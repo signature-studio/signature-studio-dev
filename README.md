@@ -23,6 +23,7 @@ FL Studio 26.1.7 をブラウザ上で完全に動作させることを目標と
    - [x] 戦略文書確定 (`analysis/strategy.md`)。技術選定・実行パイプライン・shim 12 行・マイルストーン M1〜M11・リスク/工数 (2〜4人年)・EULA 制約。プラグイン路線: プロプライエタリ製品 (Serum 2 / Massive X / OTT 最重視 / Fresh Air / Kilohearts) をデコンパイル→lifter→wasm 化して同梱
 3. [ ] webstudio リポジトリへの段階的実装
    - [x] 最小ハーネス雛形: Vite + 全画面 Canvas + AudioWorklet (128f) + SharedArrayBuffer リングバッファ、COOP/COEP 有効化。`pnpm dev` / `pnpm build` 検証済 (commit ff5d727)
+   - [x] M1: 極小 PE→wasm PoC の自動化 (`tools/m1/m1.sh`)。ELF/PE32+ → RetDec → main 抽出 → emcc (定型フラグ) → wasm → node 出力一致を 1 コマンドで検証・再生産可能化 (`tools/m1/README.md`)
 
 ## 開発
 
