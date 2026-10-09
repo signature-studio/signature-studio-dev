@@ -6,11 +6,21 @@ cd "$HERE"
 source ../m1/flags.sh
 source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1
 
-# m5 gauges: __asm_* helpers
-MSIMD_SRC=""
-if [ -f ../m5/msimd.c ]; then
-  MSIMD_SRC=../m5/msimd.c
+# m6 helpers: __asm_* 完全版 (msimd6.c; 空だった msimd6_core.h は M6b で補完済)
+MSIMD_SRC=msimd6.c
+if [ ! -f "$MSIMD_SRC" ]; then
+  echo "[m6_build] FATAL: msimd6.c 未生成 (python3 gen_msimd6.py 先行実行)" >&2
+  exit 1
 fi
+
+# IR define 置換: 破損 lift (i256 helper + 0-arg 内部 call) の CRT memmove/memset
+# を C 実装 (m6_rt.c) に outcall させる。これで i256 系未解決 import も消える。
+# + full lift 抽出 (closure declare-only だった実体関数を full_t1.drc.ll から splice):
+#   function_1801260c0 系 (=TrapSVF init block, t1 経路) / 180120d10 (getParameter 経路) 等
+python3 m6_memfix.py work/ott_shift3b.ll work/ott_memfix0.ll
+EXTRACT_TARGETS="function_1801260c0 function_180126030 function_180126010"
+python3 m6_full_extract.py work/ott_memfix1.ll $EXTRACT_TARGETS
+IR_SRC=work/ott_memfix1.ll
 
 STACK=8MB
 GLOBAL_BASE=268435456          # 256MB
@@ -18,7 +28,7 @@ INITMEM="$((0x36000000))"      # 864MB
 MAXMEM="$((0x36000000))"
 
 emcc $MSIMD_SRC work/m6_stubs.c work/m6_data.c ../shim/src/heap.c ../shim/src/failfast.c m6_rt.c work/m6_stubs_hand.c work/m6_stubs_hand2.c \
-  work/ott_shift3b.ll \
+  $IR_SRC \
   -o work/ott_test.cjs.tmp \
   -w -Wno-error=int-conversion -Wno-implicit-function-declaration \
   -O0 -g1 -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=$STACK -sGLOBAL_BASE=$GLOBAL_BASE \

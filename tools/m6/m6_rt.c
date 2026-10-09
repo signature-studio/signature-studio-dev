@@ -63,11 +63,13 @@ long long function_1801a30b0(long long dst, long long ch, long long n) {
     }
     return dst;
 }
-long long function_1801a3ad0(long long dst, long long ch, long long n) {
-    if (n > 0 && n < 0x8000000LL && dst > 0) {
-        memset((void*)(uintptr_t)dst, (int)(ch & 0xff), (size_t)n);
-    }
-    return dst;
+/* function_1801a3ad0 — 宣言上は (i64,i64) の 2 引数 (function_1801c2674 から
+ *   (ptr, 101) で call; 実体は strnlen 相当 byte-scan の可能性, closure 部分リフト
+ *   では引数解析が破損)。DSP 経路外 → 到達時 fail-fast (signemature 一致のみ必須)。 */
+long long function_1801a3ad0(long long a, long long b) {
+    (void)a; (void)b;
+    m6_failmsg("function_1801a3ad0 called (CRT str scan; DSP 経路未解析)");
+    return 0;
 }
 
 /* jmp-style dispatch 実体: function_1801d2750 (memcpymm 汎用; uintptr NULL etc 排除):
@@ -80,11 +82,34 @@ long long function_1801d2750(long long dst, long long src, long long n, long lon
     return 0;
 }
 
+/* ---------- M6b: CRT memmove/memset の C 実装化 (m6_memfix.py が IR define を
+ * 取り除き, IR 呼出 site がこの実装へ outcall する) ----------
+ * IR 呼出 site 実測:
+ *   function_1801a2a20(a1, a2, a3, a4): 本体が `store a1→rcx, a2→rdx; n=a3` で
+ *     32B ループを走る (ltr: rcx=dst, rdx=src, r8=n) → memmove(dst=a1, src=a2, n=a3)。
+ *     IR 本体は i256 系 helper (C ABI 一致不可) と 0-arg 内部 call を残す破損 lift。
+ *   function_1801a30d0(a1, a2, a3): 本体が `value=urem a2,256 → movq/punpcklbw で
+ *     16B broadcast` を 129B 以上の n=a3 に走らせる (rcx=dst) → memset(a1, a2&0xff, a3)。 */
+long long function_1801a2a20(long long dst, long long src, long long n, long long unused4) {
+    if (n > 0) {
+        if (dst <= 0 || src < 0 || n > 0x8000000LL) m6_failmsg("memmove (function_1801a2a20): bad range");
+        memmove((void*)(uintptr_t)dst, (void*)(uintptr_t)src, (size_t)n);
+    }
+    return dst;
+}
+long long function_1801a30d0(long long dst, int value, long long n) {
+    if (n > 0) {
+        if (dst <= 0 || n > 0x8000000LL) m6_failmsg("memset (function_1801a30d0): bad range");
+        memset((void*)(uintptr_t)dst, (int)(value & 0xff), (size_t)n);
+    }
+    return dst;
+}
+
 
 
 
 /* ---------- 未対応系 (fail-fast) ---------- */
-void function_18003c0丫1(void) {}
+void function_18003c0f1(void) {}
 /* ---- Windows API stubs ---- */
 
 
