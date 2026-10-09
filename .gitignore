@@ -1,0 +1,7 @@
+node_modules/
+dist/
+build/
+*.wasm.cache
+.DS_Store
+coverage/
+.vite/
