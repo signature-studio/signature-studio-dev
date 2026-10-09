@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# M6 build: ott_shift.ll → wasm (.cjs) — RetDec lift + m6 data + m6 stubs
+set -euo pipefail
+HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
+cd "$HERE"
+source ../m1/flags.sh
+source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1
+
+# m5 gauges: __asm_* helpers
+MSIMD_SRC=""
+if [ -f ../m5/msimd.c ]; then
+  MSIMD_SRC=../m5/msimd.c
+fi
+
+STACK=8MB
+GLOBAL_BASE=268435456          # 256MB
+INITMEM="$((0x36000000))"      # 864MB
+MAXMEM="$((0x36000000))"
+
+emcc $MSIMD_SRC work/m6_stubs.c work/m6_data.c ../shim/src/heap.c ../shim/src/failfast.c m6_rt.c \
+  work/ott_shift3b.ll \
+  -o work/ott_test.cjs.tmp \
+  -w -Wno-error=int-conversion -Wno-implicit-function-declaration \
+  -O0 -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=$STACK -sGLOBAL_BASE=$GLOBAL_BASE \
+  -sENVIRONMENT=node -sMODULARIZE=1 -sEXPORT_NAME=createModule \
+  -sERROR_ON_UNDEFINED_SYMBOLS=0 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sEXPORTED_FUNCTIONS=_function_18000a7c0,_function_180010cb0,_function_180014440,_function_18002d200,_function_1800a9150,_function_18011c9f0,_function_18011cc90,_function_18011d400,_function_18011de50,_function_18011e250,_function_18011e5a0,_function_18011e770,_function_18011e7b0,_function_18011e820,_function_18011eae0,_function_18011eaf0,_function_18011ebb0,_function_18011ec20,_function_180120800,_function_180120af0,_function_180120d10,_function_180125fe0,_function_180126010,_function_180126030,_function_180126040,_function_1801260c0,_function_180126130,_function_1801263f0,_function_1801264e0,_function_180126670,_function_180126920,_function_180126b30,_function_180126b50,_function_180127550,_function_18019e6e0,_function_1801a0390,_function_1801a04d0,_function_1801a0640,_function_1801a06b0,_function_1801a08a4,_function_1801a14f0,_function_1801a1cb0,_function_1801a2a00,_function_1801a2a20,_function_1801a30b0,_function_1801a30d0,_function_1801a3200,_function_1801a3210,_function_1801a3218,_function_1801a3220,_function_1801a3230,_function_1801a323c,_function_1801a3240,_function_1801a3250,_function_1801a3258,_function_1801a3ad0,_function_1801a7778,_function_1801a7794,_function_1801a9a6c,_function_1801a9b38,_function_1801a9be0,_function_1801aa1a0,_function_1801aa378,_function_1801aa4dc,_function_1801aa58c,_function_1801aa5dc,_function_1801aa624,_function_1801aad50,_function_1801ab128,_function_1801ab1d0,_function_1801ab258,_function_1801ab2e8,_function_1801ab3ec,_function_1801ab520,_function_1801ab5c0,_function_1801ab638,_function_1801ab6dc,_function_1801abd0c,_function_1801abdf0,_function_1801abf3c,_function_1801ac21c,_function_1801ac710,_function_1801ac778,_function_1801ac7ec,_function_1801ac9a8,_function_1801aca70,_function_1801acbf0,_function_1801acc78,_function_1801acd10,_function_1801acdac,_function_1801ad050,_function_1801ad148,_function_1801add44,_function_1801aea0c,_function_1801b1db0,_function_1801b21e4,_function_1801b4154,_function_1801b4220,_function_1801b4600,_function_1801b4610,_function_1801b4900,_function_1801b4e30,_function_1801b5590,_function_1801b5648,_function_1801b5654,_function_1801b5b08,_function_1801b9e18,_function_1801b9e88,_function_1801ba860,_function_1801baef8,_function_1801baf40,_function_1801baf90,_function_1801bafb0,_function_1801bb328,_function_1801bc754,_function_1801bc890,_function_1801be5a8,_function_1801be668,_function_1801be6bc,_function_1801bea2c,_function_1801bf304,_function_1801bf454,_function_1801bf634,_function_1801bf664,_function_1801bfab4,_function_1801c0a68,_function_1801c0ac8,_function_1801c0af4,_function_1801c0b6c,_function_1801c0bac,_function_1801c0d00,_function_1801c1050,_function_1801c1240,_function_1801c1438,_function_1801c144c,_function_1801c1460,_function_1801c14c8,_function_1801c1584,_function_1801c16ac,_function_1801c17e0,_function_1801c17fc,_function_1801c1934,_function_1801c1ac0,_function_1801c1ae0,_function_1801c1b5c,_function_1801c1b7c,_function_1801c1b90,_function_1801c1c10,_function_1801c1cb8,_function_1801c1ea0,_function_1801c1f4c,_function_1801c20c8,_function_1801c2260,_function_1801c2294,_function_1801c24d0,_function_1801c24d8,_function_1801c2674,_function_1801c29f4,_function_1801c2ae4,_function_1801c2cb8,_function_1801c2e20,_function_1801c2f68,_function_1801c3080,_function_1801c33b8,_function_1801c33e0,_function_1801c33f8,_function_1801c3440,_function_1801c3508,_function_1801c38c8,_function_1801c3d80,_function_1801c3dc8,_function_1801c4500,_function_1801c4d00,_function_1801c4d28,_function_1801c5038,_function_1801c5064,_function_1801c53d4,_function_1801c54dc,_function_1801c54f0,_function_1801c5b30,_function_1801c5e84,_function_1801c621c,_function_1801c65b4,_function_1801c6744,_function_1801c67a0,_function_1801c682c,_function_1801c69cc,_function_1801c6a04,_function_1801c6a2c,_function_1801c6ad4,_function_1801c6b44,_function_1801c721c,_function_1801c7334,_function_1801c8a80,_function_1801c8bc0,_function_1801c8be0,_function_1801c8c00,_function_1801c91cc,_function_1801c96b8,_function_1801c97bc,_function_1801c98d8,_function_1801c9a48,_function_1801c9b34,_function_1801caf70,_function_1801caf80,_function_1801caf8a,_function_1801cb82c,_function_1801cba40,_function_1801cbb28,_function_1801cc1ec,_function_1801cc364,_function_1801cc3ac,_function_1801cc3fc,_function_1801ce35c,_function_1801ce384,_function_1801ce3f0,_function_1801ce400,_function_1801ce4bc,_function_1801ce618,_function_1801cf85c,_function_1801cfa60,_function_1801cfa6c,_function_1801cfb60,_function_1801cfbb4,_function_1801cfcfc,_function_1801d070c,_function_1801d1194,_function_1801d1f9c,_function_1801d2000,_function_1801d2020,_function_1801d206c,_function_1801d20bc,_function_1801d212c,_function_1801d2750 -sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAPF32,HEAP32,HEAPF64,HEAPU32,HEAP64 --no-entry \
+  -Wl,--no-gc-sections \
+  -Wl,--initial-memory=$INITMEM \
+  -Wl,--max-memory=$MAXMEM
+mv work/ott_test.cjs.tmp work/ott_test.cjs
+echo "[build] OK: work/ott_test.cjs + work/ott_test.wasm"

@@ -185,7 +185,7 @@ delphi_mac_scan.py の走査で確認できた (mac 側 §5.7 観点は未実測
      関数集合の自動リスト (`delphi_candidates.json`), M3 pass の呼出置換入答。**§3 #7 の heap shim に結合**。
    - *(c) SEH: RetDec が try-finally を IR に残さないため、
      `unwind` flags 付き関数 (UHANDLER 8,021 / E+U 2,816) の IR は
-     **EH スタブ化 (catch 無視) + `__asm` helper 置き換え** を第一手とする (M5 Mini-PoC (c) 判定可変し振り暫定)。
+     **EH スタブ化 (unwind 無効化) を第一手とする**方向が実測で強まった (M5 Mini-PoC (c) の判定入力)。
    - *(d) RTTI/VMT fixed field 読み* (`-0x70/-0xa8 等`) は原形のまま残るので、
      Delphi RTL 補正 (class 表) の名付け pass は **加算可能 (数式から決まる構造)**。
 2. **M5 Delphi Mini-PoC (a)(b)(c) の素材が揃った**: (a) = EasyFLAC モジュール (DSP/C library
