@@ -27,8 +27,9 @@ FL Studio 26.1.7 をブラウザ上で完全に動作させることを目標と
    - [x] wasm ローダ glue: `src/runtime/loader.ts` (fail-fast import フォワーダ `src/runtime/imports.ts` 付き)。`pnpm typecheck`/`pnpm build` + node スモーク (M1 wasm をロードし出力照合) 検証済 (commit fe2f442)
    - [x] M2: FLEngine 解析の機械化 (`tools/m2/m2.sh`)。mac x86_64 スライス抽出 (31,637,920B / `__text` 17,656,574B)、関数境界合意検証 (win: Ghidra 59,009 vs .pdata 57,816 → delta 2.02%、mac: LC_FUNCTION_STARTS 99.5% Jaccard)、Delphi 品質インベントリ生成 (`delphi_inventory.py`, VMT/RTTI/FastMM/SEH)、shim 自動照合 (`SHIM_INVENTORY.md`)。EasyFLAC `_FLAC__crc8` (299KB → wasm) は **bit-exact 6/6**、RetDec による Delphi (embarcadero 36.0) 検知確認 (`tools/m2/REPORT.md`, commit 7e72717)
    - [ ] M3: 中規模 lifting → wasm **(部分達成)**: 純計算 4 関数 (EasyFLAC) を bit-exact **50/50** で wasm 化 (`tools/m3/m3.sh`)、性能比記録済 (同一 IR native vs wasm: crc8 1.44x / crc16 1.33x, 10x 未満)。中規模 Delphi closure (677 関数) は RetDec 産 constexpr 残存 (`ft7.ll:4281`) で emcc 未通過 — **A9 命令化 lift が次の要 IR pass** (`tools/m3/REPORT.md`, commit 7afa0fd)
-   - [ ] M5: FLEngine 部分 wasm 起動 (オーディオなし)。Delphi Mini-PoC (DSP/FastMM/try-finally) と M4 shim コア結合 — try-finally 実測は M3 残課題から引継ぎ (`tools/docs/MILESTONES.md`)
+   - [ ] M5: Delphi Mini-PoC **(部分達成)**: 純計算 2 関数 (waveshaper/distortion) の lift IR→wasm が実機 x86 機械語と **bit-exact (8/8)**、FastMM lift を shim heap に結合し alloc/free 1,000/1,000・double-free fail-fast 検知・underflow リーク検知を実証。A9 命令化 pass で Delphi closure 677 関数の constexpr 残存 187→**2**件に圧縮し **677 関数 closure 全体が emcc 通過**。try-finally lift 実測は finally 経路整合 (ParamCount off-by-one は既知課題) (`tools/m5/REPORT.md`, commit 4aa68a2)
    - [x] M4: Win32 shim コア `tools/shim/` (timer/file/thread/heap, fail-fast)。53 export API を MT(pthread)/ST 両ビルドで node 単体テスト全 PASS (4スレッド×10k 排他/TLS 分離/byte-faithful file I/O 検証済, commit 1c49c61)
+   - [ ] M6: プラグイン路線 PoC — OTT (Xfer) を lifter→wasm 化 (素材受領済み, `analysis/plugins/ott/REPORT.md` VST2/VST3/AAX/AU 抽出・DSPコア~20KB 評価済み)
 
 ## 開発
 

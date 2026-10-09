@@ -1,6 +1,6 @@
 # MILESTONES.md — マイルストーン状態表 (全 11 段)
 
-最終更新: 2026-10-09 (M3 成果物の独立検証コミット時点, HEAD=3f71131 ベース)
+最終更新: 2026-10-10 (M5 成果物の独立検証コミット時点, HEAD=4aa68a2 ベース)
 定義元: `analysis/strategy.md` §4 (全 11 段 — 判定原則: 各段の完了条件が満たされたとき次段へ)
 
 | 段 | 状態 | 実測 / 証拠 |
@@ -9,8 +9,8 @@
 | M2 | [x] 完了 | FLEngine 解析の機械化。mac x86_64 slice 抽出 **31,637,920B** (`__text` 17,656,574B)、関数境界合意 **Ghidra 59,009 vs .pdata 57,816 → delta 2.02%** (mac: LC_FUNCTION_STARTS 99.5% Jaccard)、EasyFLAC `_FLAC__crc8` wasm 化 **bit-exact 6/6**、Delphi 品質インベントリ + shim 照合 (`tools/m2/REPORT.md`) |
 | M3 | [ ] 部分達成 | 純計算 4 関数 (`_FLAC__crc8` / `_FLAC__crc16` / `_FLAC__bitmath_silog2` / `_FLAC__bitmath_extra_mulbits_unsigned`, EasyFLAC slice 由来) の wasm 化は **bit-exact 50/50 PASS** (`bash tools/m3/m3.sh`, exit=0)。性能比記録済: 同一 lifted IR native(-O2) vs wasm/node = **crc8 1.44x / crc16 1.33x** (10x 未満 → route 再評価は不要; silog2+mulbits は i64 FFI BigInt オーバーヘッド支配で約 36x — 本体計算の指標ではない)。**未達**: (1) 中規模 dylib 丸ごと wasm 動作 — FastMM/Delphi closure 677 関数 IR は ft7.ll:4281 (constexpr 残存 187 件) で emcc コンパイル未通過、(2) lift-down IR pass 1 本 + 性能影の定量化、(3) Delphi try-finally 実測、(4) VMT 間接呼の lift 欠落 (M2 既知 (d) 同型) の対策確認 (`tools/m3/REPORT.md`) |
 | M4 | [x] 完了 | Win32 shim コア `tools/shim/` (timer/file/thread/heap, fail-fast)。**53 export API** を MT(pthread)/ST 両ビルドで **node 単体テスト 5/5 PASS** (4 スレッド×10k 排他 / TLS 分離 / byte-faithful file I/O 検証済)。shim 未対応要求の fail-fast 動作も実装 |
-| M5 | [ ] 未着手 | FLEngine 部分的 wasm 起動 (オーディオ無し) + Delphi Mini-PoC (DSP 純計算 1 本 / FastMM 1 本 / try-finally 1 本) — M3 の Delphi 側未解決事項がそのまま M5 突入判定の前提に入る |
-| M6 | [ ] 未着手 | プラグイン路線 PoC — OTT (Xfer) を lifter→wasm 化 + FL wasm ホスト経由エフェクト検証 (素材はユーザ配置待ち) |
+| M5 | [ ] 部分達成 | Delphi Mini-PoC: 純計算 2 関数 (waveshaper/distortion) lift IR→wasm が実機 x86 機械語と **bit-exact 8/8** (`m5_compare.mjs`)。FastMM×shim heap 結合 **3/3 PASS** (alloc/free 1,000/1,000・double-free fail-fast・underflow リーク検知)。A9 命令化 lift で mm closure 677 関数の constexpr 残存 **187→2** 件 (合法 inttoptr×2) になり **emcc 通過 + node instantiate 成功**。try-finally (0x409fe0) は finally 経路整合まで達成、ParamCount off-by-one が既知課題 (`tools/m5/REPORT.md`, commit 4aa68a2)。未達: FLEngine 部分的 wasm 起動 (オーディオなし) 全体 |
+| M6 | [ ] 未着手 | プラグイン路線 PoC — OTT (Xfer) を lifter→wasm 化 (素材: `~/ダウンロード` Install_Xfer_OTT_137.{dmg,exe}, 前置解析 `analysis/plugins/ott/REPORT.md` 完成: VST2 win64 正本, DSPコア~20KB) |
 | M7 | [ ] 未着手 | GUI フレーム転送 → 操作可能 HUD (SAB → OffscreenCanvas/WebGL2, 30fps 以上) |
 | M8 | [ ] 未着手 | オーディオパス (AudioWorklet + SAB ring, 128f master, underrun-free) |
 | M9 | [ ] 未着手 | プロジェクト入出力 (.flp) + FL 純正プラグイン 1 個 in-process 動作 |
