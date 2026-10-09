@@ -29,7 +29,7 @@ FL Studio 26.1.7 をブラウザ上で完全に動作させることを目標と
    - [ ] M3: 中規模 lifting → wasm **(部分達成)**: 純計算 4 関数 (EasyFLAC) を bit-exact **50/50** で wasm 化 (`tools/m3/m3.sh`)、性能比記録済 (同一 IR native vs wasm: crc8 1.44x / crc16 1.33x, 10x 未満)。中規模 Delphi closure (677 関数) は RetDec 産 constexpr 残存 (`ft7.ll:4281`) で emcc 未通過 — **A9 命令化 lift が次の要 IR pass** (`tools/m3/REPORT.md`, commit 7afa0fd)
    - [ ] M5: Delphi Mini-PoC **(部分達成)**: 純計算 2 関数 (waveshaper/distortion) の lift IR→wasm が実機 x86 機械語と **bit-exact (8/8)**、FastMM lift を shim heap に結合し alloc/free 1,000/1,000・double-free fail-fast 検知・underflow リーク検知を実証。A9 命令化 pass で Delphi closure 677 関数の constexpr 残存 187→**2**件に圧縮し **677 関数 closure 全体が emcc 通過**。try-finally lift 実測は finally 経路整合 (ParamCount off-by-one は既知課題) (`tools/m5/REPORT.md`, commit 4aa68a2)
    - [x] M4: Win32 shim コア `tools/shim/` (timer/file/thread/heap, fail-fast)。53 export API を MT(pthread)/ST 両ビルドで node 単体テスト全 PASS (4スレッド×10k 排他/TLS 分離/byte-faithful file I/O 検証済, commit 1c49c61)
-   - [ ] M6: プラグイン路線 PoC — OTT (Xfer) を lifter→wasm 化 (素材受領済み, `analysis/plugins/ott/REPORT.md` VST2/VST3/AAX/AU 抽出・DSPコア~20KB 評価済み)
+   - [ ] M6: プラグイン路線 PoC — OTT (Xfer) VST2 win64 DSP クロージャ 166 関数の RetDec lift→IR pass (**部分達成**, commit 2607a2e): ir5 継承 pass (A9 残存 5 件) + comis 修復 18 + VA remap 38 + DLL 実データ化 global 400 件を経て **emcc ビルド通過** (wasm 825KB / 関数 533)。実行検証は未達 — m6 helper 156 種の `msimd6_core.h` が空のため `__asm_*` 署名不一致 12 種 → lld が unreachable stub を生成し ctor 即 trap。**helper 接続が次の最優先課題**。m6.sh 1 コマンド E2E 化は M7 引継。(`tools/m6/REPORT.md`)
 
 ## 開発
 
