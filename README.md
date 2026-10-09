@@ -25,7 +25,9 @@ FL Studio 26.1.7 をブラウザ上で完全に動作させることを目標と
    - [x] 最小ハーネス雛形: Vite + 全画面 Canvas + AudioWorklet (128f) + SharedArrayBuffer リングバッファ、COOP/COEP 有効化。`pnpm dev` / `pnpm build` 検証済 (commit ff5d727)
    - [x] M1: 極小 PE→wasm PoC の自動化 (`tools/m1/m1.sh`)。ELF/PE32+ → RetDec → main 抽出 → emcc (定型フラグ) → wasm → node 出力一致を 1 コマンドで検証・再生産可能化 (`tools/m1/README.md`)
    - [x] wasm ローダ glue: `src/runtime/loader.ts` (fail-fast import フォワーダ `src/runtime/imports.ts` 付き)。`pnpm typecheck`/`pnpm build` + node スモーク (M1 wasm をロードし出力照合) 検証済 (commit fe2f442)
-   - [ ] M2: mac slice 抽出 + 関数境界合意検証 + Delphi 品質確認 (`tools/m2/`) — 進行中
+   - [x] M2: FLEngine 解析の機械化 (`tools/m2/m2.sh`)。mac x86_64 スライス抽出 (31,637,920B / `__text` 17,656,574B)、関数境界合意検証 (win: Ghidra 59,009 vs .pdata 57,816 → delta 2.02%、mac: LC_FUNCTION_STARTS 99.5% Jaccard)、Delphi 品質インベントリ生成 (`delphi_inventory.py`, VMT/RTTI/FastMM/SEH)、shim 自動照合 (`SHIM_INVENTORY.md`)。EasyFLAC `_FLAC__crc8` (299KB → wasm) は **bit-exact 6/6**、RetDec による Delphi (embarcadero 36.0) 検知確認 (`tools/m2/REPORT.md`, commit 7e72717)
+   - [ ] M3: 中規模 lifting → wasm (bit-exact 照合 + 性能比記録)
+   - [ ] M5: FLEngine 部分 wasm 起動 (オーディオなし)。Delphi Mini-PoC (DSP/FastMM/try-finally) と M4 shim コア結合
    - [x] M4: Win32 shim コア `tools/shim/` (timer/file/thread/heap, fail-fast)。53 export API を MT(pthread)/ST 両ビルドで node 単体テスト全 PASS (4スレッド×10k 排他/TLS 分離/byte-faithful file I/O 検証済, commit 1c49c61)
 
 ## 開発
