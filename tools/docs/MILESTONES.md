@@ -1,4 +1,4 @@
-# MILESTONES.md — マイルストーン状態表 (全 11 段)
+# MILESTONES.md — マイルストーン状態表 (全 12 段)
 
 最終更新: 2026-10-10 (M6 成果物の独立検証コミット時点, HEAD=2607a2e ベース)
 定義元: `analysis/strategy.md` §4 (全 11 段 — 判定原則: 各段の完了条件が満たされたとき次段へ)
@@ -16,6 +16,7 @@
 | M9 | [ ] 未着手 | プロジェクト入出力 (.flp) + FL 純正プラグイン 1 個 in-process 動作 |
 | M10 | [ ] 未着手 | 性能・安定性チューニング (SIMD, memory growth, GC 緩和) |
 | M11 | [ ] 未着手 | E2E 統合 + FL 追従プロセス + EULA/非再配布運用固定化 |
+| M12 | [ ] 未着手 | ホストデプロイ + `agent-browser` による E2E 検証 — R2+Workers (COOP/COEP ヘッダ注入 → SAB 有効) + Cloudflare Access 保護。「URL を開くと FL が立ち上がる」を自動検証。GitHub Pages はヘッダ設定不可ゆえ不採用 |
 
 ## 各段の検証条件と実測 (要点)
 

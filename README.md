@@ -31,6 +31,13 @@ FL Studio 26.1.7 をブラウザ上で完全に動作させることを目標と
    - [x] M4: Win32 shim コア `tools/shim/` (timer/file/thread/heap, fail-fast)。53 export API を MT(pthread)/ST 両ビルドで node 単体テスト全 PASS (4スレッド×10k 排他/TLS 分離/byte-faithful file I/O 検証済, commit 1c49c61)
    - [ ] M6: プラグイン路線 PoC — OTT (Xfer) VST2 win64 DSP クロージャ 166 関数の RetDec lift→IR pass (**部分達成**, commit 2607a2e): ir5 継承 pass (A9 残存 5 件) + comis 修復 18 + VA remap 38 + DLL 実データ化 global 400 件を経て **emcc ビルド通過** (wasm 825KB / 関数 533)。実行検証は未達 — m6 helper 156 種の `msimd6_core.h` が空のため `__asm_*` 署名不一致 12 種 → lld が unreachable stub を生成し ctor 即 trap。**helper 接続が次の最優先課題**。m6.sh 1 コマンド E2E 化は M7 引継。(`tools/m6/REPORT.md`)
 
+## デプロイと E2E 検証 (指揮要件)
+
+- **目標**: 任意のホスト URL を開くと FL が立ち上がる状態。E2E 検証は `agent-browser` で自動化する (メインセッションの指揮範囲に含む)。
+- **ホスティング**: Cloudflare R2 + Workers (`cf` / `bunx wrangler` 導入済み)。Cloudflare Access による保護を前提とする。
+- **Secure Context の制約** (GitHub Pages 不採用の根拠): SharedArrayBuffer は cross-origin isolation (COOP/COEP レスポンスヘッダ) が必須。GitHub Pages はカスタムヘッダを設定できないため SAB が無効化される。→ Workers 側で COOP/COEP ヘッダを注入し、R2 から配信する構成を採る。
+- 実配信はアプリが動作する段階 (M7 以降) で着手。先行の Node/ローダ検証はローカルで継続。
+
 ## 開発
 
 ```sh
