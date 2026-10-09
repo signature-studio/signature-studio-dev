@@ -17,11 +17,12 @@ FL Studio 26.1.7 をブラウザ上で完全に動作させることを目標と
 1. [ ] FL Studio 26.1.7 インストーラ解析 (win64 exe / mac dmg)
    - [x] mac dmg: 展開→分析完了 (`analysis/mac/REPORT.md`)。核心は `FLEngine_x64.dylib` (64MB, universal2)
    - [ ] win64 exe: NSIS系インストーラを作成ツールで抽出中 (`analysis/win64/REPORT.md`)
-2. [ ] ブラウザ実行戦略の設計と技術選定 (shim 一覧付き)
+2. [x] ブラウザ実行戦略の設計と技術選定 (shim 一覧付き)
    - [x] 調査完了 (`analysis/strategy_survey.md`)。lifter (RetDec/mcsema) → LLVM IR → wasm が現実解
    - [x] ツールチェイン整備 + E2E PoC 成功 (`analysis/toolchain_setup.md`)。x64 ELF / x86_64 PE → RetDec → emcc → wasm で出力一致
-   - [ ] 戦略文書 (選定理由・制約・リスク・shim一覧) の確定
+   - [x] 戦略文書確定 (`analysis/strategy.md`)。技術選定・実行パイプライン・shim 12 行・マイルストーン M1〜M11・リスク/工数 (2〜4人年)・EULA 制約。プラグイン路線: プロプライエタリ製品 (Serum 2 / Massive X / OTT 最重視 / Fresh Air / Kilohearts) をデコンパイル→lifter→wasm 化して同梱
 3. [ ] webstudio リポジトリへの段階的実装
+   - [x] 最小ハーネス雛形: Vite + 全画面 Canvas + AudioWorklet (128f) + SharedArrayBuffer リングバッファ、COOP/COEP 有効化。`pnpm dev` / `pnpm build` 検証済 (commit ff5d727)
 
 ## 開発
 
