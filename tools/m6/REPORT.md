@@ -2,7 +2,8 @@
 
 - 日付: 2026-10-10。HEAD 基点: 901ce24。**M6b (2026-10-10 追記)**: SIMD helper 接続
   (msimd6_core.h 補完) / wasm-ld signature mismatch 12→0 / t1 run-complete / t3 mem 照合
-  / trap_test arg/BigInt 7 件解消。HEAD 基点 commit 2607a2e 時点から M6b 継续分を追記。
+  / trap_test probe 引数是正 7 件 (うち 6 件 OK, c91cc は broken-lift OOB で FAIL)。
+  HEAD 基点 commit 2607a2e 時点から M6b 継续分を追記。
 - 本 REPORT は M6 成果物 (tools/m6/, work/ を除く) に対する独立検証の実行結果を含む。
 - 検証環境: node v26.10.0 / emcc 6.0.12 / Python 3.14.8 / RetDec (lift) / wabt (wasm-objdump, wasm2wat)。
 - README (repo root) 掲示候補文言:
@@ -95,7 +96,9 @@ DLL の PE 実データを VA 一致で wasm 線形メモリに敷設し、OTT D
   - emcc 6.0.12、STACK=8MB、GLOBAL_BASE=256MB、initial/max memory=0x36000000 (864MB)、
     `-sERROR_ON_UNDEFINED_SYMBOLS=0`、`-sEXPORTED_FUNCTIONS` は closure 関数群の全エクスポート。
   - **`warning: undefined symbol`: 57 種** (整数 33 種 = closure 外 CRT 関数 + Win API 24 種。
-    旧 218 種から大幅減。内訳: `__asm_*` helper 由来 0 種、`function_1801*` 33 種)。
+    旧 218 種から大幅減。内訳 (本検証 2026-10-10 再現値): `__asm_*` helper 由来 0 種、
+    `function_1801*` 30 種 + `function_1800*` 3 種 = closure 外関数参照 33 種、
+    Win/CRT API 24 種 (CloseHandle 等 + `__readgsqword`)。
   - **`wasm-ld: function signature mismatch`: 0 種** (旧 12 種 → M6b で 0)。
     検収: `python3 m6_simd_check.py work/ott_memfix1.ll msimd6.c` → declare / 定義 / 呼出 site
     3 重照合 mismatch 0。
@@ -148,7 +151,10 @@ DLL の PE 実データを VA 一致で wasm 線形メモリに敷設し、OTT D
 - 結果: **run complete** (旧: ctor 最初の `__asm_movaps` 呼出で wasm trap)。
   `t1_out.hex` 512 行生成、再実行 determinism OK (2 run bit 一致)。
   - helper fail-fast (`__asm_cmplesd` など) 0、memory OOB 0、trap 0。
-  - processReplacing は DSP 数値としては**未正解** (out 値に 2e21 級の発散あり)。
+  - processReplacing は DSP 数値としては**未正解**。出力 (t1_out.hex) の実測は
+    9 種 unival (0x00000000, 0x00000080, 0x19DEE8xx 系列 7 種, 0xB194C940) に集約され、
+    f32 解釈では denormal〜約 4.3e-9 の微小値のみ (正常 DSP スケール ~1.0 から
+    懸け離れた無音近似状態; f32 引数閉流による setParameter 値欠落 + (ii) に整合)。
     根因は (i) f32 引数閉流 (ii) cpu feature 系 hand stub 迂回 — bit-exact 判定
     512/512 は未達 (§6-(b-4), §7-5)。本 build で解決した「実行が trap せず
     processReplacing まで駆動する」状態が M6b の達成ライン。
@@ -159,19 +165,23 @@ DLL の PE 実データを VA 一致で wasm 線形メモリに敷設し、OTT D
   部分 lift 状態の生戻り値; 照合対象外)。
 - 敷設確認 (m6_data_install 後) — **M6b 検収値**:
   - `mem[0x30260ce0..] = 0x32 0xA2 0xDF 0x2D` (LE: **0x2DDFA232 = 769630770**)。
-    IR 側 global_var literal (i32 769630770) と m6_data install は**一致** —
-    **RetDec 型取り違え無し**。旧 t3.mjs コメントの期待値 0x2DEB8762
+    IR 側 `@global_var_30260ce0 = constant [4 x i8] c"2\a2\df-"` (LE i32 = 769630770)、
+    DLL 実データ (.data RVA 0x260ce0, ファイル展開域内) 、m6_data install の
+    **三方一致** — **RetDec 型取り違え無し**。旧 t3.mjs コメントの期待値 0x2DEB8762
     (= 769756514, f32 2.6776e-11) は誤値 (実データ照合で判明; t3.mjs は M6b で
     検収ロジックに改修, 0x2DDFA232 一致で OK exit)。
 
-### (b-3) work/trap_test.mjs — **OK 8 / FAIL 13**
+### (b-3) work/trap_test.mjs — **OK 6 / FAIL 13** (probe 22 件中 実行 19 + skip 3)
 
 - probe 引数を memfix IR declare の arity/形式に是正 (旧: 全 probe に BigInt(0
   を 1 arg で渡し 3 種が arg 数不整合・4 種が BigInt 型不定)。
 - **解消 7 件**: arg 数不整合 3 (function_1801b4610 / b4900 / b4e30 — 0-arg 定義と
   probe 1-arg で assert 死) + BigInt 型不定 4 (function_1801c6a2c (4-arg BigInt),
   c6b44 (2-arg), c8a80 (2×i64 + i32), c91cc (ptr + 3×i64))。
-  うち c6a2c / c6b44 / c8a80 / b4x3 = **OK (abort せず制御返答)**。
+  **OK 6** = c6a2c / c6b44 / c8a80 / b4610 / b4900 / b4e30 (abort せず制御返答)。
+  c91cc は引数是正後も broken-lift OOB (memory access out of bounds) で **FAIL** (§7-6)。
+- probe は 22 件定義で、うち `function_1801c78 / 1801cadd / 1801cad0` の 3 件は
+  export 無しのため harness で skip (OK / FAIL いずれにも計上しない)。
 - 残 FAIL 13 = missing 11 (意図的 fail-fast: closure 外 CRT/Win API 依存群) +
   memory OOB 2 (function_1801c69cc / c91cc — 実体 body 内で broken-lift 状の
   table base 0x180001090 定数を内部 mul/add で持つ c38c8 family に到達;
@@ -253,13 +263,16 @@ DLL の PE 実データを VA 一致で wasm 線形メモリに敷設し、OTT D
 
 ```bash
 # (a) build (m6_lift.sh は RetDec 重い; 本検証は 既設手順の build を実施)
+#   前提: work/ の RetDec lift 産物 (ott_lift.ll / ott_shift3b.ll / full_t1.drc.ll 等)
+#   および msimd6.c (生成済, commit 対象) が揃っていること。work/ は commit 対象外
+#   のため fresh checkout では m6_lift.sh + ir6 適用済み IR の再生成が先行で必要。
 bash tools/m6/m6_build.sh            # memfix → extract → emcc を 1 本で実行
 # (b) helper 整合検収 (declare / 定義 / 呼出 3 重照合; 0 mismatch が正)
 python3 tools/m6/m6_simd_check.py tools/m6/work/ott_memfix1.ll tools/m6/msimd6.c
 # (c) node 実行検証
-node tools/m6/work/t1.mjs            # OK (run complete, t1_out.hex 512 行)
+node tools/m6/work/t1.mjs            # OK (run complete, t1_out.hex 512 行; t1_out.hex は cwd 直下に書出される点に注意)
 node tools/m6/work/t3.mjs            # OK (mem 0x2DDFA232 == DLL 実データ)
-node tools/m6/work/trap_test.mjs     # OK 8 / FAIL 13 (missing 11 + broken-lift OOB 2)
+node tools/m6/work/trap_test.mjs     # OK 6 / FAIL 13 (missing 11 + broken-lift OOB 2; skip 3)
 # (d) IR pass 再現 (M5/M6 時点と同一)
 python3 tools/m6/ir6_pass.py  work/ott_lift.ll  /tmp/p1.ll
 python3 tools/m6/ir6_shift.py /tmp/p1.ll        /tmp/sh.ll
