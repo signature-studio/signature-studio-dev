@@ -1,0 +1,58 @@
+# M4 shim が提供する exported 関数一覧 (exports.txt)。
+# emcc に -sEXPORTED_FUNCTIONS=@exports.txt で渡す (各行に関数名、WASM 名は自動で _ が付く)。
+# ビルド時にここに無い名前 (typo / 削除済み) を書くとリンクエラーになるため、
+# inventory.md との照合が自動的に強制される。
+# shim 内部関数 (shim_* 除く) は後続の lifter 結合面を想定して全 entry を export する。
+GetTickCount64
+GetTickCount
+timeGetTime
+QueryPerformanceCounter
+QueryPerformanceFrequency
+Sleep
+WaitForSingleObject
+WaitForSingleObjectEx
+CreateEventW
+CreateEventA
+SetEvent
+ResetEvent
+CloseHandle
+CreateThread
+ExitThread
+GetCurrentThreadId
+InitializeCriticalSection
+InitializeCriticalSectionAndSpinCount
+EnterCriticalSection
+TryEnterCriticalSection
+LeaveCriticalSection
+DeleteCriticalSection
+MemoryBarrier
+InterlockedIncrement
+InterlockedDecrement
+InterlockedExchange
+InterlockedExchangeAdd
+TlsAlloc
+TlsFree
+TlsGetValue
+TlsSetValue
+CreateFileW
+ReadFile
+WriteFile
+SetFilePointer
+SetFilePointerEx
+SetEndOfFile
+GetFileSize
+GetFileSizeEx
+GlobalAlloc
+GlobalLock
+GlobalUnlock
+GlobalFree
+LocalAlloc
+LocalReAlloc
+LocalFree
+HeapCreate
+HeapAlloc
+HeapReAlloc
+HeapFree
+GetLastError
+SetLastError
+shim_unimplemented
