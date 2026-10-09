@@ -34,8 +34,9 @@ FL Studio 26.1.7 をブラウザ上で完全に動作させることを目標と
 ## デプロイと E2E 検証 (指揮要件)
 
 - **目標**: 任意のホスト URL を開くと FL が立ち上がる状態。E2E 検証は `agent-browser` で自動化する (メインセッションの指揮範囲に含む)。
-- **ホスティング**: Cloudflare R2 + Workers (`cf` / `bunx wrangler` 導入済み)。Cloudflare Access による保護を前提とする。
-- **Secure Context の制約** (GitHub Pages 不採用の根拠): SharedArrayBuffer は cross-origin isolation (COOP/COEP レスポンスヘッダ) が必須。GitHub Pages はカスタムヘッダを設定できないため SAB が無効化される。→ Workers 側で COOP/COEP ヘッダを注入し、R2 から配信する構成を採る。
+- **ホスティング**: **R2 バケット (カスタムドメイン, Cloudflare プロキシ) 静的直配** — egress 無課金・Worker を介さないのでリクエスト課金も発生しない。COOP/COEP はゾーンレベルの Transform Rules (HTTP レスポンスヘッダ書き換え) で注入。Cloudflare Access は R2 カスタムドメインのホスト名に対する Self-hosted App として設定可 (Worker 不要)。`cf` / `bunx wrangler` 導入済み。
+- **Workers の位置づけ**: 必須ではない。将来、動的エンドポイント (preflight / uplink 系など) が必要になった場合にのみ同一ゾーン上の別経路として追加する。静的アセットを Worker でプロキシすると (Cloudflare は Workers のエグレス帯域を課金しないものの) リクエスト課金・レスポンスサイズ上限・キャッシュ管理が別途必要になるため不採用。
+- **Secure Context の制約** (GitHub Pages 不採用の根拠): SharedArrayBuffer は cross-origin isolation (COOP/COEP レスポンスヘッダ) が必須。GitHub Pages はカスタムヘッダを設定できないため SAB が無効化される。→ R2 カスタムドメイン上で Transform Rules により COOP/COEP を注入する。
 - 実配信はアプリが動作する段階 (M7 以降) で着手。先行の Node/ローダ検証はローカルで継続。
 
 ## 開発
