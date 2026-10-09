@@ -1,6 +1,6 @@
 # MILESTONES.md — マイルストーン状態表 (全 12 段)
 
-最終更新: 2026-10-10 (M6b SIMD helper 接続 + 独立検証 48fe75f 時点, HEAD=c46bd30/48fe75f ベース)
+最終更新: 2026-10-10 (OTT 継行 subagent M7/M8 完了 — E2E 化 + value-flow 接続, HEAD=9dd2f47 ベース)
 定義元: `analysis/strategy.md` §4 (全 11 段 — 判定原則: 各段の完了条件が満たされたとき次段へ)
 
 | 段 | 状態 | 実測 / 証拠 |
@@ -10,7 +10,7 @@
 | M3 | [ ] 部分達成 | 純計算 4 関数 (`_FLAC__crc8` / `_FLAC__crc16` / `_FLAC__bitmath_silog2` / `_FLAC__bitmath_extra_mulbits_unsigned`, EasyFLAC slice 由来) の wasm 化は **bit-exact 50/50 PASS** (`bash tools/m3/m3.sh`, exit=0)。性能比記録済: 同一 lifted IR native(-O2) vs wasm/node = **crc8 1.44x / crc16 1.33x** (10x 未満 → route 再評価は不要; silog2+mulbits は i64 FFI BigInt オーバーヘッド支配で約 36x — 本体計算の指標ではない)。**未達**: (1) 中規模 dylib 丸ごと wasm 動作 — FastMM/Delphi closure 677 関数 IR は ft7.ll:4281 (constexpr 残存 187 件) で emcc コンパイル未通過、(2) lift-down IR pass 1 本 + 性能影の定量化、(3) Delphi try-finally 実測、(4) VMT 間接呼の lift 欠落 (M2 既知 (d) 同型) の対策確認 (`tools/m3/REPORT.md`) |
 | M4 | [x] 完了 | Win32 shim コア `tools/shim/` (timer/file/thread/heap, fail-fast)。**53 export API** を MT(pthread)/ST 両ビルドで **node 単体テスト 5/5 PASS** (4 スレッド×10k 排他 / TLS 分離 / byte-faithful file I/O 検証済)。shim 未対応要求の fail-fast 動作も実装 |
 | M5 | [ ] 部分達成 | Delphi Mini-PoC: 純計算 2 関数 (waveshaper/distortion) lift IR→wasm が実機 x86 機械語と **bit-exact 8/8** (`m5_compare.mjs`)。FastMM×shim heap 結合 **3/3 PASS** (alloc/free 1,000/1,000・double-free fail-fast・underflow リーク検知)。A9 命令化 lift で mm closure 677 関数の constexpr 残存 **187→2** 件 (合法 inttoptr×2) になり **emcc 通過 + node instantiate 成功**。try-finally (0x409fe0) は finally 経路整合まで達成、ParamCount off-by-one が既知課題 (`tools/m5/REPORT.md`, commit 4aa68a2)。未達: FLEngine 部分的 wasm 起動 (オーディオなし) 全体 |
-| M6 | [ ] 部分達成 | OTT DSP クロージャ wasm 化+実行検証着手 — emcc 通過 (commit 2607a2e) のち **SIMD helper 接続** (c46bd30): `msimd6_core.h` 補完 (211 行) + 宣言型駆動 153 種 helper (`m6_simd_check.py` 3 重照合 0 mismatch) で wasm-ld 署名不一致 **12→0 種** / undefined symbol **218→57 種** (`__asm_*` 由来 0)。実行検証 (独立検証 48fe75f 済): t1.mjs **run complete** (512 行, 2 回実行 determinism bit 一致)、t3.mjs **0x2DDFA232 三方照合 OK** (IR literal = DLL `.data` 実測; 旧期待値 0x2DEB8762 は誤値確定)、trap_test OK 6 / FAIL 13 (= missing 11 意図的 fail-fast + broken-lift OOB 2; 対象 7 中 6 解消)。**未達**: bit-exact 512/512 — RetDec closure lift の f32 (xmm) 引数失落 (setter 2-arg 化) は M8 必須前提、broken-lift OOB 2 (c38c8 family, ir6_shift 未対応の算術合成 base)、m6.sh 1 コマンド E2E 化 (M7 引継) (`tools/m6/REPORT.md`, commits 2607a2e→c46bd30→48fe75f) |
+| M6 | [ ] 部分達成 | OTT DSP 継行 — SIMD helper 接続 (c46bd30/48fe75f) → **1 コマンド E2E 化** `tools/m7/m6_e2e.sh` (50c4ccf, 検収 805110b) → **f32 引数接続 PoC** (`ir7_argpass.py`, m7) → **value-flow 接続** (`ir8_valueflow.py`: accessor 誤訳修復 + SVF xmm1 2-arg 化 16 callsite, `ir7_argpass_fixed.py` idx_store32 正本差分, missing 10 stub `m8_rt.c` bit-exact leaf 19/19) — commit 9dd2f47。t1 が qNaN 不応答 constant から **param/入力応答を回復** (T1SVF=1: param diffs 192 / input diffs 225)。**未達**: bit-exact 512/512 (出力スケール junk — SVF 係数 ramp 上流・obj+584 分岐他方・bit-exact 参照実装は M9 引継), broken-lift OOB 2 (c38c8 family), undefined 残 47 種 (`tools/m6/REPORT.md`, `tools/m7/`, `tools/m8/REPORT.md`) |
 | M7 | [ ] 未着手 | GUI フレーム転送 → 操作可能 HUD (SAB → OffscreenCanvas/WebGL2, 30fps 以上) |
 | M8 | [ ] 未着手 | オーディオパス (AudioWorklet + SAB ring, 128f master, underrun-free) |
 | M9 | [ ] 未着手 | プロジェクト入出力 (.flp) + FL 純正プラグイン 1 個 in-process 動作 |
@@ -52,8 +52,8 @@
 
 ### M6 (部分達成, `tools/m6/REPORT.md`, commits 2607a2e / c46bd30 / 48fe75f)
 1. OTT DSP クロージャ wasm 化 — **[部分→着手]** lift→IR pass→emcc ビルド通過 → **SIMD helper 接続** (宣言型駆動 153 種, `m6_simd_check.py` 0 mismatch) で署名不一致 12→0
-2. bit-exact / 制約内一致 — **[未]** t1 run complete 512 行・t3 三方照合 OK まで到達。f32 引数失落 (setter 2-arg 化) = M8 必須前提 ([P2] 引数接続 IR pass)
-3. 1 コマンド E2E 化 — [未] M7 引継 (build 鎖は m6_build.sh 内の memfix/extract まで内蔵済、lift 前段 m6_lift.sh も含めた直列化が必要)
+2. bit-exact / 制約内一致 — **[未→着手]** t1 run complete 512 行・t3 三方照合 OK → f32 引数接続 PoC (commits 50c4ccf : 呼出 site bits 3rd arg 化 + dsm jump table 20 case 本体再生, m7 REPORT §3) と M8 value-flow 接続 (commit 9dd2f47 : `ir8_valueflow.py` accessor 誤訳 [F1] 修復 + SVF `function_1801260c0` dropped xmm1 16 callsite 2-arg 化 [F2] + `ir7_argpass_fixed.py` idx_store32 正本差分 + missing 10 stub `m8_rt.c` bit-exact leaf 19/19)。**t1 param/入力応答を回復** (T1SVF=1: param 0.5→0.9 diffs 192 / 入力 +0.3 diffs 225, M7 まで 0/0)。**未達**: bit-exact 512/512 — 出力は巨大値 junk (SVF 係数 ramp 上流 / obj+584 路 / L-R copy 未接続) で M9 引継。検収: `bash tools/m8/m8_e2e.sh` exit 0 (undefined 57→47 種, trap8 OK 14/FAIL 5)
+3. 1 コマンド E2E 化 — **[x]** `bash tools/m7/m6_e2e.sh` (lift→pass 鎖→build→simd_check→t1/t3/trap 直列化+数値照合, signature mismatch 0 / undefined 57 種 / t1 2-run SHA 一致) — commit 50c4ccf, 検収 805110b
 
-### M7〜M11 (未着手)
-各完了条件は `analysis/strategy.md` §4 を参照。M7 (FLEngine 部分wasm起動) 突入にあたり M6b 検証完了済 — helper 接続は解消済で M7 の技術的前提は満たす。M7 範囲: m6.sh 1 コマンド E2E 化 (mismatch 0 / undefined 57 種の数値照合組込, t1_out.hex 固定パス化) を subtask 1 とし、main としては unused symbol 57 種 (Win/CRT API 24) を shim/populate で接続する段階相当前に module 結合方針を確定する。
+### M7〜M11 (状況, `analysis/strategy.md` §4)
+M6b 検証完了済 — helper 接続は解消済で FLEngine 部分wasm起動 (マイルストーン M7) の技術的前提は満たす。OTT 継行 (subagent M7/M8番号) は完了済み: 1 コマンド E2E (`tools/m7/m6_e2e.sh`), f32 引数接続 PoC, value-flow 接続 (tools/m8/)。FLEngine 起動にあたり unused symbol 47 種 (Win/CRT API 24) を shim/populate で接続する段階相当前に module 結合方針を確定する。OTT の bit-exact 完走は M9 引継 (SVF 係数 ramp 上流 obj+648… stream / setParameter chunk 接続, 出力 copy L/R 配置 → 出力スケール正常化; obj+584 (0x248) 分岐他方 = 18011efb0 per-sample path の broken point; bit-exact 参照実装; broken-lift OOB 2 = c38c8 family)。M9 引継資産: `nanring.mjs`+`msimd8_dbg.c` (NaN 出生 op 別 ring tracer), `crumbs.mjs` (label breadcrumb)。
