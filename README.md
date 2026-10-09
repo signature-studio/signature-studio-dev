@@ -14,9 +14,9 @@ FL Studio 26.1.7 をブラウザ上で完全に動作させることを目標と
 
 ## 進捗フェーズ
 
-1. [ ] FL Studio 26.1.7 インストーラ解析 (win64 exe / mac dmg)
+1. [x] FL Studio 26.1.7 インストーラ解析 (win64 exe / mac dmg)
    - [x] mac dmg: 展開→分析完了 (`analysis/mac/REPORT.md`)。核心は `FLEngine_x64.dylib` (64MB, universal2)
-   - [ ] win64 exe: NSIS系インストーラを作成ツールで抽出中 (`analysis/win64/REPORT.md`)
+   - [x] win64 exe: NSIS+Image-Line 独自拡張を自作パーサで抽出→分析完了 (`analysis/win64/REPORT.md`)。実体は `FLEngine_x64.dll` (22.27MB, Delphi)、FL64.exe は薄いランチャ
 2. [x] ブラウザ実行戦略の設計と技術選定 (shim 一覧付き)
    - [x] 調査完了 (`analysis/strategy_survey.md`)。lifter (RetDec/mcsema) → LLVM IR → wasm が現実解
    - [x] ツールチェイン整備 + E2E PoC 成功 (`analysis/toolchain_setup.md`)。x64 ELF / x86_64 PE → RetDec → emcc → wasm で出力一致
@@ -24,6 +24,9 @@ FL Studio 26.1.7 をブラウザ上で完全に動作させることを目標と
 3. [ ] webstudio リポジトリへの段階的実装
    - [x] 最小ハーネス雛形: Vite + 全画面 Canvas + AudioWorklet (128f) + SharedArrayBuffer リングバッファ、COOP/COEP 有効化。`pnpm dev` / `pnpm build` 検証済 (commit ff5d727)
    - [x] M1: 極小 PE→wasm PoC の自動化 (`tools/m1/m1.sh`)。ELF/PE32+ → RetDec → main 抽出 → emcc (定型フラグ) → wasm → node 出力一致を 1 コマンドで検証・再生産可能化 (`tools/m1/README.md`)
+   - [x] wasm ローダ glue: `src/runtime/loader.ts` (fail-fast import フォワーダ `src/runtime/imports.ts` 付き)。`pnpm typecheck`/`pnpm build` + node スモーク (M1 wasm をロードし出力照合) 検証済 (commit fe2f442)
+   - [ ] M2: mac slice 抽出 + 関数境界合意検証 + Delphi 品質確認 (`tools/m2/`) — 進行中
+   - [ ] M4: Win32 shim コア `tools/shim/` (timer/file/thread/heap, fail-fast) — 進行中
 
 ## 開発
 
