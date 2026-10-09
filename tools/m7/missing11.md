@@ -49,6 +49,8 @@ DSP 経路外と同様に扱い、M8 で export 面確認が要る。
 3. 純計算 leaf (2/4/5/7/9/10) は **bit-exact 検証可能な hand C stub** 化が可能で、
    m6_rt.c への追補と ir7_argpass (tools/m7/) と同様の「dsm 実体↔C 署名一致」
    検収フローがそのまま使える。
-4. 対応に要る新規実装量の推定: hand C stub 6 種 + no-op (raise 同型) 1 種 +
-   Win API thunk no-op 2 種 (= 9 種) — M6b の stub 規模 (~60 stub) からは小,
+4. 対応に要る新規実装量の推定: hand C stub 7 種 (#2/4/5/7/9/10/11 — うち純計算 leaf
+   4 種 #2/4/5/7 は bit-exact 検証可能) + no-op (raise 同型) 1 種 (#3) +
+   Win API thunk no-op 2 種 (#1/8) = 新規 10 種 + 既存方針 1 種 (#6, caller
+   broken-lift OOB 待ち) = 全 11 種 — M6b の stub 規模 (~60 stub) からは小,
    M8 の bit-exact 評価前に 1 作業単位として処理可 (buyer stub for OK 運用)。
