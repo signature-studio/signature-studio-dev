@@ -22,6 +22,7 @@
 import argparse
 import csv
 import json
+import re
 import sys
 
 
@@ -73,6 +74,27 @@ def load_retdec(path):
     return out
 
 
+def load_retdec_dsm(path, shift):
+    """retdec dsm の '; function: ... at 0x.. -- 0x..' ラベルから境界集合を取る。
+
+    shift: VA→RVA 変換 (win DLL は 0x400000 減算, mac slice は 0)。
+    """
+    if shift is None:
+        shift = -0x400000
+    pat = re.compile(r"; function: (\S+) at (0x[0-9a-f]+) -- (0x[0-9a-f]+)")
+    out = {}
+    with open(path, errors="replace") as fh:
+        for line in fh:
+            m = pat.match(line)
+            if m:
+                s = int(m.group(2), 16) + shift
+                e = int(m.group(3), 16) + shift
+                if s in out:
+                    continue
+                out[s] = e
+    return out
+
+
 def load_ground(path, kind):
     out = {}
     if kind == "win":
@@ -97,6 +119,12 @@ def main():
     ap.add_argument("--label", required=True)
     ap.add_argument("--ghidra-csv", required=True)
     ap.add_argument("--retdec-json", default=None)
+    ap.add_argument("--retdec-dsm", default=None,
+                    help="retdec .dsm の '; function: <name> at <start> -- <end>' 行から"
+                         "関数境界集合を取る (--retdec-json 代替。FLEEngine 規模では"
+                         "後段の全 phase 完了前に dsm が確定するためこちらが実用)")
+    ap.add_argument("--dsm-shift", type=lambda s: int(s, 0), default=None,
+                    help="dsm アドレスの RVA 変換差 (既定: -0x400000=win VA→RVA, mac=0)")
     ap.add_argument("--ground", required=True)
     ap.add_argument("--ground-kind", choices=["win", "mac"], required=True)
     ap.add_argument("--va-base", type=lambda s: int(s, 0), default=0x400000)
@@ -108,6 +136,8 @@ def main():
     if args.retdec_json and json_compilable(args.retdec_json):
         rd = {s - args.va_base: e - args.va_base for s, e in
               load_retdec(args.retdec_json).items()}
+    elif args.retdec_dsm:
+        rd = load_retdec_dsm(args.retdec_dsm, args.dsm_shift)
     gr = load_ground(args.ground, args.ground_kind)
 
     gs = set(gh)

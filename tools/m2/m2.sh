@@ -110,40 +110,63 @@ fi
 # -----------------------------------------------------------------
 GHIDRA_DLL_CSV="$WORK/ghidra_dll/functions_dll.csv"
 GHIDRA_SLICE_CSV="$WORK/ghidra_slice/functions_slice.csv"
-RETDEC_WIN_CFG="$WORK/d5.drc.config.json"
-RETDEC_MAC_CFG="$WORK/engine_mac.drc.config.json"
+RETDEC_WIN_DSM="$WORK/engine_win.drc.dsm"
+RETDEC_MAC_DSM="$WORK/macbound.drc.dsm"
 GROUND_MAC="$WORK/function_starts_mac.txt"
 
 # mac slice の ground truth (LC_FUNCTION_STARTS)
 llvm-objdump --macho --function-starts "$SLICE" 2>/dev/null | grep '^0' > "$GROUND_MAC" \
   || warn "mac slice の function starts 取得に失敗"
 
-if [ -f "$GHIDRA_DLL_CSV" ] && [ -f "$RETDEC_WIN_CFG" ]; then
+if [ -f "$GHIDRA_DLL_CSV" ] && [ -f "$RETDEC_WIN_DSM" ]; then
   python3 "$HERE/function_boundary.py" --label win_dll \
     --ghidra-csv "$GHIDRA_DLL_CSV" \
-    --retdec-json "$RETDEC_WIN_CFG" \
+    --retdec-dsm "$RETDEC_WIN_DSM" --dsm-shift -0x400000 \
     --ground "$WORK/pe_scan_dll.json" --ground-kind win \
     --va-base 0x400000 \
     --out-json "$WORK/boundary_win.json" \
     || warn "win boundary 計算に失敗"
 elif [ -f "$GHIDRA_DLL_CSV" ]; then
-  warn "RetDec win64 config がしていません (d5.drc.config.json)"
+  warn "RetDec win64 dsm がありません (engine_win.drc.dsm)"
   warn "README.md の RetDec 重い解析コマンドで 1 回実行してください"
 else
   warn "Ghidra headless 成果物がありません (ghidra_dll/functions_dll.csv)"
   warn "README.md の Ghidra/RetDec 重い解析コマンドで 1 回実行してください"
 fi
 
-if [ -f "$GHIDRA_SLICE_CSV" ] && [ -s "$GROUND_MAC" ] && [ -f "$RETDEC_MAC_CFG" ]; then
+if [ -f "$GHIDRA_SLICE_CSV" ] && [ -s "$GROUND_MAC" ] && [ -f "$RETDEC_MAC_DSM" ]; then
   python3 "$HERE/function_boundary.py" --label mac_slice \
     --ghidra-csv "$GHIDRA_SLICE_CSV" \
-    --retdec-json "$RETDEC_MAC_CFG" \
+    --retdec-dsm "$RETDEC_MAC_DSM" --dsm-shift 0 \
     --ground "$GROUND_MAC" --ground-kind mac \
     --va-base 0 \
     --out-json "$WORK/boundary_mac.json" \
     || warn "mac boundary 計算に失敗"
+elif [ -f "$GHIDRA_SLICE_CSV" ] && [ -s "$GROUND_MAC" ]; then
+  python3 "$HERE/function_boundary.py" --label mac_slice_ghidra_only \
+    --ghidra-csv "$GHIDRA_SLICE_CSV" \
+    --ground "$GROUND_MAC" --ground-kind mac \
+    --va-base 0 \
+    --out-json "$WORK/boundary_mac_ghidra.json" \
+    || warn "mac boundary (ghidra-only) 計算に失敗"
+  warn "RetDec mac dsm がありません (macbound.drc.dsm)"
 else
-  warn "mac 側の boundary 計算には RetDec engine_mac / Ghidra slice 成果物が必要"
+  warn "mac 側の boundary 計算には Ghidra slice 成果物 + function starts が必要"
+fi
+
+# EasyFLAC (300KB級, 全 pipeline 完了する小規模) の 3 者照合も記録
+GHIDRA_EF_CSV="$WORK/ghidra_easyflac/functions_easyflac.csv"
+if [ -f "$GHIDRA_EF_CSV" ] && [ -f "$WORK/easyflac.drc.config.json" ]; then
+  llvm-objdump --macho --function-starts "$WORK/easyflac_x86_64.dylib" 2>/dev/null \
+    | grep '^0' > "$WORK/function_starts_easyflac.txt" \
+    || warn "EasyFLAC function starts 取得失敗"
+  python3 "$HERE/function_boundary.py" --label easyflac_fullpipeline \
+    --ghidra-csv "$GHIDRA_EF_CSV" \
+    --retdec-json "$WORK/easyflac.drc.config.json" \
+    --ground "$WORK/function_starts_easyflac.txt" --ground-kind mac \
+    --va-base 0 \
+    --out-json "$WORK/boundary_easyflac.json" \
+    || warn "EasyFLAC boundary 計算に失敗"
 fi
 
 # -----------------------------------------------------------------

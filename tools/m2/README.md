@@ -34,21 +34,30 @@ Ghidra headless / RetDec の全体解析は 30 分〜数時間かかるため `m
   -postScript DumpFunctions.java <abs>/tools/m2/work/ghidra_slice/functions_slice.csv \
   -analysisTimeoutPerFile 7200
 
-# RetDec 全体リフト (win64 FLEngine; ~1h, Heap ~10-12GB)
+# RetDec selective リフト (§5.7 5観点; 数秒〜数十秒)
 /opt/retdec/bin/retdec-decompiler tools/m2/work/block00031_PE.bin \
-  -o tools/m2/work/d5.drc.c --keep-unreachable-funcs \
-  --select-ranges "<§5.7 5観点の範囲節>" --max-memory 20000000000 --timeout 3600
-# (関数境界合意用には縮めず全 decode が望ましい; d5.drc.config.json の
-#  functions 配列がベース。mac 側も同様)
-/opt/retdec/bin/retdec-decompiler tools/m2/work/FLEngine_x86_64.dylib \
-  -o engine_mac.drc.c --keep-unreachable-funcs --backend-no-opts \
-  --max-memory 22000000000 --timeout 7200
+  -o tools/m2/work/d5fast.drc.c --select-ranges "0x40ace0-0x40ad60,..." \
+  --select-decode-only --timeout 900
+
+# FLEngine 規模の全体リフトは ~2-3h / ~15GB RAM で後段 LLVM optimization が
+# 完了しにくい (--timeout 7200 / 10800 の 2 実行とも後段で打切り)。境界照合には
+# decode 完了時点で書かれる .dsm の '; function:' ラベルで十分:
+#   (win) /opt/retdec/bin/retdec-decompiler work/block00031_PE.bin \
+#         -o engine_win.drc.c --keep-unreachable-funcs --backend-no-opts \
+#         --max-memory 20000000000 --timeout 10800   (3h 設定推奨)
+#   照合: function_boundary.py --retdec-dsm work/engine_win.drc.dsm \
+#         --dsm-shift -0x400000   (VA→RVA 変換)
+#   (mac) /opt/retdec/bin/retdec-decompiler work/FLEngine_x86_64.dylib \
+#         -o macbound.drc.c --select-ranges "0x2b50-0x10d964c" \
+#         --select-decode-only --timeout 5400 --max-memory 20000000000
+#   照合: 既定で --dsm-shift 0 (mac slice は address==file offset)
 ```
 
 出力 (いずれも `work/` に置く):
-- Giuridra: `ghidra_*/functions_*.csv` (name,entry,size)
-- RetDec: `<out>.config.json` (`functions[].startAddr/ endAddr` に境界が機械採取
-  可), 同 `<out>.ll` / `<out>.dsm` (Delphi 品質確認に使用)
+- Ghidra: `ghidra_*/functions_*.csv` (name,entry,size)
+- RetDec: `<out>.dsm` (`; function: <名> at <start> -- <end>` = decode 完了時点の
+  関数境界一覧; function_boundary.py --retdec-dsm で読む)。小規模モジュールでは
+  `<out>.config.json` (startAddr/endAddr) も利用可
 
 ## Delphi 品質確認 (§5.7観点) の 5 選択
 

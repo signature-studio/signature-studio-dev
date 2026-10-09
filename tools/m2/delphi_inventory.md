@@ -2,7 +2,7 @@
 
 生成: `tools/m2/delphi_inventory.py` (strategy.md §5.7 / M2 検証条件 5)
 
-> 結論 (機械採取時点): **FLEngine 双方とも Delphi x64 の VMT/RTTI がそのまま残っており (win 3,000+/mac 3,896 クラス出現), 関数名の自動復元は Delphi RTTI + VMT 経由で機械生成可能**。どちらのエクスポート面も超薄い (`CreateFruityInstance` 1 本 + `dbkFCallWrapper` 経由 Delphi RTL 定形) ので、シンボル面からの名付けは当たらない。よって M3 以降は「VMT→関数名/型表」(本書の class 一覧) を IR pass (名付け + 型付け) に注入する。
+> 結論 (機械採取時点): **FLEngine 双方とも Delphi x64 の VMT/RTTI がそのまま残っており (win 1,244 / mac 3,896 class 検出), 関数名の自動復元は Delphi RTTI + VMT 経由で機械生成可能**。どちらのエクスポート面も超薄い (`CreateFruityInstance` 1 本 + `dbkFCallWrapper` 経由 Delphi RTL 定形) ので、シンボル面からの名付けは当たらない。よって M3 以降は「VMT→関数名/型表」(本書の class 一覧) を IR pass (名付け + 型付け) に注入する。
 
 ## 1. Delphi VMT / class pointer 一覧 (機械走査)
 
@@ -125,7 +125,7 @@
 
 ## 2. `dbk*` / Delphi 定形 export (実機 exe/dll 面)
 
-win64 DLL (FLEEngine_x64.dll) の export 一覧 (llvm-objdump -p):
+win64 DLL (FLEngine_x64.dll) の export 一覧 (llvm-objdump -p):
 
 | export | 備考 |
 |---|---|

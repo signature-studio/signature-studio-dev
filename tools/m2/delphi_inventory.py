@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # M2-5 (delphi_inventory 機械生成):
-# FLEEngine (win64 DLL + mac x86_64 slice 双方) の
+# FLEngine (win64 DLL + mac x86_64 slice 双方) の
 #   - Delphi RTTI/VMT スキャン結果 (class pointer * class 名一覧)
 #   - export 面から取得した dbk* / Delphi 定形 export の界隈リスト
 #   - 関数名復元は RTTI class 名ベースのみ可能であることの明記
@@ -44,7 +44,7 @@ def main():
     md.append("生成: `tools/m2/delphi_inventory.py` (strategy.md §5.7 / M2 検証条件 5)")
     md.append("")
     md.append("> 結論 (機械採取時点): **FLEngine 双方とも Delphi x64 の "
-              "VMT/RTTI がそのまま残っており (win 3,000+/mac 3,896 クラス出現), "
+              "VMT/RTTI がそのまま残っており (win 1,244 / mac 3,896 class 検出), "
               "関数名の自動復元は Delphi RTTI + VMT 経由で機械生成可能**。"
               "どちらのエクスポート面も超薄い (`CreateFruityInstance` 1 本 + "
               "`dbkFCallWrapper` 経由 Delphi RTL 定形) ので、シンボル面から"
@@ -84,7 +84,7 @@ def main():
 
     md.append("## 2. `dbk*` / Delphi 定形 export (実機 exe/dll 面)")
     md.append("")
-    md.append("win64 DLL (FLEEngine_x64.dll) の export 一覧 (llvm-objdump -p):")
+    md.append("win64 DLL (FLEngine_x64.dll) の export 一覧 (llvm-objdump -p):")
     md.append("")
     md.append("| export | 備考 |")
     md.append("|---|---|")
