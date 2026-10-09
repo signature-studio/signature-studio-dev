@@ -26,7 +26,7 @@ FL Studio 26.1.7 をブラウザ上で完全に動作させることを目標と
    - [x] M1: 極小 PE→wasm PoC の自動化 (`tools/m1/m1.sh`)。ELF/PE32+ → RetDec → main 抽出 → emcc (定型フラグ) → wasm → node 出力一致を 1 コマンドで検証・再生産可能化 (`tools/m1/README.md`)
    - [x] wasm ローダ glue: `src/runtime/loader.ts` (fail-fast import フォワーダ `src/runtime/imports.ts` 付き)。`pnpm typecheck`/`pnpm build` + node スモーク (M1 wasm をロードし出力照合) 検証済 (commit fe2f442)
    - [ ] M2: mac slice 抽出 + 関数境界合意検証 + Delphi 品質確認 (`tools/m2/`) — 進行中
-   - [ ] M4: Win32 shim コア `tools/shim/` (timer/file/thread/heap, fail-fast) — 進行中
+   - [x] M4: Win32 shim コア `tools/shim/` (timer/file/thread/heap, fail-fast)。53 export API を MT(pthread)/ST 両ビルドで node 単体テスト全 PASS (4スレッド×10k 排他/TLS 分離/byte-faithful file I/O 検証済, commit 1c49c61)
 
 ## 開発
 
