@@ -6,7 +6,7 @@
    - ippsSub_32f_I          : pSrcDst[i] -= pSrc[i] (IEEE 演算のままで bit-exact)。
    - ippsCopy_32s           : 32bit 丸ごとコピー (実測: memcpy と等価)。
    - ippsAtan_32f_A11       : A11 等級 (低精度)。実 IPP は固有多項式で bit は一致しない
-     (CAB-141 確定方針: A11 系の bit 不一致は許容)。atanf ベースで実装し、
+     (CAB-141 暫定方針 — メイン暫定決定: A11 系の bit 不一致は許容, ユーザ最終確認待ち)。atanf ベースで実装し、
      実測の ulp 分布を REPORT §12 に記録 (qNaN/±0 の符号規約のみ実測に合わせる)。 */
 #include "ipp_min.h"
 #include "../gen/ipp_proto.h"

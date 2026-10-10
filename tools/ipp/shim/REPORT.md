@@ -155,7 +155,7 @@ fail-soft の注意 (**サイレントに誤る**): stub は status 0 (=成功) 
 
 ## 12. CAB-245 (IPP-5 ipp-fill-2): ResizeSqrPixel + GetBufSize 実測式 + 125 モジュール群 4 関数 (2026-10-10)
 
-**結論**: 対象 7 関数 (+ GetBufSize 2 関数の実測式版) を実装し **typed thunk 92 → 99** (stub 328 → 321)。`shim_e2e.sh` は **12 checks PASS** (S10/S11 を新設)。オラクル (実 DLL vs 自前実装, **80,256 ケース**) で **status 格子全一致**・**GetBufSize 74,468 ケース完全一致**・信号 4 関数 **bit-exact**、Resize カーネルは **NN 0.000% / Cubic 0.027% / Linear 0.101% / Super 0.643% / Lanczos 6.913%** の画素差率 (実測、§12-5)。wasm replay **1,728 レコード mismatch=0** (可搬 sin / round により native と bit 一致)。実装は `impl/ipp_resize.c` + `impl/ipp_sig_fill2.c` (+ `impl/ipp_img_fill.c` から Resize 系 GetBufSize を移設)。
+**結論**: 対象 7 関数 (+ GetBufSize 2 関数の実測式版) を実装し **typed thunk 92 → 99** (stub 328 → 321)。`shim_e2e.sh` は **12 checks PASS** (S10/S11 を新設)。オラクル (実 DLL vs 自前実装, **80,256 ケース**) で **status 格子全一致**・**GetBufSize 74,468 ケース完全一致**・信号 3 関数 **bit-exact** (Atan_32f_A11 は A11 規格内の許容差, §12-1)、Resize カーネルは **NN 0.000% / Cubic 0.027% / Linear 0.101% / Super 0.643% / Lanczos 6.913%** の画素差率 (実測、§12-5)。wasm replay **1,728 レコード mismatch=0** (可搬 sin / round により native と bit 一致)。実装は `impl/ipp_resize.c` + `impl/ipp_sig_fill2.c` (+ `impl/ipp_img_fill.c` から Resize 系 GetBufSize を移設)。
 
 ### 12-1. 実装関数
 | 関数 | 内容 | 検証 |
@@ -164,7 +164,7 @@ fail-soft の注意 (**サイレントに誤る**): stub は status 0 (=成功) 
 | `ippiResizeGetBufSize` | **実測式** (§12-3) | **74,468 ケース完全一致** (dw,dh ≤ 600 拡張ランダム含む) |
 | `ippiResizeSqrPixelGetBufSize` | **常時 -8・書込なし** (実 DLL が `mov eax,-8; ret` のスタブ — 逆アセ + 4,000 ケース実測) | 完全一致 |
 | `ippsThreshold_GT_32s_I` / `ippsSub_32f_I` / `ippsCopy_32s` | 信号 3 関数 | **bit-exact** (オラクル 160 ケース) |
-| `ippsAtan_32f_A11` | atanf 版 | bit 差 59.8%, **maxulp 3728 = A11 規格内** (spec 2^-11 ≈ 8200 ulp @ π/4, CAB-141 確定方針) |
+| `ippsAtan_32f_A11` | atanf 版 | bit 差 59.8%, **maxulp 3728 = A11 規格内** (spec 2^-11 ≈ 8200 ulp @ π/4, CAB-141 暫定方針 — メイン暫定決定・ユーザ最終確認待ち) |
 
 ### 12-2. 座標系の確定 (B+/B- 引数順序の実装前確認 — callsite_dump.py / 逆アセ)
 - 13 引数の ABI 配置は署名どおり (rcx=pSrc, rdx=srcSize 値渡し, r8=srcStep, r9=srcRoi 16B 構造体ポインタ, stk0..8)。win FLEngine 呼出実績 3 箇所で確認。

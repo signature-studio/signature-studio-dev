@@ -4,7 +4,7 @@
    各ケース: 入力を一度だけ生成 → real/ours バッファに複写 → 両者実行 → status + 出力全語比較。
    build: bash test/resize_oracle_run.sh (work/resize/ にバイナリを出力)
    usage: ./resize_oracle [dll] [--dump <file>] | --replay <file> (wasm)
-   出力: 家計ごとの統計 + 最終行に SUM JSON (shim_check.py が読む) */
+   出力: 系統ごとの統計 + 最終行に SUM JSON (shim_check.py が読む) */
 #define _GNU_SOURCE
 #include "../../ref/pe_load.h"
 #include "../../src/ipp_min.h"
