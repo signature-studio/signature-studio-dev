@@ -198,3 +198,17 @@ CAB-215 の主眼 (writeEntry ↔ 実機比較) は **ini セクション経由�
 ### 12.4 CAB-46 (Massive X 稼働中) への引き継ぎ
 
 - **KH magic 差し替え作業は CAB-46 側で不要** (実測確定・生成器反映済み)。CAB-98 領域の残は §7 の実機単体ファイル提供のみ。Massive X は `~/ダウンロード/Native Instruments Massive X v1.7.1.exe` を確認済み (win) — 解析後 `moduleinfo.json` の CID を得れば spec 1 行で追加可 (class 8, `path` は §12.1 規則で実配置に応じて選択)。VST2 側は VerifiedIDs 形 (magic 10 進) と KH パターン (id=4 文字) を踏襲。参考: `~/ダウンロード` の `FL_STUDIO_.Plugins.ini` / `FL_STUDIO_VerifiedIDs.nfo` / `OTT.fst` は `evidence/real_machine/` 同名 3 ファイルと **byte 一致** (cmp 実測) — 引き継ぎ側の再入手は不要。
+
+### 12.5 追記 (CAB-46 follow-up, 2026-10-10): Massive X spec 追加 — CID 三重突合で一致
+
+**結論**: `specs/wasm_plugins.json` に Massive X (class 8 = VST3 gen) を追加し、生成エントリが**実機 `[Generators\VST3\Massive X]` セクション (実機 ini に実在 — FL が実moduleをスキャン済み) と filename/guid/vendor/category 込みで一致** (date/size 除く全行一致, mx_check 実測)。Class CID は **`5653544e6924486d6173736976652078`** で、(1) 実機 ini `ps_file_guid_0`、(2) Service Center XML `VST3ID` (`tools/targets/massivex/work/extracted/…/Massive X.xml`)、(3) GetPluginFactory (`0x18000a870`) 即値 `mov edx,0x4e692448` (CAB-46 §4, 今回 disassembly 再実測) からの NI 規則導出 — の **3 源が一致 (= 不一致、CID 候補の列挙不要)**。**moduleinfo.json は本製品は同梱されない** (installer 11,602 ファイルの payload に 0 件、95 MB 単一ファイル PE 内にも `moduleinfo.json` 文字列は無く `Steinberg::ModuleInfoLib` RTTI 名のみ) — ゆえに moduleinfo 由来の抽出は不可で、**実機 FL 自身のスキャン値 (ps_file_guid = FL が GetPluginFactory から取得した CID) を正**として採用した。
+
+| 項目 | 実測 |
+|---|---|
+| CID 16B | text 順 ASCII **`VSTNi$Hmassive x`** / Windows GUID メモリ配置 **`4e54535624696d486173736976652078`** (CAB-46 §4 生値と一致, `.fst` record 52 / `tuidFromHex` はこの配置) |
+| NI FUID 規則 (Massive X で実証) | ASCII `"VST"` + PluginID **BE32** (`0x4e692448`→`Ni$H`) + lower(name) を 16 B に刈り — 同族例: Massive v1 `{5653544E-694D-616D-6173-736976650000}` / FM8 FX `{5653544E-6986-3866-6D38-206678000000}` (実機 VerifiedIDs, "VSTN" 起始) [med] |
+| `ps_file_filename` | **`C:\Program Files\Common Files\VST3\Massive X.vst3`** — **単一ファイルモジュール形** (§12.1 規則の実配置適用: installer dst `{cf}\VST3\Massive X.vst3` が単一 PE 95,356,824 B = 実機 ini `ps_file_size_0` **完全一致**, `\Contents\` 経由なし — task 前提の「内部バイナリ形」ではなく実配置が単一ファイル形) |
+| 実機準拠の他値 | plugclass 8 / type 2 / bits 64 / arch Intel / scanflags 1 / vendor **`Native Instruments`** (Service Center の Company 表記 `…GmbH` ではなくスキャン記録値) / category **`Instrument|Synth`** (= PClassInfo2 subCategories, PE 内 lea 先 `0x184fe7ff7` 実測 / cardinality `0x7fffffff`・version `1.7.1 (R0)`・sdk `VST 3.7.14` も lea 実測) |
+| UPID / SNPID / VST2 | UPID `41ce4ac2-34f7-469b-beb8-59a8ad7a8a67` は**ライセンス用製品 ID で CID ではない**、実機セクションに `ps_compatibility` 無し → **Serum 2 踏襲で spec も compat 無し**。SNPID `MXE`。VST2 `Massive X.dll` (95,249,816 B) は実在するが spec 未収録 (VST3 のみ — Serum 2 踏襲, 将来は magic `1315513416`=0x4e692448) |
+
+検証: `analysis/mx_check.mjs` 新設 (**10 checks, exit 0**; massivex work/ 資産は existsSync ガードのオプション参照) — 実機セクション突合 / CID 3 源突合 / FUID 規則 / installer 単一ファイル形・moduleinfo 不在 / 生成セクション + VerifiedIDs 行 verbatim 突合。`nfo_e2e.sh` に step 追加 — **e2e exit 0 維持** (tests 39→**40** / 実機 21 checks / CAB-218 16 checks / round-trip 831/831 / 生成 **50 entry・102 ファイル** reader+tools/flp 全受理)。既存節 (§0〜§12.4) は無改変。

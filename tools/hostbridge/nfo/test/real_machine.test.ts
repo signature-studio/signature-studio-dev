@@ -193,3 +193,22 @@ test('generated Serum 2 entries match the real machine sections/keys (minus unob
   assert.equal(serumKeys.length, 2);
   for (const line of serumKeys) assert.ok(verText.includes(line + '\r\n'), line);
 });
+
+test('generated Massive X entry matches the real machine section/key (CAB-46 follow-up, minus unobservable date/size)', () => {
+  const specs: PluginSpec[] = JSON.parse(readFileSync(new URL('../specs/wasm_plugins.json', import.meta.url), 'utf8')).plugins;
+  const g = generateDb(specs);
+  const ini = IniFile.fromBytes(iniRaw);
+  const real = ini.get('Generators\\VST3\\Massive X');
+  assert.ok(real, 'real machine section [Generators\\VST3\\Massive X] exists');
+  // CID three-way match: real ps_file_guid == Service Center XML VST3ID == spec (REPORT.md §12.5)
+  assert.equal(new ValueFile([...real.lines]).getString('ps_file_guid_0'), '{5653544E-6924-486D-6173-736976652078}');
+  const drop = new Set(['ps_file_date_0', 'ps_file_size_0']);
+  const strip = (lines: string[]): string[] => lines.filter((l) => !drop.has(l.slice(0, l.indexOf('=')).toLowerCase()));
+  const gen = ValueFile.parse(decodeText(g.files.get('Installed/Generators/VST3/Massive X.nfo')!));
+  assert.deepEqual(strip(gen.lines), strip(real.lines));
+  // the generated VerifiedIDs line appears verbatim in the real file
+  const gv = ValueFile.parse(decodeText(g.files.get('Installed/VerifiedIDs.nfo')!));
+  const mx = gv.lines.filter((l) => l.includes('Massive X'));
+  assert.deepEqual(mx, ['VST3:64:{5653544E-6924-486D-6173-736976652078}=Generators\\VST3\\Massive X.NFO']);
+  assert.ok(decodeText(verRaw).includes(mx[0] + '\r\n'), mx[0]);
+});

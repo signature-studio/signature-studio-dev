@@ -25,6 +25,11 @@ node analysis/kh_magic_check.mjs > work/kh_magic_metrics.json || { echo "FAIL: C
 node -e 'const m=JSON.parse(require("fs").readFileSync("work/kh_magic_metrics.json","utf8")).cab218;
 console.log(`cab-218: VST2 magic files ${m.vst2MagicFiles} (Effects\\VST ${m.effectsVstMagicSections}) | KH index==real ${m.khIndexMatch} | VerifiedIDs ${m.verifiedIdsVst} | VST3 filename inner ${m.vst3FilenameForms.innerBinary}/module ${m.vst3FilenameForms.moduleFile} | gen KH ${m.generatedKhMatch} | failed ${m.failed}`);
 if (m.failed) process.exit(1);'
+step "CAB-46 follow-up (Massive X CID 突合 + spec 実機照合)"
+node analysis/mx_check.mjs > work/mx_check_metrics.json || { echo "FAIL: CAB-46 follow-up checks"; fail=1; }
+node -e 'const m=JSON.parse(require("fs").readFileSync("work/mx_check_metrics.json","utf8")).cab46mx;
+console.log(`cab-46mx: ${m.cid} (PluginID ${m.pluginId} / SNPID ${m.snpid}) | ${m.filename} (${m.size} B) | moduleinfo.json ${m.moduleinfoJson===undefined?"n/a":(m.moduleinfoJson.includes("not shipped")?"not shipped":"present")} | failed ${m.failed}`);
+if (m.failed) process.exit(1);'
 step "metrics (shipped corpus + generator)"; node cli/metrics.ts work/metrics.json | grep -E '"(nfoFilesTotal|nfoRoundTripExact|nativePluginNfo|fst1155Files|fst1155ReproducedExact|generatedEntries|generatedFiles|readerAccepted)"'
 step "generate synthetic DB for the wasm plugin set"
 KH=../../targets/kilohearts/work/macpkg/product_index.json

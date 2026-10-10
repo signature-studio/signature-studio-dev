@@ -24,6 +24,7 @@ test('generated DB: layout, every entry accepted by the FL-reader model, preset 
     'Installed/Effects/VST/Fresh Air.fst', 'Installed/Effects/VST/Fresh Air.nfo',
     'Installed/Effects/VST/OTT.fst', 'Installed/Effects/VST/OTT.nfo',
     'Installed/Effects/VST3/Serum 2 FX.fst', 'Installed/Effects/VST3/Serum 2 FX.nfo',
+    'Installed/Generators/VST3/Massive X.fst', 'Installed/Generators/VST3/Massive X.nfo',
     'Installed/Generators/VST3/Serum 2.fst', 'Installed/Generators/VST3/Serum 2.nfo',
     'Installed/VerifiedIDs.nfo',
   ]);
@@ -71,7 +72,8 @@ test('VerifiedIDs.nfo: key = <fmt>:<bits>:<id>, value = nfo path relative to Ins
   assert.equal(vf.get('VST3:64:{56534558-6673-5073-6572-756D20320000}'), 'Generators\\VST3\\Serum 2.NFO');
   // VST2 id = ps_file_magic decimal == real machine (64/64)
   assert.equal(vf.get('VST:64:1483101268'), 'Effects\\VST\\OTT.NFO');
-  assert.equal(vf.lines.length, 4);
+  assert.equal(vf.get('VST3:64:{5653544E-6924-486D-6173-736976652078}'), 'Generators\\VST3\\Massive X.NFO');
+  assert.equal(vf.lines.length, 5);
   assert.equal(generateDb(specs, { verifiedIds: false }).files.has('Installed/VerifiedIDs.nfo'), false);
 });
 
@@ -81,9 +83,9 @@ test('.Plugins.ini: TMemIniFile layout, section content == .nfo body, BOM, blank
   assert.deepEqual([...raw.slice(0, 3)], [0xef, 0xbb, 0xbf]);
   const text = new TextDecoder('utf-8').decode(raw.subarray(3));
   assert.ok(text.includes('[Effects\\VST3\\Serum 2 FX]\r\nfileversion=2\r\n'));
-  assert.ok(text.endsWith('ps_file_category_0=Fx\r\n\r\n')); // blank line after the last section
+  assert.ok(text.endsWith('ps_file_category_0=Instrument|Synth\r\n\r\n')); // blank line after the last section (Massive X, appended last)
   const ini = IniFile.fromBytes(raw);
-  assert.equal(ini.sections.length, 4);
+  assert.equal(ini.sections.length, 5);
   // section lines == the .nfo body lines, verbatim (fle:0x912d10 shares the .nfo field writer)
   for (const e of g.entries) {
     const sec = ini.get(e.nfo.replace(/^Installed\//, '').replace(/\.nfo$/, '').replace(/\//g, '\\'))!;
