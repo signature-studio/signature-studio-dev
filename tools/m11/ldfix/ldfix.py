@@ -276,6 +276,208 @@ def replace_value_uses(lines, start, name, newval):
 
 
 # ---------------------------------------------------------------------------
+# F1v: load_dropped 変種 (CAB-131) — F1 の 3 連形 (pt→trunc→store 直接) から外れる
+# 3 変種を吸収する。いずれも機械語の rip 相対 RMW (add/sub dword [g], imm) が正本:
+#   (a) direct  : store i32 %tv, [c0] は直接だが, 関数内の別 path に同一 target への
+#                 store があり従来の f1_other_store guard で除外されていた (108ec70)
+#   (b) select  : %tv が select の operand に合流し, select 結果が [c0] へ store
+#                 (106d220: add +1 / sub -1 の両 RMW path の合流)
+#   (c) slot    : %tv が reg2mem slot に退避され, merge block の reload が [c0] へ
+#                 store (10d35b0: RMW の書込効果が merge store で実現される)
+# 修復は値の張替え (load→add を挿入し %tv の全 value use を置換) で, store 自体は
+# 増減しない。書込効果の証人として「%tv (直接/select結果/reload値) → [c0] への store」
+# を必須条件にする (無い場合は RMW の write が IR から落ちている別欠陥なので触らない)。
+# ---------------------------------------------------------------------------
+
+F1V_TRUNC_RE = re.compile(r'^\s*(%[\w.$-]+) = trunc i64 (%[\w.$-]+) to i32\s*$')
+F1V_SELECT_RE = re.compile(r'^\s*(%[\w.$-]+) = select i1 (%[\w.$-]+), i32 (%[\w.$-]+), i32 (%[\w.$-]+)\s*$')
+F1V_SLOT_ALLOCA_RE = re.compile(r'^\s*(%[\w.$-]+) = alloca i32\s*$')
+F1V_SLOT_LOAD_RE = re.compile(r'^\s*(%[\w.$-]+) = load i32, ptr (%[\w.$-]+)\s*$')
+
+
+def f1v_rip_rmws(fv, c0):
+    """target (c0+BASE) への 32bit add/sub RMW を全列挙 → [(mnem, imm, addr)]"""
+    out = []
+    want = c0 + BASE
+    for m in fv.iter_memops():
+        if m['kind'] != 'rmw' or m['size_bits'] != 32 or m.get('rip_rva') != want:
+            continue
+        ins = m['ins']
+        if ins.mnemonic in ('add', 'sub') and len(ins.operands) == 2 and ins.operands[1].type == 2:
+            out.append((ins.mnemonic, ins.operands[1].imm, ins.address))
+    return out
+
+
+def f1v_mach_block_of(fv, addr):
+    import bisect as _bs
+    k = _bs.bisect_right(fv.block_starts, addr)
+    return fv.block_starts[k - 1] if k else None
+
+
+def f1v_same_blk(lines, a, b):
+    """行 a..b が同一 IR ブロック内か (境界をまたいだら False)"""
+    if a > b:
+        a, b = b, a
+    for l in lines[a + 1:b]:
+        if re.match(r'^dec_label|^[\w.$-]+:\s*$|^}', l):
+            return False
+    return True
+
+
+def f1v_value_use_lines(lines, name):
+    """name の行リスト。アドレス用途 (ptr operand / inttoptr) を含む行があれば None (保守中止)"""
+    pat_ptr = re.compile(r', ptr ' + re.escape(name) + r'(?![\w.$-])')
+    pat_itp = re.compile(r'inttoptr \(i64 ' + re.escape(name) + r'(?![\w.$-])')
+    out = []
+    for i, l in enumerate(lines):
+        if name not in l:
+            continue
+        if pat_ptr.search(l) or pat_itp.search(l):
+            return None
+        out.append(i)
+    return out
+
+
+def f1v_classify(lines, tv, slots):
+    """%tv の消費形を分類 → (kind, c0, witness_i) | None"""
+    # (a) direct: store i32 %tv, ptr inttoptr (i64 c0 to ptr)
+    for i, l in enumerate(lines):
+        m = CE_STORE_RE.match(l)
+        if m and m.group(1) == tv:
+            return ('direct', int(m.group(2)), i)
+    # (b) select: %sel = select i1 c, i32 X, i32 %tv (どちらの operand でも) → store %sel, [c0]
+    for i, l in enumerate(lines):
+        m = F1V_SELECT_RE.match(l)
+        if not m or tv not in (m.group(3), m.group(4)):
+            continue
+        sel = m.group(1)
+        tgts = set()
+        wi = None
+        for j, l2 in enumerate(lines):
+            m2 = CE_STORE_RE.match(l2)
+            if m2 and m2.group(1) == sel:
+                tgts.add(int(m2.group(2)))
+                wi = j
+        if len(tgts) == 1 and wi is not None and f1v_same_blk(lines, i, wi):
+            return ('select', tgts.pop(), wi)
+    # (c) slot: store i32 %tv, ptr %slot → (別 block) %rl = load i32, ptr %slot → store %rl, [c0]
+    for i, l in enumerate(lines):
+        ms = re.match(r'^\s*store i32 ' + re.escape(tv) + r', ptr (%[\w.$-]+)\s*$', l)
+        if not ms or ms.group(1) not in slots:
+            continue
+        slot = ms.group(1)
+        for j, l2 in enumerate(lines):
+            ml = F1V_SLOT_LOAD_RE.match(l2)
+            if not ml or ml.group(2) != slot:
+                continue
+            rl = ml.group(1)
+            for k, l3 in enumerate(lines):
+                m3 = CE_STORE_RE.match(l3)
+                if m3 and m3.group(1) == rl:
+                    if f1v_same_blk(lines, j, k):
+                        return ('slot', int(m3.group(2)), k)
+    return None
+
+
+def fix_f1v(fn, fv, rep, ctr):
+    lines = fn.body.split('\n')
+    slots = set()
+    for l in lines:
+        m = F1V_SLOT_ALLOCA_RE.match(l)
+        if m:
+            slots.add(m.group(1))
+    pt_at = {}
+    for i, l in enumerate(lines):
+        m = CE_PT_RE.match(l)
+        if m:
+            pt_at[m.group(1)] = (i, int(m.group(2)))
+    if not pt_at:
+        return 0
+    tr_of = {}
+    for i, l in enumerate(lines):
+        m = F1V_TRUNC_RE.match(l)
+        if m and m.group(2) in pt_at:
+            tr_of.setdefault(m.group(2), []).append((i, m.group(1)))
+    fixed = 0
+    for pname, (pi, c1) in sorted(pt_at.items(), key=lambda kv: kv[1][0]):
+        trs = tr_of.get(pname)
+        if not trs or len(trs) != 1:
+            continue
+        ti, tv = trs[0]
+        if ti < pi:
+            continue
+        uses = f1v_value_use_lines(lines, tv)
+        if uses is None:
+            rep['f1v_addr_use'] = rep.get('f1v_addr_use', 0) + 1
+            continue
+        if tv == pname:
+            continue
+        # pt の使用は trunc のみ (他に value use があれば保守的に見送り)
+        pt_use_ok = True
+        for j, l in enumerate(lines):
+            if j in (pi, ti) or pname not in l:
+                continue
+            if re.search(r'(?<![\w.$-])' + re.escape(pname) + r'(?![\w.$-])', l):
+                pt_use_ok = False
+                break
+        if not pt_use_ok:
+            rep['f1v_pt_other_use'] = rep.get('f1v_pt_other_use', 0) + 1
+            continue
+        cls = f1v_classify(lines, tv, slots)
+        if cls is None:
+            rep['f1v_no_consumer'] = rep.get('f1v_no_consumer', 0) + 1
+            continue
+        kind, c0, wi = cls
+        delta = c1 - c0
+        rmws = [r for r in f1v_rip_rmws(fv, c0)
+                if (r[1] if r[0] == 'add' else -r[1]) == delta]
+        if not rmws:
+            rep['f1v_no_rmw'] = rep.get('f1v_no_rmw', 0) + 1
+            continue
+        mnem, imm, raddr = rmws[0]
+        if kind == 'direct':
+            # 別 path の同一 target store があっても値の張替えは競合しない。
+            # ただし store が RMW と同一機械語ブロックにある場合は従来どおり見送り
+            # (同一 path で RMW と生 store が混在 = RetDec の別意味の可能性)。
+            conflict = False
+            for m in fv.iter_memops():
+                if (m['kind'] == 'store' and m.get('rip_rva') == c0 + BASE
+                        and f1v_mach_block_of(fv, m['addr']) == f1v_mach_block_of(fv, raddr)):
+                    conflict = True
+                    break
+            if conflict:
+                rep['f1v_same_blk_store'] = rep.get('f1v_same_blk_store', 0) + 1
+                continue
+        ctr[0] += 1
+        nm = 'ldfxv%d' % ctr[0]
+        ld = '  %%%s = load i32, ptr inttoptr (i64 %d to ptr), align 4' % (nm, c0)
+        op = '  %%%s_v = add i32 %%%s, %d' % (nm, nm, imm if mnem == 'add' else -imm)
+        lines[pi] = ld + '\n' + op
+        lines[ti] = None
+        pat = re.compile(r'(?<![\w.$-])' + re.escape(tv) + r'(?![\w.$-])')
+        ptr_re = re.compile(r', ptr ' + re.escape(tv) + r'(?![\w.$-])')
+        itp_re = re.compile(r'inttoptr \(i64 ' + re.escape(tv) + r'(?![\w.$-])')
+        nrep = 0
+        for j in range(ti + 1, len(lines)):
+            l = lines[j]
+            if not l or tv not in l:
+                continue
+            if ptr_re.search(l) or itp_re.search(l):
+                continue
+            new = pat.sub('%%%s_v' % nm, l)
+            if new != l:
+                lines[j] = new
+                nrep += 1
+        lines = [l for l in lines if l is not None]
+        rep['f1v_kind_' + kind] = rep.get('f1v_kind_' + kind, 0) + 1
+        rep['f1v_value_uses'] = rep.get('f1v_value_uses', 0) + nrep
+        fixed += 1
+    if fixed:
+        fn.body = '\n'.join(lines)
+    return fixed
+
+
+# ---------------------------------------------------------------------------
 # F2: spill_slot_deref
 # ---------------------------------------------------------------------------
 
@@ -1030,8 +1232,9 @@ def main():
     mach = Machine(a.pe)
     rep = collections.OrderedDict()
     ctr = [0]
-    counts = collections.OrderedDict((k, 0) for k in ('f1', 'f2', 'f3a', 'f3b', 'f3c'))
-    fn_lists = collections.OrderedDict((k, []) for k in ('f1', 'f2', 'f3a', 'f3b', 'f3c'))
+    counts = collections.OrderedDict((k, 0) for k in ('f1', 'f1v', 'f2', 'f3a', 'f3b', 'f3c'))
+    fn_lists = collections.OrderedDict((k, []) for k in ('f1', 'f1v', 'f2', 'f3a', 'f3b', 'f3c'))
+    ctr_f1v = [0]               # F1v は専用 counter (F1〜F3 の SSA 名採番を不変に保つ)
     out_parts = []
     last = 0
     nfn = 0
@@ -1046,8 +1249,9 @@ def main():
         blk_vas = [bva for (bva, _ls) in fn.blocks() if bva is not None]
         fv = FnMach(mach, va, blk_vas)
         try:
-            for tag, func in (('f1', fix_f1), ('f2', fix_f2), ('f3a', fix_f3a), ('f3b', fix_f3b), ('f3c', fix_f3c)):
-                if func(fn, fv, rep, ctr):
+            for tag, func in (('f1', fix_f1), ('f1v', fix_f1v), ('f2', fix_f2), ('f3a', fix_f3a), ('f3b', fix_f3b), ('f3c', fix_f3c)):
+                c = ctr_f1v if tag == 'f1v' else ctr
+                if func(fn, fv, rep, c):
                     counts[tag] += 1
                     fn_lists[tag].append('%x' % va)
         except Exception as e:
@@ -1060,8 +1264,8 @@ def main():
     for k in counts:
         rep[k + '_fns'] = counts[k]
         rep[k + '_vas'] = fn_lists[k]
-    log('F1(load_dropped)=%d F2(spill_slot)=%d F3a(old-value)=%d F3b(count-load)=%d F3c(store-arg)=%d (errors=%d)'
-        % (counts['f1'], counts['f2'], counts['f3a'], counts['f3b'], counts['f3c'], rep.get('errors', 0)))
+    log('F1(load_dropped)=%d F1v(variant)=%d F2(spill_slot)=%d F3a(old-value)=%d F3b(count-load)=%d F3c(store-arg)=%d (errors=%d)'
+        % (counts['f1'], counts['f1v'], counts['f2'], counts['f3a'], counts['f3b'], counts['f3c'], rep.get('errors', 0)))
     if not a.dry_run:
         open(a.outfile, 'w').write(result := ''.join(out_parts))
     if a.report:

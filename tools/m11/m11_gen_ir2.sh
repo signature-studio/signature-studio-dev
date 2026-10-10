@@ -28,4 +28,14 @@ s = s.replace('@__asm_fnclex__112', '@__asm_fnclex0')
 open(d, 'w').write(s)
 print('[dotfix+fnclex0] done')
 PY2
+# ldfix (CAB-231/CAB-131): load 取り違え (値↔アドレス / 1 段 deref 脱落) 修復 pass を常設適用する。
+#   capstone による実機械語 (.pdata 区間) との突合付き。詳細は ldfix/REPORT.md / ldfix/REPORT_CAB131.md。
+#   適用位置は m11_post (weak 化/sigfix) 前 = ここ (ldfix REPORT §6-2 の推奨)。
+PE=/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin
+if [ -f "$PE" ] && python3 -c 'import capstone, pefile' 2>/dev/null; then
+  python3 ldfix/ldfix.py work/boot_final.ll work/boot_final.ldfix.ll --pe "$PE" --report work/ldfix_report.json
+  mv work/boot_final.ldfix.ll work/boot_final.ll
+else
+  echo "[gen_ir2] WARNING: ldfix skip (PE または capstone/pefile 無し)" >&2
+fi
 echo "[gen_ir2] OK: work/boot_final.ll ($(wc -l < work/boot_final.ll) 行)"
