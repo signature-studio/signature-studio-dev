@@ -100,3 +100,10 @@ DSP 固有 closure (42 効果) にはライセンス/ネット系参照が無く
 ## 7. 成果物
 
 `scripts/{lic_scan.py, lic_funcs.py, ghidra_decomp.sh}`, `REPORT.md` (本文)。`work/` (gitignore): `hc_strings.json`, `hc_xrefs.pkl`, `decomp_{core,core2,ui}.txt`, `decomp_c59.txt` (本回追加: 0x180051af0 / 0x180106f20 / 0x1801076e0 / 0x18010bff0 / 0x180021f60 / 0x18001ba90 / 0x180d52990 / 0x180d5dbe0 / 0x180d5e820 / 0x180d5f190 / 0x180ef7fc0 / 0x1800b4b10), `ghidra/*.log`。
+
+## 8. KH-9 追記 (stub 実装完了・詳細は `KH9_REPORT.md`)
+
+- 本 REPORT §5 の無力化候補を実装: `lic_stub.py` (lift IR 後処理 pass) により **stub 14 関数 + 状態マージ保持** を実装。getStatus ≡ 9 (案B) + thunk 常時化 + isMasterKey ≡ 1 (案C 相当) + KHSUnlock no-op。
+- 検証: stub モジュール実行 70/70 PASS / snapin 6 種 base・lic とも ctx-fuzz **200/200 bit-exact** (DSP の lift IR にライセンス参照 0 件 = §4 の IR レベル実証) / 既存 snapins e2e (run_all.sh) exit=0 で増減なし。
+- §2 の訂正 1 件: 状態マージ 0x1800b4b10 のテーブルは **T[24]=0, T[25]=2, T[28]=0** (機械語 disasm + decompile の両方で確認。本文「24/25→2」「28→4」は誤り)。
+- 状態 enum の意味対応 (§6-1 引継) を呼出文脈から確定: **9 = ライセンス済み (バナー解除)** / {5,7,8,26} = class 4 (同くバナー解除) / 25 = No license (編集不可) / 13 = 期限切れ / 0x1c = PACE 検証マーカー (KH9_REPORT §3)。

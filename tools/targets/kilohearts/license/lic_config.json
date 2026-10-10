@@ -1,0 +1,47 @@
+{
+  "comment": "KH-9 ライセンス stub 設定。方針 (ユーザ確定 bc07970): 全ライセンス機構を無力化し KH を常に「登録済み/ライセンス済み」として振る舞わせる。全VA は HeartCore.core_64 (ImageBase 0x180000000)。kind: ret=定数返し / store2=[out+0],[out+4] への 2 値 store / apply_key=状態を 0x1a (unlocked) に設定し 1 を返す / key_init=0x180021490 の初期化を登録済み (found=1) で短絡。value は全て rax (i64) に載る定数。",
+  "licensed_status": 9,
+  "stubs": [
+    {"va": "180054bd0", "name": "LicenseManagerHelper::getStatus", "kind": "ret", "value": 9,
+     "reason": "CAB-59 案B (推奨無力化点)。9 = UI バナー 0x180c194f0 がバナー無しにする値 / 分類 bitmask 0x60003a0 の許可側 / poll 0x180052a00 が編集可プロパティを立てる値"},
+    {"va": "1800549c0", "name": "LicenseManagerHelper::getStatusAndDaysLeft", "kind": "store2", "values": [9, 0],
+     "reason": "{status=9, daysLeft=0} を常時返す。ライセンス済み (期限なし) の意味。manager null 時の 0x16 フォールバックも消える"},
+    {"va": "1800548a0", "name": "LicenseManagerHelper::hasTag", "kind": "ret", "value": 1,
+     "reason": "タグ vector (mgr+0x470) 走査 0x18010b6d0 の短絡。ライセンス済み = 全 tag 保持。直接呼出 0 (間接のみ) だが常時 true が登録済み振る舞い"},
+    {"va": "180054ac0", "name": "LicenseManagerHelper::getPending", "kind": "ret", "value": 0,
+     "reason": "[mgr+0x488] (PACE status==0x1c フラグ) の短絡。ライセンス済み = 未処理 pending 無し。wrapper 0x180054ab0 は本関数への尾跳びなので結果も 0"},
+    {"va": "1800b4ac0", "kind": "ret", "value": 1, "name": "分類 thunk A (0x60003a0>>s, s<=0x1b)",
+     "reason": "機能ゲート (Import 0x180d5e820 / ブラウザ 0x180ef7fc0 / poll 0x180052a00・0x180052830)。許可集合 {5,7,8,9,25,26} の常時 true 化 = 機能ゲート全通過"},
+    {"va": "1800b4ad0", "kind": "ret", "value": 0, "name": "分類 thunk B (0x40001a0>>s, s<=0x1b)",
+     "reason": "バナー 0x180c194f0 の {5,7,8,26} 判定。getStatus≡9 に対する実値は false なので定数 0 が等価 (9 は後続の ==9 分岐でバナー解除)"},
+    {"va": "1800b4ae0", "kind": "ret", "value": 0, "name": "分類 thunk C (s==0x19)",
+     "reason": "s==25 (No license/編集不可) 判定。ライセンス済みでは常に偽"},
+    {"va": "1800b4af0", "kind": "ret", "value": 1, "name": "分類 thunk D (s==9)",
+     "reason": "s==9 (ライセンス済み) 判定。getStatus≡9 に対する実値は true なので定数 1 が等価"},
+    {"va": "1800b4b00", "kind": "ret", "value": 0, "name": "分類 thunk E (s==0xd)",
+     "reason": "s==13 (License has expired.) 判定。ライセンス済みでは常に偽 = 期限切れバナー不発"},
+    {"va": "180021d50", "kind": "ret", "value": 1, "name": "isMasterKey (鍵バッファ→40hex==f6e53827…)",
+     "reason": "マスター鍵常時成立。unlock適用 0x18010a1e0 / 状態計算 0x18010aa20 / 通知 0x18010a740 の全ゲートが「鍵済み」経路を通る → ソース再計算 (boost FileWatcher / PACE) を回避し外部依存を減らす (CAB-59 案C の効果を定数で実現)"},
+    {"va": "180021bd0", "kind": "ret", "value": 26, "name": "鍵ホワイトリスト検証",
+     "reason": "検証結果を常時 0x1a=26 (unlocked, ホワイトリスト 5 個のうち正規鍵 2 系統の戻り値) に固定。transform (0x180021f60, salt as0cd7896g + 未同定ハッシュ) とホワイトリスト照合を短絡"},
+    {"va": "1800219b0", "kind": "apply_key", "name": "unlock 鍵適用",
+     "reason": "状態を 0x1a (26, unlocked) に設定し 1 (成功) を返す。鍵文字列の保持 (+8) は getStatus/0x180054150 が読まないため省略 (実値との差は観測されない)"},
+    {"va": "180021490", "kind": "key_init", "name": "鍵状態初期化",
+     "reason": "実関数の初期化部 (state=0x17, std::string SSO リセット) を再現しつつ found=1 (製品順序表 <ksqe>… 検索の短絡 = 常に登録済み製品)"},
+    {"va": "180002780", "kind": "ret", "value": 0, "name": "KHSUnlock (export)",
+     "reason": "アクティベーション入口の短絡 (鍵バッファ 0x182a2d5f0 への strncpy_s を廃止)。戻り値 void なので 0"}
+  ],
+  "keep_real": [
+    {"va": "1800b4b10", "name": "状態マージ (29 エントリ優先度テーブル)",
+     "reason": "getStatus の内部部品だが入力が常時定数になるため実 IR のまま残し、wasm 実行で優先度テーブルの挙動 (class: 5/7/8/26=4 > 9=3 > 25=2 > 27=1 > 他=0) を検証可能に保つ (純関数・副作用なし)"}
+  ],
+  "modules": {
+    "A": {"comment": "stub 本体モジュール: stub 14 関数 + 実 IR マージ 1 (KHSUnlock 0x180002780 は stage-0 で名前付き export (@KHSUnlock) になるため lift 範囲外 = lic_stub が定型 define を合成)",
+          "lift": ["180054bd0", "1800549c0", "1800548a0", "180054ac0", "1800b4ac0", "1800b4ad0", "1800b4ae0", "1800b4af0", "1800b4b00", "1800b4b10", "180021d50", "180021bd0", "1800219b0", "180021490"],
+          "stub_all": true},
+    "B": {"comment": "対照モジュール: getStatus のみ stub、分類 thunk 5 種とマージは実 IR (stub 定数 ≡ 実関数@9 の等価検証用)",
+          "lift": ["180054bd0", "1800b4ac0", "1800b4ad0", "1800b4ae0", "1800b4af0", "1800b4b00", "1800b4b10"],
+          "stub_all": false,
+          "stub_only": ["180054bd0"]}
+  }
+}
