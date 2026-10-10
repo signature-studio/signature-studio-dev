@@ -1,0 +1,404 @@
+{
+ "version": 1,
+ "keys": [
+  {
+   "hive": "HKLM",
+   "csv_key": "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\FontSubstitutes",
+   "key": "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\FontSubstitutes",
+   "class": "literal",
+   "seeded": true
+  },
+  {
+   "hive": "HKCU",
+   "csv_key": "SOFTWARE\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\https\\UserChoice",
+   "key": "SOFTWARE\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\https\\UserChoice",
+   "class": "literal",
+   "seeded": false
+  },
+  {
+   "hive": "HKCU",
+   "csv_key": "Software\\Classes\\http\\shell\\open\\command",
+   "key": "Software\\Classes\\http\\shell\\open\\command",
+   "class": "literal",
+   "seeded": false
+  },
+  {
+   "hive": "HKCU",
+   "csv_key": "Software\\Image-Line\\FL Studio 26\\General",
+   "key": "Software\\Image-Line\\FL Studio 26\\General",
+   "class": "literal",
+   "seeded": true
+  },
+  {
+   "hive": "HKCU",
+   "csv_key": "Software\\Image-Line\\Registrations\\",
+   "key": "Software\\Image-Line\\Registrations",
+   "class": "literal",
+   "seeded": true
+  },
+  {
+   "hive": "HKCU",
+   "csv_key": "Software\\Image-Line\\Registrations\\FL Data",
+   "key": "Software\\Image-Line\\Registrations\\FL Data",
+   "class": "literal",
+   "seeded": true
+  },
+  {
+   "hive": "HKLM",
+   "csv_key": "Software\\Image-Line\\Registrations\\FL Data",
+   "key": "Software\\Image-Line\\Registrations\\FL Data",
+   "class": "literal",
+   "seeded": true
+  },
+  {
+   "hive": "HKCU",
+   "csv_key": "Software\\Image-Line\\Registrations\\FL Studio 26.1",
+   "key": "Software\\Image-Line\\Registrations\\FL Studio 26.1",
+   "class": "literal",
+   "seeded": true
+  },
+  {
+   "hive": "HKLM",
+   "csv_key": "Software\\Image-Line\\Registrations\\FL Studio 26.1",
+   "key": "Software\\Image-Line\\Registrations\\FL Studio 26.1",
+   "class": "literal",
+   "seeded": true
+  },
+  {
+   "hive": "HKCU",
+   "csv_key": "Software\\Image-Line\\Registrations\\Token",
+   "key": "Software\\Image-Line\\Registrations\\Token",
+   "class": "literal",
+   "seeded": false
+  },
+  {
+   "hive": "HKLM",
+   "csv_key": "Software\\Image-Line\\Registrations\\Token",
+   "key": "Software\\Image-Line\\Registrations\\Token",
+   "class": "literal",
+   "seeded": false
+  },
+  {
+   "hive": "HKCU",
+   "csv_key": "Software\\Image-Line\\Shared\\Paths",
+   "key": "Software\\Image-Line\\Shared\\Paths",
+   "class": "literal",
+   "seeded": true
+  },
+  {
+   "hive": "HKLM",
+   "csv_key": "Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts",
+   "key": "Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts",
+   "class": "literal",
+   "seeded": false
+  },
+  {
+   "hive": "HKLM",
+   "csv_key": "Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\Cubase.exe",
+   "key": "Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\Cubase.exe",
+   "class": "literal",
+   "seeded": false
+  },
+  {
+   "hive": "HKCU",
+   "csv_key": "Software\\Microsoft\\Windows\\CurrentVersion\\Internet settings",
+   "key": "Software\\Microsoft\\Windows\\CurrentVersion\\Internet settings",
+   "class": "literal",
+   "seeded": true
+  },
+  {
+   "hive": "HKLM",
+   "csv_key": "Software\\VST",
+   "key": "Software\\VST",
+   "class": "literal",
+   "seeded": false
+  },
+  {
+   "hive": "HKCU",
+   "csv_key": "Software\\Wow6432Node",
+   "key": "Software\\Wow6432Node",
+   "class": "literal",
+   "seeded": false
+  },
+  {
+   "hive": "HKLM",
+   "csv_key": "software\\asio",
+   "key": "software\\asio",
+   "class": "literal",
+   "seeded": false
+  },
+  {
+   "hive": "HKLM",
+   "csv_key": "software\\microsoft\\Windows NT\\CurrentVersion",
+   "key": "software\\microsoft\\Windows NT\\CurrentVersion",
+   "class": "literal",
+   "seeded": true
+  },
+  {
+   "hive": "HKCU",
+   "csv_key": "Software\\Image-Line\\FL Studio 26\\Envelope editor",
+   "key": "Software\\Image-Line\\FL Studio 26\\Envelope editor",
+   "class": "inferred",
+   "seeded": true
+  },
+  {
+   "hive": "HKCU",
+   "csv_key": "Software\\Image-Line\\FL Studio 26\\Environment",
+   "key": "Software\\Image-Line\\FL Studio 26\\Environment",
+   "class": "inferred",
+   "seeded": false
+  },
+  {
+   "hive": "HKCU",
+   "csv_key": "Software\\Image-Line\\FL Studio 26\\General\\MIDIForm",
+   "key": "Software\\Image-Line\\FL Studio 26\\General\\MIDIForm",
+   "class": "inferred",
+   "seeded": true
+  },
+  {
+   "hive": "HKCU",
+   "csv_key": "Software\\Image-Line\\FL Studio 26\\MRU",
+   "key": "Software\\Image-Line\\FL Studio 26\\MRU",
+   "class": "inferred",
+   "seeded": false
+  },
+  {
+   "hive": "HKCU",
+   "csv_key": "Software\\Image-Line\\FL Studio 26\\Search paths",
+   "key": "Software\\Image-Line\\FL Studio 26\\Search paths",
+   "class": "inferred",
+   "seeded": false
+  },
+  {
+   "hive": "HKCU",
+   "csv_key": "Software\\Image-Line\\Shared\\General",
+   "key": "Software\\Image-Line\\Shared\\General",
+   "class": "literal",
+   "seeded": true
+  },
+  {
+   "hive": "HKCU",
+   "csv_key": "Software\\Image-Line\\Shared\\Language",
+   "key": "Software\\Image-Line\\Shared\\Language",
+   "class": "literal",
+   "seeded": true
+  },
+  {
+   "hive": "HKCU",
+   "csv_key": "Software\\Classes\\.flp\\OpenWithProgids",
+   "key": "Software\\Classes\\.flp\\OpenWithProgids",
+   "class": "installer",
+   "seeded": false
+  },
+  {
+   "hive": "HKLM",
+   "csv_key": "Software\\Classes\\FL64.flp / .fst / .fsc / FL64.exe\\DefaultIcon",
+   "key": "Software\\Classes\\FL64.flp\\DefaultIcon",
+   "class": "installer",
+   "seeded": false
+  },
+  {
+   "hive": "HKLM",
+   "csv_key": "Software\\Classes\\FL64.flp / .fst / .fsc / FL64.exe\\DefaultIcon",
+   "key": "Software\\Classes\\FL64.fst\\DefaultIcon",
+   "class": "installer",
+   "seeded": false
+  },
+  {
+   "hive": "HKLM",
+   "csv_key": "Software\\Classes\\FL64.flp / .fst / .fsc / FL64.exe\\DefaultIcon",
+   "key": "Software\\Classes\\FL64.fsc\\DefaultIcon",
+   "class": "installer",
+   "seeded": false
+  },
+  {
+   "hive": "HKLM",
+   "csv_key": "Software\\Classes\\FL64.flp / .fst / .fsc / FL64.exe\\DefaultIcon",
+   "key": "Software\\Classes\\FL64.exe\\DefaultIcon",
+   "class": "installer",
+   "seeded": false
+  },
+  {
+   "hive": "HKLM",
+   "csv_key": "Software\\Classes\\flstudio",
+   "key": "Software\\Classes\\flstudio",
+   "class": "installer",
+   "seeded": false
+  },
+  {
+   "hive": "HKLM",
+   "csv_key": "Software\\Image-Line\\Capabilities\\FL64 / FL32",
+   "key": "Software\\Image-Line\\Capabilities\\FL64",
+   "class": "installer",
+   "seeded": false
+  },
+  {
+   "hive": "HKLM",
+   "csv_key": "Software\\Image-Line\\Capabilities\\FL64 / FL32",
+   "key": "Software\\Image-Line\\Capabilities\\FL32",
+   "class": "installer",
+   "seeded": false
+  },
+  {
+   "hive": "HKCU",
+   "csv_key": "Software\\Image-Line\\Registrations\\FL Studio",
+   "key": "Software\\Image-Line\\Registrations\\FL Studio",
+   "class": "installer",
+   "seeded": false
+  },
+  {
+   "hive": "HKLM",
+   "csv_key": "Software\\Image-Line\\Shared\\General",
+   "key": "Software\\Image-Line\\Shared\\General",
+   "class": "installer",
+   "seeded": false
+  },
+  {
+   "hive": "HKLM",
+   "csv_key": "Software\\Image-Line\\Shared\\Paths",
+   "key": "Software\\Image-Line\\Shared\\Paths",
+   "class": "installer",
+   "seeded": true
+  },
+  {
+   "hive": "HKLM",
+   "csv_key": "Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\FL64.exe",
+   "key": "Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\FL64.exe",
+   "class": "installer",
+   "seeded": false
+  },
+  {
+   "hive": "HKLM",
+   "csv_key": "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\<ProductGUID>",
+   "key": "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{0F1E1D00-0000-4000-8000-0000574542AD}",
+   "class": "installer",
+   "seeded": false
+  },
+  {
+   "hive": "HKLM",
+   "csv_key": "Software\\SoftVoice\\ImageLine",
+   "key": "Software\\SoftVoice\\ImageLine",
+   "class": "installer",
+   "seeded": false
+  },
+  {
+   "hive": "HKLM",
+   "csv_key": "SOFTWARE\\Microsoft\\Cryptography",
+   "key": "SOFTWARE\\Microsoft\\Cryptography",
+   "class": "literal",
+   "seeded": true
+  },
+  {
+   "hive": "HKLM",
+   "csv_key": "Software\\Borland\\Delphi\\Locales; Software\\Borland\\Locales; Software\\CodeGear\\Locales; Software\\Embarcadero\\Locales",
+   "key": "Software\\Borland\\Delphi\\Locales",
+   "class": "literal",
+   "seeded": false
+  },
+  {
+   "hive": "HKLM",
+   "csv_key": "Software\\Borland\\Delphi\\Locales; Software\\Borland\\Locales; Software\\CodeGear\\Locales; Software\\Embarcadero\\Locales",
+   "key": "Software\\Borland\\Locales",
+   "class": "literal",
+   "seeded": false
+  },
+  {
+   "hive": "HKLM",
+   "csv_key": "Software\\Borland\\Delphi\\Locales; Software\\Borland\\Locales; Software\\CodeGear\\Locales; Software\\Embarcadero\\Locales",
+   "key": "Software\\CodeGear\\Locales",
+   "class": "literal",
+   "seeded": false
+  },
+  {
+   "hive": "HKLM",
+   "csv_key": "Software\\Borland\\Delphi\\Locales; Software\\Borland\\Locales; Software\\CodeGear\\Locales; Software\\Embarcadero\\Locales",
+   "key": "Software\\Embarcadero\\Locales",
+   "class": "literal",
+   "seeded": false
+  },
+  {
+   "hive": "HKCU",
+   "csv_key": "Software\\Classes\\.flp / .fst / .fsc / flstudio",
+   "key": "Software\\Classes\\.flp",
+   "class": "literal",
+   "seeded": false
+  },
+  {
+   "hive": "HKCU",
+   "csv_key": "Software\\Classes\\.flp / .fst / .fsc / flstudio",
+   "key": "Software\\Classes\\.fst",
+   "class": "literal",
+   "seeded": false
+  },
+  {
+   "hive": "HKCU",
+   "csv_key": "Software\\Classes\\.flp / .fst / .fsc / flstudio",
+   "key": "Software\\Classes\\.fsc",
+   "class": "literal",
+   "seeded": false
+  },
+  {
+   "hive": "HKCU",
+   "csv_key": "Software\\Classes\\.flp / .fst / .fsc / flstudio",
+   "key": "Software\\Classes\\flstudio\\shell\\open\\command",
+   "class": "literal",
+   "seeded": false
+  },
+  {
+   "hive": "HKCU",
+   "csv_key": "Software\\Image-Line\\FL Plugin Scanner",
+   "key": "Software\\Image-Line\\FL Plugin Scanner",
+   "class": "literal",
+   "seeded": false
+  },
+  {
+   "hive": "HKCU",
+   "csv_key": "Software\\Image-Line\\FL Studio 26\\Favorite dirs",
+   "key": "Software\\Image-Line\\FL Studio 26\\Favorite dirs",
+   "class": "literal",
+   "seeded": false
+  },
+  {
+   "hive": "HKCU",
+   "csv_key": "Software\\Image-Line\\FL Studio <n-1..> (旧版)",
+   "key": "Software\\Image-Line\\FL Studio 25",
+   "class": "literal",
+   "seeded": false
+  },
+  {
+   "hive": "HKLM",
+   "csv_key": "Software\\Image-Line\\FL Studio <n-1..> (旧版)",
+   "key": "Software\\Image-Line\\FL Studio 25",
+   "class": "literal",
+   "seeded": false
+  },
+  {
+   "hive": "HKCU",
+   "csv_key": "Software\\Image-Line\\Shared\\Browser\\*",
+   "key": "Software\\Image-Line\\Shared\\Browser\\Sounds",
+   "class": "literal",
+   "seeded": false
+  },
+  {
+   "hive": "HKCU",
+   "csv_key": "Software\\Image-Line\\Shared\\Plugin list window",
+   "key": "Software\\Image-Line\\Shared\\Plugin list window",
+   "class": "literal",
+   "seeded": false
+  },
+  {
+   "hive": "HKCU",
+   "csv_key": "Software\\Image-Line\\Shared\\Plugin search paths",
+   "key": "Software\\Image-Line\\Shared\\Plugin search paths",
+   "class": "literal",
+   "seeded": false
+  },
+  {
+   "hive": "HKLM",
+   "csv_key": "System\\CurrentControlSet\\Control\\Keyboard Layouts\\%.8x",
+   "key": "System\\CurrentControlSet\\Control\\Keyboard Layouts\\00000409",
+   "class": "literal",
+   "seeded": true
+  }
+ ]
+}

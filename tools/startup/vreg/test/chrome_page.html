@@ -1,0 +1,35 @@
+<!doctype html><meta charset="utf-8"><title>vreg e2e</title>
+<script type="module">
+import createVregModule from '/build/vreg_wasm.mjs';
+import { Vreg } from '/js/vreg.mjs';
+import { IdbStore } from '/js/store.mjs';
+const seed = await (await fetch('/data/seed.json')).json();
+const GEN = 'Software\\Image-Line\\FL Studio 26\\General';
+async function boot(extra = {}) {
+  const store = new IdbStore({ dbName: 'vreg-e2e' });
+  const v = await Vreg.create({ createModule: createVregModule, seed, store, profile: 'e2e', flushDelayMs: 0, ...extra });
+  return v;
+}
+// phase 1: 新規プロファイル → 書込 → flush
+window.phase1 = async () => {
+  const v = await boot();
+  const r = { restored: v.bootInfo.restored, guid: v.machineGuid, reg: v.observeRegistration().registered,
+    engine: v.readStr('HKCU', 'Software\\Image-Line\\Shared\\Paths', 'FL Studio engine').value };
+  v.writeInt('HKCU', GEN, 'Run counter', 321);
+  v.writeStr('HKLM', 'Software\\Image-Line\\Shared\\General', 'SessionOnly', '1');
+  await v.flush();
+  return r;
+};
+// phase 2: ページ再読込後 → 復元確認
+window.phase2 = async () => {
+  const v = await boot();
+  return { restored: v.bootInfo.restored, guid: v.machineGuid, run: v.readInt('HKCU', GEN, 'Run counter', -1),
+    sessionOnly: v.valueExists('HKLM', 'Software\\Image-Line\\Shared\\General', 'SessionOnly'), reg: v.observeRegistration().registered };
+};
+// phase 3: Trial に切替 → 永続済み状態からでも license が消える
+window.phase3 = async () => {
+  const v = await boot({ licenseFlagBit0: 1 });
+  return { mode: v.licenseMode, reg: v.observeRegistration().registered, run: v.readInt('HKCU', GEN, 'Run counter', -1) };
+};
+window.ready = true;
+</script>
