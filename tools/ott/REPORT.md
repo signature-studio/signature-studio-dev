@@ -2,11 +2,11 @@
 
 ## 0. 結論 (先出し)
 
-- **`bash tools/ott/ott_e2e.sh` = PASS (約 14 秒)**。scenario matrix **89 本 / 50,236 cell が native 実機械語の出力と全 bit 一致
+- **`bash tools/ott/ott_e2e.sh` = PASS (約 15〜20 秒 warm / 初回 約 40 秒)**。scenario matrix **89 本 / 50,236 cell が native 実機械語の出力と全 bit 一致
   (max_ulp = 0)、最終 heap/obj state の差 0 qword**。t1 標準 (512 cell) は **512/512 bit-exact、junk 0**
   (census: zero 5 / normal 507 / junkHi 0 / junkTiny 0 / NaN 0 / |max| 0.2516; 旧 chain は |max| 1.13e36)。
 - **junk の根本原因は「RetDec lift 自体の構造欠陥」** で、M9/M10 が追った band-IIR 係数・exp 系 chain の個別破れは二次症状だった (§2)。
-  特に (1) **間接 call (C++ 仮想呼出 / CFG dispatch) を RetDec が丸ごと脱落** (native 実行された 47 関数内の間接 call/jmp 54 箇所が RetDec IR では 0 件)、
+  特に (1) **間接 call (C++ 仮想呼出 / CFG dispatch) を RetDec が丸ごと脱落** (native 実行された 47 関数内の間接 call/jmp 55 箇所が RetDec IR では call として 0 件; 検査 `diff/count_icall.py`)、
   (2) **小さすぎる global 宣言** (20×f32 の既定値表が `[8 x i8]` → 範囲外読み)、(3) call site の r8/r9 引数脱落、
   (4) CRT 数学 (exp/log/tan/pow) を libm へ置換した hand port の ulp 差、(5) 欠落部を hand port した値の誤り (gate box 定数 10.0 等)。
 - **修復**: RetDec 非依存の **自作 x86-64→C lifter `lift/x64c.py`** (capstone, 命令 1:1)。native 単歩 coverage で実行関数を決め
@@ -27,7 +27,8 @@
 | `lift/x64c.py` | 自作 lifter (capstone → C)。`data_gen.py` .rdata/.data/jump table 敷設, `mkentries.py`, `lift_build.sh` (emcc) |
 | `rt/ott_cpu.{h,c}` `ott_glue.c` `ott_ovr.c` | CPU 状態+flag helper+import(HeapAlloc 他)+JS 入口+CRT 誤差報告 override 4 件 |
 | `diff/matrix.py` | scenario matrix (89 本) 判定 = 本 PASS の本体。`scen2_*` 実行器, `fma_sens.py`, `old_census.mjs`, `perf.mjs` |
-| `diff/cov_nat.py` `ref/cov_all.json` | native 単歩 coverage (194 scenario → 3,157 命令 / call target 45)。`OTT_RECOVER=1` で再取得 (約 90 秒) |
+| `diff/cov_nat.py` `ref/cov_all.json` | native 単歩 coverage (194 scenario → 3,157 命令 / call target 45; params 全 0.0 の 2 scenario は native が CRT 未初期化で落ちる想定内 FAIL)。`OTT_RECOVER=1` で再取得 (+約 100 秒) |
+| `diff/count_icall.py` | D1 の独立検査: 実行済み命令の間接 call/jmp を capstone で数え, RetDec IR と突合 |
 | `diff/{scen,cmp,trace_*,cmp_trace,transplant}.*` | 差分デバッグ資産 (stage dump 比較 / 関数 entry trace / 状態移植実験) |
 | `ott_build.sh` `passes/{gvraw,trace_entry}.py` `rt/ott_{boot,rt,trace}.c` | 旧 RetDec chain の再ビルド (m6-m10 読取専用で出力は tools/ott/work) と診断 pass |
 
@@ -52,7 +53,7 @@ tools/m5..m10 は読取のみ (改変 0 行)。生成物は `tools/ott/work/` (g
 
 | # | 欠陥 | 実測証拠 |
 |---|---|---|
-| D1 | **間接 call/jmp の脱落** (RetDec は `call [rax+0x38]` 等を IR に出力しない) | 実行された 47 関数内の間接 call/jmp **54 箇所** (ctor 22 / de50 18 / resume 4 ほか; `call [rax+0x50]`, `call rdx`, `jmp [rax+0x28]` 等) が IR で **0 件** (IR 全体で `call %reg` 形 0)。ctor の gate box ループ (`call [vt+0x38]`/`[vt+0x80]`) は空ループ化 (raw RetDec 出力 `full_t1.drc.ll` でも同じ)。M9 が box 系を hand port したが定数が誤り (D5) |
+| D1 | **間接 call/jmp の脱落** (RetDec は `call [rax+0x38]` 等を IR に出力しない) | 実行された 47 関数内の間接 call/jmp **55 箇所** (IAT 経由 import call 2 は除く; ctor 22 / de50 18 / resume 4 ほか 11; `call [rax+0x50]`, `call rdx`, `jmp [rax+0x28]` 等) を capstone で数え `!insn.addr` で IR と突合: 45 = 命令ごと消失, 1 = `br` のみ, 8 = `jmp`→`ret` 化, 1 = `call rdx` が `call @function_1801d2750()` (CFG thunk; 真の target 喪失)。**レジスタ/メモリ経由の間接 call は IR 全体で 0 件** (`full_t1.drc.ll`, `ott_memfix1.ll` とも)。ctor の gate box ループ (`call [vt+0x38]`/`[vt+0x80]`) は空ループ化 (raw RetDec 出力 `full_t1.drc.ll` でも同じ)。M9 が box 系を hand port したが定数が誤り (D5) |
 | D2 | 小さすぎる global (範囲外読み) | 既定値表 20×f32 が 8B。400 global 中 256 個が `[8 x i8]`、`load i128` 32 箇所は 8B global から 16B を読む |
 | D3 | call site の引数 reg 脱落 | `function_180127550(this,0,r8=1,r9=0x14)` を IR は 1 引数で呼ぶ → obj+0x20/0x58/0x80 が 0 (native 1/0x14/2) |
 | D4 | CRT 数学を libm 置換 (exp/log/tan/pow) | SVF 係数 8 ブロックの f32 が 1–2 ulp ずれ (`0x3bce1fa2` vs `…fa3`; ctor 直後)。native は DLL 自身の SSE2 実装 |
@@ -107,7 +108,7 @@ matrix 全体 (89 scenario × 出力 50,236 cell) の native bit 一致: 旧 cha
 - 関数集合: native coverage の call target (jmp 経由 CFG thunk・メモリ operand の tail `jmp [vt+x]` を含む) + root 4 + closure 深さ 2。
 - 浮動小数: C の float/double 演算 (`-ffp-contract=off`)、`cvt*`/`comis*`/`cmpXXsd`/`min/max` は x86 意味 (第 2 operand 返し等) を
   helper 化。SSE パックは 128bit union で lane 展開。MXCSR は既定固定 (ldmxcsr は fail-fast)。
-- 速度: -O1, 256 sample block 201 µs → **実時間の約 29 倍** (node 24, `diff/perf.mjs`)。
+- 速度: bit-exact 検証と同一の `ottl.wasm` (-O1), 256 sample block 192 µs → **実時間の約 30 倍** (node 24.19; node 26 では 175 µs / 33 倍; `MOD=work/lift/ottl.cjs node diff/perf.mjs`, params 0.5・正弦入力)。
 
 ## 6. 未解決・制約
 
@@ -120,8 +121,19 @@ matrix 全体 (89 scenario × 出力 50,236 cell) の native bit 一致: 旧 cha
    (SR は harness が `obj+0x18` を直接書く)。native coverage 外の経路で未 lift callee 17 (CRT 誤差報告・lock) に入ると fail-fast。
 4. DllMain (CRT 初期化・static ctor) は実行しない。`__use_fma3`/`__isa_available` 等は DLL 静的値 (0) のまま。lock は no-op (単スレッド)。
 5. NaN の符号・payload は engine 依存 (x86 sqrtsd の default NaN は負符号)。有限値出力に影響しない。
-6. 旧 REPORT 群 (m6–m10) の「band pole / exp chain / [F8] 係数」議論は本診断で二次症状と判明したが、ファイルは読取専用のため未改訂
-   (README/MILESTONES の M10 記述の更新はメイン担当へ提案: 下記)。
+6. 旧 REPORT 群 (m6–m10) の記述は下記 §6.1 の通り誤りだが、tools/m6..m10・README・MILESTONES は読取専用/メイン担当ゆえ未改訂 (T6)。
+
+### 6.1 旧説の訂正 (m6–m10 REPORT / README / MILESTONES の M9・M10 記述に対して)
+
+| 旧記述 | 訂正 (本回の実測) |
+|---|---|
+| M9: junk 175 cell の由来 = band IIR 係数の pole (≈2..4, [0x88]/[0x90]) | 誤り。band 係数は M10 で bit 一致済みでも junk は不変。junk は RetDec lift の構造欠陥 (D1–D6) の結果 |
+| M10: junk の出生 = exp/log chain (±2^65/±2^-63, ×1.0043/sample) | 誤り (二次症状)。chain の個別修復は不要で、間接 call 脱落・小 global・引数脱落・libm 置換の下流で現れた値。旧 chain は [0x248]=0/1 とも junkHi 175/252 のまま |
+| M10→M11 引継: 「[0x248]=1 の x cell denormal 入力 deref 欠落」 | 同上 (二次症状)。lifter 版は [0x248]=0/1 とも native と 512/512 bit 一致 |
+| M8–M10 harness の `U8[obj+0x326]=0` / setParameter(19,0) 経由で junk 経路に入る | 標準 sequence の旧 chain は出力全 0。上記操作で処理経路へ入っていた (観測条件の人為性, §2.1-2) |
+| bit-exact 参照は native 不可 (SEH 依存) / mac AU 等が必要 | 誤り。DLL 機械語を Linux に敷設して直接実行可能 (§3) |
+| MILESTONES: bit-exact 判定は junk-free 確保後 / native poly tan ulp マージ留保 | 解消: 0 ulp 達成 (tan/exp/log/pow も DLL 自身の機械語を lift) |
+| M10 の junk 閾値 (\|v\|≥4) | 目安に過ぎない: params=1.0 では正当出力が 472 まで出る。junk = native と bit が異なる cell と再定義 |
 
 ## 7. 下流チケット案
 
@@ -138,8 +150,9 @@ matrix 全体 (89 scenario × 出力 50,236 cell) の native bit 一致: 旧 cha
 ## 8. 再現
 
 ```sh
-bash tools/ott/ott_e2e.sh                # 約 14 秒。--quick で matrix 縮小
-OTT_RECOVER=1 bash tools/ott/ott_e2e.sh  # native 単歩 coverage から再取得 (+約 90 秒, 並列 12)
+bash tools/ott/ott_e2e.sh                # 約 15〜20 秒 (初回 約 40 秒)。--quick で matrix 縮小
+OTT_RECOVER=1 bash tools/ott/ott_e2e.sh  # native 単歩 coverage から再取得 (全体 約 2 分, 並列 12)
+python3 tools/ott/diff/count_icall.py    # D1 独立検査 (capstone 再計数 vs RetDec IR)
 OTT_ULP_TOL=2 bash tools/ott/ott_e2e.sh  # 許容 ulp 指定
 # 個別: python3 tools/ott/diff/matrix.py tools/ott/work/lift/ottl.cjs ; node tools/ott/diff/perf.mjs
 # 前提: python3 (capstone, pefile), gcc/clang, emsdk 6.0.12 の emcc, node >= 22 (emsdk 同梱 24.19 可), setarch
