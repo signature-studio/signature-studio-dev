@@ -21,7 +21,7 @@ llvm-objdump --macho -d --no-show-raw-insn "$W/dsp_ippv2.arm64" > "$W/dsp_ippv2.
 step "6. 実 Intel IPP (win64 dsp_ippv2_x64.dll を最小 PE ローダで Linux ネイティブ実行) との差分テスト基盤をビルド"
 mkdir -p "$W/bin"; CF="-O2 -ffp-contract=off -fno-fast-math"
 gcc $CF -o "$W/bin/ipp_ref" ref/ipp_ref.c ref/pe_load.c src/ipp_min.c -lm; gcc $CF -o "$W/bin/ipp_acc" ref/ipp_acc.c ref/pe_load.c src/ipp_min.c -lm
-gcc $CF -o "$W/bin/ipp_bench" ref/ipp_bench.c ref/pe_load.c src/ipp_min.c -lm; gcc $CF -o "$W/bin/ipp_fft_ref" ref/ipp_fft_ref.c ref/pe_load.c src/ipp_fft.c src/ipp_min.c -lm
+gcc $CF -o "$W/bin/ipp_bench" ref/ipp_bench.c ref/pe_load.c src/ipp_min.c -lm; gcc $CF -o "$W/bin/ipp_fft_ref" ref/ipp_fft_ref.c ref/pe_load.c shim/fft/ipp_fft_pffft.c shim/fft/pffft/pffft.c shim/fft/pffft/pffft_double.c shim/fft/pffft/pffft_common.c src/ipp_min.c -lm   # FFT 実装は shim/fft (CAB-139)
 ALL=0xFFFFFFFFFFFFFFFF
 "$W/bin/ipp_ref" err $DLL > "$W/err_grid.json"; tail -1 "$W/err_grid.json" | sed 's/^/  /'
 "$W/bin/ipp_ref" cmp $DLL $ALL 2>/dev/null > "$W/cmp_avx512.json"; SPEC=1 "$W/bin/ipp_ref" cmp $DLL $ALL 2>/dev/null > "$W/cmp_avx512_spec.json"

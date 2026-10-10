@@ -2,7 +2,7 @@
    [abi]    thunk デコーダ (本番 thunk と同じ生成器) を実 MS x64 呼出 (gcc ms_abi + 手書き asm トランポリン) で検証。
             スタック上の float/double、値渡し struct 4B/8B、16B 構造体の参照渡し、狭い整数、13 引数。
    [loader] 420 名の GetProcAddress 解決 / legacy90 / LoadLibraryW 名判定 / 未知名
-   [stub]   未実装 377 名を全て呼んで fail-soft (eax=0, xmm0=0, 呼出カウンタ・初回順) を確認
+   [stub]   未実装 363 名 (420 - 実装 57) を全て呼んで fail-soft (eax=0, xmm0=0, 呼出カウンタ・初回順) を確認
    usage: shim_selftest <names.txt>   (1 行 1 名; flengine_ipp_names.json 由来) */
 #include "../src/ipp_shim.h"
 #include <stdio.h>
@@ -14,6 +14,7 @@
 extern void *ipp_tramp_for(int idx);
 
 static int fails = 0, checks = 0;
+static int g_exp_impl = -1, g_exp_stub = -1;
 #define CHK(c, ...) do { checks++; if (!(c)) { fails++; printf("FAIL %s:%d ", __FILE__, __LINE__); printf(__VA_ARGS__); printf("\n"); } } while (0)
 
 static struct { uint64_t u[16]; double d[8]; float f[8]; Ipp32fc c; Ipp64fc z; IppiSize s; IppiRect r; IppiPoint p; Ipp16sc q; const void *ptr[4]; int i[8]; } G;
@@ -85,7 +86,7 @@ static void test_stubs(void) {
     CHK(r == 0 && ipp_shim_calls(i) == 1 && ipp_shim_last_stub() == i, "stub %s ret=%llx calls=%u", e->name, (unsigned long long)r, ipp_shim_calls(i));
     callg(i, 0, 0, 0, 0); CHK(ipp_shim_calls(i) == 2, "stub count x2 %s", e->name);
   }
-  CHK(ni == 43 && ns == 377, "impl %d stubs %d", ni, ns);
+  CHK(ni + ns == ipp_shim_table_count && (g_exp_impl < 0 || (ni == g_exp_impl && ns == g_exp_stub)), "impl %d stubs %d (表 %d, 期待 %d/%d)", ni, ns, ipp_shim_table_count, g_exp_impl, g_exp_stub);
   CHK(ipp_shim_stub_calls_total() == (uint32_t)(2 * ns) && ipp_shim_stub_distinct() == ns, "totals %u distinct %d", ipp_shim_stub_calls_total(), ipp_shim_stub_distinct());
   int ordok = 1; for (int k = 0; k < no; k++) if (ipp_shim_stub_first(k) != order[k]) ordok = 0;
   CHK(ordok && ipp_shim_stub_first(no) == -1, "first-hit order");
@@ -95,6 +96,9 @@ static void test_stubs(void) {
 
 int main(int argc, char **argv) {
   if (argc < 2) return 2;
+  /* 期待 impl/stub 数 (任意): gen_shim.py の sigs_summary.json 由来。実装追加のたびのピン更新を不要にする。
+     省略時は 420 = impl + stub の整合のみ見る。 */
+  if (argc >= 4) { g_exp_impl = atoi(argv[2]); g_exp_stub = atoi(argv[3]); }
   test_abi(); test_loader(argv[1]); test_stubs();
   printf("shim_selftest: checks=%d failed=%d\n", checks, fails);
   return fails ? 1 : 0;

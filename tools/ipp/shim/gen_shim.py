@@ -62,7 +62,8 @@ def check_against_evidence(params, ev):
 
 def implemented_names():
     os.makedirs('/tmp/opencode', exist_ok=True); names = set()
-    files = sorted(glob.glob(f'{IPP}/src/ipp_*.c')) + sorted(glob.glob(f'{HERE}/impl/*.c'))
+    files = sorted(glob.glob(f'{IPP}/src/ipp_*.c')) + sorted(glob.glob(f'{HERE}/fft/*.c')) + \
+        sorted(glob.glob(f'{HERE}/fft/pffft/*.c')) + sorted(glob.glob(f'{HERE}/impl/*.c'))
     for f in files:
         subprocess.run(['gcc', '-c', '-O0', '-I', f'{IPP}/src', '-o', '/tmp/opencode/_shim_nm.o', f], check=True, capture_output=True)
         out = subprocess.run(['nm', '-g', '--defined-only', '/tmp/opencode/_shim_nm.o'], capture_output=True, text=True).stdout
