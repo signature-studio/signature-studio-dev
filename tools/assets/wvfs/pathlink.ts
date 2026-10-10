@@ -29,7 +29,7 @@ export interface Route {
 export interface PathRouter {
   /** Win パス → 書込先 (非対応 / 対象外は null。/fl など RO asset や /c 直下は対象外) */
   route(winPath: string): Route | null;
-  /** 対象外を含む写像の生値 (pathreg mapper の結果。诊断用) */
+  /** 対象外を含む写像の生値 (pathreg mapper の結果。診断用) */
   mapRaw(winPath: string): string | null;
   mounts: { home: string; tmp: string };
 }

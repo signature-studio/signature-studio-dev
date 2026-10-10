@@ -2,7 +2,7 @@
 # wvfs (書込可能 OPFS VFS, RT-5 / CAB-123) の 1 コマンド検収。
 #   bash wvfs/scripts/e2e.sh [--fresh]
 # 前提: node >= 24 (TypeScript 直実行), google-chrome, /opt/emsdk (node probe の emcc), npm i (esbuild)。
-# 構成: node 単体 (63 checks) → Emscripten adapter probe (emcc, node) → Chrome OPFS e2e
+# 構成: node 単体 (64 checks) → Emscripten adapter probe (emcc, node) → Chrome OPFS e2e
 #       (実ディスクプロファイル wvfs/work/chrome-profiles/, 3 起動: seed → verify+torn+compact → verify2)
 set -euo pipefail
 cd "$(dirname "$0")/../.."   # tools/assets (script は wvfs/scripts/)

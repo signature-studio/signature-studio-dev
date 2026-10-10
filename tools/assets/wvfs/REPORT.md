@@ -14,7 +14,7 @@
    レコード = `[recLen][crc32][seq][op][pathLen][dataLen][mtime][path][data]` を flush し、再生時に
    recLen/crc 検証で最終不完全レコードを捨てる。e2e で (a) 末尾書きかけ注入 → 復元 (logicalEnd 巻き戻し確認),
    (b) 中間レコード 1 バイト破壊 → 以降を捨てて以前の state を保持, の両方を実測した (Chrome e2e + node 単体)。
-3. **flush 契約は vreg / pathreg RegBridge と同一インタフェース名** (`onYield()` / `onPageHide()`)。
+3. **flush 契約は pathreg RegBridge と同一インタフェース名** (`onYield()` / `onPageHide()`)。
    ジャーナル append は物理 flush しない → 明示 flush 点 (onYield / onPageHide / `sync()` / `fsync(fd)` / close) で
    flush する。**FS.syncfs 相当口**として Emscripten `mount.type.syncfs(mount, populate, cb)` を実装し、
    `FS.syncfs(false, cb)` で全 wvfs mount をまとめて flush 可 (node 実機 probe で PASS)。
