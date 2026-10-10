@@ -1,0 +1,7162 @@
+{
+ "pe": "block00031_PE.bin",
+ "total_imports": 795,
+ "text_iat_thunks": 889,
+ "imports": [
+  {
+   "dll": "kernel32.dll",
+   "name": "LeaveCriticalSection",
+   "kind": "static",
+   "iat_rva": "0x15715f8",
+   "xref_direct": 2,
+   "xref_via_thunk": 799,
+   "xref": 801
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "EnterCriticalSection",
+   "kind": "static",
+   "iat_rva": "0x1571530",
+   "xref_direct": 2,
+   "xref_via_thunk": 699,
+   "xref": 701
+  },
+  {
+   "dll": "user32.dll",
+   "name": "SendMessageW",
+   "kind": "static",
+   "iat_rva": "0x1570c48",
+   "xref_direct": 3,
+   "xref_via_thunk": 216,
+   "xref": 219
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "MulDiv",
+   "kind": "static",
+   "iat_rva": "0x1571430",
+   "xref_direct": 1,
+   "xref_via_thunk": 164,
+   "xref": 165
+  },
+  {
+   "dll": "user32.dll",
+   "name": "PostMessageW",
+   "kind": "static",
+   "iat_rva": "0x1570b10",
+   "xref_direct": 1,
+   "xref_via_thunk": 139,
+   "xref": 140
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "DeleteObject",
+   "kind": "static",
+   "iat_rva": "0x1571bb0",
+   "xref_direct": 1,
+   "xref_via_thunk": 135,
+   "xref": 136
+  },
+  {
+   "dll": "ole32.dll",
+   "name": "IsEqualGUID",
+   "kind": "static",
+   "iat_rva": "0x1572038",
+   "xref_direct": 3,
+   "xref_via_thunk": 114,
+   "xref": 117
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "FreeLibrary",
+   "kind": "static",
+   "iat_rva": "0x1571370",
+   "xref_direct": 4,
+   "xref_via_thunk": 106,
+   "xref": 110
+  },
+  {
+   "dll": "advapi32.dll",
+   "name": "RegCloseKey",
+   "kind": "static",
+   "iat_rva": "0x1571230",
+   "xref_direct": 2,
+   "xref_via_thunk": 99,
+   "xref": 101
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "SelectObject",
+   "kind": "static",
+   "iat_rva": "0x1571ba8",
+   "xref_direct": 1,
+   "xref_via_thunk": 96,
+   "xref": 97
+  },
+  {
+   "dll": "user32.dll",
+   "name": "ReleaseDC",
+   "kind": "static",
+   "iat_rva": "0x1570bc0",
+   "xref_direct": 1,
+   "xref_via_thunk": 83,
+   "xref": 84
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetCursorPos",
+   "kind": "static",
+   "iat_rva": "0x1570d40",
+   "xref_direct": 1,
+   "xref_via_thunk": 82,
+   "xref": 83
+  },
+  {
+   "dll": "winmm.dll",
+   "name": "timeGetTime",
+   "kind": "static",
+   "iat_rva": "0x1571cb0",
+   "xref_direct": 1,
+   "xref_via_thunk": 79,
+   "xref": 80
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "CloseHandle",
+   "kind": "static",
+   "iat_rva": "0x1571290",
+   "xref_direct": 2,
+   "xref_via_thunk": 73,
+   "xref": 75
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "DeleteCriticalSection",
+   "kind": "static",
+   "iat_rva": "0x1571768",
+   "xref_direct": 2,
+   "xref_via_thunk": 65,
+   "xref": 67
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "InitializeCriticalSection",
+   "kind": "static",
+   "iat_rva": "0x15715a8",
+   "xref_direct": 2,
+   "xref_via_thunk": 65,
+   "xref": 67
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetWindowLongPtrW",
+   "kind": "static",
+   "iat_rva": "0x1570c60",
+   "xref_direct": 1,
+   "xref_via_thunk": 66,
+   "xref": 67
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetLastError",
+   "kind": "static",
+   "iat_rva": "0x15713c0",
+   "xref_direct": 3,
+   "xref_via_thunk": 61,
+   "xref": 64
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetCapture",
+   "kind": "static",
+   "iat_rva": "0x1570ae0",
+   "xref_direct": 1,
+   "xref_via_thunk": 57,
+   "xref": 58
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetSystemMetrics",
+   "kind": "static",
+   "iat_rva": "0x1570e98",
+   "xref_direct": 1,
+   "xref_via_thunk": 54,
+   "xref": 55
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetCurrentThreadId",
+   "kind": "static",
+   "iat_rva": "0x15714f0",
+   "xref_direct": 2,
+   "xref_via_thunk": 51,
+   "xref": 53
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "DeleteDC",
+   "kind": "static",
+   "iat_rva": "0x1571af8",
+   "xref_direct": 1,
+   "xref_via_thunk": 51,
+   "xref": 52
+  },
+  {
+   "dll": "user32.dll",
+   "name": "SetWindowPos",
+   "kind": "static",
+   "iat_rva": "0x1570c90",
+   "xref_direct": 1,
+   "xref_via_thunk": 51,
+   "xref": 52
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "LoadLibraryW",
+   "kind": "static",
+   "iat_rva": "0x15716e0",
+   "xref_direct": 2,
+   "xref_via_thunk": 48,
+   "xref": 50
+  },
+  {
+   "dll": "oleaut32.dll",
+   "name": "VariantInit",
+   "kind": "static",
+   "iat_rva": "0x1571140",
+   "xref_direct": 1,
+   "xref_via_thunk": 48,
+   "xref": 49
+  },
+  {
+   "dll": "advapi32.dll",
+   "name": "RegQueryValueExW",
+   "kind": "static",
+   "iat_rva": "0x1571218",
+   "xref_direct": 2,
+   "xref_via_thunk": 46,
+   "xref": 48
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "BitBlt",
+   "kind": "static",
+   "iat_rva": "0x1571b08",
+   "xref_direct": 1,
+   "xref_via_thunk": 46,
+   "xref": 47
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GlobalUnlock",
+   "kind": "static",
+   "iat_rva": "0x15713e0",
+   "xref_direct": 1,
+   "xref_via_thunk": 44,
+   "xref": 45
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetTickCount",
+   "kind": "static",
+   "iat_rva": "0x1571550",
+   "xref_direct": 2,
+   "xref_via_thunk": 42,
+   "xref": 44
+  },
+  {
+   "dll": "user32.dll",
+   "name": "SetWindowLongPtrW",
+   "kind": "static",
+   "iat_rva": "0x1570c68",
+   "xref_direct": 1,
+   "xref_via_thunk": 43,
+   "xref": 44
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "SetBkColor",
+   "kind": "static",
+   "iat_rva": "0x1571bd8",
+   "xref_direct": 1,
+   "xref_via_thunk": 42,
+   "xref": 43
+  },
+  {
+   "dll": "user32.dll",
+   "name": "SetCursor",
+   "kind": "static",
+   "iat_rva": "0x1571018",
+   "xref_direct": 1,
+   "xref_via_thunk": 39,
+   "xref": 40
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "SelectPalette",
+   "kind": "static",
+   "iat_rva": "0x1571a40",
+   "xref_direct": 1,
+   "xref_via_thunk": 38,
+   "xref": 39
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetModuleHandleW",
+   "kind": "static",
+   "iat_rva": "0x1571368",
+   "xref_direct": 2,
+   "xref_via_thunk": 37,
+   "xref": 39
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetDC",
+   "kind": "static",
+   "iat_rva": "0x1570bb0",
+   "xref_direct": 1,
+   "xref_via_thunk": 36,
+   "xref": 37
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "CopyFileW",
+   "kind": "static",
+   "iat_rva": "0x1571400",
+   "xref_direct": 1,
+   "xref_via_thunk": 35,
+   "xref": 36
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "Sleep",
+   "kind": "static",
+   "iat_rva": "0x1571520",
+   "xref_direct": 3,
+   "xref_via_thunk": 33,
+   "xref": 36
+  },
+  {
+   "dll": "user32.dll",
+   "name": "IntersectRect",
+   "kind": "static",
+   "iat_rva": "0x1570b50",
+   "xref_direct": 1,
+   "xref_via_thunk": 35,
+   "xref": 36
+  },
+  {
+   "dll": "user32.dll",
+   "name": "IsWindowVisible",
+   "kind": "static",
+   "iat_rva": "0x1570c18",
+   "xref_direct": 1,
+   "xref_via_thunk": 33,
+   "xref": 34
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "GetDeviceCaps",
+   "kind": "static",
+   "iat_rva": "0x1571b18",
+   "xref_direct": 1,
+   "xref_via_thunk": 31,
+   "xref": 32
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetCurrentProcess",
+   "kind": "static",
+   "iat_rva": "0x15715b8",
+   "xref_direct": 1,
+   "xref_via_thunk": 31,
+   "xref": 32
+  },
+  {
+   "dll": "user32.dll",
+   "name": "SetFocus",
+   "kind": "static",
+   "iat_rva": "0x1570bb8",
+   "xref_direct": 1,
+   "xref_via_thunk": 31,
+   "xref": 32
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "CreateCompatibleDC",
+   "kind": "static",
+   "iat_rva": "0x1571be8",
+   "xref_direct": 1,
+   "xref_via_thunk": 29,
+   "xref": 30
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetWindowRect",
+   "kind": "static",
+   "iat_rva": "0x15710e0",
+   "xref_direct": 1,
+   "xref_via_thunk": 29,
+   "xref": 30
+  },
+  {
+   "dll": "user32.dll",
+   "name": "ReleaseCapture",
+   "kind": "static",
+   "iat_rva": "0x1570e60",
+   "xref_direct": 1,
+   "xref_via_thunk": 29,
+   "xref": 30
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "DeleteFileW",
+   "kind": "static",
+   "iat_rva": "0x1571718",
+   "xref_direct": 1,
+   "xref_via_thunk": 28,
+   "xref": 29
+  },
+  {
+   "dll": "user32.dll",
+   "name": "OffsetRect",
+   "kind": "static",
+   "iat_rva": "0x1570e18",
+   "xref_direct": 1,
+   "xref_via_thunk": 28,
+   "xref": 29
+  },
+  {
+   "dll": "user32.dll",
+   "name": "ShowWindow",
+   "kind": "static",
+   "iat_rva": "0x1570b68",
+   "xref_direct": 1,
+   "xref_via_thunk": 28,
+   "xref": 29
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GlobalLock",
+   "kind": "static",
+   "iat_rva": "0x15715c0",
+   "xref_direct": 1,
+   "xref_via_thunk": 27,
+   "xref": 28
+  },
+  {
+   "dll": "ole32.dll",
+   "name": "CoTaskMemFree",
+   "kind": "static",
+   "iat_rva": "0x15720e0",
+   "xref_direct": 1,
+   "xref_via_thunk": 27,
+   "xref": 28
+  },
+  {
+   "dll": "user32.dll",
+   "name": "RegisterClipboardFormatW",
+   "kind": "static",
+   "iat_rva": "0x1570e08",
+   "xref_direct": 1,
+   "xref_via_thunk": 27,
+   "xref": 28
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "GetObjectW",
+   "kind": "static",
+   "iat_rva": "0x15719f0",
+   "xref_direct": 1,
+   "xref_via_thunk": 26,
+   "xref": 27
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "SetTextColor",
+   "kind": "static",
+   "iat_rva": "0x15718d0",
+   "xref_direct": 1,
+   "xref_via_thunk": 26,
+   "xref": 27
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "CompareStringW",
+   "kind": "static",
+   "iat_rva": "0x15713f8",
+   "xref_direct": 3,
+   "xref_via_thunk": 24,
+   "xref": 27
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetComputerNameExW",
+   "kind": "static",
+   "iat_rva": "0x1571440",
+   "xref_direct": 1,
+   "xref_via_thunk": 26,
+   "xref": 27
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "QueryPerformanceCounter",
+   "kind": "static",
+   "iat_rva": "0x15716a8",
+   "xref_direct": 2,
+   "xref_via_thunk": 25,
+   "xref": 27
+  },
+  {
+   "dll": "advapi32.dll",
+   "name": "RegOpenKeyExA",
+   "kind": "static",
+   "iat_rva": "0x1571200",
+   "xref_direct": 1,
+   "xref_via_thunk": 25,
+   "xref": 26
+  },
+  {
+   "dll": "user32.dll",
+   "name": "DrawTextW",
+   "kind": "static",
+   "iat_rva": "0x1570bd8",
+   "xref_direct": 2,
+   "xref_via_thunk": 23,
+   "xref": 25
+  },
+  {
+   "dll": "user32.dll",
+   "name": "MapWindowPoints",
+   "kind": "static",
+   "iat_rva": "0x1571050",
+   "xref_direct": 1,
+   "xref_via_thunk": 24,
+   "xref": 25
+  },
+  {
+   "dll": "user32.dll",
+   "name": "SystemParametersInfoW",
+   "kind": "static",
+   "iat_rva": "0x15710d0",
+   "xref_direct": 3,
+   "xref_via_thunk": 22,
+   "xref": 25
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetModuleFileNameW",
+   "kind": "static",
+   "iat_rva": "0x15713c8",
+   "xref_direct": 2,
+   "xref_via_thunk": 22,
+   "xref": 24
+  },
+  {
+   "dll": "user32.dll",
+   "name": "DefWindowProcW",
+   "kind": "static",
+   "iat_rva": "0x1570ef8",
+   "xref_direct": 1,
+   "xref_via_thunk": 22,
+   "xref": 23
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "SetWindowOrgEx",
+   "kind": "static",
+   "iat_rva": "0x1571a58",
+   "xref_direct": 1,
+   "xref_via_thunk": 21,
+   "xref": 22
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetKeyState",
+   "kind": "static",
+   "iat_rva": "0x1570d68",
+   "xref_direct": 1,
+   "xref_via_thunk": 21,
+   "xref": 22
+  },
+  {
+   "dll": "user32.dll",
+   "name": "PeekMessageW",
+   "kind": "static",
+   "iat_rva": "0x1570dd0",
+   "xref_direct": 1,
+   "xref_via_thunk": 21,
+   "xref": 22
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "CombineRgn",
+   "kind": "static",
+   "iat_rva": "0x1571b50",
+   "xref_direct": 1,
+   "xref_via_thunk": 20,
+   "xref": 21
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "RestoreDC",
+   "kind": "static",
+   "iat_rva": "0x1571908",
+   "xref_direct": 1,
+   "xref_via_thunk": 20,
+   "xref": 21
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "MoveFileW",
+   "kind": "static",
+   "iat_rva": "0x1571460",
+   "xref_direct": 1,
+   "xref_via_thunk": 20,
+   "xref": 21
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "UnmapViewOfFile",
+   "kind": "static",
+   "iat_rva": "0x1571688",
+   "xref_direct": 1,
+   "xref_via_thunk": 20,
+   "xref": 21
+  },
+  {
+   "dll": "user32.dll",
+   "name": "FillRect",
+   "kind": "static",
+   "iat_rva": "0x1570a68",
+   "xref_direct": 1,
+   "xref_via_thunk": 20,
+   "xref": 21
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "SetLastError",
+   "kind": "static",
+   "iat_rva": "0x15713d0",
+   "xref_direct": 1,
+   "xref_via_thunk": 19,
+   "xref": 20
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetParent",
+   "kind": "static",
+   "iat_rva": "0x1570f58",
+   "xref_direct": 1,
+   "xref_via_thunk": 19,
+   "xref": 20
+  },
+  {
+   "dll": "user32.dll",
+   "name": "InvalidateRect",
+   "kind": "static",
+   "iat_rva": "0x1570ff0",
+   "xref_direct": 2,
+   "xref_via_thunk": 18,
+   "xref": 20
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GlobalAlloc",
+   "kind": "static",
+   "iat_rva": "0x15713d8",
+   "xref_direct": 1,
+   "xref_via_thunk": 18,
+   "xref": 19
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GlobalFree",
+   "kind": "static",
+   "iat_rva": "0x1571510",
+   "xref_direct": 1,
+   "xref_via_thunk": 18,
+   "xref": 19
+  },
+  {
+   "dll": "ole32.dll",
+   "name": "ReleaseStgMedium",
+   "kind": "static",
+   "iat_rva": "0x15720b8",
+   "xref_direct": 1,
+   "xref_via_thunk": 18,
+   "xref": 19
+  },
+  {
+   "dll": "user32.dll",
+   "name": "RedrawWindow",
+   "kind": "static",
+   "iat_rva": "0x1570f20",
+   "xref_direct": 1,
+   "xref_via_thunk": 18,
+   "xref": 19
+  },
+  {
+   "dll": "user32.dll",
+   "name": "SetActiveWindow",
+   "kind": "static",
+   "iat_rva": "0x1570aa0",
+   "xref_direct": 1,
+   "xref_via_thunk": 18,
+   "xref": 19
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "CreateEventW",
+   "kind": "static",
+   "iat_rva": "0x15717e0",
+   "xref_direct": 1,
+   "xref_via_thunk": 17,
+   "xref": 18
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "SetEvent",
+   "kind": "static",
+   "iat_rva": "0x15716f0",
+   "xref_direct": 1,
+   "xref_via_thunk": 17,
+   "xref": 18
+  },
+  {
+   "dll": "shell32.dll",
+   "name": "ShellExecuteW",
+   "kind": "static",
+   "iat_rva": "0x1571fd8",
+   "xref_direct": 1,
+   "xref_via_thunk": 17,
+   "xref": 18
+  },
+  {
+   "dll": "user32.dll",
+   "name": "DrawEdge",
+   "kind": "static",
+   "iat_rva": "0x1570ab0",
+   "xref_direct": 1,
+   "xref_via_thunk": 17,
+   "xref": 18
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetWindowPlacement",
+   "kind": "static",
+   "iat_rva": "0x1570da0",
+   "xref_direct": 2,
+   "xref_via_thunk": 16,
+   "xref": 18
+  },
+  {
+   "dll": "user32.dll",
+   "name": "InflateRect",
+   "kind": "static",
+   "iat_rva": "0x1570e50",
+   "xref_direct": 1,
+   "xref_via_thunk": 17,
+   "xref": 18
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "RealizePalette",
+   "kind": "static",
+   "iat_rva": "0x1571ab0",
+   "xref_direct": 1,
+   "xref_via_thunk": 16,
+   "xref": 17
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "CreateFileW",
+   "kind": "static",
+   "iat_rva": "0x1571700",
+   "xref_direct": 2,
+   "xref_via_thunk": 15,
+   "xref": 17
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "WaitForSingleObject",
+   "kind": "static",
+   "iat_rva": "0x1571738",
+   "xref_direct": 1,
+   "xref_via_thunk": 16,
+   "xref": 17
+  },
+  {
+   "dll": "user32.dll",
+   "name": "EndPaint",
+   "kind": "static",
+   "iat_rva": "0x1570f28",
+   "xref_direct": 1,
+   "xref_via_thunk": 16,
+   "xref": 17
+  },
+  {
+   "dll": "advapi32.dll",
+   "name": "RegOpenKeyExW",
+   "kind": "static",
+   "iat_rva": "0x15711f0",
+   "xref_direct": 2,
+   "xref_via_thunk": 14,
+   "xref": 16
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "CreateRectRgn",
+   "kind": "static",
+   "iat_rva": "0x1571aa0",
+   "xref_direct": 1,
+   "xref_via_thunk": 15,
+   "xref": 16
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "CreateRectRgnIndirect",
+   "kind": "static",
+   "iat_rva": "0x1571a30",
+   "xref_direct": 1,
+   "xref_via_thunk": 15,
+   "xref": 16
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "OffsetRgn",
+   "kind": "static",
+   "iat_rva": "0x1571bd0",
+   "xref_direct": 1,
+   "xref_via_thunk": 15,
+   "xref": 16
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetLocaleInfoW",
+   "kind": "static",
+   "iat_rva": "0x15716f8",
+   "xref_direct": 3,
+   "xref_via_thunk": 13,
+   "xref": 16
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "SetErrorMode",
+   "kind": "static",
+   "iat_rva": "0x1571780",
+   "xref_direct": 1,
+   "xref_via_thunk": 15,
+   "xref": 16
+  },
+  {
+   "dll": "user32.dll",
+   "name": "DispatchMessageW",
+   "kind": "static",
+   "iat_rva": "0x1570e28",
+   "xref_direct": 2,
+   "xref_via_thunk": 14,
+   "xref": 16
+  },
+  {
+   "dll": "user32.dll",
+   "name": "PtInRect",
+   "kind": "static",
+   "iat_rva": "0x1570c20",
+   "xref_direct": 1,
+   "xref_via_thunk": 15,
+   "xref": 16
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetProcAddress",
+   "kind": "static",
+   "iat_rva": "0x1571600",
+   "xref_direct": 3,
+   "xref_via_thunk": 12,
+   "xref": 15
+  },
+  {
+   "dll": "ole32.dll",
+   "name": "CoCreateInstance",
+   "kind": "static",
+   "iat_rva": "0x1572018",
+   "xref_direct": 1,
+   "xref_via_thunk": 14,
+   "xref": 15
+  },
+  {
+   "dll": "ole32.dll",
+   "name": "PropVariantClear",
+   "kind": "delay",
+   "iat_rva": "0x15763d8",
+   "xref_direct": 1,
+   "xref_via_thunk": 14,
+   "xref": 15
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "LineTo",
+   "kind": "static",
+   "iat_rva": "0x1571b88",
+   "xref_direct": 1,
+   "xref_via_thunk": 13,
+   "xref": 14
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "StretchBlt",
+   "kind": "static",
+   "iat_rva": "0x15718e0",
+   "xref_direct": 1,
+   "xref_via_thunk": 13,
+   "xref": 14
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetCurrentProcessId",
+   "kind": "static",
+   "iat_rva": "0x15712a0",
+   "xref_direct": 1,
+   "xref_via_thunk": 13,
+   "xref": 14
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetFocus",
+   "kind": "static",
+   "iat_rva": "0x1570ba8",
+   "xref_direct": 1,
+   "xref_via_thunk": 13,
+   "xref": 14
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetWindowThreadProcessId",
+   "kind": "static",
+   "iat_rva": "0x1570f18",
+   "xref_direct": 2,
+   "xref_via_thunk": 12,
+   "xref": 14
+  },
+  {
+   "dll": "user32.dll",
+   "name": "SetTimer",
+   "kind": "static",
+   "iat_rva": "0x1570df0",
+   "xref_direct": 1,
+   "xref_via_thunk": 13,
+   "xref": 14
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "GetTextExtentPoint32W",
+   "kind": "static",
+   "iat_rva": "0x1571b20",
+   "xref_direct": 2,
+   "xref_via_thunk": 11,
+   "xref": 13
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "SaveDC",
+   "kind": "static",
+   "iat_rva": "0x1571b00",
+   "xref_direct": 1,
+   "xref_via_thunk": 12,
+   "xref": 13
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetFileAttributesW",
+   "kind": "static",
+   "iat_rva": "0x1571590",
+   "xref_direct": 1,
+   "xref_via_thunk": 12,
+   "xref": 13
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetStdHandle",
+   "kind": "static",
+   "iat_rva": "0x1571348",
+   "xref_direct": 2,
+   "xref_via_thunk": 11,
+   "xref": 13
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "LocalFree",
+   "kind": "static",
+   "iat_rva": "0x1571298",
+   "xref_direct": 3,
+   "xref_via_thunk": 10,
+   "xref": 13
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "MultiByteToWideChar",
+   "kind": "static",
+   "iat_rva": "0x15716d0",
+   "xref_direct": 2,
+   "xref_via_thunk": 11,
+   "xref": 13
+  },
+  {
+   "dll": "user32.dll",
+   "name": "CallWindowProcW",
+   "kind": "static",
+   "iat_rva": "0x1571060",
+   "xref_direct": 1,
+   "xref_via_thunk": 12,
+   "xref": 13
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetAsyncKeyState",
+   "kind": "static",
+   "iat_rva": "0x1570b80",
+   "xref_direct": 1,
+   "xref_via_thunk": 12,
+   "xref": 13
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetWindow",
+   "kind": "static",
+   "iat_rva": "0x15710d8",
+   "xref_direct": 2,
+   "xref_via_thunk": 11,
+   "xref": 13
+  },
+  {
+   "dll": "user32.dll",
+   "name": "IsWindowEnabled",
+   "kind": "static",
+   "iat_rva": "0x1571100",
+   "xref_direct": 1,
+   "xref_via_thunk": 12,
+   "xref": 13
+  },
+  {
+   "dll": "user32.dll",
+   "name": "RegisterWindowMessageW",
+   "kind": "static",
+   "iat_rva": "0x1570a58",
+   "xref_direct": 1,
+   "xref_via_thunk": 12,
+   "xref": 13
+  },
+  {
+   "dll": "user32.dll",
+   "name": "SetRect",
+   "kind": "static",
+   "iat_rva": "0x1570d60",
+   "xref_direct": 1,
+   "xref_via_thunk": 12,
+   "xref": 13
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "ExcludeClipRect",
+   "kind": "static",
+   "iat_rva": "0x1571a48",
+   "xref_direct": 1,
+   "xref_via_thunk": 11,
+   "xref": 12
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "SelectClipRgn",
+   "kind": "static",
+   "iat_rva": "0x15718f8",
+   "xref_direct": 1,
+   "xref_via_thunk": 11,
+   "xref": 12
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "SetStretchBltMode",
+   "kind": "static",
+   "iat_rva": "0x1571b78",
+   "xref_direct": 1,
+   "xref_via_thunk": 11,
+   "xref": 12
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "OutputDebugStringW",
+   "kind": "static",
+   "iat_rva": "0x1571498",
+   "xref_direct": 1,
+   "xref_via_thunk": 11,
+   "xref": 12
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "WriteFile",
+   "kind": "static",
+   "iat_rva": "0x1571750",
+   "xref_direct": 3,
+   "xref_via_thunk": 9,
+   "xref": 12
+  },
+  {
+   "dll": "user32.dll",
+   "name": "BeginPaint",
+   "kind": "static",
+   "iat_rva": "0x1570e00",
+   "xref_direct": 1,
+   "xref_via_thunk": 11,
+   "xref": 12
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetClassInfoW",
+   "kind": "static",
+   "iat_rva": "0x1570a90",
+   "xref_direct": 1,
+   "xref_via_thunk": 11,
+   "xref": 12
+  },
+  {
+   "dll": "user32.dll",
+   "name": "SetCursorPos",
+   "kind": "static",
+   "iat_rva": "0x1570d38",
+   "xref_direct": 1,
+   "xref_via_thunk": 11,
+   "xref": 12
+  },
+  {
+   "dll": "user32.dll",
+   "name": "SetPhysicalCursorPos",
+   "kind": "delay",
+   "iat_rva": "0x1576308",
+   "xref_direct": 1,
+   "xref_via_thunk": 11,
+   "xref": 12
+  },
+  {
+   "dll": "comctl32.dll",
+   "name": "ImageList_DrawEx",
+   "kind": "static",
+   "iat_rva": "0x1571e88",
+   "xref_direct": 1,
+   "xref_via_thunk": 10,
+   "xref": 11
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "GetStockObject",
+   "kind": "static",
+   "iat_rva": "0x1571958",
+   "xref_direct": 1,
+   "xref_via_thunk": 10,
+   "xref": 11
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "GetTextMetricsW",
+   "kind": "static",
+   "iat_rva": "0x1571918",
+   "xref_direct": 1,
+   "xref_via_thunk": 10,
+   "xref": 11
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "WideCharToMultiByte",
+   "kind": "static",
+   "iat_rva": "0x15716c8",
+   "xref_direct": 2,
+   "xref_via_thunk": 9,
+   "xref": 11
+  },
+  {
+   "dll": "user32.dll",
+   "name": "CharNextW",
+   "kind": "static",
+   "iat_rva": "0x1570ba0",
+   "xref_direct": 3,
+   "xref_via_thunk": 8,
+   "xref": 11
+  },
+  {
+   "dll": "user32.dll",
+   "name": "DeleteMenu",
+   "kind": "static",
+   "iat_rva": "0x1571118",
+   "xref_direct": 1,
+   "xref_via_thunk": 10,
+   "xref": 11
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetClientRect",
+   "kind": "static",
+   "iat_rva": "0x1570b38",
+   "xref_direct": 1,
+   "xref_via_thunk": 10,
+   "xref": 11
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetClipboardData",
+   "kind": "static",
+   "iat_rva": "0x1570ed0",
+   "xref_direct": 1,
+   "xref_via_thunk": 10,
+   "xref": 11
+  },
+  {
+   "dll": "user32.dll",
+   "name": "LoadStringW",
+   "kind": "static",
+   "iat_rva": "0x1570c78",
+   "xref_direct": 3,
+   "xref_via_thunk": 8,
+   "xref": 11
+  },
+  {
+   "dll": "user32.dll",
+   "name": "NotifyWinEvent",
+   "kind": "static",
+   "iat_rva": "0x1570c58",
+   "xref_direct": 1,
+   "xref_via_thunk": 10,
+   "xref": 11
+  },
+  {
+   "dll": "user32.dll",
+   "name": "UnregisterClassW",
+   "kind": "static",
+   "iat_rva": "0x1570c38",
+   "xref_direct": 1,
+   "xref_via_thunk": 10,
+   "xref": 11
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "CreatePalette",
+   "kind": "static",
+   "iat_rva": "0x1571930",
+   "xref_direct": 1,
+   "xref_via_thunk": 9,
+   "xref": 10
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "GetDIBits",
+   "kind": "static",
+   "iat_rva": "0x1571b80",
+   "xref_direct": 1,
+   "xref_via_thunk": 9,
+   "xref": 10
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "IntersectClipRect",
+   "kind": "static",
+   "iat_rva": "0x1571b40",
+   "xref_direct": 1,
+   "xref_via_thunk": 9,
+   "xref": 10
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "MoveToEx",
+   "kind": "static",
+   "iat_rva": "0x1571970",
+   "xref_direct": 1,
+   "xref_via_thunk": 9,
+   "xref": 10
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetThreadLocale",
+   "kind": "static",
+   "iat_rva": "0x15717f8",
+   "xref_direct": 1,
+   "xref_via_thunk": 9,
+   "xref": 10
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "MapViewOfFile",
+   "kind": "static",
+   "iat_rva": "0x1571410",
+   "xref_direct": 1,
+   "xref_via_thunk": 9,
+   "xref": 10
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "SetProcessAffinityMask",
+   "kind": "static",
+   "iat_rva": "0x1571680",
+   "xref_direct": 1,
+   "xref_via_thunk": 9,
+   "xref": 10
+  },
+  {
+   "dll": "user32.dll",
+   "name": "CreateWindowExW",
+   "kind": "static",
+   "iat_rva": "0x1570db8",
+   "xref_direct": 1,
+   "xref_via_thunk": 9,
+   "xref": 10
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetActiveWindow",
+   "kind": "static",
+   "iat_rva": "0x1570aa8",
+   "xref_direct": 1,
+   "xref_via_thunk": 9,
+   "xref": 10
+  },
+  {
+   "dll": "user32.dll",
+   "name": "UnionRect",
+   "kind": "static",
+   "iat_rva": "0x1570e88",
+   "xref_direct": 1,
+   "xref_via_thunk": 9,
+   "xref": 10
+  },
+  {
+   "dll": "wininet.dll",
+   "name": "InternetCloseHandle",
+   "kind": "static",
+   "iat_rva": "0x1571d70",
+   "xref_direct": 1,
+   "xref_via_thunk": 9,
+   "xref": 10
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "CreateBitmap",
+   "kind": "static",
+   "iat_rva": "0x1571b48",
+   "xref_direct": 1,
+   "xref_via_thunk": 8,
+   "xref": 9
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "CreateCompatibleBitmap",
+   "kind": "static",
+   "iat_rva": "0x1571888",
+   "xref_direct": 1,
+   "xref_via_thunk": 8,
+   "xref": 9
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "CreatePen",
+   "kind": "static",
+   "iat_rva": "0x1571948",
+   "xref_direct": 1,
+   "xref_via_thunk": 8,
+   "xref": 9
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "ExtTextOutW",
+   "kind": "static",
+   "iat_rva": "0x1571c28",
+   "xref_direct": 2,
+   "xref_via_thunk": 7,
+   "xref": 9
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "GetClipBox",
+   "kind": "static",
+   "iat_rva": "0x1571b28",
+   "xref_direct": 1,
+   "xref_via_thunk": 8,
+   "xref": 9
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "GetEnhMetaFileHeader",
+   "kind": "static",
+   "iat_rva": "0x15718a0",
+   "xref_direct": 1,
+   "xref_via_thunk": 8,
+   "xref": 9
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "GetPaletteEntries",
+   "kind": "static",
+   "iat_rva": "0x1571c60",
+   "xref_direct": 1,
+   "xref_via_thunk": 8,
+   "xref": 9
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "SetBkMode",
+   "kind": "static",
+   "iat_rva": "0x1571878",
+   "xref_direct": 1,
+   "xref_via_thunk": 8,
+   "xref": 9
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "SetPixelV",
+   "kind": "static",
+   "iat_rva": "0x1571928",
+   "xref_direct": 1,
+   "xref_via_thunk": 8,
+   "xref": 9
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetFileAttributesExW",
+   "kind": "static",
+   "iat_rva": "0x15714b8",
+   "xref_direct": 1,
+   "xref_via_thunk": 8,
+   "xref": 9
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetTempPathW",
+   "kind": "static",
+   "iat_rva": "0x15715d8",
+   "xref_direct": 1,
+   "xref_via_thunk": 8,
+   "xref": 9
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetVersionExW",
+   "kind": "static",
+   "iat_rva": "0x1571618",
+   "xref_direct": 2,
+   "xref_via_thunk": 7,
+   "xref": 9
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GlobalSize",
+   "kind": "static",
+   "iat_rva": "0x1571320",
+   "xref_direct": 1,
+   "xref_via_thunk": 8,
+   "xref": 9
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "QueryPerformanceFrequency",
+   "kind": "static",
+   "iat_rva": "0x15712d0",
+   "xref_direct": 1,
+   "xref_via_thunk": 8,
+   "xref": 9
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "ResetEvent",
+   "kind": "static",
+   "iat_rva": "0x1571428",
+   "xref_direct": 1,
+   "xref_via_thunk": 8,
+   "xref": 9
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "SetFileAttributesW",
+   "kind": "static",
+   "iat_rva": "0x1571248",
+   "xref_direct": 1,
+   "xref_via_thunk": 8,
+   "xref": 9
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "VerSetConditionMask",
+   "kind": "static",
+   "iat_rva": "0x1571658",
+   "xref_direct": 2,
+   "xref_via_thunk": 7,
+   "xref": 9
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "VirtualFree",
+   "kind": "static",
+   "iat_rva": "0x15712f0",
+   "xref_direct": 2,
+   "xref_via_thunk": 7,
+   "xref": 9
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "VirtualQuery",
+   "kind": "static",
+   "iat_rva": "0x1571508",
+   "xref_direct": 2,
+   "xref_via_thunk": 7,
+   "xref": 9
+  },
+  {
+   "dll": "user32.dll",
+   "name": "DestroyWindow",
+   "kind": "static",
+   "iat_rva": "0x1570b90",
+   "xref_direct": 1,
+   "xref_via_thunk": 8,
+   "xref": 9
+  },
+  {
+   "dll": "user32.dll",
+   "name": "IsIconic",
+   "kind": "static",
+   "iat_rva": "0x1570b58",
+   "xref_direct": 1,
+   "xref_via_thunk": 8,
+   "xref": 9
+  },
+  {
+   "dll": "user32.dll",
+   "name": "LockWindowUpdate",
+   "kind": "static",
+   "iat_rva": "0x1570be8",
+   "xref_direct": 1,
+   "xref_via_thunk": 8,
+   "xref": 9
+  },
+  {
+   "dll": "user32.dll",
+   "name": "MessageBoxW",
+   "kind": "static",
+   "iat_rva": "0x1570f80",
+   "xref_direct": 2,
+   "xref_via_thunk": 7,
+   "xref": 9
+  },
+  {
+   "dll": "user32.dll",
+   "name": "RegisterClassW",
+   "kind": "static",
+   "iat_rva": "0x1570b98",
+   "xref_direct": 1,
+   "xref_via_thunk": 8,
+   "xref": 9
+  },
+  {
+   "dll": "user32.dll",
+   "name": "SetCapture",
+   "kind": "static",
+   "iat_rva": "0x1570ad8",
+   "xref_direct": 1,
+   "xref_via_thunk": 8,
+   "xref": 9
+  },
+  {
+   "dll": "uxtheme.dll",
+   "name": "EndBufferedPaint",
+   "kind": "delay",
+   "iat_rva": "0x1576408",
+   "xref_direct": 1,
+   "xref_via_thunk": 8,
+   "xref": 9
+  },
+  {
+   "dll": "api-ms-win-crt-string-l1-1-0.dll",
+   "name": "memset",
+   "kind": "static",
+   "iat_rva": "0x1572170",
+   "xref_direct": 1,
+   "xref_via_thunk": 7,
+   "xref": 8
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "CreateFontIndirectW",
+   "kind": "static",
+   "iat_rva": "0x15719d0",
+   "xref_direct": 1,
+   "xref_via_thunk": 7,
+   "xref": 8
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "GdiFlush",
+   "kind": "static",
+   "iat_rva": "0x1571c40",
+   "xref_direct": 1,
+   "xref_via_thunk": 7,
+   "xref": 8
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "PatBlt",
+   "kind": "static",
+   "iat_rva": "0x1571ad8",
+   "xref_direct": 1,
+   "xref_via_thunk": 7,
+   "xref": 8
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "CreateFileMappingW",
+   "kind": "static",
+   "iat_rva": "0x1571758",
+   "xref_direct": 1,
+   "xref_via_thunk": 7,
+   "xref": 8
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "FindClose",
+   "kind": "static",
+   "iat_rva": "0x15716d8",
+   "xref_direct": 2,
+   "xref_via_thunk": 6,
+   "xref": 8
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "FindFirstFileW",
+   "kind": "static",
+   "iat_rva": "0x1571660",
+   "xref_direct": 2,
+   "xref_via_thunk": 6,
+   "xref": 8
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetSystemInfo",
+   "kind": "static",
+   "iat_rva": "0x15715e8",
+   "xref_direct": 2,
+   "xref_via_thunk": 6,
+   "xref": 8
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "LocalAlloc",
+   "kind": "static",
+   "iat_rva": "0x15717c8",
+   "xref_direct": 2,
+   "xref_via_thunk": 6,
+   "xref": 8
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "RaiseException",
+   "kind": "static",
+   "iat_rva": "0x1571468",
+   "xref_direct": 3,
+   "xref_via_thunk": 5,
+   "xref": 8
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "SetCurrentDirectoryW",
+   "kind": "static",
+   "iat_rva": "0x1571598",
+   "xref_direct": 3,
+   "xref_via_thunk": 5,
+   "xref": 8
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "SetFilePointer",
+   "kind": "static",
+   "iat_rva": "0x1571538",
+   "xref_direct": 2,
+   "xref_via_thunk": 6,
+   "xref": 8
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "VirtualAlloc",
+   "kind": "static",
+   "iat_rva": "0x15715d0",
+   "xref_direct": 2,
+   "xref_via_thunk": 6,
+   "xref": 8
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "VirtualProtect",
+   "kind": "static",
+   "iat_rva": "0x15712b0",
+   "xref_direct": 2,
+   "xref_via_thunk": 6,
+   "xref": 8
+  },
+  {
+   "dll": "ole32.dll",
+   "name": "CoUninitialize",
+   "kind": "static",
+   "iat_rva": "0x15720b0",
+   "xref_direct": 1,
+   "xref_via_thunk": 7,
+   "xref": 8
+  },
+  {
+   "dll": "oleaut32.dll",
+   "name": "SysFreeString",
+   "kind": "static",
+   "iat_rva": "0x1571150",
+   "xref_direct": 2,
+   "xref_via_thunk": 6,
+   "xref": 8
+  },
+  {
+   "dll": "user32.dll",
+   "name": "CallNextHookEx",
+   "kind": "static",
+   "iat_rva": "0x1570b60",
+   "xref_direct": 1,
+   "xref_via_thunk": 7,
+   "xref": 8
+  },
+  {
+   "dll": "user32.dll",
+   "name": "ClientToScreen",
+   "kind": "static",
+   "iat_rva": "0x1570ec0",
+   "xref_direct": 1,
+   "xref_via_thunk": 7,
+   "xref": 8
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetWindowDC",
+   "kind": "static",
+   "iat_rva": "0x1570ca8",
+   "xref_direct": 1,
+   "xref_via_thunk": 7,
+   "xref": 8
+  },
+  {
+   "dll": "user32.dll",
+   "name": "IsWindow",
+   "kind": "static",
+   "iat_rva": "0x1570fd8",
+   "xref_direct": 1,
+   "xref_via_thunk": 7,
+   "xref": 8
+  },
+  {
+   "dll": "user32.dll",
+   "name": "LoadCursorW",
+   "kind": "static",
+   "iat_rva": "0x1570e70",
+   "xref_direct": 1,
+   "xref_via_thunk": 7,
+   "xref": 8
+  },
+  {
+   "dll": "user32.dll",
+   "name": "MapVirtualKeyW",
+   "kind": "static",
+   "iat_rva": "0x1570e10",
+   "xref_direct": 1,
+   "xref_via_thunk": 7,
+   "xref": 8
+  },
+  {
+   "dll": "user32.dll",
+   "name": "PhysicalToLogicalPoint",
+   "kind": "delay",
+   "iat_rva": "0x1576310",
+   "xref_direct": 1,
+   "xref_via_thunk": 7,
+   "xref": 8
+  },
+  {
+   "dll": "user32.dll",
+   "name": "SetClipboardData",
+   "kind": "static",
+   "iat_rva": "0x1570ec8",
+   "xref_direct": 1,
+   "xref_via_thunk": 7,
+   "xref": 8
+  },
+  {
+   "dll": "user32.dll",
+   "name": "SetWindowPlacement",
+   "kind": "static",
+   "iat_rva": "0x1570ed8",
+   "xref_direct": 2,
+   "xref_via_thunk": 6,
+   "xref": 8
+  },
+  {
+   "dll": "user32.dll",
+   "name": "SetWindowsHookExW",
+   "kind": "static",
+   "iat_rva": "0x1570fa8",
+   "xref_direct": 1,
+   "xref_via_thunk": 7,
+   "xref": 8
+  },
+  {
+   "dll": "user32.dll",
+   "name": "TranslateMessage",
+   "kind": "static",
+   "iat_rva": "0x1571048",
+   "xref_direct": 1,
+   "xref_via_thunk": 7,
+   "xref": 8
+  },
+  {
+   "dll": "user32.dll",
+   "name": "UnhookWindowsHookEx",
+   "kind": "static",
+   "iat_rva": "0x1570ad0",
+   "xref_direct": 1,
+   "xref_via_thunk": 7,
+   "xref": 8
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "CreateDIBSection",
+   "kind": "static",
+   "iat_rva": "0x1571b70",
+   "xref_direct": 1,
+   "xref_via_thunk": 6,
+   "xref": 7
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "CreateSolidBrush",
+   "kind": "static",
+   "iat_rva": "0x1571960",
+   "xref_direct": 1,
+   "xref_via_thunk": 6,
+   "xref": 7
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "FileTimeToSystemTime",
+   "kind": "static",
+   "iat_rva": "0x15714e8",
+   "xref_direct": 1,
+   "xref_via_thunk": 6,
+   "xref": 7
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "FormatMessageW",
+   "kind": "static",
+   "iat_rva": "0x1571478",
+   "xref_direct": 2,
+   "xref_via_thunk": 5,
+   "xref": 7
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetACP",
+   "kind": "static",
+   "iat_rva": "0x1571278",
+   "xref_direct": 2,
+   "xref_via_thunk": 5,
+   "xref": 7
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetFileSize",
+   "kind": "static",
+   "iat_rva": "0x1571578",
+   "xref_direct": 2,
+   "xref_via_thunk": 5,
+   "xref": 7
+  },
+  {
+   "dll": "ole32.dll",
+   "name": "RegisterDragDrop",
+   "kind": "static",
+   "iat_rva": "0x15720c0",
+   "xref_direct": 1,
+   "xref_via_thunk": 6,
+   "xref": 7
+  },
+  {
+   "dll": "ole32.dll",
+   "name": "RevokeDragDrop",
+   "kind": "static",
+   "iat_rva": "0x1572098",
+   "xref_direct": 1,
+   "xref_via_thunk": 6,
+   "xref": 7
+  },
+  {
+   "dll": "propsys.dll",
+   "name": "PropVariantToStringWithDefault",
+   "kind": "delay",
+   "iat_rva": "0x15763c0",
+   "xref_direct": 1,
+   "xref_via_thunk": 6,
+   "xref": 7
+  },
+  {
+   "dll": "user32.dll",
+   "name": "EvaluateProximityToRect",
+   "kind": "delay",
+   "iat_rva": "0x1576478",
+   "xref_direct": 1,
+   "xref_via_thunk": 6,
+   "xref": 7
+  },
+  {
+   "dll": "user32.dll",
+   "name": "FindWindowW",
+   "kind": "static",
+   "iat_rva": "0x1571110",
+   "xref_direct": 1,
+   "xref_via_thunk": 6,
+   "xref": 7
+  },
+  {
+   "dll": "user32.dll",
+   "name": "FrameRect",
+   "kind": "static",
+   "iat_rva": "0x1570a50",
+   "xref_direct": 1,
+   "xref_via_thunk": 6,
+   "xref": 7
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetDCEx",
+   "kind": "static",
+   "iat_rva": "0x1570dc8",
+   "xref_direct": 1,
+   "xref_via_thunk": 6,
+   "xref": 7
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetDesktopWindow",
+   "kind": "static",
+   "iat_rva": "0x1570d30",
+   "xref_direct": 1,
+   "xref_via_thunk": 6,
+   "xref": 7
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetKeyboardState",
+   "kind": "static",
+   "iat_rva": "0x1571000",
+   "xref_direct": 1,
+   "xref_via_thunk": 6,
+   "xref": 7
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetMonitorInfoW",
+   "kind": "static",
+   "iat_rva": "0x1570ee0",
+   "xref_direct": 1,
+   "xref_via_thunk": 6,
+   "xref": 7
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetScrollInfo",
+   "kind": "static",
+   "iat_rva": "0x1570cd0",
+   "xref_direct": 1,
+   "xref_via_thunk": 6,
+   "xref": 7
+  },
+  {
+   "dll": "user32.dll",
+   "name": "LoadIconW",
+   "kind": "static",
+   "iat_rva": "0x15710c8",
+   "xref_direct": 1,
+   "xref_via_thunk": 6,
+   "xref": 7
+  },
+  {
+   "dll": "user32.dll",
+   "name": "PostQuitMessage",
+   "kind": "static",
+   "iat_rva": "0x1571080",
+   "xref_direct": 1,
+   "xref_via_thunk": 6,
+   "xref": 7
+  },
+  {
+   "dll": "user32.dll",
+   "name": "SetPropW",
+   "kind": "static",
+   "iat_rva": "0x1570f88",
+   "xref_direct": 1,
+   "xref_via_thunk": 6,
+   "xref": 7
+  },
+  {
+   "dll": "user32.dll",
+   "name": "SetWindowTextW",
+   "kind": "static",
+   "iat_rva": "0x1570cd8",
+   "xref_direct": 1,
+   "xref_via_thunk": 6,
+   "xref": 7
+  },
+  {
+   "dll": "comctl32.dll",
+   "name": "FlatSB_SetScrollProp",
+   "kind": "static",
+   "iat_rva": "0x1571e70",
+   "xref_direct": 1,
+   "xref_via_thunk": 5,
+   "xref": 6
+  },
+  {
+   "dll": "comctl32.dll",
+   "name": "ImageList_DragEnter",
+   "kind": "static",
+   "iat_rva": "0x1571ef0",
+   "xref_direct": 1,
+   "xref_via_thunk": 5,
+   "xref": 6
+  },
+  {
+   "dll": "comctl32.dll",
+   "name": "ImageList_DragShowNolock",
+   "kind": "static",
+   "iat_rva": "0x1571e58",
+   "xref_direct": 1,
+   "xref_via_thunk": 5,
+   "xref": 6
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "GetSystemPaletteEntries",
+   "kind": "static",
+   "iat_rva": "0x15719a0",
+   "xref_direct": 1,
+   "xref_via_thunk": 5,
+   "xref": 6
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "SetRectRgn",
+   "kind": "static",
+   "iat_rva": "0x1571910",
+   "xref_direct": 1,
+   "xref_via_thunk": 5,
+   "xref": 6
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "FileTimeToLocalFileTime",
+   "kind": "static",
+   "iat_rva": "0x1571358",
+   "xref_direct": 1,
+   "xref_via_thunk": 5,
+   "xref": 6
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetEnvironmentVariableW",
+   "kind": "static",
+   "iat_rva": "0x1571728",
+   "xref_direct": 2,
+   "xref_via_thunk": 4,
+   "xref": 6
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetLocalTime",
+   "kind": "static",
+   "iat_rva": "0x1571730",
+   "xref_direct": 1,
+   "xref_via_thunk": 5,
+   "xref": 6
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetVersion",
+   "kind": "static",
+   "iat_rva": "0x1571450",
+   "xref_direct": 2,
+   "xref_via_thunk": 4,
+   "xref": 6
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "SetDllDirectoryW",
+   "kind": "static",
+   "iat_rva": "0x1571380",
+   "xref_direct": 1,
+   "xref_via_thunk": 5,
+   "xref": 6
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "SetPriorityClass",
+   "kind": "static",
+   "iat_rva": "0x15714e0",
+   "xref_direct": 1,
+   "xref_via_thunk": 5,
+   "xref": 6
+  },
+  {
+   "dll": "msimg32.dll",
+   "name": "AlphaBlend",
+   "kind": "delay",
+   "iat_rva": "0x1576350",
+   "xref_direct": 1,
+   "xref_via_thunk": 5,
+   "xref": 6
+  },
+  {
+   "dll": "ole32.dll",
+   "name": "CreateStreamOnHGlobal",
+   "kind": "static",
+   "iat_rva": "0x1572048",
+   "xref_direct": 1,
+   "xref_via_thunk": 5,
+   "xref": 6
+  },
+  {
+   "dll": "ole32.dll",
+   "name": "OleSetClipboard",
+   "kind": "static",
+   "iat_rva": "0x1572030",
+   "xref_direct": 1,
+   "xref_via_thunk": 5,
+   "xref": 6
+  },
+  {
+   "dll": "ole32.dll",
+   "name": "OleUninitialize",
+   "kind": "static",
+   "iat_rva": "0x15720d8",
+   "xref_direct": 1,
+   "xref_via_thunk": 5,
+   "xref": 6
+  },
+  {
+   "dll": "user32.dll",
+   "name": "EnumThreadWindows",
+   "kind": "static",
+   "iat_rva": "0x1570fe8",
+   "xref_direct": 1,
+   "xref_via_thunk": 5,
+   "xref": 6
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetDlgItem",
+   "kind": "static",
+   "iat_rva": "0x1570fc8",
+   "xref_direct": 1,
+   "xref_via_thunk": 5,
+   "xref": 6
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetForegroundWindow",
+   "kind": "static",
+   "iat_rva": "0x1570f00",
+   "xref_direct": 1,
+   "xref_via_thunk": 5,
+   "xref": 6
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetIconInfo",
+   "kind": "static",
+   "iat_rva": "0x1570d18",
+   "xref_direct": 1,
+   "xref_via_thunk": 5,
+   "xref": 6
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetLastActivePopup",
+   "kind": "static",
+   "iat_rva": "0x1570e80",
+   "xref_direct": 1,
+   "xref_via_thunk": 5,
+   "xref": 6
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetMenuItemCount",
+   "kind": "static",
+   "iat_rva": "0x1570c98",
+   "xref_direct": 1,
+   "xref_via_thunk": 5,
+   "xref": 6
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetMenuState",
+   "kind": "static",
+   "iat_rva": "0x1570d50",
+   "xref_direct": 1,
+   "xref_via_thunk": 5,
+   "xref": 6
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetSubMenu",
+   "kind": "static",
+   "iat_rva": "0x1570c00",
+   "xref_direct": 1,
+   "xref_via_thunk": 5,
+   "xref": 6
+  },
+  {
+   "dll": "user32.dll",
+   "name": "MessageBeep",
+   "kind": "static",
+   "iat_rva": "0x1570be0",
+   "xref_direct": 1,
+   "xref_via_thunk": 5,
+   "xref": 6
+  },
+  {
+   "dll": "user32.dll",
+   "name": "MonitorFromWindow",
+   "kind": "static",
+   "iat_rva": "0x1570dd8",
+   "xref_direct": 1,
+   "xref_via_thunk": 5,
+   "xref": 6
+  },
+  {
+   "dll": "user32.dll",
+   "name": "ScrollDC",
+   "kind": "static",
+   "iat_rva": "0x1570cc8",
+   "xref_direct": 1,
+   "xref_via_thunk": 5,
+   "xref": 6
+  },
+  {
+   "dll": "wininet.dll",
+   "name": "HttpQueryInfoA",
+   "kind": "static",
+   "iat_rva": "0x1571de0",
+   "xref_direct": 1,
+   "xref_via_thunk": 5,
+   "xref": 6
+  },
+  {
+   "dll": "comctl32.dll",
+   "name": "ImageList_DragLeave",
+   "kind": "static",
+   "iat_rva": "0x1571f10",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "comctl32.dll",
+   "name": "ImageList_Draw",
+   "kind": "static",
+   "iat_rva": "0x1571f18",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "comctl32.dll",
+   "name": "ImageList_SetIconSize",
+   "kind": "static",
+   "iat_rva": "0x1571f00",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "crypt32.dll",
+   "name": "CertGetNameStringW",
+   "kind": "static",
+   "iat_rva": "0x1571830",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "crypt32.dll",
+   "name": "CryptMsgGetParam",
+   "kind": "static",
+   "iat_rva": "0x1571858",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "CreateDIBitmap",
+   "kind": "static",
+   "iat_rva": "0x1571b60",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "ExtSelectClipRgn",
+   "kind": "static",
+   "iat_rva": "0x15718e8",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "GetEnhMetaFileDescriptionW",
+   "kind": "static",
+   "iat_rva": "0x1571a10",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "GetWindowOrgEx",
+   "kind": "static",
+   "iat_rva": "0x1571920",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "SetMapMode",
+   "kind": "static",
+   "iat_rva": "0x15719c8",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "CreateThread",
+   "kind": "static",
+   "iat_rva": "0x15713f0",
+   "xref_direct": 2,
+   "xref_via_thunk": 3,
+   "xref": 5
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "EnumCalendarInfoW",
+   "kind": "static",
+   "iat_rva": "0x15717c0",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "FileTimeToDosDateTime",
+   "kind": "static",
+   "iat_rva": "0x1571390",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "FindResourceW",
+   "kind": "static",
+   "iat_rva": "0x15713e8",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetCurrentDirectoryW",
+   "kind": "static",
+   "iat_rva": "0x15715a0",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetLogicalProcessorInformation",
+   "kind": "delay",
+   "iat_rva": "0x15762d0",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetPrivateProfileStringW",
+   "kind": "static",
+   "iat_rva": "0x15717e8",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetTimeZoneInformation",
+   "kind": "static",
+   "iat_rva": "0x1571350",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "HeapFree",
+   "kind": "static",
+   "iat_rva": "0x15716c0",
+   "xref_direct": 2,
+   "xref_via_thunk": 3,
+   "xref": 5
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "IsValidLocale",
+   "kind": "static",
+   "iat_rva": "0x15717a0",
+   "xref_direct": 2,
+   "xref_via_thunk": 3,
+   "xref": 5
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "ReadFile",
+   "kind": "static",
+   "iat_rva": "0x1571398",
+   "xref_direct": 2,
+   "xref_via_thunk": 3,
+   "xref": 5
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "SetEndOfFile",
+   "kind": "static",
+   "iat_rva": "0x15716b0",
+   "xref_direct": 2,
+   "xref_via_thunk": 3,
+   "xref": 5
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "SetThreadExecutionState",
+   "kind": "static",
+   "iat_rva": "0x1571458",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "SwitchToThread",
+   "kind": "static",
+   "iat_rva": "0x1571488",
+   "xref_direct": 2,
+   "xref_via_thunk": 3,
+   "xref": 5
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "TlsGetValue",
+   "kind": "static",
+   "iat_rva": "0x1571778",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "VerifyVersionInfoW",
+   "kind": "static",
+   "iat_rva": "0x1571620",
+   "xref_direct": 2,
+   "xref_via_thunk": 3,
+   "xref": 5
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "WritePrivateProfileStringW",
+   "kind": "static",
+   "iat_rva": "0x1571558",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "lstrlenW",
+   "kind": "static",
+   "iat_rva": "0x1571698",
+   "xref_direct": 2,
+   "xref_via_thunk": 3,
+   "xref": 5
+  },
+  {
+   "dll": "ole32.dll",
+   "name": "CoGetInterfaceAndReleaseStream",
+   "kind": "static",
+   "iat_rva": "0x15720a8",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "ole32.dll",
+   "name": "CoInitialize",
+   "kind": "static",
+   "iat_rva": "0x1572068",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "ole32.dll",
+   "name": "CoMarshalInterThreadInterfaceInStream",
+   "kind": "static",
+   "iat_rva": "0x1572090",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "ole32.dll",
+   "name": "OleInitialize",
+   "kind": "static",
+   "iat_rva": "0x15720c8",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "oleaut32.dll",
+   "name": "SafeArrayPtrOfIndex",
+   "kind": "static",
+   "iat_rva": "0x1571190",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "shell32.dll",
+   "name": "ILFree",
+   "kind": "static",
+   "iat_rva": "0x1571fb0",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "shell32.dll",
+   "name": "SHFileOperationW",
+   "kind": "static",
+   "iat_rva": "0x1571fb8",
+   "xref_direct": 2,
+   "xref_via_thunk": 3,
+   "xref": 5
+  },
+  {
+   "dll": "shell32.dll",
+   "name": "SHGetDesktopFolder",
+   "kind": "static",
+   "iat_rva": "0x1571fa0",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "shell32.dll",
+   "name": "SHGetPathFromIDListW",
+   "kind": "static",
+   "iat_rva": "0x1571f50",
+   "xref_direct": 2,
+   "xref_via_thunk": 3,
+   "xref": 5
+  },
+  {
+   "dll": "user32.dll",
+   "name": "ActivateKeyboardLayout",
+   "kind": "static",
+   "iat_rva": "0x1570f50",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "user32.dll",
+   "name": "DestroyCursor",
+   "kind": "static",
+   "iat_rva": "0x1571078",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "user32.dll",
+   "name": "DrawFrameControl",
+   "kind": "static",
+   "iat_rva": "0x1571010",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "user32.dll",
+   "name": "DrawMenuBar",
+   "kind": "static",
+   "iat_rva": "0x1570b28",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "user32.dll",
+   "name": "EnumClipboardFormats",
+   "kind": "static",
+   "iat_rva": "0x1570cc0",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "user32.dll",
+   "name": "EnumWindows",
+   "kind": "static",
+   "iat_rva": "0x1570a80",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetPhysicalCursorPos",
+   "kind": "delay",
+   "iat_rva": "0x1576340",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetPropW",
+   "kind": "static",
+   "iat_rva": "0x1570f78",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "user32.dll",
+   "name": "IsChild",
+   "kind": "static",
+   "iat_rva": "0x1570b40",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "user32.dll",
+   "name": "IsWindowUnicode",
+   "kind": "static",
+   "iat_rva": "0x1570e20",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "user32.dll",
+   "name": "KillTimer",
+   "kind": "static",
+   "iat_rva": "0x1570d80",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "user32.dll",
+   "name": "LoadBitmapW",
+   "kind": "static",
+   "iat_rva": "0x1570ac0",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "user32.dll",
+   "name": "PackTouchHitTestingProximityEvaluation",
+   "kind": "delay",
+   "iat_rva": "0x1576470",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "user32.dll",
+   "name": "RemovePropW",
+   "kind": "static",
+   "iat_rva": "0x1570bf0",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "user32.dll",
+   "name": "ScrollWindow",
+   "kind": "static",
+   "iat_rva": "0x1570e78",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "user32.dll",
+   "name": "SetForegroundWindow",
+   "kind": "static",
+   "iat_rva": "0x1570b70",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "user32.dll",
+   "name": "SetGestureConfig",
+   "kind": "delay",
+   "iat_rva": "0x15762f0",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "user32.dll",
+   "name": "SetMenu",
+   "kind": "static",
+   "iat_rva": "0x1570d48",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "user32.dll",
+   "name": "SetScrollInfo",
+   "kind": "static",
+   "iat_rva": "0x1570d20",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "user32.dll",
+   "name": "SetThreadDpiAwarenessContext",
+   "kind": "delay",
+   "iat_rva": "0x1576330",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "user32.dll",
+   "name": "SetWindowRgn",
+   "kind": "static",
+   "iat_rva": "0x1570c88",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "user32.dll",
+   "name": "ValidateRect",
+   "kind": "static",
+   "iat_rva": "0x1570d70",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "user32.dll",
+   "name": "WindowFromPoint",
+   "kind": "static",
+   "iat_rva": "0x1570df8",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "uxtheme.dll",
+   "name": "BeginBufferedPaint",
+   "kind": "delay",
+   "iat_rva": "0x1576410",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "uxtheme.dll",
+   "name": "BufferedPaintSetAlpha",
+   "kind": "delay",
+   "iat_rva": "0x1576400",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "version.dll",
+   "name": "VerQueryValueW",
+   "kind": "static",
+   "iat_rva": "0x15709f8",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "winmm.dll",
+   "name": "midiOutGetDevCapsW",
+   "kind": "static",
+   "iat_rva": "0x1571d00",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "winmm.dll",
+   "name": "midiOutGetNumDevs",
+   "kind": "static",
+   "iat_rva": "0x1571ce8",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "winspool.drv",
+   "name": "EnumPrintersW",
+   "kind": "static",
+   "iat_rva": "0x1571e10",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "wintrust.dll",
+   "name": "WinVerifyTrust",
+   "kind": "static",
+   "iat_rva": "0x1571810",
+   "xref_direct": 1,
+   "xref_via_thunk": 4,
+   "xref": 5
+  },
+  {
+   "dll": "advapi32.dll",
+   "name": "RegEnumKeyExW",
+   "kind": "static",
+   "iat_rva": "0x15711d8",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "comctl32.dll",
+   "name": "ImageList_Add",
+   "kind": "static",
+   "iat_rva": "0x1571e60",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "comctl32.dll",
+   "name": "ImageList_EndDrag",
+   "kind": "static",
+   "iat_rva": "0x1571e80",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "comctl32.dll",
+   "name": "ImageList_GetDragImage",
+   "kind": "static",
+   "iat_rva": "0x1571e68",
+   "xref_direct": 2,
+   "xref_via_thunk": 2,
+   "xref": 4
+  },
+  {
+   "dll": "comctl32.dll",
+   "name": "ImageList_GetImageCount",
+   "kind": "static",
+   "iat_rva": "0x1571ee8",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "CopyEnhMetaFileW",
+   "kind": "static",
+   "iat_rva": "0x1571bc8",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "CreateHalftonePalette",
+   "kind": "static",
+   "iat_rva": "0x1571ba0",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "DeleteEnhMetaFile",
+   "kind": "static",
+   "iat_rva": "0x1571a80",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "EqualRgn",
+   "kind": "static",
+   "iat_rva": "0x1571a78",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "GetDIBColorTable",
+   "kind": "static",
+   "iat_rva": "0x1571ac8",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "GetRandomRgn",
+   "kind": "static",
+   "iat_rva": "0x1571880",
+   "xref_direct": 2,
+   "xref_via_thunk": 2,
+   "xref": 4
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "GetRgnBox",
+   "kind": "static",
+   "iat_rva": "0x1571b90",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "LPtoDP",
+   "kind": "static",
+   "iat_rva": "0x15719e0",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "SetBrushOrgEx",
+   "kind": "static",
+   "iat_rva": "0x1571c30",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "SetDIBColorTable",
+   "kind": "static",
+   "iat_rva": "0x1571ac0",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "StretchDIBits",
+   "kind": "static",
+   "iat_rva": "0x1571c58",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "imagehlp.dll",
+   "name": "ImageRvaToVa",
+   "kind": "static",
+   "iat_rva": "0x1571fe8",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "imm32.dll",
+   "name": "ImmAssociateContextEx",
+   "kind": "delay",
+   "iat_rva": "0x1576440",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "CreateDirectoryW",
+   "kind": "static",
+   "iat_rva": "0x15717b0",
+   "xref_direct": 2,
+   "xref_via_thunk": 2,
+   "xref": 4
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "ExitProcess",
+   "kind": "static",
+   "iat_rva": "0x1571300",
+   "xref_direct": 2,
+   "xref_via_thunk": 2,
+   "xref": 4
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "ExpandEnvironmentStringsW",
+   "kind": "static",
+   "iat_rva": "0x15714c0",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "FindNextFileW",
+   "kind": "static",
+   "iat_rva": "0x15712e0",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetCPInfo",
+   "kind": "static",
+   "iat_rva": "0x1571338",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetCommandLineW",
+   "kind": "static",
+   "iat_rva": "0x15715e0",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetCurrentThread",
+   "kind": "static",
+   "iat_rva": "0x15714a0",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetDriveTypeW",
+   "kind": "static",
+   "iat_rva": "0x1571448",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetExitCodeProcess",
+   "kind": "static",
+   "iat_rva": "0x1571280",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetProcessAffinityMask",
+   "kind": "static",
+   "iat_rva": "0x1571638",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetProcessHeap",
+   "kind": "static",
+   "iat_rva": "0x15712f8",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetSystemDefaultUILanguage",
+   "kind": "static",
+   "iat_rva": "0x15717b8",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetTempFileNameW",
+   "kind": "static",
+   "iat_rva": "0x1571570",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetVolumeInformationW",
+   "kind": "static",
+   "iat_rva": "0x1571420",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GlobalAddAtomW",
+   "kind": "static",
+   "iat_rva": "0x1571470",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GlobalDeleteAtom",
+   "kind": "static",
+   "iat_rva": "0x1571580",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "HeapAlloc",
+   "kind": "static",
+   "iat_rva": "0x1571308",
+   "xref_direct": 2,
+   "xref_via_thunk": 2,
+   "xref": 4
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "SetThreadErrorMode",
+   "kind": "static",
+   "iat_rva": "0x15716b8",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "SetThreadLocale",
+   "kind": "static",
+   "iat_rva": "0x1571800",
+   "xref_direct": 2,
+   "xref_via_thunk": 2,
+   "xref": 4
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "WaitForMultipleObjectsEx",
+   "kind": "static",
+   "iat_rva": "0x15717f0",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "msacm32.dll",
+   "name": "acmMetrics",
+   "kind": "static",
+   "iat_rva": "0x1572160",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "ole32.dll",
+   "name": "CreateILockBytesOnHGlobal",
+   "kind": "static",
+   "iat_rva": "0x1572058",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "ole32.dll",
+   "name": "OleGetClipboard",
+   "kind": "static",
+   "iat_rva": "0x1572020",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "ole32.dll",
+   "name": "StgCreateDocfileOnILockBytes",
+   "kind": "static",
+   "iat_rva": "0x1572010",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "oleaut32.dll",
+   "name": "SafeArrayGetElement",
+   "kind": "static",
+   "iat_rva": "0x1571170",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "oleaut32.dll",
+   "name": "SafeArrayGetLBound",
+   "kind": "static",
+   "iat_rva": "0x15711b0",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "oleaut32.dll",
+   "name": "SafeArrayGetUBound",
+   "kind": "static",
+   "iat_rva": "0x15711a8",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "oleaut32.dll",
+   "name": "SafeArrayPutElement",
+   "kind": "static",
+   "iat_rva": "0x1571130",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "oleaut32.dll",
+   "name": "SysAllocStringLen",
+   "kind": "static",
+   "iat_rva": "0x1571180",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "oleaut32.dll",
+   "name": "VariantClear",
+   "kind": "static",
+   "iat_rva": "0x1571148",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "oleaut32.dll",
+   "name": "VariantCopy",
+   "kind": "static",
+   "iat_rva": "0x15711a0",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "shell32.dll",
+   "name": "SHCreateItemFromParsingName",
+   "kind": "delay",
+   "iat_rva": "0x15763f0",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "shell32.dll",
+   "name": "ShellExecuteExW",
+   "kind": "static",
+   "iat_rva": "0x1571f58",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "shfolder.dll",
+   "name": "SHGetFolderPathW",
+   "kind": "static",
+   "iat_rva": "0x1571820",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "user32.dll",
+   "name": "AttachThreadInput",
+   "kind": "static",
+   "iat_rva": "0x1570bf8",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "user32.dll",
+   "name": "BeginDeferWindowPos",
+   "kind": "static",
+   "iat_rva": "0x1570d88",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "user32.dll",
+   "name": "CharLowerBuffW",
+   "kind": "static",
+   "iat_rva": "0x1570b08",
+   "xref_direct": 2,
+   "xref_via_thunk": 2,
+   "xref": 4
+  },
+  {
+   "dll": "user32.dll",
+   "name": "CharUpperBuffW",
+   "kind": "static",
+   "iat_rva": "0x1570ea8",
+   "xref_direct": 2,
+   "xref_via_thunk": 2,
+   "xref": 4
+  },
+  {
+   "dll": "user32.dll",
+   "name": "CloseClipboard",
+   "kind": "static",
+   "iat_rva": "0x1571070",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "user32.dll",
+   "name": "DeferWindowPos",
+   "kind": "static",
+   "iat_rva": "0x15710a0",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "user32.dll",
+   "name": "DestroyMenu",
+   "kind": "static",
+   "iat_rva": "0x1570fa0",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "user32.dll",
+   "name": "DrawFocusRect",
+   "kind": "static",
+   "iat_rva": "0x1570e58",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "user32.dll",
+   "name": "EnableMenuItem",
+   "kind": "static",
+   "iat_rva": "0x1571098",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "user32.dll",
+   "name": "EnableWindow",
+   "kind": "static",
+   "iat_rva": "0x1570f10",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "user32.dll",
+   "name": "EndDeferWindowPos",
+   "kind": "static",
+   "iat_rva": "0x15710b0",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "user32.dll",
+   "name": "EnumChildWindows",
+   "kind": "static",
+   "iat_rva": "0x1570ac8",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "user32.dll",
+   "name": "EqualRect",
+   "kind": "static",
+   "iat_rva": "0x1570c08",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetAncestor",
+   "kind": "static",
+   "iat_rva": "0x1570fc0",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetClipCursor",
+   "kind": "static",
+   "iat_rva": "0x1570f40",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetClipboardFormatNameW",
+   "kind": "static",
+   "iat_rva": "0x1570da8",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetCursor",
+   "kind": "static",
+   "iat_rva": "0x1570d78",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetKeyboardLayout",
+   "kind": "static",
+   "iat_rva": "0x1571120",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetSystemMenu",
+   "kind": "static",
+   "iat_rva": "0x1570e38",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetUpdateRgn",
+   "kind": "static",
+   "iat_rva": "0x1570a48",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "user32.dll",
+   "name": "LogicalToPhysicalPoint",
+   "kind": "delay",
+   "iat_rva": "0x1576318",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "user32.dll",
+   "name": "MsgWaitForMultipleObjects",
+   "kind": "static",
+   "iat_rva": "0x1570f98",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "user32.dll",
+   "name": "ScreenToClient",
+   "kind": "static",
+   "iat_rva": "0x1571008",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "user32.dll",
+   "name": "SetCaretPos",
+   "kind": "static",
+   "iat_rva": "0x1570a30",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "user32.dll",
+   "name": "SetClassLongPtrW",
+   "kind": "static",
+   "iat_rva": "0x1570eb0",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "user32.dll",
+   "name": "ShowCaret",
+   "kind": "static",
+   "iat_rva": "0x1570af0",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "user32.dll",
+   "name": "ShowOwnedPopups",
+   "kind": "static",
+   "iat_rva": "0x1570a88",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "version.dll",
+   "name": "GetFileVersionInfoSizeW",
+   "kind": "static",
+   "iat_rva": "0x15709f0",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "version.dll",
+   "name": "GetFileVersionInfoW",
+   "kind": "static",
+   "iat_rva": "0x1570a00",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "wininet.dll",
+   "name": "InternetOpenW",
+   "kind": "static",
+   "iat_rva": "0x1571dd0",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "wininet.dll",
+   "name": "InternetReadFile",
+   "kind": "static",
+   "iat_rva": "0x1571db8",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "winmm.dll",
+   "name": "midiInGetNumDevs",
+   "kind": "static",
+   "iat_rva": "0x1571d28",
+   "xref_direct": 1,
+   "xref_via_thunk": 3,
+   "xref": 4
+  },
+  {
+   "dll": "advapi32.dll",
+   "name": "RegCreateKeyExW",
+   "kind": "static",
+   "iat_rva": "0x1571238",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "advapi32.dll",
+   "name": "RegEnumValueW",
+   "kind": "static",
+   "iat_rva": "0x1571220",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "comctl32.dll",
+   "name": "ImageList_BeginDrag",
+   "kind": "static",
+   "iat_rva": "0x1571ed0",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "comctl32.dll",
+   "name": "ImageList_DragMove",
+   "kind": "static",
+   "iat_rva": "0x1571e40",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "comctl32.dll",
+   "name": "ImageList_GetBkColor",
+   "kind": "static",
+   "iat_rva": "0x1571ec8",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "comctl32.dll",
+   "name": "ImageList_Read",
+   "kind": "static",
+   "iat_rva": "0x1571f08",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "crypt32.dll",
+   "name": "CertFindCertificateInStore",
+   "kind": "static",
+   "iat_rva": "0x1571840",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "crypt32.dll",
+   "name": "CertFreeCertificateContext",
+   "kind": "static",
+   "iat_rva": "0x1571848",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "crypt32.dll",
+   "name": "CryptQueryObject",
+   "kind": "static",
+   "iat_rva": "0x1571838",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "dsound.dll",
+   "name": "DirectSoundCreate",
+   "kind": "static",
+   "iat_rva": "0x1572188",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "CreateDCW",
+   "kind": "static",
+   "iat_rva": "0x1571938",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "EndPage",
+   "kind": "static",
+   "iat_rva": "0x1571a70",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "GetBitmapBits",
+   "kind": "static",
+   "iat_rva": "0x1571990",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "GetBkColor",
+   "kind": "static",
+   "iat_rva": "0x1571be0",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "GetBrushOrgEx",
+   "kind": "static",
+   "iat_rva": "0x1571bf8",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "GetClipRgn",
+   "kind": "static",
+   "iat_rva": "0x1571b30",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "GetEnhMetaFileBits",
+   "kind": "static",
+   "iat_rva": "0x15719a8",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "GetEnhMetaFilePaletteEntries",
+   "kind": "static",
+   "iat_rva": "0x15719c0",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "GetRegionData",
+   "kind": "static",
+   "iat_rva": "0x15719b8",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "GetTextColor",
+   "kind": "static",
+   "iat_rva": "0x15718d8",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "GetTextExtentPointW",
+   "kind": "static",
+   "iat_rva": "0x1571c20",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "GetWinMetaFileBits",
+   "kind": "static",
+   "iat_rva": "0x1571a00",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "MaskBlt",
+   "kind": "static",
+   "iat_rva": "0x1571a50",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "PlayEnhMetaFile",
+   "kind": "static",
+   "iat_rva": "0x1571978",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "RectInRegion",
+   "kind": "static",
+   "iat_rva": "0x1571900",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "SetDIBits",
+   "kind": "static",
+   "iat_rva": "0x1571a90",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "SetTextAlign",
+   "kind": "static",
+   "iat_rva": "0x1571c10",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "SetWinMetaFileBits",
+   "kind": "static",
+   "iat_rva": "0x1571b58",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "StartPage",
+   "kind": "static",
+   "iat_rva": "0x1571988",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "imagehlp.dll",
+   "name": "ImageNtHeader",
+   "kind": "static",
+   "iat_rva": "0x1571ff8",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "imm32.dll",
+   "name": "ImmGetContext",
+   "kind": "delay",
+   "iat_rva": "0x1576450",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "imm32.dll",
+   "name": "ImmGetConversionStatus",
+   "kind": "delay",
+   "iat_rva": "0x1576438",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "imm32.dll",
+   "name": "ImmReleaseContext",
+   "kind": "delay",
+   "iat_rva": "0x1576448",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "imm32.dll",
+   "name": "ImmSetConversionStatus",
+   "kind": "delay",
+   "iat_rva": "0x1576430",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "imm32.dll",
+   "name": "ImmSetOpenStatus",
+   "kind": "delay",
+   "iat_rva": "0x1576428",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "CreateProcessW",
+   "kind": "static",
+   "iat_rva": "0x15713b0",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "DosDateTimeToFileTime",
+   "kind": "static",
+   "iat_rva": "0x15713a0",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "DuplicateHandle",
+   "kind": "static",
+   "iat_rva": "0x15715f0",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetDateFormatW",
+   "kind": "static",
+   "iat_rva": "0x1571770",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetDiskFreeSpaceW",
+   "kind": "static",
+   "iat_rva": "0x1571650",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetFileInformationByHandle",
+   "kind": "static",
+   "iat_rva": "0x1571740",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetFileType",
+   "kind": "static",
+   "iat_rva": "0x1571250",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetFinalPathNameByHandleW",
+   "kind": "delay",
+   "iat_rva": "0x1576368",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetFullPathNameW",
+   "kind": "static",
+   "iat_rva": "0x15712e8",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetLogicalDrives",
+   "kind": "static",
+   "iat_rva": "0x15714a8",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetNativeSystemInfo",
+   "kind": "delay",
+   "iat_rva": "0x1576390",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetThreadPriority",
+   "kind": "static",
+   "iat_rva": "0x15715b0",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetUserDefaultLCID",
+   "kind": "static",
+   "iat_rva": "0x15713a8",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetUserDefaultUILanguage",
+   "kind": "static",
+   "iat_rva": "0x1571668",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetUserPreferredUILanguages",
+   "kind": "delay",
+   "iat_rva": "0x1576380",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GlobalFindAtomW",
+   "kind": "static",
+   "iat_rva": "0x1571500",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "HeapDestroy",
+   "kind": "static",
+   "iat_rva": "0x1571378",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "IsBadWritePtr",
+   "kind": "static",
+   "iat_rva": "0x1571288",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "IsDBCSLeadByteEx",
+   "kind": "static",
+   "iat_rva": "0x1571720",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "LCMapStringW",
+   "kind": "static",
+   "iat_rva": "0x1571648",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "LocalFileTimeToFileTime",
+   "kind": "static",
+   "iat_rva": "0x15714b0",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "RemoveDirectoryW",
+   "kind": "static",
+   "iat_rva": "0x15717d0",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "ResumeThread",
+   "kind": "static",
+   "iat_rva": "0x1571608",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "SetFileTime",
+   "kind": "static",
+   "iat_rva": "0x1571258",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "TerminateProcess",
+   "kind": "static",
+   "iat_rva": "0x15714d8",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "TlsSetValue",
+   "kind": "static",
+   "iat_rva": "0x15717a8",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "mpr.dll",
+   "name": "WNetCloseEnum",
+   "kind": "static",
+   "iat_rva": "0x1571c80",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "msacm32.dll",
+   "name": "acmDriverClose",
+   "kind": "static",
+   "iat_rva": "0x1572110",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "msacm32.dll",
+   "name": "acmStreamClose",
+   "kind": "static",
+   "iat_rva": "0x1572100",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "msacm32.dll",
+   "name": "acmStreamConvert",
+   "kind": "static",
+   "iat_rva": "0x1572148",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "msacm32.dll",
+   "name": "acmStreamPrepareHeader",
+   "kind": "static",
+   "iat_rva": "0x1572158",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "msacm32.dll",
+   "name": "acmStreamSize",
+   "kind": "static",
+   "iat_rva": "0x15720f8",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "ole32.dll",
+   "name": "CoTaskMemAlloc",
+   "kind": "static",
+   "iat_rva": "0x1572078",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "ole32.dll",
+   "name": "DoDragDrop",
+   "kind": "static",
+   "iat_rva": "0x1572080",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "oleaut32.dll",
+   "name": "GetActiveObject",
+   "kind": "static",
+   "iat_rva": "0x1571178",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "oleaut32.dll",
+   "name": "SafeArrayCreate",
+   "kind": "static",
+   "iat_rva": "0x1571168",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "propsys.dll",
+   "name": "PropVariantToVariant",
+   "kind": "delay",
+   "iat_rva": "0x15763b8",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "shell32.dll",
+   "name": "DragAcceptFiles",
+   "kind": "static",
+   "iat_rva": "0x1571f48",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "shell32.dll",
+   "name": "DragQueryFileW",
+   "kind": "static",
+   "iat_rva": "0x1571f30",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "shell32.dll",
+   "name": "ILCreateFromPathW",
+   "kind": "static",
+   "iat_rva": "0x1571f80",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "shell32.dll",
+   "name": "SHAppBarMessage",
+   "kind": "static",
+   "iat_rva": "0x1571fc0",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "shell32.dll",
+   "name": "SHGetFileInfoW",
+   "kind": "static",
+   "iat_rva": "0x1571f88",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "shell32.dll",
+   "name": "SHGetMalloc",
+   "kind": "static",
+   "iat_rva": "0x1571f78",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "shell32.dll",
+   "name": "SHGetSpecialFolderLocation",
+   "kind": "static",
+   "iat_rva": "0x1571f38",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "user32.dll",
+   "name": "AdjustWindowRectEx",
+   "kind": "static",
+   "iat_rva": "0x1570fd0",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "user32.dll",
+   "name": "CharUpperW",
+   "kind": "static",
+   "iat_rva": "0x1570ef0",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "user32.dll",
+   "name": "CloseGestureInfoHandle",
+   "kind": "delay",
+   "iat_rva": "0x15762f8",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "user32.dll",
+   "name": "CreatePopupMenu",
+   "kind": "static",
+   "iat_rva": "0x1570ae8",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "user32.dll",
+   "name": "DestroyCaret",
+   "kind": "static",
+   "iat_rva": "0x1570b00",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "user32.dll",
+   "name": "DrawIcon",
+   "kind": "static",
+   "iat_rva": "0x1570fe0",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "user32.dll",
+   "name": "DrawIconEx",
+   "kind": "static",
+   "iat_rva": "0x1570d00",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "user32.dll",
+   "name": "EmptyClipboard",
+   "kind": "static",
+   "iat_rva": "0x1570fb8",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "user32.dll",
+   "name": "EnumDisplayMonitors",
+   "kind": "static",
+   "iat_rva": "0x1571058",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "user32.dll",
+   "name": "EnumDisplaySettingsW",
+   "kind": "static",
+   "iat_rva": "0x1570f48",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetGuiResources",
+   "kind": "static",
+   "iat_rva": "0x1570c28",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetMenu",
+   "kind": "static",
+   "iat_rva": "0x1570d58",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetMenuItemID",
+   "kind": "static",
+   "iat_rva": "0x1570af8",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetMessagePos",
+   "kind": "static",
+   "iat_rva": "0x1570d10",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetScrollPos",
+   "kind": "static",
+   "iat_rva": "0x1570e48",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetTopWindow",
+   "kind": "static",
+   "iat_rva": "0x1570c40",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetUpdateRect",
+   "kind": "static",
+   "iat_rva": "0x1570de0",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "user32.dll",
+   "name": "HideCaret",
+   "kind": "static",
+   "iat_rva": "0x15710a8",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "user32.dll",
+   "name": "InsertMenuW",
+   "kind": "static",
+   "iat_rva": "0x15710f0",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "user32.dll",
+   "name": "IsZoomed",
+   "kind": "static",
+   "iat_rva": "0x1570b18",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "user32.dll",
+   "name": "LoadKeyboardLayoutW",
+   "kind": "static",
+   "iat_rva": "0x1570f38",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "user32.dll",
+   "name": "MessageBoxA",
+   "kind": "delay",
+   "iat_rva": "0x15762d8",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "user32.dll",
+   "name": "MonitorFromRect",
+   "kind": "static",
+   "iat_rva": "0x1570f68",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "user32.dll",
+   "name": "OpenClipboard",
+   "kind": "static",
+   "iat_rva": "0x1571040",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "user32.dll",
+   "name": "RegisterTouchHitTestingWindow",
+   "kind": "delay",
+   "iat_rva": "0x1576480",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "user32.dll",
+   "name": "RemoveMenu",
+   "kind": "static",
+   "iat_rva": "0x1571028",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "user32.dll",
+   "name": "ScrollWindowEx",
+   "kind": "static",
+   "iat_rva": "0x1570a40",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "user32.dll",
+   "name": "SetParent",
+   "kind": "static",
+   "iat_rva": "0x1570b20",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "user32.dll",
+   "name": "SetThreadDpiHostingBehavior",
+   "kind": "delay",
+   "iat_rva": "0x1576328",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "user32.dll",
+   "name": "ShowCursor",
+   "kind": "static",
+   "iat_rva": "0x1570b48",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "user32.dll",
+   "name": "ToAscii",
+   "kind": "static",
+   "iat_rva": "0x1570f08",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "user32.dll",
+   "name": "TrackPopupMenu",
+   "kind": "static",
+   "iat_rva": "0x1570cf8",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "user32.dll",
+   "name": "UpdateWindow",
+   "kind": "static",
+   "iat_rva": "0x1570f90",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "user32.dll",
+   "name": "WaitMessage",
+   "kind": "static",
+   "iat_rva": "0x1570d90",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "wininet.dll",
+   "name": "InternetGetLastResponseInfoW",
+   "kind": "static",
+   "iat_rva": "0x1571d80",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "wininet.dll",
+   "name": "InternetOpenUrlW",
+   "kind": "static",
+   "iat_rva": "0x1571dc8",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "winmm.dll",
+   "name": "midiInAddBuffer",
+   "kind": "static",
+   "iat_rva": "0x1571cf8",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "winmm.dll",
+   "name": "midiInGetDevCapsW",
+   "kind": "static",
+   "iat_rva": "0x1571d08",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "winmm.dll",
+   "name": "midiInPrepareHeader",
+   "kind": "static",
+   "iat_rva": "0x1571ca8",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "winmm.dll",
+   "name": "timeBeginPeriod",
+   "kind": "static",
+   "iat_rva": "0x1571cd8",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "winmm.dll",
+   "name": "timeEndPeriod",
+   "kind": "static",
+   "iat_rva": "0x1571c98",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "winmm.dll",
+   "name": "timeGetDevCaps",
+   "kind": "static",
+   "iat_rva": "0x1571d20",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "winspool.drv",
+   "name": "ClosePrinter",
+   "kind": "static",
+   "iat_rva": "0x1571df8",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "winspool.drv",
+   "name": "DocumentPropertiesW",
+   "kind": "static",
+   "iat_rva": "0x1571df0",
+   "xref_direct": 1,
+   "xref_via_thunk": 2,
+   "xref": 3
+  },
+  {
+   "dll": "advapi32.dll",
+   "name": "GetTokenInformation",
+   "kind": "static",
+   "iat_rva": "0x1571228",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "advapi32.dll",
+   "name": "OpenProcessToken",
+   "kind": "static",
+   "iat_rva": "0x15711e8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "advapi32.dll",
+   "name": "RegDeleteKeyExW",
+   "kind": "delay",
+   "iat_rva": "0x15763a0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "advapi32.dll",
+   "name": "RegDeleteKeyW",
+   "kind": "static",
+   "iat_rva": "0x15711e0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "advapi32.dll",
+   "name": "RegDeleteValueW",
+   "kind": "static",
+   "iat_rva": "0x1571208",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "advapi32.dll",
+   "name": "RegFlushKey",
+   "kind": "static",
+   "iat_rva": "0x1571210",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "advapi32.dll",
+   "name": "RegQueryInfoKeyW",
+   "kind": "static",
+   "iat_rva": "0x15711f8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "advapi32.dll",
+   "name": "RegSetValueExW",
+   "kind": "static",
+   "iat_rva": "0x15711d0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "comctl32.dll",
+   "name": "FlatSB_GetScrollInfo",
+   "kind": "static",
+   "iat_rva": "0x1571eb0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "comctl32.dll",
+   "name": "FlatSB_GetScrollPos",
+   "kind": "static",
+   "iat_rva": "0x1571e98",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "comctl32.dll",
+   "name": "FlatSB_SetScrollInfo",
+   "kind": "static",
+   "iat_rva": "0x1571e38",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "comctl32.dll",
+   "name": "FlatSB_SetScrollPos",
+   "kind": "static",
+   "iat_rva": "0x1571ea0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "comctl32.dll",
+   "name": "ImageList_Create",
+   "kind": "static",
+   "iat_rva": "0x1571e78",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "comctl32.dll",
+   "name": "ImageList_Destroy",
+   "kind": "static",
+   "iat_rva": "0x1571e48",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "comctl32.dll",
+   "name": "ImageList_GetIcon",
+   "kind": "static",
+   "iat_rva": "0x1571ed8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "comctl32.dll",
+   "name": "ImageList_GetIconSize",
+   "kind": "static",
+   "iat_rva": "0x1571ef8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "comctl32.dll",
+   "name": "ImageList_Remove",
+   "kind": "static",
+   "iat_rva": "0x1571f20",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "comctl32.dll",
+   "name": "ImageList_Replace",
+   "kind": "static",
+   "iat_rva": "0x1571ee0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "comctl32.dll",
+   "name": "ImageList_SetBkColor",
+   "kind": "static",
+   "iat_rva": "0x1571ec0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "comctl32.dll",
+   "name": "ImageList_SetImageCount",
+   "kind": "static",
+   "iat_rva": "0x1571e90",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "comctl32.dll",
+   "name": "ImageList_Write",
+   "kind": "static",
+   "iat_rva": "0x1571eb8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "comctl32.dll",
+   "name": "InitializeFlatSB",
+   "kind": "static",
+   "iat_rva": "0x1571ea8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "comctl32.dll",
+   "name": "_TrackMouseEvent",
+   "kind": "static",
+   "iat_rva": "0x1571e50",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "crypt32.dll",
+   "name": "CertCloseStore",
+   "kind": "static",
+   "iat_rva": "0x1571850",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "crypt32.dll",
+   "name": "CryptMsgClose",
+   "kind": "static",
+   "iat_rva": "0x1571860",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "dsound.dll",
+   "name": "DirectSoundEnumerateA",
+   "kind": "static",
+   "iat_rva": "0x1572180",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "dwmapi.dll",
+   "name": "DwmExtendFrameIntoClientArea",
+   "kind": "delay",
+   "iat_rva": "0x1576468",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "dwmapi.dll",
+   "name": "DwmIsCompositionEnabled",
+   "kind": "delay",
+   "iat_rva": "0x1576460",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "AngleArc",
+   "kind": "static",
+   "iat_rva": "0x15718b8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "Arc",
+   "kind": "static",
+   "iat_rva": "0x1571a28",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "ArcTo",
+   "kind": "static",
+   "iat_rva": "0x1571a18",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "BeginPath",
+   "kind": "static",
+   "iat_rva": "0x1571898",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "Chord",
+   "kind": "static",
+   "iat_rva": "0x1571a88",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "CloseEnhMetaFile",
+   "kind": "static",
+   "iat_rva": "0x15718a8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "CreateBrushIndirect",
+   "kind": "static",
+   "iat_rva": "0x1571ad0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "CreateEnhMetaFileW",
+   "kind": "static",
+   "iat_rva": "0x1571a20",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "CreateFontW",
+   "kind": "static",
+   "iat_rva": "0x1571ab8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "CreatePatternBrush",
+   "kind": "static",
+   "iat_rva": "0x1571a60",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "CreatePenIndirect",
+   "kind": "static",
+   "iat_rva": "0x15719b0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "CreatePolygonRgn",
+   "kind": "static",
+   "iat_rva": "0x1571890",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "Ellipse",
+   "kind": "static",
+   "iat_rva": "0x1571980",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "EndDoc",
+   "kind": "static",
+   "iat_rva": "0x15719e8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "EndPath",
+   "kind": "static",
+   "iat_rva": "0x1571a68",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "EnumFontFamiliesExW",
+   "kind": "static",
+   "iat_rva": "0x1571c50",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "EnumFontsW",
+   "kind": "static",
+   "iat_rva": "0x1571b98",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "ExtFloodFill",
+   "kind": "static",
+   "iat_rva": "0x1571bb8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "FrameRgn",
+   "kind": "static",
+   "iat_rva": "0x1571b10",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "GetCurrentObject",
+   "kind": "static",
+   "iat_rva": "0x15719f8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "GetCurrentPositionEx",
+   "kind": "static",
+   "iat_rva": "0x1571c00",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "GetDCOrgEx",
+   "kind": "static",
+   "iat_rva": "0x1571bf0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "GetNearestPaletteIndex",
+   "kind": "static",
+   "iat_rva": "0x1571c08",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "GetPixel",
+   "kind": "static",
+   "iat_rva": "0x1571c38",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "GetStretchBltMode",
+   "kind": "static",
+   "iat_rva": "0x1571b68",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "GetTextAlign",
+   "kind": "static",
+   "iat_rva": "0x1571c18",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "Pie",
+   "kind": "static",
+   "iat_rva": "0x1571870",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "PolyBezier",
+   "kind": "static",
+   "iat_rva": "0x15719d8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "PolyBezierTo",
+   "kind": "static",
+   "iat_rva": "0x1571950",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "Polygon",
+   "kind": "static",
+   "iat_rva": "0x1571968",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "Polyline",
+   "kind": "static",
+   "iat_rva": "0x1571b38",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "RectVisible",
+   "kind": "static",
+   "iat_rva": "0x15718b0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "Rectangle",
+   "kind": "static",
+   "iat_rva": "0x1571af0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "ResizePalette",
+   "kind": "static",
+   "iat_rva": "0x15718c0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "RoundRect",
+   "kind": "static",
+   "iat_rva": "0x15718f0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "SelectClipPath",
+   "kind": "static",
+   "iat_rva": "0x1571ae0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "SetAbortProc",
+   "kind": "static",
+   "iat_rva": "0x15718c8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "SetDIBitsToDevice",
+   "kind": "static",
+   "iat_rva": "0x1571aa8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "SetEnhMetaFileBits",
+   "kind": "static",
+   "iat_rva": "0x1571ae8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "SetPixel",
+   "kind": "static",
+   "iat_rva": "0x1571c48",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "SetROP2",
+   "kind": "static",
+   "iat_rva": "0x1571a08",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "SetViewportOrgEx",
+   "kind": "static",
+   "iat_rva": "0x1571a98",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "StartDocW",
+   "kind": "static",
+   "iat_rva": "0x1571998",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "TextOutW",
+   "kind": "static",
+   "iat_rva": "0x1571a38",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "UnrealizeObject",
+   "kind": "static",
+   "iat_rva": "0x1571bc0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "imagehlp.dll",
+   "name": "ImageDirectoryEntryToData",
+   "kind": "static",
+   "iat_rva": "0x1571ff0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "imm32.dll",
+   "name": "ImmIsIME",
+   "kind": "delay",
+   "iat_rva": "0x1576458",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "AddAtomW",
+   "kind": "static",
+   "iat_rva": "0x1571560",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "AddVectoredExceptionHandler",
+   "kind": "static",
+   "iat_rva": "0x1571408",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "AssignProcessToJobObject",
+   "kind": "static",
+   "iat_rva": "0x1571788",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "ChangeTimerQueueTimer",
+   "kind": "static",
+   "iat_rva": "0x15713b8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "CompareFileTime",
+   "kind": "static",
+   "iat_rva": "0x1571388",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "CompareStringA",
+   "kind": "static",
+   "iat_rva": "0x15716a0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "CreateSymbolicLinkW",
+   "kind": "delay",
+   "iat_rva": "0x1576370",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "CreateTimerQueueTimer",
+   "kind": "static",
+   "iat_rva": "0x1571310",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "DeleteAtom",
+   "kind": "static",
+   "iat_rva": "0x1571270",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "DeleteTimerQueueTimer",
+   "kind": "static",
+   "iat_rva": "0x15716e8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "EnumSystemLocalesW",
+   "kind": "static",
+   "iat_rva": "0x1571340",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "ExitThread",
+   "kind": "static",
+   "iat_rva": "0x1571760",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "FindAtomW",
+   "kind": "static",
+   "iat_rva": "0x1571328",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "FreeResource",
+   "kind": "static",
+   "iat_rva": "0x1571438",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetCPInfoExW",
+   "kind": "static",
+   "iat_rva": "0x1571318",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetComputerNameW",
+   "kind": "static",
+   "iat_rva": "0x1571790",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetConsoleCP",
+   "kind": "static",
+   "iat_rva": "0x1571690",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetConsoleOutputCP",
+   "kind": "static",
+   "iat_rva": "0x1571678",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetExitCodeThread",
+   "kind": "static",
+   "iat_rva": "0x1571490",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetLogicalDriveStringsW",
+   "kind": "static",
+   "iat_rva": "0x1571610",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetOEMCP",
+   "kind": "static",
+   "iat_rva": "0x1571748",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetStartupInfoW",
+   "kind": "static",
+   "iat_rva": "0x1571588",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetSystemDefaultLocaleName",
+   "kind": "delay",
+   "iat_rva": "0x1576398",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetSystemDirectoryW",
+   "kind": "static",
+   "iat_rva": "0x1571710",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetTimeZoneInformationForYear",
+   "kind": "delay",
+   "iat_rva": "0x1576388",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GetWindowsDirectoryW",
+   "kind": "static",
+   "iat_rva": "0x1571630",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "GlobalMemoryStatus",
+   "kind": "static",
+   "iat_rva": "0x15717d8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "HeapCreate",
+   "kind": "static",
+   "iat_rva": "0x1571628",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "IsDebuggerPresent",
+   "kind": "static",
+   "iat_rva": "0x15712d8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "IsWow64Process",
+   "kind": "delay",
+   "iat_rva": "0x1576358",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "LoadLibraryA",
+   "kind": "static",
+   "iat_rva": "0x1571418",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "LoadLibraryExW",
+   "kind": "static",
+   "iat_rva": "0x15714d0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "LoadResource",
+   "kind": "static",
+   "iat_rva": "0x1571540",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "LocaleNameToLCID",
+   "kind": "delay",
+   "iat_rva": "0x1576378",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "LockResource",
+   "kind": "static",
+   "iat_rva": "0x15714c8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "NormalizeString",
+   "kind": "delay",
+   "iat_rva": "0x1576360",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "OpenFileMappingW",
+   "kind": "static",
+   "iat_rva": "0x15712c8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "OpenProcess",
+   "kind": "static",
+   "iat_rva": "0x1571480",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "QueryDosDeviceW",
+   "kind": "static",
+   "iat_rva": "0x1571260",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "RtlUnwindEx",
+   "kind": "static",
+   "iat_rva": "0x1571268",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "SetEnvironmentVariableW",
+   "kind": "static",
+   "iat_rva": "0x15712c0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "SetThreadPriority",
+   "kind": "static",
+   "iat_rva": "0x15715c8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "SetVolumeLabelW",
+   "kind": "static",
+   "iat_rva": "0x1571528",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "SignalObjectAndWait",
+   "kind": "static",
+   "iat_rva": "0x1571640",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "SizeofResource",
+   "kind": "static",
+   "iat_rva": "0x15712a8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "SuspendThread",
+   "kind": "static",
+   "iat_rva": "0x1571548",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "SystemTimeToFileTime",
+   "kind": "static",
+   "iat_rva": "0x1571708",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "SystemTimeToTzSpecificLocalTime",
+   "kind": "static",
+   "iat_rva": "0x1571360",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "TlsAlloc",
+   "kind": "static",
+   "iat_rva": "0x15712b8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "TlsFree",
+   "kind": "static",
+   "iat_rva": "0x1571670",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "TzSpecificLocalTimeToSystemTime",
+   "kind": "static",
+   "iat_rva": "0x1571798",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "UnhandledExceptionFilter",
+   "kind": "static",
+   "iat_rva": "0x15714f8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "VirtualQueryEx",
+   "kind": "static",
+   "iat_rva": "0x1571518",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "WaitForMultipleObjects",
+   "kind": "static",
+   "iat_rva": "0x1571568",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "mpr.dll",
+   "name": "WNetEnumResourceW",
+   "kind": "static",
+   "iat_rva": "0x1571c70",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "mpr.dll",
+   "name": "WNetGetUniversalNameW",
+   "kind": "static",
+   "iat_rva": "0x1571c78",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "mpr.dll",
+   "name": "WNetOpenEnumW",
+   "kind": "static",
+   "iat_rva": "0x1571c88",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "msacm32.dll",
+   "name": "acmDriverDetailsA",
+   "kind": "static",
+   "iat_rva": "0x1572130",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "msacm32.dll",
+   "name": "acmDriverEnum",
+   "kind": "static",
+   "iat_rva": "0x1572150",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "msacm32.dll",
+   "name": "acmDriverOpen",
+   "kind": "static",
+   "iat_rva": "0x1572120",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "msacm32.dll",
+   "name": "acmFormatChooseW",
+   "kind": "static",
+   "iat_rva": "0x1572108",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "msacm32.dll",
+   "name": "acmFormatSuggest",
+   "kind": "static",
+   "iat_rva": "0x1572140",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "msacm32.dll",
+   "name": "acmStreamMessage",
+   "kind": "static",
+   "iat_rva": "0x1572128",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "msacm32.dll",
+   "name": "acmStreamOpen",
+   "kind": "static",
+   "iat_rva": "0x1572138",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "msacm32.dll",
+   "name": "acmStreamUnprepareHeader",
+   "kind": "static",
+   "iat_rva": "0x1572118",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "msimg32.dll",
+   "name": "GradientFill",
+   "kind": "delay",
+   "iat_rva": "0x1576348",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "ole32.dll",
+   "name": "CLSIDFromString",
+   "kind": "static",
+   "iat_rva": "0x1572028",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "ole32.dll",
+   "name": "CoGetClassObject",
+   "kind": "static",
+   "iat_rva": "0x1572060",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "ole32.dll",
+   "name": "CreateDataAdviseHolder",
+   "kind": "static",
+   "iat_rva": "0x1572008",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "ole32.dll",
+   "name": "IsAccelerator",
+   "kind": "static",
+   "iat_rva": "0x15720a0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "ole32.dll",
+   "name": "OleDraw",
+   "kind": "static",
+   "iat_rva": "0x1572070",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "ole32.dll",
+   "name": "OleFlushClipboard",
+   "kind": "static",
+   "iat_rva": "0x1572040",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "ole32.dll",
+   "name": "OleIsCurrentClipboard",
+   "kind": "static",
+   "iat_rva": "0x1572050",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "ole32.dll",
+   "name": "OleSetMenuDescriptor",
+   "kind": "static",
+   "iat_rva": "0x15720e8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "ole32.dll",
+   "name": "ProgIDFromCLSID",
+   "kind": "static",
+   "iat_rva": "0x15720d0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "ole32.dll",
+   "name": "StringFromCLSID",
+   "kind": "static",
+   "iat_rva": "0x1572088",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "oleacc.dll",
+   "name": "LresultFromObject",
+   "kind": "static",
+   "iat_rva": "0x1571d60",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "oleaut32.dll",
+   "name": "GetErrorInfo",
+   "kind": "static",
+   "iat_rva": "0x1571138",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "oleaut32.dll",
+   "name": "SafeArrayAccessData",
+   "kind": "static",
+   "iat_rva": "0x1571158",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "oleaut32.dll",
+   "name": "SafeArrayGetElemsize",
+   "kind": "static",
+   "iat_rva": "0x1571198",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "oleaut32.dll",
+   "name": "SafeArrayUnaccessData",
+   "kind": "static",
+   "iat_rva": "0x1571188",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "oleaut32.dll",
+   "name": "SysReAllocStringLen",
+   "kind": "static",
+   "iat_rva": "0x1571160",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "oleaut32.dll",
+   "name": "VariantChangeType",
+   "kind": "static",
+   "iat_rva": "0x15711c0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "oleaut32.dll",
+   "name": "VariantCopyInd",
+   "kind": "static",
+   "iat_rva": "0x15711b8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "opengl32.dll",
+   "name": "wglGetProcAddress",
+   "kind": "static",
+   "iat_rva": "0x15709e0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "opengl32.dll",
+   "name": "wglUseFontBitmapsW",
+   "kind": "static",
+   "iat_rva": "0x15709d8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "propsys.dll",
+   "name": "PropVariantToBooleanWithDefault",
+   "kind": "delay",
+   "iat_rva": "0x15763d0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "propsys.dll",
+   "name": "PropVariantToFileTime",
+   "kind": "delay",
+   "iat_rva": "0x15763c8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "propsys.dll",
+   "name": "VariantToPropVariant",
+   "kind": "delay",
+   "iat_rva": "0x15763b0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "rpcrt4.dll",
+   "name": "UuidCreate",
+   "kind": "delay",
+   "iat_rva": "0x15763a8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "shcore.dll",
+   "name": "GetDpiForMonitor",
+   "kind": "delay",
+   "iat_rva": "0x1576488",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "shcore.dll",
+   "name": "GetProcessDpiAwareness",
+   "kind": "delay",
+   "iat_rva": "0x1576490",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "shell32.dll",
+   "name": "DragFinish",
+   "kind": "static",
+   "iat_rva": "0x1571f68",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "shell32.dll",
+   "name": "DragQueryPoint",
+   "kind": "static",
+   "iat_rva": "0x1571f90",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "shell32.dll",
+   "name": "PathCleanupSpec",
+   "kind": "static",
+   "iat_rva": "0x1571f60",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "shell32.dll",
+   "name": "SHAddToRecentDocs",
+   "kind": "static",
+   "iat_rva": "0x1571fc8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "shell32.dll",
+   "name": "SHChangeNotifyDeregister",
+   "kind": "static",
+   "iat_rva": "0x1571f70",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "shell32.dll",
+   "name": "SHChangeNotifyRegister",
+   "kind": "static",
+   "iat_rva": "0x1571fa8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "shell32.dll",
+   "name": "SHGetFolderPathW",
+   "kind": "static",
+   "iat_rva": "0x1571f98",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "shell32.dll",
+   "name": "SHGetKnownFolderPath",
+   "kind": "delay",
+   "iat_rva": "0x15763e8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "shell32.dll",
+   "name": "SHOpenFolderAndSelectItems",
+   "kind": "delay",
+   "iat_rva": "0x15763e0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "shell32.dll",
+   "name": "ShellExecuteA",
+   "kind": "static",
+   "iat_rva": "0x1571fd0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "shell32.dll",
+   "name": "Shell_NotifyIconW",
+   "kind": "static",
+   "iat_rva": "0x1571f40",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "shlwapi.dll",
+   "name": "PathUnExpandEnvStringsW",
+   "kind": "static",
+   "iat_rva": "0x15709c8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "CharLowerW",
+   "kind": "static",
+   "iat_rva": "0x1570c80",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "CharNextExA",
+   "kind": "static",
+   "iat_rva": "0x1570cb8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "CharToOemBuffW",
+   "kind": "static",
+   "iat_rva": "0x1570a38",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "CheckMenuItem",
+   "kind": "static",
+   "iat_rva": "0x1570ee8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "CopyImage",
+   "kind": "static",
+   "iat_rva": "0x1570a10",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "CountClipboardFormats",
+   "kind": "static",
+   "iat_rva": "0x1571068",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "CreateCaret",
+   "kind": "static",
+   "iat_rva": "0x1570f60",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "CreateIcon",
+   "kind": "static",
+   "iat_rva": "0x1571020",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "CreateIconFromResource",
+   "kind": "static",
+   "iat_rva": "0x1570bc8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "CreateIconIndirect",
+   "kind": "static",
+   "iat_rva": "0x1570db0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "CreateMenu",
+   "kind": "static",
+   "iat_rva": "0x1570c70",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "DefFrameProcW",
+   "kind": "static",
+   "iat_rva": "0x1570a28",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "DestroyIcon",
+   "kind": "static",
+   "iat_rva": "0x1570c10",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "DispatchMessageA",
+   "kind": "static",
+   "iat_rva": "0x1570c30",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "DrawTextExW",
+   "kind": "static",
+   "iat_rva": "0x1570cb0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "FindWindowExW",
+   "kind": "static",
+   "iat_rva": "0x15710b8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetClassLongPtrW",
+   "kind": "static",
+   "iat_rva": "0x1570eb8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetClassNameW",
+   "kind": "static",
+   "iat_rva": "0x1570d08",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetCursorInfo",
+   "kind": "static",
+   "iat_rva": "0x1570e90",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetDoubleClickTime",
+   "kind": "static",
+   "iat_rva": "0x1570fb0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetGestureInfo",
+   "kind": "delay",
+   "iat_rva": "0x1576300",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetKeyNameTextW",
+   "kind": "static",
+   "iat_rva": "0x1570d28",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetKeyboardLayoutList",
+   "kind": "static",
+   "iat_rva": "0x1570ab8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetKeyboardLayoutNameW",
+   "kind": "static",
+   "iat_rva": "0x1571038",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetMenuItemInfoW",
+   "kind": "static",
+   "iat_rva": "0x1570a20",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetMenuStringW",
+   "kind": "static",
+   "iat_rva": "0x1570a60",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetMessageExtraInfo",
+   "kind": "static",
+   "iat_rva": "0x1570ce0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetMessageTime",
+   "kind": "static",
+   "iat_rva": "0x1570c50",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetMessageW",
+   "kind": "static",
+   "iat_rva": "0x1570dc0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetSysColor",
+   "kind": "static",
+   "iat_rva": "0x1570ce8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetWindowTextW",
+   "kind": "static",
+   "iat_rva": "0x1570b78",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "InsertMenuItemW",
+   "kind": "static",
+   "iat_rva": "0x1570f70",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "InvalidateRgn",
+   "kind": "static",
+   "iat_rva": "0x1570b30",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "IsClipboardFormatAvailable",
+   "kind": "static",
+   "iat_rva": "0x1570a78",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "IsDialogMessageA",
+   "kind": "static",
+   "iat_rva": "0x1571108",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "IsDialogMessageW",
+   "kind": "static",
+   "iat_rva": "0x1570b88",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "IsProcessDPIAware",
+   "kind": "delay",
+   "iat_rva": "0x1576338",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "LoadImageW",
+   "kind": "static",
+   "iat_rva": "0x1571090",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "MessageBoxA",
+   "kind": "static",
+   "iat_rva": "0x1570de8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "MonitorFromPoint",
+   "kind": "static",
+   "iat_rva": "0x15710c0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "MsgWaitForMultipleObjectsEx",
+   "kind": "static",
+   "iat_rva": "0x1570f30",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "PostThreadMessageW",
+   "kind": "static",
+   "iat_rva": "0x15710f8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "RegisterTouchWindow",
+   "kind": "delay",
+   "iat_rva": "0x1576320",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "SendInput",
+   "kind": "static",
+   "iat_rva": "0x1570e68",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "SendMessageA",
+   "kind": "static",
+   "iat_rva": "0x1570a70",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "SetKeyboardState",
+   "kind": "static",
+   "iat_rva": "0x1570ff8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "SetMenuItemInfoW",
+   "kind": "static",
+   "iat_rva": "0x1570a18",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "SetWindowTextA",
+   "kind": "static",
+   "iat_rva": "0x1570ea0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "ShowScrollBar",
+   "kind": "static",
+   "iat_rva": "0x1571088",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "SubtractRect",
+   "kind": "static",
+   "iat_rva": "0x1571030",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "ToUnicode",
+   "kind": "static",
+   "iat_rva": "0x15710e8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "TranslateMDISysAccel",
+   "kind": "static",
+   "iat_rva": "0x1570d98",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "user32.dll",
+   "name": "ValidateRgn",
+   "kind": "static",
+   "iat_rva": "0x1570ca0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "uxtheme.dll",
+   "name": "BufferedPaintInit",
+   "kind": "delay",
+   "iat_rva": "0x1576420",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "uxtheme.dll",
+   "name": "BufferedPaintUnInit",
+   "kind": "delay",
+   "iat_rva": "0x1576418",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "windowscodecs.dll",
+   "name": "WICConvertBitmapSource",
+   "kind": "delay",
+   "iat_rva": "0x15763f8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "wininet.dll",
+   "name": "HttpAddRequestHeadersW",
+   "kind": "static",
+   "iat_rva": "0x1571d78",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "wininet.dll",
+   "name": "HttpEndRequestW",
+   "kind": "static",
+   "iat_rva": "0x1571da0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "wininet.dll",
+   "name": "HttpOpenRequestW",
+   "kind": "static",
+   "iat_rva": "0x1571dc0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "wininet.dll",
+   "name": "HttpQueryInfoW",
+   "kind": "static",
+   "iat_rva": "0x1571dd8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "wininet.dll",
+   "name": "HttpSendRequestExW",
+   "kind": "static",
+   "iat_rva": "0x1571db0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "wininet.dll",
+   "name": "InternetConnectW",
+   "kind": "static",
+   "iat_rva": "0x1571d88",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "wininet.dll",
+   "name": "InternetGetConnectedState",
+   "kind": "static",
+   "iat_rva": "0x1571da8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "wininet.dll",
+   "name": "InternetSetOptionW",
+   "kind": "static",
+   "iat_rva": "0x1571d90",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "wininet.dll",
+   "name": "InternetWriteFile",
+   "kind": "static",
+   "iat_rva": "0x1571d98",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "winmm.dll",
+   "name": "midiInClose",
+   "kind": "static",
+   "iat_rva": "0x1571ca0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "winmm.dll",
+   "name": "midiInGetErrorTextW",
+   "kind": "static",
+   "iat_rva": "0x1571d40",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "winmm.dll",
+   "name": "midiInOpen",
+   "kind": "static",
+   "iat_rva": "0x1571cc8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "winmm.dll",
+   "name": "midiInReset",
+   "kind": "static",
+   "iat_rva": "0x1571d38",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "winmm.dll",
+   "name": "midiInStart",
+   "kind": "static",
+   "iat_rva": "0x1571d50",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "winmm.dll",
+   "name": "midiInStop",
+   "kind": "static",
+   "iat_rva": "0x1571cc0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "winmm.dll",
+   "name": "midiInUnprepareHeader",
+   "kind": "static",
+   "iat_rva": "0x1571d18",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "winmm.dll",
+   "name": "midiOutClose",
+   "kind": "static",
+   "iat_rva": "0x1571ce0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "winmm.dll",
+   "name": "midiOutGetErrorTextW",
+   "kind": "static",
+   "iat_rva": "0x1571cf0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "winmm.dll",
+   "name": "midiOutLongMsg",
+   "kind": "static",
+   "iat_rva": "0x1571d30",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "winmm.dll",
+   "name": "midiOutOpen",
+   "kind": "static",
+   "iat_rva": "0x1571cb8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "winmm.dll",
+   "name": "midiOutPrepareHeader",
+   "kind": "static",
+   "iat_rva": "0x1571d10",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "winmm.dll",
+   "name": "midiOutShortMsg",
+   "kind": "static",
+   "iat_rva": "0x1571cd0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "winmm.dll",
+   "name": "midiOutUnprepareHeader",
+   "kind": "static",
+   "iat_rva": "0x1571d48",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "winspool.drv",
+   "name": "GetDefaultPrinterW",
+   "kind": "static",
+   "iat_rva": "0x1571e08",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "winspool.drv",
+   "name": "OpenPrinterW",
+   "kind": "static",
+   "iat_rva": "0x1571e00",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "wtsapi32.dll",
+   "name": "WTSRegisterSessionNotification",
+   "kind": "delay",
+   "iat_rva": "0x15762e8",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "wtsapi32.dll",
+   "name": "WTSUnRegisterSessionNotification",
+   "kind": "delay",
+   "iat_rva": "0x15762e0",
+   "xref_direct": 1,
+   "xref_via_thunk": 1,
+   "xref": 2
+  },
+  {
+   "dll": "comdlg32.dll",
+   "name": "GetOpenFileNameW",
+   "kind": "static",
+   "iat_rva": "0x1571e28",
+   "xref_direct": 1,
+   "xref_via_thunk": 0,
+   "xref": 1
+  },
+  {
+   "dll": "comdlg32.dll",
+   "name": "GetSaveFileNameW",
+   "kind": "static",
+   "iat_rva": "0x1571e20",
+   "xref_direct": 1,
+   "xref_via_thunk": 0,
+   "xref": 1
+  },
+  {
+   "dll": "gdi32.dll",
+   "name": "CreateICW",
+   "kind": "static",
+   "iat_rva": "0x1571940",
+   "xref_direct": 1,
+   "xref_via_thunk": 0,
+   "xref": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "name": "RtlUnwind",
+   "kind": "static",
+   "iat_rva": "0x1571330",
+   "xref_direct": 1,
+   "xref_via_thunk": 0,
+   "xref": 1
+  },
+  {
+   "dll": "user32.dll",
+   "name": "DefMDIChildProcW",
+   "kind": "static",
+   "iat_rva": "0x1570e30",
+   "xref_direct": 1,
+   "xref_via_thunk": 0,
+   "xref": 1
+  },
+  {
+   "dll": "user32.dll",
+   "name": "EnableScrollBar",
+   "kind": "static",
+   "iat_rva": "0x1570cf0",
+   "xref_direct": 1,
+   "xref_via_thunk": 0,
+   "xref": 1
+  },
+  {
+   "dll": "user32.dll",
+   "name": "GetScrollRange",
+   "kind": "static",
+   "iat_rva": "0x1570a98",
+   "xref_direct": 1,
+   "xref_via_thunk": 0,
+   "xref": 1
+  },
+  {
+   "dll": "user32.dll",
+   "name": "SetScrollPos",
+   "kind": "static",
+   "iat_rva": "0x1570e40",
+   "xref_direct": 1,
+   "xref_via_thunk": 0,
+   "xref": 1
+  },
+  {
+   "dll": "user32.dll",
+   "name": "SetScrollRange",
+   "kind": "static",
+   "iat_rva": "0x1570bd0",
+   "xref_direct": 1,
+   "xref_via_thunk": 0,
+   "xref": 1
+  }
+ ]
+}

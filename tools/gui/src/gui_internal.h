@@ -1,0 +1,89 @@
+/* gui_internal.h — shim 内部共有定義 (外部公開 ABI は gui_api.h; 生成物) */
+#ifndef GUI_INTERNAL_H
+#define GUI_INTERNAL_H
+
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include "gui_proto.h"
+#include "gui_win32.h"
+
+#define GUI_NORETURN __attribute__((noreturn))
+
+/* ---- platform (gui_platform.c) ---- */
+GuiShared *gui_sh(void);                 /* 初回呼出で init + host attach 待ち */
+uint32_t gui_now_ms(void);
+void gui_futex_wait(volatile uint32_t *a, uint32_t expect, int timeout_ms); /* <0 = 無期限 */
+void gui_futex_wake(volatile uint32_t *a);
+GUI_NORETURN void gui_failfast(const char *api, const char *why);
+void gui_log(const char *s);             /* LOG コマンドへ (改行付与) */
+void gui_logf(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
+void gui_out_push(const uint32_t rec[8]);
+uint64_t gui_thread_id(void);
+void gui_lock(void);
+void gui_unlock(void);
+void gui_doorbell(void);                 /* ++doorbell + wake (他スレッドからのメッセージ投函用) */
+/* headless (native/node テスト) 用: out ring が満杯のとき同期ドレインするコールバック */
+extern void (*gui_host_drain_cb)(void);
+void gui_headless_attach(uint32_t w, uint32_t h);
+
+/* ---- handle table ---- */
+typedef enum { HT_NONE = 0, HT_WND, HT_DC, HT_BMP, HT_BRUSH, HT_PEN, HT_FONT, HT_RGN, HT_ICON, HT_CURSOR,
+               HT_PAL, HT_MENU } HType;
+U64 h_alloc(HType t, void *p);
+void *h_get(U64 h, HType t);              /* 型/世代不一致は NULL */
+HType h_type(U64 h);
+void h_free(U64 h);
+
+
+/* ---- rect list (region の実体) ---- */
+typedef struct { WRECT *r; int n, cap; } RL;
+void rl_free(RL *l);
+void rl_clear(RL *l);
+void rl_add(RL *l, WRECT r);               /* 単純追加 (非重複を呼出側が保証) */
+void rl_copy(RL *dst, const RL *src);
+void rl_intersect_rect(RL *l, WRECT r);
+void rl_subtract_rect(RL *l, WRECT r);
+void rl_intersect(RL *l, const RL *o);
+void rl_subtract(RL *l, const RL *o);
+void rl_union(RL *l, const RL *o);
+void rl_bbox(const RL *l, WRECT *out);
+int  rl_empty(const RL *l);
+int  rl_contains(const RL *l, int x, int y);
+static inline int r_empty(WRECT r) { return r.right <= r.left || r.bottom <= r.top; }
+static inline WRECT r_isect(WRECT a, WRECT b) {
+  WRECT o = { a.left > b.left ? a.left : b.left, a.top > b.top ? a.top : b.top,
+              a.right < b.right ? a.right : b.right, a.bottom < b.bottom ? a.bottom : b.bottom };
+  return o;
+}
+
+/* ---- surface (gui_core.c が管理, gui_gdi.c が描画先として参照) ---- */
+typedef struct { uint8_t *px; int stride, w, h; uint32_t gen; } SurfView;
+int  surf_view(int id, SurfView *v);
+void surf_dirty(int id, WRECT r);
+void surf_flush(void);                    /* 溜まった dirty を PRESENT + FRAME_END として push */
+void gui_pump_idle_flush(void);
+
+/* ---- window <-> gdi 連携 (gui_core.c が実装) ---- */
+typedef struct Wnd Wnd;
+int  wnd_target(Wnd *w, int *surf, int *ox, int *oy);   /* top-level surf と client 原点 */
+void wnd_clip(Wnd *w, RL *out);                          /* window DC の可視領域 (surface 座標) */
+Wnd *wnd_from_h(U64 h);
+void wnd_client_size(Wnd *w, int *cw, int *ch);
+
+/* ---- gdi (gui_gdi.c) ---- */
+U64 gdi_get_dc_for_wnd(Wnd *w, int window_dc, const RL *clip_override);
+void gdi_release_dc(U64 hdc);
+void gdi_init(void);
+void gdi_fill_rect_dc(U64 hdc, WRECT r, uint32_t colorref);
+int  gdi_dc_is_valid(U64 hdc);
+
+/* ---- 小物 ---- */
+#define COLORREF_TO_BGRA(c) (0xFF000000u | (((c) & 0xFFu) << 16) | ((c) & 0xFF00u) | (((c) >> 16) & 0xFFu))
+#define BGRA_TO_COLORREF(p) ((((p) >> 16) & 0xFFu) | ((p) & 0xFF00u) | (((p) & 0xFFu) << 16))
+
+typedef int64_t (*WNDPROC64)(int64_t, int64_t, int64_t, int64_t);
+void *gui_resolve_fn(U64 v);
+void gui_set_last_error(uint32_t e);
+
+#endif

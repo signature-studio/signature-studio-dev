@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable", "WebWorker"],
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "skipLibCheck": true,
+    "rootDir": "../../src/runtime",
+    "outDir": "build/js",
+    "sourceMap": false
+  },
+  "include": ["../../src/runtime/gui.ts", "../../src/runtime/gui_worker.ts", "../../src/runtime/gui_proto.ts"]
+}

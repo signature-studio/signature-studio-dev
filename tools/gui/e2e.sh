@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# gui_e2e.sh — 1 コマンド E2E:
+#   mingw PE -> RetDec lift -> 後処理 -> emcc (pthread wasm) + shim -> tsc (gui.ts/gui_worker.ts)
+#   -> headless Chrome (CDP 実入力) -> OffscreenCanvas 読み戻し/スクリーンショット vs golden (exact)
+#   事前に native 単体テスト (selftest) と native lift 実行 (native_e2e) も流す。SKIP_NATIVE=1 で省略。
+set -euo pipefail
+HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; BUILD="$HERE/build"; mkdir -p "$BUILD"
+ROOT_REPO="$(cd "$HERE/../.." && pwd)"
+set +u; . "${EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}" >/dev/null 2>&1 || true; set -u
+command -v node >/dev/null || { echo "node not found (emsdk env)" >&2; exit 2; }
+command -v google-chrome >/dev/null || [ -n "${CHROME:-}" ] || { echo "google-chrome not found" >&2; exit 2; }
+echo "[gui-e2e] 0/6 import 解析 + API 面生成"
+[ -f "$HERE/analysis/imports_all.json" ] || python3 "$HERE/analysis/gui_imports.py" >/dev/null
+python3 "$HERE/gen_api.py"
+python3 "$HERE/golden/gen_golden.py"
+if [ "${SKIP_NATIVE:-0}" != "1" ]; then
+  echo "[gui-e2e] 1/6 native 単体テスト (ASan/UBSan)"; bash "$HERE/test/selftest.sh" | tail -2
+  echo "[gui-e2e] 2/6 native lift 実行 (PE->RetDec->gcc, headless host, golden)"; bash "$HERE/test/native_e2e.sh" 2>&1 | grep -E "native_run|\[post\]"
+fi
+echo "[gui-e2e] 3/6 PE -> RetDec lift -> 後処理"
+bash "$HERE/lift/gui_lift.sh" "$HERE/test/gui_app.c" "$BUILD/lift"
+echo "[gui-e2e] 4/6 emcc (pthread wasm + shim)"
+bash "$HERE/lift/gui_wasm.sh" "$BUILD/lift/lifted.c" "$BUILD/wasm" | tail -2
+echo "[gui-e2e] 5/6 tsc (src/runtime/gui*.ts -> build/js)"
+(cd "$HERE" && "$ROOT_REPO/node_modules/.bin/tsc" -p tsconfig.json)
+echo "[gui-e2e] 6/6 headless Chrome E2E (fixed memory)"
+node "$HERE/e2e/e2e.mjs"
+echo "[gui-e2e] 6b/6 headless Chrome E2E (ALLOW_MEMORY_GROWTH variant)"
+bash "$HERE/lift/gui_wasm.sh" "$BUILD/lift/lifted.c" "$BUILD/wasm_grow" grow | tail -1
+GUI_WASM_DIR="$BUILD/wasm_grow" node "$HERE/e2e/e2e.mjs" | grep -E "EXACT|MISMATCH|memory|PASS|FAIL"
+echo "[gui-e2e] 6c/6 fail-fast E2E (未実装 API Ellipse に到達する PE)"
+bash "$HERE/lift/gui_lift.sh" "$HERE/test/gui_app_ff.c" "$BUILD/lift_ff" >/dev/null
+bash "$HERE/lift/gui_wasm.sh" "$BUILD/lift_ff/lifted.c" "$BUILD/wasm_ff" | tail -1
+GUI_WASM_DIR="$BUILD/wasm_ff" E2E_MODE=failfast node "$HERE/e2e/e2e.mjs" | grep -E "fail-fast|FAIL|PASS"
+echo "[gui-e2e] ALL PASS"

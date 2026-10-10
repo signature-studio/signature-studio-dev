@@ -1,0 +1,5 @@
+work/
+build/
+__pycache__/
+*.o
+golden/final.ppm
