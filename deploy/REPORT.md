@@ -13,8 +13,8 @@
 
 | 区分 | ファイル |
 |---|---|
-| 新規 | `wrangler.jsonc` / `scripts/{00-preflight.sh,05-stage.mjs,20-worker.mjs,40-access.mjs,deploy.sh}` / `client/chunked.{mjs,test.mjs}` / `probe/*` / `RUNBOOK.md` `EDGE-SIM.md` `REPORT.md` |
-| 改修 | `scripts/90-verify.sh`(buildId 待ち・302/preview 検査) `scripts/lib.sh`(pnpm PATH) `env.example` `README.md` `.gitignore` |
+| 新規 | `wrangler.jsonc` / `scripts/{05-stage.mjs,20-worker.mjs}` / `client/chunked.{mjs,test.mjs}` / `probe/*` / `RUNBOOK.md` `EDGE-SIM.md` `REPORT.md` |
+| 改修 | `scripts/00-preflight.sh`(Workers 用に全面書換) `scripts/deploy.sh`(3 段化) `scripts/40-access.mjs`(hostname 型 -> worker 型に全面書換) `scripts/90-verify.sh`(buildId 待ち・302/preview 検査) `scripts/lib.sh`(pnpm PATH) `env.example` `README.md` `.gitignore` |
 | 退避 (`git mv`, 内容は import 修正のみ) | R2 構成一式 -> `legacy-r2/` (10-bucket, 20-upload, 30-rulesets, 40-access(hostname型), 50-domain, 00-preflight, deploy-r2.sh, lifecycle.json, rendered/) |
 | 不変 | `config/edge-policy.json` `lib/policy.mjs` `lib/cf.mjs` (tools/e2e が import) / tools/e2e 全体 / tools/hosting |
 
