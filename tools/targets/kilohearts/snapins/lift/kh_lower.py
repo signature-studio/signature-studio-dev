@@ -273,6 +273,9 @@ def find_load_ptr(out, old, ty):
     return None
 
 
+_RDATAEST_ROUNDS = 0        # rdata_estimate の固定点収束ラウンド数 (rep に出して実測値として残す)
+
+
 def rdata_estimate(vas, bodies, rd):
     """[rdataest] rdata_window 自動推定 (KH-4 REPORT §4 設計案の実装, 半自動: 候補列挙+上限推定)。
 
@@ -283,7 +286,9 @@ def rdata_estimate(vas, bodies, rd):
     さらに **call 辺を跨ぐ base 伝播** (UCRT 数学 helper は `lea rcx,[rip+表]` → callee が
     `[rcx+idx*8]` で読む形が多い) を 2 パスで行う: 各関数の call 直前の arg reg (rcx/rdx/r8/r9)
     への base 束縛を記録し、callee の arg-base 読出しに呼び出し元の base VA を種として与える
-    (複数呼び出し元は union, 最大 4 ラウンドの不動点)。
+    (複数呼び出し元は union。**固定点超過反復** (KH-6 phase 2): 「変化がなくなるまで」反復する。
+    旧来は 4 ラウンドで打ち切っていたため、call チェーンが 5 段以上の表の到達幅が過小評価されて
+    いた (V27 指摘の recall 不足)。収束ラウンド数は _RDATAEST_ROUNDS に出して実測する)。
     戻り値: ({va: est_bytes}, {va: 'mask'|'static'|'gap'|'arg'|'none'}) — 精密推定が取れない
     base は次参照 VA までの gap (build 側で 8KB 打切り + 64B 余白) に倒す。fuzz 検証が最終担保。
     """
@@ -395,13 +400,19 @@ def rdata_estimate(vas, bodies, rd):
         for (_, tgt, bind) in cs:
             if tgt in vaset and bind:
                 edges.append((tgt, bind))
-    # pass 2: arg base 伝播 (不動点, 最大 4 ラウンド)
+    # pass 2: arg base 伝播 (不動点。上限は設けず「変化がなくなるまで」反復する = 固定点超過反復。
+    #        KH-6 phase 2: 旧来は 4 ラウンドで打ち切っていたため、call チェーンが 5 段以上ある
+    #        表 (例: powf → 内部 helper → leaf) の到達幅が過小評価されていた (V27 指摘の recall 不足)。
+    #        反復は各ラウンド全関数を再スキャンするため O(rounds × |vas|) だが、実際の収束は
+    #        数ラウンドで停止する (converged ラウンド数を rep に出して実測で示す)。)
     seeds = {}
     for tgt, bind in edges:
         s = seeds.setdefault(tgt, {})
         for reg, vs in bind.items():
             s.setdefault(reg, set()).update(vs)
-    for _ in range(4):
+    rounds = 0
+    for _round in range(64):
+        rounds = _round + 1
         changed = False
         for v in vas:
             sd = seeds.get(v) or {}
@@ -416,6 +427,8 @@ def rdata_estimate(vas, bodies, rd):
                 allhow.setdefault('%x' % va, h2.get('%x' % va, 'none'))
         if not changed:
             break
+    global _RDATAEST_ROUNDS
+    _RDATAEST_ROUNDS = rounds
     return allreach, allhow
 
 
@@ -518,9 +531,11 @@ def main():
     # ---- [rdataest]: 表 base + 可変 index の最大読出幅を機械語から推定 (gen_globals への窓幅候補)
     est = {}
     est_how = {}
+    rdataest_rounds = 0
     if 'rdataest' not in skip:
         from pe_dis import rd as _rd2
         est, est_how = rdata_estimate(vas, bodies, _rd2)
+        rdataest_rounds = _RDATAEST_ROUNDS
     texts = {v: '\n'.join(vshift_pass(gs_pass(lower_body(bodies[v], jt, skip, uid, rep, icalls), uid, rep), uid, rep)
                           if 'vshift' not in skip else
                           gs_pass(lower_body(bodies[v], jt, skip, uid, rep, icalls), uid, rep)) for v in vas}
@@ -700,7 +715,8 @@ def main():
         icall_c.append('EMSCRIPTEN_KEEPALIVE unsigned long long kh_icfail(void) { abort(); return 0; }')
         open(a.out + '.icall.c', 'w').write('\n'.join(icall_c) + '\n')
     print('[kh_lower]', json.dumps(rep), 'rdata windows', len(vaset), 'est', json.dumps(est2), 'unlifted callees', ['%x' % c for c in sorted(called - set(vas))],
-          'icall sites', n_icall, ('icall slot map %d' % len(slots)) if icall_c else '')
+          'icall sites', n_icall, ('icall slot map %d' % len(slots)) if icall_c else '',
+          'rdataest rounds', rdataest_rounds)
 
 
 if __name__ == '__main__':

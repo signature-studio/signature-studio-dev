@@ -9,12 +9,43 @@ RetDec は SSE 命令を `@__asm_<mnemonic>[.N]` の extern 関数呼び出し�
   gen_simd.py IN.ll OUT.c [--report OUT.json]
 未知 mnemonic / 未対応シグネチャは abort() スタブ + 報告 (undefined helper として可視化)。
 """
+import base64
 import json
+import os
 import re
+import struct
 import sys
 
 CT = {'i128': 'u128', 'i64': 'u64', 'i32': 'u32', 'i16': 'unsigned short', 'i8': 'u8', 'float': 'float', 'double': 'double', 'void': 'void'}
 DECL = re.compile(r'^declare (\S+) @(__asm_[\w.]+)\(([^)]*)\)')
+
+# 実機近似表 (scripts/approx_tables.b64) を遅延ロードする。無い/壊れている場合は None。
+_APPROX_TXT = None
+
+
+def load_approx_tables():
+    """(rcp, rsq_odd, rsq_even) の 3 表を C 配列リテラル文字列で返す。失敗時 None。"""
+    global _APPROX_TXT
+    if _APPROX_TXT is not None:
+        return _APPROX_TXT
+    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'scripts', 'approx_tables.b64')
+    try:
+        b64 = ''.join(l for l in open(p) if not l.startswith('#'))
+        blob = base64.b64decode(''.join(b64.split()))
+        assert len(blob) == 3 * 4096 * 4, len(blob)
+        vals = struct.unpack('<12288I', blob)
+        _APPROX_TXT = {'rcp': '{%s}' % ','.join(str(v) for v in vals[:4096]),
+                       'rsq_odd': '{%s}' % ','.join(str(v) for v in vals[4096:8192]),
+                       'rsq_even': '{%s}' % ','.join(str(v) for v in vals[8192:12288])}
+        return _APPROX_TXT
+    except Exception:
+        _APPROX_TXT = None
+        return None
+
+
+# main() 内から名前解決できるように (モジュール属性として公開)
+def approx_tables():
+    return load_approx_tables()
 
 HEAD = r'''/* 自動生成 (gen_simd.py): declare 駆動 SSE helper。手編集禁止。 */
 #include "msimd6_core.h"
@@ -312,14 +343,18 @@ def gen(name, ret, params):
     # ----- pmovsxdq (符号拡張 2 dword → 2 qword, 厳密整数)
     if b == 'pmovsxdq' and ptys == ['i128'] and R == 'i128':
         body = '%s L128 r; r.d[0] = (u64)(long long)(int)%s.w[0]; r.d[1] = (u64)(long long)(int)%s.w[1]; return r.q;' % (pre, A(0), A(0))
-    # ----- 近似命令 (rcp/rsqrt): wasm 側は IEEE の 1/x, 1/sqrt(x) (仕様上限 1.5*2^-12 内)。
-    #       実機 x86 の近似表との差は CAB-224 の許容誤差 gate (tools/liftlib/liftlib/simd/simdtest.py と同一基準) で判定する。
+    # ----- 近似命令 (rcp/rsqrt): 実機 (AMD Ryzen 9 9950X) の近似表で bit-exact に再現する。
+    #       表 = scripts/approx_tables.b64 (extract_approx_tables.py が実機から抽出・検証)。
+    #       検証: approx_probe.c verify = 全グリッド 1,040,384 + 乱数 500,000 で不一致 0 (両命令)。
+    #       旧実装 (IEEE の 1/x, 1/sqrt(x)) は CAB-224 以来の許容誤差 gate の原因だった (§10-4)。
     if b in ('rcpps', 'rcpss') and n == 1 and ptys[0] == 'i128' and R == 'i128':
         cnt = 4 if b == 'rcpps' else 1
-        body = '%s L128 r; r.q = %s.q; %s return r.q;' % (pre, A(0), ' '.join('r.f[%d] = 1.0f / %s.f[%d];' % (i, A(0), i) for i in range(cnt)))
+        body = ('%s L128 r; r.q = %s.q; %s return r.q;'
+                % (pre, A(0), ' '.join('r.w[%d] = kh_rcp_exact(%s.w[%d]);' % (i, A(0), i) for i in range(cnt))))
     if b in ('rsqrtps', 'rsqrtss') and n == 1 and ptys[0] == 'i128' and R == 'i128':
         cnt = 4 if b == 'rsqrtps' else 1
-        body = '%s L128 r; r.q = %s.q; %s return r.q;' % (pre, A(0), ' '.join('r.f[%d] = 1.0f / sqrtf(%s.f[%d]);' % (i, A(0), i) for i in range(cnt)))
+        body = ('%s L128 r; r.q = %s.q; %s return r.q;'
+                % (pre, A(0), ' '.join('r.w[%d] = kh_rsqrt_exact(%s.w[%d]);' % (i, A(0), i) for i in range(cnt))))
     # ----- store 形 (void, ポインタ無し): RetDec が store を落とした形。実装不能 → store128 pass が除去する前提。
     #       pass を外すと silent no-op になる (poc_gain はこの状態で 6/6 通過していた = 検出力不足の実例)
     if re.match(r'^mov(aps|ups|apd|upd|dqa|dqu|ntps|ntdq)$', b) and R == 'void' and n == 2:
@@ -337,11 +372,39 @@ def gen(name, ret, params):
     return body
 
 
+APPROX_TABLE_HELPERS = r'''/* 実機 (AMD Ryzen 9 9950X) の rcpps / rsqrtps 近似表 (extract_approx_tables.py が実機から抽出・検証)。
+ * 構造: エントリ = (e=127 基準の mantissa field, 下位 23bit)。rcp = mantissa>>11 の索引、
+ *       rsq_odd / rsq_even = rsqrtps の入力 exponent field が奇/偶 (偶は √2 因子で別表)。
+ * 指数則 (実測): rcpps 253-e (<=0 で ±0) / rsqrtps 190-((e+1)>>1)。
+ * 検証: approx_probe.c verify = 全グリッド 1,040,384 + 乱数 500,000 で不一致 0 (両命令)。
+ * 抽出した表が使えない場合のみ旧実装 (IEEE の 1/x, 1/sqrt(x)) にフォールバックする。 */
+static const u32 kh_at_rcp[4096] = %(RCP)s;
+static const u32 kh_at_rsq_odd[4096] = %(ODD)s;
+static const u32 kh_at_rsq_even[4096] = %(EVEN)s;
+static inline u32 kh_rcp_exact(u32 x) {
+    u32 s = x & 0x80000000u, e = (x >> 23) & 0xff, man = x & 0x7fffffu;
+    if (e == 0) return s | 0x7f800000u;                       /* ±0 / 非正規 → ±Inf */
+    if (e == 0xff) return man ? (s | 0x7f800000u | (man | 0x400000u)) : s;  /* NaN → quiet / ±Inf → ±0 */
+    int t = 253 - (int)e;
+    return t <= 0 ? s : (s | ((u32)t << 23) | kh_at_rcp[(x >> 11) & 0xfffu]);
+}
+static inline u32 kh_rsqrt_exact(u32 x) {
+    u32 s = x & 0x80000000u, e = (x >> 23) & 0xff, man = x & 0x7fffffu;
+    if (e == 0) return s | 0x7f800000u;
+    if (e == 0xff) return man ? (s | 0x7f800000u | (man | 0x400000u)) : (s ? 0xffc00000u : 0u);
+    if (s) return 0xffc00000u;                                 /* 負の有限値 → NaN */
+    return (((u32)(190 - (int)((e + 1) >> 1)) << 23) | ((e & 1) ? kh_at_rsq_odd[(x >> 11) & 0xfffu]
+                                                                : kh_at_rsq_even[(x >> 11) & 0xfffu]));
+}
+'''
+
+
 def main():
     src, dst = sys.argv[1], sys.argv[2]
     rep = {'generated': [], 'undefined': []}
     seen = set()
     out = [HEAD]
+    approx_needed = set()
     for line in open(src):
         m = DECL.match(line)
         if not m or m.group(2) in seen:
@@ -360,10 +423,25 @@ def main():
         else:
             rep['generated'].append('%s %s(%s)' % (ret, name, ','.join(ptys)))
             out.append('EX %s { %s }' % (sig, body))
+            if 'kh_rcp_exact(' in body:
+                approx_needed.add('rcp')
+            if 'kh_rsqrt_exact(' in body:
+                approx_needed.add('rsqrt')
+    # 近似表ヘルパは実際に参照されたときだけ埋め込む (wasm サイズ増を必要最小限に)
+    if approx_needed:
+        try:
+            txt = approx_tables()
+            if txt is None:
+                raise RuntimeError('approx_tables.b64 unavailable')
+            vals = {'RCP': txt['rcp'], 'ODD': txt['rsq_odd'], 'EVEN': txt['rsq_even']}
+            out.insert(1, APPROX_TABLE_HELPERS % vals)
+        except Exception as e:                                      # pragma: no cover
+            print('[gen_simd] WARN approx tables unavailable (%s) -> IEEE fallback' % e)
     open(dst, 'w').write('\n'.join(out) + '\n')
     if len(sys.argv) > 4 and sys.argv[3] == '--report':
         json.dump(rep, open(sys.argv[4], 'w'), indent=1)
-    print('[gen_simd] helpers %d, undefined(abort stub) %d %s' % (len(rep['generated']), len(rep['undefined']), rep['undefined'][:8]))
+    print('[gen_simd] helpers %d, undefined(abort stub) %d %s approx_tables=%s'
+          % (len(rep['generated']), len(rep['undefined']), rep['undefined'][:8], ','.join(sorted(approx_needed)) or 'none'))
 
 
 if __name__ == '__main__':

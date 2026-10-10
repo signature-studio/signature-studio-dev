@@ -51,6 +51,20 @@ def main():
 
     out = ['/* 自動生成 (gen_globals.py): DLL 実データ */', '#include <stdint.h>']
     rep = []
+    # ---- D16 検出器: --window-map 経路で map 非該当の VA が IR 型サイズ (>8B) のまま載る件数。
+    #      旧実装では `max(n, window)` の window が 0 (per-VA map 経路) で falsy になり、
+    #      非該当 VA の窓が 1B/2B に縮んで定数読みが壊れた (DEFECTS.md D16 / KH-6 phaser/limiter 実測)。
+    #      修復後は 64B 床が効くが、「map に載らず かつ IR が 8B 超を要求する VA」は
+    #      64B でも足りない可能性がある = 静的に数えて可視化する (規則 36: 単位と併記)。
+    d16 = []
+    for line in open(src):
+        m = G.match(line.strip())
+        if not m:
+            continue
+        va = int(m.group(1), 16)
+        raw = size_of(m.group(3))
+        if raw is not None and wmap and '%x' % va not in wmap and raw > 8:
+            d16.append('%x %s raw=%dB' % (va, m.group(3), raw))
     for line in open(src):
         m = G.match(line.strip())
         if not m:
@@ -73,6 +87,8 @@ def main():
     if '--report' in sys.argv:
         json.dump(rep, open(sys.argv[sys.argv.index('--report') + 1], 'w'), indent=1)
     print('[gen_globals] %d globals' % len([r for r in rep if not r.startswith('unsupported')]), [r for r in rep if r.startswith('unsupported')])
+    if d16:
+        print('[gen_globals] D16 detector: map-uncovered VA with IR type > 8B = %d %s' % (len(d16), d16[:6]))
 
 
 if __name__ == '__main__':
