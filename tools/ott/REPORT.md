@@ -178,3 +178,7 @@ OTT_ULP_TOL=2 bash tools/ott/ott_e2e.sh  # 許容 ulp 指定
 - 回帰: `liftlib_e2e.sh` フル ALL PASS (FA 400/400・KH 366/366・regress 4 PASS・SIMD・inject 94/94・leafspec)、
   本 dir `ott_e2e.sh` PASS (89 scenario / 50,236 cell bit-exact, max_ulp 0)。メインツリーは LIFTLIB-2 未コミット WIP のため
   OTT auto ビルドが不能 (f7eval §1) — 着地時に同一ゲートで自動再検証される。
+
+**検収 (別セッション, 2026-10-11): `ACCEPTANCE_CAB238_CAB135.md`** — 判定 = **受入 (PASS)**
+(CAB-238 4 項目 + CAB-135 全条件を Clean HEAD snapshot で独立再現・独立再計算・ネガティブコントロール 3 件)。
+ただし既定ビルドの**無限ルーブ 2 combo (params=0.9 / [0x248]=1) は未修**で、実運用 blocker として LIFTLIB-2 引継。

@@ -1,6 +1,6 @@
 # REPORT — OTT-T3 (CAB-135): AVX/VEX 命令の lift 対応と FMA 経路の bit-exact 検証
 
-親チケット: CAB-7 (Done) / 関連: CAB-138 (CRT 初期化, In Review の母体) / 引き継ぎ先候補: CAB-122 系 (AudioWorklet ABI)
+主要チケット: CAB-7 / 関連: CAB-138 (CRT 初期化) / **検収: CAB-135 完了 = `ACCEPTANCE_CAB238_CAB135.md`** (PASS)
 
 ## 0. 結論 (先出し)
 

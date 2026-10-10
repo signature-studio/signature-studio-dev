@@ -2,6 +2,12 @@
 
 最終更新: 2026-10-11 (CAB-238 再委任分 = 全数値を実測で再取得)。親 REPORT: `tools/ott/REPORT.md` §9。
 
+**検収 (別セッション, 2026-10-11, commit 0800703 + f82f414 を検証):** 判定 = **受入 (PASS)**。
+ただし §6 の無限ルーブ 2 combo は **本検証時点で未修** (params=0.9 / [0x248]=1) のため、
+「CAB-138/CAB-238 検収通過 + 実運用 blocker として LIFTLIB-2 引継」が確定扱い。
+詳細・独立再計算・ネガティブコントロールは `tools/ott/ACCEPTANCE_CAB238_CAB135.md` /
+`tools/ott/f7eval/accept_recount.py`。
+
 ## 0. 結論 (先出し)
 
 - **検収 4 項目すべて実測 PASS** (検証環境 = a137396 (CAB-239 適用後) + CAB-238 既定化, §1):
@@ -78,7 +84,10 @@ x64c 参照 bit の両方と不一致になるのは設計どおり (§5)。
 ## 4. 脱落分岐 (P1) の再計上
 
 production 実測 (auto_stats): sites **89** = state_branch 33 (rewired **30** + unresolved_orient 3) +
-state_dropped 49 (**reconstructed 19** + unsupported **30**) + consumer 4。チケット時点の「再構成 5 / 残 47」は CAB-239
+state_dropped 49 (**reconstructed 19** + unsupported **30**) + consumer **7** (派生値。定義 =
+`sites − state_branch − state_dropped` = 89 − 33 − 49 で、auto_stats に consumer 単体のキーは無い。
+旧記述の「consumer 4」は 33 + 49 + 4 = 86 ≠ 89 で収支が合わず誤り。4 は別キー `unsupported_consumer`
+の値で consumer ではない)。チケット時点の「再構成 5 / 残 47」は CAB-239
 (a137396) の語彙拡張で 19 / 30 に更新済みで、本評価で同じ数値を再現 (vocab: call 4 / call_arg_marker 4 / comis_frag 3 / int_jcc 2 / rot 2)。
 
 **再構成 19 site** (関数帰属は `P1_FNMAP=1` の実測 mapping = `work/cab238/p1_site_functions.json`):
