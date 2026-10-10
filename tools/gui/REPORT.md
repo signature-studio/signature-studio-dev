@@ -1,12 +1,12 @@
 # REPORT — B: gui-shim (Win32 user32/gdi32 → OffscreenCanvas + SAB + 入力キュー)
 
 ## 結論 (先出し)
-- **FL(win) の GUI import を全列挙・優先度付け済み** (`IMPORTS.md`)。GUI 系 DLL 13 本で **429 名** (user32 242 / gdi32 127 / comctl32 30 他)。
+- **FL(win) の GUI import を全列挙・優先度付け済み** (`IMPORTS.md`)。対象は `FLEngine_x64.dll` (FL64.exe の GUI import は `MessageBoxA` 1 件のみで、これも包含済み)。GUI 系 DLL 13 本で **429 エントリ** (一意名 428: `MessageBoxA` が static+delay-load の 2 エントリ; user32 242 / gdi32 127 / comctl32 30 他)。
   描画は転送系中心 (`BitBlt` 47・`StretchBlt` 14・`CreateDIBSection` 7・`StretchDIBits` 4・`AlphaBlend` 6) でベクタ系は僅少 (`LineTo` 14・`Rectangle` 2・`Ellipse` 2) → 「ほぼ 100% 自前ビットマップ描画」を import 面からも裏付け。
 - **shim ABI と SAB プロトコルを設計・文書化** (`PROTOCOL.md`: 共有メモリレイアウト・リング・スレッドモデル・lift ABI・GDI モデル・制限)。
-- **最小 PoC を超えて実装**: 261 関数 (lift ABI) = FL の GUI import 429 名のうち **219 名 (51%) をカバー、P0 は 120/120、P1 は 69/119**。残り 210 名は mingw ヘッダ由来 arity の fail-fast stub を自動生成。
-- **実バイナリ経路の E2E 成功**: mingw-w64 で PE32+ → RetDec → 後処理 → emcc (pthread wasm) → **headless Chrome**、CDP の実マウス/キー入力でシナリオ駆動、
-  OffscreenCanvas 読み戻し・画面スクリーンショットとも **golden と 64,000 px 完全一致 (差 0)**。`bash tools/gui/e2e.sh` 1 コマンド (17〜24 s、Chrome 6 連続で安定; クリーン状態からも PASS)。
+- **最小 PoC を超えて実装**: 261 関数 (lift ABI; うち 43 は FL が import しない A 版・テスト用 kernel32 最小 5 本) = FL の GUI import 429 エントリのうち **219 (51%) をカバー、P0 は 120/120、P1 は 69/119 (P2 21/98、P3 9/92)**。残り 210 は mingw ヘッダ由来 arity の fail-fast stub を自動生成。
+- **PE→lift 経路の E2E 成功** (対象はテスト用 PE `test/gui_app.c`。FLEngine 本体での描画は未達): mingw-w64 で PE32+ → RetDec → 後処理 → emcc (pthread wasm) → **headless Chrome**、CDP の実マウス/キー入力でシナリオ駆動、
+  OffscreenCanvas 読み戻し・画面スクリーンショットとも **golden と 64,000 px 完全一致 (差 0)**。`bash tools/gui/e2e.sh` 1 コマンド (16〜24 s、Chrome 6 連続で安定; クリーン状態からも PASS)。
 - 副産物: RetDec の PE lift 欠陥 4 件と ABI 要件 3 件 (GLOBAL_BASE≥64KiB, 31bit ハンドル, WNDPROC 4 引数 + VA→関数 fnmap) を実測で特定 (§4)。FL 本体 lift にそのまま効く。
 
 ## 1. 成果物
@@ -56,8 +56,8 @@
 
 ## 5. 未実装・逸脱 (全量は `IMPORTS.md` の STUB 一覧)
 - **P1 未実装 50 名 (xref 計 239)**: `DrawEdge`(18)/`DrawFrameControl`/`DrawFocusRect`、クリップボード 7、フック 3 (`SetWindowsHookExW` ほか)、モニタ/DPI 7、キャレット/アイコン 9、util 8 (`LoadStringW` `CharNextW`…)、入力 7 (`SendInput` `ToUnicode`…)、`CreateDIBitmap` ほか。
-- **P2 未実装 77 名 (xref 計 283)**: ImageList_* 23 (DnD ドラッグ画像)、メニュー 21、パレット参照、BufferedPaint、スクロールバー API、IME 7、`_TrackMouseEvent`、アイコン/カーソル生成。
-- **P3 未実装 83 名**: メタファイル 11・印刷 10・wgl 2・タッチ/ジェスチャ 5・Dwm/WTS 5・ベクタ GDI (Ellipse/Polygon/Arc/Bezier/Path) 15 など。
+- **P2 未実装 77 名 (xref 計 283)**: メニュー 15、ImageList_* 14 (DnD ドラッグ画像)、アイコン/カーソル生成 7、パレット参照 6、IME 6、BufferedPaint/MaskBlt 等 5、スクロールバー API 4、`_TrackMouseEvent` ほか。(ImageList_* 全体 23・メニュー全体 21・IME 全体 7・スクロールバー全体 14 は P2+P3 の合算)
+- **P3 未実装 83 名 (xref 計 190)**: ベクタ GDI (Ellipse/Polygon/Arc/Bezier/Path) 15・メタファイル 11・印刷 10・FlatSB 10・ImageList 9・メニュー 6・タッチ/ジェスチャ 5・Dwm/WTS/oleacc 5・wgl 2・共通ダイアログ 2 など。
 - 機能制約: DIB は 32bpp のみ (1/8/24bpp は fail-fast)、GDI テキストは内蔵 8×8 固定幅 (ASCII)、無効領域は単一外接矩形、非クライアント領域なし、`SetCursorPos` は Pointer Lock 未連携、
   `GetDC(NULL)` (スクリーン DC)・複数モニタ・IME・DPI スケーリング (dpr は header に載るが未適用)・`SetWindowRgn` の形状反映は未対応 (no-op)。
 - 未検証: 実 FLEngine lift との結合 (移植待ち)・長時間ストレス・GPU 合成の実フレームレート・Chrome 以外 (Firefox/Safari)。

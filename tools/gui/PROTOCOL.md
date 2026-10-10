@@ -39,7 +39,7 @@
 | 0x140 | surface 表 16 × 128 B | shim |
 | 0x940 | in_recs[1024][8×u32] (32 KiB) | host |
 | 0x8940 | out_recs[2048][8×u32] (64 KiB) | shim |
-| 0x188C0 | 終端 (= 100,672 B) | |
+| 0x18940 | 終端 (= 100,672 B) | |
 
 surface エントリ (128 B): `state, visible, x, y, w, h, stride, pixels(wasm addr), z, gen, _rsv[6], title[64]`。
 `pixels` は **BGRA32 top-down** (Windows DIB と同じ B,G,R,A バイト順)。リサイズ/再確保で `gen++` かつ `SURF_CHANGE`。
