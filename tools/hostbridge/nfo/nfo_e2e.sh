@@ -13,8 +13,13 @@ step() { echo; echo "== $*"; }
 step "typecheck"; ../../../node_modules/.bin/tsc -p tsconfig.json
 step "browser-safety (src/ must not import node: modules)"
 if grep -rn "from 'node:" src/; then echo "FAIL: node import in src/"; fail=1; else echo "ok"; fi
-step "unit + corpus tests"; node --test test/ 2>&1 | grep -E "^ℹ (tests|pass|fail|skipped)|^✖" || true
-node --test test/ >/dev/null 2>&1 || { echo "FAIL: tests"; fail=1; }
+step "unit + corpus tests"; node --test test/*.test.ts 2>&1 | grep -E "^ℹ (tests|pass|fail|skipped)|^✖" || true
+node --test test/*.test.ts >/dev/null 2>&1 || { echo "FAIL: tests"; fail=1; }
+step "real-machine ingest (CAB-219: .Plugins.ini / VerifiedIDs.nfo)"
+node analysis/real_ini_check.mjs > work/real_ini_metrics.json || { echo "FAIL: real-machine checks"; fail=1; }
+node -e 'const m=JSON.parse(require("fs").readFileSync("work/real_ini_metrics.json","utf8"));
+console.log(`real-machine: ini round-trip + writer 406/406 sections, ${m.plugins_ini.files} files | VerifiedIDs ${m.verifiedids.keys} keys (${m.verifiedids.families.VST} VST/${m.verifiedids.families.VST3} VST3/${m.verifiedids.families.CLAP} CLAP) | VST2 pseudo-guid ${m.vst2.reproduced} | failed checks ${m.failed}`);
+if (m.failed) process.exit(1);'
 step "metrics (shipped corpus + generator)"; node cli/metrics.ts work/metrics.json | grep -E '"(nfoFilesTotal|nfoRoundTripExact|nativePluginNfo|fst1155Files|fst1155ReproducedExact|generatedEntries|generatedFiles|readerAccepted)"'
 step "generate synthetic DB for the wasm plugin set"
 KH=../../targets/kilohearts/work/macpkg/product_index.json

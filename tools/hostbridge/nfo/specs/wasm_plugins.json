@@ -1,9 +1,9 @@
 {
-  "_note": "Plugins the wasm build must make visible to FL's Plugin database. Values: OTT magic = hostbridge REPORT (AEffect.uniqueID 0x58665454 'XfTT'); Serum 2 CIDs = Serum2.vst3 moduleinfo.json; Fresh Air magic 'FrAr' = targets/freshair REPORT (product id); Kilohearts snapins are expanded by cli/gen.ts from targets/kilohearts product_index.json when present (VST2 uniqueID = 4-char product id is an ASSUMPTION). Massive X: no installer available, entry intentionally absent (needs moduleinfo.json CID).",
+  "_note": "Plugins the wasm build must make visible to FL's Plugin database. Values: OTT magic = hostbridge REPORT (AEffect.uniqueID 0x58665454 'XfTT'); Serum 2 CIDs = Serum2.vst3 moduleinfo.json (== real-machine ps_file_guid text, CAB-219); Fresh Air magic 'FrAr' 1181892978 = targets/freshair REPORT, CONFIRMED by the real VerifiedIDs.nfo (CAB-219). Kilohearts snapins are expanded by cli/gen.ts from targets/kilohearts product_index.json when present — VST2 uniqueID there is an ASSUMPTION and does NOT match the real machine (real magics are name-derived 4-char codes like 'kdsp', see REPORT §11 / FORMAT §9-5). Massive X: no installer parsed yet, entry intentionally absent (needs moduleinfo.json CID).",
   "plugins": [
     { "name": "OTT", "vendor": "Xfer Records", "format": "vst2", "kind": "effect", "magic": "XfTT", "path": "C:\\Program Files\\Common Files\\VST2\\Xfer Records\\OTT_x64.dll", "category": "Dynamics" },
     { "name": "Fresh Air", "vendor": "Kilohearts", "format": "vst2", "kind": "effect", "magic": "FrAr", "path": "C:\\Program Files\\Common Files\\VST2\\Kilohearts\\Fresh Air_x64.dll", "category": "Exciter" },
-    { "name": "Serum 2", "vendor": "Xfer Records", "format": "vst3", "kind": "generator", "guid": "56534558667350736572756D20320000", "path": "C:\\Program Files\\Common Files\\VST3\\Serum2.vst3", "category": "Synth" },
+    { "name": "Serum 2", "vendor": "Xfer Records", "format": "vst3", "kind": "generator", "guid": "56534558667350736572756D20320000", "path": "C:\\Program Files\\Common Files\\VST3\\Serum2.vst3", "category": "" },
     { "name": "Serum 2 FX", "vendor": "Xfer Records", "format": "vst3", "kind": "effect", "guid": "56534558667351736572756D20322066", "path": "C:\\Program Files\\Common Files\\VST3\\Serum2.vst3", "category": "Fx" }
   ]
 }

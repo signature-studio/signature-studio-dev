@@ -3,8 +3,10 @@
 import { newFile, writeEntry, type PluginEntry, type PluginFile } from './entry.ts';
 import { ValueFile, encodeText } from './valuefile.ts';
 import { buildWrapperFst } from './fst.ts';
+import { IniFile, iniSectionName } from './ini.ts';
 import {
-  FAMILY_DIR, familyOf, isGenClass, classVariant, sanitizeName, tuidFromHex, vst2PseudoGuid, guidToString, isNullGuid, scanFlagsFromDisk, type Family,
+  FAMILY_DIR, familyOf, isGenClass, classVariant, sanitizeName, tuidFromHex, vst2PseudoGuid, guidToString, isNullGuid,
+  scanFlagsFromDisk, NULL_GUID, type Family,
 } from './format.ts';
 
 export interface PluginSpec {
@@ -39,6 +41,8 @@ export interface GenOptions {
   flPath?: string;
   /** write Installed/VerifiedIDs.nfo (default true) */
   verifiedIds?: boolean;
+  /** write Installed/.Plugins.ini — the TMemIniFile cache FL rebuilds itself when missing (default true) */
+  pluginsIni?: boolean;
 }
 
 export const DEFAULT_DB_PATH = 'C:\\Users\\Public\\Documents\\Image-Line\\FL Studio\\Presets\\Plugin database';
@@ -64,14 +68,20 @@ function plugclassOf(s: PluginSpec): number {
 
 function fileOf(s: PluginSpec): PluginFile {
   const cls = plugclassOf(s);
+  const gen = isGenClass(cls);
   return newFile({
     name: s.name,
     filename: s.path,
     plugclass: cls,
-    type: s.type ?? 0,
+    // Real machine (CAB-219): the scanner always writes 1 (fx) / 2 (gen) on verified entries — never 0.
+    type: s.type ?? (gen ? 2 : 1),
     bits: (s.bits ?? 64) === 32 ? 2 : 3,
+    // Real machine (CAB-219): `ps_file_arch=Intel` on all 407 files, Windows included.
+    arch: 1,
     magic: s.format === 'vst2' ? magicOf(s.magic) : 0,
-    guid: s.format === 'vst3' ? tuidFromHex(s.guid ?? '') : new Uint8Array(16),
+    // VST3: CID text (moduleinfo.json / ps_file_guid 表記) → bytes (Windows GUID layout). VST2: the pseudo-GUID the
+    // real scanner stores ("VST"+magic4+lower(name), 64/64 real files, CAB-219).
+    guid: s.format === 'vst3' ? tuidFromHex(s.guid ?? '') : s.format === 'vst2' ? vst2PseudoGuid(s.name, magicOf(s.magic)) : NULL_GUID.slice(),
     size: BigInt(s.size ?? 0),
     date: BigInt(s.date ?? 0),
     scanflags: scanFlagsFromDisk(s.scanflags ?? 1),
@@ -87,14 +97,16 @@ function installedDir(s: PluginSpec): string {
   return `Installed/${isGenClass(plugclassOf(s)) ? 'Generators' : 'Effects'}/${FAMILY_DIR[fam]}`;
 }
 
-/** VerifiedIDs.nfo key: `<VST|VST3|CLAP>:<id>:<32|64>`; id = GUID text for VST2 (pseudo-GUID) / VST3, CLAP id string. (key shape fle:0x8f16d0 = certain; id text per format = inferred) */
+/** VerifiedIDs.nfo key: `<VST|VST3|CLAP>:<32|64>:<id>` (`fle:0x8f16d0`). Real machine (CAB-219, 236/236 keys):
+ *  **bits come before the id**, VST2 id = `ps_file_magic` as plain decimal (NOT the pseudo-GUID — 64/64 match),
+ *  VST3 id = `{GUID}` text (= `ps_file_guid`), CLAP id = the plugin id string. */
 function verifiedKey(s: PluginSpec, f: PluginFile): string {
   const fam = s.format === 'vst2' ? 'VST' : s.format === 'vst3' ? 'VST3' : 'CLAP';
   let id: string;
   if (s.format === 'vst3') id = guidToString(f.guid);
-  else if (s.format === 'vst2') id = guidToString(vst2PseudoGuid(s.name, f.magic, false));
+  else if (s.format === 'vst2') id = String(f.magic);
   else id = f.idstring;
-  return `${fam}:${id}:${f.bits === 3 ? '64' : '32'}`;
+  return `${fam}:${f.bits === 3 ? '64' : '32'}:${id}`;
 }
 
 export function generateDb(specs: PluginSpec[], opts: GenOptions = {}): GenResult {
@@ -102,6 +114,7 @@ export function generateDb(specs: PluginSpec[], opts: GenOptions = {}): GenResul
   const files = new Map<string, Uint8Array>();
   const entries: GenResult['entries'] = [];
   const verified = new ValueFile();
+  const ini = new IniFile();
   const groups = new Map<string, PluginSpec[]>();
   for (const s of specs) {
     const k = `${installedDir(s)}/${sanitizeName(s.name)}`;
@@ -134,9 +147,12 @@ export function generateDb(specs: PluginSpec[], opts: GenOptions = {}): GenResul
       has32,
       has64,
     });
+    const vf = writeEntry(entry, { dbPath, flPath: opts.flPath });
     files.set(fstRel, fst);
-    files.set(nfoRel, encodeText(writeEntry(entry, { dbPath, flPath: opts.flPath }).toString()));
+    files.set(nfoRel, encodeText(vf.toString()));
     entries.push({ spec: first, nfo: nfoRel, fst: fstRel, entry });
+    // .Plugins.ini section = the .nfo body lines, verbatim (fle:0x912d10 shares the 0x913f40 field writer)
+    if (opts.pluginsIni !== false) ini.sections.push({ name: iniSectionName(nfoRel), lines: [...vf.lines] });
     if (opts.verifiedIds !== false) {
       group.forEach((s, i) => {
         const key = verifiedKey(s, pf[i]);
@@ -146,5 +162,6 @@ export function generateDb(specs: PluginSpec[], opts: GenOptions = {}): GenResul
     }
   }
   if (opts.verifiedIds !== false && verified.lines.length) files.set('Installed/VerifiedIDs.nfo', encodeText(verified.toString()));
+  if (opts.pluginsIni !== false && ini.sections.length) files.set('Installed/.Plugins.ini', ini.toBytes());
   return { files, entries };
 }

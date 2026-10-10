@@ -17,11 +17,19 @@ test('GUID text mapping = Windows GUID memory layout (fle 0x439300/0x4391c0)', (
   assert.deepEqual([...guidFromString('{04030201-0605-0807-090a-0b0c0d0e0f10}')!], [...b]);
   assert.equal(guidFromString('{04030201-0605-0807-090A-0B0C0D0E0F1}'), undefined);
   assert.equal(guidFromString('04030201-0605-0807-090A-0B0C0D0E0F10'), undefined);
-  assert.equal(guidToString(tuidFromHex(VST3_CID)), '{58455356-7366-7350-6572-756D20320000}');
+  // tuidFromHex takes the CID TEXT hex (moduleinfo.json / ps_file_guid form): bytes = Windows GUID layout of it.
+  // Real machine (CAB-219): Serum 2 ps_file_guid text = {56534558-6673-5073-6572-756D20320000} == the spec CID.
+  assert.equal(guidToString(tuidFromHex(VST3_CID)), '{56534558-6673-5073-6572-756D20320000}');
 });
 
-test('VST2 pseudo-GUID = "VST" + magic + first 9 name bytes', () => {
-  assert.equal(guidToString(vst2PseudoGuid('OTT', 0x58665454)), '{56535458-6654-544F-5454-000000000000}');
+test('VST2 pseudo-GUID = "VST" + magic4 chars + lower(name), 16B (real .Plugins.ini 64/64, CAB-219)', () => {
+  // 'FrAr' + 'fresh air' — byte-identical to the real Fresh Air ps_file_guid {56535446-7241-7266-7265-736820616972}
+  assert.equal(
+    guidToString(vst2PseudoGuid('Fresh Air', 1181892978)),
+    '{56535446-7241-7266-7265-736820616972}',
+  );
+  assert.equal(guidToString(vst2PseudoGuid('OTT', 0x58665454)), '{56535458-6654-546F-7474-000000000000}');
+  // the "VSE" prefix variant (fle:0x8f0d30 param_4≠0) — not observed in real files
   assert.equal(guidToString(vst2PseudoGuid('OTT', 0x58665454, true)).slice(0, 9), '{56534558');
 });
 

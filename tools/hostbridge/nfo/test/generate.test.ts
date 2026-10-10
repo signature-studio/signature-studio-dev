@@ -6,6 +6,7 @@ import { parseWrapperData } from '../../../flp/src/summary.ts';
 import { generateDb, magicOf, DEFAULT_DB_PATH, type PluginSpec } from '../src/generate.ts';
 import { entryFromBytes } from '../src/entry.ts';
 import { ValueFile, decodeText } from '../src/valuefile.ts';
+import { IniFile } from '../src/ini.ts';
 import { guidToString, tuidFromHex, slotOf } from '../src/format.ts';
 
 const specs: PluginSpec[] = JSON.parse(readFileSync(new URL('../specs/wasm_plugins.json', import.meta.url), 'utf8')).plugins;
@@ -19,6 +20,7 @@ test('magicOf: 4-char string = big-endian u32 (uniqueID), signed int32', () => {
 test('generated DB: layout, every entry accepted by the FL-reader model, preset file present and consistent', () => {
   const g = generateDb(specs);
   assert.deepEqual([...g.files.keys()].sort(), [
+    'Installed/.Plugins.ini',
     'Installed/Effects/VST/Fresh Air.fst', 'Installed/Effects/VST/Fresh Air.nfo',
     'Installed/Effects/VST/OTT.fst', 'Installed/Effects/VST/OTT.nfo',
     'Installed/Effects/VST3/Serum 2 FX.fst', 'Installed/Effects/VST3/Serum 2 FX.nfo',
@@ -62,12 +64,33 @@ test('Serum 2 generator vs FX land in different top-level folders and classes (8
   assert.equal(cls('Installed/Effects/VST/OTT.nfo'), 0);
 });
 
-test('VerifiedIDs.nfo: key = <fmt>:<GUID>:<bits>, value = nfo path relative to Installed\\ with .NFO', () => {
+test('VerifiedIDs.nfo: key = <fmt>:<bits>:<id>, value = nfo path relative to Installed\\ with .NFO', () => {
   const g = generateDb(specs);
   const vf = ValueFile.parse(decodeText(g.files.get('Installed/VerifiedIDs.nfo')!));
-  assert.equal(vf.get('VST3:{58455356-7366-7350-6572-756D20320000}:64'), 'Generators\\VST3\\Serum 2.NFO');
+  // real machine (CAB-219): identical strings in the user's VerifiedIDs.nfo — bits before id, VST3 id = GUID text
+  assert.equal(vf.get('VST3:64:{56534558-6673-5073-6572-756D20320000}'), 'Generators\\VST3\\Serum 2.NFO');
+  // VST2 id = ps_file_magic decimal == real machine (64/64)
+  assert.equal(vf.get('VST:64:1483101268'), 'Effects\\VST\\OTT.NFO');
   assert.equal(vf.lines.length, 4);
   assert.equal(generateDb(specs, { verifiedIds: false }).files.has('Installed/VerifiedIDs.nfo'), false);
+});
+
+test('.Plugins.ini: TMemIniFile layout, section content == .nfo body, BOM, blank line after each section', () => {
+  const g = generateDb(specs);
+  const raw = g.files.get('Installed/.Plugins.ini')!;
+  assert.deepEqual([...raw.slice(0, 3)], [0xef, 0xbb, 0xbf]);
+  const text = new TextDecoder('utf-8').decode(raw.subarray(3));
+  assert.ok(text.includes('[Effects\\VST3\\Serum 2 FX]\r\nfileversion=2\r\n'));
+  assert.ok(text.endsWith('ps_file_category_0=Fx\r\n\r\n')); // blank line after the last section
+  const ini = IniFile.fromBytes(raw);
+  assert.equal(ini.sections.length, 4);
+  // section lines == the .nfo body lines, verbatim (fle:0x912d10 shares the .nfo field writer)
+  for (const e of g.entries) {
+    const sec = ini.get(e.nfo.replace(/^Installed\//, '').replace(/\.nfo$/, '').replace(/\//g, '\\'))!;
+    const nfoLines = ValueFile.parse(decodeText(g.files.get(e.nfo)!)).lines;
+    assert.deepEqual(sec.lines, nfoLines, e.nfo);
+  }
+  assert.equal(generateDb(specs, { pluginsIni: false }).files.has('Installed/.Plugins.ini'), false);
 });
 
 test('same-name 32+64 specs merge into one two-file entry; sanitised file names', () => {

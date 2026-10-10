@@ -113,12 +113,13 @@ export function guidFromString(s: string): Uint8Array | undefined {
   return out;
 }
 
-/** VST3 class id as published in moduleinfo.json / FUID::toString (32 hex chars, raw TUID memory order) → 16 bytes */
+/** VST3 class id text (32 hex chars — moduleinfo.json "CID" / `ps_file_guid` 表記 / VerifiedIDs key) → 16 bytes.
+ *  The hex IS the GUID-text hex FL writes (`{hex8-hex4-hex4-hex4-hex12}`), so the bytes are the Windows GUID memory
+ *  layout of that text — which is exactly what the .fst record 52 holds. Real-machine cross-check (CAB-215/219):
+ *  Serum 2 text {56534558-6673-5073-6572-756D20320000} ⇔ OTT record-52 raw `XTSVTfoTtt…`. */
 export function tuidFromHex(hex: string): Uint8Array {
   if (!/^[0-9a-fA-F]{32}$/.test(hex)) throw new Error('TUID hex must be 32 chars');
-  const out = new Uint8Array(16);
-  for (let i = 0; i < 16; i++) out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
-  return out;
+  return guidFromString(`{${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}}`)!;
 }
 
 export const NULL_GUID = new Uint8Array(16);
@@ -126,10 +127,15 @@ export function isNullGuid(b: Uint8Array): boolean {
   return b.every((x) => x === 0);
 }
 
-/** VST2 pseudo-GUID (`fle:0x8f0d30` + `0x8f1110`): hex("VST") + %.8x magic + first 9 name chars as %.2x, grouped 8-4-4-4-rest */
-export function vst2PseudoGuid(name: string, magic: number, isEffect = false): Uint8Array {
-  let h = (isEffect ? 0x565345 : 0x565354).toString(16).padStart(6, '0') + (magic >>> 0).toString(16).padStart(8, '0');
-  for (let i = 0; i < 9; i++) h += (i < name.length ? name.charCodeAt(i) & 0xff : 0).toString(16).padStart(2, '0');
+/** VST2 pseudo-GUID (`fle:0x8f0d30` builds the hex text: "VST" (param_4=0) / "VSE" (≠0) + `%.8x` magic + first 9
+ *  name bytes as `%.2x`, grouped 8-4-4-4-12). Real machine (CAB-219 .Plugins.ini, 64/64): the scanner calls it with
+ *  the **lower-cased** plugin name and the "VST" prefix — `ps_file_guid` of every VST2 file = ASCII
+ *  `"VST" + <magic 4 chars BE> + lower(name)` truncated / NUL-padded to 16 bytes. The "VSE" variant exists in FL but
+ *  was never observed in real files. */
+export function vst2PseudoGuid(name: string, magic: number, vseVariant = false): Uint8Array {
+  let h = (vseVariant ? 0x565345 : 0x565354).toString(16).padStart(6, '0') + (magic >>> 0).toString(16).padStart(8, '0');
+  const lower = name.toLowerCase();
+  for (let i = 0; i < 9; i++) h += (i < lower.length ? lower.charCodeAt(i) & 0xff : 0).toString(16).padStart(2, '0');
   const g = `{${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}}`;
   return guidFromString(g.toUpperCase())!;
 }

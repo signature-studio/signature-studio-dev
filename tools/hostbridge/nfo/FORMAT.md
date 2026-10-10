@@ -4,7 +4,8 @@
 根拠は `evidence/` (Ghidra decompile 抜粋 + 定数表) と `analysis/reproduce.sh` で再生成可能。実装は `src/` (パーサ/ライタ/生成器)、検証は `test/` と `nfo_e2e.sh`。
 
 確度: **[確]** = decompile/定数表で直接確認 + 実装テストあり / **[推]** = コード上の挙動から推定 (直接の実例なし) / **[未]** = 未確認。
-実例: `Installed\` 配下の v2 `.nfo` は **抽出物に 0 件** (REPORT §1)。よって v2 の書式は **FL の読み書きコードの解読**に基づく (実機サンプルで裏取り可能 → REPORT §7)。
+実例: `Installed\` 配下の v2 `.nfo` は **抽出物に 0 件** (REPORT §1)。よって v2 の書式は **FL の読み書きコードの解読**に基づく。
+**実機照合 (CAB-219, 2026-10-10)**: ユーザ実機の `.Plugins.ini` (406 セクション = 実機 v2 `.nfo` 本文の全量) と `VerifiedIDs.nfo` (236 キー) を取得 — 本書の [確/実機] 印の項目を実ファイルで裏取りし、writer が 406/406 セクションを再現 (REPORT §11, `evidence/real_machine/`)。
 
 ## 1. 物理配置 [確]
 
@@ -52,18 +53,18 @@ Presets\Plugin database\
 | `ps_file_name_i` | str | 空なら省略 | 任意 |
 | `ps_file_filename_i` | path | 空なら省略。`%FLPath%` 圧縮あり | ロードに必要。FL 配下パスは `%FLPath%\…` |
 | `ps_file_plugclass_i` | int | −1 なら省略 | **必須**: 欠落 → −1 → そのファイルは破棄 |
-| `ps_file_type_i` | int | 0 なら省略 | 任意。**1 or 2 のみ有効**、他は 0 に丸める (mask 0x06)。1=effect 強制、2=generator 強制、0=class で判定 |
+| `ps_file_type_i` | int | 0 なら省略 | **1 or 2 のみ有効**、他は 0 に丸める (mask 0x06)。1=effect 強制、2=generator 強制、0=class で判定。実機スキャナは検証済 (scanflags=1) エントリに **常に 1 (fx) / 2 (gen)** を書く (406 セクション中 363、未検証 stub のみ 0) [確/実機] |
 | `ps_file_bitsize_i` | 32/64 | 常に書く | 任意。`64` 以外は 32bit (内部値 2=32bit, 3=64bit) |
-| `ps_file_arch_i` | str | 空なら省略 | 任意 (mac)。`Intel`/`Apple`/`Apple + Intel` (0=空) |
+| `ps_file_arch_i` | str | 空なら省略 | 任意。`Intel`/`Apple`/`Apple + Intel` (0=空)。**実機 Windows でも常に `Intel`** (407/407) [確/実機] |
 | `ps_file_magic_i` | int32 | 0 なら省略 | VST2 の uniqueID。**符号付き int32 の 10 進** (`'XfTT'`=1483101268)。範囲外は 0 |
-| `ps_file_guid_i` | `{GUID}` | null GUID なら省略 | VST3 class id。不正文字列は null 扱い (FL は例外) |
-| `ps_file_date_i` | int64 | 0 なら省略 | 任意 (スキャナの変更検出。単位は未判定 [未]) |
+| `ps_file_guid_i` | `{GUID}` | null GUID なら省略 | VST3 class id。不正文字列は null 扱い (FL は例外)。**VST2 エントリにも書かれる**: 実機は疑似 GUID `ASCII("VST"+magic4文字(BE)+小文字名)` を 16B に NUL 詰め (実機 64/64, `vst2PseudoGuid`) [確/実機] |
+| `ps_file_date_i` | int64 | 0 なら省略 | スキャナの変更検出。**実体 = 最終書込時刻の Delphi TDateTime (double, 元期 1899-12-30) の IEEE754 ビット再解釈を 10 進表記** (実機 407/407 が 2015-10-22〜2026-09-29 の TDateTime に整合; 例 `4676583981019826458` = 2026-07-07 19:48:06) [確/実機] |
 | `ps_file_size_i` | int64 | 0 なら省略 | 任意 (同上) |
 | `ps_file_scanflags_i` | int | 0 なら省略 | 任意。disk 1,2,0x10,0x20 ↔ 内部 1,2,4,0x10 (`fle:0x910590/0x910530`)。内部 8 は runtime のみ (new) |
 | `ps_file_vendorname_i` | str | 空なら省略 | 任意 |
 | `ps_file_category_i` | str | 空なら省略 | 任意 |
 | `ps_file_idstring_i` | str | 空なら省略 | CLAP の plugin id (record 58 の元) |
-| `ps_compatibility_i` | list | 空なら省略 | 任意。`TStrings.DelimitedText` (区切り `,` 引用 `"`, 非 strict) |
+| `ps_compatibility_i` | list | 空なら省略 | 任意。`TStrings.DelimitedText` (区切り `,` 引用 `"`, 非 strict)。実機では **別版 CID の別名リスト** (Splice INSTRUMENT: 自 CID + 4 個の旧 CID) — VerifiedIDs は compat の GUID にも 1 キーずつ作る (→ §6) [確/実機] |
 
 **エントリの採否** [確]: 読込後、`slot = f(plugclass, bits)` が −1 のファイルは捨てられ (`fle:0x8f6990`)、ファイル 0 件のエントリは破棄 (`fle:0x910cd0` 末尾)。slot: Fruity(2,3) 32/64 → 0/1、VST(0,4) → 2/3、VST3(7,8) → 4/5、**AU(9,10) と CLAP(11,12) は 64bit のみ** → 6 / 7、DX(1,5)・class 6・13+ は常に −1。
 同じ slot に 2 ファイルは入らない (後勝ち: `fle:0x8f49e0` が既存を `Remove`)。
@@ -88,8 +89,8 @@ fx/gen の組は (0,4)(1,5)(2,3)(7,8)(9,10)(11,12)。`Effects\`/`Generators\` �
 
 | ファイル | 内容 | 確度 |
 |---|---|---|
-| `Installed\VerifiedIDs.nfo` | value file。キー `"<fmt>:<id>:<32|64>"` (`fle:0x8f16d0`) → 値 = `Installed\` からの相対 nfo パス (`ChangeFileExt(<fst>, ".NFO")`, `fle:0xabb500`+`0x8f15a0`)。`fmt` ∈ {VST, VST3, AU, CLAP, FL, DX} (`fle:0x8ef860`)。読込は 9155c0 (TValueFile, 一定間隔で再読込) | キー形・値形 [確] / `id` の文字列表現 (VST3=GUID 文字列, VST2=疑似 GUID, CLAP=id) [推] |
-| `Installed\.Plugins.ini` | `TMemIniFile`。**セクション名 = `Installed` 相対の `<sub>\<name>` (拡張子なし)**、中身は同じ `ps_*` 行 (`fle:0x912d10` 書込, `0x911e10` 読込)。無い時 FL は `Installed\**\*.NFO` を全読みして作り直す (`fle:0xaba430` → `0xab9f40` → `0xabaf70`) | 構造 [確] / ファイルの文字コード [未] → 生成器は作らない (自己修復に任せる) |
+| `Installed\VerifiedIDs.nfo` | value file。キー `"<fmt>:<32\|64>:<id>"` (**bits が id の前**, 実機 236/236) → 値 = `Installed\` からの相対 nfo パス (`ChangeFileExt(<fst>, ".NFO")`, `fle:0xabb500`+`0x8f15a0`)。`fmt` ∈ {VST, VST3, AU, CLAP, FL, DX} (`fle:0x8ef860`)。読込は 9155c0 (TValueFile, 一定間隔で再読込)。**id の文字列表現 [確/実機]**: VST = `ps_file_magic` の 10 進 (64/64), VST3 = `ps_file_guid` の `{GUID}` テキスト (171/171), CLAP = plugin id 文字列。**対象 = scanflags=1 かつ native 以外のエントリすべて** (実機: 236 キー → 223 nfo; compat GUID は 1 GUID = 1 キー)。実機ファイルは ASCII/CRLF/末尾 CRLF/236 行 | キー形・値形・id 表現・対象集合 [確/実機] |
+| `Installed\.Plugins.ini` | `TMemIniFile`。**セクション名 = `Installed` 相対の `<sub>\<name>` (拡張子なし)**、中身は同じ `ps_*` 行 — **`.nfo` 本文と同一** (書込 `fle:0x912d10` が `.nfo` 用 `0x913f40`/ヘッダ部 `0x911940` と同じ関数を呼ぶ)。**文字コード = UTF-8 + BOM (中身が全 ASCII でも BOM 付き)、CRLF、各セクション (最終を含む) の後ろに空行 1 行** [確/実機]。セクション順 = 内部リスト順 (実機では最近スキャンした Serum 2 が先頭、以後 Fruity が alphabetical 等) [推]。無い時 FL は `Installed\**\*.NFO` を全読みして作り直す (`fle:0xaba430` → `0xab9f40` → `0xabaf70`)。実機 406 セクション / 407 ファイル / 214,350 B — **native Fruity 139 (Installed 外の `.nfo` を持たない) も含む**。検証済 (scanflags=1) エントリは `type=1/2`・`arch=Intel`・`date`/`size` 実値入り、未検証 (scanflags=2/0x22) は `type`/`guid`/`vendor`/`category` を欠く stub | 構造・文字コード・本文同値・空行規則 [確/実機] / セクション順 [推] |
 | `Installed\VST\<magic 10進>[ [64bit]].NFO`, `Installed\VST3\{GUID}[ [64bit]].NFO` | ID 名の nfo の存在検査 (`fle:0x914a20`, `0x916710`) | パス規則 [確] / 実運用での作成者 [未] |
 | 参照文字列 (FLP 内の plugin 参照) | `<path>\|class=N\|magic=N\|guid={…}` (`fle:0x915220` 書, `0x914ca0` 読: キー `class,name,guid,vstid,id`) | [確] |
 
@@ -137,7 +138,8 @@ wrapper chunk (`0xa9eff0`, `tools/flp` の `parseWrapperData` で再パース可
 
 ## 9. 未確認 [未]
 
-1. `Installed\` の **v2 `.nfo` / `.fst` 実機サンプル** (本仕様は decompile のみ; REPORT §7 の依頼)。
-2. `.Plugins.ini` の文字コード / `ps_file_date` の単位 / `VerifiedIDs` の VST2 `id` 表現。
-3. VST3 バンドル (`Serum2.vst3\Contents\x86_64-win\Serum2.vst3`) で `ps_file_filename` がフォルダかバイナリか。
-4. `tip` 文字列の厳密な生成 (`fle:0x8f58b0`) と `New\` の運用 (本生成器は不使用)。
+1. `Installed\` の **実機 `.nfo` / `.fst` 単体ファイル** (本文は `.Plugins.ini` セクションと同一と強く推定 — CAB-219 で 406 セクションの writer 再現まで確認済; ファイル自体は REPORT §7 の依頼継続)。
+2. `ps_file_date` の**単位は解決** (TDateTime double bits, §3)。残: VST2 `magic` の負値 (≥2^31) の VerifiedIDs 10 進表記 (符号付き 10 進と推定 [推])。
+3. VST3 バンドルの `ps_file_filename`: **実機では両形が観測される** — 内部バイナリ形 (`…\Serum2.vst3\Contents\x86_64-win\Serum2.vst3`, Serum 2 / Scaler 3 / Splice) とバンドルフォルダ形 (`…\Vital.vst3`, kHs 群)。`.fst` record 55 はバンドルフォルダ形 (OTT 実機)。どちらも FL が受理する値の実例; 選択規則は scanner 内部の判定 [未] (H11 / CAB-218)。
+4. `tip` 文字列の厳密な生成 (`fle:0x8f58b0`) と `New\` の運用 (本生成器は不使用)。実機 `tip=VST3 / 64 bit`・`color=$40B6F6`・`iconindex=48` は §3 既定値どおり [確/実機]。
+5. Kilohearts VST2 uniqueID: 実機値は 4 文字コード (Disperser=`kdsp` 0x6B647370, Carve EQ=`ksge` 0x6B736765 等) で product_index の id とは別物 → KH 46 種の spec magic は実機値での差し替え候補 (CAB-46 領域)。

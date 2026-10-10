@@ -23,7 +23,9 @@ export interface PluginFile {
   magic: number;
   /** ps_file_guid_<i> — 16 bytes (VST3 class id, `{…}` text); all-zero when absent */
   guid: Uint8Array;
-  /** ps_file_date_<i> — int64 (scanner change detection; unit not determined) */
+  /** ps_file_date_<i> — int64 = IEEE754 bit-cast of the Delphi TDateTime (double, epoch 1899-12-30) of the file's
+   *  last-write time; written as decimal, 0 (= TDateTime 0.0) omitted. Unit confirmed on the real machine (CAB-219):
+   *  all 407 values decode into sane TDateTimes (2015-10-22 .. 2026-09-29). */
   date: bigint;
   /** ps_file_size_<i> — int64 file size in bytes */
   size: bigint;
@@ -51,6 +53,25 @@ export function newFile(p: Partial<PluginFile> & { plugclass: number }): PluginF
     name: '', filename: '', type: 0, bits: 3, arch: 0, magic: 0, guid: NULL_GUID.slice(), date: 0n, size: 0n,
     scanflags: 0, vendor: '', category: '', idstring: '', compat: [], ...p,
   };
+}
+
+/** Delphi TDateTime (double, day 0 = 1899-12-30) ↔ the int64 stored in ps_file_date (bit-cast, decimal text).
+ *  Real-machine rule (CAB-219): `ps_file_date_0=4676583981019826458` = double bits of TDateTime 46210.825 = 2026-07-07 19:48:06. */
+const TD_EPOCH_MS = Date.UTC(1899, 11, 30);
+export function tDateTimeToBits(days: number): bigint {
+  const b = new ArrayBuffer(8);
+  const dv = new DataView(b);
+  dv.setFloat64(0, days, true);
+  return dv.getBigUint64(0, true);
+}
+export function bitsToTDateTime(bits: bigint): number {
+  const b = new ArrayBuffer(8);
+  const dv = new DataView(b);
+  dv.setBigUint64(0, bits, true);
+  return dv.getFloat64(0, true);
+}
+export function tDateTimeToIso(days: number): string {
+  return new Date(TD_EPOCH_MS + days * 86400000).toISOString();
 }
 
 export interface ReadCtx {
