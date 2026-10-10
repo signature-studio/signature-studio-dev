@@ -37,6 +37,9 @@ rm -rf work/gen_out
 node cli/gen.ts specs/wasm_plugins.json work/gen_out ${KH:+--kilohearts "$KH"}
 echo "-- Installed/Effects/VST/OTT.nfo"; cat work/gen_out/Installed/Effects/VST/OTT.nfo
 if [ "${REGEN_EVIDENCE:-0}" = 1 ]; then step "regenerate evidence"; bash analysis/reproduce.sh; fi
+if [ "${SKIP_H4:-0}" = 1 ]; then echo; echo "== CAB-216 (h4) skipped (SKIP_H4=1)"; exit $fail; fi
+step "CAB-216 (HB-H4'): generateDb → pathreg → wvfs virtual fs (node + Chrome OPFS)"
+bash h4_e2e.sh ${H4_ARGS:-} || { echo "FAIL: h4 e2e"; fail=1; }
 node -e '
 const m=JSON.parse(require("fs").readFileSync("work/metrics.json","utf8"));
 const ok=(!m.haveFl)||(m.nfoRoundTripExact===m.nfoFilesTotal-m.nfoNonAscii&&m.fst1155ReproducedExact===m.fst1155Files);

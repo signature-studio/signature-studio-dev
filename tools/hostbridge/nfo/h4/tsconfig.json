@@ -1,0 +1,15 @@
+{
+  // h4/ (CAB-216) 専用 typecheck。読み取り専用の tools/assets/wvfs は include しない
+  // (tools/assets 側の tsconfig には OPFS 系 lib (ES2023/WebWorker) があり単体では PASS。
+  //  nfo/tsconfig.json に "h4" を入れると assets の型エラーが一緒に出て既存 nfo_e2e.sh の
+  //  typecheck step を壊すため、h4 はこの別 config で検査する)。
+  // 注意: `noUnusedLocals: true` は読み取り専用の tools/assets/wvfs/wvfs.ts:177 (既存の未使用 local) でも
+  // 1 件 FAIL する。e2e は h4/ 配下のエラーのみを見る (assets 側は tools/assets 自前の tsconfig で PASS 済み)。
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "lib": ["ES2023", "DOM", "DOM.Iterable", "WebWorker"]
+  },
+  "include": ["."],
+  "exclude": ["node_modules"]
+}
