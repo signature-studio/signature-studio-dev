@@ -29,7 +29,7 @@
 | m11-boot | 5.77 MiB | 28 ms | 23 ms | `{m11_dllmain_done:1}` stage=1 (M11 担当が実装中の現状と一致) |
 | pump 自己検証 | — | — | — | 2000 件欠落 0 / WM_TIMER 発火 / p50 **4.9–10 µs** p99 0.28 ms (静かな機; 高負荷時は p50 0.9–1.6 ms / p99 ~5 ms) |
 
-**Memory64 vs wasm32** (Worker 内, median/min): seq 1.21/1.06, rand RMW 1.11/1.16, pointer chase 1.08/0.95, hot loop 1.04/1.06, OTT lifted DSP **0.925/0.83**。非インライン呼出 microbench は 0.57–12× と方向が反転する外れ値 (V8 インライン判断の揺れ)。負荷 load 9–20 の共有 VM 実測ゆえ静かな機で再測推奨。
+**Memory64 vs wasm32** (Worker 内, median/min): seq 1.21/1.06, rand RMW 1.11/1.16, pointer chase 1.08/0.95, hot loop 1.04/1.06, OTT lifted DSP **0.925/0.83**。非インライン呼出 microbench は 0.57–12× と方向が反転する外れ値 (V8 インライン判断の揺れ)。負荷 load 9–20 の共有 VM 実測ゆえ静かな機で再測推奨。**検収再測 (load 11–22)**: seq 0.97(med)/1.01(min)、rand RMW 1.22/1.11、pointer chase 0.93/0.96、hot loop 1.03/0.98、OTT lifted 0.85–0.95、hash 一致。すなわち個別比は ±20% で揺れ (seq は 0.97〜1.21)、結論「性能差は決定要因でない」のみ再現性あり。個別の倍率は目安として扱うこと。
 
 **ポンプ 4 方式** (50,000 件バースト): ring(Atomics/native) 25.7–118 万 ev/s、postMessage(JSPI/Asyncify) 8.4–10.7 万 ev/s。RTT は二峰性 (5–15 / 80–110 µs) で方式差なし。**Asyncify**: M10 +7.1% (実行速度 0.998×) / M11 **+39.4〜40.0%** (4.47→6.23〜6.25 MB)。
 
@@ -67,6 +67,11 @@
 - **RT-8 (CI)** lift 成果物ごとに wasm32/wasm64 両ビルドを回し 4GiB 超仮定を早期検出 (`bench/build_ott_variants.sh` が雛形)。
 - **RT-9 (互換)** Firefox/Safari マトリクス取得と JSPI/memory64 の機能検出フォールバック設計。
 - **RT-10 (soak)** 実 FLEngine lift で download→compile→instantiate→初回フレームの総時間と tier-up 影響を計測。
+
+## 他担当・既存 e2e との整合 (検収時点)
+- `pnpm typecheck` / `pnpm build` 通過。B (`gui*.ts`) / C (`audio*.ts`) と import・設定の衝突なし。
+- `bash tools/e2e/run.sh` 既定 (preview+edge-sim, agent-browser) は PASS 15 / FAIL 0 / SKIP 3。`--driver both --targets preview,edge-sim,dev` で **PASS 44 / FAIL 0 / SKIP 10** (D の `src/index.ts` / `vite.config.ts` 変更後も維持)。
+- **`window.__webstudio` 契約 (CAB-64) は未実装**: `src/` に実装なし、e2e の `fl-boot` は SKIP (実 FL 未統合)。実装は実 FL 起動後 (RT 下流)。`?runtime=` パネルは別 UI で、契約とは独立。
 
 ## 再現手順
 ```sh
