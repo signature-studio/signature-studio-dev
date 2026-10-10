@@ -9,7 +9,7 @@
 ## 0. 結論 (先出し)
 
 1. **win インストーラは Inno Setup 6.4.2 の repack (AppPublisher "Native Instruments & Team V.R")**。独自パーサで全展開に成功: 11,602 ファイル / オリジナル 2.337 GB。pefile/7z では不可 (repack によりブロック CRC32・ローダ TableCRC・位置チェックサムが全て**古い値のまま** — innoextract 1.9/1.10-dev も CRC で中断。CRC 警告化パッチ版 innoextract と自作パーサで回避)。
-2. **プラグイン実体は同一プロダクトの 3 ビルド**: VST3 `Massive X.vst3` (95,356,824 B, PE32+ x64, .text 60,223,894 B, .pdata **187,093 関数**), VST2 `Massive X.dll` (95,249,816 B), AAX `Massive X.aax` (95,360,344 B) + CPU 判定器 `cputest.dll` (70,144 B)。
+2. **プラグイン実体は同一プロダクトの 3 ビルド**: VST3 `Massive X.vst3` (95,356,824 B, PE32+ x64, .text 60,223,894 B, .pdata **187,060 関数**), VST2 `Massive X.dll` (95,249,816 B), AAX `Massive X.aax` (95,360,344 B) + CPU 判定器 `cputest.dll` (70,144 B)。
 3. **nfo 必要値を NI 自身のメタデータから確定**: Service Center `Massive X.xml` に `PluginID 0x4e692448` / `VST3ID 5653544E-6924-486D-6173-736976652078` / `SNPID MXE` / `UPID 41ce4ac2-34f7-469b-beb8-59a8ad7a8a67`。PluginID 即値は GetPluginFactory (0x18000a870) の `mov edx, 0x4e692448` と実測一致 (§4)。
 4. **ライセンス機構 = NI SC3 (Service Center 3) + RAS3 (JWT) + RAS2 (レジストリ)**。判定は **DSP 音声経路に無く、起動時の product-administration 層と UI ゲート**で効く [med — 文字列・xref の分散から。実機の demo 音声挙動は未検証]。中性化点 N1–N8 を §6 に列挙。
 5. **cracked リソースをインストーラから取出し・解析済み** (配置可の方針どおり): `Native Access\ras3\*.jwt` 35 個 = **RS256 署名済み RAS3 activation JWT** (sub=activation, serial `1H0LR-SSPXD-FUZ81-PKS4D-NRTVR`, exp=253402300799, hardware_profile 6 種) + Service Center XML + Factory Library `.nicnt`。
@@ -54,12 +54,12 @@
 
 ## 3. VST3 構造 (lift 視点の規模)
 
-- PE32+ x64, ImageBase 0x180000000, EP 0x39359a0。セクション: .text 60,223,894 / .rdata 25,090,204 / .data 14,616,232 / .pdata 2,245,008 (**187,093 関数**) / .xdata 4,306,868 / **IPPCODE+IPPDATA** (Intel IPP 静的リンク) / .qtmimed (Qt)。
+- PE32+ x64, ImageBase 0x180000000, EP 0x39359a0。セクション: .text 60,223,894 / .rdata 25,090,204 / .data 14,616,232 / .pdata 2,245,008 (**187,060 関数** = 187,084 entry 中の有効開始・検収再計数) / .xdata 4,306,868 / **IPPCODE+IPPDATA** (Intel IPP 静的リンク) / .qtmimed (Qt)。
 - exports: `InitDll / ExitDll / GetPluginFactory / factoriesListGetter` (VST3 モジュール)。
 - **UI は Qt + QML** (QML ソースがバイナリ内に平文埋め込み: `Lechtal::MX::MXFrameEvents::*`, `unitController`, `MXDemoPopup.qml` 等)。GUI lift は Serum2 の uidesc 相当以上に重い (QML ランタイム必要)。
-- 静的リンク: **OpenSSL 3.x** (EVP_*, BN_*), Intel IPP, Qt。CRT は VST3 では import なし (静的)。VST2 は逆に CRT/WINHTTP/CRYPT32/d3d/IMM32 等を動的 import。
+- 静的リンク: **OpenSSL 3.x** (EVP_*, BN_*), Intel IPP, Qt。VC ランタイムは VST3/VST2 とも動的 import (VCRUNTIME140 26 / MSVCP140 276 / api-ms-win-crt-* ×12 = UCRT / CONCRT140)。d3d9/11/12・IMM32 も両方。※初版の「VST3 は CRT import なし」は pefile が VST3 の import 表を 30 DLL で黙って打ち切るための誤認 — 手動 walk で **64 DLL / 1,412 named** を実測 (検収修正)。
 - callgraph 実測 (自作 `mx_callgraph.py`): 直接 call を持つ関数 146,582 / rip 相対 target 88,758 / IAT スロット 1,188。
-- import 面: VST3 = WS2_32 (56), Secur32 (Schannel), bcrypt (16), ncrypt (5), ADVAPI32 crypto, MFPlat/MF (Media Foundation), dxgi/d3d11, dbghelp (MiniDumpWriteDump)。**WINHTTP は VST2 のみ** (VST3 は生ソケット+Schannel)。
+- import 面 (手動 walk 実測, 64 DLL): VST3 = WS2_32 (56), Secur32 (Schannel, 11), bcrypt (16), ncrypt (5), ADVAPI32 crypto, MFPlat/MF (Media Foundation), dxgi/d3d9/d3d11/d3d12, dbghelp (MiniDumpWriteDump), **WINHTTP (20, ordinal bind)**, CRYPT32 (24), KERNEL32 278 / USER32 197 / GDI32 53。VST2 も 64 DLL / 1,343 named でほぼ同一構成。
 - VST2 exports: `VSTPluginMain / NICreatePlugInInstance / factoriesListGetter`。
 
 ## 4. VST3 class ID (nfo データ) — Service Center XML とコードの双方向で確定
@@ -100,7 +100,7 @@ FactoryLibrary: Massive X Factory Content (UPID 0b408693-…)
   └ RAS3 JWT: {PublicDocuments}\Native Instruments\Native Access\ras3\*.jwt
        解決 0x181754f70 ('Native Instruments'/'Native Access'/'ras3') → 列挙 0x180f94350 ('0123456789abcdef-' + '.jwt')
        → ras3@ni クラス群 (RTTI 実測): JWTReader(+Exception) / KeyStore / CryptoRSAEngine / CryptoRSAPubKey / HardwareID
-       → kid 'dfd4a0d7bb4e2f3509e3e1accee33716fb6610684410be0e3b1669ddd87d40f8' がバイナリ内に定数存在 (0x184ff322d)
+       → kid 'dfd4a0d7bb4e2f3509e3e1accee33716fb6610684410be0e3b1669ddd87d40f8' がバイナリ内に定数存在 (0x184ff4c2d)
        → RSA 検証は静的 OpenSSL (EVP_PKEY_verify 系)。BCryptVerifySignature import はあるが直接呼出 0
 UI ゲート: 'Please use Native Access to (re-)activate.' 群 / 'Your serial number is incorrect…' (0x181142160, 0x181143c00)
          / 'Subscription expired.' (0x18010e4e0) / QML demoExpired・subscriptionExpired・MXDemoPopup.qml
@@ -119,7 +119,7 @@ cracked リソースの実体 (ユーザ方針により配置可): `.jwt` 35 個
 | N4 | RAS3 JWT 検証鎖 (ras3 dir 0x181754f70 / .jwt 列挙 0x180f94350 / KeyStore+CryptoRSA: OpenSSL EVP) | JWT 署名・ハードウェア束縛・exp を検証 | 検証を無条件通過。または **cracked JWT 配置** (方針 §6.0-4・ユーザ承認済み) — vreg へ `Native Access\ras3\*.jwt` を再現 |
 | N5 | QML demo UI (MXDemoPopup.qml / demoExpired / subscriptionExpired) | demo 状態で popup | 非表示固定 (QML 側プロパティ常時 false / popup 生成skip) |
 | N6 | Native Access 誘導文言群 (0x184ffcf87 ほか 6 種) / Registration Tool 文言 | 未アクティベーション時に誘導 | 出現させない |
-| N7 | ネットワーク面: WS2_32 + Secur32(Schannel) (VST3), WINHTTP+CRYPT32 (VST2), api.native-instruments.com / servicecenter… / configuration…tracking.cfg | 更新・認証・テレメトリ | 対象外方針どおり呼ばない (shim no-op/fail-fast, tools/shim 流儀) |
+| N7 | ネットワーク面: WS2_32 + Secur32(Schannel) + WINHTTP + CRYPT32 (VST3/VST2 とも import — VST3 の WINHTTP は ordinal bind), api.native-instruments.com / servicecenter… / configuration…tracking.cfg | 更新・認証・テレメトリ | 対象外方針どおり呼ばない (shim no-op/fail-fast, tools/shim 流儀)。※WINHTTP/CRYPT32/VC ランタイム (VCRUNTIME140/MSVCP140/api-ms-win-crt-*) は VST3 のロードにも必要 — shim 側で提供要 |
 | N8 | ライセンス状態データ配置: Service Center XML / .nicnt / Products.db (0x1805e6480 が path 構築) | 実ファイル読書 | vreg に実配置 (installer 展開物から再現可)。ライセンス鍵以外は通常動作 |
 
 補足: DSP `process` 本体は無変更 (音声経路に手を入れない — N1–N3 の状態を起動時に確定させる構図)。
