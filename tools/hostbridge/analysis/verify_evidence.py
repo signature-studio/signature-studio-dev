@@ -1,0 +1,40 @@
+#!/usr/bin/env python3
+"""evidence/* が HOSTBRIDGE.md §1 の主張を実際に含むことの機械検査 (Ghidra 非依存・数秒)."""
+import re, sys, pathlib
+E = pathlib.Path(__file__).resolve().parent.parent / 'evidence'
+def rd(n): return (E / n).read_text()
+fails = 0
+def ck(name, cond):
+    global fails
+    print('OK  ' if cond else 'FAIL', name)
+    fails += (not cond)
+c = rd('fw_tvstplugin_create.c')
+ck('E1 TVSTPlugin.Create は "Create VST plugin"/"loading dll"/"found main function"/"Call main" を順に出力', all(x in c for x in ['Create VST plugin', 'loading dll', 'found main function', 'Call main']) and c.index('loading dll') < c.index('found main function') < c.index('Call main'))
+ck('E2 main(FUN_007a87c0) 呼出 = audioMaster 渡し', '(*local_30)(FUN_007a87c0)' in c)
+ck('E3 effect+0x40 (resvd1) へ host this を格納', '+ 0x40) = local_res8' in c)
+ck('E4 dispatcher(+8) で effOpen(0) を発行', '(local_260 + 8))(*(undefined8 *)((longlong)local_res8 + 0x9b4),0,0,0)' in c)
+ck('E5 CanReplacing 判定/EffGetVstVersion(0x3a)/PlugCategory(0x23)=10(shell)', '0x3a' in c and '0x23' in c and '== 10' in c)
+ck('E6 SafeLoadLibrary = SetErrorMode+LoadLibraryW', 'SetErrorMode' in rd('fw_findmain_getproc.c') and 'LoadLibraryW' in rd('fw_findmain_getproc.c'))
+ck('E6b 事前検査 7a9030: export 名を小文字化し main/vstpluginmain/hint と比較; FindMain 7ad370 は hint を先に GetProcAddress', 'L"vstpluginmain"' in rd('fw_findmain_getproc.c') and 'FUN_007a8f60(param_2,param_3)' in rd('fw_findmain_getproc.c'))
+ck('E7 名前表ループは 0x1a=26 回', '!= 0x1a' in rd('fw_findmain_getproc.c'))
+nt = rd('fw_main_name_table.txt').split('\n')
+ck('E8 名前表 26 エントリ; [0]=VstPluginMain [1]=VSTPluginMain [2]=main', len([l for l in nt if l.strip()]) == 26 and nt[0].endswith('VstPluginMain') and nt[1].endswith('VSTPluginMain') and nt[2].endswith(' main'))
+a = rd('fw_audiomaster.c')
+ck('E9 audioMaster: version=0x960, vendor ver=0x271a, "Fruity_Wrapper"/"Image_Line" 文字列, canDo 表', '0x960' in a and '0x271a' in a and 'sendVstEvents' in a and 'receiveVstTimeInfo' in a)
+p = rd('fw_process_params.c')
+ck('E10 process: +0x10 / +0x78 の二股, effProcessEvents(0x19) 先行送出', '+ 0x10))' in p and '+ 0x78))' in p and '0x19' in p)
+ck('E11 getParameter(+0x20)/setParameter(+0x18)', '+ 0x20))' in p and '+ 0x18))' in p)
+b = rd('fw_bridge_kind.c')
+ck('E12 bridged/native と 32bit/64bit ラベル, ilbridge 起動条件 (kind 2/3)', '"native"' in b.replace("L\"native\"", '"native"') and 'bridged' in b and "'\\x02'" in b and "'\\x03'" in b)
+ck('E13 PE bitness 判定は MZ(0x5a4d)/machine 0x14c を読む', '0x5a4d' in rd('fw_pe_bitness.asm') and '0x14c' in rd('fw_pe_bitness.asm'))
+ck('E14 Fruity plugin export は CreatePlugInstance', 'CreatePlugInstance' in rd('fw_createplug_instance.c'))
+f = rd('fle_load_fruity_plugin.c')
+ck('E15 FLEngine: path+"_x64.dll" → SafeLoadLibrary(0x8000) → GetProcAddress("CreatePlugInstance")', '_x64.dll' in f and '0x8000' in f and 'CreatePlugInstance' in f)
+o = rd('ott_audioeffect_ctor.asm')
+ck('E16 OTT AEffect ctor: magic 0x56737450@+0x30, dispatcher@+0x38, numParams@+0x5c, uniqueID@+0xa0, version@+0xa4, object@+0x90', all(x in o for x in ['0x56737450', '[R14 + 0x38]', '[R14 + 0x5c]', '[R14 + 0xa0]', '[R14 + 0xa4]', '[R14 + 0x90]']))
+ck('E17 OTT ctor 引数: numPrograms(R8D)=1 / numParams(R9D)=0x14', 'MOV R9D,0x14' in rd('ott_ottprocessor_ctor.asm') and 'LEA R8D,[R9 + -0x13]' in rd('ott_ottprocessor_ctor.asm'))
+ck('E18 OTT VSTPluginMain: audioMaster(…,audioMasterVersion=1,…) を最初に呼ぶ', 'CALL RBX' in rd('ott_vstpluginmain.asm') and 'LEA EDX,[R9 + 0x1]' in rd('ott_vstpluginmain.asm'))
+ck('E19 OTT createEffectInstance: operator new(0x328) → ctor → resume(0x180120800)', 'MOV ECX,0x328' in rd('ott_createeffectinstance.asm') and 'CALL 0x180120800' in rd('ott_createeffectinstance.asm'))
+op = rd('fw_dispatcher_opcodes.txt')
+ck('E20 dispatcher opcode 集計に effOpen/effMainsChanged/effGetChunk/effProcessEvents/effShellGetNextPlugin', all(x in op for x in ['effOpen', 'effMainsChanged', 'effGetChunk', 'effProcessEvents', 'effShellGetNextPlugin']))
+sys.exit(1 if fails else 0)

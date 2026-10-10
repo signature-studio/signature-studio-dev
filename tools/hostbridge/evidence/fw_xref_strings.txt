@@ -1,0 +1,31 @@
+=== xrefstr 'Create VST plugin'
+  hit(u16) @007ab25c
+    ref from 007a9f6b in FUN_007a9db0@007a9db0 (to 007ab25c)
+=== xrefstr 'found main function'
+  hit(u16) @007ab380
+    ref from 007aa47f in FUN_007a9db0@007a9db0 (to 007ab380)
+=== xrefstr 'Call main'
+  hit(u16) @007ab3d8
+    ref from 007aa598 in FUN_007a9db0@007a9db0 (to 007ab3d8)
+=== xrefstr '32bit\ilbridge.exe'
+  hit(u16) @0076384c
+    ref from 00770b35 in FUN_00770a80@00770a80 (to 0076384c)
+    ref from 008dfe18 in ? (to 0076384c)
+=== xrefstr 'TBridgedPlugin.Destroy'
+  hit(u16) @0076fa00
+    ref from 0076f8bf in FUN_0076f8a0@0076f8a0 (to 0076fa00)
+=== xrefstr '-wrapper'
+  hit(u16) @00765ccc
+    ref from 00765c00 in FUN_00765bf0@00765bf0 (to 00765ccc)
+    ref from 00765c07 in FUN_00765bf0@00765bf0 (to 00765ccc)
+=== xrefstr 'bridged'
+  hit(u16) @00772ca8
+    ref from 00772b84 in FUN_007729c0@007729c0 (to 00772ca8)
+  hit(u16) @0079284a
+    ref from 00792602 in FUN_007924d0@007924d0 (to 00792848)
+    ref from 00792656 in FUN_007924d0@007924d0 (to 00792848)
+  hit(a) @009c2be5
+  hit(a) @009c2c28
+=== xrefstr 'native'
+  hit(u16) @00772cc4
+    ref from 00772b96 in FUN_007729c0@007729c0 (to 00772cc4)
