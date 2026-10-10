@@ -91,17 +91,19 @@ fma primitive 自体は emcc libm 実装が native vfmadd と **200,000/200,000 
 
 ```
 lift2/
-├── lift2_e2e.sh          1 コマンド検収 (build → bit-exact → fuzz → ABI → ablation)
-├── mlift/{mlift,mlift_ops,pe_image}.py   機械語駆動リフタ (本セッションで D-A/D-B/D-C 修復)
-├── native/{native_comp,native_filter}.c  実機機械語 oracle (PE 敷設 + IAT shim + canary)
+├── lift2_e2e.sh          1 コマンド検収 (build → bit-exact → fuzz → ABI → ablation → 制御層)
+├── mlift/{mlift,mlift_ops,pe_image}.py   機械語駆動リフタ (D-A/D-B/D-C + E-1..E-5 修復)
+├── native/{native_comp,native_filter,native_ctrl}.c   実機機械語 oracle (PE 敷設 + IAT shim + canary)
+├── native/{comp,filter,ctrl}_harness.mjs  wasm 側 harness (canary 付き, 同一契約)
+├── native/{probe235,probe7fa80,trigprobe,tracefn,entry_probe}.c  関数単位 probe / VST 入口観測点
 ├── native/abi_check.c                    実行時 ABI 検査 (asm capture/verify)
-├── native/{comp,filter}_harness.mjs      wasm 側 harness (canary 付き)
-├── native/{probe235,probe7fa80,trigprobe,tracefn}.c   関数単位 probe (bit-exact bisect 用)
+├── build_{comp,filter,ctrl}.sh           lift + emcc (ctrl は 2 段 lift + icall_extra 自動 seed)
+├── run_{comp,filter,ctrl,fuzz}.sh        各検証の driver (ctrl は ctrl_norm.py で厳密判定)
+├── gen_{comp,filter,ctrl}_scen.py        シナリオ生成 (ctrl: 先頭 8 本 = factory .epf)
+├── icall_extra.py / ctrl_norm.py / gen_win_stubs.py   icall seed 自動列挙 / 厳密判定 / import 既定実装
 ├── abi_static_check.py                   静的 ABI 検査 (push/pop 対応, closure 全関数)
-├── gen_fuzz_scen.py                      ctx-fuzz シナリオ生成 (structured + random)
-├── run_{comp,filter,fuzz}.sh             各検証の driver
-├── shim/{host_wasm,fa_win_shim}.h        wasm/native 共通 shim (fa_vector_grow, fa_mxcsr_get/set 追加)
-└── build_comp.sh / build_filter.sh / ablate_comp.sh / probe_build.sh
+├── shim/{host_wasm,fa_win_shim,am_host}.{h,c}   wasm/native 共通 shim (fa_heap_zero / audioMaster 応答表)
+└── ablate_comp.sh                        故障注入 (ablation)
 ```
 
 ## 8. 未解決 / 次タスク
@@ -160,68 +162,61 @@ lift2/
 - 0x181057d20 (shared_ptr 代入) 経路は本 closure の scenario では未発火。FreshAirDsp 制御層 (§8-2) 拡張時に CRT/lock 状態が表に出る可能性は残る (その際は §5 の poke 案が再燃する)。
 - malloc/free は emcc dlmalloc (wasm) と glibc (native) の差があるが, 比較は相対値 (end-begin/cap-begin) + 内容のみでアドレス値非依存。
 
-## 11. FA-2c 追記: FreshAirDsp 制御層 lift + factory .epf 8 本駆動検証 (CAB-260, commit 本節参照)
+## 11. FA-2c 追記: FreshAirDsp 制御層 lift + factory .epf 8 本駆動検証 (CAB-260, commit 9b420bd)
 
-**結論: 制御層 (0x1803dfc10, vtable 17 slot) の lift は完走し、factory .epf 8 本 + 小規模 structured シナリオで
+**結論: 制御層 (0x1803dfc10, vtable 17 slot) は lift 完走し、factory .epf 8 本 + 小規模 structured で
 native 実機機械語と wasm (mlift) が bit-exact 一致 (`bash lift2_e2e.sh` = ALL PASS)。**
-Compressor 400/400 (grow 込)・Filter 400/400・ctx-fuzz 4,800 は不変。制御層 closure は 305 関数 /
-228,582 B / 44,208 命令 (mlift)。
+Compressor 400/400 (grow 込)・Filter 400/400・ctx-fuzz 4,800 は不変。closure は 305 関数 / 228,582 B / 44,208 命令。
 
 ### 11.1 残骸の評価 (引継ぎ時)
 
-- `lift2/` は未追跡のまま。Compressor/Filter (FA-2/2b) はコミット済みで検収可能。
-- 制御層は vtable 17 slot の lift + ctrl harness (native/wasm) が**途中まで**作られていたが、
-  native 側が `__chkstk` の gs read (Linux は gs_base=0) で必ずクラッシュし、
-  wasm 側は未解決 icall (`jmp rax` CFG stub) で trap —— **両側とも完走していなかった**。
-  旧 `run_ctrl.sh` は「片側クラッシュ → 双方 0 byte → mismatch 0 → 空 PASS」する脆弱性を持っていたため
-  成果物の空ファイル (0 byte) が PASS と判定される状態だった。
+- Compressor/Filter (FA-2/2b) はコミット済みで検収可能。制御層は vtable 17 slot の lift + ctrl harness が
+  **途中まで**あったが、native は `__chkstk` の gs read (Linux は gs_base=0) で必ずクラッシュ、wasm は
+  未解決 icall (`jmp rax` CFG stub) で trap —— **両側とも完走していなかった**。
+  旧 `run_ctrl.sh` は「片側クラッシュ → 双方 0 byte → mismatch 0 → 空 PASS」する脆弱性を持ち、
+  実際に成果物 0 byte が PASS と判定される状態だった。
 
 ### 11.2 修正した 5 件の根本欠陥 (すべて実測で特定・修正)
 
 | # | 欠陥 | 症状 | 修正 |
 |---|---|---|---|
-| **E-1** | `__chkstk` の gs read (`mov r11, gs:[0x10]`) が Linux で SIGSEGV (gs_base=0 → addr 0x10) | native が ctor 入口で必ず停止 | gs read を `xor r11,r11` + nop に差替え (StackLimit=0 → probe skip)。wasm 側 @fa_teb=0 と同値 |
-| **E-2** | FreshAirDspModel ctor (0x1803ba840) の arg2 (rdx) は**非 NULL 必須** (`[arg2+4]` を M+0xa088 に写す)。前担当は 0 を渡し SIGSEGV | native が ctor 途中で停止 | 両側 (native/wasm) で同一の 0 初期化 32B ダミーを渡す (M+0xa088 = 0) |
-| **E-3** | `h_rep_stos` のループが **初期 rcx を毎回読み直さない** | 143KB の model ctor 内 `rep stosb` が rcx0>1 で無限ループ → wasm OOB | ループ頭で `%R_rcx` をロード (ループ持ち回し変数化) |
-| **E-4** | `fa_icall` switch が icall_targets のみ解決 | vtable slot / 引数受け回しの関数ポインタが未解決 → host trap | switch を **lift 済み全関数**に拡大 + CFG stub (`jmp rax`) の rax0 再ディスパッチ。未 seed の seed は `icall_extra.py` が自動列挙 (closure 内 lea 参照 + 制御層領域 RVA 0x3d0000..0x3f0000) |
-| **E-5** | 共有マシンスタック @fa_stack が 1MB で不足 (制御層 closure は深い入れ子 + 0x5cc0 フレーム) | guard violation 25,344 (stack 溢出) | `STACK_BYTES` を 8MB (host stack と同値) に |
+| E-1 | `__chkstk` の gs read (`mov r11, gs:[0x10]`) が Linux で SIGSEGV (gs_base=0) | native が ctor 入口で必ず停止 | `xor r11,r11` + nop に差替え (StackLimit=0 → probe skip)。wasm の @fa_teb=0 と同値 |
+| E-2 | FreshAirDspModel ctor (0x1803ba840) の arg2 (rdx) は**非 NULL 必須** (`[arg2+4]` を M+0xa088 に写す)。前担当は 0 を渡し SIGSEGV | native が ctor 途中で停止 | 両側で同一の 0 初期化 32B ダミーを渡す |
+| E-3 | `h_rep_stos` が**初期 rcx を毎回読み直さない** | model ctor 内 `rep stosb` が rcx0>1 で無限ループ → wasm OOB | ループ頭で `%R_rcx` をロード (ループ持ち回し変数化) |
+| E-4 | `fa_icall` switch が icall_targets のみ解決 | vtable slot / 引数受け回しの関数ポインタが host trap | **lift 済み全関数**に拡大 + CFG stub (`jmp rax`) の rax0 再ディスパッチ。未 seed は `icall_extra.py` が自動列挙 (closure 内 lea 参照 + 制御層領域 RVA 0x3d0000..0x3f0000) |
+| E-5 | 共有マシンスタック @fa_stack 1MB 不足 (深い入れ子 + 0x5cc0 フレーム) | guard violation 25,344 (stack 溢出) | 8MB (host stack と同値) に |
 
-補助: machine heap を両側 0 初期化する `fa_heap_zero` (未初期化バッファの残留値ダンプ差分を除去)、
-ポインタ値を同一規則でマスクする `ctrl_norm.py` (native heap アドレスと wasm guest アドレスは
-環境依存で比較不能なため)、戻り値の符号なし 16 進表記統一 (`%llx` と BigInt の書式不一致)。
+補助: `fa_heap_zero` (未初期化 heap の環境依存残留値ダンプ差分を除去)、`ctrl_norm.py` (ポインタ値マスク +
+行数/ERR 一致の厳密判定)、`gen_win_stubs.py` (PE import 表の weak 既定実装)。
 
-### 11.3 検証結果 (すべて実測・`bash lift2_e2e.sh` exit 0)
+### 11.3 検証結果 (すべて実測・exit 0)
 
 | 対象 | シナリオ | 結果 |
 |---|---|---|
-| Compressor process (FA-2b 不変) | 400 × fma0/1 (non-grow 206 + grow 194) | **400/400 bit-exact** |
-| Filter process (FA-2b 不変) | 200 × fma0/1 | **400/400 bit-exact** |
-| ctx-fuzz comp/filter | 2,400 × 2 target × 2 fma | **4,800/4,800 bit-exact** |
-| **制御層 (FA-2c)** | factory .epf 8 本 (Clap Lifter / Hat Lifter / Mixbus Polish / Mixbus Sparkle / Presence Pop / Shiny / Vocal Air / Vocal Bus Presence) + structured 2 + random 5 × fma0/1 | **15/15 bit-exact** (ポインタ値マスク後。1 scenario は native/wasm **同一の** ERR — 実機側でも同じ fail-fast) |
-| ABI / canary | 静的 (closure 全関数) + 実行時 (ms_abi) + メモリ閉込 | **0 違反 / guard violation 0** |
-| ablation | 5 類型 (comis/xmm引数/xmm戻り/icall/cmov) | 全意味論 load-bearing (icall_drop 80/200) |
+| **制御層 (FA-2c)** | factory .epf 8 本 (Clap Lifter / Hat Lifter / Mixbus Polish / Mixbus Sparkle / Presence Pop / Shiny / Vocal Air / Vocal Bus Presence) + structured 2 + random 5 × fma0/1 | **15/15 bit-exact** (1 scenario は native/wasm **同一の** ERR — 実機側でも同じ fail-fast) |
+| Compressor (不変) | 400 × fma0/1 (non-grow 206 + grow 194) | **400/400** |
+| Filter (不変) | 200 × fma0/1 | **400/400** |
+| ctx-fuzz | 2,400 × 2 target × 2 fma | **4,800/4,800** |
+| ABI / canary | 静的 + 実行時 + メモリ閉込 | **0 違反 / 0** |
+| ablation | 5 類型 | load-bearing (icall_drop 80/200) |
 
-### 11.4 検証の到達範囲 (この節が実測した境界)
+### 11.4 検証の到達範囲 (境界の明記)
 
-- 成功: factory .epf 8 本 → 制御層 (slot[12] 0x1803dfc10) → 子 snapin リスト走査 → `0x180c9d700(child,id,value)`
-  マクロ設定 → 各子 `0x180ca0d50(child, ctx)` 呼出 → 子 DSP process の**全経路**が native 機械語と一致
-  (macro 値・子 DSP state・L/R 出力・vector grow 相対値すべてバイト一致)。
-- structured/random の**大規模**シナリオ (200 structured + 1000 random) は既知限界 (§8 同根):
-  シナリオ生成が `W+0x70` (カウント)・`P+0x9e54` (型 enum)・`C+0x5e8` (種別) など
-  **意味論フィールドへランダム値を注入**するため、実機機械語側でも OOB 書込が起きる
-  (native も `malloc(): corrupted top size` / SIGSEGV で停止 = lift の問題ではない)。
-  したがって検収範囲は epf 8 本 + 小規模 structured (既定 `run_ctrl.sh 2 5`) とした。
+- 成功: .epf 8 本 → 制御層 slot[12] → 子 snapin リスト走査 → `0x180c9d700(child,id,value)` マクロ設定 →
+  各子 `0x180ca0d50(child, ctx)` → 子 DSP process の全経路が native とバイト一致
+  (macro 値・子 DSP state・L/R 出力・vector grow 相対値)。
+- 既知限界: structured/random の**大規模**シナリオ (200+1000) は、シナリオ生成が `W+0x70` (カウント)・
+  `P+0x9e54` (型 enum)・`C+0x5e8` (種別) など**意味フィールドへランダム値を注入**するため、
+  **実機機械語側でも OOB 書込が起きる** (native も `malloc(): corrupted top size` / SIGSEGV で停止
+  = lift の問題ではない)。検収範囲は epf 8 本 + 小規模 structured (既定 `run_ctrl.sh 2 5`) とした。
 
 ### 11.5 未解決 / 次タスク (FA-4 / CAB-50 への引き継ぎ)
 
-1. **シナリオ生成の値域を plugin 仕様に合わせる**: 意味フィールド (型 enum / カウント / 種別) を
-   有効値域に丸めて注入すれば、structured/random も完走させられる。param 値は 10 進即値ではなく
-   実機の tablebase 経由で整合させる (FA-4/CAB-50 の範囲)。
-2. **VST2 エントリ群の lift** (CAB-260 §2 の残り): AEffect wrapper ctor (0x180dace80) までは
-   native で作動確認済 (magic 'VstP' / thunk 群 (0x180dac610 dispatcher, 0x180dace60 setParameter,
-   0x180dacbd0 getParameter, 0x180dacda0 processReplacing, 0x180dacd80 processDoubleReplacing) /
-   numPrograms=1 / numParams=3 / numInputs=1 / numOutputs=2 / flags=0x10 / ioRatio=1.0 /
-   uniqueID=0x4e6f4566 / version=1)。framework 経路 (`VSTPluginMain_FrAr` → 0x180c7d400 → 0x180c7c030)
-   は locale/TLS 依存の深い呼出で native oracle が未成立 — host 呼出 (audioMaster) の
-   差替え・一時停止を次タスクとし、`entry_probe.c` を観測点として残した。
+1. シナリオ生成の値域を plugin 仕様 (型 enum / カウント / 種別) に丸めれば structured/random も完走可能。
+2. VST2 エントリ群: AEffect wrapper ctor (0x180dace80) は native で作動確認済 (magic 'VstP' / thunk 群
+   (0x180dac610 dispatcher, 0x180dace60 setParameter, 0x180dacbd0 getParameter, 0x180dacda0
+   processReplacing, 0x180dacd80 processDoubleReplacing) / numPrograms=1 / numParams=3 / numInputs=1 /
+   numOutputs=2 / flags=0x10 / ioRatio=1.0 / uniqueID=0x4e6f4566 / version=1)。framework 経路
+   (`VSTPluginMain_FrAr` → 0x180c7d400 → 0x180c7c030) は locale/TLS 依存が深く native oracle
+   未成立 — host 呼出 (audioMaster) の差替えが次タスク (`entry_probe.c` を観測点として残置)。
 3. GUI/エディタ層は対象外 (CAB-52 と同方針)。
