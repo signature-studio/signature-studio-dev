@@ -1,0 +1,1843 @@
+{
+"AggCreateInstance": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"Unwind_Resume",
+"ZdaPv",
+"ZdlPv",
+"Znam",
+"Znwm",
+"atan2",
+"memcpy"
+],
+"insns": 1575
+},
+"ippFree": {
+"class": "own scalar",
+"accelerate_libc_calls": [],
+"insns": 4
+},
+"ippMalloc": {
+"class": "own scalar",
+"accelerate_libc_calls": [],
+"insns": 22
+},
+"ippSetDenormAreZeros": {
+"class": "own scalar",
+"accelerate_libc_calls": [],
+"insns": 2
+},
+"ippSetFlushToZero": {
+"class": "own scalar",
+"accelerate_libc_calls": [],
+"insns": 2
+},
+"ippiAddC_8u_C3IRSfs": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 252
+},
+"ippiAddC_8u_C4IRSfs": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 299
+},
+"ippiAlphaCompC_8u_C3R": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 219
+},
+"ippiAlphaCompC_8u_C4R": {
+"class": "vImage",
+"accelerate_libc_calls": [
+"vImagePremultipliedAlphaBlend_BGRA8888"
+],
+"insns": 675
+},
+"ippiAlphaPremul_8u_AC4IR": {
+"class": "vImage",
+"accelerate_libc_calls": [
+"vImagePremultiplyData_RGBA8888"
+],
+"insns": 15
+},
+"ippiColorToGray_8u_AC4C1R": {
+"class": "vImage",
+"accelerate_libc_calls": [
+"stack_chk_fail",
+"vImageMatrixMultiply_ARGB8888ToPlanar8"
+],
+"insns": 65
+},
+"ippiColorToGray_8u_C3C1R": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"free",
+"malloc"
+],
+"insns": 56
+},
+"ippiCopyConstBorder_8u_C3R": {
+"class": "vImage",
+"accelerate_libc_calls": [
+"vImageCopyBuffer"
+],
+"insns": 108
+},
+"ippiCopyConstBorder_8u_C4R": {
+"class": "vImage",
+"accelerate_libc_calls": [
+"vImageCopyBuffer"
+],
+"insns": 108
+},
+"ippiCopyManaged_8u_C1R": {
+"class": "vImage",
+"accelerate_libc_calls": [
+"vImageCopyBuffer"
+],
+"insns": 20
+},
+"ippiCopyReplicateBorder_8u_C3R": {
+"class": "vImage",
+"accelerate_libc_calls": [
+"vImageCopyBuffer"
+],
+"insns": 202
+},
+"ippiCopyReplicateBorder_8u_C4R": {
+"class": "vImage",
+"accelerate_libc_calls": [
+"vImageBufferFill_ARGB8888",
+"vImageCopyBuffer"
+],
+"insns": 196
+},
+"ippiCopy_8u_AC4C3R": {
+"class": "vImage",
+"accelerate_libc_calls": [
+"vImageConvert_RGBA8888toRGB888"
+],
+"insns": 24
+},
+"ippiCopy_8u_C1C4R": {
+"class": "vImage",
+"accelerate_libc_calls": [
+"vImageOverwriteChannels_ARGB8888"
+],
+"insns": 56
+},
+"ippiCopy_8u_C1R": {
+"class": "vImage",
+"accelerate_libc_calls": [
+"vImageCopyBuffer"
+],
+"insns": 20
+},
+"ippiCopy_8u_C3AC4R": {
+"class": "vImage",
+"accelerate_libc_calls": [
+"vImageConvert_RGB888toRGBA8888"
+],
+"insns": 27
+},
+"ippiCopy_8u_C3R": {
+"class": "vImage",
+"accelerate_libc_calls": [
+"vImageCopyBuffer"
+],
+"insns": 19
+},
+"ippiCopy_8u_C4R": {
+"class": "vImage",
+"accelerate_libc_calls": [
+"vImageCopyBuffer"
+],
+"insns": 20
+},
+"ippiFilterBoxBorderGetBufferSize": {
+"class": "vImage",
+"accelerate_libc_calls": [
+"vImageBoxConvolve_ARGB8888"
+],
+"insns": 75
+},
+"ippiFilterBoxBorder_8u_C4R": {
+"class": "vImage",
+"accelerate_libc_calls": [
+"vImageBoxConvolve_ARGB8888"
+],
+"insns": 65
+},
+"ippiFilterBox_8u_C1IR": {
+"class": "own scalar",
+"accelerate_libc_calls": [],
+"insns": 7
+},
+"ippiFilterBox_8u_C3IR": {
+"class": "own scalar",
+"accelerate_libc_calls": [],
+"insns": 7
+},
+"ippiFilterBox_8u_C4IR": {
+"class": "own scalar",
+"accelerate_libc_calls": [],
+"insns": 7
+},
+"ippiFilterRoundGetBufSize32f_8u_C1R": {
+"class": "own scalar",
+"accelerate_libc_calls": [],
+"insns": 4
+},
+"ippiFilter_8u_C4R": {
+"class": "vImage",
+"accelerate_libc_calls": [
+"atan2",
+"bzero",
+"calloc",
+"free",
+"malloc",
+"sincos_stret",
+"vImageConvolve_ARGB8888"
+],
+"insns": 1925
+},
+"ippiFilter_Round32f_8u_C1R": {
+"class": "vImage",
+"accelerate_libc_calls": [
+"free",
+"malloc",
+"vImageBoxConvolve_ARGB8888",
+"vImageBoxConvolve_Planar8",
+"vImageConvolve_Planar8"
+],
+"insns": 376
+},
+"ippiMirror_8u_C3IR": {
+"class": "vImage",
+"accelerate_libc_calls": [
+"malloc",
+"vImageHorizontalReflect_ARGB8888",
+"vImageVerticalReflect_ARGB8888"
+],
+"insns": 64
+},
+"ippiMirror_8u_C4IR": {
+"class": "vImage",
+"accelerate_libc_calls": [
+"vImageHorizontalReflect_ARGB8888",
+"vImageVerticalReflect_ARGB8888"
+],
+"insns": 33
+},
+"ippiMirror_8u_C4R": {
+"class": "vImage",
+"accelerate_libc_calls": [
+"vImageHorizontalReflect_ARGB8888",
+"vImageVerticalReflect_ARGB8888"
+],
+"insns": 34
+},
+"ippiMulC_8u_C3IRSfs": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 257
+},
+"ippiMulC_8u_C4IRSfs": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 299
+},
+"ippiMulC_8u_C4RSfs": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 324
+},
+"ippiRGBToGray_8u_AC4C1R": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"stack_chk_fail"
+],
+"insns": 96
+},
+"ippiResizeCenter_8u_C3R": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"Unwind_Resume",
+"ZdaPv",
+"ZdlPv",
+"Znam",
+"exp",
+"memcpy",
+"memset",
+"sincos_stret"
+],
+"insns": 3369
+},
+"ippiResizeCenter_8u_C4R": {
+"class": "own scalar",
+"accelerate_libc_calls": [],
+"insns": 8
+},
+"ippiResizeGetBufSize": {
+"class": "own scalar",
+"accelerate_libc_calls": [],
+"insns": 4
+},
+"ippiResizeSqrPixel_8u_C1R": {
+"class": "vImage",
+"accelerate_libc_calls": [
+"free",
+"malloc",
+"memcpy",
+"vImageScale_Planar8"
+],
+"insns": 404
+},
+"ippiResizeSqrPixel_8u_C3R": {
+"class": "vImage",
+"accelerate_libc_calls": [
+"free",
+"malloc",
+"memcpy",
+"vImageConvert_ARGB8888toRGB888",
+"vImageConvert_RGB888toARGB8888",
+"vImageScale_ARGB8888"
+],
+"insns": 287
+},
+"ippiResizeSqrPixel_8u_C4R": {
+"class": "vImage",
+"accelerate_libc_calls": [
+"free",
+"malloc",
+"memcpy",
+"vImageScale_ARGB8888"
+],
+"insns": 232
+},
+"ippiResize_8u_C3R": {
+"class": "vImage",
+"accelerate_libc_calls": [
+"free",
+"malloc",
+"stack_chk_fail",
+"vImageConvert_Planar8toRGB888",
+"vImageConvert_RGB888toPlanar8",
+"vImageScale_Planar8"
+],
+"insns": 244
+},
+"ippiResize_8u_C4R": {
+"class": "vImage",
+"accelerate_libc_calls": [
+"free",
+"malloc",
+"vImageScale_ARGB8888"
+],
+"insns": 118
+},
+"ippiRotateCenter_8u_C4R": {
+"class": "vImage",
+"accelerate_libc_calls": [
+"Unwind_Resume",
+"ZdaPv",
+"ZdlPv",
+"Znam",
+"acos",
+"assert_rtn",
+"atan2",
+"bzero",
+"cos",
+"fmod",
+"memcpy",
+"memmove",
+"memset",
+"pow",
+"sin",
+"sincos_stret",
+"sprintf",
+"stack_chk_fail",
+"strcpy",
+"strlen",
+"tan",
+"vImageRotate_ARGB8888"
+],
+"insns": 25058
+},
+"ippiSet_8u_C3R": {
+"class": "own scalar",
+"accelerate_libc_calls": [],
+"insns": 597
+},
+"ippiSet_8u_C4R": {
+"class": "vImage",
+"accelerate_libc_calls": [
+"vImageBufferFill_ARGB8888"
+],
+"insns": 25
+},
+"ippiSubC_8u_C3IRSfs": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 255
+},
+"ippiSubC_8u_C4IRSfs": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 297
+},
+"ippiWarpAffineQuad_8u_C4R": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"stack_chk_fail",
+"vDSP_mmulD",
+"vDSP_mtransD"
+],
+"insns": 399
+},
+"ippiWarpAffine_8u_C4R": {
+"class": "vImage",
+"accelerate_libc_calls": [
+"vImageAffineWarp_ARGB8888"
+],
+"insns": 39
+},
+"ippiWarpPerspectiveQuad_8u_C4R": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"stack_chk_fail"
+],
+"insns": 50
+},
+"ippsAbs_32f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vabs"
+],
+"insns": 11
+},
+"ippsAbs_32f_I": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vabs"
+],
+"insns": 10
+},
+"ippsAddC_32f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vsadd"
+],
+"insns": 14
+},
+"ippsAddC_32f_I": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vsadd"
+],
+"insns": 14
+},
+"ippsAddC_64f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vsaddD"
+],
+"insns": 14
+},
+"ippsAddC_64f_I": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vsaddD"
+],
+"insns": 14
+},
+"ippsAddProductC_32f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vsma"
+],
+"insns": 16
+},
+"ippsAddProduct_32fc": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_zvma"
+],
+"insns": 24
+},
+"ippsAddProduct_64f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vmaD"
+],
+"insns": 17
+},
+"ippsAdd_32f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vadd"
+],
+"insns": 12
+},
+"ippsAdd_32f_I": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vadd"
+],
+"insns": 12
+},
+"ippsAdd_64f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vaddD"
+],
+"insns": 12
+},
+"ippsAdd_64f_I": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vaddD"
+],
+"insns": 12
+},
+"ippsAndC_32u_I": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 28
+},
+"ippsAtan2_32f_A21": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvatan2f"
+],
+"insns": 14
+},
+"ippsAtan_32f_A11": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvatanf"
+],
+"insns": 13
+},
+"ippsAtan_32f_A21": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvatanf"
+],
+"insns": 13
+},
+"ippsAtan_64f_A53": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvatan"
+],
+"insns": 13
+},
+"ippsAutoCorr_NormA_32f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"bzero",
+"free",
+"log",
+"malloc",
+"vDSP_create_fftsetup",
+"vDSP_ctoz",
+"vDSP_destroy_fftsetup",
+"vDSP_fft_zrip",
+"vDSP_vsmul",
+"vDSP_ztoc",
+"vDSP_zvcmul"
+],
+"insns": 122
+},
+"ippsCbrt_32f_A11": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"cbrtf"
+],
+"insns": 170
+},
+"ippsCbrt_32f_A24": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"cbrtf"
+],
+"insns": 170
+},
+"ippsConv_32f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"dgetrf_",
+"dgetri_",
+"free",
+"malloc",
+"memcpy",
+"vDSP_conv",
+"vDSP_vclr",
+"vfprintf"
+],
+"insns": 898
+},
+"ippsConvert_16s32f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vflt16"
+],
+"insns": 11
+},
+"ippsConvert_16s32f_Sfs": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"ldexpf"
+],
+"insns": 70
+},
+"ippsConvert_16s32s": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 30
+},
+"ippsConvert_24s32f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vflt24"
+],
+"insns": 11
+},
+"ippsConvert_32f16s_Sfs": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"ldexpf"
+],
+"insns": 131
+},
+"ippsConvert_32f24s_Sfs": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"ldexpf",
+"vDSP_vsmfix24"
+],
+"insns": 25
+},
+"ippsConvert_32f32s_Sfs": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"ldexpf",
+"vDSP_vfix32",
+"vDSP_vfixr32"
+],
+"insns": 117
+},
+"ippsConvert_32f64f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vspdp"
+],
+"insns": 11
+},
+"ippsConvert_32f8u_Sfs": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"ldexpf"
+],
+"insns": 243
+},
+"ippsConvert_32s16s_Sfs": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"ldexpf"
+],
+"insns": 64
+},
+"ippsConvert_32s32f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vflt32"
+],
+"insns": 11
+},
+"ippsConvert_32s32f_Sfs": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"ldexpf"
+],
+"insns": 52
+},
+"ippsConvert_64f32f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vdpsp"
+],
+"insns": 11
+},
+"ippsCopy_16s": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"memcpy"
+],
+"insns": 11
+},
+"ippsCopy_32f": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"memcpy"
+],
+"insns": 11
+},
+"ippsCopy_32s": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"memcpy"
+],
+"insns": 11
+},
+"ippsCopy_64f": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"memcpy"
+],
+"insns": 11
+},
+"ippsCopy_64s": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"memcpy"
+],
+"insns": 11
+},
+"ippsCopy_8u": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"memcpy"
+],
+"insns": 10
+},
+"ippsCos_32f_A11": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvcosf"
+],
+"insns": 13
+},
+"ippsCos_32f_A21": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvcosf"
+],
+"insns": 13
+},
+"ippsCos_32f_A24": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvcosf"
+],
+"insns": 13
+},
+"ippsCos_64f_A26": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvcos"
+],
+"insns": 13
+},
+"ippsCos_64f_A50": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvcos"
+],
+"insns": 13
+},
+"ippsCos_64f_A53": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvcos"
+],
+"insns": 13
+},
+"ippsCplxToReal_16sc": {
+"class": "own scalar",
+"accelerate_libc_calls": [],
+"insns": 60
+},
+"ippsCplxToReal_32fc": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_ctoz"
+],
+"insns": 13
+},
+"ippsCrossCorr_32f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"bzero",
+"free",
+"log",
+"malloc",
+"vDSP_create_fftsetup",
+"vDSP_ctoz",
+"vDSP_destroy_fftsetup",
+"vDSP_fft_zrip",
+"vDSP_vsmul",
+"vDSP_ztoc",
+"vDSP_zvcmul"
+],
+"insns": 158
+},
+"ippsDeinterleave_16s": {
+"class": "own scalar",
+"accelerate_libc_calls": [],
+"insns": 81
+},
+"ippsDeinterleave_32f": {
+"class": "own scalar",
+"accelerate_libc_calls": [],
+"insns": 81
+},
+"ippsDivCRev_32f_I": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 28
+},
+"ippsDiv_32f_A11": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvdivf"
+],
+"insns": 14
+},
+"ippsDiv_32f_A21": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvdivf"
+],
+"insns": 14
+},
+"ippsDiv_32f_A24": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvdivf"
+],
+"insns": 14
+},
+"ippsDiv_64f_A53": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvdiv"
+],
+"insns": 14
+},
+"ippsEqual_8u": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"memcmp"
+],
+"insns": 13
+},
+"ippsExp_32f_A11": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvexpf"
+],
+"insns": 13
+},
+"ippsExp_32f_A21": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvexpf"
+],
+"insns": 13
+},
+"ippsExp_32f_A24": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvexpf"
+],
+"insns": 13
+},
+"ippsExp_32f_I": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvexpf"
+],
+"insns": 11
+},
+"ippsExp_64f_A53": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvexp"
+],
+"insns": 13
+},
+"ippsExpm1_32f_A11": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvexpm1f"
+],
+"insns": 13
+},
+"ippsExpm1_32f_A21": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvexpm1f"
+],
+"insns": 13
+},
+"ippsExpm1_32f_A24": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvexpm1f"
+],
+"insns": 13
+},
+"ippsFFTFwd_RToCCS_32f_I": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_ctoz",
+"vDSP_fft_zrip",
+"vDSP_vsmul",
+"vDSP_ztoc"
+],
+"insns": 74
+},
+"ippsFFTFwd_RToPack_32f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"memmove",
+"vDSP_fft_zrop",
+"vDSP_vsmul"
+],
+"insns": 55
+},
+"ippsFFTFwd_RToPack_32f_I": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"memmove",
+"vDSP_fft_zrip",
+"vDSP_vsmul"
+],
+"insns": 51
+},
+"ippsFFTFwd_RToPack_64f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"memmove",
+"vDSP_fft_zropD",
+"vDSP_vsmulD"
+],
+"insns": 55
+},
+"ippsFFTFwd_RToPack_64f_I": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"memmove",
+"vDSP_fft_zripD",
+"vDSP_vsmulD"
+],
+"insns": 51
+},
+"ippsFFTGetSize_R_32f": {
+"class": "own scalar",
+"accelerate_libc_calls": [],
+"insns": 8
+},
+"ippsFFTGetSize_R_64f": {
+"class": "own scalar",
+"accelerate_libc_calls": [],
+"insns": 6
+},
+"ippsFFTInit_R_32f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_create_fftsetup",
+"vDSP_destroy_fftsetup"
+],
+"insns": 38
+},
+"ippsFFTInit_R_64f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_create_fftsetupD",
+"vDSP_destroy_fftsetupD"
+],
+"insns": 38
+},
+"ippsFFTInv_CCSToR_32f_I": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_fft_zrip",
+"vDSP_vsmul"
+],
+"insns": 47
+},
+"ippsFFTInv_PackToR_32f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"memmove",
+"vDSP_fft_zrip",
+"vDSP_vsmul"
+],
+"insns": 56
+},
+"ippsFFTInv_PackToR_32f_I": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"memmove",
+"vDSP_fft_zrip",
+"vDSP_vsmul"
+],
+"insns": 56
+},
+"ippsFFTInv_PackToR_64f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"memmove",
+"vDSP_fft_zripD",
+"vDSP_vsmulD"
+],
+"insns": 55
+},
+"ippsFFTInv_PackToR_64f_I": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"memmove",
+"vDSP_fft_zripD",
+"vDSP_vsmulD"
+],
+"insns": 55
+},
+"ippsFIR64f_32f": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 157
+},
+"ippsFIR64f_32f_I": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 150
+},
+"ippsFIRFree64f_32f": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"free"
+],
+"insns": 17
+},
+"ippsFIRFree_32f": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"free"
+],
+"insns": 17
+},
+"ippsFIRInitAlloc64f_32f": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"bzero",
+"malloc",
+"memcpy"
+],
+"insns": 73
+},
+"ippsFIRInitAlloc_32f": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"bzero",
+"malloc",
+"memcpy"
+],
+"insns": 72
+},
+"ippsFIRSetDlyLine64f_32f": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"memcpy"
+],
+"insns": 35
+},
+"ippsFIRSetDlyLine_32f": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"memcpy"
+],
+"insns": 35
+},
+"ippsFIRSetTaps64f_32f": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"memcpy"
+],
+"insns": 24
+},
+"ippsFIRSetTaps_32f": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"memcpy"
+],
+"insns": 24
+},
+"ippsFIR_32f": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 165
+},
+"ippsFIR_32f_I": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 164
+},
+"ippsFlip_16u_I": {
+"class": "own scalar",
+"accelerate_libc_calls": [],
+"insns": 15
+},
+"ippsFlip_32f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"memcpy",
+"vDSP_vrvrs"
+],
+"insns": 18
+},
+"ippsFlip_32f_I": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vrvrs"
+],
+"insns": 8
+},
+"ippsFlip_32fc_I": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vrvrsD"
+],
+"insns": 8
+},
+"ippsIIR64f_32f_I": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"Unwind_Resume",
+"ZdaPv",
+"ZdlPv",
+"sincos_stret",
+"sprintf",
+"stack_chk_fail",
+"vDSP_biquadm"
+],
+"insns": 1836
+},
+"ippsIIRGetStateSize64f_BiQuad_32f": {
+"class": "own scalar",
+"accelerate_libc_calls": [],
+"insns": 10
+},
+"ippsIIRInit64f_BiQuad_32f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"malloc",
+"vDSP_biquadm_CreateSetup",
+"vDSP_biquadm_DestroySetup"
+],
+"insns": 83
+},
+"ippsInterleave_16s": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 58
+},
+"ippsInterleave_32f": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 101
+},
+"ippsLn_32f_A11": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvlogf"
+],
+"insns": 13
+},
+"ippsLn_32f_A21": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvlogf"
+],
+"insns": 13
+},
+"ippsLn_32f_A24": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvlogf"
+],
+"insns": 13
+},
+"ippsLn_32f_I": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvlogf"
+],
+"insns": 11
+},
+"ippsLog10_32f_A11": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvlog10f"
+],
+"insns": 13
+},
+"ippsLog10_32f_A24": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvlog10f"
+],
+"insns": 13
+},
+"ippsMagnitude_32fc": {
+"class": "own scalar",
+"accelerate_libc_calls": [],
+"insns": 28
+},
+"ippsMax_16s": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 47
+},
+"ippsMax_32f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_maxv"
+],
+"insns": 8
+},
+"ippsMinMax_16s": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 76
+},
+"ippsMinMax_32f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_maxv",
+"vDSP_minv"
+],
+"insns": 20
+},
+"ippsMinMax_8u": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 90
+},
+"ippsMin_16s": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 47
+},
+"ippsMin_32f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_minv"
+],
+"insns": 8
+},
+"ippsMove_32f": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"memcpy"
+],
+"insns": 11
+},
+"ippsMove_32s": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"memcpy"
+],
+"insns": 11
+},
+"ippsMove_64f": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"memcpy"
+],
+"insns": 11
+},
+"ippsMove_64s": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"memcpy"
+],
+"insns": 11
+},
+"ippsMove_8u": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"memcpy"
+],
+"insns": 10
+},
+"ippsMulC_32f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vsmul"
+],
+"insns": 14
+},
+"ippsMulC_32f_I": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vsmul"
+],
+"insns": 14
+},
+"ippsMulC_64f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vsmulD"
+],
+"insns": 14
+},
+"ippsMulC_64f_I": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vsmulD"
+],
+"insns": 14
+},
+"ippsMulPack_32f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_zvmul"
+],
+"insns": 50
+},
+"ippsMulPack_32f_I": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_zvmul"
+],
+"insns": 42
+},
+"ippsMul_32f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vmul"
+],
+"insns": 12
+},
+"ippsMul_32f32fc": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_zrvmul"
+],
+"insns": 20
+},
+"ippsMul_32f32fc_I": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_zrvmul"
+],
+"insns": 18
+},
+"ippsMul_32f_I": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vmul"
+],
+"insns": 12
+},
+"ippsMul_32fc": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_zvmul"
+],
+"insns": 22
+},
+"ippsMul_64f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vmulD"
+],
+"insns": 12
+},
+"ippsMul_64f_I": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vmulD"
+],
+"insns": 12
+},
+"ippsOrC_32u_I": {
+"class": "vImage",
+"accelerate_libc_calls": [
+"vImageOverwriteChannelsWithScalar_ARGB8888"
+],
+"insns": 51
+},
+"ippsPhase_32fc": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_zvphas"
+],
+"insns": 16
+},
+"ippsPowerSpectr_32fc": {
+"class": "own scalar",
+"accelerate_libc_calls": [],
+"insns": 26
+},
+"ippsPowx_32f_A11": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvpowsf"
+],
+"insns": 16
+},
+"ippsPowx_32f_A21": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvpowsf"
+],
+"insns": 16
+},
+"ippsPowx_32f_A24": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvpowsf"
+],
+"insns": 16
+},
+"ippsPowx_64f_A53": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvpows"
+],
+"insns": 16
+},
+"ippsRandGauss_Direct_32f": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"memcpy",
+"stack_chk_fail"
+],
+"insns": 410
+},
+"ippsRandUniform_Direct_32f": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 72
+},
+"ippsRandUniform_Direct_64f": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 80
+},
+"ippsRealToCplx_16s": {
+"class": "own scalar",
+"accelerate_libc_calls": [],
+"insns": 56
+},
+"ippsRealToCplx_32f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_ztoc"
+],
+"insns": 13
+},
+"ippsRound_32f": {
+"class": "own scalar",
+"accelerate_libc_calls": [],
+"insns": 24
+},
+"ippsSet_32f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vfill"
+],
+"insns": 14
+},
+"ippsSet_32fc": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_zvfill"
+],
+"insns": 18
+},
+"ippsSet_32s": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vfilli"
+],
+"insns": 12
+},
+"ippsSet_64f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vfillD"
+],
+"insns": 14
+},
+"ippsSet_64fc": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_zvfillD"
+],
+"insns": 18
+},
+"ippsSet_64s": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"stack_chk_fail"
+],
+"insns": 62
+},
+"ippsSet_8u": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"memset"
+],
+"insns": 10
+},
+"ippsSinCos_32f_A21": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvsincosf"
+],
+"insns": 14
+},
+"ippsSin_32f_A21": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvsinf"
+],
+"insns": 13
+},
+"ippsSin_32f_A24": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvsinf"
+],
+"insns": 13
+},
+"ippsSin_64f_A26": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvsin"
+],
+"insns": 13
+},
+"ippsSin_64f_A50": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvsin"
+],
+"insns": 13
+},
+"ippsSin_64f_A53": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvsin"
+],
+"insns": 13
+},
+"ippsSqr_32f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vsq"
+],
+"insns": 17
+},
+"ippsSqr_32f_I": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vsq"
+],
+"insns": 10
+},
+"ippsSqrt_32f": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvsqrtf"
+],
+"insns": 13
+},
+"ippsSqrt_32f_A11": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvsqrtf"
+],
+"insns": 13
+},
+"ippsSqrt_32f_A21": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvsqrtf"
+],
+"insns": 13
+},
+"ippsSqrt_32f_A24": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvsqrtf"
+],
+"insns": 13
+},
+"ippsSqrt_32f_I": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvsqrtf"
+],
+"insns": 11
+},
+"ippsSubCRev_32f": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 37
+},
+"ippsSubCRev_32f_I": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 56
+},
+"ippsSub_32f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vsub"
+],
+"insns": 12
+},
+"ippsSub_32f_I": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vsub"
+],
+"insns": 12
+},
+"ippsSub_64f_I": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vsubD"
+],
+"insns": 12
+},
+"ippsSum_32f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_sve"
+],
+"insns": 8
+},
+"ippsSum_64f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_sveD"
+],
+"insns": 8
+},
+"ippsSwapBytes_16u_I": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"Unwind_Resume",
+"ZdaPv",
+"Znam",
+"acos",
+"atan2",
+"bzero",
+"exit",
+"fclose",
+"fopen",
+"fprintf",
+"fread",
+"free",
+"fscanf",
+"fseek",
+"ftell",
+"malloc",
+"memcpy",
+"sincos_stret",
+"strlen"
+],
+"insns": 9514
+},
+"ippsSwapBytes_32u_I": {
+"class": "own scalar",
+"accelerate_libc_calls": [],
+"insns": 33
+},
+"ippsTanh_32f_A11": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvtanhf"
+],
+"insns": 13
+},
+"ippsTanh_32f_A24": {
+"class": "vForce",
+"accelerate_libc_calls": [
+"vvtanhf"
+],
+"insns": 13
+},
+"ippsThreshold_GTAbs_32f_I": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 36
+},
+"ippsThreshold_GTVal_32f_I": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 37
+},
+"ippsThreshold_GT_32f": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 28
+},
+"ippsThreshold_GT_32f_I": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 28
+},
+"ippsThreshold_GT_32s_I": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 35
+},
+"ippsThreshold_GT_64f_I": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 34
+},
+"ippsThreshold_LTAbs_32f_I": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 43
+},
+"ippsThreshold_LTValGTVal_32f_I": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 53
+},
+"ippsThreshold_LTValGTVal_32s_I": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 53
+},
+"ippsThreshold_LTVal_32f_I": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 37
+},
+"ippsThreshold_LTVal_64f_I": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 40
+},
+"ippsThreshold_LT_32f": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 28
+},
+"ippsThreshold_LT_32f_I": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 28
+},
+"ippsThreshold_LT_32s": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 42
+},
+"ippsThreshold_LT_32s_I": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 35
+},
+"ippsThreshold_LT_64f_I": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 34
+},
+"ippsTone_Direct_32f": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"cosf"
+],
+"insns": 252
+},
+"ippsTone_Direct_32fc": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"sincosf_stret"
+],
+"insns": 305
+},
+"ippsVectorSlope_32f": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 47
+},
+"ippsVectorSlope_64f": {
+"class": "own NEON",
+"accelerate_libc_calls": [],
+"insns": 51
+},
+"ippsWinKaiser_32f_I": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"exp"
+],
+"insns": 281
+},
+"ippsWinKaiser_64f_I": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"exp",
+"memset"
+],
+"insns": 306
+},
+"ippsXorC_32u_I": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"Unwind_Resume",
+"ZdaPv",
+"ZdlPv",
+"sincos_stret"
+],
+"insns": 1394
+},
+"ippsZero_32f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vclr"
+],
+"insns": 8
+},
+"ippsZero_32s": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vclr"
+],
+"insns": 8
+},
+"ippsZero_64f": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vclrD"
+],
+"insns": 8
+},
+"ippsZero_64s": {
+"class": "vDSP",
+"accelerate_libc_calls": [
+"vDSP_vclrD"
+],
+"insns": 8
+},
+"ippsZero_8u": {
+"class": "libc/libm/LAPACK",
+"accelerate_libc_calls": [
+"bzero"
+],
+"insns": 7
+}
+}

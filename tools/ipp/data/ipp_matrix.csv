@@ -1,0 +1,421 @@
+name,category,win_dll,mac_x86_dylib,mac_arm64_dylib,used_win,used_mac_x86,used_mac_arm64,win_FLEngine,win_modules,win_call_sites,mac_x86_modules,implemented_poc
+ippMalloc,control,1,1,1,1,1,1,1,50,206,50,1
+ippFree,control,1,1,1,1,1,1,1,50,106,50,1
+ippSetFlushToZero,control,1,1,1,0,0,0,0,0,0,0,1
+ippSetDenormAreZeros,control,1,1,1,0,0,0,0,0,0,0,1
+ippSetNumThreads,control,1,1,0,0,0,1,0,0,0,0,1
+ippGetNumThreads,control,1,1,0,0,0,0,0,0,0,0,0
+ippGetLibVersion,control,1,1,0,0,0,0,0,0,0,0,0
+ippsInterleave_16s,reorder/bit,1,1,1,1,1,1,1,49,49,49,0
+ippsInterleave_32f,reorder/bit,1,1,1,1,1,1,1,49,83,49,0
+ippsDeinterleave_16s,reorder/bit,1,1,1,1,1,1,1,49,49,49,0
+ippsDeinterleave_32f,reorder/bit,1,1,1,1,1,1,1,49,84,49,0
+ippsLog10_32f_A11,vector math (accuracy-graded),1,1,1,1,1,1,1,37,97,37,0
+ippsLog10_32f_A21,vector math (accuracy-graded),1,1,0,0,0,1,0,0,0,0,0
+ippsLog10_32f_A24,vector math (accuracy-graded),1,1,1,1,1,1,0,1,1,1,0
+ippsLog10_64f_A50,vector math (accuracy-graded),1,1,0,0,0,1,0,0,0,0,0
+ippsLog10_64f_A53,vector math (accuracy-graded),1,1,0,0,0,1,0,0,0,0,0
+ippsCopy_8u,mem/fill,1,1,1,1,1,1,1,55,604,55,0
+ippsCopy_16s,mem/fill,1,1,1,1,1,1,1,4,5,3,0
+ippsCopy_32f,mem/fill,1,1,1,1,1,1,1,145,1196,143,1
+ippsCopy_64f,mem/fill,1,1,1,1,1,1,1,11,29,17,0
+ippsCopy_32s,mem/fill,1,1,1,1,1,1,1,125,289,126,0
+ippsCopy_64s,mem/fill,1,1,1,1,1,1,1,38,76,40,0
+ippsMove_8u,mem/fill,1,1,1,1,1,1,1,145,750,143,1
+ippsMove_16s,mem/fill,1,1,0,0,0,0,0,0,0,0,0
+ippsMove_32f,mem/fill,1,1,1,1,1,1,1,49,182,49,1
+ippsMove_64f,mem/fill,1,1,1,0,0,0,0,0,0,0,0
+ippsMove_32s,mem/fill,1,1,1,1,1,1,0,6,30,6,0
+ippsMove_64s,mem/fill,1,1,1,1,1,1,1,19,39,23,0
+ippsZero_8u,mem/fill,1,1,1,1,1,1,1,145,3308,143,1
+ippsZero_16s,mem/fill,1,1,0,0,0,0,0,0,0,0,0
+ippsZero_32f,mem/fill,1,1,1,1,1,1,1,60,817,58,1
+ippsZero_64f,mem/fill,1,1,1,1,1,1,1,14,30,18,0
+ippsZero_32s,mem/fill,1,1,1,1,1,1,1,51,216,50,0
+ippsZero_64s,mem/fill,1,1,1,1,1,1,1,27,65,31,0
+ippsSet_8u,mem/fill,1,1,1,1,1,1,1,1,14,143,0
+ippsSet_16s,mem/fill,1,1,0,1,0,0,1,1,2,0,0
+ippsSet_16sc,mem/fill,1,1,0,0,0,0,0,0,0,0,0
+ippsSet_32s,mem/fill,1,1,1,1,1,1,1,145,564,143,1
+ippsSet_32sc,mem/fill,1,1,0,0,0,0,0,0,0,0,0
+ippsSet_32f,mem/fill,1,1,1,1,1,1,1,53,340,53,1
+ippsSet_32fc,mem/fill,1,1,1,1,1,1,1,1,1,1,0
+ippsSet_64s,mem/fill,1,1,1,1,1,1,1,143,143,143,0
+ippsSet_64sc,mem/fill,1,1,0,0,0,0,0,0,0,0,0
+ippsSet_64f,mem/fill,1,1,1,1,1,1,1,25,31,29,0
+ippsSet_64fc,mem/fill,1,1,1,0,0,0,0,0,0,0,0
+ippsCompare_8u,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsEqual_8u,reorder/bit,1,1,1,1,1,1,0,1,1,1,0
+ippsConvert_16s32f,convert,1,1,1,1,1,1,1,50,50,49,0
+ippsConvert_32s64f,convert,1,1,0,0,0,0,0,0,0,0,0
+ippsConvert_32s32f,convert,1,1,1,1,1,1,0,1,2,1,0
+ippsConvert_32f8u_Sfs,convert,1,1,1,1,1,1,0,1,1,1,0
+ippsConvert_32f16s_Sfs,convert,1,1,1,1,1,1,1,1,1,1,0
+ippsConvert_64f32s_Sfs,convert,1,1,0,0,0,0,0,0,0,0,0
+ippsConvert_32f32s_Sfs,convert,1,1,1,1,1,1,1,143,1056,143,1
+ippsConvert_32f64f,convert,1,1,1,1,1,1,0,4,12,5,0
+ippsConvert_64f32f,convert,1,1,1,1,1,1,1,7,13,7,0
+ippsConvert_16s32f_Sfs,convert,1,1,1,1,1,1,1,49,228,49,0
+ippsConvert_16s64f_Sfs,convert,1,1,0,0,0,0,0,0,0,0,0
+ippsConvert_32s32f_Sfs,convert,1,1,1,1,1,1,1,30,35,33,0
+ippsConvert_32s64f_Sfs,convert,1,1,0,0,0,0,0,0,0,0,0
+ippsConvert_32s16s_Sfs,convert,1,1,1,1,1,1,1,30,30,33,0
+ippsConvert_16s32s,convert,1,1,1,1,1,1,1,25,25,28,0
+ippsConvert_24s32s,convert,1,1,0,0,0,0,0,0,0,0,0
+ippsConvert_32s24s_Sfs,convert,1,1,0,0,0,0,0,0,0,0,0
+ippsConvert_24s32f,convert,1,1,1,1,1,1,1,1,2,5,0
+ippsConvert_32f24s_Sfs,convert,1,1,1,1,1,1,1,49,101,49,0
+ippsSwapBytes_16u_I,reorder/bit,1,1,1,1,1,1,1,30,630,34,0
+ippsSwapBytes_24u_I,reorder/bit,1,1,0,0,0,0,0,0,0,0,0
+ippsSwapBytes_32u_I,reorder/bit,1,1,1,1,1,1,1,36,258,37,0
+ippsSwapBytes_16u,reorder/bit,1,1,0,0,0,0,0,0,0,0,0
+ippsSwapBytes_24u,reorder/bit,1,1,0,0,0,0,0,0,0,0,0
+ippsSwapBytes_32u,reorder/bit,1,1,0,0,0,0,0,0,0,0,0
+ippsAdd_32f,vector arith,1,1,1,1,1,1,1,9,11,9,0
+ippsAdd_32f_I,vector arith,1,1,1,1,1,1,1,51,340,51,1
+ippsAddC_32f,vector arith,1,1,1,1,1,1,1,143,2411,143,1
+ippsAddC_32fc,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsSub_32f,vector arith,1,1,1,1,1,1,0,4,7,5,0
+ippsSub_32f_I,vector arith,1,1,1,1,1,1,1,125,208,126,0
+ippsSubCRev_32f,vector arith,1,1,1,1,1,1,1,143,1108,143,1
+ippsMul_32f,vector arith,1,1,1,1,1,1,1,144,731,143,1
+ippsMul_32f_I,vector arith,1,1,1,1,1,1,1,143,833,143,1
+ippsMulC_32f,vector arith,1,1,1,1,1,1,1,144,2499,143,1
+ippsAddC_32f_I,vector arith,1,1,1,1,1,1,1,143,1460,143,1
+ippsMulC_32f_I,vector arith,1,1,1,1,1,1,1,144,2640,143,1
+ippsMul_32fc_I,complex/spectral,1,1,0,0,0,0,0,0,0,0,0
+ippsMul_32fc,complex/spectral,1,1,1,1,1,1,0,2,2,2,0
+ippsMul_32f32fc_I,complex/spectral,1,1,1,1,1,1,0,4,4,4,0
+ippsMul_32f32fc,complex/spectral,1,1,1,1,1,1,0,2,2,2,0
+ippsAdd_64f_I,vector arith,1,1,1,1,1,1,0,7,19,8,0
+ippsAdd_64fc_I,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsAdd_64f,vector arith,1,1,1,0,0,0,0,0,0,0,0
+ippsAdd_64fc,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsAddC_64f,vector arith,1,1,1,1,1,1,0,1,1,1,0
+ippsAddC_64f_I,vector arith,1,1,1,1,1,1,0,1,6,1,0
+ippsSub_64f,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsSub_64f_I,vector arith,1,1,1,0,0,0,0,0,0,0,0
+ippsMul_64f,vector arith,1,1,1,1,1,1,0,1,1,1,0
+ippsMul_64fc,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsMul_64f_I,vector arith,1,1,1,1,1,1,0,5,22,6,0
+ippsMul_64fc_I,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsMulC_64f_I,vector arith,1,1,1,1,1,1,0,6,10,7,0
+ippsMulC_64fc_I,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsMulC_64f,vector arith,1,1,1,1,1,1,0,3,11,4,0
+ippsMulC_64fc,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsDiv_32f_A11,vector math (accuracy-graded),1,1,1,1,1,0,0,1,0,1,0
+ippsDiv_32f_A21,vector math (accuracy-graded),1,1,1,0,0,0,0,0,0,0,0
+ippsDiv_32f_A24,vector math (accuracy-graded),1,1,1,1,1,1,0,1,2,1,0
+ippsDiv_64f_A53,vector math (accuracy-graded),1,1,1,1,1,1,0,1,1,1,0
+ippsPow_32f_A11,vector math (accuracy-graded),1,1,0,0,0,0,0,0,0,0,0
+ippsPow_32f_A21,vector math (accuracy-graded),1,1,0,0,0,0,0,0,0,0,0
+ippsPow_32f_A24,vector math (accuracy-graded),1,1,0,0,0,0,0,0,0,0,0
+ippsPowx_32f_A11,vector math (accuracy-graded),1,1,1,0,1,1,0,0,0,5,0
+ippsPowx_32f_A21,vector math (accuracy-graded),1,1,1,1,1,1,0,2,2,2,0
+ippsPowx_32f_A24,vector math (accuracy-graded),1,1,1,0,0,0,0,0,0,0,0
+ippsPowx_64f_A53,vector math (accuracy-graded),1,1,1,1,1,1,0,3,6,3,0
+ippsExp_32f_I,vector math (accuracy-graded),1,1,1,1,1,1,1,50,50,50,0
+ippsExp_32f_A11,vector math (accuracy-graded),1,1,1,1,1,1,1,143,288,143,1
+ippsExp_32f_A21,vector math (accuracy-graded),1,1,1,1,1,1,0,2,6,2,0
+ippsExp_32f_A24,vector math (accuracy-graded),1,1,1,1,1,1,0,4,5,4,0
+ippsExp_32f64f,vector math (accuracy-graded),1,1,0,0,0,0,0,0,0,0,0
+ippsExp_64f_A50,vector math (accuracy-graded),1,1,0,0,0,0,0,0,0,0,0
+ippsExp_64f_A53,vector math (accuracy-graded),1,1,1,1,1,1,0,1,1,1,0
+ippsExpm1_32f_A11,vector math (accuracy-graded),1,1,1,1,1,1,0,2,6,7,0
+ippsExpm1_32f_A21,vector math (accuracy-graded),1,1,1,1,1,1,0,1,1,6,0
+ippsExpm1_32f_A24,vector math (accuracy-graded),1,1,1,1,1,1,0,1,3,6,0
+ippsLn_32f_I,vector math (accuracy-graded),1,1,1,1,1,1,0,1,1,1,0
+ippsLn_32f_A11,vector math (accuracy-graded),1,1,1,1,1,1,1,39,80,43,0
+ippsLn_32f_A21,vector math (accuracy-graded),1,1,1,1,1,1,1,2,2,6,0
+ippsLn_32f_A24,vector math (accuracy-graded),1,1,1,1,1,1,1,4,4,8,0
+ippsLn_64f32f,vector math (accuracy-graded),1,1,0,0,0,0,0,0,0,0,0
+ippsLn_64f_A50,vector math (accuracy-graded),1,1,0,0,0,0,0,0,0,0,0
+ippsLn_64f_A53,vector math (accuracy-graded),1,1,0,0,0,0,0,0,0,0,0
+ippsCos_32f_A11,vector math (accuracy-graded),1,1,1,1,1,1,1,9,17,9,0
+ippsCos_32f_A21,vector math (accuracy-graded),1,1,1,0,0,0,0,0,0,0,0
+ippsCos_32f_A24,vector math (accuracy-graded),1,1,1,0,0,0,0,0,0,0,0
+ippsCos_64f_A26,vector math (accuracy-graded),1,1,1,0,0,0,0,0,0,0,0
+ippsCos_64f_A50,vector math (accuracy-graded),1,1,1,0,0,0,0,0,0,0,0
+ippsCos_64f_A53,vector math (accuracy-graded),1,1,1,1,1,1,0,1,1,1,0
+ippsSin_32f_A11,vector math (accuracy-graded),1,1,0,0,0,0,0,0,0,0,0
+ippsSin_32f_A21,vector math (accuracy-graded),1,1,1,1,1,1,0,3,7,4,0
+ippsSin_32f_A24,vector math (accuracy-graded),1,1,1,1,1,1,0,2,2,3,0
+ippsSin_64f_A26,vector math (accuracy-graded),1,1,1,1,1,1,0,2,3,3,0
+ippsSin_64f_A50,vector math (accuracy-graded),1,1,1,1,1,1,1,49,392,49,0
+ippsSin_64f_A53,vector math (accuracy-graded),1,1,1,0,0,0,0,0,0,0,0
+ippsSinCos_32f_A11,vector math (accuracy-graded),1,1,0,0,0,0,0,0,0,0,0
+ippsSinCos_32f_A21,vector math (accuracy-graded),1,1,1,1,1,1,1,1,2,1,0
+ippsSinCos_32f_A24,vector math (accuracy-graded),1,1,0,0,0,0,0,0,0,0,0
+ippsSinCos_64f_A26,vector math (accuracy-graded),1,1,0,0,0,0,0,0,0,0,0
+ippsSinCos_64f_A50,vector math (accuracy-graded),1,1,0,0,0,0,0,0,0,0,0
+ippsSinCos_64f_A53,vector math (accuracy-graded),1,1,0,0,0,0,0,0,0,0,0
+ippsSqr_32f_I,vector arith,1,1,1,1,1,1,1,144,1163,143,1
+ippsSqr_64f_I,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsSqr_32f,vector arith,1,1,1,1,1,1,1,143,546,143,1
+ippsSqr_64f,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsAddProduct_32f,complex/spectral,1,1,0,0,0,0,0,0,0,0,0
+ippsAddProduct_64f,complex/spectral,1,1,1,1,1,1,0,1,1,1,0
+ippsAddProduct_32fc,complex/spectral,1,1,1,1,1,1,0,2,2,2,0
+ippsAddProduct_64fc,complex/spectral,1,1,0,0,0,0,0,0,0,0,0
+ippsAddProductC_32f,complex/spectral,1,1,1,1,1,1,1,38,69,42,0
+ippsPhase_32fc,complex/spectral,1,1,1,1,1,1,0,4,5,4,0
+ippsPhase_64fc,complex/spectral,1,1,0,0,0,0,0,0,0,0,0
+ippsMagnitude_32fc,complex/spectral,1,1,1,1,1,1,1,33,40,34,0
+ippsMagnitude_64fc,complex/spectral,1,1,0,0,0,0,0,0,0,0,0
+ippsPowerSpectr_32fc,complex/spectral,1,1,1,1,1,1,1,38,61,41,0
+ippsPowerSpectr_64fc,complex/spectral,1,1,0,0,0,0,0,0,0,0,0
+ippsMax_32f,reduce,1,1,1,1,1,1,1,25,40,28,0
+ippsMax_64f,reduce,1,1,0,0,0,0,0,0,0,0,0
+ippsMax_16s,reduce,1,1,1,1,1,1,1,38,38,41,0
+ippsMax_32s,reduce,1,1,0,0,0,0,0,0,0,0,0
+ippsMin_32f,reduce,1,1,1,1,1,1,0,1,1,1,0
+ippsMin_64f,reduce,1,1,0,0,0,0,0,0,0,0,0
+ippsMin_16s,reduce,1,1,1,1,1,1,1,38,38,41,0
+ippsMin_32s,reduce,1,1,0,0,0,0,0,0,0,0,0
+ippsMinMax_64f,reduce,1,1,0,0,0,0,0,0,0,0,0
+ippsMinMax_32f,reduce,1,1,1,1,1,1,1,50,58,50,0
+ippsMinMax_32s,reduce,1,1,0,0,0,0,0,0,0,0,0
+ippsMinMax_32u,reduce,1,1,0,0,0,0,0,0,0,0,0
+ippsMinMax_16s,reduce,1,1,1,1,1,1,1,49,49,49,0
+ippsMinMax_16u,reduce,1,1,0,0,0,0,0,0,0,0,0
+ippsMinMax_8u,reduce,1,1,1,1,1,1,0,1,1,1,0
+ippsMaxAbs_16s,reduce,1,1,0,0,0,0,0,0,0,0,0
+ippsMaxAbs_32s,reduce,1,1,0,0,0,0,0,0,0,0,0
+ippsMinAbs_16s,reduce,1,1,0,0,0,0,0,0,0,0,0
+ippsMinAbs_32s,reduce,1,1,0,0,0,0,0,0,0,0,0
+ippsSum_32f,reduce,1,1,1,1,1,1,1,49,165,50,0
+ippsSum_64f,reduce,1,1,1,1,1,1,0,5,5,10,0
+ippsAbs_32f,vector arith,1,1,1,1,1,1,1,26,35,26,0
+ippsAbs_64f,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsAbs_32f_I,vector arith,1,1,1,1,1,1,0,3,4,3,0
+ippsAbs_64f_I,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsMulPack_32f_I,complex/spectral,1,1,1,0,0,0,0,0,0,0,0
+ippsMulPack_64f_I,complex/spectral,1,1,0,0,0,0,0,0,0,0,0
+ippsMulPack_32f,complex/spectral,1,1,1,1,1,1,1,49,49,49,0
+ippsMulPack_64f,complex/spectral,1,1,0,0,0,0,0,0,0,0,0
+ippsSqrt_32f_I,vector math (accuracy-graded),1,1,1,1,1,1,0,6,12,7,0
+ippsSqrt_64f_I,vector math (accuracy-graded),1,1,0,0,0,0,0,0,0,0,0
+ippsSqrt_32f,vector math (accuracy-graded),1,1,1,0,0,0,0,0,0,0,0
+ippsSqrt_64f,vector math (accuracy-graded),1,1,0,0,0,0,0,0,0,0,0
+ippsSqrt_32f_A11,vector math (accuracy-graded),1,1,1,1,1,1,1,143,577,143,1
+ippsSqrt_32f_A21,vector math (accuracy-graded),1,1,1,1,1,0,1,143,0,143,0
+ippsSqrt_32f_A24,vector math (accuracy-graded),1,1,1,1,1,1,0,2,2,2,0
+ippsSqrt_64f_A50,vector math (accuracy-graded),1,1,0,0,0,0,0,0,0,0,0
+ippsSqrt_64f_A53,vector math (accuracy-graded),1,1,0,0,0,0,0,0,0,0,0
+ippsCbrt_32f_A11,vector math (accuracy-graded),1,1,1,1,1,0,0,1,0,1,0
+ippsCbrt_32f_A21,vector math (accuracy-graded),1,1,0,0,0,0,0,0,0,0,0
+ippsCbrt_32f_A24,vector math (accuracy-graded),1,1,1,1,1,1,0,2,1,2,0
+ippsReal_64fc,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsReal_32fc,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsImag_64fc,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsImag_32fc,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsCplxToReal_64fc,complex/spectral,1,1,0,0,0,0,0,0,0,0,0
+ippsCplxToReal_32fc,complex/spectral,1,1,1,1,1,1,1,61,160,61,0
+ippsCplxToReal_16sc,complex/spectral,1,1,1,1,1,1,1,3,3,3,0
+ippsRealToCplx_64f,complex/spectral,1,1,0,0,0,0,0,0,0,0,0
+ippsRealToCplx_32f,complex/spectral,1,1,1,1,1,1,1,61,220,61,0
+ippsRealToCplx_16s,complex/spectral,1,1,1,1,1,1,0,2,2,3,0
+ippsFFTInit_R_32f,FFT,1,1,1,1,1,1,1,50,54,50,1
+ippsFFTInit_R_64f,FFT,1,1,1,1,1,1,1,50,50,50,1
+ippsFFTFwd_RToPerm_32f,FFT,1,1,0,0,0,0,0,0,0,0,0
+ippsFFTFwd_RToPack_32f,FFT,1,1,1,1,1,1,1,50,50,50,1
+ippsFFTFwd_RToCCS_32f,FFT,1,1,0,0,0,0,0,0,0,0,0
+ippsFFTInv_PermToR_32f,FFT,1,1,0,0,0,0,0,0,0,0,0
+ippsFFTInv_PackToR_32f,FFT,1,1,1,1,1,1,1,49,49,49,1
+ippsFFTInv_CCSToR_32f,FFT,1,1,0,0,0,0,0,0,0,0,0
+ippsFFTFwd_RToPerm_32f_I,FFT,1,1,0,0,0,0,0,0,0,0,0
+ippsFFTFwd_RToPack_32f_I,FFT,1,1,1,1,1,1,1,50,50,50,1
+ippsFFTFwd_RToCCS_32f_I,FFT,1,1,1,1,1,1,0,2,4,2,1
+ippsFFTInv_PermToR_32f_I,FFT,1,1,0,0,0,0,0,0,0,0,0
+ippsFFTInv_PackToR_32f_I,FFT,1,1,1,1,1,1,1,49,49,49,1
+ippsFFTInv_CCSToR_32f_I,FFT,1,1,1,1,1,1,0,2,2,2,1
+ippsFFTFwd_RToPerm_64f,FFT,1,1,0,0,0,0,0,0,0,0,0
+ippsFFTFwd_RToPack_64f,FFT,1,1,1,1,1,1,1,50,50,50,1
+ippsFFTFwd_RToCCS_64f,FFT,1,1,0,0,0,0,0,0,0,0,0
+ippsFFTInv_PermToR_64f,FFT,1,1,0,0,0,0,0,0,0,0,0
+ippsFFTInv_PackToR_64f,FFT,1,1,1,1,1,1,1,49,49,49,1
+ippsFFTInv_CCSToR_64f,FFT,1,1,0,0,0,0,0,0,0,0,0
+ippsFFTFwd_RToPerm_64f_I,FFT,1,1,0,0,0,0,0,0,0,0,0
+ippsFFTFwd_RToPack_64f_I,FFT,1,1,1,1,1,1,1,50,50,50,1
+ippsFFTFwd_RToCCS_64f_I,FFT,1,1,0,0,0,0,0,0,0,0,0
+ippsFFTInv_PermToR_64f_I,FFT,1,1,0,0,0,0,0,0,0,0,0
+ippsFFTInv_PackToR_64f_I,FFT,1,1,1,1,1,1,1,49,49,49,1
+ippsFFTInv_CCSToR_64f_I,FFT,1,1,0,0,0,0,0,0,0,0,0
+ippsFFTGetSize_R_32f,FFT,1,1,1,1,1,1,1,50,102,50,1
+ippsFFTGetSize_R_64f,FFT,1,1,1,1,1,1,1,50,100,50,1
+ippsConj_64fc_I,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsConj_32fc_I,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsConj_64fc,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsConj_32fc,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsConjFlip_64fc,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsConjFlip_32fc,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsConjCcs_64fc_I,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsConjCcs_32fc_I,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsConjCcs_64fc,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsConjCcs_32fc,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsConjPack_64fc_I,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsConjPack_32fc_I,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsConjPack_64fc,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsConjPack_32fc,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsConjPerm_64fc_I,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsConjPerm_32fc_I,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsConjPerm_64fc,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsConjPerm_32fc,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsTone_Direct_32f,signal gen,1,1,1,1,1,1,0,7,8,11,0
+ippsTone_Direct_32fc,signal gen,1,1,1,1,1,1,0,1,1,1,0
+ippsTone_Direct_64f,signal gen,1,1,0,0,0,0,0,0,0,0,0
+ippsConv_32f,FIR/IIR/conv/corr,1,1,1,1,1,1,1,25,30,28,0
+ippsConv_64f,FIR/IIR/conv/corr,1,1,0,0,0,0,0,0,0,0,0
+ippsRandUniform_Direct_32f,signal gen,1,1,1,1,1,1,1,25,38,28,0
+ippsRandUniform_Direct_64f,signal gen,1,1,1,1,1,1,0,2,2,2,0
+ippsRandGauss_Direct_32f,signal gen,1,1,1,1,1,1,1,24,24,27,0
+ippsRandGauss_Direct_64f,signal gen,1,1,0,0,0,0,0,0,0,0,0
+ippsVectorSlope_32s,signal gen,1,1,0,0,0,0,0,0,0,0,0
+ippsVectorSlope_32f,signal gen,1,1,1,1,1,1,1,144,1745,143,1
+ippsVectorSlope_64f,signal gen,1,1,1,1,1,1,1,49,86,49,0
+ippsThreshold_LT_32f,threshold,1,1,1,1,1,1,0,1,1,1,0
+ippsThreshold_LT_32f_I,threshold,1,1,1,1,1,1,1,143,980,143,1
+ippsThreshold_LT_64f_I,threshold,1,1,1,1,1,1,1,49,393,49,0
+ippsThreshold_LT_32s,threshold,1,1,1,0,0,0,0,0,0,0,0
+ippsThreshold_LT_32s_I,threshold,1,1,1,1,1,1,1,37,84,37,0
+ippsThreshold_LTAbs_32f,threshold,1,1,0,0,0,0,0,0,0,0,0
+ippsThreshold_LTAbs_32f_I,threshold,1,1,1,0,0,0,0,0,0,0,0
+ippsThreshold_LTVal_32f_I,threshold,1,1,1,1,1,1,0,3,6,3,0
+ippsThreshold_LTVal_64f_I,threshold,1,1,1,1,1,1,0,2,2,2,0
+ippsThreshold_LTVal_32f,threshold,1,1,0,0,0,0,0,0,0,0,0
+ippsThreshold_LTVal_64f,threshold,1,1,0,0,0,0,0,0,0,0,0
+ippsThreshold_GT_32f,threshold,1,1,1,1,1,1,1,143,181,143,0
+ippsThreshold_GT_32f_I,threshold,1,1,1,1,1,1,1,143,2059,143,1
+ippsThreshold_GT_32s,threshold,1,1,0,0,0,0,0,0,0,0,0
+ippsThreshold_GT_32s_I,threshold,1,1,1,1,1,1,1,125,171,126,0
+ippsThreshold_GT_64f_I,threshold,1,1,1,1,1,1,0,1,2,1,0
+ippsThreshold_GTAbs_32f,threshold,1,1,0,0,0,0,0,0,0,0,0
+ippsThreshold_GTAbs_32f_I,threshold,1,1,1,1,1,1,0,1,1,1,0
+ippsThreshold_GTVal_32f_I,threshold,1,1,1,1,1,1,0,2,3,2,0
+ippsThreshold_GTVal_32f,threshold,1,1,0,0,0,0,0,0,0,0,0
+ippsThreshold_LTValGTVal_32f,threshold,1,1,0,0,0,0,0,0,0,0,0
+ippsThreshold_LTValGTVal_32f_I,threshold,1,1,1,1,1,1,1,24,94,24,0
+ippsThreshold_LTValGTVal_32s,threshold,1,1,0,0,0,0,0,0,0,0,0
+ippsThreshold_LTValGTVal_32s_I,threshold,1,1,1,0,0,0,0,0,0,0,0
+ippsArctan_32f_I,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsAtan_32f_A11,vector math (accuracy-graded),1,1,1,1,1,1,1,125,263,126,0
+ippsAtan_32f_A21,vector math (accuracy-graded),1,1,1,0,0,0,0,0,0,0,0
+ippsAtan_32f_A24,vector math (accuracy-graded),1,1,0,0,0,0,0,0,0,0,0
+ippsAtan_64f_A53,vector math (accuracy-graded),1,1,1,1,1,1,0,3,3,3,0
+ippsAtan2_32f_A11,vector math (accuracy-graded),1,1,0,0,0,0,0,0,0,0,0
+ippsAtan2_32f_A21,vector math (accuracy-graded),1,1,1,1,1,1,1,37,74,41,0
+ippsAtan2_32f_A24,vector math (accuracy-graded),1,1,0,0,0,0,0,0,0,0,0
+ippsAtan2_64f_A53,vector math (accuracy-graded),1,1,0,0,0,0,0,0,0,0,0
+ippsTanh_32f_A11,vector math (accuracy-graded),1,1,1,1,1,0,0,1,0,1,0
+ippsTanh_32f_A21,vector math (accuracy-graded),1,1,0,0,0,0,0,0,0,0,0
+ippsTanh_32f_A24,vector math (accuracy-graded),1,1,1,1,1,1,0,2,8,2,0
+ippsFlip_32f,reorder/bit,1,1,1,1,1,1,0,1,1,1,0
+ippsFlip_32f_I,reorder/bit,1,1,1,1,1,1,1,33,34,34,0
+ippsFlip_32fc_I,reorder/bit,1,1,1,1,1,1,1,33,33,34,0
+ippsFIRInitAlloc_32f,FIR/IIR/conv/corr,1,1,1,1,1,1,0,5,5,6,0
+ippsFIRMRInitAlloc_32f,FIR/IIR/conv/corr,1,1,0,0,0,0,0,0,0,0,0
+ippsFIRInitAlloc64f_32f,FIR/IIR/conv/corr,1,1,1,1,1,1,0,3,3,4,0
+ippsFIRMRInitAlloc64f_32f,FIR/IIR/conv/corr,1,1,0,0,0,0,0,0,0,0,0
+ippsFIRFree_32f,FIR/IIR/conv/corr,1,1,1,1,1,1,0,5,5,6,0
+ippsFIRFree64f_32f,FIR/IIR/conv/corr,1,1,1,1,1,1,0,3,3,4,0
+ippsFIR_32f,FIR/IIR/conv/corr,1,1,1,1,1,1,0,5,5,6,0
+ippsFIR64f_32f,FIR/IIR/conv/corr,1,1,1,1,1,1,0,3,3,4,0
+ippsFIR_32f_I,FIR/IIR/conv/corr,1,1,1,1,1,1,0,3,6,4,0
+ippsFIR64f_32f_I,FIR/IIR/conv/corr,1,1,1,1,1,1,0,3,6,4,0
+ippsFIRSetDlyLine_32f,FIR/IIR/conv/corr,1,1,1,1,1,1,0,5,5,6,0
+ippsFIRSetDlyLine64f_32f,FIR/IIR/conv/corr,1,1,1,1,1,1,0,3,3,4,0
+ippsFIRSetTaps_32f,FIR/IIR/conv/corr,1,1,1,1,1,1,0,5,5,6,0
+ippsFIRSetTaps64f_32f,FIR/IIR/conv/corr,1,1,1,1,1,1,0,3,3,4,0
+ippsSubCRev_32f_I,vector arith,1,1,1,1,1,1,1,143,461,143,1
+ippsSubCRev_64f_I,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsDivCRev_32f_I,vector arith,1,1,1,1,1,1,0,4,9,9,0
+ippsXorC_32u_I,reorder/bit,1,1,1,1,1,1,1,1,2,1,0
+ippsOrC_32u_I,reorder/bit,1,1,1,1,1,1,1,145,151,143,0
+ippsAndC_32u_I,reorder/bit,1,1,1,1,1,1,0,2,6,2,0
+ippsIIR64f_32f_I,FIR/IIR/conv/corr,1,1,1,0,1,1,0,0,0,1,0
+ippsIIRInit64f_BiQuad_32f,FIR/IIR/conv/corr,1,1,1,0,1,1,0,0,0,1,0
+ippsIIRGetStateSize64f_BiQuad_32f,FIR/IIR/conv/corr,1,1,1,0,1,1,0,0,0,1,0
+ippsWinKaiser_32f_I,signal gen,1,1,1,1,1,1,1,49,49,49,0
+ippsWinKaiser_64f_I,signal gen,1,1,1,1,1,1,0,3,3,8,0
+ippsFilterMedian_32f_I,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsAutoCorr_NormA_32f,FIR/IIR/conv/corr,1,1,1,0,0,0,0,0,0,0,0
+ippsFlip_16u_I,reorder/bit,1,1,1,1,1,1,1,33,33,34,0
+ippsFlip_64f_I,reorder/bit,1,1,0,0,0,0,0,0,0,0,0
+ippsCrossCorr_32f,FIR/IIR/conv/corr,1,1,1,1,1,1,0,2,2,6,0
+ippsInv_32f_A21,vector math (accuracy-graded),1,1,0,0,0,0,0,0,0,0,0
+ippsInv_32f_A24,vector math (accuracy-graded),1,1,0,0,0,0,0,0,0,0,0
+ippsTrunc_32f,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsTrunc_64f,vector arith,1,1,0,0,0,0,0,0,0,0,0
+ippsRound_32f,convert,1,1,1,1,1,1,1,38,41,42,0
+ippsRound_64f,convert,1,1,0,0,0,0,0,0,0,0,0
+ippiRGBToGray_8u_AC4C1R,imaging(ippi),1,1,1,0,0,0,0,0,0,0,0
+ippiColorToGray_8u_C3C1R,imaging(ippi),1,1,1,0,0,0,0,0,0,0,0
+ippiColorToGray_8u_AC4C1R,imaging(ippi),1,1,1,0,0,0,0,0,0,0,0
+ippiSet_8u_C3R,imaging(ippi),1,1,1,1,1,1,1,145,145,143,0
+ippiSet_8u_C4R,imaging(ippi),1,1,1,0,0,0,0,0,0,0,0
+ippiCopy_8u_C3R,imaging(ippi),1,1,1,1,1,1,1,145,145,143,0
+ippiCopy_8u_C4R,imaging(ippi),1,1,1,1,1,1,1,145,145,143,0
+ippiCopy_8u_C1C4R,imaging(ippi),1,1,1,1,1,1,1,145,145,143,0
+ippiCopy_8u_P3C3R,imaging(ippi),1,1,0,0,0,0,0,0,0,0,0
+ippiCopy_8u_C3AC4R,imaging(ippi),1,1,1,1,1,1,1,145,290,143,0
+ippiCopy_8u_AC4C3R,imaging(ippi),1,1,1,1,1,1,1,145,145,143,0
+ippiCopyManaged_8u_C1R,imaging(ippi),1,1,1,1,1,1,1,145,145,143,0
+ippiAlphaPremul_8u_AC4R,imaging(ippi),1,1,0,0,0,0,0,0,0,0,0
+ippiAlphaPremul_8u_AC4IR,imaging(ippi),1,1,1,1,1,1,1,145,145,143,0
+ippiAlphaComp_8u_AC4R,imaging(ippi),1,1,0,0,0,0,0,0,0,0,0
+ippiAlphaCompC_8u_C3R,imaging(ippi),1,1,1,1,1,1,1,143,286,143,0
+ippiAlphaCompC_8u_C4R,imaging(ippi),1,1,1,1,1,1,1,143,286,143,0
+ippiAlphaCompC_8u_AC4R,imaging(ippi),1,1,0,0,0,0,0,0,0,0,0
+ippiFilterBox_8u_C1IR,imaging(ippi),1,1,1,1,1,1,1,5,5,7,0
+ippiFilterBox_8u_C3IR,imaging(ippi),1,1,1,1,1,1,1,145,145,143,0
+ippiFilterBox_8u_C4R,imaging(ippi),1,1,0,0,0,0,0,0,0,0,0
+ippiFilterBox_8u_C4IR,imaging(ippi),1,1,1,1,1,1,1,145,145,143,0
+ippiFilterBox_8u_C3R,imaging(ippi),1,1,0,0,0,0,0,0,0,0,0
+ippiFilterBoxBorderGetBufferSize,imaging(ippi),1,1,1,1,1,1,1,34,34,37,0
+ippiFilterBoxBorder_8u_C1R,imaging(ippi),1,1,0,0,0,0,0,0,0,0,0
+ippiFilterBoxBorder_8u_C3R,imaging(ippi),1,1,0,0,0,0,0,0,0,0,0
+ippiFilterBoxBorder_8u_C4R,imaging(ippi),1,1,1,1,1,1,1,34,34,37,0
+ippiFilter_8u_C4R,imaging(ippi),1,1,1,1,1,1,1,3,3,5,0
+ippiFilterGauss_8u_C4R,imaging(ippi),1,1,0,1,1,1,0,2,2,5,0
+ippiFilter_Round32f_8u_C1R,imaging(ippi),1,1,1,0,1,1,0,0,0,1,0
+ippiFilterRoundGetBufSize32f_8u_C1R,imaging(ippi),1,1,1,0,1,1,0,0,0,1,0
+ippiAddC_8u_C3RSfs,imaging(ippi),1,1,0,0,0,0,0,0,0,0,0
+ippiAddC_8u_C3IRSfs,imaging(ippi),1,1,1,1,1,1,1,145,219,143,0
+ippiAddC_8u_AC4RSfs,imaging(ippi),1,1,0,0,0,0,0,0,0,0,0
+ippiAddC_8u_C4IRSfs,imaging(ippi),1,1,1,1,1,1,1,145,219,143,0
+ippiSubC_8u_C3IRSfs,imaging(ippi),1,1,1,1,1,1,1,145,219,143,0
+ippiSubC_8u_C4IRSfs,imaging(ippi),1,1,1,1,1,1,1,145,219,143,0
+ippiMulC_8u_C1RSfs,imaging(ippi),1,1,0,0,0,0,0,0,0,0,0
+ippiMulC_8u_C3RSfs,imaging(ippi),1,1,0,0,0,0,0,0,0,0,0
+ippiMulC_8u_C4RSfs,imaging(ippi),1,1,1,1,1,1,0,2,4,5,0
+ippiMulC_8u_AC4RSfs,imaging(ippi),1,1,0,0,0,0,0,0,0,0,0
+ippiMulC_8u_C3IRSfs,imaging(ippi),1,1,1,1,1,1,1,143,143,143,0
+ippiMulC_8u_C4IRSfs,imaging(ippi),1,1,1,0,0,0,0,0,0,0,0
+ippiResize_8u_C3R,imaging(ippi),1,1,1,1,1,1,1,6,6,7,0
+ippiResize_8u_C4R,imaging(ippi),1,1,1,1,1,1,1,6,6,7,0
+ippiResizeCenter_8u_C3R,imaging(ippi),1,1,1,1,1,1,0,2,2,5,0
+ippiResizeCenter_8u_C4R,imaging(ippi),1,1,1,1,1,1,0,2,2,5,0
+ippiResizeSqrPixel_8u_C1R,imaging(ippi),1,1,1,1,1,1,1,143,143,143,0
+ippiResizeSqrPixel_8u_C3R,imaging(ippi),1,1,1,1,1,1,1,143,143,143,0
+ippiResizeSqrPixel_8u_C4R,imaging(ippi),1,1,1,1,1,1,1,143,143,143,0
+ippiResizeSqrPixelGetBufSize,imaging(ippi),1,1,0,0,0,0,0,0,0,0,0
+ippiResizeGetBufSize,imaging(ippi),1,1,1,1,1,1,1,143,143,143,0
+ippiMirror_8u_C3IR,imaging(ippi),1,1,1,1,1,1,0,4,4,7,0
+ippiMirror_8u_C4IR,imaging(ippi),1,1,1,1,1,1,0,4,4,7,0
+ippiMirror_8u_C4R,imaging(ippi),1,1,1,1,1,1,0,3,3,6,0
+ippiWarpAffine_8u_C4R,imaging(ippi),1,1,1,1,1,1,0,2,2,5,0
+ippiWarpAffineQuad_8u_C4R,imaging(ippi),1,1,1,1,1,1,1,32,32,35,0
+ippiWarpPerspectiveQuad_8u_C4R,imaging(ippi),1,1,1,1,1,1,1,34,34,37,0
+ippiWarpBilinearQuad_8u_C4R,imaging(ippi),1,1,0,1,1,1,0,2,2,5,0
+ippiWarpAffine_8u_C3R,imaging(ippi),1,1,0,0,0,0,0,0,0,0,0
+ippiWarpAffineQuad_8u_C3R,imaging(ippi),1,1,0,0,0,0,0,0,0,0,0
+ippiWarpPerspectiveQuad_8u_C3R,imaging(ippi),1,1,0,0,0,0,0,0,0,0,0
+ippiWarpBilinearQuad_8u_C3R,imaging(ippi),1,1,0,0,0,0,0,0,0,0,0
+ippiCopyConstBorder_8u_C3R,imaging(ippi),1,1,1,1,1,1,1,143,143,143,0
+ippiCopyConstBorder_8u_C4R,imaging(ippi),1,1,1,1,1,1,1,143,143,143,0
+ippiCopyReplicateBorder_8u_C3R,imaging(ippi),1,1,1,1,1,1,1,143,143,143,0
+ippiCopyReplicateBorder_8u_C4R,imaging(ippi),1,1,1,1,1,1,1,143,143,143,0
+ippiRemap_8u_C3R,imaging(ippi),1,1,0,0,0,0,0,0,0,0,0
+ippiRemap_8u_C4R,imaging(ippi),1,1,0,0,0,0,0,0,0,0,0
+ippiRotateCenter_8u_C4R,imaging(ippi),1,1,1,1,1,1,0,3,3,6,0
+ippiMul_8u_C4IRSfs,imaging(ippi),1,1,0,0,0,0,0,0,0,0,0
