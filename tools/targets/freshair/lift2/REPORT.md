@@ -5,21 +5,12 @@
 - 正本: `SlateCore.core_64` (Win x64, 36.3MB) の実機機械語を ImageBase 0x180000000 に MAP_FIXED 敷設し ms_abi で直接実行
   (IAT スロットは shim C 実装に差替え)。lift 側 (wasm) と非循環。
 
-## 0. 方針決定: 残骸の mlift + IAT patch 方式 vs liftlib 標準ハーネス
+## 0. 方針決定: 残骸の mlift + IAT patch 方式を採用 (liftlib 標準ハーネスは見送り)
 
-残骸評価の結果, **mlift (機械語駆動自作リフタ) + IAT patch 方式を採用**した。根拠:
-
-| 観点 | liftlib 標準ハーネス | mlift (残骸→修正) |
-|---|---|---|
-| RetDec 依存 | RetDec → 修復 pass (P1/F7/F2) が必要 | **不使用** (capstone で機械語 1 命令ずつ直接 IR 化) |
-| SSE スカラ脱落 (P1/F7/F2 類型) | 修復 pass で対処 | **構造的に発生しない** (全 GPR/XMM を一律保存する uniform signature) |
-| IAT 呼出を含む関数 | **native 実行不可 (既知限界)** — Compressor は `std::vector` grow (0x1803ded20) 経由で HeapAlloc/HeapFree を IAT call するため対象外になる | **native も wasm も実行可** (native: IAT スロットを shim C 実装へ差替え / wasm: `win_kernel32_*` 外部関数) |
-| FA-2 の対象関数 | 選定で回避する必要 (grow を stub 化 → bit-exact の減点) | そのまま lift 可 |
-| 実績 | FA Gain 400/400 (CAB-49/54/55) | **Compressor/Filter を本セッションで bit-exact 化 (下表)** |
-
-Compressor の closure は grow (HeapAlloc/HeapFree) を含み, liftlib 制約「IAT 呼出なし」に抵触するため,
-liftlib ハーネスでは native oracle が構成できない。逆に mlift の欠点 (RetDec 欠陥類型の検出器が無い) は,
-ablation による故障注入で「どの意味論が必須か」を実測して補完した (§6)。liftlib 自体は無改変 (読取のみ)。
+RetDec 非依存 (capstone で機械語 1 命令ずつ直接 IR 化 → SSE スカラ脱落が構造的に発生しない) こと、
+Compressor の `std::vector` grow (0x1803ded20) 経由の HeapAlloc/HeapFree を IAT call する closure を
+native でも wasm でも実行できること (liftlib は IAT 呼出を含む関数は native 実行不可) が決定的。
+liftlib 自体は無改変 (読取のみ) — 欠点 (RetDec 欠陥類型の検出器が無い) は ablation で補完 (§6)。
 
 ## 1. 結論 (先出し)
 
@@ -65,13 +56,11 @@ fma primitive 自体は emcc libm 実装が native vfmadd と **200,000/200,000 
 - NaN/Inf 入力は除外 (x86 と wasm の NaN payload 差 — liftlib と同一の方針)。
 - grow 経路 (vcap<16) の 72 fails は §5 の既知限界。
 
-## 5. 既知限界: Compressor grow 経路の wasm OOB (72 scenario-call)
+## 5. 既知限界: Compressor grow 経路 (vcap<16) の 72 scenario-call
 
-`vcap < 16` のシナリオで vector が grow し, lift 済み grow 呼出鎖 (0x1803ded20 → 0x1803de3e0 → CRT heap lock 0x18106632c の `lock inc [rcx+0x10]`) で wasm OOB ("memory access out of bounds")。native 側は正常。对应的処置:
-
-- grow + アロケータ (0x1803ded20/0x1803de3e0) を C 等価 (`fa_vector_grow`: 1.5 倍ポリシ, 4B 要素, 3 部 copy, 旧 buffer free) に差替え (`--map`)。 stmxcsr/ldmxcsr も `fa_mxcsr_get/set` に差替え。
-- 残る OOB は **shared_ptr 制御ブロック代入 (0x181057d20 → 0x18106632c `lock inc`) の CRT 状態依存**: harness が与える最小オブジェクトでは CRT lock 制御ブロックが未初期化。対処には UCRT 起動時状態の追加 poke (0x1813073xx 領域) または shared_ptr 代入の C 差替えが必要 → 次タスク。
-- 非 grow 経路 (206/206) と grow 単独 (122/194) は分離集計 (`run_comp.sh` が split 表示)。
+`vcap < 16` のシナリオで vector が grow し、lift 済み grow 呼出鎖 (0x1803ded20 → 0x1803de3e0 →
+CRT heap lock 0x18106632c の `lock inc [rcx+0x10]`) で wasm OOB。native 側は正常。
+対応処置は §10 参照 (harness 側 vbuf 規約違反が真因で、FA-2b で解消済み)。
 
 ## 6. ablation (mlift 意味論の故障注入 → 実測)
 
@@ -115,8 +104,7 @@ lift2/
 
 ## 9. 検収記録
 
-- `lift2_e2e.sh` exit=0 (ALL PASS) — /tmp/opencode/e2e_final4.log
-- 全数値は実測 (上記コマンドで再現可能)。推定値は含まない。
+- `lift2_e2e.sh` exit=0 (ALL PASS)。全数値は実測 (上記コマンドで再現可能)。推定値は含まない。
 
 ## 10. FA-2b 追記: Compressor grow 経路完走 (CAB-257, commit 本節参照)
 
@@ -166,24 +154,25 @@ lift2/
 
 **結論: 制御層 (0x1803dfc10, vtable 17 slot) は lift 完走し、factory .epf 8 本 + 小規模 structured で
 native 実機機械語と wasm (mlift) が bit-exact 一致 (`bash lift2_e2e.sh` = ALL PASS)。**
-Compressor 400/400 (grow 込)・Filter 400/400・ctx-fuzz 4,800 は不変。closure は 305 関数 / 228,582 B / 44,208 命令。
+Compressor 400/400 (grow 込)・Filter 400/400・ctx-fuzz 4,800 は不変。closure は 305 関数 / 228,582 B /
+44,208 命令。
 
-### 11.1 残骸の評価 (引継ぎ時)
+### 11.1 残骸の評価
 
-- Compressor/Filter (FA-2/2b) はコミット済みで検収可能。制御層は vtable 17 slot の lift + ctrl harness が
-  **途中まで**あったが、native は `__chkstk` の gs read (Linux は gs_base=0) で必ずクラッシュ、wasm は
-  未解決 icall (`jmp rax` CFG stub) で trap —— **両側とも完走していなかった**。
-  旧 `run_ctrl.sh` は「片側クラッシュ → 双方 0 byte → mismatch 0 → 空 PASS」する脆弱性を持ち、
-  実際に成果物 0 byte が PASS と判定される状態だった。
+Compressor/Filter (FA-2/2b) はコミット済みで検収可能。制御層は vtable 17 slot の lift + ctrl harness が
+**途中まで**あったが、native は `__chkstk` の gs read (Linux は gs_base=0) で必ずクラッシュ、wasm は
+未解決 icall (`jmp rax` CFG stub) で trap —— **両側とも完走していなかった**。旧 `run_ctrl.sh` は
+「片側クラッシュ → 双方 0 byte → mismatch 0 → 空 PASS」する脆弱性を持ち、成果物 0 byte が PASS と
+判定される状態だった。
 
 ### 11.2 修正した 5 件の根本欠陥 (すべて実測で特定・修正)
 
 | # | 欠陥 | 症状 | 修正 |
 |---|---|---|---|
-| E-1 | `__chkstk` の gs read (`mov r11, gs:[0x10]`) が Linux で SIGSEGV (gs_base=0) | native が ctor 入口で必ず停止 | `xor r11,r11` + nop に差替え (StackLimit=0 → probe skip)。wasm の @fa_teb=0 と同値 |
-| E-2 | FreshAirDspModel ctor (0x1803ba840) の arg2 (rdx) は**非 NULL 必須** (`[arg2+4]` を M+0xa088 に写す)。前担当は 0 を渡し SIGSEGV | native が ctor 途中で停止 | 両側で同一の 0 初期化 32B ダミーを渡す |
-| E-3 | `h_rep_stos` が**初期 rcx を毎回読み直さない** | model ctor 内 `rep stosb` が rcx0>1 で無限ループ → wasm OOB | ループ頭で `%R_rcx` をロード (ループ持ち回し変数化) |
-| E-4 | `fa_icall` switch が icall_targets のみ解決 | vtable slot / 引数受け回しの関数ポインタが host trap | **lift 済み全関数**に拡大 + CFG stub (`jmp rax`) の rax0 再ディスパッチ。未 seed は `icall_extra.py` が自動列挙 (closure 内 lea 参照 + 制御層領域 RVA 0x3d0000..0x3f0000) |
+| E-1 | `__chkstk` の gs read (`mov r11, gs:[0x10]`) が Linux で SIGSEGV (gs_base=0) | native が ctor 入口で停止 | `xor r11,r11` + nop に差替え (StackLimit=0 → probe skip)。wasm の @fa_teb=0 と同値 |
+| E-2 | FreshAirDspModel ctor (0x1803ba840) の arg2 (rdx) は**非 NULL 必須** (`[arg2+4]` を M+0xa088 に写す) | native が ctor 途中で停止 | 両側で同一の 0 初期化 32B ダミーを渡す |
+| E-3 | `h_rep_stos` が**初期 rcx を毎回読み直さない** | model ctor 内 `rep stosb` が無限ループ → wasm OOB | ループ頭で `%R_rcx` をロード (ループ持ち回し変数化) |
+| E-4 | `fa_icall` switch が icall_targets のみ解決 | vtable slot / 引数受け回しの関数ポインタが host trap | **lift 済み全関数**に拡大 + CFG stub (`jmp rax`) の rax0 再ディスパッチ。未 seed は `icall_extra.py` が自動列挙 |
 | E-5 | 共有マシンスタック @fa_stack 1MB 不足 (深い入れ子 + 0x5cc0 フレーム) | guard violation 25,344 (stack 溢出) | 8MB (host stack と同値) に |
 
 補助: `fa_heap_zero` (未初期化 heap の環境依存残留値ダンプ差分を除去)、`ctrl_norm.py` (ポインタ値マスク +
@@ -193,7 +182,7 @@ Compressor 400/400 (grow 込)・Filter 400/400・ctx-fuzz 4,800 は不変。clos
 
 | 対象 | シナリオ | 結果 |
 |---|---|---|
-| **制御層 (FA-2c)** | factory .epf 8 本 (Clap Lifter / Hat Lifter / Mixbus Polish / Mixbus Sparkle / Presence Pop / Shiny / Vocal Air / Vocal Bus Presence) + structured 2 + random 5 × fma0/1 | **15/15 bit-exact** (1 scenario は native/wasm **同一の** ERR — 実機側でも同じ fail-fast) |
+| **制御層 (FA-2c)** | factory .epf 8 本 (Clap Lifter / Hat Lifter / Mixbus Polish / Mixbus Sparkle / Presence Pop / Shiny / Vocal Air / Vocal Bus Presence) + structured 2 + random 5 × fma0/1 | **15/15 bit-exact** (1 scenario は native/wasm **同一の** ERR) |
 | Compressor (不変) | 400 × fma0/1 (non-grow 206 + grow 194) | **400/400** |
 | Filter (不変) | 200 × fma0/1 | **400/400** |
 | ctx-fuzz | 2,400 × 2 target × 2 fma | **4,800/4,800** |
