@@ -17,7 +17,10 @@ if (kh && existsSync(kh)) {
   const idx = JSON.parse(readFileSync(kh, 'utf8')).plugins as Array<{ id: string; displayName: string; fileName: string; formats: string[] }>;
   for (const p of idx) {
     if (!p.formats.includes('vst2') || p.id.length !== 4) continue;
-    specs.push({ name: p.fileName, vendor: 'Kilohearts', format: 'vst2', kind: 'effect', magic: p.id, path: `C:\\Program Files\\Common Files\\VST2\\Kilohearts\\${p.fileName}.dll`, category: 'Kilohearts' });
+    // Real machine (CAB-218, analysis/kh_magic_check.mjs): product id == measured VST2 uniqueID (45/45), category is
+    // "Effect" on all 44 KH VST2 fx; Phase Plant is the only KH generator (Generators\VST, category "Synth").
+    const gen = p.fileName === 'Phase Plant';
+    specs.push({ name: p.fileName, vendor: 'Kilohearts', format: 'vst2', kind: gen ? 'generator' : 'effect', magic: p.id, path: `C:\\Program Files\\Common Files\\VST2\\Kilohearts\\${p.fileName}.dll`, category: gen ? 'Synth' : 'Effect' });
   }
 }
 const res = generateDb(specs, { dbPath: flag('--db-path'), verifiedIds: !args.includes('--no-verified-ids') });

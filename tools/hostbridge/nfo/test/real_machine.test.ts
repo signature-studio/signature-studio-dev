@@ -173,14 +173,14 @@ test('real VST2 ps_file_guid = "VST"+magic4+lower(name) — vst2PseudoGuid repro
   assert.equal(n, 64);
 });
 
-test('generated Serum 2 entries match the real machine sections/keys (minus unobservable date/size/filename)', () => {
+test('generated Serum 2 entries match the real machine sections/keys (minus unobservable date/size)', () => {
   const specs: PluginSpec[] = JSON.parse(readFileSync(new URL('../specs/wasm_plugins.json', import.meta.url), 'utf8')).plugins;
   const g = generateDb(specs);
   const ini = IniFile.fromBytes(iniRaw);
-  // ps_file_date/size: real scanner values unknown for our synthetic DB; ps_file_filename: real machine uses the
-  // VST3 *inner binary* path (…\Serum2.vst3\Contents\x86_64-win\Serum2.vst3) while our spec keeps the bundle folder
-  // (the form the real OTT.fst record 55 uses) — both forms documented in FORMAT §9.
-  const drop = new Set(['ps_file_date_0', 'ps_file_size_0', 'ps_file_filename_0']);
+  // ps_file_date/size: real scanner values unknown for our synthetic DB. ps_file_filename now matches too —
+  // CAB-218 determined the rule (ps_file_filename = the loadable module FILE path, consumed verbatim down to
+  // LoadLibraryW), so the spec carries the real machine's inner-binary form (…\Contents\x86_64-win\Serum2.vst3).
+  const drop = new Set(['ps_file_date_0', 'ps_file_size_0']);
   const strip = (lines: string[]): string[] => lines.filter((l) => !drop.has(l.slice(0, l.indexOf('=')).toLowerCase()));
   for (const name of ['Generators\\VST3\\Serum 2', 'Effects\\VST3\\Serum 2 FX']) {
     const gen = ValueFile.parse(decodeText(g.files.get(`Installed/${name.replace(/\\/g, '/')}.nfo`)!));

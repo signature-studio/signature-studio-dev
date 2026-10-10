@@ -8,7 +8,8 @@
 - **書式 (FLEngine を逆アセンブルして確定; PluginManager.exe は同一 unit を内包)**: `.nfo` = CRLF の `key=value` 行 (キー大文字小文字非区別、`'` 行はコメント)。`fileversion=2` は `ps_name / ps_presetfilename / ps_files=N` + `ps_file_*_<i>` (i=0 起点)。必須は実質 `ps_files` と `ps_file_plugclass_i` のみ。`.fst` = FLhd(0x30, 2ch, ppq48) + `199 "11.5.5"`, `28`, `201 "Fruity Wrapper"`, `212`, `203 名前`, `213 wrapper chunk`。
 - **round-trip 実測**: 同梱 `.nfo` 831/831 byte-exact、FL 11.5.5 書込の `.fst` 26/26 を自作コンテナ writer で byte-exact 再構成 (§3)。v2 `.nfo` は writer→reader の自己整合 (生成 49/49 受理) に加え、**実機 `.Plugins.ini` 406/406 セクションを writer が再現** (§11)。
 - **wasm 向け**: OTT / Fresh Air / Kilohearts(46) / Serum 2(2 class) の DB エントリを 49 件・100 ファイル (`.Plugins.ini` 込み) で合成できる (`specs/wasm_plugins.json` + Kilohearts index)。Massive X は素材なしでエントリ未生成 (§5)。
-- **コミット**: `feat(hostbridge): plugin database nfo/fst format and synthetic generator` → 以後 §10/§11 分は git log 参照 (tools/hostbridge/nfo のみ)。
+- **CAB-218 (§12)**: VST3 `ps_file_filename` = **LoadLibraryW で消費するモジュールファイルパス** (規則確定, Serum 2 を内部バイナリ形に修正) / KH VST2 magic は product_index id と**実機 45/45 一致** / VerifiedIDs VST2 id = 符号付き 10 進 (64/64, ≥2³¹ は推定)。
+- **コミット**: `feat(hostbridge): plugin database nfo/fst format and synthetic generator` → 以後 §10〜§12 分は git log 参照 (tools/hostbridge/nfo のみ)。
 
 ## 1. 実例の探索結果 (実測)
 
@@ -84,18 +85,13 @@
 1. **Installed の実機 v2 サンプルが無く、`.nfo`/`.fst` は「FL コードが受理する形」を静的に再構成したもの**。reader 模型は decompile 準拠だが、FL 本体の実行による検証は未了 (lift 済み FL で `0x910cd0` を動かす検証は H4 以降)。
 2. Fruity Wrapper が生成 `.fst` (record 2/50/51/54/55/56 のみ) を読んで VST2/VST3 を起動できるかは未検証 (Wrapper の chunk reader は未解析; record 1/30/31/32 は Wrapper が補うと推定)。`tools/flp` の独立パーサ受理までは確認。
 3. Wrapper の VST2 `hint` (`TVSTPlugin` 第 6 引数) の供給元レコード (id 57 候補) は未特定。標準名エクスポートでは不要。
-4. ~~`.Plugins.ini` の文字コード、`ps_file_date` の単位、VerifiedIDs の VST2 `id` 表現~~ → **CAB-219 で解決 (§11)**: ini = UTF-8+BOM / date = TDateTime double bits / VST2 id = magic 10 進 (キー順 `<fmt>:<bits>:<id>`)。VST3 バンドルの `ps_file_filename` は**両形が実在** (§11.4, FORMAT §9-3)。FL の自己修復/名前検索経路 (FORMAT §6) で致命にならない見込みは不変。
+4. ~~`.Plugins.ini` の文字コード、`ps_file_date` の単位、VerifiedIDs の VST2 `id` 表現~~ → **CAB-219 で解決 (§11)**: ini = UTF-8+BOM / date = TDateTime double bits / VST2 id = magic 10 進 (キー順 `<fmt>:<bits>:<id>`)。VST3 `ps_file_filename` の**選択規則は CAB-218 で確定 (§12, FORMAT §9-3)**。
 5. VST3 CID → `ps_file_guid` の対応は §11.4 で実機確定 (テキスト = CID 文字列、bytes = Windows 配置)。Wrapper が factory へ渡す順序の実行検証は H5 で。
-6. Massive X 素材なし。Kilohearts の VST2 uniqueID は実機値 (`kdsp` 等) での差し替え候補 (§11.4 / FORMAT §9-5)。
+6. ~~Massive X 素材なし / KH VST2 magic 未確定~~ → **KH magic は CAB-218 で実測確定 (§12.2)**。Massive X は `~/ダウンロード/Native Instruments Massive X v1.7.1.exe` を確認済み — 未解析 (§12.4)。
 
-## 7. ユーザ依頼事項 (任意・あれば即確定)
+## 7. ユーザ依頼事項 (任意・あれば更に確実化)
 
-Windows 実機 (FL Studio 26.x、対象プラグインをインストールし Plugin Manager でスキャン済み) から次を提供 (パス: `%USERPROFILE%\Documents\Image-Line\FL Studio\Presets\Plugin database\`):
-1. `Installed\Effects\VST\<任意の VST2 エフェクト>.nfo` と同名 `.fst` (できれば OTT)。
-2. `Installed\Generators\VST3\<任意の VST3 シンセ>.nfo` と同名 `.fst` (できれば Serum 2)。
-3. ~~`Installed\VerifiedIDs.nfo` と `Installed\.Plugins.ini`~~ → **入手・照合済み (§11)**。`Installed\VST\*.NFO` (ID 名 nfo) があればその 1 つ。
-4. 可能なら Massive X (NI) の VST3 CID (`moduleinfo.json`) またはその `.nfo`。
-→ `writeEntry` / `buildWrapperFst` の出力と byte 比較でき、残りの §6 未確認が解消する。
+Windows 実機から `Installed\` 配下の **実機 v2 `.nfo` / `.fst` 単体ファイル** (VST2 1 組 + VST3 1 組, 特に OTT VST2 側) と Massive X (NI) の VST3 CID (`moduleinfo.json`) があると `writeEntry`/`buildWrapperFst` との byte 直比較と spec 追加が即完了する (`.Plugins.ini`/`VerifiedIDs.nfo`/OTT.fst は入手済み §10/§11; `~/ダウンロード` の同名 3 ファイルは evidence と byte 一致を確認済み §12.4)。
 
 ## 8. 次タスク提案 (下流チケット案)
 
@@ -103,8 +99,7 @@ Windows 実機 (FL Studio 26.x、対象プラグインをインストールし P
 |---|---|---|
 | H4' (P0) | DB 組込み | `generateDb()` (`.nfo`/`.fst`/`.Plugins.ini`/VerifiedIDs 生成) を仮想 FS 初期化 (起動時/ビルド時) に結線し、lift 済み FL の `0x910cd0` / `0xaba430` に生成 DB を読ませて受理を実行検証 |
 | H10 (P1) | Wrapper chunk reader の解析 | 生成 `.fst` の record 群を Wrapper が受理するか (hint レコード・record 1/30–32 の要否) を `fw:` 側で確定 |
-| H11 (P2) | VST3 バンドルのパス規則 | `ps_file_filename` の両形 (§11.4) の選択規則と `CreateVST3Instance` の入力を突合 |
-| ~~H9a / H12~~ | ~~実機サンプル照合 / ini・VerifiedIDs 照合~~ | **完了 (CAB-215 §10 / CAB-219 §11)** — KH VST2 magic の実測差し替えのみ残 (CAB-46) |
+| H11 (P2) | VST3 バンドルのパス規則 | ~~選択規則の突合~~ / ~~H9a / H12~~ — **完了 (CAB-215 §10 / CAB-219 §11 / CAB-218 §12)**。残は §7 の任意提供のみ |
 
 ## 9. 規約遵守メモ
 
@@ -112,59 +107,34 @@ Windows 実機 (FL Studio 26.x、対象プラグインをインストールし P
 
 ## 10. 追記 (CAB-215 部分実施, 2026-10-10): 実機 OTT.fst 照合
 
-**結論**: ユーザ実機の `Installed\Effects\VST3\OTT.fst` (323 B) を取得し、CAB-98 の全模型 (コンテナ writer / wrapper chunk 解析 / 生成器) が **byte 級で一致**することを確認した (下表, 全 PASS)。`.fst` 書式の実機裏取りとしては完了。ただし **実機 v2 `.nfo` / `VerifiedIDs.nfo` / `.Plugins.ini` は実機に存在せず未入手** → 本チケット本来の主眼である `writeEntry` との `.nfo` byte 比較は未了で、**部分実施**として扱う (§7 の依頼は継続)。
+**結論**: ユーザ実機の `Installed\Effects\VST3\OTT.fst` (323 B) を取得し、CAB-98 の全模型 (コンテナ writer / wrapper chunk 解析 / 生成器) が **byte 級で一致**することを確認した (下表, 全 PASS)。`.fst` 書式の実機裏取りとしては完了。ただし **実機 v2 `.nfo` / `VerifiedIDs.nfo` / `.Plugins.ini` は実機に存在せず未入手** → 本チケット本来の主眼である `writeEntry` との `.nfo` byte 比較は未了で、**部分実施**として扱う (§7 の依頼は継続)。再現: `node tools/hostbridge/nfo/analysis/real_fst_check.mjs` (exit 0 = 全 PASS, 約 0.2 s)。サンプル本体・全ダンプは `evidence/real_machine/`。
 
-再現: `node tools/hostbridge/nfo/analysis/real_fst_check.mjs` (exit 0 = 全 PASS, 約 0.2 s)。サンプル本体・全ダンプは `evidence/real_machine/`。
+### 10.1 検証結果 (実測, 全 PASS)
 
-### 10.1 検証結果 (実測)
-
-| 検証 | 結果 |
-|---|---|
-| ① CAB-98 コンテナ writer `assembleFst` 再構成 | **byte 一致 323/323** (イベント列から元ファイルを完全再現) |
-| ② tools/flp 独立パーサ | `parseFlp`→`writeFlp` lossless (firstDiff −1)、`parseWrapperData` が 213 を受理 (kind 8, path/vendor/name/guid 復元) |
-| ③ イベント列完全ダンプ | FLhd(0x30, 2ch, ppq48) / 199 "11.5.5" / 28=1 / 201 "Fruity Wrapper" / 212 (u32@8=2, u16@16=0 = fx) / 203 "OTT" / 213 (191 B) — **既存モデル (FORMAT §8) と差分 0** |
-| ④ 213 wrapper chunk 解析 | u32 8 + 記録 6 本 `[2, 50, 52, 54, 55, 56]`、鎖は 191/191 B を厳密消費 (詳細 §10.2) |
-| ⑤ 生成器との照合 | `buildWrapperFst` (サンプル逆抽出 spec) が **byte 一致**。さらに generateDb (OTT VST3 仮想 spec) の `.fst` は実機ファイルと **sha256 まで一致** (`f6942876…`)、その生成 `.nfo` を 49 エントリ検証器と同一の reader 模型 (`entryFromBytes`) が受理 (dropped 無し / rejectedFiles 0 / slot 5) |
-
-→ **FL 実機が DB に置いた `.fst` を自前生成器が byte 一致で再現した初の実証** (CAB-98 では同梱 26 ファイルのコンテナ層まで)。
+① `assembleFst` が実機 `.fst` を **byte 一致 323/323** で再現。② tools/flp `parseFlp`→`writeFlp` lossless、`parseWrapperData` が 213 を受理。③ イベント列 = FLhd(0x30,2ch,ppq48) / 199 "11.5.5" / 28=1 / 201 "Fruity Wrapper" / 212 (u32@8=2, u16@16=0=fx) / 203 "OTT" / 213 (191 B) — 既存モデル (FORMAT §8) と差分 0。④ 213 = u32 8 + 記録 6 本 `[2,50,52,54,55,56]`、191/191 B 厳密消費。⑤ `buildWrapperFst` (逆抽出 spec) が byte 一致、generateDb (OTT VST3 仮想 spec) の `.fst` は実機ファイルと **sha256 まで一致** (`f6942876…`)、生成 `.nfo` も reader 模型が受理 (dropped 無し / rejectedFiles 0 / slot 5)。→ **FL 実機が DB に置いた `.fst` を自前生成器が byte 一致で再現した初の実証**。
 
 ### 10.2 wrapper chunk 213 の内容 (実測) — VST3 CID を確認
 
-| 記録 | 値 (実測) | 既存モデルとの照合 |
-|---|---|---|
-| 2 | flags = **0x507D08** = 0x407908 \| 0x400 (64bit のみ) \| 0x100000 | `src/fst.ts` の「64bit 単一ファイル」予測と完全一致。record 2 flags の **実機初観測** (同梱 corpus に wrapper chunk 形式の `.fst` は 0 件 = REPORT §1 の再確認) |
-| 50 | plugclass = **7 (VST3 fx)** | `Effects\VST3` 配置と整合 |
-| 51 | **無し** | class 7 では 51 を出さない分岐 (FORMAT §8) を実機で初裏取り |
-| **52** | **VST3 CID = `5854535654666F547474000000000000`** (raw 16 B) = ASCII **`XTSVTfoTtt`** + NUL×6。GUID text 形 `{56535458-6654-546F-7474-000000000000}` (Windows GUID メモリ配置)、FUID 文字列形 `565354586654546F7474000000000000` [導出] | record 52 が raw TUID 16 B を持つ設計を実機で確認。**CAB-46 (Massive X CID) の突合基準および VST3 hosting の TUID としてそのまま使用可** |
-| 54 | `OTT` (拡張子なし basename、`.vst3` を除去) | 既定規則どおり |
-| 55 | `C:\Program Files\Common Files\VST3\OTT.vst3` (**バンドルフォルダ**) | §10.3 |
-| 56 | `Xfer Records` | — |
+| 記録 | 値 (実測) |
+|---|---|
+| 2 | flags = **0x507D08** = 0x407908 \| 0x400 (64bit のみ) \| 0x100000 — record 2 flags の**実機初観測** (src/fst.ts の「64bit 単一ファイル」予測と完全一致) |
+| 50 / 51 | plugclass = **7 (VST3 fx)** / **無し** (class 7 では 51 を出さない分岐を実機で初裏取り) |
+| **52** | **VST3 CID = `5854535654666F547474000000000000`** (raw 16 B = ASCII `XTSVTfoTtt`+NUL×6)。GUID text 形 `{56535458-6654-546F-7474-000000000000}` (Windows GUID メモリ配置) — record 52 が raw TUID 16 B を持つ設計を実機確認。**CAB-46 (Massive X CID) の突合基準および VST3 hosting の TUID としてそのまま使用可** |
+| 54 / 55 / 56 | `OTT` (拡張子なし basename) / `C:\Program Files\Common Files\VST3\OTT.vst3` (**モジュールファイル形** — §10.3, §12.1) / `Xfer Records` |
 
-CID 取扱いの注意: 公開インデックスではこの CID 値を独立突合できなかった (実機 `.fst` が第一級情報源)。Xfer 公表によると OTT VST3 は v1.33 で導入され **1.33/1.34 には ID 不整合バグがあり 1.35 で修正** — CID は版依存しうるため、本値は「ユーザ環境に導入された版の実測」として扱う。
+CID 取扱の注意: 公開インデックスではこの CID 値を独立突合できなかった (実機 `.fst` が第一級情報源)。Xfer 公表によると OTT VST3 は v1.33 で導入され 1.33/1.34 には ID 不整合バグがあり 1.35 で修正 — CID は版依存しうるため本値は「ユーザ環境に導入された版の実測」として扱う。
 
-### 10.3 VST3 path 規則の実機証拠 (H11 / CAB-218 へ)
+### 10.3 VST3 path 規則の実機証拠 (H11 / CAB-218 へ) → **§12 で確定**
 
-- 実機配置 `Installed\Effects\VST3\<name>.fst` = class 7 → `Effects\VST3` (FAMILY_DIR 規則) と一致。
-- Wrapper が保持する path (record 55) は **バンドルフォルダ形** (`…\VST3\OTT.vst3`、`Contents\x86_64-win\…` を含まない) → generateDb が Serum 2 で既に使っている形と同一。**generateDb の配置規則・path 規則に変更不要**。
-- 留意: record 55 は `.fst` 内の値。`.nfo` 側の `ps_file_filename` 実機値は §11.4 で入手済み (両形が実在)。参考: 実機の DB root は `%USERPROFILE%\Documents\Image-Line\FL Studio\…` (generate.ts の `DEFAULT_DB_PATH` = Public Documents は `%FLPluginDBPath%` 圧縮用の option 値であり、書式への影響なし)。
+- 実機配置 `Installed\Effects\VST3\<name>.fst` = class 7 → `Effects\VST3` (FAMILY_DIR 規則) と一致。record 55 は `ps_file_filename` と同値。実機の DB root は `%USERPROFILE%\Documents\Image-Line\FL Studio\…` (generate.ts の `DEFAULT_DB_PATH` = Public Documents は `%FLPluginDBPath%` 圧縮用の option 値であり書式への影響なし)。
 
 ### 10.4 「.nfo 無し .fst」の意味 (CAB-216 generateDb の優先順位へ)
 
-- **事実**: 実機に `OTT.fst` のみ存在し `OTT.nfo` / `VerifiedIDs.nfo` / `.Plugins.ini` は無かった → `Installed\` 配下に `.fst` 単体が実在しうる、の実例。
-- **解釈 [推]**: plugin picker の一覧構築 (`fle:0xaba430`) は `.Plugins.ini` / `Installed\**\*.NFO` 全読みが源泉ゆえ、`.nfo` 無しの OTT は picker には載らないはず。`.fst` 単体で効くのは (a) ブラウザ木のアイテム表示、(b) ダブルクリックでの新規インスタンス生成 (213 の record 55 path から Wrapper が起動可能) まで。プロジェクト読込時の ID 解決 (VerifiedIDs / ID 名 nfo / 名前検索) も `.nfo` 前提。→ generateDb は `.nfo` + `.fst` 両方書く現行方針を維持が正 (picker 掲載とプロジェクト解決に `.nfo` が必須)。「.fst 単体でも browser プリセットとして成立する」実例ではあるが優先順位を変える根拠にはならない (実機 FL で picker 表示されたかは未検証)。
+- **事実**: 実機に `OTT.fst` のみ存在し `OTT.nfo` / `VerifiedIDs.nfo` / `.Plugins.ini` は無かった → `Installed\` 配下に `.fst` 単体が実在しうる実例。**解釈 [推]**: picker 一覧構築 (`fle:0xaba430`) は `.Plugins.ini`/`Installed\**\*.NFO` 全読みが源泉ゆえ `.nfo` 無しの OTT は picker に載らず、`.fst` 単体で効くのはブラウザ木表示とダブルクリック新規インスタンス生成まで。→ generateDb は `.nfo` + `.fst` 両方書く現行方針を維持が正 (実機 FL での picker 表示は未検証)。
 
 ### 10.5 `specs/wasm_plugins.json` OTT エントリとの差分
 
-実機の登録は **VST3**、spec は **VST2** — 書式の誤りではなく**登録形式の違い**。wasm 版 OTT は VST2 lift (m6〜m10) ゆえ spec を VST2 のまま維持する。OTT.vst3 を hosting する段になったら spec に 1 行追加 (`format: vst3`, `guid: 5854535654666F547474000000000000`, `path: …\VST3\OTT.vst3`) すれば **実機と byte 一致の `.fst` が得られることを本検証で実証済み** (spec 変更は未実施 — CAB-46 の領域と REPORT §0/§5 の実測値保全のため)。
-
-| 項目 | 実機 (VST3) | spec 現行 (VST2) |
-|---|---|---|
-| 配置 | `Effects\VST3\OTT.fst` | `Effects\VST\OTT.fst` |
-| plugclass | 7 | 0 |
-| ID 記録 | 52: CID `5854…0000` (`XTSVTfoTtt`) | 51: magic 1483101268 (`XfTT`) |
-| 54 名前 | `OTT` | `OTT_x64` |
-| 55 path | `…\Common Files\VST3\OTT.vst3` | `…\Common Files\VST2\Xfer Records\OTT_x64.dll` |
-| 56 vendor / 203 "OTT" / 212 / FLhd / 199 / 28 | 同一 | 同一 |
+実機の登録は **VST3**、spec は **VST2** — 書式の誤りではなく**登録形式の違い** (plugclass 7 vs 0、record 52 CID vs 51 magic、path `…\VST3\OTT.vst3` vs `…\VST2\Xfer Records\OTT_x64.dll`、54 `OTT` vs `OTT_x64`)。wasm 版 OTT は VST2 lift (m6〜m10) ゆえ spec を VST2 のまま維持。OTT.vst3 を hosting する段になったら spec に 1 行追加 (`format: vst3`, `guid: 5854535654666F547474000000000000`, path は §12.1 規則) すれば**実機と byte 一致の `.fst` が得られることを本検証で実証済み**。
 
 ### 10.6 成果物と未入手
 
@@ -186,15 +156,45 @@ CID 取扱いの注意: 公開インデックスではこの CID 値を独立突
 - `.Plugins.ini` = **UTF-8+BOM、CRLF、各セクション (最終含む) の後ろに空行 1 行**。セクション名 = `Installed` 相対 `<sub>\<name>`。セクション順 = 内部リスト順 [推]。**native Fruity 139 (`.nfo` を持たない) もセクション化** — ini は `Installed\*.NFO` の上位集合。キー順序・省略規則は既存 writer 模型どおり (406/406 再現 = 実機検証)。`iconindex=48` / `color=$40B6F6` / `tip="VST3 / 64 bit"` を実機初観測。
 - **`ps_file_date` = TDateTime (double, 元期 1899-12-30) の IEEE754 ビット再解釈 10 進** — 407/407 が 2015-10-22..2026-09-29 に整合 (例 `4676583981019826458` = 2026-07-07 19:48:06)。「単位未判定」解消。**`ps_file_arch` は Windows 実機でも常に `Intel`** (407/407)。検証済 (scanflags=1, 363 ファイル) は `type` 必ず 1 (fx) / 2 (gen)。未検証 stub (scanflags=2/0x22, 44) は `type`/`guid`/`vendor`/`category` を欠く (スキャナがロード失敗した kHs / iZ 系の実例)。
 - **VerifiedIDs**: VST2 id = **magic 10 進** (64/64 突合、pseudo-GUID ではない)、VST3 id = `ps_file_guid` テキスト (171/171)、CLAP = id 文字列。**対象 = non-native かつ scanflags=1 の全エントリ** (223/223 集合一致)。**`ps_compatibility` の GUID は 1 GUID = 1 キー** (Splice INSTRUMENT: 自 CID + 旧 CID 4 個 = 5 キー) — compat = 別版 ID の別名、を実機で確定。
-- **VST2 疑似 GUID** (`ps_file_guid` on VST2 files): `ASCII("VST" + magic4文字(BE) + 小文字名)` を 16B — 実機 64/64 (Fresh Air = `{56535446-7241-7266-7265-736820616972}` = "VSTFrArfresh air")。`vst2PseudoGuid` を実機則に修正 (旧: 非小文字化 + fx で "VSE" 接頭; `fle:0x8f0d30` param_4≠0 分岐は実観測なし)。
+- **VST2 疑似 GUID** (`ps_file_guid` on VST2 files): `ASCII("VST" + magic4文字(BE) + 小文字名)` を 16B — 実機 64/64 (Fresh Air = `{56535446-7241-7266-7265-736820616972}` = "VSTFrArfresh air")。`vst2PseudoGuid` を実機則に修正 (旧: 非小文字化 + fx で "VSE" 接頭; `fle:0x8f0d30` param_4≠0 分岐は実観測なし)。符号付き 10 進の ≥2³¹ 補足は §12.3 / FORMAT §9-2。
 
 ### 11.3 生成器への反映 (実機準拠) と CAB-218 (VST3 path / CID) への新知見
 
 - `generateDb` が **`Installed/.Plugins.ini` を出力** (既定 on, `pluginsIni: false` で停止)。VerifiedIDs キー修正により**生成 Serum 2 / Serum 2 FX の 2 キーは実機 VerifiedIDs と byte 一致**。`.nfo` 既定値を実機準拠に: `type=1/2`、`arch=Intel`、VST2 疑似 GUID、Serum 2 (gen) category 省略。生成量 49 entry / **100 ファイル** / 40,661 → **69,342 B**。検証: 生成 Serum 2 セクション ≡ 実機セクション (**date/size/filename 除く全行一致**)。
-- **`ps_file_filename` の実機分布**: 内部バイナリ形 (`…\Serum2.vst3\Contents\x86_64-win\Serum2.vst3` — Serum 2 / Scaler 3 / Splice) と**バンドルフォルダ形** (`…\Vital.vst3`, kHs 群) の**両方が実在**。`.fst` record 55 (OTT) はバンドル形 → FORMAT §9-3 更新。generateDb の Serum 2 path はバンドル形のまま。
+- **`ps_file_filename` の実機分布**: 内部バイナリ形 (`…\Serum2.vst3\Contents\x86_64-win\Serum2.vst3` — Serum 2 / Scaler 3 / Splice) と単一ファイルモジュール形 (`…\Vital.vst3`, kHs 群) の**両方が実在**。`.fst` record 55 (OTT) は単一ファイル形 → 選択規則は **CAB-218 で確定 (§12)** — 本節時点では未確定ゆえ Serum 2 path をバンドル形のままとしていたが、§12 で内部バイナリ形に修正済み。
 - **VST3 CID ↔ GUID テキスト**: 実機 `ps_file_guid` テキスト = moduleinfo CID 文字列そのもの = **Windows GUID メモリ配置で raw TUID と相互変換** (OTT record 52 実機 raw `XTSVTfoTtt` と整合) → `tuidFromHex` を「CID テキスト hex → Windows 配置 bytes」に修正 (旧: raw 順と誤解釈)。H5 hosting の TUID 変換もこの規則。
 
 ### 11.4 CAB-215 残部の処理と成果物
 
-CAB-215 の主眼 (writeEntry ↔ 実機比較) は **ini セクション経由で達成** (§11.1/11.2, 406/406)。未入手: `.nfo`/`.fst` 単体ファイルと VST2 側実機 `.fst` — §7 依頼は任意で継続。**検収コメントは投稿せず REPORT 追記のみ** (CAB-215 は In Review 維持、メインが検収を統括)。
-成果物: 追加 = `evidence/real_machine/{.Plugins.ini, VerifiedIDs.nfo}` / `src/ini.ts` / `test/real_machine.test.ts` (10 test) / `analysis/real_ini_check.mjs`。変更 = `src/{format,entry,generate}.ts`、`specs/wasm_plugins.json` (_note + Serum 2 category)、`nfo_e2e.sh` (実機 step)、FORMAT.md (§3/§6/§9)、テスト 29 → **39**。Kilohearts VST2 magic: 実機値は 4 文字コード (`kdsp`=Disperser, `ksge`=Carve EQ 等) で product_index の id と別物 — 46 種の spec magic 差し替え候補 (CAB-46 領域, FORMAT §9-5)。
+CAB-215 の主眼 (writeEntry ↔ 実機比較) は **ini セクション経由で達成** (§11.1/11.2, 406/406)。未入手: `.nfo`/`.fst` 単体ファイルと VST2 側実機 `.fst` — §7 依頼は任意で継続。**検収コメントは投稿せず REPORT 追記のみ** (CAB-215 は In Review 維持、メインが検収を統括)。成果物: 追加 = `evidence/real_machine/{.Plugins.ini, VerifiedIDs.nfo}` / `src/ini.ts` / `test/real_machine.test.ts` (10 test) / `analysis/real_ini_check.mjs`。変更 = `src/{format,entry,generate}.ts`、`specs/wasm_plugins.json` (_note + Serum 2 category)、`nfo_e2e.sh` (実機 step)、FORMAT.md (§3/§6/§9)、テスト 29 → **39**。Kilohearts VST2 magic は本節時点「id と別物」と誤記 — **CAB-218 §12.2 で 45/45 一致と訂正済み**。
+
+## 12. 追記 (CAB-218 / CAB-46 小口, 2026-10-10): VST3 `ps_file_filename` 規則確定 + KH VST2 magic 実測確定
+
+**結論**: (1) **H11 選択規則を確定** — `ps_file_filename` (VST3) = **FL が `LoadLibraryW` で直接消費する「ロード可能モジュールファイル」のパス**。CAB-219 の「バンドルフォルダ形」呼称は実態が**単一ファイルモジュール** (`<Name>.vst3` という名前の PE DLL) だったための誤認で、両形の差はプラグイン側の実配置 (単一ファイル vs バンドル) 由来。FL 側に directory→`Contents` 解決は存在しない。generateDb は Serum 2 を実機一致の**内部バイナリ形**に修正し filename 込み実機突合を成立。(2) **KH VST2 magic は実測確定** — product_index.json の 4 文字 id が実機 **45/45 一致** (spec の magic 値変更は不要、§11.4 の「別物」誤記を訂正)。Fresh Air (`FrAr`) も実機一致。併せて KH の category/vendor/kind を実機準拠に修正。(3) VerifiedIDs VST2 id は **64/64 = magic の符号付き 10 進**。≥2³¹ の負値例は実機に無し → FORMAT §9-2 に writer 根拠 (`IntToStr(Integer)`) 付きの**推定**として記録。
+
+### 12.1 H11 根拠 (静的解析は読取のみ + 実機突合)
+
+| 根拠 | 実測 |
+|---|---|
+| QuickFontCache_x64.dll `CreateVST3Instance` (qfc:0x58a200 — block24350 を Ghidra 新規解析) | `TVST3Instance` 生成 → **`LoadLibraryW(与えられたパス)`** (qfc:0x58a3d0 → 0x41d910) → `GetProcAddress("InitDll")` 呼出 → `"GetPluginFactory"`。**qfc 内に `Contents`/`x86_64-win`/`moduleinfo` の文字列は皆無** = 最終 hop にバンドル解決は存在しない |
+| Wrapper `TVST3Plugin.LoadPlugin` (fw:0x84ad90) | plugin record の filename バッファ (+0x20e, 261 wchar) を**無変換**で `CreateVST3Instance` へ渡す。CID (`ps_file_guid`/record 52) は factory クラス列との `IsEqualGUID` 選択に使用 (§11.3 と整合)。fw の `moduleinfo.json` 探索 (`0x83b730`) は列挙/走査側の補助で、instance 化の入力変換ではない |
+| 実機 179 VST3 entry の filename 分布 | 内部バイナリ形 15 / モジュールファイル形 164 — **全てが「モジュールファイル」を指す** (`evidence/real_machine/.Plugins.ini`) |
+| 単一ファイル形の実証 (OTT + kHs) | OTT 1.37 インストーラ (NSIS) は `…\VST3\OTT.vst3` を**単一ファイル**で同梱 — 展開実測 **3,244,032 B** = 実機 ini `ps_file_size_0` 完全一致。Kilohearts winpkg も `kHs *.vst3_64` 単一 PE DLL (例 kHs Gain **247,296 B** = 実機 ini 一致, VST3 45 種) |
+| 内部バイナリ形の実証 (Serum 2) | Serum 2.1.5 win インストーラ実配置 `Serum2.vst3\Contents\x86_64-win\Serum2.vst3` (**19,236,864 B** = 実機 ini (FX) 一致) |
+
+→ **writer (generateDb) 規則**: 仮想 FS への配置形に合わせる。単一ファイルで置くなら `<dir>\<Name>.vst3`、バンドル配置なら `<dir>\<Name>.vst3\Contents\x86_64-win\<Name>.vst3`。`.fst` record 55 は `ps_file_filename` と同値になるため OTT 実機 `.fst` と自動的に同一形。
+
+### 12.2 KH magic 差し替え表 (全量は `node analysis/kh_magic_check.mjs` 出力)
+
+- **判定: product_index.json の 4 文字 id (= spec 現行値) が正しかった** — 実機 45/45 一致。代表: `kHs Bitcrush`=`ksbc` (1802723939) / `kHs Dynamics`=`ksot` (1802727284) / `kHs 3-Band EQ`=`ksqe` (1802727781) / Disperser=`kdsp` (1801745264) / Carve EQ=`ksge` (1802725221) / Phase Plant=`kphp` (1802528880) / Snap Heap=`kmic` / Multipass=`kmup` / Slice EQ=`kpeq`。実機 VST2 magic 64/64 が 4 文字印刷可能 ASCII (BE)。
+- 生成器更新 (cli/gen.ts): KH 拡張の category `Kilohearts`→**`Effect`** (実機 44 fx)、**Phase Plant を generator (class 4) + category `Synth`** へ (実機 `Generators\VST\Phase Plant`)。spec: Fresh Air を vendor **`Slate Digital`** / category `Effect` へ (旧 Kilohearts/Exciter は実測不一致)。→ 生成 KH 46 entry が実機セクションと **name/magic/guid/class/type/bits/arch/vendor/category 全項目一致 (46/46)**。
+- KH 以外の実測判明分 (spec 対象外, 記録のみ): iZotope 系 `INS0`/`ZMR1`/`ZOI2`/`ZRL1`/`ZBM2`/`iZVn`/`IZVD`/`VxS2`、GClip=`gyAd`、Scaler 3=`Scl3`/`Sc3F`、UJAM `SE-*` 3 種、FL Studio VSTi 2 種、Beatmaker、Youlean、Vital=`Vita` 等 18 種 (スクリプト出力参照)。
+
+### 12.3 検証と回帰
+
+- `analysis/kh_magic_check.mjs` 新設 (**16 checks, exit 0**): ini 抽出 VST2 magic 64 (Effects\VST 55 種) / KH index 突合 45+FrAr / VerifiedIDs 64/64 符号付き 10 進・負値 0 件 (max magic 1802729331 < 2³¹) / VST3 filename 15+164 / OTT・kHs・Serum の installer↔ini size 突合 / 生成 KH 46/46・Serum 2 2 セクション filename 込み一致。`nfo_e2e.sh` に step 追加 — **e2e exit 0 維持** (テスト 39 / 実機照合 21 checks / round-trip 831/831 / 生成 49 entry 受理)。
+- ≥2³¹ magic (要件 3): 実機 64 magic は全て <2³¹ で負値例無し → **REPORT 上は推定**。根拠: writer `fle:0x914780` は int32 を `IntToStr(Integer)` (`fle:0x43a7e0`) で整形 (≥2³¹ は負値出力)、reader `StrToIntDef` は 2³¹ 以上の無符号リテラルを Integer に丸められず既定値 0 — 符号付き以外に自己往復する表記が無い。
+
+### 12.4 CAB-46 (Massive X 稼働中) への引き継ぎ
+
+- **KH magic 差し替え作業は CAB-46 側で不要** (実測確定・生成器反映済み)。CAB-98 領域の残は §7 の実機単体ファイル提供のみ。Massive X は `~/ダウンロード/Native Instruments Massive X v1.7.1.exe` を確認済み (win) — 解析後 `moduleinfo.json` の CID を得れば spec 1 行で追加可 (class 8, `path` は §12.1 規則で実配置に応じて選択)。VST2 側は VerifiedIDs 形 (magic 10 進) と KH パターン (id=4 文字) を踏襲。参考: `~/ダウンロード` の `FL_STUDIO_.Plugins.ini` / `FL_STUDIO_VerifiedIDs.nfo` / `OTT.fst` は `evidence/real_machine/` 同名 3 ファイルと **byte 一致** (cmp 実測) — 引き継ぎ側の再入手は不要。

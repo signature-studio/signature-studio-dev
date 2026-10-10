@@ -20,6 +20,11 @@ node analysis/real_ini_check.mjs > work/real_ini_metrics.json || { echo "FAIL: r
 node -e 'const m=JSON.parse(require("fs").readFileSync("work/real_ini_metrics.json","utf8"));
 console.log(`real-machine: ini round-trip + writer 406/406 sections, ${m.plugins_ini.files} files | VerifiedIDs ${m.verifiedids.keys} keys (${m.verifiedids.families.VST} VST/${m.verifiedids.families.VST3} VST3/${m.verifiedids.families.CLAP} CLAP) | VST2 pseudo-guid ${m.vst2.reproduced} | failed checks ${m.failed}`);
 if (m.failed) process.exit(1);'
+step "CAB-218 (H11 VST3 filename rule + KH VST2 magic 実測 + VerifiedIDs decimal)"
+node analysis/kh_magic_check.mjs > work/kh_magic_metrics.json || { echo "FAIL: CAB-218 checks"; fail=1; }
+node -e 'const m=JSON.parse(require("fs").readFileSync("work/kh_magic_metrics.json","utf8")).cab218;
+console.log(`cab-218: VST2 magic files ${m.vst2MagicFiles} (Effects\\VST ${m.effectsVstMagicSections}) | KH index==real ${m.khIndexMatch} | VerifiedIDs ${m.verifiedIdsVst} | VST3 filename inner ${m.vst3FilenameForms.innerBinary}/module ${m.vst3FilenameForms.moduleFile} | gen KH ${m.generatedKhMatch} | failed ${m.failed}`);
+if (m.failed) process.exit(1);'
 step "metrics (shipped corpus + generator)"; node cli/metrics.ts work/metrics.json | grep -E '"(nfoFilesTotal|nfoRoundTripExact|nativePluginNfo|fst1155Files|fst1155ReproducedExact|generatedEntries|generatedFiles|readerAccepted)"'
 step "generate synthetic DB for the wasm plugin set"
 KH=../../targets/kilohearts/work/macpkg/product_index.json
