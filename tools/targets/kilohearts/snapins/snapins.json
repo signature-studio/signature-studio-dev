@@ -1,0 +1,215 @@
+{
+ "gain": {
+  "ns": "gain",
+  "cls": "GainDsp",
+  "id": "ksgn",
+  "title": "Gain",
+  "lift": {
+   "proc": "0x1804b0380"
+  },
+  "scenario": "gain"
+ },
+ "matrix": {
+  "ns": "matrix",
+  "cls": "MatrixDsp",
+  "id": "kscm",
+  "title": "Channel Mixer",
+  "lift": {
+   "proc": "0x1804f41a0",
+   "reset": "0x1804f4180",
+   "set7": "0x1804f4190"
+  },
+  "scenario": "matrix",
+  "abi": {
+   "1804f4190": {
+    "params": [
+     "i64",
+     "float"
+    ],
+    "ret": "void"
+   },
+   "1804f4180": {
+    "params": [
+     "i64"
+    ],
+    "ret": "void"
+   },
+   "1804f41a0": {
+    "params": [
+     "i64",
+     "i64",
+     "i64"
+    ],
+    "ret": "void"
+   }
+  }
+ },
+ "haas": {
+  "ns": "haas",
+  "cls": "HaasDsp",
+  "id": "ksha",
+  "title": "Haas",
+  "lift": {
+   "proc": "0x1804d0280",
+   "s13": "0x1804d0180",
+   "reset": "0x1804cff00",
+   "s17": "0x1804cff90",
+   "latency": "0x1804d0720"
+  },
+  "scenario": "haas"
+ },
+ "clipper": {
+  "ns": "clipper",
+  "cls": "ClipperDsp",
+  "id": "kclp",
+  "title": "Clipper",
+  "lift": {
+   "proc": "0x180884b30",
+   "peak": "0x180884790",
+   "reset": "0x180884b10"
+  },
+  "scenario": "clipper",
+  "abi": {
+   "180884790": {
+    "params": [
+     "i64",
+     "i64",
+     "float",
+     "float"
+    ],
+    "ret": "void"
+   },
+   "180884b10": {
+    "params": [
+     "i64"
+    ],
+    "ret": "void"
+   },
+   "180884b30": {
+    "params": [
+     "i64",
+     "i64",
+     "i64"
+    ],
+    "ret": "void"
+   }
+  }
+ },
+ "gate": {
+  "ns": "gate",
+  "cls": "GateDsp",
+  "id": "ksgt",
+  "title": "Gate",
+  "lift": {
+   "proc": "0x1804c2f50",
+   "look": "0x180295f20",
+   "dly": "0x180020e70"
+  },
+  "scenario": "gate",
+  "shims": {
+   "181384040": "memmove",
+   "1813846e0": "memset"
+  }
+ },
+ "quickeq": {
+  "ns": "quickeq",
+  "cls": "QuickEqDsp",
+  "id": "ksqe",
+  "title": "3-Band EQ",
+  "lift": {
+   "proc": "0x18035fb10",
+   "sum": "0x1802ff250",
+   "norm": "0x180316d90",
+   "design": "0x180362700",
+   "biquad": "0x180bac490",
+   "powf": "0x180fbc1f4",
+   "sincos_a": "0x180fcd690",
+   "sincos_b": "0x180fce0d0",
+   "m_cde58": "0x180fcde58",
+   "m_fbbfb8": "0x180fbbfb8",
+   "m_fcf904": "0x180fcf904",
+   "k_dc470": "0x180fdc470",
+   "k_dc660": "0x180fdc660",
+   "k_dc700": "0x180fdc700",
+   "k_dfdb0": "0x180fdfdb0",
+   "m_fcdbfc": "0x180fcdbfc",
+   "m_fd27a8": "0x180fd27a8",
+   "k_dc6d8": "0x180fdc6d8",
+   "m_fbdfcc": "0x180fbdfcc",
+   "m_fbe018": "0x180fbe018",
+   "m_fd54cc": "0x180fd54cc",
+   "m_fbde90": "0x180fbde90",
+   "m_fd5250": "0x180fd5250",
+   "m_fe5c74": "0x180fe5c74"
+  },
+  "scenario": "quickeq",
+  "jumptables": {
+   "180bac559": {
+    "table": "18236200c",
+    "n": 8
+   }
+  },
+  "abi": {
+   "180fcd690": {
+    "params": [
+     "double"
+    ],
+    "ret": "double"
+   },
+   "180fce0d0": {
+    "params": [
+     "double"
+    ],
+    "ret": "double"
+   },
+   "180fcde58": {
+    "params": [
+     "double"
+    ],
+    "ret": "double"
+   },
+   "180fbc1f4": {
+    "params": [
+     "float"
+    ],
+    "ret": "float"
+   },
+   "18035fb10": {
+    "params": [
+     "i64",
+     "i64",
+     "i64"
+    ],
+    "ret": "void"
+   },
+   "180fd27a8": {
+    "params": [
+     "double"
+    ],
+    "ret": "i64"
+   }
+  },
+  "shims": {
+   "180fbdd78": "dint",
+   "180fbdef4": "fint"
+  }
+ },
+ "resonator": {
+  "ns": "resonator",
+  "cls": "ResonatorDsp",
+  "id": "ksre",
+  "title": "Resonator"
+ },
+ "stereo": {
+  "ns": "stereo",
+  "cls": "StereoDsp",
+  "id": "ksst",
+  "title": "Stereo"
+ },
+ "disperser": {
+  "ns": "disperser",
+  "cls": "DisperserDsp",
+  "id": "kdsp",
+  "title": "Disperser"
+ }
+}
