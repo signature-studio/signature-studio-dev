@@ -48,7 +48,7 @@ const kh = vst2.filter((v) => v.vendor === 'Kilohearts' || v.section === 'Effect
 ok('ini: KH-family VST2 entries with magic = 46', kh.length === 46, String(kh.length));
 let idxHits = 0, idxMiss = [];
 for (const pkg of ['winpkg', 'macpkg']) {
-  const p = `../../../../targets/kilohearts/work/${pkg}/product_index.json`;
+  const p = `../../../targets/kilohearts/work/${pkg}/product_index.json`;
   if (!existsSync(here(p))) continue;
   const idx = new Map(JSON.parse(readFileSync(here(p), 'utf8')).plugins.map((x) => [x.fileName, x.id]));
   let hit = 0;
@@ -101,7 +101,7 @@ if (existsSync(ottInstaller) && ott) {
     buf.length === ott.size, `ini ${ott.size} vs installer ${buf.length}`);
 }
 const gain = vst3fn.find((v) => v.section === 'Effects\\VST3\\kHs Gain');
-const gainFile = here('../../../../targets/kilohearts/work/winpkg/kHs Gain.vst3_64');
+const gainFile = here('../../../targets/kilohearts/work/winpkg/kHs Gain.vst3_64');
 if (existsSync(gainFile) && gain) {
   ok('h11: real kHs Gain.vst3 = single FILE (ini size == winpkg single-file module 247,296 B)',
     statSync(gainFile).size === gain.size, `ini ${gain.size} vs winpkg ${statSync(gainFile).size}`);
@@ -110,7 +110,7 @@ const serum = vst3fn.filter((v) => v.section.includes('Serum 2'));
 const serumInner = serum.every((v) => /Serum2\.vst3\\Contents\\x86_64-win\\Serum2\.vst3$/i.test(v.fn));
 ok('h11: real Serum 2 (both classes) records the bundle INNER binary path', serumInner && serum.length === 2,
   serum.map((v) => v.fn).join(' | '));
-const serumBin = here('../../../../targets/serum2/work/exe_extract/$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3');
+const serumBin = here('../../../targets/serum2/work/exe_extract/$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3');
 if (existsSync(serumBin)) {
   const fx = serum.find((v) => v.section.includes('FX'));
   ok('h11: Serum 2 FX ini size == 2.1.5 installer inner binary (19,236,864 B)', fx && statSync(serumBin).size === fx.size,
@@ -155,7 +155,7 @@ for (const name of ['Generators\\VST3\\Serum 2', 'Effects\\VST3\\Serum 2 FX']) {
 console.log(JSON.stringify({
   cab218: {
     vst2MagicFiles: vst2.length, effectsVstMagicSections: inEffectsVST.length, khFamily: kh.length,
-    khIndexMatch: '45/45 (winpkg+macpkg, +Fresh Air FrAr)',
+    khIndexMatch: `${idxHits}/90 (winpkg+macpkg 各45/45, +Fresh Air FrAr via targets)`,
     verifiedIdsVst: `${vstKeys.length}/64 signed decimal, negative keys ${negatives.length} (max magic ${Math.max(...magics)} < 2^31)`,
     vst3FilenameForms: { innerBinary: inner.length, moduleFile: plain.length },
     generatedKhMatch: `${khMatch}/46`, checks: checks.length, failed: checks.filter((c) => !c.ok).length,

@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));
 const dir = new URL('../evidence/real_machine/', import.meta.url);
-const mxWork = '../../../../targets/massivex/work/';
+const mxWork = '../../../targets/massivex/work/';
 const checks = [];
 const ok = (name, cond, detail = '') => { checks.push({ name, ok: !!cond, detail }); if (!cond) process.exitCode = 1; };
 
@@ -65,8 +65,8 @@ if (existsSync(xmlPath)) {
   const vst3id = /<VST3ID>([^<]+)<\/VST3ID>/.exec(xml)?.[1];
   const pid = /<PluginID>([^<]+)<\/PluginID>/.exec(xml)?.[1];
   const upid = /<UPID>([^<]+)<\/UPID>/.exec(xml)?.[1];
-  ok('cid: Service Center XML VST3ID == real ps_file_guid (moduleinfo.json-equivalent, case-insensitive)',
-    !!vst3id && vst3id.toUpperCase() === CID_TEXT, vst3id ?? 'missing');
+  ok('cid: Service Center XML VST3ID == real ps_file_guid (moduleinfo.json-equivalent, case/brace-insensitive)',
+    !!vst3id && vst3id.toUpperCase() === CID_TEXT.slice(1, -1), vst3id ?? 'missing');
   ok('cid: Service Center XML PluginID == 0x4e692448 (GetPluginFactory immediate) and SNPID/Name present',
     pid === '0x4e692448' && /<SNPID>MXE<\/SNPID>/.test(xml) && /<Name>Massive X<\/Name>/.test(xml), `${pid}`);
   ok('cid: UPID is the licensing product id, NOT the CID (41ce4ac2-… ≠ 5653544E-…)',
@@ -91,9 +91,10 @@ if (existsSync(pePath)) {
   ok('installer: extracted Massive X.vst3 = PE32+ single FILE, 95,356,824 B == real ini ps_file_size_0',
     pe.length === 95356824 && pe[0] === 0x4d && pe[1] === 0x5a && pe.length === real.size,
     `file ${pe.length} vs ini ${real.size}`);
-  const hits = [...pe.matchAll(/moduleinfo/gi)].length; // only the Steinberg::ModuleInfoLib RTTI name
+  const peStr = pe.toString('latin1');
+  const hits = [...peStr.matchAll(/moduleinfo/gi)].length; // only the Steinberg::ModuleInfoLib RTTI name
   ok('installer: PE embeds no moduleinfo.json (case-insensitive "moduleinfo" hits = 1 = ModuleInfoLib RTTI のみ)',
-    !pe.toString('latin1').includes('moduleinfo.json') && hits === 1, `${hits} hit(s)`);
+    !peStr.includes('moduleinfo.json') && hits === 1, `${hits} hit(s)`);
 }
 ok('path: real ps_file_filename = module-FILE form C:\\Program Files\\Common Files\\VST3\\Massive X.vst3 (no \\Contents\\, §12.1 規則の単一ファイル形)',
   real.filename === 'C:\\Program Files\\Common Files\\VST3\\Massive X.vst3', real.filename ?? '');
