@@ -38,7 +38,7 @@ for n, va, vs in secs:
 extra = []
 if len(sys.argv) > 3:
     meta = json.load(open(sys.argv[3]))
-    wins = [(a - IMG, n) for a, n in meta.get('jt_ranges', [])] + [(a - IMG - 16, 96) for a in meta.get('textrefs', [])]
+    wins = [(a - IMG, n) for a, n in meta.get('jt_ranges', [])] + [(a - IMG - 16, 256) for a in meta.get('textrefs', [])]
     for rva, n in sorted(set(wins)):
         extra.append((rva, bytes(img[rva:rva + n])))
 for k, (rva, data) in enumerate(extra):

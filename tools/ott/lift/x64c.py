@@ -32,6 +32,17 @@ for k in range(8, 16):
     GPR_NAMES['r%d' % k] = (k, 8, 0); GPR_NAMES['r%dd' % k] = (k, 4, 0); GPR_NAMES['r%dw' % k] = (k, 2, 0); GPR_NAMES['r%db' % k] = (k, 1, 0)
 
 MASK = {1: 0xff, 2: 0xffff, 4: 0xffffffff, 8: 0xffffffffffffffff}
+
+
+def strip_prefix(m):
+    """MPX (bnd) / lock prefix を落とした base mnemonic。bnd は MPX 非搭載実行で no-op prefix、
+    lock は単 thread では直列化 no-op (xadd/inc の意味は不変)。入口拡張 (CAB-137) で
+    CRT の MPX 付き文字列 path・refcount path が closure に入ったために追加。"""
+    if m.startswith('bnd '):
+        return m[4:]
+    if m.startswith('lock '):
+        return m[5:]
+    return m
 CCMAP = {'e': 'E', 'z': 'E', 'ne': 'NE', 'nz': 'NE', 'b': 'B', 'c': 'B', 'nae': 'B', 'ae': 'AE', 'nb': 'AE', 'nc': 'AE',
          'be': 'BE', 'na': 'BE', 'a': 'A', 'nbe': 'A', 's': 'S', 'ns': 'NS', 'p': 'P', 'pe': 'P', 'np': 'NP', 'po': 'NP',
          'o': 'O', 'no': 'NO', 'l': 'L', 'nge': 'L', 'ge': 'GE', 'nl': 'GE', 'le': 'LE', 'ng': 'LE', 'g': 'G', 'nle': 'G'}
@@ -110,7 +121,7 @@ class FnLift:
                     break
                 self.insns[va] = ins
                 seen.add(va)
-                m = ins.mnemonic
+                m = strip_prefix(ins.mnemonic)
                 nxt = va + ins.size
                 if m.startswith('j'):
                     if m == 'jmp':
@@ -271,6 +282,18 @@ class FnLift:
 
     def lift(self):
         self.descend()
+        # MSVC の「image base 相対 data 参照」idiom: lea rX, [rip→IMG] 後に [rX + idx + disp(.text 内
+        # table)] で 2 段 jump table (getParamLabel の byte permutation 表など) を張る。data_gen は
+        # .text を敷設しないので、disp が .text RVA に見える memory operand に窓を張っておく
+        # (data-in-code の追送分。余分な窓は正しい image byte の追送でしかないため無害)。
+        if any(ins.mnemonic == 'lea' and ins.operands[1].mem.base == X86_REG_RIP
+               and ins.address + ins.size + ins.operands[1].mem.disp == IMG for ins in self.insns.values()):
+            for ins in self.insns.values():
+                for op in ins.operands:
+                    if op.type == X86_OP_MEM and op.mem.base != X86_REG_RIP:
+                        d = op.mem.disp & 0xffffffff
+                        if 0x1000 <= d < 0x1e2000:
+                            self.textrefs.add(IMG + d)
         order = sorted(self.insns)
         self.out.append('void f_%x(void) {' % self.entry)
         for va in order:
@@ -280,15 +303,16 @@ class FnLift:
             try:
                 self.one(ins)
             except Unsup as e:
-                self.unsup[ins.mnemonic + ':' + str(e)] += 1
-                self.L('ott_unsup(%s, "%s %s");' % (hx(ins.address), ins.mnemonic, ins.op_str.replace('"', "'")))
+                mm = strip_prefix(ins.mnemonic)
+                self.unsup[mm + ':' + str(e)] += 1
+                self.L('ott_unsup(%s, "%s %s");' % (hx(ins.address), mm, ins.op_str.replace('"', "'")))
         self.out.append('  ott_badjump(%s, 0);' % hx(order[-1] if order else 0))
         self.out.append('}')
         return '\n'.join(self.out)
 
     # ---- 命令 ----
     def one(self, ins):
-        m = ins.mnemonic
+        m = strip_prefix(ins.mnemonic)
         ops = ins.operands
         va = ins.address
         L = self.L
@@ -473,6 +497,13 @@ class FnLift:
             self.L('{ int32_t d_ = (int32_t)%s; if (!d_) ott_unsup(%s, "idiv by zero"); int64_t n_ = ((int64_t)(int32_t)R[RDX] << 32) | (uint32_t)R[RAX]; R[RAX] = (uint32_t)(int32_t)(n_ / d_); R[RDX] = (uint32_t)(int32_t)(n_ %% d_); }' % (self.rd(ins, ops[0]), hx(ins.address)))
         else:
             raise Unsup('idiv%d' % sz)
+
+    def i_xadd(self, ins, ops):
+        """xadd: dest = dest + src, src = 旧 dest (単 thread = lock 付きと同一意味)。flags は ADD 基準"""
+        sz = ops[0].size; W = sz * 8; T = 'uint%d_t' % W
+        a = self.rd(ins, ops[0], sz); b = self.rd(ins, ops[1], sz)
+        self.L('{ %s o_ = %s; %s b_ = (%s)(%s); %s r_ = o_ + b_; FL_ADD(%d, o_, b_, r_); %s %s }' % (
+            T, a, T, T, b, T, W, self.wr(ins, ops[0], 'r_', sz), self.wr(ins, ops[1], 'o_', sz)))
 
     def i_cdq(self, ins, ops): self.L('R[RDX] = (uint32_t)((int32_t)R[RAX] >> 31);')
     def i_cqo(self, ins, ops): self.L('R[RDX] = (uint64_t)((int64_t)R[RAX] >> 63);')
@@ -964,7 +995,7 @@ def main():
     used_imps = set(thunks.values())
     for f in final.values():
         for ins in f.insns.values():
-            if ins.mnemonic in ('call', 'jmp') and ins.operands[0].type == X86_OP_MEM and ins.operands[0].mem.base == X86_REG_RIP:
+            if strip_prefix(ins.mnemonic) in ('call', 'jmp') and ins.operands[0].type == X86_OP_MEM and ins.operands[0].mem.base == X86_REG_RIP:
                 s = ins.address + ins.size + ins.operands[0].mem.disp
                 if s in pe.iat:
                     used_imps.add(pe.iat[s])

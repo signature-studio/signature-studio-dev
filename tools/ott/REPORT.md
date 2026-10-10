@@ -144,6 +144,7 @@ matrix 全体 (89 scenario × 出力 50,236 cell) の native bit 一致: 旧 cha
 - **T3**: AVX/FMA 命令 (vfmadd*/vmovsd/vroundsd ほか 64 種) の lift と FMA 経路の bit-exact 化 (musl `fma()`)、ldmxcsr/FTZ/DAZ の扱い。
 - **T4**: OTT の他 entry (getParameter/Display/setSampleRate/chunk/UI 非依存部) を coverage に追加し、VST2 プラグインとして
   AudioWorklet から駆動する wasm ABI (`ott_run` → 型付き export) を M7/M8 (オーディオパス) に接続。
+  → **入口 lift 拡張は実施済み** (CAB-137): `tools/ott/entry/` — VST entry 41 関数を lift し native 実機械語と 85 scenario 全突合 (REPORT 同梱)。AudioWorklet ABI 結線は別チケット (CAB-122 系)
 - **T5**: CRT 初期化を実行する経路 (DllMain → `__scrt_*` → static ctor) を native/wasm 双方で再現し、override 4 件を native 実測で置換。
 - **T6 (docs)**: MILESTONES/README の M10 記述に「junk 原因 = RetDec の間接 call 脱落ほか D1–D6、解決 = tools/ott の自作 lifter」を追記 (メイン担当)。
 
