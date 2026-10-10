@@ -23,7 +23,7 @@
     {"va": "180021d50", "kind": "ret", "value": 1, "name": "isMasterKey (鍵バッファ→40hex==f6e53827…)",
      "reason": "マスター鍵常時成立。unlock適用 0x18010a1e0 / 状態計算 0x18010aa20 / 通知 0x18010a740 の全ゲートが「鍵済み」経路を通る → ソース再計算 (boost FileWatcher / PACE) を回避し外部依存を減らす (CAB-59 案C の効果を定数で実現)"},
     {"va": "180021bd0", "kind": "ret", "value": 26, "name": "鍵ホワイトリスト検証",
-     "reason": "検証結果を常時 0x1a=26 (unlocked, ホワイトリスト 5 個のうち正規鍵 2 系統の戻り値) に固定。transform (0x180021f60, salt as0cd7896g + 未同定ハッシュ) とホワイトリスト照合を短絡"},
+     "reason": "検証結果を常時 0x1a=26 (unlocked, ホワイトリスト 5 個のうち正規鍵 2 系統の戻り値) に固定。transform (0x180021f60, salt as0d789f6g + 未同定ハッシュ) とホワイトリスト照合を短絡"},
     {"va": "1800219b0", "kind": "apply_key", "name": "unlock 鍵適用",
      "reason": "状態を 0x1a (26, unlocked) に設定し 1 (成功) を返す。鍵文字列の保持 (+8) は getStatus/0x180054150 が読まないため省略 (実値との差は観測されない)"},
     {"va": "180021490", "kind": "key_init", "name": "鍵状態初期化",

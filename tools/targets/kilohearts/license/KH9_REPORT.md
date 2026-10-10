@@ -43,7 +43,7 @@
 | 0x1800b4af0 | 分類 thunk D (s==9) | ret 1 | s==9 判定 → getStatus≡9 に対する実値 true と等価 |
 | 0x1800b4b00 | 分類 thunk E (s==0xd) | ret 0 | s==13 (License has expired.) 判定 → 期限切れバナー不発 |
 | 0x180021d50 | isMasterKey | ret 1 | 鍵バッファ 0x182a2d5f0→40hex==f6e53827…1654 の照合を常時成立。unlock適用 0x18010a1e0 / 状態計算 0x18010aa20 / 通知 0x18010a740 の全ゲートが「鍵済み」経路 → ソース再計算 (boost FileWatcher 0x18010a3c0 / PACE) を回避 (CAB-59 案C の効果を定数で実現) |
-| 0x180021bd0 | 鍵ホワイトリスト検証 | ret 26 (0x1a) | 検証戻り値を「unlocked」に固定 (正規鍵 2 系統の戻り値)。transform 0x180021f60 (salt `as0cd7896g` + 未同定ハッシュ) と 40hex 照合 5 個 (0x1813d0a40..b2f) を短絡 |
+| 0x180021bd0 | 鍵ホワイトリスト検証 | ret 26 (0x1a) | 検証戻り値を「unlocked」に固定 (正規鍵 2 系統の戻り値)。transform 0x180021f60 (salt `as0d789f6g` + 未同定ハッシュ) と 40hex 照合 5 個 (0x1813d0a40..b2f) を短絡 |
 | 0x1800219b0 | unlock 鍵適用 | apply_key | [state]=0x1a を書込み 1 (成功) を返す。鍵文字列保持 (+8) は getStatus / 0x180054150 が読まないため省略 |
 | 0x180021490 | 鍵状態初期化 | key_init | 実関数の初期化 (state=0x17・std::string SSO リセット {ptr,size}=0, cap=0xf) を再現し、製品順序表 (0x1813d08a0 `<ksqe><ksbc>…`) 検索を短絡して **found=1 (登録済み)** |
 | 0x180002780 | `KHSUnlock` (export) | ret 0 (no-op) | アクティベーション入口の短絡 (strncpy_s 相当 0x180fb5a50(0x182a2d5f0,0x101,key) を廃止)。戻り値 void |
@@ -93,7 +93,7 @@
 
 - seed 1 × 200 trial (RFSPECIAL 含む乱数バッファ/パラメータ/状態、ABI 毒入れ検査内蔵)、base/lic とも**同一 native 参照 (ctx-fuzz vectors)** と bit 一致 → **DSP 出力は stub 適用前後で bit 一致**。
 - base の lift IR にライセンス関数参照 0 件 (`lic_va_in_ir` 全 15 VA = 0) = **DSP process はライセンス層を通らないことの lift IR 上の実証** (CAB-59 §4 の静的結論を IR レベルで反証可能な形で確認)。
-- lic 版 wasm は stub 14 関数が同一モジュールに合成され +1,128〜1,336 B (DSP 本体は不変)。
+- lic 版 wasm は stub 14 関数が同一モジュールに合成され +1,328〜1,356 B (DSP 本体は不変)。
 
 ### 4.3 EditorModel 47 呼出箇所 (検証 ②)
 - xref 実測: 0x180051af0 の直接呼出元 **47 関数** (0x180007a40 … 0x180880550, 各 1 回呼出) = `work/ctors47.json`。
