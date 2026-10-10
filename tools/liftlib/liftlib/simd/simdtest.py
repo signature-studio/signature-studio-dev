@@ -6,7 +6,7 @@
   1. kernels.lookup が返す Spec.asm を使い, x86-64 ネイティブで本物の命令を実行 (gcc inline asm)
   2. 生成 C (正規名) を emcc で wasm 化し node で実行
   3. 同一乱数入力で出力を bit 比較 (NaN 入力は除外; 出力 NaN のみの差は "nan-only" として別計上)
-近似命令 (rcpps 等) は相対誤差 < 1.5*2^-12 で判定する。
+近似命令 (rcpps 等) は相対誤差 < 1.6*2^-12 で判定する (Intel 規格上限 1.5*2^-12 + 余裕)。
 """
 import os
 import random
