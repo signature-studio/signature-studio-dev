@@ -24,13 +24,16 @@ const emailDomain = process.env.ACCESS_ALLOW_EMAIL_DOMAIN;
 const tokenName = opt("service-token", process.env.ACCESS_SERVICE_TOKEN_NAME ?? `${name}-e2e`);
 const sessionDuration = process.env.ACCESS_SESSION_DURATION ?? "24h";
 
-const include = [
+// 人間用 allow: メール指定 (ACCESS_ALLOW_EMAILS / ACCESS_ALLOW_EMAIL_DOMAIN) が無ければ
+// include: Everyone =「ログイン必須・この Zero Trust 組織のユーザならログイン可」(ユーザ決定 2026-10-10)。
+// ログイン必須は Access 自体の挙動 (未認証リクエストは IdP ログインへ 302)。service token (non_identity) のみ認証を省略する。
+// ACCESS_ALLOW_EVERYONE=1 でメール指定と Everyone の併用可 (組織ユーザ + 特定外部メール)。
+// 後日メール許可リストに絞る手順は RUNBOOK.md §4 (メール許可リストの追加)。
+let include = [
   ...emails.map((email) => ({ email: { email } })),
   ...(emailDomain ? [{ email_domain: { domain: emailDomain } }] : []),
 ];
-if (!include.length) {
-  throw new Error("人間用 allow 対象が無い: ACCESS_ALLOW_EMAILS=a@x,b@y もしくは ACCESS_ALLOW_EMAIL_DOMAIN=example.com");
-}
+if (!include.length || process.env.ACCESS_ALLOW_EVERYONE === "1") include.push({ everyone: {} });
 const listOf = (r) => (Array.isArray(r) ? r : r?.result ?? []);
 const dry = mode === "dry-run" ? ["--dry-run"] : [];
 
@@ -52,6 +55,7 @@ if (mode === "print") {
 }
 
 console.log(`## Access [${mode}] worker=${name}`);
+console.log(`  人間 allow: ${[emails.length ? `email ${emails.length} 件` : "", emailDomain ? `email_domain ${emailDomain}` : "", (process.env.ACCESS_ALLOW_EVERYONE === "1" || (!emails.length && !emailDomain)) ? "everyone" : ""].filter(Boolean).join(" + ") || "なし"} / service token: ${tokenName}`);
 const workers = listOf(await cf(["workers", "scripts", "search", "--name", name, "--per-page", "100"]));
 const worker = workers.find((w) => w.script_name === name);
 if (!worker && mode === "apply") throw new Error(`Worker ${name} が無い: 先に 20-worker.mjs --phase closed を実行する`);

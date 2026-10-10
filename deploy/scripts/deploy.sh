@@ -11,7 +11,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$HERE/lib.sh"
 WORKER_NAME="${WORKER_NAME:-signature-studio}"; export WORKER_NAME
-need ACCESS_ALLOW_EMAILS
+# ACCESS_ALLOW_EMAILS は任意 (未指定なら Access の人間ポリシーは include: Everyone。40-access.mjs 参照)
 
 bash "$HERE/00-preflight.sh"
 

@@ -53,3 +53,69 @@
 4. 反映遅延 (release 後 404 混在) は n=1 観測 (c)。verify はポーリングで吸収。
 5. `.br/.zst` を透過復号させる経路は Static Assets では不可。E の pack が br/zstd 保存なら JS デコーダ必須 (または raw 配置)。
 6. ブラウザは Chrome のみ (Firefox/Safari 未検証)。
+
+---
+
+# CAB-35: 実デプロイ実施 — 実測レポート
+
+実施 2026-10-10 (ユーザ承認済み・同日決定) / wrangler 4.149.0 / node v26.10.0 / Chrome 154 headless。**本番 URL: https://signature-studio.pycabbage.workers.dev**
+
+## 1. 結論
+
+- 3 段デプロイ (closed → Access → open → release) 完走、全検証項目 PASS。**CAB-61 の受入条件「新構成 URL で 8 check PASS」を満たしたため CAB-61 は Done 移行** (証跡は Linear コメント)。
+- デプロイ内容: **ランディング** (`vite build` の harness: index + assets 2 + worklets 2) + **E2E probe 資産** (`/__e2e__/add.wasm` 41B) + **ランタイム wasm 資産** (`/wasm/manifest.json` + m1-hello/m6-ott/m10-ott/m11-boot 計 7.4MB、ハッシュ名) の **12 ファイル 7,752,022B**。FL 本体 (314MB k100 等) は未統合ゆえ含まず。**chunk 化 (>24MiB) 対象は無し** (最大 6.0MB) — 連結 compileStreaming は CAB-61 probe (19 part / 314MB) で実証済み。
+- ベースライン増分は本デプロイ分のみ (snapshot diff 実測): **Worker 19→20 / Access app 28→29 / service token 1→2 / R2 4・zone 1 不変**。一時リソースの残置無し (cleanup 対象 0)。
+
+## 2. 実行手順と所要 (APPLY=1 実測)
+
+`bash deploy/scripts/deploy.sh --src deploy/work/app-dist --manifest deploy/work/runtime-manifest.json` と同値を段別実行 (所要記録のため)。DRY-RUN 先行実施済み。
+
+| 段 | 内容 | 所要 | 実測 |
+|---|---|---|---|
+| 00 preflight | 読取のみ (OAuth スコープ 4 種 OK / `signature-studio` 未作成確認) | 6.2s | — |
+| 05 stage | hardlink + `_headers` 生成 + 制約検査 | 0.13s | buildId **146af7ccd3ca** / 12 files / headers ok (32 blocks) / warnings 0 |
+| 20 closed | placeholder デプロイ (workers_dev=false, URL 無し) | 4.7s | version bc728c01 |
+| 40 access | Access app + service token 作成 | 4.4s | app 6a08c044… / token 0858d57b… |
+| 20 open | 公開 URL 発行 + 無認証 302 待ち | 5.8s | 推移 `[404@0.5s, 302@1.5s]` (無認証 200 の瞬間無し) |
+| 20 release | 本物 12 assets (新規 4: `/assets/*.js` 2 + m11 wasm + 他) | 7.2s | version baf2d1e2 |
+| 90 verify | 302 / preview 404 / buildId 待ち / ヘッダ検査 (読取のみ) | 1.2s | buildId 一致 **0s** |
+
+- ビルド: `tsc --noEmit` OK + `vite build --outDir deploy/work/app-dist` (104ms) + `tools/e2e/fixtures/add.wasm` を `__e2e__/` へ複製。**tools/e2e は無改変** (成果物 `url-*` は退避→復元、cmp 一致)。asset ハッシュは CAB-61 検収時と同一 (`index-DhkVDjrK.js` / `worker-37S5mIMN.js`)。
+- `--manifest deploy/work/runtime-manifest.json` (gitignore 済・再生成可): `tools/runtime/work/wasm/` (stage_wasm.mjs 生成) を `/wasm/` 配下へ配置。edge-policy は `/wasm/` を immutable prefix、`/wasm/manifest.json` を document として既に収載済み。
+
+## 3. 検証結果
+
+| 項目 | 結果 |
+|---|---|
+| ① 無認証 | `GET /` → **302** → `cabbage916.cloudflareaccess.com/cdn-cgi/access/login/…`。version preview URL 形式 (`<ver>-<name>.…`) → **404** |
+| ② service token (non_identity) | `CF-Access-Client-Id/Secret` ヘッダ → **200** (CF_Authorization cookie 発行、以降 cookie のみで通過) |
+| ③ policy-check.mjs (307 許容) | **7/7 ok, exit 0** (`/` `/assets/*.js` `/worklets/dummy-worklet.js` `/__e2e__/add.wasm` の policy 一致 + `/index.html` 307→`/` + 404) |
+| ④ 隔離 | main: `crossOriginIsolated=true` + SAB 生成 OK。module Worker: blob (同一 COI agent cluster) と**実配備 `assets/worker-*.js`** の両方で cOI=true + SAB OK。AudioWorklet: e2e `audioworklet` **PASS** (samplePos 4608→15872, **41109 frames/s**, 128f 単位) |
+| ⑤ chunk 化 | **対象無し** (最大 6.0MB < 24MiB)。連結 compileStreaming の実機実証は CAB-61 probe 参照 |
+| ⑥ 90-verify buildId | `release.json` buildId **146af7ccd3ca** が **0s** で一致 (エッジ反映待ち無し) / COOP+COEP+CORP 付き 200 |
+| ⑦ Access 対話ログイン | **未検証** (§5-1) |
+
+- **実配備 module Worker の実走行** (新規 `deploy/probe/verify-live.mjs`、`deploy/probe/run.mjs` の production 版): `/?runtime=all&pump=1&pumpN=2000` → m1-hello **25ms** / m6-ott **463.6ms** / m10-ott **514.2ms** / m11-boot **590.4ms** 全 checks ok、Worker 内ログ `cOI=true`、pump self-test (main⇔Worker SAB リング + Atomics.wait) blockedWaits>0 / dropped=0 / p99=0.14ms。結果 JSON: `deploy/work/verify-live{,-all}.json` (gitignore)。
+- ブラウザ e2e (`tools/e2e/run.sh --url`, agent-browser): **7 PASS + edge-policy 1 FAIL + fl-boot SKIP**。FAIL は既知の `/index.html` 307 誤判定 (③の 307 許容検査で ok、CAB-6 修正待ち)。
+
+## 4. Access 設定 (ユーザ決定どおり)
+
+- app `signature-studio`: self_hosted / destination `{type:"worker", worker_id: 83c98fc7…}` / session 24h / `app_launcher_visible:false`
+- 人間ポリシー `signature-studio-allow`: decision allow, **`include: [{everyone:{}}]`** — ログイン必須・この Zero Trust 組織のユーザならログイン可 (ACCESS_ALLOW_EMAILS 未指定の既定動作)
+- CI/E2E ポリシー `signature-studio-e2e-token`: decision **non_identity**, service token `signature-studio-e2e` (secret は `deploy/work/secrets/signature-studio-e2e.json`、0600・gitignore)
+- **メール許可リストへの絞り込み/追加手順**: `deploy/.env` に `ACCESS_ALLOW_EMAILS=a@x,b@y` (または `ACCESS_ALLOW_EMAIL_DOMAIN=…`、`ACCESS_ALLOW_EVERYONE=1` 併用で Everyone 残存) を設定し `node deploy/scripts/40-access.mjs --apply` を再実行 (冪等 upsert、Worker/asset/token 無変更)。詳細は RUNBOOK §4。
+
+## 5. 制限・未検証
+
+1. **Access 対話ログインは未検証** (IdP ログイン操作はユーザ権限が必要)。service token 経路 (②) と 302 リダイレクト先の正当性 (①) のみ確認。メール許可リスト設定時に実ログインで確認すること。
+2. ブラウザは Chrome 154 headless のみ (Firefox/Safari 未検証。CAB-61 から変わらず)。
+3. FL 本体 wasm は未統合のため、chunk 化 (>24MiB) 配備の本番実証は FL 起動後の再デプロイ時。
+4. tools/e2e の `edge-policy` check の 307 誤判定は未修正 (CAB-6 管轄。本件では tools/e2e 編集禁止のため、`deploy/probe/policy-check.mjs` を正とした)。
+5. `preview_urls:false` でも `cf workers scripts` の version URL 形式は 404 を返す (200 素通し無し) — 期待どおり。
+
+## 6. 次タスク
+
+- **CAB-63 運用**: 再デプロイは同一コマンド (冪等、差分 asset のみ upload)。Access セッションは 24h。_workers.dev URL の共有/認証はメール許可リスト (RUNBOOK §4) で制御。
+- **FL 起動後の再デプロイ**: `/wasm/` 配下に FL 本体 wasm (314MB 級) を `--manifest` で追加。chunk 化 (16MiB part + index.json) が初めて本番で効く。E ローダの `chunked.mjs` 結線が前提。
+- edge-sim の Static Assets 追従 (EDGE-SIM.md §B) → tools/e2e `edge-policy` の 307 修正 (CAB-6)。
+- `/c/` `/m/` `/latest.json` の edge-policy 正本取込み (tools/assets pack 使用時)。

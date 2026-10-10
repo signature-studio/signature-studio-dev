@@ -36,7 +36,7 @@ deploy/
 
 ```sh
 export PATH=$HOME/.local/share/pnpm/bin:$HOME/.bun/bin:$PATH
-cp deploy/env.example deploy/.env && $EDITOR deploy/.env                  # WORKER_NAME / ACCESS_ALLOW_EMAILS
+cp deploy/env.example deploy/.env && $EDITOR deploy/.env                  # WORKER_NAME / ACCESS_ALLOW_EMAILS (未指定なら Everyone)
 bash deploy/scripts/deploy.sh --src <dist> [--manifest tools/assets/manifest.json]            # DRY-RUN (書込なし)
 APPLY=1 bash deploy/scripts/deploy.sh --src <dist> [--manifest ...]       # 実デプロイ = CAB-35 (ユーザ承認後のみ)
 ```
