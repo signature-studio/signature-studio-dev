@@ -115,18 +115,15 @@ lift2/
 
 ### 10.1 根因 (実測で特定)
 
-1. **harness (comp_harness.mjs) の vbuf 規約違反**: vbuf を canary 付き `al()` (内部ポインタ base+64) で取得していた。
-   grow は machine 側が旧 buffer を `HeapFree` (shim: `free`) するため, `free(begin)` に**内部ポインタ**が渡り,
-   dlmalloc が chunk header (canary 0xa5a5a5a5 を size と誤読) から遠方アドレスへ書込み → wasm OOB。
-   stack trace `wasm-function[51]=free ← [37]=fa_vector_grow ← [2]=process` で特定。
-   native (native_comp.c) は当初から vbuf を plain calloc (先頭ポインタ, canary 検査外) にしており**規約が不一致**だった。
-2. **C 差替え fa_vector_grow 自体の容量計算バグ** (潜在的): `vec+16` は cap END **ポインタ**なのに, その値を
-   容量 (float 数) と混同し `newcap = ptr + ptr/2` を計算。実機 0x1803ded6c..ded8f は `(cap_end-begin)>>2` を容量に 1.5 倍
-   (`mov rcx,[rcx+0x10]; sub rcx,rdx; sar rcx,2` → `lea rbx,[rdx+rcx]`)。free クラッシュが先に起きるため未顕在化だった。
-   → C「等価」差替えは意味論を正確に写像しないと新たな破れを生む (教訓として shim に記載, 関数は削除)。
-3. **§5 仮説の不立証**: UCRT lock 状態 (0x1813073xx) の追加 poke なし, 0x181057d20 (shared_ptr 代入) の差替えなしで完走。
-   0x181057d20 は closure に静的に含まれる (0x18103fd60 経由) が, 本 scenario 群の実行経路には現れず
-   (全 comp 1,200 scenario + fuzz 2,400 比較で trap 0)。
+1. **harness (comp_harness.mjs) の vbuf 規約違反**: vbuf を canary 付き `al()` (内部ポインタ base+64) で
+   取得。grow は machine 側が旧 buffer を `HeapFree` (shim: `free`) するため `free(begin)` に**内部ポインタ**が
+   渡り、dlmalloc が chunk header (canary を size と誤読) から遠方アドレスへ書込み → wasm OOB
+   (`wasm-function[51]=free ← [37]=fa_vector_grow ← [2]=process` で特定)。native は当初から plain calloc で規約が不一致だった。
+2. **C 差替え fa_vector_grow 自体の容量計算バグ** (潜在的): `vec+16` は cap END **ポインタ**なのに容量と混同し
+   `newcap = ptr + ptr/2` を計算。実機 0x1803ded6c..ded8f は `(cap_end-begin)>>2` を容量に 1.5 倍
+   (`mov rcx,[rcx+0x10]; sub rcx,rdx; sar rcx,2` → `lea rbx,[rdx+rcx]`)。→ C「等価」差替えは意味論を正確に
+   写像しないと新たな破れを生む (教訓として shim に記載, 関数は削除)。
+3. **§5 仮説の不立証**: UCRT lock 状態の追加 poke なし, 0x181057d20 の差替えなしで完走。
 
 ### 10.2 修正方式
 
@@ -137,20 +134,12 @@ lift2/
 | `shim/host_wasm.c` | fa_vector_grow (C 等価実装) を削除 (上述の欠陥 + machine lift で不要). fa_mxcsr_get/set は 0x18103fd60 系で使用中ゆえ維持 |
 | `run_comp.sh` | 合否判定を grow 込み 400/400 に強化 (旧: non-grow のみ exit 判定) |
 
-### 10.3 検証結果 (全て実測)
+### 10.3 残限界
 
-- `lift2_e2e.sh` **exit=0 ALL PASS** (/tmp/opencode/e2e_fa2b_final.log, 最終コード状態で再実行済): comp **400/400** (non-grow 206 + grow 194) × fma0/1, ERR 0
-- **別 seed での汎化**: seed 0x1234 → 400/400 (grow 196/196), seed 0xBEEF → 400/400 (grow 201/201) — 計 3 seed × 400 × fma0/1
-- 回帰不変: Filter **400/400**, ctx-fuzz **4,800 全 bit-exact** (GUARD 0), ABI 静的 **0 違反** / 実行時 **violations=0**
-- ablation の純化: 旧数値は grow OOB 由来の偽 ERR (39 scenario) を含んだ。純化後: comis_noflags 200/200, xmm_args_drop 200/200,
-  xmm_ret_drop 200/200, **icall_drop 80/200** (§6 の 104 から変化 — 旧値は ERR 混入を含む), cmov_drop 172/200。意味論が load-bearing という結論は不変
-- ablation 構成 (grow を map せず lift したまま) で trap 0 — **machine grow 自体が wasm で bit-exact 動作**することの裏取り
-
-### 10.4 残限界
-
-- `run_fuzz.sh` (gen_fuzz_scen.py) は vcap=64 固定で grow 経路を直接 cover しない (grow 網羅は run_comp.sh の vcap<16 460 scenario / 3 seed が担う)。
-- 0x181057d20 (shared_ptr 代入) 経路は本 closure の scenario では未発火。FreshAirDsp 制御層 (§8-2) 拡張時に CRT/lock 状態が表に出る可能性は残る (その際は §5 の poke 案が再燃する)。
-- malloc/free は emcc dlmalloc (wasm) と glibc (native) の差があるが, 比較は相対値 (end-begin/cap-begin) + 内容のみでアドレス値非依存。
+- `run_fuzz.sh` は vcap=64 固定で grow 経路を直接 cover しない (grow 網羅は run_comp.sh の vcap<16 460 scenario / 3 seed が担う)。
+- 0x181057d20 (shared_ptr 代入) 経路は本 closure の scenario では未発火。
+- malloc/free は emcc dlmalloc (wasm) と glibc (native) の差があるが, 比較は相対値 + 内容のみでアドレス値非依存。
+- 検証結果は §11.3 の表 (lift2_e2e.sh の全ステップ) に統合。
 
 ## 11. FA-2c 追記: FreshAirDsp 制御層 lift + factory .epf 8 本駆動検証 (CAB-260, commit 9b420bd)
 
