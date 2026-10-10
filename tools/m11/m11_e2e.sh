@@ -59,4 +59,5 @@ step "実行 B: unit survey (942 unit を try/catch 隔離)"
 timeout 600 node m11_survey.mjs > work/e2e_survey.out 2>&1 || true
 
 python3 m11_judge.py
+python3 m11_icall_audit.py 2>/dev/null | tail -1 || true
 exit 0
