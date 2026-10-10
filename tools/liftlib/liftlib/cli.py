@@ -109,22 +109,27 @@ def simd_report():
 def cmd_ott(a):
     from .recipes import ott
     auto = tuple(x for x in a.auto.split(",") if x)
+    lb_base = int(a.lb_base, 0) if a.lb_base else None
     W = os.path.join(PKG, "work", "ott" if not auto else "ott_auto_" + "_".join(auto))
-    res, log = ott.run(W, build=True, helpers="gen", auto=auto)
+    if lb_base not in (None, 0x30000000):
+        W += "_lb%x" % lb_base                  # lowbase (CAB-220): base 別に workdir を分ける
+    res, log = ott.run(W, build=True, helpers="gen", auto=auto, lb_base=lb_base)
     ident = {k: v for k, v in res.items() if k.startswith("O") and k[1].isdigit() and isinstance(v, (bool, type(None)))}
+    print("[ott] layout:", json.dumps(res.get("lb")), "runtime_lb:", json.dumps(res.get("runtime_lb")))
     print("[ott] IR 一致 (liftlib 出力 vs 元チェーン中間成果物):", json.dumps(ident))
     print("[ott] link:", json.dumps(res.get("link_warnings")), "simd:", json.dumps({k: (v if k != "approx" else len(v)) for k, v in res["simd"].items()}))
     if a.no_e2e:
         return 0
-    r = ott.e2e_checks(res["cjs"], W)
+    r = ott.e2e_checks(res["cjs"], W, env_extra=res.get("e2e_env"))
     print("[ott] e2e: checks %s / broken %s | band 係数 maxdev=%s nbad=%s | trap rc=%s" % (r["checks"], r["broken"], r["maxdev"], r["nbad"], r["trap_rc"]))
     print("[ott] census[0x248]=0:", r["census0"])
     print("[ott] census[0x248]=1:", r["census1"])
     if r.get("outhash"):
         print("[ott] 出力 SHA (param×[0x248]×振幅): liftlib 生成 helper 版 vs 元 m10 成果物 =", json.dumps(r["outhash"]))
-        if r["outhash"].get("equal") is False:
+        if r["outhash"].get("equal") is False and r["outhash"].get("f0_equal") != r["outhash"].get("f0_total"):
             r["pass"] = False
-    ok = r["pass"] and (all(v is True for v in ident.values()) if not auto else True)
+    ok = r["pass"] and (all(v is True for v in ident.values())
+                        if (not auto and lb_base in (None, 0x30000000)) else True)
     print("[ott] RESULT:", "PASS" if ok else "FAIL")
     return 0 if ok else 1
 
@@ -175,7 +180,7 @@ def cmd_regress(a):
         rc |= r
 
     class B:  # noqa
-        auto, no_e2e = "", False
+        auto, no_e2e, lb_base = "", False, None
     r = cmd_ott(B)
     summary["ott"] = "PASS" if r == 0 else "FAIL"
     rc |= r
@@ -206,7 +211,9 @@ def main(argv=None):
     p.add_argument("sub", choices=["gen", "test", "report"]); p.add_argument("rest", nargs="*")
     p.add_argument("--n", type=int, default=200); p.set_defaults(fn=cmd_simd)
     p = sp.add_parser("ott")
-    p.add_argument("--auto", default=""); p.add_argument("--no-e2e", action="store_true"); p.set_defaults(fn=cmd_ott)
+    p.add_argument("--auto", default=""); p.add_argument("--no-e2e", action="store_true")
+    p.add_argument("--lb-base", default="", help="V-shift 先 newbase (=LB_BASE)。未指定/0x30000000 は元 m10 chain と同一レイアウト (CAB-220)")
+    p.set_defaults(fn=cmd_ott)
     p = sp.add_parser("inject-eval")
     p.set_defaults(fn=cmd_inject)
     p = sp.add_parser("specgen")

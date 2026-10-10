@@ -12,8 +12,8 @@ m6 build IR (work/ott_memfix0.ll) へ splice する。
       ため, ここでは「signature 同型」の closure declare へ寄せる。寄せ先が
       無い helper名はそのまま残し, その型で memfix 側に declare を追補して
       gen_msimd6.py に実装させる。
-  (4) @global_var_18xxxx 名と i64 純値 (VA) を 0x30000000 系へ shift
-      (ir6_shift.py と同幅: BASE 0x180000000 → 0x30000000 を ir6_shift と同処理
+  (4) @global_var_18xxxx 名と i64 純値 (VA) を --newbase (既定 0x30000000) 系へ shift
+      (ir6_shift.py と同幅: BASE 0x180000000 → NEWBASE を ir6_shift と同処理
       の差替 — ただし抽出分の IR 内では 手動に同code 重複せず ir6_shift スタイル
       の直代入)。
   (5) extract 先関数の内部 call のうち memfix に define / declare が無いものを
@@ -116,10 +116,10 @@ def ptrize(text):
     return text
 
 
-def shift_num(fn):
+def shift_num(fn, newbase=0x30000000):
     """ir6_shift 同幅: VA 直値 0x18xxxxxx / 10-11桁 dec 数値 → SHIFT."""
-    BASE, NEWBASE, MAXV = 0x180000000, 0x30000000, 0x1803FFFFF
-    shift = BASE - NEWBASE
+    BASE, MAXV = 0x180000000, 0x1803FFFFF
+    shift = BASE - newbase
     cnt = [0]
 
     def rep_hex(m):
@@ -137,9 +137,11 @@ def shift_num(fn):
     return fn and (rep_hex, rep_dec, cnt)
 
 
-def apply_shift(text):
-    BASE, NEWBASE, MAXV = 0x180000000, 0x30000000, 0x1803FFFFF
-    shift = BASE - NEWBASE
+def apply_shift(text, newbase=0x30000000):
+    """ir6_shift 同幅の VA shift (NEWBASE は pipeline から --newbase=<LB_BASE> で渡す, CAB-220)。
+    BASE/MAXV は元 VA 空間の ImageBase と image 範囲なので newbase 非依存。"""
+    BASE, MAXV = 0x180000000, 0x1803FFFFF
+    shift = BASE - newbase
     def rep_hex(m):
         v = int(m.group(1), 16)
         if not (BASE <= v <= MAXV):
@@ -218,8 +220,14 @@ def norm_helpers(text, fdecls, mdecls, warns):
 
 
 def main():
-    outpath = sys.argv[1] if len(sys.argv) > 1 else 'work/ott_memfix1.ll'
-    names = sys.argv[2:]
+    argv = sys.argv[1:]
+    newbase = 0x30000000
+    if '--newbase' in argv:                    # pipeline (liftlib recipes/ott.py) から LB_BASE を受ける
+        i = argv.index('--newbase')
+        newbase = int(argv[i + 1], 0)
+        argv = argv[:i] + argv[i + 2:]
+    outpath = argv[0] if argv else 'work/ott_memfix1.ll'
+    names = argv[1:]
     if not names:
         print('usage: m6_full_extract.py OUT.ll FNAME...'); sys.exit(2)
     full = open(FULL).read()
@@ -237,7 +245,7 @@ def main():
         text = ptrize('\n'.join(blk))
         # metadata 参照 (full lift の !insn.addr 等) を除去 (定義が block 外にあるので)
         text = re.sub(r',\s*![\w.\-]+\s*!\d+', '', text)
-        text = apply_shift(text)
+        text = apply_shift(text, newbase)
         text = norm_helpers(text, fd, md, warns)
         # mdecl 内型名の存在 check
         for tv in set(re.findall(r'%(_[A-Za-z0-9_]+)\b', text)):

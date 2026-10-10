@@ -1,4 +1,4 @@
-# liftlib REPORT — 共通 lift 修復基盤の統合 (CAB-49 / CAB-54 / CAB-55)
+# liftlib REPORT — 共通 lift 修復基盤の統合 (CAB-49 / CAB-54 / CAB-55 / CAB-220)
 
 - 日付: 2026-10-10 / 担当 dir: `tools/liftlib/` (他 dir は読取のみ) / 再現: `bash tools/liftlib/liftlib_e2e.sh` (キャッシュ時 約 25 秒, `--fresh` で FA/KH を RetDec lift から約 1 分)
 - 数値はすべて本 dir で実測。推定は「推定」と明記。
@@ -107,3 +107,48 @@ FA の P1' (comisd×2+jbe/jae+xorps/movaps+jmp, 合流先は reg2mem alloca) が
 3. **OTT M11**: `ott --auto f7,p1` を既定化し, 新規 F7 6 サイトと脱落分岐の影響を junk census/bit 突合で評価。
 4. mini-lifter 語彙拡張 (rsp 基準・call・整数フラグ) と OTT leaf への native spec。
 5. ymm/i256 helper ABI, `pcmpistri`, F2 の xmm 戻り値対応。
+
+## 10. lowbase 取り込み (CAB-220, 2026-10-10)
+
+**結論**: `bash tools/liftlib/lowbase_e2e.sh` = **ALL PASS**。OTT を liftlib pipeline 内で「最初から」低位 base 生成でき,
+2 base (0x10000 / 0x1230000) とも元 m10 成果物 (864MiB / 0x30000000) と **出力 SHA 42/42 bit 一致** (census 同値, [0x248]=0/1 両方)。
+既定 (0x30000000) の回帰は IR 7 段テキスト一致 + outhash 42/42 を維持。x64c の native bit 一致 3 構成 150,708 cell も再現
+(`tools/hostbridge/lowbase/lowbase_e2e.sh` も ALL PASS で CAB-90 成果物水準を再確認)。
+
+| 項目 | 結果 (実測) |
+|---|---|
+| dataimage.py フィルタ修正 | `0x400000 <= nt` (補正後の妥当域) → **`img.base <= v < img.base + SizeOfImage`** (元値側の image 範囲, lowbase `lb_data_gen.py` 同規約)。旧条件は LB_BASE=0x10000 で **.rdata DIR64 12,329 件全件** (nt=0x10000+RVA は常に <0x400000) を黙って落としていた (T7 で実測) |
+| LB_BASE 引数統一 | `ott --lb-base N` 1 値で駆動: `remap.shift_va(newbase)` / `gdata_legacy(datab)` / `m6_full_extract --newbase` / `ir7_argpass_fixed --shift` (既存 CLI) / `ir9_bootstraps --newbase` / `dataimage va_base`。shift の maxv は lowbase 時 `img.base+SizeOfImage` から導出 |
+| lb_layout 共有化 | `liftlib/lb_layout.py` 新設 (lowbase 正本の取り込み。T8 が両者の同一性を検査)。legacy (0x30000000) レイアウトも LB_* 変数で表現し emcc フラグ生成を 1 本化 (`resolve_layout`) |
+| C ランタイム | `runtime_lb.py` が m6_rt.c (`M6base` + **d2750 memcpy 範囲ガード** 追加) / m8_rt.c (`M8BASE` + 上限) / m6_stubs_hand.c (直値 4 箇所) / m10_boot.c (`MSCR` 静的配列化) を `#ifndef LB_IMG_BASE / LB_MAX_MEM` 付きで work へマクロ化コピー (T9, 置換数 assert 付き) |
+| emcc | legacy: 旧フラグ完全維持 (`-Wl,--initial-memory=0x36000000`) / lowbase: `-sGLOBAL_BASE/-sINITIAL_MEMORY/-sMAXIMUM_MEMORY` + `-DLB_IMG_BASE/-DLB_MAX_MEM` (`-Wl,--initial-memory` は emscripten initial-heap 16MiB 加算で "too small")。init_mib は GLOBAL_BASE+stack 8MB から自動算出 (0x1230000 で wasm-ld required 実測 31,089,728B) |
+| ott --lb-base 0x10000 | checks 7/0, band 係数 maxdev 0.0/nbad 0, trap rc 0, **outhash 42/42 equal**, census[0x248]=0 132/69/175/136 = m10 同値。layout: base 0x10000 / arena 0x320000 / GLOBAL_BASE 0x420000 / initial 24MiB / max 64MiB |
+| ott --lb-base 0x1230000 | 同じく checks 7/0 + outhash 42/42 (base 依存バグ無しの証拠)。initial 39MiB |
+| audit_va.py 0x10000 | DIR64 13,000 全て image 内 (image 外 0) / IAT 375 slot の VA 保持 0 / base 64KiB 境界 → exit 0 |
+| x64c 3 構成再現 | 0x10000/16MiB, 0x1230000/40MiB, 0x10000/8MiB の各 89 scenario 50,236 cell — **計 150,708 cell bit 一致 (max_ulp 0 / state_diff 0)** |
+| lowbase_e2e (hostbridge) | ALL PASS: 検収 65/65 (evidence 21+stub 3+marshal 13+PoC 28), 同居 512/512×2, Chrome Worker, prefix 差 0, E3 切り分け差 0 |
+
+### 発見と修正 (lowbase 化で顕在化したもの)
+1. **m6_rt.c d2750 (memcpy dispatch) に dst/src の上限が無い**: c38c8 family 系 junk 経路 (実測 dst=0xffffffff / src=-1 / n≈4.9MB) が
+   864MiB では先行する fail-fast abort (missing function_1801baef8) のおかげで到達せず, 小 memory では OOB trap した。
+   `dst/src + n <= LB_MAX_MEM` ガードを追加 (範囲外は no-op — m10 検収 trap10 の要求は「OOB 不発」のみ)。legacy では全 valid
+   pointer が範囲内ゆえ挙動不変 (回帰 outhash 42/42 で確認)。既存 lowbase RetDec 成果物 (build_m10_lb.sh 産) の同系経路も
+   OOB を確認 — trap probe を低 memory で走らせたのは liftlib 側が初めてのため顕在化した。
+2. **e2e ハーネスの detached ArrayBuffer**: ALLOW_MEMORY_GROWTH の memory.grow 後に HEAPU8/DataView が detach
+   (legacy は 864MiB で grow しないため未発覚)。全エクスポート呼出後にビューを張り直すよう修正 (e2e_check/outhash/coefdump)。
+
+### icall (integration.md §B) について
+`tools/icall/integration/liftlib_icall.patch` は **未適用のまま** (適用は CAB-228)。関数名は元 VA のままなので
+icall_rewrite の名前解決は低 base 化の影響を受けない。関数ポインタ値 (newbase+RVA) を引く逆変換テーブルは適用時に対応。
+
+### 再現
+```sh
+bash tools/liftlib/lowbase_e2e.sh            # 本チケットの 1 コマンド検証 (--full で CAB-90 e2e 全体も追加)
+python3 -m liftlib ott --lb-base 0x10000     # 単体 (cwd=tools/liftlib)
+python3 -m liftlib ott                       # 既定 (0x30000000) の回帰 = IR 7 段一致 + outhash 42/42
+```
+
+### 未解決
+- lowbase RetDec chain の junk 経路は stack/heap 絶対位置依存が残る (lowbase REPORT §4.3 と同質)。本検証の範囲
+  ([0x248]=0/1 × 2 rep × 256f) では差分 0 だったが、500blk 級の長時間 run では junk-tiny 差が出る可能性 (低 base REPORT 実測 2/128,000 cell)。
+- liftlib lowbase の OOB ガードは c38c8 family の broken-lift を修復するものでなく no-op 化 (恒久修復は §7-1/§9-4 の mini-lifter 拡張)。

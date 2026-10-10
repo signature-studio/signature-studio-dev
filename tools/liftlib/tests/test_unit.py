@@ -11,6 +11,7 @@
 import json
 import os
 import re
+import struct
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -18,7 +19,8 @@ sys.path.insert(0, os.path.join(HERE, ".."))
 T = os.path.join(HERE, "..", "..")
 
 from liftlib import ir as IR                       # noqa: E402
-from liftlib.passes import base, p1_legacy, remap  # noqa: E402
+from liftlib import lb_layout, runtime_lb          # noqa: E402
+from liftlib.passes import base, dataimage, p1_legacy, remap  # noqa: E402
 from liftlib.simd import gen                       # noqa: E402
 from liftlib.pe import Image                       # noqa: E402
 from liftlib.mc import MFunc                       # noqa: E402
@@ -98,7 +100,71 @@ def t6():
     print("T6 ok (mc: live-in / reaching defs)")
 
 
+def t7():
+    """dataimage の DIR64 補正は「元値側の image 範囲」判定 (CAB-220)。
+    旧実装の `0x400000 <= nt` は LB_BASE<0x400000 で補正を黙って落としていた。"""
+    img = Image(OTT_DLL)
+    dc, cnt = dataimage.gen_data_c(img, va_base=0x10000)
+    blob = re.search(r"dlld__rdata\[\] = \{\n(.*?)\n\};", dc, re.S).group(1)
+    got = bytes(int(x, 16) for x in re.findall(r"0x([0-9a-f]{2})\b", blob))
+    lo, sd = next((lo, d) for n, lo, d in dataimage.sections_raw(img) if n == ".rdata")
+    nfix = nlow = 0
+    for r in img.relocs_dir64():
+        if lo <= r < lo + len(sd) - 8:
+            off = r - lo
+            v = struct.unpack_from("<Q", sd, off)[0]
+            if img.base <= v < img.base + img.size:      # image 内ポインタ = 補正対象
+                assert got[off:off + 8] == struct.pack("<Q", v - img.base + 0x10000), hex(r)
+                nfix += 1
+                nlow += v < img.base + 0x400000 - 0x10000  # 補正後 nt<0x400000 = 旧フィルタの漏れ分
+    assert nfix == cnt[".rdata"] and nlow > 1000, (nfix, cnt, nlow)
+    c0 = dataimage.gen_data_c(img, va_base=0x30000000)[1]
+    c1 = dataimage.gen_data_c(img, va_base=0x1230000)[1]
+    assert cnt == c0 == c1, (cnt, c0, c1)            # 補正数は base 非依存 (旧フィルタでは base 依存)
+    print("T7 ok (dataimage: DIR64 補正 %d 件 = base 非依存, うち nt<0x400000 %d 件は旧フィルタの漏れ分)" % (nfix, nlow))
+
+
+def t8():
+    """lb_layout (liftlib 取り込み版) が lowbase 正本 (tools/hostbridge/lowbase/lb_layout.py) と同一。"""
+    ref_path = os.path.join(T, "hostbridge/lowbase/lb_layout.py")
+    if not os.path.exists(ref_path):
+        print("T8 skip (lowbase/lb_layout.py 無し)")
+        return
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("lb_layout_ref", ref_path)
+    ref = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(ref)
+    for args in ((0x10000, 0x308000, 0x100000, 16, 64), (0x1230000, 0x308000, 0x100000, 24, 64),
+                 (0x400000, 0x18c0000, 0x120000, 32, 64)):
+        assert lb_layout.layout(*args) == ref.layout(*args), args
+    try:
+        lb_layout.layout(base=0x8000)                # 64KiB 境界 assert
+        raise SystemExit("T8: 64KiB 未満の base が通ってしまった")
+    except AssertionError:
+        pass
+    print("T8 ok (lb_layout == lowbase 正本: OTT@0x10000 arena=%s)" % hex(lb_layout.layout(0x10000)["LB_ARENA"]))
+
+
+def t9():
+    """runtime_lb: C ランタイムのマクロ化が既定値で元ソースと等価 (CAB-220)。"""
+    paths = {"m6_rt.c": os.path.join(T, "m6/m6_rt.c"), "m8_rt.c": os.path.join(T, "m8/m8_rt.c"),
+             "m10_boot.c": os.path.join(T, "m10/m10_boot.c"),
+             "m6_stubs_hand.c": os.path.join(T, "m6/work/m6_stubs_hand.c")}
+    paths = {k: v for k, v in paths.items() if os.path.exists(v)}
+    if "m6_rt.c" not in paths:
+        print("T9 skip (m6/m8/m10 の C ランタイム無し)")
+        return
+    outs, rep = runtime_lb.emit(paths, os.path.join(HERE, "..", "work", "rt_lb_test"))
+    assert runtime_lb.audit_summary(rep) == {"m6_rt.c": 2, "m8_rt.c": 2, "m6_stubs_hand.c": 4, "m10_boot.c": 1}, rep
+    # 既定 (-D 無し) でマクロ展開すると元の固定値になる (前処理: clang が無いので #ifndef 既定の存在で判定)
+    t8c = open(outs["m8_rt.c"]).read()
+    assert "#define LB_IMG_BASE 0x30000000ul" in t8c and "a < LB_MAX_MEM" in t8c
+    t10c = open(outs["m10_boot.c"]).read()
+    assert "static volatile uint32_t lb_mscr[4096];" in t10c and "#define MSCR ((volatile" not in t10c
+    print("T9 ok (runtime_lb: m6_rt=2 m8_rt=2 stubs_hand=4 m10_boot=1 置換, LB_IMG_BASE/LB_MAX_MEM マクロ化)")
+
+
 if __name__ == "__main__":
-    for f in (t1, t2, t3, t4, t5, t6):
+    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9):
         f()
     print("ALL UNIT TESTS PASS")

@@ -9,6 +9,7 @@ pass と helper を 1 本に統合した (元 dir は無改変)。
 bash tools/liftlib/liftlib_e2e.sh            # 回帰 (約 25 秒; RetDec キャッシュ利用): ユニット + FA 400/400 + KH 366/366 + OTT 7/0 + SIMD 281 form + 注入 94/94
 bash tools/liftlib/liftlib_e2e.sh --quick    # 回帰のみ (FA/KH/OTT)
 bash tools/liftlib/liftlib_e2e.sh --fresh    # FA/KH を RetDec の lift から再生成 (全体で約 1 分)
+bash tools/liftlib/lowbase_e2e.sh            # lowbase 検証 (CAB-220): audit_va + OTT を低位 base で最初から生成 (2 base) + x64c native bit 一致 3 構成 150,708 cell (--full で CAB-90 e2e 全体も)
 ```
 
 ## CLI (`python3 -m liftlib …`, cwd=tools/liftlib)
@@ -19,7 +20,7 @@ bash tools/liftlib/liftlib_e2e.sh --fresh    # FA/KH を RetDec の lift から�
 | `diagnose <cfg>` | pass ごとに無効化して再評価 (どの修復が必須か) + 未修復所見 |
 | `simd gen x.ll -o out.c [--canon y.ll]` | `__asm_*` 宣言から C helper 生成 (正規名化も) |
 | `simd test` / `simd report` | 生成 helper を実機 inline asm と bit 突合 / KH census の被覆 before→after |
-| `ott [--auto f7,p1]` | OTT を liftlib 側だけで再現 (各段 IR 一致 + m10_e2e 相当) |
+| `ott [--auto f7,p1] [--lb-base N]` | OTT を liftlib 側だけで再現 (各段 IR 一致 + m10_e2e 相当)。`--lb-base` で V-shift 先 newbase (=LB_BASE) を指定して低位 base・小 memory で最初から生成 (CAB-220, 例 `0x10000` = initial 24MiB / `0x1230000`。未指定は元 m10 chain と同一の 0x30000000) |
 | `inject-eval` | パターン注入による検出器の検出力・偽陽性評価 |
 | `specgen <image> <va>` | 機械語から harness spec の雛形を生成 |
 
@@ -28,6 +29,7 @@ bash tools/liftlib/liftlib_e2e.sh --fresh    # FA/KH を RetDec の lift から�
 liftlib/ir.py        IR テキストモデル (insn.addr 保持)       liftlib/pe.py     PE 読取 / .pdata (CHAININFO 併合)
 liftlib/mc.py        capstone: CFG / 到達定義 / live-in        liftlib/regbind.py 機械語レジスタ ↔ IR SSA 値の結合 (insn.addr)
 liftlib/passes/      base(m2+m5 統合) p1 f7 f2 remap dataimage p1_legacy
+liftlib/lb_layout.py lowbase レイアウト (LB_BASE/ARENA/GLOBAL_BASE; tools/hostbridge/lowbase と共有)   liftlib/runtime_lb.py  C ランタイムの LB_IMG_BASE/LB_MAX_MEM マクロ化
 liftlib/simd/        kernels(x86 命令意味 C) gen(宣言駆動生成/正規名) simdtest(実機 asm 突合) liftlib_simd.h
 liftlib/harness/     spec(乱数 context) native_runner.c+ms_call.S(実機参照) wasm_runner.mjs diff.py specgen.py
 liftlib/recipes/     ott.py + ott/ (OTT 固有 recipe を無改変 vendored)

@@ -1,6 +1,8 @@
 """dataimage.py — PE の .rdata/.data を wasm 線形メモリの固定アドレスに敷設する C を生成する (tools/m6/m6_data_gen.py の統合版)。
 
  - on-disk の 8B ポインタ (ImageBase 基準) は .reloc (DIR64) を基準に新ベースへ補正する
+ - 補正要否の判定は「元値が PE image 範囲内か」(`img.base <= v < img.base + SizeOfImage`) で行う
+   (lowbase x64c/lb_data_gen.py 同規約。LB_BASE<0x400000 でも補正漏れ 0 — CAB-220)
  - 生成物: `m6_data_install()` を 1 度呼ぶと VA_BASE+RVA に .rdata/.data が敷設される
    (lift IR の VA 直値 → VA_BASE 系 remap (remap.shift_va) と対で使う)
 """
@@ -34,7 +36,12 @@ def gen_data_c(img, va_base=0x30000000, img_base=None, names=(".rdata", ".data")
                 off = r - lo
                 v = struct.unpack_from("<Q", sd, off)[0]
                 nt = v - img_base + va_base
-                if 0x400000 <= nt < 0x180000000:
+                # 判定は「元値側の image 範囲」で行う (lowbase x64c/lb_data_gen.py と同じ規約)。
+                # 旧実装の `0x400000 <= nt < 0x180000000` は補正後ポインタの妥当域判定で,
+                # LB_BASE < 0x400000 (lowbase, CAB-90/CAB-220) のとき image 内ポインタ
+                # (nt = LB_BASE+RVA < 0x400000) が大量に存在するにもかかわらず
+                # DIR64 補正が黙って落ちていた (CAB-90 検収で実機確認)。
+                if img_base <= v < img_base + img.size:
                     sd[off:off + 8] = struct.pack("<Q", nt)
                     c += 1
         counts[n] = c

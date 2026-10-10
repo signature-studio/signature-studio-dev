@@ -300,14 +300,15 @@ def fix_126670(lines, rep):
 
 # ================================================================ [F9] table base remap
 
-def fix_tablebase(lines, rep):
+def fix_tablebase(lines, rep, newbase=0x30000000):
   """broken-lift 算術合成 table base の即値 remap PoC (m6 REPORT §7-6).
      実測: c38c8 family の base 定数は 0x18026c9f0 / 0x18026c950 (.data) /
      0x18021e500 (.rdata) の**10 進即値** (6444992848 等) — ir6_shift は hex 形式
      (0x18xxxxxx) の VA/global_name のみ remap し得るため 10 進形が未 shift
      ⇒ wasm linear addr そのまま (0x18026c9f0 ≫ memsize) で OOB。
      本 pass は c38c8 family 3 define 内の 0x180200000..0x180300000 即値を
-     m6_data install の linear 対応 (v - 0x180000000 + 0x30000000) へ shift する。
+     m6_data install の linear 対応 (v - 0x180000000 + newbase) へ shift する
+     (newbase は pipeline から --newbase=<LB_BASE> で渡す, CAB-220)。
      (これにより table の hydrate は既存 m6_data memcpy で完結 = PoC 最小構成)"""
   #
   nrem = 0
@@ -323,7 +324,7 @@ def fix_tablebase(lines, rep):
       return tok
     if lo <= v < hi:
       nrem += 1
-      return str(v - 0x180000000 + 0x30000000)   # linear 対応 (m6_data install 表)
+      return str(v - 0x180000000 + newbase)   # linear 対応 (m6_data install 表)
     return tok
 
   tgt = ['function_1801c38c8', 'function_1801c69cc', 'function_1801c91cc']
@@ -336,7 +337,7 @@ def fix_tablebase(lines, rep):
     for l in seg:
       out.append(pat.sub(sub, l))
     lines[di:dj + 1] = out
-  rep['tablebase'] = f'remapped={nrem} (0x{lo:x}..0x{hi:x} dec-immediate -> linear +0x18000000)'
+  rep['tablebase'] = f'remapped={nrem} (0x{lo:x}..0x{hi:x} dec-immediate -> linear newbase=0x{newbase:x})'
   return lines
 
 # ================================================================ driver
@@ -347,6 +348,8 @@ def main():
   ap.add_argument('dst')
   ap.add_argument('--dsm', default=None)
   ap.add_argument('--report', default=None)
+  ap.add_argument('--newbase', type=lambda s: int(s, 0), default=0x30000000,
+                  help='m6_data install の linear base (pipeline から LB_BASE を渡す, CAB-220)')
   args = ap.parse_args()
   rep = {'modes': ['f3', 'f4', 'f5', 'f6', 'f8'], 'crt': {}, '126130_fix': []}
   lines = open(args.src, errors='replace').read().splitlines()
@@ -367,7 +370,7 @@ def main():
   lines = crt_patch(lines, rep)
   lines = fix_126670(lines, rep)
   lines = svf_coeff_reset(lines, rep)
-  lines = fix_tablebase(lines, rep)
+  lines = fix_tablebase(lines, rep, args.newbase)
   lines = fix_126130(lines, rep)
   lines = ctor_insert_gbox_call(lines, rep)
   lines = replace_resume(lines, rep)

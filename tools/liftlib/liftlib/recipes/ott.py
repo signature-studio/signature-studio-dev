@@ -13,7 +13,7 @@ import subprocess
 import sys
 import time
 
-from .. import env, ir as IR
+from .. import env, ir as IR, lb_layout, runtime_lb
 from ..pe import Image
 from ..passes import base as B, p1_legacy, remap, dataimage
 from ..simd import gen as SG
@@ -31,6 +31,29 @@ def nb(text):
     return [l for l in text.split("\n") if l.strip()]
 
 
+def resolve_layout(img, lb_base, init_mib=None, max_mib=64):
+    """CAB-220: 全レイアウト定数を LB_* 変数に統一。
+
+    - 既定 (lb_base=None / 0x30000000) は元 m10 chain のレイアウトを LB_* で表現したもの
+      (GLOBAL_BASE=256MiB の hole / initial=max=864MiB / arena は image 直後の 64K 境界) —
+      emcc フラグ・出力とも旧ビルドと同一 (回帰 = IR 一致 + outhash 42/42 で確認)。
+    - それ以外は lb_layout.layout() (tools/hostbridge/lowbase と共有の定義) に従う。
+      init_mib 未指定時は GLOBAL_BASE + stack 8MB + 余裕から自動算出する
+      (wasm-ld の required 実測: base=0x1230000 で 31,089,728B = GLOBAL_BASE 23.25MiB + stack/static 約 8.9MiB)。
+    """
+    if lb_base in (None, 0x30000000):
+        arena = lb_layout.up(img.base + img.size, 0x10000)
+        return dict(LB_BASE=0x30000000, LB_ARENA=arena, LB_GLOBAL_BASE=0x10000000,
+                    LB_INIT=0x36000000, LB_MAX=0x36000000, legacy=True)
+    arena0 = lb_layout.up(lb_base + img.size, 0x10000)
+    gb0 = lb_layout.up(arena0 + 0x100000, 0x10000)
+    init_mib = init_mib or max(24, (gb0 >> 20) + 17)
+    lay = lb_layout.layout(base=lb_base, image_size=img.size, arena_size=0x100000,
+                           init_mib=init_mib, max_mib=max_mib)
+    return dict(LB_BASE=lay["LB_BASE"], LB_ARENA=lay["LB_ARENA"], LB_GLOBAL_BASE=lay["LB_GLOBAL_BASE"],
+                LB_INIT=lay["LB_INIT"], LB_MAX=lay["LB_MAX"], legacy=False)
+
+
 def same(text, ref_path):
     if not os.path.exists(ref_path):
         return None
@@ -46,11 +69,15 @@ def sh(cmd, cwd, log, name):
     return r
 
 
-def run(workdir, build=True, helpers="gen", auto=()):
+def run(workdir, build=True, helpers="gen", auto=(), lb_base=None):
     W = os.path.abspath(workdir)
     os.makedirs(os.path.join(W, "work"), exist_ok=True)
     log, res = [], {}
     img = Image(DLL)
+    L = resolve_layout(img, lb_base)
+    LB = L["LB_BASE"]
+    res["lb"] = {k: (hex(v) if isinstance(v, int) else v) for k, v in L.items()}
+    legacy = L["legacy"]
     for f in ("full_t1.drc.ll", "full_t1.drc.dsm"):
         dst = os.path.join(W, "work", f)
         if not os.path.exists(dst):
@@ -72,39 +99,41 @@ def run(workdir, build=True, helpers="gen", auto=()):
         open(os.path.join(W, "auto_repair.log"), "w").write("\n".join(lg_a))
     lift = mod0.dump(strip=True)
     open(os.path.join(W, "ott_lift.ll"), "w").write(lift)
-    res["O1_base_identical_to_m6_ott_lift"] = same(lift, os.path.join(M6, "work", "ott_lift.ll")) if not auto else None
+    res["O1_base_identical_to_m6_ott_lift"] = same(lift, os.path.join(M6, "work", "ott_lift.ll")) if not auto and legacy else None
     log.append("O1 base: %.1fs b1=%s a9res=%s" % (time.time() - t0, brep.get("b1_fixed"), brep.get("a9_residual_constexpr")))
-    # ---- O2 P1(legacy 配線) → VA shift → gdata
+    # ---- O2 P1(legacy 配線) → VA shift (newbase=LB_BASE, CAB-220) → gdata
     p1t, st = p1_legacy.legacy_p1(lift)
-    res["O2a_p1_identical"] = same(p1t, os.path.join(M6, "work", "ir7e_p1.ll"))
+    res["O2a_p1_identical"] = same(p1t, os.path.join(M6, "work", "ir7e_p1.ll")) if legacy else None
     res["p1_stats"] = st
-    sht, nnum = remap.shift_va(p1t)
-    res["O2b_shift_identical"] = same(sht, os.path.join(M6, "work", "ir7e_p2.ll"))
-    gdt, gst = remap.gdata_legacy(sht, img)
+    # maxv は image 範囲 (base+SizeOfImage) から導出 (lowbase integration.md §A)。
+    # 既定 0x1803FFFFF は元 ir6_shift の値 (legacy 回帰のテキスト一致維持のためそのまま)。
+    sht, nnum = remap.shift_va(p1t) if legacy else remap.shift_va(p1t, newbase=LB, maxv=img.base + img.size)
+    res["O2b_shift_identical"] = same(sht, os.path.join(M6, "work", "ir7e_p2.ll")) if legacy else None
+    gdt, gst = remap.gdata_legacy(sht, img, datab=LB)
     open(os.path.join(W, "ott_shift3b.ll"), "w").write(gdt)
-    res["O2c_gdata_identical"] = same(gdt, os.path.join(M6, "work", "ir7e_p3.ll"))
+    res["O2c_gdata_identical"] = same(gdt, os.path.join(M6, "work", "ir7e_p3.ll")) if legacy else None
     res["gdata"] = gst
     # ---- O3 memfix / full_extract (vendored recipes)
     sh([sys.executable, os.path.join(RECIPES, "m6_memfix.py"), "ott_shift3b.ll", "work/ott_memfix0.ll"], W, log, "memfix")
-    res["O3a_memfix0_identical"] = same(open(os.path.join(W, "work/ott_memfix0.ll")).read(), os.path.join(M6, "work", "ott_memfix0.ll"))
+    res["O3a_memfix0_identical"] = same(open(os.path.join(W, "work/ott_memfix0.ll")).read(), os.path.join(M6, "work", "ott_memfix0.ll")) if legacy else None
     sh([sys.executable, os.path.join(RECIPES, "m6_full_extract.py"), "work/ott_memfix1.ll",
-        "function_1801260c0", "function_180126030", "function_180126010"], W, log, "full_extract")
-    res["O3b_memfix1_identical"] = same(open(os.path.join(W, "work/ott_memfix1.ll")).read(), os.path.join(M6, "work", "ott_memfix1.ll"))
+        "function_1801260c0", "function_180126030", "function_180126010", "--newbase", str(LB)], W, log, "full_extract")
+    res["O3b_memfix1_identical"] = same(open(os.path.join(W, "work/ott_memfix1.ll")).read(), os.path.join(M6, "work", "ott_memfix1.ll")) if legacy else None
     # ---- O4 m8/m9 recipes
     sh([sys.executable, os.path.join(RECIPES, "ir7_argpass_fixed.py"), "work/ott_memfix1.ll", "work/ott_argpass8.ll",
         "--dsm", "work/full_t1.drc.dsm", "--report", "work/argpass8.json", "--target", "function_180120af0",
-        "--tail", "function_18011de50"], W, log, "argpass")
+        "--tail", "function_18011de50", "--shift", str(LB)], W, log, "argpass")
     sh([sys.executable, os.path.join(RECIPES, "ir8_valueflow.py"), "work/ott_argpass8.ll", "work/ott_m8.ll", "--dsm", "work/full_t1.drc.dsm",
         "--full-ir", "work/full_t1.drc.ll", "--report", "work/valueflow.json", "--targets", "function_180126030"], W, log, "valueflow")
     sh([sys.executable, os.path.join(RECIPES, "ir9_bootstraps.py"), "work/ott_m8.ll", "work/ott_m10.ll", "--dsm", "work/full_t1.drc.dsm",
-        "--report", "work/bootstraps.json"], W, log, "bootstraps")
+        "--report", "work/bootstraps.json", "--newbase", str(LB)], W, log, "bootstraps")
     if "f7" not in auto:        # 汎用 F7 (passes/f7.py) が outcopy を包含するため, auto=f7 のときは省略
         sh([sys.executable, os.path.join(RECIPES, "ir9_outcopy.py"), "work/ott_m10.ll", "work/ott_m10.ll", "--report", "work/outcopy.json"],
            W, log, "outcopy")
     final = open(os.path.join(W, "work/ott_m10.ll")).read()
-    res["O4_m10_ll_identical"] = same(final, os.path.join(M10, "work", "ott_m10.ll")) if not auto else None
-    # ---- O5 data image
-    dc, cnt = dataimage.gen_data_c(img)
+    res["O4_m10_ll_identical"] = same(final, os.path.join(M10, "work", "ott_m10.ll")) if not auto and legacy else None
+    # ---- O5 data image (va_base=LB_BASE, CAB-220)
+    dc, cnt = dataimage.gen_data_c(img, va_base=LB)
     open(os.path.join(W, "work/ott_data.c"), "w").write(dc)
     res["O5_data_c_reloc_fixes"] = cnt
     # ---- O6 SIMD helper 自動生成 (正規名)
@@ -116,12 +145,19 @@ def run(workdir, build=True, helpers="gen", auto=()):
     res["simd"] = dict(helpers=len(rep["generated"]), unsupported=[u[0] for u in rep["unsupported"]], approx=rep["approx"])
     if not build:
         return res, log
-    # ---- O7 emcc (m10_build.sh と同一フラグ)
+    # ---- O7 emcc (m10_build.sh と同一フラグ。lowbase は lb_layout の値 + -DLB_* / -sINITIAL_MEMORY)
     exports = re.search(r"-sEXPORTED_FUNCTIONS=(\S+)", open(os.path.join(M6, "m6_build.sh")).read()).group(1)
+    rt, rt_rep = runtime_lb.emit(
+        {"m6_rt.c": os.path.join(M6, "m6_rt.c"), "m8_rt.c": os.path.join(M8, "m8_rt.c"),
+         "m10_boot.c": os.path.join(M10, "m10_boot.c"),
+         "m6_stubs_hand.c": os.path.join(M6, "work", "m6_stubs_hand.c"),
+         "m6_stubs_hand2.c": os.path.join(M6, "work", "m6_stubs_hand2.c")},
+        os.path.join(W, "work", "rt_lb"))
+    res["runtime_lb"] = runtime_lb.audit_summary(rt_rep)
     srcs = [os.path.join(W, "work/ott_data.c"), os.path.join(M6, "work/m6_stubs.c"),
-            os.path.join(TOOLS, "shim/src/heap.c"), os.path.join(TOOLS, "shim/src/failfast.c"), os.path.join(M6, "m6_rt.c"),
-            os.path.join(M6, "work/m6_stubs_hand.c"), os.path.join(M6, "work/m6_stubs_hand2.c"),
-            os.path.join(M8, "m8_rt.c"), os.path.join(M9, "m9_rt.c"), os.path.join(M10, "m10_boot.c")]
+            os.path.join(TOOLS, "shim/src/heap.c"), os.path.join(TOOLS, "shim/src/failfast.c"), rt["m6_rt.c"],
+            rt["m6_stubs_hand.c"], rt["m6_stubs_hand2.c"],
+            rt["m8_rt.c"], os.path.join(M9, "m9_rt.c"), rt["m10_boot.c"]]
     if helpers == "gen":
         srcs = [os.path.join(W, "work/ott_simd.c")] + srcs
         ll = os.path.join(W, "work/ott_m10_canon.ll")
@@ -134,10 +170,17 @@ def run(workdir, build=True, helpers="gen", auto=()):
         out = os.path.join(W, "ott_m6helpers.cjs")
     cmd = ["emcc"] + srcs + [ll, "-sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAPU32,HEAPF32,HEAPF64", "-o", out + ".tmp", "-w",
                              "-Wno-error=int-conversion", "-Wno-implicit-function-declaration", "-O0", "-g1", "-sALLOW_MEMORY_GROWTH=1",
-                             "-sSTACK_SIZE=8MB", "-sGLOBAL_BASE=268435456", "-sENVIRONMENT=node", "-sMODULARIZE=1",
+                             "-sSTACK_SIZE=8MB", "-sGLOBAL_BASE=%d" % L["LB_GLOBAL_BASE"], "-sENVIRONMENT=node", "-sMODULARIZE=1",
                              "-sEXPORT_NAME=createModule", "-sERROR_ON_UNDEFINED_SYMBOLS=0", "-sEXIT_RUNTIME=1",
-                             "-sEXPORTED_FUNCTIONS=" + exports, "-Wl,--no-gc-sections",
-                             "-Wl,--initial-memory=%d" % 0x36000000, "-Wl,--max-memory=%d" % 0x36000000] + inc
+                             "-sEXPORTED_FUNCTIONS=" + exports, "-Wl,--no-gc-sections"] + inc
+    if legacy:
+        # 元 m10 build と同一 (-Wl,--initial-memory は emscripten initial-heap が加算されても
+        # GLOBAL_BASE=256MiB の hole が十分あるため成立する)
+        cmd += ["-Wl,--initial-memory=%d" % L["LB_INIT"], "-Wl,--max-memory=%d" % L["LB_MAX"]]
+    else:
+        # lowbase: -Wl,--initial-memory だと initial-heap 既定 16MiB が加算され "initial memory too small"
+        # になるため -sINITIAL_MEMORY/-sMAXIMUM_MEMORY を使う (lowbase integration.md §A / build_m10_lb.sh 同規約)
+        cmd += ["-sINITIAL_MEMORY=%d" % L["LB_INIT"], "-sMAXIMUM_MEMORY=%d" % L["LB_MAX"]] + runtime_lb.emcc_defs(LB, L["LB_MAX"])
     t0 = time.time()
     r = env.run(cmd, capture_output=True, text=True, cwd=W)
     log.append("emcc: rc=%d %.1fs" % (r.returncode, time.time() - t0))
@@ -152,14 +195,24 @@ def run(workdir, build=True, helpers="gen", auto=()):
         if os.path.exists(out + ".tmp" + ext):
             os.replace(out + ".tmp" + ext, out + ext)
     res["cjs"] = out
+    # e2e ハーネス (recipes/ott/*.mjs) へのレイアウト指示 (既定 = legacy の値なので低 base 時のみ必要)
+    if not legacy:
+        res["e2e_env"] = {"LB_BASE": "%d" % LB, "LB_ARENA": "%d" % L["LB_ARENA"]}
     return res, log
 
 
-def e2e_checks(cjs, workdir, label=""):
-    """m10_e2e.sh の E1..E7 を再現して判定する。"""
+def e2e_checks(cjs, workdir, label="", env_extra=None):
+    """m10_e2e.sh の E1..E7 を再現して判定する。env_extra: lowbase 時の {LB_BASE, LB_ARENA}。
+
+    lowbase 時は出力 SHA 突合 (ott_outhash) の合格基準を [0x248]=0 組 (f0) にする:
+    [0x248]=1 経路は未初期化読み (junk) が stack/heap 絶対位置に依存し, base/heap 移動で
+    junk-tiny が変わり得るため (lowbase REPORT §4.3 実測: 128,000 cell 中 2 cell)。
+    """
     W = os.path.abspath(workdir)
     env.ensure()
     e = dict(os.environ, OTT_CJS=os.path.abspath(cjs))
+    if env_extra:
+        e.update(env_extra)
     out = {}
     r = subprocess.run(["node", os.path.join(RECIPES, "e2e_check.mjs")], capture_output=True, text=True, env=e, timeout=600)
     txt = r.stdout + r.stderr
@@ -189,11 +242,20 @@ def e2e_checks(cjs, workdir, label=""):
     if os.path.exists(ref) and os.path.abspath(cjs) != os.path.abspath(ref):
         try:
             hs = []
-            for c in (cjs, ref):
+            # 比較対象 (元 m10 成果物) は legacy base の module → 既定 env (env_extra 無し) で駆動する
+            for c, ee in ((cjs, env_extra), (ref, None)):
                 e2 = dict(os.environ, OTT_CJS=os.path.abspath(c))
+                if ee:
+                    e2.update(ee)
                 r = subprocess.run(["node", os.path.join(RECIPES, "ott_outhash.mjs")], capture_output=True, text=True, env=e2, timeout=900)
                 hs.append(json.loads(r.stdout))
-            out["outhash"] = dict(combos=len(hs[0]), equal=hs[0] == hs[1], distinct=len(set(hs[0].values())))
+            f0 = [k for k in hs[0] if "_f0_" in k]
+            out["outhash"] = dict(combos=len(hs[0]), equal=hs[0] == hs[1], distinct=len(set(hs[0].values())),
+                                  f0_equal=sum(1 for k in f0 if hs[0][k] == hs[1][k]), f0_total=len(f0))
+            if env_extra:                     # lowbase: [0x248]=0 組の bit 一致を合格基準にする
+                out["pass"] = out["pass"] and out["outhash"]["f0_equal"] == out["outhash"]["f0_total"]
+            else:
+                out["pass"] = out["pass"] and out["outhash"]["equal"]
         except Exception as ex:                  # noqa
             out["outhash"] = dict(error=str(ex)[:200])
     return out
