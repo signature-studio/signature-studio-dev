@@ -140,8 +140,8 @@ mac 版との対応 (参考): `~/Library/Preferences/Image-Line/reg.xml` (レジ
 | ID | 題 | 内容 / 受入 | 依存 |
 |---|---|---|---|
 | T1 | startup-glue | §2 `THostInstance` + `CreateFruityInstance` 呼出、`iface->vtbl[0]` 終了処理、URL クエリ→cmdline。受入 §7-1 | m11 (DllMain closure), T2, T3 |
-| T2 | vreg | §6 の仮想レジストリ shim (`tools/shim` に registry モジュール)、seed 読込、IndexedDB 永続、Reg* 11 API 単体テスト、REGISTRY.csv の全 literal キー往復 | M4 shim |
-| T3 | win-stubs-startup | §5 A/B/D の約 60 API を fail-soft で実装 (表の戻り値通り)。node テスト: 各 API の戻り値表との一致 | M4 shim |
+| T2 | vreg | §6 の仮想レジストリ: Reg* API 本体は `tools/shimx` (Q, CAB-11) の `reg.c` (メモリ内レジストリ + `shimx_reg_set/import_text/export_text`) を基盤とし、**seed 読込 (`vreg_seed.json`)・IndexedDB 永続・REGISTRY.csv の全 literal キー往復テスト**を担当 (Reg* 本体は再実装しない) | shimx (Q) |
+| T3 | win-stubs-startup | §5 A/B/D の約 60 API の戻り値を **shimx (Q) の実装・フック (`shimx_set_trust_ok`/`shimx_set_shell_execute_hook` 等) と突合し、差分のみ実装**。node テスト: 各 API の戻り値表との一致 | shimx (Q) |
 | T4 | wininet-offline | §5 C。`GetLastError=12163`、`InternetGetConnectedState=0` | T3 |
 | T5 | vfs-layout + asset trace | §4 の名前空間、`open()` trace → 起動必須 asset の最小 manifest 自動生成、遅延 fetch+OPFS キャッシュ | T1 |
 | T6 | message-pump | §3 の SAB ring + `GetMessage/PeekMessage/MsgWait/SetTimer/PostMessage`、DOM→`WM_*` 変換 | M7 (GUI) |
