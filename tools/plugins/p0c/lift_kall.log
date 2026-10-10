@@ -1,0 +1,22 @@
+[lift] kall: ranges=136 imghi=0x7a1000 timeout=2400
+[ir_normalize] wrote work/kall.norm0.ll
+[ir5_patch]   [C1] keep-all (全 define 維持)
+[ir5_patch]   [C13] external global → 0 初期化定義 (リンク解決; DLL データ実体取込は M6) 6 件
+[ir5_patch] wrote work/kall.lift.ll
+[P-R1] regparam alloca → inttoptr(argN): 3 件 [{"func": "function_5dee90", "reg": "r9", "arg": "arg4", "uses": 1}, {"func": "function_5df040", "reg": "r9", "arg": "arg4", "uses": 1}, {"func": "function_5e1870", "reg": "r8", "arg": "arg3", "uses": 1}]
+[P-S1d] 128bit store (i64 経由 sext) 復元 45 件
+[P-S1c] partial store 復元 11 件 (未解決 1)
+[P-C1] or.cond XNOR→AND: 0 件 (funcs=[])
+[P-D1] 重複 declare 除去 8 件
+[P-T1] 本体の ptr 文脈 %argN 使用 → inttoptr: 22 件
+[P-T1] ptr 仮引数→i64: sig 8 件 / call site 22 件
+[asmfix] combos: 65 / suffix assigned: 0 / dup names: 0 []
+[asmfix] remaining dup-decl: 0
+[ir11][M2l] num-global defs kept: 0 (dropped: 0)
+[ir11][M1] global_var uses→inttoptr 144, drop defs 628 (incl. numeric-globals)
+[ir11][M2] inttoptr constant VA remap: 0
+[ir11][M2c] typed-operand sext/zext/trunc: 0 sites
+[ir11][M2n] call signature sites rewritten: 0 (skipped: 0)
+[ir11][M2b] store/add/sub VA remap: 0
+[ir11][M11] ir passes done: out=work/kall.final.ll (10716 lines)
+[lift] OK: work/kall.final.ll (10716 lines), 138 defines, helpers: [simd2] declares 65: implemented 61, unimplemented 0, i256 trap 4 
