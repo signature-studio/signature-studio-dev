@@ -1,0 +1,26 @@
+--- ../ott/lift/x64c.py	2026-10-10 15:47:05.694564097 +0900
++++ work/x64c/x64c_fle.py	2026-10-10 17:03:12.908068931 +0900
+@@ -15,9 +15,9 @@
+ from capstone import *
+ from capstone.x86 import *
+ 
+-IMG = 0x180000000
+-SHIFT = 0x150000000        # 0x180000000 → 0x30000000
+-IMG_SIZE = 0x308000
++IMG = 0x400000
++SHIFT = 0
++IMG_SIZE = 0x1700000
+ 
+ GPR_NAMES = {}
+ for i, n in enumerate(['rax', 'rcx', 'rdx', 'rbx', 'rsp', 'rbp', 'rsi', 'rdi']):
+@@ -279,8 +279,8 @@
+                 self.out.append(self.label(va) + ':;')
+             try:
+                 self.one(ins)
+-            except Unsup as e:
+-                self.unsup[ins.mnemonic + ':' + str(e)] += 1
++            except (Unsup, AttributeError, IndexError, KeyError, TypeError, ValueError) as e:
++                self.unsup[ins.mnemonic + ':' + (str(e) if isinstance(e, Unsup) else 'CRASH-' + type(e).__name__)] += 1
+                 self.L('ott_unsup(%s, "%s %s");' % (hx(ins.address), ins.mnemonic, ins.op_str.replace('"', "'")))
+         self.out.append('  ott_badjump(%s, 0);' % hx(order[-1] if order else 0))
+         self.out.append('}')
