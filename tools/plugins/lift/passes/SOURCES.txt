@@ -1,0 +1,28 @@
+# tools/plugins/lift/passes — 参照コピー元と本作業での変更 (コピー時点 sha1 先頭12桁 = 元ファイル)
+# 規約: tools/m1..m11, tools/shim は読取専用。ここはその参照コピー + 追加 pass。 元側の更新は自動追従しない。
+#
+# 参照コピー (無改変)
+ir_normalize.py      <- tools/m2/ir_normalize.py          740ef5c936be
+ir5_patch.py         <- tools/m5/ir5_patch.py             400fdcf2db50
+msimd.c, msimd_core.h<- tools/m5/                          (msimd_core.h 81a4aa9805c8)
+ir6_pass.py          <- tools/m6/ir6_pass.py              acc31ad9cbde   (comis/ucomis フラグ解決 [P1])
+ir6_shift.py         <- tools/m6/ir6_shift.py             5f4bbe25cd02
+ir6_gdata.py         <- tools/m6/ir6_gdata.py             5ca4ccbc9ed9
+gen_msimd6.py        <- tools/m6/gen_msimd6.py            d6ff001365dc
+ir7_argpass.py       <- tools/m7/ir7_argpass.py           32c7d0522698   (float 引数復元; Eff_Render 等で必要)
+ir7_argpass_fixed.py <- tools/m8/ir7_argpass_fixed.py     8b523aa4500f
+ir8_valueflow.py     <- tools/m8/ir8_valueflow.py         13a054446583
+m11_asmfix.py        <- tools/m11/m11_asmfix.py           c1cc7fa015ca   (M11 は進行中 = スナップショット; 未コミット)
+m11_merge.py, m11_genstubs.py, m11_image_gen.py, m11_post.py, msimd11_core.h  <- tools/m11/ (同上)
+m11_simd2.py         <- tools/m11/m11_simd2.py            90af41a66083   (署名駆動 __asm_* helper 生成)
+m11_passes.py        <- tools/m11/m11_passes.py           d3cf84e29ec8
+#
+# 変更したコピー
+m11_passes.py: IMG_HI を環境変数 PLUG_IMG_HI で上書き可能に (他は無改変; プラグイン PE の SizeOfImage に合わせる)
+#
+# 本作業で追加した pass (差分試験で露見した RetDec / pass 鎖の欠陥の修復; batch_plan.md §4)
+fix_regparam_alloca.py  [P-R1]  引数レジスタ名 alloca (store 無し) → inttoptr(argN)
+fix_asm_stores.py       [P-S1c/S1d] 64bit 部分 store / i64 経由 sext の 128bit store の復元
+fix_orcond_xnor.py      [P-C1]  RetDec の `or.cond = icmp eq i1` (XNOR 誤畳み込み) → and (opt-in, 関数指定)
+fix_dup_decls.py        [P-D1]  同一 declare 重複除去
+fix_ptr_params.py       [P-T1]  定義済み関数の `ptr %argN` 仮引数を i64 に統一 (call site は ptrtoint, 本体の ptr 文脈は inttoptr)
