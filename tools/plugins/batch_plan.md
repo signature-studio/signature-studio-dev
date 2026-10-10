@@ -62,9 +62,9 @@ pass 鎖 (`lift_ranges.sh`): `ir_normalize`(m2) → `ir5_patch`(m5) → **`fix_r
 
 | 本 | メモ |
 |---|---|
-| Sytrus, Harmor | 巨大 Delphi 本体 (固有 230/370 KB で T3 扱いは synth-big 規則)。 framework 共有後なら T2 相当の可能性あり (要再評価) |
-| Kepler, Kepler Exo, Transistor Bass, Fruity Slicer 2, Fruity Delay 3, Multiband Delay, Frequency Splitter | engine DLL 0.7〜2.6 MB (MSVC C++)。 engine は C++ なので別トラック |
-| DirectWave, FLEX | 第三者級エンジン (CT engine / engineV2 5.9 MB + engine 4 MB)。 sampler/scripting を含む。最後 |
+| Sytrus, Harmor | 巨大 Delphi 本体 (固有 223/364 KB で T3 扱いは synth-big 規則)。 framework 共有後なら T2 相当の可能性あり (要再評価) |
+| Kepler, Kepler Exo, Transistor Bass, Fruity Slicer 2, Fruity Delay 3, Multiband Delay, Frequency Splitter | engine DLL 1.2〜3.4 MB (MSVC C++; Kepler/Exo 2.65, Transistor Bass 1.59, Slicer 2 2.67, Delay 3 1.2, Multiband Delay 3.09, Frequency Splitter 3.35)。 engine は C++ なので別トラック |
+| DirectWave, FLEX | 第三者級エンジン (win: DirectWave 本体 1.1 MB + editor 6.0 MB / FLEX 殻 5.1 MB + engineV2 7.9 MB + engine 5.5 MB)。 sampler/scripting を含む。最後 |
 | ZGameEditor Visualizer | OpenGL/Python/NDI/Spout — scope=big3p。 ブラウザでは WebGL 再実装/別方針が妥当 |
 | FL Studio Mobile ×3 | FLM エンジン (sqlite/ffmpeg 等) |
 | Newtone | zplane 製 engine (5.0 MB, ws2_32)、**第三者ライセンス** — EULA 事実整理は別途 |
@@ -76,25 +76,27 @@ pass 鎖 (`lift_ranges.sh`): `ir_normalize`(m2) → `ir5_patch`(m5) → **`fix_r
 2. **plugin 層**: `Eff_Render` を合成 `this` オブジェクトで native/wasm 両方実行 (this+0xcc 等のコンテキスト、SIMD 表初期化を共通化)。 Render tests (`Data/System/Render tests/*.flp` 82 本, マトリクス `RT` 列) は FLP 経由のエンドツーエンド入力。
 3. **FLEngine 統合**: FLP 読込 → CreatePlugInstance → 10 秒レンダ → 出力 hash (FLEngine lift の進捗に依存)。 参照音源は FL 実行環境が無いため **native 機械語 (Linux ms_abi) による自己参照** で代用する。
 
-## 7. 下流チケット案 (ファミリ別 lift)
+## 7. 下流チケット (Linear 起票済み; CAB-12 の子)
 
-| チケット | 内容 | 本数 | 推定 |
-|---|---|--:|--:|
-| PLG-P0a | FP_DelphiPlug framework headless lift (共有 wasm) | 1 | 20 |
-| PLG-P0b | Host shim (46 slot / Dispatcher 30 ID) + CreatePlugInstance E2E | 1 | 5 |
-| PLG-P0c | DSP kernel 表 80 本 (f80 lowering, ARG pass 再適用, 差分試験) | 80 kernels | 5 |
-| PLG-F1 stereo-util | Balance, Center, Mute 2, Phase Inverter, PanOMatic, Send, Stereo Enhancer/Shaper, Spreader | 9 | 6 |
-| PLG-F2 eq-filter | 7 Band EQ, Parametric EQ (1/2), EQUO, Filter, Free Filter, Fast LP, Bass Boost, Low Lifter, Emphasizer, Frequency Splitter(T3) | 11 | 12 |
-| PLG-F3 dynamics | Compressor, Limiter, Multiband Compressor, Maximus, Soundgoodizer, Transient Processor, Emphasis | 7 | 18 |
-| PLG-F4 reverb-delay | Delay, Delay 2/3/Bank, Reeverb 1/2, LuxeVerb, Convolver, Multiband Delay | 9 | 25 |
-| PLG-F5 modulation | Chorus, Flanger, Flangus, Phaser, Hyper Chorus, Vintage Chorus/Phaser, Frequency Shifter | 8 | 16 |
-| PLG-F6 distortion | Fast Dist, Blood Overdrive, Soft Clipper, WaveShaper, Squeeze, Distructor, Hardcore, Effector | 8 | 14 |
-| PLG-F7 pitch-time | Pitch Shifter, Pitcher, Newtime/Newtone(zplane), Vocoder, Vocodex, Gross Beat, Scratcher | 8 | 40 |
-| PLG-F8 controller/vfx/gui-only/visual | NoteBook×3, X-Y(Z), Peak/Formula/Envelope/Keyboard/Voltage Controller, VFX×7, dB meter, Spectroman, Wave Candy, Big Clock, Tuner, Control Surface | ~30 | 25 |
-| PLG-G1 synth-simple/drum-synth | 3x Osc, Wasp, Wasp XT, Plucked!, DX10, Dance, BeepMap, MiniSynth, SimSynth, Fruit Kick, BassDrum, DrumSynth Live, Drumaxx, Drumpad | 16 | 30 |
-| PLG-G2 synth | Autogun, BooBass, Harmless, Kepler/Exo, Morphine, Ogun, PoiZone, Sakura, Sawer, Toxic Biohazard, Transistor Bass, Wave Traveller, FL Slayer | 14 | 70 |
-| PLG-G3 sampler | FPC, FL Keys, Fruity Slicer 1/2, Slicex, Granulizer, GMS, Soundfont Player | 8 | 50 |
-| PLG-G4 big | Sytrus, Harmor, DirectWave, FLEX | 4 | 80+ |
-| PLG-X host/big3p | Fruity Wrapper×2, Patcher×2, ReWired, MIDI Out, Razer Chroma, Video Player, ZGE, FL Mobile×3 | 13 | 別方針 |
+141 本を重複なく 13 チケットに分割 (ファミリ = PLUGIN_MATRIX §5 を基に、multi-fx→F6, other-fx/audio-editor/gui-fx→F8, DirectWave→G4, ZGE→X)。 推定は **Tier 規則の est_days 合計** (PLUGIN_MATRIX §0。 P0 確立後の 1 本あたり; 計 524.5)。 旧版のファミリ見積 (括弧内) は合計が 416 で Tier 規則と不整合だったため置換。
 
-(重複計上あり: ファミリ別の本数は PLUGIN_MATRIX.md §5 が正。)
+| チケット | Linear | 内容 | 本数 | 推定 (人日) | 旧見積 |
+|---|---|---|--:|--:|--:|
+| PLG-P0a | CAB-194 | FP_DelphiPlug framework headless lift (共有 wasm) | 1 | 20 | (20) |
+| PLG-P0b | CAB-195 | Host shim (46 slot / Dispatcher 30 ID) + CreatePlugInstance E2E | 1 | 5 | (5) |
+| PLG-P0c | CAB-196 | DSP kernel 表 80 本 (f80 lowering, ARG pass 再適用, 差分試験) | 80 kernels | 5 | (5) |
+| PLG-F1 stereo-util | CAB-197 | Balance, Center, Mute 2, Phase Inverter, PanOMatic, Send, Stereo Enhancer/Shaper, Spreader | 9 | 5.5 | (6) |
+| PLG-F2 eq-filter | CAB-198 | 7 Band EQ, Parametric EQ (1/2), EQUO, Filter, Free Filter, Fast LP, Bass Boost, Low Lifter, Emphasizer, Frequency Splitter(T3) | 11 | 24 | (12) |
+| PLG-F3 dynamics | CAB-199 | Compressor, Limiter, Multiband Compressor, Maximus, Soundgoodizer, Transient Processor, Emphasis | 7 | 14.5 | (18) |
+| PLG-F4 reverb-delay | CAB-200 | Delay, Delay 2/3/Bank, Reeverb 1/2, LuxeVerb, Convolver, Multiband Delay | 9 | 38.5 | (25) |
+| PLG-F5 modulation | CAB-201 | Chorus, Flanger, Flangus, Phaser, Hyper Chorus, Vintage Chorus/Phaser, Frequency Shifter | 8 | 16.5 | (16) |
+| PLG-F6 distortion + multi-fx | CAB-202 | Fast Dist, Blood Overdrive, Soft Clipper, WaveShaper, Squeeze, Distructor, Hardcore, Effector, Love Philter | 9 | 16 | (14) |
+| PLG-F7 pitch-time | CAB-203 | Pitch Shifter, Pitcher, Newtime/Newtone(zplane), Vocoder, Vocodex, Gross Beat, Scratcher | 8 | 32 | (40) |
+| PLG-F8 controller/vfx/gui-only/visual/他 | CAB-204 | NoteBook×3, X-Y(Z), Peak/Formula/Envelope/Keyboard/Voltage Controller, VFX×7, dB meter, Spectroman, Wave Candy, Big Clock, Tuner, Control Surface, Dashboard, Edison, LSD, Transmitter, Transporter | 28 | 56 | (25) |
+| PLG-G1 synth-simple/drum-synth | CAB-205 | 3x Osc, Wasp, Wasp XT, Plucked!, DX10, Dance, BeepMap, MiniSynth, SimSynth, Fruit Kick, BassDrum, DrumSynth Live, Drumaxx, Drumpad | 14 | 33 | (30) |
+| PLG-G2 synth | CAB-206 | Autogun, BooBass, Harmless, Kepler/Exo, Morphine, Ogun, PoiZone, Sakura, Sawer, Toxic Biohazard, Transistor Bass, Wave Traveller, FL Slayer | 14 | 90 | (70) |
+| PLG-G3 sampler | CAB-207 | FPC, FL Keys, Fruity Slicer 1/2, Slicex, Granulizer, GMS, Soundfont Player | 8 | 57.5 | (50) |
+| PLG-G4 big | CAB-208 | Sytrus, Harmor, DirectWave, FLEX | 4 | 60 | (80+) |
+| PLG-X host/big3p | CAB-209 | Fruity Wrapper×2, Patcher×2, ReWired, MIDI Out, Razer Chroma, Video Player, ZGE, FL Mobile×3 (列挙は 12 本; 旧版の「13」は誤記) | 12 | 81 | (別方針) |
+
+本数計 141 / F+G+X の推定計 524.5 (+ P0 30 = 554.5)。 既存ファミリチケットとの対応: CAB-29→F1,F3 / CAB-41→F2 / CAB-39→F4 / CAB-42→F5,F6 / CAB-27→F7 / CAB-32→F8,X / CAB-28→F8(visual),X / CAB-44→G1,G2(小型) / CAB-30→G2,G4 / CAB-40→G3,G4 (いずれも blockedBy P0a/b/c)。

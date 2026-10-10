@@ -105,7 +105,7 @@ bash tools/plugins/lift/batch_lift.sh --tier T0    # T0 バッチ lift (~1.5 分
 ```
 
 ## 8. 次タスク提案 (下流チケット)
-batch_plan.md §7 の通り。 優先順: **PLG-P0a framework headless lift → P0b Host shim → P0c kernel 表 (f80 pass) → F1 stereo-util / F2 eq-filter / F6 distortion / F5 modulation (T0 主体) → F4 reverb-delay / F3 dynamics (T1) → G1〜G3 → T3 個別**。
+batch_plan.md §7 の通り (Linear 起票済み: CAB-194 P0a / CAB-195 P0b / CAB-196 P0c / CAB-197〜204 F1〜F8 / CAB-205〜208 G1〜G4 / CAB-209 X; すべて CAB-12 の子)。 優先順: **PLG-P0a framework headless lift → P0b Host shim → P0c kernel 表 (f80 pass) → F1 stereo-util / F2 eq-filter / F6 distortion / F5 modulation (T0 主体) → F4 reverb-delay / F3 dynamics (T1) → G1〜G3 → T3 個別**。
 
 ## 9. 検収 (2026-10-10, 独立再計算) 結果
 全主張を再計算し **PASS (訂正 3 点のみ)**。 訂正: ①kernel の f80 混入 **26→25/80** (IR 実測; 機械語 x87 は 28/80) ②framework「同一」→ 130/133 本でほぼ共通・3 本は別構成 (§0.2) ③T1 未実装 helper の件数 (§4.3)。
