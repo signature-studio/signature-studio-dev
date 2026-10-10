@@ -198,7 +198,7 @@ CAB-211 のフック口の**変換実体**を `src/cbtrans.c` として恒久実
 ## 11. vreg reg.c 本体取込 + username 統一 (CAB-214, SHX-T10)
 
 **結論**: `tools/startup/vreg/src/reg.c` (828 行, CAB-94/a5b44fe) の拡張全てを `src/reg.c` に取込した
-(686→828 行, 公開シンボル **39→50**, 欠落 0 — 旧 39 シンボルは全て継承)。以後の改良は shimx 側が正本。
+(686→829 行, 公開シンボル **39→50**, 欠落 0 — 旧 39 シンボルは全て継承)。以後の改良は shimx 側が正本。
 vreg 側との二重管理は解消 (vreg `build.sh symcheck`: shimx 50 シンボルを vreg reg.c が全包含 / **追加 0** =
 両者はシンボル集合として同一)。username も CAB-213 の正規表記 `C:\Users\webstudio` に統一した。
 
@@ -224,7 +224,7 @@ CAB-213 §3 の正規表記へ shimx 内蔵値を統一 (pathreg の alias mount
 |---|---|---|
 | `src/env.c` | env 既定表: `USERPROFILE` `HOMEPATH` `APPDATA` `LOCALAPPDATA` `TEMP` `TMP` (6 パス) + `USERNAME` | `...\Users\user...` → `...\Users\webstudio...` / `USERNAME=user` → `webstudio` |
 | `src/file.c` | `GetTempPathW/A` の既定 Temp (2 箇所) | 同上 |
-| `src/shell.c` | `csidl_path()` 16 箇所 + KnownFolder GUID 表 7 箇所 (SHGetFolderPathW/SHGetKnownFolderPath/SHGetSpecialFolderPathW が返すパス) | 同上 (`C:\Users\Public` 系は不変) |
+| `src/shell.c` | `csidl_path()` 13 箇所 + KnownFolder GUID 表 6 箇所 (SHGetFolderPathW/SHGetKnownFolderPath/SHGetSpecialFolderPathW が返すパス) | 同上 (`C:\Users\Public` 系は不変) |
 | `test/test_sys.c` | `PathUnExpandEnvStringsW` 入力 / `GetTempPathW` 期待値 (2 箇所) | 期待値を新正規表記に更新 |
 | `test/test_ole_shell.c` | `SHGetFolderPathW`/`SHGetKnownFolderPath`/`SHGetSpecialFolderLocation` 期待値 (3 箇所) | 同上 |
 
