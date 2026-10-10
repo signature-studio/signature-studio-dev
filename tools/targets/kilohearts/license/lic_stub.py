@@ -67,6 +67,16 @@ def body(kind, cfg):
             '  store i64 %p, ptr @rax',
             '  ret i64 %p',
         ]
+    if kind == 'retderef':
+        # アリーナ上の固定セル (32bit) を読んで zext して返す。native oracle 側は同一アドレスを
+        # 読む image パッチ (mov eax,[addr]; ret) を当てるので、状態注入 (status 可変) が両系で一致する。
+        addr = int(cfg['addr'], 16)
+        return [
+            '  %%q = inttoptr i64 %d to ptr' % addr,
+            '  %v = load i32, ptr %q',
+            '  %z = zext i32 %v to i64',
+            '  ret i64 %z',
+        ]
     raise SystemExit('unknown stub kind: %s' % kind)
 
 
@@ -100,6 +110,7 @@ def main():
 
     cfg = json.load(open(a.config))
     want = {s['va']: s for s in cfg['stubs']}
+    zeroarg = False
     if a.module:
         mod = cfg['modules'][a.module]
         if mod.get('stub_all'):
@@ -107,6 +118,10 @@ def main():
         else:
             only = set(mod.get('stub_only', []))
             want = {k: v for k, v in want.items() if k in only}
+        # モジュール固有の stub 上書き (例: module E の getStatus は retderef でアリーナセルから status を読む)
+        for k, v in (mod.get('stub_override') or {}).items():
+            want[k] = v
+        zeroarg = bool(mod.get('synth_zeroarg', False))
 
     lines = open(a.src).read().split('\n')
     out, rep, i = [], {k: {'wrapper': False, 'body': False, 'sig': None, 'kind': want[k]['kind']} for k in want}, 0
@@ -153,10 +168,24 @@ def main():
         out.extend(body(s['kind'], s))
         out.append('}')
         out.append('')
-        out.extend(wrapper_fn('i64', 'i64 %p0, i64 %p1, i64 %p2, i64 %p3', va))
+        # synth wrapper の呼出規約: lift 済み呼出側は stage-0 規約 (引数は @rcx/@rdx/@r8/@r9 グローバル,
+        # call は引数なし) で呼ぶ。module E のように lift 済み関数から呼される stub はゼロ引数 wrapper、
+        # KH-9 の module A/B のように JS から直接引数を渡す stub は従来の 4 引数 wrapper (config で選択)。
+        if zeroarg:
+            out.append('define i64 @function_%s() {' % va)
+            out.append('entry:')
+            out.append('  %%r = call i64 @kh_%s()' % va)
+            out.append('  ret i64 %r')
+            out.append('}')
+        else:
+            out.extend(wrapper_fn('i64', 'i64 %p0, i64 %p1, i64 %p2, i64 %p3', va))
         out.append('')
         rep[va]['wrapper'] = rep[va]['body'] = True
         rep[va]['synth'] = True
+    if synth:
+        # kh_lower が生成した unlifted callee の declare と二重定義になるため除去
+        sset = {'function_%s' % v for v in synth}
+        out = [l for l in out if not (l.startswith('declare ') and any('@%s(' % n in l for n in sset))]
     open(a.dst, 'w').write('\n'.join(out))
     n_ok = sum(1 for v in rep.values() if v['wrapper'] and v['body'])
     n_want = len(want)

@@ -41,7 +41,7 @@ FN_DEF = re.compile(r'^define \S+ @function_([0-9a-f]+)\(\) \{$')
 LIT = re.compile(r'(?<![\w%.@])(\d{10,11})(?![\w.])')
 
 
-def lower_body(lines, cfg, skip, uid, rep):
+def lower_body(lines, cfg, skip, uid, rep, volatile_ret=False):
     out = []
     i = 0
     pend_sext = {}
@@ -171,8 +171,13 @@ def lower_body(lines, cfg, skip, uid, rep):
             continue
         if l.strip() == 'ret i64 undef':
             # stage-0 の call は `store i64 <callee 戻り値>, @rax` を後置する → callee は実 rax を返す必要がある (0 を返すと戻り値を潰す)
+            # volatile_ret: LLVM -O1 の TailCallElim が「call の戻り値 ≡ 末尾の load @rax」を証明して
+            # 中間の副作用 (stub 呼出等) を消し tail call 化するのを防ぐ (module E の EditorModel 層で発災)。
             t = uid('q')
-            out += [f'  %{t} = load i64, i64* @rax', f'  ret i64 %{t}']
+            if volatile_ret:
+                out += [f'  %{t} = load volatile i64, i64* @rax', f'  ret i64 %{t}']
+            else:
+                out += [f'  %{t} = load i64, i64* @rax', f'  ret i64 %{t}']
             i += 1
             continue
         out.append(l)
@@ -197,10 +202,16 @@ def main():
     ap.add_argument('--lift', required=True)
     ap.add_argument('--abi', default='{}')
     ap.add_argument('--skip', default='')
+    ap.add_argument('--raw-va', action='store_true',
+                    help='素の VA リテラルを ptrtoint(@global_var) に置換せず値として残す (EditorModel 層: vtable store の byte parity 用)')
+    ap.add_argument('--volatile-ret', action='store_true',
+                    help='kh_ 本体末尾の load @rax を volatile にする (LLVM -O1 TailCallElim による中間副作用削除の抑止)')
     ap.add_argument('--jt', default='{}', help='{"<jmp insn va hex>": {"table": va, "n": N}}  switch jump table (32bit signed offsets from table base)')
     a = ap.parse_args()
     skip = set(filter(None, a.skip.split(',')))
-    abi = json.loads(a.abi)  # {"<va hex>": {"params": ["i64","float",...], "ret": "i64|float|double|void"}}
+    raw_va = a.raw_va
+    volatile_ret = a.volatile_ret
+    abi = json.loads(a.abi)  # {"<va hex>": {"params": ["i64","float",...], "ret": "i64|float|double|void", "stack": ["i64",...]}}
     vas = [int(x, 16) for x in a.lift.split(',')]
     text = open(a.stage0).read().split('\n')
     # 関数本体抽出
@@ -235,24 +246,33 @@ def main():
         sys.path.insert(0, __import__('os').path.join(__import__('os').path.dirname(__import__('os').path.abspath(__file__)), '..', 'scripts'))
         from pe_dis import rd as _rd
         jt['_rd'] = _rd
-    texts = {v: '\n'.join(lower_body(bodies[v], jt, skip, uid, rep)) for v in vas}
+    texts = {v: '\n'.join(lower_body(bodies[v], jt, skip, uid, rep, volatile_ret)) for v in vas}
     allt = '\n'.join(texts.values())
     # ---- rdata windows
+    # deref 意図の VA (inttoptr (i64 <PE VA> to T*)) は常に窓 (@global_var_<VA>) へ置換。
+    # 素の VA リテラル (vtable / RTTI / 関数ポインタ等の「値」store) は --raw-va 指定時のみ生の定数を残す:
+    # wasm も native と同じ 64bit 値を store するのでアリーナ byte 比較が一致する
+    # (既定動作: ptrtoint(@global_var) 置換 — 計算 index のテーブル読み (DSP closure) はこちらに依存)。
     CAST = re.compile(r'inttoptr \(i64 (\d+) to ([\w*\[\] ]+)\)')
     vaset = set()
     for m in CAST.finditer(allt):
         v = int(m.group(1))
         if IMG_LO <= v < IMG_HI:
             vaset.add(v)
-    for m in LIT.finditer(CAST.sub('', allt)):
-        v = int(m.group(1))
-        if IMG_LO <= v < IMG_HI:
-            vaset.add(v)
+    if not raw_va:
+        for m in LIT.finditer(CAST.sub('', allt)):
+            v = int(m.group(1))
+            if IMG_LO <= v < IMG_HI:
+                vaset.add(v)
 
     def window(txt):
         if 'rdata' in skip:
             return txt
         txt = CAST.sub(lambda m: (f'bitcast (i8* @global_var_{int(m.group(1)):x} to {m.group(2)})' if int(m.group(1)) in vaset else m.group(0)), txt)
+        if raw_va:
+            # --raw-va: 素の VA リテラルを値として生のまま残す (vtable/RTTI store が native と byte 一致)。
+            # deref は CAST 形のみ窓へ行くため、計算 index のテーブル読み (DSP closure) は旧動作のまま。
+            return txt
         return LIT.sub(lambda m: (f'ptrtoint (i8* @global_var_{int(m.group(1)):x} to i64)' if int(m.group(1)) in vaset else m.group(1)), txt)
 
     def rename(txt):
@@ -299,19 +319,34 @@ def main():
     # ---- wrapper
     for v in vas:
         sg = abi.get('%x' % v, {'params': ['i64', 'i64', 'i64', 'i64'], 'ret': 'i64'})
-        ps = ', '.join('%s %%p%d' % (t, k) for k, t in enumerate(sg['params']))
+        all_params = list(sg['params']) + list(sg.get('stack', []))
+        ps = ', '.join('%s %%p%d' % (t, k) for k, t in enumerate(all_params))
         w = [f'define {("i64" if sg["ret"] == "i64" else sg["ret"])} @function_{v:x}({ps}) {{', 'entry:']
         iregs = ['rcx', 'rdx', 'r8', 'r9']
-        for k, t in enumerate(sg['params']):
+        stack_args = sg.get('stack', [])
+        nreg = len(sg['params'])
+        for k, t in enumerate(all_params):
             if t == 'i64':
-                w.append(f'  store i64 %p{k}, i64* @{iregs[k]}')
+                w.append(f'  %a{k}.v = or i64 %p{k}, 0')
             elif t == 'i32':
-                w.append(f'  %p{k}.z = zext i32 %p{k} to i64\n  store i64 %p{k}.z, i64* @{iregs[k]}')
+                w.append(f'  %a{k}.v = zext i32 %p{k} to i64')
             elif t == 'float':
-                w += [f'  %p{k}.b = bitcast float %p{k} to i32', f'  %p{k}.z = zext i32 %p{k}.b to i128', f'  store i128 %p{k}.z, i128* @xmm{k}']
+                w += [f'  %a{k}.b = bitcast float %p{k} to i32', f'  %a{k}.v = zext i32 %a{k}.b to i128']
             elif t == 'double':
-                w += [f'  %p{k}.b = bitcast double %p{k} to i64', f'  %p{k}.z = zext i64 %p{k}.b to i128', f'  store i128 %p{k}.z, i128* @xmm{k}']
+                w += [f'  %a{k}.b = bitcast double %p{k} to i64', f'  %a{k}.v = zext i64 %a{k}.b to i128']
+            if k < 4:
+                if t in ('float', 'double'):
+                    w.append(f'  store i128 %a{k}.v, i128* @xmm{k}')
+                else:
+                    w.append(f'  store {t} %a{k}.v, {t}* @{iregs[k]}')
         w += ['  %sp = ptrtoint i8* @kh_stack to i64', f'  %sp1 = add i64 %sp, {STACK - 0x48}', '  store i64 %sp1, i64* @rsp']
+        # スタック引数 (5th..): MS x64 では callee entry rsp+0x28+8j。wrapper は rsp を
+        # kh_stack+STACK-0x48 (entry rsp 相当) に設定するため、引数は %sp1+0x28+8j に store する。
+        for j, t in enumerate(stack_args):
+            off = 0x28 + 8 * j
+            w.append(f'  %sarg{j} = add i64 %sp1, {off}')
+            w.append(f'  %sarg{j}.p = inttoptr i64 %sarg{j} to i64*')
+            w.append(f'  store i64 %a{nreg + j}.v, i64* %sarg{j}.p')
         if 'abicheck' not in skip:
             for k, r in enumerate(CALLEE_I):                   # 毒入れ: 上位ビット非自明な定数で callee-saved を汚してから呼ぶ
                 w.append(f'  store i64 {(0x8123456789abcdef + k * 0x11111) - (1 << 64)}, i64* @{r}')
@@ -337,6 +372,8 @@ def main():
             w += [f'  br i1 {acc}, label %abi_bad, label %abi_ok', 'abi_bad:', '  call void @llvm.trap()', '  unreachable', 'abi_ok:']
         if sg['ret'] == 'i64':
             w += ['  %ax = load i64, i64* @rax', '  ret i64 %ax']
+        elif sg['ret'] == 'i32':
+            w += ['  %ax = load i64, i64* @rax', '  %axt = trunc i64 %ax to i32', '  ret i32 %axt']
         elif sg['ret'] == 'float':
             w += ['  %x0 = load i128, i128* @xmm0', '  %t = trunc i128 %x0 to i32', '  %f = bitcast i32 %t to float', '  ret float %f']
         elif sg['ret'] == 'double':

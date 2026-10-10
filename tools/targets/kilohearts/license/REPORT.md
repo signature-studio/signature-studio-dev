@@ -107,3 +107,11 @@ DSP 固有 closure (42 効果) にはライセンス/ネット系参照が無く
 - 検証: stub モジュール実行 70/70 PASS / snapin 6 種 base・lic とも ctx-fuzz **200/200 bit-exact** (DSP の lift IR にライセンス参照 0 件 = §4 の IR レベル実証) / 既存 snapins e2e (run_all.sh) exit=0 で増減なし。
 - §2 の訂正 1 件: 状態マージ 0x1800b4b10 のテーブルは **T[24]=0, T[25]=2, T[28]=0** (機械語 disasm + decompile の両方で確認。初版本文「24/25→2」「28→4」は誤り — §2 本文は修正済み)。
 - 状態 enum の意味対応 (§6-1 引継) を呼出文脈から確定: **9 = ライセンス済み (バナー解除)** / {5,7,8,26} = class 4 (同くバナー解除) / 25 = No license (編集不可) / 13 = 期限切れ / 0x1c = PACE 検証マーカー (KH9_REPORT §3)。
+
+## 9. KH-10 追記 (EditorModel 層部分 lift 完了・詳細は `KH10_REPORT.md`)
+
+- §6-5 の「+0x1088 書込側」を解明: (1) **0x18002e850** — 47 製品のエディタ文書 ctor 0x18002dc30 が EM+0x1b0 に登録するコールバック (poll1 冒頭 `FUN_180022be0(EM+0x1b0)` から起火) で、**thunkB(status) (mask {5,7,8,26}) 成立時に 0 を書込**、(2) 0x1800f6540 — `[+0x1088] = !thunkA(status)`、(3) 0x18068f750/930/a00 — 汎用 property setter。**getStatus≡9 では全系統が 0 を書くか不発 → flag は 0 を保ち poll2 の「編集可」が成立**。
+- EditorModel ctor 0x180051af0 + poll1/poll2 (0x180052830/0x180052a00) + EventSlot/property 機構 + 分類 thunk・状態マージ (実 IR) + writer 計 **25 関数を lift** (module E, wasm 142,363B)。
+- 検証: **47/47 製品が「編集可能」として成立** (`em_check.mjs` ok=50/ng=0) + native oracle (実機機械語・アリーナ ms_abi・image パッチで stub seam 両系一致) との ctx-fuzz **200/200 (700 call) + 1000/1000 (10,000 call) bit-exact**。
+- 回帰: lic_check 70/70 / license run_all.sh exit=0 / snapins e2e exit=0 (無劣化)。
+- §5-2 の残課題は KH-11 (CAB-248) へ引継: subscribe 経路 (0x180024bd0/0x180025080) の解除 (間接 call 復元が前提) と listener/observer ありの通知、0x1800f6540 の lift。

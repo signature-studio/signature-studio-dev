@@ -7,7 +7,9 @@
 #   [2] lic_check.mjs: A/B 70 項目の実行検証 (定数返し・メモリ形状・実 thunk@9 ≡ stub 定数・実マージの優先度テーブル)
 #   [3] snapin 6 種 (Channel Mixer/Gain/Haas/Clipper/Gate/3-Band EQ) を base (stub 無し) / lic (stub 適用) の
 #       2 系で lift→emcc→ctx-fuzz 200 trial (実機機械語と bit 突合) + ライセンス関数参照数の census
-#   [4] まとめ表
+#   [4] KH-10 (CAB-247): EditorModel 層部分 lift (module E: ctor+poll1/poll2+EventSlot+writer) の
+#       lift→emcc→native oracle ctx-fuzz (ctor/poll 200 + 1000 trial, 状態注入込み) + 47 製品「編集可能」デモ
+#   [5] まとめ表
 #
 # snapins/ 側は参照のみ (run_all.sh の本体実行は別途: bash tools/targets/kilohearts/snapins/run_all.sh)。
 # 成果物は license/work/ (gitignore)。
@@ -33,7 +35,18 @@ for n in matrix gain haas clipper gate quickeq; do
   python3 lic_build.py --dsp "$n" --tag lic --trials "$TRIALS" --seed "$SEED" | tail -1
 done
 
-echo "== [4] まとめ"
+echo "== [4] KH-10 (CAB-247): EditorModel 層部分 lift (module E) → native oracle ctx-fuzz + 47 製品デモ"
+python3 lic_build.py --module E | tail -1
+if [ ! -x work/native_ref ]; then
+  cc -O1 -Wall -o work/native_ref harness/native_ref.c harness/scenarios.c -Iharness
+fi
+./work/native_ref "$CORE" em 200 1 work/em_200_1.bin
+node harness/compare.mjs work/em_200_1.bin work/licE/mod.cjs work/licE/sigs.json --json work/em_200_1.json | tail -1
+./work/native_ref "$CORE" empoll 1000 7 work/empoll_1000_7.bin
+node harness/compare.mjs work/empoll_1000_7.bin work/licE/mod.cjs work/licE/sigs.json --json work/empoll_1000_7.json | tail -1
+node em_check.mjs | tail -1
+
+echo "== [5] まとめ"
 node -e '
 const fs = require("fs");
 for (const n of ["matrix","gain","haas","clipper","gate","quickeq"]) {

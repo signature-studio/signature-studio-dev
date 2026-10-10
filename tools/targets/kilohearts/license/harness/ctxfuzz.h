@@ -12,7 +12,7 @@
 #include <stddef.h>
 #include <string.h>
 
-typedef uint64_t u64; typedef uint32_t u32; typedef uint8_t u8; typedef int32_t i32;
+typedef uint64_t u64; typedef uint32_t u32; typedef uint16_t u16; typedef uint8_t u8; typedef int32_t i32;
 
 #define ARENA_BASE 0x04000000UL
 #define ARENA_SIZE (8UL << 20)
@@ -31,15 +31,18 @@ float RFSPECIAL(float lo, float hi);       /* たまに 0 / ±lo / ±hi / 非正
 static inline u32 fbits(float f) { u32 u; memcpy(&u, &f, 4); return u; }
 static inline float bitsf(u32 u) { float f; memcpy(&f, &u, 4); return f; }
 
-/* 呼出: rcx,rdx,r8,r9 = a0..a3, xmm0..3 低 64bit = x0..x3 (float 引数は位置 k の xmm_k に fbits を入れる) */
-u64 do_call(u64 va, int rk, u64 a0, u64 a1, u64 a2, u64 a3, u64 x0, u64 x1, u64 x2, u64 x3);
-#define C1(va, rk, a0)                 do_call(va, rk, (u64)(a0), 0, 0, 0, 0, 0, 0, 0)
-#define C2(va, rk, a0, a1)             do_call(va, rk, (u64)(a0), (u64)(a1), 0, 0, 0, 0, 0, 0)
-#define C3(va, rk, a0, a1, a2)         do_call(va, rk, (u64)(a0), (u64)(a1), (u64)(a2), 0, 0, 0, 0, 0)
-#define C1F(va, rk, a0, f1)            do_call(va, rk, (u64)(a0), 0, 0, 0, 0, fbits(f1), 0, 0)
+/* 呼出: rcx,rdx,r8,r9 = a0..a3, a4..a7 = スタック引数 (MS x64: callee entry rsp+0x28+8k), xmm0..3 低 64bit = x0..x3 */
+u64 do_call(u64 va, int rk, u64 a0, u64 a1, u64 a2, u64 a3, u64 x0, u64 x1, u64 x2, u64 x3, u64 a4, u64 a5, u64 a6, u64 a7);
+#define C1(va, rk, a0)                 do_call(va, rk, (u64)(a0), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+#define C2(va, rk, a0, a1)             do_call(va, rk, (u64)(a0), (u64)(a1), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+#define C3(va, rk, a0, a1, a2)         do_call(va, rk, (u64)(a0), (u64)(a1), (u64)(a2), 0, 0, 0, 0, 0, 0, 0, 0, 0)
+#define C4(va, rk, a0, a1, a2, a3)     do_call(va, rk, (u64)(a0), (u64)(a1), (u64)(a2), (u64)(a3), 0, 0, 0, 0, 0, 0, 0, 0)
+#define C7(va, rk, a0, a1, a2, a3, s0, s1, s2) \
+                                       do_call(va, rk, (u64)(a0), (u64)(a1), (u64)(a2), (u64)(a3), 0, 0, 0, 0, (u64)(s0), (u64)(s1), (u64)(s2), 0)
+#define C1F(va, rk, a0, f1)            do_call(va, rk, (u64)(a0), 0, 0, 0, 0, fbits(f1), 0, 0, 0, 0, 0, 0)
 static inline u64 dbits(double d) { u64 u; memcpy(&u, &d, 8); return u; }
-#define CD0(va, rk, d0)                do_call(va, rk, 0, 0, 0, 0, dbits(d0), 0, 0, 0)       /* xmm0 = double */
-#define CF0(va, rk, f0)                do_call(va, rk, 0, 0, 0, 0, fbits(f0), 0, 0, 0)       /* xmm0 = float */
+#define CD0(va, rk, d0)                do_call(va, rk, 0, 0, 0, 0, dbits(d0), 0, 0, 0, 0, 0, 0, 0)       /* xmm0 = double */
+#define CF0(va, rk, f0)                do_call(va, rk, 0, 0, 0, 0, fbits(f0), 0, 0, 0, 0, 0, 0, 0)       /* xmm0 = float */
 
 typedef struct { const char* name; void (*trial)(int idx); int ncalls_hint; } Scenario;
 extern Scenario SCEN_LIST[];

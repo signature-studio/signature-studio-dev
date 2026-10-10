@@ -46,7 +46,7 @@ for (let t = 0; t < ntrials; t++) {
   for (let c = 0; c < ncalls; c++) {
     const np = u32();
     for (let i = 0; i < np; i++) { const off = u32(), len = u32(); H8().set(buf.subarray(p, p + len), ARENA + off); p += len; }
-    const va = u64(); const a = [u64(), u64(), u64(), u64()]; const x = [u64(), u64(), u64(), u64()];
+    const va = u64(); const a = [u64(), u64(), u64(), u64(), u64(), u64(), u64(), u64()]; const x = [u64(), u64(), u64(), u64()];
     const rk = u32(); const rax = u64(); const xmm0 = u64();
     const plen = u32(); const post = buf.subarray(p, p + plen); p += plen;
     usedNow = Math.max(usedNow, plen);

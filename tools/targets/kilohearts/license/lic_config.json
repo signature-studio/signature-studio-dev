@@ -42,6 +42,39 @@
     "B": {"comment": "対照モジュール: getStatus のみ stub、分類 thunk 5 種とマージは実 IR (stub 定数 ≡ 実関数@9 の等価検証用)",
           "lift": ["180054bd0", "1800b4ac0", "1800b4ad0", "1800b4ae0", "1800b4af0", "1800b4b00", "1800b4b10"],
           "stub_all": false,
-          "stub_only": ["180054bd0"]}
+          "stub_only": ["180054bd0"]},
+    "E": {
+      "comment": "KH-10 (CAB-247) EditorModel 層部分 lift モジュール。0x180051af0 (EditorModel ctor) + poll1/poll2 (0x180052830/0x180052a00) + EventSlot/property 機構 (0x18003d650/0x18003d7e0/0x180022be0/0x1800c6270/0x1800c6320/0x1800c6530/0x18001e440/0x18000d400) + 分類 thunk 5 種と状態マージの実 IR + +0x1088 writer (0x18002e850) + 補助 (0x1800b20e0/0x18001ba90/0x180054b90/0x1800524e0/0x18000caf0/0x18006be60/0x18006f270)。stub seam: getStatus は retderef (アリーナ 0x0400F100 の status セルを読む = native oracle も同一アドレスを読む image パッチで一致)、key_init/apply_key は lic_stub。C shim: operator new/delete (アリーナ bump)、memset/memcpy、getManager (fake mgr)、subscribe 0x1800526f0 (no-op — 登録先は manager 側ヒープでアリーナ外、 functor 経路の vtable call が RetDec stage-0 で落ちるため統合 seam)。raw_va: vtable/RTTI/関数ポインタの「値」store を生 VA のままにして native と byte 一致させる。",
+      "lift": ["180051af0", "180052830", "180052a00", "18003d650", "18003d7e0", "180022be0", "1800c6270", "1800c6320", "1800c6530", "18001e440", "18000d400", "1800b4ac0", "1800b4ad0", "1800b4ae0", "1800b4af0", "1800b4b00", "1800b4b10", "18002e850", "1800b20e0", "18001ba90", "180054b90", "1800524e0", "18000caf0", "18006be60", "18006f270"],
+      "stub_all": false,
+      "stub_only": ["180054bd0", "180021490", "1800219b0"],
+      "stub_override": {
+        "180054bd0": {"va": "180054bd0", "name": "LicenseManagerHelper::getStatus", "kind": "retderef", "addr": "04000008",
+                      "reason": "module E は ctx-fuzz で status を状態注入するため、定数 9 でなくアリーナ固定セル (0x04000008, i32 = scen_em の A_STATUS) を読んで返す。native oracle は同一アドレスを読む image パッチ (mov eax,[0x04000008]; ret) を当て、stub seam を両系で一致させる"}
+      },
+      "raw_va": true,
+      "volatile_ret": true,
+      "synth_zeroarg": true,
+      "emcc_opt": "-O0",
+      "shims": {
+        "180f878e0": "new",
+        "180f8791c": "delete",
+        "1813846e0": "memset",
+        "181384040": "memcpy",
+        "180107430": "getManager",
+        "1800526f0": "subscribe",
+        "180013020": "ident"
+      },
+      "abi": {
+        "180051af0": {"params": ["i64", "i64", "i64", "i64"], "stack": ["i64", "i64", "i64"], "ret": "i64",
+                      "note": "EditorModel ctor: rcx=EM, rdx=param_2 (shared_ptr), r8=param_3 (sub-object), r9=param_4, stack: param_5, param_6 (descriptor), param_7"},
+        "180052830": {"params": ["i64"], "ret": "void"},
+        "180052a00": {"params": ["i64"], "ret": "void"},
+        "180022be0": {"params": ["i64"], "ret": "void"},
+        "1800c6320": {"params": ["i64"], "ret": "void"},
+        "18003d7e0": {"params": ["i64", "i64", "i64", "i64"], "stack": ["i64"], "ret": "void"},
+        "180054b90": {"params": ["i64"], "ret": "i32"}
+      }
+    }
   }
 }

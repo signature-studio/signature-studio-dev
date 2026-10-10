@@ -68,7 +68,7 @@ float RFSPECIAL(float lo, float hi) {
     }
 }
 
-typedef struct { u64 a[4], x[4], rax, xmm0; } Frame;
+typedef struct { u64 a[8], x[4], rax, xmm0; } Frame;
 static u64 msx64_call(u64 fn, Frame* fr) {
     __asm__ volatile(
         "mov %%rsp, %%r12\n\t"
@@ -79,13 +79,22 @@ static u64 msx64_call(u64 fn, Frame* fr) {
         "mov 8(%%rdi), %%rdx\n\t"
         "mov 16(%%rdi), %%r8\n\t"
         "mov 24(%%rdi), %%r9\n\t"
-        "movq 32(%%rdi), %%xmm0\n\t"
-        "movq 40(%%rdi), %%xmm1\n\t"
-        "movq 48(%%rdi), %%xmm2\n\t"
-        "movq 56(%%rdi), %%xmm3\n\t"
+        "/* スタック引数 a4..a7 (Frame+32..56) → call 後 callee entry rsp+0x28+8k == call 前 rsp+0x20+8k */\n\t"
+        "mov 32(%%rdi), %%rax\n\t"
+        "mov %%rax, 0x20(%%rsp)\n\t"
+        "mov 40(%%rdi), %%rax\n\t"
+        "mov %%rax, 0x28(%%rsp)\n\t"
+        "mov 48(%%rdi), %%rax\n\t"
+        "mov %%rax, 0x30(%%rsp)\n\t"
+        "mov 56(%%rdi), %%rax\n\t"
+        "mov %%rax, 0x38(%%rsp)\n\t"
+        "movq 64(%%rdi), %%xmm0\n\t"
+        "movq 72(%%rdi), %%xmm1\n\t"
+        "movq 80(%%rdi), %%xmm2\n\t"
+        "movq 88(%%rdi), %%xmm3\n\t"
         "call *%%rbx\n\t"
-        "mov %%rax, 64(%%rdi)\n\t"
-        "movq %%xmm0, 72(%%rdi)\n\t"
+        "mov %%rax, 96(%%rdi)\n\t"
+        "movq %%xmm0, 104(%%rdi)\n\t"
         "mov %%r12, %%rsp\n\t"
         : "+D"(fr)
         : "b"(fn)
@@ -96,7 +105,7 @@ static u64 msx64_call(u64 fn, Frame* fr) {
 static void w32(u32 v) { fwrite(&v, 4, 1, out); }
 static void w64(u64 v) { fwrite(&v, 8, 1, out); }
 
-u64 do_call(u64 va, int rk, u64 a0, u64 a1, u64 a2, u64 a3, u64 x0, u64 x1, u64 x2, u64 x3) {
+u64 do_call(u64 va, int rk, u64 a0, u64 a1, u64 a2, u64 a3, u64 x0, u64 x1, u64 x2, u64 x3, u64 a4, u64 a5, u64 a6, u64 a7) {
     /* patch = 現アリーナ vs shadow (wasm 側が持っている状態) の差分 */
     size_t n = used;
     long pp = ftell(out); w32(0); u32 np = 0;
@@ -109,9 +118,9 @@ u64 do_call(u64 va, int rk, u64 a0, u64 a1, u64 a2, u64 a3, u64 x0, u64 x1, u64 
         i = last + 1;
     }
     long pe = ftell(out); fseek(out, pp, SEEK_SET); w32(np); fseek(out, pe, SEEK_SET);
-    Frame fr = {{a0, a1, a2, a3}, {x0, x1, x2, x3}, 0, 0};
+    Frame fr = {{a0, a1, a2, a3, a4, a5, a6, a7}, {x0, x1, x2, x3}, 0, 0};
     msx64_call(va, &fr);
-    w64(va); for (int i = 0; i < 4; i++) w64(fr.a[i]); for (int i = 0; i < 4; i++) w64(fr.x[i]);
+    w64(va); for (int i = 0; i < 8; i++) w64(fr.a[i]); for (int i = 0; i < 4; i++) w64(fr.x[i]);
     w32(rk); w64(fr.rax); w64(fr.xmm0);
     w32((u32)used); fwrite(arena, 1, used, out);
     if (used > shadow_used) memset(shadow + shadow_used, 0, used - shadow_used);

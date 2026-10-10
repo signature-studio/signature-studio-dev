@@ -23,7 +23,7 @@ static void trial_clipper(int t) {
     for (int k = 0; k < nb; k++) {
         int op = R32() % 12;
         if (op == 0) { C1(CL_RESET, RET_NONE, self); continue; }
-        if (op == 1) { do_call(CL_PEAK, RET_NONE, (u64)meter, RI(0, 63), 0, 0, 0, 0, fbits(RF(0, 2)), fbits(RF(0, 2))); continue; }
+        if (op == 1) { do_call(CL_PEAK, RET_NONE, (u64)meter, RI(0, 63), 0, 0, 0, 0, fbits(RF(0, 2)), fbits(RF(0, 2)), 0, 0, 0, 0); continue; }
         int n = pick_n(); if (n > 64) n = 64;
         float lo[4] = {0.2f, 0.05f, 0.5f, 0.5f}, hi[4] = {1.5f, 1.0f, 2.0f, 2.0f};
         for (int r = 0; r < 4; r++) {

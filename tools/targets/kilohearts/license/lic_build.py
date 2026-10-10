@@ -60,7 +60,7 @@ def capture_stage0(rstr, dst, base):
     open(dst, 'w').write(''.join(cap))
 
 
-def build(vas, tag_dir, tag, apply_stub, module=None, abi=None, jt=None, shims=None, emcc_extra_exports=None):
+def build(vas, tag_dir, tag, apply_stub, module=None, abi=None, jt=None, shims=None, emcc_extra_exports=None, raw_va=False, volatile_ret=False, emcc_opt='-O1'):
     """lift → (stub pass) → normalize → helper 生成 → emcc。stat dict を返す"""
     W = tag_dir
     os.makedirs(W, exist_ok=True)
@@ -84,8 +84,9 @@ def build(vas, tag_dir, tag, apply_stub, module=None, abi=None, jt=None, shims=N
         stat['retdec_sec'] = 0
     abi = json.dumps(abi or {})
     jts = json.dumps(jt or {})
-    r, _ = sh("python3 %s/lift/kh_lower.py %s %s --core %s --lift %s --abi '%s' --jt '%s'" % (
-        ROOT, s0, P('lowered.ll'), CORE, ','.join('%x' % v for v in sorted(vas)), abi, jts))
+    r, _ = sh("python3 %s/lift/kh_lower.py %s %s --core %s --lift %s --abi '%s' --jt '%s'%s%s" % (
+        ROOT, s0, P('lowered.ll'), CORE, ','.join('%x' % v for v in sorted(vas)), abi, jts,
+        ' --raw-va' if raw_va else '', ' --volatile-ret' if volatile_ret else ''))
     stat['passes'] = r.stdout.strip()
     sh('python3 %s/lift/ir_normalize.py %s %s' % (ROOT, P('lowered.ll'), P('n1.ll')))
     if apply_stub:
@@ -122,10 +123,10 @@ def build(vas, tag_dir, tag, apply_stub, module=None, abi=None, jt=None, shims=N
     exports = ['_function_' + k for k in sig] + ['_malloc', '_free']
     if emcc_extra_exports:
         exports += emcc_extra_exports
-    r, dt = sh('emcc -w -O1 -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=96MB -sENVIRONMENT=node -sMODULARIZE=1 '
+    r, dt = sh('emcc -w %s -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=96MB -sENVIRONMENT=node -sMODULARIZE=1 '
                '-sEXPORT_NAME=KhLic -sERROR_ON_UNDEFINED_SYMBOLS=0 --no-entry -sEXPORTED_FUNCTIONS=%s '
                '-sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAP32,HEAP64 -Wl,--no-gc-sections -I%s/lift %s %s %s %s -o %s' % (
-                   ','.join(exports), ROOT, P('final.ll'), P('simd.c'), P('globals.c'), P('stubs.c'), P('mod.cjs')),
+                   emcc_opt, ','.join(exports), ROOT, P('final.ll'), P('simd.c'), P('globals.c'), P('stubs.c'), P('mod.cjs')),
                log=P('emcc.log'))
     stat['emcc_sec'] = round(dt, 1)
     stat['wasm_bytes'] = os.path.getsize(P('mod.wasm'))
@@ -139,7 +140,7 @@ def build(vas, tag_dir, tag, apply_stub, module=None, abi=None, jt=None, shims=N
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--module', choices=['A', 'B'])
+    ap.add_argument('--module', choices=['A', 'B', 'E'])
     ap.add_argument('--dsp', default=None, help='snapin name (matrix/gain/haas/clipper/gate/quickeq)')
     ap.add_argument('--tag', default='lic')
     ap.add_argument('--no-stub', action='store_true')
@@ -152,7 +153,10 @@ def main():
         mod = CFG['modules'][a.module]
         vas = {int(v, 16) for v in mod['lift']}
         stat = build(vas, os.path.join(ROOT, 'work', 'lic' + a.module), 'lic' + a.module,
-                     apply_stub=True, module=a.module)
+                     apply_stub=True, module=a.module, abi=mod.get('abi'),
+                     shims=mod.get('shims'), raw_va=mod.get('raw_va', False),
+                     volatile_ret=mod.get('volatile_ret', False),
+                     emcc_opt=mod.get('emcc_opt', '-O1'))
         print(json.dumps({k: v for k, v in stat.items() if k != 'ranges'}, ensure_ascii=False))
         return
 
@@ -164,7 +168,7 @@ def main():
     # ctx-fuzz: 実機機械語との bit 突合 (harness は license/harness の HEAD コピー)
     if not a.no_compare:
         vecdir = os.path.join(ROOT, 'work', a.dsp)
-        vec = os.path.join(vecdir, 'vec_%d_%d.bin' % (a.trials, a.seed))
+        vec = os.path.join(vecdir, 'vec_%d_%d_v3.bin' % (a.trials, a.seed))
         nat = os.path.join(ROOT, 'work', 'native_ref')
         if not os.path.exists(nat):
             sh('cc -O1 -Wall -o %s %s/harness/native_ref.c %s/harness/scenarios.c -I%s/harness' % (nat, ROOT, ROOT, ROOT))
