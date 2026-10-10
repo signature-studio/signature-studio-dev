@@ -21,7 +21,7 @@
 audio/MIDI 関連 import (DLL 別):
 - `dsound.dll` 2: `DirectSoundCreate`(呼出元 0x12afb50, 640B), `DirectSoundEnumerateA`(0x12af3e0, 196B)。
 - `winmm.dll` 24: time 4 (`timeBeginPeriod/EndPeriod/GetDevCaps/GetTime`) + `midiIn*` 11 (GetNumDevs/GetDevCapsW/GetErrorTextW/Open/Close/Start/Stop/Reset/PrepareHeader/UnprepareHeader/AddBuffer) + `midiOut*` 9 (GetNumDevs/GetDevCapsW/GetErrorTextW/Open/Close/ShortMsg/LongMsg/PrepareHeader/UnprepareHeader)。`midiInOpen` は `dwFlags=0x30000 (CALLBACK_FUNCTION)` で呼ばれる (0xba3010)。
-- `ole32.dll` 29: `CoCreateInstance`, `CoGetClassObject`, `CLSIDFromString`, `StringFromCLSID`, `ProgIDFromCLSID` ほか — ASIO ドライバの COM 生成に使用 (レジストリ `SOFTWARE\ASIO\*` 列挙は registry shim 側)。
+- `ole32.dll` 29: `CoCreateInstance`, `CoGetClassObject`, `CLSIDFromString`, `StringFromCLSID`, `ProgIDFromCLSID` ほか — ASIO ドライバの COM 生成に使用 (レジストリ列挙は registry shim 側。FLEngine 内の実文字列は小文字 UTF-16 の `software\asio` / `software\asio\` + 値名 `clsid` で、レジストリは大小無視。`SOFTWARE\ASIO\FL Studio ASIO` というキー全体は ILWASAPI2ASIO 側の断片 `SOFTWARE`/`ASIO`/`FL Studio ASIO`/`CLSID`/`InprocServer32` からの組立てと推定 — DllRegisterServer は未デコンパイル。CLSID `{188135E1-…}` は FLEngine には無く ILWASAPI2ASIO の DllGetClassObject 表のみ)。
 - `msacm32.dll` 14、`avrt.dll` **なし** (MMCSS は ILWASAPI 側のみ)、`waveOut*` **なし**、WASAPI GUID (`IID_IAudioClient` 等) **なし**。
 
 ### ASIO (P0)
