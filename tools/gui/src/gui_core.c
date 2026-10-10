@@ -190,6 +190,17 @@ void *gui_resolve_fn(U64 v) {
   return (void *)(uintptr_t)v;
 }
 
+static GuiIcallHook g_icall_hook;
+void gui_set_icall_hook(GuiIcallHook h) { g_icall_hook = h; }
+I64 gui_call4(U64 t, I64 a0, I64 a1, I64 a2, I64 a3) {
+  if (g_icall_hook) return (I64)g_icall_hook(t, (uint64_t)a0, (uint64_t)a1, (uint64_t)a2, (uint64_t)a3);
+  return ((WNDPROC64)gui_resolve_fn(t))(a0, a1, a2, a3);
+}
+I64 gui_call2(U64 t, I64 a0, I64 a1) {
+  if (g_icall_hook) return (I64)g_icall_hook(t, (uint64_t)a0, (uint64_t)a1, 0, 0);
+  return ((int64_t (*)(int64_t, int64_t))gui_resolve_fn(t))(a0, a1);
+}
+
 /* ================= ウィンドウツリー ================= */
 Wnd *wnd_from_h(U64 h) { return (Wnd *)h_get(h, HT_WND); }
 static void link_child(Wnd *p, Wnd *w) {
@@ -253,9 +264,8 @@ void wnd_clip(Wnd *w, RL *out) {
 /* ================= 呼出し ================= */
 static int g_send_depth;
 static I64 call_proc(Wnd *w, uint32_t msg, U64 wp, I64 lp) {
-  WNDPROC64 f = (WNDPROC64)gui_resolve_fn(w->wndproc);
   g_send_depth++;
-  I64 r = f((I64)w->h, (I64)msg, (I64)wp, lp);
+  I64 r = gui_call4(w->wndproc, (I64)w->h, (I64)msg, (I64)wp, lp);
   g_send_depth--;
   return r;
 }
@@ -1102,8 +1112,7 @@ static API dispatch_impl(I64 lpmsg) {
   gui_sh();
   gui_sh()->msgs_dispatched++;
   if (m->message == WM_TIMER && m->lParam) {
-    WNDPROC64 f = (WNDPROC64)gui_resolve_fn((U64)m->lParam);
-    return f((I64)m->hwnd, WM_TIMER, (I64)m->wParam, (I64)gui_now_ms());
+    return gui_call4((U64)m->lParam, (I64)m->hwnd, WM_TIMER, (I64)m->wParam, (I64)gui_now_ms());
   }
   if (!m->hwnd) return 0;
   Wnd *w = wnd_from_h(m->hwnd);
@@ -1125,7 +1134,7 @@ API PostMessageW(I64 h, I64 msg, I64 wp, I64 lp) { return PostMessageA(h, msg, w
 API PostThreadMessageW(I64 tid, I64 msg, I64 wp, I64 lp) { (void)tid; return PostMessageA(0, msg, wp, lp); }
 API SendMessageA(I64 h, I64 msg, I64 wp, I64 lp) { gui_sh(); return send_message((U64)h, (uint32_t)msg, (U64)wp, lp); }
 API SendMessageW(I64 h, I64 msg, I64 wp, I64 lp) { return SendMessageA(h, msg, wp, lp); }
-API CallWindowProcA(I64 proc, I64 h, I64 msg, I64 wp, I64 lp) { return ((WNDPROC64)gui_resolve_fn((U64)proc))(h, msg, wp, lp); }
+API CallWindowProcA(I64 proc, I64 h, I64 msg, I64 wp, I64 lp) { return gui_call4((U64)proc, h, msg, wp, lp); }
 API CallWindowProcW(I64 proc, I64 h, I64 msg, I64 wp, I64 lp) { return CallWindowProcA(proc, h, msg, wp, lp); }
 API PostQuitMessage(I64 code) { gui_sh(); g_quit_posted = 1; g_quit_code = (int)code; gui_doorbell(); return 0; }
 API GetMessagePos(void) { return ((I64)(uint16_t)g_msg_pt.y << 16) | (uint16_t)g_msg_pt.x; }
@@ -1298,10 +1307,14 @@ API SubtractRect(I64 d, I64 a, I64 b) {
   *(WRECT *)P_(d) = o; return !r_empty(o);
 }
 
-/* ================= kernel32 最小 (テストアプリ/lift 用) ================= */
+/* ================= kernel32 最小 (テストアプリ/lift 用) =================
+ * 実 FLEngine 結合では tools/shimx が同名を提供するため -DGUI_NO_K32 で除外する (CAB-156 / INTEGRATION.md §2)。
+ * その場合の到達ログ dump は結合側の exit hook から gui_reach_dump() を呼ぶ。 */
+#ifndef GUI_NO_K32
 API ExitProcess(I64 code) {
   GuiShared *sh = gui_sh();
   surf_flush();
+  gui_reach_dump();
   sh->exit_code = (uint32_t)code;
   __atomic_store_n(&sh->exited, 1, __ATOMIC_SEQ_CST);
   out_cmd(GUI_CMD_EXIT, (uint32_t)code, 0, 0, 0, 0, 0);
@@ -1311,6 +1324,7 @@ API GetModuleHandleA(I64 name) { (void)name; return 0x00400000; }
 API GetModuleHandleW(I64 name) { return GetModuleHandleA(name); }
 API OutputDebugStringA(I64 s) { gui_log((const char *)P_(s)); return 0; }
 API OutputDebugStringW(I64 s) { char b[256]; u16_to_u8((const uint16_t *)P_(s), b, sizeof b); gui_log(b); return 0; }
+#endif /* GUI_NO_K32 */
 
 /* ================= 補助 user32 (P0/P1 の残り; 簡易実装) ================= */
 API SetParent(I64 h, I64 np) {
@@ -1402,7 +1416,7 @@ static API enum_children(Wnd *p, I64 proc, I64 lp, int recurse) {
   for (Wnd *c = p->last; c && n < 512; c = c->prev) hs[n++] = c->h;   /* z 順 (前面から) */
   for (int i = 0; i < n; i++) {
     if (!wnd_from_h(hs[i])) continue;
-    if (!((int64_t (*)(int64_t, int64_t))gui_resolve_fn((U64)proc))((I64)hs[i], lp)) return 0;
+    if (!gui_call2((U64)proc, (I64)hs[i], lp)) return 0;
     if (recurse) { Wnd *c = wnd_from_h(hs[i]); if (c && !enum_children(c, proc, lp, 1)) return 0; }
   }
   return 1;

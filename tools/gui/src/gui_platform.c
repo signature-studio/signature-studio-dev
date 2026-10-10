@@ -126,6 +126,7 @@ void gui_logf(const char *fmt, ...) {
 GUI_NORETURN void gui_failfast(const char *api, const char *why) {
   fprintf(stderr, "FAIL-FAST: unimplemented Win32 API: %s%s%s\n", api, why ? " : " : "", why ? why : "");
   fflush(stderr);
+  gui_reach_dump();
   g_sh.exit_code = 0xFA11;
   __atomic_store_n(&g_sh.exited, 2, __ATOMIC_SEQ_CST);
   { uint32_t rec[8] = { GUI_CMD_EXIT, 0xFA11, 0, 0, 0, 0, 0, 0 }; gui_out_push(rec); }

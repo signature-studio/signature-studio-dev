@@ -16,8 +16,9 @@ python3 "$HERE/golden/gen_golden.py"
 if [ "${SKIP_NATIVE:-0}" != "1" ]; then
   echo "[gui-e2e] 1/6 native 単体テスト (ASan/UBSan)"; bash "$HERE/test/selftest.sh" | tail -2
   echo "[gui-e2e] 2/6 native lift 実行 (PE->RetDec->gcc, headless host, golden)"; bash "$HERE/test/native_e2e.sh" 2>&1 | grep -E "native_run|\[post\]"
+  echo "[gui-e2e] 2b/6 結合準備 native (到達 API ログ / wasm32 署名 adapter / ハンドル 31bit / 改名 selftest; CAB-156)"; bash "$HERE/test/reach_test.sh" 2>&1 | grep -E "passed|FAIL"
 fi
-echo "[gui-e2e] 3/6 PE -> RetDec lift -> 後処理"
+echo "[gui-e2e] 3/6 PE -> RetDec lift -> 後処理 (WNDPROC は自動検出)"
 bash "$HERE/lift/gui_lift.sh" "$HERE/test/gui_app.c" "$BUILD/lift"
 echo "[gui-e2e] 4/6 emcc (pthread wasm + shim)"
 bash "$HERE/lift/gui_wasm.sh" "$BUILD/lift/lifted.c" "$BUILD/wasm" | tail -2
@@ -32,4 +33,10 @@ echo "[gui-e2e] 6c/6 fail-fast E2E (未実装 API Ellipse に到達する PE)"
 bash "$HERE/lift/gui_lift.sh" "$HERE/test/gui_app_ff.c" "$BUILD/lift_ff" >/dev/null
 bash "$HERE/lift/gui_wasm.sh" "$BUILD/lift_ff/lifted.c" "$BUILD/wasm_ff" | tail -1
 GUI_WASM_DIR="$BUILD/wasm_ff" E2E_MODE=failfast node "$HERE/e2e/e2e.mjs" | grep -E "fail-fast|FAIL|PASS"
+echo "[gui-e2e] 6d/6 reach-log E2E (shim 改名 + wrapper で到達 API を記録; CAB-156)"
+bash "$HERE/lift/gui_wasm.sh" "$BUILD/lift/lifted.c" "$BUILD/wasm_reach" reach | tail -1
+GUI_WASM_DIR="$BUILD/wasm_reach" E2E_MODE=reach node "$HERE/e2e/e2e.mjs" | grep -E "EXACT|MISMATCH|reach|PASS|FAIL"
+echo "[gui-e2e] 6e/6 sigprobe (m11 IR の GUI declare 署名 vs adapter, wasm-ld 署名検査 + 陰性対照)"
+bash "$HERE/integ/sigprobe.sh" | tail -1
+python3 "$HERE/integ/reach_report.py" "$BUILD/e2e/reach.log" >/dev/null
 echo "[gui-e2e] ALL PASS"

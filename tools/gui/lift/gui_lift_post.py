@@ -7,10 +7,13 @@ tools/m1 の「main 抽出」より踏み込んだ最小後処理 (lifter 産コ
   3. 大域変数 gN を PE イメージ (`__pe_image`) 内の固定オフセットへ #define (RetDec は構造体フィールドを
      別々の大域に分けるため、`&g1` を struct ポインタとして渡すには連続配置が必要)
   4. 関数 VA -> 関数ポインタ表 (GuiFnMap) を生成 (WNDCLASS.lpfnWndProc 等は VA 値で lifted コードが保持)
-  5. WndProc 系の 4 引数署名を強制 (--wndproc)
-usage: gui_lift_post.py <retdec.c> <pe> <out.c> [--wndproc NAME ...]
+  5. WndProc 系の 4 引数署名を強制。候補は既定で自動検出 (integ/lift_fnmap.py: RegisterClass*/SetWindowLong* を呼ぶ関数の本体で
+     VA 定数として取得されている関数)。`--wndproc NAME` は追加指定、`--no-auto-wndproc` で検出を無効化
+usage: gui_lift_post.py <retdec.c> <pe> <out.c> [--wndproc NAME ...] [--no-auto-wndproc]
 """
-import re, struct, sys, argparse
+import os, re, struct, sys, argparse
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "integ"))
+import lift_fnmap
 
 
 def read_pe_image(path):
@@ -43,6 +46,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("src"); ap.add_argument("pe"); ap.add_argument("out")
     ap.add_argument("--wndproc", action="append", default=[])
+    ap.add_argument("--no-auto-wndproc", action="store_true")
     ap.add_argument("--entry-rename", default="lifted_entry")
     a = ap.parse_args()
     txt = open(a.src, encoding="utf-8").read()
@@ -88,6 +92,15 @@ def main():
         s = re.sub(r"\(int64_t\s*\*\*+\)", "(int64_t)", s)
         return s
 
+    if not a.no_auto_wndproc:
+        auto, why = lift_fnmap.detect_wndprocs(funcs)
+        for n in auto:
+            if n not in a.wndproc:
+                a.wndproc.append(n)
+            print("[post] auto-detected WNDPROC: %s (%s)" % (n, why[n]))
+        if not auto and not a.wndproc:
+            print("[post] WARN: no WNDPROC candidate detected (use --wndproc NAME)", file=sys.stderr)
+
     protos = []; out_funcs = []; fnmap = []
     for va, name, body in funcs:
         body = fix_types(body)
@@ -121,8 +134,7 @@ def main():
         rows.append("  " + ",".join("0x%02x" % b for b in chunk) + ",")
     hdr += rows + ['};', '']
     body = "\n".join(hdr + macros + [''] + protos + [''] + out_funcs)
-    body += "\n\nconst GuiFnMap gui_lift_fnmap[] = {\n" + "".join("  { 0x%xull, (void *)%s },\n" % (va, n) for va, n in fnmap) + "};\n"
-    body += "const int gui_lift_fnmap_n = %d;\n" % len(fnmap)
+    body += "\n" + lift_fnmap.emit_fnmap(fnmap)
     body += "int64_t gui_lift_entry(void) { return %s(); }\n" % a.entry_rename
     open(a.out, "w", encoding="utf-8").write(body)
     print("[post] globals=%d functions kept=%d (thunks dropped=%d) image=%dB base=0x%x" % (len(macros), len(funcs), (len(parts) - 1) // 3 - len(funcs), len(img), base))

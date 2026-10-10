@@ -7,6 +7,7 @@
 - **最小 PoC を超えて実装**: 261 関数 (lift ABI; うち 43 は FL が import しない A 版・テスト用 kernel32 最小 5 本) = FL の GUI import 429 エントリのうち **219 (51%) をカバー、P0 は 120/120、P1 は 69/119 (P2 21/98、P3 9/92)**。残り 210 は mingw ヘッダ由来 arity の fail-fast stub を自動生成。
 - **PE→lift 経路の E2E 成功** (対象はテスト用 PE `test/gui_app.c`。FLEngine 本体での描画は未達): mingw-w64 で PE32+ → RetDec → 後処理 → emcc (pthread wasm) → **headless Chrome**、CDP の実マウス/キー入力でシナリオ駆動、
   OffscreenCanvas 読み戻し・画面スクリーンショットとも **golden と 64,000 px 完全一致 (差 0)**。`bash tools/gui/e2e.sh` 1 コマンド (16〜24 s、Chrome 6 連続で安定; クリーン状態からも PASS)。
+- **実 FLEngine 結合の準備 (CAB-156)**: 到達 API ログ・m11 IR との署名突合と wasm32 署名 adapter・icall hook・結合手順書/ABI チェックリスト (`INTEGRATION.md`)。m11 IR の GUI declare **177 名**(実装 132 / stub 45)を突合し、wasm-ld 署名不一致 **177 → 0**(adapter 無しを陰性対照)。`--wndproc` 手指定を廃止(自動検出)。e2e に 6d(到達ログ)/6e(sigprobe)/2b を追加し ALL PASS 維持。
 - 副産物: RetDec の PE lift 欠陥 4 件と ABI 要件 3 件 (GLOBAL_BASE≥64KiB, 31bit ハンドル, WNDPROC 4 引数 + VA→関数 fnmap) を実測で特定 (§4)。FL 本体 lift にそのまま効く。
 
 ## 1. 成果物
@@ -19,17 +20,20 @@
 | `src/runtime/gui.ts` `gui_worker.ts` `gui_proto.ts` | ブラウザ host (入力リング生産者・OffscreenCanvas 描画ワーカ・プロトコルミラー) ※`tsc --noEmit` OK |
 | `tools/gui/lift/` | `gui_lift.sh` (mingw→RetDec→後処理), `gui_lift_post.py`, `gui_wasm.sh` (emcc), `gui_lift_main.c` |
 | `tools/gui/test/` | `gui_app.c` (テスト PE), `selftest.c` (78 assertion), `native_run.c`, `bench.c`, `gui_app_ff.c` (fail-fast PE) |
+| `tools/gui/INTEGRATION.md` + `integ/` | 結合手順書 (リンク/ABI チェックリスト/ハンドル 31bit/ハーネス拡張方針)・`gen_adapt.py` (突合表 `INTEGRATION_XCHECK.md` + wasm32 adapter)・`sigprobe.sh`・`build_objs.sh`・`lift_fnmap.py`・`reach_report.py`・fixture |
+| `src/gui_reach.c` ほか | 到達 API ログ (`GUI-REACH` 行 / `gui_reach_json`)、`gui_set_icall_hook`、`-DGUI_NO_K32` |
 | `tools/gui/e2e/` + `e2e.sh` | CDP ドライバ `e2e.mjs`、ページ、1 コマンド E2E |
 | `tools/gui/golden/` | `gen_golden.py` (独立オラクル) と `final.png` |
 
 ## 2. 検証結果 (全て実測; `bash tools/gui/e2e.sh`)
 | 層 | 結果 |
 |---|---|
-| native 単体 `test/selftest.sh` (gcc -fsanitize=address,undefined, headless host) | **78/78 PASS**: 作成メッセージ順・投函 FIFO・WM_PAINT・タイマ・ヒットテスト/子窓/キャプチャ/GetCursorPos・キー順・DIB/Rect/Line/BitBlt/StretchBlt(2x・反転)/StretchDIBits(bottom-up)/AlphaBlend/クリップ・region・SaveDC・WindowOrg・z-order 合成・props/Enum/Scroll/SetParent・他スレッド Post/Send・WM_QUIT・fail-fast(SIGABRT+API 名) |
+| native 単体 `test/selftest.sh` (gcc -fsanitize=address,undefined, headless host) | **83/83 PASS** (78 + icall hook 5): 作成メッセージ順・投函 FIFO・WM_PAINT・タイマ・ヒットテスト/子窓/キャプチャ/GetCursorPos・キー順・DIB/Rect/Line/BitBlt/StretchBlt(2x・反転)/StretchDIBits(bottom-up)/AlphaBlend/クリップ・region・SaveDC・WindowOrg・z-order 合成・props/Enum/Scroll/SetParent・他スレッド Post/Send・WM_QUIT・fail-fast(SIGABRT+API 名) |
 | native lift `test/native_e2e.sh` (PE→RetDec→gcc→shim) | golden **完全一致 (0/64000 px)**、ExitProcess 経由で正常終了 |
 | Chrome E2E (固定 128 MiB メモリ) | **OffscreenCanvas 読み戻し 差 0 / 画面スクリーンショット 差 0**、入力リング drop 0、`present_done_seq==present_seq`、タイマ fire 3 |
 | Chrome E2E (`ALLOW_MEMORY_GROWTH`, 初期 3 MiB→3.8 MiB に成長) | 同上すべて一致 (worker の `memory.buffer` 再取得を検証) |
 | Chrome fail-fast E2E (未実装 `Ellipse` に到達する PE) | host が `EXIT 0xFA11` を受信、console に `FAIL-FAST: unimplemented Win32 API: Ellipse` |
+| 結合準備 (CAB-156) | `test/reach_test.sh`: 到達ログ 11 + wasm32 adapter wiring/ハンドル 31bit 28 + 改名ビルドで selftest 83/83。`integ/sigprobe.sh`: 177 declare で署名不一致 0 / 未解決 import 0 (陰性対照 177)。Chrome 6d: host console に `GUI-REACH` 36 API |
 | 陰性対照 | golden を 1 bit 改変 → `MISMATCH (1 px)` で exit 1 / ST (非 pthread) ビルドはブロック箇所で fail-fast |
 | 安定性 | Chrome E2E 6/6、native lift 5/5 PASS |
 - シナリオ (10 入力): クリック 2 回 + ドラッグ (SetCapture・領域外移動・GetCursorPos/ScreenToClient) + キー `A` `b` + ESC→DestroyWindow→PostQuitMessage→ExitProcess。
@@ -68,7 +72,7 @@
 ## 7. 下流チケット (Linear 起票済み; 親 CAB-8 / 検収で連番化)
 | ID | Linear | 状態 | 内容 |
 |---|---|---|---|
-| GUI-3a | CAB-156 | Todo | 結合準備 (実 FLEngine 不要): m11 GUI declare ↔ exports 突合表・fnmap 自動生成・WNDPROC 署名正規化を lift パイプラインへ |
+| GUI-3a | CAB-156 | In Review | 結合準備 (実 FLEngine 不要): m11 GUI declare ↔ exports 突合表・fnmap/WNDPROC 自動化・到達 API ログ・手順書 (本 REPORT 結論/`INTEGRATION.md`) |
 | GUI-1 | CAB-159 | Todo | P1 未実装 50 名 (DrawEdge/Clipboard/フック/モニタ/キャレット/util/入力) → P1 119/119。メニューは GUI-2 へ移動 |
 | GUI-3 | CAB-173 | Backlog (blockedBy CAB-5, CAB-156) | FLEngine 結合: `m11_winstubs.c` (`m11_genstubs.py` 生成物) の GUI 部を本 shim に置換、実到達 API ログで P 分類を更新。blocks CAB-31 |
 | GUI-2 | CAB-175 | Backlog (blockedBy GUI-3) | ImageList_* 23 + メニュー 21 + IME 7 ほか P2 77 名、OLE DnD ↔ HTML5 DnD |

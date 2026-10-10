@@ -84,6 +84,16 @@ int  gdi_dc_is_valid(U64 hdc);
 
 typedef int64_t (*WNDPROC64)(int64_t, int64_t, int64_t, int64_t);
 void *gui_resolve_fn(U64 v);
+/* コールバック呼出 (WNDPROC/TIMERPROC = 4 引数, EnumWindows 系 = 2 引数)。icall hook 未設定なら fnmap 経由の直接呼出 */
+typedef uint64_t (*GuiIcallHook)(uint64_t target, uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3);
+void gui_set_icall_hook(GuiIcallHook h);
+I64 gui_call4(U64 target, I64 a0, I64 a1, I64 a2, I64 a3);
+I64 gui_call2(U64 target, I64 a0, I64 a1);
+/* 到達 API ログ (gui_reach.c) */
+void gui_reach_hit(int idx);
+void gui_reach_hit_name(const char *name);
+int  gui_reach_index(const char *name);
+void gui_reach_dump(void);
 void gui_set_last_error(uint32_t e);
 
 #endif

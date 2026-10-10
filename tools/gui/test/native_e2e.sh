@@ -10,6 +10,6 @@ gcc -O1 -g -w -fsanitize=address,undefined -pthread -I "$ROOT/include" -I "$ROOT
   "$BUILD/lift/lifted.c" -c -o "$BUILD/lift/lifted.o"
 gcc -O1 -g -w -fsanitize=address,undefined -pthread -I "$ROOT/include" -I "$BUILD" -Dmain=gui_lift_app_main -c "$ROOT/lift/gui_lift_main.c" -o "$BUILD/lift/lift_main.o"
 gcc -O1 -g -w -fsanitize=address,undefined -pthread -I "$ROOT/include" -I "$ROOT/src" -I "$BUILD" \
-  "$BUILD/lift/lifted.o" "$BUILD/lift/lift_main.o" "$ROOT"/src/gui_platform.c "$ROOT"/src/gui_core.c "$ROOT"/src/gui_gdi.c \
+  "$BUILD/lift/lifted.o" "$BUILD/lift/lift_main.o" "$ROOT"/src/gui_platform.c "$ROOT"/src/gui_reach.c "$BUILD"/gui_reach_tab.c "$ROOT"/src/gui_core.c "$ROOT"/src/gui_gdi.c \
   "$ROOT"/src/gui_headless.c "$BUILD"/gui_stubs.c "$HERE/native_run.c" -o "$BUILD/native_run" -lm
 (cd "$BUILD" && ./native_run "$ROOT/golden/final.ppm" "$BUILD/native_actual.ppm")

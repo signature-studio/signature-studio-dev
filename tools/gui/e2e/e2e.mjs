@@ -222,6 +222,18 @@ async function main() {
   const code = await E(`window.__e2e.host.exited`);
   need(code === 0, `exit code ${code}`);
   log("app exited via ExitProcess, code=" + code);
+  if (process.env.E2E_MODE === "reach") {   // 到達 API ログ (CAB-156): ExitProcess で dump された GUI-REACH 行が host に届き内容が妥当であること
+    const rl = await E("window.__e2e.host.logs.filter((l) => l.startsWith('GUI-REACH'))");
+    const reached = new Map(rl.map((l) => l.split(" ")).filter((a) => a[0] === "GUI-REACH").map((a) => [a[2], { calls: +a[3], st: a[4], p: a[5] }]));
+    const sum = rl.find((l) => l.startsWith("GUI-REACH-SUMMARY"));
+    for (const n of ["RegisterClassA", "CreateWindowExA", "GetMessageA", "DispatchMessageA", "BeginPaint", "FillRect", "BitBlt", "SetTimer", "SetCapture", "ExitProcess"])
+      need(reached.has(n), `reach log lacks ${n}`);
+    need(!!sum, "reach log lacks GUI-REACH-SUMMARY");
+    need([...reached.values()].every((v) => v.st === "IMPL"), "reach log contains a STUB entry in a PASS run");
+    need((reached.get("GetMessageA")?.calls ?? 0) >= 10, "GetMessageA calls < 10");
+    log(`reach log OK: ${reached.size} distinct APIs (${sum}); first 6: ${[...reached.keys()].slice(0, 6).join(",")}`);
+    fs.writeFileSync(path.join(OUTDIR, "reach.log"), rl.join("\n") + "\n");
+  }
   const errs = await E("window.__e2e.errors");
   need(errs.length === 0, "page errors: " + JSON.stringify(errs));
   if (failures.length) console.log("[e2e] console:\n  " + consoleLines.slice(-30).join("\n  "));

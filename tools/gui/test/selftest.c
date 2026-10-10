@@ -73,6 +73,15 @@ static void *poster(void *a) {
   return (void *)(intptr_t)(r == 4242);
 }
 
+/* icall hook (m11_icall 相当): lpfnWndProc/コールバックは「呼べない VA 整数」で、hook が解決・呼出する */
+static int g_hook_calls, g_enum_hits; static uint64_t g_hook_last;
+static uint64_t ihook(uint64_t t, uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3) {
+  g_hook_calls++; g_hook_last = t;
+  if (t == 0x20000123ull) return (uint64_t)tproc((int64_t)a0, (int64_t)a1, (int64_t)a2, (int64_t)a3);
+  if (t == 0x20000124ull) { g_enum_hits++; return 1; }
+  return 0;
+}
+
 static uint32_t rgb(int r, int g, int b) { return (uint32_t)(r << 16 | g << 8 | b); }
 static uint32_t cref(int r, int g, int b) { return (uint32_t)(r | g << 8 | b << 16); }
 
@@ -280,6 +289,20 @@ int main(void) {
     CHK(desk(10 + 10, 20 + 5) == rgb(5, 6, 7) && desk(10 + 29, 20 + 5) == rgb(5, 6, 7), "ScrollWindow moves pixels right by 10: %06x", desk(20, 25));
     WRECT ur; GetUpdateRect(h, (int64_t)(uintptr_t)&ur, 0); CHK(ur.left == 0 && ur.right >= 10, "ScrollWindow invalidates exposed strip (%d..%d)", ur.left, ur.right); }
   { struct { int64_t hh; } enumctx = { 0 }; (void)enumctx; }
+
+  SECTION("icall hook (m11_icall 経由のコールバック解決)");
+  gui_set_icall_hook(ihook);
+  { WWNDCLASS wc; memset(&wc, 0, sizeof wc); wc.lpfnWndProc = 0x20000123ull; wc.lpszClassName = (uint64_t)(uintptr_t)"THK";
+    CHK(RegisterClassA((int64_t)(uintptr_t)&wc) != 0, "RegisterClass with non-callable VA as lpfnWndProc");
+    g_hook_calls = 0; g_nlog = 0;
+    int64_t hk = CreateWindowExA(0, (int64_t)(uintptr_t)"THK", (int64_t)(uintptr_t)"hk", WS_POPUP, 300, 300, 40, 40, 0, 0, 0x400000, 0);
+    CHK(hk != 0 && g_hook_calls >= 3 && find_msg(WM_NCCREATE, 0) == 0 && find_msg(WM_CREATE, 0) > 0, "creation messages delivered through hook (calls=%d)", g_hook_calls);
+    CHK(SendMessageA(hk, WM_USER + 9, 0, 0) == 4242 && g_hook_last == 0x20000123ull, "SendMessage -> hook(target=VA) -> 4242");
+    CHK(CallWindowProcA(0x20000123ull, hk, WM_USER + 9, 0, 0) == 4242, "CallWindowProc through hook");
+    CHK(CreateWindowExA(0, (int64_t)(uintptr_t)"THK", (int64_t)(uintptr_t)"c", WS_CHILD | WS_VISIBLE, 0, 0, 5, 5, hk, 0, 0x400000, 0) != 0
+        && EnumChildWindows(hk, 0x20000124ull, 0) == 1 && g_enum_hits == 1, "2-arg callback (EnumChildWindows) through hook (hits=%d)", g_enum_hits);
+    DestroyWindow(hk); }
+  gui_set_icall_hook(NULL);
 
   SECTION("SendMessage / cross-thread");
   CHK(SendMessageA(h, WM_USER + 9, 0, 0) == 4242, "SendMessage direct");
