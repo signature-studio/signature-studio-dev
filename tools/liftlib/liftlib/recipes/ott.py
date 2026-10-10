@@ -184,4 +184,16 @@ def e2e_checks(cjs, workdir, label=""):
     out["trap_rc"] = r.returncode
     out["trap_log"] = r.stdout
     out["pass"] = (out["broken"] == 0 and out["e2e_rc"] == 0 and out["maxdev"] == 0.0 and out["nbad"] == 0 and out["trap_rc"] == 0)
+    ref = os.path.join(M10, "work", "ott_m10.cjs")
+    out["outhash"] = None
+    if os.path.exists(ref) and os.path.abspath(cjs) != os.path.abspath(ref):
+        try:
+            hs = []
+            for c in (cjs, ref):
+                e2 = dict(os.environ, OTT_CJS=os.path.abspath(c))
+                r = subprocess.run(["node", os.path.join(RECIPES, "ott_outhash.mjs")], capture_output=True, text=True, env=e2, timeout=900)
+                hs.append(json.loads(r.stdout))
+            out["outhash"] = dict(combos=len(hs[0]), equal=hs[0] == hs[1], distinct=len(set(hs[0].values())))
+        except Exception as ex:                  # noqa
+            out["outhash"] = dict(error=str(ex)[:200])
     return out

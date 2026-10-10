@@ -32,6 +32,8 @@ if [ "$FRESH" = 1 ]; then
 fi
 
 RC=0
+echo "=== (0) ユニット/性質テスト (base==m2+m5, p1_legacy/shift/gdata==m6 鎖, helper 名前非依存 ほか)"
+python3 tests/test_unit.py || RC=1
 echo "=== (a)(b)(c) 回帰: FA Gain / KH Gain / OTT"
 python3 -m liftlib regress || RC=1
 if [ "$QUICK" = 0 ]; then

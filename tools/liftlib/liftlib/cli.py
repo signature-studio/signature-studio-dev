@@ -120,6 +120,10 @@ def cmd_ott(a):
     print("[ott] e2e: checks %s / broken %s | band 係数 maxdev=%s nbad=%s | trap rc=%s" % (r["checks"], r["broken"], r["maxdev"], r["nbad"], r["trap_rc"]))
     print("[ott] census[0x248]=0:", r["census0"])
     print("[ott] census[0x248]=1:", r["census1"])
+    if r.get("outhash"):
+        print("[ott] 出力 SHA (param×[0x248]×振幅): liftlib 生成 helper 版 vs 元 m10 成果物 =", json.dumps(r["outhash"]))
+        if r["outhash"].get("equal") is False:
+            r["pass"] = False
     ok = r["pass"] and (all(v is True for v in ident.values()) if not auto else True)
     print("[ott] RESULT:", "PASS" if ok else "FAIL")
     return 0 if ok else 1
