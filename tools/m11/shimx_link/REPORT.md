@@ -35,7 +35,7 @@
 - 570 > 557 は m11 側の probe/trampoline 追加分と lift 再生成差 (IR が boot_final2 → boot_final3 に進んでいるため)。
 - 未分類の `SHGetFolderPathW_D1` は RetDec が `SHGetFolderPathW` とは別に **0 引数 i64 返し**で declare した重複 (呼出 1 箇所)。GUI/audio と同様に fail-fast/0 返却スタブで受けている (署名正規化 = shimx T7 の対象)。
 - GUI/audio 171 は `gui_stubs_failfast.c` (`shim_unimplemented` で名前を出して abort) / `gui_stubs_soft.c` (0 返却 + `m11_stub_hit` 計数) を IR の declare から自動生成。
-  shimx 付属 `ir_undef.py --emit-stubs` は**構造体 by-value 引数を展開しない**ため `WindowFromPoint(%tagPOINT)` で実際に signature mismatch 1 を出した → `gen_link.py` は構造体を wasm32 規則で展開して生成 (shimx T7/要求 R8)。
+  shimx 付属 `ir_undef.py --emit-stubs` は**構造体 by-value 引数を展開しない**ため `WindowFromPoint(%tagPOINT)` で実際に signature mismatch 1 を出した → `gen_link.py` は構造体を wasm32 規則で展開して生成 (shimx T7/要求 R6)。
 
 ## 2. ビルド (`build.sh`)
 
