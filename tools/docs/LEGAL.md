@@ -52,7 +52,7 @@
 | `[XFER]` | Xfer Records EULA (1,914 文字) | Serum 2 mac pkg: `TGT/serum2/work/pkg_extract/Resources/License.txt` (`Distribution` に `<license>`)。OTT/Serum 2 win: NSIS ヘッダ (zlib 解凍) 内ライセンスページ文 | **OTT win / Serum 2 win / Serum 2 mac の 3 者が空白正規化後に完全一致**。OTT mac pkg には `<license>` なし |
 | `[KH]` | Kilohearts EULA (全 6 条) | `TGT/kilohearts/work/dmg/Kilohearts Installer/Kilohearts Installer.app/Contents/Resources/EULA.txt`。win: `Kilohearts Installer.exe` 内 (file offset 15,125,160) | win 埋込と mac は空白正規化後に一致 |
 | `[SLATE-ToS]` | Audiotonix General Terms of Use (Slate Digital) | <https://slatedigital.com/terms-of-service/> を 2026-10-10 に取得 | **同梱ではない**。Fresh Air に適用される版かは未確認 |
-| `[NI-EULA]` | Native Instruments EULA | <https://www.native-instruments.com/pages/end-user-license-agreement> (検索スニペットのみ、2026-10-10) | **同梱ではない・全文未取得**。Massive X のインストーラは未入手 |
+| `[NI-EULA]` | Native Instruments EULA | <https://www.native-instruments.com/pages/end-user-license-agreement> (2026-10-10。作成時は検索スニペットのみ、検収時に全文を取得: 契約主体 inMusic NI GmbH、ページ表記 "Latest Version 2026-07-01") | **同梱ではない**。Massive X のインストーラは未入手 (同梱版の有無・Web 版との同一性は未確認) |
 
 補足: FL mac の dmg に Software License Agreement リソースは無い (dmg XML plist に `LPic`/`STR#`/`RTF `/`TEXT` 無し)。抽出物の置き場はリポジトリ外 `/home/ubuntu/work/analysis/legal_work/` (tools/docs/work/ は `.gitignore` 対象外だったため)。
 
@@ -62,13 +62,13 @@
 
 ### 2.1 二系統の文書 (EULA.html / Terms of Use) と差分
 
-アプリ同梱の `[FL-EULA]` (2025-09) と、インストーラ画面の `[FL-ToU]` (2026-07 付) が **併存**している。どちらが優先されるかは文書からは判断できない (ToU art.20 "Complete agreement … supersedes all other or prior understandings" とあるが、EULA.html は引き続き `System\Legal` に導入される)。主な差:
+アプリ同梱の `[FL-EULA]` (ファイル mtime 2025-09-24) と、インストーラ画面の `[FL-ToU]` (ファイル mtime 2026-07-02) が **併存**している (どちらも文書本文内に日付の記載は無く、日付は pkg 内ファイルの mtime のみ)。どちらが優先されるかは文書からは判断できない (ToU art.20 "Complete agreement … supersedes all other or prior understandings" とあるが、EULA.html は引き続き `System\Legal` に導入される)。主な差:
 
 | 論点 | `[FL-EULA]` | `[FL-ToU]` |
 |---|---|---|
 | 対象物 | "Software" (FL, Mobile, **plugins, plugin content** を含む) §1 | "Products" (Software + FL Cloud + Digital Content + Tools) art.2(i) |
 | ライセンス性質 | personal / non-exclusive / non-transferable / worldwide / revocable §4 | 左に **non-rentable** が加わる art.10-2 |
-| RE・改変禁止 | §7(i) | art.11 General restrictions 1(i) (対象が Products に拡大、"nor shall the User give anyone permission to download the Products" が追加) |
+| RE・改変禁止 | §7(i) | art.11 General restrictions 1(i) (対象が Products に拡大。EULA §7(i) の列挙にあった "download" は 1(i) から外れ、(iii) の末尾に付く節 "nor shall the User give anyone permission to download the Products" になった) |
 | 第三者ソフト | §8: 第三者ソフトの複製・改変・派生物を禁止、"duplicate or download (even for free), such plugins" も禁止 | art.11 "Third Party software": 第三者/OSS ライセンスに従う旨に書換え。§8 相当の禁止文は無い |
 | 譲渡 | §6 | art.11 General restrictions 2: "gift" 追加、"creation or distribution of cracked versions" 追加 |
 | 責任 | 上限額の定め無し | art.17-8: 支払額が上限 |
@@ -95,13 +95,13 @@
 | 利用形態 `[FL-EULA] §4` (L559–; 非同時共用禁止は L572) / ToU art.10-2,3 | 単独の個人が自分の複数 PC で使用可。ネットワーク経由も可だが、**アクセスする全員が個別ライセンス**。非同時でも複数人共用は禁止。**同時使用ライセンスではない** | Access の許可リスト対象。各人のライセンス保有の担保 |
 | ASP 禁止 `[FL-EULA] §7(ii)` / ToU art.11 1(ii) | "make access to the Software available to others in connection with a service bureau, application service provider, or similar business" | **サービス提供**: サーバで FL を実行して配信する形は直接の検討対象。クライアント実行の wasm を配る形が「access を available にする」に当たるか、非営利・限定公開が "similar business" か、は論点 |
 | 複製の制限 `[FL-EULA] §4` (バックアップ 1 部) / §7(iv) / §2 | 追加複製を禁止。§2 (L510) は "Unauthorized duplication, whether in whole or in part, **temporary or definitive**" を著作権侵害と明記 | **配布 vs 公開**: サーバ上の複製、ブラウザキャッシュ/IndexedDB 上の複製を、適法な保有者本人が行う場合と第三者が行う場合の差 |
-| ダウンロード許可の禁止 `[FL-EULA] §7(i)` / ToU art.11 1(iii) | "nor shall the User give anyone permission to download the Products" | 公開 URL から FL 由来物を取得可能にする行為 |
+| ダウンロード許可の禁止 `[FL-EULA] §7(i)` / ToU art.11 1 ((iii) の末尾に付く節) | "nor shall the User give anyone permission to download the Products" | 公開 URL から FL 由来物を取得可能にする行為 |
 | レンタル `[FL-EULA] §7(i)` / ToU art.10-2 | rent/lease 禁止、non-rentable | 時間貸し的な有償提供 (本プロジェクトの想定外) |
 | 譲渡・サブライセンス不可 `[FL-EULA] §14` / ToU art.19 (2 つ目) | 第三者への再許諾不可 | — |
 
 3 分類に対する整理 (いずれも未決):
 - **「公開」**: URL が誰でも到達可能であること自体と、そこに FL 由来物が含まれるかは別。含まない自作コードのみの公開は FL EULA の直接対象外に見える一方、FL ABI へ依存する shim が「派生物」かは論点。
-- **「配布」**: 変換済み wasm・IR・抽出資産を第三者ブラウザへ送る行為。Access で限定してもサーバ→ブラウザの送信は複製の頒布とみなされ得るか、「本人への返送」と評価できるかが論点 (本人限定でも "download" 許可の禁止 art.11 1(iii) は残る)。
+- **「配布」**: 変換済み wasm・IR・抽出資産を第三者ブラウザへ送る行為。Access で限定してもサーバ→ブラウザの送信は複製の頒布とみなされ得るか、「本人への返送」と評価できるかが論点 (本人限定でも "download" 許可の禁止 art.11 1 ((iii) 末尾の節) は残る)。
 - **「サービス提供」**: サーバ側実行は ASP 条項に直接関係する。クライアント側実行でも、サーバ運営者が "access を available にする" 主体になるか。
 - **BYO (利用者持込み)**: サーバに FL 由来物が無ければ「配布」「ホスティング」の論点は大きく減るが、**ユーザ手元で行われる変換・翻訳そのものが §7(i) の禁止行為**である点は残る (行為主体が利用者になるだけ)。また現行計画は AOT リフト (RetDec/Ghidra) 後の wasm を配る形で、ブラウザ内で installer を受けて変換する形 (動的変換/エミュレーション) とは **技術的に別アーキテクチャ** — 運用形態 C を採るなら設計の再検討が必要 (§8)。
 
@@ -131,7 +131,7 @@
 
 | 名称 (出典 `System/Texts/Licenses/…`) | ライセンス | wasm 再ビルド/配布時に効く主な条件 |
 |---|---|---|
-| FFmpeg (`ffmpeg.txt`) — mac 同梱 n4.4.3 / win 同梱 n4.4.2 (`avcodec-58` 系、`WIN/block24433`–`24439`。※ `analysis/win64/REPORT.md` §4.2 の「FFmpeg 6.x」は誤り) | `ffmpeg.txt` 冒頭は LGPL-2.1+ と記載 (本文 LGPL-2.1)。**win 実ビルド**の configure 文字列は `--enable-version3` (=LGPLv3+)、`--disable-libx264/x265/xvid`、`--enable-libmp3lame --enable-libopus --enable-libvorbis --enable-libsrt …`、`--enable-gpl` は無し | 通知・ライセンス本文の同梱 (§6 L105)、完全なソース or 書面オファー (§6a/c, L107–109)、**差し替え可能なリンク機構** (§6b, L108)、結合物条件が改変とそのデバッグ目的 RE を許すこと (§6, L103)。GPL 部品 (`--enable-gpl`/libx264 等) を有効にしない。version3 系の部品を避ければ v2.1 のまま。「GPL 部分が使われると全体に GPL」(`ffmpeg.txt` L3) |
+| FFmpeg (`ffmpeg.txt`) — mac 同梱 n4.4.3 / win 同梱 n4.4.2 (`avcodec-58` 系、`WIN/block24433`–`24439`。※ `analysis/win64/REPORT.md` §4.2 の「FFmpeg 6.x」は誤り) | `ffmpeg.txt` 冒頭は LGPL-2.1+ と記載 (本文 LGPL-2.1)。**win 実ビルド**の configure 文字列は `--enable-version3` (=LGPLv3+)、`--disable-libx264/x265/xvid`、`--enable-libmp3lame --enable-libopus --enable-libvorbis --enable-libsrt …`、`--enable-gpl` は無し。バイナリ内の license 文字列は win `libavcodec license: LGPL version 3 or later`、mac (x86_64/arm64 とも) `LGPL version 2.1 or later` (mac の configure 文字列 `--enable-shared --disable-programs --disable-avfilter …` に `--enable-gpl`/`--enable-version3` 無し) | 通知・ライセンス本文の同梱 (§6 L105)、完全なソース or 書面オファー (§6a/c, L107–109)、**差し替え可能なリンク機構** (§6b, L108)、結合物条件が改変とそのデバッグ目的 RE を許すこと (§6, L103)。GPL 部品 (`--enable-gpl`/libx264 等) を有効にしない。version3 系の部品を避ければ v2.1 のまま。「GPL 部分が使われると全体に GPL」(`ffmpeg.txt` L3) |
 | LAME (`lame.txt`; `System/Legal/LAME MP3 encoder/LGPL.txt`) | `lame.txt`: LGPL。**別ライブラリとしてリンク**、LAME への謝辞とサイトリンク、改変は LGPL で還元。**デコード機能 (mpglib) は GPL** で GPL でないプログラムは使えない旨の注意 (L18–27)。同梱 `LGPL.txt` は実体 **GPL v2 本文** (名称不一致) | encoder のみ使用・差し替え可能な別モジュール化・mpglib デコード部を使わない。upstream から再ビルドする場合は upstream の COPYING を採用 |
 | Python 3.12.1 (`python.txt`, mac `Python.framework/.../LICENSE.txt`, win `Shared\Python\LICENSE.txt`) | PSF License (+ BeOpen/CNRI/CWI/0BSD の歴史的文書、組込 SW の表記: OpenSSL (Apache-2.0)、expat、zlib、libffi、mpdecimal 等) | PSF 著作権表示の保持 (§2)、派生物提供時に変更の要約 (§3)。組込ライブラリの表記一式を NOTICE に |
 | FreeType (`freetype.txt`) | FreeType Project License (BSD 系 + 謝辞条項) | 配布物の文書に "based in part of the work of the FreeType Team" 相当の **謝辞必須** (§2, L118–)、ソース再配布時は FTL.TXT 保持・変更明示 (§2, L111–)、名称の広告利用禁止 (§3, L129) |
@@ -177,7 +177,7 @@ zplane (Auftakt / élastique Pro / Metering / Restore)、Chicken Systems (Sample
 - Serum 2 は Xfer アカウントのブラウザ認可 + Machine ID + オフライン license ファイル (`TGT/serum2/REPORT.md` §5.2、外部サポート記事に基づく記述)。認可は wasm 版では実行不能 → demo 動作か外部注入かの方針が要る (同 REPORT §8-1)。
 
 ### 4.2 Kilohearts — `[KH]`
-- §1(a): 有効な License Key が必要、鍵を第三者と共有しない。有償製品は複数 PC に入れられるが **同時に別 PC で使えない** (または 1 台で全員が物理的に同席)。無償 ESSENTIALS は同時使用も可。§1(d): TRIAL (約 10 日・商用不可・譲渡不可) / NFR / GIFT。§1(e): 同一アカウント間のライセンス移転は無償で可。
+- §1(a): 有効な License Key が必要、鍵を第三者と共有しない。有償製品は複数 PC に入れられるが **同時に別 PC で使えない** (または 1 台で全員が物理的に同席)。無償 ESSENTIALS は同時使用も可。§1(d): TRIAL (約 10 日・商用不可・譲渡不可) / NFR / GIFT。§1(e): FULL ライセンスは別の Kilohearts アカウントへ無償で移転可 (Content Bank 除く、移転でキーが変わる)。
 - §2(c): "may not reverse engineer, decompile, or disassemble … except and only to the extent … permitted by applicable law" — **法令例外あり**。「改変」「派生物」「ホスティング」への言及なし。§2(a) 著作権表示を除去しない。§3: 違反時に終了・全複製破棄。
 - 技術側: HeartCore に PACE iLok/Eden + Kilohearts 独自 LicenseManager (`TGT/kilohearts/REPORT.md` §5)。ライセンス層の扱いは方針事項 (同 REPORT §7・KH-8)。
 
@@ -190,23 +190,26 @@ zplane (Auftakt / élastique Pro / Metering / Restore)、Chicken Systems (Sample
   - → 既存の `tools/targets/freshair` の「実機機械語との入出力 bit-exact 比較」型の検証は §16(B) の括弧書きに文言上近い、という論点がある。
 - Fresh Air は Kilohearts "HeartCore" 上の製品 (`TGT/freshair/REPORT.md`)。Kilohearts EULA は Kilohearts 製品に適用され、Fresh Air にどちらが適用されるかは文書からは不明。
 
-### 4.4 Native Instruments (Massive X) — `[NI-EULA]` (オンライン・全文未取得)
-- インストーラ未入手。検索スニペットのみ: §3.1 "not entitled to copy … decompile … reverse engineer the Product"、データマイニング/AI 学習目的の利用禁止、レンタル・貸与は禁止、恒久譲渡は一定条件で可。サウンドライブラリ作成の禁止 (§3.7 Sound License Agreement)。**全文を確認していない**。
+### 4.4 Native Instruments (Massive X) — `[NI-EULA]` (オンライン・非同梱)
+- インストーラ未入手 (同梱版の有無・Web 版との同一性は未確認)。作成時は検索スニペットのみだったが、検収時に公式ページ全文 ("Latest Version 2026-07-01", 契約主体 inMusic NI GmbH) を取得して確認:
+  - §3.1 "not entitled to copy or have copied, decompile or have decompiled, reverse engineer or have reverse engineered the Product or parts thereof"、データマイニング (Sec. 44b German Copyright Act)・AI 学習目的の利用禁止。§3.5 改変は機能維持・復旧目的を除き不可。
+  - §3.3 3 台まで・同時使用不可、"may not be used on a network by multiple users, unless each user possesses a license"。§3.6 レンタル・貸与は禁止、恒久譲渡は一定条件で可。§3.7 サウンドライブラリ作成の禁止 (Sound License Agreement)。
+  - §2.1 Native Access でのアカウント作成とシリアル登録が必要 (未アクティベートは "demo mode")。§7.3 ドイツ法。ホスティング/ASP/service bureau に当たる文言は無い。
 
 ---
 
 ## 5. 各社条項の差異表
 
-| 観点 | Image-Line EULA.html | Image-Line ToU | Xfer | Kilohearts | Slate/Audiotonix (online) | NI (online, 抜粋) |
+| 観点 | Image-Line EULA.html | Image-Line ToU | Xfer | Kilohearts | Slate/Audiotonix (online) | NI (online) |
 |---|---|---|---|---|---|---|
 | RE/逆コンパイル | §7(i) 禁止 (例外なし) | art.11-1(i) 同 | (c) 禁止 (例外なし) | §2(c) 禁止、**法令許容分は除外** | §16 禁止 + 入出力監視型 RE + AI/ML 禁止。法令権がある場合も事前請求 | §3.1 禁止 + AI/データマイニング禁止 |
-| 改変/翻訳/派生物 | §7(i) 明記 | 同 | RE 列挙内の "translating" のみ | 明記なし | §16(A) "modify, port, adapt, translate, derivative works" | §3.1 (他の使用は書面同意要) |
+| 改変/翻訳/派生物 | §7(i) 明記 | 同 | RE 列挙内の "translating" のみ | 明記なし | §16(A) "modify, port, adapt, translate, derivative works" | §3.1 (他の使用は書面同意要)、§3.5 改変不可 (機能維持・復旧目的を除く) |
 | 再配布/共有 | §6, §7 | art.11 | (e) 共有・公開・配布は事前同意 | 鍵の共有禁止 (§1(a)) のみ、本体再配布条項なし | §3.1 共有不可、§6 resell/sublicense | 貸与禁止、譲渡は条件付 |
-| ホスティング/ASP | §7(ii) | art.11-1(ii) | 明記なし | 明記なし | §6 host/stream/hosted service/service bureau | (未確認) |
-| 複数人/同時利用 | §4: 個別ライセンス、非同時でも共用不可 | art.10-3 | (a)(b) 本人+本人所有機材 | §1(a) 有償は同時に別 PC 不可、無償は可 | §3.1 1 人 1 ライセンス | (未確認) |
-| 認証/アカウント | アカウント/登録コード、Cracked 定義 | art.5-1,12-7,13 | Serum 2: アカウント認可/Machine ID。OTT: なし | License Key + PACE iLok | iLok (User Guide) | (未確認) |
+| ホスティング/ASP | §7(ii) | art.11-1(ii) | 明記なし | 明記なし | §6 host/stream/hosted service/service bureau | 明記なし |
+| 複数人/同時利用 | §4: 個別ライセンス、非同時でも共用不可 | art.10-3 | (a)(b) 本人+本人所有機材 | §1(a) 有償は同時に別 PC 不可、無償は可 | §3.1 1 人 1 ライセンス | §3.3 3 台まで・同時使用不可、ネットワーク利用は各ユーザ個別ライセンス |
+| 認証/アカウント | アカウント/登録コード、Cracked 定義 | art.5-1,12-7,13 | Serum 2: アカウント認可/Machine ID。OTT: なし | License Key + PACE iLok | iLok (User Guide) | Native Access + シリアル登録、未アクティベートは demo mode (§2.1) |
 | トライアル制限 | 私的利用のみ、成果物の商用不可 | 同 | — | TRIAL 商用不可 / NFR 私的・商用とも不可 | trial/beta 条項あり (§3) | — |
-| 準拠法/管轄 | ベルギー/ゲント | 同 | 記載なし | 記載なし | California / England & Wales / Germany、北米は仲裁 | (未確認) |
+| 準拠法/管轄 | ベルギー/ゲント | 同 | 記載なし | 記載なし | California / England & Wales / Germany、北米は仲裁 | ドイツ法 §7.3 (商人は Berlin §7.2) |
 | 規約変更 | 30 日後に発効 §19 | 同 art.23 | — | — | 公表で即時 §1.4 | — |
 
 ---
@@ -220,7 +223,7 @@ zplane (Auftakt / élastique Pro / Metering / Restore)、Chicken Systems (Sample
 | 論点 (主な出典) | A | B | C | D | E |
 |---|---|---|---|---|---|
 | R1 RE・逆コンパイル・翻訳・改変・派生物 (作業そのもの) FL §7(i)/ToU 11-1(i)、Xfer (c)、KH §2(c)、Slate §16、NI §3.1 | ● 開発者本人 | ● | ● 実施者が利用者へ移動 (消えない) | ● 同左 | ● |
-| R2 変換済み成果物 (wasm/IR/資産) が他者環境へ渡る FL §6,§7、ToU 11-1(iii)、Xfer (e) | – | △ 許可リスト内でも「送信=頒布」か | – | – (ツールが FL 固有解析結果を内包すれば △) | ● |
+| R2 変換済み成果物 (wasm/IR/資産) が他者環境へ渡る FL §6,§7、ToU 11-1 ((iii) 末尾の節)、Xfer (e) | – | △ 許可リスト内でも「送信=頒布」か | – | – (ツールが FL 固有解析結果を内包すれば △) | ● |
 | R3 複数人/ネットワーク利用 FL §4、KH §1(a)、Slate §3.1、Xfer (a)(b) | – | △ 許可者全員が個別に保有 | △ 同左 | – | ● 誰でも |
 | R4 ホスティング/ASP/service bureau FL §7(ii)、Slate §6 | – | △ サーバが FL 派生物を提供 | ○ サーバは FL を持たず実行もしない | – | ● |
 | R5 複製・保管 (installer/抽出物) FL §4 (バックアップ 1 部)・§7(iv)・§2 (一時複製も) | ○ | △ クラウド側に複製が存在 | △ ブラウザ内ストレージ (利用者機材) | ○ | ● |
@@ -242,7 +245,7 @@ zplane (Auftakt / élastique Pro / Metering / Restore)、Chicken Systems (Sample
 ## 7. 見つからなかった/確認できなかった文書、出所に関する事実
 
 見つからない/読めなかった:
-- **Native Instruments (Massive X)**: インストーラ未入手。EULA 全文は未取得 (抜粋のみ)。
+- **Native Instruments (Massive X)**: インストーラ未入手 (同梱版 EULA の有無・Web 版との同一性は未確認)。Web 版 EULA は検収時に全文確認済み (§4.4)。
 - **Slate Digital (Fresh Air)**: 同梱 EULA なし (win zip は導入後ツリー化済みで `unins000.dat` のみ、mac pkg の `Distribution` に `<license>` なし)。公式 ToS はオンライン版のみ。
 - **Xfer OTT (mac)**: pkg に `<license>` なし。OTT 専用の規約文書は未確認 (共通 Xfer EULA が win ライセンス画面に出る)。Xfer の公式サイト上の規約ページは未確認。
 - **Intel IPP / zplane / Chicken Systems / SoftVoice / Ultrafunk / ReWire / NDI / WebView2 / Edge Update** の個別ライセンス本文: 同梱なし。
@@ -256,7 +259,7 @@ zplane (Auftakt / élastique Pro / Metering / Restore)、Chicken Systems (Sample
 - 以上からファイルだけでは「正規の未改変インストーラか」を確認できない。Image-Line ToU の "Cracked" 定義は Image-Line 製品に関するもので、Slate 製品側の同種条項は ToS (§6 "circumvent any access or use restrictions") を参照。**入手元の確認をユーザに依頼 (§8)。**
 
 整合しない記述 (メモ):
-- `analysis/win64/REPORT.md` §4.2 は FFmpeg を「6.x」とするが、同梱 DLL の ident は `n4.4.2-2-g7ffb7d4b04-20220622` (`avcodec-58`/`avutil-56`)。
+- `analysis/win64/REPORT.md` §4.2 (L110) と §7 の表 (L185) は FFmpeg を「6.x」とするが、同梱 DLL の ident は `n4.4.2-2-g7ffb7d4b04-20220622` (`avcodec-58`/`avutil-56`)。mac 同梱 dylib は `n4.4.3-1-ga1f13b592b`。
 - `LAME MP3 encoder/LGPL.txt` が GPL v2 本文。`[FL-ABOUT]` は FFmpeg を LGPLv2.1 と記載するが win ビルドは `--enable-version3`。
 - README の「プロプリエタリ plugin を wasm 化して**同梱**」の「同梱」は、strategy §6 の「第三者へ頒布しない」と文言上緊張関係 (意図の確認、§8)。
 
@@ -278,7 +281,7 @@ zplane (Auftakt / élastique Pro / Metering / Restore)、Chicken Systems (Sample
 - **LGL-3**: `THIRD_PARTY_NOTICES` 自動生成 (FreeType 謝辞、BSD/MIT 表示、PSF、Apache NOTICE) + upstream バージョン/configure 記録。
 - **LGL-4**: FFmpeg/LAME 等の LGPL 部品を side module (差し替え可能) として upstream から再ビルドする設計 + `--enable-gpl`/`--enable-version3` 検出 CI。
 - **LGL-5**: 規約差分監視 (FL ToU/EULA.html、Xfer、Kilohearts、Slate、NI の最新版取得・ハッシュ比較) を FL 追従プロセスに追加。
-- **LGL-6**: 一次文書の補完取得 (NI Massive X EULA、Slate Fresh Air 個別条項、Xfer 公式規約、Image-Line の公開 ToU/FAQ)。
+- **LGL-6**: 一次文書の補完取得 (NI Massive X インストーラ同梱版 EULA ※Web 版は確認済み、Slate Fresh Air 個別条項、Xfer 公式規約、Image-Line の公開 ToU/FAQ)。
 
 ---
 
