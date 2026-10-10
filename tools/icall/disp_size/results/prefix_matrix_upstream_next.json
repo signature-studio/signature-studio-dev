@@ -1,0 +1,222 @@
+{
+ "capstone_version_attr": "6.0.0",
+ "capstone_lib_sha256_12": "ab0d5c1bed3e",
+ "n": 1429044,
+ "skipped": {
+  "no_modrm": 833984,
+  "short": 16464,
+  "modrm_offset_mismatch": 1012
+ },
+ "by_opsize": {
+  "no66": {
+   "n": 697391,
+   "memdisp_checked": 569482,
+   "has_imm": 57793
+  },
+  "opsize16": {
+   "n": 372656,
+   "memdisp_checked": 325208,
+   "has_imm": 36200
+  },
+  "rexw+66": {
+   "n": 358997,
+   "memdisp_checked": 313476,
+   "has_imm": 30042
+  }
+ },
+ "by_form": {
+  "rip|no66": {
+   "n": 172293,
+   "memdisp_checked": 161013,
+   "has_imm": 14137
+  },
+  "base+d8|no66": {
+   "n": 87315,
+   "memdisp_checked": 81665,
+   "has_imm": 7292
+  },
+  "base+d32|no66": {
+   "n": 87315,
+   "memdisp_checked": 81665,
+   "has_imm": 7292
+  },
+  "sib+d8|no66": {
+   "n": 87395,
+   "memdisp_checked": 81745,
+   "has_imm": 7292
+  },
+  "sib+d32|no66": {
+   "n": 87347,
+   "memdisp_checked": 81697,
+   "has_imm": 7244
+  },
+  "sib-nobase|no66": {
+   "n": 87347,
+   "memdisp_checked": 81697,
+   "has_imm": 7244
+  },
+  "base|no66": {
+   "n": 88379,
+   "has_imm": 7292
+  },
+  "rip|opsize16": {
+   "n": 91648,
+   "memdisp_checked": 91648,
+   "has_imm": 8648
+  },
+  "base+d8|opsize16": {
+   "n": 46712,
+   "memdisp_checked": 46712,
+   "has_imm": 4592
+  },
+  "base+d32|opsize16": {
+   "n": 46712,
+   "memdisp_checked": 46712,
+   "has_imm": 4592
+  },
+  "sib+d8|opsize16": {
+   "n": 46712,
+   "memdisp_checked": 46712,
+   "has_imm": 4592
+  },
+  "sib+d32|opsize16": {
+   "n": 46712,
+   "memdisp_checked": 46712,
+   "has_imm": 4592
+  },
+  "sib-nobase|opsize16": {
+   "n": 46712,
+   "memdisp_checked": 46712,
+   "has_imm": 4592
+  },
+  "base|opsize16": {
+   "n": 47448,
+   "has_imm": 4592
+  },
+  "rip|rexw+66": {
+   "n": 88967,
+   "memdisp_checked": 88967,
+   "has_imm": 7410
+  },
+  "base+d8|rexw+66": {
+   "n": 44969,
+   "memdisp_checked": 44969,
+   "has_imm": 3828
+  },
+  "base+d32|rexw+66": {
+   "n": 44945,
+   "memdisp_checked": 44945,
+   "has_imm": 3804
+  },
+  "sib+d8|rexw+66": {
+   "n": 44969,
+   "memdisp_checked": 44969,
+   "has_imm": 3828
+  },
+  "sib+d32|rexw+66": {
+   "n": 44813,
+   "memdisp_checked": 44813,
+   "has_imm": 3672
+  },
+  "sib-nobase|rexw+66": {
+   "n": 44813,
+   "memdisp_checked": 44813,
+   "has_imm": 3672
+  },
+  "base|rexw+66": {
+   "n": 45521,
+   "has_imm": 3828
+  }
+ },
+ "by_map": {
+  "1B|no66": {
+   "n": 225790,
+   "memdisp_checked": 197297,
+   "has_imm": 25769
+  },
+  "1B|opsize16": {
+   "n": 147964,
+   "memdisp_checked": 129304,
+   "has_imm": 17200
+  },
+  "1B|rexw+66": {
+   "n": 111177,
+   "memdisp_checked": 97110,
+   "has_imm": 12528
+  },
+  "0F|no66": {
+   "n": 305846,
+   "memdisp_checked": 266655,
+   "has_imm": 11564
+  },
+  "0F|opsize16": {
+   "n": 180020,
+   "memdisp_checked": 156816,
+   "has_imm": 6904
+  },
+  "0F|rexw+66": {
+   "n": 195500,
+   "memdisp_checked": 170586,
+   "has_imm": 6906
+  },
+  "0F38|no66": {
+   "n": 38560,
+   "memdisp_checked": 33740
+  },
+  "0F38|opsize16": {
+   "n": 32576,
+   "memdisp_checked": 28504
+  },
+  "0F38|rexw+66": {
+   "n": 41712,
+   "memdisp_checked": 36498
+  },
+  "0F3A|opsize16": {
+   "n": 12096,
+   "has_imm": 12096,
+   "memdisp_checked": 10584
+  },
+  "0F3A|rexw+66": {
+   "n": 10608,
+   "has_imm": 10608,
+   "memdisp_checked": 9282
+  },
+  "0F3A|no66": {
+   "n": 3360,
+   "has_imm": 3360,
+   "memdisp_checked": 2940
+  },
+  "VEX2|no66": {
+   "n": 11795,
+   "memdisp_checked": 10320,
+   "has_imm": 960
+  },
+  "VEX2+pp66|no66": {
+   "n": 15040,
+   "memdisp_checked": 13160,
+   "has_imm": 560
+  },
+  "VEX3|no66": {
+   "n": 13900,
+   "memdisp_checked": 12160,
+   "has_imm": 1120
+  },
+  "VEX3+pp66|no66": {
+   "n": 37920,
+   "memdisp_checked": 33210,
+   "has_imm": 8080
+  },
+  "EVEX|no66": {
+   "n": 10160,
+   "has_imm": 640
+  },
+  "EVEX+pp66|no66": {
+   "n": 35020,
+   "has_imm": 5740
+  }
+ },
+ "memdisp_checked": 1208166,
+ "memdisp_value_err": 0,
+ "examples": {},
+ "fixer_mismatch_examples": {}
+}

@@ -19,6 +19,8 @@ from capstone import Cs, CS_ARCH_X86, CS_MODE_64
 from capstone.x86 import X86_OP_MEM, X86_OP_REG, X86_OP_IMM, X86_REG_RIP
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, '..', '..', 'icall', 'disp_size'))
+import dispfix as DF      # CAB-229: capstone の disp_size は 66 prefix 付き disp32 で 2 を返す (D9)
 EXT = '/home/ubuntu/work/analysis/win64/extracted'
 BALANCE = 18983
 INIT_VA = 0x5e19f0
@@ -49,8 +51,7 @@ def norm_hash(raw, start):
     nm = bytearray(raw)
     for ins in MD.disasm(raw, start):
         o = ins.address - start
-        if ins.disp_size == 4:
-            nm[o + ins.disp_offset:o + ins.disp_offset + 4] = b'\0\0\0\0'
+        DF.zero_disp32(nm, o, ins)
         if ins.imm_size == 4 and (ins.group(1) or ins.group(2) or ins.group(7) or ins.mnemonic in ('call', 'jmp')):
             nm[o + ins.imm_offset:o + ins.imm_offset + 4] = b'\0\0\0\0'
     return hashlib.md5(bytes(nm)).hexdigest()[:16]

@@ -6,12 +6,14 @@
  他 DLL にどれだけ含まれるか (framework 同一性の直接指標) を出力する。
 出力: work/fw_overlap.json (集計のみ)。 要: pefile, capstone。 ~1 分 (14 proc)。
 """
-import json, os, re, struct, collections, hashlib, statistics
+import json, os, re, struct, sys, collections, hashlib, statistics
 from multiprocessing import Pool
 import pefile
 from capstone import Cs, CS_ARCH_X86, CS_MODE_64
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, '..', '..', 'icall', 'disp_size'))
+import dispfix as DF      # CAB-229: capstone の disp_size は 66 prefix 付き disp32 で 2 を返す (D9)
 WORK = os.path.join(HERE, '..', 'work')
 EXT = '/home/ubuntu/work/analysis/win64/extracted'
 BALANCE = 18983
@@ -44,8 +46,7 @@ def funcs_of(i):
         nm = bytearray(raw)
         for ins in md.disasm(raw, b):
             o = ins.address - b
-            if ins.disp_size == 4:
-                nm[o + ins.disp_offset:o + ins.disp_offset + 4] = b'\0\0\0\0'
+            DF.zero_disp32(nm, o, ins)
             if ins.imm_size == 4 and (ins.group(1) or ins.group(2) or ins.group(7) or ins.mnemonic in ('call', 'jmp')):
                 nm[o + ins.imm_offset:o + ins.imm_offset + 4] = b'\0\0\0\0'
         out.append((e - b, hashlib.md5(bytes(nm)).hexdigest()[:16]))

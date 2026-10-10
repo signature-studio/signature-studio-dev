@@ -1,0 +1,17 @@
+{
+ "dlls": 181,
+ "before": {
+  "(79, 1)": 129,
+  "(80, 0)": 1
+ },
+ "after": {
+  "(80, 0)": 130
+ },
+ "full_80_before": 1,
+ "full_80_after": 130,
+ "dlls_with_unmapped_kernel_before": 129,
+ "dlls_with_unmapped_kernel_after": 0,
+ "callsites_before": 3763,
+ "callsites_after": 3763,
+ "init_changed": 0
+}

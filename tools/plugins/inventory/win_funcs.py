@@ -15,9 +15,22 @@ from capstone import Cs, CS_ARCH_X86, CS_MODE_64
 from capstone.x86 import X86_OP_MEM, X86_REG_RIP
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, '..', '..', 'icall', 'disp_size'))
+import dispfix as DF
 WORK = os.path.join(HERE, '..', 'work')
 OUTD = os.path.join(WORK, 'winfuncs')
 EXT = '/home/ubuntu/work/analysis/win64/extracted'
+# CAB-229 (D9): capstone の disp_size は 66 prefix 付き disp32 で 2 を返す。補正は opt-in (WINFUNCS_DISPFIX=1)。
+# 既定 OFF の理由: ここで出すハッシュは framework/fw_prep.py (CAB-194 稼働中・編集禁止) が同一規約で再計算して
+# work/fw_hash_counts.json と突合するため、片側だけ規約を変えると framework 判定が静かに縮む。移行手順は icall/disp_size/REPORT.md §5。
+DISPFIX = os.environ.get('WINFUNCS_DISPFIX') == '1'
+
+
+def disp_of(ins):
+    """(offset, size) | None"""
+    if DISPFIX:
+        return DF.disp_span(ins)
+    return (ins.disp_offset, ins.disp_size) if ins.disp_size else None
 
 FP_RE = re.compile(r'^v?(add|sub|mul|div|sqrt|min|max|rcp|rsqrt|fmadd|fmsub|fnmadd|fnmsub|hadd|dp)(ss|sd|ps|pd)$')
 CVT_RE = re.compile(r'^v?cvt')
@@ -117,10 +130,11 @@ def analyze(fn):
                     for k in range(ins.imm_offset, ins.imm_offset + 4):
                         norm[off + k] = 0
                 continue
-            if ins.disp_size == 4:
+            dsp = disp_of(ins)
+            if dsp and dsp[1] == 4:
                 for o in ins.operands:
                     if o.type == X86_OP_MEM and o.mem.base == X86_REG_RIP:
-                        for k in range(ins.disp_offset, ins.disp_offset + 4):
+                        for k in range(dsp[0], dsp[0] + 4):
                             norm[off + k] = 0
                         tgt = ins.address + ins.size + o.mem.disp
                         if tgt in iat and mn in ('call', 'jmp'):

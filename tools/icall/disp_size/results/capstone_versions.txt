@@ -1,0 +1,9 @@
+pypi版      .so sha256[:12] repro_min (D9 誤報告 / 13 case)
+5.0.5        9048761f61b1   capstone 誤報告: 7 / 13
+5.0.6        fb3e85198944   capstone 誤報告: 7 / 13
+5.0.7        5c01440100cc   capstone 誤報告: 7 / 13
+5.0.8        0b6031427383   capstone 誤報告: 7 / 13
+5.0.9        a0897f809e06   capstone 誤報告: 7 / 13
+6.0.0a11     7ea63fdf1907   capstone 誤報告: 7 / 13
+next(HEAD)   ab0d5c1bed3e   capstone 誤報告: 0 / 13  [81497779add4f56196b16f0e0e2afe23c582c06f 2026-10-09 AArch64:]
+(参考) 現環境 pip: Version: 5.0.9 / capstone.__version__: 5.0.7

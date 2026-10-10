@@ -1,0 +1,344 @@
+{
+ "tools/flelift/probe_d9_disp.py": {
+  "C": [
+   4,
+   115
+  ]
+ },
+ "tools/flelift/x64c.py": {
+  "C": [
+   184,
+   185,
+   214,
+   216,
+   230,
+   233,
+   328,
+   341,
+   780,
+   806,
+   1554,
+   1605
+  ]
+ },
+ "tools/plugins/framework/fw_prep.py": {
+  "B": [
+   61,
+   64,
+   66,
+   69
+  ],
+  "A": [
+   71,
+   74
+  ],
+  "C": [
+   125
+  ]
+ },
+ "tools/plugins/p0c/k80abi.py": {
+  "C": [
+   118,
+   119
+  ]
+ },
+ "tools/targets/freshair/lift2/dis_annot.py": {
+  "C": [
+   14
+  ]
+ },
+ "tools/targets/freshair/lift2/mlift/mlift.py": {
+  "C": [
+   137,
+   138,
+   249,
+   263,
+   264,
+   275,
+   276,
+   277,
+   284,
+   297,
+   298,
+   532,
+   533
+  ]
+ },
+ "tools/targets/freshair/lift2/mlift/mlift_ops.py": {
+  "C": [
+   143,
+   199,
+   200,
+   207
+  ]
+ },
+ "tools/targets/kilohearts/license/scripts/f1088.py": {
+  "C": [
+   43
+  ]
+ },
+ "tools/targets/kilohearts/license/scripts/xrefscan.py": {
+  "C": [
+   50
+  ]
+ },
+ "tools/icall/audit_icall.py": {
+  "C": [
+   124,
+   162,
+   180,
+   182
+  ]
+ },
+ "tools/icall/icall_rewrite.py": {
+  "C": [
+   60
+  ],
+  "B": [
+   103,
+   124,
+   335,
+   692
+  ]
+ },
+ "tools/icall/landing/gap_fragments.py": {
+  "C": [
+   75,
+   95,
+   98,
+   119
+  ]
+ },
+ "tools/icall/landing/ott_extract.py": {
+  "C": [
+   129,
+   133,
+   143
+  ]
+ },
+ "tools/icall/tests/test_icall.py": {
+  "A": [
+   43
+  ]
+ },
+ "tools/ipp/scan_x64.py": {
+  "C": [
+   138
+  ]
+ },
+ "tools/ipp/shim/sigscan.py": {
+  "C": [
+   55
+  ]
+ },
+ "tools/liftdiff/ldlib/pe.py": {
+  "C": [
+   129,
+   159,
+   161,
+   178
+  ]
+ },
+ "tools/liftdiff/ldlib/session.py": {
+  "C": [
+   93
+  ]
+ },
+ "tools/liftlib/liftlib/mc.py": {
+  "C": [
+   87,
+   89
+  ]
+ },
+ "tools/m11/ldfix/ldfix.py": {
+  "C": [
+   602,
+   607,
+   918,
+   944,
+   945,
+   993,
+   1126
+  ]
+ },
+ "tools/m11/ldfix/ldmach.py": {
+  "C": [
+   134,
+   138
+  ]
+ },
+ "tools/m2/delphi_scan.py": {
+  "C": [
+   125,
+   242,
+   248,
+   271
+  ]
+ },
+ "tools/m5/dump_dis.py": {
+  "C": [
+   76
+  ]
+ },
+ "tools/m5/scan_pure.py": {
+  "C": [
+   139
+  ]
+ },
+ "tools/m6/ottlib.py": {
+  "C": [
+   211
+  ]
+ },
+ "tools/ott/lift/x64c.py": {
+  "C": [
+   162,
+   163,
+   198,
+   209,
+   290,
+   294,
+   570,
+   581,
+   952,
+   1001
+  ]
+ },
+ "tools/plugins/inventory/fw_overlap.py": {
+  "B": [
+   50,
+   51
+  ]
+ },
+ "tools/plugins/inventory/host_calls.py": {
+  "C": [
+   54,
+   74,
+   77
+  ]
+ },
+ "tools/plugins/inventory/kernel_table.py": {
+  "C": [
+   44,
+   46
+  ]
+ },
+ "tools/plugins/inventory/mac_funcs.py": {
+  "B": [
+   102,
+   105
+  ]
+ },
+ "tools/plugins/inventory/win_abi.py": {
+  "C": [
+   75,
+   119
+  ]
+ },
+ "tools/plugins/inventory/win_funcs.py": {
+  "A": [
+   33
+  ],
+  "B": [
+   119,
+   122,
+   127,
+   130
+  ],
+  "C": [
+   139
+  ]
+ },
+ "tools/plugins/lift/plugin_closure.py": {
+  "C": [
+   91
+  ]
+ },
+ "tools/plugins/p0c/f80_assess.py": {
+  "C": [
+   82
+  ]
+ },
+ "tools/plugins/p0c/kernel_matrix.py": {
+  "B": [
+   55,
+   56
+  ],
+  "C": [
+   101,
+   102,
+   160,
+   162,
+   265,
+   271,
+   274,
+   342,
+   353
+  ]
+ },
+ "tools/plugins/p0c/verify_table.py": {
+  "B": [
+   71,
+   73,
+   77,
+   78,
+   81,
+   82
+  ]
+ },
+ "tools/shared/scripts/ipp_mac_validate.py": {
+  "C": [
+   23
+  ]
+ },
+ "tools/shared/scripts/ipp_win_validate.py": {
+  "C": [
+   47
+  ]
+ },
+ "tools/startup/scripts/pedis.py": {
+  "C": [
+   59
+  ]
+ },
+ "tools/targets/freshair/closure.py": {
+  "C": [
+   91
+  ]
+ },
+ "tools/targets/kilohearts/license/lift/khmach.py": {
+  "C": [
+   110
+  ]
+ },
+ "tools/targets/kilohearts/snapins/lift/khmach.py": {
+  "C": [
+   110
+  ]
+ },
+ "tools/targets/serum2/license/scripts/authmap.py": {
+  "C": [
+   72
+  ]
+ },
+ "tools/targets/serum2/scripts/blob_refs.py": {
+  "C": [
+   22
+  ]
+ },
+ "tools/targets/serum2/scripts/disasm_fn.py": {
+  "C": [
+   30
+  ]
+ },
+ "tools/targets/serum2/scripts/dsp_closure.py": {
+  "C": [
+   113
+  ]
+ },
+ "tools/targets/serum2/scripts/xref_scan.py": {
+  "C": [
+   39
+  ]
+ }
+}

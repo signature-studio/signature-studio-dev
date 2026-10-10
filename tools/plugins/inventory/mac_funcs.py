@@ -10,6 +10,8 @@ from capstone import Cs, CS_ARCH_X86, CS_MODE_64
 from capstone.x86 import X86_OP_MEM, X86_REG_RIP
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, '..', '..', 'icall', 'disp_size'))
+import dispfix as DF      # CAB-229: capstone の disp_size は 66 prefix 付き disp32 で 2 を返す (D9)
 WORK = os.path.join(HERE, '..', 'work')
 ROOT = '/home/ubuntu/work/analysis/mac/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL/Plugins/Fruity'
 FP_RE = re.compile(r'^v?(add|sub|mul|div|sqrt|min|max|rcp|rsqrt|fmadd|fmsub|fnmadd|fnmsub|hadd|dp)(ss|sd|ps|pd)$')
@@ -103,10 +105,11 @@ def analyze(path):
                     for q in range(ins.imm_offset, ins.imm_offset + 4):
                         norm[o + q] = 0
                 continue
-            if ins.disp_size == 4:
+            dsp = DF.disp_span(ins)
+            if dsp and dsp[1] == 4:
                 for op in ins.operands:
                     if op.type == X86_OP_MEM and op.mem.base == X86_REG_RIP:
-                        for q in range(ins.disp_offset, ins.disp_offset + 4):
+                        for q in range(dsp[0], dsp[0] + 4):
                             norm[o + q] = 0
                         break
         res.append([b - tva, e - b, hashlib.sha1(bytes(norm)).hexdigest()[:12], ninsn, nfp])

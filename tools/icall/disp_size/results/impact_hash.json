@@ -1,0 +1,69 @@
+{
+ "fw_overlap_convention": {
+  "legacy_reproduces_stored": true,
+  "funcs": 1837410,
+  "funcs_hash_changed": 51645,
+  "bytes_changed": 57626792,
+  "dlls_affected": 133,
+  "legacy": {
+   "delphi_dlls": 133,
+   "distinct_hashes": 47487,
+   "distinct_hash_in_ge_130_dlls": 6332,
+   "distinct_hash_in_ge_100_dlls": 7119,
+   "distinct_hash_in_ge_66_dlls": 7770,
+   "distinct_hash_in_ge_13_dlls": 10836,
+   "fw_bytes_per_dll": {
+    "min": 813164,
+    "median": 1733006,
+    "max": 2622972
+   },
+   "fw_funcs_per_dll_median": 12475,
+   "fw_fraction_median": 0.958,
+   "nonfw_bytes_median": 74983,
+   "balance_func_bytes_covered_by_other_dll": {
+    "min": 0.435,
+    "median": 0.961,
+    "ge_0.9": 120,
+    "ge_0.8": 130
+   }
+  },
+  "fixed": {
+   "delphi_dlls": 133,
+   "distinct_hashes": 40492,
+   "distinct_hash_in_ge_130_dlls": 6394,
+   "distinct_hash_in_ge_100_dlls": 7151,
+   "distinct_hash_in_ge_66_dlls": 7804,
+   "distinct_hash_in_ge_13_dlls": 10875,
+   "fw_bytes_per_dll": {
+    "min": 821161,
+    "median": 1746811,
+    "max": 2638389
+   },
+   "fw_funcs_per_dll_median": 12529,
+   "fw_fraction_median": 0.966,
+   "nonfw_bytes_median": 61451,
+   "balance_func_bytes_covered_by_other_dll": {
+    "min": 0.441,
+    "median": 0.97,
+    "ge_0.9": 124,
+    "ge_0.8": 130
+   }
+  }
+ },
+ "win_funcs_convention": {
+  "files": 180,
+  "legacy_reproduces_stored_pe": 180,
+  "funcs": 2012968,
+  "funcs_hash_changed": 38369,
+  "distinct_hash_legacy": 53046,
+  "distinct_hash_fixed": 46117,
+  "ge13_legacy": 11266,
+  "ge13_fixed": 11306,
+  "fw_funcs_legacy": 1755661,
+  "fw_funcs_fixed": 1762730,
+  "flip_nonfw_to_fw": 7069,
+  "flip_fw_to_nonfw": 0,
+  "fw_bytes_legacy": 243113861,
+  "fw_bytes_fixed": 244941869
+ }
+}

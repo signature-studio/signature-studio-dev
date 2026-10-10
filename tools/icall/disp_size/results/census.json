@@ -1,0 +1,786 @@
+{
+ "OTT F (icall closure 282 関数)": {
+  "counts": {
+   "n_funcs": 282,
+   "n_ins": 17789,
+   "disp": 5134,
+   "n_rip": 985,
+   "rip_val_checked": 985,
+   "n_disp8": 3181,
+   "n_disp32": 968,
+   "err": 132,
+   "err_nonnop": 115,
+   "err_nonnop_disp32": 12,
+   "err_disp32": 29,
+   "cls_legacy66": 71,
+   "funcs_with_err_nonnop": 13,
+   "funcs_with_err": 17,
+   "cls_vex2pp66": 61,
+   "err_nonnop_rip": 103,
+   "err_rip": 103
+  },
+  "error_rate_of_disp_insns": 2.571,
+  "rip_error_rate": 10.457,
+  "nonnop_error_rate": 2.24,
+  "top_mnemonics": [
+   [
+    "nop",
+    17
+   ],
+   [
+    "vpand",
+    14
+   ],
+   [
+    "comisd",
+    9
+   ],
+   [
+    "vcomisd",
+    8
+   ],
+   [
+    "vandpd",
+    8
+   ],
+   [
+    "andpd",
+    7
+   ],
+   [
+    "por",
+    7
+   ],
+   [
+    "vpor",
+    7
+   ]
+  ],
+  "classes": {
+   "vex2pp66|rip|vex2": 53,
+   "legacy66|rip|1": 50,
+   "legacy66|disp32|1": 17,
+   "vex2pp66|disp32|vex2": 8,
+   "legacy66|disp32|0": 4
+  },
+  "phantom_examples": []
+ },
+ "OTT F 線形 sweep (参考)": {
+  "counts": {
+   "n_funcs": 282,
+   "n_ins": 18864,
+   "disp": 5333,
+   "n_rip": 1002,
+   "rip_val_checked": 1002,
+   "n_disp8": 3263,
+   "n_disp32": 1068,
+   "err": 184,
+   "err_nonnop": 117,
+   "err_nonnop_disp32": 12,
+   "err_disp32": 79,
+   "cls_legacy66": 123,
+   "funcs_with_err_nonnop": 14,
+   "funcs_with_err": 20,
+   "cls_vex2pp66": 61,
+   "err_nonnop_rip": 105,
+   "err_rip": 105
+  },
+  "error_rate_of_disp_insns": 3.45,
+  "rip_error_rate": 10.479,
+  "nonnop_error_rate": 2.194,
+  "top_mnemonics": [
+   [
+    "nop",
+    67
+   ],
+   [
+    "vpand",
+    14
+   ],
+   [
+    "comisd",
+    9
+   ],
+   [
+    "vcomisd",
+    8
+   ],
+   [
+    "vandpd",
+    8
+   ],
+   [
+    "andpd",
+    7
+   ],
+   [
+    "ucomisd",
+    7
+   ],
+   [
+    "por",
+    7
+   ]
+  ],
+  "classes": {
+   "legacy66|disp32|1": 67,
+   "vex2pp66|rip|vex2": 53,
+   "legacy66|rip|1": 52,
+   "vex2pp66|disp32|vex2": 8,
+   "legacy66|disp32|0": 4
+  },
+  "phantom_examples": []
+ },
+ "FLEngine M11 closure (7,421 関数)": {
+  "counts": {
+   "n_funcs": 7421,
+   "n_ins": 341713,
+   "disp": 139708,
+   "n_rip": 27839,
+   "rip_val_checked": 27839,
+   "n_disp8": 69051,
+   "n_disp32": 42818,
+   "err": 991,
+   "err_nonnop": 988,
+   "err_nonnop_rip": 501,
+   "err_rip": 501,
+   "cls_legacy66": 991,
+   "funcs_with_err_nonnop": 263,
+   "funcs_with_err": 264,
+   "err_nonnop_disp32": 487,
+   "err_disp32": 490
+  },
+  "error_rate_of_disp_insns": 0.709,
+  "rip_error_rate": 1.8,
+  "nonnop_error_rate": 0.707,
+  "top_mnemonics": [
+   [
+    "movdqa",
+    278
+   ],
+   [
+    "pand",
+    200
+   ],
+   [
+    "mov",
+    198
+   ],
+   [
+    "ucomisd",
+    173
+   ],
+   [
+    "cmp",
+    57
+   ],
+   [
+    "pxor",
+    55
+   ],
+   [
+    "and",
+    9
+   ],
+   [
+    "or",
+    8
+   ]
+  ],
+  "classes": {
+   "legacy66|rip|1": 404,
+   "legacy66|disp32|1": 312,
+   "legacy66|disp32|0": 178,
+   "legacy66|rip|0": 97
+  },
+  "phantom_examples": []
+ },
+ "Fruity Balance closure (67 関数)": {
+  "counts": {
+   "n_funcs": 67,
+   "n_ins": 4216,
+   "disp": 1501,
+   "n_disp8": 975,
+   "n_rip": 203,
+   "rip_val_checked": 203,
+   "err": 26,
+   "err_nonnop": 26,
+   "err_nonnop_rip": 14,
+   "err_rip": 14,
+   "cls_legacy66": 26,
+   "funcs_with_err_nonnop": 11,
+   "funcs_with_err": 11,
+   "n_disp32": 323,
+   "err_nonnop_disp32": 12,
+   "err_disp32": 12
+  },
+  "error_rate_of_disp_insns": 1.732,
+  "rip_error_rate": 6.897,
+  "nonnop_error_rate": 1.732,
+  "top_mnemonics": [
+   [
+    "movdqa",
+    12
+   ],
+   [
+    "pand",
+    7
+   ],
+   [
+    "pxor",
+    4
+   ],
+   [
+    "ucomisd",
+    2
+   ],
+   [
+    "movapd",
+    1
+   ]
+  ],
+  "classes": {
+   "legacy66|rip|1": 14,
+   "legacy66|disp32|1": 12
+  },
+  "phantom_examples": []
+ },
+ "Fresh Air SlateCore closure (131 関数)": {
+  "counts": {
+   "n_funcs": 131,
+   "n_ins": 6267,
+   "disp": 2052,
+   "n_rip": 231,
+   "rip_val_checked": 231,
+   "n_disp8": 1532,
+   "n_disp32": 289,
+   "err": 35,
+   "err_disp32": 19,
+   "cls_legacy66": 19,
+   "funcs_with_err": 8,
+   "err_nonnop": 26,
+   "err_nonnop_disp32": 10,
+   "cls_vex2pp66": 16,
+   "funcs_with_err_nonnop": 3,
+   "err_nonnop_rip": 16,
+   "err_rip": 16
+  },
+  "error_rate_of_disp_insns": 1.706,
+  "rip_error_rate": 6.926,
+  "nonnop_error_rate": 1.267,
+  "top_mnemonics": [
+   [
+    "nop",
+    9
+   ],
+   [
+    "vmovdqa",
+    4
+   ],
+   [
+    "vmovntdq",
+    4
+   ],
+   [
+    "ucomisd",
+    2
+   ],
+   [
+    "vucomisd",
+    2
+   ],
+   [
+    "vmulpd",
+    2
+   ],
+   [
+    "mov",
+    2
+   ],
+   [
+    "pand",
+    1
+   ]
+  ],
+  "classes": {
+   "legacy66|disp32|1": 9,
+   "vex2pp66|disp32|vex2": 8,
+   "legacy66|rip|1": 8,
+   "vex2pp66|rip|vex2": 8,
+   "legacy66|disp32|0": 2
+  },
+  "phantom_examples": []
+ },
+ "KH HeartCore gain+infra (196 関数)": {
+  "counts": {
+   "n_funcs": 196,
+   "n_ins": 12578,
+   "disp": 3865,
+   "n_disp8": 2377,
+   "n_rip": 1153,
+   "rip_val_checked": 1153,
+   "n_disp32": 335,
+   "err": 163,
+   "err_disp32": 52,
+   "cls_legacy66": 84,
+   "funcs_with_err": 27,
+   "err_nonnop": 135,
+   "err_nonnop_rip": 111,
+   "err_rip": 111,
+   "funcs_with_err_nonnop": 18,
+   "cls_vex2pp66": 79,
+   "err_nonnop_disp32": 24
+  },
+  "error_rate_of_disp_insns": 4.217,
+  "rip_error_rate": 9.627,
+  "nonnop_error_rate": 3.493,
+  "top_mnemonics": [
+   [
+    "nop",
+    28
+   ],
+   [
+    "comisd",
+    15
+   ],
+   [
+    "vmovapd",
+    12
+   ],
+   [
+    "vcomisd",
+    10
+   ],
+   [
+    "vmovdqa",
+    10
+   ],
+   [
+    "vpand",
+    9
+   ],
+   [
+    "vandpd",
+    9
+   ],
+   [
+    "vmovntdq",
+    8
+   ]
+  ],
+  "classes": {
+   "vex2pp66|rip|vex2": 61,
+   "legacy66|rip|1": 50,
+   "legacy66|disp32|1": 32,
+   "vex2pp66|disp32|vex2": 18,
+   "legacy66|disp32|0": 2
+  },
+  "phantom_examples": []
+ },
+ "FLEngine_x64.dll (全 .pdata)": {
+  "counts": {
+   "n_funcs": 57816,
+   "n_ins": 2566540,
+   "disp": 1058904,
+   "n_disp8": 560654,
+   "n_rip": 136207,
+   "rip_val_checked": 136207,
+   "n_disp32": 362043,
+   "err": 7419,
+   "err_nonnop": 7340,
+   "err_nonnop_disp32": 4798,
+   "err_disp32": 4877,
+   "cls_legacy66": 7419,
+   "funcs_with_err_nonnop": 1574,
+   "funcs_with_err": 1590,
+   "err_nonnop_rip": 2542,
+   "err_rip": 2542
+  },
+  "error_rate_of_disp_insns": 0.701,
+  "rip_error_rate": 1.866,
+  "nonnop_error_rate": 0.693,
+  "top_mnemonics": [
+   [
+    "movdqa",
+    1625
+   ],
+   [
+    "movd",
+    1457
+   ],
+   [
+    "mov",
+    1197
+   ],
+   [
+    "pand",
+    1147
+   ],
+   [
+    "ucomisd",
+    747
+   ],
+   [
+    "cmp",
+    578
+   ],
+   [
+    "pxor",
+    226
+   ],
+   [
+    "or",
+    190
+   ]
+  ],
+  "classes": {
+   "legacy66|disp32|1": 3307,
+   "legacy66|rip|1": 2005,
+   "legacy66|disp32|0": 1570,
+   "legacy66|rip|0": 537
+  },
+  "phantom_examples": []
+ },
+ "Fresh Air SlateCore (全 .pdata)": {
+  "counts": {
+   "n_funcs": 25063,
+   "n_ins": 3526710,
+   "disp": 1363751,
+   "n_disp32": 768805,
+   "n_disp8": 539446,
+   "n_rip": 55496,
+   "rip_val_checked": 55496,
+   "err": 9338,
+   "err_disp32": 6587,
+   "cls_legacy66": 8908,
+   "funcs_with_err": 2877,
+   "err_nonnop": 6026,
+   "err_nonnop_rip": 2751,
+   "err_rip": 2751,
+   "funcs_with_err_nonnop": 1375,
+   "err_nonnop_disp32": 3275,
+   "cls_vex2pp66": 430,
+   "n_moffs": 4
+  },
+  "error_rate_of_disp_insns": 0.685,
+  "rip_error_rate": 4.957,
+  "nonnop_error_rate": 0.442,
+  "top_mnemonics": [
+   [
+    "nop",
+    3312
+   ],
+   [
+    "movdqa",
+    2683
+   ],
+   [
+    "mov",
+    1087
+   ],
+   [
+    "movapd",
+    417
+   ],
+   [
+    "vmovdqa",
+    252
+   ],
+   [
+    "ucomisd",
+    199
+   ],
+   [
+    "cmp",
+    169
+   ],
+   [
+    "movd",
+    105
+   ]
+  ],
+  "classes": {
+   "legacy66|disp32|1": 5140,
+   "legacy66|rip|1": 2417,
+   "legacy66|disp32|0": 1300,
+   "vex2pp66|rip|vex2": 283,
+   "vex2pp66|disp32|vex2": 147,
+   "legacy66|rip|2": 41,
+   "legacy66|rip|0": 10
+  },
+  "phantom_examples": []
+ },
+ "KH HeartCore (全 .pdata)": {
+  "counts": {
+   "n_funcs": 111666,
+   "n_ins": 4995580,
+   "disp": 1682527,
+   "n_disp8": 1041050,
+   "n_disp32": 515913,
+   "n_rip": 125547,
+   "rip_val_checked": 125547,
+   "err": 21163,
+   "err_disp32": 16724,
+   "cls_legacy66": 20793,
+   "funcs_with_err": 6952,
+   "err_nonnop": 11916,
+   "err_nonnop_rip": 4439,
+   "err_rip": 4439,
+   "err_nonnop_disp32": 7477,
+   "funcs_with_err_nonnop": 3167,
+   "cls_vex2pp66": 370,
+   "n_moffs": 17
+  },
+  "error_rate_of_disp_insns": 1.258,
+  "rip_error_rate": 3.536,
+  "nonnop_error_rate": 0.708,
+  "top_mnemonics": [
+   [
+    "nop",
+    9247
+   ],
+   [
+    "movdqa",
+    3443
+   ],
+   [
+    "movapd",
+    3194
+   ],
+   [
+    "mov",
+    2436
+   ],
+   [
+    "ucomisd",
+    472
+   ],
+   [
+    "movupd",
+    260
+   ],
+   [
+    "mulpd",
+    255
+   ],
+   [
+    "movd",
+    197
+   ]
+  ],
+  "classes": {
+   "legacy66|disp32|1": 14033,
+   "legacy66|rip|1": 4130,
+   "legacy66|disp32|0": 2565,
+   "vex2pp66|rip|vex2": 244,
+   "vex2pp66|disp32|vex2": 126,
+   "legacy66|rip|0": 42,
+   "legacy66|rip|2": 23
+  },
+  "phantom_examples": []
+ },
+ "Serum2 win64 vst3 (全 .pdata)": {
+  "counts": {
+   "n_funcs": 33791,
+   "n_ins": 2515362,
+   "disp": 807737,
+   "n_rip": 91724,
+   "rip_val_checked": 91724,
+   "n_disp8": 483456,
+   "n_disp32": 232551,
+   "err": 23040,
+   "err_disp32": 19289,
+   "cls_legacy66": 22896,
+   "funcs_with_err": 4916,
+   "err_nonnop": 15063,
+   "err_nonnop_disp32": 11312,
+   "funcs_with_err_nonnop": 2587,
+   "err_nonnop_rip": 3751,
+   "err_rip": 3751,
+   "cls_vex2pp66": 144,
+   "n_moffs": 6
+  },
+  "error_rate_of_disp_insns": 2.852,
+  "rip_error_rate": 4.089,
+  "nonnop_error_rate": 1.865,
+  "top_mnemonics": [
+   [
+    "nop",
+    7977
+   ],
+   [
+    "movapd",
+    6673
+   ],
+   [
+    "movupd",
+    2021
+   ],
+   [
+    "movdqa",
+    1796
+   ],
+   [
+    "ucomisd",
+    1306
+   ],
+   [
+    "mov",
+    1245
+   ],
+   [
+    "cmp",
+    349
+   ],
+   [
+    "addpd",
+    238
+   ]
+  ],
+  "classes": {
+   "legacy66|disp32|1": 17806,
+   "legacy66|rip|1": 3467,
+   "legacy66|disp32|0": 1451,
+   "legacy66|rip|0": 172,
+   "vex2pp66|rip|vex2": 112,
+   "vex2pp66|disp32|vex2": 32
+  },
+  "phantom_examples": []
+ },
+ "Delphi plugin 133 DLL (全 .pdata)": {
+  "counts": {
+   "n_funcs": 1837410,
+   "n_ins": 68681048,
+   "disp": 25703502,
+   "n_disp8": 15550256,
+   "n_rip": 2791307,
+   "rip_val_checked": 2791307,
+   "n_disp32": 7361939,
+   "err": 350163,
+   "err_nonnop": 340853,
+   "err_nonnop_disp32": 253727,
+   "err_disp32": 263037,
+   "cls_legacy66": 350163,
+   "funcs_with_err_nonnop": 51645,
+   "funcs_with_err": 53640,
+   "err_nonnop_rip": 87126,
+   "err_rip": 87126
+  },
+  "error_rate_of_disp_insns": 1.362,
+  "rip_error_rate": 3.121,
+  "nonnop_error_rate": 1.326,
+  "top_mnemonics": [
+   [
+    "movd",
+    141292
+   ],
+   [
+    "mov",
+    49884
+   ],
+   [
+    "movdqa",
+    49519
+   ],
+   [
+    "pand",
+    31535
+   ],
+   [
+    "cmp",
+    25755
+   ],
+   [
+    "ucomisd",
+    20016
+   ],
+   [
+    "pxor",
+    11764
+   ],
+   [
+    "nop",
+    9310
+   ]
+  ],
+  "classes": {
+   "legacy66|disp32|1": 204519,
+   "legacy66|rip|1": 60353,
+   "legacy66|disp32|0": 58518,
+   "legacy66|rip|0": 26773
+  },
+  "phantom_examples": []
+ },
+ "mac Fruity Mach-O x86_64 slice (LC_FUNCTION_STARTS)": {
+  "counts": {
+   "n_funcs": 1274001,
+   "n_ins": 67002757,
+   "disp": 25540240,
+   "n_disp8": 13623627,
+   "n_rip": 3107415,
+   "rip_val_checked": 3107415,
+   "n_disp32": 8809042,
+   "err": 1494483,
+   "err_disp32": 1463476,
+   "cls_legacy66": 1492338,
+   "funcs_with_err": 739006,
+   "err_nonnop": 143620,
+   "err_nonnop_disp32": 112613,
+   "err_nonnop_rip": 31007,
+   "err_rip": 31007,
+   "funcs_with_err_nonnop": 36975,
+   "n_moffs": 156,
+   "cls_vex2pp66": 2145
+  },
+  "error_rate_of_disp_insns": 5.851,
+  "rip_error_rate": 0.998,
+  "nonnop_error_rate": 0.562,
+  "top_mnemonics": [
+   [
+    "nop",
+    1350863
+   ],
+   [
+    "movdqa",
+    45326
+   ],
+   [
+    "mov",
+    39053
+   ],
+   [
+    "test",
+    12523
+   ],
+   [
+    "cmp",
+    11299
+   ],
+   [
+    "movapd",
+    6675
+   ],
+   [
+    "comisd",
+    6610
+   ],
+   [
+    "andpd",
+    2534
+   ]
+  ],
+  "classes": {
+   "legacy66|disp32|1": 1399820,
+   "legacy66|disp32|0": 60399,
+   "legacy66|rip|1": 21441,
+   "legacy66|rip|0": 7714,
+   "vex2pp66|disp32|vex2": 1554,
+   "legacy66|disp32|3": 1522,
+   "legacy66|rip|2": 880,
+   "vex2pp66|rip|vex2": 591,
+   "legacy66|rip|3": 381,
+   "legacy66|disp32|2": 181
+  },
+  "phantom_examples": []
+ }
+}
