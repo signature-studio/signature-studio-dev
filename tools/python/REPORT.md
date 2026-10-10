@@ -5,7 +5,7 @@
 1. **CPython 3.12.1 (FL 同梱版と完全一致) の emscripten/wasm ビルド成功**。パッチ無し、emsdk 6.0.12 でクリーンビルド 3m19s。node で `print(1+1)`=2、struct/json/zlib/hashlib/decimal/re/datetime/inspect 等が動作。`flpy.wasm` **5.92MB** (gzip 2.07MB) + `flpy.data` (stdlib zip) 3.20MB。
 2. **FL の組込 Python API 面を実測**: 公開 12 module **426 関数** + FL 内部 `ilmcp` 9 = **435 関数** (公開 stubs 旧版 392 に対し +34 が 26.1.7 新規)。他に `flpianoroll`(64 メンバ)/`flcpt`/`flrack`/`fl`、MIDI script callback **27**。
 3. **MCPTools.pyc = 48 tools** (「50」ではない)。逆アセンブルは同一 3.12.1 の marshal/dis。**外部通信は pyc 内に 0 件** (import は stdlib 10 + FL module 12 のみ)。分類 **A local-flapi 38 / B local-ilmcp 8 / U Gopher-UI 付随 2 / X 対象外 0**。LLM ゲートウェイ (Gopher WebView `window.flHelper`) は pyc の外で、対象外。
-4. **PoC 成功**: wasm Python を Web Worker で起動し、SAB 同期 RPC で flapi モック (FLEngine 模擬) に接続、**FL 同梱 `MCPTools.pyc` を FL と同じく `__main__` として実行して 48/48 tools が成功** (37,423 flapi 呼出し)。Python→ホスト callable 呼戻し・MIDI callback 経路・MCP JSON-RPC (tools/list, tools/call) も確認。**headless Chrome (cross-origin isolated, module Worker) でも成功**。
+4. **PoC 成功**: wasm Python を Web Worker で起動し、SAB 同期 RPC で flapi モック (FLEngine 模擬) に接続、**FL 同梱 `MCPTools.pyc` を FL と同じく `__main__` として実行して 48/48 tools が成功** (例外なし・エラー文言なしの意味。モックの戻り値のため FL 実機と同一動作の保証ではない。37,424 flapi 呼出し)。Python→ホスト callable 呼戻し・MIDI callback 経路・MCP JSON-RPC (tools/list, tools/call) も確認。**headless Chrome (cross-origin isolated, module Worker) でも成功**。
 5. 1 コマンド E2E: `bash tools/python/run_all.sh` (incremental 19 秒 / 初回 ~4 分)。
 
 ## 1. CPython 3.12.1 wasm ビルド
@@ -15,7 +15,7 @@
 | ソース | python.org Python-3.12.1.tgz (FL: `Python.framework` Info.plist=3.12.1, `/Users/sysadmin/build/v3.12.1`; win は python312.dll=3.12.1 と win REPORT 記載) |
 | ツール | emsdk 6.0.12 (clang-24), native build-python 3.12.1 (cross 用 + dis 用) |
 | 方式 | `--host=wasm32-unknown-emscripten --with-emscripten-target=browser`、全 ext module を **静的リンク** (動的リンク無し)。`libpython3.12.a` を自前 `flpy.c` と ES module (`-sMODULARIZE -sEXPORT_ES6`) にリンク |
-| 成果物 | `flpy.wasm` 5,920,419B (gzip 2,071,492) / `flpy.data` 3,199,615B (stdlib 400 pyc の zip + `/fl/Lib`) / `flpy.js` 120,194B (gzip 32,209)。stock `python.js` ビルドは wasm 5,927,165B |
+| 成果物 | `flpy.wasm` 5,920,419B (gzip -9 で 2,071,492) / `flpy.data` 3,199,615B (stdlib 400 pyc の zip + `/fl/Lib`) / `flpy.js` 120,194B (gzip 32,209)。stock `python.js` ビルドは wasm 5,927,165B |
 | 時間 | wasm 側クリーン build+link 3m19s (16 core)、flpy 再 link 4 秒 |
 | 起動 | Worker 生成〜Python init〜MCPTools 読込前まで node 約 100ms / Chrome 150〜860ms |
 | 検証 | `tests/smoke_direct.mjs`: `print(1+1)`、struct/json/math/zlib/hashlib/re/decimal/collections/itertools/inspect/ast/dis/typing、FL スクリプトが実際に使う stdlib 22 module 全 import 可、再帰 900 |
@@ -33,7 +33,7 @@
 - **win**: python312.dll + 26 .pyd (win REPORT)。`MCPTools.pyc` は mac と **byte 一致** (100,674B, magic `cb0d0d0a`=3.12)。
 - 追加 Lib: `Shared/Python/Lib/midi.py` (770 行, 定数のみ), `utils.py` (213 行, 純 Python)。
 - 静的リンクした wasm の builtin module 66 本。FL の非 test lib-dynload 65 中 **35 を提供**。欠落 30 は `_ctypes _curses* _dbm _hashlib _ssl _lzma _uuid _tkinter _sqlite3 _codecs_{cn,hk,iso2022,jp,kr,tw} _multibytecodec _multiprocessing _posixshmem _posixsubprocess _xxsubinterpreters _xxinterpchannels fcntl grp nis readline resource syslog termios _scproxy`。FL 同梱スクリプトの import 実測では不要 (下記)。
-- **FL 同梱 Python スクリプト 65 本**: pyscript (Audio scripts 12 / Remote Scripts 5 / Piano roll 5)、device .py 1、Chord progression pyc 41、MCPTools.pyc 1、(Hardware specific の `.scr` 95 本は旧形式で Python ではない)。import する stdlib は **22 module のみ** (`__future__ abc ast collections copy enum functools inspect itertools json math operator os pathlib random re sys time traceback types typing zlib`) — wasm で全て解決済。FL module は 17 (`enveditor flpianoroll flcpt flrack` を含む)。
+- **FL 同梱 Python スクリプト 65 本**: pyscript (Audio scripts 12 / Remote Scripts 5 / Piano roll 5)、device .py 1、Chord progression 41 (pyc 39 + pyscript 2)、MCPTools.pyc 1、(Hardware specific の `.scr` 95 本は旧形式で Python ではない)。import する stdlib は **22 module のみ** (`__future__ abc ast collections copy enum functools inspect itertools json math operator os pathlib random re sys time traceback types typing zlib`) — wasm で全て解決済。FL module は 17 (`enveditor flpianoroll flcpt flrack` を含む)。
 - FL の Python 組込み方: Python.framework は **dlopen/dlsym で後付け** (LC_LOAD_DYLIB に無い)。C API 関数名は rodata に平文で残らず**未抽出**。Delphi 型名から `PyInterpreterConfig`(サブインタプリタ示唆)・`PythonSession`/`TMCPPythonSession`・`pycb*` callback 表・`fl.FLTextOutput`(stdout 差替)・`_ilmeta` を確認。
 
 ## 3. FL 組込 API 面 (`analysis/flapi/`)
@@ -57,7 +57,7 @@ FLEngine rodata の `name\0doc\0…<module>` 並びから機械抽出 (`flapi_ex
 ## 4. MCPTools.pyc 48 tools (`analysis/mcp/MCP_TOOLS.md`, `mcp_classification.json`)
 
 - 構造: `@mcp_tool`(= `_is_mcp_tool=True`) 付き関数を `get_mcp_tools_json()` が `sys.modules['__main__']` から走査して name/description/inputSchema(型は Annotated から生成) を JSON 化。FLEngine 側 `TMCPServer`/`TMCPPythonSession`/`TMCPSyncCall` が JSON-RPC 2.0 応答 (`result.content[{type:text}], isError`) を組立て、結果は WebView の `window.flHelper.onMCPTools/onRunJson` へ渡る (rodata の JS 呼出し文字列からの推定)。
-- 使う FL API は **8 module / 61 参照** (channels 18, mixer 18, ilmcp 8, plugins 7, playlist 4, ui 3, transport 2, midi 定数 1)。実行実測で 54 を踏み、未実行 7 は分岐違い (isChannelSelected 等) で静的閉包に含まれるもの。**実行時に呼ばれた API は静的閉包の部分集合** (不一致 0)。
+- 使う FL API は **8 module / 61 参照** (channels 18, mixer 18, ilmcp 8, plugins 7, playlist 4, ui 3, transport 2, midi 定数 1)。静的 61 参照 = flapi 関数 60 (公開 52 + ilmcp 8) + `midi.PIM_None` 定数 1。実行実測で 55 を踏み (`mcp_classification.json` の `api_arity_observed` も 55)、未実行 6 は分岐違いで静的閉包に含まれるもの (isChannelSelected, mixer.focusEditor, mixer.isTrackSelected, plugins.getParamValueString, ui.hideWindow, midi.PIM_None)。**実行時に呼ばれた API は静的閉包の部分集合** (不一致 0)。
 
 | 分類 | 数 | tools |
 |---|---|---|
@@ -73,8 +73,8 @@ FLEngine rodata の `name\0doc\0…<module>` 並びから機械抽出 (`flapi_ex
 | PoC 実測 | 値 |
 |---|---|
 | MCPTools.pyc を wasm Python 上で `__main__` 実行、`get_mcp_tools_json()` | 48 tools (FL と同一出力形) |
-| 全 48 tools 実行 (モック) | **48/48 ok**、flapi 呼出し 37,423、全体 2.2 秒 |
-| flapi 往復 (Worker↔main, JSON RPC) | 定常 **15µs/呼出し** (20k 回)、コールド 29〜112µs |
+| 全 48 tools 実行 (モック) | **48/48 ok**、flapi 呼出し 37,424 (tool 別合計は 37,423)、全体 2.2 秒 (検収再実行 約 4 秒、負荷依存) |
+| flapi 往復 (Worker↔main, JSON RPC) | **bimodal: 約 15µs (速い時) 〜 約 100〜130µs (遅い時)**。検収再計測 (`tests/rtt_bench.mjs`, 20k 回×3 を 5 試行) は大半が 86〜110µs で 16〜17µs は 2/15 回。コールド (最初の 500〜2,000 回) 65〜134µs。15µs は常時値ではない |
 | MCP JSON-RPC (`host/mcp_rpc.mjs`) | tools/list=48、tools/call 成功、未知 tool は isError=true |
 | MIDI 経路 (`fl_rt.dispatch_midi`) | OnMidiIn→OnMidiMsg→OnNoteOn の FL 順、`handled` 反映 |
 | headless Chrome | crossOriginIsolated=true、module Worker + SAB RPC で同 PoC 成功 |
@@ -85,7 +85,7 @@ FLEngine rodata の `name\0doc\0…<module>` 並びから機械抽出 (`flapi_ex
 
 `bash tools/python/run_all.sh` が下記を順に実行 (全て PASS で `== ALL OK`)。
 `fetch_inputs.sh`(FL 由来 pyc/py を `work/` へ。**git 非管理**) → `build_cpython_wasm.sh` → `analysis/{mcp_extract,flapi_extract,flapi_table,scripts_inventory}` → `build_flpy.sh` → `tests/{smoke_direct,poc_mcp,all_tools,browser_check}` → `mcp_classify`/`py_inventory`。
-`src/`=flpy.c, flhost_lib.js, fl_api.py, fl_rt.py / `host/`=flpython, py_worker, rpc, fl_mock, mcp_rpc / 成果物は `dist/`(gitignore)。
+`src/`=flpy.c, flhost_lib.js, fl_api.py, fl_rt.py / `host/`=flpython, py_worker, rpc, fl_mock, mcp_rpc / 成果物は `dist/`(gitignore)。`tests/rtt_bench.mjs` は検収で追加した往復コスト計測 (run_all.sh 対象外)。
 
 ## 7. 未解決・ブロッカー・留意
 
@@ -95,6 +95,10 @@ FLEngine rodata の `name\0doc\0…<module>` 並びから機械抽出 (`flapi_ex
 - 引数名 (kwargs) は stubs 由来の署名がある関数のみ。新規 43 関数と ilmcp は位置引数のみ (rodata の書式文字列 `i if sdd…` は順序対応が曖昧で未採用)。
 - 旧 stubs (LGPL) は**参照入力のみ**でリポジトリ非同梱 (`fetch_inputs.sh` が clone)。FL 由来 pyc/py も非同梱 — 利用者の FL から実行時供給。EULA 判断は行わない (事実整理のみ)。
 - 呼出しコストは node/Chrome headless の mock 実測。実 FLEngine(wasm) 結合時に再計測要。
+- **MCPTools 内のテンポ規約が不整合に見える**: `get_session_context` は `mixer.getCurrentTempo()` (引数なし) を `/1000` して BPM 化、`get_tempo` は `getCurrentTempo(1)` を素の BPM として表示、`set_tempo` は `setCurrentTempo(bpm, 1)`。モックは後者に合わせたため `get_session_context` が `tempo_bpm: 0.13` を返す (`analysis/mcp/tool_coverage.json`)。どちらが実 FL の挙動かは未確認。
+- flapi 435 関数のうち doc 無し 36 (ui 27 + ilmcp 9): ui の 27 は stubs の関数名辞書と rodata 窓内トークンの一致で補完 (`flapi_extract.py`)。doc 無しの *新規* 関数は stubs 辞書に無いため抽出漏れの可能性がある (doc 付きの新規 34 は rodata から直接抽出)。
+- 「LGPL stubs 非同梱」はファイルとしての話: stubs 由来の署名 (引数名/型/既定値、394 関数・535 引数) と callback 名 26 が `flapi_table.json` に取り込み済み (docstring 本文は無し)。`flapi_table.json` の doc 欄 (≤66 字) と `raw_*.json` は FLEngine rodata の抽出文字列、`mcp_tools.json` / `MCP_TOOLS.md` の description は MCPTools.pyc の先頭 160 字。
+- 再ビルドで成果物バイト数は ±0.2% 程度変動 (クリーン再ビルドで wasm 5,921,416 / data 3,204,697 / js 120,269、検収時)。
 
 ## 8. ユーザ依頼事項
 
@@ -104,12 +108,12 @@ FLEngine rodata の `name\0doc\0…<module>` 並びから機械抽出 (`flapi_ex
 
 | # | 内容 | 規模 |
 |---|---|---|
-| T1 | FLEngine wasm に flapi provider (`fl_api_call(fn_id,slots)`) を実装: まず MCP が使う 54 + MIDI 経路 (device/transport/mixer/channels) 優先 → 426 関数。`flapi_table.json` から C 雛形を生成 | L |
+| T1 | FLEngine wasm に flapi provider (`fl_api_call(fn_id,slots)`) を実装: まず MCP が使う 60 (公開 52 + ilmcp 8) + MIDI 経路 (device/transport/mixer/channels) 優先 → 426 関数。`flapi_table.json` から C 雛形を生成 | L |
 | T2 | CPython を FLEngine wasm へ静的リンク (JS 往復撤廃)。`flpy.c` 再利用、スレッド/GIL 方針確定 | M |
 | T3 | `ilmcp` 9 関数の実装 (PluginDB/Browser 列挙、addChannel/addEffect、PRScript store/run) → MCP B 群 8 tools | L |
 | T4 | MCP JSON-RPC をアプリ内 UI/devtools に公開 (`mcp_rpc.mjs` を FLEngine UI に接続、外部 LLM 無し) | S |
 | T5 | piano roll scripting: `flpianoroll`(Note/Marker/score/ScriptDialog) + `.pyscript` ローダ、同梱 5 本 (Euclidean/Humanize/Arpeggiator…) を回帰試験に。ScriptDialog は HUD フォーム連携 | L |
 | T6 | MIDI scripting ホスト: device script(.py) ローダ、27 callback 配送、Web MIDI 入力→`dispatch_midi`。サブインタプリタ可否の wasm 検証 | M |
-| T7 | Edison `enveditor` / `flcpt` / `flrack` module と Chord progression ツール (pyc 41 本) の動作検証 | M |
+| T7 | Edison `enveditor` / `flcpt` / `flrack` module と Chord progression ツール (pyc 39 + pyscript 2) の動作検証 | M |
 | T8 | 性能: 構造値の binary ABI、バッチ API、MIDI 1 イベント当り呼出し数の計測 | S |
 | T9 | 実機 FL でのモック意味差検証 (ユーザ環境があれば) と kwargs 署名の rodata 書式文字列からの自動復元 | S |

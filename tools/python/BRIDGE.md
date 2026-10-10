@@ -42,7 +42,7 @@ host→Python 入口 (flpy.c export): `flpy_init(syspath)` `flpy_run(src,file)` 
 ## 4. スレッド/リアルタイム
 
 - FL の Python は UI/MIDI スレッドで動き、audio スレッドには入らない (API が "Operation unsafe at current time" を返す設計)。→ Python Worker は **AudioWorklet から完全分離**。FLEngine 側 RpcServer は UI/メッセージループの tick で処理 (waitAsync のため待ち行列は自然に直列化)。
-- 往復コスト実測 (node, JSON RPC, Worker↔main): **定常 15µs/flapi 呼出し** (channelCount ×20,000)、コールド 29〜112µs (最初の 2,000 回)。MCP 48 tool 全実行は 37,423 呼出し (うち `get_session_context` 18,056 と `get_mixer_routing` 16,381 が 127 トラック×127 宛先の走査) で全体 2.2 秒 (起動込み)。MIDI 1 イベント当り数十呼出しなら数 ms: 許容。ホット経路が出たら §6 の B 案か binary ABI。
+- 往復コスト実測 (node, JSON RPC, Worker↔main): **bimodal: 約 15µs (速い時) 〜 約 100〜130µs (遅い時、検収再計測の大半)** (channelCount ×20,000, `tests/rtt_bench.mjs`)、コールド 65〜134µs (最初の 500〜2,000 回)。MCP 48 tool 全実行は 37,424 呼出し (うち `get_session_context` 18,056 と `get_mixer_routing` 16,381 が 127 トラック×127 宛先の走査) で全体 2.2 秒 (起動込み)。MIDI 1 イベント当り数十呼出しなら 100µs/呼出しでも数 ms: 許容。ホット経路が出たら §6 の B 案か binary ABI。
 
 ## 5. FLEngine 側の実装案 (provider)
 
