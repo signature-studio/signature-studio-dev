@@ -2,7 +2,7 @@
 # R2 バケット作成 (冪等) + r2.dev 公開 URL の無効化 + (任意) ライフサイクル
 #   APPLY=1 で実行。既定は cf --dry-run。
 set -euo pipefail
-source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/lib.sh"
 need CF_R2_BUCKET
 
 step "R2 バケット $CF_R2_BUCKET"
@@ -22,6 +22,6 @@ else
 fi
 
 if [[ "${APPLY_LIFECYCLE:-0}" == "1" ]]; then
-  step "ライフサイクル (config/lifecycle.json)"
-  cf r2 buckets lifecycle update "$CF_R2_BUCKET" --rules "@$DEPLOY_DIR/config/lifecycle.json" --force "${DRYFLAG[@]}"
+  step "ライフサイクル (legacy-r2/lifecycle.json)"
+  cf r2 buckets lifecycle update "$CF_R2_BUCKET" --rules "@$DEPLOY_DIR/legacy-r2/lifecycle.json" --force "${DRYFLAG[@]}"
 fi

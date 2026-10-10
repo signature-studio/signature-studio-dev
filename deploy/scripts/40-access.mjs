@@ -1,13 +1,12 @@
 #!/usr/bin/env node
-// Cloudflare Access: R2 カスタムドメインのホスト名に対する Self-hosted App (Worker 不要)。
-//   - 人間: メール allow ポリシー (ACCESS_ALLOW_EMAILS もしくは ACCESS_ALLOW_EMAIL_DOMAIN)
-//   - E2E/CI: service token + non_identity ポリシー (CF-Access-Client-Id/Secret ヘッダ)
+// Cloudflare Access: Worker 単位 (destination.type="worker") の Self-hosted App + E2E 用 service token (冪等 upsert)。
+//   - worker 型は workers.dev の本番 URL / version preview URL / 将来追加するカスタムドメインを全て保護する (tools/hosting 実測)。
+//     hostname 型は <ver>-<name>.<sub>.workers.dev の preview が 200 素通しになるため使わない。
+//   - 人間: メール allow (ACCESS_ALLOW_EMAILS / ACCESS_ALLOW_EMAIL_DOMAIN)。E2E/CI: service token + non_identity ポリシー。
+//   - **Worker が存在してから**作る (worker_id が必要)。deploy は 20-worker.mjs --phase closed -> 本スクリプト -> --phase open の順。
 //
-// 重要: カスタムドメインを R2 に接続する *前* に Access App を作ること
-//       (先に接続すると bucket が一時的に公開される。deploy.sh は順序を保証する)。
-//
-//   node deploy/scripts/40-access.mjs --host studio.example.com [mode]
-//   mode: (既定) 作成予定の JSON を表示 | --dry-run (cf --dry-run, 既存は読取) | --apply
+//   node deploy/scripts/40-access.mjs [--name signature-studio] [--emails a@x,b@y] [mode]
+//   mode: (既定) 作成予定 JSON を表示 | --dry-run (cf --dry-run、既存は読取のみ) | --apply
 import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { cf } from "../lib/cf.mjs";
@@ -18,16 +17,11 @@ const opt = (n, d) => {
   return i >= 0 ? args[i + 1] : d;
 };
 const has = (n) => args.includes(`--${n}`);
-const host = opt("host", process.env.CF_HOSTNAME);
-if (!host) throw new Error("--host (または CF_HOSTNAME) が必要");
+const name = opt("name", process.env.WORKER_NAME ?? "signature-studio");
 const mode = has("apply") ? "apply" : has("dry-run") ? "dry-run" : "print";
-const emails = (opt("emails", process.env.ACCESS_ALLOW_EMAILS) ?? "")
-  .split(",")
-  .map((s) => s.trim())
-  .filter(Boolean);
+const emails = (opt("emails", process.env.ACCESS_ALLOW_EMAILS) ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 const emailDomain = process.env.ACCESS_ALLOW_EMAIL_DOMAIN;
-const tokenName = opt("service-token", process.env.ACCESS_SERVICE_TOKEN_NAME ?? "webstudio-e2e");
-const appName = opt("app-name", process.env.ACCESS_APP_NAME ?? `webstudio (${host})`);
+const tokenName = opt("service-token", process.env.ACCESS_SERVICE_TOKEN_NAME ?? `${name}-e2e`);
 const sessionDuration = process.env.ACCESS_SESSION_DURATION ?? "24h";
 
 const include = [
@@ -35,67 +29,36 @@ const include = [
   ...(emailDomain ? [{ email_domain: { domain: emailDomain } }] : []),
 ];
 if (!include.length) {
-  throw new Error(
-    "人間用 allow 対象が無い: ACCESS_ALLOW_EMAILS=a@x,b@y もしくは ACCESS_ALLOW_EMAIL_DOMAIN=example.com",
-  );
+  throw new Error("人間用 allow 対象が無い: ACCESS_ALLOW_EMAILS=a@x,b@y もしくは ACCESS_ALLOW_EMAIL_DOMAIN=example.com");
 }
+const listOf = (r) => (Array.isArray(r) ? r : r?.result ?? []);
+const dry = mode === "dry-run" ? ["--dry-run"] : [];
 
-const policyHuman = {
-  name: `webstudio-allow (${host})`,
-  decision: "allow",
-  include,
-  exclude: [],
-  require: [],
-};
-const policyToken = (tokenId) => ({
-  name: `webstudio-e2e-token (${host})`,
-  decision: "non_identity",
-  include: [{ service_token: { token_id: tokenId } }],
-  exclude: [],
-  require: [],
-});
-const appBody = (policyIds) => ({
-  name: appName,
+const appBody = (workerId, tokenId) => ({
+  name,
   type: "self_hosted",
-  destinations: [{ type: "public", uri: host }],
+  destinations: [{ type: "worker", worker_id: workerId }],
   session_duration: sessionDuration,
   app_launcher_visible: false,
-  http_only_cookie_attribute: true,
-  policies: policyIds.map((id, i) => ({ id, precedence: i + 1 })),
+  policies: [
+    { name: `${name}-allow`, decision: "allow", include },
+    { name: `${name}-e2e-token`, decision: "non_identity", include: [{ service_token: { token_id: tokenId } }] },
+  ],
 });
 
 if (mode === "print") {
-  console.log(
-    JSON.stringify(
-      {
-        policyHuman,
-        policyToken: policyToken("<token-id>"),
-        app: appBody(["<human-policy-id>", "<token-policy-id>"]),
-      },
-      null,
-      2,
-    ),
-  );
+  console.log(JSON.stringify(appBody("<worker-id: cf workers scripts search --name " + name + ">", "<service-token-id>"), null, 2));
   process.exit(0);
 }
-const dry = mode === "dry-run" ? ["--dry-run"] : [];
-const listOf = (r) => (Array.isArray(r) ? r : r?.result ?? []);
 
-async function upsert(kind, listCmd, createCmd, updateCmd, finder, body) {
-  const cur = finder(listOf(await cf(listCmd)));
-  if (cur) {
-    const r = await cf([...updateCmd, cur.id, "--body", JSON.stringify(body), ...dry]);
-    console.log(`  ${kind}: 更新 (${cur.id.slice(0, 8)}…)${mode === "dry-run" ? " (dry-run)" : ""}`);
-    return mode === "dry-run" ? cur : r;
-  }
-  const r = await cf([...createCmd, "--body", JSON.stringify(body), ...dry]);
-  console.log(`  ${kind}: 新規作成${mode === "dry-run" ? " (dry-run)" : ""}`);
-  return mode === "dry-run" ? { id: `<${kind}-id>` } : r;
-}
+console.log(`## Access [${mode}] worker=${name}`);
+const workers = listOf(await cf(["workers", "scripts", "search", "--name", name, "--per-page", "100"]));
+const worker = workers.find((w) => w.script_name === name);
+if (!worker && mode === "apply") throw new Error(`Worker ${name} が無い: 先に 20-worker.mjs --phase closed を実行する`);
+const workerId = worker?.id ?? "<worker-id>";
+console.log(`  worker: ${worker ? `${name} (${worker.id.slice(0, 8)}…)` : "未作成 (dry-run: placeholder)"}`);
 
-console.log(`## Access [${mode}] host=${host}`);
-
-// service token (client secret は作成時の 1 回のみ返る -> 0600 ファイルへ)
+// service token: client secret は作成時の 1 回しか返らない -> 0600 ファイル (deploy/work/secrets, gitignore 済み)
 const toks = listOf(await cf(["zero-trust", "access", "service-tokens", "list"]));
 let tok = toks.find((t) => t.name === tokenName);
 if (!tok) {
@@ -113,31 +76,23 @@ if (!tok) {
     const dir = path.resolve(import.meta.dirname, "../work/secrets");
     mkdirSync(dir, { recursive: true, mode: 0o700 });
     const f = path.join(dir, `${tokenName}.json`);
-    writeFileSync(f, JSON.stringify({ client_id: r.client_id, client_secret: r.client_secret }), {
-      mode: 0o600,
-    });
+    writeFileSync(f, JSON.stringify({ client_id: r.client_id, client_secret: r.client_secret }), { mode: 0o600 });
     chmodSync(f, 0o600);
-    console.log(
-      `  service-token: 新規作成。secret は ${f} (0600, gitignore 済み)。E2E_ACCESS_CLIENT_ID/SECRET へ`,
-    );
+    console.log(`  service-token: 新規作成。secret は ${f} (0600, gitignore 済み)`);
   }
 } else {
-  console.log(`  service-token: 既存 (${tok.id.slice(0, 8)}…) — secret は再取得不可。紛失時は rotate`);
+  console.log(`  service-token: 既存 (${tok.id.slice(0, 8)}…) — secret は再取得不可。紛失時は rotate/再作成`);
 }
 
-const P = ["zero-trust", "access", "policies"];
-const human = await upsert(
-  "policy-human", [...P, "list"], [...P, "create"], [...P, "update"],
-  (l) => l.find((p) => p.name === policyHuman.name), policyHuman,
-);
-const token = await upsert(
-  "policy-token", [...P, "list"], [...P, "create"], [...P, "update"],
-  (l) => l.find((p) => p.name === policyToken("").name), policyToken(tok.id),
-);
 const A = ["zero-trust", "access", "applications"];
-await upsert(
-  "application", [...A, "list"], [...A, "create"], [...A, "update"],
-  (l) => l.find((a) => (a.destinations ?? []).some((d) => d.uri === host) || a.domain === host),
-  appBody([human.id, token.id]),
-);
-console.log("完了。次: R2 カスタムドメイン接続 (50-domain.sh) — Access が先に存在すること");
+const apps = listOf(await cf([...A, "list", "--per-page", "100"]));
+const cur = apps.find((a) => a.name === name || (a.destinations ?? []).some((d) => d.type === "worker" && d.worker_id === workerId));
+const body = appBody(workerId, tok.id);
+if (cur) {
+  await cf([...A, "update", cur.id, "--body", JSON.stringify(body), ...dry]);
+  console.log(`  application: 更新 (${cur.id.slice(0, 8)}…)${dry.length ? " (dry-run)" : ""}`);
+} else {
+  const r = await cf([...A, "create", "--body", JSON.stringify(body), ...dry]);
+  console.log(`  application: 新規作成${dry.length ? " (dry-run)" : ` (${String(r?.id).slice(0, 8)}…)`}`);
+}
+console.log("完了。次: 20-worker.mjs --phase open (公開 URL を出す) -> 90-verify.sh");

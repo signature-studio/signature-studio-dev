@@ -2,7 +2,7 @@
 # R2 カスタムドメイン接続。**Access App 作成 (40) と rules 反映 (30) の後**に実行すること
 # (先に接続すると、Access 前に bucket が公開される / COOP・COEP 無しで配信される)。
 set -euo pipefail
-source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/lib.sh"
 need CF_ZONE CF_HOSTNAME CF_R2_BUCKET
 
 step "カスタムドメイン $CF_HOSTNAME -> $CF_R2_BUCKET"

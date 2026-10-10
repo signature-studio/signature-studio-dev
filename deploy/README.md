@@ -1,110 +1,93 @@
-# deploy/ — R2 静的直配 + Cloudflare Rules (COOP/COEP) + Access
+# deploy/ — Workers Static Assets (既定ホスト名 workers.dev) + Access `worker` 型
 
-> **前提**: 本構成は**自前ゾーンのカスタムドメイン + Transform Rules 前提**。ユーザ決定は「ドメインは全作業完了後に指示、暫定は既定ホスト名」。
-> r2.dev 既定ホストでは WAF/キャッシュ/アクセス制御が使えない (R2 公式 "Public buckets": custom domain 必須)。
-> 既定ホスト名 (workers.dev 等) 構成は `tools/hosting` の結論に従い別途適応する (Linear CAB-61 = H-1)。
+> 採用構成は **案 S** (`tools/hosting/REPORT.md` §1/§9): Worker コード無しの Workers Static Assets 1 本に全資産を載せ、
+> `_headers` で COOP/COEP/CORP を `/*` 一括付与、Access は `worker` 型、`preview_urls:false`。
+> R2 / zone / Transform Rules は不要 (静的アセットへのリクエストは無料・無制限)。Linear: CAB-61 (本改修) → CAB-35 (実デプロイ)。
+> 自前ドメインは後日ユーザ指示。**同一 Worker に custom domain を足すだけで移行**できる (§移行)。
+> 旧 R2 + Transform Rules 構成は `legacy-r2/` に退避 (25MiB 超・Range・2 万ファイル超が必要になった時の次点。§旧構成)。
 
-構成 (ユーザ確定): **R2 バケット + カスタムドメイン (CF プロキシ) の静的直配**。Worker 不使用。
-COOP/COEP/CORP/Cache-Control は **ゾーンレベル Transform Rules** で注入、保護は **Access Self-hosted App**
-(R2 カスタムドメインのホスト名)。GitHub Pages はヘッダ不可で不採用。Workers は動的エンドポイントが必要になった時のみ。
+## 構成
 
-## 1 コマンド (既定 DRY-RUN)
-
-```sh
-cp deploy/env.example deploy/.env && $EDITOR deploy/.env       # CF_ZONE / CF_HOSTNAME / CF_R2_BUCKET / ACCESS_ALLOW_EMAILS
-bash tools/e2e/run.sh --targets preview                         # dist を tools/e2e/work/dist に生成 (E2E_SKIP_BUILD=1 で省略)
-bash deploy/scripts/deploy.sh --src tools/e2e/work/dist         # DRY-RUN: 読取 API のみ実呼出、書込は cf --dry-run
-APPLY=1 bash deploy/scripts/deploy.sh --src tools/e2e/work/dist # 実デプロイ (Cloudflare 認証 + 上記 .env 必須)
+```
+deploy/
+  wrangler.jsonc            wrangler 設定の正本 (main 無し=Worker コード無し / assets.directory / preview_urls:false)
+  config/edge-policy.json   配信ポリシーの正本 (tools/e2e の edge-sim も同一ファイルを直接解釈。**変更は検収後に**)
+  lib/policy.mjs            policy 解釈 (edge-sim が import。移動禁止)
+  client/chunked.mjs        大物の連結ローダ (ReadableStream -> compileStreaming)。*.test.mjs は node --test
+  scripts/                  05-stage / 20-worker / 40-access / 90-verify / 00-preflight / deploy.sh
+  probe/                    使い捨て probe (create->deploy->検証->cleanup の再現)
+  legacy-r2/                旧: R2 + zone Transform Rules 構成 (未使用)
+  RUNBOOK.md                CAB-35 実デプロイ手順 / EDGE-SIM.md  edge-sim 調整一覧 / REPORT.md  probe 実測
 ```
 
 | script | 内容 | 書込? |
 |---|---|---|
-| `00-preflight.sh` | cf/認証スコープ/zone/既存衝突の確認 | 読取のみ |
-| `10-bucket.sh` | R2 バケット作成 (冪等), **r2.dev 公開 URL を無効化** (Access を素通りさせない), 任意で lifecycle | APPLY=1 |
-| `20-upload.mjs` | 計画/圧縮見積り(`--stats`)/アップロード(`--execute`)/差分スキップ/purge | `--execute` |
-| `40-access.mjs` | service token + 2 ポリシー + Self-hosted App (冪等 upsert) | `--apply` |
-| `30-rulesets.mjs` | 4 phase の rules を生成→既存 rule とマージ→PUT。`--validate` はサーバ側検証のみ | `--apply` |
-| `50-domain.sh` | R2 カスタムドメイン接続 (**最後**) | APPLY=1 |
-| `90-verify.sh` | 実 URL に tools/e2e を agent-browser で実行 (service token 自動) | 読取のみ |
+| `00-preflight.sh` | cf/wrangler 認証・スコープ・既存衝突の確認 | 読取のみ |
+| `05-stage.mjs` | `--src` (+`--manifest`) -> `deploy/work/site`。>24MiB を 16MiB part に分割、`_headers` 生成+突合、制約検査、`release.json` | `deploy/work/` のみ |
+| `20-worker.mjs` | `--phase closed\|open\|release` で `wrangler deploy` (設定は wrangler.jsonc を name/workers_dev/assets.directory だけ上書き)。closed/open は placeholder asset、`open` は無認証 302 になるまで待つ | Worker |
+| `40-access.mjs` | service token + Access app (`destinations:[{type:"worker"}]`、人間 allow + token non_identity) の冪等 upsert | `--apply` |
+| `90-verify.sh` | release.json の buildId 反映待ち / 無認証=302 / preview=非200 / token でヘッダ検査 / `tools/e2e/run.sh --url` | 読取のみ |
+| `deploy.sh` | 上記を順序保証で一括。既定 DRY-RUN | `APPLY=1` |
 
-**順序が重要**: bucket → upload → **Access → rules → ドメイン接続**。先に接続すると、無保護 / COEP 無しで一時公開される。
+**順序 (本物の asset は Access が効いてから公開)**: stage -> deploy `closed` (placeholder・workers.dev 無し=URL 無し) -> Access (worker_id が要るので Worker 作成後) -> deploy `open` (placeholder のまま workers.dev 有効化、無認証 302 を確認) -> deploy `release` (本物の asset) -> verify。
+実測: workers.dev 有効化直後、Access が効くまで無認証 200 が返った回が 1/5 あった (他は 404 -> 302 または即 302)。そのため公開 URL ができる時点では placeholder しか載せない。
 
-## 配信ポリシー (唯一の正本: `config/edge-policy.json`)
+## 1 コマンド (既定 DRY-RUN)
 
-`lib/policy.mjs` が Rulesets API ペイロードを生成し、tools/e2e の `edge-sim` も同じ定義を解釈する
-(= rule JSON が本当に crossOriginIsolated を成立させることを CF 認証なしで E2E 検証できる)。
-`node deploy/scripts/30-rulesets.mjs --host H` で生成 JSON を確認、`rendered/` に例。全 rule は `http.host eq "<HOST>"` で
-スコープされ、`ref` は `webstudio_<host>_*` (同一ゾーンの他 rule・他ホストに触れない)。
-
-| phase | 目的 |
-|---|---|
-| `http_request_transform` | `ends_with(path,"/")` → `concat(path,"index.html")`。**R2 カスタムドメインは / の index 解決をしない** |
-| `http_response_headers_transform` | COOP `same-origin` / COEP `require-corp` / CORP `same-origin` / nosniff を全応答に。Cache-Control をクラス別に |
-| `http_request_cache_settings` | **wasm/html/json は CF 既定ではキャッシュ対象外** (既定は拡張子限定)。bucket 全体を cache:true、immutable は edge TTL 1 年、他 5 分 |
-| `http_response_compression` | wasm/js/css/html/json/svg/txt を br→zstd→gzip (Free 既定は zstd) |
-
-注意 (公式ドキュメント記載): Transform Rules で Cache-Control を書いても **CF のキャッシュ挙動は変わらない** (評価はキャッシュ後)。
-エッジ挙動は Cache Rules、ブラウザ向けは Transform、で役割分担している。
-
-### キャッシュ戦略とレイアウト
-
-```
-/index.html, /release.json, /wasm/manifest.json  document : no-cache (ETag 再検証)、エッジ TTL 60s。デプロイ時に purge
-/assets/<name>-<hash>.js|css   immutable: public, max-age=31536000, immutable   (vite のハッシュ名)
-/wasm/<name>.<hash8+>.wasm     immutable: 同上 (内容アドレス。Content-Type: application/wasm)
-/data/<hash>/...               immutable: FL 資源・プラグイン・サンプル等 (内容アドレス)
-/worklets/*.js, その他         mutable  : public, max-age=300, must-revalidate (非ハッシュ名)
-/__e2e__/add.wasm              E2E 用 fixture (instantiateStreaming + MIME 検査)
-```
-`20-upload.mjs` は **immutable 配下でファイル名にハッシュが無いと中止** (1 年 immutable の事故防止)。
-最後に `release.json` (buildId, 全ファイル sha256/size) を生成して上げる。`tools/assets` の manifest 契約:
-`{"version":1,"files":[{"path":"wasm/ott.1a2b3c4d.wasm","src":"<相対/絶対>","contentType":"任意"}]}`。
-
-制約: CF のキャッシュ可能サイズ上限は Free/Pro/Business **512MB** (公式 Cache > Default cache behavior。超過はキャッシュされず毎回 R2 = Class B op)。
-`cf r2 objects put` は **1 件 300MB** 上限 (cf の REST エンドポイント仕様。R2 本体の単一 PUT 上限は 4.995 GiB で別: 公式 R2 Limits)
-→ 大物は 256MB 以下 (M の安全側の目安) に分割するか `--backend aws` (S3 multipart)。
-
-### 圧縮 (実測: node zlib, 実 wasm)
-br(q11) / zstd(19) / gzip(9) の元サイズ比: python.wasm 5.93MB → **25.9% / 27.6% / 36.5%**,
-m11_boot.wasm ≈6.05MB → 30.2% / 33.8% / 41.2% (初回計測 6.06MB: 30.0/33.7/41.1。他担当が再ビルド), ott.wasm 0.84MB → 33.0% / 35.9% / 42.0%。
-既定は **エッジ動的圧縮** (オブジェクトは非圧縮で保管)。事前圧縮 (`Content-Encoding: br` をオブジェクトに保存) は
-`cf r2 objects put` では設定不可 (Content-Type のみ) → 必要になったら `--backend aws` を拡張。
-進捗バー用に Content-Length を保つなら origin 側 `Cache-Control: no-transform` が必要 (圧縮無効化とのトレードオフ)。
-
-## 必要な権限 (ユーザ依頼事項)
-
-**現環境の `cf` は既に OAuth ログイン済み**で、`cf auth whoami` のスコープに下記すべてが含まれる (00-preflight が検査):
-`workers-r2.write` `workers-r2-bucket-item.write` `zone-transform-rules.write` `cache-settings.write`
-`response-compression.write` `cache.purge` `access-app.write` `access-policy.write` `access-service-token.write`
-`dns.write` `zone.read`。→ **技術的ブロッカーは無く、ユーザ決定待ち**: 公開ホスト名 / Access 許可メール / 実行承認。
-
-API トークン運用 (CI) にする場合の権限グループ (OAuth スコープ名からの対応づけ。ダッシュボード表記は要確認):
-Account: Workers R2 Storage **Edit**, Access: Apps and Policies **Edit**, Access: Service Tokens **Edit** /
-Zone: Transform Rules **Edit**, Cache Rules **Edit**, Response Compression **Edit**, Cache Purge **Purge**, DNS **Edit**, Zone **Read**。
-`--backend aws` を使う場合のみ追加で R2 S3 互換キー (R2 > API トークン > Object Read & Write, 対象バケット限定)。
-
-## 運用上の注意 (実機デプロイ時に確認する未実測事項)
-- Free プラン: Transform / Cache / Compression rule は各 10 本まで (公式)。本構成は rewrite 1 / response-header 4 / cache 3 / compression 1 本。
-  single-file purge は公式 Free 上限 1 リクエスト 100 URL・800 URL/秒 (`20-upload.mjs` は保守的に 30 URL ずつ)。
-  Transform で書き換えたパスの purge は書換前 (エンドユーザ) の URL で行う (公式)。
-- CF の自動注入 (Web Analytics ビーコン, JS detections) は COEP `require-corp` 下で **ブロックされ console error** になり得る
-  → 対象ホストで無効化 (E2E の console-clean が検出する)。Rocket Loader/Email Obfuscation も OFF のまま。
-- Access セッション失効中のサブリソース fetch は 302 でログインに飛び COEP/CORS エラーになる → session 24h、失効時はリロード。
-- CORP は `same-origin`。別ホストへ資産を分離する場合は該当資産だけ `cross-origin` に変えること。
-- `http.request.uri.path` が URL rewrite 後の値か否かで Cache-Control rule のマッチが変わり得るため、
-  document 判定は `/` と `/index.html` の両方を列挙済み (公式 docs は「rewrite 後の phase では書換後の値、`raw.*` は元の値」)。
-  **実機で `curl -I /` を確認** (90-verify が表示+検査)。
-- 「R2 カスタムドメインは `/` の index を解決しない」: 公式 "Public buckets" の記載は「ルートでのバケット内容一覧不可」のみ。
-  index 非解決そのものは実機未確認 (rewrite rule は index が解決される場合も無害なので維持)。
-- `config/lifecycle.json` の書式 (R2 REST) は未検証。`APPLY_LIFECYCLE=1` 時にエラーなら wrangler の lifecycle 書式を参照。
-- 本番は E2E の `edge-policy` チェック (CORP/Cache-Control/Content-Type) が実 URL に対しても走る。
-
-## 手動手順 (スクリプトを使わない場合)
 ```sh
-cf r2 buckets create-by-name $B && cf r2 buckets domains managed update $B --enabled false
-cf r2 objects put <key> --bucket-name $B --file <f> --content-type <ct>
-cf zero-trust access applications create --body @app.json         # 先に Access
-cf rulesets account-rulesets phases update http_response_headers_transform -z $ZONE --rules @rules.json
-cf r2 buckets domains custom create $B --domain $H --zone-id $ZID --enabled true --min-tls 1.2   # 最後
+export PATH=$HOME/.local/share/pnpm/bin:$HOME/.bun/bin:$PATH
+cp deploy/env.example deploy/.env && $EDITOR deploy/.env                  # WORKER_NAME / ACCESS_ALLOW_EMAILS
+bash deploy/scripts/deploy.sh --src <dist> [--manifest tools/assets/manifest.json]            # DRY-RUN (書込なし)
+APPLY=1 bash deploy/scripts/deploy.sh --src <dist> [--manifest ...]       # 実デプロイ = CAB-35 (ユーザ承認後のみ)
 ```
-全コマンドに `--dry-run` (クライアント側) があり、rulesets は加えて `--validate-only true` (サーバ側検証・非永続) を持つ。
+CAB-35 の具体手順・確認項目は `RUNBOOK.md`。
+
+## 大物 (>24MiB。tools/perf の 335MB 級 wasm など)
+
+Static Assets は 1 ファイル 25MiB 上限 (26MiB は `Asset too large` で拒否: 実測)、Range 非対応。`05-stage.mjs` が自動で分割する:
+
+```
+wasm/ott.1a2b3c4d.wasm.parts/0000.<sha12>.part … (16MiB 単位)  +  index.json  (v, path, size, sha256, contentType, partSize, parts[{name,size,sha256}])
+release.json.chunked[<key>] = { descriptor, size, sha256, parts, contentType }       (元ファイルは配備しない)
+```
+```js
+import { compileChunkedWasm, instantiateChunkedWasm, chunkedResponse, AccessExpiredError } from '/…/chunked.mjs';
+const mod = await compileChunkedWasm('/wasm/ott.1a2b3c4d.wasm.parts/index.json', { concurrency: 6 });   // main / Worker 両方可
+```
+連結 `ReadableStream` (順序保証・並列プリフェッチ・背圧: 先読みは `concurrency` part まで)、part 毎 sha256 検証、429/5xx は Retry-After/指数バックオフ、
+Access 失効 (302/401/403) は `AccessExpiredError` (再ログイン誘導用。ネット断と区別)。`node --test deploy/client/chunked.test.mjs`。
+immutable 配下の元ファイル名はハッシュ必須 (stage が検査)。tools/assets の `c/<id>.raw|br|zst` 配置は `/c/` `/m/` を immutable、`/latest.json` を no-cache として `_headers` に反映
+(正本 edge-policy.json への取込みは tools/e2e 検収後。`STAGE_EXTRA_IMMUTABLE` / `STAGE_EXTRA_DOCUMENT` で制御)。
+
+## 配信ポリシー
+
+唯一の正本は `config/edge-policy.json`。Static Assets では `tools/hosting/headers-from-policy.mjs --check` が `_headers` に変換し、
+`_headers` の累積セマンティクス (同名ヘッダは上書きでなく追加、`! H` は splat->splat のみ) と policy の「後勝ち」の差を検査する。
+- 全応答: COOP `same-origin` / COEP `require-corp` / CORP `same-origin` / nosniff。**Worker スクリプトにも COEP が要る** (HTML だけだとネスト Worker が `ERR_BLOCKED_BY_RESPONSE`) ため `/*` 一括。
+- Cache-Control: immutable prefix = 1 年 immutable、document (`/` `/index.html` `/release.json` `/wasm/manifest.json`) = no-cache、他は Static Assets 既定 `max-age=0, must-revalidate`+ETag (policy の max-age=300 より厳格)。status 条件は表現不可。
+- 圧縮・キャッシュはエッジ既定 (text/wasm を zstd/br/gzip 自動圧縮)。Cache Rules / Compression Rules は使えない/不要。
+
+## トークン権限 (API トークン運用の場合)
+
+Account: Workers Scripts **Edit**、Access: Apps and Policies **Edit**、Access: Service Tokens **Edit**。現環境の `cf`/`wrangler` は OAuth ログイン済みで
+`workers-scripts.write` `access-app.write` `access-service-token.write` を含む (00-preflight が検査)。zone / R2 / DNS 権限は不要。
+
+## 運用上の注意
+
+- `_headers` の反映には **30–60 秒** (n=3)。90-verify は COEP が付くまでポーリング。再デプロイ直後に古いヘッダを見ても異常ではない。
+- Access 反映: worker 型でも workers.dev 有効化直後は数秒〜十数秒 404/200 が混ざりうる (上記)。release 後は新 version の asset が行き渡るまで 404/旧版が混ざる (verify が buildId 一致までポーリング)。
+- セッション失効 (24h) 時の fetch は `TypeError: Failed to fetch` (opaqueredirect)。`chunked.mjs` は `redirect:'manual'` で検知する。E のローダも同様に扱うこと。
+- OPFS/Cache Storage/IndexedDB/cookie は**オリジン単位**。ホスト名を変えると全て空 (移行時はユーザデータのエクスポート導線を先に)。
+- COEP `require-corp` 下では CF の自動注入 (Web Analytics 等) がブロックされる。Static Assets では注入されない (probe の console clean で確認)。
+- Free: 20,000 files/version、Worker 呼出 100k/日 (静的アセット要求は対象外)。stage が 20,000 超で中止 (Paid は `STATIC_ASSETS_MAX_FILES=100000`)。
+
+## 自前ドメインへの移行 (ユーザ指示後)
+
+`wrangler.jsonc` に `"routes":[{"pattern":"studio.<domain>","custom_domain":true}]` を足して再デプロイ (zone が同アカウントに必要)。
+`_headers`・Access `worker` 型 (全ドメイン/preview を自動保護)・part は無変更。旧 workers.dev は `"workers_dev": false` で閉じる。
+オリジン変更の影響は上記「運用上の注意」。R2 方式 (`legacy-r2/`) へ戻すのは 25MiB 超 Range / 2 万ファイル超が必要になった時だけ。
+
+## 旧構成 (legacy-r2/)
+
+R2 バケット + カスタムドメイン + ゾーン Transform/Cache/Compression Rules + hostname 型 Access。ゾーン (cabbagelettuce.com 等) 前提のため現在は未使用。
+パスは移動のみで内容は不変 (`deploy-r2.sh` が旧 `deploy.sh`)。`lib/policy.mjs` の `build*Rules` はこの構成用。

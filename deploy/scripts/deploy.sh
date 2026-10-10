@@ -1,29 +1,31 @@
 #!/usr/bin/env bash
-# 配信一括実行。既定は DRY-RUN (読取 API のみ実呼び出し、書込は cf --dry-run / 計画表示)。
-#   bash deploy/scripts/deploy.sh --src tools/e2e/work/dist [--manifest tools/assets/manifest.json] [--backend cf|aws]
-#   APPLY=1 bash deploy/scripts/deploy.sh --src dist ...      # 実デプロイ (要 deploy/.env と Cloudflare 認証)
+# 配信一括実行 (Workers Static Assets)。既定は DRY-RUN (書込なし)。
+#   bash deploy/scripts/deploy.sh --src tools/e2e/work/dist [--manifest tools/assets/manifest.json]
+#   APPLY=1 bash deploy/scripts/deploy.sh --src ...        # 実デプロイ (CAB-35。ユーザ承認後のみ)
 #
-# 順序の理由:
-#   10 bucket -> 20 upload -> 40 access -> 30 rules -> 50 domain(公開) -> 90 verify
-#   Access と rules(COOP/COEP/index rewrite/cache) を **公開前に**用意する。
-#   (bucket がカスタムドメイン接続時点で無保護/ヘッダ無しになるのを避ける)
+# 順序の理由 (公開 URL が出来る瞬間に Access が掛かっているようにする):
+#   05 stage -> 20 closed(placeholder, URL 無し) -> 40 access(worker 型) -> 20 open(placeholder 公開, 無認証 302 まで待つ)
+#   -> 20 release(本物の asset) -> 90 verify
+#   (workers.dev 有効化直後は Access が効くまで無認証 200 が数秒出ることがある: 実測。本物の asset はその後に載せる)
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$HERE/lib.sh"
-need CF_ZONE CF_HOSTNAME CF_R2_BUCKET
-
-UPLOAD_ARGS=("$@")
-MODE_FLAGS=(); RULE_MODE="--dry-run"; ACCESS_MODE="--dry-run"
-if [[ "$APPLY" == "1" ]]; then RULE_MODE="--apply"; ACCESS_MODE="--apply"; MODE_FLAGS=(--execute --skip-existing --purge); fi
+WORKER_NAME="${WORKER_NAME:-signature-studio}"; export WORKER_NAME
+need ACCESS_ALLOW_EMAILS
 
 bash "$HERE/00-preflight.sh"
-bash "$HERE/10-bucket.sh"
-node "$HERE/20-upload.mjs" --bucket "$CF_R2_BUCKET" --zone "$CF_ZONE" --host "$CF_HOSTNAME" "${UPLOAD_ARGS[@]}" "${MODE_FLAGS[@]}"
-node "$HERE/40-access.mjs" --host "$CF_HOSTNAME" $ACCESS_MODE
-node "$HERE/30-rulesets.mjs" --host "$CF_HOSTNAME" --zone "$CF_ZONE" $RULE_MODE
-bash "$HERE/50-domain.sh"
+
+step "stage (deploy/work/site)"
+node "$HERE/05-stage.mjs" "$@"
+
 if [[ "$APPLY" == "1" ]]; then
+  node "$HERE/20-worker.mjs" --phase closed
+  node "$HERE/40-access.mjs" --apply
+  node "$HERE/20-worker.mjs" --phase open
+  node "$HERE/20-worker.mjs" --phase release
   bash "$HERE/90-verify.sh"
 else
-  echo; echo "DRY-RUN 完了。実行は APPLY=1 を付ける。公開後検証: bash deploy/scripts/90-verify.sh"
+  node "$HERE/20-worker.mjs" --phase closed --dry-run
+  node "$HERE/40-access.mjs" --dry-run
+  echo; echo "DRY-RUN 完了 (Cloudflare 側は変更なし)。実行は APPLY=1。公開後検証: bash deploy/scripts/90-verify.sh"
 fi

@@ -4,7 +4,7 @@
 DEPLOY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO_ROOT="$(cd "$DEPLOY_DIR/.." && pwd)"
 [[ -f "$DEPLOY_DIR/.env" ]] && { set -a; source "$DEPLOY_DIR/.env"; set +a; }
-export PATH="$HOME/.bun/bin:$PATH"
+export PATH="$HOME/.local/share/pnpm/bin:$HOME/.bun/bin:$PATH"
 
 APPLY="${APPLY:-0}"
 DRYFLAG=(--dry-run)
