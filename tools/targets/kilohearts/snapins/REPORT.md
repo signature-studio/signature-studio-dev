@@ -20,7 +20,7 @@
 | snap-in (id) | process VA | process B | lift fn 数 / 合計 B | wasm B | undefined import | bit-exact trial | bit-exact call | 必要な修復 (発火数) | shim / 未 lift stub |
 |---|---|--:|--:|--:|--:|--:|--:|---|---|
 | Channel Mixer (kscm) | 0x1804f41a0 | 257 | 3 / 275 | 23,206 | 0 | 200/200 | 1149/1149 | mov128×3, flags×1, merge×2 | 0 / 0 |
-| Gain (ksgn) | 0x1804b0380 | 609 | 1 / 609 | 23,054 | 0 | 200/200 | 999/999 | merge×2, flags×1, store128×1 | 0 / 1 (vector realloc) |
+| Gain (ksgn) | 0x1804b0380 | 609 | 1 / 609 | 23,054 | 0 | 200/200 | 999/999 | merge×2, flags×1, store128×1, callret×2 | 0 / 1 (vector realloc) |
 | Haas (ksha) | 0x1804d0280 | 1175 | 5 / 1,606 | 35,967 | 0 | 200/200 | 1100/1100 | store128×4, storelow×1, merge×5, flags×5 | 0 / 0 |
 | Clipper (kclp) | 0x180884b30 | 1683 | 3 / 1,743 | 37,457 | 0 | 200/200 | 1100/1100 | mov128×10, merge×8, flags×10, store128×4, callret×1 | 0 / 0 |
 | Gate (ksgt) | 0x1804c2f50 | 1703 | 3 / 2,532 | 45,754 | 0 | 200/200 | 999/999 | callret×12, mov128×11, flags×9, merge×2, store128×1 | 2 (memmove/memset) / 1 |
