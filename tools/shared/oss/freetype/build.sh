@@ -33,7 +33,6 @@ wasm_build() { # name extra_cflags patch(0/1)
 }
 wasm_build wasm32 "" 1
 wasm_build wasm64 "-sMEMORY64=1" 0
-wasm32_unpatched() { :; }
 
 echo "[ft] test harness"
 INC="$SRC/include"

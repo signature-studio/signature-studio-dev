@@ -146,7 +146,7 @@
   "lib": "ffmpeg (avcodec58/avformat58/avutil56/swscale5/swresample3)",
   "cls": "OSS",
   "upstream": "FFmpeg n4.4.3 (mac) / n4.4.2-2-g7ffb7d4b04 (win)",
-  "lic": "LGPL (configure に --enable-gpl 無し)",
+  "lic": "LGPL (--enable-gpl 無し)。win n4.4.2 = `--enable-version3` (LGPLv3+, 内部 license 文字列 \"LGPL version 3 or later\") / mac n4.4.3 = version3 無し (\"LGPL version 2.1 or later\"); 出典 tools/docs/LEGAL.md",
   "plan": "emscripten で n4.4.x を --disable-programs --disable-x86asm 相当で再ビルド (ffmpeg.wasm 先例)。libILVideo (プロプラ wrapper 26 export) は別途",
   "diff": "中",
   "ticket": "T-SH-04",
@@ -364,7 +364,7 @@
   "cls": "プロプラ(Intel) + OSS 同梱 (AGG Agg2D / GPC)",
   "upstream": "Intel oneAPI IPP 2021.7 + AGG(Agg2D) + GPC polygon clipper",
   "lic": "Intel Simplified SW License (再配布可・改変不可) / AGG / GPC(非商用条項あり)",
-  "plan": "lift しない。実使用関数 (win 12 / mac 159) を自前 C(+wasm SIMD) で実装し 423 名を同名 export (REPORT §2)。Agg2D は Blend2D 側で代替",
+  "plan": "lift しない。実使用関数 (静的参照 win 229 / mac x86_64 234 / 和集合 239; tools/ipp の実測。本 tool の初版 win 12 / mac 159 は二段間接を数え落とした過少値) を自前 C(+wasm SIMD) で実装し 420 名を同名 export (詳細は tools/ipp)。Agg2D は Blend2D 側で代替",
   "diff": "中(使用部のみ)",
   "ticket": "T-SH-07",
   "mac_fat_bytes": 34224800,
@@ -457,7 +457,7 @@
  {
   "lib": "REX Shared Library",
   "cls": "プロプラ(Reason Studios 第三者)",
-  "upstream": "REX SDK",
+  "upstream": "REX SDK (Propellerhead Software AB 2000-2010, win DLL の著作権表示)",
   "lic": "REX SDK ライセンス",
   "plan": "第三者バイナリ。REX 読込は優先度低 (DirectWave/Slicer 経由)",
   "diff": "難",
@@ -469,10 +469,16 @@
   "win_arch": "x64",
   "evidence": [
    {
-    "check": "REX",
-    "pattern": "REX",
+    "check": "REX2 クラス名 (CREX2DecompressCallback / XREX2BadFormat)",
+    "pattern": "REX2",
     "hit": true,
-    "sample": "REX"
+    "sample": "REX2"
+   },
+   {
+    "check": "著作権表示 (Propellerhead = Reason Studios 前身; UTF-16 リソース)",
+    "pattern": "Copyright Propellerhead Software AB 2000-2010",
+    "hit": true,
+    "sample": "Copyright Propellerhead Software AB 2000-2010"
    }
   ]
  },

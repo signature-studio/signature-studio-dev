@@ -83,7 +83,7 @@ inv = {
   "ipp_version": "Intel oneAPI IPP 2021.7 (ippCore string '2021.7 (r0xa954907f) Nov 4 2022' in dsp_ippv2_x64.dylib)",
   "exports": exp_sum,
   "loader_table": {"names": len(win_loader), "win_pes_with_table": sum(1 for v in wu.values() if v["entries"]), "mac_files_with_table": sum(1 for v in mu.values() if v["entries"]),
-                   "note": "全 Delphi/FPC バイナリが同一 unit を静的リンクし 423 エントリ (重複除き 420 名) を LoadLibrary+GetProcAddress 相当で解決する (win: ローダ関数 FLEngine 0x653f40)"},
+                   "note": "全 Delphi/FPC バイナリが同一 unit を静的リンクし 423 呼出箇所 (distinct 420 名) を LoadLibrary+GetProcAddress 相当で解決する (win: ローダ関数 FLEngine 0x653f40)"},
   "win": {"distinct_used": len(win_inv), "pes_with_direct_refs": len(win_pes_with_refs), "families": fam_count(win_inv), "functions": win_inv,
           "flengine": {"wrapper_functions": [{"name": r["name"], "wrapper_va": r["func"], "callers": r["callers_of_func"]} for r in fl_wrap]}},
   "mac": {"distinct_used": len(mac_inv), "files_with_direct_refs": sum(1 for v in mac_files_by_n.values() if v), "families": fam_count(mac_inv),
@@ -91,14 +91,18 @@ inv = {
   "static_ipp": {"mac_symbols": {k.split("/")[-1] if "oggio" in k else "Multiband Delay engine.vst": {"public": v["public"], "n_own": v["n_own"], "cpu_prefixes": v["cpus"]} for k, v in sm.items()},
                  "win_ippcode_sections": sorted(static_win, key=lambda x: -x["ippcode_bytes"])},
   "difficulty": DIFF,
+  "correction": {"status": "win/mac の distinct_used は VAR 直接参照のみの下限値。二段間接 (win: mov r,[slot]; call [r] / mac: lea r,[VAR]; call [r]) を数え落としている",
+                 "authoritative": "tools/ipp (S: ipp-eval, commit f7152df) の実測: loader 420 distinct 名 (423 は呼出箇所数), 使用 win 229 / mac x86_64 234 / mac arm64 234, 和集合 239, FLEngine win 143",
+                 "arm64_slice": "408,224B・259 export は Accelerate/vImage + 自前 NEON/C による FL 自作の別実装 (Intel IPP の派生ではない)"},
 }
 json.dump(inv, open(f"{DATA}/ipp_inventory.json", "w"), indent=1, ensure_ascii=False)
 
 # ---- markdown ----
 md = []
 md.append(f"dsp_ippv2 export: win x64 {len(win_ex)} (ipps {exp_sum['win_x64']['ipps']} / ippi {exp_sum['win_x64']['ippi']} / core+Agg {exp_sum['win_x64'].get('ippcore',0)+exp_sum['win_x64'].get('agg',0)}), mac {len(mac_ex)}")
-md.append(f"win 使用 (直接参照あり): distinct {len(win_inv)} / PE {len(win_pes_with_refs)}  族別 {fam_count(win_inv)}")
-md.append(f"mac 使用 (直接参照あり): distinct {len(mac_inv)} / Mach-O {inv['mac']['files_with_direct_refs']}  族別 {fam_count(mac_inv)}; FLEngine mac distinct {len(mac_flengine)} (call site {sum(mac_flengine.values())})")
+md.append("※ 以下 win/mac 使用数は VAR 直接参照のみの下限値 (二段間接を除く)。確定値は tools/ipp: win 229 / mac 234 / 和集合 239 / loader 420 名")
+md.append(f"win 使用 (VAR 直接参照のみ): distinct {len(win_inv)} / PE {len(win_pes_with_refs)}  族別 {fam_count(win_inv)}")
+md.append(f"mac 使用 (VAR 直接参照のみ): distinct {len(mac_inv)} / Mach-O {inv['mac']['files_with_direct_refs']}  族別 {fam_count(mac_inv)}; FLEngine mac distinct {len(mac_flengine)} (call site {sum(mac_flengine.values())})")
 md.append("win 使用関数: " + ", ".join(f"{n}({v['n_pe']})" for n, v in win_inv.items()))
 open(f"{DATA}/ipp_inventory.md", "w").write("\n".join(md) + "\n")
 print("\n".join(md))

@@ -1,0 +1,12 @@
+{
+ "date": "2026-10-10",
+ "ipp_usage": {"initial_F": {"win_distinct": 12, "flengine_win_wrappers": 6, "mac_distinct": 159, "loader_entries": 423},
+               "authoritative_tools_ipp": {"commit": "f7152df", "loader_distinct_names": 420, "loader_call_sites": 423, "win": 229, "mac_x86_64": 234, "mac_arm64": 234, "union": 239, "flengine_win": 143,
+                                          "arm64_slice": "408,224B / 259 export / Accelerate+vImage+自前NEON/C = FL 自作の別実装"},
+               "cause": "VAR 直接参照のみ計数; win mov r,[slot];call [r] / mac lea r,[VAR];call [r] の二段間接を数え落とし"},
+ "ffmpeg": {"win": "n4.4.2-2-g7ffb7d4b04-20220622, --enable-version3 (LGPL v3+), no --enable-gpl", "mac": "n4.4.3-1-ga1f13b592b, LGPL v2.1+, no version3/gpl", "wrong_claim": "analysis/win64/REPORT.md 'FFmpeg 6.x'"},
+ "blend2d_pixel_diff": {"wrong": "0/197124B", "right": "0/230400B (320x240x3 PPM payload, sha256 identical x3)", "cause": "PPM ヘッダ 4 行読みで先頭約 33KB を除外"},
+ "blend2d_perf_ms_per_frame": {"native_jit": "0.053-0.058", "native_nojit": "0.121-0.137", "wasm32": "0.225-0.272", "wasm_vs_jit": "4-5x", "native_nojit_vs_jit": "2.2-2.5x"},
+ "cpython_wasm": "tools/python (CAB-20) で成功済",
+ "classification_evidence": "49/49 -> 50/50 (REX 根拠を著作権表示に差替え)"
+}

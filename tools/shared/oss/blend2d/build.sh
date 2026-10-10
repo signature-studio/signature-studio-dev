@@ -46,7 +46,7 @@ python3 - "$B/jit.ppm" "$B/nojit.ppm" <<'PY'
 import sys
 def load(p):
     d=open(p,'rb').read(); i=0; hdr=[]
-    for _ in range(4):
+    for _ in range(3):
         j=d.index(b'\n',i); hdr.append(d[i:j]); i=j+1
     return d[i:]
 a=load(sys.argv[1]); b=load(sys.argv[2])

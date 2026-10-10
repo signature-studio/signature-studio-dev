@@ -153,7 +153,7 @@
   "names": 420,
   "win_pes_with_table": 145,
   "mac_files_with_table": 143,
-  "note": "全 Delphi/FPC バイナリが同一 unit を静的リンクし 423 エントリ (重複除き 420 名) を LoadLibrary+GetProcAddress 相当で解決する (win: ローダ関数 FLEngine 0x653f40)"
+  "note": "全 Delphi/FPC バイナリが同一 unit を静的リンクし 423 呼出箇所 (distinct 420 名) を LoadLibrary+GetProcAddress 相当で解決する (win: ローダ関数 FLEngine 0x653f40)"
  },
  "win": {
   "distinct_used": 12,
@@ -1253,5 +1253,10 @@
   "transcendental": "moderate (A11/A21/A24/A50/A53 精度段; 許容誤差一致, bit-exact は不可能)",
   "dsp_filter_fft": "moderate-hard (FFT/FIR/IIR/Rand 系はアルゴリズム一致が必要)",
   "image": "moderate-hard (Resize/Warp/Filter は丸め仕様一致が必要)"
+ },
+ "correction": {
+  "status": "win/mac の distinct_used は VAR 直接参照のみの下限値。二段間接 (win: mov r,[slot]; call [r] / mac: lea r,[VAR]; call [r]) を数え落としている",
+  "authoritative": "tools/ipp (S: ipp-eval, commit f7152df) の実測: loader 420 distinct 名 (423 は呼出箇所数), 使用 win 229 / mac x86_64 234 / mac arm64 234, 和集合 239, FLEngine win 143",
+  "arm64_slice": "408,224B・259 export は Accelerate/vImage + 自前 NEON/C による FL 自作の別実装 (Intel IPP の派生ではない)"
  }
 }
