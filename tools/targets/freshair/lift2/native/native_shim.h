@@ -4,19 +4,61 @@
 #define X(name, body) static u64 __attribute__((ms_abi)) nat_##name(u64 a, u64 b, u64 c, u64 d) { return body(a, b, c, d); }
 FA_SHIM_TABLE(X)
 #undef X
+/* ---- 全 IAT 束縛 (loader の import 解決相当): PE import descriptor を歩き全 thunk を shim へ。
+ * 未知の名前は 0 を返す nat_unk0 (FA_IAT_UNKN=1 で stderr に都度表示) — FA-2c の entry 経路用。 */
+static u64 __attribute__((ms_abi)) nat_unk0(u64 a, u64 b, u64 c, u64 d) { return 0; }
+static u64 shim_ptr(const char* fn) {
+    u64 ptr = 0;
+#define X(name, body) if (!strcmp(fn, #name)) ptr = (u64)(uintptr_t)&nat_##name;
+    FA_SHIM_TABLE(X)
+#undef X
+    return ptr;
+}
 static void patch_iat(const char* path) {
     FILE* fp = fopen(path, "r"); if (!fp) { perror("iat_slots"); exit(2); }
     char line[256];
     while (fgets(line, sizeof line, fp)) {
         unsigned long long va; char nm[200]; if (sscanf(line, "%llx %199s", &va, nm) != 2) continue;
-        const char* bang = strchr(nm, '!'); const char* fn = bang ? bang + 1 : nm; u64 ptr = 0;
-#define X(name, body) if (!strcmp(fn, #name)) ptr = (u64)(uintptr_t)&nat_##name;
-        FA_SHIM_TABLE(X)
-#undef X
+        const char* bang = strchr(nm, '!'); const char* fn = bang ? bang + 1 : nm; u64 ptr = shim_ptr(fn);
         if (!ptr) { static uint8_t trapcode[16] = {0xCC}; ptr = (u64)(uintptr_t)trapcode; }
         *(u64*)va = ptr;
     }
     fclose(fp);
+}
+
+static int g_iat_unk_n; static char g_iat_unk[128][96];
+static void patch_iat_all(void) {
+    unsigned char* base = (unsigned char*)0x180000000ULL;
+    unsigned el = *(unsigned*)(base + 0x3c);
+    unsigned char* opt = base + el + 4 + 20;
+    unsigned imp_rva = *(unsigned*)(opt + 112 + 8 * 1);
+    if (!imp_rva) return;
+    unsigned char* d = base + imp_rva;
+    for (; *(unsigned*)(d + 12); d += 20) {          /* IMAGE_IMPORT_DESCRIPTOR {OFT,TS,FC,Name,FirstThunk} */
+        unsigned oft = *(unsigned*)d, ft = *(unsigned*)(d + 16);
+        unsigned t = oft ? oft : ft;
+        const char* dll = (const char*)(base + *(unsigned*)(d + 12));
+        for (int i = 0; ; i++) {
+            unsigned long long v = *(unsigned long long*)(base + t + 8 * i);
+            if (!v) break;
+            const char* fn = NULL; char ord[16];
+            if (v >> 63) { snprintf(ord, sizeof ord, "#%llu", v & 0xffff); fn = ord; }
+            else fn = (const char*)(base + (unsigned)v + 2);
+            u64 ptr = shim_ptr(fn);
+            if (!ptr) {
+                if (g_iat_unk_n < 128) { snprintf(g_iat_unk[g_iat_unk_n], 96, "%s!%s", dll, fn); }
+                g_iat_unk_n++;
+                if (getenv("FA_IAT_UNKN")) fprintf(stderr, "iatshim unknown %s!%s\n", dll, fn);
+                ptr = (u64)(uintptr_t)&nat_unk0;      /* 0 を返す (未実装 import の fail-soft) */
+            }
+            *(unsigned long long*)(base + ft + 8 * i) = ptr;
+        }
+    }
+}
+static void iat_report(void) {
+    fprintf(stderr, "IAT unresolved=%d:", g_iat_unk_n);
+    for (int i = 0; i < g_iat_unk_n && i < 128; i++) fprintf(stderr, " %s", g_iat_unk[i]);
+    fprintf(stderr, "\n");
 }
 
 static void patch_pokes(const char* path) {   /* pokes.txt: "<VA hex> <size> <value hex>" ('#' 行は無視) */

@@ -39,9 +39,24 @@ static void hexdump(const void* p, size_t n) { const uint8_t* b = p; for (size_t
 
 /* 捕捉用: 機械語の error/未解決 call を int3 に置換し SIGTRAP/SIGSEGV を siglongjmp で受ける */
 static sigjmp_buf g_jb; static volatile int g_in_guard;
-static unsigned long long g_fault_rip, g_fault_addr; static int g_fault_sig; static unsigned long long g_fault_ret; static float g_x0, g_x1;
+static unsigned long long g_fault_rip, g_fault_addr; static int g_fault_sig; static unsigned long long g_fault_ret; static float g_x0, g_x1; static unsigned long long g_rcx, g_rdx, g_r8;
 static void on_sig(int s, siginfo_t* si, void* uc) {
-    ucontext_t* u = uc; g_fault_rip = u->uc_mcontext.gregs[REG_RIP]; g_fault_addr = (unsigned long long)si->si_addr; g_fault_sig = s; g_fault_ret = *(unsigned long long*)u->uc_mcontext.gregs[REG_RSP]; { float xf[4]; memcpy(xf, &u->uc_mcontext.fpregs->_xmm[0], 16); g_x0 = xf[0]; memcpy(xf, &u->uc_mcontext.fpregs->_xmm[1], 16); g_x1 = xf[0]; }
+    ucontext_t* u = uc; g_fault_rip = u->uc_mcontext.gregs[REG_RIP]; g_fault_addr = (unsigned long long)si->si_addr; g_fault_sig = s; g_fault_ret = *(unsigned long long*)u->uc_mcontext.gregs[REG_RSP]; { float xf[4]; memcpy(xf, &u->uc_mcontext.fpregs->_xmm[0], 16); g_x0 = xf[0]; memcpy(xf, &u->uc_mcontext.fpregs->_xmm[1], 16); g_x1 = xf[0]; } g_rcx = u->uc_mcontext.gregs[REG_RCX]; g_rdx = u->uc_mcontext.gregs[REG_RDX]; g_r8 = u->uc_mcontext.gregs[REG_R8]; if (getenv("FA_REGS")) fprintf(stderr, "REGS rax=%llx rcx=%llx rdx=%llx r8=%llx rsi=%llx rdi=%llx\n", (unsigned long long)u->uc_mcontext.gregs[REG_RAX], (unsigned long long)u->uc_mcontext.gregs[REG_RCX], (unsigned long long)u->uc_mcontext.gregs[REG_RDX], (unsigned long long)u->uc_mcontext.gregs[REG_R8], (unsigned long long)u->uc_mcontext.gregs[REG_RSI], (unsigned long long)u->uc_mcontext.gregs[REG_RDI]);
+    if (getenv("FA_BT")) { /* スタック上の text 戻りアドレスを最大 12 個表示 (簡易 backtrace) */
+        unsigned long long* sp = (unsigned long long*)u->uc_mcontext.gregs[REG_RSP];
+        int found = 0;
+        fprintf(stderr, "BT rip=%llx addr=%llx rax=%llx rbx=%llx rcx=%llx rdx=%llx rsi=%llx rdi=%llx rbp=%llx rsp=%llx r8=%llx r9=%llx\n",
+            g_fault_rip, g_fault_addr, (unsigned long long)u->uc_mcontext.gregs[REG_RAX], (unsigned long long)u->uc_mcontext.gregs[REG_RBX],
+            g_rcx, g_rdx, (unsigned long long)u->uc_mcontext.gregs[REG_RSI], (unsigned long long)u->uc_mcontext.gregs[REG_RDI],
+            (unsigned long long)u->uc_mcontext.gregs[REG_RBP], (unsigned long long)u->uc_mcontext.gregs[REG_RSP],
+            g_r8, (unsigned long long)u->uc_mcontext.gregs[REG_R9]);
+        { unsigned long long rdi = u->uc_mcontext.gregs[REG_RDI]; if (rdi > 0x1000 && rdi < 0x7fffffffffffULL) { unsigned long long* q = (unsigned long long*)rdi; fprintf(stderr, "  [rdi+0]=%llx [rdi+8]=%llx [rdi+0x10]=%llx [rdi+0x90]=%llx\n", q[0], q[1], q[2], q[0x12]); } }
+        for (int k = 0; k < 24; k++) fprintf(stderr, "  rsp[%d]=%llx\n", k, sp[k]);
+        for (int k = 0; k < 4096 && found < 12; k++) {
+            unsigned long long v = sp[k];
+            if (v >= 0x180000001ULL && v < 0x181300000ULL) { fprintf(stderr, "  [%d] ret=%llx\n", k, v); found++; }
+        }
+    }
     if (g_in_guard) siglongjmp(g_jb, s); _exit(99); }
 static void guard_install(void) {
     struct sigaction sa; memset(&sa, 0, sizeof sa); sa.sa_sigaction = on_sig; sa.sa_flags = SA_NODEFER | SA_SIGINFO;

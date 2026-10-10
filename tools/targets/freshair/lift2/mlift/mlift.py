@@ -12,7 +12,7 @@ usage: mlift.py CORE OUT.ll --root VA[:sig] ... [--stub VA] [--map VA=symbol] [-
 """
 import sys, re, json, struct, argparse, collections
 from capstone import Cs, CS_ARCH_X86, CS_MODE_64, CS_OP_REG, CS_OP_IMM, CS_OP_MEM
-from capstone.x86 import X86_REG_RIP, X86_REG_INVALID
+from capstone.x86 import X86_REG_RIP, X86_REG_INVALID, X86_REG_GS
 from pe_image import Image
 
 # ---------------------------------------------------------------- レジスタ表
@@ -45,7 +45,7 @@ class Unsupported(Exception):
     pass
 
 
-STACK_BYTES = 1 << 20   # 共有マシンスタック (@fa_stack)。全 lift 関数の rsp はここに連続配置 (実機の降下スタックを模擬)
+STACK_BYTES = 8 << 20   # 共有マシンスタック (@fa_stack)。FA-2c: 制御層 closure は深い入れ子 + 大フレーム (0x5cb0) で 1MB では不足する実測のため 8MB (host stack と同値)
 
 
 def mask(bits):
@@ -72,6 +72,10 @@ class FnLifter:
     def e(self, s): self.lines.append('  ' + s)
     def t(self): self.n += 1; return '%%t%d' % self.n
     def lbl(self, va): return 'bb_%x' % va
+
+    def tmp_lbl(self):
+        self.n += 1
+        return 'bb_tmp%d' % self.n
 
     def emit_trace(self, va):
         """--trace 指定範囲: 命令実行前の全 GPR/XMM を @fa_trace に Append (デバッグ用。行 = 33 x i64)。"""
@@ -237,12 +241,23 @@ class FnLifter:
     def reg_val64(self, regid):
         name = self.cur.reg_name(regid)
         full, bits, sh = REGINFO[name]
-        assert bits == 64, name
+        if bits != 64:
+            # 32 ビットレジスタのアドレシング (0x67 address-size prefix 等)。64 bit スロットは
+            # 32 bit 書込で必ずゼロ拡張されるため、そのまま親レジスタの値を読めば同一意味。
+            return self.g_get64(full)
         return self.g_get64(full)
 
     def mem_addr(self, op):
         """メモリ operand → (ptr 式)。rip 相対でイメージ内 data は blob 定数ポインタ。"""
         m = op.mem
+        if m.segment == X86_REG_GS:
+            # TEB 読み (例: __chkstk の gs:[0x10] = StackBase)。wasm では @fa_teb セルにエミュレーション
+            # (fa_teb_init が @fa_stack 先頭 = StackBase 相当を設定)。native は実 TEB を直接読むので影響なし。
+            if m.base != X86_REG_INVALID or m.index != X86_REG_INVALID:
+                raise Unsupported('gs base/index')
+            if m.disp % 8 or not (0 <= m.disp < 128):
+                raise Unsupported('gs disp %x' % m.disp)
+            return 'getelementptr (i64, ptr @fa_teb, i64 %d)' % (m.disp // 8)
         if m.segment != 0:
             raise Unsupported('segment')
         if m.base == X86_REG_RIP:
@@ -550,6 +565,8 @@ class FnLifter:
             self.M.icall_used = True
             if 'icall_drop' in self.M.inject:
                 return
+            if getattr(self.M, 'icall_site_dbg', False):
+                self.e('call void @fa_icall_site(i64 %d)' % i.address)
             self.e('%s = call {i64, <4 x i32>, <4 x i32>} @fa_icall(i64 %s, %s)' % (res, tgt, self.regs_args()))
         self.after_call(res)
 
@@ -644,6 +661,7 @@ class Module:
         self.lifted = {}; self.failed = {}; self.pending = []; self.seen = set()
         self.inject = set(a.inject); self.cov = a.cov; self.cov_idx = {}; self.ext_decl = {}; self.text_tables = {}; self.jump_tables = []; self.iat_slots = {}; self.mapped_used = set(); self.extents = {}; self.indirect_jmp = []
         self.no_xmm1_ret = bool(a.no_xmm1_ret)
+        self.icall_site_dbg = bool(a.icall_site_dbg)
         self.trace_vas = set()
         for tr in (a.trace or []):
             lo, _, hi = tr.partition(':')
@@ -696,6 +714,15 @@ class Module:
         for r in roots:
             self.extents[r] = self.img.func_extent(r, self.md)
             self.seen.add(r); self.pending.append(r)
+        # --icall 指定 VA も lift 対象に seed する (FA-2c: vtable 間接 call 先の実関数を fa_icall switch に接続)
+        for t in sorted(self.icall_targets):
+            if t in self.seen:
+                continue
+            ext = self.img.func_extent(t, self.md) if self.img.is_text(t) else None
+            if not ext:
+                continue
+            self.extents[t] = ext
+            self.seen.add(t); self.pending.append(t)
         while self.pending:
             va = self.pending.pop()
             if va in self.stubs:
@@ -709,6 +736,8 @@ class Module:
                     self.failed[va] = fl.unsupported
             except Unsupported as ex:
                 self.failed[va] = [(va, str(ex))]
+            except Exception as ex:      # 予期せぬ形状 (非対応オペランド等) = 未 lift 関数として記録し
+                self.failed[va] = [(va, 'EXC %s: %s' % (type(ex).__name__, ex))]
         return self
 
     def build(self, roots_spec):
@@ -738,6 +767,11 @@ class Module:
             vals = struct.unpack('<%dI' % cnt, self.img.read(tva, 4 * cnt))
             body.append('%s = internal constant [%d x i32] [%s]' % (sym, cnt, ', '.join('i32 %d' % v for v in vals)))
         body.append('@fa_stack = global [%d x i8] zeroinitializer, align 16' % STACK_BYTES)
+        # TEB エミュレーション (gs:[0x10] = StackLimit = 0)。__chkstk は r10(Stack 目標) >= StackLimit で probe を
+        # skip するため 0 を返せば probe 無効 (@fa_stack 1MB に収容前提)。fa_teb_init は各 wrapper 冒頭で呼ぶ。
+        body.append('@fa_teb = global [16 x i64] zeroinitializer, align 16')
+        body.append('define internal void @fa_teb_init() {\n'
+                    '  ret void\n}')
         if self.trace_vas:
             body.append('@fa_trace = global [8100000 x i64] zeroinitializer, align 16')  # 100K rows x 81
             body.append('@fa_trace_n = global i64 0')
@@ -755,13 +789,21 @@ class Module:
         args = ('i64 %t, i64 %c, i64 %d, i64 %e, i64 %f, <4 x i32> %x0, <4 x i32> %x1, <4 x i32> %x2, <4 x i32> %x3, '
                 'i64 %sp, i64 %rax0')
         L = ['define internal {i64, <4 x i32>, <4 x i32>} @fa_icall(%s) {' % args, 'entry:']
-        targets = sorted(t for t in self.icall_targets if t in self.lifted)
+        # 間接呼出の解決対象 = **lift 済み全関数** (icall_targets はその部分集合)。実機の vtable/関数ポインタ
+        # 経由は既知関数に必ず着地するため、未知 (host token / 未 lift) だけが host フォールバックに入る。
+        targets = sorted(self.lifted)
         L.append('  switch i64 %t, label %host [')
         for t in targets:
             L.append('    i64 %d, label %%c_%x' % (t, t))
         L.append('  ]')
         for t in targets:
             L.append('c_%x:' % t)
+            if self.img.is_text(t) and self.img.read(t, 2) == b'\xff\xe0':
+                # 実機の CFG ディスパッチ stub (jmp rax): 間接呼出の実先着は rax → rax0 で再ディスパッチ
+                L.append('  %%rd_%x = call {i64, <4 x i32>, <4 x i32>} @fa_icall(i64 %%rax0, i64 %%c, i64 %%d, i64 %%e, i64 %%f, '
+                         '<4 x i32> %%x0, <4 x i32> %%x1, <4 x i32> %%x2, <4 x i32> %%x3, i64 %%sp, i64 %%rax0)' % t)
+                L.append('  ret {i64, <4 x i32>, <4 x i32>} %%rd_%x' % t)
+                continue
             L.append('  %%r_%x = call {i64, <4 x i32>, <4 x i32>} @f_%x(i64 %%c, i64 %%d, i64 %%e, i64 %%f, <4 x i32> %%x0, <4 x i32> %%x1, <4 x i32> %%x2, <4 x i32> %%x3, i64 %%sp, i64 %%rax0)' % (t, t))
             L.append('  ret {i64, <4 x i32>, <4 x i32>} %%r_%x' % t)
         L.append('host:')
@@ -776,6 +818,7 @@ class Module:
         L.append('  ret {i64, <4 x i32>, <4 x i32>} %s2')
         L.append('}')
         L.append('declare i64 @fa_host_icall(i64, i64, i64, i64, i64, i128, i128)')
+        L.append('declare void @fa_icall_site(i64)')
         L.append('declare i128 @fa_host_icall_xmm0()')
         L.append('declare void @fa_stub_trap(i64)')
         return '\n'.join(L)
@@ -790,6 +833,7 @@ class Module:
             ty = {'i64': 'i64', 'i32': 'i32', 'f32': 'float', 'f64': 'double', 'void': 'void'}
             ps = ', '.join('%s %%p%d' % (ty[a], k) for k, a in enumerate(args))
             L.append('define %s @fa_root_%x(%s) {' % (ty[ret], va, ps))
+            L.append('  call void @fa_teb_init()')
             gv = {r: '0' for r in ARG_G}; xv = {k: 'zeroinitializer' for k in range(4)}
             pre = []
             for k, a in enumerate(args):
@@ -978,6 +1022,7 @@ def main():
     ap.add_argument('--stub', action='append', default=[], type=lambda x: int(x, 16))
     ap.add_argument('--map', action='append', default=[], help='VA=symbol (外部 C 関数へ置換)')
     ap.add_argument('--icall', action='append', default=[], help='間接 call 先として登録する VA')
+    ap.add_argument('--icall-site-dbg', action='store_true', help='各間接 call 前に fa_icall_site(VA) を出す (デバッグ用)')
     ap.add_argument('--poke', action='append', default=[], help='VA:size:value(hex)  データ blob への初期値上書き (CRT 初期化済み状態の再現)')
     ap.add_argument('--inject', action='append', default=[], choices=['comis_noflags', 'xmm_args_drop', 'xmm_ret_drop', 'icall_drop', 'cmov_drop'],
                     help='RetDec 欠陥類型の故障注入 (ablation 用): lift の意味論をその類型だけ欠落させる')

@@ -17,7 +17,12 @@ typedef uint64_t u64;
 static u64 g_lasterr;
 static u64 g_tls[64];
 static u64 g_shim_calls_HeapAlloc, g_shim_calls_HeapFree, g_shim_calls_HeapReAlloc;
-static u64 sh_HeapAlloc(u64 h, u64 flags, u64 size, u64 d)   { g_shim_calls_HeapAlloc++; void* p = (flags & 8) ? calloc(1, size) : malloc(size); return (u64)(uintptr_t)p; }
+/* g_heap_zero: FA-2c 制御層検証用。1 のとき machine heap を常に 0 初期化する (native/wasm 同一)。
+ * machine 側 operator new (HeapAlloc) が確保するバッファには未初期化部があり、環境依存の残留値が
+ * ダンプに混ざって差分ノイズになる (native = glibc / wasm = emcc dlmalloc で残留が異なる) ため、
+ * 両側を determinism にする。comp/filter (FA-2/2b) ハーネスは設定しないので従来挙動のまま。 */
+static int g_heap_zero;
+static u64 sh_HeapAlloc(u64 h, u64 flags, u64 size, u64 d)   { g_shim_calls_HeapAlloc++; void* p = (flags & 8) || g_heap_zero ? calloc(1, size) : malloc(size); return (u64)(uintptr_t)p; }
 static u64 sh_HeapFree(u64 h, u64 flags, u64 p, u64 d)       { g_shim_calls_HeapFree++; free((void*)(uintptr_t)p); return 1; }
 static u64 sh_HeapReAlloc(u64 h, u64 flags, u64 p, u64 size) { g_shim_calls_HeapReAlloc++; return (u64)(uintptr_t)realloc((void*)(uintptr_t)p, size); }
 static u64 sh_GetLastError(u64 a, u64 b, u64 c, u64 d)       { return g_lasterr; }
@@ -26,6 +31,8 @@ static u64 sh_TlsGetValue(u64 i, u64 b, u64 c, u64 d)        { return i < 64 ? g
 static u64 sh_TlsSetValue(u64 i, u64 v, u64 c, u64 d)        { if (i < 64) g_tls[i] = v; return 1; }
 static u64 sh_nop0(u64 a, u64 b, u64 c, u64 d)               { return 0; }
 static u64 sh_nop1(u64 a, u64 b, u64 c, u64 d)               { return 1; }
+static u64 sh_hnd1(u64 a, u64 b, u64 c, u64 d)               { return 1; }   /* ダミーハンドル (非 NULL = 成功) */
+static u64 sh_wait0(u64 a, u64 b, u64 c, u64 d)              { return 0; }   /* WAIT_OBJECT_0 */
 static u64 sh_trap(u64 a, u64 b, u64 c, u64 d)               { SH_TRAP(); return 0; }
 /* name, body */
 #define FA_SHIM_TABLE(X) \
@@ -35,6 +42,10 @@ static u64 sh_trap(u64 a, u64 b, u64 c, u64 d)               { SH_TRAP(); return
   X(EnterCriticalSection, sh_nop0) X(LeaveCriticalSection, sh_nop0) \
   X(LoadLibraryExW, sh_nop0) X(GetProcAddress, sh_nop0) X(FreeLibrary, sh_nop0) \
   X(IsProcessorFeaturePresent, sh_nop0) X(GetCurrentProcess, sh_nop0) \
+  X(GetCurrentThreadId, sh_nop0) X(IsDebuggerPresent, sh_nop0) X(RtlPcToFileHeader, sh_nop0) \
+  X(CloseHandle, sh_nop1) X(CreateSemaphoreA, sh_hnd1) X(OutputDebugStringA, sh_nop0) \
+  X(ReleaseSemaphore, sh_nop1) X(ResetEvent, sh_nop1) X(SetEvent, sh_nop1) \
+  X(WaitForSingleObject, sh_wait0) X(WaitForSingleObjectEx, sh_wait0) \
   X(RaiseException, sh_trap) X(TerminateProcess, sh_trap) X(RtlCaptureContext, sh_trap) \
   X(RtlLookupFunctionEntry, sh_trap) X(RtlVirtualUnwind, sh_trap) \
   X(SetUnhandledExceptionFilter, sh_trap) X(UnhandledExceptionFilter, sh_trap)

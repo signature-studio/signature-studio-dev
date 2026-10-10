@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# lift2_e2e.sh — CAB-48 (FA-2) Fresh Air Compressor/Filter lift の 1 コマンド検収。
+# lift2_e2e.sh — CAB-48 (FA-2) + FA-2c 制御層 lift の 1 コマンド検収。
 #   1) mlift で Compressor (0x180775220) / Filter (0x180b6f050) closure を lift → emcc → wasm
 #   2) native oracle (実機機械語敷設 + IAT shim 差替) との bit-exact 比較 (fma0/fma1)
 #   3) ctx-fuzz: 構造化 200 + ランダム 1000 試行 × 2 target × 2 fma
 #   4) ABI 検査 (callee-saved GPR) + メモリ閉込 (canary)
 #   5) ablation: mlift 意味論の故障注入 (RetDec 欠陥類型との対応の実測)
-# 実時間: 約 3 分 (RetDec 不使用のため lift は数秒)。
+#   6) FA-2c: FreshAirDsp 制御層 (0x1803dfc10, vtable 17 slot) — factory .epf 8 本駆動 + 小規模 structured
+# 実時間: 約 2 分 + 制御層 build 約 1 分 (RetDec 不使用のため lift は数秒)。
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; FA="$(dirname "$HERE")"
 CORE="$FA/work/win/Fresh Air/C__ProgramData_Slate Digital/Fresh Air/SlateCore.core_64"
@@ -32,7 +33,11 @@ ABI_OUT=$( cd "$HERE/work/filter" && source "$HERE/env.sh" && clang -O1 -w -o ab
 echo "$ABI_OUT" | grep -E "violations"
 echo "$ABI_OUT" | grep -q "violations=0" || { echo "ABI check FAIL"; fail=1; }
 
-step "6. ablation (mlift 意味論の故障注入 → RetDec 欠陥類型の実測)"
+step "6. FA-2c 制御層: build + factory .epf 8 本駆動 bit-exact (native 実機機械語 vs wasm mlift)"
+bash "$HERE/build_ctrl.sh" 2>&1 | tail -2 || fail=1
+bash "$HERE/run_ctrl.sh" 2 5 | tail -3 || fail=1
+
+step "7. ablation (mlift 意味論の故障注入 → RetDec 欠陥類型の実測)"
 bash "$HERE/ablate_comp.sh" 200 | tail -7 || fail=1
 
 echo
