@@ -1,0 +1,2674 @@
+{
+ "top_n": 35,
+ "identified_sites_total": 894,
+ "top30_cover": 803,
+ "top30_cover_pct": 89.8,
+ "ids": {
+  "2": {
+   "sites": 163,
+   "plugins": 4,
+   "ret_use": {
+    "ignore": 4
+   },
+   "samples": [
+    {
+     "plugin": "block18797_PE.bin",
+     "func": "0x434de0",
+     "site": "0x434e15",
+     "ret_use": "ignore",
+     "pre": [
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rbx, qword ptr [rcx]",
+      "mov rcx, rdx",
+      "mov rdx, rax"
+     ],
+     "post": [
+      "add rsp, 0x30",
+      "pop rbx",
+      "ret "
+     ]
+    },
+    {
+     "plugin": "block18953_PE.bin",
+     "func": "0x2d3de0",
+     "site": "0x2d3f8a",
+     "ret_use": "ignore",
+     "pre": [
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rbx, qword ptr [rcx]",
+      "mov rcx, rdx",
+      "mov rdx, rax"
+     ],
+     "post": [
+      "mov rcx, qword ptr [rsp + 0x38]",
+      "call 0x2d0c10",
+      "movdqa xmm6, xmmword ptr [rsp + 0x40]"
+     ]
+    },
+    {
+     "plugin": "block18955_PE.bin",
+     "func": "0x48fc40",
+     "site": "0x48fe27",
+     "ret_use": "ignore",
+     "pre": [
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rsi, qword ptr [rcx]",
+      "mov rcx, rdx",
+      "mov rdx, rax"
+     ],
+     "post": [
+      "mov rcx, rbx",
+      "mov dl, 1",
+      "call 0x48bfb0"
+     ]
+    },
+    {
+     "plugin": "block18972_PE.bin",
+     "func": "0x2c3370",
+     "site": "0x2c3543",
+     "ret_use": "ignore",
+     "pre": [
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rbx, qword ptr [rcx]",
+      "mov rcx, rdx",
+      "mov rdx, rax"
+     ],
+     "post": [
+      "mov rcx, qword ptr [rsp + 0x38]",
+      "call 0x2c0990",
+      "add rsp, 0x48"
+     ]
+    }
+   ]
+  },
+  "33": {
+   "sites": 118,
+   "plugins": 4,
+   "ret_use": {
+    "ignore": 4
+   },
+   "samples": [
+    {
+     "plugin": "block18797_PE.bin",
+     "func": "0x4529d0",
+     "site": "0x452ddc",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 0x21",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 1",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rax, qword ptr [rip + 0x7553b]",
+      "mov rax, qword ptr [rax]",
+      "mov rax, qword ptr [rax + 0xc0]"
+     ]
+    },
+    {
+     "plugin": "block18914_PE.bin",
+     "func": "0x2a7de0",
+     "site": "0x2a8158",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 0x21",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 1",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "cmp byte ptr [rbp + 0x78], 0",
+      "je 0x2a819d",
+      "mov rcx, qword ptr [rbp + 0x70]"
+     ]
+    },
+    {
+     "plugin": "block18916_PE.bin",
+     "func": "0x34eeb0",
+     "site": "0x34f254",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 0x21",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 1",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "nop ",
+      "lea rcx, [rbp + 0x30]",
+      "call 0xfc70"
+     ]
+    },
+    {
+     "plugin": "block18953_PE.bin",
+     "func": "0x2cd420",
+     "site": "0x2cd75c",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 0x21",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 1",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "cmp byte ptr [rbp + 0x98], 0",
+      "je 0x2cd7b9",
+      "mov rcx, qword ptr [rbp + 0x90]"
+     ]
+    }
+   ]
+  },
+  "3": {
+   "sites": 71,
+   "plugins": 4,
+   "ret_use": {
+    "ignore": 4
+   },
+   "samples": [
+    {
+     "plugin": "block18797_PE.bin",
+     "func": "0x434a80",
+     "site": "0x434ce0",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 3",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rax, qword ptr [rsi + 0xbc]",
+      "mov rcx, rax",
+      "mov rdx, qword ptr [rsi + 8]"
+     ]
+    },
+    {
+     "plugin": "block18916_PE.bin",
+     "func": "0x34ddd0",
+     "site": "0x34e03f",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 3",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "lea rsp, [rbp + 0x78]",
+      "pop rbx",
+      "pop rsi"
+     ]
+    },
+    {
+     "plugin": "block19091_PE.bin",
+     "func": "0x392f40",
+     "site": "0x392fc1",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 3",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "test ebx, 4",
+      "je 0x392ff0",
+      "mov rax, qword ptr [rsi + 0xbc]"
+     ]
+    },
+    {
+     "plugin": "block19098_PE.bin",
+     "func": "0x444500",
+     "site": "0x4445fd",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 3",
+      "mov r9d, 1",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rax, qword ptr [rbp + 0x30]",
+      "mov rax, qword ptr [rax + 0xc4]",
+      "mov qword ptr [rbp + 0x40], rax"
+     ]
+    }
+   ]
+  },
+  "36": {
+   "sites": 47,
+   "plugins": 4,
+   "ret_use": {
+    "ignore": 4
+   },
+   "samples": [
+    {
+     "plugin": "block18955_PE.bin",
+     "func": "0x4823c0",
+     "site": "0x482453",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r9d, 3",
+      "lea r10, [rbp + 0x50]",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rax, qword ptr [rbp + 0x50]",
+      "mov qword ptr [rbp + 0x38], rax",
+      "movsd qword ptr [rbp + 0x40], xmm6"
+     ]
+    },
+    {
+     "plugin": "block18978_PE.bin",
+     "func": "0x2ddb30",
+     "site": "0x2ddb6a",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r9d, 1",
+      "lea r10, [rbp + 0x30]",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rax, qword ptr [rbx + 0xcc]",
+      "cvtsi2sd xmm0, dword ptr [rax + 8]",
+      "movsd xmm1, qword ptr [rbp + 0x30]"
+     ]
+    },
+    {
+     "plugin": "block18979_PE.bin",
+     "func": "0x341c50",
+     "site": "0x341c8a",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r9d, 1",
+      "lea r10, [rbp + 0x30]",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rax, qword ptr [rbx + 0xcc]",
+      "cvtsi2sd xmm0, dword ptr [rax + 8]",
+      "movsd xmm1, qword ptr [rbp + 0x30]"
+     ]
+    },
+    {
+     "plugin": "block18999_PE.bin",
+     "func": "0x2e9790",
+     "site": "0x2e97ca",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r9d, 1",
+      "lea r10, [rbp + 0x30]",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rax, qword ptr [rbx + 0xcc]",
+      "cvtsi2sd xmm0, dword ptr [rax + 8]",
+      "movsd xmm1, qword ptr [rbp + 0x30]"
+     ]
+    }
+   ]
+  },
+  "29": {
+   "sites": 44,
+   "plugins": 4,
+   "ret_use": {
+    "store": 4
+   },
+   "samples": [
+    {
+     "plugin": "block18797_PE.bin",
+     "func": "0x405260",
+     "site": "0x405561",
+     "ret_use": "store",
+     "pre": [
+      "mov r8d, 0x1d",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov qword ptr [rbp + 0x48], rax",
+      "mov rax, qword ptr [rbp + 0x80]",
+      "lea rax, [rax + 0xe8]"
+     ]
+    },
+    {
+     "plugin": "block18914_PE.bin",
+     "func": "0x29e920",
+     "site": "0x29ebf1",
+     "ret_use": "store",
+     "pre": [
+      "mov r8d, 0x1d",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov qword ptr [rbp + 0x48], rax",
+      "mov rax, qword ptr [rbp + 0x80]",
+      "lea rax, [rax + 0xe8]"
+     ]
+    },
+    {
+     "plugin": "block18916_PE.bin",
+     "func": "0x311870",
+     "site": "0x311b41",
+     "ret_use": "store",
+     "pre": [
+      "mov r8d, 0x1d",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov qword ptr [rbp + 0x48], rax",
+      "mov rax, qword ptr [rbp + 0x80]",
+      "lea rax, [rax + 0xe8]"
+     ]
+    },
+    {
+     "plugin": "block18953_PE.bin",
+     "func": "0x2c7610",
+     "site": "0x2c78e1",
+     "ret_use": "store",
+     "pre": [
+      "mov r8d, 0x1d",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov qword ptr [rbp + 0x48], rax",
+      "mov rax, qword ptr [rbp + 0x80]",
+      "lea rax, [rax + 0xe8]"
+     ]
+    }
+   ]
+  },
+  "50": {
+   "sites": 36,
+   "plugins": 4,
+   "ret_use": {
+    "reg": 4
+   },
+   "samples": [
+    {
+     "plugin": "block18797_PE.bin",
+     "func": "0x407390",
+     "site": "0x40743c",
+     "ret_use": "reg",
+     "pre": [
+      "mov r9d, dword ptr [rbp + 0x4c]",
+      "movsxd r9, r9d",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov ecx, eax",
+      "neg ecx",
+      "mov ebx, eax"
+     ]
+    },
+    {
+     "plugin": "block18953_PE.bin",
+     "func": "0x2c88d0",
+     "site": "0x2c897c",
+     "ret_use": "reg",
+     "pre": [
+      "mov r9d, dword ptr [rbp + 0x4c]",
+      "movsxd r9, r9d",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov ecx, eax",
+      "neg ecx",
+      "mov ebx, eax"
+     ]
+    },
+    {
+     "plugin": "block18978_PE.bin",
+     "func": "0x2d3d40",
+     "site": "0x2d3dec",
+     "ret_use": "reg",
+     "pre": [
+      "mov r9d, dword ptr [rbp + 0x4c]",
+      "movsxd r9, r9d",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov ecx, eax",
+      "neg ecx",
+      "mov ebx, eax"
+     ]
+    },
+    {
+     "plugin": "block18979_PE.bin",
+     "func": "0x321bc0",
+     "site": "0x321c6c",
+     "ret_use": "reg",
+     "pre": [
+      "mov r9d, dword ptr [rbp + 0x4c]",
+      "movsxd r9, r9d",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov ecx, eax",
+      "neg ecx",
+      "mov ebx, eax"
+     ]
+    }
+   ]
+  },
+  "91": {
+   "sites": 31,
+   "plugins": 4,
+   "ret_use": {
+    "ignore": 4
+   },
+   "samples": [
+    {
+     "plugin": "block18974_PE.bin",
+     "func": "0x309c20",
+     "site": "0x309c60",
+     "ret_use": "ignore",
+     "pre": [
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rsi, qword ptr [rcx]",
+      "mov rcx, rdx",
+      "mov rdx, rax"
+     ],
+     "post": [
+      "mov rcx, qword ptr [rip + 0x71967]",
+      "mov edx, dword ptr [rbx + 0x18]",
+      "call 0x3138e0"
+     ]
+    },
+    {
+     "plugin": "block18975_PE.bin",
+     "func": "0x2c5290",
+     "site": "0x2c52d0",
+     "ret_use": "ignore",
+     "pre": [
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rsi, qword ptr [rcx]",
+      "mov rcx, rdx",
+      "mov rdx, rax"
+     ],
+     "post": [
+      "mov rcx, qword ptr [rip + 0x652b7]",
+      "mov edx, dword ptr [rbx + 0x18]",
+      "call 0x2c9520"
+     ]
+    },
+    {
+     "plugin": "block19220_PE.bin",
+     "func": "0x550bb0",
+     "site": "0x550be9",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 0x5b",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rcx, qword ptr [rip - 0x1583b2]",
+      "mov dl, 1",
+      "mov r8, qword ptr [rbx + 0x4228]"
+     ]
+    },
+    {
+     "plugin": "block19245_PE.bin",
+     "func": "0x43cf50",
+     "site": "0x43cf90",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 0x5b",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov byte ptr [rbx + 0x7e8], 0",
+      "mov rax, qword ptr [rbx + 0x7b8]",
+      "mov eax, dword ptr [rax + 0x3b0]"
+     ]
+    }
+   ]
+  },
+  "23": {
+   "sites": 25,
+   "plugins": 4,
+   "ret_use": {
+    "ignore": 4
+   },
+   "samples": [
+    {
+     "plugin": "block19024_PE.bin",
+     "func": "0x456780",
+     "site": "0x457393",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 0x17",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 0x7d6f6d",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rax, qword ptr [rbp + 0x120]",
+      "mov rax, qword ptr [rax + 0xbc]",
+      "mov rcx, rax"
+     ]
+    },
+    {
+     "plugin": "block19294_PE.bin",
+     "func": "0x46ed00",
+     "site": "0x4700cf",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 0x17",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 0x3fa7fd",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rax, qword ptr [rbp + 0x180]",
+      "mov rax, qword ptr [rax + 0xbc]",
+      "mov rcx, rax"
+     ]
+    },
+    {
+     "plugin": "block21148_PE.bin",
+     "func": "0x3389f0",
+     "site": "0x338cf9",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 0x17",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 0x5d4e51",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "nop ",
+      "lea rcx, [rbp + 0x30]",
+      "call 0xfa40"
+     ]
+    },
+    {
+     "plugin": "block21151_PE.bin",
+     "func": "0x47edd0",
+     "site": "0x47f8f3",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 0x17",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 0xa9a39b",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rax, qword ptr [rbp + 0x120]",
+      "mov rax, qword ptr [rax + 0xbc]",
+      "mov rcx, rax"
+     ]
+    }
+   ]
+  },
+  "46": {
+   "sites": 24,
+   "plugins": 4,
+   "ret_use": {
+    "store": 4
+   },
+   "samples": [
+    {
+     "plugin": "block18797_PE.bin",
+     "func": "0x405260",
+     "site": "0x4053ed",
+     "ret_use": "store",
+     "pre": [
+      "mov r8d, 0x2e",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rcx, qword ptr [rip + 0xd525a]",
+      "mov qword ptr [rcx + 8], rax",
+      "mov rax, qword ptr [rip + 0xc3a47]"
+     ]
+    },
+    {
+     "plugin": "block18914_PE.bin",
+     "func": "0x29e920",
+     "site": "0x29ea7d",
+     "ret_use": "store",
+     "pre": [
+      "mov r8d, 0x2e",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rcx, qword ptr [rip + 0x70ab2]",
+      "mov qword ptr [rcx + 8], rax",
+      "mov rax, qword ptr [rip + 0x5f967]"
+     ]
+    },
+    {
+     "plugin": "block18916_PE.bin",
+     "func": "0x311870",
+     "site": "0x3119cd",
+     "ret_use": "store",
+     "pre": [
+      "mov r8d, 0x2e",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rcx, qword ptr [rip + 0xaec02]",
+      "mov qword ptr [rcx + 8], rax",
+      "mov rax, qword ptr [rip + 0x9d8a7]"
+     ]
+    },
+    {
+     "plugin": "block18953_PE.bin",
+     "func": "0x2c7610",
+     "site": "0x2c776d",
+     "ret_use": "store",
+     "pre": [
+      "mov r8d, 0x2e",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rcx, qword ptr [rip + 0x6cdca]",
+      "mov qword ptr [rcx + 8], rax",
+      "mov rax, qword ptr [rip + 0x5b8cf]"
+     ]
+    }
+   ]
+  },
+  "71": {
+   "sites": 22,
+   "plugins": 4,
+   "ret_use": {
+    "reg": 4
+   },
+   "samples": [
+    {
+     "plugin": "block18797_PE.bin",
+     "func": "0x405260",
+     "site": "0x40550f",
+     "ret_use": "reg",
+     "pre": [
+      "mov r8d, 0x47",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rcx, qword ptr [rip - 0x7480]",
+      "mov dl, 1",
+      "mov r8, rax"
+     ]
+    },
+    {
+     "plugin": "block18914_PE.bin",
+     "func": "0x29e920",
+     "site": "0x29eb9f",
+     "ret_use": "reg",
+     "pre": [
+      "mov r8d, 0x47",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rcx, qword ptr [rip - 0x3858]",
+      "mov dl, 1",
+      "mov r8, rax"
+     ]
+    },
+    {
+     "plugin": "block18916_PE.bin",
+     "func": "0x311870",
+     "site": "0x311aef",
+     "ret_use": "reg",
+     "pre": [
+      "mov r8d, 0x47",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rcx, qword ptr [rip - 0x3858]",
+      "mov dl, 1",
+      "mov r8, rax"
+     ]
+    },
+    {
+     "plugin": "block18953_PE.bin",
+     "func": "0x2c7610",
+     "site": "0x2c788f",
+     "ret_use": "reg",
+     "pre": [
+      "mov r8d, 0x47",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rcx, qword ptr [rip - 0x3858]",
+      "mov dl, 1",
+      "mov r8, rax"
+     ]
+    }
+   ]
+  },
+  "48": {
+   "sites": 20,
+   "plugins": 4,
+   "ret_use": {
+    "ignore": 4
+   },
+   "samples": [
+    {
+     "plugin": "block19052_PE.bin",
+     "func": "0x2a6ef0",
+     "site": "0x2a6f2a",
+     "ret_use": "ignore",
+     "pre": [
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rbx, qword ptr [rcx]",
+      "mov rcx, rdx",
+      "mov rdx, rax"
+     ],
+     "post": [
+      "add rsp, 0x30",
+      "pop rbx",
+      "ret "
+     ]
+    },
+    {
+     "plugin": "block19054_PE.bin",
+     "func": "0x2a87f0",
+     "site": "0x2a882a",
+     "ret_use": "ignore",
+     "pre": [
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rbx, qword ptr [rcx]",
+      "mov rcx, rdx",
+      "mov rdx, rax"
+     ],
+     "post": [
+      "add rsp, 0x30",
+      "pop rbx",
+      "ret "
+     ]
+    },
+    {
+     "plugin": "block19091_PE.bin",
+     "func": "0x478880",
+     "site": "0x4788b2",
+     "ret_use": "ignore",
+     "pre": [
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rbx, qword ptr [rcx]",
+      "mov rcx, rdx",
+      "mov rdx, rax"
+     ],
+     "post": [
+      "add rsp, 0x30",
+      "pop rbx",
+      "ret "
+     ]
+    },
+    {
+     "plugin": "block19220_PE.bin",
+     "func": "0x550bb0",
+     "site": "0x550d71",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 0x30",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rax, qword ptr [rbx + 0xbc]",
+      "mov rcx, rax",
+      "mov rdx, qword ptr [rbx + 8]"
+     ]
+    }
+   ]
+  },
+  "30": {
+   "sites": 19,
+   "plugins": 4,
+   "ret_use": {
+    "ignore": 4
+   },
+   "samples": [
+    {
+     "plugin": "block18974_PE.bin",
+     "func": "0x307910",
+     "site": "0x307956",
+     "ret_use": "ignore",
+     "pre": [
+      "xor r9, r9",
+      "movsxd r10, esi",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov dword ptr [rbx + 0x168], esi",
+      "add rsp, 0x28",
+      "pop rbx"
+     ]
+    },
+    {
+     "plugin": "block18975_PE.bin",
+     "func": "0x2c3460",
+     "site": "0x2c34a6",
+     "ret_use": "ignore",
+     "pre": [
+      "xor r9, r9",
+      "movsxd r10, esi",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov dword ptr [rbx + 0x160], esi",
+      "add rsp, 0x28",
+      "pop rbx"
+     ]
+    },
+    {
+     "plugin": "block18979_PE.bin",
+     "func": "0x342040",
+     "site": "0x3420b4",
+     "ret_use": "ignore",
+     "pre": [
+      "xor r9, r9",
+      "movsxd r10, dword ptr [rbx + 0x1d8]",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "add rsp, 0x28",
+      "pop rbx",
+      "pop rsi"
+     ]
+    },
+    {
+     "plugin": "block19021_PE.bin",
+     "func": "0x2d3760",
+     "site": "0x2d39e2",
+     "ret_use": "ignore",
+     "pre": [
+      "xor r9, r9",
+      "movsxd r10, dword ptr [rbx + 0x1fc]",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rcx, rbx",
+      "call 0x2d6790",
+      "mov rcx, rbx"
+     ]
+    }
+   ]
+  },
+  "40": {
+   "sites": 16,
+   "plugins": 4,
+   "ret_use": {
+    "ignore": 4
+   },
+   "samples": [
+    {
+     "plugin": "block18955_PE.bin",
+     "func": "0x48eb90",
+     "site": "0x48ec9a",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 0x28",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 1",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rax, qword ptr [rbp + 0x50]",
+      "mov rax, qword ptr [rax + 0xbc]",
+      "mov rcx, rax"
+     ]
+    },
+    {
+     "plugin": "block18992_PE.bin",
+     "func": "0x484170",
+     "site": "0x48426f",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 0x28",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 1",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rax, qword ptr [rbp + 0x50]",
+      "mov rax, qword ptr [rax + 0xbc]",
+      "mov rcx, rax"
+     ]
+    },
+    {
+     "plugin": "block19166_PE.bin",
+     "func": "0x398370",
+     "site": "0x398480",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 0x28",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 1",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rax, qword ptr [rbp + 0x1e0]",
+      "mov rax, qword ptr [rax + 0xbc]",
+      "mov rcx, rax"
+     ]
+    },
+    {
+     "plugin": "block19217_PE.bin",
+     "func": "0x3978f0",
+     "site": "0x397a00",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 0x28",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 1",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rax, qword ptr [rbp + 0x1e0]",
+      "mov rax, qword ptr [rax + 0xbc]",
+      "mov rcx, rax"
+     ]
+    }
+   ]
+  },
+  "14": {
+   "sites": 12,
+   "plugins": 4,
+   "ret_use": {
+    "store": 2,
+    "reg": 2
+   },
+   "samples": [
+    {
+     "plugin": "block18992_PE.bin",
+     "func": "0x475550",
+     "site": "0x475cd1",
+     "ret_use": "store",
+     "pre": [
+      "xor r9, r9",
+      "mov r10, qword ptr [rbp + 0x198]",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov qword ptr [rbp + 0xc0], rax",
+      "lea rcx, [rbp + 0x188]",
+      "mov rdx, qword ptr [rbp + 0xc0]"
+     ]
+    },
+    {
+     "plugin": "block19016_PE.bin",
+     "func": "0x2e1160",
+     "site": "0x2e12b0",
+     "ret_use": "reg",
+     "pre": [
+      "xor r9, r9",
+      "mov r10, qword ptr [rbp + 0x58]",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rcx, qword ptr [rbp + 0x38]",
+      "mov rdx, rax",
+      "call 0x17a80"
+     ]
+    },
+    {
+     "plugin": "block19071_PE.bin",
+     "func": "0x328d80",
+     "site": "0x329177",
+     "ret_use": "reg",
+     "pre": [
+      "xor r9, r9",
+      "mov r10, qword ptr [rbp + 0x58]",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "lea rcx, [rbp + 0x1090]",
+      "mov rdx, rax",
+      "call 0x19080"
+     ]
+    },
+    {
+     "plugin": "block19220_PE.bin",
+     "func": "0x552a70",
+     "site": "0x55305d",
+     "ret_use": "store",
+     "pre": [
+      "xor r9, r9",
+      "mov r10, qword ptr [rbp + 0x158]",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov qword ptr [rbp + 0xb0], rax",
+      "lea rcx, [rbp + 0x120]",
+      "mov rdx, qword ptr [rbp + 0xb0]"
+     ]
+    }
+   ]
+  },
+  "38": {
+   "sites": 12,
+   "plugins": 4,
+   "ret_use": {
+    "ignore": 4
+   },
+   "samples": [
+    {
+     "plugin": "block18955_PE.bin",
+     "func": "0x482aa0",
+     "site": "0x482b16",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r9d, 1",
+      "lea r10, [rbp + 0x30]",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rcx, qword ptr [rbx + 0x158]",
+      "movsd xmm1, qword ptr [rbp + 0x40]",
+      "subsd xmm1, qword ptr [rbp + 0x30]"
+     ]
+    },
+    {
+     "plugin": "block18974_PE.bin",
+     "func": "0x307970",
+     "site": "0x3079db",
+     "ret_use": "ignore",
+     "pre": [
+      "xor r9, r9",
+      "lea r10, [rbp + 0x30]",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rax, qword ptr [rbp + 0x30]",
+      "mov qword ptr [rsi + 8], rax",
+      "mov rax, qword ptr [rbp + 0x38]"
+     ]
+    },
+    {
+     "plugin": "block18975_PE.bin",
+     "func": "0x2c34c0",
+     "site": "0x2c352b",
+     "ret_use": "ignore",
+     "pre": [
+      "xor r9, r9",
+      "lea r10, [rbp + 0x30]",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rax, qword ptr [rbp + 0x30]",
+      "mov qword ptr [rsi + 8], rax",
+      "mov rax, qword ptr [rbp + 0x38]"
+     ]
+    },
+    {
+     "plugin": "block19091_PE.bin",
+     "func": "0x478410",
+     "site": "0x478548",
+     "ret_use": "ignore",
+     "pre": [
+      "xor r9, r9",
+      "lea r10, [rbp + 0x30]",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "cvtsi2sd xmm0, dword ptr [rdi + 0x7fc]",
+      "movsd xmm1, qword ptr [rbp + 0x38]",
+      "mulsd xmm1, xmm0"
+     ]
+    }
+   ]
+  },
+  "97": {
+   "sites": 12,
+   "plugins": 4,
+   "ret_use": {
+    "ignore": 4
+   },
+   "samples": [
+    {
+     "plugin": "block19091_PE.bin",
+     "func": "0x4789b0",
+     "site": "0x4789e2",
+     "ret_use": "ignore",
+     "pre": [
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rbx, qword ptr [rcx]",
+      "mov rcx, rdx",
+      "mov rdx, rax"
+     ],
+     "post": [
+      "add rsp, 0x30",
+      "pop rbx",
+      "ret "
+     ]
+    },
+    {
+     "plugin": "block19220_PE.bin",
+     "func": "0x55a650",
+     "site": "0x55a682",
+     "ret_use": "ignore",
+     "pre": [
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rbx, qword ptr [rcx]",
+      "mov rcx, rdx",
+      "mov rdx, rax"
+     ],
+     "post": [
+      "add rsp, 0x30",
+      "pop rbx",
+      "ret "
+     ]
+    },
+    {
+     "plugin": "block23676_PE.bin",
+     "func": "0x478960",
+     "site": "0x478992",
+     "ret_use": "ignore",
+     "pre": [
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rbx, qword ptr [rcx]",
+      "mov rcx, rdx",
+      "mov rdx, rax"
+     ],
+     "post": [
+      "add rsp, 0x30",
+      "pop rbx",
+      "ret "
+     ]
+    },
+    {
+     "plugin": "block24155_PE.bin",
+     "func": "0x5598e0",
+     "site": "0x559912",
+     "ret_use": "ignore",
+     "pre": [
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rbx, qword ptr [rcx]",
+      "mov rcx, rdx",
+      "mov rdx, rax"
+     ],
+     "post": [
+      "add rsp, 0x30",
+      "pop rbx",
+      "ret "
+     ]
+    }
+   ]
+  },
+  "59": {
+   "sites": 11,
+   "plugins": 4,
+   "ret_use": {
+    "ignore": 4
+   },
+   "samples": [
+    {
+     "plugin": "block18797_PE.bin",
+     "func": "0x405010",
+     "site": "0x40504f",
+     "ret_use": "ignore",
+     "pre": [
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rbx, qword ptr [rcx]",
+      "mov rcx, rdx",
+      "mov rdx, rax"
+     ],
+     "post": [
+      "add rsp, 0x30",
+      "pop rbx",
+      "ret "
+     ]
+    },
+    {
+     "plugin": "block18914_PE.bin",
+     "func": "0x29e6d0",
+     "site": "0x29e70f",
+     "ret_use": "ignore",
+     "pre": [
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rbx, qword ptr [rcx]",
+      "mov rcx, rdx",
+      "mov rdx, rax"
+     ],
+     "post": [
+      "add rsp, 0x30",
+      "pop rbx",
+      "ret "
+     ]
+    },
+    {
+     "plugin": "block18916_PE.bin",
+     "func": "0x311620",
+     "site": "0x31165f",
+     "ret_use": "ignore",
+     "pre": [
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rbx, qword ptr [rcx]",
+      "mov rcx, rdx",
+      "mov rdx, rax"
+     ],
+     "post": [
+      "add rsp, 0x30",
+      "pop rbx",
+      "ret "
+     ]
+    },
+    {
+     "plugin": "block18953_PE.bin",
+     "func": "0x2c73c0",
+     "site": "0x2c73ff",
+     "ret_use": "ignore",
+     "pre": [
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rbx, qword ptr [rcx]",
+      "mov rcx, rdx",
+      "mov rdx, rax"
+     ],
+     "post": [
+      "add rsp, 0x30",
+      "pop rbx",
+      "ret "
+     ]
+    }
+   ]
+  },
+  "103": {
+   "sites": 10,
+   "plugins": 4,
+   "ret_use": {
+    "ignore": 4
+   },
+   "samples": [
+    {
+     "plugin": "block18955_PE.bin",
+     "func": "0x48e210",
+     "site": "0x48e24d",
+     "ret_use": "ignore",
+     "pre": [
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rdi, qword ptr [rcx]",
+      "mov rcx, rdx",
+      "mov rdx, rax"
+     ],
+     "post": [
+      "mov rcx, qword ptr [rbx + 0x6f8]",
+      "mov rdx, rsi",
+      "call 0x4717a0"
+     ]
+    },
+    {
+     "plugin": "block18992_PE.bin",
+     "func": "0x4850e0",
+     "site": "0x48511d",
+     "ret_use": "ignore",
+     "pre": [
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rdi, qword ptr [rcx]",
+      "mov rcx, rdx",
+      "mov rdx, rax"
+     ],
+     "post": [
+      "mov rcx, qword ptr [rbx + 0x6f8]",
+      "mov rdx, rsi",
+      "call 0x4637f0"
+     ]
+    },
+    {
+     "plugin": "block19166_PE.bin",
+     "func": "0x39ab40",
+     "site": "0x39ae15",
+     "ret_use": "ignore",
+     "pre": [
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rdi, qword ptr [rcx]",
+      "mov rcx, rdx",
+      "mov rdx, rax"
+     ],
+     "post": [
+      "mov rcx, rsi",
+      "lea rdx, [rbp + 0x40]",
+      "call 0x1efb60"
+     ]
+    },
+    {
+     "plugin": "block19217_PE.bin",
+     "func": "0x399650",
+     "site": "0x399909",
+     "ret_use": "ignore",
+     "pre": [
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rsi, qword ptr [rcx]",
+      "mov rcx, rdx",
+      "mov rdx, rax"
+     ],
+     "post": [
+      "mov rcx, rbx",
+      "lea rdx, [rbp + 0x40]",
+      "call 0x1efcd0"
+     ]
+    }
+   ]
+  },
+  "17": {
+   "sites": 9,
+   "plugins": 4,
+   "ret_use": {
+    "ignore": 4
+   },
+   "samples": [
+    {
+     "plugin": "block18955_PE.bin",
+     "func": "0x48b640",
+     "site": "0x48b90d",
+     "ret_use": "ignore",
+     "pre": [
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rbx, qword ptr [rcx]",
+      "mov rcx, rdx",
+      "mov rdx, rax"
+     ],
+     "post": [
+      "mov rcx, qword ptr [rbp + 0x38]",
+      "call 0x93d0",
+      "mov rax, qword ptr [rbp + 0xa0]"
+     ]
+    },
+    {
+     "plugin": "block19166_PE.bin",
+     "func": "0x39b910",
+     "site": "0x39bc21",
+     "ret_use": "ignore",
+     "pre": [
+      "xor r9, r9",
+      "mov r10, qword ptr [rbp + 0xa8]",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "nop ",
+      "mov rcx, qword ptr [rbp + 0xa8]",
+      "call 0x92b0"
+     ]
+    },
+    {
+     "plugin": "block19217_PE.bin",
+     "func": "0x39a140",
+     "site": "0x39a451",
+     "ret_use": "ignore",
+     "pre": [
+      "xor r9, r9",
+      "mov r10, qword ptr [rbp + 0xa8]",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "nop ",
+      "mov rcx, qword ptr [rbp + 0xa8]",
+      "call 0x92b0"
+     ]
+    },
+    {
+     "plugin": "block23617_PE.bin",
+     "func": "0x45fe40",
+     "site": "0x4606c2",
+     "ret_use": "ignore",
+     "pre": [
+      "xor r9, r9",
+      "mov r10, qword ptr [rbp + 0xc0]",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rcx, qword ptr [rbp + 0xc0]",
+      "call 0x93d0",
+      "xor eax, eax"
+     ]
+    }
+   ]
+  },
+  "27": {
+   "sites": 9,
+   "plugins": 3,
+   "ret_use": {
+    "ignore": 3
+   },
+   "samples": [
+    {
+     "plugin": "block19091_PE.bin",
+     "func": "0x46e9f0",
+     "site": "0x46fa3c",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 0x1b",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 0x1090",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "jmp 0x46fa73",
+      "mov rax, qword ptr [rbp + 0x170]",
+      "mov rax, qword ptr [rax + 0xbc]"
+     ]
+    },
+    {
+     "plugin": "block21206_PE.bin",
+     "func": "0x3b50a0",
+     "site": "0x3b58af",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r10, qword ptr [rbp + 0xd0]",
+      "movsxd r10, dword ptr [r10 + 0x138]",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rax, qword ptr [rbp + 0xd0]",
+      "lea rax, [rax + 0x184]",
+      "mov qword ptr [rbp + 0x38], rax"
+     ]
+    },
+    {
+     "plugin": "block23676_PE.bin",
+     "func": "0x46e850",
+     "site": "0x46f89c",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 0x1b",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 0x1090",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "jmp 0x46f8d3",
+      "mov rax, qword ptr [rbp + 0x170]",
+      "mov rax, qword ptr [rax + 0xbc]"
+     ]
+    }
+   ]
+  },
+  "8": {
+   "sites": 8,
+   "plugins": 4,
+   "ret_use": {
+    "ignore": 4
+   },
+   "samples": [
+    {
+     "plugin": "block18914_PE.bin",
+     "func": "0x2a8360",
+     "site": "0x2a8514",
+     "ret_use": "ignore",
+     "pre": [
+      "movsxd r9, esi",
+      "movsxd rdi, edi",
+      "mov qword ptr [rsp + 0x20], rdi",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "nop ",
+      "lea rcx, [rbp + 0x48]",
+      "call 0xe750"
+     ]
+    },
+    {
+     "plugin": "block19091_PE.bin",
+     "func": "0x46c440",
+     "site": "0x46d02d",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 8",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 0xfff",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "jmp 0x46d30e",
+      "mov rax, qword ptr [rbp + 0x38]",
+      "cmp byte ptr [rax + 0x506c], 0"
+     ]
+    },
+    {
+     "plugin": "block19220_PE.bin",
+     "func": "0x54ad70",
+     "site": "0x54ada5",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 8",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 0xfff",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "jmp 0x54adb9",
+      "mov rcx, rbx",
+      "xor edx, edx"
+     ]
+    },
+    {
+     "plugin": "block21206_PE.bin",
+     "func": "0x3b74e0",
+     "site": "0x3b7532",
+     "ret_use": "ignore",
+     "pre": [
+      "sub r10d, 1",
+      "movsxd r10, r10d",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rax, qword ptr [rbp + 0x70]",
+      "mov eax, dword ptr [rax + 0x13c]",
+      "cmp eax, dword ptr [rbp + 0x78]"
+     ]
+    }
+   ]
+  },
+  "10": {
+   "sites": 8,
+   "plugins": 4,
+   "ret_use": {
+    "store": 1,
+    "ignore": 3
+   },
+   "samples": [
+    {
+     "plugin": "block22433_PE.bin",
+     "func": "0x4529c0",
+     "site": "0x452b61",
+     "ret_use": "store",
+     "pre": [
+      "xor r9, r9",
+      "mov r10, qword ptr [rip + 0x74b0f]",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "lea rax, [rbp + 0x98]",
+      "mov qword ptr [rbp + 0x80], rax",
+      "mov byte ptr [rbp + 0x88], 0xa"
+     ]
+    },
+    {
+     "plugin": "block23606_PE.bin",
+     "func": "0x3c9fe0",
+     "site": "0x3ca130",
+     "ret_use": "ignore",
+     "pre": [
+      "mov qword ptr [rsp + 0x20], rax",
+      "mov rax, qword ptr [rcx]",
+      "mov rcx, rdx",
+      "mov rdx, r10"
+     ],
+     "post": [
+      "mov rax, qword ptr [rbp + 0x38]",
+      "mov rax, qword ptr [rax + 0xcd4]",
+      "mov rcx, qword ptr [rax + 0xbc]"
+     ]
+    },
+    {
+     "plugin": "block23662_PE.bin",
+     "func": "0x3686d0",
+     "site": "0x369143",
+     "ret_use": "ignore",
+     "pre": [
+      "xor r9, r9",
+      "mov r10, qword ptr [rbp + 0x130]",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rax, qword ptr [rbp + 0xe0]",
+      "mov rax, qword ptr [rax + 0x718]",
+      "mov qword ptr [rbp + 0xc8], rax"
+     ]
+    },
+    {
+     "plugin": "block23663_PE.bin",
+     "func": "0x446ce0",
+     "site": "0x446eaa",
+     "ret_use": "ignore",
+     "pre": [
+      "xor r9, r9",
+      "lea r10, [rbp + 0x90]",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "jmp 0x447101",
+      "mov rax, qword ptr [rbp + 0x30]",
+      "cmp byte ptr [rax + 0x134], 0"
+     ]
+    }
+   ]
+  },
+  "61": {
+   "sites": 8,
+   "plugins": 4,
+   "ret_use": {
+    "reg": 3,
+    "store": 1
+   },
+   "samples": [
+    {
+     "plugin": "block18797_PE.bin",
+     "func": "0x4066a0",
+     "site": "0x406713",
+     "ret_use": "reg",
+     "pre": [
+      "mov r8d, 0x3d",
+      "mov r9d, 4",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "lea rcx, [rbp + 0x1e8]",
+      "mov rdx, rax",
+      "call 0x1c5f0"
+     ]
+    },
+    {
+     "plugin": "block18955_PE.bin",
+     "func": "0x37fa90",
+     "site": "0x37fb03",
+     "ret_use": "reg",
+     "pre": [
+      "mov r8d, 0x3d",
+      "mov r9d, 4",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "lea rcx, [rbp + 0x1e8]",
+      "mov rdx, rax",
+      "call 0x1b670"
+     ]
+    },
+    {
+     "plugin": "block18992_PE.bin",
+     "func": "0x382db0",
+     "site": "0x382e23",
+     "ret_use": "reg",
+     "pre": [
+      "mov r8d, 0x3d",
+      "mov r9d, 4",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "lea rcx, [rbp + 0x1e8]",
+      "mov rdx, rax",
+      "call 0x1b670"
+     ]
+    },
+    {
+     "plugin": "block19166_PE.bin",
+     "func": "0x398370",
+     "site": "0x398506",
+     "ret_use": "store",
+     "pre": [
+      "mov r8d, 0x3d",
+      "mov r9d, 4",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov qword ptr [rbp + 0x1d0], rax",
+      "lea rcx, [rbp + 0x1f0]",
+      "mov rdx, qword ptr [rbp + 0x1d0]"
+     ]
+    }
+   ]
+  },
+  "13": {
+   "sites": 7,
+   "plugins": 4,
+   "ret_use": {
+    "ignore": 4
+   },
+   "samples": [
+    {
+     "plugin": "block18797_PE.bin",
+     "func": "0x405260",
+     "site": "0x40535b",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 0xd",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rax, qword ptr [rip + 0xd52ec]",
+      "mov rax, qword ptr [rax + 0x10]",
+      "mov qword ptr [rbp + 0x50], rax"
+     ]
+    },
+    {
+     "plugin": "block19220_PE.bin",
+     "func": "0x383a50",
+     "site": "0x383b4b",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 0xd",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rax, qword ptr [rip + 0x272b0c]",
+      "mov rax, qword ptr [rax + 0x10]",
+      "mov qword ptr [rbp + 0x50], rax"
+     ]
+    },
+    {
+     "plugin": "block19258_PE.bin",
+     "func": "0x36f600",
+     "site": "0x36f6fb",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 0xd",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rax, qword ptr [rip + 0x143f44]",
+      "mov rax, qword ptr [rax + 0x10]",
+      "mov qword ptr [rbp + 0x50], rax"
+     ]
+    },
+    {
+     "plugin": "block19259_PE.bin",
+     "func": "0x2f57f0",
+     "site": "0x2f58eb",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 0xd",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rax, qword ptr [rip + 0x6ac8c]",
+      "mov rax, qword ptr [rax + 0x10]",
+      "mov qword ptr [rbp + 0x50], rax"
+     ]
+    }
+   ]
+  },
+  "20": {
+   "sites": 7,
+   "plugins": 4,
+   "ret_use": {
+    "ignore": 4
+   },
+   "samples": [
+    {
+     "plugin": "block21182_PE.bin",
+     "func": "0x3019f0",
+     "site": "0x301b12",
+     "ret_use": "ignore",
+     "pre": [
+      "mov qword ptr [rsp + 0x20], 0x59",
+      "mov rbx, qword ptr [rcx]",
+      "mov rcx, rdx",
+      "mov rdx, rax"
+     ],
+     "post": [
+      "lea rsp, [rbp + 0x60]",
+      "pop rbx",
+      "pop rsi"
+     ]
+    },
+    {
+     "plugin": "block21297_PE.bin",
+     "func": "0x32dec0",
+     "site": "0x32df29",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r9, qword ptr [r9 + 0x8d0]",
+      "movsxd r9, dword ptr [r9 + 0x3b0]",
+      "mov qword ptr [rsp + 0x20], 0x7f",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "jmp 0x32df99",
+      "mov rcx, rbx",
+      "mov edx, 0x40"
+     ]
+    },
+    {
+     "plugin": "block23606_PE.bin",
+     "func": "0x3d3660",
+     "site": "0x3d3850",
+     "ret_use": "ignore",
+     "pre": [
+      "mov qword ptr [rsp + 0x20], 0x80",
+      "mov rbx, qword ptr [rcx]",
+      "mov rcx, rdx",
+      "mov rdx, rax"
+     ],
+     "post": [
+      "jmp 0x3d3bbb",
+      "mov rax, qword ptr [rbp + 0x38]",
+      "mov rax, qword ptr [rax + 0xc04]"
+     ]
+    },
+    {
+     "plugin": "block23644_PE.bin",
+     "func": "0x31c240",
+     "site": "0x31c275",
+     "ret_use": "ignore",
+     "pre": [
+      "movsxd r9, r9d",
+      "mov qword ptr [rsp + 0x20], r9",
+      "mov rax, qword ptr [rax]",
+      "mov r9, r10"
+     ],
+     "post": [
+      "mov rcx, rsi",
+      "mov edx, ebx",
+      "call 0x319d50"
+     ]
+    }
+   ]
+  },
+  "34": {
+   "sites": 6,
+   "plugins": 4,
+   "ret_use": {
+    "ignore": 4
+   },
+   "samples": [
+    {
+     "plugin": "block19091_PE.bin",
+     "func": "0x473020",
+     "site": "0x4730a8",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 0x22",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "lea rsp, [rbp + 0x48]",
+      "pop rbx",
+      "pop rbp"
+     ]
+    },
+    {
+     "plugin": "block19220_PE.bin",
+     "func": "0x553b50",
+     "site": "0x553bb4",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 0x22",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "add rsp, 0x28",
+      "pop rbx",
+      "pop rsi"
+     ]
+    },
+    {
+     "plugin": "block23676_PE.bin",
+     "func": "0x472fd0",
+     "site": "0x473058",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 0x22",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "lea rsp, [rbp + 0x48]",
+      "pop rbx",
+      "pop rbp"
+     ]
+    },
+    {
+     "plugin": "block24155_PE.bin",
+     "func": "0x552dd0",
+     "site": "0x552e34",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 0x22",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "add rsp, 0x28",
+      "pop rbx",
+      "pop rsi"
+     ]
+    }
+   ]
+  },
+  "37": {
+   "sites": 6,
+   "plugins": 4,
+   "ret_use": {
+    "ignore": 3,
+    "store": 1
+   },
+   "samples": [
+    {
+     "plugin": "block18955_PE.bin",
+     "func": "0x4813f0",
+     "site": "0x481481",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r9d, 3",
+      "lea r10, [rbp + 0x38]",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rcx, qword ptr [rbx + 0x158]",
+      "movsd xmm1, qword ptr [rbp + 0x48]",
+      "call 0x22c040"
+     ]
+    },
+    {
+     "plugin": "block18986_PE.bin",
+     "func": "0x2a2bd0",
+     "site": "0x2a2c0b",
+     "ret_use": "store",
+     "pre": [
+      "mov r9, 0xffffffff80000002",
+      "lea r10, [rbp + 0x30]",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "movsd xmm0, qword ptr [rbp + 0x30]",
+      "call 0x9ce0",
+      "mov dword ptr [rbx + 0x124], eax"
+     ]
+    },
+    {
+     "plugin": "block23638_PE.bin",
+     "func": "0x31b290",
+     "site": "0x31b2d9",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r9d, 0x40000000",
+      "lea r10, [rbp + 0x60]",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "cvtss2sd xmm0, dword ptr [rsi + 0x7c0]",
+      "movsd xmm1, qword ptr [rbp + 0x60]",
+      "mulsd xmm1, xmm0"
+     ]
+    },
+    {
+     "plugin": "block23674_PE.bin",
+     "func": "0x3310a0",
+     "site": "0x3310e3",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r9d, 1",
+      "lea r10, [rbp + 0x30]",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "jmp 0x33110f",
+      "mov rax, qword ptr [rbx + 0xbc]",
+      "mov rcx, rax"
+     ]
+    }
+   ]
+  },
+  "67": {
+   "sites": 6,
+   "plugins": 4,
+   "ret_use": {
+    "ignore": 4
+   },
+   "samples": [
+    {
+     "plugin": "block18992_PE.bin",
+     "func": "0x475550",
+     "site": "0x4762ed",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r10, qword ptr [rbp + 0x1e0]",
+      "movsx r10, byte ptr [r10 + 0x50d]",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rcx, qword ptr [rbp + 0xf8]",
+      "call 0x482070",
+      "mov rcx, qword ptr [rbp + 0xf8]"
+     ]
+    },
+    {
+     "plugin": "block19091_PE.bin",
+     "func": "0x46e9f0",
+     "site": "0x46fbec",
+     "ret_use": "ignore",
+     "pre": [
+      "sete r10b",
+      "movsx r10, r10b",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "jmp 0x46fc37",
+      "nop ",
+      "nop "
+     ]
+    },
+    {
+     "plugin": "block19166_PE.bin",
+     "func": "0x38fd00",
+     "site": "0x3904ea",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 0x43",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 1",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "nop ",
+      "lea rcx, [rbp + 0x38]",
+      "mov edx, 4"
+     ]
+    },
+    {
+     "plugin": "block19217_PE.bin",
+     "func": "0x38eda0",
+     "site": "0x38f696",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 0x43",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 1",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "nop ",
+      "lea rcx, [rbp + 0x38]",
+      "mov edx, 4"
+     ]
+    }
+   ]
+  },
+  "90": {
+   "sites": 6,
+   "plugins": 4,
+   "ret_use": {
+    "ignore": 4
+   },
+   "samples": [
+    {
+     "plugin": "block21148_PE.bin",
+     "func": "0x337f90",
+     "site": "0x33844d",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 0x5a",
+      "mov r9, qword ptr [rip + 0x5ab47]",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "jmp 0x33851f",
+      "mov rax, qword ptr [rbp + 0x38]",
+      "mov rcx, qword ptr [rax + 0xc4]"
+     ]
+    },
+    {
+     "plugin": "block21194_PE.bin",
+     "func": "0x32e670",
+     "site": "0x32e9ff",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 0x5a",
+      "mov r9, qword ptr [rip + 0x5ab05]",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "jmp 0x32ea0c",
+      "mov eax, 1",
+      "mov qword ptr [rbp + 0x58], rax"
+     ]
+    },
+    {
+     "plugin": "block23634_PE.bin",
+     "func": "0x32d160",
+     "site": "0x32d50d",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 0x5a",
+      "mov r9, qword ptr [rip + 0x58997]",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "nop ",
+      "lea rcx, [rbp + 0x58]",
+      "call 0xfa40"
+     ]
+    },
+    {
+     "plugin": "block23636_PE.bin",
+     "func": "0x334570",
+     "site": "0x334922",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 0x5a",
+      "mov r9, qword ptr [rip + 0x5aad2]",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rax, r13",
+      "lea rsp, [rbp + 0x60]",
+      "pop rbx"
+     ]
+    }
+   ]
+  },
+  "0": {
+   "sites": 5,
+   "plugins": 4,
+   "ret_use": {
+    "ignore": 4
+   },
+   "samples": [
+    {
+     "plugin": "block19091_PE.bin",
+     "func": "0x39c450",
+     "site": "0x39c4d3",
+     "ret_use": "ignore",
+     "pre": [
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rbx, qword ptr [rcx]",
+      "mov rcx, rdx",
+      "mov rdx, rax"
+     ],
+     "post": [
+      "add rsp, 0x28",
+      "pop rbx",
+      "pop rsi"
+     ]
+    },
+    {
+     "plugin": "block21206_PE.bin",
+     "func": "0x3b2880",
+     "site": "0x3b28fb",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r9, qword ptr [r9 + 0x18]",
+      "movsxd r10, dword ptr [rbp + 0x4c]",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "lea rsp, [rbp + 0x50]",
+      "pop rbp",
+      "ret "
+     ]
+    },
+    {
+     "plugin": "block23648_PE.bin",
+     "func": "0x4ac900",
+     "site": "0x4ac988",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r9, qword ptr [r9 + 0x18]",
+      "movsxd r10, dword ptr [rbp + 0x4c]",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "lea rsp, [rbp + 0x50]",
+      "pop rbp",
+      "ret "
+     ]
+    },
+    {
+     "plugin": "block23676_PE.bin",
+     "func": "0x39c2a0",
+     "site": "0x39c323",
+     "ret_use": "ignore",
+     "pre": [
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rbx, qword ptr [rcx]",
+      "mov rcx, rdx",
+      "mov rdx, rax"
+     ],
+     "post": [
+      "add rsp, 0x28",
+      "pop rbx",
+      "pop rsi"
+     ]
+    }
+   ]
+  },
+  "5": {
+   "sites": 5,
+   "plugins": 4,
+   "ret_use": {
+    "ignore": 4
+   },
+   "samples": [
+    {
+     "plugin": "block19019_PE.bin",
+     "func": "0x3062f0",
+     "site": "0x30655c",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 5",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 1",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rax, qword ptr [rbp + 0x80]",
+      "mov rax, qword ptr [rax + 0xbc]",
+      "mov rcx, rax"
+     ]
+    },
+    {
+     "plugin": "block19091_PE.bin",
+     "func": "0x46c440",
+     "site": "0x46cb9d",
+     "ret_use": "ignore",
+     "pre": [
+      "setge r10b",
+      "movsx r10, r10b",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rcx, qword ptr [rbp + 0x38]",
+      "xor edx, edx",
+      "call 0x474200"
+     ]
+    },
+    {
+     "plugin": "block19304_PE.bin",
+     "func": "0x521a90",
+     "site": "0x521de6",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 5",
+      "xor r9, r9",
+      "mov qword ptr [rsp + 0x20], 1",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "jmp 0x521f40",
+      "mov rcx, qword ptr [rbp + 0x48]",
+      "mov rax, qword ptr [rbp + 0x38]"
+     ]
+    },
+    {
+     "plugin": "block23676_PE.bin",
+     "func": "0x46c2a0",
+     "site": "0x46c9fd",
+     "ret_use": "ignore",
+     "pre": [
+      "setge r10b",
+      "movsx r10, r10b",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rcx, qword ptr [rbp + 0x38]",
+      "xor edx, edx",
+      "call 0x4741b0"
+     ]
+    }
+   ]
+  },
+  "9": {
+   "sites": 5,
+   "plugins": 3,
+   "ret_use": {
+    "ignore": 3
+   },
+   "samples": [
+    {
+     "plugin": "block19091_PE.bin",
+     "func": "0x46e9f0",
+     "site": "0x46efc7",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r10, qword ptr [r10 + 0x5050]",
+      "movsxd r10, dword ptr [r10 + 0x780]",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rcx, qword ptr [rbp + 0x170]",
+      "mov rax, qword ptr [rbp + 0x170]",
+      "mov rax, qword ptr [rax + 0x5050]"
+     ]
+    },
+    {
+     "plugin": "block23606_PE.bin",
+     "func": "0x3c9120",
+     "site": "0x3c9200",
+     "ret_use": "ignore",
+     "pre": [
+      "mov qword ptr [rsp + 0x20], rdi",
+      "mov rbx, qword ptr [rcx]",
+      "mov rcx, rdx",
+      "mov rdx, rax"
+     ],
+     "post": [
+      "add rsp, 0x28",
+      "pop rbx",
+      "pop rsi"
+     ]
+    },
+    {
+     "plugin": "block23676_PE.bin",
+     "func": "0x46e850",
+     "site": "0x46ee27",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r10, qword ptr [r10 + 0x5050]",
+      "movsxd r10, dword ptr [r10 + 0x780]",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rcx, qword ptr [rbp + 0x170]",
+      "mov rax, qword ptr [rbp + 0x170]",
+      "mov rax, qword ptr [rax + 0x5050]"
+     ]
+    }
+   ]
+  },
+  "18": {
+   "sites": 5,
+   "plugins": 4,
+   "ret_use": {
+    "reg": 4
+   },
+   "samples": [
+    {
+     "plugin": "block18797_PE.bin",
+     "func": "0x4071e0",
+     "site": "0x4072b4",
+     "ret_use": "reg",
+     "pre": [
+      "mov r10d, dword ptr [rbp + 0x54]",
+      "movsxd r10, r10d",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rbx, rax",
+      "test rbx, rbx",
+      "je 0x407346"
+     ]
+    },
+    {
+     "plugin": "block18914_PE.bin",
+     "func": "0x29f9e0",
+     "site": "0x29fab4",
+     "ret_use": "reg",
+     "pre": [
+      "mov r10d, dword ptr [rbp + 0x54]",
+      "movsxd r10, r10d",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rbx, rax",
+      "test rbx, rbx",
+      "je 0x29fb46"
+     ]
+    },
+    {
+     "plugin": "block18916_PE.bin",
+     "func": "0x312930",
+     "site": "0x312a04",
+     "ret_use": "reg",
+     "pre": [
+      "mov r10d, dword ptr [rbp + 0x54]",
+      "movsxd r10, r10d",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rbx, rax",
+      "test rbx, rbx",
+      "je 0x312a96"
+     ]
+    },
+    {
+     "plugin": "block18953_PE.bin",
+     "func": "0x2c8720",
+     "site": "0x2c87f4",
+     "ret_use": "reg",
+     "pre": [
+      "mov r10d, dword ptr [rbp + 0x54]",
+      "movsxd r10, r10d",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov rbx, rax",
+      "test rbx, rbx",
+      "je 0x2c8886"
+     ]
+    }
+   ]
+  },
+  "19": {
+   "sites": 5,
+   "plugins": 4,
+   "ret_use": {
+    "ignore": 2,
+    "test": 2
+   },
+   "samples": [
+    {
+     "plugin": "block18955_PE.bin",
+     "func": "0x47fed0",
+     "site": "0x480251",
+     "ret_use": "ignore",
+     "pre": [
+      "mov qword ptr [rsp + 0x20], 0x30",
+      "mov rax, qword ptr [rcx]",
+      "mov rcx, rdx",
+      "mov rdx, r10"
+     ],
+     "post": [
+      "mov rax, qword ptr [rbp + 0x48]",
+      "mov eax, dword ptr [rax + 0x41c]",
+      "test eax, eax"
+     ]
+    },
+    {
+     "plugin": "block19262_PE.bin",
+     "func": "0x361420",
+     "site": "0x3614b1",
+     "ret_use": "test",
+     "pre": [
+      "mov qword ptr [rsp + 0x20], 0x24",
+      "mov rbx, qword ptr [rcx]",
+      "mov rcx, rdx",
+      "mov rdx, rax"
+     ],
+     "post": [
+      "cmp rax, 6",
+      "jne 0x36151f",
+      "mov rax, qword ptr [rbp + 0x30]"
+     ]
+    },
+    {
+     "plugin": "block19304_PE.bin",
+     "func": "0x524140",
+     "site": "0x524338",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r8d, 0x13",
+      "mov r9, qword ptr [rbp + 0x38]",
+      "mov qword ptr [rsp + 0x20], 0x40",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov byte ptr [rbp + 0x7f], 0",
+      "jmp 0x524344",
+      "mov byte ptr [rbp + 0x7f], 1"
+     ]
+    },
+    {
+     "plugin": "block23617_PE.bin",
+     "func": "0x473100",
+     "site": "0x473563",
+     "ret_use": "test",
+     "pre": [
+      "mov r9, rax",
+      "mov qword ptr [rsp + 0x20], 0x13",
+      "mov rax, qword ptr [rcx]",
+      "mov rcx, r10"
+     ],
+     "post": [
+      "sub eax, 2",
+      "test eax, eax",
+      "je 0x473618"
+     ]
+    }
+   ]
+  },
+  "21": {
+   "sites": 5,
+   "plugins": 4,
+   "ret_use": {
+    "ignore": 4
+   },
+   "samples": [
+    {
+     "plugin": "block21297_PE.bin",
+     "func": "0x32dec0",
+     "site": "0x32df73",
+     "ret_use": "ignore",
+     "pre": [
+      "mov r9, qword ptr [r9 + 0x8d0]",
+      "movsxd r9, dword ptr [r9 + 0x3b0]",
+      "mov qword ptr [rsp + 0x20], 0",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "mov dword ptr [rbx + 0xc8c], 0xffffffff",
+      "mov rax, qword ptr [rbx + 0xc4]",
+      "mov rax, qword ptr [rax + 0xa20]"
+     ]
+    },
+    {
+     "plugin": "block23606_PE.bin",
+     "func": "0x3d4030",
+     "site": "0x3d40bd",
+     "ret_use": "ignore",
+     "pre": [
+      "mov qword ptr [rsp + 0x20], 0xffffffffffffffff",
+      "mov rsi, qword ptr [rcx]",
+      "mov rcx, rdx",
+      "mov rdx, rax"
+     ],
+     "post": [
+      "mov rax, qword ptr [rbp + 0x38]",
+      "movzx rcx, byte ptr [rax + 0xae1]",
+      "cmp cl, 7"
+     ]
+    },
+    {
+     "plugin": "block23648_PE.bin",
+     "func": "0x4b2680",
+     "site": "0x4b26cf",
+     "ret_use": "ignore",
+     "pre": [
+      "movsxd r9, dword ptr [rbp + 0x60]",
+      "movsxd r10, dword ptr [rbp + 0x68]",
+      "mov qword ptr [rsp + 0x20], r10",
+      "mov rax, qword ptr [rax]"
+     ],
+     "post": [
+      "lea rsp, [rbp + 0x40]",
+      "pop rbp",
+      "ret "
+     ]
+    },
+    {
+     "plugin": "block23658_PE.bin",
+     "func": "0x355e50",
+     "site": "0x355f34",
+     "ret_use": "ignore",
+     "pre": [
+      "mov qword ptr [rsp + 0x20], 0xffffffffffffffff",
+      "mov rbx, qword ptr [rcx]",
+      "mov rcx, rdx",
+      "mov rdx, rax"
+     ],
+     "post": [
+      "lea rcx, [rbp + 0x2058]",
+      "mov rax, qword ptr [rbp + 0x2090]",
+      "mov rax, qword ptr [rax + 0x7f0]"
+     ]
+    }
+   ]
+  }
+ }
+}

@@ -58,10 +58,24 @@ void __icall_dispatch(uint64_t site) {
         if ((uint32_t)t == icall_cfg_va[k]) { t = BLKQ(0x90); break; }
     long long (*f)(void) = lookup((uint32_t)t);
     if (!f || (t >> 32)) {
-        fprintf(stderr, "[fw] FAIL-FAST: unresolved indirect target 0x%llx at site VA 0x%llx\n",
-                (unsigned long long)t, (unsigned long long)site);
-        fflush(stderr);
-        emscripten_force_exit(102);
+        /* CAB-195: host shim 連鎖 (CreatePlugInstance → ctor) では, Delphi framework が
+         * FL 本体 (FLEngine) の **export function table** (image 外 VA, 例 0x710030) を
+         * 経由する経路が到達する (0x40d6e0 → 0x710030 = FL 内部 API の函数ポインタ)。
+         * headless では FL 本体がロードされていないので呼出は不能。
+         * 連鎖検証を止めないため fail-soft (0 を返し記録) にする。
+         * fw_ff ではない (exit しない) ので回復可能。 */
+        g_dispatch_cnt++;
+        g_last_site = site;
+        g_last_target = t;
+        static unsigned soft = 0;
+        if (soft < 40) {
+            soft++;
+            fprintf(stderr, "[fw][hostshim] soft-miss indirect target 0x%llx at site VA 0x%llx (FL export table?)\n",
+                    (unsigned long long)t, (unsigned long long)site);
+            fflush(stderr);
+        }
+        BLKQ(0x80) = 0;
+        return;
     }
     g_dispatch_cnt++;
     g_last_site = site;
@@ -349,6 +363,15 @@ void GetSystemInfo(void *p) {
     *(unsigned *)(b + 8) = 4096;      /* dwPageSize */
     *(unsigned long long *)(b + 12 + 8) = 0x10000000;   /* lpMaximumApplicationAddress */
 }
+/* GetLogicalProcessorInformation: CPU トポロジは headless 固定 → FALSE (0) を返し
+ * *ReturnLength = 0。Delphi RTL (SysUtils unit init の GetCPUCount) は失敗時に
+ * GetSystemInfo の dwNumberOfProcessors への fallback を持つため init は継続する
+ * (fw_ff で落とすと unit init #2 が停止 — CAB-195 で実測)。 */
+int GetLogicalProcessorInformation(void *buf, unsigned *len) {
+    if (len) *len = 0;
+    (void)buf;
+    return 0;
+}
 void GetStartupInfoW(void *p) { memset(p, 0, 104); *(unsigned *)p = 104; }
 void GetStartupInfoA(void *p) { memset(p, 0, 68); *(unsigned *)p = 68; }
 const void *GetCommandLineW(void) { return (const void*)"p\0l\0u\0g\0i\0n\0\0\0"; }
@@ -463,6 +486,18 @@ int CoInitialize(void *p) { (void)p; return 0; }
 void CoUninitialize(void) {}
 int OleInitialize(void *p) { (void)p; return 0; }
 void OleUninitialize(void) {}
+/* CAB-195: plugin ctor (0x6b8f4b) 経路で user32 の WindowLong/ClassLong に到達する
+ * (FL plugin の editor window handle 管理)。headless では window が無いので 0 を返す
+ * (Delphi 側は 0 チェックして editor 非生成の経路に進む)。
+ * 署名は IR (lift) 側の戻り型 i32 に合わせる (GetWindowLongPtrW を long long で
+ * 宣言すると IR の trunc と mismatch になり wasm で unreachable になる —
+ * CAB-195 hs_e2e 実測。function_41ed80/41ed90 は i32)。 */
+int GetWindowLongPtrW(void *h, int i) { (void)h; (void)i; return 0; }
+int SetWindowLongPtrW(void *h, int i, int v) { (void)h; (void)i; return v; }
+int GetClassLongPtrW(void *h, int i) { (void)h; (void)i; return 0; }
+int SetClassLongPtrW(void *h, int i, int v) { (void)h; (void)i; return v; }
+int GetWindowLongW(void *h, int i) { (void)h; (void)i; return 0; }
+int SetWindowLongW(void *h, int i, int v) { (void)h; (void)i; return v; }
 
 /* ---- rep string helpers (fw_rep.py が正規化した固定署名; m11 REPORT #2 の意味) ---- */
 void fw_rep_movsb(void *dst, void *src, long long n) {

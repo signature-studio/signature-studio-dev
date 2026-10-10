@@ -1,147 +1,186 @@
-# P0a REPORT — Delphi framework headless lift (CAB-194)
+# P0b REPORT — TFruityHost shim (CAB-195)
 
-- 日付: 2026-10-10 / 担当 dir: `tools/plugins/framework/` / 再現: `bash tools/plugins/framework/fw_stage2.sh` (stage-1 済み work から; `--fresh` で stage-2 全再生成)
-- 前提: stage-1 = `fw_lift.sh` (icall 経路 PE 書換え → RetDec 8 chunk decode → 復元 → merge)。**前回委任 (insufficient_credits で中断) の成果物を引き継ぎ** (判定 §1)。
-- 数値はすべて本 dir の `tools/plugins/work/fw/` (gitignore) で実測。推定は「推定」と明記。
+- 日付: 2026-10-11 / 担当 dir: `tools/plugins/framework/` (hostshim/) / 再現: `bash tools/plugins/framework/hostshim/hs_e2e.sh`
+- 前提: stage-1/2 = `fw_lift.sh` + `fw_stage2.sh` (CAB-194) 済み。本 script は framework 成果物を**読み取りのみ**で利用し, 書込は自 dir と `tools/plugins/work/hs/` のみ。
+- 数値はすべて `tools/plugins/work/hs/` (gitignore) で実測。推定は「推定」と明記。
 
 ## 0. 結論 (先出し)
 
 | 項目 | 結果 (実測) |
 |---|---|
-| lift closure | Balance (Fruity Balance = framework 正本) **11,736 関数 / 1.61 MB** 中 framework(≥13 DLL 共有ハッシュ) 11,659 関数 / 1.61 MB + glue 77 関数 / 23.6 KB を全量 lift |
-| IR | RetDec decode 8 chunk + decode 漏れ 2 ラウンド (990→287→206 件) → **14,034 define / 約 133 万行** |
-| wasm | emcc 通過 / node instantiate 完走 / **wasm 14.8 MB** (fw_route.wasm) |
-| headless smoke | `DllMain(DLL_PROCESS_ATTACH)` → `_StartLib` → `_InitLib` → `InitUnits` が wasm で完走、**PackageInfo 290 unit のうち 16 unit init + 16 unit finalize が完走 (dispatch 38 回) / trap 0 / ff 0**。その後 RestoreContext (Halt0 経路) 到達 — m11 方式で正常終了扱い |
-| kernel 表 (CAB-196) | 呼んでいない (本 smoke の scope 外; CreatePlugInstance も不使用) |
+| TFruityHost shim | **46 slot** 実装 (`hostshim.c`, vtable 合成 VA 0xE100000+8*slot)。slot0=Dispatcher / slot6=0x47 応答の BOOL / 残 44 slot は fail-soft + 呼出記録 |
+| Dispatcher 応答表 | **A検収上位 30 ID** (`hs_ids.json`: 133 DLL / 894 site / cover **89.8%**) を「戻り値使用クラス」実測で分類設定 — store/reg 9 ID = 非 NULL, ignore/test 21 ID = 0 |
+| ctor 連鎖 (主目的) | `CreatePlugInstance(Host, Tag)` → `TestPlug26.Create` 0x6be800 → `TDelphiFruityPlug` base ctor 0x6b8e80 に到達。Dispatcher ID 序列 **0x47, 0x56, 0x0d, 0x2e, 0x47, 0x1d** を native 順序どおり記録 (Host ポインタ伝播 = BLK+8 実測値が host オブジェクトと一致) |
+| headless smoke 拡張 | framework smoke からの **dispatcher 経由 host call 連鎖**を検証。`hs_rec` 記録 7 件 (slot0 ×6 + slot6 ×1) を `fw_hs_records()` で JS から照合 |
+| RTL ユーティリティ | lock xadd を持つ 6 関数 (refcount / DynArray / TObject list) を `hs_utl.c` の C 実装に接続 (`fw_hostfix.py` override) |
+| 回帰 (CAB-194) | framework smoke: **unit init ×16 + unit finalize ×16 / dispatch 38 / trap 0 / fail-fast 0** を維持 |
+| Eff_Render 差分 | **未実施 (次段 手順 §6)** — ctor 連鎖の完全到達が先決で本 ticket では未到達 |
+| 未達 | `TFruityPlug*` 実体生成 (instance field / vtable 照合) — RTL ハッシュ表 (0x52cf40)・名前検索 (0x40b930)・TStream (0x412fc0) の fold deref 残存が原因 (§7.1) |
 
-## 1. 引継ぎ判断 (前回中断成果物の精査)
-
-`tools/plugins/framework/` に未追跡で残っていたのは `fw_prep.py` / `fw_merge.py` / `fw_lift.sh` の 3 ファイル (24 KB, 10-10 17:25-17:27) と `work/fw/` の中間成果物。
-
-| 資産 | 状態 | 判定 |
-|---|---|---|
-| `fw_prep.py` | .pdata 全関数 (11,736) の F.ranges 生成 + FLEngine RTL landmark の位置非依存ハッシュ突合 (InitUnits/_InitLib/_StartLib/UStrAsg/RestoreContext/ApplyRelocs/FastMM_GetMem が **9/9 一意一致**) + InitUnits の InitTable global (0x714c90) 抽出 | **完成・採用** |
-| `fw_lift.sh` | icall_rewrite (11,736 関数, 6,159 site, derefix 12,658, comis 630, errors 0) → RetDec 8 chunk 並列 → 復元 → merge | **完成・採用** (実行済み, `fw*.restore.json` 合計 dispatch 5,547 / comis 626 / 未変換 0) |
-| `fw_merge.py` | m11_merge.py copy。**無名 global/metadata の chunk 間番号衝突を修正** (本研究で拡張: §4) | 採用+修正 |
-| `work/fw/` 中間物 | 8 chunk の drc.ll/restored.ll, fw_icall.dll, fw_map.json | **再利用** (再 lift 不要, 約 6 分節約) |
-
-→ **結論: 引継ぎを採用** (stage-1 がほぼ完走していたため)。クリーン再実行は不採用。ただし merge の番号衝突は本研究で発見・修正した (§4)。
-
-## 2. パイプライン (stage-2 = 本研究)
+## 1. 構成 (framework build と連鎖 build を分離する理由)
 
 ```
-fw_all8.ll (8 chunk merge)
-  → fw_round2.py (decode 漏れ .pdata 非登録 callee: 990→287→206 件, RetDec 2 ラウンド)
-  → fw_merge.py (fw_all.restored.ll: 14,034 define / 6,293 global / 8,176 declare)
-  → fw_f80.py      [f80→f64]  x86_fp80 3,688 token / i3 3,364 / 定数 30 / same-type fix 73
-  → liftlib base.normalize [CAB-49/55]  A1-A8 (A7: metadata 107 万行除去)
-  → fw_cleanup.py  [W1] %wide-string 5 件 / [W2] define 重複 declare 6,992 件削除
-  → m5 ir5_patch [A9L 命令化 / B1 / S1a 82 件 / R1 147,636 行]
-  → fw_entry_fix.py  (entry spill 修復, §5.3)
-  → fw_cab129.py     (alloca 縮退 2 関数拡大, §5.2)
-  → icall ir_flatten (global→絶対アドレス, **shift 無し**: PE VA = wasm アドレス, dispatch 表生成)
-  → liftlib simd gen [CAB-54] (--canon 正規名化)
-  → fw_table.py (dispatch 表 + import wrapper 505 本)
-  → emcc (-O0, GLOBAL_BASE=0x10000000, image は 0x400000..0xD02000 に実行時敷設)
-  → fw_run.mjs smoke
+Phase A: work/fw/fw_route.cjs (CAB-194 成果物そのまま) で framework smoke — 回帰確認
+Phase B: work/hs/hs_route.cjs (派生ビルド) で host shim 連鎖 + 呼出記録照合
 ```
 
-## 3. 実測 (smoke)
+分離理由: framework build (fw_stage2.sh) に「戻り値 store / mosaic override / constant global 可変化」を
+混入させると unit init #16 経路の分岐が変わり smoke が OOB trap する (実測)。
+そこで CAB-194 build は fw_stage2.sh に hostshim.c を**追加リンクのみ**し (動作不変)、
+連鎖検証は hs_e2e.sh が別 output (work/hs/) に組む。
 
-| 項目 | 実測 |
-|---|---|
-| smoke 経路 | `DllMain(0x400000, DLL_PROCESS_ATTACH=1)` → entry (0x6c13a0) → 0x40e120 → `_StartLib` (0x4189c0, C override) → `_InitLib` (0x40db20, C override) → `InitUnits` (0x40da80, lifted) → unit init ×16 → FinalizeUnits ×16 → RestoreContext 到達 |
-| dispatch | **38 回** (16 unit init @0x40dae6 + 16 unit finalize @0x40da42 + 6 其他) |
-| PackageInfo | **290 unit** 登録 (0x6c1430 のテーブル), unit[0].init=0x4198b0 … |
-| counter (0x714c98) | 0 (FinalizeUnits が decrement 後; init 中は 1..16 を遷移) |
-| VirtualAlloc | 1 回 (FastMM 初期化) / heap alloc 1 回 |
-| trap / fail-fast | **0 / 0** |
-| wasm | fw_route.wasm **14.8 MB** (emcc -O0, GLOBAL_BASE=0x10000000, initial 320MB) |
-| IR | 最終 1,754,280 行 / post-sigfix 1,761,016 行 (fw_flat4_canon3.ll) |
-| entry 戻り値 | rax=1 (RestoreContext 経由のため参考値) |
-| unit 16 で停止 | m11 と同様、unit 初期化中に Halt0 (GetLocaleInfoW 等 stub 品質由来と推定) — RestoreContext 到達で正常終了扱い |
+```
+work/fw/fw_flat4_canon3.ll
+  → hs_irfix.py   (CreatePlugInstance 0x6bdde0 の Host/Tag 引数経路修復)
+  → fw_retw.py    (0x6be800 の ret に BLK+0x80 store)
+  → fw_hostfix.py (mosaic/RTL override + __asm_* signature 正規化 + trap artifact 除去)
+  → fw_table.py   (dispatch 表 + hs_slot0..45 を 0xE100000.. に登録)
+  → emcc (-O0, GLOBAL_BASE=0x10000000) + hs_plug.c + hostshim.c + hs_utl.c
+  → hs_e2e.mjs    (Phase A/B 判定)
+```
 
-## 4. 本研究で新規に直した欠陥
+## 2. Dispatcher 応答表の根拠 (A検収)
 
-1. **chunk merge の無名番号衝突** — RetDec は chunk 毎に無名 global (`@N`) / metadata (`!N`) を 0 起番する。
-   旧 fw_merge (m11_merge copy) は名前毎の初出採用なので、chunk 間で**別データの同名 global が混線**し得た
-   (llvm-as が `global expected to be numbered '@18' or greater` で即検出)。fw_merge.py を「ファイル毎に
-   offset 附番してから merge」に修正 (8 chunk + r2/r3 の 10 入力を一括 offset 附番)。
-2. **decode 漏れ 990 関数** — fw_prep の F.ranges は .pdata 由来のため、decode 済み関数から参照される
-   .pdata 非登録関数が define 無しで残った (m11 closure 漏れ (a) 同根)。fw_round2.py で 2 ラウンドの
-   追加 decode を実施 (990→287→206。残 206 は fail-fast stub で可視化)。
-3. **LLVM 21 で廃止された constexpr** — `zext (i32 ptrtoint ...)` 等 1,607 site。m5 ir5_patch の
-   A9L 命令化で解消 (m5 は OTT/FLEngine で実績のある既存 pass を無改変で利用)。
-4. **`%wide-string` 未定義参照** — RetDec artifact (`global [N x i16] %wide-string`)。liftlib A5 は
-   `constant` のみ対応のため、`fw_cleanup.py` で `global` も zeroinitializer 化 (5 件)。
+### 2.1 slot VAs
+`inventory/delphi_vmt.py` の block00031 FLE VMT 0x1314108 再生成値 (2026-10-10 実測)。
+`ClassName=TFruityHost`, `InstanceSize=296`, vtable = VMT+0x70, 46 slot (offset 0x00..0x168)。
+**slot0 = Dispatcher = 0x13173a0** で CAB-12 A検収確定値と一致。再抽出は `hs_vtable_gen.py`
+(`python3 hs_vtable_gen.py <FLEngine_PE>`, VMT/ClassName/InstanceSize/slot0 を assert —— FLE PE は win64 解析素材外のため本回は未実行、ABI.md §2.3 確定値を使用)。
 
-## 5. M11 既知欠陥クラスへの対策 (依頼事項: REPORT 明記)
+### 2.2 上位 30 ID の ret_use 実測 (`hs_ids.py`, top30 = 778/894 site = 89.8%)
 
-### 5.1 間接 call (D1) — **icall 経路で解消済み**
-- RetDec は間接 call/jmp を decoder 段で捨てる (Balance closure は実測 100% 落ち)。tools/icall の
-  binary pre-rewrite (site → memory-ABI BLK store + stub call) → RetDec → `ir_icall_restore` (stub →
-  `__icall_dispatch(site_va)`) で復元。**Balance 6,159 site 全復元 / 未変換 0**。
-- Delphi RTL/VCL の本質部分 (VMT 仮想呼出し `call [rbx+voff]`、InitUnits の `call [rbp+0x38]`) は
-  全てこの経路で復元される。dispatch 表は VA→lifted 関数 14,034 + import 505 本 (fw_table.py)。
-- 残制約 (integration/README §4 既知): 間接 call 経由の **5 引数目以降 (stack 渡し)** は BLK 未対応
-  ( init 経路では _StartLib→_InitLib は direct call 再接続されるため影響外; 影響時は fw_rt 側で個別拡張)。
+| ID | sites | ret_use 実測 | shim 応答 |
+|---|---|---|---|
+| 0x02 | 163 | ignore | 0 |
+| 0x21 | 118 | ignore | 0 |
+| 0x03 | 71 | ignore | 0 |
+| 0x24 | 47 | ignore | 0 |
+| **0x1d** | 44 | **store** | Host obj |
+| **0x32** | 36 | **reg** | Host obj |
+| 0x5b | 31 | ignore | 0 |
+| 0x17 | 25 | ignore | 0 |
+| **0x2e** | 24 | **store** | Host obj |
+| **0x47** | 22 | **reg** | Host obj (ctor 実測でも伝播) |
+| 0x30 / 0x1e / 0x28 / 0x26 / 0x61 / 0x3b / 0x67 / 0x11 / 0x1b / 0x08 | 20/19/16/12/12/11/10/9/9/8 | ignore | 0 |
+| **0x0e** | 12 | store+reg | Host obj |
+| 0x0d | 7 | ignore | 0 (ctor 実測: 戻り未使用) |
+| 0x14 / 0x22 / 0x43 / 0x5a / 0x00 / 0x05 / 0x09 / 0x13 / 0x15 | 7/6/6/6/5/5/5/5/5 | ignore(+test) | 0 |
+| **0x0a** | 8 | store+ignore | Host obj |
+| **0x3d** | 8 | reg+store | Host obj |
+| **0x25** | 6 | ignore+store | Host obj |
+| **0x12** | 5 | reg | Host obj |
 
-### 5.2 alloca 縮退 (CAB-129) — **静的検出 + targeted 修復**
-- 検出: 「同一関数内の定数長 fill (rep stosq / llvm.memset >64B) > 最大 alloca サイズ」を IR 全
-  14,033 関数に走査 → **2 関数が検出** (`function_43ecb0` / `function_51c2d0`, 392 B fill vs alloca 8 B)。
-  392 B = m11 の 44bb70 (0x188 レコード, rep stosq ×49) と同一サイズ = **同一 RTL 関数の Balance 版**。
-- 修復: `fw_cab129.py` が該当 alloca を `alloca [K x i64], align 8` に拡大 (opaque ptr 化後ゆえ
-  先頭 base の互換で既存参照は無影響)。
-- 汎用 pass 化は CAB-129 (In Progress, m11 担当) の担当範囲。本 dir の検出器は
-  `tools/plugins/work/fw/fw_cab129_scan.json` に証跡を残した。
+原則: **戻り値を store/保持する ID は非 NULL を返す** (deref に備える)、ignore/test は 0。
+FLE 側 case 別応答値の**意味論**は未解析 (FL 本体の case 分岐を読む必要がある) — 数値根拠は
+呼出文脈クラスのみ。次段 (T0 frontier ctor 完了後) で要確認。
 
-### 5.3 load 取り違え・home slot 落ち (CAB-231 隣接クラス) — **native 突合で 1 件修復**
-- DLL entry (0x6c13a0) で RetDec が home 用 stack slot ([rbp+0x30]/[rbp+0x3c]) を model から漏らし、
-  _StartLib 呼出しの ABI spill に**文字列定数のアドレス**を代入していた (native: r8=hinst, r9=reason を
-  capstone 実測で突合 → IR: r8 ← `@"$"`+0, r9 ← `@"$"`+0)。このままでは `_StartLib` の
-  `reason==1 (DLL_PROCESS_ATTACH)` 判定が偽になり InitUnits が空振りする (smoke の false-pass になる)。
-- `fw_entry_fix.py` が site VA 0x6c13f0 の spill block の r8/r9 を `%arg1/%arg2` に差し替え。
-- CAB-231 本体 (load_dropped 892 / spill_slot_deref 67 の IR 修復 pass, Todo) は liftdiff verdict を
-  回帰にする方針が正本。本 dir は (a) icall derefix 12,658 命令 (D7 = live-in 経由 zero-disp load 落ちの
-  PE 段回避) と (b) smoke 実走での fail-fast/突合で塞げる範囲を塞いだ。**残りは CAB-231 への引継**。
+## 3. 実測 (host shim 連鎖)
 
-### 5.4 x87 (f80) — **f64 近似で smoke を通し, 本命は CAB-196**
-- framework の f80 使用は 232 define / 3,688 token (frontend_reg_load/store 2,489 site 含む)。
-  wasm32 に f80 は無いため `fw_f80.py` で f64 に coerce (0xK 定数→0xH 変換 30 件,
-  fpext/fptrunc same-type 化 73 件は fadd 0.0 で値保存近似, i3→i32 3,364 token)。
-- **精度影響**: x87 80bit mantissa → 53bit。DSP kernel (CAB-196) では P0c の f80→f64 lowering pass が
-  本命であり, 本近似は init smoke 用の暫定。init 経路の数値系 (locale/書式) は f64 で十分と判断。
+### 3.1 e2e 判定 (`bash tools/plugins/framework/hostshim/hs_e2e.sh` → exit 0)
 
-## 6. 検証の限界 (正直な評価)
+```
+[fw] Phase A (framework smoke): Halt0/RestoreContext dispatch=38 ff=0
+[hs] CreatePlugInstance(Host=0x10fb5a50, Tag=0x54534154)
+[dispatch] site=0x6bd253 -> target=0xe100000     ← slot0, ID 0x47 (init)
+[hostshim] slot=0 id=0x47 a0=0x10000448 ... -> 0x10fb5a50
+[dispatch] site=0x6bd197 -> target=0xe100030     ← slot6 ([resp]+0x30 BOOL)
+[hostshim] slot=6 id=0x0 ... -> 0x1
+[dispatch] site=0x6bd2a4 -> target=0xe100000     ← slot0, ID 0x56 (init)
+[hostshim] slot=0 id=0x56 a0=0x10000448 ... -> 0x10fb5a50
+[dispatch] site=0x6b8f4b -> target=0xe100000     ← ★ TDelphiFruityPlug base ctor 突入
+[hostshim] slot=0 id=0xd a0=0x10fb5a50 ... -> 0x0
+[hostshim] slot=0 id=0x2e a0=0x10fb5a50 ... -> 0x10fb5a50
+[hostshim] slot=0 id=0x47 a0=0x10fb5a50 ... -> 0x10fb5a50
+[hostshim] slot=0 id=0x1d a0=0x10fb5a50 ... -> 0x10fb5a50
+[hs] E2E PASS
+```
 
-- smoke は「初期化完走」の判定のみで, unit 初期化の**値の正しさは未検証** (native 突合なし)。
-  関数単位 diff は tools/liftdiff (CAB-121) の枠組みで次段に引継。
-- import 505 本のうち実装は N 本 (fw_table.py IMPL)。未実装は呼出時に fail-fast で site 表示
-  (m11 規約)。GUI (user32/gdi32 多数) は headless 初期化で非到達のはずだが、到達したら個別実装が必要。
-- dispatch 経由の stack 引数 (5 個目以降) 未対応 (§5.1)。decode 漏れ残 206 関数は fail-fast stub。
-- f80 は f64 近似 (§5.4)。comis は icall 経路の stub+sahf (__icall_comis) で処理 (P1 pass 不要,
-  integration/README の推奨構成)。
+### 3.2 native 逆アセンブルとの対応 (capstone, block18983_PE.bin)
+
+| wasm dispatch site | native | 意味 | 検証 |
+|---|---|---|---|
+| 0x6bd253 | `mov rax,[rbp+0x30]; mov rax,[rax]; call [rax]` (r8d=0x47) | `Host.Dispatcher(Host,Tag,0x47,0,0)` | ID 一致 |
+| 0x6bd197 | `mov rax,[rbp+0x40]; mov rax,[rax]; call [rax+0x30]` (edx=0x40f) | 0x47 応答の BOOL 仮想呼出 | slot6 一致 |
+| 0x6bd2a4 | `call [rax]` (r8d=0x56) | `Host.Dispatcher(...,0x56,...)` | ID 一致 |
+| 0x6b8f4b | `call [rax]` (r8d=0x0d) | base ctor (TDelphiFruityPlug.Create) | ID 一致 |
+| 0x6b8fdd / 0x6b90ff / 0x6b9151 | `call [rax]` (r8d=0x2e / 0x47 / 0x1d) | base ctor の Continue/... | ID 一致 |
+
+### 3.3 Host ポインタ伝播
+- init 経路 (0x47/0x56 @6bd210): RetDec が「Host 引数」を定数畳み込み cell (0x24/0x10000448) に
+  落とすため a0 は host 実値でない (REPORT §5 記載どおり)。**slot6 の呼出自体**は畳み込み経路で成立。
+- ctor 経路 (0x0d/0x2e/0x47/0x1d @6b8e80): a0 = `0x10fb5a50` = `fw_hs_host_va()` 実値。
+  つまり `CreatePlugInstance(Host, Tag)` の Host が ctor 内の全 host 呼出に正しく伝播している。
+
+### 3.4 BLK-ABI 制約 (integration/README §4 継承)
+第5引数 (Dispatcher の Value = `[rsp+0x20]`) は BLK が 4 整数引数までしか運ばないため未経由。
+連鎖内の全発行 site は `Value=0` を store している (pedis.py 実測) ので動作影響なし。要対応時に拡張。
+
+## 4. 新規に直した欠陥 (すべて実測駆動)
+
+| # | 症状 | 原因 | 対処 |
+|---|---|---|---|
+| 1 | `0x40e800` で OOB | RetDec が DynArray refcount 関数の rsi/ebx を `@50`/`@49` (fold) に落とし load が極低位へ | `hs_utl_decn` C 実装に override (`fw_hostfix.py`) |
+| 2 | `0x40edb0` で OOB | `SetWideString` の Value が fold `@344` で `[@344-8]` deref | fold 値を nil として扱う override |
+| 3 | `unreachable` (function_6be800) | `@__asm_mulsd__xxx` の呼出型不整合 (declare `(i128,i128)` vs call `(i128,i64)`) → clang が `_bitcast_invalid` (本体 unreachable) を生成 | 同族名リネーム (`__xxq` など C 側の別定義へ)。**一般化**して 2973 site を正規化 |
+| 4 | `unreachable` (function_579c20) | `__readgsbyte`/`__writegsbyte` 未定義 + `llvm.trap` を本体に持つ artifact define 7 本 | fail-soft (0 返却) override |
+| 5 | `unreachable` (function_6b5290) | `GetWindowLongPtrW` を `long long` で宣言 → IR 側 i32 trunc と mismatch | fw_rt.c/h を i32 シグネチャに修正 |
+| 6 | exit(101) @0x6b8f4b | named import `SetWindowTextW` 未実装で `fw_ff` (headless 用の fail-fast) | fw_table.py の未実装 import を fail-soft (0/NULL + 記録) に |
+| 7 | `0x5c1930` / `0x5c0630` で OOB | FLE 内部 API 多段 deref が fold で OOB | fail-soft override (呼出元は結果を store するだけ) |
+| 8 | `0x40b930` / `0x40b9a0` で OOB | TComponent 名検索が fold オブジェクトの `[rcx-0x90]` deref | 「見つからない」= 0 を返す override |
+| 9 | `constant` global への store | RetDec が double 変換 temp として `@413/@414` (constant) を store → UB | 192 個の stored constant global を mutable `zeroinitializer` 化 |
+| 10 | `0x412fc0` 深い再帰 OOB → `0x461950` | TStream.Read ラッパが fold ストリームを辿って再帰 | 0 を返す override |
+| 11 | `0x52ce00` (CRC32) OOB → `0x52dba0` | TComponent.Find の name ポインタが fold | 0 を返す override |
+
+## 5. hostshim の設計
+
+- **vtable**: host オブジェクト 296B (`InstanceSize` 実測 + 余裕), vptr は合成 VA 0xE100000.. を指す。
+  import 合成 VA (0xE000000..0xE000FC0) の直上で、dispatch 表の昇順 (二分探索) を維持。
+- **呼出記録**: `hs_rec` 配列 512 件 (ring) + `fw_hs_records()`/`fw_hs_count()` を JS から照合。
+  stderr trace は既定 ON (`HOSTSHIM_TRACE=0` / `fw_hs_trace(0)` で消す)。SHIMX_TRACE 方式。
+- **scratch pool**: 誤 decode mosaic 領域の override 先用 bump allocator (1MB, wrap)。
+
+## 6. 未達: Eff_Render 差分 (次段 手順)
+
+`TFruityPlug*` 実体生成に未達のため Eff_Render 差分は未実施。次段の手順:
+
+1. **RTL ハッシュ表 (0x52cf40) の fold deref 解消** — native: 「CRC32(name) バケット巡回」。
+   wasm では name ポインタが fold 定数 → `0x52ce00` (CRC32) のバイト読取が OOB。
+   `[obj+0x38]` (name len) と `[rbp+0x78]` (name ptr) を BLK 経由で受け渡すか、
+   対象オブジェクトを `fw_hs_scratch()` に差し替える。
+2. **TComponent 名検索 (0x40b930 / 0x40b9a0)** の fold deref 解消 (同上, `[obj-0x90]` list)。
+3. `TTestPlug` instance field 照合 (ABI.md §2.1: HostTag@+0x08 / Info@+0x10=0x70e3cc / Host@+0xbc)。
+4. TFruityPlug vtable26 の Balance 実装 VA 照合 (GOLDEN.plugVtab: slot0/1/2/5/6/7)。
+5. `Eff_Render(Src, Dst, Length)` 差分 — native 実機音声 vs wasm 出力の bit/tolerance 比較。
+   (差分判定は `tools/m10` の tolerance 判定を踏襲。native poly tan の ulp 差は許容。)
+6. `GetName(Section, Index, Value, buf)` — 5 引数目 (stack buf) は BLK+0x48 拡張で対応済み。
+   戻り内容の妥当性は RetDec が Section/Index を定数化しているため記録のみ (§7.2)。
 
 ## 7. 未解決・ブロッカー
 
-1. **unit 17 以降が停止** — 290 unit 中 16 unit で Halt0 (RestoreContext 到達)。m11 の unit #18 と同根
-   (GetLocaleInfoW stub 品質 / alloca 縮退等の可能性、CAB-129 の全数調査待ち)。
-2. **dispatch 経由の stack 引数 (5 個目以降) 未対応** — _StartLib/_InitLib は C override で回避済みだが、
-   それ以外の 5+ 引数関数 (unit 内) は BLK 4 引数制限のまま。
-3. **decode 漏れ 126 関数** — fail-fast stub で可視化済み。init 経路の関数は 0 (smoke 完走で実証)。
-4. **f80 → f64 近似** — init 経路の数値計算は十分だが、DSP kernel (CAB-196) には精度不足。
-5. **named import の大半が fail-fast stub** — 552 import 中 IMPL 実装は約 100。GUI 系は headless で非到達だが、
-   到達したら個別実装が必要。
-6. **llvm-as 検証で一部命令の dominance 修正を手動適用** — ymm store 4 site の ce-chain clone。
-   汎用 pass 化は未実施。
+1. **TFruityPlug* 実体生成 (RTL fold deref 群)** — §6 の 3 段階が残。いずれも「fold オブジェクト
+   への deref」であり、hostshim 側ではなく **RetDec の引数畳み込み (CAB-231 クラス)** の課題。
+   個别 override で塞ぐか、引数復元 pass で解決するかの判断は次段。
+2. **Dispatcher ID の意味論** — 応答値 (非 NULL / 0) は呼出文脈クラスからの推定であって
+   FLE 側 case 分岐の読解ではない。`CreatePlugInstance` 完全達成後に FLE 側 0x13173a0 を解析して確定。
+3. **decode 漏れ残 206 関数** — fail-soft 化済み (init 経路は 0 で smoke 完走で実証)。
+4. **`__asm_*` signature 不整合 42 件** — rename で解消できなかった残り。`fw_hostfix` が開始時に
+   警告する。到達時は個別対処 (現状 e2e は PASS しているので非致命的)。
+5. **f80 → f64 近似** (CAB-194 から継続) — DSP kernel (CAB-196) 向けには P0c の本命 pass が必要。
+6. **llvm-as 検証の手動 dominance 修正** (CAB-194 継続) — ymm store 4 site。
 
 ## 8. ユーザ依頼事項
 
-- なし (素材は analysis/win64/extracted/block18983_PE.bin で足りた)
+- なし (Balance = `analysis/win64/extracted/block18983_PE.bin` で足りた)
+- FLEngine_x64.dll (win64) 本体を `analysis/win64/extracted/` に置いていただければ
+  `hs_vtable_gen.py` で slot VAs を再生成・assert 検証できる (現在は ABI.md §2.3 確定値を使用)。
 
 ## 9. 次タスク提案 (下流チケット案)
 
-1. CAB-196 (P0c): f80→f64 lowering pass の正式適用 + kernel 表 80 本 (本 REPORT §5.4 の近似置換)。
-2. T0 frontier 660 関数の `CreatePlugInstance` → ctor → GetName/ProcessParam 差分試験 (CAB-194 出口条件の残部)。
-3. CAB-231: liftdiff verdict 回帰の load 取り違え pass (§5.3 の残部)。
-4. Dashboard / Wave Traveller / Fruity Envelope Controller の別構成 3 本の確認 (fw_overlap.py)。
+1. **CAB-196 (P0c) 継続は読取のみ** — f80 lower / kernel 表 80 本。
+2. **CAB-196b (提案)**: RTL fold deref 解消 (RetDec 引数畳み込み pass の拡張) で
+   `CreatePlugInstance` 完全到達 → Eff_Render 差分 (§6)。
+3. **CAB-231**: liftdiff verdict 回帰の load 取り違え pass (§7.1 の根本対策)。
+4. **CAB-197 (提案)**: `TFruityHost` 残り 44 slot のうち editor 系 (slot 20 台) の実装 —
+   `ShowEditor` / `DisposeEditor` 等。hostless smoke では非到達。
+5. **CAB-198 (提案)**: `T0 frontier 660 関数` の `CreatePlugInstance` → ctor → GetName /
+   ProcessParam / Eff_Render の差分試験 (CAB-194 出口条件の残部)。

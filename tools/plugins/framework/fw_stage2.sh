@@ -358,14 +358,21 @@ fi
 [ -f fw_image.bin ] || python3 "$HERE/fw_image.py" --pe "$PE" --map fw_map.json --out fw_image.bin --imports fw_imports.json
 [ -f fw_table.c ] || python3 "$HERE/fw_table.py" --ir fw_flat4_canon3.ll --imports fw_imports.json --out fw_table.c --blk 0x8A1000
 
+# ---- 16.5 plugin 連鎖用の IR 修復は hostshim/hs_e2e.sh に分離 (CAB-195) ----
+# 本 stage-2 の成果物 (canon3) は CAB-194 の headless smoke と同一挙動を保つ。
+# CreatePlugInstance 連鎖の検証 (hs_irfix → fw_retw → fw_hostfix → emcc → e2e) は
+# hostshim/hs_e2e.sh が canon3 から派生ビルドを作って実施する (framework build に
+# 戻り値 store / mosaic override を混入させると unit init #16 経路の分岐が変わり
+# smoke が OOB trap する — 実測のため分離)。
+
 # ---- 17. emcc ----
 if [ ! -f fw_route.cjs ]; then
-  emcc fw_flat4_canon3.ll fw_simd.c fw_table.c fw_rt.c fw_boot.c \
-    -I. -I"$T/tools/liftlib/liftlib/simd" \
+  emcc fw_flat4_canon3.ll fw_simd.c fw_table.c fw_rt.c fw_boot.c "$HERE/hostshim/hostshim.c" \
+    -I. -I"$HERE/hostshim" -I"$T/tools/liftlib/liftlib/simd" \
     -w -O0 -g -ffp-contract=off -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8MB \
     -sGLOBAL_BASE=$((0x10000000)) -sENVIRONMENT=node -sMODULARIZE=1 -sEXPORT_NAME=createModule \
     -sEXIT_RUNTIME=1 -sERROR_ON_UNDEFINED_SYMBOLS=0 \
-    -sEXPORTED_FUNCTIONS=_function_6c13a0,_function_4189c0,_fw_dispatch_count,_fw_last_site,_fw_last_target,_fw_ff_count,_fw_ff_msg,_fw_va_calls,_fw_va_used,_fw_alloc_count,_fw_alloc_bytes \
+    -sEXPORTED_FUNCTIONS=_function_6c13a0,_function_4189c0,_function_6bdde0,_fw_dispatch_count,_fw_last_site,_fw_last_target,_fw_ff_count,_fw_ff_msg,_fw_va_calls,_fw_va_used,_fw_alloc_count,_fw_alloc_bytes,_fw_call_cur,_fw_hs_host,_fw_hs_host_va,_fw_hs_install,_fw_hs_fold_cell,_fw_hs_trace,_fw_hs_reset,_fw_hs_count,_fw_hs_records,_fw_hs_installed,_fw_hs_fle_impl \
     -sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAPU32,HEAPF32,HEAPF64,wasmExports \
     -Wl,--initial-memory=$((0x14000000)) -Wl,--max-memory=$((0x80000000)) \
     -o fw_route.cjs 2> emcc.log || { grep -v 'warning\|>>>\|^$' emcc.log | head -20; exit 1; }

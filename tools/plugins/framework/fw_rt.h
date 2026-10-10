@@ -84,6 +84,7 @@ int GetVersionExW(void *p);
 unsigned long long VerSetConditionMask(unsigned long long m, unsigned t, unsigned char op);
 int VerifyVersionInfoW(void *info, unsigned mask, unsigned long long cond);
 void GetSystemInfo(void *p);
+int GetLogicalProcessorInformation(void *buf, unsigned *len);
 void GetStartupInfoW(void *p);
 void GetStartupInfoA(void *p);
 const void *GetCommandLineW(void);
@@ -119,6 +120,15 @@ int CoInitialize(void *p);
 void CoUninitialize(void);
 int OleInitialize(void *p);
 void OleUninitialize(void);
+/* CAB-195: plugin ctor (0x6b8f4b) 経路で user32 の Get/SetWindowLongPtr/GetClassLongPtr に
+ * 到達する (FL plugin の editor window handle 管理)。headless では window が無いので
+ * 0 を返す (Delphi 側は 0 チェックして editor 不作成に進む経路を通る)。 */
+int GetWindowLongPtrW(void *h, int i);
+int SetWindowLongPtrW(void *h, int i, int v);
+int GetClassLongPtrW(void *h, int i);
+int SetClassLongPtrW(void *h, int i, int v);
+int GetWindowLongW(void *h, int i);
+int SetWindowLongW(void *h, int i, int v);
 
 int TlsAlloc(void);
 int TlsFree(int i);
