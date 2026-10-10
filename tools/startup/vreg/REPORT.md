@@ -6,7 +6,7 @@
 
 1. **Reg\* API は shimx `reg.c` の派生 (`vreg/src/reg.c`: 686→828 行, shimx との差分 206 行) に集約**。FLEngine が import する 12 本 (W 11 + `RegOpenKeyExA`; +delay `RegDeleteKeyExW`)、FL64.exe の 3 本、m11 init closure IR が参照する 10 本の `Reg*` は**全て定義済み**。
    shimx `reg.c` の公開 39 シンボルを全て包含 (`build.sh symcheck`: 追加 11)。shimx 既存テスト (core/sys/ole_shell MT+ST, M4 互換 ST) は vreg の reg.c で **ALL PASS**。
-2. **seed**: `data/seed.json` に 241 エントリ = REGISTRY.csv の win 値名 **229 種 (大小無視; 大小区別では 231) を 100% 被覆**。うち **77 値を起動時に書込** (apply)、164 は catalog のみ (§3)。全エントリに `confidence`(確定/推定)+`key_conf`/`value_conf`/`basis`。
+2. **seed**: `data/seed.json` に 236 エントリ (CAB-213 反映後; 初版 241) = REGISTRY.csv の win 値名 **229 種 (大小無視; 大小区別では 231) を 100% 被覆**。うち **81 値を起動時に書込** (apply; 初版 77)、155 は catalog のみ (§3, §11)。全エントリに `confidence`(確定/推定)+`key_conf`/`value_conf`/`basis`。
 3. **ライセンス (ユーザ方針「全てのライセンス機構は無力化。アクティベーションは無条件通過」の下で実施)**: 既定は registered。`HKCU/HKLM\…\Registrations\FL Studio 26.1\ILRegKey` 等 11 エントリ (apply 8) を **pinned** で書き、`observeRegistration()` (= engine `FUN_008e6150` と同じ「`FL Studio *` サブキーの ILRegKey 非空」検査) は true。
    **FLEngine 内の本検証 (`0x10c7cd0` → byte[0x14f84a8] bit0) を通るかは未確認** (値はプレースホルダ。§6)。bit0 対応の registry 状態は `licenseFlagBit0` (0=登録済み値を書く / 1=Trial: 書かず削除) で切替可、`external` で cracked 由来 `.reg` を最優先適用。
 4. **永続化**: HKCU のみを `IndexedDB` (`IdbStore`: DB `webstudio-vreg` / store `profiles` / key=profile) に JSON (`{hive:{key:{value:{t,v}}}}`) で保存し起動時復元。**headless Chrome 154 の実 IndexedDB でページ再読込を 2 回またいで検証 PASS** (`test/e2e_chrome.mjs`)。HKLM はセッション内のみ。MachineGuid はプロファイル毎に UUIDv4 を 1 回生成し永続。
@@ -20,8 +20,8 @@
 | `src/vreg.h`, `src/probe.c` | 追加面の宣言 / FL(Delphi TRegistry) と同じ呼出パターンの UTF-8 検証ヘルパ (テスト専用) |
 | `js/regfile.mjs` | `.reg` parse/serialize (UTF-16LE BOM / UTF-8 / BOM 無し UTF-16LE 復号、CRLF、継続行、全型、削除構文)、ツリーモデル |
 | `js/seed.mjs`, `js/vreg.mjs`, `js/store.mjs`, `js/cli.mjs` | seed 展開 / `Vreg` アダプタ (注入式 wasm factory + store) / `MemoryStore` `FileStore` `IdbStore` / import·export·show CLI |
-| `data/seed.json`, `keys.json`, `coverage.json` | seed (241) / REGISTRY.csv キー→具象キー (57) / 実測 coverage (テストが更新) |
-| `scripts/build_seed.py` | REGISTRY.csv + 手書き仕様 → seed.json/keys.json (決定的) |
+| `data/seed.json`, `keys.json`, `coverage.json` | seed (236) / REGISTRY.csv キー→具象キー (57) / 実測 coverage (テストが更新) |
+| `scripts/build_seed.py` | REGISTRY.csv + 手書き仕様 + key 上書き表 OVERRIDES (CAB-213 移設, §11) → seed.json/keys.json (決定的) |
 | `build.sh`, `vreg.sh`, `test/` | ビルド (`test` `shimx` `module` `symcheck`) / 1 コマンド e2e / テスト一式 |
 
 ## 2. 実装範囲
@@ -41,10 +41,10 @@ API: `flush()` `close()` `importReg(bytes|text)` `exportReg({hives, utf16le})` `
 |---|---|
 | REGISTRY.csv (win/both) の具体的値名 | 229 (大小無視) / 231 (大小区別)。除外=`(dynamic)` `#0` `(default)…` 等の非名称 22 表記。startup REPORT の「約 222」とは数え方の差と推定 (再集計根拠は未特定)。検収再試算: platform=both のみ 218 / installer+os-or-misc 除去 219 / access≠installer-W 227 等 12 通りを試算したが 222 に一致する集計法は見付からず (既定値あり 78・access含R 208 も不一致) |
 | seed が初期値を持つ値名 | **229 / 229 (100%)**, seed 欠落 0 |
-| seed エントリ (hive,key,name 単位) | 241 (HKCU 217 / HKLM 24)。apply **77** (settings 36 / os 13 / shared 12 / license 8 / paths 5 / gate 3) |
-| catalog のみ (書かない) 164 | うちキー不明 (wrapper 経由 section, low-key) **112 エントリ / 111 名**。理由: 実キーを静的に確定できず、書くと誤キーを作るため。エンジン内蔵既定で動く |
-| Reg API 経由で読めた apply 値 | 77 / 77 (値一致まで検査) |
-| 初期値がコード既定値 (ReadInt/ReadBool 第 3 引数) 由来 | 57 エントリ。残りは決定値 (Paths, OS, gate, license) または既定値不明 (`''`) |
+| seed エントリ (hive,key,name 単位) | 236 (HKCU 215 / HKLM 21)。apply **81** (settings 40 / os 13 / shared 12 / license 8 / paths 5 / gate 3) |
+| catalog のみ (書かない) 155 | うちキー不明 **3 エントリ / 3 名** (初版 low-key 112 → CAB-213 で 3; `Count` `Random seed` `clsid`)。理由: 実行時生成キーで静的に確定できず、書くと誤キーを作るため。エンジン内蔵既定で動く |
+| Reg API 経由で読めた apply 値 | 81 / 81 (値一致まで検査) |
+| 初期値がコード既定値 (ReadInt/ReadBool 第 3 引数) 由来 | 58 エントリ (`value_conf`=確定 かつ CSV 由来で数える; 同定義の初版は 57)。残りは決定値 (Paths, OS, gate, license) または既定値不明 (`''`) |
 | キー: CSV (hive,key) 47 行 → 具象キー | **57 本** (`X / Y` や `%.8x` `<ProductGUID>` を展開)。class: literal 38 / inferred 5 / installer 14 |
 | 起動後に存在するキー | 17 / 57 (literal 14, inferred 2, installer 1)。残りはエンジンが `RegCreateKeyExW` で作る/インストーラ専用/不在が正常 (`Wow6432Node`, `software\asio` 等) |
 | 全 57 具象キーの往復 (set→export UTF-16LE→[-key]削除→import→get) | **57 / 57 一致**、レジストリ全体のスナップショットも完全一致 |
@@ -57,15 +57,17 @@ CSV の key 数は startup REPORT の 46 (31/5/10) に対し本集計は 47 (33/
 
 | key_conf | value_conf | apply | 件数 | 代表 |
 |---|---|---|---|---|
-| 確定 | 確定 | ✔ | 21 | OS 8 値 (Win10 22H2), FontSubstitutes, Shared\General の既定値群 |
+| 確定 | 確定 | ✔ | 25 | OS 8 値 (Win10 22H2), FontSubstitutes, Shared\General の既定値群, CAB-213 apply 昇格 4 (Sample rate 等) |
 | 確定 | 推定 | ✔ | 15 | Paths (値=VFS 配置先), MachineGuid, ILRegKey 等 license 8, ProxyEnable |
 | 推定 | 確定 | ✔ | 38 | `FL Studio 26\General` のコード既定値 (キーが inferred-base), Keyboard Layouts |
 | 推定 | 推定 | ✔ | 3 | gate 3 値 (Browser FL CLOUD displayed / Disable FL CLOUD search / CrashLoadingStartupProject: 決定値) |
-| 確定 | 推定 | – | 20 | Token\*, Paths\FL Studio, VSTPluginsPath, 値不明の literal 名 |
-| 推定 | 確定 | – | 9 | 既定値あり・キー不明/展開キー |
-| 推定 | 推定 | – | 135 | キー不明 (low-key) かつ既定値不明 |
+| 確定 | 確定 | – | 1 | `Windows\PRForm` Grid Contrast (CAB-213 で key 確定; 既定値あり、apply 対象外) |
+| 確定 | 推定 | – | 72 | Token\*, Paths\FL Studio, VSTPluginsPath, 値不明の literal 名, CAB-213 で key 確定した値不明 catalog (Render 34 等) |
+| 推定 | 確定 | – | 5 | 既定値あり・展開キー/動的尾部キー |
+| 推定 | 推定 | – | 74 | 動的尾部キー (placeholder 付き, CAB-213) かつ既定値不明 |
+| (key=null) | 推定 | – | 3 | 確定不能 (§3 の 3 件) |
 
-合計: confidence=確定 21 / 推定 220。値名はバイナリ上の文字列リテラル由来が大半 (値名自体が推定なのは CSV の `value-name=inferred` 6 行のみ)。不確実なのは主に「どのキー(section)に属すか」と「初期値」。
+合計: 236 (apply 81 + catalog 155)、confidence=確定 26 / 推定 210 (初版 21 / 220)。key 確定 113 / key 推定 120 / key=null 3。値名はバイナリ上の文字列リテラル由来が大半 (値名自体が推定なのは CSV の `value-name=inferred` 6 行のみ)。不確実なのは主に「どのキー(section)に属すか」と「初期値」。
 
 ## 5. テスト (`bash vreg.sh` = 全 PASS, 11 秒)
 
@@ -115,4 +117,23 @@ CSV の key 数は startup REPORT の 46 (31/5/10) に対し本集計は 47 (33/
 - vreg → hostbridge 結線: `Vreg.create` を startup-glue (T1) のブートに組込み、`flush()` を message-pump (T6) の yield 点に接続 (制限 1)。
 - `0x10c7cd0` 登録パーサの解読 (入力=ILRegKey 書式, MachineGuid 依存の有無)。
 - shimx 本体への reg.c 取込 (CAB-11) と vreg の薄い層化。
-- lift 後 open ログによる low-key 112 エントリの実キー確定 → seed の key/confidence 更新 (`scripts/build_seed.py` に key 上書き表を追加すれば再生成可能)。
+- ~~low-key 112 エントリの実キー確定~~ は CAB-213 + §11 で完了 (112→3、上書き表は `scripts/build_seed.py` の OVERRIDES が正本)。残: lift 後 open ログによる推定 47 (placeholder 付き) の具体化 → OVERRIDES へ追記。
+
+## 11. CAB-213 反映: key 上書き表 OVERRIDES の正本化 (CAB-213 follow-up)
+
+**結論**: CAB-213 (74ea63b) の `tools/startup/keyfix/apply_keys.py` にあった OVERRIDES 表 (定義 115 / 一致 112) を **`scripts/build_seed.py` へ verbatim 移設**。`build_seed.py` 単独で CAB-213 の成果 (236 / apply 81 / 被覆 229/229 / key 確定 113 / key=null 3) が再現され、`vreg.sh` の seed 再生成で成果が消える二重管理は解消した。
+
+- **正本**: 以後 key 上書きは `build_seed.py` の `OVERRIDES` のみを編集する。keyfix 側の同表は履歴 (根拠は keyfix/REPORT.md §1) で正本ではない (keyfix は読取専用のため無改変)。`keyfix_e2e.sh` は build_seed → apply_keys の順を保つが、apply_keys は残 3 件 (key=null) を再照合するだけの no-op になり、seed.json はバイト不変 (実測)。
+- **実装**: `apply_overrides(out_entries)` を整列後・`seed` 組立前に適用 (整列は上書き前 key で行うため並びが CAB-213 成果物とバイト同一)。同一座標 (hive,key,name) の重複カタログ 5 件削除 (coverage テストが catalog 値の非書込を要求) と apply 昇格 4 (MIDIForm の 3 値 + Sample rate) も同ロジックで移設。実行ログ末尾に `overrides: low_key=112 defined=115 matched=112 apply_promoted=4 removed_duplicates=5 null_key_after=3` を出力。未一致の定義 3 (`FUN_00ba5650` Visible/Left/Top) は該当 low-key が無い予備定義で、verbatim 移設のため残置。
+- **再生成 diff (実測)**:
+
+| 比較 | 結果 |
+|---|---|
+| 新 `build_seed.py` 再生成 seed.json vs CAB-213 コミット (74ea63b) | **バイト同一** (`cmp`; keys.json・coverage.json も同一) |
+| 旧 pipeline (旧 build_seed → apply_keys) vs 新 build_seed 単独 | **バイト同一** |
+| 旧 `build_seed.py` 単独 (移設前の挙動) | 241 entries / apply 77 / key=null 112 / key 確定 56 = CAB-213 成果が消える (二重管理問題の再現) |
+| 新 `build_seed.py` 単独 | 236 / apply 81 / 被覆 229/229 / key 確定 113 / key=null 3 / 座標重複 0 |
+
+- **注意**: 上書き時 `basis` は表の根拠文に置換されるため、CSV 由来の「コード既定値 ReadInt/ReadBool=…」文言は 112 件で失われる (値は不変)。§3 の既定値由来件数を `value_conf` ベースに改めたのはこのため。
+- **回帰 (実測)**: `bash tools/startup/vreg/vreg.sh` exit 0 (C 単体 / shimx 結合 ST+MT+M4 / symcheck / wasm / node 22/22 / Chrome 実 IndexedDB)、`bash tools/startup/keyfix/keyfix_e2e.sh` exit 0 (上記 + pathreg 6 groups + `verify_consistency.py` 6 項目 ALL PASS)。
+- **残 (keyfix 担当範囲)**: `apply_keys.py` への廃止注記と `keyfix_e2e.sh` step 1 からの `apply_keys.py` 除去は keyfix 側の編集が必要 (本チケットでは未実施)。
