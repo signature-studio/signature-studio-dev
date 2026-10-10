@@ -63,7 +63,8 @@ OK   E5 t1 出力 param/入力 応答 (非 zero 値 190 sample)
   - 6444993008 = **0x18026c9f0** (.data, `%2 = add nuw nsw i64 %1, …`)
   - 6444992848 = **0x18026c950** (.data, `%24 = add nuw nsw i64 %23, …`)
   - 6444672256 = **0x18021e500** (.rdata, `%27 = add nuw nsw i64 %23, …`)
-- 3 define (function_1801c38c8 / c69cc / c91cc) 内のみを対象に 10 進即値 (0x180000000 ≤ v < 0x180300000)
+- 3 define (function_1801c38c8 / c69cc / c91cc) 内のみを対象に 10 進即値 (0x180200000 ≤ v < 0x180300000,
+  実装 ir9_bootstraps.py `lo, hi = 0x180200000, 0x180300000` と一致)
   を `v - 0x180000000 + 0x30000000` へ shift。 ir6_shift が hex/global_var_18xxxxxx 形式のみ対応する為に
   漏れた 10 進形を本 pass が soup up。
 - 検証: fresh module instance × 2 (c69cc / c91cc 直呼):
@@ -91,11 +92,16 @@ OK   E5 t1 出力 param/入力 応答 (非 zero 値 190 sample)
   order = SR store → flags → ramp gains → box loop → SVF init → 0x2a8=0 → ring memset (6 + 8 entry)。
 - [F4]/[F5]/[F6] (svf reset / gate box cluster / CRT dexp/dlog/dtan) 品質は継続
   (bootstraps_report.json: crt threaded 15 / 9 / 1, 126130_fix 2, ctor_gbox idx 403, 126670 = 8 sites)。
-- [F8] C port の定数は runtime 実測: π̂ = 22/7 (0x4009249249249243), 2π̂ = 44/7 (0x4019249249249243),
+- [F8] C port の定数は runtime 実測 (検収: ott_m9.cjs + m6_data_install で .rdata 0x1802056e8/0x1802056f8 直読):
+  π̂ = **0x4009249249249243 = 3.1428571428571401292**, 2π̂ = **0x4019249249249243 = 6.2857142857142802583**
+  — 22/7 (0x4009249249249249) / 44/7 (0x4019249249249249) の double とは ~6 ulp 差 (当初「22/7/44/7」と記載したが実ビットは別値)。
+  注意: m9_boot.c 実装側は 22/7 の decimal (3.1428571428571427937) を使用しており native .rdata と不一致 (残課題 1 の候補点)。
   6.0 / 4.0 / 8.0 / -4.0 / √2 = 1.41421356…, tan は libm 代置。
-- トレース体系 (再利用可): m9_boot.c MSCRATCH 0x35e00000 (pattern 0x9a5f____ = MTRACE 行番号) +
-  ir9_outtrace.py / ir9_mixtrace.py / ir9_addrtrace.py (scratch 0x35e01000 = processReplacing 最終
-  loop の R sum 途中値 / R store address 鏈 (「[0x310] = 0 → R store が outarr[0]」問題の解明に使用)。
+- トレース体系: m9_boot.c MSCRATCH 0x35e00000 (pattern 0x9a5f____ = MTRACE 行番号) — **こちらは実在**
+  (m9_boot.c L26-28 検収済)。 一方 `ir9_outtrace.py / ir9_mixtrace.py / ir9_addrtrace.py` (scratch
+  0x35e01000 = processReplacing 最終 loop の R sum 途中値 / R store address 鏈, 「[0x310] = 0 → R store
+  が outarr[0]」問題の解明用) は **本コミット (a3eaaf6) には実在しない** (当初「再利用可」と記載したが
+  tools/m9 に無し) — 次回着手時に再作成が前提。
 - build: `bash tools/m9/m9_build.sh` (m6/m8 chain 再利用, emcc 約 90 sec) → `work/ott_m9.cjs(+wasm)`,
   E2E: node LTS (26.10.0) / emsdk 6.0.12。
 
