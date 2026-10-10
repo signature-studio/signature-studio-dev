@@ -32,7 +32,7 @@
 - ヘッダ `FLhd`(len=6: format u16 / nChannels u16 / ppq u16) + `FLdt`(len)。**format**: 0=project, 0x10=score(.fsc), 0x20=channel-state, 0x30=plugin-state, 0x40=insert-state (全コーパスで slack/trailer/hdr 拡張 0 件、非正規 varint 0 件)。ppq は 24/48/72/96/120/192/384/768 (96 が 8,833 件)。
 - イベント: ID<64 → 1B, <128 → 2B, <192 → 4B, ≥192 → 7bit varint 長 + payload (TEXT=192–207, DATA=208–255 は枠組み同一)。
 - **text のエンコード**: FL < 11.5 は ASCII (ANSI)、**≥ 11.5 は UTF-16LE + NUL 終端** (実測: 11.0 までは ASCII 100%、11.5 以降 UTF-16 100%)。例外: 199 (FlVersion)・198 (RTF) は常に ASCII、231/239/241 は常に UTF-16。
-- **Playlist items (233) のレコード長は版依存**: ≤ FL 20.8 = **32B** / build 3031 (20.99, FL21 beta) 〜 FL 24.1 = **60B** / FL 24.2.99.4720 以降 = **80B**。全 playlist イベントで `u16@4==0x5000` の格子間隔から実測 (`playlistStride()`; 閾値は build 4700 で、4213–4719 は標本無し)。PyFLP は 32B 固定。
+- **Playlist items (233) のレコード長は版依存**: ≤ FL 20.8 = **32B** / build 3031 (20.99, FL21 beta) 〜 FL 24.1 = **60B** / FL 24.2.99.4720 以降 = **80B**。全 playlist イベントで `u16@4==0x5000` の格子間隔から実測 (`playlistStride()`; stride 自体は実測だが、60B→80B の境界 build 4700 は**推定** — 4213–4719 は標本無し)。PyFLP は 32B 固定。
 - **mixer 構造** (event 順): `236 InsertFlags` が 1 insert を開き、`98 SlotIndex` が effect slot (0–9) を開く。plugin は `201 内部名 → 212 wrapper(52B) → 203 表示名 → 155/128/41 → 213 状態` の並び。channel は `64 NewChannel` で開く。
 - 型付きレイアウトを与えた構造: notes(224)=24B, playlist(233), mixer params(225)=12B, track(238)=47–70B, timestamp(237)=2×f64, wrapper(212), insert flags(236), levels(219) 他。
 - **FST/FSC の構造** (イベント ID 列を畳んだ最頻形): plugin-state = `199 [159 28 37] 201 212 [203 155 128 41] 213` (8,306 件。159/37/41 付きの新形式 2,206, `199 28 201 212 213` 2,163, `199 201 212 213` 1,157 …)、channel-state = `199 [28] 64 21 [201 212 213] 0 209 138 139 … 218* 143 20 135 192 [155] 128` (643)、insert-state = `199 (201 212 213)×n 149 204 225` (18)、score(.fsc) = `199 [28] 65 224` (609)。
@@ -52,7 +52,7 @@
 
 所要 21 s (L0+L1, 262 MB)。win 側 9,128 ブロックも L0 100%。L1 は text の孤立サロゲート/末尾バイトも `tail` で保持、構造体は「名前付きフィールド + 残余バイト」で無損失。
 
-**PyFLP 2.2.1 との突合** (Python 3.10 venv, 参照のみ): `.flp` 164 件中 133 件を PyFLP が解析可 (29 件 `NoModelsFound` は PyFLP 側制約)。解析可 133 件で **チャンネル数 133/133 一致、イベント数 127/133・テンポ 127/133 一致**。不一致 6 件は全て FL 25.2.x 保存ファイル (0xAC 拡張 ID で PyFLP のフレームがずれる, 例 NewStuff.flp: PyFLP 4,440 vs 本実装 4,403 イベント → 本実装の解釈の独立な裏付け)。Python 3.12/3.14 では PyFLP 自体が起動不能。
+**PyFLP 2.2.1 との突合** (Python 3.10 venv, 参照のみ): `.flp` 164 件中 133 件を PyFLP が解析可 (31 件失敗 = `NoModelsFound` 29 + utf-16 デコード/IndexError 各 1; PyFLP 側制約)。解析可 133 件で **チャンネル数 133/133 一致、イベント数 127/133・テンポ 127/133 一致**。不一致 6 件は全て FL 25.2.x 保存ファイル (0xAC 拡張 ID で PyFLP のフレームがずれる, 例 NewStuff.flp: PyFLP 4,440 vs 本実装 4,403 イベント → 本実装の解釈の独立な裏付け)。Python 3.12/3.14 では PyFLP 自体が起動不能。
 
 ## 4. FL 26.x で追加された未知イベント (`corpus/unknown_events.json`)
 
