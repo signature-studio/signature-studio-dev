@@ -3,6 +3,7 @@
 - 解析日: 2026-10-10 / 担当 dir: `tools/targets/kilohearts/snapins/` (大物は `work/`, gitignore)
 - 1 コマンド再現: `bash tools/targets/kilohearts/snapins/run_all.sh` (既存 10 本 + **khbase** + Path A 対照 + libm 単体。キャッシュ有り 2〜3 分)
 - Linear: CAB-246 (parent CAB-53, milestone アプリケーション完成)。計画段の CAB-56 ([KH-4] parent CAB-13) と関連付け — SnapinMasterDsp ホストハーネス構築は CAB-56 側のスコープとして残置
+- 本報は KH-4 分。既存 10 snap-in (KH-1a/1b/1c) と KH-2b (D14 修復) の詳細は前版 (git log fe57c01) を参照 — run_all.sh の RESULT 行は前版 baseline と完全一致
 
 ## 0. 結論 (先出し)
 
