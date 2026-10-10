@@ -187,12 +187,19 @@
      "double"
     ],
     "ret": "i64"
+   },
+   "180fdfdb0": {
+    "params": [
+     "double"
+    ],
+    "ret": "double"
    }
   },
   "shims": {
    "180fbdd78": "dint",
    "180fbdef4": "fint"
-  }
+  },
+  "rdata_window": 256
  },
  "resonator": {
   "ns": "resonator",
@@ -314,7 +321,8 @@
     ],
     "absFloor": 0.001
    }
-  }
+  },
+  "rdata_window": 256
  },
  "disperser": {
   "ns": "disperser",
@@ -358,6 +366,7 @@
    "18004df70": "ret0",
    "181384040": "memmove",
    "180fbdef4": "fint"
-  }
+  },
+  "rdata_window": 256
  }
 }

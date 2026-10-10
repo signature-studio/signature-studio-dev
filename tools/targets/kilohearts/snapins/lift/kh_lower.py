@@ -41,6 +41,32 @@ FN_DEF = re.compile(r'^define \S+ @function_([0-9a-f]+)\(\) \{$')
 LIT = re.compile(r'(?<![\w%.@])(\d{10,11})(?![\w.])')
 
 
+def vshift_pass(lines, uid, rep):
+    """[vshift] 可変 shift のカウントを x86 語義 (64bit op は count & 63, 32bit op は & 31) に精密化する (D14/KH-2b)。
+
+    x86 は CL 由来の shift count を 6bit (64bit op) / 5bit (32bit op) にマスクする (mask 後 0 なら値・フラグ不変)。
+    一方 LLVM IR は count ≥ bitwidth を poison と定義するため、stage-0 IR の `shl/lshr/ashr iN %v, %c`
+    (%c がレジスタ) をそのままにすると count ≥ 64 の入力で未定義動作になり得る (k_dfdb0 の
+    `shl r9, cl` (cl = 64 - bsr) 等が該当位置)。`and` で事前マスクすれば LLVM == x86 に一致する。
+    フラグ計算側は RetDec が既にマスク済みカウントで分岐ガードする (`and 63` + `icmp eq 0`) ので
+    本 pass は値 shift のみの書換で整合する。
+    """
+    SH = re.compile(r'^(\s*)(%[\w.\-]+) = (shl|lshr|ashr) (i32|i64) ([^,]+), (%[\w.\-]+)\s*$')
+    MASK = {'i64': 63, 'i32': 31}
+    out = []
+    for l in lines:
+        m = SH.match(l)
+        if m:
+            ind, dst, op, ty, val, cnt = m.groups()
+            t = uid('v')
+            out.append(f'{ind}%{t}.c = and {ty} {cnt}, {MASK[ty]}')
+            out.append(f'{ind}{dst} = {op} {ty} {val}, %{t}.c')
+            rep['vshift'] = rep.get('vshift', 0) + 1
+            continue
+        out.append(l)
+    return out
+
+
 def lower_body(lines, cfg, skip, uid, rep):
     out = []
     i = 0
@@ -235,7 +261,7 @@ def main():
         sys.path.insert(0, __import__('os').path.join(__import__('os').path.dirname(__import__('os').path.abspath(__file__)), '..', 'scripts'))
         from pe_dis import rd as _rd
         jt['_rd'] = _rd
-    texts = {v: '\n'.join(lower_body(bodies[v], jt, skip, uid, rep)) for v in vas}
+    texts = {v: '\n'.join(vshift_pass(lower_body(bodies[v], jt, skip, uid, rep), uid, rep) if 'vshift' not in skip else lower_body(bodies[v], jt, skip, uid, rep)) for v in vas}
     allt = '\n'.join(texts.values())
     # ---- rdata windows
     CAST = re.compile(r'inttoptr \(i64 (\d+) to ([\w*\[\] ]+)\)')

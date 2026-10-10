@@ -17,6 +17,7 @@ Scenario SCEN_LIST[] = {
     {"gate", trial_gate, 6},
     {"quickeq", trial_quickeq, 6},
     {"qemath", trial_qemath, 96},
+    {"qebig", trial_qebig, 96},
     {"qeclass", trial_qeclass, 20},
     {"qeclass2", trial_qeclass2, 12},
     {"resonator", trial_resonator, 6},

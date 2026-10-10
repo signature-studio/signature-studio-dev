@@ -1,7 +1,7 @@
-# Kilohearts snap-in 9 本目までの lift (CAB-53 完走 + CAB-224 / CAB-225)
+# Kilohearts snap-in 9 本目までの lift (CAB-53 完走 + CAB-224 / CAB-225) + KH-2b / KH-1c (§9, §10)
 
 - 解析日: 2026-10-10 / 担当 dir: `tools/targets/kilohearts/snapins/` (大物は `work/`, gitignore)
-- 1 コマンド再現: `bash tools/targets/kilohearts/snapins/run_all.sh` (9 本。キャッシュ有り 1〜2 分 / 初回 + RetDec 約 3 分)
+- 1 コマンド再現: `bash tools/targets/kilohearts/snapins/run_all.sh` (10 本 + libm 単体 qemath/qebig。キャッシュ有り 1〜2 分 / 初回 + RetDec 約 3 分)
 - 本報は CAB-224 (Resonator / Stereo = 許容誤差判定) と CAB-225 (Disperser = bit-exact) の追試。既存 6 本の詳細 (§2〜§5 旧版) は前版 (git log 9e65bb7) を参照。
 
 ## 0. 結論 (先出し)
@@ -73,7 +73,7 @@ Resonator/Stereo/Disperser は既存 pass セット (mov128/store/merge/flags/ca
 
 ## 6. 未解決 / ブロッカー / 次
 
-- **D14 (sincos 大角度)**: \|x\| ≥ 5e5 の Payne-Hanek 経路が lift で破綻 (実測は DEFECTS.md D14)。原因はじめ込み未特定 (k_dfdb0 の 128bit mul / bsr 未定義部 / 可変 shift CF)。位相は model 層 wrap 前提なので実運用影響は小さいが、**CAB-54 [KH-2] / CAB-55 [検出器] の inputs**。
+- **D14 (sincos 大角度)**: \|x\| ≥ 5e5 の Payne-Hanek 経路が lift で破綻 (実測は DEFECTS.md D14)。原因はじめ込み未特定 (k_dfdb0 の 128bit mul / bsr 未定義部 / 可変 shift CF)。位相は model 層 wrap 前提なので実運用影響は小さいが、**CAB-54 [KH-2] / CAB-55 [検出器] の inputs**。→ **§9 (KH-2b / CAB-242) で修復済** (rdata 窓断末が真因、52,800/52,800 bit-exact)。
 - **高Q体制の許容誤差**: 利得 →1 で差が 1/(1−\|g\|) 倍に増幅 (§3)。scenario は \|g\| ≤ 0.9 に収めた。高Q を含めた判定 (または rcpps 近似表の wasm 移植 = bit-exact 化) は方針判断が必要 → 下流チケット案。
 - **rcpps/rsqrtps 近似表の移植案**: 実機から 4096-entry 表 (~16KB) を抽出すれば wasm 側も bit-exact にできる (本タスクでは未実施 — 許容誤差方針が確定済みのため)。
 - stub のまま (到達 0): Resonator = powf closure の深部 5 (`180fb6ce0` 等, EQ と同一), Stereo = vector realloc `18004cf20` + NaN/Inf 分類 `180fdc714`, Disperser = `18004d980` (param 変更通知, dirty 経路) + libm 深部 4 + `180fdc714`。
@@ -87,3 +87,44 @@ Resonator/Stereo/Disperser は既存 pass セット (mov128/store/merge/flags/ca
 ## 8. 成果物 (本追試での追加・変更)
 
 `snapins.json` (resonator/stereo/disperser の lift/abi/shim/jumptable/tol 設定)、`harness/{scen_resonator.h,scen_stereo.h,scen_disperser.h}` + `scenarios.c` (3 scenario 追加)、`harness/compare.mjs` (--tol 許容誤差判定 + TOL_DEBUG)、`lift/gen_simd.py` (rcpps/rsqrtps/packed-cmp/cvttps2dq)、`lift/gen_stubs_sigs.py` (ret0 shim)、`lift/build.py` (--tol 引渡し)、`scripts/{const_dump.py(新規),make_table.py(9本+判定列)}`、`run_all.sh` (9 本化)、`DEFECTS.md` (D14)。`work/` (gitignore: 各 tag の wasm/IR/vectors/compare.json)。
+
+## 9. KH-2b (CAB-242): D14 修復 — sincos_a Payne-Hanek 経路 (|x| ≥ 5e5) の bit-exact 化
+
+**結論**: 修復完了。`sincos_a` (0x180fcd690) / `k_dfdb0` (0x180fdfdb0) の単体差分 (native oracle = 実機 AMD Ryzen 9 9950X) が **52,800 / 52,800 call 全ビット一致** (seed 1: 4,800 / seed 7: 24,000 / seed 42: 24,000 — いずれも sincos_a と k_dfdb0 が半々)。引数域は \|x\| ∈ [3.2, 1e9] (Payne-Hanek 域 [5e5, 1e9] + その境界・2冪・負数 + 中域補正経路 (π, 5e5))。**既存 9 scenario の判定行は baseline と 1 行も差分なし** (`work/run_all.final.log` と `work/run_all.base.log` の RESULT 行 diff = 0、run_all.sh exit 0)。
+
+### 9.1 根本原因 (実測切り分け) — DEFECTS D14 の訂正
+- **主因 = [rdata] 窓 64B による 2/π 表の断末 (D11 の可変 index 変種)**: `k_dfdb0` は表 base 0x18228ac50 を `lea r9,[rip+..]` で取り、`mov rax,[r9+r10]` / `movdqu xmm0,[r9+r10+8]` / `movq rax,[r9+r10+24]` と **可変 index r10 = 0x86−(e>>3) ∈ [6, 132] byte** で計 24B×3 系統 (最大 **+164 byte**) 読む。kh_lower [rdata] は VA リテラル (base) にしか窓を張らず、build.py は gen_globals に `--window 64` を固定渡し → 表の byte 64..163 がどの global 窓にも存在せず (次窓 0x18228acf0 は base+160)、四分国民・還元値が O(1) 破綻していた。\|x\| < 5e5 で破綻しなかったのは e>>3 が小さく index が 64 未満に収まる fig 円経路を使わないため (見かけ上「大角度のみ破綻」)。
+  - 証拠: 生成物の globals のみ `--window 256` に差し替え → 同一 IR で **0/200 → 4800/4800 bit-exact**。
+- **stage-0 の語彙 (CF/mul/adc/bsr/可変 shift) は既に正確**: `shr rax,cl` の CF=最後の shift-out bit → `jae` 反転分岐 → `adc rax,0` の CF 生存、`mul` の 128bit 積、`adc rdx,0` の carry 伝播、`bsr` の src=0 → dest 不変 + ZF=1 (実機動作と一致する model) を stage-0 IR で全て確認 (`work/quickeq/retdec0/*.stage0.ll`)。旧 D14 行の「可変 shift の CF 扱い」は誤仮説 — 欠陥は演算語彙ではなく **データ供給 (rdata 窓)** にあった。
+- **潜伏語彙差の防御 [vshift]**: LLVM は shift count ≥ bitwidth を poison、x86 は CL を 6bit (64bit op) / 5bit (32bit op) にマスク (0 なら値・フラグ不変)。`k_dfdb0` 内 `shl r9,cl` (cl = 64−bsr(r9) は r9==1 で 64 になり得る) 等が該当。詳細は 9.2。
+
+### 9.2 実装
+1. **build.py**: gen_globals の窓幅を snapins.json `rdata_window` で設定 (既定 64 = 従来動作・6 本は無変更)。k_dfdb0 を含む quickeq/stereo/disperser = **256** (formant = 2048, §10)。
+2. **kh_lower.py [vshift] pass**: stage-0 IR の `shl/lshr/ashr i32|i64 %v, %reg` (レジスタ count のみ。即値はエンコード上 ≤ 63 なので対象外) に `and iN %reg, 63|31` を前置し x86 の count マスクを IR で明示 (poison 解消)。フラグ計算側は RetDec が既に `and 63` + `icmp eq 0` ガード付きで自己整合。quickeq/stereo/disperser/formant で各 44 発火。ablation (`--skip vshift`, 窓 256) で **発火差 0** (= 今回の入力域では発火しない防御パス)。
+3. **scenario `qebig`** (新規・既存行への影響なし): 1 trial 12 回 × (sincos_a + k_dfdb0 直呼び, ret f64 = 還元値) = 24 call/trial。specials (5e5 境界・2冪・負数) + 大域 log 一様 [5e5, 1e9] + 中域 (π, 5e5)。k_dfdb0 の四分国民 (rax) は compare.mjs が直接比較しないため sincos_a 経由で担保。
+4. **snapins.json**: quickeq abi に `180fdfdb0 {double→double}` 追加 (単体差分用 wrapper。内部呼出は変化なし — qemath 999/999 を維持)。
+
+### 9.3 検証 (実測)
+| 実施 | 結果 |
+|---|---|
+| qebig 200 trial seed 1 | **bit-exact 4,800/4,800** (sincos_a 2,400 + k_dfdb0 2,400) |
+| qebig 1,000 trial seed 7 / seed 42 | **bit-exact 24,000/24,000 × 2** |
+| ablation: 窓 64 + [vshift] 有 | 0/200 — 主因が窓であることの再確認 |
+| ablation: 窓 256 + [vshift] 無し | 4,800/4,800 — vshift は潜伏欠陥の防御 (発火差 0) |
+| run_all.sh (10 本 + qemath + qebig) | **exit 0**、既存 9 本の RESULT 行は baseline と完全一致 |
+| 副作用 | quickeq/stereo/disperser の wasm が +22〜23KB (窓 256 化)。下記 §9.4 の表を正とし §1 の当該 cell は更新前値 |
+
+### 9.4 修復後の一覧表 (10 本 — §1 と同一書式, KH-1c の Formant を含む)
+
+| snap-in (id) | process VA | process B | lift fn数 / 合計B | wasm B | undefined import | trial | call | 判定 | 必要な修復 (発火数) | shim / 未lift stub |
+|---|---|--:|--:|--:|--:|--:|--:|---|---|---|
+| Channel Mixer (kscm) | 0x1804f41a0 | 257 | 3 / 275 | 23206 | 0 | 200/200 | 1149/1149 | bit-exact | mov128×3, flags×1, merge×2 | 0 / 0 |
+| Gain (ksgn) | 0x1804b0380 | 609 | 1 / 609 | 23054 | 0 | 200/200 | 999/999 | bit-exact | merge×2, flags×1, store128×1, callret×2 | 0 / 1 |
+| Haas (ksha) | 0x1804d0280 | 1175 | 5 / 1606 | 35967 | 0 | 200/200 | 1100/1100 | bit-exact | store128×4, merge×5, flags×5, storelow×1 | 0 / 0 |
+| Clipper (kclp) | 0x180884b30 | 1683 | 3 / 1743 | 37457 | 0 | 200/200 | 1100/1100 | bit-exact | mov128×10, merge×8, flags×10, store128×4, callret×1 | 0 / 0 |
+| Gate (ksgt) | 0x1804c2f50 | 1703 | 3 / 2532 | 45754 | 0 | 200/200 | 999/999 | bit-exact | callret×12, mov128×11, flags×9, merge×2, store128×1 | 2 / 1 |
+| 3-Band EQ (ksqe) | 0x18035fb10 | 1754 | 24 / 11512 | 208237 | 0 | 200/200 | 999/999 | bit-exact | mov128×43, flags×30, merge×13, store128×11, callret×49, jumptable×1, vshift×44 | 2 / 6 |
+| Resonator (ksre) | 0x180743390 | 2020 | 7 / 3560 | 65787 | 0 | 200/200 | 999/999 | 許容誤差 | mov128×8, callret×18, merge×10, flags×17, store128×5 | 1 / 5 |
+| Stereo (ksst) | 0x18080d4d0 | 1679 | 8 / 6001 | 111574 | 0 | 200/200 | 999/999 | 許容誤差 | mov128×4, merge×9, callret×16, flags×4, store128×4, storelow×1, vshift×44 | 0 / 2 |
+| Disperser (kdsp) | 0x180316480 | 2311 | 24 / 11754 | 209777 | 0 | 200/200 | 999/999 | bit-exact | callret×49, mov128×40, merge×9, flags×26, jumptable×1, store128×1, vshift×44 | 3 / 8 |
+| Formant Filter (ksvf) | 0x18085a730 | 614 | 17 / 9296 | 405390 | 0 | 200/200 | 999/999 | bit-exact | mov128×20, callret×39, merge×7, jumptable×1, store128×1, flags×20, vshift×44 | 1 / 6 |

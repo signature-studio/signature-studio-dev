@@ -114,7 +114,9 @@ def main():
             HERE, s0, P('lowered.ll'), CORE, ','.join('%x' % v for v in vas), abi, jts, ('--skip ' + a.skip) if a.skip else ''))
         stat['passes'] = r.stdout.strip()
         sh('python3 %s/ir_normalize.py %s %s' % (HERE, P('lowered.ll'), P('n1.ll')))
-        win = '--window 64'
+        # rdata 窓幅: 既定 64B。テーブルを base+offset (可変 index) で読む関数 (k_dfdb0 の 2/π 表は +164B,
+        # log10f の 2^(k/256) 表は +1KB) がある snap-in は snapins.json の rdata_window で拡張する (D14 修復)。
+        win = '--window %d' % cfg.get('rdata_window', 64)
         lines_in = open(P('n1.ll')).read().split('\n')
     # declare 重複除去
     seen, outl = set(), []

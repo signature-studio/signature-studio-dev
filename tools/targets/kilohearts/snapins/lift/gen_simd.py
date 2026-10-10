@@ -76,7 +76,8 @@ def gen(name, ret, params):
     if b.startswith('v') and b[1:] in ('addsd', 'subsd', 'mulsd', 'divsd', 'minsd', 'maxsd', 'sqrtsd', 'addss', 'subss', 'mulss', 'divss', 'minss', 'maxss', 'sqrtss',
                                          'addpd', 'subpd', 'mulpd', 'divpd', 'addps', 'subps', 'mulps', 'divps', 'andpd', 'andps', 'andnpd', 'andnps', 'orpd', 'orps',
                                          'xorpd', 'xorps', 'movapd', 'movaps', 'movdqa', 'movdqu', 'movupd', 'movups', 'movq', 'movd', 'movsd', 'movss', 'unpcklpd',
-                                         'unpckhpd', 'unpcklps', 'unpckhps', 'shufpd', 'shufps', 'cvttpd2dq', 'psrldq', 'pslldq', 'psrlq', 'psllq', 'haddpd', 'haddps', 'movddup'):
+                                         'unpckhpd', 'unpcklps', 'unpckhps', 'shufpd', 'shufps', 'cvttpd2dq', 'psrldq', 'pslldq', 'psrlq', 'psllq', 'haddpd', 'haddps', 'movddup',
+                                         'pand', 'pandn', 'por', 'pxor', 'paddd', 'psubd', 'psrld', 'pslld', 'cvtdq2ps'):
         b = b[1:]
     ptys = [p.split()[0] for p in params]
     R = ret
@@ -230,6 +231,17 @@ def gen(name, ret, params):
         body = '%s L128 r; r.d[0] = (a1 > 63) ? 0 : (%s.d[0] %s a1); r.d[1] = (a1 > 63) ? 0 : (%s.d[1] %s a1); return r.q;' % (pre, A(0), op, A(0), op)
     if b == 'cvttps2dq' and n == 1 and ptys[0] == 'i128' and R == 'i128':
         body = '%s L128 r; r.q = 0; for (int i = 0; i < 4; i++) r.w[i] = (u32)cvtt32(%s.f[i]); return r.q;' % (pre, A(0))
+    # ----- packed dword 算術/シフト (log10f 等の int 経路; すべて厳密整数 = exact)
+    if b in ('paddd', 'psubd') and ptys == ['i128', 'i128'] and R == 'i128':
+        op = '+' if b == 'paddd' else '-'
+        body = ('%s L128 r; for (int i = 0; i < 4; i++) r.w[i] = (u32)(%s.w[i] %s %s.w[i]); return r.q;'
+                % (pre, A(0), op, A(1)))
+    if b in ('psrld', 'pslld') and R == 'i128' and (ptys == ['i128', 'i128'] or ptys == ['i128', 'i8']):
+        op = '>>' if b == 'psrld' else '<<'
+        # imm8 形: count > 31 → 0 (Intel SDM)。レジスタ形: count = 下位 qword mod 64、その後 > 31 → 0
+        cnt = ('(u64)a1' if ptys[1] == 'i8' else '(u64)(u64)x_a1.d[0]') + ' & 63'
+        body = ('%s L128 r; { unsigned long long c = %s; for (int i = 0; i < 4; i++) r.w[i] = (c > 31) ? 0u : (%s.w[i] %s (unsigned)c); } return r.q;'
+                % (pre, cnt, A(0), op))
     if b in ('cvttpd2dq', 'cvtpd2dq') and n == 1 and ptys[0] == 'i128' and R == 'i128':
         f = 'cvtt32(%s.g[%d])' if b == 'cvttpd2dq' else 'cvtt32(nearbyint(%s.g[%d]))'
         body = '%s L128 r; r.q = 0; r.w[0] = (u32)%s; r.w[1] = (u32)%s; return r.q;' % (pre, f % (A(0), 0), f % (A(0), 1))
