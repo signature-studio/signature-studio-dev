@@ -34,7 +34,7 @@
 - 症状: 129/130 DLL が「79/80 一致 + 1 mismatch」。mismatch VA は各 DLL の 0x5e03f0 対応物。
 - 原因: `norm_hash` が capstone の `disp_size` を信用して disp32 をゼロ化するが、**capstone 5.0.7 は 66-prefix SSE の RIP 相対 (movupd/addpd 等) で disp_size=2 を誤報告**する (実測: `movupd xmm7,[rip+disp32]` → disp_size=2, 実エンコーディングは 4B)。よって movupd の disp32 が正規化されず、DLL 間の VA 差がハッシュ差に化ける。
 - 検証: `verify_table.py` は「RIP 相対の disp32 は命令末尾 (imm 直前) 4B」というエンコーディング事実から位置を決める修正版正規化で全実装 VA を再ハッシュ → **130/130 DLL で 80/80 一致** (`work/table_verify.json`)。
-- 0x5e03f0 の per-DLL variant は機械語が同一 (差分は rip disp32 のみ) で、参照先定数も同一 (f64 **0.5** = 0x3FE0000000000000, Balance 0x7000B8 と 18914 0x6ECDD8 の先頭 8B が一致)。
+- 0x5e03f0 の per-DLL variant は機械語が同一 (差分は rip disp32 のみ) で、参照先定数も同一 (f64 **0.5** = 0x3FE0000000000000, Balance 0x6FFFB0 と 18914 0x6ECDD0 の先頭 8B が一致 — 検収で再確認)。
 
 ### 2.4 表の構造 (実測)
 - **80 実装 → 73 distinct** (正規化ハッシュ; 7 件 + 2 件の完全重複 group)。全 DLL の kernel_va_map が `{x:2, y:7}` の dup を示すのはこの重複に起因する (測定 artifact ではなく実データの重複)。
@@ -131,7 +131,7 @@ bash tools/plugins/p0c/p0c_e2e.sh      # 約 2 分 (work/ 付き初回は kernel
 3. **差分試験ハーネス** (`k80_diff.py`, fork 隔離): 実機械語 vs lowering+ARG 適用 IR を同一入力で突合。
    **f32 mul 系 0x5df210/0x5df240 は出力バッファ bit-exact**、0x5e0760/0x5e0bb0/0x5e0b70/0x5e1590/
    0x5e1780 も bit-exact。i64 系: 0x5e0330 は IR が i64 完結で構造的 bit-exact、0x5de3e0 は
-   `llvm.rint.f64` 挿入で RC=nearest を再現 (実機 native==rint **100%** / trunc 74.1% を実測)。
+   `llvm.rint.f64` 挿入で RC=nearest を再現 (実機 native==rint **100%** / trunc 74.1% を実測。検収再現: rint 100% (0/200k)、trunc 一致率は入力分布依存 — 音響 k/1000 50.4% / f64 全エントロピー 98.7%)。
 4. **既存 lift IR の x87 スタック模型欠陥を検出** (RetDec 起源・本 pass と独立): fld→演算→fstp 型
    (0x5de820/0x5dedf0/0x5dfb60/0x5dfd30 + rc_chop 3 本) で fstp 読出が st(1) になり (0x5de820 の出力が
    定数 c2 に化ける)、loop 末尾 TOP も +2 ずれる。§3 f80_micro (C model) では bit-exact だった面。

@@ -19,7 +19,8 @@
         これが正しいのでそのまま保持する (--chop-funcs で指定した関数内)。
       - chop 区間の外 (ambient RC=nearest; Delphi 既定 CW $1332 / fldcw 復帰値 0x033F)
         の fist/fistp は llvm.rint を挿入して最近接丸めに修正する
-        (実機 0x5de3e0 で native==rint 100% / native==trunc 74.1% を実測)。
+        (実機 0x5de3e0 で native==rint 100% を実測; trunc 一致率は入力分布依存 —
+        検収再現: 音響 k/1000 で 50.4% / f64 全エントロピーで 98.7% — rint 挿入が必須)。
       - --chop-funcs は機械語分類 (f80_assess.py の rc_chop label) から与える。
 
   [3] i64 保持
