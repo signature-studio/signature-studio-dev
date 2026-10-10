@@ -1,0 +1,8013 @@
+{
+ "root": "/home/ubuntu/work/analysis/mac/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL",
+ "generated": "cli/corpus.ts",
+ "count": 164,
+ "projects": [
+  {
+   "rel": "Data/Demo projects/Demo songs/Asher Postman - Future House.flp",
+   "group": "demo",
+   "size": 486096,
+   "sha256": "5dc2baba7088c761b2fc76b4e9ad2d68c06d28962feeea2b8960f65ad3feb146",
+   "events": 6888,
+   "distinctIds": 103,
+   "version": "20.99.3000.3031",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 307,
+   "tempo": 126,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "AP - FUTURE HOUSE (Stock Plugins Only)",
+   "channels": 74,
+   "channelTypes": {
+    "0": 20,
+    "2": 9,
+    "3": 2,
+    "4": 25,
+    "5": 18
+   },
+   "patterns": 44,
+   "notes": 1609,
+   "arrangements": 2,
+   "playlistItems": 534,
+   "songTicks": 13056,
+   "songBars": 34,
+   "songSeconds": 64.8,
+   "maxPatternBars": 11.93,
+   "renderSeconds": 64.76,
+   "inserts": 127,
+   "samples": 45,
+   "pluginInstances": 91,
+   "pluginUsage": {
+    "MIDI Out": 1,
+    "Fruity Envelope Controller": 1,
+    "FL Keys": 1,
+    "Harmless": 1,
+    "3x Osc": 3,
+    "GMS": 2,
+    "Fruity Balance": 2,
+    "Fruity Multiband Compressor": 7,
+    "Maximus": 2,
+    "Fruity Limiter": 1,
+    "Fruity NoteBook 2": 1,
+    "Fruity WaveShaper": 1,
+    "Fruity Parametric EQ 2": 18,
+    "Fruity Reeverb 2": 14,
+    "Fruity Compressor": 5,
+    "Soundgoodizer": 8,
+    "Transient Processor": 2,
+    "Gross Beat": 2,
+    "Fruity Love Philter": 8,
+    "Fruity Flanger": 1,
+    "Wave Candy": 1,
+    "Edison": 2,
+    "Fruity Delay 2": 1,
+    "Fruity Fast Dist": 1,
+    "Fruity Filter": 1,
+    "Fruity Flangus": 1,
+    "Effector": 1,
+    "Fruity Delay Bank": 1,
+    "Control Surface": 1
+   },
+   "sampleRefs": {
+    "total": 45,
+    "factory": 45,
+    "resolved": 45,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Demo songs/Astes - Bien Duro.flp",
+   "group": "demo",
+   "size": 1704507,
+   "sha256": "394af32e1daf734dba2d97df89f8e41c73068ffa3dcd2f7508bca4d64d763b26",
+   "events": 19783,
+   "distinctIds": 128,
+   "version": "25.1.0.4858",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 3150,
+   "tempo": 95,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Bien Duro (Clean Version)",
+   "channels": 308,
+   "channelTypes": {
+    "0": 70,
+    "2": 16,
+    "3": 16,
+    "4": 160,
+    "5": 46
+   },
+   "patterns": 162,
+   "notes": 1937,
+   "arrangements": 1,
+   "playlistItems": 904,
+   "songTicks": 35904,
+   "songBars": 93.5,
+   "songSeconds": 236.2,
+   "maxPatternBars": 8,
+   "renderSeconds": 236.21,
+   "inserts": 86,
+   "samples": 227,
+   "pluginInstances": 235,
+   "pluginUsage": {
+    "BooBass": 1,
+    "MIDI Out": 2,
+    "Harmor": 4,
+    "Sytrus": 3,
+    "FLEX": 1,
+    "Harmless": 1,
+    "Ogun": 4,
+    "Fruity NoteBook 2": 2,
+    "Fruity Limiter": 23,
+    "Fruity Parametric EQ 2": 62,
+    "Maximus": 7,
+    "Emphasis": 1,
+    "Pitch Shifter": 3,
+    "Pitcher": 11,
+    "Patcher": 10,
+    "Fruity Stereo Shaper": 10,
+    "Fruity Stereo Enhancer": 5,
+    "Fruity Reeverb 2": 5,
+    "Fruity Balance": 12,
+    "Spreader": 8,
+    "Hyper Chorus": 1,
+    "Frequency Splitter": 14,
+    "Fruity Delay Bank": 7,
+    "Fruity Blood Overdrive": 3,
+    "Fruity Fast Dist": 1,
+    "Transient Processor": 11,
+    "Fruity Delay 2": 4,
+    "Frequency Shifter": 2,
+    "Fruity Soft Clipper": 1,
+    "Low Lifter": 2,
+    "Fruity Flangus": 5,
+    "Gross Beat": 2,
+    "Fruity Convolver": 3,
+    "LuxeVerb": 2,
+    "Fruity WaveShaper": 1,
+    "Fruity Peak Controller": 1
+   },
+   "sampleRefs": {
+    "total": 227,
+    "factory": 227,
+    "resolved": 227,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Demo songs/Atthar Feat Mehran Abbasi & Elise Chantelle - Right Night feeling.flp",
+   "group": "demo",
+   "size": 1185322,
+   "sha256": "3e165c21288f86ab90c6e491540b740f8e1180693d051491f78b3474278a08e6",
+   "events": 10167,
+   "distinctIds": 102,
+   "version": "20.8.0.1377",
+   "format": "project",
+   "ppq": 72,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 112,
+   "tempo": 105,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Right Night feeling",
+   "channels": 144,
+   "channelTypes": {
+    "0": 11,
+    "2": 19,
+    "4": 37,
+    "5": 77
+   },
+   "patterns": 104,
+   "notes": 2134,
+   "arrangements": 1,
+   "playlistItems": 693,
+   "songTicks": 26856,
+   "songBars": 93.25,
+   "songSeconds": 213.1,
+   "maxPatternBars": 30.23,
+   "renderSeconds": 213.14,
+   "inserts": 127,
+   "samples": 48,
+   "pluginInstances": 213,
+   "pluginUsage": {
+    "Sytrus": 5,
+    "BassDrum": 2,
+    "3x Osc": 5,
+    "Harmor": 7,
+    "Fruity Parametric EQ 2": 85,
+    "Maximus": 9,
+    "Fruity Limiter": 8,
+    "Fruity Peak Controller": 3,
+    "Frequency Splitter": 2,
+    "Fruity Reeverb 2": 38,
+    "Transient Processor": 2,
+    "Fruity Stereo Shaper": 5,
+    "Fruity Balance": 10,
+    "Fruity Flangus": 2,
+    "Fruity Delay 2": 15,
+    "Fruity Love Philter": 4,
+    "Gross Beat": 3,
+    "Fruity Blood Overdrive": 1,
+    "Fruity WaveShaper": 1,
+    "Fruity Delay 3": 5,
+    "Pitcher": 1
+   },
+   "sampleRefs": {
+    "total": 48,
+    "factory": 48,
+    "resolved": 48,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Demo songs/Bombs Away ft KARRA - I'm Awake.flp",
+   "group": "demo",
+   "size": 2910230,
+   "sha256": "0c4b22170ef7400db9b0f9943ad3c5258fcc78d24f61639f8edd741ad81b1912",
+   "events": 18272,
+   "distinctIds": 108,
+   "version": "21.0.0.3302",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 1612,
+   "tempo": 124,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "I'm Awake",
+   "channels": 282,
+   "channelTypes": {
+    "0": 35,
+    "2": 24,
+    "3": 3,
+    "4": 127,
+    "5": 93
+   },
+   "patterns": 68,
+   "notes": 1677,
+   "arrangements": 1,
+   "playlistItems": 2117,
+   "songTicks": 35727,
+   "songBars": 93.04,
+   "songSeconds": 180.1,
+   "maxPatternBars": 31.99,
+   "renderSeconds": 180.08,
+   "inserts": 127,
+   "samples": 154,
+   "pluginInstances": 389,
+   "pluginUsage": {
+    "3x Osc": 20,
+    "Toxic Biohazard": 1,
+    "Fruity Slicer": 3,
+    "Maximus": 7,
+    "Fruity PanOMatic": 60,
+    "Soundgoodizer": 48,
+    "Fruity Parametric EQ 2": 100,
+    "Fruity Reeverb 2": 43,
+    "Transient Processor": 6,
+    "Fruity Compressor": 6,
+    "Fruity Limiter": 11,
+    "Fruity WaveShaper": 3,
+    "Fruity Convolver": 5,
+    "Fruity Fast Dist": 29,
+    "Fruity Fast LP": 16,
+    "Effector": 2,
+    "Gross Beat": 5,
+    "Pitch Shifter": 3,
+    "Vintage Chorus": 3,
+    "Fruity Delay 2": 10,
+    "Fruity Peak Controller": 1,
+    "Fruity Flanger": 1,
+    "Patcher": 1,
+    "EQUO": 2,
+    "Fruity Delay 3": 2,
+    "Fruity Stereo Enhancer": 1
+   },
+   "sampleRefs": {
+    "total": 154,
+    "factory": 154,
+    "resolved": 154,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Demo songs/Chan Gibbons x Ceebeaats - Time.flp",
+   "group": "demo",
+   "size": 226893,
+   "sha256": "9180bbb64a9ce2546bf90b29f255b93bf4ff6568589867ea912acced6a8006e9",
+   "events": 5255,
+   "distinctIds": 118,
+   "version": "25.2.5.5319",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 1178,
+   "tempo": 170,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Time",
+   "channels": 43,
+   "channelTypes": {
+    "0": 4,
+    "2": 6,
+    "4": 31,
+    "5": 2
+   },
+   "patterns": 14,
+   "notes": 536,
+   "arrangements": 1,
+   "playlistItems": 461,
+   "songTicks": 46082,
+   "songBars": 120.01,
+   "songSeconds": 169.4,
+   "maxPatternBars": 8,
+   "renderSeconds": 169.42,
+   "inserts": 49,
+   "samples": 35,
+   "pluginInstances": 173,
+   "pluginUsage": {
+    "FLEX": 3,
+    "GMS": 2,
+    "3x Osc": 1,
+    "Fruity Parametric EQ 2": 34,
+    "Maximus": 4,
+    "Fruity Soft Clipper": 1,
+    "Fruity Delay 3": 7,
+    "Fruity Reeverb 2": 26,
+    "Fruity Compressor": 17,
+    "Fruity Stereo Shaper": 7,
+    "Fruity Flangus": 1,
+    "Fruity Stereo Enhancer": 6,
+    "Fruity Limiter": 9,
+    "Pitcher": 19,
+    "Fruity Chorus": 7,
+    "Soundgoodizer": 14,
+    "Fruity Blood Overdrive": 4,
+    "Fruity Balance": 7,
+    "Fruity Delay 2": 2,
+    "Fruity PanOMatic": 1,
+    "LuxeVerb": 1
+   },
+   "sampleRefs": {
+    "total": 35,
+    "factory": 35,
+    "resolved": 35,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Demo songs/Cuebur & Thandi Draai - Africa's Calling.flp",
+   "group": "demo",
+   "size": 526434,
+   "sha256": "37d3e05a808bc56975fa4751d65813c45429dec5b7998f21928ff0953066b183",
+   "events": 5700,
+   "distinctIds": 117,
+   "version": "25.2.0.5098",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 1291,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Africa's Calling",
+   "channels": 61,
+   "channelTypes": {
+    "0": 5,
+    "2": 15,
+    "4": 20,
+    "5": 21
+   },
+   "patterns": 52,
+   "notes": 1399,
+   "arrangements": 1,
+   "playlistItems": 1000,
+   "songTicks": 13056,
+   "songBars": 34,
+   "songSeconds": 68,
+   "maxPatternBars": 31.88,
+   "renderSeconds": 68,
+   "inserts": 49,
+   "samples": 25,
+   "pluginInstances": 73,
+   "pluginUsage": {
+    "Fruit Kick": 1,
+    "FLEX": 4,
+    "3x Osc": 1,
+    "Harmor": 1,
+    "GMS": 2,
+    "Harmless": 2,
+    "Morphine": 2,
+    "Sakura": 1,
+    "Sytrus": 1,
+    "Fruity Soft Clipper": 1,
+    "Maximus": 1,
+    "Fruity Parametric EQ 2": 31,
+    "Fruity Limiter": 2,
+    "Spreader": 1,
+    "Patcher": 1,
+    "Fruity Filter": 1,
+    "Soundgoodizer": 4,
+    "Fruity Delay 3": 3,
+    "Fruity Stereo Shaper": 1,
+    "Fruity Parametric EQ": 1,
+    "Fruity Multiband Compressor": 1,
+    "Fruity Stereo Enhancer": 1,
+    "Fruity Reeverb 2": 2,
+    "Fruity Balance": 3,
+    "Frequency Shifter": 1,
+    "Effector": 1,
+    "Hyper Chorus": 1,
+    "Fruity PanOMatic": 1
+   },
+   "sampleRefs": {
+    "total": 25,
+    "factory": 25,
+    "resolved": 25,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Demo songs/DEDZII - NIGHT TERROR.flp",
+   "group": "demo",
+   "size": 738895,
+   "sha256": "a53124d19adab2cbbaf52f86bc380557f938ec7064f727e01d170c1aeab2c95a",
+   "events": 7368,
+   "distinctIds": 123,
+   "version": "24.2.99.4844",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 1546,
+   "tempo": 108,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "NIGHT TERROR",
+   "channels": 54,
+   "channelTypes": {
+    "0": 1,
+    "2": 7,
+    "4": 30,
+    "5": 16
+   },
+   "patterns": 46,
+   "notes": 1351,
+   "arrangements": 1,
+   "playlistItems": 1540,
+   "songTicks": 38400,
+   "songBars": 100,
+   "songSeconds": 222.2,
+   "maxPatternBars": 11.88,
+   "renderSeconds": 222.22,
+   "inserts": 127,
+   "samples": 31,
+   "pluginInstances": 122,
+   "pluginUsage": {
+    "Sytrus": 2,
+    "Morphine": 1,
+    "PoiZone": 1,
+    "FLEX": 2,
+    "Harmor": 1,
+    "Fruity Parametric EQ 2": 59,
+    "Maximus": 3,
+    "Emphasis": 1,
+    "Fruity HTML NoteBook": 1,
+    "Transient Processor": 3,
+    "Fruity Reeverb 2": 13,
+    "Fruity WaveShaper": 1,
+    "Spreader": 2,
+    "Fruity Blood Overdrive": 4,
+    "Fruity Compressor": 3,
+    "Fruity Multiband Compressor": 2,
+    "Fruity Soft Clipper": 3,
+    "Fruity Limiter": 3,
+    "Fruity Flangus": 3,
+    "EQUO": 3,
+    "Gross Beat": 2,
+    "Effector": 3,
+    "Soundgoodizer": 1,
+    "Fruity Delay 2": 1,
+    "Fruity Stereo Shaper": 1,
+    "Fruity Squeeze": 1,
+    "Distructor": 1,
+    "LuxeVerb": 1
+   },
+   "sampleRefs": {
+    "total": 31,
+    "factory": 31,
+    "resolved": 31,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Demo songs/Edlan & Ella Noël - Song For You.flp",
+   "group": "demo",
+   "size": 802510,
+   "sha256": "b37243d9e512e9978df12a18efabe0b5114d53478291f5e739505e469277a119",
+   "events": 7132,
+   "distinctIds": 125,
+   "version": "25.1.2.4893",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 1513,
+   "tempo": 174,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Song For You",
+   "channels": 60,
+   "channelTypes": {
+    "0": 14,
+    "2": 15,
+    "4": 15,
+    "5": 16
+   },
+   "patterns": 46,
+   "notes": 640,
+   "arrangements": 1,
+   "playlistItems": 392,
+   "songTicks": 55451,
+   "songBars": 144.4,
+   "songSeconds": 199.2,
+   "maxPatternBars": 16,
+   "renderSeconds": 199.18,
+   "inserts": 127,
+   "samples": 29,
+   "pluginInstances": 91,
+   "pluginUsage": {
+    "FLEX": 4,
+    "Sytrus": 1,
+    "GMS": 1,
+    "3x Osc": 2,
+    "Ogun": 1,
+    "Kepler": 1,
+    "Fruity DX10": 1,
+    "FL Keys": 1,
+    "Slicex": 2,
+    "Fruity slicer": 1,
+    "Fruity Parametric EQ 2": 29,
+    "Maximus": 1,
+    "Fruity Soft Clipper": 1,
+    "Fruity WaveShaper": 4,
+    "Transient Processor": 3,
+    "Low Lifter": 1,
+    "Fruity Filter": 10,
+    "Pitch Shifter": 3,
+    "Distructor": 1,
+    "Fruity Vocoder": 1,
+    "Fruity Stereo Enhancer": 1,
+    "Hyper Chorus": 1,
+    "Spreader": 8,
+    "Fruity Flangus": 2,
+    "Fruity Limiter": 3,
+    "Fruity Compressor": 2,
+    "Transporter": 1,
+    "Fruity Convolver": 1,
+    "LuxeVerb": 2,
+    "Fruity Delay 3": 1
+   },
+   "sampleRefs": {
+    "total": 29,
+    "factory": 29,
+    "resolved": 29,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Demo songs/Electroconductor - Inner Days - Original.flp",
+   "group": "demo",
+   "size": 1974800,
+   "sha256": "6793bfec2d1127cf78e9c218f4ff3615c9bbf1abd7c8b380e90f04eef47f1f40",
+   "events": 4130,
+   "distinctIds": 117,
+   "version": "21.2.99.4033",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 958,
+   "tempo": 75,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Inner Days",
+   "channels": 14,
+   "channelTypes": {
+    "0": 8,
+    "2": 5,
+    "5": 1
+   },
+   "patterns": 24,
+   "notes": 348,
+   "arrangements": 1,
+   "playlistItems": 51,
+   "songTicks": 15744,
+   "songBars": 41,
+   "songSeconds": 131.2,
+   "maxPatternBars": 8,
+   "renderSeconds": 131.2,
+   "inserts": 127,
+   "samples": 8,
+   "pluginInstances": 27,
+   "pluginUsage": {
+    "DirectWave": 2,
+    "Harmor": 1,
+    "Sytrus": 2,
+    "Fruity Compressor": 1,
+    "Fruity Parametric EQ 2": 6,
+    "Fruity Love Philter": 1,
+    "Fruity Soft Clipper": 1,
+    "Fruity Delay 3": 6,
+    "Fruity Reeverb 2": 3,
+    "Hyper Chorus": 3,
+    "Fruity Limiter": 1
+   },
+   "sampleRefs": {
+    "total": 8,
+    "factory": 8,
+    "resolved": 8,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Demo songs/Electroconductor - Inner Days - SH-1 Rework (feat. Maja Mannila).flp",
+   "group": "demo",
+   "size": 2010473,
+   "sha256": "938e91088abf9eede9493e3b26df54e2f74bbd00ca97bfa3f9811de68c29d475",
+   "events": 4827,
+   "distinctIds": 118,
+   "version": "24.1.0.4212",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 1037,
+   "tempo": 75,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Inner Days - SH-1 Rework (feat. Maja Mannila)",
+   "channels": 22,
+   "channelTypes": {
+    "0": 8,
+    "2": 6,
+    "4": 3,
+    "5": 5
+   },
+   "patterns": 26,
+   "notes": 488,
+   "arrangements": 1,
+   "playlistItems": 63,
+   "songTicks": 15744,
+   "songBars": 41,
+   "songSeconds": 131.2,
+   "maxPatternBars": 8,
+   "renderSeconds": 131.2,
+   "inserts": 127,
+   "samples": 11,
+   "pluginInstances": 75,
+   "pluginUsage": {
+    "DirectWave": 2,
+    "Harmor": 1,
+    "Sytrus": 3,
+    "Fruity Compressor": 5,
+    "Fruity Parametric EQ 2": 23,
+    "Fruity Love Philter": 2,
+    "Fruity WaveShaper": 1,
+    "Fruity Limiter": 18,
+    "Fruity Delay 3": 7,
+    "Fruity Reeverb 2": 3,
+    "Hyper Chorus": 3,
+    "Fruity Blood Overdrive": 1,
+    "Transient Processor": 1,
+    "Maximus": 1,
+    "LuxeVerb": 3,
+    "Patcher": 1
+   },
+   "sampleRefs": {
+    "total": 11,
+    "factory": 11,
+    "resolved": 11,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Demo songs/Eric Kauffmann & NrgMind - Exoplanet.flp",
+   "group": "demo",
+   "size": 950527,
+   "sha256": "76a5cd7a0fff653072d96d256b1a371d228c55d80734741539e7adc61e0b63ea",
+   "events": 9493,
+   "distinctIds": 96,
+   "version": "12.9.3.321",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 108,
+   "tempo": 140,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Exoplanet",
+   "channels": 145,
+   "channelTypes": {
+    "0": 14,
+    "2": 36,
+    "4": 10,
+    "5": 85
+   },
+   "patterns": 102,
+   "notes": 6397,
+   "arrangements": 2,
+   "playlistItems": 4440,
+   "songTicks": 100224,
+   "songBars": 261,
+   "songSeconds": 447.4,
+   "maxPatternBars": 24,
+   "renderSeconds": 447.43,
+   "inserts": 127,
+   "samples": 23,
+   "pluginInstances": 154,
+   "pluginUsage": {
+    "3x Osc": 6,
+    "MiniSynth": 10,
+    "Harmless": 4,
+    "FL Keys": 3,
+    "Sakura": 2,
+    "Sytrus": 7,
+    "Harmor": 4,
+    "Fruity Parametric EQ 2": 50,
+    "Fruity Reeverb": 7,
+    "Fruity Filter": 20,
+    "Maximus": 2,
+    "Fruity Limiter": 17,
+    "Fruity Reeverb 2": 1,
+    "Fruity Balance": 7,
+    "Fruity WaveShaper": 1,
+    "Effector": 1,
+    "Fruity Compressor": 2,
+    "Patcher": 2,
+    "Fruity Fast Dist": 1,
+    "Fruity Delay 2": 3,
+    "Fruity PanOMatic": 1,
+    "Fruity Delay 3": 2,
+    "Fruity Chorus": 1
+   },
+   "sampleRefs": {
+    "total": 23,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Demo songs/Jay Cactus x Confz - Mic Check Ready.flp",
+   "group": "demo",
+   "size": 364890,
+   "sha256": "6a33661b704150f1c8edef2f664d9462df07611db9559ad46ef1ed7fadb17495",
+   "events": 6279,
+   "distinctIds": 119,
+   "version": "25.2.3.5164",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 1452,
+   "tempo": 143,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Mic Check Ready",
+   "channels": 45,
+   "channelTypes": {
+    "0": 11,
+    "2": 6,
+    "4": 24,
+    "5": 4
+   },
+   "patterns": 26,
+   "notes": 747,
+   "arrangements": 1,
+   "playlistItems": 434,
+   "songTicks": 49168,
+   "songBars": 128.04,
+   "songSeconds": 214.9,
+   "maxPatternBars": 18,
+   "renderSeconds": 214.9,
+   "inserts": 126,
+   "samples": 35,
+   "pluginInstances": 91,
+   "pluginUsage": {
+    "FLEX": 2,
+    "Harmless": 1,
+    "Sytrus": 2,
+    "FL Keys": 1,
+    "Fruity Parametric EQ 2": 35,
+    "Maximus": 1,
+    "Fruity Balance": 2,
+    "Fruity Soft Clipper": 1,
+    "Fruity Chorus": 1,
+    "Fruity Reeverb 2": 5,
+    "Luxeverb": 1,
+    "Gross Beat": 4,
+    "Fruity Delay 2": 4,
+    "Edison": 1,
+    "Spreader": 1,
+    "Fruity Limiter": 4,
+    "Fruity Fast Dist": 1,
+    "Fruity Delay 3": 3,
+    "Fruity Compressor": 10,
+    "Fruity Multiband Compressor": 5,
+    "Fruity Blood Overdrive": 5,
+    "Fruity PanOMatic": 1
+   },
+   "sampleRefs": {
+    "total": 35,
+    "factory": 35,
+    "resolved": 35,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Demo songs/LeriQ - SHINE.flp",
+   "group": "demo",
+   "size": 590379,
+   "sha256": "4d7272968aecca97b07f6e9a7c219d70edf0f13fd5e6d40ae29f8765ba227a63",
+   "events": 5444,
+   "distinctIds": 110,
+   "version": "25.2.5.5319",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 1290,
+   "tempo": 178,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "SHINE",
+   "channels": 34,
+   "channelTypes": {
+    "0": 18,
+    "2": 10,
+    "4": 5,
+    "5": 1
+   },
+   "patterns": 24,
+   "notes": 522,
+   "arrangements": 1,
+   "playlistItems": 311,
+   "songTicks": 31488,
+   "songBars": 82,
+   "songSeconds": 110.6,
+   "maxPatternBars": 47.94,
+   "renderSeconds": 110.56,
+   "inserts": 127,
+   "samples": 22,
+   "pluginInstances": 72,
+   "pluginUsage": {
+    "FLEX": 6,
+    "Morphine": 3,
+    "Fruity DX10": 1,
+    "Fruity Limiter": 3,
+    "Fruity Compressor": 3,
+    "Fruity Parametric EQ": 6,
+    "Fruity Fast Dist": 4,
+    "Fruity Reeverb 2": 8,
+    "Fruity Flangus": 6,
+    "Fruity Stereo Shaper": 5,
+    "Gross Beat": 1,
+    "Fruity WaveShaper": 14,
+    "Fruity Delay 2": 3,
+    "Transient Processor": 3,
+    "Fruity Parametric EQ 2": 5,
+    "Fruity Delay 3": 1
+   },
+   "sampleRefs": {
+    "total": 22,
+    "factory": 22,
+    "resolved": 22,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Demo songs/LollieVox & Lezina J - I'll Be Your Madonna.flp",
+   "group": "demo",
+   "size": 1449814,
+   "sha256": "10163fc586b307b3fa98788afeb0b7ddc0fdfd676720a5994a679999d404bcd8",
+   "events": 6285,
+   "distinctIds": 103,
+   "version": "20.99.3000.3031",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 314,
+   "tempo": 91,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "I'll Be Your Madonna ",
+   "channels": 67,
+   "channelTypes": {
+    "0": 21,
+    "2": 15,
+    "4": 11,
+    "5": 20
+   },
+   "patterns": 52,
+   "notes": 715,
+   "arrangements": 1,
+   "playlistItems": 376,
+   "songTicks": 23424,
+   "songBars": 61,
+   "songSeconds": 160.9,
+   "maxPatternBars": 52,
+   "renderSeconds": 160.88,
+   "inserts": 127,
+   "samples": 32,
+   "pluginInstances": 121,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Sytrus": 2,
+    "Drumpad": 8,
+    "Morphine": 1,
+    "Ogun": 1,
+    "Harmor": 1,
+    "Fruity Envelope Controller": 1,
+    "Fruity Parametric EQ 2": 32,
+    "Fruity Limiter": 23,
+    "Fruity Balance": 1,
+    "Maximus": 4,
+    "Fruity WaveShaper": 5,
+    "Fruity Send": 1,
+    "Pitcher": 2,
+    "Fruity Compressor": 3,
+    "Fruity Delay Bank": 2,
+    "Fruity Reeverb 2": 10,
+    "Pitch Shifter": 2,
+    "Fruity Blood Overdrive": 3,
+    "Fruity Convolver": 2,
+    "Fruity Stereo Shaper": 4,
+    "Fruity Delay 3": 1,
+    "Soundgoodizer": 1,
+    "Transient Processor": 1,
+    "Vintage Chorus": 6,
+    "Fruity Soft Clipper": 1,
+    "Frequency Shifter": 1,
+    "Fruity Love Philter": 1
+   },
+   "sampleRefs": {
+    "total": 32,
+    "factory": 32,
+    "resolved": 32,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Demo songs/Mehdi Ebrahiminejad - Never Out.flp",
+   "group": "demo",
+   "size": 7142631,
+   "sha256": "631dd2e941a7f3a24d69e57b287639ae877e1fde364e60ba97498699c4bfcbf9",
+   "events": 7120,
+   "distinctIds": 117,
+   "version": "25.2.0.5098",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 1533,
+   "tempo": 165,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Never Out ( Tars )",
+   "channels": 69,
+   "channelTypes": {
+    "0": 5,
+    "2": 17,
+    "4": 40,
+    "5": 7
+   },
+   "patterns": 19,
+   "notes": 414,
+   "arrangements": 1,
+   "playlistItems": 693,
+   "songTicks": 42624,
+   "songBars": 111,
+   "songSeconds": 161.5,
+   "maxPatternBars": 9.91,
+   "renderSeconds": 161.45,
+   "inserts": 127,
+   "samples": 45,
+   "pluginInstances": 59,
+   "pluginUsage": {
+    "Harmor": 5,
+    "GMS": 2,
+    "Fruity Slicer": 3,
+    "FLEX": 5,
+    "DirectWave": 1,
+    "Harmless": 1,
+    "Fruity Parametric EQ": 1,
+    "Fruity Multiband Compressor": 1,
+    "Wave Candy": 1,
+    "Fruity Reeverb 2": 6,
+    "Fruity Delay 3": 1,
+    "Gross Beat": 2,
+    "Fruity Parametric EQ 2": 11,
+    "Fruity Love Philter": 3,
+    "Fruity Limiter": 2,
+    "Soundgoodizer": 8,
+    "Fruity Soft Clipper": 1,
+    "Fruity Delay 2": 2,
+    "Fruity Phaser": 1,
+    "Fruity NoteBook": 1,
+    "Fruity Stereo Shaper": 1
+   },
+   "sampleRefs": {
+    "total": 45,
+    "factory": 45,
+    "resolved": 45,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Demo songs/Mehran Abbasi - With You.flp",
+   "group": "demo",
+   "size": 732977,
+   "sha256": "569f8e9a3dfbd118662326c15f158b3d49cff247ecdaa9235f97dbe4dc09f794",
+   "events": 8554,
+   "distinctIds": 122,
+   "version": "24.2.99.4831",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 1608,
+   "tempo": 126,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "With You",
+   "channels": 110,
+   "channelTypes": {
+    "0": 1,
+    "2": 34,
+    "4": 4,
+    "5": 71
+   },
+   "patterns": 98,
+   "notes": 1727,
+   "arrangements": 1,
+   "playlistItems": 647,
+   "songTicks": 39936,
+   "songBars": 104,
+   "songSeconds": 198.1,
+   "maxPatternBars": 24,
+   "renderSeconds": 198.1,
+   "inserts": 50,
+   "samples": 5,
+   "pluginInstances": 138,
+   "pluginUsage": {
+    "Fruity DrumSynth Live": 8,
+    "FLEX": 18,
+    "Harmor": 1,
+    "3x Osc": 3,
+    "Sytrus": 4,
+    "Patcher": 3,
+    "Fruity Parametric EQ 2": 39,
+    "Fruity WaveShaper": 2,
+    "Emphasis": 1,
+    "Pitch Shifter": 1,
+    "Pitcher": 1,
+    "Maximus": 4,
+    "Fruity Peak Controller": 3,
+    "Spreader": 6,
+    "Hyper Chorus": 5,
+    "Fruity Balance": 8,
+    "Fruity Stereo Shaper": 4,
+    "Fruity Reeverb 2": 17,
+    "Fruity Delay 3": 3,
+    "Gross Beat": 2,
+    "Fruity Love Philter": 4,
+    "Fruity PanOMatic": 1
+   },
+   "sampleRefs": {
+    "total": 5,
+    "factory": 5,
+    "resolved": 5,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Demo songs/Ookay - Thief.flp",
+   "group": "demo",
+   "size": 313356,
+   "sha256": "9bd28ac62041297f973c1570df77e9b97fe9ca0b71ab458ef4d24b0ec6354a45",
+   "events": 4403,
+   "distinctIds": 126,
+   "version": "25.2.3.5164",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 1026,
+   "tempo": 150,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Thief",
+   "channels": 45,
+   "channelTypes": {
+    "2": 5,
+    "4": 32,
+    "5": 8
+   },
+   "patterns": 13,
+   "notes": 213,
+   "arrangements": 1,
+   "playlistItems": 1494,
+   "songTicks": 55296,
+   "songBars": 144,
+   "songSeconds": 230.4,
+   "maxPatternBars": 8,
+   "renderSeconds": 230.4,
+   "inserts": 29,
+   "samples": 32,
+   "pluginInstances": 82,
+   "pluginUsage": {
+    "Harmless": 1,
+    "3x Osc": 2,
+    "FLEX": 2,
+    "Fruity Soft Clipper": 2,
+    "Fruity Reeverb 2": 13,
+    "Fruity Parametric EQ 2": 27,
+    "Maximus": 9,
+    "Fruity Multiband Compressor": 3,
+    "Gross Beat": 1,
+    "Fruity Limiter": 9,
+    "Fruity Stereo Enhancer": 3,
+    "Fruity Balance": 2,
+    "Fruity Delay 3": 1,
+    "Fruity Chorus": 2,
+    "Fruity Free Filter": 2,
+    "Fruity Stereo Shaper": 2,
+    "Vocodex": 1
+   },
+   "sampleRefs": {
+    "total": 32,
+    "factory": 32,
+    "resolved": 32,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Demo songs/P.Priime - Use Me.flp",
+   "group": "demo",
+   "size": 183263,
+   "sha256": "4f7d8d5d81272ec7d48870fb8c1304f84c1c9cdfea2b9ae6c892636865d50318",
+   "events": 5311,
+   "distinctIds": 127,
+   "version": "25.2.5.5319",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 1315,
+   "tempo": 100,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Use Me",
+   "channels": 34,
+   "channelTypes": {
+    "0": 6,
+    "2": 2,
+    "4": 20,
+    "5": 6
+   },
+   "patterns": 10,
+   "notes": 419,
+   "arrangements": 1,
+   "playlistItems": 304,
+   "songTicks": 28416,
+   "songBars": 74,
+   "songSeconds": 177.6,
+   "maxPatternBars": 15.91,
+   "renderSeconds": 177.6,
+   "inserts": 125,
+   "samples": 26,
+   "pluginInstances": 32,
+   "pluginUsage": {
+    "Sytrus": 2,
+    "Emphasis": 1,
+    "Fruity Reeverb 2": 3,
+    "Pitcher": 1,
+    "Fruity Flangus": 1,
+    "Fruity Parametric EQ 2": 12,
+    "Fruity Delay 3": 1,
+    "Fruity Blood Overdrive": 1,
+    "Fruity Love Philter": 1,
+    "Effector": 4,
+    "Fruity WaveShaper": 1,
+    "Fruity Compressor": 1,
+    "Fruity Limiter": 1,
+    "Fruity Peak Controller": 1,
+    "Spreader": 1
+   },
+   "sampleRefs": {
+    "total": 26,
+    "factory": 26,
+    "resolved": 26,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Demo songs/Purps On The Beat Feat Luclover - Stroll Up.flp",
+   "group": "demo",
+   "size": 2856731,
+   "sha256": "ae5b613e8b6b26e6b9ae9c5313e9fb13e91f127fc462bf61e1132ac3a8452d45",
+   "events": 8387,
+   "distinctIds": 117,
+   "version": "25.2.0.5125",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 1750,
+   "tempo": 147,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Stroll Up",
+   "channels": 89,
+   "channelTypes": {
+    "0": 8,
+    "2": 9,
+    "4": 68,
+    "5": 4
+   },
+   "patterns": 31,
+   "notes": 639,
+   "arrangements": 1,
+   "playlistItems": 352,
+   "songTicks": 27648,
+   "songBars": 72,
+   "songSeconds": 117.6,
+   "maxPatternBars": 8,
+   "renderSeconds": 117.55,
+   "inserts": 127,
+   "samples": 76,
+   "pluginInstances": 112,
+   "pluginUsage": {
+    "BooBass": 1,
+    "FLEX": 5,
+    "Kepler": 1,
+    "FL Keys": 1,
+    "DirectWave": 1,
+    "Fruity Parametric EQ 2": 35,
+    "Patcher": 2,
+    "Fruity Blood Overdrive": 1,
+    "Fruity Stereo Enhancer": 1,
+    "Fruity Soft Clipper": 1,
+    "Fruity Limiter": 5,
+    "Fruity NoteBook 2": 1,
+    "Fruity Delay 3": 6,
+    "Hyper Chorus": 6,
+    "Pitcher": 4,
+    "Fruity Compressor": 4,
+    "Soundgoodizer": 5,
+    "Fruity Flangus": 6,
+    "Fruity Convolver": 4,
+    "LuxeVerb": 4,
+    "Fruity Reeverb 2": 1,
+    "Vintage Phaser": 1,
+    "Spreader": 5,
+    "Fruity WaveShaper": 2,
+    "Fruity Love Philter": 2,
+    "Fruity PanOMatic": 3,
+    "Vintage Chorus": 1,
+    "Fruity Flanger": 2,
+    "Fruity Phaser": 1
+   },
+   "sampleRefs": {
+    "total": 76,
+    "factory": 76,
+    "resolved": 76,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Demo songs/Sid De La Cruz - Secret Agent Rendezvous.flp",
+   "group": "demo",
+   "size": 2109428,
+   "sha256": "68f7ba2ca47cf52030aa17fbc62ee526ace561fe3b2f9877d59510abe5d4a988",
+   "events": 7342,
+   "distinctIds": 117,
+   "version": "24.0.99.4121",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 1775,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Secret Agent Rendezvous",
+   "channels": 46,
+   "channelTypes": {
+    "0": 18,
+    "2": 13,
+    "4": 4,
+    "5": 11
+   },
+   "patterns": 42,
+   "notes": 1452,
+   "arrangements": 2,
+   "playlistItems": 94,
+   "songTicks": 21050,
+   "songBars": 54.82,
+   "songSeconds": 109.6,
+   "maxPatternBars": 48,
+   "renderSeconds": 109.64,
+   "inserts": 127,
+   "samples": 22,
+   "pluginInstances": 61,
+   "pluginUsage": {
+    "Harmor": 2,
+    "DirectWave": 4,
+    "Kepler": 2,
+    "Wave Traveller": 2,
+    "3x Osc": 2,
+    "FLEX": 1,
+    "Fruity dB Meter": 1,
+    "LuxeVerb": 6,
+    "Fruity Parametric EQ 2": 13,
+    "Fruity Blood Overdrive": 2,
+    "Fruity Bass Boost": 2,
+    "Frequency Splitter": 1,
+    "Maximus": 1,
+    "Fruity Stereo Shaper": 4,
+    "Fruity PanOMatic": 3,
+    "Vintage Chorus": 1,
+    "Distructor": 2,
+    "Fruity Limiter": 5,
+    "Pitch Shifter": 2,
+    "Fruity Fast LP": 1,
+    "Fruity Peak Controller": 1,
+    "Fruity WaveShaper": 1,
+    "Fruity Reeverb 2": 1,
+    "Fruity NoteBook": 1
+   },
+   "sampleRefs": {
+    "total": 22,
+    "factory": 22,
+    "resolved": 22,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/NewStuff.flp",
+   "group": "demo",
+   "size": 313356,
+   "sha256": "9bd28ac62041297f973c1570df77e9b97fe9ca0b71ab458ef4d24b0ec6354a45",
+   "events": 4403,
+   "distinctIds": 126,
+   "version": "25.2.3.5164",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 1026,
+   "tempo": 150,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Thief",
+   "channels": 45,
+   "channelTypes": {
+    "2": 5,
+    "4": 32,
+    "5": 8
+   },
+   "patterns": 13,
+   "notes": 213,
+   "arrangements": 1,
+   "playlistItems": 1494,
+   "songTicks": 55296,
+   "songBars": 144,
+   "songSeconds": 230.4,
+   "maxPatternBars": 8,
+   "renderSeconds": 230.4,
+   "inserts": 29,
+   "samples": 32,
+   "pluginInstances": 82,
+   "pluginUsage": {
+    "Harmless": 1,
+    "3x Osc": 2,
+    "FLEX": 2,
+    "Fruity Soft Clipper": 2,
+    "Fruity Reeverb 2": 13,
+    "Fruity Parametric EQ 2": 27,
+    "Maximus": 9,
+    "Fruity Multiband Compressor": 3,
+    "Gross Beat": 1,
+    "Fruity Limiter": 9,
+    "Fruity Stereo Enhancer": 3,
+    "Fruity Balance": 2,
+    "Fruity Delay 3": 1,
+    "Fruity Chorus": 2,
+    "Fruity Free Filter": 2,
+    "Fruity Stereo Shaper": 2,
+    "Vocodex": 1
+   },
+   "sampleRefs": {
+    "total": 32,
+    "factory": 32,
+    "resolved": 32,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "group": "demo",
+   "size": 401308,
+   "sha256": "6a75c90cfb7b15fb6ea4a8605837fb3f3201170874b976b7b1bc1aba7c4045f2",
+   "events": 1144,
+   "distinctIds": 82,
+   "version": "10.9.0",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 130,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Performance demo",
+   "channels": 13,
+   "channelTypes": {
+    "2": 2,
+    "4": 9,
+    "5": 2
+   },
+   "patterns": 2,
+   "notes": 60,
+   "arrangements": 0,
+   "playlistItems": 36,
+   "songTicks": 1536,
+   "songBars": 4,
+   "songSeconds": 7.4,
+   "maxPatternBars": 4,
+   "renderSeconds": 7.38,
+   "inserts": 105,
+   "samples": 9,
+   "pluginInstances": 6,
+   "pluginUsage": {
+    "Harmor": 2,
+    "Maximus": 1,
+    "Fruity Parametric EQ 2": 3
+   },
+   "sampleRefs": {
+    "total": 9,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Performance mode/Drumloop Masher.flp",
+   "group": "demo",
+   "size": 356750,
+   "sha256": "ace7ed0a7c0a2e3810dc0aa0a5b48dbf16263eec45425f7e68864e937c9a5e1f",
+   "events": 2482,
+   "distinctIds": 85,
+   "version": "12.5.0.59",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 12,
+   "tempo": 130,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 19,
+   "channelTypes": {
+    "2": 18,
+    "5": 1
+   },
+   "patterns": 12,
+   "notes": 193,
+   "arrangements": 0,
+   "playlistItems": 48,
+   "songTicks": 768,
+   "songBars": 2,
+   "songSeconds": 3.7,
+   "maxPatternBars": 8,
+   "renderSeconds": 3.69,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 30,
+   "pluginUsage": {
+    "Slicex": 8,
+    "Fruity Keyboard Controller": 10,
+    "Fruity Soft Clipper": 1,
+    "Fruity Parametric EQ 2": 1,
+    "Gross Beat": 1,
+    "Maximus": 1,
+    "Fruity Love Philter": 2,
+    "Fruity X-Y Controller": 1,
+    "Fruity Delay Bank": 1,
+    "Fruity Reeverb 2": 4
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Performance mode/SeamlessR - Bass Antics Performance.flp",
+   "group": "demo",
+   "size": 768059,
+   "sha256": "7e0793bbd96b54ad5817526dfd05a5932b218dba6c35aede3f28401fb76af472",
+   "events": 6237,
+   "distinctIds": 108,
+   "version": "20.99.3000.3213",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 1144,
+   "tempo": 125,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Bass Antics",
+   "channels": 46,
+   "channelTypes": {
+    "0": 5,
+    "2": 11,
+    "4": 18,
+    "5": 12
+   },
+   "patterns": 160,
+   "notes": 421,
+   "arrangements": 1,
+   "playlistItems": 81,
+   "songTicks": 6144,
+   "songBars": 16,
+   "songSeconds": 30.7,
+   "maxPatternBars": 8,
+   "renderSeconds": 30.72,
+   "inserts": 127,
+   "samples": 22,
+   "pluginInstances": 51,
+   "pluginUsage": {
+    "Sytrus": 5,
+    "Toxic Biohazard": 2,
+    "Harmor": 4,
+    "Fruity Parametric EQ 2": 17,
+    "Maximus": 2,
+    "Edison": 1,
+    "Fruity Limiter": 9,
+    "Vocodex": 1,
+    "Fruity Chorus": 3,
+    "Fruity Reeverb 2": 6,
+    "Fruity Stereo Shaper": 1
+   },
+   "sampleRefs": {
+    "total": 22,
+    "factory": 22,
+    "resolved": 22,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Performance mode/nucleon - Complextreon.flp",
+   "group": "demo",
+   "size": 300939,
+   "sha256": "15f8ab9afacb67a55d946347d61734db34a078d225f8804c5f436034d7879167",
+   "events": 1354,
+   "distinctIds": 81,
+   "version": "11.0.3",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 124,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Complextreon",
+   "channels": 14,
+   "channelTypes": {
+    "2": 13,
+    "4": 1
+   },
+   "patterns": 45,
+   "notes": 1150,
+   "arrangements": 0,
+   "playlistItems": 25,
+   "songTicks": 7680,
+   "songBars": 20,
+   "songSeconds": 38.7,
+   "maxPatternBars": 4,
+   "renderSeconds": 38.71,
+   "inserts": 105,
+   "samples": 1,
+   "pluginInstances": 29,
+   "pluginUsage": {
+    "Harmless": 9,
+    "Slicex": 4,
+    "Gross Beat": 2,
+    "Fruity Parametric EQ 2": 4,
+    "Maximus": 4,
+    "Fruity Reeverb 2": 2,
+    "Fruity Delay Bank": 2,
+    "Fruity Love Philter": 2
+   },
+   "sampleRefs": {
+    "total": 1,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Performance mode/nucleon - Housework.flp",
+   "group": "demo",
+   "size": 138269,
+   "sha256": "205c38b613a793020c5ecb10fc2af066fa330b5f581c76e9414df67d868fa18d",
+   "events": 1369,
+   "distinctIds": 82,
+   "version": "11.0.3",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 130,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Housework",
+   "channels": 17,
+   "channelTypes": {
+    "2": 5,
+    "4": 1,
+    "5": 11
+   },
+   "patterns": 28,
+   "notes": 328,
+   "arrangements": 0,
+   "playlistItems": 26,
+   "songTicks": 6144,
+   "songBars": 16,
+   "songSeconds": 29.5,
+   "maxPatternBars": 4,
+   "renderSeconds": 29.54,
+   "inserts": 105,
+   "samples": 1,
+   "pluginInstances": 10,
+   "pluginUsage": {
+    "Harmless": 3,
+    "Slicex": 2,
+    "Maximus": 2,
+    "Fruity Love Philter": 1,
+    "Fruity Parametric EQ 2": 1,
+    "Fruity Reeverb 2": 1
+   },
+   "sampleRefs": {
+    "total": 1,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Performance mode/nucleon - Steptime.flp",
+   "group": "demo",
+   "size": 169107,
+   "sha256": "5a538397e5755339dd3475f925a60dde7f6accf8607ad0808ab1bf195164c26f",
+   "events": 1612,
+   "distinctIds": 84,
+   "version": "11.0.3",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 135,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Steptime",
+   "channels": 18,
+   "channelTypes": {
+    "0": 2,
+    "2": 11,
+    "4": 1,
+    "5": 4
+   },
+   "patterns": 59,
+   "notes": 503,
+   "arrangements": 0,
+   "playlistItems": 41,
+   "songTicks": 15360,
+   "songBars": 40,
+   "songSeconds": 71.1,
+   "maxPatternBars": 8,
+   "renderSeconds": 71.11,
+   "inserts": 105,
+   "samples": 3,
+   "pluginInstances": 46,
+   "pluginUsage": {
+    "Slicex": 2,
+    "Sytrus": 4,
+    "Harmless": 4,
+    "Fruity Envelope Controller": 1,
+    "Fruity Parametric EQ 2": 12,
+    "Maximus": 4,
+    "Fruity Love Philter": 3,
+    "Fruity Delay Bank": 5,
+    "Fruity Reeverb 2": 6,
+    "Fruity Peak Controller": 3,
+    "Fruity Limiter": 2
+   },
+   "sampleRefs": {
+    "total": 3,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Product demos/Electric Loop - The Ogun Dream.flp",
+   "group": "demo",
+   "size": 582657,
+   "sha256": "1c1ac0caf8a0c0a806bc5927caaac6e14ad22270fc8b8816c65d5e3b806da0ea",
+   "events": 3043,
+   "distinctIds": 94,
+   "version": "20.0.5.681",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 33,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "The Ogun Dream",
+   "channels": 17,
+   "channelTypes": {
+    "2": 14,
+    "5": 3
+   },
+   "patterns": 28,
+   "notes": 376,
+   "arrangements": 1,
+   "playlistItems": 218,
+   "songTicks": 18432,
+   "songBars": 48,
+   "songSeconds": 96,
+   "maxPatternBars": 8,
+   "renderSeconds": 96,
+   "inserts": 127,
+   "samples": 0,
+   "pluginInstances": 69,
+   "pluginUsage": {
+    "Ogun": 14,
+    "Fruity Parametric EQ 2": 17,
+    "Fruity Multiband Compressor": 2,
+    "Wave Candy": 1,
+    "Effector": 1,
+    "Fruity Compressor": 14,
+    "Fruity Peak Controller": 1,
+    "Maximus": 13,
+    "Transient Processor": 1,
+    "Fruity Phaser": 1,
+    "Fruity Delay": 1,
+    "Gross Beat": 2,
+    "Fruity Reeverb 2": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Product demos/Olbaid - Harmless Essentials.flp",
+   "group": "demo",
+   "size": 489646,
+   "sha256": "1891a0549624a940f9bcdd17da42255a77a65d0467082d4d36f0c180d4f7f8cf",
+   "events": 7996,
+   "distinctIds": 100,
+   "version": "20.5.0.1121",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 123,
+   "tempo": 140,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Olbaid Harmless Essentials",
+   "channels": 113,
+   "channelTypes": {
+    "0": 13,
+    "2": 77,
+    "5": 23
+   },
+   "patterns": 116,
+   "notes": 2762,
+   "arrangements": 1,
+   "playlistItems": 839,
+   "songTicks": 74880,
+   "songBars": 195,
+   "songSeconds": 334.3,
+   "maxPatternBars": 23.8,
+   "renderSeconds": 334.29,
+   "inserts": 127,
+   "samples": 13,
+   "pluginInstances": 89,
+   "pluginUsage": {
+    "Harmless": 77,
+    "Fruity Soft Clipper": 1,
+    "Wave Candy": 4,
+    "Fruity Parametric EQ 2": 1,
+    "Fruity Limiter": 1,
+    "Vocodex": 1,
+    "Fruity Delay 2": 2,
+    "Fruity Reeverb 2": 2
+   },
+   "sampleRefs": {
+    "total": 13,
+    "factory": 13,
+    "resolved": 13,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Product demos/Olbaid - Sytrus Essentials.flp",
+   "group": "demo",
+   "size": 561434,
+   "sha256": "5b6723e8540365aec265ce950c37853c8de2eee5d28ad25f00b1400ff8ab5ac5",
+   "events": 8797,
+   "distinctIds": 83,
+   "version": "12.4.0.29",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 4,
+   "tempo": 128,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Olbaid Sytrus Essentials Demo",
+   "channels": 161,
+   "channelTypes": {
+    "2": 125,
+    "5": 36
+   },
+   "patterns": 125,
+   "notes": 4559,
+   "arrangements": 0,
+   "playlistItems": 823,
+   "songTicks": 120576,
+   "songBars": 314,
+   "songSeconds": 588.8,
+   "maxPatternBars": 34,
+   "renderSeconds": 588.75,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 129,
+   "pluginUsage": {
+    "Sytrus": 125,
+    "Fruity Soft Clipper": 1,
+    "Wave Candy": 3
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Product demos/Square a Saw - Lightning (VEELA Vocals Resynthesized).flp",
+   "group": "demo",
+   "size": 2674870,
+   "sha256": "fa04c42e1c148ff24f4b5aa96a29a3e20f9f947c8a17f238b21146568f964a81",
+   "events": 5464,
+   "distinctIds": 85,
+   "version": "12.3.0.72",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 2,
+   "tempo": 128,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Lightning (feat. Veela)",
+   "channels": 69,
+   "channelTypes": {
+    "0": 7,
+    "2": 24,
+    "4": 8,
+    "5": 30
+   },
+   "patterns": 109,
+   "notes": 1650,
+   "arrangements": 0,
+   "playlistItems": 811,
+   "songTicks": 62976,
+   "songBars": 164,
+   "songSeconds": 307.5,
+   "maxPatternBars": 8,
+   "renderSeconds": 307.5,
+   "inserts": 105,
+   "samples": 15,
+   "pluginInstances": 124,
+   "pluginUsage": {
+    "Slicex": 1,
+    "Harmor": 20,
+    "Sytrus": 1,
+    "FL Keys": 1,
+    "Sakura": 1,
+    "Fruity Convolver": 1,
+    "Maximus": 3,
+    "Fruity Parametric EQ 2": 40,
+    "Transient Processor": 2,
+    "Fruity Love Philter": 3,
+    "Fruity Reeverb 2": 13,
+    "Fruity Delay 2": 3,
+    "Fruity Limiter": 30,
+    "Fruity WaveShaper": 1,
+    "Fruity Multiband Compressor": 2,
+    "Fruity Flangus": 1,
+    "Effector": 1
+   },
+   "sampleRefs": {
+    "total": 15,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Product demos/Square a Saw - Oxygen (Tevlo Vocals Resynthesized).flp",
+   "group": "demo",
+   "size": 4391444,
+   "sha256": "c18ec13ec570703e026be7591e744635817566bde679cad6fff9bc6a87f498f5",
+   "events": 5510,
+   "distinctIds": 86,
+   "version": "12.3.0.72",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 5,
+   "tempo": 145,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Oxygen (feat. Tevlo)",
+   "channels": 72,
+   "channelTypes": {
+    "0": 13,
+    "2": 30,
+    "4": 10,
+    "5": 19
+   },
+   "patterns": 92,
+   "notes": 2135,
+   "arrangements": 0,
+   "playlistItems": 537,
+   "songTicks": 60216,
+   "songBars": 156.81,
+   "songSeconds": 259.6,
+   "maxPatternBars": 10.26,
+   "renderSeconds": 259.55,
+   "inserts": 105,
+   "samples": 23,
+   "pluginInstances": 120,
+   "pluginUsage": {
+    "BassDrum": 1,
+    "FPC": 1,
+    "Harmor": 23,
+    "DirectWave": 4,
+    "3x Osc": 1,
+    "Fruity Convolver": 1,
+    "Maximus": 2,
+    "Transient Processor": 3,
+    "Fruity Love Philter": 3,
+    "Fruity Reeverb 2": 18,
+    "Fruity Parametric EQ 2": 36,
+    "Fruity Multiband Compressor": 2,
+    "Effector": 1,
+    "Fruity Limiter": 21,
+    "Fruity Delay 2": 2,
+    "Fruity WaveShaper": 1
+   },
+   "sampleRefs": {
+    "total": 23,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Product demos/Synth_dfr - Overcome - Sytrus.flp",
+   "group": "demo",
+   "size": 492590,
+   "sha256": "cc02ff43574a124e5f064dd2334b361e48a497144c9e1f13460953eefc443ae1",
+   "events": 5326,
+   "distinctIds": 85,
+   "version": "11.1.0",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 332,
+   "tempo": 124,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Overcome",
+   "channels": 88,
+   "channelTypes": {
+    "2": 72,
+    "5": 16
+   },
+   "patterns": 264,
+   "notes": 5335,
+   "arrangements": 0,
+   "playlistItems": 1056,
+   "songTicks": 53184,
+   "songBars": 138.5,
+   "songSeconds": 268.1,
+   "maxPatternBars": 21.5,
+   "renderSeconds": 268.06,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 72,
+   "pluginUsage": {
+    "Sytrus": 72
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Product demos/Vocodex demo.flp",
+   "group": "demo",
+   "size": 139596,
+   "sha256": "d718405a6595e12e4e303920364a3510146863d71a18cb8fe3cf5718d40f36f2",
+   "events": 3013,
+   "distinctIds": 95,
+   "version": "20.99.3000.3031",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 270,
+   "tempo": 140,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 7,
+   "channelTypes": {
+    "2": 5,
+    "4": 2
+   },
+   "patterns": 8,
+   "notes": 49,
+   "arrangements": 1,
+   "playlistItems": 8,
+   "songTicks": 7680,
+   "songBars": 20,
+   "songSeconds": 34.3,
+   "maxPatternBars": 6,
+   "renderSeconds": 34.29,
+   "inserts": 127,
+   "samples": 2,
+   "pluginInstances": 6,
+   "pluginUsage": {
+    "Sytrus": 5,
+    "Vocodex": 1
+   },
+   "sampleRefs": {
+    "total": 2,
+    "factory": 2,
+    "resolved": 2,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Product demos/nucleon - Fruity Delay 3.flp",
+   "group": "demo",
+   "size": 657128,
+   "sha256": "e2b62b7936ce08ea67fa5ed226a3afa55de772b3130387808e14238465b343ab",
+   "events": 2868,
+   "distinctIds": 87,
+   "version": "12.5.0.59",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 15,
+   "tempo": 150,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Fruity Delay 3 Demo",
+   "channels": 25,
+   "channelTypes": {
+    "0": 9,
+    "2": 6,
+    "4": 2,
+    "5": 8
+   },
+   "patterns": 26,
+   "notes": 123,
+   "arrangements": 0,
+   "playlistItems": 89,
+   "songTicks": 19200,
+   "songBars": 50,
+   "songSeconds": 80,
+   "maxPatternBars": 8,
+   "renderSeconds": 80,
+   "inserts": 105,
+   "samples": 11,
+   "pluginInstances": 30,
+   "pluginUsage": {
+    "DirectWave": 1,
+    "Harmless": 3,
+    "Harmor": 2,
+    "Fruity Parametric EQ 2": 4,
+    "Maximus": 2,
+    "Control Surface": 1,
+    "Fruity Delay 3": 14,
+    "Fruity Peak Controller": 2,
+    "Fruity Limiter": 1
+   },
+   "sampleRefs": {
+    "total": 11,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Product demos/nucleon - Harmless Galactic.flp",
+   "group": "demo",
+   "size": 177736,
+   "sha256": "a599f1a5662a0d17d516241690d8342a189c137c78e15010580269eed28e287a",
+   "events": 3745,
+   "distinctIds": 96,
+   "version": "20.5.1.1193",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 46,
+   "tempo": 118,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Galactic",
+   "channels": 28,
+   "channelTypes": {
+    "2": 25,
+    "5": 3
+   },
+   "patterns": 43,
+   "notes": 582,
+   "arrangements": 1,
+   "playlistItems": 68,
+   "songTicks": 26112,
+   "songBars": 68,
+   "songSeconds": 138.3,
+   "maxPatternBars": 8,
+   "renderSeconds": 138.31,
+   "inserts": 127,
+   "samples": 0,
+   "pluginInstances": 37,
+   "pluginUsage": {
+    "Harmless": 25,
+    "Fruity Parametric EQ 2": 7,
+    "Maximus": 1,
+    "Transient Processor": 2,
+    "Fruity Reeverb 2": 1,
+    "Fruity Delay 3": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Product demos/nucleon - Transient Processor.flp",
+   "group": "demo",
+   "size": 578353,
+   "sha256": "5265874fd8a971770f9d9fedc88a54941a2b20624f7c8839e5eff75a4c0459b5",
+   "events": 2473,
+   "distinctIds": 83,
+   "version": "12.3.0.71",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 2,
+   "tempo": 128,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Transient Processor",
+   "channels": 16,
+   "channelTypes": {
+    "0": 5,
+    "2": 6,
+    "4": 2,
+    "5": 3
+   },
+   "patterns": 31,
+   "notes": 946,
+   "arrangements": 0,
+   "playlistItems": 65,
+   "songTicks": 12288,
+   "songBars": 32,
+   "songSeconds": 60,
+   "maxPatternBars": 8,
+   "renderSeconds": 60,
+   "inserts": 105,
+   "samples": 7,
+   "pluginInstances": 30,
+   "pluginUsage": {
+    "FPC": 1,
+    "DirectWave": 1,
+    "Harmless": 3,
+    "Sytrus": 1,
+    "Fruity Parametric EQ 2": 4,
+    "Fruity Soft Clipper": 1,
+    "Control Surface": 1,
+    "Fruity Love Philter": 1,
+    "Fruity Delay Bank": 3,
+    "Transient Processor": 6,
+    "Effector": 6,
+    "Fruity Limiter": 2
+   },
+   "sampleRefs": {
+    "total": 7,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Visual/ZGameEditor Visualizer/Astes - Raubana - LIFE.flp",
+   "group": "demo",
+   "size": 365093,
+   "sha256": "1d00eb82432c5b7cf3e47c04252dba720a2f44f230175cc7a39d1fbfdbbf7b1c",
+   "events": 8919,
+   "distinctIds": 123,
+   "version": "24.2.99.4720",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 1590,
+   "tempo": 172,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "LIFE - by Raubana (ZGameEditor Visualizer)",
+   "channels": 108,
+   "channelTypes": {
+    "0": 2,
+    "2": 9,
+    "3": 1,
+    "4": 3,
+    "5": 93
+   },
+   "patterns": 64,
+   "notes": 660,
+   "arrangements": 1,
+   "playlistItems": 432,
+   "songTicks": 61440,
+   "songBars": 160,
+   "songSeconds": 223.3,
+   "maxPatternBars": 24,
+   "renderSeconds": 223.26,
+   "inserts": 127,
+   "samples": 4,
+   "pluginInstances": 34,
+   "pluginUsage": {
+    "Fruity slicer": 2,
+    "Sytrus": 6,
+    "FL Keys": 1,
+    "Maximus": 1,
+    "Fruity Formula Controller": 2,
+    "Fruity Peak Controller": 1,
+    "ZGameEditor Visualizer": 1,
+    "Fruity Balance": 1,
+    "Fruity Reeverb 2": 2,
+    "Fruity Parametric EQ 2": 9,
+    "Gross Beat": 1,
+    "Fruity Stereo Enhancer": 2,
+    "Fruity Limiter": 3,
+    "Fruity Delay 2": 2
+   },
+   "sampleRefs": {
+    "total": 4,
+    "factory": 4,
+    "resolved": 4,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Visual/ZGameEditor Visualizer/JuiceBass - SeamlessR - Menagerie.flp",
+   "group": "demo",
+   "size": 1231813,
+   "sha256": "8296880e285267b898fe6db18ede5a3fb80097f90ece97e211891ac50fc7087c",
+   "events": 13509,
+   "distinctIds": 84,
+   "version": "12.3.0.41",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 5,
+   "tempo": 122,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Menagerie",
+   "channels": 258,
+   "channelTypes": {
+    "0": 5,
+    "2": 14,
+    "4": 11,
+    "5": 228
+   },
+   "patterns": 171,
+   "notes": 686,
+   "arrangements": 0,
+   "playlistItems": 2158,
+   "songTicks": 92550,
+   "songBars": 241.02,
+   "songSeconds": 474.1,
+   "maxPatternBars": 16,
+   "renderSeconds": 474.13,
+   "inserts": 105,
+   "samples": 16,
+   "pluginInstances": 74,
+   "pluginUsage": {
+    "Sytrus": 6,
+    "Harmor": 8,
+    "Fruity Parametric EQ 2": 21,
+    "Maximus": 3,
+    "ZGameEditor Visualizer": 1,
+    "Fruity Limiter": 9,
+    "Fruity Fast LP": 2,
+    "Edison": 2,
+    "Fruity Peak Controller": 3,
+    "Vocodex": 1,
+    "Fruity Chorus": 3,
+    "Fruity Delay Bank": 7,
+    "Fruity Reeverb 2": 6,
+    "Fruity Love Philter": 2
+   },
+   "sampleRefs": {
+    "total": 16,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Visual/ZGameEditor Visualizer/Sacco - Expanding universe.flp",
+   "group": "demo",
+   "size": 82714,
+   "sha256": "b1b79709ca93fd4bf88bef68daa9e4687e1186a04d06d6a7eb27650a794d0a69",
+   "events": 1813,
+   "distinctIds": 79,
+   "version": "12.3.0.33",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 2,
+   "tempo": 125,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 6,
+   "channelTypes": {
+    "0": 1,
+    "2": 1,
+    "4": 1,
+    "5": 3
+   },
+   "patterns": 2,
+   "notes": 22,
+   "arrangements": 0,
+   "playlistItems": 70,
+   "songTicks": 3073,
+   "songBars": 8,
+   "songSeconds": 15.4,
+   "maxPatternBars": 3.94,
+   "renderSeconds": 15.36,
+   "inserts": 105,
+   "samples": 1,
+   "pluginInstances": 4,
+   "pluginUsage": {
+    "Harmless": 1,
+    "Fruity Limiter": 1,
+    "ZGameEditor Visualizer": 1,
+    "Fruity Peak Controller": 1
+   },
+   "sampleRefs": {
+    "total": 1,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Visual/ZGameEditor Visualizer/Sacco - Exploding Chips.flp",
+   "group": "demo",
+   "size": 176006,
+   "sha256": "20220838a348c3e986acb5f382cd0cbfa13707aa11c12cb2114a163fa34b9c49",
+   "events": 2128,
+   "distinctIds": 79,
+   "version": "12.3.0.33",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 2,
+   "tempo": 125,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 13,
+   "channelTypes": {
+    "0": 1,
+    "2": 1,
+    "4": 1,
+    "5": 10
+   },
+   "patterns": 8,
+   "notes": 68,
+   "arrangements": 0,
+   "playlistItems": 160,
+   "songTicks": 3072,
+   "songBars": 8,
+   "songSeconds": 15.4,
+   "maxPatternBars": 3.98,
+   "renderSeconds": 15.36,
+   "inserts": 105,
+   "samples": 1,
+   "pluginInstances": 4,
+   "pluginUsage": {
+    "Harmor": 1,
+    "Fruity Limiter": 1,
+    "ZGameEditor Visualizer": 1,
+    "Fruity Peak Controller": 1
+   },
+   "sampleRefs": {
+    "total": 1,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Visual/ZGameEditor Visualizer/Sacco - FlashyWaves.flp",
+   "group": "demo",
+   "size": 97987,
+   "sha256": "6d6964795dfb4b3e647c6b43bfaf7ecbb1c86c66f2a56de9df9599b2379afa3e",
+   "events": 2112,
+   "distinctIds": 80,
+   "version": "12.3.0.33",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 2,
+   "tempo": 125,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 13,
+   "channelTypes": {
+    "0": 1,
+    "2": 2,
+    "4": 1,
+    "5": 9
+   },
+   "patterns": 4,
+   "notes": 54,
+   "arrangements": 0,
+   "playlistItems": 112,
+   "songTicks": 1536,
+   "songBars": 4,
+   "songSeconds": 7.7,
+   "maxPatternBars": 1.97,
+   "renderSeconds": 7.68,
+   "inserts": 105,
+   "samples": 1,
+   "pluginInstances": 4,
+   "pluginUsage": {
+    "Harmless": 1,
+    "Fruity Envelope Controller": 1,
+    "Fruity Limiter": 1,
+    "ZGameEditor Visualizer": 1
+   },
+   "sampleRefs": {
+    "total": 1,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Visual/ZGameEditor Visualizer/Sacco - Pumping objects.flp",
+   "group": "demo",
+   "size": 81072,
+   "sha256": "c73ca89f802d0a1a60cc0f0beff7294f10fa3d0072309eda0af6a336ebbe4e12",
+   "events": 1855,
+   "distinctIds": 82,
+   "version": "12.3.0.43",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 2,
+   "tempo": 125,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 7,
+   "channelTypes": {
+    "0": 1,
+    "2": 1,
+    "4": 1,
+    "5": 4
+   },
+   "patterns": 2,
+   "notes": 24,
+   "arrangements": 0,
+   "playlistItems": 64,
+   "songTicks": 3072,
+   "songBars": 8,
+   "songSeconds": 15.4,
+   "maxPatternBars": 3.88,
+   "renderSeconds": 15.36,
+   "inserts": 105,
+   "samples": 1,
+   "pluginInstances": 3,
+   "pluginUsage": {
+    "Harmless": 1,
+    "Fruity Limiter": 1,
+    "ZGameEditor Visualizer": 1
+   },
+   "sampleRefs": {
+    "total": 1,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Visual/ZGameEditor Visualizer/Treben - Gimbal and Sinan - RawFL.flp",
+   "group": "demo",
+   "size": 239022,
+   "sha256": "7bcacd9b07222c51f3f50746dab6ac7565860bb6be7463355cc78bfdd2266108",
+   "events": 5736,
+   "distinctIds": 84,
+   "version": "12.3.0.43",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 2,
+   "tempo": 110,
+   "timeSig": [
+    8,
+    4
+   ],
+   "title": "RawFL",
+   "channels": 75,
+   "channelTypes": {
+    "0": 19,
+    "2": 17,
+    "3": 4,
+    "4": 6,
+    "5": 29
+   },
+   "patterns": 54,
+   "notes": 839,
+   "arrangements": 0,
+   "playlistItems": 398,
+   "songTicks": 39936,
+   "songBars": 52,
+   "songSeconds": 226.9,
+   "maxPatternBars": 2,
+   "renderSeconds": 226.91,
+   "inserts": 105,
+   "samples": 25,
+   "pluginInstances": 159,
+   "pluginUsage": {
+    "Fruit Kick": 1,
+    "3x Osc": 13,
+    "Fruity DX10": 2,
+    "FL Keys": 1,
+    "Fruity WaveShaper": 20,
+    "Fruity Parametric EQ 2": 47,
+    "Fruity Compressor": 11,
+    "Maximus": 6,
+    "ZGameEditor Visualizer": 1,
+    "Fruity Stereo Shaper": 3,
+    "Fruity Limiter": 22,
+    "Fruity Reeverb 2": 11,
+    "Soundgoodizer": 6,
+    "Fruity Flanger": 5,
+    "Fruity Chorus": 2,
+    "Vocodex": 1,
+    "Fruity Delay 2": 6,
+    "Fruity Peak Controller": 1
+   },
+   "sampleRefs": {
+    "total": 25,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Demo projects/Visual/ZGameEditor Visualizer/Treben - Umziky - All the same.flp",
+   "group": "demo",
+   "size": 3647561,
+   "sha256": "562c1044fcbf4ba4d0139a5ff89cf4e1cfe7324e39d9fccd9c4f01da974e4df2",
+   "events": 6635,
+   "distinctIds": 108,
+   "version": "20.99.3000.3213",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 1120,
+   "tempo": 168,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "All the same",
+   "channels": 54,
+   "channelTypes": {
+    "0": 8,
+    "2": 27,
+    "3": 1,
+    "4": 9,
+    "5": 9
+   },
+   "patterns": 48,
+   "notes": 1580,
+   "arrangements": 1,
+   "playlistItems": 108,
+   "songTicks": 69888,
+   "songBars": 182,
+   "songSeconds": 260,
+   "maxPatternBars": 32.88,
+   "renderSeconds": 260,
+   "inserts": 127,
+   "samples": 17,
+   "pluginInstances": 155,
+   "pluginUsage": {
+    "Sytrus": 5,
+    "FPC": 3,
+    "DirectWave": 5,
+    "Harmor": 10,
+    "Patcher": 7,
+    "3x Osc": 1,
+    "Fruity Parametric EQ 2": 43,
+    "Maximus": 1,
+    "Wave Candy": 1,
+    "ZGameEditor Visualizer": 1,
+    "Fruity Reeverb 2": 24,
+    "Fruity Limiter": 37,
+    "Fruity WaveShaper": 1,
+    "Fruity Delay Bank": 6,
+    "Fruity Multiband Compressor": 2,
+    "Hardcore": 1,
+    "Fruity Convolver": 2,
+    "Fruity Love Philter": 1,
+    "Vocodex": 3,
+    "Fruity Delay 2": 1
+   },
+   "sampleRefs": {
+    "total": 17,
+    "factory": 17,
+    "resolved": 17,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Empty.flp",
+   "group": "system-flp",
+   "size": 46361,
+   "sha256": "ae67bc831525c0650de212b1e614d9dc541ead54af72a6eb413482d9413685d4",
+   "events": 1413,
+   "distinctIds": 95,
+   "version": "24.2.99.4720",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 591,
+   "tempo": 140,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "0": 1
+   },
+   "patterns": 0,
+   "notes": 0,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "inserts": 18,
+   "samples": 0,
+   "pluginInstances": 0,
+   "pluginUsage": {},
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/FL Mobile/Song.flp",
+   "group": "system-flp",
+   "size": 51244,
+   "sha256": "d69b78f167ba39a7a33d03054b540bd083dc4176abd33d2a9fe767214bab015b",
+   "events": 635,
+   "distinctIds": 71,
+   "version": "11.0.4",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 140,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "0": 1
+   },
+   "patterns": 1,
+   "notes": 0,
+   "arrangements": 0,
+   "playlistItems": 1,
+   "songTicks": 384,
+   "songBars": 1,
+   "songSeconds": 1.7,
+   "renderSeconds": 1.71,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 0,
+   "pluginUsage": {},
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/3OSC.flp",
+   "group": "render-test",
+   "size": 65798,
+   "sha256": "16eec0d72bda5d8c19f46ecade9618e624b82e2e8e3a66a879063902a64ff1a7",
+   "events": 1575,
+   "distinctIds": 73,
+   "version": "12.5.0.59",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 2,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 7,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.88,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 1,
+   "pluginUsage": {
+    "3x Osc": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Autogun.flp",
+   "group": "render-test",
+   "size": 68114,
+   "sha256": "8d02c0d04e73ae2b43a46d378ed24b6a1a40fe2ce42e09e6bf7682ed253c19eb",
+   "events": 1574,
+   "distinctIds": 72,
+   "version": "12.5.0.59",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 1,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 7,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.88,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 1,
+   "pluginUsage": {
+    "Autogun": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Bassdrum.flp",
+   "group": "render-test",
+   "size": 52713,
+   "sha256": "0f442fa395e5f1c952b38991ac24af833d8f2416897a89e28fed4f7afe25b24c",
+   "events": 626,
+   "distinctIds": 69,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 106,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 7,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.88,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 1,
+   "pluginUsage": {
+    "BassDrum": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Beepmap.flp",
+   "group": "render-test",
+   "size": 93439,
+   "sha256": "92e95b21ec48796918c6ec3acd95cac6f5baf52faf180488c9b9d969e034464c",
+   "events": 1575,
+   "distinctIds": 73,
+   "version": "12.5.0.59",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 1,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 7,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.88,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 1,
+   "pluginUsage": {
+    "BeepMap": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Boobass.flp",
+   "group": "render-test",
+   "size": 65728,
+   "sha256": "0b3a21f867b10b2ebcce0012cc5a669cd011f788a5d2242e3359d0ef26e0efb6",
+   "events": 1575,
+   "distinctIds": 73,
+   "version": "12.5.0.59",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 2,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 7,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.88,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 1,
+   "pluginUsage": {
+    "BooBass": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Directwave.flp",
+   "group": "render-test",
+   "size": 445232,
+   "sha256": "744e6658e7e49708a6961faf273682ed9d7975f2283cbc8882e6126777837aa7",
+   "events": 1575,
+   "distinctIds": 73,
+   "version": "12.5.0.59",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 2,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 7,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.88,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 1,
+   "pluginUsage": {
+    "DirectWave": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Drumaxx.flp",
+   "group": "render-test",
+   "size": 87382,
+   "sha256": "6eebf2895d6a7995995a0b69d856ac67a4fb8aea31cecc1db86489c35da6f9d2",
+   "events": 1575,
+   "distinctIds": 73,
+   "version": "12.5.0.59",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 2,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 8,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 1,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 1,
+   "pluginUsage": {
+    "Drumaxx": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Drumpad.flp",
+   "group": "render-test",
+   "size": 51554,
+   "sha256": "3d05c6d0a2286bdea06af968218b13d1a0b35fdf8a0b23e61899c870987594dc",
+   "events": 626,
+   "distinctIds": 69,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 106,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 4,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.88,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 1,
+   "pluginUsage": {
+    "DrumPad": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Drumsynth Live.flp",
+   "group": "render-test",
+   "size": 70835,
+   "sha256": "32cbda56045c56cece0801e811fb324c591fbe7768f050bb0036b07f79f2edf0",
+   "events": 626,
+   "distinctIds": 69,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 106,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 8,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 1,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 1,
+   "pluginUsage": {
+    "Fruity DrumSynth Live": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/EQUO.flp",
+   "group": "render-test",
+   "size": 69875,
+   "sha256": "5eb067aa8b27fc8900dda544302da51183f56fc1728e7d080aa2c89c4062ed18",
+   "events": 1580,
+   "distinctIds": 73,
+   "version": "12.5.0.59",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 2,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "EQUO": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Effector.flp",
+   "group": "render-test",
+   "size": 66056,
+   "sha256": "79c443c786424a813e214aab631f5d4380024ab2299686def89183a5da026bf6",
+   "events": 1580,
+   "distinctIds": 73,
+   "version": "12.5.0.59",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 2,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Effector": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Emphasis.flp",
+   "group": "render-test",
+   "size": 111550,
+   "sha256": "ff2d4368aec293a952f4e395179584fa02054c87132e28b027e4164c9e91546e",
+   "events": 3383,
+   "distinctIds": 98,
+   "version": "24.2.99.4720",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 1028,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 127,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Emphasis": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/FL Keys.flp",
+   "group": "render-test",
+   "size": 51402,
+   "sha256": "9997e7551992483c529eac5ed89b2f0913b6e5ffc1da004debb21fff98d6d4c4",
+   "events": 626,
+   "distinctIds": 69,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 106,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 7,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.88,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 1,
+   "pluginUsage": {
+    "FL Keys": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/FLEX.flp",
+   "group": "render-test",
+   "size": 117449,
+   "sha256": "cbb5db6b36395e45940215cd3caaa823ee5746b1b8d3ffd1a5b664a7f8dedd75",
+   "events": 2357,
+   "distinctIds": 80,
+   "version": "20.1.2.917",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 5,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 7,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.88,
+   "renderSeconds": 2,
+   "inserts": 127,
+   "samples": 0,
+   "pluginInstances": 1,
+   "pluginUsage": {
+    "FLEX": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/FPC.flp",
+   "group": "render-test",
+   "size": 144658,
+   "sha256": "f85fc064775e69dbb8a2fbcd9121c22303ca7a0f662e02f951a5bd8845f4bb7f",
+   "events": 3247,
+   "distinctIds": 93,
+   "version": "21.2.2.3911",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 895,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 8,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 1,
+   "renderSeconds": 2,
+   "inserts": 127,
+   "samples": 0,
+   "pluginInstances": 1,
+   "pluginUsage": {
+    "FPC": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Frequency Shifter.flp",
+   "group": "render-test",
+   "size": 114937,
+   "sha256": "358a710df22c2aa0061ae97c9e8e341910e2369e781117946de3aa631f0dfe0f",
+   "events": 2364,
+   "distinctIds": 82,
+   "version": "20.8.3.2304",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 7,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 127,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Frequency Shifter": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruit Kick.flp",
+   "group": "render-test",
+   "size": 113556,
+   "sha256": "a8bc586b56bfe907c21391116c8a1e59732d9299d4c14c021e6e42ae6c6504a9",
+   "events": 2356,
+   "distinctIds": 79,
+   "version": "20.1.2.35",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 4,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 4,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.88,
+   "renderSeconds": 2,
+   "inserts": 127,
+   "samples": 0,
+   "pluginInstances": 1,
+   "pluginUsage": {
+    "Fruit Kick": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity Balance.flp",
+   "group": "render-test",
+   "size": 51735,
+   "sha256": "49a6d76ab2b382eab70a55df6ccaf3f50b2828615afb0ed67b35e932a83b5f3e",
+   "events": 630,
+   "distinctIds": 70,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 106,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Fruity Balance": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity Bass Boost.flp",
+   "group": "render-test",
+   "size": 51744,
+   "sha256": "819ce7874e4ae997a58575972b2076535f621ea0472b0a274058dc69cd90742f",
+   "events": 630,
+   "distinctIds": 70,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 106,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Fruity Bass Boost": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity Blood Overdrive.flp",
+   "group": "render-test",
+   "size": 116629,
+   "sha256": "fb2196097cf34bb7a3e2349e75a86518a781fa0f07fedebb86ec04a0527eee5d",
+   "events": 3253,
+   "distinctIds": 93,
+   "version": "21.2.1.3859",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 896,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 127,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Fruity Blood Overdrive": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity Center.flp",
+   "group": "render-test",
+   "size": 52796,
+   "sha256": "b5af4b002f5b2b44e356be6ca973f323199e1a0cf2c440883a5938e3c6403aa8",
+   "events": 630,
+   "distinctIds": 70,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 106,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "Sytrus": 1,
+    "Fruity Center": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity Chorus.flp",
+   "group": "render-test",
+   "size": 51774,
+   "sha256": "eb422d898dc9957309db825ee455266a7f33c28f465094a7af8b3b77d7df3443",
+   "events": 631,
+   "distinctIds": 71,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Fruity Chorus": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity Compressor.flp",
+   "group": "render-test",
+   "size": 51762,
+   "sha256": "976576317b704e016b1b673135a7297972089bd6baea5f90a1dce03f1d904fef",
+   "events": 631,
+   "distinctIds": 71,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Fruity Compressor": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity Convolver.flp",
+   "group": "render-test",
+   "size": 51873,
+   "sha256": "09333ec0119f0d4ae93f2bf1ed87031b83a024c8fdfe00e1d97d55914285f445",
+   "events": 630,
+   "distinctIds": 70,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Fruity Convolver": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity DX10.flp",
+   "group": "render-test",
+   "size": 51419,
+   "sha256": "3cbf1aef695a6d2da13a4faca60bb608b8677b39cc1e8f2fe8feb1d10a855daf",
+   "events": 626,
+   "distinctIds": 69,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 106,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 7,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.88,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 1,
+   "pluginUsage": {
+    "Fruity DX10": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity Delay 2.flp",
+   "group": "render-test",
+   "size": 51377,
+   "sha256": "903af50830d3631cce90681356c4fb11a84c38e57c0eceb819d021ffb92d8dd2",
+   "events": 630,
+   "distinctIds": 70,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Fruity Delay 2": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity Delay Bank.flp",
+   "group": "render-test",
+   "size": 52141,
+   "sha256": "497f799aedc1379438b0119ed75ef029a5bea819306f7ac4b10efe29fb22781f",
+   "events": 630,
+   "distinctIds": 70,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Fruity Delay Bank": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity Fast Dist.flp",
+   "group": "render-test",
+   "size": 51367,
+   "sha256": "6c5b26cd6f81b7868671bea3892277705791f8ad055396f54873631be4daaa93",
+   "events": 630,
+   "distinctIds": 70,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Fruity Fast Dist": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity Fast LP.flp",
+   "group": "render-test",
+   "size": 51737,
+   "sha256": "c3ac70f5b51fd59636f428e419209d88f9de5b103aa48147e600262c08c45521",
+   "events": 631,
+   "distinctIds": 71,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Fruity Fast LP": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity Filter.flp",
+   "group": "render-test",
+   "size": 51750,
+   "sha256": "b52c3ed45f59e2f3eb8ca81e77b6ef84f0463d7f063060b68c4c0f1e9fcf5f32",
+   "events": 631,
+   "distinctIds": 71,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Fruity Filter": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity Flanger.flp",
+   "group": "render-test",
+   "size": 51777,
+   "sha256": "fdc4f47ff75c6b55d7936a1fc34b303478bdf6c4c65b06b767569eec0984dfce",
+   "events": 631,
+   "distinctIds": 71,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Fruity Flanger": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity Flangus.flp",
+   "group": "render-test",
+   "size": 51377,
+   "sha256": "529e59239688cf671a4322d96e46a2f3c7141ab0759b062fbca58e934e6331fb",
+   "events": 630,
+   "distinctIds": 70,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Fruity Flangus": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity Free Filter.flp",
+   "group": "render-test",
+   "size": 51757,
+   "sha256": "941a67746bbe9d9ea8fff6862a2c8bbeff36d54b0eb2107bbb57682d7a5950c4",
+   "events": 631,
+   "distinctIds": 71,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Fruity Free Filter": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity Granulizer.flp",
+   "group": "render-test",
+   "size": 81913,
+   "sha256": "a701dd22ca641e754aefcdeddb7330600698aa4833a8b3643a7c139d94d14bcf",
+   "events": 1891,
+   "distinctIds": 81,
+   "version": "20.0.4",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 5,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 7,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.88,
+   "renderSeconds": 2,
+   "inserts": 127,
+   "samples": 1,
+   "pluginInstances": 1,
+   "pluginUsage": {
+    "Fruity Granulizer": 1
+   },
+   "sampleRefs": {
+    "total": 1,
+    "factory": 1,
+    "resolved": 1,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity Limiter.flp",
+   "group": "render-test",
+   "size": 51514,
+   "sha256": "7996dcdae0773159027001aa49302680b9202c2d55f5049eae6998e8c224d76b",
+   "events": 630,
+   "distinctIds": 70,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Fruity Limiter": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity Love Philter.flp",
+   "group": "render-test",
+   "size": 52923,
+   "sha256": "bc9b7498ad3ebfbd2796071f27ecf1e25966c3a1e789df0701db67b34902e1e9",
+   "events": 630,
+   "distinctIds": 70,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Fruity Love Philter": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity Multiband Compressor.flp",
+   "group": "render-test",
+   "size": 51482,
+   "sha256": "a5497671eab14ae2cede2a32b6f458b0cc36f4d1fd3260337ca7bedcf97eef51",
+   "events": 630,
+   "distinctIds": 70,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Fruity Multiband Compressor": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity Mute 2.flp",
+   "group": "render-test",
+   "size": 51734,
+   "sha256": "15f83301b187a976a87ad001bf61c2a2aead60399c06e98055e338c2344e9077",
+   "events": 631,
+   "distinctIds": 71,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Fruity Mute 2": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity PanOMatic.flp",
+   "group": "render-test",
+   "size": 51371,
+   "sha256": "c16a3ae7fcf82df129d2662d8b2e97a31a96a4fa1de627385429e8a55f6a1c14",
+   "events": 630,
+   "distinctIds": 70,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Fruity PanOMatic": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity Parametric EQ 2.flp",
+   "group": "render-test",
+   "size": 51659,
+   "sha256": "58bed4358c96d44b0daef5e94db0a96f81b4da643a1a219026dca297c953f316",
+   "events": 630,
+   "distinctIds": 70,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Fruity Parametric EQ 2": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity Parametric EQ.flp",
+   "group": "render-test",
+   "size": 51467,
+   "sha256": "cd718ddc48cd5e9816ed5a0eee5e7d6386c691a67c256e9961e2d71890e9177e",
+   "events": 630,
+   "distinctIds": 70,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Fruity Parametric EQ": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity Phase Inverter.flp",
+   "group": "render-test",
+   "size": 51754,
+   "sha256": "08debe63a51c6ac0b96819c2b7c65efa0f0bdaf7c749547cca7b2ad4b56e6ce1",
+   "events": 631,
+   "distinctIds": 71,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Fruity Phase Inverter": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity Phaser.flp",
+   "group": "render-test",
+   "size": 51762,
+   "sha256": "914442c4f8de0a5da2bbee5883f346ac02d56a8944a42d36d95e2ac4091c6210",
+   "events": 631,
+   "distinctIds": 71,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Fruity Phaser": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity Reeverb 2.flp",
+   "group": "render-test",
+   "size": 51405,
+   "sha256": "ce6016032772b5576fbfa14c8006d38b0ed44793300d3aa72084be60020de36c",
+   "events": 630,
+   "distinctIds": 70,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Fruity Reeverb 2": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity Reeverb.flp",
+   "group": "render-test",
+   "size": 51769,
+   "sha256": "66fab514fb9b36723e0ccf3f6aee26534949b31bacfb95ec4aaa87fb664d50b6",
+   "events": 631,
+   "distinctIds": 71,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Fruity Reeverb": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity Scratcher.flp",
+   "group": "render-test",
+   "size": 118042,
+   "sha256": "7ca83882e30ae6acb6d87490036a02a8a88864abf2b20f17de9193bed21d252b",
+   "events": 2363,
+   "distinctIds": 80,
+   "version": "20.2.0.1027",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 5,
+   "tempo": 140,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "0": 1
+   },
+   "patterns": 1,
+   "notes": 0,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "inserts": 127,
+   "samples": 0,
+   "pluginInstances": 1,
+   "pluginUsage": {
+    "Fruity Scratcher": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity Send.flp",
+   "group": "render-test",
+   "size": 51358,
+   "sha256": "16c00e172f1b82ba623887b546bb6238cc917b322bda54d130c8b474a9a3cc21",
+   "events": 630,
+   "distinctIds": 70,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Fruity Send": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity Slicer.flp",
+   "group": "render-test",
+   "size": 116785,
+   "sha256": "82614368e7fd12093706c558b35719e049d07d1abcc7fb8b0ce9ca77d1d9c3ce",
+   "events": 3247,
+   "distinctIds": 93,
+   "version": "21.2.2.3911",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 895,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 10,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 1,
+   "renderSeconds": 2,
+   "inserts": 127,
+   "samples": 0,
+   "pluginInstances": 1,
+   "pluginUsage": {
+    "Fruity slicer": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity Soft Clipper.flp",
+   "group": "render-test",
+   "size": 51358,
+   "sha256": "8fabd32c9fc8cb52ef8e7d821c20deac5af0c734a45aba7150b7dedcb024873c",
+   "events": 630,
+   "distinctIds": 70,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Fruity Soft Clipper": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity Squeeze.flp",
+   "group": "render-test",
+   "size": 51397,
+   "sha256": "b5f7aa81a146ffb94c0c68ecd4f8ebb7d48aa7a965978c9bea5c70b58b0472f4",
+   "events": 630,
+   "distinctIds": 70,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Fruity Squeeze": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity Stereo Enhancer.flp",
+   "group": "render-test",
+   "size": 51377,
+   "sha256": "20a1df4012e19cd17acd7e76af655d0d69050f06c07b05b80682a2a79e2f9c0d",
+   "events": 630,
+   "distinctIds": 70,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Fruity Stereo Enhancer": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity Stereo Shaper.flp",
+   "group": "render-test",
+   "size": 51387,
+   "sha256": "bd481d50d53fdd10bfce4d78d4b4b1b022a6cd1f5124d495d0260f9cb91ceb1b",
+   "events": 630,
+   "distinctIds": 70,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Fruity Stereo Shaper": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity Vocoder.flp",
+   "group": "render-test",
+   "size": 51539,
+   "sha256": "d957978a10a9df3a1ac34eaf92b2e5cfa466fb29d0417d86ca3fb6fb34ebb363",
+   "events": 630,
+   "distinctIds": 70,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Fruity Vocoder": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity Voltage Controller.flp",
+   "group": "render-test",
+   "size": 117778,
+   "sha256": "1e6618b8ba23835f8522fe4de2ae858d7f75f10bb8b77a70094e136799239b83",
+   "events": 3249,
+   "distinctIds": 93,
+   "version": "21.2.2.3914",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 895,
+   "tempo": 140,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 12,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 1.44,
+   "renderSeconds": 3.43,
+   "inserts": 127,
+   "samples": 0,
+   "pluginInstances": 1,
+   "pluginUsage": {
+    "Fruity Voltage Controller": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Fruity Waveshaper.flp",
+   "group": "render-test",
+   "size": 51499,
+   "sha256": "ed8e7bb8d34ab73826c6b98063eac9c48f9683c7ce0a11d2f002cb6589258bf2",
+   "events": 630,
+   "distinctIds": 70,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Fruity WaveShaper": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/GMS.flp",
+   "group": "render-test",
+   "size": 56287,
+   "sha256": "1ef467065d822e9ae9d2f855c9ddb290515aede2ce8a3ce5e15e3c84b23c7e4c",
+   "events": 626,
+   "distinctIds": 69,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 106,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 7,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.88,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 1,
+   "pluginUsage": {
+    "GMS": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Gross Beat.flp",
+   "group": "render-test",
+   "size": 87117,
+   "sha256": "e467c24976549056202c26b97bb9a44f0ede8a6b059b4905e8dc39087da06ee1",
+   "events": 630,
+   "distinctIds": 70,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Gross Beat": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Hardcore.flp",
+   "group": "render-test",
+   "size": 117034,
+   "sha256": "d9927eebe37d36915d141c6a1c54704305ab7d3781fbc22af26a9f0eedad16cb",
+   "events": 3253,
+   "distinctIds": 93,
+   "version": "21.2.3.3988",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 896,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 127,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Hardcore": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Harmless.flp",
+   "group": "render-test",
+   "size": 51765,
+   "sha256": "22d62740cd9e8441d428b412bd90fb6ae87db89a22335a5731123c6ab079b2db",
+   "events": 626,
+   "distinctIds": 69,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 106,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 7,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.88,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 1,
+   "pluginUsage": {
+    "Harmless": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Harmor.flp",
+   "group": "render-test",
+   "size": 136096,
+   "sha256": "023a7b2b23bd9dd0b354d7643a27b908faff595d442306a8e4ccf60fa3679ee1",
+   "events": 626,
+   "distinctIds": 69,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 106,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 7,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.88,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 1,
+   "pluginUsage": {
+    "Harmor": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Low Lifter.flp",
+   "group": "render-test",
+   "size": 116320,
+   "sha256": "cb7ac1d004c3a882fa67e26592973af2bf577f9ef7786c11ee4de0382ee69eb9",
+   "events": 3254,
+   "distinctIds": 95,
+   "version": "24.0.99.4151",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 897,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "0": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 2,
+   "renderSeconds": 4,
+   "inserts": 127,
+   "samples": 1,
+   "pluginInstances": 1,
+   "pluginUsage": {
+    "Low Lifter": 1
+   },
+   "sampleRefs": {
+    "total": 1,
+    "factory": 1,
+    "resolved": 1,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Maximus.flp",
+   "group": "render-test",
+   "size": 52681,
+   "sha256": "fcf5113d6c9ed09c8889ff87fee9458b42dc55b78e7d3821d65de25bfdd114da",
+   "events": 630,
+   "distinctIds": 70,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Maximus": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/MiniSynth.flp",
+   "group": "render-test",
+   "size": 51573,
+   "sha256": "7aec3894602d360ec578611fd1184cb036465d65fbbb72a956c70fdd61d0bb84",
+   "events": 626,
+   "distinctIds": 69,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 106,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 7,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.88,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 1,
+   "pluginUsage": {
+    "MiniSynth": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Ogun.flp",
+   "group": "render-test",
+   "size": 51929,
+   "sha256": "ad8dacac389296d6e54870cea36ef59663110e09de9ddc79d8ec51b1ee7920f2",
+   "events": 626,
+   "distinctIds": 69,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 106,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 7,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.88,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 1,
+   "pluginUsage": {
+    "Ogun": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Patcher (effect).flp",
+   "group": "render-test",
+   "size": 52918,
+   "sha256": "a112b69142f90d3ca31ea97ed631663cd5c98b1a318ed48b38cfd9e55e3c2624",
+   "events": 630,
+   "distinctIds": 70,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Patcher": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Patcher (generator).flp",
+   "group": "render-test",
+   "size": 53998,
+   "sha256": "cf39a0df0218df3ee9bb4d5a1f315abf049b4aace6a9729ab0f3de0cc92d9259",
+   "events": 626,
+   "distinctIds": 69,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 106,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 7,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.88,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 1,
+   "pluginUsage": {
+    "Patcher": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Pitch Shifter.flp",
+   "group": "render-test",
+   "size": 114973,
+   "sha256": "76f6b4392b668ac04c028e96d8254b89105413e3014646e038277e646fff46ce",
+   "events": 2618,
+   "distinctIds": 84,
+   "version": "20.9.0.2734",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 261,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 127,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Pitch Shifter": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Pitcher.flp",
+   "group": "render-test",
+   "size": 51503,
+   "sha256": "45db05921e167f537bc5aca4c665ce3e54fca0c01410446de1537e2f30b4b83e",
+   "events": 630,
+   "distinctIds": 70,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Pitcher": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/PoiZone.flp",
+   "group": "render-test",
+   "size": 52027,
+   "sha256": "aebe10a000503d2f8c3843832fb27c21880fdf0a9bbc8c5d8d5da0405c6e8114",
+   "events": 626,
+   "distinctIds": 69,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 106,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 7,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.88,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 1,
+   "pluginUsage": {
+    "PoiZone": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Sakura.flp",
+   "group": "render-test",
+   "size": 51921,
+   "sha256": "98a9bf3c64b1e6487b29e742e2ca987c9de08a834f25f190c58ae6f5d8e0302f",
+   "events": 626,
+   "distinctIds": 69,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 106,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 7,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.88,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 1,
+   "pluginUsage": {
+    "Sakura": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Sampler.flp",
+   "group": "render-test",
+   "size": 81831,
+   "sha256": "251076a87392d144510384277e0a9df5b0aeb62dfaa60d0234c8bdd8760b79eb",
+   "events": 1890,
+   "distinctIds": 80,
+   "version": "20.0.3",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 5,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "0": 1
+   },
+   "patterns": 1,
+   "notes": 7,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.88,
+   "renderSeconds": 2,
+   "inserts": 127,
+   "samples": 1,
+   "pluginInstances": 0,
+   "pluginUsage": {},
+   "sampleRefs": {
+    "total": 1,
+    "factory": 1,
+    "resolved": 1,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Sawer.flp",
+   "group": "render-test",
+   "size": 51943,
+   "sha256": "54618415b9e1f19c10d7cb13dfc2d4a672751540af455e1e315ab14c1455642e",
+   "events": 626,
+   "distinctIds": 69,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 106,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 7,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.88,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 1,
+   "pluginUsage": {
+    "Sawer": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/SimSynth.flp",
+   "group": "render-test",
+   "size": 51893,
+   "sha256": "7f7f13d0dc6a23033dfbc71b870603b9568572964c8c0ca6db151ec0d36cad8c",
+   "events": 626,
+   "distinctIds": 69,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 106,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 7,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.88,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 1,
+   "pluginUsage": {
+    "SimSynth": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Slicex.flp",
+   "group": "render-test",
+   "size": 1557695,
+   "sha256": "622707a911875ea9d16c3e8d8918f55417b584aa1001550f8e1706655fbd8c99",
+   "events": 3247,
+   "distinctIds": 93,
+   "version": "21.2.2.3911",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 895,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 10,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 1,
+   "renderSeconds": 2,
+   "inserts": 127,
+   "samples": 0,
+   "pluginInstances": 1,
+   "pluginUsage": {
+    "Slicex": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Soundgoodizer.flp",
+   "group": "render-test",
+   "size": 51356,
+   "sha256": "602d11e793f5481ec5b38ff53092984a83c34ecaaeb77eb37fc463b0f5778719",
+   "events": 630,
+   "distinctIds": 70,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 107,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Soundgoodizer": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Spreader.flp",
+   "group": "render-test",
+   "size": 116596,
+   "sha256": "8a6d2762c0ecdeee45e3b0b12ce5697c2f2c244143c8c890224c4d3c1fef170e",
+   "events": 3253,
+   "distinctIds": 93,
+   "version": "24.0.99.4087",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 896,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 127,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Spreader": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Sytrus.flp",
+   "group": "render-test",
+   "size": 52477,
+   "sha256": "4ddb4be33b3981ca4f361d880263bd1127afb405715a7a4cd64b9272824b1682",
+   "events": 626,
+   "distinctIds": 69,
+   "version": "11.1.1",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 106,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 7,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.88,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 1,
+   "pluginUsage": {
+    "Sytrus": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Transient Processor.flp",
+   "group": "render-test",
+   "size": 117896,
+   "sha256": "2581f2865e427ccee34ffa92f9043e176ad6f89a55a76123c090f3f0779e2f2c",
+   "events": 3253,
+   "distinctIds": 93,
+   "version": "21.2.3.3988",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 896,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 127,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Transient Processor": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Transporter.flp",
+   "group": "render-test",
+   "size": 116917,
+   "sha256": "191843996a2daa2e81d523379ccdfc0954ef1c8e4f8ea4852e44deb8afefbf7b",
+   "events": 3382,
+   "distinctIds": 96,
+   "version": "24.1.2.4408",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 1025,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 1,
+   "renderSeconds": 2,
+   "inserts": 127,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Transporter": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Vintage Chorus.flp",
+   "group": "render-test",
+   "size": 114972,
+   "sha256": "5a4813731c79f49cfd6df423d7eaf73ba3c635aa9b0d81c9844e7dc787e64c58",
+   "events": 2618,
+   "distinctIds": 84,
+   "version": "20.9.0.2734",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 261,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 127,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Vintage Chorus": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Vocodex.flp",
+   "group": "render-test",
+   "size": 66920,
+   "sha256": "740ba3d8868fe4456499cda2642b0d16f05c52e3b2b59939b2cf37f442deb39f",
+   "events": 1580,
+   "distinctIds": 73,
+   "version": "12.4.2.29",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 2,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 0,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 0.25,
+   "renderSeconds": 2,
+   "inserts": 105,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "3x Osc": 1,
+    "Vocodex": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/System/Render tests/Wave Traveller.flp",
+   "group": "render-test",
+   "size": 151569,
+   "sha256": "6af0aaddb86bc7298dc19e0f81d77cee724ca2009da47d33440fee7db433b46f",
+   "events": 2359,
+   "distinctIds": 80,
+   "version": "20.2.0.1027",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 5,
+   "tempo": 140,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 1,
+   "notes": 1,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 1,
+   "renderSeconds": 1.71,
+   "inserts": 127,
+   "samples": 0,
+   "pluginInstances": 1,
+   "pluginUsage": {
+    "Wave Traveller": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Templates/Advanced/Electronic/Breakbeat.flp",
+   "group": "template",
+   "size": 1031461,
+   "sha256": "cd2973b2e1fe5f769498234eaa14eb47d921059e6d4e5024cad256a3d4b426e0",
+   "events": 3128,
+   "distinctIds": 88,
+   "version": "20.7.0.1702",
+   "format": "project",
+   "ppq": 48,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 18,
+   "tempo": 128,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Breakbeat Template",
+   "channels": 11,
+   "channelTypes": {
+    "2": 9,
+    "4": 2
+   },
+   "patterns": 0,
+   "notes": 0,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "inserts": 127,
+   "samples": 2,
+   "pluginInstances": 46,
+   "pluginUsage": {
+    "FPC": 2,
+    "3x Osc": 1,
+    "Ogun": 1,
+    "Fruity DX10": 1,
+    "Harmless": 2,
+    "Autogun": 1,
+    "Slicex": 1,
+    "Maximus": 1,
+    "Fruity PanOMatic": 11,
+    "Control Surface": 1,
+    "Fruity Parametric EQ 2": 8,
+    "Fruity Stereo Shaper": 2,
+    "EQUO": 1,
+    "Fruity Limiter": 3,
+    "Fruity Delay 3": 3,
+    "Fruity Flangus": 3,
+    "Fruity Fast Dist": 1,
+    "Pitcher": 1,
+    "Fruity WaveShaper": 1,
+    "Fruity Peak Controller": 1
+   },
+   "sampleRefs": {
+    "total": 2,
+    "factory": 2,
+    "resolved": 2,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Templates/Advanced/Electronic/Chillout-Ambient.flp",
+   "group": "template",
+   "size": 4093213,
+   "sha256": "d7776998893a0990e762bf51cc3f36e8d176efb40c5bc876d32efbed7cfc47b1",
+   "events": 3166,
+   "distinctIds": 88,
+   "version": "20.7.0.1702",
+   "format": "project",
+   "ppq": 48,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 18,
+   "tempo": 82,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Chillout/Ambient Template",
+   "channels": 12,
+   "channelTypes": {
+    "2": 10,
+    "4": 2
+   },
+   "patterns": 0,
+   "notes": 0,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "inserts": 127,
+   "samples": 2,
+   "pluginInstances": 47,
+   "pluginUsage": {
+    "FPC": 1,
+    "3x Osc": 1,
+    "Harmless": 4,
+    "Autogun": 1,
+    "DirectWave": 2,
+    "Slicex": 1,
+    "Maximus": 1,
+    "Fruity PanOMatic": 10,
+    "Control Surface": 1,
+    "Fruity Parametric EQ 2": 8,
+    "Fruity Stereo Shaper": 2,
+    "EQUO": 1,
+    "Fruity Limiter": 3,
+    "Fruity Delay 3": 4,
+    "Fruity Flangus": 3,
+    "Fruity Fast Dist": 1,
+    "Pitcher": 1,
+    "Fruity WaveShaper": 1,
+    "Fruity Peak Controller": 1
+   },
+   "sampleRefs": {
+    "total": 2,
+    "factory": 2,
+    "resolved": 2,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Templates/Advanced/Electronic/Chillout.flp",
+   "group": "template",
+   "size": 4221182,
+   "sha256": "cec889facaee67326a032217e9442808d2c8ff7f9921a4f99aaa5abfde462dbf",
+   "events": 3166,
+   "distinctIds": 88,
+   "version": "20.7.0.1714",
+   "format": "project",
+   "ppq": 48,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 18,
+   "tempo": 82,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Chillout Template",
+   "channels": 12,
+   "channelTypes": {
+    "2": 10,
+    "4": 2
+   },
+   "patterns": 0,
+   "notes": 0,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "inserts": 127,
+   "samples": 2,
+   "pluginInstances": 47,
+   "pluginUsage": {
+    "FPC": 1,
+    "3x Osc": 1,
+    "Harmless": 4,
+    "Autogun": 1,
+    "DirectWave": 2,
+    "Slicex": 1,
+    "Maximus": 1,
+    "Fruity PanOMatic": 10,
+    "Control Surface": 1,
+    "Fruity Parametric EQ 2": 8,
+    "Fruity Stereo Shaper": 2,
+    "EQUO": 1,
+    "Fruity Limiter": 3,
+    "Fruity Delay 3": 4,
+    "Fruity Flangus": 3,
+    "Fruity Fast Dist": 1,
+    "Pitcher": 1,
+    "Fruity WaveShaper": 1,
+    "Fruity Peak Controller": 1
+   },
+   "sampleRefs": {
+    "total": 2,
+    "factory": 2,
+    "resolved": 2,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Templates/Advanced/Electronic/Drum & Bass.flp",
+   "group": "template",
+   "size": 1002532,
+   "sha256": "74b4b3fbab62a7e332c5087217ff7ea73a84b680424e015baa76e623216fde37",
+   "events": 3175,
+   "distinctIds": 89,
+   "version": "20.7.0.1702",
+   "format": "project",
+   "ppq": 48,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 20,
+   "tempo": 175,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Drum & Bass Template",
+   "channels": 12,
+   "channelTypes": {
+    "2": 8,
+    "4": 2,
+    "5": 2
+   },
+   "patterns": 0,
+   "notes": 0,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "inserts": 127,
+   "samples": 2,
+   "pluginInstances": 45,
+   "pluginUsage": {
+    "FPC": 1,
+    "3x Osc": 5,
+    "Autogun": 1,
+    "Slicex": 1,
+    "Maximus": 1,
+    "Fruity PanOMatic": 11,
+    "Control Surface": 1,
+    "Fruity Parametric EQ 2": 7,
+    "Fruity Stereo Shaper": 2,
+    "Fruity Limiter": 3,
+    "Fruity Delay 3": 4,
+    "Fruity Flangus": 3,
+    "Fruity WaveShaper": 2,
+    "Fruity Fast Dist": 1,
+    "Pitcher": 1,
+    "Fruity Peak Controller": 1
+   },
+   "sampleRefs": {
+    "total": 2,
+    "factory": 2,
+    "resolved": 2,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Templates/Advanced/Electronic/Dubstep.flp",
+   "group": "template",
+   "size": 1618717,
+   "sha256": "be0799c914e3b64221b199b6989c29004cdfdc9631695265adb8b4d7fabf160d",
+   "events": 3190,
+   "distinctIds": 88,
+   "version": "20.7.0.1702",
+   "format": "project",
+   "ppq": 48,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 18,
+   "tempo": 140,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Dubstep Template",
+   "channels": 12,
+   "channelTypes": {
+    "2": 8,
+    "4": 4
+   },
+   "patterns": 0,
+   "notes": 0,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "inserts": 127,
+   "samples": 4,
+   "pluginInstances": 50,
+   "pluginUsage": {
+    "FPC": 1,
+    "3x Osc": 5,
+    "Ogun": 1,
+    "Slicex": 1,
+    "Maximus": 1,
+    "Fruity PanOMatic": 11,
+    "Control Surface": 1,
+    "Fruity Parametric EQ 2": 8,
+    "Fruity Stereo Shaper": 2,
+    "Fruity Limiter": 3,
+    "Fruity Delay 3": 6,
+    "Fruity Flangus": 3,
+    "Fruity Fast Dist": 3,
+    "Pitcher": 1,
+    "Fruity Convolver": 1,
+    "Fruity WaveShaper": 1,
+    "Fruity Peak Controller": 1
+   },
+   "sampleRefs": {
+    "total": 4,
+    "factory": 4,
+    "resolved": 4,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Templates/Advanced/Electronic/EDM-House.flp",
+   "group": "template",
+   "size": 1002288,
+   "sha256": "b35a34be520c236dc18e4e588e5e49e4b538bf4adc1200dde7dccdcad80cca42",
+   "events": 3161,
+   "distinctIds": 88,
+   "version": "20.7.0.1702",
+   "format": "project",
+   "ppq": 48,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 18,
+   "tempo": 128,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "EDM/House Template",
+   "channels": 12,
+   "channelTypes": {
+    "2": 11,
+    "4": 1
+   },
+   "patterns": 0,
+   "notes": 0,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "inserts": 127,
+   "samples": 1,
+   "pluginInstances": 49,
+   "pluginUsage": {
+    "BassDrum": 1,
+    "Drumpad": 2,
+    "FPC": 1,
+    "3x Osc": 5,
+    "Autogun": 1,
+    "Slicex": 1,
+    "Maximus": 1,
+    "Fruity PanOMatic": 11,
+    "Control Surface": 1,
+    "Fruity Parametric EQ 2": 9,
+    "Fruity Stereo Shaper": 2,
+    "Fruity Limiter": 3,
+    "Fruity Delay 3": 4,
+    "Fruity Flangus": 3,
+    "Fruity Fast Dist": 1,
+    "Pitcher": 1,
+    "Fruity WaveShaper": 1,
+    "Fruity Peak Controller": 1
+   },
+   "sampleRefs": {
+    "total": 1,
+    "factory": 1,
+    "resolved": 1,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Templates/Advanced/Electronic/Electro.flp",
+   "group": "template",
+   "size": 999157,
+   "sha256": "9963b9f4db7672f6a4fbd68b4add69807dd4caca9ec20bab58973ad194c4ea3c",
+   "events": 3053,
+   "distinctIds": 88,
+   "version": "20.7.0.1702",
+   "format": "project",
+   "ppq": 48,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 18,
+   "tempo": 128,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Electro Template",
+   "channels": 9,
+   "channelTypes": {
+    "2": 8,
+    "4": 1
+   },
+   "patterns": 0,
+   "notes": 0,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "inserts": 127,
+   "samples": 1,
+   "pluginInstances": 48,
+   "pluginUsage": {
+    "FPC": 1,
+    "3x Osc": 5,
+    "Autogun": 1,
+    "Slicex": 1,
+    "Maximus": 1,
+    "Fruity PanOMatic": 11,
+    "Control Surface": 1,
+    "Fruity Parametric EQ 2": 8,
+    "Fruity Stereo Shaper": 2,
+    "Fruity Limiter": 4,
+    "Fruity Delay 3": 4,
+    "Fruity Flangus": 3,
+    "Fruity Fast Dist": 3,
+    "Pitcher": 1,
+    "Fruity WaveShaper": 1,
+    "Fruity Peak Controller": 1
+   },
+   "sampleRefs": {
+    "total": 1,
+    "factory": 1,
+    "resolved": 1,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Templates/Advanced/Electronic/HipHop-Trap.flp",
+   "group": "template",
+   "size": 983509,
+   "sha256": "d4329d79adfe0a3e5d03258ecf3a266f1641fdc5132d116b65e0b286764f28f6",
+   "events": 3123,
+   "distinctIds": 88,
+   "version": "20.7.0.1702",
+   "format": "project",
+   "ppq": 48,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 18,
+   "tempo": 140,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "HipHop/Trap Template",
+   "channels": 11,
+   "channelTypes": {
+    "2": 9,
+    "4": 2
+   },
+   "patterns": 0,
+   "notes": 0,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "inserts": 127,
+   "samples": 2,
+   "pluginInstances": 45,
+   "pluginUsage": {
+    "FPC": 2,
+    "3x Osc": 2,
+    "Fruity DX10": 3,
+    "Autogun": 1,
+    "Slicex": 1,
+    "Maximus": 1,
+    "Fruity PanOMatic": 11,
+    "Control Surface": 1,
+    "Fruity Parametric EQ 2": 7,
+    "Fruity Stereo Shaper": 2,
+    "Fruity Limiter": 3,
+    "Fruity Delay 3": 4,
+    "Fruity Flangus": 3,
+    "Fruity Fast Dist": 1,
+    "Pitcher": 1,
+    "Fruity WaveShaper": 1,
+    "Fruity Peak Controller": 1
+   },
+   "sampleRefs": {
+    "total": 2,
+    "factory": 2,
+    "resolved": 2,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Templates/Advanced/Electronic/Trap.flp",
+   "group": "template",
+   "size": 983436,
+   "sha256": "ddfe53b524e9ed75f0b42212c817f25d8584f02c5c57f76b2da372ba3ef636ff",
+   "events": 3121,
+   "distinctIds": 87,
+   "version": "20.5.0.1099",
+   "format": "project",
+   "ppq": 48,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 17,
+   "tempo": 140,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Trap Template",
+   "channels": 11,
+   "channelTypes": {
+    "2": 9,
+    "4": 2
+   },
+   "patterns": 0,
+   "notes": 0,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "inserts": 127,
+   "samples": 2,
+   "pluginInstances": 45,
+   "pluginUsage": {
+    "FPC": 2,
+    "3x Osc": 2,
+    "Fruity DX10": 3,
+    "Autogun": 1,
+    "Slicex": 1,
+    "Maximus": 1,
+    "Fruity PanOMatic": 11,
+    "Control Surface": 1,
+    "Fruity Parametric EQ 2": 7,
+    "Fruity Stereo Shaper": 2,
+    "Fruity Limiter": 3,
+    "Fruity Delay 3": 4,
+    "Fruity Flangus": 3,
+    "Fruity Fast Dist": 1,
+    "Pitcher": 1,
+    "Fruity WaveShaper": 1,
+    "Fruity Peak Controller": 1
+   },
+   "sampleRefs": {
+    "total": 2,
+    "factory": 2,
+    "resolved": 2,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Templates/Advanced/Instrumental/Funk.flp",
+   "group": "template",
+   "size": 2530892,
+   "sha256": "f359fffc559ef7ec8149d3f9decb23e2056dc19643ace013b620c42f20bf9b4a",
+   "events": 2848,
+   "distinctIds": 85,
+   "version": "20.7.0.1702",
+   "format": "project",
+   "ppq": 48,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 15,
+   "tempo": 96,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Funk Template",
+   "channels": 7,
+   "channelTypes": {
+    "2": 7
+   },
+   "patterns": 0,
+   "notes": 0,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "inserts": 127,
+   "samples": 0,
+   "pluginInstances": 27,
+   "pluginUsage": {
+    "FPC": 1,
+    "DirectWave": 6,
+    "Maximus": 1,
+    "Fruity PanOMatic": 6,
+    "Control Surface": 1,
+    "Fruity Stereo Shaper": 2,
+    "Fruity Parametric EQ 2": 6,
+    "Fruity Limiter": 2,
+    "Fruity Peak Controller": 1,
+    "Patcher": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Templates/Advanced/Instrumental/Jazz.flp",
+   "group": "template",
+   "size": 4185650,
+   "sha256": "7ff804ff82f0091ba3bed963f10a263121f26e4494060509d065219fb4a120f0",
+   "events": 3025,
+   "distinctIds": 85,
+   "version": "20.7.0.1702",
+   "format": "project",
+   "ppq": 48,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 15,
+   "tempo": 96,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Jazz Template",
+   "channels": 11,
+   "channelTypes": {
+    "2": 11
+   },
+   "patterns": 0,
+   "notes": 0,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "inserts": 127,
+   "samples": 0,
+   "pluginInstances": 31,
+   "pluginUsage": {
+    "FPC": 1,
+    "DirectWave": 10,
+    "Maximus": 1,
+    "Fruity PanOMatic": 6,
+    "Control Surface": 1,
+    "Fruity Stereo Shaper": 2,
+    "Fruity Parametric EQ 2": 6,
+    "Fruity Limiter": 2,
+    "Fruity Peak Controller": 1,
+    "Patcher": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Templates/Advanced/Instrumental/Metal.flp",
+   "group": "template",
+   "size": 2640792,
+   "sha256": "10a552f8952a3d8eed087f3c28f22a15af46a65d94aae92382949102096faf98",
+   "events": 2913,
+   "distinctIds": 86,
+   "version": "20.7.0.1702",
+   "format": "project",
+   "ppq": 48,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 15,
+   "tempo": 123,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Metal Template",
+   "channels": 8,
+   "channelTypes": {
+    "0": 1,
+    "2": 7
+   },
+   "patterns": 0,
+   "notes": 0,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "inserts": 127,
+   "samples": 1,
+   "pluginInstances": 31,
+   "pluginUsage": {
+    "FPC": 1,
+    "DirectWave": 6,
+    "Maximus": 1,
+    "Fruity PanOMatic": 6,
+    "Control Surface": 1,
+    "Fruity Stereo Shaper": 2,
+    "Fruity Parametric EQ 2": 6,
+    "Fruity Limiter": 2,
+    "Fruity Fast Dist": 1,
+    "Patcher": 2,
+    "Fruity Delay 3": 1,
+    "Fruity Chorus": 1,
+    "Fruity Peak Controller": 1
+   },
+   "sampleRefs": {
+    "total": 1,
+    "factory": 1,
+    "resolved": 1,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Templates/Advanced/Instrumental/Rock.flp",
+   "group": "template",
+   "size": 2639313,
+   "sha256": "e07e673bf6d12f0527ae459ff09d87a5496be95f9d5b6627a968f914fd3b7b60",
+   "events": 2894,
+   "distinctIds": 86,
+   "version": "20.7.0.1702",
+   "format": "project",
+   "ppq": 48,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 16,
+   "tempo": 90,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Rock Template",
+   "channels": 7,
+   "channelTypes": {
+    "2": 7
+   },
+   "patterns": 0,
+   "notes": 0,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "inserts": 127,
+   "samples": 0,
+   "pluginInstances": 36,
+   "pluginUsage": {
+    "FPC": 1,
+    "DirectWave": 6,
+    "Maximus": 1,
+    "Fruity PanOMatic": 6,
+    "Control Surface": 1,
+    "Fruity Stereo Shaper": 2,
+    "Fruity Parametric EQ 2": 6,
+    "Fruity Limiter": 2,
+    "EQUO": 1,
+    "Fruity Soft Clipper": 1,
+    "Fruity Chorus": 2,
+    "Fruity WaveShaper": 1,
+    "Fruity Delay 3": 1,
+    "Fruity Flanger": 1,
+    "Fruity Fast Dist": 1,
+    "Patcher": 2,
+    "Fruity Peak Controller": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Templates/Empty/Empty.flp",
+   "group": "template",
+   "size": 46361,
+   "sha256": "ae67bc831525c0650de212b1e614d9dc541ead54af72a6eb413482d9413685d4",
+   "events": 1413,
+   "distinctIds": 95,
+   "version": "24.2.99.4720",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 591,
+   "tempo": 140,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "0": 1
+   },
+   "patterns": 0,
+   "notes": 0,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "inserts": 18,
+   "samples": 0,
+   "pluginInstances": 0,
+   "pluginUsage": {},
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Templates/Minimal/Basic/Basic.flp",
+   "group": "template",
+   "size": 49457,
+   "sha256": "c8a7a05cf39dcf8489a9cd67e31024602fe0dd910fcb941d52ca27ddb35c907f",
+   "events": 1549,
+   "distinctIds": 96,
+   "version": "24.2.99.4720",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 603,
+   "tempo": 130,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 4,
+   "channelTypes": {
+    "0": 4
+   },
+   "patterns": 0,
+   "notes": 0,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "inserts": 18,
+   "samples": 4,
+   "pluginInstances": 0,
+   "pluginUsage": {},
+   "sampleRefs": {
+    "total": 4,
+    "factory": 4,
+    "resolved": 4,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Templates/Minimal/Basic with limiter/Basic with limiter.flp",
+   "group": "template",
+   "size": 53208,
+   "sha256": "7547bba3fcf960481a4a8dd6990e7844c54e50cba4d3196aa213259802fa297d",
+   "events": 1614,
+   "distinctIds": 101,
+   "version": "26.1.0.5528",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 619,
+   "tempo": 130,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 5,
+   "channelTypes": {
+    "0": 4,
+    "2": 1
+   },
+   "patterns": 0,
+   "notes": 0,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "inserts": 18,
+   "samples": 4,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "FLEX": 1,
+    "Emphasizer": 1
+   },
+   "sampleRefs": {
+    "total": 4,
+    "factory": 4,
+    "resolved": 4,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Templates/Minimal/Delay and reverb/Delay and reverb.flp",
+   "group": "template",
+   "size": 49058,
+   "sha256": "fc28b645c582784b617a108f2c5412a33127268ddaee8761a5368abecb42d8a5",
+   "events": 1467,
+   "distinctIds": 99,
+   "version": "24.2.99.4720",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 601,
+   "tempo": 140,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "0": 1
+   },
+   "patterns": 0,
+   "notes": 0,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "inserts": 20,
+   "samples": 0,
+   "pluginInstances": 2,
+   "pluginUsage": {
+    "Fruity Delay Bank": 1,
+    "Fruity Reeverb 2": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Templates/Minimal/Empty/Empty.flp",
+   "group": "template",
+   "size": 46361,
+   "sha256": "ae67bc831525c0650de212b1e614d9dc541ead54af72a6eb413482d9413685d4",
+   "events": 1413,
+   "distinctIds": 95,
+   "version": "24.2.99.4720",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 591,
+   "tempo": 140,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "0": 1
+   },
+   "patterns": 0,
+   "notes": 0,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "inserts": 18,
+   "samples": 0,
+   "pluginInstances": 0,
+   "pluginUsage": {},
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Templates/Minimal/Empty with 4 sends/Empty with 4 sends.flp",
+   "group": "template",
+   "size": 49251,
+   "sha256": "172c74da874e967501cc219c5dab718b5624f2e83f336d1043b152080a210644",
+   "events": 1484,
+   "distinctIds": 94,
+   "version": "24.2.99.4720",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 607,
+   "tempo": 140,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "0": 1
+   },
+   "patterns": 0,
+   "notes": 0,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "inserts": 22,
+   "samples": 0,
+   "pluginInstances": 0,
+   "pluginUsage": {},
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Templates/Other/All MIDI CC/All MIDI CC.flp",
+   "group": "template",
+   "size": 49153,
+   "sha256": "408feaa964279bd76599cb1a241698a75f15527f11a2ef0d1d2560e28e010a87",
+   "events": 1539,
+   "distinctIds": 94,
+   "version": "24.2.99.4720",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 591,
+   "tempo": 140,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "0": 1
+   },
+   "patterns": 0,
+   "notes": 0,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "inserts": 18,
+   "samples": 0,
+   "pluginInstances": 0,
+   "pluginUsage": {},
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Templates/Other/Blocks/Blocks.flp",
+   "group": "template",
+   "size": 57737,
+   "sha256": "3d3eee6d459e2af964fd8dc5e60bb076bb12f10c97a4ab299cf9c4bcf6252d57",
+   "events": 1557,
+   "distinctIds": 104,
+   "version": "24.2.99.4720",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 607,
+   "tempo": 140,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 4,
+   "channelTypes": {
+    "0": 4
+   },
+   "patterns": 0,
+   "notes": 0,
+   "arrangements": 1,
+   "playlistItems": 104,
+   "songTicks": 384,
+   "songBars": 1,
+   "songSeconds": 1.7,
+   "renderSeconds": 1.71,
+   "inserts": 18,
+   "samples": 4,
+   "pluginInstances": 0,
+   "pluginUsage": {},
+   "sampleRefs": {
+    "total": 4,
+    "factory": 4,
+    "resolved": 4,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Templates/Other/Patch bank/Patch bank.flp",
+   "group": "template",
+   "size": 101761,
+   "sha256": "c95305b1e67dfaf0ba159d022de64fb92978fb005e39ae2b8fa4114d602ee330",
+   "events": 2693,
+   "distinctIds": 100,
+   "version": "24.2.99.4720",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 730,
+   "tempo": 140,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 23,
+   "channelTypes": {
+    "0": 13,
+    "2": 10
+   },
+   "patterns": 0,
+   "notes": 0,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "inserts": 30,
+   "samples": 13,
+   "pluginInstances": 13,
+   "pluginUsage": {
+    "3x Osc": 9,
+    "FPC": 1,
+    "Fruity Limiter": 1,
+    "Fruity Reeverb 2": 1,
+    "Fruity Delay Bank": 1
+   },
+   "sampleRefs": {
+    "total": 13,
+    "factory": 13,
+    "resolved": 13,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Templates/Other/Video chopping/Video chopping.flp",
+   "group": "template",
+   "size": 77729,
+   "sha256": "958a0fb34b9d0dce23c7663605d360128661f56c6441f64f02e08541a8cfac99",
+   "events": 1518,
+   "distinctIds": 98,
+   "version": "24.2.99.4720",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 601,
+   "tempo": 140,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 3,
+   "channelTypes": {
+    "2": 2,
+    "3": 1
+   },
+   "patterns": 0,
+   "notes": 0,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "inserts": 18,
+   "samples": 0,
+   "pluginInstances": 4,
+   "pluginUsage": {
+    "Slicex": 1,
+    "MIDI Out": 1,
+    "Fruity NoteBook 2": 1,
+    "ZGameEditor Visualizer": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Templates/Performance/4x4/4x4.flp",
+   "group": "template",
+   "size": 261895,
+   "sha256": "b35b29570e90bcd0cb60b88227f0857a59d615c84a2fd39b5591311356a6c589",
+   "events": 4623,
+   "distinctIds": 105,
+   "version": "20.99.3000.3228",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 972,
+   "tempo": 130,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 26,
+   "channelTypes": {
+    "0": 7,
+    "2": 7,
+    "4": 11,
+    "5": 1
+   },
+   "patterns": 56,
+   "notes": 284,
+   "arrangements": 1,
+   "playlistItems": 26,
+   "songTicks": 1536,
+   "songBars": 4,
+   "songSeconds": 7.4,
+   "maxPatternBars": 5,
+   "renderSeconds": 7.38,
+   "inserts": 127,
+   "samples": 18,
+   "pluginInstances": 11,
+   "pluginUsage": {
+    "Harmless": 3,
+    "Slicex": 4,
+    "Fruity Soft Clipper": 1,
+    "Fruity Parametric EQ 2": 2,
+    "Fruity Delay Bank": 1
+   },
+   "sampleRefs": {
+    "total": 18,
+    "factory": 18,
+    "resolved": 18,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Templates/Performance/8x8/8x8.flp",
+   "group": "template",
+   "size": 264967,
+   "sha256": "f41e63b9f97b7a0b45b0d29881b4a1e4de20933609024f0f9ce3e4c0145d1031",
+   "events": 4659,
+   "distinctIds": 105,
+   "version": "20.99.3000.3228",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 972,
+   "tempo": 130,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 26,
+   "channelTypes": {
+    "0": 7,
+    "2": 7,
+    "4": 11,
+    "5": 1
+   },
+   "patterns": 56,
+   "notes": 261,
+   "arrangements": 1,
+   "playlistItems": 83,
+   "songTicks": 3072,
+   "songBars": 8,
+   "songSeconds": 14.8,
+   "maxPatternBars": 5,
+   "renderSeconds": 14.77,
+   "inserts": 127,
+   "samples": 18,
+   "pluginInstances": 11,
+   "pluginUsage": {
+    "Harmless": 3,
+    "Slicex": 4,
+    "Fruity Soft Clipper": 1,
+    "Fruity Parametric EQ 2": 2,
+    "Fruity Delay Bank": 1
+   },
+   "sampleRefs": {
+    "total": 18,
+    "factory": 18,
+    "resolved": 18,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Templates/Performance/Touchscreen/Touchscreen.flp",
+   "group": "template",
+   "size": 352078,
+   "sha256": "f1e2a0df8b6b110ce36e9094dc3769f25c142f97091f2519a99e178f4261d2d2",
+   "events": 4280,
+   "distinctIds": 98,
+   "version": "20.7.0.1702",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 63,
+   "tempo": 130,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "Touchscreen monitor / tablet performance mode template.",
+   "channels": 37,
+   "channelTypes": {
+    "0": 7,
+    "2": 8,
+    "4": 11,
+    "5": 11
+   },
+   "patterns": 60,
+   "notes": 389,
+   "arrangements": 1,
+   "playlistItems": 115,
+   "songTicks": 3072,
+   "songBars": 8,
+   "songSeconds": 14.8,
+   "maxPatternBars": 5,
+   "renderSeconds": 14.77,
+   "inserts": 127,
+   "samples": 18,
+   "pluginInstances": 18,
+   "pluginUsage": {
+    "Harmless": 4,
+    "Slicex": 4,
+    "Fruity Soft Clipper": 1,
+    "Fruity Parametric EQ 2": 2,
+    "Fruity Delay Bank": 1,
+    "Gross Beat": 2,
+    "Fruity Love Philter": 2,
+    "Fruity X-Y Controller": 2
+   },
+   "sampleRefs": {
+    "total": 18,
+    "factory": 18,
+    "resolved": 13,
+    "missing": [
+     "%FLStudioFactoryData%\\Data\\Patches\\Misc\\Used by demo projects\\Kieron A Gore - Return To\\Kick Basic.wav",
+     "%FLStudioFactoryData%\\Data\\Patches\\Misc\\Used by demo projects\\Seamless - Antecoder\\Clap Basic.wav",
+     "%FLStudioFactoryData%\\Data\\Patches\\Misc\\Used by demo projects\\Seamless - Antecoder\\Hat Basic.wav",
+     "%FLStudioFactoryData%\\Data\\Patches\\Misc\\Used by demo projects\\Seamless - Antecoder\\Snare Basic.wav",
+     "%FLStudioFactoryData%\\Data\\Patches\\Misc\\Used by demo projects\\Sacco - Goldener Schnitt\\HIT_5.wav"
+    ]
+   }
+  },
+  {
+   "rel": "Data/Templates/Power User/Cheese's recording setup/Cheese's recording setup.flp",
+   "group": "template",
+   "size": 155370,
+   "sha256": "dd838eb513bfab7294e84ed520b07b2a0de44daccc7a7f3520fca1a8d94a8030",
+   "events": 3843,
+   "distinctIds": 96,
+   "version": "24.1.2.4394",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 971,
+   "tempo": 158,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "0": 1
+   },
+   "patterns": 0,
+   "notes": 0,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "inserts": 127,
+   "samples": 0,
+   "pluginInstances": 75,
+   "pluginUsage": {
+    "Fruity NoteBook 2": 1,
+    "Fruity Parametric EQ 2": 25,
+    "Fruity Soft Clipper": 1,
+    "Fruity Limiter": 5,
+    "Pitcher": 13,
+    "Fruity Compressor": 12,
+    "Fruity Multiband Compressor": 4,
+    "Fruity Reeverb 2": 4,
+    "Fruity Delay 3": 5,
+    "Fruity Chorus": 1,
+    "LuxeVerb": 4
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Templates/Utility/Create a chord progression/Create a chord progression.flp",
+   "group": "template",
+   "size": 899116,
+   "sha256": "f3afb1e9802c24ade65ed9dd776fe8f809053ebb3778927fe5c2c7e7ab118a4d",
+   "events": 1611,
+   "distinctIds": 109,
+   "version": "24.2.99.4720",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 613,
+   "tempo": 128,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 4,
+   "channelTypes": {
+    "2": 4
+   },
+   "patterns": 5,
+   "notes": 51,
+   "arrangements": 1,
+   "playlistItems": 4,
+   "songTicks": 1536,
+   "songBars": 4,
+   "songSeconds": 7.5,
+   "maxPatternBars": 3.94,
+   "renderSeconds": 7.5,
+   "inserts": 18,
+   "samples": 0,
+   "pluginInstances": 6,
+   "pluginUsage": {
+    "DirectWave": 2,
+    "Sytrus": 1,
+    "FPC": 1,
+    "Fruity Soft Clipper": 1,
+    "Fruity Reeverb 2": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Templates/Utility/Drum mix/Drum mix.flp",
+   "group": "template",
+   "size": 68380,
+   "sha256": "bfb0fc1d544c29269d5df52f7568077aa994a3a5de52761507869fd227fd35b2",
+   "events": 1511,
+   "distinctIds": 98,
+   "version": "24.2.99.4720",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 602,
+   "tempo": 120,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "2": 1
+   },
+   "patterns": 0,
+   "notes": 0,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "inserts": 18,
+   "samples": 0,
+   "pluginInstances": 12,
+   "pluginUsage": {
+    "FPC": 1,
+    "Fruity Parametric EQ 2": 7,
+    "Fruity Limiter": 2,
+    "Fruity Reeverb 2": 1,
+    "Soundgoodizer": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Templates/Utility/Launch loop starter/Launch Loop Starter.flp",
+   "group": "template",
+   "size": 46361,
+   "sha256": "ae67bc831525c0650de212b1e614d9dc541ead54af72a6eb413482d9413685d4",
+   "events": 1413,
+   "distinctIds": 95,
+   "version": "24.2.99.4720",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 591,
+   "tempo": 140,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "0": 1
+   },
+   "patterns": 0,
+   "notes": 0,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "inserts": 18,
+   "samples": 0,
+   "pluginInstances": 0,
+   "pluginUsage": {},
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Templates/Utility/Record Audio/Record Audio.flp",
+   "group": "template",
+   "size": 49385,
+   "sha256": "4213c6dac8435de8ba083be28cdb1995ef27ff2bec9135221c4840b72f96f001",
+   "events": 1549,
+   "distinctIds": 96,
+   "version": "24.2.99.4720",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 603,
+   "tempo": 130,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 4,
+   "channelTypes": {
+    "0": 4
+   },
+   "patterns": 0,
+   "notes": 0,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "inserts": 18,
+   "samples": 4,
+   "pluginInstances": 0,
+   "pluginUsage": {},
+   "sampleRefs": {
+    "total": 4,
+    "factory": 4,
+    "resolved": 4,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Templates/Utility/Remix a song/Remix a song.flp",
+   "group": "template",
+   "size": 46468,
+   "sha256": "98af5a354eb476372ddbd4a2db82e8d41bad520fada93c184b653901a3165a05",
+   "events": 1419,
+   "distinctIds": 99,
+   "version": "25.2.99",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 594,
+   "tempo": 140,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "0": 1
+   },
+   "patterns": 0,
+   "notes": 0,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "inserts": 18,
+   "samples": 0,
+   "pluginInstances": 0,
+   "pluginUsage": {},
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Templates/Utility/SFX transitions/SFX transitions.flp",
+   "group": "template",
+   "size": 62260,
+   "sha256": "78b9033e8db9156c09c9f715c0b3cfda395b954b2663f52ba3987fa4f03113c8",
+   "events": 1913,
+   "distinctIds": 114,
+   "version": "24.2.99.4720",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 643,
+   "tempo": 128,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "SFX transitions",
+   "channels": 10,
+   "channelTypes": {
+    "2": 1,
+    "5": 9
+   },
+   "patterns": 4,
+   "notes": 1,
+   "arrangements": 1,
+   "playlistItems": 10,
+   "songTicks": 1536,
+   "songBars": 4,
+   "songSeconds": 7.5,
+   "maxPatternBars": 4,
+   "renderSeconds": 7.5,
+   "inserts": 18,
+   "samples": 0,
+   "pluginInstances": 7,
+   "pluginUsage": {
+    "MiniSynth": 1,
+    "Fruity Love Philter": 2,
+    "Fruity Parametric EQ 2": 1,
+    "Fruity Delay Bank": 1,
+    "Fruity Reeverb 2": 1,
+    "Fruity Limiter": 1
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Templates/Utility/Surround mix/Surround mix.flp",
+   "group": "template",
+   "size": 65954,
+   "sha256": "e3327b0024a1ccfadb9433d6fa6127c5692d7a52a9a05c47b886be2c3be5c109",
+   "events": 1731,
+   "distinctIds": 100,
+   "version": "24.2.99.4720",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 656,
+   "tempo": 140,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 1,
+   "channelTypes": {
+    "0": 1
+   },
+   "patterns": 0,
+   "notes": 0,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "inserts": 22,
+   "samples": 0,
+   "pluginInstances": 17,
+   "pluginUsage": {
+    "Control Surface": 1,
+    "Fruity X-Y Controller": 16
+   },
+   "sampleRefs": {
+    "total": 0,
+    "factory": 0,
+    "resolved": 0,
+    "missing": []
+   }
+  },
+  {
+   "rel": "Data/Templates/Utility/Vocoder/Vocoder.flp",
+   "group": "template",
+   "size": 55796,
+   "sha256": "6ceccf82f9340ef5f052d4a554138b128563fc8f8420b5471ac99493013d2acf",
+   "events": 1669,
+   "distinctIds": 108,
+   "version": "24.2.99.4720",
+   "format": "project",
+   "ppq": 96,
+   "typedRoundTripOk": true,
+   "undocumentedEvents": 622,
+   "tempo": 140,
+   "timeSig": [
+    4,
+    4
+   ],
+   "title": "",
+   "channels": 5,
+   "channelTypes": {
+    "2": 5
+   },
+   "patterns": 11,
+   "notes": 25,
+   "arrangements": 1,
+   "playlistItems": 0,
+   "songTicks": 0,
+   "maxPatternBars": 4,
+   "renderSeconds": 6.86,
+   "inserts": 18,
+   "samples": 2,
+   "pluginInstances": 8,
+   "pluginUsage": {
+    "3x Osc": 4,
+    "Fruity granulizer": 1,
+    "Vocodex": 1,
+    "Fruity Reeverb 2": 1,
+    "Fruity NoteBook 2": 1
+   },
+   "sampleRefs": {
+    "total": 2,
+    "factory": 2,
+    "resolved": 2,
+    "missing": []
+   }
+  }
+ ]
+}

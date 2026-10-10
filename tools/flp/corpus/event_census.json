@@ -1,0 +1,3883 @@
+{
+ "distinctIds": 151,
+ "events": 552878,
+ "ids": [
+  {
+   "id": 0,
+   "idHex": "0x0",
+   "name": "ChannelEnabled",
+   "cls": "byte",
+   "count": 4071,
+   "files": 807,
+   "groups": {
+    "demo": 45,
+    "fst": 643,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x4071"
+   ],
+   "firstSeen": "3.0.0.0",
+   "firstFile": "Data/Patches/Channel presets/3x Osc/BP string.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": false,
+   "sample": "01"
+  },
+  {
+   "id": 9,
+   "idHex": "0x9",
+   "name": "LoopActive",
+   "cls": "byte",
+   "count": 164,
+   "files": 164,
+   "groups": {
+    "demo": 45,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x164"
+   ],
+   "firstSeen": "10.9.0.0",
+   "firstFile": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "01"
+  },
+  {
+   "id": 10,
+   "idHex": "0xa",
+   "name": "ShowInfo",
+   "cls": "byte",
+   "count": 164,
+   "files": 164,
+   "groups": {
+    "demo": 45,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x164"
+   ],
+   "firstSeen": "10.9.0.0",
+   "firstFile": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "01"
+  },
+  {
+   "id": 11,
+   "idHex": "0xb",
+   "name": "Swing",
+   "cls": "byte",
+   "count": 164,
+   "files": 164,
+   "groups": {
+    "demo": 45,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x164"
+   ],
+   "firstSeen": "10.9.0.0",
+   "firstFile": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "39"
+  },
+  {
+   "id": 17,
+   "idHex": "0x11",
+   "name": "TimeSigNum",
+   "cls": "byte",
+   "count": 164,
+   "files": 164,
+   "groups": {
+    "demo": 45,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x164"
+   ],
+   "firstSeen": "10.9.0.0",
+   "firstFile": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "04"
+  },
+  {
+   "id": 18,
+   "idHex": "0x12",
+   "name": "TimeSigBeat",
+   "cls": "byte",
+   "count": 164,
+   "files": 164,
+   "groups": {
+    "demo": 45,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x164"
+   ],
+   "firstSeen": "10.9.0.0",
+   "firstFile": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "04"
+  },
+  {
+   "id": 19,
+   "idHex": "0x13",
+   "name": "UseLoopPoints",
+   "cls": "byte",
+   "count": 5,
+   "files": 5,
+   "groups": {
+    "fst": 5
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x5"
+   ],
+   "firstSeen": "3.6.6.0",
+   "firstFile": "Data/Patches/Packs/Legacy/Instruments/Strings/DNC_OrionString.fst",
+   "lastSeen": "4.5.4.0",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": false,
+   "sample": "01"
+  },
+  {
+   "id": 20,
+   "idHex": "0x14",
+   "name": "PingPongLoop",
+   "cls": "byte",
+   "count": 4071,
+   "files": 807,
+   "groups": {
+    "demo": 45,
+    "fst": 643,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x4071"
+   ],
+   "firstSeen": "3.0.0.0",
+   "firstFile": "Data/Patches/Channel presets/3x Osc/BP string.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "00"
+  },
+  {
+   "id": 21,
+   "idHex": "0x15",
+   "name": "ChannelType",
+   "cls": "byte",
+   "count": 4071,
+   "files": 807,
+   "groups": {
+    "demo": 45,
+    "fst": 643,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x4071"
+   ],
+   "firstSeen": "3.0.0.0",
+   "firstFile": "Data/Patches/Channel presets/3x Osc/BP string.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "02"
+  },
+  {
+   "id": 22,
+   "idHex": "0x16",
+   "name": "RoutedTo",
+   "cls": "byte",
+   "count": 2893,
+   "files": 773,
+   "groups": {
+    "demo": 31,
+    "fst": 643,
+    "system-flp": 1,
+    "render-test": 81,
+    "template": 17
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x2893"
+   ],
+   "firstSeen": "3.0.0.0",
+   "firstFile": "Data/Patches/Channel presets/3x Osc/BP string.fst",
+   "lastSeen": "24.1.2.4408",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": false,
+   "sample": "00"
+  },
+  {
+   "id": 23,
+   "idHex": "0x17",
+   "name": "PanLaw",
+   "cls": "byte",
+   "count": 164,
+   "files": 164,
+   "groups": {
+    "demo": 45,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x164"
+   ],
+   "firstSeen": "10.9.0.0",
+   "firstFile": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "00"
+  },
+  {
+   "id": 25,
+   "idHex": "0x19",
+   "name": "Unk25",
+   "cls": "byte",
+   "count": 2,
+   "files": 2,
+   "groups": {
+    "demo": 2
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x2"
+   ],
+   "firstSeen": "11.1.0.0",
+   "firstFile": "Data/Demo projects/Product demos/Synth_dfr - Overcome - Sytrus.flp",
+   "lastSeen": "12.5.0.59",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "08"
+  },
+  {
+   "id": 26,
+   "idHex": "0x1a",
+   "name": "PatternLooped",
+   "cls": "byte",
+   "count": 2,
+   "files": 2,
+   "groups": {
+    "demo": 2
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x2"
+   ],
+   "firstSeen": "20.99.3000.3213",
+   "firstFile": "Data/Demo projects/Performance mode/SeamlessR - Bass Antics Performance.flp",
+   "lastSeen": "25.1.2.4893",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "01"
+  },
+  {
+   "id": 27,
+   "idHex": "0x1b",
+   "name": "Unk27",
+   "cls": "byte",
+   "count": 6198,
+   "files": 62,
+   "groups": {
+    "demo": 5,
+    "fst": 3,
+    "system-flp": 1,
+    "render-test": 53
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x6198"
+   ],
+   "firstSeen": "8.0.0.0",
+   "firstFile": "Data/Patches/Mixer presets/1-bar overdub recording.fst",
+   "lastSeen": "11.1.1.0",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": false,
+   "sample": "0c"
+  },
+  {
+   "id": 28,
+   "idHex": "0x1c",
+   "name": "Licensed",
+   "cls": "byte",
+   "count": 7711,
+   "files": 7711,
+   "groups": {
+    "demo": 45,
+    "fst": 7352,
+    "fsc": 195,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x7711"
+   ],
+   "firstSeen": "8.5.0.0",
+   "firstFile": "Data/Patches/Plugin presets/Effects/Vocodex/Configuration/Bark scale.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "01"
+  },
+  {
+   "id": 29,
+   "idHex": "0x1d",
+   "name": "Apdc",
+   "cls": "byte",
+   "count": 164,
+   "files": 164,
+   "groups": {
+    "demo": 45,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x164"
+   ],
+   "firstSeen": "10.9.0.0",
+   "firstFile": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "00"
+  },
+  {
+   "id": 30,
+   "idHex": "0x1e",
+   "name": "PlayTruncatedNotes",
+   "cls": "byte",
+   "count": 155,
+   "files": 155,
+   "groups": {
+    "demo": 40,
+    "system-flp": 1,
+    "render-test": 82,
+    "template": 32
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x155"
+   ],
+   "firstSeen": "10.9.0.0",
+   "firstFile": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "01"
+  },
+  {
+   "id": 31,
+   "idHex": "0x1f",
+   "name": "Unk31",
+   "cls": "byte",
+   "count": 164,
+   "files": 164,
+   "groups": {
+    "demo": 45,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x164"
+   ],
+   "firstSeen": "10.9.0.0",
+   "firstFile": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "00"
+  },
+  {
+   "id": 32,
+   "idHex": "0x20",
+   "name": "ChannelLocked",
+   "cls": "byte",
+   "count": 3224,
+   "files": 105,
+   "groups": {
+    "demo": 40,
+    "system-flp": 1,
+    "render-test": 29,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x3224"
+   ],
+   "firstSeen": "12.3.0.33",
+   "firstFile": "Data/Demo projects/Visual/ZGameEditor Visualizer/Sacco - Expanding universe.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "00"
+  },
+  {
+   "id": 33,
+   "idHex": "0x21",
+   "name": "TimeMarkerNum",
+   "cls": "byte",
+   "count": 219,
+   "files": 26,
+   "groups": {
+    "demo": 21,
+    "template": 5
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x219"
+   ],
+   "firstSeen": "12.9.3.321",
+   "firstFile": "Data/Demo projects/Demo songs/Eric Kauffmann & NrgMind - Exoplanet.flp",
+   "lastSeen": "25.2.5.5319",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "04"
+  },
+  {
+   "id": 34,
+   "idHex": "0x22",
+   "name": "TimeMarkerDenom",
+   "cls": "byte",
+   "count": 219,
+   "files": 26,
+   "groups": {
+    "demo": 21,
+    "template": 5
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x219"
+   ],
+   "firstSeen": "12.9.3.321",
+   "firstFile": "Data/Demo projects/Demo songs/Eric Kauffmann & NrgMind - Exoplanet.flp",
+   "lastSeen": "25.2.5.5319",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "04"
+  },
+  {
+   "id": 35,
+   "idHex": "0x23",
+   "name": "Unk35",
+   "cls": "byte",
+   "count": 84,
+   "files": 84,
+   "groups": {
+    "demo": 28,
+    "system-flp": 1,
+    "render-test": 20,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x84"
+   ],
+   "firstSeen": "12.9.3.321",
+   "firstFile": "Data/Demo projects/Demo songs/Eric Kauffmann & NrgMind - Exoplanet.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "01"
+  },
+  {
+   "id": 36,
+   "idHex": "0x24",
+   "name": "Unk36",
+   "cls": "byte",
+   "count": 87,
+   "files": 84,
+   "groups": {
+    "demo": 28,
+    "system-flp": 1,
+    "render-test": 20,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x87"
+   ],
+   "firstSeen": "12.9.3.321",
+   "firstFile": "Data/Demo projects/Demo songs/Eric Kauffmann & NrgMind - Exoplanet.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "00"
+  },
+  {
+   "id": 37,
+   "idHex": "0x25",
+   "name": "Unk37",
+   "cls": "byte",
+   "count": 3804,
+   "files": 3804,
+   "groups": {
+    "demo": 28,
+    "fst": 3690,
+    "fsc": 30,
+    "system-flp": 1,
+    "render-test": 20,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x3804"
+   ],
+   "firstSeen": "12.9.2.275",
+   "firstFile": "Data/Patches/Plugin database/Effects/Dynamics/Fruity Compressor.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "01"
+  },
+  {
+   "id": 38,
+   "idHex": "0x26",
+   "name": "Unk38",
+   "cls": "byte",
+   "count": 76,
+   "files": 76,
+   "groups": {
+    "demo": 26,
+    "system-flp": 1,
+    "render-test": 14,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x76"
+   ],
+   "firstSeen": "20.5.0.1099",
+   "firstFile": "Data/Templates/Advanced/Electronic/Trap.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "01"
+  },
+  {
+   "id": 39,
+   "idHex": "0x27",
+   "name": "Unk39",
+   "cls": "byte",
+   "count": 73,
+   "files": 73,
+   "groups": {
+    "demo": 24,
+    "system-flp": 1,
+    "render-test": 14,
+    "template": 34
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x73"
+   ],
+   "firstSeen": "20.7.0.1702",
+   "firstFile": "Data/Templates/Advanced/Electronic/Breakbeat.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "00"
+  },
+  {
+   "id": 40,
+   "idHex": "0x28",
+   "name": "Unk40",
+   "cls": "byte",
+   "count": 60,
+   "files": 60,
+   "groups": {
+    "demo": 24,
+    "system-flp": 1,
+    "render-test": 14,
+    "template": 21
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x60"
+   ],
+   "firstSeen": "20.8.0.1377",
+   "firstFile": "Data/Demo projects/Demo songs/Atthar Feat Mehran Abbasi & Elise Chantelle - Right Night feeling.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "00"
+  },
+  {
+   "id": 41,
+   "idHex": "0x29",
+   "name": "PluginFlag41",
+   "cls": "byte",
+   "count": 6314,
+   "files": 2613,
+   "groups": {
+    "demo": 20,
+    "fst": 2560,
+    "system-flp": 1,
+    "render-test": 11,
+    "template": 21
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x6314"
+   ],
+   "firstSeen": "20.99.3000.3085",
+   "firstFile": "Data/Patches/Plugin database/Effects/Delay reverb/LuxeVerb.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "01"
+  },
+  {
+   "id": 42,
+   "idHex": "0x2a",
+   "name": "InsertFlag42",
+   "cls": "byte",
+   "count": 4210,
+   "files": 54,
+   "groups": {
+    "demo": 20,
+    "fst": 1,
+    "system-flp": 1,
+    "render-test": 11,
+    "template": 21
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x4210"
+   ],
+   "firstSeen": "20.99.3000.3213",
+   "firstFile": "Data/Demo projects/Performance mode/SeamlessR - Bass Antics Performance.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "00"
+  },
+  {
+   "id": 43,
+   "idHex": "0x2b",
+   "name": "TrackFlag43",
+   "cls": "byte",
+   "count": 27000,
+   "files": 53,
+   "groups": {
+    "demo": 20,
+    "system-flp": 1,
+    "render-test": 11,
+    "template": 21
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x27000"
+   ],
+   "firstSeen": "20.99.3000.3213",
+   "firstFile": "Data/Demo projects/Performance mode/SeamlessR - Bass Antics Performance.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "01"
+  },
+  {
+   "id": 44,
+   "idHex": "0x2c",
+   "name": "Unk44",
+   "cls": "byte",
+   "count": 53,
+   "files": 53,
+   "groups": {
+    "demo": 20,
+    "system-flp": 1,
+    "render-test": 11,
+    "template": 21
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x53"
+   ],
+   "firstSeen": "20.99.3000.3213",
+   "firstFile": "Data/Demo projects/Performance mode/SeamlessR - Bass Antics Performance.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "01"
+  },
+  {
+   "id": 45,
+   "idHex": "0x2d",
+   "name": "TimeMarkerFlag45",
+   "cls": "byte",
+   "count": 113,
+   "files": 13,
+   "groups": {
+    "demo": 11,
+    "template": 2
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x113"
+   ],
+   "firstSeen": "21.2.99.4033",
+   "firstFile": "Data/Demo projects/Demo songs/Electroconductor - Inner Days - Original.flp",
+   "lastSeen": "25.2.5.5319",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "00"
+  },
+  {
+   "id": 46,
+   "idHex": "0x2e",
+   "name": "TimeMarkerFlag46",
+   "cls": "byte",
+   "count": 113,
+   "files": 13,
+   "groups": {
+    "demo": 11,
+    "template": 2
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x113"
+   ],
+   "firstSeen": "21.2.99.4033",
+   "firstFile": "Data/Demo projects/Demo songs/Electroconductor - Inner Days - Original.flp",
+   "lastSeen": "25.2.5.5319",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "00"
+  },
+  {
+   "id": 47,
+   "idHex": "0x2f",
+   "name": "Unk47",
+   "cls": "byte",
+   "count": 48,
+   "files": 48,
+   "groups": {
+    "demo": 17,
+    "system-flp": 1,
+    "render-test": 11,
+    "template": 19
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x48"
+   ],
+   "firstSeen": "21.2.1.3859",
+   "firstFile": "Data/System/Render tests/Fruity Blood Overdrive.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "00"
+  },
+  {
+   "id": 48,
+   "idHex": "0x30",
+   "name": "ChannelFlag48",
+   "cls": "byte",
+   "count": 1249,
+   "files": 39,
+   "groups": {
+    "demo": 16,
+    "system-flp": 1,
+    "render-test": 3,
+    "template": 19
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x1249"
+   ],
+   "firstSeen": "24.0.99.4121",
+   "firstFile": "Data/Demo projects/Demo songs/Sid De La Cruz - Secret Agent Rendezvous.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "00"
+  },
+  {
+   "id": 49,
+   "idHex": "0x31",
+   "name": "InsertFlag49",
+   "cls": "byte",
+   "count": 1923,
+   "files": 35,
+   "groups": {
+    "demo": 14,
+    "system-flp": 1,
+    "render-test": 2,
+    "template": 18
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x1923"
+   ],
+   "firstSeen": "24.1.2.4408",
+   "firstFile": "Data/System/Render tests/Transporter.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "00"
+  },
+  {
+   "id": 50,
+   "idHex": "0x32",
+   "name": "ChannelFlag50",
+   "cls": "byte",
+   "count": 1178,
+   "files": 34,
+   "groups": {
+    "demo": 14,
+    "system-flp": 1,
+    "render-test": 1,
+    "template": 18
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x1178"
+   ],
+   "firstSeen": "24.2.99.4720",
+   "firstFile": "Data/Demo projects/Visual/ZGameEditor Visualizer/Astes - Raubana - LIFE.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "01"
+  },
+  {
+   "id": 51,
+   "idHex": "0x33",
+   "name": "ChannelFlag51",
+   "cls": "byte",
+   "count": 1003,
+   "files": 15,
+   "groups": {
+    "demo": 13,
+    "template": 2
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x1003"
+   ],
+   "firstSeen": "24.2.99.4831",
+   "firstFile": "Data/Demo projects/Demo songs/Mehran Abbasi - With You.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "00"
+  },
+  {
+   "id": 52,
+   "idHex": "0x34",
+   "name": "PatternFlag52",
+   "cls": "byte",
+   "count": 87,
+   "files": 8,
+   "groups": {
+    "demo": 8
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x87"
+   ],
+   "firstSeen": "25.2.0.5098",
+   "firstFile": "Data/Demo projects/Demo songs/Cuebur & Thandi Draai - Africa's Calling.flp",
+   "lastSeen": "25.2.5.5319",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "00"
+  },
+  {
+   "id": 64,
+   "idHex": "0x40",
+   "name": "NewChannel",
+   "cls": "word",
+   "count": 4071,
+   "files": 807,
+   "groups": {
+    "demo": 45,
+    "fst": 643,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "2x4071"
+   ],
+   "firstSeen": "3.0.0.0",
+   "firstFile": "Data/Patches/Channel presets/3x Osc/BP string.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "0000"
+  },
+  {
+   "id": 65,
+   "idHex": "0x41",
+   "name": "NewPattern",
+   "cls": "word",
+   "count": 3401,
+   "files": 743,
+   "groups": {
+    "demo": 45,
+    "fsc": 609,
+    "system-flp": 1,
+    "render-test": 82,
+    "template": 6
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "2x3401"
+   ],
+   "firstSeen": "3.0.0.0",
+   "firstFile": "Data/Patches/Scores/4 steps.fsc",
+   "lastSeen": "25.2.5.5319",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "0100"
+  },
+  {
+   "id": 67,
+   "idHex": "0x43",
+   "name": "CurrentPattern",
+   "cls": "word",
+   "count": 164,
+   "files": 164,
+   "groups": {
+    "demo": 45,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "2x164"
+   ],
+   "firstSeen": "10.9.0.0",
+   "firstFile": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "0900"
+  },
+  {
+   "id": 69,
+   "idHex": "0x45",
+   "name": "ChanFreqTilt",
+   "cls": "word",
+   "count": 4071,
+   "files": 807,
+   "groups": {
+    "demo": 45,
+    "fst": 643,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "2x4071"
+   ],
+   "firstSeen": "3.0.0.0",
+   "firstFile": "Data/Patches/Channel presets/3x Osc/BP string.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "8000"
+  },
+  {
+   "id": 70,
+   "idHex": "0x46",
+   "name": "ChanFxFlags",
+   "cls": "word",
+   "count": 4071,
+   "files": 807,
+   "groups": {
+    "demo": 45,
+    "fst": 643,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "2x4071"
+   ],
+   "firstSeen": "3.0.0.0",
+   "firstFile": "Data/Patches/Channel presets/3x Osc/BP string.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "0000"
+  },
+  {
+   "id": 71,
+   "idHex": "0x47",
+   "name": "ChanCutoff",
+   "cls": "word",
+   "count": 4071,
+   "files": 807,
+   "groups": {
+    "demo": 45,
+    "fst": 643,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "2x4071"
+   ],
+   "firstSeen": "3.0.0.0",
+   "firstFile": "Data/Patches/Channel presets/3x Osc/BP string.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "0004"
+  },
+  {
+   "id": 72,
+   "idHex": "0x48",
+   "name": "ChanVolWord",
+   "cls": "word",
+   "count": 307,
+   "files": 4,
+   "groups": {
+    "demo": 1,
+    "template": 3
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "2x307"
+   ],
+   "firstSeen": "11.1.0.0",
+   "firstFile": "Data/Demo projects/Product demos/Synth_dfr - Overcome - Sytrus.flp",
+   "lastSeen": "20.99.3000.3228",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": false,
+   "sample": "0456"
+  },
+  {
+   "id": 74,
+   "idHex": "0x4a",
+   "name": "ChanPreamp",
+   "cls": "word",
+   "count": 4071,
+   "files": 807,
+   "groups": {
+    "demo": 45,
+    "fst": 643,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "2x4071"
+   ],
+   "firstSeen": "3.0.0.0",
+   "firstFile": "Data/Patches/Channel presets/3x Osc/BP string.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "0000"
+  },
+  {
+   "id": 75,
+   "idHex": "0x4b",
+   "name": "ChanFadeOut",
+   "cls": "word",
+   "count": 4071,
+   "files": 807,
+   "groups": {
+    "demo": 45,
+    "fst": 643,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "2x4071"
+   ],
+   "firstSeen": "3.0.0.0",
+   "firstFile": "Data/Patches/Channel presets/3x Osc/BP string.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "0000"
+  },
+  {
+   "id": 76,
+   "idHex": "0x4c",
+   "name": "ChanFadeIn",
+   "cls": "word",
+   "count": 4071,
+   "files": 807,
+   "groups": {
+    "demo": 45,
+    "fst": 643,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "2x4071"
+   ],
+   "firstSeen": "3.0.0.0",
+   "firstFile": "Data/Patches/Channel presets/3x Osc/BP string.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "0000"
+  },
+  {
+   "id": 80,
+   "idHex": "0x50",
+   "name": "MainPitch",
+   "cls": "word",
+   "count": 164,
+   "files": 164,
+   "groups": {
+    "demo": 45,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "2x164"
+   ],
+   "firstSeen": "10.9.0.0",
+   "firstFile": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "0000"
+  },
+  {
+   "id": 83,
+   "idHex": "0x53",
+   "name": "ChanResonance",
+   "cls": "word",
+   "count": 4071,
+   "files": 807,
+   "groups": {
+    "demo": 45,
+    "fst": 643,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "2x4071"
+   ],
+   "firstSeen": "3.0.0.0",
+   "firstFile": "Data/Patches/Channel presets/3x Osc/BP string.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "0000"
+  },
+  {
+   "id": 85,
+   "idHex": "0x55",
+   "name": "ChanStereoDelay",
+   "cls": "word",
+   "count": 4071,
+   "files": 807,
+   "groups": {
+    "demo": 45,
+    "fst": 643,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "2x4071"
+   ],
+   "firstSeen": "3.0.0.0",
+   "firstFile": "Data/Patches/Channel presets/3x Osc/BP string.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "0008"
+  },
+  {
+   "id": 86,
+   "idHex": "0x56",
+   "name": "ChanPogo",
+   "cls": "word",
+   "count": 4071,
+   "files": 807,
+   "groups": {
+    "demo": 45,
+    "fst": 643,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "2x4071"
+   ],
+   "firstSeen": "3.0.0.0",
+   "firstFile": "Data/Patches/Channel presets/3x Osc/BP string.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "0001"
+  },
+  {
+   "id": 89,
+   "idHex": "0x59",
+   "name": "ChanTimeShift",
+   "cls": "word",
+   "count": 4071,
+   "files": 807,
+   "groups": {
+    "demo": 45,
+    "fst": 643,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "2x4071"
+   ],
+   "firstSeen": "3.0.0.0",
+   "firstFile": "Data/Patches/Channel presets/3x Osc/BP string.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "0000"
+  },
+  {
+   "id": 91,
+   "idHex": "0x5b",
+   "name": "Dot91",
+   "cls": "word",
+   "count": 177,
+   "files": 1,
+   "groups": {
+    "demo": 1
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "2x177"
+   ],
+   "firstSeen": "11.1.0.0",
+   "firstFile": "Data/Demo projects/Product demos/Synth_dfr - Overcome - Sytrus.flp",
+   "lastSeen": "11.1.0.0",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": false,
+   "sample": "0001"
+  },
+  {
+   "id": 92,
+   "idHex": "0x5c",
+   "name": "Dot92",
+   "cls": "word",
+   "count": 38,
+   "files": 1,
+   "groups": {
+    "demo": 1
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "2x38"
+   ],
+   "firstSeen": "11.1.0.0",
+   "firstFile": "Data/Demo projects/Product demos/Synth_dfr - Overcome - Sytrus.flp",
+   "lastSeen": "11.1.0.0",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": false,
+   "sample": "032b"
+  },
+  {
+   "id": 94,
+   "idHex": "0x5e",
+   "name": "LayerChildren",
+   "cls": "word",
+   "count": 79,
+   "files": 7,
+   "groups": {
+    "demo": 6,
+    "template": 1
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "2x79"
+   ],
+   "firstSeen": "12.3.0.43",
+   "firstFile": "Data/Demo projects/Visual/ZGameEditor Visualizer/Treben - Gimbal and Sinan - RawFL.flp",
+   "lastSeen": "25.1.0.4858",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "0300"
+  },
+  {
+   "id": 95,
+   "idHex": "0x5f",
+   "name": "InsertIcon",
+   "cls": "word",
+   "count": 1201,
+   "files": 47,
+   "groups": {
+    "demo": 29,
+    "template": 18
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "2x1201"
+   ],
+   "firstSeen": "12.3.0.43",
+   "firstFile": "Data/Demo projects/Visual/ZGameEditor Visualizer/Sacco - Pumping objects.flp",
+   "lastSeen": "25.2.5.5319",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "7400"
+  },
+  {
+   "id": 97,
+   "idHex": "0x61",
+   "name": "ChanSwing",
+   "cls": "word",
+   "count": 3243,
+   "files": 124,
+   "groups": {
+    "demo": 40,
+    "fst": 19,
+    "system-flp": 1,
+    "render-test": 29,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "2x3243"
+   ],
+   "firstSeen": "11.5.8.0",
+   "firstFile": "Data/System/AudioTrack.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "8000"
+  },
+  {
+   "id": 98,
+   "idHex": "0x62",
+   "name": "SlotIndex",
+   "cls": "word",
+   "count": 103520,
+   "files": 106,
+   "groups": {
+    "demo": 40,
+    "fst": 1,
+    "system-flp": 1,
+    "render-test": 29,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "2x103520"
+   ],
+   "firstSeen": "12.3.0.33",
+   "firstFile": "Data/Demo projects/Visual/ZGameEditor Visualizer/Sacco - Expanding universe.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "0000"
+  },
+  {
+   "id": 99,
+   "idHex": "0x63",
+   "name": "NewArrangement",
+   "cls": "word",
+   "count": 87,
+   "files": 84,
+   "groups": {
+    "demo": 28,
+    "system-flp": 1,
+    "render-test": 20,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "2x87"
+   ],
+   "firstSeen": "12.9.3.321",
+   "firstFile": "Data/Demo projects/Demo songs/Eric Kauffmann & NrgMind - Exoplanet.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "0000"
+  },
+  {
+   "id": 100,
+   "idHex": "0x64",
+   "name": "CurrentArrangement",
+   "cls": "word",
+   "count": 84,
+   "files": 84,
+   "groups": {
+    "demo": 28,
+    "system-flp": 1,
+    "render-test": 20,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "2x84"
+   ],
+   "firstSeen": "12.9.3.321",
+   "firstFile": "Data/Demo projects/Demo songs/Eric Kauffmann & NrgMind - Exoplanet.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "0100"
+  },
+  {
+   "id": 101,
+   "idHex": "0x65",
+   "name": "TimeMarkerWord101",
+   "cls": "word",
+   "count": 113,
+   "files": 13,
+   "groups": {
+    "demo": 11,
+    "template": 2
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "2x113"
+   ],
+   "firstSeen": "21.2.99.4033",
+   "firstFile": "Data/Demo projects/Demo songs/Electroconductor - Inner Days - Original.flp",
+   "lastSeen": "25.2.5.5319",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "0000"
+  },
+  {
+   "id": 103,
+   "idHex": "0x67",
+   "name": "MixerWord103",
+   "cls": "word",
+   "count": 34,
+   "files": 34,
+   "groups": {
+    "demo": 14,
+    "system-flp": 1,
+    "render-test": 1,
+    "template": 18
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "2x34"
+   ],
+   "firstSeen": "24.2.99.4720",
+   "firstFile": "Data/Demo projects/Visual/ZGameEditor Visualizer/Astes - Raubana - LIFE.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "5600"
+  },
+  {
+   "id": 104,
+   "idHex": "0x68",
+   "name": "ChanWord104",
+   "cls": "word",
+   "count": 1178,
+   "files": 34,
+   "groups": {
+    "demo": 14,
+    "system-flp": 1,
+    "render-test": 1,
+    "template": 18
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "2x1178"
+   ],
+   "firstSeen": "24.2.99.4720",
+   "firstFile": "Data/Demo projects/Visual/ZGameEditor Visualizer/Astes - Raubana - LIFE.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "3900"
+  },
+  {
+   "id": 128,
+   "idHex": "0x80",
+   "name": "PluginColor",
+   "cls": "dword",
+   "count": 12384,
+   "files": 5575,
+   "groups": {
+    "demo": 45,
+    "fst": 5411,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "4x12384"
+   ],
+   "firstSeen": "3.0.0.0",
+   "firstFile": "Data/Patches/Channel presets/3x Osc/BP string.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "5e727300"
+  },
+  {
+   "id": 131,
+   "idHex": "0x83",
+   "name": "ChanRingMod",
+   "cls": "dword",
+   "count": 4071,
+   "files": 807,
+   "groups": {
+    "demo": 45,
+    "fst": 643,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "4x4071"
+   ],
+   "firstSeen": "3.0.0.0",
+   "firstFile": "Data/Patches/Channel presets/3x Osc/BP string.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "00008000"
+  },
+  {
+   "id": 132,
+   "idHex": "0x84",
+   "name": "ChanCutGroup",
+   "cls": "dword",
+   "count": 4038,
+   "files": 802,
+   "groups": {
+    "demo": 45,
+    "fst": 638,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "4x4038"
+   ],
+   "firstSeen": "3.0.0.0",
+   "firstFile": "Data/Patches/Channel presets/3x Osc/BP string.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "01000100"
+  },
+  {
+   "id": 133,
+   "idHex": "0x85",
+   "name": "WindowHeight",
+   "cls": "dword",
+   "count": 164,
+   "files": 164,
+   "groups": {
+    "demo": 45,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "4x164"
+   ],
+   "firstSeen": "10.9.0.0",
+   "firstFile": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "63030000"
+  },
+  {
+   "id": 135,
+   "idHex": "0x87",
+   "name": "ChanRootNote",
+   "cls": "dword",
+   "count": 395,
+   "files": 331,
+   "groups": {
+    "demo": 15,
+    "fst": 303,
+    "render-test": 1,
+    "template": 12
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "4x395"
+   ],
+   "firstSeen": "3.0.0.0",
+   "firstFile": "Data/Patches/Channel presets/3x Osc/Bell.fst",
+   "lastSeen": "25.2.5.5319",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "37000000"
+  },
+  {
+   "id": 138,
+   "idHex": "0x8a",
+   "name": "ChanDelayMod",
+   "cls": "dword",
+   "count": 4071,
+   "files": 807,
+   "groups": {
+    "demo": 45,
+    "fst": 643,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "4x4071"
+   ],
+   "firstSeen": "3.0.0.0",
+   "firstFile": "Data/Patches/Channel presets/3x Osc/BP string.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "80008000"
+  },
+  {
+   "id": 139,
+   "idHex": "0x8b",
+   "name": "ChanReverb",
+   "cls": "dword",
+   "count": 4071,
+   "files": 807,
+   "groups": {
+    "demo": 45,
+    "fst": 643,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "4x4071"
+   ],
+   "firstSeen": "3.0.0.0",
+   "firstFile": "Data/Patches/Channel presets/3x Osc/BP string.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "00000100"
+  },
+  {
+   "id": 140,
+   "idHex": "0x8c",
+   "name": "ChanStretchTime",
+   "cls": "dword",
+   "count": 372,
+   "files": 372,
+   "groups": {
+    "fst": 372
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "4x372"
+   ],
+   "firstSeen": "3.0.0.0",
+   "firstFile": "Data/Patches/Channel presets/3x Osc/BP string.fst",
+   "lastSeen": "4.5.2.0",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": false,
+   "sample": "00000000"
+  },
+  {
+   "id": 142,
+   "idHex": "0x8e",
+   "name": "ChanFineTune",
+   "cls": "dword",
+   "count": 5,
+   "files": 2,
+   "groups": {
+    "demo": 2
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "4x5"
+   ],
+   "firstSeen": "12.3.0.43",
+   "firstFile": "Data/Demo projects/Visual/ZGameEditor Visualizer/Treben - Gimbal and Sinan - RawFL.flp",
+   "lastSeen": "20.99.3000.3031",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "05000000"
+  },
+  {
+   "id": 143,
+   "idHex": "0x8f",
+   "name": "ChanSamplerFlags",
+   "cls": "dword",
+   "count": 4071,
+   "files": 807,
+   "groups": {
+    "demo": 45,
+    "fst": 643,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "4x4071"
+   ],
+   "firstSeen": "3.0.0.0",
+   "firstFile": "Data/Patches/Channel presets/3x Osc/BP string.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "0a000000"
+  },
+  {
+   "id": 144,
+   "idHex": "0x90",
+   "name": "ChanLayerFlags",
+   "cls": "dword",
+   "count": 3856,
+   "files": 592,
+   "groups": {
+    "demo": 45,
+    "fst": 428,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "4x3856"
+   ],
+   "firstSeen": "3.3.4.0",
+   "firstFile": "Data/System/SoundFontTrack.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "00000000"
+  },
+  {
+   "id": 145,
+   "idHex": "0x91",
+   "name": "ChanGroupNum",
+   "cls": "dword",
+   "count": 3856,
+   "files": 592,
+   "groups": {
+    "demo": 45,
+    "fst": 428,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "4x3856"
+   ],
+   "firstSeen": "3.3.4.0",
+   "firstFile": "Data/System/SoundFontTrack.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "04000000"
+  },
+  {
+   "id": 146,
+   "idHex": "0x92",
+   "name": "CurGroupId",
+   "cls": "dword",
+   "count": 164,
+   "files": 164,
+   "groups": {
+    "demo": 45,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "4x164"
+   ],
+   "firstSeen": "10.9.0.0",
+   "firstFile": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "ffffffff"
+  },
+  {
+   "id": 147,
+   "idHex": "0x93",
+   "name": "InsertOutput",
+   "cls": "dword",
+   "count": 16546,
+   "files": 164,
+   "groups": {
+    "demo": 45,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "4x16546"
+   ],
+   "firstSeen": "10.9.0.0",
+   "firstFile": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "00000000"
+  },
+  {
+   "id": 148,
+   "idHex": "0x94",
+   "name": "NewTimeMarker",
+   "cls": "dword",
+   "count": 313,
+   "files": 37,
+   "groups": {
+    "demo": 32,
+    "template": 5
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "4x313"
+   ],
+   "firstSeen": "10.9.0.0",
+   "firstFile": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "lastSeen": "25.2.5.5319",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "00000000"
+  },
+  {
+   "id": 149,
+   "idHex": "0x95",
+   "name": "InsertColor",
+   "cls": "dword",
+   "count": 1916,
+   "files": 81,
+   "groups": {
+    "demo": 40,
+    "fst": 17,
+    "system-flp": 1,
+    "template": 23
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "4x1916"
+   ],
+   "firstSeen": "3.6.5.0",
+   "firstFile": "Data/Patches/Mixer presets/Chorus send.fst",
+   "lastSeen": "25.2.5.5319",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "b5905900"
+  },
+  {
+   "id": 150,
+   "idHex": "0x96",
+   "name": "PatternColor",
+   "cls": "dword",
+   "count": 1326,
+   "files": 51,
+   "groups": {
+    "demo": 44,
+    "system-flp": 1,
+    "template": 6
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "4x1326"
+   ],
+   "firstSeen": "10.9.0.0",
+   "firstFile": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "lastSeen": "25.2.5.5319",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "48515600"
+  },
+  {
+   "id": 154,
+   "idHex": "0x9a",
+   "name": "InsertInput",
+   "cls": "dword",
+   "count": 16546,
+   "files": 164,
+   "groups": {
+    "demo": 45,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "4x16546"
+   ],
+   "firstSeen": "10.9.0.0",
+   "firstFile": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "ffffffff"
+  },
+  {
+   "id": 155,
+   "idHex": "0x9b",
+   "name": "PluginIcon",
+   "cls": "dword",
+   "count": 11943,
+   "files": 5134,
+   "groups": {
+    "demo": 45,
+    "fst": 4970,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "4x11943"
+   ],
+   "firstSeen": "9.0.0.0",
+   "firstFile": "Data/Patches/Channel presets/Automation clips/Special/2 semitones channel pitch.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "00000000"
+  },
+  {
+   "id": 156,
+   "idHex": "0x9c",
+   "name": "Tempo",
+   "cls": "dword",
+   "count": 164,
+   "files": 164,
+   "groups": {
+    "demo": 45,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "4x164"
+   ],
+   "firstSeen": "10.9.0.0",
+   "firstFile": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "30ec0100"
+  },
+  {
+   "id": 157,
+   "idHex": "0x9d",
+   "name": "PatternDword157",
+   "cls": "dword",
+   "count": 839,
+   "files": 35,
+   "groups": {
+    "demo": 29,
+    "template": 6
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "4x839"
+   ],
+   "firstSeen": "12.5.0.59",
+   "firstFile": "Data/Demo projects/Performance mode/Drumloop Masher.flp",
+   "lastSeen": "25.2.5.5319",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "ffffffff"
+  },
+  {
+   "id": 158,
+   "idHex": "0x9e",
+   "name": "PatternDword158",
+   "cls": "dword",
+   "count": 820,
+   "files": 33,
+   "groups": {
+    "demo": 27,
+    "template": 6
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "4x820"
+   ],
+   "firstSeen": "12.9.3.321",
+   "firstFile": "Data/Demo projects/Demo songs/Eric Kauffmann & NrgMind - Exoplanet.flp",
+   "lastSeen": "25.2.5.5319",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "ffffffff"
+  },
+  {
+   "id": 159,
+   "idHex": "0x9f",
+   "name": "FlBuild",
+   "cls": "dword",
+   "count": 3804,
+   "files": 3804,
+   "groups": {
+    "demo": 28,
+    "fst": 3690,
+    "fsc": 30,
+    "system-flp": 1,
+    "render-test": 20,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "4x3804"
+   ],
+   "firstSeen": "12.9.2.275",
+   "firstFile": "Data/Patches/Plugin database/Effects/Dynamics/Fruity Compressor.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "d70b0000"
+  },
+  {
+   "id": 160,
+   "idHex": "0xa0",
+   "name": "PatternChannelIid",
+   "cls": "dword",
+   "count": 321,
+   "files": 7,
+   "groups": {
+    "demo": 6,
+    "template": 1
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "4x321"
+   ],
+   "firstSeen": "21.2.99.4033",
+   "firstFile": "Data/Demo projects/Demo songs/Electroconductor - Inner Days - Original.flp",
+   "lastSeen": "25.1.2.4893",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "09000000"
+  },
+  {
+   "id": 161,
+   "idHex": "0xa1",
+   "name": "PatternDword161",
+   "cls": "dword",
+   "count": 321,
+   "files": 7,
+   "groups": {
+    "demo": 6,
+    "template": 1
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "4x321"
+   ],
+   "firstSeen": "21.2.99.4033",
+   "firstFile": "Data/Demo projects/Demo songs/Electroconductor - Inner Days - Original.flp",
+   "lastSeen": "25.1.2.4893",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "fdffffff"
+  },
+  {
+   "id": 162,
+   "idHex": "0xa2",
+   "name": "PatternDword162",
+   "cls": "dword",
+   "count": 2,
+   "files": 2,
+   "groups": {
+    "demo": 2
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "4x2"
+   ],
+   "firstSeen": "20.99.3000.3213",
+   "firstFile": "Data/Demo projects/Performance mode/SeamlessR - Bass Antics Performance.flp",
+   "lastSeen": "25.1.2.4893",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "01000000"
+  },
+  {
+   "id": 164,
+   "idHex": "0xa4",
+   "name": "PatternLength",
+   "cls": "dword",
+   "count": 755,
+   "files": 31,
+   "groups": {
+    "demo": 25,
+    "template": 6
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "4x755"
+   ],
+   "firstSeen": "20.5.0.1121",
+   "firstFile": "Data/Demo projects/Product demos/Olbaid - Harmless Essentials.flp",
+   "lastSeen": "25.2.5.5319",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "00000000"
+  },
+  {
+   "id": 165,
+   "idHex": "0xa5",
+   "name": "InsertDword165",
+   "cls": "dword",
+   "count": 4844,
+   "files": 58,
+   "groups": {
+    "demo": 23,
+    "system-flp": 1,
+    "render-test": 13,
+    "template": 21
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "4x4844"
+   ],
+   "firstSeen": "20.9.0.2734",
+   "firstFile": "Data/System/Render tests/Pitch Shifter.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "03000000"
+  },
+  {
+   "id": 166,
+   "idHex": "0xa6",
+   "name": "InsertDword166",
+   "cls": "dword",
+   "count": 4844,
+   "files": 58,
+   "groups": {
+    "demo": 23,
+    "system-flp": 1,
+    "render-test": 13,
+    "template": 21
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "4x4844"
+   ],
+   "firstSeen": "20.9.0.2734",
+   "firstFile": "Data/System/Render tests/Pitch Shifter.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "01000000"
+  },
+  {
+   "id": 167,
+   "idHex": "0xa7",
+   "name": "ProjectDword167",
+   "cls": "dword",
+   "count": 48,
+   "files": 48,
+   "groups": {
+    "demo": 17,
+    "system-flp": 1,
+    "render-test": 11,
+    "template": 19
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "4x48"
+   ],
+   "firstSeen": "21.2.1.3859",
+   "firstFile": "Data/System/Render tests/Fruity Blood Overdrive.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "01000000"
+  },
+  {
+   "id": 168,
+   "idHex": "0xa8",
+   "name": "TimeMarkerDword168",
+   "cls": "dword",
+   "count": 113,
+   "files": 13,
+   "groups": {
+    "demo": 11,
+    "template": 2
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "4x113"
+   ],
+   "firstSeen": "21.2.99.4033",
+   "firstFile": "Data/Demo projects/Demo songs/Electroconductor - Inner Days - Original.flp",
+   "lastSeen": "25.2.5.5319",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "00000000"
+  },
+  {
+   "id": 169,
+   "idHex": "0xa9",
+   "name": "ProjectDword169",
+   "cls": "dword",
+   "count": 347,
+   "files": 347,
+   "groups": {
+    "demo": 14,
+    "fst": 312,
+    "system-flp": 1,
+    "render-test": 2,
+    "template": 18
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "4x347"
+   ],
+   "firstSeen": "24.1.2.4408",
+   "firstFile": "Data/Patches/Plugin database/Effects/Misc/Transporter.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "07000000"
+  },
+  {
+   "id": 170,
+   "idHex": "0xaa",
+   "name": "ChannelDword170",
+   "cls": "dword",
+   "count": 1003,
+   "files": 15,
+   "groups": {
+    "demo": 13,
+    "template": 2
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "4x1003"
+   ],
+   "firstSeen": "24.2.99.4831",
+   "firstFile": "Data/Demo projects/Demo songs/Mehran Abbasi - With You.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "00000000"
+  },
+  {
+   "id": 171,
+   "idHex": "0xab",
+   "name": "PatternDword171",
+   "cls": "dword",
+   "count": 87,
+   "files": 8,
+   "groups": {
+    "demo": 8
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "4x87"
+   ],
+   "firstSeen": "25.2.0.5098",
+   "firstFile": "Data/Demo projects/Demo songs/Cuebur & Thandi Draai - Africa's Calling.flp",
+   "lastSeen": "25.2.5.5319",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "00000000"
+  },
+  {
+   "id": 192,
+   "idHex": "0xc0",
+   "name": "ChannelNameLegacy",
+   "cls": "text",
+   "count": 828,
+   "files": 683,
+   "groups": {
+    "demo": 5,
+    "fst": 624,
+    "system-flp": 1,
+    "render-test": 53
+   },
+   "distinctSizes": 26,
+   "topSizes": [
+    "6x101",
+    "8x93",
+    "7x69",
+    "9x69",
+    "11x63",
+    "13x57"
+   ],
+   "firstSeen": "3.0.0.0",
+   "firstFile": "Data/Patches/Channel presets/3x Osc/BP string.fst",
+   "lastSeen": "11.5.6.0",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": false,
+   "sample": "496e74726f00"
+  },
+  {
+   "id": 193,
+   "idHex": "0xc1",
+   "name": "PatternName",
+   "cls": "text",
+   "count": 1323,
+   "files": 51,
+   "groups": {
+    "demo": 44,
+    "system-flp": 1,
+    "template": 6
+   },
+   "distinctSizes": 35,
+   "topSizes": [
+    "16x144",
+    "18x133",
+    "24x121",
+    "10x99",
+    "28x91",
+    "14x88"
+   ],
+   "firstSeen": "10.9.0.0",
+   "firstFile": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "lastSeen": "25.2.5.5319",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "4b00690063006b0020002b00200043006c00610070000000"
+  },
+  {
+   "id": 194,
+   "idHex": "0xc2",
+   "name": "ProjectTitle",
+   "cls": "text",
+   "count": 164,
+   "files": 164,
+   "groups": {
+    "demo": 45,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 30,
+   "topSizes": [
+    "2x56",
+    "1x54",
+    "20x4",
+    "12x4",
+    "28x4",
+    "40x3"
+   ],
+   "firstSeen": "10.9.0.0",
+   "firstFile": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "4100500020002d0020004600550054005500520045000620"
+  },
+  {
+   "id": 195,
+   "idHex": "0xc3",
+   "name": "ProjectComments",
+   "cls": "text",
+   "count": 105,
+   "files": 105,
+   "groups": {
+    "demo": 40,
+    "system-flp": 1,
+    "render-test": 29,
+    "template": 35
+   },
+   "distinctSizes": 45,
+   "topSizes": [
+    "2x55",
+    "582x3",
+    "3628x2",
+    "500x2",
+    "496x2",
+    "490x2"
+   ],
+   "firstSeen": "12.3.0.33",
+   "firstFile": "Data/Demo projects/Visual/ZGameEditor Visualizer/Sacco - Expanding universe.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "480065007900200067007500790073002100210020002000"
+  },
+  {
+   "id": 196,
+   "idHex": "0xc4",
+   "name": "SamplePath",
+   "cls": "text",
+   "count": 1372,
+   "files": 191,
+   "groups": {
+    "demo": 40,
+    "fst": 129,
+    "render-test": 3,
+    "template": 19
+   },
+   "distinctSizes": 118,
+   "topSizes": [
+    "194x73",
+    "326x54",
+    "150x37",
+    "45x36",
+    "196x35",
+    "190x33"
+   ],
+   "firstSeen": "3.1.1.0",
+   "firstFile": "Data/Patches/Channel presets/3x Osc/HQ_Brass 2.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "250046004c00530074007500640069006f00460061006300"
+  },
+  {
+   "id": 197,
+   "idHex": "0xc5",
+   "name": "ProjectUrl",
+   "cls": "text",
+   "count": 39,
+   "files": 39,
+   "groups": {
+    "demo": 38,
+    "template": 1
+   },
+   "distinctSizes": 24,
+   "topSizes": [
+    "74x6",
+    "50x4",
+    "66x3",
+    "25x3",
+    "62x2",
+    "58x2"
+   ],
+   "firstSeen": "10.9.0.0",
+   "firstFile": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "lastSeen": "25.2.5.5319",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "680074007400700073003a002f002f0073006f0075006e00"
+  },
+  {
+   "id": 198,
+   "idHex": "0xc6",
+   "name": "CommentsRtf",
+   "cls": "text",
+   "count": 59,
+   "files": 59,
+   "groups": {
+    "demo": 5,
+    "system-flp": 1,
+    "render-test": 53
+   },
+   "distinctSizes": 4,
+   "topSizes": [
+    "109x54",
+    "185x3",
+    "225x1",
+    "1246x1"
+   ],
+   "firstSeen": "10.9.0.0",
+   "firstFile": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "lastSeen": "11.1.1.0",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": false,
+   "sample": "7b5c727466315c616e73695c616e7369637067313235325c"
+  },
+  {
+   "id": 199,
+   "idHex": "0xc7",
+   "name": "FlVersion",
+   "cls": "text",
+   "count": 9740,
+   "files": 9740,
+   "groups": {
+    "demo": 45,
+    "fst": 8967,
+    "fsc": 609,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 10,
+   "topSizes": [
+    "12x2863",
+    "7x2543",
+    "6x2483",
+    "13x416",
+    "8x410",
+    "9x402"
+   ],
+   "firstSeen": "2.5.4.0",
+   "firstFile": "Data/Patches/Plugin presets/Generators/3x Osc/Default.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "32302e39392e333030302e3330333100"
+  },
+  {
+   "id": 200,
+   "idHex": "0xc8",
+   "name": "Licensee",
+   "cls": "text",
+   "count": 164,
+   "files": 164,
+   "groups": {
+    "demo": 45,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 11,
+   "topSizes": [
+    "36x81",
+    "18x57",
+    "50x14",
+    "44x3",
+    "60x3",
+    "42x1"
+   ],
+   "firstSeen": "10.9.0.0",
+   "firstFile": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "5b00400039003b005d0033003e0036007500790079004000"
+  },
+  {
+   "id": 201,
+   "idHex": "0xc9",
+   "name": "PluginInternalName",
+   "cls": "text",
+   "count": 15931,
+   "files": 9042,
+   "groups": {
+    "demo": 45,
+    "fst": 8879,
+    "system-flp": 1,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 38,
+   "topSizes": [
+    "2x2357",
+    "46x1810",
+    "14x1781",
+    "7x1354",
+    "8x1184",
+    "16x1138"
+   ],
+   "firstSeen": "2.5.4.0",
+   "firstFile": "Data/Patches/Plugin presets/Generators/3x Osc/Default.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "4d0049004400490020004f00750074000000"
+  },
+  {
+   "id": 202,
+   "idHex": "0xca",
+   "name": "ProjectDataPath",
+   "cls": "text",
+   "count": 164,
+   "files": 164,
+   "groups": {
+    "demo": 45,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 4,
+   "topSizes": [
+    "2x98",
+    "1x59",
+    "144x6",
+    "52x1"
+   ],
+   "firstSeen": "10.9.0.0",
+   "firstFile": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "0000"
+  },
+  {
+   "id": 203,
+   "idHex": "0xcb",
+   "name": "PluginName",
+   "cls": "text",
+   "count": 7786,
+   "files": 3888,
+   "groups": {
+    "demo": 43,
+    "fst": 3768,
+    "system-flp": 1,
+    "render-test": 42,
+    "template": 34
+   },
+   "distinctSizes": 74,
+   "topSizes": [
+    "16x1005",
+    "14x707",
+    "12x639",
+    "22x434",
+    "28x402",
+    "26x382"
+   ],
+   "firstSeen": "4.5.2.0",
+   "firstFile": "Data/Patches/Mixer presets/Dual joypad control.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "41005300480045005200062050004f00530054004d004100"
+  },
+  {
+   "id": 204,
+   "idHex": "0xcc",
+   "name": "InsertName",
+   "cls": "text",
+   "count": 1922,
+   "files": 85,
+   "groups": {
+    "demo": 43,
+    "fst": 17,
+    "system-flp": 1,
+    "template": 24
+   },
+   "distinctSizes": 44,
+   "topSizes": [
+    "24x194",
+    "12x180",
+    "16x175",
+    "14x174",
+    "18x164",
+    "10x147"
+   ],
+   "firstSeen": "3.6.5.0",
+   "firstFile": "Data/Patches/Mixer presets/Chorus send.fst",
+   "lastSeen": "25.2.5.5319",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "56006f00630061006c002000430068006f0070000000"
+  },
+  {
+   "id": 205,
+   "idHex": "0xcd",
+   "name": "TimeMarkerName",
+   "cls": "text",
+   "count": 313,
+   "files": 37,
+   "groups": {
+    "demo": 32,
+    "template": 5
+   },
+   "distinctSizes": 28,
+   "topSizes": [
+    "8x67",
+    "2x67",
+    "12x44",
+    "1x22",
+    "14x19",
+    "4x14"
+   ],
+   "firstSeen": "10.9.0.0",
+   "firstFile": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "lastSeen": "25.2.5.5319",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "4200750069006c006400750070000000"
+  },
+  {
+   "id": 206,
+   "idHex": "0xce",
+   "name": "ProjectGenre",
+   "cls": "text",
+   "count": 164,
+   "files": 164,
+   "groups": {
+    "demo": 45,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 19,
+   "topSizes": [
+    "2x58",
+    "1x58",
+    "20x7",
+    "10x6",
+    "24x5",
+    "12x5"
+   ],
+   "firstSeen": "10.9.0.0",
+   "firstFile": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "460075007400750072006500200048006f00750073006500"
+  },
+  {
+   "id": 207,
+   "idHex": "0xcf",
+   "name": "ProjectArtists",
+   "cls": "text",
+   "count": 164,
+   "files": 164,
+   "groups": {
+    "demo": 45,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 24,
+   "topSizes": [
+    "2x57",
+    "1x54",
+    "20x15",
+    "12x4",
+    "14x4",
+    "28x3"
+   ],
+   "firstSeen": "10.9.0.0",
+   "firstFile": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "41007300680065007200200050006f00730074006d006100"
+  },
+  {
+   "id": 209,
+   "idHex": "0xd1",
+   "name": "ChannelDelay",
+   "cls": "text",
+   "count": 4071,
+   "files": 807,
+   "groups": {
+    "demo": 45,
+    "fst": 643,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "20x4071"
+   ],
+   "firstSeen": "3.0.0.0",
+   "firstFile": "Data/Patches/Channel presets/3x Osc/BP string.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "0000000000190000000000000400000090000000"
+  },
+  {
+   "id": 210,
+   "idHex": "0xd2",
+   "name": "Data210",
+   "cls": "text",
+   "count": 2,
+   "files": 2,
+   "groups": {
+    "fst": 2
+   },
+   "distinctSizes": 2,
+   "topSizes": [
+    "132x1",
+    "140x1"
+   ],
+   "firstSeen": "3.5.0.0",
+   "firstFile": "Data/System/TS404Track.fst",
+   "lastSeen": "11.0.4.0",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "f4ffffff00000000f8ffffff000000000000000000000000"
+  },
+  {
+   "id": 212,
+   "idHex": "0xd4",
+   "name": "PluginWrapper",
+   "cls": "text",
+   "count": 15931,
+   "files": 9042,
+   "groups": {
+    "demo": 45,
+    "fst": 8879,
+    "system-flp": 1,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "52x15931"
+   ],
+   "firstSeen": "2.5.4.0",
+   "firstFile": "Data/Patches/Plugin presets/Generators/3x Osc/Default.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "000000000000000002000000000000005001000000000000"
+  },
+  {
+   "id": 213,
+   "idHex": "0xd5",
+   "name": "PluginData",
+   "cls": "text",
+   "count": 13564,
+   "files": 9016,
+   "groups": {
+    "demo": 45,
+    "fst": 8864,
+    "render-test": 81,
+    "template": 26
+   },
+   "distinctSizes": 3014,
+   "topSizes": [
+    "300x962",
+    "354x601",
+    "596x511",
+    "620x426",
+    "700x391",
+    "309x324"
+   ],
+   "firstSeen": "2.5.4.0",
+   "firstFile": "Data/Patches/Plugin presets/Generators/3x Osc/Default.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "0600000000000000ffffffffffffffffffffffff00000000"
+  },
+  {
+   "id": 215,
+   "idHex": "0xd7",
+   "name": "ChannelParameters",
+   "cls": "text",
+   "count": 4071,
+   "files": 807,
+   "groups": {
+    "demo": 45,
+    "fst": 643,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 13,
+   "topSizes": [
+    "168x1865",
+    "125x743",
+    "112x456",
+    "158x307",
+    "157x177",
+    "156x145"
+   ],
+   "firstSeen": "3.0.0.0",
+   "firstFile": "Data/Patches/Channel presets/3x Osc/BP string.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "ffffffff0000000001000001ffffffff3c0000000000803f"
+  },
+  {
+   "id": 216,
+   "idHex": "0xd8",
+   "name": "ProjectData216",
+   "cls": "text",
+   "count": 135,
+   "files": 135,
+   "groups": {
+    "demo": 44,
+    "system-flp": 2,
+    "render-test": 57,
+    "template": 32
+   },
+   "distinctSizes": 28,
+   "topSizes": [
+    "0x77",
+    "12x13",
+    "36x7",
+    "24x6",
+    "120x4",
+    "48x2"
+   ],
+   "firstSeen": "10.9.0.0",
+   "firstFile": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "00000000638019000affffff000000003c801900ea230000"
+  },
+  {
+   "id": 217,
+   "idHex": "0xd9",
+   "name": "PlaylistSelection",
+   "cls": "text",
+   "count": 1,
+   "files": 1,
+   "groups": {
+    "demo": 1
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "8x1"
+   ],
+   "firstSeen": "12.3.0.43",
+   "firstFile": "Data/Demo projects/Visual/ZGameEditor Visualizer/Sacco - Pumping objects.flp",
+   "lastSeen": "12.3.0.43",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "00000000000c0000"
+  },
+  {
+   "id": 218,
+   "idHex": "0xda",
+   "name": "EnvelopeLfo",
+   "cls": "text",
+   "count": 20355,
+   "files": 807,
+   "groups": {
+    "demo": 45,
+    "fst": 643,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 2,
+   "topSizes": [
+    "68x19275",
+    "56x1080"
+   ],
+   "firstSeen": "3.0.0.0",
+   "firstFile": "Data/Patches/Channel presets/3x Osc/BP string.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "000000000000000064000000204e0000204e000030750000"
+  },
+  {
+   "id": 219,
+   "idHex": "0xdb",
+   "name": "ChannelLevels",
+   "cls": "text",
+   "count": 4071,
+   "files": 807,
+   "groups": {
+    "demo": 45,
+    "fst": 643,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 2,
+   "topSizes": [
+    "24x3883",
+    "12x188"
+   ],
+   "firstSeen": "3.0.0.0",
+   "firstFile": "Data/Patches/Channel presets/3x Osc/BP string.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "001900001027000000000000000100000000000000000000"
+  },
+  {
+   "id": 220,
+   "idHex": "0xdc",
+   "name": "Data220",
+   "cls": "text",
+   "count": 188,
+   "files": 188,
+   "groups": {
+    "fst": 188
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "12x188"
+   ],
+   "firstSeen": "3.0.0.0",
+   "firstFile": "Data/Patches/Channel presets/3x Osc/BP string.fst",
+   "lastSeen": "3.2.61.0",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": false,
+   "sample": "3c0000000800000001000000"
+  },
+  {
+   "id": 221,
+   "idHex": "0xdd",
+   "name": "ChannelPolyphony",
+   "cls": "text",
+   "count": 4071,
+   "files": 807,
+   "groups": {
+    "demo": 45,
+    "fst": 643,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "9x4071"
+   ],
+   "firstSeen": "3.0.0.0",
+   "firstFile": "Data/Patches/Channel presets/3x Osc/BP string.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "00000000f401000000"
+  },
+  {
+   "id": 223,
+   "idHex": "0xdf",
+   "name": "PatternControllers",
+   "cls": "text",
+   "count": 74,
+   "files": 11,
+   "groups": {
+    "demo": 10,
+    "render-test": 1
+   },
+   "distinctSizes": 53,
+   "topSizes": [
+    "12x9",
+    "384x6",
+    "24x3",
+    "1260x3",
+    "1548x2",
+    "1416x2"
+   ],
+   "firstSeen": "11.0.3.0",
+   "firstFile": "Data/Demo projects/Performance mode/nucleon - Steptime.flp",
+   "lastSeen": "25.1.0.4858",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "00000000011fc07900320000"
+  },
+  {
+   "id": 224,
+   "idHex": "0xe0",
+   "name": "PatternNotes",
+   "cls": "text",
+   "count": 2006,
+   "files": 741,
+   "groups": {
+    "demo": 45,
+    "fsc": 609,
+    "render-test": 81,
+    "template": 6
+   },
+   "distinctSizes": 201,
+   "topSizes": [
+    "24x161",
+    "96x117",
+    "48x111",
+    "384x98",
+    "120x97",
+    "192x95"
+   ],
+   "firstSeen": "3.0.0.0",
+   "firstFile": "Data/Patches/Scores/4 steps.fsc",
+   "lastSeen": "25.2.5.5319",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "0000000000400200000000003c0000007800400040648080"
+  },
+  {
+   "id": 225,
+   "idHex": "0xe1",
+   "name": "MixerParams",
+   "cls": "text",
+   "count": 182,
+   "files": 182,
+   "groups": {
+    "demo": 45,
+    "fst": 18,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 49,
+   "topSizes": [
+    "35292x56",
+    "336x16",
+    "46392x15",
+    "55104x14",
+    "6924x13",
+    "56364x9"
+   ],
+   "firstSeen": "3.6.5.0",
+   "firstFile": "Data/Patches/Mixer presets/Chorus send.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "00000000000000400032000000000000001f002001000000"
+  },
+  {
+   "id": 226,
+   "idHex": "0xe2",
+   "name": "MidiController",
+   "cls": "text",
+   "count": 424,
+   "files": 163,
+   "groups": {
+    "demo": 45,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 34
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "20x424"
+   ],
+   "firstSeen": "10.9.0.0",
+   "firstFile": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": false,
+   "sample": "ff000000000000000400ff0f04000000acf8ffff"
+  },
+  {
+   "id": 227,
+   "idHex": "0xe3",
+   "name": "RemoteController",
+   "cls": "text",
+   "count": 1619,
+   "files": 61,
+   "groups": {
+    "demo": 43,
+    "template": 18
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "20x1619"
+   ],
+   "firstSeen": "10.9.0.0",
+   "firstFile": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "lastSeen": "25.2.5.5319",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": false,
+   "sample": "00800100000000000780492308000000d5010000"
+  },
+  {
+   "id": 228,
+   "idHex": "0xe4",
+   "name": "ChannelTracking",
+   "cls": "text",
+   "count": 7848,
+   "files": 660,
+   "groups": {
+    "demo": 45,
+    "fst": 496,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "16x7848"
+   ],
+   "firstSeen": "3.2.3.0",
+   "firstFile": "Data/Patches/Channel presets/3x Osc/Synth bass 5.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "64000000000000000000000000000000"
+  },
+  {
+   "id": 229,
+   "idHex": "0xe5",
+   "name": "ChannelLevelAdjusts",
+   "cls": "text",
+   "count": 3883,
+   "files": 619,
+   "groups": {
+    "demo": 45,
+    "fst": 455,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "20x3883"
+   ],
+   "firstSeen": "3.3.1.0",
+   "firstFile": "Data/Patches/Channel presets/3x Osc/Accordeon 2.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "0000000000320000000000000000000000000000"
+  },
+  {
+   "id": 230,
+   "idHex": "0xe6",
+   "name": "Text230",
+   "cls": "text",
+   "count": 205,
+   "files": 25,
+   "groups": {
+    "demo": 11,
+    "template": 14
+   },
+   "distinctSizes": 9,
+   "topSizes": [
+    "32x116",
+    "40x24",
+    "20x19",
+    "16x17",
+    "36x17",
+    "28x6"
+   ],
+   "firstSeen": "11.1.0.0",
+   "firstFile": "Data/Demo projects/Product demos/Synth_dfr - Overcome - Sytrus.flp",
+   "lastSeen": "25.1.0.4858",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "31002d0049006e007000750074002a0031002e0036000000"
+  },
+  {
+   "id": 231,
+   "idHex": "0xe7",
+   "name": "DisplayGroupName",
+   "cls": "text",
+   "count": 330,
+   "files": 164,
+   "groups": {
+    "demo": 45,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 20,
+   "topSizes": [
+    "18x105",
+    "12x59",
+    "9x59",
+    "22x53",
+    "14x13",
+    "16x10"
+   ],
+   "firstSeen": "10.9.0.0",
+   "firstFile": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "41007500640069006f000000"
+  },
+  {
+   "id": 233,
+   "idHex": "0xe9",
+   "name": "PlaylistItems",
+   "cls": "text",
+   "count": 114,
+   "files": 111,
+   "groups": {
+    "demo": 45,
+    "system-flp": 2,
+    "render-test": 29,
+    "template": 35
+   },
+   "distinctSizes": 54,
+   "topSizes": [
+    "0x59",
+    "119520x2",
+    "800x2",
+    "6240x1",
+    "25800x1",
+    "72320x1"
+   ],
+   "firstSeen": "10.9.0.0",
+   "firstFile": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "0000000000502a00c3000000e60100007800402040648080"
+  },
+  {
+   "id": 234,
+   "idHex": "0xea",
+   "name": "ChannelAutomation",
+   "cls": "text",
+   "count": 1163,
+   "files": 111,
+   "groups": {
+    "demo": 43,
+    "fst": 63,
+    "template": 5
+   },
+   "distinctSizes": 72,
+   "topSizes": [
+    "181x215",
+    "205x143",
+    "229x132",
+    "253x107",
+    "277x79",
+    "301x49"
+   ],
+   "firstSeen": "4.6.0.0",
+   "firstFile": "Data/Patches/Channel presets/Automation clips/Gates/BasicGate10.fst",
+   "lastSeen": "25.2.5.5319",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "010000004000000001040000000300000003000000000000"
+  },
+  {
+   "id": 235,
+   "idHex": "0xeb",
+   "name": "InsertRouting",
+   "cls": "text",
+   "count": 16508,
+   "files": 164,
+   "groups": {
+    "demo": 45,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 52,
+   "topSizes": [
+    "105x8400",
+    "127x6350",
+    "1x1124",
+    "104x198",
+    "126x101",
+    "19x48"
+   ],
+   "firstSeen": "10.9.0.0",
+   "firstFile": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "000000000000000000000000000000000000000000000000"
+  },
+  {
+   "id": 236,
+   "idHex": "0xec",
+   "name": "InsertFlags",
+   "cls": "text",
+   "count": 16550,
+   "files": 168,
+   "groups": {
+    "demo": 45,
+    "fst": 4,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 3,
+   "topSizes": [
+    "12x8147",
+    "5x6198",
+    "8x2205"
+   ],
+   "firstSeen": "8.0.0.0",
+   "firstFile": "Data/Patches/Mixer presets/1-bar overdub recording.fst",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "000000000c00000000000000"
+  },
+  {
+   "id": 237,
+   "idHex": "0xed",
+   "name": "ProjectTimestamp",
+   "cls": "text",
+   "count": 164,
+   "files": 164,
+   "groups": {
+    "demo": 45,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "16x164"
+   ],
+   "firstSeen": "10.9.0.0",
+   "firstFile": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "94ed07ddd823e54000001ac1634ee13f"
+  },
+  {
+   "id": 238,
+   "idHex": "0xee",
+   "name": "TrackData",
+   "cls": "text",
+   "count": 44052,
+   "files": 164,
+   "groups": {
+    "demo": 45,
+    "system-flp": 2,
+    "render-test": 82,
+    "template": 35
+   },
+   "distinctSizes": 6,
+   "topSizes": [
+    "66x24000",
+    "70x17000",
+    "47x1965",
+    "49x772",
+    "61x216",
+    "62x99"
+   ],
+   "firstSeen": "10.9.0.0",
+   "firstFile": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "010000004851560000000000010000803fecffffff000000"
+  },
+  {
+   "id": 239,
+   "idHex": "0xef",
+   "name": "TrackName",
+   "cls": "text",
+   "count": 1946,
+   "files": 59,
+   "groups": {
+    "demo": 39,
+    "system-flp": 1,
+    "template": 19
+   },
+   "distinctSizes": 60,
+   "topSizes": [
+    "4x201",
+    "16x147",
+    "14x141",
+    "10x141",
+    "12x140",
+    "18x138"
+   ],
+   "firstSeen": "10.9.0.0",
+   "firstFile": "Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp",
+   "lastSeen": "25.2.5.5319",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "4400520055004d0053000000"
+  },
+  {
+   "id": 240,
+   "idHex": "0xf0",
+   "name": "MixerGroupText240",
+   "cls": "text",
+   "count": 5,
+   "files": 1,
+   "groups": {
+    "demo": 1
+   },
+   "distinctSizes": 5,
+   "topSizes": [
+    "24x1",
+    "12x1",
+    "10x1",
+    "20x1",
+    "8x1"
+   ],
+   "firstSeen": "25.1.0.4858",
+   "firstFile": "Data/Demo projects/Demo songs/Astes - Bien Duro.flp",
+   "lastSeen": "25.1.0.4858",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "49006e0073007400720075006d0065006e00740073000000"
+  },
+  {
+   "id": 241,
+   "idHex": "0xf1",
+   "name": "ArrangementName",
+   "cls": "text",
+   "count": 87,
+   "files": 84,
+   "groups": {
+    "demo": 28,
+    "system-flp": 1,
+    "render-test": 20,
+    "template": 35
+   },
+   "distinctSizes": 4,
+   "topSizes": [
+    "24x83",
+    "28x2",
+    "34x1",
+    "18x1"
+   ],
+   "firstSeen": "12.9.3.321",
+   "firstFile": "Data/Demo projects/Demo songs/Eric Kauffmann & NrgMind - Exoplanet.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-upstream",
+   "upstreamKnown": true,
+   "engineWritten": true,
+   "sample": "41007200720061006e00670065006d0065006e0074000000"
+  },
+  {
+   "id": 242,
+   "idHex": "0xf2",
+   "name": "MixerData242",
+   "cls": "text",
+   "count": 49,
+   "files": 48,
+   "groups": {
+    "demo": 17,
+    "system-flp": 1,
+    "render-test": 11,
+    "template": 19
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "28x49"
+   ],
+   "firstSeen": "21.2.1.3859",
+   "firstFile": "Data/System/Render tests/Fruity Blood Overdrive.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "000000000000000000000000000000a08631264000000000"
+  },
+  {
+   "id": 243,
+   "idHex": "0xf3",
+   "name": "MixerData243",
+   "cls": "text",
+   "count": 48,
+   "files": 48,
+   "groups": {
+    "demo": 17,
+    "system-flp": 1,
+    "render-test": 11,
+    "template": 19
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "8x48"
+   ],
+   "firstSeen": "21.2.1.3859",
+   "firstFile": "Data/System/Render tests/Fruity Blood Overdrive.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "0a00000005000000"
+  },
+  {
+   "id": 251,
+   "idHex": "0xfb",
+   "name": "Data251",
+   "cls": "text",
+   "count": 2,
+   "files": 2,
+   "groups": {
+    "demo": 1,
+    "template": 1
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "43x2"
+   ],
+   "firstSeen": "25.2.5.5319",
+   "firstFile": "Data/Demo projects/Demo songs/LeriQ - SHINE.flp",
+   "lastSeen": "25.2.99.0",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "02000000ffffffffffffffffffffffffffffff7f00000000"
+  },
+  {
+   "id": 252,
+   "idHex": "0xfc",
+   "name": "PatternText252",
+   "cls": "text",
+   "count": 87,
+   "files": 8,
+   "groups": {
+    "demo": 8
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "2x87"
+   ],
+   "firstSeen": "25.2.0.5098",
+   "firstFile": "Data/Demo projects/Demo songs/Cuebur & Thandi Draai - Africa's Calling.flp",
+   "lastSeen": "25.2.5.5319",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "0000"
+  },
+  {
+   "id": 253,
+   "idHex": "0xfd",
+   "name": "PatternText253",
+   "cls": "text",
+   "count": 87,
+   "files": 8,
+   "groups": {
+    "demo": 8
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "48x87"
+   ],
+   "firstSeen": "25.2.0.5098",
+   "firstFile": "Data/Demo projects/Demo songs/Cuebur & Thandi Draai - Africa's Calling.flp",
+   "lastSeen": "25.2.5.5319",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "30002c0030002c0030002c0030002c0030002c0030002c00"
+  },
+  {
+   "id": 256,
+   "idHex": "0x100",
+   "name": "ExtByte100",
+   "cls": "byte",
+   "count": 1,
+   "files": 1,
+   "groups": {
+    "template": 1
+   },
+   "distinctSizes": 1,
+   "topSizes": [
+    "1x1"
+   ],
+   "firstSeen": "26.1.0.5528",
+   "firstFile": "Data/Templates/Minimal/Basic with limiter/Basic with limiter.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "undocumented",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "00"
+  },
+  {
+   "id": 3221225729,
+   "idHex": "0xc0000101",
+   "name": "FlStudioVersionText",
+   "cls": "text",
+   "count": 127,
+   "files": 127,
+   "groups": {
+    "demo": 6,
+    "fst": 119,
+    "template": 2
+   },
+   "distinctSizes": 3,
+   "topSizes": [
+    "54x83",
+    "56x43",
+    "40x1"
+   ],
+   "firstSeen": "25.2.3.5164",
+   "firstFile": "Data/Demo projects/Demo songs/Jay Cactus x Confz - Mic Check Ready.flp",
+   "lastSeen": "26.1.0.5528",
+   "status": "named-observed",
+   "upstreamKnown": false,
+   "engineWritten": true,
+   "sample": "46004c002000530074007500640069006f00200032003500"
+  }
+ ]
+}

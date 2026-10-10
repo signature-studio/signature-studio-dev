@@ -1,0 +1,1532 @@
+{
+ "winFlhdBlocks": 9128,
+ "roundtripOk": 9128,
+ "macFlhdFiles": 8976,
+ "winOnly": 152,
+ "winOnlyByFormat": {
+  "project": 1,
+  "plugin-state": 151
+ },
+ "winOnlyList": [
+  {
+   "block": 163,
+   "size": 705246,
+   "format": "project",
+   "version": "12.3.0.71",
+   "events": 2361,
+   "plugin": "Harmor",
+   "channels": 15,
+   "inserts": 105
+  },
+  {
+   "block": 9605,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9606,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9607,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9608,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9609,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9610,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9611,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9612,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9613,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9614,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9615,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9616,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9617,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9618,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9619,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9620,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9621,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9622,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9623,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9624,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9625,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9626,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9627,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9628,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9629,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9630,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9631,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9632,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9633,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9634,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9635,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9636,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9637,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9638,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9639,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9640,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9641,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9642,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9643,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9644,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9645,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9646,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9647,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9648,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9649,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9650,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9651,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9652,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9653,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9654,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9655,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9656,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9657,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9658,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9659,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9660,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9661,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9662,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9663,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9664,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9665,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9666,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9667,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 9668,
+   "size": 214,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "FL Slayer",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15258,
+   "size": 274,
+   "format": "plugin-state",
+   "version": "3.5.5",
+   "events": 5,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15259,
+   "size": 274,
+   "format": "plugin-state",
+   "version": "3.5.5",
+   "events": 5,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15260,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "3.0.0",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15261,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "3.5.5",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15262,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "3.1.1",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15263,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "3.1.1",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15264,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "3.0.0",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15265,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "3.2.5",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15266,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "3.6.6",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15267,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "3.5.5",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15268,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "3.0.1",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15269,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "3.0.0",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15270,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "3.0.1",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15271,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "3.5.5",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15272,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "3.2.5",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15273,
+   "size": 274,
+   "format": "plugin-state",
+   "version": "3.5.5",
+   "events": 5,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15274,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "3.3.0",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15275,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "3.0.1",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15276,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "3.3.0",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15277,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "3.5.5",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15278,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "3.5.5",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15279,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "3.5.5",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15280,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "2.9.0",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15281,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "2.9.0",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15282,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "2.9.0",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15283,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "2.9.0",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15284,
+   "size": 274,
+   "format": "plugin-state",
+   "version": "3.5.5",
+   "events": 5,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15285,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "3.5.5",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15286,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "3.5.5",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15287,
+   "size": 281,
+   "format": "plugin-state",
+   "version": "3.5.5",
+   "events": 5,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15288,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "3.5.5",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15289,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "3.5.5",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15290,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "3.3.0",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15291,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "3.5.5",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15292,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "3.0.1",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15293,
+   "size": 274,
+   "format": "plugin-state",
+   "version": "3.5.5",
+   "events": 5,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15294,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "2.9.0",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15295,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "2.9.0",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15296,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "3.2.5",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15297,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "2.9.0",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15298,
+   "size": 264,
+   "format": "plugin-state",
+   "version": "3.2.93",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15299,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "3.5.5",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15300,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "3.2.5",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15301,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "3.2.5",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15302,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "3.2.5",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15303,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "3.5.5",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15304,
+   "size": 263,
+   "format": "plugin-state",
+   "version": "2.9.0",
+   "events": 4,
+   "plugin": "Wasp",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15305,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15306,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15307,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15308,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15309,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15310,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.6.1",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15311,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.6.1",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15312,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.6.1",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15313,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.6.1",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15314,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15315,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15316,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.6.1",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15317,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.6.1",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15318,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15319,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15320,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15321,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15322,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.6.1",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15323,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15324,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15325,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.6.1",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15326,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.6.1",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15327,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15328,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15329,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15330,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15331,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15332,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15333,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.6.1",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15334,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.6.1",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15335,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15336,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15337,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15338,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15339,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15340,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15341,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15342,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15343,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  },
+  {
+   "block": 15344,
+   "size": 310,
+   "format": "plugin-state",
+   "version": "4.1.0",
+   "events": 4,
+   "plugin": "Wasp XT",
+   "channels": 0,
+   "inserts": 0
+  }
+ ]
+}

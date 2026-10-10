@@ -1,0 +1,2605 @@
+{
+ "note": "projects = distinct .flp files (Demo/Template/Render-test/system) using the plugin; instances = channel+mixer-slot instances; presetFiles = .fst/.fsc files whose root plugin is it",
+ "total": 137,
+ "ranked": [
+  {
+   "key": "3x Osc",
+   "internalName": "3x Osc",
+   "kind": "native",
+   "projects": 75,
+   "instancesChannel": 152,
+   "instancesSlot": 0,
+   "instances": 152,
+   "presetFiles": 351,
+   "presetBytes": 266370,
+   "groups": {
+    "demo": 63,
+    "render-test": 49,
+    "template": 40
+   },
+   "vendors": [],
+   "topNames": [
+    "3xOsc",
+    "Sub 1",
+    "3x Osc"
+   ]
+  },
+  {
+   "key": "Fruity Parametric EQ 2",
+   "internalName": "Fruity Parametric EQ 2",
+   "kind": "native",
+   "projects": 58,
+   "instancesChannel": 0,
+   "instancesSlot": 707,
+   "instances": 707,
+   "presetFiles": 18,
+   "presetBytes": 18141,
+   "groups": {
+    "demo": 1000,
+    "render-test": 1,
+    "template": 133
+   },
+   "vendors": [],
+   "topNames": [
+    "Fruity Parametric EQ 2",
+    "Parametric EQ",
+    "1 Fruity Parametric EQ 2"
+   ]
+  },
+  {
+   "key": "Fruity Limiter",
+   "internalName": "Fruity Limiter",
+   "kind": "native",
+   "projects": 53,
+   "instancesChannel": 0,
+   "instancesSlot": 288,
+   "instances": 288,
+   "presetFiles": 17,
+   "presetBytes": 4657,
+   "groups": {
+    "demo": 298,
+    "render-test": 1,
+    "template": 45
+   },
+   "vendors": [],
+   "topNames": [
+    "Limiter",
+    "2 Fruity Limiter",
+    "SC"
+   ]
+  },
+  {
+   "key": "Maximus",
+   "internalName": "Maximus",
+   "kind": "native",
+   "projects": 45,
+   "instancesChannel": 0,
+   "instancesSlot": 101,
+   "instances": 101,
+   "presetFiles": 53,
+   "presetBytes": 76418,
+   "groups": {
+    "demo": 111,
+    "render-test": 1,
+    "template": 13
+   },
+   "vendors": [],
+   "topNames": [
+    "Compressor",
+    "Maximus",
+    "Low Mono & Comp"
+   ]
+  },
+  {
+   "key": "Fruity Reeverb 2",
+   "internalName": "Fruity Reeverb 2",
+   "kind": "native",
+   "projects": 42,
+   "instancesChannel": 0,
+   "instancesSlot": 266,
+   "instances": 266,
+   "presetFiles": 10,
+   "presetBytes": 1724,
+   "groups": {
+    "demo": 322,
+    "render-test": 1,
+    "template": 10
+   },
+   "vendors": [],
+   "topNames": [
+    "Reverb",
+    "Fruity Reeverb 2",
+    "HH Space"
+   ]
+  },
+  {
+   "key": "Fruity Delay 3",
+   "internalName": "Fruity Delay 3",
+   "kind": "native",
+   "projects": 31,
+   "instancesChannel": 0,
+   "instancesSlot": 64,
+   "instances": 64,
+   "presetFiles": 14,
+   "presetBytes": 3388,
+   "groups": {
+    "demo": 66,
+    "template": 44
+   },
+   "vendors": [],
+   "topNames": [
+    "panning delay",
+    "Fruity Delay 3",
+    "Ping pong"
+   ]
+  },
+  {
+   "key": "Fruity WaveShaper",
+   "internalName": "Fruity WaveShaper",
+   "kind": "native",
+   "projects": 29,
+   "instancesChannel": 0,
+   "instancesSlot": 62,
+   "instances": 62,
+   "presetFiles": 40,
+   "presetBytes": 22973,
+   "groups": {
+    "demo": 61,
+    "render-test": 1,
+    "template": 11
+   },
+   "vendors": [],
+   "topNames": [
+    "Fruity WaveShaper",
+    "Hard Clip",
+    "Transient former"
+   ]
+  },
+  {
+   "key": "Fruity Stereo Shaper",
+   "internalName": "Fruity Stereo Shaper",
+   "kind": "native",
+   "projects": 28,
+   "instancesChannel": 0,
+   "instancesSlot": 55,
+   "instances": 55,
+   "presetFiles": 29,
+   "presetBytes": 4347,
+   "groups": {
+    "demo": 50,
+    "render-test": 1,
+    "template": 26
+   },
+   "vendors": [],
+   "topNames": [
+    "Stereo Shaper",
+    "Fruity Stereo Shaper Stereoized 2",
+    "Delay"
+   ]
+  },
+  {
+   "key": "Fruity Peak Controller",
+   "internalName": "Fruity Peak Controller",
+   "kind": "native",
+   "projects": 27,
+   "instancesChannel": 0,
+   "instancesSlot": 22,
+   "instances": 22,
+   "presetFiles": 7,
+   "presetBytes": 1337,
+   "groups": {
+    "demo": 23,
+    "template": 13
+   },
+   "vendors": [],
+   "topNames": [
+    "Fruity Peak Controller",
+    "Peak Controller",
+    "Sidechain Peak"
+   ]
+  },
+  {
+   "key": "Sytrus",
+   "internalName": "Sytrus",
+   "kind": "native",
+   "projects": 25,
+   "instancesChannel": 267,
+   "instancesSlot": 0,
+   "instances": 267,
+   "presetFiles": 1022,
+   "presetBytes": 2190310,
+   "groups": {
+    "demo": 264,
+    "render-test": 2,
+    "template": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Default",
+    "Supersaw",
+    "Bass"
+   ]
+  },
+  {
+   "key": "Harmless",
+   "internalName": "Harmless",
+   "kind": "native",
+   "projects": 25,
+   "instancesChannel": 160,
+   "instancesSlot": 0,
+   "instances": 160,
+   "presetFiles": 434,
+   "presetBytes": 781403,
+   "groups": {
+    "demo": 139,
+    "render-test": 1,
+    "template": 20
+   },
+   "vendors": [],
+   "topNames": [
+    "Default",
+    "CPU",
+    "Scanner"
+   ]
+  },
+  {
+   "key": "Fruity Soft Clipper",
+   "internalName": "Fruity Soft Clipper",
+   "kind": "native",
+   "projects": 23,
+   "instancesChannel": 0,
+   "instancesSlot": 18,
+   "instances": 18,
+   "presetFiles": 8,
+   "presetBytes": 1166,
+   "groups": {
+    "demo": 20,
+    "render-test": 1,
+    "template": 6
+   },
+   "vendors": [],
+   "topNames": [
+    "Fruity Soft Clipper",
+    "Soft Clipper"
+   ]
+  },
+  {
+   "key": "Fruity PanOMatic",
+   "internalName": "Fruity PanOMatic",
+   "kind": "native",
+   "projects": 22,
+   "instancesChannel": 0,
+   "instancesSlot": 175,
+   "instances": 175,
+   "presetFiles": 5,
+   "presetBytes": 769,
+   "groups": {
+    "demo": 71,
+    "render-test": 1,
+    "template": 121
+   },
+   "vendors": [],
+   "topNames": []
+  },
+  {
+   "key": "Fruity Love Philter",
+   "internalName": "Fruity Love Philter",
+   "kind": "native",
+   "projects": 21,
+   "instancesChannel": 0,
+   "instancesSlot": 36,
+   "instances": 36,
+   "presetFiles": 51,
+   "presetBytes": 63641,
+   "groups": {
+    "demo": 44,
+    "render-test": 1,
+    "template": 4
+   },
+   "vendors": [],
+   "topNames": [
+    "Love Philter",
+    "Sidechain",
+    "Default"
+   ]
+  },
+  {
+   "key": "Harmor",
+   "internalName": "Harmor",
+   "kind": "native",
+   "projects": 20,
+   "instancesChannel": 99,
+   "instancesSlot": 0,
+   "instances": 99,
+   "presetFiles": 329,
+   "presetBytes": 32674615,
+   "groups": {
+    "demo": 98,
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Analog bass 2",
+    "Pluck",
+    "Main Lead #7"
+   ]
+  },
+  {
+   "key": "Slicex",
+   "internalName": "Slicex",
+   "kind": "native",
+   "projects": 20,
+   "instancesChannel": 42,
+   "instancesSlot": 0,
+   "instances": 42,
+   "presetFiles": 8,
+   "presetBytes": 213677,
+   "groups": {
+    "demo": 19,
+    "render-test": 1,
+    "template": 22
+   },
+   "vendors": [],
+   "topNames": [
+    "Vocals 1",
+    "untitled",
+    "The Funk"
+   ]
+  },
+  {
+   "key": "Fruity Flangus",
+   "internalName": "Fruity Flangus",
+   "kind": "native",
+   "projects": 20,
+   "instancesChannel": 0,
+   "instancesSlot": 35,
+   "instances": 35,
+   "presetFiles": 16,
+   "presetBytes": 2278,
+   "groups": {
+    "demo": 28,
+    "render-test": 1,
+    "template": 27
+   },
+   "vendors": [],
+   "topNames": [
+    "Fruity Flangus_2",
+    "Flangus",
+    "Deep chorus"
+   ]
+  },
+  {
+   "key": "FPC",
+   "internalName": "FPC",
+   "kind": "native",
+   "projects": 20,
+   "instancesChannel": 25,
+   "instancesSlot": 0,
+   "instances": 25,
+   "presetFiles": 86,
+   "presetBytes": 2668470,
+   "groups": {
+    "demo": 5,
+    "render-test": 1,
+    "template": 19
+   },
+   "vendors": [],
+   "topNames": [
+    "Drums",
+    "Default",
+    "HQ Funk Kit"
+   ]
+  },
+  {
+   "key": "Fruity Fast Dist",
+   "internalName": "Fruity Fast Dist",
+   "kind": "native",
+   "projects": 18,
+   "instancesChannel": 0,
+   "instancesSlot": 38,
+   "instances": 38,
+   "presetFiles": 12,
+   "presetBytes": 1624,
+   "groups": {
+    "demo": 37,
+    "render-test": 1,
+    "template": 15
+   },
+   "vendors": [],
+   "topNames": [
+    "Fast Dist"
+   ]
+  },
+  {
+   "key": "Pitcher",
+   "internalName": "Pitcher",
+   "kind": "native",
+   "projects": 18,
+   "instancesChannel": 0,
+   "instancesSlot": 20,
+   "instances": 20,
+   "presetFiles": 4,
+   "presetBytes": 1132,
+   "groups": {
+    "demo": 39,
+    "render-test": 1,
+    "template": 22
+   },
+   "vendors": [],
+   "topNames": [
+    "Pitcher",
+    "Pitcher ",
+    "Pitcher (MIDI)"
+   ]
+  },
+  {
+   "key": "Fruity Compressor",
+   "internalName": "Fruity Compressor",
+   "kind": "native",
+   "projects": 17,
+   "instancesChannel": 0,
+   "instancesSlot": 89,
+   "instances": 89,
+   "presetFiles": 24,
+   "presetBytes": 4340,
+   "groups": {
+    "demo": 87,
+    "render-test": 1,
+    "template": 12
+   },
+   "vendors": [],
+   "topNames": [
+    "Brickwall",
+    "Compressor",
+    "Fruity Compressor"
+   ]
+  },
+  {
+   "key": "DirectWave",
+   "internalName": "DirectWave",
+   "kind": "native",
+   "projects": 17,
+   "instancesChannel": 56,
+   "instancesSlot": 0,
+   "instances": 56,
+   "presetFiles": 141,
+   "presetBytes": 53617144,
+   "groups": {
+    "demo": 21,
+    "render-test": 1,
+    "template": 34
+   },
+   "vendors": [],
+   "topNames": [
+    "Strings",
+    "Bass",
+    "Piano"
+   ]
+  },
+  {
+   "key": "Fruity Delay 2",
+   "internalName": "Fruity Delay 2",
+   "kind": "native",
+   "projects": 17,
+   "instancesChannel": 0,
+   "instancesSlot": 50,
+   "instances": 50,
+   "presetFiles": 11,
+   "presetBytes": 2637,
+   "groups": {
+    "demo": 61,
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Delay",
+    "Fruity Delay 2",
+    "Fruity delay 2"
+   ]
+  },
+  {
+   "key": "Gross Beat",
+   "internalName": "Gross Beat",
+   "kind": "native",
+   "projects": 17,
+   "instancesChannel": 0,
+   "instancesSlot": 21,
+   "instances": 21,
+   "presetFiles": 13,
+   "presetBytes": 369243,
+   "groups": {
+    "demo": 31,
+    "render-test": 1,
+    "template": 2
+   },
+   "vendors": [],
+   "topNames": [
+    "Gross Beat",
+    "Gross Beat Pitch",
+    "Gross Beat - Pitch shifter"
+   ]
+  },
+  {
+   "key": "Control Surface",
+   "internalName": "Control Surface",
+   "kind": "native",
+   "projects": 17,
+   "instancesChannel": 0,
+   "instancesSlot": 15,
+   "instances": 15,
+   "presetFiles": 5,
+   "presetBytes": 1117,
+   "groups": {
+    "demo": 3,
+    "template": 14
+   },
+   "vendors": [],
+   "topNames": [
+    "Delay on/off",
+    "TRANSIENT PROCESSORS ON/OFF",
+    "Mix"
+   ]
+  },
+  {
+   "key": "Fruity Delay Bank",
+   "internalName": "Fruity Delay Bank",
+   "kind": "native",
+   "projects": 16,
+   "instancesChannel": 0,
+   "instancesSlot": 15,
+   "instances": 15,
+   "presetFiles": 25,
+   "presetBytes": 22672,
+   "groups": {
+    "demo": 34,
+    "render-test": 1,
+    "template": 6
+   },
+   "vendors": [],
+   "topNames": [
+    "Delay Bank"
+   ]
+  },
+  {
+   "key": "FLEX",
+   "internalName": "FLEX",
+   "kind": "native",
+   "projects": 15,
+   "instancesChannel": 57,
+   "instancesSlot": 0,
+   "instances": 57,
+   "presetFiles": 142,
+   "presetBytes": 405851,
+   "groups": {
+    "demo": 55,
+    "render-test": 1,
+    "template": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "LED Analogia",
+    "FLEX",
+    "SYNTH PLUCK"
+   ]
+  },
+  {
+   "key": "Transient Processor",
+   "internalName": "Transient Processor",
+   "kind": "native",
+   "projects": 15,
+   "instancesChannel": 0,
+   "instancesSlot": 32,
+   "instances": 32,
+   "presetFiles": 14,
+   "presetBytes": 2702,
+   "groups": {
+    "demo": 46,
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Transient Processor",
+    "Cmpression"
+   ]
+  },
+  {
+   "key": "Patcher",
+   "internalName": "Patcher",
+   "kind": "native",
+   "projects": 14,
+   "instancesChannel": 4,
+   "instancesSlot": 22,
+   "instances": 26,
+   "presetFiles": 329,
+   "presetBytes": 51329215,
+   "groups": {
+    "demo": 27,
+    "render-test": 2,
+    "template": 6
+   },
+   "vendors": [],
+   "topNames": [
+    "Patcher",
+    "De-esser",
+    "Filter"
+   ]
+  },
+  {
+   "key": "Fruity Balance",
+   "internalName": "Fruity Balance",
+   "kind": "native",
+   "projects": 13,
+   "instancesChannel": 0,
+   "instancesSlot": 54,
+   "instances": 54,
+   "presetFiles": 4,
+   "presetBytes": 568,
+   "groups": {
+    "demo": 57,
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Balance",
+    "Fruity Balance",
+    "Reverb Sidechain"
+   ]
+  },
+  {
+   "key": "Fruity Multiband Compressor",
+   "internalName": "Fruity Multiband Compressor",
+   "kind": "native",
+   "projects": 13,
+   "instancesChannel": 0,
+   "instancesSlot": 27,
+   "instances": 27,
+   "presetFiles": 35,
+   "presetBytes": 8568,
+   "groups": {
+    "demo": 30,
+    "render-test": 1,
+    "template": 4
+   },
+   "vendors": [],
+   "topNames": [
+    "Multiband Compressor",
+    "Compressor"
+   ]
+  },
+  {
+   "key": "Fruity Chorus",
+   "internalName": "Fruity Chorus",
+   "kind": "native",
+   "projects": 12,
+   "instancesChannel": 0,
+   "instancesSlot": 20,
+   "instances": 20,
+   "presetFiles": 13,
+   "presetBytes": 2875,
+   "groups": {
+    "demo": 21,
+    "render-test": 1,
+    "template": 4
+   },
+   "vendors": [],
+   "topNames": [
+    "50 Detune",
+    "CE Chorus",
+    "Default"
+   ]
+  },
+  {
+   "key": "Soundgoodizer",
+   "internalName": "Soundgoodizer",
+   "kind": "native",
+   "projects": 11,
+   "instancesChannel": 0,
+   "instancesSlot": 90,
+   "instances": 90,
+   "presetFiles": 4,
+   "presetBytes": 568,
+   "groups": {
+    "demo": 95,
+    "render-test": 1,
+    "template": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Soundgoodizer"
+   ]
+  },
+  {
+   "key": "Fruity Blood Overdrive",
+   "internalName": "Fruity Blood Overdrive",
+   "kind": "native",
+   "projects": 11,
+   "instancesChannel": 0,
+   "instancesSlot": 22,
+   "instances": 22,
+   "presetFiles": 8,
+   "presetBytes": 1560,
+   "groups": {
+    "demo": 25,
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Blood Overdrive",
+    "Fruity Blood Overdrive Drive"
+   ]
+  },
+  {
+   "key": "Effector",
+   "internalName": "Effector",
+   "kind": "native",
+   "projects": 11,
+   "instancesChannel": 0,
+   "instancesSlot": 16,
+   "instances": 16,
+   "presetFiles": 4,
+   "presetBytes": 1828,
+   "groups": {
+    "demo": 21,
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Effector",
+    "Ducker",
+    "FX Distortion"
+   ]
+  },
+  {
+   "key": "Fruity Stereo Enhancer",
+   "internalName": "Fruity Stereo Enhancer",
+   "kind": "native",
+   "projects": 10,
+   "instancesChannel": 0,
+   "instancesSlot": 23,
+   "instances": 23,
+   "presetFiles": 7,
+   "presetBytes": 1093,
+   "groups": {
+    "demo": 23,
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Stereo Enhancer"
+   ]
+  },
+  {
+   "key": "Fruity Convolver",
+   "internalName": "Fruity Convolver",
+   "kind": "native",
+   "projects": 10,
+   "instancesChannel": 0,
+   "instancesSlot": 19,
+   "instances": 19,
+   "presetFiles": 265,
+   "presetBytes": 183059,
+   "groups": {
+    "demo": 19,
+    "render-test": 1,
+    "template": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Convolver",
+    "Fruity Convolver",
+    "Convolver (EQ)"
+   ]
+  },
+  {
+   "key": "Vocodex",
+   "internalName": "Vocodex",
+   "kind": "native",
+   "projects": 10,
+   "instancesChannel": 0,
+   "instancesSlot": 6,
+   "instances": 6,
+   "presetFiles": 25,
+   "presetBytes": 35068,
+   "groups": {
+    "demo": 10,
+    "render-test": 1,
+    "template": 1
+   },
+   "vendors": [],
+   "topNames": []
+  },
+  {
+   "key": "Spreader",
+   "internalName": "Spreader",
+   "kind": "native",
+   "projects": 9,
+   "instancesChannel": 0,
+   "instancesSlot": 27,
+   "instances": 27,
+   "presetFiles": 5,
+   "presetBytes": 801,
+   "groups": {
+    "demo": 32,
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Spreader"
+   ]
+  },
+  {
+   "key": "LuxeVerb",
+   "internalName": "LuxeVerb",
+   "kind": "native",
+   "projects": 9,
+   "instancesChannel": 0,
+   "instancesSlot": 18,
+   "instances": 18,
+   "presetFiles": 179,
+   "presetBytes": 63113,
+   "groups": {
+    "demo": 20,
+    "template": 4
+   },
+   "vendors": [],
+   "topNames": [
+    "Ambient Shimmer Creative name",
+    "LuxeVerb",
+    "LuxeVerb (long)"
+   ]
+  },
+  {
+   "key": "FL Keys",
+   "internalName": "FL Keys",
+   "kind": "native",
+   "projects": 9,
+   "instancesChannel": 11,
+   "instancesSlot": 0,
+   "instances": 11,
+   "presetFiles": 13,
+   "presetBytes": 2352,
+   "groups": {
+    "demo": 10,
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "FL Keys",
+    "Piano",
+    "Crusty Piano"
+   ]
+  },
+  {
+   "key": "ZGameEditor Visualizer",
+   "internalName": "ZGameEditor Visualizer",
+   "kind": "native",
+   "projects": 9,
+   "instancesChannel": 0,
+   "instancesSlot": 9,
+   "instances": 9,
+   "presetFiles": 589,
+   "presetBytes": 4867808,
+   "groups": {
+    "demo": 8,
+    "template": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Colorful Wavesimple",
+    "_ParamLinkDemo1",
+    "ZGameEditor Visualizer"
+   ]
+  },
+  {
+   "key": "Autogun",
+   "internalName": "Autogun",
+   "kind": "native",
+   "projects": 9,
+   "instancesChannel": 9,
+   "instancesSlot": 0,
+   "instances": 9,
+   "presetFiles": 4,
+   "presetBytes": 294924,
+   "groups": {
+    "render-test": 1,
+    "template": 8
+   },
+   "vendors": [],
+   "topNames": [
+    "Pad",
+    "Autogun",
+    "Pad 5"
+   ]
+  },
+  {
+   "key": "Ogun",
+   "internalName": "Ogun",
+   "kind": "native",
+   "projects": 7,
+   "instancesChannel": 23,
+   "instancesSlot": 0,
+   "instances": 23,
+   "presetFiles": 235,
+   "presetBytes": 13513564,
+   "groups": {
+    "demo": 20,
+    "render-test": 1,
+    "template": 2
+   },
+   "vendors": [],
+   "topNames": [
+    "Padsaw",
+    "Turbular Bells",
+    "3.3.1 Metal Drums: Drum"
+   ]
+  },
+  {
+   "key": "Hyper Chorus",
+   "internalName": "Hyper Chorus",
+   "kind": "native",
+   "projects": 7,
+   "instancesChannel": 0,
+   "instancesSlot": 16,
+   "instances": 16,
+   "presetFiles": 17,
+   "presetBytes": 3686,
+   "groups": {
+    "demo": 20
+   },
+   "vendors": [],
+   "topNames": [
+    "Default",
+    "Sandy crust",
+    "Top shell"
+   ]
+  },
+  {
+   "key": "Fruity DX10",
+   "internalName": "Fruity DX10",
+   "kind": "native",
+   "projects": 7,
+   "instancesChannel": 12,
+   "instancesSlot": 0,
+   "instances": 12,
+   "presetFiles": 63,
+   "presetBytes": 12304,
+   "groups": {
+    "demo": 4,
+    "render-test": 1,
+    "template": 7
+   },
+   "vendors": [],
+   "topNames": [
+    "Fruity DX10",
+    "Log Drum",
+    "Synth 2"
+   ]
+  },
+  {
+   "key": "Pitch Shifter",
+   "internalName": "Pitch Shifter",
+   "kind": "native",
+   "projects": 7,
+   "instancesChannel": 0,
+   "instancesSlot": 11,
+   "instances": 11,
+   "presetFiles": 31,
+   "presetBytes": 7444,
+   "groups": {
+    "demo": 14,
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Pitch Shifter",
+    "Daunting Delays",
+    "Delay Oct down 1"
+   ]
+  },
+  {
+   "key": "EQUO",
+   "internalName": "EQUO",
+   "kind": "native",
+   "projects": 7,
+   "instancesChannel": 0,
+   "instancesSlot": 5,
+   "instances": 5,
+   "presetFiles": 10,
+   "presetBytes": 42406,
+   "groups": {
+    "demo": 5,
+    "render-test": 1,
+    "template": 4
+   },
+   "vendors": [],
+   "topNames": []
+  },
+  {
+   "key": "Wave Candy",
+   "internalName": "Wave Candy",
+   "kind": "native",
+   "projects": 6,
+   "instancesChannel": 0,
+   "instancesSlot": 11,
+   "instances": 11,
+   "presetFiles": 43,
+   "presetBytes": 39012,
+   "groups": {
+    "demo": 11
+   },
+   "vendors": [],
+   "topNames": [
+    "dB  Meter",
+    "Spectrum",
+    "RMS Meter"
+   ]
+  },
+  {
+   "key": "Fruity Flanger",
+   "internalName": "Fruity Flanger",
+   "kind": "native",
+   "projects": 6,
+   "instancesChannel": 0,
+   "instancesSlot": 10,
+   "instances": 10,
+   "presetFiles": 32,
+   "presetBytes": 6906,
+   "groups": {
+    "demo": 9,
+    "render-test": 1,
+    "template": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Bad Leslie",
+    "Chorusy",
+    "Classic Deep"
+   ]
+  },
+  {
+   "key": "GMS",
+   "internalName": "GMS",
+   "kind": "native",
+   "projects": 6,
+   "instancesChannel": 10,
+   "instancesSlot": 0,
+   "instances": 10,
+   "presetFiles": 5,
+   "presetBytes": 25497,
+   "groups": {
+    "demo": 9,
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "GMS",
+    "FUTURE Sub",
+    "FUTURE Bass"
+   ]
+  },
+  {
+   "key": "Fruity NoteBook 2",
+   "internalName": "Fruity NoteBook 2",
+   "kind": "native",
+   "projects": 6,
+   "instancesChannel": 0,
+   "instancesSlot": 4,
+   "instances": 4,
+   "presetFiles": 6,
+   "presetBytes": 1896,
+   "groups": {
+    "demo": 4,
+    "template": 3
+   },
+   "vendors": [],
+   "topNames": [
+    "note",
+    "Notebook... read me :)",
+    "Earcandy"
+   ]
+  },
+  {
+   "key": "Fruity Filter",
+   "internalName": "Fruity Filter",
+   "kind": "native",
+   "projects": 5,
+   "instancesChannel": 0,
+   "instancesSlot": 19,
+   "instances": 19,
+   "presetFiles": 8,
+   "presetBytes": 1360,
+   "groups": {
+    "demo": 32,
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Filter",
+    "Fruity Filter"
+   ]
+  },
+  {
+   "key": "Fruity Slicer",
+   "internalName": "Fruity Slicer",
+   "kind": "native",
+   "projects": 5,
+   "instancesChannel": 10,
+   "instancesSlot": 0,
+   "instances": 10,
+   "presetFiles": 51,
+   "presetBytes": 58539,
+   "groups": {
+    "demo": 9,
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Fruity Slicer #2",
+    "DL Breaker",
+    "DL_DudaFunk"
+   ]
+  },
+  {
+   "key": "Vintage Chorus",
+   "internalName": "Vintage Chorus",
+   "kind": "native",
+   "projects": 5,
+   "instancesChannel": 0,
+   "instancesSlot": 9,
+   "instances": 9,
+   "presetFiles": 27,
+   "presetBytes": 5955,
+   "groups": {
+    "demo": 11,
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Vintage Chorus Presencer",
+    "Juno-106 Chorus I",
+    "Juno-106 Chorus II"
+   ]
+  },
+  {
+   "key": "Emphasis",
+   "internalName": "Emphasis",
+   "kind": "native",
+   "projects": 5,
+   "instancesChannel": 0,
+   "instancesSlot": 4,
+   "instances": 4,
+   "presetFiles": 26,
+   "presetBytes": 6330,
+   "groups": {
+    "demo": 4,
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Default",
+    "Emphasis Limiter",
+    "Classical"
+   ]
+  },
+  {
+   "key": "Fruity Fast LP",
+   "internalName": "Fruity Fast LP",
+   "kind": "native",
+   "projects": 4,
+   "instancesChannel": 0,
+   "instancesSlot": 18,
+   "instances": 18,
+   "presetFiles": 0,
+   "presetBytes": 0,
+   "groups": {
+    "demo": 19,
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Fruity Fast LP"
+   ]
+  },
+  {
+   "key": "Morphine",
+   "internalName": "Morphine",
+   "kind": "native",
+   "projects": 4,
+   "instancesChannel": 7,
+   "instancesSlot": 0,
+   "instances": 7,
+   "presetFiles": 5,
+   "presetBytes": 1368083,
+   "groups": {
+    "demo": 7
+   },
+   "vendors": [],
+   "topNames": [
+    "Morphine",
+    "Synth 03",
+    "Lead Synth"
+   ]
+  },
+  {
+   "key": "Fruity Parametric EQ",
+   "internalName": "Fruity Parametric EQ",
+   "kind": "native",
+   "projects": 4,
+   "instancesChannel": 0,
+   "instancesSlot": 6,
+   "instances": 6,
+   "presetFiles": 32,
+   "presetBytes": 12297,
+   "groups": {
+    "demo": 8,
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": []
+  },
+  {
+   "key": "Sakura",
+   "internalName": "Sakura",
+   "kind": "native",
+   "projects": 4,
+   "instancesChannel": 5,
+   "instancesSlot": 0,
+   "instances": 5,
+   "presetFiles": 506,
+   "presetBytes": 374761,
+   "groups": {
+    "demo": 4,
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Sakura",
+    "Pluck - Saku",
+    "strings"
+   ]
+  },
+  {
+   "key": "BassDrum",
+   "internalName": "BassDrum",
+   "kind": "native",
+   "projects": 4,
+   "instancesChannel": 5,
+   "instancesSlot": 0,
+   "instances": 5,
+   "presetFiles": 57,
+   "presetBytes": 85313,
+   "groups": {
+    "demo": 3,
+    "render-test": 1,
+    "template": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "BassDrum",
+    "BassDrum .2",
+    "kick"
+   ]
+  },
+  {
+   "key": "Edison",
+   "internalName": "Edison",
+   "kind": "native",
+   "projects": 4,
+   "instancesChannel": 0,
+   "instancesSlot": 5,
+   "instances": 5,
+   "presetFiles": 11,
+   "presetBytes": 7548,
+   "groups": {
+    "demo": 6
+   },
+   "vendors": [],
+   "topNames": [
+    "AudioEditorTrack"
+   ]
+  },
+  {
+   "key": "Fruity Envelope Controller",
+   "internalName": "Fruity Envelope Controller",
+   "kind": "native",
+   "projects": 4,
+   "instancesChannel": 4,
+   "instancesSlot": 0,
+   "instances": 4,
+   "presetFiles": 26,
+   "presetBytes": 151671,
+   "groups": {
+    "demo": 4
+   },
+   "vendors": [],
+   "topNames": [
+    "Fruity Envelope Controller",
+    "Smart X for 3 controls",
+    "Default"
+   ]
+  },
+  {
+   "key": "Fruity Phaser",
+   "internalName": "Fruity Phaser",
+   "kind": "native",
+   "projects": 4,
+   "instancesChannel": 0,
+   "instancesSlot": 2,
+   "instances": 2,
+   "presetFiles": 31,
+   "presetBytes": 5935,
+   "groups": {
+    "demo": 3,
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Stereo Enhance 01",
+    "Moog It 02",
+    "FX Phaser"
+   ]
+  },
+  {
+   "key": "Frequency Shifter",
+   "internalName": "Frequency Shifter",
+   "kind": "native",
+   "projects": 4,
+   "instancesChannel": 0,
+   "instancesSlot": 2,
+   "instances": 2,
+   "presetFiles": 13,
+   "presetBytes": 2638,
+   "groups": {
+    "demo": 4,
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Freq Splitter",
+    "Freq Shifter",
+    "Default"
+   ]
+  },
+  {
+   "key": "Fruity X-Y Controller",
+   "internalName": "Fruity X-Y Controller",
+   "kind": "native",
+   "projects": 3,
+   "instancesChannel": 0,
+   "instancesSlot": 19,
+   "instances": 19,
+   "presetFiles": 13,
+   "presetBytes": 3165,
+   "groups": {
+    "demo": 1,
+    "template": 18
+   },
+   "vendors": [],
+   "topNames": [
+    "Joy axis (main)",
+    "Low Pass",
+    "High Pass"
+   ]
+  },
+  {
+   "key": "MiniSynth",
+   "internalName": "MiniSynth",
+   "kind": "native",
+   "projects": 3,
+   "instancesChannel": 12,
+   "instancesSlot": 0,
+   "instances": 12,
+   "presetFiles": 7,
+   "presetBytes": 2476,
+   "groups": {
+    "demo": 10,
+    "render-test": 1,
+    "template": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Default",
+    "Riser",
+    "Lead Break #3"
+   ]
+  },
+  {
+   "key": "Drumpad",
+   "internalName": "Drumpad",
+   "kind": "native",
+   "projects": 3,
+   "instancesChannel": 11,
+   "instancesSlot": 0,
+   "instances": 11,
+   "presetFiles": 965,
+   "presetBytes": 386112,
+   "groups": {
+    "demo": 8,
+    "render-test": 1,
+    "template": 2
+   },
+   "vendors": [],
+   "topNames": [
+    "Drumpad",
+    "War Drum Lo 01",
+    "Hi Bongo 01"
+   ]
+  },
+  {
+   "key": "Frequency Splitter",
+   "internalName": "Frequency Splitter",
+   "kind": "native",
+   "projects": 3,
+   "instancesChannel": 0,
+   "instancesSlot": 8,
+   "instances": 8,
+   "presetFiles": 13,
+   "presetBytes": 3432,
+   "groups": {
+    "demo": 17
+   },
+   "vendors": [],
+   "topNames": [
+    "Freq Splitter",
+    "Multiband Sidechain",
+    "Frequency Splitter"
+   ]
+  },
+  {
+   "key": "Kepler",
+   "internalName": "Kepler",
+   "kind": "native",
+   "projects": 3,
+   "instancesChannel": 4,
+   "instancesSlot": 0,
+   "instances": 4,
+   "presetFiles": 281,
+   "presetBytes": 92406,
+   "groups": {
+    "demo": 4
+   },
+   "vendors": [],
+   "topNames": [
+    "Default",
+    "Gummybear",
+    "Belike"
+   ]
+  },
+  {
+   "key": "MIDI Out",
+   "internalName": "MIDI Out",
+   "kind": "native",
+   "projects": 3,
+   "instancesChannel": 4,
+   "instancesSlot": 0,
+   "instances": 4,
+   "presetFiles": 46,
+   "presetBytes": 81711,
+   "groups": {
+    "demo": 3,
+    "template": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "MIDI Out",
+    "ASHER POSTMAN",
+    "1.2 MIDI"
+   ]
+  },
+  {
+   "key": "Fruity Free Filter",
+   "internalName": "Fruity Free Filter",
+   "kind": "native",
+   "projects": 3,
+   "instancesChannel": 0,
+   "instancesSlot": 4,
+   "instances": 4,
+   "presetFiles": 9,
+   "presetBytes": 1830,
+   "groups": {
+    "demo": 4,
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Default",
+    "LowPass 16000",
+    "LowPass ~11025"
+   ]
+  },
+  {
+   "key": "Fruit Kick",
+   "internalName": "Fruit Kick",
+   "kind": "native",
+   "projects": 3,
+   "instancesChannel": 3,
+   "instancesSlot": 0,
+   "instances": 3,
+   "presetFiles": 12,
+   "presetBytes": 1768,
+   "groups": {
+    "demo": 2,
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Fruit Kick",
+    "GHOSTKICK",
+    "Fruit kick"
+   ]
+  },
+  {
+   "key": "BooBass",
+   "internalName": "BooBass",
+   "kind": "native",
+   "projects": 3,
+   "instancesChannel": 3,
+   "instancesSlot": 0,
+   "instances": 3,
+   "presetFiles": 4,
+   "presetBytes": 608,
+   "groups": {
+    "demo": 2,
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "BooBass",
+    "5.1 Bass"
+   ]
+  },
+  {
+   "key": "Distructor",
+   "internalName": "Distructor",
+   "kind": "native",
+   "projects": 3,
+   "instancesChannel": 0,
+   "instancesSlot": 2,
+   "instances": 2,
+   "presetFiles": 51,
+   "presetBytes": 51175,
+   "groups": {
+    "demo": 4
+   },
+   "vendors": [],
+   "topNames": [
+    "SS - Chaotic Chorus",
+    "Distructor Tonal Spatializer"
+   ]
+  },
+  {
+   "key": "Low Lifter",
+   "internalName": "Low Lifter",
+   "kind": "native",
+   "projects": 3,
+   "instancesChannel": 0,
+   "instancesSlot": 2,
+   "instances": 2,
+   "presetFiles": 12,
+   "presetBytes": 2635,
+   "groups": {
+    "demo": 3,
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": []
+  },
+  {
+   "key": "Fruity DrumSynth Live",
+   "internalName": "Fruity DrumSynth Live",
+   "kind": "native",
+   "projects": 2,
+   "instancesChannel": 9,
+   "instancesSlot": 0,
+   "instances": 9,
+   "presetFiles": 6,
+   "presetBytes": 87330,
+   "groups": {
+    "demo": 8,
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Fruity DrumSynth Live",
+    "Closehat",
+    "Openhat"
+   ]
+  },
+  {
+   "key": "Fruity Reeverb",
+   "internalName": "Fruity Reeverb",
+   "kind": "native",
+   "projects": 2,
+   "instancesChannel": 0,
+   "instancesSlot": 6,
+   "instances": 6,
+   "presetFiles": 22,
+   "presetBytes": 4679,
+   "groups": {
+    "demo": 7,
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Default",
+    "Acoustic Drums",
+    "Acoustic Room"
+   ]
+  },
+  {
+   "key": "Wave Traveller",
+   "internalName": "Wave Traveller",
+   "kind": "native",
+   "projects": 2,
+   "instancesChannel": 3,
+   "instancesSlot": 0,
+   "instances": 3,
+   "presetFiles": 11,
+   "presetBytes": 360584,
+   "groups": {
+    "demo": 2,
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Wave Traveller",
+    "Wave Traveller #2",
+    "Wave Traveller #3"
+   ]
+  },
+  {
+   "key": "Toxic Biohazard",
+   "internalName": "Toxic Biohazard",
+   "kind": "native",
+   "projects": 2,
+   "instancesChannel": 3,
+   "instancesSlot": 0,
+   "instances": 3,
+   "presetFiles": 5,
+   "presetBytes": 40997,
+   "groups": {
+    "demo": 3
+   },
+   "vendors": [],
+   "topNames": [
+    "Toxic Biohazard",
+    "Saw",
+    "Saw #2"
+   ]
+  },
+  {
+   "key": "PoiZone",
+   "internalName": "PoiZone",
+   "kind": "native",
+   "projects": 2,
+   "instancesChannel": 2,
+   "instancesSlot": 0,
+   "instances": 2,
+   "presetFiles": 389,
+   "presetBytes": 330598,
+   "groups": {
+    "demo": 1,
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "PoiZone"
+   ]
+  },
+  {
+   "key": "Fruity Granulizer",
+   "internalName": "Fruity Granulizer",
+   "kind": "native",
+   "projects": 2,
+   "instancesChannel": 2,
+   "instancesSlot": 0,
+   "instances": 2,
+   "presetFiles": 13,
+   "presetBytes": 2978,
+   "groups": {
+    "render-test": 1,
+    "template": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Fruity Granulizer",
+    "808 Kick",
+    "FLS_SpokenWord 001"
+   ]
+  },
+  {
+   "key": "Fruity NoteBook",
+   "internalName": "Fruity NoteBook",
+   "kind": "native",
+   "projects": 2,
+   "instancesChannel": 0,
+   "instancesSlot": 2,
+   "instances": 2,
+   "presetFiles": 6,
+   "presetBytes": 2912,
+   "groups": {
+    "demo": 2
+   },
+   "vendors": [],
+   "topNames": []
+  },
+  {
+   "key": "Transporter",
+   "internalName": "Transporter",
+   "kind": "native",
+   "projects": 2,
+   "instancesChannel": 0,
+   "instancesSlot": 1,
+   "instances": 1,
+   "presetFiles": 11,
+   "presetBytes": 2573,
+   "groups": {
+    "demo": 1,
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": []
+  },
+  {
+   "key": "Fruity Squeeze",
+   "internalName": "Fruity Squeeze",
+   "kind": "native",
+   "projects": 2,
+   "instancesChannel": 0,
+   "instancesSlot": 1,
+   "instances": 1,
+   "presetFiles": 10,
+   "presetBytes": 1666,
+   "groups": {
+    "demo": 1,
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": []
+  },
+  {
+   "key": "Fruity Vocoder",
+   "internalName": "Fruity Vocoder",
+   "kind": "native",
+   "projects": 2,
+   "instancesChannel": 0,
+   "instancesSlot": 1,
+   "instances": 1,
+   "presetFiles": 7,
+   "presetBytes": 2473,
+   "groups": {
+    "demo": 1,
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": []
+  },
+  {
+   "key": "Hardcore",
+   "internalName": "Hardcore",
+   "kind": "native",
+   "projects": 2,
+   "instancesChannel": 0,
+   "instancesSlot": 1,
+   "instances": 1,
+   "presetFiles": 5,
+   "presetBytes": 2965,
+   "groups": {
+    "demo": 1,
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": []
+  },
+  {
+   "key": "Fruity Send",
+   "internalName": "Fruity Send",
+   "kind": "native",
+   "projects": 2,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 4,
+   "presetBytes": 568,
+   "groups": {
+    "demo": 1,
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": []
+  },
+  {
+   "key": "Fruity Bass Boost",
+   "internalName": "Fruity Bass Boost",
+   "kind": "native",
+   "projects": 2,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 1,
+   "presetBytes": 169,
+   "groups": {
+    "demo": 2,
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Default",
+    "Fruity Bass Boost"
+   ]
+  },
+  {
+   "key": "Fruity Keyboard Controller",
+   "internalName": "Fruity Keyboard Controller",
+   "kind": "native",
+   "projects": 1,
+   "instancesChannel": 10,
+   "instancesSlot": 0,
+   "instances": 10,
+   "presetFiles": 11,
+   "presetBytes": 7387,
+   "groups": {
+    "demo": 10
+   },
+   "vendors": [],
+   "topNames": [
+    "Fruity Keyboard Controller",
+    "Glitch",
+    "Filter"
+   ]
+  },
+  {
+   "key": "Fruity Formula Controller",
+   "internalName": "Fruity Formula Controller",
+   "kind": "native",
+   "projects": 1,
+   "instancesChannel": 0,
+   "instancesSlot": 2,
+   "instances": 2,
+   "presetFiles": 24,
+   "presetBytes": 11068,
+   "groups": {
+    "demo": 2
+   },
+   "vendors": [],
+   "topNames": [
+    "Rand",
+    "Sync rand"
+   ]
+  },
+  {
+   "key": "Sawer",
+   "internalName": "Sawer",
+   "kind": "native",
+   "projects": 1,
+   "instancesChannel": 1,
+   "instancesSlot": 0,
+   "instances": 1,
+   "presetFiles": 426,
+   "presetBytes": 323899,
+   "groups": {
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Sawer"
+   ]
+  },
+  {
+   "key": "Drumaxx",
+   "internalName": "Drumaxx",
+   "kind": "native",
+   "projects": 1,
+   "instancesChannel": 1,
+   "instancesSlot": 0,
+   "instances": 1,
+   "presetFiles": 136,
+   "presetBytes": 2964055,
+   "groups": {
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Drumaxx"
+   ]
+  },
+  {
+   "key": "SimSynth",
+   "internalName": "SimSynth",
+   "kind": "native",
+   "projects": 1,
+   "instancesChannel": 1,
+   "instancesSlot": 0,
+   "instances": 1,
+   "presetFiles": 79,
+   "presetBytes": 52974,
+   "groups": {
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "SimSynth"
+   ]
+  },
+  {
+   "key": "Vintage Phaser",
+   "internalName": "Vintage Phaser",
+   "kind": "native",
+   "projects": 1,
+   "instancesChannel": 0,
+   "instancesSlot": 1,
+   "instances": 1,
+   "presetFiles": 21,
+   "presetBytes": 6610,
+   "groups": {
+    "demo": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Crusty phaser",
+    "Lowgrounder"
+   ]
+  },
+  {
+   "key": "BeepMap",
+   "internalName": "BeepMap",
+   "kind": "native",
+   "projects": 1,
+   "instancesChannel": 1,
+   "instancesSlot": 0,
+   "instances": 1,
+   "presetFiles": 18,
+   "presetBytes": 632894,
+   "groups": {
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "BeepMap"
+   ]
+  },
+  {
+   "key": "Fruity HTML NoteBook",
+   "internalName": "Fruity HTML NoteBook",
+   "kind": "native",
+   "projects": 1,
+   "instancesChannel": 0,
+   "instancesSlot": 1,
+   "instances": 1,
+   "presetFiles": 7,
+   "presetBytes": 1115,
+   "groups": {
+    "demo": 1
+   },
+   "vendors": [],
+   "topNames": []
+  },
+  {
+   "key": "Fruity Delay",
+   "internalName": "Fruity Delay",
+   "kind": "native",
+   "projects": 1,
+   "instancesChannel": 0,
+   "instancesSlot": 1,
+   "instances": 1,
+   "presetFiles": 6,
+   "presetBytes": 1088,
+   "groups": {
+    "demo": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "FX Delay",
+    "Ambient",
+    "Default"
+   ]
+  },
+  {
+   "key": "Emphasizer",
+   "internalName": "Emphasizer",
+   "kind": "native",
+   "projects": 1,
+   "instancesChannel": 0,
+   "instancesSlot": 1,
+   "instances": 1,
+   "presetFiles": 6,
+   "presetBytes": 1008,
+   "groups": {
+    "template": 1
+   },
+   "vendors": [],
+   "topNames": []
+  },
+  {
+   "key": "Fruity Voltage Controller",
+   "internalName": "Fruity Voltage Controller",
+   "kind": "native",
+   "projects": 1,
+   "instancesChannel": 1,
+   "instancesSlot": 0,
+   "instances": 1,
+   "presetFiles": 4,
+   "presetBytes": 1288,
+   "groups": {
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Fruity Voltage Controller"
+   ]
+  },
+  {
+   "key": "Fruity Scratcher",
+   "internalName": "Fruity Scratcher",
+   "kind": "native",
+   "projects": 1,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 5,
+   "presetBytes": 1055,
+   "groups": {
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": []
+  },
+  {
+   "key": "Fruity dB Meter",
+   "internalName": "Fruity dB Meter",
+   "kind": "none",
+   "projects": 1,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 4,
+   "presetBytes": 528,
+   "groups": {
+    "demo": 1
+   },
+   "vendors": [],
+   "topNames": []
+  },
+  {
+   "key": "Fruity Center",
+   "internalName": "Fruity Center",
+   "kind": "native",
+   "projects": 1,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 1,
+   "presetBytes": 157,
+   "groups": {
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Default",
+    "Fruity Center"
+   ]
+  },
+  {
+   "key": "Fruity Mute 2",
+   "internalName": "Fruity Wrapper",
+   "kind": "wrapper",
+   "projects": 1,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 0,
+   "presetBytes": 0,
+   "groups": {
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Fruity Mute 2"
+   ]
+  },
+  {
+   "key": "Fruity Phase Inverter",
+   "internalName": "Fruity Wrapper",
+   "kind": "wrapper",
+   "projects": 1,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 0,
+   "presetBytes": 0,
+   "groups": {
+    "render-test": 1
+   },
+   "vendors": [],
+   "topNames": [
+    "Fruity Phase Inverter"
+   ]
+  },
+  {
+   "key": "Kepler Exo",
+   "internalName": "Kepler Exo",
+   "kind": "native",
+   "projects": 0,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 192,
+   "presetBytes": 184524,
+   "groups": {},
+   "vendors": [],
+   "topNames": [
+    "Default",
+    "Kepler Exo",
+    "DAN - Hoover XMod"
+   ]
+  },
+  {
+   "key": "VFX Script",
+   "internalName": "VFX Script",
+   "kind": "native",
+   "projects": 0,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 99,
+   "presetBytes": 661460,
+   "groups": {},
+   "vendors": [],
+   "topNames": []
+  },
+  {
+   "key": "VFX Key Mapper",
+   "internalName": "VFX Key Mapper",
+   "kind": "native",
+   "projects": 0,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 42,
+   "presetBytes": 9042,
+   "groups": {},
+   "vendors": [],
+   "topNames": []
+  },
+  {
+   "key": "Transmitter",
+   "internalName": "Transmitter",
+   "kind": "native",
+   "projects": 0,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 39,
+   "presetBytes": 16790,
+   "groups": {},
+   "vendors": [],
+   "topNames": [
+    "Adding presence",
+    "Attack delayer",
+    "Blown Away Transients"
+   ]
+  },
+  {
+   "key": "FL Studio Mobile Rack FX",
+   "internalName": "FL Studio Mobile Rack FX",
+   "kind": "native",
+   "projects": 0,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 36,
+   "presetBytes": 36008,
+   "groups": {},
+   "vendors": [],
+   "topNames": [
+    "FL Studio Mobile Rack FX"
+   ]
+  },
+  {
+   "key": "VFX Keyboard Splitter",
+   "internalName": "VFX Keyboard Splitter",
+   "kind": "native",
+   "projects": 0,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 25,
+   "presetBytes": 74854,
+   "groups": {},
+   "vendors": [],
+   "topNames": []
+  },
+  {
+   "key": "Multiband Delay",
+   "internalName": "Multiband Delay",
+   "kind": "native",
+   "projects": 0,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 22,
+   "presetBytes": 42385,
+   "groups": {},
+   "vendors": [],
+   "topNames": []
+  },
+  {
+   "key": "Fruity X-Y-Z Controller",
+   "internalName": "Fruity X-Y-Z Controller",
+   "kind": "native",
+   "projects": 0,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 15,
+   "presetBytes": 10650,
+   "groups": {},
+   "vendors": [],
+   "topNames": []
+  },
+  {
+   "key": "Fruity 7 Band EQ",
+   "internalName": "Fruity 7 Band EQ",
+   "kind": "native",
+   "projects": 0,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 14,
+   "presetBytes": 2726,
+   "groups": {},
+   "vendors": [],
+   "topNames": [
+    "Cut High",
+    "Cut Low",
+    "Cut Middle"
+   ]
+  },
+  {
+   "key": "VFX Envelope",
+   "internalName": "VFX Envelope",
+   "kind": "native",
+   "projects": 0,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 12,
+   "presetBytes": 367692,
+   "groups": {},
+   "vendors": [],
+   "topNames": []
+  },
+  {
+   "key": "Tuner",
+   "internalName": "Tuner",
+   "kind": "native",
+   "projects": 0,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 10,
+   "presetBytes": 1450,
+   "groups": {},
+   "vendors": [],
+   "topNames": []
+  },
+  {
+   "key": "VFX Color Mapper",
+   "internalName": "VFX Color Mapper",
+   "kind": "native",
+   "projects": 0,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 8,
+   "presetBytes": 2152,
+   "groups": {},
+   "vendors": [],
+   "topNames": []
+  },
+  {
+   "key": "VFX Level Scaler",
+   "internalName": "VFX Level Scaler",
+   "kind": "native",
+   "projects": 0,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 8,
+   "presetBytes": 2392,
+   "groups": {},
+   "vendors": [],
+   "topNames": []
+  },
+  {
+   "key": "VFX Sequencer",
+   "internalName": "VFX Sequencer",
+   "kind": "native",
+   "projects": 0,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 8,
+   "presetBytes": 571992,
+   "groups": {},
+   "vendors": [],
+   "topNames": []
+  },
+  {
+   "key": "Dashboard",
+   "internalName": "Dashboard",
+   "kind": "native",
+   "projects": 0,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 8,
+   "presetBytes": 19389,
+   "groups": {},
+   "vendors": [],
+   "topNames": [
+    "Empty"
+   ]
+  },
+  {
+   "key": "Plucked!",
+   "internalName": "Plucked!",
+   "kind": "native",
+   "projects": 0,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 7,
+   "presetBytes": 2197,
+   "groups": {},
+   "vendors": [],
+   "topNames": [
+    "Plucked!"
+   ]
+  },
+  {
+   "key": "Fruity Slicer 2",
+   "internalName": "Fruity Slicer 2",
+   "kind": "native",
+   "projects": 0,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 7,
+   "presetBytes": 4355,
+   "groups": {},
+   "vendors": [],
+   "topNames": [
+    "Fruity Slicer 2"
+   ]
+  },
+  {
+   "key": "Transistor Bass",
+   "internalName": "Transistor Bass",
+   "kind": "native",
+   "projects": 0,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 7,
+   "presetBytes": 1382757,
+   "groups": {},
+   "vendors": [],
+   "topNames": [
+    "Factory programs",
+    "Transistor Bass #3",
+    "Default (Empty)"
+   ]
+  },
+  {
+   "key": "ReWired",
+   "internalName": "ReWired",
+   "kind": "native",
+   "projects": 0,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 6,
+   "presetBytes": 1392,
+   "groups": {},
+   "vendors": [],
+   "topNames": [
+    "ReWired"
+   ]
+  },
+  {
+   "key": "Newtime",
+   "internalName": "Newtime",
+   "kind": "native",
+   "projects": 0,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 5,
+   "presetBytes": 2345,
+   "groups": {},
+   "vendors": [],
+   "topNames": [
+    "WarpCorrectionTrack"
+   ]
+  },
+  {
+   "key": "Newtone",
+   "internalName": "Newtone",
+   "kind": "native",
+   "projects": 0,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 5,
+   "presetBytes": 2299,
+   "groups": {},
+   "vendors": [],
+   "topNames": []
+  },
+  {
+   "key": "Fruity Spectroman",
+   "internalName": "Fruity Spectroman",
+   "kind": "native",
+   "projects": 0,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 5,
+   "presetBytes": 798,
+   "groups": {},
+   "vendors": [],
+   "topNames": []
+  },
+  {
+   "key": "FL Studio Mobile Rack",
+   "internalName": "FL Studio Mobile Rack",
+   "kind": "native",
+   "projects": 0,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 5,
+   "presetBytes": 5880,
+   "groups": {},
+   "vendors": [],
+   "topNames": [
+    "FL Studio Mobile Rack"
+   ]
+  },
+  {
+   "key": "FL Studio Mobile",
+   "internalName": "FL Studio Mobile",
+   "kind": "native",
+   "projects": 0,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 5,
+   "presetBytes": 357654,
+   "groups": {},
+   "vendors": [],
+   "topNames": [
+    "FL Studio Mobile"
+   ]
+  },
+  {
+   "key": "Fruity Video Player",
+   "internalName": "Fruity Video Player",
+   "kind": "native",
+   "projects": 0,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 5,
+   "presetBytes": 1100,
+   "groups": {},
+   "vendors": [],
+   "topNames": [
+    "Fruity Video Player"
+   ]
+  },
+  {
+   "key": "Fruity Big Clock",
+   "internalName": "Fruity Big Clock",
+   "kind": "native",
+   "projects": 0,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 4,
+   "presetBytes": 548,
+   "groups": {},
+   "vendors": [],
+   "topNames": []
+  },
+  {
+   "key": "SoundFont Player",
+   "internalName": "SoundFont Player",
+   "kind": "native",
+   "projects": 0,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 4,
+   "presetBytes": 1292,
+   "groups": {},
+   "vendors": [],
+   "topNames": [
+    "STR_Ensemble"
+   ]
+  },
+  {
+   "key": "Fruity Dance",
+   "internalName": "Fruity Dance",
+   "kind": "native",
+   "projects": 0,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 4,
+   "presetBytes": 564,
+   "groups": {},
+   "vendors": [],
+   "topNames": []
+  },
+  {
+   "key": "Fruity LSD",
+   "internalName": "Fruity LSD",
+   "kind": "native",
+   "projects": 0,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 2,
+   "presetBytes": 419,
+   "groups": {},
+   "vendors": [],
+   "topNames": []
+  },
+  {
+   "key": "Fruity soundfont player",
+   "internalName": "Fruity soundfont player",
+   "kind": "native",
+   "projects": 0,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 2,
+   "presetBytes": 1746,
+   "groups": {},
+   "vendors": [],
+   "topNames": [
+    "Fruity Soundfont Player"
+   ]
+  },
+  {
+   "key": "Razer Chroma",
+   "internalName": "Razer Chroma",
+   "kind": "native",
+   "projects": 0,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 1,
+   "presetBytes": 174,
+   "groups": {},
+   "vendors": [],
+   "topNames": []
+  },
+  {
+   "key": "SynthMaker",
+   "internalName": "SynthMaker",
+   "kind": "native",
+   "projects": 0,
+   "instancesChannel": 0,
+   "instancesSlot": 0,
+   "instances": 0,
+   "presetFiles": 1,
+   "presetBytes": 20718,
+   "groups": {},
+   "vendors": [],
+   "topNames": []
+  }
+ ]
+}

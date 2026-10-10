@@ -1,0 +1,60 @@
+{
+ "total": 9740,
+ "totalBytes": 262427759,
+ "totalEvents": 552878,
+ "level0": {
+  "ok": 9740,
+  "rate": 1
+ },
+ "level1": {
+  "ok": 9740,
+  "rate": 1
+ },
+ "ms": 18731,
+ "per": {
+  "demo": {
+   "n": 45,
+   "l0ok": 45,
+   "l1ok": 45,
+   "events": 267683,
+   "typedMismatchEvents": 0
+  },
+  "fst": {
+   "n": 8967,
+   "l0ok": 8967,
+   "l1ok": 8967,
+   "events": 90272,
+   "typedMismatchEvents": 0
+  },
+  "fsc": {
+   "n": 609,
+   "l0ok": 609,
+   "l1ok": 609,
+   "events": 2082,
+   "typedMismatchEvents": 0
+  },
+  "system-flp": {
+   "n": 2,
+   "l0ok": 2,
+   "l1ok": 2,
+   "events": 2048,
+   "typedMismatchEvents": 0
+  },
+  "render-test": {
+   "n": 82,
+   "l0ok": 82,
+   "l1ok": 82,
+   "events": 104362,
+   "typedMismatchEvents": 0
+  },
+  "template": {
+   "n": 35,
+   "l0ok": 35,
+   "l1ok": 35,
+   "events": 86431,
+   "typedMismatchEvents": 0
+  }
+ },
+ "badCount": 0,
+ "bad": []
+}

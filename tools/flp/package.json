@@ -1,0 +1,13 @@
+{
+  "name": "@webstudio/flp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "FL Studio .flp/.fst parser+writer, round-trip corpus, oracle design (Node 26 type-stripping; no runtime deps)",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "typecheck": "../../node_modules/.bin/tsc -p tsconfig.json",
+    "test": "node --test test/",
+    "e2e": "bash flp_e2e.sh"
+  }
+}
