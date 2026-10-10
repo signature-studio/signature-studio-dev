@@ -1,0 +1,6 @@
+<!doctype html><meta charset=utf-8><title>bench</title><script type=module>
+const w = new Worker("/bench/bench_worker.mjs", { type: "module" });
+w.onmessage = (e) => { window.__result = e.data; };
+w.onerror = (e) => { window.__result = { ok: false, err: String(e.message) }; };
+w.postMessage(1);
+</script>

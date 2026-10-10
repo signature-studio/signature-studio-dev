@@ -39,8 +39,19 @@ export async function instantiateWasm(
   // TS (native 7.x) の WebAssembly 型: instantiate(bufferSource, imports) は
   // Instance 直を宣言しており実際の v8 戻り値 ({module,instance}) と不一致なため、
   // compile → instantiate(module, imports) の 2 段へ分解して型と実行時を一致させる。
-  // WasmImports (loose な Record) ↔ WebAssembly.Imports は unknown ブリッジで接続
   const wasmModule = await WebAssembly.compile(bytes);
+  return instantiateCompiled(wasmModule, imports);
+}
+
+/**
+ * コンパイル済み Module (compileStreaming / postMessage で受け取ったもの) を instantiate する。
+ * instantiateWasm と同じ後処理 (exports 一覧・memory 検出・ログ) を共有する。
+ * WasmImports (loose な Record) ↔ WebAssembly.Imports は unknown ブリッジで接続。
+ */
+export async function instantiateCompiled(
+  wasmModule: WebAssembly.Module,
+  imports: WasmImports = {},
+): Promise<InstancedWasm & { instance: WebAssembly.Instance }> {
   const instance = await WebAssembly.instantiate(
     wasmModule,
     imports as unknown as WebAssembly.Imports,
@@ -49,10 +60,12 @@ export async function instantiateWasm(
 
   const names = Object.keys(exports);
   const memory = findMemory(exports);
+  // lifted FLEngine 級は export が数千〜数万になるため一覧は少数のときだけ出す
+  const list = names.length <= 64 ? ` [${names.join(", ")}]` : "";
   console.log(
-    `[loader] wasm instantiated: ${names.length} exports [${names.join(", ")}]` +
+    `[loader] wasm instantiated: ${names.length} exports${list}` +
       `, memory: ${memory ? `${memory.buffer.byteLength}B` : "none"}`,
   );
 
-  return { exports, memory };
+  return { exports, memory, instance };
 }

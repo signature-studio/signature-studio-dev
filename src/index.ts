@@ -2,6 +2,7 @@ import { createAudioHarness, type AudioHarness } from "./runtime/audio";
 import { setupCanvas, blitFrame, type FrameTarget } from "./runtime/canvas";
 import { createImportForwarder } from "./runtime/imports";
 import { instantiateWasm } from "./runtime/loader";
+import { mountRuntimePanel } from "./runtime/boot_ui";
 
 const startBtn = document.getElementById("start-audio") as HTMLButtonElement;
 const statusEl = document.getElementById("status") as HTMLSpanElement;
@@ -109,5 +110,14 @@ startBtn.addEventListener("click", async () => {
     console.error("[harness] audio start failed:", e);
   }
 });
+
+// ---------------------------------------------------------------------------
+// ランタイム (Worker 実行基盤) — /?runtime=<id|all>&cache=…&compile=…&pump=1 で起動
+// 詳細: tools/runtime/DESIGN.md
+// ---------------------------------------------------------------------------
+const runtimeParams = new URLSearchParams(location.search);
+if (runtimeParams.has("runtime")) {
+  void mountRuntimePanel(runtimeParams);
+}
 
 export {};

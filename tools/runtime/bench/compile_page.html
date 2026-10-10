@@ -1,0 +1,11 @@
+<!doctype html><meta charset=utf-8><script type=module>
+const q = new URLSearchParams(location.search);
+const files = q.get("files").split(","), mode = q.get("mode") ?? "streaming", run = q.get("run") === "1";
+const results = [];
+for (const f of files) {
+  const w = new Worker("/bench/compile_worker.js", { type: "module" });
+  const r = await new Promise((res) => { w.onmessage = (e) => res(e.data); w.postMessage({ url: "/big/" + f, mode, run }); });
+  w.terminate(); results.push({ file: f, ...r });
+}
+window.__result = results;
+</script>

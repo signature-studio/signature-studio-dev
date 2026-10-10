@@ -1,0 +1,18 @@
+<!doctype html><meta charset=utf-8><script type=module>
+import createModule from "/pt/pthread_test.mjs";
+const out = [], t0 = performance.now();
+let compiled = null, exitResolve; const exited = new Promise((r) => (exitResolve = r));
+try {
+  const m = await createModule({
+    print: (t) => out.push(t), printErr: (t) => out.push("ERR " + t),
+    // 事前 compile した Module を注入 (pthread worker にも同じ Module が postMessage される)
+    instantiateWasm: (imports, cb) => {
+      WebAssembly.compileStreaming(fetch("/pt/pthread_test.wasm")).then((mod) => { compiled = mod; return WebAssembly.instantiate(mod, imports).then((inst) => cb(inst, mod)); });
+      return {};
+    },
+    onExit: (c) => { out.push("exit " + c); exitResolve(c); },
+  });
+  await Promise.race([exited, new Promise((r) => setTimeout(r, 60000))]);
+  window.__result = { ok: true, out, bootMs: +(performance.now() - t0).toFixed(1), injectedModule: !!compiled, crossOriginIsolated };
+} catch (e) { window.__result = { ok: false, err: String(e), out }; }
+</script>

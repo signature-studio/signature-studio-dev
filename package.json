@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "runtime:stage": "node tools/runtime/stage_wasm.mjs",
+    "runtime:e2e": "node tools/runtime/e2e.mjs",
+    "runtime:e2e:prod": "node tools/runtime/e2e.mjs --prod"
   },
   "keywords": [],
   "author": "",
