@@ -113,3 +113,66 @@ Windows 実機 (FL Studio 26.x、対象プラグインをインストールし P
 
 - 書込は `tools/hostbridge/nfo/` のみ (`work/` は gitignore: Ghidra project コピー約 280 MB・PluginManager/FLEngine 抽出)。`tools/flp` / `tools/targets` / `tools/m2` / `tools/hostbridge` 既存ファイルは読取のみ。README/MILESTONES/HANDOFF 無改変。
 - `evidence/` は FL 実バイナリの Ghidra decompile 抜粋 (約 130 KB) と定数表を含む (EULA は事実整理のみ: 実バイナリ本体・lift 済み wasm はコミットしない)。外部通信・認証系は不使用。
+
+## 10. 追記 (CAB-215 部分実施, 2026-10-10): 実機 OTT.fst 照合
+
+**結論**: ユーザ実機の `Installed\Effects\VST3\OTT.fst` (323 B) を取得し、CAB-98 の全模型 (コンテナ writer / wrapper chunk 解析 / 生成器) が **byte 級で一致**することを確認した (下表, 全 PASS)。`.fst` 書式の実機裏取りとしては完了。ただし **実機 v2 `.nfo` / `VerifiedIDs.nfo` / `.Plugins.ini` は実機に存在せず未入手** → 本チケット本来の主眼である `writeEntry` との `.nfo` byte 比較は未了で、**部分実施**として扱う (§7 の依頼は継続)。
+
+再現: `node tools/hostbridge/nfo/analysis/real_fst_check.mjs` (exit 0 = 全 PASS, 約 0.2 s)。サンプル本体・全ダンプは `evidence/real_machine/`。
+
+### 10.1 検証結果 (実測)
+
+| 検証 | 結果 |
+|---|---|
+| ① CAB-98 コンテナ writer `assembleFst` 再構成 | **byte 一致 323/323** (イベント列から元ファイルを完全再現) |
+| ② tools/flp 独立パーサ | `parseFlp`→`writeFlp` lossless (firstDiff −1)、`parseWrapperData` が 213 を受理 (kind 8, path/vendor/name/guid 復元) |
+| ③ イベント列完全ダンプ | FLhd(0x30, 2ch, ppq48) / 199 "11.5.5" / 28=1 / 201 "Fruity Wrapper" / 212 (u32@8=2, u16@16=0 = fx) / 203 "OTT" / 213 (191 B) — **既存モデル (FORMAT §8) と差分 0** |
+| ④ 213 wrapper chunk 解析 | u32 8 + 記録 6 本 `[2, 50, 52, 54, 55, 56]`、鎖は 191/191 B を厳密消費 (詳細 §10.2) |
+| ⑤ 生成器との照合 | `buildWrapperFst` (サンプル逆抽出 spec) が **byte 一致**。さらに generateDb (OTT VST3 仮想 spec) の `.fst` は実機ファイルと **sha256 まで一致** (`f6942876…`)、その生成 `.nfo` を 49 エントリ検証器と同一の reader 模型 (`entryFromBytes`) が受理 (dropped 無し / rejectedFiles 0 / slot 5) |
+
+→ **FL 実機が DB に置いた `.fst` を自前生成器が byte 一致で再現した初の実証** (CAB-98 では同梱 26 ファイルのコンテナ層まで)。
+
+### 10.2 wrapper chunk 213 の内容 (実測) — VST3 CID を確認
+
+| 記録 | 値 (実測) | 既存モデルとの照合 |
+|---|---|---|
+| 2 | flags = **0x507D08** = 0x407908 \| 0x400 (64bit のみ) \| 0x100000 | `src/fst.ts` の「64bit 単一ファイル」予測と完全一致。record 2 flags の **実機初観測** (同梱 corpus に wrapper chunk 形式の `.fst` は 0 件 = REPORT §1 の再確認) |
+| 50 | plugclass = **7 (VST3 fx)** | `Effects\VST3` 配置と整合 |
+| 51 | **無し** | class 7 では 51 を出さない分岐 (FORMAT §8) を実機で初裏取り |
+| **52** | **VST3 CID = `5854535654666F547474000000000000`** (raw 16 B) = ASCII **`XTSVTfoTtt`** + NUL×6。GUID text 形 `{56535458-6654-546F-7474-000000000000}` (Windows GUID メモリ配置)、FUID 文字列形 `565354586654546F7474000000000000` [導出] | record 52 が raw TUID 16 B を持つ設計を実機で確認。**CAB-46 (Massive X CID) の突合基準および VST3 hosting の TUID としてそのまま使用可** |
+| 54 | `OTT` (拡張子なし basename、`.vst3` を除去) | 既定規則どおり |
+| 55 | `C:\Program Files\Common Files\VST3\OTT.vst3` (**バンドルフォルダ**) | §10.3 |
+| 56 | `Xfer Records` | — |
+
+CID 取扱いの注意: 公開インデックスではこの CID 値を独立突合できなかった (実機 `.fst` が第一級情報源)。Xfer 公表によると OTT VST3 は v1.33 で導入され **1.33/1.34 には ID 不整合バグがあり 1.35 で修正** — CID は版依存しうるため、本値は「ユーザ環境に導入された版の実測」として扱う。
+
+### 10.3 VST3 path 規則の実機証拠 (H11 / CAB-218 へ)
+
+- 実機配置 `Installed\Effects\VST3\<name>.fst` = class 7 → `Effects\VST3` (FAMILY_DIR 規則) と一致。
+- Wrapper が保持する path (record 55) は **バンドルフォルダ形** (`…\VST3\OTT.vst3`、`Contents\x86_64-win\…` を含まない) → generateDb が Serum 2 で既に使っている形と同一。**generateDb の配置規則・path 規則に変更不要**。
+- 留意: record 55 は `.fst` 内の値。`.nfo` 側の `ps_file_filename` の実機値は未入手 (同形と推定するが FORMAT §9-3 は未確認のまま)。
+- 参考: 実機の DB root は `%USERPROFILE%\Documents\Image-Line\FL Studio\…` (generate.ts の `DEFAULT_DB_PATH` = Public Documents は `%FLPluginDBPath%` 圧縮用の option 値であり、書式への影響なし)。
+
+### 10.4 「.nfo 無し .fst」の意味 (CAB-216 generateDb の優先順位へ)
+
+- **事実**: 実機に `OTT.fst` のみ存在し `OTT.nfo` / `VerifiedIDs.nfo` / `.Plugins.ini` は無かった → `Installed\` 配下に `.fst` 単体が実在しうる、の実例。
+- **解釈 [推]**: plugin picker の一覧構築 (`fle:0xaba430`) は `.Plugins.ini` / `Installed\**\*.NFO` 全読みが源泉ゆえ、`.nfo` 無しの OTT は picker には載らないはず。`.fst` 単体で効くのは (a) ブラウザ木のアイテム表示、(b) ダブルクリックでの新規インスタンス生成 (213 の record 55 path から Wrapper が起動可能) まで。プロジェクト読込時の ID 解決 (VerifiedIDs / ID 名 nfo / 名前検索) も `.nfo` 前提。
+- **→ 示唆**: generateDb は `.nfo` + `.fst` を両方書く現行方針を維持するのが正 (picker 掲載とプロジェクト解決に `.nfo` が必須)。このサンプルは「.fst 単体でも browser プリセットとしては成立する」ことの実例で、優先順位を変える根拠にはならない。なお実機の FL が実際に OTT を picker 表示していたかは確認不能 (未検証点)。
+
+### 10.5 `specs/wasm_plugins.json` OTT エントリとの差分
+
+実機の登録は **VST3**、spec は **VST2** — 書式の誤りではなく**登録形式の違い**。wasm 版 OTT は VST2 lift (m6〜m10) ゆえ spec を VST2 のまま維持する。OTT.vst3 を hosting する段になったら spec に 1 行追加 (`format: vst3`, `guid: 5854535654666F547474000000000000`, `path: …\VST3\OTT.vst3`) すれば **実機と byte 一致の `.fst` が得られることを本検証で実証済み** (spec 変更は未実施 — CAB-46 の領域と REPORT §0/§5 の実測値保全のため)。
+
+| 項目 | 実機 (VST3) | spec 現行 (VST2) |
+|---|---|---|
+| 配置 | `Effects\VST3\OTT.fst` | `Effects\VST\OTT.fst` |
+| plugclass | 7 | 0 |
+| ID 記録 | 52: CID `5854…0000` (`XTSVTfoTtt`) | 51: magic 1483101268 (`XfTT`) |
+| 54 名前 | `OTT` | `OTT_x64` |
+| 55 path | `…\Common Files\VST3\OTT.vst3` | `…\Common Files\VST2\Xfer Records\OTT_x64.dll` |
+| 56 vendor / 203 "OTT" / 212 / FLhd / 199 / 28 | 同一 | 同一 |
+
+### 10.6 成果物と未入手
+
+- 追加: `evidence/real_machine/OTT.fst` (実機サンプル本体, 323 B, sha256 `f694287667fe486d5b9849f162a6712e198c610ebb61b0746af241b93044b3ff`)、`evidence/real_machine/ott_fst_dump.json` (全イベント + 記録列 + CID + 検証結果 + 実機由来 spec からの仮想 `.nfo` 全文)、`analysis/real_fst_check.mjs` (1 コマンド再現)。既存成果物 (src/test/FORMAT.md/specs/evidence 既存分) は無改変。
+- **未入手 (§7 継続)**: 実機 v2 `.nfo` (`writeEntry` byte 比較 = 本チケット主眼の残部)、`VerifiedIDs.nfo`、`.Plugins.ini`、VST2 側の実機 `.fst`/`.nfo`。いずれか入手後に本節へ追記する。

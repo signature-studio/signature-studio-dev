@@ -1,0 +1,251 @@
+{
+  "provenance": {
+    "source": "user Windows machine (FL Studio 26.x), %USERPROFILE%\\Documents\\Image-Line\\FL Studio\\Presets\\Plugin database\\Installed\\Effects\\VST3\\OTT.fst",
+    "copiedBy": "user",
+    "receivedAt": "2026-10-10",
+    "ticket": "CAB-215 (partial)",
+    "note": "OTT.nfo / VerifiedIDs.nfo / .Plugins.ini were NOT present on the machine (checked by user). VST3 folder registration."
+  },
+  "file": {
+    "size": 323,
+    "sha256": "f694287667fe486d5b9849f162a6712e198c610ebb61b0746af241b93044b3ff"
+  },
+  "container": {
+    "flhd": {
+      "hdrLen": 6,
+      "format": 48,
+      "nChannels": 2,
+      "ppq": 48
+    },
+    "dtLen": 301,
+    "dtSlack": 0,
+    "trailer": 0,
+    "warnings": [],
+    "events": [
+      {
+        "id": 199,
+        "kind": "text",
+        "off": 22,
+        "len": 7,
+        "text": "11.5.5",
+        "meaning": "FlVersion"
+      },
+      {
+        "id": 28,
+        "kind": "byte",
+        "off": 31,
+        "len": 1,
+        "value": 1,
+        "meaning": "byte flag (DB write path passes 1)"
+      },
+      {
+        "id": 201,
+        "kind": "text",
+        "off": 33,
+        "len": 30,
+        "text": "Fruity Wrapper",
+        "meaning": "plugin internal name"
+      },
+      {
+        "id": 212,
+        "kind": "data",
+        "off": 65,
+        "len": 52,
+        "u32_at8": 2,
+        "u16_at16": 0,
+        "hex": "00000000000000000200000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "meaning": "wrapper header"
+      },
+      {
+        "id": 203,
+        "kind": "text",
+        "off": 119,
+        "len": 8,
+        "text": "OTT",
+        "meaning": "display name"
+      },
+      {
+        "id": 213,
+        "kind": "data",
+        "off": 129,
+        "len": 191,
+        "meaning": "wrapper chunk",
+        "hex": "0800000002000000190000000000000000FFFFFFFFFFFFFFFF087D5000000000000100000000000000320000001000000000000000070000000000000000000000000000003400000010000000000000005854535654666F5474740000000000003600000003000000000000004F5454370000002B00000000000000433A5C50726F6772616D2046696C65735C436F6D6D6F6E2046696C65735C565354335C4F54542E76737433380000000C0000000000000058666572205265636F726473"
+      }
+    ]
+  },
+  "checks": {
+    "assembleFstByteExact": true,
+    "toolsFlp": {
+      "losslessRoundTrip": true,
+      "wrapperParsed": true,
+      "wrapper": {
+        "kind": 8,
+        "guid": "5854535654666f547474000000000000",
+        "name": "OTT",
+        "path": "C:\\Program Files\\Common Files\\VST3\\OTT.vst3",
+        "vendor": "Xfer Records"
+      }
+    },
+    "buildWrapperFstByteExact": true,
+    "generatedDbVst3": {
+      "fstByteExact": true,
+      "readerAccepted": true,
+      "fields": true
+    }
+  },
+  "wrapperChunk": {
+    "version": 8,
+    "length": 191,
+    "consumed": 191,
+    "records": [
+      {
+        "id": 2,
+        "size": 25,
+        "kind": "wrapper flags",
+        "u8_0": 0,
+        "i32_1": -1,
+        "i32_5": -1,
+        "flags": 5274888,
+        "flagsHex": "0x507D08",
+        "flagsModel": {
+          "base": "0x407908",
+          "delta64only": "0x400",
+          "deltaNotBoth": "0x100000"
+        },
+        "u32_13": 0,
+        "u8_17": 1
+      },
+      {
+        "id": 50,
+        "size": 16,
+        "kind": "plugclass",
+        "value": 7,
+        "name": "VST3 fx"
+      },
+      {
+        "id": 52,
+        "size": 16,
+        "kind": "VST3 class id (CID)",
+        "hex": "5854535654666F547474000000000000",
+        "ascii": "XTSVTfoTtt",
+        "guidText": "{56535458-6654-546F-7474-000000000000}"
+      },
+      {
+        "id": 54,
+        "size": 3,
+        "kind": "name (file basename / CLAP id)",
+        "text": "OTT"
+      },
+      {
+        "id": 55,
+        "size": 43,
+        "kind": "plugin path",
+        "text": "C:\\Program Files\\Common Files\\VST3\\OTT.vst3"
+      },
+      {
+        "id": 56,
+        "size": 12,
+        "kind": "vendor",
+        "text": "Xfer Records"
+      }
+    ]
+  },
+  "vst3cid": {
+    "hex": "5854535654666F547474000000000000",
+    "ascii": "XTSVTfoTtt",
+    "guidText": "{56535458-6654-546F-7474-000000000000}",
+    "tuidHex": "5854535654666F547474000000000000"
+  },
+  "specFromSample": {
+    "plugclass": 7,
+    "displayName": "OTT",
+    "filename": "C:\\Program Files\\Common Files\\VST3\\OTT.vst3",
+    "nameRecord": "OTT",
+    "vendor": "Xfer Records",
+    "guid": "5854535654666F547474000000000000",
+    "has32": false,
+    "has64": true
+  },
+  "hypotheticalVst3Entry": {
+    "note": "NOT real data — what generateDb would write for an OTT VST3 entry (CID + path from the real .fst). For CAB-46/CAB-216/CAB-218 cross-check until a real .nfo arrives.",
+    "spec": {
+      "name": "OTT",
+      "vendor": "Xfer Records",
+      "format": "vst3",
+      "kind": "effect",
+      "guid": "5854535654666F547474000000000000",
+      "path": "C:\\Program Files\\Common Files\\VST3\\OTT.vst3"
+    },
+    "fstPath": "Installed/Effects/VST3/OTT.fst",
+    "fstSha256": "f694287667fe486d5b9849f162a6712e198c610ebb61b0746af241b93044b3ff",
+    "nfoText": "fileversion=2\r\nps_name=OTT\r\nps_presetfilename=%FLPluginDBPath%\\Installed\\Effects\\VST3\\OTT.fst\r\nps_files=1\r\nps_file_name_0=OTT\r\nps_file_filename_0=C:\\Program Files\\Common Files\\VST3\\OTT.vst3\r\nps_file_plugclass_0=7\r\nps_file_bitsize_0=64\r\nps_file_guid_0={56535458-6654-546F-7474-000000000000}\r\nps_file_scanflags_0=1\r\nps_file_vendorname_0=Xfer Records\r\n",
+    "verifiedIdKey": "VST3:{56535458-6654-546F-7474-000000000000}:64 -> Effects\\VST3\\OTT.NFO",
+    "placement": "Installed\\Effects\\VST3\\ → real machine placed it in Installed\\Effects\\VST3\\ (matches)"
+  },
+  "diffVsCurrentSpec": {
+    "placement": {
+      "real": "Installed/Effects/VST3/OTT.fst (user machine)",
+      "generated": "Installed/Effects/VST/OTT.fst (spec: format vst2)"
+    },
+    "plugclass": {
+      "real": 7,
+      "generated": 0
+    },
+    "chunk213recordIds": {
+      "real": [
+        2,
+        50,
+        52,
+        54,
+        55,
+        56
+      ],
+      "generated": [
+        2,
+        50,
+        51,
+        54,
+        55,
+        56
+      ]
+    },
+    "record51_52": {
+      "real": "record 52 (CID 5854535654666F547474000000000000 = \"XTSVTfoTtt\")",
+      "generated": "record 51 (magic 0x58665454 \"XfTT\")"
+    },
+    "record54": {
+      "real": "OTT",
+      "generated": "OTT_x64"
+    },
+    "record55": {
+      "real": "C:\\Program Files\\Common Files\\VST3\\OTT.vst3",
+      "generated": "C:\\Program Files\\Common Files\\VST2\\Xfer Records\\OTT_x64.dll"
+    },
+    "record56vendor": {
+      "real": "Xfer Records",
+      "generated": "Xfer Records"
+    },
+    "event203": {
+      "real": "OTT",
+      "generated": "OTT"
+    },
+    "event212": {
+      "realU16at16": 0,
+      "genU16at16": 0
+    },
+    "container": "FLhd / 199 \"11.5.5\" / 28=1 / 201 \"Fruity Wrapper\" identical",
+    "firstByteDiff": 18,
+    "sizes": {
+      "real": 323,
+      "generated": 331
+    }
+  },
+  "record2FlagsContrast": {
+    "realMachine": "0x507D08",
+    "shippedCorpusCounts": {},
+    "shippedWrapperChunkFst": 0,
+    "corpusRoot": "/home/ubuntu/work/analysis/mac/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL",
+    "note": "shipped corpus has 0 wrapper-chunk .fst (REPORT §1) — this real file is the first observed record-2 flags value; 0x507D08 = 0x407908 | 0x400 | 0x100000 matches the fst.ts model for a 64-bit-only single-file entry"
+  }
+}
