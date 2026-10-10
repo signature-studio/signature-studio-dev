@@ -3,7 +3,7 @@
  * 方針 (チケット CAB-195 + tools/shimx 方針の踏襲):
  *   * slot0 = Dispatcher(Host, HostTag, ID, Index, Value) — ID で分岐する唯一の窓口。
  *     Balance 初期化連鎖が発行する ID (0x47/0x56/0x0d) は機械実測 (ABI.md §6, pedis.py) に基づき応答。
- *     A検収上位 30 ID (hostshim/hs_ids.json: 133 DLL 894 site, cover 89.8%) は
+ *     A検収上位 35 ID (hostshim/hs_ids.json: 894 site, cover 89.8%) は
  *     「戻り値使用クラス」実測 (store/reg = Host オブジェクト, ignore/test = 0) に基づき応答。
  *   * その他の slot は fail-soft + 呼出記録 (応答 0)。trap/abort しない。
  *   * 引数は icall memory-ABI (BLK+8=rcx, +0x10=rdx, +0x18=r8, +0x20=r9) から復元。
@@ -116,8 +116,12 @@ EMSCRIPTEN_KEEPALIVE void fw_hs_install(void) {
  *    → 応答は非 NULL オブジェクトであること。FLE 側 0x47 case の返す実体解析は未 (CAB-195 作業5)。
  *  * 0x56 (86) — Balance 0x6bd2a4: 応答を 0x5c1930() の結果オブジェクト [X+0x14] に store のみ。
  *    FLE case 0x131bb5c は global オブジェクトポインタを返す → shim も非 NULL を返す。
+ *    **検収で独立照合済 (hs_disp_tree.py, 2026-10-11)**: Dispatcher 0x13173a0 の
+ *    cmp/sub 二分木を ID 具体駆動すると ID=0x56 だけが `je 0x131bb5c` を取り、
+ *    周辺 ID (0x54/0x55/0x57/0x58) はすべて別パス (= 判別力あり)。0x131bb5c の本体は
+ *    `mov rax,[rip+0x2c9005]; mov rax,[rax]` で global オブジェクトポインタを返す。
  *  * 0x0d (13) — TDelphiFruityPlug ctor 0x6b8f4b: 応答は未使用 (実測) → 0。
- *  * 上位 35 ID — hostshim/hs_ids.json (133 DLL 894 site の戻り値使用クラス実測):
+ *  * 上位 35 ID — hostshim/hs_ids.json (894 site の戻り値使用クラス実測):
  *    store/reg クラスは非 NULL (deref に備える), ignore/test クラスは 0。
  *    FLE 0x13173a0 の case 別応答値解析は未のため、数値の意味論は次段 (T0 frontier) で要確認。 */
 static long long hs_dispatcher(uint64_t host, uint64_t tag, uint32_t id, uint64_t index) {
@@ -125,7 +129,7 @@ static long long hs_dispatcher(uint64_t host, uint64_t tag, uint32_t id, uint64_
     case 0x47: return (long long)(uintptr_t)g_hs_obj;   /* 71: init — オブジェクト返答 (実測) */
     case 0x56: return (long long)(uintptr_t)g_hs_obj;   /* 86: init — handle store のみ (実測) */
     case 0x0d: return 0;                                /* 13: ctor — 戻り未使用 (実測) */
-    /* ---- A検収上位 30 ID (hostshim/hs_ids.json: 133 DLL / 894 site / cover 89.8%) ----
+    /* ---- A検収上位 35 ID (hostshim/hs_ids.json: 894 site / cover 89.8%) ----
      * ret_use 実測による分類 (REPORT §2.2 根拠表):
      *   store / reg クラス → 戻り値を保存/保持するので **非 NULL** 応答を返す
      *   ignore / test クラス → 0 を返す (fail-soft + 記録)

@@ -1,5 +1,10 @@
 # P0b REPORT — TFruityHost shim (CAB-195)
 
+- preflight: RULES_SHA=ae9c6d414f7d (SUBAGENT_RULES.md 読了の証跡)
+- 検収起点 commit: **9b420bd** (`tools/plugins/framework` ツリーは b8e762d と同一: `git diff b8e762d HEAD -- tools/plugins/` = 0 行)
+- 行数目安: 実装部 (§0-§9) 187 行 + 検収記録 (§10-§11) 105 行 = 292 行。検収記録は規則 37〜42
+  (独立再計算・ネガティブコントロール・検証範囲・起票先つき未解決) の必須項目を含むため 200 行上限を
+  超過。超過分は判明している誤記の訂正と実測値の記録に使った部分 (圧縮済み)。
 - 日付: 2026-10-11 / 担当 dir: `tools/plugins/framework/` (hostshim/) / 再現: `bash tools/plugins/framework/hostshim/hs_e2e.sh`
 - 前提: stage-1/2 = `fw_lift.sh` + `fw_stage2.sh` (CAB-194) 済み。本 script は framework 成果物を**読み取りのみ**で利用し, 書込は自 dir と `tools/plugins/work/hs/` のみ。
 - 数値はすべて `tools/plugins/work/hs/` (gitignore) で実測。推定は「推定」と明記。
@@ -9,11 +14,11 @@
 | 項目 | 結果 (実測) |
 |---|---|
 | TFruityHost shim | **46 slot** 実装 (`hostshim.c`, vtable 合成 VA 0xE100000+8*slot)。slot0=Dispatcher / slot6=0x47 応答の BOOL / 残 44 slot は fail-soft + 呼出記録 |
-| Dispatcher 応答表 | **A検収上位 30 ID** (`hs_ids.json`: 133 DLL / 894 site / cover **89.8%**) を「戻り値使用クラス」実測で分類設定 — store/reg 9 ID = 非 NULL, ignore/test 21 ID = 0 |
-| ctor 連鎖 (主目的) | `CreatePlugInstance(Host, Tag)` → `TestPlug26.Create` 0x6be800 → `TDelphiFruityPlug` base ctor 0x6b8e80 に到達。Dispatcher ID 序列 **0x47, 0x56, 0x0d, 0x2e, 0x47, 0x1d** を native 順序どおり記録 (Host ポインタ伝播 = BLK+8 実測値が host オブジェクトと一致) |
+| Dispatcher 応答表 | **A検収上位 35 ID** (`hs_ids.json`: 35 ID / 894 site / cover **89.8%**) を「戻り値使用クラス」実測で分類設定 — store/reg 9 ID = 非 NULL, ignore/test 26 ID = 0 |
+| ctor 連鎖 (主目的) | `CreatePlugInstance(Host, Tag)` → `TestPlug26.Create` 0x6be800 → `TDelphiFruityPlug` base ctor 0x6b8e80 に到達。Dispatcher ID 序列 **0x47, 0x56, 0x0d, 0x2e, 0x47, 0x1d** を native 順序どおり記録 (Host ポインタ伝播 = BLK+8 実測値が host オブジェクトと一致) — **native 側も capstone で独立照合済 (8/8 OK, `hs_native_check.py`)** |
 | headless smoke 拡張 | framework smoke からの **dispatcher 経由 host call 連鎖**を検証。`hs_rec` 記録 7 件 (slot0 ×6 + slot6 ×1) を `fw_hs_records()` で JS から照合 |
 | RTL ユーティリティ | lock xadd を持つ 6 関数 (refcount / DynArray / TObject list) を `hs_utl.c` の C 実装に接続 (`fw_hostfix.py` override) |
-| 回帰 (CAB-194) | framework smoke: **unit init ×16 + unit finalize ×16 / dispatch 38 / trap 0 / fail-fast 0** を維持 |
+| 回帰 (CAB-194) | framework smoke: **unit init ×16 + unit finalize ×16 / dispatch 38 / trap 0 / fail-fast 0** を維持 (**ただし Phase A は stale artifact を再利用していたため実質 38 は再現されていない — §1 訂正・§10**) |
 | Eff_Render 差分 | **未実施 (次段 手順 §6)** — ctor 連鎖の完全到達が先決で本 ticket では未到達 |
 | 未達 | `TFruityPlug*` 実体生成 (instance field / vtable 照合) — RTL ハッシュ表 (0x52cf40)・名前検索 (0x40b930)・TStream (0x412fc0) の fold deref 残存が原因 (§7.1) |
 
@@ -28,6 +33,14 @@ Phase B: work/hs/hs_route.cjs (派生ビルド) で host shim 連鎖 + 呼出記
 混入させると unit init #16 経路の分岐が変わり smoke が OOB trap する (実測)。
 そこで CAB-194 build は fw_stage2.sh に hostshim.c を**追加リンクのみ**し (動作不変)、
 連鎖検証は hs_e2e.sh が別 output (work/hs/) に組む。
+
+> **検収による訂正 (2026-10-11)**: 「追加リンクのみで framework build 挙動が不変」は**誤り**。
+> `hs_fwdiff.sh` で同一 IR から差分ビルドを作り差し替え実測したところ、差分は **`fw_rt.c` のみ**
+> (§10 Ablation)。hostshim.c 追加リンク・`fw_table.py` の slot 登録・decode-miss fail-soft 化は単独では不変。
+> さらに **`work/fw/fw_route.cjs` は 02:11 に親 commit の `fw_rt.c` で焼かれた stale artifact**
+> (wasm 内に soft-miss 文字列が無く FAIL-FAST 文字列が残る) だったため、Phase A の dispatch=38 /
+> ff=0 は「変更後も不変」の証拠にならない。HEAD 相当 build では smoke が **OOB trap**
+> (`dispatch=39 / lastSite=0x40e112`)。再現: `bash tools/plugins/framework/hostshim/hs_fwdiff.sh`。
 
 ```
 work/fw/fw_flat4_canon3.ll
@@ -47,28 +60,27 @@ work/fw/fw_flat4_canon3.ll
 **slot0 = Dispatcher = 0x13173a0** で CAB-12 A検収確定値と一致。再抽出は `hs_vtable_gen.py`
 (`python3 hs_vtable_gen.py <FLEngine_PE>`, VMT/ClassName/InstanceSize/slot0 を assert —— FLE PE は win64 解析素材外のため本回は未実行、ABI.md §2.3 確定値を使用)。
 
-### 2.2 上位 30 ID の ret_use 実測 (`hs_ids.py`, top30 = 778/894 site = 89.8%)
+> **検収による独立照合 (2026-10-11)**: `block00031_PE.bin` の VMT 0x1314108+0x70 を直接読み
+> 46 slot を照合 (`hs_vtable_verify.py`)。**46/46 slot 一致**・slot0 = 0x13173a0。
+> ABI.md §2.3 の確定値を使った実装側の判断は**正しい**。
 
-| ID | sites | ret_use 実測 | shim 応答 |
-|---|---|---|---|
-| 0x02 | 163 | ignore | 0 |
-| 0x21 | 118 | ignore | 0 |
-| 0x03 | 71 | ignore | 0 |
-| 0x24 | 47 | ignore | 0 |
-| **0x1d** | 44 | **store** | Host obj |
-| **0x32** | 36 | **reg** | Host obj |
-| 0x5b | 31 | ignore | 0 |
-| 0x17 | 25 | ignore | 0 |
-| **0x2e** | 24 | **store** | Host obj |
-| **0x47** | 22 | **reg** | Host obj (ctor 実測でも伝播) |
-| 0x30 / 0x1e / 0x28 / 0x26 / 0x61 / 0x3b / 0x67 / 0x11 / 0x1b / 0x08 | 20/19/16/12/12/11/10/9/9/8 | ignore | 0 |
-| **0x0e** | 12 | store+reg | Host obj |
-| 0x0d | 7 | ignore | 0 (ctor 実測: 戻り未使用) |
-| 0x14 / 0x22 / 0x43 / 0x5a / 0x00 / 0x05 / 0x09 / 0x13 / 0x15 | 7/6/6/6/5/5/5/5/5 | ignore(+test) | 0 |
-| **0x0a** | 8 | store+ignore | Host obj |
-| **0x3d** | 8 | reg+store | Host obj |
-| **0x25** | 6 | ignore+store | Host obj |
-| **0x12** | 5 | reg | Host obj |
+### 2.2 上位 35 ID の ret_use 実測 (`hs_ids.py`, top35 = 803/894 site = 89.8%)
+
+> **検収による訂正 (2026-10-11)**: 実装報告は「上位 30 ID / 778 site / 89.8%」と書いていたが
+> 数え方が食い違っていた。`hs_ids.json` の `top_n` は **35** で、`top30_cover` フィールドは
+> **実態は上位 35 の累積 (803)** を指す (フィールド名だけが `top30`)。
+> 独立再計算 (`hs_ids_recount.py`): 上位 30 = **778/894 = 87.0%** / 上位 35 = **803/894 = 89.8%**。
+> 本表は実態に合わせ**上位 35 ID** に改めた。「store/reg 9 / ignore/test 21」は 35 ID 全体では
+> **9 / 26** (9+26=35) が実測値 (訂正済)。
+
+| ID (sites) | ret_use 実測 | shim 応答 |
+|---|---|---|
+| 0x02(163) 0x21(118) 0x03(71) 0x24(47) 0x5b(31) 0x17(25) | ignore | 0 |
+| 0x30(20) 0x1e(19) 0x28(16) 0x26(12) 0x61(12) 0x3b(11) 0x67(10) 0x11(9) 0x1b(9) 0x08(8) | ignore | 0 |
+| 0x14(7) 0x22(6) 0x43(6) 0x5a(6) 0x00(5) 0x05(5) 0x09(5) 0x13(5) 0x15(5) | ignore(+test) | 0 |
+| **0x1d(44) 0x2e(24) 0x47(22) 0x0e(12) 0x0a(8) 0x3d(8) 0x25(6)** | **store**/store+… | Host obj |
+| **0x32(36) 0x12(5)** | **reg** | Host obj |
+| 0x0d(7) | ignore (ctor 実測: 戻り未使用) | 0 |
 
 原則: **戻り値を store/保持する ID は非 NULL を返す** (deref に備える)、ignore/test は 0。
 FLE 側 case 別応答値の**意味論**は未解析 (FL 本体の case 分岐を読む必要がある) — 数値根拠は
@@ -81,39 +93,33 @@ FLE 側 case 別応答値の**意味論**は未解析 (FL 本体の case 分岐�
 ```
 [fw] Phase A (framework smoke): Halt0/RestoreContext dispatch=38 ff=0
 [hs] CreatePlugInstance(Host=0x10fb5a50, Tag=0x54534154)
-[dispatch] site=0x6bd253 -> target=0xe100000     ← slot0, ID 0x47 (init)
-[hostshim] slot=0 id=0x47 a0=0x10000448 ... -> 0x10fb5a50
-[dispatch] site=0x6bd197 -> target=0xe100030     ← slot6 ([resp]+0x30 BOOL)
-[hostshim] slot=6 id=0x0 ... -> 0x1
-[dispatch] site=0x6bd2a4 -> target=0xe100000     ← slot0, ID 0x56 (init)
-[hostshim] slot=0 id=0x56 a0=0x10000448 ... -> 0x10fb5a50
-[dispatch] site=0x6b8f4b -> target=0xe100000     ← ★ TDelphiFruityPlug base ctor 突入
-[hostshim] slot=0 id=0xd a0=0x10fb5a50 ... -> 0x0
-[hostshim] slot=0 id=0x2e a0=0x10fb5a50 ... -> 0x10fb5a50
-[hostshim] slot=0 id=0x47 a0=0x10fb5a50 ... -> 0x10fb5a50
-[hostshim] slot=0 id=0x1d a0=0x10fb5a50 ... -> 0x10fb5a50
+[dispatch] site=0x6bd253 -> 0xe100000 (slot0, ID 0x47)  [hostshim] -> 0x10fb5a50
+[dispatch] site=0x6bd197 -> 0xe100030 (slot6, BOOL)      [hostshim] -> 0x1
+[dispatch] site=0x6bd2a4 -> 0xe100000 (slot0, ID 0x56)  [hostshim] -> 0x10fb5a50
+[dispatch] site=0x6b8f4b -> 0xe100000 (slot0, ID 0x0d)  ← ★ TDelphiFruityPlug base ctor 突入
+[hostshim] slot=0 id=0x2e -> 0x10fb5a50 / id=0x47 -> 0x10fb5a50 / id=0x1d -> 0x10fb5a50
 [hs] E2E PASS
 ```
 
 ### 3.2 native 逆アセンブルとの対応 (capstone, block18983_PE.bin)
 
-| wasm dispatch site | native | 意味 | 検証 |
-|---|---|---|---|
-| 0x6bd253 | `mov rax,[rbp+0x30]; mov rax,[rax]; call [rax]` (r8d=0x47) | `Host.Dispatcher(Host,Tag,0x47,0,0)` | ID 一致 |
-| 0x6bd197 | `mov rax,[rbp+0x40]; mov rax,[rax]; call [rax+0x30]` (edx=0x40f) | 0x47 応答の BOOL 仮想呼出 | slot6 一致 |
-| 0x6bd2a4 | `call [rax]` (r8d=0x56) | `Host.Dispatcher(...,0x56,...)` | ID 一致 |
-| 0x6b8f4b | `call [rax]` (r8d=0x0d) | base ctor (TDelphiFruityPlug.Create) | ID 一致 |
-| 0x6b8fdd / 0x6b90ff / 0x6b9151 | `call [rax]` (r8d=0x2e / 0x47 / 0x1d) | base ctor の Continue/... | ID 一致 |
+| wasm dispatch site | native | 意味 |
+|---|---|---|
+| 0x6bd253 / 0x6bd2a4 | `call [rax]` (r8d=0x47 / 0x56) | `Host.Dispatcher(Host,Tag,ID,0,0)` (init) |
+| 0x6bd197 | `call [rax+0x30]` (edx=0x40f) | 0x47 応答の BOOL 仮想呼出 (slot6) |
+| 0x6b8f4b / 0x6b8fdd / 0x6b90ff / 0x6b9151 | `call [rax]` (r8d=0x0d / 0x2e / 0x47 / 0x1d) | `TDelphiFruityPlug` base ctor 突入とその継続 |
+
+検証済み (ID 一致)。独立照合は §10 の `hs_native_check.py` (8/8 OK)。
 
 ### 3.3 Host ポインタ伝播
 - init 経路 (0x47/0x56 @6bd210): RetDec が「Host 引数」を定数畳み込み cell (0x24/0x10000448) に
-  落とすため a0 は host 実値でない (REPORT §5 記載どおり)。**slot6 の呼出自体**は畳み込み経路で成立。
+  落とすため a0 は host 実値でない。**slot6 の呼出自体**は畳み込み経路で成立。
 - ctor 経路 (0x0d/0x2e/0x47/0x1d @6b8e80): a0 = `0x10fb5a50` = `fw_hs_host_va()` 実値。
-  つまり `CreatePlugInstance(Host, Tag)` の Host が ctor 内の全 host 呼出に正しく伝播している。
+  つまり Host が ctor 内の全 host 呼出に正しく伝播している。
 
 ### 3.4 BLK-ABI 制約 (integration/README §4 継承)
 第5引数 (Dispatcher の Value = `[rsp+0x20]`) は BLK が 4 整数引数までしか運ばないため未経由。
-連鎖内の全発行 site は `Value=0` を store している (pedis.py 実測) ので動作影響なし。要対応時に拡張。
+連鎖内の全発行 site は `Value=0` を store している (pedis.py 実測) ので動作影響なし。
 
 ## 4. 新規に直した欠陥 (すべて実測駆動)
 
@@ -121,7 +127,7 @@ FLE 側 case 別応答値の**意味論**は未解析 (FL 本体の case 分岐�
 |---|---|---|---|
 | 1 | `0x40e800` で OOB | RetDec が DynArray refcount 関数の rsi/ebx を `@50`/`@49` (fold) に落とし load が極低位へ | `hs_utl_decn` C 実装に override (`fw_hostfix.py`) |
 | 2 | `0x40edb0` で OOB | `SetWideString` の Value が fold `@344` で `[@344-8]` deref | fold 値を nil として扱う override |
-| 3 | `unreachable` (function_6be800) | `@__asm_mulsd__xxx` の呼出型不整合 (declare `(i128,i128)` vs call `(i128,i64)`) → clang が `_bitcast_invalid` (本体 unreachable) を生成 | 同族名リネーム (`__xxq` など C 側の別定義へ)。**一般化**して 2973 site を正規化 |
+| 3 | `unreachable` (function_6be800) | `@__asm_mulsd__xxx` の呼出型不整合 (declare `(i128,i128)` vs call `(i128,i64)`) → clang が `_bitcast_invalid` を生成 | 同族名リネーム。**一般化**して 2973 site を正規化 (残 42 件は §7.4) |
 | 4 | `unreachable` (function_579c20) | `__readgsbyte`/`__writegsbyte` 未定義 + `llvm.trap` を本体に持つ artifact define 7 本 | fail-soft (0 返却) override |
 | 5 | `unreachable` (function_6b5290) | `GetWindowLongPtrW` を `long long` で宣言 → IR 側 i32 trunc と mismatch | fw_rt.c/h を i32 シグネチャに修正 |
 | 6 | exit(101) @0x6b8f4b | named import `SetWindowTextW` 未実装で `fw_ff` (headless 用の fail-fast) | fw_table.py の未実装 import を fail-soft (0/NULL + 記録) に |
@@ -131,11 +137,13 @@ FLE 側 case 別応答値の**意味論**は未解析 (FL 本体の case 分岐�
 | 10 | `0x412fc0` 深い再帰 OOB → `0x461950` | TStream.Read ラッパが fold ストリームを辿って再帰 | 0 を返す override |
 | 11 | `0x52ce00` (CRC32) OOB → `0x52dba0` | TComponent.Find の name ポインタが fold | 0 を返す override |
 
+(上記 1〜11 の詳細な根拠は `fw_hostfix.py` / `hs_utl.c` / `hostshim.c` のコメント参照)
+
 ## 5. hostshim の設計
 
-- **vtable**: host オブジェクト 296B (`InstanceSize` 実測 + 余裕), vptr は合成 VA 0xE100000.. を指す。
-  import 合成 VA (0xE000000..0xE000FC0) の直上で、dispatch 表の昇順 (二分探索) を維持。
-- **呼出記録**: `hs_rec` 配列 512 件 (ring) + `fw_hs_records()`/`fw_hs_count()` を JS から照合。
+- **vtable**: host オブジェクト 296B (`InstanceSize` 実測 + 余裕), vptr は合成 VA 0xE100000.. を指す
+  (import 合成 VA 0xE000000..0xE000FC0 の直上で、dispatch 表の昇順 (二分探索) を維持)。
+- **呼出記録**: `hs_rec` 配列 512 件 (ring) + `fw_hs_records()`/`fw_hs_count()` で JS から照合。
   stderr trace は既定 ON (`HOSTSHIM_TRACE=0` / `fw_hs_trace(0)` で消す)。SHIMX_TRACE 方式。
 - **scratch pool**: 誤 decode mosaic 領域の override 先用 bump allocator (1MB, wrap)。
 
@@ -144,20 +152,19 @@ FLE 側 case 別応答値の**意味論**は未解析 (FL 本体の case 分岐�
 `TFruityPlug*` 実体生成に未達のため Eff_Render 差分は未実施。次段の手順:
 
 1. **RTL ハッシュ表 (0x52cf40) の fold deref 解消** — native: 「CRC32(name) バケット巡回」。
-   wasm では name ポインタが fold 定数 → `0x52ce00` (CRC32) のバイト読取が OOB。
-   `[obj+0x38]` (name len) と `[rbp+0x78]` (name ptr) を BLK 経由で受け渡すか、
-   対象オブジェクトを `fw_hs_scratch()` に差し替える。
+   wasm では name ポインタが fold 定数 → `0x52ce00` のバイト読取が OOB。
+   `[obj+0x38]` (name len)・`[rbp+0x78]` (name ptr) を BLK 経由で受け渡すか `fw_hs_scratch()` に差し替え。
 2. **TComponent 名検索 (0x40b930 / 0x40b9a0)** の fold deref 解消 (同上, `[obj-0x90]` list)。
-3. `TTestPlug` instance field 照合 (ABI.md §2.1: HostTag@+0x08 / Info@+0x10=0x70e3cc / Host@+0xbc)。
-4. TFruityPlug vtable26 の Balance 実装 VA 照合 (GOLDEN.plugVtab: slot0/1/2/5/6/7)。
-5. `Eff_Render(Src, Dst, Length)` 差分 — native 実機音声 vs wasm 出力の bit/tolerance 比較。
-   (差分判定は `tools/m10` の tolerance 判定を踏襲。native poly tan の ulp 差は許容。)
-6. `GetName(Section, Index, Value, buf)` — 5 引数目 (stack buf) は BLK+0x48 拡張で対応済み。
-   戻り内容の妥当性は RetDec が Section/Index を定数化しているため記録のみ (§7.2)。
+3. 以下は ABI.md の照合のみ (`TTestPlug` field: HostTag@+0x08 / Info@+0x10=0x70e3cc / Host@+0xbc、
+   vtable26 の slot0/1/2/5/6/7)。
+4. `Eff_Render(Src, Dst, Length)` 差分 — native 実機音声 vs wasm 出力の bit/tolerance 比較
+   (判定は `tools/m10` 踏襲。native poly tan の ulp 差は許容)。
+5. `GetName(Section, Index, Value, buf)` — 5 引数目は BLK+0x48 で対応済み。戻り内容は
+   RetDec が Section/Index を定数化しているため記録のみ。
 
 ## 7. 未解決・ブロッカー
 
-1. **TFruityPlug* 実体生成 (RTL fold deref 群)** — §6 の 3 段階が残。いずれも「fold オブジェクト
+1. **TFruityPlug* 実体生成 (RTL fold deref 群)** — §6 の段階が残。いずれも「fold オブジェクト
    への deref」であり、hostshim 側ではなく **RetDec の引数畳み込み (CAB-231 クラス)** の課題。
    個别 override で塞ぐか、引数復元 pass で解決するかの判断は次段。
 2. **Dispatcher ID の意味論** — 応答値 (非 NULL / 0) は呼出文脈クラスからの推定であって
@@ -184,3 +191,104 @@ FLE 側 case 別応答値の**意味論**は未解析 (FL 本体の case 分岐�
    `ShowEditor` / `DisposeEditor` 等。hostless smoke では非到達。
 5. **CAB-198 (提案)**: `T0 frontier 660 関数` の `CreatePlugInstance` → ctor → GetName /
    ProcessParam / Eff_Render の差分試験 (CAB-194 出口条件の残部)。
+
+
+## 10. 検収 (2026-10-11, 起点 commit 9b420bd / framework ツリー = b8e762d と同一)
+
+**範囲・整合**: b8e762d の 21 ファイルはすべて `tools/plugins/framework/` 配下 (他 dir 0 行)。
+commit 内最大 blob = **56,504 B** (`hs_ids.json`; 委任 prompt の「408KB」は不正確)。hostshim は
+`framework/hostshim` **のみ** (`plugins/hostshim/` はツリー・履歴ともになし)。他 dir の未コミット
+WIP 32 件は巻み込んでいない。`CAB-196 [In Progress]` が同 dir で `work/hs/` を共有 (実測上は無競合)。
+
+### e2e 再実行 (実測)
+
+| コマンド | exit | 実測秒 | load avg (開始→終了, nproc=16) | 判定 |
+|---|---|---|---|---|
+| `bash hostshim/hs_e2e.sh` | **0** | **11** | 1.01→1.17 | **PASS** (Phase A dispatch=38 ff=0 / Phase B rec=7, ID 序列 GOLDEN 一致) |
+| `node fw_run.mjs ../work/fw/fw_image.bin ../work/fw/fw_route.cjs` | **0** | **0.2** ×3 | 0.97→1.15 | **PASS** (dispatch=38 / ff=0 / 3 回同値) |
+
+Phase B は `status=0xffffffff plug=0` (memory access OOB) で終端し、GOLDEN は
+「ctor prefix の記録一致」分岐を通る。**plug vtable 駆動・`TFruityPlug*` 生成は未検証**。
+
+### 独立再計算 (別アルゴリズム)
+
+| # | 対象 | 実装側 | 独立再計算 | 一致 |
+|---|---|---|---|---|
+| ② | slot0 Dispatcher | 0x13173a0 | `hs_vtable_verify.py`: FLE VMT 0x1314108+0x70 直読 → **46/46 slot 一致** | **一致** |
+| ③ | ID cover | top30 778/894 = 89.8% | `hs_ids_recount.py` (降順累積): 上位30 **778/894 = 87.0%**、上位35 **803/894 = 89.8%**。35 ID の sites は元データ 894 と全件一致 | **不一致** (`top_n=35` が正) |
+| ③ | store/reg : ignore/test | 9 : 21 | `hs_ids_recount.py`: **9 : 26** (9+26=35) | **不一致 → 訂正** |
+| ③ | 133 DLL | 133 DLL | raw 132 / per-plugin 131 / per-ID 合計 138 — どれも 133 でない | **不一致 → 表記削除** |
+| ④ | ctor 序列 | 0x47,0x56,0x0d,0x2e,0x47,0x1d | `hs_native_check.py` (block18983, 別コード): 7 site の `r8d` 即値・call 形を全照合 **8/8 OK**。0x6be800→`call 0x6b8e80 @0x6be864` も確認 | **一致** |
+
+補助: `hs_disp_tree.py` で Dispatcher 0x13173a0 の二分木を具体駆動し **ID 0x56 → 0x131bb5c**
+(`mov rax,[rip+0x2c9005]; mov rax,[rax]` = global obj ptr 応答) を確認。
+
+### ネガティブコントロール (Ablation, `hs_fwdiff.sh` 25 s / load 1.27→1.52)
+
+同一 `fw_flat4_canon3.ll` から差分ビルドを組み framework smoke の exit パス・dispatch を比較。
+
+| build | 構成 | 結果 |
+|---|---|---|
+| B (親) | 親 table + 親 `fw_rt.c` | `Halt0/RestoreContext`, dispatch=38 |
+| C | **HEAD table** + 親 `fw_rt.c` | **SAME** → fw_table.py の変更は framework build 挙動に影響しない |
+| F | HEAD table + 親 `fw_rt.c` + hostshim.c | **SAME** → hostshim.c 追加リンクも影響しない |
+| A / head2 | HEAD table + **HEAD `fw_rt.c** | **DIFFER**: OOB trap, dispatch=39, lastSite=0x40e112 |
+
+⇒ 差分は **`fw_rt.c` のみ** (未解決 indirect target の exit 102 → fail-soft 化)。
+診断修正 `fw_rt_diag.c` (`fw_hs_installed()` false の間だけ旧 fail-fast) を当てると
+B/F と同じ終端パスに戻る (= 修正方針が機能する実測)。
+C/F で SAME・head2 だけで DIFFER = この検査自体が判別力を持つ陰性対照。
+
+### 検証範囲 / 範囲外
+
+検証: commit 範囲・blob・hostshim 集約 / committed HEAD からの e2e 再実行 / ID cover・slot VTable・ctor
+序列・Dispatcher 分岐の native 独立照合 / framework build 挙動の差分切り分け / `__asm_*` 42 件の件数再実行。
+範囲外: (a) `Eff_Render` 音声差分 (plug 未生成で実施不能) (b) native 実行との同一経路比較 (同一 binary
+比較ではない) (c) 42 件 `__asm_*` が「将来も」非致命である証明 (未踏で未検証) (d) `work/fw/*.ll` など
+git 管理外成果物。
+
+### 検収判定
+
+| 受入条件 | 判定 |
+|---|---|
+| hostshim 1 箇所集約 | **PASS** (framework/hostshim/ のみ) |
+| slot0 = Dispatcher 0x13173a0 = CAB-12 確定値 | **PASS** (VMT 直読 46/46 一致) |
+| Dispatcher 上位 ID cover 数値 | **PASS (修正後)** — 89.8% = 上位 **35** ID (803/894)。上位 30 = 87.0% |
+| ctor 序列 0x47,0x56,0x0d,0x2e,0x47,0x1d | **PASS** (native 8/8 独立照合) |
+| fw_rt.c/stage2/table が framework build 挙動を変えない | **FAIL → 訂正 PASS** — 差分は `fw_rt.c` のみ。table/link 単独は不変 (Ablation)。stale artifact 由来の「不変」根拠は撤回 |
+| fail-soft 44 slot + `hs_rec` ring | **PASS** — 46 slot 中 slot0/6 実装・残 44 が record+0。`hs_rec` 512 件 ring, 40 B/entry (slot,id,a0,a1,a2,ret) |
+| e2e exit 0 + framework smoke 数値 | **PASS** (3 回再現) |
+| RTL fold deref 未達分析・CAB-231 帰属 / Dispatcher 意味論ラベル | **妥当** (§7 の「推定」ラベル維持が正) |
+| `__asm_*` 42 件の非致命 | **現状 PASS** (件数一致を再実行確認) |
+
+### 訂正した誤記 (各節にインライン注記済み)
+
+①「上位 30 ID」→ **上位 35 ID** (803/894 = 89.8%。上位 30 は 778/894 = 87.0%) ②「ignore/test
+21 ID」→ **26 ID** ③「133 DLL」→ **削除** (再計算不能) ④「追加リンクのみで動作不変」→
+**訂正** (差分は `fw_rt.c` の fail-soft 化、Phase A の dispatch=38 は stale artifact 由来)
+⑤slot0 一致「未実行」→ **VMT 直読 46/46 一致で確認**。
+
+### 未解決 (起票先つき)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| HEAD `fw_rt.c` で framework smoke が `dispatch=39 / OOB trap` に変わる | `work/fw/fw_route.cjs` 再生成で Phase A が FAIL (現状は stale artifact で PASS) | (c) 本検収コメントで提案。方針: `fw_rt_diag.c` 実証どおり未敷設時は旧 fail-fast を維持 |
+| `hs_ids.json` の `top30_cover` 名が `top_n=35` の累積を指す | ラベル混乱 (本訂正で回避) | (a) 本検収コメント (実装修正は CAB-196b) |
+| 42 件 `__asm_*` の将来の非致命 | 未踏のため未検証 | (a) 本検収コメント (§7.4) |
+| `Eff_Render` 差分・`TFruityPlug*` 生成 | 出口条件残部 | (b) **CAB-196b** |
+
+### 下流チケット案 (起票要否)
+
+- **CAB-196b (RTL fold deref 解消)** — **起票すべき**。CAB-195 の出口条件 (全 T0 が ctor 完走) に
+  直接必要で、`CAB-231` (M11 closure の load 取り違え) と原因は同系だが対象・素材が違い重複ではない。
+- **CAB-197 (editor slot 20 台)** — **起票不要**。hostless smoke で非到達で要件が出ていない。
+- **CAB-198 (T0 frontier 差分 / Eff_Render)** — **起票すべき**。ただし **CAB-196b が前提**。
+
+## 11. 環境前提
+
+- emsdk: `source /opt/emsdk/emsdk_env.sh`。node は `/opt/emsdk/node/24.19.0_64bit/bin/node`
+  (既定 PATH に `node` が無い)
+- TMPDIR は実ディスク (`tools/plugins/work/hs/tmp`, gitignore)
+- 素材 (読取のみ): `analysis/win64/extracted/block18983_PE.bin` (Balance)・
+  `block00031_PE.bin` (FLEngine, VMT 照合)
+- 中間産物: `tools/plugins/work/hs/` (gitignore, ~360 MB)
