@@ -1,6 +1,9 @@
 # 検収 REPORT — CAB-238 (`ott --auto f7,p1` 既定化) + CAB-135 (AVX/VEX lift / FMA bit-exact)
 
-preflight: RULES_SHA=ae9c6d414f7d (SUBAGENT_RULES.md 154 行, 2026-10-11 06:42 読了の証跡)
+preflight: RULES_SHA=ae9c6d414f7d (着手時 preflight 出力 = SUBAGENT_RULES.md 154 行・2026-10-11 06:42 の読了証跡)
+※ 本ファイル執筆中 (2026-10-11 08:45) に SUBAGENT_RULES.md が 46 → 50 規則へ更新された (RULES_SHA=ff4999169333)。
+   手持ちの 46 規則で検収を実施。差分の規則 47 (検収 agent: 合格 → Done + 検収コメント / 条件付き → **In Review 維持**)
+   は本検収の選択 (無限ルーブ未修のため In Review 維持・所見コメント) と整合するため再実行は不要と判断。
 
 ## 0. 結論 (先出し)
 
