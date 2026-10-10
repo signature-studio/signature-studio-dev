@@ -71,14 +71,14 @@ CASE id=.. fn=<va hex> blob=<name|-> args=<k>:<v>,... [trace=1] [xfill=1] [stkfi
 {"liftdiff_version":1,"target":"m11",
  "function":{"va":"0x4133f0","name":"function_4133f0","sig":{"ret":"i64","params":["i64","i64"],"defined":true}},
  "verdict":"match|mismatch|unexec",
- "unexec_reason":"native_fault_all_patterns|native_null_deref_all_patterns|native_timeout|hang|unsupported_sig|no_wasm_definition",
+ "unexec_reason":"native_fault_all_patterns|native_null_deref_all_patterns|native_timeout|native_sigill|hang|unsupported_sig|no_wasm_definition",
  "tags":[{"tag":"load_dropped","confidence":"high|medium|low","evidence":"..."}],
  "cases":[{"id":"4133f0:p01","pattern":"p01","outcome":"equal|diff|wasm_trap|native_fault|both_fault|hang",
            "native_status":"ok","wasm_status":"ok",
            "diffs":{"ret":{...},"mem":{"count":1,"first":[{"r":"arena","o":"0x..","native":"0x..","wasm":"0x.."}]},
                     "calls":{"kind":"call_arg|call_name|native_extra_call|wasm_extra_call","index":0,...},
                     "trace":{"kind":"entry_arg|entry_va|native_extra_entry|wasm_extra_entry","index":1,"va":"0x..","pos":0,"native":"0x..","wasm":"0x.."}},
-           "wasm_uninit_dependent":false,"raw":{...}}],
+           "wasm_uninit_dependent":false,"leaf":true,"raw":{...}}],
  "static":{"machine":{"ins":..,"icall":..,"ijmp":..,"fpcmp":..,"arity_gpr":..,"arity_x":..,"stack_args":[..],"repstr":..},
            "ir":{"icalls":..,"fcmp":..,"asm_calls":..,"allocas":..,"regslot_deref":..}}}
 ```
@@ -86,6 +86,9 @@ CASE id=.. fn=<va hex> blob=<name|-> args=<k>:<v>,... [trace=1] [xfill=1] [stkfi
 - **verdict**: `match` = native が完走した case が 1 つ以上あり、完走した全 case で一致 (戻り値 / 書換えメモリ / import 呼出し列 / 関数 entry 列)。
   `mismatch` = 完走 case のどれかで差分、または native 完走 / wasm trap。`unexec` = native が完走する case が無い (比較不能)。
 - **outcome**: `native_fault`(native のみ落ちた = wasm は NULL 等で落ちない仕様差、比較不能)、`both_fault`(両方落ちた)。
+- **`leaf`**: native/wasm とも callee entry 無し (関数 entry trace が各側 ≤1) の case で true。`liftdiff.py summary` の「自己欠陥確定」
+  (callee 不在の差分 = その関数自身の欠陥) 集計に使う。**他担当が同形式を出力する場合はこのキーも必ず出す** (欠けると自己欠陥数が 0 と集計される)。
+- `function.sig.c` = true の関数は C 定義 (extra_sources / hand port) 由来 (check_ott.py の D4/D5 突合で使用)。
 - 戻り値比較: native が実際に書いたバイトのみ (rax の sentinel `0xCAFEBABE0BADF00D` と同じバイトは「未書込」)、wasm 署名の戻り幅で比較。
 - 関数 entry 列は IAT thunk (`jmp [iat]` のみの関数) を両側から除外して比較。引数は wasm 署名の型/個数のみ比較 (多い分は arity 診断へ)。
 
