@@ -1,5 +1,7 @@
 # PERF.md — wasm 性能・起動時間の設計提言 (tools/perf)
 
+> **検収追記**: 以下の OTT 数値/LTO 17〜52× は M10 RetDec lift (junk 出力・`__asm_*` helper が別 C ファイル) 固有。bit-exact な自作 x64c lift (tools/ott) では LTO 効果は 1.15×、RTF 0.015〜0.019 (REPORT §2.1)。P1 の「LTO 必須」は「LTO は無害・O2 以上が必須・RetDec chain では決定的」に読み替えること。
+
 実測根拠はすべて `results/*.jsonl` / `results/TABLES.md` (自動生成表) / `REPORT.md`。推定は「(推定)」と明記。
 測定環境: AMD Ryzen 9 9950X (16C, Zen5), node 26.10 (V8 14.6), Chrome 154.0.8037.97 (V8 15.4, headless=new, Dedicated Worker)。
 **16 コアを他 subagent と共有 (loadavg 5〜25)**。p50 は最小値寄り・p99/max は負荷の影響を受ける (後述 §1)。
@@ -141,4 +143,4 @@ inline 閾値超過)。**提言: lift pass で `__asm_*` を直接 LLVM vector I
 | P6 | FLEngine 実 closure (M11 完成版) で起動〜初回 audio までの E2E 計測 (データ像 fetch・CRT 初期化含む) | §5 未測定 |
 | P7 | headful Chrome / Firefox / Safari / Android での compile・lazy 挙動・code cache の再測 (本測定は Chrome 154 headless のみ) | §4 |
 | P8 | プラグイン別 module vs 動的リンクの性能/メモリ比較 (PIC 税、instance 数 × memory) | §5.4 |
-| P9 | OTT の機能修復後に RTF を再測 (現状 junk 出力で経路が異なる可能性) | §0.3 |
+| P9 | OTT の機能修復後に RTF を再測 (node 版は REPORT §2.1 で実施済み: LTO 1.15×; 残: Chrome・低負荷・M11 級) | §0.3 |

@@ -4,20 +4,26 @@
 環境: Ryzen 9 9950X 16C (**他 subagent と共有, loadavg 5〜25**)、node 26.10 (V8 14.6)、Chrome 154.0.8037.97 (V8 15.4, `--headless=new`)、
 emsdk 6.0.12、binaryen 133 (`results/env.json`)。
 
+> **⚠ 重要な前提 (検収で追記)**: 本 REPORT の OTT RTF 表 (§0/§2) は **M10 の RetDec lift 出力 = junk を生成する wasm** の速度である
+> (tools/ott f4e0514: 間接 call 54 箇所脱落等で実行経路が本来と異なり、処理量が過少)。**bit-exact な正しい lift (tools/ott 自作 x64c lifter) で再測した結果は §2.1**:
+> RTF は O2/O3 で **0.017〜0.019** (junk 版 0.025/0.017 と同程度) だが、**LTO は 1.15× しか効かず (junk 版の 17× は `__asm_*` helper が別 C ファイルだった RetDec chain 固有)**。
+> 「LTO が決定打」「0.0013 / 745 インスタンス/コア」は **bit-exact 版では成立しない**。下流の標準ビルド設定の根拠には §2.1 の数値を使うこと。
+
 ## 0. 結論
 
 | 論点 | 実測結果 |
 |---|---|
 | リアルタイム係数 (OTT `processReplacing` 128f) | **M10 現行相当 RTF 0.070 @44.1k (0.077 @48k)** = 204.8 µs/2902 µs、14 インスタンス/コア。**LTO+O3 で 0.0013 (3.9 µs, 745 インスタンス/コア)**。Chrome Worker ≈ node (O0/O2/O3 で ±5%; O1 のみ Chrome が 40% 遅い・原因未調査)、実 AudioWorklet スレッドも同値 (76〜103 µs @O2) |
-| 最適化の支配要因 | **`__asm_*` helper の関数呼出** (O2 で 715 call/ブロック)。LTO で call 715→1・**17× (O2) / 47〜52× (対 M10 -O0)**。出力 bit は全 59 変種で一致 (署名 `c2858a18`) |
+| 最適化の支配要因 (**junk 版 RetDec chain の場合**; bit-exact 版は §2.1) | **`__asm_*` helper の関数呼出** (O2 で 715 call/ブロック)。LTO で call 715→1・**17× (O2) / 47〜52× (対 M10 -O0)**。出力 bit は全 59 変種で一致 (署名 `c2858a18`) |
 | 二次要因 | -O1 2.7×, O2→O3 1.45×, binaryen `-O3` 1.35× (LTO 無時のみ)。`-msimd128`: LTO 無で 0〜14%、**LTO 有で 6× 退行**。pthread/gc-sections/M1 定型 CFLAGS/Os/Oz/`--converge`: 性能差なし |
 | tier | Liftoff-only は定常 1.25× (O2)〜2.0× (O0) 遅い。TurboFan 強制は O0 で 1.09× 速いのみ。起動コストは Liftoff 0 / TF 全量は巨大 wasm で致命的 |
 | Chrome 154 compile | **既定は lazy** (検証のみ)。K=10 (32MiB, 89,360 関数) **96 ms**、K=100 (300MiB, 893,600 関数) **619 ms**。eager 915 ms / 8.0 s、**TurboFan 全量 10.7 s (K=10)** |
 | 上限 | module **1 GiB ちょうどまで OK、+1 B で CompileError**。関数数 1,000,000 (1,000,832 で失敗)。同期 compile はメインスレッド 8MB 超不可 |
 | キャッシュ | IDB へ `Module` 保存 **不可**。AudioWorklet へ `Module` postMessage **不可**。自動 code cache は headless で未観測 |
-| 転送 | 実 wasm の brotli-11 = **31.0%** (gzip-9 42.1%)。K=10 を 100 Mbps で 2.8 s、stream で compile は隠れる |
+| 転送 | M11 lift wasm (-O0) の brotli-11 = **31.0%** (-O2 の OTT で 37%、M11 -O1/-O2 で 34〜35%) (gzip-9 42.1%)。K=10 を 100 Mbps で 2.8 s、stream で compile は隠れる |
 
-**M10 の OTT は出力 junk (実行経路が本来と異なる可能性)** → RTF 絶対値は目安。相対比 (helper inline 化効果) は頑健。
+**M10 の OTT は出力 junk** → 上の OTT RTF は junk 版の値。**bit-exact 版 (§2.1)**: -O0 0.12〜0.13 / -O1 0.031 / -O2 0.018〜0.019 / -O3 0.018 / -O3+LTO 0.015 (≈ 67 インスタンス/コア)。
+最適化 -O0→-O2 の 7× は共通で頑健、LTO の桁違い効果は junk 版のみ。
 
 ## 1. 成果物
 
@@ -62,6 +68,24 @@ wasm-opt (入力: clang -O2 のみ・binaryen 未通過 `o2raw` 692,389B): none 
 -O4 55.0 / -O2 --converge 69.7 / **-O3 --converge 54.4** / --flatten --rereloop -O3 55.1 (サイズ 624〜635KB、gzip 285〜295KB で差小)。
 `o2rawsimd` 入力でも同傾向 (-O3 48.6 vs none 78.8 µs)。wasm-opt 所要: OTT 0.7MB で 0.1〜1.5 s、M11 5.65MB で -O3 1.1 s / `--converge` 3.2 s (`results/wasmopt_m11.tsv`)。
 
+### 2.1 bit-exact 版 (tools/ott x64c lift) での再測 — 検収追加
+
+`build/ott_x64c_build.sh` + `harness/ott_x64c_bench.mjs` (tools/ott の `work/lift/ott_lifted.c` と `rt/*` を読取専用コピーしてビルド)。node 26, 3 反復 p50 の範囲, **loadavg 19〜20 (共有ホスト)**。
+CPU 状態をグローバル (`R[]`/`X[]`/flag) に持つ 1:1 lift で、SSE helper は `ott_cpu.h` の static inline (= 別ファイル call 無し)。全変種で出力署名一致 (`6b1696f0`)。
+
+| 変種 | wasm B | p50 µs | RTF@44.1k | 対 o0 |
+|---|--:|--:|--:|--:|
+| o0 | 905,274 | 358〜388 | 0.123〜0.134 | 1.0× |
+| o1 | 736,946 | 90〜97 | 0.031〜0.033 | 4.1× |
+| o2 / o3 | 666,061 / 670,594 | 52〜56 / 51〜54 | 0.018〜0.019 / 0.018〜0.019 | 7× |
+| o2lto / o3lto | 650,185 / 655,595 | 44〜47 / 43〜44 | 0.015〜0.016 | 8.3〜8.6× (対 o2 **1.15×**) |
+| o2 + wasm-opt -O3 / o3lto + wasm-opt -O3 | 663,917 / 655,285 | 51 / 43〜46 | 0.018 / 0.015 | 効果なし |
+| o3lto + `-msimd128` | 706,103 | 62〜64 | 0.021〜0.022 | **1.4× 退行** |
+
+→ bit-exact 版の O2 (52 µs) は junk 版 O2 (73 µs) と同程度だが、junk 版 LTO 後 (4 µs) の 1/10 以下の水準には届かない = junk 版 LTO の 4 µs は本来の処理量を実行していない値の可能性が高い。**定常 RTF 0.015〜0.019 (O2/O3)** が現実的な目安。
+結論の差: LTO/`-O3`/wasm-opt の効果は小 (≤1.15×)、`-O2` 以上であれば十分、`-msimd128` は逆効果、O0 は 7× 遅い。LTO 自体は無害 (ビルド時間のみ) ゆえ標準に入れてよいが「決定打」ではない。
+(別 loadavg 下の追加試行では o2 90 µs / o3lto 72 µs と絶対値が悪化し比は 1.25×; 絶対値は負荷依存。)
+
 M5 純 SSE カーネル (128 sample/call, µs): waveshaper O0 2.11 / O2 0.845 / **O2+simd 0.207** / O3+simd 0.187、distortion O0 1.72 / O2 0.575 / O2+simd 0.261 / O3+simd 0.159。
 `-O1 -msimd128` は退行 (3.4 / 2.3)。Liftoff-only は O3+simd で 0.298/0.337。署名は 14 変種とも一致 (`fd5cb93` / `d5864b34`)。
 
@@ -98,7 +122,7 @@ M5 純 SSE カーネル (128 sample/call, µs): waveshaper O0 2.11 / O2 0.845 / 
 
 ## 5. 未解決・制約
 
-1. **OTT 出力が junk** のため実行命令の分布が本番と異なる可能性。LTO 効果の方向 (call 削減) は構造由来だが絶対 RTF は M10 修復後に再測。
+1. **junk 版の LTO 効果 (17×) は bit-exact 版に移らない** (§2.1 で 1.15×)。M5 カーネル (純 SSE) の SIMD 効果は別 (OTT x64c lift には SIMD 化余地なし)。bit-exact 版の Chrome 実測・M11 級 closure での LTO 効果は未測。
 2. 共有ホスト (loadavg 5〜25/16C): **単発 max に 5〜6 ms の外れ値** (O3+LTO の 4 µs ブロックでも発生)=スケジューラ起因。実 underrun 評価は低負荷+実オーディオデバイスで要再測 (headless は null sink)。
 3. Chrome 自動 wasm code cache は headless で未観測 (headful 未確認)。compilationHints は「無効果」までで機序未解明 (eager/bg/lazybase ヒントで global eager 時 CPU 9.3→5.7 s、wall 2.3→3.3〜4.1 s)。
 4. FLEngine 実体の wasm は未存在: 規模は M11 closure の K 倍複製+x86 サイズ比の**外挿 (推定)**。`-O1/-O2` の M11 は到達可能関数のみ (619〜810 関数, code 44〜53KB) になり比較に使えない。
@@ -115,7 +139,7 @@ M5 純 SSE カーネル (128 sample/call, µs): waveshaper O0 2.11 / O2 0.845 / 
 P1 lift ビルド標準を LTO+O3+最小 export に (署名ガード付き) / P2 `__asm_*` を LLVM vector IR へ lowering (SIMD+LTO 両立) /
 P3 AudioWorklet ローダ (bytes transfer・worklet 内 compile・pre-warm・main 側 Module 保持) / P4 lifted VA の低位再配置 (initial 864MiB→数十MB) /
 P5 perf 回帰ゲート (PERF_QUICK を CI) / P6 FLEngine 実 closure の起動〜初回 audio E2E / P7 headful・Firefox・Safari・Android 再測 /
-P8 プラグイン別 module vs 動的リンクの比較 / P9 OTT 機能修復後の RTF 再測。
+P8 プラグイン別 module vs 動的リンクの比較 / P9 OTT 機能修復後の RTF 再測 (**node 版は §2.1 で実施済み**; Chrome・低負荷再測が残)。
 
 ## 8. 再現
 
