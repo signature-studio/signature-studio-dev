@@ -9,6 +9,7 @@
 #include "scen_resonator.h"
 #include "scen_stereo.h"
 #include "scen_disperser.h"
+#include "scen_formant.h"
 Scenario SCEN_LIST[] = {
     {"matrix", trial_matrix, 6},
     {"gain", trial_gain, 6},
@@ -23,5 +24,6 @@ Scenario SCEN_LIST[] = {
     {"resonator", trial_resonator, 6},
     {"stereo", trial_stereo, 6},
     {"disperser", trial_disperser, 6},
+    {"formant", trial_formant, 6},
     {0, 0, 0},
 };

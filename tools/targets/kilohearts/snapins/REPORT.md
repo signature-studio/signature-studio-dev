@@ -128,3 +128,30 @@ Resonator/Stereo/Disperser は既存 pass セット (mov128/store/merge/flags/ca
 | Stereo (ksst) | 0x18080d4d0 | 1679 | 8 / 6001 | 111574 | 0 | 200/200 | 999/999 | 許容誤差 | mov128×4, merge×9, callret×16, flags×4, store128×4, storelow×1, vshift×44 | 0 / 2 |
 | Disperser (kdsp) | 0x180316480 | 2311 | 24 / 11754 | 209777 | 0 | 200/200 | 999/999 | bit-exact | callret×49, mov128×40, merge×9, flags×26, jumptable×1, store128×1, vshift×44 | 3 / 8 |
 | Formant Filter (ksvf) | 0x18085a730 | 614 | 17 / 9296 | 405390 | 0 | 200/200 | 999/999 | bit-exact | mov128×20, callret×39, merge×7, jumptable×1, store128×1, flags×20, vshift×44 | 1 / 6 |
+
+## 10. KH-1c (CAB-243): Formant Filter (ksvf / vocalfilter) lift — bit-exact 200/200
+
+**結論**: `vocalfilter::VocalFilterDsp::process` (0x18085a730, 614B) を Path B (kh_lower) で lift → **ctx-fuzz 200/200 trial・999/999 call bit-exact** (1,000 trial seed 7 も **4,999/4,999 bit-exact**)。process 系に近似命令 (rcpps/rsqrtps) が無いことを逆アセで確認済ゆえ bit-exact 判定を適用。wasm **405,390 B** / undefined import 0 / SIMD helper 110 種 (abort 残 0)。
+
+### 10.1 lift 構成 (17 関数 / 9,296 B)
+- process (0x18085a730) + **biquad design 0x180bac490** (Disperser/EQ 実績の再利用。jumptable 0x180bac559 → 0x18236200c ×8 も同一設定) + **log10f 0x180fbbae0 (1,237B — UCRT log10f。FMA3/SSE2 二系統を内包し、ディスパッチ flag 0x184162364 (PE 実値 0x3E19B838 ≠ 0) により実機も wasm 側も FMA 系を実行。vfmadd 系は gen_simd の fmaf 単一丸めで exact)** + libm closure 14 (sincos_a/b, m_cde58, k_dc470/660/700/6d8, k_dfdb0, m_fcdbfc, m_fd27a8, m_fbde90, m_fbe018, m_fd5250, m_fe5c74 — quickeq 実績セットから未使用の powf/m_fbbfb8/m_fcf904/m_fbdfcc/m_fd54cc を除いた必要集合)。
+- **gen_simd.py 追加 helper**: `paddd/psubd/psrld/pslld` + VEX 別名 (`vpand/vpor/vpxor/vpandn/vpaddd/vpsubd/vpsrld/vpslld/vcvtdq2ps`) — log10f の指数/仮数分離 (packed int 経路) 用。**すべて厳密整数演算・C 正規変換 = exact**。declare 駆動ゆえ未使用の既存 9 本の生成物は不変 (全緑で再確認)。
+- shim: `dint` (0x180fbdd78, EQ 実績)。fail-fast stub 7 (`180fd4c50` = log10f 特殊値経路 (x ≤ 0 / inf / NaN → CRT 例外報告 chain へ深掘りするため lift 対象外) ほか) — scenario は Q = P+0x08 > 0 常時ゆえ**到達 0**。
+- **rdata_window = 2048**: log10f が表 base 0x182286100 / 0x182286530 / 0x182286740 を可変 index (≤ 255 × 4B → +1,020 byte) で読むため (D14 と同型の窓要求。§9.2 の `rdata_window` 機構の第 2 適用例)。
+
+### 10.2 構造 (逆アセ起こし)
+- this(0x100): +0x60 = f32 サンプルレート (prepare slot7 = 0x180020650 設定値)、+0x70..+0xf0 = DF2 状態 8 スロット × 16B (L/R 2 ch を f64 ペアで保持。reset slot15 後 = 0 初期化 = arena 0 転写と一致)。
+- ctx+0x3188 → P{+0x00 f 周波数 A, +0x04 f 周波数 B, +0x08 f **Q** (log10f 定義域 > 0), +0x0c u8 bit0 → biquad type = **2\|5**, +0x10 u8 bit0 → type = **0\|5**}。process は P を書かない。
+- 処理: dB = 20·log10f(Q) → biquad design × 2 (第 5/6 スタック引数に Q と dB を渡す。第 2 引数 xmm1 は biquad 冒頭で定数 1.0 を再ロードするため呼出側が設定しない MSVC コードだが register-global 方式で忠実に再現) → min/max 周波数で別 type の 2 段縦続 biquad → per-sample f64 状態更新 → cvtpd2ps で f32 出力 (L/R)。
+- AudioBuffer は既存レイアウト (ch0@0, ch1@8, n@0x28)。scenario: A,B ∈ [20, 20000] Hz, Q ∈ [0.1, 30], mode bit ×2, sr ∈ {44100, 48000, 88200, 96000}。
+
+### 10.3 検証
+- 200 trial seed 1: **200/200・999/999 bit-exact** / 1,000 trial seed 7: **1,000/1,000・4,999/4,999 bit-exact**。
+- run_all.sh 全体 exit 0 (§9 の 52,800/52,800 qebig 含む、既存判定行不変)。
+- 帰属: 新規 helper 無しでは log10f の int 経路が abort() stub に到達し 0/200 (trap) → helper 追加のみで 200/200。窓 2048 は log10f の表読み出しに必須 (64 のままでは index > 15 で欠落 — §9.1 同型)。
+
+## 11. 未解決 / 次 (KH-2b・KH-1c 後)
+- **rdata 窓幅の静的推定**: `rdata_window` は手動設定 (256/2048)。「表 base + 可変 offset」の最大読出幅を IR から機械推定する pass があると同型欠陥 (D11 変種) を未然に防げる → 検出器 (CAB-55) 系の下流チケット案。
+- **log10f の特殊値経路**: `0x180fd4c50` → CRT 例外報告 chain は fail-fast stub のまま (到達 0)。x ≤ 0 入力を扱う场景 (model 層で Q ≥ 0 下限あり) では不要と判断したが、将来 Q が 0 を取り得る構成では lift 追加か shim 化 (ret -inf/NaN) が必要。
+- Formant Filter 固有の残: なし (bit-exact)。  
+- §6 の高Q体制・rcpps 近似表移植案は変更なし (下流)。
