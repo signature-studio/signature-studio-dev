@@ -1,0 +1,3623 @@
+{
+ "file": "/home/ubuntu/work/analysis/mac/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Libs/FLEngine_x64.dylib",
+ "slice": "x86_64",
+ "modules": {
+  "playlist": [
+   {
+    "functions": [
+     [
+      "trackCount",
+      "Get track count"
+     ],
+     [
+      "getTrackName",
+      "Get track name"
+     ],
+     [
+      "setTrackName",
+      "Set track name"
+     ],
+     [
+      "getTrackColor",
+      "Get track color"
+     ],
+     [
+      "setTrackColor",
+      "Set track color"
+     ],
+     [
+      "isTrackMuted",
+      "Get track mute state"
+     ],
+     [
+      "muteTrack",
+      "Toggle track mute state"
+     ],
+     [
+      "isTrackMuteLock",
+      "Get track mute lock state"
+     ],
+     [
+      "muteTrackLock",
+      "Toggle track mute lock state"
+     ],
+     [
+      "isTrackSolo",
+      "Get track solo state"
+     ],
+     [
+      "soloTrack",
+      "Toggle track solo state"
+     ],
+     [
+      "isTrackSelected",
+      "Get track selected state"
+     ],
+     [
+      "selectTrack",
+      "Set track selected state"
+     ],
+     [
+      "selectAll",
+      "Select all tracks"
+     ],
+     [
+      "deselectAll",
+      "Deselect all tracks"
+     ],
+     [
+      "getTrackActivityLevel",
+      "Get track activity level"
+     ],
+     [
+      "getTrackActivityLevelVis",
+      "Get track visual activity level"
+     ],
+     [
+      "getDisplayZone",
+      "Get display zone number"
+     ],
+     [
+      "lockDisplayZone",
+      "Lock display zone"
+     ],
+     [
+      "liveDisplayZone",
+      "Live display zone"
+     ],
+     [
+      "getLiveLoopMode",
+      "Get live loop mode"
+     ],
+     [
+      "getLiveTriggerMode",
+      "Get live trigger mode"
+     ],
+     [
+      "getLivePosSnap",
+      "Get live pos snap"
+     ],
+     [
+      "getLiveTrigSnap",
+      "Get live trig snap"
+     ],
+     [
+      "getLiveBlockStatus",
+      "Get live block status"
+     ],
+     [
+      "getLiveStatus",
+      "Get live status"
+     ],
+     [
+      "getLiveBlockColor",
+      "Get live block color"
+     ],
+     [
+      "triggerLiveClip",
+      "Trigger live clips"
+     ],
+     [
+      "refreshLiveClips",
+      "Refresh live clips"
+     ],
+     [
+      "incLivePosSnap",
+      "Increase live pos snap"
+     ],
+     [
+      "incLiveTrigSnap",
+      "Increase live trig snap"
+     ],
+     [
+      "incLiveLoopMode",
+      "Increase live loop mode"
+     ],
+     [
+      "incLiveTrigMode",
+      "Increase live trig mode"
+     ],
+     [
+      "getVisTimeBar",
+      "Get time bar"
+     ],
+     [
+      "getVisTimeTick",
+      "Get time tick"
+     ],
+     [
+      "getVisTimeStep",
+      "Get time step"
+     ],
+     [
+      "liveTimeToBlockNum",
+      "Live time to block number"
+     ],
+     [
+      "liveBlockNumToTime",
+      "Live block number to time"
+     ],
+     [
+      "getSongStartTickPos",
+      "Get song start tick position"
+     ],
+     [
+      "scrollTo",
+      "Scroll to"
+     ],
+     [
+      "getPerformanceModeState",
+      "Get performance mode state"
+     ],
+     [
+      "selectTool",
+      "Select playlist tool"
+     ]
+    ],
+    "name_only": [],
+    "tail": [
+     "éý\u0001",
+     "ÿÿÿÿÿÿÿÿ\u0001",
+     "i",
+     "is",
+     "ii",
+     "i|ii",
+     "i|i",
+     "iiii|i",
+     "ii|i",
+     "ð¿ii|id",
+     "=",
+     "iiii",
+     "canBeNone",
+     "offset",
+     "canBeNone",
+     "offset",
+     "indexGlobal",
+     "value",
+     "useGlobalIndex",
+     "index",
+     "name",
+     "useGlobalIndex",
+     "index",
+     "useGlobalIndex",
+     "index",
+     "color",
+     "useGlobalIndex",
+     "index",
+     "useGlobalIndex",
+     "index",
+     "value",
+     "useGlobalIndex",
+     "index",
+     "useGlobalIndex",
+     "index",
+     "value",
+     "useGlobalIndex",
+     "index",
+     "useDb",
+     "useGlobalIndex",
+     "index",
+     "volume",
+     "pickupMode",
+     "useGlobalIndex",
+     "index",
+     "useGlobalIndex",
+     "index",
+     "pan",
+     "pickupMode",
+     "useGlobalIndex",
+     "index",
+     "mode",
+     "useGlobalIndex",
+     "index",
+     "value",
+     "pitchUnit",
+     "pickupMode",
+     "useGlobalIndex",
+     "index",
+     "useGlobalIndex",
+     "index",
+     "useGlobalIndex",
+     "index",
+     "value",
+     "useGlobalIndex",
+     "index",
+     "useGlobalIndex",
+     "index",
+     "useGlobalIndex",
+     "index",
+     "position",
+     "useGlobalIndex",
+     "index",
+     "position",
+     "value",
+     "useGlobalIndex",
+     "index",
+     "interval",
+     "offset",
+     "velocity",
+     "useGlobalIndex",
+     "step",
+     "param",
+     "offset",
+     "startPos",
+     "padsStride",
+     "index",
+     "step",
+     "param",
+     "useGlobalIndex",
+     "index",
+     "position",
+     "useGlobalIndex",
+     "index",
+     "useGlobalIndex",
+     "index",
+     "useGlobalIndex",
+     "index",
+     "value",
+     "useGlobalIndex",
+     "index",
+     "useGlobalIndex",
+     "index",
+     "state",
+     "useGlobalIndex",
+     "index",
+     "value",
+     "useGlobalIndex",
+     "index",
+     "useGlobalIndex",
+     "indexGlobal",
+     "note",
+     "velocity",
+     "channel",
+     "temporary",
+     "param",
+     "step",
+     "index",
+     "useGlobalIndex",
+     "index",
+     "patNum",
+     "step",
+     "param",
+     "value",
+     "useGlobalIndex",
+     "index",
+     "useGlobalIndex",
+     "index",
+     "startOnly",
+     "useGlobalIndex",
+     "index",
+     "useGlobalIndex",
+     "index",
+     "useGlobalIndex",
+     "index",
+     "useGlobalIndex"
+    ],
+    "marker_tok": 1072783
+   }
+  ],
+  "channels": [
+   {
+    "functions": [
+     [
+      "processRECEvent",
+      "Process rec event"
+     ],
+     [
+      "incEventValue",
+      "increase event value"
+     ],
+     [
+      "channelNumber",
+      "Get channel number"
+     ],
+     [
+      "selectedChannel",
+      "Get selected channel number"
+     ],
+     [
+      "channelCount",
+      "Get channels count"
+     ],
+     [
+      "getChannelName",
+      "Get channel name"
+     ],
+     [
+      "setChannelName",
+      "Set channel name"
+     ],
+     [
+      "getChannelColor",
+      "Get channel color"
+     ],
+     [
+      "setChannelColor",
+      "Set channel color"
+     ],
+     [
+      "isChannelMuted",
+      "Get channel mute state"
+     ],
+     [
+      "muteChannel",
+      "Toggle channel mute state"
+     ],
+     [
+      "isChannelSolo",
+      "Get channel solo state"
+     ],
+     [
+      "soloChannel",
+      "Toggle channel solo state"
+     ],
+     [
+      "getChannelVolume",
+      "Get channel volume"
+     ],
+     [
+      "setChannelVolume",
+      "Set channel volume"
+     ],
+     [
+      "getChannelPan",
+      "Get channel pan"
+     ],
+     [
+      "setChannelPan",
+      "Set channel pan"
+     ],
+     [
+      "getChannelPitch",
+      "Get channel pitch"
+     ],
+     [
+      "setChannelPitch",
+      "Set channel pitch"
+     ],
+     [
+      "getChannelType",
+      "get channel type"
+     ],
+     [
+      "isChannelSelected",
+      "Get channel selected state"
+     ],
+     [
+      "selectChannel",
+      "Set channel selected state"
+     ],
+     [
+      "selectOneChannel",
+      "Select channel exclusively"
+     ],
+     [
+      "selectAll",
+      "Select all channels"
+     ],
+     [
+      "deselectAll",
+      "Deselect all channels"
+     ],
+     [
+      "getChannelMidiInPort",
+      "Get channel midi in port"
+     ],
+     [
+      "getChannelIndex",
+      "Get channel index"
+     ],
+     [
+      "getTargetFxTrack",
+      "Get channel target FX track"
+     ],
+     [
+      "setTargetFxTrack",
+      "Set channel target FX track"
+     ],
+     [
+      "getRecEventId",
+      "Get channel rec event id"
+     ],
+     [
+      "isGridBitAssigned",
+      "Is grid bit assigned"
+     ],
+     [
+      "getGridBit",
+      "Get channel grid bit"
+     ],
+     [
+      "setGridBit",
+      "Set channel grid bit"
+     ],
+     [
+      "getStepParam",
+      "Get step param"
+     ],
+     [
+      "getCurrentStepParam",
+      "Get current step param"
+     ],
+     [
+      "fillEachNSteps",
+      "Fill every N steps"
+     ],
+     [
+      "getGridBitWithLoop",
+      "Get grid bit with loop"
+     ],
+     [
+      "showCSForm",
+      "Show cs form"
+     ],
+     [
+      "showEditor",
+      "focus channel editor"
+     ],
+     [
+      "focusEditor",
+      "focus channel editor"
+     ],
+     [
+      "isHighLighted",
+      "Is higlight rectangle defined"
+     ],
+     [
+      "midiNoteOn",
+      "Set midi note on for channel"
+     ],
+     [
+      "isGraphEditorVisible",
+      "Returns true if graph editor is visible"
+     ],
+     [
+      "updateGraphEditor",
+      "Update graph editor"
+     ],
+     [
+      "closeGraphEditor",
+      "Close graph editor"
+     ],
+     [
+      "showGraphEditor",
+      "Show graph editor"
+     ],
+     [
+      "setStepParameterByIndex",
+      "Set step parameter by index"
+     ],
+     [
+      "getActivityLevel",
+      "Get channel activity level"
+     ],
+     [
+      "quickQuantize",
+      "Perform quick quantize"
+     ],
+     [
+      "rerollLoopStarterLoop",
+      "Reroll LoopStarter audio loop (use index -1 for all loops)"
+     ],
+     [
+      "rerollLoopStarterSteps",
+      "Reroll LoopStarter steps (use index -1 for all step channels)"
+     ],
+     [
+      "rerollLoopStarterSample",
+      "Reroll LoopStarter kit sample (use index -1 for all step channels)"
+     ],
+     [
+      "getSwing",
+      "Get swing "
+     ],
+     [
+      "setSwing",
+      "Set swing"
+     ]
+    ],
+    "name_only": [],
+    "tail": [
+     "Iii",
+     "UUUUUU¥?Ii|d",
+     "|ii",
+     "|iii",
+     "|i",
+     "i|i",
+     "is|i",
+     "ii|i",
+     "i|ii",
+     "Ã@{\u0014®Gázô?",
+     "ð?",
+     "ÿ",
+     "4@",
+     "?",
+     "N",
+     "ýÿÿÿÿÿß¿if|ii",
+     "É@",
+     "@",
+     "?",
+     "if|iii",
+     "iii|i",
+     "ii|iii",
+     "iiii|i",
+     "éý\u0001",
+     "ÿÿÿÿÿÿÿÿ\u0001",
+     "i",
+     "@@iiiii|i",
+     "?",
+     "C",
+     "éý\u0001",
+     "ÿÿÿÿÿÿÿÿ\u0001",
+     "f",
+     "index",
+     "flags",
+     "index",
+     "maxLen",
+     "index",
+     "value",
+     "index",
+     "value",
+     "mode",
+     "index",
+     "value",
+     "index",
+     "value",
+     "index",
+     "flag",
+     "index",
+     "volume",
+     "pickupMode",
+     "index",
+     "pan",
+     "pickupMode",
+     "index",
+     "slot",
+     "pickupMode",
+     "index",
+     "plugIndex",
+     "value",
+     "index",
+     "plugIndex",
+     "value",
+     "pickupMode",
+     "index",
+     "value",
+     "index",
+     "value",
+     "smoothTarget",
+     "index",
+     "flags",
+     "index",
+     "shortName",
+     "index",
+     "locked",
+     "index",
+     "value",
+     "flags",
+     "smoothSpeed",
+     "isIncrement",
+     "res",
+     "channel",
+     "track",
+     "select",
+     "index",
+     "value",
+     "index",
+     "value",
+     "index",
+     "value",
+     "index",
+     "band",
+     "mode",
+     "index",
+     "band",
+     "mode"
+    ],
+    "marker_tok": 1073028
+   }
+  ],
+  "mixer": [
+   {
+    "functions": [
+     [
+      "trackNumber",
+      "Get track number"
+     ],
+     [
+      "getTrackInfo",
+      "Get tracks info"
+     ],
+     [
+      "setTrackNumber",
+      "Set track number"
+     ],
+     [
+      "trackCount",
+      "Get tracks count"
+     ],
+     [
+      "getTrackName",
+      "Get track name"
+     ],
+     [
+      "setTrackName",
+      "Set track name"
+     ],
+     [
+      "getTrackColor",
+      "Get track color"
+     ],
+     [
+      "setTrackColor",
+      "Set track color"
+     ],
+     [
+      "getSlotColor",
+      "Get slot color"
+     ],
+     [
+      "setSlotColor",
+      "Set slot color"
+     ],
+     [
+      "isTrackArmed",
+      "Get track armed state"
+     ],
+     [
+      "armTrack",
+      "Toggle track armed state"
+     ],
+     [
+      "isTrackSolo",
+      "Get track solo state"
+     ],
+     [
+      "soloTrack",
+      "Toggle track solo state"
+     ],
+     [
+      "isTrackAutomationEnabled",
+      "Get track autotimation state"
+     ],
+     [
+      "isTrackEnabled",
+      "Get track enabled state"
+     ],
+     [
+      "enableTrack",
+      "Toggle track enabled state"
+     ],
+     [
+      "isTrackMuted",
+      "Get track mute state"
+     ],
+     [
+      "muteTrack",
+      "Toggle track mute state"
+     ],
+     [
+      "isTrackMuteLock",
+      "Get track mute lock state"
+     ],
+     [
+      "getTrackPluginId",
+      "Get track plugin ID"
+     ],
+     [
+      "isTrackPluginValid",
+      "Get track plugin valid state"
+     ],
+     [
+      "getTrackVolume",
+      "Get track volume"
+     ],
+     [
+      "setTrackVolume",
+      "Ser track volume"
+     ],
+     [
+      "getTrackPan",
+      "Get track pan"
+     ],
+     [
+      "setTrackPan",
+      "Set track pan"
+     ],
+     [
+      "getTrackStereoSep",
+      "Get track stereo separation"
+     ],
+     [
+      "setTrackStereoSep",
+      "Set track setereo separation"
+     ],
+     [
+      "getPluginMixLevel",
+      "Get track plugin mix level"
+     ],
+     [
+      "setPluginMixLevel",
+      "Set track plugin mix level"
+     ],
+     [
+      "getPluginMuteState",
+      "Get track plugin mute state"
+     ],
+     [
+      "setPluginMuteState",
+      "Set track plugin mute state"
+     ],
+     [
+      "isTrackSelected",
+      "Get track selected state"
+     ],
+     [
+      "selectTrack",
+      "Set track selected state"
+     ],
+     [
+      "selectAll",
+      "Select all tracks"
+     ],
+     [
+      "deselectAll",
+      "Deselect all tracks"
+     ],
+     [
+      "setRouteTo",
+      "Set route to"
+     ],
+     [
+      "setRouteToLevel",
+      "Set route to lebel"
+     ],
+     [
+      "getRouteToLevel",
+      "Get route to lebel"
+     ],
+     [
+      "getRouteSendActive",
+      "Get route send state"
+     ],
+     [
+      "afterRoutingChanged",
+      "After routing changed"
+     ],
+     [
+      "setActiveTrack",
+      "Set active track"
+     ],
+     [
+      "getEventValue",
+      "Get event value from midi"
+     ],
+     [
+      "remoteFindEventValue",
+      "Remote find event value"
+     ],
+     [
+      "getEventIDName",
+      "Get event ID name"
+     ],
+     [
+      "getEventIDValueString",
+      "Get event ID value string"
+     ],
+     [
+      "getAutoSmoothEventValue",
+      "Get event ID value string"
+     ],
+     [
+      "automateEvent",
+      "Automate event"
+     ],
+     [
+      "getTrackPeaks",
+      "Get track peaks"
+     ],
+     [
+      "getTrackRecordingFileName",
+      "Get track recording file name"
+     ],
+     [
+      "linkTrackToChannel",
+      "Link track to channel"
+     ],
+     [
+      "linkChannelToTrack",
+      "Link channel to track"
+     ],
+     [
+      "getSongStepPos",
+      "Get song step position"
+     ],
+     [
+      "getCurrentTempo",
+      "Get current tempo"
+     ],
+     [
+      "setCurrentTempo",
+      "Set current tempo"
+     ],
+     [
+      "getRecPPS",
+      "Get Rec pps"
+     ],
+     [
+      "getSongTickPos",
+      "Get sing tick pos"
+     ],
+     [
+      "getLastPeakVol",
+      "Get last peak vol"
+     ],
+     [
+      "getTrackDockSide",
+      "Get track dock"
+     ],
+     [
+      "isTrackSlotsEnabled",
+      "Get track slots enabled state"
+     ],
+     [
+      "enableTrackSlots",
+      "Toggle track slots enabled state"
+     ],
+     [
+      "isTrackRevPolarity",
+      "Get track reversed polarity state"
+     ],
+     [
+      "revTrackPolarity",
+      "Toggle track reverssed polarity state"
+     ],
+     [
+      "focusEditor",
+      "focus mixer editor"
+     ],
+     [
+      "getActiveEffectIndex",
+      "get Active Effect Index"
+     ],
+     [
+      "isTrackSwapChannels",
+      "Get track swap channels state"
+     ],
+     [
+      "swapTrackChannels",
+      "Toggle track swap channels state"
+     ],
+     [
+      "getEqBandCount",
+      "Get eq band count"
+     ],
+     [
+      "getEqGain",
+      "Get eq gain"
+     ],
+     [
+      "setEqGain",
+      "Set eq gain"
+     ],
+     [
+      "getEqFrequency",
+      "Get eq frequency"
+     ],
+     [
+      "setEqFrequency",
+      "Set eq frequency"
+     ],
+     [
+      "getEqBandwidth",
+      "Get eq bandwidth"
+     ],
+     [
+      "setEqBandwidth",
+      "Set eq bandwidth"
+     ],
+     [
+      "getTrackCount",
+      "Get track count"
+     ]
+    ],
+    "name_only": [],
+    "tail": [
+     "i|i",
+     "éý\u0001",
+     "ÿÿÿÿÿÿÿÿ\u0001",
+     "i",
+     "is",
+     "ii",
+     "iii",
+     "i|ii",
+     "\u0010>",
+     "ô?",
+     "ð?",
+     "ÿ",
+     "4@",
+     "?",
+     "N",
+     "ýÿÿÿÿÿß¿if|i",
+     "à?",
+     "@",
+     "¿",
+     "?«ª*=",
+     "iif|i",
+     "iii|i",
+     "zF",
+     "iif",
+     "@Ï@I|ii",
+     "I|i",
+     "Ii",
+     "UUUUUU¥?Iii|iid",
+     "@",
+     "3í÷AÀù?ii|i",
+     "|i",
+     "zDf|i",
+     "\u0010B",
+     "$@1º\u001b'âu\u0012@ÍÌÌÌÌüc@index",
+     "playNow",
+     "flags",
+     "x",
+     "y",
+     "index",
+     "value",
+     "preview",
+     "index",
+     "storeUndo",
+     "updateUi",
+     "rootNoteNum"
+    ],
+    "marker_tok": 1073274
+   }
+  ],
+  "patterns": [
+   {
+    "functions": [
+     [
+      "patternNumber",
+      "Get current pattern number"
+     ],
+     [
+      "patternCount",
+      "Get patterns count"
+     ],
+     [
+      "patternMax",
+      "Get max pattern id"
+     ],
+     [
+      "getPatternName",
+      "Get pattern name"
+     ],
+     [
+      "setPatternName",
+      "Set pattern name"
+     ],
+     [
+      "getPatternColor",
+      "Get pattern color"
+     ],
+     [
+      "setPatternColor",
+      "Set pattern color"
+     ],
+     [
+      "getPatternLength",
+      "Get pattern length"
+     ],
+     [
+      "setPatternLength",
+      "Set pattern length"
+     ],
+     [
+      "duplicatePatternData",
+      "Duplicate pattern data"
+     ],
+     [
+      "incrementPatternLength",
+      "Increment pattern length"
+     ],
+     [
+      "getBlockSetStatus",
+      "Get block set status"
+     ],
+     [
+      "ensureValidNoteRecord",
+      "Ensure Valid Note Record"
+     ],
+     [
+      "jumpToPattern",
+      "Jump to pattern"
+     ],
+     [
+      "findFirstNextEmptyPat",
+      "Find first next empty pattern"
+     ],
+     [
+      "getChannelLoopStyle",
+      "Get channel loop style"
+     ],
+     [
+      "setChannelLoop",
+      "Set channel loop"
+     ],
+     [
+      "isPatternSelected",
+      "Get pattern selected state"
+     ],
+     [
+      "isPatternDefault",
+      "Get pattern default state"
+     ],
+     [
+      "selectPattern",
+      "Select pattern"
+     ],
+     [
+      "selectAll",
+      "Select all patterns"
+     ],
+     [
+      "deselectAll",
+      "Deselect all patterns"
+     ],
+     [
+      "clonePattern",
+      "Clone pattern"
+     ],
+     [
+      "clearPattern",
+      "Clear pattern"
+     ],
+     [
+      "movePattern",
+      "Move pattern"
+     ],
+     [
+      "burnLoop",
+      "Burn loop"
+     ],
+     [
+      "setLoopStarterRootNote",
+      "Set the root note of Loopstarter, when its enabled"
+     ],
+     [
+      "getPatternGroupCount",
+      "Get pattern group count"
+     ],
+     [
+      "getActivePatternGroup",
+      "Get active pattern group"
+     ],
+     [
+      "getPatternGroupName",
+      "Get pattern group name"
+     ],
+     [
+      "getPatternsInGroup",
+      "Get patterns in group"
+     ]
+    ],
+    "name_only": [],
+    "tail": [
+     "éý\u0001",
+     "ÿÿÿÿÿÿÿÿ\u0001",
+     "i",
+     "is",
+     "ii",
+     "iiii",
+     "i|i",
+     "i|ii",
+     "|ii",
+     "|i",
+     "index",
+     "value",
+     "pmeFlags",
+     "flags",
+     "position",
+     "mode",
+     "startStop",
+     "flags",
+     "value",
+     "flags",
+     "value",
+     "flags"
+    ],
+    "marker_tok": 1073382
+   }
+  ],
+  "transport": [
+   {
+    "functions": [
+     [
+      "globalTransport",
+      "Global transport"
+     ],
+     [
+      "start",
+      "Start playback"
+     ],
+     [
+      "stop",
+      "Stop playback"
+     ],
+     [
+      "record",
+      "Start recording"
+     ],
+     [
+      "isRecording",
+      "Get recording state"
+     ],
+     [
+      "getLoopMode",
+      "Get loop mode"
+     ],
+     [
+      "setLoopMode",
+      "Set loop mode"
+     ],
+     [
+      "getSongPos",
+      "Get song position"
+     ],
+     [
+      "setSongPos",
+      "Set song position"
+     ],
+     [
+      "getSongPosHint",
+      "Get song position hint"
+     ],
+     [
+      "rewind",
+      "Rewind song"
+     ],
+     [
+      "setPlaybackSpeed",
+      "Set playback speed"
+     ],
+     [
+      "fastForward",
+      "Fast forward song pos"
+     ],
+     [
+      "isPlaying",
+      "Returns if the program is playing or stopped"
+     ],
+     [
+      "markerJumpJog",
+      "Jog marker jump"
+     ],
+     [
+      "markerSelJog",
+      "Jog marker selection"
+     ],
+     [
+      "getHWBeatLEDState",
+      "get HWBeatLEDState"
+     ],
+     [
+      "continuousMovePos",
+      "Continuous move pos"
+     ],
+     [
+      "continuousMove",
+      "Continuous move"
+     ],
+     [
+      "getSongLength",
+      "Get song length"
+     ]
+    ],
+    "name_only": [],
+    "tail": [
+     "ii|ii",
+     "|i",
+     "@@d|i",
+     "i|i",
+     ">",
+     "@",
+     "éý\u0001",
+     "ÿÿÿÿÿÿÿÿ\u0001",
+     "d",
+     "ii",
+     "éý\u0001",
+     "ÿÿÿÿÿÿÿÿ\u0001",
+     "i",
+     "undoName",
+     "flags",
+     "updateHistory",
+     "time",
+     "silent"
+    ],
+    "marker_tok": 1073445
+   }
+  ],
+  "general": [
+   {
+    "functions": [
+     [
+      "undo",
+      "Undo/redo last, or move down in undo history"
+     ],
+     [
+      "undoUp",
+      "Move up in undo history "
+     ],
+     [
+      "undoDown",
+      "Move down in undo history "
+     ],
+     [
+      "undoUpDown",
+      "Move up and down in undo history"
+     ],
+     [
+      "restoreUndo",
+      "Restore undo"
+     ],
+     [
+      "restoreUndoLevel",
+      "Restore undo by level"
+     ],
+     [
+      "getUndoLevelHint",
+      "Get undo level"
+     ],
+     [
+      "getRecPPB",
+      "Get rec ppb"
+     ],
+     [
+      "getRecPPQ",
+      "Get rec ppq"
+     ],
+     [
+      "setRecPPQ",
+      "Set rec ppq"
+     ],
+     [
+      "setNumerator",
+      "Set numerator"
+     ],
+     [
+      "setDenominator",
+      "Set denominator"
+     ],
+     [
+      "getChangedFlag",
+      "Get changed flag "
+     ],
+     [
+      "getUseMetronome",
+      "Get use metronome"
+     ],
+     [
+      "getPrecount",
+      "Get precounr"
+     ],
+     [
+      "saveUndo",
+      "Save undo"
+     ],
+     [
+      "getUndoHistoryPos",
+      "Get undo history position"
+     ],
+     [
+      "getUndoHistoryCount",
+      "Get undo history count"
+     ],
+     [
+      "getUndoHistoryLast",
+      "Get undo history last"
+     ],
+     [
+      "setUndoHistoryPos",
+      "Set undo history position"
+     ],
+     [
+      "setUndoHistoryCount",
+      "Set undo history count"
+     ],
+     [
+      "setUndoHistoryLast",
+      "Set undo history last"
+     ],
+     [
+      "getVersion",
+      "Get Midi scripting version"
+     ],
+     [
+      "processRECEvent",
+      "Process rec event"
+     ],
+     [
+      "dumpScoreLog",
+      "Dump score log"
+     ],
+     [
+      "clearLog",
+      "Clear log"
+     ],
+     [
+      "safeToEdit",
+      "Safe to edit stuff"
+     ],
+     [
+      "getProjectTitle",
+      "Get project title"
+     ],
+     [
+      "getProjectAuthor",
+      "Get project author"
+     ],
+     [
+      "getProjectGenre",
+      "Get project genre"
+     ]
+    ],
+    "name_only": [],
+    "tail": [
+     "éý\u0001",
+     "ÿÿÿÿÿÿÿÿ\u0001",
+     "i",
+     "si|i",
+     "Iii",
+     "i|i",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ.",
+     "N",
+     "e",
+     "w",
+     " ",
+     "f",
+     "i",
+     "r",
+     "m",
+     "w",
+     "a",
+     "r",
+     "e",
+     " ",
+     "i",
+     "s",
+     " ",
+     "a",
+     "v",
+     "a",
+     "i",
+     "l",
+     "a",
+     "b",
+     "l",
+     "e",
+     " ",
+     "f",
+     "o",
+     "r",
+     " ",
+     "y",
+     "o",
+     "u",
+     "r",
+     " ",
+     "M",
+     "I",
+     "D",
+     "I",
+     " ",
+     "d",
+     "e",
+     "v",
+     "i",
+     "c",
+     "e",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\"",
+     "N",
+     "e",
+     "w",
+     " ",
+     "v",
+     "e",
+     "r",
+     "s",
+     "i",
+     "o",
+     "n",
+     " ",
+     "o",
+     "f",
+     " ",
+     "s",
+     "c",
+     "r",
+     "i",
+     "p",
+     "t",
+     " ",
+     "i",
+     "s",
+     " ",
+     "a",
+     "v",
+     "a",
+     "i",
+     "l",
+     "a",
+     "b",
+     "l",
+     "e"
+    ],
+    "marker_tok": 1073524
+   }
+  ],
+  "ui": [
+   {
+    "functions": [
+     [
+      "nextWindow",
+      "Next window"
+     ],
+     [
+      "selectWindow",
+      "Select window"
+     ],
+     [
+      "isClosing",
+      "Get closing state"
+     ],
+     [
+      "getProgTitle",
+      "Get FL Studio title"
+     ],
+     [
+      "getVersion",
+      "Get FL Studio version as string"
+     ],
+     [
+      "getHintMsg",
+      "Get FL Studio hint"
+     ],
+     [
+      "setHintMsg",
+      "Set FL Studio hint"
+     ],
+     [
+      "showNotification",
+      "Show FL Studio notification"
+     ],
+     [
+      "getFocusedFormCaption",
+      "Get focused form caption"
+     ],
+     [
+      "getFocusedFormID",
+      "Get focused form ID"
+     ],
+     [
+      "getFocusedPluginName",
+      "Get focused plugin name"
+     ],
+     [
+      "getHintValue",
+      "Get hint value"
+     ],
+     [
+      "getTimeDispMin",
+      "Is time time display set to minutes"
+     ],
+     [
+      "setTimeDispMin",
+      "Is time time display set to minutes"
+     ],
+     [
+      "getFocused",
+      "Get form focus state"
+     ],
+     [
+      "setFocused",
+      "Set form focus state"
+     ],
+     [
+      "getVisible",
+      "Get form visible state"
+     ],
+     [
+      "showWindow",
+      "Show window"
+     ],
+     [
+      "hideWindow",
+      "Hide window"
+     ],
+     [
+      "scrollWindow",
+      "Scroll window"
+     ],
+     [
+      "launchAudioEditor",
+      "Launch audio editor"
+     ],
+     [
+      "isInPopupMenu",
+      "Is in popup menu"
+     ],
+     [
+      "closeAllMenu",
+      "Close all menu"
+     ],
+     [
+      "closeActivePopupMenu",
+      "Close active popup menu"
+     ],
+     [
+      "isMetronomeEnabled",
+      "Is metronome enabled"
+     ],
+     [
+      "isStartOnInputEnabled",
+      "Is start on input enabled"
+     ],
+     [
+      "isPrecountEnabled",
+      "Is precount enabled"
+     ],
+     [
+      "isLoopRecEnabled",
+      "Is loop recording enabled"
+     ],
+     [
+      "crDisplayRect",
+      "Display selection rectangle in channel rack"
+     ],
+     [
+      "miDisplayRect",
+      "Display selection rectangle in mixer"
+     ],
+     [
+      "miDisplayDockRect",
+      "Display selection rectangle in mixer dock"
+     ],
+     [
+      "navigateBrowser",
+      "Navigate browser"
+     ],
+     [
+      "toggleBrowserNode",
+      "Toggle browser node"
+     ],
+     [
+      "navigateBrowserTabs",
+      "Navigate browser tabs"
+     ],
+     [
+      "navigateBrowserMenu",
+      "Navigate browser menu"
+     ],
+     [
+      "selectBrowserMenuItem",
+      "Select browser menu item"
+     ],
+     [
+      "previewBrowserMenuItem",
+      "Preview browser menu item"
+     ],
+     [
+      "getFocusedNodeFileType",
+      "Get focused node file type"
+     ],
+     [
+      "getFocusedNodeCaption",
+      "Get focused node caption"
+     ],
+     [
+      "isBrowserAutoHide",
+      "Get browser auto hide state"
+     ],
+     [
+      "setBrowserAutoHide",
+      "Set browser auto hide state"
+     ],
+     [
+      "openEventEditor",
+      "Open event editor"
+     ],
+     [
+      "getStepEditMode",
+      "Get step edit mode"
+     ],
+     [
+      "setStepEditMode",
+      "Set step edit mode"
+     ],
+     [
+      "showPicker",
+      "Show picker panel"
+     ]
+    ],
+    "name_only": [
+     "copy",
+     "cut",
+     "delete",
+     "down",
+     "enter",
+     "escape",
+     "getSnapMode",
+     "horZoom",
+     "insert",
+     "jog",
+     "jog2",
+     "left",
+     "moveJog",
+     "next",
+     "no",
+     "paste",
+     "previous",
+     "right",
+     "setSnapMode",
+     "snapMode",
+     "snapOnOff",
+     "strip",
+     "stripHold",
+     "stripJog",
+     "up",
+     "verZoom",
+     "yes"
+    ],
+    "tail": [
+     "éý\u0001",
+     "ÿÿÿÿÿÿÿÿ\u0001",
+     "i",
+     "|i",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u000e",
+     "F",
+     "L",
+     " ",
+     "S",
+     "t",
+     "u",
+     "d",
+     "i",
+     "o",
+     " ",
+     "2",
+     "0",
+     "2",
+     "6",
+     "éý\u0001",
+     "ÿÿÿÿÿÿÿÿ\u0001",
+     "s",
+     "ii",
+     "ii|i",
+     "isiss",
+     "8CÕÿÿß¿",
+     "A",
+     "iiiii|i",
+     "iii|i"
+    ],
+    "marker_tok": 1073757
+   }
+  ],
+  "device": [
+   {
+    "functions": [
+     [
+      "midiOutMsg",
+      "Send out midi message"
+     ],
+     [
+      "midiOutNewMsg",
+      "Send out new midi message"
+     ],
+     [
+      "sendMsgGeneric",
+      "Send out generic midi message"
+     ],
+     [
+      "midiOutSysex",
+      "Send midi out sysex"
+     ],
+     [
+      "processMIDICC",
+      "Send out generic midi message"
+     ],
+     [
+      "forwardMIDICC",
+      "Send  generic midi message to active plugin"
+     ],
+     [
+      "directFeedback",
+      "Send out generic midi message"
+     ],
+     [
+      "dispatch",
+      "Dispatch midi message"
+     ],
+     [
+      "dispatchReceiverCount",
+      "Get dispatch midi message receiver count"
+     ],
+     [
+      "dispatchGetReceiverPortNumber",
+      "Get receiver port number"
+     ],
+     [
+      "isAssigned",
+      "Is device assigned"
+     ],
+     [
+      "isMidiOutAssigned",
+      "Is device midi out assigned"
+     ],
+     [
+      "getPortNumber",
+      "Is device assigned"
+     ],
+     [
+      "getName",
+      "Get device name"
+     ],
+     [
+      "findEventID",
+      "Find event id"
+     ],
+     [
+      "getLinkedValue",
+      "Get normalized value of linked control back or -1 if not linked"
+     ],
+     [
+      "getLinkedValueString",
+      "Get string value of linked control back or error if not linked"
+     ],
+     [
+      "getLinkedChannel",
+      "Get channel value of linked control back or -1 if not linked"
+     ],
+     [
+      "getLinkedParamName",
+      "Get string value of linked control back or error if not linked"
+     ],
+     [
+      "getLinkedInfo",
+      "Get linked control info back or -1 if not linked"
+     ],
+     [
+      "createRefreshThread",
+      "Create refresh thread"
+     ],
+     [
+      "destroyRefreshThread",
+      "Destroy refresh thread"
+     ],
+     [
+      "fullRefresh",
+      "Perform full refresh"
+     ],
+     [
+      "isDoubleClick",
+      "Double-clicking handling for MIDI"
+     ],
+     [
+      "repeatMidiEvent",
+      "Repeat midi event"
+     ],
+     [
+      "stopRepeatMidiEvent",
+      "stop repeat midi event"
+     ],
+     [
+      "setHasMeters",
+      "Set has meters"
+     ],
+     [
+      "baseTrackSelect",
+      "Base track select"
+     ],
+     [
+      "hardwareRefreshMixerTrack",
+      "Hardware refresh mixer track"
+     ],
+     [
+      "getIdleElapsed",
+      "Get idle elapsed"
+     ],
+     [
+      "setMasterSync",
+      "Set device master sync"
+     ],
+     [
+      "getMasterSync",
+      "Get device master sync"
+     ],
+     [
+      "linkToLastTweaked",
+      "Link controller control to last tweked parameter"
+     ],
+     [
+      "getDeviceID",
+      "Get device hardware id"
+     ],
+     [
+      "flrMidiNote",
+      "send a midi note via FL Studio Remote scripting"
+     ],
+     [
+      "flrMidiCC",
+      "send a midi cc value via FL Studio Remote scripting"
+     ],
+     [
+      "releaseCC",
+      "allow a midi cc to be controlled by automation again"
+     ]
+    ],
+    "name_only": [],
+    "tail": [
+     "i|iiii"
+    ],
+    "marker_tok": 1073886
+   }
+  ],
+  "arrangement": [
+   {
+    "functions": [
+     [
+      "jumpToMarker",
+      "Jump to arrangement marker"
+     ],
+     [
+      "getMarkerName",
+      "Get marker name"
+     ],
+     [
+      "addAutoTimeMarker",
+      "Add audio time marker"
+     ],
+     [
+      "liveSelection",
+      "Live selection"
+     ],
+     [
+      "liveSelectionStart",
+      "Live selection start"
+     ],
+     [
+      "currentTime",
+      "Current time"
+     ],
+     [
+      "currentTimeHint",
+      "Current time hint"
+     ],
+     [
+      "selectionStart",
+      "Selection start"
+     ],
+     [
+      "selectionEnd",
+      "Selection end"
+     ],
+     [
+      "selectionIsActive",
+      "Selection active"
+     ],
+     [
+      "selectionClear",
+      "Clear selection"
+     ],
+     [
+      "selectionSet",
+      "Set selection start"
+     ]
+    ],
+    "name_only": [],
+    "tail": [
+     "i|i",
+     "éý\u0001",
+     "ÿÿÿÿÿÿÿÿ\u0001",
+     "i",
+     "is",
+     "ii",
+     "ii|ii",
+     "=",
+     "ii|iii"
+    ],
+    "marker_tok": 1073945
+   }
+  ],
+  "launchMapPages": [
+   {
+    "functions": [
+     [
+      "init",
+      "Init launchmap pages"
+     ],
+     [
+      "length",
+      "Get launchmap pages length"
+     ],
+     [
+      "updateMap",
+      "Update launchmap page"
+     ],
+     [
+      "getMapItemColor",
+      "Get launchmap item color"
+     ],
+     [
+      "getMapCount",
+      "Get launchmap items length"
+     ],
+     [
+      "getMapItemChannel",
+      "Get launchmap item destination channel"
+     ],
+     [
+      "getMapItemAftertouch",
+      "Get launchmap item aftertouch"
+     ],
+     [
+      "processMapItem",
+      "Process map item"
+     ],
+     [
+      "releaseMapItem",
+      "Release map item"
+     ],
+     [
+      "checkMapForHiddenItem",
+      "Check for launchpad hidden item"
+     ],
+     [
+      "createOverlayMap",
+      "Create overlay map"
+     ],
+     [
+      "setMapItemTarget",
+      "Set map item destination target"
+     ]
+    ],
+    "name_only": [],
+    "tail": [
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u000b",
+     "P",
+     "a",
+     "l",
+     "e",
+     "t",
+     "t",
+     "e",
+     ".",
+     "s",
+     "c",
+     "r",
+     "sii",
+     "éý\u0001",
+     "ÿÿÿÿÿÿÿÿ\u0001",
+     "i"
+    ],
+    "marker_tok": 1073979
+   }
+  ],
+  "screen": [
+   {
+    "functions": [
+     [
+      "init",
+      "Init screen object"
+     ],
+     [
+      "setup",
+      "Setup screen properties"
+     ],
+     [
+      "addTextLine",
+      "Add text line"
+     ],
+     [
+      "removeTextLine",
+      "Remove text line"
+     ],
+     [
+      "addMeter",
+      "Add meter"
+     ],
+     [
+      "fillRect",
+      "Fill rectangle"
+     ],
+     [
+      "drawRect",
+      "Draw rectangle"
+     ],
+     [
+      "deInit",
+      "Destroy screen object"
+     ],
+     [
+      "update",
+      "Update screen"
+     ],
+     [
+      "menuShowing",
+      "Return true when menu is showing"
+     ],
+     [
+      "hideMenu",
+      "Hide menu"
+     ],
+     [
+      "findTextLine",
+      "Find text line"
+     ],
+     [
+      "displayBar",
+      "Display bar"
+     ],
+     [
+      "displayText",
+      "Display text"
+     ],
+     [
+      "drawText",
+      "Draw text"
+     ],
+     [
+      "eraseRect",
+      "Erase rectangle"
+     ],
+     [
+      "displayTimedText",
+      "Display timed text"
+     ],
+     [
+      "animateText",
+      "Animate text"
+     ],
+     [
+      "blank",
+      "Blank"
+     ],
+     [
+      "unBlank",
+      "Unblank"
+     ],
+     [
+      "isBlanked",
+      "Is blanked"
+     ],
+     [
+      "isUnBlank",
+      "Is Unblank"
+     ],
+     [
+      "getScreenActiveCounter",
+      "Get screen active counter"
+     ],
+     [
+      "setScreenActiveCounter",
+      "Set screen active counter"
+     ],
+     [
+      "menuItemClick",
+      "Menu item click"
+     ],
+     [
+      "menuNext",
+      "Select next menu"
+     ],
+     [
+      "menuPrev",
+      "Select previous menu"
+     ],
+     [
+      "keepDisplayActive",
+      "Keep display active"
+     ]
+    ],
+    "name_only": [],
+    "tail": [],
+    "marker_tok": 1074058
+   }
+  ],
+  "ilmcp": [
+   {
+    "functions": [],
+    "name_only": [],
+    "tail": [
+     "sss|Op",
+     "ss",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\t",
+     ".",
+     "P",
+     "Y",
+     "S",
+     "C",
+     "R",
+     "I",
+     "P",
+     "T",
+     "éý\u0001",
+     "ÿÿÿÿÿÿÿÿ\u0001",
+     "s",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\n",
+     "t",
+     "e",
+     "m",
+     "p",
+     "s",
+     "c",
+     "r",
+     "i",
+     "p",
+     "t",
+     "|s",
+     "ð¿éý\u0001",
+     "ÿÿÿÿÿÿÿÿ\u0001",
+     "i",
+     "sp",
+     "éý\u0001",
+     "ÿÿÿÿÿÿÿÿ)",
+     "FullRecursive not allowed with empty name",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0001",
+     "/",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ+",
+     "C",
+     "o",
+     "u",
+     "l",
+     "d",
+     " ",
+     "n",
+     "o",
+     "t",
+     " ",
+     "f",
+     "i",
+     "n",
+     "d",
+     " ",
+     "b",
+     "r",
+     "o",
+     "w",
+     "s",
+     "e",
+     "r",
+     " ",
+     "t",
+     "r",
+     "e",
+     "e",
+     " ",
+     "n",
+     "o",
+     "d",
+     "e",
+     " ",
+     "w",
+     "i",
+     "t",
+     "h",
+     " ",
+     "n",
+     "a",
+     "m",
+     "e",
+     " ",
+     "sii",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0016",
+     "I",
+     "n",
+     "v",
+     "a",
+     "l",
+     "i",
+     "d",
+     " ",
+     "t",
+     "r",
+     "a",
+     "c",
+     "k",
+     " ",
+     "n",
+     "u",
+     "m",
+     "b",
+     "e",
+     "r",
+     ":",
+     " ",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0015",
+     "I",
+     "n",
+     "v",
+     "a",
+     "l",
+     "i",
+     "d",
+     " ",
+     "s",
+     "l",
+     "o",
+     "t",
+     " ",
+     "n",
+     "u",
+     "m",
+     "b",
+     "e",
+     "r",
+     ":",
+     " ",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u000f",
+     "(",
+     "d",
+     "e",
+     "l",
+     "e",
+     "t",
+     "e",
+     ")",
+     " ",
+     "e",
+     "f",
+     "f",
+     "e",
+     "c",
+     "t",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0004",
+     ".",
+     "f",
+     "s",
+     "t",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0014",
+     "r",
+     "e",
+     "m",
+     "o",
+     "v",
+     "e",
+     " ",
+     "e",
+     "f",
+     "f",
+     "e",
+     "c",
+     "t",
+     " ",
+     "p",
+     "l",
+     "u",
+     "g",
+     "i",
+     "n",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0014",
+     "i",
+     "n",
+     "s",
+     "e",
+     "r",
+     "t",
+     " ",
+     "e",
+     "f",
+     "f",
+     "e",
+     "c",
+     "t",
+     " ",
+     "p",
+     "l",
+     "u",
+     "g",
+     "i",
+     "n",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u000b",
+     "F",
+     "i",
+     "r",
+     "s",
+     "t",
+     "U",
+     "n",
+     "l",
+     "o",
+     "c",
+     "k",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0004",
+     "D",
+     "a",
+     "t",
+     "a",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ ",
+     "S",
+     "o",
+     "f",
+     "t",
+     "w",
+     "a",
+     "r",
+     "e",
+     "\\",
+     "I",
+     "m",
+     "a",
+     "g",
+     "e",
+     "-",
+     "L",
+     "i",
+     "n",
+     "e",
+     "\\",
+     "F",
+     "L",
+     " ",
+     "S",
+     "t",
+     "u",
+     "d",
+     "i",
+     "o",
+     " ",
+     "2",
+     "6",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u001a",
+     "S",
+     "o",
+     "f",
+     "t",
+     "w",
+     "a",
+     "r",
+     "e",
+     "\\",
+     "I",
+     "m",
+     "a",
+     "g",
+     "e",
+     "-",
+     "L",
+     "i",
+     "n",
+     "e",
+     "\\",
+     "S",
+     "h",
+     "a",
+     "r",
+     "e",
+     "d",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\n",
+     "L",
+     "a",
+     "s",
+     "t",
+     " ",
+     "s",
+     "t",
+     "a",
+     "r",
+     "t",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0007",
+     "G",
+     "e",
+     "n",
+     "e",
+     "r",
+     "a",
+     "l",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\n",
+     "S",
+     "t",
+     "a",
+     "r",
+     "t",
+     "C",
+     "o",
+     "u",
+     "n",
+     "t",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\n",
+     "A",
+     "c",
+     "t",
+     "i",
+     "v",
+     "e",
+     "D",
+     "a",
+     "y",
+     "s",
+     "éý\u0001",
+     "ÿÿÿÿÿÿÿÿ\u0003",
+     "%d.",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0004",
+     "D",
+     "a",
+     "y",
+     "s",
+     "Lí@°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0004",
+     "T",
+     "i",
+     "m",
+     "e",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0005",
+     "W",
+     "e",
+     "e",
+     "k",
+     "s",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0005",
+     "T",
+     "r",
+     "i",
+     "a",
+     "l",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0005",
+     "T",
+     "r",
+     "i",
+     "a",
+     "l",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0007",
+     "E",
+     "x",
+     "p",
+     "r",
+     "e",
+     "s",
+     "s",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u000e",
+     "F",
+     "r",
+     "u",
+     "i",
+     "t",
+     "y",
+     " ",
+     "E",
+     "d",
+     "i",
+     "t",
+     "i",
+     "o",
+     "n",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0010",
+     "P",
+     "r",
+     "o",
+     "d",
+     "u",
+     "c",
+     "e",
+     "r",
+     " ",
+     "E",
+     "d",
+     "i",
+     "t",
+     "i",
+     "o",
+     "n",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0003",
+     "X",
+     "X",
+     "L",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\b",
+     "3",
+     "1",
+     "0",
+     "2",
+     "0",
+     "A",
+     "L",
+     "L",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\b",
+     "3",
+     "1",
+     "0",
+     "3",
+     "5",
+     "A",
+     "L",
+     "L",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\b",
+     "3",
+     "1",
+     "0",
+     "3",
+     "6",
+     "A",
+     "L",
+     "L",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\b",
+     "3",
+     "1",
+     "0",
+     "3",
+     "7",
+     "A",
+     "L",
+     "L",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\b",
+     "3",
+     "1",
+     "0",
+     "3",
+     "9",
+     "A",
+     "L",
+     "L",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\b",
+     "3",
+     "1",
+     "0",
+     "4",
+     "0",
+     "A",
+     "L",
+     "L",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\b",
+     "3",
+     "1",
+     "0",
+     "8",
+     "3",
+     "A",
+     "L",
+     "L",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\b",
+     "3",
+     "1",
+     "0",
+     "8",
+     "4",
+     "A",
+     "L",
+     "L",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\b",
+     "3",
+     "1",
+     "0",
+     "8",
+     "7",
+     "A",
+     "L",
+     "L",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\r",
+     "T",
+     "r",
+     "i",
+     "a",
+     "l",
+     " ",
+     "v",
+     "e",
+     "r",
+     "s",
+     "i",
+     "o",
+     "n",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u000f",
+     "R",
+     "e",
+     "m",
+     "o",
+     "v",
+     "e",
+     " ",
+     "s",
+     "e",
+     "l",
+     "e",
+     "c",
+     "t",
+     "e",
+     "d",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0015",
+     "D",
+     "o",
+     "n",
+     "'",
+     "t",
+     " ",
+     "r",
+     "e",
+     "m",
+     "o",
+     "v",
+     "e",
+     " ",
+     "s",
+     "e",
+     "l",
+     "e",
+     "c",
+     "t",
+     "e",
+     "d",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0006",
+     "C",
+     "a",
+     "n",
+     "c",
+     "e",
+     "l",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0013",
+     "M",
+     "o",
+     "r",
+     "e",
+     " ",
+     "i",
+     "n",
+     "f",
+     "o",
+     "r",
+     "m",
+     "a",
+     "t",
+     "i",
+     "o",
+     "n",
+     ".",
+     ".",
+     ".",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\f",
+     "D",
+     "a",
+     "t",
+     "a",
+     "/",
+     "S",
+     "y",
+     "s",
+     "t",
+     "e",
+     "m",
+     "/",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u000f",
+     "(",
+     "d",
+     "e",
+     "l",
+     "e",
+     "t",
+     "e",
+     ")",
+     " ",
+     "e",
+     "f",
+     "f",
+     "e",
+     "c",
+     "t",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0004",
+     ".",
+     "f",
+     "s",
+     "t",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0010",
+     "(",
+     "d",
+     "e",
+     "l",
+     "e",
+     "t",
+     "e",
+     ")",
+     " ",
+     "c",
+     "h",
+     "a",
+     "n",
+     "n",
+     "e",
+     "l",
+     "ð¿°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ)",
+     "e",
+     "n",
+     "v",
+     "s",
+     "e",
+     "t",
+     "t",
+     "i",
+     "n",
+     "g",
+     "s",
+     "_",
+     "g",
+     "e",
+     "n",
+     "e",
+     "r",
+     "a",
+     "l",
+     ".",
+     "h",
+     "t",
+     "m",
+     "#",
+     "s",
+     "e",
+     "t",
+     "t",
+     "i",
+     "n",
+     "g",
+     "s",
+     "_",
+     "w",
+     "a",
+     "r",
+     "n",
+     "i",
+     "n",
+     "g",
+     "s",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0002",
+     " ",
+     "(",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0001",
+     ")",
+     "index",
+     "slotIndex",
+     "useGlobalIndex",
+     "index",
+     "slotIndex",
+     "userName",
+     "useGlobalIndex",
+     "index",
+     "slotIndex",
+     "useGlobalIndex",
+     "paramIndex",
+     "index",
+     "slotIndex"
+    ],
+    "marker_tok": 1074093
+   }
+  ],
+  "plugins": [
+   {
+    "functions": [
+     [
+      "isValid",
+      "Get plugin validity"
+     ],
+     [
+      "getPluginName",
+      "Get plugin name"
+     ],
+     [
+      "getParamCount",
+      "Get plugin parameter count"
+     ],
+     [
+      "getParamName",
+      "Get plugin parameter name"
+     ],
+     [
+      "getParamValue",
+      "Get plugin parameter value"
+     ],
+     [
+      "getParamValueString",
+      "Get plugin parameter value string"
+     ],
+     [
+      "setParamValue",
+      "Set plugin parameter value"
+     ],
+     [
+      "nextPreset",
+      "Select next plugin preset"
+     ],
+     [
+      "prevPreset",
+      "Select previous plugin preset"
+     ],
+     [
+      "getPresetCount",
+      "Get preset count"
+     ],
+     [
+      "getColor",
+      "Get plugin color"
+     ],
+     [
+      "getName",
+      "Get plugin name"
+     ],
+     [
+      "getPadInfo",
+      "Get plugin pad info"
+     ]
+    ],
+    "name_only": [],
+    "tail": [
+     "i|ii",
+     "i|iii",
+     "ii|ii",
+     "fii|iii",
+     "Ni|iiii",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0007",
+     "f",
+     "a",
+     "i",
+     "l",
+     "u",
+     "r",
+     "e",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0007",
+     "s",
+     "u",
+     "c",
+     "c",
+     "e",
+     "s",
+     "s",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0007",
+     "C",
+     "o",
+     "n",
+     "f",
+     "i",
+     "r",
+     "m",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0001",
+     "|",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u001a",
+     "T",
+     "h",
+     "e",
+     " ",
+     "l",
+     "i",
+     "c",
+     "e",
+     "n",
+     "s",
+     "e",
+     " ",
+     "w",
+     "a",
+     "s",
+     " ",
+     "i",
+     "n",
+     "s",
+     "t",
+     "a",
+     "l",
+     "l",
+     "e",
+     "d",
+     ".",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0001",
+     " ",
+     "éý\u0001",
+     "ÿÿÿÿÿÿÿÿ\t",
+     "FL Studio",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0014",
+     "%",
+     "s",
+     " ",
+     "w",
+     "i",
+     "l",
+     "l",
+     " ",
+     "n",
+     "o",
+     "w",
+     " ",
+     "r",
+     "e",
+     "s",
+     "t",
+     "a",
+     "r",
+     "t",
+     ".",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0002",
+     "\r",
+     "\n",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ/",
+     "D",
+     "o",
+     " ",
+     "y",
+     "o",
+     "u",
+     " ",
+     "w",
+     "a",
+     "n",
+     "t",
+     " ",
+     "t",
+     "o",
+     " ",
+     "s",
+     "a",
+     "v",
+     "e",
+     " ",
+     "y",
+     "o",
+     "u",
+     "r",
+     " ",
+     "c",
+     "u",
+     "r",
+     "r",
+     "e",
+     "n",
+     "t",
+     " ",
+     "p",
+     "r",
+     "o",
+     "j",
+     "e",
+     "c",
+     "t",
+     " ",
+     "f",
+     "i",
+     "r",
+     "s",
+     "t",
+     "?",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0010",
+     "S",
+     "a",
+     "v",
+     "e",
+     " ",
+     "a",
+     "n",
+     "d",
+     " ",
+     "r",
+     "e",
+     "s",
+     "t",
+     "a",
+     "r",
+     "t",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0016",
+     "R",
+     "e",
+     "s",
+     "t",
+     "a",
+     "r",
+     "t",
+     " ",
+     "w",
+     "i",
+     "t",
+     "h",
+     "o",
+     "u",
+     "t",
+     " ",
+     "s",
+     "a",
+     "v",
+     "i",
+     "n",
+     "g",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0011",
+     "D",
+     "o",
+     "n",
+     "'",
+     "t",
+     " ",
+     "r",
+     "e",
+     "s",
+     "t",
+     "a",
+     "r",
+     "t",
+     " ",
+     "n",
+     "o",
+     "w",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0007",
+     "R",
+     "e",
+     "s",
+     "t",
+     "a",
+     "r",
+     "t",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0013",
+     "y",
+     "o",
+     "u",
+     "r",
+     " ",
+     "e",
+     "-",
+     "m",
+     "a",
+     "i",
+     "l",
+     " ",
+     "a",
+     "d",
+     "d",
+     "r",
+     "e",
+     "s",
+     "s",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u001e",
+     "T",
+     "h",
+     "e",
+     " ",
+     "t",
+     "e",
+     "r",
+     "m",
+     "s",
+     " ",
+     "o",
+     "f",
+     " ",
+     "u",
+     "s",
+     "e",
+     " ",
+     "h",
+     "a",
+     "v",
+     "e",
+     " ",
+     "c",
+     "h",
+     "a",
+     "n",
+     "g",
+     "e",
+     "d",
+     ".",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0002",
+     "\r",
+     "\r",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ;",
+     "Y",
+     "o",
+     "u",
+     " ",
+     "h",
+     "a",
+     "v",
+     "e",
+     " ",
+     "t",
+     "o",
+     " ",
+     "a",
+     "c",
+     "c",
+     "e",
+     "p",
+     "t",
+     " ",
+     "t",
+     "h",
+     "e",
+     " ",
+     "n",
+     "e",
+     "w",
+     " ",
+     "t",
+     "e",
+     "r",
+     "m",
+     "s",
+     " ",
+     "t",
+     "o",
+     " ",
+     "d",
+     "o",
+     "w",
+     "n",
+     "l",
+     "o",
+     "a",
+     "d",
+     " ",
+     "a",
+     " ",
+     "n",
+     "e",
+     "w",
+     " ",
+     "l",
+     "i",
+     "c",
+     "e",
+     "n",
+     "s",
+     "e",
+     ".",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ>",
+     "Y",
+     "o",
+     "u",
+     "r",
+     " ",
+     "a",
+     "c",
+     "c",
+     "o",
+     "u",
+     "n",
+     "t",
+     " ",
+     "d",
+     "o",
+     "e",
+     "s",
+     "n",
+     "'",
+     "t",
+     " ",
+     "i",
+     "n",
+     "c",
+     "l",
+     "u",
+     "d",
+     "e",
+     " ",
+     "a",
+     " ",
+     "l",
+     "i",
+     "c",
+     "e",
+     "n",
+     "s",
+     "e",
+     " ",
+     "f",
+     "o",
+     "r",
+     " ",
+     "t",
+     "h",
+     "i",
+     "s",
+     " ",
+     "v",
+     "e",
+     "r",
+     "s",
+     "i",
+     "o",
+     "n",
+     " ",
+     "o",
+     "f",
+     " ",
+     "%",
+     "s",
+     ".",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0001",
+     "\r",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ&",
+     "P",
+     "l",
+     "e",
+     "a",
+     "s",
+     "e",
+     " ",
+     "p",
+     "u",
+     "r",
+     "c",
+     "h",
+     "a",
+     "s",
+     "e",
+     " ",
+     "L",
+     "i",
+     "f",
+     "e",
+     "t",
+     "i",
+     "m",
+     "e",
+     " ",
+     "f",
+     "r",
+     "e",
+     "e",
+     " ",
+     "u",
+     "p",
+     "d",
+     "a",
+     "t",
+     "e",
+     "s",
+     ".",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ.",
+     "Y",
+     "o",
+     "u",
+     "r",
+     " ",
+     "a",
+     "c",
+     "c",
+     "o",
+     "u",
+     "n",
+     "t",
+     " ",
+     "d",
+     "o",
+     "e",
+     "s",
+     "n",
+     "'",
+     "t",
+     " ",
+     "i",
+     "n",
+     "c",
+     "l",
+     "u",
+     "d",
+     "e",
+     " ",
+     "a",
+     " ",
+     "l",
+     "i",
+     "c",
+     "e",
+     "n",
+     "s",
+     "e",
+     " ",
+     "f",
+     "o",
+     "r",
+     " ",
+     "%",
+     "s",
+     "!",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0001",
+     "\tä",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u001d",
+     "F",
+     "a",
+     "i",
+     "l",
+     "e",
+     "d",
+     " ",
+     "t",
+     "o",
+     " ",
+     "u",
+     "n",
+     "l",
+     "o",
+     "c",
+     "k",
+     " ",
+     "t",
+     "h",
+     "e",
+     " ",
+     "p",
+     "r",
+     "o",
+     "g",
+     "r",
+     "a",
+     "m",
+     ".",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u0001",
+     "ÿä",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿi",
+     "P",
+     "l",
+     "e",
+     "a",
+     "s",
+     "e",
+     " ",
+     "m",
+     "a",
+     "k",
+     "e",
+     " ",
+     "s",
+     "u",
+     "r",
+     "e",
+     " ",
+     "y",
+     "o",
+     "u",
+     "r",
+     " ",
+     "e",
+     "-",
+     "m",
+     "a",
+     "i",
+     "l",
+     " ",
+     "a",
+     "d",
+     "d",
+     "r",
+     "e",
+     "s",
+     "s",
+     " ",
+     "a",
+     "n",
+     "d",
+     " ",
+     "p",
+     "a",
+     "s",
+     "s",
+     "w",
+     "o",
+     "r",
+     "d",
+     " ",
+     "a",
+     "r",
+     "e",
+     " ",
+     "c",
+     "o",
+     "r",
+     "r",
+     "e",
+     "c",
+     "t",
+     ".",
+     " ",
+     "C",
+     "l",
+     "i",
+     "c",
+     "k",
+     " ",
+     "t",
+     "h",
+     "e",
+     " ",
+     "e",
+     "y",
+     "e",
+     "-",
+     "i",
+     "c",
+     "o",
+     "n",
+     " ",
+     "t",
+     "o",
+     " ",
+     "c",
+     "h",
+     "e",
+     "c",
+     "k",
+     " ",
+     "y",
+     "o",
+     "u",
+     "r",
+     " ",
+     "p",
+     "a",
+     "s",
+     "s",
+     "w",
+     "o",
+     "r",
+     "d",
+     ".",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ\u001f",
+     "F",
+     "a",
+     "i",
+     "l",
+     "e",
+     "d",
+     " ",
+     "t",
+     "o",
+     " ",
+     "d",
+     "o",
+     "w",
+     "n",
+     "l",
+     "o",
+     "a",
+     "d",
+     " ",
+     "t",
+     "h",
+     "e",
+     " ",
+     "l",
+     "i",
+     "c",
+     "e",
+     "n",
+     "s",
+     "e",
+     ".",
+     "°\u0004\u0002",
+     "ÿÿÿÿÿÿÿÿ",
+     "P",
+     "l",
+     "e",
+     "a",
+     "s",
+     "e",
+     " ",
+     "c",
+     "h",
+     "e",
+     "c",
+     "k",
+     " ",
+     "y",
+     "o",
+     "u",
+     "r",
+     " ",
+     "i",
+     "n",
+     "t",
+     "e",
+     "r",
+     "n",
+     "e",
+     "t",
+     " ",
+     "c",
+     "o",
+     "n",
+     "n",
+     "e",
+     "c",
+     "t",
+     "i"
+    ],
+    "marker_tok": 1074860
+   }
+  ]
+ }
+}

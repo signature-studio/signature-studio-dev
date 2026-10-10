@@ -1,0 +1,8170 @@
+{
+ "fl_version": "26.1.7",
+ "python": "3.12.1",
+ "function_total": 435,
+ "function_counts": {
+  "playlist": 42,
+  "channels": 54,
+  "mixer": 75,
+  "patterns": 31,
+  "transport": 20,
+  "general": 30,
+  "ui": 72,
+  "device": 37,
+  "arrangement": 12,
+  "launchMapPages": 12,
+  "screen": 28,
+  "plugins": 13,
+  "ilmcp": 9
+ },
+ "modules": {
+  "playlist": {
+   "deselectAll": {
+    "doc": "Deselect all tracks",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getDisplayZone": {
+    "doc": "Get display zone number",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getLiveBlockColor": {
+    "doc": "Get live block color",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "blockNum",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getLiveBlockStatus": {
+    "doc": "Get live block status",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "blockNum",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "mode",
+       "type": "int",
+       "default": "midi.LB_Status_Default"
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getLiveLoopMode": {
+    "doc": "Get live loop mode",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getLivePosSnap": {
+    "doc": "Get live pos snap",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getLiveStatus": {
+    "doc": "Get live status",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "mode",
+       "type": "int",
+       "default": "midi.LB_Status_Default"
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getLiveTrigSnap": {
+    "doc": "Get live trig snap",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getLiveTriggerMode": {
+    "doc": "Get live trigger mode",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getPerformanceModeState": {
+    "doc": "Get performance mode state",
+    "sig": {
+     "params": [],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getSongStartTickPos": {
+    "doc": "Get song start tick position",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getTrackActivityLevel": {
+    "doc": "Get track activity level",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "float"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getTrackActivityLevelVis": {
+    "doc": "Get track visual activity level",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "float"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getTrackColor": {
+    "doc": "Get track color",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getTrackName": {
+    "doc": "Get track name",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "str"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "get_playlist_track_names"
+    ]
+   },
+   "getVisTimeBar": {
+    "doc": "Get time bar",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getVisTimeStep": {
+    "doc": "Get time step",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getVisTimeTick": {
+    "doc": "Get time tick",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "incLiveLoopMode": {
+    "doc": "Increase live loop mode",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "value",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "incLivePosSnap": {
+    "doc": "Increase live pos snap",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "value",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "incLiveTrigMode": {
+    "doc": "Increase live trig mode",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "value",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "incLiveTrigSnap": {
+    "doc": "Increase live trig snap",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "value",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "isTrackMuteLock": {
+    "doc": "Get track mute lock state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "isTrackMuted": {
+    "doc": "Get track mute state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "isTrackSelected": {
+    "doc": "Get track selected state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "isTrackSolo": {
+    "doc": "Get track solo state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "liveBlockNumToTime": {
+    "doc": "Live block number to time",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "liveDisplayZone": {
+    "doc": "Live display zone",
+    "sig": {
+     "params": [
+      {
+       "name": "left",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "top",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "right",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "bottom",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "duration",
+       "type": "int",
+       "default": "0"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "liveTimeToBlockNum": {
+    "doc": "Live time to block number",
+    "sig": {
+     "params": [
+      {
+       "name": "time",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "lockDisplayZone": {
+    "doc": "Lock display zone",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "value",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "muteTrack": {
+    "doc": "Toggle track mute state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "value",
+       "type": "int",
+       "default": "-1"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "muteTrackLock": {
+    "doc": "Toggle track mute lock state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "refreshLiveClips": {
+    "doc": "Refresh live clips",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "scrollTo": {
+    "doc": "Scroll to",
+    "sig": {
+     "params": [
+      {
+       "name": "a",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "b",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "c",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "d",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "selectAll": {
+    "doc": "Select all tracks",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "selectTool": {
+    "doc": "Select playlist tool",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "selectTrack": {
+    "doc": "Set track selected state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setTrackColor": {
+    "doc": "Set track color",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "color",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "set_playlist_tracks_colour"
+    ]
+   },
+   "setTrackName": {
+    "doc": "Set track name",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "name",
+       "type": "str",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "rename_playlist_tracks"
+    ]
+   },
+   "soloTrack": {
+    "doc": "Toggle track solo state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "value",
+       "type": "int",
+       "default": "-1"
+      },
+      {
+       "name": "inGroup",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "trackCount": {
+    "doc": "Get track count",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "get_playlist_track_names"
+    ]
+   },
+   "triggerLiveClip": {
+    "doc": "Trigger live clips",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "subNum",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "flags",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "velocity",
+       "type": "int",
+       "default": "-1"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   }
+  },
+  "channels": {
+   "channelCount": {
+    "doc": "Get channels count",
+    "sig": {
+     "params": [
+      {
+       "name": "globalCount",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "get_channel_volumes",
+     "get_plugin_parameter_list",
+     "get_plugin_parameter_value",
+     "get_session_context",
+     "list_channel_names",
+     "mute_channels",
+     "open_piano_roll_for_channel",
+     "remove_channels",
+     "rename_channels",
+     "route_channels_to_mixer",
+     "select_channels",
+     "set_channels_colour",
+     "set_channels_pan",
+     "set_channels_volume",
+     "set_channels_volume_db",
+     "set_plugin_parameter_value",
+     "set_step_sequencer_pattern",
+     "set_step_sequencer_step",
+     "solo_channels"
+    ]
+   },
+   "channelNumber": {
+    "doc": "Get channel number",
+    "sig": {
+     "params": [
+      {
+       "name": "canBeNone",
+       "type": "bool",
+       "default": "False"
+      },
+      {
+       "name": "offset",
+       "type": "int",
+       "default": "0"
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "closeGraphEditor": {
+    "doc": "Close graph editor",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "deselectAll": {
+    "doc": "Deselect all channels",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "open_piano_roll_for_channel"
+    ]
+   },
+   "fillEachNSteps": {
+    "doc": "Fill every N steps",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "focusEditor": {
+    "doc": "focus channel editor",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": false,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getActivityLevel": {
+    "doc": "Get channel activity level",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "float"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getChannelColor": {
+    "doc": "Get channel color",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getChannelIndex": {
+    "doc": "Get channel index",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getChannelMidiInPort": {
+    "doc": "Get channel midi in port",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getChannelName": {
+    "doc": "Get channel name",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "str"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "get_channel_volumes",
+     "get_plugin_parameter_list",
+     "get_plugin_parameter_value",
+     "get_session_context",
+     "list_channel_names",
+     "mute_channels",
+     "open_piano_roll_for_channel",
+     "remove_channels",
+     "rename_channels",
+     "route_channels_to_mixer",
+     "select_channels",
+     "set_channels_colour",
+     "set_channels_pan",
+     "set_channels_volume",
+     "set_channels_volume_db",
+     "set_plugin_parameter_value",
+     "set_step_sequencer_pattern",
+     "set_step_sequencer_step",
+     "solo_channels"
+    ]
+   },
+   "getChannelPan": {
+    "doc": "Get channel pan",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "float"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "get_session_context"
+    ]
+   },
+   "getChannelPitch": {
+    "doc": "Get channel pitch",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "mode",
+       "type": "int",
+       "default": "0"
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "'float | int'"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getChannelType": {
+    "doc": "get channel type",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getChannelVolume": {
+    "doc": "Get channel volume",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "mode",
+       "type": "bool",
+       "default": "False"
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "float"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "get_channel_volumes",
+     "get_session_context",
+     "set_channels_volume_db"
+    ]
+   },
+   "getCurrentStepParam": {
+    "doc": "Get current step param",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "step",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "param",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getGridBit": {
+    "doc": "Get channel grid bit",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "position",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getGridBitWithLoop": {
+    "doc": "Get grid bit with loop",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "position",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getRecEventId": {
+    "doc": "Get channel rec event id",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getStepParam": {
+    "doc": "Get step param",
+    "sig": {
+     "params": [
+      {
+       "name": "step",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "param",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "startPos",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "padsStride",
+       "type": "int",
+       "default": "16"
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getSwing": {
+    "doc": "Get swing ",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getTargetFxTrack": {
+    "doc": "Get channel target FX track",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "get_session_context"
+    ]
+   },
+   "incEventValue": {
+    "doc": "increase event value",
+    "sig": {
+     "params": [
+      {
+       "name": "eventId",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "step",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "res",
+       "type": "float",
+       "default": "1 / 24"
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "isChannelMuted": {
+    "doc": "Get channel mute state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "isChannelSelected": {
+    "doc": "Get channel selected state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "get_channel_volumes",
+     "get_plugin_parameter_list",
+     "get_plugin_parameter_value",
+     "mute_channels",
+     "open_piano_roll_for_channel",
+     "remove_channels",
+     "rename_channels",
+     "route_channels_to_mixer",
+     "select_channels",
+     "set_channels_colour",
+     "set_channels_pan",
+     "set_channels_volume",
+     "set_channels_volume_db",
+     "set_plugin_parameter_value",
+     "set_step_sequencer_pattern",
+     "set_step_sequencer_step",
+     "solo_channels"
+    ]
+   },
+   "isChannelSolo": {
+    "doc": "Get channel solo state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "isGraphEditorVisible": {
+    "doc": "Returns true if graph editor is visible",
+    "sig": {
+     "params": [],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "isGridBitAssigned": {
+    "doc": "Is grid bit assigned",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "isHighLighted": {
+    "doc": "Is higlight rectangle defined",
+    "sig": {
+     "params": [],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "midiNoteOn": {
+    "doc": "Set midi note on for channel",
+    "sig": {
+     "params": [
+      {
+       "name": "indexGlobal",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "note",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "velocity",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "channel",
+       "type": "int",
+       "default": "-1"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "muteChannel": {
+    "doc": "Toggle channel mute state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "value",
+       "type": "int",
+       "default": "-1"
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "mute_channels"
+    ]
+   },
+   "processRECEvent": {
+    "doc": "Process rec event",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "quickQuantize": {
+    "doc": "Perform quick quantize",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "startOnly",
+       "type": "int",
+       "default": "1"
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "quantize_channel"
+    ]
+   },
+   "rerollLoopStarterLoop": {
+    "doc": "Reroll LoopStarter audio loop (use index -1 for all loops)",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "rerollLoopStarterSample": {
+    "doc": "Reroll LoopStarter kit sample (use index -1 for all step channels)",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "rerollLoopStarterSteps": {
+    "doc": "Reroll LoopStarter steps (use index -1 for all step channels)",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "selectAll": {
+    "doc": "Select all channels",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "selectChannel": {
+    "doc": "Set channel selected state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "value",
+       "type": "int",
+       "default": "-1"
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "open_piano_roll_for_channel",
+     "select_channels"
+    ]
+   },
+   "selectOneChannel": {
+    "doc": "Select channel exclusively",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "selectedChannel": {
+    "doc": "Get selected channel number",
+    "sig": {
+     "params": [
+      {
+       "name": "canBeNone",
+       "type": "bool",
+       "default": "False"
+      },
+      {
+       "name": "offset",
+       "type": "int",
+       "default": "0"
+      },
+      {
+       "name": "indexGlobal",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setChannelColor": {
+    "doc": "Set channel color",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "color",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "set_channels_colour"
+    ]
+   },
+   "setChannelName": {
+    "doc": "Set channel name",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "name",
+       "type": "str",
+       "default": null
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "rename_channels"
+    ]
+   },
+   "setChannelPan": {
+    "doc": "Set channel pan",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "pan",
+       "type": "float",
+       "default": null
+      },
+      {
+       "name": "pickupMode",
+       "type": "int",
+       "default": "midi.PIM_None"
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "set_channels_pan"
+    ]
+   },
+   "setChannelPitch": {
+    "doc": "Set channel pitch",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "value",
+       "type": "float",
+       "default": null
+      },
+      {
+       "name": "mode",
+       "type": "int",
+       "default": "0"
+      },
+      {
+       "name": "pickupMode",
+       "type": "int",
+       "default": "midi.PIM_None"
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setChannelVolume": {
+    "doc": "Set channel volume",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "volume",
+       "type": "float",
+       "default": null
+      },
+      {
+       "name": "pickupMode",
+       "type": "int",
+       "default": "midi.PIM_None"
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "set_channels_volume",
+     "set_channels_volume_db"
+    ]
+   },
+   "setGridBit": {
+    "doc": "Set channel grid bit",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "position",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "value",
+       "type": "bool",
+       "default": null
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "set_step_sequencer_pattern",
+     "set_step_sequencer_step"
+    ]
+   },
+   "setStepParameterByIndex": {
+    "doc": "Set step parameter by index",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "patNum",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "step",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "param",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "value",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setSwing": {
+    "doc": "Set swing",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setTargetFxTrack": {
+    "doc": "Set channel target FX track",
+    "sig": {
+     "params": [
+      {
+       "name": "channelIndex",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "mixerIndex",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "route_channels_to_mixer"
+    ]
+   },
+   "showCSForm": {
+    "doc": "Show cs form",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "state",
+       "type": "int",
+       "default": "1"
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "showEditor": {
+    "doc": "focus channel editor",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "value",
+       "type": "int",
+       "default": "-1"
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "set_plugin_parameter_value"
+    ]
+   },
+   "showGraphEditor": {
+    "doc": "Show graph editor",
+    "sig": {
+     "params": [
+      {
+       "name": "temporary",
+       "type": "bool",
+       "default": null
+      },
+      {
+       "name": "param",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "step",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "True"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "soloChannel": {
+    "doc": "Toggle channel solo state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "solo_channels"
+    ]
+   },
+   "updateGraphEditor": {
+    "doc": "Update graph editor",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   }
+  },
+  "mixer": {
+   "afterRoutingChanged": {
+    "doc": "After routing changed",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "armTrack": {
+    "doc": "Toggle track armed state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "automateEvent": {
+    "doc": "Automate event",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "value",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "flags",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "speed",
+       "type": "int",
+       "default": "0"
+      },
+      {
+       "name": "isIncrement",
+       "type": "int",
+       "default": "0"
+      },
+      {
+       "name": "res",
+       "type": "float",
+       "default": "midi.EKRes"
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "deselectAll": {
+    "doc": "Deselect all tracks",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "enableTrack": {
+    "doc": "Toggle track enabled state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "enableTrackSlots": {
+    "doc": "Toggle track slots enabled state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "value",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "focusEditor": {
+    "doc": "focus mixer editor",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "plugIndex",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": null
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "set_plugin_parameter_value"
+    ]
+   },
+   "getActiveEffectIndex": {
+    "doc": "get Active Effect Index",
+    "sig": {
+     "params": [],
+     "returns": "tuple[int, int] | None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getAutoSmoothEventValue": {
+    "doc": "Get event ID value string",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "locked",
+       "type": "int",
+       "default": "1"
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": false,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getCurrentTempo": {
+    "doc": "Get current tempo",
+    "sig": {
+     "params": [
+      {
+       "name": "asInt",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "'int | float'"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "get_session_context",
+     "get_tempo"
+    ]
+   },
+   "getEqBandCount": {
+    "doc": "Get eq band count",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getEqBandwidth": {
+    "doc": "Get eq bandwidth",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "band",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "float"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getEqFrequency": {
+    "doc": "Get eq frequency",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "band",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "mode",
+       "type": "int",
+       "default": "0"
+      }
+     ],
+     "returns": "float"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getEqGain": {
+    "doc": "Get eq gain",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "band",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "mode",
+       "type": "int",
+       "default": "0"
+      }
+     ],
+     "returns": "float"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getEventIDName": {
+    "doc": "Get event ID name",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "shortname",
+       "type": "int",
+       "default": "0"
+      }
+     ],
+     "returns": "str"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getEventIDValueString": {
+    "doc": "Get event ID value string",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "value",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "str"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getEventValue": {
+    "doc": "Get event value from midi",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "value",
+       "type": "int",
+       "default": "midi.MaxInt"
+      },
+      {
+       "name": "smoothTarget",
+       "type": "int",
+       "default": "1"
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getLastPeakVol": {
+    "doc": "Get last peak vol",
+    "sig": {
+     "params": [
+      {
+       "name": "section",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "float"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getPluginMixLevel": {
+    "doc": "Get track plugin mix level",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getPluginMuteState": {
+    "doc": "Get track plugin mute state",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getRecPPS": {
+    "doc": "Get Rec pps",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getRouteSendActive": {
+    "doc": "Get route send state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "destIndex",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "get_mixer_routing",
+     "get_session_context",
+     "reset_mixer_routing",
+     "reset_mixer_tracks"
+    ]
+   },
+   "getRouteToLevel": {
+    "doc": "Get route to lebel",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "destIndex",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "float"
+    },
+    "new_vs_stubs": true,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "get_mixer_routing",
+     "get_session_context"
+    ]
+   },
+   "getSlotColor": {
+    "doc": "Get slot color",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "slot",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getSongStepPos": {
+    "doc": "Get song step position",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getSongTickPos": {
+    "doc": "Get sing tick pos",
+    "sig": {
+     "params": [
+      {
+       "name": "mode",
+       "type": "int",
+       "default": "midi.ST_Int"
+      }
+     ],
+     "returns": "'int | float'"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getTrackColor": {
+    "doc": "Get track color",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getTrackCount": {
+    "doc": "Get track count",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getTrackDockSide": {
+    "doc": "Get track dock",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getTrackInfo": {
+    "doc": "Get tracks info",
+    "sig": {
+     "params": [
+      {
+       "name": "mode",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getTrackName": {
+    "doc": "Get track name",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "str"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "add_effect",
+     "get_mixer_routing",
+     "get_mixer_tracks_volume",
+     "get_plugin_parameter_list",
+     "get_plugin_parameter_value",
+     "get_session_context",
+     "mute_mixer_tracks",
+     "remove_effect",
+     "rename_mixer_tracks",
+     "reset_mixer_routing",
+     "reset_mixer_tracks",
+     "route_channels_to_mixer",
+     "set_mixer_routing",
+     "set_mixer_tracks_colour",
+     "set_mixer_tracks_pan",
+     "set_mixer_tracks_volume_db",
+     "set_mixer_tracks_volume_percent",
+     "set_plugin_parameter_value",
+     "solo_mixer_tracks"
+    ]
+   },
+   "getTrackPan": {
+    "doc": "Get track pan",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "float"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "get_session_context"
+    ]
+   },
+   "getTrackPeaks": {
+    "doc": "Get track peaks",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "mode",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "float"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getTrackPluginId": {
+    "doc": "Get track plugin ID",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "plugIndex",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getTrackRecordingFileName": {
+    "doc": "Get track recording file name",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "str"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getTrackStereoSep": {
+    "doc": "Get track stereo separation",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "float"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getTrackVolume": {
+    "doc": "Get track volume",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "mode",
+       "type": "int",
+       "default": "0"
+      }
+     ],
+     "returns": "float"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "get_mixer_tracks_volume",
+     "get_session_context",
+     "set_channels_volume_db",
+     "set_mixer_tracks_volume_db"
+    ]
+   },
+   "isTrackArmed": {
+    "doc": "Get track armed state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "isTrackAutomationEnabled": {
+    "doc": "Get track autotimation state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "plugIndex",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "isTrackEnabled": {
+    "doc": "Get track enabled state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "isTrackMuteLock": {
+    "doc": "Get track mute lock state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "isTrackMuted": {
+    "doc": "Get track mute state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "isTrackPluginValid": {
+    "doc": "Get track plugin valid state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "plugIndex",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "isTrackRevPolarity": {
+    "doc": "Get track reversed polarity state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "isTrackSelected": {
+    "doc": "Get track selected state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "add_effect",
+     "get_mixer_tracks_volume",
+     "get_plugin_parameter_list",
+     "get_plugin_parameter_value",
+     "mute_mixer_tracks",
+     "remove_effect",
+     "rename_mixer_tracks",
+     "reset_mixer_routing",
+     "reset_mixer_tracks",
+     "route_channels_to_mixer",
+     "set_mixer_routing",
+     "set_mixer_tracks_colour",
+     "set_mixer_tracks_pan",
+     "set_mixer_tracks_volume_db",
+     "set_mixer_tracks_volume_percent",
+     "set_plugin_parameter_value",
+     "solo_mixer_tracks"
+    ]
+   },
+   "isTrackSlotsEnabled": {
+    "doc": "Get track slots enabled state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "isTrackSolo": {
+    "doc": "Get track solo state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "isTrackSwapChannels": {
+    "doc": "Get track swap channels state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "linkChannelToTrack": {
+    "doc": "Link channel to track",
+    "sig": {
+     "params": [
+      {
+       "name": "channel",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "track",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "select",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "linkTrackToChannel": {
+    "doc": "Link track to channel",
+    "sig": {
+     "params": [
+      {
+       "name": "mode",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "muteTrack": {
+    "doc": "Toggle track mute state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "value",
+       "type": "int",
+       "default": "-1"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "mute_mixer_tracks"
+    ]
+   },
+   "remoteFindEventValue": {
+    "doc": "Remote find event value",
+    "sig": {
+     "params": [],
+     "returns": "float"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "revTrackPolarity": {
+    "doc": "Toggle track reverssed polarity state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "value",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "selectAll": {
+    "doc": "Select all tracks",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "selectTrack": {
+    "doc": "Set track selected state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setActiveTrack": {
+    "doc": "Set active track",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": null
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setCurrentTempo": {
+    "doc": "Set current tempo",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "set_tempo"
+    ]
+   },
+   "setEqBandwidth": {
+    "doc": "Set eq bandwidth",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "band",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "value",
+       "type": "float",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setEqFrequency": {
+    "doc": "Set eq frequency",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "band",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "value",
+       "type": "float",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setEqGain": {
+    "doc": "Set eq gain",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "band",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "value",
+       "type": "float",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setPluginMixLevel": {
+    "doc": "Set track plugin mix level",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setPluginMuteState": {
+    "doc": "Set track plugin mute state",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setRouteTo": {
+    "doc": "Set route to",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "destIndex",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "value",
+       "type": "bool",
+       "default": null
+      },
+      {
+       "name": "updateUI",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "reset_mixer_routing",
+     "reset_mixer_tracks",
+     "set_mixer_routing"
+    ]
+   },
+   "setRouteToLevel": {
+    "doc": "Set route to lebel",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "destIndex",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "level",
+       "type": "float",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": true,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "reset_mixer_routing",
+     "reset_mixer_tracks",
+     "set_mixer_routing"
+    ]
+   },
+   "setSlotColor": {
+    "doc": "Set slot color",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "slot",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "color",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setTrackColor": {
+    "doc": "Set track color",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "color",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "reset_mixer_tracks",
+     "set_mixer_tracks_colour"
+    ]
+   },
+   "setTrackName": {
+    "doc": "Set track name",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "name",
+       "type": "str",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "rename_mixer_tracks",
+     "reset_mixer_tracks"
+    ]
+   },
+   "setTrackNumber": {
+    "doc": "Set track number",
+    "sig": {
+     "params": [
+      {
+       "name": "trackNumber",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "flags",
+       "type": "int",
+       "default": "0"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setTrackPan": {
+    "doc": "Set track pan",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "pan",
+       "type": "float",
+       "default": null
+      },
+      {
+       "name": "pickupMode",
+       "type": "int",
+       "default": "midi.PIM_None"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "reset_mixer_tracks",
+     "set_mixer_tracks_pan"
+    ]
+   },
+   "setTrackStereoSep": {
+    "doc": "Set track setereo separation",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "pan",
+       "type": "float",
+       "default": null
+      },
+      {
+       "name": "pickupMode",
+       "type": "int",
+       "default": "midi.PIM_None"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setTrackVolume": {
+    "doc": "Ser track volume",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "volume",
+       "type": "float",
+       "default": null
+      },
+      {
+       "name": "pickupMode",
+       "type": "int",
+       "default": "midi.PIM_None"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "reset_mixer_tracks",
+     "set_mixer_tracks_volume_db",
+     "set_mixer_tracks_volume_percent"
+    ]
+   },
+   "soloTrack": {
+    "doc": "Toggle track solo state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "value",
+       "type": "int",
+       "default": "-1"
+      },
+      {
+       "name": "mode",
+       "type": "int",
+       "default": "-1"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "solo_mixer_tracks"
+    ]
+   },
+   "swapTrackChannels": {
+    "doc": "Toggle track swap channels state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "value",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "trackCount": {
+    "doc": "Get tracks count",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "add_effect",
+     "get_mixer_routing",
+     "get_mixer_tracks_volume",
+     "get_plugin_parameter_list",
+     "get_plugin_parameter_value",
+     "get_session_context",
+     "mute_mixer_tracks",
+     "remove_effect",
+     "rename_mixer_tracks",
+     "reset_mixer_routing",
+     "reset_mixer_tracks",
+     "route_channels_to_mixer",
+     "set_mixer_routing",
+     "set_mixer_tracks_colour",
+     "set_mixer_tracks_pan",
+     "set_mixer_tracks_volume_db",
+     "set_mixer_tracks_volume_percent",
+     "set_plugin_parameter_value",
+     "solo_mixer_tracks"
+    ]
+   },
+   "trackNumber": {
+    "doc": "Get track number",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": false,
+    "arm64_same": true,
+    "mcp_tools": []
+   }
+  },
+  "patterns": {
+   "burnLoop": {
+    "doc": "Burn loop",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "storeUndo",
+       "type": "int",
+       "default": "1"
+      },
+      {
+       "name": "updateUi",
+       "type": "int",
+       "default": "1"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "clearPattern": {
+    "doc": "Clear pattern",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "clonePattern": {
+    "doc": "Clone pattern",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int | None",
+       "default": "None"
+      }
+     ],
+     "returns": null
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "deselectAll": {
+    "doc": "Deselect all patterns",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "duplicatePatternData": {
+    "doc": "Duplicate pattern data",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "ensureValidNoteRecord": {
+    "doc": "Ensure Valid Note Record",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "findFirstNextEmptyPat": {
+    "doc": "Find first next empty pattern",
+    "sig": {
+     "params": [
+      {
+       "name": "flags",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "x",
+       "type": "int",
+       "default": "-1"
+      },
+      {
+       "name": "y",
+       "type": "int",
+       "default": "-1"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getActivePatternGroup": {
+    "doc": "Get active pattern group",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getBlockSetStatus": {
+    "doc": "Get block set status",
+    "sig": {
+     "params": [
+      {
+       "name": "left",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "top",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "right",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "bottom",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getChannelLoopStyle": {
+    "doc": "Get channel loop style",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getPatternColor": {
+    "doc": "Get pattern color",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getPatternGroupCount": {
+    "doc": "Get pattern group count",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getPatternGroupName": {
+    "doc": "Get pattern group name",
+    "sig": {
+     "params": [],
+     "returns": "str"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getPatternLength": {
+    "doc": "Get pattern length",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getPatternName": {
+    "doc": "Get pattern name",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "str"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getPatternsInGroup": {
+    "doc": "Get patterns in group",
+    "sig": {
+     "params": [],
+     "returns": "tuple[int, ...]"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "incrementPatternLength": {
+    "doc": "Increment pattern length",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "isPatternDefault": {
+    "doc": "Get pattern default state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "isPatternSelected": {
+    "doc": "Get pattern selected state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "jumpToPattern": {
+    "doc": "Jump to pattern",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "movePattern": {
+    "doc": "Move pattern",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "patternCount": {
+    "doc": "Get patterns count",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "patternMax": {
+    "doc": "Get max pattern id",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "patternNumber": {
+    "doc": "Get current pattern number",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "selectAll": {
+    "doc": "Select all patterns",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "selectPattern": {
+    "doc": "Select pattern",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "value",
+       "type": "int",
+       "default": "-1"
+      },
+      {
+       "name": "preview",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setChannelLoop": {
+    "doc": "Set channel loop",
+    "sig": {
+     "params": [],
+     "returns": "str"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setLoopStarterRootNote": {
+    "doc": "Set the root note of Loopstarter, when its enabled",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setPatternColor": {
+    "doc": "Set pattern color",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "color",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setPatternLength": {
+    "doc": "Set pattern length",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setPatternName": {
+    "doc": "Set pattern name",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "name",
+       "type": "str",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   }
+  },
+  "transport": {
+   "continuousMove": {
+    "doc": "Continuous move",
+    "sig": {
+     "params": [
+      {
+       "name": "speed",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "startStop",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "continuousMovePos": {
+    "doc": "Continuous move pos",
+    "sig": {
+     "params": [
+      {
+       "name": "speed",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "startStop",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "fastForward": {
+    "doc": "Fast forward song pos",
+    "sig": {
+     "params": [
+      {
+       "name": "startStop",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "flags",
+       "type": "int",
+       "default": "midi.GT_All"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getHWBeatLEDState": {
+    "doc": "get HWBeatLEDState",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getLoopMode": {
+    "doc": "Get loop mode",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getSongLength": {
+    "doc": "Get song length",
+    "sig": {
+     "params": [
+      {
+       "name": "mode",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getSongPos": {
+    "doc": "Get song position",
+    "sig": {
+     "params": [
+      {
+       "name": "mode",
+       "type": "int",
+       "default": "-1"
+      }
+     ],
+     "returns": "'float | int'"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getSongPosHint": {
+    "doc": "Get song position hint",
+    "sig": {
+     "params": [],
+     "returns": "str"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "globalTransport": {
+    "doc": "Global transport",
+    "sig": {
+     "params": [
+      {
+       "name": "command",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "value",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "pmeflags",
+       "type": "int",
+       "default": "midi.PME_System"
+      },
+      {
+       "name": "flags",
+       "type": null,
+       "default": "midi.GT_All"
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "isPlaying": {
+    "doc": "Returns if the program is playing or stopped",
+    "sig": {
+     "params": [],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "isRecording": {
+    "doc": "Get recording state",
+    "sig": {
+     "params": [],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "markerJumpJog": {
+    "doc": "Jog marker jump",
+    "sig": {
+     "params": [
+      {
+       "name": "value",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "flags",
+       "type": "int",
+       "default": "midi.GT_All"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "markerSelJog": {
+    "doc": "Jog marker selection",
+    "sig": {
+     "params": [
+      {
+       "name": "value",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "flags",
+       "type": "int",
+       "default": "midi.GT_All"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "record": {
+    "doc": "Start recording",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "rewind": {
+    "doc": "Rewind song",
+    "sig": {
+     "params": [
+      {
+       "name": "startStop",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "flags",
+       "type": "int",
+       "default": "midi.GT_All"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setLoopMode": {
+    "doc": "Set loop mode",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setPlaybackSpeed": {
+    "doc": "Set playback speed",
+    "sig": {
+     "params": [
+      {
+       "name": "speedMultiplier",
+       "type": "float",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setSongPos": {
+    "doc": "Set song position",
+    "sig": {
+     "params": [
+      {
+       "name": "position",
+       "type": "'float | int'",
+       "default": null
+      },
+      {
+       "name": "mode",
+       "type": "int",
+       "default": "-1"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "start": {
+    "doc": "Start playback",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "play"
+    ]
+   },
+   "stop": {
+    "doc": "Stop playback",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "stop"
+    ]
+   }
+  },
+  "general": {
+   "clearLog": {
+    "doc": "Clear log",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "dumpScoreLog": {
+    "doc": "Dump score log",
+    "sig": {
+     "params": [
+      {
+       "name": "time",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "silent",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getChangedFlag": {
+    "doc": "Get changed flag ",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getPrecount": {
+    "doc": "Get precounr",
+    "sig": {
+     "params": [],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getProjectAuthor": {
+    "doc": "Get project author",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getProjectGenre": {
+    "doc": "Get project genre",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getProjectTitle": {
+    "doc": "Get project title",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getRecPPB": {
+    "doc": "Get rec ppb",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getRecPPQ": {
+    "doc": "Get rec ppq",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getUndoHistoryCount": {
+    "doc": "Get undo history count",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getUndoHistoryLast": {
+    "doc": "Get undo history last",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getUndoHistoryPos": {
+    "doc": "Get undo history position",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getUndoLevelHint": {
+    "doc": "Get undo level",
+    "sig": {
+     "params": [],
+     "returns": "str"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getUseMetronome": {
+    "doc": "Get use metronome",
+    "sig": {
+     "params": [],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getVersion": {
+    "doc": "Get Midi scripting version",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "processRECEvent": {
+    "doc": "Process rec event",
+    "sig": {
+     "params": [
+      {
+       "name": "eventId",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "value",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "flags",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "restoreUndo": {
+    "doc": "Restore undo",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "restoreUndoLevel": {
+    "doc": "Restore undo by level",
+    "sig": {
+     "params": [
+      {
+       "name": "level",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "safeToEdit": {
+    "doc": "Safe to edit stuff",
+    "sig": {
+     "params": [],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "saveUndo": {
+    "doc": "Save undo",
+    "sig": {
+     "params": [
+      {
+       "name": "undoName",
+       "type": "str",
+       "default": null
+      },
+      {
+       "name": "flags",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "update",
+       "type": "bool",
+       "default": "True"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setDenominator": {
+    "doc": "Set denominator",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setNumerator": {
+    "doc": "Set numerator",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setRecPPQ": {
+    "doc": "Set rec ppq",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setUndoHistoryCount": {
+    "doc": "Set undo history count",
+    "sig": {
+     "params": [
+      {
+       "name": "value",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setUndoHistoryLast": {
+    "doc": "Set undo history last",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setUndoHistoryPos": {
+    "doc": "Set undo history position",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "undo": {
+    "doc": "Undo/redo last, or move down in undo history",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": false,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "undoDown": {
+    "doc": "Move down in undo history ",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "undoUp": {
+    "doc": "Move up in undo history ",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "undoUpDown": {
+    "doc": "Move up and down in undo history",
+    "sig": {
+     "params": [
+      {
+       "name": "value",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   }
+  },
+  "ui": {
+   "closeActivePopupMenu": {
+    "doc": "Close active popup menu",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "closeAllMenu": {
+    "doc": "Close all menu",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "copy": {
+    "doc": "",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": null,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "crDisplayRect": {
+    "doc": "Display selection rectangle in channel rack",
+    "sig": {
+     "params": [
+      {
+       "name": "left",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "top",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "right",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "bottom",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "duration",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "flags",
+       "type": "int",
+       "default": "0"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "cut": {
+    "doc": "",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": null,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "delete": {
+    "doc": "",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": null,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "down": {
+    "doc": "",
+    "sig": {
+     "params": [
+      {
+       "name": "value",
+       "type": "int",
+       "default": "1"
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": null,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "enter": {
+    "doc": "",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": null,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "escape": {
+    "doc": "",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": null,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getFocused": {
+    "doc": "Get form focus state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getFocusedFormCaption": {
+    "doc": "Get focused form caption",
+    "sig": {
+     "params": [],
+     "returns": "str"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getFocusedFormID": {
+    "doc": "Get focused form ID",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getFocusedNodeCaption": {
+    "doc": "Get focused node caption",
+    "sig": {
+     "params": [],
+     "returns": "str"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getFocusedNodeFileType": {
+    "doc": "Get focused node file type",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getFocusedPluginName": {
+    "doc": "Get focused plugin name",
+    "sig": {
+     "params": [],
+     "returns": "str"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getHintMsg": {
+    "doc": "Get FL Studio hint",
+    "sig": {
+     "params": [],
+     "returns": "str"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getHintValue": {
+    "doc": "Get hint value",
+    "sig": {
+     "params": [
+      {
+       "name": "value",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "max",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "str"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getProgTitle": {
+    "doc": "Get FL Studio title",
+    "sig": {
+     "params": [],
+     "returns": "str"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getSnapMode": {
+    "doc": "",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": null,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getStepEditMode": {
+    "doc": "Get step edit mode",
+    "sig": {
+     "params": [],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getTimeDispMin": {
+    "doc": "Is time time display set to minutes",
+    "sig": {
+     "params": [],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getVersion": {
+    "doc": "Get FL Studio version as string",
+    "sig": {
+     "params": [
+      {
+       "name": "mode",
+       "type": "int",
+       "default": "4"
+      }
+     ],
+     "returns": "'str | int'"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getVisible": {
+    "doc": "Get form visible state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "open_piano_roll_for_channel"
+    ]
+   },
+   "hideWindow": {
+    "doc": "Hide window",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "open_piano_roll_for_channel",
+     "show_or_hide_window"
+    ]
+   },
+   "horZoom": {
+    "doc": "",
+    "sig": {
+     "params": [
+      {
+       "name": "value",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": null,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "insert": {
+    "doc": "",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": null,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "isBrowserAutoHide": {
+    "doc": "Get browser auto hide state",
+    "sig": {
+     "params": [],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "isClosing": {
+    "doc": "Get closing state",
+    "sig": {
+     "params": [],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "isInPopupMenu": {
+    "doc": "Is in popup menu",
+    "sig": {
+     "params": [],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "isLoopRecEnabled": {
+    "doc": "Is loop recording enabled",
+    "sig": {
+     "params": [],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "isMetronomeEnabled": {
+    "doc": "Is metronome enabled",
+    "sig": {
+     "params": [],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "isPrecountEnabled": {
+    "doc": "Is precount enabled",
+    "sig": {
+     "params": [],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "isStartOnInputEnabled": {
+    "doc": "Is start on input enabled",
+    "sig": {
+     "params": [],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "jog": {
+    "doc": "",
+    "sig": {
+     "params": [
+      {
+       "name": "value",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": null,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "jog2": {
+    "doc": "",
+    "sig": {
+     "params": [
+      {
+       "name": "value",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": null,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "launchAudioEditor": {
+    "doc": "Launch audio editor",
+    "sig": {
+     "params": [
+      {
+       "name": "reuse",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "filename",
+       "type": "str",
+       "default": null
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "preset",
+       "type": "str",
+       "default": null
+      },
+      {
+       "name": "presetGUID",
+       "type": "str",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "left": {
+    "doc": "",
+    "sig": {
+     "params": [
+      {
+       "name": "value",
+       "type": "int",
+       "default": "1"
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": null,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "miDisplayDockRect": {
+    "doc": "Display selection rectangle in mixer dock",
+    "sig": {
+     "params": [
+      {
+       "name": "start",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "length",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "dock_side",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "time",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "miDisplayRect": {
+    "doc": "Display selection rectangle in mixer",
+    "sig": {
+     "params": [
+      {
+       "name": "start",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "end",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "duration",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "flags",
+       "type": "int",
+       "default": "0"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "moveJog": {
+    "doc": "",
+    "sig": {
+     "params": [
+      {
+       "name": "value",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": null,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "navigateBrowser": {
+    "doc": "Navigate browser",
+    "sig": {
+     "params": [
+      {
+       "name": "direction",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "shiftHeld",
+       "type": "bool",
+       "default": null
+      }
+     ],
+     "returns": "str"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "navigateBrowserMenu": {
+    "doc": "Navigate browser menu",
+    "sig": {
+     "params": [
+      {
+       "name": "direction",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "shiftHeld",
+       "type": "bool",
+       "default": null
+      }
+     ],
+     "returns": "str"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "navigateBrowserTabs": {
+    "doc": "Navigate browser tabs",
+    "sig": {
+     "params": [
+      {
+       "name": "direction",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "str"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "next": {
+    "doc": "",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": null,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "nextWindow": {
+    "doc": "Next window",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "no": {
+    "doc": "",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": null,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "openEventEditor": {
+    "doc": "Open event editor",
+    "sig": {
+     "params": [
+      {
+       "name": "eventId",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "mode",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "newWindow",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "paste": {
+    "doc": "",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": null,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "previewBrowserMenuItem": {
+    "doc": "Preview browser menu item",
+    "sig": {
+     "params": [],
+     "returns": null
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "previous": {
+    "doc": "",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": null,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "right": {
+    "doc": "",
+    "sig": {
+     "params": [
+      {
+       "name": "value",
+       "type": "int",
+       "default": "1"
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": null,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "scrollWindow": {
+    "doc": "Scroll window",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "value",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "directionFlag",
+       "type": "int",
+       "default": "0"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "selectBrowserMenuItem": {
+    "doc": "Select browser menu item",
+    "sig": {
+     "params": [],
+     "returns": null
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "selectWindow": {
+    "doc": "Select window",
+    "sig": {
+     "params": [
+      {
+       "name": "shift",
+       "type": "bool",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setBrowserAutoHide": {
+    "doc": "Set browser auto hide state",
+    "sig": {
+     "params": [
+      {
+       "name": "value",
+       "type": "bool",
+       "default": null
+      }
+     ],
+     "returns": null
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setFocused": {
+    "doc": "Set form focus state",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setHintMsg": {
+    "doc": "Set FL Studio hint",
+    "sig": {
+     "params": [
+      {
+       "name": "msg",
+       "type": "str",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setSnapMode": {
+    "doc": "",
+    "sig": {
+     "params": [
+      {
+       "name": "value",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": null,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setStepEditMode": {
+    "doc": "Set step edit mode",
+    "sig": {
+     "params": [
+      {
+       "name": "newValue",
+       "type": "bool",
+       "default": null
+      }
+     ],
+     "returns": null
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setTimeDispMin": {
+    "doc": "Is time time display set to minutes",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": false,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "showNotification": {
+    "doc": "Show FL Studio notification",
+    "sig": {
+     "params": [
+      {
+       "name": "notificationId",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": null
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "showPicker": {
+    "doc": "Show picker panel",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "showWindow": {
+    "doc": "Show window",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "open_piano_roll_for_channel",
+     "run_piano_roll_script",
+     "show_or_hide_window"
+    ]
+   },
+   "snapMode": {
+    "doc": "",
+    "sig": {
+     "params": [
+      {
+       "name": "value",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": null,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "snapOnOff": {
+    "doc": "",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": null,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "strip": {
+    "doc": "",
+    "sig": {
+     "params": [
+      {
+       "name": "value",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": null,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "stripHold": {
+    "doc": "",
+    "sig": {
+     "params": [
+      {
+       "name": "value",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": null,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "stripJog": {
+    "doc": "",
+    "sig": {
+     "params": [
+      {
+       "name": "value",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": null,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "toggleBrowserNode": {
+    "doc": "Toggle browser node",
+    "sig": {
+     "params": [
+      {
+       "name": "value",
+       "type": "int",
+       "default": "-1"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "up": {
+    "doc": "",
+    "sig": {
+     "params": [
+      {
+       "name": "value",
+       "type": "int",
+       "default": "1"
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": null,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "verZoom": {
+    "doc": "",
+    "sig": {
+     "params": [
+      {
+       "name": "value",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": null,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "yes": {
+    "doc": "",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": null,
+    "arm64_same": true,
+    "mcp_tools": []
+   }
+  },
+  "device": {
+   "baseTrackSelect": {
+    "doc": "Base track select",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "step",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "createRefreshThread": {
+    "doc": "Create refresh thread",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "destroyRefreshThread": {
+    "doc": "Destroy refresh thread",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "directFeedback": {
+    "doc": "Send out generic midi message",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": false,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "dispatch": {
+    "doc": "Dispatch midi message",
+    "sig": {
+     "params": [
+      {
+       "name": "ctrlIndex",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "message",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "sysex",
+       "type": "bytes | None",
+       "default": "None"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "dispatchGetReceiverPortNumber": {
+    "doc": "Get receiver port number",
+    "sig": {
+     "params": [
+      {
+       "name": "ctrlIndex",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "dispatchReceiverCount": {
+    "doc": "Get dispatch midi message receiver count",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "findEventID": {
+    "doc": "Find event id",
+    "sig": {
+     "params": [
+      {
+       "name": "controlId",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "flags",
+       "type": "int",
+       "default": "0"
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "flrMidiCC": {
+    "doc": "send a midi cc value via FL Studio Remote scripting",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "flrMidiNote": {
+    "doc": "send a midi note via FL Studio Remote scripting",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "forwardMIDICC": {
+    "doc": "Send  generic midi message to active plugin",
+    "sig": {
+     "params": [
+      {
+       "name": "message",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "mode",
+       "type": "int",
+       "default": "1"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "fullRefresh": {
+    "doc": "Perform full refresh",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getDeviceID": {
+    "doc": "Get device hardware id",
+    "sig": {
+     "params": [],
+     "returns": "bytes"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getIdleElapsed": {
+    "doc": "Get idle elapsed",
+    "sig": {
+     "params": [],
+     "returns": "float"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getLinkedChannel": {
+    "doc": "Get channel value of linked control back or -1 if not linked",
+    "sig": {
+     "params": [
+      {
+       "name": "eventId",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getLinkedInfo": {
+    "doc": "Get linked control info back or -1 if not linked",
+    "sig": {
+     "params": [
+      {
+       "name": "eventID",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getLinkedParamName": {
+    "doc": "Get string value of linked control back or error if not linked",
+    "sig": {
+     "params": [
+      {
+       "name": "eventID",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "str"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": false,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getLinkedValue": {
+    "doc": "Get normalized value of linked control back or -1 if not linked",
+    "sig": {
+     "params": [
+      {
+       "name": "eventID",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "float"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getLinkedValueString": {
+    "doc": "Get string value of linked control back or error if not linked",
+    "sig": {
+     "params": [
+      {
+       "name": "eventID",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "str"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getMasterSync": {
+    "doc": "Get device master sync",
+    "sig": {
+     "params": [],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getName": {
+    "doc": "Get device name",
+    "sig": {
+     "params": [],
+     "returns": "str"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getPortNumber": {
+    "doc": "Is device assigned",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": false,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "hardwareRefreshMixerTrack": {
+    "doc": "Hardware refresh mixer track",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "isAssigned": {
+    "doc": "Is device assigned",
+    "sig": {
+     "params": [],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "isDoubleClick": {
+    "doc": "Double-clicking handling for MIDI",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "isMidiOutAssigned": {
+    "doc": "Is device midi out assigned",
+    "sig": {
+     "params": [],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "linkToLastTweaked": {
+    "doc": "Link controller control to last tweked parameter",
+    "sig": {
+     "params": [
+      {
+       "name": "controlIndex",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "channel",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "global_link",
+       "type": "bool",
+       "default": "False"
+      },
+      {
+       "name": "eventId",
+       "type": "int",
+       "default": "midi.REC_None"
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "midiOutMsg": {
+    "doc": "Send out midi message",
+    "sig": {
+     "params": [
+      {
+       "name": "message",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "channel",
+       "type": "int",
+       "default": "-1"
+      },
+      {
+       "name": "data1",
+       "type": "int",
+       "default": "-1"
+      },
+      {
+       "name": "data2",
+       "type": "int",
+       "default": "-1"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "midiOutNewMsg": {
+    "doc": "Send out new midi message",
+    "sig": {
+     "params": [
+      {
+       "name": "slotIndex",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "message",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "midiOutSysex": {
+    "doc": "Send midi out sysex",
+    "sig": {
+     "params": [
+      {
+       "name": "message",
+       "type": "bytes",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "processMIDICC": {
+    "doc": "Send out generic midi message",
+    "sig": {
+     "params": [
+      {
+       "name": "eventData",
+       "type": "FlMidiMsg",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": false,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "releaseCC": {
+    "doc": "allow a midi cc to be controlled by automation again",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "repeatMidiEvent": {
+    "doc": "Repeat midi event",
+    "sig": {
+     "params": [
+      {
+       "name": "eventData",
+       "type": "FlMidiMsg",
+       "default": null
+      },
+      {
+       "name": "delay",
+       "type": "int",
+       "default": "300"
+      },
+      {
+       "name": "rate",
+       "type": "int",
+       "default": "300"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "sendMsgGeneric": {
+    "doc": "Send out generic midi message",
+    "sig": {
+     "params": [],
+     "returns": "str"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setHasMeters": {
+    "doc": "Set has meters",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setMasterSync": {
+    "doc": "Set device master sync",
+    "sig": {
+     "params": [
+      {
+       "name": "value",
+       "type": "bool",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "stopRepeatMidiEvent": {
+    "doc": "stop repeat midi event",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   }
+  },
+  "arrangement": {
+   "addAutoTimeMarker": {
+    "doc": "Add audio time marker",
+    "sig": {
+     "params": [
+      {
+       "name": "time",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "name",
+       "type": "str",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "currentTime": {
+    "doc": "Current time",
+    "sig": {
+     "params": [
+      {
+       "name": "snap",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "currentTimeHint": {
+    "doc": "Current time hint",
+    "sig": {
+     "params": [
+      {
+       "name": "mode",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "time",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "setRecPPB",
+       "type": "int",
+       "default": "0"
+      },
+      {
+       "name": "isLength",
+       "type": "int",
+       "default": "0"
+      }
+     ],
+     "returns": "str"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getMarkerName": {
+    "doc": "Get marker name",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "str"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "jumpToMarker": {
+    "doc": "Jump to arrangement marker",
+    "sig": {
+     "params": [
+      {
+       "name": "delta",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "select",
+       "type": "bool",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "liveSelection": {
+    "doc": "Live selection",
+    "sig": {
+     "params": [
+      {
+       "name": "time",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "stop",
+       "type": "bool",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "liveSelectionStart": {
+    "doc": "Live selection start",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "selectionClear": {
+    "doc": "Clear selection",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "selectionEnd": {
+    "doc": "Selection end",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "selectionIsActive": {
+    "doc": "Selection active",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "selectionSet": {
+    "doc": "Set selection start",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "selectionStart": {
+    "doc": "Selection start",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   }
+  },
+  "launchMapPages": {
+   "checkMapForHiddenItem": {
+    "doc": "Check for launchpad hidden item",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "createOverlayMap": {
+    "doc": "Create overlay map",
+    "sig": {
+     "params": [
+      {
+       "name": "offColor",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "onColor",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "width",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "height",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getMapCount": {
+    "doc": "Get launchmap items length",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getMapItemAftertouch": {
+    "doc": "Get launchmap item aftertouch",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "itemIndex",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getMapItemChannel": {
+    "doc": "Get launchmap item destination channel",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "itemIndex",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getMapItemColor": {
+    "doc": "Get launchmap item color",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "itemIndex",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "init": {
+    "doc": "Init launchmap pages",
+    "sig": {
+     "params": [
+      {
+       "name": "deviceName",
+       "type": "str",
+       "default": null
+      },
+      {
+       "name": "width",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "height",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "length": {
+    "doc": "Get launchmap pages length",
+    "sig": {
+     "params": [],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "processMapItem": {
+    "doc": "Process map item",
+    "sig": {
+     "params": [
+      {
+       "name": "eventData",
+       "type": "FlMidiMsg",
+       "default": null
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "itemIndex",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "velocity",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "releaseMapItem": {
+    "doc": "Release map item",
+    "sig": {
+     "params": [
+      {
+       "name": "eventData",
+       "type": "FlMidiMsg",
+       "default": null
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setMapItemTarget": {
+    "doc": "Set map item destination target",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "itemIndex",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "target",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "updateMap": {
+    "doc": "Update launchmap page",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   }
+  },
+  "screen": {
+   "addMeter": {
+    "doc": "Add meter",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "addTextLine": {
+    "doc": "Add text line",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "animateText": {
+    "doc": "Animate text",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "blank": {
+    "doc": "Blank",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "deInit": {
+    "doc": "Destroy screen object",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "displayBar": {
+    "doc": "Display bar",
+    "sig": {
+     "params": [
+      {
+       "name": "zero",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "vertical_position",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "text",
+       "type": "str",
+       "default": null
+      },
+      {
+       "name": "value",
+       "type": null,
+       "default": null
+      },
+      {
+       "name": "bipolar",
+       "type": null,
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "displayText": {
+    "doc": "Display text",
+    "sig": {
+     "params": [
+      {
+       "name": "font",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "justification",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "text_row",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "text",
+       "type": "str",
+       "default": null
+      },
+      {
+       "name": "check_if_same",
+       "type": "bool",
+       "default": null
+      },
+      {
+       "name": "display_time",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "displayTimedText": {
+    "doc": "Display timed text",
+    "sig": {
+     "params": [
+      {
+       "name": "text",
+       "type": "str",
+       "default": null
+      },
+      {
+       "name": "text_row",
+       "type": "int",
+       "default": null
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "drawRect": {
+    "doc": "Draw rectangle",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "drawText": {
+    "doc": "Draw text",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "eraseRect": {
+    "doc": "Erase rectangle",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "fillRect": {
+    "doc": "Fill rectangle",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "findTextLine": {
+    "doc": "Find text line",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getScreenActiveCounter": {
+    "doc": "Get screen active counter",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "hideMenu": {
+    "doc": "Hide menu",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "init": {
+    "doc": "Init screen object",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": false,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "isBlanked": {
+    "doc": "Is blanked",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "isUnBlank": {
+    "doc": "Is Unblank",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "keepDisplayActive": {
+    "doc": "Keep display active",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "menuItemClick": {
+    "doc": "Menu item click",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "menuNext": {
+    "doc": "Select next menu",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "menuPrev": {
+    "doc": "Select previous menu",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "menuShowing": {
+    "doc": "Return true when menu is showing",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "removeTextLine": {
+    "doc": "Remove text line",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setScreenActiveCounter": {
+    "doc": "Set screen active counter",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setup": {
+    "doc": "Setup screen properties",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "unBlank": {
+    "doc": "Unblank",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "update": {
+    "doc": "Update screen",
+    "sig": {
+     "params": [],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   }
+  },
+  "plugins": {
+   "getColor": {
+    "doc": "Get plugin color",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "slotIndex",
+       "type": "int",
+       "default": "-1"
+      },
+      {
+       "name": "flag",
+       "type": "int",
+       "default": "midi.GC_BackgroundColor"
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getName": {
+    "doc": "Get plugin name",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "slotIndex",
+       "type": "int",
+       "default": "-1"
+      },
+      {
+       "name": "flag",
+       "type": "int",
+       "default": "midi.FPN_Param"
+      },
+      {
+       "name": "paramIndex",
+       "type": "int",
+       "default": "0"
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "str"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": false,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getPadInfo": {
+    "doc": "Get plugin pad info",
+    "sig": {
+     "params": [
+      {
+       "name": "chanIndex",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "slotIndex",
+       "type": "int",
+       "default": "-1"
+      },
+      {
+       "name": "paramOption",
+       "type": "int",
+       "default": "0"
+      },
+      {
+       "name": "paramIndex",
+       "type": "int",
+       "default": "-1"
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "getParamCount": {
+    "doc": "Get plugin parameter count",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "slotIndex",
+       "type": "int",
+       "default": "-1"
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "get_plugin_parameter_list",
+     "get_plugin_parameter_value",
+     "set_plugin_parameter_value"
+    ]
+   },
+   "getParamName": {
+    "doc": "Get plugin parameter name",
+    "sig": {
+     "params": [
+      {
+       "name": "paramIndex",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "slotIndex",
+       "type": "int",
+       "default": "-1"
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "str"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "get_plugin_parameter_list",
+     "get_plugin_parameter_value",
+     "set_plugin_parameter_value"
+    ]
+   },
+   "getParamValue": {
+    "doc": "Get plugin parameter value",
+    "sig": {
+     "params": [
+      {
+       "name": "paramIndex",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "slotIndex",
+       "type": "int",
+       "default": "-1"
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "float"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "get_plugin_parameter_value"
+    ]
+   },
+   "getParamValueString": {
+    "doc": "Get plugin parameter value string",
+    "sig": {
+     "params": [
+      {
+       "name": "paramIndex",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "slotIndex",
+       "type": "int",
+       "default": "-1"
+      },
+      {
+       "name": "pickupMode",
+       "type": "int",
+       "default": "midi.PIM_None"
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "str"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "get_plugin_parameter_value"
+    ]
+   },
+   "getPluginName": {
+    "doc": "Get plugin name",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "slotIndex",
+       "type": "int",
+       "default": "-1"
+      },
+      {
+       "name": "userName",
+       "type": "bool",
+       "default": "False"
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "str"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "get_channel_volumes",
+     "get_plugin_parameter_list",
+     "get_plugin_parameter_value",
+     "get_session_context",
+     "list_channel_names",
+     "mute_channels",
+     "open_piano_roll_for_channel",
+     "remove_channels",
+     "rename_channels",
+     "route_channels_to_mixer",
+     "select_channels",
+     "set_channels_colour",
+     "set_channels_pan",
+     "set_channels_volume",
+     "set_channels_volume_db",
+     "set_plugin_parameter_value",
+     "set_step_sequencer_pattern",
+     "set_step_sequencer_step",
+     "solo_channels"
+    ]
+   },
+   "getPresetCount": {
+    "doc": "Get preset count",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "slotIndex",
+       "type": "int",
+       "default": "-1"
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "int"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "isValid": {
+    "doc": "Get plugin validity",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "slotIndex",
+       "type": "int",
+       "default": "-1"
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "bool"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "get_channel_volumes",
+     "get_plugin_parameter_list",
+     "get_plugin_parameter_value",
+     "get_session_context",
+     "mute_channels",
+     "open_piano_roll_for_channel",
+     "remove_channels",
+     "rename_channels",
+     "route_channels_to_mixer",
+     "select_channels",
+     "set_channels_colour",
+     "set_channels_pan",
+     "set_channels_volume",
+     "set_channels_volume_db",
+     "set_plugin_parameter_value",
+     "set_step_sequencer_pattern",
+     "set_step_sequencer_step",
+     "solo_channels"
+    ]
+   },
+   "nextPreset": {
+    "doc": "Select next plugin preset",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "slotIndex",
+       "type": "int",
+       "default": "-1"
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "prevPreset": {
+    "doc": "Select previous plugin preset",
+    "sig": {
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "slotIndex",
+       "type": "int",
+       "default": "-1"
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "setParamValue": {
+    "doc": "Set plugin parameter value",
+    "sig": {
+     "params": [
+      {
+       "name": "value",
+       "type": "float",
+       "default": null
+      },
+      {
+       "name": "paramIndex",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "slotIndex",
+       "type": "int",
+       "default": "-1"
+      },
+      {
+       "name": "pickupMode",
+       "type": "int",
+       "default": "0"
+      },
+      {
+       "name": "useGlobalIndex",
+       "type": "bool",
+       "default": "False"
+      }
+     ],
+     "returns": "None"
+    },
+    "new_vs_stubs": false,
+    "win_pair_verified": true,
+    "arm64_same": true,
+    "mcp_tools": [
+     "set_plugin_parameter_value"
+    ]
+   }
+  },
+  "ilmcp": {
+   "showHighlight": {
+    "doc": "",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": null,
+    "arm64_same": true,
+    "mcp_tools": [
+     "show_highlight"
+    ]
+   },
+   "forwardTutorialEvent": {
+    "doc": "",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": null,
+    "arm64_same": true,
+    "mcp_tools": []
+   },
+   "storePRScript": {
+    "doc": "",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": null,
+    "arm64_same": true,
+    "mcp_tools": [
+     "save_piano_roll_script"
+    ]
+   },
+   "runPRScript": {
+    "doc": "",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": null,
+    "arm64_same": true,
+    "mcp_tools": [
+     "run_piano_roll_script"
+    ]
+   },
+   "addChannel": {
+    "doc": "",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": null,
+    "arm64_same": true,
+    "mcp_tools": [
+     "add_channel"
+    ]
+   },
+   "removeChannel": {
+    "doc": "",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": null,
+    "arm64_same": true,
+    "mcp_tools": [
+     "remove_channels"
+    ]
+   },
+   "getBrowserNames": {
+    "doc": "",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": null,
+    "arm64_same": true,
+    "mcp_tools": [
+     "get_browser_names"
+    ]
+   },
+   "getHighlightNames": {
+    "doc": "",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": null,
+    "arm64_same": true,
+    "mcp_tools": [
+     "get_highlight_names",
+     "show_highlight"
+    ]
+   },
+   "addEffect": {
+    "doc": "",
+    "sig": null,
+    "new_vs_stubs": true,
+    "win_pair_verified": null,
+    "arm64_same": true,
+    "mcp_tools": [
+     "add_effect",
+     "remove_effect",
+     "reset_mixer_tracks"
+    ]
+   }
+  }
+ },
+ "objects": {
+  "flpianoroll": {
+   "note": "ピアノロール scripting (.pyscript)。Note/Marker は値オブジェクト、score は現ピアノロールの Pattern",
+   "classes": {
+    "Note": [
+     "number",
+     "time",
+     "length",
+     "pan",
+     "velocity",
+     "color",
+     "fcut",
+     "fres",
+     "pitchofs",
+     "slide",
+     "porta",
+     "group",
+     "muted",
+     "selected",
+     "release",
+     "repeats",
+     "clone()"
+    ],
+    "Marker": [
+     "time",
+     "mode",
+     "tsnum",
+     "tsden",
+     "scale_root",
+     "name",
+     "scale_helper"
+    ],
+    "score(Pattern)": [
+     "getNote",
+     "addNote",
+     "deleteNote",
+     "getMarker",
+     "addMarker",
+     "deleteMarker",
+     "clear",
+     "clearNotes",
+     "clearMarkers",
+     "getTimelineSelection",
+     "setTimelineSelection",
+     "getDefaultNoteProperties",
+     "getNextFreeGroupIndex",
+     "loadScoreFromFile",
+     "noteCount",
+     "markerCount",
+     "PPQ",
+     "length",
+     "tsnum",
+     "tsden",
+     "snap_scale_helper",
+     "snap_root_note"
+    ],
+    "Utils(TUtils)": [
+     "ProgressMsg",
+     "ShowMessage",
+     "log"
+    ],
+    "ScriptDialog": [
+     "Execute",
+     "AddInput",
+     "AddInputKnob",
+     "AddInputKnobInt",
+     "AddInputCombo",
+     "AddInputText",
+     "AddInputCheckbox",
+     "AddInputSurface",
+     "GetInputValue",
+     "SetText",
+     "SetNormalizedValue",
+     "addGroup",
+     "endGroup",
+     "restoreFormValues",
+     "DialogParams"
+    ]
+   },
+   "entrypoints": [
+    "createDialog()",
+    "apply(form)"
+   ]
+  },
+  "flcpt": {
+   "note": "Chord Progression Tool 用 (System/Tools/Chord progression の pyc 群が使用)",
+   "classes": {
+    "CPT": [
+     "addChordMarker",
+     "getChordMarker",
+     "clearChordMarkers",
+     "chordMarkerCount",
+     "(+ ~70 attr: style1/style2/temperature/repeats/... )"
+    ],
+    "ChordMarker": [
+     "time",
+     "length",
+     "name",
+     "alternativeCount",
+     "getAlternative",
+     "..."
+    ],
+    "ChordAlternative": [
+     "name",
+     "note_classes",
+     "extensions",
+     "locked"
+    ]
+   }
+  },
+  "flrack": {
+   "note": "Channel rack/score ツール用",
+   "classes": {
+    "Channel": [
+     "channel_id",
+     "channel_type",
+     "name",
+     "tool_type",
+     "ui_params",
+     "seed",
+     "preset",
+     "volume",
+     "pitch_shift",
+     "..."
+    ],
+    "Channels": [
+     "channels",
+     "pattern_id",
+     "rack_initialised",
+     "sample_rate",
+     "pattern_length"
+    ]
+   }
+  },
+  "fl": {
+   "note": "stdout/stderr 差替え",
+   "classes": {
+    "FLTextOutput": [
+     "write"
+    ]
+   }
+  },
+  "_ilmeta": {
+   "note": "インタプリタ側メタ (内部)",
+   "classes": {}
+  }
+ },
+ "midi_script_callbacks": {
+  "OnInit": [],
+  "OnDeInit": [],
+  "OnMidiIn": [
+   "msg"
+  ],
+  "OnMidiMsg": [
+   "msg"
+  ],
+  "OnSysEx": [
+   "msg"
+  ],
+  "OnNoteOn": [
+   "msg"
+  ],
+  "OnNoteOff": [
+   "msg"
+  ],
+  "OnControlChange": [
+   "msg"
+  ],
+  "OnProgramChange": [
+   "msg"
+  ],
+  "OnPitchBend": [
+   "msg"
+  ],
+  "OnKeyPressure": [
+   "msg"
+  ],
+  "OnChannelPressure": [
+   "msg"
+  ],
+  "OnMidiOutMsg": [
+   "msg"
+  ],
+  "OnIdle": [],
+  "OnProjectLoad": [
+   "status"
+  ],
+  "OnRefresh": [
+   "flags"
+  ],
+  "OnDoFullRefresh": [],
+  "OnUpdateBeatIndicator": [
+   "value"
+  ],
+  "OnDisplayZone": [],
+  "OnUpdateLiveMode": [
+   "lastTrack"
+  ],
+  "OnDirtyMixerTrack": [
+   "index"
+  ],
+  "OnDirtyChannel": [
+   "index"
+  ],
+  "OnFirstConnect": [],
+  "OnUpdateMeters": [],
+  "OnWaitingForInput": [],
+  "OnSendTempMsg": [
+   "message",
+   "duration"
+  ]
+ },
+ "midi_script_callbacks_in_binary": [
+  "OnChannelPressure",
+  "OnControlChange",
+  "OnDeInit",
+  "OnDirtyChannel",
+  "OnDirtyMixerTrack",
+  "OnDisplayZone",
+  "OnDoFullRefresh",
+  "OnFirstConnect",
+  "OnIdle",
+  "OnInit",
+  "OnInitAll",
+  "OnKeyPressure",
+  "OnMidiIn",
+  "OnMidiMsg",
+  "OnMidiOutMsg",
+  "OnNoteOff",
+  "OnNoteOn",
+  "OnPitchBend",
+  "OnProgramChange",
+  "OnProjectLoad",
+  "OnRefresh",
+  "OnSendTempMsg",
+  "OnSysEx",
+  "OnUpdateBeatIndicator",
+  "OnUpdateLiveMode",
+  "OnUpdateMeters",
+  "OnWaitingForInput"
+ ],
+ "py_modules_from_files": {
+  "midi": "Shared/Python/Lib/midi.py (定数のみ)",
+  "utils": "Shared/Python/Lib/utils.py (純Python helper)"
+ }
+}

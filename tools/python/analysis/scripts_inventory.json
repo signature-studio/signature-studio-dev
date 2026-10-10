@@ -1,0 +1,1268 @@
+{
+ "counts": {
+  "System/Config/Audio scripts/Amp": 1,
+  "System/Config/Audio scripts/FX": 5,
+  "System/Config/Audio scripts/Generation": 4,
+  "System/Config/Audio scripts/Regions": 2,
+  "System/Config/FL Studio Remote Scripts": 5,
+  "System/Config/Piano roll scripts": 5,
+  "System/Hardware specific/Forward CCs to current plugin Port 10": 1,
+  "System/Tools/Chord progression": 11,
+  "System/Tools/Chord progression/Chords": 8,
+  "System/Tools/Chord progression/Notes": 15,
+  "System/Tools/Chord progression/States": 3,
+  "System/Tools/Chord progression/consonance": 2,
+  "System/Tools/Chord progression/toolbox": 2,
+  "System/Tools/MCP": 1
+ },
+ "stdlib_modules_used": [
+  "__future__",
+  "abc",
+  "ast",
+  "collections",
+  "copy",
+  "enum",
+  "functools",
+  "inspect",
+  "itertools",
+  "json",
+  "math",
+  "operator",
+  "os",
+  "pathlib",
+  "random",
+  "re",
+  "sys",
+  "time",
+  "traceback",
+  "types",
+  "typing",
+  "zlib"
+ ],
+ "fl_modules_used": [
+  "arrangement",
+  "channels",
+  "device",
+  "enveditor",
+  "flcpt",
+  "flpianoroll",
+  "flrack",
+  "general",
+  "ilmcp",
+  "midi",
+  "mixer",
+  "patterns",
+  "playlist",
+  "plugins",
+  "transport",
+  "ui",
+  "utils"
+ ],
+ "other_imports": [
+  "Chords",
+  "Notes",
+  "States",
+  "asset_io",
+  "consonance",
+  "constants",
+  "constants_rack",
+  "control",
+  "control_rack",
+  "flcpt_proxy",
+  "flpianoroll_proxy",
+  "flrack_proxy",
+  "rack",
+  "toolbox",
+  "util",
+  "util_rack"
+ ],
+ "groups": {
+  "System/Hardware specific/Forward CCs to current plugin Port 10": [
+   {
+    "file": "device_Forward CCs to current plugin Port 10.py",
+    "kind": "py",
+    "imports_std": [
+     "math",
+     "time"
+    ],
+    "imports_fl": [
+     "channels",
+     "device",
+     "general",
+     "midi",
+     "mixer",
+     "patterns",
+     "playlist",
+     "transport",
+     "ui",
+     "utils"
+    ],
+    "imports_other": [],
+    "top_functions": [
+     "OnInit",
+     "OnMidiMsg",
+     "OnMidiIn"
+    ]
+   }
+  ],
+  "System/Config/FL Studio Remote Scripts": [
+   {
+    "file": "rerollLSloop.pyscript",
+    "kind": "py",
+    "imports_std": [],
+    "imports_fl": [],
+    "imports_other": [],
+    "top_functions": [
+     "rerollLSloop"
+    ]
+   },
+   {
+    "file": "rerollLSsteps.pyscript",
+    "kind": "py",
+    "imports_std": [],
+    "imports_fl": [],
+    "imports_other": [],
+    "top_functions": [
+     "rerollLSsteps"
+    ]
+   },
+   {
+    "file": "flrInit.pyscript",
+    "kind": "py",
+    "imports_std": [],
+    "imports_fl": [],
+    "imports_other": [],
+    "top_functions": [
+     "mapToRange",
+     "mapToIntRange",
+     "mapToValues",
+     "noteToNum",
+     "flrInit"
+    ]
+   },
+   {
+    "file": "rerollLSsample.pyscript",
+    "kind": "py",
+    "imports_std": [],
+    "imports_fl": [],
+    "imports_other": [],
+    "top_functions": [
+     "rerollLSsample"
+    ]
+   },
+   {
+    "file": "filleach.pyscript",
+    "kind": "py",
+    "imports_std": [],
+    "imports_fl": [],
+    "imports_other": [],
+    "top_functions": [
+     "filleach"
+    ]
+   }
+  ],
+  "System/Config/Audio scripts/FX": [
+   {
+    "file": "Ring modulation.pyscript",
+    "kind": "py",
+    "imports_std": [],
+    "imports_fl": [
+     "enveditor"
+    ],
+    "imports_other": [],
+    "top_functions": [
+     "rm",
+     "createDialog",
+     "apply"
+    ]
+   },
+   {
+    "file": "Destructoid.pyscript",
+    "kind": "py",
+    "imports_std": [
+     "math"
+    ],
+    "imports_fl": [
+     "enveditor"
+    ],
+    "imports_other": [],
+    "top_functions": [
+     "fx",
+     "createDialog",
+     "apply"
+    ]
+   },
+   {
+    "file": "Old school.pyscript",
+    "kind": "py",
+    "imports_std": [],
+    "imports_fl": [
+     "enveditor"
+    ],
+    "imports_other": [],
+    "top_functions": [
+     "fx",
+     "createDialog",
+     "apply"
+    ]
+   },
+   {
+    "file": "Limiter.pyscript",
+    "kind": "py",
+    "imports_std": [
+     "math"
+    ],
+    "imports_fl": [
+     "enveditor"
+    ],
+    "imports_other": [],
+    "top_functions": [
+     "getAccurateWavePeak_32FM",
+     "limiter",
+     "createDialog",
+     "apply"
+    ]
+   },
+   {
+    "file": "Bit reduction.pyscript",
+    "kind": "py",
+    "imports_std": [],
+    "imports_fl": [
+     "enveditor"
+    ],
+    "imports_other": [],
+    "top_functions": [
+     "br",
+     "createDialog",
+     "apply"
+    ]
+   }
+  ],
+  "System/Config/Audio scripts/Generation": [
+   {
+    "file": "Saw generator.pyscript",
+    "kind": "py",
+    "imports_std": [],
+    "imports_fl": [
+     "enveditor"
+    ],
+    "imports_other": [],
+    "top_functions": [
+     "genSaw",
+     "createDialog",
+     "apply"
+    ]
+   },
+   {
+    "file": "Pulse generator.pyscript",
+    "kind": "py",
+    "imports_std": [],
+    "imports_fl": [
+     "enveditor"
+    ],
+    "imports_other": [],
+    "top_functions": [
+     "genPulse",
+     "createDialog",
+     "apply"
+    ]
+   },
+   {
+    "file": "Silence generator.pyscript",
+    "kind": "py",
+    "imports_std": [],
+    "imports_fl": [
+     "enveditor"
+    ],
+    "imports_other": [],
+    "top_functions": [
+     "genSilence",
+     "createDialog",
+     "apply"
+    ]
+   },
+   {
+    "file": "Sine generator.pyscript",
+    "kind": "py",
+    "imports_std": [],
+    "imports_fl": [
+     "enveditor"
+    ],
+    "imports_other": [],
+    "top_functions": [
+     "genSine",
+     "createDialog",
+     "apply"
+    ]
+   }
+  ],
+  "System/Config/Audio scripts/Amp": [
+   {
+    "file": "Amp.pyscript",
+    "kind": "py",
+    "imports_std": [],
+    "imports_fl": [
+     "enveditor"
+    ],
+    "imports_other": [],
+    "top_functions": [
+     "amp",
+     "createDialog",
+     "apply"
+    ]
+   }
+  ],
+  "System/Config/Audio scripts/Regions": [
+   {
+    "file": "Convert markers.pyscript",
+    "kind": "py",
+    "imports_std": [],
+    "imports_fl": [
+     "enveditor"
+    ],
+    "imports_other": [],
+    "top_functions": []
+   },
+   {
+    "file": "Play to end.pyscript",
+    "kind": "py",
+    "imports_std": [],
+    "imports_fl": [
+     "enveditor"
+    ],
+    "imports_other": [],
+    "top_functions": [
+     "PlayToEnd"
+    ]
+   }
+  ],
+  "System/Config/Piano roll scripts": [
+   {
+    "file": "Euclidean.pyscript",
+    "kind": "py",
+    "imports_std": [],
+    "imports_fl": [
+     "flpianoroll"
+    ],
+    "imports_other": [],
+    "top_functions": [
+     "writeNote",
+     "bressenhamEuclidean",
+     "rotate",
+     "createDialog",
+     "apply"
+    ]
+   },
+   {
+    "file": "Note repeater sprinkler.pyscript",
+    "kind": "py",
+    "imports_std": [],
+    "imports_fl": [
+     "flpianoroll"
+    ],
+    "imports_other": [],
+    "top_functions": [
+     "createDialog",
+     "apply",
+     "copyNote"
+    ]
+   },
+   {
+    "file": "Select by velocity and more.pyscript",
+    "kind": "py",
+    "imports_std": [],
+    "imports_fl": [
+     "flpianoroll"
+    ],
+    "imports_other": [],
+    "top_functions": [
+     "createDialog",
+     "apply"
+    ]
+   },
+   {
+    "file": "Humanize.pyscript",
+    "kind": "py",
+    "imports_std": [
+     "math",
+     "time"
+    ],
+    "imports_fl": [
+     "flpianoroll"
+    ],
+    "imports_other": [],
+    "top_functions": [
+     "rand_int",
+     "rand_uniform",
+     "rand_tri",
+     "rand_sin_recursive",
+     "createDialog",
+     "apply"
+    ]
+   },
+   {
+    "file": "Arpeggiator.pyscript",
+    "kind": "py",
+    "imports_std": [
+     "time"
+    ],
+    "imports_fl": [
+     "flpianoroll"
+    ],
+    "imports_other": [],
+    "top_functions": [
+     "rand_int",
+     "makeNote",
+     "createDialog",
+     "apply"
+    ]
+   }
+  ],
+  "System/Tools/MCP": [
+   {
+    "file": "MCPTools.pyc",
+    "kind": "pyc",
+    "imports_std": [
+     "ast",
+     "inspect",
+     "json",
+     "math",
+     "os",
+     "sys",
+     "time",
+     "traceback",
+     "types",
+     "typing"
+    ],
+    "imports_fl": [
+     "arrangement",
+     "channels",
+     "device",
+     "general",
+     "ilmcp",
+     "midi",
+     "mixer",
+     "patterns",
+     "playlist",
+     "plugins",
+     "transport",
+     "ui"
+    ],
+    "imports_other": [],
+    "top_functions": [
+     "mcp_tool",
+     "get_mcp_tools_json",
+     "_get_target_track_indices",
+     "_get_target_channel_indices",
+     "_resolve_plugin_target",
+     "_resolve_param_index",
+     "_db_to_normalized_volume",
+     "_parse_llm_dict_arg",
+     "_parse_mapping_arg",
+     "_adjust_brightness",
+     "_parse_colour",
+     "whenDone"
+    ]
+   }
+  ],
+  "System/Tools/Chord progression": [
+   {
+    "file": "control.pyc",
+    "kind": "pyc",
+    "imports_std": [
+     "copy",
+     "inspect",
+     "math",
+     "pathlib",
+     "typing"
+    ],
+    "imports_fl": [
+     "flcpt",
+     "flpianoroll"
+    ],
+    "imports_other": [
+     "Chords",
+     "Notes",
+     "States",
+     "constants",
+     "flcpt_proxy",
+     "flpianoroll_proxy",
+     "toolbox",
+     "util"
+    ],
+    "top_functions": [
+     "apply_multiselect",
+     "call_model",
+     "reset",
+     "clear",
+     "apply_performance",
+     "analyse_scale",
+     "auto_scale",
+     "update_scales",
+     "analyse_chord",
+     "analyse_chord_sequence",
+     "learn_chord",
+     "generate_chord_sequence"
+    ]
+   },
+   {
+    "file": "constants_rack.pyc",
+    "kind": "pyc",
+    "imports_std": [
+     "enum",
+     "typing"
+    ],
+    "imports_fl": [],
+    "imports_other": [],
+    "top_functions": [
+     "HOSTS"
+    ]
+   },
+   {
+    "file": "asset_io.pyc",
+    "kind": "pyc",
+    "imports_std": [
+     "json",
+     "pathlib",
+     "zlib"
+    ],
+    "imports_fl": [],
+    "imports_other": [],
+    "top_functions": [
+     "load_asset"
+    ]
+   },
+   {
+    "file": "cpt.pyscript",
+    "kind": "py",
+    "imports_std": [],
+    "imports_fl": [],
+    "imports_other": [
+     "control"
+    ],
+    "top_functions": []
+   },
+   {
+    "file": "util.pyc",
+    "kind": "pyc",
+    "imports_std": [
+     "ast",
+     "collections",
+     "copy",
+     "functools",
+     "inspect",
+     "itertools",
+     "math",
+     "operator",
+     "pathlib",
+     "traceback",
+     "typing"
+    ],
+    "imports_fl": [
+     "flcpt",
+     "flpianoroll"
+    ],
+    "imports_other": [
+     "Chords",
+     "Notes",
+     "States",
+     "asset_io",
+     "constants",
+     "constants_rack",
+     "flcpt_proxy",
+     "flpianoroll_proxy",
+     "rack",
+     "toolbox"
+    ],
+    "top_functions": [
+     "updateChordMarker",
+     "copy_chord_marker",
+     "getChordMarker",
+     "getIndex",
+     "get_sorted_index",
+     "getChordMarkers",
+     "sort_chord_markers",
+     "addChordMarkers",
+     "blank_chord_marker",
+     "get_global_voicing_default",
+     "has_no_name",
+     "valid_progression"
+    ]
+   },
+   {
+    "file": "flcpt_proxy.pyc",
+    "kind": "pyc",
+    "imports_std": [],
+    "imports_fl": [],
+    "imports_other": [],
+    "top_functions": [
+     "ChordAlternative",
+     "ChordMarker",
+     "CPT",
+     "ChordPool"
+    ]
+   },
+   {
+    "file": "stack.pyscript",
+    "kind": "py",
+    "imports_std": [],
+    "imports_fl": [],
+    "imports_other": [
+     "control_rack"
+    ],
+    "top_functions": []
+   },
+   {
+    "file": "util_rack.pyc",
+    "kind": "pyc",
+    "imports_std": [
+     "ast",
+     "collections",
+     "copy",
+     "functools",
+     "inspect",
+     "json",
+     "math",
+     "random",
+     "traceback",
+     "typing"
+    ],
+    "imports_fl": [
+     "flcpt",
+     "flpianoroll"
+    ],
+    "imports_other": [
+     "Notes",
+     "States",
+     "constants",
+     "constants_rack",
+     "flcpt_proxy",
+     "flpianoroll_proxy",
+     "rack",
+     "toolbox",
+     "util"
+    ],
+    "top_functions": [
+     "check_init",
+     "convert_uid_str",
+     "get_selected_cids",
+     "resolve_tier",
+     "add_channel_display_labels",
+     "initialise_pattern_params",
+     "fix_sound_type",
+     "reset_generator",
+     "get_tag_data",
+     "fetch_channel_tags",
+     "all_tags",
+     "infer_channel_tags"
+    ]
+   },
+   {
+    "file": "rack.pyc",
+    "kind": "pyc",
+    "imports_std": [
+     "ast",
+     "copy",
+     "functools",
+     "inspect",
+     "json",
+     "pathlib",
+     "typing"
+    ],
+    "imports_fl": [
+     "flpianoroll",
+     "flrack"
+    ],
+    "imports_other": [
+     "Chords",
+     "asset_io",
+     "constants_rack",
+     "flpianoroll_proxy",
+     "flrack_proxy",
+     "toolbox"
+    ],
+    "top_functions": [
+     "Generator",
+     "Progression",
+     "Audio",
+     "Drum",
+     "MultiDrums",
+     "Chords",
+     "Melody",
+     "Bassline",
+     "Channel",
+     "Group",
+     "Version",
+     "value_to_label_map"
+    ]
+   },
+   {
+    "file": "control_rack.pyc",
+    "kind": "pyc",
+    "imports_std": [
+     "copy",
+     "json",
+     "typing"
+    ],
+    "imports_fl": [
+     "flpianoroll"
+    ],
+    "imports_other": [
+     "Notes",
+     "constants_rack",
+     "control",
+     "flpianoroll_proxy",
+     "rack",
+     "toolbox",
+     "util",
+     "util_rack"
+    ],
+    "top_functions": [
+     "initialise_system",
+     "get_genres",
+     "get_template",
+     "get_tag_maps",
+     "initialise_pattern",
+     "genre_change",
+     "initialise_group",
+     "initialise_generator",
+     "process",
+     "search_query",
+     "handle_404_search_error",
+     "update_rack_params"
+    ]
+   },
+   {
+    "file": "constants.pyc",
+    "kind": "pyc",
+    "imports_std": [],
+    "imports_fl": [],
+    "imports_other": [
+     "toolbox"
+    ],
+    "top_functions": [
+     "GlobalParams"
+    ]
+   }
+  ],
+  "System/Tools/Chord progression/States": [
+   {
+    "file": "__init__.pyc",
+    "kind": "pyc",
+    "imports_std": [],
+    "imports_fl": [],
+    "imports_other": [],
+    "top_functions": []
+   },
+   {
+    "file": "markov.pyc",
+    "kind": "pyc",
+    "imports_std": [
+     "copy",
+     "itertools",
+     "math",
+     "typing"
+    ],
+    "imports_fl": [],
+    "imports_other": [
+     "toolbox"
+    ],
+    "top_functions": [
+     "Model",
+     "Markov",
+     "HiddenMarkov"
+    ]
+   },
+   {
+    "file": "sequencer.pyc",
+    "kind": "pyc",
+    "imports_std": [
+     "abc",
+     "collections",
+     "copy",
+     "inspect",
+     "math",
+     "typing"
+    ],
+    "imports_fl": [],
+    "imports_other": [
+     "toolbox"
+    ],
+    "top_functions": [
+     "PresetError",
+     "LogItem",
+     "MetricLevel",
+     "BaseLoop",
+     "Loop",
+     "MainLoop",
+     "Dep",
+     "Stream",
+     "ContextLoop",
+     "Context",
+     "Feature",
+     "Group"
+    ]
+   }
+  ],
+  "System/Tools/Chord progression/consonance": [
+   {
+    "file": "__init__.pyc",
+    "kind": "pyc",
+    "imports_std": [],
+    "imports_fl": [],
+    "imports_other": [],
+    "top_functions": []
+   },
+   {
+    "file": "consonance.pyc",
+    "kind": "pyc",
+    "imports_std": [
+     "math",
+     "typing"
+    ],
+    "imports_fl": [],
+    "imports_other": [
+     "toolbox"
+    ],
+    "top_functions": [
+     "Consonance"
+    ]
+   }
+  ],
+  "System/Tools/Chord progression/Notes": [
+   {
+    "file": "drum_patterns.pyc",
+    "kind": "pyc",
+    "imports_std": [],
+    "imports_fl": [],
+    "imports_other": [],
+    "top_functions": []
+   },
+   {
+    "file": "audio.pyc",
+    "kind": "pyc",
+    "imports_std": [
+     "typing"
+    ],
+    "imports_fl": [],
+    "imports_other": [
+     "States",
+     "toolbox"
+    ],
+    "top_functions": [
+     "AudioLoop",
+     "Audio",
+     "AudioChannels"
+    ]
+   },
+   {
+    "file": "melody.pyc",
+    "kind": "pyc",
+    "imports_std": [
+     "collections",
+     "copy",
+     "typing"
+    ],
+    "imports_fl": [
+     "flcpt",
+     "flpianoroll"
+    ],
+    "imports_other": [
+     "Chords",
+     "Notes",
+     "States",
+     "flcpt_proxy",
+     "flpianoroll_proxy",
+     "toolbox"
+    ],
+    "top_functions": [
+     "Melody"
+    ]
+   },
+   {
+    "file": "arpeggiate.pyc",
+    "kind": "pyc",
+    "imports_std": [
+     "math",
+     "random",
+     "typing"
+    ],
+    "imports_fl": [
+     "flpianoroll"
+    ],
+    "imports_other": [
+     "Notes",
+     "States",
+     "flpianoroll_proxy",
+     "toolbox"
+    ],
+    "top_functions": [
+     "SubstitutionLoop",
+     "Arpeggiator"
+    ]
+   },
+   {
+    "file": "drum_setup.pyc",
+    "kind": "pyc",
+    "imports_std": [
+     "copy",
+     "math",
+     "typing"
+    ],
+    "imports_fl": [
+     "flpianoroll"
+    ],
+    "imports_other": [
+     "Chords",
+     "States",
+     "flpianoroll_proxy",
+     "rack",
+     "toolbox"
+    ],
+    "top_functions": [
+     "update_kits",
+     "ExtraHit",
+     "Flurry",
+     "GhostHit",
+     "Swap",
+     "Vary",
+     "BreakConsecutive",
+     "RhythmLoop",
+     "RepeatsLoop",
+     "ShiftLoop",
+     "OctaveLoop",
+     "OffsetLoop"
+    ]
+   },
+   {
+    "file": "__init__.pyc",
+    "kind": "pyc",
+    "imports_std": [],
+    "imports_fl": [],
+    "imports_other": [],
+    "top_functions": []
+   },
+   {
+    "file": "chord_writer.pyc",
+    "kind": "pyc",
+    "imports_std": [
+     "re"
+    ],
+    "imports_fl": [],
+    "imports_other": [
+     "toolbox"
+    ],
+    "top_functions": [
+     "Renderer"
+    ]
+   },
+   {
+    "file": "drums.pyc",
+    "kind": "pyc",
+    "imports_std": [
+     "collections",
+     "operator",
+     "pathlib",
+     "random",
+     "typing"
+    ],
+    "imports_fl": [
+     "flpianoroll"
+    ],
+    "imports_other": [
+     "Notes",
+     "States",
+     "constants_rack",
+     "flpianoroll_proxy",
+     "rack",
+     "toolbox"
+    ],
+    "top_functions": [
+     "Drum",
+     "DrumKit"
+    ]
+   },
+   {
+    "file": "humanise.pyc",
+    "kind": "pyc",
+    "imports_std": [
+     "inspect",
+     "math",
+     "typing"
+    ],
+    "imports_fl": [],
+    "imports_other": [
+     "toolbox"
+    ],
+    "top_functions": [
+     "HumaniseComponent",
+     "Humanise"
+    ]
+   },
+   {
+    "file": "patterns.pyc",
+    "kind": "pyc",
+    "imports_std": [],
+    "imports_fl": [],
+    "imports_other": [],
+    "top_functions": []
+   },
+   {
+    "file": "melody_patterns.pyc",
+    "kind": "pyc",
+    "imports_std": [],
+    "imports_fl": [],
+    "imports_other": [],
+    "top_functions": []
+   },
+   {
+    "file": "bass_line.pyc",
+    "kind": "pyc",
+    "imports_std": [
+     "typing"
+    ],
+    "imports_fl": [
+     "flcpt",
+     "flpianoroll"
+    ],
+    "imports_other": [
+     "Notes",
+     "States",
+     "flcpt_proxy",
+     "flpianoroll_proxy",
+     "toolbox"
+    ],
+    "top_functions": [
+     "Bassline"
+    ]
+   },
+   {
+    "file": "chopper.pyc",
+    "kind": "pyc",
+    "imports_std": [
+     "__future__",
+     "typing"
+    ],
+    "imports_fl": [
+     "flpianoroll"
+    ],
+    "imports_other": [
+     "Notes",
+     "States",
+     "flpianoroll_proxy",
+     "toolbox"
+    ],
+    "top_functions": [
+     "Chop"
+    ]
+   },
+   {
+    "file": "seq.pyc",
+    "kind": "pyc",
+    "imports_std": [
+     "typing"
+    ],
+    "imports_fl": [
+     "flpianoroll"
+    ],
+    "imports_other": [
+     "States",
+     "flpianoroll_proxy",
+     "toolbox"
+    ],
+    "top_functions": [
+     "StackContextLoop",
+     "Raw",
+     "Harmonic"
+    ]
+   },
+   {
+    "file": "harmonic_setup.pyc",
+    "kind": "pyc",
+    "imports_std": [
+     "copy",
+     "math",
+     "typing"
+    ],
+    "imports_fl": [],
+    "imports_other": [
+     "States",
+     "toolbox"
+    ],
+    "top_functions": [
+     "ChopRhythmLoop",
+     "ArpRhythmLoop",
+     "ArpNoteLoop",
+     "BassRhythmLoop",
+     "BassNoteTypeLoop",
+     "BassChordDegreeLoop",
+     "BassTransitionLoop",
+     "BassFixedNoteLoop",
+     "BassOctaveLoop",
+     "MelodyRhythmLoop",
+     "MelodyContourLoop",
+     "MelodyIntervalLoop"
+    ]
+   }
+  ],
+  "System/Tools/Chord progression/Chords": [
+   {
+    "file": "analyse.pyc",
+    "kind": "pyc",
+    "imports_std": [],
+    "imports_fl": [],
+    "imports_other": [
+     "toolbox"
+    ],
+    "top_functions": [
+     "ChordAnalyser",
+     "ChordAnalyserMulti"
+    ]
+   },
+   {
+    "file": "rhythm.pyc",
+    "kind": "pyc",
+    "imports_std": [],
+    "imports_fl": [],
+    "imports_other": [
+     "States",
+     "toolbox"
+    ],
+    "top_functions": [
+     "RhythmLoop",
+     "Rhythm"
+    ]
+   },
+   {
+    "file": "data.pyc",
+    "kind": "pyc",
+    "imports_std": [
+     "functools",
+     "os",
+     "typing"
+    ],
+    "imports_fl": [],
+    "imports_other": [
+     "Chords",
+     "constants",
+     "toolbox"
+    ],
+    "top_functions": [
+     "load_data",
+     "check_data_loaded",
+     "scale_relative_chords",
+     "rel_chord_names",
+     "chord_to_state",
+     "state_to_chord",
+     "make_priorities_dict",
+     "get_data",
+     "interpolated_style_data",
+     "double_interpolated_style_data",
+     "interpolated_priorities",
+     "double_interpolated_priorities"
+    ]
+   },
+   {
+    "file": "pool.pyc",
+    "kind": "pyc",
+    "imports_std": [],
+    "imports_fl": [],
+    "imports_other": [],
+    "top_functions": []
+   },
+   {
+    "file": "__init__.pyc",
+    "kind": "pyc",
+    "imports_std": [],
+    "imports_fl": [],
+    "imports_other": [],
+    "top_functions": []
+   },
+   {
+    "file": "helpers.pyc",
+    "kind": "pyc",
+    "imports_std": [
+     "math",
+     "typing"
+    ],
+    "imports_fl": [],
+    "imports_other": [
+     "consonance",
+     "toolbox"
+    ],
+    "top_functions": [
+     "rescale_notes",
+     "closest_transposition_val",
+     "calc_notes",
+     "overlap",
+     "prune_buckets",
+     "bias_relative_to_notes",
+     "pool_bias_chords",
+     "pool_bias_bass",
+     "pool_bias_extensions",
+     "transition_bias",
+     "bass_bias_dist",
+     "ExtensionSampler"
+    ]
+   },
+   {
+    "file": "static_data.pyc",
+    "kind": "pyc",
+    "imports_std": [],
+    "imports_fl": [],
+    "imports_other": [],
+    "top_functions": []
+   },
+   {
+    "file": "cpt_config.pyc",
+    "kind": "pyc",
+    "imports_std": [],
+    "imports_fl": [],
+    "imports_other": [
+     "toolbox"
+    ],
+    "top_functions": []
+   }
+  ],
+  "System/Tools/Chord progression/toolbox": [
+   {
+    "file": "toolbox.pyc",
+    "kind": "pyc",
+    "imports_std": [
+     "collections",
+     "copy",
+     "functools",
+     "math",
+     "operator",
+     "time",
+     "types",
+     "typing"
+    ],
+    "imports_fl": [],
+    "imports_other": [],
+    "top_functions": [
+     "attribute",
+     "create_default_output",
+     "quantize",
+     "minmax",
+     "interpolate",
+     "normalise",
+     "flatten",
+     "ordered_idxs",
+     "size_idxs",
+     "strToList",
+     "url_encode",
+     "getNotes"
+    ]
+   },
+   {
+    "file": "__init__.pyc",
+    "kind": "pyc",
+    "imports_std": [],
+    "imports_fl": [],
+    "imports_other": [],
+    "top_functions": []
+   }
+  ]
+ }
+}

@@ -1,0 +1,39 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>flpy browser check</title>
+<pre id="result">PENDING</pre>
+<script type="module">
+import { FlPython } from "/host/flpython.mjs";
+import { createMockEngine } from "/host/fl_mock.mjs";
+const out = { crossOriginIsolated, sab: typeof SharedArrayBuffer !== "undefined" };
+try {
+  const get = async (p) => new Uint8Array(await (await fetch(p)).arrayBuffer());
+  const ids = await (await fetch("/analysis/flapi/flapi_ids.json")).json();
+  const engine = createMockEngine();
+  const t0 = performance.now();
+  const py = await FlPython.create({
+    flpyUrl: new URL("/dist/flpy.js", location.href), engine, ids,
+    files: {
+      "/fl/Lib/midi.py": await get("/work/midi.py"),
+      "/fl/Lib/utils.py": await get("/work/utils.py"),
+      "/fl/Tools/MCPTools.pyc": await get("/work/MCPTools.pyc"),
+    },
+    onStdout: () => {}, onStderr: () => {},
+  });
+  out.init_ms = Math.round(performance.now() - t0);
+  await py.run(`import fl_rt, sys\nfl_rt.install_flapi()\nfl_rt.load_pyc("/fl/Tools/MCPTools.pyc", "__main__")\nprint(sys.version)`);
+  const call = async (n, a = {}) => (await py.call("__main__:" + n, a)).ok;
+  out.tools = JSON.parse(await call("get_mcp_tools_json")).length;
+  out.get_tempo = await call("get_tempo");
+  await call("set_tempo", { bpm: 150 });
+  out.tempo_state = engine.state.tempo;
+  out.channels = await call("list_channel_names");
+  await call("set_channels_volume_db", { target_channels: "1", volume_db: "-6" });
+  out.kick_vol = engine.state.channels[0].vol;
+  await py.run("import channels\nfor _ in range(500): channels.channelCount()");
+  out.host_calls = engine.record.length;
+  out.ok = out.tools === 48 && out.tempo_state === 150 && out.kick_vol < 0.78125;
+  await py.terminate();
+} catch (e) { out.error = String(e && e.stack || e); out.ok = false; }
+document.getElementById("result").textContent = "RESULT " + JSON.stringify(out);
+</script>

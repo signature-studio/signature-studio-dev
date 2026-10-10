@@ -1,0 +1,1338 @@
+{
+ "total": 48,
+ "counts": {
+  "A": 38,
+  "B": 8,
+  "U": 2
+ },
+ "classes": {
+  "A": [
+   "get_session_context",
+   "show_or_hide_window",
+   "play",
+   "stop",
+   "get_tempo",
+   "set_tempo",
+   "list_channel_names",
+   "select_channels",
+   "rename_channels",
+   "route_channels_to_mixer",
+   "get_channel_volumes",
+   "set_channels_volume_db",
+   "set_channels_volume",
+   "set_channels_pan",
+   "set_channels_colour",
+   "mute_channels",
+   "solo_channels",
+   "set_step_sequencer_step",
+   "set_step_sequencer_pattern",
+   "set_mixer_tracks_pan",
+   "get_mixer_tracks_volume",
+   "set_mixer_tracks_volume_db",
+   "set_mixer_tracks_volume_percent",
+   "rename_mixer_tracks",
+   "set_mixer_tracks_colour",
+   "mute_mixer_tracks",
+   "solo_mixer_tracks",
+   "get_mixer_routing",
+   "set_mixer_routing",
+   "reset_mixer_routing",
+   "open_piano_roll_for_channel",
+   "quantize_channel",
+   "get_playlist_track_names",
+   "rename_playlist_tracks",
+   "set_playlist_tracks_colour",
+   "get_plugin_parameter_list",
+   "get_plugin_parameter_value",
+   "set_plugin_parameter_value"
+  ],
+  "B": [
+   "get_browser_names",
+   "add_channel",
+   "remove_channels",
+   "add_effect",
+   "remove_effect",
+   "reset_mixer_tracks",
+   "save_piano_roll_script",
+   "run_piano_roll_script"
+  ],
+  "U": [
+   "get_highlight_names",
+   "show_highlight"
+  ]
+ },
+ "network_imports_in_pyc": [],
+ "pyc_imports": [
+  "arrangement",
+  "ast",
+  "channels",
+  "device",
+  "general",
+  "ilmcp",
+  "inspect",
+  "json",
+  "math",
+  "midi",
+  "mixer",
+  "os",
+  "patterns",
+  "playlist",
+  "plugins",
+  "sys",
+  "time",
+  "traceback",
+  "transport",
+  "types",
+  "typing",
+  "ui"
+ ],
+ "api_arity_observed": {
+  "channels.channelCount": [
+   0,
+   1
+  ],
+  "channels.deselectAll": [
+   0
+  ],
+  "channels.getChannelName": [
+   1,
+   2
+  ],
+  "channels.getChannelPan": [
+   1
+  ],
+  "channels.getChannelVolume": [
+   1,
+   2
+  ],
+  "channels.getTargetFxTrack": [
+   1
+  ],
+  "channels.muteChannel": [
+   2
+  ],
+  "channels.quickQuantize": [
+   1
+  ],
+  "channels.selectChannel": [
+   2
+  ],
+  "channels.setChannelColor": [
+   2
+  ],
+  "channels.setChannelName": [
+   3
+  ],
+  "channels.setChannelPan": [
+   3
+  ],
+  "channels.setChannelVolume": [
+   3
+  ],
+  "channels.setGridBit": [
+   3
+  ],
+  "channels.setTargetFxTrack": [
+   3
+  ],
+  "channels.showEditor": [
+   3
+  ],
+  "channels.soloChannel": [
+   2
+  ],
+  "ilmcp.addChannel": [
+   1
+  ],
+  "ilmcp.addEffect": [
+   3
+  ],
+  "ilmcp.getBrowserNames": [
+   2
+  ],
+  "ilmcp.getHighlightNames": [
+   0
+  ],
+  "ilmcp.removeChannel": [
+   1
+  ],
+  "ilmcp.runPRScript": [
+   1
+  ],
+  "ilmcp.showHighlight": [
+   5
+  ],
+  "ilmcp.storePRScript": [
+   2
+  ],
+  "mixer.getCurrentTempo": [
+   0,
+   1
+  ],
+  "mixer.getRouteSendActive": [
+   2
+  ],
+  "mixer.getRouteToLevel": [
+   2
+  ],
+  "mixer.getTrackName": [
+   1
+  ],
+  "mixer.getTrackPan": [
+   1
+  ],
+  "mixer.getTrackVolume": [
+   1,
+   2
+  ],
+  "mixer.muteTrack": [
+   2
+  ],
+  "mixer.setCurrentTempo": [
+   2
+  ],
+  "mixer.setRouteTo": [
+   4
+  ],
+  "mixer.setRouteToLevel": [
+   3
+  ],
+  "mixer.setTrackColor": [
+   2
+  ],
+  "mixer.setTrackName": [
+   2
+  ],
+  "mixer.setTrackPan": [
+   3
+  ],
+  "mixer.setTrackVolume": [
+   3
+  ],
+  "mixer.soloTrack": [
+   2
+  ],
+  "mixer.trackCount": [
+   0
+  ],
+  "playlist.getTrackName": [
+   1
+  ],
+  "playlist.setTrackColor": [
+   2
+  ],
+  "playlist.setTrackName": [
+   2
+  ],
+  "playlist.trackCount": [
+   0
+  ],
+  "plugins.getParamCount": [
+   3
+  ],
+  "plugins.getParamName": [
+   4
+  ],
+  "plugins.getParamValue": [
+   4
+  ],
+  "plugins.getPluginName": [
+   2,
+   4
+  ],
+  "plugins.isValid": [
+   1,
+   2
+  ],
+  "plugins.setParamValue": [
+   6
+  ],
+  "transport.start": [
+   0
+  ],
+  "transport.stop": [
+   0
+  ],
+  "ui.getVisible": [
+   1
+  ],
+  "ui.showWindow": [
+   1
+  ]
+ },
+ "tools": [
+  {
+   "name": "get_session_context",
+   "class": "A",
+   "params": [],
+   "flapi": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "channels.getChannelPan",
+    "channels.getChannelVolume",
+    "channels.getTargetFxTrack",
+    "mixer.getCurrentTempo",
+    "mixer.getRouteSendActive",
+    "mixer.getRouteToLevel",
+    "mixer.getTrackName",
+    "mixer.getTrackPan",
+    "mixer.getTrackVolume",
+    "mixer.trackCount",
+    "plugins.getPluginName",
+    "plugins.isValid"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "channels.channelCount/0",
+    "channels.getChannelName/1",
+    "channels.getChannelPan/1",
+    "channels.getChannelVolume/1",
+    "channels.getChannelVolume/2",
+    "channels.getTargetFxTrack/1",
+    "mixer.getCurrentTempo/0",
+    "mixer.getRouteSendActive/2",
+    "mixer.getRouteToLevel/2",
+    "mixer.getTrackName/1",
+    "mixer.getTrackPan/1",
+    "mixer.getTrackVolume/1",
+    "mixer.getTrackVolume/2",
+    "mixer.trackCount/0",
+    "plugins.getPluginName/2",
+    "plugins.isValid/2"
+   ]
+  },
+  {
+   "name": "get_browser_names",
+   "class": "B",
+   "params": [
+    "name",
+    "fullRecursive"
+   ],
+   "flapi": [],
+   "ilmcp": [
+    "ilmcp.getBrowserNames"
+   ],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "ilmcp.getBrowserNames/2"
+   ]
+  },
+  {
+   "name": "show_or_hide_window",
+   "class": "A",
+   "params": [
+    "window_name",
+    "state"
+   ],
+   "flapi": [
+    "ui.hideWindow",
+    "ui.showWindow"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "ui.showWindow/1"
+   ]
+  },
+  {
+   "name": "get_highlight_names",
+   "class": "U",
+   "params": [],
+   "flapi": [],
+   "ilmcp": [
+    "ilmcp.getHighlightNames"
+   ],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "ilmcp.getHighlightNames/0"
+   ]
+  },
+  {
+   "name": "show_highlight",
+   "class": "U",
+   "params": [
+    "item",
+    "tutorialName",
+    "tutorialCaption"
+   ],
+   "flapi": [],
+   "ilmcp": [
+    "ilmcp.getHighlightNames",
+    "ilmcp.showHighlight"
+   ],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "ilmcp.getHighlightNames/0",
+    "ilmcp.showHighlight/5"
+   ]
+  },
+  {
+   "name": "play",
+   "class": "A",
+   "params": [],
+   "flapi": [
+    "transport.start"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "transport.start/0"
+   ]
+  },
+  {
+   "name": "stop",
+   "class": "A",
+   "params": [],
+   "flapi": [
+    "transport.stop"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "transport.stop/0"
+   ]
+  },
+  {
+   "name": "get_tempo",
+   "class": "A",
+   "params": [],
+   "flapi": [
+    "mixer.getCurrentTempo"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "mixer.getCurrentTempo/1"
+   ]
+  },
+  {
+   "name": "set_tempo",
+   "class": "A",
+   "params": [
+    "bpm"
+   ],
+   "flapi": [
+    "mixer.setCurrentTempo"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "mixer.setCurrentTempo/2"
+   ]
+  },
+  {
+   "name": "list_channel_names",
+   "class": "A",
+   "params": [],
+   "flapi": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "plugins.getPluginName"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "channels.channelCount/1",
+    "channels.getChannelName/2",
+    "plugins.getPluginName/4"
+   ]
+  },
+  {
+   "name": "select_channels",
+   "class": "A",
+   "params": [
+    "target_channels",
+    "selected"
+   ],
+   "flapi": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "channels.isChannelSelected",
+    "channels.selectChannel",
+    "plugins.getPluginName",
+    "plugins.isValid"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "channels.channelCount/1",
+    "channels.getChannelName/2",
+    "channels.selectChannel/2",
+    "plugins.getPluginName/4",
+    "plugins.isValid/1"
+   ]
+  },
+  {
+   "name": "rename_channels",
+   "class": "A",
+   "params": [
+    "channel_mapping"
+   ],
+   "flapi": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "channels.isChannelSelected",
+    "channels.setChannelName",
+    "plugins.getPluginName",
+    "plugins.isValid"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "channels.channelCount/1",
+    "channels.getChannelName/2",
+    "channels.setChannelName/3",
+    "plugins.getPluginName/4",
+    "plugins.isValid/1"
+   ]
+  },
+  {
+   "name": "add_channel",
+   "class": "B",
+   "params": [
+    "plugin"
+   ],
+   "flapi": [],
+   "ilmcp": [
+    "ilmcp.addChannel"
+   ],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "ilmcp.addChannel/1"
+   ]
+  },
+  {
+   "name": "remove_channels",
+   "class": "B",
+   "params": [
+    "target_channels"
+   ],
+   "flapi": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "channels.isChannelSelected",
+    "plugins.getPluginName",
+    "plugins.isValid"
+   ],
+   "ilmcp": [
+    "ilmcp.removeChannel"
+   ],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "channels.channelCount/1",
+    "channels.getChannelName/2",
+    "ilmcp.removeChannel/1",
+    "plugins.getPluginName/4",
+    "plugins.isValid/1"
+   ]
+  },
+  {
+   "name": "route_channels_to_mixer",
+   "class": "A",
+   "params": [
+    "target_channels",
+    "mixer_track_target"
+   ],
+   "flapi": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "channels.isChannelSelected",
+    "channels.setTargetFxTrack",
+    "mixer.getTrackName",
+    "mixer.isTrackSelected",
+    "mixer.trackCount",
+    "plugins.getPluginName",
+    "plugins.isValid"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "channels.channelCount/1",
+    "channels.getChannelName/2",
+    "channels.setTargetFxTrack/3",
+    "mixer.getTrackName/1",
+    "mixer.trackCount/0",
+    "plugins.getPluginName/4",
+    "plugins.isValid/1"
+   ]
+  },
+  {
+   "name": "get_channel_volumes",
+   "class": "A",
+   "params": [
+    "target_channels"
+   ],
+   "flapi": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "channels.getChannelVolume",
+    "channels.isChannelSelected",
+    "plugins.getPluginName",
+    "plugins.isValid"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "channels.channelCount/1",
+    "channels.getChannelName/1",
+    "channels.getChannelVolume/1",
+    "channels.getChannelVolume/2"
+   ]
+  },
+  {
+   "name": "set_channels_volume_db",
+   "class": "A",
+   "params": [
+    "target_channels",
+    "volume_db"
+   ],
+   "flapi": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "channels.getChannelVolume",
+    "channels.isChannelSelected",
+    "channels.setChannelVolume",
+    "mixer.getTrackVolume",
+    "plugins.getPluginName",
+    "plugins.isValid"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "channels.channelCount/1",
+    "channels.getChannelName/2",
+    "channels.getChannelVolume/1",
+    "channels.getChannelVolume/2",
+    "channels.setChannelVolume/3",
+    "plugins.getPluginName/4",
+    "plugins.isValid/1"
+   ]
+  },
+  {
+   "name": "set_channels_volume",
+   "class": "A",
+   "params": [
+    "target_channels",
+    "volume"
+   ],
+   "flapi": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "channels.isChannelSelected",
+    "channels.setChannelVolume",
+    "plugins.getPluginName",
+    "plugins.isValid"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "channels.channelCount/1",
+    "channels.getChannelName/2",
+    "channels.setChannelVolume/3",
+    "plugins.getPluginName/4",
+    "plugins.isValid/1"
+   ]
+  },
+  {
+   "name": "set_channels_pan",
+   "class": "A",
+   "params": [
+    "target_channels",
+    "pan"
+   ],
+   "flapi": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "channels.isChannelSelected",
+    "channels.setChannelPan",
+    "plugins.getPluginName",
+    "plugins.isValid"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "channels.channelCount/1",
+    "channels.getChannelName/2",
+    "channels.setChannelPan/3",
+    "plugins.getPluginName/4",
+    "plugins.isValid/1"
+   ]
+  },
+  {
+   "name": "set_channels_colour",
+   "class": "A",
+   "params": [
+    "target_channels",
+    "colour"
+   ],
+   "flapi": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "channels.isChannelSelected",
+    "channels.setChannelColor",
+    "plugins.getPluginName",
+    "plugins.isValid"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "channels.channelCount/1",
+    "channels.getChannelName/2",
+    "channels.setChannelColor/2",
+    "plugins.getPluginName/4",
+    "plugins.isValid/1"
+   ]
+  },
+  {
+   "name": "mute_channels",
+   "class": "A",
+   "params": [
+    "target_channels",
+    "muted"
+   ],
+   "flapi": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "channels.isChannelSelected",
+    "channels.muteChannel",
+    "plugins.getPluginName",
+    "plugins.isValid"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "channels.channelCount/1",
+    "channels.getChannelName/2",
+    "channels.muteChannel/2",
+    "plugins.getPluginName/4",
+    "plugins.isValid/1"
+   ]
+  },
+  {
+   "name": "solo_channels",
+   "class": "A",
+   "params": [
+    "target_channels",
+    "value"
+   ],
+   "flapi": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "channels.isChannelSelected",
+    "channels.soloChannel",
+    "plugins.getPluginName",
+    "plugins.isValid"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "channels.channelCount/1",
+    "channels.getChannelName/2",
+    "channels.soloChannel/2",
+    "plugins.getPluginName/4",
+    "plugins.isValid/1"
+   ]
+  },
+  {
+   "name": "set_step_sequencer_step",
+   "class": "A",
+   "params": [
+    "target_channels",
+    "step_number",
+    "value"
+   ],
+   "flapi": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "channels.isChannelSelected",
+    "channels.setGridBit",
+    "plugins.getPluginName",
+    "plugins.isValid"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "channels.channelCount/1",
+    "channels.getChannelName/2",
+    "channels.setGridBit/3",
+    "plugins.getPluginName/4",
+    "plugins.isValid/1"
+   ]
+  },
+  {
+   "name": "set_step_sequencer_pattern",
+   "class": "A",
+   "params": [
+    "target_channels",
+    "pattern"
+   ],
+   "flapi": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "channels.isChannelSelected",
+    "channels.setGridBit",
+    "plugins.getPluginName",
+    "plugins.isValid"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "channels.channelCount/1",
+    "channels.getChannelName/2",
+    "channels.setGridBit/3",
+    "plugins.getPluginName/4",
+    "plugins.isValid/1"
+   ]
+  },
+  {
+   "name": "set_mixer_tracks_pan",
+   "class": "A",
+   "params": [
+    "target_tracks",
+    "pan"
+   ],
+   "flapi": [
+    "mixer.getTrackName",
+    "mixer.isTrackSelected",
+    "mixer.setTrackPan",
+    "mixer.trackCount"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "mixer.getTrackName/1",
+    "mixer.setTrackPan/3",
+    "mixer.trackCount/0"
+   ]
+  },
+  {
+   "name": "get_mixer_tracks_volume",
+   "class": "A",
+   "params": [
+    "target_tracks"
+   ],
+   "flapi": [
+    "mixer.getTrackName",
+    "mixer.getTrackVolume",
+    "mixer.isTrackSelected",
+    "mixer.trackCount"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "mixer.getTrackName/1",
+    "mixer.getTrackVolume/1",
+    "mixer.getTrackVolume/2",
+    "mixer.trackCount/0"
+   ]
+  },
+  {
+   "name": "set_mixer_tracks_volume_db",
+   "class": "A",
+   "params": [
+    "target_tracks",
+    "volume_db"
+   ],
+   "flapi": [
+    "mixer.getTrackName",
+    "mixer.getTrackVolume",
+    "mixer.isTrackSelected",
+    "mixer.setTrackVolume",
+    "mixer.trackCount"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "mixer.getTrackName/1",
+    "mixer.getTrackVolume/1",
+    "mixer.getTrackVolume/2",
+    "mixer.setTrackVolume/3",
+    "mixer.trackCount/0"
+   ]
+  },
+  {
+   "name": "set_mixer_tracks_volume_percent",
+   "class": "A",
+   "params": [
+    "target_tracks",
+    "percent"
+   ],
+   "flapi": [
+    "mixer.getTrackName",
+    "mixer.isTrackSelected",
+    "mixer.setTrackVolume",
+    "mixer.trackCount"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "mixer.getTrackName/1",
+    "mixer.setTrackVolume/3",
+    "mixer.trackCount/0"
+   ]
+  },
+  {
+   "name": "rename_mixer_tracks",
+   "class": "A",
+   "params": [
+    "track_mapping"
+   ],
+   "flapi": [
+    "mixer.getTrackName",
+    "mixer.isTrackSelected",
+    "mixer.setTrackName",
+    "mixer.trackCount"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "mixer.getTrackName/1",
+    "mixer.setTrackName/2",
+    "mixer.trackCount/0"
+   ]
+  },
+  {
+   "name": "add_effect",
+   "class": "B",
+   "params": [
+    "plugin",
+    "target_tracks",
+    "slot_number"
+   ],
+   "flapi": [
+    "mixer.getTrackName",
+    "mixer.isTrackSelected",
+    "mixer.trackCount"
+   ],
+   "ilmcp": [
+    "ilmcp.addEffect"
+   ],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "ilmcp.addEffect/3",
+    "mixer.getTrackName/1",
+    "mixer.trackCount/0"
+   ]
+  },
+  {
+   "name": "remove_effect",
+   "class": "B",
+   "params": [
+    "target_tracks",
+    "slot_numbers"
+   ],
+   "flapi": [
+    "mixer.getTrackName",
+    "mixer.isTrackSelected",
+    "mixer.trackCount"
+   ],
+   "ilmcp": [
+    "ilmcp.addEffect"
+   ],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "ilmcp.addEffect/3",
+    "mixer.getTrackName/1",
+    "mixer.trackCount/0"
+   ]
+  },
+  {
+   "name": "set_mixer_tracks_colour",
+   "class": "A",
+   "params": [
+    "target_tracks",
+    "colour"
+   ],
+   "flapi": [
+    "mixer.getTrackName",
+    "mixer.isTrackSelected",
+    "mixer.setTrackColor",
+    "mixer.trackCount"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "mixer.getTrackName/1",
+    "mixer.setTrackColor/2",
+    "mixer.trackCount/0"
+   ]
+  },
+  {
+   "name": "mute_mixer_tracks",
+   "class": "A",
+   "params": [
+    "target_tracks",
+    "muted"
+   ],
+   "flapi": [
+    "mixer.getTrackName",
+    "mixer.isTrackSelected",
+    "mixer.muteTrack",
+    "mixer.trackCount"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "mixer.getTrackName/1",
+    "mixer.muteTrack/2",
+    "mixer.trackCount/0"
+   ]
+  },
+  {
+   "name": "solo_mixer_tracks",
+   "class": "A",
+   "params": [
+    "target_tracks",
+    "value"
+   ],
+   "flapi": [
+    "mixer.getTrackName",
+    "mixer.isTrackSelected",
+    "mixer.soloTrack",
+    "mixer.trackCount"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "mixer.getTrackName/1",
+    "mixer.soloTrack/2",
+    "mixer.trackCount/0"
+   ]
+  },
+  {
+   "name": "reset_mixer_tracks",
+   "class": "B",
+   "params": [
+    "target_tracks"
+   ],
+   "flapi": [
+    "mixer.getRouteSendActive",
+    "mixer.getTrackName",
+    "mixer.isTrackSelected",
+    "mixer.setRouteTo",
+    "mixer.setRouteToLevel",
+    "mixer.setTrackColor",
+    "mixer.setTrackName",
+    "mixer.setTrackPan",
+    "mixer.setTrackVolume",
+    "mixer.trackCount"
+   ],
+   "ilmcp": [
+    "ilmcp.addEffect"
+   ],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "ilmcp.addEffect/3",
+    "mixer.getRouteSendActive/2",
+    "mixer.getTrackName/1",
+    "mixer.setRouteTo/4",
+    "mixer.setRouteToLevel/3",
+    "mixer.setTrackColor/2",
+    "mixer.setTrackName/2",
+    "mixer.setTrackPan/3",
+    "mixer.setTrackVolume/3",
+    "mixer.trackCount/0"
+   ]
+  },
+  {
+   "name": "get_mixer_routing",
+   "class": "A",
+   "params": [],
+   "flapi": [
+    "mixer.getRouteSendActive",
+    "mixer.getRouteToLevel",
+    "mixer.getTrackName",
+    "mixer.trackCount"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "mixer.getRouteSendActive/2",
+    "mixer.getRouteToLevel/2",
+    "mixer.getTrackName/1",
+    "mixer.trackCount/0"
+   ]
+  },
+  {
+   "name": "set_mixer_routing",
+   "class": "A",
+   "params": [
+    "source_track",
+    "dest_track",
+    "active",
+    "level"
+   ],
+   "flapi": [
+    "mixer.getTrackName",
+    "mixer.isTrackSelected",
+    "mixer.setRouteTo",
+    "mixer.setRouteToLevel",
+    "mixer.trackCount"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "mixer.getTrackName/1",
+    "mixer.setRouteTo/4",
+    "mixer.setRouteToLevel/3",
+    "mixer.trackCount/0"
+   ]
+  },
+  {
+   "name": "reset_mixer_routing",
+   "class": "A",
+   "params": [
+    "target_tracks"
+   ],
+   "flapi": [
+    "mixer.getRouteSendActive",
+    "mixer.getTrackName",
+    "mixer.isTrackSelected",
+    "mixer.setRouteTo",
+    "mixer.setRouteToLevel",
+    "mixer.trackCount"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "mixer.getRouteSendActive/2",
+    "mixer.getTrackName/1",
+    "mixer.setRouteTo/4",
+    "mixer.setRouteToLevel/3",
+    "mixer.trackCount/0"
+   ]
+  },
+  {
+   "name": "open_piano_roll_for_channel",
+   "class": "A",
+   "params": [
+    "target_channel"
+   ],
+   "flapi": [
+    "channels.channelCount",
+    "channels.deselectAll",
+    "channels.getChannelName",
+    "channels.isChannelSelected",
+    "channels.selectChannel",
+    "plugins.getPluginName",
+    "plugins.isValid",
+    "ui.getVisible",
+    "ui.hideWindow",
+    "ui.showWindow"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "channels.channelCount/1",
+    "channels.deselectAll/0",
+    "channels.getChannelName/1",
+    "channels.getChannelName/2",
+    "channels.selectChannel/2",
+    "plugins.getPluginName/4",
+    "plugins.isValid/1",
+    "ui.getVisible/1",
+    "ui.showWindow/1"
+   ]
+  },
+  {
+   "name": "quantize_channel",
+   "class": "A",
+   "params": [
+    "channel_number"
+   ],
+   "flapi": [
+    "channels.quickQuantize"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "channels.quickQuantize/1"
+   ]
+  },
+  {
+   "name": "get_playlist_track_names",
+   "class": "A",
+   "params": [],
+   "flapi": [
+    "playlist.getTrackName",
+    "playlist.trackCount"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "playlist.getTrackName/1",
+    "playlist.trackCount/0"
+   ]
+  },
+  {
+   "name": "rename_playlist_tracks",
+   "class": "A",
+   "params": [
+    "track_mapping"
+   ],
+   "flapi": [
+    "playlist.setTrackName"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "playlist.setTrackName/2"
+   ]
+  },
+  {
+   "name": "set_playlist_tracks_colour",
+   "class": "A",
+   "params": [
+    "target_tracks",
+    "colour"
+   ],
+   "flapi": [
+    "playlist.setTrackColor"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "playlist.setTrackColor/2"
+   ]
+  },
+  {
+   "name": "get_plugin_parameter_list",
+   "class": "A",
+   "params": [
+    "target",
+    "slot_number"
+   ],
+   "flapi": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "channels.isChannelSelected",
+    "mixer.getTrackName",
+    "mixer.isTrackSelected",
+    "mixer.trackCount",
+    "plugins.getParamCount",
+    "plugins.getParamName",
+    "plugins.getPluginName",
+    "plugins.isValid"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "channels.channelCount/1",
+    "channels.getChannelName/2",
+    "plugins.getParamCount/3",
+    "plugins.getParamName/4",
+    "plugins.getPluginName/4",
+    "plugins.isValid/1",
+    "plugins.isValid/2"
+   ]
+  },
+  {
+   "name": "get_plugin_parameter_value",
+   "class": "A",
+   "params": [
+    "target",
+    "param_identifier",
+    "slot_number"
+   ],
+   "flapi": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "channels.isChannelSelected",
+    "mixer.getTrackName",
+    "mixer.isTrackSelected",
+    "mixer.trackCount",
+    "plugins.getParamCount",
+    "plugins.getParamName",
+    "plugins.getParamValue",
+    "plugins.getParamValueString",
+    "plugins.getPluginName",
+    "plugins.isValid"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "channels.channelCount/1",
+    "channels.getChannelName/2",
+    "plugins.getParamCount/3",
+    "plugins.getParamName/4",
+    "plugins.getParamValue/4",
+    "plugins.getPluginName/4",
+    "plugins.isValid/1",
+    "plugins.isValid/2"
+   ]
+  },
+  {
+   "name": "set_plugin_parameter_value",
+   "class": "A",
+   "params": [
+    "target",
+    "param_identifier",
+    "value",
+    "slot_number"
+   ],
+   "flapi": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "channels.isChannelSelected",
+    "channels.showEditor",
+    "mixer.focusEditor",
+    "mixer.getTrackName",
+    "mixer.isTrackSelected",
+    "mixer.trackCount",
+    "plugins.getParamCount",
+    "plugins.getParamName",
+    "plugins.getPluginName",
+    "plugins.isValid",
+    "plugins.setParamValue"
+   ],
+   "ilmcp": [],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "channels.channelCount/1",
+    "channels.getChannelName/2",
+    "channels.showEditor/3",
+    "plugins.getParamCount/3",
+    "plugins.getParamName/4",
+    "plugins.getPluginName/4",
+    "plugins.isValid/1",
+    "plugins.isValid/2",
+    "plugins.setParamValue/6"
+   ]
+  },
+  {
+   "name": "save_piano_roll_script",
+   "class": "B",
+   "params": [
+    "script_name",
+    "source"
+   ],
+   "flapi": [],
+   "ilmcp": [
+    "ilmcp.storePRScript"
+   ],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "ilmcp.storePRScript/2"
+   ]
+  },
+  {
+   "name": "run_piano_roll_script",
+   "class": "B",
+   "params": [
+    "source"
+   ],
+   "flapi": [
+    "ui.showWindow"
+   ],
+   "ilmcp": [
+    "ilmcp.runPRScript"
+   ],
+   "wasm_run": "ok",
+   "observed_calls": [
+    "ilmcp.runPRScript/1",
+    "ui.showWindow/1"
+   ]
+  }
+ ]
+}

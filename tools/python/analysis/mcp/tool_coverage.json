@@ -1,0 +1,591 @@
+{
+ "summary": {
+  "total": 48,
+  "ok": 48,
+  "soft_error": 0,
+  "raised": 0,
+  "no_args": 0,
+  "host_calls": 37424,
+  "callback_roundtrip": true
+ },
+ "tools": [
+  {
+   "name": "get_session_context",
+   "status": "ok",
+   "result": "{\n  \"tempo_bpm\": 0.13,\n  \"active_channels\": [\n    {\n      \"index\": 1,\n      \"name\": \"Kick\",\n      \"generator_plugin\": \"Sampler\",\n      \"volume_normalized\": 0.78",
+   "api_calls": [
+    "channels.channelCount/0",
+    "channels.getChannelName/1",
+    "channels.getChannelPan/1",
+    "channels.getChannelVolume/1",
+    "channels.getChannelVolume/2",
+    "channels.getTargetFxTrack/1",
+    "mixer.getCurrentTempo/0",
+    "mixer.getRouteSendActive/2",
+    "mixer.getRouteToLevel/2",
+    "mixer.getTrackName/1",
+    "mixer.getTrackPan/1",
+    "mixer.getTrackVolume/1",
+    "mixer.getTrackVolume/2",
+    "mixer.trackCount/0",
+    "plugins.getPluginName/2",
+    "plugins.isValid/2"
+   ],
+   "host_calls": 18056
+  },
+  {
+   "name": "get_browser_names",
+   "status": "ok",
+   "result": "[object Object]",
+   "api_calls": [
+    "ilmcp.getBrowserNames/2"
+   ],
+   "host_calls": 1
+  },
+  {
+   "name": "show_or_hide_window",
+   "status": "ok",
+   "result": "Showed 'mixer' window.",
+   "api_calls": [
+    "ui.showWindow/1"
+   ],
+   "host_calls": 1
+  },
+  {
+   "name": "get_highlight_names",
+   "status": "ok",
+   "result": "Toolbar: Show Piano roll,Toolbar: Show playlist,Toolbar: Show Mixer,Toolbar: Show Channel Rack",
+   "api_calls": [
+    "ilmcp.getHighlightNames/0"
+   ],
+   "host_calls": 1
+  },
+  {
+   "name": "show_highlight",
+   "status": "ok",
+   "result": "Success: Highlighted 'Toolbar: Show Mixer'",
+   "api_calls": [
+    "ilmcp.getHighlightNames/0",
+    "ilmcp.showHighlight/5"
+   ],
+   "host_calls": 2
+  },
+  {
+   "name": "play",
+   "status": "ok",
+   "result": "Playback started .",
+   "api_calls": [
+    "transport.start/0"
+   ],
+   "host_calls": 1
+  },
+  {
+   "name": "stop",
+   "status": "ok",
+   "result": "Playback stopped .",
+   "api_calls": [
+    "transport.stop/0"
+   ],
+   "host_calls": 1
+  },
+  {
+   "name": "get_tempo",
+   "status": "ok",
+   "result": "Current tempo is 130 BPM.",
+   "api_calls": [
+    "mixer.getCurrentTempo/1"
+   ],
+   "host_calls": 1
+  },
+  {
+   "name": "set_tempo",
+   "status": "ok",
+   "result": "Tempo set to 128.0 BPM.",
+   "api_calls": [
+    "mixer.setCurrentTempo/2"
+   ],
+   "host_calls": 1
+  },
+  {
+   "name": "list_channel_names",
+   "status": "ok",
+   "result": "Current Channel Rack Channels (1-based index):\n1: Kick [Sampler]\n2: Snare [Sampler]\n3: 3x Osc",
+   "api_calls": [
+    "channels.channelCount/1",
+    "channels.getChannelName/2",
+    "plugins.getPluginName/4"
+   ],
+   "host_calls": 7
+  },
+  {
+   "name": "select_channels",
+   "status": "ok",
+   "result": "Selected 2 channel(s): [1, 2].",
+   "api_calls": [
+    "channels.channelCount/1",
+    "channels.getChannelName/2",
+    "channels.selectChannel/2",
+    "plugins.getPluginName/4",
+    "plugins.isValid/1"
+   ],
+   "host_calls": 12
+  },
+  {
+   "name": "rename_channels",
+   "status": "ok",
+   "result": "Successfully renamed 1 channel(s).",
+   "api_calls": [
+    "channels.channelCount/1",
+    "channels.getChannelName/2",
+    "channels.setChannelName/3",
+    "plugins.getPluginName/4",
+    "plugins.isValid/1"
+   ],
+   "host_calls": 11
+  },
+  {
+   "name": "add_channel",
+   "status": "ok",
+   "result": "Successfully added Fruity Slicer to the Channel Rack.",
+   "api_calls": [
+    "ilmcp.addChannel/1"
+   ],
+   "host_calls": 1
+  },
+  {
+   "name": "remove_channels",
+   "status": "ok",
+   "result": "Successfully removed 1 channel(s).",
+   "api_calls": [
+    "channels.channelCount/1",
+    "channels.getChannelName/2",
+    "ilmcp.removeChannel/1",
+    "plugins.getPluginName/4",
+    "plugins.isValid/1"
+   ],
+   "host_calls": 14
+  },
+  {
+   "name": "route_channels_to_mixer",
+   "status": "ok",
+   "result": "Successfully routed 1 channel(s) to mixer track 'Insert 2' (Index 2).",
+   "api_calls": [
+    "channels.channelCount/1",
+    "channels.getChannelName/2",
+    "channels.setTargetFxTrack/3",
+    "mixer.getTrackName/1",
+    "mixer.trackCount/0",
+    "plugins.getPluginName/4",
+    "plugins.isValid/1"
+   ],
+   "host_calls": 139
+  },
+  {
+   "name": "get_channel_volumes",
+   "status": "ok",
+   "result": "[\n  {\n    \"index\": 1,\n    \"name\": \"Kick2\",\n    \"volume_normalized\": 0.7812,\n    \"volume_percent\": 78.1,\n    \"volume_db\": 0.0\n  },\n  {\n    \"index\": 2,\n    \"name\"",
+   "api_calls": [
+    "channels.channelCount/1",
+    "channels.getChannelName/1",
+    "channels.getChannelVolume/1",
+    "channels.getChannelVolume/2"
+   ],
+   "host_calls": 10
+  },
+  {
+   "name": "set_channels_volume_db",
+   "status": "ok",
+   "result": "Set volume for 1 channel(s). All channels: -3.0 dB.",
+   "api_calls": [
+    "channels.channelCount/1",
+    "channels.getChannelName/2",
+    "channels.getChannelVolume/1",
+    "channels.getChannelVolume/2",
+    "channels.setChannelVolume/3",
+    "plugins.getPluginName/4",
+    "plugins.isValid/1"
+   ],
+   "host_calls": 31
+  },
+  {
+   "name": "set_channels_volume",
+   "status": "ok",
+   "result": "Set volume for 1 channel(s). All channels: 0.5000.",
+   "api_calls": [
+    "channels.channelCount/1",
+    "channels.getChannelName/2",
+    "channels.setChannelVolume/3",
+    "plugins.getPluginName/4",
+    "plugins.isValid/1"
+   ],
+   "host_calls": 11
+  },
+  {
+   "name": "set_channels_pan",
+   "status": "ok",
+   "result": "Set pan for 1 channel(s). All channels: 0.50.",
+   "api_calls": [
+    "channels.channelCount/1",
+    "channels.getChannelName/2",
+    "channels.setChannelPan/3",
+    "plugins.getPluginName/4",
+    "plugins.isValid/1"
+   ],
+   "host_calls": 11
+  },
+  {
+   "name": "set_channels_colour",
+   "status": "ok",
+   "result": "Set colour for 1 channel(s). All channels: #FF0000.",
+   "api_calls": [
+    "channels.channelCount/1",
+    "channels.getChannelName/2",
+    "channels.setChannelColor/2",
+    "plugins.getPluginName/4",
+    "plugins.isValid/1"
+   ],
+   "host_calls": 11
+  },
+  {
+   "name": "mute_channels",
+   "status": "ok",
+   "result": "Muted 1 channel(s).",
+   "api_calls": [
+    "channels.channelCount/1",
+    "channels.getChannelName/2",
+    "channels.muteChannel/2",
+    "plugins.getPluginName/4",
+    "plugins.isValid/1"
+   ],
+   "host_calls": 11
+  },
+  {
+   "name": "solo_channels",
+   "status": "ok",
+   "result": "Soloed 1 channel(s).",
+   "api_calls": [
+    "channels.channelCount/1",
+    "channels.getChannelName/2",
+    "channels.soloChannel/2",
+    "plugins.getPluginName/4",
+    "plugins.isValid/1"
+   ],
+   "host_calls": 11
+  },
+  {
+   "name": "set_step_sequencer_step",
+   "status": "ok",
+   "result": "Set step 1 to on for 1 channel(s).",
+   "api_calls": [
+    "channels.channelCount/1",
+    "channels.getChannelName/2",
+    "channels.setGridBit/3",
+    "plugins.getPluginName/4",
+    "plugins.isValid/1"
+   ],
+   "host_calls": 11
+  },
+  {
+   "name": "set_step_sequencer_pattern",
+   "status": "ok",
+   "result": "Set full 16-step pattern 1000100010001000 on 1 channel(s).",
+   "api_calls": [
+    "channels.channelCount/1",
+    "channels.getChannelName/2",
+    "channels.setGridBit/3",
+    "plugins.getPluginName/4",
+    "plugins.isValid/1"
+   ],
+   "host_calls": 26
+  },
+  {
+   "name": "set_mixer_tracks_pan",
+   "status": "ok",
+   "result": "Set pan for 1 track(s). All tracks: -0.50.",
+   "api_calls": [
+    "mixer.getTrackName/1",
+    "mixer.setTrackPan/3",
+    "mixer.trackCount/0"
+   ],
+   "host_calls": 128
+  },
+  {
+   "name": "get_mixer_tracks_volume",
+   "status": "ok",
+   "result": "[\n  {\n    \"index\": 0,\n    \"name\": \"Master\",\n    \"volume_normalized\": 0.8,\n    \"volume_percent\": 100.0,\n    \"volume_db\": 0.0\n  },\n  {\n    \"index\": 1,\n    \"name\":",
+   "api_calls": [
+    "mixer.getTrackName/1",
+    "mixer.getTrackVolume/1",
+    "mixer.getTrackVolume/2",
+    "mixer.trackCount/0"
+   ],
+   "host_calls": 133
+  },
+  {
+   "name": "set_mixer_tracks_volume_db",
+   "status": "ok",
+   "result": "Set volume for 1 track(s). All tracks: -6.0 dB.",
+   "api_calls": [
+    "mixer.getTrackName/1",
+    "mixer.getTrackVolume/1",
+    "mixer.getTrackVolume/2",
+    "mixer.setTrackVolume/3",
+    "mixer.trackCount/0"
+   ],
+   "host_calls": 150
+  },
+  {
+   "name": "set_mixer_tracks_volume_percent",
+   "status": "ok",
+   "result": "Set volume for 1 track(s). All tracks: 80.0%.",
+   "api_calls": [
+    "mixer.getTrackName/1",
+    "mixer.setTrackVolume/3",
+    "mixer.trackCount/0"
+   ],
+   "host_calls": 128
+  },
+  {
+   "name": "rename_mixer_tracks",
+   "status": "ok",
+   "result": "Successfully renamed 1 track(s).",
+   "api_calls": [
+    "mixer.getTrackName/1",
+    "mixer.setTrackName/2",
+    "mixer.trackCount/0"
+   ],
+   "host_calls": 128
+  },
+  {
+   "name": "add_effect",
+   "status": "ok",
+   "result": "Added effect 'Fruity Reeverb 2' to visual slot 1 for 1 track(s): [1].",
+   "api_calls": [
+    "ilmcp.addEffect/3",
+    "mixer.getTrackName/1",
+    "mixer.trackCount/0"
+   ],
+   "host_calls": 128
+  },
+  {
+   "name": "remove_effect",
+   "status": "ok",
+   "result": "Removed effects from slot(s) [1] for 1 track(s): [1].",
+   "api_calls": [
+    "ilmcp.addEffect/3",
+    "mixer.getTrackName/1",
+    "mixer.trackCount/0"
+   ],
+   "host_calls": 128
+  },
+  {
+   "name": "set_mixer_tracks_colour",
+   "status": "ok",
+   "result": "Set colour for 1 track(s). All tracks: #FF0000.",
+   "api_calls": [
+    "mixer.getTrackName/1",
+    "mixer.setTrackColor/2",
+    "mixer.trackCount/0"
+   ],
+   "host_calls": 128
+  },
+  {
+   "name": "mute_mixer_tracks",
+   "status": "ok",
+   "result": "Muted 1 mixer track(s): [1].",
+   "api_calls": [
+    "mixer.getTrackName/1",
+    "mixer.muteTrack/2",
+    "mixer.trackCount/0"
+   ],
+   "host_calls": 128
+  },
+  {
+   "name": "solo_mixer_tracks",
+   "status": "ok",
+   "result": "Soloed 1 mixer track(s): [1].",
+   "api_calls": [
+    "mixer.getTrackName/1",
+    "mixer.soloTrack/2",
+    "mixer.trackCount/0"
+   ],
+   "host_calls": 128
+  },
+  {
+   "name": "reset_mixer_tracks",
+   "status": "ok",
+   "result": "Successfully reset 1 track(s): [1].",
+   "api_calls": [
+    "ilmcp.addEffect/3",
+    "mixer.getRouteSendActive/2",
+    "mixer.getTrackName/1",
+    "mixer.setRouteTo/4",
+    "mixer.setRouteToLevel/3",
+    "mixer.setTrackColor/2",
+    "mixer.setTrackName/2",
+    "mixer.setTrackPan/3",
+    "mixer.setTrackVolume/3",
+    "mixer.trackCount/0"
+   ],
+   "host_calls": 269
+  },
+  {
+   "name": "get_mixer_routing",
+   "status": "ok",
+   "result": "[\n  {\n    \"from_track\": 1,\n    \"from_name\": \"Insert 1\",\n    \"sends\": [\n      {\n        \"to_track\": 0,\n        \"to_name\": \"Master\",\n        \"level\": 1.0\n      }\n",
+   "api_calls": [
+    "mixer.getRouteSendActive/2",
+    "mixer.getRouteToLevel/2",
+    "mixer.getTrackName/1",
+    "mixer.trackCount/0"
+   ],
+   "host_calls": 16381
+  },
+  {
+   "name": "set_mixer_routing",
+   "status": "ok",
+   "result": "Send from 'Insert 1' (1) to 'Insert 5' (5) enabled at level 0.50.",
+   "api_calls": [
+    "mixer.getTrackName/1",
+    "mixer.setRouteTo/4",
+    "mixer.setRouteToLevel/3",
+    "mixer.trackCount/0"
+   ],
+   "host_calls": 258
+  },
+  {
+   "name": "reset_mixer_routing",
+   "status": "ok",
+   "result": "Cleared 2 send(s) across 1 track(s), restored Master send.",
+   "api_calls": [
+    "mixer.getRouteSendActive/2",
+    "mixer.getTrackName/1",
+    "mixer.setRouteTo/4",
+    "mixer.setRouteToLevel/3",
+    "mixer.trackCount/0"
+   ],
+   "host_calls": 257
+  },
+  {
+   "name": "open_piano_roll_for_channel",
+   "status": "ok",
+   "result": "Opened Piano Roll for channel 'Kick2' (index 1).",
+   "api_calls": [
+    "channels.channelCount/1",
+    "channels.deselectAll/0",
+    "channels.getChannelName/1",
+    "channels.getChannelName/2",
+    "channels.selectChannel/2",
+    "plugins.getPluginName/4",
+    "plugins.isValid/1",
+    "ui.getVisible/1",
+    "ui.showWindow/1"
+   ],
+   "host_calls": 15
+  },
+  {
+   "name": "quantize_channel",
+   "status": "ok",
+   "result": "Quantized channel 1.",
+   "api_calls": [
+    "channels.quickQuantize/1"
+   ],
+   "host_calls": 1
+  },
+  {
+   "name": "get_playlist_track_names",
+   "status": "ok",
+   "result": "1: Track 1\n2: Track 2\n3: Track 3\n4: Track 4\n5: Track 5\n6: Track 6\n7: Track 7\n8: Track 8\n9: Track 9\n10: Track 10\n11: Track 11\n12: Track 12\n13: Track 13\n14: Track",
+   "api_calls": [
+    "playlist.getTrackName/1",
+    "playlist.trackCount/0"
+   ],
+   "host_calls": 501
+  },
+  {
+   "name": "rename_playlist_tracks",
+   "status": "ok",
+   "result": "Successfully renamed 1 playlist track(s).",
+   "api_calls": [
+    "playlist.setTrackName/2"
+   ],
+   "host_calls": 1
+  },
+  {
+   "name": "set_playlist_tracks_colour",
+   "status": "ok",
+   "result": "Set colour for 1 playlist track(s). Track 1: #0000FF.",
+   "api_calls": [
+    "playlist.setTrackColor/2"
+   ],
+   "host_calls": 1
+  },
+  {
+   "name": "get_plugin_parameter_list",
+   "status": "ok",
+   "result": "Parameters for '3x Osc':\n  Index 1: Cutoff\n  Index 2: Resonance\n  Index 3: Gain",
+   "api_calls": [
+    "channels.channelCount/1",
+    "channels.getChannelName/2",
+    "plugins.getParamCount/3",
+    "plugins.getParamName/4",
+    "plugins.getPluginName/4",
+    "plugins.isValid/1",
+    "plugins.isValid/2"
+   ],
+   "host_calls": 16
+  },
+  {
+   "name": "get_plugin_parameter_value",
+   "status": "ok",
+   "result": "Value for 'Cutoff' (Visual Index 1): Normalized Value: 0.5000",
+   "api_calls": [
+    "channels.channelCount/1",
+    "channels.getChannelName/2",
+    "plugins.getParamCount/3",
+    "plugins.getParamName/4",
+    "plugins.getParamValue/4",
+    "plugins.getPluginName/4",
+    "plugins.isValid/1",
+    "plugins.isValid/2"
+   ],
+   "host_calls": 15
+  },
+  {
+   "name": "set_plugin_parameter_value",
+   "status": "ok",
+   "result": "Set 'Cutoff' (Visual Index 1) to 0.9000",
+   "api_calls": [
+    "channels.channelCount/1",
+    "channels.getChannelName/2",
+    "channels.showEditor/3",
+    "plugins.getParamCount/3",
+    "plugins.getParamName/4",
+    "plugins.getPluginName/4",
+    "plugins.isValid/1",
+    "plugins.isValid/2",
+    "plugins.setParamValue/6"
+   ],
+   "host_calls": 16
+  },
+  {
+   "name": "save_piano_roll_script",
+   "status": "ok",
+   "result": "Successfully saved Piano Roll script as 'demo.py'",
+   "api_calls": [
+    "ilmcp.storePRScript/2"
+   ],
+   "host_calls": 1
+  },
+  {
+   "name": "run_piano_roll_script",
+   "status": "ok",
+   "result": "true",
+   "api_calls": [
+    "ilmcp.runPRScript/1",
+    "ui.showWindow/1"
+   ],
+   "host_calls": 2
+  }
+ ]
+}

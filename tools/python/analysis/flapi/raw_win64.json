@@ -1,0 +1,1060 @@
+{
+ "file": "/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin",
+ "slice": "pe",
+ "modules": {
+  "channels": [
+   {
+    "functions": [
+     [
+      "isHighLighted",
+      "Is higlight rectangle defined"
+     ],
+     [
+      "midiNoteOn",
+      "Set midi note on for channel"
+     ],
+     [
+      "isGraphEditorVisible",
+      "Returns true if graph editor is visible"
+     ],
+     [
+      "updateGraphEditor",
+      "Update graph editor"
+     ],
+     [
+      "closeGraphEditor",
+      "Close graph editor"
+     ],
+     [
+      "showGraphEditor",
+      "Show graph editor"
+     ],
+     [
+      "setStepParameterByIndex",
+      "Set step parameter by index"
+     ],
+     [
+      "getActivityLevel",
+      "Get channel activity level"
+     ],
+     [
+      "quickQuantize",
+      "Perform quick quantize"
+     ],
+     [
+      "rerollLoopStarterLoop",
+      "Reroll LoopStarter audio loop (use index -1 for all loops)"
+     ],
+     [
+      "rerollLoopStarterSteps",
+      "Reroll LoopStarter steps (use index -1 for all step channels)"
+     ],
+     [
+      "rerollLoopStarterSample",
+      "Reroll LoopStarter kit sample (use index -1 for all step channels)"
+     ],
+     [
+      "getSwing",
+      "Get swing "
+     ],
+     [
+      "setSwing",
+      "Set swing"
+     ]
+    ],
+    "name_only": [
+     "channelCount",
+     "channelNumber",
+     "deselectAll",
+     "focusEditor",
+     "getChannelColor",
+     "getChannelIndex",
+     "getChannelMidiInPort",
+     "getChannelName",
+     "getChannelPan",
+     "getChannelPitch",
+     "getChannelType",
+     "getChannelVolume",
+     "getCurrentStepParam",
+     "getGridBit",
+     "getGridBitWithLoop",
+     "getRecEventId",
+     "getStepParam",
+     "getTargetFxTrack",
+     "incEventValue",
+     "isChannelMuted",
+     "isChannelSelected",
+     "isChannelSolo",
+     "isGridBitAssigned",
+     "muteChannel",
+     "processRECEvent",
+     "selectAll",
+     "selectChannel",
+     "selectOneChannel",
+     "selectedChannel",
+     "setChannelColor",
+     "setChannelName",
+     "setChannelPan",
+     "setChannelPitch",
+     "setChannelVolume",
+     "setGridBit",
+     "setTargetFxTrack",
+     "showCSForm",
+     "showEditor",
+     "soloChannel"
+    ],
+    "tail": [
+     "ÌÌÌÌÌVSHì(HËH\rx{",
+     "è»£íÿHÆHÙH\u0015\u00167\u0002",
+     "èI\u0018kÿHÃHñè®ÿÿÿH\u0018HðHÄ([^ÃÌ\u0005Q¿",
+     "\u0001=J¿",
+     "ÃÌ-A¿",
+     "\u0001=:¿",
+     "ÿÃÌHì(H\u0005õ?",
+     "\bH\u0005Ì[",
+     "ÿ\u0010HÄ(ÃÌÌÌÌÌUSHì8HìHËHÇC`þÿÿÿH\u0005µ`",
+     "H",
+     "H@\bHÁH",
+     "ÿ",
+     "ÀtfHÇC`",
+     "HC\u0018HÀ|\u0014H\r:",
+     "\té\u0002HcÉH;Á~\nH{\u0018õ\u0001",
+     "u7HK HU/A¸\u0001",
+     "èLµjÿH\u0005;",
+     "H8",
+     "t\u0017H\u0005;",
+     "H\bS\u0018L\u000f¶E/è\u0012S",
+     "He8[]Ãindex"
+    ],
+    "marker_tok": 866137
+   }
+  ],
+  "mixer": [
+   {
+    "functions": [
+     [
+      "automateEvent",
+      "Automate event"
+     ],
+     [
+      "getTrackPeaks",
+      "Get track peaks"
+     ],
+     [
+      "getTrackRecordingFileName",
+      "Get track recording file name"
+     ],
+     [
+      "linkTrackToChannel",
+      "Link track to channel"
+     ],
+     [
+      "linkChannelToTrack",
+      "Link channel to track"
+     ],
+     [
+      "getSongStepPos",
+      "Get song step position"
+     ],
+     [
+      "getCurrentTempo",
+      "Get current tempo"
+     ],
+     [
+      "setCurrentTempo",
+      "Set current tempo"
+     ],
+     [
+      "getRecPPS",
+      "Get Rec pps"
+     ],
+     [
+      "getSongTickPos",
+      "Get sing tick pos"
+     ],
+     [
+      "getLastPeakVol",
+      "Get last peak vol"
+     ],
+     [
+      "getTrackDockSide",
+      "Get track dock"
+     ],
+     [
+      "isTrackSlotsEnabled",
+      "Get track slots enabled state"
+     ],
+     [
+      "enableTrackSlots",
+      "Toggle track slots enabled state"
+     ],
+     [
+      "isTrackRevPolarity",
+      "Get track reversed polarity state"
+     ],
+     [
+      "revTrackPolarity",
+      "Toggle track reverssed polarity state"
+     ],
+     [
+      "focusEditor",
+      "focus mixer editor"
+     ],
+     [
+      "getActiveEffectIndex",
+      "get Active Effect Index"
+     ],
+     [
+      "isTrackSwapChannels",
+      "Get track swap channels state"
+     ],
+     [
+      "swapTrackChannels",
+      "Toggle track swap channels state"
+     ],
+     [
+      "getEqBandCount",
+      "Get eq band count"
+     ],
+     [
+      "getEqGain",
+      "Get eq gain"
+     ],
+     [
+      "setEqGain",
+      "Set eq gain"
+     ],
+     [
+      "getEqFrequency",
+      "Get eq frequency"
+     ],
+     [
+      "setEqFrequency",
+      "Set eq frequency"
+     ],
+     [
+      "getEqBandwidth",
+      "Get eq bandwidth"
+     ],
+     [
+      "setEqBandwidth",
+      "Set eq bandwidth"
+     ],
+     [
+      "getTrackCount",
+      "Get track count"
+     ]
+    ],
+    "name_only": [
+     "afterRoutingChanged",
+     "armTrack",
+     "deselectAll",
+     "enableTrack",
+     "getAutoSmoothEventValue",
+     "getEventIDName",
+     "getEventIDValueString",
+     "getEventValue",
+     "getRouteSendActive",
+     "getSlotColor",
+     "getTrackColor",
+     "getTrackInfo",
+     "getTrackName",
+     "getTrackPan",
+     "getTrackPluginId",
+     "getTrackStereoSep",
+     "getTrackVolume",
+     "isTrackArmed",
+     "isTrackAutomationEnabled",
+     "isTrackEnabled",
+     "isTrackMuteLock",
+     "isTrackMuted",
+     "isTrackPluginValid",
+     "isTrackSelected",
+     "isTrackSolo",
+     "muteTrack",
+     "remoteFindEventValue",
+     "selectAll",
+     "selectTrack",
+     "setActiveTrack",
+     "setRouteTo",
+     "setSlotColor",
+     "setTrackColor",
+     "setTrackName",
+     "setTrackNumber",
+     "setTrackPan",
+     "setTrackStereoSep",
+     "setTrackVolume",
+     "soloTrack",
+     "trackCount"
+    ],
+    "tail": [
+     "ÌÌÌÌÌÌÌÌVSHì(HËH\r\u0018A{",
+     "è;=íÿHÆHÙH\u0015Ð\u0001",
+     "èÉ±jÿHÃHñè®ÿÿÿH\u0018HðHÄ([^ÃÌ\u0005ÕX",
+     "\u0001=ÎX",
+     "ÃÌ-ÅX",
+     "\u0001=¾X",
+     "ÿÃÌHì(H\u0005íò",
+     "\bH\u0005Lõ",
+     "ÿ\u0010HÄ(ÃÌÌÌÌÌVSHì(3Û¾\u0001",
+     "ñ²\u0001M3ÀM3ÉèÔ?W",
+     "Àu\u0003Ã\u0001Æ\u0001þè\u0003",
+     "ußÙH\u0005\bõ",
+     "ÿ\u0010HÄ([^ÃÌÌÌÌÌÌÌÌÌÌÌÌÌÌÌHì(¹ç\u0003",
+     "H\u0005àô",
+     "ÿ\u0010HÄ(ÃÌÌÌÌÌÌÌÌÌUHìPHìHU HÇE@",
+     "HÇE8",
+     "HM H\u0015À",
+     "LELH\u0005uÐ",
+     "ÿ\u0010HcÀHÀ~OHcELHÀ|?H=ç\u0003",
+     "7MLHU@M3ÀèSÀV",
+     "HM8HU@è\u0006vkÿHM8èÝñjÿHÁH\u0005#ï",
+     "ÿ\u0010HE(ë\u0013HÇÀüÿÿÿÁèÝÝ\u0001",
+     "HE(HM8è_ßjÿHM@è\u0006ßjÿHE(HeP]ÃH@",
+     "H\u0004\u0005",
+     "USHì(HìHÓHK8è+ßjÿHK@èÒÞjÿHe([]Ã",
+     "i",
+     "ÌÌÌÌÌÌSHì HËHÇC`þÿÿÿH\u0005Ùø",
+     "H",
+     "H@\bHÁH",
+     "ÿ",
+     "ÀtRHÇC`",
+     "HC\u0018HÀ|9H=ç\u0003",
+     "1K\u0018HSHèÀV",
+     "H\u0005Îæ",
+     "H",
+     "H4\r",
+     "HÀt\u0017HÁ²\u0001M3ÀèÊ+\u0014",
+     "ë\bHÇC`üÿÿÿHÄ [ÃÌÌÌÌÌÌÌÌÌÌUVSHì°",
+     "HìHMhHUpHÇ ",
+     "H",
+     "H\u0015âÇ\u0001",
+     "è­\u0006kÿHMhè#'",
+     "H0HMpH\u0015\t\u0001",
+     "L¬",
+     "L",
+     "H\u0005ÈÎ",
+     "ÿ\u0010ÃHcÛH ",
+     "H",
+     "è6wkÿHÛ~bHñH",
+     "L\u0005àþÿÿL ",
+     "Hc¬",
+     "HD$ HÇD$(",
+     "HÇD$0",
+     "HÇD$8",
+     "HÇD$@",
+     "HÇD$H",
+     "ÆD$P\u0001èÆó\u0001",
+     "H",
+     "Ùè\bÜ\u0001",
+     "HExH",
+     "H\u0015\u0015Ç\u0001",
+     "è",
+     "\fkÿH ",
+     "è$ÝjÿHExH¥°",
+     "[^]ÃHD ",
+     "USHì(HìHÓH",
+     "H\u0015ÖÆ\u0001",
+     "èÁ\u000bkÿH ",
+     "èåÜjÿHe([]Ã"
+    ],
+    "marker_tok": 868144
+   }
+  ],
+  "patterns": [
+   {
+    "functions": [
+     [
+      "patternNumber",
+      "Get current pattern number"
+     ],
+     [
+      "patternCount",
+      "Get patterns count"
+     ],
+     [
+      "patternMax",
+      "Get max pattern id"
+     ],
+     [
+      "getPatternName",
+      "Get pattern name"
+     ],
+     [
+      "setPatternName",
+      "Set pattern name"
+     ],
+     [
+      "getPatternColor",
+      "Get pattern color"
+     ],
+     [
+      "setPatternColor",
+      "Set pattern color"
+     ],
+     [
+      "getPatternLength",
+      "Get pattern length"
+     ],
+     [
+      "setPatternLength",
+      "Set pattern length"
+     ],
+     [
+      "duplicatePatternData",
+      "Duplicate pattern data"
+     ],
+     [
+      "incrementPatternLength",
+      "Increment pattern length"
+     ],
+     [
+      "getBlockSetStatus",
+      "Get block set status"
+     ],
+     [
+      "ensureValidNoteRecord",
+      "Ensure Valid Note Record"
+     ],
+     [
+      "jumpToPattern",
+      "Jump to pattern"
+     ],
+     [
+      "findFirstNextEmptyPat",
+      "Find first next empty pattern"
+     ],
+     [
+      "getChannelLoopStyle",
+      "Get channel loop style"
+     ],
+     [
+      "setChannelLoop",
+      "Set channel loop"
+     ],
+     [
+      "isPatternSelected",
+      "Get pattern selected state"
+     ],
+     [
+      "isPatternDefault",
+      "Get pattern default state"
+     ],
+     [
+      "selectPattern",
+      "Select pattern"
+     ],
+     [
+      "selectAll",
+      "Select all patterns"
+     ],
+     [
+      "deselectAll",
+      "Deselect all patterns"
+     ],
+     [
+      "clonePattern",
+      "Clone pattern"
+     ],
+     [
+      "clearPattern",
+      "Clear pattern"
+     ],
+     [
+      "movePattern",
+      "Move pattern"
+     ],
+     [
+      "burnLoop",
+      "Burn loop"
+     ],
+     [
+      "setLoopStarterRootNote",
+      "Set the root note of Loopstarter, when its enabled"
+     ],
+     [
+      "getPatternGroupCount",
+      "Get pattern group count"
+     ],
+     [
+      "getActivePatternGroup",
+      "Get active pattern group"
+     ],
+     [
+      "getPatternGroupName",
+      "Get pattern group name"
+     ],
+     [
+      "getPatternsInGroup",
+      "Get patterns in group"
+     ]
+    ],
+    "name_only": [],
+    "tail": [
+     "ÌÌÌÌÌVSHì(HËH\r0&{",
+     "èK\u0013íÿHÆHÙH\u0015¦¦\u0001",
+     "èÙjÿHÃHñè®ÿÿÿH\u0018HðHÄ([^ÃÌ\u0005é.",
+     "\u0001=â.",
+     "ÃÌ-Ù.",
+     "\u0001=Ò.",
+     "ÿÃÌindex",
+     "value",
+     "pmeFlags"
+    ],
+    "marker_tok": 868986
+   }
+  ],
+  "transport": [
+   {
+    "functions": [
+     [
+      "globalTransport",
+      "Global transport"
+     ],
+     [
+      "start",
+      "Start playback"
+     ],
+     [
+      "stop",
+      "Stop playback"
+     ],
+     [
+      "record",
+      "Start recording"
+     ],
+     [
+      "isRecording",
+      "Get recording state"
+     ],
+     [
+      "getLoopMode",
+      "Get loop mode"
+     ],
+     [
+      "setLoopMode",
+      "Set loop mode"
+     ],
+     [
+      "getSongPos",
+      "Get song position"
+     ],
+     [
+      "setSongPos",
+      "Set song position"
+     ],
+     [
+      "getSongPosHint",
+      "Get song position hint"
+     ],
+     [
+      "rewind",
+      "Rewind song"
+     ],
+     [
+      "setPlaybackSpeed",
+      "Set playback speed"
+     ],
+     [
+      "fastForward",
+      "Fast forward song pos"
+     ],
+     [
+      "isPlaying",
+      "Returns if the program is playing or stopped"
+     ],
+     [
+      "markerJumpJog",
+      "Jog marker jump"
+     ],
+     [
+      "markerSelJog",
+      "Jog marker selection"
+     ],
+     [
+      "getHWBeatLEDState",
+      "get HWBeatLEDState"
+     ],
+     [
+      "continuousMovePos",
+      "Continuous move pos"
+     ],
+     [
+      "continuousMove",
+      "Continuous move"
+     ],
+     [
+      "getSongLength",
+      "Get song length"
+     ]
+    ],
+    "name_only": [],
+    "tail": [
+     "ÌÌÌÌVSHì(HËH\rP\u0018{",
+     "èËüìÿHÆHÙH\u0015&\u0001",
+     "èYqjÿHÃHñè®ÿÿÿH\u0018HðHÄ([^ÃÌ\u0005m\u0018",
+     "\u0001=f\u0018",
+     "ÃÌ-]\u0018",
+     "\u0001=V\u0018",
+     "ÿÃÌH\u0005Á·",
+     "H8",
+     "t\fH\u0005´·",
+     "H",
+     "ë\nH\u0005\u0018¨",
+     "H",
+     "ÃÌÌÌÌÌÌÌÌÌÌÌÌUSHìhHìHM0HMHH\u0015h\u0001",
+     "è3ÈjÿHM0èù\u001a",
+     "H\u0018èD'",
+     "HÙHUHA¸\u0014",
+     "A¹\u0001",
+     "D$ ÇD$(\u000f",
+     "èm¸\u0001",
+     "HEHHÀu\u0012MPH\u0005Z´",
+     "ÿ\u0010HE8ë\fÁèë\u0001",
+     "HE8HMHH\u0015û\u0001",
+     "èæÍjÿHE8Heh[]ÃHÀH\u0004\u0005",
+     "UHì HìHJHH\u0015Í\u0001",
+     "è¸ÍjÿHe ]ÃÌÌUSHìhHìHM0HMHH\u0015¨\u0001",
+     "èsÇjÿHM0è9\u001a",
+     "H\u0018èÁC'",
+     "HÙHUHA¸\u0015",
+     "A¹\u0001",
+     "D$ ÇD$(\u000f",
+     "è­·\u0001",
+     "HEHHÀu\u0012MPH\u0005³",
+     "ÿ\u0010HE8ë\fÁè+\u0001",
+     "HE8HMHH\u0015;\u0001",
+     "è&ÍjÿHE8Heh[]ÃHÀH\u0004\u0005",
+     "UHì HìHJHH\u0015\r\u0001",
+     "èøÌjÿHe ]ÃÌÌUSHìhHìHM0HMHH\u0015è\u0001",
+     "è³ÆjÿHM0èy\u0019",
+     "H\u0018è\u0001C'",
+     "HÙHUHA¸\u0016",
+     "A¹\u0001",
+     "D$ ÇD$(\u000f",
+     "èí¶\u0001",
+     "HEHHÀu\u0012MPH\u0005Ú²",
+     "ÿ\u0010HE8ë\fÁèk\u0001",
+     "HE8HMHH\u0015{\u0001",
+     "èfÌjÿHE8Heh[]ÃHÀH\u0004\u0005",
+     "UHì HìHJHH\u0015M\u0001",
+     "è8ÌjÿHe ]ÃÌÌUSHìxHìHM8HU@HMPH\u0015$\u0001",
+     "èïÅjÿHM8èµ\u0018",
+     "H\u0018HM@H\u0015§",
+     "LElH\u0005\u0014",
+     "ÿ\u0010HcÀHÀ~Bè\u001dB'",
+     "HÙHUPA¸\u0016",
+     "DMlD$ ÇD$(\u000f",
+     "è\u000b¶\u0001",
+     "HEPHÀu\u0012MXH\u0005ø±",
+     "ÿ\u0010HEHë\fÁè\u0001",
+     "HEHHMPH\u0015\u0001",
+     "èËjÿHEHHex[]ÃH\u0004\u0005",
+     "UHì HìHJPH\u0015m\u0001",
+     "èXËjÿHe ]Ã",
+     "i",
+     "ÌÌÌÌÌÌÌÌÌÌÌÌÌÌSHì HËHÇC`þÿÿÿH\u0005¶",
+     "H",
+     "H@\bHÁH",
+     "ÿ",
+     "Àt\u001aHÇC`",
+     "H\u0005K",
+     "H\bS\u0018èâ*",
+     "HÄ [ÃÌÌUSHì¨",
+     "HìHMhHUpH",
+     "H\u0015Þ\u0001",
+     "è©ÄjÿHMhèo\u0017",
+     "H\u0018HMpH\u0015Õ",
+     "L",
+     "H\u0005Ë",
+     "ÿ\u0010HcÀHÀ~^HÙH",
+     "L\u0005HÿÿÿM3ÉH",
+     "HD$ HÇD$(",
+     "HÇD$0",
+     "HÇD$8",
+     "HÇD$@",
+     "HÇD$H",
+     "ÆD$P\u0001èâ±\u0001",
+     "H",
+     "Áè$\u0001",
+     "HExH",
+     "H\u00151\u0001",
+     "è\u001cÊjÿHExH¥¨",
+     "[]ÃdHD ",
+     "H\u0004\u0005",
+     "UHì HìH",
+     "H\u0015ú\u0001",
+     "èåÉjÿHe ]Ã",
+     "i",
+     "ÌÌÌÌÌÌÌÌÌÌUHì@HìHÇE(",
+     "HÇE8",
+     "H\u0005ø",
+     "H\bHU(èÔÛ*",
+     "HM8HU(è1kÿHM8è^­jÿHÁH\u0005¤ª",
+     "ÿ\u0010HE ë\u0001HM(è¢jÿHM8èéjÿHE He@]ÃH",
+     "H\u0004\u0005",
+     "USHì(HìHÓHK(èkjÿHK8è²jÿHe([]ÃÌÌÌÌÌÌÌÌÌÌÌHì(èwúÿÿ \u000b",
+     "H\u0005Z¯",
+     "ÿ\u0010HÄ(ÃÌÌÌHì(H\u0005n",
+     "\bH\u0005<¯",
+     "ÿ\u0010HÄ(ÃÌÌÌÌÌSHì HËHÇC`þÿÿÿH\u0005)´",
+     "H",
+     "H@\bHÁH",
+     "ÿ",
+     "Àt6HÇC`",
+     "HC\u0018Hø\u0018|\u001cH=À\u0003",
+     "\u0014H\u0005\u0019",
+     "H\bS\u0018è¶_",
+     "ë\bHÇC`ýÿÿÿHÄ [ÃÌÌÌÌÌÌUSHì¨",
+     "HìHMhHUpH",
+     "H\u0015^\u0001",
+     "è)ÂjÿHMhèï\u0014",
+     "H\u0018HMpH\u0015Õ",
+     "L",
+     "H\u0005K",
+     "ÿ\u0010HcÀHÀ~^HÙH",
+     "L\u0005(ÿÿÿM3ÉHc",
+     "HD$ HÇD$(",
+     "HÇD$0",
+     "HÇD$8",
+     "HÇD$@",
+     "HÇD$H",
+     "ÆD$P\u0001èb¯\u0001",
+     "H",
+     "Áè¤\u0001",
+     "HExH",
+     "H\u0015±\u0001",
+     "èÇjÿHExH¥¨",
+     "[]ÃdHD ",
+     "H\u0004\u0005",
+     "UHì HìH",
+     "H\u0015z\u0001",
+     "èeÇjÿHe ]Ã",
+     "i",
+     "ÌÌÌÌÌÌÌÌÌÌSHì HËHÇC`þÿÿÿH\u0005²",
+     "H",
+     "H@\bHÁH",
+     "ÿ",
+     "Àt4HÇC`",
+     "HC\u0018Hø\u0001|\u001aHø\u0010\u0014H\u0005~",
+     "H\bS\u0018è\u0018Ô_",
+     "ë\bHÇC`ýÿÿÿHÄ [ÃÌÌÌÌÌÌÌÌUSHì¨",
+     "HìHMhHUpH",
+     "H\u0015Î\u0001",
+     "èÀjÿHMhè_\u0013",
+     "H\u0018HMpH\u0015Õ",
+     "L",
+     "H\u0005»",
+     "ÿ\u0010HcÀHÀ~^HÙH",
+     "L\u0005(ÿÿÿM3ÉHc",
+     "HD$ HÇD$(",
+     "HÇD$0",
+     "HÇD$8",
+     "HÇD$@",
+     "HÇD$H",
+     "ÆD$P\u0001èÒ­\u0001",
+     "H",
+     "Áè\u0014\u0001",
+     "HExH",
+     "H\u0015!\u0001",
+     "è\fÆjÿHExH¥¨",
+     "[]ÃdHD ",
+     "H\u0004\u0005",
+     "UHì HìH",
+     "H\u0015ê\u0001",
+     "èÕÅjÿHe ]Ã",
+     "i",
+     "ÌÌÌÌÌÌÌÌÌÌSHì HËHÇC`þÿÿÿH\u0005\t±",
+     "H",
+     "H@\bHÁH",
+     "ÿ",
+     "Àt4HÇC`",
+     "HC\u0018Hø\u0002|\u001aHø\u0010\u0014H\u0005û|",
+     "H\bS\u0018è\bÓ_",
+     "ë\bHÇC`ýÿÿÿHÄ [ÃÌÌÌÌÌÌÌÌUSHì¨",
+     "HìHMhHUpH",
+     "H\u0015>\u0001",
+     "è\t¿jÿHMhèÏ\u0011",
+     "H\u0018HMpH\u0015Õ",
+     "L",
+     "H\u0005+",
+     "ÿ\u0010HcÀHÀ~^HÙH",
+     "L\u0005(ÿÿÿM3ÉHc",
+     "HD$ HÇD$(",
+     "HÇD$0",
+     "HÇD$8",
+     "HÇD$@",
+     "HÇD$H",
+     "ÆD$P\u0001èB¬\u0001",
+     "H",
+     "Áè\u0001",
+     "HExH",
+     "H\u0015\u0001",
+     "è|ÄjÿHExH¥¨",
+     "[]ÃdHD ",
+     "H\u0004\u0005",
+     "UHì HìH",
+     "H\u0015Z\u0001",
+     "èEÄjÿHe ]Ã",
+     "i",
+     "ÌÌÌÌÌÌÌÌÌÌHì(H\u0005Ås",
+     "\bH\u0005lª",
+     "ÿ\u0010HÄ(ÃÌÌÌÌÌHì(H\u0005m|",
+     "H\u000f¶\bH\u0005Jª",
+     "ÿ\u0010HÄ(ÃÌÌÌHì(H\u0005½s",
+     "H\u000f¶\bH\u0005*ª",
+     "ÿ\u0010HÄ(ÃÌÌÌUSHì8HìHËHÇC`þÿÿÿH\u0005\u0015¯",
+     "H",
+     "H@\bHÁH",
+     "ÿ",
+     "Àt;HÇC`",
+     "HK\u0018HU(A¸\b",
+     "èÓ\u0003jÿH\u0005Ä",
+     "H\bHSHLE(H{ \u0001A\u000fÁè\u0003â*",
+     "He8[]ÃundoName",
+     "flags"
+    ],
+    "marker_tok": 869408
+   }
+  ],
+  "general": [
+   {
+    "functions": [
+     [
+      "undoUp",
+      "Move up in undo history "
+     ],
+     [
+      "undoDown",
+      "Move down in undo history "
+     ],
+     [
+      "undoUpDown",
+      "Move up and down in undo history"
+     ],
+     [
+      "restoreUndo",
+      "Restore undo"
+     ],
+     [
+      "restoreUndoLevel",
+      "Restore undo by level"
+     ],
+     [
+      "getUndoLevelHint",
+      "Get undo level"
+     ],
+     [
+      "getRecPPB",
+      "Get rec ppb"
+     ],
+     [
+      "getRecPPQ",
+      "Get rec ppq"
+     ],
+     [
+      "setRecPPQ",
+      "Set rec ppq"
+     ],
+     [
+      "setNumerator",
+      "Set numerator"
+     ],
+     [
+      "setDenominator",
+      "Set denominator"
+     ],
+     [
+      "getChangedFlag",
+      "Get changed flag "
+     ],
+     [
+      "getUseMetronome",
+      "Get use metronome"
+     ],
+     [
+      "getPrecount",
+      "Get precounr"
+     ],
+     [
+      "saveUndo",
+      "Save undo"
+     ],
+     [
+      "getUndoHistoryPos",
+      "Get undo history position"
+     ],
+     [
+      "getUndoHistoryCount",
+      "Get undo history count"
+     ],
+     [
+      "getUndoHistoryLast",
+      "Get undo history last"
+     ],
+     [
+      "setUndoHistoryPos",
+      "Set undo history position"
+     ],
+     [
+      "setUndoHistoryCount",
+      "Set undo history count"
+     ],
+     [
+      "setUndoHistoryLast",
+      "Set undo history last"
+     ],
+     [
+      "getVersion",
+      "Get Midi scripting version"
+     ],
+     [
+      "processRECEvent",
+      "Process rec event"
+     ],
+     [
+      "dumpScoreLog",
+      "Dump score log"
+     ],
+     [
+      "clearLog",
+      "Clear log"
+     ],
+     [
+      "safeToEdit",
+      "Safe to edit stuff"
+     ],
+     [
+      "getProjectTitle",
+      "Get project title"
+     ],
+     [
+      "getProjectAuthor",
+      "Get project author"
+     ],
+     [
+      "getProjectGenre",
+      "Get project genre"
+     ]
+    ],
+    "name_only": [],
+    "tail": [
+     "ÌÌÌÌÌÌVSHì(HËH\rP\u0004{",
+     "èûàìÿHÆHÙH\u0015Vt\u0001",
+     "èUjÿHÃHñè®ÿÿÿH\u0018HðHÄ([^ÃÌ\u0005¡ü",
+     "\u0001=ü",
+     "ÃÌ-ü",
+     "\u0001=ü",
+     "ÿÃÌUSHìxHìHM8HU@HMPH\u0015Äm\u0001",
+     "è¬jÿHM8èS",
+     "H\u0018HM@H\u0015§",
+     "LElH\u0005´t",
+     "ÿ\u0010HcÀHÀ~?è½('",
+     "HÙHUPM3ÀDMlD$ ÇD$(\u000f",
+     "è®\u0001",
+     "HEPHÀu\u0012MXH\u0005",
+     "ÿ\u0010HEHë\fÁè,\u0001",
+     "HEHHMPH\u0015<m\u0001",
+     "è'²jÿHEHHex[]ÃH@",
+     "H\u0004\u0005",
+     "UHì HìHJPH\u0015\rm\u0001",
+     "èø±jÿHe ]Ã",
+     "i",
+     "ÌÌÌÌÌÌÌÌÌÌÌÌÌÌUSHìxHìHM8HU@HMPH\u0015Ôl\u0001",
+     "è«jÿHM8èR",
+     "H\u0018HM@H\u0015§",
+     "LElH\u0005Äs",
+     "ÿ\u0010HcÀHÀ~BèÍ''",
+     "HÙHUPA¸\u0001",
+     "DMlD$ ÇD$(\u000f",
+     "è»\u0001",
+     "HEPHÀu\u0012MXH\u0005¨",
+     "ÿ\u0010HEHë\fÁè9\u0001",
+     "HEHHMPH\u0015Il\u0001",
+     "è4±jÿHEHHex[]ÃH\u0004\u0005",
+     "UHì HìHJPH\u0015\u001dl\u0001",
+     "è\b±jÿHe ]Ã",
+     "i",
+     "ÌÌÌÌÌÌÌÌÌÌÌÌÌÌUSHìxHìHM8HU@HMPH\u0015äk\u0001",
+     "è¯ªjÿHM8è¥Q",
+     "H\u0018HM@H\u0015§",
+     "LElH\u0005Ôr",
+     "ÿ\u0010HcÀHÀ~BèÝ&'",
+     "HÙHUPA¸\u0002",
+     "DMlD$ ÇD$(\u000f",
+     "èË\u0001",
+     "HEPHÀu\u0012MXH\u0005¸",
+     "ÿ\u0010HEHë\fÁèI\u0001",
+     "HEHHMPH\u0015Yk\u0001",
+     "èD°jÿHEHHex[]ÃH\u0004\u0005",
+     "UHì HìHJPH\u0015-k\u0001",
+     "è\u0018°jÿHe ]Ã",
+     "i",
+     "ÌÌÌÌÌÌÌÌÌÌÌÌÌÌUSHìxHìHM8HU@HMPH\u0015ôj\u0001",
+     "è¿©jÿHM8èµP",
+     "H\u0018HM@H\u0015§",
+     "LElH\u0005äq",
+     "ÿ\u0010HcÀHÀ~Bèí%'",
+     "HÙHUPA¸\u0003",
+     "DMlD$ ÇD$(\u000f",
+     "èÛ\u0001",
+     "HEPHÀu\u0012MXH\u0005È",
+     "ÿ\u0010HEHë\fÁèY\u0001",
+     "HEHHMPH\u0015ij\u0001",
+     "èT¯jÿHEHHex[]ÃH\u0004\u0005",
+     "UHì HìHJPH\u0015=j\u0001",
+     "è(¯jÿHe ]Ã",
+     "i",
+     "ÌÌÌÌÌÌÌÌÌÌÌÌÌÌUSHìxHìHM8HU@HMPH\u0015\u0004j\u0001",
+     "èÏ¨jÿHM8èÅO",
+     "H\u0018HM@H\u0015§",
+     "LElH\u0005ôp",
+     "ÿ\u0010HcÀHÀ~Bèý$'",
+     "HÙHUPA¸\u0004",
+     "DMlD$ ÇD$(\u000f",
+     "èë\u0001",
+     "HEPHÀu\u0012MXH\u0005Ø",
+     "ÿ\u0010HEHë\fÁèi~\u0001",
+     "HEHHMPH\u0015yi\u0001",
+     "èd®jÿHEHHex[]ÃH\u0004\u0005",
+     "UHì HìHJPH\u0015Mi\u0001",
+     "è8®jÿHe ]Ã",
+     "i",
+     "ÌÌÌÌÌÌÌÌÌÌÌÌÌÌUSHìhHìHM0HMHH\u0015\u0018i\u0001",
+     "èã§jÿHM0èÙN",
+     "H\u0018è1$'",
+     "HÙHUHA¸\u0005",
+     "A¹\u0001",
+     "D$ ÇD$(\u000f",
+     "è\u001d\u0001",
+     "HEHHÀu\u0012MPH\u0005\n",
+     "ÿ\u0010HE8ë\fÁè}\u0001",
+     "HE8HMHH\u0015«h\u0001",
+     "è­jÿHE8Heh[]ÃHÀH\u0004\u0005",
+     "UHì HìHJHH\u0015}h\u0001",
+     "èh­jÿHe ]ÃÌÌUSHìhHìHM0HMHH\u0015Xh\u0001",
+     "è#§jÿHM0è\u0019N",
+     "H\u0018èq#'",
+     "HÙHUHA¸\u0006",
+     "A¹\u0001",
+     "D$ ÇD$(\u000f",
+     "è]\u0001",
+     "HEHHÀu\u0012MPH\u0005J",
+     "ÿ\u0010HE8ë\fÁèÛ|\u0001",
+     "HE8HMHH\u0015ëg\u0001",
+     "èÖ¬jÿHE8Heh[]ÃHÀH\u0004\u0005",
+     "UHì HìHJHH\u0015½g\u0001",
+     "è¨¬jÿHe ]ÃÌÌUSHìxHìHM8HU@HMPH\u0015g\u0001",
+     "è_¦jÿHM8èUM",
+     "H\u0018HM@H\u0015§",
+     "LElH\u0005n",
+     "ÿ\u0010HcÀHÀ~Bè\"'",
+     "HÙHUPA¸\b",
+     "DMlD$ ÇD$(\u000f",
+     "è{\u0001"
+    ],
+    "marker_tok": 869925
+   }
+  ]
+ }
+}

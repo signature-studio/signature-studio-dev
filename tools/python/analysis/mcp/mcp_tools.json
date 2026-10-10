@@ -1,0 +1,1699 @@
+{
+ "python": "3.12.1",
+ "tool_count": 48,
+ "imports": [
+  "arrangement",
+  "ast",
+  "channels",
+  "device",
+  "general",
+  "ilmcp",
+  "inspect",
+  "json",
+  "math",
+  "midi",
+  "mixer",
+  "os",
+  "patterns",
+  "playlist",
+  "plugins",
+  "sys",
+  "time",
+  "traceback",
+  "transport",
+  "types",
+  "typing",
+  "ui"
+ ],
+ "tools": [
+  {
+   "name": "get_session_context",
+   "description": "Returns a snapshot of the current FL Studio session: tempo, active channels, and modified mixer tracks (including names, volumes, panning, routing, loaded plugi",
+   "description_chars": 198,
+   "params": [],
+   "api_calls": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "channels.getChannelPan",
+    "channels.getChannelVolume",
+    "channels.getTargetFxTrack",
+    "mixer.getCurrentTempo",
+    "mixer.getRouteSendActive",
+    "mixer.getRouteToLevel",
+    "mixer.getTrackName",
+    "mixer.getTrackPan",
+    "mixer.getTrackVolume",
+    "mixer.trackCount",
+    "plugins.getPluginName",
+    "plugins.isValid"
+   ],
+   "helpers": [],
+   "api_calls_transitive": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "channels.getChannelPan",
+    "channels.getChannelVolume",
+    "channels.getTargetFxTrack",
+    "mixer.getCurrentTempo",
+    "mixer.getRouteSendActive",
+    "mixer.getRouteToLevel",
+    "mixer.getTrackName",
+    "mixer.getTrackPan",
+    "mixer.getTrackVolume",
+    "mixer.trackCount",
+    "plugins.getPluginName",
+    "plugins.isValid"
+   ],
+   "helpers_transitive": []
+  },
+  {
+   "name": "get_browser_names",
+   "description": "Use this tool to collect browser contents. CRITICAL PATHS TO USE: 'Plugin database' (Use this to find instruments or generators for the Channel Rack)",
+   "description_chars": 149,
+   "params": [
+    {
+     "name": "name",
+     "type": "string",
+     "desc": "The exact directory path to search.",
+     "required": true
+    },
+    {
+     "name": "fullRecursive",
+     "type": "integer",
+     "desc": "Use 1 for deep search, 0 for direct children only.",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "ilmcp.getBrowserNames"
+   ],
+   "helpers": [],
+   "api_calls_transitive": [
+    "ilmcp.getBrowserNames"
+   ],
+   "helpers_transitive": []
+  },
+  {
+   "name": "show_or_hide_window",
+   "description": "Sets the visibility state (shows or hides) of specified FL Studio window. Use for requests to open or close windows.",
+   "description_chars": 116,
+   "params": [
+    {
+     "name": "window_name",
+     "type": "string",
+     "desc": "The name of the window. Valid names: {VALID_WINDOW_NAMES}",
+     "required": true
+    },
+    {
+     "name": "state",
+     "type": "string",
+     "desc": "The desired visibility state. Valid states: 'show', 'hide', 'open', 'close'.",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "ui.hideWindow",
+    "ui.showWindow"
+   ],
+   "helpers": [],
+   "api_calls_transitive": [
+    "ui.hideWindow",
+    "ui.showWindow"
+   ],
+   "helpers_transitive": []
+  },
+  {
+   "name": "get_highlight_names",
+   "description": "Returns a list of all currently valid UI elements that can be highlighted. Call this tool to get the exact string names required for the 'show_highlight' tool.",
+   "description_chars": 159,
+   "params": [],
+   "api_calls": [
+    "ilmcp.getHighlightNames"
+   ],
+   "helpers": [],
+   "api_calls_transitive": [
+    "ilmcp.getHighlightNames"
+   ],
+   "helpers_transitive": []
+  },
+  {
+   "name": "show_highlight",
+   "description": "Highlights a toolbar icon or UI element. Use when user asks to be shown something.",
+   "description_chars": 82,
+   "params": [
+    {
+     "name": "item",
+     "type": "string",
+     "desc": "The specific UI element to highlight. CRITICAL: This MUST be an exact string returned by the 'get_highlight_names' tool. DO NOT guess or substitute. If the user's requested element (e.g., 'browser') is not in the returned list, you MUST NOT substitute it with a workaround like 'Add channel'. You must leave this tool uncalled and tell the user you cannot highlight that specific item.",
+     "required": true
+    },
+    {
+     "name": "tutorialName",
+     "type": "string",
+     "desc": "A short label/identifier for the tutorial step (e.g., 'Open Piano Roll'). This is shown internally and used for grouping. ALWAYS provide a value.",
+     "required": true
+    },
+    {
+     "name": "tutorialCaption",
+     "type": "string",
+     "desc": "The instructional text displayed to the user along with the highlight.Keep this very brief. Never say 'click here' as the user will need to click a Continue button to remove this message.",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "ilmcp.getHighlightNames",
+    "ilmcp.showHighlight"
+   ],
+   "helpers": [
+    "whenDone"
+   ],
+   "api_calls_transitive": [
+    "ilmcp.getHighlightNames",
+    "ilmcp.showHighlight"
+   ],
+   "helpers_transitive": [
+    "whenDone"
+   ]
+  },
+  {
+   "name": "play",
+   "description": "Starts playback in FL Studio.",
+   "description_chars": 29,
+   "params": [],
+   "api_calls": [
+    "transport.start"
+   ],
+   "helpers": [],
+   "api_calls_transitive": [
+    "transport.start"
+   ],
+   "helpers_transitive": []
+  },
+  {
+   "name": "stop",
+   "description": "Stops playback in FL Studio.",
+   "description_chars": 28,
+   "params": [],
+   "api_calls": [
+    "transport.stop"
+   ],
+   "helpers": [],
+   "api_calls_transitive": [
+    "transport.stop"
+   ],
+   "helpers_transitive": []
+  },
+  {
+   "name": "get_tempo",
+   "description": "Gets the current project tempo in BPM.",
+   "description_chars": 38,
+   "params": [],
+   "api_calls": [
+    "mixer.getCurrentTempo"
+   ],
+   "helpers": [],
+   "api_calls_transitive": [
+    "mixer.getCurrentTempo"
+   ],
+   "helpers_transitive": []
+  },
+  {
+   "name": "set_tempo",
+   "description": "Sets the project tempo.",
+   "description_chars": 23,
+   "params": [
+    {
+     "name": "bpm",
+     "type": "integer",
+     "desc": "The tempo in BPM to set the project to.",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "mixer.setCurrentTempo"
+   ],
+   "helpers": [],
+   "api_calls_transitive": [
+    "mixer.setCurrentTempo"
+   ],
+   "helpers_transitive": []
+  },
+  {
+   "name": "list_channel_names",
+   "description": "Retrieves and lists all channels in the Channel Rack with their name and plugin. Returns a numbered list showing both the channel name and the underlying plugin",
+   "description_chars": 230,
+   "params": [],
+   "api_calls": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "plugins.getPluginName"
+   ],
+   "helpers": [],
+   "api_calls_transitive": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "plugins.getPluginName"
+   ],
+   "helpers_transitive": []
+  },
+  {
+   "name": "select_channels",
+   "description": "Selects, deselects, or toggles one or more channels in the Channel Rack. Use this when the user says 'select [instrument name]' or 'select channel [n]'. The tar",
+   "description_chars": 243,
+   "params": [
+    {
+     "name": "target_channels",
+     "type": "string",
+     "desc": "Comma-separated list of 1-based visual indices, names, or keywords ('all', 'selected').",
+     "required": true
+    },
+    {
+     "name": "selected",
+     "type": "integer",
+     "desc": "1 to select, 0 to deselect, -1 to toggle.",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "channels.selectChannel"
+   ],
+   "helpers": [
+    "_get_target_channel_indices"
+   ],
+   "api_calls_transitive": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "channels.isChannelSelected",
+    "channels.selectChannel",
+    "plugins.getPluginName",
+    "plugins.isValid"
+   ],
+   "helpers_transitive": [
+    "_get_target_channel_indices"
+   ]
+  },
+  {
+   "name": "rename_channels",
+   "description": "Renames one or multiple channels in a single call. If the user asks you to choose names (e.g. 'rename after colours'), generate them yourself and call this tool",
+   "description_chars": 170,
+   "params": [
+    {
+     "name": "channel_mapping",
+     "type": "string",
+     "desc": "Dictionary mapping 1-based visual channel numbers (or names) to new names. (e.g. {'1': 'Kick', '2': 'Snare'}).",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "channels.setChannelName"
+   ],
+   "helpers": [
+    "_get_target_channel_indices",
+    "_parse_llm_dict_arg"
+   ],
+   "api_calls_transitive": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "channels.isChannelSelected",
+    "channels.setChannelName",
+    "plugins.getPluginName",
+    "plugins.isValid"
+   ],
+   "helpers_transitive": [
+    "_get_target_channel_indices",
+    "_parse_llm_dict_arg"
+   ]
+  },
+  {
+   "name": "add_channel",
+   "description": "Use this tool to add a new instrument/generator to the channel rack. Effects are not for the channel rack. CRITICAL RULE: NEVER guess the plugin name. Before ca",
+   "description_chars": 259,
+   "params": [
+    {
+     "name": "plugin",
+     "type": "string",
+     "desc": "The exact name of the generator plugin. Do NOT include folder paths or file extensions (like .fst).",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "ilmcp.addChannel"
+   ],
+   "helpers": [],
+   "api_calls_transitive": [
+    "ilmcp.addChannel"
+   ],
+   "helpers_transitive": []
+  },
+  {
+   "name": "remove_channels",
+   "description": "Removes one or more channels from the Channel Rack. DESTRUCTIVE: if the matched channel's display name differs from its actual plugin (e.g. a channel named 'Syt",
+   "description_chars": 360,
+   "params": [
+    {
+     "name": "target_channels",
+     "type": "string",
+     "desc": "Comma-separated list of 1-based visual indices, names, or keywords ('all', 'selected').",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "ilmcp.removeChannel"
+   ],
+   "helpers": [
+    "_get_target_channel_indices"
+   ],
+   "api_calls_transitive": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "channels.isChannelSelected",
+    "ilmcp.removeChannel",
+    "plugins.getPluginName",
+    "plugins.isValid"
+   ],
+   "helpers_transitive": [
+    "_get_target_channel_indices"
+   ]
+  },
+  {
+   "name": "route_channels_to_mixer",
+   "description": "Routes one or more channels to a specified mixer track (useful for bus routing).",
+   "description_chars": 80,
+   "params": [
+    {
+     "name": "target_channels",
+     "type": "string",
+     "desc": "Comma-separated list of 1-based visual indices, names, or keywords ('all', 'selected') for source channels.",
+     "required": true
+    },
+    {
+     "name": "mixer_track_target",
+     "type": "string",
+     "desc": "The name or 0-based index of the destination mixer track (Master = 0, Insert 1 = 1).",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "channels.setTargetFxTrack",
+    "mixer.getTrackName"
+   ],
+   "helpers": [
+    "_get_target_channel_indices",
+    "_get_target_track_indices"
+   ],
+   "api_calls_transitive": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "channels.isChannelSelected",
+    "channels.setTargetFxTrack",
+    "mixer.getTrackName",
+    "mixer.isTrackSelected",
+    "mixer.trackCount",
+    "plugins.getPluginName",
+    "plugins.isValid"
+   ],
+   "helpers_transitive": [
+    "_get_target_channel_indices",
+    "_get_target_track_indices"
+   ]
+  },
+  {
+   "name": "get_channel_volumes",
+   "description": "Returns the current volume of one or more channels in normalized, percentage and dB form. Use this before relative volume changes: - 'reduce by X dB' → get volu",
+   "description_chars": 394,
+   "params": [
+    {
+     "name": "target_channels",
+     "type": "string",
+     "desc": "Comma-separated list of 1-based visual indices, names, or keywords ('all', 'selected').",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "channels.getChannelName",
+    "channels.getChannelVolume"
+   ],
+   "helpers": [
+    "_get_target_channel_indices"
+   ],
+   "api_calls_transitive": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "channels.getChannelVolume",
+    "channels.isChannelSelected",
+    "plugins.getPluginName",
+    "plugins.isValid"
+   ],
+   "helpers_transitive": [
+    "_get_target_channel_indices"
+   ]
+  },
+  {
+   "name": "set_channels_volume_db",
+   "description": "Sets volume for one or more channels in the Channel Rack using decibels (dB). Channel Rack volume maxes out at 0dB (unity, normalized 1.0). Accepts either a sin",
+   "description_chars": 395,
+   "params": [
+    {
+     "name": "target_channels",
+     "type": "string",
+     "desc": "Comma-separated list of 1-based visual indices, names, or keywords ('all', 'selected'). Pass 'mapping' to use per-channel values via volume_db.",
+     "required": true
+    },
+    {
+     "name": "volume_db",
+     "type": "string",
+     "desc": "Either a single dB value (e.g. '-10') applied to all target_channels, or a JSON mapping of channel→dB (e.g. '{'1': -5.0, '2': -3.0}') for per-channel targets. Max is 0dB (unity). Use mapping for relative changes across channels with different starting volumes.",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "channels.getChannelVolume",
+    "channels.setChannelVolume",
+    "midi.PIM_None"
+   ],
+   "helpers": [
+    "_db_to_normalized_volume",
+    "_get_target_channel_indices",
+    "_parse_mapping_arg"
+   ],
+   "api_calls_transitive": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "channels.getChannelVolume",
+    "channels.isChannelSelected",
+    "channels.setChannelVolume",
+    "midi.PIM_None",
+    "mixer.getTrackVolume",
+    "plugins.getPluginName",
+    "plugins.isValid"
+   ],
+   "helpers_transitive": [
+    "_db_to_normalized_volume",
+    "_get_target_channel_indices",
+    "_parse_mapping_arg"
+   ]
+  },
+  {
+   "name": "set_channels_volume",
+   "description": "Sets the volume for one or more channels in the Channel Rack as a normalized value. Accepts either a single normalized value for all channels, or a per-channel ",
+   "description_chars": 355,
+   "params": [
+    {
+     "name": "target_channels",
+     "type": "string",
+     "desc": "Comma-separated list of 1-based visual indices, names, or keywords ('all', 'selected'). Pass 'mapping' to use per-channel values via volume.",
+     "required": true
+    },
+    {
+     "name": "volume",
+     "type": "string",
+     "desc": "Either a single normalized value (e.g. '0.8') applied to all target_channels, or a JSON mapping of channel→normalized (e.g. '{'1': 0.7, '2': 0.9}') for per-channel targets. 1.0 = unity (0dB). 0.0 = silence.",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "channels.setChannelVolume",
+    "midi.PIM_None"
+   ],
+   "helpers": [
+    "_get_target_channel_indices",
+    "_parse_mapping_arg"
+   ],
+   "api_calls_transitive": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "channels.isChannelSelected",
+    "channels.setChannelVolume",
+    "midi.PIM_None",
+    "plugins.getPluginName",
+    "plugins.isValid"
+   ],
+   "helpers_transitive": [
+    "_get_target_channel_indices",
+    "_parse_mapping_arg"
+   ]
+  },
+  {
+   "name": "set_channels_pan",
+   "description": "Sets the stereo pan for one or more channels in the Channel Rack. Accepts either a single pan value for all target_channels, or a per-channel mapping.",
+   "description_chars": 150,
+   "params": [
+    {
+     "name": "target_channels",
+     "type": "string",
+     "desc": "Comma-separated list of 1-based visual indices, names, or keywords ('all', 'selected'). Ignored when 'pan' is a JSON mapping.",
+     "required": true
+    },
+    {
+     "name": "pan",
+     "type": "string",
+     "desc": "Either a single pan value (e.g. '-0.5') applied to all target_channels, or a JSON mapping of channel to pan like {'1': -0.5, '2': 0.3} for per-channel pan. -1.0 is full left, 1.0 is full right, 0.0 is center.",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "channels.setChannelPan",
+    "midi.PIM_None"
+   ],
+   "helpers": [
+    "_get_target_channel_indices",
+    "_parse_mapping_arg"
+   ],
+   "api_calls_transitive": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "channels.isChannelSelected",
+    "channels.setChannelPan",
+    "midi.PIM_None",
+    "plugins.getPluginName",
+    "plugins.isValid"
+   ],
+   "helpers_transitive": [
+    "_get_target_channel_indices",
+    "_parse_mapping_arg"
+   ]
+  },
+  {
+   "name": "set_channels_colour",
+   "description": "Sets the color for one or more channels in the Channel Rack. Accepts either a single colour for all target_channels, or a per-channel mapping. The default chann",
+   "description_chars": 180,
+   "params": [
+    {
+     "name": "target_channels",
+     "type": "string",
+     "desc": "Comma-separated list of 1-based visual indices, names, or keywords ('all', 'selected'). Ignored when 'colour' is a JSON mapping.",
+     "required": true
+    },
+    {
+     "name": "colour",
+     "type": "string",
+     "desc": "Either a single colour (name like 'red' or hex like '#FF0000') applied to all target_channels, or a JSON mapping of channel to colour like {'1': 'red', '2': 'blue'} for per-channel colours.",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "channels.setChannelColor"
+   ],
+   "helpers": [
+    "_get_target_channel_indices",
+    "_parse_colour",
+    "_parse_mapping_arg"
+   ],
+   "api_calls_transitive": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "channels.isChannelSelected",
+    "channels.setChannelColor",
+    "plugins.getPluginName",
+    "plugins.isValid"
+   ],
+   "helpers_transitive": [
+    "_adjust_brightness",
+    "_get_target_channel_indices",
+    "_parse_colour",
+    "_parse_mapping_arg"
+   ]
+  },
+  {
+   "name": "mute_channels",
+   "description": "Mutes, unmutes, or toggles the mute state of one or more channels.",
+   "description_chars": 66,
+   "params": [
+    {
+     "name": "target_channels",
+     "type": "string",
+     "desc": "Comma-separated list of 1-based visual indices, names, or keywords ('all', 'selected').",
+     "required": true
+    },
+    {
+     "name": "muted",
+     "type": "integer",
+     "desc": "1 to mute, 0 to unmute, -1 to toggle.",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "channels.muteChannel"
+   ],
+   "helpers": [
+    "_get_target_channel_indices"
+   ],
+   "api_calls_transitive": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "channels.isChannelSelected",
+    "channels.muteChannel",
+    "plugins.getPluginName",
+    "plugins.isValid"
+   ],
+   "helpers_transitive": [
+    "_get_target_channel_indices"
+   ]
+  },
+  {
+   "name": "solo_channels",
+   "description": "Solos, unsolos, or toggles the solo state of one or more channels.",
+   "description_chars": 66,
+   "params": [
+    {
+     "name": "target_channels",
+     "type": "string",
+     "desc": "Comma-separated list of 1-based visual indices, names, or keywords ('all', 'selected').",
+     "required": true
+    },
+    {
+     "name": "value",
+     "type": "integer",
+     "desc": "1 to solo, 0 to unsolo, -1 to toggle.",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "channels.soloChannel"
+   ],
+   "helpers": [
+    "_get_target_channel_indices"
+   ],
+   "api_calls_transitive": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "channels.isChannelSelected",
+    "channels.soloChannel",
+    "plugins.getPluginName",
+    "plugins.isValid"
+   ],
+   "helpers_transitive": [
+    "_get_target_channel_indices"
+   ]
+  },
+  {
+   "name": "set_step_sequencer_step",
+   "description": "Sets a single step in the step sequencer for one or more channels.",
+   "description_chars": 66,
+   "params": [
+    {
+     "name": "target_channels",
+     "type": "string",
+     "desc": "Comma-separated list of 1-based visual indices, names, or keywords ('all', 'selected').",
+     "required": true
+    },
+    {
+     "name": "step_number",
+     "type": "integer",
+     "desc": "Step position (1-16 for a standard pattern).",
+     "required": true
+    },
+    {
+     "name": "value",
+     "type": "integer",
+     "desc": "1 to activate the step, 0 to deactivate.",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "channels.setGridBit"
+   ],
+   "helpers": [
+    "_get_target_channel_indices"
+   ],
+   "api_calls_transitive": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "channels.isChannelSelected",
+    "channels.setGridBit",
+    "plugins.getPluginName",
+    "plugins.isValid"
+   ],
+   "helpers_transitive": [
+    "_get_target_channel_indices"
+   ]
+  },
+  {
+   "name": "set_step_sequencer_pattern",
+   "description": "Sets a 16-step pattern for one or more channels. Can also clear a pattern (all 0s). For vague requests like 'add a beat', call once per channel with a distinct,",
+   "description_chars": 245,
+   "params": [
+    {
+     "name": "target_channels",
+     "type": "string",
+     "desc": "Comma-separated list of 1-based visual indices, names, or keywords ('all', 'selected').",
+     "required": true
+    },
+    {
+     "name": "pattern",
+     "type": "string",
+     "desc": "16-character string of 1s and 0s (e.g. '1000100010001000').",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "channels.setGridBit"
+   ],
+   "helpers": [
+    "_get_target_channel_indices"
+   ],
+   "api_calls_transitive": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "channels.isChannelSelected",
+    "channels.setGridBit",
+    "plugins.getPluginName",
+    "plugins.isValid"
+   ],
+   "helpers_transitive": [
+    "_get_target_channel_indices"
+   ]
+  },
+  {
+   "name": "set_mixer_tracks_pan",
+   "description": "Sets stereo pan for one or more mixer tracks. Accepts either a single pan value for all target_tracks, or a per-track mapping.",
+   "description_chars": 126,
+   "params": [
+    {
+     "name": "target_tracks",
+     "type": "string",
+     "desc": "Comma-separated list of track numbers, names, or keywords ('all', 'all_inserts', 'master', 'selected'). For numbers: Master is 0. Inserts match visual numbers (Insert 4 = 4). DO NOT subtract 1. Ignored when 'pan' is a JSON mapping.",
+     "required": true
+    },
+    {
+     "name": "pan",
+     "type": "string",
+     "desc": "Either a single pan value (e.g. '-0.5') applied to all target_tracks, or a JSON mapping of track to pan like {'1': -0.5, '2': 0.3} for per-track pan. -1.0 is full left, 1.0 is full right, 0.0 is center.",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "midi.PIM_None",
+    "mixer.setTrackPan"
+   ],
+   "helpers": [
+    "_get_target_track_indices",
+    "_parse_mapping_arg"
+   ],
+   "api_calls_transitive": [
+    "midi.PIM_None",
+    "mixer.getTrackName",
+    "mixer.isTrackSelected",
+    "mixer.setTrackPan",
+    "mixer.trackCount"
+   ],
+   "helpers_transitive": [
+    "_get_target_track_indices",
+    "_parse_mapping_arg"
+   ]
+  },
+  {
+   "name": "get_mixer_tracks_volume",
+   "description": "Returns the current volume of one or more mixer tracks in normalized, percentage and dB form. Use this before relative volume changes: - 'reduce by X dB' → get ",
+   "description_chars": 388,
+   "params": [
+    {
+     "name": "target_tracks",
+     "type": "string",
+     "desc": "Comma-separated list of track numbers, names, or keywords ('all', 'all_inserts', 'master', 'selected'). Master is 0. Inserts match visual numbers. DO NOT subtract 1.",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "mixer.getTrackName",
+    "mixer.getTrackVolume"
+   ],
+   "helpers": [
+    "_get_target_track_indices"
+   ],
+   "api_calls_transitive": [
+    "mixer.getTrackName",
+    "mixer.getTrackVolume",
+    "mixer.isTrackSelected",
+    "mixer.trackCount"
+   ],
+   "helpers_transitive": [
+    "_get_target_track_indices"
+   ]
+  },
+  {
+   "name": "set_mixer_tracks_volume_db",
+   "description": "Sets volume level for specified mixer tracks using decibels (dB). Accepts either a single dB value for all tracks, or a per-track mapping. This sets ABSOLUTE dB",
+   "description_chars": 288,
+   "params": [
+    {
+     "name": "target_tracks",
+     "type": "string",
+     "desc": "Comma-separated list of track numbers, names, or keywords ('all', 'all_inserts', 'master', 'selected'). For numbers: Master is 0. Inserts match visual numbers (Insert 4 = 4). DO NOT subtract 1. Pass 'mapping' to use per-track values via volume_db.",
+     "required": true
+    },
+    {
+     "name": "volume_db",
+     "type": "string",
+     "desc": "Either a single dB value (e.g. '-10') applied to all target_tracks, or a JSON mapping of track→dB (e.g. '{'1': -5.0, '2': -2.0, '3': -2.0}') for per-track targets. Use mapping for relative changes across tracks with different starting volumes.",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "midi.PIM_None",
+    "mixer.getTrackVolume",
+    "mixer.setTrackVolume"
+   ],
+   "helpers": [
+    "_db_to_normalized_volume",
+    "_get_target_track_indices",
+    "_parse_mapping_arg"
+   ],
+   "api_calls_transitive": [
+    "midi.PIM_None",
+    "mixer.getTrackName",
+    "mixer.getTrackVolume",
+    "mixer.isTrackSelected",
+    "mixer.setTrackVolume",
+    "mixer.trackCount"
+   ],
+   "helpers_transitive": [
+    "_db_to_normalized_volume",
+    "_get_target_track_indices",
+    "_parse_mapping_arg"
+   ]
+  },
+  {
+   "name": "set_mixer_tracks_volume_percent",
+   "description": "Sets volume level for specified mixer tracks as a percentage. 100% = unity (0dB, normalized 0.8). 125% = maximum (+5.6dB, normalized 1.0). Accepts either a sing",
+   "description_chars": 347,
+   "params": [
+    {
+     "name": "target_tracks",
+     "type": "string",
+     "desc": "Comma-separated list of track numbers, names, or keywords ('all', 'all_inserts', 'master', 'selected'). For numbers: Master is 0. Inserts match visual numbers (Insert 4 = 4). DO NOT subtract 1. Pass 'mapping' to use per-track values via percent.",
+     "required": true
+    },
+    {
+     "name": "percent",
+     "type": "string",
+     "desc": "Either a single percentage (e.g. '80') applied to all target_tracks, or a JSON mapping of track→percent (e.g. '{'1': 70.0, '2'': 80.0}') for per-track targets. 100% = unity (0dB). 125% = max. 0% = silence.",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "midi.PIM_None",
+    "mixer.setTrackVolume"
+   ],
+   "helpers": [
+    "_get_target_track_indices",
+    "_parse_mapping_arg"
+   ],
+   "api_calls_transitive": [
+    "midi.PIM_None",
+    "mixer.getTrackName",
+    "mixer.isTrackSelected",
+    "mixer.setTrackVolume",
+    "mixer.trackCount"
+   ],
+   "helpers_transitive": [
+    "_get_target_track_indices",
+    "_parse_mapping_arg"
+   ]
+  },
+  {
+   "name": "rename_mixer_tracks",
+   "description": "Renames one or multiple mixer tracks in a single call. If the user asks you to choose names (e.g. 'rename after instruments', 'rename randomly'), generate them ",
+   "description_chars": 197,
+   "params": [
+    {
+     "name": "track_mapping",
+     "type": "string",
+     "desc": "Dictionary mapping tracks to names. Master is '0'. Inserts match visual numbers (e.g. '4'). DO NOT subtract 1.",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "mixer.setTrackName"
+   ],
+   "helpers": [
+    "_get_target_track_indices",
+    "_parse_llm_dict_arg"
+   ],
+   "api_calls_transitive": [
+    "mixer.getTrackName",
+    "mixer.isTrackSelected",
+    "mixer.setTrackName",
+    "mixer.trackCount"
+   ],
+   "helpers_transitive": [
+    "_get_target_track_indices",
+    "_parse_llm_dict_arg"
+   ]
+  },
+  {
+   "name": "add_effect",
+   "description": "Add an effect plugin to mixer track slot(s). NEVER guess the plugin name — always call get_browser_names first.",
+   "description_chars": 111,
+   "params": [
+    {
+     "name": "plugin",
+     "type": "string",
+     "desc": "The exact plugin name to add. First call getBrowserNames with path 'Plugin database' (fullRecursive=1) to get valid names. Pass only the base name (e.g., 'Fruity Compressor').",
+     "required": true
+    },
+    {
+     "name": "target_tracks",
+     "type": "string",
+     "desc": "Comma-separated list of tracks. Master is 0. Inserts match their visual numbers (Insert 4 = 4). DO NOT subtract 1.",
+     "required": true
+    },
+    {
+     "name": "slot_number",
+     "type": "integer",
+     "desc": "The visual mixer slot number (1 to 10). DO NOT subtract 1.",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "ilmcp.addEffect"
+   ],
+   "helpers": [
+    "_get_target_track_indices"
+   ],
+   "api_calls_transitive": [
+    "ilmcp.addEffect",
+    "mixer.getTrackName",
+    "mixer.isTrackSelected",
+    "mixer.trackCount"
+   ],
+   "helpers_transitive": [
+    "_get_target_track_indices"
+   ]
+  },
+  {
+   "name": "remove_effect",
+   "description": "Remove effects from mixer track slot(s). This cannot be undone via script — the effect and its settings are lost.",
+   "description_chars": 113,
+   "params": [
+    {
+     "name": "target_tracks",
+     "type": "string",
+     "desc": "Comma-separated list of tracks. Master is 0. Inserts match their visual numbers (Insert 4 = 4). DO NOT subtract 1.",
+     "required": true
+    },
+    {
+     "name": "slot_numbers",
+     "type": "string",
+     "desc": "Comma-separated visual slot numbers to clear (1–10), or 'all' to clear all 10 slots.",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "ilmcp.addEffect"
+   ],
+   "helpers": [
+    "_get_target_track_indices"
+   ],
+   "api_calls_transitive": [
+    "ilmcp.addEffect",
+    "mixer.getTrackName",
+    "mixer.isTrackSelected",
+    "mixer.trackCount"
+   ],
+   "helpers_transitive": [
+    "_get_target_track_indices"
+   ]
+  },
+  {
+   "name": "set_mixer_tracks_colour",
+   "description": "Sets the color of one or more mixer tracks. Accepts either a single colour for all target_tracks, or a per-track mapping. The default mixer track colour is #636",
+   "description_chars": 163,
+   "params": [
+    {
+     "name": "target_tracks",
+     "type": "string",
+     "desc": "Comma-separated list of track numbers, names, or keywords ('all', 'all_inserts', 'master', 'selected'). Master is 0. Inserts match visual numbers. DO NOT subtract 1. Ignored when 'colour' is a JSON mapping.",
+     "required": true
+    },
+    {
+     "name": "colour",
+     "type": "string",
+     "desc": "Either a single colour (name like 'red' or hex like '#FF0000') applied to all target_tracks, or a JSON mapping of track→colour (e.g. '{'1': 'red', '2': 'blue'}') for per-track colours.",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "mixer.setTrackColor"
+   ],
+   "helpers": [
+    "_get_target_track_indices",
+    "_parse_colour",
+    "_parse_mapping_arg"
+   ],
+   "api_calls_transitive": [
+    "mixer.getTrackName",
+    "mixer.isTrackSelected",
+    "mixer.setTrackColor",
+    "mixer.trackCount"
+   ],
+   "helpers_transitive": [
+    "_adjust_brightness",
+    "_get_target_track_indices",
+    "_parse_colour",
+    "_parse_mapping_arg"
+   ]
+  },
+  {
+   "name": "mute_mixer_tracks",
+   "description": "Mutes, unmutes, or toggles the mute state of one or more mixer tracks.",
+   "description_chars": 70,
+   "params": [
+    {
+     "name": "target_tracks",
+     "type": "string",
+     "desc": "Comma-separated list of track numbers, names, or keywords ('all', 'all_inserts', 'master', 'selected'). Master is 0. Inserts match visual numbers. DO NOT subtract 1.",
+     "required": true
+    },
+    {
+     "name": "muted",
+     "type": "integer",
+     "desc": "1 to mute, 0 to unmute, -1 to toggle.",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "mixer.muteTrack"
+   ],
+   "helpers": [
+    "_get_target_track_indices"
+   ],
+   "api_calls_transitive": [
+    "mixer.getTrackName",
+    "mixer.isTrackSelected",
+    "mixer.muteTrack",
+    "mixer.trackCount"
+   ],
+   "helpers_transitive": [
+    "_get_target_track_indices"
+   ]
+  },
+  {
+   "name": "solo_mixer_tracks",
+   "description": "Solos or unsolos one or more mixer tracks.",
+   "description_chars": 42,
+   "params": [
+    {
+     "name": "target_tracks",
+     "type": "string",
+     "desc": "Comma-separated list of track numbers, names, or keywords ('all', 'all_inserts', 'master', 'selected'). Master is 0. Inserts match visual numbers. DO NOT subtract 1.",
+     "required": true
+    },
+    {
+     "name": "value",
+     "type": "integer",
+     "desc": "1 to solo, 0 to unsolo, -1 to toggle.",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "mixer.soloTrack"
+   ],
+   "helpers": [
+    "_get_target_track_indices"
+   ],
+   "api_calls_transitive": [
+    "mixer.getTrackName",
+    "mixer.isTrackSelected",
+    "mixer.soloTrack",
+    "mixer.trackCount"
+   ],
+   "helpers_transitive": [
+    "_get_target_track_indices"
+   ]
+  },
+  {
+   "name": "reset_mixer_tracks",
+   "description": "Resets one or multiple mixer tracks to their default state. This resets volume to unity (0dB), pan to center, clears custom names, removes all effect plugins, c",
+   "description_chars": 343,
+   "params": [
+    {
+     "name": "target_tracks",
+     "type": "string",
+     "desc": "Comma-separated list of tracks to reset. Master is 0. Inserts match visual numbers (Insert 15 = 15). 'all' or 'selected' also valid.",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "ilmcp.addEffect",
+    "midi.PIM_None",
+    "mixer.getRouteSendActive",
+    "mixer.setRouteTo",
+    "mixer.setRouteToLevel",
+    "mixer.setTrackColor",
+    "mixer.setTrackName",
+    "mixer.setTrackPan",
+    "mixer.setTrackVolume",
+    "mixer.trackCount"
+   ],
+   "helpers": [
+    "_get_target_track_indices"
+   ],
+   "api_calls_transitive": [
+    "ilmcp.addEffect",
+    "midi.PIM_None",
+    "mixer.getRouteSendActive",
+    "mixer.getTrackName",
+    "mixer.isTrackSelected",
+    "mixer.setRouteTo",
+    "mixer.setRouteToLevel",
+    "mixer.setTrackColor",
+    "mixer.setTrackName",
+    "mixer.setTrackPan",
+    "mixer.setTrackVolume",
+    "mixer.trackCount"
+   ],
+   "helpers_transitive": [
+    "_get_target_track_indices"
+   ]
+  },
+  {
+   "name": "get_mixer_routing",
+   "description": "Returns the full send/receive routing matrix for all active mixer tracks. Shows which tracks are sending to which destinations and at what level. Call this befo",
+   "description_chars": 201,
+   "params": [],
+   "api_calls": [
+    "mixer.getRouteSendActive",
+    "mixer.getRouteToLevel",
+    "mixer.getTrackName",
+    "mixer.trackCount"
+   ],
+   "helpers": [],
+   "api_calls_transitive": [
+    "mixer.getRouteSendActive",
+    "mixer.getRouteToLevel",
+    "mixer.getTrackName",
+    "mixer.trackCount"
+   ],
+   "helpers_transitive": []
+  },
+  {
+   "name": "set_mixer_routing",
+   "description": "Sets up or removes a send from one mixer track to another. Use this to create send/return effects chains, group routing, or sidechain setups. To clear ALL sends",
+   "description_chars": 312,
+   "params": [
+    {
+     "name": "source_track",
+     "type": "string",
+     "desc": "The source mixer track. Master is 0. Inserts match visual numbers. DO NOT subtract 1.",
+     "required": true
+    },
+    {
+     "name": "dest_track",
+     "type": "string",
+     "desc": "The destination mixer track to send to. Master is 0. Inserts match visual numbers. DO NOT subtract 1.",
+     "required": true
+    },
+    {
+     "name": "active",
+     "type": "integer",
+     "desc": "1 to enable the send, 0 to disable it.",
+     "required": true
+    },
+    {
+     "name": "level",
+     "type": "number",
+     "desc": "Send level as a normalized value (0.0 to 1.0). Default is 1.0 (full).",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "mixer.getTrackName",
+    "mixer.setRouteTo",
+    "mixer.setRouteToLevel"
+   ],
+   "helpers": [
+    "_get_target_track_indices"
+   ],
+   "api_calls_transitive": [
+    "mixer.getTrackName",
+    "mixer.isTrackSelected",
+    "mixer.setRouteTo",
+    "mixer.setRouteToLevel",
+    "mixer.trackCount"
+   ],
+   "helpers_transitive": [
+    "_get_target_track_indices"
+   ]
+  },
+  {
+   "name": "reset_mixer_routing",
+   "description": "Removes ALL send routing from one or more mixer tracks in a single call — accepts 'all', a list, or 'selected'. Restores the default send to Master after cleari",
+   "description_chars": 224,
+   "params": [
+    {
+     "name": "target_tracks",
+     "type": "string",
+     "desc": "Comma-separated list of tracks to reset. Master is 0. Inserts match visual numbers (Insert 15 = 15). 'all' or 'selected' also valid.",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "mixer.getRouteSendActive",
+    "mixer.setRouteTo",
+    "mixer.setRouteToLevel",
+    "mixer.trackCount"
+   ],
+   "helpers": [
+    "_get_target_track_indices"
+   ],
+   "api_calls_transitive": [
+    "mixer.getRouteSendActive",
+    "mixer.getTrackName",
+    "mixer.isTrackSelected",
+    "mixer.setRouteTo",
+    "mixer.setRouteToLevel",
+    "mixer.trackCount"
+   ],
+   "helpers_transitive": [
+    "_get_target_track_indices"
+   ]
+  },
+  {
+   "name": "open_piano_roll_for_channel",
+   "description": "Opens the Piano Roll for a specific channel. Deselects all channels first, selects only the target channel exclusively, closes the Piano Roll if already open, t",
+   "description_chars": 282,
+   "params": [
+    {
+     "name": "target_channel",
+     "type": "string",
+     "desc": "1-based visual index or name of the channel to open the Piano Roll for.",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "channels.deselectAll",
+    "channels.getChannelName",
+    "channels.selectChannel",
+    "ui.getVisible",
+    "ui.hideWindow",
+    "ui.showWindow"
+   ],
+   "helpers": [
+    "_get_target_channel_indices"
+   ],
+   "api_calls_transitive": [
+    "channels.channelCount",
+    "channels.deselectAll",
+    "channels.getChannelName",
+    "channels.isChannelSelected",
+    "channels.selectChannel",
+    "plugins.getPluginName",
+    "plugins.isValid",
+    "ui.getVisible",
+    "ui.hideWindow",
+    "ui.showWindow"
+   ],
+   "helpers_transitive": [
+    "_get_target_channel_indices"
+   ]
+  },
+  {
+   "name": "quantize_channel",
+   "description": "Quickly quantizes notes of the specified channel.",
+   "description_chars": 49,
+   "params": [
+    {
+     "name": "channel_number",
+     "type": "integer",
+     "desc": "1-based visual index of the channel.",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "channels.quickQuantize"
+   ],
+   "helpers": [],
+   "api_calls_transitive": [
+    "channels.quickQuantize"
+   ],
+   "helpers_transitive": []
+  },
+  {
+   "name": "get_playlist_track_names",
+   "description": "Returns a numbered list of all current Playlist track names. Use this before renaming to find the correct track index.",
+   "description_chars": 118,
+   "params": [],
+   "api_calls": [
+    "playlist.getTrackName",
+    "playlist.trackCount"
+   ],
+   "helpers": [],
+   "api_calls_transitive": [
+    "playlist.getTrackName",
+    "playlist.trackCount"
+   ],
+   "helpers_transitive": []
+  },
+  {
+   "name": "rename_playlist_tracks",
+   "description": "Renames one or multiple playlist tracks in a single call. If the user asks you to choose names (e.g. 'rename after animals'), generate them yourself and call th",
+   "description_chars": 177,
+   "params": [
+    {
+     "name": "track_mapping",
+     "type": "string",
+     "desc": "Dictionary mapping track numbers to names. Playlist tracks are 1-based (e.g., '1': 'Vocals'). DO NOT subtract 1.",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "playlist.setTrackName"
+   ],
+   "helpers": [
+    "_parse_llm_dict_arg"
+   ],
+   "api_calls_transitive": [
+    "playlist.setTrackName"
+   ],
+   "helpers_transitive": [
+    "_parse_llm_dict_arg"
+   ]
+  },
+  {
+   "name": "set_playlist_tracks_colour",
+   "description": "Sets the color of one or more playlist tracks. Accepts either a single colour for all target_tracks, or a per-track mapping. The default playlist track colour i",
+   "description_chars": 169,
+   "params": [
+    {
+     "name": "target_tracks",
+     "type": "string",
+     "desc": "Comma-separated list of 1-based playlist track numbers (e.g. '1', '2,3,5'). DO NOT subtract 1. Ignored when 'colour' is a JSON mapping.",
+     "required": true
+    },
+    {
+     "name": "colour",
+     "type": "string",
+     "desc": "Either a single colour (name like 'red' or hex like '#FF0000') applied to all target_tracks, or a JSON mapping of track to colour like {'1': 'red', '2': 'blue'} for per-track colours.",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "playlist.setTrackColor"
+   ],
+   "helpers": [
+    "_parse_colour",
+    "_parse_mapping_arg"
+   ],
+   "api_calls_transitive": [
+    "playlist.setTrackColor"
+   ],
+   "helpers_transitive": [
+    "_adjust_brightness",
+    "_parse_colour",
+    "_parse_mapping_arg"
+   ]
+  },
+  {
+   "name": "get_plugin_parameter_list",
+   "description": "Lists all parameters for a specific plugin.",
+   "description_chars": 43,
+   "params": [
+    {
+     "name": "target",
+     "type": "string",
+     "desc": "Channel (1-based index or name) or Mixer Track (Master=0, Inserts=1+)",
+     "required": true
+    },
+    {
+     "name": "slot_number",
+     "type": "integer",
+     "desc": "Visual mixer slot (1-10) for effects, or -1 for channel generators.",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "plugins.getParamCount",
+    "plugins.getParamName",
+    "plugins.getPluginName"
+   ],
+   "helpers": [
+    "_resolve_plugin_target"
+   ],
+   "api_calls_transitive": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "channels.isChannelSelected",
+    "mixer.getTrackName",
+    "mixer.isTrackSelected",
+    "mixer.trackCount",
+    "plugins.getParamCount",
+    "plugins.getParamName",
+    "plugins.getPluginName",
+    "plugins.isValid"
+   ],
+   "helpers_transitive": [
+    "_get_target_channel_indices",
+    "_get_target_track_indices",
+    "_resolve_plugin_target"
+   ]
+  },
+  {
+   "name": "get_plugin_parameter_value",
+   "description": "Gets the current value of a plugin parameter.",
+   "description_chars": 45,
+   "params": [
+    {
+     "name": "target",
+     "type": "string",
+     "desc": "Channel (1-based index or name) or Mixer Track (Master=0, Inserts=1+)",
+     "required": true
+    },
+    {
+     "name": "param_identifier",
+     "type": "string",
+     "desc": "The 1-based visual index (e.g., '1', '6') or exact name of the parameter.",
+     "required": true
+    },
+    {
+     "name": "slot_number",
+     "type": "integer",
+     "desc": "Visual mixer slot (1-10) for effects, or -1 for channel generators.",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "plugins.getParamName",
+    "plugins.getParamValue",
+    "plugins.getParamValueString"
+   ],
+   "helpers": [
+    "_resolve_param_index",
+    "_resolve_plugin_target"
+   ],
+   "api_calls_transitive": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "channels.isChannelSelected",
+    "mixer.getTrackName",
+    "mixer.isTrackSelected",
+    "mixer.trackCount",
+    "plugins.getParamCount",
+    "plugins.getParamName",
+    "plugins.getParamValue",
+    "plugins.getParamValueString",
+    "plugins.getPluginName",
+    "plugins.isValid"
+   ],
+   "helpers_transitive": [
+    "_get_target_channel_indices",
+    "_get_target_track_indices",
+    "_resolve_param_index",
+    "_resolve_plugin_target"
+   ]
+  },
+  {
+   "name": "set_plugin_parameter_value",
+   "description": "Sets the value of a plugin parameter.",
+   "description_chars": 37,
+   "params": [
+    {
+     "name": "target",
+     "type": "string",
+     "desc": "Channel (1-based index or name) or Mixer Track (Master=0, Inserts=1+)",
+     "required": true
+    },
+    {
+     "name": "param_identifier",
+     "type": "string",
+     "desc": "The 1-based visual index (e.g., '1', '6') or exact name of the parameter.",
+     "required": true
+    },
+    {
+     "name": "value",
+     "type": "number",
+     "desc": "Desired normalized value (0.0 to 1.0).",
+     "required": true
+    },
+    {
+     "name": "slot_number",
+     "type": "integer",
+     "desc": "Visual mixer slot (1-10) for effects, or -1 for channel generators.",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "channels.showEditor",
+    "midi.PIM_None",
+    "mixer.focusEditor",
+    "plugins.getParamName",
+    "plugins.setParamValue"
+   ],
+   "helpers": [
+    "_resolve_param_index",
+    "_resolve_plugin_target"
+   ],
+   "api_calls_transitive": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "channels.isChannelSelected",
+    "channels.showEditor",
+    "midi.PIM_None",
+    "mixer.focusEditor",
+    "mixer.getTrackName",
+    "mixer.isTrackSelected",
+    "mixer.trackCount",
+    "plugins.getParamCount",
+    "plugins.getParamName",
+    "plugins.getPluginName",
+    "plugins.isValid",
+    "plugins.setParamValue"
+   ],
+   "helpers_transitive": [
+    "_get_target_channel_indices",
+    "_get_target_track_indices",
+    "_resolve_param_index",
+    "_resolve_plugin_target"
+   ]
+  },
+  {
+   "name": "save_piano_roll_script",
+   "description": "Use this tool to save Piano Roll scripts.",
+   "description_chars": 41,
+   "params": [
+    {
+     "name": "script_name",
+     "type": "string",
+     "desc": "The filename to save as (e.g., 'TransposeScript').",
+     "required": true
+    },
+    {
+     "name": "source",
+     "type": "string",
+     "desc": "The full Python code block for the script.",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "ilmcp.storePRScript"
+   ],
+   "helpers": [],
+   "api_calls_transitive": [
+    "ilmcp.storePRScript"
+   ],
+   "helpers_transitive": []
+  },
+  {
+   "name": "run_piano_roll_script",
+   "description": "Runs a Piano Roll script. Opens the Piano Roll first if it isn't already visible. Suggest this tool when the previous interaction saw a piano roll script being ",
+   "description_chars": 168,
+   "params": [
+    {
+     "name": "source",
+     "type": "string",
+     "desc": "The full Python code block for the script.",
+     "required": true
+    }
+   ],
+   "api_calls": [
+    "ilmcp.runPRScript",
+    "ui.showWindow"
+   ],
+   "helpers": [],
+   "api_calls_transitive": [
+    "ilmcp.runPRScript",
+    "ui.showWindow"
+   ],
+   "helpers_transitive": []
+  }
+ ],
+ "helpers": {
+  "get_type_hints": {
+   "api_calls": [],
+   "helpers": []
+  },
+  "get_origin": {
+   "api_calls": [],
+   "helpers": []
+  },
+  "get_args": {
+   "api_calls": [],
+   "helpers": []
+  },
+  "_get_target_track_indices": {
+   "api_calls": [
+    "mixer.getTrackName",
+    "mixer.isTrackSelected",
+    "mixer.trackCount"
+   ],
+   "helpers": []
+  },
+  "_get_target_channel_indices": {
+   "api_calls": [
+    "channels.channelCount",
+    "channels.getChannelName",
+    "channels.isChannelSelected",
+    "plugins.getPluginName",
+    "plugins.isValid"
+   ],
+   "helpers": []
+  },
+  "_resolve_plugin_target": {
+   "api_calls": [
+    "plugins.isValid"
+   ],
+   "helpers": [
+    "_get_target_channel_indices",
+    "_get_target_track_indices"
+   ]
+  },
+  "_resolve_param_index": {
+   "api_calls": [
+    "plugins.getParamCount",
+    "plugins.getParamName"
+   ],
+   "helpers": []
+  },
+  "_db_to_normalized_volume": {
+   "api_calls": [
+    "midi.PIM_None",
+    "mixer.getTrackVolume"
+   ],
+   "helpers": []
+  },
+  "_parse_llm_dict_arg": {
+   "api_calls": [],
+   "helpers": []
+  },
+  "_parse_mapping_arg": {
+   "api_calls": [],
+   "helpers": []
+  },
+  "_adjust_brightness": {
+   "api_calls": [],
+   "helpers": []
+  },
+  "_parse_colour": {
+   "api_calls": [],
+   "helpers": [
+    "_adjust_brightness"
+   ]
+  },
+  "whenDone": {
+   "api_calls": [
+    "ilmcp.showHighlight"
+   ],
+   "helpers": []
+  }
+ }
+}
