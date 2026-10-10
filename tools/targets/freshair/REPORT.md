@@ -11,8 +11,8 @@
 | 実体 | 配布 DLL/AU/VST3/AAX は **250KB の薄いシェル**。DSP+UI は全て `SlateCore.core_64` (Win x64, 36.3MB) / `SlateCore` (mac **arm64 のみ**, 19.1MB) に在る |
 | フレームワーク | JUCE ではない。**Kilohearts "HeartCore" snapin エンジン** (PDB: `...\Slate Fresh Air\bin_freshair\HeartCoreFreshAir.pdb`)。UI=Skia、boost、AAX/VST SDK。コアは 37 製品 ID (`FrAr`+`ks*`/`k*` 36 種) を内包 |
 | Fresh Air の DSP | **新規 DSP ではなく既存 snapin の合成**: プリセット `FRAR/DUMP` ("FRESH AIR v8") = **Filter ×2 + Compressor ×3 + Gain ×3** + マクロ (UI ノブ: Mid Air / High Air / Trim)。FreshAirDsp 自体は vtable 全 17 slot で 2.3KB 級の制御層 |
-| DSP 規模 (実測, 直接 call のみ=下限) | 237 関数 / 67,689 B / 15,988 命令 / SSE 3,281 命令 (20.5%)。コア .text 17.58MB の **0.39%**。OTT (166 関数 / 58,891 B) の ~1.15 倍 |
-| **認証/保護 (Win)** | **PACE/iLok/Eden のコード・ラッパ・マーカー 0、ネット系 import 0、パッカー無し** (§4)。公式 User Guide は「iLok 必須」と記載 → **バイナリ内実装と不一致 (未解明)**。静的には lift を阻む要因は検出されず |
+| DSP 規模 (実測, 直接 call のみ=下限) | 237 関数 / 67,689 B / 15,988 命令 / SSE 3,281 命令 (20.5%) (capstone mnemonic 判定。Ghidra は 15,463 命令 / XMM・YMM 操作 3,925=§3.3。うち pdata 外 call 先 62 関数は 16 B 仮定 = 992 B、pdata 実在は 175 関数 / 66,697 B)。コア .text 17.58MB の **0.39%**。OTT (166 関数 / 58,891 B) の ~1.15 倍 |
+| **認証/保護 (Win)** | **PE イメージ内 (shell/core/unins) の PACE/iLok/Eden マーカー 0、ネット系 import 0、パッカー無し** (§4)。PACE 文字列は AAX の署名ブロック (PE イメージ外) にのみ有り。公式 User Guide は「iLok 必須」と記載 → **バイナリ内実装と不一致 (未解明)**。静的には lift を阻む要因は検出されず |
 | 認証/保護 (mac) | コアが **PACE Eden ラッパ** (`__pbootstrap`/`__POVERTEXT` + 4.1MB エントロピー 8.00 の `__data`) かつ arm64 のみ → **lift 対象外** |
 | **lift→wasm 試行** | `gain::GainDsp::process` (SlateCore 0x180afe090, 446 B +meter 2 本) を RetDec→修復 pass→emcc で wasm 化し **実機 x86 機械語と 400/400 シナリオ bit-exact** (§5)。修復は 3 類型のみ (全て OTT 既知クラス) |
 | 判定 | **lift 可 / 難度: 中** (DSP 規模は OTT 同等、認証 blocker 無し。難所は C++ 実行時層と SSE helper 署名・分岐脱落の機械修復)。**blocker 無し (Win x64 を正本とする限り)** |
@@ -27,8 +27,8 @@ zip は **インストール後ツリー** (Inno Setup 5.5.7 の `unins000.exe` 
 |---|---|---|---|---|
 | `Fresh Air.dll` (VST2 fn: `VSTPluginMain`/`main`) | PE32+ DLL | x64 | 250,368 | .text 154,928, pdata 751 関数, import: kernel32 96/user32 1/shell32 1/ole32 1 |
 | `Fresh Air.vst3` | 同上 | x64 | 250,368 | **VST2 DLL とバイト同一** (md5 a5f0ddef…)。`GetPluginFactory`/`InitDll`/`ExitDll` を同 DLL に同居 |
-| `Fresh Air.aaxplugin` | 同上 | x64 | 266,960 | 上と同一コード + Authenticode 16,592 B (Kilohearts AB EV + **PACE "ILokCC" 証明書鎖**=AAX 署名) |
-| **`SlateCore.core_64`** | PE32+ DLL | x64 | **36,285,952** | .text 17,575,936 / .rdata 1.67MB / .data 0.71MB / **.rsrc 16.3MB** / pdata **25,063 関数** / export 120 |
+| `Fresh Air.aaxplugin` | 同上 | x64 | 266,960 | 上と同一コード + 署名テーブル 16,592 B = WIN_CERTIFICATE 2 本 (①Kilohearts AB EV/Sectigo Authenticode 10,048 B、②**PACE 署名ブロック** 6,544 B @file+260,416 = "ILokCC"/PACE Anti-Piracy 証明書鎖 + `WrapInstaller`/`Eden wrapper shared library`/`PACE Anti-Piracy 2023`/`5.8.1` 属性。PE イメージ本体は VST2/VST3 とバイト単位で同一コード) |
+| **`SlateCore.core_64`** | PE32+ DLL | x64 | **36,285,952** | .text 17,575,936 / .rdata 1.67MB / .data 0.71MB / **.rsrc 16.3MB** / pdata **25,063 エントリ** (CHAININFO 2,557 含む → 論理関数 22,506) / export 120 |
 | `Fresh Air.component` (AU) | Mach-O universal | x86_64 76,720 + arm64 92,384 | 190,688 | シェル。`KHSAudioUnitFactory` |
 | `Fresh Air.vst3` (mac) | 同上 | 同上 | 190,688 | シェル (AU とサイズ同) |
 | **`SlateCore`** (mac) | Mach-O thin-in-fat | **arm64 のみ** | 19,142,496 | `__text` 11,898,564, **Eden ラッパ** (§4) |
@@ -71,10 +71,10 @@ DSP closure に `LicenseManager` 取得関数 (0x180ca86e0) / `LicenseNotificati
 ### 4.1 Windows x64 (正本候補)
 | 検査 | 結果 |
 |---|---|
-| iLok/PACE/Eden/wraptool/dongle 文字列 (ASCII+UTF-16, shell/AAX/core) | **0 件**。唯一の "PACE Anti-Piracy / ILokCC" は AAX の Authenticode 証明書鎖 (AAX 署名) |
+| iLok/PACE/Eden/wraptool/dongle 文字列 (ASCII+UTF-16, shell×2/AAX/core/unins000.exe; 語境界一致) | **PE イメージ内 0 件** (shell・core・unins000.exe は全域 0)。AAX のみ署名テーブル第 2 エントリ (PACE 署名ブロック, file+260,416 以降) に 36 件: PACE Anti-Piracy CA/Master/Root・"ILokCC" 証明書鎖、`pace-ccjf1`、`WrapInstaller`/`Eden wrapper shared library`/`Copyright 2023, PACE Anti-Piracy`/`5.8.1`。= AAX が PACE 署名ツールを通した痕跡で、コードは未ラップ (VST2/VST3 と同一)。Pro Tools 側の署名検証強制は未検証 |
 | セクション/エントロピー | 通常の MSVC 7 セクション。64KB 窓で >7.5 は `.rsrc` (PNG/TTF 圧縮データ) のみ。.text エントロピー 5.98 (shell 6.48) |
 | コードの平文性 | pdata 先頭バイトが標準 MSVC prologue (先頭 3B: `48 89 5c`=5,977 / `40 55 48`=4,141 / `41 57 41`=2,657 …)。entry 0x100be34 は .text 内の CRT |
-| ネットワーク | `ws2_32/wininet/winhttp/urlmon/crypt32/bcrypt/ncrypt` import **0**。文字列中の DLL 名にも無し。URL は slatedigital.com / kilohearts.com / zendesk の ShellExecute 用リンクのみ |
+| ネットワーク | `ws2_32/wininet/winhttp/urlmon/crypt32/bcrypt/ncrypt` import **0** (core の import DLL は kernel32/user32/gdi32/comdlg32/advapi32(GetUserNameW のみ)/shell32/ole32 の 7 本)。文字列中の DLL 名にも無し。ローカル IPC 系 (`CreateMutexW`/`PeekNamedPipe`/`WaitNamedPipeA`) はあるがネットワーク API ではない。URL は slatedigital.com / kilohearts.com / zendesk の ShellExecute 用リンクのみ |
 | HW 指紋 | `DeviceIoControl` 2 箇所は ioctl=0x900A8 (`FSCTL_GET_REPARSE_POINT`, シンボリックリンク解決)。`GetUserNameW` 1 (用途未確認)。`CoCreateGuid` 1。ボリューム S/N・MAC 取得 API 無し |
 | Kilohearts ライセンス層 | `LicenseManager`/`LicenseNotification{Popup,Snapin,Trigger}`/`LicenseInfo<disperser,faturator>` が **コアに存在** (getter 0x180ca86e0 の直接呼出元 38 関数。確認した 1 例は 0x888 B スタックの構築系関数で、UI/エディタ側と推定)。文言: "You do not have a license for this plugin. **It will still work as part of this preset, but can not be edited.**" → 挙動は **編集不可の soft gate**。Disperser/Faturator は serial 画面あり。**Fresh Air の DSP closure 237 関数は license getter を呼ばない** (直接 call のみ確認) |
 | 公式記述 | User Guide: "An iLok license is required... Fresh Air will not function without a valid license" (iLok Cloud は Internet 接続要) |
@@ -138,3 +138,8 @@ RetDec 出力の欠陥と修復 (対照実験 `lift/gain_ablate.sh` で各々が
 
 ## 9. ユーザ依頼事項
 - **U1**: 上記 FA-1 (Windows 実機/Sandbox での動作観測)。可能なら iLok 無し環境での挙動と、公式 Slate Digital インストーラ自体 (`Fresh Air.exe` 等) の提供 (本 zip は post-install ツリーで `[Run]` 動作が観測不能)。
+
+## 10. 検収記録 (2026-10-10, 独立再計算)
+- `analyze.sh` / `gain_e2e.sh` / `gain_ablate.sh`: work/ キャッシュ再利用・別 dir へ clean 再生成 (zip/pkg から, 29 s) のいずれも 400/400 bit-exact、ablation は P1 87/400・F7 trap(1/400 実行)・F2 400/400 不一致で一致。
+- 独立再計算で一致: 2 ファイル sha256 同一 / 全サイズ / core pdata 25,063 エントリ / .text 17,575,936 / Gain process 0x180afe090 = 446 B / Compressor process 0x180775220 = 1,664 B / license getter 呼出元 38 (DSP closure 内 0) / 独立 BFS closure は 237 を包含 (--stop 0x1803ded20 配下 2 関数/246 B 差のみ)。
+- 本節で §0・§1・§4.1 の PACE 記述 (AAX 署名ブロックの `Eden wrapper` 属性)・pdata 数の表記・closure の 16 B 仮定を訂正。
