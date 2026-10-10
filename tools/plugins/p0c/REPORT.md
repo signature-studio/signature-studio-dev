@@ -117,3 +117,84 @@ bash tools/plugins/p0c/p0c_e2e.sh      # 約 2 分 (work/ 付き初回は kernel
 ## 7. ユーザ依頼事項 / 次タスク提案
 - **用語定義の確認**: 指示の「helper 9件・distinct 6名・Harmless i256 trap 6箇所」に一致する測定量が残骸に無い (§2.6 の対応候補を提示)。出所 (前回 run の進捗メモ等) を頂けると REPORT を追記できる。
 - 次タスク案 (CAB-196 ticket 本体の続き): (1) f80→f64 lowering pass の実装 (§3.4 の 4 点, i64 保持含む) + ARG pass (xmm3/stack, ir7/ir8 系) 再適用; (2) 55/80 f80 無し kernel から差分試験 (native_ref 汎用化 — kernel_args_raw.json の interface 抽出済み); (3) capstone disp_size quirk の共有 fix を inventory 正規化系へ反映。
+
+## 8. P0c-2 追記 (CAB-241): f80→f64 lowering pass の実装と検証
+
+作成: 2026-10-10 / 担当 dir: tools/plugins/p0c のみ (新規 5 ファイル、既存記述は本節のみ追記)
+
+### 8.0 結論 (先出し)
+
+1. **f80→f64 lowering pass を実装** (`f80_lower.py`): k80.lift.ll の x86_fp80 968 token → **0**、
+   **llvm-as 通過・冪等 (2 回適用 byte 一致)・wasm32 バックエンド通過** (101,150 B; emcc_base.log の 20 error 全解消)。
+2. **ARG pass 再適用** (`k80_argfix.py`): RetDec が落とす xmm 引数 46 site と spill 初期化落ち 27 件を
+   機械語 ABI 走査 (`k80abi.py`) と突合して再接続。冪等。引数は**末尾追記** (m7 ir7 同規約)。
+3. **差分試験ハーネス** (`k80_diff.py`, fork 隔離): 実機械語 vs lowering+ARG 適用 IR を同一入力で突合。
+   **f32 mul 系 0x5df210/0x5df240 は出力バッファ bit-exact**、0x5e0760/0x5e0bb0/0x5e0b70/0x5e1590/
+   0x5e1780 も bit-exact。i64 系: 0x5e0330 は IR が i64 完結で構造的 bit-exact、0x5de3e0 は
+   `llvm.rint.f64` 挿入で RC=nearest を再現 (実機 native==rint **100%** / trunc 74.1% を実測)。
+4. **既存 lift IR の x87 スタック模型欠陥を検出** (RetDec 起源・本 pass と独立): fld→演算→fstp 型
+   (0x5de820/0x5dedf0/0x5dfb60/0x5dfd30 + rc_chop 3 本) で fstp 読出が st(1) になり (0x5de820 の出力が
+   定数 c2 に化ける)、loop 末尾 TOP も +2 ずれる。§3 f80_micro (C model) では bit-exact だった面。
+5. 既存 e2e は両方完走 (`p0c_e2e.sh` exit=0 / `p0c2_e2e.sh` exit=0)。
+
+### 8.1 pass 仕様 (f80_lower.py — §3.4 の 4 点の実装)
+
+| # | 変換 | k80 実測 |
+|---|---|---|
+| 1 | `x86_fp80`→`double` 型置換 (define/declare/alloca/load/store/算術/fcmp/select/call/frontend_reg 署名) — **f80 spill slot 排除はこの帰結** (alloca 3 件 16B→8B) | 968→0 |
+| 2 | f80 定数 `0xK`→f64 bits (Fraction で正確な最近接丸め; bare 位置は `0xH` のみ) | 14 |
+| 3 | `@llvm.*.f80`→`.f64` + 重複 declare 除去 | 13 |
+| 4 | same-type 化した `fpext/fptrunc double→double` を RAUW 消去 (連鎖収束; f64→f80→f64 往復は -0.0/NaN 含め恒等) | 24 |
+| 5 | `i3`→`i32` (wasm legalization; add の wrap は &7 で整合) | 813 |
+| 6 | chop 区間外の `fptosi double→iN` に `llvm.rint.f64` 挿入 (`--chop-funcs` で rc_chop 3 本は trunc 保持)。冪等性は「%v が既に rint 結果なら挿入しない」 | 4 |
+| 7 | `sitofp i64→double` 直後 `fptosi double→i64` (中間 def 無し) を恒等畳み込み = **i64 保持**。k80 は RetDec 既 i64 化のため適用例 0 (framework 向け) | 0 |
+
+### 8.2 ARG pass 再適用 (k80_argfix.py)
+
+A: movd-from-zero — `%Z = xor i128 0,0` が `__asm_movX*(i128 %Z)` 専用のとき機械語 xmm slot を
+`i64 %in.xmmN.bits` 引数で追加し `zext(trunc)` に置換 (46 site / 26 kernel)。B1: orphan spill —
+load のみの alloca に引数+entry store (1)。B2: reg2mem 初期化落ち — `%rcx.0.reg2mem` 等に
+slot 名から引数追加 (26)。abi json は `k80abi.py` (read-before-write + copy 逆向き伝播)。
+
+### 8.3 検証結果
+
+**(a) pass 品質**: llvm-as OK / 冪等 OK (両 pass) / wasm32 compile OK。k80.final.ll・kall.final.ll
+にも同一変換計数で適用可能。
+
+**(b) 差分試験 (2000 case/kernel)**: bit-exact 7 (§8.0-3)。RetDec x87 模型欠陥による不一致 7
+(§8.0-4)。SSE 系の差分は pass 非干渉 (f80 無し kernel は変換 0) で lift 品質由来。crash 4
+(ABI 推定の harness 限界, fork 隔離)。Group B 12 kernel (Delphi RTL / x87 helper 外部呼出) は
+数値差分対象外 — framework 統合時に翻訳単位ごと。
+
+**(c) model level 回帰**: f80_micro を N=2,000,000 で再実行し §3.2 と同値 (P1/P2=0, P3=1/2M,
+P4=±1ulp 0.018%, K5e0330 native vs LD=0) — lowering 設計前提は不変。
+
+### 8.4 CAB-194 (framework lift) への統合手順
+
+1. `fw_f80.py` を `f80_lower.py` に置換 (`--chop-funcs` に rc_chop 分類)。fadd 0.0 近似 (73 site) は
+   RAUW 消去に、0xK 定数は正確な最近接丸めに改善。
+2. 引数末尾追記: `%in.xmmN.bits` (i64) / `%in.xmmN` (float/double) を呼出側 (dispatch/ir8) で末尾追加。
+   site 計数は `k80_argfix.py --report` を流用。ABI json は `k80abi.py` を PE 毎に実行。
+3. wasm 化は triple/datalayout を wasm32 に置換してから emcc (p0c2_e2e.sh [5])。
+4. x87 模型欠陥 (§8.0-4) は framework 側にも同型発生が見込まれる — liftdiff (CAB-121) への分類追加を推奨。
+
+### 8.5 限界
+
+- fstp dword の chop 区間内 f32 丸めは nearest のまま (tie ~2^-25/case、実測未観測)。
+- fistp overflow→indefinite / NaN→real-indefinite 正規化 (§3.4 (4)) 未実装 — 極端値域で
+  native=indefinite vs IR=0 の差分 (rc_chop 系で観測)。
+- RetDec x87 スタック模型欠陥 (fstp off-by-one / TOP 破綻) は本 pass scope 外 — 7 kernel 不一致の原因。
+- 差分試験の入力は音響レベル (f32 指数 2^-17..2^7)。ABI 推定はヒューリスティック (crash 4 kernel は fork 隔離)。
+
+### 8.6 再現手順 / 次タスク提案
+
+再現: `bash tools/plugins/p0c/p0c2_e2e.sh 2000` (約 3 分) / 既存 e2e 回帰: `p0c_e2e.sh`。
+
+次タスク (下流チケット案):
+
+1. **[P0c-3] RetDec x87 スタック模型修復 pass** — fstp off-by-one / TOP 更新の機械的修復
+   (transform C)。0x5de820 系 7 kernel の bit-exact 化見込み (欠陥様式と実機正解は確定済み)。
+2. **[P0c-4] ARG pass の ABI 推定強化** — mid-function push のある rsp 相対 frame と
+   movd site↔xmm slot の機械語主導対話で crash 4 kernel を救済。
+3. CAB-194 framework への f80_lower 適用 (§8.4) + frontend_reg C 実装の共有化。
+4. liftdiff (CAB-121) への「x87 fstp off-by-one」欠陥分類追加。
