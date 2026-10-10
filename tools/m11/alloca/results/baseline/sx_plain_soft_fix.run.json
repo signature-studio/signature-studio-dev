@@ -1,0 +1,29 @@
+{
+ "variant": "m11_sx_plain_soft_fix",
+ "shimx_trace_env": "1",
+ "boot_stage": 1,
+ "init_count": 18,
+ "init_count_var": 18,
+ "units_total": 942,
+ "units_run": 17,
+ "va_calls": 3,
+ "va_used": 721289216,
+ "icall_ok": 19,
+ "icall_miss": 1,
+ "dllmain_done": false,
+ "longjmp_hit": 0,
+ "boot_rc": null,
+ "threw": "memory access out of bounds",
+ "stack": "RuntimeError: memory access out of bounds\n    at wasm://wasm/0179af5e:wasm-function[3082]<function_407e20__lifted>:0x16a6de\n    at wasm://wasm/0179af5e:wasm-function[3080]<function_407e20>:0x1698bb\n    at wasm://wasm/0179af5e:wasm-function[3110]<function_409440__lifted>:0x16df07\n    at wasm://wasm/0179af5e:wasm-function[2422]<function_409440>:0x11aea8\n    at wasm://wasm/0179af5e:wasm-function[1276]<function_412d60>:0x985eb\n    at wasm://wasm/0179af5e:wasm-function[3133]<function_413060>:0x16f19e\n    at wasm://wasm/0179af5e:wasm-function[3920]<function_446370>:0x19d830\n    at wasm://wasm/0179af5e:wasm-function[3922]<function_446400>:0x19db34\n    at wasm://wasm/0179af5e:wasm-function[3976]<function_44bb70>:0x1a252d\n    at wasm://wasm/0179af5e:wasm-function[4046]<function_455790>:0x1a8145",
+ "m11_stub_total": 0,
+ "m11_stub_hits": [],
+ "last_stderr": [
+  "[m11] PE image .data/.rdata installed (LVA base 0)",
+  "[m11][args] entry_point(0x0, 0x1, 0x1)",
+  "[shimx] GetProcAddress miss: kernel32.dll!#39682",
+  "[m11][VA] #0 addr=0 size=1310704 (0x13fff0) type=0x1000 prot=0x4",
+  "[shimx] GetProcAddress miss: ntdll.dll!",
+  "[m11][VA] #1 addr=0 size=359989248 (0x15750000) type=0x101000 prot=0x4",
+  "[m11][VA] #2 addr=0 size=359989248 (0x15750000) type=0x101000 prot=0x4"
+ ]
+}

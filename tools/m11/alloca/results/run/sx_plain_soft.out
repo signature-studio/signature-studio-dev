@@ -1,0 +1,1 @@
+SXL_RESULT {"variant":"m11_sx_plain_soft","shimx_trace_env":null,"boot_stage":1,"init_count":18,"init_count_var":18,"units_total":942,"units_run":17,"va_calls":2,"va_used":361299968,"icall_ok":19,"icall_miss":0,"dllmain_done":false,"longjmp_hit":0,"boot_rc":null,"threw":"table index is out of bounds","m11_stub_total":0,"m11_stub_hits":[]}

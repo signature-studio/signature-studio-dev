@@ -1,0 +1,4 @@
+reached_stage: 4/6  (FastMM4 実行: GetMem が VirtualAlloc でプールを確保)
+stop_reason (full InitUnits run): trap "memory access out of bounds" @ function_4133f0 <- function_446400 <- function_44bb70 <- function_455790 <- m11_tr_function_455790
+  units: run=17 / total=942, init_count(prologue)=18, icall ok=19 miss=0
+M11_SUMMARY {"reached_stage": 4, "units_run_full": 17, "survey_ok": 812, "survey_trap": 83}

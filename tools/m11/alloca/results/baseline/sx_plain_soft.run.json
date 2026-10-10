@@ -1,0 +1,25 @@
+{
+ "variant": "m11_sx_plain_soft",
+ "shimx_trace_env": "1",
+ "boot_stage": 1,
+ "init_count": 17,
+ "init_count_var": 0,
+ "units_total": 942,
+ "units_run": 17,
+ "va_calls": 0,
+ "va_used": 0,
+ "icall_ok": 18,
+ "icall_miss": 0,
+ "dllmain_done": true,
+ "longjmp_hit": 1,
+ "boot_rc": "1",
+ "threw": null,
+ "stack": null,
+ "m11_stub_total": 0,
+ "m11_stub_hits": [],
+ "last_stderr": [
+  "[m11] PE image .data/.rdata installed (LVA base 0)",
+  "[m11][args] entry_point(0x0, 0x1, 0x1)",
+  "[shimx] GetProcAddress miss: kernel32.dll!#39682"
+ ]
+}

@@ -1,0 +1,842 @@
+{
+ "baseline": {
+  "mainline_units_run": 17,
+  "mainline_survey": {
+   "dllmain_done": true,
+   "boot_threw": null,
+   "units": 942,
+   "ok": 812,
+   "noproc": 1,
+   "miss": 46,
+   "trap": 83,
+   "trap_kinds": {
+    "memory access out of bounds": 34,
+    "halt0->longjmp (unit が Halt を呼んだ)": 48,
+    "Aborted(native code called abort())": 1
+   },
+   "top_frame_idx": {
+    "60": 1,
+    "734": 5,
+    "1879": 2,
+    "2005": 1,
+    "3074": 3,
+    "3141": 2,
+    "3168": 1,
+    "3182": 1,
+    "3227": 1,
+    "3605": 1,
+    "4020": 1,
+    "5302": 9,
+    "5385": 1,
+    "5386": 3,
+    "14870": 2,
+    "15502": 1
+   },
+   "failfast_functions": {},
+   "halted_units": [
+    "0x67f00",
+    "0x105bd0",
+    "0x1998a0",
+    "0x19b100",
+    "0x19f9a0",
+    "0x23bef0",
+    "0x243270",
+    "0x26e010",
+    "0x26e9a0",
+    "0x29fcd0",
+    "0x2a6890",
+    "0x2b7e40",
+    "0x2cf480",
+    "0x2f6b90",
+    "0x333090",
+    "0x4136d0",
+    "0x4b2080",
+    "0x4cb690",
+    "0x502960",
+    "0x55b400"
+   ],
+   "first_trap_units": [
+    "0x55790",
+    "0x67f00",
+    "0x105bd0",
+    "0x158e20",
+    "0x1658e0",
+    "0x16fde0",
+    "0x177290",
+    "0x177fd0",
+    "0x179610",
+    "0x17fd50",
+    "0x180970",
+    "0x182230"
+   ],
+   "getmem": 258,
+   "freemem": 19,
+   "fastmm_getmem_impl": 260,
+   "fastmm_freemem_impl": 20,
+   "va_calls": 33,
+   "va_bytes": 1460142080,
+   "icall_miss": 46,
+   "icall_miss_uniq": 1,
+   "stub_total": 139,
+   "stub_uniq": 33,
+   "stub_hits": [
+    "GetLocaleInfoW:48",
+    "EnumCalendarInfoW:2",
+    "FormatMessageW:1",
+    "GetDC:4",
+    "GetDeviceCaps:3",
+    "ReleaseDC:5",
+    "CreatePalette:1",
+    "GetStockObject:4",
+    "LoadIconW:1",
+    "MulDiv:1",
+    "RegCloseKey:7",
+    "GlobalAddAtomW:3",
+    "RegisterWindowMessageW:10",
+    "GetSystemMetrics:6",
+    "FindWindowW:2",
+    "LoadCursorW:1",
+    "LoadImageW:21",
+    "GetKeyboardLayout:1",
+    "EnumDisplayMonitors:1",
+    "GetCurrentThread:1",
+    "SystemParametersInfoW:1",
+    "RegisterClipboardFormatW:4",
+    "acmMetrics:1",
+    "SHGetMalloc:1",
+    "GetClipboardFormatNameW:1",
+    "EnumDisplaySettingsW:1",
+    "GetSystemDefaultLocaleName:1",
+    "GetClipCursor:1",
+    "EnumFontFamiliesExW:1",
+    "GetTempPathW:1",
+    "FreeLibrary:1",
+    "GetComputerNameExW:1",
+    "RegOpenKeyExA:1"
+   ]
+  },
+  "sx_pure_startup": {
+   "variant": "m11_sx_plain_soft",
+   "shimx_trace_env": null,
+   "boot_stage": 1,
+   "init_count": 17,
+   "init_count_var": 0,
+   "units_total": 942,
+   "units_run": 17,
+   "va_calls": 0,
+   "va_used": 0,
+   "icall_ok": 18,
+   "icall_miss": 0,
+   "dllmain_done": true,
+   "longjmp_hit": 1,
+   "boot_rc": "1",
+   "threw": null,
+   "m11_stub_total": 0,
+   "m11_stub_hits": []
+  },
+  "sx_pure_kinds": {
+   "ok": 807,
+   "oob": 44,
+   "halt0": 44,
+   "closure_outside": 46,
+   "noproc": 1
+  },
+  "sx_fix_kinds": {
+   "ok": 800,
+   "oob": 41,
+   "halt0": 53,
+   "closure_outside": 46,
+   "abort": 1,
+   "noproc": 1
+  },
+  "mainline_trace_kinds": {
+   "ok": 800,
+   "oob": 50,
+   "halt0": 44,
+   "closure_outside": 46,
+   "abort": 1,
+   "noproc": 1
+  }
+ },
+ "after": {
+  "mainline_units_run": 17,
+  "mainline_survey": {
+   "dllmain_done": true,
+   "boot_threw": null,
+   "units": 942,
+   "ok": 812,
+   "noproc": 1,
+   "miss": 46,
+   "trap": 83,
+   "trap_kinds": {
+    "memory access out of bounds": 34,
+    "halt0->longjmp (unit が Halt を呼んだ)": 48,
+    "Aborted(native code called abort())": 1
+   },
+   "top_frame_idx": {
+    "60": 1,
+    "734": 5,
+    "1879": 2,
+    "2005": 1,
+    "3074": 3,
+    "3141": 2,
+    "3168": 1,
+    "3182": 1,
+    "3227": 1,
+    "3605": 1,
+    "4020": 1,
+    "5302": 9,
+    "5385": 1,
+    "5386": 3,
+    "14870": 2,
+    "15502": 1
+   },
+   "failfast_functions": {},
+   "halted_units": [
+    "0x67f00",
+    "0x105bd0",
+    "0x1998a0",
+    "0x19b100",
+    "0x19f9a0",
+    "0x23bef0",
+    "0x243270",
+    "0x26e010",
+    "0x26e9a0",
+    "0x29fcd0",
+    "0x2a6890",
+    "0x2b7e40",
+    "0x2cf480",
+    "0x2f6b90",
+    "0x333090",
+    "0x4136d0",
+    "0x4b2080",
+    "0x4cb690",
+    "0x502960",
+    "0x55b400"
+   ],
+   "first_trap_units": [
+    "0x55790",
+    "0x67f00",
+    "0x105bd0",
+    "0x158e20",
+    "0x1658e0",
+    "0x16fde0",
+    "0x177290",
+    "0x177fd0",
+    "0x179610",
+    "0x17fd50",
+    "0x180970",
+    "0x182230"
+   ],
+   "getmem": 258,
+   "freemem": 19,
+   "fastmm_getmem_impl": 260,
+   "fastmm_freemem_impl": 20,
+   "va_calls": 33,
+   "va_bytes": 1460142080,
+   "icall_miss": 46,
+   "icall_miss_uniq": 1,
+   "stub_total": 139,
+   "stub_uniq": 33,
+   "stub_hits": [
+    "GetLocaleInfoW:48",
+    "EnumCalendarInfoW:2",
+    "FormatMessageW:1",
+    "GetDC:4",
+    "GetDeviceCaps:3",
+    "ReleaseDC:5",
+    "CreatePalette:1",
+    "GetStockObject:4",
+    "LoadIconW:1",
+    "MulDiv:1",
+    "RegCloseKey:7",
+    "GlobalAddAtomW:3",
+    "RegisterWindowMessageW:10",
+    "GetSystemMetrics:6",
+    "FindWindowW:2",
+    "LoadCursorW:1",
+    "LoadImageW:21",
+    "GetKeyboardLayout:1",
+    "EnumDisplayMonitors:1",
+    "GetCurrentThread:1",
+    "SystemParametersInfoW:1",
+    "RegisterClipboardFormatW:4",
+    "acmMetrics:1",
+    "SHGetMalloc:1",
+    "GetClipboardFormatNameW:1",
+    "EnumDisplaySettingsW:1",
+    "GetSystemDefaultLocaleName:1",
+    "GetClipCursor:1",
+    "EnumFontFamiliesExW:1",
+    "GetTempPathW:1",
+    "FreeLibrary:1",
+    "GetComputerNameExW:1",
+    "RegOpenKeyExA:1"
+   ]
+  },
+  "sx_pure": {
+   "variant": "m11_sx_plain_soft",
+   "shimx_trace_env": null,
+   "boot_stage": 1,
+   "init_count": 18,
+   "init_count_var": 18,
+   "units_total": 942,
+   "units_run": 17,
+   "va_calls": 2,
+   "va_used": 361299968,
+   "icall_ok": 19,
+   "icall_miss": 0,
+   "dllmain_done": false,
+   "longjmp_hit": 0,
+   "boot_rc": null,
+   "threw": "table index is out of bounds",
+   "m11_stub_total": 0,
+   "m11_stub_hits": []
+  },
+  "sx_fix_kinds": {
+   "ok": 800,
+   "oob": 41,
+   "halt0": 53,
+   "closure_outside": 46,
+   "abort": 1,
+   "noproc": 1
+  },
+  "sx_pure_kinds": {
+   "ok": 807,
+   "oob": 44,
+   "halt0": 44,
+   "closure_outside": 46,
+   "noproc": 1
+  },
+  "mainline_trace_kinds": {
+   "ok": 800,
+   "oob": 50,
+   "halt0": 44,
+   "closure_outside": 46,
+   "abort": 1,
+   "noproc": 1
+  }
+ },
+ "pass": {
+  "detector_counts": {
+   "R1_rep_stos": 4,
+   "R2_rep_movs": 5,
+   "R3_fillchar": 16,
+   "R4_llvm_mem": 0,
+   "R5_api_out": 24,
+   "R6_count_buf": 12,
+   "R7_wide_store": 39017
+  },
+  "functions_patched": 56,
+  "widened_count": 63,
+  "total_added_bytes": 269874,
+  "widened": [
+   {
+    "function": "function_10c7cd0",
+    "alloca": "%stack_var_-17564",
+    "was_bytes": 8,
+    "now_bytes": 32,
+    "need_bytes": 32,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_1221290",
+    "alloca": "%stack_var_-148",
+    "was_bytes": 8,
+    "now_bytes": 88,
+    "need_bytes": 88,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_125da90",
+    "alloca": "%stack_var_-16500",
+    "was_bytes": 8,
+    "now_bytes": 32,
+    "need_bytes": 32,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_12a3ff0",
+    "alloca": "%stack_var_-4072",
+    "was_bytes": 8,
+    "now_bytes": 4016,
+    "need_bytes": 4016,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_407380",
+    "alloca": "%stack_var_-112",
+    "was_bytes": 4,
+    "now_bytes": 104,
+    "need_bytes": 104,
+    "was_type": "i32"
+   },
+   {
+    "function": "function_407800",
+    "alloca": "%stack_var_-104",
+    "was_bytes": 8,
+    "now_bytes": 48,
+    "need_bytes": 48,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_4078c0",
+    "alloca": "%stack_var_-104",
+    "was_bytes": 8,
+    "now_bytes": 48,
+    "need_bytes": 48,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_408b60",
+    "alloca": "%stack_var_-188472",
+    "was_bytes": 8,
+    "now_bytes": 188416,
+    "need_bytes": 188416,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_408b60",
+    "alloca": "%stack_var_-221248",
+    "was_bytes": 8,
+    "now_bytes": 32768,
+    "need_bytes": 32768,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_408b60",
+    "alloca": "%stack_var_-254016",
+    "was_bytes": 8,
+    "now_bytes": 32768,
+    "need_bytes": 32768,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_409b30",
+    "alloca": "%stack_var_-324",
+    "was_bytes": 8,
+    "now_bytes": 288,
+    "need_bytes": 284,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_409c40",
+    "alloca": "%rdx",
+    "was_bytes": 8,
+    "now_bytes": 16,
+    "need_bytes": 16,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_409c80",
+    "alloca": "%rdx",
+    "was_bytes": 8,
+    "now_bytes": 16,
+    "need_bytes": 16,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_40a060",
+    "alloca": "%stack_var_-546",
+    "was_bytes": 8,
+    "now_bytes": 528,
+    "need_bytes": 522,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_40f640",
+    "alloca": "%stack_var_-1048",
+    "was_bytes": 8,
+    "now_bytes": 512,
+    "need_bytes": 512,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_40f640",
+    "alloca": "%stack_var_-536",
+    "was_bytes": 8,
+    "now_bytes": 512,
+    "need_bytes": 512,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_412160",
+    "alloca": "%stack_var_-280",
+    "was_bytes": 8,
+    "now_bytes": 240,
+    "need_bytes": 240,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_412770",
+    "alloca": "%stack_var_-264",
+    "was_bytes": 8,
+    "now_bytes": 240,
+    "need_bytes": 240,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_418b40",
+    "alloca": "%stack_var_-56",
+    "was_bytes": 8,
+    "now_bytes": 48,
+    "need_bytes": 48,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_418b80",
+    "alloca": "%stack_var_-546",
+    "was_bytes": 8,
+    "now_bytes": 528,
+    "need_bytes": 522,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_419150",
+    "alloca": "%stack_var_-194",
+    "was_bytes": 8,
+    "now_bytes": 176,
+    "need_bytes": 170,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_419150",
+    "alloca": "%stack_var_-364",
+    "was_bytes": 8,
+    "now_bytes": 176,
+    "need_bytes": 170,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_419750",
+    "alloca": "%stack_var_-648",
+    "was_bytes": 8,
+    "now_bytes": 592,
+    "need_bytes": 592,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_419990",
+    "alloca": "%stack_var_-546",
+    "was_bytes": 2,
+    "now_bytes": 528,
+    "need_bytes": 522,
+    "was_type": "i16"
+   },
+   {
+    "function": "function_419ed0",
+    "alloca": "%stack_var_-600",
+    "was_bytes": 8,
+    "now_bytes": 592,
+    "need_bytes": 592,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_41a3d0",
+    "alloca": "%stack_var_-530",
+    "was_bytes": 8,
+    "now_bytes": 528,
+    "need_bytes": 522,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_41ca30",
+    "alloca": "%stack_var_-56",
+    "was_bytes": 8,
+    "now_bytes": 48,
+    "need_bytes": 48,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_4209c0",
+    "alloca": "%stack_var_-56",
+    "was_bytes": 8,
+    "now_bytes": 16,
+    "need_bytes": 16,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_425a10",
+    "alloca": "%stack_var_-284",
+    "was_bytes": 4,
+    "now_bytes": 288,
+    "need_bytes": 284,
+    "was_type": "i32"
+   },
+   {
+    "function": "function_426310",
+    "alloca": "%stack_var_-292",
+    "was_bytes": 8,
+    "now_bytes": 288,
+    "need_bytes": 284,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_43b7e0",
+    "alloca": "%stack_var_-616",
+    "was_bytes": 8,
+    "now_bytes": 592,
+    "need_bytes": 592,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_43b830",
+    "alloca": "%stack_var_-60",
+    "was_bytes": 8,
+    "now_bytes": 40,
+    "need_bytes": 36,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_43ba20",
+    "alloca": "%stack_var_-600",
+    "was_bytes": 4,
+    "now_bytes": 592,
+    "need_bytes": 592,
+    "was_type": "i32"
+   },
+   {
+    "function": "function_442bd0",
+    "alloca": "%stack_var_-24",
+    "was_bytes": 8,
+    "now_bytes": 16,
+    "need_bytes": 16,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_442c00",
+    "alloca": "%stack_var_-24",
+    "was_bytes": 8,
+    "now_bytes": 16,
+    "need_bytes": 16,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_442c30",
+    "alloca": "%stack_var_-40",
+    "was_bytes": 8,
+    "now_bytes": 16,
+    "need_bytes": 16,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_442e60",
+    "alloca": "%stack_var_-24",
+    "was_bytes": 2,
+    "now_bytes": 16,
+    "need_bytes": 16,
+    "was_type": "i16"
+   },
+   {
+    "function": "function_446370",
+    "alloca": "%stack_var_-536",
+    "was_bytes": 8,
+    "now_bytes": 512,
+    "need_bytes": 512,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_4463d0",
+    "alloca": "%stack_var_-30",
+    "was_bytes": 2,
+    "now_bytes": 8,
+    "need_bytes": 6,
+    "was_type": "i16"
+   },
+   {
+    "function": "function_4488f0",
+    "alloca": "%stack_var_-1084",
+    "was_bytes": 8,
+    "now_bytes": 528,
+    "need_bytes": 522,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_4488f0",
+    "alloca": "%stack_var_-1648",
+    "was_bytes": 8,
+    "now_bytes": 48,
+    "need_bytes": 48,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_44a9a0",
+    "alloca": "%stack_var_-292",
+    "was_bytes": 4,
+    "now_bytes": 288,
+    "need_bytes": 284,
+    "was_type": "i32"
+   },
+   {
+    "function": "function_44bb70",
+    "alloca": "%stack_var_-416",
+    "was_bytes": 8,
+    "now_bytes": 392,
+    "need_bytes": 392,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_452960",
+    "alloca": "%stack_var_-44",
+    "was_bytes": 4,
+    "now_bytes": 24,
+    "need_bytes": 20,
+    "was_type": "i32"
+   },
+   {
+    "function": "function_454030",
+    "alloca": "%stack_var_-292",
+    "was_bytes": 8,
+    "now_bytes": 288,
+    "need_bytes": 284,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_454090",
+    "alloca": "%stack_var_-372",
+    "was_bytes": 8,
+    "now_bytes": 288,
+    "need_bytes": 284,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_454090",
+    "alloca": "%stack_var_-88",
+    "was_bytes": 2,
+    "now_bytes": 48,
+    "need_bytes": 48,
+    "was_type": "i16"
+   },
+   {
+    "function": "function_59b100",
+    "alloca": "%stack_var_-416",
+    "was_bytes": 8,
+    "now_bytes": 392,
+    "need_bytes": 392,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_5cc340",
+    "alloca": "%stack_var_-144",
+    "was_bytes": 8,
+    "now_bytes": 104,
+    "need_bytes": 104,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_5cee10",
+    "alloca": "%stack_var_-160",
+    "was_bytes": 8,
+    "now_bytes": 104,
+    "need_bytes": 104,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_6516d0",
+    "alloca": "%stack_var_-48",
+    "was_bytes": 2,
+    "now_bytes": 8,
+    "need_bytes": 8,
+    "was_type": "i16"
+   },
+   {
+    "function": "function_670fd0",
+    "alloca": "%stack_var_-252",
+    "was_bytes": 8,
+    "now_bytes": 32,
+    "need_bytes": 28,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_6a43a0",
+    "alloca": "%rcx",
+    "was_bytes": 8,
+    "now_bytes": 16,
+    "need_bytes": 16,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_6c8910",
+    "alloca": "%r8",
+    "was_bytes": 8,
+    "now_bytes": 16,
+    "need_bytes": 16,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_6c8910",
+    "alloca": "%rdx",
+    "was_bytes": 8,
+    "now_bytes": 16,
+    "need_bytes": 16,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_6cef10",
+    "alloca": "%rcx",
+    "was_bytes": 8,
+    "now_bytes": 16,
+    "need_bytes": 16,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_6cef20",
+    "alloca": "%rcx",
+    "was_bytes": 8,
+    "now_bytes": 16,
+    "need_bytes": 16,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_6cef50",
+    "alloca": "%rcx",
+    "was_bytes": 8,
+    "now_bytes": 16,
+    "need_bytes": 16,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_7747c0",
+    "alloca": "%rcx",
+    "was_bytes": 8,
+    "now_bytes": 16,
+    "need_bytes": 16,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_866d80",
+    "alloca": "%stack_var_-116",
+    "was_bytes": 8,
+    "now_bytes": 96,
+    "need_bytes": 92,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_95b400",
+    "alloca": "%stack_var_-416",
+    "was_bytes": 8,
+    "now_bytes": 392,
+    "need_bytes": 392,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_ade4d0",
+    "alloca": "%stack_var_-416",
+    "was_bytes": 8,
+    "now_bytes": 392,
+    "need_bytes": 392,
+    "was_type": "i64"
+   },
+   {
+    "function": "function_f3d620",
+    "alloca": "%stack_var_-542",
+    "was_bytes": 8,
+    "now_bytes": 504,
+    "need_bytes": 502,
+    "was_type": "i64"
+   }
+  ],
+  "over_cap": [],
+  "gep_warn": []
+ }
+}

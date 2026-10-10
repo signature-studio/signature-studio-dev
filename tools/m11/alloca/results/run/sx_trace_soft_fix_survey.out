@@ -1,0 +1,1 @@
+SXL_SURVEY {"variant":"m11_sx_trace_soft_fix","units":942,"kinds":{"ok":800,"oob":41,"halt0":53,"closure_outside":46,"abort":1,"noproc":1},"reboots":1,"shimx_trace_msgs":{},"api_units":51,"aborts":1}

@@ -1,0 +1,20 @@
+[m11] PE image .data/.rdata installed (LVA base 0)
+[m11][args] entry_point(0x0, 0x1, 0x1)
+[m11][VA] #0 addr=0 size=1310704 (0x13fff0) type=0x1000 prot=0x4
+[m11][VA] #1 addr=0 size=355205120 (0x152c0000) type=0x101000 prot=0x4
+[m11][stub-notimpl] GetLocaleInfoW called (0 を返して継続)
+[m11][stub-notimpl] EnumCalendarInfoW called (0 を返して継続)
+[m11][VA] #2 addr=0 size=355205120 (0x152c0000) type=0x101000 prot=0x4
+[e2e] boot threw: memory access out of bounds
+RuntimeError: memory access out of bounds
+    at wasm://wasm/016ebdca:wasm-function[14870]:0x35171a
+    at wasm://wasm/016ebdca:wasm-function[2719]:0x1708ff
+    at wasm://wasm/016ebdca:wasm-function[2773]:0x175276
+    at wasm://wasm/016ebdca:wasm-function[2843]:0x17ae96
+    at wasm://wasm/016ebdca:wasm-function[9741]:0x33f576
+    at wasm://wasm/016ebdca:wasm-function[14857]:0x350a32
+    at wasm://wasm/016ebdca:wasm-function[14865]:0x350f23
+    at wasm://wasm/016ebdca:wasm-function[14866]:0x351362
+    at wasm://wasm/016ebdca:wasm-function[14868]:0x3514ef
+    at wasm://wasm/016ebdca:wasm-function[22]:0x5e41d
+M11_RESULT {"wasm_size":6008690,"image_bytes":22515781,"boot_stage":1,"init_count":18,"va_used":711720960,"va_calls":3,"icall_ok":19,"icall_miss":0,"icall_miss_uniq":0,"icall_miss_targets":[],"units_total":942,"units_run":17,"units_skipped":0,"disp_entries":7399,"probes":{"GetMem":13,"FreeMem":1,"FastMM_GetMem(407a50)":13,"FastMM_FreeMem(407e20)":1,"InitUnits":0,"Halt0":0},"stub_total":50,"stub_uniq":2,"stub_hits":["GetLocaleInfoW:48","EnumCalendarInfoW:2"],"dllmain_done":false,"longjmp_hit":0,"boot_rc":null,"threw":"memory access out of bounds"}

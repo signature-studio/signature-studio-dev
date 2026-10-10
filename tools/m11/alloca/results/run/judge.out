@@ -1,0 +1,29 @@
+========================================================================
+M11 e2e: FLEngine_x64.dll 部分起動 PoC (audio/GUI なし; RetDec lift → emcc → wasm → node)
+========================================================================
+reached_stage: 4/6  (FastMM4 実行: GetMem が VirtualAlloc でプールを確保)
+  [x] stage 1: PE image (.text/.data/.rdata, LVA) を linear memory に敷設
+  [x] stage 2: entry_point(DllMain) → _StartLib → _InitLib 到達 (TLS hook を間接 call 表経由で実行)
+  [x] stage 3: System.InitUnits 開始 (InitTable 942 unit を読出し)
+  [x] stage 4: FastMM4 実行: GetMem が VirtualAlloc でプールを確保
+  [ ] stage 5: 全 942 unit 初期化が trap 無しで完走 (survey: 隔離実行)
+  [ ] stage 6: DllMain attach が正常終了 (Halt0 → RestoreContext/longjmp 到達)
+stop_reason (full InitUnits run): trap "memory access out of bounds" @ function_4133f0 <- function_446400 <- function_44bb70 <- function_455790 <- m11_tr_function_455790
+  units: run=17 / total=942, init_count(prologue)=18, icall ok=19 miss=0
+FastMM4 state (full run): GetMem=13 FreeMem=1 FastMM_GetMem_impl=13 FastMM_FreeMem_impl=1
+  VirtualAlloc calls=3 total=711.7 MB
+  first VirtualAlloc size=1310704 (0x13fff0)  == FastMM4 MediumBlockPoolSize (1.25MB-16)
+  fastmm_initialized: yes (GetMem->medium pool VirtualAlloc 実行済)
+stubs/dispatch: Win32 stub uniq=2 hits=50 / indirect-call table entries=7399
+image: 22515781 bytes, wasm: 6008690 bytes
+------------------------------------------------------------------------
+unit survey (InitUnits 抑止 → 942 unit を 1 本ずつ try/catch 隔離; DllMain done=True):
+  ok=812 noproc=1 miss(closure外)=46 trap=83  (合計 942)
+  trap kinds: {"memory access out of bounds": 34, "halt0->longjmp (unit が Halt を呼んだ)": 48, "Aborted(native code called abort())": 1}
+  top trap frames: function_8cbcb0 x9, function_414ad0 x5, function_47ad70 x3, function_903e00 x3, function_408040 x2, function_4f9f40 x2, function_4133f0 x2, function_414e70 x1
+  FastMM (survey 通算): GetMem=258 FreeMem=19 VirtualAlloc calls=33 1460.1 MB
+  unresolved function_* (fail-fast): {}
+  Win32 stub hits (uniq=33 total=139): GetLocaleInfoW:48, EnumCalendarInfoW:2, FormatMessageW:1, GetDC:4, GetDeviceCaps:3, ReleaseDC:5, CreatePalette:1, GetStockObject:4, LoadIconW:1, MulDiv:1, RegCloseKey:7, GlobalAddAtomW:3
+  MessageBox 呼出し: 0 件
+------------------------------------------------------------------------
+M11_SUMMARY {"reached_stage": 4, "stop_reason": "trap \"memory access out of bounds\" @ function_4133f0 <- function_446400 <- function_44bb70 <- function_455790 <- m11_tr_function_455790", "units_run_full": 17, "units_total": 942, "survey_ok": 812, "survey_trap": 83, "survey_miss": 46, "getmem": 13, "freemem": 1, "va_calls": 3, "va_mb": 711.7, "wasm_bytes": 6008690, "trampolines": 7399}
