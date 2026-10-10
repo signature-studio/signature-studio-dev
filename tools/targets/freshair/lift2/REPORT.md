@@ -48,13 +48,11 @@ fma primitive 自体は emcc libm 実装が native vfmadd と **200,000/200,000 
 | 対象 | 経路 | シナリオ | fma0 | fma1 |
 |---|---|---|---|---|
 | Filter process 0x180b6f050 | 型 0-7 × order 0-5 × 周波数/Q/gain × n=1..64 × 1-5 call (crossfade 状態遷移含む) | 200 | **200/200** | **200/200** |
-| Compressor process 0x180775220 | 型/周波数/mode/sidechain/vector push (vcap 0-64: grow 含む) × n=0..128 | 400 | 非grow 206/206, grow 122/194 | 同左 |
-| ctx-fuzz (comp) | 構造化 200 + 乱数 1000 (境界値: ±0, 非正規, 巨大/極小, n=1..128, 複数 call) | 1200 | **1200/1200** | **1200/1200** |
-| ctx-fuzz (filter) | 同上 (n=1..64) | 1200 | **1200/1200** | **1200/1200** |
+| Compressor process 0x180775220 | 型/周波数/mode/sidechain/vector push (vcap 0-64) × n=0..128 | 400 | 非grow 206/206, grow 122/194 | 同左 |
+| ctx-fuzz (comp/filter) | 構造化 200 + 乱数 1000 (境界値: ±0, 非正規, 巨大/極小, n=1..128, 複数 call) | 各 1200 | **1200/1200** | **1200/1200** |
 
 - 比較対象: 状態ブロック (S+0x98.., P+0x9f70.., vector begin/end/cap 相対値) + L/R 出力の全バイト。
 - NaN/Inf 入力は除外 (x86 と wasm の NaN payload 差 — liftlib と同一の方針)。
-- grow 経路 (vcap<16) の 72 fails は §5 の既知限界。
 
 ## 5. 既知限界: Compressor grow 経路 (vcap<16) の 72 scenario-call
 
@@ -97,10 +95,13 @@ lift2/
 
 ## 8. 未解決 / 次タスク
 
-1. **Compressor grow 経路の wasm OOB 完走 (72/800)**: UCRT lock 制御ブロックの追加 poke または shared_ptr 代入 (0x181057d20) の C 差替え。非 grow は bit-exact 済みなので残差は限定。
-2. **FreshAirDsp 制御層 (0x1803dfc10, vtable 17 slot)**: 子 snapin 呼出は本セッションの Compressor/Filter process で部品が揃った。vtable 経由の間接 call を fa_icall switch に追加する形で lift 可能。
-3. **mlift の汎用化起票案 (liftlib 側への反映は REPORT 起票のみ)**: (a) 共有スタック + rsp 引数渡し, (b) callee 入口 rax = caller rax, (c) 戻り {rax, xmm0, xmm1}, (d) wrapper の positional 引数割付 — いずれも RetDec 経路 (tools/liftlib) の修復 pass にも適用可能な知見。
-4. **Determinism**: wasm 2 回実行の SHA 一致は fma0/fma1 の 2 pass で暗黙確認 (同一シナリオ再実行)。明示の 3rd pass は未実施。
+1. Compressor grow 経路の wasm OOB 完走 (72/800): FA-2b (§10) で解消。
+2. FreshAirDsp 制御層 (0x1803dfc10, vtable 17 slot): FA-2c (§11) で bit-exact 化。
+3. mlift の汎用化起票案 (liftlib 側への反映は REPORT 起票のみ): (a) 共有スタック + rsp 引数渡し,
+   (b) callee 入口 rax = caller rax, (c) 戻り {rax,xmm0,xmm1}, (d) wrapper の positional 引数割付,
+   (e) __chkstk の gs read 差替え, (f) rep stos のループ変数, (g) icall switch の全関数化
+   — いずれも RetDec 経路 (tools/liftlib) の修復 pass にも適用可能な知見。
+4. Determinism: wasm 2 回実行の SHA 一致は fma0/fma1 の 2 pass で暗黙確認。明示の 3rd pass は未実施。
 
 ## 9. 検収記録
 
