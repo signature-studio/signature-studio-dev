@@ -146,3 +146,12 @@ bash license/scripts/ghidra_auth.sh                                      # 167 �
 - §2 の「判定 3点」のうち funclet 0x18004ffc0 は demo ロジック無し → patch 不要と確定。
 - 新規所見: RetDec `--select-decode-only` の lift fidelity gap 5 件 (L1–L6, authstub/REPORT.md §6) — 本 lift 時の pass 追補対象。
 - 再現: `bash authstub/e2e.sh` (wasm ハーネス 23/23 PASS) / `python3 authstub/synth_state.py <dir>` (licensed 状態合成, 決定論) / `python3 authstub/mpatch.py <pe> <out>` (機械語参照パッチ, 原 bytes 照合 6/6)。
+
+## 11. SR-1 (CAB-68) 最小 host による実測フィードバック (2026-10-10 メモ追記)
+
+`host/REPORT.md` (CAB-68 成果物) の実測のうち本マップに関係する確定事項 (記述の変更は無し, 追記のみ):
+
+1. **§1/§2 の ABI slot が実測確定** (実 DLL の vtable 実読み): SerumDSP IComponent vtable = 0xa24048 で **slot12 = setState (0x18004fad0)**, IAudioProcessor vtable = 0xa240c8 で slot9 = process (0x180056670)。SerumController IEditController vtable = 0xa2bf58 で **slot6 = setState (0x1800c2b50) / slot7 = getState (0x1800c6090)** — §2 表の「実アドレス」列と一致。CAB-71 §7 の med 項目「0xa2bf58 の (interface, slot) 番号」は解消。
+2. **`call [vtbl+0x30]` with 0x800010 = IComponentHandler::restartComponent (slot6)** — IComponentHandler は beginEdit/performEdit/endEdit/restartComponent の 4 メソッド。§7 の「slot5 (+0x28) と +8 ずれ」の疑問は SDK ABI 実測で解消 (restartComponent が slot6)。
+3. **host session state の実形式** = `"XferJson\0"` + u64 meta JSON 長 + meta JSON + payload (u32 展開後長 + u32 2 + zstd)。§3 の合成物 (synth_state.py の meta JSON) はこのコンテナで封入する必要がある。meta だけでは setState が S_FALSE (payload は setState 内で実際に展開検証される — corrupt 対照で実証)。
+4. **demoVersion による demo 経路の発火は実 DLL 経路では未観測** — meta の demoVersion は 0x18004fad0 / 0x1800c2b50 の分岐に届かず (payload 側 DOM 参照の推定)。controller 側 demo bit / 0x800010 は内部フラグ base+0x10c==1 が前提で headless 構成では 2 のまま。§10 の wasm ハーネス検証 (IR レベル) を引き続き正とし、payload 合成 + +0x10c setter 特定は host/REPORT.md §5 に引継。
