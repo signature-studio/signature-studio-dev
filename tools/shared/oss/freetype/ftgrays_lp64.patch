@@ -1,0 +1,16 @@
+--- a/src/smooth/ftgrays.c	2026-10-10 15:07:48.507831625 +0900
++++ b/src/smooth/ftgrays.c	2026-10-10 15:07:48.561830521 +0900
+@@ -372,10 +372,10 @@
+   /* These macros speed up repetitive divisions by replacing them */
+   /* with multiplications and right shifts.                       */
+ #define FT_UDIVPREP( b )                                       \
+-  long  b ## _r = (long)( FT_ULONG_MAX >> PIXEL_BITS ) / ( b )
++  long long  b ## _r = (long long)( 0xFFFFFFFFFFFFFFFFULL >> PIXEL_BITS ) / ( b )
+ #define FT_UDIV( a, b )                                        \
+-  ( ( (unsigned long)( a ) * (unsigned long)( b ## _r ) ) >>   \
+-    ( sizeof( long ) * FT_CHAR_BIT - PIXEL_BITS ) )
++  ( ( (unsigned long long)( a ) * (unsigned long long)( b ## _r ) ) >>   \
++    ( 64 - PIXEL_BITS ) )
+ 
+ 
+   /*************************************************************************/

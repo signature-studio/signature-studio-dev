@@ -1,0 +1,34 @@
+#!/usr/bin/env python3
+"""kio_fix.py IN.ll OUT.ll — RetDec 型復元欠陥 [C] の最小修復 pass (PoC)。
+  [C] C++ `long` (LP64 では 64bit) を RetDec が i32 として復元する → 該当関数の i32 を i64 に拡幅。
+      対象は demangle 署名 (Z9Limit_RCSlll / Z9FixHi_RCSll / Z9CBool_RCSl) の `l` 引数のみ。
+  [E] idiv (符号付き除算) が urem に化ける符号欠陥: FixHi_RCS の `urem i64` を `srem i64` へ。
+  [A] deref 落ち ([rsi] が rsi そのものに化ける): 参照渡し引数を持つ Get*/Set*Intel 6 関数のみ修復。
+      unilen/wcslen16/str*compare の `cmp word ptr [rdi],0` 系、[B] float 引数落ち、[D] ucomiss flags 落ちは
+      この PoC では修復しない (tools/m7 ir7_argpass / m8 ir8_valueflow 相当の関数別 pass が必要; REPORT §4)。"""
+import re, sys
+WIDEN = ["__Z9Limit_RCSlll", "__Z9FixHi_RCSll", "__Z9CBool_RCSl"]
+s = open(sys.argv[1]).read()
+n = 0
+for fn in WIDEN:
+    m = re.search(r"(?ms)^define [^\n]*@" + re.escape(fn) + r"\(.*?^}\n", s)
+    if not m: continue
+    body = m.group(0)
+    new = re.sub(r"\bi32\b", "i64", body)
+    new = re.sub(r"sext i64 (\S+) to i64", r"add i64 \1, 0", new)
+    new = re.sub(r"zext i64 (\S+) to i64", r"add i64 \1, 0", new)
+    if fn == "__Z9FixHi_RCSll": new = new.replace("urem i64", "srem i64")
+    s = s.replace(body, new); n += 1
+# [A] 参照渡し引数 (const long& / const double&) の deref 復元: 元 asm は `mov rax,[rsi]` / `mov rax,[rdx]` だが
+#     RetDec IR は ptrtoint(%argN) (= ポインタ値そのもの) を使っている。 N は関数ごとの `&` 引数位置。
+DEREF = {"__Z12GetFourIntelPhRKl": [2], "__Z13GetEightIntelPhRKl": [2], "__Z13GetFloatIntelPhRKl": [2], "__Z14GetDoubleIntelPhRKl": [2],
+         "__Z12SetFourIntelPhRKlS1_": [2, 3], "__Z20SetDoubleIntelDoublePhRKlRKd": [2, 3]}
+for fn, idxs in DEREF.items():
+    m = re.search(r"(?ms)^define [^\n]*@" + re.escape(fn) + r"\(.*?^}\n", s)
+    if not m: continue
+    body = m.group(0); new = body
+    for i in idxs:
+        new = re.sub(r"(%\w+) = ptrtoint \S+ %arg" + str(i) + r" to i64", r"\1 = load i64, ptr %arg" + str(i) + ", align 8", new)
+    s = s.replace(body, new); n += 1
+open(sys.argv[2], "w").write(s)
+print(f"[kio_fix] widened {n} functions")

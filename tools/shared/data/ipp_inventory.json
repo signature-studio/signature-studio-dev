@@ -1,0 +1,1257 @@
+{
+ "ipp_version": "Intel oneAPI IPP 2021.7 (ippCore string '2021.7 (r0xa954907f) Nov 4 2022' in dsp_ippv2_x64.dylib)",
+ "exports": {
+  "win_x64": {
+   "total": 446,
+   "agg": 1,
+   "ippcore": 8,
+   "ippi": 71,
+   "ipps": 366
+  },
+  "win_x86": {
+   "total": 446
+  },
+  "mac_x86_64": {
+   "total": 434,
+   "agg": 1,
+   "ippcore": 64,
+   "ippi": 51,
+   "ipps": 318
+  },
+  "win_only": [
+   "ippSetCpuFeatures",
+   "ippiFilterBox_8u_C1IR",
+   "ippiFilterBox_8u_C3IR",
+   "ippiFilterBox_8u_C3R",
+   "ippiFilterBox_8u_C4IR",
+   "ippiFilterBox_8u_C4R",
+   "ippiFilterGauss_8u_C4R",
+   "ippiFilterRoundGetBufSize32f_8u_C1R",
+   "ippiFilter_8u_C4R",
+   "ippiFilter_Round32f_8u_C1R",
+   "ippiResizeGetBufSize",
+   "ippiResizeSqrPixel_8u_C1R",
+   "ippiResizeSqrPixel_8u_C3R",
+   "ippiResizeSqrPixel_8u_C4R",
+   "ippiRotateCenter_8u_C4R",
+   "ippiWarpAffineQuad_8u_C3R",
+   "ippiWarpAffineQuad_8u_C4R",
+   "ippiWarpAffine_8u_C3R",
+   "ippiWarpAffine_8u_C4R",
+   "ippiWarpPerspectiveQuad_8u_C3R",
+   "ippiWarpPerspectiveQuad_8u_C4R",
+   "ippsAutoCorr_NormA_32f",
+   "ippsConvCyclic4x4_32f32fc",
+   "ippsConvCyclic8x8_32f",
+   "ippsConv_32f",
+   "ippsConv_64f",
+   "ippsCrossCorr_32f",
+   "ippsDeinterleave_16s",
+   "ippsDeinterleave_32f",
+   "ippsExp_32f64f",
+   "ippsFIR64f_32f",
+   "ippsFIR64f_32f_I",
+   "ippsFIRFree64f_32f",
+   "ippsFIRFree_32f",
+   "ippsFIRInitAlloc64f_32f",
+   "ippsFIRInitAlloc_32f",
+   "ippsFIRMRInitAlloc64f_32f",
+   "ippsFIRMRInitAlloc_32f",
+   "ippsFIRSetDlyLine64f_32f",
+   "ippsFIRSetDlyLine_32f",
+   "ippsFIRSetTaps64f_32f",
+   "ippsFIRSetTaps_32f",
+   "ippsFIR_32f",
+   "ippsFIR_32f_I",
+   "ippsIIR64f_32f",
+   "ippsIIRGetDlyLine64f_32f",
+   "ippsIIRGetDlyLine_32f",
+   "ippsIIRGetDlyLine_32fc",
+   "ippsIIRSetDlyLine64f_32f",
+   "ippsIIRSetDlyLine_32f",
+   "ippsIIRSetDlyLine_32fc",
+   "ippsIIR_32f",
+   "ippsIIR_32f_I",
+   "ippsIIR_32fc",
+   "ippsIIR_32fc_I",
+   "ippsInterleave_16s",
+   "ippsInterleave_32f",
+   "ippsLn_64f32f",
+   "ippsRandGauss_Direct_32f",
+   "ippsRandGauss_Direct_64f",
+   "ippsRandUniform_Direct_32f",
+   "ippsRandUniform_Direct_64f",
+   "ippsTone_Direct_32f",
+   "ippsTone_Direct_32fc",
+   "ippsTone_Direct_64f",
+   "ippsTriangle_Direct_32f",
+   "ippsTriangle_Direct_32fc",
+   "ippsVectorRamp_32f",
+   "ippsVectorRamp_64f"
+  ],
+  "mac_only": [
+   "legacy90ippiFilterBox_8u_C1IR",
+   "legacy90ippiFilterBox_8u_C3IR",
+   "legacy90ippiFilterBox_8u_C3R",
+   "legacy90ippiFilterBox_8u_C4IR",
+   "legacy90ippiFilterBox_8u_C4R",
+   "legacy90ippiFilterGauss_8u_C4R",
+   "legacy90ippiFilterRoundGetBufSize32f_8u_C1R",
+   "legacy90ippiFilter_8u_C4R",
+   "legacy90ippiFilter_Round32f_8u_C1R",
+   "legacy90ippiResizeGetBufSize",
+   "legacy90ippiResizeSqrPixel_8u_C1R",
+   "legacy90ippiResizeSqrPixel_8u_C3R",
+   "legacy90ippiResizeSqrPixel_8u_C4R",
+   "legacy90ippiRotateCenter_8u_C4R",
+   "legacy90ippiWarpAffineQuad_8u_C3R",
+   "legacy90ippiWarpAffineQuad_8u_C4R",
+   "legacy90ippiWarpAffine_8u_C3R",
+   "legacy90ippiWarpAffine_8u_C4R",
+   "legacy90ippiWarpPerspectiveQuad_8u_C3R",
+   "legacy90ippiWarpPerspectiveQuad_8u_C4R",
+   "legacy90ippsAutoCorr_NormA_32f",
+   "legacy90ippsConvCyclic4x4_32f32fc",
+   "legacy90ippsConvCyclic8x8_32f",
+   "legacy90ippsConv_32f",
+   "legacy90ippsConv_64f",
+   "legacy90ippsCrossCorr_32f",
+   "legacy90ippsDeinterleave_16s",
+   "legacy90ippsDeinterleave_32f",
+   "legacy90ippsExp_32f64f",
+   "legacy90ippsFIR64f_32f",
+   "legacy90ippsFIR64f_32f_I",
+   "legacy90ippsFIRFree64f_32f",
+   "legacy90ippsFIRFree_32f",
+   "legacy90ippsFIRInitAlloc64f_32f",
+   "legacy90ippsFIRInitAlloc_32f",
+   "legacy90ippsFIRMRInitAlloc64f_32f",
+   "legacy90ippsFIRMRInitAlloc_32f",
+   "legacy90ippsFIRSetDlyLine64f_32f",
+   "legacy90ippsFIRSetDlyLine_32f",
+   "legacy90ippsFIRSetTaps64f_32f",
+   "legacy90ippsFIRSetTaps_32f",
+   "legacy90ippsFIR_32f",
+   "legacy90ippsFIR_32f_I",
+   "legacy90ippsInterleave_16s",
+   "legacy90ippsInterleave_32f",
+   "legacy90ippsLn_64f32f",
+   "legacy90ippsRandGauss_Direct_32f",
+   "legacy90ippsRandGauss_Direct_64f",
+   "legacy90ippsRandUniform_Direct_32f",
+   "legacy90ippsRandUniform_Direct_64f",
+   "legacy90ippsTone_Direct_32f",
+   "legacy90ippsTone_Direct_32fc",
+   "legacy90ippsTone_Direct_64f",
+   "legacy90ippsTriangle_Direct_32f",
+   "legacy90ippsTriangle_Direct_32fc",
+   "legacy90ippsVectorRamp_32f",
+   "legacy90ippsVectorRamp_64f"
+  ]
+ },
+ "loader_table": {
+  "names": 420,
+  "win_pes_with_table": 145,
+  "mac_files_with_table": 143,
+  "note": "全 Delphi/FPC バイナリが同一 unit を静的リンクし 423 エントリ (重複除き 420 名) を LoadLibrary+GetProcAddress 相当で解決する (win: ローダ関数 FLEngine 0x653f40)"
+ },
+ "win": {
+  "distinct_used": 12,
+  "pes_with_direct_refs": 54,
+  "families": {
+   "memory": 4,
+   "arith_reduce": 3,
+   "transcendental": 3,
+   "dsp_filter_fft": 1,
+   "image": 1
+  },
+  "functions": {
+   "ippsMove_8u": {
+    "family": "memory",
+    "n_pe": 49,
+    "sites": 49,
+    "pes": [
+     "FLEngine_x64.dll",
+     "speaker_x64.dll",
+     "FruityPlug_x64.dll",
+     "FruityPlug_x64.dll"
+    ]
+   },
+   "ippsMove_32f": {
+    "family": "memory",
+    "n_pe": 49,
+    "sites": 49,
+    "pes": [
+     "FLEngine_x64.dll",
+     "speaker_x64.dll",
+     "FruityPlug_x64.dll",
+     "FruityPlug_x64.dll"
+    ]
+   },
+   "ippsZero_8u": {
+    "family": "memory",
+    "n_pe": 49,
+    "sites": 49,
+    "pes": [
+     "FLEngine_x64.dll",
+     "speaker_x64.dll",
+     "FruityPlug_x64.dll",
+     "FruityPlug_x64.dll"
+    ]
+   },
+   "ippsMulC_32f_I": {
+    "family": "arith_reduce",
+    "n_pe": 49,
+    "sites": 49,
+    "pes": [
+     "FLEngine_x64.dll",
+     "speaker_x64.dll",
+     "FruityPlug_x64.dll",
+     "FruityPlug_x64.dll"
+    ]
+   },
+   "ippsAdd_32f_I": {
+    "family": "arith_reduce",
+    "n_pe": 25,
+    "sites": 25,
+    "pes": [
+     "FLEngine_x64.dll",
+     "speaker_x64.dll",
+     "FruityPlug_x64.dll",
+     "FruityPlug_x64.dll"
+    ]
+   },
+   "ippsZero_32f": {
+    "family": "memory",
+    "n_pe": 2,
+    "sites": 2,
+    "pes": [
+     "FLEngine_x64.dll",
+     "FruityPlug_x64.dll"
+    ]
+   },
+   "ippsAtan_32f_A24": {
+    "family": "transcendental",
+    "n_pe": 1,
+    "sites": 1,
+    "pes": [
+     "FruityPlug_x64.dll"
+    ]
+   },
+   "ippsTrunc_64f": {
+    "family": "transcendental",
+    "n_pe": 1,
+    "sites": 1,
+    "pes": [
+     "FruityPlug_x64.dll"
+    ]
+   },
+   "ippsExp_32f_A11": {
+    "family": "transcendental",
+    "n_pe": 1,
+    "sites": 1,
+    "pes": [
+     "FruityPlug_x64.dll"
+    ]
+   },
+   "ippsFIR64f_32f": {
+    "family": "dsp_filter_fft",
+    "n_pe": 1,
+    "sites": 1,
+    "pes": [
+     "FruityPlug_x64.dll"
+    ]
+   },
+   "ippsThreshold_LTValGTVal_32f_I": {
+    "family": "arith_reduce",
+    "n_pe": 1,
+    "sites": 1,
+    "pes": [
+     "FruityPlug_x64.dll"
+    ]
+   },
+   "ippiFilterRoundGetBufSize32f_8u_C1R": {
+    "family": "image",
+    "n_pe": 1,
+    "sites": 1,
+    "pes": [
+     "Fruityplug_x64.dll"
+    ]
+   }
+  },
+  "flengine": {
+   "wrapper_functions": [
+    {
+     "name": "ippsMove_8u",
+     "wrapper_va": "0x653c60",
+     "callers": 11
+    },
+    {
+     "name": "ippsMove_32f",
+     "wrapper_va": "0x653c80",
+     "callers": 3
+    },
+    {
+     "name": "ippsZero_8u",
+     "wrapper_va": "0x653cb0",
+     "callers": 3
+    },
+    {
+     "name": "ippsZero_32f",
+     "wrapper_va": "0x653ce0",
+     "callers": 1
+    },
+    {
+     "name": "ippsAdd_32f_I",
+     "wrapper_va": "0x653d10",
+     "callers": 1
+    },
+    {
+     "name": "ippsMulC_32f_I",
+     "wrapper_va": "0x653d70",
+     "callers": 4
+    }
+   ]
+  }
+ },
+ "mac": {
+  "distinct_used": 159,
+  "files_with_direct_refs": 143,
+  "families": {
+   "memory": 21,
+   "convert_shuffle": 10,
+   "arith_reduce": 43,
+   "transcendental": 31,
+   "image": 43,
+   "dsp_filter_fft": 11
+  },
+  "flengine_distinct": 115,
+  "flengine_call_sites": 410,
+  "functions": {
+   "ippsCopy_32f": {
+    "family": "memory",
+    "n_files": 143,
+    "sites": 781
+   },
+   "ippsZero_8u": {
+    "family": "memory",
+    "n_files": 143,
+    "sites": 221
+   },
+   "ippsSet_8u": {
+    "family": "memory",
+    "n_files": 143,
+    "sites": 143
+   },
+   "ippsSet_32s": {
+    "family": "memory",
+    "n_files": 143,
+    "sites": 400
+   },
+   "ippsSet_64s": {
+    "family": "memory",
+    "n_files": 143,
+    "sites": 143
+   },
+   "ippsConvert_32f32s_Sfs": {
+    "family": "convert_shuffle",
+    "n_files": 143,
+    "sites": 1046
+   },
+   "ippsAddC_32f": {
+    "family": "arith_reduce",
+    "n_files": 143,
+    "sites": 2387
+   },
+   "ippsSubCRev_32f": {
+    "family": "arith_reduce",
+    "n_files": 143,
+    "sites": 1110
+   },
+   "ippsMul_32f": {
+    "family": "arith_reduce",
+    "n_files": 143,
+    "sites": 515
+   },
+   "ippsMul_32f_I": {
+    "family": "arith_reduce",
+    "n_files": 143,
+    "sites": 797
+   },
+   "ippsMulC_32f": {
+    "family": "arith_reduce",
+    "n_files": 143,
+    "sites": 2292
+   },
+   "ippsAddC_32f_I": {
+    "family": "arith_reduce",
+    "n_files": 143,
+    "sites": 1463
+   },
+   "ippsMulC_32f_I": {
+    "family": "arith_reduce",
+    "n_files": 143,
+    "sites": 2171
+   },
+   "ippsExp_32f_A11": {
+    "family": "transcendental",
+    "n_files": 143,
+    "sites": 266
+   },
+   "ippsSqr_32f_I": {
+    "family": "arith_reduce",
+    "n_files": 143,
+    "sites": 1124
+   },
+   "ippsSqr_32f": {
+    "family": "arith_reduce",
+    "n_files": 143,
+    "sites": 511
+   },
+   "ippsSqrt_32f_A11": {
+    "family": "transcendental",
+    "n_files": 143,
+    "sites": 855
+   },
+   "ippsSqrt_32f_A21": {
+    "family": "transcendental",
+    "n_files": 143,
+    "sites": 269
+   },
+   "ippsVectorSlope_32f": {
+    "family": "arith_reduce",
+    "n_files": 143,
+    "sites": 1597
+   },
+   "ippsThreshold_LT_32f_I": {
+    "family": "arith_reduce",
+    "n_files": 143,
+    "sites": 899
+   },
+   "ippsThreshold_GT_32f": {
+    "family": "arith_reduce",
+    "n_files": 143,
+    "sites": 185
+   },
+   "ippsThreshold_GT_32f_I": {
+    "family": "arith_reduce",
+    "n_files": 143,
+    "sites": 2060
+   },
+   "ippsSubCRev_32f_I": {
+    "family": "arith_reduce",
+    "n_files": 143,
+    "sites": 442
+   },
+   "ippsOrC_32u_I": {
+    "family": "arith_reduce",
+    "n_files": 143,
+    "sites": 146
+   },
+   "ippiSet_8u_C3R": {
+    "family": "image",
+    "n_files": 143,
+    "sites": 143
+   },
+   "ippiCopy_8u_C3R": {
+    "family": "image",
+    "n_files": 143,
+    "sites": 143
+   },
+   "ippiCopy_8u_C4R": {
+    "family": "image",
+    "n_files": 143,
+    "sites": 143
+   },
+   "ippiCopy_8u_C1C4R": {
+    "family": "image",
+    "n_files": 143,
+    "sites": 144
+   },
+   "ippiCopy_8u_C3AC4R": {
+    "family": "image",
+    "n_files": 143,
+    "sites": 429
+   },
+   "ippiCopy_8u_AC4C3R": {
+    "family": "image",
+    "n_files": 143,
+    "sites": 143
+   },
+   "ippiCopyManaged_8u_C1R": {
+    "family": "image",
+    "n_files": 143,
+    "sites": 144
+   },
+   "ippiAlphaPremul_8u_AC4IR": {
+    "family": "image",
+    "n_files": 143,
+    "sites": 143
+   },
+   "ippiAlphaCompC_8u_C3R": {
+    "family": "image",
+    "n_files": 143,
+    "sites": 286
+   },
+   "ippiAlphaCompC_8u_C4R": {
+    "family": "image",
+    "n_files": 143,
+    "sites": 286
+   },
+   "ippiFilterBox_8u_C3IR": {
+    "family": "image",
+    "n_files": 143,
+    "sites": 143
+   },
+   "ippiFilterBox_8u_C4IR": {
+    "family": "image",
+    "n_files": 143,
+    "sites": 143
+   },
+   "ippiAddC_8u_C3IRSfs": {
+    "family": "image",
+    "n_files": 143,
+    "sites": 222
+   },
+   "ippiAddC_8u_C4IRSfs": {
+    "family": "image",
+    "n_files": 143,
+    "sites": 222
+   },
+   "ippiSubC_8u_C3IRSfs": {
+    "family": "image",
+    "n_files": 143,
+    "sites": 222
+   },
+   "ippiSubC_8u_C4IRSfs": {
+    "family": "image",
+    "n_files": 143,
+    "sites": 222
+   },
+   "ippiMulC_8u_C3IRSfs": {
+    "family": "image",
+    "n_files": 143,
+    "sites": 143
+   },
+   "ippiResizeSqrPixel_8u_C1R": {
+    "family": "image",
+    "n_files": 143,
+    "sites": 143
+   },
+   "ippiResizeSqrPixel_8u_C3R": {
+    "family": "image",
+    "n_files": 143,
+    "sites": 143
+   },
+   "ippiResizeSqrPixel_8u_C4R": {
+    "family": "image",
+    "n_files": 143,
+    "sites": 143
+   },
+   "ippiResizeGetBufSize": {
+    "family": "image",
+    "n_files": 143,
+    "sites": 143
+   },
+   "ippiCopyConstBorder_8u_C3R": {
+    "family": "image",
+    "n_files": 143,
+    "sites": 143
+   },
+   "ippiCopyConstBorder_8u_C4R": {
+    "family": "image",
+    "n_files": 143,
+    "sites": 143
+   },
+   "ippiCopyReplicateBorder_8u_C3R": {
+    "family": "image",
+    "n_files": 143,
+    "sites": 143
+   },
+   "ippiCopyReplicateBorder_8u_C4R": {
+    "family": "image",
+    "n_files": 143,
+    "sites": 143
+   },
+   "ippsCopy_32s": {
+    "family": "memory",
+    "n_files": 126,
+    "sites": 254
+   },
+   "ippsSub_32f_I": {
+    "family": "arith_reduce",
+    "n_files": 126,
+    "sites": 128
+   },
+   "ippsThreshold_GT_32s_I": {
+    "family": "arith_reduce",
+    "n_files": 126,
+    "sites": 164
+   },
+   "ippsAtan_32f_A11": {
+    "family": "transcendental",
+    "n_files": 126,
+    "sites": 270
+   },
+   "ippsZero_32s": {
+    "family": "memory",
+    "n_files": 50,
+    "sites": 206
+   },
+   "ippsCopy_8u": {
+    "family": "memory",
+    "n_files": 49,
+    "sites": 109
+   },
+   "ippsZero_32f": {
+    "family": "memory",
+    "n_files": 49,
+    "sites": 250
+   },
+   "ippsSet_32f": {
+    "family": "memory",
+    "n_files": 49,
+    "sites": 148
+   },
+   "ippsConvert_16s32f_Sfs": {
+    "family": "convert_shuffle",
+    "n_files": 49,
+    "sites": 185
+   },
+   "ippsSin_64f_A50": {
+    "family": "transcendental",
+    "n_files": 49,
+    "sites": 392
+   },
+   "ippsSum_32f": {
+    "family": "arith_reduce",
+    "n_files": 49,
+    "sites": 102
+   },
+   "ippsCplxToReal_32fc": {
+    "family": "convert_shuffle",
+    "n_files": 49,
+    "sites": 49
+   },
+   "ippsRealToCplx_32f": {
+    "family": "convert_shuffle",
+    "n_files": 49,
+    "sites": 53
+   },
+   "ippsVectorSlope_64f": {
+    "family": "arith_reduce",
+    "n_files": 49,
+    "sites": 91
+   },
+   "ippsThreshold_LT_64f_I": {
+    "family": "arith_reduce",
+    "n_files": 49,
+    "sites": 392
+   },
+   "ippsWinKaiser_32f_I": {
+    "family": "dsp_filter_fft",
+    "n_files": 49,
+    "sites": 49
+   },
+   "ippsLn_32f_A11": {
+    "family": "transcendental",
+    "n_files": 42,
+    "sites": 92
+   },
+   "ippsAddProductC_32f": {
+    "family": "arith_reduce",
+    "n_files": 42,
+    "sites": 58
+   },
+   "ippsAdd_32f_I": {
+    "family": "arith_reduce",
+    "n_files": 38,
+    "sites": 74
+   },
+   "ippsLog10_32f_A11": {
+    "family": "transcendental",
+    "n_files": 37,
+    "sites": 96
+   },
+   "ippsThreshold_LT_32s_I": {
+    "family": "arith_reduce",
+    "n_files": 37,
+    "sites": 75
+   },
+   "ippiFilterBoxBorderGetBufferSize": {
+    "family": "image",
+    "n_files": 37,
+    "sites": 37
+   },
+   "ippiFilterBoxBorder_8u_C4R": {
+    "family": "image",
+    "n_files": 37,
+    "sites": 37
+   },
+   "ippiWarpPerspectiveQuad_8u_C4R": {
+    "family": "image",
+    "n_files": 37,
+    "sites": 37
+   },
+   "ippiWarpAffineQuad_8u_C4R": {
+    "family": "image",
+    "n_files": 35,
+    "sites": 35
+   },
+   "ippsZero_64f": {
+    "family": "memory",
+    "n_files": 11,
+    "sites": 16
+   },
+   "ippsZero_64s": {
+    "family": "memory",
+    "n_files": 10,
+    "sites": 22
+   },
+   "ippsSum_64f": {
+    "family": "arith_reduce",
+    "n_files": 10,
+    "sites": 11
+   },
+   "ippsMove_32f": {
+    "family": "memory",
+    "n_files": 9,
+    "sites": 9
+   },
+   "ippsSet_64f": {
+    "family": "memory",
+    "n_files": 9,
+    "sites": 10
+   },
+   "ippsLn_32f_A24": {
+    "family": "transcendental",
+    "n_files": 8,
+    "sites": 9
+   },
+   "ippsWinKaiser_64f_I": {
+    "family": "dsp_filter_fft",
+    "n_files": 8,
+    "sites": 8
+   },
+   "ippsDivCRev_32f_I": {
+    "family": "arith_reduce",
+    "n_files": 7,
+    "sites": 13
+   },
+   "ippiFilterBox_8u_C1IR": {
+    "family": "image",
+    "n_files": 7,
+    "sites": 7
+   },
+   "ippiResize_8u_C3R": {
+    "family": "image",
+    "n_files": 7,
+    "sites": 7
+   },
+   "ippiResize_8u_C4R": {
+    "family": "image",
+    "n_files": 7,
+    "sites": 7
+   },
+   "ippiMirror_8u_C3IR": {
+    "family": "image",
+    "n_files": 7,
+    "sites": 7
+   },
+   "ippiMirror_8u_C4IR": {
+    "family": "image",
+    "n_files": 7,
+    "sites": 7
+   },
+   "ippsExpm1_32f_A11": {
+    "family": "transcendental",
+    "n_files": 6,
+    "sites": 10
+   },
+   "ippsExpm1_32f_A21": {
+    "family": "transcendental",
+    "n_files": 6,
+    "sites": 6
+   },
+   "ippsExpm1_32f_A24": {
+    "family": "transcendental",
+    "n_files": 6,
+    "sites": 8
+   },
+   "ippsLn_32f_A21": {
+    "family": "transcendental",
+    "n_files": 6,
+    "sites": 6
+   },
+   "ippsConv_32f": {
+    "family": "dsp_filter_fft",
+    "n_files": 6,
+    "sites": 9
+   },
+   "ippiRotateCenter_8u_C4R": {
+    "family": "image",
+    "n_files": 6,
+    "sites": 6
+   },
+   "ippsConvert_24s32f": {
+    "family": "convert_shuffle",
+    "n_files": 5,
+    "sites": 5
+   },
+   "ippsPowx_32f_A11": {
+    "family": "transcendental",
+    "n_files": 5,
+    "sites": 5
+   },
+   "ippsExp_32f_I": {
+    "family": "transcendental",
+    "n_files": 5,
+    "sites": 5
+   },
+   "ippiFilter_8u_C4R": {
+    "family": "image",
+    "n_files": 5,
+    "sites": 5
+   },
+   "ippiFilterGauss_8u_C4R": {
+    "family": "image",
+    "n_files": 5,
+    "sites": 5
+   },
+   "ippiMulC_8u_C4RSfs": {
+    "family": "image",
+    "n_files": 5,
+    "sites": 10
+   },
+   "ippiResizeCenter_8u_C3R": {
+    "family": "image",
+    "n_files": 5,
+    "sites": 5
+   },
+   "ippiResizeCenter_8u_C4R": {
+    "family": "image",
+    "n_files": 5,
+    "sites": 5
+   },
+   "ippiMirror_8u_C4R": {
+    "family": "image",
+    "n_files": 5,
+    "sites": 5
+   },
+   "ippiWarpAffine_8u_C4R": {
+    "family": "image",
+    "n_files": 5,
+    "sites": 5
+   },
+   "ippiWarpBilinearQuad_8u_C4R": {
+    "family": "image",
+    "n_files": 5,
+    "sites": 5
+   },
+   "ippsRandUniform_Direct_32f": {
+    "family": "dsp_filter_fft",
+    "n_files": 5,
+    "sites": 10
+   },
+   "ippsCopy_64s": {
+    "family": "memory",
+    "n_files": 4,
+    "sites": 11
+   },
+   "ippsPhase_32fc": {
+    "family": "dsp_filter_fft",
+    "n_files": 4,
+    "sites": 5
+   },
+   "ippsMagnitude_32fc": {
+    "family": "dsp_filter_fft",
+    "n_files": 4,
+    "sites": 5
+   },
+   "ippsConvert_32f64f": {
+    "family": "convert_shuffle",
+    "n_files": 3,
+    "sites": 9
+   },
+   "ippsAdd_32f": {
+    "family": "arith_reduce",
+    "n_files": 3,
+    "sites": 5
+   },
+   "ippsSub_32f": {
+    "family": "arith_reduce",
+    "n_files": 3,
+    "sites": 6
+   },
+   "ippsAdd_64f_I": {
+    "family": "arith_reduce",
+    "n_files": 3,
+    "sites": 15
+   },
+   "ippsMul_64f_I": {
+    "family": "arith_reduce",
+    "n_files": 3,
+    "sites": 11
+   },
+   "ippsMulC_64f": {
+    "family": "arith_reduce",
+    "n_files": 3,
+    "sites": 10
+   },
+   "ippsSin_32f_A21": {
+    "family": "transcendental",
+    "n_files": 3,
+    "sites": 6
+   },
+   "ippsSin_32f_A24": {
+    "family": "transcendental",
+    "n_files": 3,
+    "sites": 3
+   },
+   "ippsSin_64f_A26": {
+    "family": "transcendental",
+    "n_files": 3,
+    "sites": 4
+   },
+   "ippsMove_8u": {
+    "family": "memory",
+    "n_files": 2,
+    "sites": 2
+   },
+   "ippsFIRInitAlloc_32f": {
+    "family": "dsp_filter_fft",
+    "n_files": 2,
+    "sites": 2
+   },
+   "ippsCopy_64f": {
+    "family": "memory",
+    "n_files": 2,
+    "sites": 3
+   },
+   "ippsConvert_64f32f": {
+    "family": "convert_shuffle",
+    "n_files": 2,
+    "sites": 4
+   },
+   "ippsMulC_64f_I": {
+    "family": "arith_reduce",
+    "n_files": 2,
+    "sites": 3
+   },
+   "ippsPowx_32f_A21": {
+    "family": "transcendental",
+    "n_files": 2,
+    "sites": 2
+   },
+   "ippsExp_32f_A24": {
+    "family": "transcendental",
+    "n_files": 2,
+    "sites": 3
+   },
+   "ippsAbs_32f": {
+    "family": "arith_reduce",
+    "n_files": 2,
+    "sites": 5
+   },
+   "ippsRandUniform_Direct_64f": {
+    "family": "dsp_filter_fft",
+    "n_files": 2,
+    "sites": 2
+   },
+   "ippsThreshold_LTVal_32f_I": {
+    "family": "arith_reduce",
+    "n_files": 2,
+    "sites": 5
+   },
+   "ippsThreshold_GTVal_32f_I": {
+    "family": "arith_reduce",
+    "n_files": 2,
+    "sites": 3
+   },
+   "ippsLog10_64f_A53": {
+    "family": "transcendental",
+    "n_files": 1,
+    "sites": 1
+   },
+   "ippsSet_64fc": {
+    "family": "memory",
+    "n_files": 1,
+    "sites": 1
+   },
+   "ippsSinCos_64f_A53": {
+    "family": "transcendental",
+    "n_files": 1,
+    "sites": 1
+   },
+   "ippsCopy_16s": {
+    "family": "memory",
+    "n_files": 1,
+    "sites": 1
+   },
+   "ippsLn_64f_A53": {
+    "family": "transcendental",
+    "n_files": 1,
+    "sites": 1
+   },
+   "ippsCplxToReal_64fc": {
+    "family": "convert_shuffle",
+    "n_files": 1,
+    "sites": 1
+   },
+   "ippsAddC_64f": {
+    "family": "arith_reduce",
+    "n_files": 1,
+    "sites": 1
+   },
+   "ippsTone_Direct_32fc": {
+    "family": "dsp_filter_fft",
+    "n_files": 1,
+    "sites": 1
+   },
+   "ippsMove_32s": {
+    "family": "memory",
+    "n_files": 1,
+    "sites": 2
+   },
+   "ippsMove_64s": {
+    "family": "memory",
+    "n_files": 1,
+    "sites": 1
+   },
+   "ippsConvert_32s32f": {
+    "family": "convert_shuffle",
+    "n_files": 1,
+    "sites": 2
+   },
+   "ippsConvert_32f8u_Sfs": {
+    "family": "convert_shuffle",
+    "n_files": 1,
+    "sites": 1
+   },
+   "ippsAddC_64f_I": {
+    "family": "arith_reduce",
+    "n_files": 1,
+    "sites": 6
+   },
+   "ippsDiv_32f_A11": {
+    "family": "transcendental",
+    "n_files": 1,
+    "sites": 1
+   },
+   "ippsDiv_32f_A24": {
+    "family": "transcendental",
+    "n_files": 1,
+    "sites": 3
+   },
+   "ippsExp_64f_A53": {
+    "family": "transcendental",
+    "n_files": 1,
+    "sites": 1
+   },
+   "ippsMax_32f": {
+    "family": "arith_reduce",
+    "n_files": 1,
+    "sites": 2
+   },
+   "ippsMin_32f": {
+    "family": "arith_reduce",
+    "n_files": 1,
+    "sites": 1
+   },
+   "ippsMinMax_32f": {
+    "family": "arith_reduce",
+    "n_files": 1,
+    "sites": 2
+   },
+   "ippsSqrt_32f_A24": {
+    "family": "transcendental",
+    "n_files": 1,
+    "sites": 2
+   },
+   "ippsCbrt_32f_A11": {
+    "family": "transcendental",
+    "n_files": 1,
+    "sites": 1
+   },
+   "ippsCbrt_32f_A24": {
+    "family": "transcendental",
+    "n_files": 1,
+    "sites": 1
+   },
+   "ippsTone_Direct_32f": {
+    "family": "dsp_filter_fft",
+    "n_files": 1,
+    "sites": 2
+   },
+   "ippsThreshold_GT_64f_I": {
+    "family": "arith_reduce",
+    "n_files": 1,
+    "sites": 2
+   },
+   "ippsTanh_32f_A11": {
+    "family": "transcendental",
+    "n_files": 1,
+    "sites": 1
+   },
+   "ippsTanh_32f_A24": {
+    "family": "transcendental",
+    "n_files": 1,
+    "sites": 1
+   },
+   "ippsFlip_32f": {
+    "family": "arith_reduce",
+    "n_files": 1,
+    "sites": 1
+   },
+   "ippsFlip_32f_I": {
+    "family": "arith_reduce",
+    "n_files": 1,
+    "sites": 1
+   },
+   "ippsAndC_32u_I": {
+    "family": "arith_reduce",
+    "n_files": 1,
+    "sites": 3
+   },
+   "ippsRound_32f": {
+    "family": "transcendental",
+    "n_files": 1,
+    "sites": 2
+   },
+   "ippsFFTFwd_RToPack_64f_I": {
+    "family": "dsp_filter_fft",
+    "n_files": 1,
+    "sites": 1
+   }
+  }
+ },
+ "static_ipp": {
+  "mac_symbols": {
+   "Multiband Delay engine.vst": {
+    "public": [
+     "ippFree",
+     "ippGetCpuFeatures",
+     "ippGetEnabledCpuFeatures",
+     "ippGetMaxCacheSizeB",
+     "ippMalloc",
+     "ippSetCpuFeatures",
+     "ippSetCpuFeaturesMask",
+     "ippsConj_32fc",
+     "ippsCopy_8u",
+     "ippsCosOne",
+     "ippsCos_32f_A24",
+     "ippsFFTFwd_CToC_32fc",
+     "ippsFFTGetSize_C_32fc",
+     "ippsFFTInit_C_32fc",
+     "ippsFFTInv_CToC_32fc",
+     "ippsFree",
+     "ippsMalloc_32fc",
+     "ippsMalloc_8u",
+     "ippsMulC_32f_I",
+     "ippsMul_32fc",
+     "ippsMul_32fc_A21",
+     "ippsMul_32fc_I",
+     "ippsSet_8u",
+     "ippsSinOne",
+     "ippsSin_32f_A24",
+     "ippsSqrtOne",
+     "ippsZero_32f",
+     "ippsZero_32fc",
+     "ippsZero_8u",
+     "ipps_cFFT_1_32fc",
+     "ipps_cFFT_1_scale_32fc",
+     "ipps_cFFT_2_32fc",
+     "ipps_cFFT_2_scale_32fc",
+     "ipps_cFFTfwd_128_32fc",
+     "ipps_cFFTfwd_128_scale_32fc",
+     "ipps_cFFTfwd_16_32fc",
+     "ipps_cFFTfwd_16_scale_32fc",
+     "ipps_cFFTfwd_32_32fc",
+     "ipps_cFFTfwd_32_scale_32fc",
+     "ipps_cFFTfwd_4_32fc",
+     "ipps_cFFTfwd_4_scale_32fc",
+     "ipps_cFFTfwd_64_32fc",
+     "ipps_cFFTfwd_64_scale_32fc",
+     "ipps_cFFTfwd_8_32fc",
+     "ipps_cFFTfwd_8_scale_32fc",
+     "ipps_cFFTinv_128_32fc",
+     "ipps_cFFTinv_128_scale_32fc",
+     "ipps_cFFTinv_16_32fc",
+     "ipps_cFFTinv_16_scale_32fc",
+     "ipps_cFFTinv_32_32fc",
+     "ipps_cFFTinv_32_scale_32fc",
+     "ipps_cFFTinv_4_32fc",
+     "ipps_cFFTinv_4_scale_32fc",
+     "ipps_cFFTinv_64_32fc",
+     "ipps_cFFTinv_64_scale_32fc",
+     "ipps_cFFTinv_8_32fc",
+     "ipps_cFFTinv_8_scale_32fc"
+    ],
+    "n_own": 0,
+    "cpu_prefixes": [
+     "e9",
+     "k0",
+     "l9",
+     "y8"
+    ]
+   },
+   "liboggio_x64.dylib": {
+    "public": [
+     "ippGetCpuFeatures",
+     "ippGetEnabledCpuFeatures",
+     "ippGetMaxCacheSizeB",
+     "ippSetCpuFeatures",
+     "ippSetCpuFeaturesMask",
+     "ippsConvert_32f32s_Sfs",
+     "ippsConvert_32s32f_Sfs",
+     "ippsCopy_32f",
+     "ippsCopy_8u",
+     "ippsCplxToReal_32fc",
+     "ippsThreshold_LTValGTVal_32s_I"
+    ],
+    "n_own": 206,
+    "cpu_prefixes": [
+     "e9",
+     "k0",
+     "l9",
+     "y8"
+    ]
+   }
+  },
+  "win_ippcode_sections": [
+   {
+    "pe": "elastique_x64.dll",
+    "ippcode_bytes": 979456
+   },
+   {
+    "pe": "engine_x64.dll | engine_x64.pdb",
+    "ippcode_bytes": 675840
+   },
+   {
+    "pe": "ildsp_x64.dll | ildsp_x64.pdb",
+    "ippcode_bytes": 633856
+   },
+   {
+    "pe": "engineV2_x64.dll | engineV2_x64.pdb",
+    "ippcode_bytes": 555520
+   },
+   {
+    "pe": "engine_x64.dll | engine_x64.pdb",
+    "ippcode_bytes": 543744
+   },
+   {
+    "pe": "oggio_x64.dll",
+    "ippcode_bytes": 331776
+   }
+  ]
+ },
+ "difficulty": {
+  "core": "trivial",
+  "memory": "trivial",
+  "convert_shuffle": "trivial (丸め/飽和 Sfs の仕様一致が要点)",
+  "arith_reduce": "easy (SIMD-friendly C)",
+  "transcendental": "moderate (A11/A21/A24/A50/A53 精度段; 許容誤差一致, bit-exact は不可能)",
+  "dsp_filter_fft": "moderate-hard (FFT/FIR/IIR/Rand 系はアルゴリズム一致が必要)",
+  "image": "moderate-hard (Resize/Warp/Filter は丸め仕様一致が必要)"
+ }
+}

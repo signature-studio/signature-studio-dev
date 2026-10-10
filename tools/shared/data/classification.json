@@ -1,0 +1,857 @@
+[
+ {
+  "lib": "libfreetype_x64",
+  "cls": "OSS",
+  "upstream": "FreeType 2.7 (2016)",
+  "lic": "FTL/GPLv2 (dual)",
+  "plan": "wasm 再ビルド (PoC 済・LP64 bit 一致に ftgrays patch か wasm64 要)",
+  "diff": "易",
+  "ticket": "T-SH-01",
+  "mac_fat_bytes": 1860192,
+  "mac_x86_64_bytes": 814832,
+  "mac_exports": 190,
+  "mac_instructions": 262394,
+  "mac_simd_ratio": 0.0163,
+  "mac_classes": {
+   "scalar_int": 258104,
+   "sse_other": 522,
+   "sse_packed": 3746,
+   "x87": 20,
+   "sse_scalar": 2
+  },
+  "win": "freetype.dll",
+  "win_bytes": 607032,
+  "win_exports": 271,
+  "win_arch": "x64",
+  "evidence": [
+   {
+    "check": "mac 内ビルドパス freetype-2.7",
+    "pattern": "/Users/eugene/Documents/freetype-2\\.7/",
+    "hit": true,
+    "sample": "/Users/eugene/Documents/freetype-2.7/"
+   },
+   {
+    "check": "FreeType 標準モジュール名",
+    "pattern": "ftgrays|ftsmooth|ftbase\\.c",
+    "hit": true,
+    "sample": "ftbase.c"
+   }
+  ]
+ },
+ {
+  "lib": "libblend2d",
+  "cls": "OSS + プロプラ glue (Agg2D)",
+  "upstream": "Blend2D 0.11.x 系 (pre-v0.20, camelCase C ABI) + asmjit 1.13 + FL 独自 Agg2D glue",
+  "lic": "zlib (Blend2D/asmjit) + IL 独自",
+  "plan": "Blend2D 本体は wasm 再ビルド (no-JIT, PoC 済 pixel-exact)。Agg2D glue (~140 symbol) は lift か C++ 再実装",
+  "diff": "易(本体)/中(glue)",
+  "ticket": "T-SH-02",
+  "mac_fat_bytes": 4685520,
+  "mac_x86_64_bytes": 2613520,
+  "mac_exports": 1,
+  "mac_instructions": 1002662,
+  "mac_simd_ratio": 0.1546,
+  "mac_classes": {
+   "scalar_int": 847690,
+   "sse_packed": 113864,
+   "sse_scalar": 35174,
+   "sse_other": 5934
+  },
+  "win": "Blend2D.dll",
+  "win_bytes": 2065920,
+  "win_exports": 1,
+  "win_arch": "x64",
+  "evidence": [
+   {
+    "check": "Blend2D runtime assert 文字列",
+    "pattern": "\\[Blend2D\\] ASSERTION FAILURE",
+    "hit": true,
+    "sample": "[Blend2D] ASSERTION FAILURE"
+   },
+   {
+    "check": "asmjit ABI 名前空間 _abi_1_13",
+    "pattern": "N6asmjit9_abi_1_13",
+    "hit": true,
+    "sample": "N6asmjit9_abi_1_13"
+   },
+   {
+    "check": "camelCase C ABI (v0.20 で snake_case 化)",
+    "pattern": "_blArrayInit",
+    "hit": true,
+    "sample": "_blArrayInit"
+   },
+   {
+    "check": "Agg2D glue (export は AggCreateInstance 1 本)",
+    "pattern": "Agg2D",
+    "hit": true,
+    "sample": "Agg2D"
+   }
+  ]
+ },
+ {
+  "lib": "liboggio_x64",
+  "cls": "OSS 集合 + プロプラ wrapper + 静的 IPP",
+  "upstream": "libogg 1.3.x + libvorbis 1.3.5 + libFLAC 1.3.1 (+FLAC++)",
+  "lic": "BSD-3 (Xiph) + Intel IPP 静的",
+  "plan": "ogg+vorbis wasm 再ビルド (PoC 済 byte-exact)。FLAC 1.3.1 も同様。Oggio* wrapper (9 export, C++) は lift/再実装。IPP 静的部は自前 C に置換",
+  "diff": "易(OSS)/中(wrapper)",
+  "ticket": "T-SH-03",
+  "mac_fat_bytes": 2490896,
+  "mac_x86_64_bytes": 1388416,
+  "mac_exports": 1496,
+  "mac_instructions": 320182,
+  "mac_simd_ratio": 0.2356,
+  "mac_classes": {
+   "scalar_int": 244738,
+   "sse_packed": 55348,
+   "sse_scalar": 13394,
+   "avx_128": 1268,
+   "avx_256": 1488,
+   "sse_other": 3864,
+   "avx512": 68,
+   "x87": 14
+  },
+  "win": "oggio_x64.dll",
+  "win_bytes": 1872384,
+  "win_exports": 9,
+  "win_arch": "x64",
+  "evidence": [
+   {
+    "check": "libFLAC 1.3.1",
+    "pattern": "reference libFLAC 1\\.3\\.1 20141125",
+    "hit": true,
+    "sample": "reference libFLAC 1.3.1 20141125"
+   },
+   {
+    "check": "libvorbis 1.3.5",
+    "pattern": "Xiph\\.Org libVorbis 1\\.3\\.5",
+    "hit": true,
+    "sample": "Xiph.Org libVorbis 1.3.5"
+   },
+   {
+    "check": "win 側 vorbis vendor 文字列",
+    "pattern": "Xiph\\.Org libVorbis I 20150105",
+    "hit": true,
+    "sample": "Xiph.Org libVorbis I 20150105"
+   },
+   {
+    "check": "静的 IPP (CPU dispatch prefix e9_)",
+    "pattern": "_e9_ippsConvert_32f32s_Sfs",
+    "hit": true,
+    "sample": "_e9_ippsConvert_32f32s_Sfs"
+   }
+  ]
+ },
+ {
+  "lib": "ffmpeg (avcodec58/avformat58/avutil56/swscale5/swresample3)",
+  "cls": "OSS",
+  "upstream": "FFmpeg n4.4.3 (mac) / n4.4.2-2-g7ffb7d4b04 (win)",
+  "lic": "LGPL (configure に --enable-gpl 無し)",
+  "plan": "emscripten で n4.4.x を --disable-programs --disable-x86asm 相当で再ビルド (ffmpeg.wasm 先例)。libILVideo (プロプラ wrapper 26 export) は別途",
+  "diff": "中",
+  "ticket": "T-SH-04",
+  "mac_fat_bytes": null,
+  "win": "avcodec-58.dll ほか",
+  "win_bytes": 47050240,
+  "win_exports": 240,
+  "win_arch": "x64",
+  "evidence": [
+   {
+    "check": "mac libavutil の version 文字列 n4.4.3",
+    "pattern": "n4\\.4\\.3-1-ga1f13b592b",
+    "hit": true,
+    "sample": "n4.4.3-1-ga1f13b592b"
+   },
+   {
+    "check": "configure 行 (--enable-gpl 無し = LGPL)",
+    "pattern": "--disable-x86asm",
+    "hit": true,
+    "sample": "--disable-x86asm"
+   },
+   {
+    "check": "libavcodec 58 系",
+    "pattern": "Lavc58",
+    "hit": true,
+    "sample": "Lavc58"
+   }
+  ]
+ },
+ {
+  "lib": "Python.framework 3.12",
+  "cls": "OSS",
+  "upstream": "CPython 3.12.1",
+  "lic": "PSF",
+  "plan": "wasm32-emscripten (CPython Tier-3 / Pyodide 手法) で 3.12.1 を再ビルド。ctypes/sqlite/ssl 等は不要分を除外",
+  "diff": "中",
+  "ticket": "T-SH-05",
+  "mac_fat_bytes": null,
+  "win": "python312.dll + 拡張 34 本",
+  "win_bytes": 7003928,
+  "win_exports": 1696,
+  "win_arch": "x64",
+  "evidence": [
+   {
+    "check": "mac Info.plist = 3.12.1",
+    "pattern": "3\\.12\\.1, \\(c\\) 2001-2023 Python Software Foundation",
+    "hit": true,
+    "sample": "3.12.1, (c) 2001-2023 Python Software Foundation"
+   }
+  ]
+ },
+ {
+  "lib": "libmp3lame_x64",
+  "cls": "OSS",
+  "upstream": "LAME 3.99.5",
+  "lic": "LGPL",
+  "plan": "wasm 再ビルド",
+  "diff": "易",
+  "ticket": "T-SH-03b",
+  "mac_fat_bytes": 901408,
+  "mac_x86_64_bytes": 463728,
+  "mac_exports": 402,
+  "mac_instructions": 129716,
+  "mac_simd_ratio": 0.2537,
+  "mac_classes": {
+   "scalar_int": 96810,
+   "sse_scalar": 16280,
+   "sse_packed": 16004,
+   "sse_other": 622
+  },
+  "win": "lame_enc_dll.dll",
+  "win_bytes": 465720,
+  "win_exports": 9,
+  "win_arch": "x64",
+  "evidence": [
+   {
+    "check": "LAME バージョン書式",
+    "pattern": "LAME %s version %s",
+    "hit": true,
+    "sample": "LAME %s version %s"
+   },
+   {
+    "check": "3.99.5",
+    "pattern": "3\\.99\\.5",
+    "hit": true,
+    "sample": "3.99.5"
+   }
+  ]
+ },
+ {
+  "lib": "wavpack_x64",
+  "cls": "OSS",
+  "upstream": "WavPack 4.80 (mac) / 4.60 (win)",
+  "lic": "BSD-3",
+  "plan": "wasm 再ビルド",
+  "diff": "易",
+  "ticket": "T-SH-03b",
+  "mac_fat_bytes": 534224,
+  "mac_x86_64_bytes": 217584,
+  "mac_exports": 54,
+  "mac_instructions": 65494,
+  "mac_simd_ratio": 0.0157,
+  "mac_classes": {
+   "scalar_int": 64464,
+   "sse_scalar": 404,
+   "sse_packed": 606,
+   "sse_other": 18,
+   "x87": 2
+  },
+  "win": "wavpackdll.dll",
+  "win_bytes": 271672,
+  "win_exports": 48,
+  "win_arch": "x64",
+  "evidence": [
+   {
+    "check": "mac 4.80.0",
+    "pattern": "4\\.80\\.0",
+    "hit": true,
+    "sample": "4.80.0"
+   },
+   {
+    "check": "WavPack 標準メッセージ",
+    "pattern": "can't read all of WavPack file",
+    "hit": true,
+    "sample": "can't read all of WavPack file"
+   }
+  ]
+ },
+ {
+  "lib": "EasyFLAC_x64",
+  "cls": "OSS(libFLAC) + 薄いプロプラ wrapper",
+  "upstream": "libFLAC 1.5.0 (mac) / M2 で crc8 lift 済",
+  "lic": "BSD-3 + IL",
+  "plan": "libFLAC 再ビルド + EasyFLAC_* 10 関数を薄く再実装 (M2/M3 の crc8 lift は参考のみ)",
+  "diff": "易",
+  "ticket": "T-SH-03",
+  "mac_fat_bytes": 626960,
+  "mac_x86_64_bytes": 299376,
+  "mac_exports": 524,
+  "mac_instructions": 96610,
+  "mac_simd_ratio": 0.1322,
+  "mac_classes": {
+   "scalar_int": 83822,
+   "sse_scalar": 2294,
+   "sse_packed": 9864,
+   "sse_other": 616,
+   "x87": 14
+  },
+  "win": "EasyFLAC_x64.dll",
+  "win_bytes": 394240,
+  "win_exports": 10,
+  "win_arch": "x64",
+  "evidence": [
+   {
+    "check": "libFLAC 1.5.0",
+    "pattern": "reference libFLAC 1\\.5\\.0 20250211",
+    "hit": true,
+    "sample": "reference libFLAC 1.5.0 20250211"
+   }
+  ]
+ },
+ {
+  "lib": "ILSvg_x64",
+  "cls": "OSS 派生 (svgdom+svgren+AGG) + 3 関数 wrapper",
+  "upstream": "cppfw: svgdom / svgren / papki / utki / mikroxml + AGG 2.4",
+  "lic": "MIT (cppfw) + AGG(2.4 BSD 系)",
+  "plan": "upstream (cppfw) の同 version を特定して wasm 再ビルド (version 特定が TODO) + svgCreate/Render/Destroy を薄く実装",
+  "diff": "中",
+  "ticket": "T-SH-06",
+  "mac_fat_bytes": 3297952,
+  "mac_x86_64_bytes": 1641088,
+  "mac_exports": 3,
+  "mac_instructions": 339086,
+  "mac_simd_ratio": 0.1086,
+  "mac_classes": {
+   "scalar_int": 302262,
+   "sse_packed": 14872,
+   "sse_scalar": 21200,
+   "sse_other": 748,
+   "x87": 4
+  },
+  "win": "ILSvg_x64.dll",
+  "win_bytes": 1504256,
+  "win_exports": 3,
+  "win_arch": "x64",
+  "evidence": [
+   {
+    "check": "svgren::renderer",
+    "pattern": "N6svgren8rendererE",
+    "hit": true,
+    "sample": "N6svgren8rendererE"
+   },
+   {
+    "check": "svgdom 名前空間",
+    "pattern": "N6svgdom",
+    "hit": true,
+    "sample": "N6svgdom"
+   },
+   {
+    "check": "AGG ソース名",
+    "pattern": "agg_vcgen_stroke\\.cpp",
+    "hit": true,
+    "sample": "agg_vcgen_stroke.cpp"
+   },
+   {
+    "check": "win 側にも svgren",
+    "pattern": "svgren",
+    "hit": true,
+    "sample": "svgren"
+   }
+  ]
+ },
+ {
+  "lib": "dsp_ippv2_x64",
+  "cls": "プロプラ(Intel) + OSS 同梱 (AGG Agg2D / GPC)",
+  "upstream": "Intel oneAPI IPP 2021.7 + AGG(Agg2D) + GPC polygon clipper",
+  "lic": "Intel Simplified SW License (再配布可・改変不可) / AGG / GPC(非商用条項あり)",
+  "plan": "lift しない。実使用関数 (win 12 / mac 159) を自前 C(+wasm SIMD) で実装し 423 名を同名 export (REPORT §2)。Agg2D は Blend2D 側で代替",
+  "diff": "中(使用部のみ)",
+  "ticket": "T-SH-07",
+  "mac_fat_bytes": 34224800,
+  "mac_x86_64_bytes": 33790992,
+  "mac_exports": 434,
+  "mac_instructions": 11662418,
+  "mac_simd_ratio": 0.4317,
+  "mac_classes": {
+   "scalar_int": 6620682,
+   "sse_scalar": 988034,
+   "sse_packed": 1862260,
+   "sse_other": 118370,
+   "x87": 6824,
+   "avx_256": 624590,
+   "avx_128": 1033422,
+   "avx512": 408236
+  },
+  "win": "dsp_ippv2_x64.dll",
+  "win_bytes": 39942656,
+  "win_exports": 446,
+  "win_arch": "x64",
+  "evidence": [
+   {
+    "check": "ippCore",
+    "pattern": "ippCore",
+    "hit": true,
+    "sample": "ippCore"
+   },
+   {
+    "check": "IPP 2021.7",
+    "pattern": "2021\\.7 \\(r0xa954907f\\)",
+    "hit": true,
+    "sample": "2021.7 (r0xa954907f)"
+   },
+   {
+    "check": "AGG ctrl クラス",
+    "pattern": "N3agg\\d+\\w+ctrl",
+    "hit": true,
+    "sample": "N3agg17polygon_ctrl"
+   },
+   {
+    "check": "GPC (General Polygon Clipper) の alloc 文字列",
+    "pattern": "tristrip node creation",
+    "hit": true,
+    "sample": "tristrip node creation"
+   }
+  ]
+ },
+ {
+  "lib": "elastique_x64",
+  "cls": "プロプラ(zplane 第三者)",
+  "upstream": "zplane élastique (2.2.15-elastiqueProV2)",
+  "lic": "商用ライセンス (SDK 契約)",
+  "plan": "第三者バイナリ: lift 対象 (win は静的 IPP 約 1MB 含む → mac 版 (Accelerate 依存) か win 版 + 自前 IPP)。EULA 事実整理要",
+  "diff": "難",
+  "ticket": "T-SH-10",
+  "mac_fat_bytes": 1180928,
+  "mac_x86_64_bytes": 625408,
+  "mac_exports": 12,
+  "mac_instructions": 267050,
+  "mac_simd_ratio": 0.2126,
+  "mac_classes": {
+   "scalar_int": 210270,
+   "sse_scalar": 33498,
+   "sse_packed": 22170,
+   "x87": 8,
+   "sse_other": 544,
+   "avx_256": 200,
+   "avx_128": 360
+  },
+  "win": "elastique_x64.dll",
+  "win_bytes": 4997632,
+  "win_exports": 15,
+  "win_arch": "x64",
+  "evidence": [
+   {
+    "check": "élastique version",
+    "pattern": "2\\.2\\.15-elastiqueProV2",
+    "hit": true,
+    "sample": "2.2.15-elastiqueProV2"
+   },
+   {
+    "check": "zplane クラス名",
+    "pattern": "TElastiquePro",
+    "hit": true,
+    "sample": "TElastiquePro"
+   }
+  ]
+ },
+ {
+  "lib": "REX Shared Library",
+  "cls": "プロプラ(Reason Studios 第三者)",
+  "upstream": "REX SDK",
+  "lic": "REX SDK ライセンス",
+  "plan": "第三者バイナリ。REX 読込は優先度低 (DirectWave/Slicer 経由)",
+  "diff": "難",
+  "ticket": "T-SH-11",
+  "mac_fat_bytes": null,
+  "win": "REX Shared Library.dll",
+  "win_bytes": 321848,
+  "win_exports": 14,
+  "win_arch": "x64",
+  "evidence": [
+   {
+    "check": "REX",
+    "pattern": "REX",
+    "hit": true,
+    "sample": "REX"
+   }
+  ]
+ },
+ {
+  "lib": "ILTools_x64",
+  "cls": "プロプラ(IL)",
+  "upstream": "FPC 3.2.3 (mac) / Delphi (win) — 同一 Pascal ソース",
+  "lic": "IL 独自",
+  "plan": "win Delphi x64 (3.66MB) を M5 A9/M11 と同じパイプラインで lift。PathManager 等 OS 依存が大きく shim 先行",
+  "diff": "難",
+  "ticket": "T-SH-12",
+  "mac_fat_bytes": 4591968,
+  "mac_x86_64_bytes": 2232128,
+  "mac_exports": 5,
+  "mac_instructions": 673136,
+  "mac_simd_ratio": 0.0324,
+  "mac_classes": {
+   "scalar_int": 648912,
+   "sse_other": 328,
+   "sse_packed": 5458,
+   "sse_scalar": 16010,
+   "x87": 2428
+  },
+  "win": "ILTools_x64.dll",
+  "win_bytes": 3662336,
+  "win_exports": 7,
+  "win_arch": "x64",
+  "evidence": [
+   {
+    "check": "FPC 3.2.3",
+    "pattern": "FPC 3\\.2\\.3 \\[2023/12/20\\] for x86_64 - Darwin",
+    "hit": true,
+    "sample": "FPC 3.2.3 [2023/12/20] for x86_64 - Darwin"
+   },
+   {
+    "check": "FPC generics.defaults",
+    "pattern": "TDelphiHashFactory",
+    "hit": true,
+    "sample": "TDelphiHashFactory"
+   }
+  ]
+ },
+ {
+  "lib": "SGv2_x64",
+  "cls": "プロプラ(IL)",
+  "upstream": "FPC 3.2.3 (mac) / Delphi (win)",
+  "lic": "IL 独自",
+  "plan": "Fruity プラグイン SDK ホスト層。GUI 結合が強く FLEngine lift 後に着手",
+  "diff": "難",
+  "ticket": "T-SH-12",
+  "mac_fat_bytes": 8054368,
+  "mac_x86_64_bytes": 3991200,
+  "mac_exports": 2,
+  "mac_instructions": 1151338,
+  "mac_simd_ratio": 0.0746,
+  "mac_classes": {
+   "scalar_int": 1061358,
+   "sse_other": 476,
+   "sse_packed": 14570,
+   "sse_scalar": 70890,
+   "x87": 4044
+  },
+  "win": "FruityPlug_x64.dll (export CreatePlugInstance 一致; 推定)",
+  "win_bytes": 5892096,
+  "win_exports": 3,
+  "win_arch": "x64",
+  "evidence": [
+   {
+    "check": "FPC 3.2.3",
+    "pattern": "FPC 3\\.2\\.3 \\[2023/12/20\\] for x86_64 - Darwin",
+    "hit": true,
+    "sample": "FPC 3.2.3 [2023/12/20] for x86_64 - Darwin"
+   },
+   {
+    "check": "Fruity plugin ホスト層",
+    "pattern": "TDelphiFruityPlug",
+    "hit": true,
+    "sample": "TDelphiFruityPlug"
+   }
+  ]
+ },
+ {
+  "lib": "libQuickFontCachev2_x64",
+  "cls": "プロプラ(IL)",
+  "upstream": "FPC 3.2.3 (mac) / Delphi (win)",
+  "lic": "IL 独自",
+  "plan": "共有サービス層 (FontCache/AnimTimer/ThreadBank/InitSharedPython/LoadSharedElastiqueDll)。Delphi lift 候補だが freetype 結合のため OSS 再ビルド後",
+  "diff": "中-難",
+  "ticket": "T-SH-12",
+  "mac_fat_bytes": 4691536,
+  "mac_x86_64_bytes": 2265824,
+  "mac_exports": 8,
+  "mac_instructions": 696246,
+  "mac_simd_ratio": 0.0394,
+  "mac_classes": {
+   "scalar_int": 666394,
+   "sse_other": 394,
+   "sse_packed": 6310,
+   "sse_scalar": 20720,
+   "x87": 2428
+  },
+  "win": "QuickFontCache_x64.dll",
+  "win_bytes": 2067968,
+  "win_exports": 10,
+  "win_arch": "x64",
+  "evidence": [
+   {
+    "check": "FPC 3.2.3",
+    "pattern": "FPC 3\\.2\\.3 \\[2023/12/20\\] for x86_64 - Darwin",
+    "hit": true,
+    "sample": "FPC 3.2.3 [2023/12/20] for x86_64 - Darwin"
+   },
+   {
+    "check": "export 面 (font cache + 共有 timer/thread bank/Python/elastique ローダ)",
+    "pattern": "FontCache_AcquireFont|CreateVST3Instance",
+    "hit": true,
+    "sample": "CreateVST3Instance"
+   }
+  ]
+ },
+ {
+  "lib": "libwinbridge_x64",
+  "cls": "プロプラ(IL) mac 専用",
+  "upstream": "FPC 3.2.3",
+  "lic": "IL 独自",
+  "plan": "移植不要: Win32 面は tools/shim (M4) + M2 SHIM_INVENTORY で代替。lift しない",
+  "diff": "n/a",
+  "ticket": "-",
+  "mac_fat_bytes": 1382096,
+  "mac_x86_64_bytes": 661136,
+  "mac_exports": 34,
+  "mac_instructions": 213116,
+  "mac_simd_ratio": 0.0033,
+  "mac_classes": {
+   "scalar_int": 212400,
+   "sse_other": 4,
+   "sse_packed": 128,
+   "sse_scalar": 562,
+   "x87": 22
+  },
+  "win": "(なし: mac 専用)",
+  "evidence": [
+   {
+    "check": "FPC 3.2.3",
+    "pattern": "FPC 3\\.2\\.3 \\[2023/12/20\\] for x86_64 - Darwin",
+    "hit": true,
+    "sample": "FPC 3.2.3 [2023/12/20] for x86_64 - Darwin"
+   },
+   {
+    "check": "Winapi 型を mac へ橋渡し",
+    "pattern": "TFPGMap<Winapi",
+    "hit": true,
+    "sample": "TFPGMap<Winapi"
+   }
+  ]
+ },
+ {
+  "lib": "DirectWaveCtEngine_x64",
+  "cls": "プロプラ(IL/第三者形式 importer)",
+  "upstream": "C++ (libc++), SampleImport (Kontakt/EXS/Akai/SF2/SFZ/REX)",
+  "lic": "IL 独自",
+  "plan": "DirectWave 用サンプル形式 importer。FS shim 完成後に lift (MSVC C++ x64)。優先度低",
+  "diff": "難",
+  "ticket": "T-SH-13",
+  "mac_fat_bytes": 9320496,
+  "mac_x86_64_bytes": 4785936,
+  "mac_exports": 3717,
+  "mac_instructions": 1713118,
+  "mac_simd_ratio": 0.0258,
+  "mac_classes": {
+   "scalar_int": 1668914,
+   "sse_scalar": 17284,
+   "sse_packed": 26714,
+   "sse_other": 206
+  },
+  "win": "DirectWaveCtEngine.dll",
+  "win_bytes": 4788736,
+  "win_exports": 2,
+  "win_arch": "x64",
+  "evidence": [
+   {
+    "check": "ソースパス SampleImport",
+    "pattern": "SampleImport/",
+    "hit": true,
+    "sample": "SampleImport/"
+   },
+   {
+    "check": "Kontakt importer",
+    "pattern": "CKontaktStruct",
+    "hit": true,
+    "sample": "CKontaktStruct"
+   },
+   {
+    "check": "win 側にも Kontakt 実装を内蔵",
+    "pattern": "CreateKontakt",
+    "hit": true,
+    "sample": "CreateKontakt"
+   }
+  ]
+ },
+ {
+  "lib": "libkio_x64",
+  "cls": "プロプラ(第三者 NI K4PL 派生)",
+  "upstream": "GCC C++ + boost, namespace NI::GP / K4PO / K4PatchLib (Kontakt 4 patch lib)",
+  "lic": "第三者(NI)派生・要確認",
+  "plan": "NKI(Kontakt) 読込。DirectWave と同チケット。lift PoC: 純粋ユーティリティ 15 関数 (REPORT §4)",
+  "diff": "中-難",
+  "ticket": "T-SH-13",
+  "mac_fat_bytes": 5502144,
+  "mac_x86_64_bytes": 2792336,
+  "mac_exports": 126,
+  "mac_instructions": 793798,
+  "mac_simd_ratio": 0.0192,
+  "mac_classes": {
+   "scalar_int": 778456,
+   "sse_other": 548,
+   "sse_packed": 12880,
+   "sse_scalar": 1798,
+   "x87": 116
+  },
+  "win": "(DirectWaveCtEngine.dll に内蔵)",
+  "win_bytes": 4788736,
+  "win_exports": 2,
+  "win_arch": "x64",
+  "evidence": [
+   {
+    "check": "Kontakt 4 patch lib 名前空間",
+    "pattern": "K4PL|K4PatchLib|CKontaktStruct_RCS",
+    "hit": true,
+    "sample": "K4PatchLib"
+   },
+   {
+    "check": "boost 使用",
+    "pattern": "N5boost",
+    "hit": true,
+    "sample": "N5boost"
+   }
+  ]
+ },
+ {
+  "lib": "beat_tracker",
+  "cls": "プロプラ(IL) + Eigen(MPL2)",
+  "upstream": "C++ (libc++) + Eigen, librosa/madmom 風 (estimate_bpm / forward_backward_decode / bar_position_hmm)",
+  "lic": "IL 独自 + MPL2 (Eigen)",
+  "plan": "export 14 本の小 API。Eigen テンプレ展開部が大 (SSE packed 24%)。x86_64 mac slice を RetDec lift が現実的だが double 精度/決定性の検証要",
+  "diff": "中-難",
+  "ticket": "T-SH-14",
+  "mac_fat_bytes": 2565392,
+  "mac_x86_64_bytes": 1405984,
+  "mac_exports": 305,
+  "mac_instructions": 461298,
+  "mac_simd_ratio": 0.2324,
+  "mac_classes": {
+   "scalar_int": 354072,
+   "sse_scalar": 28400,
+   "sse_other": 3028,
+   "sse_packed": 75788,
+   "x87": 10
+  },
+  "win": "beat_tracker_dll.dll",
+  "win_bytes": 983552,
+  "win_exports": 14,
+  "win_arch": "x64",
+  "evidence": [
+   {
+    "check": "Eigen 使用",
+    "pattern": "N5Eigen6Matrix",
+    "hit": true,
+    "sample": "N5Eigen6Matrix"
+   },
+   {
+    "check": "librosa/madmom 風アルゴリズム名",
+    "pattern": "estimate_bpm|forward_backward_decode|bar_position_hmm",
+    "hit": true,
+    "sample": "estimate_bpm"
+   },
+   {
+    "check": "win export",
+    "pattern": "beatTrackerEstimateBpm",
+    "hit": true,
+    "sample": "beatTrackerEstimateBpm"
+   }
+  ]
+ },
+ {
+  "lib": "ildsp_x64",
+  "cls": "プロプラ(IL)",
+  "upstream": "C++ (libc++) DSP (Limiter/PSOLA/Shimmer/StereoEnhancer…)",
+  "lic": "IL 独自",
+  "plan": "OTT と同型の DSP (SIMD 40%): M6-M11 手法 (mac x86_64 SSE のみ版が lift しやすい)",
+  "diff": "中",
+  "ticket": "T-SH-15",
+  "mac_fat_bytes": 847504,
+  "mac_x86_64_bytes": 454976,
+  "mac_exports": 10,
+  "mac_instructions": 145746,
+  "mac_simd_ratio": 0.4019,
+  "mac_classes": {
+   "scalar_int": 87166,
+   "sse_scalar": 38612,
+   "sse_packed": 19296,
+   "sse_other": 664,
+   "x87": 8
+  },
+  "win": "ildsp_x64.dll",
+  "win_bytes": 4197376,
+  "win_exports": 10,
+  "win_arch": "x64",
+  "evidence": [
+   {
+    "check": "IL ソース名",
+    "pattern": "Lowpass1\\.cpp|GRAdaptiveRel\\.cpp|MathUtils\\.cpp",
+    "hit": true,
+    "sample": "GRAdaptiveRel.cpp"
+   }
+  ]
+ },
+ {
+  "lib": "libreverb_x64",
+  "cls": "プロプラ(IL)",
+  "upstream": "C++ (libc++) Fruity Reverb",
+  "lic": "IL 独自",
+  "plan": "最小 DSP lib (5.6K 命令)。M6-M11 手法の別 PoC 候補 (Process_Fruity は SSE scalar → __asm_* helper 要)",
+  "diff": "易-中",
+  "ticket": "T-SH-15",
+  "mac_fat_bytes": 157040,
+  "mac_x86_64_bytes": 58672,
+  "mac_exports": 31,
+  "mac_instructions": 5660,
+  "mac_simd_ratio": 0.3466,
+  "mac_classes": {
+   "scalar_int": 3698,
+   "sse_scalar": 1714,
+   "sse_packed": 208,
+   "sse_other": 40
+  },
+  "win": "Reverb.dll",
+  "win_bytes": 492544,
+  "win_exports": 3,
+  "win_arch": "x64",
+  "evidence": [
+   {
+    "check": "IL ソース名",
+    "pattern": "DelayLine\\.cpp",
+    "hit": true,
+    "sample": "DelayLine.cpp"
+   }
+  ]
+ },
+ {
+  "lib": "ILRemoteServerOSX_x64",
+  "cls": "プロプラ(IL)",
+  "upstream": "C++ (ILR_ServerManager)",
+  "lic": "IL 独自",
+  "plan": "リモートコントロール(ネットワーク)。対象外 (外部通信)",
+  "diff": "n/a",
+  "ticket": "-",
+  "mac_fat_bytes": 240000,
+  "mac_x86_64_bytes": 88096,
+  "mac_exports": 7,
+  "mac_instructions": 17314,
+  "mac_simd_ratio": 0.0195,
+  "mac_classes": {
+   "scalar_int": 16974,
+   "sse_packed": 330,
+   "x87": 2,
+   "sse_scalar": 8
+  },
+  "win": "ILRemoteServerCppDLL.dll",
+  "win_bytes": 215040,
+  "win_exports": 1,
+  "win_arch": "x64",
+  "evidence": [
+   {
+    "check": "ILRemote",
+    "pattern": "ILRemoteClientClass",
+    "hit": true,
+    "sample": "ILRemoteClientClass"
+   }
+  ]
+ }
+]
