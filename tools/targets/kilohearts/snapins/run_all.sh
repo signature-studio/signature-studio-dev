@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Kilohearts snap-in 8 本 (Channel Mixer / Gain / Haas / Clipper / Gate / 3-Band EQ / Resonator / Stereo) の
+# Kilohearts snap-in 9 本 (Channel Mixer / Gain / Haas / Clipper / Gate / 3-Band EQ / Resonator / Stereo / Disperser) の
 # lift → wasm → 実機機械語と ctx-fuzz 突合 (既存 6 本 = bit-exact, Resonator/Stereo = 許容誤差 (CAB-224), Disperser = bit-exact (CAB-225))。
 #   bash tools/targets/kilohearts/snapins/run_all.sh                 本編 (Path B: RetDec stage-0 + kh_lower) 9 本 + Path A 対照 (matrix/gain/haas) + 一覧表
 #   ABLATE=1 bash .../run_all.sh                                     + 修復 pass を 1 本ずつ外す ablation (数分)
@@ -13,8 +13,8 @@ if [ ! -f "$CORE" ]; then echo "== HeartCore 未抽出: installer 抽出 (../scr
 mkdir -p work
 echo "== [1] native 参照 (ctx-fuzz; 実機機械語を ImageBase に VA 敷設して ms_abi 直接実行)"
 cc -O1 -Wall -o work/native_ref harness/native_ref.c harness/scenarios.c -Iharness
-echo "== [2] Path B (RetDec stage-0 IR → kh_lower → emcc → wasm) × 8 → 実機と突合 (6 本 bit-exact / resonator+stereo 許容誤差)"
-for n in matrix gain haas clipper gate quickeq resonator stereo; do
+echo "== [2] Path B (RetDec stage-0 IR → kh_lower → emcc → wasm) × 9 → 実機と突合 (6 本 bit-exact / resonator+stereo 許容誤差)"
+for n in matrix gain haas clipper gate quickeq resonator stereo disperser; do
   echo "--- $n"; python3 lift/build.py $n --path s0 --tag s0 --trials "$TRIALS" --seed "$SEED" | python3 -c "import sys,json; l=sys.stdin.readline(); d=json.loads(l); print(' ', d['passes'][:160]); print(' ', d.get('compare'), '| wasm', d['wasm_bytes'], 'B | undefined import', len(d['undefined_imports']))"
 done
 echo "== [3] Path A (RetDec 最終 IR + kh_passes) 対照: matrix gain haas (clipper は消失コードで不可能 = 負の対照)"

@@ -315,5 +315,49 @@
     "absFloor": 0.001
    }
   }
+ },
+ "disperser": {
+  "ns": "disperser",
+  "cls": "DisperserDsp",
+  "id": "kdsp",
+  "title": "Disperser",
+  "lift": {
+   "proc": "0x180316480",
+   "clear": "0x1803172a0",
+   "finish": "0x1803172f0",
+   "norm": "0x180316d90",
+   "biquad": "0x180bac490",
+   "interp": "0x180006500",
+   "sincos_a": "0x180fcd690",
+   "sincos_b": "0x180fce0d0",
+   "m_cde58": "0x180fcde58",
+   "k_dc470": "0x180fdc470",
+   "k_dc660": "0x180fdc660",
+   "k_dc700": "0x180fdc700",
+   "k_dfdb0": "0x180fdfdb0",
+   "k_dc6d8": "0x180fdc6d8",
+   "m_fcdbfc": "0x180fcdbfc",
+   "m_fd27a8": "0x180fd27a8",
+   "m_fbbfb8": "0x180fbbfb8",
+   "m_fcf904": "0x180fcf904",
+   "m_fbdfcc": "0x180fbdfcc",
+   "m_fbe018": "0x180fbe018",
+   "m_fd54cc": "0x180fd54cc",
+   "m_fbde90": "0x180fbde90",
+   "m_fd5250": "0x180fd5250",
+   "m_fe5c74": "0x180fe5c74"
+  },
+  "scenario": "disperser",
+  "jumptables": {
+   "180bac559": {
+    "table": "18236200c",
+    "n": 8
+   }
+  },
+  "shims": {
+   "18004df70": "ret0",
+   "181384040": "memmove",
+   "180fbdef4": "fint"
+  }
  }
 }

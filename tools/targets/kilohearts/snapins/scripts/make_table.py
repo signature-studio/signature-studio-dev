@@ -7,7 +7,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 tag = sys.argv[1] if len(sys.argv) > 1 else 's0'
 cfg = json.load(open(os.path.join(ROOT, 'snapins.json')))
 rows = []
-ORDER = ['matrix', 'gain', 'haas', 'clipper', 'gate', 'quickeq', 'resonator', 'stereo']
+ORDER = ['matrix', 'gain', 'haas', 'clipper', 'gate', 'quickeq', 'resonator', 'stereo', 'disperser']
 for n in ORDER:
     sp = os.path.join(ROOT, 'work', n, tag, 'stat.json')
     if not os.path.exists(sp):
