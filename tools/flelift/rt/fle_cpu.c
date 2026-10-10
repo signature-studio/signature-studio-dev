@@ -1,0 +1,212 @@
+/* fle_cpu.c: lifted code の CPU 状態 + 実行時 fail-fast + Win32/CRT import (FLEngine 用)。
+ * 原型 = tools/ott/rt/ott_cpu.c。FLEngine 拡張: DF/AF flag, YL (ymm 上位), x87 制御モデル,
+ * TEB (gs) 敷設, alloc log, IAT pseudo-VA index 参照。 */
+#include "fle_cpu.h"
+#include <stdio.h>
+uint64_t R[16];
+X128 X[16];
+X128 YL[16];
+uint64_t M[8];                  /* MMX (実機非 alias 実測) */
+uint8_t fZF, fSF, fCF, fOF, fPF, fAF, fDF;
+uint16_t x87_cw = 0x037f, x87_sw = 0;
+uint32_t mxcsr = 0x1f80;
+uint32_t XCR0 = 0x7;            /* x87|SSE|AVX (xgetbv モデル値) */
+uint64_t SEG_GS = FLE_TEB, SEG_FS = FLE_TEB;
+uint64_t ott_xrip;
+
+void ott_unsup(uint64_t addr, const char* what) {
+    fprintf(stderr, "[fle] UNSUPPORTED instruction at %#llx: %s\n", (unsigned long long)addr, what); abort();
+}
+void ott_unlifted(uint64_t va) {
+    fprintf(stderr, "[fle] call to UNLIFTED function %#llx ret=%#llx\n", (unsigned long long)va, (unsigned long long)LD64(R[RSP])); abort();
+}
+void ott_badjump(uint64_t addr, uint64_t target) {
+    fprintf(stderr, "[fle] bad jump at %#llx target %#llx\n", (unsigned long long)addr, (unsigned long long)target); abort();
+}
+void ott_missing_import(const char* nm) {
+    fprintf(stderr, "[fle] MISSING IMPORT %s\n", nm); abort();
+}
+#ifdef FLE_CHK
+void fle_chk(uint64_t a, int line) {
+    /* wasm linear 上限 (initial-memory) と emcc static 領域 (GLOBAL_BASE 0x10000000..) を避ける */
+    if (a >= 0x36000000ull || (a >= 0x10000000ull && a < 0x1D00000ull) || (a >= 0x1e00000ull && a < 0x2000000ull)) {
+        fprintf(stderr, "[fle] bad guest address %#llx (fle_cpu.h line %d)\n", (unsigned long long)a, line); abort();
+    }
+}
+#endif
+
+void cpuid_model(void) {
+    /* 最小 CPUID モデル: leaf 0 = max 1 / "GenuineIntel" 風, leaf 1 = SSE2+SSSE3+SSE4 家系, 他 0 */
+    switch (R[RAX] & 0xffffffffULL) {
+    case 0:
+        R[RAX] = 1; R[RBX] = 0x756e6547; R[RDX] = 0x49656e69; R[RCX] = 0x6c65746e; break;
+    case 1:
+        R[RAX] = 0x000306a9; R[RBX] = 0; R[RCX] = 0x00000001; R[RDX] = 0x178bfbff; break; /* edx: SSE2 等, ecx: SSSE3 bit */
+    default:
+        R[RAX] = 0; R[RBX] = 0; R[RCX] = 0; R[RDX] = 0; break;
+    }
+}
+static uint64_t g_tsc;
+void rdtsc_model(void) { g_tsc += 1000; R[RAX] = g_tsc & 0xffffffffULL; R[RDX] = g_tsc >> 32; }
+
+/* ---- TEB / TLS 敷設 (gs:[0x58] = ThreadLocalStoragePointer 等) ---- */
+void fle_install_teb(void) {
+    memset((void*)A_(FLE_TEB), 0, 0x400);
+    memset((void*)A_(FLE_TLSARRAY), 0, 64 * 8);
+    for (int i = 0; i < 64; i++)
+        ST64(FLE_TLSARRAY + 8 * (uint64_t)i, FLE_TLSBLOCK + 0x10000ull * (uint64_t)i);
+    ST64(FLE_TEB + 0x30, FLE_TEB);            /* Self (TEB self reference) */
+    ST64(FLE_TEB + 0x58, FLE_TLSARRAY);       /* ThreadLocalStoragePointer */
+    ST64(FLE_TEB + 0x08, 0x1D8000ull);        /* StackBase (概算) */
+    ST64(FLE_TEB + 0x10, 0x1D0000ull);        /* StackLimit */
+    ST64(FLE_TEB + 0x60, 0);                  /* GDI/環境系は 0 */
+    SEG_GS = FLE_TEB; SEG_FS = FLE_TEB;
+}
+
+/* ---- alloc log (native 側 heap 再生用) ---- */
+void fle_alog(void* p, uint64_t n) {
+    volatile uint32_t* L = (volatile uint32_t*)A_(FLE_ALOG);
+    uint32_t c = L[0];
+    if (c < 0x8000u) { L[2 + 2 * c] = (uint32_t)(uintptr_t)p; L[3 + 2 * c] = (uint32_t)n; L[0] = c + 1; }
+}
+
+/* ---- imports: callee 側が ret 相当 (R[RSP] += 8) を行う ---- */
+#define IMP_RET() (R[RSP] += 8)
+static void* fle_alloc(uint64_t sz, int zero) {
+    void* p = malloc(sz ? (size_t)sz : 1);
+    if (p && zero) memset(p, 0, sz);
+    if (p) fle_alog(p, sz);
+    return p;
+}
+void imp_HeapAlloc(void) {
+    uint64_t flags = R[RDX] & 0xffffffff, sz = R[R8];
+    void* p = fle_alloc(sz, (flags & 8) != 0);
+    R[RAX] = (uint64_t)(uintptr_t)p; IMP_RET();
+}
+void imp_HeapFree(void) { R[RAX] = 1; IMP_RET(); }
+void imp_HeapReAlloc(void) {
+    /* 本体は未実装: 旧ポインタ内容は引継ぎせず新規確保 (使用経路で要確認) */
+    void* p = fle_alloc(R[R9], 0);
+    R[RAX] = (uint64_t)(uintptr_t)p; IMP_RET();
+}
+void imp_HeapSize(void) { R[RAX] = 0; IMP_RET(); }
+void imp_HeapValidate(void) { R[RAX] = 1; IMP_RET(); }
+void imp_GetProcessHeap(void) { R[RAX] = 0x1000; IMP_RET(); }
+void imp_GetLastError(void) { R[RAX] = 0; IMP_RET(); }
+void imp_SetLastError(void) { IMP_RET(); }
+void imp_EnterCriticalSection(void) { IMP_RET(); }
+void imp_LeaveCriticalSection(void) { IMP_RET(); }
+void imp_InitializeCriticalSection(void) { IMP_RET(); }
+void imp_InitializeCriticalSectionAndSpinCount(void) { R[RAX] = 1; IMP_RET(); }
+void imp_DeleteCriticalSection(void) { IMP_RET(); }
+void imp_GetCurrentThreadId(void) { R[RAX] = 1; IMP_RET(); }
+void imp_GetCurrentProcessId(void) { R[RAX] = 1000; IMP_RET(); }
+void imp_GetCurrentProcess(void) { R[RAX] = 0x2000; IMP_RET(); }
+void imp_IsDebuggerPresent(void) { R[RAX] = 0; IMP_RET(); }
+void imp_IsProcessorFeaturePresent(void) { R[RAX] = 1; IMP_RET(); }
+void imp_TlsAlloc(void) { R[RAX] = 0; IMP_RET(); }
+void imp_TlsGetValue(void) { R[RAX] = LD64(FLE_TLSARRAY + 8 * (R[RCX] & 63)); IMP_RET(); }
+void imp_TlsSetValue(void) { ST64(FLE_TLSARRAY + 8 * (R[RCX] & 63), R[RDX]); R[RAX] = 1; IMP_RET(); }
+void imp_QueryPerformanceCounter(void) { ST64(R[RCX], 0); R[RAX] = 1; IMP_RET(); }
+void imp_QueryPerformanceFrequency(void) { ST64(R[RCX], 1000000000ULL); R[RAX] = 1; IMP_RET(); }
+void imp_Sleep(void) { IMP_RET(); }
+void imp_GetTickCount(void) { R[RAX] = 0; IMP_RET(); }
+void imp_GetTickCount64(void) { R[RAX] = 0; IMP_RET(); }
+void imp_InitializeConditionVariable(void) { IMP_RET(); }
+void imp_SleepConditionVariableCS(void) { R[RAX] = 0; IMP_RET(); }
+void imp_WakeAllConditionVariable(void) { IMP_RET(); }
+void imp_WakeConditionVariable(void) { IMP_RET(); }
+void imp_TryEnterCriticalSection(void) { R[RAX] = 1; IMP_RET(); }
+void imp_LoadLibraryExW(void) { R[RAX] = 0; IMP_RET(); }
+void imp_LoadLibraryW(void) { R[RAX] = 0; IMP_RET(); }
+void imp_GetModuleHandleW(void) { R[RAX] = 0x3000; IMP_RET(); }
+void imp_GetProcAddress(void) { R[RAX] = 0; IMP_RET(); }
+void imp_FreeLibrary(void) { R[RAX] = 1; IMP_RET(); }
+void imp_GetSystemTimeAsFileTime(void) { ST64(R[RCX], 0); IMP_RET(); }
+void imp_GetSystemInfo(void) { memset((void*)A_(R[RCX]), 0, 40); ST32(R[RCX] + 0x18, 16); ST32(R[RCX] + 0x1c, 4096); IMP_RET(); } /* dwNumberOfProcessors=16, pageSize */
+void imp_GetVersionExW(void) { memset((void*)A_(R[RCX]), 0, 284); ST32(R[RCX], 284); ST32(R[RCX] + 4, 6); ST32(R[RCX] + 8, 1); ST32(R[RCX] + 12, 7601); R[RAX] = 1; IMP_RET(); }
+void imp_GetModuleFileNameW(void) { R[RAX] = 0; IMP_RET(); }
+void imp_MultiByteToWideChar(void) { R[RAX] = 0; IMP_RET(); }
+void imp_WideCharToMultiByte(void) { R[RAX] = 0; IMP_RET(); }
+void imp_GetLocaleInfoW(void) { R[RAX] = 0; IMP_RET(); }
+void imp_GetUserDefaultUILanguage(void) { R[RAX] = 0x409; IMP_RET(); }
+void imp_GetSystemDefaultLangID(void) { R[RAX] = 0x409; IMP_RET(); }
+void imp_GetComputerNameW(void) { R[RAX] = 0; IMP_RET(); }
+void imp_GetUserNameW(void) { R[RAX] = 0; IMP_RET(); }
+void imp_GetEnvironmentVariableW(void) { R[RAX] = 0; IMP_RET(); }
+void imp_GetEnvironmentStringsW(void) { R[RAX] = (uint64_t)(uintptr_t)L"\0"; IMP_RET(); }
+void imp_FreeEnvironmentStringsW(void) { R[RAX] = 1; IMP_RET(); }
+void imp_ExitProcess(void) { fprintf(stderr, "[fle] ExitProcess(%llu)\n", (unsigned long long)R[RCX]); exit((int)(R[RCX] & 0xff)); }
+void imp_TerminateProcess(void) { fprintf(stderr, "[fle] TerminateProcess\n"); exit(3); }
+void imp_RaiseException(void) { fprintf(stderr, "[fle] RaiseException(0x%llx) — fail-fast (SEH は対象外)\n", (unsigned long long)R[RCX]); abort(); }
+void imp_SetUnhandledExceptionFilter(void) { R[RAX] = 0; IMP_RET(); }
+void imp_GetStdHandle(void) { R[RAX] = 0; IMP_RET(); }
+void imp_WriteFile(void) { R[RAX] = 1; IMP_RET(); }
+void imp_CloseHandle(void) { R[RAX] = 1; IMP_RET(); }
+void imp_CreateFileW(void) { R[RAX] = (uint64_t)(uintptr_t)-1; IMP_RET(); }
+void imp_VirtualAlloc(void) {
+    /* bump allocator (liftdiff ld_core と同型) */
+    static uint64_t cur = 0x2100000ull;
+    uint64_t sz = (R[RDX] + 0xffff) & ~0xffffull;
+    void* p = (void*)A_(cur); cur += sz;
+    memset(p, 0, sz);
+    R[RAX] = (uint64_t)(uintptr_t)p; IMP_RET();
+}
+void imp_VirtualFree(void) { R[RAX] = 1; IMP_RET(); }
+void imp_VirtualProtect(void) { R[RAX] = 1; IMP_RET(); }
+void imp_FlushInstructionCache(void) { R[RAX] = 1; IMP_RET(); }
+void imp_GetCPInfo(void) { R[RAX] = 0; IMP_RET(); }
+void imp_GetACP(void) { R[RAX] = 1252; IMP_RET(); }
+void imp_GetOEMCP(void) { R[RAX] = 437; IMP_RET(); }
+void imp_IsValidCodePage(void) { R[RAX] = 1; IMP_RET(); }
+void imp_GetStringTypeW(void) { R[RAX] = 0; IMP_RET(); }
+void imp_LCMapStringW(void) { R[RAX] = 0; IMP_RET(); }
+void imp_GetFileType(void) { R[RAX] = 2; IMP_RET(); }
+void imp_SetHandleCount(void) { R[RAX] = 32; IMP_RET(); }
+void imp_GetStartupInfoW(void) { memset((void*)A_(R[RCX]), 0, 68); IMP_RET(); }
+void imp_GetCommandLineA(void) { R[RAX] = (uint64_t)(uintptr_t)""; IMP_RET(); }
+void imp_GetCommandLineW(void) { R[RAX] = (uint64_t)(uintptr_t)L""; IMP_RET(); }
+void imp_GetModuleFileNameA(void) { R[RAX] = 0; IMP_RET(); }
+void imp_GetModuleHandleA(void) { R[RAX] = 0x3000; IMP_RET(); }
+void imp_RtlUnwind(void) { IMP_RET(); }
+void imp_SetFilePointer(void) { R[RAX] = (uint64_t)-1; IMP_RET(); }
+void imp_ReadFile(void) { R[RAX] = 0; IMP_RET(); }
+void imp_GetFileAttributesW(void) { R[RAX] = (uint64_t)-1; IMP_RET(); }
+void imp_GetTempPathW(void) { R[RAX] = 0; IMP_RET(); }
+void imp_CreateDirectoryW(void) { R[RAX] = 0; IMP_RET(); }
+void imp_DeleteFileW(void) { R[RAX] = 0; IMP_RET(); }
+void imp_GetCurrentDirectoryW(void) { R[RAX] = 0; IMP_RET(); }
+void imp_SetCurrentDirectoryW(void) { R[RAX] = 0; IMP_RET(); }
+void imp_FindFirstFileW(void) { R[RAX] = (uint64_t)(uintptr_t)-1; IMP_RET(); }
+void imp_FindNextFileW(void) { R[RAX] = 0; IMP_RET(); }
+void imp_FindClose(void) { R[RAX] = 1; IMP_RET(); }
+void imp_InterlockedIncrement(void) { ST32(R[RCX], LD32(R[RCX]) + 1); R[RAX] = LD32(R[RCX]); IMP_RET(); }
+void imp_InterlockedDecrement(void) { ST32(R[RCX], LD32(R[RCX]) - 1); R[RAX] = LD32(R[RCX]); IMP_RET(); }
+void imp_InterlockedExchange(void) { uint32_t o = LD32(R[RCX]); ST32(R[RCX], (uint32_t)R[RDX]); R[RAX] = o; IMP_RET(); }
+void imp_InitializeSRWLock(void) { IMP_RET(); }
+void imp_AcquireSRWLockExclusive(void) { IMP_RET(); }
+void imp_ReleaseSRWLockExclusive(void) { IMP_RET(); }
+void imp_AcquireSRWLockShared(void) { IMP_RET(); }
+void imp_ReleaseSRWLockShared(void) { IMP_RET(); }
+void imp_GetLogicalDrives(void) { R[RAX] = 0x4; IMP_RET(); }
+void imp_GetDriveTypeW(void) { R[RAX] = 3; IMP_RET(); }
+void imp_GetDiskFreeSpaceExW(void) { R[RAX] = 0; IMP_RET(); }
+void imp_OutputDebugStringW(void) { IMP_RET(); }
+void imp_IsDBCSLeadByte(void) { R[RAX] = 0; IMP_RET(); }
+void imp_GetProcessAffinityMask(void) { ST64(R[RDX], 0xffff); ST64(R[R8], 0xffff); R[RAX] = 1; IMP_RET(); }
+void imp_SetThreadAffinityMask(void) { R[RAX] = 1; IMP_RET(); }
+void imp_SwitchToThread(void) { R[RAX] = 1; IMP_RET(); }
+void imp_MapViewOfFile(void) { R[RAX] = 0; IMP_RET(); }
+void imp_UnmapViewOfFile(void) { R[RAX] = 1; IMP_RET(); }
+void imp_CreateFileMappingW(void) { R[RAX] = 0; IMP_RET(); }
+void imp_GetPrivateProfileIntW(void) { R[RAX] = 0; IMP_RET(); }
+void imp_GetPrivateProfileStringW(void) { R[RAX] = 0; IMP_RET(); }
+void imp_WritePrivateProfileStringW(void) { R[RAX] = 1; IMP_RET(); }
+void imp_GetWindowsDirectoryW(void) { R[RAX] = 0; IMP_RET(); }
+void imp_GetSystemDirectoryW(void) { R[RAX] = 0; IMP_RET(); }
+void imp_CoInitialize(void) { R[RAX] = 0; IMP_RET(); }
+void imp_CoUninitialize(void) { IMP_RET(); }
+void imp_CoCreateInstance(void) { R[RAX] = (uint64_t)-1; IMP_RET(); }
+void imp_CoTaskMemAlloc(void) { void* p = fle_alloc(R[RCX], 1); R[RAX] = (uint64_t)(uintptr_t)p; IMP_RET(); }
+void imp_CoTaskMemFree(void) { IMP_RET(); }
+void imp_PropVariantClear(void) { R[RAX] = 0; IMP_RET(); }

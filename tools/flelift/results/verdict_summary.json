@@ -1,0 +1,13 @@
+{
+ "verdicts": {
+  "0x409c80": "match",
+  "0x4133f0": "match",
+  "0x6a7e40": "match",
+  "0x6a7180": "match",
+  "0x69a130": "match",
+  "0x660c40": "match",
+  "0x6a7990": "mismatch"
+ },
+ "cases": 16,
+ "equal": 14
+}
