@@ -1,0 +1,12 @@
+<!doctype html><meta charset="utf-8"><title>perf bench</title>
+<script type="module">
+window.runBench = (opts) => new Promise((resolve, reject) => {
+  const w = new Worker('/h/bench_worker.mjs', { type: 'module' });
+  window.__w = w;
+  w.onmessage = (e) => { if (e.data.type === 'done') resolve(e.data.result); else if (e.data.type === 'err') reject(new Error(e.data.msg)); };
+  w.onerror = (e) => reject(new Error('worker error ' + e.message));
+  w.postMessage(opts);
+});
+window.killWorker = () => { if (window.__w) window.__w.terminate(); };
+window.__ready = true;
+</script>

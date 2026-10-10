@@ -1,0 +1,151 @@
+<!doctype html><meta charset="utf-8"><title>huge wasm exp</title>
+<script>
+const ms = () => performance.now();
+function stubImports(mod) {
+  const o = {};
+  for (const i of WebAssembly.Module.imports(mod)) {
+    o[i.module] ??= {};
+    if (i.kind === 'function') o[i.module][i.name] = () => 0;
+    else if (i.kind === 'memory') o[i.module][i.name] = new WebAssembly.Memory({ initial: 256, maximum: 65536 });
+    else if (i.kind === 'table') o[i.module][i.name] = new WebAssembly.Table({ initial: 16, element: 'anyfunc' });
+    else if (i.kind === 'global') o[i.module][i.name] = 0;
+  }
+  return o;
+}
+window.exp = {
+  // fetch(bytes) → WebAssembly.compile / compileStreaming → instantiate(stub) → 最初の export 呼出
+  async compile({ url, how = 'bytes', instantiate = true, callExport = null }) {
+    const r = { url, how };
+    const t0 = ms(); let mod;
+    if (how === 'stream') {
+      mod = await WebAssembly.compileStreaming(fetch(url));
+      r.compileMs = ms() - t0;
+    } else {
+      const resp = await fetch(url); const buf = await resp.arrayBuffer();
+      r.fetchMs = ms() - t0; r.bytes = buf.byteLength;
+      const t1 = ms(); mod = await WebAssembly.compile(buf); r.compileMs = ms() - t1;
+    }
+    r.totalMs = ms() - t0;
+    r.imports = WebAssembly.Module.imports(mod).length; r.exports = WebAssembly.Module.exports(mod).length;
+    window.__mod = mod;
+    if (instantiate) {
+      const t2 = ms(); const inst = await WebAssembly.instantiate(mod, stubImports(mod)); r.instantiateMs = ms() - t2;
+      window.__inst = inst;
+      r.memPages = inst.exports.memory ? inst.exports.memory.buffer.byteLength / 65536 : null;
+      if (callExport && inst.exports[callExport]) {
+        const t3 = ms(); try { inst.exports[callExport](); r.firstCallMs = ms() - t3; } catch (e) { r.firstCallErr = String(e).slice(0, 100); r.firstCallMs = ms() - t3; }
+        const t4 = ms(); try { inst.exports[callExport](); r.secondCallMs = ms() - t4; } catch (e) {}
+      }
+    }
+    return r;
+  },
+  async compileErr({ url }) {   // 失敗の場合のエラー文を得る
+    const t0 = ms();
+    try { const m = await WebAssembly.compileStreaming(fetch(url)); return { ok: true, ms: ms() - t0 }; }
+    catch (e) { return { ok: false, ms: ms() - t0, err: String(e).slice(0, 300) }; }
+  },
+  async syncCompile({ url }) {   // 同期 new WebAssembly.Module のメインスレッド制限 (8MB)
+    const buf = await (await fetch(url)).arrayBuffer(); const t0 = ms();
+    try { new WebAssembly.Module(buf); return { bytes: buf.byteLength, ok: true, ms: ms() - t0 }; }
+    catch (e) { return { bytes: buf.byteLength, ok: false, err: String(e).slice(0, 200) }; }
+  },
+  async syncCompileWorker({ url }) {
+    const src = `onmessage = async (e) => { const buf = await (await fetch(e.data)).arrayBuffer(); const t0=performance.now(); try { new WebAssembly.Module(buf); postMessage({bytes: buf.byteLength, ok:true, ms: performance.now()-t0}); } catch (er) { postMessage({bytes: buf.byteLength, ok:false, err:String(er).slice(0,200)}); } }`;
+    const w = new Worker(URL.createObjectURL(new Blob([src])));
+    return await new Promise((res) => { w.onmessage = (e) => { w.terminate(); res(e.data); }; w.postMessage(new URL(url, location.href).href); });
+  },
+  async idbModule({ url }) {   // WebAssembly.Module を IndexedDB / structured clone に入れられるか
+    const buf = await (await fetch(url)).arrayBuffer(); const mod = await WebAssembly.compile(buf); const out = {};
+    try { const db = await new Promise((res, rej) => { const q = indexedDB.open('wasmdb', 1); q.onupgradeneeded = () => q.result.createObjectStore('m'); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); });
+      await new Promise((res, rej) => { const tx = db.transaction('m', 'readwrite'); tx.objectStore('m').put(mod, 'k'); tx.oncomplete = res; tx.onerror = () => rej(tx.error); tx.onabort = () => rej(tx.error); });
+      out.idbModule = 'OK'; } catch (e) { out.idbModule = 'FAIL ' + String(e).slice(0, 150); }
+    try { structuredClone(mod); out.structuredClone = 'OK'; } catch (e) { out.structuredClone = 'FAIL ' + String(e).slice(0, 150); }
+    // postMessage で worker へ (同一 agent cluster)
+    try {
+      const w = new Worker(URL.createObjectURL(new Blob([`onmessage=async(e)=>{const t=performance.now();try{const i=await WebAssembly.instantiate(e.data,Object.fromEntries([...new Set(WebAssembly.Module.imports(e.data).map(x=>x.module))].map(m=>[m,Object.fromEntries(WebAssembly.Module.imports(e.data).filter(x=>x.module===m).map(x=>[x.name,x.kind==='function'?()=>0:(x.kind==='memory'?new WebAssembly.Memory({initial:256,maximum:65536}):0)]))])));postMessage({ok:true,instMs:performance.now()-t})}catch(er){postMessage({ok:false,err:String(er).slice(0,150)})}}`])));
+      const t0 = ms(); out.postMessageToWorker = await new Promise((res) => { w.onmessage = (e) => { w.terminate(); res(e.data); }; w.postMessage(mod); }); out.postMessageToWorker.roundtripMs = ms() - t0;
+    } catch (e) { out.postMessageToWorker = 'FAIL ' + String(e).slice(0, 150); }
+    // IndexedDB に bytes を保存 → 読出 → 再 compile (code cache 無し基準)
+    try {
+      const db = await new Promise((res, rej) => { const q = indexedDB.open('wasmbytes', 1); q.onupgradeneeded = () => q.result.createObjectStore('b'); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); });
+      let t0 = ms(); await new Promise((res, rej) => { const tx = db.transaction('b', 'readwrite'); tx.objectStore('b').put(buf, 'k'); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); out.idbBytesPutMs = ms() - t0;
+      t0 = ms(); const back = await new Promise((res, rej) => { const q = db.transaction('b').objectStore('b').get('k'); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); out.idbBytesGetMs = ms() - t0; out.idbBytes = back.byteLength;
+      t0 = ms(); await WebAssembly.compile(back); out.recompileFromIdbMs = ms() - t0;
+    } catch (e) { out.idbBytes = 'FAIL ' + String(e).slice(0, 150); }
+    return out;
+  },
+  async cacheApi({ url }) {   // Cache Storage に put → match した Response を compileStreaming
+    const c = await caches.open('w'); const out = {};
+    let t0 = ms(); const resp = await fetch(url); const buf = await resp.arrayBuffer(); out.fetchMs = ms() - t0;
+    t0 = ms(); await c.put('/m.wasm', new Response(buf, { headers: { 'Content-Type': 'application/wasm' } })); out.putMs = ms() - t0;
+    t0 = ms(); const hit = await c.match('/m.wasm'); const m = await WebAssembly.compileStreaming(hit); out.compileFromCacheMs = ms() - t0;
+    return out;
+  },
+  async cacheApiCompileOnly() {
+    const c = await caches.open('w'); const out = {};
+    const t0 = ms(); const hit = await c.match('/m.wasm'); if (!hit) return { hit: false };
+    await WebAssembly.compileStreaming(hit); out.compileFromCacheMs = ms() - t0; out.hit = true; return out;
+  },
+  memoryAlloc({ initialPages, maximumPages, shared = false }) {   // WebAssembly.Memory の確保/touch コスト
+    const t0 = ms(); const o = { initial: initialPages }; if (maximumPages) o.maximum = maximumPages; if (shared) o.shared = true;
+    try { const m = new WebAssembly.Memory(o); const t1 = ms(); const u = new Uint8Array(m.buffer); u[u.length - 1] = 1; u[0] = 1; const t2 = ms(); window.__mem = window.__mem || []; window.__mem.push(m);
+      return { ok: true, allocMs: t1 - t0, touchMs: t2 - t1, bytes: m.buffer.byteLength }; }
+    catch (e) { return { ok: false, err: String(e).slice(0, 200), ms: ms() - t0 }; }
+  },
+};
+</script>
+<script>
+// AudioWorklet 実測 (本物の worklet スレッド)
+window.exp.worklet = async function ({ wasmUrl, sampleRate = 48000, rtSeconds = 2 }) {
+  const out = {};
+  const ctx = new AudioContext({ sampleRate });
+  out.ctxState0 = ctx.state; out.sampleRate = ctx.sampleRate;
+  await ctx.audioWorklet.addModule('/h/ott_worklet.js');
+  const resp = await fetch(wasmUrl); const bytes = await resp.arrayBuffer();
+  let t0 = performance.now(); const mod = await WebAssembly.compile(bytes.slice(0)); out.compileMsMainThread = performance.now() - t0;
+  const node = new AudioWorkletNode(ctx, 'ott-proc', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2] });
+  node.connect(ctx.destination);
+  const wait = (type) => new Promise((res, rej) => { const h = (e) => { if (e.data.type === type) { node.port.removeEventListener('message', h); res(e.data); } else if (e.data.type === 'err') rej(new Error(e.data.msg)); }; node.port.addEventListener('message', h); node.port.start(); });
+  // WebAssembly.Module の postMessage が AudioWorklet に届くか
+  out.moduleToWorklet = await new Promise((res) => { const h = (e) => { if (e.data.type === 'err' || e.data.type === 'loaded') { node.port.removeEventListener('message', h); res(e.data.type === 'err' ? 'FAIL: ' + e.data.msg : 'OK'); } }; node.port.addEventListener('message', h); node.port.start(); node.port.postMessage({ type: 'load', module: mod }); setTimeout(() => res('TIMEOUT'), 3000); });
+  // bytes を transfer して worklet 内で compile+instantiate (実用経路)
+  t0 = performance.now(); node.port.postMessage({ type: 'loadbytes', bytes }, [bytes]); const ld = await wait('loaded'); out.loadRoundtripMs = performance.now() - t0; out.compileMsInWorklet = ld.compileMsInWorklet; out.instantiateMsInWorklet = ld.instantiateMs; out.memBytes = ld.memBytes;
+  await ctx.resume(); out.ctxState1 = ctx.state;
+  node.port.postMessage({ type: 'bench', chunks: 10, per: 1000 }); const b = await wait('bench'); out.workletChunkMeanMs = b.chunkMeanMs;
+  node.port.postMessage({ type: 'rt' });
+  const w0 = performance.now(); const c0 = ctx.currentTime;
+  await new Promise((r) => setTimeout(r, rtSeconds * 1000));
+  node.port.postMessage({ type: 'rtstop' }); const rt = await wait('rt');
+  out.rt = { ...rt, ctxTimeAdvance: ctx.currentTime - c0, wallMs: performance.now() - w0, expectedBlocks: Math.round((ctx.currentTime - c0) * ctx.sampleRate / 128) };
+  out.baseLatency = ctx.baseLatency; await ctx.close();
+  return out;
+};
+</script>
+<script>
+// メインスレッド (Window) で instantiateStreaming → OTT を iters ブロック実行 (Chrome の wasm code cache は Window コンテキストの streaming 経路が対象)
+window.exp.rawRun = async function ({ url, iters = 20000, streaming = true, cacheApi = null }) {
+  const f32bits = (v) => { const f = new Float32Array(1); f[0] = v; return BigInt(new Uint32Array(f.buffer)[0]); };
+  const OBJ = 0x30310000, IN_A = 0x30320000, OU_A = 0x30330000, BUF = 0x30340000, N = 128;
+  const out = {}; const t0 = performance.now();
+  const imp = {}; const stub = (mod) => { for (const i of WebAssembly.Module.imports(mod)) { imp[i.module] ??= {}; imp[i.module][i.name] = i.kind === 'function' ? () => 0 : undefined; } };
+  let inst;
+  if (streaming) {
+    const resp = await fetch(url); const buf = await resp.clone().arrayBuffer(); const m0 = await WebAssembly.compile(buf); stub(m0);   // import 名取得用 (別 isolate cache 影響を避けるため bytes 経路)
+    let src;
+    if (cacheApi) { const c = await caches.open('w'); let hit = await c.match('/m.wasm'); out.cacheHit = !!hit; if (!hit) { await c.put('/m.wasm', new Response(buf, { headers: { 'Content-Type': 'application/wasm' } })); hit = await c.match('/m.wasm'); } src = hit; } else src = fetch(url);
+    const t1 = performance.now(); const r = await WebAssembly.instantiateStreaming(src, imp); inst = r.instance; out.instantiateStreamingMs = performance.now() - t1;
+  } else { const r = await fetch(url); const m = await WebAssembly.compile(await r.arrayBuffer()); stub(m); inst = await WebAssembly.instantiate(m, imp); }
+  const x = inst.exports; if (x.__wasm_call_ctors) x.__wasm_call_ctors();
+  const buf = x.memory.buffer, U8 = new Uint8Array(buf), U32 = new Uint32Array(buf), F32 = new Float32Array(buf);
+  x.m6_data_install(); x.function_18011d400(BigInt(OBJ), 0n);
+  for (let i = 0; i < 20; i++) x.function_180120af0(BigInt(OBJ), BigInt(i), i === 19 ? 0n : f32bits(0.5));
+  x.function_180120800(BigInt(OBJ)); U8[OBJ + 0x248] = 0;
+  for (let i = 0; i < N; i++) { F32[(BUF >> 2) + i] = Math.fround(Math.sin(i * 0.05) * 0.7); F32[(BUF >> 2) + N + i] = Math.fround(Math.cos(i * 0.13) * 0.5); }
+  U32[IN_A >> 2] = BUF; U32[(IN_A >> 2) + 2] = BUF + N * 4; U32[OU_A >> 2] = BUF + N * 8; U32[(OU_A >> 2) + 2] = BUF + N * 12;
+  const call = () => x.function_18011ec20(BigInt(OBJ), BigInt(IN_A), BigInt(OU_A), BigInt(N));
+  const th = []; for (let i = 0; i < 300; i++) { const t = performance.now(); call(); th.push(performance.now() - t); }
+  out.head = th.slice(0, 5); out.head100_110 = th.slice(100, 105);
+  const tt = performance.now(); for (let i = 0; i < iters; i++) call(); out.perCallMsMean = (performance.now() - tt) / iters;
+  out.totalMs = performance.now() - t0; return out;
+};
+</script>
