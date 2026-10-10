@@ -1,0 +1,72 @@
+{
+ "flengine_static_total": 738,
+ "implemented_functional": 243,
+ "implemented_stub": 115,
+ "libc_resolved": 1,
+ "other_owner": 379,
+ "other_owner_gui": 377,
+ "other_owner_audio": 2,
+ "unimplemented": 0,
+ "ordinal": 0,
+ "coverage_pct_vs_738": 48.5,
+ "coverage_pct_incl_libc_vs_738": 48.6,
+ "coverage_pct_in_scope": 100.0,
+ "in_scope": 359,
+ "delay_total": 57,
+ "delay_implemented": 23,
+ "delay_other_owner": 34,
+ "delay_unimplemented": 0,
+ "m4_api": 53,
+ "m4_api_inherited": 53,
+ "shimx_public_api": 593,
+ "shimx_hooks": 33,
+ "shimx_stub_api": 166,
+ "shimx_functional_api": 427,
+ "plugins": {
+  "OTT_vst2_win64.dll": {
+   "total": 375,
+   "in_scope": 147,
+   "covered": 146,
+   "missing": [
+    "ord74"
+   ]
+  },
+  "OTT_vst3_win64.dll": {
+   "total": 380,
+   "in_scope": 151,
+   "covered": 150,
+   "missing": [
+    "ord74"
+   ]
+  },
+  "Serum2_win64.vst3": {
+   "total": 332,
+   "in_scope": 238,
+   "covered": 234,
+   "missing": [
+    "ord12",
+    "ord155",
+    "ord190",
+    "ord219"
+   ]
+  },
+  "FreshAir.dll": {
+   "total": 99,
+   "in_scope": 98,
+   "covered": 98,
+   "missing": []
+  },
+  "FL64.exe": {
+   "total": 112,
+   "in_scope": 111,
+   "covered": 111,
+   "missing": []
+  }
+ },
+ "m11_closure": {
+  "win_other": 171,
+  "shimx": 183,
+  "lifter": 199
+ },
+ "ott_api_resolved": 24
+}

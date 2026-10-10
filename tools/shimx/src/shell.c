@@ -1,0 +1,440 @@
+/* shell32 / shlwapi / SHFolder / version / propsys(一部) / comdlg32 / winspool / oleacc / msacm32 / wtsapi32。
+ * 方針: ブラウザ内に存在しないシステム機能は「無い/キャンセル」を意味するエラーを返す (fail-fast にはしない)。
+ * 実体が要るもの (ShellExecute のブラウザ起動, ファイル選択ダイアログ) は下流のフック口のみ。
+ */
+#include "shimx_internal.h"
+#include <strings.h>
+#include <ctype.h>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+extern DWORD g_shx_fv_ms, g_shx_fv_ls;
+
+/* ---------------------------------------------------------------
+ * 特殊フォルダ
+ * --------------------------------------------------------------- */
+static const char* csidl_path(int csidl) {
+    switch (csidl & 0xFF) {
+        case 0x00: case 0x10: return "C:\\Users\\user\\Desktop";
+        case 0x05: return "C:\\Users\\user\\Documents";
+        case 0x0D: return "C:\\Users\\user\\Music";
+        case 0x0E: return "C:\\Users\\user\\Videos";
+        case 0x27: return "C:\\Users\\user\\Pictures";
+        case 0x1A: return "C:\\Users\\user\\AppData\\Roaming";
+        case 0x1C: return "C:\\Users\\user\\AppData\\Local";
+        case 0x23: return "C:\\ProgramData";
+        case 0x2E: return "C:\\Users\\Public\\Documents";
+        case 0x28: return "C:\\Users\\user";
+        case 0x24: return "C:\\Windows";
+        case 0x25: return "C:\\Windows\\System32";
+        case 0x26: return "C:\\Program Files";
+        case 0x2A: return "C:\\Program Files (x86)";
+        case 0x2B: return "C:\\Program Files\\Common Files";
+        case 0x14: return "C:\\Windows\\Fonts";
+        case 0x15: return "C:\\Users\\user\\AppData\\Roaming\\Microsoft\\Windows\\Templates";
+        case 0x02: return "C:\\Users\\user\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs";
+        case 0x0B: return "C:\\Users\\user\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu";
+        case 0x07: return "C:\\Users\\user\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Startup";
+        case 0x20: return "C:\\Users\\user\\AppData\\Local\\Microsoft\\Windows\\INetCache";
+        case 0x19: return "C:\\Users\\Public\\Desktop";
+        case 0x35: return "C:\\Users\\Public\\Music";
+        default: return NULL;
+    }
+}
+static void mk_win_dir(const char* win) {
+    char px[2048], t[2048];
+    if (shimx_path_to_posix(win, px, sizeof px) < 0) return;
+    snprintf(t, sizeof t, "%s", px);
+    for (char* p = t + 1; *p; p++) if (*p == '/') { *p = 0; mkdir(t, 0755); *p = '/'; }
+    mkdir(t, 0755);
+}
+HRESULT SHGetFolderPathW(HWND w, int csidl, HANDLE tok, DWORD flags, LPWSTR path) {
+    (void)w; (void)tok; (void)flags;
+    shx_ensure_init();
+    const char* p = csidl_path(csidl);
+    if (!p || !path) return E_INVALIDARG;
+    if (csidl & 0x8000) mk_win_dir(p);          /* CSIDL_FLAG_CREATE */
+    int n = shimx_utf8_to_utf16(p, -1, path, MAX_PATH - 1);
+    path[n < 0 ? 0 : n] = 0;
+    return S_OK;
+}
+
+typedef struct { GUID id; const char* path; } KnownFolder;
+#define G(a,b,c,d0,d1,d2,d3,d4,d5,d6,d7) {a,b,c,{d0,d1,d2,d3,d4,d5,d6,d7}}
+static const KnownFolder k_known[] = {
+    { G(0x3EB685DB,0x65F9,0x4CF6,0xA0,0x3A,0xE3,0xEF,0x65,0x72,0x9F,0x3D), "C:\\Users\\user\\AppData\\Roaming" },
+    { G(0xF1B32785,0x6FBA,0x4FCF,0x9D,0x55,0x7B,0x8E,0x7F,0x15,0x70,0x91), "C:\\Users\\user\\AppData\\Local" },
+    { G(0xFDD39AD0,0x238F,0x46AF,0xAD,0xB4,0x6C,0x85,0x48,0x03,0x69,0xC7), "C:\\Users\\user\\Documents" },
+    { G(0x62AB5D82,0xFDC1,0x4DC3,0xA9,0xDD,0x07,0x0D,0x1D,0x49,0x5D,0x97), "C:\\ProgramData" },
+    { G(0xB4BFCC3A,0xDB2C,0x424C,0xB0,0x29,0x7F,0xE9,0x9A,0x87,0xC6,0x41), "C:\\Users\\user\\Desktop" },
+    { G(0x4BD8D571,0x6D19,0x48D3,0xBE,0x97,0x42,0x22,0x20,0x08,0x0E,0x43), "C:\\Users\\user\\Music" },
+    { G(0x905E63B6,0xC1BF,0x494E,0xB2,0x9C,0x65,0xB7,0x32,0xD3,0xD2,0x1A), "C:\\Program Files" },
+    { G(0xF38BF404,0x1D43,0x42F2,0x93,0x05,0x67,0xDE,0x0B,0x28,0xFC,0x23), "C:\\Windows" },
+    { G(0x5E6C858F,0x0E22,0x4760,0x9A,0xFE,0xEA,0x33,0x17,0xB6,0x71,0x73), "C:\\Users\\user" },
+};
+HRESULT SHGetKnownFolderPath(const GUID* id, DWORD flags, HANDLE tok, LPWSTR* out) {
+    (void)tok;
+    shx_ensure_init();
+    if (!id || !out) return E_INVALIDARG;
+    *out = NULL;
+    for (size_t i = 0; i < sizeof k_known / sizeof k_known[0]; i++) {
+        if (!IsEqualGUID(id, &k_known[i].id)) continue;
+        if (flags & 0x8000u /* KF_FLAG_CREATE */) mk_win_dir(k_known[i].path);
+        WCHAR* w = shx_wcsdup_utf8(k_known[i].path);
+        size_t n = (size_t)shx_wstr_len(w) + 1;
+        WCHAR* c = (WCHAR*)CoTaskMemAlloc(n * 2);
+        memcpy(c, w, n * 2); free(w);
+        *out = c;
+        return S_OK;
+    }
+    return (HRESULT)0x80070002;     /* HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND) */
+}
+
+/* PIDL: [uint16 cb][UTF-16 path + NUL][uint16 0] の自前形式 (往復のみ有効) */
+static void* pidl_make(const WCHAR* path) {
+    size_t n = (size_t)shx_wstr_len(path) + 1;
+    uint8_t* p = (uint8_t*)CoTaskMemAlloc(2 + n * 2 + 2);
+    if (!p) return NULL;
+    *(uint16_t*)p = (uint16_t)(2 + n * 2);
+    memcpy(p + 2, path, n * 2);
+    *(uint16_t*)(p + 2 + n * 2) = 0;
+    return p;
+}
+HRESULT SHGetSpecialFolderLocation(HWND w, int csidl, LPVOID* pidl) {
+    WCHAR buf[MAX_PATH];
+    HRESULT hr = SHGetFolderPathW(w, csidl, 0, 0, buf);
+    if (FAILED(hr)) return hr;
+    *pidl = pidl_make(buf);
+    return *pidl ? S_OK : E_OUTOFMEMORY;
+}
+LPVOID ILCreateFromPathW(LPCWSTR path) { return path ? pidl_make(path) : NULL; }
+void ILFree(LPVOID pidl) { CoTaskMemFree(pidl); }
+BOOL SHGetPathFromIDListW(const void* pidl, LPWSTR path) {
+    if (!pidl || !path) return FALSE;
+    const uint8_t* p = (const uint8_t*)pidl;
+    uint16_t cb = *(const uint16_t*)p;
+    if (cb < 4 || *(const uint16_t*)(p + cb) != 0) return FALSE;
+    size_t n = (cb - 2) / 2;
+    if (n > MAX_PATH) return FALSE;
+    memcpy(path, p + 2, n * 2);
+    return TRUE;
+}
+HRESULT SHGetDesktopFolder(LPVOID* out) { if (out) *out = NULL; return E_NOTIMPL; }
+HRESULT SHCreateItemFromParsingName(LPCWSTR p, LPVOID bc, const GUID* iid, LPVOID* out) { (void)p; (void)bc; (void)iid; if (out) *out = NULL; return E_NOTIMPL; }
+HRESULT SHOpenFolderAndSelectItems(LPVOID pidl, UINT n, LPVOID* ch, DWORD fl) { (void)pidl; (void)n; (void)ch; (void)fl; return S_OK; }
+
+int SHCreateDirectoryExW(HWND w, LPCWSTR path, LPVOID sa) {
+    (void)w; (void)sa;
+    char px[2048];
+    if (shx_wpath_to_posix(path, px, sizeof px) < 0) return ERROR_BAD_PATHNAME;
+    struct stat st;
+    if (stat(px, &st) == 0) return S_ISDIR(st.st_mode) ? (int)ERROR_ALREADY_EXISTS : (int)ERROR_FILE_EXISTS;
+    char t[2048]; snprintf(t, sizeof t, "%s", px);
+    for (char* p = t + 1; *p; p++) if (*p == '/') { *p = 0; mkdir(t, 0755); *p = '/'; }
+    if (mkdir(t, 0755) != 0 && errno != EEXIST) return (int)ERROR_PATH_NOT_FOUND;
+    return 0;
+}
+
+/* ---- SHFileOperationW (Win64 SHFILEOPSTRUCTW: pFrom@16 pTo@24 flags@32 aborted@36, wFunc@8) ---- */
+static int rm_rf(const char* p) {
+    struct stat st;
+    if (lstat(p, &st) != 0) return -1;
+    if (S_ISDIR(st.st_mode)) {
+        DIR* d = opendir(p);
+        if (d) {
+            struct dirent* de;
+            while ((de = readdir(d))) {
+                if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, "..")) continue;
+                char c[2600]; snprintf(c, sizeof c, "%s/%s", p, de->d_name);
+                rm_rf(c);
+            }
+            closedir(d);
+        }
+        return rmdir(p);
+    }
+    return unlink(p);
+}
+static int cp_rf(const char* from, const char* to) {
+    struct stat st;
+    if (stat(from, &st) != 0) return -1;
+    if (S_ISDIR(st.st_mode)) {
+        mkdir(to, 0755);
+        DIR* d = opendir(from);
+        if (!d) return -1;
+        struct dirent* de;
+        while ((de = readdir(d))) {
+            if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, "..")) continue;
+            char a[2600], b[2600]; snprintf(a, sizeof a, "%s/%s", from, de->d_name); snprintf(b, sizeof b, "%s/%s", to, de->d_name);
+            cp_rf(a, b);
+        }
+        closedir(d);
+        return 0;
+    }
+    int fi = open(from, O_RDONLY), fo = open(to, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fi < 0 || fo < 0) { if (fi >= 0) close(fi); if (fo >= 0) close(fo); return -1; }
+    char buf[8192]; ssize_t r;
+    while ((r = read(fi, buf, sizeof buf)) > 0) if (write(fo, buf, (size_t)r) != r) break;
+    close(fi); close(fo);
+    return 0;
+}
+int SHFileOperationW(void* op) {
+    uint8_t* o = (uint8_t*)op;
+    DWORD func = *(uint32_t*)(o + 8);
+    const WCHAR* from = (const WCHAR*)(uintptr_t)*(uint64_t*)(o + 16);
+    const WCHAR* to = (const WCHAR*)(uintptr_t)*(uint64_t*)(o + 24);
+    *(uint32_t*)(o + 36) = 0;
+    if (!from) return 0x402;
+    char dest[2048] = "";
+    if (to && func != 3 && shx_wpath_to_posix(to, dest, sizeof dest) < 0) return 0x7C;
+    struct stat dst; int destIsDir = (dest[0] && stat(dest, &dst) == 0 && S_ISDIR(dst.st_mode));
+    int err = 0;
+    for (const WCHAR* f = from; *f; f += shx_wstr_len(f) + 1) {
+        char src[2048];
+        if (shx_wpath_to_posix(f, src, sizeof src) < 0) { err = 0x7C; break; }
+        struct stat s;
+        if (stat(src, &s) != 0) { err = 0x402; break; }
+        const char* base = strrchr(src, '/'); base = base ? base + 1 : src;
+        char target[2700];
+        if (func != 3) snprintf(target, sizeof target, "%s%s%s", dest, destIsDir ? "/" : "", destIsDir ? base : "");
+        if (func == 3) { if (rm_rf(src) != 0) { err = 0x7C; break; } }
+        else if (func == 2) { if (cp_rf(src, target) != 0) { err = 0x7C; break; } }
+        else if (func == 1 || func == 4) { if (rename(src, target) != 0) { err = 0x7C; break; } }
+        else { err = 0x7C; break; }
+    }
+    return err;
+}
+void SHAddToRecentDocs(UINT flags, LPCVOID pv) { (void)flags; (void)pv; }
+UINT_PTR_T SHAppBarMessage(DWORD msg, void* data) { (void)msg; (void)data; return 0; }
+static volatile uint32_t g_notify_id;
+ULONG SHChangeNotifyRegister(HWND w, int src, LONG events, UINT msg, int n, const void* entries) {
+    (void)w; (void)src; (void)events; (void)msg; (void)n; (void)entries;
+    return __atomic_add_fetch(&g_notify_id, 1u, __ATOMIC_SEQ_CST);
+}
+BOOL SHChangeNotifyDeregister(ULONG id) { (void)id; return TRUE; }
+BOOL Shell_NotifyIconW(DWORD msg, void* data) { (void)msg; (void)data; return FALSE; }
+
+void DragAcceptFiles(HWND w, BOOL a) { (void)w; (void)a; }
+void DragFinish(HANDLE d) { (void)d; }
+UINT DragQueryFileW(HANDLE d, UINT i, LPWSTR buf, UINT cch) { (void)d; (void)i; (void)buf; (void)cch; return 0; }
+BOOL DragQueryPoint(HANDLE d, void* pt) { (void)d; (void)pt; return FALSE; }
+
+/* ---- ShellExecute: ブラウザ起動などは下流フックへ ---- */
+static int (*g_shexec_hook)(const char*, const char*, const char*);
+void shimx_set_shell_execute_hook(int (*fn)(const char*, const char*, const char*)) { g_shexec_hook = fn; }
+static HINSTANCE do_shexec(const WCHAR* verb, const WCHAR* file, const WCHAR* params) {
+    char v[64] = "open", f[1024] = "", p[1024] = "";
+    if (verb) shimx_utf16_to_utf8(verb, -1, v, sizeof v);
+    if (file) shimx_utf16_to_utf8(file, -1, f, sizeof f);
+    if (params) shimx_utf16_to_utf8(params, -1, p, sizeof p);
+    SHX_TRACE("ShellExecute(%s, %s, %s)", v, f, p);
+    if (g_shexec_hook && g_shexec_hook(v, f, p)) return (HINSTANCE)33;
+    SetLastError(ERROR_FILE_NOT_FOUND);
+    return (HINSTANCE)2;          /* SE_ERR_FNF */
+}
+HINSTANCE ShellExecuteW(HWND w, LPCWSTR op, LPCWSTR file, LPCWSTR params, LPCWSTR dir, int show) {
+    (void)w; (void)dir; (void)show; return do_shexec(op, file, params);
+}
+HINSTANCE ShellExecuteA(HWND w, LPCSTR op, LPCSTR file, LPCSTR params, LPCSTR dir, int show) {
+    (void)w; (void)dir; (void)show;
+    WCHAR a[64] = {0}, b[1024] = {0}, c[1024] = {0};
+    if (op) MultiByteToWideChar(CP_ACP, 0, op, -1, a, 64);
+    if (file) MultiByteToWideChar(CP_ACP, 0, file, -1, b, 1024);
+    if (params) MultiByteToWideChar(CP_ACP, 0, params, -1, c, 1024);
+    return do_shexec(op ? a : NULL, file ? b : NULL, params ? c : NULL);
+}
+BOOL ShellExecuteExW(void* info) {
+    uint8_t* i = (uint8_t*)info;       /* Win64 SHELLEXECUTEINFOW: lpVerb@16 lpFile@24 lpParameters@32 hInstApp@56 hProcess@104 */
+    HINSTANCE r = do_shexec((const WCHAR*)(uintptr_t)*(uint64_t*)(i + 16), (const WCHAR*)(uintptr_t)*(uint64_t*)(i + 24),
+                            (const WCHAR*)(uintptr_t)*(uint64_t*)(i + 32));
+    *(uint64_t*)(i + 56) = (uint64_t)(uintptr_t)r;
+    *(uint64_t*)(i + 104) = 0;
+    return (uintptr_t)r > 32;
+}
+
+/* ---- shlwapi: PathUnExpandEnvStringsW ---- */
+BOOL PathUnExpandEnvStringsW(LPCWSTR path, LPWSTR out, UINT cch) {
+    static const char* const vars[] = { "SystemRoot", "ProgramFiles(x86)", "ProgramFiles", "CommonProgramFiles", "ProgramData",
+        "LOCALAPPDATA", "APPDATA", "USERPROFILE", "TEMP", "SystemDrive" };
+    const char* bestVar = NULL; size_t bestLen = 0;
+    char p8[2048];
+    if (!path || shimx_utf16_to_utf8(path, -1, p8, sizeof p8) < 0) return FALSE;
+    for (size_t i = 0; i < sizeof vars / sizeof vars[0]; i++) {
+        WCHAR wn[64], wv[1024];
+        int k = shimx_utf8_to_utf16(vars[i], -1, wn, 63); wn[k] = 0;
+        DWORD n = GetEnvironmentVariableW(wn, wv, 1024);
+        if (!n || n >= 1024) continue;
+        char v8[2048]; shimx_utf16_to_utf8(wv, -1, v8, sizeof v8);
+        size_t vl = strlen(v8);
+        if (vl > bestLen && !strncasecmp(p8, v8, vl) && (p8[vl] == '\\' || p8[vl] == 0)) { bestVar = vars[i]; bestLen = vl; }
+    }
+    char res[2200];
+    if (bestVar) snprintf(res, sizeof res, "%%%s%%%s", bestVar, p8 + bestLen); else snprintf(res, sizeof res, "%s", p8);
+    WCHAR* w = shx_wcsdup_utf8(res);
+    int len = shx_wstr_len(w);
+    if ((UINT)len + 1 <= cch && out) memcpy(out, w, ((size_t)len + 1) * 2);
+    free(w);
+    return bestVar != NULL;
+}
+
+/* ---------------------------------------------------------------
+ * version.dll: 合成バージョン情報 (FL ファイル版 + 固定文字列)。構造は不透明 (不変条件: GetFileVersionInfoW → VerQueryValueW のみで解釈)
+ * --------------------------------------------------------------- */
+typedef struct { uint32_t magic, total; uint32_t ffi[13]; uint32_t trans; } VerHdr;   /* 8+52+4 = 64B */
+static const char* const k_vstr[][2] = {
+    { "CompanyName", "Image-Line" }, { "FileDescription", "FL Studio" }, { "ProductName", "FL Studio" },
+    { "InternalName", "FL Studio" }, { "LegalCopyright", "Copyright Image-Line" }, { "OriginalFilename", "FL64.exe" },
+};
+static size_t ver_blob_size(void) {
+    size_t n = sizeof(VerHdr);
+    for (size_t i = 0; i < sizeof k_vstr / sizeof k_vstr[0]; i++) n += 4 + (strlen(k_vstr[i][0]) + 1 + strlen(k_vstr[i][1]) + 1) * 2;
+    n += 2 * (2 * 28 + 4);   /* FileVersion / ProductVersion */
+    return n + 4;
+}
+static int file_exists_w(LPCWSTR f) {
+    if (!f) return 0;
+    if (GetFileAttributesW(f) != INVALID_FILE_ATTRIBUTES) return 1;
+    return 0;
+}
+DWORD GetFileVersionInfoSizeW(LPCWSTR file, LPDWORD handle) {
+    if (handle) *handle = 0;
+    if (!file_exists_w(file)) { SetLastError(ERROR_FILE_NOT_FOUND); return 0; }
+    return (DWORD)ver_blob_size();
+}
+static uint8_t* ver_put(uint8_t* p, const char* k, const char* v) {
+    uint16_t kl = (uint16_t)(strlen(k) + 1), vl = (uint16_t)(strlen(v) + 1);
+    *(uint16_t*)p = kl; p += 2;
+    for (int i = 0; i < kl; i++) { *(uint16_t*)p = (uint16_t)(unsigned char)k[i]; p += 2; }
+    *(uint16_t*)p = vl; p += 2;
+    for (int i = 0; i < vl; i++) { *(uint16_t*)p = (uint16_t)(unsigned char)v[i]; p += 2; }
+    return p;
+}
+BOOL GetFileVersionInfoW(LPCWSTR file, DWORD handle, DWORD len, LPVOID data) {
+    (void)handle;
+    if (!file_exists_w(file)) { SetLastError(ERROR_FILE_NOT_FOUND); return FALSE; }
+    size_t need = ver_blob_size();
+    if (!data || len < need) { SetLastError(ERROR_INSUFFICIENT_BUFFER); return FALSE; }
+    memset(data, 0, need);
+    VerHdr* h = (VerHdr*)data;
+    h->magic = 0x56584853u; h->total = (uint32_t)need;
+    h->ffi[0] = 0xFEEF04BDu; h->ffi[1] = 0x10000;
+    h->ffi[2] = g_shx_fv_ms; h->ffi[3] = g_shx_fv_ls; h->ffi[4] = g_shx_fv_ms; h->ffi[5] = g_shx_fv_ls;
+    h->ffi[6] = 0x3F; h->ffi[7] = 0; h->ffi[8] = 0x40004; h->ffi[9] = 1; h->ffi[10] = 0;
+    h->trans = 0x04B00409u;
+    uint8_t* p = (uint8_t*)data + sizeof(VerHdr);
+    char fv[48]; snprintf(fv, sizeof fv, "%u.%u.%u.%u", g_shx_fv_ms >> 16, g_shx_fv_ms & 0xFFFF, g_shx_fv_ls >> 16, g_shx_fv_ls & 0xFFFF);
+    for (size_t i = 0; i < sizeof k_vstr / sizeof k_vstr[0]; i++) p = ver_put(p, k_vstr[i][0], k_vstr[i][1]);
+    p = ver_put(p, "FileVersion", fv);
+    p = ver_put(p, "ProductVersion", fv);
+    *(uint16_t*)p = 0;
+    return TRUE;
+}
+BOOL VerQueryValueW(LPCVOID block, LPCWSTR sub, LPVOID* buf, UINT* len) {
+    const VerHdr* h = (const VerHdr*)block;
+    if (!h || h->magic != 0x56584853u || !sub || !buf) { SetLastError(ERROR_INVALID_PARAMETER); return FALSE; }
+    char s[256]; int i = 0;
+    for (; sub[i] && i < 255; i++) s[i] = (char)sub[i];
+    s[i] = 0;
+    if (!strcmp(s, "\\") ) { *buf = (void*)h->ffi; if (len) *len = 52; return TRUE; }
+    if (!strcasecmp(s, "\\VarFileInfo\\Translation")) { *buf = (void*)&h->trans; if (len) *len = 4; return TRUE; }
+    const char* pre = "\\StringFileInfo\\";
+    if (!strncasecmp(s, pre, strlen(pre))) {
+        const char* r = s + strlen(pre);
+        const char* sl = strchr(r, '\\');
+        if (sl) {
+            const char* key = sl + 1;
+            const uint8_t* p = (const uint8_t*)block + sizeof(VerHdr);
+            while (*(const uint16_t*)p) {
+                uint16_t kl = *(const uint16_t*)p; const uint16_t* kw = (const uint16_t*)(p + 2);
+                const uint16_t* vlp = kw + kl; uint16_t vl = *vlp; const uint16_t* vw = vlp + 1;
+                int eq = (int)strlen(key) + 1 == kl;
+                for (int k = 0; eq && k < kl; k++) if (tolower((unsigned char)key[k]) != tolower((int)kw[k])) eq = 0;
+                if (eq) { *buf = (void*)vw; if (len) *len = vl; return TRUE; }
+                p = (const uint8_t*)(vw + vl);
+            }
+        }
+    }
+    SetLastError(ERROR_RESOURCE_TYPE_NOT_FOUND);
+    return FALSE;
+}
+
+/* ---------------------------------------------------------------
+ * comdlg32 / winspool / oleacc / wtsapi32 / propsys / msacm32 : 「無い・キャンセル」スタブ
+ * --------------------------------------------------------------- */
+BOOL GetOpenFileNameW(LPVOID ofn) { (void)ofn; SHX_TRACE("GetOpenFileNameW: ファイル選択 UI は未接続 → キャンセル扱い"); return FALSE; }
+BOOL GetSaveFileNameW(LPVOID ofn) { (void)ofn; SHX_TRACE("GetSaveFileNameW: ファイル選択 UI は未接続 → キャンセル扱い"); return FALSE; }
+DWORD CommDlgExtendedError(void) { return 0; }
+
+BOOL OpenPrinterW(LPWSTR name, LPHANDLE h, LPVOID def) { (void)name; (void)def; if (h) *h = 0; SetLastError(1801 /* ERROR_INVALID_PRINTER_NAME */); return FALSE; }
+BOOL ClosePrinter(HANDLE h) { (void)h; return TRUE; }
+BOOL EnumPrintersW(DWORD flags, LPWSTR name, DWORD level, LPBYTE buf, DWORD n, LPDWORD needed, LPDWORD returned) {
+    (void)flags; (void)name; (void)level; (void)buf; (void)n;
+    if (needed) *needed = 0;
+    if (returned) *returned = 0;
+    return TRUE;
+}
+BOOL GetDefaultPrinterW(LPWSTR buf, LPDWORD n) { (void)buf; (void)n; SetLastError(ERROR_FILE_NOT_FOUND); return FALSE; }
+LONG DocumentPropertiesW(HWND w, HANDLE h, LPWSTR dev, LPVOID out, LPVOID in, DWORD mode) { (void)w; (void)h; (void)dev; (void)out; (void)in; (void)mode; return 0; }
+
+LRESULT_T LresultFromObject(const GUID* iid, LRESULT_T wp, LPVOID unk) { (void)iid; (void)wp; (void)unk; return (LRESULT_T)(uint32_t)E_NOTIMPL; }
+BOOL WTSRegisterSessionNotification(HWND w, DWORD flags) { (void)w; (void)flags; return TRUE; }
+BOOL WTSUnRegisterSessionNotification(HWND w) { (void)w; return TRUE; }
+
+const WCHAR* PropVariantToStringWithDefault(const void* pv, const WCHAR* def) {
+    uint16_t vt = pv ? *(const uint16_t*)pv : 0;
+    if (vt == 31 /* VT_LPWSTR */ || vt == 8 /* VT_BSTR */) { const WCHAR* s = (const WCHAR*)(uintptr_t)*(const uint64_t*)((const uint8_t*)pv + 8); if (s) return s; }
+    return def;
+}
+BOOL PropVariantToBooleanWithDefault(const void* pv, BOOL def) {
+    if (pv && *(const uint16_t*)pv == 11) return *(const int16_t*)((const uint8_t*)pv + 8) != 0;
+    return def;
+}
+HRESULT PropVariantToFileTime(const void* pv, int type, FILETIME* ft) { (void)pv; (void)type; (void)ft; return E_NOTIMPL; }
+HRESULT PropVariantToVariant(const void* pv, void* v) { (void)pv; (void)v; return E_NOTIMPL; }
+HRESULT VariantToPropVariant(const void* v, void* pv) { (void)v; (void)pv; return E_NOTIMPL; }
+
+/* msacm32: ACM ドライバ無し */
+#define MMSYSERR_INVALHANDLE 5u
+#define MMSYSERR_NODRIVER 6u
+#define ACMERR_NOTPOSSIBLE 0x200u
+#define ACMERR_CANCELED 0x203u
+UINT acmMetrics(uint64_t h, UINT metric, LPVOID out) { (void)h; (void)metric; if (out) *(DWORD*)out = 0; return 0; }
+UINT acmDriverEnum(LPVOID cb, ULONG_PTR dw, DWORD flags) { (void)cb; (void)dw; (void)flags; return 0; }
+UINT acmDriverOpen(LPHANDLE h, HANDLE id, DWORD flags) { (void)id; (void)flags; if (h) *h = 0; return MMSYSERR_NODRIVER; }
+UINT acmDriverClose(HANDLE h, DWORD flags) { (void)h; (void)flags; return MMSYSERR_INVALHANDLE; }
+UINT acmDriverDetailsA(HANDLE h, LPVOID d, DWORD flags) { (void)h; (void)d; (void)flags; return MMSYSERR_INVALHANDLE; }
+UINT acmFormatChooseW(LPVOID p) { (void)p; return ACMERR_CANCELED; }
+UINT acmFormatSuggest(HANDLE h, LPVOID src, LPVOID dst, DWORD n, DWORD flags) { (void)h; (void)src; (void)dst; (void)n; (void)flags; return ACMERR_NOTPOSSIBLE; }
+UINT acmStreamOpen(LPHANDLE h, HANDLE drv, LPVOID src, LPVOID dst, LPVOID flt, ULONG_PTR cb, ULONG_PTR inst, DWORD flags) {
+    (void)drv; (void)src; (void)dst; (void)flt; (void)cb; (void)inst; (void)flags; if (h) *h = 0; return ACMERR_NOTPOSSIBLE;
+}
+UINT acmStreamClose(HANDLE h, DWORD flags) { (void)h; (void)flags; return MMSYSERR_INVALHANDLE; }
+UINT acmStreamConvert(HANDLE h, LPVOID hdr, DWORD flags) { (void)h; (void)hdr; (void)flags; return MMSYSERR_INVALHANDLE; }
+UINT acmStreamMessage(HANDLE h, UINT msg, ULONG_PTR a, ULONG_PTR b) { (void)h; (void)msg; (void)a; (void)b; return MMSYSERR_INVALHANDLE; }
+UINT acmStreamPrepareHeader(HANDLE h, LPVOID hdr, DWORD flags) { (void)h; (void)hdr; (void)flags; return MMSYSERR_INVALHANDLE; }
+UINT acmStreamUnprepareHeader(HANDLE h, LPVOID hdr, DWORD flags) { (void)h; (void)hdr; (void)flags; return MMSYSERR_INVALHANDLE; }
+UINT acmStreamSize(HANDLE h, DWORD n, LPDWORD out, DWORD flags) { (void)h; (void)n; (void)flags; if (out) *out = 0; return MMSYSERR_INVALHANDLE; }
+
+/* SHGetFileInfoW: アイコン/種別情報は取得不可 → 0 (失敗) */
+ULONG_PTR SHGetFileInfoW(LPCWSTR path, DWORD attrs, LPVOID info, UINT cb, UINT flags) {
+    (void)path; (void)attrs; (void)cb; (void)flags;
+    (void)info;
+    return 0;
+}
+
+BOOL SHGetSpecialFolderPathW(HWND w, LPWSTR path, int csidl, BOOL create) {
+    return SUCCEEDED(SHGetFolderPathW(w, create ? (csidl | 0x8000) : csidl, 0, 0, path));
+}
+BOOL ShellExecuteExA(void* info) {
+    uint8_t* i = (uint8_t*)info;       /* Win64 SHELLEXECUTEINFOA: lpVerb@16 lpFile@24 lpParameters@32 hInstApp@56 hProcess@104 */
+    HINSTANCE r = ShellExecuteA(0, (LPCSTR)(uintptr_t)*(uint64_t*)(i + 16), (LPCSTR)(uintptr_t)*(uint64_t*)(i + 24),
+                                (LPCSTR)(uintptr_t)*(uint64_t*)(i + 32), NULL, 1);
+    *(uint64_t*)(i + 56) = (uint64_t)(uintptr_t)r;
+    *(uint64_t*)(i + 104) = 0;
+    return (uintptr_t)r > 32;
+}
+HANDLE ExtractAssociatedIconW(HANDLE inst, LPWSTR path, WORD* idx) { (void)inst; (void)path; (void)idx; return 0; }
+HRESULT SHCreateStreamOnFileEx(LPCWSTR path, DWORD mode, DWORD attrs, BOOL create, LPVOID tmpl, LPVOID* out) {
+    (void)path; (void)mode; (void)attrs; (void)create; (void)tmpl; if (out) *out = NULL; return E_NOTIMPL;
+}

@@ -1,0 +1,42 @@
+/* shimx テストランナー。
+ *   node x.cjs            : 全グループ (MT ビルドならスレッド系も)
+ *   node x.cjs unimpl     : shim_unimplemented → 関数名を出して abort
+ *   node x.cjs raise      : 未処理 RaiseException → fail-fast
+ *   node x.cjs rtlunwind  : RtlUnwind → fail-fast
+ *   node x.cjs strict     : strict モードで未知 GetProcAddress → fail-fast
+ *   node x.cjs exit       : ExitProcess(7) → exit hook + 終了コード 7
+ *   node x.cjs deadlock   : ST ビルドで INFINITE 待ちが起こり得る場合 fail-fast
+ */
+#include "test_common.h"
+
+static void exit_hook(UINT code) { fprintf(stderr, "[shimx-test] exit hook code=%u\n", code); }
+
+int main(int argc, char** argv) {
+    const char* mode = argc > 1 ? argv[1] : "all";
+    if (!strcmp(mode, "unimpl")) { shim_unimplemented("DestroyWindow_NonImplemented_Example"); return 0; }
+    if (!strcmp(mode, "raise")) { uint64_t a[1] = { 0x1234 }; RaiseException(0xE06D7363u, EXCEPTION_NONCONTINUABLE, 1, a); return 0; }
+    if (!strcmp(mode, "rtlunwind")) { RtlUnwind(NULL, NULL, NULL, NULL); return 0; }
+    if (!strcmp(mode, "strict")) {
+        shimx_set_strict(1);
+        GetProcAddress(GetModuleHandleW(W("kernel32.dll")), "NoSuchKernelApi");
+        return 0;
+    }
+    if (!strcmp(mode, "exit")) { shimx_set_exit_hook(exit_hook); ExitProcess(7); return 0; }
+    if (!strcmp(mode, "deadlock")) {
+        HANDLE e = CreateEventW(NULL, TRUE, FALSE, NULL);
+        WaitForSingleObject(e, INFINITE);
+        return 0;
+    }
+#if defined(__EMSCRIPTEN_PTHREADS__)
+    const int mt = 1;
+    const char* build = "mt(pthreads)";
+#else
+    const int mt = 0;
+    const char* build = "st";
+#endif
+    run_core_tests(mt);          fprintf(stderr, "[shimx-test] core OK\n");
+    run_sys_tests();             fprintf(stderr, "[shimx-test] sys OK\n");
+    run_ole_shell_tests();       fprintf(stderr, "[shimx-test] ole/shell OK\n");
+    printf("[shimx-test] ALL PASS (build=%s)\n", build);
+    return 0;
+}
