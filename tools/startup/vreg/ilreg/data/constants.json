@@ -1,0 +1,246 @@
+{
+ "dll": {
+  "path": "/home/ubuntu/work/webstudio/tools/startup/work/FLEngine_x64.dll",
+  "image_base": 4194304,
+  "size": 22227016
+ },
+ "flag_byte": {
+  "va": "0x14f84a8",
+  "ptr_slot": "0x15e0698",
+  "static_init": 0,
+  "init_value_src": "0x10d08d8 (=0x00)"
+ },
+ "separators": {
+  "colon": {
+   "va": "0x10d0b2c",
+   "len": 1,
+   "chars": [
+    58
+   ],
+   "text": ":"
+  },
+  "pipe": {
+   "va": "0x10d0b3c",
+   "len": 1,
+   "chars": [
+    124
+   ],
+   "text": "|"
+  },
+  "sep1_encoded": {
+   "va": "0x10d0b4c",
+   "len": 7,
+   "chars": [
+    140,
+    92,
+    92,
+    77,
+    95,
+    86,
+    86
+   ],
+   "text": "\\\\M_VV",
+   "delta": -16,
+   "decoded": "|LL=OFF"
+  },
+  "sep2_encoded": {
+   "va": "0x10d0b68",
+   "len": 4,
+   "chars": [
+    157,
+    109,
+    109,
+    94
+   ],
+   "text": "mm^",
+   "delta": 65503,
+   "decoded": "|LL="
+  },
+  "marker_encoded": {
+   "va": "0x10d0b80",
+   "len": 5,
+   "chars": [
+    104,
+    102,
+    103,
+    96,
+    85
+   ],
+   "text": "hfg`U",
+   "delta": 65516,
+   "decoded": "TRSLA"
+  },
+  "marker_result": {
+   "va": "0x10d0b98",
+   "len": 1,
+   "chars": [
+    49
+   ],
+   "text": "1"
+  },
+  "rec_a": {
+   "va": "0x10d0ba8",
+   "len": 3,
+   "chars": [
+    170,
+    129,
+    122
+   ],
+   "text": "ªz"
+  },
+  "fmt_s_s": {
+   "va": "0x10d0bbc",
+   "len": 6,
+   "chars": [
+    37,
+    115,
+    58,
+    37,
+    115,
+    58
+   ],
+   "text": "%s:%s:"
+  },
+  "generic_colon": {
+   "va": "0x8e6db8",
+   "text": ":"
+  },
+  "generic_pipe": {
+   "va": "0x8e6dc8",
+   "text": "|"
+  }
+ },
+ "id_prefix": {
+  "encoded": {
+   "va": "0x10d0bd8",
+   "text": "l"
+  },
+  "delta": -50,
+  "decoded": "id:"
+ },
+ "feature_table": {
+  "va": "0x15b7f00",
+  "dwords": [
+   31000,
+   31010,
+   31020,
+   2147483647,
+   31005,
+   2147483647,
+   0,
+   84150545
+  ],
+  "tiers": [
+   {
+    "grade_char": "A",
+    "first": 31000,
+    "second": 2147483647
+   },
+   {
+    "grade_char": "B",
+    "first": 31010,
+    "second": 31005
+   },
+   {
+    "grade_char": "C",
+    "first": 31020,
+    "second": 2147483647
+   }
+  ]
+ },
+ "grade_mask": {
+  "va": "0x10d0be0",
+  "value": 6,
+  "bits": [
+   1,
+   2
+  ]
+ },
+ "strings": {
+  "please_remember": {
+   "va": "0x10d0c18",
+   "text": "Please remember to register"
+  },
+  "product": {
+   "va": "0x10d0a70",
+   "text": "FL Studio 26.1"
+  },
+  "machine_guid_key": {
+   "text": "SOFTWARE\\Microsoft\\Cryptography",
+   "value": "MachineGuid"
+  },
+  "hsd": {
+   "key": "Software\\Image-Line\\Shared\\General",
+   "value": "HSD",
+   "va_value_name": "0x10c7cc4"
+  }
+ },
+ "sha256": {
+  "init_func": "0xbf89b0",
+  "compress_func": "0xbf86f0",
+  "h_init": [
+   "0x6a09e667",
+   "0xbb67ae85",
+   "0x3c6ef372",
+   "0xa54ff53a",
+   "0x510e527f",
+   "0x9b05688c",
+   "0x1f83d9ab",
+   "0x5be0cd19"
+  ],
+  "k_table": {
+   "va": 20647980,
+   "first": [
+    "0x428a2f98",
+    "0x71374491",
+    "0xb5c0fbcf",
+    "0xe9b5dba5"
+   ],
+   "last": "0xc67178f2",
+   "ok": true
+  }
+ },
+ "vm_program": {
+  "va": "0x14111e0",
+  "size": 687
+ },
+ "globals": {
+  "user_name": "0x15e43f8",
+  "webpass": "0x15e4bd0",
+  "fls_info": "0x15e3b00",
+  "license_plate": "0x15e19f8",
+  "machine_string": "0x15e1358",
+  "decoded": "0x15e49a8",
+  "reg_name_display": "0x15dfdf8",
+  "button_id": "0x15e0488",
+  "grade_char_obj": "0x15e4790(+0xd0)",
+  "days_remaining": "0x15e14a8",
+  "fire_mode": "0x15e3d80",
+  "dup_flag": "0x15e1b10",
+  "fire_dates": [
+   "0x15e1948",
+   "0x15e4cb8"
+  ],
+  "today_cache": "0x15e1608",
+  "grade_cache": "0x15e0ab0"
+ },
+ "key_funcs": {
+  "parser": "0x10c7cd0",
+  "parser_size": 32177,
+  "machine_hash_helper": "0x10d3a30",
+  "days_remaining": "0x10c7850",
+  "reg_info_display": "0x10c7530",
+  "observe_registration": "0x8e6150",
+  "box_string": "0x8cfd20",
+  "delta_box": "0x8cfdc0",
+  "char_encode_rec": "0x8cf800",
+  "hex_unpack_and_cipher": "0x8d0580",
+  "cipher_vm_run": "0x8d0380",
+  "date_from_8chars": "0x8e6660",
+  "date_encode": "0x442770",
+  "decode_cached": "0x8e7080",
+  "split_first_group": "0x8e6770",
+  "charsum5": "0x8e5f80",
+  "normalize_rec": "0x8e6e30"
+ }
+}
