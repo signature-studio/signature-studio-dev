@@ -78,7 +78,7 @@
 ## 7. 制限
 
 - `--wrap` はリンクオプション: 下流 (lift closure 等) は `wrap_list.txt` 16 本を `-Wl,--wrap=` で渡す必要 (`scripts/build.sh` の wrap モード参照)。未指定なら shimx 既定挙動 (G03 失敗 / WebView2Loader も解決許可) になる。
-- 新規 8 本のうち user32/uxtheme 系 7 本は **weak**: tools/gui (CAB-8) の強定義があればそちらが優先 (実測: gui 強定義 4/8、重複 0、GetProcAddress 不整合 0)。
+- 新規 8 本のうち user32/uxtheme 系 7 本は **weak**: tools/gui (CAB-8) の強定義があればそちらが優先 (検収再実測 2026-10-10: gui 強定義 6/8、winstubs 由来の重複 0、GetProcAddress 不整合 0。強定義数は gui 側の実装進行で増減する — 本層は weak のため影響なし)。
 - `GetSystemMetrics`/`SystemParametersInfoW` は 1920x1080 / Win10 100%DPI の固定近似。実 DPI への追従は gui 担当側の強定義で置換。
 - `ShellExecuteExW/A` の wrap は Win64 構造体レイアウト決め打ち (`cbSize=112`, verb/file/params を +16/+24/+32 から読む)。
 - `cpuid` は lift 側 `__asm_cpuid` が `winstubs_cpuid` を呼ぶ前提の返値表提供。IR 突合は `boot_final2.ll` の declare 42 本のみ (実結線は lift 側タスク)。
