@@ -1,0 +1,111 @@
+{
+ "pkg": "/home/ubuntu/work/webstudio/tools/assets/work/pkg-full",
+ "shaping": {
+  "latencyMs": 0,
+  "mbps": 0
+ },
+ "cacheAfterContent": {
+  "slots": 232,
+  "used": 232,
+  "evictions": 0,
+  "kind": "slot"
+ },
+ "warmRestart": {
+  "files": 399,
+  "chunkRequests": 0,
+  "cacheSlotsScanned": 232
+ },
+ "eviction": {
+  "maxMiB": 8,
+  "evictions": 20,
+  "used": 8,
+  "slots": 8
+ },
+ "smallFirstRead": {
+  "n": 120,
+  "coldMs": {
+   "p50": 0.019025999999939813,
+   "p95": 10.526651000000129,
+   "min": 0.0034270000001015433,
+   "max": 40.34624299999996
+  },
+  "warmMs": {
+   "p50": 0.005441000000246277,
+   "p95": 0.01522800000020652
+  },
+  "missLatencyMs": {
+   "p50": 7.986168000000362,
+   "p95": 12.951031999999941,
+   "n": 29
+  }
+ },
+ "sequential": [
+  {
+   "file": "Data/Patches/Packs/FLEX/Packs/General Midi Library.flexpack",
+   "MB": 42.3,
+   "coldMBps": 301.8,
+   "coldFirstReadMs": 7.6,
+   "warmMBps": 19961.2
+  },
+  {
+   "file": "Data/Patches/Packs/FLEX/Packs/Melodic Techno.flexpack",
+   "MB": 23.8,
+   "coldMBps": 228.2,
+   "coldFirstReadMs": 7.4,
+   "warmMBps": 20890.6
+  },
+  {
+   "file": "Data/Patches/Plugin presets/Generators/Patcher/X WiseLabs/QDR.fst",
+   "MB": 21.9,
+   "coldMBps": 165.4,
+   "coldFirstReadMs": 8,
+   "warmMBps": 13066.3
+  }
+ ],
+ "vfsStats": {
+  "reads": 914,
+  "bytesRead": 177918166,
+  "chunkMemHits": 263,
+  "chunkCacheHits": 579,
+  "chunkMisses": 72,
+  "chunkPrefetched": 42,
+  "netBytesDecoded": 74953727,
+  "netWaitMs": 575.4137180000048,
+  "evictions": 0
+ },
+ "fetcher": {
+  "t": "stat",
+  "requests": 114,
+  "bytesFetched": 117813073,
+  "maxInflight": 8
+ },
+ "preloadBoot": {
+  "T0": {
+   "chunks": 5,
+   "fetched": 5,
+   "bytes": 2211880,
+   "ms": 26
+  },
+  "T0p": {
+   "chunks": 17,
+   "fetched": 17,
+   "bytes": 5580691,
+   "ms": 60
+  }
+ },
+ "preloadNet": {
+  "requests": 22,
+  "bytes": 2964649,
+  "byKind": {
+   "chunk": 22
+  }
+ },
+ "failed": 0,
+ "timings": {
+  "contentCheck": {
+   "files": 399,
+   "bytes": 14902709,
+   "ms": 1967
+  }
+ }
+}

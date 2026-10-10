@@ -1,0 +1,14 @@
+FILE size=42260901 ftell=42260901 fnv=3c284b9b b5=00036300
+DIR entries=18
+STAT rc=0 size=42260901 isreg=1
+MISSING ENOENT
+WRITE denied
+  ok   main rc=0
+  ok   fread/fseek/ftell via Emscripten FS match (Data/Patches/Packs/FLEX/Packs/General Midi Library.flexpack, 42.3 MB, fnv=3c284b9b)
+  ok   fseek+fread random position
+  ok   opendir/readdir
+  ok   stat
+  ok   ENOENT
+  ok   write denied (read-only)
+ALL PASS
+em EXIT 0

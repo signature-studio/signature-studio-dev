@@ -1,0 +1,219 @@
+{
+ "pkg": "/home/ubuntu/work/webstudio/tools/assets/work/pkg-full",
+ "shaping": {
+  "latencyMs": 40,
+  "mbps": 200
+ },
+ "runs": {
+  "cold": {
+   "phase": "cold",
+   "loader": "sab",
+   "workerIsolated": true,
+   "pageIsolated": true,
+   "sab": true,
+   "ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36",
+   "opfsOpened": true,
+   "openMs": 4.1,
+   "secondHandleBlocked": true,
+   "cacheKind": "slot",
+   "cacheScannedSlots": 0,
+   "statOk": "151/151",
+   "content": {
+    "files": 151,
+    "mismatches": 0,
+    "MB": 8.8,
+    "ms": 6744,
+    "readMs": {
+     "p50": 51.635,
+     "p95": 87.23,
+     "max": 104.29
+    }
+   },
+   "missLatencyMs": {
+    "n": 98,
+    "p50": 69.59,
+    "p95": 87.32
+   },
+   "sequential": [
+    {
+     "file": "Data/Patches/Packs/FLEX/Packs/General Midi Library.flexpack",
+     "MB": 42.3,
+     "firstReadMs": 50.8,
+     "coldMBps": 31.4,
+     "warmMBps": 3815.9
+    },
+    {
+     "file": "Data/Patches/Packs/FLEX/Packs/Melodic Techno.flexpack",
+     "MB": 23.8,
+     "firstReadMs": 51,
+     "coldMBps": 70.7,
+     "warmMBps": 7152.4
+    }
+   ],
+   "preloadBoot": {
+    "T0": {
+     "chunks": 5,
+     "fetched": 5,
+     "bytes": 2211880,
+     "ms": 80
+    },
+    "T0p": {
+     "chunks": 17,
+     "fetched": 15,
+     "bytes": 4429597,
+     "ms": 167
+    }
+   },
+   "enoent": "ENOENT",
+   "vfsStats": {
+    "reads": 657,
+    "bytesRead": 140948158,
+    "chunkMemHits": 203,
+    "chunkCacheHits": 306,
+    "chunkMisses": 150,
+    "chunkPrefetched": 14,
+    "netBytesDecoded": 147722291,
+    "netWaitMs": 8205.929999981076,
+    "evictions": 0,
+    "cacheUsed": 184
+   },
+   "fetcher": {
+    "t": "stat",
+    "requests": 164,
+    "bytesFetched": 161371781,
+    "maxInflight": 8
+   },
+   "serverChunkRequests": 184,
+   "serverBytes": 86044894
+  },
+  "warm": {
+   "phase": "warm",
+   "loader": "sab",
+   "workerIsolated": true,
+   "pageIsolated": true,
+   "sab": true,
+   "ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36",
+   "opfsOpened": true,
+   "openMs": 6.2,
+   "cacheKind": "slot",
+   "cacheScannedSlots": 183,
+   "statOk": "151/151",
+   "content": {
+    "files": 151,
+    "mismatches": 0,
+    "MB": 8.8,
+    "ms": 18,
+    "readMs": {
+     "p50": 0.015,
+     "p95": 0.17,
+     "max": 1.74
+    }
+   },
+   "missLatencyMs": {
+    "n": 0,
+    "p50": null,
+    "p95": null
+   },
+   "sequential": [
+    {
+     "file": "Data/Patches/Packs/FLEX/Packs/General Midi Library.flexpack",
+     "MB": 42.3,
+     "firstReadMs": 0.3,
+     "coldMBps": 5642.3,
+     "warmMBps": 5718.7
+    },
+    {
+     "file": "Data/Patches/Packs/FLEX/Packs/Melodic Techno.flexpack",
+     "MB": 23.8,
+     "firstReadMs": 0.1,
+     "coldMBps": 7939.1,
+     "warmMBps": 9882.7
+    }
+   ],
+   "enoent": "ENOENT",
+   "vfsStats": {
+    "reads": 657,
+    "bytesRead": 140948158,
+    "chunkMemHits": 0,
+    "chunkCacheHits": 659,
+    "chunkMisses": 0,
+    "chunkPrefetched": 0,
+    "netBytesDecoded": 0,
+    "netWaitMs": 0,
+    "evictions": 0,
+    "cacheUsed": 183
+   },
+   "fetcher": {
+    "t": "stat",
+    "requests": 0,
+    "bytesFetched": 0,
+    "maxInflight": 0
+   },
+   "serverChunkRequests": 0,
+   "serverBytes": 65335
+  },
+  "xhr-cold": {
+   "phase": "xhr-cold",
+   "loader": "xhr",
+   "workerIsolated": true,
+   "pageIsolated": true,
+   "sab": true,
+   "ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36",
+   "opfsOpened": true,
+   "openMs": 4.1,
+   "secondHandleBlocked": true,
+   "cacheKind": "slot",
+   "cacheScannedSlots": 0,
+   "statOk": "151/151",
+   "content": {
+    "files": 151,
+    "mismatches": 0,
+    "MB": 8.8,
+    "ms": 7319,
+    "readMs": {
+     "p50": 57.735,
+     "p95": 94.62,
+     "max": 167.66
+    }
+   },
+   "missLatencyMs": {
+    "n": 100,
+    "p50": 72.67,
+    "p95": 93.44
+   },
+   "sequential": [
+    {
+     "file": "Data/Patches/Packs/FLEX/Packs/General Midi Library.flexpack",
+     "MB": 42.3,
+     "firstReadMs": 58.9,
+     "coldMBps": 12.2,
+     "warmMBps": 3979.4
+    },
+    {
+     "file": "Data/Patches/Packs/FLEX/Packs/Melodic Techno.flexpack",
+     "MB": 23.8,
+     "firstReadMs": 51.9,
+     "coldMBps": 16.2,
+     "warmMBps": 1744.9
+    }
+   ],
+   "enoent": "ENOENT",
+   "vfsStats": {
+    "reads": 657,
+    "bytesRead": 140948158,
+    "chunkMemHits": 242,
+    "chunkCacheHits": 253,
+    "chunkMisses": 164,
+    "chunkPrefetched": 0,
+    "netBytesDecoded": 161371781,
+    "netWaitMs": 11840.045000009239,
+    "evictions": 0,
+    "cacheUsed": 164
+   },
+   "fetcher": {},
+   "serverChunkRequests": 164,
+   "serverBytes": 83464507
+  }
+ },
+ "failed": 0
+}

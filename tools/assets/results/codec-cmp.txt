@@ -1,0 +1,6 @@
+br q11 usize 279386237 stored 83014092 ratio 0.2971 compressSec 22.368 manifest 104635
+br q9 usize 279386237 stored 87501065 ratio 0.3132 compressSec 4.478 manifest 104572
+br q5 usize 279386237 stored 88838511 ratio 0.3180 compressSec 1.664 manifest 104612
+zstd q11 usize 279386237 stored 86852293 ratio 0.3109 compressSec 11.638 manifest 104560
+zstd q3 usize 279386237 stored 91556531 ratio 0.3277 compressSec 1.651 manifest 104575
+CMP_DONE

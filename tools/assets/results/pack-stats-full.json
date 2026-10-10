@@ -1,0 +1,58 @@
+{
+ "name": "fl-studio-26.1.7.5653-win64",
+ "chunkSize": 1048576,
+ "smallMax": 131072,
+ "codec": "br",
+ "quality": 11,
+ "inventoryEntries": 27329,
+ "stubEntries": 239,
+ "dataEntries": 27090,
+ "uniqueContents": 24827,
+ "contentBytesUnique": 1047406849,
+ "chunksPlanned": 2009,
+ "packChunks": 321,
+ "objects": 2009,
+ "usizeSumPlanned": 1047406849,
+ "storedBytes": 609973958,
+ "ratio": 0.5823658290781332,
+ "dedupeSavedUsize": 0,
+ "codecObjects": {
+  "raw": 726,
+  "br": 1283,
+  "zst": 0
+ },
+ "codecStoredBytes": {
+  "raw": 329893463,
+  "br": 280080495,
+  "zst": 0
+ },
+ "groups": {
+  "T0": {
+   "chunks": 5,
+   "usize": 2211880,
+   "csize": 879093
+  },
+  "T0p": {
+   "chunks": 17,
+   "usize": 5580691,
+   "csize": 2085556
+  },
+  "T1": {
+   "chunks": 66,
+   "usize": 53369131,
+   "csize": 21589235
+  },
+  "T2": {
+   "chunks": 1921,
+   "usize": 986245147,
+   "csize": 585420074
+  }
+ },
+ "manifest": {
+  "key": "m/caae585af4997a7a.json",
+  "jsonBytes": 1181781,
+  "brBytes": 266038
+ },
+ "compressSec": 102.193,
+ "totalSec": 103.867
+}

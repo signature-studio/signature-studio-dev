@@ -1,0 +1,607 @@
+{
+ "tiers": {
+  "T0": {
+   "files": 142,
+   "bytes": 2212908
+  },
+  "T0p": {
+   "files": 258,
+   "bytes": 5595646
+  },
+  "T1": {
+   "files": 1700,
+   "bytes": 76414481
+  },
+  "T2": {
+   "files": 24990,
+   "bytes": 1001026635
+  },
+  "X-lift": {
+   "files": 196,
+   "bytes": 771827960
+  },
+  "X-rebuild": {
+   "files": 43,
+   "bytes": 99622456
+  },
+  "X-skip": {
+   "files": 72,
+   "bytes": 189736312
+  }
+ },
+ "rules": [
+  {
+   "tier": "T0",
+   "glob": "Artwork/Skins/Default/*",
+   "why": "既定スキン (起動画面/UI 素材, 起動音)",
+   "files": 7,
+   "bytes": 518483,
+   "evidence": {
+    "Artwork\\Skins\\": true,
+    "Title.png": true,
+    "BigFruit.png": true,
+    "ClipHanger.png": true,
+    "PickerChan.png": true,
+    "ScopeGradient.bmp": true,
+    "StartSnd.wv": true
+   },
+   "evidence_found": 7,
+   "evidence_total": 7
+  },
+  {
+   "tier": "T0",
+   "glob": "Artwork/Themes/thmDefault.png",
+   "why": "既定テーマ画像",
+   "files": 1,
+   "bytes": 37118,
+   "evidence": {
+    "thmDefault.png": true
+   },
+   "evidence_found": 1,
+   "evidence_total": 1
+  },
+  {
+   "tier": "T0",
+   "glob": "Artwork/Themes/tweak_default.png",
+   "why": "既定テーマ調整画像",
+   "files": 1,
+   "bytes": 6708,
+   "evidence": {
+    "tweak_default.png": true
+   },
+   "evidence_found": 1,
+   "evidence_total": 1
+  },
+  {
+   "tier": "T0",
+   "glob": "Artwork/Fonts/Fruity microfont.ttf",
+   "why": "マイクロフォント",
+   "files": 1,
+   "bytes": 20072,
+   "evidence": {
+    "Artwork\\Fonts": true,
+    ".ttf": true
+   },
+   "evidence_found": 2,
+   "evidence_total": 2
+  },
+  {
+   "tier": "T0",
+   "glob": "Shared/Artwork/Fonts/PT_Sans-Web-Regular.ttf",
+   "why": "UI 既定フォント (リテラル名参照)",
+   "files": 1,
+   "bytes": 442960,
+   "evidence": {
+    "PT_Sans-Web-Regular.ttf": true
+   },
+   "evidence_found": 1,
+   "evidence_total": 1
+  },
+  {
+   "tier": "T0p",
+   "glob": "Shared/Artwork/Fonts/*",
+   "why": "フォントディレクトリ列挙 (QuickFontCache が登録): 他フォント",
+   "files": 50,
+   "bytes": 4802080,
+   "evidence": {
+    "Artwork\\Fonts": true
+   },
+   "evidence_found": 1,
+   "evidence_total": 1
+  },
+  {
+   "tier": "T0",
+   "glob": "System/Config/*.txt",
+   "why": "設定/命名プリセット",
+   "files": 6,
+   "bytes": 4033,
+   "evidence": {
+    "System\\Config\\": true,
+    "MP3Genres.txt": true,
+    "NamePresets_Channel.txt": true,
+    "NamePresets_Pattern.txt": true
+   },
+   "evidence_found": 4,
+   "evidence_total": 4
+  },
+  {
+   "tier": "T0",
+   "glob": "System/Config/Chords.map",
+   "why": "設定 (コード map)",
+   "files": 1,
+   "bytes": 2716,
+   "evidence": {
+    "System\\Config\\": true
+   },
+   "evidence_found": 1,
+   "evidence_total": 1
+  },
+  {
+   "tier": "T0",
+   "glob": "System/Config/Master/*",
+   "why": "マスタ設定",
+   "files": 1,
+   "bytes": 481273,
+   "evidence": {
+    "System\\Config\\Master": true
+   },
+   "evidence_found": 1,
+   "evidence_total": 1
+  },
+  {
+   "tier": "T0",
+   "glob": "System/Config/Mapping/*",
+   "why": "コントローラ mapping",
+   "files": 14,
+   "bytes": 174644,
+   "evidence": {
+    "System\\Config\\Mapping\\": true
+   },
+   "evidence_found": 1,
+   "evidence_total": 1
+  },
+  {
+   "tier": "T0",
+   "glob": "System/Config/Typing to piano/*",
+   "why": "キー→ピアノ",
+   "files": 32,
+   "bytes": 8846,
+   "evidence": {
+    "System\\Config\\Typing to piano": true
+   },
+   "evidence_found": 1,
+   "evidence_total": 1
+  },
+  {
+   "tier": "T0",
+   "glob": "System/Config/Toolbar presets/*",
+   "why": "ツールバープリセット",
+   "files": 11,
+   "bytes": 7701,
+   "evidence": {
+    "System\\Config\\Toolbar presets\\": true
+   },
+   "evidence_found": 1,
+   "evidence_total": 1
+  },
+  {
+   "tier": "T0",
+   "glob": "System/Config/Touch keyboard/*",
+   "why": "タッチ鍵盤",
+   "files": 6,
+   "bytes": 50337,
+   "evidence": {
+    "System\\Config\\Touch keyboard\\": true
+   },
+   "evidence_found": 1,
+   "evidence_total": 1
+  },
+  {
+   "tier": "T0",
+   "glob": "System/Config/Note color presets/*",
+   "why": "ノート色",
+   "files": 2,
+   "bytes": 556,
+   "evidence": {
+    "System\\Config\\Note color presets\\": true
+   },
+   "evidence_found": 1,
+   "evidence_total": 1
+  },
+  {
+   "tier": "T0",
+   "glob": "System/Config/Note name presets/*",
+   "why": "ノート名",
+   "files": 0,
+   "bytes": 0,
+   "evidence": {
+    "System\\Config\\Note name presets\\": true
+   },
+   "evidence_found": 1,
+   "evidence_total": 1
+  },
+  {
+   "tier": "T0",
+   "glob": "System/Config/Browser/*",
+   "why": "ブラウザタブ構成 (.tabconfig)",
+   "files": 11,
+   "bytes": 762,
+   "evidence": {
+    "System\\Config\\Browser": true
+   },
+   "evidence_found": 1,
+   "evidence_total": 1
+  },
+  {
+   "tier": "T0p",
+   "glob": "System/Config/Audio scripts/*",
+   "why": "スクリプト列挙",
+   "files": 13,
+   "bytes": 23303,
+   "evidence": {
+    "System\\Config\\Audio scripts": true
+   },
+   "evidence_found": 1,
+   "evidence_total": 1
+  },
+  {
+   "tier": "T0p",
+   "glob": "System/Config/Piano roll scripts/*",
+   "why": "スクリプト列挙",
+   "files": 6,
+   "bytes": 26735,
+   "evidence": {
+    "System\\Config\\Piano roll scripts": true
+   },
+   "evidence_found": 1,
+   "evidence_total": 1
+  },
+  {
+   "tier": "T0p",
+   "glob": "System/Config/FL Studio Remote Scripts/*",
+   "why": "リモートスクリプト列挙",
+   "files": 5,
+   "bytes": 1890,
+   "evidence": {
+    "System\\Config\\FL Studio Remote Scripts": true
+   },
+   "evidence_found": 1,
+   "evidence_total": 1
+  },
+  {
+   "tier": "T1",
+   "glob": "System/Config/Thumbnails/*",
+   "why": "ブラウザ/エディション サムネイル",
+   "files": 163,
+   "bytes": 6916966,
+   "evidence": {
+    "System\\Config\\Thumbnails\\": true,
+    "edition-signature.png": true
+   },
+   "evidence_found": 2,
+   "evidence_total": 2
+  },
+  {
+   "tier": "T0",
+   "glob": "System/Plugin Formats/*",
+   "why": "プラグイン形式定義",
+   "files": 0,
+   "bytes": 0,
+   "evidence": {
+    "System\\Plugin Formats\\": true,
+    "formats.txt": true
+   },
+   "evidence_found": 2,
+   "evidence_total": 2
+  },
+  {
+   "tier": "T0p",
+   "glob": "System/Texts/*.txt",
+   "why": "エディション/案内文",
+   "files": 8,
+   "bytes": 1881,
+   "evidence": {
+    "System\\Texts\\": true,
+    "BoxEdition.txt": true,
+    "NotReggedTxt.txt": true,
+    "DemoTxt.txt": true
+   },
+   "evidence_found": 4,
+   "evidence_total": 4
+  },
+  {
+   "tier": "T1",
+   "glob": "System/Texts/*",
+   "why": "About/ライセンス文",
+   "files": 16,
+   "bytes": 108360,
+   "evidence": {
+    "System\\Texts\\": true
+   },
+   "evidence_found": 1,
+   "evidence_total": 1
+  },
+  {
+   "tier": "T0p",
+   "glob": "System/Internet/*",
+   "why": "ニュース/オフライン案内 (外部通信は対象外, 既定ページのみ)",
+   "files": 8,
+   "bytes": 479347,
+   "evidence": {
+    "System\\Internet\\": true,
+    "error-offline.html": true
+   },
+   "evidence_found": 2,
+   "evidence_total": 2
+  },
+  {
+   "tier": "T1",
+   "glob": "System/Languages/*",
+   "why": "言語ファイル (英語は内蔵; 選択言語のみ 1 ファイル)",
+   "files": 15,
+   "bytes": 6286149,
+   "evidence": {
+    "System\\Languages\\": true,
+    "Languages\\": true
+   },
+   "evidence_found": 2,
+   "evidence_total": 2
+  },
+  {
+   "tier": "T1",
+   "glob": "System/Hardware specific/*",
+   "why": "MIDI コントローラ定義 (デバイス接続時)",
+   "files": 118,
+   "bytes": 840613,
+   "evidence": {
+    "System\\Hardware specific\\": true
+   },
+   "evidence_found": 1,
+   "evidence_total": 1
+  },
+  {
+   "tier": "T0",
+   "glob": "Data/System/*.fst",
+   "why": "チャンネル既定 state (.fst)",
+   "files": 40,
+   "bytes": 257363,
+   "evidence": {
+    "Data\\System\\": true,
+    "AudioTrack.fst": true,
+    "SamplerTrack.fst": true,
+    "MIDITrack.fst": true,
+    "AutoTrack.fst": true,
+    "DirectWaveTrack.fst": true
+   },
+   "evidence_found": 6,
+   "evidence_total": 6
+  },
+  {
+   "tier": "T0",
+   "glob": "Data/System/Empty.flp",
+   "why": "空プロジェクト",
+   "files": 1,
+   "bytes": 46361,
+   "evidence": {
+    "Data\\System\\Empty.flp": true,
+    "Empty.flp": true
+   },
+   "evidence_found": 2,
+   "evidence_total": 2
+  },
+  {
+   "tier": "T0",
+   "glob": "Data/System/Metronome*.wav",
+   "why": "メトロノーム音",
+   "files": 5,
+   "bytes": 52706,
+   "evidence": {
+    "Metronome.wav": true,
+    "Metronome2.wav": true
+   },
+   "evidence_found": 2,
+   "evidence_total": 2
+  },
+  {
+   "tier": "T0",
+   "glob": "Data/System/*.ico",
+   "why": "アイコン",
+   "files": 1,
+   "bytes": 100269,
+   "evidence": {
+    "Data\\System\\": true
+   },
+   "evidence_found": 1,
+   "evidence_total": 1
+  },
+  {
+   "tier": "T0p",
+   "glob": "Data/System/Riff machine/*",
+   "why": "Riff machine 既定",
+   "files": 8,
+   "bytes": 17346,
+   "evidence": {
+    "Data\\System\\": true
+   },
+   "evidence_found": 1,
+   "evidence_total": 1
+  },
+  {
+   "tier": "T0p",
+   "glob": "Data/System/Default/*",
+   "why": "既定インストール済みプラグイン定義",
+   "files": 13,
+   "bytes": 4169,
+   "evidence": {
+    "Data\\System\\Default\\Installed plugins\\": true,
+    "Data\\System\\Default\\": true
+   },
+   "evidence_found": 2,
+   "evidence_total": 2
+  },
+  {
+   "tier": "T1",
+   "glob": "Data/System/Plugin databases/*",
+   "why": "プラグインデータベース (ブラウザ初回展開)",
+   "files": 1310,
+   "bytes": 25967470,
+   "evidence": {
+    "Data\\Patches\\Plugin database": true,
+    "Presets\\Plugin database\\": true
+   },
+   "evidence_found": 2,
+   "evidence_total": 2
+  },
+  {
+   "tier": "T2",
+   "glob": "Data/System/FL Mobile/*",
+   "why": "FL Studio Mobile ラック内容 (プラグイン生成時)",
+   "files": 341,
+   "bytes": 42902844,
+   "evidence": {
+    "Data\\System\\FL Mobile Rack": true
+   },
+   "evidence_found": 1,
+   "evidence_total": 1
+  },
+  {
+   "tier": "T2",
+   "glob": "Data/System/Render tests/*",
+   "why": "レンダーテスト (内部)",
+   "files": 82,
+   "bytes": 7676773,
+   "evidence": {},
+   "evidence_found": 0,
+   "evidence_total": 0
+  },
+  {
+   "tier": "T0p",
+   "glob": "Data/Templates/Minimal/Basic with limiter/*",
+   "why": "既定テンプレート (起動時にロードされる推定)",
+   "files": 2,
+   "bytes": 53345,
+   "evidence": {
+    "Minimal\\Basic with limiter\\Basic with limiter.flp": true,
+    "Data\\Templates\\": true
+   },
+   "evidence_found": 2,
+   "evidence_total": 2
+  },
+  {
+   "tier": "T1",
+   "glob": "Data/Templates/*",
+   "why": "テンプレート一覧 (New from template)",
+   "files": 68,
+   "bytes": 30790917,
+   "evidence": {
+    "Data\\Templates\\": true
+   },
+   "evidence_found": 1,
+   "evidence_total": 1
+  },
+  {
+   "tier": "T0p",
+   "glob": "Data/Patches/Packs/Legacy/Drums/Dance/Basic 808 *.wav",
+   "why": "既定テンプレート参照サンプル (FLP 文字列から導出)",
+   "files": 4,
+   "bytes": 182132,
+   "evidence": {
+    "Data\\Patches\\Packs": true
+   },
+   "evidence_found": 1,
+   "evidence_total": 1
+  },
+  {
+   "tier": "T0p",
+   "glob": "Plugins/Fruity/*/*/Plugin.nfo",
+   "why": "プラグインスキャン用メタ",
+   "files": 141,
+   "bytes": 3418,
+   "evidence": {
+    "Plugin.nfo": true,
+    ".nfo": true,
+    "Plugins\\Fruity\\": true
+   },
+   "evidence_found": 3,
+   "evidence_total": 3
+  },
+  {
+   "tier": "T0p",
+   "glob": "Plugins/Fruity/*/*.nfo",
+   "why": "プラグインスキャン用メタ",
+   "files": 0,
+   "bytes": 0,
+   "evidence": {
+    ".nfo": true,
+    "Plugins\\Fruity\\": true
+   },
+   "evidence_found": 2,
+   "evidence_total": 2
+  },
+  {
+   "tier": "T1",
+   "glob": "Help/index_offline.html",
+   "why": "オフラインヘルプ入口",
+   "files": 1,
+   "bytes": 3999,
+   "evidence": {
+    "index_offline.html": true
+   },
+   "evidence_found": 1,
+   "evidence_total": 1
+  },
+  {
+   "tier": "T1",
+   "glob": "Help/*.scr",
+   "why": "ヘルプ別名表",
+   "files": 2,
+   "bytes": 10949,
+   "evidence": {
+    "HelpPlugins.scr": true,
+    "HelpAliases.scr": true
+   },
+   "evidence_found": 2,
+   "evidence_total": 2
+  },
+  {
+   "tier": "T1",
+   "glob": "WhatsNew.rtf",
+   "why": "更新情報",
+   "files": 1,
+   "bytes": 1036529,
+   "evidence": {
+    "WhatsNew.htm": true
+   },
+   "evidence_found": 1,
+   "evidence_total": 1
+  },
+  {
+   "tier": "T1",
+   "glob": "Shared/Python/*",
+   "why": "Python 3.12 標準ライブラリ (スクリプト実行時)",
+   "files": 6,
+   "bytes": 4452529,
+   "evidence": {
+    "InitSharedPython": true
+   },
+   "evidence_found": 1,
+   "evidence_total": 1
+  }
+ ],
+ "template_refs": {
+  "file": "Data/Templates/Minimal/Basic with limiter/Basic with limiter.flp",
+  "refs": [
+   "%FLStudioFactoryData%\\Data\\Patches\\Packs\\Legacy\\Drums\\Dance\\Basic 808 Kick.wav",
+   "%FLStudioFactoryData%\\Data\\Patches\\Packs\\Legacy\\Drums\\Dance\\Basic 808 Clap.wav",
+   "%FLStudioFactoryData%\\Data\\Patches\\Packs\\Legacy\\Drums\\Dance\\Basic 808 HiHat.wav",
+   "%FLStudioFactoryData%\\Data\\Patches\\Packs\\Legacy\\Drums\\Dance\\Basic 808 Snare.wav"
+  ],
+  "exist": [
+   true,
+   true,
+   true,
+   true
+  ]
+ },
+ "note": "T0/T0p/T1 は静的解析による推定。T0=文字列リテラルで直接裏取り / T0p=ディレクトリ列挙・既定テンプレートからの導出。"
+}

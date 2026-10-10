@@ -1,0 +1,191 @@
+expected: 151 files, big Data/Patches/Packs/FLEX/Packs/General Midi Library.flexpack 42.3MB, Data/Patches/Packs/FLEX/Packs/Melodic Techno.flexpack 23.8MB
+[chrome:cold]
+  ok   stat 151/151
+  ok   sha256 match (151 files, 8.8 MB, 1036 ms)
+  ok   ENOENT
+  ok   OPFS SyncAccessHandle opened (cache kind=slot)
+  ok   crossOriginIsolated + SAB in worker
+  ok   second OPFS handle blocked while first open (multi-tab → fallback path)
+{
+ "content": {
+  "files": 151,
+  "mismatches": 0,
+  "MB": 8.8,
+  "ms": 1036,
+  "readMs": {
+   "p50": 7.985,
+   "p95": 14.875,
+   "max": 21.79
+  }
+ },
+ "missLatencyMs": {
+  "n": 98,
+  "p50": 8.48,
+  "p95": 13.94
+ },
+ "sequential": [
+  {
+   "file": "Data/Patches/Packs/FLEX/Packs/General Midi Library.flexpack",
+   "MB": 42.3,
+   "firstReadMs": 8.2,
+   "coldMBps": 258.9,
+   "warmMBps": 6882.9
+  },
+  {
+   "file": "Data/Patches/Packs/FLEX/Packs/Melodic Techno.flexpack",
+   "MB": 23.8,
+   "firstReadMs": 8.4,
+   "coldMBps": 233.5,
+   "warmMBps": 4941.4
+  }
+ ],
+ "preloadBoot": {
+  "T0": {
+   "chunks": 5,
+   "fetched": 5,
+   "bytes": 2211880,
+   "ms": 17
+  },
+  "T0p": {
+   "chunks": 17,
+   "fetched": 15,
+   "bytes": 4429597,
+   "ms": 39
+  }
+ },
+ "serverChunkRequests": 184,
+ "fetcher": {
+  "t": "stat",
+  "requests": 164,
+  "bytesFetched": 161371781,
+  "maxInflight": 8
+ },
+ "vfsStats": {
+  "reads": 657,
+  "bytesRead": 140948158,
+  "chunkMemHits": 209,
+  "chunkCacheHits": 298,
+  "chunkMisses": 152,
+  "chunkPrefetched": 12,
+  "netBytesDecoded": 149819443,
+  "netWaitMs": 1095.4499999918044,
+  "evictions": 0,
+  "cacheUsed": 184
+ }
+}
+[chrome:warm]
+  ok   stat 151/151
+  ok   sha256 match (151 files, 8.8 MB, 18 ms)
+  ok   ENOENT
+  ok   OPFS SyncAccessHandle opened (cache kind=slot)
+  ok   crossOriginIsolated + SAB in worker
+  ok   warm: 183 slots recovered from OPFS
+  ok   warm: server chunk requests = 0 (sequential big files may add)
+{
+ "content": {
+  "files": 151,
+  "mismatches": 0,
+  "MB": 8.8,
+  "ms": 18,
+  "readMs": {
+   "p50": 0.015,
+   "p95": 0.18,
+   "max": 1.55
+  }
+ },
+ "missLatencyMs": {
+  "n": 0,
+  "p50": null,
+  "p95": null
+ },
+ "sequential": [
+  {
+   "file": "Data/Patches/Packs/FLEX/Packs/General Midi Library.flexpack",
+   "MB": 42.3,
+   "firstReadMs": 0.2,
+   "coldMBps": 5560.6,
+   "warmMBps": 6996.8
+  },
+  {
+   "file": "Data/Patches/Packs/FLEX/Packs/Melodic Techno.flexpack",
+   "MB": 23.8,
+   "firstReadMs": 0.1,
+   "coldMBps": 7658.3,
+   "warmMBps": 10244
+  }
+ ],
+ "serverChunkRequests": 0,
+ "fetcher": {
+  "t": "stat",
+  "requests": 0,
+  "bytesFetched": 0,
+  "maxInflight": 0
+ },
+ "vfsStats": {
+  "reads": 657,
+  "bytesRead": 140948158,
+  "chunkMemHits": 0,
+  "chunkCacheHits": 659,
+  "chunkMisses": 0,
+  "chunkPrefetched": 0,
+  "netBytesDecoded": 0,
+  "netWaitMs": 0,
+  "evictions": 0,
+  "cacheUsed": 183
+ }
+}
+[chrome:xhr-cold]
+  ok   stat 151/151
+  ok   sha256 match (151 files, 8.8 MB, 1080 ms)
+  ok   ENOENT
+  ok   OPFS SyncAccessHandle opened (cache kind=slot)
+{
+ "content": {
+  "files": 151,
+  "mismatches": 0,
+  "MB": 8.8,
+  "ms": 1080,
+  "readMs": {
+   "p50": 7.52,
+   "p95": 17.21,
+   "max": 19.81
+  }
+ },
+ "missLatencyMs": {
+  "n": 100,
+  "p50": 8.3,
+  "p95": 16.59
+ },
+ "sequential": [
+  {
+   "file": "Data/Patches/Packs/FLEX/Packs/General Midi Library.flexpack",
+   "MB": 42.3,
+   "firstReadMs": 7.7,
+   "coldMBps": 132,
+   "warmMBps": 8254.1
+  },
+  {
+   "file": "Data/Patches/Packs/FLEX/Packs/Melodic Techno.flexpack",
+   "MB": 23.8,
+   "firstReadMs": 8.1,
+   "coldMBps": 150.7,
+   "warmMBps": 5364.3
+  }
+ ],
+ "serverChunkRequests": 164,
+ "fetcher": {},
+ "vfsStats": {
+  "reads": 657,
+  "bytesRead": 140948158,
+  "chunkMemHits": 242,
+  "chunkCacheHits": 253,
+  "chunkMisses": 164,
+  "chunkPrefetched": 0,
+  "netBytesDecoded": 161371781,
+  "netWaitMs": 1357.3250000327826,
+  "evictions": 0,
+  "cacheUsed": 164
+ }
+}
+ALL PASS
+chrome EXIT 0

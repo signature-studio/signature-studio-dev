@@ -1,0 +1,493 @@
+{
+ "win": {
+  "label": "win64 (NSIS 抽出ブロック + 復元パス, $PLUGINSDIR/user-var 配置を除く)",
+  "files": 27401,
+  "bytes": 2146436398,
+  "unique_content_files": 25130,
+  "unique_content_bytes": 2104623417,
+  "by_cat_cls": {
+   "exec/lift": {
+    "files": 196,
+    "bytes": 771827960
+   },
+   "audio/data": {
+    "files": 6581,
+    "bytes": 446586414
+   },
+   "preset/data": {
+    "files": 14790,
+    "bytes": 241401304
+   },
+   "exec/skip": {
+    "files": 72,
+    "bytes": 189736312
+   },
+   "image/data": {
+    "files": 1412,
+    "bytes": 145668203
+   },
+   "other/data": {
+    "files": 660,
+    "bytes": 114812534
+   },
+   "exec/rebuild": {
+    "files": 43,
+    "bytes": 99622456
+   },
+   "project/data": {
+    "files": 165,
+    "bytes": 87694538
+   },
+   "text/data": {
+    "files": 1549,
+    "bytes": 18699259
+   },
+   "python-lib/data": {
+    "files": 114,
+    "bytes": 15916493
+   },
+   "font/data": {
+    "files": 100,
+    "bytes": 13840220
+   },
+   "midi/data": {
+    "files": 1719,
+    "bytes": 630705
+   }
+  },
+  "by_topdir": {
+   "Plugins/Fruity": {
+    "files": 6414,
+    "bytes": 909835243
+   },
+   "Data/Patches": {
+    "files": 17782,
+    "bytes": 657048638
+   },
+   "Shared": {
+    "files": 123,
+    "bytes": 215848086
+   },
+   "System": {
+    "files": 864,
+    "bytes": 135140557
+   },
+   "Data/System": {
+    "files": 1952,
+    "bytes": 77820758
+   },
+   "Data/Demo projects": {
+    "files": 46,
+    "bytes": 49079912
+   },
+   "Data/Templates": {
+    "files": 70,
+    "bytes": 30844262
+   },
+   "FLEngine_x64.dll": {
+    "files": 1,
+    "bytes": 22227016
+   },
+   "Artwork": {
+    "files": 80,
+    "bytes": 20619818
+   },
+   "FLMManaged.dll": {
+    "files": 1,
+    "bytes": 9294848
+   },
+   "uninstall.exe": {
+    "files": 1,
+    "bytes": 4128008
+   },
+   "speaker_x64.dll": {
+    "files": 1,
+    "bytes": 3263488
+   },
+   "Help": {
+    "files": 55,
+    "bytes": 2925770
+   },
+   "uninstall.fud": {
+    "files": 1,
+    "bytes": 2556034
+   },
+   "iZAudioRestore.dll": {
+    "files": 1,
+    "bytes": 2481784
+   },
+   "WhatsNew.rtf": {
+    "files": 1,
+    "bytes": 1036529
+   },
+   "AudioRestore.dll": {
+    "files": 1,
+    "bytes": 953976
+   },
+   "FL64 (scaled).exe": {
+    "files": 1,
+    "bytes": 597064
+   },
+   "FL64.exe": {
+    "files": 1,
+    "bytes": 597064
+   },
+   "WebView2Loader.dll": {
+    "files": 1,
+    "bytes": 137120
+   },
+   "ChromaAppInfo.xml": {
+    "files": 1,
+    "bytes": 354
+   },
+   "Data": {
+    "files": 3,
+    "bytes": 69
+   }
+  },
+  "size_hist": {
+   "2^02": {
+    "files": 1,
+    "bytes": 5
+   },
+   "2^03": {
+    "files": 18,
+    "bytes": 260
+   },
+   "2^04": {
+    "files": 532,
+    "bytes": 12309
+   },
+   "2^05": {
+    "files": 170,
+    "bytes": 7353
+   },
+   "2^06": {
+    "files": 611,
+    "bytes": 60794
+   },
+   "2^07": {
+    "files": 1937,
+    "bytes": 374264
+   },
+   "2^08": {
+    "files": 4618,
+    "bytes": 1603788
+   },
+   "2^09": {
+    "files": 4243,
+    "bytes": 3211406
+   },
+   "2^10": {
+    "files": 1899,
+    "bytes": 2742515
+   },
+   "2^11": {
+    "files": 934,
+    "bytes": 2704506
+   },
+   "2^12": {
+    "files": 1910,
+    "bytes": 11186707
+   },
+   "2^13": {
+    "files": 2762,
+    "bytes": 31246617
+   },
+   "2^14": {
+    "files": 2190,
+    "bytes": 51787699
+   },
+   "2^15": {
+    "files": 2261,
+    "bytes": 106344294
+   },
+   "2^16": {
+    "files": 1584,
+    "bytes": 143541725
+   },
+   "2^17": {
+    "files": 806,
+    "bytes": 144131417
+   },
+   "2^18": {
+    "files": 439,
+    "bytes": 164552670
+   },
+   "2^19": {
+    "files": 210,
+    "bytes": 155879611
+   },
+   "2^20": {
+    "files": 58,
+    "bytes": 84416680
+   },
+   "2^21": {
+    "files": 120,
+    "bytes": 426981012
+   },
+   "2^22": {
+    "files": 83,
+    "bytes": 468274001
+   },
+   "2^23": {
+    "files": 6,
+    "bytes": 63790739
+   },
+   "2^24": {
+    "files": 6,
+    "bytes": 154332229
+   },
+   "2^25": {
+    "files": 3,
+    "bytes": 129253797
+   }
+  },
+  "dup_extra_files": 2271,
+  "dup_extra_bytes": 41812981
+ },
+ "mac": {
+  "label": "mac .app Contents",
+  "files": 28085,
+  "bytes": 2399326418,
+  "unique_content_files": 25421,
+  "unique_content_bytes": 2351418395,
+  "by_cat_cls": {
+   "exec/lift": {
+    "files": 193,
+    "bytes": 1054635984
+   },
+   "audio/data": {
+    "files": 6581,
+    "bytes": 446586414
+   },
+   "preset/data": {
+    "files": 14767,
+    "bytes": 243049242
+   },
+   "image/data": {
+    "files": 1537,
+    "bytes": 156220571
+   },
+   "other/data": {
+    "files": 398,
+    "bytes": 142160414
+   },
+   "exec/skip": {
+    "files": 7,
+    "bytes": 113235664
+   },
+   "exec/rebuild": {
+    "files": 99,
+    "bytes": 99625552
+   },
+   "project/data": {
+    "files": 164,
+    "bytes": 86989292
+   },
+   "python-lib/data": {
+    "files": 852,
+    "bytes": 25380801
+   },
+   "text/data": {
+    "files": 1682,
+    "bytes": 18696387
+   },
+   "font/data": {
+    "files": 86,
+    "bytes": 12115392
+   },
+   "midi/data": {
+    "files": 1719,
+    "bytes": 630705
+   }
+  },
+  "by_topdir": {
+   "Plugins/Fruity": {
+    "files": 6434,
+    "bytes": 1112153328
+   },
+   "Data/Patches": {
+    "files": 17963,
+    "bytes": 665200886
+   },
+   "Shared": {
+    "files": 982,
+    "bytes": 197596297
+   },
+   "System": {
+    "files": 519,
+    "bytes": 162373605
+   },
+   "Data/System": {
+    "files": 1927,
+    "bytes": 77568497
+   },
+   "Libs": {
+    "files": 1,
+    "bytes": 64006864
+   },
+   "Data/Demo projects": {
+    "files": 45,
+    "bytes": 48374666
+   },
+   "Data/Templates": {
+    "files": 70,
+    "bytes": 30844262
+   },
+   "Artwork": {
+    "files": 79,
+    "bytes": 20619240
+   },
+   "_CodeSignature": {
+    "files": 1,
+    "bytes": 10049776
+   },
+   "MacOS": {
+    "files": 1,
+    "bytes": 5237056
+   },
+   "Help": {
+    "files": 55,
+    "bytes": 2925770
+   },
+   "Resources": {
+    "files": 1,
+    "bytes": 1336118
+   },
+   "WhatsNew.rtf": {
+    "files": 1,
+    "bytes": 1036529
+   },
+   "Info.plist": {
+    "files": 1,
+    "bytes": 3092
+   },
+   "ChromaAppInfo.xml": {
+    "files": 1,
+    "bytes": 354
+   },
+   "Data": {
+    "files": 3,
+    "bytes": 69
+   },
+   "PkgInfo": {
+    "files": 1,
+    "bytes": 9
+   }
+  },
+  "size_hist": {
+   "0": {
+    "files": 3,
+    "bytes": 0
+   },
+   "2^02": {
+    "files": 1,
+    "bytes": 5
+   },
+   "2^03": {
+    "files": 32,
+    "bytes": 413
+   },
+   "2^04": {
+    "files": 634,
+    "bytes": 14681
+   },
+   "2^05": {
+    "files": 191,
+    "bytes": 8073
+   },
+   "2^06": {
+    "files": 562,
+    "bytes": 55468
+   },
+   "2^07": {
+    "files": 1911,
+    "bytes": 368495
+   },
+   "2^08": {
+    "files": 4574,
+    "bytes": 1594478
+   },
+   "2^09": {
+    "files": 4319,
+    "bytes": 3273875
+   },
+   "2^10": {
+    "files": 1983,
+    "bytes": 2853881
+   },
+   "2^11": {
+    "files": 1010,
+    "bytes": 2919908
+   },
+   "2^12": {
+    "files": 1963,
+    "bytes": 11499565
+   },
+   "2^13": {
+    "files": 2901,
+    "bytes": 32982813
+   },
+   "2^14": {
+    "files": 2269,
+    "bytes": 53669310
+   },
+   "2^15": {
+    "files": 2333,
+    "bytes": 109671659
+   },
+   "2^16": {
+    "files": 1631,
+    "bytes": 147282933
+   },
+   "2^17": {
+    "files": 855,
+    "bytes": 153124483
+   },
+   "2^18": {
+    "files": 435,
+    "bytes": 162262514
+   },
+   "2^19": {
+    "files": 212,
+    "bytes": 158678997
+   },
+   "2^20": {
+    "files": 53,
+    "bytes": 75891817
+   },
+   "2^21": {
+    "files": 37,
+    "bytes": 105224108
+   },
+   "2^22": {
+    "files": 142,
+    "bytes": 779584873
+   },
+   "2^23": {
+    "files": 21,
+    "bytes": 209445571
+   },
+   "2^24": {
+    "files": 10,
+    "bytes": 248425933
+   },
+   "2^25": {
+    "files": 3,
+    "bytes": 140492565
+   }
+  },
+  "dup_extra_files": 2662,
+  "dup_extra_bytes": 47908023,
+  "symlinks": 20
+ },
+ "common_win_mac": {
+  "unique_contents": 24213,
+  "bytes": 1021692242,
+  "win_unique_total": 25130,
+  "mac_unique_total": 25420,
+  "win_only_bytes": 1082931175,
+  "mac_only_bytes": 1329726153
+ }
+}

@@ -1,0 +1,238 @@
+{
+ "pkg": "/home/ubuntu/work/webstudio/tools/assets/work/pkg-full",
+ "bigFile": "Data/Patches/Packs/FLEX/Packs/General Midi Library.flexpack",
+ "bigMB": 42.260901,
+ "scenarios": [
+  {
+   "name": "localhost (unshaped)",
+   "latencyMs": 0,
+   "mbps": 0,
+   "sequential": [
+    {
+     "file": "flexpack(br)",
+     "MB": 42.3,
+     "readahead": 0,
+     "firstReadMs": 55.5,
+     "totalMs": 472,
+     "MBps": 89.6
+    },
+    {
+     "file": "flexpack(br)",
+     "MB": 42.3,
+     "readahead": 2,
+     "firstReadMs": 55.9,
+     "totalMs": 410,
+     "MBps": 103.1
+    },
+    {
+     "file": "flexpack(br)",
+     "MB": 42.3,
+     "readahead": 8,
+     "firstReadMs": 49.9,
+     "totalMs": 351,
+     "MBps": 120.4
+    },
+    {
+     "file": "flexpack(br)",
+     "MB": 42.3,
+     "readahead": 16,
+     "firstReadMs": 58.2,
+     "totalMs": 369,
+     "MBps": 114.5
+    }
+   ],
+   "smallCold": {
+    "n": 60,
+    "firstAccessMs": {
+     "p50": 0.04,
+     "p95": 28.57
+    },
+    "missMs": {
+     "n": 15,
+     "p50": 17.3,
+     "p95": 63.1
+    }
+   },
+   "preload": [
+    {
+     "concurrency": 1,
+     "chunks": 22,
+     "MB": 7.79,
+     "ms": 253
+    },
+    {
+     "concurrency": 4,
+     "chunks": 22,
+     "MB": 7.79,
+     "ms": 148
+    },
+    {
+     "concurrency": 8,
+     "chunks": 22,
+     "MB": 7.79,
+     "ms": 144
+    },
+    {
+     "concurrency": 16,
+     "chunks": 22,
+     "MB": 7.79,
+     "ms": 112
+    }
+   ]
+  },
+  {
+   "name": "broadband 40ms/200Mbps",
+   "latencyMs": 40,
+   "mbps": 200,
+   "sequential": [
+    {
+     "file": "flexpack(br)",
+     "MB": 42.3,
+     "readahead": 0,
+     "firstReadMs": 134.6,
+     "totalMs": 3762,
+     "MBps": 11.2
+    },
+    {
+     "file": "flexpack(br)",
+     "MB": 42.3,
+     "readahead": 2,
+     "firstReadMs": 110.1,
+     "totalMs": 2138,
+     "MBps": 19.8
+    },
+    {
+     "file": "flexpack(br)",
+     "MB": 42.3,
+     "readahead": 8,
+     "firstReadMs": 105,
+     "totalMs": 1498,
+     "MBps": 28.2
+    },
+    {
+     "file": "flexpack(br)",
+     "MB": 42.3,
+     "readahead": 16,
+     "firstReadMs": 113,
+     "totalMs": 1507,
+     "MBps": 28
+    }
+   ],
+   "smallCold": {
+    "n": 60,
+    "firstAccessMs": {
+     "p50": 0.02,
+     "p95": 86.79
+    },
+    "missMs": {
+     "n": 12,
+     "p50": 76.6,
+     "p95": 153.8
+    }
+   },
+   "preload": [
+    {
+     "concurrency": 1,
+     "chunks": 22,
+     "MB": 7.79,
+     "ms": 1219
+    },
+    {
+     "concurrency": 4,
+     "chunks": 22,
+     "MB": 7.79,
+     "ms": 465
+    },
+    {
+     "concurrency": 8,
+     "chunks": 22,
+     "MB": 7.79,
+     "ms": 345
+    },
+    {
+     "concurrency": 16,
+     "chunks": 22,
+     "MB": 7.79,
+     "ms": 299
+    }
+   ]
+  },
+  {
+   "name": "slow 100ms/50Mbps",
+   "latencyMs": 100,
+   "mbps": 50,
+   "sequential": [
+    {
+     "file": "flexpack(br)",
+     "MB": 42.3,
+     "readahead": 0,
+     "firstReadMs": 170.1,
+     "totalMs": 9209,
+     "MBps": 4.6
+    },
+    {
+     "file": "flexpack(br)",
+     "MB": 42.3,
+     "readahead": 2,
+     "firstReadMs": 181.3,
+     "totalMs": 5639,
+     "MBps": 7.5
+    },
+    {
+     "file": "flexpack(br)",
+     "MB": 42.3,
+     "readahead": 8,
+     "firstReadMs": 205,
+     "totalMs": 5047,
+     "MBps": 8.4
+    },
+    {
+     "file": "flexpack(br)",
+     "MB": 42.3,
+     "readahead": 16,
+     "firstReadMs": 186.8,
+     "totalMs": 5035,
+     "MBps": 8.4
+    }
+   ],
+   "smallCold": {
+    "n": 60,
+    "firstAccessMs": {
+     "p50": 0.06,
+     "p95": 188.5
+    },
+    "missMs": {
+     "n": 16,
+     "p50": 149.9,
+     "p95": 325.5
+    }
+   },
+   "preload": [
+    {
+     "concurrency": 1,
+     "chunks": 22,
+     "MB": 7.79,
+     "ms": 2872
+    },
+    {
+     "concurrency": 4,
+     "chunks": 22,
+     "MB": 7.79,
+     "ms": 1039
+    },
+    {
+     "concurrency": 8,
+     "chunks": 22,
+     "MB": 7.79,
+     "ms": 745
+    },
+    {
+     "concurrency": 16,
+     "chunks": 22,
+     "MB": 7.79,
+     "ms": 791
+    }
+   ]
+  }
+ ]
+}

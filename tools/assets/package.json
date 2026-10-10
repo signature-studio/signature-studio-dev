@@ -1,0 +1,14 @@
+{
+  "name": "@webstudio/assets",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "FL Studio 資産 manifest + 遅延取得 chunk VFS (range+opfs) 設計・PoC",
+  "scripts": {
+    "typecheck": "../../node_modules/.bin/tsc -p tsconfig.json --noEmit",
+    "test": "bash e2e.sh"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}
