@@ -31,6 +31,7 @@
 | `diff/count_icall.py` | D1 の独立検査: 実行済み命令の間接 call/jmp を capstone で数え, RetDec IR と突合 |
 | `diff/{scen,cmp,trace_*,cmp_trace,transplant}.*` | 差分デバッグ資産 (stage dump 比較 / 関数 entry trace / 状態移植実験) |
 | `ott_build.sh` `passes/{gvraw,trace_entry}.py` `rt/ott_{boot,rt,trace}.c` | 旧 RetDec chain の再ビルド (m6-m10 読取専用で出力は tools/ott/work) と診断 pass |
+| `f7eval/` | CAB-238 評価 driver。`cab238_eval.py` (site/group 別 build + e2e + bitcmp + 無限ルーブ probe, 既定 34 tag), `run_eval.sh`, `cab238_bitcmp.mjs` (2 module の出力 bit 比較), `cab238_outhash.mjs` (SHA プロトコル, DROP 対応), `cab238_probe.mjs` (任意 combo の停止判定), `outhash_gate.sh` (SHA gate), `REPORT.md` |
 
 tools/m5..m10 は読取のみ (改変 0 行)。生成物は `tools/ott/work/` (gitignore)。
 
@@ -158,3 +159,22 @@ OTT_ULP_TOL=2 bash tools/ott/ott_e2e.sh  # 許容 ulp 指定
 # 個別: python3 tools/ott/diff/matrix.py tools/ott/work/lift/ottl.cjs ; node tools/ott/diff/perf.mjs
 # 前提: python3 (capstone, pefile), gcc/clang, emsdk 6.0.12 の emcc, node >= 22 (emsdk 同梱 24.19 可), setarch
 ```
+
+## 9. CAB-238 — `ott --auto f7,p1` 既定化の評価 (詳細・全実測は `f7eval/REPORT.md`)
+
+- liftlib `ott` コマンドの既定が auto f7,p1 に (実装は tools/liftlib 側 / LIFTLIB-2 スコープ, 本 dir は評価と文書を担当)。
+  検証環境 = **a137396 (CAB-239 適用後) + CAB-238 既定化** の snapshot (`work/cab238/` と `f7eval/` が再現器)。
+  検収実測: **checks 7/0・census junkHi 104≤104 (旧 175 より −71)・trap rc 0**。出力 SHA は旧既定 `--auto none`
+  = m10 参照と **42/42 一致** (継続ゲート) / auto 既定は修復由来の変化が正のため突合を分離 — 実測 **40 combo 中 34 不一致**
+  (一致 6 = param 0.0 の無音のみ)。
+- 新規 F7 は **7 site** (チケットの 6 + 0x180120632)。junkHi 175→104 の全量は P1 tail 6 site の再構成,
+  **F7 単独は census0 不変**。**F7@0x180120632 は例悪 (除外で census0 52 / census1 248→0, absmax 2.2e-3)** — 次の既定候補。
+- 脱落分岐: 再構成 **19** / 残留 **30** (region join 8・bind xmm0 6・bind rcx 5・bind xmm1 2・bind xmm5 2・reg2mem 5・
+  間接 call 1・live-out 1) を site リスト付きで再計上。関数帰属は実測 (processReplacing 内 14 / cvt 6 / tan 2 ほか)。
+  bit 一致は x64c 参照に対し P1 再構成の有無で 765/3072→0/3072 (bit-parity は未達, x64c のみ bit-exact)。
+- **未解決 (CAB-238 で新たに発見)**: 既定ビルドは params=0.9・[0x248]=1 の 2 combo で processReplacing が停止しない
+  (無限ルーブ)。原因は P1 再構築 site **0x18012024b / 0x1801204b9** の単体再現 (f7eval §6 の bisect)。e2e gate は
+  param 0.5 固定なので未検出 → 下流チケット (site 修正 or 白リスト) が必要。
+- 回帰: `liftlib_e2e.sh` フル ALL PASS (FA 400/400・KH 366/366・regress 4 PASS・SIMD・inject 94/94・leafspec)、
+  本 dir `ott_e2e.sh` PASS (89 scenario / 50,236 cell bit-exact, max_ulp 0)。メインツリーは LIFTLIB-2 未コミット WIP のため
+  OTT auto ビルドが不能 (f7eval §1) — 着地時に同一ゲートで自動再検証される。
