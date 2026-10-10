@@ -1,0 +1,37 @@
+# MX-1 / CAB-46: Massive X 1.7.1 ライセンス呼出点リスト (VST3 win64, ImageBase 0x180000000)
+# 対象: work/extracted/VST3/Massive X.vst3 (95,356,824 B, .text 60,223,894 B, .pdata 187,093 fn)
+# 出典: license/scripts/mx_callgraph.py (callgraph+rip xref) + mx_scan.py strings
+# 断定: [確]=decompile/実測xref, [ med]=文字列+クラスタ推定, [推]=低
+# ---- SC3 product-administration (pa-lib, sources/libs/product-administration/src/SC3/) ----
+0x1805b3510  Engine::productCheckSerialNumber (UPID, SerialNumber, bool&, bool)   [確] log+sig文字列 xref
+0x1805b3ad0  Engine::productGetSubscription (UPID, PA::RAS3::Subscription&, bool) [確]
+0x1805a7ea0  Engine::productGetVST3ID (UPID, PA::VST3ID&, bool, bool)             [確]
+0x1805a79a0  Engine::productGetPluginID (UPID, PA::tPluginID&, bool, bool)        [確]
+0x18115de60  Product::evaluateRAS2ActivationState                                  [確] ('Activated RAS2 product' 0x184fddb7e)
+0x18116fb20  CXDB3 verifying product/subscription ('VERIFICATION ERROR:')          [確]
+# ---- RAS3 JWT 系 (ras3@ni) ----
+0x181754f70  ras3 ディレクトリ解決: {PublicDocuments}\Native Instruments\Native Access\ras3 [確]
+0x180f94350  .jwt 列挙 ('0123456789abcdef-' + '.jwt')                              [確]
+0x184ff322d  KeyStore kid 定数文字列 'dfd4a0d7bb4e2f3509e3e1accee33716fb6610684410be0e3b1669ddd87d40f8' (ras3 JWT kid と一致) [med]
+0x184ff3a51  本体 UPID 定数 '41ce4ac2-34f7-469b-beb8-59a8ad7a8a67' (= Service Center XML <UPID>) [確]
+# RTTI (.?AV...): JWTReader::Exception / KeyStore / CryptoRSAEngine / CryptoRSAPubKey / HardwareID / RAS3@PA@NI / RAS2@ras@ni / RAS2Ext@ras@ni [確]
+# RSA 署名検証: 静的リンク OpenSSL 3.x (EVP_PKEY_verify 等)。BCryptVerifySignature は import あるも直接呼出 0 (wrapper 経由の可能性, 未特定) [med]
+# bcrypt/ncrypt IAT thunk 群: 0x18396ef10-0x18396f7b0 (jmp [rip+IAT])。呼出クラスタ: 0x18102c9bc-0x18102ca99, 0x18175558f-0x181755a5b, 0x181e98xx-0x181e9bxx (Schannel), 0x181d31xxx-0x181d3fxxx [確]
+# ---- UI / demo ゲート ----
+0x181142160 / 0x181143c00  'Your serial number is incorrect. Please run '           [確]
+0x18010e4e0  'Subscription expired.' / 'Subscription'                              [確]
+0x184ffc425  'Your serial number is incorrect. Please run ' (文言プール)            [確]
+0x184ffcf87 / 0x184ffcfe8 / 0x184ffd03f / 0x184ffd092 / 0x184ffd0d6 / 0x184ffd131  'Please (open|use) Native Access to (re-)activate.' [確]
+0x184ff8e88  'Please run the Registration Tool to enter the correct serial number for {}.' [確]
+0x184879407 / 0x1848792b9  QML property 'demoExpired' / 'demoExpiredChanged'        [確]
+0x18487941a  QML property 'subscriptionExpired'                                    [確]
+0x18415f411  'MXDemoPopup.qml'                                                     [確]
+0x185013ca8  'Subscription expired.' (UTF-16 UI プール)                            [確]
+# ---- VST3 ファクトリ ----
+0x18000a870  GetPluginFactory (export)。クラス情報生成: name 'Massive X' / version '1.7.1 (R0)' / vendor 'Native Instruments' / sdk 'VST 3.7.14' / sub 'Instrument|Synth' / cat 'Audio Module Class' / card 0x7fffffff [確]
+0x4e692448   PluginID 即値 (Service Center XML <PluginID>) — FUID 生成に入力 [確]
+# VST3ID = 5653544E-6924-486D-6173-736976652078 (Service Center XML <VST3ID>) [確]
+# ---- 出力 (nfo) 用値 ----
+# VST3: plugclass=8 (VST3 gen), bitsize=64, guid=5653544e6924486d6173736976652078 (FUID文字列のdash無しhex)
+# VST2: plugclass=4, magic=0x4e692448 ('H$iN', signed 1315513416)
+# vendor 'Native Instruments GmbH', category 'Synth' (subCategories 'Instrument|Synth')
