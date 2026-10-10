@@ -18,7 +18,7 @@ EXTRA_IMPL_K32 = {"ExitProcess", "GetModuleHandleA", "GetModuleHandleW", "Output
 
 def impl_names():
     out = collections.OrderedDict()
-    for f in ("gui_core.c", "gui_gdi.c"):
+    for f in ("gui_core.c", "gui_core_ext.inc", "gui_gdi.c"):
         for line in open(os.path.join(HERE, "src", f), encoding="utf-8"):
             m = re.match(r"^API (\w+)\(([^)]*)\) \{", line)
             if m:

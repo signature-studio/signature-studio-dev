@@ -14,14 +14,15 @@ typedef struct Pen { int style, width, stock; uint32_t color; } Pen;
 typedef struct Font { int height, stock; } Font;
 typedef struct Rgn { RL rl; } Rgn;
 typedef struct DCState {
-  int dx_wox, wox, woy, vox, voy; uint32_t bk, tc; int bkmode, rop2, align, stretch;
+  int dx_wox, wox, woy, vox, voy, bx, by; uint32_t bk, tc; int bkmode, rop2, align, stretch;
   U64 hbrush, hpen, hfont; WPOINT cur; RL user; int has_user; struct DCState *next;
 } DCState;
 typedef struct DC {
   int kind;               /* 1 window / 2 memory */
   int surf, ox, oy;       /* window: surface id + client 原点 */
   U64 hbmp;               /* memory: 選択中ビットマップ */
-  int wox, woy, vox, voy;
+  struct Bmp *bp;         /* 同ポインタ (選択中に DeleteObject されてもハンドル失効後に解放できるよう保持) */
+  int wox, woy, vox, voy, bx, by;
   RL base; int has_base;
   RL user; int has_user;
   RL eff; int eff_valid;
@@ -91,7 +92,7 @@ static void bmp_unref(Bmp *b) {
   if (b->deleted && b->sel == 0) { if (b->owns) free(b->bits); free(b); }
 }
 static void dc_free(DC *d) {
-  if (d->kind == 2) bmp_unref((Bmp *)h_get(d->hbmp, HT_BMP));
+  if (d->kind == 2) bmp_unref(d->bp ? d->bp : (Bmp *)h_get(d->hbmp, HT_BMP));
   rl_free(&d->base); rl_free(&d->user); rl_free(&d->eff);
   while (d->saved) { DCState *s = d->saved; d->saved = s->next; rl_free(&s->user); free(s); }
   free(d);
@@ -104,7 +105,7 @@ API DeleteDC(I64 h) { DC *d = dc_of((U64)h); if (!d) return 0; h_free((U64)h); d
 API CreateCompatibleDC(I64 hdc) {
   gui_sh(); (void)hdc;
   DC *d = dc_new(2); d->hbmp = g_def_bmp;
-  Bmp *b = (Bmp *)h_get(g_def_bmp, HT_BMP); b->sel++;
+  Bmp *b = (Bmp *)h_get(g_def_bmp, HT_BMP); b->sel++; d->bp = b;
   return (I64)h_alloc(HT_DC, d);
 }
 
@@ -240,9 +241,9 @@ API SelectObject(I64 hdc, I64 ho) {
     case HT_BMP: {
       if (d->kind != 2) return 0;
       Bmp *nb = (Bmp *)h_get((U64)ho, HT_BMP);
-      old = d->hbmp; Bmp *ob = (Bmp *)h_get(old, HT_BMP);
+      old = d->hbmp; Bmp *ob = d->bp ? d->bp : (Bmp *)h_get(old, HT_BMP);
       if (ob) bmp_unref(ob);
-      nb->sel++; d->hbmp = (U64)ho; d->eff_valid = 0;
+      nb->sel++; d->hbmp = (U64)ho; d->bp = nb; d->eff_valid = 0;
       break;
     }
     case HT_RGN: { extern API SelectClipRgn(I64, I64); return SelectClipRgn(hdc, ho); }
@@ -290,7 +291,12 @@ API GetStretchBltMode(I64 hdc) { DC *d = dc_of((U64)hdc); return d ? d->stretch 
 API SetTextAlign(I64 hdc, I64 a) { DC *d = dc_of((U64)hdc); if (!d) return 0; int o = d->align; d->align = (int)a; return o; }
 API GetTextAlign(I64 hdc) { DC *d = dc_of((U64)hdc); return d ? d->align : 0; }
 API SetMapMode(I64 hdc, I64 m) { (void)hdc; if (m != 1) gui_failfast("SetMapMode", "only MM_TEXT supported"); return 1; }
-API SetBrushOrgEx(I64 hdc, I64 x, I64 y, I64 old) { (void)hdc; (void)x; (void)y; if (old) memset(P_(old), 0, 8); return 1; }
+API SetBrushOrgEx(I64 hdc, I64 x, I64 y, I64 old) {
+  DC *d = dc_of((U64)hdc); if (!d) return 0;
+  if (old) { WPOINT *p = (WPOINT *)P_(old); p->x = d->bx; p->y = d->by; }
+  d->bx = (int)x; d->by = (int)y; return 1;
+}
+API GetBrushOrgEx(I64 hdc, I64 pt) { DC *d = dc_of((U64)hdc); if (!d || !pt) return 0; WPOINT *p = (WPOINT *)P_(pt); p->x = d->bx; p->y = d->by; return 1; }
 API SetWindowOrgEx(I64 hdc, I64 x, I64 y, I64 old) {
   DC *d = dc_of((U64)hdc); if (!d) return 0;
   if (old) { WPOINT *p = (WPOINT *)P_(old); p->x = d->wox; p->y = d->woy; }
@@ -418,7 +424,7 @@ API GetClipBox(I64 hdc, I64 rc) {
 API SaveDC(I64 hdc) {
   DC *d = dc_of((U64)hdc); if (!d) return 0;
   DCState *s = (DCState *)calloc(1, sizeof *s);
-  s->wox = d->wox; s->woy = d->woy; s->vox = d->vox; s->voy = d->voy; s->bk = d->bk; s->tc = d->tc; s->bkmode = d->bkmode;
+  s->wox = d->wox; s->woy = d->woy; s->vox = d->vox; s->voy = d->voy; s->bx = d->bx; s->by = d->by; s->bk = d->bk; s->tc = d->tc; s->bkmode = d->bkmode;
   s->rop2 = d->rop2; s->align = d->align; s->stretch = d->stretch; s->hbrush = d->hbrush; s->hpen = d->hpen; s->hfont = d->hfont;
   s->cur = d->cur; s->has_user = d->has_user; rl_copy(&s->user, &d->user);
   s->next = d->saved; d->saved = s;
@@ -432,7 +438,7 @@ API RestoreDC(I64 hdc, I64 n) {
   if (pop < 1 || pop > depth) return 0;
   DCState *s = NULL;
   while (pop--) { if (s) { rl_free(&s->user); free(s); } s = d->saved; d->saved = s->next; }
-  d->wox = s->wox; d->woy = s->woy; d->vox = s->vox; d->voy = s->voy; d->bk = s->bk; d->tc = s->tc; d->bkmode = s->bkmode;
+  d->wox = s->wox; d->woy = s->woy; d->vox = s->vox; d->voy = s->voy; d->bx = s->bx; d->by = s->by; d->bk = s->bk; d->tc = s->tc; d->bkmode = s->bkmode;
   d->rop2 = s->rop2; d->align = s->align; d->stretch = s->stretch; d->hbrush = s->hbrush; d->hpen = s->hpen; d->hfont = s->hfont;
   d->cur = s->cur; rl_free(&d->user); d->user = s->user; d->has_user = s->has_user; d->eff_valid = 0;
   free(s);
@@ -819,3 +825,271 @@ static API drawtext_impl(I64 hdc, I64 str, I64 n, I64 rc, I64 fmt, int wide) {
 }
 API DrawTextA(I64 hdc, I64 s, I64 n, I64 rc, I64 fmt) { return drawtext_impl(hdc, s, n, rc, fmt, 0); }
 API DrawTextW(I64 hdc, I64 s, I64 n, I64 rc, I64 fmt) { return drawtext_impl(hdc, s, n, rc, fmt, 1); }
+
+/* ======================================================================================
+ * P1 拡張 (CAB-159): 3D 枠/フレームコントロール/フォーカス矩形・リージョン取得・画面 DC・DDB 生成・アイコン描画
+ * ====================================================================================== */
+extern API GetSysColor(I64);
+extern GuiResProvider gui_get_resource_provider(void);
+#define g_gdi_res (gui_get_resource_provider())
+static void px_cref(U64 hdc, int x, int y, uint32_t cref) { gdi_fill_rect_dc(hdc, (WRECT){ x, y, x + 1, y + 1 }, cref); }
+static void edge_fill(U64 hdc, int l, int t, int r, int b, int sysidx) { if (sysidx >= 0 && r > l && b > t) gdi_fill_rect_dc(hdc, (WRECT){ l, t, r, b }, (uint32_t)GetSysColor(sysidx)); }
+
+/* DrawEdge: 外枠層 (BDR_*OUTER) → 内枠層 (BDR_*INNER) の各 1px を左上(LT)/右下(RB)色で描く。色は Windows の標準/SOFT/FLAT/MONO 規則。
+ * COLOR_* : BTNFACE=15 BTNSHADOW=16 BTNHIGHLIGHT=20 3DDKSHADOW=21 3DLIGHT=22 WINDOWFRAME=6。SOFT は 3DDKSHADOW→BTNSHADOW / 3DLIGHT→BTNHIGHLIGHT の近似。 */
+enum { BF_LEFT_ = 1, BF_TOP_ = 2, BF_RIGHT_ = 4, BF_BOTTOM_ = 8, BF_DIAGONAL_ = 0x10, BF_MIDDLE_ = 0x800, BF_SOFT_ = 0x1000, BF_ADJUST_ = 0x2000, BF_FLAT_ = 0x4000, BF_MONO_ = 0x8000 };
+static int edge_color(int layer /*0 outer,1 inner*/, int lt, int kind /*1 raised, 2 sunken*/, int flags) {
+  static const int oLT[3] = { -1, 22, 16 }, oRB[3] = { -1, 21, 20 }, iLT[3] = { -1, 20, 21 }, iRB[3] = { -1, 16, 22 };
+  if (flags & BF_MONO_) return layer == 0 ? 6 : -1;
+  if (flags & BF_FLAT_) return layer == 0 ? 16 : 15;
+  int c = layer == 0 ? (lt ? oLT[kind] : oRB[kind]) : (lt ? iLT[kind] : iRB[kind]);
+  if (flags & BF_SOFT_) { if (c == 21) c = 16; else if (c == 22) c = 20; }
+  return c;
+}
+API DrawEdge(I64 hdc, I64 qrc, I64 edge, I64 flags) {
+  if (!dc_of((U64)hdc) || !qrc) return 0;
+  WRECT *q = (WRECT *)P_(qrc); WRECT r = *q; int f = (int)flags, e = (int)edge;
+  if (f & BF_DIAGONAL_) gui_failfast("DrawEdge", "BF_DIAGONAL");
+  int sl = (f & BF_LEFT_) != 0, st = (f & BF_TOP_) != 0, sr = (f & BF_RIGHT_) != 0, sb = (f & BF_BOTTOM_) != 0;
+  for (int layer = 0; layer < 2; layer++) {
+    int kind = (e >> (layer * 2)) & 3;   /* bit0/2 = RAISED, bit1/3 = SUNKEN */
+    if (!kind) continue;
+    int cl = edge_color(layer, 1, kind, f), cr = edge_color(layer, 0, kind, f);
+    /* LT: 左列 (上辺が有効なら 1 行下から) と上行 (右辺が有効なら右端手前まで) / RB: 右列 (下辺が有効なら下端手前まで) と下行 (全幅) */
+    if (sl) edge_fill((U64)hdc, r.left, st ? r.top + 1 : r.top, r.left + 1, r.bottom, cl);
+    if (st) edge_fill((U64)hdc, r.left, r.top, sr ? r.right - 1 : r.right, r.top + 1, cl);
+    if (sr) edge_fill((U64)hdc, r.right - 1, r.top, r.right, sb ? r.bottom - 1 : r.bottom, cr);
+    if (sb) edge_fill((U64)hdc, r.left, r.bottom - 1, r.right, r.bottom, cr);
+    if (sl) { r.left++; }
+    if (st) { r.top++; }
+    if (sr) { r.right--; }
+    if (sb) { r.bottom--; }
+  }
+  if (f & BF_MIDDLE_) edge_fill((U64)hdc, r.left, r.top, r.right, r.bottom, (f & BF_MONO_) ? 5 : 15);
+  if (f & BF_ADJUST_) *q = r;
+  return 1;
+}
+
+/* DrawFrameControl: ボタン (押し/チェック/ラジオ)・スクロール矢印・キャプションボタン・メニュー記号。外観は簡略 (形状は Windows 標準の近似) */
+enum { DFC_CAPTION_ = 1, DFC_MENU_ = 2, DFC_SCROLL_ = 3, DFC_BUTTON_ = 4, DFC_POPUPMENU_ = 5 };
+enum { DFCS_PUSHED_ = 0x200, DFCS_CHECKED_ = 0x400, DFCS_INACTIVE_ = 0x100, DFCS_FLAT_ = 0x4000, DFCS_MONO_ = 0x8000 };
+static void tri(U64 hdc, int cx, int cy, int dir, int n, uint32_t col) {   /* 向き 0 上 1 下 2 左 3 右 の三角 (高さ n) */
+  for (int i = 0; i < n; i++) {
+    int half = i;   /* 先端から i 段目: 幅 2*i+1 */
+    switch (dir) {
+      case 0: gdi_fill_rect_dc(hdc, (WRECT){ cx - half, cy - n / 2 + i, cx + half + 1, cy - n / 2 + i + 1 }, col); break;
+      case 1: gdi_fill_rect_dc(hdc, (WRECT){ cx - half, cy + n / 2 - i, cx + half + 1, cy + n / 2 - i + 1 }, col); break;
+      case 2: gdi_fill_rect_dc(hdc, (WRECT){ cx - n / 2 + i, cy - half, cx - n / 2 + i + 1, cy + half + 1 }, col); break;
+      default: gdi_fill_rect_dc(hdc, (WRECT){ cx + n / 2 - i, cy - half, cx + n / 2 - i + 1, cy + half + 1 }, col); break;
+    }
+  }
+}
+API DrawFrameControl(I64 hdc, I64 prc, I64 type, I64 state) {
+  if (!dc_of((U64)hdc) || !prc) return 0;
+  WRECT r = *(WRECT *)P_(prc); int st = (int)state, sub = st & 0xFF;
+  uint32_t ink = (uint32_t)GetSysColor((st & DFCS_INACTIVE_) ? 17 : 18);
+  int cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2;
+  int flat = (st & DFCS_FLAT_) ? BF_FLAT_ : 0, mono = (st & DFCS_MONO_) ? BF_MONO_ : 0;
+  int pushed = (st & DFCS_PUSHED_) != 0;
+  switch ((int)type) {
+    case DFC_BUTTON_: {
+      if (sub == 0x10 /* DFCS_BUTTONPUSH */) {
+        WRECT q = r; DrawEdge(hdc, H_(&q), pushed ? 10 : 5, 15 | BF_MIDDLE_ | flat | mono); return 1;
+      }
+      int radio = (sub == 4 || sub == 1 || sub == 2), sz = 13;
+      WRECT b = { cx - sz / 2, cy - sz / 2, cx - sz / 2 + sz, cy - sz / 2 + sz };
+      if (!radio) {   /* チェックボックス / 3STATE */
+        WRECT q = b; DrawEdge(hdc, H_(&q), 10, 15 | BF_ADJUST_ | flat | mono);
+        edge_fill((U64)hdc, q.left, q.top, q.right, q.bottom, (st & (DFCS_INACTIVE_ | DFCS_PUSHED_)) ? 15 : 5);
+        if (st & DFCS_CHECKED_) {   /* ✓ */
+          static const int8_t ck[][2] = { { 0, 2 }, { 1, 3 }, { 2, 4 }, { 3, 3 }, { 4, 2 }, { 5, 1 }, { 6, 0 } };
+          for (int i = 0; i < 7; i++) { px_cref((U64)hdc, b.left + 2 + ck[i][0], b.top + 4 + ck[i][1], ink); px_cref((U64)hdc, b.left + 2 + ck[i][0], b.top + 5 + ck[i][1], ink); px_cref((U64)hdc, b.left + 2 + ck[i][0], b.top + 6 + ck[i][1], ink); }
+        }
+      } else {   /* ラジオ: 外周 = 影(左上)/ハイライト(右下)、内部 = 白、チェック時は中心 4x4 */
+        int R = sz / 2;
+        for (int y = -R; y <= R; y++) for (int x = -R; x <= R; x++) {
+          int d2 = x * x + y * y; if (d2 > R * R + R) continue;
+          uint32_t col = d2 > (R - 1) * (R - 1) + (R - 1) ? (uint32_t)GetSysColor((x + y) <= 0 ? 16 : 20) : (uint32_t)GetSysColor((st & (DFCS_INACTIVE_ | DFCS_PUSHED_)) ? 15 : 5);
+          px_cref((U64)hdc, cx + x, cy + y, col);
+        }
+        if (st & DFCS_CHECKED_) gdi_fill_rect_dc((U64)hdc, (WRECT){ cx - 2, cy - 2, cx + 2, cy + 2 }, ink);
+      }
+      return 1;
+    }
+    case DFC_SCROLL_: {
+      WRECT q = r; DrawEdge(hdc, H_(&q), pushed ? 10 : 5, 15 | BF_MIDDLE_ | flat | mono);
+      int dir = sub & 3; if (sub == 5 /* COMBOBOX */) dir = 1; if (sub == 8 /* SIZEGRIP */) { for (int i = 1; i <= 3; i++) for (int k = 0; k < i; k++) px_cref((U64)hdc, r.right - 2 - k * 4, r.bottom - 2 - (3 - i) * 4, (uint32_t)GetSysColor(16)); return 1; }
+      tri(hdc, cx + (pushed ? 1 : 0), cy + (pushed ? 1 : 0), dir, 4, ink); return 1;
+    }
+    case DFC_CAPTION_: {
+      WRECT q = r; DrawEdge(hdc, H_(&q), pushed ? 10 : 5, 15 | BF_MIDDLE_ | flat | mono);
+      int o = pushed ? 1 : 0;
+      switch (sub) {
+        case 0: for (int i = -3; i <= 3; i++) { px_cref((U64)hdc, cx + i + o, cy + i + o, ink); px_cref((U64)hdc, cx + i + o + 1, cy + i + o, ink); px_cref((U64)hdc, cx + i + o, cy - i + o, ink); px_cref((U64)hdc, cx + i + o + 1, cy - i + o, ink); } break;   /* 閉じる X */
+        case 1: gdi_fill_rect_dc((U64)hdc, (WRECT){ cx - 4 + o, cy + 2 + o, cx + 4 + o, cy + 4 + o }, ink); break;                                         /* 最小化 */
+        case 2: gdi_fill_rect_dc((U64)hdc, (WRECT){ cx - 4 + o, cy - 4 + o, cx + 5 + o, cy - 2 + o }, ink); edge_fill((U64)hdc, cx - 4 + o, cy - 2 + o, cx - 3 + o, cy + 4 + o, -1); break;  /* 最大化 */
+        default: gdi_fill_rect_dc((U64)hdc, (WRECT){ cx - 2 + o, cy - 4 + o, cx + 4 + o, cy - 2 + o }, ink); gdi_fill_rect_dc((U64)hdc, (WRECT){ cx - 4 + o, cy - 1 + o, cx + 2 + o, cy + 1 + o }, ink); break;   /* 復元/ヘルプ */
+      }
+      return 1;
+    }
+    case DFC_MENU_: case DFC_POPUPMENU_: {
+      uint32_t col = (uint32_t)GetSysColor(18);
+      if (sub == 0 || sub == 4) tri(hdc, cx - 1, cy, 3, 4, col);                    /* MENUARROW / ARROWRIGHT */
+      else if (sub == 1) { for (int i = 0; i < 3; i++) { px_cref((U64)hdc, cx - 3 + i, cy + i, col); px_cref((U64)hdc, cx - 3 + i, cy + i + 1, col); } for (int i = 0; i < 4; i++) { px_cref((U64)hdc, cx + i, cy + 2 - i, col); px_cref((U64)hdc, cx + i, cy + 3 - i, col); } }   /* CHECK */
+      else gdi_fill_rect_dc((U64)hdc, (WRECT){ cx - 2, cy - 2, cx + 2, cy + 2 }, col);                                                                                   /* BULLET */
+      return 1;
+    }
+  }
+  gui_set_last_error(87); return 0;
+}
+
+/* DrawFocusRect: 外周 1px の点線 (座標 (x+y) が偶数の画素) を反転 (2 回で元に戻る = PATINVERT の性質) */
+API DrawFocusRect(I64 hdc, I64 prc) {
+  DC *d = dc_of((U64)hdc); if (!d || !prc) return 0;
+  WRECT r = *(const WRECT *)P_(prc); int dx = dev_dx(d), dy = dev_dy(d);
+  for (int x = r.left; x < r.right; x++) for (int k = 0; k < 2; k++) {
+    int y = k ? r.bottom - 1 : r.top; if (k && r.bottom - 1 == r.top) continue;
+    if (((x + y) & 1) == 0) fill_dev(d, (WRECT){ x + dx, y + dy, x + dx + 1, y + dy + 1 }, 0xFFFFFFFFu, 7);
+  }
+  for (int y = r.top + 1; y < r.bottom - 1; y++) for (int k = 0; k < 2; k++) {
+    int x = k ? r.right - 1 : r.left; if (k && r.right - 1 == r.left) continue;
+    if (((x + y) & 1) == 0) fill_dev(d, (WRECT){ x + dx, y + dy, x + dx + 1, y + dy + 1 }, 0xFFFFFFFFu, 7);
+  }
+  return 1;
+}
+
+/* ---------- リージョン取得 ---------- */
+static void rgn_set_shifted(Rgn *g, const RL *src, int dx, int dy) {
+  rl_clear(&g->rl);
+  for (int i = 0; i < src->n; i++) rl_add(&g->rl, (WRECT){ src->r[i].left + dx, src->r[i].top + dy, src->r[i].right + dx, src->r[i].bottom + dy });
+}
+API GetClipRgn(I64 hdc, I64 hrgn) {   /* 1 = アプリクリップあり (論理座標で hrgn へコピー) / 0 = なし / -1 = エラー */
+  DC *d = dc_of((U64)hdc); Rgn *g = (Rgn *)h_get((U64)hrgn, HT_RGN); if (!d || !g) return -1;
+  if (!d->has_user) return 0;
+  rgn_set_shifted(g, &d->user, -dev_dx(d), -dev_dy(d)); return 1;
+}
+API GetRandomRgn(I64 hdc, I64 hrgn, I64 which) {   /* CLIPRGN=1 (デバイス = DC 原点基準), SYSRGN=4 (画面座標の可視領域), その他は領域なし (0) */
+  DC *d = dc_of((U64)hdc); Rgn *g = (Rgn *)h_get((U64)hrgn, HT_RGN); if (!d || !g) return -1;
+  if (which == 1) { if (!d->has_user) return 0; rgn_set_shifted(g, &d->user, d->kind == 1 ? -d->ox : 0, d->kind == 1 ? -d->oy : 0); return 1; }
+  if (which == 4) {
+    Tgt t; if (!dc_tgt(d, &t)) return -1;
+    RL v = {0}; rl_add(&v, (WRECT){ 0, 0, t.w, t.h }); if (d->has_base) rl_intersect(&v, &d->base);
+    int sx = 0, sy = 0; if (d->kind == 1) { GuiShared *sh = gui_sh(); sx = sh->surf[d->surf].x; sy = sh->surf[d->surf].y; }
+    rgn_set_shifted(g, &v, sx, sy); rl_free(&v); return 1;
+  }
+  return 0;
+}
+static int rect_cmp(const void *a, const void *b) {
+  const WRECT *x = (const WRECT *)a, *y = (const WRECT *)b;
+  return x->top != y->top ? x->top - y->top : x->left - y->left;
+}
+API GetRegionData(I64 hrgn, I64 count, I64 pdata) {   /* RGNDATA = RGNDATAHEADER(32B: dwSize,iType=1,nCount,nRgnSize,rcBound) + RECT[nCount] */
+  Rgn *g = (Rgn *)h_get((U64)hrgn, HT_RGN); if (!g) return 0;
+  uint32_t need = 32 + 16 * (uint32_t)g->rl.n;
+  if (!pdata) return need;
+  if ((uint32_t)count < need) return 0;
+  uint32_t *h = (uint32_t *)P_(pdata); WRECT bb; rl_bbox(&g->rl, &bb);
+  h[0] = 32; h[1] = 1; h[2] = (uint32_t)g->rl.n; h[3] = 16 * (uint32_t)g->rl.n;
+  if (!g->rl.n) memset(&bb, 0, sizeof bb);
+  memcpy(h + 4, &bb, 16);
+  WRECT *o = (WRECT *)(h + 8); memcpy(o, g->rl.r, 16 * (size_t)g->rl.n); qsort(o, (size_t)g->rl.n, sizeof(WRECT), rect_cmp);
+  return (I64)count;
+}
+
+/* CreateDCW: "DISPLAY" (または driver NULL + デバイス名) の画面 DC = 画面寸法を返す互換 DC (描画は破棄される 1x1 ビットマップ宛; GetDeviceCaps/CreateCompatibleBitmap 用途)。それ以外のドライバ (印刷等) は fail-fast */
+API CreateDCW(I64 drv, I64 dev, I64 out, I64 pdm) {
+  (void)out; (void)pdm; gui_sh();
+  const uint16_t *s = drv ? (const uint16_t *)P_(drv) : (const uint16_t *)P_(dev);
+  static const char want[] = "DISPLAY"; int ok = (s == NULL);
+  if (s) { ok = 1; for (int i = 0; want[i] && ok; i++) { uint16_t c = s[i]; if (c >= 'a' && c <= 'z') c -= 32; if (c != (uint16_t)want[i]) ok = 0; } }
+  if (!ok && drv == 0 && dev) { const char pre[] = "\\\\.\\DISPLAY"; ok = 1; for (int i = 0; pre[i] && ok; i++) if (s[i] != (uint16_t)pre[i]) ok = 0; }
+  if (!ok) gui_failfast("CreateDCW", "non-DISPLAY device (printer DC)");
+  return CreateCompatibleDC(0);
+}
+
+/* ---------- DDB 生成 / 資源ビットマップ ---------- */
+static int dib_bits_offset(const WBMIH *bi) {   /* ヘッダ + (BITFIELDS マスク) + パレット */
+  int colors = bi->biBitCount <= 8 ? (bi->biClrUsed ? (int)bi->biClrUsed : 1 << bi->biBitCount) : 0;
+  return (int)bi->biSize + (bi->biCompression == BI_BITFIELDS && bi->biSize == 40 ? 12 : 0) + colors * 4;
+}
+static void dib_fill_bmp(Bmp *b, const WBMIH *bi, const uint8_t *bits, const char *api) {
+  if (bi->biBitCount != 24 && bi->biBitCount != 32) { char m[48]; snprintf(m, sizeof m, "DIB source bpp=%d (only 24/32bpp)", bi->biBitCount); gui_failfast(api, m); }
+  if (bi->biCompression != BI_RGB && bi->biCompression != BI_BITFIELDS) gui_failfast(api, "compressed DIB");
+  for (int y = 0; y < b->h; y++) for (int x = 0; x < b->w; x++) ((uint32_t *)(b->bits + (size_t)y * b->stride))[x] = dib_px(bi, bits, x, y);
+}
+#define CBM_INIT_ 4
+API CreateDIBitmap(I64 hdc, I64 pbih, I64 init, I64 pbits, I64 pbmi, I64 usage) {
+  (void)hdc; (void)usage; gui_sh();
+  const WBMIH *bih = (const WBMIH *)P_(pbih); if (!bih || bih->biSize < 40 || bih->biWidth <= 0 || bih->biHeight == 0) { gui_set_last_error(87); return 0; }
+  Bmp *b = bmp_new(bih->biWidth, bih->biHeight, 1);
+  if ((init & CBM_INIT_) && pbits && pbmi) {
+    const WBMIH *bi = (const WBMIH *)P_(pbmi);
+    if (bi->biWidth != b->w) { free(b->bits); free(b); gui_failfast("CreateDIBitmap", "lpbmi width != lpbmih width"); }
+    Bmp tmp = *b; tmp.h = bi->biHeight < 0 ? -bi->biHeight : bi->biHeight; if (tmp.h > b->h) tmp.h = b->h;
+    dib_fill_bmp(&tmp, bi, (const uint8_t *)P_(pbits), "CreateDIBitmap");
+  }
+  return (I64)h_alloc(HT_BMP, b);
+}
+API LoadBitmapW(I64 hinst, I64 name) {
+  gui_sh();
+  if ((U64)name >= 0x10000) gui_failfast("LoadBitmapW", "named (string) bitmap resource");
+  if (!hinst && name >= 32700 && name <= 32767) {   /* OBM_*: 実ビットマップは未同梱。13x13 の白地プレースホルダ */
+    Bmp *b = bmp_new(13, 13, 1); memset(b->bits, 0xFF, (size_t)b->stride * b->h); return (I64)h_alloc(HT_BMP, b);
+  }
+  const void *data = NULL; uint32_t sz = 0;
+  if (!g_gdi_res || !g_gdi_res((U64)hinst, 2 /* RT_BITMAP */, (uint32_t)name, &data, &sz)) { gui_set_last_error(1813); return 0; }   /* ERROR_RESOURCE_TYPE_NOT_FOUND */
+  const WBMIH *bi = (const WBMIH *)data; Bmp *b = bmp_new(bi->biWidth, bi->biHeight, 1);
+  dib_fill_bmp(b, bi, (const uint8_t *)data + dib_bits_offset(bi), "LoadBitmapW");
+  return (I64)h_alloc(HT_BMP, b);
+}
+
+/* ---------- アイコン / カーソル (擬似ハンドルの標準アイコン・カーソルのみ; 画像は 32x32 のプレースホルダ生成) ---------- */
+static int icon_kind(I64 h) { return (h >= 0x7E000000 && h < 0x7E010000) ? 1 : (h >= 0x7F000000 && h < 0x7F010000) ? 2 : 0; }
+static void icon_pixels(I64 h, uint32_t px[32 * 32], int *hx, int *hy) {   /* BGRA, 透明 = 0 */
+  memset(px, 0, 32 * 32 * 4); *hx = *hy = 0;
+  if (icon_kind(h) == 1) {
+    for (int y = 0; y < 32; y++) for (int x = 0; x < 32; x++) px[y * 32 + x] = (x == 0 || y == 0 || x == 31 || y == 31) ? 0xFF404040u : 0xFFC0C0C0u;
+    return;
+  }
+  if (h - 0x7F000000 == 32512) {   /* IDC_ARROW : 黒縁白塗りの矢印 */
+    for (int y = 0; y < 19; y++) for (int x = 0; x <= (y * 12) / 19 + 1 && x < 13; x++) px[y * 32 + x] = (x == 0 || x >= (y * 12) / 19 || y == 18) ? 0xFF000000u : 0xFFFFFFFFu;
+    return;
+  }
+  *hx = *hy = 15;   /* それ以外のカーソル = 十字 */
+  for (int i = 4; i < 28; i++) { px[15 * 32 + i] = 0xFF000000u; px[i * 32 + 15] = 0xFF000000u; }
+}
+API GetIconInfo(I64 hicon, I64 pii) {   /* ICONINFO (Win64 32B): fIcon@0 xHotspot@4 yHotspot@8 hbmMask@16 hbmColor@24。2 枚のビットマップは呼出側が DeleteObject する */
+  if (!icon_kind(hicon) || !pii) { gui_set_last_error(1402); return 0; }
+  uint32_t px[32 * 32]; int hx, hy; icon_pixels(hicon, px, &hx, &hy);
+  Bmp *c = bmp_new(32, 32, 1), *m = bmp_new(32, 32, 1);
+  for (int i = 0; i < 32 * 32; i++) { ((uint32_t *)c->bits)[i] = px[i]; ((uint32_t *)m->bits)[i] = (px[i] >> 24) ? 0xFF000000u : 0xFFFFFFFFu; }   /* AND マスク: 不透明 = 黒 */
+  uint8_t *o = (uint8_t *)P_(pii); memset(o, 0, 32);
+  *(uint32_t *)o = icon_kind(hicon) == 1; *(uint32_t *)(o + 4) = (uint32_t)hx; *(uint32_t *)(o + 8) = (uint32_t)hy;
+  *(U64 *)(o + 16) = h_alloc(HT_BMP, m); *(U64 *)(o + 24) = h_alloc(HT_BMP, c);
+  return 1;
+}
+API DrawIconEx(I64 hdc, I64 x, I64 y, I64 hicon, I64 cx, I64 cy, I64 step, I64 hbr, I64 flags) {
+  (void)step; (void)hbr; DC *d = dc_of((U64)hdc);
+  if (!d || !icon_kind(hicon)) { gui_set_last_error(icon_kind(hicon) ? 6 : 1402); return 0; }
+  uint32_t px[32 * 32]; int hx, hy; icon_pixels(hicon, px, &hx, &hy);
+  int w = (flags & 8) || cx <= 0 ? 32 : (int)cx, h = (flags & 8) || cy <= 0 ? 32 : (int)cy, f = (int)flags & 3; if (!f) f = 3;
+  int dx = dev_dx(d), dy = dev_dy(d);
+  for (int j = 0; j < h; j++) for (int i = 0; i < w; i++) {
+    uint32_t p = px[(j * 32 / h) * 32 + (i * 32 / w)]; if (!(p >> 24)) continue;
+    uint32_t col = (f == 1) ? 0xFF000000u : p;   /* DI_MASK だけなら黒 (AND マスクの不透明部) */
+    fill_dev(d, (WRECT){ (int)x + i + dx, (int)y + j + dy, (int)x + i + dx + 1, (int)y + j + dy + 1 }, col, 13);
+  }
+  return 1;
+}
+API DrawIcon(I64 hdc, I64 x, I64 y, I64 hicon) { return DrawIconEx(hdc, x, y, hicon, 0, 0, 0, 0, 3 | 4 | 8); }
+int gdi_stock_count(void) {   /* GetStockObject 群の重複を除いた数 + 既定ビットマップ */
+  int stock = 1;
+  for (int i = 0; i < 20; i++) { if (!g_stock[i]) continue; int dup = 0; for (int j = 0; j < i; j++) if (g_stock[j] == g_stock[i]) dup = 1; if (!dup) stock++; }
+  return stock;
+}
+int gdi_object_count(void) {   /* ストックを除く生存 GDI オブジェクト数 */
+  static const HType ts[] = { HT_DC, HT_BMP, HT_BRUSH, HT_PEN, HT_FONT, HT_RGN, HT_PAL };
+  int n = 0; for (unsigned i = 0; i < sizeof ts / sizeof ts[0]; i++) n += h_count(ts[i]);
+  int stock = gdi_stock_count();
+  return n > stock ? n - stock : 0;
+}

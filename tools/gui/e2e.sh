@@ -12,6 +12,7 @@ command -v google-chrome >/dev/null || [ -n "${CHROME:-}" ] || { echo "google-ch
 echo "[gui-e2e] 0/6 import 解析 + API 面生成"
 [ -f "$HERE/analysis/imports_all.json" ] || python3 "$HERE/analysis/gui_imports.py" >/dev/null
 python3 "$HERE/gen_api.py"
+python3 "$HERE/integ/check_p1_tests.py"
 python3 "$HERE/golden/gen_golden.py"
 if [ "${SKIP_NATIVE:-0}" != "1" ]; then
   echo "[gui-e2e] 1/6 native 単体テスト (ASan/UBSan)"; bash "$HERE/test/selftest.sh" | tail -2

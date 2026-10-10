@@ -37,6 +37,11 @@
    ```
    `m11_icall` は VA→trampoline (8×u64 統一署名) で、WNDPROC の引数個数が 4 でなくても `call_indirect` 署名不一致を起こさない。miss 時は 0 を返し `m11_icall_miss` を加算するだけなので、
    結合側で WNDPROC 呼出前後の miss 増分を見て fail-fast するとよい。`WNDCLASS.lpfnWndProc` の定数アドレス: `python3 tools/gui/integ/lift_fnmap.py --ir <m11>/work/boot_final.ll` が現 IR の `RegisterClassW` 呼出点 (例 `function_52a7f0` → WNDCLASS 0xfbe810) を列挙する。
+   **リソース供給 hook** (`LoadStringW`/`LoadBitmapW` 用; CAB-159): shimx 側のリソース供給 (`shimx_set_resource_provider` / FindResource 系) を同様に 1 回接続する。
+   ```c
+   static int gui_res(unsigned long long hinst, unsigned type, unsigned id, const void **data, unsigned *size);   /* RT_STRING=6 は (id>>4)+1 のブロック, RT_BITMAP=2 は DIB */
+   /* 起動時: gui_set_resource_provider(gui_res); */
+   ```
 5. **ブラウザ host**: `GuiHost.attach({canvas, memory: Module.wasmMemory, base: Module._gui_shared_ptr(), ...})` (README)。FL は**ワーカ上**で動かす (§4-4)。
 6. **到達 API ログの回収**: ExitProcess 経路 (`GUI_NO_K32` では shimx の exit hook から `gui_reach_dump()`) / fail-fast 時 (自動) / 任意時点で `Module._gui_reach_dump()`。host の `GuiHost.logs` に `GUI-REACH` 行が溜まる。
    `python3 tools/gui/integ/reach_report.py <ログ>` で「到達した stub = 実装必須」「P2/P3 の昇格候補」「未到達 P0」を出し、IMPORTS.md の P 分類を更新する (CAB-173 の完了条件)。
@@ -45,7 +50,7 @@
 ## 3. 署名/コールバックの扱い
 
 - IR の GUI declare 署名 (`ptr`=i32, WPARAM/LPARAM=i32, `i1`, `i16`, `%tagPOINT` 値渡し) は adapter で int64 化 (変換表は `INTEGRATION_XCHECK.md` §2): ptr=zero-extend / i32=sign-extend / i16,i8,i1=zero-extend / ≤8B struct=int64 詰め。
-- 現 IR の GUI declare 177 名の内訳: 実装済み 132 / fail-fast stub 45 (CAB-159 実装後に再生成して減る) / 署名不一致 0 / shim 不在 0。残り 251 名は IR に未出現。
+- 現 IR の GUI declare 177 名の内訳: 実装済み **153** / fail-fast stub **24** (CAB-159 の P1 50 名実装で 132/45 から改善; 残る stub は P2/P3 = メニュー・ImageList 等) / 署名不一致 0 / shim 不在 0。残り 251 名は IR に未出現。
 - コールバック: `gui_call4`(WNDPROC/TIMERPROC)・`gui_call2`(EnumWindows 系) が hook 経由。hook 未設定時は `GuiFnMap` ({VA, fn}) 経由 (RetDec C 経路; `gui_register_fnmap`)。
 - RetDec C 経路 (テスト PE): WNDPROC 候補は `RegisterClass*`/`SetWindowLong*` を呼ぶ関数が VA 定数で取得する関数を自動検出 (`[post] auto-detected WNDPROC: ...`)。VCL の `MakeObjectInstance` 等、データ表経由で渡る WNDPROC は静的検出不能 → m11_icall 経路が前提。
 
@@ -77,7 +82,7 @@
 | H3 | **署名の違う WNDPROC** (引数 1〜3 個に縮んだ lift 結果) を trampoline (8×u64) 越しに呼ぶ | `m11_icall` 相当グルーで署名不一致 trap が出ないこと | テスト用 `icall` を 5 行で再現可能 |
 | H4 | **別スレッド**から PostMessage/SendMessage (FL のオーディオ/ワーカ) と WM_TIMER 競合 | 他スレッド同期 SendMessage の wasm 版 (native では selftest 済み) | `PTHREAD_POOL_SIZE` を 2 → 4 に |
 | H5 | **wasm32 IR 署名**で GUI API を呼ぶ lifter 経路 (RetDec x64 ではなく m11 の wasm32 型 IR を生成) | 実機の呼び方 (`ptr`=i32, `%tagPOINT` 分解) と adapter の整合を**実行時**に確認 | 現状 sigprobe は署名検査のみ (実行は native wiring まで) |
-| H6 | FL 実リソース: `LoadStringW`・アイコン/ビットマップ資源 (`LoadBitmapW` 等) | CAB-159 で入れた provider hook に m11/shimx のリソース供給を接続 | ユーザ素材は触らない |
+| H6 | FL 実リソース: `LoadStringW`・ビットマップ資源 (`LoadBitmapW`)、アイコン資源 (`LoadImageW`/`CreateIconIndirect` は GUI-2) | `gui_set_resource_provider` に m11/shimx のリソース供給を接続 (§2-4) | ユーザ素材は触らない |
 | H7 | 既定ウィンドウクラス (BUTTON/EDIT 等 comctl32) と DPI/複数モニタ API の実呼出順 | 到達ログで確定 | CAB-173 の入力 |
 
 優先は H1→H2→H3 (結合直後に必ず踏む)。各段で `e2e.sh` のゴールデン比較 (差 0) を維持し、到達 API ログを必ず付ける。

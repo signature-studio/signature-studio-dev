@@ -173,6 +173,14 @@ GuiShared *gui_sh(void) {
 typedef struct { void *p; uint8_t type, gen; } HEnt;
 static HEnt *g_ht; static uint32_t g_ht_n, g_ht_cap; static uint32_t *g_ht_free; static uint32_t g_ht_nfree, g_ht_freecap;
 
+/* 種別ごとの生存数と GDI/USER グループのピーク (GetGuiResources 用)。HT_* の 4bit 種別で分類 */
+static int g_hcnt[16], g_peak_gdi, g_peak_user;
+static int hsum(int user) {
+  static const int gdi_t[] = { HT_DC, HT_BMP, HT_BRUSH, HT_PEN, HT_FONT, HT_RGN, HT_PAL }, usr_t[] = { HT_WND, HT_ICON, HT_CURSOR, HT_MENU, HT_HOOK };
+  const int *a = user ? usr_t : gdi_t; int n = 0, c = user ? 5 : 7;
+  for (int i = 0; i < c; i++) n += g_hcnt[a[i]];
+  return n;
+}
 U64 h_alloc(HType t, void *p) {
   gui_lock();
   uint32_t idx;
@@ -188,6 +196,7 @@ U64 h_alloc(HType t, void *p) {
     idx = g_ht_n++;
   }
   HEnt *e = &g_ht[idx];
+  g_hcnt[t & 15]++; { int a = hsum(0), b = hsum(1); if (a > g_peak_gdi) g_peak_gdi = a; if (b > g_peak_user) g_peak_user = b; }
   e->p = p; e->type = (uint8_t)t; e->gen = (uint8_t)((e->gen + 1) & 0x7f); if (!e->gen) e->gen = 1;
   U64 h = ((U64)e->gen << 24) | ((U64)t << 20) | idx;
   gui_unlock();
@@ -210,12 +219,15 @@ void *h_get(U64 h, HType t) {
   gui_unlock();
   return p;
 }
+int h_count(HType t) { gui_lock(); int n = g_hcnt[t & 15]; gui_unlock(); return n; }
+int h_peak(int user) { gui_lock(); int n = user ? g_peak_user : g_peak_gdi; gui_unlock(); return n; }
 HType h_type(U64 h) { gui_lock(); HEnt *e = h_ent(h); HType t = e ? (HType)e->type : HT_NONE; gui_unlock(); return t; }
 void h_free(U64 h) {
   gui_lock();
   HEnt *e = h_ent(h);
   if (e) {
     uint32_t idx = (uint32_t)(h & 0xFFFFF);
+    g_hcnt[e->type & 15]--;
     e->type = 0; e->p = NULL;
     if (g_ht_nfree >= g_ht_freecap) { g_ht_freecap = g_ht_freecap ? g_ht_freecap * 2 : 256; g_ht_free = (uint32_t *)realloc(g_ht_free, g_ht_freecap * 4); }
     g_ht_free[g_ht_nfree++] = idx;

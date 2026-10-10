@@ -131,7 +131,7 @@ host は **レコード書込の前に** 共有 pointer 状態 (cursor/buttons/m
 ## 9. 制限・既知の逸脱 (fail-fast ではなく近似で通すもの)
 `SetWindowRgn`/`NotifyWinEvent`/`LockWindowUpdate`/`ShowOwnedPopups`/`AttachThreadInput`/`IsDialogMessage`/`SetThreadDpiAwarenessContext` は no-op、`SelectPalette`/`RealizePalette` は常に 32bpp 真色扱い、
 `SetCursorPos` は共有 cursor 値のみ更新 (Pointer Lock 連携は未実装)、`GetDeviceCaps(RASTERCAPS)` は RC_PALETTE なし、`MsgWaitForMultipleObjects` は `nCount==0` のみ、`GetDC(NULL)`(スクリーン DC) は fail-fast。
-フックは `SetWindowsHookEx` 系を **未実装 (fail-fast)**。ImageList_*/FlatSB_*/uxtheme BufferedPaint/IME/印刷/メタファイル/wgl は stub (IMPORTS.md)。
+フック (`SetWindowsHookEx` 系) は §11 の範囲で配送 (CAB-159)。ImageList_*/FlatSB_*/uxtheme BufferedPaint/IME/印刷/メタファイル/wgl は stub (IMPORTS.md)。
 
 ## 10. FL lift 接続メモ (RetDec 実測知見, PE 実験 3 本から)
 1. **stack 上の構造体フィールド store が落ちる** (`WNDCLASSA wc; RECT r` 等。API の struct 引数型が付くと 2 番目以降の stack var が消える)。静的大域に置けば全 store が残る。
@@ -140,3 +140,22 @@ host は **レコード書込の前に** 共有 pointer 状態 (cursor/buttons/m
 4. `keybuf[n++]=c` が `g38 = &g39` (定数畳み込み誤り) に化ける例あり (`n=nkeys; ...; nkeys=n+1` に書き直すと正しい)。
 5. WndProc の引数は未使用だと落ちる (`WndProc(a1)` 等) → `--wndproc` で 4 引数正規化。関数ポインタは VA 整数 → fnmap 登録。
 6. `(int32_t)lParam` に潰される箇所がある → 64bit 値を lParam で渡す API は 31bit 内ポインタ前提 (wasm の >2GB ヒープは注意)。
+
+## 11. P1 拡張 (CAB-159) の意味論と制約
+
+実装: `src/gui_core_ext.inc` (user32; `gui_core.c` 末尾で #include) と `src/gui_gdi.c` 末尾 (gdi32/user32 描画系)。テスト: `test/selftest_p1.inc` (231 assertion)。
+
+- **クリップボード (7)**: プロセス内ストア。Open 中のみ Empty/Set/Get/Enum 可、他スレッド Open 中は `ERROR_ACCESS_DENIED`、Empty で旧所有者へ `WM_DESTROYCLIPBOARD`、
+  `SetClipboardData(fmt, NULL)` は遅延レンダリング (Get 時に所有者へ `WM_RENDERFORMAT`)。データは HGLOBAL 値をそのまま保持し内容は解釈しない (CF_TEXT↔CF_UNICODETEXT の自動合成なし)。
+  **ブラウザとの橋渡しは未実装** (host/プロトコル変更が要るため): async Clipboard API (`navigator.clipboard.readText/writeText`) は**ユーザジェスチャ + 権限**が必要で非同期。
+  設計案 = ① copy: `CloseClipboard` 時に CF_UNICODETEXT を LOG 系の新 `GUI_CMD_CLIP_SET` で host へ送り host が `writeText` (keydown 等のジェスチャ内で最大 1 回)、
+  ② paste: host が `paste` イベントの本文を新 `GUI_IN_CLIP_TEXT` で共有領域へ置き、次の `OpenClipboard` で shim が HGLOBAL 化して Store に積む。同期 API は「直近の paste イベントのスナップショット」を返す形になる (FL が任意タイミングで読む場合は古い可能性)。
+- **フック (3)**: 配送は `WH_KEYBOARD`(2)/`WH_MOUSE`(7) (入力→キュー前、戻り≠0 で破棄)・`WH_GETMESSAGE`(3)・`WH_CALLWNDPROC`(4)/`WH_CALLWNDPROCRET`(12) (SendMessage 経路のみ)。
+  それ以外の有効 id (-1..14) は登録のみ (呼ばれない)。グローバル/他プロセスのフックは存在しない (`dwThreadId`/`hMod` は無視)。新しいフックほど先、`CallNextHookEx` で次へ。呼出中の解除は遅延回収。
+- **モニタ/DPI (7)**: 単一仮想モニタ (HMONITOR=0x7B000001, 矩形 = canvas 寸法)。`EnumDisplaySettingsW` は 1 モード (32bpp/60Hz)。DPI は `SetThreadDpiHostingBehavior` の値保持のみ (描画スケールは GUI-7)。`GetGuiResources` はハンドル表の種別別カウンタ (GDI はストック除く、PEAK は実ピーク)。
+- **キャレット (4 + 前倒し `CreateCaret`)**: システムで 1 個。表示 = client DC への `DSTINVERT` (点滅なし)。所有ウィンドウ破棄でキャレット破棄。WM_PAINT で上書きされた場合は次の Show/Hide/移動まで反転状態が不整合になり得る (近似)。
+- **入力 (7)**: `SendInput` は host リングを介さず `translate_input` へ直接注入 (キー/Unicode/スキャンコード/マウス相対・絶対 (0..65535→画面)・ボタン・ホイール)。`buttons/mods/cursor` は host 所有の領域を shim も更新し、次の実入力で host 値に上書きされる。`ToUnicode`/`ToAscii` は US 配列 (デッドキー・AltGr なし)。キー名/スキャンコード表は set 1 US。HKL は 1 個 (0x04090409)。
+- **リソース**: `LoadStringW` (RT_STRING) / `LoadBitmapW` (RT_BITMAP, 24/32bpp のみ) は `gui_set_resource_provider()` で結合側が供給する (shimx の FindResource/LoadResource 相当を CAB-173 で接続)。未設定/未発見は 0 + `ERROR_RESOURCE_NAME_NOT_FOUND`(1814)/`ERROR_RESOURCE_TYPE_NOT_FOUND`(1813)。
+- **GDI**: `DrawEdge` は矩形のみ (`BF_DIAGONAL` は fail-fast; SOFT は近似)。`DrawFrameControl` は形状簡略 (ボタン/チェック/ラジオ/スクロール矢印/キャプション/メニュー記号)。`DrawFocusRect` は (x+y)偶数画素の XOR (2 回で復帰)。
+  `CreateDCW("DISPLAY")` は画面寸法を返す互換 DC (描画は破棄; 画面直描きは不可)。`GetClipRgn` は論理座標、`GetRandomRgn` は SYSRGN=画面座標 / CLIPRGN=DC 原点基準。`GetRegionData` は RDH_RECTANGLES を (top,left) 順で返す。
+  アイコン/カーソルは標準 (擬似ハンドル) のみ: 32x32 のプレースホルダ画像を生成して `GetIconInfo`/`DrawIcon[Ex]` が使う (実画像資源・`CreateIconIndirect`・`LoadImage` は GUI-2)。

@@ -29,11 +29,13 @@ void gui_headless_attach(uint32_t w, uint32_t h);
 
 /* ---- handle table ---- */
 typedef enum { HT_NONE = 0, HT_WND, HT_DC, HT_BMP, HT_BRUSH, HT_PEN, HT_FONT, HT_RGN, HT_ICON, HT_CURSOR,
-               HT_PAL, HT_MENU } HType;
+               HT_PAL, HT_MENU, HT_HOOK } HType;
 U64 h_alloc(HType t, void *p);
 void *h_get(U64 h, HType t);              /* 型/世代不一致は NULL */
 HType h_type(U64 h);
 void h_free(U64 h);
+int  h_count(HType t);                    /* 生存ハンドル数 (GetGuiResources 用) */
+int  h_peak(int user);                    /* GDI(0)/USER(1) グループの生存数ピーク */
 
 
 /* ---- rect list (region の実体) ---- */
@@ -89,6 +91,11 @@ typedef uint64_t (*GuiIcallHook)(uint64_t target, uint64_t a0, uint64_t a1, uint
 void gui_set_icall_hook(GuiIcallHook h);
 I64 gui_call4(U64 target, I64 a0, I64 a1, I64 a2, I64 a3);
 I64 gui_call2(U64 target, I64 a0, I64 a1);
+I64 gui_call3(U64 target, I64 a0, I64 a1, I64 a2);               /* HOOKPROC */
+/* リソース供給 (LoadStringW/LoadBitmapW): 結合側が shimx のリソース供給 (FindResource/LoadResource 相当) を接続する。
+ * type は RT_xxx の数値、id は整数 ID (MAKEINTRESOURCE)。見つかれば out 引数 data/size を設定して 1 を返す */
+typedef int (*GuiResProvider)(uint64_t hinst, uint32_t type, uint32_t id, const void **data, uint32_t *size);
+void gui_set_resource_provider(GuiResProvider p);
 /* 到達 API ログ (gui_reach.c) */
 void gui_reach_hit(int idx);
 void gui_reach_hit_name(const char *name);

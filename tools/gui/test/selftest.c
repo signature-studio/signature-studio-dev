@@ -85,6 +85,8 @@ static uint64_t ihook(uint64_t t, uint64_t a0, uint64_t a1, uint64_t a2, uint64_
 static uint32_t rgb(int r, int g, int b) { return (uint32_t)(r << 16 | g << 8 | b); }
 static uint32_t cref(int r, int g, int b) { return (uint32_t)(r | g << 8 | b << 16); }
 
+#include "selftest_p1.inc"
+
 int main(void) {
   gui_hl_start(640, 480, 1);
   GuiShared *S = gui_shared_native();
@@ -303,6 +305,8 @@ int main(void) {
         && EnumChildWindows(hk, 0x20000124ull, 0) == 1 && g_enum_hits == 1, "2-arg callback (EnumChildWindows) through hook (hits=%d)", g_enum_hits);
     DestroyWindow(hk); }
   gui_set_icall_hook(NULL);
+
+  run_p1(h);
 
   SECTION("SendMessage / cross-thread");
   CHK(SendMessageA(h, WM_USER + 9, 0, 0) == 4242, "SendMessage direct");

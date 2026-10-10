@@ -1,14 +1,14 @@
 # m11 IR の GUI declare ↔ shim exports 突合表 (自動生成)
 
-生成: `python3 tools/gui/integ/gen_adapt.py` / 入力 IR: `../m11/work/boot_final.ll` (19882776 B, sha1 e5d3820e86)。shim 側は `build/gui_reach_tab.json` (gen_api.py 産; 実装 261 + stub 210)。
+生成: `python3 tools/gui/integ/gen_adapt.py` / 入力 IR: `integ/fixtures/boot_final_gui_declares.ll (m11 boot_final.ll の GUI declare 抜粋)` (10669 B, sha1 03a45205b0)。shim 側は `build/gui_reach_tab.json` (gen_api.py 産; 実装 312 + stub 159)。
 
 ## 1. 要約
 
 | 区分 | 件数 | 意味 |
 |---|---|---|
 | IR が declare する GUI 系 import 名 | 177 | FLEngine の GUI import 428 名のうち m11 IR(boot 到達閉包)に現れるもの |
-| (a) 実装済み・adapter 生成可 | 132 | `gui_adapt_w32.c` の wrapper で署名一致 |
-| (b) fail-fast stub・adapter 生成可 | 45 | 署名は合うが到達すると `FAIL-FAST: unimplemented Win32 API` で停止 (**実到達 API ログで優先度見直し対象**) |
+| (a) 実装済み・adapter 生成可 | 153 | `gui_adapt_w32.c` の wrapper で署名一致 |
+| (b) fail-fast stub・adapter 生成可 | 24 | 署名は合うが到達すると `FAIL-FAST: unimplemented Win32 API` で停止 (**実到達 API ログで優先度見直し対象**) |
 | (c) 署名不一致 (adapter 不能) | 0 | 下記変換方針で **0 件**であることが完了条件 |
 | (d) shim に存在しない | 0 | gen_api.py の arity 表(mingw ヘッダ+手動表)が全 import を網羅しているため 0 の想定 |
 | IR 未 declare (まだ lift 閉包に現れない) | 251 | 実結合で lift 範囲が広がると declare される。同じ adapter 生成で追従 |
@@ -27,38 +27,19 @@ shim は全 API を `int64_t NAME(int64_t...)` (lift ABI) で公開、m11 IR は
 
 コールバック (`WNDPROC`/`TIMERPROC`/`EnumWindowsProc`) の呼出は `gui_set_icall_hook()` で m11 の `m11_icall` (VA -> trampoline, 8×u64 統一署名) に委譲するので、lifted 側 WNDPROC の署名が 4 引数でなくても `call_indirect` 署名不一致は起きない (INTEGRATION.md §3)。
 
-## 3. 到達しうる fail-fast stub (b) — 45 件
+## 3. 到達しうる fail-fast stub (b) — 24 件
 
 | API | xref | IR 署名 | 備考 |
 |---|---|---|---|
-| CharNextW | 11 | `ptr(ptr)` |  |
 | DeleteMenu | 11 | `i1(ptr, i32, i32)` |  |
-| LoadStringW | 11 | `i32(ptr, i32, ptr, i32)` |  |
 | GetPaletteEntries | 9 | `i32(ptr, i32, i32, ptr)` |  |
-| SetClipboardData | 8 | `ptr(i32, ptr)` |  |
-| SetWindowsHookExW | 8 | `ptr(i32, ptr, ptr, i32)` |  |
-| UnhookWindowsHookEx | 8 | `i1(ptr)` |  |
-| GetMonitorInfoW | 7 | `i1(i64, ptr)` |  |
-| GetIconInfo | 6 | `i1(ptr, ptr)` |  |
 | GetSystemPaletteEntries | 6 | `i32(ptr, i32, i32, ptr)` |  |
-| MonitorFromWindow | 6 | `i64(ptr, i32)` |  |
-| CreateDIBitmap | 5 | `ptr(ptr, ptr, i32, ptr, ptr, i32)` |  |
-| DestroyCursor | 5 | `i1(ptr)` |  |
 | DrawMenuBar | 5 | `i1(ptr)` |  |
-| CharLowerBuffW | 4 | `i32(ptr, i32)` |  |
-| CharUpperBuffW | 4 | `i32(ptr, i32)` |  |
 | CreateHalftonePalette | 4 | `ptr(ptr)` |  |
-| GetClipboardFormatNameW | 4 | `i32(i32, ptr, i32)` |  |
 | GetDIBColorTable | 4 | `i32(ptr, i32, i32, ptr)` |  |
-| GetRandomRgn | 4 | `i32(ptr, ptr, i32)` |  |
 | GetSystemMenu | 4 | `ptr(ptr, i1)` | i1 |
 | SetDIBColorTable | 4 | `i32(ptr, i32, i32, ptr)` |  |
-| CharUpperW | 3 | `ptr(ptr)` |  |
-| EnumDisplayMonitors | 3 | `i1(ptr, ptr, ptr, i32)` |  |
-| EnumDisplaySettingsW | 3 | `i1(ptr, i32, ptr)` |  |
 | GetBitmapBits | 3 | `i32(ptr, i32, ptr)` |  |
-| GetClipRgn | 3 | `i32(ptr, ptr)` |  |
-| GetRegionData | 3 | `i32(ptr, i32, ptr)` |  |
 | BufferedPaintInit | 2 | `i32()` |  |
 | CharLowerW | 2 | `ptr(ptr)` |  |
 | CheckMenuItem | 2 | `i32(ptr, i32, i32)` |  |
@@ -66,10 +47,8 @@ shim は全 API を `int64_t NAME(int64_t...)` (lift ABI) で公開、m11 IR は
 | CreateIcon | 2 | `ptr(ptr, i32, i32, i8, i8, ptr, ptr)` |  |
 | CreateIconIndirect | 2 | `ptr(ptr)` |  |
 | EnumFontFamiliesExW | 2 | `i32(ptr, ptr, ptr, i32, i32)` |  |
-| GetCursorInfo | 2 | `i1(ptr)` |  |
 | GetDCOrgEx | 2 | `i1(ptr, ptr)` |  |
 | GetDpiForMonitor | 2 | `i32(i64, i64, ptr, ptr)` |  |
-| GetKeyNameTextW | 2 | `i32(i32, ptr, i32)` |  |
 | GetMenuItemInfoW | 2 | `i1(ptr, i32, i1, ptr)` | i1 |
 | GetProcessDpiAwareness | 2 | `i32(ptr, ptr)` |  |
 | IsProcessDPIAware | 2 | `i1()` |  |
@@ -81,34 +60,15 @@ shim は全 API を `int64_t NAME(int64_t...)` (lift ABI) で公開、m11 IR は
 
 | API | 区分 | shim | P | IR 署名 | 備考 |
 |---|---|---|---|---|---|
-| CharNextW | b | stub | P1 | `ptr(ptr)` |  |
 | DeleteMenu | b | stub | P2 | `i1(ptr, i32, i32)` |  |
-| LoadStringW | b | stub | P1 | `i32(ptr, i32, ptr, i32)` |  |
 | GetPaletteEntries | b | stub | P2 | `i32(ptr, i32, i32, ptr)` |  |
-| SetClipboardData | b | stub | P1 | `ptr(i32, ptr)` |  |
-| SetWindowsHookExW | b | stub | P1 | `ptr(i32, ptr, ptr, i32)` |  |
-| UnhookWindowsHookEx | b | stub | P1 | `i1(ptr)` |  |
-| GetMonitorInfoW | b | stub | P1 | `i1(i64, ptr)` |  |
-| GetIconInfo | b | stub | P1 | `i1(ptr, ptr)` |  |
 | GetSystemPaletteEntries | b | stub | P2 | `i32(ptr, i32, i32, ptr)` |  |
-| MonitorFromWindow | b | stub | P1 | `i64(ptr, i32)` |  |
-| CreateDIBitmap | b | stub | P1 | `ptr(ptr, ptr, i32, ptr, ptr, i32)` |  |
-| DestroyCursor | b | stub | P1 | `i1(ptr)` |  |
 | DrawMenuBar | b | stub | P2 | `i1(ptr)` |  |
-| CharLowerBuffW | b | stub | P1 | `i32(ptr, i32)` |  |
-| CharUpperBuffW | b | stub | P1 | `i32(ptr, i32)` |  |
 | CreateHalftonePalette | b | stub | P2 | `ptr(ptr)` |  |
-| GetClipboardFormatNameW | b | stub | P1 | `i32(i32, ptr, i32)` |  |
 | GetDIBColorTable | b | stub | P2 | `i32(ptr, i32, i32, ptr)` |  |
-| GetRandomRgn | b | stub | P1 | `i32(ptr, ptr, i32)` |  |
 | GetSystemMenu | b | stub | P2 | `ptr(ptr, i1)` | i1 |
 | SetDIBColorTable | b | stub | P2 | `i32(ptr, i32, i32, ptr)` |  |
-| CharUpperW | b | stub | P1 | `ptr(ptr)` |  |
-| EnumDisplayMonitors | b | stub | P1 | `i1(ptr, ptr, ptr, i32)` |  |
-| EnumDisplaySettingsW | b | stub | P1 | `i1(ptr, i32, ptr)` |  |
 | GetBitmapBits | b | stub | P2 | `i32(ptr, i32, ptr)` |  |
-| GetClipRgn | b | stub | P1 | `i32(ptr, ptr)` |  |
-| GetRegionData | b | stub | P1 | `i32(ptr, i32, ptr)` |  |
 | BufferedPaintInit | b | stub | P3 | `i32()` |  |
 | CharLowerW | b | stub | P2 | `ptr(ptr)` |  |
 | CheckMenuItem | b | stub | P3 | `i32(ptr, i32, i32)` |  |
@@ -116,10 +76,8 @@ shim は全 API を `int64_t NAME(int64_t...)` (lift ABI) で公開、m11 IR は
 | CreateIcon | b | stub | P2 | `ptr(ptr, i32, i32, i8, i8, ptr, ptr)` |  |
 | CreateIconIndirect | b | stub | P2 | `ptr(ptr)` |  |
 | EnumFontFamiliesExW | b | stub | P2 | `i32(ptr, ptr, ptr, i32, i32)` |  |
-| GetCursorInfo | b | stub | P1 | `i1(ptr)` |  |
 | GetDCOrgEx | b | stub | P3 | `i1(ptr, ptr)` |  |
 | GetDpiForMonitor | b | stub | P2 | `i32(i64, i64, ptr, ptr)` |  |
-| GetKeyNameTextW | b | stub | P1 | `i32(i32, ptr, i32)` |  |
 | GetMenuItemInfoW | b | stub | P3 | `i1(ptr, i32, i1, ptr)` | i1 |
 | GetProcessDpiAwareness | b | stub | P2 | `i32(ptr, ptr)` |  |
 | IsProcessDPIAware | b | stub | P2 | `i1()` |  |
@@ -184,9 +142,11 @@ shim は全 API を `int64_t NAME(int64_t...)` (lift ABI) で公開、m11 IR は
 | GetClassInfoW | a | impl | P0 | `i1(ptr, ptr, ptr)` |  |
 | SelectClipRgn | a | impl | P1 | `i32(ptr, ptr)` |  |
 | SetPhysicalCursorPos | a | impl | P0 | `i1(i32, i32)` |  |
+| CharNextW | a | impl | P1 | `ptr(ptr)` |  |
 | GetClientRect | a | impl | P0 | `i1(ptr, ptr)` |  |
 | GetStockObject | a | impl | P1 | `ptr(i32)` |  |
 | GetTextMetricsW | a | impl | P1 | `i1(ptr, ptr)` |  |
+| LoadStringW | a | impl | P1 | `i32(ptr, i32, ptr, i32)` |  |
 | UnregisterClassW | a | impl | P0 | `i1(ptr, ptr)` |  |
 | CreatePalette | a | impl | P2 | `ptr(ptr)` |  |
 | CreateWindowExW | a | impl | P0 | `ptr(i32, ptr, ptr, i32, i32, i32, i32, i32, ptr, ptr, ptr, ptr)` |  |
@@ -207,17 +167,25 @@ shim は全 API を `int64_t NAME(int64_t...)` (lift ABI) で公開、m11 IR は
 | LoadCursorW | a | impl | P1 | `ptr(ptr, ptr)` |  |
 | MapVirtualKeyW | a | impl | P0 | `i32(i32, i32)` |  |
 | PatBlt | a | impl | P0 | `i1(ptr, i32, i32, i32, i32, i32)` |  |
+| SetClipboardData | a | impl | P1 | `ptr(i32, ptr)` |  |
 | SetWindowPlacement | a | impl | P1 | `i1(ptr, ptr)` |  |
+| SetWindowsHookExW | a | impl | P1 | `ptr(i32, ptr, ptr, i32)` |  |
 | TranslateMessage | a | impl | P0 | `i1(ptr)` |  |
+| UnhookWindowsHookEx | a | impl | P1 | `i1(ptr)` |  |
 | CreateDIBSection | a | impl | P0 | `ptr(ptr, ptr, i32, ptr, ptr, i32)` |  |
 | CreateSolidBrush | a | impl | P1 | `ptr(i32)` |  |
 | FindWindowW | a | impl | P1 | `ptr(ptr, ptr)` |  |
+| GetMonitorInfoW | a | impl | P1 | `i1(i64, ptr)` |  |
 | LoadIconW | a | impl | P1 | `ptr(ptr, ptr)` |  |
 | PostQuitMessage | a | impl | P0 | `void(i32)` |  |
 | SetPropW | a | impl | P1 | `i1(ptr, ptr, ptr)` |  |
 | EnumThreadWindows | a | impl | P1 | `i1(i32, ptr, i32)` |  |
+| GetIconInfo | a | impl | P1 | `i1(ptr, ptr)` |  |
 | GetLastActivePopup | a | impl | P1 | `ptr(ptr)` |  |
+| MonitorFromWindow | a | impl | P1 | `i64(ptr, i32)` |  |
 | SetRectRgn | a | impl | P1 | `i1(ptr, i32, i32, i32, i32)` |  |
+| CreateDIBitmap | a | impl | P1 | `ptr(ptr, ptr, i32, ptr, ptr, i32)` |  |
+| DestroyCursor | a | impl | P1 | `i1(ptr)` |  |
 | EnumWindows | a | impl | P1 | `i1(ptr, i32)` |  |
 | ExtSelectClipRgn | a | impl | P1 | `i32(ptr, ptr, i32)` |  |
 | GetPhysicalCursorPos | a | impl | P0 | `i1(ptr)` |  |
@@ -229,25 +197,36 @@ shim は全 API を `int64_t NAME(int64_t...)` (lift ABI) で公開、m11 IR は
 | ValidateRect | a | impl | P0 | `i1(ptr, ptr)` |  |
 | WindowFromPoint | a | impl | P0 | `ptr(%tagPOINT)` | struct 値渡し -> int64 詰め |
 | BeginDeferWindowPos | a | impl | P1 | `ptr(i32)` |  |
+| CharLowerBuffW | a | impl | P1 | `i32(ptr, i32)` |  |
+| CharUpperBuffW | a | impl | P1 | `i32(ptr, i32)` |  |
 | DeferWindowPos | a | impl | P1 | `ptr(ptr, ptr, ptr, i32, i32, i32, i32, i32)` |  |
 | EnableWindow | a | impl | P0 | `i1(ptr, i1)` | i1 |
 | EndDeferWindowPos | a | impl | P1 | `i1(ptr)` |  |
 | EnumChildWindows | a | impl | P1 | `i1(ptr, ptr, i32)` |  |
 | EqualRgn | a | impl | P1 | `i1(ptr, ptr)` |  |
 | GetClipCursor | a | impl | P0 | `i1(ptr)` |  |
+| GetClipboardFormatNameW | a | impl | P1 | `i32(i32, ptr, i32)` |  |
 | GetCursor | a | impl | P1 | `ptr()` |  |
 | GetKeyboardLayout | a | impl | P0 | `ptr(i32)` |  |
+| GetRandomRgn | a | impl | P1 | `i32(ptr, ptr, i32)` |  |
 | GetRgnBox | a | impl | P1 | `i32(ptr, ptr)` |  |
 | GetUpdateRgn | a | impl | P1 | `i32(ptr, ptr, i1)` | i1 |
 | LPtoDP | a | impl | P1 | `i1(ptr, ptr, i32)` |  |
 | MsgWaitForMultipleObjects | a | impl | P1 | `i32(i32, ptr, i1, i32, i32)` | i1 |
 | SetClassLongPtrW | a | impl | P1 | `i32(ptr, i32, i32)` |  |
 | ShowOwnedPopups | a | impl | P1 | `i1(ptr, i1)` | i1 |
+| CharUpperW | a | impl | P1 | `ptr(ptr)` |  |
+| EnumDisplayMonitors | a | impl | P1 | `i1(ptr, ptr, ptr, i32)` |  |
+| EnumDisplaySettingsW | a | impl | P1 | `i1(ptr, i32, ptr)` |  |
+| GetClipRgn | a | impl | P1 | `i32(ptr, ptr)` |  |
+| GetRegionData | a | impl | P1 | `i32(ptr, i32, ptr)` |  |
 | RectInRegion | a | impl | P1 | `i1(ptr, ptr)` |  |
 | ScrollWindowEx | a | impl | P1 | `i32(ptr, i32, i32, ptr, ptr, ptr, ptr, i32)` |  |
 | ShowCursor | a | impl | P1 | `i32(i1)` | i1 |
 | WaitMessage | a | impl | P0 | `i1()` |  |
 | DispatchMessageA | a | impl | P0 | `i32(ptr)` |  |
+| GetCursorInfo | a | impl | P1 | `i1(ptr)` |  |
+| GetKeyNameTextW | a | impl | P1 | `i32(i32, ptr, i32)` |  |
 | GetSysColor | a | impl | P2 | `i32(i32)` |  |
 | GetWindowTextW | a | impl | P0 | `i32(ptr, ptr, i32)` |  |
 | InvalidateRgn | a | impl | P0 | `i1(ptr, ptr, i1)` | i1 |
@@ -261,4 +240,4 @@ shim は全 API を `int64_t NAME(int64_t...)` (lift ABI) で公開、m11 IR は
 
 ## 5. IR 未 declare の GUI import (251 名; 実結合で出現しうる)
 
-実装済み 86 / stub 165。stub の内訳 (P 別): P0=0, P1=29, P2=59, P3=77
+実装済み 116 / stub 135。stub の内訳 (P 別): P0=0, P1=0, P2=58, P3=77

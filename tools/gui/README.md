@@ -14,3 +14,4 @@ FL の GUI (Win32 user32/gdi32 経由のウィンドウ・メッセージルー�
 
 結合 (実 FLEngine; CAB-173) 向け: [INTEGRATION.md](INTEGRATION.md) (リンク手順・ABI チェックリスト・到達 API ログ) / [integ/INTEGRATION_XCHECK.md](integ/INTEGRATION_XCHECK.md) (m11 IR との署名突合表; `python3 tools/gui/integ/gen_adapt.py`)。
 検証: `bash tools/gui/test/reach_test.sh` (到達ログ/adapter/31bit) / `bash tools/gui/integ/sigprobe.sh` (wasm-ld 署名検査) / `bash tools/gui/lift/gui_wasm.sh <lifted.c> <out> reach` (到達ログ付き wasm)。
+P1 50 名 (CAB-159) の意味論: [PROTOCOL.md §11](PROTOCOL.md)。unit テスト `test/selftest_p1.inc` (selftest 314 assertion) と `python3 tools/gui/integ/check_p1_tests.py` (実装+テスト呼出の機械検査)。

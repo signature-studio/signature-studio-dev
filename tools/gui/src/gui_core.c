@@ -196,6 +196,17 @@ I64 gui_call4(U64 t, I64 a0, I64 a1, I64 a2, I64 a3) {
   if (g_icall_hook) return (I64)g_icall_hook(t, (uint64_t)a0, (uint64_t)a1, (uint64_t)a2, (uint64_t)a3);
   return ((WNDPROC64)gui_resolve_fn(t))(a0, a1, a2, a3);
 }
+I64 gui_call3(U64 t, I64 a0, I64 a1, I64 a2) {
+  if (g_icall_hook) return (I64)g_icall_hook(t, (uint64_t)a0, (uint64_t)a1, (uint64_t)a2, 0);
+  return ((int64_t (*)(int64_t, int64_t, int64_t))gui_resolve_fn(t))(a0, a1, a2);
+}
+static GuiResProvider g_res_provider;
+void gui_set_resource_provider(GuiResProvider p) { g_res_provider = p; }
+GuiResProvider gui_get_resource_provider(void) { return g_res_provider; }
+/* フック (gui_core_ext.inc): WH_* の内部ディスパッチ。id = WH_* (-1..14) */
+static int hook_any(int id);
+static I64 hook_run(int id, int code, U64 wp, I64 lp);
+enum { WH_MSGFILTER = -1, WH_KEYBOARD = 2, WH_GETMESSAGE = 3, WH_CALLWNDPROC = 4, WH_MOUSE = 7, WH_CALLWNDPROCRET = 12 };
 I64 gui_call2(U64 t, I64 a0, I64 a1) {
   if (g_icall_hook) return (I64)g_icall_hook(t, (uint64_t)a0, (uint64_t)a1, 0, 0);
   return ((int64_t (*)(int64_t, int64_t))gui_resolve_fn(t))(a0, a1);
@@ -282,6 +293,18 @@ static void q_push(QMsg m) {
   gui_doorbell();
 }
 
+/* SendMessage 経路の呼出し: WH_CALLWNDPROC / WH_CALLWNDPROCRET を挟む (キュー経由 = DispatchMessage には掛けない: Windows と同じ) */
+static I64 call_proc_sent(Wnd *w, uint32_t msg, U64 wp, I64 lp) {
+  if (!hook_any(WH_CALLWNDPROC) && !hook_any(WH_CALLWNDPROCRET)) return call_proc(w, msg, wp, lp);
+  struct { I64 lParam; U64 wParam; uint32_t message, _pad; U64 hwnd; } cwp = { lp, wp, msg, 0, w->h };
+  if (hook_any(WH_CALLWNDPROC)) hook_run(WH_CALLWNDPROC, 0, 1, (I64)(uintptr_t)&cwp);
+  I64 r = call_proc(w, cwp.message, cwp.wParam, cwp.lParam);
+  if (hook_any(WH_CALLWNDPROCRET)) {
+    struct { I64 lResult; I64 lParam; U64 wParam; uint32_t message, _pad; U64 hwnd; } cwr = { r, cwp.lParam, cwp.wParam, cwp.message, 0, w->h };
+    hook_run(WH_CALLWNDPROCRET, 0, 1, (I64)(uintptr_t)&cwr);
+  }
+  return r;
+}
 static I64 send_message(U64 h, uint32_t msg, U64 wp, I64 lp) {
   Wnd *w = wnd_from_h(h);
   if (!w) return 0;
@@ -292,7 +315,7 @@ static I64 send_message(U64 h, uint32_t msg, U64 wp, I64 lp) {
     while (!__atomic_load_n(&rq.done, __ATOMIC_ACQUIRE)) gui_futex_wait(&rq.done, 0, 10);
     return rq.result;
   }
-  return call_proc(w, msg, wp, lp);
+  return call_proc_sent(w, msg, wp, lp);
 }
 
 /* ================= クラス ================= */
@@ -884,6 +907,11 @@ static int g_cursor_shape = -1;
 static uint32_t g_last_click_t; static int g_last_click_x, g_last_click_y, g_last_click_btn = -1;
 static I64 mk_lparam(int x, int y) { return ((I64)(uint16_t)(int16_t)y << 16) | (uint16_t)(int16_t)x; }
 
+static int mouse_hook_discard(Wnd *w, uint32_t msg, int x, int y) {
+  if (!hook_any(WH_MOUSE)) return 0;
+  struct { WPOINT pt; U64 hwnd; uint32_t hit, _pad; U64 extra; } mh = { { x, y }, w->h, 1 /* HTCLIENT */, 0, 0 };
+  return hook_run(WH_MOUSE, 0, msg, (I64)(uintptr_t)&mh) != 0;
+}
 static void translate_input(const uint32_t *r) {
   GuiShared *sh = gui_sh();
   uint32_t type = r[0]; int x = (int32_t)r[2], y = (int32_t)r[3]; uint32_t a = r[4], b = r[5], t = r[6];
@@ -897,11 +925,13 @@ static void translate_input(const uint32_t *r) {
       if (!w) return;
       if (type == GUI_IN_MOUSE_MOVE) {
         if (!g_capture) send_message(w->h, WM_SETCURSOR, w->h, (I64)(1 | (WM_MOUSEMOVE << 16)));
+        if (mouse_hook_discard(w, WM_MOUSEMOVE, x, y)) return;
         QMsg m = { w->h, WM_MOUSEMOVE, cur_mods_wparam(sh), mk_lparam(lx, ly), t, { x, y }, NULL };
         q_push_move_coalesce(m);
       } else if (type == GUI_IN_WHEEL) {
         int sx = x, sy = y;
         Wnd *fw = g_focus ? g_focus : w; (void)fw;
+        if (mouse_hook_discard(w, WM_MOUSEWHEEL, x, y)) return;
         QMsg m = { w->h, WM_MOUSEWHEEL, ((U64)(uint16_t)(int16_t)(int32_t)a << 16) | cur_mods_wparam(sh), mk_lparam(sx, sy), t, { x, y }, NULL };
         q_push(m);
       } else {
@@ -915,6 +945,7 @@ static void translate_input(const uint32_t *r) {
           if (dbl) { msg = base + 2; g_last_click_btn = -1; }
           else { g_last_click_btn = btn; g_last_click_t = t; g_last_click_x = x; g_last_click_y = y; }
         }
+        if (mouse_hook_discard(w, msg, x, y)) return;
         QMsg m = { w->h, msg, cur_mods_wparam(sh), mk_lparam(lx, ly), t, { x, y }, NULL };
         q_push(m);
       }
@@ -929,6 +960,7 @@ static void translate_input(const uint32_t *r) {
       uint32_t msg = type == GUI_IN_KEY_DOWN ? (alt ? WM_SYSKEYDOWN : WM_KEYDOWN) : (alt ? WM_SYSKEYUP : WM_KEYUP);
       uint32_t scan = (b >> 8) & 0xFF;
       I64 lp = 1 | ((I64)scan << 16) | ((b & 2) ? (1 << 24) : 0) | ((b & 1) ? (1 << 30) : 0) | (type == GUI_IN_KEY_UP ? (3u << 30) : 0) | (alt ? (1 << 29) : 0);
+      if (hook_any(WH_KEYBOARD) && hook_run(WH_KEYBOARD, 0, vk, lp)) return;
       QMsg m = { w->h, msg, vk, lp, t, { x, y }, NULL };
       q_push(m);
       return;
@@ -1002,7 +1034,7 @@ static int service_sync_requests(void) {
     gui_unlock();
     if (!found) break;
     Wnd *w = wnd_from_h(m.hwnd);
-    m.sync->result = w ? call_proc(w, m.msg, m.wp, m.lp) : 0;
+    m.sync->result = w ? call_proc_sent(w, m.msg, m.wp, m.lp) : 0;
     __atomic_store_n(&m.sync->done, 1, __ATOMIC_RELEASE);
     gui_futex_wake(&m.sync->done);
     did = 1;
@@ -1079,6 +1111,7 @@ static API get_message_impl(I64 lpmsg, I64 hwnd, I64 mn, I64 mx) {
     uint32_t seen = __atomic_load_n(&sh->doorbell, __ATOMIC_SEQ_CST);
     if (try_get(m, (U64)hwnd, (uint32_t)mn, (uint32_t)mx, 1)) {
       g_msg_time = m->time; g_msg_pt = m->pt;
+      if (hook_any(WH_GETMESSAGE)) hook_run(WH_GETMESSAGE, 0, PM_REMOVE, (I64)(uintptr_t)m);
       return m->message == WM_QUIT ? 0 : 1;
     }
     surf_flush();
@@ -1092,6 +1125,7 @@ static API peek_message_impl(I64 lpmsg, I64 hwnd, I64 mn, I64 mx, I64 flags) {
   gui_sh();
   int ok = try_get(m, (U64)hwnd, (uint32_t)mn, (uint32_t)mx, (flags & PM_REMOVE) != 0);
   if (!ok) surf_flush();
+  else if (hook_any(WH_GETMESSAGE)) hook_run(WH_GETMESSAGE, 0, (flags & PM_REMOVE) ? PM_REMOVE : PM_NOREMOVE, (I64)(uintptr_t)m);
   return ok;
 }
 API PeekMessageA(I64 a, I64 b, I64 c, I64 d, I64 e) { return peek_message_impl(a, b, c, d, e); }
@@ -1139,12 +1173,13 @@ API CallWindowProcW(I64 proc, I64 h, I64 msg, I64 wp, I64 lp) { return CallWindo
 API PostQuitMessage(I64 code) { gui_sh(); g_quit_posted = 1; g_quit_code = (int)code; gui_doorbell(); return 0; }
 API GetMessagePos(void) { return ((I64)(uint16_t)g_msg_pt.y << 16) | (uint16_t)g_msg_pt.x; }
 API GetMessageTime(void) { return g_msg_time; }
+static char g_regnames[64][96]; static int g_nregnames;
+static const char *regmsg_name(uint32_t id) { return (id >= 0xC000 && id < 0xC000u + (uint32_t)g_nregnames) ? g_regnames[id - 0xC000] : NULL; }
 API RegisterWindowMessageA(I64 s) {
-  static char names[64][96]; static int n;
   const char *p = (const char *)P_(s);
-  for (int i = 0; i < n; i++) if (!strcmp(names[i], p)) return 0xC000 + i;
-  if (n >= 64) gui_failfast("RegisterWindowMessage", "table full");
-  snprintf(names[n], 96, "%s", p); return 0xC000 + n++;
+  for (int i = 0; i < g_nregnames; i++) if (!strcmp(g_regnames[i], p)) return 0xC000 + i;
+  if (g_nregnames >= 64) gui_failfast("RegisterWindowMessage", "table full");
+  snprintf(g_regnames[g_nregnames], 96, "%s", p); return 0xC000 + g_nregnames++;
 }
 API RegisterWindowMessageW(I64 s) { char b[96]; u16_to_u8((const uint16_t *)P_(s), b, sizeof b); return RegisterWindowMessageA(H_(b)); }
 API RegisterClipboardFormatW(I64 s) { return RegisterWindowMessageW(s); }
@@ -1204,7 +1239,15 @@ API SetCursor(I64 c) {
   return old;
 }
 API GetCursor(void) { return g_cur; }
-API ShowCursor(I64 show) { static int cnt = 0; cnt += show ? 1 : -1; return cnt; }
+static int g_cursor_cnt;   /* ShowCursor 表示カウンタ (マウス有りの初期値 0 = 表示) */
+API ShowCursor(I64 show) { g_cursor_cnt += show ? 1 : -1; return g_cursor_cnt; }
+API GetCursorInfo(I64 pci) {
+  uint32_t *u = (uint32_t *)P_(pci);   /* CURSORINFO (Win64 24B): cbSize, flags, hCursor(8), ptScreenPos(8) */
+  if (!u || u[0] != 24) { gui_set_last_error(87); return 0; }
+  u[1] = g_cursor_cnt >= 0 ? 1 /* CURSOR_SHOWING */ : 0;
+  *(U64 *)(u + 2) = (U64)g_cur;
+  GetCursorPos(H_(u + 4)); return 1;
+}
 API GetKeyState(I64 vk) {
   GuiShared *sh = gui_sh(); vk &= 0xFF;
   if (vk == VK_LBUTTON) return (sh->buttons & 1) ? (int16_t)0x8000 : 0;
@@ -1252,9 +1295,13 @@ API GetSystemMetrics(I64 i) {
   }
   return 0;
 }
-API GetSysColor(I64 i) {
-  switch ((int)i) { case COLOR_WINDOW: return 0xFFFFFF; case COLOR_BTNFACE: return 0xF0F0F0; case 8: return 0x000000; case 18: return 0x000000; }
-  return 0xC0C0C0;
+API GetSysColor(I64 i) {   /* Windows 10 既定テーマの COLORREF (0x00BBGGRR) */
+  static const uint32_t t[] = {
+    0xC8C8C8, 0x000000, 0xD1B499, 0xDBCDBF, 0xF0F0F0, 0xFFFFFF, 0x646464, 0x000000,   /* SCROLLBAR..WINDOWTEXT */
+    0x000000, 0x000000, 0xB4B4B4, 0xFCF7F4, 0xABABAB, 0xFF9933, 0xFFFFFF, 0xF0F0F0,   /* CAPTIONTEXT..BTNFACE */
+    0xA0A0A0, 0x6D6D6D, 0x000000, 0x000000, 0xFFFFFF, 0x696969, 0xE3E3E3, 0x000000,   /* BTNSHADOW..INFOTEXT */
+    0xE1FFFF, 0x000000, 0xCC6600, 0xEAD1B9, 0xF2E4D7, 0xFF9933, 0xF0F0F0 };            /* INFOBK..MENUBAR */
+  return (i >= 0 && i < (I64)(sizeof t / sizeof t[0])) ? t[i] : 0;
 }
 API SystemParametersInfoW(I64 act, I64 p1, I64 p2, I64 fl) {
   (void)p1; (void)fl;
@@ -1265,6 +1312,46 @@ API SystemParametersInfoW(I64 act, I64 p1, I64 p2, I64 fl) {
 }
 API SystemParametersInfoA(I64 a, I64 b, I64 c, I64 d) { return SystemParametersInfoW(a, b, c, d); }
 API GetKeyboardState(I64 buf) { memcpy(P_(buf), g_kb, 256); return 1; }
+API SetKeyboardState(I64 buf) { memcpy(g_kb, P_(buf), 256); return 1; }
+/* INPUT (Win64 40B): type@0, union@8 — MOUSEINPUT{dx,dy,mouseData,dwFlags,time,extra} / KEYBDINPUT{wVk,wScan,dwFlags,time,extra}。
+ * host 入力リングを介さず translate_input へ直接注入する (host が書く buttons/mods/cursor はここでも更新; 次の実入力で host 値に上書きされる) */
+static uint32_t vk_from_scan(uint32_t sc, int ext);
+API SendInput(I64 n, I64 pin, I64 cb) {
+  GuiShared *sh = gui_sh();
+  if (cb != 40 || !pin || n < 0) { gui_set_last_error(87); return 0; }
+  int done = 0;
+  for (int i = 0; i < (int)n; i++) {
+    const uint8_t *in = (const uint8_t *)P_(pin) + (size_t)i * 40;
+    uint32_t type = *(const uint32_t *)in; uint32_t t = gui_now_ms();
+    if (type == 1) {   /* INPUT_KEYBOARD */
+      uint16_t vk = *(const uint16_t *)(in + 8), sc = *(const uint16_t *)(in + 10); uint32_t fl = *(const uint32_t *)(in + 12);
+      int up = (fl & 2) != 0, ext = (fl & 1) != 0;
+      if (fl & 4) { if (!up) { uint32_t r[8] = { GUI_IN_CHAR, 0, (uint32_t)sh->cursor_x, (uint32_t)sh->cursor_y, sc, 0, t, 0 }; translate_input(r); } done++; continue; }
+      if (fl & 8) vk = (uint16_t)vk_from_scan(sc, ext);
+      uint32_t bit = vk == VK_SHIFT ? GUI_MOD_SHIFT : vk == VK_CONTROL ? GUI_MOD_CTRL : vk == VK_MENU ? GUI_MOD_ALT : 0;
+      if (bit) sh->mods = up ? (sh->mods & ~bit) : (sh->mods | bit);
+      uint32_t r[8] = { up ? GUI_IN_KEY_UP : GUI_IN_KEY_DOWN, 0, (uint32_t)sh->cursor_x, (uint32_t)sh->cursor_y, vk, ((uint32_t)sc << 8) | (ext ? 2u : 0u), t, 0 };
+      translate_input(r); done++;
+    } else if (type == 0) {   /* INPUT_MOUSE */
+      int32_t dx = *(const int32_t *)(in + 8), dy = *(const int32_t *)(in + 12); int32_t data = *(const int32_t *)(in + 16); uint32_t fl = *(const uint32_t *)(in + 20);
+      if (fl & 1) {   /* MOVE */
+        int nx, ny;
+        if (fl & 0x8000) { nx = (int)((int64_t)dx * sh->screen_w / 65536); ny = (int)((int64_t)dy * sh->screen_h / 65536); }
+        else { nx = sh->cursor_x + dx; ny = sh->cursor_y + dy; }
+        sh->cursor_x = nx; sh->cursor_y = ny;
+        uint32_t r[8] = { GUI_IN_MOUSE_MOVE, 0, (uint32_t)nx, (uint32_t)ny, sh->buttons, 0, t, 0 }; translate_input(r);
+      }
+      static const struct { uint32_t f; uint32_t dom; int up; uint32_t mask; } bt[] = { { 2, 0, 0, 1 }, { 4, 0, 1, 1 }, { 8, 2, 0, 2 }, { 0x10, 2, 1, 2 }, { 0x20, 1, 0, 4 }, { 0x40, 1, 1, 4 } };
+      for (int k = 0; k < 6; k++) if (fl & bt[k].f) {
+        sh->buttons = bt[k].up ? (sh->buttons & ~bt[k].mask) : (sh->buttons | bt[k].mask);
+        uint32_t r[8] = { bt[k].up ? GUI_IN_MOUSE_UP : GUI_IN_MOUSE_DOWN, 0, (uint32_t)sh->cursor_x, (uint32_t)sh->cursor_y, bt[k].dom, sh->mods, t, 0 }; translate_input(r);
+      }
+      if (fl & 0x800) { uint32_t r[8] = { GUI_IN_WHEEL, 0, (uint32_t)sh->cursor_x, (uint32_t)sh->cursor_y, (uint32_t)data, sh->mods, t, 0 }; translate_input(r); }
+      done++;
+    } else { gui_set_last_error(87); break; }   /* INPUT_HARDWARE は未対応 */
+  }
+  return done;
+}
 API MessageBoxA(I64 h, I64 t, I64 c, I64 f) { (void)h; (void)f; gui_logf("MessageBox[%s]: %s", c ? (const char *)P_(c) : "", t ? (const char *)P_(t) : ""); return 1; }
 API MessageBoxW(I64 h, I64 t, I64 c, I64 f) { char a[200], b[100]; u16_to_u8((const uint16_t *)P_(t), a, sizeof a); u16_to_u8((const uint16_t *)P_(c), b, sizeof b); return MessageBoxA(h, H_(a), H_(b), f); }
 API NotifyWinEvent(I64 a, I64 b, I64 c, I64 d) { (void)a; (void)b; (void)c; (void)d; return 0; }
@@ -1341,10 +1428,9 @@ API MapVirtualKeyW(I64 code, I64 type) {
   if (type == 0) { static const uint8_t sc[] = { 0 }; (void)sc; return 0; }                                                    /* VK_TO_VSC は未対応 = 0 */
   return 0;
 }
+static int vk_to_char(uint32_t vk, const uint8_t *st);   /* gui_core_ext.inc (US 配列) */
 API ToAscii(I64 vk, I64 sc, I64 state, I64 buf, I64 flags) {
-  (void)sc; (void)flags; const uint8_t *st = (const uint8_t *)P_(state);
-  int shift = st && (st[VK_SHIFT] & 0x80); int ch = 0;
-  if (vk >= 0x41 && vk <= 0x5A) ch = shift ? (int)vk : (int)vk + 32; else if (vk >= 0x30 && vk <= 0x39) ch = (int)vk; else if (vk == VK_SPACE) ch = ' ';
+  (void)sc; (void)flags; int ch = vk_to_char((uint32_t)vk, (const uint8_t *)P_(state));
   if (!ch) return 0; *(uint16_t *)P_(buf) = (uint16_t)ch; return 1;
 }
 API GetKeyboardLayout(I64 tid) { (void)tid; return 0x04090409; }
@@ -1492,3 +1578,6 @@ API ScrollDC(I64 hdc, I64 dx, I64 dy, I64 rs, I64 rc, I64 rgn, I64 ru) {
   if (ru) memset(P_(ru), 0, sizeof(WRECT));
   return 1;
 }
+
+/* ================= P1 拡張 (CAB-159): クリップボード/フック/モニタ/キャレット/入力補助/文字列 ================= */
+#include "gui_core_ext.inc"
