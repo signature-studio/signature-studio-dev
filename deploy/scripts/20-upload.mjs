@@ -256,7 +256,7 @@ if (has("purge")) {
   files.push(`https://${host}/`);
   const zid = await zoneId(zone);
   for (let i = 0; i < files.length; i += 30) {
-    // 1 リクエスト 30 URL まで (Free プラン上限に合わせる)
+    // 1 リクエスト 30 URL ずつ (保守的な値。公式の Free 上限は 100 URL/リクエスト)
     await cf(["cache", "purge", "-z", zid, "--force", "--body", JSON.stringify({ files: files.slice(i, i + 30) })]);
   }
   console.log(`purge: ${files.length} URL`);

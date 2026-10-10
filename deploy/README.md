@@ -1,5 +1,9 @@
 # deploy/ — R2 静的直配 + Cloudflare Rules (COOP/COEP) + Access
 
+> **前提**: 本構成は**自前ゾーンのカスタムドメイン + Transform Rules 前提**。ユーザ決定は「ドメインは全作業完了後に指示、暫定は既定ホスト名」。
+> r2.dev 既定ホストでは WAF/キャッシュ/アクセス制御が使えない (R2 公式 "Public buckets": custom domain 必須)。
+> 既定ホスト名 (workers.dev 等) 構成は `tools/hosting` の結論に従い別途適応する (Linear CAB-61 = H-1)。
+
 構成 (ユーザ確定): **R2 バケット + カスタムドメイン (CF プロキシ) の静的直配**。Worker 不使用。
 COOP/COEP/CORP/Cache-Control は **ゾーンレベル Transform Rules** で注入、保護は **Access Self-hosted App**
 (R2 カスタムドメインのホスト名)。GitHub Pages はヘッダ不可で不採用。Workers は動的エンドポイントが必要になった時のみ。
@@ -56,12 +60,13 @@ APPLY=1 bash deploy/scripts/deploy.sh --src tools/e2e/work/dist # 実デプロ�
 最後に `release.json` (buildId, 全ファイル sha256/size) を生成して上げる。`tools/assets` の manifest 契約:
 `{"version":1,"files":[{"path":"wasm/ott.1a2b3c4d.wasm","src":"<相対/絶対>","contentType":"任意"}]}`。
 
-制約: CF のキャッシュ可能サイズ上限は Free/Pro/Business **512MB** (超過はキャッシュされず毎回 R2 = Class B op)。
-`cf r2 objects put` は **1 件 300MB** 上限 → 大物は 256MB 以下に分割するか `--backend aws` (S3 multipart)。
+制約: CF のキャッシュ可能サイズ上限は Free/Pro/Business **512MB** (公式 Cache > Default cache behavior。超過はキャッシュされず毎回 R2 = Class B op)。
+`cf r2 objects put` は **1 件 300MB** 上限 (cf の REST エンドポイント仕様。R2 本体の単一 PUT 上限は 4.995 GiB で別: 公式 R2 Limits)
+→ 大物は 256MB 以下 (M の安全側の目安) に分割するか `--backend aws` (S3 multipart)。
 
 ### 圧縮 (実測: node zlib, 実 wasm)
 br(q11) / zstd(19) / gzip(9) の元サイズ比: python.wasm 5.93MB → **25.9% / 27.6% / 36.5%**,
-m11_boot.wasm 6.06MB → 30.0% / 33.7% / 41.1%, ott.wasm 0.84MB → 33.0% / 35.9% / 42.0%。
+m11_boot.wasm ≈6.05MB → 30.2% / 33.8% / 41.2% (初回計測 6.06MB: 30.0/33.7/41.1。他担当が再ビルド), ott.wasm 0.84MB → 33.0% / 35.9% / 42.0%。
 既定は **エッジ動的圧縮** (オブジェクトは非圧縮で保管)。事前圧縮 (`Content-Encoding: br` をオブジェクトに保存) は
 `cf r2 objects put` では設定不可 (Content-Type のみ) → 必要になったら `--backend aws` を拡張。
 進捗バー用に Content-Length を保つなら origin 側 `Cache-Control: no-transform` が必要 (圧縮無効化とのトレードオフ)。
@@ -79,13 +84,18 @@ Zone: Transform Rules **Edit**, Cache Rules **Edit**, Response Compression **Edi
 `--backend aws` を使う場合のみ追加で R2 S3 互換キー (R2 > API トークン > Object Read & Write, 対象バケット限定)。
 
 ## 運用上の注意 (実機デプロイ時に確認する未実測事項)
-- Free プラン: Transform/Cache/Compression rule は各 phase 10 本まで (本構成は 1/4/2/1 本)。purge は 1 リクエスト 30 URL。
+- Free プラン: Transform / Cache / Compression rule は各 10 本まで (公式)。本構成は rewrite 1 / response-header 4 / cache 3 / compression 1 本。
+  single-file purge は公式 Free 上限 1 リクエスト 100 URL・800 URL/秒 (`20-upload.mjs` は保守的に 30 URL ずつ)。
+  Transform で書き換えたパスの purge は書換前 (エンドユーザ) の URL で行う (公式)。
 - CF の自動注入 (Web Analytics ビーコン, JS detections) は COEP `require-corp` 下で **ブロックされ console error** になり得る
   → 対象ホストで無効化 (E2E の console-clean が検出する)。Rocket Loader/Email Obfuscation も OFF のまま。
 - Access セッション失効中のサブリソース fetch は 302 でログインに飛び COEP/CORS エラーになる → session 24h、失効時はリロード。
 - CORP は `same-origin`。別ホストへ資産を分離する場合は該当資産だけ `cross-origin` に変えること。
 - `http.request.uri.path` が URL rewrite 後の値か否かで Cache-Control rule のマッチが変わり得るため、
-  document 判定は `/` と `/index.html` の両方を列挙済み。**実機で `curl -I /` を確認** (90-verify が表示+検査)。
+  document 判定は `/` と `/index.html` の両方を列挙済み (公式 docs は「rewrite 後の phase では書換後の値、`raw.*` は元の値」)。
+  **実機で `curl -I /` を確認** (90-verify が表示+検査)。
+- 「R2 カスタムドメインは `/` の index を解決しない」: 公式 "Public buckets" の記載は「ルートでのバケット内容一覧不可」のみ。
+  index 非解決そのものは実機未確認 (rewrite rule は index が解決される場合も無害なので維持)。
 - `config/lifecycle.json` の書式 (R2 REST) は未検証。`APPLY_LIFECYCLE=1` 時にエラーなら wrangler の lifecycle 書式を参照。
 - 本番は E2E の `edge-policy` チェック (CORP/Cache-Control/Content-Type) が実 URL に対しても走る。
 
