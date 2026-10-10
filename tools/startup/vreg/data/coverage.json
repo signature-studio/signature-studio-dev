@@ -1,19 +1,19 @@
 {
- "seed_entries": 241,
+ "seed_entries": 236,
  "distinct_value_names_ci": 229,
  "csv_distinct_value_names_ci": 229,
  "csv_names_missing_in_seed": 0,
- "applied_to_registry": 77,
- "catalog_only": 164,
- "catalog_only_key_unknown": 112,
- "readable_via_reg_api": 77,
+ "applied_to_registry": 81,
+ "catalog_only": 155,
+ "catalog_only_key_unknown": 3,
+ "readable_via_reg_api": 81,
  "confidence": {
-  "確定": 21,
-  "推定": 220
+  "確定": 26,
+  "推定": 210
  },
  "groups": {
-  "catalog": 112,
-  "settings": 69,
+  "settings": 173,
+  "catalog": 3,
   "gate": 3,
   "license": 11,
   "shared": 25,
@@ -38,15 +38,15 @@
  },
  "boot": {
   "restored": false,
-  "imported": 77,
-  "applied": 77,
-  "catalogSkipped": 164,
+  "imported": 81,
+  "applied": 81,
+  "catalogSkipped": 155,
   "pinned": 9,
   "external": 0,
   "mode": "registered"
  },
  "stats_after_boot": {
-  "keys": 50,
-  "values": 95
+  "keys": 53,
+  "values": 99
  }
 }

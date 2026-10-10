@@ -156,8 +156,12 @@ void pathreg_paths_init(PathRegPaths* p) {
     memset(p, 0, sizeof *p);
     p->installDir = "C:\\Program Files\\Image-Line\\FL Studio 2026";
     p->vfsInstall = "/fl";
-    p->userProfile = "C:\\Users\\user";                              /* shimx SHGetFolderPathW / env と一致 */
-    p->user2Profile = "C:\\Users\\webstudio";                        /* vreg seed "Shared data" 値 (推定) */
+    /* 正規 username (CAB-213 で統一): vreg seed (env/known_folders/Shared data) と
+     * pathreg e2e 契約が "C:\Users\webstudio" を採用。 */
+    p->userProfile = "C:\\Users\\webstudio";
+    /* 予備 profile: shimx 内蔵 (env.c/shell.c, 読取専用) が "C:\Users\user" を返すため、
+     * 同一実体 (/c/home) への写像を既定表に維持して吸収する。shimx 取込時に統一予定。 */
+    p->user2Profile = "C:\\Users\\user";
     p->vfsHome = "/c/home";
     p->sharedDataDir = NULL;                                         /* NULL = <profile>\Documents\Image-Line */
     p->vfsSharedData = "/c/home/Documents/Image-Line";
@@ -248,7 +252,9 @@ int pathreg_unmap(const char* posixPath, char* outWin, size_t outSize) {
         if (nl < tl) continue;
         if (strncasecmp(posixPath, g_mounts[i].target, tl) != 0) continue;
         if (posixPath[tl] && posixPath[tl] != '/') continue;
-        if (tl >= bestLen) { best = &g_mounts[i]; bestLen = tl; }
+        /* 同長 (同一 target の別名 profile) は先勝ち: 正規 username (webstudio) を返す
+         * (CAB-213 username 統一 — 既定表の先頭 = userProfile = 正規)。 */
+        if (tl > bestLen) { best = &g_mounts[i]; bestLen = tl; }
     }
     if (!best) return -1;
     const char* rest = posixPath + bestLen;
