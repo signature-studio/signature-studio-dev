@@ -1,0 +1,10 @@
+[m11] PE image .data/.rdata installed (LVA base 0)
+[m11][args] entry_point(0x0, 0x1, 0x1)
+[shimx] GetProcAddress miss: kernel32.dll!#39682
+[shimx] GetProcAddress miss: kernel32.dll!GetThreadPreferredUILanguages
+[shimx] GetProcAddress miss: kernel32.dll!SetThreadPreferredUILanguages
+[shimx] GetProcAddress miss: kernel32.dll!GetThreadUILanguage
+[m11][VA] #0 addr=0 size=1310704 (0x13fff0) type=0x1000 prot=0x4
+[shimx] GetProcAddress miss: ntdll.dll!
+[m11][VA] #1 addr=0 size=629145600 (0x25800000) type=0x101000 prot=0x4
+[m11][VA] #2 addr=0 size=629145600 (0x25800000) type=0x101000 prot=0x4

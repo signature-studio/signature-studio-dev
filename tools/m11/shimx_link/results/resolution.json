@@ -1,0 +1,94 @@
+[
+ {
+  "label": "boot_final2.ll (shimx REPORT の 557)",
+  "ir": "boot_final2.ll",
+  "total_external": 557,
+  "shimx": 182,
+  "shimx_functional": 169,
+  "shimx_stub": 13,
+  "shimx_stub_names": [
+   "CoCreateInstance",
+   "InternetGetConnectedState",
+   "OutputDebugStringW",
+   "SHAppBarMessage",
+   "SetErrorMode",
+   "SetThreadErrorMode",
+   "ShellExecuteW",
+   "WTSRegisterSessionNotification",
+   "acmMetrics",
+   "midiOutShortMsg",
+   "timeBeginPeriod",
+   "timeEndPeriod",
+   "timeGetDevCaps"
+  ],
+  "gui": 170,
+  "audio": 1,
+  "gui_audio_total": 171,
+  "gui_audio_by_dll": {
+   "user32.dll": 114,
+   "gdi32.dll": 53,
+   "uxtheme.dll": 1,
+   "shcore.dll": 2,
+   "dsound.dll": 1
+  },
+  "lift_total": 203,
+  "lift_provided_by_m11_c": 188,
+  "lift_provided_breakdown": {
+   "simd helper (__asm_*)": 179,
+   "function_* fail-fast stub (m11_fnstubs)": 8,
+   "m11 runtime": 1
+  },
+  "lift_unresolved": 12,
+  "llvm_intrinsic": 3,
+  "unknown": 1,
+  "unknown_names": [
+   "SHGetFolderPathW.1"
+  ]
+ },
+ {
+  "label": "現行リンク対象 boot_final3.ll",
+  "ir": "boot_fixed.ll",
+  "total_external": 570,
+  "shimx": 184,
+  "shimx_functional": 171,
+  "shimx_stub": 13,
+  "shimx_stub_names": [
+   "CoCreateInstance",
+   "InternetGetConnectedState",
+   "OutputDebugStringW",
+   "SHAppBarMessage",
+   "SetErrorMode",
+   "SetThreadErrorMode",
+   "ShellExecuteW",
+   "WTSRegisterSessionNotification",
+   "acmMetrics",
+   "midiOutShortMsg",
+   "timeBeginPeriod",
+   "timeEndPeriod",
+   "timeGetDevCaps"
+  ],
+  "gui": 170,
+  "audio": 1,
+  "gui_audio_total": 171,
+  "gui_audio_by_dll": {
+   "user32.dll": 114,
+   "gdi32.dll": 53,
+   "uxtheme.dll": 1,
+   "shcore.dll": 2,
+   "dsound.dll": 1
+  },
+  "lift_total": 214,
+  "lift_provided_by_m11_c": 211,
+  "lift_provided_breakdown": {
+   "simd helper (__asm_*)": 201,
+   "function_* fail-fast stub (m11_fnstubs)": 8,
+   "m11 runtime": 2
+  },
+  "lift_unresolved": 0,
+  "llvm_intrinsic": 3,
+  "unknown": 1,
+  "unknown_names": [
+   "SHGetFolderPathW_D1"
+  ]
+ }
+]
