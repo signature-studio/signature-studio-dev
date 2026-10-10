@@ -1,0 +1,28 @@
+{
+ "name": "fa_gain",
+ "image": "tools/targets/freshair/work/win/Fresh Air/C__ProgramData_Slate Digital/Fresh Air/SlateCore.core_64",
+ "retdec": {
+  "ranges": "0x180afe090-0x180afe24e,0x180afe3a0-0x180afe415,0x180afe420-0x180afe495",
+  "timeout": 900
+ },
+ "funcs": [
+  "function_180afe090",
+  "function_180afe3a0",
+  "function_180afe420"
+ ],
+ "passes": {
+  "p1": true,
+  "f7": true,
+  "f2": true,
+  "gdata": "external"
+ },
+ "exports": [
+  "function_180afe090"
+ ],
+ "spec": "specs/fa_gain.json",
+ "wasm_func": "function_180afe090",
+ "func_va": "0x180afe090",
+ "regress": {
+  "expect_match": "all"
+ }
+}

@@ -1,0 +1,178 @@
+"""pipeline.py — 設定 JSON 駆動の lift 修復パイプライン (lift → 修復 → helper 生成 → emcc)。
+
+cfg (JSON) の主なキー:
+  name, image, funcs: ["function_180afe090"]  (module 内で修復対象にする関数; 省略時は全て)
+  raw_ll (既存の RetDec raw .ll; 無ければ retdec.ranges で RetDec 実行)
+  retdec: {"ranges": "0x..-0x..,...", "timeout": 900}
+  passes: {"p1": true, "f7": true, "f2": true, "gdata": "external"|"all"|null, "shift": {"base":..,"newbase":..}|null}
+  exports: [ "function_180afe090", ... ]
+  emcc: {"opt": "-O1", "extra": [..], "sources": [..] (追加 C)}
+"""
+import json
+import os
+import re
+import subprocess
+import sys
+import time
+
+from . import env
+from . import ir as IR
+from .pe import Image
+from .passes import base as B, p1, f7, f2, remap
+from .simd import gen as SG
+
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+HERE = os.path.abspath(os.path.dirname(__file__))
+SIMD_DIR = os.path.join(HERE, "simd")
+
+
+def rpath(p):
+    if p is None:
+        return None
+    return p if os.path.isabs(p) else os.path.join(ROOT, p)
+
+
+def load_cfg(path):
+    cfg = json.load(open(path))
+    cfg["_path"] = os.path.abspath(path)
+    return cfg
+
+
+def retdec_lift(cfg, workdir, log):
+    """RetDec --select-ranges で raw .ll を生成 (既存 raw_ll があればそれを使う)。"""
+    if cfg.get("raw_ll"):
+        return rpath(cfg["raw_ll"])
+    rd = cfg["retdec"]
+    out_c = os.path.join(workdir, cfg["name"] + ".drc.c")
+    out_ll = os.path.join(workdir, cfg["name"] + ".drc.ll")
+    if os.path.exists(out_ll) and not cfg.get("force_lift"):
+        log.append("retdec: reuse %s" % out_ll)
+        return out_ll
+    tmp = os.path.join(workdir, "tmp")
+    os.makedirs(tmp, exist_ok=True)
+    e = dict(os.environ, TMPDIR=tmp)
+    cmd = ["/opt/retdec/bin/retdec-decompiler", rpath(cfg["image"]), "-o", out_c, "--select-ranges", rd["ranges"],
+           "--select-decode-only", "--timeout", str(rd.get("timeout", 1800))]
+    t0 = time.time()
+    r = subprocess.run(cmd, capture_output=True, text=True, env=e)
+    log.append("retdec: %.1fs rc=%d" % (time.time() - t0, r.returncode))
+    if not os.path.exists(out_ll):
+        raise RuntimeError("RetDec failed: " + (r.stdout + r.stderr)[-1500:])
+    dsm = os.path.join(workdir, cfg["name"] + ".drc.dsm")
+    if os.path.exists(dsm) and not cfg.get("keep_dsm"):
+        os.remove(dsm)
+    return out_ll
+
+
+def repair_ll(cfg, raw_path, img, log, detect_only=False):
+    """raw .ll → 修復済み Module。返値 (Module, stats)"""
+    stats = {}
+    t0 = time.time()
+    text, brep = B.run_base(open(raw_path).read(), B.make_args())
+    stats["base"] = {k: v for k, v in brep.items() if k in ("b1_fixed", "s1_stores", "a9_residual_constexpr", "fixups_add0", "dup_declares_removed")}
+    mod = IR.Module.parse(text)
+    passes = cfg.get("passes", {})
+    names = set(cfg.get("funcs") or [f.name for f in mod.funcs()])
+    rep = not detect_only
+    if passes.get("p1", True):
+        st, lg = {}, []
+        for fn in mod.funcs():
+            if fn.name in names:
+                p1.run_function(mod, fn, img, rep, lg, st)
+        stats["p1"] = st
+        log.extend("p1: " + x for x in lg)
+    if passes.get("f7", True):
+        st, lg = {}, []
+        for fn in mod.funcs():
+            if fn.name in names:
+                f7.run_function(mod, fn, img, rep, lg, st)
+        stats["f7"] = st
+        log.extend("f7: " + x for x in lg)
+    if passes.get("f2", True):
+        st, lg = {}, []
+        f2.run(mod, img, lg, st, repair=rep)
+        stats["f2"] = st
+        log.extend("f2: " + x for x in lg)
+    if passes.get("gdata") and not detect_only:
+        sh = passes.get("shift")
+        if sh:
+            text2, n = remap.shift_va(mod.dump(), int(str(sh["base"]), 0), int(str(sh["newbase"]), 0))
+            mod = IR.Module.parse(text2)
+            stats["shift_numeric"] = n
+        stats["gdata"] = remap.gdata(mod, img, mode=passes["gdata"], base=img.base,
+                                     newbase=int(str(passes["shift"]["newbase"]), 0) if passes.get("shift") else None)
+    stats["time_s"] = round(time.time() - t0, 2)
+    return mod, stats
+
+
+def c_ty(t):
+    t = t.strip().split()[0]
+    return {"i64": "long long", "i32": "int", "i16": "short", "i8": "signed char", "ptr": "void*", "i128": "unsigned __int128",
+            "double": "double", "float": "float", "void": "void", "i1": "_Bool"}.get(t, "long long")
+
+
+def emit_stubs(mod, defined_extra=()):
+    """define の無い function_* declare を fail-fast stub 化。"""
+    defs = {f.name for f in mod.funcs()}
+    lines = ['#include <emscripten.h>', '/* liftlib auto stubs: 未 lift の callee は fail-fast (黙って 0 を返さない) */']
+    n = 0
+    for nm, (ret, args, _l) in sorted(mod.declares().items()):
+        if nm in defs or not re.match(r"function_[0-9a-f]+$", nm) or nm in defined_extra:
+            continue
+        al = [a.strip() for a in args.split(",") if a.strip()]
+        params = ", ".join("%s a%d" % (c_ty(a), i) for i, a in enumerate(al)) or "void"
+        rt = c_ty(ret)
+        lines.append('EMSCRIPTEN_KEEPALIVE %s %s(%s) { __builtin_trap(); %s}' % (rt, nm, params, "" if rt == "void" else "return 0; "))
+        n += 1
+    return "\n".join(lines) + "\n", n
+
+
+def build(cfg, mod, workdir, log, stats):
+    """修復済み Module → helper 生成 → emcc → <name>.cjs"""
+    name = cfg["name"]
+    text = mod.dump()
+    text, mp = SG.canonicalize(text)
+    ll_path = os.path.join(workdir, name + "_fixed.ll")
+    open(ll_path, "w").write(text)
+    decls = SG.scan_decls(text)
+    c, rep = SG.emit_c(decls, use_names="canon")
+    h_path = os.path.join(workdir, name + "_simd.c")
+    open(h_path, "w").write(c)
+    stats["simd"] = {"helpers": len(rep["generated"]), "unsupported": [u[0] for u in rep["unsupported"]], "approx": rep["approx"]}
+    mod2 = IR.Module.parse(text)
+    ex = set(cfg.get("stub_skip", []))
+    stub_c, nstub = emit_stubs(mod2, ex)
+    s_path = os.path.join(workdir, name + "_stubs.c")
+    open(s_path, "w").write(stub_c)
+    stats["stubs"] = nstub
+    em = cfg.get("emcc", {})
+    exports = ["_malloc", "_free"] + ["_" + e for e in cfg.get("exports", [])]
+    out_js = os.path.join(workdir, name + ".js")
+    cmd = ["emcc", "-w", em.get("opt", "-O1"), "-ffp-contract=off", "-frounding-math", "-fno-fast-math",
+           "-I", SIMD_DIR, ll_path, h_path, s_path] + [rpath(x) for x in em.get("sources", [])] + em.get("extra", []) + [
+        "-sERROR_ON_UNDEFINED_SYMBOLS=1", "-sMODULARIZE=1", "-sENVIRONMENT=node", "-sALLOW_MEMORY_GROWTH=1",
+        "-sEXPORTED_FUNCTIONS=" + ",".join(exports), "-sEXPORTED_RUNTIME_METHODS=HEAPU8", "--no-entry",
+        "-Wl,--no-gc-sections", "-o", out_js]
+    r = env.run(cmd, capture_output=True, text=True)
+    if r.returncode:
+        raise RuntimeError("emcc failed:\n" + r.stderr[-3000:])
+    cjs = os.path.join(workdir, name + ".cjs")
+    os.replace(out_js, cjs)
+    return cjs, ll_path
+
+
+def run_all(cfg_path, workdir=None, detect_only=False):
+    cfg = load_cfg(cfg_path)
+    workdir = workdir or os.path.join(HERE, "..", "work", cfg["name"])
+    workdir = os.path.abspath(workdir)
+    os.makedirs(workdir, exist_ok=True)
+    log, stats = [], {}
+    img = Image(rpath(cfg["image"]))
+    raw = retdec_lift(cfg, workdir, log)
+    mod, st = repair_ll(cfg, raw, img, log, detect_only=detect_only)
+    stats.update(st)
+    cjs = None
+    if not detect_only:
+        cjs, ll_path = build(cfg, mod, workdir, log, stats)
+    json.dump(dict(stats=stats, log=log), open(os.path.join(workdir, "pipeline_report.json"), "w"), indent=1, ensure_ascii=False, default=str)
+    return cfg, workdir, cjs, stats, log

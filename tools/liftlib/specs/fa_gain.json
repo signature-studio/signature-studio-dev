@@ -1,0 +1,386 @@
+{
+ "name": "fa_gain_process",
+ "func": "0x180afe090",
+ "wasm_func": "function_180afe090",
+ "scenarios": 400,
+ "steps": 1,
+ "seed": 64030,
+ "vars": [
+  {
+   "name": "mode",
+   "gen": {
+    "choice": [
+     0,
+     1
+    ]
+   }
+  },
+  {
+   "name": "ga",
+   "gen": {
+    "unif": [
+     0,
+     4
+    ]
+   }
+  },
+  {
+   "name": "gb",
+   "gen": {
+    "unif": [
+     0,
+     4
+    ]
+   }
+  },
+  {
+   "name": "n",
+   "gen": {
+    "mix": [
+     [
+      0.5,
+      {
+       "choice": [
+        0,
+        1,
+        2,
+        3,
+        7,
+        16,
+        31,
+        64
+       ]
+      }
+     ],
+     [
+      0.5,
+      {
+       "int": [
+        1,
+        128
+       ]
+      }
+     ]
+    ]
+   }
+  },
+  {
+   "name": "first",
+   "gen": {
+    "choice": [
+     1,
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "name": "tgt",
+   "expr": "gb*2 if mode==1 else ga"
+  },
+  {
+   "name": "kind",
+   "gen": {
+    "unif": [
+     0,
+     1
+    ]
+   }
+  },
+  {
+   "name": "prev",
+   "expr": "tgt if kind < .2 else (tgt + 1e-40 if kind < .3 else rnd(0,4))"
+  },
+  {
+   "name": "cur",
+   "gen": {
+    "unif": [
+     0,
+     4
+    ]
+   }
+  },
+  {
+   "name": "g0",
+   "gen": {
+    "unif": [
+     0,
+     4
+    ]
+   }
+  },
+  {
+   "name": "c1",
+   "gen": {
+    "unif": [
+     0,
+     1
+    ]
+   }
+  },
+  {
+   "name": "c2",
+   "gen": {
+    "unif": [
+     0,
+     1
+    ]
+   }
+  },
+  {
+   "name": "mL",
+   "gen": {
+    "unif": [
+     0,
+     2
+    ]
+   }
+  },
+  {
+   "name": "mR",
+   "gen": {
+    "unif": [
+     0,
+     2
+    ]
+   }
+  },
+  {
+   "name": "f93",
+   "gen": {
+    "choice": [
+     1,
+     1,
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "name": "fdb",
+   "gen": {
+    "choice": [
+     1,
+     1,
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "name": "v50",
+   "gen": {
+    "unif": [
+     -2,
+     2
+    ]
+   }
+  },
+  {
+   "name": "v98",
+   "gen": {
+    "unif": [
+     -2,
+     2
+    ]
+   }
+  }
+ ],
+ "args": [
+  {
+   "ptr": "this"
+  },
+  {
+   "ptr": "ctx"
+  }
+ ],
+ "buffers": {
+  "this": {
+   "size": 256,
+   "fields": [
+    {
+     "off": "0x90",
+     "ptr": "P"
+    },
+    {
+     "off": "0xb0",
+     "type": "u8",
+     "gen": {
+      "var": "first"
+     }
+    },
+    {
+     "off": "0xa8",
+     "type": "f32",
+     "gen": {
+      "var": "prev"
+     }
+    },
+    {
+     "off": "0xac",
+     "type": "f32",
+     "gen": {
+      "var": "cur"
+     }
+    },
+    {
+     "off": "0xa4",
+     "type": "f32",
+     "gen": {
+      "var": "g0"
+     }
+    },
+    {
+     "off": "0xbc",
+     "type": "f32",
+     "gen": {
+      "var": "c1"
+     }
+    },
+    {
+     "off": "0xc0",
+     "type": "f32",
+     "gen": {
+      "var": "mL"
+     }
+    },
+    {
+     "off": "0xcc",
+     "type": "f32",
+     "gen": {
+      "var": "c2"
+     }
+    },
+    {
+     "off": "0xd0",
+     "type": "f32",
+     "gen": {
+      "var": "mR"
+     }
+    }
+   ]
+  },
+  "P": {
+   "size": 40960,
+   "fields": [
+    {
+     "off": "0x9dc4",
+     "type": "u32",
+     "gen": {
+      "var": "mode"
+     }
+    },
+    {
+     "off": "0x9e0c",
+     "type": "f32",
+     "gen": {
+      "var": "ga"
+     }
+    },
+    {
+     "off": "0x9e18",
+     "type": "f32",
+     "gen": {
+      "var": "gb"
+     }
+    },
+    {
+     "off": "0x9e93",
+     "type": "u8",
+     "gen": {
+      "var": "f93"
+     }
+    },
+    {
+     "off": "0x9edb",
+     "type": "u8",
+     "gen": {
+      "var": "fdb"
+     }
+    },
+    {
+     "off": "0x9e50",
+     "type": "f32",
+     "gen": {
+      "var": "v50"
+     }
+    },
+    {
+     "off": "0x9e98",
+     "type": "f32",
+     "gen": {
+      "var": "v98"
+     }
+    },
+    {
+     "off": "0x9f30",
+     "ptr": "Q"
+    }
+   ]
+  },
+  "Q": {
+   "size": 128,
+   "fields": [
+    {
+     "off": "0x28",
+     "ptr": "buf"
+    },
+    {
+     "off": "0x30",
+     "ptr": "buf"
+    },
+    {
+     "off": "0x38",
+     "ptr": "buf",
+     "poff": 8
+    }
+   ]
+  },
+  "buf": {
+   "size": 32
+  },
+  "ctx": {
+   "size": 48,
+   "fields": [
+    {
+     "off": 0,
+     "ptr": "L"
+    },
+    {
+     "off": 8,
+     "ptr": "R"
+    },
+    {
+     "off": "0x28",
+     "type": "u32",
+     "gen": {
+      "var": "n"
+     }
+    }
+   ]
+  },
+  "L": {
+   "size": "4*n+4",
+   "fill": {
+    "type": "f32",
+    "count": "n",
+    "gen": {
+     "sample": 1
+    }
+   }
+  },
+  "R": {
+   "size": "4*n+4",
+   "fill": {
+    "type": "f32",
+    "count": "n",
+    "gen": {
+     "sample": 1
+    }
+   }
+  }
+ }
+}

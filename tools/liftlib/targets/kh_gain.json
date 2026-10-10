@@ -1,0 +1,26 @@
+{
+ "name": "kh_gain",
+ "image": "tools/targets/kilohearts/work/winpkg/HeartCore.core_64",
+ "retdec": {
+  "ranges": "0x1804b0380-0x1804b05e1",
+  "timeout": 1500
+ },
+ "funcs": [
+  "function_1804b0380"
+ ],
+ "passes": {
+  "p1": true,
+  "f7": true,
+  "f2": true,
+  "gdata": "external"
+ },
+ "exports": [
+  "function_1804b0380"
+ ],
+ "spec": "specs/kh_gain.json",
+ "wasm_func": "function_1804b0380",
+ "func_va": "0x1804b0380",
+ "regress": {
+  "expect_match": "all"
+ }
+}
