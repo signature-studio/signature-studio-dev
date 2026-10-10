@@ -204,10 +204,10 @@ Compressor/Filter (FA-2/2b) はコミット済みで検収可能。制御層は 
 ### 11.5 未解決 / 次タスク (FA-4 / CAB-50 への引き継ぎ)
 
 1. シナリオ生成の値域を plugin 仕様 (型 enum / カウント / 種別) に丸めれば structured/random も完走可能。
-2. VST2 エントリ群: AEffect wrapper ctor (0x180dace80) は native で作動確認済 (magic 'VstP' /
-   thunk 群 0x180dac610/0x180dace60/0x180dacbd0/0x180dacda0/0x180dacd80 = dispatcher/setParameter/
-   getParameter/processReplacing/processDoubleReplacing, numPrograms=1, numParams=3, numInputs=1,
-   numOutputs=2, flags=0x10, ioRatio=1.0, uniqueID=0x4e6f4566, version=1)。framework 経路
+2. VST2 エントリ群: AEffect wrapper ctor (0x180dace80) は native で作動確認済 (magic 'VstP' / thunk 群
+   0x180dac610/0x180dace60/0x180dacbd0/0x180dacda0/0x180dacd80 = dispatcher/setParameter/
+   getParameter/processReplacing/processDoubleReplacing / numPrograms=1 / numParams=3 / numInputs=1 /
+   numOutputs=2 / flags=0x10 / ioRatio=1.0 / uniqueID=0x4e6f4566 / version=1)。framework 経路
    (`VSTPluginMain_FrAr` → 0x180c7d400 → 0x180c7c030) は locale/TLS 依存が深く native oracle
    未成立 — host 呼出 (audioMaster) の差替えが次タスク (`entry_probe.c` を観測点として残置)。
-3. GUI/エディタ層は対象外 (CAB-52 と同方針)。
+3. GUI/エディタ層は対象外 (CAB-52 と同方針)。Determinism は暗黙確認のみ (§8-4)。
