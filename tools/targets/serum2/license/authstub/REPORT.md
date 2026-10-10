@@ -7,12 +7,12 @@
 
 ## 0. 結論 (先出し)
 
-1. **中性化は 6 IR ルール / 機械語 9 バイトで完結する** (CAB-71 予想より小さい)。全 .text 走査 (33,791 関数) の結果、demo bit (obj+0x22792) の writer は `SerumController::setState` (0x1800c2b50) の 2 store のみ、host 通知即値 0x800010 も同関数 2 箇所のみ、demo マーカ判定も同関数 + `SerumController::getState` (0x1800c6090) の 1 分岐のみ。**demo 状態は host session state 経由でしか発生しない** (prefs/registry 由来の demo 判定は存在しない)。
+1. **中性化は 6 IR ルール / 機械語パッチ 6 箇所で完結する (バイト差分 15B)** (CAB-71 予想より小さい)。全 .text 走査 (33,791 関数) の結果、demo bit (obj+0x22792) の writer は `SerumController::setState` (0x1800c2b50) の 2 store のみ、host 通知即値 0x800010 も同関数 2 箇所のみ、demo マーカ判定も同関数 + `SerumController::getState` (0x1800c6090) の 1 分岐のみ。**demo 状態は host session state 経由でしか発生しない** (prefs/registry 由来の demo 判定は存在しない)。
 2. IR pass (`authstub_irpass.py`) を RetDec raw .ll に適用し、**適用後の到達性を機械検証まで実施**: demo bit store 2/2 が定数 0、0x800010 通知ブロックが到達不能、getState の demo マーカ書込ブロックが到達不能、DSP setState の demo ダイアログブロックが到達不能 (version 復元経路は到達可能)。N4: `SerumDSP::process` (0x180056670) と funclet (0x18004ffc0) は **1 行も非変更** (assert 込み)。
 3. **wasm 実行ハーネス 23/23 PASS**: lift 実 IR (patched / 未 patch の両方) を emcc → wasm → node で実行し、demo bit 常時 0・0x800010 通知抑止・demoVersion 無視で復元続行 (N1)・version 範囲判定の維持を実測。callee は IR の declare 契約どおりの mock (分岐駆動)。
 4. ライセンス状態データ合成 (`synth_state.py`): 5 保存先に対する licensed 形を **決定論的** (2 回実行でバイト一致, MANIFEST.sha256 付き) に生成。鍵となる事実: **マーカキーの不在が licensed 形** (demo 判定は「有る/無い」で読む)。
 5. 受口: ネットワーク群 (N5) は呼ばない設計 (wasm shim で WININET/WS2_32 を no-op/fail-fast, vreg seed 断片を同梱)。**Locate License (N6) は「常に成功または非表示」ではなく「表示のまま・選択結果は license 状態に影響しない」を採用** (根拠 §4)。GUI overlay (N7) は uidesc 側実体化が 0 参照でコード側のため保留 (§4)。
-6. lift fidelity gap を 5 件同定 (L1–L6, §6) — Seru2 本 lift (SR-3) への引継事項。うち L1 (0x1800c2b50 の直接 vtable 通知 call が raw IR から脱落) は本 stub とは逆方向 (偶然有利) だが修正必須。
+6. lift fidelity gap を 5 件同定 (L1–L6, §6) — Serum2 本 lift (SR-3) への引継事項。うち L1 (0x1800c2b50 の直接 vtable 通知 call が raw IR から脱落) は本 stub とは逆方向 (偶然有利) だが修正必須。
 
 ## 1. 差し替え点一覧 (CAB-71 §7 N1–N8 × 実施/保留)
 

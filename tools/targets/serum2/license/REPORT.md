@@ -33,11 +33,11 @@
 | **0x1800c2b50** | `SerumController::setState` 相当 (vtable 0xa2bf58 slot 6)。tag `component`/`controller` → **`demoVersion` 検出でデモ状態ロード 0x1800c3080 → host へ restart 通知 0x800010** (`(**(code**)(*plVar2+0x30))(plVar2,0x800010)`)。JSON bool キー 0xfc8950 から **+0x22792 = ¬値**、`productVersion` と "**2.0.20**" (0xfd631e) 比較 <0 で +0x22792=1、+0x22790==1 なら +0x22b70 |= 0x10 | デコンパイル | high |
 | **0x1800c6090** | `SerumController::getState` 相当 (同 vtable slot 7)。preset メタ (presetName/Author/Comment/Description) を書き出し、**+0x22792==1 のとき demo マーカ (キー 0xfc8950, 値 4) を controller セクションに書込** | デコンパイル | high |
 | 0x1800c3080 | controller デモ/状態セクションの JSON ローダ (modMatrixLocked / scalarCurvesLocked / product 等)。呼出元: 0x1800c2b50 / 0x1800d5c00 / 0x1800d68b0 (preset ロード "Are You Sure?") | xref + decomp | high |
-| 0x1800a9f40 / 0x1800ac190 | SerumController ctor / dtor — +0x22790 初期化と解放 | member disp 走査 (全 .text で +0x22790/92/b70 を触るのは 15 関数のみ) | high |
+| 0x1800a9f40 / 0x1800ac190 | SerumController ctor / dtor — +0x22790 初期化と解放 | member disp 走査 (全 .text で +0x22790/92/22b70 を触るのは 5 関数 9 命令のみ: ctor 0x1800a9f40 / dtor 0x1800ac190 / 0x1800b9530 / 0x1800c2b50 / 0x1800c6090) | high |
 
 **XOR 難読化文字列プール 0x180a21827–0x180a21940** (実測・復元済み。スキーム: `dec[i] = ((step*i)&0xff ^ ((i&7)+add7) ^ enc[i]) ^ xor8` / `dec[i] = enc[i] ^ ((i+add)&0xff)`):
 
-| 位置 | 長 | 復元結果 | 使 手 |
+| 位置 | 長 | 復元結果 | 使用箇所 |
 |---|---:|---|---|
 | 0xa21827 | 70 | `Sorry, the demo does not save or recall state with a host DAW session.` | 0x18004fad0 demo 分岐 |
 | 0xa2186e | 18 | `Serum Demo Version` | 同上 (タイトル) |
@@ -121,7 +121,7 @@
 
 下流チケット案 (起票はメイン判断):
 - **[SR-2b] serum2-auth-stub 設計・実装** (親 CAB-13): 本マップ §7 N1–N8 の実装。入力=本 REPORT。成果=中性化 diff (最小箇所数) + license 状態データ合成スクリプト (ユーザ承認済み運用 §6.0-4) + vreg/shim 側 no-op 受口。目安 1〜2 週 (規模は N1–N3+N7 の 4 点が本体)。
-- 依存: SR-1 (CAB-68, 最小 host) の vtable 座標系を実測确认できると N1–N3 の差し替え点が確定する (mediun confidence の ABI slot を解消)。
+- 依存: SR-1 (CAB-68, 最小 host) の vtable 座標系を実測確認できると N1–N3 の差し替え点が確定する (medium confidence の ABI slot を解消)。
 
 ## 9. 再現・成果物
 
@@ -139,7 +139,7 @@ bash license/scripts/ghidra_auth.sh                                      # 167 �
 
 ## 10. SR-2b 実装 (CAB-237, 2026-10-10 追記)
 
-§7 N1–N8 のうち本体 (N1–N3 + N2b 通知経路) を **IR 6 ルール / 機械語 9 バイト**で実装した。
+§7 N1–N8 のうち本体 (N1–N3 + N2b 通知経路) を **IR 6 ルール / 機械語パッチ 6 箇所**で実装した (バイト差分 15B / パッチ領域 17B — je→jmp 変換 2 箇所の rel32 再計算・pad 含む)。
 実装・検証の詳細は **`authstub/REPORT.md`** (本 dir の authstub/ サブディレクトリ) に分離。
 
 - 差し替え点の確定値: demo bit (+0x22792) writer は全 .text で 0x1800c2b50 の 2 store のみ、0x800010 即値も同関数のみ (全 33,791 関数 walk で再確認)。
