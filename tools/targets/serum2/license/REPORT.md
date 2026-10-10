@@ -136,3 +136,13 @@ bash license/scripts/ghidra_auth.sh                                      # 167 �
 - `license/work/` (gitignore): graph.pkl, ghidraProjA/, ghidra_auth/ (decomp_targets.c), tmp/。ターゲット一覧は `license/targets_auth.txt` (167 関数, コミット済み)。
 - 新規解析スクリプト: `license/scripts/{authmap.py, zone.py, ghidra_auth.sh}` (+ targets `license/targets_auth.txt`)。
 - 制限: ① Ghidra light (noanalysis) のため indirect 呼出は vtable/関数ポインタ経由のみ追跡, ② XOR 文字列は setState/getState 系のみ復元 (実行時生成型は未復元), ③ mac 版は未実施 (Win を正とし lift 対象も Win)。
+
+## 10. SR-2b 実装 (CAB-237, 2026-10-10 追記)
+
+§7 N1–N8 のうち本体 (N1–N3 + N2b 通知経路) を **IR 6 ルール / 機械語 9 バイト**で実装した。
+実装・検証の詳細は **`authstub/REPORT.md`** (本 dir の authstub/ サブディレクトリ) に分離。
+
+- 差し替え点の確定値: demo bit (+0x22792) writer は全 .text で 0x1800c2b50 の 2 store のみ、0x800010 即値も同関数のみ (全 33,791 関数 walk で再確認)。
+- §2 の「判定 3点」のうち funclet 0x18004ffc0 は demo ロジック無し → patch 不要と確定。
+- 新規所見: RetDec `--select-decode-only` の lift fidelity gap 5 件 (L1–L6, authstub/REPORT.md §6) — 本 lift 時の pass 追補対象。
+- 再現: `bash authstub/e2e.sh` (wasm ハーネス 23/23 PASS) / `python3 authstub/synth_state.py <dir>` (licensed 状態合成, 決定論) / `python3 authstub/mpatch.py <pe> <out>` (機械語参照パッチ, 原 bytes 照合 6/6)。
