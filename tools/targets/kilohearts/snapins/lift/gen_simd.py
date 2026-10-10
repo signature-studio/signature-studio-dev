@@ -79,7 +79,8 @@ def gen(name, ret, params):
                                          'unpckhpd', 'unpcklps', 'unpckhps', 'shufpd', 'shufps', 'cvttpd2dq', 'psrldq', 'pslldq', 'psrlq', 'psllq', 'haddpd', 'haddps', 'movddup',
                                          'pand', 'pandn', 'por', 'pxor', 'paddd', 'psubd', 'psrld', 'pslld', 'cvtdq2ps', 'cvtdq2pd', 'cvtpd2dq', 'cvttpd2dq', 'cvtps2pd',
                                          'cvtpd2ps', 'cvtsd2ss', 'cvtss2sd', 'cvtsi2sd', 'cvtsi2ss', 'cvtss2si', 'cvtsd2si', 'cvttsd2si', 'cvttss2si', 'paddq', 'psubq', 'psrad',
-                                         'punpckldq', 'punpckhdq', 'punpcklqdq', 'punpckhqdq', 'pshufd', 'ldmxcsr', 'stmxcsr'):
+                                         'punpckldq', 'punpckhdq', 'punpcklqdq', 'punpckhqdq', 'pshufd', 'ldmxcsr', 'stmxcsr', 'sqrtps', 'sqrtpd',
+                                         'pcmpeqd', 'pcmpeqq', 'pcmpgtd', 'pmovsxdq'):
         b = b[1:]
     ptys = [p.split()[0] for p in params]
     R = ret
@@ -292,6 +293,25 @@ def gen(name, ret, params):
             body = '%s %s.%s[0] = (%s) ? %s : 0; return %s.q;' % (pre, A(0), rf, conds[0], mask, A(0))
         else:
             body = '%s L128 r; %s return r.q;' % (pre, ' '.join('r.%s[%d] = (%s) ? %s : 0;' % (rf, i, c, mask) for i, c in enumerate(conds)))
+    # ----- packed sqrt (IEEE 正確): sqrtps/sqrtpd (scalar sqrtss/sqrtsd は [merge] 経路)
+    if b in ('sqrtps', 'sqrtpd') and n == 1 and ptys[0] == 'i128' and R == 'i128':
+        cnt, fld, fn_ = (4, 'f', 'sqrtf') if b == 'sqrtps' else (2, 'g', 'sqrt')
+        body = '%s L128 r; %s return r.q;' % (pre, ' '.join('r.%s[%d] = %s(%s.%s[%d]);' % (fld, i, fn_, A(0), fld, i) for i in range(cnt)))
+    # ----- packed int compare (厳密整数): 全 1 = mask
+    if b in ('pcmpeqd', 'pcmpeqq', 'vpcmpeqq', 'pcmpgtd') and ptys == ['i128', 'i128'] and R == 'i128':
+        if 'eq' in b:
+            w = 64 if b.endswith('q') else 32
+            cnt = 2 if w == 64 else 4
+            fld = 'd' if w == 64 else 'w'
+            expr = lambda i: '(%s.d[%d] == %s.d[%d])' % (A(0), i, A(1), i) if w == 64 else '(%s.w[%d] == %s.w[%d])' % (A(0), i, A(1), i)
+            mask = '~0ULL' if w == 64 else '0xffffffffu'
+            body = '%s L128 r; %s return r.q;' % (pre, ' '.join('r.%s[%d] = (%s) ? %s : 0;' % (fld, i, expr(i), mask) for i in range(cnt)))
+        else:
+            body = ('%s L128 r; for (int i = 0; i < 4; i++) r.w[i] = ((int)%s.w[i] > (int)%s.w[i]) ? 0xffffffffu : 0; return r.q;'
+                    % (pre, A(0), A(1)))
+    # ----- pmovsxdq (符号拡張 2 dword → 2 qword, 厳密整数)
+    if b == 'pmovsxdq' and ptys == ['i128'] and R == 'i128':
+        body = '%s L128 r; r.d[0] = (u64)(long long)(int)%s.w[0]; r.d[1] = (u64)(long long)(int)%s.w[1]; return r.q;' % (pre, A(0), A(0))
     # ----- 近似命令 (rcp/rsqrt): wasm 側は IEEE の 1/x, 1/sqrt(x) (仕様上限 1.5*2^-12 内)。
     #       実機 x86 の近似表との差は CAB-224 の許容誤差 gate (tools/liftlib/liftlib/simd/simdtest.py と同一基準) で判定する。
     if b in ('rcpps', 'rcpss') and n == 1 and ptys[0] == 'i128' and R == 'i128':

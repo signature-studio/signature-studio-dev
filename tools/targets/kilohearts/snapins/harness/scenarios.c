@@ -11,6 +11,9 @@
 #include "scen_disperser.h"
 #include "scen_formant.h"
 #include "scen_khmath.h"
+#include "scen_phaser.h"
+#include "scen_delay.h"
+#include "scen_limiter.h"
 Scenario SCEN_LIST[] = {
     {"matrix", trial_matrix, 6},
     {"gain", trial_gain, 6},
@@ -31,5 +34,8 @@ Scenario SCEN_LIST[] = {
     {"khvec", trial_khvec, 16},
     {"khicall", trial_khicall, 16},
     {"khprobe", trial_khprobe, 12},
+    {"phaser", trial_phaser, 6},
+    {"delay", trial_delay, 6},
+    {"limiter", trial_limiter, 6},
     {0, 0, 0},
 };

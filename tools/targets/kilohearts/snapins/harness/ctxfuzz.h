@@ -37,6 +37,7 @@ u64 do_call(u64 va, int rk, u64 a0, u64 a1, u64 a2, u64 a3, u64 x0, u64 x1, u64 
 #define C2(va, rk, a0, a1)             do_call(va, rk, (u64)(a0), (u64)(a1), 0, 0, 0, 0, 0, 0)
 #define C3(va, rk, a0, a1, a2)         do_call(va, rk, (u64)(a0), (u64)(a1), (u64)(a2), 0, 0, 0, 0, 0)
 #define C1F(va, rk, a0, f1)            do_call(va, rk, (u64)(a0), 0, 0, 0, 0, fbits(f1), 0, 0)
+#define C2F(va, rk, a0, f1)            do_call(va, rk, (u64)(a0), 0, 0, 0, 0, fbits(f1), 0, 0)
 static inline u64 dbits(double d) { u64 u; memcpy(&u, &d, 8); return u; }
 #define CD0(va, rk, d0)                do_call(va, rk, 0, 0, 0, 0, dbits(d0), 0, 0, 0)       /* xmm0 = double */
 #define CF0(va, rk, f0)                do_call(va, rk, 0, 0, 0, 0, fbits(f0), 0, 0, 0)       /* xmm0 = float */

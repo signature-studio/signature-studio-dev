@@ -31,6 +31,9 @@ def size_of(ty):
 def main():
     src, core, dst = sys.argv[1:4]
     window = int(sys.argv[sys.argv.index('--window') + 1]) if '--window' in sys.argv else 0
+    wmap = {}
+    if '--window-map' in sys.argv:
+        wmap = json.load(open(sys.argv[sys.argv.index('--window-map') + 1]))
     pe = pefile.PE(core, fast_load=True)
     data = open(core, 'rb').read()
     base = pe.OPTIONAL_HEADER.ImageBase
@@ -54,8 +57,11 @@ def main():
             continue
         va = int(m.group(1), 16)
         n = size_of(m.group(3))
-        if window and n is not None:
-            n = max(n, window)
+        if n is not None:
+            # 窓幅: IR 型サイズ (直接 load) と [rdataest] 推定 (base+可変 index) の最大値
+            # 既定窓 64B: map 非該当の静的参照 (定数プール 1 個読み) も従来どおり 64B を保証する
+            # (--window-map 経路で window=0 の時, 非該当が 1B に縮んで定数読みが壊れた [KH-6 実測])
+            n = max(n, window or 64, int(wmap.get('%x' % va, 0)))
         if n is None:
             rep.append('unsupported type %s @%x' % (m.group(3), va))
             continue

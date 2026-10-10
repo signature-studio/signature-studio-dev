@@ -116,7 +116,19 @@ def main():
         sh('python3 %s/ir_normalize.py %s %s' % (HERE, P('lowered.ll'), P('n1.ll')))
         # rdata 窓幅: 既定 64B。テーブルを base+offset (可変 index) で読む関数 (k_dfdb0 の 2/π 表は +164B,
         # log10f の 2^(k/256) 表は +1KB) がある snap-in は snapins.json の rdata_window で拡張する (D14 修復)。
-        win = '--window %d' % cfg.get('rdata_window', 64)
+        # KH-6: kh_lower [rdataest] の推定 map (rdata_window_map) を snapins.json の "rdata_est": true の
+        # エントリのみ使う (per-VA 窓)。明示 rdata_window があれば従来どおり全局共通窓を優先。
+        # 未指定エントリ (既存 10 本) は意図的に従来の --window 64 相当に固定する (RESULT baseline 不変のため)。
+        ljson = json.load(open(P('lowered.ll.json')))
+        if 'rdata_window' in cfg:
+            win = '--window %d' % cfg['rdata_window']
+        elif cfg.get('rdata_est') and ljson.get('rdata_window_map'):
+            mp = P('rdatamap.json')
+            json.dump(ljson['rdata_window_map'], open(mp, 'w'))
+            win = '--window-map %s' % mp
+        else:
+            win = ''
+        stat['rdata_window_map'] = ljson.get('rdata_window_map', {})
         lines_in = open(P('n1.ll')).read().split('\n')
     # declare 重複除去
     seen, outl = set(), []

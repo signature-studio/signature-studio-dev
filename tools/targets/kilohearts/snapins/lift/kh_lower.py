@@ -273,6 +273,152 @@ def find_load_ptr(out, old, ty):
     return None
 
 
+def rdata_estimate(vas, bodies, rd):
+    """[rdataest] rdata_window 自動推定 (KH-4 REPORT §4 設計案の実装, 半自動: 候補列挙+上限推定)。
+
+    機械語から (1) `lea reg,[rip+X]` の表 base 候補を収集し、(2) reg を base に使うメモリ命令の
+    到達幅 (disp + index*scale + opsize) を推定する。index の上限は直近の `and idx, imm` /
+    `mov reg,imm` + `and` から取れる場合は正確に (例: expf の `and eax,0x3f` ×8 = 512B)。
+    命令位置は stage-0 の `; 0xADDR` コメント (実命令境界) を使う (線形 sweep の desync 回避)。
+    さらに **call 辺を跨ぐ base 伝播** (UCRT 数学 helper は `lea rcx,[rip+表]` → callee が
+    `[rcx+idx*8]` で読む形が多い) を 2 パスで行う: 各関数の call 直前の arg reg (rcx/rdx/r8/r9)
+    への base 束縛を記録し、callee の arg-base 読出しに呼び出し元の base VA を種として与える
+    (複数呼び出し元は union, 最大 4 ラウンドの不動点)。
+    戻り値: ({va: est_bytes}, {va: 'mask'|'static'|'gap'|'arg'|'none'}) — 精密推定が取れない
+    base は次参照 VA までの gap (build 側で 8KB 打切り + 64B 余白) に倒す。fuzz 検証が最終担保。
+    """
+    import capstone
+    md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
+    md.detail = True
+    X86_LEA, X86_AND, X86_MOV, X86_CALL = capstone.x86.X86_INS_LEA, capstone.x86.X86_INS_AND, capstone.x86.X86_INS_MOV, capstone.x86.X86_INS_CALL
+    X86_MOVABS = capstone.x86.X86_INS_MOVABS
+
+    def RG(k):
+        return getattr(capstone.x86, 'X86_REG_%s' % k.upper())
+
+    CANON = {'eax': 'rax', 'ebx': 'rbx', 'ecx': 'rcx', 'edx': 'rdx', 'esi': 'rsi', 'edi': 'rdi', 'ebp': 'rbp', 'esp': 'rsp',
+             'r8d': 'r8', 'r9d': 'r9', 'r10d': 'r10', 'r11d': 'r11', 'r12d': 'r12', 'r13d': 'r13', 'r14d': 'r14', 'r15d': 'r15'}
+    reg_canon = {}
+    for n64 in ('rax', 'rbx', 'rcx', 'rdx', 'rsi', 'rdi', 'rbp', 'rsp', 'r8', 'r9', 'r10', 'r11', 'r12', 'r13', 'r14', 'r15'):
+        reg_canon[RG(n64)] = RG(n64)
+    for n32, n64 in CANON.items():
+        reg_canon[RG(n32)] = RG(n64)
+
+    def canon(reg_id):
+        return reg_canon.get(reg_id, reg_id)
+    ARG_REGS = (RG('rcx'), RG('rdx'), RG('r8'), RG('r9'))
+    vaset = set(vas)
+
+    def scan(v, seed):
+        """1 関数走査。戻り値 (reach{va:max}, how{va:kind}, callsites[(addr,target,{reg:baseVA})], arguse{reg:max})"""
+        body = '\n'.join(bodies[v])
+        addrs = [int(x, 16) for x in re.findall(r'; 0x([0-9a-f]+)', body)]
+        reach, how, callsites, arguse = {}, {}, [], {}
+        if not addrs:
+            return reach, how, callsites, arguse
+        base = dict(seed)      # reg id -> set(table VA)
+        andmask, movimm = {}, {}
+        for a in addrs:
+            ins = next(md.disasm(rd(a, 16), a, 1), None)
+            if ins is None or ins.address != a:
+                continue
+            if ins.id == X86_LEA and len(ins.operands) == 2:
+                d, s = ins.operands
+                if d.type == capstone.x86.X86_OP_REG and s.type == capstone.x86.X86_OP_MEM and s.mem.base == RG('rip'):
+                    base[canon(d.reg)] = {ins.address + ins.size + s.mem.disp}
+                    andmask.pop(canon(d.reg), None)
+                continue
+            if ins.id in (X86_MOV, X86_MOVABS) and len(ins.operands) == 2 and ins.operands[0].type == capstone.x86.X86_OP_REG \
+                    and ins.operands[1].type == capstone.x86.X86_OP_IMM and 0 < ins.operands[1].imm < (1 << 32):
+                movimm[canon(ins.operands[0].reg)] = ins.operands[1].imm
+                continue
+            if ins.id == X86_AND and len(ins.operands) == 2 and ins.operands[0].type == capstone.x86.X86_OP_REG:
+                b, s2 = ins.operands
+                cand = [x for x in (andmask.get(canon(b.reg)), movimm.get(canon(b.reg)),
+                                    movimm.get(canon(s2.reg)) if s2.type == capstone.x86.X86_OP_REG else None,
+                                    s2.imm if s2.type == capstone.x86.X86_OP_IMM else None) if x is not None]
+                if cand:
+                    andmask[canon(b.reg)] = min(cand)
+                continue
+            if ins.id == X86_CALL and len(ins.operands) == 1 and ins.operands[0].type == capstone.x86.X86_OP_IMM:
+                tgt = ins.operands[0].imm
+                bind = {r: frozenset(base[r]) for r in ARG_REGS if base.get(r)}
+                callsites.append((a, tgt, bind))
+                for r in ARG_REGS:
+                    base.pop(r, None)       # callee-saved ではない引数レジスタは call で上書きされる
+                    andmask.pop(r, None)
+                continue
+            if ins.id in (X86_MOV, X86_MOVABS) and len(ins.operands) == 2 and \
+                    ins.operands[0].type == capstone.x86.X86_OP_REG and ins.operands[1].type == capstone.x86.X86_OP_REG:
+                dreg, sreg = canon(ins.operands[0].reg), canon(ins.operands[1].reg)
+                if sreg in base:
+                    base[dreg] = base[sreg]
+                else:
+                    base.pop(dreg, None)
+                continue
+            for op in ins.operands:
+                if op.type != capstone.x86.X86_OP_MEM:
+                    continue
+                m = op.mem
+                if not m.base:
+                    continue
+                bset = base.get(canon(m.base))
+                opsz = max(1, op.size)
+                mk = andmask.get(canon(m.index)) if m.index else None
+                if bset is None:
+                    if canon(m.base) in ARG_REGS and m.index:
+                        arguse[canon(m.base)] = max(arguse.get(canon(m.base), 0),
+                                                    max(1, m.disp) + (mk if mk is not None else 0) * m.scale + opsz)
+                    continue
+                kind = ('mask' if (m.index and mk is not None) else ('arg' if canon(m.base) in ARG_REGS else 'static'))
+                for va in bset:
+                    if m.index and mk is not None:
+                        r = max(1, m.disp) + mk * m.scale + opsz
+                    else:
+                        r = max(1, m.disp) + opsz
+                    if r > reach.get(va, 0):
+                        reach[va] = r
+                    prev = how.get('%x' % va)
+                    if prev != 'mask':
+                        how['%x' % va] = kind
+        return reach, how, callsites, arguse
+
+    # pass 1: 種なし走査 + call 辺収集
+    allreach, allhow = {}, {}
+    edges = []          # (tgt, bind)
+    for v in vas:
+        r1, h1, cs, _ = scan(v, {})
+        for va, r in r1.items():
+            if r > allreach.get(va, 0):
+                allreach[va] = r
+            allhow.setdefault('%x' % va, h1.get('%x' % va, 'none'))
+        for (_, tgt, bind) in cs:
+            if tgt in vaset and bind:
+                edges.append((tgt, bind))
+    # pass 2: arg base 伝播 (不動点, 最大 4 ラウンド)
+    seeds = {}
+    for tgt, bind in edges:
+        s = seeds.setdefault(tgt, {})
+        for reg, vs in bind.items():
+            s.setdefault(reg, set()).update(vs)
+    for _ in range(4):
+        changed = False
+        for v in vas:
+            sd = seeds.get(v) or {}
+            if not sd:
+                continue
+            sd2 = {r: set(x) for r, x in sd.items()}
+            r2, h2, _, _ = scan(v, sd2)
+            for va, r in r2.items():
+                if r > allreach.get(va, 0):
+                    allreach[va] = r
+                    changed = True
+                allhow.setdefault('%x' % va, h2.get('%x' % va, 'none'))
+        if not changed:
+            break
+    return allreach, allhow
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('stage0')
@@ -369,6 +515,12 @@ def main():
                                 ok = tgt in set(vas)
                                 icalls['%x' % ins.address] = ('__rip__', tgt if (ok and IMG_LO <= tgt < IMG_HI) else -slot)
     n_icall = len(icalls)
+    # ---- [rdataest]: 表 base + 可変 index の最大読出幅を機械語から推定 (gen_globals への窓幅候補)
+    est = {}
+    est_how = {}
+    if 'rdataest' not in skip:
+        from pe_dis import rd as _rd2
+        est, est_how = rdata_estimate(vas, bodies, _rd2)
     texts = {v: '\n'.join(vshift_pass(gs_pass(lower_body(bodies[v], jt, skip, uid, rep, icalls), uid, rep), uid, rep)
                           if 'vshift' not in skip else
                           gs_pass(lower_body(bodies[v], jt, skip, uid, rep, icalls), uid, rep)) for v in vas}
@@ -495,7 +647,22 @@ def main():
         w += ['}', '']
         final += w
     open(a.out, 'w').write('\n'.join(final) + '\n')
-    json.dump({'lowered': rep, 'rdata_windows': ['%x' % v for v in sorted(vaset)], 'unlifted_callees': ['%x' % c for c in sorted(called - set(vas))],
+    # 窓幅 = max(精密推定 (static disp / and mask), gap 下限 = 次参照 VA までの距離 + 64B 余白を 8KB で打切り)。
+    # gap 下限の根拠: UCRT の定数プールは同一テーブル群を連続配置し、D11 (64B→不足) / D14 (164B) /
+    # powf (8192B) の 3 実例がいずれも「base から 8KB 以内」に収まる (KH-4 REPORT §4)。
+    # +64B は「次参照 VA が同一テーブル領域内の別 base」のケース (0x18228ac50 の 2/π 表 = 実測 +164B) を
+    # 読出幅込みで被覆するための余白。過大側のコストは wasm サイズのみ、過小は O(1) 差分 (silent) という
+    # 非対称性より過大側に倒す。
+    vs = sorted(vaset)
+    est2 = {}
+    for v, r in est.items():
+        nxt = next((x for x in vs if x > v), 0)
+        gap = min(nxt - v + 64, 8192) if nxt else 0
+        # 上限 8192: ImageBase 相対の D10 型 (lea base, [base+idx*2+0x227ffc0]) で reach が 68MB 級に
+        # 爆発する実測がある (limiter/KH-6)。8192 は powf 実績窓 = 検証済み最大 (それ超は dint/fint shim 経路)。
+        est2['%x' % v] = min(max(r, gap), 8192)
+    json.dump({'lowered': rep, 'rdata_windows': ['%x' % v for v in sorted(vaset)], 'rdata_window_map': est2,
+               'unlifted_callees': ['%x' % c for c in sorted(called - set(vas))],
                'icall_sites': sorted(icalls)},
               open(a.out + '.json', 'w'), indent=1)
     # ---- kh_icall (D15 [icall]): アリーナ内 vtable の実値 → 既知 callee へ dispatch。
@@ -532,7 +699,7 @@ def main():
         icall_c.append('}')
         icall_c.append('EMSCRIPTEN_KEEPALIVE unsigned long long kh_icfail(void) { abort(); return 0; }')
         open(a.out + '.icall.c', 'w').write('\n'.join(icall_c) + '\n')
-    print('[kh_lower]', json.dumps(rep), 'rdata windows', len(vaset), 'unlifted callees', ['%x' % c for c in sorted(called - set(vas))],
+    print('[kh_lower]', json.dumps(rep), 'rdata windows', len(vaset), 'est', json.dumps(est2), 'unlifted callees', ['%x' % c for c in sorted(called - set(vas))],
           'icall sites', n_icall, ('icall slot map %d' % len(slots)) if icall_c else '')
 
 

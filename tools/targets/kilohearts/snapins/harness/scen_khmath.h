@@ -1,3 +1,5 @@
+#ifndef SCEN_KHMATH_H
+#define SCEN_KHMATH_H
 /* scen_khmath.h — KH-4 共通基盤 (khbase) の ctx-fuzz 差分。
  *
  * 構成:
@@ -246,3 +248,4 @@ static void trial_khmath(int t) {
     trial_khicall(t);
     trial_khprobe(t);
 }
+#endif /* SCEN_KHMATH_H */
