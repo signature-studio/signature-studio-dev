@@ -26,6 +26,7 @@
 | Gate (ksgt) | 0x1804c2f50 | 1703 | 3 / 2,532 | 45,754 | 0 | 200/200 | 999/999 | callret×12, mov128×11, flags×9, merge×2, store128×1 | 2 (memmove/memset) / 1 |
 | 3-Band EQ (ksqe) | 0x18035fb10 | 1754 | 24 / 11,512 | 186,285 | 0 | 200/200 | 999/999 | mov128×43, flags×30, merge×13, store128×11, callret×49, jumptable×1 | 2 (`_dint`/`_fdint`) / 6 (CRT 例外系) |
 
+- lift した関数 (config `lift`): Channel Mixer = process + reset(slot15) + slot7(float 引数); Gain = process; Haas = process + 無音ブロック(slot13) + reset + slot17 + latency(slot19, int 戻り); Clipper = process + peak-hold callee(xmm2/xmm3 引数) + reset; Gate = process + lookahead delay 2 関数 (sidechain 経路); 3-Band EQ = process + 設計/libm/CRT 23 関数。
 - 「lift fn 数 / 合計 B」= lift した関数 (process + 必要な closure + reset 等) の数と機械語バイト (`fnscan.py` の extent)。**process B は REPORT.md (親) の「固有 B」より大きい**: 親の leaf 関数サイズ推定は末尾分離ブロックを落とす (Channel Mixer process 186B → 実 257B, §5 D13)。
 - 3-Band EQ の closure = process + 係数設計 (`180362700`/`180bac490` = 8 type の biquad 設計 switch) + **FMA3 libm** (`180fcd690`/`180fce0d0` = sin/cos, `180fcde58` = exp 系 double, `180fbc1f4` = float exp 系) + CRT 補助。libm 4 関数は単体でも **4800/4800 call bit-exact** (`qemath` scenario)。
 - wasm サイズは Path B がレジスタをグローバル (メモリ) 経由で持つため大きめ (Path A の Gain 17KB / Channel Mixer 17KB に対し 23KB)。register localization (mem2reg 相当) は未実施の最適化余地。
@@ -106,7 +107,7 @@ D13 (調査精度) 親 REPORT の leaf サイズ推定が過小 (257B を 186B)�
 
 ## 6. 未解決 / ブロッカー / 次
 
-- **未着手**: Resonator / Stereo / Disperser (余力枠)。process の直接 callee を見る限り Resonator は `180fbc1f4` (lift 済) のみ、Stereo は libm 2 関数 (lift 済) + vector realloc、Disperser は `180316d90`/`1803172a0`/`1803172f0`/`180bac490` 等 (以上は推定; scenario 作成 = this/ctx レイアウト起こしが律速)。
+- **未着手**: Resonator / Stereo / Disperser (余力枠)。**Resonator は `rcpps`、Stereo は `rsqrtps` を process 内で使う** — 逆数/逆平方根の *近似* 命令 (相対誤差 ≤ 1.5·2^-12) で結果は CPU 実装依存 (Intel/AMD で異なる)。native 参照 (本機 = AMD Ryzen 9 9950X) と bit-exact を取るには AMD 表の再現が必要で、他 CPU 上の本物とは一致しない → bit-exact の定義自体が CPU 依存。wasm 側は IEEE の `1/x`, `1/sqrt(x)` との許容誤差 (≤ 2^-11 相対) 判定にするか、特定 CPU の近似表を移植する方針判断が要る。Disperser は近似命令無しだが `180316d90`/`1803172a0`/`1803172f0`/`180006500` 等の追加 lift + this レイアウト起こし (7 段 biquad の状態 ≈ 0x4a0B) が必要 (scenario 作成が律速)。
 - stub のまま (到達 0): Gain/Gate の `std::vector<int>` 再確保 `0x18004cf20` (通知 vector が満杯の経路)、EQ の CRT 例外系 6 関数 (NaN/Inf/domain error 用)。**NaN・Inf 入力は未試験** (NaN ペイロード差のため意図的に除外)。
 - 性能: Path B はレジスタ=グローバルで -O1 のまま (wasm 23〜186KB)。register file の局所化 (関数内 alloca 化 → mem2reg) で縮む見込み (推定)。
 - ライセンス層・GUI・間接 call (vtable) 経由の closure 拡張は対象外 (親 REPORT §7)。
