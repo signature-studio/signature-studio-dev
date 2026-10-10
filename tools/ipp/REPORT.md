@@ -1,6 +1,6 @@
 # tools/ipp — Intel IPP (`dsp_ippv2`) 再現要否の評価と最小実装 PoC
 
-再現: `bash tools/ipp/ipp_e2e.sh` (約 25 秒, exit 0 = 12 checks PASS)。大物中間物は `work/` (gitignore)。数値はすべて実測、推定は「推定」と明記。
+再現: `bash tools/ipp/ipp_e2e.sh` (約 40 秒 [検収実測 38 秒], exit 0 = 12 checks PASS)。大物中間物は `work/` (gitignore)。数値はすべて実測、推定は「推定」と明記。
 
 ## 0. 結論 (ユーザ質問への回答)
 
@@ -9,7 +9,7 @@
 | IPP **本体**(win 39.9MB / mac 33.8MB の Intel 実装)を再現・lift する必要は? | **不要**。mac arm64 スライスは FL 自身が書いた **0.4MB (text 244KB)** の IPP 互換 API 別実装 (Accelerate + 自前 NEON/C) で、FL はそれで出荷・動作している |
 | mac 版になければ Intel 独自という仮説は? | **半分正しい**。Intel 固有なのは「CPU 別 6 経路 (SSE2/SSSE3/SSE4.2/AVX/AVX2/AVX-512) の SIMD 実装」。**API 面 (239 関数)** は arm64 でも必要で、arm64 スライスが 257/420 名・使用関数の 232/239 を提供 |
 | 全部不要か? | **否**。win64 FL も `dsp_ippv2` を 229 関数静的参照 (FLEngine 本体だけで 143)。ロード時に 420 名を要求する。→ **API 実装は必要** |
-| 最小自前実装で足りるか | **足りる見込み**。PoC: **43 関数 / wasm 46KB** (420 名 lookup 表付き)。実 Intel IPP との差分: 24 関数中 **21 が bit-exact** (全 ISA 経路で決定的な 21)、残 3 は IPP 自身が CPU 依存/低精度で bit 一致が定義不能 (§4) |
+| 最小自前実装で足りるか | **足りる見込み**。PoC: **43 関数 / wasm 46KB** (420 名 lookup 表付き)。実 Intel IPP との差分: 24 関数中 **21 が bit-exact** (AVX-512 経路との比較。NaN の仮数ペイロード差は除く — §4 注。Convert/Threshold の 3 関数は NaN 入力で IPP 自身が ISA 経路間差を持つので「全 ISA 経路で決定的」ではない)、残 3 は IPP 自身が CPU 依存/低精度で bit 一致が定義不能 (§4) |
 | 推奨 | **案C**: 使用関数のみ C で自前実装 → emcc。arm64 スライスを「どの関数が要るか・どう実装されているか」の仕様書、win の実 IPP DLL を差分テストの **オラクル** にする (§5) |
 
 ## 1. 予備情報の訂正 (メインの未検証メモ vs 実測)
@@ -19,7 +19,7 @@
 | arm64 は ipp 約258+5 export | arm64 export は 259 = FL 要求名 257 + FL が要求しない 2 (`AggCreateInstance`, `ippiCopy_8u_C1R`)。x86_64 は 434 = plain 377 (うち FL 要求 369) + `legacy90` 接頭辞 57。`legacy90` 付きは FL の fallback 名で、plain と合わせ 420 名全てを提供 |
 | 423 エントリ | **420 distinct 名** (423 はローダ呼出箇所数; 3 重複)。FLEngine x86_64 と arm64 は**同一 420 名・同順**の表を持つ (`C1`) |
 | 参照のある distinct 関数は 159 (F の集計) | **過少**。F は `call [VAR]` のみ数えた。実際は mac が `lea r,[VAR]; call [r]` 形、win(Delphi) が **`mov r,[slot]; call [r]` の二段間接** (.data の &VAR スロット 143 個, reloc 付) で呼ぶ。分類し直すと **win 225 (+関数ポインタ読出 4)=229 / mac x86_64 230(+4)=234 / mac arm64 234**、和集合 **239**。(私自身も最初は win=6 と誤判定し、llvm-objdump 線形掃引の独立検証で二段間接を発見して訂正した) |
-| win64 の IPP 同梱は未確認 | `dsp_ippv2_x64.dll` **39,942,656B (block24356)** = 本物の Intel IPP。446 export, .pdata 50,560 関数, `.text`25.0MB+`IPPCODE`7.2MB, import は KERNEL32 のみ, 経路 index を 1 変数 (`[0x182541000]`) で切替 (6 経路)。x86 版 28.2MB (block24355) は 32bit FL 用で不要。win DLL は 420 名を**全て plain 名で**提供 (legacy90 不要) |
+| win64 の IPP 同梱は未確認 | `dsp_ippv2_x64.dll` **39,942,656B (block24356)** = 本物の Intel IPP。446 export, .pdata 50,529 エントリ (例外ディレクトリ 606,348B÷12; 検収で 50,560 から訂正 — 旧値は節の raw サイズ 606,720B÷12 でパディング込み), `.text`25.0MB+`IPPCODE`7.2MB, import は KERNEL32 のみ, 経路 index を 1 変数 (`[0x182541000]`) で切替 (6 経路)。x86 版 28.2MB (block24355) は 32bit FL 用で不要。win DLL は 420 名を**全て plain 名で**提供 (legacy90 不要) |
 | FLEngine に _ipp 未定義なし (dlopen 経由?) | 正しい。mac: `_dlopen/_dlsym/_dlclose` import + UTF-16 リテラル。win: `LoadLibraryW/GetProcAddress`。ipp 未定義シンボル 0 (`C2`) |
 | ildsp_x64.dylib | IPP ではない (Limiter/PitchShifter 等 10 `*_CreateInstance`, Accelerate 依存)。本チケット対象外 |
 
@@ -35,7 +35,7 @@
 | 戻り値の扱い | 呼出 4 箇所 (initialization 相当) | 呼出 4 箇所 | 呼出 3 箇所 — **いずれも戻り値を検査しない** |
 
 - arm64 Mac で arm64 スライスが選ばれる件: dlopen のスライス選択は OS 挙動でコードには現れない。構造的裏付けのみ — FLEngine 自体が universal2 で arm64 スライスに**同じローダ**(420 名・同順)を持ち、142/143 モジュールが arm64 スライス保持 (`ilbridge` のみ thin x86_64 = Rosetta 橋渡し)。
-- **arm64 版は未提供 163 名をそのまま nil にして起動する**。そのうえ arm64 コードには未提供関数向けと思われる nil 判定(`ldr; cbz`)が 15 関数に検出された (x86/win は 0; ヒューリスティックなスキャナ値)。= FL 側が「arm64 は小さい実装」前提で作られている証拠。
+- **arm64 版は未提供 163 名をそのまま nil のままにする** (ローダ読解 + 戻り値非検査からの推論。arm64 実機での起動は未確認)。そのうえ arm64 コードには未提供関数向けと思われる nil 判定(`ldr; cbz`)が 15 関数に検出された (x86/win は 0; ヒューリスティックなスキャナ値)。= FL 側が「arm64 は小さい実装」前提で作られている証拠。
 - wasm shim への含意: 起動時に 420 名の GetProcAddress が引けることが必要 (win は引けなくても OutputDebugString のみだが、未実装関数を呼べば nil call で即死)。→ 未実装名は **名前入り fail-fast stub** にする (`gen_table.py`)。
 
 ## 3. arm64 スライスの正体 (0.4MB)
@@ -61,7 +61,7 @@
 
 | 24 関数 (n=1..4097, 位置ずれ 0/1/3, 特殊値 ±0/denormal/inf/NaN, 216 ケース・各 2.67M 要素を比較) | 結果 (AVX-512 経路との比較) |
 |---|---|
-| Move_8u/32f, Zero_8u/32f, Copy_32f, Set_32f/32s, Add_32f_I, Mul_32f(_I), AddC_32f(_I), MulC_32f(_I), SubCRev_32f(_I), Sqr_32f(_I), Threshold_GT/LT_32f_I, Convert_32f32s_Sfs | **21 関数 bit-exact** (戻りステータス含む。通常入力と特殊値のみ入力の両方, `C6/C7`)。NULL×len エラー格子 222 点も全一致 (`C8`) |
+| Move_8u/32f, Zero_8u/32f, Copy_32f, Set_32f/32s, Add_32f_I, Mul_32f(_I), AddC_32f(_I), MulC_32f(_I), SubCRev_32f(_I), Sqr_32f(_I), Threshold_GT/LT_32f_I, Convert_32f32s_Sfs | **21 関数 bit-exact** (戻りステータス含む。通常入力と特殊値のみ入力の両方, `C6/C7`)。ただし **両方 NaN の要素は仮数ペイロードの差を「一致」とみなす** (`nan_payload_diff` 別計上: 通常入力 AddC/MulC で各 42〜43 要素、特殊値入力 Add_I 826・Mul_I 817・AddC_I 201・MulC_I 189・AddC 206・MulC 214 要素 / 約 2.67M 中)。NaN 以外は全 bit 一致。NULL×len エラー格子 222 点も全一致 (`C8`) |
 | `Sqrt_32f_A11` / `Exp_32f_A11` | 実 IPP は **A11 = 12〜14.5 bit 精度** (相対誤差 最大 4.4e-5〜2.6e-4 = 11.9〜14.5 bit)、自前は 24 bit。IPP 自身が **AVX-512 vs AVX2 で Sqrt 最大 4098 ulp / Exp 最大 1802 ulp 異なる** → bit 一致は定義不能。状態コード (overflow=12, underflow=17, 負引数=19) は一致 (Exp は overflow/underflow 境界の 71 ケースで不一致) |
 | `VectorSlope_32f` | 実 IPP は **ブロック累積** (誤差が真値比で 100〜130 eps24 まで漂う; ISA 経路間の出力は同一) で bit 再現は未解決。自前は 1.8 eps24 (厳密に近い) |
 
@@ -69,13 +69,13 @@
 
 **実 IPP の ISA 経路間差** (`data/diff_results.json`): Exp/Sqrt_A11 (avx512↔avx2), Convert の NaN 入力 (avx↔avx2, ssse3↔sse4.2, sse2↔ssse3: 古い経路は 0、新しい経路は符号で INT_MIN/MAX), Threshold_GT/LT の NaN (avx↔sse4.2)。→ **IPP の bit は CPU 依存**で、ユーザ環境ごとに FL の出力が既に異なる。bit-exact 要件は A11 系・NaN 入力には課せない。
 
-FFT (`ipp_fft.c`, 倍精度基数2 の素朴実装): ippsFFTGetSize/Init/Fwd_RToPack/Inv_PackToR/_I + RToCCS/CCSToR を 32f/64f で実装。order 1..16 × 全 flag(1/2/4/8) 128 ケースで実 IPP との正規化 RMS 誤差 **32f 最大 1.5e-7, 64f 最大 6.6e-16** (`C11`)。Pack/CCS 形式・符号・スケール flag の意味が一致。
+FFT (`ipp_fft.c`, 倍精度基数2 の素朴実装): ippsFFTGetSize/Init/Fwd_RToPack/Inv_PackToR/_I + RToCCS/CCSToR を 32f/64f で実装。order 1..16 × 全 flag(1/2/4/8) 128 ケース (ネイティブ build, `ipp_fft_ref`) で実 IPP との正規化 RMS 誤差 **32f 最大 1.5e-7, 64f 最大 6.6e-16**。wasm 版の突合 (`C11`) は golden 48 ケースで 32f 最大 1.3e-7 / 64f 最大 5.9e-16。Pack/CCS 形式・符号・スケール flag の意味が一致。
 
 ## 5. 判定: 案A/B/C 比較
 
 | | 案A: x86_64 IPP を lift | 案B: arm64 スライスを lift | **案C: 必要関数のみ C 自前→emcc (推奨)** |
 |---|---|---|---|
-| 入力サイズ | mac 33.8MB (text 26.2MB) / win 39.9MB (50,560 関数, 6 経路) | 0.41MB (text 244KB, 259 関数) | PoC 43 関数 = C 約 230 行 → wasm **46KB** (simd128 版 47KB) |
+| 入力サイズ | mac x86_64 スライス 33.8MB (fat 全体 34.2MB; text 26.2MB) / win 39.9MB (.pdata 50,529 エントリ, 6 経路) | 0.41MB (text 244KB, 259 関数) | PoC 43 関数 = C 約 230 行 → wasm **46KB** (simd128 版 47KB) |
 | 工数 (推定) | 最大。RetDec で 26MB text・巨大 closure・経路 dispatch 間接 jmp・AVX-512 経路を避ける pass が必要 | 中。arm64 リフタ要 (RetDec 5.0 は arm64 を名目サポート、未検証) **かつ Accelerate ~100 関数 (vDSP/vImage/vForce) の再実装が結局必要** → C より重い | 小〜中。残 ~190 関数 ≈ 2〜3 人週 (推定; vector 系は定型, imaging 45 と FIR/IIR が重め) |
 | wasm サイズ | 数 MB 以上 (推定) | 小 + Accelerate 再実装 | 全 239 関数で 150〜300KB (推定: arm64 text 244KB 比) |
 | 数値精度 | 選んだ 1 経路に対して bit-exact (ただし実機 CPU の経路とは別物) | arm64 シムの挙動 (vv* は高精度) | 21/24 bit-exact + A11 は 24bit (IPP 規格内)。差分テスト基盤で関数ごとに実測 |
@@ -101,16 +101,16 @@ FFT (`ipp_fft.c`, 倍精度基数2 の素朴実装): ippsFFTGetSize/Init/Fwd_RTo
 | `ipp_wasm_cmp.mjs` `ipp_wasm_fft.mjs` `ipp_wasm_bench.mjs` | wasm と golden(実 IPP 出力) の突合・性能 |
 | `data/` | `ipp_usage_summary.json`, `ipp_matrix.csv`(420 名×使用/提供/実装), `arm64_ipp_map.json`, `diff_results.json` |
 
-## 7. 性能 (n=4096 float, ns/call。既知の問題として記録)
+## 7. 性能 (n=4096 float, ns/call。既知の問題として記録。単発測定でラン間ばらつきが大きい: 検収で 4 回測った範囲を括弧内に併記)
 
 | 関数 | 実 IPP (AVX-512) | wasm scalar | wasm simd128 |
 |---|---|---|---|
-| Add_32f_I | 86 | 919 (11x) | 349 (4.1x) |
-| MulC_32f_I | 85 | 530 | 246 (2.9x) |
+| Add_32f_I | 86 | 919 (11x) | 349 (4.1x; 再測 3.5〜4.5x) |
+| MulC_32f_I | 85 | 530 | 246 (2.9x; 再測 3.1〜5.7x) |
 | Move_8u (16KB) | 70 | 67 | 67 (同等) |
-| Sqrt_32f_A11 | 114 | 5941 | 889 (7.8x) |
-| Exp_32f_A11 | 333 | 9810 | 8612 (26x; scalar `expf`) |
-| FFT Fwd 4096 (32f) | 1238 | 48971 (40x) | 39952 (32x) |
+| Sqrt_32f_A11 | 114 | 5941 | 889 (7.8x; 再測 6.4〜9.5x) |
+| Exp_32f_A11 | 333 | 9810 | 8612 (26x; scalar `expf`; 再測 32〜44x) |
+| FFT Fwd 4096 (32f) | 1238 | 48971 (40x) | 39952 (32x; 再測 32〜50x) |
 
 → FFT は PoC の素朴実装なので **pffft 等 upstream SIMD 実装への差替え**が要る (方針「upstream からビルドできるものはビルド」に合致)。Exp/Log 系は A11 (12bit) 規格なので SIMD 多項式化の余地大。他の bit-exact 関数は simd128 化しても bit 不変 (`C10`)。
 
@@ -129,3 +129,10 @@ FFT (`ipp_fft.c`, 倍精度基数2 の素朴実装): ippsFFTGetSize/Init/Fwd_RTo
 2. **ipp-fill**: `data/ipp_matrix.csv` の優先順 (win モジュール数降順) で残 ~190 関数を実装し、`ref/ipp_ref.c` の FN 表に追加して差分テストを広げる。FLEngine 本体の ippi 33 関数 (GUI) は M7 と連携。
 3. **ipp-fft**: pffft 等で置換 (RToPack/CCS, 32f/64f)。
 4. **ipp-profile**: lift 済 FLEngine で実呼出関数を採取 → 実使用集合の確定 (本 REPORT の 239 を絞る)。
+
+## 10. 検収記録 (独立再計算)
+
+- 420 名: FLEngine 3 種 (mac x86_64/arm64, win64) を UTF-16 正規表現で独立走査 → 同一 420 distinct 名 (x86_64=arm64 は同順)。export 集合も `llvm-objdump --exports-trie` と自前 PE export パーサで再計算し、win 446 export が 420 名全提供・arm64 257/420・x86_64 plain 369+legacy90 で 420 を確認。
+- FLEngine 本体の使用関数: 別系統 (llvm-objdump 逐次逆アセンブル + rip 相対ターゲット解決; win は &VAR スロット 143 個) で mac x86_64 = 187、win64 = 143 を再現。
+- オラクルは実 DLL の機械語をそのまま実行 (`pe_load.c` は PE 敷設・import 解決のみ。IPP 互換実装は経路に介在しない)。ただし KERNEL32 26 関数は自前スタブ。
+- 訂正した点: .pdata 50,560→50,529、所要 25→約 40 秒、bit-exact の NaN ペイロード注記、「全 ISA 経路で決定的」の削除、FFT ケース数 (native 128 / wasm 48)、性能のラン間ばらつき。
