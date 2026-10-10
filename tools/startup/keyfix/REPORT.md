@@ -145,6 +145,8 @@
    master 版が将来読まれる場合は追加エントリ。
 4. seed.json は build_seed.py 再生成で上書きされる (vreg.sh step1)。恒久化には apply_keys.py の OVERRIDES を
    build_seed.py へ取込む必要 (tools/startup/vreg/scripts は本チケットの書込範囲外のため未実施 → 次タスク案)。
+   **→ 完了 (follow-up c72f220)**: OVERRIDES 正本は `tools/startup/vreg/scripts/build_seed.py` へ verbatim 移設済み
+   (115 定義 / 差分 0 を検収で再照合。本ファイルの表は履歴。詳細は vreg REPORT §11)。
 5. m11 IR 突合は closure 内 1 関数のみ (closure 外 28 関数は capstone+Ghidra decompile で代替)。
 
 ## 9. ユーザ依頼事項
@@ -156,6 +158,6 @@
 | # | チケット | 要点 |
 |---|---|---|
 | 1 | CAB-101 | §4 の期待キー表を SHIMX_TRACE 観測と突合。推定 47 の具体化データが取れる |
-| 2 | build_seed.py 取込 | apply_keys.py OVERRIDES を vreg/scripts/build_seed.py へ移設 (二重管理解消) |
+| 2 | ~~build_seed.py 取込~~ **完了** | follow-up c72f220 で移設済み (正本=build_seed.py OVERRIDES / apply_keys.py は no-op 後処理として残置) |
 | 3 | shimx username 統一 | shimx 取込時に env.c/shell.c を webstudio へ (pathreg secondary 退役) |
 | 4 | vreg REPORT/§3・§4 更新 | 本成果 (236/81/3) への数値更新 — tools/startup/vreg/REPORT.md は本チケット範囲外のため main 側で |
