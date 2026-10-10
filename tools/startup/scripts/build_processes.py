@@ -1,0 +1,48 @@
+#!/usr/bin/env python3
+"""build_processes.py — PROCESSES.csv 生成 (子プロセス/外部起動点/外部 DLL の全列挙と browser 版判定)。
+判定: 必要 / 不要 / 代替(別実装で置換) / 対象外(外部通信・規約方針) / 後回し(機能として将来)
+evidence: v=Ghidra decompile/逆アセンブルで確認, s=文字列のみ, r=既存 REPORT 由来
+"""
+import csv, os
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+H = ['id', 'platform', 'name', 'kind', 'launch_api', 'launch_site', 'trigger', 'args', 'verdict', 'browser_replacement', 'evidence']
+R = [
+ # --- Windows: 外部プロセス ---
+ ('W01', 'win', 'FL64.exe -> FLEngine_x64.dll', 'in-proc (LoadLibraryW)', 'LoadLibraryW + GetProcAddress("CreateFruityInstance")', 'FL64.exe:140004f33,140006f1b', '起動', 'CreateFruityInstance(0xc0,0xede95a,THostInstance*,&iface)', '代替', 'ローダ不要。wasm 内で CreateFruityInstance を直接呼ぶ glue (THostInstance は C 構造体で供給)', 'v'),
+ ('W02', 'win', 'ilbridge.exe (32bit\\ / 64bit\\)', 'child process', 'CreateProcessW(+Job Object AssignProcessToJobObject)', 'engine:00c836a0 <- 00c9c530 <- 00c9c390 <- 00c9f500', 'プラグインを bridge 指定でロード/ビット幅不一致/クラッシュ隔離 (TBridgedPlugin)', '<exe> <pipe/args> (dwCreationFlags=CREATE_BREAKAWAY_FROM_JOB 0x1000000 if job)', '不要', 'wasm プラグインは in-process (または専用 Worker)。bridge 要求は常に false (TBridgedPlugin を生成させない)。CreateProcessW=失敗返却', 'v'),
+ ('W03', 'win', 'PluginManager.exe', 'child process', 'ShellExecuteW("open")', 'engine:00abe3c0 <- 00b7ce00 <- 011942f0 他', 'Browser の "Find installed plugins" / メニュー / プラグインスキャン完了後', '-deepscan -flpath -vstpath -flcaption -remove -name -format -type (mac 文字列から。win も同系)', '代替', 'ネイティブスキャン不要。wasm プラグイン一覧 manifest を Plugin database\\Installed\\ に静的投入。ShellExecuteW は成功(>32)返却+no-op', 'v/s'),
+ ('W04', 'win', 'InterprocessPluginScan.exe (x64 3.1MB x2)', 'child of PluginManager', 'CreateProcess (PluginManager 内)', 'blocks 24343/24344', 'VST/VST3 スキャン', '-', '不要', 'なし (VST ホスト機能は wasm 化対象外)', 'r/s'),
+ ('W05', 'win', 'ControlCreator.exe', 'child process', 'ShellExecuteW("open")', 'engine:00f1c5c0 -> 00ed6780(id=0)', 'メニュー Tools > Control Creator', '(なし)', '後回し', 'MIDI コントローラ定義 GUI。将来 iframe/Web ページ化。当面 no-op', 'v'),
+ ('W06', 'win', 'fldiagnostic.exe (IL Diagnostic)', 'child process', 'ShellExecuteW("open")', 'engine:00f1d4f0 / 011f0540 / 0125d370 / 013173a0 -> 00ed6780(id=1)', 'Help > Diagnostics (/version "x")、クラッシュ時 (/log "<crashlog>")、再起動 (/restartfl "<exe>")', '/version "%s" | /log "%s" | /restartfl "%s"', '代替', 'restartfl = location.reload()/engine 再初期化、/log = クラッシュログを OPFS に保存しダウンロード提示、Diagnostics = 不要', 'v'),
+ ('W07', 'win', 'CopyLicenseToAllUsers.exe', 'child process (runas)', 'ShellExecuteExW(runas)', 'engine:00f02630 -> 00ed6780(id=1000)', 'ライセンス .reg 取込後 (-load "<.reg>")', '-load "%s"', '不要', '仮想レジストリのみ (全ユーザ概念なし)', 'v'),
+ ('W08', 'win', 'RemoveLicenses.exe (UsrMgr)', 'child process', 'ShellExecuteW', 'engine:00eff3c0 -> 00ed6780(id=1002)', 'Log out this user / all users', '-', '代替', '仮想レジストリの Registrations\\* 削除で置換', 'v'),
+ ('W09', 'win', 'CloudBounceConsole.exe (FL Cloud Mastering CLI)', 'child process / in-proc API', 'CreateProcessW + WaitForSingleObject', 'engine:0094a6d0 <- 0095e850/0095f3d0/0095f9d0/0095fd80/009601c0', 'FL Cloud mastering: --analyse / --getchain / --login -u fl_api_user -p … / --process … (+0x30!=0 なら in-proc CloudBounceConsoleAPI_* へ)', '--analyse -i X -m Y | --getchain | --login | --process -i -c -r -o -l -g', '対象外', '外部通信 (FL Cloud) 方針により機能ごと無効 (Mastering メニューはログイン要求ゲートで停止)', 'v'),
+ ('W10', 'win', 'FL Cloud Plugins.exe (+licence-engine\\LicenceEngine.dll)', 'child process / in-proc DLL', 'ShellExecuteW("open")', 'engine:00f066b0, 00f068d0, 00f1c6c0; 00f067d0', 'メニュー Manage FL Cloud plugins / 起動ジョブ "Initialize FL Cloud Plugins"', '-', '対象外', '別アプリ (未インストール時はダイアログ "couldn\'t be opened")。no-op', 'v'),
+ ('W11', 'win', 'LilyPond.exe + python.exe midi2ly.py', 'child process', 'ShellExecuteExW', 'engine:010d6790 <- 010d6e60', 'Score export (MIDI->PDF) "-dgui"', 'midi2ly.py <mid> / lilypond -dgui <ly>', '後回し', '機能として無効 (ShellExecuteExW 失敗返却)', 'v'),
+ ('W12', 'win', 'explorer / notepad / charmap / 既定ブラウザ / properties / runas', 'shell open', 'ShellExecuteW/A/ExW', 'engine:17 callers(ShellExecuteW) + 00766990(charmap) + 0081b040(properties) + 0081d600(runas)', 'フォルダを開く(explore)、URL を開く(open)、notepad、WhatsNew.htm 等', '-', '代替', 'URL: window.open (ユーザ操作起点のみ)、explore/notepad/charmap/properties/runas: ダイアログ/no-op', 'v'),
+ ('W13', 'win', 'msedgewebview2.exe 他 (WebView2 Runtime)', 'child processes of runtime', 'WebView2Loader.dll!CreateCoreWebView2EnvironmentWithOptions', 'engine:00be3520 (LoadLibraryW "WebView2Loader.dll")', 'FL CLOUD タブ / Gopher / Help(index_offline.html) / チュートリアル', 'userDataFolder=...\\EBWebView\\Default\\Network\\', '代替', 'LoadLibraryW(WebView2Loader.dll)=NULL でエンジンは非 WebView 経路。Help は iframe(srcdoc/Blob) で後日。FL CLOUD/Gopher は対象外', 'v'),
+ ('W14', 'win', 'MicrosoftEdgeUpdateSetup.exe (201MB, installer 同梱)', 'installer-time', 'NSIS ExecWait', 'installer', 'WebView2 Runtime 未導入時のみ', '/silent /install', '不要', 'ブラウザ自体が描画基盤', 'r'),
+ ('W15', 'win', 'powershell Add-MpPreference / regsvr32 ILWASAPI2ASIO / .bat', 'installer-time', 'NSIS ExecWait', 'installer', 'インストール時のみ', '-', '不要', 'なし', 'r'),
+ ('W16', 'win', 'ILWASAPI2ASIO(_x64).dll (FL Studio ASIO)', 'in-proc COM', 'CoCreateInstance(CLSID under HKLM\\software\\asio)', 'engine:00c526f0/00c522f0 (+ 005d08b0 ほか CoCreateInstance 14 箇所)', 'オーディオデバイス初期化', '-', '代替', 'AudioWorklet+SAB ring (M8)。ASIO 列挙は 1 デバイス "WebStudio Web Audio" を返す shim', 'v/r'),
+ ('W17', 'win', 'DirectSound (dsound.dll) / winmm / msacm32', 'in-proc (import)', 'DirectSoundCreate/Enumerate, waveOut, midiIn/Out, ACM', 'engine import (24 DLL)', 'オーディオ/MIDI', '-', '代替', 'Web Audio / Web MIDI shim (shim 表 #1/#10)', 'r'),
+ ('W18', 'win', 'python312.dll (CPython 3.12.1 + 26 .pyd)', 'in-proc DLL (LoadLibrary "Python312")', 'LoadLibrary / Py_* 動的束縛', 'engine:00c393a0 (InitSharedPython) 00c395a0 00c3b340', 'Piano roll / Audio / MIDI scripts, Chord progression tool, MCP', 'Python\\ (Shared\\Python)', '代替', 'upstream CPython を wasm 再ビルド (lift しない)。または初期は機能無効 ("Could not initialize Python.")', 'v'),
+ ('W19', 'win', 'MCPTools.pyc (System\\Tools\\MCP)', 'in-proc Python module', 'embedded Python', 'engine:00d9c320, 00d9d710 (get_mcp_tools_json)', 'Gopher/AI 制御面 (tools/call JSON)', 'JSON-RPC 風 {name,arguments}', '対象外', '外部 AI 通信とセット。Python 初期化が成立すれば postMessage 経由の外部制御面として後日', 'v/s'),
+ ('W20', 'win', 'Chord progression tool (System\\Tools\\Chord progression\\cpt.pyscript)', 'in-proc Python script', 'embedded Python', 'engine:00d2fd60', 'Piano roll tool', '-', '代替', 'Python 層が動けばそのまま動く (プロセスなし)', 'v'),
+ ('W21', 'win', 'ReWire (System\\Plugin\\ReWire\\FLReWire_x64.dll)', 'in-proc DLL', 'LoadLibrary', 'FL64.exe:140001000 (文字列のみ。使用箇所なし)', 'ReWire 連携', '-', '不要', 'なし', 'v'),
+ ('W22', 'win', 'Processing.NDI.Lib.x64.dll / ZGameEditor Visualizer (OpenGL, ffmpeg\\x64\\ilvideo_x64.dll)', 'in-proc DLL', 'LoadLibrary', 'engine:0066d230 他', '映像出力/Visualizer/動画音声抽出', '-', '後回し', 'NDI 不要。ffmpeg 系は upstream を wasm 再ビルド(別チケット)', 'r/s'),
+ ('W23', 'win', 'FL64.exe self-restart / 2nd instance', 'IPC', 'FindWindowW("TFruityLoopsMainForm") + SendMessageW(WM_COPYDATA)', 'engine:0117b930', '多重起動時 (ファイル引数を既存インスタンスへ転送)', '-', '代替', 'FindWindowW=NULL (常に単一インスタンス)。複数タブ排他は Web Locks (任意)', 'v'),
+ # --- macOS ---
+ ('M01', 'mac', 'OsxFL -> FLEngine_x64.dylib', 'in-proc (dlopen)', 'dlopen(<bundle>/Contents/Libs/FLEngine_x64.dylib)+dlsym("CreateFruityInstance")', 'OsxFL:100081110', '起動', 'CreateFruityInstance(host,&iface) 後 iface vtbl+200 (Run)', '代替', 'win と同じ glue', 'v'),
+ ('M02', 'mac', 'OsxFL -setenginepath', 'self mode', 'argc==1 && argv[1]=="-setenginepath"', 'OsxFL:100001de0 -> 100001c20', 'インストーラ後処理/復旧', 'RegWriteStringValue(2,"Software\\Image-Line\\Shared\\Paths","FL Studio engine",path)+CFPreferences', '不要', 'なし', 'v'),
+ ('M03', 'mac', 'libwinbridge_x64.dylib', 'in-proc dlopen', 'CFBundle/dladdr + CFPreferences("com.image-line.shared","FL Studio engine")', 'OsxFL:100086ff0', '起動直後 (Reg* shim の実体)', '-', '代替', 'tools/shim の registry 実装(IndexedDB/メモリ)が同等物', 'v'),
+ ('M04', 'mac', 'ControlCreator.app / fldiagnostic.app / PluginManager.app / ilbridge.app (x86_64 only) / CloudBounceConsole / RemoveLicenses', 'child .app', 'NSWorkspace / NSTask / fork+exec (imports 確認)', 'mac engine strings: Control Creator/ControlCreator.app, Diagnostics/fldiagnostic.app, System/Tools/Plugin Manager/PluginManager.app', 'win と同じ起動点 (W02-W09 に対応)', 'PluginManager: -deepscan -flpath -vstpath -flcaption -remove -name -format -type', '不要', 'win と同判定', 's'),
+ ('M05', 'mac', 'FL Cloud Plugins.app (FL Cloud Plugins Installer.pkg + launchDaemon plist)', 'child .app / installer', 'NSWorkspace open /Applications/FL Cloud Plugins.app', 'mac engine string', 'Manage FL Cloud plugins', '-', '対象外', 'no-op', 's/r'),
+ ('M06', 'mac', 'WKWebView (WebKit)', 'in-proc (WebKit XPC)', 'WKWebView', 'mac engine imports (WebKit 5 symbols)', 'FL CLOUD タブ / Help', '-', '代替', 'W13 と同じ', 'r/s'),
+ ('M07', 'mac', 'Python.framework 3.12 (+ python3-intel64)', 'in-proc framework', 'dlopen', 'Shared/Python', 'W18 と同じ', '-', '代替', 'W18 と同じ', 'r'),
+]
+out = os.path.join(ROOT, 'PROCESSES.csv')
+with open(out, 'w', newline='') as f:
+    w = csv.writer(f); w.writerow(H); w.writerows(R)
+import collections
+print('rows', len(R)); print(collections.Counter(r[8] for r in R))
+print('real child processes (CreateProcess/ShellExecute 起動): ', [r[0] for r in R if 'child' in r[3] and r[1]=='win'])
