@@ -63,17 +63,21 @@
 - 未検証: 実 FLEngine lift との結合 (移植待ち)・長時間ストレス・GPU 合成の実フレームレート・Chrome 以外 (Firefox/Safari)。
 
 ## 6. ユーザ依頼事項
-特になし (外部素材不要。mingw-w64 / RetDec / emsdk / Chrome は既設を使用)。
+現時点で必須の依頼なし (外部素材不要。mingw-w64 / RetDec / emsdk / Chrome は既設を使用)。将来分: ① GUI-9 (CAB-185) GDI フォント同梱方針 (Windows 標準フォントを同梱せず OSS フォントで代替してよいか) の判断、② GUI-6 (CAB-181) / GUI-8 (CAB-183) の IME・タッチ・Firefox 実機確認 (CAB-126 に合流)。
 
-## 7. 下流チケット案
-- **GUI-1 (P1 完走)**: DrawEdge/DrawFocusRect/DrawFrameControl、クリップボード (async Clipboard API 経由で同期 API 化)、モニタ/DPI、フック (WH_MOUSE/WH_KEYBOARD の内部ディスパッチ)、メニュー (FL が自前描画か要確認)。
-- **GUI-2 (ImageList + DnD)**: comctl32 ImageList_* を shim 内実装 (内部は BGRA surface 配列) + OLE DragDrop ↔ HTML5 DnD。
-- **GUI-3 (FLEngine 結合)**: `tools/m11` の `m11_winstubs.c` の GUI 部を本 shim に置換、fnmap 生成を lift パイプラインに組込み、WNDPROC 署名の自動正規化 (VMT 経由呼出を含む)、`__pe_image` を m11_data_gen 方式へ統合。
-- **GUI-4 (WebGL2 present)**: 変換を GPU 化 (BGRA を `texSubImage2D` + swizzle)、dirty 複数矩形、rAF 同期、seqlock で tearing 防止。
-- **GUI-5 (SIMD/ROP 最適化)**: 非 SRCCOPY ROP・StretchBlt・AlphaBlend を wasm SIMD128 化、24bpp/8bpp DIB 対応。
-- **GUI-6 (入力品質)**: Pointer Lock による `SetCursorPos`、IME (composition → WM_IME_*)、タッチ→WM_POINTER/GESTURE、`MapVirtualKey`/`ToUnicode` 実装。
-- **GUI-7 (マルチ top-level)**: ポップアップ/メニュー/ツールチップ窓、ウィンドウ枠 (非クライアント領域)、DPI 対応、複数 canvas/DOM 重畳。
-- **GUI-8 (耐久/CI)**: E2E を `agent-browser` 経由へ載せ替え、Firefox 確認、長時間ストレス (数万フレーム)・リーク検査。
+## 7. 下流チケット (Linear 起票済み; 親 CAB-8 / 検収で連番化)
+| ID | Linear | 状態 | 内容 |
+|---|---|---|---|
+| GUI-3a | CAB-156 | Todo | 結合準備 (実 FLEngine 不要): m11 GUI declare ↔ exports 突合表・fnmap 自動生成・WNDPROC 署名正規化を lift パイプラインへ |
+| GUI-1 | CAB-159 | Todo | P1 未実装 50 名 (DrawEdge/Clipboard/フック/モニタ/キャレット/util/入力) → P1 119/119。メニューは GUI-2 へ移動 |
+| GUI-3 | CAB-173 | Backlog (blockedBy CAB-5, CAB-156) | FLEngine 結合: `m11_winstubs.c` (`m11_genstubs.py` 生成物) の GUI 部を本 shim に置換、実到達 API ログで P 分類を更新。blocks CAB-31 |
+| GUI-2 | CAB-175 | Backlog (blockedBy GUI-3) | ImageList_* 23 + メニュー 21 + IME 7 ほか P2 77 名、OLE DnD ↔ HTML5 DnD |
+| GUI-5 | CAB-180 | Backlog (blockedBy GUI-3) | 24/8/1bpp DIB・DDB 対応 (現状 32bpp のみ) + ROP/StretchBlt/AlphaBlend の SIMD128 化 |
+| GUI-9 | CAB-185 | Backlog (blockedBy GUI-3; フォント方針はユーザ判断) | GDI テキストを内蔵 8×8 → FreeType (CAB-18) 実フォント描画 |
+| GUI-7 | CAB-182 | Backlog (blockedBy GUI-3) | ポップアップ/メニュー/ツールチップ窓、非クライアント領域、DPI、複数 canvas 重畳 |
+| GUI-4 | CAB-179 | Backlog (blockedBy GUI-3) | WebGL2 present・dirty 複数矩形・rAF 同期・seqlock (現行 CPU 経路は 1080p 2.2〜3.8 ms/frame で予算内) |
+| GUI-6 | CAB-181 | Backlog (blockedBy GUI-3) | Pointer Lock による SetCursorPos、IME、タッチ、キーボード配列 (実機確認はユーザ依頼の可能性) |
+| GUI-8 | CAB-183 | Todo | e2e を agent-browser 載せ替え・数万フレーム耐久/リーク検査・Firefox (CAB-126 依存) |
 
 ## 8. 再現
 ```
