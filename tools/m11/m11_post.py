@@ -1,0 +1,301 @@
+#!/usr/bin/env python3
+"""M11 IR 後処理: boot_final.ll → boot_final3.ll
+
+ 1. function_* の define を weak 化 (tools/m11/m11_ov.c の強シンボルで差替可能にする。
+    RetDec が落とす間接 call / stack 引数の取りこぼしを関数単位で手修正するための仕組み)
+ 2. 間接 call 用トランポリン m11_tr_<fn> (全 i64×8 引数, i64 返り) と VA→トランポリン表を IR 末尾に付加
+    (RetDec は IR から間接 call を全て落とす: 実測 boot closure 7416 fn 中 0 件。
+     Delphi の unit init ループ / VMT / TLS hook は C override 側で m11_icall(va,...) 経由で呼ぶ)
+ 使い方: python3 m11_post.py IN.ll OUT.ll [--report REPORT.json]
+"""
+import re, sys, json
+
+src, dst = sys.argv[1], sys.argv[2]
+rep = {}
+if '--report' in sys.argv:
+    rep_path = sys.argv[sys.argv.index('--report') + 1]
+else:
+    rep_path = None
+text = open(src).read()
+
+def ptypes(args):
+    out = []
+    depth = 0
+    cur = ''
+    for ch in args:
+        if ch == '(':
+            depth += 1
+        elif ch == ')':
+            depth -= 1
+        if ch == ',' and depth == 0:
+            out.append(cur.strip()); cur = ''
+        else:
+            cur += ch
+    if cur.strip():
+        out.append(cur.strip())
+    tys = []
+    for p in out:
+        toks = p.split()
+        tys.append(toks[0])
+    return tys
+
+
+def_re = re.compile(r'^define (?P<ret>[^@]*?)@(?P<nm>function_[0-9a-f]+)\((?P<args>[^)]*)\)(?P<rest>.*)$', re.M)
+fns = []
+
+
+# ---------------------------------------------------------------
+# [sigfix] call site / callee 署名不一致の解消.
+#  RetDec は関数ごとに引数数・戻り型を独立に推定するため, closure 内 call 27,714 件中 約 6,600 件で
+#  署名が食い違う (実測). LLVM-wasm の FixFunctionBitcasts は食い違いを thunk 化し, 表現できない型差
+#  (ptr/i128/void 戻り等) の thunk は body=unreachable になる (実測: 132 thunk / 2,431 call site が実行時 trap).
+#  call site を callee の定義署名に合わせて書換える: 余剰引数は捨て, 不足は 0 詰め, 型は trunc/zext/inttoptr/ptrtoint で変換,
+#  戻り値は call site が期待する型へ変換 (void 戻りは 0).
+#  注意: 不足引数の 0 詰めは「RetDec が落とした stack 引数」の意味補完ではない (値は未知). 意味保証なし.
+# ---------------------------------------------------------------
+_ATTR = re.compile(r'^(?:(?:nonnull|noundef|signext|zeroext|noalias|readonly|align \d+|dereferenceable\(\d+\))\s+)+')
+
+
+def _split_top(s):
+    out, depth, cur = [], 0, ''
+    for ch in s:
+        if ch in '([{<':
+            depth += 1
+        elif ch in ')]}>':
+            depth -= 1
+        if ch == ',' and depth == 0:
+            out.append(cur.strip()); cur = ''
+        else:
+            cur += ch
+    if cur.strip():
+        out.append(cur.strip())
+    return out
+
+
+def _conv(val, frm, to, tmp):
+    """returns (lines, newval)"""
+    if frm == to:
+        return [], val
+    n = tmp()
+    ints = {'i1': 1, 'i8': 8, 'i16': 16, 'i32': 32, 'i64': 64, 'i128': 128}
+    if frm in ints and to in ints:
+        op = 'trunc' if ints[frm] > ints[to] else 'zext'
+        return ['  %s = %s %s %s to %s' % (n, op, frm, val, to)], n
+    if frm == 'ptr' and to in ints:
+        if ints[to] == 32:
+            return ['  %s = ptrtoint ptr %s to i32' % (n, val)], n
+        n2 = tmp()
+        return ['  %s = ptrtoint ptr %s to i32' % (n, val), '  %s = zext i32 %s to %s' % (n2, n, to)], n2
+    if frm in ints and to == 'ptr':
+        if ints[frm] == 32:
+            return ['  %s = inttoptr i32 %s to ptr' % (n, val)], n
+        if ints[frm] > 32:
+            n1 = tmp()
+            return ['  %s = trunc %s %s to i32' % (n1, frm, val), '  %s = inttoptr i32 %s to ptr' % (n, n1)], n
+        n1 = tmp()
+        return ['  %s = zext %s %s to i32' % (n1, frm, val), '  %s = inttoptr i32 %s to ptr' % (n, n1)], n
+    return None, None
+
+
+def _zero(ty):
+    if ty == 'ptr':
+        return 'null'
+    if ty in ('float', 'double'):
+        return '0.0'
+    if ty.startswith('%') or ty.startswith('<') or ty.startswith('['):
+        return 'zeroinitializer'
+    return '0'
+
+
+def sigfix(text, report):
+    sigs = {}
+    for m in re.finditer(r'^(?:define|declare)(?: weak)? (\S+) @(function_[0-9a-f]+)\(([^)]*)\)', text, re.M):
+        ret, nm, args = m.groups()
+        sigs[nm] = (ret, [a.strip().split()[0] for a in args.split(',') if a.strip()])
+    callre = re.compile(r'^(\s*)(%[\w.$-]+ = )?(tail )?call (\S+) @(function_[0-9a-f]+)\((.*)\)\s*$')
+    out = []
+    ctr = [0]
+
+    def tmp():
+        ctr[0] += 1
+        return '%%m11sf%d' % ctr[0]
+    fixed = skipped = 0
+    for line in text.split('\n'):
+        m = callre.match(line) if ' call ' in line else None
+        if not m:
+            out.append(line)
+            continue
+        ind, lhs, tail, sret, nm, argstr = m.groups()
+        sig = sigs.get(nm)
+        if not sig:
+            out.append(line); continue
+        tret, tparams = sig
+        args = []
+        for a in _split_top(argstr):
+            ty = a.split()[0]
+            rest = _ATTR.sub('', a[len(ty):].strip())
+            args.append((ty, rest))
+        if tret == sret and [t for t, _ in args] == tparams:
+            out.append(line); continue
+        if any(t.startswith('%') for t in tparams) or tret.startswith('%') or sret.startswith('%') or any(t.startswith('%') for t, _ in args):
+            skipped += 1
+            out.append(line); continue
+        pre, newargs, bad = [], [], False
+        for i, pt in enumerate(tparams):
+            if i < len(args):
+                ty, val = args[i]
+                ls, nv = _conv(val, ty, pt, tmp)
+                if ls is None:
+                    bad = True; break
+                pre += ls
+                newargs.append('%s %s' % (pt, nv))
+            else:
+                newargs.append('%s %s' % (pt, _zero(pt)))
+        if bad:
+            skipped += 1
+            out.append(line); continue
+        call = '%s %s call %s @%s(%s)' % (ind, '', tret, nm, ', '.join(newargs))
+        call = '  ' + (tail or '') + 'call %s @%s(%s)' % (tret, nm, ', '.join(newargs))
+        if not lhs:
+            out.extend(pre); out.append(call); fixed += 1; continue
+        dst = lhs.split('=')[0].strip()
+        if tret == sret:
+            out.extend(pre); out.append('  %s = %s' % (dst, call.strip())); fixed += 1; continue
+        if tret == 'void':
+            out.extend(pre); out.append(call)
+            if sret == 'ptr':
+                out.append('  %s = inttoptr i32 0 to ptr' % dst)
+            else:
+                out.append('  %s = add %s 0, 0' % (dst, sret))
+            fixed += 1; continue
+        r = tmp()
+        ls, nv = _conv(r, tret, sret, tmp)
+        if ls is None:
+            skipped += 1; out.append(line); continue
+        out.extend(pre); out.append('  %s = %s' % (r, call.strip())); out.extend(ls)
+        out.append('  %s = %s' % (dst, ('add %s %s, 0' % (sret, nv)) if sret != 'ptr' else ('getelementptr i8, ptr %s, i32 0' % nv)))
+        fixed += 1
+    report['sigfix_rewritten'] = fixed
+    report['sigfix_skipped'] = skipped
+    print('[m11_post][sigfix] call site 署名書換え: %d (型未対応で skip: %d)' % (fixed, skipped))
+    return '\n'.join(out)
+
+
+# 呼出し計数 probe (FastMM4 の入口): 計数 wrapper を weak で被せ, 本体は __lifted に改名
+PROBES = {0x409410: 'GetMem', 0x409440: 'FreeMem', 0x407a50: 'FastMM_GetMem(407a50)', 0x407e20: 'FastMM_FreeMem(407e20)',
+          0x4120c0: 'InitUnits', 0x4128b0: 'Halt0'}
+probe_wrappers = []
+
+
+def weaken(m):
+    ret = m.group('ret').strip()
+    nm = m.group('nm')
+    args = m.group('args')
+    fns.append((nm, ret, args))
+    va = int(nm.split('_')[1], 16)
+    if va in PROBES:
+        idx = list(PROBES).index(va)
+        pnames = ['%%p%d' % i for i in range(len(ptypes(args)))]
+        ptys = ptypes(args)
+        plist = ', '.join('%s %s' % (t, pn) for t, pn in zip(ptys, pnames))
+        clist = ', '.join('%s %s' % (t, pn) for t, pn in zip(ptys, pnames))
+        rt = ret.split()[0]
+        w = ['define weak %s @%s(%s) {' % (ret, nm, plist), '  call void @m11_probe(i32 %d)' % idx]
+        if rt == 'void':
+            w += ['  call void @%s__lifted(%s)' % (nm, clist), '  ret void']
+        else:
+            w += ['  %%r = call %s @%s__lifted(%s)' % (rt, nm, clist), '  ret %s %%r' % rt]
+        w.append('}')
+        probe_wrappers.append('\n'.join(w))
+        return 'define %s @%s__lifted(%s)%s' % (ret, nm, args, m.group('rest'))
+    return 'define weak %s @%s(%s)%s' % (ret, nm, args, m.group('rest'))
+
+text = sigfix(text, rep)
+text = def_re.sub(weaken, text)
+
+NMAX = 8
+tr = []
+tab = []
+maxargs = 0
+for (nm, ret, args) in fns:
+    tys = ptypes(args)
+    maxargs = max(maxargs, len(tys))
+    if len(tys) > NMAX:
+        continue
+    ret = ret.split()[0] if ret else 'void'
+    va = int(nm.split('_')[1], 16)
+    L = ['define i64 @m11_tr_%s(i64 %%a0, i64 %%a1, i64 %%a2, i64 %%a3, i64 %%a4, i64 %%a5, i64 %%a6, i64 %%a7) {' % nm]
+    cargs = []
+    for i, t in enumerate(tys):
+        v = '%%a%d' % i
+        if t == 'i64':
+            cargs.append('i64 %s' % v)
+        elif t in ('i32', 'i16', 'i8', 'i1'):
+            L.append('  %%c%d = trunc i64 %s to %s' % (i, v, t))
+            cargs.append('%s %%c%d' % (t, i))
+        elif t == 'ptr':
+            L.append('  %%c%d = inttoptr i64 %s to ptr' % (i, v))
+            cargs.append('ptr %%c%d' % i)
+        elif t == 'i128':
+            L.append('  %%c%d = zext i64 %s to i128' % (i, v))
+            cargs.append('i128 %%c%d' % i)
+        elif t == 'double':
+            L.append('  %%c%d = bitcast i64 %s to double' % (i, v))
+            cargs.append('double %%c%d' % i)
+        elif t == 'float':
+            L.append('  %%t%d = trunc i64 %s to i32' % (i, v))
+            L.append('  %%c%d = bitcast i32 %%t%d to float' % (i, i))
+            cargs.append('float %%c%d' % i)
+        else:
+            L.append('  ; unsupported param %s' % t)
+            cargs.append('%s zeroinitializer' % t)
+    callexpr = 'call %s @%s(%s)' % (ret, nm, ', '.join(cargs))
+    if ret == 'void':
+        L.append('  ' + callexpr)
+        L.append('  ret i64 0')
+    elif ret == 'i64':
+        L.append('  %r = ' + callexpr)
+        L.append('  ret i64 %r')
+    elif ret in ('i32', 'i16', 'i8', 'i1'):
+        L.append('  %r = ' + callexpr)
+        L.append('  %%z = zext %s %%r to i64' % ret)
+        L.append('  ret i64 %z')
+    elif ret == 'ptr':
+        L.append('  %r = ' + callexpr)
+        L.append('  %p = ptrtoint ptr %r to i32')
+        L.append('  %z = zext i32 %p to i64')
+        L.append('  ret i64 %z')
+    elif ret == 'i128':
+        L.append('  %r = ' + callexpr)
+        L.append('  %z = trunc i128 %r to i64')
+        L.append('  ret i64 %z')
+    else:
+        L.append('  %r = ' + callexpr)
+        L.append('  ret i64 0')
+    L.append('}')
+    tr.append('\n'.join(L))
+    tab.append((va, nm))
+
+tab.sort()
+# C prototype header: IR の署名そのまま (C override が呼ぶ extern を署名ずれさせない: ずれると wasm-ld が trap thunk を生成する)
+CT = {'i64': 'unsigned long long', 'i32': 'unsigned int', 'i16': 'unsigned int', 'i8': 'unsigned int', 'i1': 'unsigned int',
+      'ptr': 'void*', 'void': 'void', 'i128': 'unsigned __int128', 'double': 'double', 'float': 'float'}
+hdr = ['/* auto-gen by m11_post.py: IR function_* の C 署名 */']
+for (nm, ret, args) in fns:
+    rt = CT.get(ret.split()[0], 'unsigned long long')
+    ats = ', '.join(CT.get(t, 'unsigned long long') for t in ptypes(args)) or 'void'
+    hdr.append('extern %s %s(%s);' % (rt, nm, ats))
+open(dst.replace('.ll', '_sigs.h'), 'w').write('\n'.join(hdr) + '\n')
+ent = ', '.join('{ i32, ptr } { i32 %d, ptr @m11_tr_%s }' % (va, nm) for va, nm in tab)
+tail = ['', 'declare void @m11_probe(i32)'] + probe_wrappers + ['', '; ---- m11_post.py: 間接 call トランポリン + VA 表 ----']
+tail.extend(tr)
+tail.append('@m11_disp_n = constant i32 %d' % len(tab))
+tail.append('@m11_disp_tab = constant [%d x { i32, ptr }] [%s]' % (len(tab), ent))
+text = text.rstrip('\n') + '\n' + '\n'.join(tail) + '\n'
+open(dst, 'w').write(text)
+import json as _j
+open(dst.replace('.ll', '_probes.json'), 'w').write(_j.dumps(list(PROBES.values())))
+rep.update({'weak_defines': len(fns), 'trampolines': len(tab), 'max_args': maxargs})
+print('[m11_post] weak defines: %d, trampolines: %d, max params: %d -> %s' % (len(fns), len(tab), maxargs, dst))
+if rep_path:
+    json.dump(rep, open(rep_path, 'w'))

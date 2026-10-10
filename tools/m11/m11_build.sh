@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# M11 build: boot_final.ll → (m11_post: weak 化 + 間接 call トランポリン) → emcc → work/m11_boot.cjs(+wasm)
+# 各翻訳単位を work/obj/*.o にキャッシュ (入力より新しければ再コンパイルしない) し,
+# 反復 build (m11_ov.c など C 側修正) を数十秒で回せるようにする.
+set -euo pipefail
+HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
+cd "$HERE"
+source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1
+export TMPDIR="$HERE/work/tmp"
+mkdir -p work/tmp work/obj
+CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1"
+
+if [ ! -f work/boot_final.ll ]; then echo "[m11build] work/boot_final.ll 無し: m11_gen_ir2.sh を先に" >&2; exit 2; fi
+if [ ! -f work/boot_final3.ll ] || [ work/boot_final.ll -nt work/boot_final3.ll ] || [ m11_post.py -nt work/boot_final3.ll ]; then
+  python3 m11_post.py work/boot_final.ll work/boot_final3.ll --report work/post_report.json
+fi
+# SIMD helper (C) は IR の declare から署名駆動で再生成 (m11_simd2.py)
+if [ ! -f work/m11_simd.c ] || [ work/boot_final.ll -nt work/m11_simd.c ] || [ m11_simd2.py -nt work/m11_simd.c ]; then
+  python3 m11_simd2.py work/boot_final.ll > work/m11_simd.c 2> work/simd2.log
+fi
+
+cc() { # cc <src> <obj> [extra deps...]
+  local src="$1" obj="$2"; shift 2
+  local need=0
+  [ ! -f "$obj" ] && need=1
+  [ "$src" -nt "$obj" ] && need=1
+  for d in "$@"; do [ "$d" -nt "$obj" ] && need=1; done
+  if [ $need = 1 ]; then
+    echo "[m11build] cc $src"
+    case "$src" in
+      *.ll) emcc -c "$src" -o "$obj" $CF ;;
+      *)    emcc -c "$src" -o "$obj" $CF -I. ;;
+    esac
+  fi
+}
+# 別 TU (tools/shim, m11_rt/ov/win) が定義する Win32 API は winstubs から除外 (duplicate symbol 回避)
+for f in heap failfast file timer sync; do cc ../shim/src/$f.c work/obj/shim_$f.o; done
+cc m11_rt.c work/obj/rt.o
+cc m11_win.c work/obj/win.o
+llvm-nm --defined-only work/obj/shim_*.o work/obj/rt.o work/obj/win.o 2>/dev/null | awk '$2 ~ /^[TtWwDd]$/ {print $3}' | sort -u > work/defined_c.txt
+if [ ! -f work/m11_winstubs.c ] || [ work/defined_c.txt -nt work/m11_winstubs.c ] || [ m11_genstubs.py -nt work/m11_winstubs.c ] || [ work/boot_final.ll -nt work/m11_winstubs.c ]; then
+  M11_EXCLUDE=work/defined_c.txt python3 m11_genstubs.py work/boot_final.ll work > work/genstubs.log
+  touch work/m11_winstubs.c work/m11_fnstubs.c
+fi
+cc work/boot_final3.ll work/obj/boot.o
+cc work/m11_simd.c work/obj/simd.o msimd11_core.h
+cc work/m11_winstubs.c work/obj/winstubs.o
+cc work/m11_fnstubs.c work/obj/fnstubs.o
+cc m11_ov.c work/obj/ov.o work/boot_final3_sigs.h
+cc work/m11_data.c work/obj/data.o
+
+INITMEM="$((0x12000000))"
+MAXMEM="$((0x72000000))"
+EXPORTS=_m11_boot_enter,_entry_point,_m11_init_count,_m11_boot_stage,_m11_va_used,_m11_va_calls,_m11_set_trace,_m11_icall_ok,_m11_icall_miss,_m11_icall_miss_uniq,_m11_icall_miss_at,_m11_disp_count,_m11_units_run,_m11_units_total,_m11_units_skipped,_m11_stub_total,_m11_stub_uniq,_m11_stub_name,_m11_stub_count,_m11_probe_count,_m11_longjmp_hit,_m11_set_survey,_m11_call_unit,_m11_unit_va,__emscripten_stack_restore,_emscripten_stack_get_current
+emcc work/obj/*.o -o work/m11_boot.cjs.tmp \
+  -O0 -g1 -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8MB -sGLOBAL_BASE="$((0x10000000))" \
+  -sENVIRONMENT=node -sMODULARIZE=1 -sEXPORT_NAME=m11create \
+  -sERROR_ON_UNDEFINED_SYMBOLS=0 -sEXIT_RUNTIME=1 \
+  --no-entry -Wl,--export-all \
+  -sEXPORTED_RUNTIME_METHODS=UTF8ToString,HEAPU8,HEAPF32,HEAP32,HEAPF64,HEAPU32,HEAP64,wasmTable,addFunction \
+  -sEXPORTED_FUNCTIONS=$EXPORTS \
+  -Wl,--initial-memory="$INITMEM" -Wl,--max-memory="$MAXMEM" 2> work/link.log || { tail -30 work/link.log; exit 1; }
+mv work/m11_boot.cjs.tmp work/m11_boot.cjs
+python3 m11_postjs.py work/m11_boot.cjs 2>/dev/null
+echo "[m11build] OK: work/m11_boot.cjs(+.wasm)  wasm-ld signature mismatch: $(grep -c 'signature mismatch' work/link.log || true), undefined symbol: $(grep -c 'undefined symbol' work/link.log || true)"

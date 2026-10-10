@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# M11 lift: RetDec select-ranges → <name>.drc.ll → (m2 normalize + m5 ir5_patch) → <name>.lift.ll
+# 使い方: bash tools/m11/m11_lift.sh <ranges_file> <name> [timeout_sec]
+set -euo pipefail
+HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
+cd "$HERE"
+mkdir -p work
+BIN=/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin
+export TMPDIR="$HERE/work/tmp"
+mkdir -p work/tmp
+
+RANGES="${1}"
+if [ -f "$1" ]; then RANGES="$(cat "$1")"; fi
+NAME="$2"
+TMO="${3:-2400}"
+NFN="$(echo "$RANGES" | tr ',' '\n' | wc -l)"
+echo "[lift] $NAME: ranges=$NFN timeout=$TMO"
+/opt/retdec/bin/retdec-decompiler "$BIN" -o "work/$NAME.drc.c" \
+  --select-ranges "$RANGES" --select-decode-only --timeout "$TMO" \
+  > "work/$NAME.retdec.log" 2>&1
+touch "work/$NAME.retdec.DONE"
+[ -f "work/$NAME.drc.ll" ] || { echo "[lift] FAIL: $NAME.drc.ll 未生成" >&2; tail -20 "work/$NAME.retdec.log"; exit 1; }
+echo "[lift] RetDec OK: $(wc -l < "work/$NAME.drc.ll") lines ($NAME.drc.ll)"
+
+python3 ../m2/ir_normalize.py "work/$NAME.drc.ll" "work/$NAME.norm0.ll"
+python3 ../m5/ir5_patch.py "work/$NAME.norm0.ll" "work/$NAME.lift.ll" \
+  --report "work/$NAME.ir5.json" 2>&1 | tail -6 || true
+touch "work/$NAME.lift.DONE"
+echo "[lift] ir5 OK: $(wc -l < "work/$NAME.lift.ll") lines ($NAME.lift.ll)"
