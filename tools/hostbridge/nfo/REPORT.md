@@ -8,7 +8,7 @@
 - **実例**: 抽出物 (mac pkg + win installer) に `Installed\` 配下の v2 `.nfo` (`ps_file_plugclass` / `fileversion=2` を含むもの) は **0 件**。`.nfo` は 831 件 (全て ASCII, 25,203 B) あり、`ps_*` を含むのは native の `Plugin.nfo` 141 件 (`ps_vendorname` のみ) だけ (§1)。
 - **書式 (FLEngine を逆アセンブルして確定; PluginManager.exe は同一 unit を内包)**: `.nfo` = CRLF の `key=value` 行 (キー大文字小文字非区別、`'` 行はコメント)。`fileversion=2` は `ps_name / ps_presetfilename / ps_files=N` + `ps_file_*_<i>` (i=0 起点)。必須は実質 `ps_files` と `ps_file_plugclass_i` のみ。`.fst` = FLhd(0x30, 2ch, ppq48) + `199 "11.5.5"`, `28`, `201 "Fruity Wrapper"`, `212`, `203 名前`, `213 wrapper chunk`。
 - **round-trip 実測**: 同梱 `.nfo` 831/831 byte-exact、FL 11.5.5 書込の `.fst` 26/26 を自作コンテナ writer で byte-exact 再構成 (§3)。v2 `.nfo` は writer→reader の自己整合 (生成 49/49 受理) と decompile 準拠テスト (29 件 PASS)。
-- **wasm 向け**: OTT / Fresh Air / Kilohearts(46) / Serum 2(2 class) の DB エントリを 49 件・99 ファイル・39 KB で合成できる (`specs/wasm_plugins.json` + Kilohearts index)。Massive X は素材なしでエントリ未生成 (§5)。
+- **wasm 向け**: OTT / Fresh Air / Kilohearts(46) / Serum 2(2 class) の DB エントリを 49 件・99 ファイル・40,661 B で合成できる (`specs/wasm_plugins.json` + Kilohearts index)。Massive X は素材なしでエントリ未生成 (§5)。
 - **コミット**: `feat(hostbridge): plugin database nfo/fst format and synthetic generator` (tools/hostbridge/nfo のみ)。
 
 ## 1. 実例の探索結果 (実測)
@@ -79,7 +79,7 @@
 
 - `ps_file_scanflags_0=1`、`ps_file_type` は 0 (class で fx/gen 判定)、`ps_file_bitsize_0=64`。32bit は載せない (bridge 不使用: HOSTBRIDGE §1.6)。
 - Wrapper→VST2 の `hint` (entry export 名) は標準名 (`VSTPluginMain`) なら不要。Kilohearts は stub 消去 (alias) で標準名に揃う。hint を DB に持たせる必要が出た場合の記録先は未特定 (§6-3)。
-- 生成量: 49 entry / 99 ファイル / 39,266 B (決定的)。IDB プリロードに載せても無視できる大きさ。
+- 生成量: 49 entry / 99 ファイル / 40,661 B (決定的)。IDB プリロードに載せても無視できる大きさ。
 
 ## 6. 未解決とブロッカー
 

@@ -53,7 +53,7 @@ const specs: PluginSpec[] = JSON.parse(readFileSync(new URL('../specs/wasm_plugi
 const khp = '/home/ubuntu/work/webstudio/tools/targets/kilohearts/work/macpkg/product_index.json';
 if (existsSync(khp)) {
   for (const p of JSON.parse(readFileSync(khp, 'utf8')).plugins as Array<{ id: string; fileName: string; formats: string[] }>) {
-    if (p.formats.includes('vst2') && p.id.length === 4) specs.push({ name: p.fileName, vendor: 'Kilohearts', format: 'vst2', kind: 'effect', magic: p.id, path: `C:\\Program Files\\Common Files\\VST2\\Kilohearts\\${p.fileName}.dll` });
+    if (p.formats.includes('vst2') && p.id.length === 4) specs.push({ name: p.fileName, vendor: 'Kilohearts', format: 'vst2', kind: 'effect', magic: p.id, path: `C:\\Program Files\\Common Files\\VST2\\Kilohearts\\${p.fileName}.dll`, category: 'Kilohearts' });
   }
 }
 const g = generateDb(specs);
