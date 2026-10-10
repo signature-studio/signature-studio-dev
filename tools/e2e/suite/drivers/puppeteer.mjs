@@ -1,0 +1,55 @@
+// フォールバック/クロスチェック用ドライバ: puppeteer-core + 既存 /usr/bin/google-chrome (CDP)。
+// agent-browser と同一インターフェース。E2E_DRIVER=puppeteer で選択。
+import puppeteer from "puppeteer-core";
+
+export async function createDriver({ chrome = "/usr/bin/google-chrome", headers }) {
+  const browser = await puppeteer.launch({
+    executablePath: chrome,
+    headless: true,
+    args: ["--no-sandbox", "--autoplay-policy=no-user-gesture-required"],
+    defaultViewport: { width: 1280, height: 720 },
+  });
+  const page = await browser.newPage();
+  const consoleMsgs = [];
+  const errors = [];
+  page.on("console", (m) =>
+    consoleMsgs.push({ type: m.type(), text: m.text(), url: m.location()?.url ?? "" }),
+  );
+  page.on("pageerror", (e) => errors.push(String(e.message ?? e)));
+  if (headers) await page.setExtraHTTPHeaders(headers);
+
+  return {
+    name: "puppeteer-core",
+    version: `puppeteer-core ${await browser.version()}`,
+    async open(url) {
+      await page.goto(url, { waitUntil: "load" });
+    },
+    async eval(expr) {
+      return page.evaluate(expr);
+    },
+    async click(selector) {
+      await page.click(selector);
+    },
+    async waitFn(expr, timeoutMs = 15000) {
+      try {
+        await page.waitForFunction(expr, { timeout: timeoutMs, polling: 100 });
+        return true;
+      } catch (e) {
+        if (e?.name === "TimeoutError") return false;
+        throw e;
+      }
+    },
+    async screenshot(file) {
+      await page.screenshot({ path: file });
+    },
+    async consoleMessages() {
+      return consoleMsgs.slice();
+    },
+    async pageErrors() {
+      return errors.slice();
+    },
+    async close() {
+      await browser.close();
+    },
+  };
+}

@@ -1,0 +1,8 @@
+[
+  {
+    "id": "expire-tmp-uploads",
+    "enabled": true,
+    "conditions": { "prefix": "_tmp/" },
+    "deleteObjectsTransition": { "condition": { "type": "Age", "maxAge": 86400 } }
+  }
+]

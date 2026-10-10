@@ -1,0 +1,193 @@
+{
+  "$comment": "配信ポリシーの唯一の正本。deploy/lib/build-rules.mjs が Cloudflare Rulesets API ペイロードを生成し、tools/e2e の edge-sim も同じ定義を直接解釈する。match: host は常に AND。path/pathPrefix/ext は OR。status は応答コード(レスポンスヘッダ rule のみ)。後続ルールが先行ルールを上書き(Cloudflare の評価順と同じ)。",
+  "version": 1,
+  "layout": {
+    "document": [
+      "/",
+      "/index.html",
+      "/release.json",
+      "/wasm/manifest.json"
+    ],
+    "immutablePrefixes": [
+      "/assets/",
+      "/wasm/",
+      "/data/"
+    ],
+    "mutablePrefixes": [
+      "/worklets/",
+      "/__e2e__/"
+    ],
+    "notes": "immutable は内容アドレス(ファイル名にハッシュ)ゆえ 1 年 immutable。document は no-cache(ETag 再検証)。それ以外(worklets 等、非ハッシュ名)は短 TTL + must-revalidate / /wasm/manifest.json は /wasm/ 配下だが非ハッシュ名の可変ファイル(ランタイムのブート manifest)ゆえ document 扱い"
+  },
+  "requestRewrite": [
+    {
+      "id": "directory-index",
+      "description": "R2 カスタムドメインは / や dir/ の index 解決をしないため、末尾 / のパスに index.html を連結 (Transform Rules: URL Rewrite)",
+      "match": {
+        "pathSuffix": "/"
+      },
+      "appendToPath": "index.html"
+    }
+  ],
+  "responseHeaders": [
+    {
+      "id": "isolation",
+      "description": "crossOriginIsolated (SharedArrayBuffer) 用 COOP/COEP + CORP + nosniff",
+      "match": {},
+      "set": {
+        "Cross-Origin-Opener-Policy": "same-origin",
+        "Cross-Origin-Embedder-Policy": "require-corp",
+        "Cross-Origin-Resource-Policy": "same-origin",
+        "X-Content-Type-Options": "nosniff"
+      }
+    },
+    {
+      "id": "cache-default",
+      "description": "非ハッシュ名の既定: 5 分 + 再検証",
+      "match": {
+        "status": [
+          200,
+          206
+        ]
+      },
+      "set": {
+        "Cache-Control": "public, max-age=300, must-revalidate"
+      }
+    },
+    {
+      "id": "cache-immutable",
+      "description": "ハッシュ付き/内容アドレス資産: 1 年 immutable",
+      "match": {
+        "pathPrefix": [
+          "/assets/",
+          "/wasm/",
+          "/data/"
+        ],
+        "status": [
+          200,
+          206
+        ]
+      },
+      "set": {
+        "Cache-Control": "public, max-age=31536000, immutable"
+      }
+    },
+    {
+      "id": "cache-document",
+      "description": "エントリ HTML / release.json / ブート manifest は常に再検証",
+      "match": {
+        "path": [
+          "/",
+          "/index.html",
+          "/release.json",
+          "/wasm/manifest.json"
+        ],
+        "status": [
+          200,
+          206
+        ]
+      },
+      "set": {
+        "Cache-Control": "no-cache"
+      }
+    }
+  ],
+  "cache": [
+    {
+      "id": "cache-default",
+      "description": "bucket 全体をエッジキャッシュ対象に (wasm/html/json は既定では非キャッシュ)。mutable は 5 分 + デプロイ時 purge",
+      "match": {},
+      "cache": true,
+      "edgeTtl": {
+        "mode": "override_origin",
+        "default": 300
+      },
+      "browserTtl": {
+        "mode": "respect_origin"
+      }
+    },
+    {
+      "id": "cache-immutable",
+      "description": "内容アドレス資産はエッジも 1 年",
+      "match": {
+        "pathPrefix": [
+          "/assets/",
+          "/wasm/",
+          "/data/"
+        ]
+      },
+      "cache": true,
+      "edgeTtl": {
+        "mode": "override_origin",
+        "default": 31536000
+      },
+      "browserTtl": {
+        "mode": "respect_origin"
+      }
+    },
+    {
+      "id": "cache-document",
+      "description": "document 群は immutable prefix(/wasm/)配下でもエッジ TTL を短く(60s)。デプロイ時に purge",
+      "match": {
+        "path": [
+          "/",
+          "/index.html",
+          "/release.json",
+          "/wasm/manifest.json"
+        ]
+      },
+      "cache": true,
+      "edgeTtl": {
+        "mode": "override_origin",
+        "default": 60
+      },
+      "browserTtl": {
+        "mode": "respect_origin"
+      }
+    }
+  ],
+  "compression": [
+    {
+      "id": "compress-text-wasm",
+      "description": "wasm/js/css/html/json を br 優先で圧縮 (無料プラン既定は zstd。ブラウザ互換のため br 先頭)",
+      "match": {
+        "ext": [
+          "wasm",
+          "js",
+          "mjs",
+          "css",
+          "html",
+          "json",
+          "svg",
+          "txt"
+        ]
+      },
+      "algorithms": [
+        "brotli",
+        "zstd",
+        "gzip"
+      ]
+    }
+  ],
+  "contentTypes": {
+    "wasm": "application/wasm",
+    "js": "text/javascript; charset=utf-8",
+    "mjs": "text/javascript; charset=utf-8",
+    "css": "text/css; charset=utf-8",
+    "html": "text/html; charset=utf-8",
+    "json": "application/json",
+    "map": "application/json",
+    "svg": "image/svg+xml",
+    "txt": "text/plain; charset=utf-8",
+    "png": "image/png",
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+    "webp": "image/webp",
+    "ico": "image/x-icon",
+    "woff2": "font/woff2",
+    "bin": "application/octet-stream",
+    "dat": "application/octet-stream",
+    "data": "application/octet-stream"
+  },
+  "defaultContentType": "application/octet-stream"
+}

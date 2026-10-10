@@ -1,0 +1,16 @@
+{
+  "name": "webstudio-e2e",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser E2E harness for webstudio (agent-browser + puppeteer-core fallback)",
+  "dependencies": {
+    "agent-browser": "0.39.0",
+    "puppeteer-core": "^24.0.0"
+  },
+  "scripts": {
+    "e2e": "bash run.sh",
+    "e2e:both": "bash run.sh --driver both",
+    "e2e:all": "bash run.sh --driver both --targets preview,edge-sim,dev"
+  }
+}

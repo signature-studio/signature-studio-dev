@@ -1,0 +1,51 @@
+{
+  "policyHuman": {
+    "name": "webstudio-allow (studio.example.com)",
+    "decision": "allow",
+    "include": [
+      {
+        "email": {
+          "email": "you@example.com"
+        }
+      }
+    ],
+    "exclude": [],
+    "require": []
+  },
+  "policyToken": {
+    "name": "webstudio-e2e-token (studio.example.com)",
+    "decision": "non_identity",
+    "include": [
+      {
+        "service_token": {
+          "token_id": "<token-id>"
+        }
+      }
+    ],
+    "exclude": [],
+    "require": []
+  },
+  "app": {
+    "name": "webstudio (studio.example.com)",
+    "type": "self_hosted",
+    "destinations": [
+      {
+        "type": "public",
+        "uri": "studio.example.com"
+      }
+    ],
+    "session_duration": "24h",
+    "app_launcher_visible": false,
+    "http_only_cookie_attribute": true,
+    "policies": [
+      {
+        "id": "<human-policy-id>",
+        "precedence": 1
+      },
+      {
+        "id": "<token-policy-id>",
+        "precedence": 2
+      }
+    ]
+  }
+}
