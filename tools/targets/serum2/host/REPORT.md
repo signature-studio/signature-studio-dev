@@ -6,7 +6,7 @@
 
 ## 0. 結論 (先出し)
 
-1. **最小 VST3 host (C++ 単一ファイル ~1,100 行, `vst3host.cpp`) で Serum2 実 DLL を native 駆動した**。mingw-w64 で PE host をビルドし wine64 上で実行 (Linux native 実行は DLL が Win64 PE のため wine 経由 = native x64 機械語をそのまま実行)。LoadLibrary → InitDll → GetPluginFactory → **4 CID 列挙 (moduleinfo.json と一致)** → IComponent (SerumDSP) / IEditController (SerumController) 生成 → initialize / 接続点接続 / bus 構成 / setupProcessing (kRealtime, kSample32, 128 frames, 48 kHz) → **setState→getState 往復 → process 64 ブロック完走 → 非ゼロ音声出力** (16,380/16,384 cell 非ゼロ, peak 0.691)。
+1. **最小 VST3 host (C++ 単一ファイル ~1,260 行, `vst3host.cpp`) で Serum2 実 DLL を native 駆動した**。mingw-w64 で PE host をビルドし wine64 上で実行 (Linux native 実行は DLL が Win64 PE のため wine 経由 = native x64 機械語をそのまま実行)。LoadLibrary → InitDll → GetPluginFactory → **4 CID 列挙 (moduleinfo.json と一致)** → IComponent (SerumDSP) / IEditController (SerumController) 生成 → initialize / 接続点接続 / bus 構成 / setupProcessing (kRealtime, kSample32, 128 frames, 48 kHz) → **setState→getState 往復 → process 64 ブロック完走 → 非ゼロ音声出力** (16,380/16,384 cell 非ゼロ, peak 0.691)。
 2. **CAB-71 §7 の med ABI slot を実測確定** (実メモリの vtable dump, host/work/out_*/summary.json `*_slots`):
    | vtable (RVA) | interface | 確定 slot |
    |---|---|---|
