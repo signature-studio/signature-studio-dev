@@ -90,6 +90,6 @@ export async function withChrome({ root, page, flags = [], log = () => {} }, fn)
   } finally {
     cp.kill("SIGKILL");
     srv.close();
-    fs.rmSync(udd, { recursive: true, force: true });
+    try { fs.rmSync(udd, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 }); } catch { /* SIGKILL 直後の Chrome 子プロセスとの書込み競合 (ENOTEMPTY)。結果を失わないよう握り潰す */ }
   }
 }

@@ -63,7 +63,10 @@ await withChrome({ root: path.join(here, "../build/web"), page: "index.html?" + 
     let r, err = null;
     try { r = await cdp.eval("window.__done"); } catch (e) { err = String(e); }
     let ok = false, msg = err ?? "";
-    if (r) [ok, msg] = sc.expect(r);
+    if (r) {
+      try { [ok, msg] = sc.expect(r); }
+      catch (e) { ok = false; msg = r.aborted ? `想定外の abort: ${r.stderr?.find((l) => l.includes("FAIL-FAST")) ?? r.what}` : `expect 例外: ${e.message}`; }
+    }
     if (!ok) failed++;
     results.push({ name: sc.name, query: sc.q, ok, msg, result: r ?? null, error: err });
     const st = r?.stats ?? {};

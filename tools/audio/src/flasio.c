@@ -168,7 +168,8 @@ static void do_buffer(int idx) {
         memset(&t, 0, sizeof t);
         fla_clock_t k;
         fla_clock_read(&k);
-        uint64_t pos = k.pos_frames > k.play_start ? k.pos_frames - k.play_start : 0;
+        /* play_start は worklet が新 gen を認識した時に更新される (wl_state != IDLE でそれが確定)。それ以前は原点 0 に固定し、起動直後の位置巻き戻りを防ぐ */
+        uint64_t pos = (LD(c->wl_state) != FLA_WL_IDLE && k.pos_frames > k.play_start) ? k.pos_frames - k.play_start : 0;
         t.timeInfo.samplePosition.hi = (uint32_t)(pos >> 32); t.timeInfo.samplePosition.lo = (uint32_t)pos;
         t.timeInfo.systemTime.hi = (uint32_t)(k.audible_ns >> 32); t.timeInfo.systemTime.lo = (uint32_t)k.audible_ns;
         t.timeInfo.sampleRate = A.sr; t.timeInfo.speed = 1.0;
