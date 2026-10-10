@@ -47,6 +47,9 @@ class PE:
 
 
 CALLER_SAVED = {X.X86_REG_RAX, X.X86_REG_RCX, X.X86_REG_RDX, X.X86_REG_R8, X.X86_REG_R9, X.X86_REG_R10, X.X86_REG_R11}
+# packed-int (MMX/SSE2 整数) 命令の接頭辞 — clift (x64c) の類型判定用ヒューリスティック
+SIMDINT_PRE = ('punpck', 'padd', 'psub', 'pmul', 'pack', 'pcmp', 'pshuf', 'psll', 'psrl', 'psra',
+               'pmax', 'pmin', 'pand', 'por', 'pxor', 'palignr', 'pblend', 'phadd', 'phsub', 'psadbw', 'pavgb', 'pavgw')
 ARG_GPR = [(X.X86_REG_RCX, X.X86_REG_ECX, X.X86_REG_CX, X.X86_REG_CL), (X.X86_REG_RDX, X.X86_REG_EDX, X.X86_REG_DX, X.X86_REG_DL),
            (X.X86_REG_R8, X.X86_REG_R8D, X.X86_REG_R8W, X.X86_REG_R8B), (X.X86_REG_R9, X.X86_REG_R9D, X.X86_REG_R9W, X.X86_REG_R9B)]
 GPR_ALIAS = {}
@@ -84,6 +87,7 @@ class Analyzer:
         work = [rva0]
         icall = ijmp = 0
         fpcmp = 0
+        simdint = 0
         calls = []
         packed = 0
         repstr = 0
@@ -113,6 +117,8 @@ class Analyzer:
             # --- 特徴 ---
             if ins.id in FPCMP:
                 fpcmp += 1
+            if mn.startswith(SIMDINT_PRE) or mn in ('movq', 'movd'):
+                simdint += 1
             if mn.startswith('rep'):
                 repstr += 1
             if ins.group(capstone.CS_GRP_CALL) or ins.group(capstone.CS_GRP_JUMP):
@@ -206,7 +212,7 @@ class Analyzer:
                 if s not in seen:
                     work.append(s)
         arity_gpr = (max(used_args) + 1) if used_args else 0
-        return dict(ins=n, icall=icall, ijmp=ijmp, fpcmp=fpcmp, calls=sorted(set(calls)), repstr=repstr,
+        return dict(ins=n, icall=icall, ijmp=ijmp, fpcmp=fpcmp, simdint=simdint, calls=sorted(set(calls)), repstr=repstr,
                     arity_gpr=arity_gpr, arity_x=(max(used_x) + 1) if used_x else 0,
                     stack_args=sorted(stack_args), truncated=bool(work))
 

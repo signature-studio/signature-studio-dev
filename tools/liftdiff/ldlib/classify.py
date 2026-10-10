@@ -4,7 +4,7 @@
 出力: タグ列 (信頼度付き)。タグ一覧は docs/FORMAT.md §4。
 """
 
-PRIORITY = ['load_dropped', 'short_global', 'spill_slot_deref', 'callsite_arg_drop', 'icall_drop', 'arg_drop', 'xmm_arg_drop', 'unresolved_callee', 'zero_init_drop', 'fp_flag_unreflected', 'import_arg_diff',
+PRIORITY = ['load_dropped', 'short_global', 'spill_slot_deref', 'callsite_arg_drop', 'icall_drop', 'arg_drop', 'xmm_arg_drop', 'simd_int_semantics', 'xmm_result', 'unresolved_callee', 'unlifted_callee', 'zero_init_drop', 'fp_flag_unreflected', 'import_arg_diff',
             'rep_string_helper', 'simd_helper', 'ret_only', 'callee_divergence', 'wasm_trap', 'memory_semantics', 'other']
 
 
@@ -25,8 +25,10 @@ def trap_kind(msg):
     return 'other'
 
 
-def classify(rec, mach, irf, sig):
-    """rec: _run_one の結果 (cases)。mach/irf: 静的特徴 (None 可)。戻り: [(tag, confidence, evidence)]"""
+def classify(rec, mach, irf, sig, route='ir'):
+    """rec: _run_one の結果 (cases)。mach/irf: 静的特徴 (None 可)。route: 'ir'=RetDec 系 (既定) / 'clift'=C 転写 (x64c)。
+    戻り: [(tag, confidence, evidence)]。clift では IR 由来の類型 (lift 産物に IR が無い) を抑止し、
+    x64c 由来の類型を追加する (docs/FORMAT.md §4)。"""
     tags = []
 
     def add(tag, conf, ev):
@@ -103,11 +105,29 @@ def classify(rec, mach, irf, sig):
                 add('unresolved_callee', 'high', 'wasm called undefined %s' % cl['n'])
         if cs.get('wasm_uninit_dependent'):
             add('zero_init_drop', 'high', 'wasm result depends on uninitialised stack fill (0x00 vs 0xa5) while native is deterministic')
-    if mach and mach['fpcmp'] > 0:
+    if mach and route == 'ir' and mach['fpcmp'] > 0:
         add('fp_flag_unreflected', 'medium' if irf and irf['fcmp'] == 0 else 'low',
             'machine has %d comis/ucomis; IR fcmp=%d (comis lowered via __asm helper without CPU-flag semantics)' % (mach['fpcmp'], irf['fcmp'] if irf else -1))
-    if mach and mach['repstr'] > 0:
+    if mach and route == 'ir' and mach['repstr'] > 0:
         add('rep_string_helper', 'low', 'machine has %d rep movs/stos' % mach['repstr'])
+    if route == 'clift':
+        # x64c 固有の類型 (C 転写 route)。既存類型のうち lift 産物に IR が無いため出せないものは
+        # irf=None で自動抑止され、さらに静的特徴のみの低確信度タグは route='ir' のみに限定した。
+        d = diffs.get('ret') or {}
+        if 'xmm0' in diffs or (('native_x0' in d or 'wasm_x0' in d) and not diffs.get('mem')):
+            add('xmm_result', 'medium', 'xmm0 (x0) return differs while memory writes agree: FP/MMX/SIMD result semantics (cvt/pack/saturate/round) diverge')
+        if mach and mach.get('simdint', 0) > 0 and ('mem' in diffs or 'ret' in diffs):
+            add('simd_int_semantics', 'medium', 'machine has %d packed-int (MMX/SSE2) ops and results differ: packed byte/word semantics (saturation, packus/pmulhuw, MMX XMM-non-alias)' % mach['simdint'])
+        nul = 0
+        uva = None
+        for cs in bad:
+            w = cs.get('_w', {}) or {}
+            k = int(w.get('unlifted', 0) or 0)
+            if k:
+                nul += k
+                uva = w.get('unlifted_va')
+        if nul:
+            add('unlifted_callee', 'high', 'wasm ret-0-continued over %d indirect call(s) to VAs outside the x64c lift closure (last %s); native executed the real callee' % (nul, uva))
     if irf and irf['asm_calls'] > 0 and not tags:
         add('simd_helper', 'low', 'IR calls %d __asm_* helper(s)' % irf['asm_calls'])
     if 'ret' in diffs and not ('mem' in diffs or 'calls' in diffs or 'trace' in diffs) and not tags:

@@ -58,8 +58,13 @@ function prepCase(c) {
 function resetState() {
   // CPU 状態 full reset (fle_reset) + .bss (VA 0x15e5008..0x196f000) + scratch + arena を 0 に
   // (native driver の fle_reset+zero と同一条件) → TEB/alloc log 再初期化
+  // [CAB-232 修正] 旧: U8.fill(0, 0x20000000, 0x3100000) は start(0x20000000) > end(0x3100000) で
+  // no-op → scratch が zero 化されず前 case ('pat' prep) の残留が src に残り、native (fle_reset は
+  // zero 化) と 0x6a7990 の dst byte 差 (2/16 case) を生じていた。scratch (0x20000000..0x20100000) と
+  // arena (0x2100000..0x3100000) を個別に zero 化する。
   U8.fill(0, 0x15e5008, 0x196f000);
-  U8.fill(0, 0x20000000, 0x3100000);
+  U8.fill(0, 0x2100000, 0x3100000);
+  U8.fill(0, 0x20000000, 0x20100000);
   m._fle_reset();
   m._fle_init();
 }

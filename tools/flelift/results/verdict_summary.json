@@ -6,8 +6,8 @@
   "0x6a7180": "match",
   "0x69a130": "match",
   "0x660c40": "match",
-  "0x6a7990": "mismatch"
+  "0x6a7990": "match"
  },
  "cases": 16,
- "equal": 14
+ "equal": 16
 }

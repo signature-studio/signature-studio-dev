@@ -54,6 +54,7 @@ def make_record(sess, rec, irfeats):
         mach = None
     irf = irfeats.get(rec['name'])
     irf_s = irf and {k: v for k, v in irf.items() if k != 'callees'}
+    route = 'clift' if sess.t.get('clift') else 'ir'
     out = {'liftdiff_version': FORMAT_VERSION, 'target': sess.t['name'],
            'function': {'va': rec['va'], 'name': rec['name'], 'sig': rec.get('sig')}}
     if 'cases' not in rec:
@@ -67,7 +68,7 @@ def make_record(sess, rec, irfeats):
     if v == 'unexec':
         out['unexec_reason'] = classify.unexec_reason(rec)
     if v == 'mismatch':
-        out['tags'] = [{'tag': t, 'confidence': c, 'evidence': e} for t, c, e in classify.classify(rec, mach, irf, rec['sig'])]
+        out['tags'] = [{'tag': t, 'confidence': c, 'evidence': e} for t, c, e in classify.classify(rec, mach, irf, rec['sig'], route=route)]
     out['cases'] = [trim_case(c, KEEP_RAW_ALL or c['outcome'] in ('diff', 'wasm_trap')) for c in rec['cases']]
     out['static'] = {'machine': mach, 'ir': irf_s}
     return out
@@ -102,7 +103,7 @@ def cmd_bootstate(a):
 
 def cmd_run(a):
     sess = Session(a.target, shards=1, build=not a.nobuild, trace=not a.notrace, state=state_path(a))
-    irfeats = irtool.ir_features(sess.t['ir'], sess.prefix)
+    irfeats = {} if sess.t.get('clift') else irtool.ir_features(sess.t['ir'], sess.prefix)
     global KEEP_RAW_ALL, TRACE_HEAD
     if a.verbose:
         KEEP_RAW_ALL = True; TRACE_HEAD = 200
@@ -154,7 +155,7 @@ def select_set(sess, spec, irfeats):
 
 def cmd_batch(a):
     sess = Session(a.target, shards=a.shards, build=not a.nobuild, trace=not a.notrace, timeout=a.timeout, state=state_path(a))
-    irfeats = irtool.ir_features(sess.t['ir'], sess.prefix)
+    irfeats = {} if sess.t.get('clift') else irtool.ir_features(sess.t['ir'], sess.prefix)
     vas = select_set(sess, a.set, irfeats)
     if a.limit:
         vas = vas[:a.limit]

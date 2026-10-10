@@ -36,6 +36,9 @@ def newer(a, b):
 
 
 def build(t, force=False):
+    if t.get('clift'):
+        from ldlib import clift
+        return clift.build(t, force)
     W = t['work']
     os.makedirs(W + '/obj', exist_ok=True)
     os.makedirs(W + '/tmp', exist_ok=True)

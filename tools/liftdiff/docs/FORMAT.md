@@ -120,3 +120,29 @@ CASE id=.. fn=<va hex> blob=<name|-> args=<k>:<v>,... [trace=1] [xfill=1] [stkfi
   `docs/FORMAT.md §4` のタグで横断集計できる。独自タグは `x-` プレフィクスで追加可。
 - 関数 VA を持つ他 target (Fresh Air / Kilohearts / plugin kernel) は `targets/*.json` を足せば同じ native ランナで検証できる
   (PE x64 + `define @function_<VA>` の IR + `wasm_origin`)。
+
+## 6. C 転写 lift (clift) ルート — `targets/flelift.json` (x64c, CAB-232)
+
+LLVM IR を持たない lift 産物 (x64c = C 転写, tools/flelift) を同じハーネスで採点するモード。target JSON に `"clift": true` を置くと
+`build_wasm.build()` が `ldlib/clift.py` に分岐する。
+
+| 追加キー | 意味 |
+|---|---|
+| `clift` | true = C 転写ルート |
+| `clift_sources` | lift 産物 C (各 `void f_<VA16進>(void)` が 1 関数。entry に `ld_fle_trace(0xVA)` を自動挿入して計装) |
+| `clift_data` | image 敷設 C (`init_exports` の `fle_data_install` が wasm linear に恒等写像で敷設) |
+| `clift_meta` | x64c lift 実績 JSON (`functions` = lift 済 VA 列, `imports_used` = import 名)。`lifted.json` に書き出され、非 lift 関数は `unexec/no_wasm_definition` |
+| `clift_rt` | lift runtime dir (`fle_cpu.c/h`)。既定 import (`imp_*`, `ott_unlifted`) は `-D` リネームで無効化し、生成 `imps.inc` (全 IAT 名の強い定義, `ld_core.ld_stub` 経由 = native と同一応答モデル+呼出しログ) とブリッジの `ott_unlifted` (ret-0 継続) で置き換える |
+| `runner_js` | ランナ JS (既定 `rt/ld_runner.mjs`。clift は `rt/fle_runner.mjs`: case 実行を `_fle_ld_run()` = Win64 ABI → CPU 状態 `R[RCX..]/X[0..3]`/guest stack → `ott_dispatch(va)` に差し替え) |
+| `ir` | **署名ソース**としてのみ使用 (case の引数パターンと callee 引数比較を m11 route と同一にし、比較可能性を保つ)。コンパイルはしない |
+
+**アドレス規約**: 恒等写像 (`wasm_origin` = ImageBase = 0x400000, `delta = 0`)。`heap` (= TEB/gs 領域) を 0x1D00000、
+`arena` (blob/a: 引数領域) を 0x20000000 に置く。
+
+**case 結果の追加フィールド**: `"unlifted":N, "unlifted_va":"0x.."` — dispatch が lift 集合外 VA (VMT/関数ポインタ経由) に着地し、
+m11 route と同じ「ret 0 で継続」をした回数と最終 VA (native は実 callee を実行する)。分類タグ `unlifted_callee` (high)。
+
+**clift ルートの分類タグ差分**: lift 産物に IR が無いため IR 由来タグ (`icall_drop`/`spill_slot_deref`/`short_global`/
+`fp_flag_unreflected`/`rep_string_helper`/`simd_helper`) は出ない (静的特徴のみの低確信度タグは誤検出防止のため route='ir' に限定)。
+代わりに x64c 由来のタグを追加: `simd_int_semantics` (packed-int 命令を持ち結果が不一致 — packus/pmulhuw/MMX 非エイリアス等),
+`xmm_result` (xmm0 戻りのみ差), `unlifted_callee` (上記)。

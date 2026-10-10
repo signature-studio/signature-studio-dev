@@ -1,0 +1,20 @@
+{
+  "name": "flelift",
+  "desc": "FLEngine_x64.dll (FL Studio 26.1.7) — x64c lift (tools/flelift, CAB-226) を liftdiff で全数採点 (CAB-232)。恒等写像 (wasm linear == VA, wasm_origin=0x400000, delta=0)。ir は署名ソースとしてのみ使用 (m11 RetDec IR と同一 sig/pattern で比較可能にする)。clift_sources は tools/flelift/fle_lift.sh の生成物",
+  "pe": "/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin",
+  "ir": "tools/m11/work/boot_final3.ll",
+  "image": null,
+  "wasm_origin": "0x400000",
+  "fn_prefix": "function_",
+  "clift": true,
+  "clift_sources": ["tools/flelift/work/lift/fle_lifted.c"],
+  "clift_data": "tools/flelift/work/lift/fle_data.c",
+  "clift_meta": "tools/flelift/work/lift/lift_meta.json",
+  "clift_rt": "tools/flelift/rt",
+  "runner_js": "rt/fle_runner.mjs",
+  "init_exports": ["fle_data_install"],
+  "initial_memory": 905969664,
+  "max_memory": 905969664,
+  "global_base": 268435456,
+  "init_table_rva": "0xf768b0"
+}

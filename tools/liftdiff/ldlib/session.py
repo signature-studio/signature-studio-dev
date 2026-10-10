@@ -26,6 +26,11 @@ class Session:
         self.origin = int(str(self.t.get('wasm_origin', '0x0')), 16)
         self.delta = self.pe.base - self.origin
         self.wasm_js = W + '/ld_wasm.cjs'
+        self.runner_js = self.t.get('runner_js', 'rt/ld_runner.mjs')
+        lifted_p = W + '/lifted.json'
+        self.lifted = None
+        if os.path.exists(lifted_p):   # clift (x64c 等): wasm 側に定義がある関数集合
+            self.lifted = {int(v, 16) for v in json.load(open(lifted_p))['vas']}
         self.lay = self._layout()
         wins = [(self.origin, self.origin + self.pe.size),
                 (self.lay['arena'], self.lay['arena'] + self.lay['arena_size']),
@@ -37,7 +42,7 @@ class Session:
             self.state = json.load(open(state))
 
     def _layout(self):
-        r = subprocess.run(['node', os.path.join(ROOT, 'rt/ld_runner.mjs'), self.wasm_js, self.t.get('image') or '-', '%x' % self.origin,
+        r = subprocess.run(['node', os.path.join(ROOT, self.runner_js), self.wasm_js, self.t.get('image') or '-', '%x' % self.origin,
                             '%x' % self.delta, '--layout', '--init=' + ','.join(self.t.get('init_exports', []))], capture_output=True, text=True, env=env())
         if r.returncode:
             raise RuntimeError('layout 取得失敗: ' + r.stderr[-500:])
@@ -77,7 +82,7 @@ class Session:
             lw, _ = state_lines_for('wasm', self.state['state'], self)
         nat = Runner('native', ['setarch', '-R', os.path.join(ROOT, 'work/ld_native'), self.t['pe']],
                      self.init_lines('native') + ln + [self.tracelines()], timeout=self.timeout)
-        was = Runner('wasm', ['node', '--stack-size=4000', os.path.join(ROOT, 'rt/ld_runner.mjs'), self.wasm_js, self.t.get('image') or '-',
+        was = Runner('wasm', ['node', '--stack-size=4000', os.path.join(ROOT, self.runner_js), self.wasm_js, self.t.get('image') or '-',
                               '%x' % self.origin, '%x' % self.delta, '--init=' + ','.join(self.t.get('init_exports', []))], self.init_lines('wasm') + lw, timeout=self.timeout)
         return nat, was
 
@@ -133,6 +138,9 @@ class Session:
             return rec
         if not cases.supported_sig(sig):
             rec['verdict'] = 'unexec'; rec['reason'] = 'unsupported_sig'
+            return rec
+        if self.lifted is not None and va not in self.lifted:
+            rec['verdict'] = 'unexec'; rec['reason'] = 'no_wasm_definition'   # clift: lift 集合外
             return rec
         lines = [cases.case_line(va, name, p, sig, trace=self.trace) for p in patterns]
         ids = ['%x:%s' % (va, p) for p in patterns]

@@ -62,7 +62,8 @@ class Runner:
             pass
 
     def run_cases(self, lines, ids, chunk=16):
-        """lines: CASE 行 (プレフィクスなし)。戻り値: [結果 dict]。ハング/クラッシュは status=hang/crash の dict。"""
+        """lines: CASE 行 (プレフィクスなし)。戻り値: [結果 dict]。ハング/クラッシュは status=hang/crash の dict。
+        badjson (壊れた応答行) はランナ再起動 + 1 回だけ再試行する (モジュール状態の汚染に対応、CAB-232)。"""
         out = []
         i = 0
         while i < len(lines):
@@ -74,6 +75,7 @@ class Runner:
             except (BrokenPipeError, OSError):
                 pass
             got = []
+            bad = []
             for k, l in enumerate(part):
                 r = self._recv(self.timeout)
                 if r is None:
@@ -81,7 +83,8 @@ class Runner:
                 try:
                     got.append(json.loads(r))
                 except Exception:
-                    got.append({'id': ids[i + k], 'status': 'badjson', 'detail': r[:200]})
+                    got.append({'id': ids[i + k], 'status': 'badjson', 'detail': r[:200], 'calls': [], 'mem': []})
+                    bad.append(k)
             out.extend(got)
             if len(got) < len(part):
                 # 失敗した case = got の次. ハング/クラッシュとして記録して再起動
@@ -93,6 +96,23 @@ class Runner:
                 self.restarts += 1
                 self.start()
                 i += k + 1
+                continue
+            if bad:
+                # 応答行が壊れていた case: ランナを再起動して 1 回だけ再試行する
+                self.kill()
+                self.restarts += 1
+                self.start()
+                base = len(out) - len(part)
+                for k in bad:
+                    try:
+                        self._send('CASE ' + part[k])
+                        self.p.stdin.flush()
+                        r = self._recv(self.timeout)
+                        if r is not None:
+                            out[base + k] = json.loads(r)
+                    except Exception:
+                        pass
+                i += len(part)
                 continue
             i += len(part)
         return out
