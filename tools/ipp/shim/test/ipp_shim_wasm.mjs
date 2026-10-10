@@ -124,7 +124,7 @@ console.log(`fft via thunk vs real IPP: cases=${fcases.length} worstNRMS32f=${wo
 const cnt = new DataView(X.memory.buffer).getInt32(X.ipp_shim_table_count.value ?? X.ipp_shim_table_count, true);
 let stubOk = true; X.ipp_shim_reset();
 const sc = (n) => { const dv = new DataView(X.memory.buffer); for (let o = 0; o < 0x100; o += 8) dv.setBigUint64(BLK + o, 0n, true); dv.setBigUint64(BLK, X.ipp_shim_getproc(cstr(n)), true); dv.setBigUint64(BLK + 0x80, 0xFFn, true); X.ipp_shim_dispatch(BLK); return new DataView(X.memory.buffer).getBigUint64(BLK + 0x80, true); };
-for (const n of ['ippsConv_32f', 'ippiResizeSqrPixel_8u_C4R', 'ippsFIR_32f']) if (sc(n) !== 0n) stubOk = false;
+for (const n of ['ippsConv_32f', 'ippiWarpAffine_8u_C3R', 'ippsFIR_32f']) /* CAB-245: ResizeSqrPixel は型付き化のため stub 抽出を WARP 系へ */ if (sc(n) !== 0n) stubOk = false;
 const tbl = { count: cnt, stub_calls: X.ipp_shim_stub_calls_total(), stub_distinct: X.ipp_shim_stub_distinct(), stub_failsoft_ok: stubOk, last_stub: X.ipp_shim_last_stub() };
 console.log('table', JSON.stringify(tbl));
 if (outPath) fs.writeFileSync(outPath, JSON.stringify({ rows, fft: { worst32, worst64, bad: fbad }, table: tbl }, null, 1));

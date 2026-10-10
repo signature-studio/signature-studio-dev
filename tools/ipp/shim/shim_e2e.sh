@@ -31,5 +31,8 @@ for f in "$SX"/*.c; do emcc -c -O1 -w -Wno-error=int-conversion -Wno-implicit-fu
 emcc -O1 -w -I"$SX" -Isrc -I"$IPP/src" test/shimx_glue_test.c src/ipp_shim_shimx.c src/ipp_shim.c gen/ipp_shim_tab.c "$IPP/src/ipp_min.c" "$HERE"/fft/*.c "$HERE"/fft/pffft/*.c $(ls "$HERE"/impl/*.c 2>/dev/null || true) "$W"/shimx_obj/*.o -o "$W/shimx_glue_test.cjs" \
   -sALLOW_MEMORY_GROWTH=1 -sENVIRONMENT=node -sEXIT_RUNTIME=1 -sERROR_ON_UNDEFINED_SYMBOLS=1 -sGLOBAL_BASE=1048576 --embed-file "$W/names.txt@/names.txt"
 node "$W/shimx_glue_test.cjs" | tee "$W/shimx_glue.log" | sed 's/^/  /'
+step "5c. Resize/GetBufSize/信号4関数 オラクル (実 DLL vs 自前実装, native + wasm replay)"
+bash "$HERE/test/resize_oracle_run.sh" | sed 's/^/  /'
+
 step "6. 判定"
 python3 shim_check.py

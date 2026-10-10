@@ -3412,11 +3412,11 @@
   {
    "name": "ippiResizeSqrPixel_8u_C1R",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp8u* pSrc, IppiSize srcSize, int srcStep, IppiRect srcRoi, Ipp8u* pDst, int dstStep, IppiRect dstRoi, double xFactor, double yFactor, double xShift, double yShift, int interpolation, Ipp8u* pBuffer",
    "family": "ippi",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -3517,11 +3517,11 @@
   {
    "name": "ippiResizeSqrPixel_8u_C3R",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp8u* pSrc, IppiSize srcSize, int srcStep, IppiRect srcRoi, Ipp8u* pDst, int dstStep, IppiRect dstRoi, double xFactor, double yFactor, double xShift, double yShift, int interpolation, Ipp8u* pBuffer",
    "family": "ippi",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -3622,11 +3622,11 @@
   {
    "name": "ippiResizeSqrPixel_8u_C4R",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp8u* pSrc, IppiSize srcSize, int srcStep, IppiRect srcRoi, Ipp8u* pDst, int dstStep, IppiRect dstRoi, double xFactor, double yFactor, double xShift, double yShift, int interpolation, Ipp8u* pBuffer",
    "family": "ippi",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -5820,11 +5820,11 @@
   {
    "name": "ippsAtan_32f_A11",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp32f* a, Ipp32f* r, Ipp32s n",
    "family": "vm-unary",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -7675,11 +7675,11 @@
   {
    "name": "ippsCopy_32s",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp32s* pSrc, Ipp32s* pDst, int len",
    "family": "mem",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -15641,11 +15641,11 @@
   {
    "name": "ippsSub_32f_I",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp32f* pSrc, Ipp32f* pSrcDst, int len",
    "family": "arith-I",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -16411,11 +16411,11 @@
   {
    "name": "ippsThreshold_GT_32s_I",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "Ipp32s* pSrcDst, int len, Ipp32s level",
    "family": "threshold",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [

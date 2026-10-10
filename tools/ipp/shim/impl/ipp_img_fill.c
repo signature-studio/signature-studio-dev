@@ -327,21 +327,11 @@ IppStatus ippiCopyConstBorder_8u_C4R(const Ipp8u *pSrc, int srcStep, IppiSize sr
   return border_copy(pSrc, srcStep, srcRoiSize, pDst, dstStep, dstRoiSize, topBorderHeight, leftBorderWidth, value, 4, 0);
 }
 
-/* ---- GetBufSize 系: エラーコード返却 (CAB-134 検収決定。サイズ式は IPP バージョン間で
-      実測が異なる (arm64 は固定値/退化, win は別式) ため値を書かず fail-fast にする) ---- */
+/* ---- GetBufSize 系 (FilterBox/FilterRound): エラーコード返却 (CAB-134 検収決定)。
+      Resize 系 2 関数は CAB-245 で実測式を実装 (impl/ipp_resize.c) のため移設済み。 ---- */
 static IppStatus getsize_err(int *pSize) {
   if (!pSize) return ippStsNullPtrErr;
   return IPP_STS_NOTSUPPORT;
-}
-IppStatus ippiResizeGetBufSize(IppiRect srcRoi, IppiRect dstRoi, int nChannel, int interpolation, int *pSize) {
-  (void)srcRoi; (void)dstRoi;
-  if (nChannel < 1) return IPP_STS_BADARG;
-  return getsize_err(pSize);
-}
-IppStatus ippiResizeSqrPixelGetBufSize(IppiSize dstSize, int nChannel, int interpolation, int *pSize) {
-  (void)dstSize;
-  if (nChannel < 1) return IPP_STS_BADARG;
-  return getsize_err(pSize);
 }
 IppStatus ippiFilterBoxBorderGetBufferSize(IppiSize dstRoiSize, IppiSize maskSize, int dataType, int numChannels, int *pBufferSize) {
   (void)dstRoiSize; (void)maskSize;

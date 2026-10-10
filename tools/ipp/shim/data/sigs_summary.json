@@ -1,12 +1,12 @@
 {
  "names": 420,
- "thunks_typed(impl)": 92,
- "stubs(fail-soft)": 328,
+ "thunks_typed(impl)": 99,
+ "stubs(fail-soft)": 321,
  "unknown_sig": 0,
  "confidence": {
-  "A": 92,
+  "A": 99,
   "B-": 199,
-  "B+": 129
+  "B+": 122
  },
  "evidence_check": {
   "agree": 173,
@@ -87,15 +87,15 @@
  "conflict": [],
  "stub_with_output_handles(hazard)": [],
  "union_used_239": 239,
- "union_used_impl": 73,
+ "union_used_impl": 80,
  "detail": {
-  "A(impl)": 92,
-  "B+ agree": 111,
+  "A(impl)": 99,
+  "B+ agree": 104,
   "B+ weak(型一致・引数の一部が実績で未観測)": 18,
   "B- 実績なし かつ 使用集合239内(mac のみ呼出 or 低サンプル)": 37,
   "B- 実績なし かつ どの platform からも呼ばれない": 162,
-  "rule-derived(non-A)": 239,
-  "hand-written(non-A)": 89
+  "rule-derived(non-A)": 235,
+  "hand-written(non-A)": 86
  },
  "hand_written_unverified_in_239": [
   "ippiFilter_Round32f_8u_C1R",
@@ -145,9 +145,6 @@
   "ippiRemap_8u_C4R",
   "ippiResizeCenter_8u_C3R",
   "ippiResizeCenter_8u_C4R",
-  "ippiResizeSqrPixel_8u_C1R",
-  "ippiResizeSqrPixel_8u_C3R",
-  "ippiResizeSqrPixel_8u_C4R",
   "ippiResize_8u_C3R",
   "ippiResize_8u_C4R",
   "ippiRotateCenter_8u_C4R",

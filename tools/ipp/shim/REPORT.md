@@ -151,3 +151,48 @@ fail-soft の注意 (**サイレントに誤る**): stub は status 0 (=成功) 
 
 ### 10-6. 残 stub (使用集合 239 中 166) と次タスク
 上位: `ippiResizeSqrPixel_8u_C1R/C3R/C4R` (143 モジュール, 13 引数 + 補間 + pBuffer — `ippiResizeSqrPixelGetBufSize` がエラーコード返却のため lift 側は fail-fast になる) / `ippsThreshold_GT_32s_I`・`ippsSub_32f_I`・`ippsCopy_32s`・`ippsAtan_32f_A11` (125) / `ippsRealToCplx_32f`・`ippsCplxToReal_32fc` (61) / `ippsCopy_8u` (55) / `ippsZero_32s` (51)。次善: `ippiResizeSqrPixel` 群 (線形/NN 補間) と 125 モジュール群の 4 関数。
+
+
+## 12. CAB-245 (IPP-5 ipp-fill-2): ResizeSqrPixel + GetBufSize 実測式 + 125 モジュール群 4 関数 (2026-10-10)
+
+**結論**: 対象 7 関数 (+ GetBufSize 2 関数の実測式版) を実装し **typed thunk 92 → 99** (stub 328 → 321)。`shim_e2e.sh` は **12 checks PASS** (S10/S11 を新設)。オラクル (実 DLL vs 自前実装, **80,256 ケース**) で **status 格子全一致**・**GetBufSize 74,468 ケース完全一致**・信号 4 関数 **bit-exact**、Resize カーネルは **NN 0.000% / Cubic 0.027% / Linear 0.101% / Super 0.643% / Lanczos 6.913%** の画素差率 (実測、§12-5)。wasm replay **1,728 レコード mismatch=0** (可搬 sin / round により native と bit 一致)。実装は `impl/ipp_resize.c` + `impl/ipp_sig_fill2.c` (+ `impl/ipp_img_fill.c` から Resize 系 GetBufSize を移設)。
+
+### 12-1. 実装関数
+| 関数 | 内容 | 検証 |
+|---|---|---|
+| `ippiResizeSqrPixel_8u_C1R/C3R/C4R` | 13 引数 + interp {1,2,4,5,6,7,8,16} (5/6/7 は 4 と同一視, 6 のみ H-pass 重み回帰で一致確認) | NN bit-exact / Cubic 0.027% / Super・Lanczos §12-5 |
+| `ippiResizeGetBufSize` | **実測式** (§12-3) | **74,468 ケース完全一致** (dw,dh ≤ 600 拡張ランダム含む) |
+| `ippiResizeSqrPixelGetBufSize` | **常時 -8・書込なし** (実 DLL が `mov eax,-8; ret` のスタブ — 逆アセ + 4,000 ケース実測) | 完全一致 |
+| `ippsThreshold_GT_32s_I` / `ippsSub_32f_I` / `ippsCopy_32s` | 信号 3 関数 | **bit-exact** (オラクル 160 ケース) |
+| `ippsAtan_32f_A11` | atanf 版 | bit 差 59.8%, **maxulp 3728 = A11 規格内** (spec 2^-11 ≈ 8200 ulp @ π/4, CAB-141 確定方針) |
+
+### 12-2. 座標系の確定 (B+/B- 引数順序の実装前確認 — callsite_dump.py / 逆アセ)
+- 13 引数の ABI 配置は署名どおり (rcx=pSrc, rdx=srcSize 値渡し, r8=srcStep, r9=srcRoi 16B 構造体ポインタ, stk0..8)。win FLEngine 呼出実績 3 箇所で確認。
+- **FL は `ippiResizeGetBufSize`(5 引数) → malloc → `ippiResizeSqrPixel_*R` の順で呼ぶ** (block00031 0x6c0bda/0x6c0c80 実測) — lift 側の fail-fast は GetBufSize 実測式実装により解消。
+- **座標系 (実測で確定)**: `u = (x_abs + 0.5 − xShift)/xFactor − srcRoi.x` (x_abs = dst 絶対座標)。書込条件は `0 ≤ u ≤ srcRoi.w` かつ v 同様 — **範囲外の dst は未書込のまま** (probe5/6 実測)。書込可能画素が 1 つも無ければ status 1 で無操作。タップは **ROI 相対 index で画像絶対座標をフェッチ** (画像範囲でクランプ, ROI 外の隣接画素も読む — CAB-136 FilterBox と同様)。
+- 位相パイプライン: **NN index は Q16 固定小数点** (`inv16 = trunc(65536/fx)`, `idx = (u16−1)>>16`) — double だと fx=0.7/0.9 で index が ±1 ずれるを実測。重み位相は double (§12-5)。
+- エラー格子 (52 ケース × 4 interp): NULL→-8 / 寸法<1→-6 / interp 無効→-22 / factor≤0・Super+拡大→-23 — **全一致**。
+
+### 12-3. ippiResizeGetBufSize 実測式 (受入条件)
+密グリッド (dw ≤ 96 × dh ≤ 48 × ch ∈ {1,3,4} × interp 5 種 = 34,560 点) でフィットし、**拡張ランダム dw,dh,sw,sh ≤ 600 (40,000 点) で完全一致** を確認。b = ブロック数。
+- NN(1): `144 + 64·(c16(dw)−1) + 64·(c16(dh)−1)` (ch 非依存), c16(x)=⌈x/16⌉
+- Linear(2): `1168 + 64·(16·⌊(bw−1)/4⌋ + [0,1,6,7][(bw−1)%4]) + 64·(8·⌊(bh−1)/4⌋ + (bh−1)%4) + (ch−1)·256·(2+⌊(dw−1)/32⌋)`, bw=c16(dw), bh=c16(dh) — 初期の二次式フィットは dw>96 で破綻 (4 ブロック周期の線形が正, dense2 実測)
+- Cubic(4): `2448 + 64·(20·⌊(bw8−1)/4⌋ + [0,2,9,11][(bw8−1)%4]) + 64·(12·⌊(bh8−1)/4⌋ + [0,2,5,7][(bh8−1)%4]) + (ch−1)·256·(4+⌊(dw−1)/16⌋)`, bw8=c8(dw)
+- Super(8): `16 + 128·ch·c16(sw)` (srcRoi 幅のみ依存, dst 非依存)
+- Lanczos(16): `2704 + 64·(28·⌊(bl−1)/6⌋ + [0,4,8,13,17,21][(bl−1)%6]) + 64·(16·⌊blh−1)/6⌋ + [0,2,4,7,9,11][(blh−1)%6]) + (ch−1)·128·(bl+5)`, bl は 5/5/6px ブロック番号
+- ch=2 → **-53** (実測), dstRoi 寸法 < 1 → **-6** (実測; CAB-136 時の -5 仮定を修正)
+
+### 12-4. 補間カーネル (実測フィット)
+- **Cubic**: 4-tap `f(d)=0.5d³−d²−0.5d+1 (d≤1)`, `f(d)=−(1/6)(d−1)(d−2)(d−3) (1<d≤2)` — 全位相で partition of unity (fit13)。スパイク+回帰で A=−0.5 Keys ではないことを確認 (負ローブの分布が異なる)。
+- **Super**: 面積平均。footprint `[start, start+1/fx)`, `start=(x−sx)/fx`。**ROI 外の面積は最近接エッジ画素へ fold してから総面積で正規化** (spike 重み表 fx=0.3/0.5/0.75 × sx 4 種と全一致)。
+- **interp 5/6/7** (`CUBIC2P_*` 系と推定): H-pass 重み回帰で 6 のみ cubic と一致。5/7 は独立カーネル (spike で負ローブ+非対称を確認, spike行列を work/resize/spikes.log に記録) — **完全再現は後続チケットへ** (現実装は cubic 代用)。
+
+### 12-5. 残差 (許容差の根拠 — 受入条件の「bit-exact または許容差」)
+オラクル 74,456 resize ケース (591 万画素) の画素差率: **NN 0.000% / Cubic 0.027% / Linear 0.101% / Super 0.643% / Lanczos 6.913%**。差分は **|d|≤1 の丸め境界差** (Lanczos big8=16/72.9 万 = 0.002%)。
+- 原因: 実 DLL は重みを内部固定小数点経路で算出し、`255·w` が厳密に 0.5 に乗る位相 (±0.006 帯域) で +1/−1 が手計算と逆になる (spike 313 ペアで分離検証 — fit15〜21)。例: a=1/6 で (213,42) vs (213,43)。
+- 影響は ±1/画素のみ (NN/Cubic はこの帯域をほぼ回避) — リサイズ用途の実害は限定的。完全一致は DLL の重み算出経路 (Q16 逆算+独自丸め) の解明が前提で **IPP-6 (候補) へ**。
+- wasm 差異: libm sin と lround のプラットフォーム差を可搬実装 (テイラー 11 項の sin_pi + round-half-up) で排除 → **wasm replay mismatch=0**。
+
+### 12-6. 更新物
+- `impl/ipp_resize.c` (新規 351 行) / `impl/ipp_sig_fill2.c` (新規 47 行) / `impl/ipp_img_fill.c` (Resize 系 GetBufSize を移設) / `test/resize_oracle.c` + `test/resize_oracle_run.sh` (新規, オラクルハーネス) / `shim_e2e.sh` (S10/S11 追加) / `shim_check.py` / `test/ipp_shim_wasm.mjs` (stub 抽出サンプルを WARP 系へ — ResizeSqrPixel が型付き化したため)
+- 検証ハーネスの開発過程物 (probe1〜10, fit1〜21, callsite 解析) は `work/resize/` (gitignore)

@@ -10,7 +10,7 @@ summ = json.load(open(f'{HERE}/data/sigs_summary.json')); sigs = json.load(open(
 chk('S1 420 名すべてに署名 (不明 0) + thunk 件数', summ['names'] == 420 and summ['unknown_sig'] == 0, f"typed thunk(実装済)={summ['thunks_typed(impl)']} fail-soft stub={summ['stubs(fail-soft)']}")
 chk('S2 署名の呼出実績検算: 型/個数の矛盾 0', summ['evidence_check'].get('conflict', 0) == 0, f"確度 {summ['confidence']} / 実績 {summ['evidence_check']}")
 st = open(f'{W}/selftest.log').read().strip().splitlines()[-1]
-chk('S3 native 自己検査 (ABI プローブ 6 + 420 名解決 + LoadLibraryW + stub 377 fail-soft)', st.endswith('failed=0'), st)
+chk('S3 native 自己検査 (ABI プローブ 6 + 420 名解決 + LoadLibraryW + fail-soft 全数)', st.endswith('failed=0'), st)
 base1 = {r['fn']: r for r in jl(f'{IPP}/work/cmp_avx512.json')}; base2 = {r['fn']: r for r in jl(f'{IPP}/work/cmp_avx512_spec.json')}
 def cmp_set(path, base):
     th = {r['fn']: r for r in jl(path)}; bad = []
@@ -32,6 +32,20 @@ for tag, p in (('scalar', 'wasm_thunk.json'), ('simd128', 'wasm_thunk_simd.json'
     ok = all(r['verdict'] == 'PASS' for r in rows) and sum(1 for r in rows if r['bit_exact_all']) == 21 and w['fft']['bad'] == 0 and w['table']['count'] == 420 and w['table']['stub_failsoft_ok']
     chk(f'S8 wasm({tag}): golden 突合 21 bit-exact + FFT 48 ケース + 420 名表 + stub fail-soft (thunk 経由)', ok, f"bitExact={sum(1 for r in rows if r['bit_exact_all'])}/{len(rows)} fft32={w['fft']['worst32']:.2e} fft64={w['fft']['worst64']:.2e}")
     res[f'wasm_{tag}'] = w
+# S10/S11: CAB-245 オラクル (resize + GetBufSize + 信号4関数)
+olog = open(f'{IPP}/work/resize/oracle.log').read()
+wlog = open(f'{IPP}/work/resize/oracle_wasm.log').read()
+import re as _re
+sum_m = _re.search(r'SUM (\{.*\})', olog)
+st_mis = json.loads(sum_m.group(1))['st_mis'] if sum_m else -1
+gbsm = olog.count('GBS-') ; bigs = olog.count('BIG8')
+chk('S10 CAB-245 オラクル: status 全一致 + GetBufSize 実測式一致 (native)',
+    st_mis == 0 and 'mismatch=0' in olog and sum_m is not None,
+    f"SUM={sum_m.group(1) if sum_m else '?'}")
+wmis = _re.search(r'wasm replay: records=(\d+) mismatch=(\d+)', wlog)
+chk('S11 CAB-245 オラクル wasm replay (native ハッシュ突合)',
+    wmis is not None and wmis.group(2) == '0',
+    f"records={wmis.group(1) if wmis else '?'} mismatch={wmis.group(2) if wmis else '?'}")
 gl = open(f'{W}/shimx_glue.log').read().strip().splitlines()[-1]
 chk('S9 shimx 結合: LoadLibraryW(dsp_ippv2_x64.dll) -> GetProcAddress 420/420 -> dispatch (MulC 実行, stub fail-soft)', gl.startswith('shimx_glue_test: PASS'), gl)
 sz = {p: os.path.getsize(f'{W}/{p}') for p in ('ipp_shim.wasm', 'ipp_shim_simd.wasm')}
