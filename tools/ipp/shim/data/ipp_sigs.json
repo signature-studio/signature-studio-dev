@@ -213,11 +213,11 @@
   {
    "name": "ippiAddC_8u_C3IRSfs",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp8u* value, Ipp8u* pSrcDst, int srcDstStep, IppiSize roiSize, int scaleFactor",
    "family": "ippi",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -325,11 +325,11 @@
   {
    "name": "ippiAddC_8u_C4IRSfs",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp8u* value, Ipp8u* pSrcDst, int srcDstStep, IppiSize roiSize, int scaleFactor",
    "family": "ippi",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -458,11 +458,11 @@
   {
    "name": "ippiAlphaCompC_8u_C3R",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp8u* pSrc1, int src1Step, Ipp8u alpha1, const Ipp8u* pSrc2, int src2Step, Ipp8u alpha2, Ipp8u* pDst, int dstStep, IppiSize roiSize, int alphaType",
    "family": "ippi",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -542,11 +542,11 @@
   {
    "name": "ippiAlphaCompC_8u_C4R",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp8u* pSrc1, int src1Step, Ipp8u alpha1, const Ipp8u* pSrc2, int src2Step, Ipp8u alpha2, Ipp8u* pDst, int dstStep, IppiSize roiSize, int alphaType",
    "family": "ippi",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -696,11 +696,11 @@
   {
    "name": "ippiAlphaPremul_8u_AC4IR",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "Ipp8u* pSrcDst, int srcDstStep, IppiSize roiSize",
    "family": "ippi",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -892,11 +892,11 @@
   {
    "name": "ippiCopyConstBorder_8u_C3R",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp8u* pSrc, int srcStep, IppiSize srcRoiSize, Ipp8u* pDst, int dstStep, IppiSize dstRoiSize, int topBorderHeight, int leftBorderWidth, const Ipp8u* value",
    "family": "ippi",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "weak",
    "evidence_note": "slot0: 期待 gp / 観測なし(gp=0 xmm=0 of 143); slot1: 期待 gp / 観測なし(gp=0 xmm=0 of 143); slot2: 期待 gp / 観測なし(gp=0 xmm=0 of 143); slot3: 期待 gp / 観測なし(gp=0 xmm=0 of 143); stack: 期待 5 / 観測 0 (下限値)",
    "params": [
@@ -969,11 +969,11 @@
   {
    "name": "ippiCopyConstBorder_8u_C4R",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp8u* pSrc, int srcStep, IppiSize srcRoiSize, Ipp8u* pDst, int dstStep, IppiSize dstRoiSize, int topBorderHeight, int leftBorderWidth, const Ipp8u* value",
    "family": "ippi",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "weak",
    "evidence_note": "slot0: 期待 gp / 観測なし(gp=0 xmm=0 of 143); slot1: 期待 gp / 観測なし(gp=0 xmm=0 of 143); slot2: 期待 gp / 観測なし(gp=0 xmm=0 of 143); slot3: 期待 gp / 観測なし(gp=0 xmm=0 of 143); stack: 期待 5 / 観測 0 (下限値)",
    "params": [
@@ -1046,11 +1046,11 @@
   {
    "name": "ippiCopyManaged_8u_C1R",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp8u* pSrc, int srcStep, Ipp8u* pDst, int dstStep, IppiSize roiSize, int flags",
    "family": "ippi",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -1102,11 +1102,11 @@
   {
    "name": "ippiCopyReplicateBorder_8u_C3R",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp8u* pSrc, int srcStep, IppiSize srcRoiSize, Ipp8u* pDst, int dstStep, IppiSize dstRoiSize, int topBorderHeight, int leftBorderWidth",
    "family": "ippi",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -1172,11 +1172,11 @@
   {
    "name": "ippiCopyReplicateBorder_8u_C4R",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp8u* pSrc, int srcStep, IppiSize srcRoiSize, Ipp8u* pDst, int dstStep, IppiSize dstRoiSize, int topBorderHeight, int leftBorderWidth",
    "family": "ippi",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -1242,11 +1242,11 @@
   {
    "name": "ippiCopy_8u_AC4C3R",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp8u* pSrc, int srcStep, Ipp8u* pDst, int dstStep, IppiSize roiSize",
    "family": "ippi",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -1291,11 +1291,11 @@
   {
    "name": "ippiCopy_8u_C1C4R",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp8u* pSrc, int srcStep, Ipp8u* pDst, int dstStep, IppiSize roiSize",
    "family": "ippi",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -1340,11 +1340,11 @@
   {
    "name": "ippiCopy_8u_C3AC4R",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp8u* pSrc, int srcStep, Ipp8u* pDst, int dstStep, IppiSize roiSize",
    "family": "ippi",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -1389,11 +1389,11 @@
   {
    "name": "ippiCopy_8u_C3R",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp8u* pSrc, int srcStep, Ipp8u* pDst, int dstStep, IppiSize roiSize",
    "family": "ippi",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -1438,11 +1438,11 @@
   {
    "name": "ippiCopy_8u_C4R",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp8u* pSrc, int srcStep, Ipp8u* pDst, int dstStep, IppiSize roiSize",
    "family": "ippi",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -1536,11 +1536,11 @@
   {
    "name": "ippiFilterBoxBorderGetBufferSize",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "IppiSize dstRoiSize, IppiSize maskSize, int dataType, int numChannels, int* pBufferSize",
    "family": "ippi",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -1865,11 +1865,11 @@
   {
    "name": "ippiFilterBox_8u_C3IR",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "Ipp8u* pSrcDst, int srcDstStep, IppiSize dstRoiSize, IppiSize maskSize, IppiPoint anchor",
    "family": "ippi",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -1977,11 +1977,11 @@
   {
    "name": "ippiFilterBox_8u_C4IR",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "Ipp8u* pSrcDst, int srcDstStep, IppiSize dstRoiSize, IppiSize maskSize, IppiPoint anchor",
    "family": "ippi",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -2145,11 +2145,11 @@
   {
    "name": "ippiFilterRoundGetBufSize32f_8u_C1R",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "IppiSize roiSize, IppiSize kernelSize, int* pBufferSize",
    "family": "ippi",
-   "conf": "B-",
+   "conf": "A",
    "evidence": "nodata",
    "evidence_note": "",
    "params": [
@@ -2600,11 +2600,11 @@
   {
    "name": "ippiMulC_8u_C3IRSfs",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp8u* value, Ipp8u* pSrcDst, int srcDstStep, IppiSize roiSize, int scaleFactor",
    "family": "ippi",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -3321,11 +3321,11 @@
   {
    "name": "ippiResizeGetBufSize",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "IppiRect srcRoi, IppiRect dstRoi, int nChannel, int interpolation, int* pSize",
    "family": "ippi",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -3370,11 +3370,11 @@
   {
    "name": "ippiResizeSqrPixelGetBufSize",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "IppiSize dstSize, int nChannel, int interpolation, int* pSize",
    "family": "ippi",
-   "conf": "B-",
+   "conf": "A",
    "evidence": "nodata",
    "evidence_note": "",
    "params": [
@@ -3986,11 +3986,11 @@
   {
    "name": "ippiSet_8u_C3R",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp8u* value, Ipp8u* pDst, int dstStep, IppiSize roiSize",
    "family": "ippi",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -4070,11 +4070,11 @@
   {
    "name": "ippiSubC_8u_C3IRSfs",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp8u* value, Ipp8u* pSrcDst, int srcDstStep, IppiSize roiSize, int scaleFactor",
    "family": "ippi",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -4119,11 +4119,11 @@
   {
    "name": "ippiSubC_8u_C4IRSfs",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp8u* value, Ipp8u* pSrcDst, int srcDstStep, IppiSize roiSize, int scaleFactor",
    "family": "ippi",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -8886,11 +8886,11 @@
   {
    "name": "ippsFFTFwd_RToCCS_32f",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp32f* pSrc, Ipp32f* pDst, const void* pFFTSpec, Ipp8u* pBuffer",
    "family": "fft",
-   "conf": "B-",
+   "conf": "A",
    "evidence": "nodata",
    "evidence_note": "",
    "params": [
@@ -8963,11 +8963,11 @@
   {
    "name": "ippsFFTFwd_RToCCS_64f",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp64f* pSrc, Ipp64f* pDst, const void* pFFTSpec, Ipp8u* pBuffer",
    "family": "fft",
-   "conf": "B-",
+   "conf": "A",
    "evidence": "nodata",
    "evidence_note": "",
    "params": [
@@ -9005,11 +9005,11 @@
   {
    "name": "ippsFFTFwd_RToCCS_64f_I",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "Ipp64f* pSrcDst, const void* pFFTSpec, Ipp8u* pBuffer",
    "family": "fft",
-   "conf": "B-",
+   "conf": "A",
    "evidence": "nodata",
    "evidence_note": "",
    "params": [
@@ -9194,11 +9194,11 @@
   {
    "name": "ippsFFTFwd_RToPerm_32f",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp32f* pSrc, Ipp32f* pDst, const void* pFFTSpec, Ipp8u* pBuffer",
    "family": "fft",
-   "conf": "B-",
+   "conf": "A",
    "evidence": "nodata",
    "evidence_note": "",
    "params": [
@@ -9236,11 +9236,11 @@
   {
    "name": "ippsFFTFwd_RToPerm_32f_I",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "Ipp32f* pSrcDst, const void* pFFTSpec, Ipp8u* pBuffer",
    "family": "fft",
-   "conf": "B-",
+   "conf": "A",
    "evidence": "nodata",
    "evidence_note": "",
    "params": [
@@ -9271,11 +9271,11 @@
   {
    "name": "ippsFFTFwd_RToPerm_64f",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp64f* pSrc, Ipp64f* pDst, const void* pFFTSpec, Ipp8u* pBuffer",
    "family": "fft",
-   "conf": "B-",
+   "conf": "A",
    "evidence": "nodata",
    "evidence_note": "",
    "params": [
@@ -9313,11 +9313,11 @@
   {
    "name": "ippsFFTFwd_RToPerm_64f_I",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "Ipp64f* pSrcDst, const void* pFFTSpec, Ipp8u* pBuffer",
    "family": "fft",
-   "conf": "B-",
+   "conf": "A",
    "evidence": "nodata",
    "evidence_note": "",
    "params": [
@@ -9572,11 +9572,11 @@
   {
    "name": "ippsFFTInv_CCSToR_32f",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp32f* pSrc, Ipp32f* pDst, const void* pFFTSpec, Ipp8u* pBuffer",
    "family": "fft",
-   "conf": "B-",
+   "conf": "A",
    "evidence": "nodata",
    "evidence_note": "",
    "params": [
@@ -9649,11 +9649,11 @@
   {
    "name": "ippsFFTInv_CCSToR_64f",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp64f* pSrc, Ipp64f* pDst, const void* pFFTSpec, Ipp8u* pBuffer",
    "family": "fft",
-   "conf": "B-",
+   "conf": "A",
    "evidence": "nodata",
    "evidence_note": "",
    "params": [
@@ -9691,11 +9691,11 @@
   {
    "name": "ippsFFTInv_CCSToR_64f_I",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "Ipp64f* pSrcDst, const void* pFFTSpec, Ipp8u* pBuffer",
    "family": "fft",
-   "conf": "B-",
+   "conf": "A",
    "evidence": "nodata",
    "evidence_note": "",
    "params": [
@@ -9880,11 +9880,11 @@
   {
    "name": "ippsFFTInv_PermToR_32f",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp32f* pSrc, Ipp32f* pDst, const void* pFFTSpec, Ipp8u* pBuffer",
    "family": "fft",
-   "conf": "B-",
+   "conf": "A",
    "evidence": "nodata",
    "evidence_note": "",
    "params": [
@@ -9922,11 +9922,11 @@
   {
    "name": "ippsFFTInv_PermToR_32f_I",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "Ipp32f* pSrcDst, const void* pFFTSpec, Ipp8u* pBuffer",
    "family": "fft",
-   "conf": "B-",
+   "conf": "A",
    "evidence": "nodata",
    "evidence_note": "",
    "params": [
@@ -9957,11 +9957,11 @@
   {
    "name": "ippsFFTInv_PermToR_64f",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp64f* pSrc, Ipp64f* pDst, const void* pFFTSpec, Ipp8u* pBuffer",
    "family": "fft",
-   "conf": "B-",
+   "conf": "A",
    "evidence": "nodata",
    "evidence_note": "",
    "params": [
@@ -9999,11 +9999,11 @@
   {
    "name": "ippsFFTInv_PermToR_64f_I",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "Ipp64f* pSrcDst, const void* pFFTSpec, Ipp8u* pBuffer",
    "family": "fft",
-   "conf": "B-",
+   "conf": "A",
    "evidence": "nodata",
    "evidence_note": "",
    "params": [
@@ -10153,11 +10153,11 @@
   {
    "name": "ippsFIRInitAlloc64f_32f",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "void** ppState, const Ipp64f* pTaps, int tapsLen, const Ipp32f* pDlyLine",
    "family": "fir",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -10195,11 +10195,11 @@
   {
    "name": "ippsFIRInitAlloc_32f",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "void** ppState, const Ipp32f* pTaps, int tapsLen, const Ipp32f* pDlyLine",
    "family": "fir",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -10237,11 +10237,11 @@
   {
    "name": "ippsFIRMRInitAlloc64f_32f",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "void** ppState, const Ipp64f* pTaps, int tapsLen, int upFactor, int upPhase, int downFactor, int downPhase, const Ipp32f* pDlyLine",
    "family": "fir",
-   "conf": "B-",
+   "conf": "A",
    "evidence": "nodata",
    "evidence_note": "",
    "params": [
@@ -10307,11 +10307,11 @@
   {
    "name": "ippsFIRMRInitAlloc_32f",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "void** ppState, const Ipp32f* pTaps, int tapsLen, int upFactor, int upPhase, int downFactor, int downPhase, const Ipp32f* pDlyLine",
    "family": "fir",
-   "conf": "B-",
+   "conf": "A",
    "evidence": "nodata",
    "evidence_note": "",
    "params": [
@@ -10804,11 +10804,11 @@
   {
    "name": "ippsIIRGetStateSize64f_BiQuad_32f",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "int numBq, int* pBufferSize",
    "family": "iir",
-   "conf": "B-",
+   "conf": "A",
    "evidence": "nodata",
    "evidence_note": "",
    "params": [
@@ -10832,11 +10832,11 @@
   {
    "name": "ippsIIRInit64f_BiQuad_32f",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "void** ppState, const Ipp64f* pTaps, int numBq, const Ipp64f* pDlyLine, Ipp8u* pBuf",
    "family": "iir",
-   "conf": "B-",
+   "conf": "A",
    "evidence": "nodata",
    "evidence_note": "",
    "params": [
@@ -13282,11 +13282,11 @@
   {
    "name": "ippsOrC_32u_I",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "Ipp32u val, Ipp32u* pSrcDst, int len",
    "family": "logic-I",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -14493,11 +14493,11 @@
   {
    "name": "ippsSet_64s",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "Ipp64s val, Ipp64s* pDst, int len",
    "family": "mem-set",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -15256,11 +15256,11 @@
   {
    "name": "ippsSqrt_32f_A21",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp32f* a, Ipp32f* r, Ipp32s n",
    "family": "vm-unary",
-   "conf": "B-",
+   "conf": "A",
    "evidence": "nodata",
    "evidence_note": "",
    "params": [
@@ -16292,11 +16292,11 @@
   {
    "name": "ippsThreshold_GT_32f",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp32f* pSrc, Ipp32f* pDst, int len, Ipp32f level",
    "family": "threshold",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [

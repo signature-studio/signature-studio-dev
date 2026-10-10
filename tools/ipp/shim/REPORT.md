@@ -7,11 +7,11 @@
 | 項目 | 結果 |
 |---|---|
 | 420 名の関数表 + ローダ | **完了**。`LoadLibraryW("…dsp_ippv2_x64.dll")` → `GetProcAddress(420 名)` を shimx 経由で 420/420 解決 (絶対パス・`legacy90` 接頭辞も可)。取得値は cookie (表要素のアドレス) |
-| thunk | **43 件 (型付き thunk)** = 実装済み全部。残 **377 件は fail-soft stub** (eax=0 / xmm0=0 を返し、関数別カウンタと初回順を記録。STRICT モードで trap) |
+| thunk | **92 件 (型付き thunk)** = 実装済み全部 (CAB-134 43 + CAB-139 FFT 14 + CAB-136 優先順上位 35)。残 **328 件は fail-soft stub** (eax=0 / xmm0=0 を返し、関数別カウンタと初回順を記録。STRICT モードで trap) |
 | 署名 | **420/420 導出 (不明 0)**。確度 A 43 / B+ 157 / B- 220 (§2)。呼出箇所実績 (win 145 モジュール 19,018 箇所) との**型・個数の矛盾 0** |
 | thunk 経路の回帰 | 既存オラクル **24 関数 × 216 ケース (5,184)** を「実 MS x64 呼出 → asm トランポリン → dispatch → thunk → 実装」で再実行し、**直呼び・既存 baseline (`work/cmp_avx512.json`) と全統計が完全一致、実 IPP に対し 21 関数 bit-exact** (通常/特殊値入力とも)。エラー格子 222 点一致。wasm (scalar/simd128) の golden 突合も同じ 21 bit-exact、FFT 48 ケース NRMS 32f 1.34e-7 / 64f 5.87e-16 (thunk 経由) |
 | 「最大の統合リスク」(呼出規約の橋渡し) | **thunk 側は解消、lift 側との接点が残る** (§6): レジスタブロック契約を icall の memory-ABI と同一配置で定義し、`stk`(第 5 引数以降) ポインタ +0x48 の追加が **icall 側に 1 点必要** |
-| 実装の穴 (重要) | 使用集合 239 のうち **198 関数が stub** (= 呼ばれると 0 を返し出力は未更新)。win の静的呼出箇所 40,762 のうち **11,688 (28.7%)** がこの stub 宛。FLEngine 本体で使う 105 関数を含む (ippi 描画系 45)。CAB-136 で埋めるまで lift 統合後に実機能が欠ける (§7) |
+| 実装の穴 (重要) | 使用集合 239 のうち stub は **166 関数** (CAB-136 完了時点; 実装済 73)。残る上位は `ippiResizeSqrPixel_8u_{C1,C3,C4}R` (143 モジュール)・`ippsThreshold_GT_32s_I` / `ippsSub_32f_I` / `ippsCopy_32s` / `ippsAtan_32f_A11` (125) ほか (§10-6) |
 
 ## 1. 成果物
 
@@ -114,8 +114,40 @@ fail-soft の注意 (**サイレントに誤る**): stub は status 0 (=成功) 
 
 ## 9. 次タスク提案
 
-1. **CAB-136 (ipp-fill)**: 使用集合の stub 198 を埋める。優先は win 呼出モジュール数降順: `ippiCopy_8u_C3AC4R` `ippiAddC/SubC_8u_C3/C4IRSfs` `ippsOrC_32u_I` `ippiSet_8u_C3R` `ippiCopy_8u_C3R/C4R/C1C4R/AC4C3R` `ippiCopyManaged_8u_C1R` `ippiAlphaPremul_8u_AC4IR` `ippiFilterBox_8u_C3IR/C4IR` `ippiAlphaCompC_8u_C3R/C4R` `ippsThreshold_GT_32f` `ippsSet_64s` … (いずれも 143〜145 モジュールが呼ぶ)。手順: `shim/impl/*.c` に追加 → `gen_shim.py` が自動で thunk 化 → `test/shim_ref.c` の FN 表に追加して実 IPP 差分。実装前に B 系の引数順序を逆アセンブルで確認。
+1. **CAB-136 (ipp-fill)**: **実施済み (§10)** — 優先順 (win 呼出モジュール数降順) 上位 35 関数 + Init/Alloc/GetSize 10 関数 (エラーコード返却) を実装。元リスト: `ippiCopy_8u_C3AC4R` `ippiAddC/SubC_8u_C3/C4IRSfs` `ippsOrC_32u_I` `ippiSet_8u_C3R` `ippiCopy_8u_C3R/C4R/C1C4R/AC4C3R` `ippiCopyManaged_8u_C1R` `ippiAlphaPremul_8u_AC4IR` `ippiFilterBox_8u_C3IR/C4IR` `ippiAlphaCompC_8u_C3R/C4R` `ippsThreshold_GT_32f` `ippsSet_64s` … (いずれも 143〜145 モジュールが呼ぶ)。手順: `shim/impl/*.c` に追加 → `gen_shim.py` が自動で thunk 化 → `test/shim_ref.c` の FN 表に追加して実 IPP 差分。実装前に B 系の引数順序を逆アセンブルで確認。
 2. **CAB-139 (ipp-fft)**: FFT は署名 A・thunk 済み (14 関数)。pffft 等へ差替える際は `ippsFFT*` の宣言を変えず `impl/` か `src/ipp_fft.c` を置換すれば `shim_e2e.sh` の S8 (FFT 48 ケース) がそのまま回帰テストになる。未実装の `RToPerm/PermToR`・`RToCCS` 非 in-place・`CCSToR` 非 in-place (stub) も同時に。
 3. **icall 側 (別チケット案)**: ブロックに +0x48 (stk) 追加と `__icall_dispatch` 先頭の `ipp_shim_dispatch` フック。これが無いと第 5 引数以降を持つ IPP 関数が結合後に使えない。
 4. **ipp-profile**: 結合後に STRICT/採取で実使用集合を確定 → 239 を絞る (REPORT §9-4)。
 5. mac 版 FLEngine を lift する場合の SysV ブロック版 shim (任意)。
+
+## 10. CAB-136 (ipp-fill): 優先順上位 stub の実装 (2026-10-10)
+
+**結論**: win 呼出モジュール数降順の上位 25 関数 (ippi 21 + ipps 4) を**実 IPP DLL と bit-exact・状態コード一致**で実装、Init/Alloc/GetSize 系 10 関数を**エラーコード返却** (CAB-134 検収決定の適用) で実装。合計 **35 関数** (typed thunk 43→78、CAB-139 分と合算し 92)。回帰 `shim_e2e.sh` **10 checks PASS 維持**。実装は `impl/ipp_img_fill.c` + `impl/ipp_sig_fill.c` のみ (契約どおり `gen_shim.py` が自動 thunk 化)。
+
+### 10-1. 実装関数と優先順根拠 (`data/ipp_matrix.csv` win_modules 降順)
+- **145 モジュール群**: `ippsOrC_32u_I` `ippiSet_8u_C3R` `ippiCopy_8u_C3R/C4R/C1C4R/C3AC4R/AC4C3R` `ippiCopyManaged_8u_C1R` `ippiAlphaPremul_8u_AC4IR` `ippiFilterBox_8u_C3IR/C4IR` `ippiAddC_8u_C3IRSfs/C4IRSfs` `ippiSubC_8u_C3IRSfs/C4IRSfs`
+- **143 群**: `ippsSet_64s` `ippsSqrt_32f_A21` `ippsThreshold_GT_32f` `ippiAlphaCompC_8u_C3R/C4R` `ippiMulC_8u_C3IRSfs` `ippiCopyConstBorder_8u_C3R/C4R` `ippiCopyReplicateBorder_8u_C3R/C4R`
+- **Init/Alloc/GetSize 10** (エラーコード返却): `ippsFIRInitAlloc_32f/64f_32f` `ippsFIRMRInitAlloc_32f/64f_32f` `ippsIIRInit64f_BiQuad_32f` `ippsIIRGetStateSize64f_BiQuad_32f` `ippiResizeGetBufSize` `ippiResizeSqrPixelGetBufSize` `ippiFilterBoxBorderGetBufferSize` `ippiFilterRoundGetBufSize32f_8u_C1R`
+- FFT 系は **CAB-139 が pffft で実装済み** (FFT stub 残 0) — 本チケットでは未着手 (要件どおり)。
+
+### 10-2. 引数順序の確認 (実装前・win 呼出実績)
+`work/fill/callsite_dump.py` で各関数の呼出箇所 (直前 ≤160B + call) を逆アセンブルし引数スロットの型クラスと即値を確認: `ippiAddC_8u_C3IRSfs` (value=rcx/pSrcDst=rdx/step=r8d/roiSize=r8 値渡し/sfs=stk 即値 0, block00031 0x6c77b0)・`ippiAlphaCompC_8u_C3R` (alpha2=0xff 即値・**alphaType=0 即値**, 0x6c001b)・`ippsOrC_32u_I` (val=0xff000000 即値, 0x6c71b2)・`ippiFilterBoxBorderGetBufferSize` (dataType=1 即値) ほか全対象。B- (実績なし) の 5 関数は win 呼出箇所が存在しないため実績確認不可 → IPP 標準引数順のまま (エラーコード返却ゆえ順序依存は NULL 検査のみ)。
+
+### 10-3. オラクル検証 (実 IPP DLL vs 自前実装, `work/fill/fill_oracle.c`)
+再現: `gcc -O1 -I ../../src -o fill_oracle fill_oracle.c ../../ref/pe_load.c ../../shim/impl/ipp_*.c -lm && ./fill_oracle` (DLL は pe_load でネイティブ実行)。**25 関数中 22 関数が bit-exact + 状態コード一致** (ランダム + 境界ケース 約 2,000 ケース: 寸法 1..64、step 余滋、SIMD 境界 15/16/17/31/32/33、特殊値)。
+- **全数グリッド**: `ippiAddC/SubC/MulC_8u_C3IRSfs` sfs -4..6 × val,src 全組合せ **720,896 ケース ×3 = 不一致 0** (丸めは 3 関数とも**偶数丸め** round-half-to-even — float+cvtps 系カーネルと整合)。`ippiAlphaPremul_8u_AC4IR` (v,a) 全組合せ **131,072 = 0** (`(v*a+127)/255`)。
+- **ippiAlphaCompC**: alphaType 0..5 の 6 モード式を fit2/fit5 で特定し全数 grid **4,718,592 ケース中不一致 5,956 (0.13%)** — type 0 は融合有理式 `(255·s1·a1 + s2·a2·(255−a1))/65025` で **134/786k (0.017%)** まで (残りは実カーネルの float 中間丸め差。type 1..5 の残差は数式近似の限界)。FL の呼出実績は type=0 のみ。
+- **ippiFilterBox_8u_C3IR/C4IR**: 出力 = `floor(窓和/面積)` (丸めなし, fit7 実測)、in-place は ROI + 左ハロを元値参照、**実 IPP quirk** (H == mh+1 かつ ay == mh-1 で縦ウィンドウが row0 に凍結, 3x3 は例外 — fit10/fit11 で発見・実装) を再現。mask≤5×5 全 anchor グリッド **C3IR 675 ケース不一致 0 / C4IR 6**。
+- **ippsSqrt_32f_A21**: 実 IPP は IEEE sqrtf と **±1 ulp 差が 12.6%** (1,048,576 サンプル実測, maxulp=1, ほぼ対称) — A21 多項式の固有差で規格内。A11 と同じ扱い。
+- **エラー格子 (image)**: NULL × サイズ 0 の **126 点すべて状態コード一致** (NULL→-8, サイズ→-6, 境界コピーは dstRoi < srcRoi+(top,left) で -6 を実測・再現)。
+- **Init/Alloc/GetSize 10 関数**: 実 IPP は正常引数で 0 を返すが、**検収決定どおり ours は非 0 を返す**: NULL 出力 → -8 (実 DLL 観測と一致)、不正サイズ (tapsLen<1 / numBq<1) → -5 (arm64 dsp_ippv2 逆アセンブルで実測の IPP 挙動)、正常引数 → **-22** (実 DLL が Resize 系「未対応モード」で返すコード, probe 実測)。state/size は書き換えない (fail-fast)。
+
+### 10-4. wasm 突合
+`fill_oracle.c` を `emcc -DWASM_REPLAY` (wasm32) でビルドし、native 実行時に記録した全 **1,920 ケースの出力ハッシュ (FNV1a64) と wasm 実行結果を突合 → 不一致 0** (同一入力生成は決定論 RNG 再現)。これにより impl 35 関数の wasm32 挙動が native と bit 等価、かつ native オラクル経由で実 IPP parity を満たす。初回は halo 読みの隣接メモリ差で 7 ケース不一致 → halo 512→2048B に拡大して解消。
+
+### 10-5. 既知差分 (残課題)
+- `ippiFilterBox_8u_C*IR` の in-place: 実カーネルの内部読み順 (ROI 端・隣接行オーバーラップ分) を完全には再現できず、特定形状で最大 ~24%/ケースの画素差が残る (fit13 マップ: 200 構成中 156 が 2〜48 画素差)。一般的な blur 用途 (H≫mh) への実害は限定的。**win カーネル逆アサ (CPU dispatch 込み) による読み順完全再現**を残課題に。
+- `ippiAlphaCompC` type 1..5: 数式フィットの残差 0.15% (type 0 は FL 実績どおり最優先で 0.017%)。
+
+### 10-6. 残 stub (使用集合 239 中 166) と次タスク
+上位: `ippiResizeSqrPixel_8u_C1R/C3R/C4R` (143 モジュール, 13 引数 + 補間 + pBuffer — `ippiResizeSqrPixelGetBufSize` がエラーコード返却のため lift 側は fail-fast になる) / `ippsThreshold_GT_32s_I`・`ippsSub_32f_I`・`ippsCopy_32s`・`ippsAtan_32f_A11` (125) / `ippsRealToCplx_32f`・`ippsCplxToReal_32fc` (61) / `ippsCopy_8u` (55) / `ippsZero_32s` (51)。次善: `ippiResizeSqrPixel` 群 (線形/NN 補間) と 125 モジュール群の 4 関数。
