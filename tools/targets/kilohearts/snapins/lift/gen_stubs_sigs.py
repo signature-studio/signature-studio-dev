@@ -8,6 +8,51 @@ import sys
 
 CT = {'i128': 'u128', 'i64': 'u64', 'i32': 'u32', 'i16': 'unsigned short', 'i8': 'u8', 'float': 'float', 'double': 'double', 'void': 'void', 'ptr': 'void*'}
 
+# ---- KH-4: Win32 named import shim (レジスタグローバル ABI: 引数 rcx/rdx/r8..., 戻り rax)。
+# 割当アドレス KH_HEAP (0x05000000, 1MB) は arena(0x04000000..0x04800000) の直後で、
+# wasm リニアメモリ (96MB) 内。bump 状態は KH_HEAP 先頭 8B に置き native (scenario が IAT を同実装へ
+# patch) と wasm で同一進行。割当は常に 16B 整列 + ゼロ充填 = 決定的 (HeapAlloc の未初期化内容も一致)。
+HEAP_C = r'''
+#include <stdlib.h>
+#define KH_HEAP 0x05000000ULL
+#define KH_HEAP_END (0x05000000ULL + 0x100000ULL)
+static u64 kh_heap_alloc(u64 bytes) {
+  u64 cur = *(u64*)(unsigned int)0x04000100ULL;   /* bump 状態はアリーナ内 (scenario が trial 毎に 0 reset) */
+  if (cur == 0) cur = KH_HEAP + 16;
+  u64 a = (cur + 15) & ~(u64)15;
+  u64 n = (bytes + 15) & ~(u64)15;
+  if (n > 0xF0000ULL) n = 0xF0000ULL;
+  if (a + n > KH_HEAP_END) a = KH_HEAP + 16;
+  unsigned char* m = (unsigned char*)(unsigned int)a;
+  for (u64 i = 0; i < n; i++) m[i] = 0;
+  *(u64*)(unsigned int)0x04000100ULL = a + n;
+  return a;
+}
+'''
+
+IMP_SHIM = {
+    'HeapAlloc': 'rax = kh_heap_alloc(r8);',
+    'HeapFree': 'rax = 1;',
+    'GetProcessHeap': 'rax = 1;',
+    'GetLastError': 'rax = 0;',
+    'SetLastError': 'rax = 0;',
+    'EnterCriticalSection': 'rax = 0;',
+    'LeaveCriticalSection': 'rax = 0;',
+    'InitializeCriticalSection': 'rax = 0;',
+    'InitializeCriticalSectionAndSpinCount': 'rax = 1;',
+    'InitializeCriticalSectionEx': 'rax = 1;',
+    'DeleteCriticalSection': 'rax = 0;',
+    'IsProcessorFeaturePresent': 'rax = 1;',
+    'IsDebuggerPresent': 'rax = 0;',
+    'GetCurrentProcess': 'rax = 0xffffffffffffffffULL;',
+    'GetCurrentProcessId': 'rax = 1234;',
+    'GetCurrentThreadId': 'rax = 1;',
+    'TlsGetValue': 'rax = 0x04000200ULL;',   # arena scratch (native shim と同一)
+    'FlsGetValue': 'rax = 0x04000200ULL;',
+    'FlsSetValue': 'rax = 1;',
+    'RaiseException': 'rax = 1;',
+}
+
 
 def main():
     src, stubs, sigs = sys.argv[1:4]
@@ -37,6 +82,19 @@ def main():
                   ' else { u32 m = (1U << r) - 1; res = (b & m) ? 0xffff : 0; b &= ~m; memcpy(p, &b, 4); } } rax = res; }')
     if shims:
         out.append('extern u64 rax, rcx, rdx, r8;')
+    # ---- named import (Win32/CRT) の使用確認 → shim または fail-fast stub (レジスタグローバル ABI)
+    body = '\n'.join(x for x in text if not x.startswith('declare '))
+    used_names = sorted({n for n in re.findall(r'@([A-Za-z][\w]*)\(', body)
+                         if not n.startswith(('function_', 'kh_', 'llvm', 'global_var'))})
+    if used_names:
+        out.append(HEAP_C)
+        out.append('extern u64 rax, rcx, rdx, r8, r9;')
+    for n in used_names:
+        if n in IMP_SHIM:
+            out.append('EMSCRIPTEN_KEEPALIVE u64 %s(void) { %s return rax; }' % (n, IMP_SHIM[n]))
+        else:
+            out.append('EMSCRIPTEN_KEEPALIVE u64 %s(void) { abort(); return 0; }   /* Win32 import: fail-fast (到達したら fuzz が検出) */' % n)
+        nstub += 1
     for l in text:
         m = re.match(r'^declare (\S+) @function_([0-9a-f]+)\(([^)]*)\)', l)
         if m and m.group(2) in shims and m.group(2) not in defined:

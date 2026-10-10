@@ -414,5 +414,208 @@
   "shims": {
    "180fbdd78": "dint"
   }
+ },
+ "khbase": {
+  "ns": "commonbase",
+  "cls": "KHCommon",
+  "id": "khbase",
+  "title": "KH Common Base",
+  "lift": {
+   "throw_helper": "180005c50",
+   "vec_push": "18004cf20",
+   "param_map_notify": "18004d980",
+   "dirty_notify": "18004df70",
+   "sp_release": "18004f350",
+   "sp_destroy_walker": "180050860",
+   "sp_decref": "180050bb0",
+   "ctx_getidx": "1800fb8c0",
+   "ctx_set2f": "1800fb8f0",
+   "op_new": "180f878e0",
+   "f_180f8791c": "180f8791c",
+   "chkstk": "180f87cd0",
+   "f_180f87d40": "180f87d40",
+   "f_180f87f24": "180f87f24",
+   "f_180f88084": "180f88084",
+   "f_180f880a4": "180f880a4",
+   "f_180f880e4": "180f880e4",
+   "f_180f88104": "180f88104",
+   "raise_exc_helper": "180fa8534",
+   "f_180fb5b4c": "180fb5b4c",
+   "f_180fb5bb4": "180fb5bb4",
+   "f_180fb5c20": "180fb5c20",
+   "unwind_filter": "180fb5c6c",
+   "f_180fb5dd0": "180fb5dd0",
+   "f_180fb5e6c": "180fb5e6c",
+   "f_180fb5f3c": "180fb5f3c",
+   "f_180fb5f5c": "180fb5f5c",
+   "fastfail_check": "180fb5f8c",
+   "f_180fb6bf8": "180fb6bf8",
+   "f_180fb6c0c": "180fb6c0c",
+   "f_180fb6ce0": "180fb6ce0",
+   "f_180fbdd78": "180fbdd78",
+   "f_180fbdef4": "180fbdef4",
+   "powf": "180fc3640",
+   "f_180fc61dc": "180fc61dc",
+   "f_180fc7468": "180fc7468",
+   "f_180fd0898": "180fd0898",
+   "f_180fd08d0": "180fd08d0",
+   "f_180fd099c": "180fd099c",
+   "f_180fd0a64": "180fd0a64",
+   "f_180fd0a98": "180fd0a98",
+   "atexit_probe": "180fd0ac8",
+   "f_180fd0b50": "180fd0b50",
+   "f_180fd1540": "180fd1540",
+   "f_180fd172c": "180fd172c",
+   "f_180fd185c": "180fd185c",
+   "f_180fd1ac4": "180fd1ac4",
+   "f_180fd1b00": "180fd1b00",
+   "f_180fd1b34": "180fd1b34",
+   "f_180fd1f30": "180fd1f30",
+   "f_180fd1f84": "180fd1f84",
+   "f_180fd2a60": "180fd2a60",
+   "f_180fd2ba0": "180fd2ba0",
+   "f_180fd2c10": "180fd2c10",
+   "f_180fd2c90": "180fd2c90",
+   "f_180fd2d38": "180fd2d38",
+   "f_180fd2f20": "180fd2f20",
+   "f_180fd2fcc": "180fd2fcc",
+   "f_180fd3144": "180fd3144",
+   "f_180fd320c": "180fd320c",
+   "op_delete": "180fd4f30",
+   "malloc_core": "180fd51cc",
+   "strtol_helper": "180fd5bcc",
+   "matherr_raise": "180fd5bf4",
+   "f_180fd5f04": "180fd5f04",
+   "f_180fd5f30": "180fd5f30",
+   "f_180fd620c": "180fd620c",
+   "f_180fd622c": "180fd622c",
+   "f_180fd62a8": "180fd62a8",
+   "f_180fd62c8": "180fd62c8",
+   "f_180fd62dc": "180fd62dc",
+   "f_180fd6320": "180fd6320",
+   "f_180fd648c": "180fd648c",
+   "f_180fd6498": "180fd6498",
+   "f_180fd662c": "180fd662c",
+   "heap_alloc_wrap": "180fd66a0",
+   "dll_probe": "180fd7d94",
+   "f_180fd7f54": "180fd7f54",
+   "f_180fd81e4": "180fd81e4",
+   "f_180fd81ec": "180fd81ec",
+   "f_180fd8988": "180fd8988",
+   "f_180fd89f0": "180fd89f0",
+   "strtol_core": "180fd8aac",
+   "powf_adj2": "180fd8bd4",
+   "f_180fd8d24": "180fd8d24",
+   "powf_adj": "180fdb804",
+   "f_180fdc714": "180fdc714",
+   "f_180fe027c": "180fe027c",
+   "f_180fe2470": "180fe2470",
+   "f_180fe24b8": "180fe24b8",
+   "f_180fe2788": "180fe2788",
+   "f_180fe27b0": "180fe27b0",
+   "f_180fe3284": "180fe3284",
+   "f_180fe3310": "180fe3310",
+   "f_180fe3488": "180fe3488",
+   "f_180fe34b0": "180fe34b0",
+   "f_180fe34e8": "180fe34e8",
+   "f_180fe3510": "180fe3510",
+   "f_180fe3690": "180fe3690",
+   "f_180fe3cd0": "180fe3cd0",
+   "f_180fe4020": "180fe4020",
+   "f_180fe4394": "180fe4394",
+   "f_180fe5c6c": "180fe5c6c",
+   "f_180fe5dfc": "180fe5dfc",
+   "f_180fe5ef0": "180fe5ef0",
+   "f_180fe5f00": "180fe5f00",
+   "f_180fe5f0a": "180fe5f0a",
+   "f_180fe5f40": "180fe5f40",
+   "f_181327120": "181327120",
+   "setuhf": "181327314",
+   "f_181327348": "181327348",
+   "unwind_probe": "18132753c",
+   "proc": "180fc3640"
+  },
+  "scenario": "khmath",
+  "rdata_window": 8192,
+  "abi": {
+   "180fc3640": {
+    "params": [
+     "float",
+     "float"
+    ],
+    "ret": "float"
+   },
+   "180f878e0": {
+    "params": [
+     "i64"
+    ],
+    "ret": "i64"
+   },
+   "180fd4f30": {
+    "params": [
+     "i64"
+    ],
+    "ret": "i64"
+   },
+   "180fd51cc": {
+    "params": [
+     "i64",
+     "i64"
+    ],
+    "ret": "i64"
+   },
+   "18004cf20": {
+    "params": [
+     "i64",
+     "i64",
+     "i64"
+    ],
+    "ret": "void"
+   },
+   "1800fb8c0": {
+    "params": [
+     "i64",
+     "i32"
+    ],
+    "ret": "i32"
+   },
+   "1800fb8f0": {
+    "params": [
+     "i64",
+     "float",
+     "float",
+     "i32"
+    ],
+    "ret": "void"
+   },
+   "180fd2c10": {
+    "params": [
+     "i64",
+     "i64",
+     "i64",
+     "i64"
+    ],
+    "ret": "i64"
+   },
+   "180fd2c90": {
+    "params": [
+     "i64",
+     "i64",
+     "i64",
+     "i64"
+    ],
+    "ret": "i64"
+   },
+   "180f87f24": {
+    "params": [
+     "i64"
+    ],
+    "ret": "void"
+   }
+  },
+  "shims": {
+   "181384040": "memmove",
+   "1813846e0": "memset"
+  }
  }
 }

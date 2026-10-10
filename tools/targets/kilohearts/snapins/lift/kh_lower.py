@@ -67,7 +67,34 @@ def vshift_pass(lines, uid, rep):
     return out
 
 
-def lower_body(lines, cfg, skip, uid, rep):
+def gs_pass(lines, uid, rep):
+    """[gs] セグメント相対アクセス (addrspace(256)) をエミュレート用グローバル @kh_gs への普通のアクセスに置換する。
+
+    RetDec は `mov r11, gs:[0x10]` (TIB StackLimit) 等を
+    `%X = load i64, i64 addrspace(256)* inttoptr (i64 N to i64 addrspace(256)*)` に出す。
+    wasm32 に addrspace(256) は載らないため、@kh_gs (ゼロ初期化 4KB) へのオフセット参照に置き換える。
+    値は 0 (PEB無し / StackLimit=0)。_chkstk (0x180f87cd0) の probe 経路は小さな frame では不発なので
+    実機 (深い stack, probe 不発) と分岐結果が一致する。gs:[0x60] (PEB) は CRT 初期化 check 経路のみ。
+    """
+    out = []
+    n = 0
+    for l in lines:
+        m = re.match(r'^(\s*)(%[\w.\-]+) = load (i\d+), \3 addrspace\(256\)\* inttoptr \(i64 (\d+) to \3 addrspace\(256\)\*\)\s*$', l)
+        if m:
+            ind, dst, ty, off = m.groups()
+            t = uid('g')
+            out += [f'{ind}%{t}.b = ptrtoint i8* @kh_gs to i32',
+                    f'{ind}%{t}.o = add i32 %{t}.b, {off}',
+                    f'{ind}%{t}.p = inttoptr i32 %{t}.o to {ty}*',
+                    f'{ind}{dst} = load {ty}, {ty}* %{t}.p']
+            rep['gs'] = rep.get('gs', 0) + 1
+            continue
+        out.append(l)
+    return out
+
+
+def lower_body(lines, cfg, skip, uid, rep, icalls=None):
+    icalls = icalls or {}
     out = []
     i = 0
     pend_sext = {}
@@ -80,6 +107,37 @@ def lower_body(lines, cfg, skip, uid, rep):
         if mc:
             cur_addr = mc.group(1)
         if 'store volatile i64' in l and '@_asm_program_counter' in l:
+            i += 1
+            continue
+        # ---- 間接 call (D15): stage-0 は `call qword [reg+N]` (vtable dispatch) を *空ブロック* にする
+        #      (vtable load と `mov rcx,` は残るが call が消える)。機械語側から (reg, disp) を復元し
+        #      kh_icall(slot) への間接呼出に置換する (slot = vtable base + disp。wasm 側はアリーナ内
+        #      vtable の実値を読んで既知 callee へ dispatch、未知は fail-fast)。
+        # ---- 間接 call (D15): stage-0 は `call qword [reg+N]` (vtable dispatch) を *空ブロック* にする
+        #      (vtable load と `mov rcx,` は残るが call が消える)。機械語側から (reg, disp) を復元し
+        #      kh_icall(slot) への間接呼出に置換する (slot = vtable base + disp。wasm 側はアリーナ内
+        #      vtable の実値を読んで既知 callee へ dispatch、未知は fail-fast)。
+        if cur_addr in icalls and 'icall' not in skip:
+            reg, disp = icalls.pop(cur_addr)
+            t = uid('i')
+            if reg == '__rip__':
+                if disp >= 0:
+                    # 解決済みの静的 target (lift 済保証: 検出側で vas 判定済み)
+                    out += [f'  %{t}.sp = load i64, i64* @rsp', f'  %{t}.sp8 = sub i64 %{t}.sp, 8',
+                            f'  store i64 %{t}.sp8, i64* @rsp', f'  %{t}.pp = inttoptr i64 %{t}.sp8 to i64*',
+                            f'  store i64 0, i64* %{t}.pp', f'  %{t}.c = call i64 @kh_%x()' % disp,
+                            f'  store i64 %{t}.c, i64* @rax', f'  store i64 %{t}.sp, i64* @rsp']
+                else:
+                    out += [f'  %{t}.c = call i64 @kh_icfail()', f'  store i64 %{t}.c, i64* @rax']
+                rep['icall'] = rep.get('icall', 0) + 1
+                i += 1
+                continue
+            out += [f'  %{t}.b = load i64, i64* @{reg}', f'  %{t}.a = add i64 %{t}.b, {disp}',
+                    f'  %{t}.sp = load i64, i64* @rsp', f'  %{t}.sp8 = sub i64 %{t}.sp, 8',
+                    f'  store i64 %{t}.sp8, i64* @rsp', f'  %{t}.pp = inttoptr i64 %{t}.sp8 to i64*',
+                    f'  store i64 0, i64* %{t}.pp', f'  %{t}.c = call i64 @kh_icall(i64 %{t}.a)',
+                    f'  store i64 %{t}.c, i64* @rax', f'  store i64 %{t}.sp, i64* @rsp']
+            rep['icall'] = rep.get('icall', 0) + 1
             i += 1
             continue
         # ---- 間接 jmp (switch jump table): stage-0 は `jmp rax` を `ret i64 undef` にしてしまう → switch へ復元
@@ -257,11 +315,63 @@ def main():
         return 'k%s%d' % (p, cnt[0])
     rep = {}
     jt = {k: {'table': int(v['table'], 16), 'n': v['n']} for k, v in json.loads(a.jt).items()}
+    sys.path.insert(0, __import__('os').path.join(__import__('os').path.dirname(__import__('os').path.abspath(__file__)), '..', 'scripts'))
+    from pe_dis import rd as _rd
     if jt:
-        sys.path.insert(0, __import__('os').path.join(__import__('os').path.dirname(__import__('os').path.abspath(__file__)), '..', 'scripts'))
-        from pe_dis import rd as _rd
         jt['_rd'] = _rd
-    texts = {v: '\n'.join(vshift_pass(lower_body(bodies[v], jt, skip, uid, rep), uid, rep) if 'vshift' not in skip else lower_body(bodies[v], jt, skip, uid, rep)) for v in vas}
+    # ---- D15 [icall]: stage-0 の空ブロック (call qword [reg+disp] の欠落) を機械語から検出
+    icalls = {}
+    n_icall = 0
+    if 'icall' not in skip:
+        import capstone
+        md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
+        for v in vas:
+            body = '\n'.join(bodies[v])
+            addrs = [int(x, 16) for x in re.findall(r'; 0x([0-9a-f]+)', body)]
+            if not addrs:
+                continue
+            end = max(addrs) + 16
+            for ins in md.disasm(_rd(v, end - v), v):
+                if ins.address >= end:
+                    break
+                if ins.mnemonic == 'call' and ins.op_str.startswith('qword ptr ['):
+                    o = ins.op_str[len('qword ptr ['):-1]
+                    m2 = re.match(r'^(r[a-z0-9]+) \+ (0x[0-9a-f]+|\d+)$', o)
+                    if m2:
+                        disp = int(m2.group(2), 0)
+                        # stage-0 ブロックが空 (pc store のみ) か確認
+                        blk = re.search(r'; 0x%x\n(.*?)(?=; 0x|\n\}|$)' % ins.address, body, re.S)
+                        seg = [x for x in (blk.group(1) if blk else '').split('\n') if x.strip() and 'store volatile' not in x]
+                        if not seg:
+                            icalls['%x' % ins.address] = (m2.group(1), disp)
+                    else:
+                        # rip 相対 form (`call qword [rip+X]`): slot 実値を辿り (jmp [rip] 1 hop まで)、
+                        # lift 済関数なら直接 call へ、非対応 (遅延バインド trampoline 等) は fail-fast へ
+                        m3 = re.match(r'^rip \+ (0x[0-9a-f]+|\d+)$|^rip \- (0x[0-9a-f]+|\d+)$', o)
+                        if m3:
+                            d = int(m3.group(1), 0) if m3.group(1) else -int(m3.group(2), 0)
+                            slot = ins.address + ins.size + d
+                            tgt = int.from_bytes(_rd(slot, 8), 'little')
+                            hops = 0
+                            while hops < 2 and IMG_LO <= tgt < IMG_HI:
+                                ins2 = next(md.disasm(_rd(tgt, 8), tgt), None)
+                                if ins2 is not None and ins2.mnemonic == 'jmp' and ins2.op_str.startswith('qword ptr [rip'):
+                                    m4 = re.search(r'rip \+ (0x[0-9a-f]+|\d+)', ins2.op_str)
+                                    if m4:
+                                        s2 = tgt + ins2.size + int(m4.group(1), 0)
+                                        tgt = int.from_bytes(_rd(s2, 8), 'little')
+                                        hops += 1
+                                        continue
+                                break
+                            blk = re.search(r'; 0x%x\n(.*?)(?=; 0x|\n\}|$)' % ins.address, body, re.S)
+                            seg = [x for x in (blk.group(1) if blk else '').split('\n') if x.strip() and 'store volatile' not in x]
+                            if not seg:
+                                ok = tgt in set(vas)
+                                icalls['%x' % ins.address] = ('__rip__', tgt if (ok and IMG_LO <= tgt < IMG_HI) else -slot)
+    n_icall = len(icalls)
+    texts = {v: '\n'.join(vshift_pass(gs_pass(lower_body(bodies[v], jt, skip, uid, rep, icalls), uid, rep), uid, rep)
+                          if 'vshift' not in skip else
+                          gs_pass(lower_body(bodies[v], jt, skip, uid, rep, icalls), uid, rep)) for v in vas}
     allt = '\n'.join(texts.values())
     # ---- rdata windows
     CAST = re.compile(r'inttoptr \(i64 (\d+) to ([\w*\[\] ]+)\)')
@@ -306,11 +416,22 @@ def main():
     final = ['source_filename = "kh_lower"', 'target datalayout = "e-m:e-p:64:64-i64:64-f80:128-n8:16:32:64-S128"', '']
     final += regs
     final.append('@kh_stack = external global i8')
+    if rep.get('gs'):
+        final.append('@kh_gs = global [4096 x i8] zeroinitializer, align 16')
     for v in sorted(vaset):
         final.append(f'@global_var_{v:x} = external global i8')
     final.append('declare void @llvm.trap()')
+    if n_icall:
+        final.append('declare i64 @kh_icall(i64)')
+        final.append('declare i64 @kh_icfail()')
     final.append('')
     hused = set(re.findall(r'@(__asm_[\w.]+)\(', allt)) | set(re.findall(r'@(llvm\.[\w.]+)\(', allt))
+    # named import (Win32/CRT, 引数なし宣言 = レジスタグローバル ABI): body 内で使う関数の declare を出す (function_/kh_ は除く)
+    body_names = set(re.findall(r'@([A-Za-z][\w]*)\(', allt)) - {x for x in re.findall(r'@function_([0-9a-f]+)\(', allt)} - set()
+    for n in sorted(body_names):
+        if re.match(r'(llvm|kh|global_var)', n) or n.startswith('function_'):
+            continue
+        hused.add(n)
     dec2 = {re.sub(r'(__asm_[A-Za-z0-9_]+)\.(\d+)', r'\1__\2', k): re.sub(r'(@__asm_[A-Za-z0-9_]+)\.(\d+)', r'\1__\2', v) for k, v in declares.items()}
     for h in sorted(hused):
         final.append(dec2.get(h, f'declare i64 @{h}()'))
@@ -363,6 +484,8 @@ def main():
             w += [f'  br i1 {acc}, label %abi_bad, label %abi_ok', 'abi_bad:', '  call void @llvm.trap()', '  unreachable', 'abi_ok:']
         if sg['ret'] == 'i64':
             w += ['  %ax = load i64, i64* @rax', '  ret i64 %ax']
+        elif sg['ret'] == 'i32':
+            w += ['  %ax = load i64, i64* @rax', '  %ax32 = trunc i64 %ax to i32', '  ret i32 %ax32']
         elif sg['ret'] == 'float':
             w += ['  %x0 = load i128, i128* @xmm0', '  %t = trunc i128 %x0 to i32', '  %f = bitcast i32 %t to float', '  ret float %f']
         elif sg['ret'] == 'double':
@@ -372,9 +495,45 @@ def main():
         w += ['}', '']
         final += w
     open(a.out, 'w').write('\n'.join(final) + '\n')
-    json.dump({'lowered': rep, 'rdata_windows': ['%x' % v for v in sorted(vaset)], 'unlifted_callees': ['%x' % c for c in sorted(called - set(vas))]},
+    json.dump({'lowered': rep, 'rdata_windows': ['%x' % v for v in sorted(vaset)], 'unlifted_callees': ['%x' % c for c in sorted(called - set(vas))],
+               'icall_sites': sorted(icalls)},
               open(a.out + '.json', 'w'), indent=1)
-    print('[kh_lower]', json.dumps(rep), 'rdata windows', len(vaset), 'unlifted callees', ['%x' % c for c in sorted(called - set(vas))])
+    # ---- kh_icall (D15 [icall]): アリーナ内 vtable の実値 → 既知 callee へ dispatch。
+    #      PE .rdata の vtable slot (slot addr → 中身が lift 対訳関数) も build 時に静的解決する。
+    icall_c = None
+    if n_icall:
+        import numpy as np
+        import pefile
+        pe = pefile.PE(a.core, fast_load=True)
+        data = open(a.core, 'rb').read()
+        base = pe.OPTIONAL_HEADER.ImageBase
+        rsect = [s for s in pe.sections if s.Name.rstrip(b'\0') == b'.rdata'][0]
+        rva0, rsz = rsect.VirtualAddress, rsect.Misc_VirtualSize
+        nbytes = min(rsz, rsect.SizeOfRawData) - (min(rsz, rsect.SizeOfRawData) % 8)
+        arr = np.frombuffer(data[rsect.PointerToRawData:rsect.PointerToRawData + nbytes], dtype='<u8')
+        vs = np.array(sorted(vas), dtype='<u8')
+        idx = np.searchsorted(vs, arr)
+        idx[idx >= len(vs)] = 0
+        hit = (arr == vs[idx])
+        slots = {}
+        for k in np.nonzero(hit)[0]:
+            slots[base + rva0 + int(k) * 8] = int(vs[idx[k]])
+        icall_c = ['#include <emscripten.h>', '#include <stdint.h>', '#include <stdlib.h>', 'typedef uint64_t u64;']
+        icall_c += ['u64 kh_%x(void);' % v for v in sorted(vas)]
+        icall_c.append('EMSCRIPTEN_KEEPALIVE unsigned long long kh_icall(unsigned long long slot) {')
+        icall_c.append('  if (slot < 0x10000000ULL) { unsigned long long t = *(unsigned long long*)(unsigned int)slot; switch (t) {')
+        for v in sorted(vas):
+            icall_c.append('    case 0x%xULL: return kh_%x();' % (v, v))
+        icall_c.append('    default: __builtin_trap(); return 0; } }')
+        icall_c.append('  switch (slot) {')
+        for s, t in sorted(slots.items()):
+            icall_c.append('    case 0x%xULL: return kh_%x();   /* .rdata vtable slot */' % (s, t))
+        icall_c.append('    default: __builtin_trap(); return 0; }')
+        icall_c.append('}')
+        icall_c.append('EMSCRIPTEN_KEEPALIVE unsigned long long kh_icfail(void) { abort(); return 0; }')
+        open(a.out + '.icall.c', 'w').write('\n'.join(icall_c) + '\n')
+    print('[kh_lower]', json.dumps(rep), 'rdata windows', len(vaset), 'unlifted callees', ['%x' % c for c in sorted(called - set(vas))],
+          'icall sites', n_icall, ('icall slot map %d' % len(slots)) if icall_c else '')
 
 
 if __name__ == '__main__':

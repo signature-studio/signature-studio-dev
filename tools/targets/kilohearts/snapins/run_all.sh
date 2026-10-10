@@ -28,6 +28,8 @@ node harness/compare.mjs work/quickeq/qemath.bin work/quickeq/s0/mod.cjs work/qu
 echo "== [4b] libm 部品の単体差分 (KH-2b D14: sincos_a / k_dfdb0 大引数 Payne-Hanek, |x| ∈ [5e5, 1e9], 4800 call)"
 ./work/native_ref "$CORE" qebig 200 3 work/quickeq/qebig.bin
 node harness/compare.mjs work/quickeq/qebig.bin work/quickeq/s0/mod.cjs work/quickeq/s0/sigs.json | tail -1
+echo "== [4c] KH-4 共通基盤 lift (khbase: powf FMA3 / allocator / vector push / shared_ptr icall (D15) / probe)"
+python3 lift/build.py khbase --path s0 --tag s0 --trials "$TRIALS" --seed "$SEED" | python3 -c "import sys,json; l=sys.stdin.readline(); d=json.loads(l); print(' ', d['passes'][:160]); print(' ', d.get('compare'), '| wasm', d['wasm_bytes'], 'B | undefined import', len(d['undefined_imports']))"
 echo "== [5] 一覧表"
 python3 scripts/make_table.py s0
 if [ "${ABLATE:-0}" = 1 ]; then echo "== [6] ablation"; python3 scripts/ablate.py; fi

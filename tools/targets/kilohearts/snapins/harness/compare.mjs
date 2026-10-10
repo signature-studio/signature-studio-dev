@@ -119,7 +119,7 @@ for (let t = 0; t < ntrials; t++) {
     if (rk === 1) { const got = typeof r === 'bigint' ? Number(r & 0xffffffffn) : (typeof r === 'number' && !Number.isInteger(r) ? f32bits(r) : (r >>> 0)); const want = Number(rax & 0xffffffffn); retOk = got === want; retInfo = `ret i32 want ${want} got ${got}`; }
     else if (rk === 2) { const got = typeof r === 'number' ? f32bits(r) : null; const want = Number(xmm0 & 0xffffffffn); retOk = got === want; retInfo = `ret f32 want ${hex(want)} got ${got === null ? typeof r : hex(got)}`; }
     else if (rk === 4) { const got = typeof r === 'number' ? (f64[0] = r, u64a[0]) : null; retOk = got === xmm0; retInfo = `ret f64 want ${xmm0.toString(16)} got ${got === null ? typeof r : got.toString(16)}`; }
-    else if (rk === 3) { const got = BigInt.asUintN(64, BigInt(r)); retOk = got === rax; retInfo = `ret i64 want ${rax} got ${got}`; }
+    else if (rk === 3) { if (typeof r === 'undefined' || r === null) { retOk = false; retInfo = `ret i64 want ${rax} got (undefined)`; } else { const got = BigInt.asUintN(64, BigInt(r)); retOk = got === rax; retInfo = `ret i64 want ${rax} got ${got}`; } }
     // アリーナ全バイト → 4B word 単位の差分収集 (判定は trial 末尾: region 辞書は calls の後に記録される)
     const mem = H8().subarray(ARENA, ARENA + plen);
     const diffWords = [];

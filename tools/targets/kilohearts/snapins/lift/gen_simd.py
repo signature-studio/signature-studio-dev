@@ -77,7 +77,9 @@ def gen(name, ret, params):
                                          'addpd', 'subpd', 'mulpd', 'divpd', 'addps', 'subps', 'mulps', 'divps', 'andpd', 'andps', 'andnpd', 'andnps', 'orpd', 'orps',
                                          'xorpd', 'xorps', 'movapd', 'movaps', 'movdqa', 'movdqu', 'movupd', 'movups', 'movq', 'movd', 'movsd', 'movss', 'unpcklpd',
                                          'unpckhpd', 'unpcklps', 'unpckhps', 'shufpd', 'shufps', 'cvttpd2dq', 'psrldq', 'pslldq', 'psrlq', 'psllq', 'haddpd', 'haddps', 'movddup',
-                                         'pand', 'pandn', 'por', 'pxor', 'paddd', 'psubd', 'psrld', 'pslld', 'cvtdq2ps'):
+                                         'pand', 'pandn', 'por', 'pxor', 'paddd', 'psubd', 'psrld', 'pslld', 'cvtdq2ps', 'cvtdq2pd', 'cvtpd2dq', 'cvttpd2dq', 'cvtps2pd',
+                                         'cvtpd2ps', 'cvtsd2ss', 'cvtss2sd', 'cvtsi2sd', 'cvtsi2ss', 'cvtss2si', 'cvtsd2si', 'cvttsd2si', 'cvttss2si', 'paddq', 'psubq', 'psrad',
+                                         'punpckldq', 'punpckhdq', 'punpcklqdq', 'punpckhqdq', 'pshufd', 'ldmxcsr', 'stmxcsr'):
         b = b[1:]
     ptys = [p.split()[0] for p in params]
     R = ret
@@ -197,12 +199,13 @@ def gen(name, ret, params):
         else:
             body = '%s L128 r; r.g[0] = %s.g[0] + %s.g[1]; r.g[1] = %s.g[0] + %s.g[1]; return r.q;' % (pre, A(0), A(0), A(1), A(1))
     # ----- conversions
-    if b in ('cvtsi2ss', 'cvtsi2sd') and n == 1 and R == 'i128':
-        sg = 'int' if ptys[0] == 'i32' else 'long long'
+    if b in ('cvtsi2ss', 'cvtsi2sd') and n in (1, 2) and R == 'i128':
+        sg = 'int' if (ptys[n - 1] == 'i32') else 'long long'
+        keep = 'r.q = a0; ' if n == 2 else 'r.q = 0; '
         if b == 'cvtsi2ss':
-            body = 'L128 r; r.q = 0; r.f[0] = (float)(%s)a0; return r.q;' % sg
+            body = 'L128 r; %sr.f[0] = (float)(%s)a%d; return r.q;' % (keep, sg, n - 1)
         else:
-            body = 'L128 r; r.q = 0; r.g[0] = (double)(%s)a0; return r.q;' % sg
+            body = 'L128 r; %sr.g[0] = (double)(%s)a%d; return r.q;' % (keep, sg, n - 1)
     if b == 'cvtss2sd' and n in (1, 2) and R == 'i128':
         si = n - 1
         s = S('ss', si)
@@ -236,6 +239,14 @@ def gen(name, ret, params):
         op = '+' if b == 'paddd' else '-'
         body = ('%s L128 r; for (int i = 0; i < 4; i++) r.w[i] = (u32)(%s.w[i] %s %s.w[i]); return r.q;'
                 % (pre, A(0), op, A(1)))
+    if b in ('paddq', 'psubq') and ptys == ['i128', 'i128'] and R == 'i128':
+        op = '+' if b == 'paddq' else '-'
+        body = ('%s L128 r; for (int i = 0; i < 2; i++) r.d[i] = (u64)((long long)%s.d[i] %s (long long)%s.d[i]); return r.q;'
+                % (pre, A(0), op, A(1)))
+    if b == 'psrad' and R == 'i128' and (ptys == ['i128', 'i8'] or ptys == ['i128', 'i128']):
+        cnt = ('(u64)a1' if ptys[1] == 'i8' else '(u64)x_a1.d[0]') + ' & 63'
+        body = ('%s L128 r; { unsigned long long c = %s; for (int i = 0; i < 4; i++) r.w[i] = (u32)((int)(%s.w[i]) >> (c > 31 ? 31 : c)); } return r.q;'
+                % (pre, cnt, A(0)))
     if b in ('psrld', 'pslld') and R == 'i128' and (ptys == ['i128', 'i128'] or ptys == ['i128', 'i8']):
         op = '>>' if b == 'psrld' else '<<'
         # imm8 形: count > 31 → 0 (Intel SDM)。レジスタ形: count = 下位 qword mod 64、その後 > 31 → 0
@@ -296,6 +307,11 @@ def gen(name, ret, params):
     # ----- ucomis*/comis*: フラグは kh_passes[flags] が fcmp 化済み → 呼出は no-op
     if re.match(r'^v?u?comis[sd]$', b) and R == 'void':
         body = '(void)a0; (void)a1;'
+    # ----- MXCSR: wasm は固定環境 (round-nearest, no exceptions)。既存 9 snap-in も MXCSR を使わない。
+    if b in ('ldmxcsr', 'stmxcsr') and R == 'void' and n == 1:
+        body = '(void)a0;' if b == 'ldmxcsr' else '*(u32*)(unsigned int)a0 = 0x1f80;'
+    if b in ('ldmxcsr', 'stmxcsr') and R == 'i32' and n == 1:
+        body = 'return 0x1f80;'
     if body is None:
         return None
     return body

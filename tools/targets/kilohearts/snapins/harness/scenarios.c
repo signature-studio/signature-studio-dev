@@ -10,6 +10,7 @@
 #include "scen_stereo.h"
 #include "scen_disperser.h"
 #include "scen_formant.h"
+#include "scen_khmath.h"
 Scenario SCEN_LIST[] = {
     {"matrix", trial_matrix, 6},
     {"gain", trial_gain, 6},
@@ -25,5 +26,10 @@ Scenario SCEN_LIST[] = {
     {"stereo", trial_stereo, 6},
     {"disperser", trial_disperser, 6},
     {"formant", trial_formant, 6},
+    {"khmath", trial_khmath, 60},
+    {"khalloc", trial_khalloc, 24},
+    {"khvec", trial_khvec, 16},
+    {"khicall", trial_khicall, 16},
+    {"khprobe", trial_khprobe, 12},
     {0, 0, 0},
 };
