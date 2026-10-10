@@ -1,20 +1,31 @@
 # liftdiff — flelift (x64c) 全数採点 (CAB-232) + native 全起動の参照化 (CAB-233)
 
+preflight: RULES_SHA=ae9c6d414f7d
+検証起点 commit: 01d5cb5 (CAB-233)。A/B は fba272c (CAB-232) 側。検収は b8e762d (HEAD) から実施。
+既知類型との関係 (DEFECTS.md, 規則 44): 該当 **D15** (メモリ間接 call 脱落) — 残 3 unit の VMT 仮想 call
+`call qword ptr [rdi+0x18]` (0x513da9) 診断で参照。jump table **D9 (DEFECTS.md)** は未使用。
+icall REPORT §4 体系 (D1=間接 call / D9=disp_size) とは別物。
+
 **判定: CAB-232 達成 / CAB-233 達成 (残 3 unit は下流)**。CAB-232 では FLEngine closure **7,421 関数の全数採点**
 (9 pattern × native/wasm) で **一致 4,143 / 不一致 633 / 実行不能 2,645** を実測し、m11 RetDec route との突合で
 **m11 mismatch → flelift match が 2,226 関数** (leaf 差分 1,281 → 19) を確定した。CAB-223 残差 0x6a7990 は
 harness の scratch zero 化バグと特定し 1 行修正で 16/16 一致 (§4)。
-CAB-233 では **native entry_point 起動を 171 unit → 928/942 unit 完走**まで拡張 (stub 拡充 + hybrid boot)、
+CAB-233 では **native entry_point 起動を 171 unit → 928/942 unit 到達**まで拡張 (stub 拡充 + hybrid boot)、
 m11 の boot 状態を 17 → 22 unit に拡大し、flelift route を再採点して**実行不能 2,645 → 2,498**・
 **wasm_trap 2,053 → 941 case** を数値計上。f_410360 (TObject.Free 系) OOB カスケードを個別化し、
 **246 case は f_410360 自身の欠陥**と確定した (§3)。
+
+> **用語の定義 (規則 36・検収による訂正)**: `units_run` は **到達 unit 数** =
+> `System.InitCount` (試行した unit 数) + unit フェーズの ok 数。**完走 unit 数** (init 関数が正常終了したもの)
+> は別値で、検収の独立再計算により **890/942** と確定 (§2.1)。
+> したがって「928/942 unit **完走**」は誤りで、「928/942 unit **到達**」が正しい。
 
 ## 1. 結論 (実測)
 
 | 項目 | 実測 |
 |---|---|
-| native 全起動 (flelift target, hybrid boot) | **928/942 unit 完走** (entry 単独 246 / units 従来 22)。残 3 = unit 830/895/898、11 unit は空 (proc==0) |
-| m11 boot 状態 (TLS 修正効果) | 17 → **22 unit** (unit #17 = 0x455790 が native/wasm とも完走。TLS 配列を heap 内に移し状態移送で写す) |
+| native 全起動 (flelift target, hybrid boot) | **928/942 unit 到達** (entry 単独 246 / units 従来 22)。**真の完走は 890/942** (§2.1)。残 3 = unit 830/895/898、空 = 47 unit (proc==0 1 + \*proc==0 46)、未実行 1 (unit #246)、entry 内未完走 1 (#245) |
+| m11 boot 状態 (TLS 修正効果) | 17 → **22 unit** (units モードは「最初の失敗で停止」なので到達=完走。Ablation により 17→22 は TLS 変更ではなく stub 拡充側の効果と確定、§5.2) |
 | flelift 全数再採点 (928 unit 状態) | **一致 4,182 (+39) / 不一致 741 (+108) / 実行不能 2,498 (−147)**。比較可能 4,776 → 4,923 (64.4% → 66.3%) |
 | native 全滅 (fault + null deref) | 1,849 → **1,738** (null deref 691 → 494 / fault 1,158 → 1,244)。hang 357 → 321 |
 | wasm_trap (OOB) | case **2,053 → 941 (−54%)**、関数 361 → 211 |
@@ -28,9 +39,9 @@ m11 の boot 状態を 17 → 22 unit に拡大し、flelift route を再採点�
 
 | mode | 動作 | flelift 实测 |
 |---|---|---|
-| `units` (従来) | unit 0 から 1 本ずつ実行し最初の失敗で停止 | 22 unit (TLS 修正後。修正前は 17 で unit #17 が TLS で segv) |
-| `entry` | `entry_point(hinst,1,0)` を 1 case で直接実行 (実 InitUnits ループ) | **246 unit** 完走後 rip 0x26833d で停止 (起案時 171 から stub 拡充で +75) |
-| `hybrid` | entry → 到達 unit (`System.InitCount` = image 0x11eac98) の次から unit 単位で継続。実 InitUnits と同じ「proc && *proc」判定 (PEEK)・失敗 unit は記録して続行 | **928/942** |
+| `units` (従来) | unit 0 から 1 本ずつ実行し最初の失敗で停止 | 22 unit (CAB-233 前は 17 で unit #17 が segv。Ablation で原因は stub 拡充側と確定、§5) |
+| `entry` | `entry_point(hinst,1,0)` を 1 case で直接実行 (実 InitUnits ループ) | **246 unit 試行後** rip 0x26833d で停止 (起案時 171 から stub 拡充で +75。InitCount=246 は試行数) |
+| `hybrid` | entry → 到達 unit (`System.InitCount` = image 0x11eac98) の次から unit 単位で継続。実 InitUnits と同じ「proc && *proc」判定 (PEEK)・失敗 unit は記録して続行 | **928/942 到達** (完走 890、§2.1) |
 
 起動を 246 → 928 に伸ばした stub 拡充 (`rt/ld_core.h`、native/wasm が同一応答モデルを共有 = 比較の公平性不変):
 
@@ -44,22 +55,53 @@ m11 の boot 状態を 17 → 22 unit に拡大し、flelift route を再採点�
 | 画面/DB/同期系 | GetDeviceCaps / GetVersionEx (Win7 SP1) / GetSystemInfo / Reg* (empty) / CreateEvent・DC・LoadImage は連番仮 handle / VerSetConditionMask / MultiByteToWideChar・WideCharToMultiByte (第5/6引数 = スタック経由で取得、`ld_ms_call.S` で参照) |
 | 出力ポインタ | `ld_dst_ok()` で image/arena/heap/guest stack 外への書込みを拒否 (guest ゴミポインタから native ランナを守る) |
 
-entry が 0x26833d で止まるのは `System.@Langs` 系が要求する DLL 読み込みの枝。unit 単位フェーズで 942 unit のうち
-**11 は proc==0 (空) をスキップ**、928 が完走。
+entry が 0x26833d で止まるのは `System.@Langs` 系が要求する DLL 読み込みの枝 (末尾 import 呼出は
+`FindFirstFileW`/`GetFileAttributesW`/`WideCharToMultiByte`。fp = 0x26830f の `mov rbx,[rax]`、rax=[rbx+8]=0)。
+unit 単位フェーズで 942 unit のうち **1 は proc==0 (unit #941, 静的)**、**46 は \*proc==0** (実行時に PEEK で判定。
+いずれも `0x13a9390` という同一の「空 init」を指す) をスキップする。到達 928・完走 890 の内訳は §2.1。
+
+### 2.1 到達数と完走数の違い (検収で確定・`tests/recheck_boot_units.py`)
+
+`System.@InitUnits` (image 0x4120c0) のループを逆アセンブルすると、**InitCount は unit 初期化関数を呼ぶ「前」に
+インクリメント**される (0x12108 `add dword[rbp+0x48],1` → 0x1210f `mov [rip+0x11d8b83],eax` → 0x12126 `call [rbp+0x38]`)。
+つまり InitCount=246 は「unit #0〜#245 を**試行**し、#245 の途中で落ちた」ことを意味する (完走 245 ではない)。
+boot.py は `start = k + 1` とするため unit #246 は一度も実行されない (off-by-one)。
+
+| 区分 | unit 数 | 根拠 |
+|---|---|---|
+| entry フェーズで完走 | **208** | 0..244 のうち `*proc != 0` のもの (246 試行 − 37 skip − #245 未完走) |
+| entry フェーズで skip (\*proc==0) | 37 | PEEK で先頭 8B が 0 → InitUnits も呼ばない |
+| entry フェーズで未完走 | 1 | unit #245 (InitCount は 246 にインクリメント後にクラッシュ) |
+| unit フェーズで完走 | **682** | 各 unit を `CASE keep=1` で実行し status==ok |
+| unit フェーズでクラッシュ | 3 | unit 830/895/898 (rip_rva=0x4e0fab) |
+| unit フェーズで skip | 10 | proc==0 1 (#941) + \*proc==0 9 |
+| **未実行 (off-by-one)** | **1** | unit #246 (`start = k+1`) |
+| 合計 | **942** | 208+37+1+682+3+10+1 = 942 ✓ |
+
+- 実装の `units_run` (到達) = InitCount 246 + phase_ok 682 = **928**
+- **真の完走** = 208 + 682 = **890**
+- 差分 38 = entry の skip 37 + #245 未完走 1 (「到達」に含まれるが完走ではない)
 
 ### 残 3 unit (830/895/898) — 原因確定、下流タスク化
 
 3 unit とも `\System\Languages\LC_MESSAGES\default.moe` (GNU gettext .mo カタログ) を読む言語カタログ初期化で
-rip 0x4e0fab (`mov ebx,[rdx]`、rdx=カタログバッファ) に落ちる。検証した 3 通りの stub 応答:
+rip 0x4e0fab (`mov ebx,[rdx]`、rdx=0 なので NULL deref) に落ちる。検証した 3 通りの stub 応答:
 
-1. CreateFileW = 0 (従来): バッファが NULL → 必修の magic check (`0x4e1a3c`、GNU .mo magic 0x950412de/0xde120495) に到達できず segv。
+1. CreateFileW = 0 (従来): バッファが NULL → 必修の magic check (`0x4e1a3c` で `cmp dword[rbp+0xac],0x950412de` /
+   `cmp dword[rbp+0xac],0xde120495`) に到達できず segv。0x4e0fab の属する関数は 0x4e0fa0 始まりで
+   `mov r8d,r8d; add rdx,r8; mov ebx,[rdx]` — rdx=0 = 素直な NULL deref (fp 健全)。
 2. INVALID_HANDLE_VALUE (-1): entry が別地点 (0x2690dc) に落ち **906/942 に後退**。
 3. **実カタログ供給** (win64 `extracted/block25158_DATA.bin` = 先頭 magic 0x950412de・47,405B・498 エントリの正規 .mo を
    CreateFileW→仮 handle + ReadFile で読ませる実験): magic check は通過するが、catalog iteration loop
-   (0x513da9 の VMT 仮想 call `Get(i)`) から **rbp ごと破壊されて戻る** (rbp=0x7fff00000000, rax=.mo サイズ, rdx=.mo の host バッファ)
-   → さらに深い stub ギャップ (または例外経路の縮退) が残る。0 応答の 928/942 が最良として** revert し記録のみ残した**
+   (0x513da9 の VMT 仮想 call `call qword ptr [rdi+0x18]`) から **rbp ごと破壊されて戻る** (rbp=0x7fff00000000, rax=.mo サイズ, rdx=.mo の host バッファ)
+   → さらに深い stub ギャップ (または例外経路の縮退) が残る。0 応答の 928/942 (到達) が最良として** revert し記録のみ残した**
    (`rt/ld_core.h` のファイル系コメント、`tests/boot_probe.py` の fault detail にレジスタが出るので再検証可)。
    なお stub 0 応答 (採用形) での crash は rbp 健全・rdx=0 の素直な NULL deref (`mov ebx,[rdx]`) である。
+
+> **検証範囲 (規則 40)**: 上記 3. の「rbp=0x7fff00000000 のフレーム破壊」は **revert された experiment の記録**で、
+> committed HEAD からは再現できない (ld_core.h のコメントとしてのみ残る)。検収では 0x513da9 が
+> `call qword ptr [rdi+0x18]` (VMT スロット+0x18 の間接 call) であること、0x4e1a3c の magic check、
+> block25158_DATA.bin が 498 エントリの正規 .mo であることを**独立に確認**した。
 
 ## 3. flelift route 再採点と f_410360 カスケードの個別化
 
@@ -89,9 +131,16 @@ import 呼出列での乖離判定で個別化 (batch は trace を保持しな�
 | trap_upstream (f_410360 経由) | 327 | f_410360 に到達する前に上流乖離 (call_arg 265 / native_extra_call 181 が主因、最多は FreeLibrary の module handle 差) → f_410360 は被害者 |
 | trap_direct_other | 167 | f_410360 非経由の別 OOB (f_412770 115 / f_415c30 108 / f_407e20 45 / f_511fe0 26) |
 | trap_upstream_other | 201 | 上流乖離 + 別 OOB |
+| (参考) self_native_fail | 0 | native も同じ case で落ちたもの。941 case 全て native ok |
 
 **結論: OOB カスケードは「単一 helper のカスケード」ではなく (a) 246 case = f_410360 自身の修正で消える、
 (b) 327 case = 上流の stub 応答差 (仮 module handle の取扱い) の修正で消える、の 2 層に分離できる。**
+
+> **限定 (検証範囲・規則 40)**: `trap_direct` 246 case のうち **237 case は native/wasm とも import 呼出列が 0 件**
+> (いずれも import を 1 度も呼ばずに trap)。すなわち「上流で乖離していない」ことを確認できるだけの
+> 呼出列ログが**ない**状態での分類であり、「import 呼出列まで一致した」という表現は実質
+> 「import 呼出列が両側空 = 比較情報なし」を意味する (検収の実測)。分類自体 (246/327/368) は
+> 独立再計算で一致する (§6)。
 
 ## 4. 0x6a7990 の 2/16 byte 差 (CAB-232、結論のみ)
 
@@ -102,19 +151,44 @@ start > end で no-op で、wasm 側だけ scratch に前 case の byte が残�
 ## 5. 回帰 — fresh HEAD との A/B (本チケットで実測)
 
 HEAD (= f555629) の tools/liftdiff を作業ツリー外に展開し (REPO を実リポジトリに差し替え、入力 IR は共有)、
-**同じ IR・同じ手順**で A/B した (CAB-232 の手法を再現・検証):
+**同じ IR・同じ手順**で A/B した (CAB-232 の手法を再現・検証)。
+検収では **b8e762d (HEAD) から `liftdiff_e2e.sh` をまるごと再実行**して同じ値を再現した
+(実測 1 分 2.4 s / load average 開始 3.08・終了 2.47, 12 shard):
 
-| 指標 | HEAD (fresh A/B) | CAB-233 | 判定 |
-|---|---|---|---|
-| OTT  closure (212 関数) | match 39 / mismatch 106 / unexec 67、D1〜D6 全検出 | **38 / 108 / 66、D1〜D6 全検出** (D3 callsite_arg_drop 12→14) | 検出維持・感度向上。check_ott PASS |
-| unit#18 check 1 (_UStrAsg mem diff) | PASS | PASS | 維持 |
+| 指標 | HEAD (fresh A/B) | CAB-233 | 検収再実行 (HEAD) | 判定 |
+|---|---|---|---|---|
+| OTT  closure (212 関数) | match 39 / mismatch 106 / unexec 67、D1〜D6 全検出 | **38 / 108 / 66、D1〜D6 全検出** (D3 callsite_arg_drop 12→14) | 38 / 108 / 66、D1〜D6 全検出 | 検出維持・感度向上。check_ott PASS |
+| unit#18 check 1 (_UStrAsg mem diff) | PASS | PASS | PASS | 維持 |
 | unit#18 check 2 (Move spill_slot_deref) | PASS | PASS | 維持 |
 | unit#18 check 3 (4123c0 resourcestring, wasm trace ≤6) | **FAIL (native 53 / wasm 25)** | FAIL (native 67 / wasm 46) | **HEAD でも同一 FAIL** = CAB-131 の boot_final3.ll 再生成 (10-10 20:48) 由来で本チケット無関係。wasm trace は 25→46 と native (53→67) に近づく方向 |
 | unit#18 case 追加所見 | 446370 = wasm_trap / 455790 = unexec | **446370 = diff (trap 解消) / 455790 = match** | 改善 |
-| m11 closure sample:800 | 355 / 198 / 247 | **353 / 217 / 230** | match −2・unexec −17 (実行可能域拡大)・mismatch +19 は全て深部乖離型 (callee_divergence 10・wasm_trap 5・import_call_seq 5・icall_drop 4・memory_semantics 2。leaf 自己欠陥 45→49)。状態・応答が充実し native/wasm がより深い経路まで到達して wasm lift 欠陥が可視化されたもので、検出器の劣化ではない |
+| m11 closure sample:800 | 355 / 198 / 247 | **353 / 217 / 230** | **353 / 217 / 230** (93 s) | match −2・unexec −17 (実行可能域拡大)・mismatch +19 は全て深部乖離型 (callee_divergence 10・wasm_trap 5・import_call_seq 5・icall_drop 4・memory_semantics 2。leaf 自己欠陥 45→49)。状態・応答が充実し native/wasm がより深い経路まで到達して wasm lift 欠陥が可視化されたもので、検出器の劣化ではない |
 
 判定基準 (m11 sample:800 356/205/239 非劣化) に対し、一致は 355→353 (−0.6%)・実行不能は 247→230 (−6.8%)。
 不一致の増加は上記の可視化効果で、**OTT 欠陥検出・unit#18 の既有 2 チェックは完全維持**。
+
+### 5.1 check 3 (4123c0) の FAIL は既存 (CAB-131 由来)
+
+`check 3` は **CAB-233 以前から FAIL**。検収で A/B 取りした fba272c (CAB-232) 側でも同一条件で FAIL し、
+HEAD (b8e762d) でも FAIL することを確認した (native entry 67 / wasm 46)。原因は
+tools/m11/work/boot_final3.ll が CAB-131 の再生成 (10-10 20:48) で resourcestring 初期化ループの
+wasm トレースが 25 → 46 に増えたこと。**本チケット (liftdiff) とは無関係**で、fix 対象外。
+`liftdiff_e2e.sh` は check 3 で exit 1 になるため、検収时は [4/4] を別途手動実行した (§6 参照)。
+
+### 5.2 Ablation (規則 41)
+
+主要な効果に対して、その修正だけを外した対照を 3 つ実施した (いずれも `work/abl/` にビルド、
+結果は本節の実測):
+
+| ablation | 操作 | 結果 |
+|---|---|---|
+| 旧 rt (fba272c) 全体 | CAB-233 の rt 変更を全部戻した ld_native で m11 bootstate | **units_run=17、unit #17 が segv** (rip_rva=0x1d15a) = CAB-233 前の挙動を再現 |
+| **GetProcAddress 仮 proc 応答の除去** | `GetProcAddress` を `return 0` に差し替え (TLS/その他は温存) | flelift entry が **InitCount=246 → 17** (rip_rva=0xffffffffffc00000、rcx=-1 で proc 0 を call) → **仮 proc 応答が起動延伸の主因** |
+| **TLS 配列の heap 移送だけ revert** | `TlsGetValue/TlsSetValue` を旧 `ld_tls_vals[]` 実装に戻す | m11 units_run は **22 のまま** (不変) → 17→22 は TLS 変更由来**ではない** |
+
+→ CAB-233 の stub 拡充が native boot 延伸に効いているのは **GetProcAddress の仮 proc** (実測 +229 unit)。
+TLS 配列の heap 化は native 起動には影響せず、**状態移送 (SHEAP) で wasm 側にも TLS 値が写る**効果
+(m11 unit #17 が wasm 側でも完走) として働く。**
 
 ## 6. 成果物と再現
 
@@ -128,23 +202,57 @@ HEAD (= f555629) の tools/liftdiff を作業ツリー外に展開し (REPO を�
 | `tests/compare_bootstate.py` | 新旧 boot 状態の全数 verdict 比較 → `results/flelift_vs_bootstate.md` |
 | `tests/cascade_410360.py` | wasm_trap case の個別化 (import 呼出列ベース) → `results/cascade_410360.md` |
 | `tests/boot_probe.py` | 残 3 unit の fault 詳細・要求ファイルパスのダンプ (`\System\Languages\\LC_MESSAGES\default.moe`) |
+| `tests/recheck_boot_units.py` | **(検収・追加)** 到達数/完走数の独立再計算 (ldlib 非依存のネイティブ駆動 + 機械語解析) |
 | `docs/FORMAT.md` §7 | boot mode・仮 module/proc・TLS 配置の仕様 |
 
 ```sh
-python3 liftdiff.py bootstate targets/flelift.json --mode hybrid --nobuild   # 928/942 unit
+python3 liftdiff.py bootstate targets/flelift.json --mode hybrid --nobuild   # 928/942 unit 到達
+python3 tests/recheck_boot_units.py                                          # 到達 928 vs 完走 890 の独立再計算
 python3 tests/boot_probe.py --mode hybrid                                    # 残 3 unit の原因 (file path・fault)
 python3 liftdiff.py batch targets/flelift.json --set closure --shards 14 \
-  --state auto --out work/flelift/batch_closure_hybrid.jsonl                # 全数 約 30 分
+  --state auto --out work/flelift/batch_closure_hybrid.jsonl                # 全数 (検収実測 585 s)
 python3 tests/compare_bootstate.py work/flelift/batch_closure_hybrid.jsonl \
   results/flelift_closure_verdicts.tsv --md results/flelift_vs_bootstate.md
 python3 tests/cascade_410360.py work/flelift/batch_closure_hybrid.jsonl \
   --md results/cascade_410360.md
-bash tools/liftdiff/liftdiff_e2e.sh                                          # OTT/unit#18/m11 sample:800 (check3 は CAB-131 IR 由来で FAIL)
+bash tools/liftdiff/liftdiff_e2e.sh   # OTT/unit#18 (check3 は CAB-131 IR 由来で FAIL → exit 1)
+# check3 FAIL で e2e が止まるため [4/4] は手動で:
+python3 liftdiff.py batch targets/m11.json --set sample:800 --shards 12 --nobuild --state auto \
+  --out work/m11/batch_sample_800.jsonl
 ```
+
+## 6.1 検収 (CAB-233) で実施した独立検証
+
+| 検証 | 手法 | 結果 |
+|---|---|---|
+| unit 到達/完走の再計算 | `tests/recheck_boot_units.py` (自前 PE パーサ + ldlib 非依存のランナ駆動 + 0x4120c0 の逆アセンブル) | 到達 **928** = InitCount 246 + phase 682 (一致)。完走は **890** (§2.1) |
+| f_410360 カスケードの再計算 | stored batch jsonl を別アルゴリズムで再分類 | trap_direct **246** / trap_upstream **327** / 非経路 **368** / case **941** / 関数 **211** — すべて実装値と一致 |
+| flelift 全数再採点 | `batch --set closure --shards 14` を HEAD から再実行 (585 s) | 一致 4,092 / 不一致 767 / 実行不能 **2,562** (§6.2 の注意) |
+| m11 sample:800 A/B | e2e の [4/4] を HEAD から再実行 (93 s) | **353 / 217 / 230** — REPORT の CAB-233 値と完全一致 |
+| 残 3 unit の原因 | `tests/boot_probe.py` + 0x4e0fab/0x4e1a3c/0x513da9 の逆アセンブル + block25158 の .mo 検証 | `default.moe`・magic check・VMT 間接 call すべて確認。フレーム破壊は revert 済み experiment で HEAD では未再現 |
+| ⑤ limit 外の変数の再入力 | `ld_tls_next` の unbounded 性をコード/実測で確認 | entry の TlsAlloc は **1 回** (index 0)・TlsGetValue 72 回。1025 回目の TlsAlloc で slot 0 に折り返す設計だが boot 中は未発火 |
+
+### 6.2 全数採点の再現性について (負荷依存・規則 38)
+
+検収で `batch --set closure --shards 14` を同じ boot_state.json を使って再実行したところ、
+verdict 合計が **一致 4,092 / 不一致 767 / 実行不能 2,562** となり、REPORT の 4,182 / 741 / 2,498 とは
+**一致 90・不一致 26・実行不能 64 の差**が出た (24.4 s 単位の bootstate と 585 s の batch は完全再現)。
+
+原因は **native ランナの `badjson` (88 case) / time out (native 248 / wasm 346) が負荷で変動**することで、
+同一 boot 状態・同一 wasm でも verdict がぶれるため。負荷を上げて 3 回同じ入力を回しても
+(sample:200 で 3 回とも 102/22/76) 小規模では安定し、全数 (7,421 関数 × 9 pattern) では
+badjson/timeout の Shot noise が乗る。
+
+**結論: 全数採点の絶対値 (2,498 / 941 / 4,182 / 741) は 1 run の snapshot であり、
+実行のたびに数十オーダーで変動する。** したがって下流の判断は
+(a) `tests/compare_bootstate.py` の**遷移 (旧→新)** の方向性、(b) `tests/cascade_410360.py` の
+case 単位の分類 (同一 jsonl を別アルゴリズムで完全再現)、を基準にすべきで、
+「実行不能 2,498」という一点の数値を target には使えない。
 
 ## 7. 限界と下流チケット
 
 - **実行不能 2,498 の大半は native が落ちる case** (route 非依存)。比較可能 4,923 の不一致 741 が real の追跡対象。
+  (ただし再現性は §6.2 の注意)
 - **残 3 unit (830/895/898)**: 実カタログを読ませても catalog loop の VMT 仮想 call で rbp 破壊 (§2)。
   真正ファイル I/O + 例外/仮想 call 経路の stub 化が次の一手。`block25158_DATA.bin` を boot 時に読む
   仮想ファイル層は experiment として revert 済み (差分は git history、手順は §2)。
@@ -152,3 +260,39 @@ bash tools/liftdiff/liftdiff_e2e.sh                                          # O
   それぞれ消える見込み (§3)。leaf 自己欠陥確定数は 19 → 41 (深部到達による露出増、m11 sample:800 では 45 → 49)。
 - unlifted_callee の実在 callee (~7 個) 追加は fle_entries.json 拡張 = tools/flelift 側作業 (CAB-252 と競合のため要調整)。
 - boot 状態は host stack アドレスが heap に残留するため run 間でバイト一致しない (guest 意味論は同一: unit 数・heap_used・クラッシュ点は完全再現)。
+
+### 7.1 未解決と起票先 (規則 42)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `units_run=928` が到達数であり完走数でない。真の完走 890・#245 未完走・#246 未実行 (off-by-one `start=k+1`) | 到達数で boot 品質を語ると +38 unit の過大評価。boot 比較の基準がずれる | (c) 親 CAB-121 にコメント (下流で reporting と off-by-one 修正タスク) |
+| m11 の 17→22 が「TLS 配列の heap 移送」由来では**ない** (TLS 差分を revert しても 22 のまま) | 修正効果の帰因が誤っていた。TLS heap 化の効果は wasm 側への状態移送 (比較の公平性) 面 | (c) 親 CAB-121 にコメント |
+| 全数採点の絶対値が負荷でぶれる (実行不能 2,498 ↔ 2,562) | 目標値として使えない | (c) 親 CAB-121 にコメント (§6.2。A/B は遷移ベースで運用) |
+| `trap_direct` 246 case のうち 237 は import 呼出列が両側 0 件 (比較情報なし) | 「f_410360 自身の欠陥」の根拠が trap chain のみ | (c) 親 CAB-121 にコメント。strict 判定には trace 保持が必要 |
+| `ld_tls_next` は無上限。1025 回目の TlsAlloc で slot 0 に折り返す | boot 中は TlsAlloc 1 回のみで未発火 | (c) 親 CAB-121 にコメント (軽微) |
+| `rt/fle_ldbridge.c` の `g_inbuf[192MB]` / `ld_out` 256MB | wasm 側 static data が非常に大きい (ネイティブ 8MB の 24 倍) | 既存 CAB-252 (続) に相乗り (読取のみ) |
+
+### 7.2 検証範囲 / 範囲外 (規則 40)
+
+**検証した**: tools/liftdiff のコミット 01d5cb5 の内容 (boot mode・stub 拡充・cascade 個別化) を
+HEAD (b8e762d) から独立に再計算。unit 到達/完走・f_410360 分類・m11 sample:800・残 3 unit の原因・
+`ld_tls_next` の limit 性・e2e 再現・3 つの ablation (旧 rt / GetProcAddress 除去 / TLS 差分 revert)。
+
+**範囲外**: (1) native 実機 (Windows の FL Studio) との比較は行っていない (native 参照 = 同一バイナリの
+lift ランナ内実行であり、実 OS 起動の再現ではない)。(2) wasm 側 verdict (mismatch 741 の内訳) は
+lift 対象関数の品質そのものではなく、liftdiff の比較器が出した結果である。
+(3) revert された「実カタログ供給 experiment」の rbp=0x7fff00000000 は HEAD では再現不能 (§2)。
+(4) tools/liftlib・tools/flelift は読取のみで、CAB-252 続 稼働中の未コミット WIP の影響は評価対象外。
+
+### 7.3 環境前提 (規則 43)
+
+- `source <(bash /home/ubuntu/work/analysis/preflight.sh --env tools/liftdiff)` で PATH/TMPDIR を修正
+  (TMPDIR = `tools/liftdiff/work/tmp`、実ディスク。/tmp は tmpfs 3.7 GB)。
+- 入力 (読取のみ): `/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin`、
+  `tools/m11/work/{boot_final3.ll,boot_final.ll,m11_image.bin}`、`tools/ott/work/ott.ll`、
+  `tools/flelift/work/lift/*` (CAB-252 続 が稼働中・未コミット差分あり)。
+- ビルド: `gcc -O1 -g -Wall -Wno-unused-function -o work/ld_native rt/ld_native.c rt/ld_ms_call.S -lm`
+  (format-truncation warning は既知・動作影響なし)。wasm は emcc (/opt/emsdk)。
+- 所要 (実測): bootstate flelift hybrid **24.4 s** (load 0.79→2.62)、e2e [1/4]-[3/4] **62.5 s**、
+  m11 sample:800 (12 shard) **93〜95 s**、flelift closure (14 shard) **585 s**
+  (load average 4.80 → 12.06 の範囲で変動)。負荷依存なので min-max で扱う。
