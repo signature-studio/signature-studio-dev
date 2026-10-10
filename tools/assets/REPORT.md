@@ -96,3 +96,11 @@ asset: `Engine/FLEngine.wasm` = k100.wasm 314,206,140B / 300 chunk (br, 125.8MB 
 2. **part index 形式との相互運用**: deploy/05-stage.mjs 形式の資産を E ローダで読む adapter (§6 の逆輸入路線)。>25MiB 資産が Static Assets に載る場合の唯一の経路。
 3. **manifest の完全オフライン化**: latest.json/manifest も IDB に載せて「2 回目は全くネット無し」を成立させる (e2e に `net=m` モード追加)。
 4. **複数 asset のキャッシュ管理**: fl-assets 配下の quota 管理 (storage.estimate との突合, LRU 削除, バージョン更新時の差分再取得)。OPFS bitmap は差分再開に対応済み。
+
+## 9. 後続: 書込可能 VFS (RT-5, `wvfs/`)
+
+CAB-123 により `/c/home`・`/c/tmp` の OPFS バッキング書込 mount が `wvfs/` に追加された
+(アペンドジャーナル + A/B スーパーブロック, flush 契約 `onYield()`/`onPageHide()` = FS.syncfs 相当,
+pathreg 既定マウント表の `/c/home`・`/c/tmp` 写像先を実装)。本 REPORT (CAB-21) の資産は無変更。
+詳細は **`wvfs/REPORT.md`**、検収は `bash tools/assets/wvfs/scripts/e2e.sh`。
+差分: 本ファイルへのこの節追加と `tsconfig.json` include への `"wvfs"` 追加のみ。
