@@ -384,13 +384,18 @@ def gen_driver(kernels, funcs, cases):
                 nat_expr.append('(float)vA[%d].f' % si2 if st['width'] == 32 else 'vA[%d].f' % si2)
             else:
                 nat_expr.append('vA[%d].u' % si2)
-        # ir 引数式
+        # ir 引数式 (value slot 番号は nat 側と共通: gpr=0..3, xmm=4.., stack=sidx)
         ir_expr = []
         for i, (pn, pt) in enumerate(f['params']):
             entry = K['irmap'][i] if i < len(K['irmap']) else ('none', None)
             if entry[0] == 'slot':
                 si2 = entry[1]
-                kind, d, used, dr = mslots[si2]
+                kind2, d2, u2, dr2 = mslots[si2]
+                if kind2 == 'xmm':
+                    si2 = xidx[d2[0]]
+                elif kind2 == 'stack':
+                    si2 = sidx[d2['off']]
+                kind, d, used, dr = mslots[entry[1]]
                 if pt in ('float', 'double'):
                     ir_expr.append('(%s)vI[%d].f' % (pt, si2))
                 else:

@@ -198,3 +198,82 @@ P4=±1ulp 0.018%, K5e0330 native vs LD=0) — lowering 設計前提は不変。
    movd site↔xmm slot の機械語主導対話で crash 4 kernel を救済。
 3. CAB-194 framework への f80_lower 適用 (§8.4) + frontend_reg C 実装の共有化。
 4. liftdiff (CAB-121) への「x87 fstp off-by-one」欠陥分類追加。
+
+## 9. P0c-3 追記 (CAB-251): RetDec x87 スタック模型修復 pass
+
+作成: 2026-10-10 / 担当 dir: tools/plugins/p0c のみ / 新規: x87fix.py, p0c3_e2e.sh
+
+### 9.0 結論 (先出し)
+
+1. **x87 スタック模型修復 pass を実装** (`x87fix.py`): RetDec が生成する fpr[] 配列 +
+   fpu_stat_TOP 変数模型の欠陥 (fstp 読出 off-by-one / fld 書込先ずれ / 演算 operand 絶対
+   slot ずれ / loop 末尾 TOP 更新過大 / fisub 零化 / fxch 対象ずれ / 初期 TOP store 欠落) を
+   IR のみから機械検出し、真の TOP シミュレーションで全 fpr アクセスの絶対 slot を再導出して
+   書替える。**0x5de820 / 0x5dedf0 / 0x5dfb60 の 3 kernel が k80_diff.py で bit-exact** (buf_diff=0)。
+2. **0x5dfbe0 / 0x5dfc90 / 0x5dfdb0 / 0x5dfd30 の構造も修復** (fist overflow→0x80000000 化、
+   fstp f32 の chop 丸め、frac/index の構造) し、残差を桁で圧縮 (下表)。残差の原因は
+   **x87 64-bit mantissa (ext) と double 53-bit の演算精度差** であり論理欠陥ではない (§9.4)。
+3. **k80_diff.py の driver bug を修復**: ir 引数式が mslot index (4..7) を value slot として
+   使い stack 引数が未初期化 vI[4..7] を渡していた (正は sidx 8..11)。これにより 0x5dfb60 の
+   差分が消えた (P0c-2 の §8.0-4 での「b60 不一致」の実体はこの harness bug だった)。
+4. p0c_e2e.sh / p0c2_e2e.sh exit 0 (回帰なし)、x87fix 冪等 (2 回適用 byte 一致)、
+   llvm-as + wasm32 通過。`bash tools/plugins/p0c/p0c3_e2e.sh` で 1 コマンド再現。
+
+### 9.1 x87 模型と欠陥の機構
+
+RetDec 模型: `st(i) = fpr[(TOP+i)&7]`、fld=`store.fpr(TOP-1)`+`TOP:=TOP-1`、fstp/fist=`load.fpr(TOP)`(+pop)、entry TOP=0。
+欠陥: 翻訳中の内部 TOP 追跡が loop 内で破綻し (D1) fstp 読出 st(1) 化、(D2) 第2 fld 書込先 +1、
+(D3) 演算 operand 絶対 slot ずれ、(D4) loop 末尾 TOP 更新 +1/+2、(D5) fist 直後 fisub が
+`fsub %X,%X`(=0)、(D6) fxch 対象ずれ、(D7) 初期 TOP store 欠落。0x5de820 では fstp が定数 c2 を読む。
+
+### 9.2 修復規則 (x87fix.py — 機械検出+機械的書替え)
+
+| # | 規則 | 欠陥 | 実装 |
+|---|---|---|---|
+| R1 | emission パターン (push/dup/binop dest-st0,st1+pop/memarith/fstp_mem/fist/fstpst0/fxch/fisub) を復元し真 TOP で全 index を `add i32 <block先頭TOP>, <真slot-先頭TOP>` 正準形へ再導出 | D1/D2/D3 | process_function |
+| R2 | fpu_stat_TOP store を真 delta へ (平衡 loop = 0) | D4 | simulate |
+| R3 | fisub 零化: `fsub %X,%X` → `fsub %X, sitofp(fptosi(%X))` (fpr/devirtualized 両方) | D5 | composite / fix_fsub_zero_global |
+| R4 | 初期 TOP store 補完 | D7 | process_function |
+| R5 | fst/fist/fstp st(0) の pop 有無は 2^k 組合せを試し back-edge TOP 平衡が一意な組合せのみ採用 (非平衡/複数解はスキップ) | D1 | simulate |
+| R6 | chop 区間の fstp f32 store を RC=toward-zero 化 (nearest が真値を跨いだら nextafterf で 1 つ戻す。符号ゲート付) | fstp chop RC | fix_chop_f32 |
+| R10 | fist/fistp overflow → 0x80000000: fptosi 入力を \|v\|≥2^31 で -2^31 へ clamp (poison 解消) | fist overflow | fix_fist_overflow |
+
+パターン外は関数単位で未変更スキップ (安全側)。適用スコープは `--funcs` (+`--chop-f32-fns`)。
+
+### 9.3 検証結果 (k80_diff.py, 2000 case/kernel, fork 隔離)
+
+| kernel | 修復前 buf_diff | 修復後 | 判定 |
+|---|---:|---:|---|
+| 0x5de820 | 5,136,704 | **0** | bit-exact |
+| 0x5dedf0 | 2,571,305 | **0** | bit-exact |
+| 0x5dfb60 | 758,431 (harness bug) | **0** | bit-exact |
+| 0x5dfbe0 | 790,341 | 288,922 | 構造修復 / 残差 §9.4 |
+| 0x5dfc90 | 757,178 | 52,323 | 構造修復 / 残差 §9.4 |
+| 0x5dfd30 | 2,552,059 (ret 1518) | 38,099 (ret 59) | 構造修復 / 残差 §9.4 |
+| 0x5dfdb0 | 2,454,776 (ret 1712) | 841,305 (ret 79) | 構造修復 / 残差 §9.4 |
+
+回帰: 既修復 0x5df210/0x5df240/0x5e0760/0x5e0b70/0x5e0bb0/0x5e1590/0x5e1780 (+0x5e0330/0x5de3e0)
+すべて buf_diff=0 維持。f80_lower/argfix 冪等性・llvm-as・wasm32 (101,539 B) 通過。
+
+### 9.4 残限界 (ext 精度 — 据置と [P0c-4] 引継)
+
+修復後も be0/c90/d30/db0 に ±1-8 f32 ulp が残る (cell 比率 14%/2.5%/1.9%/41%)。
+原因は論理ではなく **x87 64-bit mantissa (ext) と double 53-bit の演算精度差**:
+(1) frac = p - trunc(p) の精度が \|p\| の整数部ビット数分圧縮される (p~1e9 で frac 粒度
+1.2e-7、ext では 7.5e-12)。(2) interp/積鎖の各段の丸めが 53-bit。(3) harness の入力分布が
+f6/f7 最大 2^116 級の極端スケールを含み、frac の微小差が f32 下位 bit に増幅する。
+対処には x87 ext 演算の double-double/64-bit-grid エミュレーション (fma 鎖で各段の丸め剰余を
+伝搬) が必要 — 試作 (fma 補正) は compiled-IR の FMA 収縮と干渉し悪化したため未採用。
+f32 音響出力への影響は ±1ulp 時点で実質無視できるが、bit-exact 完走には上流の
+f80_lower に ext-emulation mode を追加するのが正しい設計位置。
+
+### 9.5 [P0c-4] への引き継ぎ
+
+1. **ARG pass ABI 推定強化** (本チケット繰越): mid-function push のある rsp 相対 frame、
+   movd site↔xmm slot 対話、crash 4 kernel (0x5de710/0x5df610/0x5e05b0/0x5e0d80, sig11) 救済。
+2. **x87 ext-precision emulation** (§9.4): f80_lower の mode 追加 (frac/interp 鎖の
+   double-double 化)。bit-exact 完走の前提。
+3. liftdiff (CAB-121) への分類追加候補: 「x87 fstp/fld index ドリフト」「fisub 零化」
+   「fpu_stat_TOP loop 更新過大」「fptosi poison (fist overflow)」。
+4. harness 注意: k80_diff.py の stack 引数 value-slot 対応修正済み (§9.0-3) —
+   P0c-2 時点の sweep 数値とは driver 分だけ非互換 (改善)。
