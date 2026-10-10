@@ -1,0 +1,28 @@
+# ImageBase 0x400000
+# ps_file_arch names (fle:0x13e4fe8, index 0 = empty): ['', 'Intel', 'Apple', 'Apple + Intel']
+# key index suffix (fle:0x913954, 0x91355c): '_' '_0'
+# list separators (fle:0x9150e0/0x9150f0) : '|' '='
+# plugclass masks:
+  folder Fruity\   (fle:0x8f0444): [2, 3]
+  folder VST\      (0x8f0464): [0, 4]
+  folder VST3\     (0x8f047e): [7, 8]
+  folder AudioUnit\(0x8f0498): [9, 10]
+  folder CLAP\     (0x8f04be): [11, 12]
+  slot0/1 Fruity   (0x8f6ac4): [2, 3]
+  slot2/3 VST      (0x8f6ac5): [0, 4]
+  slot4/5 VST3     (0x8f6ac6): [7, 8]
+  slot6   AU 64    (0x8f6ac8): [9, 10]
+  slot7   CLAP 64  (0x8f6ac9): [11, 12]
+  is-fx classes    (0x8f63ec): [0, 1, 2, 7, 9, 11]
+  is-gen classes   (0x8f655c): [3, 4, 5, 8, 10, 12]
+  legacy v1 fx     (0x910bca): [0, 1, 2, 7, 9, 11]
+  ps_file_type ok  (0x9117de): [1, 2]
+  VST2 pseudo-guid  (0x8f6e44): [0, 4, 10, 11, 14, 15]
+# GUID string byte positions (fle:0x13ab018): [7, 5, 3, 1, 12, 10, 17, 15, 20, 22, 25, 27, 29, 31, 33, 35]
+# default scanflags (0x9145c4) / date (0x914390): 00 0000000000000000
+# 212 header u32@8 per kind index 0..15 (fle:0x14e11d0): ['0x0', '0x1', '0x2', '0x2', '0x0', '0x1', '0x6', '0x7', '0x7'] ...
+# 212 kind by isGen (fle:0x14e1cdc): ['0x2', '0x3']
+# event 28 by flag (fle:0x14e11c8): 01000000ffffffff
+# bitness file suffix (fle:*0x15e1818): ['', ' [64bit]']
+# FLhd magic / FLdt magic: b'FLhd' b'FLdt' ; wrapper chunk stream flag byte (0xa9f3bc): 00
+# class names (fle:0x8ef860): see HOSTBRIDGE/FORMAT.md

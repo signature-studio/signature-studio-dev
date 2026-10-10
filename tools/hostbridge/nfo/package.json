@@ -1,0 +1,13 @@
+{
+  "name": "@webstudio/hostbridge-nfo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "FL Studio Plugin database (.nfo / .fst) parser, writer and synthetic generator (Node 26 type-stripping; no runtime deps)",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "typecheck": "../../../node_modules/.bin/tsc -p tsconfig.json",
+    "test": "node --test test/",
+    "e2e": "bash nfo_e2e.sh"
+  }
+}
