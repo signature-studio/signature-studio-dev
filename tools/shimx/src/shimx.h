@@ -974,7 +974,8 @@ HRESULT GetErrorInfo(DWORD rsv, LPVOID* info);
 /* =============================================================
  * shell32 / shlwapi / version / imagehlp / その他システム DLL (ほぼスタブ)
  * ============================================================= */
-HRESULT SHGetFolderPathW(HWND w, int csidl, HANDLE tok, DWORD flags, LPWSTR path);HRESULT SHGetKnownFolderPath(const GUID* id, DWORD flags, HANDLE tok, LPWSTR* path);
+HRESULT SHGetFolderPathW(HWND w, int csidl, HANDLE tok, DWORD flags, LPWSTR path);
+HRESULT SHGetKnownFolderPath(const GUID* id, DWORD flags, HANDLE tok, LPWSTR* path);
 HRESULT SHGetSpecialFolderLocation(HWND w, int csidl, LPVOID* pidl);
 BOOL    SHGetPathFromIDListW(const void* pidl, LPWSTR path);
 LPVOID  ILCreateFromPathW(LPCWSTR path);
