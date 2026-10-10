@@ -8,14 +8,14 @@
 
 | 項目 | 実測 |
 |---|---|
-| shimx 公開 API | **593 本** (機能 427 + スタブ 166) + 運用フック 33 本。実装 6,724 行 (C) + テスト アサーション 536 行 |
+| shimx 公開 API | **593 本** (機能 427 + スタブ 166) + 運用フック 33 本 (`exports.txt` の 627 = これらに M4 互換 `shim_unimplemented` を加えた数)。実装 6,724 行 (C) + テスト アサーション 536 行 |
 | FLEngine_x64.dll 静的 import **738** に対するカバレッジ | 実装 **358 = 48.5%** (機能 243 + スタブ 115)。libc 解決 `memset` 込み 48.6% |
-| 担当範囲 (他担当 DLL を除く 359) に対するカバレッジ | **100.0%** (未実装 **0**、序数 import 0)。対象外 379 = user32/gdi32/comctl32/opengl32 (tools/gui) + dsound (tools/audio) |
+| 担当範囲 (738 − 他担当 379 = 359) に対するカバレッジ | **100.0%** (未実装 **0**、序数 import 0)。内訳 = 実装 358 + libc 解決 `memset` 1。対象外 379 = user32/gdi32/comctl32/opengl32 (tools/gui) 377 + dsound (tools/audio) 2。実装 358 のうち 9 本は user32 の weak 実装 (Char*W/MsgWaitForMultipleObjects*; gui 側が強定義で上書き可)。**100% は「シンボル提供」の意味**で、うち 115 本はスタブ (常時エラー/0 台/fail-fast の `RtlUnwind*` 等)。機能実装は 243 本 |
 | 呼出サイト加重 (静的 7,309 サイト) | shimx 4,050 サイト (55.4%) / 他担当 (GUI) 3,252 サイト (44.5%) / libc 7 |
 | delay-load 57 | 実装 23 / 他担当 34 / 未実装 0 |
 | プラグイン import (GUI/audio 除く) | OTT vst2 146/147, vst3 150/151 (残 = shell32 序数 74), FreshAir 98/98, FL64.exe 111/111, Serum2 234/238 (残 = 序数 4) |
 | **OTT undefined 47 種 (M8)** | shimx リンクで **47 → 23**。Win/CRT API **24 種は全て解決** (CloseHandle/CreateFileW/TlsGet・SetValue/WriteFile/GetProcAddress/LoadLibraryExW/`__readgsqword`/Rtl*/UnhandledExceptionFilter ほか)。残 23 は `function_18*` = lift 欠落で shim の対象外。t1 出力 SHA は baseline と bit 一致 (`b5a91b9b…`, 512 行)。signature mismatch 0 |
-| M11 init closure (`boot_final2.ll`) 外部参照 553 | shimx 提供 **183** / GUI・audio 担当 171 / lift 由来 199。**非 GUI の Win/CRT は 100% 提供**、IR declare と wasm 署名の不一致 0 (後述 §4 の 5 件を修正済み) |
+| M11 init closure (`boot_final2.ll`) 外部参照 557 | shimx 提供 **183** / GUI・audio 担当 171 (user32 114 / gdi32 53 / shcore 2 / uxtheme 1 / dsound 1) / lift 由来 203。**非 GUI の Win/CRT は 100% 提供**、IR declare と wasm 署名の不一致 0 (後述 §4 の 5 件を修正済み) |
 | M4 の 53 API | **53/53 継承**。`tools/shim/test/test_main.c` を **無改変** で shimx 実装に対し MT/ST とも ALL PASS |
 | テスト | MT(pthread) ALL PASS / ST ALL PASS (6 回連続実行で安定) / fail-fast 6 モード / M4 互換 MT・ST / 署名突合 2 本 / OTT 再リンク+実行回帰 |
 
@@ -109,3 +109,7 @@ bash tools/shimx/scripts/verify_ott.sh             # OTT undefined 47→23 と t
 ```
 
 ユーザ依頼事項: なし (素材は既存。node v26 が PATH に無い環境のため emsdk 同梱 node 24.19 を使用)。
+
+## 8. 検収記録 (CAB-11)
+
+- 独立再計算 (pefile で `analysis/win64/extracted/block00031_PE.bin` を直接解析; 呼出サイトは E8/E9 rel32 を独自走査) で主要数値は一致。差異は M11 外部参照 553→557 (ir_undef の declare 正規表現が struct 戻り値 `__asm_cpuid*` 4 件を取りこぼし。lift 由来のみ・shimx/GUI 件数に影響なし) の 1 件のみで修正済み。

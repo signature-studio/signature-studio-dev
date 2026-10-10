@@ -6,7 +6,7 @@
 - 他担当 DLL (user32/gdi32/comctl32/opengl32 = tools/gui, dsound = tools/audio) の **379 個を対象外** とすると、担当範囲 359 個に対するカバレッジは **100.0%** (未実装 0)。
 - delay-load import 57 個: 実装 23 / 他担当 34 / 未実装 0。
 - shimx 公開 API 593 本 (機能 427 + スタブ 166) + 運用フック 33 本。M4 の 53 API は **53/53 を継承** (M4 の unmodified test_main.c が shimx 実装で PASS)。
-- M11 init closure (`boot_final2.ll`) の外部参照 553 件: shimx 提供 **183** / GUI・audio 担当 171 / lift 由来 199。非 GUI の Win/CRT は **100% 提供**。
+- M11 init closure (`boot_final2.ll`) の外部参照 557 件: shimx 提供 **183** / GUI・audio 担当 171 / lift 由来 203。非 GUI の Win/CRT は **100% 提供**。
 - プラグイン OTT_vst2_win64.dll: import 375 (GUI/audio 除く担当 147) のうち shimx 提供 146、未提供: ord74
 - プラグイン OTT_vst3_win64.dll: import 380 (GUI/audio 除く担当 151) のうち shimx 提供 150、未提供: ord74
 - プラグイン Serum2_win64.vst3: import 332 (GUI/audio 除く担当 238) のうち shimx 提供 234、未提供: ord12, ord155, ord190, ord219

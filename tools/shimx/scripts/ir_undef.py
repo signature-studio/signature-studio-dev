@@ -57,7 +57,7 @@ def main():
     a = ap.parse_args()
     src = open(a.ir, errors='replace').read()
     decls = {}
-    for m in re.finditer(r'^declare\s+(?:[\w.]+\s+)*?(void|i\d+|float|double|ptr|<[^>]+>)\s+@([\w.$-]+)\((.*?)\)', src, re.M):
+    for m in re.finditer(r'^declare\s+(?:[\w.]+\s+)*?(void|i\d+|float|double|ptr|<[^>]+>|%[\w.$-]+|\{[^}]*\})\s+@([\w.$-]+)\((.*?)\)', src, re.M):
         decls.setdefault(m.group(2), (m.group(1), m.group(3)))
     defined = set(re.findall(r'^define\s+[^@\n]*@([\w.$-]+)\(', src, re.M))
     shimx = set()
