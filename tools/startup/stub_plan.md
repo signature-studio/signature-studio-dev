@@ -124,8 +124,8 @@ mac 版との対応 (参考): `~/Library/Preferences/Image-Line/reg.xml` (レジ
 - 意味論 (実測): Delphi TRegistry。ルート既定 HKCU、アクセス mask `0xf003f` (`& 0x300` で WOW64 ビット保持)、**値は REG_SZ の文字列で保存** (Int/Bool も `"123"`/`"0"`/`"1"`)。例外: OS キーの `CurrentMajorVersionNumber/CurrentMinorVersionNumber` は DWORD 直読み。
   HKLM は別ハイブ (書込可だがセッション内のみ)。`HKCU\Software\Image-Line\FL Studio <旧版>` が無ければ移行処理 (S12) は no-op。
 - 永続: IndexedDB に JSON (`{hive:{key:{value:{t,v}}}}`)。エクスポートは Windows `.reg` と mac `reg.xml` の両形式 (後日; ユーザが手持ち設定を持ち込める)。
-- seed (`data/vreg_seed.json`, 18 値): Paths 3 値 ×(HKCU,HKLM 一部)、`FL Studio 26\General` の 3 値 (FL Cloud 無効・クラッシュ復帰フラグ)、OS の `CurrentVersion` 8 値、`MachineGuid`、`FontSubstitutes`。
-  **seed しないもの**: `Registrations\*` (ILRegKey 等 = ライセンス/トークン)。→ 未登録 (Trial 仮定) で起動 (G04)。
+- seed (`tools/startup/vreg/data/seed.json`, 241 エントリ / 起動時書込 77 — 旧 `data/vreg_seed.json` 18 値は CAB-94 で seed 本体としては廃止 (env/known_folders の参照入力のみ残存)): Paths、`FL Studio 26\General` ゲート 3 値、OS (`CurrentVersion` 8 値 / `MachineGuid` / `FontSubstitutes`)、REGISTRY.csv 由来のコード既定値群 (confidence 付き)。
+  ライセンス (ユーザ承認「全てのライセンス機構は無力化。アクティベーションは無条件通過」により本節の旧記述「Registrations\* は seed しない → Trial 仮定」を CAB-94 検収で更新): `Registrations\*` の ILRegKey 等 8 値を **pinned で既定書込 (registered 起動)**。Trial 化は `licenseFlagBit0=1` (license group を書かず削除)、cracked 資源は `externalReg` (ユーザ .reg を最優先適用)。bit0 の語義・実観測は CAB-106、ILRegKey 書式の解読は未実施 (値はプレースホルダ)。
 - 既定値: REGISTRY.csv の `default` 列に `ReadInt/ReadBool` の既定を抽出済み (例 `Sample rate=44100`)。エンジン側が既定を持つので seed 不要。
 
 ## 7. 検証計画 (lift 後に実施する受入テスト)

@@ -39,7 +39,7 @@ API: `flush()` `close()` `importReg(bytes|text)` `exportReg({hives, utf16le})` `
 
 | 項目 | 実測 |
 |---|---|
-| REGISTRY.csv (win/both) の具体的値名 | 229 (大小無視) / 231 (大小区別)。除外=`(dynamic)` `#0` `(default)…` 等の非名称 22 表記。startup REPORT の「約 222」とは数え方の差と推定 (再集計根拠は未特定) |
+| REGISTRY.csv (win/both) の具体的値名 | 229 (大小無視) / 231 (大小区別)。除外=`(dynamic)` `#0` `(default)…` 等の非名称 22 表記。startup REPORT の「約 222」とは数え方の差と推定 (再集計根拠は未特定)。検収再試算: platform=both のみ 218 / installer+os-or-misc 除去 219 / access≠installer-W 227 等 12 通りを試算したが 222 に一致する集計法は見付からず (既定値あり 78・access含R 208 も不一致) |
 | seed が初期値を持つ値名 | **229 / 229 (100%)**, seed 欠落 0 |
 | seed エントリ (hive,key,name 単位) | 241 (HKCU 217 / HKLM 24)。apply **77** (settings 36 / os 13 / shared 12 / license 8 / paths 5 / gate 3) |
 | catalog のみ (書かない) 164 | うちキー不明 (wrapper 経由 section, low-key) **112 エントリ / 111 名**。理由: 実キーを静的に確定できず、書くと誤キーを作るため。エンジン内蔵既定で動く |
