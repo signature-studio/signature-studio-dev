@@ -6,12 +6,12 @@
 
 1. **起動はホスト 11 ステップ + エンジン 13 ステップ = win 24 ステップ、mac 10 ステップ**。ホスト (FL64.exe 597,064 B / OsxFL 5.0 MB) は
    `THostInstance` (0x38 B, host version=1) を作り、エンジン唯一のエントリ **`CreateFruityInstance`** を 1 回呼ぶだけ。win は
-   `CreateFruityInstance(0xC0, 0xEDE95A, host, &iface)` (定数ハンドシェイク)、mac は `(host, &iface)`。**メッセージループは win ではこの関数の内部** (`TApplication.Run` 0x86a660) にあり、mac では戻ってからホストが `iface+200` を呼ぶ。→ STARTUP.md
+   `CreateFruityInstance(0xC0, 0xEDE95A, host, &iface)` (定数ハンドシェイク)、mac は `(host, &iface)`。**メッセージループは win ではこの関数の内部** (`TApplication.Run` 0x86a660) にあり、mac では戻ってからホストが `iface->vtbl+200` (vtable オフセット 200 = slot25) を呼ぶ。→ STARTUP.md
 2. **ブラウザ版で置換するのはホスト側のみ** (glue 約 20 行 + 仮想レジストリ + Win32 スタブ約 60 API + 専用 Worker 上のメッセージポンプ)。エンジンの 13 ステップは lift してそのまま動かす。**FL コードは無改変**。→ stub_plan.md
 3. **外部起動点は PROCESSES.csv 30 行 (win 23 / mac 7)**。FL が自分で起動する外部実行体は win **11 種** (CreateProcessW 2 関数 / ShellExecuteA 1 / ShellExecuteExW 3 / ShellExecuteW 17 関数)。
    判定: 必要 0 / 不要 8 / 代替 15 / 対象外 4 / 後回し 3。**ブラウザ版で「プロセスとして必要」なものは無い**。FL64.exe 自身は CreateProcess を一切呼ばない (IAT で確認)。
 4. **ゲートは 16 件 (GATES.md)**。起動をブロックし得るのは 8 件 (G01–G08) で、全て shim の戻り値か仮想レジストリ既定で通る。ネットワーク/認証/更新/WebView 系 (G09–G13) は **起動時には発火しない** (遅延タイマー or ユーザ操作起点)。
-5. **レジストリ**: REGISTRY.csv 457 行。win の確定リテラルキー 46 本 (HKCU/HKLM)、エンジンが参照する値名 222 種 (`TRegistry` 経由・全て REG_SZ 文字列)、`default` 列に ReadInt/ReadBool の既定値を抽出。
+5. **レジストリ**: REGISTRY.csv 457 行。win のキー 46 本 (HKCU/HKLM; 内訳: コード上でリテラル確認 31 / ベース名からの推定 5 / インストーラ(NSIS)報告ベース 10)、エンジンが参照する値名 222 種 (FL の `TRegistry` 経由・全て REG_SZ 文字列; 例外は OS の `CurrentMajor/MinorVersionNumber` DWORD 2 値のみ)、`default` 列に ReadInt/ReadBool の既定値を抽出。
    mac は `~/Library/Preferences/Image-Line/reg.xml` (libwinbridge `TXmlRegistry`) + CFPreferences `com.image-line.shared`。seed は最小 18 値 (`data/vreg_seed.json`)。
 
 ## 1. 成果物

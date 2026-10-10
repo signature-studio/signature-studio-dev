@@ -28,7 +28,7 @@ FL が元々持つオフライン経路 (`error-offline.html`、"Not signed in"�
 
 - ライセンス検査は単一関数ではなく、`MachineGuid`+`GetComputerNameExW`+`SHGetFolderPathW` を読む同型コードが **24 関数にインライン展開**されている
   (例: `0xf2dbb0` 25 KB, `0x10c7cd0` 32 KB, `0x11dd800` 30 KB。難読化文字列 `hfg\`U`/`%s:%s:` を共有)。lift 後に**これらが同じ shim 面 (RegOpenKeyExA/RegQueryValueExW/GetComputerNameExW) を叩く**ことが
-  スタブ要件。ライセンスの実効的な内容 (どの機能が Trial で制限されるか) は本タスクでは未解析 → 下流チケット T12 (lift 後に観察で確定)。
+  スタブ要件。ライセンスの実効的な内容 (どの機能が Trial で制限されるか) は本タスクでは未解析 → 下流チケット T11 (lift 後に観察で確定)。
 - 署名検査 (G03) は Authenticode の検証をバイパスする shim であり、Image-Line 署名物の改変を意味しない (WebStudio は wasm 再ビルド物のため署名自体が成立しない)。EULA 上の評価は行わない。
 - `fl_api_user` / パスワード文字列が `CloudBounceConsole` の CLI 引数として engine に埋め込まれている (`0x95f9d0`)。Cloud Mastering は外部通信ゆえ対象外であり、この資格情報は使用しない。
 - Gopher AI / FL Cloud / 認証は規約 (SUBAGENT_RULES) どおり対象外。上表の「無効化」はその実装方針。
