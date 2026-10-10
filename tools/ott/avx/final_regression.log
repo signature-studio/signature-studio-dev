@@ -1,0 +1,24 @@
+[1/6] native coverage (CRT 経路 scenario 実行 + 単歩 coverage)
+[crt_nat] err_zero_disp    ok calls=35 obj=yes
+[crt_nat] wrote /home/ubuntu/work/webstudio/tools/ott/work/crtlift/nat_probe.json (9 scenarios)
+[crt_scen] scenarios 9
+[2/6] lift → wasm (CRT 初期化版)
+[x64c] functions 260, insns 16378, unsup {}, unlifted callees 13, imports 26
+[lift_crt] [4/4] data + emcc
+[lift_crt] OK: /home/ubuntu/work/webstudio/tools/ott/work/crtlift/ottl_crt.cjs
+[3/6] 新 scenario matrix (CRT 経路) — native 実機械語 vs lift wasm
+[crt_nat] wrote /home/ubuntu/work/webstudio/tools/ott/work/crtlift/matrix/nat_result.json (9 scenarios)
+[run_matrix] wrote /home/ubuntu/work/webstudio/tools/ott/work/crtlift/matrix
+[cmp_entries] scenarios 9: PASS 9 / nat_crash(到達確認) 0 / FAIL 0
+[4/6] 既存 entry 85 scenario を CRT 版 build で再突合 (回帰)
+[crt_nat] wrote /home/ubuntu/work/webstudio/tools/ott/work/crtlift/matrix85/nat_result.json (85 scenarios)
+[run_matrix] wrote /home/ubuntu/work/webstudio/tools/ott/work/crtlift/matrix85
+[cmp_entries] scenarios 85: PASS 85 / nat_crash(到達確認) 0 / FAIL 0
+[5/6] 陰性対照 (OTT_CRTINIT=0 → 旧 fail-fast の再現)
+  native SIGSEGV(CFG garbage jump) 再現: OK / wasm ott_unlifted(同一 garbage VA) 再現: OK
+[6/6] 既存 e2e の継続性確認 (旧 build — 改変は lift/x64c.py の mxcsr のみ)
+      RetDec chain [0x248]=1: zero 4 / normal 254 / junkHi 252 / junkTiny 2 / nan 0 / |max| 1.131e+36
+[ott_e2e] PASS
+[ott_e2e] PASS
+[entry_e2e] PASS
+[crt_e2e] PASS

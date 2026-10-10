@@ -80,6 +80,7 @@ unsup 627 箇所は **17 関数**に集中し、その内訳:
 | SSE2 ↔ FMA の出力差 (native 単独, CAB-137/138 実績) | 12 case / 18,432 cell で **0 ulp** |
 | FMA 強制 (`__use_fma3=1` + `__isa_available=3` を native/wasm 両側 .data に書く) での native↔wasm 突合 | avx 9 / crt 9 / entry 85 = **103 scenario 全 PASS** (bit 一致) |
 | FMA 演算自体の bit 一致性 (`fma_fuzz`: native vfmadd213sd (hw) vs wasm musl fma()) | **300,012 case bit 一致** (NaN payload 含む — `ott_fma_d/s` で bit51 整正) |
+| pcmpistri 0x40 の意味の実機確定 (`pcfuzz2.c`: 実機 inline asm vs model, movd needle / 2byte / 一般 random) | **150,000 case 0 不一致** (idx = mask の MSB 位置 / ZF=(ld<16) / CF=(mask≠0) / SF=(ls<16) / OF=mask bit0) |
 | 大块 ymm copy 経路 (`__isa_available>=3` で memmove/memset が ymm loop へ) | avx_proc_2k/8k/4k_x2 (native↔wasm bit 一致, Gate B) |
 
 根拠 (維持の理由):
@@ -144,7 +145,9 @@ unsup 627 箇所は **17 関数**に集中し、その内訳:
    上位を読む」コードは現 coverage に無く、厳密には実行実績の範囲で正当。
 3. lift した VEX 命令の実行 coverage は `AVX_VEXCOV=1` probe build + `avx/work_unsup*.json`
    (site 集合) で採取できる。FMA 強時の VEX site 実行は native coverage 5,436 insn 中
-   144 site (avx 9 scenario, Gate 4 — probe build のみ OOM で 4 scenario 未完。本体 Gate B は完走)。
+   **182 site** (avx 9 scenario, Gate 4 — **hit ⊆ native 実行 OK** / matrix 9/9)。
+   (初版の probe build OOM は vexcov buffer の配置衝突 (0x35e00000 = ott_boot MSCR / alog 0x35f00000
+   と重複) が原因で、buffer を 0x35c00000 へ移動 + JS 読取アドレス修正で解消済み — 後続コミット参照。)
 
 ## 8. CAB-122 系 (AudioWorklet ABI 正本候補) への引き継ぎ
 
@@ -167,7 +170,7 @@ bash tools/ott/ott_e2e.sh && bash tools/ott/entry/entry_e2e.sh --quick
 
 # 2) AVX/FMA 検証 (本チケット新設; 約 6 分)
 bash tools/ott/avx/avx_e2e.sh          # Gate A (flags=0) / Gate B (強制) / fuzz
-#   ※ Gate 4 (VEXCOV probe) のみ大块 scenario で node OOM の既知不具合 — Gate A/B/fuzz は独立に PASS
+#   Gate 4 (VEXCOV probe) を含め全 gate PASS (buffer 衝突修正後)
 
 # 3) 0x1801bc890 unit 突合 (mxcsr/rcr site の実行確認)
 python3 tools/ott/avx/fpctl_scen.py /tmp/scen_fpctl.json

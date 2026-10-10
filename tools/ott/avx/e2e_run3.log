@@ -1,0 +1,22 @@
+[1/6] build (VEX lift → wasm 通常 + VEXCOV probe)
+  再利用 (/home/ubuntu/work/webstudio/tools/ott/work/avx/ottl_avx.cjs)
+[2/6] Gate A: flags=0 回帰 (crt 9 + entry 85, avx build)
+[run_matrix] wrote /home/ubuntu/work/webstudio/tools/ott/work/avx/matrix
+[cmp_entries] scenarios 9: PASS 9 / nat_crash(到達確認) 0 / FAIL 0
+[run_matrix] wrote /home/ubuntu/work/webstudio/tools/ott/work/avx/matrix85
+[cmp_entries] scenarios 85: PASS 85 / nat_crash(到達確認) 0 / FAIL 0
+[3/6] Gate B: AVX/FMA 強制 (AVX_FORCE=fma,isa) — avx 9 + crt 9 + entry 85
+[avx_matrix] wrote /home/ubuntu/work/webstudio/tools/ott/work/avx/mavx
+[cmp_entries] scenarios 9: PASS 9 / nat_crash(到達確認) 0 / FAIL 0
+[avx_matrix] wrote /home/ubuntu/work/webstudio/tools/ott/work/avx/mcrt
+[cmp_entries] scenarios 9: PASS 9 / nat_crash(到達確認) 0 / FAIL 0
+[avx_matrix] wrote /home/ubuntu/work/webstudio/tools/ott/work/avx/m85
+[cmp_entries] scenarios 85: PASS 85 / nat_crash(到達確認) 0 / FAIL 0
+[4/6] VEX 実行 coverage (native vs wasm probe) — 新 scenario
+[avx_matrix] wrote /home/ubuntu/work/webstudio/tools/ott/work/avx/mavx_cov
+[cmp_entries] scenarios 9: PASS 9 / nat_crash(到達確認) 0 / FAIL 0
+[vexcov] native 実行 insn 5436 / wasm VEX hit 182 種 / hit⊆native実行: OK
+[5/6] fma_fuzz (native vfmadd213sd vs wasm fma(), 30 万 case)
+  fma native/wasm bit 一致: OK (300012 cases)
+[6/6] summary
+[avx_e2e] PASS

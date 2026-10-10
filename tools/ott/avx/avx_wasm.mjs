@@ -125,7 +125,7 @@ const am = Array.from(new Uint32Array(U8.buffer, U8.byteOffset + amBase, 64));
 const out = { calls, obj: obj ? hex(obj, 0x328) : null, eff_ptr: eff, obj_ptr: obj, alog, am };
 if (VEXCOV) {
   const n = U32[0x35c00000 / 4];
-  out.vexcov = Array.from(U32.subarray(0x35e00008 / 4, 0x35e00008 / 4 + n), (v) => v - 0x30000000);   // RVA
+  out.vexcov = Array.from(U32.subarray(0x35c00008 / 4, 0x35c00008 / 4 + n), (v) => v - 0x30000000);   // RVA
 }
 const jrepl = (k, v) => {
   if (typeof v !== 'bigint') return v;
