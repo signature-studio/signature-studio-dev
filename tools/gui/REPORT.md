@@ -20,7 +20,7 @@
 | `tools/gui/src/` | shim 本体 C: `gui_core.c` (user32 1,583 行) + `gui_core_ext.inc` (P1 拡張 356 行)・`gui_gdi.c` (gdi32/msimg32 1,095 行)・`gui_platform.c` (futex/ring/handle/region)・`gui_headless.c` (native host 代替) |
 | `src/runtime/gui.ts` `gui_worker.ts` `gui_proto.ts` | ブラウザ host (入力リング生産者・OffscreenCanvas 描画ワーカ・プロトコルミラー) ※`tsc --noEmit` OK |
 | `tools/gui/lift/` | `gui_lift.sh` (mingw→RetDec→後処理), `gui_lift_post.py`, `gui_wasm.sh` (emcc), `gui_lift_main.c` |
-| `tools/gui/test/` | `gui_app.c` (テスト PE), `selftest.c` (78 assertion), `native_run.c`, `bench.c`, `gui_app_ff.c` (fail-fast PE) |
+| `tools/gui/test/` | `gui_app.c` (テスト PE), `selftest.c` (83 assertion、+P1 `selftest_p1.inc` 231 = 314), `native_run.c`, `bench.c`, `gui_app_ff.c` (fail-fast PE) |
 | `tools/gui/INTEGRATION.md` + `integ/` | 結合手順書 (リンク/ABI チェックリスト/ハンドル 31bit/ハーネス拡張方針)・`gen_adapt.py` (突合表 `INTEGRATION_XCHECK.md` + wasm32 adapter)・`sigprobe.sh`・`build_objs.sh`・`lift_fnmap.py`・`reach_report.py`・fixture |
 | `src/gui_reach.c` ほか | 到達 API ログ (`GUI-REACH` 行 / `gui_reach_json`)、`gui_set_icall_hook`、`-DGUI_NO_K32` |
 | `tools/gui/e2e/` + `e2e.sh` | CDP ドライバ `e2e.mjs`、ページ、1 コマンド E2E |
