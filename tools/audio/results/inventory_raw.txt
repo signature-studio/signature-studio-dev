@@ -1,0 +1,172 @@
+### [1] FLEngine_x64.dll: audio/MIDI import 参照元 (fl_audio_xref.py, thunk 経由 e8 解決)
+  dsound.dll!DirectSoundCreate         callers=['0x12afb50']
+  dsound.dll!DirectSoundEnumerateA     callers=['0x12af3e0']
+  winmm.dll!midiInAddBuffer            callers=['0xba24a0', '0xba2dd0']
+  winmm.dll!midiInClose                callers=['0xba3100']
+  winmm.dll!midiInGetDevCapsW          callers=['0xba2a40', '0xba2c00']
+  winmm.dll!midiInGetErrorTextW        callers=['0xba26a0']
+  winmm.dll!midiInGetNumDevs           callers=['0xba24f0', '0xba2a40', '0xba2c00']
+  winmm.dll!midiInOpen                 callers=['0xba3010']
+  winmm.dll!midiInPrepareHeader        callers=['0xba24a0', '0xba2dd0']
+  winmm.dll!midiInReset                callers=['0xba3100']
+  winmm.dll!midiInStart                callers=['0xba31b0']
+  winmm.dll!midiInStop                 callers=['0xba31e0']
+  winmm.dll!midiInUnprepareHeader      callers=['0xba2f60']
+  winmm.dll!midiOutClose               callers=['0xba4af0']
+  winmm.dll!midiOutGetDevCapsW         callers=['0xba4420', '0xba45e0', '0xba47b0']
+  winmm.dll!midiOutGetErrorTextW       callers=['0xba4070']
+  winmm.dll!midiOutGetNumDevs          callers=['0xba3f60', '0xba4420', '0xba45e0', '0xba47b0']
+  winmm.dll!midiOutLongMsg             callers=['0xba4a40']
+  winmm.dll!midiOutOpen                callers=['0xba4950']
+  winmm.dll!midiOutPrepareHeader       callers=['0xba4a40']
+  winmm.dll!midiOutShortMsg            callers=['0xba4a20']
+  winmm.dll!midiOutUnprepareHeader     callers=['0xba3f30']
+  winmm.dll!timeGetTime distinct caller functions = 68
+  anchor 'ASIO: CreateBuffers failed with error %d': [('0xc57a00', 3106)]
+  anchor 'ASIO: GetLatencies failed with error %d': [('0xc57760', 178), ('0xc57a00', 3106)]
+  anchor 'ASIO: GetSamplePosition failed with error %d': [('0xc57420', 161)]
+  anchor 'ASIO: GetSampleRate failed with error %d': [('0xc57550', 203)]
+  anchor 'ASIO driver is not open.': [('0xc57a00', 3106)]
+  anchor "Couldn't create the primary DirectSound buffer.": [('0x12afb50', 640)]
+  anchor "Couldn't create the streaming ASIO buffer.": [('0xc57a00', 3106)]
+  anchor "Couldn't init the ASIO driver.": [('0xc589b0', 19639)]
+  anchor "Couldn't open the ASIO driver.": [('0xc589b0', 19639)]
+  anchor 'Error while accessing the ASIO driver.': [('0xc589b0', 19639)]
+  anchor 'Could not open ASIO control panel: ': [('0x135d460', 128)]
+  anchor 'MIDI input overflow detected': []
+
+### [2] FLEngine ASIO/DirectSound vtable 呼出面 (fl_asio_surface.py)
+## ASIO wrapper functions (IASIO method called)
+  0xc53da0 size= 22 [+0x60] canSampleRate
+  0xc53dc0 size= 25 [+0xa8] controlPanel
+  0xc53de0 size= 35 [+0x98] createBuffers
+  0xc53e10 size= 25 [+0xa0] disposeBuffers
+  0xc53e30 size= 32 [+0x58] getBufferSize
+  0xc53e50 size= 25 [+0x90] getChannelInfo
+  0xc53e70 size= 22 [+0x48] getChannels
+  0xc53e90 size= 22 [+0x78] getClockSources
+  0xc53eb0 size= 24 [+0x20] getDriverName
+  0xc53ed0 size= 22 [+0x28] getDriverVersion
+  0xc53ef0 size= 22 [+0x50] getLatencies
+  0xc53f10 size= 25 [+0x88] getSamplePosition
+  0xc53f30 size= 22 [+0x68] getSampleRate
+  0xc53f50 size= 22 [+0x18] init
+  0xc53f70 size= 25 [+0xb8] outputReady
+  0xc53f90 size= 25 [+0x80] setClockSource
+  0xc53fb0 size= 22 [+0x70] setSampleRate
+  0xc53fd0 size= 22 [+0x38] start
+  0xc53ff0 size= 22 [+0x40] stop
+  -> 19 distinct methods: ['canSampleRate', 'controlPanel', 'createBuffers', 'disposeBuffers', 'getBufferSize', 'getChannelInfo', 'getChannels', 'getClockSources', 'getDriverName', 'getDriverVersion', 'getLatencies', 'getSamplePosition', 'getSampleRate', 'init', 'outputReady', 'setClockSource', 'setSampleRate', 'start', 'stop']
+  not wrapped (no direct FL call): ['getErrorMessage', 'future']
+## DirectSound vtable calls (functions 0x12ae000..0x12b2000, around DirectSoundCreate/Enumerate callers)
+  [+0x18] x4  IDirectSound::CreateSoundBuffer | IDirectSoundBuffer::GetCaps | IDirectSoundNotify::SetNotificationPositions
+  [+0x20] x2  IDirectSoundBuffer::GetCurrentPosition | IDirectSound::GetCaps
+  [+0x28] x3  IDirectSoundBuffer::GetFormat | IDirectSound::DuplicateSoundBuffer
+  [+0x30] x1  IDirectSound::SetCooperativeLevel | IDirectSoundBuffer::GetVolume
+  [+0x58] x2  IDirectSoundBuffer::Lock
+  [+0x60] x1  IDirectSoundBuffer::Play
+  [+0x68] x1  IDirectSoundBuffer::SetCurrentPosition
+  [+0x70] x1  IDirectSoundBuffer::SetFormat
+  [+0x78] x3  IDirectSoundBuffer::SetVolume
+  [+0x88] x1  IDirectSoundBuffer::SetFrequency
+  [+0x90] x1  IDirectSoundBuffer::Stop
+  [+0x98] x2  IDirectSoundBuffer::Unlock
+## ASIOCallbacks 構造体 VA = 0x16b87e9
+  callbacks[0] bufferSwitch          = 0xc57420 (size 161)
+  callbacks[1] sampleRateDidChange   = 0xc576b0 (size 14)
+  callbacks[2] asioMessage           = 0xc576c0 (size 152)
+  callbacks[3] bufferSwitchTimeInfo  = 0xc56ae0 (size 2353)
+
+### [3] GUID 走査 (scan_guids.py)
+## /home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin
+  IID_IUnknown: ['0x4034d5', '0x4035b8', '0x403898', '0x44d538', '0x461ef8', '0x4cbbd8']
+  IID_IDirectSoundNotify: ['0x12afa0e']
+  KSDATAFORMAT_SUBTYPE_PCM: ['0x13e9488']
+  KSDATAFORMAT_SUBTYPE_IEEE_FLOAT: ['0x13e9498']
+## /home/ubuntu/work/analysis/win64/extracted/block00001_PE.bin
+  CLSID_MMDeviceEnumerator: ['0x180065610']
+  IID_IMMDeviceEnumerator: ['0x180065620']
+  IID_IMMNotificationClient: ['0x180065f08']
+  IID_IAudioClient: ['0x180065c10']
+  IID_IAudioRenderClient: ['0x180065c20']
+  IID_IAudioCaptureClient: ['0x180065c30']
+  IID_IUnknown: ['0x180065fb0']
+  IID_IClassFactory: ['0x180065fd0']
+  KSDATAFORMAT_SUBTYPE_IEEE_FLOAT: ['0x180065ef8']
+
+### [4] ILWASAPI2ASIO_x64.dll: ILWasapiToAsioDriver vtable / 報告値 (ilw_vtable.py, ilw_consts.py)
+== .?AVILWasapiToAsioDriver@@ vtable@0x1800657e0 (COL off=0) slots=32
+  [ 0] 0x1800032c0 QueryInterface
+  [ 1] 0x1800030b0 AddRef
+  [ 2] 0x1800032d0 Release
+  [ 3] 0x180003ad0 init
+  [ 4] 0x1800038d0 getDriverName
+  [ 5] 0x180003900 getDriverVersion
+  [ 6] 0x180003930 getErrorMessage
+  [ 7] 0x180003f70 start
+  [ 8] 0x180003fc0 stop
+  [ 9] 0x180003870 getChannels
+  [10] 0x180003950 getLatencies
+  [11] 0x180003770 getBufferSize
+  [12] 0x180003380 canSampleRate
+  [13] 0x180003a80 getSampleRate
+  [14] 0x180003f50 setSampleRate
+  [15] 0x180003890 getClockSources
+  [16] 0x180003eb0 setClockSource
+  [17] 0x180003a10 getSamplePosition
+  [18] 0x1800037a0 getChannelInfo
+  [19] 0x180003570 createBuffers
+  [20] 0x1800036e0 disposeBuffers
+  [21] 0x180003560 controlPanel
+  [22] 0x180003710 future
+  [23] 0x180003cc0 outputReady
+  [24] 0x180074050 ?
+  [25] 0x180003290 ?
+  [26] 0x1800013a0 ?
+canSampleRate constants: []
+  canSampleRate: 22050.0
+  canSampleRate: 44100.0
+  canSampleRate: 48000.0
+  canSampleRate: 96000.0
+  canSampleRate: 192000.0
+  slot4 movsd rip-> 0x1800658f0: b'FL Studio ASIO'
+  slot4 mov rip-> 0x1800658f8: b'o ASIO'
+  slot4 movzx rip-> 0x1800658fc: b'IO'
+  slot4 movzx rip-> 0x1800658fe: b''
+  slot15 movsd rip-> 0x180065968: b'Internal'
+  slot15 movzx rip-> 0x180065970: b''
+  slot18 lea rip-> 0x18006597c: b'Out %i'
+  slot18 lea rip-> 0x180065974: b'In %i'
+
+### [5] macOS FLEngine x86_64 slice: CoreAudio/AudioToolbox/CoreMIDI undefined symbols (llvm-nm)
+_AudioComponentFindNext (from AudioToolbox)
+_AudioComponentInstanceDispose (from AudioToolbox)
+_AudioComponentInstanceNew (from AudioToolbox)
+_AudioObjectAddPropertyListener (from CoreAudio)
+_AudioObjectGetPropertyData (from CoreAudio)
+_AudioObjectGetPropertyDataSize (from CoreAudio)
+_AudioObjectRemovePropertyListener (from CoreAudio)
+_AudioObjectSetPropertyData (from CoreAudio)
+_AudioOutputUnitStart (from AudioToolbox)
+_AudioOutputUnitStop (from AudioToolbox)
+_AudioUnitGetProperty (from AudioToolbox)
+_AudioUnitInitialize (from AudioToolbox)
+_AudioUnitRender (from AudioToolbox)
+_AudioUnitSetProperty (from AudioToolbox)
+_AudioUnitUninitialize (from AudioToolbox)
+_MIDIClientCreate (from CoreMIDI)
+_MIDIClientDispose (from CoreMIDI)
+_MIDIGetDestination (from CoreMIDI)
+_MIDIGetNumberOfDestinations (from CoreMIDI)
+_MIDIGetNumberOfDevices (from CoreMIDI)
+_MIDIGetNumberOfSources (from CoreMIDI)
+_MIDIGetSource (from CoreMIDI)
+_MIDIInputPortCreate (from CoreMIDI)
+_MIDIObjectGetStringProperty (from CoreMIDI)
+_MIDIOutputPortCreate (from CoreMIDI)
+_MIDIPacketListAdd (from CoreMIDI)
+_MIDIPacketListInit (from CoreMIDI)
+_MIDIPortConnectSource (from CoreMIDI)
+_MIDIPortDisconnectSource (from CoreMIDI)
+_MIDIPortDispose (from CoreMIDI)
+_MIDISend (from CoreMIDI)

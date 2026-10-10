@@ -1,0 +1,298 @@
+/* flasio.c — ASIO 互換層 (コールバック駆動 bufferSwitch を shim スレッドから SAB リングへ)。
+ * 設計: docs/PROTOCOL.md §3。ILWASAPI2ASIO_x64 実測値 (2in/2out, Float32LSB, "Internal" clock,
+ * 22050/44100/48000/96000/192000, outputReady=ASE_NotPresent) を既定とする。 */
+#include "flasio.h"
+#include "flaudio.h"
+#include <emscripten.h>
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define LD(x) __atomic_load_n(&(x), __ATOMIC_SEQ_CST)
+
+#define FLASIO_NUM_IN  2
+#define FLASIO_NUM_OUT 2
+
+static struct {
+    int inited, created, running;
+    ASIOCallbacks cb;
+    double sr;
+    uint32_t B, depth, hint;
+    int nOut, nIn;                          /* ring に開くチャネル数 (使用最大 index + 1) */
+    int useOut[FLA_MAX_CH], useIn[FLA_MAX_CH];
+    float *obuf[2][FLA_MAX_CH], *ibuf[2][FLA_MAX_CH];
+    pthread_t th;
+    volatile int stop;
+    uint32_t ready;
+    uint32_t reset_requests, latency_changes, T, timeinfo_cb;
+    int use_timeinfo, notify_lat;
+} A = { .sr = 48000.0, .depth = 2, .hint = 0 };
+
+static void wake32(uint32_t *a) { __builtin_wasm_memory_atomic_notify((int *)a, 0x7fffffff); }
+
+void flasio_set_notify_latency_changes(int on) { A.notify_lat = on; }
+
+void flasio_configure(uint32_t depth, uint32_t latency_hint) {
+    if (A.created) fla_failfast("flasio_configure", "must be called before CreateBuffers");
+    if (depth < 2 || depth > 8) fla_failfast("flasio_configure", "depth in [2,8]");
+    A.depth = depth; A.hint = latency_hint;
+}
+
+ASIOBool flasio_init(void *sysHandle) {
+    (void)sysHandle;
+    A.inited = 1;
+    return 1;
+}
+void flasio_get_driver_name(char name[32]) { memset(name, 0, 32); strcpy(name, "FL Studio ASIO"); }
+ASIOLong flasio_get_driver_version(void) { return 1; }
+
+static void need_init(const char *api) { if (!A.inited) fla_failfast(api, "driver not initialised (call flasio_init)"); }
+
+ASIOError flasio_get_channels(ASIOLong *numIn, ASIOLong *numOut) {
+    need_init("flasio_get_channels");
+    *numIn = FLASIO_NUM_IN; *numOut = FLASIO_NUM_OUT;
+    return ASE_OK;
+}
+
+ASIOError flasio_get_buffer_size(ASIOLong *minS, ASIOLong *maxS, ASIOLong *prefS, ASIOLong *gran) {
+    need_init("flasio_get_buffer_size");
+#if FLASIO_PROFILE_ILWASAPI
+    *minS = 256; *maxS = 4096; *gran = 0;
+#else
+    *minS = FLA_QUANTUM; *maxS = 4096; *gran = FLA_QUANTUM;
+#endif
+    *prefS = A.created ? (ASIOLong)A.B : 512;
+    return ASE_OK;
+}
+
+ASIOError flasio_can_sample_rate(double r) {
+    need_init("flasio_can_sample_rate");
+    static const double ok[] = { 22050.0, 44100.0, 48000.0, 96000.0, 192000.0 };
+    for (unsigned i = 0; i < sizeof ok / sizeof ok[0]; i++) if (r == ok[i]) return ASE_OK;
+    return ASE_NoClock;
+}
+ASIOError flasio_get_sample_rate(double *r) { need_init("flasio_get_sample_rate"); *r = A.sr; return ASE_OK; }
+ASIOError flasio_set_sample_rate(double r) {
+    need_init("flasio_set_sample_rate");
+    if (flasio_can_sample_rate(r) != ASE_OK) return ASE_NoClock;
+    if (A.running) return ASE_InvalidMode;
+    if (r == A.sr) return ASE_OK;
+    if (A.created) {
+        fla_ctl_t *c = fla_ctl();
+        c->sample_rate = (uint32_t)r;
+        if (fla_cmd(FLA_CMD_SET_SR, (uint32_t)r, 0, 0, 0, NULL, 10000) != 0) return ASE_HWMalfunction;
+    }
+    A.sr = r;
+    if (A.cb.sampleRateDidChange) A.cb.sampleRateDidChange(r);
+    return ASE_OK;
+}
+ASIOError flasio_get_clock_sources(ASIOClockSource *clocks, ASIOLong *num) {
+    need_init("flasio_get_clock_sources");
+    memset(clocks, 0, sizeof *clocks);
+    clocks[0].index = 0; clocks[0].associatedChannel = -1; clocks[0].associatedGroup = -1;
+    clocks[0].isCurrentSource = 1; strcpy(clocks[0].name, "Internal");
+    *num = 1;
+    return ASE_OK;
+}
+ASIOError flasio_set_clock_source(ASIOLong ref) { need_init("flasio_set_clock_source"); return ref == 0 ? ASE_OK : ASE_InvalidParameter; }
+
+ASIOError flasio_get_channel_info(ASIOChannelInfo *info) {
+    need_init("flasio_get_channel_info");
+    int n = info->isInput ? FLASIO_NUM_IN : FLASIO_NUM_OUT;
+    if (info->channel < 0 || info->channel >= n) return ASE_InvalidParameter;
+    info->type = ASIOSTFloat32LSB; info->channelGroup = 0;
+    info->isActive = A.created && (info->isInput ? A.useIn[info->channel] : A.useOut[info->channel]);
+    snprintf(info->name, sizeof info->name, info->isInput ? "In %i" : "Out %i", info->channel + 1);
+    return ASE_OK;
+}
+
+ASIOError flasio_get_latencies(ASIOLong *inLat, ASIOLong *outLat) {
+    need_init("flasio_get_latencies");
+    if (!A.created) { *inLat = *outLat = 0; return ASE_OK; }   /* ASIO 仕様: CreateBuffers 後のみ有効 */
+    fla_ctl_t *c = fla_ctl();
+    double hw_out = (LD(c->base_latency_us) + LD(c->out_latency_us)) * 1e-6 * A.sr;
+    double hw_in = LD(c->base_latency_us) * 1e-6 * A.sr;
+    *outLat = (ASIOLong)(A.depth * A.B + FLA_QUANTUM + hw_out + 0.5);   /* depth は動的拡張後の値 */
+    *inLat = (ASIOLong)(A.B + FLA_QUANTUM + hw_in + 0.5);
+    return ASE_OK;
+}
+
+ASIOError flasio_create_buffers(ASIOBufferInfo *infos, ASIOLong n, ASIOLong bufferSize, ASIOCallbacks *cb) {
+    need_init("flasio_create_buffers");
+    if (A.created) return ASE_InvalidMode;
+    if (!infos || n <= 0 || !cb) return ASE_InvalidParameter;
+    if (!cb->bufferSwitch) fla_failfast("flasio_create_buffers", "ASIOCallbacks.bufferSwitch is NULL");
+    if (bufferSize < (ASIOLong)FLA_QUANTUM || bufferSize > 4096 || bufferSize % FLA_QUANTUM) return ASE_InvalidMode;
+    memset(A.useOut, 0, sizeof A.useOut); memset(A.useIn, 0, sizeof A.useIn);
+    int nOut = 0, nIn = 0;
+    for (int i = 0; i < n; i++) {
+        int ch = infos[i].channelNum;
+        if (ch < 0 || ch >= (infos[i].isInput ? FLASIO_NUM_IN : FLASIO_NUM_OUT)) return ASE_InvalidMode;
+        if (infos[i].isInput) { A.useIn[ch] = 1; if (ch + 1 > nIn) nIn = ch + 1; }
+        else { A.useOut[ch] = 1; if (ch + 1 > nOut) nOut = ch + 1; }
+    }
+    if (nOut == 0) nOut = 1;                    /* 出力ゼロ指定でも ring は 1ch 必要 */
+    A.B = (uint32_t)bufferSize; A.nOut = nOut; A.nIn = nIn; A.cb = *cb;
+    if (fla_open((uint32_t)A.sr, (uint32_t)nOut, (uint32_t)nIn, A.B, A.depth, FLA_F_DECLICK | (A.hint << 8)) != 0) return ASE_NotPresent;
+    A.depth = fla_ctl()->depth;                 /* burst に合わせて自動拡張された実効 depth */
+    for (int b = 0; b < 2; b++) {
+        for (int ch = 0; ch < nOut; ch++) A.obuf[b][ch] = calloc(A.B, sizeof(float));
+        for (int ch = 0; ch < nIn; ch++) A.ibuf[b][ch] = calloc(A.B, sizeof(float));
+    }
+    for (int i = 0; i < n; i++) {
+        int ch = infos[i].channelNum;
+        for (int b = 0; b < 2; b++) infos[i].buffers[b] = infos[i].isInput ? (void *)A.ibuf[b][ch] : (void *)A.obuf[b][ch];
+    }
+    /* ホストの対応メッセージ問い合わせ (ASIO ハンドシェイク) */
+    A.use_timeinfo = 0;
+    if (cb->asioMessage) {
+        cb->asioMessage(kAsioSelectorSupported, kAsioEngineVersion, NULL, NULL);
+        cb->asioMessage(kAsioEngineVersion, 0, NULL, NULL);
+        /* FL の asioMessage は kAsioSupportsTimeInfo に 1 を返す (実測) → bufferSwitchTimeInfo 経路を使う */
+        if (cb->asioMessage(kAsioSelectorSupported, kAsioSupportsTimeInfo, NULL, NULL) == 1 &&
+            cb->asioMessage(kAsioSupportsTimeInfo, 0, NULL, NULL) == 1 && cb->bufferSwitchTimeInfo)
+            A.use_timeinfo = 1;
+    }
+    A.created = 1;
+    return ASE_OK;
+}
+
+static void do_buffer(int idx) {
+    fla_ctl_t *c = fla_ctl();
+    if (A.nIn) fla_in_read(A.ibuf[idx], A.B);       /* 入力 buffers[idx] を更新してからコールバック */
+    for (int ch = 0; ch < A.nOut; ch++) memset(A.obuf[idx][ch], 0, A.B * sizeof(float));
+    double t0 = emscripten_get_now();
+    if (A.use_timeinfo) {
+        ASIOTime t;
+        memset(&t, 0, sizeof t);
+        fla_clock_t k;
+        fla_clock_read(&k);
+        uint64_t pos = k.pos_frames > k.play_start ? k.pos_frames - k.play_start : 0;
+        t.timeInfo.samplePosition.hi = (uint32_t)(pos >> 32); t.timeInfo.samplePosition.lo = (uint32_t)pos;
+        t.timeInfo.systemTime.hi = (uint32_t)(k.audible_ns >> 32); t.timeInfo.systemTime.lo = (uint32_t)k.audible_ns;
+        t.timeInfo.sampleRate = A.sr; t.timeInfo.speed = 1.0;
+        t.timeInfo.flags = kSampleRateValid | kSamplePositionValid | (k.audible_ns ? kSystemTimeValid : 0);
+        A.timeinfo_cb++;
+        A.cb.bufferSwitchTimeInfo(&t, idx, 1);
+    } else {
+        A.cb.bufferSwitch(idx, 1);
+    }
+    double us = (emscripten_get_now() - t0) * 1000.0;
+    uint32_t u = (uint32_t)us;
+    c->cb_count++;
+    c->cb_sum_us_lo += u;
+    if (u > c->cb_max_us) c->cb_max_us = u;
+    fla_out_write((const float *const *)A.obuf[idx], A.B);
+}
+
+static void *thread_fn(void *arg) {
+    (void)arg;
+    fla_ctl_t *c = fla_ctl();
+    int idx = 0;
+    for (uint32_t k = 0; k < A.depth; k++) { do_buffer(idx); idx ^= 1; }     /* prefill (ASIO: 起動時に連続 bufferSwitch) */
+    c->cb_count = 0; c->cb_sum_us_lo = 0; c->cb_max_us = 0; c->in_underflows = 0;   /* prefill 分は統計から除外 */
+    fla_go();
+    __atomic_store_n(&A.ready, 1, __ATOMIC_SEQ_CST);
+    wake32(&A.ready);
+    /* 目標充填 T の動的調整: (1) worklet が観測した最長バースト + 25% + B を下限に (2) underrun 毎に +B (上限 ring-2B)。
+     * 下げる方向は無し (セッション内)。変更時はホストへ kAsioLatenciesChanged。 */
+    uint32_t T = A.depth * A.B, T0 = T, esc = 0, last_u = 0;
+    const uint32_t Tmax = c->ring_frames - 2 * A.B;
+    while (!A.stop) {
+        uint32_t burst = LD(c->burst_obs);
+        uint32_t need = (burst + burst / 4 + A.B + A.B - 1) / A.B * A.B;
+        uint32_t u = LD(c->underruns);
+        if (u != last_u) { esc += A.B; last_u = u; }
+        uint32_t Tn = (need > T0 ? need : T0) + esc;
+        if (Tn > Tmax) Tn = Tmax;
+        if (Tn > T) {
+            T = Tn; A.depth = T / A.B; A.T = T;
+            c->depth = T / A.B; A.latency_changes++;
+            if (A.notify_lat && A.cb.asioMessage) A.cb.asioMessage(kAsioLatenciesChanged, 0, NULL, NULL);
+        }
+        int rc = fla_out_wait_fill_le(T - A.B, 50);
+        uint32_t ev = __atomic_exchange_n(&c->dev_events, 0, __ATOMIC_SEQ_CST);
+        if (ev & (FLA_EV_CLOSED | FLA_EV_SUSPENDED | FLA_EV_RATE_CHANGED)) {
+            A.reset_requests++;
+            if (A.cb.asioMessage) A.cb.asioMessage(kAsioResetRequest, 0, NULL, NULL);
+        }
+        if (rc < 0) break;
+        if (rc == 1) continue;
+        uint32_t fill = fla_out_fill();
+        if (fill < c->min_fill) c->min_fill = fill;
+        c->fill_sum_lo += fill; c->fill_samples++;
+        if (fill < FLA_QUANTUM) c->cb_late++;
+        do_buffer(idx); idx ^= 1;
+    }
+    return NULL;
+}
+
+ASIOError flasio_start(void) {
+    need_init("flasio_start");
+    if (!A.created) return ASE_InvalidMode;
+    if (A.running) return ASE_OK;
+    fla_halt();
+    fla_reset_indexes();
+    A.stop = 0; A.ready = 0;
+    if (pthread_create(&A.th, NULL, thread_fn, NULL) != 0) return ASE_HWMalfunction;
+    while (!__atomic_load_n(&A.ready, __ATOMIC_SEQ_CST))
+        __builtin_wasm_memory_atomic_wait32((int *)&A.ready, 0, 50 * 1000000LL);
+    A.running = 1;
+    return ASE_OK;
+}
+
+ASIOError flasio_stop(void) {
+    need_init("flasio_stop");
+    if (!A.running) return ASE_OK;
+    A.stop = 1;
+    wake32(&fla_ctl()->out_read);
+    pthread_join(A.th, NULL);
+    fla_halt();
+    A.running = 0;
+    return ASE_OK;
+}
+
+ASIOError flasio_dispose_buffers(void) {
+    need_init("flasio_dispose_buffers");
+    flasio_stop();
+    if (!A.created) return ASE_InvalidMode;
+    fla_close();
+    for (int b = 0; b < 2; b++) {
+        for (int ch = 0; ch < A.nOut; ch++) { free(A.obuf[b][ch]); A.obuf[b][ch] = NULL; }
+        for (int ch = 0; ch < A.nIn; ch++) { free(A.ibuf[b][ch]); A.ibuf[b][ch] = NULL; }
+    }
+    A.created = 0;
+    return ASE_OK;
+}
+
+ASIOError flasio_get_sample_position(ASIOSamples *sPos, ASIOSamples *tStamp) {
+    need_init("flasio_get_sample_position");
+    if (!A.running) return ASE_SPNotAdvancing;
+    fla_clock_t k;
+    fla_clock_read(&k);
+    uint64_t pos = k.pos_frames > k.play_start ? k.pos_frames - k.play_start : 0;
+    sPos->hi = (uint32_t)(pos >> 32); sPos->lo = (uint32_t)pos;
+    tStamp->hi = (uint32_t)(k.audible_ns >> 32); tStamp->lo = (uint32_t)k.audible_ns;
+    return ASE_OK;
+}
+
+ASIOError flasio_output_ready(void) { need_init("flasio_output_ready"); return ASE_NotPresent; }  /* ILWASAPI 実測: 0xfffffc18 */
+ASIOError flasio_control_panel(void) { need_init("flasio_control_panel"); return ASE_OK; }
+ASIOError flasio_future(ASIOLong selector, void *opt) { (void)selector; (void)opt; need_init("flasio_future"); return ASE_InvalidParameter; }
+
+void flasio_get_stats(flasio_stats_t *s) {
+    fla_ctl_t *c = fla_ctl();
+    memset(s, 0, sizeof *s);
+    s->cb_count = c->cb_count; s->cb_late = c->cb_late; s->cb_max_us = c->cb_max_us;
+    s->cb_avg_us = c->cb_count ? c->cb_sum_us_lo / c->cb_count : 0;
+    s->underruns = LD(c->underruns); s->silence_frames = LD(c->silence_frames); s->in_overruns = LD(c->in_overruns);
+    s->in_underflows = c->in_underflows;
+    s->min_fill = c->min_fill; s->avg_fill = c->fill_sum_lo ? c->fill_sum_lo / (c->fill_samples ? c->fill_samples : 1) : 0;
+    s->wake_count = c->wake_count; s->wait_timeouts = c->wait_timeouts;
+    s->buffer_frames = A.B; s->depth = A.depth; s->ring_frames = c->ring_frames; s->quanta = LD(c->quanta);
+    s->reset_requests = A.reset_requests;
+    s->timeinfo_cb = A.timeinfo_cb; s->latency_changes = A.latency_changes; s->T = A.depth * A.B; s->burst_obs = LD(c->burst_obs);
+    for (int k = 0; k < 6; k++) s->wake_hist[k] = c->wake_hist[k];
+}
+

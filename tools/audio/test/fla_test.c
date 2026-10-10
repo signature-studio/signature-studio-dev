@@ -1,0 +1,284 @@
+/* fla_test.c — shim PoC テストプログラム (emcc -pthread, PROXY_TO_PTHREAD=1 で main が worker 上で走る)。
+ * 引数: api=asio|wasapi mode=sine|ramp|loop buf=256 depth=2 secs=10 sr=48000 stress=0 work_us=0
+ *       hiccup_ms=0 hiccup_every=0 profile=0
+ * 結果は g_result (JSON 文字列) + g_done (futex) で main thread JS へ返す。 */
+#include "flasio.h"
+#include "flwasapi.h"
+#include "flaudio.h"
+#include <emscripten.h>
+#include <math.h>
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+static struct {
+    int asio; int apikind; int mode; /* 0 sine 1 ramp 2 loop */
+    uint32_t buf, depth, sr, stress, work_us, hiccup_ms, hiccup_every, timeinfo, sr_after;
+    double secs;
+} P = { .asio = 1, .mode = 0, .buf = 256, .depth = 2, .sr = 48000, .secs = 10 };
+
+static char g_result[8192];
+static uint32_t g_done;
+EMSCRIPTEN_KEEPALIVE uint32_t *fla_test_done_ptr(void) { return &g_done; }
+EMSCRIPTEN_KEEPALIVE char *fla_test_result_ptr(void) { return g_result; }
+
+static float *g_obuf[2][2], *g_ibuf[2][2];
+static uint64_t g_n;           /* producer 側の生成フレーム数 (prefill 含む) */
+static volatile int g_stress_stop;
+static uint32_t g_cbs_since;
+
+static void spin_us(double us) {
+    double t0 = emscripten_get_now();
+    while ((emscripten_get_now() - t0) * 1000.0 < us) { }
+}
+
+static void gen_block(float *o0, float *o1, const float *i0, const float *i1, uint32_t frames) {
+    for (uint32_t k = 0; k < frames; k++) {
+        uint64_t n = g_n + k;
+        if (P.mode == 0) {
+            o0[k] = (float)(0.5 * sin(2.0 * M_PI * 440.0 * (double)n / (double)P.sr));
+            o1[k] = (float)(0.5 * sin(2.0 * M_PI * 660.0 * (double)n / (double)P.sr));
+        } else if (P.mode == 1) {
+            o0[k] = (float)((n & 0xFFFFFFu) + 1);
+            o1[k] = -(float)((n & 0xFFFFFFu) + 1);
+        } else {
+            o0[k] = i0 ? i0[k] : 0.f;
+            o1[k] = i1 ? i1[k] : 0.f;
+        }
+    }
+    g_n += frames;
+}
+
+static void load_sim(void) {
+    if (P.work_us) spin_us(P.work_us);
+    if (P.hiccup_every && ++g_cbs_since >= P.hiccup_every) { g_cbs_since = 0; spin_us(P.hiccup_ms * 1000.0); }
+}
+
+static void bufferSwitch(ASIOLong idx, ASIOBool direct) {
+    (void)direct;
+    gen_block(g_obuf[idx][0], g_obuf[idx][1], g_ibuf[idx][0], g_ibuf[idx][1], P.buf);
+    load_sim();
+}
+static uint32_t g_resets, g_rate_changes;
+static uint64_t g_ti_last; static uint32_t g_ti_bad, g_ti_n;
+static ASIOTime *bufferSwitchTimeInfo(ASIOTime *t, ASIOLong idx, ASIOBool direct) {
+    uint64_t pos = ((uint64_t)t->timeInfo.samplePosition.hi << 32) | t->timeInfo.samplePosition.lo;
+    if (g_ti_n && pos < g_ti_last) g_ti_bad++;            /* サンプル位置の単調性 */
+    if (t->timeInfo.sampleRate != (double)P.sr) g_ti_bad++;
+    g_ti_last = pos; g_ti_n++;
+    bufferSwitch(idx, direct);
+    return NULL;
+}
+static void sampleRateDidChange(double r) { (void)r; g_rate_changes++; }
+static ASIOLong asioMessage(ASIOLong sel, ASIOLong val, void *msg, double *opt) {
+    (void)msg; (void)opt;
+    switch (sel) {
+    case kAsioSelectorSupported: return (val >= 2 && val <= 6) || (P.timeinfo && val == kAsioSupportsTimeInfo) ? 1 : 0;
+    case kAsioSupportsTimeInfo: return P.timeinfo ? 1 : 0;
+    case kAsioEngineVersion: return 2;
+    case kAsioResetRequest: g_resets++; return 1;
+    default: return 0;
+    }
+}
+
+static void *stress_fn(void *a) { (void)a; volatile uint64_t x = 0; while (!g_stress_stop) x++; return NULL; }
+
+static void wait_ms(double ms) {
+    static uint32_t dummy;
+    __builtin_wasm_memory_atomic_wait32((int *)&dummy, 0, (int64_t)(ms * 1e6));
+}
+
+typedef struct { double pos, ns, now_ms; } pos_sample_t;
+
+static int fit_rate(const pos_sample_t *s, int n, double *rate, double *offs_ms, double *rate_resid_ppm) {
+    if (n < 4) return -1;
+    double sx = 0, sy = 0, sxx = 0, sxy = 0;
+    const double x0 = s[0].ns * 1e-9, y0 = s[0].pos;
+    for (int i = 0; i < n; i++) { double x = s[i].ns * 1e-9 - x0, y = s[i].pos - y0; sx += x; sy += y; sxx += x * x; sxy += x * y; }
+    double d = n * sxx - sx * sx;
+    if (d == 0) return -1;
+    *rate = (n * sxy - sx * sy) / d;
+    double mean_off = 0;
+    for (int i = 0; i < n; i++) mean_off += s[i].ns * 1e-6 - s[i].now_ms;
+    *offs_ms = mean_off / n;
+    *rate_resid_ppm = 0;
+    return 0;
+}
+
+static int run_asio(char *j, size_t jn) {
+    ASIOLong nin, nout, mn, mx, pref, gran;
+    char name[32];
+    flasio_init(NULL);
+    flasio_get_driver_name(name);
+    flasio_get_channels(&nin, &nout);
+    flasio_get_buffer_size(&mn, &mx, &pref, &gran);
+    if (flasio_can_sample_rate((double)P.sr) != ASE_OK) { snprintf(j, jn, "{\"error\":\"canSampleRate\"}"); return 1; }
+    if (P.sr != 48000 && flasio_set_sample_rate((double)P.sr) != ASE_OK) { snprintf(j, jn, "{\"error\":\"setSampleRate\"}"); return 1; }
+    flasio_configure(P.depth, 0);
+    ASIOBufferInfo infos[4]; int n = 0;
+    for (int c = 0; c < 2; c++) { infos[n].isInput = 0; infos[n].channelNum = c; n++; }
+    if (P.mode == 2) for (int c = 0; c < 2; c++) { infos[n].isInput = 1; infos[n].channelNum = c; n++; }
+    ASIOCallbacks cb = { bufferSwitch, sampleRateDidChange, asioMessage, P.timeinfo ? bufferSwitchTimeInfo : NULL };
+    ASIOError e = flasio_create_buffers(infos, n, (ASIOLong)P.buf, &cb);
+    if (e != ASE_OK) { snprintf(j, jn, "{\"error\":\"createBuffers\",\"code\":%d}", e); return 1; }
+    for (int i = 0; i < n; i++)
+        for (int b = 0; b < 2; b++) (infos[i].isInput ? g_ibuf : g_obuf)[b][infos[i].channelNum] = infos[i].buffers[b];
+    if (P.sr_after) {   /* CreateBuffers 後・Start 前の SetSampleRate → main が AudioContext を再生成 */
+        if (flasio_set_sample_rate((double)P.sr_after) != ASE_OK) { snprintf(j, jn, "{\"error\":\"setSampleRate_after\"}"); return 1; }
+        P.sr = P.sr_after;
+    }
+    ASIOLong lin, lout;
+    flasio_get_latencies(&lin, &lout);
+    ASIOChannelInfo ci = { .channel = 0, .isInput = 0 };
+    flasio_get_channel_info(&ci);
+    for (uint32_t k = 0; k < P.stress; k++) { pthread_t t; pthread_create(&t, NULL, stress_fn, NULL); pthread_detach(t); }
+    if (flasio_start() != ASE_OK) { snprintf(j, jn, "{\"error\":\"start\"}"); return 1; }
+    double t0 = emscripten_get_now();
+    pos_sample_t smp[256]; int ns = 0;
+    int mono = 1; double lastpos = -1;
+    while (emscripten_get_now() - t0 < P.secs * 1000.0) {
+        wait_ms(250);
+        ASIOSamples sp, ts;
+        if (flasio_get_sample_position(&sp, &ts) == ASE_OK && ns < 256) {
+            double pos = (double)(((uint64_t)sp.hi << 32) | sp.lo);
+            uint64_t t = ((uint64_t)ts.hi << 32) | ts.lo;
+            if (t) { smp[ns].pos = pos; smp[ns].ns = (double)t; smp[ns].now_ms = fla_now_ms(); ns++; }
+            if (pos < lastpos) mono = 0;
+            lastpos = pos;
+        }
+    }
+    double elapsed = emscripten_get_now() - t0;
+    flasio_stats_t st;
+    flasio_get_stats(&st);
+    flasio_get_latencies(&lin, &lout);
+    flasio_stop();
+    double rate = 0, offs = 0, rr = 0;
+    int fit = fit_rate(smp, ns, &rate, &offs, &rr);
+    flasio_dispose_buffers();
+    g_stress_stop = 1;
+    snprintf(j, jn,
+        "{\"api\":\"asio\",\"driver\":\"%s\",\"buf\":%u,\"depth\":%u,\"sr\":%u,\"mode\":%d,\"secs_wall\":%.3f,"
+        "\"reported\":{\"nin\":%d,\"nout\":%d,\"min\":%d,\"max\":%d,\"pref\":%d,\"gran\":%d,\"lat_in\":%d,\"lat_out\":%d,\"ch_type\":%d},"
+        "\"stats\":{\"cb_count\":%u,\"cb_late\":%u,\"cb_max_us\":%u,\"cb_avg_us\":%u,\"underruns\":%u,\"silence_frames\":%u,"
+        "\"in_overruns\":%u,\"in_underflows\":%u,\"min_fill\":%u,\"avg_fill\":%u,\"wake_count\":%u,\"wait_timeouts\":%u,"
+        "\"ring_frames\":%u,\"quanta\":%u,\"reset_requests\":%u,\"wake_hist\":[%u,%u,%u,%u,%u,%u],\"latency_changes\":%u,\"T\":%u,\"burst_obs\":%u,\"timeinfo_cb\":%u},\"timeinfo\":{\"calls\":%u,\"bad\":%u},"
+        "\"clock\":{\"samples\":%d,\"fit_ok\":%d,\"rate_hz\":%.3f,\"audible_minus_now_ms\":%.3f,\"monotonic\":%d},"
+        "\"produced_frames\":%llu,\"resets_seen\":%u,\"rate_changes\":%u}",
+        name, P.buf, st.depth, P.sr, P.mode, elapsed / 1000.0,
+        nin, nout, mn, mx, pref, gran, lin, lout, ci.type,
+        st.cb_count, st.cb_late, st.cb_max_us, st.cb_avg_us, st.underruns, st.silence_frames,
+        st.in_overruns, st.in_underflows, st.min_fill, st.avg_fill, st.wake_count, st.wait_timeouts,
+        st.ring_frames, st.quanta, st.reset_requests,
+        st.wake_hist[0], st.wake_hist[1], st.wake_hist[2], st.wake_hist[3], st.wake_hist[4], st.wake_hist[5], st.latency_changes, st.T, st.burst_obs, st.timeinfo_cb, g_ti_n, g_ti_bad,
+        ns, fit == 0, rate, offs, mono, (unsigned long long)g_n, g_resets, g_rate_changes);
+    return 0;
+}
+
+static int run_wasapi(char *j, size_t jn) {
+    flwasapi_fmt_t f; int64_t defp, minp;
+    flwasapi_get_mix_format(&f);
+    f.sample_rate = P.sr;
+    flwasapi_get_device_period(&defp, &minp);
+    int64_t period_hns = (int64_t)P.buf * 10000000LL / P.sr;
+    FLHR hr = flwasapi_initialize(FL_AUDCLNT_SHAREMODE_SHARED, FL_AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
+                                  period_hns * P.depth, period_hns, &f);
+    if (hr != FL_S_OK) { snprintf(j, jn, "{\"error\":\"initialize\",\"hr\":%d}", hr); return 1; }
+    uint32_t bufsize; int64_t lat;
+    flwasapi_get_buffer_size(&bufsize);
+    flwasapi_get_stream_latency(&lat);
+    flwasapi_set_event_handle(1);
+    for (uint32_t k = 0; k < P.stress; k++) { pthread_t t; pthread_create(&t, NULL, stress_fn, NULL); pthread_detach(t); }
+    /* prime: 全バッファを埋める */
+    float *data; float *o0 = malloc(bufsize * sizeof(float)), *o1 = malloc(bufsize * sizeof(float));
+    uint32_t calls = 0, polls = 0, timeouts = 0;
+    gen_block(o0, o1, NULL, NULL, bufsize);
+    flwasapi_render_get_buffer(bufsize, &data);
+    for (uint32_t i = 0; i < bufsize; i++) { data[2 * i] = o0[i]; data[2 * i + 1] = o1[i]; }
+    flwasapi_render_release_buffer(bufsize, 0);
+    flwasapi_start();
+    double t0 = emscripten_get_now();
+    double maxcb = 0, sumcb = 0;
+    while (emscripten_get_now() - t0 < P.secs * 1000.0) {
+        if (flwasapi_wait_event(100) != FL_WAIT_OBJECT_0) { timeouts++; continue; }
+        polls++;
+        uint32_t pad; flwasapi_get_current_padding(&pad);
+        uint32_t room = bufsize - pad;
+        if (room < P.buf) continue;
+        uint32_t frames = room / P.buf * P.buf;
+        double c0 = emscripten_get_now();
+        gen_block(o0, o1, NULL, NULL, frames);
+        load_sim();
+        if (flwasapi_render_get_buffer(frames, &data) != FL_S_OK) fla_failfast("test", "GetBuffer failed");
+        for (uint32_t i = 0; i < frames; i++) { data[2 * i] = o0[i]; data[2 * i + 1] = o1[i]; }
+        flwasapi_render_release_buffer(frames, 0);
+        double us = (emscripten_get_now() - c0) * 1000.0;
+        if (us > maxcb) maxcb = us;
+        sumcb += us; calls++;
+    }
+    double elapsed = emscripten_get_now() - t0;
+    fla_ctl_t *c = fla_ctl();
+    uint32_t underruns = __atomic_load_n(&c->underruns, __ATOMIC_SEQ_CST), sil = __atomic_load_n(&c->silence_frames, __ATOMIC_SEQ_CST);
+    uint32_t quanta = __atomic_load_n(&c->quanta, __ATOMIC_SEQ_CST);
+    flwasapi_release();
+    g_stress_stop = 1;
+    snprintf(j, jn,
+        "{\"api\":\"wasapi\",\"buf\":%u,\"depth\":%u,\"sr\":%u,\"mode\":%d,\"secs_wall\":%.3f,"
+        "\"reported\":{\"bufsize\":%u,\"stream_latency_hns\":%lld,\"default_period_hns\":%lld,\"min_period_hns\":%lld},"
+        "\"stats\":{\"fills\":%u,\"events\":%u,\"event_timeouts\":%u,\"fill_max_us\":%.1f,\"fill_avg_us\":%.1f,"
+        "\"underruns\":%u,\"silence_frames\":%u,\"quanta\":%u},\"produced_frames\":%llu}",
+        P.buf, P.depth, P.sr, P.mode, elapsed / 1000.0, bufsize, (long long)lat, (long long)defp, (long long)minp,
+        calls, polls, timeouts, maxcb, calls ? sumcb / calls : 0.0, underruns, sil, quanta, (unsigned long long)g_n);
+    free(o0); free(o1);
+    return 0;
+}
+
+/* 検証系 API の戻り値確認 (AudioContext を開かない) */
+static void cb_dummy(ASIOLong i, ASIOBool d) { (void)i; (void)d; }
+static int run_apicheck(char *j, size_t jn) {
+    ASIOCallbacks cb = { cb_dummy, NULL, NULL, NULL };
+    ASIOBufferInfo bi[1] = { { 0, 0, { 0, 0 } } };
+    ASIOBufferInfo bad_ch[1] = { { 0, 5, { 0, 0 } } };
+    flasio_init(NULL);
+    double sr = 0;
+    ASIOSamples sp, ts;
+    ASIOChannelInfo ci = { .channel = 7, .isInput = 0 };
+    ASIOClockSource cs; ASIOLong ncs = 0;
+    snprintf(j, jn,
+        "{\"api\":\"apicheck\",\"codes\":{\"createBuffers_100\":%d,\"createBuffers_8192\":%d,\"createBuffers_badch\":%d,\"createBuffers_nullinfo\":%d,"
+        "\"setSampleRate_12345\":%d,\"canSampleRate_44100\":%d,\"getSamplePosition_stopped\":%d,\"outputReady\":%d,\"future\":%d,"
+        "\"getChannelInfo_ch7\":%d,\"setClockSource_1\":%d,\"getClockSources\":%d,\"clock_n\":%d,\"start_nobuf\":%d,\"getSampleRate\":%d,\"rate\":%d}}",
+        flasio_create_buffers(bi, 1, 100, &cb), flasio_create_buffers(bi, 1, 8192, &cb), flasio_create_buffers(bad_ch, 1, 256, &cb),
+        flasio_create_buffers(NULL, 1, 256, &cb), flasio_set_sample_rate(12345.0), flasio_can_sample_rate(44100.0),
+        flasio_get_sample_position(&sp, &ts), flasio_output_ready(), flasio_future(1, NULL), flasio_get_channel_info(&ci),
+        flasio_set_clock_source(1), flasio_get_clock_sources(&cs, &ncs), (int)ncs, flasio_start(), flasio_get_sample_rate(&sr), (int)sr);
+    return 0;
+}
+
+int main(int argc, char **argv) {
+    for (int i = 1; i < argc; i++) {
+        char *a = argv[i], *v = strchr(a, '=');
+        if (!v) continue;
+        *v++ = 0;
+        if (!strcmp(a, "api")) { P.asio = strcmp(v, "wasapi") != 0; P.apikind = !strcmp(v, "ff_uninit") ? 2 : !strcmp(v, "ff_excl") ? 3 : !strcmp(v, "apicheck") ? 4 : 0; }
+        else if (!strcmp(a, "mode")) P.mode = !strcmp(v, "ramp") ? 1 : !strcmp(v, "loop") ? 2 : 0;
+        else if (!strcmp(a, "buf")) P.buf = (uint32_t)atoi(v);
+        else if (!strcmp(a, "depth")) P.depth = (uint32_t)atoi(v);
+        else if (!strcmp(a, "secs")) P.secs = atof(v);
+        else if (!strcmp(a, "sr")) P.sr = (uint32_t)atoi(v);
+        else if (!strcmp(a, "stress")) P.stress = (uint32_t)atoi(v);
+        else if (!strcmp(a, "work_us")) P.work_us = (uint32_t)atoi(v);
+        else if (!strcmp(a, "hiccup_ms")) P.hiccup_ms = (uint32_t)atoi(v);
+        else if (!strcmp(a, "timeinfo")) P.timeinfo = (uint32_t)atoi(v);
+        else if (!strcmp(a, "sr_after")) P.sr_after = (uint32_t)atoi(v);
+        else if (!strcmp(a, "hiccup_every")) P.hiccup_every = (uint32_t)atoi(v);
+    }
+    int rc;
+    if (P.apikind == 2) { ASIOLong a, b; flasio_get_channels(&a, &b); rc = 0; }                 /* init 前の呼出 → fail-fast abort */
+    else if (P.apikind == 3) { flwasapi_fmt_t f = { 48000, 2 }; flwasapi_initialize(1, 0, 0, 0, &f); rc = 0; }   /* exclusive → fail-fast */
+    else if (P.apikind == 4) rc = run_apicheck(g_result, sizeof g_result);
+    else rc = P.asio ? run_asio(g_result, sizeof g_result) : run_wasapi(g_result, sizeof g_result);
+    __atomic_store_n(&g_done, rc ? 2 : 1, __ATOMIC_SEQ_CST);
+    __builtin_wasm_memory_atomic_notify((int *)&g_done, 0x7fffffff);
+    return 0;
+}

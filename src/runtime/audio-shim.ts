@@ -1,0 +1,300 @@
+/**
+ * FL audio shim — メインスレッド側コントローラ。
+ *
+ * wasm スレッド (FL エンジン / shim) は AudioContext / getUserMedia / WebMIDI に触れられない
+ * (worker に AudioContext は無い) ため、制御面はここ (main thread) が担当する:
+ *   - wasm 共有メモリ上のコマンドメールボックス (cmd_seq/ack_seq) を Atomics.waitAsync で待ち受け
+ *   - OPEN: AudioContext + AudioWorkletNode (fl-audio-shim) を生成して ack
+ *   - 時刻対応 (getOutputTimestamp → ref_*) とレイテンシ値を ctl に定期公開
+ *   - AudioContext の状態変化を dev_events で wasm へ通知 (ASIO kAsioResetRequest の元)
+ * 設計: tools/audio/docs/PROTOCOL.md
+ */
+import { FLA_CMD, FLA_EV, FLA_LAYOUT, verifyLayout, type FlaField } from "./audio-layout";
+
+/** wasm モジュールへの薄い口 (Emscripten Module / 自前 instance いずれからも作れる) */
+export interface FlAudioWasmApi {
+  /** 現在の wasm 共有メモリ。memory.grow 後は新しい SAB が返る */
+  getBuffer(): SharedArrayBuffer;
+  ctlPtr(): number;
+  layoutCount(): number;
+  layoutOff(i: number): number;
+  layoutName(i: number): string;
+}
+
+export interface FlCaptureSpec {
+  sab: SharedArrayBuffer;
+  frames: number;
+  outCh: number;
+  inCh: number;
+}
+
+export interface FlAudioShimOptions {
+  workletUrl: string;
+  /** OPEN 毎にテスト用ダンプ領域を割り当てる (本番は未指定 = ダンプ無し) */
+  captureFactory?: (outCh: number, inCh: number) => FlCaptureSpec | null;
+  /** ノード生成直後に呼ばれる (入力ソース接続等のフック) */
+  onNode?: (ctx: AudioContext, node: AudioWorkletNode) => void | Promise<void>;
+  log?: (msg: string) => void;
+  /** getOutputTimestamp の採取ログ (テスト用: 時刻対応の傾き検証) */
+  refLog?: { ctxTime: number; epochMs: number }[];
+  /** AudioContext 作成オプションの上書き (テスト用) */
+  contextOptions?: AudioContextOptions;
+}
+
+type WaitAsyncResult = { async: false; value: "not-equal" | "timed-out" } | { async: true; value: Promise<"ok" | "timed-out"> };
+const waitAsync = (ia: Int32Array, idx: number, val: number): WaitAsyncResult =>
+  (Atomics as unknown as { waitAsync(ia: Int32Array, i: number, v: number): WaitAsyncResult }).waitAsync(ia, idx, val);
+
+const HINTS: (AudioContextLatencyCategory | number)[] = ["interactive", "balanced", "playback", 0];
+
+export class FlAudioShim {
+  private i32!: Int32Array;
+  private i64f = new Float64Array(1);
+  private i64u = new Uint32Array(this.i64f.buffer);
+  private ctx: AudioContext | null = null;
+  private node: AudioWorkletNode | null = null;
+  private disposed = false;
+  private refTimer: ReturnType<typeof setInterval> | null = null;
+  private moduleLoadedFor: AudioContext | null = null;
+  private pendingOpen: { outCh: number; inCh: number } | null = null;
+  private ctlPtr = 0;
+  lastCapture: FlCaptureSpec | null = null;
+  workletErrors: string[] = [];
+  commandsHandled = 0;
+  private refPts: { x: number; y: number }[] = [];
+
+  constructor(private api: FlAudioWasmApi, private opts: FlAudioShimOptions) {}
+
+  get context(): AudioContext | null { return this.ctx; }
+  get node_(): AudioWorkletNode | null { return this.node; }
+  private log(m: string) { this.opts.log?.(`[audio-shim] ${m}`); }
+
+  private ix(f: FlaField): number { return FLA_LAYOUT[f] >> 2; }
+  private ld(f: FlaField): number { return Atomics.load(this.i32, this.ix(f)); }
+  private st(f: FlaField, v: number) { Atomics.store(this.i32, this.ix(f), v | 0); }
+
+  /** wasm ロード後に呼ぶ。レイアウト自己検証 → コマンドループ開始 */
+  attach(): void {
+    const n = this.api.layoutCount();
+    verifyLayout(n, (i) => this.api.layoutOff(i), (i) => this.api.layoutName(i));
+    this.ctlPtr = this.api.ctlPtr();
+    this.i32 = new Int32Array(this.api.getBuffer(), this.ctlPtr, 96);
+    this.st("ctrl_ready", 1);
+    Atomics.notify(this.i32, this.ix("ctrl_ready"));
+    this.log(`attached ctl@${this.ctlPtr} (layout ${n} fields OK)`);
+    void this.loop();
+  }
+
+  dispose(): void {
+    this.disposed = true;
+    if (this.refTimer) clearInterval(this.refTimer);
+    this.node?.disconnect();
+    void this.ctx?.close();
+    Atomics.notify(this.i32, this.ix("cmd_seq"));
+  }
+
+  private async loop(): Promise<void> {
+    const iSeq = this.ix("cmd_seq");
+    while (!this.disposed) {
+      const seq = Atomics.load(this.i32, iSeq);
+      if (seq !== this.ld("ack_seq")) {
+        let status = 0;
+        const res = [0, 0, 0, 0];
+        try { status = await this.handle(res); } catch (e) {
+          this.log(`command ${this.ld("cmd_op")} failed: ${(e as Error).stack ?? e}`);
+          status = -1;
+        }
+        this.commandsHandled++;
+        for (let k = 0; k < 4; k++) Atomics.store(this.i32, this.ix("ack_res") + k, res[k] | 0);
+        this.st("ack_status", status);
+        Atomics.store(this.i32, this.ix("ack_seq"), seq);
+        Atomics.notify(this.i32, this.ix("ack_seq"));
+        continue;
+      }
+      const r = waitAsync(this.i32, iSeq, seq);
+      if (r.async) await r.value;
+    }
+  }
+
+  private async handle(res: number[]): Promise<number> {
+    const op = this.ld("cmd_op");
+    const a = [0, 1, 2, 3].map((k) => Atomics.load(this.i32, this.ix("cmd_arg") + k) >>> 0);
+    switch (op) {
+      case FLA_CMD.OPEN: return this.cmdOpen(a[0], a[3], res);
+      case FLA_CMD.ATTACH: return this.cmdAttach(a[0], res);
+      case FLA_CMD.CLOSE: return this.cmdClose();
+      case FLA_CMD.RESUME: await this.ctx?.resume(); return 0;
+      case FLA_CMD.SET_SR: return this.cmdSetSr(a[0]);
+      default:
+        this.log(`unimplemented command op=${op} (fail-fast)`);
+        return -2;
+    }
+  }
+
+  private async ensureContext(sr: number, hint: number): Promise<AudioContext> {
+    if (this.ctx && this.ctx.sampleRate === sr && this.ctx.state !== "closed") return this.ctx;
+    if (this.ctx) { this.teardownNode(); await this.ctx.close().catch(() => {}); }
+    const ctx = new AudioContext({
+      latencyHint: HINTS[hint] ?? "interactive",
+      sampleRate: sr,
+      ...this.opts.contextOptions,
+    });
+    ctx.onstatechange = () => this.onState(ctx);
+    this.ctx = ctx;
+    this.moduleLoadedFor = null;
+    return ctx;
+  }
+
+  private onState(ctx: AudioContext): void {
+    if (ctx !== this.ctx) return;
+    const s = ctx.state as string;
+    this.log(`AudioContext state -> ${s}`);
+    let ev = 0;
+    if (s === "suspended" || s === "interrupted") ev = FLA_EV.SUSPENDED;
+    else if (s === "closed") ev = FLA_EV.CLOSED;
+    else if (s === "running") ev = FLA_EV.RESUMED;
+    if (ev && this.i32) {
+      Atomics.or(this.i32, this.ix("dev_events"), ev);
+      Atomics.notify(this.i32, this.ix("out_read"));
+    }
+  }
+
+  private teardownNode(): void {
+    if (this.refTimer) { clearInterval(this.refTimer); this.refTimer = null; }
+    if (this.node) { this.node.disconnect(); this.node.port.close(); this.node = null; }
+  }
+
+  /** ブラウザ音声スレッドの実バースト長 (frames) を 96 quanta の観測で較正する。resume 後 ~0.25 s。失敗時は 0 */
+  private async probeBurst(ctx: AudioContext): Promise<number> {
+    try {
+      await ctx.resume();
+      const probe = new AudioWorkletNode(ctx, "fl-burst-probe", { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [1] });
+      probe.connect(ctx.destination);
+      const max = await new Promise<number>((ok) => {
+        const t = setTimeout(() => ok(0), 3000);
+        probe.port.onmessage = (e: MessageEvent) => { clearTimeout(t); ok((e.data as { max: number }).max); };
+      });
+      probe.disconnect();
+      return max;
+    } catch (e) {
+      this.log(`burst probe failed: ${e}`);
+      return 0;
+    }
+  }
+
+  /** phase 1: AudioContext 生成 + worklet module ロード。ブラウザの音声コールバック粒度 (burst) を返す */
+  private async cmdOpen(sr: number, hint: number, res: number[]): Promise<number> {
+    const ctx = await this.ensureContext(sr, hint);
+    this.teardownNode();
+    this.refPts = [];
+    if (this.moduleLoadedFor !== ctx) {
+      await ctx.audioWorklet.addModule(this.opts.workletUrl);
+      this.moduleLoadedFor = ctx;
+    }
+    const probed = await this.probeBurst(ctx);
+    res[0] = Math.max(Math.round((ctx.baseLatency || 0) * ctx.sampleRate), probed);
+    res[1] = ctx.sampleRate;
+    res[2] = Math.round((ctx.outputLatency || 0) * 1e6);
+    this.pendingOpen = { outCh: 0, inCh: 0 };
+    this.log(`OPEN sr=${ctx.sampleRate} baseLatency=${ctx.baseLatency} probed_burst=${probed} -> burst ${res[0]} frames state=${ctx.state}`);
+    return 0;
+  }
+
+  /** phase 2: ring 確保後。最新の wasm SAB と ctl/layout を processorOptions で渡して node を生成 */
+  private async cmdAttach(_unused: number, res: number[]): Promise<number> {
+    void res;
+    const ctx = this.ctx;
+    if (!ctx || !this.pendingOpen) throw new Error("ATTACH without OPEN");
+    const outCh = this.ld("out_ch"), inCh = this.ld("in_ch");
+    this.pendingOpen = null;
+    this.teardownNode();
+    const layout: Record<string, number> = { ...FLA_LAYOUT };
+    this.lastCapture = this.opts.captureFactory?.(outCh, inCh) ?? null;
+    const node = new AudioWorkletNode(ctx, "fl-audio-shim", {
+      numberOfInputs: inCh > 0 ? 1 : 0,
+      numberOfOutputs: 1,
+      outputChannelCount: [outCh],
+      channelCount: Math.max(inCh, 1),
+      channelCountMode: "explicit",
+      channelInterpretation: "speakers",
+      processorOptions: {
+        buffer: this.api.getBuffer(),   // fla_open の malloc 後 (= ring 確保後) の最新 SAB
+        ctlPtr: this.ctlPtr,
+        layout,
+        capture: this.lastCapture,
+      },
+    });
+    node.port.onmessage = (e: MessageEvent) => {
+      const d = e.data as { type: string; message?: string };
+      if (d.type === "error") { this.workletErrors.push(d.message ?? "?"); this.log(`worklet error: ${d.message}`); }
+    };
+    node.connect(ctx.destination);
+    this.node = node;
+    await this.opts.onNode?.(ctx, node);
+    await ctx.resume();
+    this.updateRef();
+    this.refTimer = setInterval(() => this.updateRef(), 250);
+    this.log(`ATTACH out=${outCh} in=${inCh} ring=${this.ld("ring_frames")} depth=${this.ld("depth")} outLat=${ctx.outputLatency} state=${ctx.state}`);
+    return 0;
+  }
+
+  private async cmdClose(): Promise<number> {
+    this.teardownNode();
+    if (this.ctx) { const c = this.ctx; this.ctx = null; this.moduleLoadedFor = null; await c.close().catch(() => {}); }
+    return 0;
+  }
+
+  /** SET_SR: ASIO setSampleRate。AudioContext を作り直し、同じ ring に node を再接続する (producer 停止中のみ) */
+  private async cmdSetSr(sr: number): Promise<number> {
+    const res = [0, 0, 0, 0];
+    await this.cmdOpen(sr, 0, res);
+    return this.cmdAttach(0, res);
+  }
+
+  /** getOutputTimestamp → ctl.ref_* (seqlock) + レイテンシ値 */
+  updateRef(): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.i32) return;
+    const ts = ctx.getOutputTimestamp();
+    this.st("base_latency_us", Math.round((ctx.baseLatency || 0) * 1e6));
+    this.st("out_latency_us", Math.round((ctx.outputLatency || 0) * 1e6));
+    if (!ts.performanceTime || ts.contextTime === undefined) return;
+    const epochMs = performance.timeOrigin + ts.performanceTime;
+    this.opts.refLog?.push({ ctxTime: ts.contextTime, epochMs });
+    // getOutputTimestamp は ±数 ms ジッタがあるため、直近 16 点の最小二乗直線 (ctx→epoch) で平滑化して公開
+    this.refPts.push({ x: ts.contextTime, y: epochMs });
+    if (this.refPts.length > 16) this.refPts.shift();
+    let ctxRef = ts.contextTime, epochRef = epochMs;
+    const n = this.refPts.length;
+    if (n >= 4) {
+      const x0 = this.refPts[0].x, y0 = this.refPts[0].y;
+      let sx = 0, sy = 0, sxx = 0, sxy = 0;
+      for (const p of this.refPts) { const x = p.x - x0, y = p.y - y0; sx += x; sy += y; sxx += x * x; sxy += x * y; }
+      const d = n * sxx - sx * sx;
+      if (d > 0) {
+        const slope = (n * sxy - sx * sy) / d, icpt = (sy - slope * sx) / n;
+        ctxRef = ts.contextTime; epochRef = y0 + icpt + slope * (ts.contextTime - x0);
+      }
+    }
+    const i = this.i32;
+    Atomics.add(i, this.ix("ref_seq"), 1);
+    this.i64f[0] = ctxRef;
+    Atomics.store(i, this.ix("ref_ctx_time_bits"), this.i64u[0] | 0);
+    Atomics.store(i, this.ix("ref_ctx_time_bits") + 1, this.i64u[1] | 0);
+    this.i64f[0] = epochRef;
+    Atomics.store(i, this.ix("ref_epoch_ms_bits"), this.i64u[0] | 0);
+    Atomics.store(i, this.ix("ref_epoch_ms_bits") + 1, this.i64u[1] | 0);
+    Atomics.add(i, this.ix("ref_seq"), 1);
+  }
+
+  /** ctl の統計スナップショット (テスト/診断用) */
+  snapshot(): Record<string, number> {
+    const o: Record<string, number> = {};
+    for (const k of ["underruns", "silence_frames", "quanta", "in_overruns", "wl_state", "out_read", "out_write",
+      "in_write", "in_read", "gen", "cb_count", "cb_late", "cb_max_us", "wake_count", "wait_timeouts", "in_underflows",
+      "min_fill", "clock_jumps", "clock_jump_frames", "ring_frames", "buffer_frames", "depth", "sample_rate", "out_latency_us", "base_latency_us"] as FlaField[]) {
+      o[k] = this.ld(k) >>> 0;
+    }
+    return o;
+  }
+}

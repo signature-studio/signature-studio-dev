@@ -1,0 +1,713 @@
+{
+ "iat_callers": {
+  "dsound.dll!DirectSoundCreate": [
+   {
+    "fn": "0x12afb50",
+    "size": 640
+   }
+  ],
+  "dsound.dll!DirectSoundEnumerateA": [
+   {
+    "fn": "0x12af3e0",
+    "size": 196
+   }
+  ],
+  "msacm32.dll!acmDriverClose": [
+   {
+    "fn": "0xa5ee30",
+    "size": 1347
+   },
+   {
+    "fn": "0xa5f380",
+    "size": 28
+   }
+  ],
+  "msacm32.dll!acmDriverDetailsA": [
+   {
+    "fn": "0xa5dad0",
+    "size": 232
+   }
+  ],
+  "msacm32.dll!acmDriverEnum": [
+   {
+    "fn": "0xa5dc40",
+    "size": 73
+   }
+  ],
+  "msacm32.dll!acmDriverOpen": [
+   {
+    "fn": "0xa5ee30",
+    "size": 1347
+   }
+  ],
+  "msacm32.dll!acmFormatChooseW": [
+   {
+    "fn": "0x6726b0",
+    "size": 307
+   }
+  ],
+  "msacm32.dll!acmFormatSuggest": [
+   {
+    "fn": "0x673f40",
+    "size": 1031
+   }
+  ],
+  "msacm32.dll!acmMetrics": [
+   {
+    "fn": "0x672600",
+    "size": 170
+   },
+   {
+    "fn": "0x6726b0",
+    "size": 307
+   },
+   {
+    "fn": "0x673f40",
+    "size": 1031
+   }
+  ],
+  "msacm32.dll!acmStreamClose": [
+   {
+    "fn": "0x672850",
+    "size": 93
+   },
+   {
+    "fn": "0x6729d0",
+    "size": 2961
+   }
+  ],
+  "msacm32.dll!acmStreamConvert": [
+   {
+    "fn": "0x6729d0",
+    "size": 2961
+   }
+  ],
+  "msacm32.dll!acmStreamMessage": [
+   {
+    "fn": "0x6729d0",
+    "size": 2961
+   }
+  ],
+  "msacm32.dll!acmStreamOpen": [
+   {
+    "fn": "0x6729d0",
+    "size": 2961
+   }
+  ],
+  "msacm32.dll!acmStreamPrepareHeader": [
+   {
+    "fn": "0x6729d0",
+    "size": 2961
+   }
+  ],
+  "msacm32.dll!acmStreamSize": [
+   {
+    "fn": "0x6729d0",
+    "size": 2961
+   }
+  ],
+  "msacm32.dll!acmStreamUnprepareHeader": [
+   {
+    "fn": "0x672850",
+    "size": 93
+   }
+  ],
+  "winmm.dll!midiInAddBuffer": [
+   {
+    "fn": "0xba24a0",
+    "size": 77
+   },
+   {
+    "fn": "0xba2dd0",
+    "size": 395
+   }
+  ],
+  "winmm.dll!midiInClose": [
+   {
+    "fn": "0xba3100",
+    "size": 158
+   }
+  ],
+  "winmm.dll!midiInGetDevCapsW": [
+   {
+    "fn": "0xba2a40",
+    "size": 271
+   },
+   {
+    "fn": "0xba2c00",
+    "size": 321
+   }
+  ],
+  "winmm.dll!midiInGetErrorTextW": [
+   {
+    "fn": "0xba26a0",
+    "size": 247
+   }
+  ],
+  "winmm.dll!midiInGetNumDevs": [
+   {
+    "fn": "0xba24f0",
+    "size": 309
+   },
+   {
+    "fn": "0xba2a40",
+    "size": 271
+   },
+   {
+    "fn": "0xba2c00",
+    "size": 321
+   }
+  ],
+  "winmm.dll!midiInOpen": [
+   {
+    "fn": "0xba3010",
+    "size": 184
+   }
+  ],
+  "winmm.dll!midiInPrepareHeader": [
+   {
+    "fn": "0xba24a0",
+    "size": 77
+   },
+   {
+    "fn": "0xba2dd0",
+    "size": 395
+   }
+  ],
+  "winmm.dll!midiInReset": [
+   {
+    "fn": "0xba3100",
+    "size": 158
+   }
+  ],
+  "winmm.dll!midiInStart": [
+   {
+    "fn": "0xba31b0",
+    "size": 37
+   }
+  ],
+  "winmm.dll!midiInStop": [
+   {
+    "fn": "0xba31e0",
+    "size": 37
+   }
+  ],
+  "winmm.dll!midiInUnprepareHeader": [
+   {
+    "fn": "0xba2f60",
+    "size": 166
+   }
+  ],
+  "winmm.dll!midiOutClose": [
+   {
+    "fn": "0xba4af0",
+    "size": 104
+   }
+  ],
+  "winmm.dll!midiOutGetDevCapsW": [
+   {
+    "fn": "0xba4420",
+    "size": 297
+   },
+   {
+    "fn": "0xba45e0",
+    "size": 336
+   },
+   {
+    "fn": "0xba47b0",
+    "size": 270
+   }
+  ],
+  "winmm.dll!midiOutGetErrorTextW": [
+   {
+    "fn": "0xba4070",
+    "size": 259
+   }
+  ],
+  "winmm.dll!midiOutGetNumDevs": [
+   {
+    "fn": "0xba3f60",
+    "size": 169
+   },
+   {
+    "fn": "0xba4420",
+    "size": 297
+   },
+   {
+    "fn": "0xba45e0",
+    "size": 336
+   },
+   {
+    "fn": "0xba47b0",
+    "size": 270
+   }
+  ],
+  "winmm.dll!midiOutLongMsg": [
+   {
+    "fn": "0xba4a40",
+    "size": 171
+   }
+  ],
+  "winmm.dll!midiOutOpen": [
+   {
+    "fn": "0xba4950",
+    "size": 160
+   }
+  ],
+  "winmm.dll!midiOutPrepareHeader": [
+   {
+    "fn": "0xba4a40",
+    "size": 171
+   }
+  ],
+  "winmm.dll!midiOutShortMsg": [
+   {
+    "fn": "0xba4a20",
+    "size": 27
+   }
+  ],
+  "winmm.dll!midiOutUnprepareHeader": [
+   {
+    "fn": "0xba3f30",
+    "size": 44
+   }
+  ],
+  "winmm.dll!timeBeginPeriod": [
+   {
+    "fn": "0x6d8b00",
+    "size": 130
+   },
+   {
+    "fn": "0x81c0d0",
+    "size": 125
+   }
+  ],
+  "winmm.dll!timeEndPeriod": [
+   {
+    "fn": "0x6d8b00",
+    "size": 130
+   },
+   {
+    "fn": "0x81c0d0",
+    "size": 125
+   }
+  ],
+  "winmm.dll!timeGetDevCaps": [
+   {
+    "fn": "0x6d8b00",
+    "size": 130
+   },
+   {
+    "fn": "0x81c0d0",
+    "size": 125
+   }
+  ],
+  "winmm.dll!timeGetTime": [
+   {
+    "fn": "0x6ecd50",
+    "size": 353
+   },
+   {
+    "fn": "0x6edc40",
+    "size": 764
+   },
+   {
+    "fn": "0x71ea70",
+    "size": 35
+   },
+   {
+    "fn": "0x71eaa0",
+    "size": 45
+   },
+   {
+    "fn": "0x79ae50",
+    "size": 268
+   },
+   {
+    "fn": "0x79af60",
+    "size": 111
+   },
+   {
+    "fn": "0x817590",
+    "size": 1008
+   },
+   {
+    "fn": "0x91bce0",
+    "size": 661
+   },
+   {
+    "fn": "0x91cec0",
+    "size": 1383
+   },
+   {
+    "fn": "0x9709c0",
+    "size": 74
+   },
+   {
+    "fn": "0x970a10",
+    "size": 480
+   },
+   {
+    "fn": "0x973350",
+    "size": 494
+   },
+   {
+    "fn": "0x973540",
+    "size": 116
+   },
+   {
+    "fn": "0xa0e6c0",
+    "size": 578
+   },
+   {
+    "fn": "0xa0faa0",
+    "size": 587
+   },
+   {
+    "fn": "0xa87ff0",
+    "size": 2787
+   },
+   {
+    "fn": "0xac4b50",
+    "size": 4976
+   },
+   {
+    "fn": "0xac6a40",
+    "size": 2058
+   },
+   {
+    "fn": "0xaca590",
+    "size": 339
+   },
+   {
+    "fn": "0xb4b5b0",
+    "size": 1353
+   },
+   {
+    "fn": "0xb504d0",
+    "size": 1322
+   },
+   {
+    "fn": "0xb52f50",
+    "size": 109
+   },
+   {
+    "fn": "0xb7a9f0",
+    "size": 57
+   },
+   {
+    "fn": "0xb8d6c0",
+    "size": 2071
+   },
+   {
+    "fn": "0xc56ae0",
+    "size": 2353
+   },
+   {
+    "fn": "0xc906d0",
+    "size": 402
+   },
+   {
+    "fn": "0xc93a50",
+    "size": 159
+   },
+   {
+    "fn": "0xd32600",
+    "size": 235
+   },
+   {
+    "fn": "0xd328f0",
+    "size": 1059
+   },
+   {
+    "fn": "0xd331b0",
+    "size": 127
+   },
+   {
+    "fn": "0xd85160",
+    "size": 164
+   },
+   {
+    "fn": "0xe6ff80",
+    "size": 1156
+   },
+   {
+    "fn": "0xe9caf0",
+    "size": 1019
+   },
+   {
+    "fn": "0xf8f910",
+    "size": 93
+   },
+   {
+    "fn": "0xf900c0",
+    "size": 364
+   },
+   {
+    "fn": "0xf90290",
+    "size": 97
+   },
+   {
+    "fn": "0xf95a10",
+    "size": 554
+   },
+   {
+    "fn": "0xf97850",
+    "size": 673
+   },
+   {
+    "fn": "0xf98010",
+    "size": 1225
+   },
+   {
+    "fn": "0xf99020",
+    "size": 489
+   },
+   {
+    "fn": "0xf997f0",
+    "size": 1221
+   },
+   {
+    "fn": "0xf9aa70",
+    "size": 476
+   },
+   {
+    "fn": "0xfc6fa0",
+    "size": 2801
+   },
+   {
+    "fn": "0x1018830",
+    "size": 290
+   },
+   {
+    "fn": "0x1018d50",
+    "size": 93
+   },
+   {
+    "fn": "0x1018db0",
+    "size": 339
+   },
+   {
+    "fn": "0x1018fb0",
+    "size": 222
+   },
+   {
+    "fn": "0x10b6600",
+    "size": 79
+   },
+   {
+    "fn": "0x10b6650",
+    "size": 79
+   },
+   {
+    "fn": "0x10ebce0",
+    "size": 497
+   },
+   {
+    "fn": "0x10ec050",
+    "size": 821
+   },
+   {
+    "fn": "0x10ec400",
+    "size": 748
+   },
+   {
+    "fn": "0x10ec7a0",
+    "size": 674
+   },
+   {
+    "fn": "0x117bcc0",
+    "size": 194
+   },
+   {
+    "fn": "0x117bdc0",
+    "size": 221
+   },
+   {
+    "fn": "0x11a36e0",
+    "size": 3497
+   },
+   {
+    "fn": "0x11b32a0",
+    "size": 861
+   },
+   {
+    "fn": "0x11efbf0",
+    "size": 481
+   },
+   {
+    "fn": "0x11fc770",
+    "size": 8048
+   },
+   {
+    "fn": "0x1253260",
+    "size": 695
+   },
+   {
+    "fn": "0x125a790",
+    "size": 838
+   },
+   {
+    "fn": "0x12a13c0",
+    "size": 1602
+   },
+   {
+    "fn": "0x12aeec0",
+    "size": 948
+   },
+   {
+    "fn": "0x12e2ac0",
+    "size": 1195
+   },
+   {
+    "fn": "0x12e2ff0",
+    "size": 125
+   },
+   {
+    "fn": "0x13606f0",
+    "size": 141
+   },
+   {
+    "fn": "0x13691b0",
+    "size": 42
+   },
+   {
+    "fn": "0x1375990",
+    "size": 3213
+   }
+  ]
+ },
+ "anchors": {
+  "ASIO: CreateBuffers failed with error %d": [
+   {
+    "enc": "utf-16le",
+    "fn": "0xc57a00",
+    "size": 3106,
+    "vtable_disp": {
+     "0x0": 1
+    }
+   }
+  ],
+  "ASIO: GetLatencies failed with error %d": [
+   {
+    "enc": "utf-16le",
+    "fn": "0xc57760",
+    "size": 178,
+    "vtable_disp": {}
+   },
+   {
+    "enc": "utf-16le",
+    "fn": "0xc57a00",
+    "size": 3106,
+    "vtable_disp": {
+     "0x0": 1
+    }
+   }
+  ],
+  "ASIO: GetSamplePosition failed with error %d": [
+   {
+    "enc": "utf-16le",
+    "fn": "0xc57420",
+    "size": 161,
+    "vtable_disp": {
+     "0x0": 1
+    }
+   }
+  ],
+  "ASIO: GetSampleRate failed with error %d": [
+   {
+    "enc": "utf-16le",
+    "fn": "0xc57550",
+    "size": 203,
+    "vtable_disp": {}
+   }
+  ],
+  "ASIO driver is not open.": [
+   {
+    "enc": "utf-16le",
+    "fn": "0xc57a00",
+    "size": 3106,
+    "vtable_disp": {
+     "0x0": 1
+    }
+   }
+  ],
+  "Couldn't create the primary DirectSound buffer.": [
+   {
+    "enc": "utf-16le",
+    "fn": "0x12afb50",
+    "size": 640,
+    "vtable_disp": {
+     "0x18": 1,
+     "0x30": 1,
+     "0x70": 1,
+     "0x78": 2
+    }
+   }
+  ],
+  "Couldn't create the streaming ASIO buffer.": [
+   {
+    "enc": "utf-16le",
+    "fn": "0xc57a00",
+    "size": 3106,
+    "vtable_disp": {
+     "0x0": 1
+    }
+   }
+  ],
+  "Couldn't init the ASIO driver.": [
+   {
+    "enc": "utf-16le",
+    "fn": "0xc589b0",
+    "size": 19639,
+    "vtable_disp": {
+     "0x18": 48,
+     "0x20": 18,
+     "0x28": 57,
+     "0x38": 30,
+     "0x40": 24,
+     "0x60": 6
+    }
+   }
+  ],
+  "Couldn't open the ASIO driver.": [
+   {
+    "enc": "utf-16le",
+    "fn": "0xc589b0",
+    "size": 19639,
+    "vtable_disp": {
+     "0x18": 48,
+     "0x20": 18,
+     "0x28": 57,
+     "0x38": 30,
+     "0x40": 24,
+     "0x60": 6
+    }
+   }
+  ],
+  "Error while accessing the ASIO driver.": [
+   {
+    "enc": "utf-16le",
+    "fn": "0xc589b0",
+    "size": 19639,
+    "vtable_disp": {
+     "0x18": 48,
+     "0x20": 18,
+     "0x28": 57,
+     "0x38": 30,
+     "0x40": 24,
+     "0x60": 6
+    }
+   }
+  ],
+  "Could not open ASIO control panel: ": [
+   {
+    "enc": "utf-16le",
+    "fn": "0x135d460",
+    "size": 128,
+    "vtable_disp": {}
+   }
+  ],
+  "MIDI input overflow detected": []
+ }
+}
