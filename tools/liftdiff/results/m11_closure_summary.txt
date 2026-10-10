@@ -1,0 +1,28 @@
+関数数 7421: 一致 2275 / 不一致 2885 / 実行不能 2261
+
+不一致の類型 (主因 = 優先順位最上位の1つ / 該当数 = 複数タグ重複あり):
+  load_dropped             主因   892   該当   892
+  wasm_trap                主因   380   該当   578
+  callee_divergence        主因   374   該当   881
+  callsite_arg_drop        主因   310   該当   312
+  memory_semantics         主因   208   該当   212
+  ret_only                 主因   183   該当   183
+  icall_drop               主因   150   該当   186
+  import_arg_diff          主因   122   該当   174
+  xmm_arg_drop             主因    70   該当   121
+  simd_helper              主因    64   該当    64
+  fp_flag_unreflected      主因    31   該当    93
+  arg_drop                 主因    28   該当    48
+  zero_init_drop           主因    27   該当    43
+  spill_slot_deref         主因    17   該当    17
+  import_call_seq          主因    12   該当   129
+  rep_string_helper        主因    10   該当    12
+  unresolved_callee        主因     7   該当    19
+
+不一致のうち callee を一切呼ばずに差分が出た (= その関数自身の欠陥と確定) : 1281 / wasm trap を含む : 578
+
+実行不能の内訳:
+  native_fault_all_patterns           1267
+  native_null_deref_all_patterns       689
+  hang                                 255
+  unsupported_sig                       50

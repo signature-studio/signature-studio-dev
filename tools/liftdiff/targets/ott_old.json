@@ -1,0 +1,17 @@
+{
+  "name": "ott_old",
+  "desc": "OTT (Xfer) VST2 win64 — 旧 RetDec chain (M6-M9 pass 済 ott.ll, tools/ott/ott_build.sh 産物)。既知欠陥 D1〜D6 の検出対象",
+  "pe": "/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll",
+  "ir": "tools/ott/work/ott.ll",
+  "image": null,
+  "wasm_origin": "0x30000000",
+  "fn_prefix": "function_",
+  "extra_sources": [
+    "tools/m6/msimd6.c", "tools/m6/work/m6_stubs.c", "tools/m6/work/m6_data.c", "tools/shim/src/heap.c", "tools/shim/src/failfast.c",
+    "tools/ott/rt/ott_rt.c", "tools/m6/work/m6_stubs_hand.c", "tools/m6/work/m6_stubs_hand2.c", "tools/m8/m8_rt.c", "tools/m9/m9_rt.c", "tools/ott/rt/ott_boot.c"
+  ],
+  "init_exports": ["m6_data_install"],
+  "initial_memory": 905969664,
+  "max_memory": 905969664,
+  "global_base": 268435456
+}

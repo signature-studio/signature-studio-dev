@@ -1,0 +1,110 @@
+{
+ "D1_indirect_call_drop": {
+  "tags": [
+   "icall_drop"
+  ],
+  "functions": [
+   "18011e7b0",
+   "1801a1cb0",
+   "18011d400",
+   "180120af0"
+  ],
+  "count": 4
+ },
+ "D2_short_global": {
+  "tags": [
+   "short_global"
+  ],
+  "functions": [
+   "1801c1240",
+   "1801c1050",
+   "1801b4e30",
+   "1801c0d00",
+   "1801aa1a0",
+   "1801a9be0"
+  ],
+  "count": 6
+ },
+ "D3_callsite_arg_drop": {
+  "tags": [
+   "callsite_arg_drop",
+   "arg_drop"
+  ],
+  "functions": [
+   "18011c9f0",
+   "18011cc90",
+   "18011d400",
+   "18011e7b0",
+   "18011eae0",
+   "180127550",
+   "1801ab638",
+   "1801c29f4",
+   "1801c2e20",
+   "1801c54f0",
+   "1801d070c",
+   "1801d2020"
+  ],
+  "count": 12
+ },
+ "D4_D5_c_defined_ports": {
+  "note": "C \u5b9a\u7fa9 (libm \u7f6e\u63db CRT \u6570\u5b66 / hand port) vs native \u5b9f\u6a5f\u68b0\u8a9e",
+  "functions": [
+   "1801be668",
+   "1801be6bc",
+   "1801cfa6c",
+   "1801cfcfc",
+   "1801a08a4",
+   "1801a7794",
+   "1801c17e0",
+   "1801cfa60",
+   "180126b30",
+   "180126b50",
+   "1801a3ad0",
+   "1801a7778",
+   "1801c1438",
+   "1801c721c",
+   "1801a30b0",
+   "1801c0ac8",
+   "1801c6744",
+   "1801c6a04"
+  ],
+  "count": 18
+ },
+ "D6_body_layer": {
+  "tags": [
+   "xmm_arg_drop",
+   "zero_init_drop",
+   "fp_flag_unreflected",
+   "spill_slot_deref"
+  ],
+  "functions": [
+   "18011d400",
+   "180126040",
+   "1801260c0",
+   "1801263f0",
+   "1801264e0",
+   "180126670",
+   "1801a3ad0",
+   "1801a9a6c",
+   "1801a9b38",
+   "1801a9be0",
+   "1801aa1a0",
+   "1801aa624",
+   "1801abdf0",
+   "1801ac7ec",
+   "1801b4220",
+   "1801b4900",
+   "1801b4e30",
+   "1801c0af4",
+   "1801c0bac",
+   "1801c0d00",
+   "1801c1050",
+   "1801c1240",
+   "1801c1438",
+   "1801c1b90",
+   "1801c2e20",
+   "1801c3080"
+  ],
+  "count": 26
+ }
+}

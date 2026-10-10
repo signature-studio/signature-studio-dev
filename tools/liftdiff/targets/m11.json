@@ -1,0 +1,18 @@
+{
+  "name": "m11",
+  "desc": "FLEngine_x64.dll (FL Studio 26.1.7) \u2014 M11 closure 7,380 \u95a2\u6570 (RetDec lift \u2192 m11 passes \u2192 boot_final3.ll)",
+  "pe": "/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin",
+  "ir": "tools/m11/work/boot_final3.ll",
+  "image": "tools/m11/work/m11_image.bin",
+  "wasm_origin": "0x0",
+  "fn_prefix": "function_",
+  "simd": {
+    "gen": "python3 tools/m11/m11_simd2.py {ir}",
+    "ir": "tools/m11/work/boot_final.ll",
+    "include": [
+      "tools/m11"
+    ]
+  },
+  "initial_memory": 469762048,
+  "init_table_rva": "0xf768b0"
+}
