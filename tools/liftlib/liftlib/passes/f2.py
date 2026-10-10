@@ -112,6 +112,7 @@ def run(mod, img, log=None, stats=None, repair=True, only=None):
             have = any(p[1].startswith("%xmm") for p in funcs[nm].params())
         info[nm] = dict(params=xp, have=have, mf=mf)
     stats["callees_with_xmm"] = len(info)
+    stats["callees_pending"] = sum(1 for i in info.values() if not i["have"])
     log.append("F2 callee xmm live-in: " + ", ".join("%s:%s" % (n, {k: v[0] for k, v in i["params"].items()}) for n, i in info.items()))
     if not repair:
         return stats

@@ -80,14 +80,68 @@ class Image:
         self._pdata = ents
         self._pd_begin = [e[0] for e in ents]
 
-    def func_at(self, va):
+    def _chain_parent(self, u):
+        """UNWIND_INFO (RVA u) が CHAININFO なら親 RUNTIME_FUNCTION (begin,end) を返す。"""
+        try:
+            d = self.read(self.base + u, 4)
+            flags = d[0] >> 3
+            if not (flags & 4):
+                return None
+            ncodes = d[2]
+            off = 4 + ((ncodes + 1) & ~1) * 2
+            b, e, _u2 = struct.unpack("<III", self.read(self.base + u + off, 12))
+            return (self.base + b, self.base + e)
+        except Exception:
+            return None
+
+    def _merged(self):
+        """chain 併合した関数範囲 {root_begin: [(b,e), ...]}"""
+        if hasattr(self, "_mg"):
+            return self._mg
+        self._load_pdata()
+        root = {}
+        for (b, e, u) in self._pdata:
+            p = self._chain_parent(u)
+            root[b] = p[0] if p else b
+        groups = {}
+        for (b, e, u) in self._pdata:
+            r = root[b]
+            for _ in range(8):
+                r2 = root.get(r, r)
+                if r2 == r:
+                    break
+                r = r2
+            groups.setdefault(r, []).append((b, e))
+        self._mg = groups
+        self._mg_begin = sorted(groups)
+        self._mg_of = {}
+        for r, lst in groups.items():
+            for (b, e) in lst:
+                self._mg_of[b] = r
+        return groups
+
+    def func_at(self, va, merge=True):
+        """va を含む関数の範囲 (b, e)。merge=True なら chain された pdata を併合 (連続部分のみ)。"""
         self._load_pdata()
         i = bisect.bisect_right(self._pd_begin, va) - 1
-        if i >= 0:
-            b, e, _u = self._pdata[i]
-            if b <= va < e:
-                return (b, e)
-        return None
+        if i < 0:
+            return None
+        b, e, _u = self._pdata[i]
+        if not (b <= va < e):
+            return None
+        if not merge:
+            return (b, e)
+        self._merged()
+        r = self._mg_of.get(b, b)
+        lst = sorted(self._mg[r])
+        # r から連続して接する範囲を結合
+        cur_b, cur_e = lst[0]
+        for (bb, ee) in lst[1:]:
+            if bb <= cur_e:
+                cur_e = max(cur_e, ee)
+            else:
+                break
+        return (cur_b, cur_e) if cur_b <= va or True else (b, e)
 
     def pdata_functions(self):
         self._load_pdata()

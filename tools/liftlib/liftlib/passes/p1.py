@@ -30,7 +30,7 @@ CC_PRED = {
     "np": "ord", "po": "ord",
 }
 
-COMIS_CALL = re.compile(r"call void @(__asm_v?u?comis([sd])(?:__\d+|\.\d+)?)\((.*)\)")
+COMIS_CALL = re.compile(r"call void @(__asm_v?u?comis([sd])(?:__\w+|\.\d+)?)\((.*)\)")
 
 
 def label_target(label):
@@ -272,6 +272,169 @@ class Region:
             self.mod.add_global("%s = external local_unnamed_addr constant %s" % (gname, ty))
         return gname, ty
 
+    # ---- 拡張語彙: GPR mov / メモリ load/store / SSE 算術 (正規名 helper 呼出) ----
+    def _gpr_val(self, st, reg, va, out, bits=64):
+        v = self.read_reg(st, reg, va, out)
+        name, ty = v
+        w = {"i64": 64, "i32": 32, "i16": 16, "i8": 8}.get(ty)
+        if w is None:
+            raise Unsupported("gpr %s type %s" % (reg, ty))
+        if w == bits:
+            return name
+        n = self.nm(va, "gc")
+        out.append("  %s = %s %s %s to i%d" % (n, "trunc" if w > bits else "zext", ty, name, bits))
+        return n
+
+    def _addr(self, it, st, out, va, tag):
+        """メモリ operand の IR ptr 値 (名前) を返す。rsp 基準は未対応。"""
+        m = it.mem
+        if m is None or m["seg"]:
+            raise Unsupported("addr form")
+        if m["base"] == "rip":
+            g, gty = self.global_ref(m["rip"], m["size"] if m["size"] in (4, 8, 16) else 8)
+            return g
+        if m["base"] in (None, "rsp"):
+            raise Unsupported("addr base %s" % m["base"])
+        cur = self._gpr_val(st, m["base"], va, out)
+        if m["index"]:
+            ix = self._gpr_val(st, m["index"], va, out)
+            n = self.nm(va, "ai")
+            out.append("  %s = mul i64 %s, %d%s" % (n, ix, m["scale"], tag))
+            n2 = self.nm(va, "as")
+            out.append("  %s = add i64 %s, %s%s" % (n2, cur, n, tag))
+            cur = n2
+        if m["disp"]:
+            n = self.nm(va, "ad")
+            out.append("  %s = add i64 %s, %d%s" % (n, cur, m["disp"], tag))
+            cur = n
+        p = self.nm(va, "ap")
+        out.append("  %s = inttoptr i64 %s to ptr%s" % (p, cur, tag))
+        return p
+
+    def _decl_helper(self, base, ret, args):
+        nm = "__asm_%s__%s%s" % (base, ret, "".join(args))
+        ct = {"x": "i128", "q": "i64", "d": "i32", "b": "i8", "v": "void"}
+        if nm not in self.mod.declares():
+            self.mod.add_declare("declare %s @%s(%s) local_unnamed_addr" % (ct[ret], nm, ", ".join(ct[a] for a in args)))
+        return nm
+
+    def lift_data_insn(self, it, ops, st, out, tag):
+        from ..simd import kernels
+        va, m = it.va, it.mnem
+        mem = it.mem
+        # --- GPR: mov r,r / mov r,imm / xor r,r
+        if m == "mov" and len(ops) == 2 and ops[0][0] == "reg" and ops[0][1].startswith("r") and not mem:
+            if ops[1][0] == "reg":
+                st[ops[0][1]] = self.read_reg(st, ops[1][1], va, out)
+            elif ops[1][0] == "imm":
+                st[ops[0][1]] = (str(ops[1][1]), "i64")
+            else:
+                return False
+            st["__w"].add(ops[0][1])
+            return True
+        if m == "xor" and len(ops) == 2 and ops[0] == ops[1] and ops[0][0] == "reg":
+            st[ops[0][1]] = ("0", "i64")
+            st["__w"].add(ops[0][1])
+            return True
+        # --- GPR store: mov [m], r / imm
+        if m == "mov" and mem and mem["write"] and len(ops) == 2 and ops[0][0] == "mem":
+            sz = mem["size"]
+            ity = {1: "i8", 2: "i16", 4: "i32", 8: "i64"}.get(sz)
+            if ity is None:
+                return False
+            p = self._addr(it, st, out, va, tag)
+            if ops[1][0] == "reg":
+                v = self._gpr_val(st, ops[1][1], va, out, bits=sz * 8)
+            elif ops[1][0] == "imm":
+                v = str(ops[1][1] if ops[1][1] < (1 << 63) else ops[1][1] - (1 << 64))
+                if sz == 4 and int(v) >= (1 << 31):
+                    v = str(int(v) - (1 << 32))
+            else:
+                return False
+            out.append("  store %s %s, ptr %s, align 1%s" % (ity, v, p, tag))
+            return True
+        # --- SSE: 移動 / 算術
+        base = m
+        vex = False
+        if m.startswith("v") and len(m) > 2:
+            base, vex = m[1:], True
+        xr = lambda o: o[0] == "reg" and o[1].startswith("xmm")
+        # store: movss/movsd/movaps... [m], xmm
+        if mem and mem["write"] and len(ops) == 2 and ops[0][0] == "mem" and xr(ops[1]):
+            sz = mem["size"]
+            if base not in ("movss", "movsd", "movaps", "movapd", "movups", "movupd", "movdqa", "movdqu", "movd", "movq"):
+                return False
+            ity = {4: "i32", 8: "i64", 16: "i128"}.get(sz)
+            if ity is None:
+                return False
+            p = self._addr(it, st, out, va, tag)
+            x = self.read_reg(st, ops[1][1], va, out)
+            if x[1] != "i128":
+                raise Unsupported("xmm type")
+            if ity == "i128":
+                out.append("  store i128 %s, ptr %s, align 1%s" % (x[0], p, tag))
+            else:
+                n = self.nm(va, "st")
+                out.append("  %s = trunc i128 %s to %s%s" % (n, x[0], ity, tag))
+                out.append("  store %s %s, ptr %s, align 1%s" % (ity, n, p, tag))
+            return True
+        # xmm 書込み命令
+        if not (ops and xr(ops[0])):
+            return False
+        dst = ops[0][1]
+        # ゼロ化 (vpxor x,x,x 等) は既に処理済み _ZERO_X (vex 3-op 形のみここへ)
+        if base in ("xorps", "xorpd", "pxor") and vex and len(ops) == 3 and ops[1] == ops[2] and xr(ops[1]):
+            st[dst] = ("0", "i128")
+            st["__w"].add(dst)
+            return True
+        # capstone の operand access から (read 対象) を決める
+        ci = it._ci
+        args, vals = [], []
+        for k, o in enumerate(ci.operands):
+            if k == 0:
+                if o.access & 1:             # dst も read (RMW)
+                    args.append("x")
+                    vals.append(self.read_reg(st, dst, va, out)[0])
+                continue
+            kind = ops[k][0]
+            if kind == "reg":
+                if not xr(ops[k]):
+                    # GPR 源 (cvtsi2sd 等)
+                    gv = self._gpr_val(st, ops[k][1], va, out, bits=o.size * 8)
+                    args.append({4: "d", 8: "q"}.get(o.size, "q"))
+                    vals.append(gv)
+                else:
+                    args.append("x")
+                    vals.append(self.read_reg(st, ops[k][1], va, out)[0])
+            elif kind == "mem":
+                sz = mem["size"]
+                ity = {4: "i32", 8: "i64", 16: "i128"}.get(sz)
+                if ity is None:
+                    return False
+                p = self._addr(it, st, out, va, tag)
+                n = self.nm(va, "ld")
+                out.append("  %s = load %s, ptr %s, align 1%s" % (n, ity, p, tag))
+                args.append({"i32": "d", "i64": "q", "i128": "x"}[ity])
+                vals.append(n)
+            elif kind == "imm":
+                args.append("b")
+                vals.append(str(ops[k][1] & 0xFF))
+        # 完全上書きの移動 (movaps x,[m] / movaps x,x)
+        if base in ("movaps", "movapd", "movups", "movupd", "movdqa", "movdqu") and args == ["x"]:
+            st[dst] = (vals[0], "i128")
+            st["__w"].add(dst)
+            return True
+        sp = kernels.lookup(base if not vex else m, "x", args) or kernels.lookup(m, "x", args)
+        if sp is None:
+            raise Unsupported("%x: no helper for %s(%s)" % (va, m, ",".join(args)))
+        hn = self._decl_helper(m if (kernels.lookup(m, "x", args) is not None and vex) else base, "x", args)
+        n = self.nm(va, "h")
+        ct = {"x": "i128", "q": "i64", "d": "i32", "b": "i8"}
+        out.append("  %s = call i128 @%s(%s)%s" % (n, hn, ", ".join("%s %s" % (ct[a], v) for a, v in zip(args, vals)), tag))
+        st[dst] = (n, "i128")
+        st["__w"].add(dst)
+        return True
+
     def lift_block(self, start, st):
         """機械語 start から基本ブロック終端まで lift し IR 行を返す。st['__w'] = 書込済 reg 集合。"""
         mf, mod = self.mf, self.mod
@@ -336,6 +499,8 @@ class Region:
                 return out
             elif m.startswith("nop"):
                 pass
+            elif self.lift_data_insn(it, ops, st, out, tag):
+                pass
             else:
                 raise Unsupported("%x: %s %s" % (va, m, it.op_str))
             va = it.next
@@ -346,7 +511,7 @@ class Region:
 
     def edge(self, va, st):
         """辺 -> 先のラベル名。region 内なら再帰 lift, 既存 IR なら merge store を持つ中継ブロックを作る。"""
-        if va == self.S:
+        if va == self.S and not self.S_is_label:
             bad = (st["__w"] - {"flags"}) & self.live_at_S
             if bad:
                 raise Unsupported("region writes %s live into survivor" % sorted(bad))
@@ -412,30 +577,68 @@ class Region:
 
 
 def reconstruct(mod, fn, mf, binder, rec, c, stats, log):
-    """脱落 (または br label に畳まれた) jcc を再構成。成功 True。"""
+    """脱落 (または br label に畳まれた) jcc を再構成。成功 True。失敗は Unsupported (IR 無改変)。"""
     ix = binder.ix
     A, J = rec["A"], c["J"]
     T, F = c["T"], c["F"]
     cb, cl, call_ln = rec["call"]
+    blk = fn.blocks[cb]
     pT, pF = ix.present(T), ix.present(F)
-    folded_br = c.get("br") if c["state"] == "folded" else None
-    if folded_br:
-        s = IR.strip_tokens(folded_br[2])
-        m = re.match(r"^\s*br label %([\w$.\-]+)", s)
-        S = label_target(m.group(1))
-        if S not in (T, F):
-            raise Unsupported("folded br target %x not in {T,F}" % (S or 0))
-    elif pT and not pF:
-        S = T
-    elif pF and not pT:
-        S = F
-    else:
-        raise Unsupported("survivor ambiguous (T present=%s F present=%s)" % (pT, pF))
-    D = F if S == T else T
     pred = CC_PRED.get(c["cc"])
     if pred is None:
         raise Unsupported("cc %s" % c["cc"])
     kind = parse_comis_call(call_ln)[0]
+
+    # ---- head / tail の分割点: comis 呼出の後で J より後ろのアドレスを持つ最初の行。無ければ終端命令。
+    sp = None
+    for i in range(cl + 1, len(blk.lines)):
+        a = mod.addr_of(blk.lines[i])
+        if a is not None and a > J:
+            sp = i
+            break
+    term_idx = None
+    for i in range(len(blk.lines) - 1, cl, -1):
+        if re.match(r"^\s*(br|ret|switch|unreachable)\b", IR.strip_tokens(blk.lines[i])):
+            term_idx = i
+            break
+    if term_idx is None:
+        raise Unsupported("no terminator in comis block")
+    if sp is None:
+        sp = term_idx
+    tail_lines = blk.lines[sp:]
+
+    # ---- 生存側 S: 既存 IR の到達で決める
+    S = None
+    if c["state"] == "folded":
+        m = re.match(r"^\s*br label %([\w$.\-]+)", IR.strip_tokens(c["br"][2]))
+        S = label_target(m.group(1)) if m else None
+    if S is None:
+        # tail の終端 `br label %L` の先, または tail 先頭の注釈アドレスで判定
+        tm = re.match(r"^\s*br label %([\w$.\-]+)", IR.strip_tokens(blk.lines[term_idx]))
+        t_first = None
+        for ln in tail_lines:
+            a = mod.addr_of(ln)
+            if a is not None:
+                t_first = a
+                break
+        if t_first is not None and (t_first == T or t_first == F or (J < t_first)):
+            # 注釈付きの続きがある: T 側/F 側のどちらの領域か (機械語の fallthrough = F 側は J の直後)
+            if t_first == T or (t_first > J and t_first != F and T > J and t_first >= T):
+                S = T
+            else:
+                S = F if t_first >= F else None
+        if S is None and tm:
+            lt = label_target(tm.group(1))
+            if lt in (T, F):
+                S = lt
+        if S is None:
+            if pT and not pF:
+                S = T
+            elif pF and not pT:
+                S = F
+    if S not in (T, F):
+        raise Unsupported("survivor ambiguous (T present=%s F present=%s)" % (pT, pF))
+    D = F if S == T else T
 
     # ---- 機械語 CFG から region の端点 (既存 IR 側ラベル) を決める
     reg = Region(mod, fn, mf, binder, rec, S, D)
@@ -445,41 +648,27 @@ def reconstruct(mod, fn, mf, binder, rec, c, stats, log):
         mm = re.match(r"dec_label_pc_([0-9a-f]+)$", lab or "")
         if mm:
             reg.exit_vas.add(int(mm.group(1), 16))
-    reg.exit_vas.discard(S)
+    reg.S_is_label = ix.has_label(S)
+    if not reg.S_is_label:
+        reg.exit_vas.discard(S)
     reg.live_at_S = _live_in_at(mf, S)
     reg.visited = set()
-
-    # ---- head / tail 分割
-    head_bi = cb
-    blk = fn.blocks[head_bi]
-    reg.head_bi = head_bi
-    if folded_br:
-        sp = None
-        reg.tail_range = set()
-        tail_label = "dec_label_pc_%x" % S
+    reg.head_bi = cb
+    reg.tail_range = set((cb, i) for i in range(sp, len(blk.lines)))
+    # tail の新ラベル (S が既存ラベルならラベル衝突を避ける)
+    if reg.S_is_label:
+        tail_label = "dec_label_pc_p1tail_%x_%x" % (A, J)
     else:
-        sp = None
-        for i in range(cl + 1, len(blk.lines)):
-            a = mod.addr_of(blk.lines[i])
-            if a is not None and a > J:
-                sp = i
-                break
-        if sp is None:
-            raise Unsupported("no split point after comis")
         tail_label = "dec_label_pc_%x" % S
-        if ix.has_label(S):
-            raise Unsupported("survivor label already exists but br missing")
-        reg.tail_range = set((head_bi, i) for i in range(sp, len(blk.lines)))
-
     st0 = {"__w": set()}
     dlabel = reg.edge(D, st0)
     # ---- 比較命令 (comis 呼出直後) + 分岐
     tag = mod.tag(J)
-    bc = build_compare(mod, A, call_ln, kind) if "cmp" not in rec else None
     if "cmp" in rec:
         _i, fa, fb, ty = rec["cmp"]
         ins = []
     else:
+        bc = build_compare(mod, A, call_ln, kind)
         if bc is None:
             raise Unsupported("comis operand form")
         rec["cmp"] = bc
@@ -491,18 +680,11 @@ def reconstruct(mod, fn, mf, binder, rec, c, stats, log):
         newbr = "  br i1 %s, label %%%s, label %%%s%s" % (cname, tail_label, dlabel, tag)
     else:
         newbr = "  br i1 %s, label %%%s, label %%%s%s" % (cname, dlabel, tail_label, tag)
-
-    if folded_br:
-        bi, li, _ = folded_br
-        fn.blocks[bi].lines[li] = newbr
-        fn.blocks[cb].lines[cl + 1:cl + 1] = ins
-    else:
-        tail_lines = blk.lines[sp:]
-        blk.lines[sp:] = []
-        blk.lines[cl + 1:cl + 1] = ins
-        blk.lines.append(newbr)
-        tb = IR.Block(tail_label, tail_label + ":", tail_lines)
-        fn.blocks.insert(head_bi + 1, tb)
+    blk.lines[sp:] = []
+    blk.lines[cl + 1:cl + 1] = ins
+    blk.lines.append(newbr)
+    tb = IR.Block(tail_label, tail_label + ":", tail_lines)
+    fn.blocks.insert(cb + 1, tb)
     for (lab, lines) in reg.blocks:
         fn.blocks.append(IR.Block(lab, lab + ":", lines))
     stats["reconstructed"] = stats.get("reconstructed", 0) + 1

@@ -118,6 +118,32 @@ def repair(mod, fn, mf, binder, X, R, users, stats, log):
                     continue
                 if resolves_to(ix, tok, btok):
                     edits.append((bi, li, tok, Y))
+    if not edits:
+        # fallback (位置規則): user 命令 Y の IR アドレス計算 `add i64 A, B` のうち, index 側 (mul/束縛値) でない方が誤った base
+        for Y in _all_readers(mf, R, X):
+            iy = mf.insns[Y]
+            if not iy.mem or iy.mem["base"] != R:
+                continue
+            idx_tok = None
+            if iy.mem["index"]:
+                for (bi, li, ln) in ix.instrs_at(Y):
+                    mm = re.match(r"^\s*(%[\w$.\-]+) = mul i64 \S+, " + str(iy.mem["scale"]) + r"\b", IR.strip_tokens(ln))
+                    if mm:
+                        idx_tok = mm.group(1)
+                if idx_tok is None:
+                    bb2 = binder.bind(iy.mem["index"], Y)
+                    idx_tok = bb2[0] if bb2 else None
+            for (bi, li, ln) in ix.instrs_at(Y):
+                mm = re.match(r"^\s*%[\w$.\-]+ = add i64 (%[\w$.\-]+), (%[\w$.\-]+)\s*$", IR.strip_tokens(ln))
+                if not mm or idx_tok is None:
+                    continue
+                a, b2 = mm.group(1), mm.group(2)
+                if a == idx_tok and b2 != idx_tok:
+                    edits.append((bi, li, b2, Y))
+                elif b2 == idx_tok and a != idx_tok:
+                    edits.append((bi, li, a, Y))
+        if edits:
+            log.append("F7 @%x: operand 特定は位置規則 (alias 解決不能)" % X)
     seen, ed2 = set(), []
     for e in edits:
         k = (e[0], e[1], e[2])
@@ -144,21 +170,41 @@ def repair(mod, fn, mf, binder, X, R, users, stats, log):
     base = "%%f7_%x" % X
     ins = []
     cur = btok
-    if bty != "i64":
-        ins.append("  %s_z = zext %s %s to i64%s" % (base, bty, btok, tag))
-        cur = base + "_z"
-    if m["disp"]:
-        ins.append("  %s_a = add i64 %s, %d%s" % (base, cur, m["disp"], tag))
-        cur = base + "_a"
-    ins.append("  %s_p = inttoptr i64 %s to ptr%s" % (base, cur, tag))
+    if bty == "ptr":
+        if m["disp"]:
+            ins.append("  %s_p = getelementptr i8, ptr %s, i64 %d%s" % (base, btok, m["disp"], tag))
+        else:
+            ins.append("  %s_p = bitcast ptr %s to ptr%s" % (base, btok, tag))
+    else:
+        if bty != "i64":
+            ins.append("  %s_z = zext %s %s to i64%s" % (base, bty, btok, tag))
+            cur = base + "_z"
+        if m["disp"]:
+            ins.append("  %s_a = add i64 %s, %d%s" % (base, cur, m["disp"], tag))
+            cur = base + "_a"
+        ins.append("  %s_p = inttoptr i64 %s to ptr%s" % (base, cur, tag))
     ins.append("  %s_v = load i64, ptr %s_p, align 8%s" % (base, base, tag))
+    # 置換先トークンの型 (ptr 文脈なら inttoptr した値を使う)
+    from ..regbind import result_type
+
+    def tok_ty(tok):
+        for (ty, nm) in fn.params():
+            if nm == tok:
+                return ty
+        d = ix.defs.get(tok)
+        if d:
+            return result_type(fn.blocks[d[0]].lines[d[1]])
+        return "i64"
+    if any(tok_ty(e[2]) == "ptr" for e in edits):
+        ins.append("  %s_vp = inttoptr i64 %s_v to ptr%s" % (base, base, tag))
     fn.blocks[pos_bi].lines[pos_li:pos_li] = ins
     shift = len(ins)
     for (bi, li, tok, Y) in edits:
         if bi == pos_bi and li >= pos_li:
             li += shift
         old = fn.blocks[bi].lines[li]
-        fn.blocks[bi].lines[li] = re.sub(token_re(tok), base + "_v", old)
+        rep = base + ("_vp" if tok_ty(tok) == "ptr" else "_v")
+        fn.blocks[bi].lines[li] = re.sub(token_re(tok), rep, old)
     stats["repaired"] = stats.get("repaired", 0) + 1
     log.append("F7 repaired @%x: mov %s,[%s%+d] -> load %s_v; %d operand(s) rewritten (%s)" %
                (X, R, m["base"], m["disp"], base, len(edits), ",".join(sorted(set(e[2] for e in edits)))))
