@@ -921,8 +921,10 @@ class FnLift:
     def i_pextrw(self, ins, ops):
         self.L(self.wr(ins, ops[0], 'X[%d].w[%d]' % (self.xd(ins, ops[1]), ops[2].imm & 7), 4))
 
-    def i_ldmxcsr(self, ins, ops): self.L('ott_unsup(%s, "ldmxcsr");' % hx(ins.address))
-    def i_stmxcsr(self, ins, ops): self.L('ST32(%s, 0x1f80);' % self.ea(ins, ops[0]))
+    def i_ldmxcsr(self, ins, ops): self.L('ott_mxcsr = LD32(%s);' % self.ea(ins, ops[0]))
+    def i_stmxcsr(self, ins, ops): self.L('ST32(%s, ott_mxcsr);' % self.ea(ins, ops[0]))
+    i_vldmxcsr = i_ldmxcsr
+    i_vstmxcsr = i_stmxcsr
     def i_leave(self, ins, ops): self.L('R[RSP] = R[RBP]; R[RBP] = LD64(R[RSP]); R[RSP] += 8;')
     def i_cld(self, ins, ops): pass
     def i_cpuid(self, ins, ops): self.L('ott_unsup(%s, "cpuid");' % hx(ins.address))

@@ -5,6 +5,7 @@ uint64_t R[16];
 X128 X[16];
 uint8_t fZF, fSF, fCF, fOF, fPF;
 uint64_t ott_xrip;
+uint32_t ott_mxcsr = 0x1f80u;   /* x86 既定 (全例外 mask, round-nearest)。ldmxcsr/stmxcsr はこの shadow を読み書き */
 
 void ott_unsup(uint64_t addr, const char* what) {
     fprintf(stderr, "[ott] UNSUPPORTED instruction at %#llx: %s\n", (unsigned long long)addr, what); abort();

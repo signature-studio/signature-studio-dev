@@ -104,5 +104,6 @@ void ott_unlifted(uint64_t va) __attribute__((noreturn));
 void ott_badjump(uint64_t addr, uint64_t target) __attribute__((noreturn));
 void ott_dispatch(uint64_t target);   /* 間接 call: shifted VA → lifted 関数 */
 extern uint64_t ott_xrip;             /* デバッグ: 直近 call 元 */
+extern uint32_t ott_mxcsr;            /* CAB-138: MXCSR software shadow (既定 0x1f80, ldmxcsr/stmxcsr 用) */
 
 #endif
