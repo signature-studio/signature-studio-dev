@@ -1076,12 +1076,39 @@ BOOL    HttpQueryInfoA(LPVOID h, DWORD level, LPVOID buf, LPDWORD n, LPDWORD idx
  * ============================================================= */
 typedef int (*shimx_path_mapper_fn)(const char* winPathUtf8, char* outPosix, size_t outSize);
 typedef void* (*shimx_callback_translator_fn)(const char* api, void* callback);   /* R2: 関数ポインタ引数の変換フック */
+/* R2 実体 (cbtrans.c / CAB-177): lift 側 VA→関数解決の正本 (__icall_dispatch 関数表+BLK 方式 または
+ * m11_icall) を登録する invoke 契約。未知 va は例外でなく 0 を返す (列挙の穏当な打切り)。 */
+typedef unsigned long long (*shimx_cb_invoke_fn)(unsigned long long va, unsigned long long a0,
+                                                 unsigned long long a1, unsigned long long a2,
+                                                 unsigned long long a3, unsigned long long a4,
+                                                 unsigned long long a5, unsigned long long a6,
+                                                 unsigned long long a7);
+/* R3 実体: lift ABI トークン (SHX_LIFTTAB_TOKEN_BASE+index) → u64×8 uniform ABI の型付き thunk */
+typedef unsigned long long (*shimx_lift_thunk_fn)(unsigned long long a0, unsigned long long a1,
+                                                  unsigned long long a2, unsigned long long a3,
+                                                  unsigned long long a4, unsigned long long a5,
+                                                  unsigned long long a6, unsigned long long a7);
 void shimx_init(void);                                      /* 省略可 (遅延初期化) */
 void shimx_set_trace(int on);                               /* stderr にトレース出力 (環境変数 SHIMX_TRACE=1 でも可) */
 void shimx_set_strict(int on);                              /* 1: 未知 GetProcAddress 名を fail-fast */
 void shimx_set_intptr_limit(uint32_t lim);                  /* R1: 値 < lim を序数/整数 (MAKEINTRESOURCE 等) とみなす閾値。既定 0x10000 */
 uint32_t shimx_get_intptr_limit(void);
 void shimx_set_callback_translator(shimx_callback_translator_fn fn);  /* R2: 列挙系・CreateThread・FlsAlloc・タイマ・スレッドプールのコールバック変換 */
+shimx_callback_translator_fn shimx_get_callback_translator(void);     /* R2: 現在のフック (未設定は NULL) */
+void* shimx_cb_translator(const char* api, void* cb);       /* R2 実体: VA≥intptr_limit → slot トランポリン (invoke 経由) / 未満は恒等 */
+void* shimx_cbtrans_install(void);                          /* R2 実体の取付 (set_callback_translator(shimx_cb_translator))。戻り=前のフック */
+void shimx_cbtrans_set_invoke(shimx_cb_invoke_fn fn);       /* lift 側 dispatch (m11_icall / __icall_dispatch(BLK) 相当) を登録 */
+shimx_cb_invoke_fn shimx_cbtrans_get_invoke(void);
+int  shimx_cbtrans_slots(void);                             /* 使用中スロット数 (distinct VA 数) */
+unsigned shimx_cbtrans_slot_va(int slot);                   /* slot → 登録 VA (診断) */
+unsigned shimx_cbtrans_registrations(void);                 /* 累計登録数 */
+unsigned shimx_cbtrans_calls(void);                         /* トランポリン実呼出回数 */
+void shimx_cbtrans_reset(void);                             /* スロット/統計を掃除 (テスト用。invoke は保持) */
+unsigned shimx_lifttab_token(const char* name, DWORD ordinal);  /* R3: 名前/序数 → lift ABI トークン (0=対象外) */
+void* shimx_lifttab_proc_resolver(HMODULE m, const char* name, DWORD ordinal); /* R3: shimx_set_proc_resolver 用 (IL* と UI言語 をトークン化) */
+shimx_lift_thunk_fn shimx_lifttab_trampoline(unsigned token);   /* R3: トークン → u64×8 thunk (実 C 署名へ marshal)。未知は NULL */
+int  shimx_lifttab_count(void);
+const char* shimx_lifttab_name(int i);
 void shimx_set_pseudo_load(int on);                         /* R4: 1 = 未知 DLL の LoadLibrary を擬似モジュール登録で成功させる (既定 0 = 失敗) */
 void shimx_set_cs_null_ok(int on);                          /* R7: 1 = CRITICAL_SECTION の NULL/非整列を no-op で通す (既定 0 = fail-fast = Win32 AV 相当) */
 void shimx_set_path_mapper(shimx_path_mapper_fn fn);        /* VFS 連携: Win パス → FS パス */

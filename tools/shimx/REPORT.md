@@ -8,7 +8,7 @@
 
 | 項目 | 実測 |
 |---|---|
-| shimx 公開 API | **604 本** (機能 438 + スタブ 166) + 運用フック 38 本 (`exports.txt` の 643 = これらに M4 互換 `shim_unimplemented` を加えた数)。実装 6,724 行 (C) + テスト アサーション 536 行 + R1〜R8 追加実装 (§9) |
+| shimx 公開 API | **604 本** (機能 438 + スタブ 166) + 運用フック 53 本 (`exports.txt` の 658 = これらに M4 互換 `shim_unimplemented` を加えた数)。実装 6,724 行 (C) + テスト アサーション 536 行 + R1〜R8 追加実装 (§9) + **R2/R3 実体接続 `src/cbtrans.c` (§10, CAB-177)** |
 | FLEngine_x64.dll 静的 import **738** に対するカバレッジ | 実装 **358 = 48.5%** (機能 243 + スタブ 115)。libc 解決 `memset` 込み 48.6% |
 | 担当範囲 (738 − 他担当 379 = 359) に対するカバレッジ | **100.0%** (未実装 **0**、序数 import 0)。内訳 = 実装 358 + libc 解決 `memset` 1。対象外 379 = user32/gdi32/comctl32/opengl32 (tools/gui) 377 + dsound (tools/audio) 2。実装 358 のうち 9 本は user32 の weak 実装 (Char*W/MsgWaitForMultipleObjects*; gui 側が強定義で上書き可)。**100% は「シンボル提供」の意味**で、うち 115 本はスタブ (常時エラー/0 台/fail-fast の `RtlUnwind*` 等)。機能実装は 243 本 |
 | 呼出サイト加重 (静的 7,309 サイト) | shimx 4,050 サイト (55.4%) / 他担当 (GUI) 3,252 サイト (44.5%) / libc 7 |
@@ -16,8 +16,9 @@
 | プラグイン import (GUI/audio 除く) | OTT vst2 146/147, vst3 150/151 (残 = shell32 序数 74), FreshAir 98/98, FL64.exe 111/111, Serum2 234/238 (残 = 序数 4) |
 | **OTT undefined 47 種 (M8)** | shimx リンクで **47 → 23**。Win/CRT API **24 種は全て解決** (CloseHandle/CreateFileW/TlsGet・SetValue/WriteFile/GetProcAddress/LoadLibraryExW/`__readgsqword`/Rtl*/UnhandledExceptionFilter ほか)。残 23 は `function_18*` = lift 欠落で shim の対象外。t1 出力 SHA は baseline と bit 一致 (`b5a91b9b…`, 512 行)。signature mismatch 0 |
 | M11 init closure (`boot_final2.ll`) 外部参照 557 | shimx 提供 **182** + shimx 重複 declare (`SHGetFolderPathW.1` = R6 の shimx_dup 分類) **1** / GUI・audio 担当 171 (user32 114 / gdi32 53 / shcore 2 / uxtheme 1 / dsound 1) / lift 由来 203。**非 GUI の Win/CRT は 100% 提供**、IR declare と wasm 署名の不一致 0 (後述 §4 の 5 件を修正済み) |
+| **R2/R3 実体接続 (§10, CAB-177)** | `shimx_set_callback_translator` の**変換実体** `src/cbtrans.c` (VA→slot トランポリン→lift 側関数表) + R3 `shimx_lifttab_*` (IL* 10 本 + kernel32 UI言語 3 本を lift ABI トークン化)。M11 純リンクに接続済み: unit 18 の `EnumCalendarInfoW(0x4476d0)` が trampoline 経由で実呼出され **"table index is out of bounds" trap が消滅** (init_count 18・mismatch/undefined 0・survey 800/41/53 不変)。検証: `test/test_cbtrans.c` (MT/ST) + `tools/hostbridge/cb/cb_e2e.sh` (MT 15/ST 12 checks) |
 | M4 の 53 API | **53/53 継承**。`tools/shim/test/test_main.c` を **無改変** で shimx 実装に対し MT/ST とも ALL PASS |
-| テスト | MT(pthread) ALL PASS / ST ALL PASS / fail-fast 8 モード / M4 互換 MT・ST / 署名突合 3 本 (boot_final2・3 / OTT) / OTT 再リンク+実行回帰 / **R1〜R8 対応分 `test/test_link.c` (MT/ST)** / R6 検査 (構造体展開 + 正規化 IR の emcc 通過) |
+| テスト | MT(pthread) ALL PASS / ST ALL PASS / fail-fast 8 モード / M4 互換 MT・ST / 署名突合 3 本 (boot_final2・3 / OTT) / OTT 再リンク+実行回帰 / **R1〜R8 対応分 `test/test_link.c` (MT/ST)** / **R2・R3 実体接続分 `test/test_cbtrans.c` (MT/ST, §10)** / R6 検査 (構造体展開 + 正規化 IR の emcc 通過) |
 
 ## 1. バックログ (優先度付け, `BACKLOG.md` 全表)
 
@@ -82,7 +83,7 @@ Init・DeleteCriticalSection 65 / GetLastError 61 / GetCurrentThreadId 51 / Vari
 - **FileMapping**: マッピング毎の共有バッファ (書戻しは Unmap/Flush/Close)。別プロセスとの共有や巨大ファイルの遅延マップは不可。VirtualAlloc 予約は malloc (上限 512MB/回)。
 - **GlobalUnlock** は M4 互換 (ロック済みなら TRUE)。HeapDestroy は配下ブロックを回収しない。SuspendThread は実停止しない。
 - 序数 import (shell32 74, shlwapi 12/219, d2d1 1): 名前未特定で未実装。shell32 155=ILFree / 190=ILCreateFromPathW は R3 で同定済み (§9.1, GetProcAddress 序数表で解決)。Serum2 の advapi32 Crypt* は常に失敗 (FL 本体は使わない)。
-- **コールバック (R2)**: 翻訳フックは登録時に 1 回走り、戻り値 (実 call 可能な関数ポインタ) を保存して以後使う。非同期系 (CreateThread/タイマ/FLS/スレッドプール) は hostbridge が寿命を管理するトランポリンを返す前提 (同期系は呼出中のみ有効であれば足りる)。未設定時は恒等なので挙動は不変。
+- **コールバック (R2)**: 翻訳フックは登録時に 1 回走り、戻り値 (実 call 可能な関数ポインタ) を保存して以後使う。**変換実体は `src/cbtrans.c` (§10, CAB-177)**: guest VA (≥intptr_limit) を slot トランポリン (寿命 = プロセス, 解放しない) に変換し lift 側関数表 (invoke 契約) へ落とす。未設定時は恒等なので挙動は不変。実 C 関数ポインタ (<intptr_limit) は恒等通過 (M4 互換テストを壊さない)。
 - **BSTR (R5)**: 管理外ポインタの free は無視されるため、lift 側が FastMM 等の別確保元 BSTR を SysFreeString した場合はリークになる (abort しない優先)。所有表はピーク同時 BSTR 数 × 8B。
 - **intptr 閾値 (R1)**: プロセス共通の 1 変数。image を <0x10000 に敷設する lift 系と MAKEINTRESOURCE 系の両立は敷設側 (lowbase LB_BASE≥0x10000) か閾値設定のいずれかで解決する。
 - 実機 FL の実行ではまだ検証していない (M11 の closure と OTT のリンク・署名・t1 回帰まで)。
@@ -112,6 +113,7 @@ python3 tools/shimx/scripts/ir_undef.py <ir.ll> --normalize-dup norm.ll   # NAME
 bash tools/shimx/scripts/verify_sig.sh <ir.ll> m11 # IR declare ↔ shimx 署名の突合
 bash tools/shimx/scripts/verify_ott.sh             # OTT undefined 47→23 と t1 回帰
 bash tools/shimx/scripts/rem11_check.sh            # M11 純リンク (no --fix) 17unit 再測 + R8 進捗 (§9.2)
+bash tools/hostbridge/cb/cb_e2e.sh                 # R2/R3 実体接続の往復ハーネス (§10, MT 15 + ST 12 checks)
 ```
 
 ユーザ依頼事項: なし (素材は既存。node v26 が PATH に無い環境のため emsdk 同梱 node 24.19 を使用)。
@@ -166,6 +168,29 @@ bash tools/shimx/scripts/rem11_check.sh
 
 | --fix 構成要素 | 取り込み | 補足 |
 |---|---|---|
-| `cb_adapt.c` (列挙コールバック変換) | **取り込み済み (機構)** | R2 の `shimx_set_callback_translator` が恒常フック口。VA→トランポリン変換 (m11_icall) の実体は hostbridge T2 (CAB-177) に接続されるまで link 側アダプタで暫定 |
+| `cb_adapt.c` (列挙コールバック変換) | **置換完了 (CAB-177)** | R2 の `shimx_set_callback_translator` が恒常フック口。VA→トランポリン変換の実体は **`src/cbtrans.c` (§10)** として shimx 側に恒久実装し、link 側は `sx_cbboot.c` (constructor で invoke+translator+resolver を登録) だけになった。**tools/m11/shimx_link/cb_adapt.c は削除** (--wrap=Enum* も廃止)。M11 純リンクへの接続実測は §10 |
 | `fix_alloca.py` (alloca 拡幅) | **意図的保留** | lift IR の縮退 alloca 修復で shim の担当外 (CAB-129 の本修正待ち)。`--emit-stubs`/`--normalize-dup` は IR を書くが構造体署名の正規化のみで alloca 構造には触れない |
 | `sx_liftfix.c` (`_WStrClr` C 転記) | **部分取り込み (症状緩和)** | 論理修復 (2 段 deref) は lift 側のまま保留。ただし R5 の所有表により、誤ったポインタを `SysFreeString` に渡しても abort しなくなり、純リンク時の同症状は無害化される (次回 §9.2 の再測で確認) |
+
+## 10. R2/R3 実体接続 — cbtrans (CAB-177 / SHX-T2 hostbridge 接続)
+
+CAB-211 のフック口の**変換実体**を `src/cbtrans.c` として恒久実装し、M11 純リンク (CAB-129 ビルド) と
+検証ハーネスへ接続した。**詳細 (設計/寿命契約/接続手順/実測/未対応・CAB-101 引継ぎ) は
+`tools/hostbridge/cb/REPORT.md`** と `src/cbtrans.c` 冒頭コメント、往復検証は `test/test_cbtrans.c` (MT/ST)
++ `tools/hostbridge/cb/cb_e2e.sh` (MT 15 / ST 12 checks, exit 0)。
+
+- **R2**: guest VA (≥intptr_limit) → 型付き slot トランポリン (6 形 × 64 slot) → **invoke 契約**
+  `u64 invoke(u64 va, u64 a0..a7)` (= `m11_icall` 或いは `__icall_dispatch` 関数表+BLK 方式) で lift 側関数表へ。
+  未知 va は 0 返し (closure 外でも trap しない)。`cb < intptr_limit` は実 C 関数ポインタの恒等通過 (M4 互換)。
+  **寿命契約**: 翻訳は 7 API の登録時に 1 回 / slot は**プロセス寿命で解放しない** → 非同期系
+  (CreateThread/FlsAlloc/タイマ/スレッドプール) も安全 (同一 VA = 常に同一トランポリン)。
+- **R3**: shell32 IL* 10 本 + kernel32 UI言語 3 本を **lift ABI トークン** (0x7F000000+index) 化する
+  `shimx_lifttab_*`。proc_resolver 接続で GetProcAddress がトークンを返し、lift dispatch 側は
+  `shimx_lifttab_trampoline(token)` (u64×8 → 実 C 署名 thunk) で実体呼出 (M11 = `--wrap=m11_icall`)。
+- **接続手順**: `shimx_cbtrans_set_invoke(<m11_icall 相当>)` → `shimx_cbtrans_install()` →
+  `shimx_set_proc_resolver(shimx_lifttab_proc_resolver)`。実装例 = `tools/m11/shimx_link/sx_cbboot.c`。
+
+**M11 純リンク実測**: init_count=18 / longjmp_hit=0 維持、threw が **"table index is out of bounds" →
+"memory access out of bounds"** (CAB-231 既知 OOB に進行, 後退なし)。icall_ok/miss = 19/**1**。ビルド 5 variant
+とも mismatch/undefined/duplicate **0**。survey 942 unit は **800/41/53 不変**。R3 の 13 名は survey で
+**トークン解決** (GetProcAddress miss 消滅)。

@@ -4,7 +4,9 @@
 #     (既定)   plain / GUI fail-fast : IR は無改変, shimx を直接リンク。署名不一致/重複の検査用 (CAB-166 本体)
 #     --trace  lifted 側の shimx/GUI 呼出を __sxt_ ラッパ経由にして計数 (IR の識別子を改名した別 IR を使う)
 #     --soft   GUI/audio 未提供 API を fail-fast ではなく「0 返却+m11_stub_hit 計数」にする (M11 既存挙動と同じ)
-#     --fix    fix_alloca.py で IR の縮退 alloca を拡幅 + cb_adapt.c (列挙系コールバックの VA→table 変換)。CAB-129 / T2 の計測用回避
+#     --fix    fix_alloca.py で IR の縮退 alloca を拡幅 + sx_liftfix.c (_WStrClr)。CAB-129 計測用回避
+#              (旧 cb_adapt.c の列挙コールバック変換は CAB-177 で shimx R2 実体 (cbtrans) + sx_cbboot に置換済み。
+#               R2/R3 接続は --fix 無しの全 variant で constructor 実行: -Wl,--wrap=m11_icall 含む)
 #   tools/shimx と tools/m11 既存ファイルは読取のみ。成果物は全て tools/m11/work/shimx_link/ (gitignore 済)。
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
@@ -49,10 +51,11 @@ cc "$M11/work/m11_simd.c" "$W/obj/m11_simd.o" $CF -I"$M11"
 cc "$M11/work/m11_fnstubs.c" "$W/obj/m11_fnstubs.o" $CF
 cc "$M11/work/m11_data.c" "$W/obj/m11_data.o" $CF
 cc "$HERE/sx_liftfix.c" "$W/obj/m11_sxfix.o" $CF
+cc "$HERE/sx_cbboot.c" "$W/obj/sx_cbboot.o" $CF   # CAB-177: R2 translator 実体 + R3 トークン (全 variant, constructor)
 llvm-nm --defined-only -g "$W"/obj/m11_*.o > "$W/m11_nm.txt"
 
-if [ $FIX = 1 ]; then cc "$HERE/cb_adapt.c" "$W/obj/cb_adapt.o" $CF; fi
 # 2b. alloca 拡幅 (--fix) ----------------------------------------------------------
+#   (旧 --fix 構成要素の cb_adapt.c は sx_cbboot.c + shimx cbtrans に置換済み = CAB-177 正式化)
 if [ $FIX = 1 ]; then
   IR="$W/boot_fixed.ll"
   if [ ! -f "$IR" ] || [ "$IR0" -nt "$IR" ] || [ "$HERE/fix_alloca.py" -nt "$IR" ]; then python3 "$HERE/fix_alloca.py" "$IR0" "$IR" --report "$W/fix_report.json"; fi
@@ -64,7 +67,8 @@ if [ ! -f "$GEN/classes.json" ] || [ "$IR" -nt "$GEN/classes.json" ] || [ "$HERE
 fi
 cc "$GEN/gui_stubs_$GUIV.c" "$W/obj/gui_$GUIV$SUF.o" $CF
 GUIOBJ="$W/obj/gui_$GUIV$SUF.o"
-WRAP=""; if [ $FIX = 1 ]; then GUIOBJ="$GUIOBJ $W/obj/cb_adapt.o"; WRAP="-Wl,--wrap=EnumCalendarInfoW -Wl,--wrap=EnumSystemLocalesW"; fi
+# CAB-177: --wrap=m11_icall (R3 トークン → lifttab thunk → 実体。それ以外は __real_m11_icall)
+WRAP="-Wl,--wrap=m11_icall"
 if [ $SOFT = 1 ]; then cc "$HERE/gui_compat.c" "$W/obj/gui_compat.o" $CF; GUIOBJ="$GUIOBJ $W/obj/gui_compat.o"; fi
 
 # 4. IR → obj (plain: 無改変 / trace: 識別子改名済み) -----------------------------
@@ -78,7 +82,8 @@ else
   BOOT="$W/obj/boot_plain$SUF.o"
 fi
 
-# 5. リンク (重複定義は error のまま = SHIM_BIND 廃止後の衝突検出) ------------------
+# 5. リンク (重複定義は error のまま = SHIM_BIND 廃止後の衝突検出)
+#    ※ $W/obj/sx_*.o glob は shimx 各 .o に加え sx_cbboot.o も拾う (CAB-177)
 OBJS="$W/obj/sx_*.o $W/obj/m11_rt.o $W/obj/m11_ov.o $W/obj/m11_simd.o $W/obj/m11_fnstubs.o $W/obj/m11_data.o $W/obj/m11_sxfix.o $GUIOBJ $BOOT"
 EXPORTS=_m11_boot_enter,_entry_point,_m11_init_count,_m11_boot_stage,_m11_va_used,_m11_va_calls,_m11_set_trace,_m11_icall_ok,_m11_icall_miss,_m11_icall_miss_uniq,_m11_icall_miss_at,_m11_disp_count,_m11_units_run,_m11_units_total,_m11_units_skipped,_m11_stub_total,_m11_stub_uniq,_m11_stub_name,_m11_stub_count,_m11_probe_count,_m11_longjmp_hit,_m11_set_survey,_m11_call_unit,_m11_unit_va,_shimx_set_trace,_shimx_init,__emscripten_stack_restore,_emscripten_stack_get_current
 OUT="$W/m11_sx_$TAG"

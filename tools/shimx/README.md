@@ -29,6 +29,7 @@ emcc <lift IR / runtime> tools/shimx/src/*.c ... -sGLOBAL_BASE=<64KB 以上>    
 | 領域 | API |
 |---|---|
 | VFS | `shimx_set_path_mapper` (Win→FS パス写像) / `shimx_path_to_posix` |
+| コールバック変換 (R2/R3 実体) | `shimx_cbtrans_set_invoke` (lift 側 VA→関数解決を登録) / `shimx_cbtrans_install` / `shimx_cb_translator` / `shimx_lifttab_proc_resolver` / `shimx_lifttab_trampoline` (詳細は REPORT §10 と src/cbtrans.c 冒頭) |
 | モジュール | `shimx_module_register` / `shimx_proc_register` / `shimx_set_proc_resolver` / `shimx_set_load_hook` / `shimx_set_resource_provider` / `shimx_set_exe_path` / `shimx_set_strict` |
 | レジストリ | `shimx_reg_set[_sz/_dword]` / `shimx_reg_import_text` / `shimx_reg_export_text` / `shimx_reg_reset` |
 | プロセス | `shimx_set_command_line` / `shimx_setenv_utf8` / `shimx_set_version` / `shimx_set_exit_hook` / `shimx_set_acp` / `shimx_set_locale` |

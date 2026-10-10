@@ -110,6 +110,9 @@ static inline int shx_is_iptr(uintptr_t v) { return v < g_shx_intptr_limit; }
  * fn 未設定 (既定) は恒等変換。hostbridge が m11_icall トランポリンを返す想定 (shimx T2) */
 void* shx_translate_cb(const char* api, void* cb);
 
+/* モジュール表内部 (module.c): HMODULE → モジュール名 (小文字, .dll 付き。無ければ NULL) */
+const char* shx_mod_name(HMODULE h);
+
 /* strict モード参照 (module.c) */
 int shx_strict_mode(void);
 

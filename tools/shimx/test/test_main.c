@@ -50,6 +50,7 @@ int main(int argc, char** argv) {
     run_sys_tests();             fprintf(stderr, "[shimx-test] sys OK\n");
     run_ole_shell_tests();       fprintf(stderr, "[shimx-test] ole/shell OK\n");
     run_link_tests(mt);          fprintf(stderr, "[shimx-test] link OK\n");
+    run_cbtrans_tests(mt);       fprintf(stderr, "[shimx-test] cbtrans OK\n");
     printf("[shimx-test] ALL PASS (build=%s)\n", build);
     return 0;
 }

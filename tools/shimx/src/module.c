@@ -112,6 +112,15 @@ static ShxMod* mod_by_base_locked(HMODULE h) {
     for (ShxMod* m = g_mods; m; m = m->next) if (m->base == h) return m;
     return NULL;
 }
+/* 内部: HMODULE → モジュール名 (見つからなければ NULL)。cbtrans の lifttab resolver が DLL 別判定に使う */
+const char* shx_mod_name(HMODULE h) {
+    if (!h) return NULL;
+    shx_mutex_lock(&g_mod_lk);
+    ShxMod* m = mod_by_base_locked(h);
+    const char* r = m ? m->name : NULL;
+    shx_mutex_unlock(&g_mod_lk);
+    return r;
+}
 static ShxMod* mod_add_locked(const char* name, const char* path, HMODULE base, size_t size, int builtin) {
     ShxMod* m = (ShxMod*)calloc(1, sizeof(ShxMod));
     m->name = strdup(name); m->path = strdup(path); m->base = base; m->size = size; m->refs = 1; m->builtin = builtin;

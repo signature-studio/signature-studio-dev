@@ -54,13 +54,13 @@ unit=18 GetLocaleInfoW x40
 停止スタック (wasm):
 ```
 RuntimeError: memory access out of bounds
-    at wasm://wasm/017bef8a:wasm-function[801]<function_4133f0>:0x81bb1
-    at wasm://wasm/017bef8a:wasm-function[3902]<function_446400>:0x19f1ed
-    at wasm://wasm/017bef8a:wasm-function[3956]<function_44bb70>:0x1a3b61
-    at wasm://wasm/017bef8a:wasm-function[4026]<function_455790>:0x1a9779
-    at wasm://wasm/017bef8a:wasm-function[10924]<m11_tr_function_455790>:0x36de2b
-    at wasm://wasm/017bef8a:wasm-function[788]<m11_icall>:0x80ec9
-    at wasm://wasm/017bef8a:wasm-function[796]<function_4120c0>:0x813ba
-    at wasm://wasm/017bef8a:wasm-function[797]<m11_InitLib>:0x817f9
-    at wasm://wasm/017bef8a:wasm-function[799]<function_41d8f0>:0x81986
+    at wasm://wasm/017eed06:wasm-function[1240]<function_4133f0>:0x8d088
+    at wasm://wasm/017eed06:wasm-function[4338]<function_446400>:0x1aa653
+    at wasm://wasm/017eed06:wasm-function[4392]<function_44bb70>:0x1aefca
+    at wasm://wasm/017eed06:wasm-function[4462]<function_455790>:0x1b4bea
+    at wasm://wasm/017eed06:wasm-function[11360]<m11_tr_function_455790>:0x3792ca
+    at wasm://wasm/017eed06:wasm-function[1227]<m11_icall>:0x8c3a0
+    at wasm://wasm/017eed06:wasm-function[42]<__wrap_m11_icall>:0x64ce9
+    at wasm://wasm/017eed06:wasm-function[1235]<function_4120c0>:0x8c891
+    at wasm://wasm/017eed06:wasm-function[1236]<m11_InitLib>:0x8ccd0
 ```

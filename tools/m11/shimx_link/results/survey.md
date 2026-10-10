@@ -15,10 +15,12 @@
 ## SHIMX_TRACE=1 の [shimx] 出力 (survey 全体; GetProcAddress miss / LoadLibrary 失敗 / ShellExecute 等)
 
 - `[shimx] GetProcAddress miss: kernel32.dll!#39682` x1 (最初 unit 2)
-- `[shimx] GetProcAddress miss: kernel32.dll!GetThreadPreferredUILanguages` x1 (最初 unit 2)
-- `[shimx] GetProcAddress miss: kernel32.dll!SetThreadPreferredUILanguages` x1 (最初 unit 2)
-- `[shimx] GetProcAddress miss: kernel32.dll!GetThreadUILanguage` x1 (最初 unit 2)
+- `[shimx] lifttab: GetThreadPreferredUILanguages # orm=0 -> token 0x7f00000a` x1 (最初 unit 2)
+- `[shimx] lifttab: SetThreadPreferredUILanguages # orm=0 -> token 0x7f00000b` x1 (最初 unit 2)
+- `[shimx] lifttab: GetThreadUILanguage # orm=0 -> token 0x7f00000c` x1 (最初 unit 2)
 - `[shimx] GetProcAddress miss: ntdll.dll!` x1 (最初 unit 18)
+- `[shimx] cbtrans: EnumCalendarInfoW VA 0x4476d0 -> trampoline slot 0 (invoke=0x1)` x1 (最初 unit 18)
+- `[shimx] cbtrans: EnumCalendarInfoW VA 0x4477a0 -> trampoline slot 1 (invoke=0x1)` x1 (最初 unit 18)
 - `[shimx] GetProcAddress miss: kernel32.dll!` x11 (最初 unit 36)
 - `[shimx] LoadLibrary 失敗: Msctf.dll` x1 (最初 unit 104)
 - `[shimx] GetProcAddress miss: ole32.dll!` x6 (最初 unit 107)
@@ -29,15 +31,15 @@
 - `[shimx] GetProcAddress miss: advapi32.dll!` x1 (最初 unit 146)
 - `[shimx] LoadLibrary 失敗: PowrProf.dll` x1 (最初 unit 146)
 - `[shimx] GetProcAddress miss: shcore.dll!` x1 (最初 unit 146)
-- `[shimx] GetProcAddress miss: shell32.dll!#16` x1 (最初 unit 239)
-- `[shimx] GetProcAddress miss: shell32.dll!#17` x1 (最初 unit 239)
-- `[shimx] GetProcAddress miss: shell32.dll!#18` x1 (最初 unit 239)
-- `[shimx] GetProcAddress miss: shell32.dll!#19` x1 (最初 unit 239)
-- `[shimx] GetProcAddress miss: shell32.dll!#21` x1 (最初 unit 239)
-- `[shimx] GetProcAddress miss: shell32.dll!#25` x1 (最初 unit 239)
-- `[shimx] GetProcAddress miss: shell32.dll!#152` x1 (最初 unit 239)
-- `[shimx] GetProcAddress miss: shell32.dll!#153` x1 (最初 unit 239)
-- `[shimx] GetProcAddress miss: shell32.dll!#155` x1 (最初 unit 239)
+- `[shimx] lifttab: (null) # orm=16 -> token 0x7f000000` x1 (最初 unit 239)
+- `[shimx] lifttab: (null) # orm=17 -> token 0x7f000001` x1 (最初 unit 239)
+- `[shimx] lifttab: (null) # orm=18 -> token 0x7f000002` x1 (最初 unit 239)
+- `[shimx] lifttab: (null) # orm=19 -> token 0x7f000003` x1 (最初 unit 239)
+- `[shimx] lifttab: (null) # orm=21 -> token 0x7f000004` x1 (最初 unit 239)
+- `[shimx] lifttab: (null) # orm=25 -> token 0x7f000005` x1 (最初 unit 239)
+- `[shimx] lifttab: (null) # orm=152 -> token 0x7f000006` x1 (最初 unit 239)
+- `[shimx] lifttab: (null) # orm=153 -> token 0x7f000007` x1 (最初 unit 239)
+- `[shimx] lifttab: (null) # orm=155 -> token 0x7f000008` x1 (最初 unit 239)
 - `[shimx] GetProcAddress miss: comctl32.dll!` x12 (最初 unit 299)
 
 ## fail-fast (abort) した unit
@@ -50,11 +52,11 @@
 |---|---|---|---|---|
 | TlsGetValue | 53 | 61 | 41 | 機能 |
 | MessageBoxA | 42 | 42 | 41 | X:gui |
-| LoadStringW | 28 | 288108620 | 16 | X:gui |
+| LoadStringW | 28 | 288112716 | 16 | X:gui |
 | InitializeCriticalSection | 22 | 28 | 2 | 機能 |
 | VirtualAlloc | 16 | 33 | 18 | 機能 |
-| GetProcAddress | 13 | 99 | 2 | 機能 |
 | GetModuleHandleW | 12 | 17 | 2 | 機能 |
+| GetProcAddress | 12 | 77 | 2 | 機能 |
 | WideCharToMultiByte | 10 | 64 | 18 | 機能 |
 | GetCurrentThreadId | 6 | 13 | 2 | 機能 |
 | QueryPerformanceCounter | 5 | 5 | 46 | 機能 |

@@ -10,11 +10,11 @@
   "top_frames": [
    "at abort (/home/ubuntu/work/webstudio/tools/m11/work/shimx_link/m11_sx_plain_failfast.cjs:521:11)",
    "at __abort_js (/home/ubuntu/work/webstudio/tools/m11/work/shimx_link/m11_sx_plain_failfast.cjs:3911:7)",
-   "wasm-function[16023]<abort>:0x37c3a8",
-   "wasm-function[669]<shim_unimplemented>:0x7aecc",
-   "wasm-function[1141]<LoadStringW>:0x89256",
-   "wasm-function[3222]<function_41c820>:0x1771ab",
-   "wasm-function[1526]<function_448ee0>:0xba169"
+   "wasm-function[16462]<abort>:0x387b4b",
+   "wasm-function[1107]<shim_unimplemented>:0x8638b",
+   "wasm-function[1580]<LoadStringW>:0x947ac",
+   "wasm-function[3661]<function_41c820>:0x18282e",
+   "wasm-function[1965]<function_448ee0>:0xc56bf"
   ],
   "last_stderr": [
    "[shim] FAIL-FAST: unimplemented Win32 API: LoadStringW"
@@ -23,12 +23,20 @@
  {
   "variant": "m11_sx_plain_soft",
   "units_run": 17,
-  "init_count_var": 0,
-  "dllmain_done": true,
-  "threw": null,
-  "icall_miss": 0,
-  "va_calls": 0,
-  "top_frames": [],
+  "init_count_var": 18,
+  "dllmain_done": false,
+  "threw": "memory access out of bounds",
+  "icall_miss": 1,
+  "va_calls": 3,
+  "top_frames": [
+   "wasm-function[1240]<function_4133f0>:0x8aaf7",
+   "wasm-function[4338]<function_446400>:0x1a80c2",
+   "wasm-function[4392]<function_44bb70>:0x1aca39",
+   "wasm-function[4462]<function_455790>:0x1b2659",
+   "wasm-function[11360]<m11_tr_function_455790>:0x376d39",
+   "wasm-function[1227]<m11_icall>:0x89e0f",
+   "wasm-function[42]<__wrap_m11_icall>:0x62758"
+  ],
   "last_stderr": []
  },
  {
@@ -40,13 +48,13 @@
   "icall_miss": 1,
   "va_calls": 3,
   "top_frames": [
-   "wasm-function[3062]<function_407e20__lifted>:0x169759",
-   "wasm-function[3060]<function_407e20>:0x168936",
-   "wasm-function[3090]<function_409440__lifted>:0x16cf82",
-   "wasm-function[2402]<function_409440>:0x119f23",
-   "wasm-function[1256]<function_412d60>:0x97666",
-   "wasm-function[3113]<function_413060>:0x16e219",
-   "wasm-function[3900]<function_446370>:0x19c8ab"
+   "wasm-function[1240]<function_4133f0>:0x8aaf7",
+   "wasm-function[4338]<function_446400>:0x1a80c2",
+   "wasm-function[4392]<function_44bb70>:0x1aca39",
+   "wasm-function[4462]<function_455790>:0x1b2659",
+   "wasm-function[11360]<m11_tr_function_455790>:0x376d39",
+   "wasm-function[1227]<m11_icall>:0x89e0f",
+   "wasm-function[42]<__wrap_m11_icall>:0x62758"
   ],
   "last_stderr": []
  },
@@ -61,11 +69,11 @@
   "top_frames": [
    "at abort (/home/ubuntu/work/webstudio/tools/m11/work/shimx_link/m11_sx_trace_failfast_fix.cjs:521:11)",
    "at __abort_js (/home/ubuntu/work/webstudio/tools/m11/work/shimx_link/m11_sx_trace_failfast_fix.cjs:3911:7)",
-   "wasm-function[16394]<abort>:0x386154",
-   "wasm-function[669]<shim_unimplemented>:0x7d4dc",
-   "wasm-function[1141]<LoadStringW>:0x8b866",
-   "wasm-function[16319]<__sxt_LoadStringW>:0x38486a",
-   "wasm-function[3225]<function_41c820>:0x179990"
+   "wasm-function[16830]<abort>:0x3915f3",
+   "wasm-function[1107]<shim_unimplemented>:0x8891c",
+   "wasm-function[1580]<LoadStringW>:0x96d3d",
+   "wasm-function[16755]<__sxt_LoadStringW>:0x38fd09",
+   "wasm-function[3661]<function_41c820>:0x184dbf"
   ],
   "last_stderr": [
    "[shim] FAIL-FAST: unimplemented Win32 API: LoadStringW"
@@ -80,13 +88,13 @@
   "icall_miss": 1,
   "va_calls": 3,
   "top_frames": [
-   "wasm-function[801]<function_4133f0>:0x81bb1",
-   "wasm-function[3902]<function_446400>:0x19f1ed",
-   "wasm-function[3956]<function_44bb70>:0x1a3b61",
-   "wasm-function[4026]<function_455790>:0x1a9779",
-   "wasm-function[10924]<m11_tr_function_455790>:0x36de2b",
-   "wasm-function[788]<m11_icall>:0x80ec9",
-   "wasm-function[796]<function_4120c0>:0x813ba"
+   "wasm-function[1240]<function_4133f0>:0x8d088",
+   "wasm-function[4338]<function_446400>:0x1aa653",
+   "wasm-function[4392]<function_44bb70>:0x1aefca",
+   "wasm-function[4462]<function_455790>:0x1b4bea",
+   "wasm-function[11360]<m11_tr_function_455790>:0x3792ca",
+   "wasm-function[1227]<m11_icall>:0x8c3a0",
+   "wasm-function[42]<__wrap_m11_icall>:0x64ce9"
   ],
   "last_stderr": []
  }

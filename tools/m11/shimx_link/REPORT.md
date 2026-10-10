@@ -142,3 +142,24 @@ GetCurrentThreadId 3, GetModuleHandleW, GetProcAddress, InitializeCriticalSectio
 - 実行は node の -O0 ビルド。ブラウザ・MT は未検証。survey の ok 数は abort 後にインスタンスを作り直す手順に依存し、M11 REPORT の survey (ok 812) とは直接比較できない (同手順で既存ビルドを再測して比較した)。
 - トレースは lifted コードからの呼出のみ (shimx 内部の呼出・`m11_ov.c` から C で直接呼ぶ `LCMapStringW` は含まない)。
 - `ok` = 例外なく戻っただけで、意味の正しさは保証しない (M11 REPORT §4 の「lift 検証手段が無い」は未解決)。
+
+## 9. R2/R3 実体接続 (CAB-177) — cb_adapt 廃止と sx_cbboot
+
+本チケット (CAB-177) により §3-#3 / §6-R2 の暫定対応を置換した。詳細は `tools/hostbridge/cb/REPORT.md` と
+`tools/shimx/REPORT.md` §10。**本 REPORT の数値は CAB-166/CAB-129 時点 (cb_adapt 時代) の記録として保持**
+し、接続後の実測は下表のとおり (2026-10-10 再測, `results/` 更新済み)。
+
+- `cb_adapt.c` (--wrap=EnumCalendarInfoW/EnumSystemLocalesW, 単一 global g_cb, 同期 2 API のみ) を**削除**。
+- 代わりに `sx_cbboot.c` (constructor) が全 variant で `shimx_cbtrans_set_invoke(m11_icall)` →
+  `shimx_cbtrans_install()` → `shimx_set_proc_resolver(shimx_lifttab_proc_resolver)` を実行し、
+  build.sh は `-Wl,--wrap=m11_icall` (R3 トークン → `shimx_lifttab_trampoline` → `__real_m11_icall`) を追加。
+- `--fix` は fix_alloca.py + sx_liftfix.c のみになった (**コールバック変換は全 variant の常時機構に昇格**)。
+  なお現行 boot_final3.ll は CAB-129 pass 適用済みで fix_alloca の拡幅対象は 0 関数 (`results/fix_alloca_report.json`)。
+
+| 項目 | §0〜§8 の記録 (cb_adapt 時代) | 接続後 (CAB-177) |
+|---|---|---|
+| 純リンク (trace_soft) | init_count 17〜18 / unit 18 で table index trap (§3-#3) | **init_count 18 / longjmp_hit 0 / threw=memory access out of bounds** (= §4.2 の CAB-231 停止点に到達) |
+| trace_soft の shimx 呼出 | 94 回 / 26 種 (§4, --fix 時) | **91 回 / 26 種 (純リンク --fix 無しで同等に到達)** |
+| R3 の GetProcAddress | §4.3 の miss 12 名 (UI言語 3 + shell32 序数 9) | **13 名トークン解決** (`lifttab: … -> token 0x7f0000xx`), miss 消滅 |
+| survey (trace_soft_fix) | ok 800 / oob 41 / halt0 53 | **同値 (不変)** |
+| ビルド 5 variant | mismatch/undefined/duplicate 0 | **0 (不変)** |

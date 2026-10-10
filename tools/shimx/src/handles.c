@@ -305,6 +305,7 @@ static shimx_callback_translator_fn g_cb_trans;
 void shimx_set_intptr_limit(uint32_t lim) { g_shx_intptr_limit = lim; }
 uint32_t shimx_get_intptr_limit(void) { return g_shx_intptr_limit; }
 void shimx_set_callback_translator(shimx_callback_translator_fn fn) { g_cb_trans = fn; }
+shimx_callback_translator_fn shimx_get_callback_translator(void) { return g_cb_trans; }
 void* shx_translate_cb(const char* api, void* cb) {
     if (!cb || !g_cb_trans) return cb;
     void* r = g_cb_trans(api, cb);
