@@ -13,17 +13,28 @@ uint32_t mxcsr = 0x1f80;
 uint32_t XCR0 = 0x7;            /* x87|SSE|AVX (xgetbv モデル値) */
 uint64_t SEG_GS = FLE_TEB, SEG_FS = FLE_TEB;
 uint64_t ott_xrip;
+/* FLE-2 boot hook (fle_cpu.h 参照)。未設定 = abort (fle_native の spot diff 経路と同一挙動)。 */
+void (*fle_ff_hook)(const char* kind, uint64_t a) = 0;
+/* FLE-2 boot: ott_dispatch probe (未設定 = 何もしない) */
+void (*fle_dispatch_probe)(uint64_t t) = 0;
+
+#define FLE_FF(kind, a) do { if (fle_ff_hook) { fle_ff_hook((kind), (uint64_t)(a)); } } while (0)
 
 void ott_unsup(uint64_t addr, const char* what) {
+    FLE_FF("unsup", addr);
     fprintf(stderr, "[fle] UNSUPPORTED instruction at %#llx: %s\n", (unsigned long long)addr, what); abort();
 }
 void ott_unlifted(uint64_t va) {
+    /* FLE-2: hook が戻した場合は「ret 0 扱い」で継続 (m11 の icall-miss 揃え)。hook は retaddr を pop する。 */
+    if (fle_ff_hook) { fle_ff_hook("unlifted", va); return; }
     fprintf(stderr, "[fle] call to UNLIFTED function %#llx ret=%#llx\n", (unsigned long long)va, (unsigned long long)LD64(R[RSP])); abort();
 }
 void ott_badjump(uint64_t addr, uint64_t target) {
+    FLE_FF("badjump", target);
     fprintf(stderr, "[fle] bad jump at %#llx target %#llx\n", (unsigned long long)addr, (unsigned long long)target); abort();
 }
 void ott_missing_import(const char* nm) {
+    FLE_FF(nm, 0);
     fprintf(stderr, "[fle] MISSING IMPORT %s\n", nm); abort();
 }
 #ifdef FLE_CHK

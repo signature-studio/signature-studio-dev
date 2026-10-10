@@ -83,6 +83,12 @@ class PEInfo:
             for imp in ent.imports:
                 nm = imp.name.decode() if imp.name else 'ord%d' % imp.ordinal
                 self.iat[imp.address] = nm
+        # 遅延読み込み (delay import): jmp [遅延IAT] 形 thunk も通常 import と同一扱いにする
+        # (slot に pseudo-VA を敷設 → thunk 経由の呼出が imp 直行。__delayLoadHelper2 は不要化)
+        for ent in getattr(pe, 'DIRECTORY_ENTRY_DELAY_IMPORT', []):
+            for imp in ent.imports:
+                nm = imp.name.decode() if imp.name else 'ord%d' % imp.ordinal
+                self.iat[imp.address] = nm
         self.pdata = []
         for s in pe.sections:
             if s.Name.startswith(b'.pdata'):
@@ -1619,9 +1625,13 @@ def main():
         for e in sorted(final):
             fh.write(final[e].csrc + '\n')
         # 間接 dispatch: lifted 関数表 + IAT pseudo-VA 経路
-        fh.write('void ott_dispatch(uint64_t t) {\n  switch (t) {\n')
+        # (FLE-2: 冒頭に optional probe hook — boot 側で計数/トレースする。未設定なら何もしない)
+        fh.write('void ott_dispatch(uint64_t t) {\n')
+        fh.write('  if (fle_dispatch_probe) fle_dispatch_probe(t);\n  switch (t) {\n')
         for e in sorted(final):
             fh.write('  case %s: f_%x(); return;\n' % (hx(sh(e)), e))
+        for tv2 in sorted(thunks):
+            fh.write('  case %s: imp_%s(); return;\n' % (hx(sh(tv2)), thunks[tv2]))
         fh.write('  default: break;\n  }\n')
         if slots:
             fh.write('  if (t >= IMP_VA_BASE && t < IMP_VA_BASE + %du) { imp_by_index((int)(t - IMP_VA_BASE)); return; }\n' % len(slots))

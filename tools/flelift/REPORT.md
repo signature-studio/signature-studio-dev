@@ -137,6 +137,9 @@ fail-fast) (3) self-assign ✓。`Move(0x409c80)` n=392 (**M11 の 0x188 record 
   直接原因 (`_UStrAsg` 旧値読出し欠落 / record 縮退) は x64c では構造的に存在しない**。
 - 次接続: (1) `fle_data_install` + Delphi unit init 連鎖 (memory manager table 設定) を M11 e2e に接続し、
   (2) unit #18 以降の unit init を x64c lift 関数で実行 → survey trap の解消を確認 (CAB-5/M11 再開時)。
+- **実施済み (FLE-2, tools/flelift/boot/)**: boot 連鎖は DllMain → _InitLib → InitUnits まで実働
+  (17 unit dispatch / 16 完走、unit#17 で FreeMem 失敗 raise)。survey 942 隔離 = ok 808 / oob 66 / unlifted 12 /
+  halt0 9。詳細は **tools/flelift/boot/REPORT.md**、liftdiff FORMAT 記録は boot/results/verdict_boot.jsonl。
 
 ## 8. 再現
 

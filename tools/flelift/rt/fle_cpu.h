@@ -129,10 +129,10 @@ static inline int64_t cvtt_d2i64(double v) { if (v != v || v >= 9223372036854775
 static inline int32_t cvt_d2i32(double v) { double r = nearbyint(v); if (r != r || r >= 2147483648.0 || r < -2147483648.0) return INT32_MIN; return (int32_t)r; }
 static inline int64_t cvt_d2i64(double v) { double r = nearbyint(v); if (r != r || r >= 9223372036854775808.0 || r < -9223372036854775808.0) return INT64_MIN; return (int64_t)r; }
 
-/* 実行制御 */
-void ott_unsup(uint64_t addr, const char* what) __attribute__((noreturn));
-void ott_unlifted(uint64_t va) __attribute__((noreturn));
-void ott_badjump(uint64_t addr, uint64_t target) __attribute__((noreturn));
+/* 実行制御 (FLE-2 boot: hook により「戻る」経路があるため noreturn は付けない) */
+void ott_unsup(uint64_t addr, const char* what);
+void ott_unlifted(uint64_t va);
+void ott_badjump(uint64_t addr, uint64_t target);
 void ott_dispatch(uint64_t target);   /* 間接 call/jmp: VA → lifted 関数 or IAT pseudo-VA */
 void imp_by_index(int k);
 void ott_missing_import(const char* nm);
@@ -141,5 +141,12 @@ void fle_alog(void* p, uint64_t n);
 void cpuid_model(void);
 void rdtsc_model(void);
 extern uint64_t ott_xrip;             /* デバッグ: 直近 call 元 */
+
+/* FLE-2 boot: 非 0 なら fail-fast 系 (unlifted/badjump/missing import/unsup) を abort の代わりに
+ * 通知する (実装は JS 例外を投げて戻らない。未設定 = 従来どおり abort)。 */
+extern void (*fle_ff_hook)(const char* kind, uint64_t a);
+/* FLE-2 boot: 間接 dispatch (ott_dispatch) の全呼出を観測する probe (未設定 = 何もしない)。
+ * x64c.py が生成する ott_dispatch 冒頭から呼ばれる。VMT 経路/FastMM 入口/unit proc の計数に使う。 */
+extern void (*fle_dispatch_probe)(uint64_t t);
 
 #endif
