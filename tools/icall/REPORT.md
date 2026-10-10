@@ -48,7 +48,7 @@
 
 - OTT の旧 "47 関数 54 site" (R) は native 実行 75 関数の部分集合。本監査は同 75 関数で非 IAT call 49 + tail-jmp 7 + 表 2 (`work/audit_ott_native75.json`)、IR 残存 0。
 - FLEngine 復元後の残 382 のうち **366 は 2 本の巨大 GUI 構築関数** (`0xc589b0` 19.6KB / `0x128f9e0` 20.7KB, 各 183 site) で RetDec が本体を途中で捨てる。残り 16 site は別の小関数。
-- FLEngine **gap site 879** = control-flow 非到達コード (Delphi unwind landing pad: `mov rbx,[rax]; call [rbx-0x20]` = 仮想 dtor 呼出し等) で RetDec は decode しない。RetDec dsm にも無い (879 中 2)。**間接 call 以前に「例外経路の dtor が lift されない」欠陥**。
+- FLEngine **gap site 879** = control-flow 非到達コード (Delphi unwind landing pad: `mov ebx,[rax]; call [rbx-0x20]` = 仮想 dtor 呼出し等, 実測 879 中 493 がこの形) で RetDec は decode しない。RetDec dsm にも無い (879 中 2)。**間接 call 以前に「例外経路の dtor が lift されない」欠陥**。
 - 復元後 FLEngine: dispatch 3,462 / comis 830 / 書換え derefix 12,559 / direct call ABI 化 30,092 / ret 7,030 / tail-jmp 22 (`work/rt_flengine/rewrite.txt`)。**FLEngine は構造検証のみ (wasm 実行は未, §6)**。
 
 ## 3. 復元 pass の設計と OTT 検証
@@ -94,8 +94,8 @@
 | 観点 | RetDec + icall pass | x64c 拡張 (tools/ott/lift) | Ghidra pcode ベース |
 |---|---|---|---|
 | OTT 実績 | 89/89 bit-exact (本回) | 89/89 (R) | 未実施 |
-| FLEngine 実測 | 書換え 7,421 関数 約 30 秒, RetDec 4 並列 約 1–2 分, 構造検証のみ (間接 call 87% 復元) | **7,031 関数 340,764 命令を 36 秒で lift, 未対応 1,105 site (0.32%)**, 全 C 34.9MB を emcc -O0 で 21 秒 → wasm 22.6MB。変更は定数 3 行 + 例外耐性 1 行 (`integration/x64c_fle.patch`) |
-| 未対応/未知 | RetDec translator が黒箱: 既知 D7–D13 は差分試験でしか見つからない。x87/MMX/string 命令の意味は未検証 | 内訳が全列挙済: movsq 632 + stosq 122 + rep 系 (string 754 = 72%), lock 付き 91, SSE2 整数 pack ~110, x87 制御 ~10, bt mem 29, 他 ~60 | SLEIGH が x87/SSE/AVX flag まで意味定義済 (期待) |
+| FLEngine 実測 | 書換え 7,421 関数 約 30 秒, RetDec 4 並列 約 1–2 分, 構造検証のみ (間接 call 90.1% 復元, 残存 382/3,844) | **7,031 関数 340,764 命令を 36 秒で lift, 未対応 1,105 site (0.32%)**, 全 C 34.9MB を emcc -O0 で 21 秒 → wasm 22.6MB。変更は定数 3 行 + 例外耐性 1 行 (`integration/x64c_fle.patch`) |
+| 未対応/未知 | RetDec translator が黒箱: 既知 D7–D13 は差分試験でしか見つからない。x87/MMX/string 命令の意味は未検証 | 内訳が全列挙済: movsq 632 + stosq 122 + rep 系 (string 788 = 71%), lock 付き 91, SSE2 整数 pack ~110, x87 制御 ~10, bt mem 29, 他 ~60 | SLEIGH が x87/SSE/AVX flag まで意味定義済 (期待) |
 | コード量 (実測) | pass 群 約 1,900 行 (本ディレクトリ) | x64c 998 行 + rt 約 600 行 (OTT) | pcode→C/IR 変換器を新規 (推定 1.5–3k 行) |
 | 追加工数 (推定) | landing pad・stack 引数・巨大関数・Delphi 固有を RetDec 越しに手当て | 未対応 ~60 mnemonic の実装 + 7.4k dispatch + SEH/x87/TLS runtime = **推定 2–4 週** | 変換器 + 検証 = 推定 4–8 週 |
 | 正確さ | 既に bit-exact だが不具合が顕在化するたび pass 追加 | 命令 1:1 で決定的。native 実機械語との差分枠組みが既存 | Ghidra 解析の誤り (関数境界/型) が混入 |
