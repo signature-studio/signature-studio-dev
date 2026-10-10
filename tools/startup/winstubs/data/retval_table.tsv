@@ -1,0 +1,132 @@
+id	api	gate	expected	plan_ref
+G03.01	WinVerifyTrust	G03	ret=0	§5-A WinVerifyTrust: 0 (状態 VERIFY)
+G03.02	WinVerifyTrust	G03	ret=0	§5-A WinVerifyTrust: 0 (状態 CLOSE)
+G03.03	CryptQueryObject	G03	ret=1 enc=0x10001 ct=10 ft=1 store=1 msg=1	§5-A CryptQueryObject(1,path,0x400,2,..): TRUE, *hStore/*hMsg 非NULL
+G03.04	CryptQueryObject	G03	ret=0	Win32仕様: 期待種別が PKCS7_SIGNED_EMBED(0x400) でなければ失敗
+G03.05	CryptMsgGetParam	G03	ret=1 len=136	§5-A 1回目 len=sizeof(CMSG_SIGNER_INFO) >= 0x80 (Win64 実寸 0x88)
+G03.06	CryptMsgGetParam	G03	ret=1 len=136 zero=1	§5-A 2回目 ゼロ埋め構造 (Issuer/SerialNumber 長 0)
+G03.07	CryptMsgGetParam	G03	ret=0 need=136 err=234	Win32仕様: バッファ不足は ERROR_MORE_DATA(234) + 必要長
+G03.08	CryptMsgGetParam	G03	ret=1 count=1	補助: CMSG_SIGNER_COUNT_PARAM=1
+G03.09	CertFindCertificateInStore	G03	nonnull=1	§5-A CERT_FIND_SUBJECT_CERT(0xb0000): 非NULL
+G03.10	CertFindCertificateInStore	G03	null=1 err=0x80092004	Win32仕様: 列挙終端は NULL + CRYPT_E_NOT_FOUND(0x80092004)
+G03.11	CertGetNameStringW	G03	len=14	§5-A 長さ照会時=14
+G03.12	CertGetNameStringW	G03	ret=14 name=Image Line NV	§5-A 本取得時 L"Image Line NV"
+G03.13	CertGetNameStringW	G03	eq=1	§5-A engine の == 比較が成立
+G03.14	CertGetNameStringW	G03	ret=5 name=Imag	Win32仕様: 切詰め (NUL 含め n 文字)
+G03.15	CertGetNameStringA	G03	ret=14 name=Image Line NV	G03.12 の ANSI 版
+G03.16	CertGetNameStringW	G03	ret=1 issuer_len=0	補助: 発行者 (flags=ISSUER) は偽装せず shimx 既定 (空)
+G03.17	CertFreeCertificateContext	G03	ret=1	§5-A TRUE
+G03.18	CertCloseStore	G03	ret=1	§5-A TRUE
+G03.19	CryptMsgClose	G03	ret=1	§5-A TRUE
+G05.01	cpuid	G05	vendor=GenuineIntel max=0xd	§5-A leaf0: "GenuineIntel" (最大 leaf は SSE2 プロファイルで 0x0d = m11 helper と一致)
+G05.02	cpuid	G05	cmov=1 fxsr=1 mmx=1 sse=1 sse2=1 tsc=1 sse3=0 sse41=0 popcnt=0 avx=0	§5-A leaf1.EDX: CMOV(15) FXSR(24) MMX(23) SSE(25) SSE2(26) TSC(4)。SSE2 プロファイルは ECX=0, AVX なし
+G05.04	cpuid	G05	ebx=0x0 ecx=0x0 edx=0x0 avx2=0	§5-A leaf7: AVX2 を立てない
+G05.05	cpuid	G05	lm=1 lahf=1	§5-A 0x80000001: LM / LAHF
+G05.06	cpuid	G05	brand0=WebS	補助: ブランド文字列
+G05.07	cpuid	G05	plan_max=0x16	§5-A PLAN プロファイル: leaf0 最大 0x16
+G05.08	cpuid	G05	plan_ecx=0x00980201 sse3=1 ssse3=1 sse41=1 sse42=1 popcnt=1 avx=0	§5-A PLAN プロファイル: ECX に SSE3/SSSE3/SSE4.1/4.2/POPCNT (AVX なし)
+G05.09	cpuid	G05	plan_avx2=0	§5-A PLAN でも AVX2 は立てない
+G06.01	FindWindowW	G06	null=1	§5-A FindWindowW("TFruityLoopsMainForm"): NULL
+G06.02	FindWindowExW	G06	null=1	§5-A FindWindowExW: NULL
+G06.03	FindWindowW	G06	null=1	補助: タイトルのみ検索でも NULL
+G16.01	GetVersionExW	G16	ret=1 ver=10.0.19045 plat=2	§5-A 10.0 build 19045 (284B EXW)
+G16.02	GetVersionExW	G16	ret=1 ver=10.0.19045	§5-A 10.0.19045 (276B)
+G16.03	GetVersionExW	G16	ret=0 err=87	Win32仕様: 不正サイズは FALSE + ERROR_INVALID_PARAMETER(87)
+G16.04	GetVersion	G16	ver=0x4a65000a	§5-A 10.0.19045 → 0x4A65000A
+G16.05	RtlGetVersion	G16	status=0x0 ver=10.0.19045 plat=2	§5-A RtlGetVersion: STATUS_SUCCESS + 10.0.19045
+G16.06	RtlGetVersion	G16	status=0xc000000d	Win32仕様: 不正サイズは STATUS_INVALID_PARAMETER(0xC000000D)
+G16.07	RtlGetVersion	G16	gpa=1	GetProcAddress(ntdll,"RtlGetVersion") が解決する
+G16.08	RegOpenKeyExW,RegQueryValueExW,RegCloseKey	G16	open=0 build=0:19045 major=0:10 type=4	§5-A/GATES G16: レジストリ CurrentBuild="19045" と CurrentMajorVersionNumber=10 (DWORD) が一貫 (Reg* は shimx。CAB-94 が seed 担当)
+G04.01	GetComputerNameW	G04	ret=1 name=WEBSTUDIO n=9	§5-A GetComputerNameW: "WEBSTUDIO"
+G04.02	GetComputerNameExW	G04	ret=1 name=WEBSTUDIO n=9	§5-A GetComputerNameExW: "WEBSTUDIO"
+G04.03	GetComputerNameW	G04	ret=0 need=10 err=111	Win32仕様: 小バッファは FALSE + ERROR_BUFFER_OVERFLOW(111) + 必要長 10
+G04.04	RegOpenKeyExA,RegQueryValueExA	G04	open=0 query=0 type=1 guid=11111111-2222-4333-8444-555555555555	§5-A HWID コードの MachineGuid 読み経路が shimx Reg* 経由で到達する (値の供給は CAB-94 vreg)
+G04.05	SHGetFolderPathW	G04	hr=0x0 path=C:\Users\webstudio\Documents	§5-A/seed _known_folders CSIDL_PERSONAL(5)
+G04.06	SHGetFolderPathW	G04	hr=0x0 path=C:\Users\webstudio\AppData\Roaming	seed CSIDL_APPDATA(0x1a)
+G04.07	SHGetFolderPathW	G04	hr=0x0 path=C:\Users\webstudio\AppData\Local	seed CSIDL_LOCAL_APPDATA(0x1c)
+G04.08	SHGetFolderPathW	G04	hr=0x80070057	Win32仕様: 未知 CSIDL は E_INVALIDARG
+G04.09	SHGetFolderPathW	G07	hr=0x0 path=C:\Users\webstudio\Documents attr_dir=1	CSIDL_FLAG_CREATE: webstudio 側のフォルダが実際に作られる (G07)
+G04.10	SHGetSpecialFolderPathW	G04	ret=1 path=C:\Users\webstudio\AppData\Local	SHGetFolderPathW と同値
+G04.11	SHGetKnownFolderPath	G04	hr=0x0 path=C:\Users\webstudio\Documents	§5-A SHGetKnownFolderPath(FOLDERID_Documents): seed と同値
+G04.12	SHGetKnownFolderPath	G04	hr=0x80070002 out_null=1	Win32仕様: 未知 GUID は ERROR_FILE_NOT_FOUND の HRESULT + *ppszPath=NULL
+G04.13	GetTempPathW	G07	n=38 path=C:\Users\webstudio\AppData\Local\Temp\	seed _known_folders GetTempPathW
+G04.14	GetTempPathW	G07	need=39	Win32仕様: 小バッファは必要長 (NUL 込み) を返す
+G04.15	LoadLibraryW	G04	dll=1 proc=1 hr=0x0 path=C:\Users\webstudio\Documents	§5-A LoadLibraryW("SHFolder.dll") 成功 + GetProcAddress("SHGetFolderPathW") 解決 → 呼出可
+G04.16	GetProcAddress	G04	proc_known=1	shell32!SHGetKnownFolderPath が解決する
+G04.17	GetProcAddress	G04	proc_miss=1 err=127	Win32仕様: 未知名は NULL + ERROR_PROC_NOT_FOUND(127) (trap しない)
+G04.18	GetModuleFileNameW	G03	ret_exe=51 path=C:\Program Files\Image-Line\FL Studio 2026\FL64.exe	§5-A h==NULL → …\FL Studio 2026\FL64.exe
+G04.19	GetModuleFileNameW	G03	ret_eng=59 path=C:\Program Files\Image-Line\FL Studio 2026\FLEngine_x64.dll	§5-A h==engine → …\FL Studio 2026\FLEngine_x64.dll
+G04.20	GetModuleFileNameW	G03	ret=0 err=126	Win32仕様: 不明 HMODULE は 0 + ERROR_MOD_NOT_FOUND(126)
+ENV.01	GetEnvironmentVariableW	G08	n=2 val=en	§5-A GetEnvironmentVariableW("LANG") = seed _env.LANG "en"
+ENV.02	GetEnvironmentVariableW	G08	n=0 err=203	Win32仕様: 未定義は 0 + ERROR_ENVVAR_NOT_FOUND(203)
+ENV.03	SetEnvironmentVariableW	G07	ret=1	§5-A SetEnvironmentVariableW: TRUE
+ENV.04	GetEnvironmentVariableW	G07	n=40 val=C:\Users\webstudio\Documents\Image-Line\	Set した値が読める (FLStudioData)
+ENV.05	SetEnvironmentVariableW	G07	ret=1	NULL 値で削除
+ENV.06	GetEnvironmentVariableW	G07	n=0 err=203	削除後は 203
+ENV.07	ExpandEnvironmentStringsW	G08	n=36 val=C:\Users\webstudio\x%NO_SUCH_VAR_X%	§5-A %USERPROFILE% → seed _env。未定義変数はそのまま
+ENV.08	ExpandEnvironmentStringsW	G08	need=35	Win32仕様: dst=NULL は必要長 (NUL 込み)
+ENV.09	GetEnvironmentVariableW	G08	n=9 val=webstudio	seed 由来ユーザ名 (USERNAME)
+TIME.01	QueryPerformanceFrequency	-	qpf=1000000	§5-A QPF (performance.now 基準, 1MHz)
+TIME.02	QueryPerformanceCounter	-	qpc_mono=1	§5-A 単調増加
+TIME.03	timeGetTime	-	tgt_mono=1 tick_mono=1	§5-A timeGetTime/GetTickCount 単調増加
+TIME.04	GetTickCount	-	tgt_vs_tick_close=1	timeGetTime と同一時計
+MEM.01	LocalAlloc	G03	nonnull=1 zero=1	CryptMsgGetParam 用 LPTR: 非NULL ゼロ埋め
+MEM.02	LocalFree	G03	free_ret_null=1	成功時 NULL
+B01.01	CreateProcessW	G12	ret=0 err=2 pi_zero=1	§5-B CreateProcessW(ilbridge): FALSE + GetLastError=2, PROCESS_INFORMATION ゼロ
+B01.02	CreateProcessW	G12	ret=0 err=2	§5-B CreateProcessW(CloudBounceConsole): FALSE + 2
+B02.01	ShellExecuteW	B	ret=33	§5-B "open" https:// → 33
+B02.02	ShellExecuteW	B	ret=33	§5-B "open" http:// → 33
+B02.03	ShellExecuteW	B	ret=33	§5-B "explore" → 33 (no-op)
+B02.04	ShellExecuteW	B	ret=33	§5-B notepad → 33 (no-op)
+B02.05	ShellExecuteW	B	ret=33	§5-B .htm → 33 (no-op)
+B02.06	ShellExecuteW	B	ret=2	§5-B ControlCreator.exe → 2
+B02.07	ShellExecuteW	B	ret=2	§5-B fldiagnostic.exe /version → 2
+B02.08	ShellExecuteW	B	ret=2	§5-B PluginManager.exe → 2
+B02.09	ShellExecuteW	B	ret=2	§5-B FL Cloud Plugins.exe → 2
+B02.10	ShellExecuteW	B	ret=2	§5-B CopyLicenseToAllUsers.exe → 2
+B02.11	ShellExecuteW	B	ret=33	§5-B verb=NULL は "open" 扱い
+B02.12	ShellExecuteW	G12	ret=2	§5-B 0x125d370 restartfl: 2
+B02.13	ShellExecuteW	G12	restart=1	§5-B /restartfl を検知して glue へ通知
+B03.01	ShellExecuteA	B	ret=33	§5-B ShellExecuteA "open" https:// → 33
+B03.02	ShellExecuteA	B	ret=2	§5-B ShellExecuteA .exe → 2
+B04.01	ShellExecuteExW	B	ret=1 hInst=33 err=0	§5-B "open" https:// → TRUE (hInstApp 33)
+B04.02	ShellExecuteExW	B	ret=0 hInst=5 err=1223	§5-B runas → FALSE + 1223
+B04.03	ShellExecuteExW	B	ret=0 hInst=5 err=1223	§5-B properties → FALSE + 1223
+B04.04	ShellExecuteExW	B	ret=0 hInst=5 err=1223	§5-B LilyPond → FALSE + 1223
+B04.05	ShellExecuteExW	B	ret=0 hInst=2 err=2	§5-B ControlCreator.exe → FALSE (hInstApp 2 / 2)
+B04.06	ShellExecuteExA	B	ret=1 hInst=33 err=0	ShellExecuteExW と同方針 (A 版)
+B04.07	ShellExecuteExA	B	ret=0 hInst=5 err=1223	ShellExecuteExW と同方針 (A 版 runas → 1223)
+B05.01	LoadLibraryW	G13	null=1 err=126	§5-B LoadLibraryW("WebView2Loader.dll") = NULL / 126
+B05.02	LoadLibraryW	G13	null=1 err=126	パス付きでも同じ
+B05.03	LoadLibraryA	G13	null=1 err=126	A 版・小文字でも同じ
+B05.04	LoadLibraryExW	G13	null=1 err=126	Ex 版でも同じ
+B05.05	LoadLibraryW	G13	null=1 err=126	§5-B/G13: 将来 load hook (hostbridge) が何でも解決する状況でも WebView2Loader.dll は恒久拒否
+B05.06	LoadLibraryA	G13	null=1 err=126	同上 (A 版)
+B05.07	LoadLibraryExW	G13	null=1 err=126	同上 (Ex 版・パス付き)
+B05.08	LoadLibraryW	G13	nonnull=1	対照: 拒否対象外の名前は load hook で解決できる (hook 機構は塞がない)
+B06.01	LoadLibraryW	B	null=1 err=126	§5-B 未登録名 = NULL / 126 (trap しない)
+B06.02	LoadLibraryA	B	null=1 err=126	§5-B python312.dll 等も NULL / 126 (T7 までは未提供)
+B06.03	LoadLibraryW	B	nonnull=1	システム DLL は成功
+B06.04	LoadLibraryW	B	logged=1	§5-B 未登録名はログに残る
+B07.01	CoCreateInstance	B	hr=0x80040154 out_null=1	§5-B REGDB_E_CLASSNOTREG (0x80040154), *ppv=NULL
+D01.01	WTSRegisterSessionNotification	D	ret=1	§5-D TRUE
+D01.02	WTSUnRegisterSessionNotification	D	ret=1	§5-D TRUE
+D02.01	BufferedPaintInit	D	hr=0x0	§5-D S_OK
+D02.02	BufferedPaintUnInit	D	hr=0x0	S_OK
+D04.01	LoadIconW	D	nonnull=1	§5-D LoadIconW(hInst,"MAINICON"): 非NULL ダミー HICON
+D05.01	GetSystemMetrics	D	cx=1920 cy=1080	§5-D キャンバス寸法 1920x1080 (既定)
+D05.02	GetSystemMetrics	D	vscroll=17 hscroll=17 caption=23 frame=8	Windows 10 100% DPI 既定の近似値
+D05.03	GetSystemMetrics	D	smicon=16 virt=1920x1080 mouse=1 unknown=0	近似値 + 未知 index は 0
+D06.01	SystemParametersInfoW	D	ret=1 rect=0,0,1920,1040	§5-D SPI_GETWORKAREA = キャンバス - タスクバー 40
+D06.02	SystemParametersInfoW	D	ret=1 lines=3	SPI_GETWHEELSCROLLLINES=3
+D06.03	SystemParametersInfoW	D	ret=1 cb=504 scroll=17 face0=S	SPI_GETNONCLIENTMETRICS (cbSize=504, Segoe UI)
+D06.04	SystemParametersInfoW	D	ret=0 err=87	fail-soft: 未知 action は FALSE + 87 (trap しない)
+D03.01	SetPriorityClass	D	ok=1	§5-D no-op (TRUE)
+D03.02	SetErrorMode	D	old=0 cur=0x8001	§5-D no-op (前値を返す)
+D03.03	GetCurrentProcess	D	pseudo=0xffffffff	§5-D 擬似ハンドル (HANDLE)-1
+P01.01	PeekMessageW,GetMessageW,TranslateMessage,DispatchMessageW,PostMessageW,SendMessageW,PostQuitMessage,SetTimer,KillTimer,WaitMessage	P	peek=0 get=0 translate=0 dispatch=0 post=1 send=0 timer=7 kill=1 wait=1	user32 ポンプ系: 最小値のみ (GetMessageW=0 でループ終了)。実体は CAB-102
+P01.02	PeekMessageW,GetMessageW,TranslateMessage,DispatchMessageW,PostMessageW,SendMessageW,PostQuitMessage,SetTimer,KillTimer,WaitMessage	P	pump_calls=10	呼出カウントのみ (10 API × 1 = 10)
+G07.01	SHGetFolderPathW	G07	mkdir=1 write=1 bytes=4 delete=1	GATES G07: Shared data dir 作成と testpermissions.tmp 書込 (VFS 書込可)
+G03.20	WinVerifyTrust	G03	verify=0x800b0100 query=0	cfg.trust=0 では shimx 既定 (TRUST_E_NOSIGNATURE 0x800B0100 / CryptQueryObject 失敗) に委譲
+S01.01	CreateProcessW	G12	createprocess_success=0 createprocess_attempts_ge1=1	受入: boot 中 CreateProcessW 成功 0 回
+E01.01	TerminateProcess	D	exit=5 hook=1	§5-D TerminateProcess(self): 終了フック経由で Worker 終了 (exit code 伝播)

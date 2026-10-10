@@ -1,0 +1,132 @@
+id	apis	gate	status	expected	shimx_only
+G03.01	WinVerifyTrust	G03	MATCH	ret=0	ret=0
+G03.02	WinVerifyTrust	G03	MATCH	ret=0	ret=0
+G03.03	CryptQueryObject	G03	DIFF	ret=1 enc=0x10001 ct=10 ft=1 store=1 msg=1	ret=0 enc=0x0 ct=0 ft=0 store=0 msg=0
+G03.04	CryptQueryObject	G03	MATCH	ret=0	ret=0
+G03.05	CryptMsgGetParam	G03	DIFF	ret=1 len=136	ret=0 len=0
+G03.06	CryptMsgGetParam	G03	DIFF	ret=1 len=136 zero=1	ret=0 len=0 zero=1
+G03.07	CryptMsgGetParam	G03	DIFF	ret=0 need=136 err=234	ret=0 need=64 err=2148081673
+G03.08	CryptMsgGetParam	G03	DIFF	ret=1 count=1	ret=0 count=0
+G03.09	CertFindCertificateInStore	G03	DIFF	nonnull=1	nonnull=0
+G03.10	CertFindCertificateInStore	G03	MATCH	null=1 err=0x80092004	null=1 err=0x80092004
+G03.11	CertGetNameStringW	G03	DIFF	len=14	len=1
+G03.12	CertGetNameStringW	G03	DIFF	ret=14 name=Image Line NV	ret=1 name=
+G03.13	CertGetNameStringW	G03	DIFF	eq=1	eq=0
+G03.14	CertGetNameStringW	G03	DIFF	ret=5 name=Imag	ret=1 name=
+G03.15	CertGetNameStringA	G03	DIFF	ret=14 name=Image Line NV	ret=1 name=
+G03.16	CertGetNameStringW	G03	MATCH	ret=1 issuer_len=0	ret=1 issuer_len=0
+G03.17	CertFreeCertificateContext	G03	MATCH	ret=1	ret=1
+G03.18	CertCloseStore	G03	MATCH	ret=1	ret=1
+G03.19	CryptMsgClose	G03	MATCH	ret=1	ret=1
+G05.01	cpuid	G05	MISSING	vendor=GenuineIntel max=0xd	(API が存在しない)
+G05.02	cpuid	G05	MISSING	cmov=1 fxsr=1 mmx=1 sse=1 sse2=1 tsc=1 sse3=0 sse41=0 popcnt=0 avx=0	(API が存在しない)
+G05.04	cpuid	G05	MISSING	ebx=0x0 ecx=0x0 edx=0x0 avx2=0	(API が存在しない)
+G05.05	cpuid	G05	MISSING	lm=1 lahf=1	(API が存在しない)
+G05.06	cpuid	G05	MISSING	brand0=WebS	(API が存在しない)
+G05.07	cpuid	G05	MISSING	plan_max=0x16	(API が存在しない)
+G05.08	cpuid	G05	MISSING	plan_ecx=0x00980201 sse3=1 ssse3=1 sse41=1 sse42=1 popcnt=1 avx=0	(API が存在しない)
+G05.09	cpuid	G05	MISSING	plan_avx2=0	(API が存在しない)
+G06.01	FindWindowW	G06	MISSING	null=1	(API が存在しない)
+G06.02	FindWindowExW	G06	MISSING	null=1	(API が存在しない)
+G06.03	FindWindowW	G06	MISSING	null=1	(API が存在しない)
+G16.01	GetVersionExW	G16	MATCH	ret=1 ver=10.0.19045 plat=2	ret=1 ver=10.0.19045 plat=2
+G16.02	GetVersionExW	G16	MATCH	ret=1 ver=10.0.19045	ret=1 ver=10.0.19045
+G16.03	GetVersionExW	G16	MATCH	ret=0 err=87	ret=0 err=87
+G16.04	GetVersion	G16	MATCH	ver=0x4a65000a	ver=0x4a65000a
+G16.05	RtlGetVersion	G16	MISSING	status=0x0 ver=10.0.19045 plat=2	(API が存在しない)
+G16.06	RtlGetVersion	G16	MISSING	status=0xc000000d	(API が存在しない)
+G16.07	RtlGetVersion	G16	MISSING	gpa=1	(API が存在しない)
+G16.08	RegOpenKeyExW,RegQueryValueExW,RegCloseKey	G16	MATCH	open=0 build=0:19045 major=0:10 type=4	open=0 build=0:19045 major=0:10 type=4
+G04.01	GetComputerNameW	G04	MATCH	ret=1 name=WEBSTUDIO n=9	ret=1 name=WEBSTUDIO n=9
+G04.02	GetComputerNameExW	G04	MATCH	ret=1 name=WEBSTUDIO n=9	ret=1 name=WEBSTUDIO n=9
+G04.03	GetComputerNameW	G04	MATCH	ret=0 need=10 err=111	ret=0 need=10 err=111
+G04.04	RegOpenKeyExA,RegQueryValueExA	G04	MATCH	open=0 query=0 type=1 guid=11111111-2222-4333-8444-555555555555	open=0 query=0 type=1 guid=11111111-2222-4333-8444-555555555555
+G04.05	SHGetFolderPathW	G04	DIFF	hr=0x0 path=C:\Users\webstudio\Documents	hr=0x0 path=C:\Users\user\Documents
+G04.06	SHGetFolderPathW	G04	DIFF	hr=0x0 path=C:\Users\webstudio\AppData\Roaming	hr=0x0 path=C:\Users\user\AppData\Roaming
+G04.07	SHGetFolderPathW	G04	DIFF	hr=0x0 path=C:\Users\webstudio\AppData\Local	hr=0x0 path=C:\Users\user\AppData\Local
+G04.08	SHGetFolderPathW	G04	MATCH	hr=0x80070057	hr=0x80070057
+G04.09	SHGetFolderPathW	G07	DIFF	hr=0x0 path=C:\Users\webstudio\Documents attr_dir=1	hr=0x0 path=C:\Users\user\Documents attr_dir=1
+G04.10	SHGetSpecialFolderPathW	G04	DIFF	ret=1 path=C:\Users\webstudio\AppData\Local	ret=1 path=C:\Users\user\AppData\Local
+G04.11	SHGetKnownFolderPath	G04	DIFF	hr=0x0 path=C:\Users\webstudio\Documents	hr=0x0 path=C:\Users\user\Documents
+G04.12	SHGetKnownFolderPath	G04	MATCH	hr=0x80070002 out_null=1	hr=0x80070002 out_null=1
+G04.13	GetTempPathW	G07	DIFF	n=38 path=C:\Users\webstudio\AppData\Local\Temp\	n=33 path=C:\Users\user\AppData\Local\Temp\
+G04.14	GetTempPathW	G07	DIFF	need=39	need=34
+G04.15	LoadLibraryW	G04	DIFF	dll=1 proc=1 hr=0x0 path=C:\Users\webstudio\Documents	dll=1 proc=1 hr=0x0 path=C:\Users\user\Documents
+G04.16	GetProcAddress	G04	MISSING	proc_known=1	(API が存在しない)
+G04.17	GetProcAddress	G04	MATCH	proc_miss=1 err=127	proc_miss=1 err=127
+G04.18	GetModuleFileNameW	G03	MATCH	ret_exe=51 path=C:\Program Files\Image-Line\FL Studio 2026\FL64.exe	ret_exe=51 path=C:\Program Files\Image-Line\FL Studio 2026\FL64.exe
+G04.19	GetModuleFileNameW	G03	MATCH	ret_eng=59 path=C:\Program Files\Image-Line\FL Studio 2026\FLEngine_x64.dll	ret_eng=59 path=C:\Program Files\Image-Line\FL Studio 2026\FLEngine_x64.dll
+G04.20	GetModuleFileNameW	G03	MATCH	ret=0 err=126	ret=0 err=126
+ENV.01	GetEnvironmentVariableW	G08	DIFF	n=2 val=en	n=0 val=
+ENV.02	GetEnvironmentVariableW	G08	MATCH	n=0 err=203	n=0 err=203
+ENV.03	SetEnvironmentVariableW	G07	MATCH	ret=1	ret=1
+ENV.04	GetEnvironmentVariableW	G07	MATCH	n=40 val=C:\Users\webstudio\Documents\Image-Line\	n=40 val=C:\Users\webstudio\Documents\Image-Line\
+ENV.05	SetEnvironmentVariableW	G07	MATCH	ret=1	ret=1
+ENV.06	GetEnvironmentVariableW	G07	MATCH	n=0 err=203	n=0 err=203
+ENV.07	ExpandEnvironmentStringsW	G08	DIFF	n=36 val=C:\Users\webstudio\x%NO_SUCH_VAR_X%	n=31 val=C:\Users\user\x%NO_SUCH_VAR_X%
+ENV.08	ExpandEnvironmentStringsW	G08	DIFF	need=35	need=30
+ENV.09	GetEnvironmentVariableW	G08	DIFF	n=9 val=webstudio	n=4 val=user
+TIME.01	QueryPerformanceFrequency	-	MATCH	qpf=1000000	qpf=1000000
+TIME.02	QueryPerformanceCounter	-	MATCH	qpc_mono=1	qpc_mono=1
+TIME.03	timeGetTime	-	MATCH	tgt_mono=1 tick_mono=1	tgt_mono=1 tick_mono=1
+TIME.04	GetTickCount	-	MATCH	tgt_vs_tick_close=1	tgt_vs_tick_close=1
+MEM.01	LocalAlloc	G03	MATCH	nonnull=1 zero=1	nonnull=1 zero=1
+MEM.02	LocalFree	G03	MATCH	free_ret_null=1	free_ret_null=1
+B01.01	CreateProcessW	G12	MATCH	ret=0 err=2 pi_zero=1	ret=0 err=2 pi_zero=1
+B01.02	CreateProcessW	G12	MATCH	ret=0 err=2	ret=0 err=2
+B02.01	ShellExecuteW	B	DIFF	ret=33	ret=2
+B02.02	ShellExecuteW	B	DIFF	ret=33	ret=2
+B02.03	ShellExecuteW	B	DIFF	ret=33	ret=2
+B02.04	ShellExecuteW	B	DIFF	ret=33	ret=2
+B02.05	ShellExecuteW	B	DIFF	ret=33	ret=2
+B02.06	ShellExecuteW	B	MATCH	ret=2	ret=2
+B02.07	ShellExecuteW	B	MATCH	ret=2	ret=2
+B02.08	ShellExecuteW	B	MATCH	ret=2	ret=2
+B02.09	ShellExecuteW	B	MATCH	ret=2	ret=2
+B02.10	ShellExecuteW	B	MATCH	ret=2	ret=2
+B02.11	ShellExecuteW	B	DIFF	ret=33	ret=2
+B02.12	ShellExecuteW	G12	MATCH	ret=2	ret=2
+B02.13	ShellExecuteW	G12	MISSING	restart=1	(API が存在しない)
+B03.01	ShellExecuteA	B	DIFF	ret=33	ret=2
+B03.02	ShellExecuteA	B	MATCH	ret=2	ret=2
+B04.01	ShellExecuteExW	B	DIFF	ret=1 hInst=33 err=0	ret=0 hInst=2 err=2
+B04.02	ShellExecuteExW	B	DIFF	ret=0 hInst=5 err=1223	ret=0 hInst=2 err=2
+B04.03	ShellExecuteExW	B	DIFF	ret=0 hInst=5 err=1223	ret=0 hInst=2 err=2
+B04.04	ShellExecuteExW	B	DIFF	ret=0 hInst=5 err=1223	ret=0 hInst=2 err=2
+B04.05	ShellExecuteExW	B	MATCH	ret=0 hInst=2 err=2	ret=0 hInst=2 err=2
+B04.06	ShellExecuteExA	B	DIFF	ret=1 hInst=33 err=0	ret=0 hInst=2 err=2
+B04.07	ShellExecuteExA	B	DIFF	ret=0 hInst=5 err=1223	ret=0 hInst=2 err=2
+B05.01	LoadLibraryW	G13	MATCH	null=1 err=126	null=1 err=126
+B05.02	LoadLibraryW	G13	MATCH	null=1 err=126	null=1 err=126
+B05.03	LoadLibraryA	G13	MATCH	null=1 err=126	null=1 err=126
+B05.04	LoadLibraryExW	G13	MATCH	null=1 err=126	null=1 err=126
+B05.05	LoadLibraryW	G13	DIFF	null=1 err=126	null=0 err=0
+B05.06	LoadLibraryA	G13	DIFF	null=1 err=126	null=0 err=0
+B05.07	LoadLibraryExW	G13	DIFF	null=1 err=126	null=0 err=0
+B05.08	LoadLibraryW	G13	MATCH	nonnull=1	nonnull=1
+B06.01	LoadLibraryW	B	MATCH	null=1 err=126	null=1 err=126
+B06.02	LoadLibraryA	B	MATCH	null=1 err=126	null=1 err=126
+B06.03	LoadLibraryW	B	MATCH	nonnull=1	nonnull=1
+B06.04	LoadLibraryW	B	MISSING	logged=1	(API が存在しない)
+B07.01	CoCreateInstance	B	MATCH	hr=0x80040154 out_null=1	hr=0x80040154 out_null=1
+D01.01	WTSRegisterSessionNotification	D	MATCH	ret=1	ret=1
+D01.02	WTSUnRegisterSessionNotification	D	MATCH	ret=1	ret=1
+D02.01	BufferedPaintInit	D	MISSING	hr=0x0	(API が存在しない)
+D02.02	BufferedPaintUnInit	D	MISSING	hr=0x0	(API が存在しない)
+D04.01	LoadIconW	D	MISSING	nonnull=1	(API が存在しない)
+D05.01	GetSystemMetrics	D	MISSING	cx=1920 cy=1080	(API が存在しない)
+D05.02	GetSystemMetrics	D	MISSING	vscroll=17 hscroll=17 caption=23 frame=8	(API が存在しない)
+D05.03	GetSystemMetrics	D	MISSING	smicon=16 virt=1920x1080 mouse=1 unknown=0	(API が存在しない)
+D06.01	SystemParametersInfoW	D	MISSING	ret=1 rect=0,0,1920,1040	(API が存在しない)
+D06.02	SystemParametersInfoW	D	MISSING	ret=1 lines=3	(API が存在しない)
+D06.03	SystemParametersInfoW	D	MISSING	ret=1 cb=504 scroll=17 face0=S	(API が存在しない)
+D06.04	SystemParametersInfoW	D	MISSING	ret=0 err=87	(API が存在しない)
+D03.01	SetPriorityClass	D	MATCH	ok=1	ok=1
+D03.02	SetErrorMode	D	MATCH	old=0 cur=0x8001	old=0 cur=0x8001
+D03.03	GetCurrentProcess	D	MATCH	pseudo=0xffffffff	pseudo=0xffffffff
+P01.01	PeekMessageW,GetMessageW,TranslateMessage,DispatchMessageW,PostMessageW,SendMessageW,PostQuitMessage,SetTimer,KillTimer,WaitMessage	P	MISSING	peek=0 get=0 translate=0 dispatch=0 post=1 send=0 timer=7 kill=1 wait=1	(API が存在しない)
+P01.02	PeekMessageW,GetMessageW,TranslateMessage,DispatchMessageW,PostMessageW,SendMessageW,PostQuitMessage,SetTimer,KillTimer,WaitMessage	P	MISSING	pump_calls=10	(API が存在しない)
+G07.01	SHGetFolderPathW	G07	MATCH	mkdir=1 write=1 bytes=4 delete=1	mkdir=1 write=1 bytes=4 delete=1
+G03.20	WinVerifyTrust	G03	MISSING	verify=0x800b0100 query=0	(API が存在しない)
+S01.01	CreateProcessW	G12	MISSING	createprocess_success=0 createprocess_attempts_ge1=1	(API が存在しない)
+E01.01	TerminateProcess	D	MATCH	exit=5 hook=1	exit=5 hook=1

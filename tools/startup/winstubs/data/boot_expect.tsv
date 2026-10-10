@@ -1,0 +1,22 @@
+step	gate	expected
+S00.init	seed	seed_values=18
+G05.cpu	G05	cmov=1
+G03.engine_self_1	G03	verify=0 signer_match=1 close=0
+G03.engine_self_2	G03	verify=0 signer_match=1 close=0
+G03.host_exe	G03	verify=0 signer_match=1 close=0
+G03.result	G03	pass=1
+G06.single_instance	G06	existing_window=0
+G16.os	G16	rtl=10.0.19045 api=10.0.19045 reg_major=10 consistent=1
+G07.userdata	G07	dir=C:\Users\webstudio\Documents\Image-Line created=1 writable=1
+G08.flags	G08	open=0 query=0 CrashLoadingStartupProject=0
+G08.registrations_key	G04	status=2
+G04.machine_inputs	G04	guid_len=36 reg=0/0 computer=WEBSTUDIO shfolder_hr=0 path=C:\Users\webstudio\Documents
+S08.env	env	flstudiodata_ok=1 lang=en
+G12.process	G12/G13	create_process=0 webview2=0 err=126 shell_url=33 shell_exe=2 asio_hr=0x80040154
+D.ui	D	wts=1 bp=0x0 icon=1 cx=1920
+S11.pump_stub	pump	loop_exit=1 spins=0
+ACC.createprocess_success	受入	0
+ACC.createprocess_attempts	受入	1
+ACC.shell_url_calls	受入	1 cb=1
+ACC.loadlib_blocked	受入	1
+ACC.unresolved_trap	受入	0

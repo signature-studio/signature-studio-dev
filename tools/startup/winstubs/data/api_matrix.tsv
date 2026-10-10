@@ -1,0 +1,69 @@
+# api	dll	group	gate	impl	gpa	note
+# impl: shimx+seed=API は shimx のまま・環境変数の初期値を seed 値で上書き (shimx_setenv_utf8) / shimx=shimx 既存で戻り値表を満たす / shimx+count=同左 (計数のため --wrap) / wrap=shimx 実装と戻り値表が食い違うため --wrap で差分実装 / hook=shimx の運用フックへ方針を接続 / new=shimx に無く新規 (strong) / weak-new=新規 (weak: tools/gui・CAB-102 の強定義が優先) / lift-bridge=Win32 API でなく lift 側 intrinsic の返値表 / cross-ref=他担当 (CAB-94 vreg) の API。突合のみで定義しない
+WinVerifyTrust	wintrust.dll	A	G03	shimx+count	y	shimx_set_trust_ok(1) で 0 (VERIFY/CLOSE とも)。winstubs は呼出回数のみ計数
+CryptQueryObject	crypt32.dll	A	G03	wrap	y	shimx は常に失敗 (CRYPT_E_NO_MATCH)
+CryptMsgGetParam	crypt32.dll	A	G03	wrap	y	shimx は常に失敗
+CertFindCertificateInStore	crypt32.dll	A	G03	wrap	y	shimx は常に NULL
+CertGetNameStringW	crypt32.dll	A	G03	wrap	y	shimx は空文字+1
+CertGetNameStringA	crypt32.dll	A	G03	wrap	y	W 版の ANSI 版 (補完)
+CertFreeCertificateContext	crypt32.dll	A	G03	shimx	y	TRUE
+CertCloseStore	crypt32.dll	A	G03	shimx	y	TRUE
+CryptMsgClose	crypt32.dll	A	G03	shimx	y	TRUE
+cpuid	-	A	G05	lift-bridge	-	winstubs_cpuid(): lift 側 __asm_cpuid の返値表 (m11_simd2.py CPUID_BODY を置換する想定)
+FindWindowW	user32.dll	A	G06	weak-new	y	shimx 範囲外 (user32)。tools/gui 側にも実装があり、強定義が優先
+FindWindowExW	user32.dll	A	G06	weak-new	y	同上
+GetModuleFileNameW	kernel32.dll	A	G03	shimx	y	engine は shimx_module_register 済みであること (winstubs_init が登録)
+GetVersion	kernel32.dll	A	G16	shimx	y	0x4A65000A
+GetVersionExW	kernel32.dll	A	G16	shimx	y	10.0.19045
+RtlGetVersion	ntdll.dll	A	G16	new	y	shimx に無い
+GetComputerNameW	kernel32.dll	A	G04	shimx	y	"WEBSTUDIO"
+GetComputerNameExW	kernel32.dll	A	G04	shimx	y	"WEBSTUDIO"
+SHGetFolderPathW	shfolder.dll	A	G04	wrap	y	shimx 既定ユーザは "user"。seed は "webstudio" → 写像 + CSIDL_FLAG_CREATE を webstudio 側へ
+SHGetSpecialFolderPathW	shell32.dll	A	G07	wrap	y	同上 (shimx 内部呼出は --wrap の対象外のため別途)
+SHGetKnownFolderPath	shell32.dll	A	G04	wrap	y	同上
+GetTempPathW	kernel32.dll	A	G07	wrap	y	shimx 固定値 "user" → seed 値
+GetProcAddress	kernel32.dll	A	G04	shimx	y	SHFolder.dll!SHGetFolderPathW の動的束縛を含む
+ExpandEnvironmentStringsW	kernel32.dll	A	G08	shimx+seed	y	環境テーブルは winstubs_init が seed 値で上書き
+GetEnvironmentVariableW	kernel32.dll	A	G08	shimx+seed	y	LANG="en" は winstubs_init が投入
+SetEnvironmentVariableW	kernel32.dll	A	G07	shimx	y	
+timeGetTime	winmm.dll	A	-	shimx	y	
+QueryPerformanceCounter	kernel32.dll	A	-	shimx	y	
+QueryPerformanceFrequency	kernel32.dll	A	-	shimx	y	
+GetTickCount	kernel32.dll	A	-	shimx	y	
+LocalAlloc	kernel32.dll	A	G03	shimx	y	
+LocalFree	kernel32.dll	A	G03	shimx	y	
+CreateProcessW	kernel32.dll	B	G12	shimx+count	y	shimx は常に FALSE/2。winstubs は試行/成功回数を計数 (受入: 成功 0)
+ShellExecuteW	shell32.dll	B	B	hook	y	shimx 既定は常に 2。分類方針を shimx_set_shell_execute_hook へ接続
+ShellExecuteA	shell32.dll	B	B	hook	y	同上
+ShellExecuteExW	shell32.dll	B	B	wrap	y	runas/properties/LilyPond の FALSE+1223 は hook で表せないため --wrap
+ShellExecuteExA	shell32.dll	B	B	wrap	y	同上
+LoadLibraryW	kernel32.dll	B	G13	wrap	y	WebView2Loader.dll の恒久拒否 + 失敗名ログ
+LoadLibraryA	kernel32.dll	B	G13	wrap	y	同上
+LoadLibraryExW	kernel32.dll	B	G13	wrap	y	同上
+CoCreateInstance	ole32.dll	B	B	shimx	y	REGDB_E_CLASSNOTREG
+TerminateProcess	kernel32.dll	D	D	shimx	y	自プロセスは exit フック経由 (Worker 終了)
+WTSRegisterSessionNotification	wtsapi32.dll	D	D	shimx	y	
+WTSUnRegisterSessionNotification	wtsapi32.dll	D	D	shimx	y	
+BufferedPaintInit	uxtheme.dll	D	D	weak-new	y	shimx 範囲外 (uxtheme)
+BufferedPaintUnInit	uxtheme.dll	D	D	weak-new	y	
+SetPriorityClass	kernel32.dll	D	D	shimx	y	
+SetErrorMode	kernel32.dll	D	D	shimx	y	
+GetCurrentProcess	kernel32.dll	D	D	shimx	y	
+LoadIconW	user32.dll	D	D	weak-new	y	
+GetSystemMetrics	user32.dll	D	D	weak-new	y	
+SystemParametersInfoW	user32.dll	D	D	weak-new	y	
+PeekMessageW	user32.dll	P	P	weak-new	y	ポンプ系: 呼出カウントのみ (実体は CAB-102)
+GetMessageW	user32.dll	P	P	weak-new	y	
+TranslateMessage	user32.dll	P	P	weak-new	y	
+DispatchMessageW	user32.dll	P	P	weak-new	y	
+PostMessageW	user32.dll	P	P	weak-new	y	
+SendMessageW	user32.dll	P	P	weak-new	y	
+PostQuitMessage	user32.dll	P	P	weak-new	y	
+SetTimer	user32.dll	P	P	weak-new	y	
+KillTimer	user32.dll	P	P	weak-new	y	
+WaitMessage	user32.dll	P	P	weak-new	y	
+RegOpenKeyExW	advapi32.dll	X	G16	cross-ref	y	CAB-94 vreg 担当。shimx reg.c の既存実装に接続するのみ
+RegOpenKeyExA	advapi32.dll	X	G04	cross-ref	y	同上
+RegQueryValueExW	advapi32.dll	X	G16	cross-ref	y	同上
+RegQueryValueExA	advapi32.dll	X	G04	cross-ref	y	同上
+RegCloseKey	advapi32.dll	X	G04	cross-ref	y	同上
