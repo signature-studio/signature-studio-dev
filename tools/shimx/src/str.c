@@ -353,7 +353,7 @@ BOOL GetStringTypeW(DWORD type, LPCWSTR src, int cch, WORD* out) {
 }
 
 static LPWSTR char_xform(LPWSTR s, int upper) {
-    if (((uintptr_t)s >> 16) == 0) {            /* 単一文字モード */
+    if (shx_is_iptr((uintptr_t)s)) {            /* 単一文字モード (閾値は shimx_set_intptr_limit) */
         uint32_t c = (uint32_t)(uintptr_t)s;
         return (LPWSTR)(uintptr_t)(upper ? shimx_towupper(c) : shimx_towlower(c));
     }

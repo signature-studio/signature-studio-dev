@@ -747,6 +747,9 @@ LCID   GetThreadLocale(void);
 BOOL   SetThreadLocale(LCID loc);
 LANGID GetSystemDefaultUILanguage(void);
 LANGID GetUserDefaultUILanguage(void);
+LANGID GetThreadUILanguage(void);
+BOOL   GetThreadPreferredUILanguages(DWORD flags, ULONG* num, LPWSTR buf, ULONG* cch);
+BOOL   SetThreadPreferredUILanguages(DWORD flags, LPCWSTR buf, ULONG* num);
 LCID   LocaleNameToLCID(LPCWSTR name, DWORD flags);
 int    GetSystemDefaultLocaleName(LPWSTR out, int cch);
 BOOL   GetUserPreferredUILanguages(DWORD flags, ULONG* num, LPWSTR buf, ULONG* cch);
@@ -971,12 +974,21 @@ HRESULT GetErrorInfo(DWORD rsv, LPVOID* info);
 /* =============================================================
  * shell32 / shlwapi / version / imagehlp / その他システム DLL (ほぼスタブ)
  * ============================================================= */
-HRESULT SHGetFolderPathW(HWND w, int csidl, HANDLE tok, DWORD flags, LPWSTR path);
-HRESULT SHGetKnownFolderPath(const GUID* id, DWORD flags, HANDLE tok, LPWSTR* path);
+HRESULT SHGetFolderPathW(HWND w, int csidl, HANDLE tok, DWORD flags, LPWSTR path);HRESULT SHGetKnownFolderPath(const GUID* id, DWORD flags, HANDLE tok, LPWSTR* path);
 HRESULT SHGetSpecialFolderLocation(HWND w, int csidl, LPVOID* pidl);
 BOOL    SHGetPathFromIDListW(const void* pidl, LPWSTR path);
 LPVOID  ILCreateFromPathW(LPCWSTR path);
 void    ILFree(LPVOID pidl);
+/* shell32 序数 import 分 (Windows 10/11 の序数表: 16/17/18/19/21/25/152/153/155/190。R3)。
+ * PIDL は shimx 自前形式 ([u16 cb][UTF-16 path + NUL][u16 0]) で実装する */
+LPVOID  ILFindLastID(const void* pidl);
+BOOL    ILRemoveLastID(void* pidl);
+LPVOID  ILClone(const void* pidl);
+LPVOID  ILCloneFirst(const void* pidl);
+BOOL    ILIsEqual(const void* a, const void* b);
+LPVOID  ILCombine(const void* a, const void* b);
+UINT    ILGetSize(const void* pidl);
+LPVOID  ILGetNext(const void* pidl);
 HRESULT SHGetMalloc(LPVOID* out);
 HRESULT SHGetDesktopFolder(LPVOID* out);
 HRESULT SHCreateItemFromParsingName(LPCWSTR p, LPVOID bc, const GUID* iid, LPVOID* out);
@@ -1062,9 +1074,15 @@ BOOL    HttpQueryInfoA(LPVOID h, DWORD level, LPVOID buf, LPDWORD n, LPDWORD idx
  * 運用フック (shimx 独自 API)
  * ============================================================= */
 typedef int (*shimx_path_mapper_fn)(const char* winPathUtf8, char* outPosix, size_t outSize);
+typedef void* (*shimx_callback_translator_fn)(const char* api, void* callback);   /* R2: 関数ポインタ引数の変換フック */
 void shimx_init(void);                                      /* 省略可 (遅延初期化) */
 void shimx_set_trace(int on);                               /* stderr にトレース出力 (環境変数 SHIMX_TRACE=1 でも可) */
 void shimx_set_strict(int on);                              /* 1: 未知 GetProcAddress 名を fail-fast */
+void shimx_set_intptr_limit(uint32_t lim);                  /* R1: 値 < lim を序数/整数 (MAKEINTRESOURCE 等) とみなす閾値。既定 0x10000 */
+uint32_t shimx_get_intptr_limit(void);
+void shimx_set_callback_translator(shimx_callback_translator_fn fn);  /* R2: 列挙系・CreateThread・FlsAlloc・タイマ・スレッドプールのコールバック変換 */
+void shimx_set_pseudo_load(int on);                         /* R4: 1 = 未知 DLL の LoadLibrary を擬似モジュール登録で成功させる (既定 0 = 失敗) */
+void shimx_set_cs_null_ok(int on);                          /* R7: 1 = CRITICAL_SECTION の NULL/非整列を no-op で通す (既定 0 = fail-fast = Win32 AV 相当) */
 void shimx_set_path_mapper(shimx_path_mapper_fn fn);        /* VFS 連携: Win パス → FS パス */
 int  shimx_path_to_posix(const char* winUtf8, char* out, size_t outSize);
 void shimx_set_acp(UINT cp);

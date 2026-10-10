@@ -100,6 +100,22 @@ int  shx_wcopy_out(const WCHAR* src, int srcLen, LPWSTR dst, DWORD dstCch); /* W
 /* 遅延初期化 */
 void shx_ensure_init(void);
 
+/* R1: 値 < g_shx_intptr_limit は序数/整数 (MAKEINTRESOURCE / ordinal GetProcAddress / 単一文字 Char*)。
+ * lowbase (LB_BASE≥0x10000) では既定値のままで guest ポインタが全て ≥ lim に敷設される。
+ * LVA=0 敷設 (M11 旧式) の場合は shimx_set_intptr_limit() で下げる */
+extern uint32_t g_shx_intptr_limit;
+static inline int shx_is_iptr(uintptr_t v) { return v < g_shx_intptr_limit; }
+
+/* R2: lifted コードが渡す関数ポインタ (VA/LVA 整数) → 呼出可能な関数ポインタへの変換フック。
+ * fn 未設定 (既定) は恒等変換。hostbridge が m11_icall トランポリンを返す想定 (shimx T2) */
+void* shx_translate_cb(const char* api, void* cb);
+
+/* strict モード参照 (module.c) */
+int shx_strict_mode(void);
+
+/* R7: CRITICAL_SECTION の NULL/非整列を no-op で通す (既定 0 = fail-fast) */
+extern int g_shx_cs_null_ok;
+
 /* 統計 */
 extern int g_shx_trace;
 #define SHX_TRACE(...) do { if (g_shx_trace) { fprintf(stderr, "[shimx] " __VA_ARGS__); fputc('\n', stderr); } } while (0)

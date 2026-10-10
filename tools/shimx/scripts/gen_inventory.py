@@ -83,6 +83,8 @@ public_api = sorted(n for n in defined if not n.startswith('shimx_'))
 hooks = sorted(n for n in defined if n.startswith('shimx_'))
 
 LIBC_OK = {'memset', 'socket', 'bind', 'listen', 'accept', 'recv', 'send', 'getsockname', 'ntohs'}   # Emscripten libc が解決 (ソケットは実行時エラー)
+# R3 で序数 → API を同定し GetProcAddress 序数表 (src/module.c shx_ordtable) に登録済みのもの
+ORD_KNOWN = {'shell32.dll': {155: 'ILFree', 190: 'ILCreateFromPathW'}}
 def status(name, dll):
     if name in defined:
         return 'S' if name in STUBS else 'F'
@@ -273,7 +275,13 @@ else:
     A('FLEngine 静的/delay import には担当範囲内の未実装 API は **ありません**。')
 A('')
 if ordn:
-    A('序数 import (名前解決不能。実体 API の特定が要る): ' + ', '.join('%s!%s' % (r['dll'].replace('.dll', ''), r['name']) for r in ordn))
+    known = ['%s!%s=%s (R3 同定, GetProcAddress 序数表で解決)' % (r['dll'].replace('.dll', ''), r['name'], ORD_KNOWN.get(r['dll'], {}).get(int(r['name'][3:]), '?'))
+             for r in ordn if int(r['name'][3:]) in ORD_KNOWN.get(r['dll'], {})]
+    unknown = ['%s!%s' % (r['dll'].replace('.dll', ''), r['name']) for r in ordn if int(r['name'][3:]) not in ORD_KNOWN.get(r['dll'], {})]
+    if known:
+        A('序数 import のうち同定済み (実行時は GetProcAddress が返す): ' + ', '.join(known))
+    if unknown:
+        A('序数 import (名前解決不能。実体 API の特定が要る): ' + ', '.join(unknown))
 A('')
 A('プラグイン専用で未提供 (BSD ソケット名は Emscripten libc が解決; 下記は Serum2 のみ): ' + ', '.join(sorted({n for p in plug_rows for n in p[4]})) )
 A('')

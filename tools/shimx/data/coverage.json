@@ -18,10 +18,10 @@
  "delay_unimplemented": 0,
  "m4_api": 53,
  "m4_api_inherited": 53,
- "shimx_public_api": 593,
- "shimx_hooks": 33,
+ "shimx_public_api": 604,
+ "shimx_hooks": 38,
  "shimx_stub_api": 166,
- "shimx_functional_api": 427,
+ "shimx_functional_api": 438,
  "plugins": {
   "OTT_vst2_win64.dll": {
    "total": 375,
@@ -65,8 +65,9 @@
  },
  "m11_closure": {
   "win_other": 171,
-  "shimx": 183,
-  "lifter": 203
+  "shimx": 182,
+  "lifter": 203,
+  "shimx_dup": 1
  },
  "ott_api_resolved": 24
 }

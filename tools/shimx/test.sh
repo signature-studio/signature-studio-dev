@@ -7,10 +7,11 @@
 #      ファイル/時刻/heap/モジュール/環境/SEH, ole/shell: BSTR/VARIANT/SAFEARRAY/IStream/shell32/version)
 #   3. ST(単一スレッド) ビルドで同テストが PASS (スレッド系は skip)
 #   4. fail-fast: 未対応 API / 未処理 RaiseException / RtlUnwind / strict GetProcAddress / ST の INFINITE 待ち → 非 0 終了 + 名前出力。
-#      ExitProcess(7) → 終了コード 7
+#      ExitProcess(7) → 終了コード 7。strict SysFreeString(管理外 BSTR) / EnterCriticalSection(NULL) も fail-fast
 #   5. M4 互換: tools/shim/test/test_main.c (無改変) を shimx 実装に対して MT/ST で実行 → ALL PASS
 #   6. カバレッジ: inventory/BACKLOG 再生成。担当範囲の未実装 0 / M4 53 API 継承 53 を検査
 #   6b. lift IR (M11 init closure / OTT) の declare 署名と shimx 定義の wasm 署名が一致 (signature mismatch 0)
+#   6c. R6 検査: ir_undef.py の構造体展開 + 重複 declare 正規化 (--normalize-dup 産物が emcc 通過) を M11 IR で実測
 #   7. OTT undefined 47 種 → shimx リンクで Win/CRT API 24 種が全て解決 (tools/m8 成果物があれば)
 #
 # 使い方:  bash tools/shimx/test.sh        (--quick で 7 を省略)
@@ -70,6 +71,8 @@ expect_fail unimpl "DestroyWindow_NonImplemented_Example"
 expect_fail raise "RaiseException (code=0xE06D7363"
 expect_fail rtlunwind "RtlUnwind"
 expect_fail strict "GetProcAddress(kernel32.dll!NoSuchKernelApi)"
+expect_fail bstrfree "SysFreeString (管理外ポインタ)"
+expect_fail csnull "EnterCriticalSection (NULL/misaligned)"
 expect_fail deadlock "WaitFor\*Object(INFINITE)"
 rc=0; node "$BUILD/shimx_test_st.cjs" exit > /dev/null 2> "$BUILD/ff_exit.err" || rc=$?
 [ "$rc" -eq 7 ] || die "ExitProcess(7) の終了コードが $rc"
@@ -97,10 +100,21 @@ fi
 if [ -f "$HERE/../m8/work/ott_m8.ll" ]; then
     python3 "$HERE/scripts/ir_undef.py" "$HERE/../m8/work/ott_m8.ll" --nm "$HERE/work/nm_MT.txt" --json "$HERE/work/ir_ott.json" > "$HERE/work/ir_ott.txt"
 fi
-for pair in "m11:$HERE/../m11/work/boot_final2.ll" "ott:$HERE/../m8/work/ott_m8.ll"; do
+for pair in "m11:$HERE/../m11/work/boot_final2.ll" "m11_3:$HERE/../m11/work/boot_final3.ll" "ott:$HERE/../m8/work/ott_m8.ll"; do
     tag="${pair%%:*}"; ir="${pair#*:}"
     if [ -f "$ir" ]; then bash "$HERE/scripts/verify_sig.sh" "$ir" "$tag" | sed 's/^/    /' || die "署名不一致 ($tag): lift IR の declare と shimx 定義が wasm 署名で食い違う"; fi
 done
+# R6: 構造体展開スタブ + 重複 declare 正規化 (M11 IR があれば実測)
+if [ -f "$HERE/../m11/work/boot_final3.ll" ]; then
+    python3 "$HERE/scripts/ir_undef.py" "$HERE/../m11/work/boot_final3.ll" --nm "$HERE/work/nm_MT.txt" \
+        --emit-stubs "$HERE/work/r6_stubs.c" --normalize-dup "$HERE/work/r6_norm.ll" > "$HERE/work/r6_ir.txt" || die "ir_undef 失敗"
+    grep -q "void\* WindowFromPoint(int a0, int a1)" "$HERE/work/r6_stubs.c" || die "R6: 構造体 by-value 引数が wasm32 展開されていない (WindowFromPoint)"
+    NORM_N=$(grep -c "正規化" "$HERE/work/r6_ir.txt" || true)
+    set +u; . /opt/emsdk/emsdk_env.sh >/dev/null 2>&1; set -u
+    emcc "$HERE/work/r6_norm.ll" -o "$HERE/work/r6_norm.js" -w -O0 -sALLOW_MEMORY_GROWTH=1 -sENVIRONMENT=node \
+        -sERROR_ON_UNDEFINED_SYMBOLS=0 --no-entry -sGLOBAL_BASE=268435456 2> "$HERE/work/r6_norm.log" || { tail -5 "$HERE/work/r6_norm.log"; die "R6: 正規化 IR が emcc を通過しない"; }
+    info "    R6: 構造体展開スタブ + 重複 declare 正規化 OK ($(grep -- '--normalize-dup' "$HERE/work/r6_ir.txt" | head -1 | sed 's/^ *//'))"
+fi
 if [ "$QUICK" -eq 0 ]; then
     bash "$HERE/scripts/verify_ott.sh" | tee "$BUILD/ott.out" | sed 's/^/    /'
     grep -q "API 解決 24 種" "$BUILD/ott.out" || [ ! -f "$HERE/../m8/work/ott_m8.ll" ] || die "OTT: Win/CRT API 24 種が解決されていない"

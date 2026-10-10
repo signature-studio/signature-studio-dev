@@ -4,6 +4,8 @@
  *   node x.cjs raise      : 未処理 RaiseException → fail-fast
  *   node x.cjs rtlunwind  : RtlUnwind → fail-fast
  *   node x.cjs strict     : strict モードで未知 GetProcAddress → fail-fast
+ *   node x.cjs bstrfree   : strict モードで SysFreeString(管理外ポインタ) → fail-fast (R5)
+ *   node x.cjs csnull     : 既定モードで EnterCriticalSection(NULL) → fail-fast (R7)
  *   node x.cjs exit       : ExitProcess(7) → exit hook + 終了コード 7
  *   node x.cjs deadlock   : ST ビルドで INFINITE 待ちが起こり得る場合 fail-fast
  */
@@ -19,6 +21,16 @@ int main(int argc, char** argv) {
     if (!strcmp(mode, "strict")) {
         shimx_set_strict(1);
         GetProcAddress(GetModuleHandleW(W("kernel32.dll")), "NoSuchKernelApi");
+        return 0;
+    }
+    if (!strcmp(mode, "bstrfree")) {                                       /* R5: strict では管理外 BSTR を fail-fast */
+        shimx_set_strict(1);
+        uint64_t dummy[2] = { 0, 0 };
+        SysFreeString((BSTR)&dummy[1]);
+        return 0;
+    }
+    if (!strcmp(mode, "csnull")) {                                         /* R7: 既定は fail-fast (Win32 AV 相当) */
+        EnterCriticalSection(NULL);
         return 0;
     }
     if (!strcmp(mode, "exit")) { shimx_set_exit_hook(exit_hook); ExitProcess(7); return 0; }
@@ -37,6 +49,7 @@ int main(int argc, char** argv) {
     run_core_tests(mt);          fprintf(stderr, "[shimx-test] core OK\n");
     run_sys_tests();             fprintf(stderr, "[shimx-test] sys OK\n");
     run_ole_shell_tests();       fprintf(stderr, "[shimx-test] ole/shell OK\n");
+    run_link_tests(mt);          fprintf(stderr, "[shimx-test] link OK\n");
     printf("[shimx-test] ALL PASS (build=%s)\n", build);
     return 0;
 }

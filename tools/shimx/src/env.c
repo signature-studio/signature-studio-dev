@@ -358,7 +358,7 @@ static AtomEnt g_atoms[2][ATOM_MAX];
 static shx_mutex_t g_atom_lk;
 static ATOM atom_add(int t, LPCWSTR s) {
     if (!s) { SetLastError(ERROR_INVALID_PARAMETER); return 0; }
-    if (((uintptr_t)s >> 16) == 0) return (ATOM)(uintptr_t)s;   /* MAKEINTATOM */
+    if (shx_is_iptr((uintptr_t)s)) return (ATOM)(uintptr_t)s;   /* MAKEINTATOM */
     int n = shx_wstr_len(s);
     if (n == 0 || n > 255) { SetLastError(ERROR_INVALID_PARAMETER); return 0; }
     shx_mutex_lock(&g_atom_lk);
@@ -376,7 +376,7 @@ static ATOM atom_add(int t, LPCWSTR s) {
 }
 static ATOM atom_find(int t, LPCWSTR s) {
     if (!s) { SetLastError(ERROR_INVALID_PARAMETER); return 0; }
-    if (((uintptr_t)s >> 16) == 0) return (ATOM)(uintptr_t)s;
+    if (shx_is_iptr((uintptr_t)s)) return (ATOM)(uintptr_t)s;
     ATOM a = 0;
     shx_mutex_lock(&g_atom_lk);
     for (int i = 0; i < ATOM_MAX; i++) if (g_atoms[t][i].s && shx_wcsicmp(g_atoms[t][i].s, s) == 0) { a = (ATOM)(0xC000 + i); break; }

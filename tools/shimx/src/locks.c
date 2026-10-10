@@ -18,14 +18,26 @@ typedef struct {
     uint64_t SpinCount;
 } ShxCS;   /* 40B (wasm32 でもフィールド幅は固定) */
 
+/* R7: NULL/非整列 CRITICAL_SECTION の方針。
+ *   既定 (g_shx_cs_null_ok=0): fail-fast = Win32 実機のアクセス違反相当 (lift 側ポインタ不正を隠さない;
+ *     M11 survey unit 115 / 旧 M4 shim と同じ unit で同一 abort = lift 側起因の実績あり)。
+ *   shimx_set_cs_null_ok(1): no-op で通す (Enter/Leave は無視, TryEnter は FALSE, Initialize は何もしない)。
+ *     旧 M4 shim の「ポインタ→mutex 表, 溢れで fail-fast」より緩い互換モードで、起動の先伸ばし用。 */
+int g_shx_cs_null_ok = 0;
+void shimx_set_cs_null_ok(int on) { g_shx_cs_null_ok = on; }
+
+/* 有効な ShxCS* を返す。無効 (NULL/非整列) のとき: strict なら fail-fast、許可モードなら NULL を返す */
 static ShxCS* cs_of(PCRITICAL_SECTION p, const char* who) {
-    if (!p || ((uintptr_t)p & 7u)) shim_unimplemented(who);
-    return (ShxCS*)p;
+    if (p && !((uintptr_t)p & 7u)) return (ShxCS*)p;
+    if (g_shx_cs_null_ok) return NULL;
+    shim_unimplemented(who);
+    return NULL;
 }
 
 BOOL InitializeCriticalSectionEx(PCRITICAL_SECTION p, DWORD spin, DWORD flags) {
     (void)flags;
     ShxCS* cs = cs_of(p, "InitializeCriticalSection (NULL/misaligned)");
+    if (!cs) return FALSE;
     memset(cs, 0, sizeof(*cs));
     cs->LockCount = -1;
     cs->SpinCount = spin;
@@ -37,6 +49,7 @@ BOOL InitializeCriticalSectionAndSpinCount(PCRITICAL_SECTION p, DWORD spin) {
 void InitializeCriticalSection(PCRITICAL_SECTION p) { InitializeCriticalSectionEx(p, 0, 0); }
 DWORD SetCriticalSectionSpinCount(PCRITICAL_SECTION p, DWORD spin) {
     ShxCS* cs = cs_of(p, "SetCriticalSectionSpinCount");
+    if (!cs) return 0;
     DWORD old = (DWORD)cs->SpinCount;
     cs->SpinCount = spin;
     return old;
@@ -44,6 +57,7 @@ DWORD SetCriticalSectionSpinCount(PCRITICAL_SECTION p, DWORD spin) {
 
 void EnterCriticalSection(PCRITICAL_SECTION p) {
     ShxCS* cs = cs_of(p, "EnterCriticalSection (NULL/misaligned)");
+    if (!cs) return;
     uint64_t me = shx_tid();
     if (__atomic_load_n(&cs->OwningThread, __ATOMIC_RELAXED) == me) {
         cs->RecursionCount++;
@@ -58,6 +72,7 @@ void EnterCriticalSection(PCRITICAL_SECTION p) {
 
 BOOL TryEnterCriticalSection(PCRITICAL_SECTION p) {
     ShxCS* cs = cs_of(p, "TryEnterCriticalSection (NULL/misaligned)");
+    if (!cs) return FALSE;
     uint64_t me = shx_tid();
     if (__atomic_load_n(&cs->OwningThread, __ATOMIC_RELAXED) == me) {
         cs->RecursionCount++;
@@ -73,6 +88,7 @@ BOOL TryEnterCriticalSection(PCRITICAL_SECTION p) {
 
 void LeaveCriticalSection(PCRITICAL_SECTION p) {
     ShxCS* cs = cs_of(p, "LeaveCriticalSection (NULL/misaligned)");
+    if (!cs) return;
     if (__atomic_load_n(&cs->OwningThread, __ATOMIC_RELAXED) != shx_tid()) return;  /* 対応 Enter 無しは no-op (M4 同様) */
     if (--cs->RecursionCount > 0) { cs->LockCount--; return; }
     cs->LockCount = -1;
@@ -187,6 +203,7 @@ static void cs_lock_cb(void* p) {
     cs->LockCount = cs->RecursionCount - 1;
 }
 BOOL SleepConditionVariableCS(PCONDITION_VARIABLE c, PCRITICAL_SECTION p, DWORD ms) {
+    if (g_shx_cs_null_ok && (!p || ((uintptr_t)p & 7u))) return FALSE;   /* R7 許可モード: 待ち不可 */
     return cv_wait(c, ms, cs_unlock_cb, cs_lock_cb, cs_of(p, "SleepConditionVariableCS"));
 }
 static void srw_unlock_cb(void* p) {
@@ -233,6 +250,7 @@ BOOL InitOnceComplete(PINIT_ONCE once, DWORD flags, LPVOID ctx) {
     return TRUE;
 }
 BOOL InitOnceExecuteOnce(PINIT_ONCE once, PINIT_ONCE_FN fn, LPVOID param, LPVOID* ctx) {
+    fn = (PINIT_ONCE_FN)shx_translate_cb("InitOnceExecuteOnce", (void*)fn);   /* R2 (同期呼出) */
     BOOL pend = FALSE;
     LPVOID c = NULL;
     if (!InitOnceBeginInitialize(once, 0, &pend, &c)) return FALSE;

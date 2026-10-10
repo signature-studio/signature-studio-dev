@@ -102,13 +102,72 @@ HRESULT CLSIDFromString(LPCWSTR s, GUID* g) {
 }
 HRESULT ProgIDFromCLSID(const GUID* g, LPWSTR* out) { (void)g; if (out) *out = NULL; return REGDB_E_CLASSNOTREG; }
 
-/* ---------------- BSTR ---------------- */
+/* ---------------- BSTR ----------------
+ * R5: SysFreeString が shimx 管理外ポインタ (lift 側 FastMM/スタック等) を受けたときの扱い。
+ * SysAlloc* が確保したベースポインタ (user - 4) を所有表に記録し、解放時に入口で判定する:
+ *   所有済み  → unregister して free (従来どおり)
+ *   管理外    → strict=1: fail-fast (「SysFreeString (管理外ポインタ)」) / strict=0: 無視 + trace
+ *               (M11 の lift 誤り `_WStrClr` がスタック番地を渡して abort した実測 (REPORT §3-#1) を
+ *                shimx 側で無害化する。二重 free も同一経路で無害化)
+ */
+#define BSTR_SET_INIT_CAP 1024
+typedef struct { uintptr_t* v; size_t cap, n; } ShxPtrSet;
+static ShxPtrSet g_bstr_set;
+static shx_mutex_t g_bstr_lk;
+
+static uintptr_t bstr_hash(uintptr_t x) { x ^= x >> 16; x *= 0x45d9f3bull; x ^= x >> 16; x *= 0x45d9f3bull; x ^= x >> 16; return x; }
+static int bstr_set_has_locked(uintptr_t key) {
+    ShxPtrSet* s = &g_bstr_set;
+    if (!s->cap) return 0;
+    size_t i = (size_t)bstr_hash(key) & (s->cap - 1);
+    for (size_t probe = 0; probe < s->cap; probe++, i = (i + 1) & (s->cap - 1)) {
+        if (!s->v[i]) return 0;
+        if (s->v[i] == key) return 1;
+    }
+    return 0;
+}
+static int bstr_set_add_locked(uintptr_t key) {
+    ShxPtrSet* s = &g_bstr_set;
+    if (s->n * 2 >= s->cap) {                     /* 負荷率 < 0.5 で再ハッシュ */
+        size_t nc = s->cap ? s->cap * 2 : BSTR_SET_INIT_CAP;
+        uintptr_t* nv = (uintptr_t*)calloc(nc, sizeof(uintptr_t));
+        if (!nv) return 0;
+        for (size_t i = 0; s->cap && i < s->cap; i++) {
+            if (!s->v[i]) continue;
+            size_t j = (size_t)bstr_hash(s->v[i]) & (nc - 1);
+            while (nv[j]) j = (j + 1) & (nc - 1);
+            nv[j] = s->v[i];
+        }
+        free(s->v);
+        s->v = nv; s->cap = nc;
+    }
+    size_t i = (size_t)bstr_hash(key) & (s->cap - 1);
+    while (s->v[i]) {
+        if (s->v[i] == key) return 1;
+        i = (i + 1) & (s->cap - 1);
+    }
+    s->v[i] = key; s->n++;
+    return 1;
+}
+static void bstr_set_del_locked(uintptr_t key) {
+    ShxPtrSet* s = &g_bstr_set;
+    if (!s->cap) return;
+    size_t i = (size_t)bstr_hash(key) & (s->cap - 1);
+    for (size_t probe = 0; probe < s->cap; probe++, i = (i + 1) & (s->cap - 1)) {
+        if (!s->v[i]) return;
+        if (s->v[i] == key) { s->v[i] = 0; s->n--; return; }
+    }
+}
+
 BSTR SysAllocStringByteLen(LPCSTR s, UINT bytes) {
     uint8_t* p = (uint8_t*)malloc(4 + (size_t)bytes + 4);
     if (!p) return NULL;
     *(uint32_t*)p = bytes;
     if (s) memcpy(p + 4, s, bytes); else memset(p + 4, 0, bytes);
     memset(p + 4 + bytes, 0, 4);
+    shx_mutex_lock(&g_bstr_lk);
+    bstr_set_add_locked((uintptr_t)p);
+    shx_mutex_unlock(&g_bstr_lk);
     return (BSTR)(p + 4);
 }
 BSTR SysAllocStringLen(const WCHAR* s, UINT len) { return SysAllocStringByteLen((LPCSTR)s, len * 2); }
@@ -123,7 +182,20 @@ BOOL SysReAllocStringLen(BSTR* b, const WCHAR* s, UINT len) {
     *b = n;
     return TRUE;
 }
-void SysFreeString(BSTR b) { if (b) free((uint8_t*)b - 4); }
+void SysFreeString(BSTR b) {
+    if (!b) return;
+    uintptr_t base = (uintptr_t)b - 4;
+    shx_mutex_lock(&g_bstr_lk);
+    int owned = bstr_set_has_locked(base);
+    if (owned) bstr_set_del_locked(base);
+    shx_mutex_unlock(&g_bstr_lk);
+    if (!owned) {
+        if (shx_strict_mode()) shim_unimplemented("SysFreeString (管理外ポインタ)");
+        SHX_TRACE("SysFreeString: 管理外ポインタ %p を無視 (strict=0)", b);
+        return;
+    }
+    free((void*)base);
+}
 UINT SysStringLen(BSTR b) { return b ? *(uint32_t*)((uint8_t*)b - 4) / 2 : 0; }
 UINT SysStringByteLen(BSTR b) { return b ? *(uint32_t*)((uint8_t*)b - 4) : 0; }
 

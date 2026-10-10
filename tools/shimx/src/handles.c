@@ -294,3 +294,19 @@ void shx_ensure_init(void) {
 
 void shimx_init(void) { shx_ensure_init(); }
 void shimx_set_trace(int on) { shx_ensure_init(); g_shx_trace = on; }
+
+/* ---------------------------------------------------------------
+ * R1: 「値 < 0x10000 は序数/整数」判定の閾値 ( 既定 0x10000 )
+ * R2: 関数ポインタ引数の変換フック (既定 = 恒等)
+ * --------------------------------------------------------------- */
+uint32_t g_shx_intptr_limit = 0x10000;
+static shimx_callback_translator_fn g_cb_trans;
+
+void shimx_set_intptr_limit(uint32_t lim) { g_shx_intptr_limit = lim; }
+uint32_t shimx_get_intptr_limit(void) { return g_shx_intptr_limit; }
+void shimx_set_callback_translator(shimx_callback_translator_fn fn) { g_cb_trans = fn; }
+void* shx_translate_cb(const char* api, void* cb) {
+    if (!cb || !g_cb_trans) return cb;
+    void* r = g_cb_trans(api, cb);
+    return r ? r : cb;          /* 翻訳結果 NULL の場合は元の値を維持 (呼出側の NULL 判定を壊さない) */
+}

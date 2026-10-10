@@ -111,6 +111,85 @@ HRESULT SHGetSpecialFolderLocation(HWND w, int csidl, LPVOID* pidl) {
 }
 LPVOID ILCreateFromPathW(LPCWSTR path) { return path ? pidl_make(path) : NULL; }
 void ILFree(LPVOID pidl) { CoTaskMemFree(pidl); }
+
+/* R3: shell32 序数 16/17/18/19/21/25/152/153/155 (= IL* PIDL 操作系, Win10/11 の序数表)。
+ * shimx 自前 PIDL 形式 ([u16 cb][UTF-16 path+NUL][u16 0]) の単項 + 終端で実装する。
+ * ILGetNext/ILFindLastID は「1 項目しか無いリスト」としての正しい答えを返す。 */
+static size_t pidl_total(const void* pidl) {           /* 終端含む総バイト数 */
+    size_t tot = 0;
+    const uint8_t* p = (const uint8_t*)pidl;
+    if (!p) return 0;
+    while (*(const uint16_t*)p) {
+        uint16_t cb = *(const uint16_t*)p;
+        if (cb < 4) break;
+        tot += cb;
+        p += cb;
+    }
+    return tot + 2;                                    /* 終端 [u16 0] */
+}
+LPVOID ILGetNext(const void* pidl) {
+    if (!pidl) return NULL;
+    uint16_t cb = *(const uint16_t*)pidl;
+    if (cb < 4) return NULL;                           /* 空または終端 */
+    const uint8_t* next = (const uint8_t*)pidl + cb;
+    return *(const uint16_t*)next ? (LPVOID)next : NULL;
+}
+LPVOID ILFindLastID(const void* pidl) {
+    /* 最終項目の先頭。空リストは NULL。単項リストでは pidl 自身 */
+    if (!pidl || !*(const uint16_t*)pidl) return NULL;
+    const uint8_t* last = (const uint8_t*)pidl;
+    const uint8_t* p = last;
+    while (*(const uint16_t*)p) {
+        uint16_t cb = *(const uint16_t*)p;
+        if (cb < 4) break;
+        last = p;
+        p += cb;
+    }
+    return (LPVOID)last;
+}
+BOOL ILRemoveLastID(void* pidl) {
+    /* 最終項目を除去 (in place)。空リストは FALSE。単項リスト → 空リスト化 */
+    uint8_t* last = (uint8_t*)ILFindLastID(pidl);
+    if (!last || !*(uint16_t*)last) return FALSE;
+    *(uint16_t*)last = 0;
+    return TRUE;
+}
+LPVOID ILClone(const void* pidl) {
+    if (!pidl) return NULL;
+    size_t n = pidl_total(pidl);
+    void* c = CoTaskMemAlloc(n);
+    if (!c) return NULL;
+    memcpy(c, pidl, n);
+    return c;
+}
+LPVOID ILCloneFirst(const void* pidl) {
+    if (!pidl || *(const uint16_t*)pidl < 4) return NULL;
+    uint16_t cb = *(const uint16_t*)pidl;
+    void* c = CoTaskMemAlloc((size_t)cb + 2);
+    if (!c) return NULL;
+    memcpy(c, pidl, cb);
+    *(uint16_t*)((uint8_t*)c + cb) = 0;
+    return c;
+}
+BOOL ILIsEqual(const void* a, const void* b) {
+    if (!a || !b) return a == b;
+    size_t na = pidl_total(a), nb = pidl_total(b);
+    return na == nb && (na == 2 || memcmp(a, b, na) == 0);
+}
+LPVOID ILCombine(const void* a, const void* b) {
+    if (!a) return ILClone(b);
+    if (!b) return ILClone(a);
+    size_t na = pidl_total(a);                         /* 終端含む */
+    size_t nb = pidl_total(b);                         /* b は終端抜きで連結 */
+    uint8_t* c = (uint8_t*)CoTaskMemAlloc(na + nb - 2);
+    if (!c) return NULL;
+    memcpy(c, a, na - 2);                              /* a の項目群 (終端除く) */
+    memcpy(c + na - 2, b, nb);                         /* b 全体 (項目群+終端) */
+    return c;
+}
+UINT ILGetSize(const void* pidl) {
+    return pidl ? (UINT)pidl_total(pidl) : 0;          /* 終端含むバイト数 (Win32 同様) */
+}
 BOOL SHGetPathFromIDListW(const void* pidl, LPWSTR path) {
     if (!pidl || !path) return FALSE;
     const uint8_t* p = (const uint8_t*)pidl;

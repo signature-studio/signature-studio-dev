@@ -61,6 +61,38 @@ BOOL GetUserPreferredUILanguages(DWORD flags, ULONG* num, LPWSTR buf, ULONG* cch
     return TRUE;
 }
 
+/* R3: MUI 言語 API (M11 unit 2 が GetProcAddress で取得)。優先リストはプロセス共通の 1 言語固定
+ * (shimx のロケールは en-US 固定。shimx_set_locale で LCID を変えた場合はそちらに追従)。 */
+static WCHAR g_pref_ui_lang[16];   /* 空なら未設定 = 既定言語 */
+BOOL GetThreadPreferredUILanguages(DWORD flags, ULONG* num, LPWSTR buf, ULONG* cch) {
+    (void)flags;
+    if (g_pref_ui_lang[0]) {
+        ULONG n = (ULONG)shx_wstr_len(g_pref_ui_lang) + 2;
+        if (num) *num = 1;
+        if (!cch) { SetLastError(ERROR_INVALID_PARAMETER); return FALSE; }
+        if (!buf) { *cch = n; return TRUE; }
+        if (*cch < n) { *cch = n; SetLastError(ERROR_INSUFFICIENT_BUFFER); return FALSE; }
+        memcpy(buf, g_pref_ui_lang, ((size_t)shx_wstr_len(g_pref_ui_lang) + 2) * 2);
+        *cch = n;
+        return TRUE;
+    }
+    return GetUserPreferredUILanguages(0, num, buf, cch);
+}
+BOOL SetThreadPreferredUILanguages(DWORD flags, LPCWSTR buf, ULONG* num) {
+    (void)flags;
+    if (buf && buf[0]) {
+        int i = 0;
+        while (buf[i] && i < 15) { g_pref_ui_lang[i] = buf[i]; i++; }
+        g_pref_ui_lang[i] = 0;
+    } else {
+        g_pref_ui_lang[0] = 0;                  /* NULL/空 = 既定に戻す */
+    }
+    if (num) *num = g_pref_ui_lang[0] ? 1 : 0;
+    SetLastError(ERROR_SUCCESS);
+    return TRUE;
+}
+LANGID GetThreadUILanguage(void) { return (LANGID)g_user_lcid; }
+
 static const char* const k_dayn[7] = {"Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"};
 static const char* const k_dayab[7] = {"Mon","Tue","Wed","Thu","Fri","Sat","Sun"};
 static const char* const k_monn[12] = {"January","February","March","April","May","June","July","August","September","October","November","December"};
@@ -162,6 +194,7 @@ int GetLocaleInfoEx(LPCWSTR name, LCTYPE type, LPWSTR out, int cch) {
 
 BOOL EnumSystemLocalesW(LOCALE_ENUMPROCW cb, DWORD flags) {
     (void)flags;
+    cb = (LOCALE_ENUMPROCW)shx_translate_cb("EnumSystemLocalesW", (void*)cb);   /* R2 */
     if (!cb) { SetLastError(ERROR_INVALID_PARAMETER); return FALSE; }
     for (size_t i = 0; i < sizeof k_locs / sizeof k_locs[0]; i++) {
         WCHAR s[16]; char t[16]; snprintf(t, sizeof t, "%08x", k_locs[i].id);
@@ -173,6 +206,7 @@ BOOL EnumSystemLocalesW(LOCALE_ENUMPROCW cb, DWORD flags) {
 
 BOOL EnumCalendarInfoW(CALINFO_ENUMPROCW cb, LCID loc, DWORD cal, DWORD type) {
     (void)loc; (void)cal;
+    cb = (CALINFO_ENUMPROCW)shx_translate_cb("EnumCalendarInfoW", (void*)cb);   /* R2 */
     if (!cb) { SetLastError(ERROR_INVALID_PARAMETER); return FALSE; }
     const char* v = NULL; char tmp[32];
     if (type >= 7 && type <= 13) v = k_dayn[type - 7];

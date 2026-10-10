@@ -27,11 +27,31 @@ static ShxMod* g_mods;
 static ShxMod* g_exe;
 static shx_mutex_t g_mod_lk;
 static int g_strict;
+static int g_pseudo_load;       /* R4: 未知 DLL を擬似モジュールとして登録するか */
 static void* (*g_resolver)(HMODULE, const char*, DWORD);
 static HMODULE (*g_load_hook)(const char*, DWORD);
 static const void* (*g_res_provider)(HMODULE, const WCHAR*, const WCHAR*, DWORD*);
 
+/* R3: 序数直指定 GetProcAddress の組込み表 (手書き)。名前表 (proctable.c, 自動生成) は序数を扱えないため別表。
+ * 序数 → 名前の対応は Windows 10/11 の shell32.dll エクスポート表 (implib 定義 + wine shell32.spec と突合済み)。
+ * 既知 74 (SHCreateStdEnumFmtEtc) は shimx 未実装のため対象外、190 (ILCreateFromPathW) は実装済み。 */
+typedef struct { const char* dll; DWORD ord; void* fn; } ShxOrdEnt;
+static const ShxOrdEnt shx_ordtable[] = {
+    { "shell32.dll",  16, (void*)ILFindLastID },
+    { "shell32.dll",  17, (void*)ILRemoveLastID },
+    { "shell32.dll",  18, (void*)ILClone },
+    { "shell32.dll",  19, (void*)ILCloneFirst },
+    { "shell32.dll",  21, (void*)ILIsEqual },
+    { "shell32.dll",  25, (void*)ILCombine },
+    { "shell32.dll", 152, (void*)ILGetSize },
+    { "shell32.dll", 153, (void*)ILGetNext },
+    { "shell32.dll", 155, (void*)ILFree },
+    { "shell32.dll", 190, (void*)ILCreateFromPathW },
+};
+
 void shimx_set_strict(int on) { g_strict = on; }
+int shx_strict_mode(void) { return g_strict; }
+void shimx_set_pseudo_load(int on) { g_pseudo_load = on; }
 void shimx_set_proc_resolver(void* (*fn)(HMODULE, const char*, DWORD)) { g_resolver = fn; }
 void shimx_set_load_hook(HMODULE (*fn)(const char*, DWORD)) { g_load_hook = fn; }
 void shimx_set_resource_provider(const void* (*fn)(HMODULE, const WCHAR*, const WCHAR*, DWORD*)) { g_res_provider = fn; }
@@ -243,6 +263,16 @@ static HMODULE load_utf8(const char* name, DWORD flags) {
             shx_mutex_unlock(&g_mod_lk);
         }
     }
+    if (!r && g_pseudo_load) {                       /* R4: 未知 DLL を擬似モジュール (最小 PE ヘッダ画像) として登録 */
+        char bn[256]; base_name(name, bn, sizeof bn);
+        shx_mutex_lock(&g_mod_lk);
+        ShxMod* pm = mod_find_locked(bn);
+        if (!pm) pm = mod_add_locked(bn, name, (HMODULE)fake_image(0x7FFB00000000ull, 1), 0x1000, 1);
+        pm->refs++;
+        r = pm->base;
+        shx_mutex_unlock(&g_mod_lk);
+        SHX_TRACE("LoadLibrary 擬似登録: %s", name);
+    }
     if (!r) { SHX_TRACE("LoadLibrary 失敗: %s", name); SetLastError(ERROR_MOD_NOT_FOUND); }
     else SetLastError(ERROR_SUCCESS);
     return r;
@@ -272,7 +302,7 @@ BOOL SetDllDirectoryW(LPCWSTR p) { (void)p; return TRUE; }
 void* GetProcAddress(HMODULE h, LPCSTR name) {
     shx_ensure_init();
     if (!name) { SetLastError(ERROR_INVALID_PARAMETER); return NULL; }
-    int byOrd = ((uintptr_t)name >> 16) == 0;
+    int byOrd = shx_is_iptr((uintptr_t)name);            /* R1: 閾値は shimx_set_intptr_limit で変更可 (既定 0x10000) */
     DWORD ord = byOrd ? (DWORD)(uintptr_t)name : 0;
     void* fn = NULL;
     char modname[256] = "?"; int builtin = 0;
@@ -293,6 +323,12 @@ void* GetProcAddress(HMODULE h, LPCSTR name) {
             const ShxProcEnt* e = &shx_proctable[i];
             if (strcmp(e->name, name)) continue;
             if (!strcmp(e->dll, modname) || (any && (!strcmp(e->dll, "kernel32.dll") || !strcmp(e->dll, "advapi32.dll")))) fn = e->fn;
+        }
+    }
+    if (!fn && byOrd) {                                  /* R3: 序数直指定の組込み表 (M11 の shell32 序数 import 分) */
+        for (size_t i = 0; i < sizeof shx_ordtable / sizeof shx_ordtable[0] && !fn; i++) {
+            const ShxOrdEnt* e = &shx_ordtable[i];
+            if (e->ord == ord && !strcmp(e->dll, modname)) fn = e->fn;
         }
     }
     if (!fn) {
@@ -324,8 +360,8 @@ HRSRC FindResourceW(HMODULE m, LPCWSTR name, LPCWSTR type) {
 }
 HRSRC FindResourceA(HMODULE m, LPCSTR name, LPCSTR type) {
     WCHAR wn[256], wt[256]; const WCHAR* pn; const WCHAR* pt;
-    if (((uintptr_t)name >> 16) == 0) pn = (const WCHAR*)name; else { MultiByteToWideChar(CP_ACP, 0, name, -1, wn, 256); pn = wn; }
-    if (((uintptr_t)type >> 16) == 0) pt = (const WCHAR*)type; else { MultiByteToWideChar(CP_ACP, 0, type, -1, wt, 256); pt = wt; }
+    if (shx_is_iptr((uintptr_t)name)) pn = (const WCHAR*)name; else { MultiByteToWideChar(CP_ACP, 0, name, -1, wn, 256); pn = wn; }
+    if (shx_is_iptr((uintptr_t)type)) pt = (const WCHAR*)type; else { MultiByteToWideChar(CP_ACP, 0, type, -1, wt, 256); pt = wt; }
     return FindResourceW(m, pn, pt);
 }
 HGLOBAL LoadResource(HMODULE m, HRSRC r) { (void)m; return r ? (HGLOBAL)r : 0; }

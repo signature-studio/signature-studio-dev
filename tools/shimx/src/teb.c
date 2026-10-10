@@ -141,6 +141,7 @@ BOOL TlsSetValue(DWORD idx, LPVOID val) {
  * FLS (Fiber Local Storage; MSVC CRT が使用)。スレッド終了時にコールバックを呼ぶ
  * --------------------------------------------------------------- */
 DWORD FlsAlloc(PFLS_CALLBACK_FUNCTION cb) {
+    cb = (PFLS_CALLBACK_FUNCTION)shx_translate_cb("FlsAlloc", (void*)cb);   /* R2 */
     DWORD found = FLS_OUT_OF_INDEXES;
     shx_lock();
     for (DWORD i = 0; i < SHX_FLS_MAX; i++) {

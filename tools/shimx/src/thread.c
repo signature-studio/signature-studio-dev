@@ -101,6 +101,7 @@ HANDLE CreateThread(LPSECURITY_ATTRIBUTES sa, SIZE_T stackSize, LPTHREAD_START_R
                     LPVOID param, DWORD flags, LPDWORD threadId) {
     (void)sa;
     shx_ensure_init();
+    start = (LPTHREAD_START_ROUTINE)shx_translate_cb("CreateThread", (void*)start);   /* R2 */
     if (!start) { shx_set_last_error(ERROR_INVALID_PARAMETER); return 0; }
 #if defined(__EMSCRIPTEN_PTHREADS__)
     ShxObj* o = shx_obj_new(OBJ_THREAD);
@@ -289,6 +290,7 @@ BOOL CreateTimerQueueTimer(LPHANDLE timer, HANDLE queue, WAITORTIMERCALLBACK cb,
                            DWORD due, DWORD period, ULONG flags) {
     (void)flags;
     shx_ensure_init();
+    cb = (WAITORTIMERCALLBACK)shx_translate_cb("CreateTimerQueueTimer", (void*)cb);   /* R2 */
 #if defined(__EMSCRIPTEN_PTHREADS__)
     if (!timer || !cb) { shx_set_last_error(ERROR_INVALID_PARAMETER); return FALSE; }
     ShxTimer* t = (ShxTimer*)calloc(1, sizeof(*t));
@@ -384,6 +386,7 @@ typedef struct { PTP_WORK_CALLBACK cb; void* ctx; volatile int pending; volatile
 
 void* CreateThreadpoolWork(PTP_WORK_CALLBACK cb, void* ctx, void* env) {
     (void)env;
+    cb = (PTP_WORK_CALLBACK)shx_translate_cb("CreateThreadpoolWork", (void*)cb);   /* R2 */
     if (!cb) { shx_set_last_error(ERROR_INVALID_PARAMETER); return NULL; }
     ShxWork* w = (ShxWork*)calloc(1, sizeof(ShxWork));
     if (!w) { shx_set_last_error(ERROR_NOT_ENOUGH_MEMORY); return NULL; }

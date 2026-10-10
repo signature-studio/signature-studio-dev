@@ -1,6 +1,6 @@
 # tools/shimx REPORT — Win32/CRT shim 拡張 (担当 Q)
 
-- 日付: 2026-10-10 / 検証環境: emcc 6.0.12, node v24.19.0 (emsdk 同梱; 再起動後の PATH に node v26 が無かったため), llvm-nm
+- 日付: 2026-10-10 (初版) / **2026-10-10 更新: CAB-211 — M11 リンク フィードバック R1〜R8 対応 (§9)** / 検証環境: emcc 6.0.12, node v24.19.0 (emsdk 同梱), llvm-nm
 - 書込範囲: `tools/shimx/` のみ。`tools/shim` `tools/m2` `tools/m6` `tools/m8` `tools/m11` `tools/plugins` `tools/startup` `tools/targets` は読取のみ (改変 0 行)。
 - 検収: `bash tools/shimx/test.sh` → **exit 0** (約 20 秒。`--quick` で OTT 再リンクを省略)
 
@@ -8,16 +8,16 @@
 
 | 項目 | 実測 |
 |---|---|
-| shimx 公開 API | **593 本** (機能 427 + スタブ 166) + 運用フック 33 本 (`exports.txt` の 627 = これらに M4 互換 `shim_unimplemented` を加えた数)。実装 6,724 行 (C) + テスト アサーション 536 行 |
+| shimx 公開 API | **604 本** (機能 438 + スタブ 166) + 運用フック 38 本 (`exports.txt` の 643 = これらに M4 互換 `shim_unimplemented` を加えた数)。実装 6,724 行 (C) + テスト アサーション 536 行 + R1〜R8 追加実装 (§9) |
 | FLEngine_x64.dll 静的 import **738** に対するカバレッジ | 実装 **358 = 48.5%** (機能 243 + スタブ 115)。libc 解決 `memset` 込み 48.6% |
 | 担当範囲 (738 − 他担当 379 = 359) に対するカバレッジ | **100.0%** (未実装 **0**、序数 import 0)。内訳 = 実装 358 + libc 解決 `memset` 1。対象外 379 = user32/gdi32/comctl32/opengl32 (tools/gui) 377 + dsound (tools/audio) 2。実装 358 のうち 9 本は user32 の weak 実装 (Char*W/MsgWaitForMultipleObjects*; gui 側が強定義で上書き可)。**100% は「シンボル提供」の意味**で、うち 115 本はスタブ (常時エラー/0 台/fail-fast の `RtlUnwind*` 等)。機能実装は 243 本 |
 | 呼出サイト加重 (静的 7,309 サイト) | shimx 4,050 サイト (55.4%) / 他担当 (GUI) 3,252 サイト (44.5%) / libc 7 |
 | delay-load 57 | 実装 23 / 他担当 34 / 未実装 0 |
 | プラグイン import (GUI/audio 除く) | OTT vst2 146/147, vst3 150/151 (残 = shell32 序数 74), FreshAir 98/98, FL64.exe 111/111, Serum2 234/238 (残 = 序数 4) |
 | **OTT undefined 47 種 (M8)** | shimx リンクで **47 → 23**。Win/CRT API **24 種は全て解決** (CloseHandle/CreateFileW/TlsGet・SetValue/WriteFile/GetProcAddress/LoadLibraryExW/`__readgsqword`/Rtl*/UnhandledExceptionFilter ほか)。残 23 は `function_18*` = lift 欠落で shim の対象外。t1 出力 SHA は baseline と bit 一致 (`b5a91b9b…`, 512 行)。signature mismatch 0 |
-| M11 init closure (`boot_final2.ll`) 外部参照 557 | shimx 提供 **183** / GUI・audio 担当 171 (user32 114 / gdi32 53 / shcore 2 / uxtheme 1 / dsound 1) / lift 由来 203。**非 GUI の Win/CRT は 100% 提供**、IR declare と wasm 署名の不一致 0 (後述 §4 の 5 件を修正済み) |
+| M11 init closure (`boot_final2.ll`) 外部参照 557 | shimx 提供 **182** + shimx 重複 declare (`SHGetFolderPathW.1` = R6 の shimx_dup 分類) **1** / GUI・audio 担当 171 (user32 114 / gdi32 53 / shcore 2 / uxtheme 1 / dsound 1) / lift 由来 203。**非 GUI の Win/CRT は 100% 提供**、IR declare と wasm 署名の不一致 0 (後述 §4 の 5 件を修正済み) |
 | M4 の 53 API | **53/53 継承**。`tools/shim/test/test_main.c` を **無改変** で shimx 実装に対し MT/ST とも ALL PASS |
-| テスト | MT(pthread) ALL PASS / ST ALL PASS (6 回連続実行で安定) / fail-fast 6 モード / M4 互換 MT・ST / 署名突合 2 本 / OTT 再リンク+実行回帰 |
+| テスト | MT(pthread) ALL PASS / ST ALL PASS / fail-fast 8 モード / M4 互換 MT・ST / 署名突合 3 本 (boot_final2・3 / OTT) / OTT 再リンク+実行回帰 / **R1〜R8 対応分 `test/test_link.c` (MT/ST)** / R6 検査 (構造体展開 + 正規化 IR の emcc 通過) |
 
 ## 1. バックログ (優先度付け, `BACKLOG.md` 全表)
 
@@ -81,7 +81,10 @@ Init・DeleteCriticalSection 65 / GetLastError 61 / GetCurrentThreadId 51 / Vari
 - **コードページ**: 既定 ACP=1252。932 等 DBCS は ERROR_INVALID_PARAMETER (日本語 ACP が要るなら表実装が必要)。ロケールデータは en-US 固定。
 - **FileMapping**: マッピング毎の共有バッファ (書戻しは Unmap/Flush/Close)。別プロセスとの共有や巨大ファイルの遅延マップは不可。VirtualAlloc 予約は malloc (上限 512MB/回)。
 - **GlobalUnlock** は M4 互換 (ロック済みなら TRUE)。HeapDestroy は配下ブロックを回収しない。SuspendThread は実停止しない。
-- 序数 import (shell32 74/155/190, shlwapi 12/219): 名前未特定で未実装。Serum2 の advapi32 Crypt* は常に失敗 (FL 本体は使わない)。
+- 序数 import (shell32 74, shlwapi 12/219, d2d1 1): 名前未特定で未実装。shell32 155=ILFree / 190=ILCreateFromPathW は R3 で同定済み (§9.1, GetProcAddress 序数表で解決)。Serum2 の advapi32 Crypt* は常に失敗 (FL 本体は使わない)。
+- **コールバック (R2)**: 翻訳フックは登録時に 1 回走り、戻り値 (実 call 可能な関数ポインタ) を保存して以後使う。非同期系 (CreateThread/タイマ/FLS/スレッドプール) は hostbridge が寿命を管理するトランポリンを返す前提 (同期系は呼出中のみ有効であれば足りる)。未設定時は恒等なので挙動は不変。
+- **BSTR (R5)**: 管理外ポインタの free は無視されるため、lift 側が FastMM 等の別確保元 BSTR を SysFreeString した場合はリークになる (abort しない優先)。所有表はピーク同時 BSTR 数 × 8B。
+- **intptr 閾値 (R1)**: プロセス共通の 1 変数。image を <0x10000 に敷設する lift 系と MAKEINTRESOURCE 系の両立は敷設側 (lowbase LB_BASE≥0x10000) か閾値設定のいずれかで解決する。
 - 実機 FL の実行ではまだ検証していない (M11 の closure と OTT のリンク・署名・t1 回帰まで)。
 
 ## 6. 下流チケット案
@@ -103,9 +106,12 @@ Init・DeleteCriticalSection 65 / GetLastError 61 / GetCurrentThreadId 51 / Vari
 ```
 bash tools/shimx/test.sh                           # 全検収 (exit 0)
 python3 tools/shimx/scripts/import_scan.py         # data/imports.json 再生成 (FLEngine/プラグイン PE 走査)
-python3 tools/shimx/scripts/ir_undef.py <ir.ll>    # lift IR の外部参照を shimx/libc/lifter/GUI に分類 (+ fail-fast スタブ生成)
+python3 tools/shimx/scripts/ir_undef.py <ir.ll>    # lift IR の外部参照を shimx/libc/lifter/GUI に分類
+python3 tools/shimx/scripts/ir_undef.py <ir.ll> --emit-stubs out.c        # fail-fast スタブ生成 (構造体 by-value 展開済み, R6)
+python3 tools/shimx/scripts/ir_undef.py <ir.ll> --normalize-dup norm.ll   # NAME.1/NAME_D1 重複 declare を基名へ正規化 (R6)
 bash tools/shimx/scripts/verify_sig.sh <ir.ll> m11 # IR declare ↔ shimx 署名の突合
 bash tools/shimx/scripts/verify_ott.sh             # OTT undefined 47→23 と t1 回帰
+bash tools/shimx/scripts/rem11_check.sh            # M11 純リンク (no --fix) 17unit 再測 + R8 進捗 (§9.2)
 ```
 
 ユーザ依頼事項: なし (素材は既存。node v26 が PATH に無い環境のため emsdk 同梱 node 24.19 を使用)。
@@ -113,3 +119,53 @@ bash tools/shimx/scripts/verify_ott.sh             # OTT undefined 47→23 と t
 ## 8. 検収記録 (CAB-11)
 
 - 独立再計算 (pefile で `analysis/win64/extracted/block00031_PE.bin` を直接解析; 呼出サイトは E8/E9 rel32 を独自走査) で主要数値は一致。差異は M11 外部参照 553→557 (ir_undef の declare 正規表現が struct 戻り値 `__asm_cpuid*` 4 件を取りこぼし。lift 由来のみ・shimx/GUI 件数に影響なし) の 1 件のみで修正済み。
+
+## 9. M11 リンク フィードバック対応 — R1〜R8 (CAB-211)
+
+出典: `tools/m11/shimx_link/REPORT.md` §6 (CAB-166, commit 8170eee)。テスト: `test/test_link.c` (`bash tools/shimx/test.sh` の MT/ST で実行)。既存検収 (M4 53/53, MT/ST, 署名突合 0, OTT t1 SHA 一致 `b5a91b9b…`) は **全て維持**。
+
+### 9.1 対応表
+
+| # | 要求 (M11 REPORT §6) | 対応 | 実装 |
+|---|---|---|---|
+| R1 | 「ポインタ < 0x10000 は序数/整数」判定の閾値設定 or image 敷設 ≥64KB | **実装** | `shimx_set_intptr_limit(lim)` / `shimx_get_intptr_limit()` (既定 0x10000)。判定箇所は 5 か所 (GetProcAddress 序数 / FindResourceA name,type / AddAtom・FindAtomW の MAKEINTATOM / CharUpper・LowerW 単一文字) を共通ヘルパ `shx_is_iptr()` に統一。**lowbase は LB_BASE=0x10000 敷設で既定値のままで整合** (guest ポインタ全て ≥ lim)。LVA=0 敷設 (M11 旧式) では `shimx_set_intptr_limit(0x4000)` 等に下げる — `kernel32.dll!#39682` (Delphi 文字列 LVA 0x9b02) は lim<0x9b02 で文字列扱いになり、序数 shell32 #16..155 (<0x4000) は引き続き有効。デフォルト不変のため M11 の miss 挙動自体は変わらない (harness 側の設定が必要) |
+| R2 | 関数ポインタ引数の変換フック | **実装** | `shimx_set_callback_translator(fn)` (型: `void* (*fn)(const char* api, void* cb)`)。適用 API: EnumSystemLocalesW / EnumCalendarInfoW / CreateThread / FlsAlloc / CreateTimerQueueTimer / CreateThreadpoolWork / InitOnceExecuteOnce (同期 7 系統 + 非同期 3 = REPORT 要求の Enum*/CreateThread/FlsAlloc/タイマ/スレッドプールを網羅)。翻訳結果 NULL は元値にフォールバック (呼出側の NULL 判定を保護)。未設定時は恒等 → 既存挙動不変。**VA→トランポリン変換の実体は hostbridge (T2/CAB-177)** がこのフックに接続する |
+| R3 | GetProcAddress 組込み表追加 (kernel32 UI言語 3 本, shell32 序数 9 個) | **実装** | kernel32: `GetThreadPreferredUILanguages` / `SetThreadPreferredUILanguages` / `GetThreadUILanguage` を機能実装 (en-US 固定, multi-sz "en-US\0\0", GetProcAddress 名前解決は自動生成 proctable に反映)。shell32 序数は Windows 10/11 の序数表と突合して **同定**: 16=ILFindLastID, 17=ILRemoveLastID, 18=ILClone, 19=ILCloneFirst, 21=ILIsEqual, 25=ILCombine, 152=ILGetSize, 153=ILGetNext, 155=ILFree (既知 190=ILCreateFromPathW も登録)。IL* 8 本を shimx 自前 PIDL 形式で実装し、序数直指定用の新表 `shx_ordtable` (src/module.c, 手書き) から解決。74 (SHCreateStdEnumFmtEtc) は未実装のまま miss |
+| R4 | LoadLibrary 失敗方針 (Msctf.dll/avrt/PowrProf.dll を擬似 DLL 登録するか) | **実装** (選択式) | `shimx_set_pseudo_load(1)`: 未知 DLL 名を擬似モジュール (最小 PE ヘッダ画像, 組込み扱い) として登録し LoadLibrary を成功させる。**既定 0 = 従来どおり失敗** (M11 survey で失敗のまま起動が進む実績があるため既定は不変)。失敗/擬似登録は `SHX_TRACE` に出力 |
+| R5 | SysFreeString が管理外ポインタを受けたときの挙動 | **実装** | SysAlloc* が確保したベースポインタの所有表 (オープンアドレス法ハッシュ, mutex 保護) を導入。`SysFreeString`: 所有済み→従来どおり free / 管理外→**strict=1 で fail-fast (`SysFreeString (管理外ポインタ)`), strict=0 (既定) で無視 + trace**。二重 free も同一経路で無害化。M11 REPORT §3-#1 の lift 誤り (`_WStrClr` がスタック番地を渡して free で abort) は **この変更だけで abort しなくなる** (--fix の `sx_liftfix.c` C 転記は論理修復として並行維持) |
+| R6 | `ir_undef.py --emit-stubs` の構造体 by-value 展開 + `NAME.1` 重複 declare 正規化 | **実装** | (a) `--emit-stubs` が `%name = type {...}` 表から by-value 構造体引数を wasm32 規則で展開 (`WindowFromPoint(%tagPOINT)` → `(int, int)` — M11 REPORT §1 の signature mismatch 1 の再発防止)。(b) 新オプション `--normalize-dup out.ll`: `NAME.<d>` / `NAME_D<d>` (基名が shimx 定義) を基名 declare へ正規化 — 重複 declare 削除 + 呼出siteの引数 0/null 補間 + 戻り値型差の変換命令 (trunc/zext/inttoptr/ptrtoint/fpext/fptrunc)。実測: boot_final2/3 とも 1 名 1 site 正規化され **emcc 通過**。(c) 分類に `shimx_dup` を新設 (§9.3 の再計測参照) |
+| R7 | EnterCriticalSection(NULL) の方針 | **実装** (方針決定 + 選択式) | **既定 = fail-fast のまま** (= Win32 実機のアクセス違反相当。survey unit 115 は旧 M4 shim でも同一 unit で abort する lift 側ポインタ不正であり、黙って成功させると lift 誤りを隠す)。許容モード `shimx_set_cs_null_ok(1)` を追加: Enter/Leave は no-op、TryEnter=FALSE、Initialize 何もしない、SleepConditionVariableCS=FALSE。null_ok モード自体も fail-fast モード (`node x.cjs csnull`) で検査 |
+| R8 | 未検証 133 名の実機検証 | **手順整備** (実検証は unit 完走後) | `scripts/reach_check.py` (M11 `reach.json` の `static_reach_but_never_called` 133 名と実行トレースの差分集計) + `scripts/rem11_check.sh` (§9.2)。現時点の純リンク実行では 133 名の呼出 0 (起動経路は 17 unit まででレジストリ・ファイル系大半に未到達) — REPORT のとおり T9 (CAB-176) の unit 完走後の後続 |
+
+### 9.2 「CAB-129 修正後、--fix なし純リンクで 17 unit 再測」の検証手順 (1 コマンド)
+
+```
+bash tools/shimx/scripts/rem11_check.sh
+```
+
+1. `tools/m11/shimx_link/build.sh --trace --soft` — **IR 無改変・--fix 一切無し** のトレース付き純リンク (signature mismatch 0 / undefined 0 / duplicate 0 を build ログで確認)
+2. `run_trace.mjs` で起動実行 (`SHIMX_TRACE=1`) → `tools/shimx/work/rem11/m11_sx_trace_soft.run.json`
+3. 判定基準 (M11 REPORT §0/§3-#2 の実測と対応):
+   - **真の 17 unit 完走** = `init_count >= 18` (unit #18 に進入) かつ `longjmp_hit == 0` (unit #18 OOB で停止するのが期待値)
+   - **偽の DllMain 完走** (CAB-129 未修正の現状) = `init_count == 17` かつ `longjmp_hit == 1` かつ `boot_rc == 1` — shadow stack 破壊による Halt0
+   - **2026-10-10 実測 (CAB-129 未修正)**: `init_count=17, longjmp_hit=1, boot_rc=1, threw=null` = 偽の完走 (既知到達点どおり。shimx 呼出 17 種 / 27 回)。CAB-129 修正後に同コマンドを再実行し判定行が「真の 17 unit 完走」に変わることを確認する
+4. 同スクリプトが `reach_check.py` で R8 進捗 (133 名のうち本実行で呼ばれた名) を `tools/shimx/work/rem11/reach_progress.md` に出力
+
+前提: `bash tools/m11/m11_e2e.sh` 済みの M11 成果物 (`tools/m11/work/boot_final3.ll` 等)。`tools/m11/shimx_link/` の tracked ファイルは読取のみ (成果物は同 dir の work/ = gitignore)。
+
+### 9.3 ir_undef.py 変更の M11 外部参照数への影響 (再計測)
+
+| IR | 旧分類 (変更前実測) | 新分類 (本変更後) | 差分 |
+|---|---|---|---|
+| boot_final2.ll (557) | shimx 183 / lifter 203 / win_other 171 / unknown 0 | shimx **182** / **shimx_dup 1** (`SHGetFolderPathW.1`) / lifter 203 / win_other 171 / unknown 0 | shimx 183→182+dup1 (合計不変)。`NAME.1` が署名不一致の恐れがある別シンボルとして明示化され、`--emit-stubs` がスタブを吐く/`--normalize-dup` で正規化できるように |
+| boot_final3.ll (570) | shimx 184 / lifter 214 / win_other 171 / unknown 1 (`SHGetFolderPathW_D1`) | shimx **184** / **shimx_dup 1** / lifter 214 / win_other 171 / unknown 0 | unknown 1→0 (同上の rename 後形式も同一扱い)。合計不変 |
+
+外部参照総数 (557/570)・GUI 171・lift 由来は不変。`--emit-stubs` は `win_other + unknown + shimx_dup` を対象に変わったため、旧版で取りこぼしていた重複 declare 分のスタブが生成される (172 本 @boot_final3, 旧 171 本相当 + 1)。
+
+### 9.4 CAB-166 `--fix` の取り込み状況
+
+| --fix 構成要素 | 取り込み | 補足 |
+|---|---|---|
+| `cb_adapt.c` (列挙コールバック変換) | **取り込み済み (機構)** | R2 の `shimx_set_callback_translator` が恒常フック口。VA→トランポリン変換 (m11_icall) の実体は hostbridge T2 (CAB-177) に接続されるまで link 側アダプタで暫定 |
+| `fix_alloca.py` (alloca 拡幅) | **意図的保留** | lift IR の縮退 alloca 修復で shim の担当外 (CAB-129 の本修正待ち)。`--emit-stubs`/`--normalize-dup` は IR を書くが構造体署名の正規化のみで alloca 構造には触れない |
+| `sx_liftfix.c` (`_WStrClr` C 転記) | **部分取り込み (症状緩和)** | 論理修復 (2 段 deref) は lift 側のまま保留。ただし R5 の所有表により、誤ったポインタを `SysFreeString` に渡しても abort しなくなり、純リンク時の同症状は無害化される (次回 §9.2 の再測で確認) |
