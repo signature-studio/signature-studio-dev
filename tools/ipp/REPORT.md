@@ -136,3 +136,11 @@ FFT (`ipp_fft.c`, 倍精度基数2 の素朴実装): ippsFFTGetSize/Init/Fwd_RTo
 - FLEngine 本体の使用関数: 別系統 (llvm-objdump 逐次逆アセンブル + rip 相対ターゲット解決; win は &VAR スロット 143 個) で mac x86_64 = 187、win64 = 143 を再現。
 - オラクルは実 DLL の機械語をそのまま実行 (`pe_load.c` は PE 敷設・import 解決のみ。IPP 互換実装は経路に介在しない)。ただし KERNEL32 26 関数は自前スタブ。
 - 訂正した点: .pdata 50,560→50,529、所要 25→約 40 秒、bit-exact の NaN ペイロード注記、「全 ISA 経路で決定的」の削除、FFT ケース数 (native 128 / wasm 48)、性能のラン間ばらつき。
+
+## 11. ipp-shim (CAB-134) — ローダ接続 + 署名 thunk 自動生成 (追記)
+
+詳細は `shim/REPORT.md`、再現 `bash tools/ipp/shim/shim_e2e.sh` (約 10 秒, 10 checks)。§9-1 の実施結果:
+- 420 名の関数表 + `LoadLibraryW/GetProcAddress` 接続 (shimx 経由 420/420 解決)。実装済み 43 は型付き thunk、残 377 は fail-soft stub (0 戻し + 呼出カウンタ。STRICT で従来の fail-fast)。
+- 署名 420/420 導出 (確度 A 43 / B+ 157 / B- 220)。win 全モジュール 19,018 呼出箇所で型・個数の矛盾 0。同クラス引数の順序は未検証 (B 系)。
+- thunk 経路 (本物の MS x64 呼出 → レジスタブロック → dispatch) で §4 の 24 関数 5,184 ケースを再実行: 直呼び・既存 baseline と全統計一致、実 IPP に 21 関数 bit-exact (§0/§4 と同数)。wasm・FFT も同結果。
+- 残: icall ブロックへ +0x48 (第 5 引数ポインタ) 追加、使用集合 239 のうち stub 198 (win 静的呼出 28.7% が stub 宛) は CAB-136 で実装。
