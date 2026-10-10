@@ -6,6 +6,8 @@
 #include "scen_gate.h"
 #include "scen_quickeq.h"
 #include "scen_qemath.h"
+#include "scen_resonator.h"
+#include "scen_stereo.h"
 Scenario SCEN_LIST[] = {
     {"matrix", trial_matrix, 6},
     {"gain", trial_gain, 6},
@@ -16,5 +18,7 @@ Scenario SCEN_LIST[] = {
     {"qemath", trial_qemath, 96},
     {"qeclass", trial_qeclass, 20},
     {"qeclass2", trial_qeclass2, 12},
+    {"resonator", trial_resonator, 6},
+    {"stereo", trial_stereo, 6},
     {0, 0, 0},
 };

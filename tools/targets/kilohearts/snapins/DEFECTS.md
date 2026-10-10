@@ -19,6 +19,7 @@
 | D11 | ours | **新規** | PE VA リテラル (`i64 0x18…`) が wasm32 で切り捨て → OOB | 絶対 VA がそのまま IR 定数 | 全 snap-in で rdata 無し 0〜2/200 | `i64 6.4e9…6.5e9` の定数 | `global_var_<VA>` 窓 + PE 実データ ([rdata]) |
 | D12 | ours (harness) | **新規** | 出力バッファだけ比較すると callee-saved 破損が不可視 | レジスタ状態が比較対象外 | Clipper mov128 ablation: 検査無し 200/200 → 有り 0/200 | wrapper の ABI 毒入れ検査 | 毒入れ + 事後不変チェック |
 | D13 | 調査 | **新規** | leaf 関数サイズ推定の過小 (Channel Mixer process 186B → 実 257B) | callgraph.py の終端ヒューリスティック (最後の前方分岐先後の ret) | 親 REPORT の難度表は下限 | `.pdata` 無し関数の BB 走査結果との差 | `scripts/fnscan.py` (BB 走査 + .pdata) |
+| D14 | fe | **新規** (CAB-224 発見) | `sincos_a` (0x180fcd690) の **Payne-Hanek 経路 (\|x\| ≥ 5e5)** が破綻 (O(1) 誤差)。callee `k_dfdb0` (0x180fdfdb0) は 64bit `mul` (128bit 積) + `adc` + `bsr` + 可変 shift (`shr rax, cl`) + `seta`/`cmov` 連鎖 | 実測: \|x\| < 5e5 は bit-exact 480/480、5e6 級で ret が O(1) 不一致 (0.845 vs −0.245)。原因是じ込み未特定 (128bit mul 翻訳 / bsr(x=0) 未定義部 / 可変 shift の CF 扱いのいずれか) | qemath 大角度試験で `ret f64` 不一致 | \|x\| ≥ 5e5 の sin/cos 出力が呼び出し元と O(1) 違い | 未修復 (Stereo は位相 wrap 前提レンジで回避) → 下流チケット (可変 shift CF の精密 model 要) |
 
 ## 検出器設計メモ (CAB-55)
 1. **機械語 jcc ↔ IR br 対応表**: capstone の jcc 全件について `!insn.addr` を持つ `br` が存在するか。D1b は jcc 痕跡欠落として決定的に検出できる (偽陽性: RetDec が select/switch に畳む場合)。

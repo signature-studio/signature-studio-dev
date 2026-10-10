@@ -228,6 +228,8 @@ def gen(name, ret, params):
     if b in ('psrlq', 'psllq') and n == 2 and ptys == ['i128', 'i8'] and R == 'i128':
         op = '>>' if b == 'psrlq' else '<<'
         body = '%s L128 r; r.d[0] = (a1 > 63) ? 0 : (%s.d[0] %s a1); r.d[1] = (a1 > 63) ? 0 : (%s.d[1] %s a1); return r.q;' % (pre, A(0), op, A(0), op)
+    if b == 'cvttps2dq' and n == 1 and ptys[0] == 'i128' and R == 'i128':
+        body = '%s L128 r; r.q = 0; for (int i = 0; i < 4; i++) r.w[i] = (u32)cvtt32(%s.f[i]); return r.q;' % (pre, A(0))
     if b in ('cvttpd2dq', 'cvtpd2dq') and n == 1 and ptys[0] == 'i128' and R == 'i128':
         f = 'cvtt32(%s.g[%d])' if b == 'cvttpd2dq' else 'cvtt32(nearbyint(%s.g[%d]))'
         body = '%s L128 r; r.q = 0; r.w[0] = (u32)%s; r.w[1] = (u32)%s; return r.q;' % (pre, f % (A(0), 0), f % (A(0), 1))
@@ -245,21 +247,36 @@ def gen(name, ret, params):
     if b in ('sqrtsd', 'sqrtss') and n == 1 and R == 'i128':
         body = ('%s L128 r; r.q = 0; r.g[0] = sqrt(%s); return r.q;' % (pre, S('sd', 0))) if b == 'sqrtsd' else ('%s L128 r; r.q = 0; r.f[0] = sqrtf(%s); return r.q;' % (pre, S('ss', 0)))
     # ----- compares
-    m = re.match(r'^cmp(eq|lt|le|unord|neq|nlt|nle|ord)(ss|sd)$', b)
+    m = re.match(r'^cmp(eq|lt|le|unord|neq|nlt|nle|ord)(ss|sd|ps|pd)$', b)
     if m and n == 2 and ptys[0] == 'i128' and R == 'i128':
         pr, k = m.group(1), m.group(2)
-        x = '%s.%s[0]' % (A(0), 'f' if k == 'ss' else 'g')
-        y = S(k, 1)
-        e = {'eq': '%s == %s', 'lt': '%s < %s', 'le': '%s <= %s', 'unord': '(%s != %s || %s == %s)', 'neq': '!(%s == %s)', 'nlt': '!(%s < %s)', 'nle': '!(%s <= %s)', 'ord': '(%s == %s || %s != %s)'}[pr]
-        cond = (e % (x, y)) if pr not in ('unord', 'ord') else None
-        if pr == 'unord':
-            cond = '(isnan(%s) || isnan(%s))' % (x, y)
-        if pr == 'ord':
-            cond = '(!isnan(%s) && !isnan(%s))' % (x, y)
-        if k == 'ss':
-            body = '%s %s.w[0] = (%s) ? 0xffffffffu : 0; return %s.q;' % (pre, A(0), cond, A(0))
+        packed = k in ('ps', 'pd')
+        cnt = (4 if k == 'ps' else 2) if packed else 1
+        rf, xf = ('w', 'f') if k in ('ss', 'ps') else (('d', 'g') if packed else ('w', 'f') if k == 'ss' else ('d', 'g'))
+        mask = '0xffffffffu' if k in ('ss', 'ps') else '~0ULL'
+        x = lambda i: '%s.%s[%d]' % (A(0), xf, i) if packed else ('%s.%s[0]' % (A(0), 'f' if k == 'ss' else 'g'))
+        y = lambda i: ('%s.%s[%d]' % (A(1), xf, i)) if packed else S(k, 1)
+        e = {'eq': '%s == %s', 'lt': '%s < %s', 'le': '%s <= %s', 'neq': '!(%s == %s)', 'nlt': '!(%s < %s)', 'nle': '!(%s <= %s)'}[pr]
+        conds = []
+        for i in range(cnt):
+            c = (e % (x(i), y(i)))
+            if pr == 'unord':
+                c = '(isnan(%s) || isnan(%s))' % (x(i), y(i))
+            elif pr == 'ord':
+                c = '(!isnan(%s) && !isnan(%s))' % (x(i), y(i))
+            conds.append(c)
+        if not packed:
+            body = '%s %s.%s[0] = (%s) ? %s : 0; return %s.q;' % (pre, A(0), rf, conds[0], mask, A(0))
         else:
-            body = '%s %s.d[0] = (%s) ? ~0ULL : 0; return %s.q;' % (pre, A(0), cond, A(0))
+            body = '%s L128 r; %s return r.q;' % (pre, ' '.join('r.%s[%d] = (%s) ? %s : 0;' % (rf, i, c, mask) for i, c in enumerate(conds)))
+    # ----- 近似命令 (rcp/rsqrt): wasm 側は IEEE の 1/x, 1/sqrt(x) (仕様上限 1.5*2^-12 内)。
+    #       実機 x86 の近似表との差は CAB-224 の許容誤差 gate (tools/liftlib/liftlib/simd/simdtest.py と同一基準) で判定する。
+    if b in ('rcpps', 'rcpss') and n == 1 and ptys[0] == 'i128' and R == 'i128':
+        cnt = 4 if b == 'rcpps' else 1
+        body = '%s L128 r; r.q = %s.q; %s return r.q;' % (pre, A(0), ' '.join('r.f[%d] = 1.0f / %s.f[%d];' % (i, A(0), i) for i in range(cnt)))
+    if b in ('rsqrtps', 'rsqrtss') and n == 1 and ptys[0] == 'i128' and R == 'i128':
+        cnt = 4 if b == 'rsqrtps' else 1
+        body = '%s L128 r; r.q = %s.q; %s return r.q;' % (pre, A(0), ' '.join('r.f[%d] = 1.0f / sqrtf(%s.f[%d]);' % (i, A(0), i) for i in range(cnt)))
     # ----- store 形 (void, ポインタ無し): RetDec が store を落とした形。実装不能 → store128 pass が除去する前提。
     #       pass を外すと silent no-op になる (poc_gain はこの状態で 6/6 通過していた = 検出力不足の実例)
     if re.match(r'^mov(aps|ups|apd|upd|dqa|dqu|ntps|ntdq)$', b) and R == 'void' and n == 2:

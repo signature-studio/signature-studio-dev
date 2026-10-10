@@ -22,7 +22,8 @@ def main():
             ps = [p.strip().split()[0] for p in m.group(3).split(',') if p.strip()]
             sg[m.group(2)] = {'params': ps, 'ret': m.group(1)}
     nstub = 0
-    SH = {'memmove': 'memmove((void*)(u32)rcx, (void*)(u32)rdx, (u32)r8); rax = rcx;', 'memset': 'memset((void*)(u32)rcx, (int)(rdx & 0xff), (u32)r8); rax = rcx;'}
+    SH = {'memmove': 'memmove((void*)(u32)rcx, (void*)(u32)rdx, (u32)r8); rax = rcx;', 'memset': 'memset((void*)(u32)rcx, (int)(rdx & 0xff), (u32)r8); rax = rcx;',
+          'ret0': ''}   # 早期 return パスのみ使う関数 (Disperser の 0x18004df70: ctx+0xa8 != 1 なら epilogue のみ = 副作用なし)
     # CRT _dint / _fdint (modf 系: 小数部を切り捨て。ImageBase 相対の mask 表を引くため lift 不能 → 同一意味の C 実装。差分試験で検証)
     SH['dint'] = ('{ double* p = (double*)(u32)rcx; u64 b; memcpy(&b, p, 8); unsigned ex = (b >> 52) & 0x7ff; u64 sc = (unsigned short)rdx; u64 res;'
                   ' if (ex == 0x7ff) res = ((b & 0xfffffffffffffULL) == 0) ? 1 : 2;'

@@ -198,18 +198,122 @@
   "ns": "resonator",
   "cls": "ResonatorDsp",
   "id": "ksre",
-  "title": "Resonator"
+  "title": "Resonator",
+  "lift": {
+   "proc": "0x180743390",
+   "powf": "0x180fbc1f4",
+   "m_fbbfb8": "0x180fbbfb8",
+   "m_fcf904": "0x180fcf904",
+   "m_fbdfcc": "0x180fbdfcc",
+   "m_fbe018": "0x180fbe018",
+   "m_fd54cc": "0x180fd54cc"
+  },
+  "scenario": "resonator",
+  "shims": {
+   "180fbdef4": "fint"
+  },
+  "tol": {
+   "self": {
+    "f32": [
+     [
+      96,
+      16
+     ],
+     [
+      160,
+      120
+     ]
+    ]
+   },
+   "bufL": {
+    "f32": [
+     [
+      0,
+      1040
+     ]
+    ],
+    "absFloor": 0.001
+   },
+   "bufR": {
+    "f32": [
+     [
+      0,
+      1040
+     ]
+    ],
+    "absFloor": 0.001
+   },
+   "histL": {
+    "f32": [
+     [
+      0,
+      8280
+     ]
+    ],
+    "absFloor": 0.001
+   },
+   "histR": {
+    "f32": [
+     [
+      0,
+      8280
+     ]
+    ],
+    "absFloor": 0.001
+   }
+  }
  },
  "stereo": {
   "ns": "stereo",
   "cls": "StereoDsp",
   "id": "ksst",
-  "title": "Stereo"
- },
- "disperser": {
-  "ns": "disperser",
-  "cls": "DisperserDsp",
-  "id": "kdsp",
-  "title": "Disperser"
+  "title": "Stereo",
+  "lift": {
+   "proc": "0x18080d4d0",
+   "sincos_a": "0x180fcd690",
+   "sincos_b": "0x180fce0d0",
+   "k_dc470": "0x180fdc470",
+   "k_dc660": "0x180fdc660",
+   "k_dc700": "0x180fdc700",
+   "k_dfdb0": "0x180fdfdb0",
+   "k_dc6d8": "0x180fdc6d8"
+  },
+  "scenario": "stereo",
+  "tol": {
+   "self": {
+    "f32": [
+     [
+      96,
+      112
+     ]
+    ]
+   },
+   "P": {
+    "f32": [
+     [
+      12,
+      8
+     ]
+    ]
+   },
+   "bufL": {
+    "f32": [
+     [
+      0,
+      1040
+     ]
+    ],
+    "absFloor": 0.001
+   },
+   "bufR": {
+    "f32": [
+     [
+      0,
+      1040
+     ]
+    ],
+    "absFloor": 0.001
+   }
+  }
  }
 }
