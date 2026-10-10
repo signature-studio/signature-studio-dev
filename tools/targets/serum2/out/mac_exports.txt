@@ -1,0 +1,6 @@
+work/mac_bin/Serum2_vst3_x86_64:
+
+Exports trie:
+0x00001600  _GetPluginFactory
+0x005D3930  _bundleEntry
+0x005D3AD0  _bundleExit

@@ -1,0 +1,2 @@
+INFO  SerumLight.java> PDATA_FUNCS_CREATED=115 FAILED=0 TOTAL_FUNCS=33792 (GhidraScript)  
+INFO  SerumLight.java> DONE light (GhidraScript)  

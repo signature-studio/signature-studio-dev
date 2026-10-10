@@ -1,0 +1,287 @@
+{
+ "n_funcs": 33791,
+ "text_bytes_by_pdata": 10130044,
+ "rtti_vtables": 2311,
+ "rtti_classes": 1099,
+ "dsp_root_funcs": 89,
+ "dsp_root_bytes": 47148,
+ "gui_root_funcs": 836,
+ "gui_root_bytes": 276811,
+ "dsp_closure_funcs": 4105,
+ "dsp_closure_bytes": 2439614,
+ "gui_closure_funcs": 7138,
+ "gui_closure_bytes": 4208161,
+ "dsp_only_funcs": 184,
+ "dsp_only_bytes": 148542,
+ "gui_only_funcs": 3217,
+ "gui_only_bytes": 1917089,
+ "shared_funcs": 3921,
+ "shared_bytes": 2291072,
+ "fp_slots": 18741,
+ "fp_tables": 8929,
+ "unreached_funcs": 26469,
+ "unreached_bytes": 5773341,
+ "dsp_root_families(methods,bytes)": {
+  "filters": [
+   34,
+   29682
+  ],
+  "midi/arp/clip": [
+   5,
+   6562
+  ],
+  "sfz/muparser": [
+   6,
+   4801
+  ],
+  "convolution/fft": [
+   13,
+   1969
+  ],
+  "core/voice": [
+   11,
+   1233
+  ],
+  "oscillators": [
+   14,
+   1138
+  ],
+  "mod": [
+   8,
+   1060
+  ],
+  "fx": [
+   1,
+   910
+  ]
+ },
+ "top_dsp_classes(name,methods,bytes)": [
+  [
+   "XferFilterWild",
+   5,
+   13116
+  ],
+  [
+   "XferFilterCombFlangePhase",
+   5,
+   12964
+  ],
+  [
+   "MidiClip",
+   3,
+   6354
+  ],
+  [
+   "mu::Parser",
+   5,
+   4758
+  ],
+  [
+   "XferFilterDiffuser",
+   5,
+   1730
+  ],
+  [
+   "XferFilterFormant",
+   2,
+   1094
+  ],
+  [
+   "SerumDSP",
+   8,
+   1058
+  ],
+  [
+   "ZLDualFDLConvolve",
+   5,
+   1019
+  ],
+  [
+   "XferReverb::xfer_plate_resampling",
+   1,
+   910
+  ],
+  [
+   "ZLSingleFDLConvolve",
+   5,
+   758
+  ],
+  [
+   "ModMatrix",
+   1,
+   523
+  ],
+  [
+   "ModLine",
+   4,
+   318
+  ],
+  [
+   "MultiSampleOsc",
+   2,
+   234
+  ],
+  [
+   "SpectralOsc",
+   2,
+   222
+  ],
+  [
+   "ZLFIRConvolve",
+   3,
+   192
+  ],
+  [
+   "XferFilterWasp",
+   2,
+   178
+  ],
+  [
+   "XferFader",
+   3,
+   175
+  ],
+  [
+   "NoiseOsc",
+   2,
+   173
+  ],
+  [
+   "SubOsc",
+   2,
+   173
+  ],
+  [
+   "XferFilterSEM",
+   2,
+   158
+  ],
+  [
+   "ClipPlayer",
+   1,
+   122
+  ],
+  [
+   "WTOsc",
+   2,
+   112
+  ],
+  [
+   "SampleOsc",
+   2,
+   112
+  ],
+  [
+   "GranularOsc",
+   2,
+   112
+  ],
+  [
+   "Arp",
+   1,
+   86
+  ],
+  [
+   "LFO",
+   1,
+   75
+  ],
+  [
+   "SkEnv",
+   1,
+   72
+  ],
+  [
+   "MacroModSource",
+   1,
+   72
+  ],
+  [
+   "libsfz::Sound",
+   1,
+   43
+  ],
+  [
+   "XferFilterBase",
+   1,
+   34
+  ]
+ ],
+ "top_other_classes(name,methods,bytes)": [
+  [
+   "LFOController",
+   9,
+   12345
+  ],
+  [
+   "PresetBrowserController",
+   23,
+   11854
+  ],
+  [
+   "ClipPlayerAutomationLaneController",
+   19,
+   10015
+  ],
+  [
+   "AutomationLaneController",
+   17,
+   9736
+  ],
+  [
+   "MainMenuController",
+   9,
+   9006
+  ],
+  [
+   "ArpAutomationLaneController",
+   21,
+   8931
+  ],
+  [
+   "ModSlotController",
+   9,
+   8689
+  ],
+  [
+   "VSTGUI::?A0x2C8A3EE3::D2DBitmapDeviceContext",
+   4,
+   8238
+  ],
+  [
+   "VSTGUI::D2DGraphicsDeviceContext",
+   4,
+   8085
+  ],
+  [
+   "MidiClipSlotController",
+   8,
+   7673
+  ],
+  [
+   "ClipPlayerController",
+   11,
+   7668
+  ],
+  [
+   "GlobalDropTarget",
+   6,
+   7264
+  ],
+  [
+   "ArpController",
+   11,
+   7218
+  ],
+  [
+   "VSTGUI::STBTextEditView",
+   6,
+   7098
+  ],
+  [
+   "ClipboardMidiClip",
+   3,
+   6354
+  ]
+ ]
+}

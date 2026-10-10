@@ -1,0 +1,64 @@
+== import callers (function entry RVAs + VA)
+CoCreateGuid           n=  1 ['0x18001e2c0']
+CryptAcquireContextA   n=  1 ['0x1801bee30']
+CryptCreateHash        n=  1 ['0x1801bee30']
+CryptGetHashParam      n=  1 ['0x1801bee30']
+CryptHashData          n=  1 ['0x1801bee30']
+DeviceIoControl        n=  1 ['0x180268ff0']
+FindResourceA          n=  2 ['0x18017dd10', '0x18060db10']
+GetProcAddress         n=  9 ['0x180176d50', '0x18019d2f0', '0x18019ff70', '0x1801bc2b0', '0x180408130', '0x1809c92a8', '0x1809deb28', '0x180a01098', '0x180a112f4']
+GetTickCount64         n=  2 ['0x18001e2c0', '0x1809a8980']
+GetVersionExW          n=  1 ['0x1801bba90']
+HttpQueryInfoW         n=  1 ['0x1801bca00']
+InternetOpenA          n=  1 ['0x1801bb8d0']
+InternetOpenUrlA       n=  1 ['0x1801bc630']
+InternetReadFile       n=  1 ['0x1801bca00']
+IsDebuggerPresent      n=  2 ['0x1809adaa0', '0x1809e164c']
+LoadLibraryA           n=  3 ['0x180176d50', '0x18019d2f0', '0x18019ff70']
+LoadLibraryExW         n=  2 ['0x180a01098', '0x180a112f4']
+LoadLibraryW           n=  1 ['0x180408130']
+RegOpenKeyExA          n=  1 ['0x180267210']
+RegQueryValueExW       n=  1 ['0x180267210']
+ShellExecuteExA        n=  1 ['0x1801bc300']
+ShellExecuteW          n=  1 ['0x180267b00']
+VirtualProtect         n=  2 ['0x180a005c4', '0x180a01098']
+WSAPoll                n=  1 ['0x18042dc20']
+WSAStartup             n=  1 ['0x180429290']
+accept                 n=  1 ['0x18042dc20']
+bind                   n=  1 ['0x180429290']
+listen                 n=  1 ['0x180429290']
+recv                   n=  1 ['0x18042dc20']
+send                   n=  2 ['0x18042dc20', '0x18042fa30']
+socket                 n=  1 ['0x180429290']
+== string users
+Download Update                                              n=  1 ['0x1806fd740']
+Locate License                                               n=  1 ['0x18089ea80']
+MTS_RegisterClient                                           n=  1 ['0x180408130']
+OfflineRender                                                n=  4 ['0x180064d60', '0x1804533f0', '0x180453480', '0x180455a50']
+Serum2Prefs.json                                             n=  1 ['0x18001ee60']
+Software\XferRecords\Serum2InstallerPrefs                    n=  1 ['0x180267210']
+Update Available from Your Account on xferrecords.com:       n=  1 ['0x180726ff0']
+\Xfer\Serum\SerumPrefs.json                                  n=  1 ['0x180020290']
+\Xfer\Serumpresetdb.dat                                      n=  2 ['0x18052ed00', '0x18052f6c0']
+com.xferrecords.serum2.factory-content                       n=  1 ['0x180086f30']
+demoVersion                                                  n=  2 ['0x18004fad0', '0x1800c2b50']
+https://xferrecords.com                                      n=  1 ['0x180001120']
+https://xferrecords.com/                                     n=  6 ['0x180023ea0', '0x1804faaf0', '0x1805158a0', '0x180515d60', '0x180517d00', '0x18051b7a0']
+productVersion                                               n=  7 ['0x180023ea0', '0x1800244f0', '0x1800c2b50', '0x1800d4b10', '0x1804faaf0', '0x1805ce4e0', '0x1805d99b0']
+== strings found at (rva)
+0xa20480 Serum2Prefs.json
+0xfbaaf3 com.xferrecords.serum2.factory-content
+0xfbad4c MTS_RegisterClient
+0xfbb8a6 \Xfer\Serumpresetdb.dat
+0xfc3001 Software\XferRecords\Serum2InstallerPrefs
+0xfc6f4e OfflineRender
+0xfc88b4 \Xfer\Serum\SerumPrefs.json
+0xfc8fe9 productVersion
+0xfc8ff8 demoVersion
+0xfc9025 Last Update Version
+0xfc9700 https://xferrecords.com
+0xfcba4d Download Update
+0xfcbcd7 Locate License
+0xfcc045 Expire
+0xfd66fc https://xferrecords.com/
+0xfdb965 Update Available from Your Account on xferrecords.com: 

@@ -1,0 +1,8 @@
+decode coverage by pdata funcs: 10129995/10130044 = 100.00%  funcs<95% decoded: 1/33791
+{'insn': 2515362, 'call_mem': 29999, 'ret': 29046, 'int3_in_func': 10323, 'cmov': 10595, 'call_reg': 1058, 'jmp_mem': 212, 'jmp_reg': 1137, 'int': 7}
+raw byte patterns in .text: rdtsc(0f31)=81 int2d=7 syscall(0f05)=28 (raw matches include false positives inside operands)
+EP bytes 48895c24084889742410574883ec20498bf88bda488bf183fa017505e81f0000004c8bc78bd3488bce488b5c2430488b | mov qword ptr [rsp + 8], rbx; mov qword ptr [rsp + 0x10], rsi; push rdi; sub rsp, 0x20; mov rdi, r8; mov ebx, edx; mov rsi, rcx; cmp edx, 1; jne 0x9ca611; call 0x9ca630; mov r8, rdi; mov edx, ebx; mov rcx, rsi; mov rbx, qword ptr [rsp + 0x30]
+TLS callbacks ['0x1809a50f8']
+LoadConfig GuardFlags=0x0 SecurityCookie=0x18119ee80
+overlay offset: None file size: 19236864
+section names: ['.text', '.rdata', '.data', '.pdata', '.fptable', '.retplne', '.tls', '_RDATA', '.rsrc', '.reloc']

@@ -1,0 +1,21 @@
+# VA  label  (from scripts/xref_scan.py)
+0x1801bb8d0 http_open (InternetOpenA)
+0x1801bba90 os_version (GetVersionExW)
+0x1801bc2b0 wine_detect
+0x1801bc300 open_browser (ShellExecuteExA)
+0x1801bc630 http_get (InternetOpenUrlA)
+0x1801bca00 http_read (HttpQueryInfoW/InternetReadFile)
+0x1801bee30 md5_hex (CryptoAPI MD5)
+0x180267210 installerprefs_reg
+0x180268ff0 junction_create (DeviceIoControl FSCTL_SET_REPARSE_POINT)
+0x180267b00 shell_execute_w
+0x180429290 socket_server_init
+0x18042dc20 socket_server_loop
+0x18042fa30 socket_send
+0x18089ea80 Locate_License_user
+0x1806fd740 Download_Update_user
+0x180726ff0 Update_Available_user
+0x180023ea0 xferrecords_url_user_1
+0x18001e2c0 guid_tick_seed
+0x18004fad0 demoVersion_user_1
+0x1800c2b50 demoVersion_user_2

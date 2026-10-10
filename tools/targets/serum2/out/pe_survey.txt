@@ -1,0 +1,70 @@
+## work/Serum2_win64.vst3
+machine=0x8664 nsec=10 ts=1783421286 imgbase=0x180000000 entry=0x9ca5f0 size_of_image=34902016 linker=14.0 subsys=2 dllchar=0x160
+  .text    va=0x00001000 vsz= 10593334 raw= 10593792 R-X entropy=6.432 <-EP
+  .rdata   va=0x00a1c000 vsz=  7356876 raw=  7356928 R-- entropy=7.453
+  .data    va=0x01121000 vsz= 16275460 raw=   635904 RW- entropy=5.266
+  .pdata   va=0x020a7000 vsz=   405492 raw=   405504 R-- entropy=6.645
+  .fptable va=0x0210a000 vsz=      256 raw=      512 RW- entropy=-0.000
+  .retplne va=0x0210b000 vsz=      232 raw=      512 --- entropy=1.753
+  .tls     va=0x0210c000 vsz=       54 raw=      512 RW- entropy=0.020
+  _RDATA   va=0x0210d000 vsz=      500 raw=      512 R-- entropy=4.214
+  .rsrc    va=0x0210e000 vsz=   126520 raw=   126976 R-- entropy=7.986
+  .reloc   va=0x0212d000 vsz=   114580 raw=   114688 R-- entropy=5.451
+  dir IMAGE_DIRECTORY_ENTRY_EXPORT     va=0xfe1a10 size=115
+  dir IMAGE_DIRECTORY_ENTRY_IMPORT     va=0xfe1a84 size=280
+  dir IMAGE_DIRECTORY_ENTRY_RESOURCE   va=0x210e000 size=126520
+  dir IMAGE_DIRECTORY_ENTRY_EXCEPTION  va=0x20a7000 size=405492
+  dir IMAGE_DIRECTORY_ENTRY_BASERELOC  va=0x212d000 size=114580
+  dir IMAGE_DIRECTORY_ENTRY_DEBUG      va=0xfe1250 size=28
+  dir IMAGE_DIRECTORY_ENTRY_TLS        va=0xfb5f30 size=40
+  dir IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG va=0xfa37e0 size=320
+  dir IMAGE_DIRECTORY_ENTRY_IAT        va=0xfe2668 size=2760
+  exports: ['ExitDll', 'GetPluginFactory', 'InitDll']
+  import KERNEL32.dll (186)
+  import USER32.dll (77)
+  import ole32.dll (12)
+  import SHELL32.dll (10)
+  import GDI32.dll (12)
+  import ADVAPI32.dll (8)
+  import d3d11.dll (1)
+  import dwmapi.dll (2)
+  import d2d1.dll (1)
+  import DWrite.dll (1)
+  import SHLWAPI.dll (3)
+  import WININET.dll (6)
+  import WS2_32.dll (13)
+  total imports: 332
+  TLS callbacks va=0x180fe19c8
+  debug type=2 size=121
+   pdb: C:\actions-runner\_work\Serum2\Serum2\win\x64\Release\Serum2.vst3\Contents\x86_64-win\Serum2.pdb
+## work/exe_extract/$COMMONFILES64/Avid/Audio/Plug-Ins/Serum2.aaxplugin/Contents/x64/Serum2.aaxplugin
+machine=0x8664 nsec=10 ts=1762869211 imgbase=0x180000000 entry=0x5e464 size_of_image=819200 linker=14.0 subsys=2 dllchar=0x160
+  .text    va=0x00001000 vsz=   556782 raw=   557056 R-X entropy=6.457 <-EP
+  .rdata   va=0x00089000 vsz=   169140 raw=   169472 R-- entropy=5.224
+  .data    va=0x000b3000 vsz=    28048 raw=    15872 RW- entropy=3.830
+  .pdata   va=0x000ba000 vsz=    27660 raw=    28160 R-- entropy=5.803
+  .fptable va=0x000c1000 vsz=      256 raw=      512 RW- entropy=-0.000
+  .retplne va=0x000c2000 vsz=      200 raw=      512 --- entropy=1.394
+  .tls     va=0x000c3000 vsz=        9 raw=      512 RW- entropy=0.020
+  _RDATA   va=0x000c4000 vsz=      500 raw=      512 R-- entropy=4.235
+  .rsrc    va=0x000c5000 vsz=      424 raw=      512 R-- entropy=4.185
+  .reloc   va=0x000c6000 vsz=     5648 raw=     6144 R-- entropy=5.293
+  dir IMAGE_DIRECTORY_ENTRY_EXPORT     va=0xa2d08 size=304
+  dir IMAGE_DIRECTORY_ENTRY_IMPORT     va=0xa2e38 size=100
+  dir IMAGE_DIRECTORY_ENTRY_RESOURCE   va=0xc5000 size=424
+  dir IMAGE_DIRECTORY_ENTRY_EXCEPTION  va=0xba000 size=27660
+  dir IMAGE_DIRECTORY_ENTRY_SECURITY   va=0xbe800 size=14344
+  dir IMAGE_DIRECTORY_ENTRY_BASERELOC  va=0xc6000 size=5648
+  dir IMAGE_DIRECTORY_ENTRY_DEBUG      va=0xa2b60 size=28
+  dir IMAGE_DIRECTORY_ENTRY_TLS        va=0x9c230 size=40
+  dir IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG va=0x93f10 size=320
+  dir IMAGE_DIRECTORY_ENTRY_IAT        va=0xa3240 size=928
+  exports: ['ACFCanUnloadNow', 'ACFGetClassFactory', 'ACFGetSDKVersion', 'ACFRegisterComponent', 'ACFRegisterPlugin', 'ACFShutdown', 'ACFStartup', 'ExitDll', 'GetPluginFactory', 'InitDll']
+  import KERNEL32.dll (108)
+  import SHELL32.dll (1)
+  import USER32.dll (2)
+  import ole32.dll (1)
+  total imports: 112
+  TLS callbacks va=0x1800a2cc8
+  debug type=2 size=119
+   pdb: C:\actions-runner\_work\Serum2\Serum2\win\x64\Release\Serum2.aaxplugin\Contents\x64\Serum2.pdb

@@ -1,0 +1,30 @@
+
+work/mac_bin/Serum2_vst3_x86_64:	file format mach-o 64-bit x86-64
+
+Sections:
+Idx Name             Size     VMA              Type
+  0 __text           009909d0 0000000000001180 TEXT
+  1 __stubs          00000d56 0000000000991b50 TEXT
+  2 __stub_helper    00001a7e 00000000009928a8 TEXT
+  3 __const          00530ba8 0000000000994330 DATA
+  4 __cstring        00023b22 0000000000ec4ee0 DATA
+  5 __gcc_except_tab 00050c14 0000000000ee8a04 DATA
+  6 __ustring        000000d0 0000000000f39618 DATA
+  7 __objc_methname  00001979 0000000000f396e8 DATA
+  8 __objc_classname 00000001 0000000000f3b061 DATA
+  9 __unwind_info    0001bc00 0000000000f3b064 DATA
+ 10 __eh_frame       00000098 0000000000f56c68 DATA
+ 11 __got            00000468 0000000000f57000 DATA
+ 12 __la_symbol_ptr  000011a0 0000000000f57468 DATA
+ 13 __mod_init_func  000005a0 0000000000f58608 DATA
+ 14 __const          00108548 0000000000f58bb0 DATA
+ 15 __cfstring       00000320 00000000010610f8 DATA
+ 16 __objc_imageinfo 00000008 0000000001061418 DATA
+ 17 __objc_selrefs   00000ae0 0000000001061420 DATA
+ 18 __objc_classrefs 00000138 0000000001061f00 DATA
+ 19 __data           000044e0 0000000001062040 DATA
+ 20 __uidesc         0001e828 0000000001066520 DATA
+ 21 __thread_vars    00000090 0000000001084d48 DATA
+ 22 __thread_bss     00000028 0000000001084dd8 DATA
+ 23 __bss            000197b8 0000000001084e00 BSS
+ 24 __common         00ecaa10 000000000109e600 BSS

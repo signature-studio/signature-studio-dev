@@ -1,0 +1,21 @@
+family                 funcs      bytes  %text  scalarFP  packedFP
+unlabelled             14472    4873011  48.1%     23759      4318
+gui.serum              13794    3803809  37.5%     12282      2485
+gui.vstgui              3360     692315   6.8%      3059      1488
+lib.std/json/crt        1302     325487   3.2%        54        13
+dsp.midi/arp/clip        195     111237   1.1%      1291        10
+dsp.osc                   70     102738   1.0%      3446       740
+dsp.filter                67      96876   1.0%      7039       389
+lib.sfz/muparser         201      48964   0.5%        21         0
+sdk.steinberg            258      33880   0.3%        20         1
+dsp.core/voice            20      31113   0.3%       532        32
+dsp.conv/fft              40       8325   0.1%        25         0
+dsp.mod/env/lfo           11       1379   0.0%         5         0
+dsp.fx                     1        910   0.0%         2         7
+dsp.filter 0x18008b270 .. 0x1805ef20c
+dsp.fx 0x18036a020 .. 0x18036a3ae
+dsp.osc 0x1803c83b0 .. 0x1803e9d00
+dsp.core/voice 0x18007e700 .. 0x1800861f3
+dsp.mod/env/lfo 0x1803cab60 .. 0x1808b23c7
+dsp.midi/arp/clip 0x180329200 .. 0x1804216c9
+dsp.conv/fft 0x1805ea750 .. 0x1805ecb22
