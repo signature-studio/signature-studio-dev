@@ -1,0 +1,8 @@
+ok 200 / no-cache 
+ok 200 /release.json no-cache 
+ok 200 /wasm/manifest.json public, max-age=31536000, immutable, no-cache 
+ok 200 /wasm/a.wasm public, max-age=31536000, immutable 
+ok 200 /assets/app.js public, max-age=31536000, immutable 
+ok 200 /data/c/ab/abcdef.raw public, max-age=31536000, immutable 
+ok 200 /worklets/w.js public, max-age=0, must-revalidate 
+ok 200 /other.txt public, max-age=0, must-revalidate 

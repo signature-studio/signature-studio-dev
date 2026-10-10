@@ -1,0 +1,14 @@
+{
+ "valid": {
+  "default": "200 redirected=false type=basic",
+  "manual": "200 type=basic",
+  "xhrHeader": "200 type=basic",
+  "inWorker": "200 basic"
+ },
+ "expired": {
+  "default": "TypeError: Failed to fetch",
+  "manual": "0 type=opaqueredirect",
+  "xhrHeader": "401 type=basic",
+  "inWorker": "TypeError: Failed to fetch"
+ }
+}

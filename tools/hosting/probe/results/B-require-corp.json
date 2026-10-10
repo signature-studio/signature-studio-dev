@@ -1,0 +1,585 @@
+{
+ "name": "B-require-corp",
+ "url": "https://signature-studio-hosting-probe-s.pycabbage.workers.dev/b-rc/?data=https://pub-ff77dc40473244c9bee9645e2d6988be.r2.dev/d/&big=big-100m.bin",
+ "runs": [
+  {
+   "run": 0,
+   "accessCookie": null,
+   "wallSec": 7.3,
+   "docHdr": {
+    "status": 200,
+    "coop": "same-origin",
+    "coep": "require-corp",
+    "corp": "same-origin",
+    "server": "cloudflare",
+    "cfRay": "a483bfb4bf8b1223-NRT"
+   },
+   "result": {
+    "tag": "/b-rc/",
+    "url": "https://signature-studio-hosting-probe-s.pycabbage.workers.dev/b-rc/?data=https://pub-ff77dc40473244c9bee9645e2d6988be.r2.dev/d/&big=big-100m.bin",
+    "dataBase": "https://pub-ff77dc40473244c9bee9645e2d6988be.r2.dev/d/",
+    "main": {
+     "crossOriginIsolated": true,
+     "isSecureContext": true,
+     "sab": "function",
+     "cores": 16,
+     "sabAlloc": 1048576,
+     "imgNoCors": "blocked",
+     "worklet": {
+      "sab": "function",
+      "wrote": 119,
+      "kind": "realtime",
+      "sabSeenByMain": 119
+     },
+     "sabSeenFromWorker": {
+      "v0": 23130,
+      "inc": 1
+     }
+    },
+    "worker": {
+     "tag": "/b-rc/",
+     "worker": {
+      "crossOriginIsolated": true,
+      "sab": "function",
+      "origin": "https://signature-studio-hosting-probe-s.pycabbage.workers.dev"
+     },
+     "sabWrite": {
+      "ok": true,
+      "ms": 0
+     },
+     "headBig": {
+      "status": 200,
+      "headers": {
+       "content-type": "application/octet-stream",
+       "content-length": "104857600",
+       "accept-ranges": "bytes",
+       "etag": "\"a024524ce27f55bb0b2712943c261695\"",
+       "last-modified": "Sat, 10 Oct 2026 06:57:49 GMT"
+      },
+      "ms": 55
+     },
+     "fullGet": {
+      "status": 200,
+      "headers": {
+       "content-type": "application/octet-stream",
+       "content-length": "104857600",
+       "accept-ranges": "bytes",
+       "etag": "\"a024524ce27f55bb0b2712943c261695\"",
+       "last-modified": "Sat, 10 Oct 2026 06:57:49 GMT"
+      },
+      "bytes": 104857600,
+      "expected": 104857600,
+      "badPieces": 0,
+      "ttfbMs": 0,
+      "sec": 2.08,
+      "MBps": 48.2,
+      "opfsSize": 104857600,
+      "ms": 2121
+     },
+     "range": {
+      "head1k": {
+       "status": 206,
+       "len": 1024,
+       "same": true,
+       "contentRange": "bytes 0-1023/104857600",
+       "contentLength": "1024"
+      },
+      "mid1k": {
+       "status": 206,
+       "len": 1000,
+       "same": true,
+       "contentRange": "bytes 52428923-52429922/104857600",
+       "contentLength": "1000"
+      },
+      "openEnd": {
+       "status": 206,
+       "len": 5000,
+       "same": true,
+       "contentRange": "bytes 104852600-104857599/104857600",
+       "contentLength": "5000"
+      },
+      "suffix": {
+       "status": 206,
+       "len": 1024,
+       "same": true,
+       "contentRange": "bytes 104856576-104857599/104857600",
+       "contentLength": "1024"
+      },
+      "ms": 184
+     },
+     "rangeParallel": {
+      "statuses": {
+       "206": 25
+      },
+      "non206": 0,
+      "badPieces": 0,
+      "sec": 1.48,
+      "MBps": 67.6,
+      "ms": 1485
+     },
+     "chunks": {
+      "n": 100,
+      "statuses": {
+       "200": 100
+      },
+      "errors": 0,
+      "badIds": 0,
+      "bytes": 104857600,
+      "sec": 0.95,
+      "MBps": 105,
+      "reqPerSec": 105,
+      "p50ms": 67,
+      "p95ms": 111,
+      "cacheStorageHit": true,
+      "ms": 964
+     },
+     "ext": {
+      "x.raw": {
+       "status": 200,
+       "bytes": 6200,
+       "expected": 6200,
+       "ct": "application/octet-stream",
+       "ce": null
+      },
+      "x.br": {
+       "status": 200,
+       "bytes": 37,
+       "expected": 37,
+       "ct": "application/octet-stream",
+       "ce": null
+      },
+      "x.zst": {
+       "status": 200,
+       "bytes": 49,
+       "expected": 49,
+       "ct": "application/octet-stream",
+       "ce": null
+      },
+      "ms": 120
+     },
+     "conditional": {
+      "etag": "\"0f43515f88da9f35ac0907fe2273c6a1\"",
+      "ifNoneMatchStatus": 304,
+      "status404": 404,
+      "ms": 185
+     },
+     "wasmStreaming": {
+      "ok": true,
+      "ct": "application/wasm",
+      "ms": 42
+     },
+     "wasmParts": {
+      "parts": 4,
+      "bytes": 31457297,
+      "expected": 31457297,
+      "padLen": 31457280,
+      "expectedPad": 31457280,
+      "ok": true,
+      "sec": 1.15,
+      "ms": 1155
+     },
+     "noCorsFetch": {
+      "error": "TypeError: Failed to fetch",
+      "ms": 45
+     }
+    }
+   },
+   "err": null,
+   "logs": [
+    "error: Failed to load resource: net::ERR_BLOCKED_BY_RESPONSE.NotSameOriginAfterDefaultedToSameOriginByCoep",
+    "error: Failed to load resource: the server responded with a status of 404 ()"
+   ],
+   "failed": [
+    "GET https://pub-ff77dc40473244c9bee9645e2d6988be.r2.dev/d/pixel.png?t=1791615634741 :: net::ERR_BLOCKED_BY_RESPONSE.NotSameOriginAfterDefaultedToSameOriginByCoep",
+    "HEAD https://pub-ff77dc40473244c9bee9645e2d6988be.r2.dev/d/big-100m.bin :: net::ERR_ABORTED",
+    "GET https://pub-ff77dc40473244c9bee9645e2d6988be.r2.dev/d/x.raw :: net::ERR_BLOCKED_BY_RESPONSE.NotSameOriginAfterDefaultedToSameOriginByCoep"
+   ]
+  },
+  {
+   "run": 1,
+   "accessCookie": null,
+   "wallSec": 7.8,
+   "docHdr": {
+    "status": 200,
+    "coop": "same-origin",
+    "coep": "require-corp",
+    "corp": "same-origin",
+    "server": "cloudflare",
+    "cfRay": "a483bfe3ee19ed81-NRT"
+   },
+   "result": {
+    "tag": "/b-rc/",
+    "url": "https://signature-studio-hosting-probe-s.pycabbage.workers.dev/b-rc/?data=https://pub-ff77dc40473244c9bee9645e2d6988be.r2.dev/d/&big=big-100m.bin",
+    "dataBase": "https://pub-ff77dc40473244c9bee9645e2d6988be.r2.dev/d/",
+    "main": {
+     "crossOriginIsolated": true,
+     "isSecureContext": true,
+     "sab": "function",
+     "cores": 16,
+     "sabAlloc": 1048576,
+     "imgNoCors": "blocked",
+     "worklet": {
+      "sab": "function",
+      "wrote": 119,
+      "kind": "realtime",
+      "sabSeenByMain": 119
+     },
+     "sabSeenFromWorker": {
+      "v0": 23130,
+      "inc": 1
+     }
+    },
+    "worker": {
+     "tag": "/b-rc/",
+     "worker": {
+      "crossOriginIsolated": true,
+      "sab": "function",
+      "origin": "https://signature-studio-hosting-probe-s.pycabbage.workers.dev"
+     },
+     "sabWrite": {
+      "ok": true,
+      "ms": 0
+     },
+     "headBig": {
+      "status": 200,
+      "headers": {
+       "content-type": "application/octet-stream",
+       "content-length": "104857600",
+       "accept-ranges": "bytes",
+       "etag": "\"a024524ce27f55bb0b2712943c261695\"",
+       "last-modified": "Sat, 10 Oct 2026 06:57:49 GMT"
+      },
+      "ms": 88
+     },
+     "fullGet": {
+      "status": 200,
+      "headers": {
+       "content-type": "application/octet-stream",
+       "content-length": "104857600",
+       "accept-ranges": "bytes",
+       "etag": "\"a024524ce27f55bb0b2712943c261695\"",
+       "last-modified": "Sat, 10 Oct 2026 06:57:49 GMT"
+      },
+      "bytes": 104857600,
+      "expected": 104857600,
+      "badPieces": 0,
+      "ttfbMs": 0,
+      "sec": 2.2,
+      "MBps": 45.5,
+      "opfsSize": 104857600,
+      "ms": 2274
+     },
+     "range": {
+      "head1k": {
+       "status": 206,
+       "len": 1024,
+       "same": true,
+       "contentRange": "bytes 0-1023/104857600",
+       "contentLength": "1024"
+      },
+      "mid1k": {
+       "status": 206,
+       "len": 1000,
+       "same": true,
+       "contentRange": "bytes 52428923-52429922/104857600",
+       "contentLength": "1000"
+      },
+      "openEnd": {
+       "status": 206,
+       "len": 5000,
+       "same": true,
+       "contentRange": "bytes 104852600-104857599/104857600",
+       "contentLength": "5000"
+      },
+      "suffix": {
+       "status": 206,
+       "len": 1024,
+       "same": true,
+       "contentRange": "bytes 104856576-104857599/104857600",
+       "contentLength": "1024"
+      },
+      "ms": 304
+     },
+     "rangeParallel": {
+      "statuses": {
+       "206": 25
+      },
+      "non206": 0,
+      "badPieces": 0,
+      "sec": 1.59,
+      "MBps": 62.9,
+      "ms": 1594
+     },
+     "chunks": {
+      "n": 100,
+      "statuses": {
+       "200": 100
+      },
+      "errors": 0,
+      "badIds": 0,
+      "bytes": 104857600,
+      "sec": 1.32,
+      "MBps": 75.9,
+      "reqPerSec": 75.9,
+      "p50ms": 83,
+      "p95ms": 199,
+      "cacheStorageHit": true,
+      "ms": 1329
+     },
+     "ext": {
+      "x.raw": {
+       "status": 200,
+       "bytes": 6200,
+       "expected": 6200,
+       "ct": "application/octet-stream",
+       "ce": null
+      },
+      "x.br": {
+       "status": 200,
+       "bytes": 37,
+       "expected": 37,
+       "ct": "application/octet-stream",
+       "ce": null
+      },
+      "x.zst": {
+       "status": 200,
+       "bytes": 49,
+       "expected": 49,
+       "ct": "application/octet-stream",
+       "ce": null
+      },
+      "ms": 124
+     },
+     "conditional": {
+      "etag": "\"0f43515f88da9f35ac0907fe2273c6a1\"",
+      "ifNoneMatchStatus": 304,
+      "status404": 404,
+      "ms": 178
+     },
+     "wasmStreaming": {
+      "ok": true,
+      "ct": "application/wasm",
+      "ms": 49
+     },
+     "wasmParts": {
+      "parts": 4,
+      "bytes": 31457297,
+      "expected": 31457297,
+      "padLen": 31457280,
+      "expectedPad": 31457280,
+      "ok": true,
+      "sec": 1.21,
+      "ms": 1213
+     },
+     "noCorsFetch": {
+      "error": "TypeError: Failed to fetch",
+      "ms": 37
+     }
+    }
+   },
+   "err": null,
+   "logs": [
+    "error: Failed to load resource: net::ERR_BLOCKED_BY_RESPONSE.NotSameOriginAfterDefaultedToSameOriginByCoep",
+    "error: Failed to load resource: the server responded with a status of 404 ()"
+   ],
+   "failed": [
+    "GET https://pub-ff77dc40473244c9bee9645e2d6988be.r2.dev/d/pixel.png?t=1791615642295 :: net::ERR_BLOCKED_BY_RESPONSE.NotSameOriginAfterDefaultedToSameOriginByCoep",
+    "HEAD https://pub-ff77dc40473244c9bee9645e2d6988be.r2.dev/d/big-100m.bin :: net::ERR_ABORTED",
+    "GET https://pub-ff77dc40473244c9bee9645e2d6988be.r2.dev/d/x.raw :: net::ERR_BLOCKED_BY_RESPONSE.NotSameOriginAfterDefaultedToSameOriginByCoep"
+   ]
+  },
+  {
+   "run": 2,
+   "accessCookie": null,
+   "wallSec": 8.3,
+   "docHdr": {
+    "status": 200,
+    "coop": "same-origin",
+    "coep": "require-corp",
+    "corp": "same-origin",
+    "server": "cloudflare",
+    "cfRay": "a483c0162c8a9d35-NRT"
+   },
+   "result": {
+    "tag": "/b-rc/",
+    "url": "https://signature-studio-hosting-probe-s.pycabbage.workers.dev/b-rc/?data=https://pub-ff77dc40473244c9bee9645e2d6988be.r2.dev/d/&big=big-100m.bin",
+    "dataBase": "https://pub-ff77dc40473244c9bee9645e2d6988be.r2.dev/d/",
+    "main": {
+     "crossOriginIsolated": true,
+     "isSecureContext": true,
+     "sab": "function",
+     "cores": 16,
+     "sabAlloc": 1048576,
+     "imgNoCors": "blocked",
+     "worklet": {
+      "sab": "function",
+      "wrote": 119,
+      "kind": "realtime",
+      "sabSeenByMain": 119
+     },
+     "sabSeenFromWorker": {
+      "v0": 23130,
+      "inc": 1
+     }
+    },
+    "worker": {
+     "tag": "/b-rc/",
+     "worker": {
+      "crossOriginIsolated": true,
+      "sab": "function",
+      "origin": "https://signature-studio-hosting-probe-s.pycabbage.workers.dev"
+     },
+     "sabWrite": {
+      "ok": true,
+      "ms": 0
+     },
+     "headBig": {
+      "status": 200,
+      "headers": {
+       "content-type": "application/octet-stream",
+       "content-length": "104857600",
+       "accept-ranges": "bytes",
+       "etag": "\"a024524ce27f55bb0b2712943c261695\"",
+       "last-modified": "Sat, 10 Oct 2026 06:57:49 GMT"
+      },
+      "ms": 94
+     },
+     "fullGet": {
+      "status": 200,
+      "headers": {
+       "content-type": "application/octet-stream",
+       "content-length": "104857600",
+       "accept-ranges": "bytes",
+       "etag": "\"a024524ce27f55bb0b2712943c261695\"",
+       "last-modified": "Sat, 10 Oct 2026 06:57:49 GMT"
+      },
+      "bytes": 104857600,
+      "expected": 104857600,
+      "badPieces": 0,
+      "ttfbMs": 0,
+      "sec": 3.11,
+      "MBps": 32.2,
+      "opfsSize": 104857600,
+      "ms": 3159
+     },
+     "range": {
+      "head1k": {
+       "status": 206,
+       "len": 1024,
+       "same": true,
+       "contentRange": "bytes 0-1023/104857600",
+       "contentLength": "1024"
+      },
+      "mid1k": {
+       "status": 206,
+       "len": 1000,
+       "same": true,
+       "contentRange": "bytes 52428923-52429922/104857600",
+       "contentLength": "1000"
+      },
+      "openEnd": {
+       "status": 206,
+       "len": 5000,
+       "same": true,
+       "contentRange": "bytes 104852600-104857599/104857600",
+       "contentLength": "5000"
+      },
+      "suffix": {
+       "status": 206,
+       "len": 1024,
+       "same": true,
+       "contentRange": "bytes 104856576-104857599/104857600",
+       "contentLength": "1024"
+      },
+      "ms": 190
+     },
+     "rangeParallel": {
+      "statuses": {
+       "206": 25
+      },
+      "non206": 0,
+      "badPieces": 0,
+      "sec": 1.52,
+      "MBps": 65.8,
+      "ms": 1525
+     },
+     "chunks": {
+      "n": 100,
+      "statuses": {
+       "200": 100
+      },
+      "errors": 0,
+      "badIds": 0,
+      "bytes": 104857600,
+      "sec": 1.12,
+      "MBps": 89.2,
+      "reqPerSec": 89.2,
+      "p50ms": 77,
+      "p95ms": 150,
+      "cacheStorageHit": true,
+      "ms": 1130
+     },
+     "ext": {
+      "x.raw": {
+       "status": 200,
+       "bytes": 6200,
+       "expected": 6200,
+       "ct": "application/octet-stream",
+       "ce": null
+      },
+      "x.br": {
+       "status": 200,
+       "bytes": 37,
+       "expected": 37,
+       "ct": "application/octet-stream",
+       "ce": null
+      },
+      "x.zst": {
+       "status": 200,
+       "bytes": 49,
+       "expected": 49,
+       "ct": "application/octet-stream",
+       "ce": null
+      },
+      "ms": 157
+     },
+     "conditional": {
+      "etag": "\"0f43515f88da9f35ac0907fe2273c6a1\"",
+      "ifNoneMatchStatus": 304,
+      "status404": 404,
+      "ms": 158
+     },
+     "wasmStreaming": {
+      "ok": true,
+      "ct": "application/wasm",
+      "ms": 66
+     },
+     "wasmParts": {
+      "parts": 4,
+      "bytes": 31457297,
+      "expected": 31457297,
+      "padLen": 31457280,
+      "expectedPad": 31457280,
+      "ok": true,
+      "sec": 1.29,
+      "ms": 1292
+     },
+     "noCorsFetch": {
+      "error": "TypeError: Failed to fetch",
+      "ms": 73
+     }
+    }
+   },
+   "err": null,
+   "logs": [
+    "error: Failed to load resource: net::ERR_BLOCKED_BY_RESPONSE.NotSameOriginAfterDefaultedToSameOriginByCoep",
+    "error: Failed to load resource: the server responded with a status of 404 ()"
+   ],
+   "failed": [
+    "GET https://pub-ff77dc40473244c9bee9645e2d6988be.r2.dev/d/pixel.png?t=1791615650333 :: net::ERR_BLOCKED_BY_RESPONSE.NotSameOriginAfterDefaultedToSameOriginByCoep",
+    "HEAD https://pub-ff77dc40473244c9bee9645e2d6988be.r2.dev/d/big-100m.bin :: net::ERR_ABORTED",
+    "GET https://pub-ff77dc40473244c9bee9645e2d6988be.r2.dev/d/x.raw :: net::ERR_BLOCKED_BY_RESPONSE.NotSameOriginAfterDefaultedToSameOriginByCoep"
+   ]
+  }
+ ]
+}

@@ -1,0 +1,8 @@
+{
+  // 規模検証: 2400 x 1MiB (2.34GiB) の静的アセットを 1 Worker version に載せられるか / デプロイ時間 / 配信の健全性
+  "name": "signature-studio-hosting-probe-big",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "preview_urls": false,
+  "assets": { "directory": "../../work/dist-big" }
+}

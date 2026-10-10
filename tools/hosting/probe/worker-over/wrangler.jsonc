@@ -1,0 +1,6 @@
+{
+  // 上限テスト用: 26MiB の単一ファイルを assets に含めるとどうなるか (期待: デプロイ拒否)
+  "name": "signature-studio-hosting-probe-over",
+  "compatibility_date": "2026-10-01",
+  "assets": { "directory": "../../work/dist-over" }
+}

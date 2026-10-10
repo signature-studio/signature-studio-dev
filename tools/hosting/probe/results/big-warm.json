@@ -1,0 +1,1 @@
+{"base":"https://signature-studio-hosting-probe-big.pycabbage.workers.dev/","n":400,"statuses":{"200":400},"errors":0,"badHash":0,"GiB":0.39,"sec":5.7,"MBps":70.2,"reqPerSec":70.2,"p50ms":220,"p95ms":308,"p99ms":356,"firstHeaders":{"cacheControl":"public, max-age=31536000, immutable","coep":"require-corp","corp":"same-origin","cf":"HIT"}}

@@ -1,0 +1,16 @@
+[
+  {
+    "id": "signature-studio-probe",
+    "allowed": {
+      "origins": [
+        "https://signature-studio-hosting-probe-s.pycabbage.workers.dev",
+        "https://signature-studio-hosting-probe-a.pycabbage.workers.dev",
+        "https://signature-studio-hosting-probe-p.pages.dev"
+      ],
+      "methods": ["GET", "HEAD"],
+      "headers": ["range", "if-none-match", "if-match"]
+    },
+    "exposeHeaders": ["content-length", "content-range", "etag", "accept-ranges", "content-type", "last-modified"],
+    "maxAgeSeconds": 86400
+  }
+]

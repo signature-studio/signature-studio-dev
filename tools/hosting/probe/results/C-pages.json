@@ -1,0 +1,570 @@
+{
+ "name": "C-pages",
+ "url": "https://signature-studio-hosting-probe-p.pages.dev/s/?data=/d/&big=part-24m.bin",
+ "runs": [
+  {
+   "run": 0,
+   "accessCookie": null,
+   "wallSec": 7.7,
+   "docHdr": {
+    "status": 200,
+    "coop": "same-origin",
+    "coep": "require-corp",
+    "corp": "same-origin",
+    "server": "cloudflare",
+    "cfRay": "a483c3f7eee2e377-NRT"
+   },
+   "result": {
+    "tag": "/s/",
+    "url": "https://signature-studio-hosting-probe-p.pages.dev/s/?data=/d/&big=part-24m.bin",
+    "dataBase": "/d/",
+    "main": {
+     "crossOriginIsolated": true,
+     "isSecureContext": true,
+     "sab": "function",
+     "cores": 16,
+     "sabAlloc": 1048576,
+     "imgNoCors": "skipped(same-origin)",
+     "worklet": {
+      "sab": "function",
+      "wrote": 119,
+      "kind": "realtime",
+      "sabSeenByMain": 119
+     },
+     "sabSeenFromWorker": {
+      "v0": 23130,
+      "inc": 1
+     }
+    },
+    "worker": {
+     "tag": "/s/",
+     "worker": {
+      "crossOriginIsolated": true,
+      "sab": "function",
+      "origin": "https://signature-studio-hosting-probe-p.pages.dev"
+     },
+     "sabWrite": {
+      "ok": true,
+      "ms": 0
+     },
+     "headBig": {
+      "status": 200,
+      "headers": {
+       "content-type": "application/octet-stream",
+       "etag": "\"1e29002de059e3c1c674d1471f1491c2\"",
+       "cache-control": "public, max-age=0, must-revalidate",
+       "access-control-allow-origin": "*"
+      },
+      "ms": 350
+     },
+     "fullGet": {
+      "status": 200,
+      "headers": {
+       "content-type": "application/octet-stream",
+       "content-length": "25165824",
+       "etag": "\"1e29002de059e3c1c674d1471f1491c2\"",
+       "cache-control": "public, max-age=0, must-revalidate",
+       "access-control-allow-origin": "*"
+      },
+      "bytes": 25165824,
+      "expected": 25165824,
+      "badPieces": 0,
+      "ttfbMs": 0,
+      "sec": 0.17,
+      "MBps": 138.6,
+      "opfsSize": 25165824,
+      "ms": 382
+     },
+     "range": {
+      "head1k": {
+       "status": 200,
+       "len": 25165824,
+       "same": false,
+       "contentRange": null,
+       "contentLength": "25165824"
+      },
+      "mid1k": {
+       "status": 200,
+       "len": 25165824,
+       "same": false,
+       "contentRange": null,
+       "contentLength": "25165824"
+      },
+      "openEnd": {
+       "status": 200,
+       "len": 25165824,
+       "same": false,
+       "contentRange": null,
+       "contentLength": "25165824"
+      },
+      "suffix": {
+       "status": 200,
+       "len": 25165824,
+       "same": false,
+       "contentRange": null,
+       "contentLength": "25165824"
+      },
+      "ms": 1528
+     },
+     "rangeParallel": {
+      "statuses": {
+       "200": 6
+      },
+      "non206": 6,
+      "badPieces": 16,
+      "sec": 2.25,
+      "MBps": 10.7,
+      "ms": 2251
+     },
+     "chunks": {
+      "n": 100,
+      "statuses": {
+       "200": 100
+      },
+      "errors": 0,
+      "badIds": 0,
+      "bytes": 104857600,
+      "sec": 1.46,
+      "MBps": 68.6,
+      "reqPerSec": 68.6,
+      "p50ms": 111,
+      "p95ms": 176,
+      "cacheStorageHit": true,
+      "ms": 1468
+     },
+     "ext": {
+      "x.raw": {
+       "status": 200,
+       "bytes": 6200,
+       "expected": 6200,
+       "ct": "application/octet-stream",
+       "ce": null
+      },
+      "x.br": {
+       "status": 200,
+       "bytes": 37,
+       "expected": 37,
+       "ct": "application/octet-stream",
+       "ce": null
+      },
+      "x.zst": {
+       "status": 200,
+       "bytes": 49,
+       "expected": 49,
+       "ct": "application/octet-stream",
+       "ce": null
+      },
+      "ms": 64
+     },
+     "conditional": {
+      "etag": "\"c8e14b8bb438b85d1578b80eb44b65ac\"",
+      "ifNoneMatchStatus": 304,
+      "status404": 200,
+      "ms": 71
+     },
+     "wasmStreaming": {
+      "ok": true,
+      "ct": "application/wasm",
+      "ms": 20
+     },
+     "wasmParts": {
+      "parts": 4,
+      "bytes": 31457297,
+      "expected": 31457297,
+      "padLen": 31457280,
+      "expectedPad": 31457280,
+      "ok": true,
+      "sec": 0.8,
+      "ms": 795
+     },
+     "noCorsFetch": {
+      "type": "basic",
+      "status": 200,
+      "ms": 26
+     }
+    }
+   },
+   "err": null,
+   "logs": [],
+   "failed": [
+    "HEAD https://signature-studio-hosting-probe-p.pages.dev/d/part-24m.bin :: net::ERR_ABORTED"
+   ]
+  },
+  {
+   "run": 1,
+   "accessCookie": null,
+   "wallSec": 5.8,
+   "docHdr": {
+    "status": 200,
+    "coop": "same-origin",
+    "coep": "require-corp",
+    "corp": "same-origin",
+    "server": "cloudflare",
+    "cfRay": "a483c429af44f5a3-NRT"
+   },
+   "result": {
+    "tag": "/s/",
+    "url": "https://signature-studio-hosting-probe-p.pages.dev/s/?data=/d/&big=part-24m.bin",
+    "dataBase": "/d/",
+    "main": {
+     "crossOriginIsolated": true,
+     "isSecureContext": true,
+     "sab": "function",
+     "cores": 16,
+     "sabAlloc": 1048576,
+     "imgNoCors": "skipped(same-origin)",
+     "worklet": {
+      "sab": "function",
+      "wrote": 119,
+      "kind": "realtime",
+      "sabSeenByMain": 119
+     },
+     "sabSeenFromWorker": {
+      "v0": 23130,
+      "inc": 1
+     }
+    },
+    "worker": {
+     "tag": "/s/",
+     "worker": {
+      "crossOriginIsolated": true,
+      "sab": "function",
+      "origin": "https://signature-studio-hosting-probe-p.pages.dev"
+     },
+     "sabWrite": {
+      "ok": true,
+      "ms": 0
+     },
+     "headBig": {
+      "status": 200,
+      "headers": {
+       "content-type": "application/octet-stream",
+       "etag": "\"1e29002de059e3c1c674d1471f1491c2\"",
+       "cache-control": "public, max-age=0, must-revalidate",
+       "access-control-allow-origin": "*"
+      },
+      "ms": 164
+     },
+     "fullGet": {
+      "status": 200,
+      "headers": {
+       "content-type": "application/octet-stream",
+       "content-length": "25165824",
+       "etag": "\"1e29002de059e3c1c674d1471f1491c2\"",
+       "cache-control": "public, max-age=0, must-revalidate",
+       "access-control-allow-origin": "*"
+      },
+      "bytes": 25165824,
+      "expected": 25165824,
+      "badPieces": 0,
+      "ttfbMs": 0,
+      "sec": 0.23,
+      "MBps": 103.8,
+      "opfsSize": 25165824,
+      "ms": 380
+     },
+     "range": {
+      "head1k": {
+       "status": 200,
+       "len": 25165824,
+       "same": false,
+       "contentRange": null,
+       "contentLength": "25165824"
+      },
+      "mid1k": {
+       "status": 200,
+       "len": 25165824,
+       "same": false,
+       "contentRange": null,
+       "contentLength": "25165824"
+      },
+      "openEnd": {
+       "status": 200,
+       "len": 25165824,
+       "same": false,
+       "contentRange": null,
+       "contentLength": "25165824"
+      },
+      "suffix": {
+       "status": 200,
+       "len": 25165824,
+       "same": false,
+       "contentRange": null,
+       "contentLength": "25165824"
+      },
+      "ms": 1361
+     },
+     "rangeParallel": {
+      "statuses": {
+       "200": 6
+      },
+      "non206": 6,
+      "badPieces": 16,
+      "sec": 1.58,
+      "MBps": 15.2,
+      "ms": 1585
+     },
+     "chunks": {
+      "n": 100,
+      "statuses": {
+       "200": 100
+      },
+      "errors": 0,
+      "badIds": 0,
+      "bytes": 104857600,
+      "sec": 1.17,
+      "MBps": 85.6,
+      "reqPerSec": 85.6,
+      "p50ms": 91,
+      "p95ms": 151,
+      "cacheStorageHit": true,
+      "ms": 1173
+     },
+     "ext": {
+      "x.raw": {
+       "status": 200,
+       "bytes": 6200,
+       "expected": 6200,
+       "ct": "application/octet-stream",
+       "ce": null
+      },
+      "x.br": {
+       "status": 200,
+       "bytes": 37,
+       "expected": 37,
+       "ct": "application/octet-stream",
+       "ce": null
+      },
+      "x.zst": {
+       "status": 200,
+       "bytes": 49,
+       "expected": 49,
+       "ct": "application/octet-stream",
+       "ce": null
+      },
+      "ms": 46
+     },
+     "conditional": {
+      "etag": "\"c8e14b8bb438b85d1578b80eb44b65ac\"",
+      "ifNoneMatchStatus": 304,
+      "status404": 200,
+      "ms": 115
+     },
+     "wasmStreaming": {
+      "ok": true,
+      "ct": "application/wasm",
+      "ms": 16
+     },
+     "wasmParts": {
+      "parts": 4,
+      "bytes": 31457297,
+      "expected": 31457297,
+      "padLen": 31457280,
+      "expectedPad": 31457280,
+      "ok": true,
+      "sec": 0.5,
+      "ms": 499
+     },
+     "noCorsFetch": {
+      "type": "basic",
+      "status": 200,
+      "ms": 21
+     }
+    }
+   },
+   "err": null,
+   "logs": [],
+   "failed": [
+    "HEAD https://signature-studio-hosting-probe-p.pages.dev/d/part-24m.bin :: net::ERR_ABORTED"
+   ]
+  },
+  {
+   "run": 2,
+   "accessCookie": null,
+   "wallSec": 6.7,
+   "docHdr": {
+    "status": 200,
+    "coop": "same-origin",
+    "coep": "require-corp",
+    "corp": "same-origin",
+    "server": "cloudflare",
+    "cfRay": "a483c44fa92318ce-NRT"
+   },
+   "result": {
+    "tag": "/s/",
+    "url": "https://signature-studio-hosting-probe-p.pages.dev/s/?data=/d/&big=part-24m.bin",
+    "dataBase": "/d/",
+    "main": {
+     "crossOriginIsolated": true,
+     "isSecureContext": true,
+     "sab": "function",
+     "cores": 16,
+     "sabAlloc": 1048576,
+     "imgNoCors": "skipped(same-origin)",
+     "worklet": {
+      "sab": "function",
+      "wrote": 119,
+      "kind": "realtime",
+      "sabSeenByMain": 119
+     },
+     "sabSeenFromWorker": {
+      "v0": 23130,
+      "inc": 1
+     }
+    },
+    "worker": {
+     "tag": "/s/",
+     "worker": {
+      "crossOriginIsolated": true,
+      "sab": "function",
+      "origin": "https://signature-studio-hosting-probe-p.pages.dev"
+     },
+     "sabWrite": {
+      "ok": true,
+      "ms": 0
+     },
+     "headBig": {
+      "status": 200,
+      "headers": {
+       "content-type": "application/octet-stream",
+       "etag": "\"1e29002de059e3c1c674d1471f1491c2\"",
+       "cache-control": "public, max-age=0, must-revalidate",
+       "access-control-allow-origin": "*"
+      },
+      "ms": 224
+     },
+     "fullGet": {
+      "status": 200,
+      "headers": {
+       "content-type": "application/octet-stream",
+       "content-length": "25165824",
+       "etag": "\"1e29002de059e3c1c674d1471f1491c2\"",
+       "cache-control": "public, max-age=0, must-revalidate",
+       "access-control-allow-origin": "*"
+      },
+      "bytes": 25165824,
+      "expected": 25165824,
+      "badPieces": 0,
+      "ttfbMs": 0,
+      "sec": 0.19,
+      "MBps": 127.3,
+      "opfsSize": 25165824,
+      "ms": 427
+     },
+     "range": {
+      "head1k": {
+       "status": 200,
+       "len": 25165824,
+       "same": false,
+       "contentRange": null,
+       "contentLength": "25165824"
+      },
+      "mid1k": {
+       "status": 200,
+       "len": 25165824,
+       "same": false,
+       "contentRange": null,
+       "contentLength": "25165824"
+      },
+      "openEnd": {
+       "status": 200,
+       "len": 25165824,
+       "same": false,
+       "contentRange": null,
+       "contentLength": "25165824"
+      },
+      "suffix": {
+       "status": 200,
+       "len": 25165824,
+       "same": false,
+       "contentRange": null,
+       "contentLength": "25165824"
+      },
+      "ms": 1379
+     },
+     "rangeParallel": {
+      "statuses": {
+       "200": 6
+      },
+      "non206": 6,
+      "badPieces": 20,
+      "sec": 1.93,
+      "MBps": 12.5,
+      "ms": 1931
+     },
+     "chunks": {
+      "n": 100,
+      "statuses": {
+       "200": 100
+      },
+      "errors": 0,
+      "badIds": 0,
+      "bytes": 104857600,
+      "sec": 1.27,
+      "MBps": 78.9,
+      "reqPerSec": 78.9,
+      "p50ms": 101,
+      "p95ms": 163,
+      "cacheStorageHit": true,
+      "ms": 1272
+     },
+     "ext": {
+      "x.raw": {
+       "status": 200,
+       "bytes": 6200,
+       "expected": 6200,
+       "ct": "application/octet-stream",
+       "ce": null
+      },
+      "x.br": {
+       "status": 200,
+       "bytes": 37,
+       "expected": 37,
+       "ct": "application/octet-stream",
+       "ce": null
+      },
+      "x.zst": {
+       "status": 200,
+       "bytes": 49,
+       "expected": 49,
+       "ct": "application/octet-stream",
+       "ce": null
+      },
+      "ms": 58
+     },
+     "conditional": {
+      "etag": "\"c8e14b8bb438b85d1578b80eb44b65ac\"",
+      "ifNoneMatchStatus": 304,
+      "status404": 200,
+      "ms": 61
+     },
+     "wasmStreaming": {
+      "ok": true,
+      "ct": "application/wasm",
+      "ms": 20
+     },
+     "wasmParts": {
+      "parts": 4,
+      "bytes": 31457297,
+      "expected": 31457297,
+      "padLen": 31457280,
+      "expectedPad": 31457280,
+      "ok": true,
+      "sec": 0.61,
+      "ms": 614
+     },
+     "noCorsFetch": {
+      "type": "basic",
+      "status": 200,
+      "ms": 24
+     }
+    }
+   },
+   "err": null,
+   "logs": [],
+   "failed": [
+    "HEAD https://signature-studio-hosting-probe-p.pages.dev/d/part-24m.bin :: net::ERR_ABORTED"
+   ]
+  }
+ ]
+}

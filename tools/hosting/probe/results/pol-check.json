@@ -1,0 +1,13 @@
+{
+ "blocks": 8,
+ "bytes": 734,
+ "warnings": [
+  "rule cache-default: status 条件 [200,206] は無視 (全応答に付与)",
+  "rule cache-default: 全パスの Cache-Control は出力しない (Static Assets 既定 \"public, max-age=0, must-revalidate\" を使う。元: public, max-age=300, must-revalidate)",
+  "rule cache-immutable: status 条件 [200,206] は無視 (全応答に付与)",
+  "rule cache-document: status 条件 [200,206] は無視 (全応答に付与)"
+ ],
+ "errors": [],
+ "checked": true,
+ "mismatches": []
+}

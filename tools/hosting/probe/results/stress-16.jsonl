@@ -1,0 +1,8 @@
+{"base":"https://signature-studio-hosting-probe-s.pycabbage.workers.dev/d/","conc":16,"total":1000,"statuses":{"200":1000},"sec":14.2,"reqPerSec":70.4,"MBps":70.4,"p50ms":223,"p95ms":290,"p99ms":337}
+{"base":"https://signature-studio-hosting-probe-a.pycabbage.workers.dev/d/","conc":16,"total":1000,"statuses":{"200":1000},"sec":13.9,"reqPerSec":71.8,"MBps":71.8,"p50ms":219,"p95ms":282,"p99ms":327}
+{"base":"https://signature-studio-hosting-probe-p.pages.dev/d/","conc":16,"total":1000,"statuses":{"200":1000},"sec":16,"reqPerSec":62.4,"MBps":62.4,"p50ms":244,"p95ms":330,"p99ms":613}
+{"base":"https://pub-ff77dc40473244c9bee9645e2d6988be.r2.dev/d/","conc":16,"total":1000,"statuses":{"200":614,"429":386},"sec":3.2,"reqPerSec":317.3,"MBps":194.8,"p50ms":62,"p95ms":152,"p99ms":205}
+{"base":"https://pub-ff77dc40473244c9bee9645e2d6988be.r2.dev/d/","conc":2,"total":600,"statuses":{"429":600},"sec":2.5,"reqPerSec":236.9,"MBps":0,"p50ms":0,"p95ms":0,"p99ms":0}
+{"base":"https://pub-ff77dc40473244c9bee9645e2d6988be.r2.dev/d/","conc":4,"total":600,"statuses":{"200":598,"429":2},"sec":10.3,"reqPerSec":58.5,"MBps":58.3,"p50ms":57,"p95ms":133,"p99ms":194}
+{"base":"https://pub-ff77dc40473244c9bee9645e2d6988be.r2.dev/d/","conc":8,"total":600,"statuses":{"200":61,"429":539},"sec":1.4,"reqPerSec":417,"MBps":42.4,"p50ms":73,"p95ms":197,"p99ms":242}
+{"base":"https://pub-ff77dc40473244c9bee9645e2d6988be.r2.dev/d/","conc":64,"total":600,"statuses":{"429":600},"sec":0.5,"reqPerSec":1138,"MBps":0,"p50ms":0,"p95ms":0,"p99ms":0}

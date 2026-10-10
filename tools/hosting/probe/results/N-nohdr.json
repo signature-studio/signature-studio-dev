@@ -1,0 +1,52 @@
+{
+ "name": "N-nohdr",
+ "url": "https://signature-studio-hosting-probe-s.pycabbage.workers.dev/nohdr/?data=/d/&big=part-24m.bin",
+ "runs": [
+  {
+   "run": 0,
+   "accessCookie": null,
+   "wallSec": 0.7,
+   "docHdr": {
+    "status": 200,
+    "coop": "same-origin",
+    "coep": "require-corp",
+    "corp": "same-origin",
+    "server": "cloudflare",
+    "cfRay": "a483c58d8ab5291c-NRT"
+   },
+   "result": {
+    "tag": "/nohdr/",
+    "url": "https://signature-studio-hosting-probe-s.pycabbage.workers.dev/nohdr/?data=/d/&big=part-24m.bin",
+    "dataBase": "/d/",
+    "main": {
+     "crossOriginIsolated": true,
+     "isSecureContext": true,
+     "sab": "function",
+     "cores": 16,
+     "sabAlloc": 1048576,
+     "imgNoCors": "skipped(same-origin)",
+     "worklet": {
+      "sab": "function",
+      "wrote": 119,
+      "kind": "realtime",
+      "sabSeenByMain": 119
+     },
+     "sabSeenFromWorker": {
+      "v0": 0,
+      "inc": 0
+     }
+    },
+    "worker": {
+     "error": "worker onerror: undefined"
+    }
+   },
+   "err": null,
+   "logs": [
+    "error: Failed to load resource: the server responded with a status of 404 ()"
+   ],
+   "failed": [
+    "GET https://signature-studio-hosting-probe-s.pycabbage.workers.dev/nohdr/probe-worker.js :: net::ERR_BLOCKED_BY_RESPONSE"
+   ]
+  }
+ ]
+}

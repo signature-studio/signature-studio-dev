@@ -1,0 +1,14 @@
+{
+  "name": "@webstudio/hosting",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "既定ホスト名 (workers.dev / pages.dev / r2.dev) だけで COOP/COEP を成立させる配信構成の検証 (使い捨て probe)",
+  "scripts": {
+    "probe": "bash probe/e2e.sh",
+    "cleanup": "bash probe/cleanup.sh"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^24.0.0"
+  }
+}

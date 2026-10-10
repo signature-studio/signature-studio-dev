@@ -1,0 +1,9 @@
+{
+  // 案 S (Workers Static Assets): Worker コードなし。assets のみ。COOP/COEP は assets/_headers で付与。
+  // 静的アセットへのリクエストは無料・無制限 (Worker 呼出しなし)。
+  "name": "signature-studio-hosting-probe-s",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "assets": { "directory": "../../work/dist-s" },
+  "observability": { "enabled": false }
+}

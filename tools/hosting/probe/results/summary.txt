@@ -1,0 +1,184 @@
+## A-worker-r2 https://signature-studio-hosting-probe-a.pycabbage.workers.dev/a/?data=/d/&big=big-100m.bin
+   access: None
+run0 wall=9.5s err=None iso(main/worker)=True/True sab=1048576 img=skipped(same-origin)
+   full: st=200 92.8MB/s 1.08s bad=0 
+   rangePar: {'206': 25} bad=0 76.3MB/s 
+   chunks: st={'200': 100} bad=0 27.2MB/s 27.2req/s p50=232 p95=563 cache=True 
+   range: {'head1k': '206ok', 'mid1k': '206ok', 'openEnd': '206ok', 'suffix': '206ok'} 
+   access: None
+run1 wall=10.3s err=None iso(main/worker)=True/True sab=1048576 img=skipped(same-origin)
+   full: st=200 62.4MB/s 1.6s bad=0 
+   rangePar: {'206': 25} bad=0 28.9MB/s 
+   chunks: st={'200': 100} bad=0 47.1MB/s 47.1req/s p50=159 p95=256 cache=True 
+   range: {'head1k': '206ok', 'mid1k': '206ok', 'openEnd': '206ok', 'suffix': '206ok'} 
+   access: None
+run2 wall=7.8s err=None iso(main/worker)=True/True sab=1048576 img=skipped(same-origin)
+   full: st=200 64MB/s 1.56s bad=0 
+   rangePar: {'206': 25} bad=0 70.2MB/s 
+   chunks: st={'200': 100} bad=0 60.2MB/s 60.2req/s p50=128 p95=206 cache=True 
+   range: {'head1k': '206ok', 'mid1k': '206ok', 'openEnd': '206ok', 'suffix': '206ok'} 
+   cond: {'etag': '"0f43515f88da9f35ac0907fe2273c6a1"', 'ifNoneMatchStatus': 304, 'status404': 404, 'ms': 127}
+   ext: {'x.raw': '200 ct=application/octet-stream ce=None 6200/6200', 'x.br': '200 ct=application/octet-stream ce=None 37/37', 'x.zst': '200 ct=application/octet-stream ce=None 49/49'}
+   wasmParts: {'parts': 4, 'bytes': 31457297, 'expected': 31457297, 'padLen': 31457280, 'expectedPad': 31457280, 'ok': True, 'sec': 1.47, 'ms': 1475}
+   wasm: {'ok': True, 'ct': 'application/wasm', 'ms': 450} noCorsFetch: {'type': 'basic', 'status': 200, 'ms': 50}
+   headBig: {'content-type': 'application/octet-stream', 'content-length': '104857600', 'accept-ranges': 'bytes', 'etag': '"a024524ce27f55bb0b2712943c261695"', 'cross-origin-resource-policy': 'same-origin', 'cross-origin-embedder-policy': 'require-corp'}
+   worklet: {'sab': 'function', 'wrote': 119, 'kind': 'realtime', 'sabSeenByMain': 119}
+   failed: ['HEAD https://signature-studio-hosting-probe-a.pycabbage.workers.dev/d/big-100m.bin :: net::ERR_ABORTED'] logs: ['error: Failed to load resource: the server responded with a status of 404 ()']
+## S-static https://signature-studio-hosting-probe-s.pycabbage.workers.dev/s/?data=/d/&big=part-24m.bin
+   access: None
+run0 wall=6.6s err=None iso(main/worker)=True/True sab=1048576 img=skipped(same-origin)
+   full: st=200 186.5MB/s 0.13s bad=0 
+   rangePar: {'200': 6} bad=20 12.9MB/s 
+   chunks: st={'200': 100} bad=0 71.4MB/s 71.4req/s p50=111 p95=159 cache=True 
+   range: {'head1k': '200NG', 'mid1k': '200NG', 'openEnd': '200NG', 'suffix': '200NG'} 
+   access: None
+run1 wall=6.7s err=None iso(main/worker)=True/True sab=1048576 img=skipped(same-origin)
+   full: st=200 140.5MB/s 0.17s bad=0 
+   rangePar: {'200': 6} bad=16 12.5MB/s 
+   chunks: st={'200': 100} bad=0 63MB/s 63req/s p50=128 p95=200 cache=True 
+   range: {'head1k': '200NG', 'mid1k': '200NG', 'openEnd': '200NG', 'suffix': '200NG'} 
+   access: None
+run2 wall=6.2s err=None iso(main/worker)=True/True sab=1048576 img=skipped(same-origin)
+   full: st=200 83.1MB/s 0.29s bad=0 
+   rangePar: {'200': 6} bad=16 14.5MB/s 
+   chunks: st={'200': 100} bad=0 81.3MB/s 81.3req/s p50=94 p95=155 cache=True 
+   range: {'head1k': '200NG', 'mid1k': '200NG', 'openEnd': '200NG', 'suffix': '200NG'} 
+   cond: {'etag': '"c8e14b8bb438b85d1578b80eb44b65ac"', 'ifNoneMatchStatus': 304, 'status404': 404, 'ms': 41}
+   ext: {'x.raw': '200 ct=None ce=None 6200/6200', 'x.br': '200 ct=None ce=None 37/37', 'x.zst': '200 ct=None ce=None 49/49'}
+   wasmParts: {'parts': 4, 'bytes': 31457297, 'expected': 31457297, 'padLen': 31457280, 'expectedPad': 31457280, 'ok': True, 'sec': 0.79, 'ms': 790}
+   wasm: {'ok': True, 'ct': 'application/wasm', 'ms': 16} noCorsFetch: {'type': 'basic', 'status': 200, 'ms': 21}
+   headBig: {'content-type': 'application/octet-stream', 'etag': '"1e29002de059e3c1c674d1471f1491c2"', 'cache-control': 'public, max-age=0, must-revalidate', 'cf-cache-status': 'MISS'}
+   worklet: {'sab': 'function', 'wrote': 119, 'kind': 'realtime', 'sabSeenByMain': 119}
+   failed: ['HEAD https://signature-studio-hosting-probe-s.pycabbage.workers.dev/d/part-24m.bin :: net::ERR_ABORTED'] logs: ['error: Failed to load resource: the server responded with a status of 404 ()']
+## B-credentialless https://signature-studio-hosting-probe-s.pycabbage.workers.dev/b-cl/?data=https://pub-ff77dc40473244c9bee9645e2d6988be.r2.dev/d/&big=big-100m.bin
+   access: None
+run0 wall=12.2s err=None iso(main/worker)=True/True sab=1048576 img=loaded
+   full: st=200 50.8MB/s 1.97s bad=0 
+   rangePar: {'206': 25} bad=0 56.6MB/s 
+   chunks: st={'200': 100} bad=0 24.1MB/s 24.1req/s p50=265 p95=624 cache=True 
+   range: {'head1k': '206ok', 'mid1k': '206ok', 'openEnd': '206ok', 'suffix': '206ok'} 
+   access: None
+run1 wall=7.3s err=None iso(main/worker)=True/True sab=1048576 img=loaded
+   full: st=200 48.1MB/s 2.08s bad=0 
+   rangePar: {'206': 25} bad=0 64.1MB/s 
+   chunks: st={'200': 100} bad=0 86.5MB/s 86.5req/s p50=82 p95=134 cache=True 
+   range: {'head1k': '206ok', 'mid1k': '206ok', 'openEnd': '206ok', 'suffix': '206ok'} 
+   access: None
+run2 wall=7.9s err=None iso(main/worker)=True/True sab=1048576 img=loaded
+   full: st=200 47.8MB/s 2.09s bad=0 
+   rangePar: {'206': 25} bad=0 68.8MB/s 
+   chunks: st={'200': 100} bad=0 68.7MB/s 68.7req/s p50=93 p95=200 cache=True 
+   range: {'head1k': '206ok', 'mid1k': '206ok', 'openEnd': '206ok', 'suffix': '206ok'} 
+   cond: {'etag': '"0f43515f88da9f35ac0907fe2273c6a1"', 'ifNoneMatchStatus': 304, 'status404': 404, 'ms': 170}
+   ext: {'x.raw': '200 ct=application/octet-stream ce=None 6200/6200', 'x.br': '200 ct=application/octet-stream ce=None 37/37', 'x.zst': '200 ct=application/octet-stream ce=None 49/49'}
+   wasmParts: {'parts': 4, 'bytes': 31457297, 'expected': 31457297, 'padLen': 31457280, 'expectedPad': 31457280, 'ok': True, 'sec': 1.69, 'ms': 1695}
+   wasm: {'ok': True, 'ct': 'application/wasm', 'ms': 174} noCorsFetch: {'type': 'opaque', 'status': 0, 'ms': 105}
+   headBig: {'content-type': 'application/octet-stream', 'content-length': '104857600', 'accept-ranges': 'bytes', 'etag': '"a024524ce27f55bb0b2712943c261695"', 'last-modified': 'Sat, 10 Oct 2026 06:57:49 GMT'}
+   worklet: {'sab': 'function', 'wrote': 119, 'kind': 'realtime', 'sabSeenByMain': 119}
+   failed: ['HEAD https://pub-ff77dc40473244c9bee9645e2d6988be.r2.dev/d/big-100m.bin :: net::ERR_ABORTED'] logs: ['error: Failed to load resource: the server responded with a status of 404 ()']
+## B-require-corp https://signature-studio-hosting-probe-s.pycabbage.workers.dev/b-rc/?data=https://pub-ff77dc40473244c9bee9645e2d6988be.r2.dev/d/&big=big-100m.bin
+   access: None
+run0 wall=7.3s err=None iso(main/worker)=True/True sab=1048576 img=blocked
+   full: st=200 48.2MB/s 2.08s bad=0 
+   rangePar: {'206': 25} bad=0 67.6MB/s 
+   chunks: st={'200': 100} bad=0 105MB/s 105req/s p50=67 p95=111 cache=True 
+   range: {'head1k': '206ok', 'mid1k': '206ok', 'openEnd': '206ok', 'suffix': '206ok'} 
+   access: None
+run1 wall=7.8s err=None iso(main/worker)=True/True sab=1048576 img=blocked
+   full: st=200 45.5MB/s 2.2s bad=0 
+   rangePar: {'206': 25} bad=0 62.9MB/s 
+   chunks: st={'200': 100} bad=0 75.9MB/s 75.9req/s p50=83 p95=199 cache=True 
+   range: {'head1k': '206ok', 'mid1k': '206ok', 'openEnd': '206ok', 'suffix': '206ok'} 
+   access: None
+run2 wall=8.3s err=None iso(main/worker)=True/True sab=1048576 img=blocked
+   full: st=200 32.2MB/s 3.11s bad=0 
+   rangePar: {'206': 25} bad=0 65.8MB/s 
+   chunks: st={'200': 100} bad=0 89.2MB/s 89.2req/s p50=77 p95=150 cache=True 
+   range: {'head1k': '206ok', 'mid1k': '206ok', 'openEnd': '206ok', 'suffix': '206ok'} 
+   cond: {'etag': '"0f43515f88da9f35ac0907fe2273c6a1"', 'ifNoneMatchStatus': 304, 'status404': 404, 'ms': 185}
+   ext: {'x.raw': '200 ct=application/octet-stream ce=None 6200/6200', 'x.br': '200 ct=application/octet-stream ce=None 37/37', 'x.zst': '200 ct=application/octet-stream ce=None 49/49'}
+   wasmParts: {'parts': 4, 'bytes': 31457297, 'expected': 31457297, 'padLen': 31457280, 'expectedPad': 31457280, 'ok': True, 'sec': 1.15, 'ms': 1155}
+   wasm: {'ok': True, 'ct': 'application/wasm', 'ms': 42} noCorsFetch: {'error': 'TypeError: Failed to fetch', 'ms': 45}
+   headBig: {'content-type': 'application/octet-stream', 'content-length': '104857600', 'accept-ranges': 'bytes', 'etag': '"a024524ce27f55bb0b2712943c261695"', 'last-modified': 'Sat, 10 Oct 2026 06:57:49 GMT'}
+   worklet: {'sab': 'function', 'wrote': 119, 'kind': 'realtime', 'sabSeenByMain': 119}
+   failed: ['GET https://pub-ff77dc40473244c9bee9645e2d6988be.r2.dev/d/pixel.png?t=1791615634741 :: net::ERR_BLOCKED_BY_RESPONSE.NotSameOriginAfterDefaultedToSameOriginByCoep', 'HEAD https://pub-ff77dc40473244c9bee9645e2d6988be.r2.dev/d/big-100m.bin :: net::ERR_ABORTED', 'GET https://pub-ff77dc40473244c9bee9645e2d6988be.r2.dev/d/x.raw :: net::ERR_BLOCKED_BY_RESPONSE.NotSameOriginAfterDefaultedToSameOriginByCoep'] logs: ['error: Failed to load resource: net::ERR_BLOCKED_BY_RESPONSE.NotSameOriginAfterDefaultedToSameOriginByCoep', 'error: Failed to load resource: the server responded with a status of 404 ()']
+## C-pages https://signature-studio-hosting-probe-p.pages.dev/s/?data=/d/&big=part-24m.bin
+   access: None
+run0 wall=7.7s err=None iso(main/worker)=True/True sab=1048576 img=skipped(same-origin)
+   full: st=200 138.6MB/s 0.17s bad=0 
+   rangePar: {'200': 6} bad=16 10.7MB/s 
+   chunks: st={'200': 100} bad=0 68.6MB/s 68.6req/s p50=111 p95=176 cache=True 
+   range: {'head1k': '200NG', 'mid1k': '200NG', 'openEnd': '200NG', 'suffix': '200NG'} 
+   access: None
+run1 wall=5.8s err=None iso(main/worker)=True/True sab=1048576 img=skipped(same-origin)
+   full: st=200 103.8MB/s 0.23s bad=0 
+   rangePar: {'200': 6} bad=16 15.2MB/s 
+   chunks: st={'200': 100} bad=0 85.6MB/s 85.6req/s p50=91 p95=151 cache=True 
+   range: {'head1k': '200NG', 'mid1k': '200NG', 'openEnd': '200NG', 'suffix': '200NG'} 
+   access: None
+run2 wall=6.7s err=None iso(main/worker)=True/True sab=1048576 img=skipped(same-origin)
+   full: st=200 127.3MB/s 0.19s bad=0 
+   rangePar: {'200': 6} bad=20 12.5MB/s 
+   chunks: st={'200': 100} bad=0 78.9MB/s 78.9req/s p50=101 p95=163 cache=True 
+   range: {'head1k': '200NG', 'mid1k': '200NG', 'openEnd': '200NG', 'suffix': '200NG'} 
+   cond: {'etag': '"c8e14b8bb438b85d1578b80eb44b65ac"', 'ifNoneMatchStatus': 304, 'status404': 200, 'ms': 71}
+   ext: {'x.raw': '200 ct=application/octet-stream ce=None 6200/6200', 'x.br': '200 ct=application/octet-stream ce=None 37/37', 'x.zst': '200 ct=application/octet-stream ce=None 49/49'}
+   wasmParts: {'parts': 4, 'bytes': 31457297, 'expected': 31457297, 'padLen': 31457280, 'expectedPad': 31457280, 'ok': True, 'sec': 0.8, 'ms': 795}
+   wasm: {'ok': True, 'ct': 'application/wasm', 'ms': 20} noCorsFetch: {'type': 'basic', 'status': 200, 'ms': 26}
+   headBig: {'content-type': 'application/octet-stream', 'etag': '"1e29002de059e3c1c674d1471f1491c2"', 'cache-control': 'public, max-age=0, must-revalidate', 'access-control-allow-origin': '*'}
+   worklet: {'sab': 'function', 'wrote': 119, 'kind': 'realtime', 'sabSeenByMain': 119}
+   failed: ['HEAD https://signature-studio-hosting-probe-p.pages.dev/d/part-24m.bin :: net::ERR_ABORTED'] logs: []
+## C-pages-r2 https://signature-studio-hosting-probe-p.pages.dev/b-rc/?data=https://pub-ff77dc40473244c9bee9645e2d6988be.r2.dev/d/&big=big-100m.bin
+   access: None
+run0 wall=8.3s err=None iso(main/worker)=True/True sab=1048576 img=blocked
+   full: st=200 35MB/s 2.85s bad=0 
+   rangePar: {'206': 25} bad=0 60.3MB/s 
+   chunks: st={'200': 100} bad=0 69.8MB/s 69.8req/s p50=90 p95=190 cache=True 
+   range: {'head1k': '206ok', 'mid1k': '206ok', 'openEnd': '206ok', 'suffix': '206ok'} 
+   access: None
+run1 wall=7.3s err=None iso(main/worker)=True/True sab=1048576 img=blocked
+   full: st=200 48.4MB/s 2.07s bad=0 
+   rangePar: {'206': 25} bad=0 67.3MB/s 
+   chunks: st={'200': 100} bad=0 82.9MB/s 82.9req/s p50=79 p95=150 cache=True 
+   range: {'head1k': '206ok', 'mid1k': '206ok', 'openEnd': '206ok', 'suffix': '206ok'} 
+   access: None
+run2 wall=10.3s err=None iso(main/worker)=True/True sab=1048576 img=blocked
+   full: st=200 26MB/s 3.84s bad=0 
+   rangePar: {'206': 25} bad=0 65.6MB/s 
+   chunks: st={'200': 100} bad=0 86.4MB/s 86.4req/s p50=77 p95=140 cache=True 
+   range: {'head1k': '206ok', 'mid1k': '206ok', 'openEnd': '206ok', 'suffix': '206ok'} 
+   cond: {'etag': '"0f43515f88da9f35ac0907fe2273c6a1"', 'ifNoneMatchStatus': 304, 'status404': 404, 'ms': 127}
+   ext: {'x.raw': '200 ct=application/octet-stream ce=None 6200/6200', 'x.br': '200 ct=application/octet-stream ce=None 37/37', 'x.zst': '200 ct=application/octet-stream ce=None 49/49'}
+   wasmParts: {'parts': 4, 'bytes': 31457297, 'expected': 31457297, 'padLen': 31457280, 'expectedPad': 31457280, 'ok': True, 'sec': 1.16, 'ms': 1156}
+   wasm: {'ok': True, 'ct': 'application/wasm', 'ms': 36} noCorsFetch: {'error': 'TypeError: Failed to fetch', 'ms': 46}
+   headBig: {'content-type': 'application/octet-stream', 'content-length': '104857600', 'accept-ranges': 'bytes', 'etag': '"a024524ce27f55bb0b2712943c261695"', 'last-modified': 'Sat, 10 Oct 2026 06:57:49 GMT'}
+   worklet: {'sab': 'function', 'wrote': 119, 'kind': 'realtime', 'sabSeenByMain': 119}
+   failed: ['GET https://pub-ff77dc40473244c9bee9645e2d6988be.r2.dev/d/pixel.png?t=1791615733623 :: net::ERR_BLOCKED_BY_RESPONSE.NotSameOriginAfterDefaultedToSameOriginByCoep', 'HEAD https://pub-ff77dc40473244c9bee9645e2d6988be.r2.dev/d/big-100m.bin :: net::ERR_ABORTED', 'GET https://pub-ff77dc40473244c9bee9645e2d6988be.r2.dev/d/x.raw :: net::ERR_BLOCKED_BY_RESPONSE.NotSameOriginAfterDefaultedToSameOriginByCoep'] logs: ['error: Failed to load resource: net::ERR_BLOCKED_BY_RESPONSE.NotSameOriginAfterDefaultedToSameOriginByCoep']
+## N-plain https://signature-studio-hosting-probe-s.pycabbage.workers.dev/plain/?data=/d/&big=part-24m.bin
+   access: None
+run0 wall=22.8s err=None iso(main/worker)=False/False sab=ERR SharedArrayBuffer is not defined img=skipped(same-origin)
+   full: st=200 125.9MB/s 0.19s bad=0 
+   rangePar: {'200': 6} bad=12 17.4MB/s 
+   chunks: st={'200': 100} bad=0 74.2MB/s 74.2req/s p50=105 p95=145 cache=True 
+   range: {'head1k': '200NG', 'mid1k': '200NG', 'openEnd': '200NG', 'suffix': '200NG'} 
+   cond: {'etag': '"c8e14b8bb438b85d1578b80eb44b65ac"', 'ifNoneMatchStatus': 304, 'status404': 404, 'ms': 47}
+   ext: {'x.raw': '200 ct=None ce=None 6200/6200', 'x.br': '200 ct=None ce=None 37/37', 'x.zst': '200 ct=None ce=None 49/49'}
+   wasmParts: {'parts': 4, 'bytes': 31457297, 'expected': 31457297, 'padLen': 31457280, 'expectedPad': 31457280, 'ok': True, 'sec': 0.84, 'ms': 840}
+   wasm: {'ok': True, 'ct': 'application/wasm', 'ms': 19} noCorsFetch: {'type': 'basic', 'status': 200, 'ms': 22}
+   headBig: {'content-type': 'application/octet-stream', 'etag': '"1e29002de059e3c1c674d1471f1491c2"', 'cache-control': 'public, max-age=0, must-revalidate', 'cf-cache-status': 'MISS'}
+   worklet: {'error': 'realtime: worklet message timeout (state=running); offline: Error: worklet message timeout (state=closed)'}
+   failed: ['HEAD https://signature-studio-hosting-probe-s.pycabbage.workers.dev/d/part-24m.bin :: net::ERR_ABORTED'] logs: ['error: Failed to load resource: the server responded with a status of 404 ()']
+## S-access https://signature-studio-hosting-probe-s.pycabbage.workers.dev/s/?data=/d/&big=part-24m.bin
+   access: {'preauthStatus': 200, 'cookie': True, 'httpOnly': True, 'sameSite': 'None', 'secure': True, 'expiresInMin': 1440}
+run0 wall=7.1s err=None iso(main/worker)=True/True sab=1048576 img=skipped(same-origin)
+   full: st=200 125.6MB/s 0.19s bad=0 
+   rangePar: {'200': 6} bad=20 12.7MB/s 
+   chunks: st={'200': 100} bad=0 66MB/s 66req/s p50=119 p95=167 cache=True 
+   range: {'head1k': '200NG', 'mid1k': '200NG', 'openEnd': '200NG', 'suffix': '200NG'} 
+   cond: {'etag': '"c8e14b8bb438b85d1578b80eb44b65ac"', 'ifNoneMatchStatus': 304, 'status404': 404, 'ms': 85}
+   ext: {'x.raw': '200 ct=None ce=None 6200/6200', 'x.br': '200 ct=None ce=None 37/37', 'x.zst': '200 ct=None ce=None 49/49'}
+   wasmParts: None
+   wasm: {'ok': True, 'ct': 'application/wasm', 'ms': 41} noCorsFetch: {'type': 'basic', 'status': 200, 'ms': 33}
+   headBig: {'content-type': 'application/octet-stream', 'etag': '"359aa11470f92b5790ea7de985372672"', 'cache-control': 'public, max-age=0, must-revalidate', 'cf-cache-status': 'MISS'}
+   worklet: {'sab': 'function', 'wrote': 119, 'kind': 'realtime', 'sabSeenByMain': 119}
+   failed: ['HEAD https://signature-studio-hosting-probe-s.pycabbage.workers.dev/d/part-24m.bin :: net::ERR_ABORTED'] logs: ['error: Failed to load resource: the server responded with a status of 404 ()']

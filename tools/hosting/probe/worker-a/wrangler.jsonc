@@ -1,0 +1,9 @@
+{
+  // 案 A: Worker が全リクエストを受け、R2 バインディングから配信しつつ COOP/COEP/CORP を付与する
+  "name": "signature-studio-hosting-probe-a",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "signature-studio-hosting-probe" }],
+  "observability": { "enabled": false }
+}
