@@ -146,3 +146,23 @@ m11 route と同じ「ret 0 で継続」をした回数と最終 VA (native は�
 `fp_flag_unreflected`/`rep_string_helper`/`simd_helper`) は出ない (静的特徴のみの低確信度タグは誤検出防止のため route='ir' に限定)。
 代わりに x64c 由来のタグを追加: `simd_int_semantics` (packed-int 命令を持ち結果が不一致 — packus/pmulhuw/MMX 非エイリアス等),
 `xmm_result` (xmm0 戻りのみ差), `unlifted_callee` (上記)。
+
+## 7. boot 状態の生成モード (CAB-233)
+
+`liftdiff.py bootstate <target> [--mode units|entry|hybrid]` は native 実機械語で Delphi InitTable の unit 初期化を実行し、
+その時点のメモリ (image diff / heap) を `work/<target>/boot_state.json` に保存する (wasm 側の pristine)。
+
+| mode | 動作 | 用途 |
+|---|---|---|
+| `units` (既定) | unit 0 から 1 本ずつ `CASE keep=1` で実行し、最初の失敗で止める (`--upto N` で本数指定) | 従来動作。m11 の unit #18 分析 (TLS 修正後は 22 unit 完走) |
+| `entry` | `entry_point(hinst,1,0)` を 1 case で直接実行 (実 InitUnits ループが unit を進める)。止まっても到達時点の状態を採用 | 起動経路の実物再現 |
+| `hybrid` | entry 実行 → その到達 unit (`System.InitCount` = image 0x11eac98) の次から残りを unit 単位で継続。unit 実行は実 InitUnits と同じ「proc && *proc」判定 (PEEK で先頭 8B が 0 の unit は呼ばない)、失敗 unit は記録して続行 (tolerant) | **native 全起動の参照化**。flelift target で 928/942 unit |
+
+**仮想モジュール / 仮 proc (応答モデル、CAB-233)**: `LoadLibraryW` 系は名前で同一視した仮 module handle (0x50000000+0x10000*i)、
+`GetProcAddress` は (module, 名前) で同一視した仮 proc を返す。proc は native では **実行可能 thunk** (0x50010000+i*32 に
+`mov r10, MARK|i; mov r11, ld_stub_common; jmp r11` を敷く → native は本当に呼べて応答を返す)、wasm では同じ番地を
+`ott_dispatch` が捕捉して同一 `ld_stub` 応答に振り向ける (未対応 index は従来どおり unlifted ret-0)。
+
+**TLS の置き場所 (CAB-233)**: 偽 TEB は heap 先頭 (`LD_HEAP_RESERVED` 64KB)、TLS 配列は heap+0x1000 (`LD_TLS_OFF`)。
+TlsAlloc のインデックスで heap 内のスロットを読み書きするため、boot 状態の heap 移送 (SHEAP) で wasm 側にも TLS 値が写る
+(m11 の unit #17 = 0x455790 が wasm 側でも通るようになる)。

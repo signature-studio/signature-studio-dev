@@ -8,10 +8,12 @@
 #define HEAP_SIZE (96u << 20)
 static u8 g_arena[ARENA_SIZE] __attribute__((aligned(4096)));
 static u8 g_heap[HEAP_SIZE] __attribute__((aligned(65536)));
-static char g_inbuf[8u << 20];
+static char g_inbuf[192u << 20];   /* CAB-233: boot 状態の SHEAP (hybrid boot で数十MB heap) を載せるため 8MB→192MB */
 static int32_t g_counter;
 
-u64 ld_stub_x(const char* n, u64 a0, u64 a1, u64 a2, u64 a3) { return ld_stub(n, a0, a1, a2, a3); }
+u64 ld_stub_x(const char* n, u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5) { return ld_stub(n, a0, a1, a2, a3, a4, a5); }
+/* CAB-233: 仮 proc アドレス (native と同一の値。wasm では実行されず ott_dispatch が unlifted ret-0 にする) */
+u64 ld_fake_ptr(u64 i) { return LD_FAKEPROC_BASE + i * LD_FAKEPROC_SZ; }
 void ld_trace(u64 va, u32 np, u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7, u64 x0, u64 x1, u64 x2, u64 x3) {
   if (!ld_trace_on) return;
   u64 a[8] = { a0, a1, a2, a3, a4, a5, a6, a7 }, x[4] = { x0, x1, x2, x3 };

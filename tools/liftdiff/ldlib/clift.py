@@ -58,10 +58,11 @@ def instrument_clift(src, dst, vas):
 
 
 def gen_imps(names, dst):
-    """全 IAT 名の強い imp_<名前> (ブリッジ TU へ #include される): ld_core 応答モデル + 呼出しログ。"""
+    """全 IAT 名の強い imp_<名前> (ブリッジ TU へ #include される): ld_core 応答モデル + 呼出しログ。
+    CAB-233: 第5/6引数を guest stack ([R4+0x28]/[R4+0x30]) からも読む (6引数 API の dst 書込み用)。"""
     out = ['/* 生成ファイル (ldlib/clift.py): flelift import を ld_core.ld_stub 経由に統一 (native と同一応答) */',
            'static u64 fle_imp_stub(const char* n) {',
-           '  u64 r = ld_stub(n, R[1], R[2], R[8], R[9]);   /* rcx,rdx,r8,r9 */',
+           '  u64 r = ld_stub(n, R[1], R[2], R[8], R[9], LD64(R[4] + 0x28), LD64(R[4] + 0x30));   /* rcx,rdx,r8,r9 + stack */',
            '  R[0] = r; R[4] += 8;                          /* rax = 応答, callee 側 ret */',
            '  return r;',
            '}', '']

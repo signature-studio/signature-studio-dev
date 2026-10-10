@@ -93,12 +93,14 @@ def state_path(a):
 def cmd_bootstate(a):
     from ldlib import boot
     sess = Session(a.target, shards=1, build=not a.nobuild)
-    r, res = boot.build_state(sess, a.upto)
+    r, res = boot.build_state(sess, a.upto, mode=a.mode)
     out = os.path.join(sess.t['work'], 'boot_state.json')
     json.dump(res, open(out, 'w'))
     st = res['state']
-    print('[boot] units_run=%s/%s first_fail=%s img_runs=%d heap_used=%s hw=%s -> %s' % (res['units_run'], res['units_total'], res['first_fail'], len(st['img']), st['heap_used'], st['hw'], out))
-    r.close()
+    print('[boot] units_run=%s/%s first_fail=%s mode=%s img_runs=%d heap_used=%s hw=%s -> %s' % (
+        res['units_run'], res['units_total'], res['first_fail'], res.get('mode'), len(st['img']), st['heap_used'], st['hw'], out))
+    if r:
+        r.close()
 
 
 def cmd_run(a):
@@ -246,7 +248,7 @@ def main():
     p = sp.add_parser('batch'); p.add_argument('target'); p.add_argument('--set', default='closure'); p.add_argument('--shards', type=int, default=8)
     p.add_argument('--out', required=True); p.add_argument('--limit', type=int); p.add_argument('--add'); p.add_argument('--nobuild', action='store_true')
     p.add_argument('--notrace', action='store_true'); p.add_argument('--state'); p.add_argument('--timeout', type=float, default=10.0)
-    p = sp.add_parser('bootstate'); p.add_argument('target'); p.add_argument('--upto', type=int); p.add_argument('--nobuild', action='store_true')
+    p = sp.add_parser('bootstate'); p.add_argument('target'); p.add_argument('--upto', type=int); p.add_argument('--mode', default='units', choices=['units', 'entry', 'hybrid']); p.add_argument('--nobuild', action='store_true')
     p = sp.add_parser('summary'); p.add_argument('file'); p.add_argument('--md')
     p = sp.add_parser('export'); p.add_argument('file'); p.add_argument('--out', required=True)
     a = ap.parse_args()

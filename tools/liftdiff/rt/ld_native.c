@@ -31,9 +31,40 @@ static u8* g_thunks;
 static char* g_impname[MAX_IMP];
 static int g_nimp;
 
-u64 ld_stub_c(u64 idx, u64 a0, u64 a1, u64 a2, u64 a3) {
-  const char* n = idx < (u64)g_nimp ? g_impname[idx] : "?bad";
-  return ld_stub(n, a0, a1, a2, a3);
+u64 ld_stub_c(u64 idx, u64 a0, u64 a1, u64 a2, u64 a3, const u64* stk) {
+  const char* n = "?bad";
+  if (idx >= LD_FAKEPROC_MARK) n = ld_fakeproc_name(idx - LD_FAKEPROC_MARK);   /* GetProcAddress 仮 proc */
+  else if (idx < (u64)g_nimp) n = g_impname[idx];
+  u64 a4 = 0, a5 = 0;                                 /* 既定 0 */
+  if (stk && (strcmp(n, "MultiByteToWideChar") == 0 || strcmp(n, "WideCharToMultiByte") == 0)) {
+    a4 = stk[0]; a5 = stk[1];                          /* MS 第5/6引数 (6引数 API のみ読む) */
+  }
+  return ld_stub(n, a0, a1, a2, a3, a4, a5);
+}
+
+/* CAB-233: 仮 proc の実行可能 thunk (LD_FAKEPROC_BASE 固定番地 = wasm 側の値と同一)。
+ * thunk: mov r10, LD_FAKEPROC_MARK|i ; mov r11, ld_stub_common ; jmp r11 */
+static u8* g_fake_thunks;
+u64 ld_fake_ptr(u64 i) {
+  if (i >= 32768) return LD_FAKEPROC_BASE + i * LD_FAKEPROC_SZ;
+  if (!g_fake_thunks) {
+    g_fake_thunks = mmap((void*)(uintptr_t)LD_FAKEPROC_BASE, 1 << 20, PROT_READ | PROT_WRITE | PROT_EXEC,
+                         MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, -1, 0);
+    if (g_fake_thunks != (void*)(uintptr_t)LD_FAKEPROC_BASE) {
+      fprintf(stderr, "[ld_native] fakeproc page mmap failed (calls into fake procs will fault)\n");
+      g_fake_thunks = (u8*)-1;
+      return LD_FAKEPROC_BASE + i * LD_FAKEPROC_SZ;
+    }
+  }
+  if (g_fake_thunks == (u8*)-1) return LD_FAKEPROC_BASE + i * LD_FAKEPROC_SZ;
+  u8* p = g_fake_thunks + (size_t)i * LD_FAKEPROC_SZ;
+  if (p[0] != 0x49) {   /* 未生成 */
+    u64 im = LD_FAKEPROC_MARK | i, cm = (u64)(uintptr_t)ld_stub_common;
+    p[0] = 0x49; p[1] = 0xBA; memcpy(p + 2, &im, 8);
+    p[10] = 0x49; p[11] = 0xBB; memcpy(p + 12, &cm, 8);
+    p[20] = 0x41; p[21] = 0xFF; p[22] = 0xE3;
+  }
+  return (u64)(uintptr_t)p;
 }
 
 static int load_pe(const char* path) {
@@ -83,6 +114,8 @@ static int load_pe(const char* path) {
 static sigjmp_buf g_jb;
 static volatile int g_in_call;
 static volatile int g_sig; static volatile u64 g_fault_addr, g_fault_rip;
+static volatile u64 g_fault_rsp; static volatile u64 g_fault_stk[256];  /* fault 時の rsp と stack 語 (guest 呼出し site 復元用) */
+static volatile u64 g_fault_g[16];   /* CAB-233: fault 時の汎用レジスタ (rbp/rbx/rdi/rsi/rax/rcx/rdx は仮想 call 後のフレーム破壊診断用) */
 static u64 *g_tr_va; static u8* g_tr_orig; static int g_ntr_set;
 static u8* volatile g_pending;
 
@@ -112,6 +145,11 @@ static void on_sig(int sig, siginfo_t* si, void* ucv) {
   }
   if (g_in_call) {
     g_sig = sig; g_fault_addr = (u64)(uintptr_t)si->si_addr; g_fault_rip = (u64)g[REG_RIP];
+    g_fault_rsp = (u64)g[REG_RSP];
+    { static const int rg[8] = {REG_RBP, REG_RBX, REG_RDI, REG_RSI, REG_RAX, REG_RCX, REG_RDX, REG_R8};
+      for (int j = 0; j < 8; j++) g_fault_g[j] = (u64)g[rg[j]]; }
+    u64* sp = (u64*)g_fault_rsp;
+    for (int j = 0; j < 64; j++) g_fault_stk[j] = sp[j];   /* デバッグ用: fault 時の stack 上位語 */
     g[REG_EFL] &= ~0x100;
     siglongjmp(g_jb, 1);
   }
@@ -157,7 +195,8 @@ static void run_case(char* line) {
   if (ld_case.fn < g_imgbase || ld_case.fn >= g_imgbase + g_imgsize) {
     puts(ld_case_end("bad_fn", "fn outside image", 0, 0, 0, 0, 0, 0, 0)); fflush(stdout); return;
   }
-  g_sig = 0; g_pending = NULL;
+  g_sig = 0; g_pending = NULL; g_fault_rsp = 0; g_fault_stk[0] = 0;
+  for (int j = 0; j < 8; j++) g_fault_g[j] = 0;
   scrub_stack(ld_case.stkfill);
   if (ld_case.trace) tr_arm();
   struct itimerval it = { {0, 0}, {1, 500000} };
@@ -173,7 +212,26 @@ static void run_case(char* line) {
     g_in_call = 0;
     if (ld_case.trace) tr_disarm();
     u64 rip = g_fault_rip;
-    char det[128]; snprintf(det, sizeof det, "rip_rva=%#llx", (unsigned long long)(rip - g_imgbase));
+    char det[512]; snprintf(det, sizeof det, "rip_rva=%#llx", (unsigned long long)(rip - g_imgbase));
+    /* fault 時の stack 語を detail に加える (call 直後の [rsp] = 呼出し site の復元用) */
+    { char* p = det + strlen(det); u64 rsp = g_fault_rsp;
+      p += snprintf(p, sizeof det - (size_t)(p - det), " rsp=%#llx rbp=%#llx rbx=%#llx rdi=%#llx rsi=%#llx rax=%#llx rcx=%#llx rdx=%#llx r8=%#llx",
+                    (unsigned long long)rsp, (unsigned long long)g_fault_g[0], (unsigned long long)g_fault_g[1],
+                    (unsigned long long)g_fault_g[2], (unsigned long long)g_fault_g[3], (unsigned long long)g_fault_g[4],
+                    (unsigned long long)g_fault_g[5], (unsigned long long)g_fault_g[6], (unsigned long long)g_fault_g[7]);
+      for (int j = 0; j < 8; j++) p += snprintf(p, sizeof det - (size_t)(p - det), " s%d=%#llx", j, (unsigned long long)g_fault_stk[j]);
+      /* guest 外 (host 領域) fault 時: stack を遡り最初の image 内 return address を探す (guest 呼出し site の復元) */
+      if (rip < g_imgbase || rip >= g_imgbase + g_imgsize) {
+        u64* sp2 = (u64*)g_fault_rsp;
+        for (int j = 0; j < 4096; j++) {   /* host frame を遡り最初の guest (image 内) return address を探す */
+          u64 v = sp2[j];
+          if (v >= g_imgbase + 0x1000 && v < g_imgbase + g_imgsize && (v & 7) == 0) {
+            p += snprintf(p, sizeof det - (size_t)(p - det), " gs_ret=%#llx", (unsigned long long)v);
+            break;
+          }
+        }
+      }
+      (void)p; }
     puts(ld_case_end(signame(g_sig), det, g_fault_addr, rip, 0, 0, 0, 0, 0));
   }
   fflush(stdout);

@@ -23,7 +23,7 @@
 #define FLE_HEAP      0x1D00000ull
 #define FLE_HEAP_SZ   0xE300000ull
 
-static u8 g_inbuf[8u << 20];
+static u8 g_inbuf[192u << 20];   /* CAB-233: boot 状態の SHEAP (hybrid boot で 33MB heap → 66MB hex) を載せるため 8MB→192MB */
 /* guest stack: 32MB — emcc C スタック (8MB) より大きくし、深い再帰では C スタックが先に
  * 枯渇して「投げられる abort」になるようにする (guest stack 枯渇は静的領域を破壊し
  * サイレント死亡/badjson になるため)。CAB-232 全数採点で 2MB では 0x737e00 等が
@@ -37,6 +37,9 @@ extern const fle_nptab_t fle_nptab[];
 extern const int fle_nptab_n;
 
 /* ---------------- entry トレース (fle_lifted.c の f_ 冒頭から呼ばれる) ---------------- */
+/* CAB-233: 仮 proc アドレス (native と同一の値。実行は ott_dispatch → unlifted ret-0 に落ちる) */
+u64 ld_fake_ptr(u64 i) { return LD_FAKEPROC_BASE + i * LD_FAKEPROC_SZ; }
+
 void ld_fle_trace(u64 va) {
   if (!ld_trace_on) return;
   int lo = 0, hi = fle_nptab_n - 1, np = -1;
@@ -130,12 +133,24 @@ void ott_unlifted(u64 va) {
 
 /* ott_dispatch のラッパ: guest stack (R[RSP]) が g_stack 範囲外なら wasm trap で cleanly 落とす。
  * fle_lifted.c 側は -Dott_dispatch=flelift_dispatch_impl でリネームしてある。
- * 範囲外 = guest stack 枯渇 (深い再帰) — 放置すると静的領域を破壊しランナがサイレント死亡する。 */
+ * 範囲外 = guest stack 枯渇 (深い再帰) — 放置すると静的領域を破壊しランナがサイレント死亡する。
+ * CAB-233: GetProcAddress の仮 proc (LD_FAKEPROC_BASE 番地, native は実行可能 thunk → ld_stub 応答)
+ * も wasm 側で同一の ld_stub 応答に振り向ける (native/wasm 同一応答モデルの維持。未対応 index は
+ * 従来どおり ott_unlifted = ret-0)。 */
 void flelift_dispatch_impl(u64 t);
 void ott_dispatch(u64 t) {
   if ((u64)(uintptr_t)g_stack + 0x100 > R[4] || R[4] >= LD_STACK_TOP) {
     ld_gstack_ovf++;
     __builtin_trap();   /* wasm unreachable → JS で捕まる (case は trap 扱い) */
+  }
+  if (t >= LD_FAKEPROC_BASE && t < LD_FAKEPROC_BASE + LD_FAKEPROC_SZ * 256u &&
+      (t - LD_FAKEPROC_BASE) % LD_FAKEPROC_SZ == 0) {
+    u64 idx = (t - LD_FAKEPROC_BASE) / LD_FAKEPROC_SZ;
+    if (idx < (u64)ld_nfakeproc) {
+      R[0] = ld_stub(ld_fakeproc_name(idx), R[1], R[2], R[8], R[9], LD64(R[4] + 0x28), LD64(R[4] + 0x30));
+      R[4] += 8;   /* thunk は callee 側 ret (native ld_stub_common と同一) */
+      return;
+    }
   }
   flelift_dispatch_impl(t);
 }

@@ -148,9 +148,10 @@ def ctype(ty):
 
 def gen_stubs(ll_path, defined_names, prefix='function_'):
     """IR の declare から、呼出しをログして ld_stub() の応答を返す C スタブを生成する。
-    戻り値: (C ソース文字列, [名前...], 型未対応で飛ばした名前)"""
+    戻り値: (C ソース文字列, [名前...], 型未対応で飛ばした名前)
+    CAB-233: 第5/6引数も ld_stub_x へ転送する (MultiByteToWideChar 等 6引数 API の dst 書込み用)。"""
     out = ['#include <stdint.h>', 'typedef unsigned long long u64;',
-           'extern u64 ld_stub_x(const char* n, u64 a0, u64 a1, u64 a2, u64 a3);']
+           'extern u64 ld_stub_x(const char* n, u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5);']
     names, skipped = [], []
     widths = {}
     seen = set()
@@ -176,14 +177,14 @@ def gen_stubs(ll_path, defined_names, prefix='function_'):
             widths[nm] = [64 if c == 'u64' else 32 for c in cps[:4]]
             params = ', '.join('%s a%d' % (c, i) for i, c in enumerate(cps)) or 'void'
             av = []
-            for i, c in enumerate(cps[:4]):
+            for i, c in enumerate(cps[:6]):
                 if c in ('float', 'double'):
                     av.append('0')
                 elif c == 'void*':
                     av.append('(u64)(uintptr_t)a%d' % i)
                 else:
                     av.append('(u64)a%d' % i)
-            while len(av) < 4:
+            while len(av) < 6:
                 av.append('0')
             call = 'ld_stub_x("%s", %s)' % (nm, ', '.join(av))
             if crt == 'void':
