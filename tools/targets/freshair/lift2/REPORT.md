@@ -25,14 +25,15 @@ liftlib 自体は無改変 (読取のみ) — 欠点 (RetDec 欠陥類型の検�
 
 ## 2. 残骸の状態 (引継ぎ時)
 
-- `lift2/` 丸ごと未追跡。Compressor は mlift で lift 済み (fma0/1 800/800 bit-exact の成果物あり), **Filter は lift 済みだが 100/100 不一致 (全シナリオで wasm が NaN)** で停止していた。
-- 前担当の最終 reasoning: 「native_comp.c で IAT を VA マップでパッチ … Win32 host 関数を libc 等価で実装する ms_abi shim を設計中」— 設計は実装済みで動作していた。
-- lift2 内のツール: mlift (955 行 machine-code lifter), native_* (PE 敷設 oracle), gen_*_scen (シナリオ生成), ablate_comp (故障注入)。
+- `lift2/` 丸ごと未追跡。Compressor は mlift で lift 済み (fma0/1 800/800 bit-exact の成果物あり)、
+  **Filter は lift 済みだが 100/100 不一致 (全シナリオで wasm が NaN)** で停止していた。
+- 前担当の最終 reasoning: 「native_comp.c で IAT を VA マップでパッチ … Win32 host 関数を libc 等価で
+  実装する ms_abi shim を設計中」— 設計は実装済みで動作していた。lift2 内のツール: mlift (955 行),
+  native_* (PE 敷設 oracle), gen_*_scen, ablate_comp。
 
-## 3. mlift の根源欠陥 3 件と修復 (本セッションの主要成果)
+## 3. mlift の根源欠陥 3 件と修復 (FA-2 セッションの主要成果)
 
-残骸の mlift は「関数ごとに独立した alloca フレームを rsp に据える」設計で, 以下が顕在化:
-
+残骸の mlift は「関数ごとに独立した alloca フレームを rsp に据える」設計で、以下が顕在化:
 | # | 欠陥 | 症状 | 修復 |
 |---|---|---|---|
 | **D-A** | **callee の rsp が caller のスタック引数を見えない**: 関数ごとに独立 alloca。Filter の係数設計 `0x180b7fa80` が callee 側 `[rsp+0xf0..]` で Q/gain/sr を読む → 未初期化 (ほぼ 0) を読む → div-by-zero → NaN カスケード | Filter 100/100 不一致 | **共有マシンスタック `@fa_stack` (1MB)** を導入し, call で caller の rsp を引数渡し (callee 入口で -8 = retaddr push を再現)。caller のスタック引数 `[rsp+0x20..]` が callee から見える |
@@ -198,15 +199,15 @@ Compressor/Filter (FA-2/2b) はコミット済みで検収可能。制御層は 
 - 既知限界: structured/random の**大規模**シナリオ (200+1000) は、シナリオ生成が `W+0x70` (カウント)・
   `P+0x9e54` (型 enum)・`C+0x5e8` (種別) など**意味フィールドへランダム値を注入**するため、
   **実機機械語側でも OOB 書込が起きる** (native も `malloc(): corrupted top size` / SIGSEGV で停止
-  = lift の問題ではない)。検収範囲は epf 8 本 + 小規模 structured (既定 `run_ctrl.sh 2 5`) とした。
+  = lift の問題ではない)。検収範囲は epf 8 本 + 小規模 structured (既定 `run_ctrl.sh 2 5`)。
 
 ### 11.5 未解決 / 次タスク (FA-4 / CAB-50 への引き継ぎ)
 
 1. シナリオ生成の値域を plugin 仕様 (型 enum / カウント / 種別) に丸めれば structured/random も完走可能。
-2. VST2 エントリ群: AEffect wrapper ctor (0x180dace80) は native で作動確認済 (magic 'VstP' / thunk 群
-   (0x180dac610 dispatcher, 0x180dace60 setParameter, 0x180dacbd0 getParameter, 0x180dacda0
-   processReplacing, 0x180dacd80 processDoubleReplacing) / numPrograms=1 / numParams=3 / numInputs=1 /
-   numOutputs=2 / flags=0x10 / ioRatio=1.0 / uniqueID=0x4e6f4566 / version=1)。framework 経路
+2. VST2 エントリ群: AEffect wrapper ctor (0x180dace80) は native で作動確認済 (magic 'VstP' /
+   thunk 群 0x180dac610/0x180dace60/0x180dacbd0/0x180dacda0/0x180dacd80 = dispatcher/setParameter/
+   getParameter/processReplacing/processDoubleReplacing, numPrograms=1, numParams=3, numInputs=1,
+   numOutputs=2, flags=0x10, ioRatio=1.0, uniqueID=0x4e6f4566, version=1)。framework 経路
    (`VSTPluginMain_FrAr` → 0x180c7d400 → 0x180c7c030) は locale/TLS 依存が深く native oracle
    未成立 — host 呼出 (audioMaster) の差替えが次タスク (`entry_probe.c` を観測点として残置)。
 3. GUI/エディタ層は対象外 (CAB-52 と同方針)。
