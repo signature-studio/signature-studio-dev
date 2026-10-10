@@ -1,0 +1,25 @@
+[1/6] native coverage (CRT 経路 scenario 実行 + 単歩 coverage)
+[crt_nat] err_zero_disp    ok calls=35 obj=yes
+[crt_nat] wrote /home/ubuntu/work/webstudio/tools/ott/work/crtlift/nat_probe.json (9 scenarios)
+[crt_scen] scenarios 9
+[2/6] lift → wasm (CRT 初期化版)
+[x64c] functions 260, insns 16378, unsup {'mov:segment': 1, 'int:int': 3, 'vmovdqu:vmovdqu': 45, 'vmovdqa:vmovdqa': 63, 'vzeroupper:vzeroupper': 4, 'vmovntdq:vmovntdq': 15, 'sfence:sfence': 2, 'movntps:movntps': 8, 'pshuflw:pshuflw': 1, 'pcmpistri:pcmpistri': 2, 'vmovq:vmovq': 27, 'vmovsd:vmovsd': 43, 'vxorpd:vxorpd': 6, 'vmulsd:vmulsd': 60, 'vfmadd213sd:vfmadd213sd': 40, 'vdivsd:vdivsd': 12, 'vfmadd132sd:vfmadd132sd': 4, 'vaddsd:vaddsd': 41, 'vfnmadd231sd:vfnmadd231sd': 4, 'vmovapd:vmovapd': 19, 'vcomisd:vcomisd': 11, 'vsubsd:vsubsd': 34, 'vxorps:vxorps': 2, 'vfnmadd132sd:vfnmadd132sd': 3, 'vfmsub132sd:vfmsub132sd': 1, 'vandpd:vandpd': 8, 'vfmadd231sd:vfmadd231sd': 15, 'vcmplesd:vcmplesd': 1, 'vcmpnltsd:vcmpnltsd': 1, 'vandps:vandps': 1, 'vucomisd:vucomisd': 5, 'vroundsd:vroundsd': 1, 'vcvttsd2si:vcvttsd2si': 1, 'vpaddq:vpaddq': 4, 'vpxor:vpxor': 8, 'vpsrlq:vpsrlq': 5, 'vpsubq:vpsubq': 3, 'vcvtdq2pd:vcvtdq2pd': 7, 'vpand:vpand': 14, 'vpsllq:vpsllq': 3, 'vpor:vpor': 7, 'vfmsub213sd:vfmsub213sd': 3, 'vpsubd:vpsubd': 2, 'vmovd:vmovd': 31, 'vcvtss2sd:vcvtss2sd': 1, 'vmulss:vmulss': 1, 'vaddss:vaddss': 1, 'vcvttpd2dq:vcvttpd2dq': 2, 'vpmovsxdq:vpmovsxdq': 1, 'vshufps:vshufps': 1, 'vpsrldq:vpsrldq': 2, 'vcvtsd2ss:vcvtsd2ss': 3, 'rcr:rcr': 6, 'vpunpckldq:vpunpckldq': 1, 'vcvtps2pd:vcvtps2pd': 1, 'vpshufd:vpshufd': 7, 'vmulpd:vmulpd': 3, 'vcvtpd2dq:vcvtpd2dq': 1, 'vpsrad:vpsrad': 1, 'vorps:vorps': 3, 'vcvtss2si:vcvtss2si': 3, 'vcvtsi2ss:vcvtsi2ss': 3, 'vucomiss:vucomiss': 3, 'vmovss:vmovss': 1, 'vaddpd:vaddpd': 1, 'vunpcklpd:vunpcklpd': 1, 'vpcmpeqb:vpcmpeqb': 1, 'vpmovmskb:vpmovmskb': 2, 'vpcmpeqw:vpcmpeqw': 1, 'pcmpeqw:pcmpeqw': 1, 'movlhps:movlhps': 2, 'movhlps:movhlps': 3}, unlifted callees 13, imports 26
+[lift_crt] [4/4] data + emcc
+[lift_crt] OK: /home/ubuntu/work/webstudio/tools/ott/work/crtlift/ottl_crt.cjs
+[3/6] 新 scenario matrix (CRT 経路) — native 実機械語 vs lift wasm
+[crt_nat] wrote /home/ubuntu/work/webstudio/tools/ott/work/crtlift/matrix/nat_result.json (9 scenarios)
+[run_matrix] wrote /home/ubuntu/work/webstudio/tools/ott/work/crtlift/matrix
+[cmp_entries] scenarios 9: PASS 9 / nat_crash(到達確認) 0 / FAIL 0
+[4/6] 既存 entry 85 scenario を CRT 版 build で再突合 (回帰)
+[crt_nat] wrote /home/ubuntu/work/webstudio/tools/ott/work/crtlift/matrix85/nat_result.json (85 scenarios)
+[run_matrix] wrote /home/ubuntu/work/webstudio/tools/ott/work/crtlift/matrix85
+[cmp_entries] scenarios 85: PASS 85 / nat_crash(到達確認) 0 / FAIL 0
+[5/6] 陰性対照 (OTT_CRTINIT=0 → 旧 fail-fast の再現)
+  native SIGSEGV(CFG garbage jump) 再現: OK / wasm ott_unlifted(同一 garbage VA) 再現: OK
+[6/6] 既存 e2e の継続性確認 (旧 build — 改変は lift/x64c.py の mxcsr のみ)
+      RetDec chain [0x248]=1: zero 4 / normal 254 / junkHi 252 / junkTiny 2 / nan 0 / |max| 1.131e+36
+[ott_e2e] PASS
+[ott_e2e] PASS
+[entry_e2e] PASS
+[crt_e2e] PASS
+BASELINE_DONE

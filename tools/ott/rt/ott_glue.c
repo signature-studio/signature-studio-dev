@@ -7,6 +7,7 @@ uint64_t ott_run(uint32_t va, uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3
     R[RSP] = STACK_TOP;
     R[RCX] = a0; R[RDX] = a1; R[R8] = a2; R[R9] = a3;
     X[0].q[0] = x0; X[0].q[1] = 0; X[1].q[0] = x1; X[1].q[1] = 0; X[2].q[0] = x2; X[2].q[1] = 0; X[3].q[0] = x3; X[3].q[1] = 0;
+    for (int k_ = 0; k_ < 4; k_++) XH[k_] = xz();   /* ymm 上位半分 (CAB-135) */
     R[RSP] -= 8; ST64(R[RSP], 0xdead0000ull);
     ott_dispatch(va);
     return R[RAX];

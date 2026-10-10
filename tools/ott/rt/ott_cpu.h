@@ -12,7 +12,10 @@
 typedef union { uint8_t b[16]; int8_t sb[16]; uint16_t w[8]; int16_t sw[8]; uint32_t d[4]; int32_t sd[4];
                 uint64_t q[2]; int64_t sq[2]; float f[4]; double df[2]; } X128;
 extern uint64_t R[16];
+/* X[0..15] = xmm0..15, XH[0..15] = ymm_k の上位 128bit (CAB-135: VEX/AVX 対応)。
+ * VEX.128 命令は dest の上位 128bit をゼロ化 (XZ(i))、legacy SSE 命令は X のみ触り (上位保存)。 */
 extern X128 X[16];
+extern X128 XH[16];
 extern uint8_t fZF, fSF, fCF, fOF, fPF;
 enum { RAX, RCX, RDX, RBX, RSP, RBP, RSI, RDI, R8, R9, R10, R11, R12, R13, R14, R15 };
 
@@ -42,6 +45,25 @@ void ott_chk(uint64_t a, int line);
 #define STF64(a, v) (*(f64u*)A_(a) = (double)(v))
 static inline X128 LDX(uint64_t a) { X128 x; memcpy(&x, (void*)A_(a), 16); return x; }
 static inline void STX(uint64_t a, X128 x) { memcpy((void*)A_(a), &x, 16); }
+static inline X128 xz(void) { X128 x; memset(&x, 0, sizeof x); return x; }
+
+/* CAB-135: segment (gs/fs) の shadow base。Win64 は gs = TEB。実行 coverage 内の gs 参照は
+ * gs:[0x10] = TEB.StackLimit (スタック余裕判定) のみ → 全 0 の静的ブロックを指せば
+ * 「スタック溢れなし」の意味になり native と揃う (guest stack は emcc 2MB)。 */
+extern uint64_t ott_gsbase, ott_fsbase;
+
+/* CAB-135: 256bit (ymm) レジスタ i のメモリ load/store (X+XH の組) と VEX.128 dest の上位ゼロ化 */
+static inline void LDY(int i, uint64_t a) { memcpy(&X[i], (const void*)A_(a), 16); memcpy(&XH[i], (const void*)A_(a + 16), 16); }
+static inline void STY(int i, uint64_t a) { memcpy((void*)A_(a), &X[i], 16); memcpy((void*)A_(a + 16), &XH[i], 16); }
+#define XZ(i) (XH[i].q[0] = XH[i].q[1] = 0)
+
+/* CAB-135 probe: VEX 命令の実行 coverage (probe build = -DOTT_VEXCOV のみ本体を持つ) */
+#ifdef OTT_VEXCOV
+void ott_vexhit(uint64_t va);
+#define OTT_VEXCOV_HIT(a) ott_vexhit(a)
+#else
+#define OTT_VEXCOV_HIT(a) ((void)0)
+#endif
 
 #define PAR8(x) (!__builtin_parity((uint8_t)(x)))
 #define SETZSP(W, r) do { fZF = ((uint##W##_t)(r) == 0); fSF = (((uint##W##_t)(r)) >> (W - 1)) & 1; fPF = PAR8(r); } while (0)
@@ -105,5 +127,54 @@ void ott_badjump(uint64_t addr, uint64_t target) __attribute__((noreturn));
 void ott_dispatch(uint64_t target);   /* 間接 call: shifted VA → lifted 関数 */
 extern uint64_t ott_xrip;             /* デバッグ: 直近 call 元 */
 extern uint32_t ott_mxcsr;            /* CAB-138: MXCSR software shadow (既定 0x1f80, ldmxcsr/stmxcsr 用) */
+
+/* ---- CAB-135: VEX/AVX 対応 (本体は x64c.py 側: X[16+k] = ymm 上位, xz() = 0 化) ----
+ * FMA (vfmadd 等 → IEEE 正しく丸められる 1 回丸め)。libc fma() は NaN 入力で quiet bit を立てない
+ * 場合がある (musl 実測: 3M 中 374 件, payload は一致) — x86 FMA は入力 NaN を quiet 化して伝播する
+ * ので quiet bit を強制して一致させる (avx/fma_fuzz.c で native vfmadd213sd と 0/3M 突合)。
+ * FMA3 経路の bit 突合で NaN が現れたら fma()/fmaf() をこれに差し替える。 */
+static inline double ott_fma_d(double a, double b, double c) {
+    double r = fma(a, b, c);
+    if (r != r) { uint64_t u; memcpy(&u, &r, 8); u |= 1ULL << 51; memcpy(&r, &u, 8); }
+    return r;
+}
+static inline float ott_fma_s(float a, float b, float c) {
+    float r = fmaf(a, b, c);
+    if (r != r) { uint32_t u; memcpy(&u, &r, 4); u |= 1u << 22; memcpy(&r, &u, 4); }
+    return r;
+}
+
+/* vroundsd/vroundss の imm8: 0=RNE 1=down 2=up 3=trunc。bit2 = MXCSR の丸め (本 shadow は
+ * 常に round-nearest 固定ゆえ nearbyint = RNE と同じ) */
+static inline double ott_round_d(int imm, double v) {
+    switch (imm & 3) {
+    case 0: return nearbyint(v);
+    case 1: return floor(v);
+    case 2: return ceil(v);
+    default: return (imm & 4) ? nearbyint(v) : trunc(v);
+    }
+}
+
+/* PCMPISTRI control 0x40 (unsigned byte / equal-any / positive / implicit length)。
+ * intel 第 1 operand = 「文字の集合 (SET)」、第 2 = 「データ (DATA)」:
+ *   mask[i] = (i < ld) && (DATA[i] ∈ SET[0..ls-1])   (ls/ld = 各々の NULL 終端位置 = 有効長)
+ *   ECX = mask の最上位 set bit (control bit6 = 1 → MSB first)。無ければ 16。
+ *   ZF = DATA 内に NULL あり (ld < 16) / CF = mask != 0 / SF = SET 内に NULL あり (ls < 16) / OF = mask bit0
+ *   (実機 150k case 突合済, work/avx/pcfuzz2.c — ZF/CF は jae/je で使用) */
+static inline uint32_t ott_pcmpistri40(const uint8_t* set, uint64_t da) {
+    const uint8_t* data = (const uint8_t*)A_(da);
+    int ls = 16, ld = 16;
+    for (int i = 0; i < 16; i++) if (set[i] == 0) { ls = i; break; }
+    for (int i = 0; i < 16; i++) if (data[i] == 0) { ld = i; break; }
+    uint32_t mask = 0;
+    for (int i = 0; i < ld; i++)
+        for (int j = 0; j < ls; j++) if (set[j] == data[i]) { mask |= 1u << i; break; }
+    fZF = (uint8_t)(ld < 16);
+    fCF = mask ? 1 : 0;
+    fSF = (uint8_t)(ls < 16);
+    fOF = (uint8_t)(mask & 1);
+    fPF = 0;
+    return mask ? (31u - (unsigned)__builtin_clz(mask)) : 16u;
+}
 
 #endif
