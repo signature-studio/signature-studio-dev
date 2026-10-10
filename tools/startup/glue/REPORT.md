@@ -130,17 +130,23 @@ node tools/startup/glue/scripts/audit_trace.mjs       # 別アルゴリズム検
 
 ## 6. 数え方の定義 (規則 36・37)
 - 「C 単体 N チェック」: `test/glue_unit.c` の stdout で `  ok   ` 行 (56) + 段階 10 個の `       stage <name> done=` 行 (10)。
-  再計算: `node tools/startup/glue/scripts/count_checks.mjs` (出力: `C unit ST/MT: pass=66 fail=0 okLines=66`)。
+  再計算 (`node tools/startup/glue/scripts/count_checks.mjs`、クリーン HEAD の出力):
+  `C unit ST {"verdict":"ALL PASS","pass":66,"fail":0,"okLines":66}` / `C unit MT 同左` / `SUMMARY: C(unit)=66/66 checks TS(unit)=49 checks e2e(static)=12`。
 - 「TS 単体 N チェック」: `test/glue_unit.ts` の `(pass=X fail=Y)`。同スクリプトがソースの `ok(` 呼出し数を別途数えて
   両者の一致も確認する (`static ok( calls = 49`)。
 - 「e2e 検証項目 N」: `host/glue_e2e.ts` の `ok(` 呼出し行数 (12)。実行ごとの成否は `glue.sh` の exit code。
 - 再計算 (別アルゴリズム): `node tools/startup/glue/scripts/audit_trace.mjs` — glue の検査 API を**使わず** trace 文字列だけで
   A enter 順一致 / B `C:\Users\user` 0 件 / C `/c/Users/` 残差 0 件 / D stage ok 10 種一致 を検算する。
+  クリーン HEAD の出力: `A enter order = paths>...>shutdown -> MATCH` / `B C:\Users\user = 0件 -> 0 (PASS)` /
+  `C /c/Users/ 残差 = 0件 -> 0 (PASS)` / `D stage ok 列 = ... -> ALL 10` / `(写像行数=3 / trace 行数=40)` / `audit_trace: PASS`。
 - 「SIGKILL 跨ぎ N ファイル」: seed が書いた Win パス 3 件 (Manifest.xml / Demo.flp / tmp scratch.bin) で、
   verify が sha256 を照合した件数。
 
 ## 7. 検証起点とクリーン HEAD 再現
-- 検証起点 commit: `<本コミット hash は preflight --since で確定・コミット後に追記>`。
+- 検証起点 commit: **569bad9** (`feat(startup): glue conventions (CAB-101)`)。
+- クリーン HEAD 再現 (規則 45): `git archive HEAD -- tools/startup/glue tools/assets/{wvfs,vfs} tools/shimx tools/startup/{vreg,pump,winstubs} src/runtime | tar -x -C tools/startup/glue/work/verify_569bad9`
+  + `ln -s <repo>/node_modules` 後に **別ツリーで `glue.sh` を再実行 → exit 0 / 全 12 項目 PASS / 6.6 秒**
+  (max blob 20MiB 超 0 / 変更は担当 dir のみ)。
 - 再現: `git archive HEAD -- tools/startup/glue | tar -x -C <tmp>` 後、同梱の `glue.sh` を実行
   (絶対パスで他 dir を参照するスクリプトは無し。`REPO` は glue dir からの相対解決)。
 
