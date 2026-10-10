@@ -3,7 +3,7 @@
 ## 0. 結論 (先出し)
 
 1. **141 プラグイン全数 (Effects 90 + Generators 51) の実測インベントリを mac/win 両側で作成** (`PLUGIN_MATRIX.md/.json`)。 win 側はインストーラ内部スクリプト (NSIS ヘッダ, Image-Line "BI" 拡張) を自作解析して **25,165 ブロック中 25,164 の実パス名を復元** (`inventory/nsis_names.py`) し、`block_manifest.json` では不能だった block↔プラグイン対応を確定した。
-2. **構造上の最重要発見**: Delphi プラグイン 133 本は **同一の約 1.6 MB framework (FP_DelphiPlug+RTL+VCL, 関数 ~11.3k)** を静的リンクし、プラグイン固有コードは中央値 71 KB (閉包は T0 中央値 6 KB / 17 関数)。 DSP は framework 内の **共有 SIMD kernel 表 (45 変数 / 80 実装 / 10.9 KB)** を関数ポインタ経由で呼ぶ。 → lift は「framework 1 回 + kernel 表 1 回 + プラグイン固有閉包」の 3 層で進めるのが最短。
+2. **構造上の最重要発見**: Delphi プラグイン 133 本は **ほぼ共通の約 1.6 MB framework (FP_DelphiPlug+RTL+VCL; Balance 1.61 MB / 11.7k 関数, 133 本の中央値 1.73 MB)** を静的リンクし、プラグイン固有コードは中央値 71 KB (閉包は T0 中央値 6 KB / 17 関数)。 ※「同一」の精度 (検収再計測, `inventory/fw_overlap.py`): Balance の framework 関数バイトが他 DLL に位置非依存ハッシュで含まれる割合は中央値 96%、130/133 本で ≥80%、**Dashboard / Wave Traveller / Fruity Envelope Controller の 3 本は 44% のみ** (別構成)。 ハッシュ一致 distinct 関数数は ≥13 DLL 共通で 10.8k〜11.3k 種、**≥130 DLL 共通は 5.4k〜6.3k 種** (正規化方式で ±15%)。 DSP は framework 内の **共有 SIMD kernel 表 (45 変数 / 80 実装 / 10.9 KB)** を関数ポインタ経由で呼ぶ。 → lift は「framework 1 回 + kernel 表 1 回 + プラグイン固有閉包」の 3 層で進めるのが最短。
 3. **Tier**: T0 **42** / T1 **45** / T2 **34** / T3 **20** (計 141)。 推定総工数 ~525 人日 (T0 21 / T1 68 / T2 136 / T3 300; 推定)。
 4. **ABI (ABI.md)**: 入口は `CreatePlugInstance(Host, Tag)` (※`CreateFruityInstance` は FLEngine 自身の export で別物)。 plugin vtable は C++ 互換の **20 スロット** (Image-Line 版 Delphi は TObject 仮想を vptr の負側に配置)、ホスト `TFruityHost` は **46 スロット**、`Dispatcher(HostTag, ID, Index, Value)` が窓口。 全 133 DLL で機械確認 (132 で vtable、124 で `TFruityPlugInfo`)。
 5. **T0 実証 (Fruity Balance の SIMD kernel 2 本)**: RetDec→pass 鎖→emcc→wasm→node の出力が **実機械語 (Linux ms_abi で DLL を VA 敷設して直接実行) と 1,071/1,071 case で bit-exact** (`bash tools/plugins/lift/t0_balance/t0_e2e.sh`, exit 0)。 差分試験で RetDec/pass 鎖の欠陥 4 種を発見・修復 (batch_plan.md §4)。
@@ -65,19 +65,19 @@ scope: in 121 / host 9 (Fruity Wrapper×2, Patcher×2, ReWired, MIDI Out, Razer 
 
 ## 4. バッチ lift 雛形の実測
 ### 4.1 DSP kernel 表 (framework 初期化 `0x5e19f0`)
-45 変数 / 80 実装 (35 変数は 2 実装から選択) / 計 10.9 KB。 **80 本全て RetDec 完走・`__asm_*` helper 48 種は全て実装済 (署名駆動生成)**。 ただし **26/80 本に x87 (`x86_fp80`) が混入** → wasm バックエンドで libcall 無し (f80→f64 lowering pass が未実装, batch_plan F80)。
+45 変数 / 80 実装 (35 変数は 2 実装から選択) / 計 10.9 KB。 **80 本全て RetDec 完走・`__asm_*` helper 48 種は全て実装済 (署名駆動生成)**。 ただし **25/80 本の IR に x87 (`x86_fp80`) が混入** (機械語に x87 命令を含むのは 28/80; 差の 3 本は RetDec が f64 に落とした) → wasm バックエンドで `no libcall available for fp_round with type f80` (f80→f64 lowering pass が未実装, batch_plan F80)。 表の復元は `inventory/kernel_table.py` (ranges は `lift/kernel_ranges_balance.txt`)。
 ### 4.2 lift 鎖の追加 pass (差分試験・バッチで実測した欠陥 → 修復)
 R1/S1c/S1d/C1 (§3), D1 重複 declare (T0 5/42 本), T1 ptr 仮引数不整合 (T1 7/45 本; `fix_ptr_params.py`)。
 ### 4.3 バッチ結果 (`work/batch/status.csv`, 閉包のみ lift; framework は P0 側)
 | Tier | 閉包数 | RetDec+pass 鎖 完走 | `emcc -c` 通過 | 閉包規模 (関数 / x86 コード) | 備考 |
 |---|--:|--:|--:|---|---|
 | T0 | 41 | 41 | **41** | 781 関数 / 305 KB (計 97 秒) | f80 0, 未実装 helper 0 |
-| T1 | 45 | 45 | **44** | 2,835 関数 / 1.26 MB (計 163 秒) | 失敗は ReWired (f80 2 関数)。 未実装 helper 5 本: `rep_stosb_memset` ×4 (Love Philter, Granulizer, Slicer, ReWired = memset へ写像可), `prefetcht0` / AVX `vaddps`,`vmovaps` (Harmless; CPUID 分岐で SSE 路固定) |
+| T1 | 45 | 45 | **44** | 2,835 関数 / 1.26 MB (計 163 秒) | 失敗は ReWired (f80 2 関数)。 未実装 helper 宣言 9 件 / 5 プラグイン (distinct 6 名): `rep_stosb_memset` ×4 (Love Philter, Granulizer, Slicer, ReWired = memset へ写像可), Harmless 5 件 = `prefetcht0` / AVX `vaddps`,`vmovaps` (CPUID 分岐で SSE 路固定) + `cmpnltps`, `movmskps` (+ i256 trap 6 箇所) |
 
 (Wasp と Wasp XT は同一 block を共有するため T0 の閉包は 41 件で 42 プラグインを覆う。) 初回実行では D1/ptr 型不整合で T0 5/42・T1 8/45 が `emcc -c` 不通過 → `fix_dup_decls.py` / `fix_ptr_params.py` で解消 (差分: T1 の 7 本が同一原因)。
 
 ## 5. 未解決・ブロッカー
-1. **F80** (kernel 26/80, ReWired 等): x87 混入 IR の wasm 化 (f80 lowering pass)。
+1. **F80** (kernel 25/80, ReWired 等): x87 混入 IR の wasm 化 (f80 lowering pass)。
 2. **float 引数/関数ポインタ/仮想呼出**: Eff_Render 本体の lift には `ir7_argpass`+VMT/関数ポインタ direct 化が必要 (T0 実証は pointer/int 引数の leaf kernel に限定)。
 3. **GUI**: 133 本は VCL+Blend2D エディタを framework に内包。 headless (ShowEditor 非到達) 前提の計画。 GUI 表示は M7 路線 (別チケット)。
 4. **Host Dispatcher ID の意味**: 上位 ID の出現頻度は実測 (ABI.md §6) だが、名称付けは公開 SDK の記憶と実測挙動の合致確認 (ID 0/2/4/5) に留まる。 `TFruityHost.Dispatcher` (0x13173a0) の全 case 解析は未。 host vtable 使用 offset の taint 追跡は近似 (0x100/0x108 に偽陽性の疑い)。
@@ -95,7 +95,7 @@ R1/S1c/S1d/C1 (§3), D1 重複 declare (T0 5/42 本), T1 ptr 仮引数不整合 
 | `ABI.md` | FruityPlug ABI (逆アセンブル根拠付き) |
 | `batch_plan.md` | フェーズ/欠陥表/検証戦略/下流チケット案 |
 | `build_all.sh` | 全実測→マトリクスを 1 コマンドで再生成 (`--quick` で重い解析を再利用) |
-| `inventory/*.py` | win_scan, nsis_names, mac_scan(+export trie), win_funcs/win_unique, mac_funcs, win_abi, host_calls, build_matrix_raw, family_table, delphi_vmt/pedis/macdis |
+| `inventory/*.py` | win_scan, nsis_names, mac_scan(+export trie), win_funcs/win_unique, mac_funcs, win_abi, host_calls, build_matrix_raw, family_table, delphi_vmt/pedis/macdis, **kernel_table** (80 kernel 表の機械語復元; 検収追加), **fw_overlap** (framework 共有度の独立再計測; 検収追加) |
 | `lift/` | `lift_ranges.sh`, `plugin_closure.py`, `batch_lift.sh`, `passes/` (m2/m5/m6/m7/m8/m11 参照コピー + 追加 5 pass; `SOURCES.txt`), `t0_balance/` (build_wasm.sh, native_ref.c, run_t0.mjs, t0_e2e.sh) |
 
 ```sh
@@ -106,3 +106,7 @@ bash tools/plugins/lift/batch_lift.sh --tier T0    # T0 バッチ lift (~1.5 分
 
 ## 8. 次タスク提案 (下流チケット)
 batch_plan.md §7 の通り。 優先順: **PLG-P0a framework headless lift → P0b Host shim → P0c kernel 表 (f80 pass) → F1 stereo-util / F2 eq-filter / F6 distortion / F5 modulation (T0 主体) → F4 reverb-delay / F3 dynamics (T1) → G1〜G3 → T3 個別**。
+
+## 9. 検収 (2026-10-10, 独立再計算) 結果
+全主張を再計算し **PASS (訂正 3 点のみ)**。 訂正: ①kernel の f80 混入 **26→25/80** (IR 実測; 機械語 x87 は 28/80) ②framework「同一」→ 130/133 本でほぼ共通・3 本は別構成 (§0.2) ③T1 未実装 helper の件数 (§4.3)。
+再計算済 (一致): 141 本 (mac 90+51 を ls で直接数え JSON と集合一致) / Tier 42-45-34-20・工数 524.5 / x64 PE 258・全 313・`CreatePlugInstance` export 160 (tree 159)・`CreateFruityInstance` は FLEngine のみ / NSIS 25,164÷25,165 (未対応 1 = idx 29 DATA; Info.long と名称の交差検証 120/123 一致) / kernel 表 45 変数・80 実装・10,886 B (init 0x5e19f0 を逆アセンブルし独立復元、lift 実績 ranges と完全一致) / `t0_e2e.sh` 1,071/1,071 (2.1 s; **C1 修復を外すと 325/357 に落ちる陰性対照**で試験の識別力も確認) / バッチ lift を全 86 閉包で再実行し status.csv と完全一致 (T0 41/41, T1 44/45; 44 秒/12 並列) / ABI: TFruityPlug 基底 20 スロット・TTestPlug 26・TFruityHost 46 (slot0=0x13173a0)・Dispatcher ID 71 種/894 サイト。

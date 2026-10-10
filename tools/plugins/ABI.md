@@ -232,6 +232,6 @@ python3 inventory/macdis.py <dylib> 52130 0x100 --until-ret            # mac Cre
 
 1. **Host shim が必須** (wasm 内に TFruityHost 相当の vtable 46 スロット = function table index の配列 + Dispatcher の ID 実装)。実装すべき ID は §6 の上位 ID から開始, 残りは fail-fast (M4 shim 方針)。
 2. 仮想呼出は全て `mov rax,[obj]; call [rax+off]` の形 → IR pass で `call_indirect` (wasm table) に落とす。plugin vtable は DLL データ (`.text` 内 VMT) にあるため M6 の "DLL 実データ化" pass と同系の取込が必要。
-3. 全プラグインが共通 framework (FP_DelphiPlug+VCL+RTL, **約 1.6 MB / 11.3k 関数** がハッシュ一致) を静的リンク → framework は 1 回 lift して共有 (P0)。plugin 固有部は 12〜400 KB (Tier 表参照)。
+3. Delphi 133 本のうち 130 本が共通 framework (FP_DelphiPlug+VCL+RTL, **約 1.6 MB / 11.3k 関数** がハッシュ一致; 残る 3 本 Dashboard / Wave Traveller / Fruity Envelope Controller は別構成で一致 44%) を静的リンク → framework は 1 回 lift して共有 (P0)。plugin 固有部は 12〜400 KB (Tier 表参照)。
 4. `Eff_Render` が SIMD 関数ポインタ変数経由 (§4) → framework 初期化 `0x5e19f0` の CPUID 分岐を「SSE 実装固定」に差し替えて direct 化 (wasm 側は SSE→wasm-simd128 の既存 `__asm_*` helper 路線)。
 5. 実行時ロード: framework 文字列に `dsp_ippv2.dll` / `Blend2D.dll` / `QuickFontCache` / `ilvideo_x64.dll` / `FLEngine_x64.dll` / `FruityPlug_x64.dll` (全 133 DLL 共通, win)。DSP 経路 (Balance Eff_Render) は IPP を呼ばず DLL 内 SSE 実装のみ — IPP 依存の有無は個別確認が必要 (T2+ で顕在化する見込み, 推定)。
