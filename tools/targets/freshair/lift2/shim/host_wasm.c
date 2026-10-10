@@ -9,32 +9,11 @@ FA_SHIM_TABLE(X)
 EMSCRIPTEN_KEEPALIVE u64 fa_memmove(u64 dst, u64 src, u64 n, u64 d) { memmove((void*)(uintptr_t)dst, (void*)(uintptr_t)src, (size_t)n); return dst; }
 EMSCRIPTEN_KEEPALIVE void fa_stub_trap(long long va) { __builtin_trap(); }
 
-/* fa_vector_grow — std::vector<float>::_Reallocate (0x1803ded20) の C 等価実装。
- * machine 側 (0x1803ded20 + 0x1803de3e0) の観測関数 (capacity 1.5 倍ポリシ, 要素 4B, prefix/elem/suffix の
- * 3 部 copy, 旧 buffer の HeapFree) を再現する。mlift lift 版の grow 経路で OOB が残るための差替え。
- *   rcx = vector {begin, end, cap}, rdx = 挿入位置 ptr, r8 = 挿入要素 ptr
- * 戻り: なし (vector を in-place 更新) */
-EMSCRIPTEN_KEEPALIVE u64 fa_vector_grow(u64 vec, u64 ins, u64 elem, u64 d) {
-    u64 begin = *(u64*)(uintptr_t)vec;
-    u64 end = *(u64*)(uintptr_t)(vec + 8);
-    u64 cap = *(u64*)(uintptr_t)(vec + 16);
-    u64 count = (end - begin) >> 2;
-    u64 need = count + 1;
-    u64 newcap = cap + (cap >> 1);
-    if (newcap < need) newcap = need;
-    if (newcap == 0) newcap = 1;
-    u64 nbuf = (u64)(uintptr_t)malloc((size_t)(newcap * 4));
-    u64 off = (ins - begin) >> 2;                       /* 挿入 index */
-    if (off > count) off = count;
-    memcpy((void*)(uintptr_t)nbuf, (void*)(uintptr_t)begin, (size_t)(off * 4));
-    *(u32*)(uintptr_t)(nbuf + off * 4) = *(u32*)(uintptr_t)elem;
-    memcpy((void*)(uintptr_t)(nbuf + (off + 1) * 4), (void*)(uintptr_t)ins, (size_t)((count - off) * 4));
-    if (begin) free((void*)(uintptr_t)begin);
-    *(u64*)(uintptr_t)vec = nbuf;
-    *(u64*)(uintptr_t)(vec + 8) = nbuf + (count + 1) * 4;
-    *(u64*)(uintptr_t)(vec + 16) = nbuf + newcap * 4;
-    return 0;
-}
+/* fa_vector_grow は削除 (FA-2b): 旧実装は harness の canary 内部ポインタを free する OOB と
+ * 容量計算 (vec+16 のポインタ値を容量と混同) の 2 重の欠陥を抱えていた。根因修復 (comp_harness.mjs の
+ * vbuf を plain malloc へ) により machine 側 grow (0x1803ded20 → 0x1803de100 → 0x1803de3e0) を
+ * lift 済みコードのまま実行できており, C 差替えは不要になった (REPORT §5.1)。
+ * 教訓: C「等価」差替えは機械語の意味論を正確に写像しないと新たな破れを生む — machine lift を優先する。 */
 
 /* fa_mxcsr_get/set — stmxcsr/ldmxcsr (0x18106a3a0/0x18106a3ba) の C 等価 (丸めモード制御の差替え) */
 static unsigned int g_mxcsr = 0x1f80;

@@ -16,7 +16,7 @@ for F in 0 1; do
   echo "fma=$F: scenarios $N, calls(total '|' tokens incl ERR) $ncalls, mismatch $m, ERR native/wasm $e/$ew"
   tot=$((tot+N)); bad=$((bad+m))
 done
-# grow 経路 (vcap<16: shared_ptr/CRT 状態依存) と非 grow を分離集計
+# grow 経路 (vcap<16) と非 grow を分離集計 (FA-2b: grow も bit-exact 合否に含める)
 python3 - <<'PYEOF'
 import sys
 n = open('comp_n0.txt').read().splitlines()
@@ -32,6 +32,6 @@ for i, (a, b) in enumerate(zip(n, w)):
     else:
         bad_grow += grow; bad_norm += not grow
 print('comp split: non-grow %d/%d OK, grow(vcap<16) %d/%d OK, wasm ERR %d' % (ok_norm, ok_norm + bad_norm, ok_grow, ok_grow + bad_grow, err))
-sys.exit(0 if bad_norm == 0 else 1)
+sys.exit(0 if (bad_norm == 0 and bad_grow == 0 and err == 0) else 1)
 PYEOF
-if [ $? -eq 0 ]; then echo "RESULT: comp non-grow BIT-EXACT (grow subset は既知限界として REPORT 参照)"; else echo "RESULT: MISMATCH in non-grow scenarios"; exit 1; fi
+if [ $? -eq 0 ]; then echo "RESULT: comp BIT-EXACT 400/400 scenarios (non-grow + grow, fma0+fma1)"; else echo "RESULT: MISMATCH in comp scenarios"; exit 1; fi

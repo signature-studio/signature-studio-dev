@@ -20,7 +20,10 @@ const out = [];
 for (const line of lines) {
   const t = line.split(' ').map((x) => parseInt(x, 16)); let ti = 0;
   const sidx = t[ti++], ncalls = t[ti++], vcap = t[ti++];
-  const S = al(0x200), P = al(0xa400), Q = al(0x80), vbuf = al(64), ctx = al(0x40), sc = al(0x80), VT = al(32 * 8);
+  const S = al(0x200), P = al(0xa400), Q = al(0x80), ctx = al(0x40), sc = al(0x80), VT = al(32 * 8);
+  // vbuf は native (native_comp.c) と同一規約: plain calloc (先頭ポインタ) — grow が machine/C 側 free の対象とするため
+  // canary (内部ポインタ) にすると free(begin) が dlmalloc の chunk header を誤解釈して OOB する (REPORT §10.1)。
+  const vbuf = (() => { const p = M._malloc(64); M.HEAPU8.fill(0, p, p + 64); return p; })();
   w64(S + 0x90, P); w64(P + 0xa098, VT); w32(VT + 12 * 8, 0x7F000001); w64(P + 0xa128, Q);
   w64(Q + 0x28, vbuf); w64(Q + 0x30, vbuf); w64(Q + 0x38, vbuf + vcap);
   w32(P + 0xa118, 0xffffffff); w32(flagPtr, FMA);
@@ -44,7 +47,8 @@ for (const line of lines) {
     const sp = M.stackSave();
     try { PROC(BigInt(S), BigInt(ctx)); }
     catch (e) { M.stackRestore(sp); o += ' |ERR'; if (process.env.FA_DBG) console.error('ERR', String(e).slice(0, 80), String(e.stack || '').split('\n').slice(1, 4).join(' | ')); bad = true; break; }
-    const gv = chk(S, 0x200) + chk(P, 0xa400) + chk(Q, 0x80) + chk(vbuf, 64) + chk(ctx, 0x40) + chk(sc, 0x80)
+    const gv = chk(S, 0x200) + chk(P, 0xa400) + chk(Q, 0x80) + 0   /* vbuf は free 対象ゆえ canary 検査外 (native と同一) */
+             + chk(ctx, 0x40) + chk(sc, 0x80)
              + chk(L, (n + 1) * 4) + chk(R, (n + 1) * 4) + chk(SL, (n + 1) * 4) + chk(SR, (n + 1) * 4);
     guardViol += gv;
     if (gv) o += ' |GUARD';
