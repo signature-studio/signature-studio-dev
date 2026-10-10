@@ -8,6 +8,7 @@
 #   (c) KH    : Kilohearts Gain を同様に (61 シーケンス × 6 ブロック = 366 ステップ bit-exact)
 #   (d) SIMD  : 生成 helper を実機 inline asm と bit 突合 (205 mnemonic の全 form) + 被覆 before/after   [--quick で省略]
 #   (e) 注入  : パターン注入による P1/F7/F2 検出器の検出力と偽陽性                                     [--quick で省略]
+#   (f) leaf  : OTT leaf native spec — exp/log 等の lift を実機機械語と bit 突合 (CAB-239)             [--quick で省略]
 #   --fresh : RetDec の raw .ll キャッシュ (work/*/*.drc.ll) を捨てて再 lift する (KH は約 40 秒)
 #
 # 前提 (読取のみ): tools/targets/{freshair,kilohearts}/work の展開物, tools/m6/work の OTT lift 成果物, /opt/{emsdk,retdec}
@@ -17,6 +18,8 @@ cd "$HERE"
 QUICK=0; FRESH=0
 for a in "$@"; do case "$a" in --quick) QUICK=1;; --fresh) FRESH=1;; esac; done
 export PATH="$PATH:/opt/emsdk/node/24.19.0_64bit/bin"
+# emcc/gcc の中間ファイルを tmpfs (/tmp 3.7GB) から担当 dir の work へ隔離 (CAB-239)
+export TMPDIR="$HERE/work/tmp"; mkdir -p "$TMPDIR"
 mkdir -p work
 
 need() { [ -e "$1" ] || { echo "[liftlib_e2e] 前提が無い: $1  ($2)" >&2; exit 2; }; }
@@ -42,6 +45,8 @@ if [ "$QUICK" = 0 ]; then
   python3 -m liftlib simd report || RC=1
   echo "=== (e) パターン注入による検出力評価"
   python3 -m liftlib inject-eval || RC=1
+  echo "=== (f) OTT leaf native spec (leafabi + 実機機械語オラクル bit 突合, CAB-239)"
+  python3 -m liftlib leafspec targets/ott_leaf.json --n 40 || RC=1
 fi
 if [ "$RC" = 0 ]; then echo "[liftlib_e2e] ALL PASS"; else echo "[liftlib_e2e] FAIL (上のログ参照)" >&2; fi
 exit $RC

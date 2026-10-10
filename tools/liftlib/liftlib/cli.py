@@ -191,6 +191,44 @@ def cmd_regress(a):
     return rc
 
 
+def cmd_leafspec(a):
+    """OTT leaf native spec: leaf closure を base→f2→P1→leafabi→emcc で构建し,
+    実機機械語 (native_runner の VA 敷設 + MS x64 ABI 直接実行) と乱数 scenario で bit 突合する。"""
+    from .harness import diff as D
+    cfg = pipeline.load_cfg(os.path.join(PKG, a.cfg))
+    cfg, wd, cjs, stats, log = pipeline.run_all(os.path.join(PKG, a.cfg), workdir=a.workdir)
+    print("[leafspec] build %s: %s" % (cfg["name"], json.dumps({k: stats.get(k) for k in ("p1", "f2", "leafabi")}, ensure_ascii=False)))
+    for l in log:
+        if "leafabi" in l or "reconstructed" in l:
+            print("[leafspec]   " + l)
+    rc = 0
+    summary = {}
+    for sp in cfg.get("leaf_specs", []):
+        spec = json.load(open(os.path.join(PKG, sp)))
+        va = int(spec["func"], 16)
+        s = D.run_diff(pipeline.rpath(cfg["image"]), va, spec, cjs, os.path.join(wd, cfg["name"] + "_fixed.ll"),
+                       spec["wasm_func"], os.path.join(wd, "diff_" + spec["name"]), n=a.n, timeout=a.timeout)
+        summary[spec["name"]] = dict(match=s["match"], mismatch=s["mismatch"], native_crash=s["native_crash"],
+                                     wasm_trap=s["wasm_trap"], scenarios=s["scenarios"])
+        print("[leafspec] %s: %s" % (spec["name"], D.fmt(s)))
+        for d in s["details"][:3]:
+            print("[leafspec]   mismatch", d)
+        thr = spec.get("expect_match_min")
+        if thr is not None:
+            # 合格基準 (spec に expect_match_min が在る物のみ gate): crash を除く scenario の一致率
+            den = s["scenarios"] - s["native_crash"]
+            rate = (s["match"] / den) if den else 0.0
+            ok = rate >= thr and s["wasm_trap"] == 0 and s["match"] > 0
+            summary[spec["name"]]["expect_match_min"] = thr
+            summary[spec["name"]]["match_rate_excl_crash"] = round(rate, 3)
+            print("[leafspec]   gate %s: rate=%.3f thr=%.2f -> %s" % (spec["name"], rate, thr, "PASS" if ok else "FAIL"))
+            rc |= (0 if ok else 1)
+    os.makedirs(os.path.join(PKG, "work"), exist_ok=True)
+    json.dump(summary, open(os.path.join(wd, "leafspec_summary.json"), "w"), indent=1)
+    print("[leafspec] RESULT:", "PASS" if rc == 0 else "FAIL", json.dumps(summary))
+    return rc
+
+
 def cmd_specgen(a):
     from .harness import specgen
     return specgen.main([a.image, a.va] + (["--name", a.name] if a.name else []))
@@ -218,6 +256,9 @@ def main(argv=None):
     p.set_defaults(fn=cmd_inject)
     p = sp.add_parser("specgen")
     p.add_argument("image"); p.add_argument("va"); p.add_argument("--name", default=""); p.set_defaults(fn=cmd_specgen)
+    p = sp.add_parser("leafspec")
+    p.add_argument("cfg"); p.add_argument("--n", type=int); p.add_argument("--workdir"); p.add_argument("--timeout", type=int, default=300)
+    p.set_defaults(fn=cmd_leafspec)
     p = sp.add_parser("regress")
     p.set_defaults(fn=cmd_regress)
     a, rest = ap.parse_known_args(argv)

@@ -4,9 +4,10 @@ RetDec IR の各命令は `!insn.addr !N` で機械語 VA に紐づく。これ�
   bind(reg, va)  : 命令 va の直前時点で reg が保持する値を表す IR 値 (名前と型) を返す
 を実現する。到達定義は mc.MFunc、IR 側定義は本モジュールの索引から。
   - 単一定義 d      → d に注釈された IR 命令のうち reg の幅に合う型の最後の def
-  - 関数入口 (ENTRY) → GPR 引数は %argN, それ以外は None
+  - 関数入口 (ENTRY) → GPR 引数は %argN, xmm は %xmmK_bits (f2 付与があれば), それ以外は None
   - 複数定義 (phi)   → RetDec の reg2mem alloca のうち, 各定義値を全て store している alloca を探し,
                         その alloca を load する (支配する既存 load を優先)
+  - IR に現れない定数系 def (xor/sub 自己ゼロ化, mov/movabs 即値) は値を合成する (CAB-239)。
 """
 import re
 
@@ -192,11 +193,49 @@ class Binder:
                 k = GPR_ARGS.index(r[1])
                 if k < len(self.params):
                     return (self.params[k][1], self.params[k][0])
+            if r[1].startswith("xmm"):
+                # f2 pass が付与した %xmmK_bits 引数があれば入口 xmm 値として使う (CAB-239)
+                k = int(r[1][3:])
+                for ty, nm in self.params:
+                    if nm == "%%xmm%d_bits" % k:
+                        return (nm, ty)
             return None
         if r[0] == "def":
-            return self.value_defined_at(r[2], r[1])
+            v = self.value_defined_at(r[2], r[1])
+            if v is not None:
+                return v
+            return self.synthetic_def(r[2], r[1])
         # multi: reg2mem alloca を探す
         return self._bind_multi(r[2], r[1], va)
+
+    def synthetic_def(self, reg, va):
+        """RetDec IR に現れない定数系 def (xor/sub 自己ゼロ化, mov/movabs 即値) の値を合成する。
+
+        call を跨ぐ callee-saved reg (r15/rbx 等) がプロローグのゼロ化/即値 mov だけで
+        定義されている場合, IR 側に対応行が無く bind に失敗していた (CAB-239 語彙拡張)。
+        """
+        it = self.mf.insns.get(va)
+        if it is None:
+            return None
+        m, ops = it.mnem, it.ops
+        want_xmm = reg.startswith("xmm")
+        if m in ("mov", "movabs") and len(ops) == 2 and ops[0].type == 1 and ops[1].type == 2 \
+                and not want_xmm:
+            w = ops[0].size * 8
+            imm = ops[1].imm
+            if w < 64:
+                imm &= (1 << w) - 1
+            elif imm >= (1 << 63):
+                imm -= (1 << 64)
+            return (str(imm), "i64" if w == 64 else "i%d" % w)
+        if not want_xmm and m in ("xor", "sub") and len(ops) == 2 \
+                and ops[0].type == 1 and ops[0].reg == ops[1].reg:
+            w = ops[0].size * 8
+            return ("0", "i64" if w == 64 else "i%d" % w)
+        if want_xmm and m.lstrip("v") in ("xorps", "xorpd", "pxor") and len(ops) >= 2 \
+                and ops[0].type == 1 and ops[0].reg == ops[-1].reg:
+            return ("0", "i128")
+        return None
 
     def _bind_multi(self, reg, defs, va):
         want = set(defs)
@@ -218,7 +257,10 @@ class Binder:
                             if v2 in ix.defs:
                                 d2 = ix.defs[v2]
                                 covered.add(self.mod.addr_of(ix.fn.blocks[d2[0]].lines[d2[1]]))
-            if want and want <= covered:
+            # 入口 (ENTRY=0) は callee-saved reg の入口値 (ハーネス側で 0 初期化) として
+            # alloca 未初期化読み (B1 後 0) と整合させる (CAB-239)
+            eff = want - {0}
+            if eff and eff <= covered:
                 if best is None or len(covered) < len(best[1]):
                     best = (a, covered)
         if best is None:

@@ -54,7 +54,7 @@ def parse_out(path):
         if ln.startswith("R "):
             w = ln.split()
             cur = (int(w[1]), int(w[2]))
-            res[cur] = dict(crash=int(w[3]), rax=w[4], bufs={})
+            res[cur] = dict(crash=int(w[3]), rax=w[4], xmm0=w[5] if len(w) > 5 else "0" * 16, bufs={})
         elif ln.startswith("D ") and cur is not None:
             w = ln.split(" ")
             res[cur]["bufs"][w[1]] = (w[2], w[3] if len(w) > 3 else "-")
@@ -86,6 +86,7 @@ def run_diff(image, func_va, spec, cjs, ll_path, wasm_func, out_dir, n=None, see
     N, W = parse_out(nat), (parse_out(was) if os.path.exists(was) else {})
     nscen = len(set(k[0] for k in N))
     cmp_ret = spec.get("compare_ret", False)
+    ret_xmm0 = spec.get("ret_from_xmm0", False)      # wasm の i64 戻り = xmm0 下位 64bit (leafabi)
     ign = set(spec.get("ignore_buffers", []))
     summ = dict(scenarios=nscen, steps=len(N), match=0, mismatch=0, native_crash=0, wasm_trap=0, wasm_hang=hang, mismatch_scen=set(), details=[])
     dead = set()
@@ -118,6 +119,8 @@ def run_diff(image, func_va, spec, cjs, ll_path, wasm_func, out_dir, n=None, see
                 bad.append((nm, offs[:6], len(offs), tok != tb))
         if cmp_ret and a["rax"] != b["rax"]:
             bad.append(("<rax>", [], 1, False))
+        if ret_xmm0 and a["xmm0"][:16] != b["rax"]:
+            bad.append(("<xmm0>", [], 1, False))
         if bad:
             summ["mismatch"] += 1
             summ["mismatch_scen"].add(s)

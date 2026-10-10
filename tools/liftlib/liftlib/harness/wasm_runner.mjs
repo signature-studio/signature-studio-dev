@@ -59,13 +59,12 @@ for (const line of lines) {
     case 'C': {
       const slotval = (a) => a.kind === 'ptr' ? BigInt(bufs[find(a.v)].p) : BigInt('0x' + a.v);
       const call = [];
-      for (const s of sig) {
-        let a;
-        if (s.slot !== undefined) a = args.find((x) => x.slot === s.slot);
-        else a = args.find((x) => x.slot === s.xmm);
+      // sig (define の仮引数順) と A 行 (spec の args 宣言順) を 1:1 に対応させる
+      sig.forEach((s, j) => {
+        const a = args[j];
         let v = a ? slotval(a) : 0n;
-        if (s.ty === 'i32') call.push(Number(v & 0xFFFFFFFFn)); else if (s.ty === 'i128') call.push(v); else call.push(BigInt.asUintN(64, v));
-      }
+        if (s.ty === 'i32') call.push(Number(v & 0xFFFFFFFFn)); else call.push(BigInt.asUintN(64, v));
+      });
       let crashed = 0, ret = 0n;
       try { ret = M['_' + fname](...call); } catch (e) { crashed = 1; if (process.env.LL_VERBOSE) console.error('trap:', String(e).slice(0, 200)); }
       out.push(`R ${scen} ${step} ${crashed} ${crashed ? '0'.padStart(16, '0') : BigInt.asUintN(64, BigInt(ret ?? 0)).toString(16).padStart(16, '0')} ${'0'.padStart(16, '0')}`);

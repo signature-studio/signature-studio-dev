@@ -1,0 +1,63 @@
+{
+ "name": "ott_leaf_exp",
+ "func": "0x1801b4220",
+ "wasm_func": "function_1801b4220",
+ "scenarios": 300,
+ "steps": 1,
+ "seed": 23901,
+ "ret_from_xmm0": true,
+ "vars": [
+  {
+   "name": "x",
+   "gen": {
+    "mix": [
+     [
+      0.55,
+      {
+       "unif": [
+        -40.0,
+        40.0
+       ]
+      }
+     ],
+     [
+      0.25,
+      {
+       "loguni": [
+        -8,
+        3
+       ]
+      }
+     ],
+     [
+      0.1,
+      {
+       "choice": [
+        0.0,
+        1.0,
+        -1.0,
+        0.5,
+        709.0,
+        -708.0,
+        1e-300
+       ]
+      }
+     ],
+     [
+      0.1,
+      {
+       "sample": 1
+      }
+     ]
+    ]
+   }
+  }
+ ],
+ "args": [
+  {
+   "f64": "x"
+  }
+ ],
+ "buffers": {},
+ "expect_match_min": 1.0
+}

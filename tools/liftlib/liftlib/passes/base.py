@@ -319,9 +319,11 @@ def normalize(text):
     stage("A6", f"ptrtoint 幅正規化 (i64 slot のみ) {n6} 件")
 
     # [A7] メタデータ・uselistorder
-    cmeta = len(re.findall(r", *!(?!insn\.addr)\w[\w.\-]* +", text))
-    text = re.sub(r", *!(?!insn\.addr)\w[\w.\-]* +\S+", "", text)
-    text = re.sub(r"(?<=\)) +!(?!insn\.addr)\w[\w.\-]* +\S+", "", text)
+    #   値は常に `!name` 参照ゆえ ` +![\w.\-]+` で止める (\S+ だと区切りのカンマを食み,
+    #   `) !insn.addr` のカンマ無し形が残って emcc (clang) のパースエラーになる — CAB-239 修正)
+    cmeta = len(re.findall(r", *!(?!insn\.addr)\w[\w.\-]* +!", text))
+    text = re.sub(r", *!(?!insn\.addr)\w[\w.\-]* +![\w.\-]+", "", text)
+    text = re.sub(r"(?<=\)) +!(?!insn\.addr)\w[\w.\-]* +![\w.\-]+", "", text)
     text = re.sub(r", *!(?!insn\.addr)\w[\w.\-]*(?=[,)])", "", text)
     # insn.addr 参照用の `!N = !{i64 VA}` は保持し, それ以外のメタデータ定義だけ除去
     text = re.sub(r"(?m)^!(?!\d+ = !\{i64 \d+\}\s*$)\w[\w.\-]* *= !\{.*\}\s*\n?", "", text)

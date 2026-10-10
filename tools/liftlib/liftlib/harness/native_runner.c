@@ -117,9 +117,11 @@ int main(int argc, char** argv) {
         }
         if (line[0] == 'C') {
             struct ms_ctx c; memset(&c, 0, sizeof c); c.fn = (void*)(uintptr_t)fva;
+            /* MS x64 ABI: float 引数は xmm を独立カウント, それ以外は gpr を独立カウント (A 行は宣言順) */
+            int gp = 0, xp = 0;
             for (int i = 0; i < nargs; i++) {
                 u64 val = !strcmp(args[i].kind, "ptr") ? (u64)(uintptr_t)bufs[args[i].pb].p : args[i].v;
-                if (!strcmp(args[i].kind, "f32") || !strcmp(args[i].kind, "f64")) c.xmm[args[i].slot] = val; else c.gpr[args[i].slot] = val;
+                if (!strcmp(args[i].kind, "f32") || !strcmp(args[i].kind, "f64")) c.xmm[xp++] = val; else c.gpr[gp++] = val;
             }
             crashed = 0;
             if (sigsetjmp(jb, 1) == 0) ll_ms_call(&c);

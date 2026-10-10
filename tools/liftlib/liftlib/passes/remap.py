@@ -21,43 +21,72 @@ def _esc(b):
     return "".join(out)
 
 
-def gdata(mod, img, mode="external", min_size=8, base=None, newbase=None, log=None):
-    """module item の `@global_var_*` 定義行を書換える。返値: {"replaced": n, "added": n}"""
+def gdata(mod, img, mode="external", min_size=8, base=None, newbase=None, log=None, pad_gap=False):
+    """module item の `@global_var_*` 定義行を書換える。返値: {"replaced": n, "added": n}
+
+    pad_gap (CAB-239): 定義サイズを「次の global VA までの間隔」まで拡張する。
+    RetDec は表アクセスを `ptrtoint(@global) + idx*scale` の定数式でliftするため,
+    宣言サイズ (i64 等) のままでは索引が宣言外の隣接データ (実在する表の続き) を踏む。
+    隣接データで埋める事で IR 上の索引読みが実機と同じバイト列を指す。"""
     log = log if log is not None else []
     base = img.base if base is None else base
     n_rep = n_add = 0
-    have = set()
+    have = {}
     for idx, it in enumerate(mod.items):
         if not isinstance(it, str):
             continue
         m = re.match(r"^(@global_var_([0-9a-f]+)) = (.*)$", it)
         if not m:
             continue
-        name, hexva, rest = m.group(1), m.group(2), m.group(3)
-        va = int(hexva, 16)
-        have.add(name)
-        is_ext = " external " in (" " + rest + " ") or rest.startswith("external")
-        if mode == "external" and not is_ext:
-            continue
-        sz = _decl_size(rest, min_size)
-        rd_va = va if newbase is None else va - newbase + base
-        b = img.read(rd_va, sz)
-        quals = "constant" if re.search(r"\bconstant\b", rest) else "global"
-        mod.items[idx] = '%s = local_unnamed_addr %s [%d x i8] c"%s", align 16' % (name, quals, sz, _esc(b))
-        n_rep += 1
-    # 参照のみで定義の無い global (declare 忘れ) を補う
+        have[m.group(1)] = (idx, int(m.group(2), 16), m.group(3))
+    # 補間: 参照のみで定義の無い global
     refs = set()
     for it in mod.items:
         if hasattr(it, "render"):
             for ln in it.render():
                 for mm in re.finditer(r"@global_var_([0-9a-f]+)\b", ln):
                     refs.add("@global_var_" + mm.group(1))
-    for name in sorted(refs - have):
+    # ptrtoint (@global_var_X) 形 (表 base) のみ pad 対象にする (CAB-239: 索引読みが隣接データを踏むため)。
+    # 書換可能性の確認も兼ねる
+    tp_bases = set()
+    for it in mod.items:
+        if hasattr(it, "render"):
+            for ln in it.render():
+                for mm in re.finditer(r"ptrtoint \((?:i\d+\*|ptr)\s*(@global_var_[0-9a-f]+)", ln):
+                    tp_bases.add(mm.group(1))
+                for mm in re.finditer(r"ptrtoint ptr (@global_var_[0-9a-f]+) to i64", ln):
+                    tp_bases.add(mm.group(1))
+        elif isinstance(it, str):
+            for mm in re.finditer(r"ptrtoint \((?:i\d+\*|ptr)\s*(@global_var_[0-9a-f]+)", it):
+                tp_bases.add(mm.group(1))
+    order = sorted(have.items(), key=lambda kv: kv[1][1])
+    for name in sorted(refs - set(have)):
         va = int(name[len("@global_var_"):], 16)
-        rd_va = va if newbase is None else va - newbase + base
-        b = img.read(rd_va, min_size)
+        b = img.read(va if newbase is None else va - newbase + base, min_size)
         mod.add_global('%s = local_unnamed_addr constant [%d x i8] c"%s", align 16' % (name, min_size, _esc(b)))
+        have[name] = (None, va, "constant [%d x i8]" % min_size)
         n_add += 1
+        order = sorted(have.items(), key=lambda kv: kv[1][1])
+    all_vas = [v[1] for _, v in order] + [img.base + img.size]
+    for gi, (name, (idx, va, rest)) in enumerate(order):
+        is_ext = " external " in (" " + rest + " ") or rest.startswith("external")
+        if mode == "external" and not is_ext and idx is None:
+            continue
+        if mode == "external" and not is_ext and idx is not None:
+            continue
+        sz = _decl_size(rest, min_size)
+        if pad_gap and name in tp_bases:
+            nxt = all_vas[gi + 1]
+            if nxt > va:
+                sz = max(sz, min(nxt - va, 65536))
+        rd_va = va if newbase is None else va - newbase + base
+        b = img.read(rd_va, sz)
+        quals = "constant" if re.search(r"\bconstant\b", rest) else "global"
+        if idx is None:
+            mod.add_global('%s = local_unnamed_addr %s [%d x i8] c"%s", align 16' % (name, quals, sz, _esc(b)))
+        else:
+            mod.items[idx] = '%s = local_unnamed_addr %s [%d x i8] c"%s", align 16' % (name, quals, sz, _esc(b))
+        n_rep += 1
     return {"replaced": n_rep, "added": n_add}
 
 

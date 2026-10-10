@@ -1,6 +1,6 @@
-# liftlib REPORT — 共通 lift 修復基盤の統合 (CAB-49 / CAB-54 / CAB-55 / CAB-220)
+# liftlib REPORT — 共通 lift 修復基盤の統合 (CAB-49 / CAB-54 / CAB-55 / CAB-220 / CAB-239)
 
-- 日付: 2026-10-10 / 担当 dir: `tools/liftlib/` (他 dir は読取のみ) / 再現: `bash tools/liftlib/liftlib_e2e.sh` (キャッシュ時 約 25 秒, `--fresh` で FA/KH を RetDec lift から約 1 分)
+- 日付: 2026-10-10 / 担当 dir: `tools/liftlib/` (他 dir は読取のみ) / 再現: `bash tools/liftlib/liftlib_e2e.sh` (キャッシュ時 約 25 秒 + leaf spec 約 4 分, `--fresh` で FA/KH を RetDec lift から約 1 分)
 - 数値はすべて本 dir で実測。推定は「推定」と明記。
 
 ## 0. 結論 (先出し)
@@ -13,7 +13,12 @@
 | SIMD helper (CAB-54) | 宣言駆動で自動生成。KH census 205 mnemonic の **未被覆 83(効果)/31(共通基盤)/90(合算)/92(host 込) → 1/1/2/2** (残: `pcmpistri`, `vinsertf128`)。**実機 inline asm vs wasm を 192 mnemonic・281 form・95,400 ベクタで突合: 不一致 0** (近似命令 4 種は相対誤差 <1.6·2⁻¹² を許容して 489 件合格) |
 | 検出器 (CAB-55) | パターン注入 **94 件 (F7 57 / P1 畳込み 35 / F2 2) を 94/94 検出**, 修復済み IR への偽陽性 0。OTT 生 IR で既知 [F7] 1 件 + **新規 6 件の F7 型脱落**, comis 89 サイトの分類 (§5) |
 
-コミット列: c8027d3 (基盤: base/P1/F7/F2/simd/harness) → 56679d5 (OTT recipe・CLI・e2e・注入評価) → 09b3918 (docs/unit test; feature 完了点) → 本 REPORT 修正コミット。
+コミット列: c8027d3 (基盤: base/P1/F7/F2/simd/harness) → 56679d5 (OTT recipe・CLI・e2e・注入評価) → 09b3918 (docs/unit test; feature 完了点) → cf096a6 (lowbase 取り込み CAB-220) → 本チケット (CAB-239)。
+
+**CAB-239 追加 (§11)**: mini-lifter 語彙 9 系統拡張 — OTT 落下分岐の再構成 **5 → 19**, 理由付き残留 **47 → 30**。
+auto f7,p1 で junk census junkHi **175 → 104** (checks 7/0・band maxdev 0・trap 0 維持)。
+OTT leaf native spec 新設 (`leafspec`) — **exp leaf 40/40 bit-exact**, log 32/40 (残は native CRT 経路 crash による除外)。
+liftlib 本体の欠陥 3 件修正 (base A7 メタデータのカンマ落ち / gdata 表サイズ / f2 の v128 引数 wasm ABI)。
 
 ## 1. 既存資産の棚卸し (pass ごとの 検出条件 / 修復内容 / 入力依存)
 
@@ -152,3 +157,68 @@ python3 -m liftlib ott                       # 既定 (0x30000000) の回帰 = I
 - lowbase RetDec chain の junk 経路は stack/heap 絶対位置依存が残る (lowbase REPORT §4.3 と同質)。本検証の範囲
   ([0x248]=0/1 × 2 rep × 256f) では差分 0 だったが、500blk 級の長時間 run では junk-tiny 差が出る可能性 (低 base REPORT 実測 2/128,000 cell)。
 - liftlib lowbase の OOB ガードは c38c8 family の broken-lift を修復するものでなく no-op 化 (恒久修復は §7-1/§9-4 の mini-lifter 拡張)。
+
+## 11. mini-lifter 語彙拡張 + OTT leaf native spec (CAB-239)
+
+**結論**: 語彙 9 系統を拡張し OTT 落下分岐の再構成 **5 → 19**・理由付き残留 **47 → 30** (auto f7,p1 で
+checks 7/0・band maxdev 0・trap 0 維持, junk census junkHi **175 → 104**)。leaf native spec (`leafspec`
+コマンド) を新設し **exp leaf 40/40 bit-exact**, log 32/40 (残 8 は native 側 CRT 経路 crash = 除外計上)。
+tan / SVF / f32変換は不一致 — 原因を断片レベルで特定。過程で liftlib 本体の欠陥 3 件 (base A7 メタデータ
+のカンマ落ち / gdata 表サイズ / f2 v128 引数の wasm ABI) を発見・修正。
+
+### 11.1 新語彙と実測 (stats 実測: sites 89 = branch 33 [rewired 30 + orient 未解決 3] + dropped 49 [reconstructed 19 + unsupported 30] + consumer 4)
+| 語彙 | 内容 | 実測 |
+|---|---|---|
+| bind 定数 def 合成 | xor/sub 自己ゼロ化・mov/movabs 即値 def を IR 無しで合成 (call 跨ぎ callee-saved) | r15 ×10 + rbx ×1 解消 |
+| rsp slot | `movsd [rsp+off], xmm` を head block の alloca 経由で受渡 (RetDec store/load-form 規約と整合) | addr base rsp ×6 解消 |
+| 断片内 call | declare 駆動。第5引数以降 = [rsp+0x20+8i] (callee 側スタック引数)。post-call xmm0 = 戻り bits。F6 thread 用に直前 movsd(i64)→i128 marker | 断片 11 site のうち 6 解消 (vocab_call 4) |
+| 整数フラグ | cmp/test+jcc (u/s) + setcc + cmovcc を flag 状態追跡で IR 化。rcr は CF 出力 = 旧 bit0 (ZF 保存) を伝搬 | tan poly の ja/seta/inc/rcr 連鎖 (int_jcc 2, rot 2) |
+| GPR load/ALU/movabs/shift | mov r,[m], or/and/xor/add/sub/inc/dec, shr/sar/shl | mov r8d,[rip]・or eax・movabs 解消 |
+| extract/lea/cvtsi, 断片内 ret, region br 重複回避 | movd/movq 抽出・lea・cvttsd2si / ret (rax 仮置き) / 再構成済み br の再取り上げ禁止 | lea 2 ほか・exp return 経路・支配破壊防止 |
+
+残留 30 の内訳: region join (木でない断片) 8 / 多定義 bind (phi 合成要) 9 / reg2mem carry 4 / 入口 xmm
+未引数化 5 / 間接 call 1 / 他 3。unit test T10 が再構成数と語彙発動を固定。
+
+### 11.2 auto f7,p1 の census 影響 (junk 減少) と SHA
+census[0x248]=0: zero 132 / normal 69→**140** / junkHi **175→104** / junkTiny 136, absmax 1.67e20→1.67e18。
+census[0x248]=1: 4/254/252/2 → 4/259/248/1。checks 7/0・maxdev 0.0・trap rc 0 は維持。
+**[0x248]=0 出力 SHA は m10 と不一致になる** (改善由来の変化)。SHA 突合は auto 無し (m10 再現) モードで継続。
+
+### 11.3 OTT leaf native spec (`leafspec`, 新設)
+`targets/ott_leaf.json` (roots {SVF reset, exp, log, tan, sqrt 系, f32変換} の call closure 71 関数) → base →
+f2 (closure 限定) → P1 (新語彙) → **leafabi** → gdata(all+表 pad) → emcc → 実機機械語 (native_runner:
+ImageBase に VA 敷設・MS x64 ABI 直接実行) と乱数 scenario で bit 突合。**xmm0 戻り**: leafabi が各 `ret`
+の xmm0 到達定義を bind し `ret i64 (trunc i128 …)` に差替 (40 ret)。加えて RX: ret_xmm0 callee の call
+直後の最初の xmm0 読みを call 戻りへ差替 (29 site — RetDec が call 後も呼出前 SSA を流用する欠落の修復)。
+native R 行 xmm0 列 ↔ wasm 戻りを `ret_from_xmm0` spec で突合。ハーネス制約: ① IAT/CRT 経路は native
+crash → シナリオ除外 (実測 log 8/40・cvt 23/40 — bits 系入力が CRT 報告経路 d2750 `jmp *rax` に入る)。
+② wasm xmm0 戻りは未差替 ret では rax のまま。③ NaN/Inf は spec で除外。④ 入口 callee-saved/xmm4-15 は 0 初期化を仮定 (runner が gp/xmm 独立カウントで zero)。
+| leaf | 40 scenario | 判定 |
+|---|---|---|
+| exp 1801b4220 | **40/40 bit-exact** | ✅ |
+| log 1801b4900 | 32/40 + crash 8 | 一致行は完全一致 |
+| tan poly 1801a9be0 | 1/40 | region join @1801a9dfa 未修復 + 入口 3 引数 (実体 xmm0 1 引数) の誤解析 |
+| SVF reset 180126040 | 2/40 + crash 8 | tan 依存の係数に波及 |
+| f32変換 1801bc890 | 4/40 + crash 23 + trap 13 | cmov 連鎖の多定義 phi 合成未実装 (bind rcx ×4) |
+
+e2e の gate は spec の `expect_match_min` (crash を除く一致率) のみ適用 (exp 1.0 / log 0.9。tan/SVF/変換は測定対象)。
+
+**発見と修正 (leaf spec 構築中に顕在化)**
+1. **base A7**: メタデータ除去が区切りカンマを食み `) !insn.addr` 形を残し clang パースエラー
+   (`x, !range !N, !insn.addr !M` → `x !insn.addr !M`)。値参照を ` +![\w.\-]+` で止めて修正
+   (!range を含む OTT 系 IR で発生。FA/KH は !range 無しで未発覚)。
+2. **gdata 表サイズ**: RetDec は表アクセスを `ptrtoint(@global)+idx*scale` で lift するが gdata は宣言型
+   (i64=8B) でしか埋めず, 索引が宣言外の隣接データ (表の続き) を踏む。`gdata_pad=True` (leaf cfg のみ)
+   で表 base を次 global VA まで実データ拡張 → **exp 0/40 → 40/40**。既定 False (FA/KH/OTT legacy 不変)。
+3. **f2 v128 引数**: 入口 xmm live-in の v128 判定が i128 引数になり wasm ABI (2 個 lower) と不一致。
+   movq/movd/movmsk 抽出を f64/f32 bits に分類し v128 も下位 64bit で受ける。call site 側も型別 cast。
+
+### 11.4 CAB-238 / CAB-240 との境界と次タスク
+- **CAB-238 (auto 既定化)**: auto 時は census 改善 (junkHi −71) の一方で m10 参照 SHA と不一致になる
+  (改善由来)。検収は checks 7/0 + maxdev 0 + trap 0 + census 改善で行い, SHA 突合は auto 無しモードを継続。
+- **CAB-240 (ymm ABI)**: 本チケットでは i256/ymm 未触 (`__asm_vmovdqu__yy` 3 種のまま)。断片語彙も
+  VEX-256 未対応 (vfmadd 系巨大断片は次チケット候補)。
+- 限界: 多定義 phi 合成未実装 (×9)。setcc/flag の上書き幅 zext 仮定。RX は同 block 読みに限定。
+  leaf native は CRT 経路で crash (tools/ott/native の IAT thunk 方式で吸収可 — 読取のみのため未統合)。
+- 次タスク: ① phi 合成 (tan/cvt が通る見込み) ② leafabi 方式の SVF 経路適用 (m9 C port からの置換)
+  ③ leafspec の crash scenario 自動除外 ④ CAB-238 検収条件の策定。

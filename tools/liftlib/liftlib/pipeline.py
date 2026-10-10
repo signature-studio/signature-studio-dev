@@ -90,9 +90,15 @@ def repair_ll(cfg, raw_path, img, log, detect_only=False):
         log.extend("f7: " + x for x in lg)
     if passes.get("f2", True):
         st, lg = {}, []
-        f2.run(mod, img, lg, st, repair=rep)
+        f2.run(mod, img, lg, st, repair=rep, only=passes.get("f2_only"))
         stats["f2"] = st
         log.extend("f2: " + x for x in lg)
+    if passes.get("leafabi") and not detect_only:
+        from .passes import leafabi as LA
+        st, lg = {}, []
+        LA.run(mod, img, passes["leafabi"].get("ret_xmm0", []), lg, st, repair=rep)
+        stats["leafabi"] = st
+        log.extend("leafabi: " + x for x in lg)
     if passes.get("gdata") and not detect_only:
         sh = passes.get("shift")
         if sh:
@@ -100,7 +106,8 @@ def repair_ll(cfg, raw_path, img, log, detect_only=False):
             mod = IR.Module.parse(text2)
             stats["shift_numeric"] = n
         stats["gdata"] = remap.gdata(mod, img, mode=passes["gdata"], base=img.base,
-                                     newbase=int(str(passes["shift"]["newbase"]), 0) if passes.get("shift") else None)
+                                     newbase=int(str(passes["shift"]["newbase"]), 0) if passes.get("shift") else None,
+                                     pad_gap=bool(cfg.get("gdata_pad")))
     stats["time_s"] = round(time.time() - t0, 2)
     return mod, stats
 
@@ -111,14 +118,22 @@ def c_ty(t):
             "double": "double", "float": "float", "void": "void", "i1": "_Bool"}.get(t, "long long")
 
 
-def emit_stubs(mod, defined_extra=()):
-    """define の無い function_* declare を fail-fast stub 化。"""
+def emit_stubs(mod, defined_extra=(), externals=False):
+    """define の無い declare を fail-fast stub 化 (function_* は常時, externals=True で
+    Win32/CRT 等も対象 — llvm.*/__asm_*/_emscripten 系は除外)。"""
     defs = {f.name for f in mod.funcs()}
     lines = ['#include <emscripten.h>', '/* liftlib auto stubs: 未 lift の callee は fail-fast (黙って 0 を返さない) */']
     n = 0
     for nm, (ret, args, _l) in sorted(mod.declares().items()):
-        if nm in defs or not re.match(r"function_[0-9a-f]+$", nm) or nm in defined_extra:
+        if nm in defs or nm in defined_extra:
             continue
+        if re.match(r"function_[0-9a-f]+$", nm):
+            pass
+        elif not externals or nm.startswith("__asm_") or nm.startswith("llvm.") or nm.startswith("_emscripten") \
+                or nm.startswith("__cxa") or nm.startswith("_ZN") or nm.startswith("_Z"):
+            continue
+        else:
+            pass
         al = [a.strip() for a in args.split(",") if a.strip()]
         params = ", ".join("%s a%d" % (c_ty(a), i) for i, a in enumerate(al)) or "void"
         rt = c_ty(ret)
@@ -141,7 +156,7 @@ def build(cfg, mod, workdir, log, stats):
     stats["simd"] = {"helpers": len(rep["generated"]), "unsupported": [u[0] for u in rep["unsupported"]], "approx": rep["approx"]}
     mod2 = IR.Module.parse(text)
     ex = set(cfg.get("stub_skip", []))
-    stub_c, nstub = emit_stubs(mod2, ex)
+    stub_c, nstub = emit_stubs(mod2, ex, externals=bool(cfg.get("stub_externals")))
     s_path = os.path.join(workdir, name + "_stubs.c")
     open(s_path, "w").write(stub_c)
     stats["stubs"] = nstub

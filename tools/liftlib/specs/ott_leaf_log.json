@@ -1,0 +1,62 @@
+{
+ "name": "ott_leaf_log",
+ "func": "0x1801b4900",
+ "wasm_func": "function_1801b4900",
+ "scenarios": 300,
+ "steps": 1,
+ "seed": 23902,
+ "ret_from_xmm0": true,
+ "vars": [
+  {
+   "name": "x",
+   "gen": {
+    "mix": [
+     [
+      0.55,
+      {
+       "unif": [
+        1e-06,
+        1000000.0
+       ]
+      }
+     ],
+     [
+      0.25,
+      {
+       "loguni": [
+        -8,
+        8
+       ]
+      }
+     ],
+     [
+      0.1,
+      {
+       "choice": [
+        1.0,
+        0.5,
+        2.0,
+        10.0,
+        1e-300,
+        1e+300
+       ]
+      }
+     ],
+     [
+      0.1,
+      {
+       "sample": 1
+      }
+     ]
+    ]
+   }
+  }
+ ],
+ "args": [
+  {
+   "f64": "x"
+  }
+ ],
+ "buffers": {},
+ "expect_match_min": 0.9
+}

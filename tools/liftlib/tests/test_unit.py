@@ -164,7 +164,63 @@ def t9():
     print("T9 ok (runtime_lb: m6_rt=2 m8_rt=2 stubs_hand=4 m10_boot=1 置換, LB_IMG_BASE/LB_MAX_MEM マクロ化)")
 
 
+def t10():
+    """CAB-239: mini-lifter 語彙拡張 — OTT 生 IR で落下分岐の再構成数と新語彙の発動を実測値で固定。"""
+    raw = os.path.join(T, "m6/work/ott.drc.ll")
+    if not os.path.exists(raw):
+        print("T10 skip (OTT raw .ll 無し)")
+        return
+    from liftlib.passes import p1
+    img = Image(OTT_DLL)
+    text, _ = base.run_base(open(raw).read(), base.make_args())
+    mod = IR.Module.parse(text)
+    log, st = [], {}
+    for fn in mod.funcs():
+        va = int(fn.name.split("_")[1], 16) if re.match(r"function_[0-9a-f]+$", fn.name) else None
+        if va is None or img.func_at(va) is None:
+            continue
+        p1.run_function(mod, fn, img, True, log, st)
+    # 実測固定 (CAB-239): 再構成 18 以上 / UNSUPPORTED 31 以下 / 新語彙 (rot/int_jcc/call/rsp) の発動
+    assert st.get("reconstructed", 0) >= 19, st
+    assert st.get("unsupported", 0) <= 30, st
+    assert st.get("rewired", 0) >= 30, st
+    assert st.get("vocab_rot", 0) >= 2 and st.get("vocab_int_jcc", 0) >= 2, st
+    assert st.get("vocab_call", 0) >= 3, st
+    print("T10 ok (p1 語彙拡張: reconstructed=%d unsupported=%d rewired=%d vocab_call=%d rot=%d int_jcc=%d)"
+          % (st.get("reconstructed", 0), st.get("unsupported", 0), st.get("rewired", 0),
+             st.get("vocab_call", 0), st.get("vocab_rot", 0), st.get("vocab_int_jcc", 0)))
+
+
+def t11():
+    """CAB-239: leafabi — exp (0-arg i64) の ret を xmm0 bits 戻りに差し替え, gdata pad が表 base を拡張。"""
+    from liftlib.passes import leafabi
+    raw = os.path.join(T, "m6/work/ott.drc.ll")
+    if not os.path.exists(raw) or not os.path.exists(OTT_DLL):
+        print("T11 skip (OTT の成果物無し)")
+        return
+    img = Image(OTT_DLL)
+    text, _ = base.run_base(open(raw).read(), base.make_args())
+    mod = IR.Module.parse(text)
+    fn = mod.func("function_1801b4220")
+    mf = MFunc(img, *img.func_at(0x1801b4220))
+    from liftlib.regbind import Binder
+    st, lg = {}, []
+    leafabi._ret_thread(mod, fn, mf, Binder(mod, fn, mf), lg, st)
+    rets = [l for l in fn.render() if l.strip().startswith("ret")]
+    threaded = [l for l in rets if "%lf_" in l]
+    assert len(threaded) >= 6, threaded[:4]
+    assert st.get("ret_threaded", 0) >= 6, st
+    # gdata pad: 表 base (ptrtoint 被参照) が次 global VA まで拡張される
+    text2, _ = base.run_base(open(raw).read(), base.make_args())
+    mod2 = IR.Module.parse(text2)
+    gst = remap.gdata(mod2, img, mode="all", base=img.base, pad_gap=True)
+    tbl = [it for it in mod2.items if isinstance(it, str) and it.startswith("@global_var_18021fe80 = ")][0]
+    m = re.search(r"\[(\d+) x i8\]", tbl)
+    assert m and int(m.group(1)) > 8, tbl[:80]
+    print("T11 ok (leafabi ret_threaded=%d, gdata pad: 表 base %d bytes)" % (st.get("ret_threaded", 0), int(m.group(1))))
+
+
 if __name__ == "__main__":
-    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9):
+    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11):
         f()
     print("ALL UNIT TESTS PASS")

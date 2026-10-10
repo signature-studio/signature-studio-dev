@@ -92,6 +92,14 @@ def crt_patch(lines, rep):
           arg_op, hit = mm.group(1), j
           break
       if arg_op is None:
+        # フォールバック (CAB-239): P1 region が生成する正規名 (接尾付き) も探す。
+        # 無接尾で見つかる場合 (legacy) は上の経路と同じ結果ゆえ出力は不変。
+        for j in range(len(out) - 1, max(len(out) - 90, -1), -1):
+          mm = re.match(r'^\s*(%[\w.\-]+) = call i128 @__asm_(' + '|'.join(SD_OPS) + r')(?:__[a-z0-9]+|\.\d+|__\d+)?\((.*)\)\s*$', out[j])
+          if mm:
+            arg_op, hit = mm.group(1), j
+            break
+      if arg_op is None:
         ctx = ' // '.join(x.strip() for x in out[-5:])
         raise AssertionError(f'{name}: idx {i} 呼出直前 __asm_{"|".join(SD_OPS)} なし (thread 先未特定) ctx=[{ctx}]')
       tz = f'%crz{gbase + n_sites:05d}'

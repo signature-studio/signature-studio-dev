@@ -34,11 +34,19 @@ def classify_kind(mf, k):
                 kinds.add("f32")
             elif m.endswith("sd") or m in ("cvtsd2ss", "comisd", "ucomisd") or m.endswith("sd2si"):
                 kinds.add("f64")
+            elif m in ("movq", "movd", "movmskps", "movmskpd"):
+                # GPR への bits 抽出は double/float bits として受ける (wasm ABI は i64/i32)
+                kinds.add("f64" if m in ("movq", "movmskpd") else "f32")
             else:
                 kinds.add("v128")
     if not readers:
         return None, []
     kind = "f32" if "f32" in kinds else ("f64" if "f64" in kinds else "v128")
+    if kind == "v128":
+        # v128 のままでは wasm ABI が 2 個に lower され呼出側と合わないため,
+        # f64 bits (下位 64 bit) で受ける。高 lane を使う callee は native spec が乖離として
+        # 検出する (OTT leaf ではスカラー引数が実情) — CAB-239
+        kind = "f64"
     return kind, readers
 
 
@@ -194,14 +202,16 @@ def run(mod, img, log=None, stats=None, repair=True, only=None):
                     ok = False
                     break
                 nm_ = "%%f2_%x_x%d" % (C, k)
-                if kind == "f32":
-                    ins.append("  %s = trunc i128 %s to i32%s" % (nm_, v[0], tag))
-                    args.append("i32 " + nm_)
-                elif kind == "f64":
-                    ins.append("  %s = trunc i128 %s to i64%s" % (nm_, v[0], tag))
-                    args.append("i64 " + nm_)
+                pty = {"f32": "i32", "f64": "i64", "v128": "i128"}[kind]
+                if v[1] == pty:
+                    args.append("%s %s" % (pty, v[0]))
+                    continue
+                w = {"i8": 8, "i16": 16, "i32": 32, "i64": 64, "i128": 128}
+                if w.get(v[1], 0) > w[pty]:
+                    ins.append("  %s = trunc %s %s to %s%s" % (nm_, v[1], v[0], pty, tag))
                 else:
-                    args.append("i128 " + v[0])
+                    ins.append("  %s = zext %s %s to %s%s" % (nm_, v[1], v[0], pty, tag))
+                args.append("%s %s" % (pty, nm_))
             if not ok:
                 continue
             newln = re.sub(r"(@%s\()(.*?)(\)(?:\s*,\s*!insn\.addr !\d+)?\s*$)" % re.escape(callee),
