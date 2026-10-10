@@ -1,15 +1,13 @@
 # ld --wrap で差し替える shimx 既存シンボル (1 行 1 API)。リンク時 -Wl,--wrap=<name> として渡す。
 # 呼出側 (lift IR / proctable.c の GetProcAddress 表) は __wrap_<name> に束縛され、shimx 実装は __real_<name> で委譲される。
+# 退役 (CAB-214 follow-up): SHGetFolderPathW / SHGetSpecialFolderPathW / SHGetKnownFolderPath / GetTempPathW は shimx の username 統一
+#   (C:\Users\webstudio) で shimx 単体が期待一致となったため wrap 不要。ExpandEnvironmentStringsW も seed 上書き不要 (api_matrix 参照)。
 WinVerifyTrust
 CryptQueryObject
 CryptMsgGetParam
 CertFindCertificateInStore
 CertGetNameStringW
 CertGetNameStringA
-SHGetFolderPathW
-SHGetSpecialFolderPathW
-SHGetKnownFolderPath
-GetTempPathW
 CreateProcessW
 ShellExecuteExW
 ShellExecuteExA

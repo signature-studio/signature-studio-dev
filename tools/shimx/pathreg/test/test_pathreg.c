@@ -50,7 +50,12 @@ static void test_mounts(void) {
     pathreg_paths_init(&p);
     CHECK(pathreg_set_paths(&p) == 0);
     int n0 = pathreg_mount_count();
-    CHECK(n0 >= 9);                                   /* install + 2 profiles × 5 + C: */
+    CHECK(n0 == 8);                                   /* install + 1 profile (webstudio) × 6 + C: — 予備 profile (user) は退役済み */
+    /* 退役した予備 profile (C:\Users\user): alias mount は無く、残余ドライブ C: 規則 (/c/Users/user/...) に落ちる */
+    CHECK(pathreg_map("C:\\Users\\user\\Documents\\Image-Line\\x.txt", g_buf, sizeof g_buf) == 0);
+    CHECK(strcmp(g_buf, "/c/Users/user/Documents/Image-Line/x.txt") == 0);
+    CHECK(pathreg_map("C:\\Users\\webstudio\\Documents\\Image-Line\\x.txt", g_buf, sizeof g_buf) == 0);
+    CHECK(strcmp(g_buf, "/c/home/Documents/Image-Line/x.txt") == 0);
 
     /* 取得・監査 */
     PathRegMount m;
@@ -77,9 +82,9 @@ static void test_map(void) {
     CHECK(pathreg_set_paths(&p) == 0);
     pathreg_clear_mounts();                            /* 明示的に作り直して最長一致を検査 */
     CHECK(pathreg_add_mount("C:\\Program Files\\Image-Line\\FL Studio 2026", "/fl", PATHREG_RO) == 0);
-    CHECK(pathreg_add_mount("C:\\Users\\user\\Documents\\Image-Line", "/c/home/Documents/Image-Line", PATHREG_PERSIST) == 0);
-    CHECK(pathreg_add_mount("C:\\Users\\user\\AppData\\Local\\Temp\\Image-Line", "/c/tmp", PATHREG_TMP) == 0);
-    CHECK(pathreg_add_mount("C:\\Users\\user\\AppData\\Local", "/c/home/AppData/Local", PATHREG_PERSIST) == 0);
+    CHECK(pathreg_add_mount("C:\\Users\\webstudio\\Documents\\Image-Line", "/c/home/Documents/Image-Line", PATHREG_PERSIST) == 0);
+    CHECK(pathreg_add_mount("C:\\Users\\webstudio\\AppData\\Local\\Temp\\Image-Line", "/c/tmp", PATHREG_TMP) == 0);
+    CHECK(pathreg_add_mount("C:\\Users\\webstudio\\AppData\\Local", "/c/home/AppData/Local", PATHREG_PERSIST) == 0);
     CHECK(pathreg_add_mount("C:", "/c", PATHREG_PERSIST) == 0);
 
     struct { const char* in; const char* want; } cases[] = {
@@ -88,13 +93,13 @@ static void test_map(void) {
         { "c:/PROGRAM FILES/image-line/fl studio 2026/Plugins/Fruity/Generators/Fruity Wrapper/Fruity Wrapper_x64.dll",
           "/fl/Plugins/Fruity/Generators/Fruity Wrapper/Fruity Wrapper_x64.dll" },
         /* Shared data (永続): vreg seed paths / nfo 配置規則 */
-        { "C:\\Users\\user\\Documents\\Image-Line\\FL Studio\\Settings\\Manifest.xml",
+        { "C:\\Users\\webstudio\\Documents\\Image-Line\\FL Studio\\Settings\\Manifest.xml",
           "/c/home/Documents/Image-Line/FL Studio/Settings/Manifest.xml" },
-        { "C:\\Users\\user\\Documents\\Image-Line\\FL Studio\\Presets\\Plugin database\\Installed\\Effects\\VST\\Xfer Records, OTT.nfo",
+        { "C:\\Users\\webstudio\\Documents\\Image-Line\\FL Studio\\Presets\\Plugin database\\Installed\\Effects\\VST\\Xfer Records, OTT.nfo",
           "/c/home/Documents/Image-Line/FL Studio/Presets/Plugin database/Installed/Effects/VST/Xfer Records, OTT.nfo" },
         /* Temp (TMP) は Local (PERSIST) より長い接頭辞で勝つ (stub_plan §4: Temp\Image-Line\<pid>-<id>\ → /c/tmp/…) */
-        { "C:\\Users\\user\\AppData\\Local\\Temp\\Image-Line\\123-1\\pack.zip", "/c/tmp/123-1/pack.zip" },
-        { "C:\\Users\\user\\AppData\\Local\\Image-Line\\cache.dat", "/c/home/AppData/Local/Image-Line/cache.dat" },
+        { "C:\\Users\\webstudio\\AppData\\Local\\Temp\\Image-Line\\123-1\\pack.zip", "/c/tmp/123-1/pack.zip" },
+        { "C:\\Users\\webstudio\\AppData\\Local\\Image-Line\\cache.dat", "/c/home/AppData/Local/Image-Line/cache.dat" },
         /* 残余ドライブ C: → /c (shimx 既定と同じ形) */
         { "C:\\Windows\\notepad.exe", "/c/Windows/notepad.exe" },
         /* フォールバック (表に無いドライブ) → shimx 既定写像に委譲 */
@@ -165,7 +170,7 @@ static void test_file_io(void) {
     /* 書込: 永続領域 (/c/home/Documents/Image-Line)。shimx が親 dir も作る経路 = 先に posix mkdir */
     const char* setdir = "/c/home/Documents/Image-Line/FL Studio/Settings";
     mkdir_p(setdir);
-    HANDLE h2 = CreateFileW(W("C:\\Users\\user\\Documents\\Image-Line\\FL Studio\\Settings\\Manifest.xml"),
+    HANDLE h2 = CreateFileW(W("C:\\Users\\webstudio\\Documents\\Image-Line\\FL Studio\\Settings\\Manifest.xml"),
                             GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
     CHECK(h2 != INVALID_HANDLE_VALUE);
     const char xml[] = "<manifest>webstudio</manifest>";

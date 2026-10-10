@@ -156,12 +156,9 @@ void pathreg_paths_init(PathRegPaths* p) {
     memset(p, 0, sizeof *p);
     p->installDir = "C:\\Program Files\\Image-Line\\FL Studio 2026";
     p->vfsInstall = "/fl";
-    /* 正規 username (CAB-213 で統一): vreg seed (env/known_folders/Shared data) と
-     * pathreg e2e 契約が "C:\Users\webstudio" を採用。 */
+    /* 正規 username (CAB-213 で統一): vreg seed / shimx 内蔵 (env.c/shell.c, CAB-214 で統一済み) /
+     * pathreg e2e 契約が全て "C:\Users\webstudio" を採用。予備 profile (user) は CAB-214 follow-up で退役。 */
     p->userProfile = "C:\\Users\\webstudio";
-    /* 予備 profile: shimx 内蔵 (env.c/shell.c, 読取専用) が "C:\Users\user" を返すため、
-     * 同一実体 (/c/home) への写像を既定表に維持して吸収する。shimx 取込時に統一予定。 */
-    p->user2Profile = "C:\\Users\\user";
     p->vfsHome = "/c/home";
     p->sharedDataDir = NULL;                                         /* NULL = <profile>\Documents\Image-Line */
     p->vfsSharedData = "/c/home/Documents/Image-Line";
@@ -194,8 +191,6 @@ int pathreg_set_paths(const PathRegPaths* p) {
     if (p->installDir && *p->installDir)
         pr_add(p->installDir, p->vfsInstall && *p->vfsInstall ? p->vfsInstall : "/fl", PATHREG_RO);
     pr_add_user_mounts(p->userProfile, p->vfsHome, p->sharedDataDir, p->vfsSharedData, p->vfsTmp);
-    if (p->user2Profile && *p->user2Profile && (!p->userProfile || strcasecmp(p->userProfile, p->user2Profile) != 0))
-        pr_add_user_mounts(p->user2Profile, p->vfsHome, p->sharedDataDir, p->vfsSharedData, p->vfsTmp);
     pr_add("C:", "/c", PATHREG_PERSIST);                              /* 残余のドライブ C (shimx 既定と同じ形) */
     return 0;
 }

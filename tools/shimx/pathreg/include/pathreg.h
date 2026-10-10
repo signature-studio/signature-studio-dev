@@ -10,9 +10,9 @@
  *      永続化の実体は JS 側 js/regbridge.mjs (Vreg 互換レコードを書く)。
  *
  * ビルド: shimx のソース群と一緒に本 dir の src (C ファイル) をリンクする (下流は build.sh 参照)。
- *   ※ vreg reg.c と shimx reg.c は同名シンボルで同時リンク不可 (vreg REPORT §7)。
- *     下流は「shimx reg.c を除外して vreg/src/reg.c を入れる」(推奨・通知フック有) か
- *     「shimx reg.c のまま」(後述の flush 時スナップショット差分で運用) のどちらか。
+ *   ※ CAB-214 で vreg reg.c の拡張 (vreg_* 運用フック) が shimx reg.c に取込済みで、vreg/src/reg.c は退役 (reg.c は shimx 1 本)。
+ *     下流は「vreg_* フックを export して通知で運用」(推奨) か「フック非 export」(後述の flush 時スナップショット差分で運用)
+ *     のどちらか (リンクするソースは同一)。
  */
 #ifndef PATHREG_H
 #define PATHREG_H
@@ -41,8 +41,7 @@ typedef struct PathRegMount {
 typedef struct PathRegPaths {
     const char* installDir;      /* FL インストール dir。→ vfsInstall。既定 C:\Program Files\Image-Line\FL Studio 2026 */
     const char* vfsInstall;      /* 既定 "/fl" (= E asset bundle mount 点, tools/assets/vfs/emscripten.ts) */
-    const char* userProfile;     /* %USERPROFILE%。既定 C:\Users\user (shimx SHGetFolderPathW / env 一致) */
-    const char* user2Profile;    /* 予備 profile (vreg seed の Shared data 値が使う C:\Users\webstudio)。NULL 可 */
+    const char* userProfile;     /* %USERPROFILE%。既定 C:\Users\webstudio (shimx SHGetFolderPathW / env / vreg seed 一致) */
     const char* vfsHome;         /* user profile の写像先。既定 "/c/home" */
     const char* sharedDataDir;   /* Shared data (Documents\Image-Line)。NULL = <userProfile>\Documents\Image-Line */
     const char* vfsSharedData;   /* 既定 "/c/home/Documents/Image-Line" */
@@ -98,9 +97,9 @@ int      pathreg_reg_seed_text(const char* regTextUtf8);  /* .reg テキスト�
  *     HKCU のみ永続 (HKLM 等は seed から毎回再構成)。これにより vreg Vreg アダプタと同一 profile を相互運用できる。
  *
  * [変更検出と flush 契約] (vreg REPORT §8-1 準拠)
- *   - vreg reg.c 結線時 (推奨): C→JS 通知 vreg_set_notify(addFunction 'vi') で dirty 化 → 遅延 flush
+ *   - vreg_* フック export 時 (推奨): C→JS 通知 vreg_set_notify(addFunction 'vi') で dirty 化 → 遅延 flush
  *     (flushDelayMs 既定 200ms) + 明示 flush 点。vreg_generation() で変化確認も可。
- *   - shimx reg.c のまま: 通知口が無いため flush 点で pathreg_reg_hash() (または export テキストの JS hash) を
+ *   - フック非 export: 通知口が使えないため flush 点で pathreg_reg_hash() (または export テキストの JS hash) を
  *     比較して差分時のみ保存。flush 点 = ① メッセージポンプの yield 点 ② pagehide / visibilitychange。
  *     ※ FL を Worker で回し Atomics.wait でブロックする間は JS タイマが走らない → setTimeout だけに頼らない
  *       こと (vreg REPORT §8-1)。regbridge は onYield() / onPageHide() を明示口として提供する。
@@ -110,9 +109,9 @@ int      pathreg_reg_seed_text(const char* regTextUtf8);  /* .reg テキスト�
  *         _shimx_reg_set_sz,_shimx_reg_set_dword,_shimx_reg_stats,_pathreg_map,_pathreg_normalize,
  *         _pathreg_install,_pathreg_add_mount,_pathreg_reg_hash,_pathreg_reg_changed,_pathreg_reg_mark_saved,
  *         _malloc,_free + EXPORTED_RUNTIME_METHODS: UTF8ToString,stringToUTF8,lengthBytesUTF8,stringToUTF16,HEAPU32
- *   vreg reg.c 結線時: 上記に加え _vreg_export_root,_vreg_clear_root,_vreg_generation,_vreg_set_notify,
+ *   vreg_* フック export 時: 上記に加え _vreg_export_root,_vreg_clear_root,_vreg_generation,_vreg_set_notify,
  *         _vreg_probe_* (+ addFunction/removeFunction, -sALLOW_TABLE_GROWTH=1)
- *   削除反映 (shimx reg.c のまま) 用: _RegDeleteValueW,_RegDeleteKeyW (import_text が削除構文を解釈しないため)
+ *   削除反映 (フック非 export 構成) 用: _RegDeleteValueW,_RegDeleteKeyW (import_text が削除構文を解釈しないため)
  *
  * [写像の既定表] pathreg_paths_init + pathreg_set_paths の既定値 (stub_plan §4 整合):
  *   C:\Program Files\Image-Line\FL Studio 2026  → /fl                              (RO, E asset bundle)

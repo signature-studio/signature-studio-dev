@@ -3,10 +3,10 @@
 //   実行: node test/e2e.mjs  (scripts/e2e.sh が 1 コマンド化)
 //
 // 検証内容:
-//   A. module-a (vreg reg.c 結線 = 本番構成): RegBridge で seed→書込→flush→「再起動」→復元。
+//   A. module-a (vreg_* フック export = 本番構成; reg.c は shimx 正本): RegBridge で seed→書込→flush→「再起動」→復元。
 //      flush タイミング契約 (遅延 / onYield / onPageHide / ブロック中は保存されない)。
 //      ★ 本物の vreg Vreg アダプタ (tools/startup/vreg/js/vreg.mjs) が同じ store レコードを読める相互運用。
-//   B. module-b (shimx reg.c のまま = 代替構成): 同様の往復 + built-in 既定値の削除が永続すること
+//   B. module-b (フック非 export = 代替構成; 通知口なし経路): 同様の往復 + built-in 既定値の削除が永続すること
 //      (shimx_reg_reset による復活を _applyDeletions が消す) + hash 変更検出。
 //   C. パス写像 C (pathreg_map) ↔ JS (pathmap.mjs) のクロスチェック (fixture 全件一致 + 逆写像)。
 import { readFileSync } from 'node:fs';
@@ -29,7 +29,7 @@ const INTL = 'Control Panel\\International';
 let pass = 0;
 const ok = (msg) => { pass++; console.log(`OK e2e: ${msg}`); };
 
-// ---------------------------------------------------------------- A. module-a (vreg 結線)
+// ---------------------------------------------------------------- A. module-a (vreg_* フック結線)
 {
   const store = new MemoryStore();
   const bridge = await RegBridge.create({ mod: await createA(), store, seed, profile: 'p-a', flushDelayMs: 0 });
@@ -41,10 +41,10 @@ const ok = (msg) => { pass++; console.log(`OK e2e: ${msg}`); };
   // ライセンス (既定 registered): ILRegKey が有る
   assert.equal(bridge.observeRegistration().registered, true);
 
-  // エンジン相当の書込 → 遅延 flush 経由で永続 (vreg reg.c の通知フック → dirty → setTimeout)
+  // エンジン相当の書込 → 遅延 flush 経由で永続 (shimx reg.c の通知フック vreg_set_notify → dirty → setTimeout)
   const b2 = await RegBridge.create({ mod: await createA(), store, seed, profile: 'p-a', flushDelayMs: 100 });
   assert.equal(b2.bootInfo.restored, true);
-  b2.writeStr('HKCU', GEN, 'LastProject', 'C:\\Users\\user\\Documents\\Image-Line\\FL Studio\\Projects\\demo.flp');
+  b2.writeStr('HKCU', GEN, 'LastProject', 'C:\\Users\\webstudio\\Documents\\Image-Line\\FL Studio\\Projects\\demo.flp');
   b2.writeInt('HKCU', GEN, 'Run counter', 41);
   assert.equal(b2.dirty, true);
   await new Promise((r) => setTimeout(r, 30));            // 遅延中 (未保存)
@@ -87,7 +87,7 @@ const ok = (msg) => { pass++; console.log(`OK e2e: ${msg}`); };
   ok(`A4: vreg Vreg 相互運用 (レコード互換, keys=${Object.keys(rec.hkcu).length})`);
 }
 
-// ---------------------------------------------------------------- B. module-b (shimx reg.c のまま)
+// ---------------------------------------------------------------- B. module-b (フック非 export)
 {
   const store = new MemoryStore();
   const bridge = await RegBridge.create({ mod: await createB(), store, seed, profile: 'p-b', flushDelayMs: 0 });
@@ -121,12 +121,13 @@ const ok = (msg) => { pass++; console.log(`OK e2e: ${msg}`); };
   const fixtures = [
     'C:\\Program Files\\Image-Line\\FL Studio 2026\\Data\\System\\Empty.flp',
     'C:\\PROGRAM FILES\\Image-Line\\FL Studio 2026\\Plugins\\Fruity\\Effects\\Fruity Send\\Fruity Send_x64.dll',
-    'C:\\Users\\user\\Documents\\Image-Line\\FL Studio\\Presets\\Plugin database\\Installed\\Effects\\VST\\Xfer Records, OTT.nfo',
-    'C:\\Users\\user\\Documents\\Image-Line\\FL Studio\\Presets\\Plugin database\\Installed\\VerifiedIDs.nfo',
+    'C:\\Users\\webstudio\\Documents\\Image-Line\\FL Studio\\Presets\\Plugin database\\Installed\\Effects\\VST\\Xfer Records, OTT.nfo',
+    'C:\\Users\\webstudio\\Documents\\Image-Line\\FL Studio\\Presets\\Plugin database\\Installed\\VerifiedIDs.nfo',
     'C:\\Users\\webstudio\\Documents\\Image-Line\\FL Studio\\Settings\\Manifest.xml',
-    'C:\\Users\\user\\AppData\\Roaming\\Image-Line\\Shared\\config.xml',
-    'C:\\Users\\user\\AppData\\Local\\Temp\\Image-Line\\9-2\\zip\\inner.bin',
-    'C:\\Users\\user\\AppData\\Local\\Image-Line\\QuickFontCache.dat',
+    'C:\\Users\\webstudio\\AppData\\Roaming\\Image-Line\\Shared\\config.xml',
+    'C:\\Users\\webstudio\\AppData\\Local\\Temp\\Image-Line\\9-2\\zip\\inner.bin',
+    'C:\\Users\\webstudio\\AppData\\Local\\Image-Line\\QuickFontCache.dat',
+    'C:\\Users\\user\\Documents\\Image-Line\\retired.txt',   // 退役した予備 profile: 残余 C: 規則で C/JS 一致
     'C:\\Windows\\notepad.exe',
     'C:\\foo\\..\\bar\\./x',
     'D:\\unmapped\\path.txt',

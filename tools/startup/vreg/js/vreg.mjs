@@ -1,5 +1,5 @@
 // vreg.mjs — 仮想レジストリ アダプタ (JS 側)。
-//   C 側 (vreg/src/reg.c = shimx reg.c 派生) が Reg* API 本体。ここは seed 投入・永続化 (store)・.reg 入出力・ライセンス状態の切替を担当。
+//   C 側 (shimx/src/reg.c が正本, CAB-214 で vreg 拡張を取込済み) が Reg* API 本体。ここは seed 投入・永続化 (store)・.reg 入出力・ライセンス状態の切替を担当。
 //   hostbridge 規約に合わせ: ESM (.mjs) / 外部依存なし / wasm モジュールは factory (createModule) を注入 / 永続化は注入式 store。
 import { ROOTS, ROOT_NAME, parseToModel, parseReg, applyOps, serializeReg, regBytes, emptyModel, setValue, deleteKey, deleteValue,
   getValue, fillMissing, countModel, decodeRegBytes, valueText } from './regfile.mjs';

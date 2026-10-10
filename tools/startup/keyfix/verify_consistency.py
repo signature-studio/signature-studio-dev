@@ -5,7 +5,8 @@ ALL PASS 条件:
   1. seed entries の (hive,key,name) 一意 (重複 0)
   2. key=null エントリ ≤ 20 (CAB-213 の目標)
   3. username 表記: seed 内の C:\\Users\\<name> は正規 'webstudio' に統一
-     (pathreg 既定マウント表は webstudio=正規 + user=shimx 内蔵予備の 2 表記を同一実体へ写像)
+     (shimx 内蔵値も CAB-214 で webstudio に統一済み。pathreg 既定マウント表は webstudio のみ —
+      予備 profile `user2Profile` (user) は CAB-214 follow-up で退役)
   4. seed 'Shared data' 値と pathreg 既定マウント (webstudio\\Documents\\Image-Line →
      /c/home/Documents/Image-Line) が同一実体
   5. apply=true エントリは全て key を持ち、value が空でない
@@ -19,8 +20,8 @@ KEYS = '/home/ubuntu/work/webstudio/tools/startup/vreg/data/keys.json'
 PATHMAP_JS = '/home/ubuntu/work/webstudio/tools/shimx/pathreg/js/pathmap.mjs'
 PATHMAP_C = '/home/ubuntu/work/webstudio/tools/shimx/pathreg/src/pathmap.c'
 
-CANON = 'webstudio'          # 正規 username (CAB-213 確定)
-SECOND = 'user'              # shimx 内蔵 (読取専用) — pathreg 予備 profile で吸収
+CANON = 'webstudio'          # 正規 username (CAB-213 確定 / CAB-214 で shimx 内蔵値も統一)
+RETIRED = 'user'             # 旧 shimx 内蔵値 — pathreg 予備 profile (user2Profile) は退役済み
 
 fails = []
 
@@ -51,15 +52,17 @@ for e in entries:
 for k in ('env', 'known_folders'):
     for m in re.finditer(r'C:\\\\Users\\\\([A-Za-z0-9_\-]+)', json.dumps(seed.get(k, {}), ensure_ascii=False)):
         users.add(m.group(1))
-extra = users - {CANON, SECOND, 'GENERATE_ONCE_PER_PROFILE'}
-check('seed username 表記 = 正規 %s (+予備 %s)' % (CANON, SECOND), not extra, 'users=%s' % sorted(users))
+extra = users - {CANON, 'GENERATE_ONCE_PER_PROFILE'}
+check('seed username 表記 = 正規 %s のみ' % CANON, not extra, 'users=%s' % sorted(users))
 
 # 4. Shared data ↔ pathreg 既定マウント
 sd = next(e for e in entries if e['name'] == 'Shared data' and e['group'] == 'paths')
 pm_c = open(PATHMAP_C, encoding='utf-8').read()
 pm_js = open(PATHMAP_JS, encoding='utf-8').read()
-ok_c = ('userProfile = "C:\\\\Users\\\\%s"' % CANON) in pm_c and ('user2Profile = "C:\\\\Users\\\\%s"' % SECOND) in pm_c
-check('pathreg C 既定: 正規 %s primary / %s secondary' % (CANON, SECOND), ok_c)
+ok_c = ('userProfile = "C:\\\\Users\\\\%s"' % CANON) in pm_c and 'user2Profile' not in pm_c
+check('pathreg C 既定: 正規 %s のみ (予備 %s 退役済み)' % (CANON, RETIRED), ok_c)
+ok_js = ("userProfile: 'C:\\\\Users\\\\%s'" % CANON) in pm_js and 'user2Profile' not in pm_js
+check('pathreg JS ミラー既定: 正規 %s のみ (予備 %s 退役済み)' % (CANON, RETIRED), ok_js)
 target = sd['value'].replace('C:\\\\%s\\\\Documents\\\\Image-Line\\\\' % CANON, '/c/home/Documents/Image-Line')
 check('seed "Shared data" → /c/home/Documents/Image-Line (同一実体)',
       sd['value'] == 'C:\\Users\\%s\\Documents\\Image-Line\\' % CANON, sd['value'])

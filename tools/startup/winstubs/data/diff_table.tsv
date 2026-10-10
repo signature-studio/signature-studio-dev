@@ -41,17 +41,17 @@ G04.01	GetComputerNameW	G04	MATCH	ret=1 name=WEBSTUDIO n=9	ret=1 name=WEBSTUDIO 
 G04.02	GetComputerNameExW	G04	MATCH	ret=1 name=WEBSTUDIO n=9	ret=1 name=WEBSTUDIO n=9
 G04.03	GetComputerNameW	G04	MATCH	ret=0 need=10 err=111	ret=0 need=10 err=111
 G04.04	RegOpenKeyExA,RegQueryValueExA	G04	MATCH	open=0 query=0 type=1 guid=11111111-2222-4333-8444-555555555555	open=0 query=0 type=1 guid=11111111-2222-4333-8444-555555555555
-G04.05	SHGetFolderPathW	G04	DIFF	hr=0x0 path=C:\Users\webstudio\Documents	hr=0x0 path=C:\Users\user\Documents
-G04.06	SHGetFolderPathW	G04	DIFF	hr=0x0 path=C:\Users\webstudio\AppData\Roaming	hr=0x0 path=C:\Users\user\AppData\Roaming
-G04.07	SHGetFolderPathW	G04	DIFF	hr=0x0 path=C:\Users\webstudio\AppData\Local	hr=0x0 path=C:\Users\user\AppData\Local
+G04.05	SHGetFolderPathW	G04	MATCH	hr=0x0 path=C:\Users\webstudio\Documents	hr=0x0 path=C:\Users\webstudio\Documents
+G04.06	SHGetFolderPathW	G04	MATCH	hr=0x0 path=C:\Users\webstudio\AppData\Roaming	hr=0x0 path=C:\Users\webstudio\AppData\Roaming
+G04.07	SHGetFolderPathW	G04	MATCH	hr=0x0 path=C:\Users\webstudio\AppData\Local	hr=0x0 path=C:\Users\webstudio\AppData\Local
 G04.08	SHGetFolderPathW	G04	MATCH	hr=0x80070057	hr=0x80070057
-G04.09	SHGetFolderPathW	G07	DIFF	hr=0x0 path=C:\Users\webstudio\Documents attr_dir=1	hr=0x0 path=C:\Users\user\Documents attr_dir=1
-G04.10	SHGetSpecialFolderPathW	G04	DIFF	ret=1 path=C:\Users\webstudio\AppData\Local	ret=1 path=C:\Users\user\AppData\Local
-G04.11	SHGetKnownFolderPath	G04	DIFF	hr=0x0 path=C:\Users\webstudio\Documents	hr=0x0 path=C:\Users\user\Documents
+G04.09	SHGetFolderPathW	G07	MATCH	hr=0x0 path=C:\Users\webstudio\Documents attr_dir=1	hr=0x0 path=C:\Users\webstudio\Documents attr_dir=1
+G04.10	SHGetSpecialFolderPathW	G04	MATCH	ret=1 path=C:\Users\webstudio\AppData\Local	ret=1 path=C:\Users\webstudio\AppData\Local
+G04.11	SHGetKnownFolderPath	G04	MATCH	hr=0x0 path=C:\Users\webstudio\Documents	hr=0x0 path=C:\Users\webstudio\Documents
 G04.12	SHGetKnownFolderPath	G04	MATCH	hr=0x80070002 out_null=1	hr=0x80070002 out_null=1
-G04.13	GetTempPathW	G07	DIFF	n=38 path=C:\Users\webstudio\AppData\Local\Temp\	n=33 path=C:\Users\user\AppData\Local\Temp\
-G04.14	GetTempPathW	G07	DIFF	need=39	need=34
-G04.15	LoadLibraryW	G04	DIFF	dll=1 proc=1 hr=0x0 path=C:\Users\webstudio\Documents	dll=1 proc=1 hr=0x0 path=C:\Users\user\Documents
+G04.13	GetTempPathW	G07	MATCH	n=38 path=C:\Users\webstudio\AppData\Local\Temp\	n=38 path=C:\Users\webstudio\AppData\Local\Temp\
+G04.14	GetTempPathW	G07	MATCH	need=39	need=39
+G04.15	LoadLibraryW	G04	MATCH	dll=1 proc=1 hr=0x0 path=C:\Users\webstudio\Documents	dll=1 proc=1 hr=0x0 path=C:\Users\webstudio\Documents
 G04.16	GetProcAddress	G04	MISSING	proc_known=1	(API が存在しない)
 G04.17	GetProcAddress	G04	MATCH	proc_miss=1 err=127	proc_miss=1 err=127
 G04.18	GetModuleFileNameW	G03	MATCH	ret_exe=51 path=C:\Program Files\Image-Line\FL Studio 2026\FL64.exe	ret_exe=51 path=C:\Program Files\Image-Line\FL Studio 2026\FL64.exe
@@ -63,9 +63,9 @@ ENV.03	SetEnvironmentVariableW	G07	MATCH	ret=1	ret=1
 ENV.04	GetEnvironmentVariableW	G07	MATCH	n=40 val=C:\Users\webstudio\Documents\Image-Line\	n=40 val=C:\Users\webstudio\Documents\Image-Line\
 ENV.05	SetEnvironmentVariableW	G07	MATCH	ret=1	ret=1
 ENV.06	GetEnvironmentVariableW	G07	MATCH	n=0 err=203	n=0 err=203
-ENV.07	ExpandEnvironmentStringsW	G08	DIFF	n=36 val=C:\Users\webstudio\x%NO_SUCH_VAR_X%	n=31 val=C:\Users\user\x%NO_SUCH_VAR_X%
-ENV.08	ExpandEnvironmentStringsW	G08	DIFF	need=35	need=30
-ENV.09	GetEnvironmentVariableW	G08	DIFF	n=9 val=webstudio	n=4 val=user
+ENV.07	ExpandEnvironmentStringsW	G08	MATCH	n=36 val=C:\Users\webstudio\x%NO_SUCH_VAR_X%	n=36 val=C:\Users\webstudio\x%NO_SUCH_VAR_X%
+ENV.08	ExpandEnvironmentStringsW	G08	MATCH	need=35	need=35
+ENV.09	GetEnvironmentVariableW	G08	MATCH	n=9 val=webstudio	n=9 val=webstudio
 TIME.01	QueryPerformanceFrequency	-	MATCH	qpf=1000000	qpf=1000000
 TIME.02	QueryPerformanceCounter	-	MATCH	qpc_mono=1	qpc_mono=1
 TIME.03	timeGetTime	-	MATCH	tgt_mono=1 tick_mono=1	tgt_mono=1 tick_mono=1

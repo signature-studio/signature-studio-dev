@@ -4,6 +4,12 @@
 書込範囲: `tools/shimx/pathreg/` のみ (shimx 既存ファイル・tools/startup・tools/assets・tools/hostbridge は無変更, `git status` で `?? tools/shimx/pathreg/` のみ)
 検収: **`bash tools/shimx/pathreg/scripts/e2e.sh` → exit 0 (8.5 秒)**。`bash tools/shimx/test.sh --quick` も PASS を確認 (影響 0)
 
+> **更新 2026-10-10 (CAB-214 follow-up, shimx REPORT §12)**: shimx の username 統一 (`C:\Users\webstudio`) と vreg reg.c の取込・退役に伴い、
+> ①予備 profile `user2Profile` (`C:\Users\user` の alias mount 6 本) を**退役** (既定表は install + webstudio×6 + `C:` = **8 本**。C/JS 既定・
+> `PathRegPaths` から `user2Profile` 削除。fixture は webstudio 表記に更新し、退役 alias が残余 `C:` 規則 `/c/Users/user/...` に落ちる陰性確認を C/JS/e2e に追加)、
+> ②`module-a` は shimx 全 src (reg.c 含む) + vreg `probe.c` のリンクに変更 (vreg/src/reg.c は削除済み)。以下の本文中の「vreg reg.c 結線」は
+> 「vreg_* フック export 構成」、「2 種の profile」は「webstudio のみ」と読み替える。e2e 6 groups PASS 維持。
+
 ## 0. 結論 (数値は全て実測)
 
 1. **パス写像インタフェースを実装し、C (wasm) と JS の双方で同一結果になることを 15 fixture で検証した**。
@@ -23,6 +29,7 @@
 4. **発見 (CAB-213 へ)**: shimx 内蔵の `SHGetFolderPathW`/環境変数は `C:\Users\user` 固定に対し、vreg seed の
    `Shared data` 値は `C:\Users\webstudio\Documents\Image-Line\` (推定)。両方を既定マウント表に登録して
    同一実体へ写像することで当面は吸収した (§3)。実キー確定時にどちらかに統一すること。
+   **→ 解消 (CAB-213 + CAB-214 + follow-up)**: webstudio に統一済み、予備 `user` mount は退役。
 
 ## 1. 成果物 (`tools/shimx/pathreg/`)
 
@@ -36,7 +43,7 @@
 | `test/test_pathreg.c` (229 行) | C 単体 (shimx 結合含む)。`build.sh test` で ST/MT 両方実行 |
 | `test/pathmap.test.mjs` (86 行) | JS 単体 (node:test 4 件) |
 | `test/e2e.mjs` (181 行) | e2e: モック永続化層 (MemoryStore) で「再起動」を含む往復 + **本物の vreg Vreg との相互運用** + C↔JS 写像クロスチェック |
-| `scripts/build.sh` | `test` / `module-a` (vreg reg.c 結線) / `module-b` (shimx reg.c のまま) / `all`。emcc フラグは shimx `flags.sh` を流用 |
+| `scripts/build.sh` | `test` / `module-a` (vreg_* フック export + probe.c 同梱) / `module-b` (フック非 export) / `all`。emcc フラグは shimx `flags.sh` を流用 |
 | `scripts/e2e.sh` | 1 コマンド検収 (build → C 単体 ST/MT → JS 単体 → e2e) |
 
 vreg 資産の利用は **import のみ** (読取専用遵守): `regfile.mjs` (model/serialize)・`seed.mjs` (`resolveSeed`)・
@@ -61,7 +68,7 @@ vreg 資産の利用は **import のみ** (読取専用遵守): `regfile.mjs` (m
 | `<profile>\AppData\Local\Temp\Image-Line` | `/c/tmp` | TMP (S18 の一時 dir。Local より長い接頭辞で勝つ) |
 | `<profile>\AppData\Local` | `/c/home/AppData/Local` | PERSIST (%LOCALAPPDATA%) |
 | `<profile>\AppData\Roaming\Image-Line` | `/c/home/AppData/Roaming/Image-Line` | PERSIST |
-| `<profile>` | `/c/home` | PERSIST (`<profile>` は `C:\Users\user` と `C:\Users\webstudio` の 2 種を登録) |
+| `<profile>` | `/c/home` | PERSIST (`<profile>` = `C:\Users\webstudio` のみ。旧予備 `C:\Users\user` は退役) |
 | `C:` | `/c` | PERSIST (shimx 既定と同じ形。表を自己完結させるため明示) |
 
 照合は**大小無視・最長一致** (同長は後勝ち、セグメント境界必須)。未登録 (`D:\` 等や POSIX 形) は
@@ -98,9 +105,9 @@ wasm (shimx Reg* + pathreg) ⇄ RegBridge (js/regbridge.mjs) ⇄ store {load,sav
 
 ### 3.2 2 つのリンク構成 (自動判別: `_vreg_export_root` の有無)
 
-| | (a) vreg reg.c 結線 (本番推奨) | (b) shimx reg.c のまま |
+| | (a) vreg_* フック export (本番推奨; module-a) | (b) フック非 export (module-b) |
 |---|---|---|
-| リンク | shimx src から `reg.c` を除外し `vreg/src/{reg,probe}.c` を追加 (vreg REPORT §7 の指示どおり) | shimx src のまま |
+| リンク | shimx src 全部 (reg.c は CAB-214 で vreg 拡張取込済み) + `vreg/src/probe.c` を追加。`vreg_*` を EXPORTED に載せる | shimx src のまま (`vreg_*` 非 export) |
 | 変更検出 | `vreg_set_notify` (addFunction 'vi') → dirty → 遅延 flush。`vreg_generation` で確認 | flush 点で `pathreg_reg_hash` (FNV-1a 64bit) を前回保存値と比較。通知口を増やしたい場合は CAB-101 が Reg* 呼出を wrap して `_pathreg_reg_mark_saved` 相当を叩ける (本実装は不要と判断) |
 | 復元 | `vreg_clear_root(HKCU)` → 永続 model + `fillMissing(seed)` を import (削除含め永続値が正) | `shimx_reg_reset` は使わず (新規インスタンス = 内蔵既定のみ)、import 後に**内蔵既定 HKCU にあって永続 model に無い値/キーを Reg* で差分削除** (`_applyHkcuDeletions`) |
 | seed 投入 | `shimx_reg_import_text` 一括 (=CAB-98 の `shimx_reg_set*` 個別投入も可。両方テスト済) | 同左 |
@@ -114,7 +121,7 @@ e2e 実測: 復元後の `Software\Image-Line\FL Studio 26\General\Run counter` 
 
 ```js
 // 1) モジュール: tools/shimx/pathreg/scripts/build.sh module-a の構成で lift 済み FL とリンク
-//    (shimx src から reg.c を除き vreg/src/{reg,probe}.c + tools/shimx/pathreg/src/*.c を追加。
+//    (shimx src 全部 (reg.c 含む) + vreg/src/probe.c + tools/shimx/pathreg/src/*.c を追加。
 //     EXPORTED_FUNCTIONS は include/pathreg.h の一覧 + FL 本体が必要な分)
 import createPathregModule from '<...>/module_a.mjs';
 const mod = await createPathregModule();
@@ -158,9 +165,9 @@ E (asset-vfs) 側は無変更で良い (`/fl` mount 点と vpath = tree 相対�
 | # | チケット | 要点 |
 |---|---|---|
 | 1 | CAB-101 (実FL結線) | §4 の手順で lift 済み FL + E + RegBridge を 1 プロセスに結線。`SHIMX_TRACE` で Reg*/CreateFile の実呼出を観測し、既定マウント表と seed 値のずれ (username 問題含む) を確定する |
-| 2 | CAB-213 (パス実キー確定) | `C:\Users\user` (shimx 内蔵) vs `C:\Users\webstudio` (vreg seed) の統一。`pathreg_set_paths` 1 箇所 + seed 値修正で済む設計にしてある |
+| 2 | ~~CAB-213 (パス実キー確定)~~ | 完了 (webstudio 統一; 予備 `user` mount は CAB-214 follow-up で退役) |
 | 3 | E 側書込領域 | `/c/home`, `/c/tmp` の IDBFS/OPFS mount 実装と、`onPageHide` での IDBFS sync (`FS.syncfs`) 接続。flush 契約は本 REPORT §3.1 を流用可 |
-| 4 | vreg 取込の恒久化 | shimx 本体への reg.c 差分取込 (vreg REPORT §7 の提案) を行った場合、本 bridge は構成 (a) のみで動く (構成 b のコードは退役可。判別は自動) |
+| 4 | ~~vreg 取込の恒久化~~ | 完了 (CAB-214: shimx reg.c が正本、vreg/src/reg.c 削除)。構成 (b) は「通知口を export しない」代替経路として存続 (コード退役は任意) |
 
 ## 8. 規約遵守メモ
 

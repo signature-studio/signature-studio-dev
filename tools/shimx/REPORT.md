@@ -1,6 +1,6 @@
 # tools/shimx REPORT — Win32/CRT shim 拡張 (担当 Q)
 
-- 日付: 2026-10-10 (初版) / **2026-10-10 更新: CAB-211 — M11 リンク フィードバック R1〜R8 対応 (§9)** / **2026-10-10 更新: CAB-214 — vreg reg.c 本体取込 + username 統一 (§11)** / 検証環境: emcc 6.0.12, node v24.19.0 (emsdk 同梱), llvm-nm
+- 日付: 2026-10-10 (初版) / **2026-10-10 更新: CAB-211 — M11 リンク フィードバック R1〜R8 対応 (§9)** / **2026-10-10 更新: CAB-214 — vreg reg.c 本体取込 + username 統一 (§11)** / **2026-10-10 更新: CAB-214 follow-up — 後始末 3 件 (vreg 薄ラッパ化 / pathreg 予備 profile 退役 / winstubs wrap 5 API 退役, §12)** / 検証環境: emcc 6.0.12, node v24.19.0 (emsdk 同梱), llvm-nm
 - 書込範囲: `tools/shimx/` のみ。`tools/shim` `tools/m2` `tools/m6` `tools/m8` `tools/m11` `tools/plugins` `tools/startup` `tools/targets` は読取のみ (改変 0 行)。
 - 検収: `bash tools/shimx/test.sh` → **exit 0** (約 20 秒。`--quick` で OTT 再リンクを省略)
 
@@ -230,7 +230,7 @@ CAB-213 §3 の正規表記へ shimx 内蔵値を統一 (pathreg の alias mount
 
 **触っていないもの**: `tools/shimx/pathreg/` 全体 (V18 検収が読み中のため読取のみ) / `src/reg.c` の seed 内 `RegisteredOwner="user"` (Windows の登録所有者名でユーザ profile 路線でない。vreg seed 236 エントリにも含まれず影響 0)。
 
-### 11.3 vreg 側の薄ラッパ化 / 退役方針 (別作業用 — 本チケットでは vreg 無改変)
+### 11.3 vreg 側の薄ラッパ化 / 退役方針 (別作業用 — 本チケットでは vreg 無改変) — **→ 実施済み (§12.1)**
 
 vreg (`tools/startup/vreg/`) は **1 行も変更していない** (vreg.sh 再実行で data/seed.json 等バイト不変を実測済)。
 現状の vreg `build.sh` は shimx `src/*.c` から `reg.c` を除外して自前 `src/reg.c` をリンクしているが、
@@ -242,7 +242,7 @@ vreg (`tools/startup/vreg/`) は **1 行も変更していない** (vreg.sh 再�
    の名前が shimx 側でも不変のため **無変更で動作する**
 4. 退役後も `build.sh symcheck` は「自前 vs shimx」の退化検査として残せる (追加 0 を維持)
 
-### 11.4 pathreg 予備 profile (`user2Profile`) の退役手順 (別タスク用)
+### 11.4 pathreg 予備 profile (`user2Profile`) の退役手順 (別タスク用) — **→ 実施済み (§12.2)**
 
 username 統一により shimx は `C:\Users\user` を**発行しなくなった**ため、pathreg 既定表の
 `user2Profile = "C:\Users\user"` (pathmap.c 164 行, 予備 mount 4 本) は冗長。退役は pathreg 担当作業:
@@ -264,7 +264,7 @@ username 統一により shimx は `C:\Users\user` を**発行しなくなった
 | `bash tools/shimx/pathreg/scripts/e2e.sh` | **ALL PASS** (C 単体 ST/MT + JS 4/4 + e2e 6 groups。module-b = **shimx reg.c のまま**の構成で新 reg.c を実行して無劣化) |
 | winstubs/gui リンク共存 | `coexist_gui.sh`: 重複シンボル = **既知記録 1 件のみ** (`WTSRegisterSessionNotification`, shimx weak × gui 強定義の既存分)。winstubs 由来の重複 **0**。`verify_sig_ir.sh`: mismatch 0 + 陰性対照 1 検出。winstubs wrap 層経由の shimx 単体テスト ST/MT **ALL PASS** |
 
-### 11.6 winstubs への影響 (後続タスク)
+### 11.6 winstubs への影響 (後続タスク) — **→ 実施済み (§12.3)**
 
 username 統一により、winstubs (CAB-96) が wrap していた **5 API が shimx 単体で期待値一致**になった
 (`winstubs.sh` step 4 の「差分実装は不要」検査が FAIL 5 件: `SHGetFolderPathW` `SHGetSpecialFolderPathW`
@@ -281,3 +281,52 @@ username 統一により、winstubs (CAB-96) が wrap していた **5 API が s
    必要がなくなり、`vreg_generation()`/`vreg_set_notify()` で Reg 呼出トレース拡張が shimx 直結で可能
    (vreg REPORT §10 の提案がそのまま shimx で実施可)。
 3. **追加 6 API が GetProcAddress 組込み表に載った** (advapi32 532→538) — lift 側が動的解決しても解決する。
+
+## 12. CAB-214 follow-up: 後始末 3 件 (§11.3 / §11.4 / §11.6) — 全て実施
+
+**結論**: 3 件とも REPORT §11 の手順どおり実施し、回帰は全て exit 0 (§12.4)。shimx 本体 (`src/*.c`) は**コメント 1 箇所以外無変更** (挙動不変)。
+退役の本質は「同名シンボル同時リンク不可」の正式解消 (vreg) と「username 差の吸収層」の撤去 (pathreg alias mount / winstubs wrap) で、いずれも §11.2 の統一で不要になったもの。
+
+### 12.1 vreg 薄ラッパ化 (§11.3 の 4 手順)
+
+| 手順 | 実施 |
+|---|---|
+| 1. `SRCS` 除外工作の削除 | `vreg/build.sh`: `SRCS=("$SHIMX"/src/*.c)` (reg.c 含む) |
+| 2. `VSRC` から reg.c を外す | `VSRC=("$HERE/src/probe.c")` (probe.c はテスト/e2e 専用ヘルパとして継続) |
+| 3. `vreg/src/reg.c` 削除 | `git rm` (828 行)。JS (`js/*.mjs`) は**無変更**で動作 (`vreg_generation` 等の名前不変)。`src/vreg.h` は probe 宣言のみに縮小 (運用フック/追加 6 API の宣言は shimx.h に既存) |
+| 4. `symcheck` の継続 | 手順どおり「自前 vs shimx」比較は自前が無くなるため成立しない → **判断**: 「vreg が要求する公開面 (shimx.h 宣言の `Reg[A-Z]*` 全て + module の EXPORTED `vreg_*`/`shimx_reg_*`) を shimx reg.c が定義している」検査に差し替え (実測: 要求 38 シンボル / reg.c 公開 50 / 不足 0) |
+
+**手順書に無かった波及 (判断)**: `pathreg/scripts/build.sh module-a` が `vreg/src/reg.c` をリンクしていたため同時に修正 — shimx 全 src + `vreg/src/probe.c` + pathreg に変更
+(module-a = `vreg_*` フック export + probe 同梱の本番構成 / module-b = フック非 export の代替構成、として両方存続。regbridge の自動判別 (`_vreg_export_root` の有無) は不変)。
+
+### 12.2 pathreg 予備 profile `user2Profile` 退役 (§11.4 の 4 手順)
+
+| 手順 | 実施 |
+|---|---|
+| 1. `pathmap.c` | `pathreg_paths_init` の `user2Profile` 設定 + `pathreg_set_paths` の条件追加 mount を削除。構造体 `PathRegPaths.user2Profile` (pathreg.h) と JS ミラー (`js/pathmap.mjs` DEFAULT_PATHS + 2 profile ループ) も削除。既定表 **14→8 本** (install 1 + webstudio×6 + `C:` 1) |
+| 2. fixture の webstudio 化 | `test_pathreg.c` / `pathmap.test.mjs` / `e2e.mjs` の `C:\Users\user` → `webstudio`。**追加 (判断)**: 表件数 8 の厳密化 (旧 `>= 9`)、退役 alias `C:\Users\user\...` が残余 `C:` 規則 (`/c/Users/user/...`) に落ちる陰性確認を C / JS / e2e クロスチェック (fixture 15→16) に追加 |
+| 3. `pathreg_unmap` tie-break | コード無変更 (webstudio のみになり結果不変。e2e C グループの逆写像一致で確認) |
+| 4. 検収 + `verify_consistency.py` | `keyfix/verify_consistency.py`: 「+予備 user」文言と `user2Profile = "...user"` 必須判定を撤去し、「webstudio のみ + `user2Profile` 不在 (C / JS 各 1 項目)」に更新 (6→7 項目)。keyfix は shimx 取込完了を待って予備退役する計画 (keyfix REPORT §4-4) だったため整合 |
+
+### 12.3 winstubs wrap 5 API 退役 (§11.6)
+
+| API | 実施 |
+|---|---|
+| `SHGetFolderPathW` `SHGetSpecialFolderPathW` `SHGetKnownFolderPath` `GetTempPathW` | `wrap_list.txt` から削除 (16→12 本)。`ws_sys.c` の `fix_user`/`is_default_user_prefix`/`__wrap_*` 4 本と `ws_internal.h` の `__real_*` 4 宣言を削除。`api_matrix.tsv` impl `wrap`→`shimx`。CREATE フラグ (`CSIDL_FLAG_CREATE`/`KF_FLAG_CREATE`/Temp 作成) は shimx 側 (`shell.c` `mk_win_dir` / `file.c` `mkdirs`) が webstudio を作るため wrap 不要 (boot e2e G07 `created=1 writable=1` 維持) |
+| `ExpandEnvironmentStringsW` | wrap でなく `shimx+seed` 分類だった (§11.6 の 5 件目)。impl→`shimx` (既定環境表が webstudio で一致)。`winstubs_init` の env 上書きは `GetEnvironmentVariableW` (`LANG=en`) のため残置 |
+
+**判断**: `WsConfig.user` は存続 (ABI 維持)。ただし既定以外にすると env (`USERNAME`/`USERPROFILE` 等) のみ追従し、`SHGetFolderPathW`/`GetTempPathW` は shimx 固定の webstudio になる (従来は wrap の `fix_user` が追従)。
+使用箇所は現状ゼロ (テスト・下流とも既定値のみ) のため許容し、`ws_core.c` にコメントで明記。
+再計測 (`winstubs.sh` step 4): impl 内訳 `shimx` 23→**28** / `shimx+seed` 2→**1** / `wrap` 14→**10**、baseline 差分 MATCH 60→**72** / DIFF 40→**28** / MISSING 31 (不変)。「差分実装は不要」検査 FAIL 5→**0**、checks=1133 ALL PASS。
+
+### 12.4 回帰 (全て 2026-10-10 実測、exit 0)
+
+| 検証 | 結果 |
+|---|---|
+| `bash tools/shimx/test.sh` | **exit 0**: MT/ST PASS / fail-fast 8 / M4 53/53 / 署名突合 3 IR mismatch **0** / OTT t1 SHA **b5a91b9b2ee8da1e 不変** / 未実装 0 (担当 100.0%) |
+| `bash tools/startup/vreg/vreg.sh` | **ALL OK** (6/6 step: seed 再生成バイト不変 / C 単体 / shimx 結合 ST+MT+M4 / symcheck / wasm / node 22/22 / Chrome 実 IndexedDB) |
+| `bash tools/startup/keyfix/keyfix_e2e.sh` | **ALL OK** (entries=236 / apply=81 / key確定=113 / key=null=3 不変、`verify_consistency.py` **7 項目** ALL PASS) |
+| `bash tools/shimx/pathreg/scripts/e2e.sh` | **ALL PASS** (C 単体 ST/MT + JS 4/4 + e2e 6 groups, fixture 16) |
+| `bash tools/startup/winstubs/winstubs.sh` | **exit 0** (8/8 step: 131/131 行一致 ST/MT / リンク 67/67 / boot 21/21 / IR 署名 mismatch 0 + 陰性対照 1 / shimx 回帰 ST/MT PASS / **gui 共存**: 重複は既知記録 `WTSRegisterSessionNotification` 1 件のみ・winstubs 由来 0・GetProcAddress 不整合 0・gui 強定義 6/8) |
+| `bash tools/startup/pump/pump.sh` (波及確認; winstubs src を別 work で再ビルド) | **exit 0** (全 PASS) |
+

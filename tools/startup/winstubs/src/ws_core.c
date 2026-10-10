@@ -42,7 +42,8 @@ void winstubs_init(const WsConfig* in) {
     shimx_set_version(10, 0, 19045, 0, 0);                     /* G16: Windows 10 22H2 (vreg seed CurrentBuild=19045 と一致) */
     shimx_set_shell_execute_hook(ws_shell_hook);               /* B: ShellExecute 分類 */
 
-    /* vreg_seed.json の _env / _known_folders に合わせる (shimx 既定は "user") */
+    /* vreg_seed.json の _env / _known_folders に合わせる (shimx 既定も CAB-214 で webstudio に統一済みのため既定では no-op。
+     * cfg.user を既定以外にした場合は env のみ追従する — SHGetFolderPathW / GetTempPathW は shimx 固定の webstudio) */
     setenv_user("USERNAME", "%s", user);
     setenv_user("USERPROFILE", "C:\\Users\\%s", user);
     setenv_user("HOMEPATH", "\\Users\\%s", user);

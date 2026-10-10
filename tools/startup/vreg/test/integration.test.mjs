@@ -1,4 +1,4 @@
-// vreg 結合テスト: 実 wasm (shimx 派生 reg.c) × JS アダプタ × store。受入: Shared\Paths / MachineGuid / CurrentVersion、
+// vreg 結合テスト: 実 wasm (shimx 正本 reg.c) × JS アダプタ × store。受入: Shared\Paths / MachineGuid / CurrentVersion、
 // REGISTRY.csv 全キーの往復 (set→export→import→get)、リロードで HKCU 永続。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

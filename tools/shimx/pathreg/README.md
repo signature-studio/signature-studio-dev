@@ -13,7 +13,7 @@ Win パス/レジストリの意味論は変えず、ブラウザ側の実体 (O
 | `src/pathmap.c` | パス正規化 (参照実装) + マウント表 + `shimx_path_mapper_fn` 互換写像フック |
 | `src/regpersist.c` | レジストリ変更検出 (export → FNV-1a 64bit hash) + seed 投入口 |
 | `js/pathmap.mjs` | pathmap.c の JS ミラー (glue が起動前に配置先を計算する用) |
-| `js/regbridge.mjs` | Reg* ↔ vreg store (IndexedDB) ブリッジ。vreg reg.c 結線 / shimx reg.c 両対応 |
+| `js/regbridge.mjs` | Reg* ↔ vreg store (IndexedDB) ブリッジ。vreg_* 通知フック結線 / フック非 export (hash 差分) 両対応 |
 | `test/`, `scripts/` | C 単体 (ST/MT) / JS 単体 / e2e (モック永続化層) + 1 コマンド検収 |
 
 ## 検収

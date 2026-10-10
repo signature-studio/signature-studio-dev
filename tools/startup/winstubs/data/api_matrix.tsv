@@ -18,12 +18,12 @@ GetVersionExW	kernel32.dll	A	G16	shimx	y	10.0.19045
 RtlGetVersion	ntdll.dll	A	G16	new	y	shimx に無い
 GetComputerNameW	kernel32.dll	A	G04	shimx	y	"WEBSTUDIO"
 GetComputerNameExW	kernel32.dll	A	G04	shimx	y	"WEBSTUDIO"
-SHGetFolderPathW	shfolder.dll	A	G04	wrap	y	shimx 既定ユーザは "user"。seed は "webstudio" → 写像 + CSIDL_FLAG_CREATE を webstudio 側へ
-SHGetSpecialFolderPathW	shell32.dll	A	G07	wrap	y	同上 (shimx 内部呼出は --wrap の対象外のため別途)
-SHGetKnownFolderPath	shell32.dll	A	G04	wrap	y	同上
-GetTempPathW	kernel32.dll	A	G07	wrap	y	shimx 固定値 "user" → seed 値
+SHGetFolderPathW	shfolder.dll	A	G04	shimx	y	CAB-214 で shimx 既定が webstudio に統一 (CSIDL_FLAG_CREATE も shimx 側で webstudio を作成) → wrap 退役
+SHGetSpecialFolderPathW	shell32.dll	A	G07	shimx	y	同上 (wrap 退役)
+SHGetKnownFolderPath	shell32.dll	A	G04	shimx	y	同上 (KF_FLAG_CREATE も shimx 側; wrap 退役)
+GetTempPathW	kernel32.dll	A	G07	shimx	y	shimx 固定値が webstudio に統一 (CAB-214; Temp 実作成も shimx 側) → wrap 退役
 GetProcAddress	kernel32.dll	A	G04	shimx	y	SHFolder.dll!SHGetFolderPathW の動的束縛を含む
-ExpandEnvironmentStringsW	kernel32.dll	A	G08	shimx+seed	y	環境テーブルは winstubs_init が seed 値で上書き
+ExpandEnvironmentStringsW	kernel32.dll	A	G08	shimx	y	shimx 既定の環境テーブル (webstudio) で期待一致 (CAB-214)。seed 上書きは GetEnvironmentVariableW の LANG のみ必要
 GetEnvironmentVariableW	kernel32.dll	A	G08	shimx+seed	y	LANG="en" は winstubs_init が投入
 SetEnvironmentVariableW	kernel32.dll	A	G07	shimx	y	
 timeGetTime	winmm.dll	A	-	shimx	y	

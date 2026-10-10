@@ -1,7 +1,7 @@
 /* メモリ内レジストリ (advapi32 Reg*)。— shimx 正本。
  * CAB-214: tools/startup/vreg/src/reg.c (CAB-94) の拡張を本体取込し、二重管理を解消した。
- *   以後の改良は本ファイル (shimx) が正本。vreg 側は薄ラッパ (vreg/build.sh の SRCS 除外を廃止して
- *   本ファイルを直接リンク可能 — probe.c は vreg テスト専用として継続) への退役を推奨。
+ *   以後の改良は本ファイル (shimx) が正本。vreg 側は薄ラッパ化済み (CAB-214 follow-up: vreg/src/reg.c 削除、
+ *   vreg/build.sh は本ファイルを直接リンク — probe.c は vreg テスト専用として継続)。
  * - 5 ルート (HKCR/HKCU/HKLM/HKU/HKCC) の木構造。サブキーは名前順 (大小無視)、値は作成順で列挙
  * - 開いたキーは統一ハンドル表 (OBJ_KEY)。削除済みキーは ERROR_KEY_DELETED
  * - 既定値シード + `.reg` 風テキストの import/export (永続化は下流: IndexedDB 等)

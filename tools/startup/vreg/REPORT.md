@@ -2,6 +2,11 @@
 
 日付: 2026-10-10 / 担当: vreg / 書込範囲: `tools/startup/vreg/` のみ (tools/startup 直下の共通スクリプトは**無変更**) / 再現: `bash tools/startup/vreg/vreg.sh` (約 11 秒, `--no-chrome` `--no-shimx` 可)
 
+> **更新 2026-10-10 (CAB-214 follow-up, shimx REPORT §12 = 薄ラッパ化)**: Reg* 本体は **shimx `src/reg.c` が正本**になり、`vreg/src/reg.c` は**削除**した
+> (`build.sh` は shimx `src/*.c` 全部 + `src/probe.c` をリンク、SRCS 除外工作なし)。JS (`js/*.mjs`) は無変更で `vreg.sh` が通る。`build.sh symcheck` は
+> 「vreg が要求する公開面 (shimx.h 宣言の `Reg*` 全て + module の EXPORTED `vreg_*`/`shimx_reg_*`) を shimx reg.c が定義している」検査に差し替え。
+> 以下本文中の「vreg の reg.c / shimx 派生」は取込前 (CAB-94 時点) の記述 (履歴)。
+
 ## 0. 結論 (数値は全て実測。推定は「推定」と明記)
 
 1. **Reg\* API は shimx `reg.c` の派生 (`vreg/src/reg.c`: 686→828 行, shimx との差分 206 行) に集約**。FLEngine が import する 12 本 (W 11 + `RegOpenKeyExA`; +delay `RegDeleteKeyExW`)、FL64.exe の 3 本、m11 init closure IR が参照する 10 本の `Reg*` は**全て定義済み**。
@@ -16,8 +21,8 @@
 
 | パス | 内容 |
 |---|---|
-| `src/reg.c` | shimx `reg.c` 派生: 変更世代+通知、Enum の MORE_DATA 必要長、import 強化 (BOM / `[-key]` / `"v"=-` / `@=-`)、ルート単位 export/clear、追加 6 API |
-| `src/vreg.h`, `src/probe.c` | 追加面の宣言 / FL(Delphi TRegistry) と同じ呼出パターンの UTF-8 検証ヘルパ (テスト専用) |
+| ~~`src/reg.c`~~ | **削除 (CAB-214 follow-up)**。拡張 (変更世代+通知、Enum の MORE_DATA 必要長、import 強化、ルート単位 export/clear、追加 6 API) は `tools/shimx/src/reg.c` が正本 |
+| `src/vreg.h`, `src/probe.c` | probe 宣言 (運用フック・追加 6 API の宣言は shimx.h へ移管) / FL(Delphi TRegistry) と同じ呼出パターンの UTF-8 検証ヘルパ (テスト専用) |
 | `js/regfile.mjs` | `.reg` parse/serialize (UTF-16LE BOM / UTF-8 / BOM 無し UTF-16LE 復号、CRLF、継続行、全型、削除構文)、ツリーモデル |
 | `js/seed.mjs`, `js/vreg.mjs`, `js/store.mjs`, `js/cli.mjs` | seed 展開 / `Vreg` アダプタ (注入式 wasm factory + store) / `MemoryStore` `FileStore` `IdbStore` / import·export·show CLI |
 | `data/seed.json`, `keys.json`, `coverage.json` | seed (236) / REGISTRY.csv キー→具象キー (57) / 実測 coverage (テストが更新) |
@@ -91,7 +96,7 @@ CSV の key 数は startup REPORT の 46 (31/5/10) に対し本集計は 47 (33/
 
 ## 7. 境界メモ (実装していないもの / 他担当への連絡)
 
-- **CAB-96 win-stubs**: `Reg*` を定義しないこと。vreg の reg.c は shimx の reg.c と**同名シンボルなので同時リンク不可** → 下流ビルドは `shimx/src/*.c` から `reg.c` を除き `vreg/src/reg.c` を入れる (`build.sh` の `SRCS` 参照)。`Crypt*` スタブ/`OpenProcessToken`/`GetTokenInformation` は reg.c 同居のまま継承 (shimx 同一挙動)。
+- **CAB-96 win-stubs**: `Reg*` を定義しないこと。vreg の reg.c は shimx の reg.c と**同名シンボルなので同時リンク不可** → 下流ビルドは `shimx/src/*.c` から `reg.c` を除き `vreg/src/reg.c` を入れる (`build.sh` の `SRCS` 参照)。**[CAB-214 follow-up で解消: 同名衝突自体が無くなり、shimx `src/*.c` をそのままリンクすればよい]**`Crypt*` スタブ/`OpenProcessToken`/`GetTokenInformation` は reg.c 同居のまま継承 (shimx 同一挙動)。
 - 恒久化するなら shimx 側 (CAB-11 担当) へ本差分の取込を提案 (そうすれば二重管理が消える)。shimx は読取専用のため本チケットでは行わない。
 - 未実装 (曖昧/未使用で見送り): `RegNotifyChangeKeyValue` `RegConnectRegistry` `RegLoadKey/SaveKey/CopyTree/ReplaceKey` `RegQueryMultipleValues` `RegGetKeySecurity/SetKeySecurity` `RegOverridePredefKey` `RegOpenCurrentUser` `RegCreateKeyTransacted` `RegSetValueW/RegQueryValueW`(旧式) と GetProcAddress 組込み表 (`proctable.c`) への追加 6 API の登録 (静的 import のみ想定。必要になれば proctable 生成の対象に追加)。
 - WOW64 リダイレクトなし (`0x100/0x200` mask は無視; 1 本の木)。HKU/HKCC/HKCR は空 (HKCR は FL が `Software\Classes` を直接見るため不要の見込み)。`KEY_NOTIFY` 等は無視。
@@ -116,7 +121,7 @@ CSV の key 数は startup REPORT の 46 (31/5/10) に対し本集計は 47 (33/
 - **CAB-106 license-observation**: lift 後に `vreg` の open/read ログ + byte[0x14f84a8] を観測 (`Vreg` の `licenseFlagBit0` 0/1 で A/B、`General\TrialEdition` も記録)。`generation()` と通知フックで Reg 呼出トレースを取る拡張が容易。
 - vreg → hostbridge 結線: `Vreg.create` を startup-glue (T1) のブートに組込み、`flush()` を message-pump (T6) の yield 点に接続 (制限 1)。
 - `0x10c7cd0` 登録パーサの解読 (入力=ILRegKey 書式, MachineGuid 依存の有無)。
-- shimx 本体への reg.c 取込 (CAB-11) と vreg の薄い層化。
+- ~~shimx 本体への reg.c 取込 (CAB-11) と vreg の薄い層化。~~ → 完了 (取込 CAB-214 / 薄ラッパ化 CAB-214 follow-up)。
 - ~~low-key 112 エントリの実キー確定~~ は CAB-213 + §11 で完了 (112→3、上書き表は `scripts/build_seed.py` の OVERRIDES が正本)。残: lift 後 open ログによる推定 47 (placeholder 付き) の具体化 → OVERRIDES へ追記。
 
 ## 11. CAB-213 反映: key 上書き表 OVERRIDES の正本化 (CAB-213 follow-up)

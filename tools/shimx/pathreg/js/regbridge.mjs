@@ -4,9 +4,9 @@
 //     store は MemoryStore / FileStore / IdbStore (DB "webstudio-vreg" / store "profiles" / key=profile) をそのまま使える。
 //
 // 2 つのリンク構成を自動判別する (pathreg.h「ホストブリッジ (JS) フック契約」参照):
-//   - vreg reg.c 結線 (推奨; _vreg_export_root 等が有る): 通知フック (vreg_set_notify) で dirty 化 → 遅延 flush。
+//   - vreg_* フック結線 (推奨; _vreg_export_root 等が export されている。実体は shimx reg.c): 通知フック (vreg_set_notify) で dirty 化 → 遅延 flush。
 //     restore は vreg_clear_root(HKCU) 後に model を import (削除も model 演算で確実)。
-//   - shimx reg.c のまま (代替; 通知口なし): flush 点で C hash (pathreg_reg_hash) を比較して差分時のみ保存。
+//   - フック非 export (代替; 通知口なし): flush 点で C hash (pathreg_reg_hash) を比較して差分時のみ保存。
 //     restore は「内蔵既定の HKCU にあって永続 model に無い値/キー」を Reg* で差分削除 (_applyHkcuDeletions)。
 //
 // flush 契約 (vreg REPORT §8-1 準拠): 変更 → 遅延 flush (既定 200ms) に加え、メッセージポンプの yield 点で
@@ -69,7 +69,7 @@ export class RegBridge {
     this.chain = Promise.resolve();
     this.flushes = 0;
     this.bootInfo = {};
-    this.lastPersisted = null;       // { gen } (vreg 結線時) / { hash } (shimx reg.c のまま)
+    this.lastPersisted = null;       // { gen } (フック結線時) / { hash } (フック非 export)
     this.notifyFp = null;
   }
 
@@ -137,7 +137,7 @@ export class RegBridge {
 
     // C 側へ投入。C インスタンスは毎回新規 (= shimx 内蔵既定のみの状態) なので reset は不要。
     //   vreg 結線: 復元時は HKCU を clear してから live を import (削除も含め HKCU は永続値が正)。
-    //   shimx reg.c のまま: import 後、「内蔵既定の HKCU にあって live に無い値/キー」を差分削除
+    //   フック非 export: import 後、「内蔵既定の HKCU にあって live に無い値/キー」を差分削除
     //   (shimx の import は削除構文を解釈しないため。HKLM 等は vreg と同じくセッション内のみ)。
     let baseHkcu = null;
     if (this.hasVreg) {
@@ -159,7 +159,7 @@ export class RegBridge {
     if (!restored) await this.flush(true);   // 新規プロファイル: MachineGuid 等を直ちに永続
   }
 
-  /** 復元時 (shimx reg.c 構成) の HKCU 差分削除: 内蔵既定 (base) にあって永続 model (want) に無い
+  /** 復元時 (フック非 export 構成) の HKCU 差分削除: 内蔵既定 (base) にあって永続 model (want) に無い
    *  値/キーを Reg* で削除する。vreg 結線時は clear_root + import で同等になるため不要。
    *  ※ HKCU のみ (HKLM 等は vreg と同じく「セッション内のみ」)。深い順で削除 (RegDeleteKeyW は葉のみ) */
   _applyHkcuDeletions(want, base) {
@@ -257,7 +257,7 @@ export class RegBridge {
   async resetProfile() { await this.store.delete(this.profile); }
 
   // ------------------------- 検証用 API (FL と同じ呼出パターン / C へ書き込み) -------------------------
-  writeStr(hive, key, name, val) {   // shimx_reg_set_sz 経由 (vreg reg.c でも同名)
+  writeStr(hive, key, name, val) {   // shimx_reg_set_sz 経由
     const path = `${ROOT_NAME[hive]}${key ? '\\' + key : ''}`;
     return this._cstr(path, (a) => this._cstr(name, (b) => this._cstr(val, (c) => this.mod._shimx_reg_set_sz(a, b, c))));
   }
@@ -265,7 +265,7 @@ export class RegBridge {
     const path = `${ROOT_NAME[hive]}${key ? '\\' + key : ''}`;
     return this._cstr(path, (a) => this._cstr(name, (b) => this.mod._shimx_reg_set_dword(a, b, v >>> 0)));
   }
-  /** 値削除 (RegOpenKeyExW + RegDeleteValueW)。vreg 結線時は通知 → dirty、shimx reg.c のままでは
+  /** 値削除 (RegOpenKeyExW + RegDeleteValueW)。フック結線時は通知 → dirty、フック非 export では
    *  flush 点の hash 差分で検出される。戻り 0=削除 / -1=失敗 */
   deleteValue(hive, key, name) {
     const mod = this.mod;

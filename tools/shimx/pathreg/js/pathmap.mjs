@@ -14,8 +14,7 @@ export const FLAG_TMP = 4;
 export const DEFAULT_PATHS = {
   installDir: 'C:\\Program Files\\Image-Line\\FL Studio 2026',
   vfsInstall: '/fl',
-  userProfile: 'C:\\Users\\user',            // shimx SHGetFolderPathW / env と一致
-  user2Profile: 'C:\\Users\\webstudio',      // vreg seed "Shared data" 値 (推定)
+  userProfile: 'C:\\Users\\webstudio',       // shimx SHGetFolderPathW / env / vreg seed と一致 (CAB-213/214 で統一)
   vfsHome: '/c/home',
   sharedDataDir: null,                       // null = <profile>\Documents\Image-Line
   vfsSharedData: '/c/home/Documents/Image-Line',
@@ -55,8 +54,8 @@ export function defaultMounts(paths = DEFAULT_PATHS) {
   const mounts = [];
   const add = (win, target, flags) => mounts.push({ win: normalizeWinPath(win), target: target.replace(/\/+$/, ''), flags });
   if (paths.installDir) add(paths.installDir, paths.vfsInstall || '/fl', FLAG_RO);
-  for (const user of [paths.userProfile, paths.user2Profile]) {
-    if (!user) continue;
+  const user = paths.userProfile;
+  if (user) {
     const sd = paths.sharedDataDir || `${user}\\Documents\\Image-Line`;
     add(sd, paths.vfsSharedData || '/c/home/Documents/Image-Line', FLAG_PERSIST);
     add(`${user}\\AppData\\Roaming`, '/c/home/AppData/Roaming', FLAG_PERSIST);

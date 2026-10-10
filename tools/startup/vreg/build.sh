@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# vreg ビルド: shimx/src/*.c から reg.c を除き、vreg/src/{reg,probe}.c に差し替えてリンク。
+# vreg ビルド: shimx/src/*.c (reg.c 含む — CAB-214 で shimx が正本化) + vreg/src/probe.c (テスト専用ヘルパ) をリンク。
 #   build.sh test    : C 単体テスト (build/test_vreg.cjs)
-#   build.sh shimx   : shimx 既存テスト一式 (core/sys/ole_shell + M4 互換) を vreg の reg.c で実行
+#   build.sh shimx   : shimx 既存テスト一式 (core/sys/ole_shell + M4 互換) を probe.c 同梱で実行
 #   build.sh module  : node/ブラウザ共用 wasm モジュール (build/vreg_wasm.mjs, SINGLE_FILE, ES6)
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
@@ -9,8 +9,8 @@ SHIMX="$HERE/../../shimx"
 B="$HERE/build"; mkdir -p "$B"
 set +u; . /opt/emsdk/emsdk_env.sh >/dev/null 2>&1 || true; set -u
 source "$SHIMX/flags.sh"
-SRCS=(); for f in "$SHIMX"/src/*.c; do [ "$(basename "$f")" = reg.c ] || SRCS+=("$f"); done
-VSRC=("$HERE/src/reg.c" "$HERE/src/probe.c")
+SRCS=("$SHIMX"/src/*.c)
+VSRC=("$HERE/src/probe.c")
 INC=(-I"$SHIMX/src" -I"$HERE/src")
 case "${1:-test}" in
   test)
@@ -34,13 +34,14 @@ case "${1:-test}" in
       -sEXPORTED_FUNCTIONS="$EXP" -sEXPORTED_RUNTIME_METHODS=UTF8ToString,stringToUTF8,lengthBytesUTF8,addFunction,removeFunction,HEAPU8,HEAPU32 \
       "${INC[@]}" "${SRCS[@]}" "${VSRC[@]}" -o "$B/vreg_wasm.mjs"
     ls -l "$B/vreg_wasm.mjs" ;;
-  symcheck)   # shimx の reg.c が公開する全シンボルを vreg の reg.c が包含する (差し替えで未解決が出ない) ことの検査
+  symcheck)   # vreg が要求する公開面 (shimx.h 宣言の Reg* 全て + module の EXPORTED の vreg_*/shimx_reg_*) を shimx reg.c が定義している検査
     mkdir -p "$HERE/work"
     emcc "${SHIMX_CLANG_FLAGS[@]}" -c "${INC[@]}" "$SHIMX/src/reg.c" -o "$HERE/work/shimx_reg.o"
-    emcc "${SHIMX_CLANG_FLAGS[@]}" -c "${INC[@]}" "$HERE/src/reg.c" -o "$HERE/work/vreg_reg.o"
     syms() { llvm-nm --defined-only -g "$1" | awk '$2=="T"||$2=="W"{print $3}' | sort; }
-    miss="$(comm -23 <(syms "$HERE/work/shimx_reg.o") <(syms "$HERE/work/vreg_reg.o"))"
-    [ -z "$miss" ] || { echo "vreg reg.c に不足: $miss"; exit 1; }
-    echo "[vreg] symcheck OK: shimx reg.c の公開 $(syms "$HERE/work/shimx_reg.o" | wc -l) シンボルを全て包含 (追加 $(comm -13 <(syms "$HERE/work/shimx_reg.o") <(syms "$HERE/work/vreg_reg.o") | wc -l))" ;;
+    need="$( { grep -oE '\bReg[A-Z][A-Za-z]*\(' "$SHIMX/src/shimx.h" | tr -d '(';
+               sed -n 's/^ *EXP=.*_shimx_init,\(.*\)'"'"'$/\1/p' "$HERE/build.sh" | tr ',' '\n' | grep -E '^_(vreg_|shimx_reg_)' | sed 's/^_//'; } | sort -u)"
+    miss="$(comm -23 <(printf '%s\n' "$need") <(syms "$HERE/work/shimx_reg.o"))"
+    [ -z "$miss" ] || { echo "shimx reg.c に不足: $miss"; exit 1; }
+    echo "[vreg] symcheck OK: vreg 要求 $(printf '%s\n' "$need" | wc -l) シンボルを shimx reg.c が全て定義 (reg.c 公開 $(syms "$HERE/work/shimx_reg.o" | wc -l))" ;;
   *) echo "usage: build.sh test|shimx|module|symcheck"; exit 2 ;;
 esac

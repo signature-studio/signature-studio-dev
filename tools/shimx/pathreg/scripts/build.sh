@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # pathreg ビルド (CAB-168)。成果物は tools/shimx/pathreg/build/ (gitignore)。
 #   build.sh test      : C 単体テスト (ST/MT) → build/test_pathreg_{st,mt}.cjs
-#   build.sh module-a  : 本番構成モジュール = shimx src (reg.c 除外) + vreg reg.c/probe.c + pathreg
-#                        (build/module_a.mjs, ES6 SINGLE_FILE。JS bridge / e2e 用)
-#   build.sh module-b  : 代替構成モジュール = shimx src (shimx reg.c のまま) + pathreg (build/module_b.mjs)
+#   build.sh module-a  : 本番構成モジュール = shimx src (reg.c 含む; CAB-214 で vreg 拡張取込済み) + vreg probe.c + pathreg、
+#                        vreg_* 運用フック (通知/世代/ルート export) を export (build/module_a.mjs, ES6 SINGLE_FILE。JS bridge / e2e 用)
+#   build.sh module-b  : 代替構成モジュール = shimx src + pathreg、vreg_* フック・probe 非 export = 通知口なし経路 (build/module_b.mjs)
 #   build.sh all       : 上記全て
 # 使う emcc フラグは tools/shimx/flags.sh を流用 (shimx 既存ファイルは無変更)。
 set -euo pipefail
@@ -16,8 +16,6 @@ source "$SHIMX/flags.sh"
 
 INC=(-I"$SHIMX/src" -I"$VREG/src" -I"$HERE/include")
 PSRC=("$HERE"/src/*.c)
-
-SRCS_NO_REG=(); for f in "$SHIMX"/src/*.c; do [ "$(basename "$f")" = reg.c ] || SRCS_NO_REG+=("$f"); done
 
 case "${1:-all}" in
   test)
@@ -42,7 +40,7 @@ case "${1:-all}" in
       -sEXIT_RUNTIME=0 -sINITIAL_MEMORY=33554432 -sERROR_ON_UNDEFINED_SYMBOLS=1 \
       -sEXPORTED_FUNCTIONS="$EXP" \
       -sEXPORTED_RUNTIME_METHODS=UTF8ToString,stringToUTF8,lengthBytesUTF8,stringToUTF16,UTF16ToString,HEAPU32,HEAPU16,addFunction,removeFunction \
-      "${INC[@]}" "${SRCS_NO_REG[@]}" "$VREG/src/reg.c" "$VREG/src/probe.c" "${PSRC[@]}" -o "$B/module_a.mjs"
+      "${INC[@]}" "$SHIMX"/src/*.c "$VREG/src/probe.c" "${PSRC[@]}" -o "$B/module_a.mjs"
     ls -l "$B/module_a.mjs" ;;
   module-b)
     EXP='_malloc,_free,_shimx_init,_shimx_reg_import_text,_shimx_reg_export_text,_shimx_reg_reset,_shimx_reg_set,_shimx_reg_set_sz,_shimx_reg_set_dword,_shimx_reg_stats'

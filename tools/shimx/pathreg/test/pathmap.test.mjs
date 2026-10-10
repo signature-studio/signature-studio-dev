@@ -36,24 +36,24 @@ test('mapper: 既定表の写像 (stub_plan §4 / nfo 配置 / seed paths 整合
     '/fl/Plugins/Fruity/Generators/Fruity Wrapper/Fruity Wrapper_x64.dll',
   );
   assert.equal(
-    m.map('C:\\Users\\user\\Documents\\Image-Line\\FL Studio\\Settings\\Manifest.xml'),
+    m.map('C:\\Users\\webstudio\\Documents\\Image-Line\\FL Studio\\Settings\\Manifest.xml'),
     '/c/home/Documents/Image-Line/FL Studio/Settings/Manifest.xml',
   );
   // nfo REPORT §3 の Plugin database 配置 (Shared data 配下)
   assert.equal(
-    m.map('C:\\Users\\user\\Documents\\Image-Line\\FL Studio\\Presets\\Plugin database\\Installed\\Generators\\VST3\\Serum2.vst3.nfo'),
+    m.map('C:\\Users\\webstudio\\Documents\\Image-Line\\FL Studio\\Presets\\Plugin database\\Installed\\Generators\\VST3\\Serum2.vst3.nfo'),
     '/c/home/Documents/Image-Line/FL Studio/Presets/Plugin database/Installed/Generators/VST3/Serum2.vst3.nfo',
   );
-  // vreg seed の Shared data 値 (webstudio profile) も同じ実体へ
+  // vreg seed の Shared data 値 (正規 profile = webstudio) も同じ実体へ
   assert.equal(
     m.map('C:\\Users\\webstudio\\Documents\\Image-Line\\FL Studio\\Presets\\Plugin database\\Installed\\Effects\\VST\\OTT.nfo'),
     '/c/home/Documents/Image-Line/FL Studio/Presets/Plugin database/Installed/Effects/VST/OTT.nfo',
   );
   // Temp は Local より長い接頭辞で勝つ
-  assert.equal(m.map('C:\\Users\\user\\AppData\\Local\\Temp\\Image-Line\\123-1\\pack.zip'), '/c/tmp/123-1/pack.zip');
-  assert.equal(m.map('C:\\Users\\user\\AppData\\Local\\Image-Line\\cache.dat'), '/c/home/AppData/Local/Image-Line/cache.dat');
+  assert.equal(m.map('C:\\Users\\webstudio\\AppData\\Local\\Temp\\Image-Line\\123-1\\pack.zip'), '/c/tmp/123-1/pack.zip');
+  assert.equal(m.map('C:\\Users\\webstudio\\AppData\\Local\\Image-Line\\cache.dat'), '/c/home/AppData/Local/Image-Line/cache.dat');
   // %APPDATA% 直接
-  assert.equal(m.map('C:\\Users\\user\\AppData\\Roaming\\Image-Line\\config.xml'), '/c/home/AppData/Roaming/Image-Line/config.xml');
+  assert.equal(m.map('C:\\Users\\webstudio\\AppData\\Roaming\\Image-Line\\config.xml'), '/c/home/AppData/Roaming/Image-Line/config.xml');
   // 残余ドライブ C
   assert.equal(m.map('C:\\Windows\\notepad.exe'), '/c/Windows/notepad.exe');
   // 非対応 → null (shimx 既定写像に委譲)
@@ -72,13 +72,16 @@ test('mapper: 追加マウント (最長一致・大小無視) と逆写像', ()
   assert.equal(m.unmap('/elsewhere/x'), null);
 });
 
-test('既定表の構造 (flags / 2 プロファイル / C:) ', () => {
+test('既定表の構造 (flags / 正規 profile のみ / C:) ', () => {
   const mounts = defaultMounts();
   const byWin = new Map(mounts.map((m) => [m.win, m]));
   assert.equal(byWin.get('C:\\Program Files\\Image-Line\\FL Studio 2026').flags, FLAG_RO);
-  assert.equal(byWin.get('C:\\Users\\user\\Documents\\Image-Line').flags, FLAG_PERSIST);
-  assert.equal(byWin.get('C:\\Users\\user\\AppData\\Local\\Temp\\Image-Line').flags, FLAG_TMP);
-  assert.ok(byWin.has('C:\\Users\\webstudio\\Documents\\Image-Line'));   // vreg seed 由来の予備 profile
+  assert.equal(byWin.get('C:\\Users\\webstudio\\Documents\\Image-Line').flags, FLAG_PERSIST);
+  assert.equal(byWin.get('C:\\Users\\webstudio\\AppData\\Local\\Temp\\Image-Line').flags, FLAG_TMP);
+  assert.equal(mounts.length, 8);                                        // install + webstudio × 6 + C:
+  assert.ok(![...byWin.keys()].some((w) => /^C:\\Users\\user(\\|$)/i.test(w)));   // 予備 profile (user) は退役済み
+  // 退役した alias: C:\Users\user\... は残余ドライブ C 規則に落ちる (pathmap.c と同挙動)
+  assert.equal(createMapper().map('C:\\Users\\user\\Documents\\Image-Line\\x.txt'), '/c/Users/user/Documents/Image-Line/x.txt');
   assert.ok(byWin.has('C:\\'));                                          // 残余ドライブ C ("C:" は "C:\" に正準化)
   // 共有データ先の上書き (CAB-101 が実配置を確定した場合)
   const custom = defaultMounts({ ...DEFAULT_PATHS, sharedDataDir: 'D:\\FLData' });

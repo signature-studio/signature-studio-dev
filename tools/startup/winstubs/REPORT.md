@@ -3,6 +3,12 @@
 日付: 2026-10-10 / 書込範囲: `tools/startup/winstubs/`(成果物) と `tools/startup/work/winstubs/`(gitignore) のみ。`tools/shimx` `tools/gui` `tools/m11` `tools/runtime` は読取のみ(改変 0 行)。
 再現: `bash tools/startup/winstubs/winstubs.sh` (約 10 秒 / `FORCE=1` で全再ビルド, exit 0 = 全 PASS)。
 
+> **更新 2026-10-10 (CAB-214 follow-up, shimx REPORT §12)**: shimx の username 統一 (`C:\Users\user` → `webstudio`, CAB-214) により `SHGetFolderPathW` `SHGetSpecialFolderPathW`
+> `SHGetKnownFolderPath` `GetTempPathW` の `--wrap` 差分実装と `ExpandEnvironmentStringsW` の seed 上書きが**冗長化**したため退役した (`wrap_list.txt` 16→**12** 本、
+> `ws_sys.c` の `fix_user`/`__wrap_*` 4 本とその `__real_*` 宣言を削除、`api_matrix.tsv` の impl を `wrap`/`shimx+seed` → `shimx`)。
+> 再計測: impl 内訳 shimx 純 28 / +計数 2 / +seed 1 / hook 2 / **`--wrap` 差分実装 10** / 新規 8 / lift 1 (=52)。baseline 差分 **MATCH 72 / DIFF 28 / MISSING 31** (旧 60/40/31)。
+> 以下本文の「16 本」「14 本」「`user`→`webstudio` 写像」は退役前 (CAB-96 時点) の記述。`WsConfig.user` は env 初期値 (USERNAME/USERPROFILE 等) のみに作用し、既定 (`webstudio`) では no-op。
+
 ## 0. 結論 (数値は全て実測)
 
 1. 起動 critical は **52 API** (stub_plan §5 の A 32 / B 9 / D 11) を `data/api_matrix.tsv` に確定。ほかに user32 ポンプ 10 と Reg* 5 (突合のみ) を載せて計 67 行。WinInet(C) は T4 (ネットワーク) の担当で対象外、Reg* は §5。
@@ -62,6 +68,8 @@
 `tools/runtime/worker_pump.ts` の RING ABI への結線 (実メッセージ配信) は **CAB-102 が強定義で置換する**前提であり、winstubs 側では結線しない。置換後も `WS_INC(pump_calls)` の計数署名を踏襲すれば統計は継続利用できる。boot e2e: `S11.pump_stub loop_exit=1 spins=0`。
 
 ## 5. Reg* は一切定義しない (CAB-94 vreg と shimx の衝突回避)
+
+> CAB-214 follow-up: vreg の reg.c は shimx に取込済みで `vreg/src/reg.c` は削除された。同名衝突の制約は解消したが、`Reg*` は shimx が正本のため winstubs が定義しない方針は不変。
 
 `RegOpenKeyExW/A` `RegQueryValueExW/A` `RegCloseKey` の 5 本は `cross-ref` として api_matrix に掲載するのみで、**winstubs はシンボルを定義せずテストでもリンクしない**。
 理由: vreg の `reg.c` と shimx の `reg.c` が同名シンボルを既に持ち、winstubs が 3 番目の定義を置くと duplicate symbol / 置換不明確化になる。boot e2e の seed 投入も shimx の `shimx_reg_set_*` を直接使う (vreg 実装への依存なし)。

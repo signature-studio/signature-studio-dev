@@ -10,7 +10,7 @@ command -v node >/dev/null || { echo "[pathreg] FAIL: node が見つかりませ
 echo "[pathreg] 1/3 ビルド + C 単体テスト (ST/MT)"
 bash "$HERE/scripts/build.sh" test
 
-echo "[pathreg] 2/3 module ビルド (module-a: vreg reg.c 結線 / module-b: shimx reg.c のまま)"
+echo "[pathreg] 2/3 module ビルド (module-a: vreg_* フック export + probe 同梱 / module-b: フック非 export)"
 bash "$HERE/scripts/build.sh" module-a >/dev/null
 bash "$HERE/scripts/build.sh" module-b >/dev/null
 

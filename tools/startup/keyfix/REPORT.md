@@ -98,6 +98,8 @@
    ブラウザ版では画面サイズが可変 → vreg 側で起動時の実画面サイズキーを書くか、observed 値のみ seed する方針決定要。
 4. **shimx 内蔵 username の将来統一**: shimx 取込 (CAB-11 恒久化) 時に env.c/shell.c を `C:\Users\webstudio` へ
    統一し、pathreg の user2Profile (user) を退役させるのが本丸 (shimx 読取専用につき本チケットでは未実施)。
+   **→ 完了 (CAB-214 + follow-up)**: shimx 統一 (CAB-214) → pathreg `user2Profile` 退役 (既定表 14→8 本)。`verify_consistency.py` は
+   「webstudio のみ + `user2Profile` 不在」(C/JS 両ミラー) の 7 項目に更新 (旧 6 項目 → check 4 を C/JS 別 2 項目化)。
 5. **license 関連**: `Registrations\FL Studio 26.1\ILRegKey` は pinned seed が書くため、FUN_01183130 系の読みが
    通るはず。通らない場合 CAB-106 (license-observation) の観測対象。
 
