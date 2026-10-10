@@ -17,27 +17,27 @@ extern DWORD g_shx_fv_ms, g_shx_fv_ls;
  * --------------------------------------------------------------- */
 static const char* csidl_path(int csidl) {
     switch (csidl & 0xFF) {
-        case 0x00: case 0x10: return "C:\\Users\\user\\Desktop";
-        case 0x05: return "C:\\Users\\user\\Documents";
-        case 0x0D: return "C:\\Users\\user\\Music";
-        case 0x0E: return "C:\\Users\\user\\Videos";
-        case 0x27: return "C:\\Users\\user\\Pictures";
-        case 0x1A: return "C:\\Users\\user\\AppData\\Roaming";
-        case 0x1C: return "C:\\Users\\user\\AppData\\Local";
+        case 0x00: case 0x10: return "C:\\Users\\webstudio\\Desktop";
+        case 0x05: return "C:\\Users\\webstudio\\Documents";
+        case 0x0D: return "C:\\Users\\webstudio\\Music";
+        case 0x0E: return "C:\\Users\\webstudio\\Videos";
+        case 0x27: return "C:\\Users\\webstudio\\Pictures";
+        case 0x1A: return "C:\\Users\\webstudio\\AppData\\Roaming";
+        case 0x1C: return "C:\\Users\\webstudio\\AppData\\Local";
         case 0x23: return "C:\\ProgramData";
         case 0x2E: return "C:\\Users\\Public\\Documents";
-        case 0x28: return "C:\\Users\\user";
+        case 0x28: return "C:\\Users\\webstudio";
         case 0x24: return "C:\\Windows";
         case 0x25: return "C:\\Windows\\System32";
         case 0x26: return "C:\\Program Files";
         case 0x2A: return "C:\\Program Files (x86)";
         case 0x2B: return "C:\\Program Files\\Common Files";
         case 0x14: return "C:\\Windows\\Fonts";
-        case 0x15: return "C:\\Users\\user\\AppData\\Roaming\\Microsoft\\Windows\\Templates";
-        case 0x02: return "C:\\Users\\user\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs";
-        case 0x0B: return "C:\\Users\\user\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu";
-        case 0x07: return "C:\\Users\\user\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Startup";
-        case 0x20: return "C:\\Users\\user\\AppData\\Local\\Microsoft\\Windows\\INetCache";
+        case 0x15: return "C:\\Users\\webstudio\\AppData\\Roaming\\Microsoft\\Windows\\Templates";
+        case 0x02: return "C:\\Users\\webstudio\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs";
+        case 0x0B: return "C:\\Users\\webstudio\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu";
+        case 0x07: return "C:\\Users\\webstudio\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Startup";
+        case 0x20: return "C:\\Users\\webstudio\\AppData\\Local\\Microsoft\\Windows\\INetCache";
         case 0x19: return "C:\\Users\\Public\\Desktop";
         case 0x35: return "C:\\Users\\Public\\Music";
         default: return NULL;
@@ -64,15 +64,15 @@ HRESULT SHGetFolderPathW(HWND w, int csidl, HANDLE tok, DWORD flags, LPWSTR path
 typedef struct { GUID id; const char* path; } KnownFolder;
 #define G(a,b,c,d0,d1,d2,d3,d4,d5,d6,d7) {a,b,c,{d0,d1,d2,d3,d4,d5,d6,d7}}
 static const KnownFolder k_known[] = {
-    { G(0x3EB685DB,0x65F9,0x4CF6,0xA0,0x3A,0xE3,0xEF,0x65,0x72,0x9F,0x3D), "C:\\Users\\user\\AppData\\Roaming" },
-    { G(0xF1B32785,0x6FBA,0x4FCF,0x9D,0x55,0x7B,0x8E,0x7F,0x15,0x70,0x91), "C:\\Users\\user\\AppData\\Local" },
-    { G(0xFDD39AD0,0x238F,0x46AF,0xAD,0xB4,0x6C,0x85,0x48,0x03,0x69,0xC7), "C:\\Users\\user\\Documents" },
+    { G(0x3EB685DB,0x65F9,0x4CF6,0xA0,0x3A,0xE3,0xEF,0x65,0x72,0x9F,0x3D), "C:\\Users\\webstudio\\AppData\\Roaming" },
+    { G(0xF1B32785,0x6FBA,0x4FCF,0x9D,0x55,0x7B,0x8E,0x7F,0x15,0x70,0x91), "C:\\Users\\webstudio\\AppData\\Local" },
+    { G(0xFDD39AD0,0x238F,0x46AF,0xAD,0xB4,0x6C,0x85,0x48,0x03,0x69,0xC7), "C:\\Users\\webstudio\\Documents" },
     { G(0x62AB5D82,0xFDC1,0x4DC3,0xA9,0xDD,0x07,0x0D,0x1D,0x49,0x5D,0x97), "C:\\ProgramData" },
-    { G(0xB4BFCC3A,0xDB2C,0x424C,0xB0,0x29,0x7F,0xE9,0x9A,0x87,0xC6,0x41), "C:\\Users\\user\\Desktop" },
-    { G(0x4BD8D571,0x6D19,0x48D3,0xBE,0x97,0x42,0x22,0x20,0x08,0x0E,0x43), "C:\\Users\\user\\Music" },
+    { G(0xB4BFCC3A,0xDB2C,0x424C,0xB0,0x29,0x7F,0xE9,0x9A,0x87,0xC6,0x41), "C:\\Users\\webstudio\\Desktop" },
+    { G(0x4BD8D571,0x6D19,0x48D3,0xBE,0x97,0x42,0x22,0x20,0x08,0x0E,0x43), "C:\\Users\\webstudio\\Music" },
     { G(0x905E63B6,0xC1BF,0x494E,0xB2,0x9C,0x65,0xB7,0x32,0xD3,0xD2,0x1A), "C:\\Program Files" },
     { G(0xF38BF404,0x1D43,0x42F2,0x93,0x05,0x67,0xDE,0x0B,0x28,0xFC,0x23), "C:\\Windows" },
-    { G(0x5E6C858F,0x0E22,0x4760,0x9A,0xFE,0xEA,0x33,0x17,0xB6,0x71,0x73), "C:\\Users\\user" },
+    { G(0x5E6C858F,0x0E22,0x4760,0x9A,0xFE,0xEA,0x33,0x17,0xB6,0x71,0x73), "C:\\Users\\webstudio" },
 };
 HRESULT SHGetKnownFolderPath(const GUID* id, DWORD flags, HANDLE tok, LPWSTR* out) {
     (void)tok;

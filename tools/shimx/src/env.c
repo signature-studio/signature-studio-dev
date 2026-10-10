@@ -51,13 +51,13 @@ void shx_init_env(void) {
     char n[16]; snprintf(n, sizeof n, "%d", g_ncpu);
     static const char* const kv[][2] = {
         {"SystemRoot", "C:\\Windows"}, {"windir", "C:\\Windows"}, {"SystemDrive", "C:"},
-        {"USERPROFILE", "C:\\Users\\user"}, {"HOMEDRIVE", "C:"}, {"HOMEPATH", "\\Users\\user"},
-        {"APPDATA", "C:\\Users\\user\\AppData\\Roaming"}, {"LOCALAPPDATA", "C:\\Users\\user\\AppData\\Local"},
-        {"TEMP", "C:\\Users\\user\\AppData\\Local\\Temp"}, {"TMP", "C:\\Users\\user\\AppData\\Local\\Temp"},
+        {"USERPROFILE", "C:\\Users\\webstudio"}, {"HOMEDRIVE", "C:"}, {"HOMEPATH", "\\Users\\webstudio"},
+        {"APPDATA", "C:\\Users\\webstudio\\AppData\\Roaming"}, {"LOCALAPPDATA", "C:\\Users\\webstudio\\AppData\\Local"},
+        {"TEMP", "C:\\Users\\webstudio\\AppData\\Local\\Temp"}, {"TMP", "C:\\Users\\webstudio\\AppData\\Local\\Temp"},
         {"ProgramFiles", "C:\\Program Files"}, {"ProgramFiles(x86)", "C:\\Program Files (x86)"},
         {"CommonProgramFiles", "C:\\Program Files\\Common Files"}, {"ProgramData", "C:\\ProgramData"},
         {"ALLUSERSPROFILE", "C:\\ProgramData"}, {"PUBLIC", "C:\\Users\\Public"},
-        {"COMPUTERNAME", "WEBSTUDIO"}, {"USERNAME", "user"}, {"USERDOMAIN", "WEBSTUDIO"},
+        {"COMPUTERNAME", "WEBSTUDIO"}, {"USERNAME", "webstudio"}, {"USERDOMAIN", "WEBSTUDIO"},
         {"OS", "Windows_NT"}, {"PROCESSOR_ARCHITECTURE", "AMD64"}, {"PROCESSOR_IDENTIFIER", "Intel64 Family 6 Model 158 Stepping 10, GenuineIntel"},
         {"PATHEXT", ".COM;.EXE;.BAT;.CMD"}, {"ComSpec", "C:\\Windows\\system32\\cmd.exe"},
         {"PATH", "C:\\Windows\\system32;C:\\Windows"},

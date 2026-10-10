@@ -79,8 +79,8 @@ for l in open(W('work', 'nm_by_file_MT.txt')):
         if n.startswith('shx_') or n == 'shim_unimplemented':
             continue
         defined.add(n); src_of[n] = os.path.basename(m.group(1))[:-2] + '.c'
-public_api = sorted(n for n in defined if not n.startswith('shimx_'))
-hooks = sorted(n for n in defined if n.startswith('shimx_'))
+public_api = sorted(n for n in defined if not n.startswith('shimx_') and not n.startswith('vreg_'))
+hooks = sorted(n for n in defined if n.startswith('shimx_') or n.startswith('vreg_'))
 
 LIBC_OK = {'memset', 'socket', 'bind', 'listen', 'accept', 'recv', 'send', 'getsockname', 'ntohs'}   # Emscripten libc が解決 (ソケットは実行時エラー)
 # R3 で序数 → API を同定し GetProcAddress 序数表 (src/module.c shx_ordtable) に登録済みのもの
@@ -260,7 +260,7 @@ for n in public_api:
 for s_, names in sorted(bysrc.items()):
     A('| %s | %d | %s |' % (s_, len(names), ' '.join(n + ('*' if n in STUBS else '') + ('~' if n in weak else '') for n in sorted(names))))
 A('')
-A('運用フック (`shimx_*`): ' + ' '.join(hooks))
+A('運用フック (`shimx_*` + `vreg_*`): ' + ' '.join(hooks))
 A('')
 A('## 表C: 未実装 (担当範囲内)')
 A('')

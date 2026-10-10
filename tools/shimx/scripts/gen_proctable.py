@@ -36,6 +36,7 @@ PREFIX_DLL = [
 ]
 # 序数/内部用で表に載せない
 SKIP = {'shim_unimplemented', '__readgsqword', '__readgsdword', '__readgsword', '__readgsbyte', '__writegsqword', '__writegsdword'}
+SKIP_PREFIX = ('shimx_', 'shx_', 'shim_', 'vreg_')   # vreg_ = 運用フック (CAB-214, JS 側 EXPORTED_FUNCTIONS 用)
 
 
 def dll_for(name, mapping):
@@ -76,7 +77,7 @@ def main():
 
     ents = []
     for n in sorted(defined):
-        if n in SKIP or n.startswith('shimx_') or n.startswith('shx_') or n.startswith('shim_'):
+        if n in SKIP or n.startswith(SKIP_PREFIX):
             continue
         if n not in declared:
             continue

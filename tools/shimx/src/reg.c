@@ -1,7 +1,15 @@
-/* メモリ内レジストリ (advapi32 Reg*)。
+/* メモリ内レジストリ (advapi32 Reg*)。— shimx 正本。
+ * CAB-214: tools/startup/vreg/src/reg.c (CAB-94) の拡張を本体取込し、二重管理を解消した。
+ *   以後の改良は本ファイル (shimx) が正本。vreg 側は薄ラッパ (vreg/build.sh の SRCS 除外を廃止して
+ *   本ファイルを直接リンク可能 — probe.c は vreg テスト専用として継続) への退役を推奨。
  * - 5 ルート (HKCR/HKCU/HKLM/HKU/HKCC) の木構造。サブキーは名前順 (大小無視)、値は作成順で列挙
  * - 開いたキーは統一ハンドル表 (OBJ_KEY)。削除済みキーは ERROR_KEY_DELETED
  * - 既定値シード + `.reg` 風テキストの import/export (永続化は下流: IndexedDB 等)
+ * - vreg 拡張 (取込分, 詳細は vreg/REPORT.md §2):
+ *   変更世代 vreg_generation() + 通知 vreg_set_notify() (ロック解放後に呼出スレッドで同期通知) /
+ *   RegEnum* の ERROR_MORE_DATA で必要長を返す / import 拡張 (UTF-8 BOM・[-HKEY_..]・"v"=-・@=-) /
+ *   ルート単位 export/clear (vreg_export_root/vreg_clear_root/vreg_clear_all) /
+ *   追加 6 API (RegGetValueA RegEnumKeyW RegDeleteTreeW RegSetKeyValueW RegDeleteKeyValueW RegQueryInfoKeyA)
  * 全操作を 1 本の mutex で保護 (呼出頻度が低いため)。
  */
 #include "shimx_internal.h"
@@ -23,6 +31,17 @@ static RegKey* g_roots[5];
 static const char* const k_root_names[5] = { "HKEY_CLASSES_ROOT", "HKEY_CURRENT_USER", "HKEY_LOCAL_MACHINE", "HKEY_USERS", "HKEY_CURRENT_CONFIG" };
 static const char* const k_root_short[5] = { "HKCR", "HKCU", "HKLM", "HKU", "HKCC" };
 static int g_reg_inited;
+static uint32_t g_gen;                 /* 変更世代 (set/delete/create で増加) */
+static int g_pending;                  /* ロック保持中に変更あり → unlock 後に通知 */
+static void (*g_notify)(uint32_t);
+static void reg_unlock(void) {
+    int fire = g_pending; g_pending = 0;
+    shx_mutex_unlock(&g_reg_lk);
+    if (fire && g_notify) g_notify(g_gen);
+}
+static void touched(void) { g_gen++; g_pending = 1; }
+uint32_t vreg_generation(void) { return g_gen; }
+void vreg_set_notify(void (*cb)(uint32_t)) { g_notify = cb; }
 
 static uint64_t now_ft(void) { FILETIME ft; GetSystemTimeAsFileTime(&ft); return ((uint64_t)ft.dwHighDateTime << 32) | ft.dwLowDateTime; }
 static WCHAR* wdup(const WCHAR* s, int n) {
@@ -54,7 +73,7 @@ static RegKey* add_sub(RegKey* p, const WCHAR* name, int n) {
     RegKey** pp = &p->child;
     while (*pp && wn((*pp)->name, shx_wstr_len((*pp)->name), name, n) < 0) pp = &(*pp)->sibling;
     k->sibling = *pp; *pp = k;
-    p->nsub++; p->mtime = now_ft();
+    p->nsub++; p->mtime = now_ft(); touched();
     return k;
 }
 
@@ -119,7 +138,7 @@ static int set_val(RegKey* k, const WCHAR* name, DWORD type, const void* data, D
         k->vtail = v; k->nvals++;
     } else free(v->data);
     v->type = type; v->data = d; v->cb = cb;
-    k->mtime = now_ft();
+    k->mtime = now_ft(); touched();
     return 0;
 }
 
@@ -131,9 +150,9 @@ LSTATUS RegOpenKeyExW(HKEY h, LPCWSTR sub, DWORD opt, REGSAM sam, PHKEY out) {
     if (!out) return ERROR_INVALID_PARAMETER;
     shx_mutex_lock(&g_reg_lk);
     DWORD err; RegKey* b = resolve(h, &err);
-    if (!b) { shx_mutex_unlock(&g_reg_lk); return err; }
+    if (!b) { reg_unlock(); return err; }
     RegKey* k = walk(b, sub, 0, NULL);
-    shx_mutex_unlock(&g_reg_lk);
+    reg_unlock();
     if (!k) return ERROR_FILE_NOT_FOUND;
     if ((!sub || !*sub) && (uint32_t)h >= 0x80000000u) { *out = h; return ERROR_SUCCESS; }
     HANDLE nh = key_handle(k);
@@ -149,10 +168,10 @@ LSTATUS RegCreateKeyExW(HKEY h, LPCWSTR sub, DWORD rsv, LPWSTR cls, DWORD opt, R
     if (!out) return ERROR_INVALID_PARAMETER;
     shx_mutex_lock(&g_reg_lk);
     DWORD err; RegKey* b = resolve(h, &err);
-    if (!b) { shx_mutex_unlock(&g_reg_lk); return err; }
+    if (!b) { reg_unlock(); return err; }
     int created = 0;
     RegKey* k = walk(b, sub, 1, &created);
-    shx_mutex_unlock(&g_reg_lk);
+    reg_unlock();
     if (disp) *disp = created ? REG_CREATED_NEW_KEY : REG_OPENED_EXISTING_KEY;
     HANDLE nh = key_handle(k);
     if (!nh) return ERROR_NOT_ENOUGH_MEMORY;
@@ -171,7 +190,7 @@ LSTATUS RegCloseKey(HKEY h) {
     return ERROR_SUCCESS;
 }
 LSTATUS RegFlushKey(HKEY h) {
-    shx_mutex_lock(&g_reg_lk); DWORD err; RegKey* k = resolve(h, &err); shx_mutex_unlock(&g_reg_lk);
+    shx_mutex_lock(&g_reg_lk); DWORD err; RegKey* k = resolve(h, &err); reg_unlock();
     return k ? ERROR_SUCCESS : err;
 }
 
@@ -195,7 +214,7 @@ LSTATUS RegQueryValueExW(HKEY h, LPCWSTR name, LPDWORD rsv, LPDWORD type, LPBYTE
         RegVal* v = find_val2(k, name);
         r = v ? copy_out(v, type, data, cb) : ERROR_FILE_NOT_FOUND;
     }
-    shx_mutex_unlock(&g_reg_lk);
+    reg_unlock();
     return r;
 }
 
@@ -205,7 +224,7 @@ LSTATUS RegSetValueExW(HKEY h, LPCWSTR name, DWORD rsv, DWORD type, const BYTE* 
     shx_mutex_lock(&g_reg_lk);
     DWORD err; RegKey* k = resolve(h, &err);
     LSTATUS r = k ? (set_val(k, name, type, data, cb) == 0 ? ERROR_SUCCESS : ERROR_NOT_ENOUGH_MEMORY) : err;
-    shx_mutex_unlock(&g_reg_lk);
+    reg_unlock();
     return r;
 }
 LSTATUS RegDeleteValueW(HKEY h, LPCWSTR name) {
@@ -220,13 +239,27 @@ LSTATUS RegDeleteValueW(HKEY h, LPCWSTR name) {
             if (wn((*pp)->name, shx_wstr_len((*pp)->name), name, n) == 0) {
                 RegVal* d = *pp; *pp = d->next;
                 if (k->vtail == d) { k->vtail = NULL; for (RegVal* t = k->vals; t; t = t->next) k->vtail = t; }
-                free(d->name); free(d->data); free(d); k->nvals--; r = ERROR_SUCCESS; break;
+                free(d->name); free(d->data); free(d); k->nvals--; r = ERROR_SUCCESS; touched(); break;
             }
             pp = &(*pp)->next;
         }
     }
-    shx_mutex_unlock(&g_reg_lk);
+    reg_unlock();
     return r;
+}
+static void free_vals(RegKey* k) {
+    for (RegVal* v = k->vals; v;) { RegVal* n = v->next; free(v->name); free(v->data); free(v); v = n; }
+    k->vals = k->vtail = NULL; k->nvals = 0;
+}
+static void mark_deleted(RegKey* k) {   /* 開いているハンドル保護のため解放せず削除印 */
+    for (RegKey* c = k->child; c; c = c->sibling) mark_deleted(c);
+    k->deleted = 1; free_vals(k);
+}
+static void unlink_key(RegKey* k) {
+    RegKey** pp = &k->parent->child;
+    while (*pp && *pp != k) pp = &(*pp)->sibling;
+    if (*pp) *pp = k->sibling;
+    k->parent->nsub--; touched();
 }
 LSTATUS RegDeleteKeyW(HKEY h, LPCWSTR sub) {
     if (!sub || !*sub) return ERROR_INVALID_PARAMETER;
@@ -240,14 +273,14 @@ LSTATUS RegDeleteKeyW(HKEY h, LPCWSTR sub) {
         else if (k->nsub > 0) r = ERROR_ACCESS_DENIED;
         else if (!k->parent) r = ERROR_ACCESS_DENIED;
         else {
-            k->deleted = 1; k->parent->nsub--;
+            k->deleted = 1; k->parent->nsub--; touched();
             RegKey** pp = &k->parent->child;
             while (*pp && *pp != k) pp = &(*pp)->sibling;
             if (*pp) *pp = k->sibling;
             r = ERROR_SUCCESS;
         }
     }
-    shx_mutex_unlock(&g_reg_lk);
+    reg_unlock();
     return r;
 }
 LSTATUS RegDeleteKeyExW(HKEY h, LPCWSTR sub, REGSAM sam, DWORD rsv) { (void)sam; (void)rsv; return RegDeleteKeyW(h, sub); }
@@ -255,7 +288,7 @@ LSTATUS RegDeleteKeyExW(HKEY h, LPCWSTR sub, REGSAM sam, DWORD rsv) { (void)sam;
 static LSTATUS put_name(const WCHAR* src, LPWSTR dst, LPDWORD cch) {
     DWORD n = (DWORD)shx_wstr_len(src);
     if (!cch || !dst) return ERROR_INVALID_PARAMETER;
-    if (*cch < n + 1) return ERROR_MORE_DATA;
+    if (*cch < n + 1) { *cch = n; return ERROR_MORE_DATA; }
     memcpy(dst, src, ((size_t)n + 1) * 2);
     *cch = n;
     return ERROR_SUCCESS;
@@ -280,7 +313,7 @@ LSTATUS RegEnumKeyExW(HKEY h, DWORD idx, LPWSTR name, LPDWORD cchName, LPDWORD r
             }
         }
     }
-    shx_mutex_unlock(&g_reg_lk);
+    reg_unlock();
     return r;
 }
 LSTATUS RegEnumValueW(HKEY h, DWORD idx, LPWSTR name, LPDWORD cchName, LPDWORD rsv, LPDWORD type,
@@ -299,7 +332,7 @@ LSTATUS RegEnumValueW(HKEY h, DWORD idx, LPWSTR name, LPDWORD cchName, LPDWORD r
             if (r == ERROR_SUCCESS) r = copy_out(v, type, data, cb);
         }
     }
-    shx_mutex_unlock(&g_reg_lk);
+    reg_unlock();
     return r;
 }
 LSTATUS RegQueryInfoKeyW(HKEY h, LPWSTR cls, LPDWORD cchCls, LPDWORD rsv, LPDWORD nSub, LPDWORD maxSub,
@@ -324,7 +357,7 @@ LSTATUS RegQueryInfoKeyW(HKEY h, LPWSTR cls, LPDWORD cchCls, LPDWORD rsv, LPDWOR
         if (secDesc) *secDesc = 0;
         if (lw) { lw->dwLowDateTime = (DWORD)k->mtime; lw->dwHighDateTime = (DWORD)(k->mtime >> 32); }
     }
-    shx_mutex_unlock(&g_reg_lk);
+    reg_unlock();
     return r;
 }
 
@@ -352,7 +385,7 @@ LSTATUS RegGetValueW(HKEY h, LPCWSTR sub, LPCWSTR name, DWORD flags, LPDWORD typ
             else r = copy_out(v, type, (LPBYTE)data, cb);
         }
     }
-    shx_mutex_unlock(&g_reg_lk);
+    reg_unlock();
     return r;
 }
 
@@ -489,7 +522,7 @@ int shimx_reg_set(const char* path, const char* name, DWORD type, const void* da
         r = set_val(k, w, type, data, cb);
         free(w);
     }
-    shx_mutex_unlock(&g_reg_lk);
+    reg_unlock();
     return r;
 }
 int shimx_reg_set_sz(const char* path, const char* name, const char* utf8) {
@@ -508,22 +541,18 @@ void shimx_reg_stats(int* nKeys, int* nVals) {
         RegKey* k = stack[--sp]; nk++; nv += k->nvals;
         for (RegKey* c = k->child; c && sp < 255; c = c->sibling) stack[sp++] = c;
     }
-    shx_mutex_unlock(&g_reg_lk);
+    reg_unlock();
     if (nKeys) *nKeys = nk;
     if (nVals) *nVals = nv;
 }
 
 static void seed_defaults(void);
+static void clear_root_locked(int i);
 void shimx_reg_reset(void) {
     shx_ensure_init();
     shx_mutex_lock(&g_reg_lk);
-    for (int i = 0; i < 5; i++) {
-        for (RegKey* c = g_roots[i]->child; c; c = c->sibling) c->deleted = 1;   /* 開いているハンドル保護のため解放せず削除印 */
-        g_roots[i]->child = NULL; g_roots[i]->nsub = 0;
-        for (RegVal* v = g_roots[i]->vals; v;) { RegVal* n = v->next; free(v->name); free(v->data); free(v); v = n; }
-        g_roots[i]->vals = g_roots[i]->vtail = NULL; g_roots[i]->nvals = 0;
-    }
-    shx_mutex_unlock(&g_reg_lk);
+    for (int i = 0; i < 5; i++) clear_root_locked(i);
+    reg_unlock();
     seed_defaults();
 }
 
@@ -547,6 +576,7 @@ int shimx_reg_import_text(const char* text) {
     shx_mutex_lock(&g_reg_lk);
     RegKey* cur = NULL;
     const char* p = text;
+    if ((uint8_t)p[0] == 0xEF && (uint8_t)p[1] == 0xBB && (uint8_t)p[2] == 0xBF) p += 3;   /* UTF-8 BOM */
     while (*p) {
         /* 論理行 (行末 '\' 継続は hex 値のみ) を組み立てる */
         const char* e = strchr(p, '\n');
@@ -563,7 +593,14 @@ int shimx_reg_import_text(const char* text) {
         char* s = line; while (*s == ' ' || *s == '\t') s++;
         if (*s == '[') {
             char* rb = strrchr(s, ']');
-            if (rb) { *rb = 0; cur = path_to_key(s + 1, 1); }
+            if (rb) {
+                *rb = 0;
+                if (s[1] == '-') {                       /* [-HKEY_...\\path] = キーごと削除 */
+                    RegKey* d = path_to_key(s + 2, 0);
+                    if (d && d->parent) { unlink_key(d); mark_deleted(d); count++; }
+                    cur = NULL;
+                } else cur = path_to_key(s + 1, 1);
+            }
         } else if (cur && (*s == '"' || *s == '@')) {
             WCHAR* nm = NULL; char* q = s;
             if (*q == '@') { q++; }
@@ -576,7 +613,17 @@ int shimx_reg_import_text(const char* text) {
             while (*q == ' ') q++;
             if (*q == '=') {
                 q++; while (*q == ' ') q++;
-                if (*q == '"') {
+                if (*q == '-') {                         /* "name"=- : 値削除 */
+                    RegVal** pp = &cur->vals; int n = nm ? shx_wstr_len(nm) : 0;
+                    while (*pp) {
+                        if (wn((*pp)->name, shx_wstr_len((*pp)->name), nm, n) == 0) {
+                            RegVal* d = *pp; *pp = d->next;
+                            cur->vtail = NULL; for (RegVal* t = cur->vals; t; t = t->next) cur->vtail = t;
+                            free(d->name); free(d->data); free(d); cur->nvals--; touched(); count++; break;
+                        }
+                        pp = &(*pp)->next;
+                    }
+                } else if (*q == '"') {
                     q++; char* vs = (char*)malloc(strlen(q) + 1); size_t vi = 0;
                     while (*q && *q != '"') { if (*q == '\\' && q[1]) q++; vs[vi++] = *q++; }
                     vs[vi] = 0;
@@ -600,7 +647,7 @@ int shimx_reg_import_text(const char* text) {
         }
         free(line);
     }
-    shx_mutex_unlock(&g_reg_lk);
+    reg_unlock();
     return count;
 }
 
@@ -648,8 +695,104 @@ char* shimx_reg_export_text(void) {
     sb_put(&s, "Windows Registry Editor Version 5.00\n\n");
     shx_mutex_lock(&g_reg_lk);
     for (int i = 0; i < 5; i++) export_key(&s, g_roots[i], k_root_names[i]);
-    shx_mutex_unlock(&g_reg_lk);
+    reg_unlock();
     return s.b;
+}
+
+char* vreg_export_root(int root) {
+    shx_ensure_init();
+    if (root < 0 || root > 4) return NULL;
+    Sb s = {0};
+    sb_put(&s, "Windows Registry Editor Version 5.00\n\n");
+    shx_mutex_lock(&g_reg_lk);
+    export_key(&s, g_roots[root], k_root_names[root]);
+    reg_unlock();
+    return s.b;
+}
+static void clear_root_locked(int i) {
+    for (RegKey* c = g_roots[i]->child; c; c = c->sibling) mark_deleted(c);
+    g_roots[i]->child = NULL; g_roots[i]->nsub = 0;
+    free_vals(g_roots[i]);
+    touched();
+}
+void vreg_clear_root(int root) {
+    shx_ensure_init();
+    if (root < 0 || root > 4) return;
+    shx_mutex_lock(&g_reg_lk); clear_root_locked(root); reg_unlock();
+}
+void vreg_clear_all(void) {
+    shx_ensure_init();
+    shx_mutex_lock(&g_reg_lk);
+    for (int i = 0; i < 5; i++) clear_root_locked(i);
+    reg_unlock();
+}
+
+/* ---------------------------------------------------------------
+ * 追加 API
+ * --------------------------------------------------------------- */
+LSTATUS RegEnumKeyW(HKEY h, DWORD idx, LPWSTR name, DWORD cch) {
+    DWORD n = cch;
+    return RegEnumKeyExW(h, idx, name, &n, NULL, NULL, NULL, NULL);
+}
+LSTATUS RegQueryInfoKeyA(HKEY h, LPSTR cls, LPDWORD cchCls, LPDWORD rsv, LPDWORD nSub, LPDWORD maxSub, LPDWORD maxCls,
+                         LPDWORD nVal, LPDWORD maxValName, LPDWORD maxValData, LPDWORD secDesc, FILETIME* lw) {
+    (void)cls;
+    return RegQueryInfoKeyW(h, NULL, cchCls, rsv, nSub, maxSub, maxCls, nVal, maxValName, maxValData, secDesc, lw);
+}
+LSTATUS RegDeleteTreeW(HKEY h, LPCWSTR sub) {
+    shx_mutex_lock(&g_reg_lk);
+    DWORD err; RegKey* b = resolve(h, &err);
+    LSTATUS r = ERROR_SUCCESS;
+    if (!b) r = err;
+    else {
+        RegKey* k = walk(b, sub, 0, NULL);
+        if (!k) r = ERROR_FILE_NOT_FOUND;
+        else if (sub && *sub && k != b) {
+            if (!k->parent) r = ERROR_ACCESS_DENIED; else { unlink_key(k); mark_deleted(k); }
+        } else {      /* sub が NULL/空: h 直下の全サブキーと全値 */
+            for (RegKey* c = k->child; c; c = c->sibling) mark_deleted(c);
+            k->child = NULL; k->nsub = 0; free_vals(k); touched();
+        }
+    }
+    reg_unlock();
+    return r;
+}
+LSTATUS RegSetKeyValueW(HKEY h, LPCWSTR sub, LPCWSTR name, DWORD type, LPCVOID data, DWORD cb) {
+    HKEY t = h; LSTATUS r;
+    if (sub && *sub) { r = RegCreateKeyExW(h, sub, 0, NULL, 0, KEY_ALL_ACCESS, NULL, &t, NULL); if (r) return r; }
+    r = RegSetValueExW(t, name, 0, type, (const BYTE*)data, cb);
+    if (t != h) RegCloseKey(t);
+    return r;
+}
+LSTATUS RegDeleteKeyValueW(HKEY h, LPCWSTR sub, LPCWSTR name) {
+    HKEY t = h; LSTATUS r;
+    if (sub && *sub) { r = RegOpenKeyExW(h, sub, 0, KEY_ALL_ACCESS, &t); if (r) return r; }
+    r = RegDeleteValueW(t, name);
+    if (t != h) RegCloseKey(t);
+    return r;
+}
+static int type_flags_ok(DWORD t, DWORD flags) {
+    if ((flags & 0xFFFFu) == 0xFFFFu) return 1;
+    switch (t) {
+        case REG_SZ: case REG_EXPAND_SZ: return (flags & RRF_RT_REG_SZ) || (t == REG_EXPAND_SZ && (flags & 0x4u));
+        case REG_DWORD: return (flags & RRF_RT_REG_DWORD) != 0;
+        case REG_BINARY: return (flags & 0x8u) != 0;
+        case REG_MULTI_SZ: return (flags & 0x20u) != 0;
+        case REG_QWORD: return (flags & 0x40u) != 0;
+        default: return 0;
+    }
+}
+LSTATUS RegGetValueA(HKEY h, LPCSTR sub, LPCSTR name, DWORD flags, LPDWORD type, PVOID data, LPDWORD cb) {
+    HKEY t = h; LSTATUS r;
+    if (sub && *sub) { r = RegOpenKeyExA(h, sub, 0, KEY_ALL_ACCESS, &t); if (r) return r; }
+    DWORD ty = 0;
+    r = RegQueryValueExA(t, name, NULL, &ty, NULL, NULL);
+    if (r == ERROR_SUCCESS) {
+        if (!type_flags_ok(ty, flags)) r = ERROR_UNSUPPORTED_TYPE;
+        else r = RegQueryValueExA(t, name, NULL, type, (LPBYTE)data, cb);
+    }
+    if (t != h) RegCloseKey(t);
+    return r;
 }
 
 static const char* const k_seed =

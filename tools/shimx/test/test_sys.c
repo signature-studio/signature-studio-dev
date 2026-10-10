@@ -73,7 +73,7 @@ static void test_strings(void) {
     CHECK(FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM, NULL, 0xDEAD, 0, w, 64, NULL) == 0);    /* 未知 ID */
     char ab[128];
     CHECK(FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, ERROR_ACCESS_DENIED, 0, ab, 128, NULL) > 0 && !strncmp(ab, "Access is denied.", 17));
-    CHECK(PathUnExpandEnvStringsW(W("C:\\Users\\user\\AppData\\Roaming\\x.dat"), w, 64) && wstr_eq(w, "%APPDATA%\\x.dat"));
+    CHECK(PathUnExpandEnvStringsW(W("C:\\Users\\webstudio\\AppData\\Roaming\\x.dat"), w, 64) && wstr_eq(w, "%APPDATA%\\x.dat"));
     CHECK(PathUnExpandEnvStringsW(W("D:\\none"), w, 64) == FALSE);
 }
 
@@ -262,7 +262,7 @@ static void test_files(void) {
     CHECK(GetFileAttributesW(W("C:\\shimx_t\\rel.txt")) != INVALID_FILE_ATTRIBUTES);
     CHECK(SetCurrentDirectoryW(W("C:\\nodir")) == FALSE);
     SetCurrentDirectoryW(W("C:\\"));
-    CHECK(GetTempPathW(300, full) > 0 && wstr_eq(full, "C:\\Users\\user\\AppData\\Local\\Temp\\"));
+    CHECK(GetTempPathW(300, full) > 0 && wstr_eq(full, "C:\\Users\\webstudio\\AppData\\Local\\Temp\\"));
     WCHAR tmp[300];
     UINT u = GetTempFileNameW(full, W("shx"), 0, tmp);
     CHECK(u != 0 && GetFileAttributesW(tmp) != INVALID_FILE_ATTRIBUTES && strstr(U8(tmp), "\\shx") != NULL);

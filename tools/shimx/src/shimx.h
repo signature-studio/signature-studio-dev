@@ -807,6 +807,14 @@ LSTATUS RegEnumValueA(HKEY k, DWORD idx, LPSTR name, LPDWORD cchName, LPDWORD rs
 LSTATUS RegQueryInfoKeyW(HKEY k, LPWSTR cls, LPDWORD cchCls, LPDWORD rsv, LPDWORD nSub, LPDWORD maxSub,
                          LPDWORD maxCls, LPDWORD nVal, LPDWORD maxValName, LPDWORD maxValData,
                          LPDWORD secDesc, FILETIME* lastWrite);
+/* vreg 拡張の追加 6 API (CAB-94/CAB-214 取込) */
+LSTATUS RegGetValueA(HKEY k, LPCSTR sub, LPCSTR name, DWORD flags, LPDWORD type, PVOID data, LPDWORD cb);
+LSTATUS RegEnumKeyW(HKEY k, DWORD idx, LPWSTR name, DWORD cch);
+LSTATUS RegDeleteTreeW(HKEY k, LPCWSTR sub);
+LSTATUS RegSetKeyValueW(HKEY k, LPCWSTR sub, LPCWSTR name, DWORD type, LPCVOID data, DWORD cb);
+LSTATUS RegDeleteKeyValueW(HKEY k, LPCWSTR sub, LPCWSTR name);
+LSTATUS RegQueryInfoKeyA(HKEY k, LPSTR cls, LPDWORD cchCls, LPDWORD rsv, LPDWORD nSub, LPDWORD maxSub, LPDWORD maxCls,
+                         LPDWORD nVal, LPDWORD maxValName, LPDWORD maxValData, LPDWORD secDesc, FILETIME* lastWrite);
 BOOL    OpenProcessToken(HANDLE proc, DWORD access, LPHANDLE tok);
 BOOL    GetTokenInformation(HANDLE tok, int cls, LPVOID info, DWORD n, LPDWORD ret);
 /* シード / 永続化 API (shimx 独自) */
@@ -817,6 +825,13 @@ int     shimx_reg_import_text(const char* text);
 char*   shimx_reg_export_text(void);    /* malloc 済み。free() すること */
 void    shimx_reg_reset(void);
 void    shimx_reg_stats(int* nKeys, int* nValues);
+/* vreg 運用フック (CAB-94 で導入, CAB-214 で shimx 本体に取込。名前は vreg JS 側の
+ * EXPORTED_FUNCTIONS (_vreg_generation 等) との互換のため vreg_ 接頭辞を維持) */
+uint32_t vreg_generation(void);                    /* 変更世代 (値/キーの作成・削除・更新で増加) */
+void     vreg_set_notify(void (*cb)(uint32_t gen));/* 変更通知 (Reg* を呼んだスレッドで、内部ロック解放後に同期呼出) */
+char*    vreg_export_root(int root);               /* 0=HKCR 1=HKCU 2=HKLM 3=HKU 4=HKCC を .reg 形式 (UTF-8, LF) で。free() すること */
+void     vreg_clear_root(int root);                /* 指定ルート配下を空にする (seed 再投入前に使用) */
+void     vreg_clear_all(void);                     /* 全ルートを空にする (shimx 内蔵 seed も消す) */
 
 /* =============================================================
  * モジュール / プロセス / 環境 / システム情報

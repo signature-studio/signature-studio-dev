@@ -135,19 +135,19 @@ static int shexec_hook(const char* verb, const char* file, const char* params) {
 
 static void test_shell_version(void) {
     WCHAR p[MAX_PATH];
-    CHECK(SHGetFolderPathW(0, 0x1a, 0, 0, p) == S_OK && wstr_eq(p, "C:\\Users\\user\\AppData\\Roaming"));
+    CHECK(SHGetFolderPathW(0, 0x1a, 0, 0, p) == S_OK && wstr_eq(p, "C:\\Users\\webstudio\\AppData\\Roaming"));
     CHECK(SHGetFolderPathW(0, 0x1c | 0x8000, 0, 0, p) == S_OK && GetFileAttributesW(p) & FILE_ATTRIBUTE_DIRECTORY);       /* CSIDL_FLAG_CREATE */
     CHECK(SHGetFolderPathW(0, 0xFE, 0, 0, p) == E_INVALIDARG);
     CHECK(SHGetSpecialFolderPathW(0, p, 0x23, FALSE) && wstr_eq(p, "C:\\ProgramData"));
     LPWSTR kp = NULL;
     GUID roaming = { 0x3EB685DB, 0x65F9, 0x4CF6, { 0xA0, 0x3A, 0xE3, 0xEF, 0x65, 0x72, 0x9F, 0x3D } };
-    CHECK(SHGetKnownFolderPath(&roaming, 0, 0, &kp) == S_OK && wstr_eq(kp, "C:\\Users\\user\\AppData\\Roaming")); CoTaskMemFree(kp);
+    CHECK(SHGetKnownFolderPath(&roaming, 0, 0, &kp) == S_OK && wstr_eq(kp, "C:\\Users\\webstudio\\AppData\\Roaming")); CoTaskMemFree(kp);
     GUID bogus = {1, 2, 3, {4, 5, 6, 7, 8, 9, 10, 11}};
     CHECK(SHGetKnownFolderPath(&bogus, 0, 0, &kp) == (HRESULT)0x80070002 && kp == NULL);
     LPVOID pidl = ILCreateFromPathW(W("C:\\foo\\bar"));
     WCHAR back[MAX_PATH];
     CHECK(pidl && SHGetPathFromIDListW(pidl, back) && wstr_eq(back, "C:\\foo\\bar")); ILFree(pidl);
-    CHECK(SHGetSpecialFolderLocation(0, 5, &pidl) == S_OK && SHGetPathFromIDListW(pidl, back) && wstr_eq(back, "C:\\Users\\user\\Documents")); ILFree(pidl);
+    CHECK(SHGetSpecialFolderLocation(0, 5, &pidl) == S_OK && SHGetPathFromIDListW(pidl, back) && wstr_eq(back, "C:\\Users\\webstudio\\Documents")); ILFree(pidl);
     CHECK(SHCreateDirectoryExW(0, W("C:\\shx_dir\\a\\b"), NULL) == 0 && SHCreateDirectoryExW(0, W("C:\\shx_dir\\a\\b"), NULL) == (int)ERROR_ALREADY_EXISTS);
     CHECK(GetFileAttributesW(W("C:\\shx_dir\\a\\b")) & FILE_ATTRIBUTE_DIRECTORY);
     WCHAR src[64]; memset(src, 0, sizeof src); lstrcpyW(src, W("C:\\shx_dir\\a"));

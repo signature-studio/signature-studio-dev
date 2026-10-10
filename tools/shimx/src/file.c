@@ -670,13 +670,13 @@ static void mkdirs(const char* path) {
 DWORD GetTempPathW(DWORD n, LPWSTR buf) {
     shx_ensure_init();
     char px[2048];
-    const char* tmp = "C:\\Users\\user\\AppData\\Local\\Temp\\";
+    const char* tmp = "C:\\Users\\webstudio\\AppData\\Local\\Temp\\";
     shimx_path_to_posix(tmp, px, sizeof px);
     mkdirs(px);
     return (DWORD)copy_utf8_out(tmp, buf, n);
 }
 DWORD GetTempPathA(DWORD n, LPSTR buf) {
-    const char* tmp = "C:\\Users\\user\\AppData\\Local\\Temp\\";
+    const char* tmp = "C:\\Users\\webstudio\\AppData\\Local\\Temp\\";
     DWORD len = (DWORD)strlen(tmp);
     if (!buf || n < len + 1) return len + 1;
     memcpy(buf, tmp, len + 1);
