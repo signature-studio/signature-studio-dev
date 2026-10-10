@@ -8,7 +8,7 @@
 |---|---|
 | 420 名の関数表 + ローダ | **完了**。`LoadLibraryW("…dsp_ippv2_x64.dll")` → `GetProcAddress(420 名)` を shimx 経由で 420/420 解決 (絶対パス・`legacy90` 接頭辞も可)。取得値は cookie (表要素のアドレス) |
 | thunk | **92 件 (型付き thunk)** = 実装済み全部 (CAB-134 43 + CAB-139 FFT 14 + CAB-136 優先順上位 35)。残 **328 件は fail-soft stub** (eax=0 / xmm0=0 を返し、関数別カウンタと初回順を記録。STRICT モードで trap) |
-| 署名 | **420/420 導出 (不明 0)**。確度 A 43 / B+ 157 / B- 220 (§2)。呼出箇所実績 (win 145 モジュール 19,018 箇所) との**型・個数の矛盾 0** |
+| 署名 | **420/420 導出 (不明 0)**。確度 A 92 / B+ 129 / B- 199 (CAB-136/139 完了時点。§2 の導出監査時は A 43 / B+ 157 / B- 220 — 実装済み 92 関数は A に繰り上げ)。呼出箇所実績 (win 145 モジュール 19,018 箇所) との**型・個数の矛盾 0** |
 | thunk 経路の回帰 | 既存オラクル **24 関数 × 216 ケース (5,184)** を「実 MS x64 呼出 → asm トランポリン → dispatch → thunk → 実装」で再実行し、**直呼び・既存 baseline (`work/cmp_avx512.json`) と全統計が完全一致、実 IPP に対し 21 関数 bit-exact** (通常/特殊値入力とも)。エラー格子 222 点一致。wasm (scalar/simd128) の golden 突合も同じ 21 bit-exact、FFT 48 ケース NRMS 32f 1.34e-7 / 64f 5.87e-16 (thunk 経由) |
 | 「最大の統合リスク」(呼出規約の橋渡し) | **thunk 側は解消、lift 側との接点が残る** (§6): レジスタブロック契約を icall の memory-ABI と同一配置で定義し、`stk`(第 5 引数以降) ポインタ +0x48 の追加が **icall 側に 1 点必要** |
 | 実装の穴 (重要) | 使用集合 239 のうち stub は **166 関数** (CAB-136 完了時点; 実装済 73)。残る上位は `ippiResizeSqrPixel_8u_{C1,C3,C4}R` (143 モジュール)・`ippsThreshold_GT_32s_I` / `ippsSub_32f_I` / `ippsCopy_32s` / `ippsAtan_32f_A11` (125) ほか (§10-6) |
@@ -74,7 +74,7 @@ fail-soft の注意 (**サイレントに誤る**): stub は status 0 (=成功) 
 |---|---|---|
 | S1 | 420 名の署名・thunk 件数 | 不明 0 / 型付き 43 / stub 377 |
 | S2 | 呼出実績との矛盾 | **0** (agree 173 / weak 24 / nodata 223) |
-| S3 | native 自己検査 (ABI プローブ 6・420 名解決・legacy90・LoadLibraryW 名 8 形・stub 377 を全て呼んで fail-soft/カウンタ/初回順) | 1,611 checks 失敗 0 |
+| S3 | native 自己検査 (ABI プローブ 6・420 名解決・legacy90・LoadLibraryW 名 8 形・stub 全数を呼んで fail-soft/カウンタ/初回順) | 1,513 checks 失敗 0 (CAB-136/139 後の stub 328×2 実測。CAB-134 当初は 377 stub で 1,611) |
 | S4/S5 | 実 DLL オラクル (AVX-512 経路) vs thunk、通常入力/特殊値入力: thunk 統計 = 直呼び統計 = 既存 baseline JSON、バッファ全語・状態コードの thunk-直呼び差 0 | 24 関数 5,184 ケース ×2 入力種、不一致 0 |
 | S6 | thunk 経由でも実 IPP に bit-exact | **21 関数** (NaN 仮数ペイロード差は既存と同じ扱い・同じ件数) |
 | S7 | NULL×len エラー格子 | 222 点、実 IPP との不一致 0 |
@@ -87,7 +87,7 @@ fail-soft の注意 (**サイレントに誤る**): stub は status 0 (=成功) 
 
 **シンボル命名**: 公開は `ipp_shim_*` (C リンケージ、接頭辞なし)。実装関数は IPP 名そのまま (`ippsAddC_32f` …) で lifted 側の `function_<VA>` / Win32 名 (shimx) と衝突しない。per-function thunk は `static blk_<IPP名>` (非公開)。複数 DLL 同居で接頭辞化する場合も `ipp_shim_*` は 1 つだけ持てばよい。
 
-1. **同一 wasm モジュール/同一リニアメモリにリンクする** (必須)。IPP に渡るポインタは FL のバッファそのもの。別 instance にすると deref 不能。`m11_build.sh` の `cc` 群に次を追加: `ipp/shim/src/ipp_shim.c`, `ipp/shim/gen/ipp_shim_tab.c`, `ipp/src/ipp_min.c`, `ipp/src/ipp_fft.c`, (shimx 経由なら) `ipp/shim/src/ipp_shim_shimx.c` (`-I tools/shimx/src`)。**IPP 実装 2 本は `-ffp-contract=off -fno-fast-math` 必須** (m11 の `CF` は `-O0 -g1` のみ。bit-exact 前提が崩れる)。M11 の `-sERROR_ON_UNDEFINED_SYMBOLS=0` / `--export-all` でも衝突しない。
+1. **同一 wasm モジュール/同一リニアメモリにリンクする** (必須)。IPP に渡るポインタは FL のバッファそのもの。別 instance にすると deref 不能。`m11_build.sh` の `cc` 群に次を追加: `ipp/shim/src/ipp_shim.c`, `ipp/shim/gen/ipp_shim_tab.c`, `ipp/src/ipp_min.c`, `ipp/shim/fft/ipp_fft_pffft.c` + `ipp/shim/fft/pffft/*.c` (CAB-139 以降。旧 `ipp/src/ipp_fft.c` は移設済), `ipp/shim/impl/*.c` (CAB-136 以降), (shimx 経由なら) `ipp/shim/src/ipp_shim_shimx.c` (`-I tools/shimx/src`)。**IPP 実装 2 本は `-ffp-contract=off -fno-fast-math` 必須** (m11 の `CF` は `-O0 -g1` のみ。bit-exact 前提が崩れる)。M11 の `-sERROR_ON_UNDEFINED_SYMBOLS=0` / `--export-all` でも衝突しない。
 2. **起動順**: shimx 初期化後・FL の IPP ローダ (win64 `0x653f40`、呼出 3 箇所) より前に `ipp_shim_install_shimx()` を 1 回。FL は `dsp_ippv2.dll` に `_x64` を挿入した名で `LoadLibraryW` → `GetProcAddress`×420 → 戻り値は検査されない。shimx を使わない場合は、lift 側の `LoadLibraryW`/`GetProcAddress` 実装から `ipp_shim_load_library_w` / `ipp_shim_get_proc_address` を呼ぶ。
 3. **間接 call の接続**: FL は VAR に取得値を保持し `mov r,[slot]; call [r]` で呼ぶ (win)。`icall_rewrite.py` が target と rcx/rdx/r8/r9/xmm0-3 をブロックへ store し `__icall_dispatch(site_va)` に落とすので、**その先頭で `if (ipp_shim_dispatch(blk)) return;`** を入れる (cookie 以外は 0 で素通り)。戻り値はブロック +0x80/+0x88 から icall 側が既に load する。x64c (`ott_dispatch`) でも CPU 状態 `R[]` から同じブロックを組めば同様。
 4. **icall への要望 (CAB-134 範囲外・要依頼)**: ブロックに **+0x48 = call 時点の rsp+0x20** を追加 (`lea` 1 命令)。無いと第 5 引数以降を持つ関数が使えない — 実装済みでは `Convert_32f32s_Sfs`・`FFTGetSize_R_32f/64f`・`FFTInit_R_32f/64f` の 5 関数、stub では 90 関数 (うち win が呼ぶもの 45。`ippiResize*` は 10〜13 引数) が該当。≤4 引数の IPP 呼出はこれ無しで動く。
@@ -115,7 +115,7 @@ fail-soft の注意 (**サイレントに誤る**): stub は status 0 (=成功) 
 ## 9. 次タスク提案
 
 1. **CAB-136 (ipp-fill)**: **実施済み (§10)** — 優先順 (win 呼出モジュール数降順) 上位 35 関数 + Init/Alloc/GetSize 10 関数 (エラーコード返却) を実装。元リスト: `ippiCopy_8u_C3AC4R` `ippiAddC/SubC_8u_C3/C4IRSfs` `ippsOrC_32u_I` `ippiSet_8u_C3R` `ippiCopy_8u_C3R/C4R/C1C4R/AC4C3R` `ippiCopyManaged_8u_C1R` `ippiAlphaPremul_8u_AC4IR` `ippiFilterBox_8u_C3IR/C4IR` `ippiAlphaCompC_8u_C3R/C4R` `ippsThreshold_GT_32f` `ippsSet_64s` … (いずれも 143〜145 モジュールが呼ぶ)。手順: `shim/impl/*.c` に追加 → `gen_shim.py` が自動で thunk 化 → `test/shim_ref.c` の FN 表に追加して実 IPP 差分。実装前に B 系の引数順序を逆アセンブルで確認。
-2. **CAB-139 (ipp-fft)**: FFT は署名 A・thunk 済み (14 関数)。pffft 等へ差替える際は `ippsFFT*` の宣言を変えず `impl/` か `src/ipp_fft.c` を置換すれば `shim_e2e.sh` の S8 (FFT 48 ケース) がそのまま回帰テストになる。未実装の `RToPerm/PermToR`・`RToCCS` 非 in-place・`CCSToR` 非 in-place (stub) も同時に。
+2. **CAB-139 (ipp-fft)**: **実施済み** (`shim/fft/REPORT.md` — pffft 差替え、FFT 28 関数 stub 0)。`impl/` か FFT 実装 TU を置き換えるだけで `shim_e2e.sh` の S8 (FFT 48 ケース) が回帰テストとして機能する設計は維持。
 3. **icall 側 (別チケット案)**: ブロックに +0x48 (stk) 追加と `__icall_dispatch` 先頭の `ipp_shim_dispatch` フック。これが無いと第 5 引数以降を持つ IPP 関数が結合後に使えない。
 4. **ipp-profile**: 結合後に STRICT/採取で実使用集合を確定 → 239 を絞る (REPORT §9-4)。
 5. mac 版 FLEngine を lift する場合の SysV ブロック版 shim (任意)。

@@ -95,7 +95,7 @@ FFT (`ipp_fft.c`, 倍精度基数2 の素朴実装): ippsFFTGetSize/Init/Fwd_RTo
 | `discover.py` `scan_x64.py` `scan_arm64.py` `scan_win.py` `scan_all.py` `analyze_usage.py` | 使用関数集合の抽出・分類・集約 |
 | `a64_map.py` | arm64 各 export が呼ぶ Accelerate/libc の対応表 |
 | `xref.py` `a64_xref.py` | ローダ関数・リテラルの xref 探索 (§2 のアドレス特定に使用; arm64 は `llvm-objdump -d` 出力が入力) |
-| `src/ipp_min.[ch]` `src/ipp_fft.c` `src/gen/ipp_table.c` | 実装 43 関数 + 420 名 lookup 表 (`gen_table.py` 生成: 未実装 377 は fail-fast stub) |
+| `src/ipp_min.[ch]` `src/ipp_fft.c`[*] `src/gen/ipp_table.c` | 実装 43 関数 + 420 名 lookup 表 (`gen_table.py` 生成: 未実装 377 は fail-fast stub)。<br>[*] `src/ipp_fft.c` は CAB-139 で `shim/fft/` (pffft 版 28 関数) へ移設・削除。CAB-136 で `shim/impl/` に 35 関数追加 (型付き thunk 計 92 / stub 328, `shim/REPORT.md` §10) |
 | `build_wasm.sh` | emcc (standalone wasm, 唯一の import は `emscripten_notify_memory_growth`) scalar / `EXTRA=-msimd128` |
 | `ref/` | PE ローダ + 差分ハーネス (`ipp_ref.c` cmp/isa/gen/err, `ipp_acc.c` 精度, `ipp_fft_ref.c`, `ipp_bench.c`) と探索 probe 3 本 |
 | `ipp_wasm_cmp.mjs` `ipp_wasm_fft.mjs` `ipp_wasm_bench.mjs` | wasm と golden(実 IPP 出力) の突合・性能 |

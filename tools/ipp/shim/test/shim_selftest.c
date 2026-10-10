@@ -2,7 +2,7 @@
    [abi]    thunk デコーダ (本番 thunk と同じ生成器) を実 MS x64 呼出 (gcc ms_abi + 手書き asm トランポリン) で検証。
             スタック上の float/double、値渡し struct 4B/8B、16B 構造体の参照渡し、狭い整数、13 引数。
    [loader] 420 名の GetProcAddress 解決 / legacy90 / LoadLibraryW 名判定 / 未知名
-   [stub]   未実装 363 名 (420 - 実装 57) を全て呼んで fail-soft (eax=0, xmm0=0, 呼出カウンタ・初回順) を確認
+   [stub]   未実装名 (420 - 実装。実装数は e2e が sigs_summary.json から渡す) を全て呼んで fail-soft (eax=0, xmm0=0, 呼出カウンタ・初回順) を確認
    usage: shim_selftest <names.txt>   (1 行 1 名; flengine_ipp_names.json 由来) */
 #include "../src/ipp_shim.h"
 #include <stdio.h>

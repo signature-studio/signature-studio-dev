@@ -33,7 +33,7 @@ pffft の制約と対処: **最小変換サイズが REAL で 2·simd² (=32)** 
 | `test/fft_wasm_ext.mjs` | wasm 規模拡張テスト (thunk 経由): order 0..16 × flag × 全 Run 系 × in/out-of-place × buffer あり/なし = **3,784 checks** |
 | `test/fft_proto_check.c` | 署名突合 TU |
 | `test/probe_ipp_sem.c` | 実 IPP の意味採取プローブ (エラーコード・読み書き長の根拠, §5) |
-| `bench/` | 差替え前後ベンチ (`build_bench.sh` は旧実装を `git show HEAD:` で取得して同フラグでビルド) |
+| `bench/` | 差替え前後ベンチ (`build_bench.sh` は旧実装を git 履歴 — 削除済み `src/ipp_fft.c` の最終 touch コミットの親 — から取得して同フラグでビルド。HEAD 参照だと本チケットの削除コミット後に取得できないため検収時に修正) |
 | `fft_e2e.sh` | 上記全部を直列実行する 1 コマンド |
 
 設計の要点:
@@ -59,7 +59,7 @@ pffft の制約と対処: **最小変換サイズが REAL で 2·simd² (=32)** 
 
 ## 4. 性能 (差替え前後を同一条件で実測)
 
-条件: 同一 node (v24.19.0, emsdk 同梱)・同一入力・同一 iteration (min 3 回の最速値)・同一 emcc フラグ (`-O2 -DNDEBUG -ffp-contract=off -fno-fast-math` ± `-msimd128`)。旧実装は `git show HEAD:tools/ipp/src/ipp_fft.c` をそのままビルド (`bench/build_bench.sh`)。pBuffer=NULL で統一 (旧実装は内部 malloc、新実装は内部 scratch)。単位 ns/call。**再現: `fft_e2e.sh` step 6**。
+条件: 同一 node (v24.19.0, emsdk 同梱)・同一入力・同一 iteration (min 3 回の最速値)・同一 emcc フラグ (`-O2 -DNDEBUG -ffp-contract=off -fno-fast-math` ± `-msimd128`)。旧実装は git 履歴 (削除前の `tools/ipp/src/ipp_fft.c`) をそのままビルド (`bench/build_bench.sh`)。pBuffer=NULL で統一 (旧実装は内部 malloc、新実装は内部 scratch)。単位 ns/call。**再現: `fft_e2e.sh` step 6**。
 
 | ケース | 旧 (scalar) | 新 (scalar) | 旧 (simd128) | 新 (simd128) | speedup (simd128) |
 |---|---|---|---|---|---|
@@ -86,6 +86,7 @@ pffft の制約と対処: **最小変換サイズが REAL で 2·simd² (=32)** 
 - **`shim_e2e.sh` 10 checks 全 PASS** (S1..S9, scalar/simd128 含む; FFT 48 ケース 32f 1.90e-7 / 64f 3.63e-16、typed thunk 92 = 旧 43 + 本チケット 14 + CAB-136 進行中 35)。
 - `fft_e2e.sh` 6 step 全緑 (proto 突合 / native オラクル / golden 48 / 規模拡張 3,784×2 / v128 確認 / ベンチ)。
 - 併せて shim_e2e.sh の 2 点を改修: (1) fft ソースの追加 (本チケット), (2) **step 5b (shimx 結合) が `impl/*.c` をリンクしていなかった既存の穴**を修正 (CAB-136 の実装追加で顕在化したもの)。`shim_selftest.c` の実装数ピン (43/377) はハードコードをやめ `sigs_summary.json` と突き合わせる方式に変更 (実装追加のたびの更新が不要になり, CAB-136 との競合も回避)。
+- **検収時修正 (2026-10-10)**: 本チケットのコミット後は `src/ipp_fft.c` が HEAD に存在しなくなるため `git show HEAD:` が exit 128 で step 5/6 が落ちる → `build_bench.sh` を「最終 touch コミットの親」参照に変更。修正後 `fft_e2e.sh` 全 6 step exit 0 を再確認。
 
 ## 7. 未解決・制約
 

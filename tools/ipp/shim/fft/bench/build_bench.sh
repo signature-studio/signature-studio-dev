@@ -6,7 +6,10 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"; FFT="$(dirname "$HERE")"; SHIM="$(dirname "$FFT")"; IPP="$(dirname "$SHIM")"
 W="$FFT/work/bench"; mkdir -p "$W"
 source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1
-git -C "$IPP/../.." show HEAD:tools/ipp/src/ipp_fft.c > "$W/ipp_fft_old.c"   # 差替え前の正確なソース (git 由来)
+# 差替え前の正確なソース (git 由来)。src/ipp_fft.c は CAB-139 コミットで削除済みのため
+# 最終_touch コミット (削除コミット) の親から取得する (HEAD 参照だと削除後に出ない)。
+DEL=$(git -C "$IPP/../.." rev-list -1 HEAD -- tools/ipp/src/ipp_fft.c)
+git -C "$IPP/../.." show "$DEL^:tools/ipp/src/ipp_fft.c" > "$W/ipp_fft_old.c"
 FLAGS="-O2 -DNDEBUG -DPFFFT_ENABLE_WASM -ffp-contract=off -fno-fast-math"
 EXTRA="${EXTRA:-}"
 TAG=$([ "${EXTRA:-}" != "" ] && echo _simd || echo)
