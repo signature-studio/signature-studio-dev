@@ -33,7 +33,7 @@
 |---|---|---|
 | F1 | `0x180126766 mulsd xmm13, xmm7` (C1⁴) | m9 port は v13 = C1² で通過 → K に C1² が加算され A16 ≈ −2 (dyad 分母欠落)。これが **m9 検収時の junk bit 系列と係数完全一致** (m9 側係数再シミュレーション (dsm ops 転記) が m9 junk 時点の係数を再現し, FIX1 適用で消滅する E2 evidence) する真の破れ 1 位 |
 | F2 | `0x18012676b mulsd xmm9, xmm10` (4W2²) | S2 = 4W2²C1² が W2²C1² (÷4) になる脱漏 |
-| F3 | `0x180126723 mulsd xmm2, [0x1802056f0=6.0]` (6W2⁴) | C16 = W2⁴/K (×6 殆…誤) → 6W2⁴/K, A32 分子も同値 |
+| F3 | `0x180126723 mulsd xmm2, [0x1802056f0=6.0]` (6W2⁴) | C16 = W2⁴/K (×6 欠落) → 6W2⁴/K, A32 分子も同値 |
 | F4 | π̂/2π̂ 実ビット転記 | `b2d(0x4009249249249243)` / `b2d(0x4019249249249243)` (原 PE .rdata 0x1802056e8/f8 直読, 22/7 decimal から ~6 ulp 差) |
 
 - 検収値 (f0 = 88.30000305175781 [0x42b0999a], SR = 44100.0 f64@st+0xb8):
@@ -45,7 +45,7 @@
   **8 states × 10 係数: bit 一致 (dev = 0.0)** — f0 = 88.3/2500 とも。
 - 定数の PE 直検 (analysis Plugins/binaries 直読): 0x1801ee848 = 2.0, 0x1801f70d8 = 8.0, 0x1801fde58 = 4.0,
   0x1802056f0 = 6.0, 0x180205700 = −4.0 — m9 const_addrs 側 indication (0xdf004/0xd7744 の rip-a 差 ~8B)
-  の算出誤差が FIX の分かりを上書き (全て dsm 次点 = m10 転記 ヘ編集判決)。
+  の算出誤差が FIX の根拠判別を上書き (定数は全て dsm 実測 = m10 転記値を採用)。
 
 ## 3. junk 出生 trace (目標 1+3) — 実測 見所
 
@@ -58,7 +58,7 @@
 
 ### 3.2 junk 値の正体 (確定部)
 
-- junk 値群 = **±2^65 (3.68934878e19 EXACT), ±2^-63 (1.0842e-19 EXACT), ±2.0 系 → その後に per-stage ×1.0043
+- junk 値群 = **±2^65 (3.68934881e19 EXACT), ±2^-63 (1.0842e-19 EXACT), ±2.0 系 → その後に per-stage ×1.0043
   増大系列** (ring0 → ring5: −3.705e19 → −3.94e19, 同時: −2.01 → −2.16) — exponential series は band IIR の
   係数 pole ではなく **exp() の入力量として放大される exp/log chain** ([box+0xb8] = 1.83e37, [box+0x90] =
   1.43e18 も GROWING — 3 gate box): m9 REPORT §2 の「由来 = [0x88]/[0x90] pole」の推定は本 trace により**保留 (実質否定寄)**: junk 2^65 量級は exp 系出力で, 係数 pole 解では説明できない。
@@ -72,8 +72,8 @@
   → **per-sample の破れ点が別に残ることを示す** (次回 [F7] 型 base-deref 修復を 0x18011e*  に適用).
 - dsm-faithful 係数 (§2) の feedback 再帰 1 + A16z + A32z² + B16z³ + B32z⁴ の |root|:
   f0 = 88.3: {1.0190 ×2, 0.9720 ×2}, f0 = 2500: {1.6729 ×2, 0.9700 ×2} — **faithful 設定でも outside-root が存在**;
-  native は stable, 残る破れ (per-sample 係数組合せ/経路) の別層に由来する可能性を verif 後に入れることに備え
-  REPORT 自体的に「在り」として残す。
+  native は stable, 残る破れ (per-sample 係数組合せ/経路) の別層に由来する可能性があり,
+  verif 後の判定課題として REPORT 上に「在り」として記録する。
 
 ## 4. tolerance 宣言と判定スクリプト化 (目標 4+5)
 
