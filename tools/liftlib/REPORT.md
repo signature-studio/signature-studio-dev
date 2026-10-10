@@ -1,6 +1,6 @@
-# liftlib REPORT — 共通 lift 修復基盤の統合 (CAB-49 / CAB-54 / CAB-55 / CAB-220 / CAB-239)
+# liftlib REPORT — 共通 lift 修復基盤の統合 (CAB-49 / CAB-54 / CAB-55 / CAB-220 / CAB-239 / LIFTLIB-2)
 
-- 日付: 2026-10-10 / 担当 dir: `tools/liftlib/` (他 dir は読取のみ) / 再現: `bash tools/liftlib/liftlib_e2e.sh` (キャッシュ時 約 25 秒 + leaf spec 約 4 分, `--fresh` で FA/KH を RetDec lift から約 1 分)
+- 日付: 2026-10-11 / 担当 dir: `tools/liftlib/` (他 dir は読取のみ) / 再現: `bash tools/liftlib/liftlib_e2e.sh` (キャッシュ時 約 25 秒 + leaf spec 約 4 分, `--fresh` で FA/KH を RetDec lift から約 1 分)
 - 数値はすべて本 dir で実測。推定は「推定」と明記。
 
 ## 0. 結論 (先出し)
@@ -13,7 +13,7 @@
 | SIMD helper (CAB-54) | 宣言駆動で自動生成。KH census 205 mnemonic の **未被覆 83(効果)/31(共通基盤)/90(合算)/92(host 込) → 1/1/2/2** (残: `pcmpistri`, `vinsertf128`)。**実機 inline asm vs wasm を 192 mnemonic・281 form・95,400 ベクタで突合: 不一致 0** (近似命令 4 種は相対誤差 <1.6·2⁻¹² を許容して 489 件合格) |
 | 検出器 (CAB-55) | パターン注入 **94 件 (F7 57 / P1 畳込み 35 / F2 2) を 94/94 検出**, 修復済み IR への偽陽性 0。OTT 生 IR で既知 [F7] 1 件 + **新規 6 件の F7 型脱落**, comis 89 サイトの分類 (§5) |
 
-コミット列: c8027d3 (基盤: base/P1/F7/F2/simd/harness) → 56679d5 (OTT recipe・CLI・e2e・注入評価) → 09b3918 (docs/unit test; feature 完了点) → cf096a6 (lowbase 取り込み CAB-220) → 本チケット (CAB-239)。
+コミット列: c8027d3 (基盤: base/P1/F7/F2/simd/harness) → 56679d5 (OTT recipe・CLI・e2e・注入評価) → 09b3918 (docs/unit test; feature 完了点) → cf096a6 (lowbase 取り込み CAB-220) → CAB-239 → 本チケット (LIFTLIB-2 / CAB-256)。
 
 **CAB-239 追加 (§11)**: mini-lifter 語彙 9 系統拡張 — OTT 落下分岐の再構成 **5 → 19**, 理由付き残留 **47 → 30**。
 auto f7,p1 で junk census junkHi **175 → 104** (checks 7/0・band maxdev 0・trap 0 維持)。
@@ -222,3 +222,125 @@ e2e の gate は spec の `expect_match_min` (crash を除く一致率) のみ�
   leaf native は CRT 経路で crash (tools/ott/native の IAT thunk 方式で吸収可 — 読取のみのため未統合)。
 - 次タスク: ① phi 合成 (tan/cvt が通る見込み) ② leafabi 方式の SVF 経路適用 (m9 C port からの置換)
   ③ leafspec の crash scenario 自動除外 ④ CAB-238 検収条件の策定。
+
+## 12. LIFTLIB-2 (CAB-256) — 領域 DAG の phi 合成 + CAB-238 無限ルーブ修復
+
+**結論**: ① OTT 既定ビルドの **無限ルーブを修復** (CAB-238 §6 の 2 combo が `rc=124` → `rc=0`)。
+② 領域リフトを DAG 化する phi 合成で **多定義 bind の残留 9 → 4 / region join 8 → 0**,
+**脱落分岐の再構成 19 → 25・理由付き残留 30 → 21** (LIFTLIB-2 着地で既定ビルドが初めて build 通過も達成)。
+③ e2e gate を **param 0.0/0.1/0.9/1.0 の sweep + ハード timeout** に拡張 (CAB-238 提案④)。
+④ 回帰すべて緑 (`liftlib_e2e.sh` ALL PASS / `ott_e2e.sh` 89 scenario 50,236 cell bit-exact)。
+
+### 12.1 無限ルーブの原因と修復 (CAB-238 §6)
+
+| 項目 | 実測 |
+|---|---|
+| 現象 | 既定 (`python3 -m liftlib ott` = auto f7,p1) で params=0.9 / [0x248]=1 / amp=0.0,1.0 の 2 combo が `processReplacing` で停止 (60 s timeout で HANG, CPU 100%) |
+| bisect | `work/hang_bisect.py` を 25 再構成 site 単体で実行 → **HANG は `p1_one_18012024b` のみ** (他 24 site は完走)。`1801204b9` (CAB-238 snapshot 側) は本ツリーでは別 site に吸収され未再構成 |
+| 機械語 | `0x18012024b jbe 0x180120336` — 脱落側入口 **D = 0x180120336** が *head block 自身の IR ラベル* (`dec_label_pc_180120336`: RetDec が 0x1801200f3..0x18012034d を 1 ブロックにマージし末尾 VA をラベルにしたもの)。collect() が D を出口と見なして `br label %dec_label_pc_180120336` (= head 自身) を張ったため **自己辺** になり永久ループ |
+
+**修復 (3 点)**:
+1. **join split**: D の IR ラベルが head 自身のとき, tail を「D の機械語コードの始点」で割り
+   〔生存側尾部 (FALSE) / 合流点 (join)〕の 2 block にする。脱落側 relay の行き先を **合流点 block** に
+   変更 (head 自身ではない) → 自己辺が消える。実測 2 site (`18011ffdd` / `18012024b`) が対象。
+2. **join merge (phi)**: 合流点が「生存側尾部で定義した値」を読む場合 (ここでは `movaps xmm0, xmm14` =
+   jcc の FALSE 側のみの def), 脱落側経路では実行されないので reg2mem 合成
+   (入口 alloca + 各 pred 終端 store + 合流点 load) でマージ。脱落側の値は **分岐点 J** (D でなく) で
+   bind する (D で bind すると生存側尾部の def を拾ってしまう)。実測 merge 1 件/site。
+3. **安全網**: `dlabel` が head 自身のラベルになったら `Unsupported` (IR 無改変)。
+   同じ形が別条件で現れても無限ループを出さない。
+
+同じ scope で入れた IR 健全性対策 (clang `does not dominate all uses` 防止):
+- **値の支配検証** (`Region._checked` / `_value_ok`): 領域 block が参照する値は (a) head 分割点より前,
+  (b) head を支配する block, (c) 自領域内で定義 block が使用 block を支配する — のいずれかに限る。
+  非支配/他 site 領域の値 (`%p1r_<va>_<salt>_…`) は候補から外し次の fallback に回す。
+- **alloca load の再発行** (`_reissue_load`): 非支配だった reg2mem load は「使用点で load し直す」。
+- **多定義 bind のフィルタ** (`_resolve_multi`): IR 値を持つ def が非支配/他領域なら採用せず,
+  cmov select 合成 / def 命令のローカル lift にフォールバック。
+- **`_bind_call_ret`**: RetDec が `call i64 @function_1801b4220()` (exp) 等と lift する CRT 数学関数の
+  i64 戻りを xmm0 ビット列として補う (F6 の C port 規約と同じ) — `bind xmm0` 失敗の主因。
+
+### 12.2 phi 合成 (領域 DAG 化) の実測
+
+| 指標 | CAB-239 (a137396) | LIFTLIB-2 本ブランチ | 差分 |
+|---|---|---|---|
+| P1 sites 内訳 | 89 = branch 33 (rewired 30) + dropped 49 (再構成 19 + unsupported 30) + consumer 4 | 89 = branch 33 (rewired 30) + dropped 52 (**再構成 25** + unsupported 21) + consumer 4 | 再構成 **+6** / 残留 **−9** |
+| region join (残留理由) | 8 | **0** | DAG 化で解消 |
+| 多定義 bind (phi 要) | 9 (rcx 5 / xmm5 2 / xmm1 2) | **4** (rcx 1 / xmm5 1 / xmm0 1 / xmm1 1) | phi 合成 + フォールバックで半減 |
+| vocab (初発動含む) | — | `phi_join` 2, `bind_call_ret` 2, `join_merge_store` 2, `load_reissue` 1 | — |
+| processReplacing 再構成 | 14 | 14 (region blocks 最大 19) | DAG で大断片も扱う |
+
+残留 21 の理由分類 (実測, `work/tmp/dbg_reason.py`): bind xmm0 6 / bind xmm1 5 /
+merge xmm2 (非支配・他領域) 4 / reg2mem 値消失 (`no value`) 2 / 間接 call 1 / region live-out 1 /
+bind rcx 1 / bind xmm5 1。
+
+### 12.3 OTT 既定ビルドの検収 (CAB-238 検収条件を m10 SHA 分離のまま確認)
+
+| ゲート | 実測 | 判定 |
+|---|---|---|
+| checks / broken | **8 / 0** (E7 param sweep 追加で 7→8) | PASS |
+| band 係数 maxdev / nbad | 0.0 / 0 | PASS |
+| trap rc | 0 | PASS |
+| census[0x248]=0 | 132 / 140 / **junkHi 104** / 136 / nan 0 / absmax 1.67e18 | 104 ≤ 104 OK |
+| census[0x248]=1 | 4 / 259 / junkHi 248 / 1 / absmax 1.13e34 | (CAB-238 と同値) |
+| **E7 param sweep** | 0.0/0.1/0.9/1.0 × [0x248]=0/1 の **8 combo すべて完走** (timeout 60 s) | PASS (無限ループ解消) |
+| 旧既定 `--auto none` | checks 7/0, census 132/69/175/136, SHA 42/42, IR 一致 | PASS (継続) |
+| link | signature mismatch 0 / undefined 46 / `undefined __asm_*` 0 | PASS |
+| simd helper | 自動生成 159 本 (CAB-239 時 153) | — |
+
+### 12.4 tan / SVF / f32変換 leaf の bit-exact 進捗 (LIFTLIB-2 本来 scope)
+
+`leafspec` 実測 (各 40 scenario, native 実機械語オラクル):
+| leaf | CAB-239 | LIFTLIB-2 | 差分 |
+|---|---|---|---|
+| exp 1801b4220 | 40/40 | **40/40** (mismatch 0 / crash 0) | 不変 |
+| log 1801b4900 | 32/40 + crash 8 | **32/40** + crash 8 (一致行は完全一致) | 不変 |
+| tan 1801a9be0 | 1/40 | 1/40 | 不変 (残因は下記) |
+| SVF reset 180126040 | 2/40 + crash 8 | 2/40 + crash 8 | 不変 (tan 依存の波及) |
+| f32変換 1801bc890 | 4/40 + crash 23 + trap 13 | **11/40** + crash 23 + trap 6 | match **+7**, trap **−7** |
+
+読み取り: ① f32変換は phi 合成 (`bind_multi_eq` / `phi_join`) と load 再発行で **wasm trap 13 → 6**、
+match +7 (region live-out に塞がれていた経路が通るようになった)。② 残 6 trap は CRT 経路 crash と同根
+(`tools/ott/native` の IAT thunk 方式で吸収可 — 読取のみのため未統合)。
+③ tan は **region join @1801a9dfa の再構成は DAG 化で解消したが**, 入口 3 引数 (実体 xmm0 1 引数) の
+誤解析が別に残り match は不変 (CAB-256 ticket 記載の「tan 1/40」と一致)。
+④ SVF は tan の係数への波及で不変 (CAB-239 から引き継ぎ)。phi 合成の直接効果は
+**残留理由の region join 8 → 0** と f32変換の trap 減に現れている。
+
+### 12.5 e2e gate 拡張 (CAB-238 提案④)
+
+`liftlib/recipes/ott/e2e_check.mjs` に **E7 param sweep** を追加:
+- param **0.5 固定を廃止**し, 0.0 / 0.1 / 0.9 / 1.0 × [0x248]=0/1 の 8 combo で
+  `processReplacing` (2 rep) が完走することを確認。checks は 7 → **8**。
+- 無限ループは `processReplacing` 内で停止するため JS 側 watchdog では中断できない。
+  各 combo を **子プロセス (`spawnSync`, 既定 timeout 60 s, `OTT_SWEEP_TIMEOUT` で調整)** として
+  実行し, timeout/非 0 exit を HANG として FAIL にする (`--sweep-child` モード)。
+- 本 gate があれば CAB-238 §6 の無限ループは CI で自動検出される (修復前なら 2 combo が timeout)。
+
+### 12.6 再現
+
+```sh
+# 無限ループの再発/解消確認 (読取のみの再現器, timeout 必須)
+OTT_CJS=tools/liftlib/work/ott_auto_f7_p1/ott_gen.cjs V=0.9 F=1 A=0.0 timeout 60 \
+  node tools/ott/f7eval/cab238_probe.mjs        # rc 0 / "DONE v=0.9 f=1 amp=0"
+# 既定 (auto f7,p1): checks 8/0 + census 改善 + E7 sweep
+python3 -m liftlib ott
+# 旧既定 (m10 chain 再現): IR 一致 + SHA 42/42
+python3 -m liftlib ott --auto none
+# 1 コマンド回帰 (unit T1..T11 + FA 400/400 + KH 366/366 + OTT + SIMD 95,400 + 注入 94/94 + leafspec)
+bash tools/liftlib/liftlib_e2e.sh
+# x64c 参照 (liftlib 非依存): 89 scenario / 50,236 cell bit-exact
+bash tools/ott/ott_e2e.sh
+# site 単体 bisect (LIFTLIB-2 追加): V=0.9/F=1 無限ループの切り分け
+python3 tools/liftlib/work/hang_bisect.py p1_one_18012024b
+```
+
+### 12.7 限界と次タスク
+- 残留 21 の主因は **`bind xmm0` (CRT 数学関数の xmm0 戻り)** 6 件 — `_bind_call_ret` は exp/log/tan 系の
+  明示的 C port 名 (`function_1801b4220/4900/ba860`) のみ対象で, 汎用の「i64 戻り = xmm0 ビット列」推論は
+  未実装 (誤代入の危険があるため)。次はここを落とすのが最も効果が大きい。
+- leaf native の CRT 経路 crash (log 8 / SVF 8 / cvt 23) はオラクル側の IAT thunk 未整備が原因
+  (tools/ott は読取のみのため統合していない)。cvt の残 6 trap も同根。
+- CAB-240 (ymm/i256 ABI) は未触 (`__asm_vmovdqu__yy` 3 種)。VEX-256 断片語彙も未対応。
+- 次タスク: ① 汎用 xmm0-ret bind (CRT/移植関数全体) ② leafabi 方式の SVF 経路適用
+  ③ `tools/ott/native` の IAT thunk を liftlib 側 spec に取り込み CRT crash を解消 ④ CAB-240 (ymm ABI)。

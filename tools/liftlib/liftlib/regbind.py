@@ -139,9 +139,9 @@ def bits_of(tok_type):
 
 
 class Binder:
-    def __init__(self, mod, fn, mf):
+    def __init__(self, mod, fn, mf, ix=None):
         self.mod, self.fn, self.mf = mod, fn, mf
-        self.ix = FuncIndex(mod, fn)
+        self.ix = ix if ix is not None else FuncIndex(mod, fn)
         self.params = fn.params()          # [(type, %name)]
         self.notes = []
 
@@ -208,6 +208,18 @@ class Binder:
         # multi: reg2mem alloca を探す
         return self._bind_multi(r[2], r[1], va)
 
+    def bind_relaxed(self, reg, va):
+        """多定義 bind の緩和 (LIFTLIB-2): IR 値を持たない def (= 落とされた経路の def) が
+        未覆でも, 残りの def を store で覆う reg2mem alloca があればそれを読む。
+
+        alloca の内容 = 生存側経路の store (領域側の値は p1 の relay store / reg2mem 合成が
+        同一 alloca に書く)。落とされた経路の def が IR 値を持つ場合は緩和しない
+        (誤った経路の値を選ぶ危険が高いため)。"""
+        r = self.root_def(reg, va)
+        if r[0] != "multi":
+            return None
+        return self._bind_multi(r[2], r[1], va, relaxed=True)
+
     def synthetic_def(self, reg, va):
         """RetDec IR に現れない定数系 def (xor/sub 自己ゼロ化, mov/movabs 即値) の値を合成する。
 
@@ -237,7 +249,7 @@ class Binder:
             return ("0", "i128")
         return None
 
-    def _bind_multi(self, reg, defs, va):
+    def _bind_multi(self, reg, defs, va, relaxed=False):
         want = set(defs)
         ix = self.ix
         best = None
@@ -260,7 +272,17 @@ class Binder:
             # 入口 (ENTRY=0) は callee-saved reg の入口値 (ハーネス側で 0 初期化) として
             # alloca 未初期化読み (B1 後 0) と整合させる (CAB-239)
             eff = want - {0}
-            if eff and eff <= covered:
+            if relaxed:
+                # 緩和: 未覆 def が「IR 値を持たない (落とされた経路の) def」のみなら許す
+                unc = eff - covered
+                if not unc or not (eff & covered):
+                    continue
+                if any(self.value_defined_at(reg, d) is not None and self.synthetic_def(reg, d) is not None
+                       for d in unc if d):
+                    continue
+                if best is None or len(covered & eff) > len(best[2] & best[1]):
+                    best = (a, eff, covered)
+            elif eff and eff <= covered:
                 if best is None or len(covered) < len(best[1]):
                     best = (a, covered)
         if best is None:

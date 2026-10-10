@@ -1,4 +1,4 @@
-# liftlib — 共通 lift 修復基盤 (CAB-49 / CAB-54 / CAB-55 / CAB-239)
+# liftlib — 共通 lift 修復基盤 (CAB-49 / CAB-54 / CAB-55 / CAB-239 / CAB-256)
 
 RetDec の生出力 (`.ll`) を機械語 (正本) と突き合わせて **silent miscompile を検出・修復**し, SIMD helper を自動生成して wasm 化し,
 **実機機械語 (VA 敷設・ms_abi 直接実行) と bit 比較**する, OTT / Fresh Air / Kilohearts 共通のパッケージ。
@@ -6,7 +6,7 @@ OTT (`tools/m5〜m10`)・Fresh Air (`targets/freshair/{ref,lift}`)・Kilohearts 
 pass と helper を 1 本に統合した (元 dir は無改変)。
 
 ```
-bash tools/liftlib/liftlib_e2e.sh            # 回帰 (約 25 秒 + leaf spec 約 4 分; RetDec キャッシュ利用): ユニット + FA 400/400 + KH 366/366 + OTT 7/0 + SIMD 281 form + 注入 94/94 + OTT leaf native spec
+bash tools/liftlib/liftlib_e2e.sh            # 回帰 (OTT = auto f7,p1 既定 (checks 8/0 = param 0.0/0.1/0.9/1.0 sweep 付き) + 旧既定 --auto none + leaf spec。所要は REPORT.md §12 参照): ユニット + FA 400/400 + KH 366/366 + OTT + SIMD 281 form + 注入 94/94 + OTT leaf native spec
 bash tools/liftlib/liftlib_e2e.sh --quick    # 回帰のみ (FA/KH/OTT)
 bash tools/liftlib/liftlib_e2e.sh --fresh    # FA/KH を RetDec の lift から再生成 (全体で約 1 分)
 bash tools/liftlib/lowbase_e2e.sh            # lowbase 検証 (CAB-220): audit_va + OTT を低位 base で最初から生成 (2 base) + x64c native bit 一致 3 構成 150,708 cell (--full で CAB-90 e2e 全体も)
@@ -20,7 +20,7 @@ bash tools/liftlib/lowbase_e2e.sh            # lowbase 検証 (CAB-220): audit_v
 | `diagnose <cfg>` | pass ごとに無効化して再評価 (どの修復が必須か) + 未修復所見 |
 | `simd gen x.ll -o out.c [--canon y.ll]` | `__asm_*` 宣言から C helper 生成 (正規名化も) |
 | `simd test` / `simd report` | 生成 helper を実機 inline asm と bit 突合 / KH census の被覆 before→after |
-| `ott [--auto f7,p1] [--lb-base N]` | OTT を liftlib 側だけで再現 (各段 IR 一致 + m10_e2e 相当)。`--lb-base` で V-shift 先 newbase (=LB_BASE) を指定して低位 base・小 memory で最初から生成 (CAB-220, 例 `0x10000` = initial 24MiB / `0x1230000`。未指定は元 m10 chain と同一の 0x30000000) |
+| `ott [--auto none\|f7\|p1\|f7,p1] [--lb-base N]` | OTT を liftlib 側だけで再現 (m10_e2e 相当)。**`--auto` 既定 = `f7,p1` (CAB-238)**: 汎用 F7 (ir9_outcopy 包含) + 語彙拡張 P1 を適用し, checks 7/0 + census 改善 (junkHi ≤104) をゲートにする。出力 SHA は修復由来で m10 参照と分離 (差分理由は REPORT.md §12)。`--auto none` = 旧既定 (修復無し m10 chain 再現, 各段 IR 一致 + SHA 42/42 ゲート)。`--lb-base` で V-shift 先 newbase (=LB_BASE) を指定して低位 base・小 memory で最初から生成 (CAB-220, 例 `0x10000` = initial 24MiB / `0x1230000`。未指定は元 m10 chain と同一の 0x30000000) |
 | `leafspec targets/ott_leaf.json` | OTT leaf closure を base→f2→P1→leafabi→emcc で構築し, 実機機械語と乱数 scenario で bit 突合 (CAB-239。xmm0 戻りは IR ret 差替で搬送) |
 | `inject-eval` | パターン注入による検出器の検出力・偽陽性評価 |
 | `specgen <image> <va>` | 機械語から harness spec の雛形を生成 |
@@ -44,6 +44,11 @@ targets/*.json specs/*.json  data/kh_mnemonics.json  tests/test_unit.py
   (b) br が無い=folded/dropped → 脱落側断片を mini-lifter で IR 化して分岐を再構成 (reg2mem alloca への merge store を含む)。
   語彙 (CAB-239): rsp 基準 spill slot / 断片内 call (callee 側スタック引数含む) / 整数フラグ分岐 (cmp/test+jcc+setcc+cmov+rcr) /
   GPR load・ALU・movabs・shift・extract・lea・断片内 ret / call 跨ぎ定数 def の bind 合成。範囲外は `UNSUPPORTED <理由>` で IR 不変。
+  **LIFTLIB-2 (CAB-256) DAG 化 + phi 合成**: 領域内合流を許す — 合流点では pred 間で値が不一致の reg を「関数入口 alloca +
+  各 pred 終端 store + 合流点先頭 load」で合成 (reg2mem phi)。RetDec が 1 ブロックにマージした巨大 block (ラベル = 末尾 VA) では
+  脱落側入口が head 自身と衝突して自己辺 (= 無限ループ, CAB-238 §6) になるため, tail を割って合流点を独立 block にし,
+  その値を脱落側でもマージする。非支配の bind 値は候補から外し, alloca load の再発行 / cmov select 合成 /
+  CRT 数学関数の i64 戻り (= xmm0 ビット) の合成にフォールバックする。
 - **leafabi** leaf 関数の xmm0 入出力: 入口は f2 の `%xmmK_bits` 引数, 戻りは各 `ret` の xmm0 到達定義を
   `ret i64 (trunc i128 …)` に差替 (double bits)。RX: ret_xmm0 callee の call 直後の最初の xmm0 読みを call 戻りへ差替。
 - **F7** `mov r64,[b+d]` の load 脱落: dest がアドレス基準に使われるのに `load i64` が無い → base を bind して load 挿入 + 使用側置換。

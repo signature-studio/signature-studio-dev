@@ -6,7 +6,7 @@
   simd gen <ll...> -o out.c [--canon]   __asm_* 宣言から C helper 生成
   simd test                             生成 helper を実機 inline asm と bit 突合 (KH census 205 mnemonic の全 form)
   simd report                           KH mnemonic census の被覆 before/after
-  ott [--auto f7,p1] [--no-e2e]         OTT を liftlib 側だけで再現 (m10_e2e 相当)
+  ott [--auto f7|p1|f7,p1|none]         OTT を liftlib 側だけで再現 (m10_e2e 相当)。--auto 既定 = f7,p1 (CAB-238)。
   inject-eval                           パターン注入による検出器の検出力/偽陽性評価
   specgen <image> <func_va>             機械語から harness spec の雛形を生成 (ポインタ/フィールド推定)
   regress                               OTT / FA Gain / KH Gain の回帰 (liftlib_e2e.sh から呼ぶ)
@@ -106,9 +106,23 @@ def simd_report():
     return 0
 
 
+# CAB-238: ott の既定 auto pass 群。旧既定 (m10 chain 再現, 修復無し) は --auto none で切替可。
+OTT_AUTO_DEFAULT = "f7,p1"
+# CAB-238 検収②: auto f7,p1 の census[0x248]=0 junkHi 実測値 (m10 参照 175 から改善)。悪化 (超過) は FAIL。
+OTT_AUTO_JUNKHI_MAX = 104
+
+
+def parse_auto(s):
+    """--auto の値を pass 群 tuple へ。none/off/legacy/空 = 旧既定 (auto 無し)。"""
+    s = (s or "").strip().lower()
+    if s in ("", "none", "off", "legacy"):
+        return ()
+    return tuple(x for x in s.split(",") if x)
+
+
 def cmd_ott(a):
     from .recipes import ott
-    auto = tuple(x for x in a.auto.split(",") if x)
+    auto = parse_auto(a.auto)
     lb_base = int(a.lb_base, 0) if a.lb_base else None
     W = os.path.join(PKG, "work", "ott" if not auto else "ott_auto_" + "_".join(auto))
     if lb_base not in (None, 0x30000000):
@@ -116,18 +130,32 @@ def cmd_ott(a):
     res, log = ott.run(W, build=True, helpers="gen", auto=auto, lb_base=lb_base)
     ident = {k: v for k, v in res.items() if k.startswith("O") and k[1].isdigit() and isinstance(v, (bool, type(None)))}
     print("[ott] layout:", json.dumps(res.get("lb")), "runtime_lb:", json.dumps(res.get("runtime_lb")))
-    print("[ott] IR 一致 (liftlib 出力 vs 元チェーン中間成果物):", json.dumps(ident))
+    print("[ott] IR 一致 (liftlib 出力 vs 元チェーン中間成果物):", json.dumps(ident),
+          "" if not auto else "(auto 既定モード: 元チェーン一致ゲートは適用外 — m10 再現は --auto none)")
     print("[ott] link:", json.dumps(res.get("link_warnings")), "simd:", json.dumps({k: (v if k != "approx" else len(v)) for k, v in res["simd"].items()}))
     if a.no_e2e:
         return 0
-    r = ott.e2e_checks(res["cjs"], W, env_extra=res.get("e2e_env"))
+    r = ott.e2e_checks(res["cjs"], W, env_extra=res.get("e2e_env"), outhash=not auto)
     print("[ott] e2e: checks %s / broken %s | band 係数 maxdev=%s nbad=%s | trap rc=%s" % (r["checks"], r["broken"], r["maxdev"], r["nbad"], r["trap_rc"]))
     print("[ott] census[0x248]=0:", r["census0"])
     print("[ott] census[0x248]=1:", r["census1"])
     if r.get("outhash"):
+        # outhash は旧既定 (--auto none = m10 chain 再現) モードで実施する (CAB-238: auto 既定モードは
+        # 修復由来の SHA 変化が正のため突合を省略し, 差分は REPORT.md §12 の表を参照)。
         print("[ott] 出力 SHA (param×[0x248]×振幅): liftlib 生成 helper 版 vs 元 m10 成果物 =", json.dumps(r["outhash"]))
-        if r["outhash"].get("equal") is False and r["outhash"].get("f0_equal") != r["outhash"].get("f0_total"):
-            r["pass"] = False
+        if not auto:
+            if r["outhash"].get("equal") is False and r["outhash"].get("f0_equal") != r["outhash"].get("f0_total"):
+                r["pass"] = False
+    if auto and r.get("census0"):
+        # CAB-238 検収②: auto 既定モードは census 改善 (junkHi ≤ 実測値) の維持を合格条件に含める
+        try:
+            jh = json.loads(r["census0"]).get("junkHi")
+        except Exception:                      # noqa
+            jh = None
+        if jh is not None:
+            ok_jh = jh <= OTT_AUTO_JUNKHI_MAX
+            print("[ott] census gate (auto 既定): junkHi %d <= %d -> %s" % (jh, OTT_AUTO_JUNKHI_MAX, "OK" if ok_jh else "NG"))
+            r["pass"] = r["pass"] and ok_jh
     ok = r["pass"] and (all(v is True for v in ident.values())
                         if (not auto and lb_base in (None, 0x30000000)) else True)
     print("[ott] RESULT:", "PASS" if ok else "FAIL")
@@ -180,9 +208,15 @@ def cmd_regress(a):
         rc |= r
 
     class B:  # noqa
-        auto, no_e2e, lb_base = "", False, None
+        auto, no_e2e, lb_base = OTT_AUTO_DEFAULT, False, None
     r = cmd_ott(B)
     summary["ott"] = "PASS" if r == 0 else "FAIL"
+    rc |= r
+
+    class B2:  # noqa
+        auto, no_e2e, lb_base = "none", False, None
+    r = cmd_ott(B2)                             # 旧既定 (--auto none = m10 chain 再現) の回帰も維持する (CAB-238)
+    summary["ott_auto_none"] = "PASS" if r == 0 else "FAIL"
     rc |= r
     summary["elapsed_s"] = round(time.time() - t0, 1)
     print("[regress] " + json.dumps(summary))
@@ -249,7 +283,9 @@ def main(argv=None):
     p.add_argument("sub", choices=["gen", "test", "report"]); p.add_argument("rest", nargs="*")
     p.add_argument("--n", type=int, default=200); p.set_defaults(fn=cmd_simd)
     p = sp.add_parser("ott")
-    p.add_argument("--auto", default=""); p.add_argument("--no-e2e", action="store_true")
+    p.add_argument("--auto", default=OTT_AUTO_DEFAULT,
+                   help="auto 修復 pass 群 (既定 %s / CAB-238)。none = 旧既定 (m10 chain 再現, 修復無し)" % OTT_AUTO_DEFAULT)
+    p.add_argument("--no-e2e", action="store_true")
     p.add_argument("--lb-base", default="", help="V-shift 先 newbase (=LB_BASE)。未指定/0x30000000 は元 m10 chain と同一レイアウト (CAB-220)")
     p.set_defaults(fn=cmd_ott)
     p = sp.add_parser("inject-eval")

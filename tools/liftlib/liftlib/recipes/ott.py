@@ -201,12 +201,14 @@ def run(workdir, build=True, helpers="gen", auto=(), lb_base=None):
     return res, log
 
 
-def e2e_checks(cjs, workdir, label="", env_extra=None):
+def e2e_checks(cjs, workdir, label="", env_extra=None, outhash=True):
     """m10_e2e.sh の E1..E7 を再現して判定する。env_extra: lowbase 時の {LB_BASE, LB_ARENA}。
 
     lowbase 時は出力 SHA 突合 (ott_outhash) の合格基準を [0x248]=0 組 (f0) にする:
     [0x248]=1 経路は未初期化読み (junk) が stack/heap 絶対位置に依存し, base/heap 移動で
     junk-tiny が変わり得るため (lowbase REPORT §4.3 実測: 128,000 cell 中 2 cell)。
+    outhash=False (CAB-238: auto 既定モード) は SHA 突合を省略する — auto f7,p1 は修復由来で
+    m10 参照と SHA が一致しないのが正であり, 差分表は REPORT.md §12 を参照。
     """
     W = os.path.abspath(workdir)
     env.ensure()
@@ -239,7 +241,7 @@ def e2e_checks(cjs, workdir, label="", env_extra=None):
     out["pass"] = (out["broken"] == 0 and out["e2e_rc"] == 0 and out["maxdev"] == 0.0 and out["nbad"] == 0 and out["trap_rc"] == 0)
     ref = os.path.join(M10, "work", "ott_m10.cjs")
     out["outhash"] = None
-    if os.path.exists(ref) and os.path.abspath(cjs) != os.path.abspath(ref):
+    if outhash and os.path.exists(ref) and os.path.abspath(cjs) != os.path.abspath(ref):
         try:
             hs = []
             # 比較対象 (元 m10 成果物) は legacy base の module → 既定 env (env_extra 無し) で駆動する
@@ -247,7 +249,8 @@ def e2e_checks(cjs, workdir, label="", env_extra=None):
                 e2 = dict(os.environ, OTT_CJS=os.path.abspath(c))
                 if ee:
                     e2.update(ee)
-                r = subprocess.run(["node", os.path.join(RECIPES, "ott_outhash.mjs")], capture_output=True, text=True, env=e2, timeout=900)
+                # 42 combo × module 初期化 (864MiB) を 2 module 分: 実測 約 7 分/module (CAB-238) ゆえ 1800 秒
+                r = subprocess.run(["node", os.path.join(RECIPES, "ott_outhash.mjs")], capture_output=True, text=True, env=e2, timeout=1800)
                 hs.append(json.loads(r.stdout))
             f0 = [k for k in hs[0] if "_f0_" in k]
             out["outhash"] = dict(combos=len(hs[0]), equal=hs[0] == hs[1], distinct=len(set(hs[0].values())),

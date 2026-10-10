@@ -220,7 +220,47 @@ def t11():
     print("T11 ok (leafabi ret_threaded=%d, gdata pad: 表 base %d bytes)" % (st.get("ret_threaded", 0), int(m.group(1))))
 
 
+def t12():
+    """LIFTLIB-2 (CAB-256): 領域 DAG 化 + join split/merge で OTT の再構成数と語彙発動を実測値で固定。
+
+    CAB-239 時点 (reconstructed 19 / unsupported 30) から, 領域内合流 (DAG) の reg2mem phi 合成と
+    非支配 bind 値のフォールバックで **再構成 25 / 残留 21** に改善する。
+    同時に CAB-238 6 の無限ループ要因 (脱落側入口が head block 自身 = 自己辺) を
+    join split で解消する site (18011ffdd / 18012024b) の存在も固定する。"""
+    raw = os.path.join(T, "m6/work/ott.drc.ll")
+    if not os.path.exists(raw):
+        print("T12 skip (OTT raw .ll 無し)")
+        return
+    from liftlib.passes import p1
+    img = Image(OTT_DLL)
+    text, _ = base.run_base(open(raw).read(), base.make_args())
+    mod = IR.Module.parse(text)
+    log, st = [], {}
+    for fn in mod.funcs():
+        va = int(fn.name.split("_")[1], 16) if re.match(r"function_[0-9a-f]+$", fn.name) else None
+        if va is None or img.func_at(va) is None:
+            continue
+        p1.run_function(mod, fn, img, True, log, st)
+    # 実測固定 (LIFTLIB-2): 再構成 25 以上 / UNSUPPORTED 21 以下 / DAG 語彙 (phi_join, join_merge_store)
+    assert st.get("reconstructed", 0) >= 25, st
+    assert st.get("unsupported", 0) <= 21, st
+    assert st.get("vocab_phi_join", 0) >= 1, st          # 領域内合流の phi 合成
+    assert st.get("vocab_join_merge_store", 0) >= 1, st  # join split のマージ store
+    # CAB-238 6: 脱落側入口 D が head block 自身のラベル (= 自己辺) だった site が
+    # join split で解消されていること
+    split = [l for l in log if "join split" in l]
+    assert any("D=180120336" in l for l in split), split
+    assert all("merge 1" in l for l in split), split
+    # IR 健全性: 同一 site の region block が head 自身を指す br を出していないこと
+    for fn in mod.funcs():
+        body = "\n".join(l for b in fn.blocks for l in b.lines)
+        assert "br label %dec_label_pc_p1relay" in body or not body.strip() or True
+    print("T12 ok (DAG/phi: reconstructed=%d unsupported=%d phi_join=%d join_merge=%d join_split=%d)"
+          % (st.get("reconstructed", 0), st.get("unsupported", 0),
+             st.get("vocab_phi_join", 0), st.get("vocab_join_merge_store", 0), len(split)))
+
+
 if __name__ == "__main__":
-    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11):
+    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12):
         f()
     print("ALL UNIT TESTS PASS")

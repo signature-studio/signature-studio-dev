@@ -89,7 +89,16 @@ def find_undef_for(mod, fn, ix, readers):
     return None
 
 
-def run(mod, img, log=None, stats=None, repair=True, only=None):
+def run(mod, img, log=None, stats=None, repair=True, only=None, phase="both", ix_map=None):
+    """phase: "callee" (define/declare への %xmmK_bits 追加) / "callsite" (call site 引数接続)
+    / "both" (従来通り)。LIFTLIB-2 では pipeline が callee 相を p1 より前に流す
+    (p1 の領域が入口 xmm 値を bind できるようにするため)。callsite 相は p1 後
+    (構造変更後の IR に対して今日と同じ条件で bind する)。
+
+    ix_map: {関数名: p1 実行前の FuncIndex} — callsite 相の bind を p1 が生成した
+    領域コピー (同じ機械語 VA のタグ付き行) ではなく元 IR の値で解決するために使う。
+    領域コピーは別経路の値なので, 生存側 call site の bind がそれを拾うと
+    支配違反 (他経路の SSA を参照) になる。"""
     stats = stats if stats is not None else {}
     log = log if log is not None else []
     funcs = {f.name: f for f in mod.funcs()}
@@ -101,31 +110,55 @@ def run(mod, img, log=None, stats=None, repair=True, only=None):
             if m:
                 names.add(m.group(1))
     info = {}
-    for nm in sorted(names):
-        if only and nm not in only:
-            continue
-        if not re.match(r"function_[0-9a-f]+$", nm):
-            continue
-        va = int(nm.split("_")[1], 16)
-        rng = img.func_at(va)
-        if rng is None:
-            continue
-        mf = MFunc(img, *rng)
-        xp = xmm_params(mf)
-        if not xp:
-            continue
-        # IR 側が既に xmm 引数を持つか (再実行 idempotent)
-        have = False
-        if nm in funcs:
-            have = any(p[1].startswith("%xmm") for p in funcs[nm].params())
-        info[nm] = dict(params=xp, have=have, mf=mf)
-    stats["callees_with_xmm"] = len(info)
-    stats["callees_pending"] = sum(1 for i in info.values() if not i["have"])
-    log.append("F2 callee xmm live-in: " + ", ".join("%s:%s" % (n, {k: v[0] for k, v in i["params"].items()}) for n, i in info.items()))
+    if phase in ("both", "callee"):
+        for nm in sorted(names):
+            if only and nm not in only:
+                continue
+            if not re.match(r"function_[0-9a-f]+$", nm):
+                continue
+            va = int(nm.split("_")[1], 16)
+            rng = img.func_at(va)
+            if rng is None:
+                continue
+            mf = MFunc(img, *rng)
+            xp = xmm_params(mf)
+            if not xp:
+                continue
+            # IR 側が既に xmm 引数を持つか (再実行 idempotent)
+            have = False
+            if nm in funcs:
+                have = any(p[1].startswith("%xmm") for p in funcs[nm].params())
+            info[nm] = dict(params=xp, have=have, mf=mf)
+        stats["callees_with_xmm"] = len(info)
+        stats["callees_pending"] = sum(1 for i in info.values() if not i["have"])
+        log.append("F2 callee xmm live-in: " + ", ".join("%s:%s" % (n, {k: v[0] for k, v in i["params"].items()}) for n, i in info.items()))
+        for nm, i in info.items():
+            i["pty"] = {k: PTY[v[0]] for k, v in i["params"].items()}
+    if phase == "callsite":
+        # callsite 単独実行: callee 相で書換済みの define 引数から info を復元する
+        for nm in sorted(names):
+            if only and nm not in only:
+                continue
+            fn = funcs.get(nm)
+            if fn is None:
+                continue
+            pmap = {}
+            for p in fn.params():
+                mm2 = re.match(r"^%xmm(\d+)_bits$", p[1])
+                if mm2:
+                    pmap[int(mm2.group(1))] = p[0]
+            if not pmap:
+                continue
+            va = int(nm.split("_")[1], 16)
+            rng = img.func_at(va)
+            if rng is None:
+                continue
+            info[nm] = dict(params={k: (None, []) for k in pmap}, have=False, mf=MFunc(img, *rng), pty=pmap)
+        stats["callees_with_xmm"] = len(info)
     if not repair:
         return stats
     # ---- callee の define/declare を書換 (call site 側が先に参照できるよう params 順を固定)
-    for nm, i in info.items():
+    for nm, i in (list(info.items()) if phase in ("both", "callee") else []):
         if i["have"]:
             continue
         fn = funcs.get(nm)
@@ -155,12 +188,15 @@ def run(mod, img, log=None, stats=None, repair=True, only=None):
             if isinstance(it, str):
                 m = re.match(r"^(declare\s+\S+\s+@%s)\((.*?)\)(.*)$" % re.escape(nm), it)
                 if m:
-                    ty = ", ".join(PTY[i["params"][k][0]] for k in ks)
+                    # 引数名付きで追加 (p1 領域の _lift_call が xmm 引数を識別するため)
+                    ty = ", ".join("%s %%xmm%d_bits" % (PTY[i["params"][k][0]], k) for k in ks)
                     a = m.group(2).strip()
                     mod.items[idx] = "%s(%s)%s" % (m.group(1), (a + ", " + ty) if a else ty, m.group(3))
         stats["callee_fixed"] = stats.get("callee_fixed", 0) + 1
         log.append("F2 callee %s: + %s" % (nm, extra))
     # ---- call site
+    if phase not in ("both", "callsite"):
+        return stats
     for fn in mod.funcs():
         if not re.match(r"function_[0-9a-f]+$", fn.name):
             continue
@@ -174,13 +210,19 @@ def run(mod, img, log=None, stats=None, repair=True, only=None):
                 s = IR.strip_tokens(ln)
                 m = re.search(r"\bcall\s+\S+\s+@(function_[0-9a-f]+)\((.*)\)\s*$", s)
                 if m and m.group(1) in info and not info[m.group(1)]["have"]:
-                    callsites.append((bi, li, m.group(1)))
+                    callsites.append((bi, li, m.group(1), s))
         if not callsites:
             continue
         mf = MFunc(img, *rng)
         done = []
-        for (bi, li, callee) in callsites:
-            binder = Binder(mod, fn, mf)
+        for (bi, li, callee, s0) in callsites:
+            # 既に引数が揃っている call (p1 領域が lift した物等) は二重付与しない (LIFTLIB-2)
+            cf = funcs.get(callee)
+            ms = re.search(r"@%s\((.*)\)\s*$" % re.escape(callee), s0)
+            if cf is not None and ms is not None and \
+                    len([a for a in IR.split_args(ms.group(1)) if a.strip()]) == len(cf.params()):
+                continue
+            binder = Binder(mod, fn, mf, ix=(ix_map.get(fn.name) if ix_map else None))
             # 構造が変わらないので (bi, li) を補正しつつ処理
             shift = sum(n for (b2, l2, n) in done if b2 == bi and l2 <= li)
             li2 = li + shift
@@ -194,7 +236,7 @@ def run(mod, img, log=None, stats=None, repair=True, only=None):
             tag = mod.tag(C)
             ok = True
             for k in sorted(info[callee]["params"]):
-                kind = info[callee]["params"][k][0]
+                pty = info[callee]["pty"][k]
                 v = binder.bind("xmm%d" % k, C)
                 if v is None or v[0].startswith("@@load:"):
                     log.append("F2 call %s@%x: xmm%d unbound" % (callee, C, k))
@@ -202,7 +244,6 @@ def run(mod, img, log=None, stats=None, repair=True, only=None):
                     ok = False
                     break
                 nm_ = "%%f2_%x_x%d" % (C, k)
-                pty = {"f32": "i32", "f64": "i64", "v128": "i128"}[kind]
                 if v[1] == pty:
                     args.append("%s %s" % (pty, v[0]))
                     continue

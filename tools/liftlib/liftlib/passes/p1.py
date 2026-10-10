@@ -15,7 +15,7 @@ import re
 
 from .. import ir as IR
 from ..mc import MFunc, _canon_reg
-from ..regbind import Binder, FuncIndex, result_type
+from ..regbind import Binder, FuncIndex, TYPE_BITS, result_type
 
 # jcc の condition code -> (fcmp predicate, 反転か)
 #   comis: unordered => CF=ZF=PF=1, a<b => CF=1, a==b => ZF=1, a>b => 全 0
@@ -41,6 +41,16 @@ def label_target(label):
     if "crit_edge" in label and len(hs) > 1:
         return int(hs[-1], 16)
     return int(hs[0], 16)
+
+
+# p1 が領域 block を新設した機械語 VA (run_function 単位)。後続 site はこれらの VA を
+# 「未 lift」扱いで自分の経路値で再 lift する (領域 block は経路固有の SSA を持つため,
+# 他経路の辺 (relay 等) が直接飛び込むと支配が壊れる — LIFTLIB-2)
+_REGION_VAS = set()
+
+# p1 が領域内で生成した値の名前: %p1r_<機械語va>_<salt>_<tag><n>
+# (salt = "<A>_<J>" = site 識別子で自体内に "_" を含む。他 site の領域値の流入検出に使う — LIFTLIB-2)
+P1R_NAME = re.compile(r"%p1r_([0-9a-f]+)_(.+)_")
 
 
 def parse_comis_call(line):
@@ -224,7 +234,19 @@ def _reg_ops(it):
 
 
 class Region:
-    """脱落側断片を IR 化する (木構造の断片のみ; 合流は既存ブロックへの辺だけ許す)。
+    """脱落側断片を IR 化する。
+
+    CAB-239 までは木構造の断片 (各合流点を高々 1 辺) に限っていた。LIFTLIB-2 では
+    領域内合流 (DAG) を reg2mem 合成で許す — RetDec 自身と同じイディオム:
+      - collect(): D から機械語 CFG を DFS し領域 block 集合を求める
+        (既存 IR ラベル = 出口 (relay), S = 生存側尾部。back edge = ループは unsupported)
+      - 各 block はトポロジ順に 1 度だけ lift する。合流点では pred 間で値が
+        不一致の reg を「関数入口 alloca への各 pred 終端 store + 合流 block 先頭 load」
+        で合成する (phi の代わり)。alloca を関数入口に置くのは, 後続 site の relay が
+        合流 block へ新たな pred を足しても支配が保たれるため (RetDec の reg2mem と同じ)。
+      - bind 失敗時は def 側から値を復元する: cmov (RetDec が分岐化して IR に無い)
+        は直前 comis から fcmp + select で合成, 多定義は各 def を
+        (IR 値 / 定数合成 / def 命令 1 個の lift) で復元し全一致の時だけ採用する。
 
     語彙 (CAB-239 拡張):
       - GPR mov/imm/movabs, GPR load/store, GPR ALU (or/and/xor/add/sub/inc/dec)
@@ -235,39 +257,380 @@ class Region:
     状態は st 辞書で運ぶ: "__w"=書込 reg, "rsp"={off: (val,ty)}, "fl"=flag 状態。
     """
 
-    def __init__(self, mod, fn, mf, binder, rec, S, D):
+    def __init__(self, mod, fn, mf, binder, rec, S, D, J):
         self.mod, self.fn, self.mf, self.b = mod, fn, mf, binder
         self.rec, self.S, self.D = rec, S, D
+        self.J = J                    # jcc の VA (分岐点 = 脱落側経路の bind 基準)
+        self.salt = "%x_%x" % (rec["A"], J)     # site 固有の名前 salt (A, J)
         self.blocks = []           # [(label, [lines])]
         self.cnt = 0
         self.leaders = set(mf.cfg().keys())
         self.vocab = {}            # 語彙ごとの使用数 (stats 記録用)
         self.rsp_allocas = {}      # rsp disp → alloca 名 (head block に後で挿入)
         self.rsp_alloca_lines = []
+        # LIFTLIB-2: 領域内合流 (DAG) の reg2mem 合成
+        self.join_allocas = {}     # (join_va, reg) -> alloca 名
+        self.join_alloca_lines = []  # 関数入口へ搬入 (alloca + 0 初期化)
+        self.join_stores = {}      # block_va -> [行] (終端前に差し込む 変換/store/束縛)
+        self.bodies = {}           # block_va -> 本体行
+        self.terms = {}            # block_va -> 終端行
+        self.out_states = {}       # block_va -> 終端時の st
+        self.relay_n = 0
+        self._resolving = set()    # bind 値合成の再帰ガード
+        self._blk_live = None      # block 開始点 live-in の cache
+        self._domreg = None        # 自領域の機械語 block 支配関係 (cache)
+        self.cur_va = None         # 現在 lift 中の機械語 block 先頭
+        self.tail_lines = []       # 生存側尾部 (reconstruct が設定)
+        self.labmap = {}           # va -> ラベル (領域内で idempotent)
 
     def nm(self, va, tag):
         self.cnt += 1
-        return "%%p1r_%x_%s%d" % (va, tag, self.cnt)
+        return "%%p1r_%x_%s_%s%d" % (va, self.salt, tag, self.cnt)
+
+    # ---- LIFTLIB-2: 値の「支配」検証 (領域 DAG リフトの健全性) ----------------
+    # 領域 block は head block の br からのみ入る。したがって領域内で参照できる値は
+    #   (a) head の分割点より前の行で定義された値, (b) head を支配する block の値,
+    #   (c) 自領域内で, 定義 block が使用 block を支配する値
+    # のいずれかに限る。それ以外 (他 site の領域 block の値 / 別経路の load 結果) を
+    # 参照すると clang が "Instruction does not dominate all uses!" で拒絕する。
+
+    def _dom_region(self, a, b):
+        """自領域の機械語 block a が b を支配するか (入口 D からの支配, 1 fixpoint)。"""
+        if self._domreg is None:
+            cfg = self.mf.cfg()
+            nodes = set(self.internal)
+            dom = {n: set(nodes) for n in nodes}
+            dom[self.D] = {self.D}
+            ch = True
+            while ch:
+                ch = False
+                for n in nodes:
+                    if n == self.D:
+                        continue
+                    ps = [p for p in cfg[n]["pred"] if p in nodes]
+                    if not ps:
+                        continue
+                    new = set(nodes)
+                    for p in ps:
+                        new &= dom[p]
+                    new.add(n)
+                    if new != dom[n]:
+                        dom[n] = new
+                        ch = True
+            self._domreg = dom
+        return a in self._domreg.get(b, ())
+
+    def _value_ok(self, name, use_va):
+        """IR 値 name が use_va の地点から合法に参照できるか (支配の確認)。"""
+        m = P1R_NAME.match(name)
+        if m:
+            if m.group(2) != self.salt:
+                return False                       # 他 site の領域 block の値
+            dva = int(m.group(1), 16)
+            if dva == 0:
+                return True                        # 変換補助 (同一 block 内で消費)
+            u = use_va if use_va is not None else self.cur_va
+            if u is None:
+                return True
+            db, ub = self.mf.block_of(dva), self.mf.block_of(u)
+            return db == ub or self._dom_region(db, ub)
+        d = self.ix.defs.get(name)
+        if d is None:
+            return True                            # 引数 / alloca (入口 block) は全域を支配
+        dbi, dli = d
+        if dbi == self.head_bi:
+            return dli < self.split_li              # head の分割点より前の行のみ
+        return self.ix.dominates(dbi, self.head_bi)
+
+    def _reissue_load(self, name, use_va, out):
+        """非支配の reg2mem alloca load を「使用点で load を再発行」して値を取り戻す。
+
+        RetDec は reg2mem 形式で `%x.reload = load T, ptr %x.reg2mem` を *使用側* block に
+        置く。領域 (別 block) からその load 結果を参照すると非支配になるので, 同じ alloca を
+        使用点で読み直す (reg2mem イディオムと同じ。alloca への store は全経路で使用点より前
+        に行われるため値は不変)。取り戻せない場合は None。"""
+        d = self.ix.defs.get(name)
+        if d is None or out is None:
+            return None
+        dbi, dli = d
+        ln = self.fn.blocks[dbi].lines[dli]
+        m = re.match(r"^\s*%[\w$.\-]+ = load (\S+), ptr (%[\w$.\-]+)", IR.strip_tokens(ln))
+        if not m:
+            return None
+        a = m.group(2)
+        if a not in self.ix.allocas:
+            return None                          # alloca 以外 (グローバル等) は再発行しない
+        ty = m.group(1).rstrip(",")
+        n = self.nm(use_va if use_va is not None else 0, "rl")
+        out.append("  %s = load %s, ptr %s%s" % (n, ty, a, self.mod.tag(use_va or 0)))
+        self.used("load_reissue")
+        return (n, ty)
+
+    def _checked(self, v, use_va, what, out=None):
+        """値 v の使用可否を検証し, 非支配/他領域の値は Unsupported にする。"""
+        if v is None:
+            return v
+        name = v[0]
+        if name == "0" or not isinstance(name, str) or name.startswith("@@"):
+            return v                                # 定数 / alloca 経由 load (入口 block)
+        if not self._value_ok(name, use_va):
+            nv = self._reissue_load(name, use_va, out)
+            if nv is not None:
+                return nv
+            raise Unsupported("%s: 値 %s は非支配/他領域 (@%x)" % (what, name, use_va or 0))
+        return v
 
     def lab(self, va):
-        return "dec_label_pc_%x" % va
+        """領域 block のラベル。未請求の VA は素の dec_label_pc_<va> を請求し,
+        他 site の領域 (または既存 IR) が既に使う VA は site 固有の接尾付き名にする。
+        接尾付き名は 16 進のみのラベル判定 (exit_vas / has_label) から外れるため,
+        後続 site はこの block を「未 lift」として自分の経路値で再 lift できる
+        (領域 block は経路固有 SSA を持つゆえ, 他経路の辺の直入りを禁止する — LIFTLIB-2)。"""
+        if va in self.labmap:
+            return self.labmap[va]
+        if va in _REGION_VAS or self.ix.has_label(va):
+            n = "dec_label_pc_p1r%s_%x" % (self.salt, va)
+        else:
+            n = "dec_label_pc_%x" % va
+            _REGION_VAS.add(va)
+        self.labmap[va] = n
+        return n
 
     def used(self, key):
         self.vocab[key] = self.vocab.get(key, 0) + 1
 
-    def read_reg(self, st, reg, va, out):
+    def _call_ret_bits(self, reg, d, va, out):
+        """call の戻り値を xmm のビット列として拾う (LIFTLIB-2)。
+
+        RetDec は double 戻り (xmm0) を持つ CRT 数学関数を `call i64 @f()` と lift し,
+        xmm0 の値を IR に残さない (bind xmm0 失敗の主因)。F6 (ir9_bootstraps) が
+        exp/log/tan を i64 ビット列を授受する C port へ置換するため, これらの callee の
+        i64 戻りは xmm0 のビット列そのものとして扱える。"""
+        if not reg.startswith("xmm"):
+            return None
+        it = self.mf.insns.get(d)
+        if it is None or not it.is_call or it.target is None:
+            return None
+        callee = "function_%x" % it.target
+        if not (re.match(r"function_1801b(4220|4900|ba860)$", callee) or callee.startswith("m9_d")):
+            return None
+        v = self.b.value_defined_at("rax", d)
+        if v is None or v[1] not in ("i64", "i32"):
+            return None
+        n = self.nm(va, "cb")
+        out.append("  %s = zext %s %s to i128%s" % (n, v[1], v[0], self.mod.tag(va)))
+        self.used("bind_call_ret")
+        return (n, "i128")
+
+    def read_reg(self, st, reg, va, out, use_va=None):
         if reg in st:
             return st[reg]
-        v = self.b.bind(reg, va)
+        v = self._bind_dominating(reg, va)
+        if v is None:
+            v = self.resolve_bind(reg, va, out)      # LIFTLIB-2: cmov / 多定義 def からの値合成
+        if v is None:
+            v = self.b.bind_relaxed(reg, va)         # LIFTLIB-2: 生存側 store で覆う alloca の緩和読み
+        if v is None:
+            r = self.b.root_def(reg, va)
+            if r[0] == "def":
+                v = self._call_ret_bits(reg, r[1], va, out)
         if v is None:
             raise Unsupported("bind %s @%x" % (reg, va))
+        # LIFTLIB-2: 非支配/他領域の値を弾く (clang の "does not dominate all uses" 防止)
+        v = self._checked(v, va if use_va is None else use_va, "bind %s" % reg, out)
         if isinstance(v[0], str) and v[0].startswith("@@load:"):
             a = v[0][7:]
             n = self.nm(va, "ld")
             out.append("  %s = load %s, ptr %s%s" % (n, v[1], a, self.mod.tag(va)))
             v = (n, v[1])
+        if reg.startswith("xmm") and v[1] != "i128":
+            # xmm の追跡値は i128 に正規化 (f2 の %xmmK_bits 引数など i64 幅の bind 値)
+            if v[0] == "0":
+                v = ("0", "i128")
+            else:
+                n = self.nm(va, "xz")
+                op = "trunc" if TYPE_BITS.get(v[1], 0) > 128 else "zext"
+                out.append("  %s = %s %s %s to i128%s" % (n, op, v[1], v[0], self.mod.tag(va)))
+                v = (n, "i128")
         st[reg] = v
         return v
+
+    # ---- LIFTLIB-2: bind 失敗時の値合成 (phi 合成の bind 側) --------------------
+
+    def _bind_dominating(self, reg, va):
+        """bind 結果のうち領域の実行経路に流れる物のみ返す (支配検証)。
+
+        領域は head block の br から入る。def が (a) 他 site の領域/tail/relay block
+        (別経路の値のコピー), (b) head の split 点以降の行 (= 生存側尾部),
+        (c) head を支配しない block — のいずれかにあると, 領域 block からの参照が
+        非支配 (または別経路の値) になるので候補から外す。
+        候補から外れた場合は None を返し, 呼出側 (read_reg) が cmov/多定義/def 命令の
+        ローカル lift で値を取り戻す。"""
+        v = self.b.bind(reg, va)
+        if v is None:
+            return None
+        if not self._value_ok(v[0], va):
+            return None
+        r = self.b.root_def(reg, va)
+        if r[0] != "def":
+            return v
+        for (bi, li, ln) in self.ix.instrs_at(r[1]):
+            if IR.instr_dst(ln) is None:
+                continue
+            lab = self.fn.blocks[bi].label
+            if lab.startswith("dec_label_pc_p1r") or lab.startswith("dec_label_pc_p1tail") \
+                    or lab.startswith("dec_label_pc_p1relay") or lab.startswith("dec_label_pc_p1srelay"):
+                return None
+            mm = re.match(r"dec_label_pc_([0-9a-f]+)$", lab)
+            if mm and int(mm.group(1), 16) in _REGION_VAS:
+                return None
+            if bi == self.head_bi and li >= self.split_li:
+                return None
+            if bi != self.head_bi and not self.ix.dominates(bi, self.head_bi):
+                return None
+            break
+        return v
+
+    def resolve_bind(self, reg, va, out):
+        """bind が None を返した時の復元。失敗は None (呼出側で最終 fallback 判定)。"""
+        try:
+            r = self.b.root_def(reg, va)
+            if r[0] == "multi":
+                return self._resolve_multi(reg, r[1], va, out)
+            if r[0] == "def":
+                it = self.mf.insns.get(r[1])
+                if it is not None and it.mnem.startswith("cmov") and len(it.ops) == 2:
+                    return self._cmov_value(reg, r[1], va, out)
+        except Unsupported:
+            return None
+        return None
+
+    def _entry_value(self, reg):
+        """関数入口の reg 値 (GPR 引数 / f2 付与の %xmmK_bits)。"""
+        from ..mc import GPR_ARGS
+        if reg in GPR_ARGS:
+            k = GPR_ARGS.index(reg)
+            if k < len(self.b.params):
+                return (self.b.params[k][1], self.b.params[k][0])
+            return None
+        if reg.startswith("xmm"):
+            k = int(reg[3:])
+            for ty, nm2 in self.b.params:
+                if nm2 == "%%xmm%d_bits" % k:
+                    return (nm2, ty)
+        return None
+
+    def _cmov_value(self, reg, d, va, out):
+        """cmovcc dst, src @d (RetDec が分岐化して IR に対応行が無い) を select で合成。
+
+        条件: 直前の comis (IR には __asm_*comis* call が残る) から fcmp。
+        src / 古い dst: 機械語到達定義から bind (st は汚さず新辞書で再帰)。"""
+        it = self.mf.insns[d]
+        cc = it.mnem[4:]
+        fdefs = self.mf.defs_before(d, "flags")
+        if len(fdefs) != 1 or not next(iter(fdefs)):
+            raise Unsupported("cmov flag producer @%x" % d)
+        A = next(iter(fdefs))
+        calls = [(bi, li, ln) for (bi, li, ln) in self.ix.instrs_at(A) if COMIS_CALL.search(IR.strip_tokens(ln))]
+        if not calls:
+            raise Unsupported("cmov flag producer %x は comis でない" % A)
+        pred = CC_PRED.get(cc)
+        if pred is None:
+            raise Unsupported("cmov cc %s" % cc)
+        call_ln = calls[0][2]
+        kind = parse_comis_call(call_ln)[0]
+        key = ("cm", reg, d)
+        if key in self._resolving:
+            raise Unsupported("cmov cycle @%x" % d)
+        self._resolving.add(key)
+        try:
+            bc = build_compare(self.mod, A, call_ln, kind, sfx="s%sc%x_%d" % (self.salt, d, self.cnt + 1))
+            if bc is None:
+                raise Unsupported("cmov comis operand form")
+            ins, fa, fb, ty = bc
+            out.extend(ins)
+            tag = self.mod.tag(va)
+            c = self.nm(va, "cc")
+            out.append("  %s = fcmp %s %s %s, %s%s" % (c, pred, ty, fa, fb, tag))
+            bits = it._ci.operands[0].size * 8
+            st2 = {"__w": set(), "rsp": {}, "fl": None}
+            v_src = self.read_reg(st2, _canon_reg(it._ci, it.ops[1].reg), d, out)
+            v_dst = self.read_reg(st2, _canon_reg(it._ci, it.ops[0].reg), d, out)
+            s = self._gpr_val_from(st2, v_src, va, out, bits=bits, tag=tag)
+            dv = self._gpr_val_from(st2, v_dst, va, out, bits=bits, tag=tag)
+            n = self.nm(va, "mv")
+            wty = "i%d" % bits if bits < 64 else "i64"
+            out.append("  %s = select i1 %s, i%d %s, i%d %s%s" % (n, c, bits, s, bits, dv, tag))
+            self.used("bind_cmov")
+            return (n, wty)
+        finally:
+            self._resolving.discard(key)
+
+    def _def_site_lift(self, reg, d, va, out):
+        """落とされた経路上の def 命令 1 個をその場で lift して値を復元する
+        (SSE 算術 / GPR mov・即値 / rip 基準 load など, 値を生む単一命令)。"""
+        it = self.mf.insns.get(d)
+        if it is None or it.is_jcc or it.is_jmp or it.is_ret or it.is_call or it.indirect:
+            return None
+        if it.mnem.startswith("cmov") or (it.mem and it.mem["write"]):
+            return None
+        if it.mnem.lstrip("v") in ("comisd", "comiss", "ucomisd", "ucomiss", "cmp", "test"):
+            return None                              # 値を生まない (flag のみ)
+        key = ("dl", reg, d)
+        if key in self._resolving:
+            return None
+        self._resolving.add(key)
+        try:
+            ops = _reg_ops(it)
+            st2 = {"__w": set(), "rsp": {}, "fl": None}
+            body = []
+            if it.mnem in _MOV_RR and len(ops) == 2 and ops[0][0] == "reg" and ops[1][0] == "reg":
+                v = self.read_reg(st2, ops[1][1], d, body)
+                st2[ops[0][1]] = v
+                st2["__w"].add(ops[0][1])
+            elif not self.lift_data_insn(it, ops, st2, body, self.mod.tag(d)):
+                return None
+            v = st2.get(reg)
+            if v is None:
+                return None
+            out.extend(body)
+            self.used("bind_deflift")
+            return v
+        except Unsupported:
+            return None
+        finally:
+            self._resolving.discard(key)
+
+    def _resolve_multi(self, reg, defs, va, out):
+        """多定義 bind: 各 def の値を復元し, 全 def が同一値の時だけ採用する (LIFTLIB-2)。
+
+        不一致の場合はここでは合成しない (誤った値の選択より unsupported を優先)。
+        領域内合流による多定義は collect/merge_in の reg2mem 合成が正しい値を選ぶ。"""
+        vals = []
+        for d in sorted(defs):
+            if d == 0:
+                v = self._entry_value(reg)
+            else:
+                v = self.b.value_defined_at(reg, d)
+                # LIFTLIB-2: 非支配/他 site 領域の IR 値は採用せず, この def 命令を
+                # ローカルに lift して値を取り戻す (領域 block は経路固有 SSA を持つため)
+                if v is not None and not self._value_ok(v[0], va):
+                    v = None
+                if v is None:
+                    v = self.b.synthetic_def(reg, d)
+                if v is None:
+                    it = self.mf.insns.get(d)
+                    if it is not None and it.mnem.startswith("cmov") and len(it.ops) == 2:
+                        v = self._cmov_value(reg, d, va, out)
+                if v is None:
+                    v = self._def_site_lift(reg, d, va, out)
+            if v is None:
+                raise Unsupported("multi-def %s@%x: def %x を復元不能" % (reg, va, d))
+            vals.append(v)
+        if all(v == vals[0] for v in vals):
+            self.used("bind_multi_eq")
+            return vals[0]
+        raise Unsupported("multi-def %s@%x: %d 値が不一致" % (reg, va, len(set(map(str, vals)))))
 
     def global_ref(self, va_abs, size):
         gname = "@global_var_%x" % va_abs
@@ -386,7 +749,12 @@ class Region:
             # 16B 復元 (vmovdqa xmmK, [rsp+off]) — RetDec は entry save を reg2mem 化している事が多い
             bv = self.b.bind(dst, va)
             if bv is None:
-                raise Unsupported("rsp restore %s" % dst)
+                bv = self.resolve_bind(dst, va, out)
+            if bv is None:
+                # 入口 callee-saved xmm の復元 (RetDec IR も alloca 未 store = B1 後 0)。
+                # ハーネスも入口 xmm4-15 を 0 初期化するため 0 を復元値にする (LIFTLIB-2)
+                bv = ("0", "i128")
+                self.used("rsp_restore_zero")
             if isinstance(bv[0], str) and bv[0].startswith("@@load:"):
                 n = self.nm(va, "ld")
                 out.append("  %s = load %s, ptr %s%s" % (n, bv[1], bv[0][7:], self.mod.tag(va)))
@@ -400,6 +768,8 @@ class Region:
     def _lift_call(self, it, st, out, va, tag):
         """断片内 call。declare (RetDec) の引数型列を (rcx,rdx,r8,r9) に対応付け,
         第5引数以降は call site の [rsp+0x20+8i] slot (callee 側スタック引数) から。
+        f2 が付与した `%xmmK_bits` 引数 (callee の入口 xmm) は領域が追跡する xmmK 値を渡す
+        (LIFTLIB-2: f2 callee 相を p1 前に流すため, 領域内 call も引数が整合する)。
         戻り: rax = 宣言の戻り型。xmm0 は「call 戻り値の bits」を仮置きする
         (F6/leafabi が callee を bits 戻りに差替えた経路と整合; raw では survivor 経路と同品質)。"""
         callee = "function_%x" % it.target
@@ -409,28 +779,46 @@ class Region:
             # define 済み callee: define の引数列を使う (declare 追加はしない — 再定義エラー回避)
             m = IR.DEFINE.match(dfn.sig)
             ret = m.group(1).split()[0]
-            decl = (ret, ", ".join(ty for ty, _n in dfn.params()), None)
+            decl = (ret, ", ".join("%s %s" % (ty, nm) for ty, nm in dfn.params()), None)
         elif decl is None:
             self.mod.add_declare("declare i64 @%s() local_unnamed_addr" % callee)
             ret, argtys = "i64", []
         else:
             ret = decl[0]
-        argtys = [a.split()[0] for a in IR.split_args(decl[1]) if a.strip()] if decl else []
+        args_full = [a.strip() for a in IR.split_args(decl[1]) if a.strip()] if decl else []
+        argtys = [a.split()[0] for a in args_full]
+        argnames = [a.split()[1] if len(a.split()) > 1 else "" for a in args_full]
         gprs = ["rcx", "rdx", "r8", "r9"]
         if len(argtys) > 8:
             raise Unsupported("call args %d" % len(argtys))
         vals = []
         slots = st.get("rsp", {})
+        gi = 0
         for i, ty in enumerate(argtys):
+            mx = re.match(r"^%xmm(\d+)_bits$", argnames[i] or "")
+            if mx:
+                # f2 付与の入口 xmm 引数: 領域が追跡する xmm 値 (i128) の下位 bits
+                k = int(mx.group(1))
+                x = self.read_reg(st, "xmm%d" % k, va, out)
+                if x[1] != "i128":
+                    raise Unsupported("call xmm%d arg type %s" % (k, x[1]))
+                if ty == "i128":
+                    vals.append("i128 %s" % x[0])
+                    continue
+                t = self.nm(va, "ca")
+                out.append("  %s = trunc i128 %s to %s%s" % (t, x[0], ty, tag))
+                vals.append("%s %s" % (ty, t))
+                continue
             if ty == "ptr" or ty.startswith("i"):
                 bits = {"ptr": 64}.get(ty) or self._ITyw.get(ty, 64)
-                if i < 4:
-                    v = self._gpr_val(st, gprs[i], va, out, bits=bits)
+                if gi < 4:
+                    v = self._gpr_val(st, gprs[gi], va, out, bits=bits)
                 else:
-                    key = 0x20 + 8 * (i - 4)
+                    key = 0x20 + 8 * (gi - 4)
                     if key not in slots:
-                        raise Unsupported("call stack arg %d (slot %x 未追跡)" % (i + 1, key))
+                        raise Unsupported("call stack arg %d (slot %x 未追跡)" % (gi + 1, key))
                     v = self._gpr_val_from(st, slots[key], va, out, bits=bits, tag=tag)
+                gi += 1
                 if ty == "ptr":
                     p = self.nm(va, "cp")
                     out.append("  %s = inttoptr i64 %s to ptr%s" % (p, v, tag))
@@ -453,9 +841,9 @@ class Region:
             out.append("  %s = call i128 @%s(i64 %s)%s" % (mk, self._decl_helper("movsd", "x", ["q"]), t64, tag))
             self.used("call_arg_marker")
         out.append("  %s = call %s @%s(%s)%s" % (rn, callty, callee, ", ".join(vals), tag))
-        for r in ("rcx", "rdx", "r8", "r9", "r10", "r11"):
+        for r in ("rcx", "rdx", "r8", "r9"):
             st.pop(r, None)
-        st["__w"].difference_update(("rcx", "rdx", "r8", "r9", "r10", "r11"))
+        st["__w"].difference_update(("rcx", "rdx", "r8", "r9"))
         st["fl"] = None                       # call で flag は破壊される
         if callty != "void":
             st["rax"] = (rn, callty if callty != "ptr" else "i64")
@@ -588,19 +976,16 @@ class Region:
             out.append("  %s = icmp ult i%d %s, %s%s" % (n, bits, a, b, tag))
         return n
 
-    def _int_jcc(self, it, st, out, va, tag):
-        """整数フラグ分岐 (cmp/test + jcc) の IR 化。comis 系は fcmp へ流用。"""
+    def _int_jcc_cond(self, it, st, out, va, tag):
+        """整数フラグ分岐 (cmp/test + jcc) の条件 i1 を生成。comis 系は fcmp へ流用。"""
         fl = st.get("fl")
         if fl is None:
             raise Unsupported("jcc without flag producer @%x" % va)
         cc = it.cc
         c = self._flag_cc_i1(st, cc, out, va, tag)
         if c is not None:
-            lt = self.edge(it.target, st)
-            lf = self.edge(it.next, st)
-            out.append("  br i1 %s, label %%%s, label %%%s%s" % (c, lt, lf, tag))
             self.used("int_jcc")
-            return out
+            return c
         if fl[0] in ("comis", "site"):
             fa, fb, ty = self._cmp_operands(fl, out, va, tag)
             pred = CC_PRED.get(cc)
@@ -627,11 +1012,8 @@ class Region:
                     raise Unsupported("int cc %s" % cc)
                 c = self.nm(va, "ic")
                 out.append("  %s = icmp %s i%d %s, %s%s" % (c, pred, bits, a, b, tag))
-        lt = self.edge(it.target, st)
-        lf = self.edge(it.next, st)
-        out.append("  br i1 %s, label %%%s, label %%%s%s" % (c, lt, lf, tag))
         self.used("int_jcc")
-        return out
+        return c
 
     def _lift_setcc(self, it, st, out, va, tag):
         """setcc r8 — 整数フラグ → 0/1 を GPR に格納。"""
@@ -735,8 +1117,8 @@ class Region:
         # 断片内 call
         if it.is_call and it.target is not None and not mem:
             return self._lift_call(it, st, out, va, tag)
-        # setcc (整数フラグ → GPR)
-        if m.startswith("set") and len(ops) == 2 and ops[0][0] == "reg" and not mem:
+        # setcc (整数フラグ → GPR) — setcc は operand 1 値 (r/m8)
+        if m.startswith("set") and len(ops) == 1 and ops[0][0] == "reg" and not mem:
             return self._lift_setcc(it, st, out, va, tag)
         # cmovcc r, r/m — フラグ条件 select (comis/cmp 由来)
         if m.startswith("cmov") and len(ops) == 2 and ops[0][0] == "reg" and ops[1][0] == "reg" and not mem:
@@ -849,8 +1231,9 @@ class Region:
             st[ops[0][1]] = (n, ity)
             st["__w"].add(ops[0][1])
             self.used("gpr_load")
-            return True        # --- GPR ALU (RMW): or/and/xor/add/sub/inc/dec r, r|imm|mem
-        if (m in self._GPR_ALU or m in ("inc", "dec")) and len(ops) == 2 and ops[0][0] == "reg" \
+            return True        # --- GPR ALU (RMW): or/and/xor/add/sub r, r|imm|mem / inc|dec r
+        if ((m in self._GPR_ALU and len(ops) == 2) or (m in ("inc", "dec") and len(ops) == 1)) \
+                and ops[0][0] == "reg" \
                 and ops[0][1].startswith("r") and not mem:
             dst = ops[0][1]
             if dst == "rsp":
@@ -860,7 +1243,9 @@ class Region:
                 raise Unsupported("rsp alu %s" % it.op_str)
             bits = it._ci.operands[0].size * 8
             a = self._gpr_val(st, dst, va, out, bits=bits)
-            if ops[1][0] == "reg":
+            if m in ("inc", "dec"):
+                b = "1"
+            elif ops[1][0] == "reg":
                 b = self._gpr_val(st, ops[1][1], va, out, bits=bits)
             elif ops[1][0] == "mem":
                 ity = {1: "i8", 2: "i16", 4: "i32", 8: "i64"}.get(mem["size"])
@@ -1032,10 +1417,12 @@ class Region:
         return True
 
     def lift_block(self, start, st):
-        """機械語 start から基本ブロック終端まで lift し IR 行を返す。
+        """機械語 start から基本ブロック終端まで lift し (本体行, 終端行) を返す。
+        辺は再帰 lift せず edge_target で行き先ラベルを解決する (LIFTLIB-2: DAG lift)。
         st: "__w"=書込 reg, "rsp"=rsp slot 値, "fl"=flag 状態 (comis/整数 cmp)。"""
         mf, mod = self.mf, self.mod
         out = []
+        self.cur_va = start          # LIFTLIB-2: 値の支配検証の基準 block
         va = start
         while True:
             it = mf.insns[va]
@@ -1088,12 +1475,11 @@ class Region:
                         raise Unsupported("comis b type %s" % bv[1])
                     c = self.nm(va, "c")
                     out.append("  %s = fcmp %s %s %s, %s%s" % (c, pred, ty, fa, fb, tag))
-                    lt = self.edge(it.target, st)
-                    lf = self.edge(it.next, st)
-                    out.append("  br i1 %s, label %%%s, label %%%s%s" % (c, lt, lf, tag))
-                    return out
-                self._int_jcc(it, st, out, va, tag)
-                return out
+                else:
+                    c = self._int_jcc_cond(it, st, out, va, tag)
+                lt = self.edge_target(it.target, st, va)
+                lf = self.edge_target(it.next, st, va)
+                return out, "  br i1 %s, label %%%s, label %%%s%s" % (c, lt, lf, tag)
             elif it.is_ret:
                 # 断片内 ret: rax は追跡値 (無ければ 0)。実値は xmm0 戻り (leafabi が搬送)
                 rax = st.get("rax")
@@ -1103,13 +1489,11 @@ class Region:
                     n = self.nm(va, "rr")
                     out.append("  %s = zext %s %s to i64%s" % (n, ty, rv, tag))
                     rv = n
-                out.append("  ret i64 %s%s" % (rv, tag))
                 self.used("ret")
-                return out
+                return out, "  ret i64 %s%s" % (rv, tag)
             elif m == "jmp" and it.target is not None:
-                lt = self.edge(it.target, st)
-                out.append("  br label %%%s%s" % (lt, tag))
-                return out
+                lt = self.edge_target(it.target, st, va)
+                return out, "  br label %%%s%s" % (lt, tag)
             elif m.startswith("nop"):
                 pass
             elif self.lift_data_insn(it, ops, st, out, tag):
@@ -1118,40 +1502,260 @@ class Region:
                 raise Unsupported("%x: %s %s" % (va, m, it.op_str))
             va = it.next
             if va in self.leaders:
-                lt = self.edge(va, st)
-                out.append("  br label %%%s" % lt)
-                return out
+                lt = self.edge_target(va, st, va)
+                return out, "  br label %%%s" % lt
 
-    def edge(self, va, st):
-        """辺 -> 先のラベル名。region 内なら再帰 lift, 既存 IR なら merge store を持つ中継ブロックを作る。"""
+    # ---- LIFTLIB-2: 領域の収集 (DAG) と reg2mem 合成 ----------------------------
+
+    def block_live_in(self):
+        """全機械語 block 開始点の live-in (1 fixpoint で計算して cache)。"""
+        if self._blk_live is None:
+            self._blk_live = _all_blocks_live_in(self.mf)
+        return self._blk_live
+
+    @staticmethod
+    def _trackable(reg):
+        """合成対象にする reg (GPR は rsp 除く / xmm)。"""
+        return reg.startswith("xmm") or (reg.startswith("r") and reg != "rsp")
+
+    def preterm_lines(self, va):
+        return self.join_stores.setdefault(va, [])
+
+    def collect(self):
+        """D から機械語 CFG を DFS し領域 block 集合を求める。
+
+        出口 = 既存 IR ラベル (exit_vas) と生存側 S。back edge (ループ) は unsupported。
+        領域内 block の機械語 pred は領域内か入口 D のみ (それ以外は合流構造が
+        RetDec の block 境界と矛盾するため unsupported)。"""
+        cfg = self.mf.cfg()
+        color, internal, order = {}, set(), []
+        stack = [(self.D, False)]
+        while stack:
+            va, done = stack.pop()
+            if done:
+                color[va] = 2
+                order.append(va)
+                continue
+            if va == self.S and not self.S_is_label:
+                continue
+            if va in self.exit_vas:
+                continue
+            if va not in self.mf.insns:
+                raise Unsupported("edge outside function @%x" % va)
+            c = color.get(va, 0)
+            if c == 1:
+                raise Unsupported("region loop @%x" % va)
+            if c == 2:
+                continue
+            color[va] = 1
+            internal.add(va)
+            stack.append((va, True))
+            for s in cfg[va]["succ"]:
+                stack.append((s, False))
+        order.reverse()
+        # 注: 領域内 block の機械語 pred に領域外 (生存側) block が在ってもよい。
+        # 生存側の IR 辺は既存ラベル (出口) 宛であり, 本領域が作る IR block への
+        # 辺は領域内の辺だけである (merge_in は領域内 pred だけを合成する)。
+        self.internal = internal
+        self.topo = order
+
+    def run(self, D, st0):
+        """領域を構築し, 入口 (D) block のラベルを返す。IR への反映は呼出側 (reconstruct)。"""
+        self.collect()
+        if not self.internal:
+            return self.edge_target(D, st0, D)
+        entry = None
+        for va in self.topo:
+            if va == D:
+                st = {k: (set(v) if k == "__w" else (dict(v) if k == "rsp" else v)) for k, v in st0.items()}
+                pre = []
+            else:
+                st, pre = self.merge_in(va)
+            body, term = self.lift_block(va, st)
+            self.bodies[va] = pre + body
+            self.terms[va] = term
+            self.out_states[va] = st
+            if va == D:
+                entry = self.lab(va)
+        for va in self.topo:
+            self.blocks.append((self.lab(va), self.bodies[va] + self.preterm_lines(va) + [self.terms[va]]))
+        return entry
+
+    def merge_in(self, va):
+        """合流点の入力状態を pred 状態から合成する。戻り値 (st, 先頭に置く行)。
+
+        pred 間で一致する reg はその値, 不一致の reg は関数入口 alloca への
+        store (各 pred 終端) + 合流 block 先頭 load で合成 (reg2mem phi)。"""
+        cfg = self.mf.cfg()
+        preds = [p for p in cfg[va]["pred"] if p in self.internal]
+        pst = [self.out_states[p] for p in preds]
+        st = {"__w": set(), "fl": None, "rsp": {}}
+        if pst:
+            st["__w"] = set().union(*[s["__w"] for s in pst])
+            fls = [s.get("fl") for s in pst]
+            st["fl"] = fls[0] if all(f == fls[0] for f in fls) else None
+            rsps = [s.get("rsp", {}) for s in pst]
+            common = set.intersection(*[set(r) for r in rsps]) if rsps else set()
+            for off in sorted(common):
+                vs = [r[off] for r in rsps]
+                if all(v == vs[0] for v in vs):
+                    st["rsp"][off] = vs[0]
+        pre = []
+        # 合成対象: pred 状態が持つ reg 全体 (machine live-in に限定しない —
+        # IR レベルの need (f2 の %xmmK_bits call 引数など) は機械語 liveness に現れないため)
+        cands = sorted({r for s in pst for r in s if self._trackable(r)} - set(st))
+        for r in cands:
+            if not all(r in s for s in pst):
+                # 持っていない pred の終端で到達値を束縛してから合成する
+                for s, p in zip(pst, preds):
+                    if r not in s:
+                        self.read_reg(s, r, cfg[p]["vas"][-1], self.preterm_lines(p), use_va=p)
+            vals = [s[r] for s in pst]
+            vals = [self._checked(v, p, "merge %s" % r, self.preterm_lines(p))
+                    for p, v in zip(preds, vals)]
+            if all(v == vals[0] for v in vals):
+                st[r] = vals[0]
+            else:
+                st[r] = self._join_value(va, r, vals, preds, pre)
+        return st, pre
+
+    def _join_ty(self, r, vals):
+        tys = {v[1] for v in vals}
+        if tys == {"i128"}:
+            return "i128"
+        if tys <= {"i8", "i16", "i32", "i64", "i128"}:
+            # 混在 (例: xmm が f2 引数の i64 と helper 結果の i128) は最広幅へ揃える
+            return "i128" if "i128" in tys else "i64"
+        raise Unsupported("join %s: 型混合 %s" % (r, sorted(tys)))
+
+    def _to_ty(self, p, v, ty):
+        """値を alloca の型へ変換 (変換行は pred p の終端前に差し込む)。"""
+        name, vty = v
+        if vty == ty or name == "0":
+            return name
+        n = self.nm(p, "jv")
+        op = "trunc" if TYPE_BITS.get(vty, 0) > TYPE_BITS.get(ty, 0) else "zext"
+        self.preterm_lines(p).append("  %s = %s %s %s to %s" % (n, op, vty, name, ty))
+        return n
+
+    def _join_value(self, va, r, vals, preds, out):
+        """pred 値が不一致の reg を「入口 alloca + 各 pred 終端 store + 先頭 load」で合成。"""
+        ty = self._join_ty(r, vals)
+        key = (va, r)
+        a = self.join_allocas.get(key)
+        if a is None:
+            n0 = 9000
+            while "%%%s.%d.reg2mem" % (r, n0) in self.ix.allocas or \
+                    "%%%s.%d.reg2mem" % (r, n0) in self.join_allocas.values():
+                n0 += 1
+            a = "%%%s.%d.reg2mem" % (r, n0)
+            self.join_allocas[key] = a
+            self.join_alloca_lines.append("  %s = alloca %s" % (a, ty))
+            self.join_alloca_lines.append("  store %s 0, ptr %s" % (ty, a))
+        for p, v in zip(preds, vals):
+            vv = self._to_ty(p, v, ty)
+            self.preterm_lines(p).append("  store %s %s, ptr %s" % (ty, vv, a))
+        n = self.nm(va, "jn")
+        out.append("  %s = load %s, ptr %s%s" % (n, ty, a, self.mod.tag(va)))
+        self.used("phi_join")
+        return (n, ty)
+
+    def edge_target(self, va, st, from_va):
+        """辺 -> 行き先ラベル。既存 IR ラベル = relay (merge store), S = 生存側尾部,
+        領域内 = そのままのラベル (合流は merge_in が扱う)。"""
         if va == self.S and not self.S_is_label:
             bad = (st["__w"] - {"flags"}) & self.live_at_S
             if bad:
-                raise Unsupported("region writes %s live into survivor" % sorted(bad))
+                # LIFTLIB-2: tail が reg2mem alloca で受ける reg は store で運べる
+                cov = self._tail_alloca_regs()
+                if bad - cov:
+                    raise Unsupported("region writes %s live into survivor" % sorted(bad - cov))
+                self.relay_n += 1
+                relay = "dec_label_pc_p1srelay_%s_%d" % (self.salt, self.relay_n)
+                pre = []
+                self._emit_tail_stores(st, pre)
+                self.blocks.append((relay, pre + ["  br label %%dec_label_pc_%x" % va]))
+                self.used("relay_s")
+                return relay
             return "dec_label_pc_%x" % va
         if va in self.exit_vas:
-            relay = "dec_label_pc_p1relay_%x_%d" % (self.D, len(self.blocks))
+            if va == self.D and getattr(self, "join_label", None):
+                # CAB-238 §6: 脱落側入口 = head block 自身のラベル。
+                # relay の行き先は tail を割った合流点 block (head 自身ではない — 自己辺禁止)
+                self.relay_n += 1
+                relay = "dec_label_pc_p1relay_%s_%d" % (self.salt, self.relay_n)
+                pre = []
+                self.emit_merge_stores(va, st, pre)
+                for (_u, ty, a, r) in getattr(self, "join_merge", None) or []:
+                    # 脱落側経路でのレジスタ到達値を, 合流点が読む alloca に store する
+                    # (bind 基準は分岐点 J — D にすると生存側尾部の def まで戻ってしまう)
+                    try:
+                        v = self.read_reg(st, r, self.J, pre)
+                        pre.append("  store %s %s, ptr %s" % (ty, self._conv_inline(pre, v, ty), a))
+                        self.used("join_merge_store")
+                    except Unsupported as _e:
+                        raise Unsupported("join merge %s @%x: 脱落側の値を解決できない (%s)"
+                                          % (r, self.J, _e))
+                self.blocks.append((relay, pre + ["  br label %%%s" % self.join_label]))
+                self.used("relay")
+                return relay
+            self.relay_n += 1
+            relay = "dec_label_pc_p1relay_%s_%d" % (self.salt, self.relay_n)
             pre = []
             self.emit_merge_stores(va, st, pre)
             self.blocks.append((relay, pre + ["  br label %%dec_label_pc_%x" % va]))
+            self.used("relay")
             return relay
-        if va in self.visited:
-            raise Unsupported("region join @%x" % va)
-        if va not in self.mf.insns:
-            raise Unsupported("edge outside function @%x" % va)
-        self.visited.add(va)
-        lab = self.lab(va)
-        sub = self.lift_block(va, {k: (set(v) if k == "__w" else (dict(v) if k == "rsp" else v)) for k, v in st.items()})
-        self.blocks.append((lab, sub))
-        return lab
+        return self.lab(va)
+
+    def _tail_alloca_regs(self):
+        """tail (生存側尾部) が reg2mem alloca の load で受ける reg 集合。"""
+        if not hasattr(self, "_tail_cov"):
+            cov = set()
+            for ln in getattr(self, "tail_lines", []):
+                mm = re.match(r"^\s*%[\w$.\-]+ = load \S+, ptr (%[\w$.\-]+)", IR.strip_tokens(ln))
+                if mm and mm.group(1).endswith(".reg2mem"):
+                    rm = re.match(r"^%(r[a-z0-9]+|xmm\d+)\.\d+(?:\.in)?\.reg2mem$", mm.group(1))
+                    if rm:
+                        cov.add(rm.group(1))
+            self._tail_cov = cov
+        return self._tail_cov
+
+    def _emit_tail_stores(self, st, out):
+        """tail の reg2mem alloca (load がある物) へ, 領域が書いた reg の値を store する。"""
+        for ln in getattr(self, "tail_lines", []):
+            mm = re.match(r"^\s*%[\w$.\-]+ = load (\S+), ptr (%[\w$.\-]+)", IR.strip_tokens(ln))
+            if not mm or not mm.group(2).endswith(".reg2mem"):
+                continue
+            ty, a = mm.group(1).rstrip(","), mm.group(2)
+            rm = re.match(r"^%(r[a-z0-9]+|xmm\d+)\.\d+(?:\.in)?\.reg2mem$", a)
+            if not rm or rm.group(1) not in st["__w"]:
+                continue
+            val = self._conv_inline(out, st[rm.group(1)], ty)
+            out.append("  store %s %s, ptr %s" % (ty, val, a))
+
+    def _conv_inline(self, out, v, ty):
+        """(name, ty) を alloca/load の型 ty へ (変換行は out へ)。定数 0 は型不問。"""
+        name, vty = v
+        if vty == ty or name == "0":
+            return name
+        n = self.nm(0, "cv")
+        op = "trunc" if TYPE_BITS.get(vty, 0) > TYPE_BITS.get(ty, 0) else "zext"
+        out.append("  %s = %s %s %s to %s" % (n, op, vty, name, ty))
+        return n
 
     def emit_merge_stores(self, L, st, out):
         """既存ブロック L の先頭で load される reg2mem alloca へ, この辺の値を store する。"""
         fn, ix = self.fn, self.ix
-        bi = ix.label_idx.get("dec_label_pc_%x" % L)
-        if bi is None:
-            raise Unsupported("exit label %x" % L)
-        for ln in fn.blocks[bi].lines:
+        # join split (CAB-238 §6): 脱落側入口が head block 自身のラベルだった場合,
+        # 合流点は tail を割った後ろ block なのでそちらを走査する
+        scan = self.join_scan if (L == self.D and getattr(self, "join_label", None)) else None
+        if scan is None:
+            bi = ix.label_idx.get("dec_label_pc_%x" % L)
+            if bi is None:
+                raise Unsupported("exit label %x" % L)
+            scan = fn.blocks[bi].lines
+        for ln in scan:
             mm = re.match(r"^\s*%[\w$.\-]+ = load (\S+), ptr (%[\w$.\-]+)", IR.strip_tokens(ln))
             if not mm:
                 continue
@@ -1161,10 +1765,15 @@ class Region:
             rm = re.match(r"^%(r[a-z0-9]+|xmm\d+)\.\d+(?:\.in)?\.reg2mem$", a)
             val = None
             if rm and rm.group(1) in st["__w"]:
-                v = st[rm.group(1)]
-                if v[1] != ty and v[0] != "0":
-                    raise Unsupported("alloca %s type %s vs %s" % (a, ty, v[1]))
-                val = v[0]
+                val = self._conv_inline(out, st[rm.group(1)], ty)
+            elif rm:
+                # LIFTLIB-2: 生存側 store の無い alloca は, この辺の到達値 (機械語 bind) で埋める
+                try:
+                    v = self.read_reg(st, rm.group(1), L, out)
+                    val = self._conv_inline(out, v, ty)
+                    self.used("relay_bind")
+                except Unsupported:
+                    val = None
             else:
                 val = self.carry_value(a)
             if val is None:
@@ -1196,7 +1805,8 @@ def reconstruct(mod, fn, mf, binder, rec, c, stats, log):
     T, F = c["T"], c["F"]
     cb, cl, call_ln = rec["call"]
     blk = fn.blocks[cb]
-    pT, pF = ix.present(T), ix.present(F)
+    # 他 site の領域が lift 済みの VA は「未 lift」扱い (自分の経路値で再 lift する)
+    pT, pF = ix.present(T) and T not in _REGION_VAS, ix.present(F) and F not in _REGION_VAS
     pred = CC_PRED.get(c["cc"])
     if pred is None:
         raise Unsupported("cc %s" % c["cc"])
@@ -1254,27 +1864,61 @@ def reconstruct(mod, fn, mf, binder, rec, c, stats, log):
     D = F if S == T else T
 
     # ---- 機械語 CFG から region の端点 (既存 IR 側ラベル) を決める
-    reg = Region(mod, fn, mf, binder, rec, S, D)
+    reg = Region(mod, fn, mf, binder, rec, S, D, J)
     reg.ix = ix
     reg.exit_vas = set()
-    for lab, bi in ix.label_idx.items():
-        mm = re.match(r"dec_label_pc_([0-9a-f]+)$", lab or "")
+    for lab2, bi in ix.label_idx.items():
+        mm = re.match(r"dec_label_pc_([0-9a-f]+)$", lab2 or "")
         if mm:
-            reg.exit_vas.add(int(mm.group(1), 16))
+            va2 = int(mm.group(1), 16)
+            if va2 not in _REGION_VAS:      # 他 site の領域 block は出口にしない (再 lift 対象)
+                reg.exit_vas.add(va2)
     reg.S_is_label = ix.has_label(S)
     if not reg.S_is_label:
         reg.exit_vas.discard(S)
     reg.live_at_S = _live_in_at(mf, S)
-    reg.visited = set()
     reg.head_bi = cb
+    reg.split_li = sp
+    reg.tail_lines = list(tail_lines)
     reg.tail_range = set((cb, i) for i in range(sp, len(blk.lines)))
     # tail の新ラベル (S が既存ラベルならラベル衝突を避ける)
     if reg.S_is_label:
         tail_label = "dec_label_pc_p1tail_%x_%x" % (A, J)
     else:
         tail_label = "dec_label_pc_%x" % S
+    # ---- 脱落側入口 D の IR ラベルが head block 自身 (= RetDec がマージした巨大 block の
+    #      ラベルが末尾側の機械語 VA であるケース)。そのまま relay を作ると
+    #      head → relay → head の自己辺になり processReplacing が停止しない (CAB-238 §6)。
+    #      tail を D の機械語コードの始点で割り, 「生存側尾部」+「合流点」の 2 block に
+    #      分け、脱落側は合流点ブロックへ直接渡す (機械語の jmp と同じ構造)。
+    reg.join_label = None
+    if ix.label_idx.get("dec_label_pc_%x" % D) == cb:
+        ti = None
+        for i, ln in enumerate(tail_lines):
+            a = mod.addr_of(ln)
+            if a is not None and a >= D:
+                ti = i
+                break
+        if ti is None:
+            raise Unsupported("join %x: head block label collision, split point が見つからない" % D)
+        tail_lines = list(tail_lines)
+        reg.join_label = "dec_label_pc_p1join_%x_%x" % (A, J)
+        head_tail = tail_lines[:ti]
+        reg.join_scan = list(tail_lines[ti:])   # emit_merge_stores が読む load 行
+        # 合流点 (尾部の後半) が「生存側尾部 (前半) で定義した値」を読む場合, 脱落側経路では
+        # その定義が実行されないので reg2mem マージ (pred ごとの store + 合流点 load) が要る。
+        # 機械語レベルでは jcc の両辺が xmm0 等を別値にすることがあり, 正当な phi である。
+        reg.join_merge = _plan_join_merge(mod, fn, mf, reg.join_scan, head_tail,
+                                          reg.join_alloca_lines)
+        if reg.join_merge is None:
+            raise Unsupported("join %x: 合流点の入力レジスタを解決できない" % D)
+        tail_lines = head_tail + ["  br label %%%s" % reg.join_label]
+        reg.tail_lines = list(tail_lines)
+        log.append("join split jcc@%x: D=%x を tail 内の合流点へ (tail %d 行 / join %d 行%s)"
+                   % (J, D, ti, len(reg.join_scan),
+                      " / merge %d" % len(reg.join_merge) if reg.join_merge else ""))
     st0 = {"__w": set(), "fl": ("site", None), "rsp": {}}
-    dlabel = reg.edge(D, st0)
+    dlabel = reg.run(D, st0)
     # ---- 比較命令 (comis 呼出直後) + 分岐
     tag = mod.tag(J)
     if "cmp" in rec:
@@ -1307,8 +1951,15 @@ def reconstruct(mod, fn, mf, binder, rec, c, stats, log):
     blk.lines.append(newbr)
     if reg.rsp_alloca_lines:
         blk.lines[cl + 1:cl + 1] = reg.rsp_alloca_lines
+    # 関数先頭 block は LLVM の entry (pred 禁止)。relay 等の新辺が先頭 block に
+    # 向かっても壊れないよう, 常に新 entry block を先頭に置く (join alloca の配置先でもある)。
+    e0 = fn.blocks[0]
+    lab0 = "dec_label_pc_p1entry_%x_%x" % (A, J)
+    fn.blocks.insert(0, IR.Block(lab0, lab0 + ":", list(reg.join_alloca_lines) + ["  br label %%%s" % e0.label]))
     tb = IR.Block(tail_label, tail_label + ":", tail_lines)
     fn.blocks.insert(cb + 1, tb)
+    if reg.join_label:
+        fn.blocks.append(IR.Block(reg.join_label, reg.join_label + ":", reg.join_scan))
     for (lab, lines) in reg.blocks:
         fn.blocks.append(IR.Block(lab, lab + ":", lines))
     stats["reconstructed"] = stats.get("reconstructed", 0) + 1
@@ -1318,6 +1969,111 @@ def reconstruct(mod, fn, mf, binder, rec, c, stats, log):
         J, "T" if S == T else "F", S, len(reg.blocks),
         (" vocab=" + ",".join("%s:%d" % kv for kv in sorted(reg.vocab.items()))) if reg.vocab else ""))
     return True
+
+
+def _instr_type(s):
+    """IR 命令文字列 (token 列) から結果の型を取り出す。取れなければ None。
+
+    `%x = <ty> <op> ...` / `%x = call <ty> @f(...)` / `%x = load <ty>, ptr ...`
+    / `%x = phi <ty> ...` 系に対応。call は `call` 自体が型ではないので op 後の型を採る。"""
+    s = s.lstrip()
+    m = re.match(r"^%[\w$.\-]+ = (call|invoke) (\S+)\s", s)
+    if m:
+        t = m.group(2).rstrip(",")
+        return t if re.match(r"^(i\d+|ptr|float|double|void|<.*>|\{.*\}|\[.*\])$", t) else None
+    m = re.match(r"^%[\w$.\-]+ = (\S+)\s", s)
+    if not m:
+        return None
+    t = m.group(1).rstrip(",")
+    if re.match(r"^(i\d+|ptr|float|double|void|<.*>|\{.*\}|\[.*\])$", t):
+        return t
+    return None
+
+
+def _plan_join_merge(mod, fn, mf, join_lines, head_tail_lines, alloca_lines):
+    """合流点 (join) が生存側尾部 (head_tail) で定義した値を読む時の reg2mem マージを計画する。
+
+    戻り値: [(ir値, 型, alloca, レジスタ)] — 脱落側 relay はレジスタの到達値を store し,
+    合流点は alloca を load して使う (RetDec の reg2mem イディオムと同じ)。
+    解決できないレジスタが 1 つでもあれば None (呼出側が unsupported にする)。
+    """
+    defined = {}                       # ir 値 -> (型, 機械語 VA)
+    for ln in head_tail_lines:
+        s = IR.strip_tokens(ln)
+        m = re.match(r"^\s*(%[\w$.\-]+) = ", s)
+        if not m:
+            continue
+        ty = _instr_type(s)
+        if ty is None or ty == "void":
+            continue
+        defined[m.group(1)] = (ty, mod.addr_of(ln))
+    if not defined:
+        return []
+    need = {}
+    for ln in join_lines:
+        s = IR.strip_tokens(ln)
+        head = s.split(" = ")[0]
+        for u in set(re.findall(r"%[\w$.\-]+", s)):
+            if u in defined and u != head:
+                need[u] = defined[u]
+    if not need:
+        return []
+    out = []
+    for u, (ty, va) in sorted(need.items()):
+        reg = None
+        if va is not None:
+            it = mf.insns.get(va)
+            if it is not None:
+                cand = sorted(r for r in it.writes
+                              if r.startswith("xmm") or (r.startswith("r") and r != "rsp"))
+                if len(cand) == 1:
+                    reg = cand[0]
+        if reg is None:
+            return None                       # レジスタ対応が取えない値は諮める
+        n0 = 0
+        while True:
+            a = "%%p1jm_%x_%d" % (va, n0)
+            if a not in alloca_lines and a not in [m[2] for m in out]:
+                break
+            n0 += 1
+        alloca_lines.append("  %s = alloca %s" % (a, ty))
+        alloca_lines.append("  store %s 0, ptr %s" % (ty, a))
+        # 生存側尾部 (FALSE 側) の終端 = この値の store (後続の br label %join の前)
+        head_tail_lines.append("  store %s %s, ptr %s" % (ty, u, a))
+        nv = "%%p1jmv_%x_%d" % (va, n0)
+        join_lines.insert(0, "  %s = load %s, ptr %s" % (nv, ty, a))
+        for i, ln in enumerate(join_lines):
+            if i == 0:
+                continue
+            join_lines[i] = re.sub(r"(?<![\w$.])" + re.escape(u) + r"(?![\w$.])", nv, ln)
+        out.append((u, ty, a, reg))
+    return out
+
+
+def _all_blocks_live_in(mf):
+    """全機械語 block 開始点の live-in (_live_in_at の block 単位版, 1 fixpoint)。"""
+    blocks = mf.cfg()
+    use, defn = {}, {}
+    for l, b in blocks.items():
+        u, d = set(), set()
+        for v in b["vas"]:
+            it = mf.insns[v]
+            u |= (it.reads - d)
+            d |= it.writes
+        use[l], defn[l] = u, d
+    LIVE = {l: set() for l in blocks}
+    ch = True
+    while ch:
+        ch = False
+        for l, b in blocks.items():
+            out = set()
+            for s in b["succ"]:
+                out |= LIVE[s]
+            new = use[l] | (out - defn[l])
+            if new != LIVE[l]:
+                LIVE[l] = new
+                ch = True
+    return LIVE
 
 
 def _live_in_at(mf, va):
@@ -1358,6 +2114,43 @@ def _live_in_at(mf, va):
     return live - {"flags"}
 
 
+def _renumber_fn(fn):
+    """関数内の無名番号 (値 %N と無名 block は同じ 0 起点の番号空間を共有する) を
+    file 順で引き直す (LIFTLIB-2)。
+
+    LLVM の構文規則で関数内の番号は単調増加が必要。head block の tail 分割と挿入に
+    より RetDec の元番号の file 順が崩れる事があるため, 変更のあった関数を引き直す。
+    無名 block の `; <label>:N:` 行と `label %N` 参照も同じ番号空間なので一緒に張替える。
+    番号の対応は写像置換なので意味は不変 (use/def の構造はそのまま)。"""
+    items = []                            # file 順の (種別, 旧番号)
+    for b in fn.blocks:
+        for ln in b.lines:
+            m = re.match(r"^; <label>:(\d+):", ln)
+            if m:
+                items.append(int(m.group(1)))
+                continue
+            m = re.match(r"^\s*%(\d+) = ", ln)
+            if m:
+                items.append(int(m.group(1)))
+    if not items:
+        return 0
+    mapping = {old: n for n, old in enumerate(items)}
+    pat = re.compile(r"(?<![\w$.!\-])%(\d+)(?![\w$.!\-])")
+    labpat = re.compile(r"(^; <label>:)(\d+):")
+
+    def sub(ln):
+        s = labpat.sub(lambda m: "%s%d:" % (m.group(1), mapping[int(m.group(2))])
+                       if int(m.group(2)) in mapping else m.group(0), ln)
+        return pat.sub(lambda m: "%%%d" % mapping[int(m.group(1))]
+                       if int(m.group(1)) in mapping else m.group(0), s)
+
+    for b in fn.blocks:
+        b.lines = [sub(l) for l in b.lines]
+        if b.header:
+            b.header = sub(b.header)
+    return len(items)
+
+
 def run_function(mod, fn, img, repair=True, log=None, stats=None, mf=None):
     stats = stats if stats is not None else {}
     log = log if log is not None else []
@@ -1368,6 +2161,7 @@ def run_function(mod, fn, img, repair=True, log=None, stats=None, mf=None):
     if rng is None:
         stats["no_pdata"] = stats.get("no_pdata", 0) + 1
         return stats
+    _REGION_VAS.clear()          # 領域 block の請求は関数単位 (LIFTLIB-2)
     mf = mf or MFunc(img, *rng)
     # 1 サイトずつ処理 (FuncIndex は構造変更後に作り直す)
     done = set()
@@ -1406,4 +2200,6 @@ def run_function(mod, fn, img, repair=True, log=None, stats=None, mf=None):
         except Unsupported as e:
             stats["unsupported"] = stats.get("unsupported", 0) + 1
             log.append("UNSUPPORTED %s@%x: %s" % (st, c["J"], e))
+    if repair and (stats.get("reconstructed") or stats.get("rewired")):
+        stats["renumbered"] = _renumber_fn(fn)
     return stats

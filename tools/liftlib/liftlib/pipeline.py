@@ -74,6 +74,19 @@ def repair_ll(cfg, raw_path, img, log, detect_only=False):
     passes = cfg.get("passes", {})
     names = set(cfg.get("funcs") or [f.name for f in mod.funcs()])
     rep = not detect_only
+    # LIFTLIB-2: f2 を p1 より前に実行する (callee 相で入口 xmm 値 (%xmmK_bits 引数) を
+    # define に足し, callsite 相で生存側 call を固定した後に p1 が領域を lift する。
+    # p1 の領域は _lift_call で f2 済みの declare 引数 (%xmmK_bits) を正しく渡し,
+    # f2 の bind は領域コピーが存在しない素な IR に対して行われる (支配違反の混入を避ける)。
+    if passes.get("f2", True):
+        st, lg = {}, []
+        f2.run(mod, img, lg, st, repair=rep, only=passes.get("f2_only"), phase="callee")
+        stats["f2_callee"] = st
+        log.extend("f2: " + x for x in lg)
+        st, lg = {}, []
+        f2.run(mod, img, lg, st, repair=rep, only=passes.get("f2_only"), phase="callsite")
+        stats["f2"] = st
+        log.extend("f2: " + x for x in lg)
     if passes.get("p1", True):
         st, lg = {}, []
         for fn in mod.funcs():
@@ -88,11 +101,6 @@ def repair_ll(cfg, raw_path, img, log, detect_only=False):
                 f7.run_function(mod, fn, img, rep, lg, st)
         stats["f7"] = st
         log.extend("f7: " + x for x in lg)
-    if passes.get("f2", True):
-        st, lg = {}, []
-        f2.run(mod, img, lg, st, repair=rep, only=passes.get("f2_only"))
-        stats["f2"] = st
-        log.extend("f2: " + x for x in lg)
     if passes.get("leafabi") and not detect_only:
         from .passes import leafabi as LA
         st, lg = {}, []
