@@ -444,13 +444,12 @@ bash tools/plugins/framework/fw_269_nc.sh             # ネガティブコント
 | full A | 1 (*) | **297** | 3.62 3.59 3.34 → 5.37 4.65 3.86 |
 | full B | 1 (*) | **343** | 12.72 12.99 8.77 → 7.15 12.15 10.02 |
 | full C | 1 (*) | **343** | 7.15 12.15 10.02 → 6.15 8.39 8.96 |
-| full D (現行 script・FW_SIZE=0) | **0** | (smoke ×3 のみ下表) | — |
-| smoke ×3 (full B) | 0 | 188 / 187 / **191 ms** | — |
-| smoke ×3 (full C) | 0 | 228 / 228 / 209 ms | — |
+| full D (commit 6ab9a4d snapshot) | **0** | **297** | 2.29 2.73 4.66 → 3.73 3.31 4.37 |
+| smoke ×3 (full B / C / D) | 0 | 187〜233 ms | — |
 
 (*) A-C は `--size` の既定が 14,828,623 B (77cde78 vintage) だった時期の実行で、**wasm サイズだけ**
-が MISMATCH (smoke 5 値は全 run PASS)。現行 script は既定でサイズ照合をスキップし exit 0
-(FW_SIZE 指定時のみ厳密照合)。e2e 自体 (steps 1-18・emcc・smoke) は全 run で完走。
+が MISMATCH (smoke 5 値は全 run PASS)。D は現行 commit の snapshot (既定 = サイズ照合スキップ) で
+exit 0。実測秒は 4 回中 297/343/343/297、smoke 1 発あたり 187〜233 ms (負荷依存・レンジ表記)。
 
 smoke ×3 は全実行で同値 (`smoke1.log` と `smoke2/3.log` の diff = 0 行・`ctx=0x…` はスタック値なので正規化):
 ```
