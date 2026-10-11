@@ -118,23 +118,29 @@ jobs:
           cf-r2-access-key-id: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
           cf-r2-secret-access-key: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
 
-      - name: Assemble prompt
-        id: prompt
+      # イベント文脈を $GITHUB_ENV に書く (後続 step で参照できる)
+      - name: Prepare event context
+        id: context
         shell: bash
         run: |
-          # イベント文脈を環境変数化 → テンプレートに流し込む
           {
             echo "EVENT_NAME=${{ github.event_name }}"
             echo "PERMISSION=${{ steps.judge.outputs.permission }}"
             echo "ISSUE_NUMBER=${{ github.event.issue.number || '' }}"
             echo "PR_NUMBER=${{ github.event.issue.number || github.event.pull_request.number || '' }}"
-            echo "COMMENT_BODY<<EOF"
+            echo "COMMENT_BODY<<OCCTXEOF"
             printf '%s' "${{ github.event.comment.body || github.event.inputs.prompt || '' }}" | head -c 20000
             echo ""
-            echo "EOF"
+            echo "OCCTXEOF"
             echo "REPO=${{ github.repository }}"
             echo "GITHUB_REF_NAME=${GITHUB_REF_NAME}"
           } >> "$GITHUB_ENV"
+
+      # $GITHUB_ENV の内容はこの step から見える (前行で書き出したもの)
+      - name: Assemble prompt
+        id: prompt
+        shell: bash
+        run: |
           bash .github/scripts/assemble-prompt.sh >> "$GITHUB_OUTPUT"
 
       - name: Run OpenCode (implementer)
