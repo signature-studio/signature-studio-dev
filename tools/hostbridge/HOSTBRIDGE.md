@@ -1,8 +1,7 @@
 # HOSTBRIDGE — Fruity Wrapper (外部 VST ホスト経路) 解析 + wasm 同梱モジュール表の設計
 
 > 正本: `tools/hostbridge/HOSTBRIDGE.md` (設計書・上限 300 行)。
-> **行数目安**: 本ファイルは 250 行を超過 (`docs/DOC_MAP.md` §1 の上限ルール参照)。
-> 超過分は Git 履歴に残る形での分割移動を推奨 (**内容は削除しない**)。
+> **行数目安**: 268 行。設計書の上限は 300 行 (`docs/DOC_MAP.md` §1) なので超過していない。
 
 対象: FL Studio 26.1.7.5653 (win64) / 根拠ファイルは `evidence/` (Ghidra 12.1.4 の decompile/disasm を commit 済み、
 再生成 `analysis/reproduce.sh`、機械検査 `analysis/verify_evidence.py` 20 項目)。

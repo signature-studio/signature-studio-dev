@@ -13,7 +13,7 @@
 
 | ID | 所在 | 内容 |
 |---|---|---|
-| `[STRATEGY]` | `../analysis/strategy.md` | 実行戦略・技術選定の正本。パイプライン・shim 一覧・マイルストーン M1〜M11 の定義元 |
+| `[STRATEGY]` | `../analysis/strategy.md` | 実行戦略・技術選定の正本。パイプライン・shim 一覧・マイルストーン `MS1`〜`MS11` の定義元 (`MS12` は repo 内 `docs/STATUS.md` §2 で定義) |
 | `[STRATEGY-SURVEY]` | `../analysis/strategy_survey.md` | 技術選定の調査資料 (lifter 比較) |
 | `[TOOLCHAIN]` | `../analysis/toolchain_setup.md` | ツールチェイン整備記録 (RetDec → emcc PoC) |
 | `[WIN64]` | `../analysis/win64/` (`REPORT.md`・`extracted/`・`block_manifest.json`・`pe_metadata.json`・`tools/nsis_extract.py`) | FL Studio win64 インストーラ解析。NSIS+Image-Line 独自拡張の抽出、FLEngine_x64.dll 実体 |

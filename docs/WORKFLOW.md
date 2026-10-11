@@ -36,7 +36,7 @@ PM (main)                      subagent (実装)                  subagent (検�
    │                                ├ 実装 + e2e + REPORT              │
    │                                ├ commit (scope)                   │
    │                                ├ push -u origin <N>-<slug>        │
-   │                                ├ gh pr create --base master       │
+   │                                ├ gh pr create --base main         │
    │                                ├ gh issue comment N (進捗・実測)   │
    │                                └ Status → In review を依頼 ────────┤
    │                                                                   ├ 自分の worktree で
@@ -50,10 +50,12 @@ PM (main)                      subagent (実装)                  subagent (検�
 ```
 
 - **worktree の場所**: リポジトリの**親ディレクトリの `ws-<N>`**
-  (`git worktree add ../ws-<N> -b <N>-<slug> origin/master`)。
+  (`git worktree add ../ws-<N> -b <N>-<slug> origin/main`)。
   既存 worktree は `git worktree list` で確認。**他人の worktree には触れない** (消さない・checkout しない)。
 - **merge は PM のみ**。merge 後、`git worktree remove --force` で**自分が使った worktree** を片付ける。
-- **競合時**: `git rebase origin/master` で解消してから `push --force-with-lease` (自分 branch のみ)。
+- **競合時**: `git rebase origin/main` で解消してから `push --force-with-lease` (自分 branch のみ)。
+- **既定ブランチは `main`** (`origin/HEAD → origin/main`)。旧 `origin/master` は `main` の祖先で
+  12+ commits 遅れの凍結枝。master を base にした PR・master への pull/push は行わない。
 
 ## 3. ステータスと責任区分
 
@@ -63,8 +65,8 @@ PM (main)                      subagent (実装)                  subagent (検�
 | 検収 subagent | 対象が In review 確認 | 合格 → Done + コメント / 条件付き → **In review 維持** + 所見 | In review でないものを Done にしない |
 | PM (main) | 起票・milestone 確定 | merge・方針変更・是正 | — |
 
-- **状態の唯一の正は Project V2 の Status フィールド + issue の open/closed。**
-  不変条件: `CLOSED ⇔ Done`、`OPEN ⇔ Backlog|Ready|In progress|In review`。
+- **チケット状態の唯一の正は Project V2 の Status フィールド + issue の open/closed**
+  (技術進捗の正本は `docs/STATUS.md`)。不変条件: `CLOSED ⇔ Done`、`OPEN ⇔ Backlog|Ready|In progress|In review`。
 - **label `state:*` は使わない** (2026-10-12 実測で全削除済み・0 件)。新規作成・付与しない。
 - **1 状態遷移 = 1 コメント**。コメントなしの状態変更は禁止。
 - **Status を変えるのは PM の責務**。subagent は依頼コメントを書く (PM が委任プロンプトで明示許可した場合を除く)。
@@ -122,7 +124,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   `fix(ipp): ...` / `feat(flelift): ... (CAB-252)`。過去の `CAB-xxx` 採番を参照してもよい。
 - 例: `docs(liftlib): ...`・`fix(plugins): report corrections (CAB-269)`・
   `feat(kh): add DecompAt2 ghidra postScript`。
-- PR は `--base master` を基本 (repo の既定ブランチに従う)。body に `Closes #N`・受入条件・検証結果を書く。
+- PR は `--base main` を基本 (repo の既定ブランチ = `main`)。body に `Closes #N`・受入条件・検証結果を書く。
 - **1 チケット = 1 subagent。** チケット化されていない作業も subagent 委任する。
   10 回以上の tool call が必要になる作業は必ず subagent に委任すること。
 
@@ -140,9 +142,12 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
 
 ## 9. Issue / PR の命名規則
 
-- タイトル: **`[AREA-n]` prefix** + 英語表題。`AREA` は `AGENTS.md` の AREA 一覧
-  (`KH`/`PLG`/`SHX`/`AU`/`HB`/`IPP`/`LIFTLIB`/`RT`/`GUI`/`SR`/`MX`/`FA`/`E2E`/`LGL`/`ST`/`PY`/`PERF` 等)。
-- 過去の採番は尊重する (例: `[IPP-7]`・`[KH-2b]`)。`[HB-H4']` のような記号付きは作らない。
+- タイトル: **`[AREA-n]` prefix** + 英語表題。`AREA` は**次の一覧が正本**で `n` は AREA 内の連番
+  (同名族・重複タイトルを作らない):
+  `KH`・`PLG` / `P0c`・`SHX` / `T-SH`・`AU`・`HB`・`IPP`・`LIFTLIB` / `L`・`RT`・`GUI`・`SR`・`MX`・`FA`・`OTT`・`E2E`・`LGL`・`ST`・`PY`・`PERF`・`LD` / `ICALL`・`M11`。
+- 過去の採番は尊重する (例: `[IPP-7]`・`[KH-2b]`・`[HB-H2]`)。
+  `[HB-H4']` のような記号付き・`[ユーザ依頼]` のような日本語 prefix は**作らない**
+  (`needs-user-input` ラベルとの二重表現もしない)。
 - 起票前に `gh issue list --search "<kw>"` で重複確認。**重複タイトルを作らない。**
 - 子チケットは親と同じ milestone を付ける (milestone の確定は PM)。
 - PR タイトルは commit と同じ conventional commits 書式。

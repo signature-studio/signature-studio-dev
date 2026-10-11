@@ -1,6 +1,7 @@
-# STATUS — 状態の唯一の正本
+# STATUS — 技術進捗の正本
 
-本ファイルが**プロジェクトの状態**に関する唯一の正本である。
+本ファイルが**技術進捗**に関する唯一の正本である (チケット状態の正本は Project V2 の Status
+フィールド + issue の open/closed。`docs/WORKFLOW.md` §3)。
 旧 `tools/docs/MILESTONES.md`・`tools/ipp/STATUS.md`・`tools/m11/STATUS.md` は本ファイルに統合し削除した。
 
 - 更新責任: **PM (main) のみ**。subagent は REPORT で報告し、PM がここを更新する。
@@ -25,7 +26,11 @@
 
 - 戦略上の到達段階は **`MS1`〜`MS12`** と表記する。
 - 作業用ツリーは **`m1`〜`m11`** (小文字・ディレクトリ名) のままで、**MS 番号とは対応させない**。
-- `MS` の定義元は `[STRATEGY]` §4 (全 11 段 + M12 追加)。本ファイルは**状態**だけを持つ。
+- **定義元**: `MS1`〜`MS11` は `[STRATEGY]` §4 (`docs/REFERENCES.md`) が定義元。**`MS12` は本ファイルで定義**
+  (repo 外の `[STRATEGY]` §4 には M1〜M11 の 11 段のみ)。
+- **歴史表記**: 過去のコミット・既存 `REPORT.md` に残る `M7` / `M8` / `M10` / `M11` は
+  **milestone 意味の歴史的な表記**で、`tools/m7`・`tools/m8`・`tools/m10`・`tools/m11` という
+  ディレクトリ名を指すものではない。過去の記述は書き換えない (判断は文脈の `MS`/`m` 表記で行う)。
 
 ## 2. MS (戦略上の到達段階) の状態
 
@@ -56,9 +61,9 @@
 | `m2` FLEngine 解析機械化 | 完了 | `tools/m2/REPORT.md` |
 | `m3` 中規模 lift→wasm | 部分達成 | `tools/m3/REPORT.md` |
 | `m5` Delphi Mini-PoC | 部分達成 | `tools/m5/REPORT.md` |
-| `m6`〜`m10` OTT (RetDec 路線) | 旧路線。手段としては歴史的手段に移行 | 各 `REPORT.md` |
+| `m6`〜`m10` OTT (RetDec 路線) | 旧路線 (歴史的記録として保持。新規 lift は x64c / flelift / liftlib) | 各 `REPORT.md` |
 | `ott` OTT bit-exact 参照 | **完走路検証済** | `tools/ott/REPORT.md` |
-| `m11` FLEngine 部分起動 | 部分達成 (stage 4/6) | `tools/m11/REPORT.md` |
+| `m11` FLEngine 部分起動 | 部分達成 (到達 stage は REPORT 参照) | `tools/m11/REPORT.md` |
 | `m11/alloca` | 修復実装済 | `tools/m11/alloca/REPORT.md` |
 | `m11/ldfix` | 修復実装済 (常設化) | `tools/m11/ldfix/REPORT.md` |
 | `m11/shimx_link` | 接続実装済 | `tools/m11/shimx_link/REPORT.md` |
@@ -78,7 +83,7 @@
 | `hostbridge` | 設計+mini VST2 host PoC | `tools/hostbridge/REPORT.md` |
 | `hostbridge/{cb,h2,lowbase,nfo}` | 各実装済 | 各 `REPORT.md` |
 | `gui` | 設計+PoC | `tools/gui/REPORT.md` |
-| `audio` | 設計+PoC (22 シナリオ PASS) | `tools/audio/REPORT.md` |
+| `audio` | 設計+PoC (e2e で既知 FAIL 1 件あり・詳細は REPORT) | `tools/audio/REPORT.md`・`tools/audio/asio/REPORT.md` |
 | `audio/asio` | COM アダプタ+soak | `tools/audio/asio/REPORT.md` |
 | `assets` | chunk ローダ+二段キャッシュ | `tools/assets/REPORT.md` |
 | `assets/wvfs` | 書込可能 VFS | `tools/assets/wvfs/REPORT.md` |
