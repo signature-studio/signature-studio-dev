@@ -188,7 +188,7 @@ delay closure 142 関数の近似命令は rcpps 4 箇所のみ (すべて 0x180
 
 | 検証 | 実測 |
 |---|---|
-| `python3 scripts/tol_removal_check.py` | **OK**: `tol` キー **0** 件・`--tol` 解析 **0** 件・build.py tol 経路 **0** 件・make_table `c.get('tol')` **0** 件。HEAD の snapins.json との差分 = **tol キー削除のみ** (tol-stripped ツリー相等) |
+| `python3 scripts/tol_removal_check.py` | **OK**: `tol` キー **0** 件・`--tol` 解析 **0** 件・build.py tol 経路 **0** 件・make_table `c.get('tol')` **0** 件。HEAD の snapins.json との差分 = **tol キー削除のみ** (tol-stripped ツリー相等)。**[6] 独立再計算**: `work/<n>/s0/stat.json` 14 本の実測を数え直し = not-exact **0**・legacy tol タグ **0**・欠落 **0** |
 | `bash run_all.sh` 200/1 (n=2) | exit 0・**413・423 s** (load 2.95 3.28 3.69 → 16.12 10.31 6.43、nproc=16 直列)。RESULT **23 本** の baseline (`49f7dd4`) との diff = **ちょうど 3 行** = resonator/stereo/delay の `[tolerance]` タグ消滅のみ (trial 200/200・call 999/999・1299/1299・wasm B は不変) |
 | `TRIALS=1000 SEED=7 bash run_all.sh` (n=2) | exit 0・**400・423 s** (load 7.17 12.33 10.06 → 4.54 7.45 8.60)。13 snap-in + khbase がすべて 1000/1000 bit-exact (delay 6,499/6,499・khbase 52,500/52,500・qebig 4,800/4,800 = KH-2b sincos を含む)。Path A clipper のみ 0/1000 (消失コードの意図的負の対照) |
 | lic_check (`license/` は読取のみ) | `cd ../license && node lic_check.mjs work` = **ok 70 / fail 0**・license/ 改変 0 行 |
