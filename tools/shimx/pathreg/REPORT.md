@@ -45,6 +45,7 @@
 | `test/e2e.mjs` | e2e: モック永続化層 (MemoryStore) で「再起動」を含む往復 + **本物の vreg Vreg との相互運用** + C↔JS 写像クロスチェック |
 | `scripts/build.sh` | `test` / `module-a` (vreg_* フック export + probe.c 同梱) / `module-b` (フック非 export) / `all`。emcc フラグは shimx `flags.sh` を流用 |
 | `scripts/e2e.sh` | 1 コマンド検収 (build → C 単体 ST/MT → JS 単体 → e2e) |
+| `scripts/accept_recount.mjs` | **検収 agent の独立再計算 + ネガティブコントロール** (別アルゴリズム・規則 37・41。§8) |
 
 vreg 資産の利用は **import のみ** (読取専用遵守): `regfile.mjs` (model/serialize)・`seed.mjs` (`resolveSeed`)・
 `store.mjs` (`MemoryStore/FileStore/IdbStore` がそのまま使える)・`vreg.mjs` (相互運用テスト)。
@@ -148,7 +149,7 @@ E (asset-vfs) 側は無変更で良い (`/fl` mount 点と vpath = tree 相対�
    非 ASCII キー名の削除も動くが、mount 表の照合は ASCII 大小無視のみ (UTF-8 全体の casefold はしない。
    E の lookup が大小無視のため実害なしと判断)。
 3. **pathreg_map の入力は UTF-8 前提** (shimx `shimx_path_to_posix` と同じ)。W 版 API は shimx 内部で UTF-8 化してから mapper へ渡る。
-4. hash 変更検出 (構成 b) は export 全文の O(レジストリ全体) — flush 点のみ呼ぶ設計なので実用上無視できる。高頻度ポーリングは想定しない。誤「無変更」は FNV-1a 64bit 衝突時のみ (事実上 0)。
+4. hash 変更検出 (構成 b) は export 全文の O(レジストリ全体) — flush 点のみ呼ぶ設計なので実用上無視できる。高頻度ポーリングは想定しない。誤「無変更」は FNV-1a 64bit 衝突時のみ。
 5. レコードの `hkcu` は「その時点の全 HKCU」を含む (vreg と同一)。seed version 更新時は `fillMissing` で
    不足分のみ補完 (ユーザ変更・削除は保持)。レコード破損時のマイグレーションは未実装 (schema:1 固定)。
 6. 実 FL バイナリを通した検証は未了 (本チケットはインタフェース接続。実 FL 結線は CAB-101)。
@@ -182,11 +183,11 @@ E (asset-vfs) 側は無変更で良い (`/fl` mount 点と vpath = tree 相対�
 | e2e group N | `test/e2e.mjs` の `ok()` 呼出し箇所 (= `E2E PASS: N groups`) | **6** (A1・A2・A3・A4・B・C) |
 | seed エントリ | `vreg resolveSeed(registered)` の model 値数 + `catalogSkipped` | **236** (起動時書込 **81** / catalog のみ **155**) |
 
-独立再計算 (検収 agent・別アルゴリズム・規則 37): `work/verify/recount.mjs` (ソースの配列テキスト解析 +
+独立再計算 (検収 agent・別アルゴリズム・規則 37): `scripts/accept_recount.mjs` (ソースの配列テキスト解析 +
 `defaultMounts()` + build 済み module の export 直接呼出)。出力:
 `mount table: JS=8 C=8 -> MATCH(8)` / `fixtures: e2e.mjs array entries=16` /
 `C unit: normalize 18 / mounts 8 / map 8` / `LOC: C=460 JS=461 TEST=505 SCRIPT=82 TOTAL=1508`。
-ネガティブコントロール (規則 41): `work/verify/negctl.mjs` — C 側のみ追加マウント (`E:\Ablated`→`/libs/ablated`)
+ネガティブコントロール (規則 41): `scripts/accept_recount.mjs` のネガティブコントロール部 — C 側のみ追加マウント (`E:\Ablated`→`/libs/ablated`)
 → `C=/libs/ablated/x/y.dll` / `JS=null` で**不一致を検出**。対照 (追加なし) は 5/5 一致 → 照合は空振りでない。
 
 ### 8-2. 検収記録 (2026-10-11・CAB-168 検収 agent)
@@ -194,6 +195,4 @@ E (asset-vfs) 側は無変更で良い (`/fl` mount 点と vpath = tree 相対�
 - 検証起点 commit **0669f26** (+ follow-up **baca426** 後の HEAD)。`bash tools/shimx/pathreg/scripts/e2e.sh`
   → **exit 0 / 8 秒** (`E2E PASS: 6 groups`)。load average (1/5/15 分) 開始 4.90/3.96/3.72 → 終了 4.92/3.99/3.74。
 - 誤記修正 (本 commit): 15→**16** fixture / マウント表・既定表件数 14→**8** / 行数・module サイズ / `snapshot keys=50 種`→定義付き実測値。原因は CAB-214 follow-up (`baca426`) の `user2Profile` 退役・ファイル更新に REPORT の数値が追随していなかったため。
-- コミット: `feat(shimx): path mapping + registry persistence interface (CAB-168)`。追加は `tools/shimx/pathreg/` のみ
-  (`build/`・`work/` は gitignore 済)。20MB 超 blob なし (最大 = module_a.mjs 204,619 B)。
-  再現: `bash tools/shimx/pathreg/scripts/e2e.sh` (8 秒・exit 0)。環境: emcc 6.0.12 / node v26.10.0 (pnpm)。
+- コミット: `feat(shimx): path mapping + registry persistence interface (CAB-168)`。追加は `tools/shimx/pathreg/` のみ (`build/`・`work/` は gitignore 済)。20MB 超 blob なし (最大 = module_a.mjs 204,619 B)。再現: `bash tools/shimx/pathreg/scripts/e2e.sh` (8 秒・exit 0)。環境: emcc 6.0.12 / node v26.10.0 (pnpm)。

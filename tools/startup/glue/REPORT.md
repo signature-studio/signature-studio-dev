@@ -83,6 +83,7 @@ vtbl 逐語仕様 (stub_plan §2): slot0 = slot2 へ forward、slot1 = `ret`、s
 | `test/glue_unit.ts` | TS 単体 (49 チェック) |
 | `test/glue_child.ts` | SIGKILL 跨ぎ e2e の seed/verify 子プロセス |
 | `scripts/count_checks.mjs` | 見出し数値の再計算 (規則 37) |
+| `scripts/accept_recount.mjs` | **検収 agent の独立再計算** (別アルゴリズム・規則 37。§10) |
 | `scripts/audit_trace.mjs` | 別アルゴリズムの検算 (trace 突合・規則 37) |
 | `env.sh` | 環境前提 (規則 43) |
 | `glue.sh` | 1 コマンド検収 |
@@ -91,6 +92,7 @@ vtbl 逐語仕様 (stub_plan §2): slot0 = slot2 へ forward、slot1 = `ret`、s
 bash tools/startup/glue/glue.sh                       # 全部 (exit 0 = ALL PASS)
 node tools/startup/glue/scripts/count_checks.mjs      # 数値の再計算
 node tools/startup/glue/scripts/audit_trace.mjs       # 別アルゴリズム検算
+node tools/startup/glue/scripts/accept_recount.mjs    # 検収の独立再計算 (§10)
 ```
 
 ## 4. 実測 (所要は n=7 runs の min–max、load average は `uptime`)
@@ -174,7 +176,7 @@ node tools/startup/glue/scripts/audit_trace.mjs       # 別アルゴリズム検
   (`tools/startup`・`tools/audio`・`tools/shimx`) すべて差分 0 のクリーン状態で実行。
   `bash tools/startup/glue/glue.sh` → **exit 0 / ALL PASS / 4.2 秒 (load 1/5/15 分 = 3.16/3.28/3.49) と
   5.5 秒 (load 3.45/4.87/9.62) の 2 回**。いずれも REPORT 記載の 3.8〜7.0 秒レンジ内。
-- **独立再計算 (別アルゴリズム・規則 37)**: `work/verify/glue_recount.mjs` — 実装側の
+- **独立再計算 (別アルゴリズム・規則 37)**: `scripts/accept_recount.mjs` — 実装側の
   `count_checks.mjs` (単体バイナリの stdout 行Regex)・`audit_trace.mjs` (trace 文字列) とは別系統で、
   **①ソースの `ok(` 呼出しサイト静的解析** (C 単体 = `glue_unit.c` の `ok(` 56 + `glue.c` の `kStages[]` 10 = 66) /
   **②既定マウント表を `pathmap.mjs` の `defaultMounts()` から独立集計** / ③trace の enter・ok 順を
