@@ -269,6 +269,9 @@ def main():
                     for x in run:
                         if x not in pset and text_lo <= x < text_hi and is_delphi_case(x):
                             roots.add(x)
+            # 注 (FLE-4): .text 内の「.pdata 整齊エントリの連続」= Delphi VMT スロット配列も
+            # 含まれうるが、対象 0x6a7b70 は **image 内に qword 参照を持たない** (実行時構築
+            # vtable) ため本 scan では拾えない。boot_roots.json への実行時累積で対応する。
             for off in range(0, len(data) - 7, 8):
                 v = struct.unpack_from('<Q', data, off)[0]
                 if text_lo <= v < text_hi:
