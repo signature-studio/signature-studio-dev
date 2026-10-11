@@ -2,14 +2,22 @@
 
 preflight: RULES_SHA=ff4999169333 (SUBAGENT_RULES.md 228 行・追加規則 36〜50 準拠)
 
-最終更新 2026-10-11 / 担当 subagent (hostbridge-nfo) / 再現: `bash tools/hostbridge/nfo/nfo_e2e.sh` (exit 0 = 全 PASS、約 8 s、§13 の h4 結線 e2e を含む) + `bash tools/hostbridge/nfo/h4_e2e.sh` (CAB-216 単独) + `node tools/hostbridge/nfo/analysis/real_ini_check.mjs` (実機照合 21 checks) + `node tools/hostbridge/nfo/h4_recount.mjs` (独立再計算) / 仕様: `FORMAT.md`
+最終更新 2026-10-11 / 担当 subagent (hostbridge-nfo) / 再現: `bash tools/hostbridge/nfo/nfo_e2e.sh` (exit 0 = 全 PASS / §13 の h4 結線 e2e を含む) + `bash tools/hostbridge/nfo/h4_e2e.sh` (CAB-216 単独) + `node tools/hostbridge/nfo/analysis/real_ini_check.mjs` (実機照合 21 checks) + `node tools/hostbridge/nfo/h4_recount.mjs` (実装側 独立再計算) + `node tools/hostbridge/nfo/h4_accept_check.mjs` / `node tools/hostbridge/nfo/h4_accept_chrome.mjs` (検収側 独立再計算) / 仕様: `FORMAT.md`
+
+所要 (実測。定義: `bash <script>` の wall time・`/usr/bin/time`・n=3 ・min–max 表記。/tmp/opencode 上、他 subagent 稼働中の load average は並記):
+
+| コマンド | 実測 (n=3) | load average 開始 / 終了 (抜粋) |
+|---|---|---|
+| `nfo_e2e.sh` (全 step・h4 含む) | **5.90–7.69 s** (5.90 / 6.28 / 7.69 s, exit 0) | 13.98–15.13 / 13.98–15.12 |
+| `h4_e2e.sh` (CAB-216 単独) | **3.66–3.75 s** (3.66 / 3.70 / 3.75 s, exit 0) | 7.00–8.09 / 6.43–7.60 |
+| `h4_accept_check.mjs` (検収側) | **0.36–0.36 s** (0.36 × 3, exit 0) | 13.32–36.87 / 13.32–36.87 |
 
 ## 0. 結論 (先出し)
 
 - **判定: 静的解析のみで書式を確定し、パーサ/ライタ/合成 DB 生成器を実装した。** その後 §10/§11 で実機突合まで完了 (CAB-215/CAB-219)。**実例**: 抽出物 (mac pkg + win installer) に `Installed\` 配下の v2 `.nfo` は **0 件**。`.nfo` は 831 件 (全て ASCII, 25,203 B) あり、`ps_*` を含むのは native の `Plugin.nfo` 141 件 (`ps_vendorname` のみ) だけ (§1)。
 - **書式 (FLEngine を逆アセンブルして確定; PluginManager.exe は同一 unit を内包)**: `.nfo` = CRLF の `key=value` 行 (キー大文字小文字非区別、`'` 行はコメント)。`fileversion=2` は `ps_name / ps_presetfilename / ps_files=N` + `ps_file_*_<i>` (i=0 起点)。必須は実質 `ps_files` と `ps_file_plugclass_i` のみ。`.fst` = FLhd(0x30, 2ch, ppq48) + `199 "11.5.5"`, `28`, `201 "Fruity Wrapper"`, `212`, `203 名前`, `213 wrapper chunk`。
-- **round-trip 実測**: 同梱 `.nfo` 831/831 byte-exact、FL 11.5.5 書込の `.fst` 26/26 を自作コンテナ writer で byte-exact 再構成 (§3)。v2 `.nfo` は writer→reader の自己整合 (生成 49/49 受理) に加え、**実機 `.Plugins.ini` 406/406 セクションを writer が再現** (§11)。
-- **wasm 向け**: OTT / Fresh Air / Kilohearts(46) / Serum 2(2 class) の DB エントリを 49 件・100 ファイル (`.Plugins.ini` 込み) で合成できる (`specs/wasm_plugins.json` + Kilohearts index)。Massive X は素材なしでエントリ未生成 (§5)。
+- **round-trip 実測**: 同梱 `.nfo` 831/831 byte-exact、FL 11.5.5 書込の `.fst` 26/26 を自作コンテナ writer で byte-exact 再構成 (§3)。v2 `.nfo` は writer→reader の自己整合 (生成 50/50 受理) に加え、**実機 `.Plugins.ini` 406/406 セクションを writer が再現** (§11)。
+- **wasm 向け**: OTT / Fresh Air / Kilohearts(45) / Serum 2(2 class) / Massive X の DB エントリを **50 件・102 ファイル** (`.Plugins.ini` 込み) で合成できる (`specs/wasm_plugins.json` + Kilohearts index)。Kilohearts 45 = product_index 展開分の実測 (`formats` に 'vst2' かつ `id` 4 文字 = 44 fx + Phase Plant)。Massive X は **CAB-46 follow-up (§12.5) で spec 追加済** (CID 3 源一致)。
 - **CAB-218 (§12)**: VST3 `ps_file_filename` = **LoadLibraryW で消費するモジュールファイルパス** (規則確定, Serum 2 を内部バイナリ形に修正) / KH VST2 magic は product_index id と**実機 45/45 一致** / VerifiedIDs VST2 id = 符号付き 10 進 (64/64, ≥2³¹ は推定)。
 - **コミット**: `feat(hostbridge): plugin database nfo/fst format and synthetic generator` → 以後 §10〜§12 分は git log 参照 (tools/hostbridge/nfo のみ)。
 
@@ -46,7 +54,7 @@ preflight: RULES_SHA=ff4999169333 (SUBAGENT_RULES.md 228 行・追加規則 36�
 | 補助 | `VerifiedIDs.nfo` (`<VST\|VST3\|CLAP>:<GUID>:<64>=<rel .NFO>`)、`.Plugins.ini` (INI キャッシュ; 無ければ FL が NFO を全走査して再生成) | 確 (形) / 推 (VST2 の id 表現) / 未 (ini の文字コード) |
 | 読む時点 | 起動時の一覧構築 (`.Plugins.ini` → NFO 全読み)、プロジェクト読込の plugin 解決 (VerifiedIDs → ID nfo → 名前検索)、新規インスタンス (`ps_presetfilename` の fst) | 確 (呼出元の実測) |
 
-実測値 (`work/metrics.json`): 同梱 `.nfo` round-trip **831/831**、`Plugin.nfo` 141/141 読了 (vendor `Image-Line` 141)、FL 11.5.5 `.fst` **26/26 byte-exact 再構成**、生成 49 entry を reader 模型が **49/49 受理** (rejectedFiles 0)、テスト **29/29 PASS**、e2e 全体 1.7 s。
+実測値 (`work/metrics.json`): 同梱 `.nfo` round-trip **831/831**、`Plugin.nfo` 141/141 読了 (vendor `Image-Line` 141)、FL 11.5.5 `.fst` **26/26 byte-exact 再構成**、生成 50 entry を reader 模型が **50/50 受理** (rejectedFiles 0)、テスト **40/40 PASS**、`nfo_e2e.sh` 実測 5.90–7.69 s (定義は冒頭の所要表)。
 
 ## 4. 成果物 (tools/hostbridge/nfo/)
 
@@ -59,7 +67,7 @@ preflight: RULES_SHA=ff4999169333 (SUBAGENT_RULES.md 228 行・追加規則 36�
 | `src/fst.ts` | wrapper chunk (`0xa9eff0`) と `.fst` (`0xaac300`/`0xaac1e0`) の生成、`assembleFst` コンテナ writer |
 | `src/generate.ts` | plugin 一覧 → `Installed/**` の `.nfo/.fst/VerifiedIDs.nfo` (決定的出力) |
 | `cli/gen.ts` `cli/metrics.ts` | 生成 CLI / 実測値出力。`specs/wasm_plugins.json` が wasm 用 plugin 表 |
-| `test/` | node:test 29 件 (コーパス往復・FL 準拠規則・生成物の独立パーサ受理・決定性) |
+| `test/` | node:test 40 件 (コーパス往復・FL 準拠規則・生成物の独立パーサ受理・決定性・実機突合) |
 | `analysis/` `evidence/` | Ghidra 抽出 (`reproduce.sh`)、定数表、decompile 抜粋 (約 130 KB, FL 実バイナリ由来) |
 | `nfo_e2e.sh` | 1 コマンド再現: typecheck → ブラウザ安全性 grep → tests → 実測 → 生成 |
 
@@ -73,14 +81,14 @@ preflight: RULES_SHA=ff4999169333 (SUBAGENT_RULES.md 228 行・追加規則 36�
 |---|---|---|---|---|---|
 | OTT | VST2 x64 | 0 (fx) | magic `XfTT` = 1483101268 (hostbridge PoC 実測の uniqueID) | `C:\Program Files\Common Files\VST2\Xfer Records\OTT_x64.dll` | chunk: record 51 / 54 (`OTT_x64`) / 55 / 56 |
 | Fresh Air | VST2 x64 | 0 | magic `FrAr` (targets/freshair の製品 ID) | `…\VST2\Kilohearts\Fresh Air_x64.dll` | 250 KB shell → `SlateCore.core_64` はモジュール表側で入れ子 LoadLibrary |
-| Kilohearts ×46 | VST2 x64 | 0 | magic = 4 文字 product id (`ksgn` 等) **仮定** | `…\VST2\Kilohearts\kHs <Name>.dll` | 46 shell → `HeartCore.core_64` 共有。DB 名は `fileName` ("kHs Gain")。plugin 自己申告名は未確認 |
-| Serum 2 | VST3 のみ | 8 (gen) | CID `56534558667350736572756D20320000` | `…\VST3\Serum2.vst3` | VST3 facade (H5) 前提 |
+| Kilohearts ×45 | VST2 x64 | 0 | magic = 4 文字 product id (`ksgn` 等・実機 45/45 一致) | `…\VST2\Kilohearts\kHs <Name>.dll` | 45 shell → `HeartCore.core_64` 共有。DB 名は `fileName` ("kHs Gain")。plugin 自己申告名は未確認 |
+| Serum 2 | VST3 のみ | 8 (gen) | CID `56534558667350736572756D20320000` | `…\VST3\Serum2.vst3\Contents\x86_64-win\Serum2.vst3` | VST3 facade (H5) 前提 |
 | Serum 2 FX | VST3 | 7 (fx) | CID `56534558667351736572756D20322066` | 同上 | 同一バイナリ・別 class → 別エントリ (`Effects\VST3\`) |
-| Massive X | VST3 (想定) | 8 | **未取得** | — | `~/ダウンロード` に素材なし。moduleinfo.json の CID が得られ次第 `specs` に 1 行追加 (class 8, vst3) |
+| Massive X | VST3 | 8 (gen) | CID `5653544e6924486d6173736976652078` (§12.5・3 源一致) | `…\VST3\Massive X.vst3` | 単一ファイルモジュール形 (moduleinfo.json 非同梱)。実機 ini 由来の vendor/category を使用 |
 
 - `ps_file_scanflags_0=1`、`ps_file_bitsize_0=64`、`ps_file_type` は実機準拠の 1 (fx) / 2 (gen) (§11.3)。32bit は載せない (bridge 不使用: HOSTBRIDGE §1.6)。
 - Wrapper→VST2 の `hint` (entry export 名) は標準名 (`VSTPluginMain`) なら不要。Kilohearts は stub 消去 (alias) で標準名に揃う。hint を DB に持たせる必要が出た場合の記録先は未特定 (§6-3)。
-- 生成量: 49 entry / **100 ファイル** / 69,342 B (決定的, `.Plugins.ini` 込み §11.3)。IDB プリロードに載せても無視できる大きさ。
+- 生成量: **50 entry / 102 ファイル / 70,571 B** (決定的, `.Plugins.ini` 込み §11.3・Kilohearts 45 + spec 5)。IDB プリロードに載せても無視できる大きさ。
 
 ## 6. 未解決とブロッカー
 
@@ -89,17 +97,17 @@ preflight: RULES_SHA=ff4999169333 (SUBAGENT_RULES.md 228 行・追加規則 36�
 3. Wrapper の VST2 `hint` (`TVSTPlugin` 第 6 引数) の供給元レコード (id 57 候補) は未特定。標準名エクスポートでは不要。
 4. ~~`.Plugins.ini` の文字コード、`ps_file_date` の単位、VerifiedIDs の VST2 `id` 表現~~ → **CAB-219 で解決 (§11)**: ini = UTF-8+BOM / date = TDateTime double bits / VST2 id = magic 10 進 (キー順 `<fmt>:<bits>:<id>`)。VST3 `ps_file_filename` の**選択規則は CAB-218 で確定 (§12, FORMAT §9-3)**。
 5. VST3 CID → `ps_file_guid` の対応は §11.4 で実機確定 (テキスト = CID 文字列、bytes = Windows 配置)。Wrapper が factory へ渡す順序の実行検証は H5 で。
-6. ~~Massive X 素材なし / KH VST2 magic 未確定~~ → **KH magic は CAB-218 で実測確定 (§12.2)**。Massive X は `~/ダウンロード/Native Instruments Massive X v1.7.1.exe` を確認済み — 未解析 (§12.4)。
+6. ~~Massive X 素材なし / KH VST2 magic 未確定~~ → **KH magic は CAB-218 で実測確定 (§12.2)**。**Massive X も CAB-46 follow-up (§12.5) で spec 追加・CID 確定** (`~/ダウンロード/Native Instruments Massive X v1.7.1.exe` 解析済。moduleinfo.json は本製品に同梱されない = CID は実機 FL スキャン値を正とした)。
 
 ## 7. ユーザ依頼事項 (任意・あれば更に確実化)
 
-Windows 実機から `Installed\` 配下の **実機 v2 `.nfo` / `.fst` 単体ファイル** (VST2 1 組 + VST3 1 組, 特に OTT VST2 側) と Massive X (NI) の VST3 CID (`moduleinfo.json`) があると `writeEntry`/`buildWrapperFst` との byte 直比較と spec 追加が即完了する (`.Plugins.ini`/`VerifiedIDs.nfo`/OTT.fst は入手済み §10/§11; `~/ダウンロード` の同名 3 ファイルは evidence と byte 一致を確認済み §12.4)。
+Windows 実機から `Installed\` 配下の **実機 v2 `.nfo` / `.fst` 単体ファイル** (VST2 1 組 + VST3 1 組, 特に OTT VST2 側) があると `writeEntry`/`buildWrapperFst` との byte 直比較が即完了する (`.Plugins.ini`/`VerifiedIDs.nfo`/OTT.fst は入手済み §10/§11; `~/ダウンロード` の同名 3 ファイルは evidence と byte 一致を確認済み §12.4)。**Massive X の VST3 CID 依頼は取下げ** — moduleinfo.json は本製品に同梱されないことを実測し (§12.5)、CID は実機 FL スキャン値・Service Center XML・GetPluginFactory 即値の 3 源一致で確定済み。
 
 ## 8. 次タスク提案 (下流チケット案)
 
 | # | チケット | 要点 |
 |---|---|---|
-| H4' (P0) | DB 組込み | `generateDb()` (`.nfo`/`.fst`/`.Plugins.ini`/VerifiedIDs 生成) を仮想 FS 初期化 (起動時/ビルド時) に結線し、lift 済み FL の `0x910cd0` / `0xaba430` に生成 DB を読ませて受理を実行検証 |
+| H4' (P0) | DB 組込み | ~~`generateDb()` (`.nfo`/`.fst`/`.Plugins.ini`/VerifiedIDs 生成) を仮想 FS 初期化 (起動時/ビルド時) に結線し、lift 済み FL の `0x910cd0` / `0xaba430` に生成 DB を読ませて受理を実行検証~~ — **結線まで完了 (CAB-216 §13)**。残は FL 実物 reader の実行検証のみ (§13.6・§14) |
 | H10 (P1) | Wrapper chunk reader の解析 | 生成 `.fst` の record 群を Wrapper が受理するか (hint レコード・record 1/30–32 の要否) を `fw:` 側で確定 |
 | H11 (P2) | VST3 バンドルのパス規則 | ~~選択規則の突合~~ / ~~H9a / H12~~ — **完了 (CAB-215 §10 / CAB-219 §11 / CAB-218 §12)**。残は §7 の任意提供のみ |
 
@@ -272,6 +280,7 @@ CAB-215 の主眼 (writeEntry ↔ 実機比較) は **ini セクション経由�
 | `h4_e2e.sh` | 1 コマンド入口 (`SKIP_H4=1` で nfo_e2e.sh から外せる) |
 | `h4/tsconfig.json` | h4 専用 typecheck (assets 側の既存警告を巻き込まないため) |
 | `h4_recount.mjs` | **独立再計算 (規則 37)**: ジャーナル自前デコード + 自前 `.nfo` パーサ + 自前 FLhd/FLdt 分解 + vreg seed × pathreg 写映射。実装側スクリトを import しない |
+| `h4_accept_check.mjs` `h4_accept_chrome.mjs` | **検収側 独立再計算 (§14)**: CLI 別プロセス生成木・pathreg JS ミラー・正規表現パーサ・自前 SIGKILL 子プロセス・Chrome プロファイル LevelDB 実 journal の自前デコード |
 | `nfo_e2e.sh` `package.json` `tsconfig.json` | h4 step 追加 / `e2e:h4`・`typecheck:h4` script 追加 (tsconfig の include は変更なし — §13.7) |
 
 ### 13.5 陰性制御 (規則 41、実測)
@@ -304,4 +313,62 @@ CAB-215 の主眼 (writeEntry ↔ 実機比較) は **ini セクション経由�
 ### 13.9 ユーザ依頼事項
 
 今回はなし (spec 元データは全て揃っている)。任意: Windows 実機の `Installed\` 単体 `.nfo` (VST2 側) があると writer の byte 直比較が完了する (§7 継続)。
+
+---
+
+## 14. 検収 (CAB-216 / HB-H4') — 検収側 独立再計算・別アルゴリズム検算
+
+preflight: RULES_SHA=ff4999169333。コミット範囲 `4b162ce` + `85424b0` = `tools/hostbridge/nfo` のみ・最大 blob 47,906 B (REPORT.md, 20 MiB 未満)・`git status` で担当外 WIP 混入 0 (tools/hostbridge は作業物 0、他 dir の WIP 64 ファイルは他担当のため未接触)。**検証起点**: `85424b0` (HEAD=`a76310f` 時点で `git diff 85424b0 HEAD -- tools/hostbridge/nfo` は空 = nfo ツリーは同一)。
+
+### 14.1 検収側 独立再計算スクリプト (規則 37: 実装側とは別アルゴリズム)
+
+| スクリプト | 別アルゴリズムの要点 | 実行 |
+|---|---|---|
+| `h4_accept_check.mjs` | 生成基準は `cli/gen.ts` を**別プロセスで実ディスクに書いた木** (`h4/specs.ts` 非 import。集計は `readdirSync(withFileTypes)` 再帰) / Win→VFS 写 Mapping は pathreg **JS ミラー** `shimx/pathreg/js/pathmap.mjs` の `createMapper` で `/c/home` を自前 strip (`pathlink.ts` の `route()` は本編不使用・末尾 cross-check のみ) / 書込は `seedPluginDb` を呼ばず自前ループ / `.nfo` 受理は**正規表現** (`^key=(.*)$`) で判定 (src/entry.ts の map 先勝ちパーサとは別コード) / SIGKILL は自前子プロセス (flush 0 のまま自殺) | `node h4_accept_check.mjs` |
+| `h4_accept_chrome.mjs` | Chrome プロファイル配下の **LevelDB (実ディスク) のジャーナル実ファイル**を直接読み自前レコードデコーダでツリー復元 (wvfs の Journal/Wvfs 非 import)。照合相手は `cli/gen.ts` の実ディスク出力 | `node h4_accept_chrome.mjs work/h4/chrome-profiles/h4-e2e-XXX` |
+
+**実行順**: `bash nfo_e2e.sh` (または `bash h4_e2e.sh`) → `node h4_accept_check.mjs` (`work/h4-accept/cli-out` を生成) → `node h4_accept_chrome.mjs work/h4/chrome-profiles/h4-e2e-XXX`。3 本とも exit 0。
+
+所要: `h4_accept_check.mjs` **0.36 s × 3 → 最終実行 exit 0 / 45 ok** / `h4_accept_chrome.mjs` exit 0 / 12 ok。load average 開始 2.14–36.87 / 終了 2.88–36.87 (他 subagent 稼働中)。`nfo_e2e.sh` 最終実行 exit 0 / 7.60 s (load 2.14→2.88)。
+
+### 14.2 照合表 (実装側 REPORT §13 の主張 vs 検収側 独立再計算)
+
+| 受入条件 | 実装側主張 | 検収側 実測 | 判定 |
+|---|---|---|---|
+| 生成 | 50 entry / 102 ファイル / 70,571 B | 50 / 102 / 70,571 B (CLI 別プロセス + 再帰 walk) | PASS |
+| 仮想 FS 書込 | route 失敗 0 | 0/102 (pathreg JS ミラー)。pathlink.route と一致 | PASS |
+| round-trip nfo 受理 | 50/50 | 50/50 (正規表現パーサ)、drop 0・rejected 0・重複キー 0 | PASS |
+| round-trip fst | parse 50 / writeFlp byte-exact 50 / wrapper path 50 / 203 name 50 | 50 / 50 / **50 (`.nfo` の `ps_file_filename_0` と 213 照合 = 検収側独自)** / 50 | PASS |
+| ini / VerifiedIDs | セクション 50 verbatim 50 / キー 50 | 50 / 50 verbatim / 50 (全 entry `.NFO` 参照 50) | PASS |
+| 仮想 FS 再読込一致 | sha256 不一致 0・大小変え 102/102・余剰 0 | 0 / 102 / 0 | PASS |
+| SIGKILL/reload 永続 | 不一致 0 | flush 0・自前子プロセス SIGKILL → 不一致 0・大小変え 102/102 | PASS |
+| レジストリ整合 | `Shared data` → home mount | `/Documents/Image-Line` (createMapper)。USERPROFILE/CSIDL_PERSONAL 一致 | PASS |
+| Chrome OPFS 実機 | sha256 102/102 一致・torn 0 | 実ディスク LevelDB ジャーナル 2 store (216 rec / 624 rec) 各 **102/102 sha256 一致・torn 0** | PASS |
+| 独立再計算 (実装側) | 102/50/50/50/50・problems 0 | `h4_recount.mjs` exit 0 で同値 (worktree でも再現) | PASS |
+
+### 14.3 ネガティブコントロール・アブレーション (規則 41、検収側)
+
+1. **dbPath 未上書き** (`DEFAULT_DB_PATH` = `C:\Users\Public\…`): createMapper → `/c/Users/Public/…` = **HOME 外** → 102/102 が書込対象外・**書込 0 件**。→ dbPath 上書きが必須 (実装側 ⑤b-1 と一致)。
+2. **1 バイト改変** (OTT.nfo の `ps_file_plugclass_0=0`→`1` = DX): 受理 usable **1→0**。別改変 (`ps_file_filename_0` の `C`→`Z`): 213 wrapper path と**不一致**。→ round-trip 監査は改変を検出する (PASS のみの検査ではない)。
+3. **no-flush probe** (OPFS 実機): ジャーナル自前デコードで `op=1 path=/probe/unflushed.bin data(16)="H4-NOFLUSH-PROBE"` を SIGKILL 後の実ディスクに確認 → 実装側 ⑤b-3 と一致。
+
+### 14.4 検収で見つかった誤記 (本 commit で修正)
+
+§0・§3・§4・§5 の数値が Massive X 追加 (§12.5) ・tests 増 (§12.2) 以前の値のままだった: 生成 **49→50 entry / 100→102 ファイル**、reader **49/49→50/50**、Kilohearts **(46)→45**、テスト **29/29→40/40**、§3 の「e2e 全体 1.7 s」を実測に置換、§5 の生成量 **69,342→70,571 B**、§5 Massive X 行「未取得」→§12.5 確定値、§6-6/§7 の Massive X 依頼を取下げ、§8 H4' を完了扱いに修正。ヘッダの「約 8 s」は**定義付き実測値** (min–max・n=3・load average) に置換 (規則 38)。
+
+### 14.5 未解決 (起票先付き・規則 42)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `cli/metrics.ts` の Kilohearts 展開規則が `cli/gen.ts` / `h4/specs.ts` と不一致 (Phase Plant を `kind:"effect"` / `category:"Kilohearts"` で `Effects\VST\` に置く。正は `Generators\VST\`) | `work/metrics.json` の `generatedBytes` が 70,921 B (正は 70,571 B)。entry/ファイル数と reader 受理は不変のため **REPORT の見出し数値・e2e 出力には影響なし** (nfo_e2e.sh は generatedBytes を印字しない) | (b) 新規子チケット (CAB-216 配下・重複確認済) |
+| REPORT.md が 315 行 (規則の上限 200 行。CAB-216 の §13 追加で 214→307) | 可読性・保守性 | (c) 親 CAB-98 に提案コメント |
+| 起動時 vs ビルド時の DB 書込択 | 起動時刻・初回起動体験 | (c) 親 CAB-98 (§13.8 と同) |
+| lift 済み FL の `fle:0x910cd0` / `0xaba430` に生成 DB を読ませる実行検証 | 本節の 50/50 は reader 模型の判定 | (b) 子チケット (§13.8 と同) |
+
+### 14.6 検証範囲 / 範囲外 (規則 40)
+
+- **範囲内**: コミット範囲の検査・担当 dir のみの書込・`nfo_e2e.sh` / `h4_e2e.sh` の実ディスク再実行 (exit 0・tests 40/40・round-trip 831/831・実機照合 21+20+19)・検収側 独立再計算 2 本・ネガコン 3 件・`git archive` / `git worktree` でのクリーン HEAD 再現。
+- **範囲外 (未実行)**: lift 済み FL 実物 reader への読み込み検証 (boot 貫通後・§13.6)・Fruity Wrapper の生成 `.fst` 受入 (§6-2/H10)・32bit/AU/CLAP・Firefox/Safari・FL 実機 (Windows) での起動確認。
+- **クリーン HEAD**: `git worktree add --detach work/wt_h4 HEAD` で `h4_e2e.sh` を再実行 → node 側 42 ok / 0 FAIL・`h4_recount.mjs` exit 0。**Chrome フェーズのみ `report timeout`** (入れ子 `work/wt_*` パスで spawn-server の URL 解決が失敗するハーネス事象。実装側 §13.6 の記載と一致。実ディレクトリでは 3 回連続 exit 0)。検証後の worktree は撤去済。
+
 
