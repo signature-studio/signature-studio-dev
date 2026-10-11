@@ -1,4 +1,4 @@
-自動生成: `python3 tools/assets/bootset/classify_bootset.py` (`bootset/bootset.json`・`work/tiers.json` と同時生成)
+# 自動生成: `python3 tools/assets/bootset/classify_bootset.py` (`bootset/bootset.json`・`work/tiers.json` と同時生成)
 
 > **人手編集禁止** (生成元の `classify_bootset.py` を直す)。推定 tier の記載ここが正本。
 > 起動 tier の解釈・配信順への反映は `tools/assets/MANIFEST.md`、実施記録は `tools/assets/REPORT.md`。
