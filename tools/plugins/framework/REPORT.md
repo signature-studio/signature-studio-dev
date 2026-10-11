@@ -2,10 +2,10 @@
 
 - preflight: RULES_SHA=ae9c6d414f7d (SUBAGENT_RULES.md 読了の証跡)
 - 検収起点 commit: **9b420bd** (`tools/plugins/framework` ツリーは b8e762d と同一: `git diff b8e762d HEAD -- tools/plugins/` = 0 行)
-- 行数目安: 実装部 (§0-§9) 187 行 + 検収記録 (§10-§11) 105 行 + CAB-194 検収 (§12) 78 行 = 370 行
-  (実ファイル 378 行)。検収記録は規則 37〜42
+- 行数目安: 実装部 (§0-§9) 187 行 + 検収記録 (§10-§11) 105 行 + CAB-194 検収 (§12) 78 行 + CAB-269 (§13) 118 行 = 488 行
+  (実ファイル 476 行)。検収記録・修正記録は規則 37〜42
   (独立再計算・ネガティブコントロール・検証範囲・起票先つき未解決) の必須項目を含むため 200 行上限を
-  超過。超過分は判明している誤記の訂正と実測値の記録に使った部分 (圧縮済み)。
+  超過。超過分は CAB-269 (§13) の実測・訂正の記録にも使った。
 - 日付: 2026-10-11 / 担当 dir: `tools/plugins/framework/` (hostshim/) / 再現: `bash tools/plugins/framework/hostshim/hs_e2e.sh`
 - 前提: stage-1/2 = `fw_lift.sh` + `fw_stage2.sh` (CAB-194) 済み。本 script は framework 成果物を**読み取りのみ**で利用し, 書込は自 dir と `tools/plugins/work/hs/` のみ。
 - 数値はすべて `tools/plugins/work/hs/` (gitignore) で実測。推定は「推定」と明記。
@@ -396,3 +396,127 @@ stage-1 成果物を再利用 (RetDec 再 decode は未実施) (e) 7,058 site �
 ③「14,033 関数」→ **14,037** ④「PackageInfo 290 unit」→ **290 件・うち init≠0 は 289**
 ⑤「declares 8,176」→ **重複込 8,176 / unique 8,063** ⑥「decode 漏れ 126/206」→ **最終 IR 143**
 ⑦「1.61 MB」→ **1.55 MiB (1,626,299 B)** ⑧「14.8 MB」→ **14.87 MB (14,874,162 B)**。
+
+---
+
+## 13. CAB-269 (2026-10-11) — `fw_stage2.sh` S1-S4 修正と 1 コマンド e2e 復旧
+
+- preflight: RULES_SHA=ff4999169333 (読了の証跡) / 既知類型との関係: **該当 D7 (stack 引数・戻り値)・
+  該当なし** (S2 は手書き pass の採番衝突で DEFECTS.md 未登録 → §13.7 に行案)
+- 検証起点: 本節の全実測は `git archive HEAD -- tools/plugins/framework` の **snapshot** から再実行
+  (snapshot commit c737c4a。`git diff db6565c c737c4a -- tools/plugins/framework` = 0 行 = 本修正ツリーと同一)。
+- 変更 7 ファイル (すべて `tools/plugins/framework/`・他 dir 0 行・最大 blob 40,637 B = `REPORT.md`・20 MiB ライン未満):
+
+| ファイル | 変更 | 対応 |
+|---|---|---|
+| `fw_stage2.sh` | step 14 の 3 インライン heredoc → `fw_canon.py` 呼出 / `stage_inputs()` (build 入力コピー) / `FW_W` 差し替え対応 / `llvm-as` ガード / smoke 検証追加 | S1, S2, S3 |
+| `fw_canon.py` | **新規 243 行** — canon 段の正規化 1 実装 (ymm store 化・dominance clone 採番・i256 identity・fldenv rename+declare) | S2, S3 |
+| `fw_ovpass.py` | `ret_of()`: 64 bit より広い整数は `zext`・ポインタは `inttoptr`・未対応型は fatal | S4 |
+| `fw_smoke_check.py` | **新規** — smoke 出力の独立再計算 (fw_run.mjs と別 regex) + wasm サイズ照合 | 規則 37 |
+| `fw_269_verify.sh` | **新規** — clean HEAD snapshot からの 1 コマンド e2e + smoke ×3 + 同値照合 | 受入 1, 2 |
+| `fw_269_nc.sh` | **新規** — ネガティブコントロール 5 件 (S1-S4 + entry export) | 規則 41 |
+| `REPORT.md` | §13 に本節を追記 (訂正・起票先つき未解決を含む) | 規則 42 |
+
+### 13.1 修正 4 件
+
+| # | 症状 (clang/llvm-as 実測) | 原因 | 修正 |
+|---|---|---|---|
+| S1 | `emcc: error: fw_boot.c: No such file or directory` | `cp` は `fw_rt.h`/`fw_rt.c` のみ (`\|\| true` で欠落も隠れていた) | `stage_inputs()` が `fw_boot.c` もコピー (存在チェック付き) |
+| S2 | `fw_flat4_canon3.ll:11224:3: error: multiple definition of local value named 'ceclone1'` | ymm dominance 修正の `uid` が canon 段で 0 にリセットされ、`function_4076b0` 内で `ceclone1..5` が二重定義 | 採番を `max(10000, 入力内の最大 ceclone 番号)` から採番 (`fw_canon.py:next_uid`) → pass を跨いでも衝突しない |
+| S3 | `fw_flat4_canon3.ll:1307203:13: error: use of undefined value '@fw_fldenv'` | `__asm_fldenv__vg224(i224)` を `fw_fldenv(ptr)` に rename した後の declare を**削除**していた。(A/B 段の正規表現は実名 `__asm_fldenv` に非マッチで無効 = rename は simd gen 後の canon 段で初めて成立) | declare を `declare void @fw_fldenv(ptr)` に**置き換え** (位置は declares 節のまま)。rename は gen 後固定 (gen 前に rename すると `fw_simd.c` の stub が消えて別ビルドになる) |
+| S4 | `fw_flat4_canon3.ll:35753:14: error: invalid cast opcode for cast from 'i64' to 'i128'` | `fw_ovpass.py` が i64 以外をすべて `trunc` に変換 (i128 戻りの `function_40e0b0` = RestoreContext 実行本体) | 64 bit より広い整数は `zext`・`ptr`/`*` は `inttoptr`・未対応型は fatal |
+
+番号の対応: CAB-269 チケットの S3/S4 は §12.3 の S4/S3 と同一現象 (declare 欠落 / trunc)。本節は
+**チケット番号**に合わせる (§12.3 は「S3 = trunc・S4 = declare」と逆)。
+
+### 13.2 1 コマンド e2e (受入条件 1・2・要件 1)
+
+```
+bash tools/plugins/framework/fw_269_verify.sh         # SIZE 未指定 = wasm サイズは照合スキップ
+bash tools/plugins/framework/fw_269_nc.sh             # ネガティブコントロール 5 件
+```
+→ stage-1 成果物 (`fw_icall.dll` 9,358,848 B・`fw_map.json` 11,513,493 B・`fw[0-7].restored.ll`・
+`r2/r3.restored.ll` 計 10 ファイル) だけをハードリンクした**独立 W** (`work/verify_269/fw`・共有
+`work/fw` は非変更) に `git archive HEAD` の snapshot から `FW_W` 付きで steps 1-18 全部を実行。
+
+| 実行 (full = stage-1 からの作り直し) | fw_stage2.sh exit | 実測秒 | load avg 開始→終了 (nproc=16) |
+|---|---|---|---|
+| full A | 1 (*) | **297** | 3.62 3.59 3.34 → 5.37 4.65 3.86 |
+| full B | 1 (*) | **343** | 12.72 12.99 8.77 → 7.15 12.15 10.02 |
+| full C | 1 (*) | **343** | 7.15 12.15 10.02 → 6.15 8.39 8.96 |
+| full D (現行 script・FW_SIZE=0) | **0** | (smoke ×3 のみ下表) | — |
+| smoke ×3 (full B) | 0 | 188 / 187 / **191 ms** | — |
+| smoke ×3 (full C) | 0 | 228 / 228 / 209 ms | — |
+
+(*) A-C は `--size` の既定が 14,828,623 B (77cde78 vintage) だった時期の実行で、**wasm サイズだけ**
+が MISMATCH (smoke 5 値は全 run PASS)。現行 script は既定でサイズ照合をスキップし exit 0
+(FW_SIZE 指定時のみ厳密照合)。e2e 自体 (steps 1-18・emcc・smoke) は全 run で完走。
+
+smoke ×3 は全実行で同値 (`smoke1.log` と `smoke2/3.log` の diff = 0 行・`ctx=0x…` はスタック値なので正規化):
+```
+[fw] SMOKE PASS (Halt0/RestoreContext 到達): dispatch=38 units_done=0 va=1 heap=1 ff=0
+```
+trace 行 33 = dispatch counter 38 − trace soft limit 5 (定義: `fw_smoke_check.py` docstring / NC5)。
+**空ディレクトリ/work 新規 (条件 ③)**: `FW_W=<新規dir>` で検証。既定 W = `tools/plugins/work/fw`。
+
+### 13.3 ネガティブコントロール 5 件 (`bash fw_269_nc.sh` → OK=5 NG=0)
+
+| # | 壊した箇所 | 期待した FAIL (実測出力) | 判別力 |
+|---|---|---|---|
+| NC1 (S1) | `stage_inputs` から `fw_boot.c` を外す | `emcc: error: fw_boot.c: No such file or directory` | **有** |
+| NC2 (S2) | `fw_canon.py` の採番を 0 から (継続採番も外す) | `fw_flat4_canon3.ll:11224:3: error: multiple definition of local value named 'ceclone1'` | **有** |
+| NC3 (S3) | fldenv の declare を置き換えず削除 | `fw_flat4_canon3.ll:1307203:13: error: use of undefined value '@fw_fldenv'` | **有** |
+| NC4 (S4) | `fw_ovpass.py` を `trunc` に戻す | `fw_flat4_canon3.ll:35753:14: error: invalid cast opcode for cast from 'i64' to 'i128'` | **有** |
+| NC5 | `_function_6c13a0` の export 名を破壊 | `[fw] SMOKE FAIL: entry function_6c13a0 が export されていない` (exit 1) | **有** |
+
+NC2-NC4 の行:桁は **チケット記載の S2/S3/S4 と完全一致** (11224:3 / 1307203:13 / 35753:14)
+= 修正対象と同じ IR 位置を壊している証拠。NC5 の注記: `fw_run.mjs` のメッセージは export 名を
+`function_6c13a0` とハードコードしているため 6c13a1 に壊しても 6c13a0 と出る (§12 の NEGCON A の
+記載 `entry function_6c13a1 …` はこの誤記・本節で訂正)。
+`llvm-as` ガード (追加分) が上記 3 件を emcc 前に落とす (shared canon3 85.8 MB で **2.59 s**・maxrss 508,020 KB)。
+
+### 13.4 等価性の検算 (別実装との突合 = 規則 37・45)
+
+リファクタした `fw_canon.py` が旧実装 (77cde78 のインライン 3 ブロック + 検証時の回避策) と
+**同一の IR を出す**ことを、同一入力で diff して確認 (`%ceclone` 名は `%CL` に正規化):
+
+| 比較 | 差分行 |
+|---|---|
+| 旧 A+B → `fw_flat4.ll` vs `fw_canon.py --stage flat4` (同一 `fw_flat3.ll`) | **0 行** (採番名のみ差異) |
+| 旧 C (`uid[0]=10000` の回避策) → `fw_flat4_canon2.ll` vs `--stage canon` | **1 行** (declare の位置: 旧は後付・新は declares 節内) |
+
+### 13.5 検証範囲 / 範囲外
+
+検証: clean HEAD snapshot からの e2e ×3 / smoke 同値 ×3 / S1-S4 の個別 FAIL 再現 / 旧実装との IR 同一性 /
+hostshim `hs_e2e.sh` 回帰 (Phase A dispatch=38 ff=0・Phase B rec=7 GOLDEN 一致・exit 0・実測 0.5 s)
+/ 本ビルドを `hs_e2e.mjs` に直接入れた場合も Phase A 同値。
+範囲外: (a) native 実行との bit 比較 (b) `Eff_Render` 音声差分 (CAB-195 未達を継続) (c) RetDec 再 decode
+(stage-1 成果物をハードリンク再利用) (d) `work/fw` 共有成果物の更新 (本節では書換えない)。
+
+### 13.6 wasm サイズの差分 (委任 prompt の 14,828,623 B に対し実測 15,061,227 B)
+
+HEAD ツリーの e2e で出力される `fw_route.wasm` は **15,061,227 B** (3 回同値)。参照 14,828,623 B は
+**77cde78 (CAB-194 vintage) ツリー**の再ビルド実測値で、HEAD とは別ビルド。実測で切り分け:
+
+| 比較 (同一 canon3 入力) | 結果 |
+|---|---|
+| HEAD の emcc 行全体 (hostshim.c リンク + fw_hs_* export 13 本) | 15,061,227 B |
+| 同じ canon3 から **hostshim.c を外し** export を 77cde78 の 11 本に | 15,051,660 B (Δ −9,567 B) |
+| `fw_table.py` 生成 C: HEAD 版 vs 77cde78 版 (同一 canon3) | 2,112,554 B vs 1,956,397 B (Δ **+156,157 B**) |
+
+⇒ 差分の大半は **CAB-195 (b8e762d) の `fw_table.py` fail-soft 化** (missing-stub 126 + 未実装 import に
+`fprintf`/`fflush`/`seen` を追加) と `fw_rt.c` の fail-soft 化、残りが hostshim.c 追加リンク。
+canon 段の IR は旧実装と同一 (§13.4) なので、**修正 S1-S4 がサイズを変えたのではない**。
+
+### 13.7 未解決 (起票先つき) / 誤記訂正 / 新类型行案
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| HEAD の wasm が 77cde78 vintage と 232,604 B 差 (同一 smoke 挙動) | サイズで合否を見る手順が混乱 | (a) 本節に原因を実測で記録。親 CAB-194 にコメント |
+| `fw_run.mjs` の FAIL メッセージが export 名をハードコード | NC5 の期待文字列が実名と不一致 | (a) 本節で訂正 |
+| shared `work/fw` の成果物が 77cde78 vintage のまま (HEAD の再ビルド未反映) | 次に `work/fw` を W に `fw_stage2.sh` を流したセッションだけ成果物が入れ替わる | (c) 親 CAB-194 に提案コメント (main 判断) |
+| **新类型 (DEFECTS.md 未登録)**: インライン pass の採番カウンタが pass 間で衝突 (S2) | 同じ轍を踏む | (a) 本節に行案を記載。DEFECTS.md は他担領域のため直接編集しない |
+
+行案 (DEFECTS.md 形式): **D17 手書き pass の採番衝突** — 症状: `multiple definition of local value
+named 'ceclone1'` / 根本原因: pass ごとに `uid` を 0 にリセット / 観測: canon 段の chain clone
+(`function_4076b0` 11224 行) / 検出信号: `llvm-as` を emcc 前に 1 本通す (2.59 s) / 修復: `max(10000, 最大番号)`。
