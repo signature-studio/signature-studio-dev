@@ -15,6 +15,10 @@ from . import ir as IR
 from .mc import GPR_ARGS
 
 TYPE_BITS = {"i1": 1, "i8": 8, "i16": 16, "i32": 32, "i64": 64, "i128": 128}
+import os
+# ablation (規則 41): LL_NO_ORIG_PREF=1 で LIFTLIB-4 の「同一アドレスの原本 IR 命令を
+# 優先」を止め, LIFTLIB-3 迄の「末尾 (= 領域側) を拾う」に戻す。
+_ABLATE_ORIG_PREF = bool(os.environ.get("LL_NO_ORIG_PREF"))
 _CAST_OPS = ("zext", "sext", "trunc", "bitcast", "inttoptr", "ptrtoint", "fpext", "fptrunc", "sitofp",
              "uitofp", "fptosi", "fptoui")
 _ATTRS = r"(?:(?:nuw|nsw|exact|inbounds|nonnull|noundef|disjoint|fast|nnan|ninf|nsz|volatile|tail|notail|musttail)\s+)*"
@@ -197,6 +201,7 @@ class Binder:
     # 注意: 領域 block の **ラベル** は `dec_label_pc_<va>` で原本と区別できないので,
     # dst の SSA 名 (`%p1r_` / `%p1tail_` / `%p1relay_` / `%p1srelay_`) で判別する。
     _REGION_DST = ("%p1r_", "%p1tail_", "%p1relay_", "%p1srelay_")
+    prefer_region = False       # True で領域値を優先 (leafabi の ret threading 用)
 
     def _is_region_dst(self, name):
         return isinstance(name, str) and name.startswith(self._REGION_DST)
@@ -209,7 +214,7 @@ class Binder:
         LIFTLIB-4: 同一アドレスに原本/領域の 2 命令が在るとき原本を優先する (上記参照)。
         """
         want_xmm = reg.startswith("xmm")
-        orig, last = None, None
+        orig, last, reg = None, None, None
         for (bi, li, ln) in self.ix.instrs_at(va):
             d = IR.instr_dst(ln)
             if not d:
@@ -227,9 +232,54 @@ class Binder:
             if not ok:
                 continue
             last = (d, ty)
-            if not self._is_region_dst(d):
+            if self.prefer_region:
+                if self._is_region_dst(d):
+                    reg = (d, ty)           # 領域側を優先 (leafabi ret 用: 同一 block 内定義)
+            elif not self._is_region_dst(d) and not _ABLATE_ORIG_PREF:
                 orig = (d, ty)              # 原本側を記憶 (後の領域命令で上書きしない)
+        if self.prefer_region and reg is not None:
+            return reg
         return orig if orig is not None else last
+
+    def candidates_at(self, reg, va, defva=None):
+        """reg の def 命令で書かれた IR 値の**全候補** (優先順)。LIFTLIB-4。
+
+        va = use (参照) の機械語 VA。defva を省略すると root_def から def を引く。
+        同一機械語アドレスに p1 の領域が複数コピーを作ると IR 命令が 2 本以上になる。
+        `value_defined_at` は 1 本を選ぶが, どれが use を支配するかは use 側の文脈に
+        依る (leafabi の ret threading は自分の ret block と同じ領域の値が要る)。
+        呼出側が dominance を見て選べるよう全候補を返す。"""
+        want_xmm = reg.startswith("xmm")
+        out = []
+        if defva is None:
+            r = self.root_def(reg, va)
+            if r[0] != "def":
+                return []
+            defva = r[1]
+
+        def ok(ty):
+            if want_xmm:
+                if ty == "i128":
+                    return True
+                if ty in ("i64", "i32") and self.xmm0_ret_of_call(defva):
+                    return True
+                return False
+            return ty in ("i64", "i32", "i16", "i8")
+
+        seen = set()
+        for (bi, li, ln) in self.ix.instrs_at(defva):
+            d = IR.instr_dst(ln)
+            if not d or d in seen:
+                continue
+            ty = result_type(ln)
+            if not ok(ty):
+                continue
+            seen.add(d)
+            regi = self._is_region_dst(d)
+            out.append((d, ty, regi))
+        # 原本 (非領域) を先に, 領域は同値なら後に (LIFTLIB-4 の既定と合わせる)
+        out.sort(key=lambda x: (x[2],))
+        return [(d, ty) for (d, ty, _r) in out]
 
     def _is_copy(self, va):
         it = self.mf.insns.get(va)

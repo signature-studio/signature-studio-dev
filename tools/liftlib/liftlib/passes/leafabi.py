@@ -58,9 +58,24 @@ def _ret_thread(mod, fn, mf, binder, log, stats):
             stats["ret_unbound"] = stats.get("ret_unbound", 0) + 1
             continue
         if not dominates_use(v[0], bi):
-            # 別経路 (p1 領域) の値を拾うと非支配 → その ret は見送る
-            stats["ret_nodom"] = stats.get("ret_nodom", 0) + 1
-            continue
+            # LIFTLIB-4: 同一機械語アドレスに複数の領域コピーが在ると, bind が拾った値は
+            # **別領域** の物でこの ret block からは非支配になり得る。候補を全件試して
+            # この ret block を支配するものを選ぶ (従来は非支配で見送り = rax フラグを
+            # 返す誤った ret になっていた)。
+            pick = None
+            for cand in binder.candidates_at("xmm0", va):
+                if cand[1] == "i1":
+                    continue
+                if dominates_use(cand[0], bi):
+                    pick = cand
+                    break
+            if pick is None:
+                stats["ret_nodom"] = stats.get("ret_nodom", 0) + 1
+                continue
+            v = pick
+            self_used = binder.ix.defs.get(v[0])
+            if self_used is not None and self_used[0] == bi:
+                pass                              # 同一 block 内定義 (正しい)
 
         def fresh(base):
             cand, k = "%%lf_%x_%s" % (va, base), 0
