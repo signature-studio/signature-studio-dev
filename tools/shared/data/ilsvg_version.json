@@ -1,0 +1,87 @@
+{
+  "_retrieved": "2026-10-11",
+  "_method": "ILSvg_x64.x86_64.dylib (work/slices) の (a) Xcode object ファイル名 (/Volumes/imageline/flextra/sdks/ILSvg/xcode/.../Objects-normal/x86_64/<base>.o) と (b) def symbol (llvm-nm --defined-only, T/t, 2780 個) を抽出し、upstream repo の tag と突合する。詳細と再計算: scripts/ilsvg_version_recount.py",
+  "_definitions": {
+    "defined_symbol": "llvm-nm --defined-only の 'T'/'t' 行 1 個 (同名重複は別行として数える)",
+    "obj_file_set": "Mach-O 文字列から抽出した <base>.o の unique 集合 (95 個)"
+  },
+  "vendor_layout": "/Volumes/imageline/flextra/sdks/ILSvg/{agg,cssom,mikroxml,papki,pixman,svgdom,svgren,utki}/ に vendored (IL の Xcode プロジェクト xcode/ILSvg/)",
+  "components": {
+    "svgdom": {
+      "determined": "0.3.59〜0.4.9 (2021-04-03〜2023-06-27)",
+      "evidence": [
+        "src/svgdom の .cpp ファイル名集合 (.o 名) が svgdom 0.3.59〜0.4.9 の全 tag と一致 (26 本, elements/ + util/ 構成)",
+        "symbol に style_stack_cache / finder_by_class / finder_by_id / finder_by_tag が存在 -> 0.3.59 (commit ddb828e, 2021-04-03) 以降",
+        " PascalCase ファイル (Element.o 等) は svgdom 0.3.31 以前のもので ILSvg には無い (0.3.32 で snake_case 化済)",
+        "symbol 集合は 0.3.59〜0.4.35 で安定 (0.4.x 間で差なし) のため、その中での単一点特定は不可"
+      ],
+      "most_likely": "0.4.x (svgren 0.6.x と同時期) を想定 (推定)"
+    },
+    "svgren": {
+      "determined": "0.6.0〜0.6.3 (2022-10-25〜2023-02-14)",
+      "evidence": [
+        "canvas.cpp が存在 = 0.6.9 以下 (0.6.20 で veg 名前空間へ移設, HEAD では消滅)",
+        "gradient_setter (renderer.cpp の nested struct) が symbol に存在 = 0.6.0 以上",
+        "path_type / spread_templ が symbol に不存在 = 0.6.4 未満",
+        "canvas/filter_applier/render/renderer/surface/util の 6 cpp が一致"
+      ],
+      "candidates_excluded": {
+        "0.5.x": "gradient_setter がない",
+        "0.6.4+": "spread_templ/path_type がある",
+        "0.6.20+": "canvas.cpp がなく veg:: 名前空間"
+      }
+    },
+    "agg": {
+      "determined": "cppfw/agg 2.8.x (svgren 0.6.x が要求)",
+      "evidence": [
+        "コンパイルされた agg_*.o 25 本は svgren の AGG backend が使うサブセット",
+        "platform support / ctrl 系 (agg_platform_support, agg_*_ctrl) を含まない",
+        "agg::pixfmt_alpha_blend_rgba の 13 symbol が存在 = AGG backend",
+        "cairo symbol 0 個 = cairo backend ではない"
+      ],
+      "correction": "REPORT.md 旧 'AGG 2.4 推定' を訂正。svgren 0.6.x の依存は cppfw/agg 2.8 系 (2020-12〜2021-08)。元バイナリが AGG 2.4 由来の API 形状 (trans_affine::parl_to_parl, gradient_radial_focus) を持つが、それは cppfw/agg 2.8 にも存在 (AGG 2.4 からの fork で API 互換)"
+    },
+    "pixman": {
+      "determined": "vendored (static link), version 未特定",
+      "evidence": [
+        "pixman-* の .c/.o 25 本が静的リンク (230 symbol)",
+        "/Volumes/imageline/flextra/sdks/ILSvg/pixman/pixman/ に vendored",
+        "svgren 自身には pixman を含まない → IL が追加"
+      ],
+      "note": "version 文字列がなく未特定。起票先: CAB-150 コメントで記録"
+    },
+    "papki": {
+      "determined": "2024-02-25 以降のコミット (tag なし)",
+      "evidence": [
+        "papki::dir(std::string) が存在 = 72b5b58 'add as_dir()' (2024-02-25) 以降",
+        "papki::file/fs_file/span_file/vector_file の 4 クラスが一致"
+      ],
+      "note": "papki は tag を打たないため commit 日付で特定。この日付は svgdom/svgren の範囲 (2021-04〜2023-06) と *矛盾* → ILSvg は FL 26 向けに後年 (2024-2026) にリビルドされた可能性 (推定)"
+    },
+    "utki": { "determined": "未特定 (8 class / 17 symbol)", "evidence": ["utki::string/time/unicode/debug の存在のみ"] },
+    "mikroxml": {
+      "determined": "未特定",
+      "evidence": [
+        "mikroxml::parser と mikroxml.o が存在",
+        "parse は cssom::parser / mikroxml 経由"
+      ]
+    },
+    "cssom": {
+      "determined": "0.2.x",
+      "evidence": [
+        "cssom::parser/selector/sheet/style/malformed_css_error/read の 6 class が一致",
+        "class 集合は 0.2.0 (2022-10-29) 以降で安定",
+        "om.cpp/parser.cpp の 2 cpp が一致"
+      ]
+    },
+    "il_glue": {
+      "determined": "IL 独自 (非 OSS)",
+      "evidence": [
+        "PascalCase の .o (Element, Filter, Gradients, Length, Parser, Referencing, Renderer, Shapes, Source, Structurals, Styleable, Surface, Transformable, Visitor, File) は IL のグルー層",
+        "papki::dir 等の後年シンボルを含む = IL が 2024 以降にリビルド"
+      ],
+      "note": "3 export (svgCreate/svgRender/svgDestroy) の実装側。REPORT §1 の cppfw svgdom+svgren+papki/utki/mikroxml 集合に IL グルーを含む"
+    }
+  },
+  "conclusion": "ILSvg = svgdom 0.3.59〜0.4.9 + svgren 0.6.0〜0.6.3 + cppfw/agg 2.8 系 + vendored pixman (version 未特定) + cssom 0.2.x + papki(2024-02-25 以降) + IL 独自グルー (PascalCase .o 15 本)。papki の日付が他の構成要素と矛盾するため、ビルド時期はずれている (推定: FL 26 向けに後年リビルド)"
+}
