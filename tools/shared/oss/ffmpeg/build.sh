@@ -56,7 +56,7 @@ for A in wasm32 wasm64; do
   rm -rf "$D"; mkdir -p "$(dirname "$D")"; cp -a "$S/ffmpeg-$V" "$D"
   (
     cd "$D"
-    FF_CFG . emconfigure >/dev/null 2>&1
+    FF_CFG . emconfigure ./configure --cc=emcc --cxx=em++ --ar=emar --ranlib=emranlib --nm=llvm-nm --strip=llvm-strip >/dev/null 2>&1
     # -sMEMORY64=1 は configure の try-compile を壊すため config.mak の CFLAGS に直接注入する
     if [ "$A" = wasm64 ]; then sed -i 's|^CFLAGS=   -std=c11|CFLAGS=   -sMEMORY64=1 -std=c11|' ffbuild/config.mak; fi
     find . -name '*.o' -delete; find . -name '*.a' -delete

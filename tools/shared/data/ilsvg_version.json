@@ -15,31 +15,32 @@
         " PascalCase ファイル (Element.o 等) は svgdom 0.3.31 以前のもので ILSvg には無い (0.3.32 で snake_case 化済)",
         "symbol 集合は 0.3.59〜0.4.35 で安定 (0.4.x 間で差なし) のため、その中での単一点特定は不可"
       ],
-      "most_likely": "0.4.x (svgren 0.6.x と同時期) を想定 (推定)"
+      "most_likely": "0.4.x (svgren 0.5.9〜0.6.3 と同時期) を想定 (推定)"
     },
     "svgren": {
-      "determined": "0.6.0〜0.6.3 (2022-10-25〜2023-02-14)",
+      "determined": "0.5.9〜0.6.3 (2021-04-03〜2023-02-14) [検収で下限を修正]",
       "evidence": [
-        "canvas.cpp が存在 = 0.6.9 以下 (0.6.20 で veg 名前空間へ移設, HEAD では消滅)",
-        "gradient_setter (renderer.cpp の nested struct) が symbol に存在 = 0.6.0 以上",
-        "path_type / spread_templ が symbol に不存在 = 0.6.4 未満",
+        "canvas.cpp が存在 = 0.4.75〜0.6.19 (0.6.20 で veg 名前空間へ移設し消滅)",
+        "gradient_setter (renderer.cpp の nested struct) が symbol に存在 = **0.5.9 以降** (初出 0.5.9, 2021-04-03)。旧記載の「0.6.0 以上」は下限の取り違え",
+        "path_type / spread_templ が symbol に不存在 = 0.6.4 未満 (0.6.4〜0.6.19 に存在)",
         "canvas/filter_applier/render/renderer/surface/util の 6 cpp が一致"
       ],
       "candidates_excluded": {
-        "0.5.x": "gradient_setter がない",
-        "0.6.4+": "spread_templ/path_type がある",
-        "0.6.20+": "canvas.cpp がなく veg:: 名前空間"
+        "0.5.8以前": "gradient_setter がない",
+        "0.4.74以前": "canvas.cpp がない",
+        "0.6.4〜0.6.19": "spread_templ/path_type がある",
+        "0.6.20〜": "canvas.cpp がなく veg:: 名前空間"
       }
     },
     "agg": {
-      "determined": "cppfw/agg 2.8.x (svgren 0.6.x が要求)",
+      "determined": "未確定: cppfw/agg 2.7.4〜2.8.42 のいずれか (検収で 2.8.x を弱めた)",
       "evidence": [
-        "コンパイルされた agg_*.o 25 本は svgren の AGG backend が使うサブセット",
-        "platform support / ctrl 系 (agg_platform_support, agg_*_ctrl) を含まない",
-        "agg::pixfmt_alpha_blend_rgba の 13 symbol が存在 = AGG backend",
-        "cairo symbol 0 個 = cairo backend ではない"
+        "コンパイルされた agg_*.o 25 本のファイル名集合は 2.7.4〜2.8.42 の全 tag に含まれる (2.7.0〜2.7.3 は code/ レイアウトのため差分なし)",
+        "svgren 0.6.3 の canvas.cpp/canvas.hxx が使う agg API (agg::rgba, trans_affine, conv_curve, curve3_div/curve4_div, conv_stroke, conv_dash, rasterizer_scanline_aa, scanline_u8, pixfmt_rgba32, renderer_base, gradient_lut, span_gradient, span_allocator, span_interpolator_linear, bounding_rect_single) をそのまま写した probe は 2.7.0〜2.8.42 の全 tag でコンパイル成功 (API 形状では絞り込めない)",
+        "svgren は agg を pin していない (conanfile.py.in は agg/[>=0.0.0]@cppfw/main, android は io.github.cppfw:agg:+)",
+        "agg::pixfmt_alpha_blend_rgba の 13 symbol・cairo symbol 0 は AGG backend であることの確認のみ"
       ],
-      "correction": "REPORT.md 旧 'AGG 2.4 推定' を訂正。svgren 0.6.x の依存は cppfw/agg 2.8 系 (2020-12〜2021-08)。元バイナリが AGG 2.4 由来の API 形状 (trans_affine::parl_to_parl, gradient_radial_focus) を持つが、それは cppfw/agg 2.8 にも存在 (AGG 2.4 からの fork で API 互換)"
+      "correction": "REPORT.md 旧「cppfw/agg 2.8.x」は上記の間接証拠のみで version を示す決定的根拠が無い。旧「AGG 2.4 推定」も cppfw/agg に 2.4 tag が存在しないため同様に根拠無し。→ 検収で「未確定: 2.7.4〜2.8.42」に修正"
     },
     "pixman": {
       "determined": "vendored (static link), version 未特定",
@@ -51,12 +52,13 @@
       "note": "version 文字列がなく未特定。起票先: CAB-150 コメントで記録"
     },
     "papki": {
-      "determined": "2024-02-25 以降のコミット (tag なし)",
+      "determined": "1.0.101 以前 (2021-06-09 未満) [検収で修正: 旧「2024-02-25 以降」は誤り]",
       "evidence": [
-        "papki::dir(std::string) が存在 = 72b5b58 'add as_dir()' (2024-02-25) 以降",
-        "papki::file/fs_file/span_file/vector_file の 4 クラスが一致"
+        "バイナリのシンボルは papki::dir(std::string const&) (std::string_view ではない)。papki が dir() の引数を std::string → std::string_view に変えたのは commit 7255fb8 (release 1.0.102, 2021-06-09) なので、**1.0.102 より前** (= 2021-06-09 未満) の papki",
+        "papki::file/fs_file/span_file/vector_file の 4 クラスが一致",
+        "旧記載の根拠だった commit 72b5b58 (2024-02-25, \"add as_dir()\") が追加したのは as_dir() であり dir() はその以前から存在"
       ],
-      "note": "papki は tag を打たないため commit 日付で特定。この日付は svgdom/svgren の範囲 (2021-04〜2023-06) と *矛盾* → ILSvg は FL 26 向けに後年 (2024-2026) にリビルドされた可能性 (推定)"
+      "note": "この修正により papki は svgdom (2021-04〜2023-06)・svgren (2021-04〜2023-02) と矛盾しない。旧記載の「papki の日付が他要素と矛盾するため FL 26 向けに後年リビルド」は根拠を失ったので取下げ。起票先: CAB-150 コメント"
     },
     "utki": { "determined": "未特定 (8 class / 17 symbol)", "evidence": ["utki::string/time/unicode/debug の存在のみ"] },
     "mikroxml": {
@@ -83,5 +85,5 @@
       "note": "3 export (svgCreate/svgRender/svgDestroy) の実装側。REPORT §1 の cppfw svgdom+svgren+papki/utki/mikroxml 集合に IL グルーを含む"
     }
   },
-  "conclusion": "ILSvg = svgdom 0.3.59〜0.4.9 + svgren 0.6.0〜0.6.3 + cppfw/agg 2.8 系 + vendored pixman (version 未特定) + cssom 0.2.x + papki(2024-02-25 以降) + IL 独自グルー (PascalCase .o 15 本)。papki の日付が他の構成要素と矛盾するため、ビルド時期はずれている (推定: FL 26 向けに後年リビルド)"
+  "conclusion": "ILSvg = svgdom 0.3.59〜0.4.9 + svgren 0.5.9〜0.6.3 + cppfw/agg 未確定 (2.7.4〜2.8.42) + vendored pixman (version 未特定) + cssom 0.2.x + papki 1.0.101 以前 (2021-06-09 未満) + IL 独自グルー (PascalCase .o 15 本)。papki の日付矛盾は検収で解消 (旧記載は dir() と as_dir() の取り違え)。win 側に ILSvg バイナリは存在しないため win/mac version 文字列照合は対象外。"
 }
