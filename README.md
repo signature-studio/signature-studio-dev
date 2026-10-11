@@ -20,7 +20,7 @@ docs 索引・各ファイルの責務・行数上限ルールは **[`docs/DOC_M
 
 ## tools 索引
 
-tools 直下は **33 dir** (下表は下位 dir を含め 51 名を列挙)。測定値・実測は各 `REPORT.md` が単一の正本。
+tools 直下は **33 dir** (下表は下位 dir を含め 59 名を列挙)。測定値・実測は各 `REPORT.md` が単一の正本。
 索引は [`docs/DOC_MAP.md`](docs/DOC_MAP.md)。
 
 | 系統 | ディレクトリ | 正本 |

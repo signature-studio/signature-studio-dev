@@ -84,7 +84,7 @@
 | `assets` (+`wvfs`,`bootset`) | 巨大 wasm の chunk ローダ・二段キャッシュ・書込可能 VFS |
 | `python` | CPython wasm + flapi/MCP ブリッジ |
 | `flp` | FLP/FST パーサ・ライタ・往復コーパス |
-| `plugins` (+`framework`,`p0c`) | Fruity プラグイン 141 種 wasm 化・TFruityHost shim・ABI 推定 |
+| `plugins` (+`framework`,`p0c`) | Fruity プラグイン 141 種 wasm 化 (カウントの正本: `tools/plugins/REPORT.md`)・TFruityHost shim・ABI 推定 |
 | `shared` | FL Shared ライブラリ (IPP 実測・OSS wasm 再ビルド・プロプラ lift PoC) |
 | `targets/*` | Serum 2 / Massive X / Kilohearts / Fresh Air / OTT の個別解析と lift |
 | `e2e`, `hosting`, `deploy` | ブラウザ E2E ハーネス・配信構成・デプロイ手順 |
@@ -92,8 +92,7 @@
 
 ## 4. 横断的な原則
 
-1. **測定値は REPORT.md だけ**。`README.md`・`docs/STATUS.md`・設計文書は「結論 1 行 + リンク」に留める。
-2. **外部絶対パスは `docs/REFERENCES.md` だけ**。repo 内の他 `.md` に書かない。
-3. **外部通信機能 (Gopher AI / FL Cloud / 認証・ログイン系) は対象外** (`docs/DECISIONS.md` D3)。
-4. **スクラッチ再実装は不採用**。実物バイナリの lift → wasm が第一目標 (`docs/DECISIONS.md` D5)。
-5. **ライセンス機構の無力化方針**は `docs/LEGAL.md` §6.0 が正本。
+1. **外部絶対パスは `docs/REFERENCES.md` だけ**。repo 内の他 `.md` に書かない。
+2. **外部通信機能 (Gopher AI / FL Cloud / 認証・ログイン系) は対象外** (`docs/DECISIONS.md` D3)。
+3. **スクラッチ再実装は不採用**。実物バイナリの lift → wasm が第一目標 (`docs/DECISIONS.md` D5)。
+4. **ライセンス機構の無力化方針**は `docs/LEGAL.md` §6.0 が正本。

@@ -7,7 +7,7 @@
 - **判定: 要件を満たす。** `bash tools/ott/crtinit/crt_e2e.sh` = **PASS**。
   - 新 scenario **9 本** (float formatter 13 param × 4 値 sets / op34 effGetOutputProperties / op7 dispatcher / DSP params 全 0 の数学エラー経路 3 本) が **native 実機械語と全突合項目一致** (文字列 buffer / rax / obj 0x328B 全 qword / HeapAlloc alog / audioMaster 呼出回数)。FAIL 0。
   - 既存 entry **85 scenario** を CRT 初期化版 build で全数再突合 = **85/85 PASS** (旧 build では native が crash していた float 経路も含め nat_crash 0)。
-  - 既存 DSP e2e **89 scenario / 50,236 cell max_ulp 0 / state 差 0** 継続 PASS と entry e2e (旧 build 全 85) PASS
+  - 既存 DSP e2e **89 scenario・全 cell bit-exact (正本 `tools/ott/REPORT.md`)** の継続 PASS と entry e2e (旧 build 全 85) PASS
     (旧 build — 改変は lifter の mxcsr 1 点のみ, §4)。
 - **CRT 初期化は (b) C 等価置換を採用** (DllMain / `_CRT_INIT` / `_initterm*` は実行しない):
   UCRT が `__security_cookie` で encode する関数ポインタ表 (**api-set 表 0x18026c9f0** ほか 4 slot) を
@@ -126,7 +126,7 @@ CAB-137 で「wasm も同一 fail-fast」と記録されていた現象の正体
 
 注記: 旧 override 4 件は DSP 89 matrix (cov_all) / entry 85 (cov_entry) の**いずれでも実行実績が無かった**
 (実測: coverage に関数が現れない)。よって置換が既存 matrix の結果に影響する経路は構造的に存在せず、
-実際 89 scenario / 50,236 cell max_ulp 0 と 85/85 は無改変のまま維持された。
+実際 DSP e2e (89 scenario・全 cell bit-exact・正本 `tools/ott/REPORT.md`) と 85/85 は無改変のまま維持された。
 残る override は surrogate 系 8 件 (`ovr_editor_null` / `ovr_am_shim` と CRT api-set trampoline 6 件 —
 後者 6 件は CRT 初期化の置換面そのもの, §2)。
 
@@ -136,7 +136,7 @@ CAB-137 で「wasm も同一 fail-fast」と記録されていた現象の正体
 |---|---|
 | 新 scenario (crt build) | **9/9 PASS** (文字列 / rax / obj / alog / am counter 全一致) |
 | entry 85 scenario (crt build で再実行) | **85/85 PASS** (nat_crash 0 — 旧 build では float 経路が nat_crash 対象だった) |
-| DSP e2e (`ott_e2e.sh`, 旧 build) | **89 scenario / 50,236 cell / max_ulp 0 / state 差 0 PASS** |
+| DSP e2e (`ott_e2e.sh`, 旧 build) | **89 scenario / 全 cell bit-exact / max_ulp 0 / state 差 0 PASS** (正本 `tools/ott/REPORT.md`) |
 | entry e2e (`entry_e2e.sh` 全 85, 旧 build) | **PASS** (matrix 85/85 突合; §9 再現コマンド) |
 | 陰性対照 native | `OTT_CRTINIT=0` → **SIGSEGV st=95** (rip=0x1801d2750, rax=0xae64b77e88c8000) — 旧 fail-fast 再現 |
 | 陰性対照 wasm | `OTT_CRTINIT=0` → **`ott_unlifted 0xae64b77e88c8000`** — native と同一 garbage VA / 対応 ret |

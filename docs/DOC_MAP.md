@@ -3,8 +3,7 @@
 全 `REPORT.md`・主要ドキュメントの索引。**何がどこに書かれているか**の一覧。
 行数は 2026-10-12 時点の概数。
 
-- 原則: 測定値・実測数値は **`tools/<area>/REPORT.md` だけ** が単一の正本。
-  外側 (`README.md`・`docs/STATUS.md`) は結論 1 行 + リンク。
+- **測定値の正本・各ファイルの「書いてはいけないもの」の割り当ては §4 が正本** (本書のそこだけで定める)。
 - 衝突時: 同じ対象の数値が複数ファイルにあったら、**より新しい検証起点の REPORT** を正本とし、
   他方は「結論 1 行 + リンク」に縮める。
 
@@ -136,7 +135,7 @@
 | `tools/assets/wvfs/REPORT.md` | ~145 | 書込可能 OPFS VFS |
 | `tools/python/REPORT.md` | ~120 | CPython wasm + flapi/MCP 解析 + ブリッジ設計 |
 | `tools/flp/REPORT.md` | ~120 | FLP/FST パーサ・ライタ・往復コーパス |
-| `tools/plugins/REPORT.md` | ~115 | Fruity プラグイン 141 種 wasm 化マップ |
+| `tools/plugins/REPORT.md` | ~115 | Fruity プラグイン 141 種 wasm 化マップ (カウントの正本) |
 | `tools/plugins/framework/REPORT.md` | ~520 | TFruityHost shim 実装と検収 |
 | `tools/plugins/p0c/REPORT.md` | ~665 | kernel 表妥当性検証 + f80 assessment |
 | `tools/shared/REPORT.md` | ~295 | FL Shared ライブラリの分類・IPP 実測・OSS wasm 再ビルド・プロプラ lift PoC |
@@ -168,8 +167,9 @@
 
 ## 4. ドキュメント責務 (単一責任の正本)
 
-**「何をどこに書くか」の割り当て。** 鉄則: 同じ数値を 2 ファイルに書かない。外側は
-「結論 1 行 + リンク」に縮める。`AGENTS.md` は本表の原則要約と導線のみを持つ。
+**「何をどこに書くか」の割り当て。** 鉄則: 測定値・実測数値は `tools/<area>/REPORT.md` だけに書き、
+同じ数値を 2 ファイルに書かない。外側は「結論 1 行 + リンク」に縮める。
+`AGENTS.md` は本表の原則要約と導線のみを持つ。
 
 | ファイル | 単一責任 | **書いてはいけないもの** |
 |---|---|---|

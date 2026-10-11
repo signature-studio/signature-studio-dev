@@ -4,7 +4,7 @@
 
 - **CAB-137 = PASS (受入・条件 1 件)**。`bash tools/ott/entry/entry_e2e.sh` = **PASS**。native 実機械語 vs
   lift wasm の突合 **85/85 scenario** (nat_crash 0 / FAIL 0 / `dsp_verified 30` + `entry_new_verified 35`)。
-  既存 DSP e2e **89 scenario / 50,236 cell / max_ulp 0 / state 差 0** を維持。
+  既存 DSP e2e **89 scenario・全 cell bit-exact / max_ulp 0 / state 差 0** を維持 (数値の正本: `tools/ott/REPORT.md`)。
 - **CAB-138 = PASS (受入・条件 1 件)**。`bash tools/ott/crtinit/crt_e2e.sh` = **PASS**。新 scenario
   **9/9**・entry 85 を CRT 版 build で再突合 **85/85**・陰性対照 `OTT_CRTINIT=0` が **native SIGSEGV /
   wasm `ott_unlifted` の同一 garbage VA** で両側再現。
@@ -87,7 +87,7 @@
 | 新規 scenario 9 本 | **9/9 PASS** (文字列・rax・obj・alog・am counter 全一致) | 9/9 | **PASS** |
 | float formatter の native 突合 | 既定 `100/0.0/--`・035 `34/67/-3.5/BYPASS`・mix ` 0/998/-48/19.1/-20.0/BYPASS`・op34 `OTTOut 1/2` — **13 param すべて native と byte 一致** (op7 経由も一致) | 同 | **PASS** |
 | entry 85 を CRT 版で再突合 | **85/85 PASS** (nat_crash 0) — 旧 build で nat_crash だった float 経路も含む | 85/85 | **PASS** |
-| DSP e2e 89 / 50,236 max_ulp 0 | **PASS** (継続) | 同 | **PASS** |
+| DSP e2e 89 scenario・全 cell bit-exact / max_ulp 0 | **PASS** (継続・数値は §3.1 と `tools/ott/REPORT.md`) | 同 | **PASS** |
 | 陰性対照 `OTT_CRTINIT=0` | native **SIGSEGV rip=0x1801d2750 rax=0xae64b77e88c8000** / wasm **`ott_unlifted 0xae64b77e88c8000` ret=0x301c3e06** | 同 | **PASS** |
 | fail-fast 根因 `ror(0^cookie,50)` | `acc_crt_table.py` の **4 方式で 0x0ae64b77e88c8000 に一致**。enc/dec round-trip も確認 | 同値 | **PASS** |
 | override 4 件の機械語 lift 置換 | 4 VA がすべて `lifted` に載り、`overrides` は **8 件** (editor_null / am_shim / fls×4 / cs_ex / gstpaft) で CRT 4 件は消えている | 4 件置換 | **PASS** |
@@ -145,7 +145,7 @@ enc(NULL) = rol(0,14) ^ cookie = 0x2b992ddfa232 == cookie: True ; decode(enc(NUL
 
 | コマンド (snapshot `verify2_4b162ce`・clean) | 実測 | 開始 load |
 |---|---|---|
-| `entry/entry_e2e.sh` (全工程) / `crtinit/crt_e2e.sh` (全工程) / `ott_e2e.sh` | **281 s** (85/85) / **80 s** (9/9 + 85/85 + 陰性対照 + 既存 e2e) / 18 s (DSP 89/50,236) | 2.90 / 2.17 / 2.25 |
+| `entry/entry_e2e.sh` (全工程) / `crtinit/crt_e2e.sh` (全工程) / `ott_e2e.sh` | **281 s** (85/85) / **80 s** (9/9 + 85/85 + 陰性対照 + 既存 e2e) / 18 s (DSP 89 scenario・全 cell) | 2.90 / 2.17 / 2.25 |
 | `lift_entry.sh` / `lift_crt.sh` / `run_matrix.py`×2 | 5.8 s / 7.0 s / 5.4 s・0.7 s | 1.4 / 1.7 / 16.4 |
 | coverage 再取得 (`entry_nat.py`) × 2 / `acc_perf.mjs` REPEAT=7 × 3 build | 4 分 44 s / 回 (2 回の coverage は**完全一致**)・各 7〜11 s | 14.0 / 1.7〜2.8 |
 
@@ -154,7 +154,7 @@ enc(NULL) = rol(0,14) ^ cookie = 0x2b992ddfa232 == cookie: True ; decode(enc(NUL
 ## 8. 検証範囲 / 範囲外 (規則 40)
 
 **検証した範囲**: clean HEAD snapshot 2 個 (`git archive` 展開・他 dir 書込 0) での全 e2e 再実行
-(entry 85/85・crt 9/9 + 85/85・DSP 89/50,236)、lift/cov 集合の別アルゴリズム独立再計算 (`accept/` 5 本)、
+(entry 85/85・crt 9/9 + 85/85・DSP 89 scenario 全 cell)、lift/cov 集合の別アルゴリズム独立再計算 (`accept/` 5 本)、
 ror の 4 方式検算、float formatter の native 文字列 byte 突合 (13 param × 集合)、getParameter xmm0 の
 bit・`out_f` 突合、override 4 件の lift 載り確認 (機械的)、ネガティブコントロール 4 件、性能 n≥5 レンジ、
 commit 範囲 (tools/ott のみ / 最大 blob 50,581 B / 他 dir 0 行)。
@@ -175,7 +175,7 @@ commit 範囲 (tools/ott のみ / 最大 blob 50,581 B / 他 dir 0 行)。
 
 ```sh
 SNAP=tools/ott/work/verify2_4b162ce/tools/ott   # clean HEAD snapshot (修正込み)
-cd $SNAP && bash ott_e2e.sh                     # 18 s: DSP 89/50,236 max_ulp 0
+cd $SNAP && bash ott_e2e.sh                     # 18 s: DSP 89 scenario・全 cell bit-exact (max_ulp 0・正本 tools/ott/REPORT.md)
 cd $SNAP && bash entry/entry_e2e.sh             # 281 s: entry 85/85 PASS
 cd $SNAP && bash crtinit/crt_e2e.sh             #  80 s: 9/9 + 85/85 + 陰性対照 + 既存 e2e PASS
 # 独立再計算 (本検収で新規: tools/ott/accept/ 5 本)

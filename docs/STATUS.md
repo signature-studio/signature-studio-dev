@@ -89,7 +89,7 @@
 | `assets/wvfs` | 書込可能 VFS | `tools/assets/wvfs/REPORT.md` |
 | `python` | CPython wasm+ブリッジ設計 | `tools/python/REPORT.md` |
 | `flp` | FLP/FST パーサ設計 | `tools/flp/REPORT.md` |
-| `plugins` | 141 種マップ | `tools/plugins/REPORT.md` |
+| `plugins` | 141 種マップ (カウントの正本: `tools/plugins/REPORT.md`) | `tools/plugins/REPORT.md` |
 | `plugins/framework` | TFruityHost shim | `tools/plugins/framework/REPORT.md` |
 | `plugins/p0c` | kernel 表検証+f80 | `tools/plugins/p0c/REPORT.md` |
 | `shared` | 分類+OSS 再ビルド+プロプラ lift PoC | `tools/shared/REPORT.md` |

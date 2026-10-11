@@ -15,7 +15,7 @@
 - **適用**: fw_overlap.py / kernel_matrix.py / mac_funcs.py に直接適用。win_funcs.py は **opt-in (`WINFUNCS_DISPFIX=1`, 既定 OFF)**: 同規約を framework/fw_prep.py (CAB-194 稼働中・編集禁止) が
   再計算して突合するため片側だけ変えると framework 判定が静かに縮む。fw_prep.py の差分と lockstep 移行手順は §5。
 - **回帰**: p0c kernel 表 hash 突合 **(79/80 + 1 mismatch) × 129 DLL → 80/80 × 130/130 DLL** (kernel_va_map の未対応 129→0, 呼出 site 3,763→3,763 不変)。
-  tools/ott `ott_e2e.sh` PASS (89 scenario / 50,236 cell 全て native と bit 一致, state 差 0; ott は無変更), tools/icall `tests/test_icall.py` と `icall_e2e.sh` も PASS (§6)。
+  tools/ott `ott_e2e.sh` PASS (89 scenario・全 cell が native と bit 一致, state 差 0; ott は無変更・正本 `tools/ott/REPORT.md`), tools/icall `tests/test_icall.py` と `icall_e2e.sh` も PASS (§6)。
 
 ## 1. 再現 (prefix × opcode map × modrm 形式の全組合せ)
 
@@ -135,8 +135,8 @@ REX が legacy prefix の前にある場合 (REX 無効) も扱う (KH の data-
 |---|---|
 | p0c kernel 表 hash 突合 (`p0c_regress.py`: 修正後 kernel_matrix.scan_dll を 181 PE に実走; Delphi かつ init 発見 130) | (kernels_hash_ok, bad) **(79,1)×129 + (80,0)×1 → (80,0)×130**。80/80 DLL 1→130。mismatch 件数 {1:129, 0:1}→{0:130}。kernel_va_map の未対応を含む DLL 129→0。init_va/nvars/nimpls 変化 0、呼出 site 3,763→3,763 |
 | 参考: CAB-196 の個別回避版 `verify_table.py` | 130/130 で 80/80 (CAB-196 報告値; p0c の成果物を上書きするため本回は未再実行)。本回は kernel_matrix 本体の修正で同じ結論に到達 |
-| tools/ott `bash tools/ott/ott_e2e.sh` | PASS (15 秒): scenarios 89, failed 0, cells 50,236 全て bit 一致 (max_ulp 0), state_diff 0, std 512/512。ott は無変更 (作業ツリーに他担当の未コミット変更 x64c.py / ott_cpu.[ch] が有り、それを含む状態での結果) |
-| tools/icall `python3 tests/test_icall.py` / `bash tools/icall/icall_e2e.sh` | 単体 PASS (0 failed; OTT F rewrite sites 96, errors {}) / e2e PASS: 89 scenario 全て bit 一致 (50,236 cell, max_ulp 0, state 差 0)。e2e は /tmp が quota 超過 (他担当の大量一時ファイル) で emcc が失敗したため `TMPDIR`/`EMCC_TEMP_DIR` を実ディスクへ向けて実行 |
+| tools/ott `bash tools/ott/ott_e2e.sh` | PASS (15 秒): scenarios 89, failed 0, 全 cell が bit 一致 (max_ulp 0), state_diff 0, std 512/512 (正本 `tools/ott/REPORT.md`)。ott は無変更 (作業ツリーに他担当の未コミット変更 x64c.py / ott_cpu.[ch] が有り、それを含む状態での結果) |
+| tools/icall `python3 tests/test_icall.py` / `bash tools/icall/icall_e2e.sh` | 単体 PASS (0 failed; OTT F rewrite sites 96, errors {}) / e2e PASS: 89 scenario 全て bit 一致 (全 cell・max_ulp 0・state 差 0)。e2e は /tmp が quota 超過 (他担当の大量一時ファイル) で emcc が失敗したため `TMPDIR`/`EMCC_TEMP_DIR` を実ディスクへ向けて実行 |
 | tools/icall 既存ファイル | 変更 0 行 (`git diff --stat tools/icall` 空; 追加は disp_size/ のみ) |
 | p0c の `work/kernel_matrix.json` | 上書きせず (回帰は import して `work/kernel_matrix_fixed.json` へ出力) |
 

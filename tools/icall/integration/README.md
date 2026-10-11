@@ -37,7 +37,7 @@ closure 外 (CRT 等) の direct call は従来どおり RetDec の推定 signat
 | テスト | コマンド | 期待 |
 |---|---|---|
 | unit + rewriter 固定値 | `python3 tools/icall/tests/test_icall.py` | PASS 全件 (derefix 符号/復元 lea, modrm 長, capstone `disp_size` 誤りの検知, OTT F: site 96 / errors {} / jt-chain ≥5) |
-| 監査 + route + native 比較 | `bash tools/icall/icall_e2e.sh` (約 1 分; `--small` / `--full` で target 追加) | OTT F の非 IAT 間接 call 落ち ≥60 → ≤8, tail-jmp 落ち 0, **matrix 89 scenario 50,236 cell が native と bit 一致 (max_ulp 0, state diff 0)** |
+| 監査 + route + native 比較 | `bash tools/icall/icall_e2e.sh` (約 1 分; `--small` / `--full` で target 追加) | OTT F の非 IAT 間接 call 落ち ≥60 → ≤8, tail-jmp 落ち 0, **matrix 89 scenario・全 cell が native と bit 一致 (max_ulp 0, state diff 0・正本 `tools/ott/REPORT.md`)** |
 | liftlib 側 | `bash tools/liftlib/liftlib_e2e.sh` に `python3 -m liftlib ott --icall` 相当 (ott_route.sh を呼ぶ) を追加 | 上と同一基準 |
 
 ## 4. 既知の制約 (統合時の注意)

@@ -1,7 +1,7 @@
 # HOSTBRIDGE — Fruity Wrapper (外部 VST ホスト経路) 解析 + wasm 同梱モジュール表の設計
 
 > 正本: `tools/hostbridge/HOSTBRIDGE.md` (設計書・上限 300 行)。
-> **行数目安**: 268 行。設計書の上限は 300 行 (`docs/DOC_MAP.md` §1) なので超過していない。
+> **行数目安**: 269 行。設計書の上限は 300 行 (`docs/DOC_MAP.md` §1) なので超過していない。
 
 対象: FL Studio 26.1.7.5653 (win64) / 根拠ファイルは `evidence/` (Ghidra 12.1.4 の decompile/disasm を commit 済み、
 再生成 `analysis/reproduce.sh`、機械検査 `analysis/verify_evidence.py` 20 項目)。
@@ -17,8 +17,10 @@
 3. 32bit プラグイン / "Make bridged" 指定は `ilbridge.exe` を別プロセス起動し共有メモリ+イベントで同じ TVSTPlugin コードを遠隔実行 (§1.6)。**wasm では不要** (instance 分離で代替)。
 4. 設計決定: **「プラグイン 1 DLL = 1 wasm instance = 専用 linear memory」+ VST2 境界の table 駆動 marshalling** (共有メモリ方式は不採用, §2.4)。
    LoadLibrary/GetProcAddress/FreeLibrary は「事前登録モジュール表」へ解決、関数ポインタは bridge が払い出す合成 VA (thunk slot) で返す (§2.2)。
-5. PoC (`bash tools/hostbridge/hostbridge.sh`, 4〜10 s, **65/65 PASS**): FL 側の代役 mini VST2 host (freestanding wasm32 C) が Fruity Wrapper と同じ手順で
-   M10 の lift 済み OTT wasm をロードし `processReplacing` を駆動。出力は直接呼出と **512/512 bit 一致**、`[0x248]=0` 条件では M10 e2e の出力と **512/512 bit 一致 (junk census は `tools/ott/REPORT.md` §2.3 の旧 chain 行と同値)** (§3)。
+5. PoC (`bash tools/hostbridge/hostbridge.sh`, 4〜10 s): FL 側の代役 mini VST2 host (freestanding wasm32 C) が Fruity Wrapper と同じ手順で
+   M10 の lift 済み OTT wasm をロードし `processReplacing` を駆動する。**検収は全項目 PASS**で、bridge 越しに
+   M10 到達水準 (bit-exact 未達・junk あり) をそのまま再現する。件数・bit 一致・junk census などの**実測値は
+   `tools/hostbridge/REPORT.md` が正本** (§3)。
 
 ---
 
@@ -237,9 +239,9 @@ PluginManager.exe は外部プロセスなので移植せず、`ModuleTable.virt
 host は Wrapper の手順 (§1.3) を再現: `LoadLibraryW` → 26 名前表 → `main(audioMaster)` → magic → `resvd1` → `effOpen`/`SetSampleRate`/`SetBlockSize`/`MainsChanged` → 問合せ → `processReplacing`。
 
 実測 (`work/poc_result.json`, ノード v26.10 / 本 VM, CPU は他 agent と共有):
-- 検収 **65/65** (evidence 21 + PE スタブ 3 + marshal 13 + PoC 28), 全体 4〜10 s (build 込み)。
-- **T4a**: bridge 経由 `processReplacing(256f×2ch)` = 直接 baseline と **512/512 bit 一致**。**T5c**: A/B 2 本交互 2×128f も直接 2×128 と一致 (diff 0/0)。**T5b**: 2 本目 instance 出力 = 1 本目 (instance 間漏れ無し)。
-- **T4c**: `obj+0x248=0` (M10 e2e 条件) で M10 正規手順の出力と **512/512 一致**、census zero 132 / normal 69 / junkHi 175 / junkTiny 136 (M10 と同値)。→ **M10 到達水準 (bit-exact 未達・junk あり) をそのまま bridge 越しに再現**。参照は lift 済み wasm 同士で native 機械語実行との比較ではない (junk 同士の一致 = bridge 透過性のみ証明、DSP 正当性は未証明)。tools/ott (f4e0514) の native 参照では正解出力は junk 0/512、RetDec lift の間接 call 脱落が主因。
+- 検収は**全項目 PASS** (内訳と件数は `tools/hostbridge/REPORT.md` §0・§1 が正本)、全体 4〜10 s (build 込み)。
+- **T4a**: bridge 経由 `processReplacing(256f×2ch)` = 直接 baseline と **全 bit 一致**。**T5c**: A/B 2 本交互 2×128f も直接 2×128 と一致 (diff 0/0)。**T5b**: 2 本目 instance 出力 = 1 本目 (instance 間漏れ無し)。(実測値の正本: `tools/hostbridge/REPORT.md`)
+- **T4c**: `obj+0x248=0` (M10 e2e 条件) で M10 正規手順の出力と **全 bit 一致**、census は `tools/ott/REPORT.md` §2.3 の旧 chain 行と同値 (M10 と同値・数値は同 REPORT が正本)。→ **M10 到達水準 (bit-exact 未達・junk あり) をそのまま bridge 越しに再現**。参照は lift 済み wasm 同士で native 機械語実行との比較ではない (junk 同士の一致 = bridge 透過性のみ証明、DSP 正当性は未証明)。tools/ott (f4e0514) の native 参照では正解出力は junk 0/512、RetDec lift の間接 call 脱落が主因。
 - 発見: **自然フロー (VSTPluginMain→…) では `obj+0x248` は 1** (ctor が立てる; M10 の `probe_flag` でも ctor 後=1)。この経路の census は zero 4 / normal 254 / junkHi 252 / junkTiny 2 (M10 REPORT §3.3 の `[0x248]=1` と同値)。M10 は手動で 0 に強制している → 実プラグインとして動かすと junk の多い側が既定。DSP 検証チケットの前提情報。
 - 性能: 128f 処理 bridge 経由 395–884 µs vs guest 直 416–887 µs (差 −21〜−4 µs = 測定誤差内, 予算 2902 µs の ±1% 未満)。固定オーバーヘッド (getParameter 往復) は静穏時 **0.39–0.44 µs/call** (絶対値)、CPU 共有下の再実測で 0.77–1.62 µs。128f の bridge−直接差も再実測では予算比 −10.4%〜+3.2% とばらつく。DSP 自体は `-O0 -g1` 版で 13〜30% / 128f 予算。
 - メモリ: 3 instance prewarm で node RSS 62 MB (864 MiB ずつ仮想予約のみ; 実 commit は遅延), 全試験後 110 MB。prewarm 48 ms。
