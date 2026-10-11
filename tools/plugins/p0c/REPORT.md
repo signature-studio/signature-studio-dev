@@ -649,3 +649,16 @@ work/ 内の既存 lift IR (work/k80.lift.ll) を入力として p0c4_abi_e2e.py
 0x400000 に MAP_FIXED 敷設して実機械語を直接実行)。追加: 負論対照は環境変数
 `K80_NO_PROTO=1` / `K80_NO_STRUCTD=1` / `K80_NO_NNEGF=1` で各修正を OFF にできる
 (p0c4_nega.py が使用)。
+
+### 11.11 GitHub issue / PR (運用メモ)
+
+- GitHub issue: **#254** (本 ticket、label `state:in-review`)。親 #197 ([PLG-P0c] / CAB-196)、
+  子 **#277** (native crash 残 7 + abi-mismatch 残 7)、**#269** ([P0c-5] / CAB-268、ext 精度)、
+  #242 ([P0c-2] / CAB-241)。milestone は M-App (親から継承)。
+- PR: **#278** (branch `254-arg-pass-abi`)。worktree 内クリーン HEAD から e2e 再現済み。
+- 規約変更: SUBAGENT_RULES.md は 2026-10-11 14:06 に「worktree + PR (直接 master commit 禁止)」
+  へ改訂 (RULES_SHA=4d7380074852)。着手時の RULES_SHA は ff4999169333 (本節冒頭)。
+  改訂前に同内容を共有 master へ直接 commit した (ca5ac3f) ため、PR は origin/master から
+  の cherry-pick (00996d5)。共有 master の ca5ac3f は reset/revert せず残置 (他担当の
+  staged WIP を巻き込むため)。扱いは main 判断。
+- Linear は規則 56 で読み取り専用のため CAB-253 の状態変更は行っていない (GitHub label で代替)。
