@@ -219,7 +219,7 @@ glue e2e が `ERR_MODULE_NOT_FOUND` で失敗する (本 § の archive コマ�
 ## 9. ユーザ依頼事項
 
 なし (~/ダウンロード・既存抽出物とも未使用。素材・認証は不要)。規則 49-4 の確認:
-`ls ~/ダウンロード/`・`ls analysis/win64/extracted`・`ls analysis/mac/pkg_extract` はいずれも本 ticket で不要なため未参照。
+`ls ~/ダウンロード/`・`ls [WIN64] の extracted/`・`ls [MAC] の pkg_extract/` はいずれも本 ticket で不要なため未参照。
 
 ## 10. 次タスク提案 (下流チケット案)
 

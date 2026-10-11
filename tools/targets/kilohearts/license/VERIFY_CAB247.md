@@ -17,7 +17,7 @@
 
 ## 1. 環境前提 (規則 43)
 
-- `node` / `emcc` は `source /opt/emsdk/emsdk_env.sh` + `PATH=/opt/emsdk/node/24.19.0_64bit/bin:$PATH`。**run_all.sh 自身が PATH を設定する** (21 行目) ため、この検証では個別 export は不要だった。
+- `node` / `emcc` は `[EMSDK]` の `emsdk_env.sh` を source + 同梱 node 24.19.0 (`node/24.19.0_64bit/bin`) を PATH に追加。**run_all.sh 自身が PATH を設定する** (21 行目) ため、この検証では個別 export は不要だった。
 - TMPDIR 未設定のまま実行したが /tmp は tmpfs 2925M 空き。本検証の大物 (HeartCore 76 MB、.bin ベクタ最大 178 MB) はすべて `license/work/` (実ディスク) に出力された。
 - 検証用スナップショットは `license/work/verify_2a762a0` (work/ は gitignore 済)。**`work/` 配下のため git add 対象外。削除済み。**
 

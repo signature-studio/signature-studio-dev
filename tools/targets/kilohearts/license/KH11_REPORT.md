@@ -105,7 +105,7 @@ V28 検収時点で subscribe 0x1800526f0 は `ret` no-op seam (scen_em.h の im
 | subscribe 経路有効化に伴う functor offset の未初期化 qword コピー | native image パッチ + wasm IR 対称修正で 0 確定にしたが、FL コード本来の UB (パディング未初期化) | (a) 本 REPORT / (b) 親 CAB-13 |
 
 ## 7. 環境前提 (規則 43)
-- `run_all.sh` が `PATH=/opt/emsdk/node/24.19.0_64bit/bin` を設定。TMPDIR 未設定 (/tmp tmpfs) だが大物は `license/work/` (gitignore) のみ。
+- `run_all.sh` が `[EMSDK]` 同梱 node 24.19.0 (`node/24.19.0_64bit/bin`) を PATH に設定。TMPDIR 未設定 (/tmp tmpfs) だが大物は `license/work/` (gitignore) のみ。
 - `CORE=../work/winpkg/HeartCore.core_64` は**相対パス**。work/ 配下に別 snapshot を展開する場合のみ `work/winpkg -> ../winpkg` symlink が必要 (本ラウンドでは未使用)。
 - ネイティブ oracle の image パッチ (functor offset 0 確定化) は `patch_em()` 内で毎 run 適用 (bytes 検証付き・不一致時 exit(9))。
 

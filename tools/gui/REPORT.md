@@ -98,4 +98,4 @@ bash tools/gui/e2e.sh            # 全層 (17〜24 s): 解析→API 面生成→
 bash tools/gui/test/selftest.sh  # native 単体のみ
 python3 tools/gui/analysis/gui_imports.py && python3 tools/gui/gen_api.py   # import 面 / IMPORTS.md 再生成 (入力 tools/m2/work/block00031_PE.bin)
 ```
-前提: x86_64-w64-mingw32-gcc, /opt/retdec, /opt/emsdk (同梱 node 24 を PATH に使用), google-chrome, gcc。
+前提: x86_64-w64-mingw32-gcc, RetDec (`[RETDEC]`), Emscripten (`[EMSDK]`・同梱 node 24 を PATH に使用), google-chrome, gcc。

@@ -124,7 +124,7 @@ bash tools/hostbridge/cb/cb_e2e.sh                 # R2/R3 実体接続の往復
 
 ## 8. 検収記録 (CAB-11)
 
-- 独立再計算 (pefile で `analysis/win64/extracted/block00031_PE.bin` を直接解析; 呼出サイトは E8/E9 rel32 を独自走査) で主要数値は一致。差異は M11 外部参照 553→557 (ir_undef の declare 正規表現が struct 戻り値 `__asm_cpuid*` 4 件を取りこぼし。lift 由来のみ・shimx/GUI 件数に影響なし) の 1 件のみで修正済み。
+- 独立再計算 (pefile で `[WIN64]` の `extracted/block00031_PE.bin` を直接解析; 呼出サイトは E8/E9 rel32 を独自走査) で主要数値は一致。差異は M11 外部参照 553→557 (ir_undef の declare 正規表現が struct 戻り値 `__asm_cpuid*` 4 件を取りこぼし。lift 由来のみ・shimx/GUI 件数に影響なし) の 1 件のみで修正済み。
 
 ## 9. M11 リンク フィードバック対応 — R1〜R8 (CAB-211)
 

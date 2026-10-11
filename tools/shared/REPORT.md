@@ -7,7 +7,7 @@
 日付: 2026-10-10 (検収・訂正 2026-10-10: §8) / 2026-10-11 (OSS 実クロスビルド追加: §9〜§12) / 担当: F shared-libs
 再現: `bash tools/shared/run_all.sh` (~6 分, 素材は `docs/REFERENCES.md` `[MAC]` / `[WIN64]` / `[ANALYSIS-PLUGINS]` を読むのみ) / OSS 実ビルドは `bash tools/shared/oss/flac/build.sh` 等
 素材: mac `Contents/Resources/FL/Shared` (+ `Libs/FLEngine`, Plugins 全 dylib = Mach-O 222 本) / win `docs/REFERENCES.md` `[WIN64]` の `extracted` (PE 313 本; 対応 DLL は PDB・export・VERSIONINFO・文字列で特定)
-環境前提 (§11 参照): `source /opt/emsdk/emsdk_env.sh`, TMPDIR は実ディスク、node は pnpm の PATH (`/home/ubuntu/.local/share/pnpm/bin`) に在り環境変数 PATH 修復が必要な場合あり
+環境前提 (§11 参照): `[EMSDK]` の `emsdk_env.sh` を source, TMPDIR は実ディスク、node は pnpm の PATH (`[PNPM-HOME]`) に在り環境変数 PATH 修復が必要な場合あり
 
 ## 0. 結論 (先出し)
 
@@ -206,7 +206,7 @@ ILSvg は **version 文字列が無い** (旧 "AGG 2.4 系は推定" を訂正)�
 ## 11. 検証の範囲・環境前提・未解決 (規則 38〜42)
 
 ### 11.1 環境前提 (規則 43)
-`source /opt/emsdk/emsdk_env.sh` で emcc 有効化。node は `/home/ubuntu/.local/share/pnpm/bin/node` (PATH から落ちるので各スクリプトで修復)。TMPDIR: `/tmp` は tmpfs 3.7GB で FFmpeg は 200MB × 3 構成になるため `work/tmp/` (実ディスク) を使う。各 build.sh / negctl.sh は自己解決 (`set -euo pipefail`) するので呼出し側 export に依存しない。
+`[EMSDK]` の `emsdk_env.sh` で emcc 有効化。node は `[PNPM-HOME]` の node (PATH から落ちるので各スクリプトで修復)。TMPDIR: `/tmp` は tmpfs 3.7GB で FFmpeg は 200MB × 3 構成になるため `work/tmp/` (実ディスク) を使う。各 build.sh / negctl.sh は自己解決 (`set -euo pipefail`) するので呼出し側 export に依存しない。
 
 ### 11.2 検証した範囲 / 範囲外 (規則 40)
 - **検証した**: upstream 公式ソースから native / wasm32 / wasm64 の 3 構成をビルドし、同一入力のエンコード出力バイト列と復号 PCM の hash が一致すること (lossless: FLAC/WavPack/WAV、lossy: LAME MP3 の同一設定再エンコード一致)。

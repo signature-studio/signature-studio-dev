@@ -128,7 +128,7 @@ headline の round 2/3 は 1 コマンド e2e では再現できない (規則 3
 ## 5. lift 計画・見積もり (推定ラベル付き)
 
 ### 5.1 案 A: Ghidra 完全 decompile → Lean 風 IR 自前変換 (推奨・推定)
-- /opt/ghidra 12.1.4 で 95 MB / 187K 関数を decompile。~15 GB 級 (RetDec 全 decode と同等規模)。
+- `[GHIDRA]` 12.1.4 で 95 MB / 187K 関数を decompile。~15 GB 級 (RetDec 全 decode と同等規模)。
 - 利点: D11 と vtable 間接 call (D15) を Ghidra の参照解析が解決。未対応 AVX 語彙も不要。
 - リスク (推定): decompile C は数十 GB 級、wasm 再コンパイルに Emscripten + MS ABI shim が別途必要。
 - **見積 (推定): 15〜30 人日** (根拠: RetDec 全 decode ~15 GB と同規模、OTT/KH は 60〜190 関数で
@@ -162,7 +162,7 @@ headline の round 2/3 は 1 コマンド e2e では再現できない (規則 3
 
 **無し** — `~/ダウンロード` の VST3 と振出済 `work/extracted/` で不足なし (preflight 規則 43 準拠)。
 `MX_PE` / `MX_X64C` で PE・x64c パスを差し替え可。依存: python3 + capstone 5.0.7 + pefile 2024.8.26
-(/opt/ghidra 12.1.4 は未使用・案 A 向け)。TMPDIR は実ディスク (`work/tmp`)。生成物は `dsp/work/`
+(`[GHIDRA]` 12.1.4 は未使用・案 A 向け)。TMPDIR は実ディスク (`work/tmp`)。生成物は `dsp/work/`
 (gitignore 済・48 MB)。x64c は `tools/flelift/x64c.py` (CAB-252 継続稼働中につき読取実行のみ・未変更)。
 
 ## 8. 再現

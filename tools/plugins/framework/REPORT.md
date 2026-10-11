@@ -286,7 +286,7 @@ git 管理外成果物。
 
 ## 11. 環境前提
 
-- emsdk: `source /opt/emsdk/emsdk_env.sh`。node は `/opt/emsdk/node/24.19.0_64bit/bin/node`
+- emsdk: `[EMSDK]` の `emsdk_env.sh` を source。node は同梱 `node/24.19.0_64bit/bin/node`
   (既定 PATH に `node` が無い)
 - TMPDIR は実ディスク (`tools/plugins/work/hs/tmp`, gitignore)
 - 素材 (読取のみ): `docs/REFERENCES.md` `[WIN64]` の `extracted/block18983_PE.bin` (Balance)・

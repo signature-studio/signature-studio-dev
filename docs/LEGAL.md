@@ -59,7 +59,7 @@
 | `[SLATE-ToS]` | Audiotonix General Terms of Use (Slate Digital) | <https://slatedigital.com/terms-of-service/> を 2026-10-10 に取得 | **同梱ではない**。Fresh Air に適用される版かは未確認 |
 | `[NI-EULA]` | Native Instruments EULA | <https://www.native-instruments.com/pages/end-user-license-agreement> (2026-10-10。作成時は検索スニペットのみ、検収時に全文を取得: 契約主体 inMusic NI GmbH、ページ表記 "Latest Version 2026-07-01") | **同梱ではない**。Massive X のインストーラは未入手 (同梱版の有無・Web 版との同一性は未確認) |
 
-補足: FL mac の dmg に Software License Agreement リソースは無い (dmg XML plist に `LPic`/`STR#`/`RTF `/`TEXT` 無し)。抽出物の置き場はリポジトリ外 `analysis/legal_work/` (所在は `docs/REFERENCES.md` `[LEGAL-WORK]`) (抽出作業用 dir は当時 `.gitignore` 対象外だったため)。
+補足: FL mac の dmg に Software License Agreement リソースは無い (dmg XML plist に `LPic`/`STR#`/`RTF `/`TEXT` 無し)。抽出物の置き場はリポジトリ外 (`docs/REFERENCES.md` `[LEGAL-WORK]`) (抽出作業用 dir は当時 `.gitignore` 対象外だったため)。
 
 ---
 
@@ -296,7 +296,7 @@ zplane (Auftakt / élastique Pro / Metering / Restore)、Chicken Systems (Sample
 
 次タスク案 (下流チケット):
 - **LGL-1**: 運用形態を確定し本書 §6 を単一形態の「運用規程」に書き換え (M11「EULA/非再配布運用固定化」と統合)。
-- **LGL-2**: `release guard` — 公開前に dist/R2 同期対象を走査し、FL/プラグイン由来バイト列・資産ハッシュ (analysis/* から生成した deny-list) を検出したら失敗させる。
+- **LGL-2**: `release guard` — 公開前に dist/R2 同期対象を走査し、FL/プラグイン由来バイト列・資産ハッシュ (`[ANALYSIS-DIR]`/* から生成した deny-list) を検出したら失敗させる。
 - **LGL-3**: `THIRD_PARTY_NOTICES` 自動生成 (FreeType 謝辞、BSD/MIT 表示、PSF、Apache NOTICE) + upstream バージョン/configure 記録。
 - **LGL-4**: FFmpeg/LAME 等の LGPL 部品を side module (差し替え可能) として upstream から再ビルドする設計 + `--enable-gpl`/`--enable-version3` 検出 CI。
 - **LGL-5**: 規約差分監視 (FL ToU/EULA.html、Xfer、Kilohearts、Slate、NI の最新版取得・ハッシュ比較) を FL 追従プロセスに追加。
@@ -321,4 +321,4 @@ rg -a -o 'FFmpeg version [^\x00]{0,60}' "$WIN/block24433_PE.bin"
 # FL win (BI flags=0x30) は `docs/REFERENCES.md` `[WIN64]` の `tools/nsis_extract.py` と同じ LZMA(raw, lc3 lp0 pb2, dict 8MB) でヘッダ解凍
 # win ファイル一覧: WIN/block25163_DATA.bin (path/size/mtime のテキスト)
 ```
-抽出物 (リポジトリ外): `analysis/legal_work/{fl_mac_eula.txt, win_terms_of_use.txt, ott_nsis_license.txt, serum2_nsis_license.txt, nsis_hdr.py, fa/guide.txt}` (所在は `docs/REFERENCES.md` `[LEGAL-WORK]`)。
+抽出物 (リポジトリ外・所在は `docs/REFERENCES.md` `[LEGAL-WORK]`): `{fl_mac_eula.txt, win_terms_of_use.txt, ott_nsis_license.txt, serum2_nsis_license.txt, nsis_hdr.py, fa/guide.txt}`。

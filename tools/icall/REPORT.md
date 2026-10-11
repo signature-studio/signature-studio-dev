@@ -124,4 +124,4 @@ bash tools/icall/icall_e2e.sh --full    # + FLEngine 7,421 関数 (RetDec 4 並�
 bash tools/icall/x64c_fle_probe.sh   # x64c を FLEngine に当てた対応度 (36 秒)
 python3 tools/icall/tests/test_icall.py
 ```
-前提: python3 (capstone, pefile), emsdk 6.0.12, /opt/retdec, node, setarch。keystone は raw 試験 (`work/probe`) のみ。
+前提: python3 (capstone, pefile), emsdk 6.0.12 (`[EMSDK]`), RetDec (`[RETDEC]`), node, setarch。keystone は raw 試験 (`work/probe`) のみ。

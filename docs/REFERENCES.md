@@ -4,7 +4,8 @@
 リポジトリ内の他の `.md` から外部絶対パスを直接参照してはならない。本ファイルのエントリ ID を使う。
 
 - 管理方針: 正史ドキュメント (`docs/`・`README.md`・`tools/**/REPORT.md`) はリポジトリ外の絶対パスを書かない。
-  repo 外パスを書く必要があるのは **このファイルだけ**。
+  repo 外パスを書く必要があるのは **このファイルだけ**。repo 内の `.md` には上記 ID のみを記す
+  (過去の実行環境の記載も同梱・絶対パスそのものは本ファイルに集約する)。
 - 読み方: 各エントリは `[ID] 説明` の形式。repo 内からは `docs/REFERENCES.md` の `[WIN64]` のように参照する。
 
 ---
@@ -14,6 +15,7 @@
 | ID | 所在 | 内容 |
 |---|---|---|
 | `[STRATEGY]` | `../analysis/strategy.md` | 実行戦略・技術選定の正本。パイプライン・shim 一覧・マイルストーン `MS1`〜`MS11` の定義元 (`MS12` は repo 内 `docs/STATUS.md` §2 で定義) |
+| `[ANALYSIS-DIR]` | `../analysis/` | repo 外の解析作業ディレクトリ根。上記 `[STRATEGY]`・`[WIN64]`・`[MAC]`・`[LEGAL-WORK]`・`[SUBAGENT-RULES]` 等の親 |
 | `[STRATEGY-SURVEY]` | `../analysis/strategy_survey.md` | 技術選定の調査資料 (lifter 比較) |
 | `[TOOLCHAIN]` | `../analysis/toolchain_setup.md` | ツールチェイン整備記録 (RetDec → emcc PoC) |
 | `[WIN64]` | `../analysis/win64/` (`REPORT.md`・`extracted/`・`block_manifest.json`・`pe_metadata.json`・`tools/nsis_extract.py`) | FL Studio win64 インストーラ解析。NSIS+Image-Line 独自拡張の抽出、FLEngine_x64.dll 実体 |
@@ -40,9 +42,12 @@ CI や他人の環境では存在しないため、再現手順は本ファイ�
 
 | ID | 所在 | 版 |
 |---|---|---|
+| `[OPT-TOOLS]` | `/opt/` | ローカルツールのインストール根。配下に `[EMSDK]`・`[RETDEC]`・`[GHIDRA]`・`[_TEST]` |
 | `[EMSDK]` | `/opt/emsdk` | Emscripten 6.0.12 (pin。`tools/m1/flags.sh`) |
 | `[RETDEC]` | `/opt/retdec` | RetDec v5.0 (歴史的。現行の主力 lifter は x64c / flelift / liftlib。DESIGN 参照 `docs/DECISIONS.md` D5) |
 | `[GHIDRA]` | `/opt/ghidra` | Ghidra 12.1.4 (解析支援) |
+| `[_TEST]` | `/opt/_test/` | toolchain E2E 実証のスクラッチ領域 (`tools/m1` が参照) |
+| `[PNPM-HOME]` | `/home/ubuntu/.local/share/pnpm/bin` | pnpm (と同梱 node) のユーザローカル配置 (`tools/shared`・`tools/audio/asio` が参照) |
 
 ---
 

@@ -1,7 +1,7 @@
 # M2 REPORT — function boundary 合意 / Delphi lift 品質 / shim inventory / wasm PoC
 
 日付: 2026-10-09 / 作成: M2 subagent
-参照: strategy.md §4 M2, §5.7 / toolchain_setup.md / analysis/mac/REPORT.md, win64/REPORT.md
+参照: `[STRATEGY]` §4 M2, §5.7 / `[TOOLCHAIN]` / `[MAC]` REPORT.md, `[WIN64]` REPORT.md
 
 ---
 

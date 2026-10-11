@@ -197,7 +197,7 @@ OTT_CJS=work/cab238/p1_one_1801204b9/ott_gen.cjs V=0.9 F=1 A=0 timeout 30 \
 ## 10. 環境前提 (規則 43)
 
 - 環境: `bash tools/ott/env.sh` (PATH: node 26.10 / emsdk、所在は `docs/REFERENCES.md` `[EMSDK]`)
-  と TMPDIR を修復。`avx/avx_e2e.sh` は node を `/opt/emsdk/node/24.19.0_64bit/bin/node` に固定し
+  と TMPDIR を修復。`avx/avx_e2e.sh` は node を `[EMSDK]` 同梱 (`node/24.19.0_64bit/bin/node`) に固定し
   相対パス `work/avx/...` を参照するため **cwd = tools/ott で実行**すること。
 - 必要: python3 (capstone, pefile), gcc/clang, emsdk 6.0.12, node ≥ 22, setarch。
   DLL は `docs/REFERENCES.md` `[ANALYSIS-PLUGINS]` の `plugins/ott/binaries/OTT_vst2_win64.dll`。

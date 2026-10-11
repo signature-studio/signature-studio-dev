@@ -2,7 +2,7 @@
 
 - 日付: 2026-10-10。基点 HEAD = 805110b (M7 検収後)。工域: tools/m8/ のみ新規追加
   (tools/m5/m6/m7 は読取のみ, 改変 0 行; work/, __pycache__ は tools/m8/.gitignore で除外)。
-- 検証環境: node v26 / emcc 6.0.12 (/opt/emsdk) / Python 3.14 / RetDec 5.0 産物を m6 work 再利用。
+- 検証環境: node v26 / emcc 6.0.12 (`[EMSDK]`) / Python 3.14 / RetDec 5.0 産物を m6 work 再利用。
 - 検収コマンド: `bash tools/m8/m8_e2e.sh` (**exit 0**, tools/m8/work/e2e_result.json)。
 
 ## 0. 結論一覧

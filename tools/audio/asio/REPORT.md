@@ -119,7 +119,7 @@ bash tools/audio/e2e.sh --out tools/audio/work/results_parent.json   # 親 e2e 2
 
 成果物は `work/` (gitignore)。20MB 超 blob なし (最大 = work/node/com_check.wasm 149,231 B / committed blob 最大 = com_test.wasm 114,508 B)。
 
-**環境前提 (規則 43)**: `e2e.sh` は**自分で `export PATH="/home/ubuntu/.local/share/pnpm/bin:$PATH"` するため呼出し側の export に依存しない** (node 前提)。emcc は `/opt/emsdk/emsdk_env.sh` を `build.sh` が source。`TMPDIR` 未設定でも大物は `tools/audio/asio/work/` (実ディスク・gitignore) に出るので `/tmp` (tmpfs) は使わない。Chrome は headless `google-chrome 154`・fake 出力シンク (音声 HW 無し)。
+**環境前提 (規則 43)**: `e2e.sh` は**自分で `[PNPM-HOME]` を PATH に追加するため呼出し側の export に依存しない** (node 前提)。emcc は `[EMSDK]` の `emsdk_env.sh` を `build.sh` が source。`TMPDIR` 未設定でも大物は `tools/audio/asio/work/` (実ディスク・gitignore) に出るので `/tmp` (tmpfs) は使わない。Chrome は headless `google-chrome 154`・fake 出力シンク (音声 HW 無し)。
 
 ## 6. 変更ファイル (CAB-270)
 

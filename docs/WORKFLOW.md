@@ -1,6 +1,6 @@
 # WORKFLOW — subagent 運用・PR・レビュー・検収 (repo 内正本)
 
-本ファイルは**subagent 運用ルールの repo 内正本**である。外部 `analysis/SUBAGENT_RULES.md` から
+本ファイルは**subagent 運用ルールの repo 内正本**である。外部 `[SUBAGENT-RULES]` (`docs/REFERENCES.md`) から
 必要な規則を import して repo 内自己完結化したもの。
 
 - 原本: `docs/REFERENCES.md` `[SUBAGENT-RULES]` (repo 外・凍結)。原本に無い規則はここに追加してよく、

@@ -413,7 +413,7 @@ V==H (it=6)、cubic との差の定量化、GetBufSize 実測。
   ハッシュ一致) のみで、wasm 側の単独テストはしていない。it=7 の残差 31 px の原因 (丸め経路) は未追跡 (it=5 と同種の ±1)。
 - **未解決**: it=4 のカーネルが MN でない理由 (線形項付き) は未解明 — 影響なし (0.027%) で起票先なし (既存許容差)。
   GetBufSize の it=5/6/7 旧値 (Lanczos 式) を踏んでいた呼出元はなし (FL は ResizeSqrPixel 使用・§12-3)。
-- **環境前提**: `/opt/emsdk` (emcc、所在は `docs/REFERENCES.md` `[EMSDK]`)、実 DLL は `docs/REFERENCES.md` `[WIN64]` の `extracted/block24356_PE.bin` (pe_load が直接読む)、
+- **環境前提**: Emscripten (`[EMSDK]`・emcc)、実 DLL は `docs/REFERENCES.md` `[WIN64]` の `extracted/block24356_PE.bin` (pe_load が直接読む)、
   `tools/ipp/work/` の gitignore データ (golden・win_refs・baseline・spike ログ — `tools/ipp/ipp_e2e.sh` が生成)。
   TMPDIR は未指定 (ネイティブ gcc/emcc は小物のみ)。/tmp は tmpfs 3.7GB だが本節の産物はすべて `work/` (実ディスク)。
 - **独立再計算の実行出力** (`python3 shim/verify_cab274_kernel.py`、impl 非リンク):

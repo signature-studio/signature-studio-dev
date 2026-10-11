@@ -4,7 +4,7 @@
 - 1 コマンド再現: `bash tools/targets/kilohearts/license/run_all.sh` ([4] 節が本チケット分 / 全体 135 s・**単発計測**・load average 3.39→5.31 (nproc=16)。検証担当が [4] のみ 3 回抜出し測定した range は 2,246–2,347 ms)
 - 対象: `work/winpkg/HeartCore.core_64` (76,642,304 B, ImageBase 0x180000000)
 - 既知類型との関係 (規則 44): **該当なし** (DEFECTS.md D1a〜D16 の silent miscompile 型は本 closure で観測せず。kh_lower の store128/callret 修復は D2/D3/D7 対策の再利用、thunk 5 本の非 pdata 連続は snapins D13 同型の size 表近似)
-- 環境前提 (規則 43): `run_all.sh` が `PATH=/opt/emsdk/node/24.19.0_64bit/bin` を設定するため追加 export 不要 (ただし単発 `node` は PATH 外)。TMPDIR 未設定で /tmp (tmpfs 2925M) を使用するが、大物 (76 MB PE・178 MB ベクタ) はすべて `license/work/` 実ディスクに出る。
+- 環境前提 (規則 43): `run_all.sh` が `[EMSDK]` 同梱 node 24.19.0 (`node/24.19.0_64bit/bin`) を PATH に設定するため追加 export 不要 (ただし単発 `node` は PATH 外)。TMPDIR 未設定で /tmp (tmpfs 2925M) を使用するが、大物 (76 MB PE・178 MB ベクタ) はすべて `license/work/` 実ディスクに出る。
 
 ## 0. 結論 (先出し)
 

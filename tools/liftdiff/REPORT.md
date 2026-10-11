@@ -271,6 +271,6 @@ m11 sample:800・残 3 unit の原因・`ld_tls_next` の limit 性・e2e 再現
 `tools/m11/work/{boot_final3.ll,boot_final.ll,m11_image.bin}`・`tools/ott/work/ott.ll`・
 `tools/flelift/work/lift/*` (CAB-252 続 が稼働中・未コミット差分あり)。
 ビルド: `gcc -O1 -g -Wall -Wno-unused-function -o work/ld_native rt/ld_native.c rt/ld_ms_call.S -lm`
-(format-truncation warning は既知・動作影響なし)。wasm は emcc (/opt/emsdk)。
+(format-truncation warning は既知・動作影響なし)。wasm は emcc (`[EMSDK]`)。
 所要 (実測・負荷依存): bootstate flelift hybrid **24.4 s** (load 0.79→2.62)、e2e [1/4]-[3/4] **62.5 s**、
 m11 sample:800 (12 shard) **93〜95 s**、flelift closure (14 shard) **585 s** (load 4.80→12.06)。

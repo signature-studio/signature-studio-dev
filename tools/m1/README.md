@@ -1,7 +1,7 @@
 # M1: 極小 PE→wasm PoC の E2E 自動化
 
 戦略文書 (`docs/REFERENCES.md` `[STRATEGY]`) §4 M1 / §2.1 パイプラインの検証条件を満たすため、
-toolchain_setup.md の E2E 実証 (`/opt/_test/`) を **1 本のスクリプトで再生産可能** にしたもの。
+toolchain_setup.md の E2E 実証 (`[_TEST]`) を **1 本のスクリプトで再生産可能** にしたもの。
 
 ## 使い方
 
@@ -20,7 +20,7 @@ M1_STRICT=1 bash tools/m1/m1.sh   # 固定バージョンと不一致なら失�
 | 2 | native 実行 → 比較 reference 採取 | `build/ref.out` (PE は実行環境がないため ELF native 出力を reference にする) |
 | 3 | RetDec 逆コンパイル | RetDec v5.0 `-o`: ELF → `retdec_elf.c`, PE → `retdec_pe.c` |
 | 4 | 必要関数抽出 | `extract_main.awk` で `main` 定義ブロックのみ抽出。PE 固有の後処理: `__mingw_printf` → `printf` 置換、`__main()` 行除去 |
-| 5 | emcc 再コンパイル → wasm | `flags.sh` の `EMCC_FLAGS_M1` (toolchain_setup.md 実績値) |
+| 5 | emcc 再コンパイル → wasm | `flags.sh` の `EMCC_FLAGS_M1` (`[TOOLCHAIN]` 実績値) |
 | 6 | node 実行 | emcc が生成した JS glue を node で実行 |
 | 7 | 出力比較 | `compare.sh ref.out wasm_elf.out wasm_pe.out` (3-way: native ELF = wasm ELF = wasm PE) |
 
@@ -44,7 +44,7 @@ M1_STRICT=1 bash tools/m1/m1.sh   # 固定バージョンと不一致なら失�
 
 ## 定型フラグ
 
-toolchain_setup.md 実績値 (M1 で検証済):
+`[TOOLCHAIN]` 実績値 (M1 で検証済):
 
 ```
 -emcc: -w -Wno-error=int-conversion -Wno-implicit-function-declaration -sERROR_ON_UNDEFINED_SYMBOLS=0
