@@ -186,6 +186,12 @@ python3 dsp/scripts/mx_roots.py <pe> work/rtti_vtables.json work/roots_mx Massiv
 
 ## 10. 検証範囲 / 範囲外 (規則 40)
 
+**クリーン HEAD 検証 (規則 45)**: `git archive HEAD -- tools/targets/massivex/dsp | tar -x -C /tmp`
+で展開したツリーから `e2e.sh` を再実行 → **全数値が不一致なく再現**
+(567 関数 / 258,087 命令 / 48,612 site / 246 種 / .pdata 186,960 / 非 begin 率 83.0%)。
+経過 42 s, load 17.93 11.15 7.01 → 17.13 11.80 7.41。検証起点 commit = **e6c6e91**。
+注: 展開先では gitignore 済み `work/` が無いため `mkdir -p work/lift_seeds work/logs` が必要。
+
 **検証した**: (1) RTTI/MSVC vtable の機械抽出と VST3 入口面の特定。(2) 567 関数の x64c lift と
 未対応命令センサス。(3) .pdata 完全性 (独立再計算で交差確認)。(4) ネガティブコントロール 3 件。
 (5) 線形バイトスキャンによる非 pdata target 率の再計測。
