@@ -344,3 +344,94 @@ python3 tools/liftlib/work/hang_bisect.py p1_one_18012024b
 - CAB-240 (ymm/i256 ABI) は未触 (`__asm_vmovdqu__yy` 3 種)。VEX-256 断片語彙も未対応。
 - 次タスク: ① 汎用 xmm0-ret bind (CRT/移植関数全体) ② leafabi 方式の SVF 経路適用
   ③ `tools/ott/native` の IAT thunk を liftlib 側 spec に取り込み CRT crash を解消 ④ CAB-240 (ymm ABI)。
+
+## 13. LIFTLIB-3 (CAB-264) — 汎用 xmm0-ret bind + tan 入口誤解析修正
+
+- preflight: RULES_SHA=ff4999169333
+- 既知類型との関係 (規則 44): **該当なし** (`tools/targets/kilohearts/snapins/DEFECTS.md` の D1a〜D16 は ucomis 誤配線/load 脱落/xmm 引数落ち/store 欠落等で, 本チケットで扱う「callee の戻り値レジスタ推定」と「entry 純 move の live-in 誤判定」は未登録 → REPORT 末に新類型行案を記載)
+- 検証起点 commit: `ae18b1e` (clean HEAD から `git worktree` 展開で再現・下記の検証を全て再実行して確認)
+
+### 13.1 結論
+
+**汎用 xmm0-ret bind を leafabi/regbind/mc/f2 に実装し, 残留 dropped を 21 → 15 に, tan を 1/40 → 8/40 に改善した。回帰はすべて緑。** census[0x248]=1 の junkHi は **248 で不変** (低減せず、記録のみ)。
+
+| 項目 | LIFTLIB-2 (61f1e4e) | LIFTLIB-3 (ae18b1e) | 差分 |
+|---|---|---|---|
+| OTT 既定 (`--auto f2,f7,p1`) p1 残留 UNSUPPORTED | 21 | **15** | −6 |
+| その内 `bind xmm0` | 6 | **1** | −5 |
+| leaf spec `tan` (0x1801a9be0) | 1/40 | **8/40** | +7 |
+| leaf spec `exp` / `log` | 40/40 / 32/40+crash 8 | **40/40 / 32/40+crash 8** | 不変 |
+| leaf spec `svf` / `cvt` | 2/40+crash 8 / 11/40+crash 23 | 2/40+crash 8 / 11/40+crash 23 | 不変 |
+| census[0x248]=0 junkHi | 104 | **104** | 不変 |
+| census[0x248]=1 junkHi | 248 | **248** | **不変 (低減せず)** |
+| checks / trap / HANG | 8/0 / 0 / 0 | **8/0 / 0 / 0** | 不変 |
+
+### 13.2 残留 21 の実原因 (LIFTLIB-2 の記載と実測が違った点)
+
+LIFTLIB-2 §12.7 は「`_bind_call_ret` は明示的 C port 名のみ bind でき」と書いていたが, **実測では 6 件の `bind xmm0` は call 戻りではない**:
+
+| site | 所在関数 | root_def | 実原因 |
+|---|---|---|---|
+| 0x1801aa157 / 0x1801aa1c9 | tan / 0x1801aa1a0 | **entry** | 入口 xmm0 の IR 値が無い (f2 未適用) |
+| 0x1801b4e7b / 0x1801b5163 | 0x1801b4e30 | **entry** | 同上 |
+| 0x1801b4bf3 | 0x1801b4e30 | **到達不能ブロック** | pdata 無し関数の範囲誤読 (孤立ブロック列) |
+| 0x18011ff6f | 0x18011ec20 | multi (addsd/mulsd) | SSE 多定義 = 別要因 |
+
+`_bind_call_ret` (p1) が関係するのは call 戻り site だけなので, これでは残留は減らない。**主因は「CRT leaf が入口 xmm を読むのに IR 側に `%xmmK_bits` 引数が無い」こと**。
+
+### 13.3 実装した汎用規則
+
+1. **`mc.MFunc._writes_at_all_ret(reg)` / `ret_in_xmm0()`**: 全 ret で xmm0 が関数内定義かを判定。**到達不能ブロックは除外**する (孤立ブロック列を「対象外」と誤判定しないため)。rax は見ない — `defs_before` は call を volatile として rax の def にするため, call 経路ではほぼ常に「rax = 関数内定義」になり誤認の元 (実測: log/tanf は実は xmm0 戻りなのに `ret_reg_raw()=="both"`).
+2. **`regbind.Binder.callee_returns_xmm0(target)` / `xmm0_ret_of_call(va)`**: 上記を callee 側に適用。**命名規則 (関数名・C port 名) に依存しない**。
+3. **`regbind.value_defined_at`**: call site の i64/i32 戻りを xmm0 bits として拾えるように (従来は明示名のみ)。
+4. **`regbind._bind_multi`**: xmm0 が multi-def で, def のうち xmm0-ret callee への call が **1 個だけ** のとき、その call の i64 戻りを採用 (`function_1801aa1a0` を呼ぶ tan で発動)。
+5. **`leafabi.run` の自動 callee_set 拡張**: cfg の `ret_xmm0` 明示リストに **加えて** `ret_in_xmm0()` を満たす define を自動追加。従来はリスト漏れ (tan の kernel `function_1801aa1a0`) が tan の戻り 0 を招いていた。
+6. **`leafabi._ret_thread`**: 非支配値の弾き方 (`dominates_use`) を追加 (clang "does not dominate all uses") + 同一 ret VA を p1 が複製した block での一時名衝突を `fresh()` で回避 + i64/i32 bind (xmm0 bits の下位 64bit) を `zext` して受理。
+7. **`p1._call_ret_bits`**: callee 選定を `callee_returns_xmm0()` に変更 (旧: `function_1801b{4220,4900,ba860}` の name match)。`m9_d*` の OTT C port 名も併用。
+8. **`f2.classify_kind`**: **dest のみを書く move (`movsd xmm1, xmm0`) は dest の旧値を消費しない**ので entry-live-in から除外。capstone の `regs_access` は dest も read と報告するため, 従来は tan が xmm1 も仮引数と誤判定していた (実体は xmm0 1 引数)。`movq xmm0, xmm0` (dest == src = 上位 zero 化の恒等) は旧値を使うので除外しない。
+9. **`f2.find_undef_for`**: 同一 alloca の load が複数 undef になっていると「どれがその reg の値か」が曖昧 (tan は xmm0 も xmm1 も同じ undef に解決)。**機械語順で最も早い reader アドレスで使われている undef** を選ぶように変更。
+10. **`recipes/ott.py` + `cli.py`**: `--auto` 既定を `f7,p1` → **`f2,f7,p1`** に。f2 は **callee 相のみ** (引数付与) を p1 の前に流す。callsite 相は recipe 側の名前依存 wiring (m9_d* C port) と衝突するため既定では入れない (`--auto f2` 指定時は両相)。
+11. **`harness/wasm_runner.mjs`**: spec args の wasm 引数マッピングを **位置対応から ABI 分割対応** に (native_runner と同じ規約)。f32/f64 の A 行は xmm 仮引数 (`%xmmK_bits`), それ以外は gpr 仮引数 (`%argN`)。従来は位置対応だったため tan の f64 が余分な `%arg1` に入り `%xmm0_bits` が 0 になっていた (**tan 1/40 の直接原因**)。
+
+### 13.4 数え方の定義・再計算 (規則 36・37)
+
+`python3 tools/liftlib/xmm0_ret_census.py` (1 コマンド再現) を同梱:
+- 分母 = RetDec raw `.ll` の module に define がある `function_<hex>` で image 内に範囲があるもの = **169**
+- 検出 = そのうち「到達可能な全 ret で xmm0 が関数内定義」= **103**
+- **別アルゴリズム**「ENTRY→ret の xmm0 未書経路が存在しない」で検算 = **103 (一致)**。実装は向きが逆 (不在判定 vs 存在判定) で完全に別コード。
+
+残留内訳の再計算は `work/tmp/dbg_reason.py` (p1 単体) と同スクリプトに f2 callee 相を足した T13 (unit test) で固定。
+
+### 13.5 ネガティブコントロール (規則 41)
+
+| 検査 | 対象 | 結果 |
+|---|---|---|
+| `LL_NO_XMM0_RET_AUTO=1` (leafabi 自動 callee_set 拡張を停止) | leafspec tan | **8/40 → 1/40** (FAIL) 。exp は 40/40 のまま = 拡張のみが効いている証拠 |
+
+### 13.6 検証 (実測秒・load average・並列数)
+
+| 検証 | 内容 | 所要 (real) | 終了時 load average (nproc=16) |
+|---|---|---|---|
+| `bash liftlib_e2e.sh` (clean HEAD: `ae18b1e`) | unit T1..T14 + FA 400/400 + KH 366/366 + OTT 既定/旧既定 + SIMD 95,400 + 注入 94/94 + leafspec | **115 秒** (10:28:19 → 10:30:14) | 10.25 / 5.22 / 4.75 |
+| `python3 tests/test_unit.py` (clean HEAD) | T1..T14 (T13 = f2→p1 残留, T14 = xmm0-ret 検出と別アルゴリズム一致) | 同 e2e 内 | 同上 |
+| `python3 xmm0_ret_census.py` (clean HEAD) | 103/169 + 別アルゴリズム一致 | 同 e2e 内 | 同上 |
+| `bash tools/ott/ott_e2e.sh` | 89 scenario / 50,236 cell bit-exact / E7 8 combo / OTT 既定 checks 8/0 | 前掲 (読取のみ) | — |
+| `python3 -m liftlib ott` (develop 側) | checks 8/0・junkHi 104/248・trap 0・RESULT PASS | 10 秒 | — |
+
+### 13.7 未解決 (起票先付き・規則 42)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 残留 15 の内訳: `bind xmm1` 5 / `merge xmm2` (非支配・他領域) 4 / `no value` 2 / 間接 call 1 / `bind xmm0` 1 / `bind xmm5` 1 | OTT 既定ビルドの未修復 dropped 分岐 | (b) 新規子チケット (CAB-49 下) を起票 — 次タスク |
+| leaf native CRT 経路 crash (log 8/40 / SVF 8/40 / cvt 23/40) | leafspec の crash 除外 (tools/ott 読取制約) | (a) CAB-256 にコメント済 (LIFTLIB-2 §12.7 から継続) |
+| tan の残 32/40 (region 内 phi 合成・cvt 依存) | tan の bit-exact は 8/40 止まり | 上記新規子チケット |
+| IAT thunk spec (tools/ott/native 方式) の liftlib 統合 | CRT crash を解消できる | (c) 親チケット CAB-49 に提案コメント |
+| CAB-240 ymm(i256) ABI | `__asm_vmovdqu__yy` 3 種 | (a) CAB-240 は既存 (Backlog)。本チケットでは未触のため重複起票はしない |
+
+### 13.8 新類型行案 (DEFECTS.md 形式・規則 44)
+
+| 症状 (silent) | 根本原因 | 観測 (証拠) | 検出信号 | 修復 |
+|---|---|---|---|---|
+| callee の i64 戻りが xmm0 (double bits) なのに整数と解釈して bind 失敗 | capstone2llvmir は結果レジスタの区別 (rax/xmm0) を落とし `call i64 @f()` に一律化。LIFTLIB-2 は OTT 固有名 (`function_1801b4220/4900/ba860`) で回避 | OTT 既定 p1 の `bind xmm0` 6 件 (うち 5 件は実は entry xmm0 で原因は別) / leafspec tan 1/40 | 機械語の全 ret で xmm0 が関数内定義か | `MFunc._writes_at_all_ret` + `Binder.callee_returns_xmm0` (命名非依存) |
+| entry live-in の誤判定: `movsd xmm1, xmm0` の dest (xmm1) を read と数えてスカラー引数を余分に仮引数化 | capstone `regs_access` は dest のみ書く move について dest も read と報告 (MS ABI では上部 lane 保存のため実機では正しいが xmm1 の旧値は消費されない) | tan 定義が `(arg1,arg2,arg3,xmm0_bits,xmm1_bits)` の 5 引数 (実体 xmm0 1 引数) → wasm は `%xmm0_bits=0` で自明解を返す | entry-live-in 読取のうち dest のみ書く move の件数 | `f2.classify_kind` の純 move 除外 (dest == src は除外しない) + `find_undef_for` の最早 reader 選択 |
+| 同一未初期化 alloca の load が複数 undef になり, xmm 仮引数の undef 対応が恒等的でない | RetDec reg2mem の全 load が同一 alloca を指し, f2 は「どれがその reg の値か」を無視して先頭を拾う | tan: xmm0 と xmm1 が同一 undef `%5` に解決 (実読取は xmm0 = `%6`) | 同一 undef を 2 レジスタが参照 | 機械語順で最も早い reader アドレスの undef を選ぶ |
