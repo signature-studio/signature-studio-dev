@@ -83,7 +83,7 @@ bash tools/audio/e2e.sh               # 親 e2e 22 シナリオ (約 9 分, --qu
 ## 7. 検収記録 (2026-10-11・CAB-97 検収 agent・規則 36〜41)
 
 - 検証起点 commit **3d35d65**。`bash tools/audio/asio/e2e.sh` → node check **126/126 PASS**・headless Chrome **3/3 PASS** (7 回中 6 回。負荷依存 1 回は §3-1)。最終実行は load 1分 2.08 で 3/3・exit 0。
-- **独立再計算 (別アルゴリズム・規則 37)**: `work/verify/iasio_recount.mjs` — `work/node_check.json` ではなく
+- **独立再計算 (別アルゴリズム・規則 37)**: `accept_recount.mjs` — `work/node_check.json` ではなく
   `test/com_test.c` のソースから判定呼出しサイトを静的集計 (`CK(`/`CKV(` = 数値照合 / `ck_str(` = 文字列照合) し、
   実測 JSON と突合する。出力: **`CK=6 + CKV=109 + ck_str=11 = 126` / JSON n=126・fail=0 / 名前集合は完全一致 /
   内訳 hostmsg 15 (selector 13 + カウンタ 2), slot 監査 7, shimx 実レジストリ 14**。
