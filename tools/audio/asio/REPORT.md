@@ -33,7 +33,7 @@ preflight: RULES_SHA=ff4999169333
 - **iasio_vreg.c (126 行)**: 内蔵 mini レジストリ (PoC/単体テスト用)。FLEngine の実フロー (`RegOpenKeyEx(HKLM,"software\asio")` → `RegEnumKeyEx` → 値 `clsid` → CLSIDFromString → CoCreateInstance) をバックエンドインターフェースで抽象化。
 - **iasio_shimx.c (107 行)**: tools/shimx の実レジストリ (lifted FLEngine が advapi32 Reg* で読むものと同一実体) へ `"FL Studio ASIO" = {188135E1-7171-3434-854F-01A3C71F3DF9}` を登録し、Reg* をバックエンドに取る結合 (shimx は読取専用参照リンク — 改変 0 行)。
 - **test/com_test.c (515 行)**: mode=check (node, AudioContext 不使用 — fla_open に到達しない静的検証 126 項目) と mode=ramp|sine (headless Chrome + FlAudioShim — COM 取得→CreateBuffers→bufferSwitchTimeInfo 連鎖→Stop→Release の全経路)。
-- **harness/**: `run_com.mjs` (3 シナリオランナー, tools/audio/harness/chrome.mjs 流用) + `com_page.mjs` (page.mjs 流儀, ramp/sine bit 突合) + `index_com.html`。
+- **harness/**: `run_com.mjs` (CAB-270 以降は **4 シナリオ** = 短 3 + 120s soak。tools/audio/harness/chrome.mjs 流用) + `com_page.mjs` (page.mjs 流儀, ramp/sine bit 突合) + `index_com.html`。
 
 ### 実測値の取込 (INVENTORY §2-§3 / CAB-9 検収 03dbd1a)
 
@@ -57,7 +57,7 @@ win64 レイアウト static_assert (BufferInfo64=24B/buffers@8, Callbacks64=32B
 全シナリオで `getChannels 2/2, getBufferSize 0x100/0x1000/gran 0 (作成後 pref=B), type 0x13, lat_out>0` を確認。`output_ready = -1000 (ASE_NotPresent)` も実測一致。
 
 #### 3-1. 短シナリオの負荷依存 (規則 38・41)
-`e2e.sh` を計 **7 回** 実行 (各 **20〜21 秒**・実測, load average 1/5/15 分 = 2.08〜17.2 / 3.28〜11.9 / 3.47〜10.32):
+以下は **soak 追加前** (3 シナリオ構成) の記録。`e2e.sh` を計 **7 回** 実行 (各 **20〜21 秒**・実測, load average 1/5/15 分 = 2.08〜17.2 / 3.28〜11.9 / 3.47〜10.32):
 **6 回は 3/3 PASS**。残り 1 回は `com_sine_b256_d2` が **underruns=1 / silence=512f / maxErr=8.21e-1** で FAIL
 (load 1分 16.24 の高負荷時。burst 観測値が伸びた際の既知モード)。失敗以降の 6 回 (load 1分 2.08 含む) は
 全て underruns=0 / maxErr=1.49e-8 で 3/3 PASS。**したがって「短シナリオ 3/3」は単発値ではなく負荷依存であり、
