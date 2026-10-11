@@ -224,10 +224,13 @@ def main():
                     pdata.append(IMG + b)
                 break
         pset = set(pdata)
-        # FLE-2: VMT スロットが「.pdata 整列でない関数途中」を指す場合がある。
-        # 全 .text word を root にすると root が 6 万超 (= 全域 lift) になって実用的でないため、
+        # FLE-2: VMT スロットや **jump table の case body** が「.pdata 整列でない関数途中」を指す。
+        # 全 .text word を root にすると 6 万超 (= 全域 lift) になって実用的でないため、
         # **boot_roots.json に明記された target のみ** を追加で root にする
-        # (実行時に unlifted として発見 → 累積する既存方式。実測 0x527b5b は fn 0x5274c0 の途中)。
+        # (実行時に unlifted として発見 → 累積する既存方式)。
+        # 実測: 0x527592 系 (fn 0x5274c0 は 1 バイトの縮退 .pdata) / 0x433051 系 (fn 0x42daa0 内)。
+        # いずれも `add rcx,-imm; jmp <target>` の Delphi switch テーブルで、x64c の
+        # jump_table_abs が解決するには当該 VA が roots に入っている必要がある。
         extra_targets = {int(x, 16) for x in json.load(open(extra_path))} if os.path.exists(extra_path) else set()
         for s in pe.sections:
             n = s.Name.rstrip(b'\0').decode()
@@ -239,6 +242,40 @@ def main():
                 v = struct.unpack_from('<Q', data, off)[0]
                 if v in pset or v in extra_targets:
                     roots.add(v)
+        # ---- FLE-2: Delphi switch テーブルの case body 自動 harvest ----
+        # .text 内に「.text を指す 8B 値が 2〜16 個連続する」領域 = jump table 候補。
+        # case body は Delphi RTL の同一 shape `48 83 c1 <imm8>  e9 <rel32>`
+        # (add rcx,-imm ; jmp 共通継続) で .pdata 整列でないことが多い
+        # (縮退 .pdata の fn 0x5274c0 / fn 0x42daa0 等)。
+        # 無条件採取は非コード領域まで root 化して unsupported 命令が爆発するため
+        # (実測: 40,263 関数 / unsup 60 種)、shape 検査を通ったものだけ roots に入れる。
+        # 連続数上限は 32 (実測の最大テーブルは 0x642e78 の 20 entry)。
+        text_lo, text_hi = 0x401000, 0x401000 + 0xfa34b0
+        def is_delphi_case(va):
+            b = bytes(img[va - IMG: va - IMG + 12])
+            if len(b) < 12:
+                return False
+            return b[0] == 0x48 and b[1] == 0x83 and b[2] == 0xc1 and b[4] == 0xe9
+        tsec = None
+        for s in pe.sections:
+            if s.Name.rstrip(b'\0').decode().startswith('.text'):
+                tsec = s; break
+        if tsec is not None:
+            va0, sz, rawsz = tsec.VirtualAddress, tsec.Misc_VirtualSize, tsec.SizeOfRawData
+            data = bytes(img[va0:va0 + min(sz, rawsz) if rawsz else sz])
+            run = []
+            def flush():
+                if 2 <= len(run) <= 32:
+                    for x in run:
+                        if x not in pset and text_lo <= x < text_hi and is_delphi_case(x):
+                            roots.add(x)
+            for off in range(0, len(data) - 7, 8):
+                v = struct.unpack_from('<Q', data, off)[0]
+                if text_lo <= v < text_hi:
+                    run.append(v)
+                else:
+                    flush(); run = []
+            flush()
     json.dump({'roots': sorted(roots), 'calltgt': base.get('calltgt', [])},
               open(os.path.join(a.out, 'fle_entries_boot.json'), 'w'), indent=1)
 

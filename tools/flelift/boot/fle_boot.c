@@ -183,7 +183,7 @@ void imp_RaiseException(void) {  /* Delphi SEH raise → JS 例外化 (boot/surv
 }
 void imp_VirtualAlloc(void) {  /* shimx VirtualAlloc (weak) へ委譲 + 計数 */
     u64 addr = R[1], size = R[2]; u32 type = R[8] & 0xffffffff, prot = R[9] & 0xffffffff;
-#ifdef FLEBOOT_NOSX
+#if FLEBOOT_NOSX
     /* nosx: shimx 未 link なので fle_cpu.c の bump allocator を使う */
     static uint64_t cur = 0x2100000ull;
     uint64_t sz = (size + 0xffff) & ~0xffffull;
@@ -495,7 +495,7 @@ EMSCRIPTEN_KEEPALIVE void fle_boot_enter(int survey) {
         fle_data_install();
         fle_textwin_install();
         fle_init();
-#ifndef FLEBOOT_NOSX
+#if !FLEBOOT_NOSX
         /* nosx variant は shimx を link しない (fle_cpu.c の imp_ のみ) ので、shimx 依存の
          * wiring は丸ごと落とす。旧実装はここが無条件で nosx が link できなかった
          * (FLE-2 実測: wasm-ld undefined symbol shimx_cbtrans_* 等 8 件)。 */
@@ -503,11 +503,17 @@ EMSCRIPTEN_KEEPALIVE void fle_boot_enter(int survey) {
         shimx_cbtrans_install();
         shimx_set_proc_resolver(shimx_lifttab_proc_resolver);
         shimx_set_intptr_limit(0x10000);
+        /* FLE-3: R7 互換モード。unit 111 で `InitializeCriticalSectionEx(NULL/misaligned)` が
+         * shimx の fail-fast に掛かり abort していた (実測: work/boot/run_plain.log)。
+         * CRITICAL_SECTION は単一スレッド前提では意味を持たないので no-op で通し、
+         * boot 連鎖の先を伸ばす。副作用: Enter/Leave/TryEnter の意味が失われる
+         * (survey の lock 依存 unit は誤判定する可能性 — REPORT §5 に記録)。 */
+        shimx_set_cs_null_ok(1);
 #endif
         fle_ff_hook = fle_ff;
         fle_dispatch_probe = fle_probe_dispatch;
         g_installed = 1;
-#ifdef FLEBOOT_NOSX
+#if FLEBOOT_NOSX
         fprintf(stderr, "[fleboot] image + textwin installed (nosx: shimx 未 link)\n");
 #else
         fprintf(stderr, "[fleboot] image + textwin installed, shimx cbtrans/resolver wired\n");

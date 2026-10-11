@@ -30,7 +30,9 @@ python3 "$HERE/gen_boot.py" --pe "$PE" --out "$W"
 # ---- 2. lift (boot 用 entries: +entry_point 0x1376820, +longjmp 断片 0x1376840, +override) ----
 if [ ! -f "$LIFT/fle_lifted.c" ] || [ "$FAST" = 0 ] || [ "$W/fle_entries_boot.json" -nt "$LIFT/fle_lifted.c" ]; then
   echo "[boot_e2e] lift (x64c) ..."
-  python3 "$FLE/x64c.py" --pe "$PE" --entries "$W/fle_entries_boot.json" --out "$LIFT" --closure ${FLE_LIFT_CLOSURE:-0} \
+  # closure 既定 2 (FLE-2 実測: closure 0 = 16 unit / closure 2 = 40 unit。20,479 → 29,415 関数)。
+  # FLE_LIFT_CLOSURE=0 で旧既定に戻せる。
+  python3 "$FLE/x64c.py" --pe "$PE" --entries "$W/fle_entries_boot.json" --out "$LIFT" --closure ${FLE_LIFT_CLOSURE:-2} \
     --img 0x400000 --shift 0 --img-size 0x18c0000 --impbase 0x1D80000 \
     --override 0x4126f0=fle_ov_longjmp --override 0x409410=fle_ov_getmem \
     --override 0x409440=fle_ov_freemem --override 0x4120c0=fle_ov_initunits

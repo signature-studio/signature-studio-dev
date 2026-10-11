@@ -20,7 +20,7 @@ for round in $(seq 1 "$MAX"); do
   echo "==== round $round ===="
   python3 "$HERE/gen_boot.py" --pe "$PE" --out "$W" >/dev/null
   T0=$(date +%s)
-  python3 "$FLE/x64c.py" --pe "$PE" --entries "$W/fle_entries_boot.json" --out "$W/lift" --closure 12 \
+  python3 "$FLE/x64c.py" --pe "$PE" --entries "$W/fle_entries_boot.json" --out "$W/lift" --closure ${FLE_LIFT_CLOSURE:-2} \
     --img 0x400000 --shift 0 --img-size 0x18c0000 --impbase 0x1D80000 \
     --override 0x4126f0=fle_ov_longjmp --override 0x409410=fle_ov_getmem \
     --override 0x409440=fle_ov_freemem --override 0x4120c0=fle_ov_initunits 2>&1 | tail -1
