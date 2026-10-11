@@ -458,6 +458,10 @@ void fle_ov_initunits(void) {
     }
 }
 
+/* FLE-5 診断フック (既定 0 = 無効)。gentrace/dbg lift の fprintf を有効にする。
+ * 設定は fle_boot_set_dbg(int)。diagnostic lift (work/boot/dbgout/) のみ参照。 */
+int g_dbg_6c = 0;
+EMSCRIPTEN_KEEPALIVE void fle_boot_set_dbg(int v) { g_dbg_6c = (int)(v != 0); }
 static int g_installed;
 EMSCRIPTEN_KEEPALIVE void fle_boot_set_strict(int v) { fle_g_strict = (unsigned char)(v != 0); }
 EMSCRIPTEN_KEEPALIVE void fle_test_throw(void) { fle_throw_kind((long)(intptr_t)"test", 5); }

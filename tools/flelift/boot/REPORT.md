@@ -1,9 +1,12 @@
-# tools/flelift/boot — FLE-2/FLE-3: x64c lift による FLEngine boot 連鎖 (DllMain → _InitLib → InitUnits)
+# tools/flelift/boot — FLE-2〜FLE-5: x64c lift による FLEngine boot 連鎖 (DllMain → _InitLib → InitUnits)
 
 ## 0. 結論 (先出し)
 
-- **判定 (累積, FLE-4 末): unit 進行 209 止まりだが survey は全 942 unit で functional**
-  (FLE-1 17 → FLE-2 40 → FLE-3 209 → FLE-4 は unit 209 で blocker 変更)。
+- **判定 (累積, FLE-5 末): unit 進行は 209 止まり、survey は全 942 unit で functional**
+  (FLE-1 17 → FLE-2 40 → FLE-3 209 → FLE-4 blocker 変更 → FLE-5 は **原因特定完了**)。
+  **FLE-5 の主成果**: FLE-4 で「未初期化」と報じた `f_6c7900` の fill ループ幅について、
+  **真の原因は `f_653f40` (VCL フォーム登録ルーチン) が早期 return して
+  コールバック `0x15F34A0` が未設定のまま** であることを 5 段の逆引きで実証 (§3-5)。
   **FLE-2/FLE-3 で突破したもの** (累積):
   1. **Delphi switch テーブルの case body 自動 harvest** (`gen_boot.py`): `.text` 内の
      「`.text` を指す 8B 値が 2〜32 個連続」領域から shape `48 83 c1 <imm8> e9` のものだけ root 化。
@@ -28,6 +31,29 @@
      設定する **fill コールバック**。root 化すると `f_6c7900` の fill ループが未初期化幅
      (0xffffa = 1,048,570 回) で暴走して ExitProcess → survey が成立しない。
      **boot_roots.json からは除外** (unlifted で止める方が survey は functional)。
+- **FLE-5 の成果 (fill ループ幅「未初期化」の真因特定)**:
+  1. **`chk` variant の `__LINE__` 逆引きは guest VA 直接指定に拡張** (`boot/dbg_lift.py`)。
+     lift 生成 C は `/* <VA>: <asm> */` コメントが 1 行ずつ対応するため、`grep -n "6c7610"`
+     で即座に C 行を引け、`fprintf` を挿入して実測できる。
+  2. **`f_6c7610` の `rsi` (record へのポインタ) は 0x100000、中身は全 0**。
+     rsi の由来は `f_6b91c6` の `System._GetMem` 直後の **`call [rax]` (0x6b91e6)** が
+     `dispatch(0)` (= icall-miss) に失敗したことで、結果が 0 渡しになったこと。
+  3. **その `rax = *(0x15E0A48)` = 0x15F34A0 は .bss の関数ポインタで、image 全体に
+     store 命令が 1 つも無い** (直接 store 0 件)。→ **動的登録型**。
+  4. **登録側は `f_653f40`**: `f_653dd0(self, @field, @method)` が `@field` に
+     メソッドのクラスインスタンスを store する。`0x15F34A0 = 0x15F33C0 + 0x1E0` は
+     `f_653f40` が登録する連続 .bss フィールド列の 15 番目。
+  5. **`f_653f40` は "guard `*(0x15F40E8) != 0`" で早期 return している** (実測)。
+     その guard を作る `f_6539e0` → `f_43c5e0` (VCL リーダ/`0x43c624` の DFM 系データ参照)
+     → `f_414ec0` が **out = 0** を返すため。`f_6539e0` は正常系で
+     `0x15F40E8` に non-NULL を書く必要がある。
+  → **前ラウンド「ループ幅が未初期化」という観測は正しいが、原因はそこではなく
+     「フィールド登録が 1 つも走っていない」**。根は VCL フォーム/リソース読み出しにある。
+- **FLE-5 の副次成果**:
+  1. **`native_fault 89` を CAB-232/233 接続可能な形に整理** (§4-2)。両 route は同一 PE VA
+     空間なので、function-level JSONL と混在採点しても `function.va` で衝突しない。
+  2. **survey の非 ok 内訳を確定** (§4-4): `unlifted 5` = 上の `0x6a7b70` と同じ
+     フィールド登録依存のものが主体。
 - **FLE-4 実測値**:
   - **survey (942 unit 隔離, closure 2)**: **ok 888 / oob 2 / unlifted 5 / empty 46 / noproc 1**
     (FLE-3 末 ok 888 / oob 2 / unlifted 5 / empty 46 / noproc 1 と同一 — NULL page guard は

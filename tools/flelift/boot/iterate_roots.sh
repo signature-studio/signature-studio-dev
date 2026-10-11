@@ -16,6 +16,11 @@ export TMPDIR="$W/tmp"
 
 EXPORTS=_fle_boot_enter,_fle_boot_set_strict,_fle_units_run,_fle_units_total,_fle_units_empty,_fle_boot_stage,_fle_n_getmem,_fle_n_freemem,_fle_n_longjmp,_fle_n_exit,_fle_n_getproc,_fle_n_soft,_fle_n_soft_uniq,_fle_soft_name,_fle_soft_count,_fle_va_calls,_fle_va_bytes,_fle_n_cb,_fle_unit_proc,_fle_run,_fle_rget,_fle_data_install,_fle_init,_fle_reset,_shimx_set_trace,_shimx_init,_fle_test_throw,_fle_n_dispatch,_fle_n_disp_getmem,_fle_n_disp_freemem,_fle_n_disp_realloc,_fle_n_disp0,_fle_ring_at,_fle_n_loadstr
 
+# FLE-5: root 化すると survey が破裂する address の blocklist。
+# lift すると f_6c7900 の fill ループが未初期化幅 (1,048,570 回) で暴走 → ExitProcess
+# → survey が成立しなくなる (§3-4 参照)。unlifted で止める方が survey は functional。
+BLOCKLIST="${FLE_ROOT_BLOCKLIST:-0x6a7b70}"
+
 for round in $(seq 1 "$MAX"); do
   echo "==== round $round ===="
   python3 "$HERE/gen_boot.py" --pe "$PE" --out "$W" >/dev/null
@@ -79,18 +84,19 @@ PYEOF
     break
   fi
   # unlifted target を boot_roots.json へ (実行時発見分)
-  python3 - "$W" "$HERE" <<'PYEOF'
+  python3 - "$W" "$HERE" "$BLOCKLIST" <<'PYEOF'
 import json, re, sys
-W, HERE = sys.argv[1], sys.argv[2]
+W, HERE, BLOCK = sys.argv[1], sys.argv[2], sys.argv[3]
+block = {x.strip() for x in BLOCK.split(',') if x.strip()}
 log = open(W + '/run_plain.log', errors='replace').read()
 targets = set(int(m, 16) for m in re.findall(r'\[fleboot\]\[ff\] unlifted 0x([0-9a-f]+)', log))
-old = json.load(open(HERE + '/boot_roots.json'))
-new = sorted(set(old) | set(hex(t) for t in targets))
+old = list(json.load(open(HERE + '/boot_roots.json')))
+new = sorted(set(old) | (set(hex(t) for t in targets) - block))
 if len(new) > len(old):
     json.dump(new, open(HERE + '/boot_roots.json', 'w'), indent=1)
     print('[iter] runtime unlifted %d 件を追加 (boot_roots -> %d)' % (len(new) - len(old), len(new)))
 else:
-    print('[iter] runtime unlifted 追加なし')
+    print('[iter] runtime unlifted 追加なし (blocked: %s)' % sorted(block))
 PYEOF
 done
 echo "[iter] done"

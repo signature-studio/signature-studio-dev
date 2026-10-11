@@ -1,45 +1,24 @@
 {
  "units_covered": 895,
  "byCls": {
-  "ok": 888,
-  "oob": 2,
-  "unlifted": 5
+  "ok": 892,
+  "unlifted": 3
  },
  "details": [
   [
    280,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   296,
    "unlifted",
-   4685427
+   6978416
   ],
   [
    659,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   666,
    "unlifted",
-   13705952
-  ],
-  [
-   830,
-   "unlifted",
-   9306096
+   6978416
   ],
   [
    895,
    "unlifted",
-   9306096
-  ],
-  [
-   898,
-   "unlifted",
-   9306096
+   9924000
   ]
  ]
 }
