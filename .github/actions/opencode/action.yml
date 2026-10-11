@@ -28,118 +28,52 @@ runs:
         printf '%s' "$OC_AUTH_EXPORT" | opencode auth import
         opencode auth list
 
+    # prompt は env 経由で渡す (run スクリプト中に直接展開すると $( ) として評価されてしまう)
+    # 1 回だけリトライ: プロバイダ接続が transient に切れることがある
     - name: Run OpenCode
       id: run
       shell: bash
-      # prompt はバッククォートを含むため env 経由で渡す
-      # (run スクリプト中に直接展開すると $( ) として評価されてしまう)
       env:
         OC_PROMPT: ${{ inputs.prompt }}
         OC_MODEL: ${{ inputs.model }}
         OC_AGENT: ${{ inputs.agent }}
       run: |
         set +e
-        printf '%s' "$OC_PROMPT" > "$RUNNER_TEMP/oc-prompt.txt"
-        opencode run \
-          --standalone \
-          --auto \
-          --model "$OC_MODEL" \
-          --agent "$OC_AGENT" \
-          --format json \
-          "$(cat "$RUNNER_TEMP/oc-prompt.txt")" < "$RUNNER_TEMP/oc-prompt.txt" \
-          > "$RUNNER_TEMP/oc-output.jsonl" 2> "$RUNNER_TEMP/oc-stderr.log"
-        rc=$?
+        rc=1
+        for attempt in 1 2; do
+          opencode run --standalone --auto \
+            --model "$OC_MODEL" --agent "$OC_AGENT" \
+            --format json --print-logs "$OC_PROMPT" \
+            > "$RUNNER_TEMP/oc-output.jsonl" 2> "$RUNNER_TEMP/oc-stderr.log"
+          rc=$?
+          if [ "$rc" = 0 ]; then break; fi
+          echo "::warning::opencode run failed (attempt $attempt, exit $rc); retrying"
+        done
         echo "rc=$rc" >> "$GITHUB_OUTPUT"
+        echo "sid=$(jq -r 'select(.sessionID != null) | .sessionID' \
+          "$RUNNER_TEMP/oc-output.jsonl" | head -1)" >> "$GITHUB_OUTPUT"
         echo "opencode exit code: $rc"
-        echo "jsonl lines: $(wc -l < "$RUNNER_TEMP/oc-output.jsonl")"
-    # 要約の書き出しは opencode が失敗しても行う (失敗原因の手がかりを残す)
 
-    # -------------------------------------------------------------------
-    # 出力の要約を $GITHUB_STEP_SUMMARY へ。
-    # opencode run --format json は JSONL。最後のメッセージが text とは限らないため、
-    # 後ろから遡って最初の text パートを採用する (v2 の subagent と同手法)。
-    # 見つからない場合はデバッグ用に末尾の生イベントを出力。
-    # -------------------------------------------------------------------
+    # 最終回答は opencode api から取得する (JSONL の解析はしない)
     - name: Write step summary
-      shell: bash
-      run: |
-        python3 - "$RUNNER_TEMP/oc-output.jsonl" >> "$GITHUB_STEP_SUMMARY" <<'PY'
-        import json, sys
-        path = sys.argv[1]
-        summary = None
-        try:
-            lines = open(path, encoding="utf-8").read().splitlines()
-        except OSError:
-            lines = []
-        events = []
-        for ln in lines:
-            ln = ln.strip()
-            if not ln.startswith("{"):
-                continue
-            try:
-                events.append(json.loads(ln))
-            except json.JSONDecodeError:
-                pass
-
-        def texts(ev):
-            """イベント内の全 text パートを (役割, テキスト) で返す"""
-            out = []
-            def walk(o):
-                if isinstance(o, dict):
-                    if o.get("type") == "text" and isinstance(o.get("text"), str):
-                        out.append(o["text"])
-                    for v in o.values():
-                        walk(v)
-                elif isinstance(o, list):
-                    for v in o:
-                        walk(v)
-            walk(ev)
-            return out
-
-        # 後ろから遡り、十分な長さのある text を探す (assistant 優先)
-        best = None
-        for ev in reversed(events):
-            if isinstance(ev, dict) and ev.get("type") in ("message.updated", "message.part.updated", "session.idle"):
-                for t in texts(ev):
-                    t = t.strip()
-                    if len(t) >= 40:
-                        best = t
-                        break
-            if best:
-                break
-        if best is None:
-            for ev in reversed(events):
-                for t in texts(ev):
-                    t = t.strip()
-                    if len(t) >= 40:
-                        best = t
-                        break
-                if best:
-                    break
-
-        print("## OpenCode result")
-        print()
-        if best:
-            print(best[:20000])
-        else:
-            print("_No textual summary found in opencode output. Raw tail:_")
-            print("```")
-            print("\n".join(lines[-30:])[:8000])
-            print("```")
-        PY
-        echo "" >> "$GITHUB_STEP_SUMMARY"
-        echo "events: $(wc -l < "$RUNNER_TEMP/oc-output.jsonl" 2>/dev/null || echo 0)"
-
-    # opencode が異常終了していたらジョブを失敗させる
-    # (セットアップだけ成功して agent が動いていない状態を検知するため)
-    - name: Fail if OpenCode did not succeed
+      if: ${{ always() && steps.run.outputs.sid != '' }}
       shell: bash
       env:
-        OC_RC: ${{ steps.run.outputs.rc }}
+        SID: ${{ steps.run.outputs.sid }}
       run: |
-        if [ "${OC_RC:-1}" != "0" ]; then
-          echo "::error::opencode run exited with code ${OC_RC}"
-          echo "--- opencode stderr (tail) ---"
-          tail -c 8000 "$RUNNER_TEMP/oc-stderr.log" 2>/dev/null || true
-          exit 1
-        fi
+        echo "## OpenCode result"
+        echo
+        opencode api --standalone get "/api/session/$SID/message" \
+          | jq -r '[.data[] | select(.type == "assistant")] | last | .content[]? | select(.type == "text") | .text' \
+          >> "$GITHUB_STEP_SUMMARY" || echo "::warning::could not extract summary for session $SID"
+
+    - name: Fail if OpenCode did not succeed
+      if: ${{ steps.run.outputs.rc != '0' }}
+      shell: bash
+      env:
+        RC: ${{ steps.run.outputs.rc }}
+      run: |
+        echo "::error::opencode run exited with code $RC"
+        echo "--- opencode stderr (tail) ---"
+        tail -c 8000 "$RUNNER_TEMP/oc-stderr.log" 2>/dev/null
+        exit 1

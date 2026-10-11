@@ -49,47 +49,9 @@ runs:
       run: sudo apt-get update -qq && sudo apt-get install -y -qq zstd
     - name: Setup OpenCode
       shell: bash
-      # バージョン決定 (CI からですと update/api が 500 になりがちなのでリトライ)
-      # VERSION を明示すると installer 内部の metadata 取得フェーズがスキップされる
       run: |
-        set -e
-        VERSION=""
-        for attempt in 1 2 3 4 5; do
-          META=$(curl -fsSL "https://opencode.ai/update/api/latest/cli/npm" 2>/dev/null || true)
-          if [ -n "$META" ] && printf '%s' "$META" | grep -q '"version"'; then
-            VERSION=$(printf '%s' "$META" | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')
-            break
-          fi
-          echo "::warning::could not determine opencode version (attempt $attempt); retrying in $((attempt * 10))s"
-          sleep $((attempt * 10))
-        done
-        if [ -z "$VERSION" ]; then
-          echo "::error::could not determine the latest opencode version"
-          exit 1
-        fi
-        echo "installing opencode $VERSION"
-        echo "OPENCODE_CLI_VERSION=$VERSION" >> "$GITHUB_ENV"
-
-        for attempt in 1 2 3 4 5; do
-          if curl -fsSL https://opencode.ai/v2/install -o "$RUNNER_TEMP/opencode-install.sh"; then
-            echo "installer fetched on attempt $attempt"
-            break
-          fi
-          echo "::warning::opencode installer fetch failed (attempt $attempt); retrying in $((attempt * 10))s"
-          sleep $((attempt * 10))
-          if [ "$attempt" = "5" ]; then
-            echo "::error::could not fetch https://opencode.ai/v2/install after 5 attempts"
-            exit 1
-          fi
-        done
-        VERSION="$VERSION" bash "$RUNNER_TEMP/opencode-install.sh"
+        curl -fsSL --retry 10 --retry-delay 3 https://opencode.ai/v2/install | bash
         echo "$HOME/.opencode/bin" >> $GITHUB_PATH
-    - name: Verify setup
-      shell: bash
-      run: |
-        which opencode uv pnpm bun node python zstd
-        echo "opencode: $(opencode --version)"
-        echo "zstd: $(zstd --version)"
 
     # ---------------------------------------------------------------
     # GitHub App token auto-refresh (1h expiry mitigation)
@@ -120,19 +82,14 @@ runs:
         SIG=$(printf '%s' "$SIGNING" | openssl dgst -sha256 -sign <(printf '%s' "$OC_APP_PRIVATE_KEY") | openssl base64 -A | tr '+/' '-_' | tr -d '=')
         JWT="$SIGNING.$SIG"
         INSTALL_ID=$(curl -fsSL -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" \
-          https://api.github.com/app/installations | python3 -c 'import json,sys; print(json.load(sys.stdin)[0]["id"])')
+          https://api.github.com/app/installations | jq -r '.[0].id')
         # OC_TOKEN_PERMISSIONS が設定されていれば権限を制限する (read-only モード用)
         PERM_ARGS=()
         if [ -n "${OC_TOKEN_PERMISSIONS:-}" ]; then
-          if ! printf '%s' "$OC_TOKEN_PERMISSIONS" | python3 -c 'import json,sys; json.load(sys.stdin)' 2>/dev/null; then
-            echo "ERROR: OC_TOKEN_PERMISSIONS is not valid JSON: $OC_TOKEN_PERMISSIONS" >&2
-            exit 1
-          fi
           PERM_ARGS=(-H "Content-Type: application/json" --data "$OC_TOKEN_PERMISSIONS")
         fi
         TOKEN=$(curl -fsSL -X POST "${PERM_ARGS[@]}" -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" \
-          https://api.github.com/app/installations/$INSTALL_ID/access_tokens \
-          | python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])')
+          https://api.github.com/app/installations/$INSTALL_ID/access_tokens | jq -r '.token')
         printf '%s' "$TOKEN" > "$RUNNER_TEMP/gh_token"
         MINT
         chmod +x "$RUNNER_TEMP/bin/mint-token.sh"
@@ -162,8 +119,7 @@ runs:
 
     # ---------------------------------------------------------------
     # R2 artifacts (FL Studio・プラグイン素材一式)
-    # 認証情報は repository secrets から (未設定ならskip・read-only モードで動作)
-    # 404 (未アップロード) は notice で継続し、認証/一時的エラーのみ fail させる
+    # 認証情報は repository secrets から (未設定なら skip・read-only モードで動作)
     # ---------------------------------------------------------------
     - name: Download artifacts from R2
       shell: bash
@@ -172,44 +128,18 @@ runs:
         CF_R2_ACCESS_KEY_ID: ${{ inputs.cf-r2-access-key-id }}
         CF_R2_SECRET_ACCESS_KEY: ${{ inputs.cf-r2-secret-access-key }}
       run: |
-        set -e
         BUCKET="${{ inputs.r2-bucket }}"
-        LIST="${{ inputs.artifacts }}"
-        if [ -z "$CF_R2_ACCESS_KEY_ID" ]; then
-          echo "::notice::R2 credentials not set; skipping artifact download (agent will run without binaries)"
-          exit 0
-        fi
         ENDPOINT="https://$CF_ACCOUNT_ID.r2.cloudflarestorage.com"
         mkdir -p "$HOME/ダウンロード" "$HOME/work/analysis"
-        ok=0
-        for name in $LIST; do
-          URL="$ENDPOINT/$BUCKET/artifacts/$name.tar.zst"
-          echo "downloading $name.tar.zst ..."
-          # -f は付けない: 404 でも body を拾って 404 と判別できるようにする
-          code=$(curl -sSL --retry 3 -o "/tmp/$name.tar.zst" -w '%{http_code}' \
-            -H "x-amz-content-sha256: UNSIGNED-PAYLOAD" \
+        for n in ${{ inputs.artifacts }}; do
+          curl -fsSL --retry 3 \
             --aws-sigv4 "aws:amz:auto:s3" \
             --user "$CF_R2_ACCESS_KEY_ID:$CF_R2_SECRET_ACCESS_KEY" \
-            "$URL") || true
-          if [ "$code" = "200" ]; then
-            tar -xf "/tmp/$name.tar.zst" -C "$HOME" --zstd
-            rm -f "/tmp/$name.tar.zst"
-            echo "extracted $name"
-            ok=$((ok + 1))
-            continue
-          fi
-          rm -f "/tmp/$name.tar.zst"
-          if [ "$code" = "404" ]; then
-            echo "::warning::artifact not present in R2 (404): $URL -> agent runs without these binaries"
-          else
-            echo "::error::failed to download $URL (http=$code)"
-            exit 1
-          fi
+            "$ENDPOINT/$BUCKET/artifacts/$n.tar.zst" \
+          | tar -x -C "$HOME" --zstd \
+          && echo "extracted $n" \
+          || echo "::warning::artifact $n unavailable; agent runs without these binaries"
         done
-        if [ "$ok" -eq 0 ]; then
-          echo "::warning::no R2 artifacts available; the agent will run without the FL Studio / plugin binaries"
-          exit 0
-        fi
         # e2e が参照する環境変数の既定値を素材の場所に合わせる
         {
           echo "FL_WIN_INSTALLER=$HOME/ダウンロード/flstudio_win64_26.1.7.5653.exe"
