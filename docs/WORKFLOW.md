@@ -13,7 +13,7 @@
 
 ## 1. 絶対遵守 (事故防止・上書き)
 
-1. **`master` / `main` の共有ワークツリー (`/home/ubuntu/work/webstudio`) では作業しない。**
+1. **`master` / `main` の共有ワークツリー (PM が管理する既定の作業ツリー) では作業しない。**
    変更は branch → worktree → PR のみ。`git push origin master` 禁止。
 2. **禁止 git 操作**: `git reset` / `git reset --hard` / `git stash` / `git checkout -- <他人のfile>` /
    `git checkout .` / `git restore` / `git clean` / **`git push --force` / `--force-with-lease`**。
@@ -49,7 +49,8 @@ PM (main)                      subagent (実装)                  subagent (検�
    └ gh pr merge --squash ──→ branch/worktree 削除
 ```
 
-- **worktree の場所**: `/home/ubuntu/work/ws-<N>` (`git worktree add /home/ubuntu/work/ws-<N> -b <N>-<slug> origin/master`)。
+- **worktree の場所**: リポジトリの**親ディレクトリの `ws-<N>`**
+  (`git worktree add ../ws-<N> -b <N>-<slug> origin/master`)。
   既存 worktree は `git worktree list` で確認。**他人の worktree には触れない** (消さない・checkout しない)。
 - **merge は PM のみ**。merge 後、`git worktree remove --force` で**自分が使った worktree** を片付ける。
 - **競合時**: `git rebase origin/master` で解消してから `push --force-with-lease` (自分 branch のみ)。

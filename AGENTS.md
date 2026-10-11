@@ -27,8 +27,8 @@ Signature Studio (webstudio) のリポジトリで作業する**全エージェ�
 - **`master` / `main` には変更を加えない** (直接 commit・`git push origin master` 禁止)。
 - **全作業は subagent 委任**。**1 チケット = 1 subagent**。チケット化されていない作業も subagent で行う。
   10 回以上の tool call が必要になる作業は必ず subagent に委任する。
-- worktree の場所は `/home/ubuntu/work/ws-<N>` (N = issue 番号)。
-  共有ワークツリー `/home/ubuntu/work/webstudio` は main のもの。**絶対に触らない。**
+- worktree の場所は**リポジトリの親ディレクトリの `ws-<N>`** (N = issue 番号)。
+  main の共有ワークツリー (既定 `ws-main` 相当) は **絶対に触らない** (PM の管理物)。
 - 詳細: `docs/WORKFLOW.md` §1〜§2。
 
 ## 2. ドキュメント責務マップ (最も重要なセクション)
@@ -112,7 +112,7 @@ Signature Studio (webstudio) のリポジトリで作業する**全エージェ�
 ### ブランチ / worktree
 
 - branch: `<N>-<slug>` (N = issue 番号。例 `254-arg-pass-abi`)。
-- worktree: `/home/ubuntu/work/ws-<N>`。
+- worktree: 親 dir の `ws-<N>`。
 - 破壊的 git 操作 (`reset --hard` / `push --force` / `stash` / 他 branch checkout) は禁止。
 
 ## 4. レビュー規約
@@ -135,7 +135,7 @@ Signature Studio (webstudio) のリポジトリで作業する**全エージェ�
 
 ## 6. 禁止事項 (絶対)
 
-1. **repo 外絶対パス (`/home/ubuntu/work/...`, `/opt/...`) の羅列を repo 内 .md に書く** —
+1. **repo 外絶対パス (`/home/<user>/...`・`/opt/...` 等のマシン依存パス) の羅列を repo 内 .md に書く** —
    外部パスは `docs/REFERENCES.md` のエントリ ID (`[WIN64]`・`[EMSDK]` 等) で参照する。
 2. **preflight 読了証跡 (ハッシュ 1 行) の羅列** — 廃止 (`docs/DECISIONS.md` D6・`docs/WORKFLOW.md` 冒頭参照)。
    検証手順は `docs/WORKFLOW.md` §6 に一本化。
@@ -145,7 +145,7 @@ Signature Studio (webstudio) のリポジトリで作業する**全エージェ�
 5. **`node_modules/`・`dist/`・`.wrangler/` への作業** (gitignore 対象)。
 6. **`git push --force` / `--force-with-lease` (他人 branch)**・`git reset --hard`・
    `git stash`・`git checkout -- <他人のfile>`・`git checkout .`・`git clean`。
-7. **他ブランチへの checkout / main worktree (`/home/ubuntu/work/webstudio`) への作業。**
+7. **他ブランチへの checkout / main worktree (PM の共有ワークツリー) への作業。**
 8. **旧 `master` / `main` への直接 commit・push。**
 9. **Linear への書き込み** — 2026-10-12 廃止・読み取り専用の歴史データ。
 10. **`state:*` ラベルの新規作成・付与** (全削除済み)。
