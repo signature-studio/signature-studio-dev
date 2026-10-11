@@ -32,26 +32,15 @@ FL Studio 26.1.7 をブラウザ (wasm) 上で完全に動作させるプロジ�
 
 | 系統 | ディレクトリ | 正本 |
 |---|---|---|
-| 基盤 | `m1`,`m2`,`m3`,`m5` | `tools/m1/README.md`・各 `REPORT.md` |
-| 基盤 | `flelift`,`liftlib`,`liftdiff` | 各 `REPORT.md`・`tools/liftlib/README.md` |
+| 基盤 | `m1`,`m2`,`m3`,`m5`・`flelift`(+`boot`)・`liftlib`・`liftdiff` | `tools/m1/README.md`・各 `REPORT.md` |
 | OTT | `m6`〜`m10`,`ott` | `tools/ott/REPORT.md` |
-| 起動 | `m11` (+`alloca`,`ldfix`,`shimx_link`) | `tools/m11/REPORT.md` |
+| 起動 | `m11`(+`alloca`,`ldfix`,`shimx_link`)・`startup`(+`glue`,`keyfix`,`pump`,`vreg`,`winstubs`) | `tools/m11/REPORT.md`・`tools/startup/STARTUP.md` |
 | 解析 | `icall` (+`disp_size`,`landing`) | `tools/icall/REPORT.md` |
 | shim | `shim`,`shimx` (+`pathreg`) | `tools/shim/README.md`・`tools/shimx/README.md` |
-| 起動 | `startup` (+`glue`,`keyfix`,`pump`,`vreg`,`winstubs`) | `tools/startup/REPORT.md`・`STARTUP.md`・`GATES.md` |
-| 実行基盤 | `runtime` | `tools/runtime/REPORT.md`・`DESIGN.md` |
-| ホスト | `hostbridge` (+`cb`,`h2`,`lowbase`,`nfo`) | `tools/hostbridge/REPORT.md`・`HOSTBRIDGE.md` |
-| GUI | `gui` | `tools/gui/REPORT.md` |
-| オーディオ | `audio` (+`asio`) | `tools/audio/REPORT.md` |
-| 資産 | `assets` (+`wvfs`,`bootset`) | `tools/assets/REPORT.md`・`MANIFEST.md` |
-| スクリプト | `python`,`flp` | `tools/python/REPORT.md`・`tools/flp/REPORT.md` |
-| プラグイン | `plugins` (+`framework`,`p0c`) | `tools/plugins/REPORT.md`・`ABI.md` |
-| 共通 | `shared`,`ipp` (+`shim`,`shim/fft`) | `tools/shared/REPORT.md`・`tools/ipp/REPORT.md` |
-| ターゲット | `targets/serum2` (+`host`,`license`) | `tools/targets/serum2/REPORT.md` |
-| ターゲット | `targets/massivex` (+`dsp`) | `tools/targets/massivex/REPORT.md` |
-| ターゲット | `targets/kilohearts` (+`license`,`snapins`) | `tools/targets/kilohearts/REPORT.md` |
-| ターゲット | `targets/freshair` (+`lift2`) | `tools/targets/freshair/REPORT.md` |
-| 検証 | `e2e`,`hosting`,`perf` | `tools/e2e/REPORT.md`・`tools/hosting/REPORT.md`・`tools/perf/REPORT.md` |
+| 実行 | `runtime`・`hostbridge`(+`cb`,`h2`,`lowbase`,`nfo`)・`gui`・`audio`(+`asio`)・`assets`(+`wvfs`,`bootset`) | 各 `REPORT.md`・`tools/runtime/DESIGN.md` |
+| 共通 | `python`,`flp`,`shared`,`ipp`(+`shim`,`shim/fft`)・`plugins`(+`framework`,`p0c`) | 各 `REPORT.md`・`tools/plugins/ABI.md` |
+| ターゲット | `targets/{serum2,massivex,kilohearts,freshair}` とその下位 dir | 各 `targets/*/REPORT.md` |
+| 検証/配信 | `e2e`,`hosting`,`deploy`,`perf` | `tools/e2e/REPORT.md`・`deploy/README.md` |
 
 ## 開発
 
