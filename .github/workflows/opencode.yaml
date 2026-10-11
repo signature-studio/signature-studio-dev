@@ -1,0 +1,34 @@
+name: OpenCode
+
+on:
+  workflow_dispatch:
+
+jobs:
+  opencode:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v10.3.0
+      - name: Setup Python using uv
+        run: uv python install --default 3.14
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+      - name: Setup Node.js using pnpm
+        run: pnpm runtime set node 26.10.0
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+      - name: Setup OpenCode
+        run: |
+          curl -fsSL https://opencode.ai/v2/install | bash
+          echo "$HOME/.opencode/bin" >> $GITHUB_PATH
+      - name: Verify setup
+        run: |
+          which opencode uv pnpm bun node python
+          echo "opencode: $(opencode --version)"
+          echo "uv: $(uv --version)"
+          echo "pnpm: $(pnpm --version)"
+          echo "bun: $(bun --version)"
+          echo "node: $(node --version)"
+          echo "python: $(python --version)"
