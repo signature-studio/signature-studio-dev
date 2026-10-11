@@ -7,10 +7,13 @@
 #       → liftlib base.normalize → cleanup → cefix (事前 hoist) → ir5_patch (8 way 並列)
 #       → cefix (残留型補完) → sigfix → entry_fix → cab129 → flatten → rep/cpuid/ymm/fldenv 正規化
 #       → liftlib simd gen (TAG 拡張) → ovpass → fw_table (dispatch 表 + override) → emcc → smoke
+#
+# 再現性 (CAB-269): W は FW_W で差し替え可能 (既定は tools/plugins/work/fw)。共有 work/fw を
+# 触らず独立再現するときは `FW_W=<空dir> bash fw_stage2.sh` (dir に stage-1 成果物を置く)。
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 T=/home/ubuntu/work/webstudio
-W="$HERE/../work/fw"
+W="${FW_W:-$HERE/../work/fw}"
 PE="$W/fw_icall.dll"
 FRESH=0
 for a in "$@"; do case "$a" in --fresh) FRESH=1 ;; esac; done
@@ -18,6 +21,17 @@ cd "$W"
 mkdir -p tmp
 export TMPDIR="$W/tmp"
 source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1
+
+# ---- emcc 入力 (相対参照) と hs_e2e.sh の前提ファイルを W に揃える ----
+# S1 (CAB-269): fw_rt.h/fw_rt.c は cp していたが fw_boot.c は漏れていた
+#   → `emcc: error: fw_boot.c: No such file or directory`
+stage_inputs() {
+  local f
+  for f in fw_rt.h fw_rt.c fw_boot.c; do
+    [ -f "$HERE/$f" ] || { echo "[s2] 入力欠落: $HERE/$f" >&2; exit 1; }
+    cp -f "$HERE/$f" .
+  done
+}
 
 # ---- 1. 8 chunk merge (無名番号衝突 Fix + fn-ptr 戻り define 取り込み) ----
 if [ $FRESH = 1 ] || [ ! -f fw_all8.ll ]; then
@@ -116,132 +130,15 @@ fi
 [ -f fw_flat2.ll ] || python3 "$HERE/fw_rep.py" fw_flat.ll fw_flat2.ll
 [ -f fw_flat3.ll ] || python3 "$HERE/fw_cpuid.py" fw_flat2.ll fw_flat3.ll
 
-# ---- 14. ymm store 正規化 + simd gen + table + ovpass ----
-cp -f "$HERE/fw_rt.h" "$HERE/fw_rt.c" . 2>/dev/null || true
+# ---- 14. ymm store 正規化 + simd gen + canon 正規化 (CAB-269: fw_canon.py に集約) ----
+stage_inputs
 if [ ! -f fw_flat4_canon2.ll ]; then
-  # ymm store 形を IR store に正規化 + i256 helper を IR identity define 化
-  python3 - <<'PY'
-import re
-lines = open('fw_flat3.ll').read().split('\n')
-out = []
-CALL_RE = re.compile(r'^(\s*)call void @(__asm_vmovups__3)\(i256 ([^,]+), i256 (%[\w.-]+)\)\s*$')
-LOAD_RE = re.compile(r'^\s*(%[\w.-]+) = load i256, (?:ptr|[^ ]+\*) (%[\w.-]+)')
-def find_load_ptr(buf, old, idx, depth=160):
-    for k in range(idx - 1, max(-1, idx - depth), -1):
-        m = LOAD_RE.match(buf[k])
-        if m and m.group(1) == old:
-            return m.group(2), k
-    return None, None
-for idx, l in enumerate(lines):
-    m = CALL_RE.match(l)
-    if m:
-        ptr, load_at = find_load_ptr(lines, m.group(3), idx)
-        if ptr:
-            out.append('%sstore i256 %s, ptr %s, align 1' % (m.group(1), m.group(4), ptr))
-            continue
-    out.append(l)
-# i256 declare → IR identity define
-t = '\n'.join(out)
-decls = re.findall(r'^declare (i256) @(__asm_[\w]+)\((i256)\) local_unnamed_addr$', t, re.M)
-for ret, nm, args in decls:
-    t = t.replace('declare %s @%s(%s) local_unnamed_addr\n' % (ret, nm, args), '')
-    d = 'define i256 @%s(i256 %%v) {\n  ret i256 %%v\n}' % nm
-    idx = t.index('\ndefine ')
-    t = t[:idx] + '\n' + d + '\n' + t[idx:]
-# fldenv (i224) → ptr
-t = t.replace('call void @__asm_fldenv__v?(i224 %7)', 'call void @fw_fldenv(ptr %6)')
-t = t.replace('declare void @__asm_fldenv__v?(i224) local_unnamed_addr\n', '')
-open('fw_flat4.ll', 'w').write(t)
-print('[ymm] done')
-PY
-fi
-if [ ! -f fw_flat4_canon2.ll ]; then
-  cp -f "$HERE/fw_rt.h" . 2>/dev/null || true
-  # ymm store (残り) → IR store
-  python3 - <<'PY'
-import re
-t = open('fw_flat4.ll').read().split('\n')
-out = []
-n = 0
-CALL_RE = re.compile(r'^(\s*)call void @(__asm_vmovups__3)\(i256 ([^,]+), i256 (%[\w.-]+)\)\s*$')
-LOAD_RE = re.compile(r'^\s*(%[\w.-]+) = load i256, (?:ptr|[^ ]+\*) (%[\w.-]+)')
-for idx, l in enumerate(t):
-    m = CALL_RE.match(l)
-    if m:
-        ptr = None
-        for k in range(idx - 1, max(-1, idx - 160), -1):
-            mm = LOAD_RE.match(t[k])
-            if mm and mm.group(1) == m.group(3).strip():
-                ptr = mm.group(2); break
-        if ptr is None:
-            for k in range(idx + 1, min(len(t), idx + 14)):
-                mm = LOAD_RE.match(t[k])
-                if mm: ptr = mm.group(2); break
-        if ptr:
-            out.append('%sstore i256 %s, ptr %s, align 1' % (m.group(1), m.group(4), ptr)); n += 1
-            continue
-    out.append(l)
-# ymm store の dominance 修正 (chain clone)
-lines = out
-uid = [0]
-fixed = 0
-starts2 = [i for i, l in enumerate(lines) if l.startswith('define ')]
-starts2.append(len(lines))
-for si in range(len(starts2) - 1):
-    lo, hi = starts2[si], starts2[si + 1]
-    defs = {}
-    for j in range(lo, hi):
-        m2 = re.match(r'\s*(%[\w.-]+) = ', lines[j])
-        if m2 and m2.group(1) not in defs: defs[m2.group(1)] = j
-    i2 = lo
-    while i2 < hi:
-        m2 = re.match(r'^(\s*)store i256 (%[\w.-]+), ptr (%[\w.-]+), align 1\s*$', lines[i2])
-        if not m2: i2 += 1; continue
-        ptrname = m2.group(3)
-        dj = defs.get(ptrname)
-        if dj is None or dj < i2: i2 += 1; continue
-        dm = re.match(r'\s*%[\w.-]+ = inttoptr i64 (%[\w.-]+) to ptr', lines[dj])
-        if not dm: i2 += 1; continue
-        chain = []; seen = set(); stack = [dm.group(1)]
-        while stack:
-            nm = stack.pop()
-            if nm in seen: continue
-            seen.add(nm)
-            dj2 = defs.get(nm)
-            if dj2 is None: continue
-            dl = lines[dj2].lstrip()
-            mm2 = re.match(r'%[\w.-]+ = (inttoptr i64 |ptrtoint ptr |add i64 )(.*)$', dl)
-            if not mm2: continue
-            chain.append((nm, dl.split(' = ', 1)[1]))
-            for d in re.findall(r'%[\w.-]+', mm2.group(2)): stack.append(d)
-        pre = []; ren = {}
-        for nm, rhs in reversed(chain):
-            uid[0] += 1; nn = '%%ceclone%d' % uid[0]
-            for old, new in reversed(list(ren.items())):
-                rhs = rhs.replace(old + ' ', new + ' ').replace(', ' + old, ', ' + new).replace(' ' + old + ',', ' ' + new + ',')
-            ren[nm] = nn; pre.append('  %s = %s' % (nn, rhs))
-        top = ren.get(dm.group(1))
-        top_i = '%%ceclone%d' % (uid[0] + 1); uid[0] += 1
-        pre.append('  %s = inttoptr i64 %s to ptr' % (top_i, top))
-        lines[i2] = '  store i256 %s, ptr %s, align 1' % (m2.group(2), top_i)
-        for k2, pl in enumerate(pre): lines.insert(i2 + k2, pl)
-        i2 += len(pre) + 1; fixed += 1
-# fldenv → ptr
-t2 = '\n'.join(lines)
-t2 = t2.replace('call void @__asm_fldenv__v?(i224 %7)', 'call void @fw_fldenv(ptr %6)')
-t2 = t2.replace('declare void @__asm_fldenv__v?(i224) local_unnamed_addr\n', '')
-# fn-ptr 戻り型正規化 (simd gen 対応)
-t2 = re.sub(r'\b(?:i\d+|void|ptr|float|double) \(\)\* ', 'ptr ', t2)
-# BLENDFUNCTION/tagPOINT 構造体引数 → i64
-t2 = t2.replace('%_BLENDFUNCTION %', 'i64 %').replace('%_BLENDFUNCTION)', 'i64)').replace('%_BLENDFUNCTION,', 'i64,')
-t2 = t2.replace('%tagPOINT %', 'i64 %').replace('%tagPOINT)', 'i64)').replace('%tagPOINT,', 'i64,')
-open('fw_flat4.ll', 'w').write(t2)
-print('[ymm2] dominance fixed: %d' % fixed)
-PY
+  # 旧実装は 3 つのインライン heredoc に重複実装され, S2 (ceclone 採番の衝突)・S3 (declare 欠落) の
+  # 原因だった。正規化は fw_canon.py の 1 実装に統一し, stage で差分 (i256 identity / fldenv) を切替える。
+  python3 "$HERE/fw_canon.py" fw_flat3.ll fw_flat4.ll --stage flat4 --report fw_canon_flat4.json
 fi
 if [ ! -f fw_simd.c ]; then
   # liftlib simd gen (TAG 拡張)
-  cp -f "$HERE/fw_rt.h" . 2>/dev/null || true
   python3 - <<'PY'
 import sys, re
 sys.path.insert(0, '/home/ubuntu/work/webstudio/tools/liftlib')
@@ -259,84 +156,8 @@ G.main(sys.argv[1:])
 PY
 fi
 if [ ! -f fw_flat4_canon2.ll ]; then
-  # canon → ymm 残り store → fnptr/BLENDFUNCTION/tagPOINT 正規化
-  python3 - <<'PY'
-import re
-t = open('fw_flat4_canon.ll').read()
-# ymm store 残り
-lines = t.split('\n')
-out = []
-CALL_RE = re.compile(r'^(\s*)call void @(__asm_vmovups__3)\(i256 ([^,]+), i256 (%[\w.-]+)\)\s*$')
-LOAD_RE = re.compile(r'^\s*(%[\w.-]+) = load i256, (?:ptr|[^ ]+\*) (%[\w.-]+)')
-uid = [0]
-for idx, l in enumerate(lines):
-    m = CALL_RE.match(l)
-    if m:
-        ptr = None
-        for k in range(idx - 1, max(-1, idx - 160), -1):
-            mm = LOAD_RE.match(t.split('\n')[k])
-            if mm and mm.group(1) == m.group(3).strip(): ptr = mm.group(2); break
-        if ptr is None:
-            for k in range(idx + 1, min(len(lines), idx + 14)):
-                mm = LOAD_RE.match(lines[k])
-                if mm: ptr = mm.group(2); break
-        if ptr:
-            out.append('%sstore i256 %s, ptr %s, align 1' % (m.group(1), m.group(4), ptr)); continue
-    out.append(l)
-# dominance fix + fnptr + struct 引数
-lines = out
-uid[0] = 0
-starts2 = [i for i, l in enumerate(lines) if l.startswith('define ')]
-starts2.append(len(lines))
-for si in range(len(starts2) - 1):
-    lo, hi = starts2[si], starts2[si + 1]
-    defs = {}
-    for j in range(lo, hi):
-        m2 = re.match(r'\s*(%[\w.-]+) = ', lines[j])
-        if m2 and m2.group(1) not in defs: defs[m2.group(1)] = j
-    i2 = lo
-    while i2 < hi:
-        m2 = re.match(r'^(\s*)store i256 (%[\w.-]+), ptr (%[\w.-]+), align 1\s*$', lines[i2])
-        if not m2: i2 += 1; continue
-        ptrname = m2.group(3)
-        dj = defs.get(ptrname)
-        if dj is None or dj < i2: i2 += 1; continue
-        dm = re.match(r'\s*%[\w.-]+ = inttoptr i64 (%[\w.-]+) to ptr', lines[dj])
-        if not dm: i2 += 1; continue
-        chain = []; seen = set(); stack = [dm.group(1)]
-        while stack:
-            nm = stack.pop()
-            if nm in seen: continue
-            seen.add(nm)
-            dj2 = defs.get(nm)
-            if dj2 is None: continue
-            dl = lines[dj2].lstrip()
-            mm2 = re.match(r'%[\w.-]+ = (inttoptr i64 |ptrtoint ptr |add i64 )(.*)$', dl)
-            if not mm2: continue
-            chain.append((nm, dl.split(' = ', 1)[1]))
-            for d in re.findall(r'%[\w.-]+', mm2.group(2)): stack.append(d)
-        pre = []; ren = {}
-        for nm, rhs in reversed(chain):
-            uid[0] += 1; nn = '%%ceclone%d' % uid[0]
-            for old, new in reversed(list(ren.items())):
-                rhs = rhs.replace(old + ' ', new + ' ').replace(', ' + old, ', ' + new).replace(' ' + old + ',', ' ' + new + ',')
-            ren[nm] = nn; pre.append('  %s = %s' % (nn, rhs))
-        top = ren.get(dm.group(1))
-        top_i = '%%ceclone%d' % (uid[0] + 1); uid[0] += 1
-        pre.append('  %s = inttoptr i64 %s to ptr' % (top_i, top))
-        lines[i2] = '  store i256 %s, ptr %s, align 1' % (m2.group(2), top_i)
-        for k2, pl in enumerate(pre): lines.insert(i2 + k2, pl)
-        i2 += len(pre) + 1; fixed = fixed + 1 if 'fixed' in dir() else 1
-t2 = '\n'.join(lines)
-t2 = re.sub(r'\b(?:i\d+|void|ptr|float|double) \(\)\* ', 'ptr ', t2)
-t2 = t2.replace('%_BLENDFUNCTION %', 'i64 %').replace('%_BLENDFUNCTION)', 'i64)').replace('%_BLENDFUNCTION,', 'i64,')
-t2 = t2.replace('%tagPOINT %', 'i64 %').replace('%tagPOINT)', 'i64)').replace('%tagPOINT,', 'i64,')
-# fldenv
-t2 = t2.replace('call void @__asm_fldenv__vg224(i224 %7)', 'call void @fw_fldenv(ptr %6)')
-t2 = t2.replace('declare void @__asm_fldenv__vg224(i224) local_unnamed_addr\n', '')
-open('fw_flat4_canon2.ll', 'w').write(t2)
-print('[canon2] done')
-PY
+  # gen 後のみ __asm_fldenv__vg224(i224) が現れるので, rename + declare 置き換えはここ (S3)
+  python3 "$HERE/fw_canon.py" fw_flat4_canon.ll fw_flat4_canon2.ll --stage canon --report fw_canon_canon.json
 fi
 
 # ---- 15. ovpass (_StartLib/_InitLib/RestoreContext override) ----
@@ -367,6 +188,10 @@ fi
 
 # ---- 17. emcc ----
 if [ ! -f fw_route.cjs ]; then
+  # S2/S3/S4 回帰ガード (CAB-269): clang/emcc が落とす IR エラーは llvm-as で 3 s で再現できる
+  #   (multiple definition of local value / use of undefined value '@fw_fldenv' /
+  #    invalid cast opcode for cast from 'i64' to 'i128' — 実測は REPORT §参照)
+  llvm-as fw_flat4_canon3.ll -o tmp/fw_canon3.bc || { echo "[s2] IR 検証失敗 (llvm-as)" >&2; exit 1; }
   emcc fw_flat4_canon3.ll fw_simd.c fw_table.c fw_rt.c fw_boot.c "$HERE/hostshim/hostshim.c" \
     -I. -I"$HERE/hostshim" -I"$T/tools/liftlib/liftlib/simd" \
     -w -O0 -g -ffp-contract=off -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8MB \
@@ -377,7 +202,8 @@ if [ ! -f fw_route.cjs ]; then
     -Wl,--initial-memory=$((0x14000000)) -Wl,--max-memory=$((0x80000000)) \
     -o fw_route.cjs 2> emcc.log || { grep -v 'warning\|>>>\|^$' emcc.log | head -20; exit 1; }
 fi
-ls -la fw_route.cjs
+ls -la fw_route.cjs fw_route.wasm
 
-# ---- 18. smoke ----
-node "$HERE/fw_run.mjs" "$W/fw_image.bin" "$W/fw_route.cjs"
+# ---- 18. smoke (CAB-269: 期待値を独立に再計算して検証) ----
+node "$HERE/fw_run.mjs" "$W/fw_image.bin" "$W/fw_route.cjs" 2>&1 | tee smoke.log
+python3 "$HERE/fw_smoke_check.py" --log smoke.log --wasm "$W/fw_route.wasm"

@@ -10,6 +10,29 @@ dispatch 経由は fw_table.py の OVERRIDES で接続するが, RetDec が直�
 import re, sys
 
 OVERRIDES = {0x4189c0: 'fw_ov_startlib', 0x40db20: 'fw_ov_initlib', 0x40e0b0: 'fw_ov_restorectx_run'}
+INT_RE = re.compile(r'^i(\d+)$')
+
+
+def ret_of(rt, r):
+    """戻り型 rt の `%r` (i64) からの変換命令を返す。
+
+    S4 (CAB-269): 旧実装は i64 以外をすべて `trunc i64 %r to <rt>` にしていたため,
+    i128 を返す function_40e0b0 (= RestoreContext 実行本体) で
+    clang `invalid cast opcode for cast from 'i64' to 'i128'` になっていた。
+    64 bit より広い整数は `zext` (拡張) が必要。
+    """
+    if rt == 'i64':
+        return ['  ret i64 %s' % r]
+    if rt == 'void':
+        return ['  ret void']
+    if rt == 'ptr' or rt.endswith('*'):
+        return ['  %%t = inttoptr i64 %s to %s' % (r, rt), '  ret %s %%t' % rt]
+    m = INT_RE.match(rt)
+    if m and int(m.group(1)) > 64:
+        return ['  %%t = zext i64 %s to %s' % (r, rt), '  ret %s %%t' % rt]
+    if m:
+        return ['  %%t = trunc i64 %s to %s' % (r, rt), '  ret %s %%t' % rt]
+    raise SystemExit('[fw_ovpass] FATAL: 戻り型 %s は未対応 (i64/void/ptr/iN のみ)' % rt)
 
 
 def main():
@@ -30,13 +53,7 @@ def main():
             call_args = ', '.join('%s 0' % p.split(' ')[0] if not p.split(' ')[0].endswith('*') else 'ptr null' for p in pl) or 'void'
             out.append('define %s @function_%x(%s) {' % (m.group(1), va, params))
             out.append('  %%r = call i64 @%s()' % cname)
-            if m.group(1) == 'i64':
-                out.append('  ret i64 %r')
-            elif m.group(1) == 'void':
-                out.append('  ret void')
-            else:
-                out.append('  %%t = trunc i64 %%r to %s' % m.group(1))
-                out.append('  ret %s %%t' % m.group(1))
+            out.extend(ret_of(m.group(1), '%r'))
             out.append('}')
             # declare 追加 (先頭の define の前に入れられないのでマーカー)
             out.append('; FWOV-DECLARE declare i64 @%s() local_unnamed_addr' % cname)
