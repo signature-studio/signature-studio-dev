@@ -57,14 +57,16 @@ jobs:
           fi
 
       # 実装 App トークン (issue_comment が PR 上のコメントなら PR にも触る)
+      # read モードでは contents:read のみ要求する (installation が write 権限を
+      # 未grant の環境でも read-only 検証が通るようにするため)
       - uses: actions/create-github-app-token@v3
         id: app-token
         with:
           client-id: ${{ vars.OC_APP_CLIENT_ID }}
           private-key: ${{ secrets.OC_APP_PRIVATE_KEY }}
           permission-contents: ${{ steps.judge.outputs.permission }}
-          permission-issues: write
-          permission-pull-requests: write
+          permission-issues: ${{ steps.judge.outputs.permission == 'write' && 'write' || 'read' }}
+          permission-pull-requests: ${{ steps.judge.outputs.permission == 'write' && 'write' || 'read' }}
 
       - name: Checkout repository
         uses: actions/checkout@v7
