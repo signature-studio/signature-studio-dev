@@ -1,11 +1,13 @@
 // compare.mjs — ctx-fuzz 差分: native_ref の vectors.bin を wasm(lift) で再生して全バイト突合する。
-//   node compare.mjs <vectors.bin> <module.cjs> <sigs.json> [--tol tol.json] [--v] [--json out.json]
+//   node compare.mjs <vectors.bin> <module.cjs> <sigs.json> [--v] [--json out.json]
 // sigs.json: { "<va hex>": {"params":["i64","i64","float"], "ret":"i64"} }  (kh_sigs.py が最終 .ll から生成)
-// --tol (CAB-224): 指定 region×範囲を f32/f64 値とみなし、tools/liftlib/liftlib/simd/simdtest.py と
-//   同一基準の相対誤差 gate で判定する (近似命令 rcpps/rsqrtps 経路の CPU 依存差を許容)。
-//   tol.json: { "<region>": {"f32": [[off,len],...], "f64": [[off,len],...] } }  (off/len = region 先頭からの byte)
-//   gate: |a-b| > 1.6*2^-12*max(|a|,|b|) + 1e-38 → 不一致 (両方 NaN は OK, ±inf は値一致必須)。
-//   --tol 無しの既定動作 = 従来どおり全バイト bit-exact (既存 6 snapin の判定は不変)。
+//
+// CAB-273 (tol gate 撤去): CAB-224 以来の `--tol <tol.json>` 相対誤差 gate 経路は **撤去**した。
+//   rcpps/rsqrtps の実機近似表移植 (CAB-258, 0d5117c) で tol 対象 3 本 (resonator/stereo/delay) が
+//   approx 0 / maxrel 0 / maxabs 0 / exceed 0 になった = gate が實質未使用。よって比較は常に
+//   **全バイト strict 一致** (tolerance なし完全一致) に統一する。旧 tol 設定は snapins.json からも
+//   削除済み (残存監査: `python3 scripts/tol_removal_check.py`)。履歴・数値は REPORT.md §13/§15。
+//   legacy gate が 1 bit 差を吸納していた実測 (対照) = REPORT.md §15 のネガコン (scripts/negcon_1bit.py)。
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -15,15 +17,9 @@ const args = process.argv.slice(2);
 const verbose = args.includes('--v');
 const jIdx = args.indexOf('--json');
 const jsonOut = jIdx >= 0 ? args[jIdx + 1] : null;
-const tIdx = args.indexOf('--tol');
-const tolPath = tIdx >= 0 ? args[tIdx + 1] : null;
-const pos = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--json' && args[i - 1] !== '--tol');
+const pos = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--json');
 const [vecPath, modPath, sigPath] = pos;
 const ARENA = 0x04000000;
-
-const tol = tolPath ? JSON.parse(fs.readFileSync(tolPath, 'utf8')) : null;
-const TOL_GATE = 1.6 * 2 ** -12;   // liftlib simdtest.py の実 gate 値 (仕様上限 1.5*2^-12 + 余裕)
-const TOL_FLOOR = 1e-38;
 
 const buf = fs.readFileSync(vecPath);
 const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
@@ -44,51 +40,8 @@ const bitsToF32 = (b) => { u32a[0] = Number(BigInt(b) & 0xffffffffn); return f32
 const bitsToF64 = (b) => { u64a[0] = BigInt(b); return f64[0]; };
 const f32bits = (x) => { f32[0] = x; return u32a[0]; };
 
-// tol 用: region 名 → {entries: [{off, len, ty}], absFloor}
-const tolMap = new Map();
-if (tol) {
-  for (const [name, spec] of Object.entries(tol)) {
-    const arr = [];
-    for (const ty of ['f32', 'f64']) for (const e of (spec[ty] || [])) arr.push({ off: e[0], len: e[1], ty: e[2] || ty });
-    if (arr.length) tolMap.set(name, { entries: arr, absFloor: spec.absFloor || TOL_FLOOR });
-  }
-}
-const tolAt = (regs, off) => {
-  for (const r of regs) {
-    if (off >= r.off && off < r.off + r.len) {
-      const rel = off - r.off, spec = tolMap.get(r.name);
-      if (!spec) return null;
-      for (const s of spec.entries) if (rel >= s.off && rel < s.off + s.len) return { ty: s.ty, where: `${r.name}+0x${rel.toString(16)}`, floor: spec.absFloor };
-      return null;
-    }
-  }
-  return null;
-};
-const isNan32 = (b) => (b & 0x7f800000) === 0x7f800000 && (b & 0x7fffff) !== 0;
-const isNan64hi = (w32hi) => (w32hi & 0x7ff00000) === 0x7ff00000;
-// simdtest.py compare_form と同一の gate (+ absFloor: 音声経路の離散化増幅分会)。戻り: 'exact' | {ok, rel, abs}
-const gate = (wa, wb, ty, floor) => {
-  if (wa === wb) return { ok: true, exact: true };
-  const fl = floor === undefined ? TOL_FLOOR : floor;
-  if (ty === 'f32') {
-    const a = bitsToF32(wa), b = bitsToF32(wb);
-    if (isNan32(wa >>> 0) && isNan32(wb >>> 0)) return { ok: true, nan: true };
-    if (!Number.isFinite(a) || !Number.isFinite(b)) return { ok: a === b };
-    const abs = Math.abs(a - b), rel = abs / Math.max(Math.abs(a), Math.abs(b));
-    return abs > TOL_GATE * Math.max(Math.abs(a), Math.abs(b)) + fl ? { ok: false, rel, abs } : { ok: true, rel, abs };
-  }
-  const a = bitsToF64(wa), b = bitsToF64(wb);
-  const na = isNan64hi(Number((wa >> 32n) & 0xffffffffn)) && (wa & 0xfffffffffffffn) !== 0n;
-  const nb = isNan64hi(Number((wb >> 32n) & 0xffffffffn)) && (wb & 0xfffffffffffffn) !== 0n;
-  if (na && nb) return { ok: true, nan: true };
-  if (!Number.isFinite(a) || !Number.isFinite(b)) return { ok: a === b };
-  const abs = Math.abs(a - b), rel = abs / Math.max(Math.abs(a), Math.abs(b));
-  return abs > TOL_GATE * Math.max(Math.abs(a), Math.abs(b)) + fl ? { ok: false, rel, abs } : { ok: true, rel, abs };
-};
-
 let usedPrev = 0;
-const stat = { trials: 0, trialsOk: 0, calls: 0, callsOk: 0, firstFail: [],
-  tolWords: 0, tolExact: 0, tolApprox: 0, tolMaxRel: 0, tolMaxAbs: 0, tolBad: 0 };
+const stat = { trials: 0, trialsOk: 0, calls: 0, callsOk: 0, firstFail: [] };
 const byCall = {};
 const hex = (n) => '0x' + n.toString(16);
 
@@ -135,68 +88,17 @@ for (let t = 0; t < ntrials; t++) {
   }
   const nreg = u32(); const regs = [];
   for (let i = 0; i < nreg; i++) { const off = u32(), len = u32(), nl = u32(); regs.push({ off, len, name: buf.toString('latin1', p, p + nl) }); p += nl; }
-  // tol 統計: tol region 内の全 word 数 (trial 末尾で確定)
-  if (tol) {
-    for (const r of regs) {
-      const spec = tolMap.get(r.name);
-      if (!spec) continue;
-      const lo = Math.max(r.off, 0), hi = Math.min(r.off + r.len, usedNow);
-      for (const s of spec.entries) {
-        const a = Math.max(s.off, lo - r.off), b = Math.min(s.off + s.len, hi - r.off);
-        if (b > a) stat.tolWords += Math.ceil((b - a) / (s.ty === 'f64' ? 8 : 4));
-      }
-    }
-  }
-  // tol 判定
+  // strict 判定 (CAB-273: tolerance なし完全一致)。region 名は trial 末尾テーブルから引く。
   for (const ci of pending) {
-    let approx = 0, bad = null, exactBad = null;
-    const seen = new Set();
+    let exactBad = null;
     for (const w of ci.diffWords) {
-      if (tol) {
-        const tinf = tolAt(regs, w);
-        if (tinf) {
-          if (tinf.ty === 'f64') {
-            const w8 = w & ~7;
-            if (seen.has(w8)) continue;
-            seen.add(w8);
-            const waB = Buffer.from(ci.post.buffer, ci.post.byteOffset + w8, 8).readBigUInt64LE(0);
-            const wbB = Buffer.from(ci.mem.buffer, ci.mem.byteOffset + w8, 8).readBigUInt64LE(0);
-            const g = gate(waB, wbB, 'f64', tinf.floor);
-            if (g.exact) continue;
-            if (g.ok) { approx++; stat.tolApprox++; if (g.rel > stat.tolMaxRel) stat.tolMaxRel = g.rel; if (g.abs > stat.tolMaxAbs) stat.tolMaxAbs = g.abs; continue; }
-            stat.tolBad++; if (!bad) bad = { w: w8, wa: waB, wb: wbB, where: tinf.where };
-            continue;
-          }
-          const wa = Buffer.from(ci.post.subarray(w, w + 4)).readUInt32LE(0);
-          const wb = Buffer.from(ci.mem.subarray(w, w + 4)).readUInt32LE(0);
-          const g = gate(wa, wb, 'f32', tinf.floor);
-          if (g.exact) continue;
-          if (g.ok) { approx++; stat.tolApprox++; if (g.rel > stat.tolMaxRel) stat.tolMaxRel = g.rel; if (g.abs > stat.tolMaxAbs) stat.tolMaxAbs = g.abs; continue; }
-          stat.tolBad++; if (!bad) bad = { w, wa, wb, where: tinf.where };
-          continue;
-        }
-      }
       if (exactBad === null) {
         const r = regs.find((g) => w >= g.off && w < g.off + g.len);
         exactBad = { w, where: r ? r.name + '+0x' + (w - r.off).toString(16) : hex(w) };
       }
     }
-    if (ci.retOk && !bad && !exactBad) { stat.callsOk++; byCall[ci.va].ok++; }
-    else if (!failed) failed = { call: ci.call, va: ci.va, ndiff: ci.diffWords.length, first: (bad || exactBad || { w: ci.diffWords[0] }).w, retOk: ci.retOk, retInfo: ci.retInfo, plen: ci.plen, post: ci.post, mem: ci.mem, tolBad: bad, exactBad };
-    if (process.env.TOL_DEBUG) {
-      let worst = null;
-      for (const w of ci.diffWords) {
-        const wa = Buffer.from(ci.post.subarray(w, w + 4)).readUInt32LE(0), wb = Buffer.from(ci.mem.subarray(w, w + 4)).readUInt32LE(0);
-        const g = gate(wa, wb, 'f32');
-        const abs = g && g.abs !== undefined ? g.abs : Math.abs(bitsToF32(wa) - bitsToF32(wb));
-        if (!worst || abs > worst.abs) worst = { w, abs, wa, wb };
-      }
-      if (worst && (!stat._worst || worst.abs > stat._worst.abs)) {
-        stat._worst = { ...worst, trial: t, call: ci.call };
-        const r = regs.find((g) => worst.w >= g.off && worst.w < g.off + g.len);
-        console.log(`WORST trial ${t} call ${ci.call} @${r ? r.name + '+0x' + (worst.w - r.off).toString(16) : hex(worst.w)} abs ${worst.abs.toExponential(3)} want ${hex(worst.wa)}(${bitsToF32(worst.wa)}) got ${hex(worst.wb)}(${bitsToF32(worst.wb)})`);
-      }
-    }
+    if (ci.retOk && !exactBad) { stat.callsOk++; byCall[ci.va].ok++; }
+    else if (!failed) failed = { call: ci.call, va: ci.va, ndiff: ci.diffWords.length, first: (exactBad || { w: ci.diffWords[0] }).w, retOk: ci.retOk, retInfo: ci.retInfo, plen: ci.plen, post: ci.post, mem: ci.mem, exactBad };
   }
   usedPrev = usedNow;
   stat.trials++;
@@ -204,7 +106,6 @@ for (let t = 0; t < ntrials; t++) {
   else {
     let where = '';
     if (failed.exactBad) where = `exact-region diff @${failed.exactBad.where}`;
-    else if (failed.tolBad) where = `tol gate EXCEED @${failed.tolBad.where} want ${hex(failed.tolBad.wa)} got ${hex(failed.tolBad.wb)}`;
     else if (failed.first !== undefined && failed.first >= 0) {
       const r = regs.find((g) => failed.first >= g.off && failed.first < g.off + g.len);
       const w = failed.first & ~3;
@@ -225,9 +126,7 @@ for (let t = 0; t < ntrials; t++) {
     if (verbose || stat.firstFail.length <= 5) console.log('FAIL', msg);
   }
 }
-const tolTotal = stat.tolApprox + stat.tolBad;
-const tolTag = tol ? ` tol(1.6*2^-12 gate): approx ${stat.tolApprox} / diff-words, maxrel ${stat.tolMaxRel.toExponential(3)}, maxabs ${stat.tolMaxAbs.toExponential(3)}, exceed ${stat.tolBad}` : '';
-console.log(`RESULT trials ${stat.trialsOk}/${stat.trials}${tol ? ' [tolerance]' : ' bit-exact'}; calls ${stat.callsOk}/${stat.calls}; by fn ` +
-  Object.entries(byCall).map(([k, v]) => `${k}:${v.ok}/${v.n}`).join(' ') + tolTag);
-if (jsonOut) fs.writeFileSync(jsonOut, JSON.stringify({ trials: stat.trials, trialsOk: stat.trialsOk, calls: stat.calls, callsOk: stat.callsOk, byCall, tol: { words: stat.tolWords, exact: stat.tolWords - tolTotal, approx: stat.tolApprox, maxRel: stat.tolMaxRel, maxAbs: stat.tolMaxAbs, bad: stat.tolBad }, fails: stat.firstFail.slice(0, 20) }, null, 1));
+console.log(`RESULT trials ${stat.trialsOk}/${stat.trials} bit-exact; calls ${stat.callsOk}/${stat.calls}; by fn ` +
+  Object.entries(byCall).map(([k, v]) => `${k}:${v.ok}/${v.n}`).join(' '));
+if (jsonOut) fs.writeFileSync(jsonOut, JSON.stringify({ trials: stat.trials, trialsOk: stat.trialsOk, calls: stat.calls, callsOk: stat.callsOk, byCall, fails: stat.firstFail.slice(0, 20) }, null, 1));
 process.exit(stat.trialsOk === stat.trials ? 0 : 1);

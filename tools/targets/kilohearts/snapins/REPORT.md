@@ -1,17 +1,16 @@
 # KH-4: KH 共通基盤 lift (CAB-246) + KH-6 (CAB-258) Tier-M 3 本 + CAB-56 SnapinMasterDsp ホストハーネス
 
-- 解析日: 2026-10-11 / 担当 dir: `tools/targets/kilohearts/snapins/` (大物は `work/`, gitignore)
-- 1 コマンド再現: `bash tools/targets/kilohearts/snapins/run_all.sh` (13 snap-in + **khbase** + Path A 対照 + libm 単体 + **CAB-56 ホストハーネス**。実測 376〜384 s (200 trial, n=2, キャッシュ有り) / 453 s (1000 trial seed 7, n=1)。負荷依存のため実測秒 + load average は §13-5)。1000 trial / seed 7 は `TRIALS=1000 SEED=7 bash .../run_all.sh` (全 13 本 + khbase + ハーネスが 1000 trial になる)。§9/§10 の 1000 trial 数値はこの形で取得
-- Linear: CAB-246 (KH-4) / CAB-258 (KH-6, parent CAB-53) / CAB-56 (KH-4b ホストハーネス, parent CAB-13)
-- preflight: RULES_SHA=ff4999169333
-- 既知類型 (DEFECTS.md): **D14 修復 (CAB-242) / D15 修復 (CAB-246) / D16 検出器 (CAB-258) が該当**、D2/D3/D7/D8/D9/D11 は非該当。検収 (=§14) も独立再計算・別アルゴリズム・ネガコン・baseline diff を実施
-- 本報は KH-4 (§1〜§8) と KH-6 (§9, §11) と CAB-56 (§10) の合本。**第 2 弾 = §13** (rcpps/rsqrtps 実機近似表で Resonator/Stereo/Delay が bit-exact 化, D16 検出器化)。既存 10 snap-in (KH-1a/1b/1c) と KH-2b (D14 修復) の詳細は前版 (git log fe57c01) を参照 — run_all.sh の RESULT 行は前版 baseline と完全一致
+- 解析日: 2026-10-11 / 担当 dir: `tools/targets/kilohearts/snapins/` (大物は `work/`, gitignore) / Linear: CAB-246 (KH-4) / CAB-258 (KH-6, parent CAB-53) / CAB-56 (KH-4b, parent CAB-13) / CAB-273 (§15, parent CAB-53)
+- 1 コマンド再現: `bash tools/targets/kilohearts/snapins/run_all.sh` (13 snap-in + **khbase** + Path A 対照 + libm 単体 + **CAB-56 ホストハーネス**。実測秒 + load average は §13-5・§15)。1000 trial / seed 7 は `TRIALS=1000 SEED=7 bash .../run_all.sh` (全 13 本 + khbase + ハーネスが 1000 trial になる)。§9/§10 の 1000 trial 数値はこの形で取得
+- preflight: RULES_SHA=ff4999169333 (着手時) / c8361d4dce5e (報告前再実行・SUBAGENT_RULES.md 235 行版: GitHub remote/worktree 出現時対応の追加のみ・作業ルール不変)
+- 既知類型 (DEFECTS.md): **D14 修復 (CAB-242) / D15 修復 (CAB-246) / D16 検出器 (CAB-258) が該当**、D2/D3/D7/D8/D9/D11 は非該当 (§15 も非該当)。検収 (=§14) も独立再計算・別アルゴリズム・ネガコン・baseline diff を実施
+- 本報は KH-4 (§1〜§8) と KH-6 (§9, §11) と CAB-56 (§10) の合本。**第 2 弾 = §13** (rcpps/rsqrtps 実機近似表で Resonator/Stereo/Delay が bit-exact 化, D16 検出器化)、**第 3 弾 = §15** (CAB-273: tol gate 撤去)。既存 10 snap-in (KH-1a/1b/1c) と KH-2b (D14 修復) の詳細は前版 (git log fe57c01) を参照
 
 ## 0. 結論 (先出し)
 
 **KH-4 (CAB-246)**: infra 188 関数 / 53,010B を実測分類 → (a) process 到達 **135 / 34,373B**、(b) Editor/Controller のみ **21 / 4,898B**、(c) 未到達 **32 / 13,739B**。(a) から既存 22 を除く新規 113 のうち **112 を lift** (khbase, KH-4 時点 24,263B。CRT atexit ランナ 0x180fe2508 は D15+trampoline 連鎖で残置)。検証 = khbase ctx-fuzz **200/200・10,500/10,500 call** (seed 1) + **1,000/1,000・52,500/52,500** (seed 7)、**UCRT powf 3,000/3,000 + 15,000/15,000**。**D15 (新規欠陥)**: stage-0 がメモリ間接 call を空ブロックとして丸ごと欠落 (5 関数・65 site) → **[icall] pass で修復**。主要な達成 = allocator / vector push_back / shared_ptr move-assign が wasm で bit-exact 動作。本改修で khbase 112 → **116 関数** (判定行は完全不変、wasm +9,634B)。
 
-**KH-6 (CAB-258) + CAB-56**: Tier-M 3 本 — Phaser (80 fn/17,955B)・Limiter (108 fn/22,580B) = **bit-exact**、Delay (141 fn/37,914B) は当時 許容誤差 exceed 0 (§13 で bit-exact 化)。**(c) 32 関数中 5 関数 / 8,018B (58%) に到達・lift** (最大 0x180fc4590 double pow 5,777B)。**CAB-56**: vtable dispatch 4 種 (7,395B) を実オブジェクト契約で unit-diff → khmrel/khmaster/khmring すべて 200/200 + 1000/1000 bit-exact・D15 destroy 分岐 (class A/B) 全経路発火。**[rdataest] pass**: delay 24 base の per-VA 窓を推定、最大 cap 8192。**D16 (新規欠陥)** → 64B 既定を併用して修復。**回帰**: run_all.sh exit 0、RESULT 行 baseline と 1 行も差分なし、lic_check 70/70。
+**KH-6 (CAB-258) + CAB-56**: Tier-M 3 本 — Phaser (80 fn/17,955B)・Limiter (108 fn/22,580B) = **bit-exact**、Delay (141 fn/37,914B) は当時 許容誤差 exceed 0 (§13 で bit-exact 化 → §15 で tol gate 撤去)。**(c) 32 関数中 5 関数 / 8,018B (58%) に到達・lift** (最大 0x180fc4590 double pow 5,777B)。**CAB-56**: vtable dispatch 4 種 (7,395B) を実オブジェクト契約で unit-diff → khmrel/khmaster/khmring すべて 200/200 + 1000/1000 bit-exact・D15 destroy 分岐 (class A/B) 全経路発火。**[rdataest] pass**: delay 24 base の per-VA 窓を推定、最大 cap 8192。**D16 (新規欠陥)** → 64B 既定を併用して修復。**回帰**: run_all.sh exit 0、RESULT 行 baseline と 1 行も差分なし、lic_check 70/70。**§15 (CAB-273)**: tol gate を撤去し比較を tolerance なし完全一致に統一 = 14 snap-in 全本が bit-exact 表記・1 bit 改変を FAIL 検出。
 
 ## 1. 分類表 (実測)
 
@@ -44,8 +43,7 @@
 
 - **症状**: `call qword ptr [rax+8]` (vtable dispatch) の IR ブロックが空 (pc store のみ)。vtable load と `mov rcx,obj` は残るため、call だけが無言で消える。`call reg` は解決済 (D15 はメモリ間接のみ)。
 - **実測**: khbase 113 関数中 5 関数・65 site (0x18004f350×42 / 0x18004df70×11 / 0x180050860×7 / 0x18004d980×3 / 0x180050bb0×2)。全て shared_ptr/notify 系の vtable dispatch。
-- **修復**: kh_lower [icall] pass — 空ブロックの機械語を capstone で読み (reg, disp) を復元 → `%slot = @reg + disp` → `call i64 @kh_icall(i64 %slot)` (callret fixup 付き)。kh_icall (C, 自動生成) は slot < 0x10000000 (アリーナ) なら実値を読み lift 済 callee へ switch、PE .rdata vtable slot は build 時逆引き map、未知は fail-fast。
-- **検証**: SP_MOVE (0x180050bb0) の arena fake vtable unit-diff **400/400 bit-exact**。destroy 分岐の全経路実働は §10/CAB-56 で解消 (class A 500+520, class B 54 hit = §13)。**意義**: KH-6 以降の snap-in (vtable dispatch を含む) と SnapinMasterDsp ホストハーネス (CAB-56) の必須前提。CAB-55 検出器への「空ブロック × メモリ間接 call」機械チェック追加を推奨 (DEFECTS.md)。
+- **修復**: kh_lower [icall] pass — 空ブロックの機械語を capstone で読み (reg, disp) を復元 → `%slot = @reg + disp` → `call i64 @kh_icall(i64 %slot)` (callret fixup 付き)。kh_icall (C, 自動生成) は slot < 0x10000000 (アリーナ) なら実値を読み lift 済 callee へ switch、PE .rdata vtable slot は build 時逆引き map、未知は fail-fast。**検証**: SP_MOVE (0x180050bb0) の arena fake vtable unit-diff **400/400 bit-exact**。destroy 分岐の全経路実働は §10/CAB-56 で解消 (class A 500+520, class B 54 hit)。**意義**: KH-6 以降の snap-in (vtable dispatch を含む) と SnapinMasterDsp ホストハーネス (CAB-56) の必須前提。CAB-55 検出器への「空ブロック × メモリ間接 call」機械チェック追加を推奨 (DEFECTS.md)。
 
 ## 4. rdata_window の第 3 実例 (powf) と自動推定
 
@@ -54,23 +52,20 @@ powf は 2^t 分解表 (log2 仮数→index) を可変 index で読む。**窓 2
 ## 5. 制限 / 未達
 
 1. ~~**vtable dispatch 4 種 (7,395B) の直接差分なし**~~ → **§10 (CAB-56) で解消**: 実オブジェクト契約をアリーナ上に構築し 3 scenario で 200 + 1000 trial bit-exact。destroy 分岐 (class A/B) も全経路発火済み。
-2. **MXCSR exception-flag 非追跡**: native は FP 演算で flag が蓄積し CRT matherr helper (0x180fd5bf4 / 0x180fd662c / 0x180fe5ef0 / 0x180fd8d24) がそれを参照。wasm は定数 0x1f80 を返す shim のため 4 関数は probe 対象外 (flag 追跡は下流)。
-3. **CRT 初期化前提の遅延バインド (UCRT encoded-pointer 機構)**: `__crt_state` の cookie デコード (0x180fe27b0 等) は CRT init で再エンコードされるため native 単独実行が不可。0x180fe2508 を含む ~15 関数は lift のみ (fail-fast stub)。
-4. **gs/PEB**: [gs] pass はゼロ初期化エミュレート (StackLimit=0 → probe 不発 = 実機と分岐一致)。PEB を読む CRT OS プローブ 2 関数 (0x180fd0a98 / 0x180fe027c) は実機依存のため probe 対象外。
-5. **直接差分 34 関数 / 間接 78 関数**: khbase 112 のうち直接 fuzz は 34。残りは lift + build 通過 + 呼び枝経由で発火 — 個別 coverage 測定は未実施 (関数カウンタ埋め込みは下流案)。~~**rcpps 完全エミュレート未実装**~~ → **§13 で達成** (142 関数中 4 箇所・すべて 0x180289ea0 内)。native oracle = 実機 Ryzen 9 9950X・IAT を同意味 ms_abi shim へ patch して直接実行。
-6. **undefined import 0 (訂正)**: 旧版は「khbase のみ env.exit 1」としていたが、実測では **khbase / phaser / delay / limiter すべて 0** (fail-fast stub 化で消えた)。旧 values (112 fn 時点) は wasm 1,319,920B / undefined 1。
+2. **MXCSR exception-flag 非追跡**: native は FP 演算で flag が蓄積し CRT matherr helper (0x180fd5bf4 / 0x180fd662c / 0x180fe5ef0 / 0x180fd8d24) がそれを参照。wasm は定数 0x1f80 を返す shim のため 4 関数は probe 対象外 (flag 追跡は下流)。**CRT 初期化前提の遅延バインド** (UCRT encoded-pointer 機構): `__crt_state` の cookie デコード (0x180fe27b0 等) は CRT init で再エンコードされるため native 単独実行が不可。0x180fe2508 を含む ~15 関数は lift のみ (fail-fast stub)。
+3. **gs/PEB**: [gs] pass はゼロ初期化エミュレート (StackLimit=0 → probe 不発 = 実機と分岐一致)。PEB を読む CRT OS プローブ 2 関数 (0x180fd0a98 / 0x180fe027c) は実機依存のため probe 対象外。
+4. **直接差分 34 関数 / 間接 78 関数**: khbase 112 のうち直接 fuzz は 34。残りは lift + build 通過 + 呼び枝経由で発火 — 個別 coverage 測定は未実施 (関数カウンタ埋め込みは下流案)。~~**rcpps 完全エミュレート未実装**~~ → **§13 で達成** (142 関数中 4 箇所・すべて 0x180289ea0 内)。native oracle = 実機 Ryzen 9 9950X・IAT を同意味 ms_abi shim へ patch して直接実行。
+5. **undefined import 0 (訂正)**: 旧版は「khbase のみ env.exit 1」としていたが、実測では **khbase / phaser / delay / limiter すべて 0** (fail-fast stub 化で消えた)。旧 values (112 fn 時点) は wasm 1,319,920B / undefined 1。
 
-## 6. ユーザ依頼事項: なし (素材・認証とも不要)。
-## 7. 成果物 (追加・変更)
+## 6. ユーザ依頼事項: なし (素材・認証とも不要) / §7. 成果物 (追加・変更)
 
-`scripts/khbase_classify.py` (分類)、`snapins.json` (khbase lift 112→**116** + phaser/delay/limiter・rdata_window 8192)、`harness/scen_khmath.h` (khmath 統合 + native IAT patch + arena ヒープ shim)、`harness/{scenarios.c,scenarios_kh.c}`、`lift/kh_lower.py` (**[icall]/[gs]/[rdataest]**・ret i32 wrapper・named import declare・kh_icall 生成)、`lift/gen_stubs_sigs.py` (named-import shim + arena ヒープ)、`lift/gen_simd.py` (paddq/psubq/psrad/VEX 別名 15 種・cvtsi2 dest-merge・mxcsr・**sqrtps/sqrtpd/pcmpeq*/pcmpgtd/pmovsxdq**)、`lift/gen_globals.py` (**--window-map** + D16 修復・検出器)、`lift/build.py` (icall.c 入力追加)、`scripts/make_table.py` (13 本 + khbase)、`run_all.sh` ([2] 13 本 + [4c] khbase + **[4d] CAB-56**)、`scripts/leafscan.py`、`DEFECTS.md` (D15 + D14 窓実績 + **D16**)。`work/khbase/` (gitignore)。
+`scripts/khbase_classify.py` (分類)、`snapins.json` (khbase lift 112→**116** + phaser/delay/limiter・rdata_window 8192)、`harness/scen_khmath.h` (khmath 統合 + native IAT patch + arena ヒープ shim)、`harness/{scenarios.c,scenarios_kh.c}`、`lift/kh_lower.py` (**[icall]/[gs]/[rdataest]**・ret i32 wrapper・named import declare・kh_icall 生成)、`lift/gen_stubs_sigs.py` (named-import shim + arena ヒープ)、`lift/gen_simd.py` (paddq/psubq/psrad/VEX 別名 15 種・cvtsi2 dest-merge・mxcsr・**sqrtps/sqrtpd/pcmpeq*/pcmpgtd/pmovsxdq**・**rcpps/rsqrtps 実機表**)、`lift/gen_globals.py` (**--window-map** + D16 修復・検出器)、`lift/build.py` (icall.c 入力追加)、`scripts/make_table.py` (13 本 + khbase、**§15 で判定を実測由来に変更**)、`run_all.sh` ([2] 13 本 + [4c] khbase + **[4d] CAB-56**)、`scripts/leafscan.py`、`DEFECTS.md` (D15 + D14 窓実績 + **D16**)。`work/khbase/` (gitignore)。**§15 (CAB-273) 追加分**: `harness/compare.mjs` (tol 撤去)、`scripts/{tol_removal_check.py, negcon_1bit.py, negcon_table.py, tol_negcon.sh}`、`scripts/acc_replay.mjs`・`acc_independent.sh`・`run_all.sh` の注記更新。
 
 ## 8. Tier-M への引き継ぎ状況 — 3/5/6 は解消済み
 
 1. **khbase の使い方**: snapins.json に新 snap-in を追加し lift に process + 固有 closure を書くだけ。共通基盤 (powf/allocator/vector/notify) は khbase の pass セットがそのまま適用される。vtable dispatch を含む関数は [icall] が自動修復する (空ブロック検出は自動)。**heap**: allocator IAT shim はアリーナ+0x100 を状態に使い trial 毎 reset — 新 scenario も冒頭で `A(0x110)` して cell を確保する慣習を踏襲すること。
 2. ~~**notify/dirty 経路** の unit-diff 未実施~~ → **§10 で解消済み** (khmaster/khmring 実オブジェクト契約)。~~**rdata_window 自動推定**~~ → **§9-2 の [rdataest] pass で実装済み**。§13-2 で固定点超過反復化。
-3. **MXCSR flag / CRT init / PEB**: §5 の 3 制限はホストハーネス設計 (CAB-56) と lift 語彙拡張に持ち越し。
-4. ~~**CAB-53 進捗**~~ → KH-1a/1b/1c (10 本) + KH-2b + KH-4 + **KH-6 (3 本) + CAB-56 ハーネス** 完了。残りは CAB-60 の中位〜難 snap-in (§11)。
+3. **MXCSR flag / CRT init / PEB**: §5 の 3 制限はホストハーネス設計 (CAB-56) と lift 語彙拡張に持ち越し。~~**CAB-53 進捗**~~ → KH-1a/1b/1c (10 本) + KH-2b + KH-4 + **KH-6 (3 本) + CAB-56 ハーネス** 完了。残りは CAB-60 の中位〜難 snap-in (§11)。
 
 ## 9. KH-6 (CAB-258): Tier-M snap-in 3 本 (Phaser / Delay / Limiter) — 新規 lift 329 関数・(c) 到達 5 関数
 
@@ -79,7 +74,7 @@ powf は 2^t 分解表 (log2 仮数→index) を可変 index で読む。**窓 2
 | snap-in (id) | process VA | B | lift fn / 合計B | wasm B | undefined | 200 trial | 1000 trial (seed 7) | 判定 |
 |---|---|--:|--:|--:|--:|---|---|---|
 | Phaser (ksph) | 0x1807270d0 | 2172 | 80 / 17,955 | 345,220 | 0 | 200/200・1,100/1,100 call | **1000/1000・5,500/5,500** | **bit-exact** |
-| Delay (ksdl) | 0x1802ed7f0 | 3291 | 141 / 37,914 | 3,585,984 | 0 | 200/200・1,299/1,299 call | **1000/1000・6,499/6,499** | 許容誤差 (§9-4 → §13 で bit-exact) |
+| Delay (ksdl) | 0x1802ed7f0 | 3291 | 141 / 37,914 | 3,585,984 | 0 | 200/200・1,299/1,299 call | **1000/1000・6,499/6,499** | 許容誤差 (§9-4 → §13 で bit-exact 化 → §15 で tol 撤去) |
 | Limiter (kslt) | 0x1804e8500 | 1980 | 108 / 22,580 | 438,170 | 0 | 200/200・1,100/1,100 call | **1000/1000・5,500/5,500** | **bit-exact** |
 
 - **scenario は slot13 (prepare) / slot14 (process) / slot15 (reset) の 3 エントリを混在させる** (Delay は setfs/delay-line 確保・Limiter/Phaser は sync/bands 変化で ramp 再計算)。通知 vector・dirty フラグ・AudioBuffer (L/R/n + f64 sample rate) も bit 突合対象。Delay は 0x1802ed640 (dl_prepare) が `op_new[]` で delay line 2 本を確保 (fs=8000 → cap 65,536 × 4B = 256KB × 2)、tap_add 0x1802ecfc0 が obj+0x198 を加算先にする実オブジェクト契約を scenario で再現。**vec push の満倉 realloc 経路 (0x18004cf20)** も end を 0..64 slot に散らして発火。
@@ -95,15 +90,11 @@ powf は 2^t 分解表 (log2 仮数→index) を可変 index で読む。**窓 2
 
 - **単体差分**: pow (0x180fc4590) 5,012 ケース・tan (0x180fcce40) 6,011 ケースを native (実機 IAT 無し直接 call) と wasm で突合 → **両者 bit 一致** (負底・非整数指数・NaN・±0・指数 1e306 級を含む)。
 
-### 9-2. rdata_window 自動推定 [rdataest] pass (KH-4 §4 設計案の実装 = 半自動)
+### 9-2. rdata_window 自動推定 [rdataest] pass (KH-4 §4 設計案の実装 = 半自動)・9-3 新規 SIMD 語彙 (gen_simd)
 
-kh_lower が各関数の機械語を持つことを利用し、(1) `lea reg,[rip+X]` の表 base 候識、(2) base を使う load の到達幅 (`disp + mask×scale + opsize`、`and idx,imm` から index 上限を取得)、(3) **call 辺を跨ぐ base 伝播** (arg reg への base 束縛を callee の `[rcx+idx*8]` 読出しに伝播) で per-VA 窓幅を推定。精密推定不能な base は「次参照 VA までの gap + 64B」に倒す。
+kh_lower が各関数の機械語を持つことを利用し、(1) `lea reg,[rip+X]` の表 base 候識、(2) base を使う load の到達幅 (`disp + mask×scale + opsize`、`and idx,imm` から index 上限を取得)、(3) **call 辺を跨ぐ base 伝播** (arg reg への base 束縛を callee の `[rcx+idx*8]` 読出しに伝播) で per-VA 窓幅を推定。精密推定不能な base は「次参照 VA までの gap + 64B」に倒す。**9-3** sqrtps / sqrtpd (IEEE 正確, 4 lane / 2 lane)・pcmpeqd / pcmpeqq / vpcmpeqq / pcmpgtd (全 1 = mask)・pmovsxdq (符号拡張 2 dword → 2 qword)。いずれも厳密演算なので近似判定は不要。
 
-### 9-3. 新規 SIMD 語彙 (gen_simd)
-
-sqrtps / sqrtpd (IEEE 正確, 4 lane / 2 lane)・pcmpeqd / pcmpeqq / vpcmpeqq / pcmpgtd (全 1 = mask)・pmovsxdq (符号拡張 2 dword → 2 qword)。いずれも厳密演算なので近似判定は不要。
-
-### 9-4. Delay の許容誤差判定 (rcpps) — 数値根拠 (→ §13 で bit-exact 化)
+### 9-4. Delay の許容誤差判定 (rcpps) — 数値根拠 (legacy: → §13 で bit-exact 化 → §15 で tol 撤去)
 
 delay closure 142 関数の近似命令は rcpps 4 箇所のみ (すべて 0x180289ea0)。wasm 側が IEEE の 1/x だったため実機近似表との差が伝播し、純相対 gate 超過は 185 / 1,271,000 word (0.015%)、絶対誤差は 1 ULP (2⁻²²) で頭打ち。したがって snapins.json の delay `tol` に tap へ absFloor 1e-6 を設定して exceed 0 としていた。**§13 で実機近似表を移植したため approx 0 / bit-exact に移行。**
 
@@ -117,27 +108,22 @@ delay closure 142 関数の近似命令は rcpps 4 箇所のみ (すべて 0x180
 | **khmaster** | dirty_notify 0x18004df70 + param_map_notify 0x18004d980 (interp driver 0x180006500 経由) | master (0x2e00) + 201 dirty record + route table 100 本 + ctrl block + obj2 | **200/200・400/400** | **1000/1000・2,000/2,000** |
 | **khmring** | ring driver 0x1804faa80 | master + ring bank 5 本 (128 slot × 16B) | **200/200・200/200** | **1000/1000・1,000/1,000** |
 
-- **D15 destroy 分岐の全経路**: ctrl block の vtable slot +8 = destroy / +0x10 = delete (op_delete 実物, HeapFree IAT shim) を dispatch。destroy は **class A (ctx_set2f 0x1800fb8f0, r9d でアリーナ内 +0x768/+0x780 に書込)** と **class B (0x180f87f24, r9 が野生ポインタ)** の 2 種を切替え、小路線 (A) と大路線後半 (B) の両方を発火。refcount/weakref 0〜7 を振って replace/remove/append を踏む。
-- **native oracle は IAT patch 方式**: scen_khmaster.h が 20 種の IAT slot を同意味 ms_abi shim に差替え + 0x5000000 に 1MB ヒープ域を mmap + ARCH_SET_GS でゼロ TEB 設定 ([gs] の wasm ゼロ初期化と同一)。**wasm 側は patch 不要**。
+- **D15 destroy 分岐の全経路**: ctrl block の vtable slot +8 = destroy / +0x10 = delete (op_delete 実物, HeapFree IAT shim) を dispatch。destroy は **class A (ctx_set2f 0x1800fb8f0, r9d でアリーナ内 +0x768/+0x780 に書込)** と **class B (0x180f87f24, r9 が野生ポインタ)** の 2 種を切替え、小路線 (A) と大路線後半 (B) の両方を発火。refcount/weakref 0〜7 を振って replace/remove/append を踏む。**native oracle は IAT patch 方式**: scen_khmaster.h が 20 種の IAT slot を同意味 ms_abi shim に差替え + 0x5000000 に 1MB ヒープ域を mmap + ARCH_SET_GS でゼロ TEB 設定 ([gs] の wasm ゼロ初期化と同一)。**wasm 側は patch 不要**。
 - khbase lift 112 → **116 関数** (+2,218B、.pdata extent 実測: interp 145B / ring driver 163B / getshared 30B / route map get 8B)。**判定行は完全不変**、wasm 1,304,576 → **1,314,210 B (+9,634 B)**。0x1800065e0 (8B) は `scripts/leafscan.py` で HeartCore 全 .text から発見した leaf (KH-4 分類では (c) だったため同時に解消)。
 
-## 11. 引継ぎ (次タスク)
+## 11. 引継ぎ (次タスク) — §12 (V27 検収) は §14 に統合したため削除
 
 ~~**rcpps の完全エミュレート**~~ → **§13 で達成** (実機表 3 × 4,096 で 3 本が bit-exact 化、gate 未使用のまま解消)。~~**rdataest の精度向上 + D16 検出器化**~~ → **§13-2 で達成**。**CAB-60 の中位〜難 snap-in**: (c) 残り 27 関数 (5,721B) と Ladder / Slice EQ / Filter Table (AVX・FMA 427) は report §4 の難度表に従い未実施 (§13-4 起票先 = 親 CAB-53)。
-
-## 12. 前回検収 (V27, 2026-10-11) — §14 に統合済み
-
-vtable dispatch 4 種・D15 destroy 分岐 (class A/B) は gdb bp の hit 数で実働確認済 (0x18004f350 637 / 0x180050860 605 / 0x18004df70 400 / 0x18004d980 1,100 / class A 500+520 / class B 54)。khbase 112→116 fn / wasm 1,304,576→1,314,210 B で判定行不変・lic_check ok 70 / fail 0。**上記は §14 で再確認・更新済み。**
 
 ## 13. KH-6 第 2 弾 (CAB-258 続, 2026-10-11) — rcpps/rsqrtps 実機近似表で Resonator/Stereo/Delay が bit-exact 化
 
 起点 `8efb7a0`。既知類型 (DEFECTS.md): **D16 該当** (§13-2)、D2/D3/D7/D8/D9/D11/D14 非該当。前提: rcpps/rsqrtps の結果は CPU 内蔵近似表で仕様 (SDM) は相対誤差 ≤1.5·2⁻¹² しか保束せず、旧 wasm 実装 (IEEE の 1/x) との差が CAB-224 以来の許容誤差 gate の原因だった。
 
-| 対象 | 変更前 (V27 検収) | 変更後 (本弾) |
+| 対象 | 変更前 (legacy tol 判定, V27 検収) | 変更後 (本弾) |
 |---|---|---|
-| Resonator | 許容誤差 approx 140,067 / maxrel 2.778e-1 | **approx 0 / maxrel 0.000e+0, 1000/1000・4,999/4,999** |
-| Stereo | 許容誤差 approx 827 / maxrel 2.894e-5 | **approx 0 / maxrel 0.000e+0, 1000/1000・4,999/4,999** |
-| Delay | 許容誤差 approx 3,052 / maxrel 3.591e-2 | **approx 0 / maxrel 0.000e+0, 1000/1000・6,499/6,499** |
+| Resonator | 許容誤差 (legacy) approx 140,067 / maxrel 2.778e-1 | **approx 0 / maxrel 0.000e+0, 1000/1000・4,999/4,999** |
+| Stereo | 許容誤差 (legacy) approx 827 / maxrel 2.894e-5 | **approx 0 / maxrel 0.000e+0, 1000/1000・4,999/4,999** |
+| Delay | 許容誤差 (legacy) approx 3,052 / maxrel 3.591e-2 | **approx 0 / maxrel 0.000e+0, 1000/1000・6,499/6,499** |
 | 既存 10 + Path A + qemath/qebig + khbase + CAB-56 | baseline | **1 行も差分なし** (limiter/phaser も 1000/1000・5,500/5,500)、lic_check **70/70** |
 
 ### 13-1. 近似表の構造 (実測) と検証
@@ -169,9 +155,8 @@ vtable dispatch 4 種・D15 destroy 分岐 (class A/B) は gdb bp の hit 数で
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 近似表は **実機 CPU (9950X) 依存** | 別 CPU では表が違い bit-exact でない | 親 CAB-53 に次タスク提案コメント |
-| resonator/stereo/delay の snapins.json `tol` 残存 (exceed 0 で実質 gate 未使用) | gate 緩いまま判定が落ちる萌芽 | 親 CAB-53 にコメント (撤去は別チケット) |
+| ~~resonator/stereo/delay の snapins.json `tol` 残存 (exceed 0 で実質 gate 未使用)~~ → **§15 (CAB-273) で撤去済み** | gate 緩いまま判定が落ちる萌芽 | 解消 (CAB-273) |
 | (c) 未到達 27 関数/5,721B のシナリオ拡張は未実施 (c) が 5 関数/8,018B のまま / run_all.sh 一括 1000 trial は globals.c 1.25GB で稀に SIGKILL | 個別 build の和で担保 | 親 CAB-53 にコメント |
-| 検証範囲外: wasm helper は C テーブル lookup で wasm SIMD 近似命令は未使用 (= CPU 非依存厳密実装) | — | — |
 
 ### 13-5. 実行時間の実測 (規則 38: 実測秒 + load average・n を併記)
 
@@ -195,6 +180,21 @@ vtable dispatch 4 種・D15 destroy 分岐 (class A/B) は gdb bp の hit 数で
 | CAB-246 | 分類 **135 / 21 / 32** (188 関数 / 53,010 B)・khbase lift **116 関数 / 24,609 B**・powf **3,000/3,000 + 15,000/15,000**・ctx-fuzz **10,500 + 52,500 call**・[icall] **65 site**・op_new 8,000 / vector 11,500 / SP_MOVE 2,000 call bit-exact |
 | CAB-258 | rcpps/rsqrtps 表 **49,152 B / 12,288 エントリ**・グリッド **1,040,384 + 乱数 500,000 不一致 0**・gen_simd 生成 C のホスト検証 **1,048,576 + 500,000 不一致 0**・rdataest **収束 2 ラウンド**・D16 検出器 + ネガコン PASS |
 
-**ネガティブコントロール (規則 41・主因を 1 件ずつ壊す)**: ① quickeq の `rdata_window`/`rdata_est` を外して窓 64 B 相当に戻す (D14 再現) → qebig **0/200** (want `3fe1778cae83c69b` got `3fef179225980ce8`) = 窓が主因。② 窓 256 + `--skip vshift` → **4,800/4,800** = vshift は防御 (発火差 0)。③ 近似表 1 エントリ (`kh_at_rcp[100]` +1) → grid mismatch **391** (rcp) / rsqrt **0** = 表照合が実機に紐づいている。④ D16 修復を外す → `global_var[64]` → **`[16]`** に縮小を再現し検出器は同条件を検出。
+**ネガティブコントロール (規則 41・主因を 1 件ずつ壊す)**: ① quickeq の `rdata_window`/`rdata_est` を外して窓 64 B 相当に戻す (D14 再現) → qebig **0/200** (want `3fe1778cae83c69b` got `3fef179225980ce8`) = 窓が主因。② 窓 256 + `--skip vshift` → **4,800/4,800** = vshift は防御 (発火差 0)。③ 近似表 1 エントリ (`kh_at_rcp[100]` +1) → grid mismatch **391** (rcp) / rsqrt **0** = 表照合が実機に紐づいている。④ D16 修復を外す → `global_var[64]` → **`[16]`** に縮小を再現し検出器は同条件を検出。**baseline 差分 (CAB-258「1 行も差分なし」の検証)**: `git worktree add --detach work/wt_base_8efb7a0 8efb7a0` で親ツリーを展開し `run_all.sh` 200/1 を再実行 (exit 0, 696 s)。RESULT 行 23 本の diff = **ちょうど 3 行** — resonator / stereo / delay のみ (approx 140,067→0・827→0・478→0 + wasm 拡大分)。他の 20 行 (既存 10 本 + Path A + qemath/qebig + khbase + CAB-56) は **差分 0 行**。lic_check (license/ は読取のみ) **ok 70 / fail 0**・license/ 改変 0 行。
 
-**baseline 差分 (CAB-258「1 行も差分なし」の検証)**: `git worktree add --detach work/wt_base_8efb7a0 8efb7a0` で親ツリーを展開し `run_all.sh` 200/1 を再実行 (exit 0, 696 s)。RESULT 行 23 本の diff = **ちょうど 3 行** — resonator / stereo / delay のみ (approx 140,067→0・827→0・478→0 + wasm 拡大分)。他の 20 行 (既存 10 本 + Path A + qemath/qebig + khbase + CAB-56) は **差分 0 行**。lic_check (license/ は読取のみ) **ok 70 / fail 0**・license/ 改変 0 行。
+## 15. CAB-273 (2026-10-11) — tol gate 撤去: 比較を tolerance なし完全一致に統一
+
+起点 `49f7dd4` (HEAD・snapins ツリー clean)。既知類型 (DEFECTS.md): **該当なし** (lift/IR は不変 = ハーネス判定層のみの改修)。撤去 = ① `harness/compare.mjs` の `--tol` 相対誤差 gate (`|a-b| > 1.6·2⁻¹²·max(|a|,|b|) + absFloor`、CAB-224 由来)・② `snapins.json` の `tol` (resonator 5 region / stereo 4 / delay 5)・③ `lift/build.py` の tolarg/tol.json 生成・④ `scripts/make_table.py` の「`cfg['tol']` の有無 → 許容誤差/bit-exact」判定 (→ 実測に変更)。撤去後は比較が常に全バイト strict 一致 = 14 snap-in すべて `bit-exact` 表記 (§13-4 の tol 残存は解消)。
+
+| 検証 | 実測 |
+|---|---|
+| `python3 scripts/tol_removal_check.py` | **OK**: `tol` キー **0** 件・`--tol` 解析 **0** 件・build.py tol 経路 **0** 件・make_table `c.get('tol')` **0** 件。HEAD の snapins.json との差分 = **tol キー削除のみ** (tol-stripped ツリー相等) |
+| `bash run_all.sh` 200/1 (n=2) | exit 0・**413・423 s** (load 2.95 3.28 3.69 → 16.12 10.31 6.43、nproc=16 直列)。RESULT **23 本** の baseline (`49f7dd4`) との diff = **ちょうど 3 行** = resonator/stereo/delay の `[tolerance]` タグ消滅のみ (trial 200/200・call 999/999・1299/1299・wasm B は不変) |
+| `TRIALS=1000 SEED=7 bash run_all.sh` (n=2) | exit 0・**400・423 s** (load 7.17 12.33 10.06 → 4.54 7.45 8.60)。13 snap-in + khbase がすべて 1000/1000 bit-exact (delay 6,499/6,499・khbase 52,500/52,500・qebig 4,800/4,800 = KH-2b sincos を含む)。Path A clipper のみ 0/1000 (消失コードの意図的負の対照) |
+| lic_check (`license/` は読取のみ) | `cd ../license && node lic_check.mjs work` = **ok 70 / fail 0**・license/ 改変 0 行 |
+| ネガコン (規則 41) `bash scripts/tol_negcon.sh` | **FAIL=0**。① 1 bit 改変 (`negcon_1bit.py`): 旧 tol 領域 1 byte の最下位 bit を XOR (改変バイト数 = 1) → strict は **exit 1 / trials 199/200** で FAIL 検出 (resonator `histR+0x0`・stereo `bufR+0x0`・delay `tap+0x20`)、未改変は exit 0。**同一改変を HEAD 版 `--tol` で再判定すると exit 0 = gate が吸収** (maxrel 7.365e-8・9.198e-8・**1.000e+0**、maxabs 1.192e-7・1.863e-9・**1.401e-45**): delay は tap の denormal 1.401e-45 の 1 bit 差 (相対誤差 100%) を absFloor 1e-6 で PASS していた。② `negcon_table.py`: 親 `8efb7a0` の実測 (approx 140,067/827/478) を埋めた snapshot → 判定列 `許容誤差(legacy)` (bit-exact と誤表示しない)。現行 14 本はすべて `bit-exact` |
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| /tmp (tmpfs 3.7GB) の emscripten_temp が `Disk quota exceeded` で一括再実行が失敗 (TMPDIR=`work/tmp` で解消)・一括 1000 trial は globals.c 1.25GB で稀に SIGKILL | 個別 build の和で担保 | 親 CAB-53 にコメント |
+| 検証範囲外: 別 CPU での strict 比較は未実施 (§13-4 の「wasm helper は C テーブル lookup・SIMD 近似命令不使用」も適用。legacy gate の再現は HEAD 版 compare.mjs を `work/` に展開する形・work/ は gitignore) | — | — |

@@ -2,7 +2,7 @@
 # acc_independent.sh — 独立再計算 (規則 37): 自分で native oracle を生成し、自分の replay で突合する。
 #   build.py は vec_<trials>_<seed>.bin が存在すると native_ref を再実行しない (キャッシュ) ため、
 #   本スクリプトは別人ファイル名 (myvec_*) で native oracle を作り直し、acc_replay.mjs (別実装) で
-#   全バイト bit 突合する。tol gate は使わない (exact 比較の方が強い)。
+#   全バイト bit 突合する。tol gate は CAB-273 で compare.mjs からも撤去済み (exact 比較に統一)。
 #   注意: scenario 名と dir 名が一致しないもの (khbase) は個別に処理する。存在しない dir を
 #   出力先に渡すと native_ref.c は fopen 失敗を検査せず SIGSEGV する (ハーネスの既知動作)。
 #
@@ -24,7 +24,7 @@ for n in matrix gain haas clipper gate quickeq resonator stereo disperser forman
   echo "$n $r"
   echo "$r" | grep -q '"firstDiff":null' || { echo "  ^^ $n NOT bit-exact"; fail=1; }
 done
-# khbase は scenario 名 khmath・成果物 dir は khbase (tol 判定とは無関係に exact 比較)
+# khbase は scenario 名 khmath・成果物 dir は khbase (strict 比較なので tol とは無関係)
 v=work/khbase/myvec_${TRIALS}_${SEED}.bin
 "$NAT" "$CORE" khmath "$TRIALS" "$SEED" "$v" || { echo "khbase NATIVE_FAIL"; fail=1; }
 r=$(node scripts/acc_replay.mjs "$v" work/khbase/s0/mod.cjs work/khbase/s0/sigs.json)
