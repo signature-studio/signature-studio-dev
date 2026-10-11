@@ -141,8 +141,13 @@ def build_argmodel(func, abi):
       nat thunk 側で xmm位置に敷設する)。xmm 無し kernel の float param は stack fp。
     - 機械語が mem.base として deref する gpr slot はポインタ引数 (バッファ割当)。
       機械語を ground truth とする (IR 側 inttoptr 解析は補助に留める)。
+
     mslots: [('gpr', reg, used, isbase) x4, ('xmm', (reg,w), used, True).., ('stack', st, True, False)..]
     irmap:  param index -> ('slot', idx) | ('extra', name, ty) | ('none', None)
+
+    **CAB-253 修正**: leftover は「機械語が使用する未割当 slot」のみ数える (旧実装は
+    未使用 gpr slot を引き算に含めていたため、機械語が rcx を読まない kernel
+    (0x5de3e0: gpr=[rdx,r8] のみ) で leftover が負になり abi-mismatch 除外されていた)。
     """
     gused = set(canon_gprs(abi.get('gpr_slots', [])))
     gbase = set(abi.get('gpr_base', []))
@@ -192,9 +197,12 @@ def build_argmodel(func, abi):
             irmap[i] = ('none', None)
             continue
         irmap[i] = ('slot', j)
-    # leftover は「機械語が使用する未割当 slot」のみ (未使用 slot は k)
-    unused_gpr = [k for k, (kind, d, u, dr) in enumerate(mslots) if kind == 'gpr' and not u]
-    leftover = len(pool_gpr) + len(pool_xmm) + len(pool_stf) + len(pool_sti) - len(unused_gpr)
+    # leftover (CAB-253): 機械語が使い, かつどの IR 引数にも割り当てられなかった slot 数。
+    # 未使用 gpr slot は「機械語が読まない」ので数えない (旧実装はこれを引いていた)。
+    unclaimed_used = [k for k, (kind, d, u, dr) in enumerate(mslots)
+                      if u and k not in named
+                      and not any(e[0] == 'slot' and e[1] == k for e in irmap)]
+    leftover = len(unclaimed_used)
     status = 'ok' if leftover == 0 else 'abi-mismatch'
     return mslots, irmap, status
 
@@ -240,49 +248,115 @@ def gen_shims(kernels, funcs):
     for va, K in sorted(kernels.items()):
         fn = K['name']
         f = funcs[fn]
-        xmms = K['xmms']
-        xw = K['xw']
-        stacks = K['stacks']
-        ntypes = ['u64'] * 4
-        if xmms:
-            for k in range(4):
-                xn = 'xmm%d' % k
-                ntypes.append('double' if (xn in xmms and xw.get(xn, 32) == 64) else 'float')
-        for st in stacks:
-            if st['fp']:
-                ntypes.append('double' if st['width'] == 64 else 'float')
-            else:
-                ntypes.append('u64')
-        nparams = ', '.join('%s a%d' % (t, i) for i, t in enumerate(ntypes))
-        callargs = ['a0', 'a1', 'a2', 'a3']
-        if xmms:
-            callargs += ['a%d' % (4 + k) for k in range(4)]
-        base = 4 + (4 if xmms else 0)
-        callargs += ['a%d' % (base + j) for j in range(len(stacks))]
+        reads = K['reads']                                   # [(kind, key, fp, width)]
+        ptypes = K['ptypes']
+        nparams = K['nparams']
+        ntypes = list(ptypes)
+        nparams_c = ', '.join('%s a%d' % (t, i) for i, t in enumerate(ntypes)) or 'void'
+        callargs = ['a%d' % i for i in range(nparams)]
         isf128 = f['ret'] == 'i128'
         fret = 'float' if isf128 else 'u64'
-        out.append('typedef %s (__attribute__((ms_abi)) *natf_%s)(%s);' % (fret, va, nparams))
+        out.append('typedef %s (__attribute__((ms_abi)) *natf_%s)(%s);' % (fret, va, nparams_c))
+        # xmm レジスタを引数として読む kernel: call 直前に movss/movsd でロードする
+        # (ms_abi 間接呼出では FP 引数は xmm に入らず stack home に載る — CAB-253 実測)
+        xloads = []
+        for kind, key, fp, w in reads:
+            if kind != 'xmm':
+                continue
+            xn = int(key[3:])
+            if 4 + xn in K['conflict_pid']:
+                continue                                       # stack home と競合 → そちらを優先
+            xloads.append('    __asm__ volatile("%s %%0, %%%%xmm%d" :: "m"(a%d) : "xmm%d");'
+                          % ('movsd' if w == 64 else 'movss', xn, 4 + xn, xn))
+        body = ''.join(x + '\n' for x in xloads)
         if isf128:
-            out.append('u64 nat_%s(%s) { float r = ((natf_%s)(REBASE + ((u64)%s - REBASE)))(%s); u64 b; memcpy(&b, &r, 4); return b; }'
-                       % (va, nparams, va, va, ', '.join(callargs)))
+            out.append('u64 nat_%s(%s) { %sfloat r = ((natf_%s)(REBASE + ((u64)%s - REBASE)))(%s); u64 b; memcpy(&b, &r, 4); return b; }'
+                       % (va, nparams_c, body, va, va, ', '.join(callargs) or '0'))
         else:
-            out.append('u64 nat_%s(%s) { return ((natf_%s)(REBASE + ((u64)%s - REBASE)))(%s); }'
-                       % (va, nparams, va, va, ', '.join(callargs)))
+            out.append('u64 nat_%s(%s) { %sreturn ((natf_%s)(REBASE + ((u64)%s - REBASE)))(%s); }'
+                       % (va, nparams_c, body, va, va, ', '.join(callargs) or '0'))
         itypes = [CT.get(t, 'u64') for _, t in f['params']]
         iparams = ', '.join('%s b%d' % (t, i) for i, t in enumerate(itypes))
         icast = ', '.join('b%d' % i for i in range(len(itypes)))
         out.append('u64 ir_%s(%s) { extern %s %s(%s); return (u64)%s(%s); }'
-                   % (va, iparams or 'void', CT.get(f['ret'], 'u64'), fn, iparams or 'void', fn, icast))
+                   % (va, iparams or 'void', CT.get(f['ret'], 'u64'), fn, iparams or 'void', fn,
+                      icast or ''))
     return '\n'.join(out)
 
 
-def gen_driver(kernels, funcs, cases):
+def machine_reads(abi):
+    """機械語が読む slot → [(kind, key, fp, width)]。
+       kind: 'gpr'(key=reg) | 'xmm'(key=xmmN) | 'stack'(key=offset)"""
+    out = []
+    xw = abi.get('xmm_width', {})
+    for g in canon_gprs(abi.get('gpr_slots', [])):
+        out.append(('gpr', g, False, 64))
+    for x in sorted(abi.get('xmm_slots', []), key=lambda s: int(s[3:])):
+        if int(x[3:]) >= 4:
+            continue
+        out.append(('xmm', x, True, xw.get(x, 32)))
+    for st in abi.get('stack', []):
+        out.append(('stack', st['off'], st['fp'], st['width']))
+    return out
+
+
+def pid_of(read):
+    """machine read → nat thunk の param index (CAB-253 実測配置)。
+
+    a0..a3 = rcx,rdx,r8,r9 (home offset 8..32) / b0..b3 = home offset 40..64 /
+    a8.. = stack args (offset 72+)。⇒ offset O の param index は O/8-1。
+    """
+    kind, key = read[0], read[1]
+    if kind == 'gpr':
+        return GORD.index(key)
+    if kind == 'xmm':
+        return 4 + int(key[3:])
+    return key // 8 - 1
+
+
+def build_param_layout(abi):
+    """nat thunk の param 型・個数・xmm ロード競合を決める (CAB-253)。"""
+    reads = machine_reads(abi)
+    pids = [pid_of(r) for r in reads]
+    nparams = max([3] + pids) + 1
+    # param 型 = その param に対応する機械語 read の型。4..7 は home slot (offset 40..64)
+    # だが型は read に応じ u64/float/double どちらでもよい (実測: stack param は型混合でも
+    # パラメータ順に offset 40 から詰められる — probe t11)。
+    ptypes = []
+    for i in range(nparams):
+        if i < 4:
+            ptypes.append('u64')
+            continue
+        w64 = any(pid == i and r[3] == 64 for r, pid in zip(reads, pids))
+        fp = any(pid == i and r[2] for r, pid in zip(reads, pids))
+        if not fp:
+            ptypes.append('u64')
+        else:
+            ptypes.append('double' if w64 else 'float')
+    # xmm レジスタロードと stack home の競合: 同じ param を両方が使う場合 stack home 優先
+    home_stack = set(r[1] for r in reads if r[0] == 'stack' and r[1] < 72)
+    conflict = set()
+    for r in reads:
+        if r[0] == 'xmm':
+            off = 40 + 8 * int(r[1][3:])
+            if off in home_stack:
+                conflict.add(4 + int(r[1][3:]))
+    return {'reads': reads, 'pids': pids, 'ptypes': ptypes, 'nparams': nparams,
+            'conflict_pid': conflict, 'clip_index': bool(abi.get('clip_index')),
+            'ptr_struct': abi.get('ptr_struct', [])}
+
+
+def gen_driver(kernels, funcs, cases, proto=None):
+    if proto is None:
+        proto = os.environ.get('K80_NO_PROTO') != '1'
     out = ['/* k80_diff driver.c — auto-generated (手編集禁止) */',
            '#include <stdint.h>', '#include <stdio.h>', '#include <stdlib.h>', '#include <string.h>',
            '#include <math.h>', '#include <sys/wait.h>', '#include <unistd.h>', '#include <sys/types.h>', '#include "msimd11_core.h"',
            'static uint64_t RS0 = 0x9e3779b97f4a7c15ull, RS1 = 0xbf58476d1ce4e5b9ull;',
            'static uint64_t rnd(void) { uint64_t x = RS0, y = RS1; RS0 = y; x ^= x << 23; RS1 = x ^ y ^ (x >> 17) ^ (y >> 26); return RS1 + y; }',
            'static float bits2f(uint32_t u) { float f; memcpy(&f, &u, 4); return f; }',
+           'static float nnegf(float v) { return v < 0 ? -v : v; }',
+           'static uint32_t fbits(float f) { uint32_t u; memcpy(&u, &f, 4); return u; }',
            'static double ulp32f(float x, float y) { float lo = fabsf(x) < fabsf(y) ? x : y; if (!isfinite(lo)) return 0;',
            '    float nx = nextafterf(lo, INFINITY); double u = (double)nx - (double)lo; return fabs((double)x - (double)y) / (u > 0 ? u : 1e-45); }',
            'static double ulp64d(double x, double y) { double lo = fabs(x) < fabs(y) ? x : y; if (!isfinite(lo)) return 0;',
@@ -290,6 +364,17 @@ def gen_driver(kernels, funcs, cases):
            '#define NBUF 8192', '#define NBUF_B (NBUF * 8 + 256)',
            'typedef struct { const char* va; const char* cls; long ncases; long retdiff; long bufdiff; long nandiff; double maxulp; const char* status; } result_t;',
            'static result_t RES[128]; static int NRES = 0;']
+    # thunk の prototype (CAB-253): 宣言なしで呼ぶと float 引数が default argument promotion で
+    # double に昇格し (call サイトが movsd), thunk 側の movss は double の下 4 byte を読むため
+    # 意図した値と不一致になっていた (両側に同じ値が行くため diff 比較自体は成立するが、
+    # 添字アクセス kernel では昇値の符号で OOB read → SIGSEGV になる)。
+    for va, K in (sorted(kernels.items()) if proto else []):
+        out.append('u64 nat_%s(%s);'
+                   % (va, ', '.join('%s a%d' % (t, i) for i, t in enumerate(K['ptypes'])) or 'void'))
+        f = funcs[K['name']]
+        itypes = [CT.get(t, 'u64') for _, t in f['params']]
+        out.append('u64 ir_%s(%s);'
+                   % (va, ', '.join('%s b%d' % (t, i) for i, t in enumerate(itypes)) or 'void'))
     for va, K in sorted(kernels.items()):
         fn = K['name']
         f = funcs[fn]
@@ -297,21 +382,19 @@ def gen_driver(kernels, funcs, cases):
         if K['status'] != 'ok':
             continue
         mslots = K['mslots']
-        nstack = sum(1 for m in mslots if m[0] == 'stack')
-        nV = 8 + nstack
-        sidx = {}                                          # stack off -> slot idx
-        j = 8
-        for m in mslots:
-            if m[0] == 'stack':
-                sidx[m[1]['off']] = j
-                j += 1
-        xidx = {}
-        j = 4
-        for m in mslots:
-            if m[0] == 'xmm':
-                xidx[m[1][0]] = j
-                j += 1
-        gidx = {m[1]: k for k, m in enumerate(mslots) if m[0] == 'gpr'}
+        reads = K['reads']
+        ptypes = K['ptypes']
+        nparams = K['nparams']
+        pids = K['pids']
+        nV = nparams
+        pid_of_read = {id(r): p for r, p in zip(reads, pids)}
+        rpid = {}
+        for r, p in zip(reads, pids):
+            rpid[(r[0], r[1])] = p
+        # read ごとの param id (kind,key) → pid
+        bykey = {}
+        for r, p in zip(reads, pids):
+            bykey[(r[0], r[1])] = (p, r[2])     # (param id, is-fp)
         # gpr ptr 判定: 機械語が mem.base として deref する slot (機械語 ground truth)。
         # 要素型は IR inttoptr 解析 (kinds) で判れば使用, 無ければ分類に応じ既定。
         bufs = {}
@@ -323,11 +406,24 @@ def gen_driver(kernels, funcs, cases):
         for k, (kind, d, u, isbase) in enumerate(mslots):
             if kind == 'gpr' and u and isbase:
                 bufs[k] = idelem.get(k) or ('f32' if cls == 'f32chain' else 'i64')
+        # 二重 deref される gpr slot (ptr_struct): buffer 先頭 16B を有効ポインタにし、
+        # その指す 2 バッファを比較対象にする (0x5e05b0/0x5e02b0 の record{ptr,ptr})
+        struct_slots = [GORD.index(s) for s in K.get('ptr_struct', []) if s in GORD]
+        extra = {}                                          # 比較対象の追加 buffer id -> 'f32'
+        for k, ps in enumerate(struct_slots):
+            extra[200 + 10 * k] = 'f32'
+            extra[200 + 10 * k + 1] = 'f32'
         out.append('/* ---- kernel %s (%s) ---- */' % (va, cls))
         out.append('static void test_%s(long NC, result_t* r) {' % va)
         out.append('  union V { u64 u; double f; } vA[%d], vI[%d];' % (nV, nV))
         for si in sorted(bufs):
+            if si in struct_slots:
+                continue
             out.append('  static unsigned char bA%d[NBUF_B], bI%d[NBUF_B], bK%d[NBUF_B];' % (si, si, si))
+        for ei in sorted(extra):
+            out.append('  static unsigned char bA%d[NBUF_B], bI%d[NBUF_B], bK%d[NBUF_B];' % (ei, ei, ei))
+        for k, ps in enumerate(struct_slots):
+            out.append('  static unsigned char bS%d[NBUF_B], bI%d_0[NBUF_B];' % (ps, ps))
         extras = sorted(set(e[1] for e in K['irmap'] if e[0] == 'extra'))
         for e in extras:
             out.append('  u64 vX_%s = 0;' % e.replace('.', '_'))
@@ -335,6 +431,8 @@ def gen_driver(kernels, funcs, cases):
         retmask = ' & 0xffffffffu' if f['ret'] == 'i128' else ''
         out.append('  for (long cs = 0; cs < NC; cs++) {')
         for si in sorted(bufs):
+            if si in struct_slots:
+                continue
             ety = bufs[si]
             if ety == 'f32':
                 out.append('    { for (unsigned j = 0; j < NBUF_B / 4; j++) { uint32_t rr = (uint32_t)rnd(); rr = (rr & 0x807fffffu) | ((((rnd() >> 40) & 0xffu) %% 25u + 118u) << 23); float fv; memcpy(&fv, &rr, 4); memcpy(bK%d + j * 4, &fv, 4); } }' % si)
@@ -342,49 +440,61 @@ def gen_driver(kernels, funcs, cases):
                 out.append('    { for (unsigned j = 0; j < NBUF_B / 8; j++) { double dv = (double)(int64_t)(rnd() %% 4000001) / 1000.0; memcpy(bK%d + j * 8, &dv, 8); } }' % si)
             else:
                 out.append('    { for (unsigned j = 0; j < NBUF_B / 4; j++) { uint32_t rr = (uint32_t)rnd(); rr = (rr & 0x807fffffu) | ((((rnd() >> 40) & 0xffu) %% 25u + 118u) << 23); memcpy(bK%d + j * 4, &rr, 4); } }' % si)
-        for k, (kind, d, used, dr) in enumerate(mslots):
+        # value slot 初期化: 機械語が読む slot (param id) に値を敷設。読まない param は 0。
+        clip = K.get('clip_index')
+        for pid in range(nparams):
+            hit = [(r, p) for r, p in zip(reads, pids) if p == pid]
+            if not hit:
+                out.append('    vA[%d].u = vI[%d].u = 0;' % (pid, pid))
+                continue
+            kind, key, fp, w = hit[0][0]
             if kind == 'gpr':
-                if k in bufs:
-                    continue                               # 後で buffer address を設定
-                if used:
-                    out.append('    vA[%d].u = vI[%d].u = 512 + (rnd() %% 1536);' % (k, k))
-                else:
-                    out.append('    vA[%d].u = vI[%d].u = 0;' % (k, k))
-            elif kind == 'xmm':
-                w = d[1]
-                if w == 64:
-                    out.append('    { double v = (double)(int64_t)(rnd() %% 4000001) / 1000.0; vA[%d].f = vI[%d].f = v; }' % (k, k))
-                else:
-                    out.append('    { uint32_t rr = (uint32_t)rnd(); if ((rnd() >> 40) > 5) rr = (rr & 0x807fffffu) | ((((rnd() >> 40) & 0xffu) %% 126u + 118u) << 23); vA[%d].f = vI[%d].f = (double)bits2f(rr); }' % (k, k))
+                if pid in bufs:
+                    continue                                   # 後で buffer address を設定
+                out.append('    vA[%d].u = vI[%d].u = 512 + (rnd() %% 1536);' % (pid, pid))
+            elif not fp:
+                out.append('    vA[%d].u = vI[%d].u = 512 + (rnd() %% 1536);' % (pid, pid))
             else:
-                if d['fp']:
-                    if d['width'] == 64:
-                        out.append('    { double v = (double)(int64_t)(rnd() %% 4000001) / 1000.0; vA[%d].f = vI[%d].f = v; }' % (sidx[d['off']], sidx[d['off']]))
-                    else:
-                        out.append('    { uint32_t rr = (uint32_t)rnd(); if ((rnd() >> 40) > 5) rr = (rr & 0x807fffffu) | ((((rnd() >> 40) & 0xffu) %% 126u + 118u) << 23); vA[%d].f = vI[%d].f = (double)bits2f(rr); }' % (sidx[d['off']], sidx[d['off']]))
-                else:
-                    out.append('    vA[%d].u = vI[%d].u = 512 + (rnd() %% 1536);' % (sidx[d['off']], sidx[d['off']]))
+                # clip_index kernel (添字アクセス) は fp scalar を有限・非負に制限する
+                # (負または inf/NaN の gain → trunc が 0x8000.. → 負添字 → OOB read → SIGSEGV)
+                gate = '' if (clip and os.environ.get('K80_NO_NNEGF') != '1') else 'if ((rnd() >> 40) > 5) '
+                gen = ('{ double v = (double)(int64_t)(rnd() %% 4000001) / 1000.0; vA[%d].f = vI[%d].f = v; }'
+                       % (pid, pid)) if w == 64 else (
+                    '{ uint32_t rr = (uint32_t)rnd(); %srr = (rr & 0x807fffffu) | ((((rnd() >> 40) & 0xffu) %% 25u + 118u) << 23); vA[%d].f = vI[%d].f = %s; }'
+                    % (gate, pid, pid, ('nnegf((double)bits2f(rr))'
+                                       if (clip and os.environ.get('K80_NO_NNEGF') != '1')
+                                       else '(double)bits2f(rr)')))
+                out.append('    ' + gen)
+        for ei in sorted(extra):
+            out.append('    { for (unsigned j = 0; j < NBUF_B / 4; j++) { uint32_t rr = (uint32_t)rnd(); rr = (rr & 0x807fffffu) | ((((rnd() >> 40) & 0xffu) %% 25u + 118u) << 23); float fv; memcpy(&fv, &rr, 4); memcpy(bK%d + j * 4, &fv, 4); } }' % ei)
         for si in sorted(bufs):
+            if si in struct_slots:
+                continue
             out.append('    memcpy(bA%d, bK%d, NBUF_B); memcpy(bI%d, bK%d, NBUF_B);' % (si, si, si, si))
             out.append('    vA[%d].u = (u64)(uintptr_t)bA%d; vI[%d].u = (u64)(uintptr_t)bI%d;' % (si, si, si, si))
-        # nat 引数式: int 4 + fp 4 + stack
-        nat_expr = ['vA[%d].u' % k for k in range(4)]
-        if K['xmms']:
-            for k in range(4):
-                xn = 'xmm%d' % k
-                if xn in K['xmms']:
-                    xi2 = xidx[xn]
-                    w = K['xw'].get(xn, 32)
-                    nat_expr.append('(float)vA[%d].f' % xi2 if w == 32 else 'vA[%d].f' % xi2)
-                else:
-                    nat_expr.append('0.0f')
-        for st in K['stacks']:
-            si2 = sidx[st['off']]
-            if st['fp']:
-                nat_expr.append('(float)vA[%d].f' % si2 if st['width'] == 32 else 'vA[%d].f' % si2)
+        for k, ps in enumerate(struct_slots):
+            # struct buffer 先頭 16B = {extra buf, extra buf} (nat/IR で別領域を指す)
+            t0, t1 = 200 + 10 * k, 200 + 10 * k + 1
+            out.append('    memcpy(bS%d, bK%d, NBUF_B); memcpy(bI%d_0, bK%d, NBUF_B);' % (ps, t0, ps, t0))
+            out.append('    *(uint64_t*)(bS%d + 0) = (uint64_t)(uintptr_t)bA%d; *(uint64_t*)(bS%d + 8) = (uint64_t)(uintptr_t)bA%d;'
+                       % (ps, t0, ps, t1))
+            out.append('    *(uint64_t*)(bI%d_0 + 0) = (uint64_t)(uintptr_t)bI%d; *(uint64_t*)(bI%d_0 + 8) = (uint64_t)(uintptr_t)bI%d;'
+                       % (ps, t0, ps, t1))
+            out.append('    vA[%d].u = (u64)(uintptr_t)bS%d; vI[%d].u = (u64)(uintptr_t)bI%d_0;' % (ps, ps, ps, ps))
+            # 参照先 extra buffer を nat/IR 同じ内容で埋める
+            out.append('    memcpy(bA%d, bK%d, NBUF_B); memcpy(bI%d, bK%d, NBUF_B);' % (t0, t0, t0, t0))
+            out.append('    memcpy(bA%d, bK%d, NBUF_B); memcpy(bI%d, bK%d, NBUF_B);' % (t1, t1, t1, t1))
+        # nat 引数式: param 型に応じた式
+        nat_expr = []
+        for pid in range(nparams):
+            t = ptypes[pid]
+            if t == 'u64':
+                nat_expr.append('vA[%d].u' % pid)
+            elif t == 'double':
+                nat_expr.append('vA[%d].f' % pid)
             else:
-                nat_expr.append('vA[%d].u' % si2)
-        # ir 引数式 (value slot 番号は nat 側と共通: gpr=0..3, xmm=4.., stack=sidx)
+                nat_expr.append('(float)vA[%d].f' % pid)
+        # ir 引数式 (value slot 番号は nat 側と共通: pid で指定)
         ir_expr = []
         for i, (pn, pt) in enumerate(f['params']):
             entry = K['irmap'][i] if i < len(K['irmap']) else ('none', None)
@@ -392,12 +502,19 @@ def gen_driver(kernels, funcs, cases):
                 si2 = entry[1]
                 kind2, d2, u2, dr2 = mslots[si2]
                 if kind2 == 'xmm':
-                    si2 = xidx[d2[0]]
+                    key = ('xmm', d2[0])
                 elif kind2 == 'stack':
-                    si2 = sidx[d2['off']]
-                kind, d, used, dr = mslots[entry[1]]
+                    key = ('stack', d2['off'])
+                else:
+                    key = ('gpr', d2)
+                ent = bykey.get(key, (si2, None))
+                si2, isfp = ent[0], ent[1]
                 if pt in ('float', 'double'):
                     ir_expr.append('(%s)vI[%d].f' % (pt, si2))
+                elif isfp:
+                    # fp slot の値を整数型引数 (i32 = f32 bits) に渡す: float の bit 表現
+                    ir_expr.append('fbits((float)vI[%d].f)' % si2 if pt in ('i32', 'i16', 'i8')
+                                   else '(u64)fbits((float)vI[%d].f)' % si2)
                 else:
                     ir_expr.append('vI[%d].u' % si2)
             elif entry[0] == 'extra':
@@ -408,8 +525,10 @@ def gen_driver(kernels, funcs, cases):
         out.append('    u64 ri = ir_%s(%s);' % (va, ', '.join(ir_expr) or '0'))
         out.append('    if ((rn %s) != (ri %s)) { r->retdiff++; if (r->retdiff == 1) fprintf(stderr, "[%s] ret case %%ld nat=%%llx ir=%%llx\\n", cs, (unsigned long long)rn, (unsigned long long)ri); }'
                    % (retmask, retmask, va))
-        for si in sorted(bufs):
-            ety = bufs[si]
+        cmp_bufs = dict((si, bufs[si]) for si in bufs if si not in struct_slots)
+        cmp_bufs.update(extra)
+        for si in sorted(cmp_bufs):
+            ety = cmp_bufs[si]
             esz = {'f32': 4, 'f64': 8, 'i16': 2, 'i32': 4, 'i64': 8}.get(ety, 4)
             isf = ety in ('f32', 'f64')
             ulpfn = 'ulp32f' if ety == 'f32' else 'ulp64d'
@@ -505,10 +624,14 @@ def main():
             if g:
                 ptrargs['gpr:%s' % g] = {'i8': 'i8', 'i16': 'i16', 'i32': 'i32', 'i64': 'i64',
                                          'float': 'f32', 'double': 'f64'}.get(ty, 'i64')
+        lay = build_param_layout(ab)
         kernels[va] = {'name': fn, 'cls': clsva.get(va, 'sse'), 'mslots': mslots, 'irmap': irmap,
                        'status': status, 'kinds': kinds, 'gprs': canon_gprs(ab.get('gpr_slots', [])),
                        'xmms': ab.get('xmm_slots', []), 'xw': ab.get('xmm_width', {}),
-                       'stacks': ab.get('stack', [])}
+                       'stacks': ab.get('stack', []),
+                       'reads': lay['reads'], 'pids': lay['pids'], 'ptypes': lay['ptypes'],
+                       'nparams': lay['nparams'], 'conflict_pid': lay['conflict_pid'],
+                       'clip_index': lay['clip_index'], 'ptr_struct': lay['ptr_struct']}
     if a.list_groupb:
         print('GroupB (数値差分対象外 — 外部 helper 呼出):')
         for va, c, h in groupb:
