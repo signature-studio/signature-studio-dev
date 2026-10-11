@@ -11,10 +11,10 @@ inputs:
     required: false
     default: 'fl-win64'
   app-id:
-    description: 'GitHub App id (client id) used for token auto-refresh. Pass via workflow: ${{ vars.OC_APP_CLIENT_ID }}'
+    description: 'GitHub App id (client id) used for token auto-refresh. Pass via workflow: vars.OC_APP_CLIENT_ID'
     required: false
   app-private-key:
-    description: 'GitHub App private key (PEM) for token auto-refresh. Pass via workflow: ${{ secrets.OC_APP_PRIVATE_KEY }}'
+    description: 'GitHub App private key (PEM) for token auto-refresh. Pass via workflow: secrets.OC_APP_PRIVATE_KEY (composite actions cannot read the secrets context directly)'
     required: false
   token-permissions:
     description: 'JSON fragment limiting the refreshed token permissions, e.g. {"contents":"read"}. Empty = installation defaults.'
