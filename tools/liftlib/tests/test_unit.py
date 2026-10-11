@@ -417,12 +417,10 @@ def t15():
 
     def run_env(extra):
         e = dict(os.environ, **extra)
-        r = subprocess.run([sys.executable, os.path.abspath(dbg)], capture_output=True, text=True,
-                           env=e, timeout=1800)
+        r = subprocess.run([sys.executable, os.path.abspath(dbg), "--json"], capture_output=True,
+                           text=True, env=e, timeout=1800)
         assert r.returncode == 0, r.stderr[-500:]
-        m = re.search(r"--- stats --- (\{.*?\})", r.stdout)
-        st = eval(m.group(1))
-        return st
+        return json.loads(r.stdout)["stats"]
 
     st0, cnt0 = run()
     # LIFTLIB-4 実測固定: 残留 6 以下 / bind xmm0 0 / bind xmm1 1以下 / merge xmm2 0
