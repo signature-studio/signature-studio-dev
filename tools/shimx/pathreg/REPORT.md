@@ -2,7 +2,7 @@
 
 日付: 2026-10-10 / 親: CAB-11 (shimx, Done) / 関連: CAB-94 (vreg, Done)・CAB-104 (asset-vfs E, 稼働中)・CAB-98 (nfo)・CAB-213 (実キー確定)・CAB-101 (実FL結線)
 書込範囲: `tools/shimx/pathreg/` のみ (shimx 既存ファイル・tools/startup・tools/assets・tools/hostbridge は無変更, `git status` で `?? tools/shimx/pathreg/` のみ)
-検収: **`bash tools/shimx/pathreg/scripts/e2e.sh` → exit 0 (8.5 秒)**。`bash tools/shimx/test.sh --quick` も PASS を確認 (影響 0)
+検収: **`bash tools/shimx/pathreg/scripts/e2e.sh` → exit 0 (8 秒・実測)**。`bash tools/shimx/test.sh --quick` も PASS を確認 (影響 0)
 
 > **更新 2026-10-10 (CAB-214 follow-up, shimx REPORT §12)**: shimx の username 統一 (`C:\Users\webstudio`) と vreg reg.c の取込・退役に伴い、
 > ①予備 profile `user2Profile` (`C:\Users\user` の alias mount 6 本) を**退役** (既定表は install + webstudio×6 + `C:` = **8 本**。C/JS 既定・
@@ -12,7 +12,7 @@
 
 ## 0. 結論 (数値は全て実測)
 
-1. **パス写像インタフェースを実装し、C (wasm) と JS の双方で同一結果になることを 15 fixture で検証した**。
+1. **パス写像インタフェースを実装し、C (wasm) と JS の双方で同一結果になることを 16 fixture で検証した**。
    FL が期待する Windows パス (インストール dir / %APPDATA% / Documents\Image-Line / Plugin database / Temp) を
    仮想 FS (`/fl` = E asset bundle, `/c/home/...` = OPFS 永続, `/c/tmp` = MEMFS) へ写像する。正規化参照実装
    (大小無視・区切り文字・ドライブレター・`\\?\`・`.` `..` 畳み込み) 付き。C 側は `shimx_set_path_mapper`
@@ -22,10 +22,10 @@
    `vreg_set_notify` → 遅延 flush、(b) shimx reg.c のまま — flush 点で C hash (export 全文 FNV-1a 64bit) を
    比較。**永続レコードは vreg `Vreg.flush()` と同一形式**で、e2e で**本物の vreg Vreg アダプタとの
    双方向相互運用** (bridge 書込→vreg 読取 / vreg 書込→bridge 読取, MachineGuid 一致) を確認した。
-3. テスト: C 単体 (正規化 18 例・マウント 14 表・写像 8 例・実ファイル I/O・hash) を **ST/MT 両方 ALL PASS**、
+3. テスト: C 単体 (正規化 18 例・マウント表 8 本・写像 8 例・実ファイル I/O・hash) を **ST/MT 両方 ALL PASS**、
    JS 単体 4/4、e2e 6 グループ (遅延 flush / onYield / onPageHide / flush 点契約 / 削除の永続 / C↔JS クロスチェック)。
-   成果物 1,547 行 (C 460 / JS 462 / テスト 541 / スクリプト 84)。モジュール: module_a 204,830 B /
-   module_b 188,820 B (SINGLE_FILE, wasm 埋込済み)。
+   成果物 1,508 行 (数え方は §8-1: `wc -l` で tracked 13 files・README 除く。C 460 / JS 461 / テスト 505 / スクリプト 82)。
+   モジュール: module_a.mjs 204,619 B / module_b.mjs 190,588 B (SINGLE_FILE, wasm 埋込済み)。
 4. **発見 (CAB-213 へ)**: shimx 内蔵の `SHGetFolderPathW`/環境変数は `C:\Users\user` 固定に対し、vreg seed の
    `Shared data` 値は `C:\Users\webstudio\Documents\Image-Line\` (推定)。両方を既定マウント表に登録して
    同一実体へ写像することで当面は吸収した (§3)。実キー確定時にどちらかに統一すること。
@@ -35,14 +35,14 @@
 
 | パス | 内容 |
 |---|---|
-| `include/pathreg.h` | 契約書 (135 行): マウント表 API / 正規化 / 写像 / 変更検出 + **ホストブリッジ (JS) フック署名・シリアライズ形式・flush タイミング・必要エクスポート一覧** |
-| `src/pathmap.c` (267 行) | 正規化 `pathreg_normalize` / マウント表 `pathreg_{set_paths,add_mount,remove_mount,clear_mounts,get_mount}` / 写像 `pathreg_map` (`shimx_path_mapper_fn` 互換) + `pathreg_install()` / 逆写像 `pathreg_unmap` / 既定表の遅延ロード |
-| `src/regpersist.c` (48 行) | `pathreg_reg_hash` (export 全文 → FNV-1a 64bit) / `pathreg_reg_changed` / `pathreg_reg_mark_saved` / `pathreg_reg_seed_text` |
-| `js/pathmap.mjs` (110 行) | C の JS ミラー: `normalizeWinPath` / `createMapper` (既定表 + 追加マウント) / `defaultMounts` / `DEFAULT_PATHS`。glue が wasm 起動前に「どこに書けば C から見えるか」を計算する用 |
-| `js/regbridge.mjs` (352 行) | `RegBridge`: seed 適用 (vreg `resolveSeed` 再利用) → `shimx_reg_import_text` 一括投入、変更検出 (通知 or hash)、flush (vreg 互換レコード)、`onYield`/`onPageHide`、検証用 read/write/delete API、`observeRegistration` (FUN_008e6150 同型判定) |
-| `test/test_pathreg.c` (229 行) | C 単体 (shimx 結合含む)。`build.sh test` で ST/MT 両方実行 |
-| `test/pathmap.test.mjs` (86 行) | JS 単体 (node:test 4 件) |
-| `test/e2e.mjs` (181 行) | e2e: モック永続化層 (MemoryStore) で「再起動」を含む往復 + **本物の vreg Vreg との相互運用** + C↔JS 写像クロスチェック |
+| `include/pathreg.h` | 契約書 (134 行): マウント表 API / 正規化 / 写像 / 変更検出 + **ホストブリッジ (JS) フック署名・シリアライズ形式・flush タイミング・必要エクスポート一覧** |
+| `src/pathmap.c` | 正規化 `pathreg_normalize` / マウント表 `pathreg_{set_paths,add_mount,remove_mount,clear_mounts,get_mount}` / 写像 `pathreg_map` (`shimx_path_mapper_fn` 互換) + `pathreg_install()` / 逆写像 `pathreg_unmap` / 既定表の遅延ロード |
+| `src/regpersist.c` | `pathreg_reg_hash` (export 全文 → FNV-1a 64bit) / `pathreg_reg_changed` / `pathreg_reg_mark_saved` / `pathreg_reg_seed_text` |
+| `js/pathmap.mjs` | C の JS ミラー: `normalizeWinPath` / `createMapper` (既定表 + 追加マウント) / `defaultMounts` / `DEFAULT_PATHS`。glue が wasm 起動前に「どこに書けば C から見えるか」を計算する用 |
+| `js/regbridge.mjs` | `RegBridge`: seed 適用 (vreg `resolveSeed` 再利用) → `shimx_reg_import_text` 一括投入、変更検出 (通知 or hash)、flush (vreg 互換レコード)、`onYield`/`onPageHide`、検証用 read/write/delete API、`observeRegistration` (FUN_008e6150 同型判定) |
+| `test/test_pathreg.c` | C 単体 (shimx 結合含む)。`build.sh test` で ST/MT 両方実行 |
+| `test/pathmap.test.mjs` | JS 単体 (node:test 4 件) |
+| `test/e2e.mjs` | e2e: モック永続化層 (MemoryStore) で「再起動」を含む往復 + **本物の vreg Vreg との相互運用** + C↔JS 写像クロスチェック |
 | `scripts/build.sh` | `test` / `module-a` (vreg_* フック export + probe.c 同梱) / `module-b` (フック非 export) / `all`。emcc フラグは shimx `flags.sh` を流用 |
 | `scripts/e2e.sh` | 1 コマンド検収 (build → C 単体 ST/MT → JS 単体 → e2e) |
 
@@ -78,12 +78,13 @@ CAB-101 は `pathreg_set_paths()` / `pathreg_add_mount()` で実配置に合わ�
 
 ### 2.3 検証実績
 
-- C 単体: 正規化 18 例 (UNC / `\\?\` / 相対 / 根超え pop 含む)、マウント表操作、写像 8 例
+- C 単体: 正規化 18 例 (UNC / `\\?\` / 相対 / 根超え pop 含む)、マウント表操作 (既定表 **8 本**)、写像 8 例
   (asset 読取 / Shared data 書込 / Temp 優先 / フォールバック)、**実ファイル I/O** — `/fl` 側 0444 ファイルを
   `CreateFileW(GENERIC_READ)` で読めて `GENERIC_WRITE` は `ERROR_ACCESS_DENIED` (E の EPERM 相当)、
   `/c/home/...` 側へ `CreateFileW(CREATE_ALWAYS)+WriteFile` で書けて posix 側から同一バイトを読取 — を ST/MT 両方 PASS。
-- e2e クロスチェック: 15 fixture (`\\?\` 付き・UNC・相対・未登録含む) で **C `pathreg_map` と JS `createMapper` が
-  全件一致** (非対応は両方 null) + 逆写像一致 + 追加マウント一致 + 既定表件数一致 (14)。
+- e2e クロスチェック: 16 fixture (`\\?\` 付き・UNC・相対・未登録・退役 alias 含む。`test/e2e.mjs` の `fixtures[]` 要素数) で
+  **C `pathreg_map` と JS `createMapper` が全件一致** (非対応は両方 null) + 逆写像一致 + 追加マウント一致 +
+  既定表件数一致 (C `pathreg_mount_count()` = JS `defaultMounts().length` = **8**。install + webstudio×6 + `C:`)。
 
 ## 3. レジストリ永続化接続
 
@@ -115,27 +116,24 @@ wasm (shimx Reg* + pathreg) ⇄ RegBridge (js/regbridge.mjs) ⇄ store {load,sav
 
 e2e 実測: 復元後の `Software\Image-Line\FL Studio 26\General\Run counter` (REG_DWORD)・`LastProject` (REG_SZ)・
 削除した `Control Panel\International\sDecimal` (内蔵既定) が**再起動後も正しく保持/欠落**、
-`MachineGuid` はプロファイル内で安定。snapshot keys=50 種。
+`MachineGuid` はプロファイル内で安定。キー数 (数え方は §8-1): e2e A4 の永続レコード `hkcu` キー **12** /
+e2e B の `bridge.stats()` は **keys=53・values=99** (全ハイブ・shimx 内蔵既定 + seed + 書込分) /
+`bridge.counts()` は **keys=25・values=99** (model 集計)。
 
 ## 4. CAB-101 (実FL結線) での利用方法
 
 ```js
-// 1) モジュール: tools/shimx/pathreg/scripts/build.sh module-a の構成で lift 済み FL とリンク
-//    (shimx src 全部 (reg.c 含む) + vreg/src/probe.c + tools/shimx/pathreg/src/*.c を追加。
-//     EXPORTED_FUNCTIONS は include/pathreg.h の一覧 + FL 本体が必要な分)
+// 1) モジュール: scripts/build.sh module-a の構成 (shimx src 全部 + vreg/src/probe.c + pathreg/src/*.c) で
+//    lift 済み FL とリンク。EXPORTED_FUNCTIONS は include/pathreg.h の一覧 + FL 本体が必要な分。
 import createPathregModule from '<...>/module_a.mjs';
-const mod = await createPathregModule();
-const bridge = await RegBridge.create({ mod, store: new IdbStore(), seed, profile: 'default' });
-//    ↑ boot 内で _shimx_init / _pathreg_install (mapper 登録) / seed 適用 / 復元 / flush(false→初回は強制) まで完了
-
-// 2) FS 側 (E との結合手順):
-//    - 読取: E の createEmscriptenFs(FS, vfs) を /fl に mount (既定表どおり)。OpfsCache 等は E の手順どおり
-//    - 書込: /c/home/... (/c/tmp) を MEMFS+IDBFS または OPFS 由来の書込可 FS で mount。
-//      写像先の計算は js/pathmap.mjs (C と全 fixture 一致) を使って起動前に mkdir/事前配置できる
-//      (例: nfo の generateDb() 出力を /c/home/Documents/Image-Line/FL Studio/Presets/Plugin database/ へ)
-// 3) ランタイム: メッセージポンプの yield 点で bridge.onYield()、pagehide/visibilitychange で
-//    bridge.onPageHide()。 Worker 終了前にも close() (flush + 通知フック解除)
-// 4) 設定: 実配置が確定したら pathreg_set_paths() で mount 表を上書き (C) + createMapper({paths}) (JS) を同一値に
+const bridge = await RegBridge.create({ mod: await createPathregModule(), store: new IdbStore(), seed, profile: 'default' });
+//    ↑ boot 内で _shimx_init / _pathreg_install / seed 適用 / 復元 / flush(false→初回は強制) まで完了
+// 2) FS 側: 読取は E の createEmscriptenFs(FS, vfs) を /fl に mount。書込は /c/home(/c/tmp) を
+//    MEMFS+IDBFS または OPFS 由来の書込可 FS で mount。写像先は js/pathmap.mjs で起動前に計算できる
+//    (例: nfo generateDb() 出力を /c/home/Documents/Image-Line/FL Studio/Presets/Plugin database/ へ)。
+// 3) ランタイム: pump の yield 点で bridge.onYield()、pagehide/visibilitychange で bridge.onPageHide()。
+//    Worker 終了前にも close() (flush + 通知フック解除)。
+// 4) 設定: 実配置が確定したら pathreg_set_paths() (C) + createMapper({paths}) (JS) を同一値で上書き。
 ```
 
 E (asset-vfs) 側は無変更で良い (`/fl` mount 点と vpath = tree 相対の規約を本側が既定表に採用)。
@@ -150,8 +148,7 @@ E (asset-vfs) 側は無変更で良い (`/fl` mount 点と vpath = tree 相対�
    非 ASCII キー名の削除も動くが、mount 表の照合は ASCII 大小無視のみ (UTF-8 全体の casefold はしない。
    E の lookup が大小無視のため実害なしと判断)。
 3. **pathreg_map の入力は UTF-8 前提** (shimx `shimx_path_to_posix` と同じ)。W 版 API は shimx 内部で UTF-8 化してから mapper へ渡る。
-4. hash 変更検出 (構成 b) は export 全文の O(レジストリ全体) — flush 点のみ呼ぶ設計なので実用上無視できるが、
-   高頻度ポーリングは想定していない。誤「無変更」確率は FNV-1a 64bit 衝突時のみ (事実上 0)。
+4. hash 変更検出 (構成 b) は export 全文の O(レジストリ全体) — flush 点のみ呼ぶ設計なので実用上無視できる。高頻度ポーリングは想定しない。誤「無変更」は FNV-1a 64bit 衝突時のみ (事実上 0)。
 5. レコードの `hkcu` は「その時点の全 HKCU」を含む (vreg と同一)。seed version 更新時は `fillMissing` で
    不足分のみ補完 (ユーザ変更・削除は保持)。レコード破損時のマイグレーションは未実装 (schema:1 固定)。
 6. 実 FL バイナリを通した検証は未了 (本チケットはインタフェース接続。実 FL 結線は CAB-101)。
@@ -169,8 +166,34 @@ E (asset-vfs) 側は無変更で良い (`/fl` mount 点と vpath = tree 相対�
 | 3 | E 側書込領域 | `/c/home`, `/c/tmp` の IDBFS/OPFS mount 実装と、`onPageHide` での IDBFS sync (`FS.syncfs`) 接続。flush 契約は本 REPORT §3.1 を流用可 |
 | 4 | ~~vreg 取込の恒久化~~ | 完了 (CAB-214: shimx reg.c が正本、vreg/src/reg.c 削除)。構成 (b) は「通知口を export しない」代替経路として存続 (コード退役は任意) |
 
-## 8. 規約遵守メモ
+## 8. 数え方の定義・検収記録 (規則 36・37・41)
 
-- コミット: `feat(shimx): path mapping + registry persistence interface (CAB-168)` / 追加は `tools/shimx/pathreg/` のみ
-  (`build/`, `work/` は gitignore 済)。20MB 超 blob なし (最大 = module_a 204,830 B)。README / tools/docs / shimx 既存ファイルは無変更。
-- 再現: `bash tools/shimx/pathreg/scripts/e2e.sh` (8.5 秒, exit 0)。環境: emcc 6.0.12 / node v24.19.0 (emsdk 同梱)。
+### 8-1. 数え方 (定義 / 実測)
+
+| 数値 | 定義 | 実測 |
+|---|---|---|
+| fixture N | `test/e2e.mjs` の `fixtures[]` 要素数 | **16** |
+| 正規化 N 例 | `test/test_pathreg.c` `test_normalize()` の `cases[]` 要素数 | **18** |
+| 写像 N 例 | `test_pathreg.c` `test_map()` の `cases[]` 要素数 (fallback 1 含む) | **8** |
+| 既定マウント表 N 本 | C `pathreg_mount_count()` = JS `defaultMounts().length` (install + webstudio×6 + `C:`) | **8** |
+| 行数 | `wc -l` / tracked 13 files・README 除く。C=`include/`+`src/`, JS=`js/`, テスト=`test/`(`test_common.h` 除く), スクリプト=`scripts/` | C **460** / JS **461** / テスト **505** / スクリプト **82** / 計 **1,508** |
+| module サイズ | `ls -l build/module_{a,b}.mjs` (SINGLE_FILE, wasm 埋込) | a **204,619 B** / b **190,588 B** |
+| e2e キー数 | A4=`Object.keys(rec.hkcu).length`(永続レコード) / B=`bridge.stats()`(全ハイブ) / `bridge.counts()`(model) | **12** / **53 (values 99)** / **25 (values 99)** |
+| e2e group N | `test/e2e.mjs` の `ok()` 呼出し箇所 (= `E2E PASS: N groups`) | **6** (A1・A2・A3・A4・B・C) |
+| seed エントリ | `vreg resolveSeed(registered)` の model 値数 + `catalogSkipped` | **236** (起動時書込 **81** / catalog のみ **155**) |
+
+独立再計算 (検収 agent・別アルゴリズム・規則 37): `work/verify/recount.mjs` (ソースの配列テキスト解析 +
+`defaultMounts()` + build 済み module の export 直接呼出)。出力:
+`mount table: JS=8 C=8 -> MATCH(8)` / `fixtures: e2e.mjs array entries=16` /
+`C unit: normalize 18 / mounts 8 / map 8` / `LOC: C=460 JS=461 TEST=505 SCRIPT=82 TOTAL=1508`。
+ネガティブコントロール (規則 41): `work/verify/negctl.mjs` — C 側のみ追加マウント (`E:\Ablated`→`/libs/ablated`)
+→ `C=/libs/ablated/x/y.dll` / `JS=null` で**不一致を検出**。対照 (追加なし) は 5/5 一致 → 照合は空振りでない。
+
+### 8-2. 検収記録 (2026-10-11・CAB-168 検収 agent)
+
+- 検証起点 commit **0669f26** (+ follow-up **baca426** 後の HEAD)。`bash tools/shimx/pathreg/scripts/e2e.sh`
+  → **exit 0 / 8 秒** (`E2E PASS: 6 groups`)。load average (1/5/15 分) 開始 4.90/3.96/3.72 → 終了 4.92/3.99/3.74。
+- 誤記修正 (本 commit): 15→**16** fixture / マウント表・既定表件数 14→**8** / 行数・module サイズ / `snapshot keys=50 種`→定義付き実測値。原因は CAB-214 follow-up (`baca426`) の `user2Profile` 退役・ファイル更新に REPORT の数値が追随していなかったため。
+- コミット: `feat(shimx): path mapping + registry persistence interface (CAB-168)`。追加は `tools/shimx/pathreg/` のみ
+  (`build/`・`work/` は gitignore 済)。20MB 超 blob なし (最大 = module_a.mjs 204,619 B)。
+  再現: `bash tools/shimx/pathreg/scripts/e2e.sh` (8 秒・exit 0)。環境: emcc 6.0.12 / node v26.10.0 (pnpm)。
