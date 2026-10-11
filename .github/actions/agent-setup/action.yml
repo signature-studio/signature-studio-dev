@@ -49,8 +49,27 @@ runs:
       run: sudo apt-get update -qq && sudo apt-get install -y -qq zstd
     - name: Setup OpenCode
       shell: bash
-      # opencode.ai 側が一時的に 500 を返すことがあるためリトライする
+      # バージョン決定 (CI からですと update/api が 500 になりがちなのでリトライ)
+      # VERSION を明示すると installer 内部の metadata 取得フェーズがスキップされる
       run: |
+        set -e
+        VERSION=""
+        for attempt in 1 2 3 4 5; do
+          META=$(curl -fsSL "https://opencode.ai/update/api/latest/cli/npm" 2>/dev/null || true)
+          if [ -n "$META" ] && printf '%s' "$META" | grep -q '"version"'; then
+            VERSION=$(printf '%s' "$META" | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')
+            break
+          fi
+          echo "::warning::could not determine opencode version (attempt $attempt); retrying in $((attempt * 10))s"
+          sleep $((attempt * 10))
+        done
+        if [ -z "$VERSION" ]; then
+          echo "::error::could not determine the latest opencode version"
+          exit 1
+        fi
+        echo "installing opencode $VERSION"
+        echo "OPENCODE_CLI_VERSION=$VERSION" >> "$GITHUB_ENV"
+
         for attempt in 1 2 3 4 5; do
           if curl -fsSL https://opencode.ai/v2/install -o "$RUNNER_TEMP/opencode-install.sh"; then
             echo "installer fetched on attempt $attempt"
@@ -63,7 +82,7 @@ runs:
             exit 1
           fi
         done
-        bash "$RUNNER_TEMP/opencode-install.sh"
+        VERSION="$VERSION" bash "$RUNNER_TEMP/opencode-install.sh"
         echo "$HOME/.opencode/bin" >> $GITHUB_PATH
     - name: Verify setup
       shell: bash
