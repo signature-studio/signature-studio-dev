@@ -49,8 +49,21 @@ runs:
       run: sudo apt-get update -qq && sudo apt-get install -y -qq zstd
     - name: Setup OpenCode
       shell: bash
+      # opencode.ai 側が一時的に 500 を返すことがあるためリトライする
       run: |
-        curl -fsSL https://opencode.ai/v2/install | bash
+        for attempt in 1 2 3 4 5; do
+          if curl -fsSL https://opencode.ai/v2/install -o "$RUNNER_TEMP/opencode-install.sh"; then
+            echo "installer fetched on attempt $attempt"
+            break
+          fi
+          echo "::warning::opencode installer fetch failed (attempt $attempt); retrying in $((attempt * 10))s"
+          sleep $((attempt * 10))
+          if [ "$attempt" = "5" ]; then
+            echo "::error::could not fetch https://opencode.ai/v2/install after 5 attempts"
+            exit 1
+          fi
+        done
+        bash "$RUNNER_TEMP/opencode-install.sh"
         echo "$HOME/.opencode/bin" >> $GITHUB_PATH
     - name: Verify setup
       shell: bash
