@@ -13,7 +13,9 @@ preflight: RULES_SHA=ae9c6d414f7d ／ 書込範囲: `tools/startup/glue/`(新規
    オフセットに固定した (+0x08 version=1 / +0x0c flags / +0x10 hwnd_parent / +0x18 "FL Studio" / +0x30 cmdline])。
    CreateFruityInstance はハンドシェイク `0xC0 / 0xEDE95A` を検証して呼ぶ規約関数と、未達時のスタブを置いた。
 3. **1 コマンド e2e `bash tools/startup/glue/glue.sh`** = exit 0。C 単体 **66 チェック** (ST/MT 同数)、TS 単体 **49 チェック**、
-   SIGKILL 跨ぎ検証 (3 ファイル / 0 mismatch / レジストリ一致)、trace 監査 **4 項目**、陰性対照 2 件を **4.2 秒**で通す。
+   SIGKILL 跨ぎ検証 (3 ファイル / 0 mismatch / レジストリ一致)、trace 監査 **5 項目**、陰性対照 2 件を **4.2〜5.5 秒**で通す。
+   (「trace 監査 N 項目」= `host/glue_e2e.ts` phase 5 の `ok(` 件数。実行 ok 行数は C 単体 2+TS 1+SIGKILL 5+trace 5 = 13 で
+   `ok(` 呼出しサイトは 12 = §6 の「e2e 検証項目」。)
 4. **SIGKILL 跨ぎ e2e を実装** (wvfs REPORT/既存方式を再利用): seed プロセスは onYield/onPageHide だけで flush して
    close せず親から `kill -9` (プロセスグループ)、別プロセスが Wvfs を開き直して全ファイルの sha256 を照合する。
 5. **trace 監査**: username=webstudio で `C:\Users\user` 残存 **0 件**、写像残差 `/c/Users/` **0 件**、
@@ -135,6 +137,11 @@ node tools/startup/glue/scripts/audit_trace.mjs       # 別アルゴリズム検
 - 「TS 単体 N チェック」: `test/glue_unit.ts` の `(pass=X fail=Y)`。同スクリプトがソースの `ok(` 呼出し数を別途数えて
   両者の一致も確認する (`static ok( calls = 49`)。
 - 「e2e 検証項目 N」: `host/glue_e2e.ts` の `ok(` 呼出し行数 (12)。実行ごとの成否は `glue.sh` の exit code。
+  実行時の ok 行数は 13 (C 単体が ST/MT の 2 回ループで 1 サイトを 2 度実行するため)。
+- 「trace 監査 N 項目」: `host/glue_e2e.ts` phase 5 の `ok(` 件数 (**5**: `C:\Users\user` 残存 0 / 写像残差 0 /
+  写影記録 home・tmp・fl / 順序違反 0 / 段階 10)。※ 旧版は 4 と書かれていたが phase 5 は 5 項目。
+- 「陰性対照 2 件」: ①順序違反 → `GLUE_EORDER`(-100) で拒否・違反カウンタ増加 (`test/glue_unit.c` §6・
+  `test/glue_unit.ts` §2・C と JS の二重) ②flush 点なし SIGKILL → レジストリが失われる (`regOk=false`)。
 - 再計算 (別アルゴリズム): `node tools/startup/glue/scripts/audit_trace.mjs` — glue の検査 API を**使わず** trace 文字列だけで
   A enter 順一致 / B `C:\Users\user` 0 件 / C `/c/Users/` 残差 0 件 / D stage ok 10 種一致 を検算する。
   クリーン HEAD の出力: `A enter order = paths>...>shutdown -> MATCH` / `B C:\Users\user = 0件 -> 0 (PASS)` /
@@ -160,3 +167,29 @@ node tools/startup/glue/scripts/audit_trace.mjs       # 別アルゴリズム検
 
 ## 9. ユーザ依頼事項
 なし (~/ダウンロード・既存抽出物とも未使用。素材・認証は不要)。
+
+## 10. 検収記録 (2026-10-11・CAB-101 検収 agent・規則 36〜41)
+
+- **検証起点 commit: 569bad9 (+ 誤記 fix cb6f21c 後の HEAD)。** 作業ツリーは対象 3 dir
+  (`tools/startup`・`tools/audio`・`tools/shimx`) すべて差分 0 のクリーン状態で実行。
+  `bash tools/startup/glue/glue.sh` → **exit 0 / ALL PASS / 4.2 秒 (load 1/5/15 分 = 3.16/3.28/3.49) と
+  5.5 秒 (load 3.45/4.87/9.62) の 2 回**。いずれも REPORT 記載の 3.8〜7.0 秒レンジ内。
+- **独立再計算 (別アルゴリズム・規則 37)**: `work/verify/glue_recount.mjs` — 実装側の
+  `count_checks.mjs` (単体バイナリの stdout 行Regex)・`audit_trace.mjs` (trace 文字列) とは別系統で、
+  **①ソースの `ok(` 呼出しサイト静的解析** (C 単体 = `glue_unit.c` の `ok(` 56 + `glue.c` の `kStages[]` 10 = 66) /
+  **②既定マウント表を `pathmap.mjs` の `defaultMounts()` から独立集計** / ③trace の enter・ok 順を
+  規約順と配列比較。出力: `C unit: ok( 56 + stage 10 = 66` / `C unit st: pass=66 fail=0 lines=66 MATCH` /
+  `C unit mt: 同左` / `TS unit: pass=49 fail=0 lines=49 MATCH` / `mount table: JS=8 C=8 MATCH(8)` /
+  `trace: lines=40 enter=10 ok=10 C:\Users\user=0 residual=0 violations=0` + enter/ok 順いずれも `MATCH`。
+- **ネガティブコントロール (規則 41)** — すべて FAIL 検出を実測: ①順序違反 (`glue_stage_vfs()` を
+  paths より前に呼ぶ) → C 側 `-100`・違反カウンタ 1 増加・該当段階は done にならない。JS 側も throw。
+  ②flush 点なし SIGKILL → `mismatches=0 / regOk=false` (レジストリのみ失われる = flush 点が契約)。
+  ③既定表に無い foreign プロファイル (`C:\Users\alien\...`) → `/c/Users/alien/` を返し、監査が
+  `/c/Users/` 残差を検出できる (= 監査が空振りでないことの確認)。
+- **誤記修正 (本 commit)**: 「trace 監査 4 項目」→ **5 項目** (phase 5 の `ok(` 実数。§6 に定義を追加) /
+  「e2e 検証項目 12」の実行時行数 (13) と「陰性対照 2 件」の内訳を §6 に明記 /
+  §0-3 の所要を単発 4.2 秒 → **4.2〜5.5 秒 (実測 2 回)** に変更。
+- **その他の検証結果**: `pathreg_set_paths()` 直後の初回 `pathreg_map()` が既定表で上書きする既知の落とし穴を
+  `tools/shimx/pathreg/src/pathmap.c` (`pr_ensure_defaults()` が `g_defaults_loaded` を立てない) で
+  **原因を確認し**、glue 側の回避 (`pathreg_mount_count()` を先に 1 回呼ぶ) が有効であることを単体 ⑩ で確認。
+  起票先は CAB-168 (検収時にコメント済)。
