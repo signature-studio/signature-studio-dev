@@ -28,6 +28,8 @@ preflight: RULES_SHA=ff4999169333
 | `impl/README.md` | CAB-136 以降の実装追加契約 (置くだけで stub → 型付き thunk に自動切替) |
 | `verify_cab261_kernel.py` `test/verify_cab262_quirks.c` | **検収の独立再計算** (§13-8/§14-6): spike ログと数式モデルの突き合わせ (`work/resize/sw5.txt`・`sw7.txt` が必要・再生成コマンドは docstring) / quirk を実装を参照せず実 DLL だけで確認する probe |
 | `count_fill3.py` | CAB-262 の stub 充填の独立再計算 (nm ベース・実装側) |
+| `verify_cab261_kernel.py` `test/verify_cab262_quirks.c` | **検収の独立再計算** (§13-8/§14-6): spike ログと数式モデルの突き合わせ (`work/resize/sw5.txt`・`sw7.txt` が必要・再生成コマンドは docstring) / quirk を実装を参照せず実 DLL だけで確認する probe |
+| `count_fill3.py` | CAB-262 の stub 充填の独立再計算 (nm ベース・実装側) |
 
 ## 2. 署名: 導出・確度・検算
 
@@ -276,31 +278,7 @@ wasm replay: records=297 mismatch=0 -> PASS
 ### 13-7. 残 stub (使用集合 239 中 130) と次タスク
 上位: `ippsExp_32f_I` (50)・`ippsSum_32f` (49)・`ippsSin_64f_A50` (49)・`ippsMulPack_32f` (49)・`ippsConvert_32f24s_Sfs` (49)・`ippsConvert_16s32f_Sfs` (49)・`ippsLn_32f_A11` (39)・`ippsLog10_32f_A11` (37)。`ippsSin_64f_A50` は実 DLL 自体が Segv するため要調査 (probe_k で n=1 でも Segv を実測)。
 
-| S13 | CAB-262 オラクル (実 DLL vs 自前実装, native + wasm replay): 次層 29 関数のうち 28 関数のデータ + エラー格子 23 エントリ | **727 ケース status 不一致 0**、wasm replay **297 レコード mismatch=0** (§13) |
-
-### 13-8. 検収の独立再計算 (2026-10-11 検収 subagent・別アルゴリズム)
-
-本検収は SUBAGENT_RULES.md **RULES_SHA=ff4999169333** で着手。セッション中に同ファイルが更新 (RULES_SHA=**c8361d4dce5e**・「GitHub remote/worktree 出現時の対応」節の追加)。本検収はローカル flock コミットのみで remote/worktree 操作は行っていないため手順への影響なし。
-
-実装側の集計 (`count_fill3.py` = nm ベース) とは**別アルゴリズム**で再計算し、quirk は実装を参照しない独立 probe で確認した。
-
-| 検算した数値 | 独立再計算 (アルゴリズム) | 結果 |
-|---|---|---|
-| 型付き thunk 128 / stub 292 | (a) `gen/ipp_shim_tab.c` の `static void blk_` 定義を数える (b) `impl/*.c` `src/*.c` を正規表現で走査して `ipp*` 定義を数える (nm を使わない) | どちらも **128**、`ipp_sigs.json` の impl 集合と**完全一致**。stub = 420−128 = **292** |
-| 使用集合 239 中 stub 130 | `data/ipp_matrix.csv` の `used_win/used_mac_x86/used_mac_arm64` から使用集合を数え直す (ipp_sigs.json 側の集計と別ファイル) | 使用集合 **239** / うち impl 109 / stub **130** |
-| 29 関数・win_modules 総和 1,219 | `count_fill3.py` 出力をそのまま再実行 | **29 関数 / 総和 1,219** (上位 61,61,55,51,50,50… と一致) |
-| 727 ケース / status 不一致 0 | オラクルログの `cases=` と `errgrid=` を再集計 | データ 473 + エラー格子 254 = **727**、`st_mis=0`・各 errgrid `mismatch=0` |
-| 61 エントリの内訳 | ログの行を数える (データ 38 行 + エラー格子 23 行) | **38 + 23 = 61**。実装側の註記 (「29 実装関数 + エラー格子 32」) は誤りだったため本節で修正 |
-| bit-exact 関数数 | `case_diff=0` の行を集計 (byte 比較した関数のみ) | **27 関数が完全一致**。`ippsWinKaiser_32f_I` は許容差 (max abs err 2.444e-06・`case_diff` 未集計)、`ippsVectorSlope_64f` は 7/9 ケース不一致、`ippsCplxToReal_32fc` は**データ比較なし** (29 関数中 28 関数しかオラクルが触っていない) |
-| wasm replay 297 レコード mismatch=0 | `work/fill7/oracle_wasm.log` の最終行 | records=297 mismatch=0 → PASS |
-
-- quirk の裏取り (独立 probe `test/verify_cab262_quirks.c`、実装 (`impl/ipp_sig_fill3.c`) をリンクしない):
-  - `gcc -O1 -I ../../src -I ../../ref -o /tmp/vq test/verify_cab262_quirks.c ../../ref/pe_load.c -lm && /tmp/vq <DLL>`
-  - RealToCplx: `dst=NULL,len=0 → -8` / `dst=NULL,len=-1 → -8` / `dst=ok,len=0 → -6` / `re=NULL,len=4 → 0 (im 書込のみ)` / `im=NULL,len=4 → 0 (re 書込のみ)` / `両NULL,len=4 → -8` → §13-3 の優先順 (dst NULL 最優先) を確認
-  - AddProductC: 判別入力 180 組合せのうち「float 2 段丸め ≠ double 1 段丸め」が 7 組合せ → DLL は **7/7 で double 側** (float 側 0) に一致
-  - Round_32f: 0.5→1, −0.5→−1, 1.5→2, −1.5→−2, 2.5→3, −2.5→−3, 3.5→4, −3.5→−4 (half-away)、±0 は符号保存、|x|≥2^31 は入力をそのまま返す
-  - WinKaiser: I0 級数を 20〜80 項で当てると beta≈30 では 24 項 2.6e-04 vs 60 項 8.3e-07、beta≈37.5 では 24 項 6.5e-03 vs 60 項 2.0e-06 → **60 項が必要**。beta 境界を N=256・a を 0.00005 刻みで走査: beta=37.995 は status 0・38.001 は −39
-- ネガティブコントロール: §13-6 の `+1.0` を `work/negc262/` のコピーに適用 → `SUM {"fns":61,"cases":727,"st_mis":0,"case_diff":16,"byte_diff":9933}` (AddProductC 行 `case_diff=9 byte_diff=5176`) を再現。
+| S13 | CAB-262 オラクル (実 DLL vs 自前実装, native + wasm replay): 次層 29 関数のデータ + エラー格子 61 関数分 | **727 ケース status 不一致 0**、wasm replay **297 レコード mismatch=0** (§13) |
 
 ## 14. CAB-261 (IPP-6): interp 5/7 (CUBIC2P 系) カーネル再現 — it5 は 3 次 B-スプラインで解決、it7 は spike 行列を記録 (2026-10-11)
 
