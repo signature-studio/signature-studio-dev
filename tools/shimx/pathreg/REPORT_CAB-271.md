@@ -169,20 +169,31 @@ C=`include/`+`src/`、JS=`js/`、テスト=`test/` (`test_common.h` を除く)�
 
 ## 6. 検証起点とクリーン HEAD 再現 (規則 45)
 
-検証起点 commit: **CAB-271 修正 commit** (下記 §7 の hash)。§4 の数値はこの commit を作る作業ツリーで計測し、
-報告前に同一ツリーで e2e.sh を n=3 再実行 (13.89 / 15.40 / 14.30 秒・全 exit 0) して確認した。
+- 検証起点 commit: **5bfe20a** (`fix(shimx): pathreg explicit paths not overridden by defaults`) +
+  **382ecb9** (`fix(shimx): report corrections`)。§4・§5 の数値は 5bfe20a を作る作業ツリーで計測。
+- 報告前に同一ツリーで e2e.sh を n=3 再実行 (13.44 / 13.30 / 13.66 秒・全 exit 0) して確認。
 
 ```sh
-# クリーン HEAD 再現 (別ツリー・リポジトリ非破壊)
-git archive HEAD -- tools/shimx tools/startup | tar -x -C <tmp>
+# クリーン HEAD 再現 (別ツリー・リポジトリ非破壊。tools/shimx/pathreg/work/verify_<hash>・gitignore 済)
+git archive HEAD -- tools/startup/glue tools/assets/wvfs tools/assets/vfs tools/shimx \
+    tools/startup/vreg tools/startup/pump tools/startup/winstubs src/runtime tools/startup/keyfix | tar -x -C <tmp>
 ln -s <repo>/node_modules <tmp>/node_modules      # vreg の JS 資産のみ import
 bash <tmp>/tools/shimx/pathreg/scripts/e2e.sh     # → exit 0 / E2E PASS: 6 groups
 bash <tmp>/tools/startup/glue/glue.sh             # → exit 0 / ALL PASS (CAB-101 無劣化)
 node <tmp>/tools/shimx/pathreg/scripts/accept_recount.mjs   # → accept_recount: MATCH
 ```
 
+**再現結果 (commit 382ecb9 の clean snapshot、実測)**:
+
+| コマンド | 結果 | 所要 / load average (1/5/15 分) |
+|---|---|---|
+| `scripts/e2e.sh` | **exit 0** / `E2E PASS: 6 groups` / `ALL PASS` / C 単体 4 build OK (test st・defaults st・test mt・defaults mt)・`nc OK (2 ablations が FAIL を検出)` | **12.9 秒** (load 3.03/3.70/3.89 → 3.31/3.73/3.90) |
+| `startup/glue/glue.sh` | **exit 0** / `ALL PASS` ・C 単体 ST **66/66 fail 0**・MT **66/66 fail 0**・TS 単体 **49 fail 0**・SIGKILL 跨ぎ `checked=3 mismatches=0 regOk=true` (対照 `regOk=false`)・trace `C:\Users\user` 0・`/c/Users/` 0・順序違反 0・stage 10 | **6.1 秒** (load 2.46/3.33/3.74 → 2.69/3.35/3.75) |
+| `scripts/accept_recount.mjs` | **exit 0** / `accept_recount: MATCH (mounts 8 / fixtures 16 / CAB-271 PASS / LOC 1709)` | 0.5 秒未満 |
+
 絶対パスで他 dir を参照するスクリプトは無し (`HERE` は pathreg dir からの相対解決。shimx は `$HERE/..`、
-vreg は `$HERE/../../startup/vreg`)。
+vreg は `$HERE/../../startup/vreg`)。**注意**: snapshot に `tools/assets/wvfs`・`src/runtime` を含めないと
+glue e2e が `ERR_MODULE_NOT_FOUND` で失敗する (本 § の archive コマンドの一覧が必要)。
 
 ## 7. コミット・Linear
 
