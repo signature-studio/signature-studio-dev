@@ -2,7 +2,7 @@
 
 preflight: RULES_SHA=ff4999169333
 
-再現: `bash tools/ipp/shim/shim_e2e.sh` (前提 `tools/ipp/ipp_e2e.sh` の成果が `work/` にあること。無ければ自動実行。前提ありで約 10 秒、exit 0 = **13 checks PASS** [CAB-262 で S13 追加])。検証起点 commit: `b8e762d` (HEAD, 自分の起点)。大物は `tools/ipp/work/shim/` (gitignore)。数値はすべて実測、推定は「推定」と明記。
+再現: `bash tools/ipp/shim/shim_e2e.sh` (前提 `tools/ipp/ipp_e2e.sh` の成果が `work/` にあること。無ければ自動実行。前提ありで実測 21.3〜22.5 秒 (§15 参照・負荷依存)、exit 0 = **13 checks PASS** [CAB-262 で S13 追加])。検証起点 commit: `b8e762d` (HEAD, 自分の起点)。大物は `tools/ipp/work/shim/` (gitignore)。数値はすべて実測、推定は「推定」と明記。
 
 ## 0. 結論
 
@@ -326,6 +326,8 @@ it=5 の 4 タップ正規化重みの `w[0] += 0.02; w[3] -= 0.02` (1 行) を�
 
 **結論**: it=7・it=6 のカーネルを **Mitchell-Netravalli 2 パラメータ三次カーネル** (CUBIC2P) と特定し closed form で実装。オラクル画素差率 **it7 13.169% → 0.005%** (受入 <1% 達成)、**it6 9.768% → 0.000% (bit-exact)**。it=5 = 0.021% 不変、it=4 = 0.027% 不変。`shim_e2e.sh` 13 checks PASS、wasm replay **1,728 records mismatch=0**。
 
+検証起点 commit: `2f8e79c` (feat 本体) / `23aa4be` (本注記)。クリーン HEAD 検証 (規則 45): `git archive HEAD -- tools/ipp` を `work/verify_head/` に展開し、`work/` の gitignore データ (spike ログ・golden・baseline) をコピーして同一 e2e を再現。5b の `tools/shimx` 参照のみ symlink)。`bash shim/shim_e2e.sh` 実測 **21.3〜22.5 秒** (n=3: 21.29 / 22.47 / 22.11 秒。負荷依存値: load average 開始 3.22〜3.44、3 本目直後の uptime = 3.44 / 2.87 / 2.59。nproc=16・他セッションと共有)。クリーン HEAD 再実行結果: **13 checks PASS / SUM 同一 (px_diff=55588, cases=82056) / wasm replay 1,728 records mismatch=0**。
+
 ### 15-1. カーネル特定 (1D spike + 2D インパルス応答の2系統で確定)
 
 | interp | カーネル | 同定根拠 |
@@ -397,6 +399,31 @@ V==H (it=6)、cubic との差の定量化、GetBufSize 実測。
   ハッシュ一致) のみで、wasm 側の単独テストはしていない。it=7 の残差 31 px の原因 (丸め経路) は未追跡 (it=5 と同種の ±1)。
 - **未解決**: it=4 のカーネルが MN でない理由 (線形項付き) は未解明 — 影響なし (0.027%) で起票先なし (既存許容差)。
   GetBufSize の it=5/6/7 旧値 (Lanczos 式) を踏んでいた呼出元はなし (FL は ResizeSqrPixel 使用・§12-3)。
+- **環境前提**: `/opt/emsdk` (emcc)、実 DLL の絶対パス `/home/ubuntu/work/analysis/win64/extracted/block24356_PE.bin` (pe_load が直接読む)、
+  `tools/ipp/work/` の gitignore データ (golden・win_refs・baseline・spike ログ — `tools/ipp/ipp_e2e.sh` が生成)。
+  TMPDIR は未指定 (ネイティブ gcc/emcc は小物のみ)。/tmp は tmpfs 3.7GB だが本節の産物はすべて `work/` (実ディスク)。
+- **独立再計算の実行出力** (`python3 shim/verify_cab274_kernel.py`、impl 非リンク):
+```
+[1] 1D spike 予測 (S(d) = round(255*(K(1)+K(0))*K(d)), 負値 clamp)
+   it=4 (ker_cubic(impl)): 15 点中 不一致 0 (最大 |diff| = 0) -> 一致
+   it=5 (MN): 25 点中 不一致 0 (最大 |diff| = 0) -> 一致
+   it=6 (MN): 15 点中 不一致 0 (最大 |diff| = 0) -> 一致
+   it=7 (MN): 19 点中 不一致 0 (最大 |diff| = 0) -> 一致
+[2] 2D インパルス応答からの (B,C) 最小二乗フィット (別アルゴリズム)
+   it=5: fit B=1.000 C=-0.002 (rms=0.00159 max=0.00516 n=65)
+   it=6: fit B=0.000 C=0.504 (rms=0.00274 max=0.01438 n=60)
+   it=7: fit B=0.502 C=0.300 (rms=0.00209 max=0.00678 n=65)
+[3] 2D インパルス応答 3x3 予測 (MN + 負値 clamp、分離モデル)
+   it=6: 576 点中 不一致 0 (最大 |diff| = 0) -> 一致
+   it=7: 576 点中 不一致 0 (最大 |diff| = 0) -> 一致
+[4] it=6 の V-pass (swv6) vs H-pass (sw6)、cubic (it=4) との差: 不一致 0 点
+[5] GetBufSize 実測 (gbs.log): it4/5/6/7 各 96 ケースすべて CUBIC 一致
+```
+- **並行セッション** (規則 46): 本セッション中に CAB-261/262 検収の別セッションが tools/ipp に staged WIP を持っていた。
+  本コミットは一時インデックス (GIT_INDEX_FILE) で**自分のファイルのみ**を commit して巻き込みを防止した。
+  ただし main の lost-commit recovery (reset) でその staged WIP は失われ、ファイル実体のみディスクに残存
+  (`shim/impl/ipp_sig_fill3.c` 変更分・`shim/verify_cab261_kernel.py`・`shim/test/verify_cab262_quirks.c`)。
+  shim/REPORT.md の §13-8/§14-6 加筆分はダングリング blob の可能性 (`git fsck --lost-found`)。
 
 ### 15-7. 更新物
 
