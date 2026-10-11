@@ -1,6 +1,6 @@
 /* com_test.c — IASIO COM アダプタ テストハーネス (CAB-97)。
  *
- * mode=check      : COM 面の静的検証 66 項目 (node 実行。AudioContext 不使用 — fla_open に到達しない)
+ * mode=check      : COM 面の静的検証 126 項目 (node 実行。AudioContext 不使用 — fla_open に到達しない)
  *                   - win64 レイアウト static_assert (BufferInfo64=24B/buffers@8, Callbacks64=32B, ASIOTime=148B)
  *                   - FL 側 asioMessage 応答表 (検収実測値) の検証
  *                   - IUnknown / IClassFactory / CLSID 解決 / slot index 監査 (生 slot vs typed 呼出)

@@ -38,32 +38,66 @@
 
 ## 3. 検収実測 (`bash tools/audio/asio/e2e.sh`, exit 0)
 
-### node check (COM 面静的検証) — **126/126 PASS**
-win64 レイアウト static_assert (BufferInfo64=24B/buffers@8, Callbacks64=32B, ASIOTime=148B, vtable=192B) / asioMessage 応答表 14 項目 / IUnknown+IClassFactory+CLSID 解決 (正常系・失敗系) / slot index 監査 (生 slot 呼出 vs typed 呼出の一致 6 項目) / 19 メソッド + getErrorMessage/future の戻り値照合 / vreg 登録→FLEngine フロー / **shimx 実レジストリ経由** (Reg* で software\asio 列挙→clsid→CoCreateInstance→init) / 8B スロット変換の往復。
+### node check (COM 面静的検証) — **126/126 PASS** (fail 0)
+win64 レイアウト static_assert (BufferInfo64=24B/buffers@8, Callbacks64=32B, ASIOTime=148B, vtable=192B) / asioMessage 応答表 **15 項目** (selector 呼出 13 + カウンタ照合 2) / IUnknown+IClassFactory+CLSID 解決 (正常系・失敗系) / slot index 監査 (生 slot 呼出 vs typed 呼出の一致 6 項目) / 19 メソッド + getErrorMessage/future の戻り値照合 / vreg 登録→FLEngine フロー / **shimx 実レジストリ経由** (Reg* で software\asio 列挙→clsid→CoCreateInstance→init) / 8B スロット変換の往復。
 
-### headless Chrome (FLEngine 呼出を模した全経路) — **3/3 PASS**
+### headless Chrome (FLEngine 呼出を模した全経路) — **3/3 PASS** (負荷依存の範囲は §3-1)
 | シナリオ | 実測 |
 |---|---|
-| com_ramp_b256_d2 | ramp 不一致 **0 / 240,640 frame** (bit-exact), underruns **0** silence 0, bufferSwitchTimeInfo **945 calls bad=0** (samplePosition 単調 + sr 一致), cb_max **84µs**, QI 1 / alive 0 (Release で自己解放), sellog `[[1,2],[2,0],[1,7],[7,0]]` (= flasio_create_buffers ハンドシェイクの実測問合せ順) |
-| com_ramp_b1024_d2 | ramp **0/240,640**, underruns **0**, cb_max 15µs, T=3072 (64.0ms) |
+| com_ramp_b256_d2 | ramp 不一致 **0 / 240,640〜241,152 frame** (bit-exact), underruns **0** silence 0, bufferSwitchTimeInfo **942〜947 calls bad=0** (samplePosition 単調 + sr 一致), cb_max **64〜494µs** (負荷依存), QI 1 / alive 0 (Release で自己解放), sellog `[[1,2],[2,0],[1,7],[7,0]]` (= flasio_create_buffers ハンドシェイクの実測問合せ順) |
+| com_ramp_b1024_d2 | ramp **0/240,640〜241,664**, underruns **0**, cb_max **15〜6,260µs** (負荷依存), T=3072 (64.0ms) |
 | com_sine_b256_d2 | sine maxErr **1.49e-8** (< 1e-5 基準), zeroRuns 0, underruns **0**, rms 0.3536 (= 0.5/√2 理論値) |
 
 全シナリオで `getChannels 2/2, getBufferSize 0x100/0x1000/gran 0 (作成後 pref=B), type 0x13, lat_out>0` を確認。`output_ready = -1000 (ASE_NotPresent)` も実測一致。
+
+#### 3-1. Chrome シナリオの負荷依存 (規則 38・41)
+`e2e.sh` を計 **7 回** 実行 (各 **20〜21 秒**・実測, load average 1/5/15 分 = 2.08〜17.2 / 3.28〜11.9 / 3.47〜10.32):
+**6 回は 3/3 PASS**。残り 1 回は `com_sine_b256_d2` が **underruns=1 / silence=512f / maxErr=8.21e-1** で FAIL
+(load 1分 16.24 の高負荷時。burst 観測値が伸びた際の既知モード)。失敗以降の 6 回 (load 1分 2.08 含む) は
+全て underruns=0 / maxErr=1.49e-8 で 3/3 PASS。**したがって「Chrome 3/3」は単発値ではなく負荷依存であり、
+低負荷時 (load 1分 2.08) に再現する。**
+ネガティブコントロール: 上記 1 回の実 FAIL 出力 (`underruns=1 silence=512`) は run_com.mjs の判定が空振りでない
+ことの実証。加えて node check の判定をわざと壊すと exit 1 になることを確認 (§7)。
 
 ## 4. 既存 e2e への影響 (非破壊確認)
 
 `bash tools/audio/e2e.sh` (22 シナリオ, 本アダプタは未リンク = 影響経路なし) を 2 周実行: いずれも **21/22** で、唯一 `asio_sine_b256_96k` が 96kHz 時のブラウザ burst 観測値依存の FAIL-FAST (`fla_open: effective depth > 16` — flaudio.c の親コード内, 実行時観測) で落ちたが、**単独再実行では 2 回とも PASS** (underruns 0 / clock 95,939.9Hz・96,017.0Hz)。並行 subagent の負荷で burst 観測が伸びる環境依存であり、CAB-97 とは無関係 (HEAD の検収結果 results.json も 22/22 PASS を記録)。**マージ後の results.json は 22/22 PASS**。ASIO B=128–1024 の underrun 0 水準 (asio_loop_noise_b128/256/512, asio_ramp_b256_load, soak120 など) は維持。
 
+検証時の再実行 (2026-10-11, `bash tools/audio/e2e.sh --quick`, load 1分 15.58→20.14): **21/21 PASS / exit 0 / 65 秒**。
+`--quick` は `asio_ramp_b256_soak120` を落とすので、上記の 21 シナリオには soak が含まれない
+( soak は committed `results/results.json` の記録: **underruns=0, ramp mismatches=0/5,764,096** で検証済み)。
+なお検証実行は `--out` を既定の results.json に向けたため tracked な 22 シナリオ記録を一時的に 21/quick で
+上書きしたが、**実行後の `git checkout` で committed 22/22 記録に復旧済み** (差分 0 を確認)。
+
 ## 5. 再現手順
 
 ```sh
-bash tools/audio/asio/e2e.sh          # 1 コマンド検収 (node 126/126 + Chrome 3/3, 約 1.5 分)
+bash tools/audio/asio/e2e.sh          # 1 コマンド検収 (node 126/126 + Chrome 3/3, 20〜21 秒・実測 7 回)
 bash tools/audio/asio/e2e.sh --quick  # Chrome シナリオ 3 秒短縮版
 IASIO_FORCE_SHIMX_SRC=1 bash tools/audio/asio/build.sh   # shimx をソースからビルド (クリーンチェックアウト用の常設 path もある)
-bash tools/audio/e2e.sh               # 親 e2e 22 シナリオ (約 9 分, --quick 約 2 分)
+bash tools/audio/e2e.sh               # 親 e2e 22 シナリオ (約 9 分, --quick 実測 65 秒・21 シナリオ)
 ```
 
-成果物は `work/` (gitignore)。20MB 超 blob なし (最大 = com_test.wasm 114,508B)。
+成果物は `work/` (gitignore)。20MB 超 blob なし (最大 = work/node/com_check.wasm 149,231 B / committed blob 最大 = com_test.wasm 114,508 B)。
+
+## 7. 検収記録 (2026-10-11・CAB-97 検収 agent・規則 36〜41)
+
+- 検証起点 commit **3d35d65**。`bash tools/audio/asio/e2e.sh` → node check **126/126 PASS**・headless Chrome **3/3 PASS** (7 回中 6 回。負荷依存 1 回は §3-1)。最終実行は load 1分 2.08 で 3/3・exit 0。
+- **独立再計算 (別アルゴリズム・規則 37)**: `work/verify/iasio_recount.mjs` — `work/node_check.json` ではなく
+  `test/com_test.c` のソースから判定呼出しサイトを静的集計 (`CK(`/`CKV(` = 数値照合 / `ck_str(` = 文字列照合) し、
+  実測 JSON と突合する。出力: **`CK=6 + CKV=109 + ck_str=11 = 126` / JSON n=126・fail=0 / 名前集合は完全一致 /
+  内訳 hostmsg 15 (selector 13 + カウンタ 2), slot 監査 7, shimx 実レジストリ 14**。
+  注: `com_test.c` 冒頭コメントの「66 項目」は**旧値の残骸**で実測 126 (本 commit で修正)。
+- **ネガティブコントロール (規則 41)**: ① node check の JSON で check #0 をわざと不一致にすると e2e.sh の判定が
+  **exit 1** で FAIL を検出 (非破壊時は exit 0)。② Chrome では §3-1 の 1 回の実 FAIL (underruns=1) が
+  同様に exit 1。→ どちらの判定ゲートも空振りでない。
+- **誤記修正 (本 commit)**: `com_test.c` 冒頭「66 項目」→ **126 項目** / REPORT「asioMessage 応答表 14 項目」→
+  **15 項目 (selector 13 + カウンタ 2)** / Chrome 単発値 (cb_max 84µs・15µs・945 calls・240,640 frame) を
+  6 回の実測レンジに置換 / 「約 1.5 分」→ **20〜21 秒 (実測)** / 親 e2e の「約 2 分」→ **65 秒 (実測・quick)**。
+- **未解決 (起票先つき)**: (a) `asioMessage` selector 6 の内部コマンド 0x17 の正体は未解消 →
+  CAB-97 本 ticket にコメント済 (推定: 再起動系。INVENTORY §6 既知事項のまま)。
+  (b) `shimx` 側 `CoCreateInstance` の REGDB_E_CLASSNOTREG スタブからのフォワード 1 行は shimx 担当で未実施 →
+  CAB-33 (実 FLEngine 結線) に引継ぎ (§6)。
 
 ## 6. CAB-33 (実 FLEngine 結線) への引継ぎ事項
 
