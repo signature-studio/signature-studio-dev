@@ -94,8 +94,8 @@ const TEST = sum(['test/test_pathreg.c', 'test/test_defaults.c', 'test/pathmap.t
 const SCRIPT = sum(['scripts/build.sh', 'scripts/e2e.sh']);
 console.log(`LOC: C=${C} JS=${JS} TEST=${TEST} SCRIPT=${SCRIPT} TOTAL=${C + JS + TEST + SCRIPT}`);
 for (const f of files) console.log(`    ${f} = ${loc[f]}`);
-chk('LOC C', C, 474); chk('LOC JS', JS, 461); chk('LOC TEST', TEST, 654); chk('LOC SCRIPT', SCRIPT, 117);
+chk('LOC C', C, 474); chk('LOC JS', JS, 461); chk('LOC TEST', TEST, 654); chk('LOC SCRIPT', SCRIPT, 120);
 
-console.log(bad === 0 ? 'accept_recount: MATCH (mounts 8 / fixtures 16 / CAB-271 PASS / LOC 1706)'
+console.log(bad === 0 ? 'accept_recount: MATCH (mounts 8 / fixtures 16 / CAB-271 PASS / LOC 1709)'
                       : `accept_recount: MISMATCH (${bad} 件)`);
 process.exit(bad === 0 ? 0 : 1);

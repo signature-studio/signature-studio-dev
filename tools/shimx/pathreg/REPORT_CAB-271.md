@@ -135,7 +135,7 @@ e2e が旧 8 秒から増えたのは `test_defaults` 2 build とネガコン 2 
 | ablate N 件 | `build.sh nc` が build・実行する ablation 数 | **2** |
 | 既定マウント表 N 本 | C `pathreg_mount_count()` = JS `defaultMounts().length` | **8** |
 
-独立再計算 (別アルゴリズム・規則 37): `bash tools/shimx/pathreg/scripts/build.sh test` 後に
+独立再計算 (別アルゴリズム・規則 37): `bash tools/shimx/pathreg/scripts/build.sh all` 後に
 
 ```console
 $ node tools/shimx/pathreg/scripts/accept_recount.mjs
@@ -148,13 +148,13 @@ test_defaults map cases=9 (REPORT: 9) -> MATCH
 CAB-271 explicit-paths (test_pathreg_st 再実行): -> PASS
 CAB-271 default-path   (test_defaults_st 再実行): -> PASS
 CAB-271 test body: CHECK(=23 / webstudio 残存 0 のガード=true
-LOC: C=474 JS=461 TEST=654 SCRIPT=117 TOTAL=1706
+LOC: C=474 JS=461 TEST=654 SCRIPT=120 TOTAL=1709
     include/pathreg.h = 137 / src/pathmap.c = 279 / src/regpersist.c = 48 / src/pathreg_internal.h = 10
     js/pathmap.mjs = 109 / js/regbridge.mjs = 352
     test/test_pathreg.c = 295 / test/test_defaults.c = 72 / test/pathmap.test.mjs = 105 / test/e2e.mjs = 182
     scripts/build.sh = 94 / scripts/e2e.sh = 23
-LOC C=474 (REPORT: 474) -> MATCH / LOC JS=461 -> MATCH / LOC TEST=654 -> MATCH / LOC SCRIPT=117 -> MATCH
-accept_recount: MATCH (mounts 8 / fixtures 16 / CAB-271 PASS / LOC 1706)
+LOC C=474 (REPORT: 474) -> MATCH / LOC JS=461 -> MATCH / LOC TEST=654 -> MATCH / LOC SCRIPT=120 -> MATCH
+accept_recount: MATCH (mounts 8 / fixtures 16 / CAB-271 PASS / LOC 1709)
 ```
 
 `accept_recount.mjs` は e2e.mjs とは別系統に「REPORT が主張する数」を、①ソースのテキスト解析

@@ -13,7 +13,7 @@ preflight: RULES_SHA=ff4999169333
 > **更新 2026-10-11 (CAB-271)**: `pathreg_set_paths()` 直後の初回 `pathreg_map()` が既定マウント表で**上書き**するバグを根本修正
 > (§8-3)。既定表は `pathreg_set_paths()` を一度も呼ばない経路でのみ遅延ロードされる。既定経路 (`test_defaults.c`) と明示設定経路
 > (`test_pathreg.c` §1.5) を分離し `build.sh nc` でネガコン (規則 41)。fixture 16 件・既定表 8 本・e2e 6 groups・glue e2e は
-> 不変。行数 1,508→**1,706**・module →**204,729/190,698 B**・JS 単体 4→**5** 件。詳細は **`REPORT_CAB-271.md`**。
+> 不変。行数 1,508→**1,709**・module →**204,729/190,698 B**・JS 単体 4→**5** 件。詳細は **`REPORT_CAB-271.md`**。
 
 ## 0. 結論 (数値は全て実測)
 
@@ -26,8 +26,8 @@ preflight: RULES_SHA=ff4999169333
    (b) flush 点で C hash (export 全文 FNV-1a 64bit) を比較。**永続レコードは vreg `Vreg.flush()` と同一形式**で、
    e2e で**本物の vreg Vreg アダプタとの双方向相互運用** (MachineGuid 一致) を確認した。
 3. テスト: C 単体 (正規化 18 例・マウント表 8 本・写像 8 例・実ファイル I/O・hash) を **ST/MT 両方 ALL PASS**、JS 単体 **5**/5、
-   e2e 6 グループ (遅延 flush / onYield / onPageHide / flush 点契約 / 削除の永続 / C↔JS クロスチェック)。成果物 **1,706 行**
-   (§8-1・README・REPORT・accept_recount を除く 12 ファイル。C 474 / JS 461 / テスト 654 / スクリプト 117)、module_a **204,729 B** / module_b **190,698 B**。
+   e2e 6 グループ (遅延 flush / onYield / onPageHide / flush 点契約 / 削除の永続 / C↔JS クロスチェック)。成果物 **1,709 行**
+   (§8-1・README・REPORT・accept_recount を除く 12 ファイル。C 474 / JS 461 / テスト 654 / スクリプト 120)、module_a **204,729 B** / module_b **190,698 B**。
 4. **発見 (CAB-213 へ) → 解消**: shimx 内蔵 `SHGetFolderPathW`/環境変数 (`C:\Users\user`) と vreg seed の `Shared data`
    (`C:\Users\webstudio\...`) の不一致は、webstudio に統一済みで予備 `user` mount も退役。
 
@@ -149,13 +149,13 @@ mount 実装 (IDBFS/OPFS) は CAB-104/CAB-101 の担当で、本チケットは�
 | 正規化 N 例 | `test_pathreg.c` `test_normalize()` の `cases[]` 要素数 | **18** |
 | 写像 N 例 | `test_map()` の `cases[]` 要素数 (fallback 1 含む) / `test_defaults.c` `main()` (fallback 3 含む) | **8** / **9** |
 | 既定マウント表 N 本 / CHECK N 件 | C `pathreg_mount_count()` = JS `defaultMounts().length` / ファイル本文の `CHECK(` 出現数 (同一行 2 個は 2)。CAB-271 の §1.5 は **23** | **8** / `test_pathreg.c` **90**・`test_defaults.c` **22** |
-| 行数 | `wc -l` / README・REPORT・`accept_recount.mjs` を除く **12 ファイル**。C=`include/`+`src/`, JS=`js/`, テスト=`test/`(`test_common.h` 除く), スクリプト=`scripts/{build,e2e}.sh` | C **474** / JS **461** / テスト **654** / スクリプト **117** / 計 **1,706** |
+| 行数 | `wc -l` / README・REPORT・`accept_recount.mjs` を除く **12 ファイル**。C=`include/`+`src/`, JS=`js/`, テスト=`test/`(`test_common.h` 除く), スクリプト=`scripts/{build,e2e}.sh` | C **474** / JS **461** / テスト **654** / スクリプト **120** / 計 **1,709** |
 | module サイズ | `ls -l build/module_{a,b}.mjs` (SINGLE_FILE, wasm 埋込) | a **204,729 B** / b **190,698 B** |
 | e2e キー数 / group N | A4=`Object.keys(rec.hkcu).length`(永続レコード) / B=`bridge.stats()`(全ハイブ) / `bridge.counts()`(model) / `test/e2e.mjs` の `ok()` 呼出し箇所 | **12** / **53 (values 99)** / **25 (values 99)** / **6** (A1・A2・A3・A4・B・C) |
 | seed エントリ / ablate N 件 | `vreg resolveSeed(registered)` の model 値数 + `catalogSkipped` / `scripts/build.sh nc` が build・実行する ablation 数 | **236** (起動時書込 **81** / catalog のみ **155**) / **2** (nc1: 修正のみ取消 / nc2: 既定ロード無効化) |
 
-独立再計算 (別アルゴリズム・規則 37): `bash tools/shimx/pathreg/scripts/build.sh test` 後に `node tools/shimx/pathreg/scripts/accept_recount.mjs`
-→ exit 0。3 経路で数え直す: ①ソースのテキスト解析 (関数名で囲んだ `cases[]`・`CHECK(`) ②`defaultMounts()` と build 済み module の生 export ③**C 単体 binary の再実行**。全項目 MATCH → `accept_recount: MATCH (mounts 8 / fixtures 16 / CAB-271 PASS / LOC 1706)`。
+独立再計算 (別アルゴリズム・規則 37): `bash tools/shimx/pathreg/scripts/build.sh all` 後に `node tools/shimx/pathreg/scripts/accept_recount.mjs`
+→ exit 0。3 経路で数え直す: ①ソースのテキスト解析 (関数名で囲んだ `cases[]`・`CHECK(`) ②`defaultMounts()` と build 済み module の生 export ③**C 単体 binary の再実行**。全項目 MATCH → `accept_recount: MATCH (mounts 8 / fixtures 16 / CAB-271 PASS / LOC 1709)`。
 ネガティブコントロール (規則 41): ① 従来部 — C 側のみ追加マウント (`E:\Ablated`) → `C=/libs/ablated/x/y.dll` / `JS=null` で**不一致を検出**
 (対照は 5/5 一致 → 空振りでない) ② CAB-271 追加 — §8-3 の 2 ablate が FAIL することを実測。
 
