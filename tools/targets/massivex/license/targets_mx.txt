@@ -13,7 +13,8 @@
 0x181754f70  ras3 ディレクトリ解決: {PublicDocuments}\Native Instruments\Native Access\ras3 [確]
 0x180f94350  .jwt 列挙 ('0123456789abcdef-' + '.jwt')                              [確]
 0x184ff322d  KeyStore kid 定数文字列 'dfd4a0d7bb4e2f3509e3e1accee33716fb6610684410be0e3b1669ddd87d40f8' (ras3 JWT kid と一致) [med]
-0x184ff3a51  本体 UPID 定数 '41ce4ac2-34f7-469b-beb8-59a8ad7a8a67' (= Service Center XML <UPID>) [確]
+0x184ff5451  本体 UPID 定数 '41ce4ac2-34f7-469b-beb8-59a8ad7a8a67' (= Service Center XML <UPID>) [確]
+#   ※訂正 (CAB-46 検収・f62f49e): 旧値 0x184ff3a51 は転記差 (実測は 0x184ff5451)
 # RTTI (.?AV...): JWTReader::Exception / KeyStore / CryptoRSAEngine / CryptoRSAPubKey / HardwareID / RAS3@PA@NI / RAS2@ras@ni / RAS2Ext@ras@ni [確]
 # RSA 署名検証: 静的リンク OpenSSL 3.x (EVP_PKEY_verify 等)。BCryptVerifySignature は import あるも直接呼出 0 (wrapper 経由の可能性, 未特定) [med]
 # bcrypt/ncrypt IAT thunk 群: 0x18396ef10-0x18396f7b0 (jmp [rip+IAT])。呼出クラスタ: 0x18102c9bc-0x18102ca99, 0x18175558f-0x181755a5b, 0x181e98xx-0x181e9bxx (Schannel), 0x181d31xxx-0x181d3fxxx [確]
