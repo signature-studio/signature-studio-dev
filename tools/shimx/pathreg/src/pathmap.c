@@ -23,11 +23,16 @@ typedef struct {
 static PrMount g_mounts[PR_MAX_MOUNTS];
 static int g_nmounts;
 static PathRegPaths g_paths;        /* 現在の設定 (監査用) */
-static int g_defaults_loaded;
+static int g_defaults_loaded;       /* 既定マウント表をロード済み */
+static int g_defaults_blocked;      /* pathreg_set_paths() で明示設定済み = 以降の既定ロードを禁止 */
 
-/* 既定マウント表の遅延ロード (モジュール初期化順序に依存しない)。JS 側は add_mount で上書き追加できる */
+/* 既定マウント表の遅延ロード (モジュール初期化順序に依存しない)。JS 側は add_mount で上書き追加できる。
+ * ただし pathreg_set_paths() による明示設定が既にある場合は読み込まない (CAB-271)。
+ *   旧実装は g_defaults_loaded だけを見ていたため、set_paths で組んだ表の「後」で初回の
+ *   pathreg_map() / add_mount() / mount_count() が走ると、既定 (C:\Users\webstudio) の表を
+ *   作り直して呼出側の表を上書きしていた。 */
 static void pr_ensure_defaults(void) {
-    if (g_defaults_loaded) return;
+    if (g_defaults_loaded || g_defaults_blocked) return;
     g_defaults_loaded = 1;
     PathRegPaths p;
     pathreg_paths_init(&p);
@@ -187,6 +192,12 @@ static void pr_add_user_mounts(const char* user, const char* home, const char* s
 int pathreg_set_paths(const PathRegPaths* p) {
     if (!p) return -1;
     g_paths = *p;                                                     /* 文字列は呼出側が静的に保持する前提 */
+    /* 明示設定が成立したので、以降は pr_ensure_defaults() が既定マウント表を読み込まない (CAB-271)。
+     * ここでフラグを立てないと、set_paths の「後」で初回に呼ばれる pathreg_map() 等が
+     * 既定 (C:\Users\webstudio) の表を作り直し、呼出側が設定した表を上書きしてしまう。
+     * (立てるのは pr_ensure_defaults() の再入より前。既定ロード経路でもこの関数に到達するが、
+     *  その場合は g_defaults_loaded が既に 1 なので pr_ensure_defaults の再入は起きない) */
+    g_defaults_blocked = 1;
     pathreg_clear_mounts();
     if (p->installDir && *p->installDir)
         pr_add(p->installDir, p->vfsInstall && *p->vfsInstall ? p->vfsInstall : "/fl", PATHREG_RO);

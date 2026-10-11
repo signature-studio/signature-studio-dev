@@ -14,12 +14,17 @@ Win パス/レジストリの意味論は変えず、ブラウザ側の実体 (O
 | `src/regpersist.c` | レジストリ変更検出 (export → FNV-1a 64bit hash) + seed 投入口 |
 | `js/pathmap.mjs` | pathmap.c の JS ミラー (glue が起動前に配置先を計算する用) |
 | `js/regbridge.mjs` | Reg* ↔ vreg store (IndexedDB) ブリッジ。vreg_* 通知フック結線 / フック非 export (hash 差分) 両対応 |
-| `test/`, `scripts/` | C 単体 (ST/MT) / JS 単体 / e2e (モック永続化層) + 1 コマンド検収 |
+| `test/`, `scripts/` | C 単体 (ST/MT: 既定経路 + 明示設定) / JS 単体 / e2e (モック永続化層) + 1 コマンド検収 |
 
 ## 検収
 
 ```sh
-bash tools/shimx/pathreg/scripts/e2e.sh   # 約 9 秒, exit 0
+bash tools/shimx/pathreg/scripts/e2e.sh   # exit 0 (C 単体 ST/MT → ネガコン → module ビルド → JS 単体 + e2e)
 ```
+
+- `scripts/build.sh nc` は**ネガティブコントロール** (規則 41): 修正を 1 つずつ外した ablate 版を
+  build して FAIL することを確認する (CAB-271: `pathreg_set_paths()` の明示設定が既定表で上書きされるバグ)。
+- 既定マウント表は `pathreg_set_paths()` を**呼ばない**経路でのみ遅延ロードされる。明示設定後の
+  `pathreg_map()` が既定表で上書きしない (CAB-271 で修正。詳細は REPORT §8-3)。
 
 既存検収への影響なし: `bash tools/shimx/test.sh --quick` PASS (shimx 既存ファイルは無変更)。
