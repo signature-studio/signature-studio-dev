@@ -131,6 +131,7 @@ runs:
     # ---------------------------------------------------------------
     # R2 artifacts (FL Studio・プラグイン素材一式)
     # 認証情報は repository secrets から (未設定ならskip・read-only モードで動作)
+    # 404 (未アップロード) は notice で継続し、認証/一時的エラーのみ fail させる
     # ---------------------------------------------------------------
     - name: Download artifacts from R2
       shell: bash
@@ -148,17 +149,35 @@ runs:
         fi
         ENDPOINT="https://$CF_ACCOUNT_ID.r2.cloudflarestorage.com"
         mkdir -p "$HOME/ダウンロード" "$HOME/work/analysis"
+        ok=0
         for name in $LIST; do
+          URL="$ENDPOINT/$BUCKET/artifacts/$name.tar.zst"
           echo "downloading $name.tar.zst ..."
-          curl -fsSL --retry 3 \
+          # -f は付けない: 404 でも body を拾って 404 と判別できるようにする
+          code=$(curl -sSL --retry 3 -o "/tmp/$name.tar.zst" -w '%{http_code}' \
             -H "x-amz-content-sha256: UNSIGNED-PAYLOAD" \
             --aws-sigv4 "aws:amz:auto:s3" \
             --user "$CF_R2_ACCESS_KEY_ID:$CF_R2_SECRET_ACCESS_KEY" \
-            "$ENDPOINT/$BUCKET/artifacts/$name.tar.zst" -o "/tmp/$name.tar.zst"
-          tar -xf "/tmp/$name.tar.zst" -C "$HOME" --zstd
+            "$URL") || true
+          if [ "$code" = "200" ]; then
+            tar -xf "/tmp/$name.tar.zst" -C "$HOME" --zstd
+            rm -f "/tmp/$name.tar.zst"
+            echo "extracted $name"
+            ok=$((ok + 1))
+            continue
+          fi
           rm -f "/tmp/$name.tar.zst"
-          echo "extracted $name"
+          if [ "$code" = "404" ]; then
+            echo "::warning::artifact not present in R2 (404): $URL -> agent runs without these binaries"
+          else
+            echo "::error::failed to download $URL (http=$code)"
+            exit 1
+          fi
         done
+        if [ "$ok" -eq 0 ]; then
+          echo "::warning::no R2 artifacts available; the agent will run without the FL Studio / plugin binaries"
+          exit 0
+        fi
         # e2e が参照する環境変数の既定値を素材の場所に合わせる
         {
           echo "FL_WIN_INSTALLER=$HOME/ダウンロード/flstudio_win64_26.1.7.5653.exe"
