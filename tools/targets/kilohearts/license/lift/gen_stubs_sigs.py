@@ -68,9 +68,12 @@ def main():
             ps = [p.strip().split()[0] for p in m.group(3).split(',') if p.strip()]
             r = m.group(1)
             args = ', '.join('%s a%d' % (CT.get(t, 'u64'), i) for i, t in enumerate(ps)) or 'void'
-            out.append('EMSCRIPTEN_KEEPALIVE %s function_%s(%s) { abort(); %s}' % (CT.get(r, 'u64'), m.group(2), args, '' if r == 'void' else 'return 0; '))
+            # fail-fast: 未 lift callee は VA 付きで例外 (cold パスのみ到達するはず。到達 = 移植漏れのシグナル)
+            out.append('EMSCRIPTEN_KEEPALIVE %s function_%s(%s) { EM_ASM({ throw new Error("unlifted callee 0x" + %s); }); abort(); %s}' % (
+                CT.get(r, 'u64'), m.group(2), args, '"%s"' % m.group(2), '' if r == 'void' else 'return 0; '))
             nstub += 1
     out.append('unsigned char kh_stack[65536] __attribute__((aligned(16), used));')
+    out.append('EMSCRIPTEN_KEEPALIVE unsigned char* kh_stack_ptr(void) { return kh_stack; }   /* compare.mjs のスタックプライム用 */')
     open(stubs, 'w').write('\n'.join(out) + '\n')
     json.dump(sg, open(sigs, 'w'), indent=1)
     print('[stubs/sigs] defined %d, stubs %d' % (len(sg), nstub))

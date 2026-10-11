@@ -14,6 +14,8 @@
   [store]   movups/movlps/movhps/movsd/movq/movss/movd の *メモリ store 形* が `call void @__asm_X(old_load, val)` で store 消失
   [merge]   cvtsi2ss/sd, cvtss2sd, cvtsd2ss の dest 上位 lane 保持 (helper シグネチャが dest を落とす)
   [callret] call 時の戻り番地 push/pop 省略 (stage-0) による callee スタック引数 8B ずれの補正
+  [icall]   stage-0 が `call qword ptr [reg+disp]` (functor vtable dispatch) を空ブロックにする
+            D15 (DEFECTS.md) を機械語から復元し kh_icall(slot) 間接呼出へ (snapins 5d30dff と同型)
   [rdata]   `inttoptr (i64 <PE VA> ...)` / `i64 <PE VA>` リテラルを DLL 実データ窓 (global_var_<VA>) へ
   [abi]     入口 wrapper: rcx/rdx/r8/r9 + xmm0-3 引数 → レジスタグローバル, 戻り値 rax / xmm0 (F2 相当を ABI 仕様で解決)
 usage: kh_lower.py stage0.ll OUT.ll --core HeartCore.core_64 --lift va,va,... [--abi json] [--skip a,b]
@@ -41,7 +43,20 @@ FN_DEF = re.compile(r'^define \S+ @function_([0-9a-f]+)\(\) \{$')
 LIT = re.compile(r'(?<![\w%.@])(\d{10,11})(?![\w.])')
 
 
-def lower_body(lines, cfg, skip, uid, rep, volatile_ret=False):
+def next_block_addr(lines, i, nxt=None, cur=None):
+    """call の戻り番地。nxt (機械語の命令長から算出した {VA: 次命令 VA}) を優先し、
+    無い場合は次の '; 0xVA' ブロック ( stage-0 は 1 命令 = 1 ブロックが基本)"""
+    if nxt is not None and cur is not None and cur in nxt:
+        return nxt[cur]
+    for k in range(i + 1, len(lines)):
+        m = re.match(r'^; 0x([0-9a-f]+)\s*$', lines[k])
+        if m:
+            return int(m.group(1), 16)
+    return 0
+
+
+def lower_body(lines, cfg, skip, uid, rep, volatile_ret=False, icalls=None, nxt=None):
+    icalls = icalls or {}
     out = []
     i = 0
     pend_sext = {}
@@ -54,6 +69,36 @@ def lower_body(lines, cfg, skip, uid, rep, volatile_ret=False):
         if mc:
             cur_addr = mc.group(1)
         if 'store volatile i64' in l and '@_asm_program_counter' in l:
+            i += 1
+            continue
+        # ---- 間接 call (D15 / [icall]): stage-0 は `call qword [reg+N]` (functor vtable dispatch) を
+        #      *空ブロック* にする (vtable load と mov rcx は残るが call が消える)。機械語側から
+        #      (reg, disp) を復元し kh_icall(slot) への間接呼出に置換する (slot = vtable base + disp。
+        #      wasm 側はアリーナ内 vtable の実値 or PE .rdata の slot アドレスから既知 callee へ
+        #      dispatch、未知は fail-fast)。snapins 5d30dff (DEFECTS D15) と同型。
+        if cur_addr in icalls and 'icall' not in skip:
+            reg, disp = icalls.pop(cur_addr)
+            t = uid('i')
+            if reg == '__rip__':
+                if disp >= 0:
+                    # 解決済みの静的 target (lift 済保証: 検出側で vas 判定済み)
+                    ra = next_block_addr(lines, i, nxt, cur_addr and int(cur_addr, 16))
+                    out += [f'  %{t}.sp = load i64, i64* @rsp', f'  %{t}.sp8 = sub i64 %{t}.sp, 8',
+                            f'  store i64 %{t}.sp8, i64* @rsp', f'  %{t}.pp = inttoptr i64 %{t}.sp8 to i64*',
+                            f'  store i64 {ra}, i64* %{t}.pp', f'  %{t}.c = call i64 @kh_%x()' % disp,
+                            f'  store i64 %{t}.c, i64* @rax', f'  store i64 %{t}.sp, i64* @rsp']
+                else:
+                    out += [f'  %{t}.c = call i64 @kh_icfail()', f'  store i64 %{t}.c, i64* @rax']
+                rep['icall'] = rep.get('icall', 0) + 1
+                i += 1
+                continue
+            ra = next_block_addr(lines, i, nxt, cur_addr and int(cur_addr, 16))
+            out += [f'  %{t}.b = load i64, i64* @{reg}', f'  %{t}.a = add i64 %{t}.b, {disp}',
+                    f'  %{t}.sp = load i64, i64* @rsp', f'  %{t}.sp8 = sub i64 %{t}.sp, 8',
+                    f'  store i64 %{t}.sp8, i64* @rsp', f'  %{t}.pp = inttoptr i64 %{t}.sp8 to i64*',
+                    f'  store i64 {ra}, i64* %{t}.pp', f'  %{t}.c = call i64 @kh_icall(i64 %{t}.a)',
+                    f'  store i64 %{t}.c, i64* @rax', f'  store i64 %{t}.sp, i64* @rsp']
+            rep['icall'] = rep.get('icall', 0) + 1
             i += 1
             continue
         # ---- 間接 jmp (switch jump table): stage-0 は `jmp rax` を `ret i64 undef` にしてしまう → switch へ復元
@@ -164,8 +209,11 @@ def lower_body(lines, cfg, skip, uid, rep, volatile_ret=False):
         m = re.match(r'^(\s*)(?:%[\w.\-]+ = )?call i64 @function_[0-9a-f]+\(\)\s*$', l)
         if m and 'callret' not in skip:
             ind, t = m.group(1), uid('r')
+            # リターンアドレススロットには call 直後の実 VA を書く (native と同内容にしないと
+            # 未初期化スタック読みが `store i64 0` (wasm) と実番地 (native) で不一致になる)
+            ra = next_block_addr(lines, i, nxt, cur_addr and int(cur_addr, 16))
             out += [f'{ind}%{t}.s = load i64, i64* @rsp', f'{ind}%{t}.s8 = sub i64 %{t}.s, 8', f'{ind}store i64 %{t}.s8, i64* @rsp',
-                    f'{ind}%{t}.p = inttoptr i64 %{t}.s8 to i64*', f'{ind}store i64 0, i64* %{t}.p', l, f'{ind}store i64 %{t}.s, i64* @rsp']
+                    f'{ind}%{t}.p = inttoptr i64 %{t}.s8 to i64*', f'{ind}store i64 {ra}, i64* %{t}.p', l, f'{ind}store i64 %{t}.s, i64* @rsp']
             rep['callret'] = rep.get('callret', 0) + 1
             i += 1
             continue
@@ -246,7 +294,75 @@ def main():
         sys.path.insert(0, __import__('os').path.join(__import__('os').path.dirname(__import__('os').path.abspath(__file__)), '..', 'scripts'))
         from pe_dis import rd as _rd
         jt['_rd'] = _rd
-    texts = {v: '\n'.join(lower_body(bodies[v], jt, skip, uid, rep, volatile_ret)) for v in vas}
+    # ---- D15 [icall]: stage-0 の空ブロック (call qword [reg+disp] の欠落) を機械語から検出
+    icalls = {}
+    n_icall = 0
+    nxt = {}      # {命令 VA: 次命令 VA} (callret のリターンアドレス精密算出用)
+    if 'icall' not in skip:
+        import capstone
+        sys.path.insert(0, __import__('os').path.join(__import__('os').path.dirname(__import__('os').path.abspath(__file__)), '..', 'scripts'))
+        from pe_dis import rd as _rd
+        md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
+        for v in vas:
+            body = '\n'.join(bodies[v])
+            addrs = [int(x, 16) for x in re.findall(r'; 0x([0-9a-f]+)', body)]
+            if not addrs:
+                continue
+            end = max(addrs) + 16
+            for ins in md.disasm(_rd(v, end - v), v):
+                if ins.address >= end:
+                    break
+                nxt[ins.address] = ins.address + ins.size
+                if ins.mnemonic == 'call' and ins.op_str.startswith('qword ptr ['):
+                    o = ins.op_str[len('qword ptr ['):-1]
+                    m2 = re.match(r'^(r[a-z0-9]+) \+ (0x[0-9a-f]+|\d+)$', o)
+                    if m2:
+                        disp = int(m2.group(2), 0)
+                        # stage-0 ブロックが空 (pc store のみ) か確認
+                        blk = re.search(r'; 0x%x\n(.*?)(?=; 0x|\n\}|$)' % ins.address, body, re.S)
+                        seg = [x for x in (blk.group(1) if blk else '').split('\n') if x.strip() and 'store volatile' not in x]
+                        if not seg:
+                            icalls['%x' % ins.address] = (m2.group(1), disp)
+                    else:
+                        # rip 相対 form (`call qword [rip+X]`): slot 実値を辿り (jmp [rip] 1 hop まで)、
+                        # lift 済関数なら直接 call へ、非対応 (遅延バインド trampoline 等) は fail-fast へ
+                        m3 = re.match(r'^rip \+ (0x[0-9a-f]+|\d+)$|^rip \- (0x[0-9a-f]+|\d+)$', o)
+                        if m3:
+                            d = int(m3.group(1), 0) if m3.group(1) else -int(m3.group(2), 0)
+                            slot = ins.address + ins.size + d
+                            tgt = int.from_bytes(_rd(slot, 8), 'little')
+                            hops = 0
+                            while hops < 2 and IMG_LO <= tgt < IMG_HI:
+                                ins2 = next(md.disasm(_rd(tgt, 8), tgt), None)
+                                if ins2 is not None and ins2.mnemonic == 'jmp' and ins2.op_str.startswith('qword ptr [rip'):
+                                    m4 = re.search(r'rip \+ (0x[0-9a-f]+|\d+)', ins2.op_str)
+                                    if m4:
+                                        s2 = tgt + ins2.size + int(m4.group(1), 0)
+                                        tgt = int.from_bytes(_rd(s2, 8), 'little')
+                                        hops += 1
+                                        continue
+                                break
+                            blk = re.search(r'; 0x%x\n(.*?)(?=; 0x|\n\}|$)' % ins.address, body, re.S)
+                            seg = [x for x in (blk.group(1) if blk else '').split('\n') if x.strip() and 'store volatile' not in x]
+                            if not seg:
+                                ok = tgt in set(vas)
+                                icalls['%x' % ins.address] = ('__rip__', tgt if (ok and IMG_LO <= tgt < IMG_HI) else -slot)
+    n_icall = len(icalls)
+    icall_sites_snap = sorted(icalls)   # lower_body が pop で消費する前にスナップショット
+    texts = {v: '\n'.join(lower_body(bodies[v], jt, skip, uid, rep, volatile_ret, icalls, nxt)) for v in vas}
+    # ---- functor clone (0x18005b430) の offset 字段 (+0x18) を 0 確定にする wasm 側対化。
+    # native 側 (scen_em.h) は `mov rcx,[rcx+0x18]` を `xor ecx,ecx` にパッチしており、ここでは
+    # 同じ機械語ブロック (0x18005b445) の rcx store を 0 に置換する。invoke thunk (0x18003f7f0) は
+    # +0x18 を movsxd dword で読むため、本 closure の全 functor (offset=0) と機能等価。
+    CLONE_BLKS = {0x18005b430: '0x18005b445', 0x18003f7d0: '0x18003f7e5'}   # functor clone: offset qword コピーの機械語ブロック
+    for cva, cblk in CLONE_BLKS.items():
+        if cva not in texts:
+            continue
+        pat = ('; ' + cblk + '\n((?:  .*\n)*?)  store i64 (%[\\w.\\-]+), i64\\* @rcx\n')
+        mt = re.search(pat, texts[cva])
+        if mt:
+            texts[cva] = texts[cva].replace(mt.group(0), '; ' + cblk + '\n' + mt.group(1) + '  store i64 0, i64* @rcx\n')
+            rep['clone_zero_offset'] = rep.get('clone_zero_offset', 0) + 1
     allt = '\n'.join(texts.values())
     # ---- rdata windows
     # deref 意図の VA (inttoptr (i64 <PE VA> to T*)) は常に窓 (@global_var_<VA>) へ置換。
@@ -303,6 +419,9 @@ def main():
     for v in sorted(vaset):
         final.append(f'@global_var_{v:x} = external global i8')
     final.append('declare void @llvm.trap()')
+    if n_icall:
+        final.append('declare i64 @kh_icall(i64)')
+        final.append('declare i64 @kh_icfail()')
     final.append('')
     hused = set(re.findall(r'@(__asm_[\w.]+)\(', allt)) | set(re.findall(r'@(llvm\.[\w.]+)\(', allt))
     dec2 = {re.sub(r'(__asm_[A-Za-z0-9_]+)\.(\d+)', r'\1__\2', k): re.sub(r'(@__asm_[A-Za-z0-9_]+)\.(\d+)', r'\1__\2', v) for k, v in declares.items()}
@@ -383,9 +502,45 @@ def main():
         w += ['}', '']
         final += w
     open(a.out, 'w').write('\n'.join(final) + '\n')
-    json.dump({'lowered': rep, 'rdata_windows': ['%x' % v for v in sorted(vaset)], 'unlifted_callees': ['%x' % c for c in sorted(called - set(vas))]},
+    # ---- kh_icall (D15 [icall]): アリーナ内 vtable の実値 → 既知 callee へ dispatch。
+    #      PE .rdata の vtable slot (slot addr → 中身が lift 対訳関数) も build 時に静的解決する。
+    #      (slot < 0x10000000 = アリーナアドレス: slot 番地の 8B (vtable entry 値 = raw VA) で switch。
+    #       それ以外 = PE .rdata 上の vtable slot アドレスそのもので switch。snapins 5d30dff と同型)
+    icall_c = None
+    slots = {}
+    if n_icall:
+        import pefile
+        pe = pefile.PE(a.core, fast_load=True)
+        data = open(a.core, 'rb').read()
+        base = pe.OPTIONAL_HEADER.ImageBase
+        rsect = [s for s in pe.sections if s.Name.rstrip(b'\0') == b'.rdata'][0]
+        rva0 = rsect.VirtualAddress
+        nbytes = min(rsect.Misc_VirtualSize, rsect.SizeOfRawData) - (min(rsect.Misc_VirtualSize, rsect.SizeOfRawData) % 8)
+        raw8 = [int.from_bytes(data[rsect.PointerToRawData + 8 * k:rsect.PointerToRawData + 8 * k + 8], 'little') for k in range(nbytes // 8)]
+        vsset = set(vas)
+        for k, val in enumerate(raw8):
+            if val in vsset:
+                slots[base + rva0 + 8 * k] = val
+        icall_c = ['#include <emscripten.h>', '#include <stdint.h>', '#include <stdlib.h>', 'typedef uint64_t u64;']
+        icall_c += ['u64 kh_%x(void);' % v for v in sorted(vas)]
+        icall_c.append('EMSCRIPTEN_KEEPALIVE unsigned long long kh_icall(unsigned long long slot) {')
+        icall_c.append('  if (slot < 0x10000000ULL) { unsigned long long t = *(unsigned long long*)(unsigned int)slot; switch (t) {')
+        for v in sorted(vas):
+            icall_c.append('    case 0x%xULL: return kh_%x();' % (v, v))
+        icall_c.append('    default: EM_ASM({ throw new Error("kh_icall unknown arena slot value 0x" + $0.toString(16)); }, (int)t); __builtin_trap(); return 0; } }')
+        icall_c.append('  switch (slot) {')
+        for s, t in sorted(slots.items()):
+            icall_c.append('    case 0x%xULL: return kh_%x();   /* .rdata vtable slot */' % (s, t))
+        icall_c.append('    default: EM_ASM({ throw new Error("kh_icall unknown PE slot 0x" + $0.toString(16)); }, (int)slot); __builtin_trap(); return 0; }')
+        icall_c.append('}')
+        icall_c.append('EMSCRIPTEN_KEEPALIVE unsigned long long kh_icfail(void) { abort(); return 0; }')
+        open(a.out + '.icall.c', 'w').write('\n'.join(icall_c) + '\n')
+    json.dump({'lowered': rep, 'rdata_windows': ['%x' % v for v in sorted(vaset)],
+               'unlifted_callees': ['%x' % c for c in sorted(called - set(vas))],
+               'icall_sites': icall_sites_snap, 'icall_slot_map': {'%x' % s: '%x' % t for s, t in sorted(slots.items())}},
               open(a.out + '.json', 'w'), indent=1)
-    print('[kh_lower]', json.dumps(rep), 'rdata windows', len(vaset), 'unlifted callees', ['%x' % c for c in sorted(called - set(vas))])
+    print('[kh_lower]', json.dumps(rep), 'rdata windows', len(vaset), 'unlifted callees', ['%x' % c for c in sorted(called - set(vas))],
+          'icall sites', n_icall, ('icall slot map %d' % len(slots)) if icall_c else '')
 
 
 if __name__ == '__main__':

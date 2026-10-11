@@ -27,10 +27,14 @@
 #define EM_POLL1   0x180052830UL
 #define EM_POLL2   0x180052a00UL
 #define EM_WRITER  0x18002e850UL
+#define EM_SUBSCRIBE 0x1800526f0UL
+#define EM_REGISTER  0x18002e710UL      /* editor document ctor 0x18002dc30 と同行為 (observer → SUB+0x1b0) */
+#define EM_FIRE      0x18010b180UL      /* LicenseManager notify (0x18010a740) の EventSlot 起火部分 */
 
 #define A_CURSOR   0x04000000UL   /* new bump cursor (u64) */
 #define A_STATUS   0x04000008UL   /* getStatus が返す status セル (i32) */
 #define A_FAKEMGR  0x0400F000UL   /* getManager が out に書く fake manager (書込なし・used 外) */
+#define MGR_SLOT   (A_FAKEMGR + 0x20UL)   /* LicenseManager EventSlot (subscribe の登録先・起火対象) */
 #define NEW_BASE   0x04000100UL   /* trial 冒頭で cursor に設定する初期値 */
 
 /* ms_abi bump allocator — 0x180f878e0 の entry から jmp で呼ばれる (呼出し規約は Windows 側)。
@@ -97,13 +101,43 @@ static void patch_em(void) {
         0xC3,
     };
     memcpy(gm_stub, gm_code, sizeof(gm_code));
+    /* functor の offset 字段 (+0x18, invoke thunk 0x18003f7f0 が movsxd で読む) は FL コードが
+     * dword 部分的に初期化し (subscribe 0x18005275c / register 0x18002e779 の `mov dword [rbp-0x48], r15d`。
+     * 本 closure の全 functor は r15d=0)、clone (0x18005b430) が +0x18 を qword コピーするため
+     * native 実スタックの call リターンアドレス残骸が下位 4B に写り invoke 時の rcx がワイルド化する
+     * (0x180022be0 の `incl 0x30(%rcx)` で SIGSEGV を実測)。本 closure では offset は常に 0 なので
+     * clone の `mov rcx,[rcx+0x18]` (48 8B 48 18) を `xor ecx,ecx; nop; nop` (同 4B) に置換し
+     * 0 確定にする。wasm 側は kh_stack のフレーム窓を 0 化 (compare.mjs --zero-stack) して対にする。 */
+    {
+        u8* img0 = (u8*)0x180000000UL;
+        /* (1) functor 構築の dword store を qword store に (44 89 7D B8 → 4D 89 7D B8, 同 4B):
+         *     +0x1C パディングを 0 確定にする (r15d ロードは 0 拡張なので値は不変) */
+        u64 PAD_STORES[2] = {0x18005275cUL, 0x18002e779UL};   /* subscribe / register */
+        for (int k = 0; k < 2; k++) {
+            u8* q = img0 + (PAD_STORES[k] - 0x180000000UL);
+            if (!(q[0] == 0x44 && q[1] == 0x89 && q[2] == 0x7D && q[3] == 0xB8)) {
+                fprintf(stderr, "em: functor pad patch mismatch @%lx\n", PAD_STORES[k]);
+                exit(9);
+            }
+            q[0] = 0x4D;   /* mov dword [rbp-0x48], r15d → mov qword [rbp-0x48], r15 */
+        }
+        /* (2) functor clone の offset qword コピーを 0 確定に (48 8B 49 18 → 31 C9 90 90, 同 4B) */
+        u64 CLONE_LOADS[2] = {0x18005b445UL, 0x18003f7e5UL};   /* subscribe/register の functor clone */
+        for (int k = 0; k < 2; k++) {
+            u8* q = img0 + (CLONE_LOADS[k] - 0x180000000UL);
+            if (!(q[0] == 0x48 && q[1] == 0x8B && q[2] == 0x49 && q[3] == 0x18)) {   /* mov rcx, [rcx+0x18] */
+                fprintf(stderr, "em: clone offset patch mismatch @%lx\n", CLONE_LOADS[k]);
+                exit(9);
+            }
+            q[0] = 0x31; q[1] = 0xC9; q[2] = 0x90; q[3] = 0x90;   /* xor ecx,ecx; nop; nop */
+        }
+    }
     /* image パッチ */
     u8* img = (u8*)0x180000000UL;
     patch_jmp(img + (0x180021490UL - 0x180000000UL), (u64)c);            /* key_init */
     patch_jmp(img + (0x1800219b0UL - 0x180000000UL), (u64)apply_stub);   /* apply_key */
     patch_jmp(img + (0x180107430UL - 0x180000000UL), (u64)gm_stub);      /* getManager */
     patch_jmp(img + (0x180f878e0UL - 0x180000000UL), (u64)em_new_entry);  /* operator new */
-    { u8 r = 0xC3; memcpy(img + (0x1800526f0UL - 0x180000000UL), &r, 1); } /* subscribe: no-op */
     { u8 r = 0xC3; memcpy(img + (0x180f8791cUL - 0x180000000UL), &r, 1); } /* operator delete: no-op */
     /* getStatus: mov eax, dword [0x04000008]; ret (8B, 関数は 285B) */
     u8 gs[8] = {0x8B, 0x04, 0x25, 0x08, 0x00, 0x00, 0x04, 0xC3};
@@ -216,6 +250,45 @@ static void trial_empoll(int t) {
         *(u32*)(o.SUB + 0x1088) = (R32() % 3 == 0) ? 1 : 0;
         *(u32*)(o.SUB + 0x548) = R32() & 1;
         if (k == 4) C1(EM_POLL1, RET_NONE, o.EM);
+        C1(EM_POLL2, RET_NONE, o.EM);
+    }
+}
+
+/* emfire (KH-11 / CAB-247 残スコープ): subscribe 経路を通した「状態変化 → poll1 起火 → +0x548 更新」E2E。
+ *   ctor       … subscribe (0x1800526f0) が EM→poll1 functor を mgr+0x20 EventSlot へ実登録 (実 IR)
+ *   register   … editor document ctor 0x18002dc30 と同行為で writer functor を SUB+0x1b0 へ登録 (0x18002e710)
+ *   fire       … notify (0x18010a740) が呼ぶ EventSlot 起火 (0x18010b180) → functor invoke → poll1
+ *                → poll1 の 0x180022be0(SUB+0x1b0) → writer 0x18002e850 → [+0x1088]
+ *   poll2      … editable = thunkA(status) && [+0x1088]==0 → [+0x548]/[+0x5c8]
+ * 状態注入 (10 状態) を fire/poll の前に書くので [+0x548] が status に追従することを両系で照合する。
+ * 起火的 payload string は SSO (cap=7, len≤7) で 0x18010c010 の inline リセット経路を通す。 */
+static u32 emfire_pick_status(int t, int k) {
+    static const u32 st[10] = {0, 5, 7, 8, 9, 13, 22, 25, 26, 40};
+    return st[(t * 3 + k * 7) % 10];
+}
+
+static void trial_emfire(int t) {
+    EmObj o;
+    em_setup(t, &o);
+    REGION("mgrslot", (void*)MGR_SLOT, 0x40);
+    *(u64*)(o.X + 0x100) = (u64)o.EM;             /* X = writer の ctx ([X+0x100]=EM) */
+    u8* fn = A(0x10);                             /* functor {callback VA, i32 0} (ctor と同じ形) */
+    *(u64*)fn = EM_WRITER;
+    *(u32*)(fn + 8) = 0;
+    u8* str = A(0x20);                            /* 通知 payload: SSO std::string {u8[16], len, cap=7} */
+    for (int i = 0; i < 16; i++) str[i] = 0;
+    *(u64*)(str + 0x10) = 4;
+    *(u64*)(str + 0x18) = 7;
+    *(u32*)A_STATUS = 9;
+    C7(EM_CTOR, RET_I64, o.EM, o.sp2, o.SUB, o.sp4, o.sp5, o.desc, o.p7);   /* subscribe 実登録 */
+    C3(EM_REGISTER, RET_NONE, (u64)o.EM + 0x1b0, o.X, fn);   /* writer observer 登録 (editor doc ctor 0x18002dc30 と同: [doc+0x100]+0x1b0 = EM+0x1b0) */
+    for (int k = 0; k < 4; k++) {
+        u32 s = emfire_pick_status(t, k);
+        *(u32*)A_STATUS = s;                       /* LicenseManager 状態変化 (seam: getStatus) */
+        *(u32*)(o.SUB + 0x1088) = (R32() % 3 == 0) ? 1 : 0;
+        *(u32*)(o.SUB + 0x548) = R32() & 1;
+        C2(EM_FIRE, RET_NONE, MGR_SLOT, str);      /* EventSlot 起火 → poll1 → writer */
+        C1(EM_POLL1, RET_NONE, o.EM);
         C1(EM_POLL2, RET_NONE, o.EM);
     }
 }

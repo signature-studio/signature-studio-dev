@@ -19,6 +19,8 @@ const workDir = process.argv[2] || 'work/licE';
 const Mod = require(path.resolve(workDir, 'mod.cjs'));
 const A = 0x04000000;
 const EM_CTOR = 0x180051af0, POLL1 = 0x180052830, POLL2 = 0x180052a00, WRITER = 0x18002e850;
+const SUBSCRIBE = 0x1800526f0, REGISTER = 0x18002e710, FIRE = 0x18010b180;
+const MGR_SLOT = 0x400f020n;   /* getManager の fake manager (0x0400F000) + 0x20 = LicenseManager EventSlot */
 
 // 47 呼出元 (work/ctors47.json) に対応する合成 desc: 製品名スニペット + kind
 const ctors47 = JSON.parse(fs.readFileSync('work/ctors47.json', 'utf8'));
@@ -119,6 +121,51 @@ console.log('== [3] +0x1088 書込側 (0x18002e850) と flag 消費の検証 =='
   M._function_180052a00(BigInt(EM));
   if (dv.getUint32(SUB + 0x548, true) !== 1 || H[SUB + 0x5c8] !== 1) fail('poll2: flag 解除で復帰');
   else pass('poll2: +0x1088=0 → 編集可に復帰 (cache+dirty 更新)');
+}
+
+console.log('== [4] subscribe 経路 (CAB-247 残スコープ) の wasm 実証: 状態変化 → poll1/poll2 → [+0x548] 動的更新 ==');
+{
+  /* KH-11 (CAB-247 残スコープ): subscribe 0x1800526f0 を no-op seam から実 IR に変更し、
+   * EditorModel ctor が LicenseManager の EventSlot (mgr+0x20) へ poll1 functor を実登録する。
+   * bit 精密な native 照合は em (200/700)・empoll (1000/10000) ctx-fuzz で実証済み (run_all.sh [4])。
+   * ここでは wasm 上で (a) 47 製品の動的更新 (b) 10 状態スイープを実証する。
+   * 注: manager 側の起火 (0x18010b180) → observer invoke 連鎖は vector-compact の ctrl vtable
+   * delete thunk (0x180003360, 尾 `jmp rax`) が未 lift のため本デモでは未実施 = 未解決 (REPORT 記載)。 */
+  const X = 0x4004400, STR = 0x4004500, FN = 0x4004600;
+  dv.setBigUint64(X + 0x100, 0x4001100n, true);      /* writer の ctx: [X+0x100] = EM */
+  dv.setBigUint64(FN, BigInt(WRITER), true);         /* functor {callback VA, i32 0} */
+  dv.setUint32(FN + 8, 0, true);
+  /* (a) 47 製品: ctor (subscribe 実登録) → cache クリア → poll1 → poll2 で [+0x548]=1 が动態的に立つ */
+  let dynamicOk = 0;
+  for (let i = 0; i < ctors47.length; i++) {
+    const { EM, SUB, SP, P7 } = setup(i);
+    M._function_180051af0(BigInt(EM), BigInt(SP), BigInt(SUB), BigInt(SP), BigInt(SP), 0x4004100n, BigInt(P7));
+    dv.setUint32(SUB + 0x548, 0, true);
+    dv.setUint32(SUB + 0x5c8, 0, true);
+    dv.setUint32(A + 8, 9, true);                    /* LicenseManager 状態 = licensed */
+    M._function_180052830(BigInt(EM));              /* poll1 (mgr slot 登録コールバック本体) */
+    M._function_180052a00(BigInt(EM));              /* poll2 → [+0x548] */
+    if (dv.getUint32(SUB + 0x548, true) === 1) dynamicOk++;
+    else console.log('  NG product', i, 'editable=', dv.getUint32(SUB + 0x548, true));
+  }
+  if (dynamicOk === ctors47.length) pass(`subscribe 実 IR 化後の 47 製品: ${dynamicOk}/${ctors47.length} が「編集可」成立 (ctor→subscribe→poll1→poll2)`);
+  else fail(`subscribe 実 IR 化後の 47 製品: ${dynamicOk}/${ctors47.length}`);
+  /* (b) 10 状態スイープ: status を変えると [+0x548] が追従 (thunkA(s) && [+0x1088]==0) */
+  const STAT = [0, 5, 7, 8, 9, 13, 22, 25, 26, 40];
+  const thunkA = (s) => [5, 7, 8, 9, 25, 26].includes(s) ? 1 : 0;   /* mask 0x60003a0 */
+  let sweepOk = 0;
+  for (const s of STAT) {
+    const { EM, SUB, SP, P7 } = setup(0);
+    M._function_180051af0(BigInt(EM), BigInt(SP), BigInt(SUB), BigInt(SP), BigInt(SP), 0x4004100n, BigInt(P7));
+    dv.setUint32(A + 8, s, true);                    /* 状態注入 */
+    dv.setUint32(SUB + 0x1088, 0, true);
+    M._function_180052a00(BigInt(EM));
+    const editable = dv.getUint32(SUB + 0x548, true);
+    if (editable === thunkA(s)) sweepOk++;
+    else console.log('  NG status', s, 'editable=', editable, 'want', thunkA(s));
+  }
+  if (sweepOk === STAT.length) pass(`10 状態スイープ: [+0x548] が status に追従 (${sweepOk}/${STAT.length}、thunkA マスク 0x60003a0 と一致)`);
+  else fail(`10 状態スイープ: ${sweepOk}/${STAT.length}`);
 }
 
 console.log(`\nRESULT ok=${ok} ng=${ng}`);

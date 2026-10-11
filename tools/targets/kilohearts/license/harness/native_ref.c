@@ -143,7 +143,9 @@ int main(int argc, char** argv) {
     out = fopen(argv[5], "w+b");
     fwrite("KHV2", 1, 4, out); w32((u32)nt); w32(0);
     for (int t = 0; t < nt; t++) {
-        memset(arena, 0, used); used = 0; memset(shadow, 0, shadow_used); shadow_used = 0; nreg = 0; ncalls_cur = 0;
+        /* trial 冒頭の zero 化: mgr slot 0x0400F020 (ARENA_CLEAR 内) を毎 trial 同じ初期状態にするため
+         * used 累積ではなく固定窓を掩う (subscribe 経路が mgr ヒープ相当アドレスを使うため) */
+        memset(arena, 0, ARENA_CLEAR); used = 0; memset(shadow, 0, shadow_used); shadow_used = 0; nreg = 0; ncalls_cur = 0;
         rng = seed * 2654435761u + (u32)t * 40503u + 12345u; if (!rng) rng = 1;
         for (int k = 0; k < 4; k++) R32();
         long p0 = ftell(out); w32(0); w32(0);          /* ncalls, nreg 後置 */
