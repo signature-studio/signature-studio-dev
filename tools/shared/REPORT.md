@@ -1,6 +1,6 @@
 # tools/shared REPORT — FL Shared ライブラリ群の分類・IPP 実測・OSS wasm 再ビルド PoC・プロプラ lift PoC・OSS 実クロスビルド (CAB-146/147/148/150)
 
-preflight: RULES_SHA=ae9c6d414f7d
+preflight: RULES_SHA=ae9c6d414f7d (実装担当) / RULES_SHA=ff4999169333 (検収着手時) / RULES_SHA=4d7380074852 (検収報告時・ファイル更新後)
 
 日付: 2026-10-10 (検収・訂正 2026-10-10: §8) / 2026-10-11 (OSS 実クロスビルド追加: §9〜§12) / 担当: F shared-libs
 再現: `bash tools/shared/run_all.sh` (~6 分, 素材は analysis/ を読むのみ) / OSS 実ビルドは `bash tools/shared/oss/flac/build.sh` 等
