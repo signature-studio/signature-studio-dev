@@ -15,14 +15,21 @@ NODE="${NODE:-/opt/emsdk/node/24.19.0_64bit/bin/node}"
 mkdir -p "$OUT"
 FAIL=0
 
+[ -f "$CRT/scen_crt.json" ] || python3 "$CRT/crt_scen.py" "$OUT/scen_crt.json"
+
+# [1/6] は crt_nat.py が work/crtlift/libottnatcrt.so を必要とする。clean tree では
+# まだ存在しないので、先に native 参照ハーネスだけ build する (lift_crt.sh [1/4] と同一)。
+# 再実行時は既存 .so をそのまま使う。
+[ -f "$OUT/libottnatcrt.so" ] || \
+  gcc -O1 -g -fPIC -shared -o "$OUT/libottnatcrt.so" "$CRT/crt_native.c" "$OTT/native/ms_call.S" \
+    -I"$OTT/rt" -I"$OTT/native" -I"$OTT/entry"
+
 if [ "${CRT_COV_SKIP:-0}" != "1" ] || [ ! -f "$OUT/cov_crt.json" ]; then
   echo "[1/6] native coverage (CRT 経路 scenario 実行 + 単歩 coverage)"
   python3 -u "$CRT/crt_nat.py" --out "$OUT/nat_probe.json" --scen "$OUT/scen_crt.json" --cov "$OUT/cov_crt.json" 2>&1 | tail -2
 else
   echo "[1/6] coverage 再利用 ($OUT/cov_crt.json)"
 fi
-[ -f "$CRT/scen_crt.json" ] || python3 "$CRT/crt_scen.py" "$OUT/scen_crt.json"
-
 if [ "${CRT_LIFT_SKIP:-0}" != "1" ] || [ ! -f "$OUT/ottl_crt.cjs" ]; then
   echo "[2/6] lift → wasm (CRT 初期化版)"
   bash "$CRT/lift_crt.sh" "$OUT/cov_crt.json" 2>&1 | grep -E "^\[|functions" | tail -3
