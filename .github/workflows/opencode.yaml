@@ -1,15 +1,13 @@
 name: OpenCode
 
 on:
-  # Issuesに `/oc` または `/opencode` がコメントされたとき、実装エージェントが開始される
-  # `oc_actions_allow_write` がコメントに含まれている場合、エージェントはコンテンツを編集でき、含まれていない場合Issues/PRのみ編集できる。
+  # Issues/PR に `/oc` または `/opencode` コマンドが投稿されたとき
+  # `oc_actions_allow_write` を含む場合のみコンテンツ書き込み可
   issue_comment:
     types: [created]
-  # PRがOpenになったとき、レビューエージェントが開始される。
-  # コンテンツはデフォルトで読み取り専用となる。
+  # PR が Open になったとき → レビュワーエージェントが起動
   pull_request:
     types: [opened]
-  # Issues/PRに紐づかないエージェントは、workflow_dispatchを介して開始できる。
   workflow_dispatch:
     inputs:
       prompt:
@@ -22,31 +20,43 @@ on:
         required: false
         default: false
 
+# 同一 PR/issue での並行実行は最新のみ
+concurrency:
+  group: opencode-${{ github.event.pull_request.number || github.event.issue.number || github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  opencode:
+  implement:
+    # 実装エージェント: issue_comment (/oc) または workflow_dispatch で起動。
+    # PR 上の /oc コメントは conflict 解消などの追加作業。
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issue_comment' &&
+       (contains(github.event.comment.body, '/oc') || contains(github.event.comment.body, '/opencode')))
     runs-on: ubuntu-latest
-    if: ${{ (github.event_name == 'issue_comment' && (contains(github.event.comment.body, '/oc') || contains(github.event.comment.body, '/opencode'))) || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' }}
+    env:
+      OC_APP_ID: ${{ vars.OC_APP_CLIENT_ID }}
+    outputs:
+      pr-url: ${{ steps.make-pr.outputs.pr-url || steps.oc.outputs.pr-url }}
     steps:
       - name: Pre-judge step
         id: judge
         run: |
           if [ "${{ github.event_name }}" = "issue_comment" ]; then
-            if ${{ contains(github.event.comment.body, 'oc_actions_allow_write') }}; then
-              echo "permission=write" >> $GITHUB_OUTPUT
-            else
-              echo "permission=read" >> $GITHUB_OUTPUT
-            fi
-          elif [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "permission=read" >> $GITHUB_OUTPUT
-          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            if [ "${{ github.event.inputs.allow_write }}" = "true" ]; then
+            if printf '%s' "${{ github.event.comment.body }}" | grep -q 'oc_actions_allow_write'; then
               echo "permission=write" >> $GITHUB_OUTPUT
             else
               echo "permission=read" >> $GITHUB_OUTPUT
             fi
           else
-            echo "permission=read" >> $GITHUB_OUTPUT
+            if [ "${{ github.event.inputs.allow_write }}" = "true" ]; then
+              echo "permission=write" >> $GITHUB_OUTPUT
+            else
+              echo "permission=read" >> $GITHUB_OUTPUT
+            fi
           fi
+
+      # 実装 App トークン (issue_comment が PR 上のコメントなら PR にも触る)
       - uses: actions/create-github-app-token@v3
         id: app-token
         with:
@@ -60,19 +70,149 @@ jobs:
         uses: actions/checkout@v7
         with:
           token: ${{ steps.app-token.outputs.token }}
+          fetch-depth: 0
+
       - if: ${{ steps.judge.outputs.permission == 'write' }}
         id: setup-credentials
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           USER_ID=$(gh api "/users/${{ steps.app-token.outputs.app-slug }}[bot]" --jq .id)
-          echo "user-id=$USER_ID" >> "$GITHUB_OUTPUT"
           git config --global user.name '${{ steps.app-token.outputs.app-slug }}[bot]'
-          git config --global user.email '${USER_ID}+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com'
+          git config --global user.email "${USER_ID}+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com"
           gh auth setup-git
+
       - name: Setup Agent Environment
         uses: ./.github/actions/agent-setup
-      - name: Run OpenCode
+        with:
+          artifacts: fl-win64
+
+      - name: Assemble prompt
+        id: prompt
+        shell: bash
+        run: |
+          # イベント文脈を環境変数化 → テンプレートに流し込む
+          {
+            echo "EVENT_NAME=${{ github.event_name }}"
+            echo "PERMISSION=${{ steps.judge.outputs.permission }}"
+            echo "ISSUE_NUMBER=${{ github.event.issue.number || '' }}"
+            echo "PR_NUMBER=${{ github.event.issue.number || github.event.pull_request.number || '' }}"
+            echo "COMMENT_BODY<<EOF"
+            printf '%s' "${{ github.event.comment.body || github.event.inputs.prompt || '' }}" | head -c 20000
+            echo ""
+            echo "EOF"
+            echo "REPO=${{ github.repository }}"
+            echo "GITHUB_REF_NAME=${GITHUB_REF_NAME}"
+          } >> "$GITHUB_ENV"
+          bash .github/scripts/assemble-prompt.sh >> "$GITHUB_OUTPUT"
+
+      - name: Run OpenCode (implementer)
+        id: oc
         uses: ./.github/actions/opencode
         with:
           model: "opencode-go/step-5-preview-free"
+          agent: build
+          auth-export: ${{ secrets.OC_AUTH_EXPORT }}
+          prompt: ${{ steps.prompt.outputs.prompt }}
+
+  review:
+    # レビュワーエージェント: PR opened で起動。Approve/Deny し、
+    # Auto Merge が使えない場合は Cognos がマージまで実行する。
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    steps:
+      # レビュワーは実装 App と別アイデンティティの方が approve できる
+      # (同一 App は自分自身の PR を approve できない)。
+      # OC_REVIEW_APP_CLIENT_ID / OC_REVIEW_APP_PRIVATE_KEY が未設定の場合は
+      # 実装 App を使う (この場合 approve はできず、コメント+マージ試行のみ)
+      - name: Detect reviewer credentials
+        id: creds
+        run: |
+          if [ -n "${{ vars.OC_REVIEW_APP_CLIENT_ID }}" ] && [ -n "${{ secrets.OC_REVIEW_APP_PRIVATE_KEY }}" ]; then
+            echo "use-reviewer=true" >> $GITHUB_OUTPUT
+          else
+            echo "use-reviewer=false" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          client-id: ${{ vars.OC_APP_CLIENT_ID }}
+          private-key: ${{ secrets.OC_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - uses: actions/create-github-app-token@v3
+        if: ${{ steps.creds.outputs.use-reviewer == 'true' }}
+        id: reviewer-token
+        with:
+          client-id: ${{ vars.OC_REVIEW_APP_CLIENT_ID }}
+          private-key: ${{ secrets.OC_REVIEW_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - name: Configure git
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          SLUG=${{ steps.app-token.outputs.app-slug }}
+          USER_ID=$(gh api "/users/${SLUG}[bot]" --jq .id)
+          git config --global user.name "${SLUG}[bot]"
+          git config --global user.email "${USER_ID}+${SLUG}[bot]@users.noreply.github.com"
+          gh auth setup-git
+
+      - name: Setup Agent Environment
+        uses: ./.github/actions/agent-setup
+        with:
+          artifacts: fl-win64
+
+      - name: "PR diff context"
+        id: diff
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          gh pr diff ${{ github.event.pull_request.number }} --repo ${{ github.repository }} > "$RUNNER_TEMP/pr.diff" || true
+          gh pr view ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --json title,body,isDraft --jq '.title' > "$RUNNER_TEMP/pr.title" || true
+          echo "diff-lines=$(wc -l < "$RUNNER_TEMP/pr.diff")" >> $GITHUB_OUTPUT
+
+      - name: Run OpenCode (reviewer)
+        uses: ./.github/actions/opencode
+        with:
+          model: "opencode-go/step-5-preview-free"
+          agent: build
+          auth-export: ${{ secrets.OC_AUTH_EXPORT }}
+          prompt: ${{ steps.prompt.outputs.prompt }}
+
+      - name: Assemble reviewer prompt
+        id: prompt
+        shell: bash
+        run: |
+          DIFF_FILE="$RUNNER_TEMP/pr.diff"
+          TITLE_FILE="$RUNNER_TEMP/pr.title"
+          {
+            echo "prompt<<OCEOF"
+            cat .github/prompts/reviewer.md
+            echo ""
+            echo "## PR"
+            echo "repo: ${{ github.repository }}"
+            echo "number: ${{ github.event.pull_request.number }}"
+            echo "title: $(cat "$TITLE_FILE" 2>/dev/null || echo '')"
+            echo ""
+            echo "## diff"
+            echo '```diff'
+            head -c 100000 "$DIFF_FILE" 2>/dev/null || echo "(diff unavailable)"
+            echo '```'
+            if [ "${{ steps.creds.outputs.use-reviewer }}" = "true" ]; then
+              echo "REVIEWER_TOKEN=${{ steps.reviewer-token.outputs.token }}"
+            else
+              echo "NOTE: reviewer App identity unavailable; you cannot approve your own PR. Post the review as comment and merge directly if the project allows."
+            fi
+            echo "OCEOF"
+          } >> "$GITHUB_OUTPUT"

@@ -1,5 +1,5 @@
 name: OpenCode
-description: 'Run OpenCode tasks based on the provided prompt'
+description: 'Run OpenCode tasks based on the provided prompt; summary goes to $GITHUB_STEP_SUMMARY'
 
 inputs:
   model:
@@ -8,18 +8,112 @@ inputs:
   prompt:
     description: 'the prompt for OpenCode'
     required: true
+  agent:
+    description: 'the opencode agent to run'
+    required: false
+    default: build
+  auth-export:
+    description: 'JSON exported by `opencode auth export` (OpenCode Console credentials)'
+    required: false
 
 runs:
   using: "composite"
   steps:
-    # - name: Start OpenCode Background Service
-    #   shell: bash
-    #   run: opencode serve --port 14096
+    - name: Import OpenCode credentials
+      if: ${{ inputs.auth-export != '' }}
+      shell: bash
+      env:
+        OC_AUTH_EXPORT: ${{ inputs.auth-export }}
+      run: |
+        printf '%s' "$OC_AUTH_EXPORT" | opencode auth import
+        opencode auth list
+
     - name: Run OpenCode
+      id: run
       shell: bash
       run: |
+        set +e
         opencode run \
+          --standalone \
           --auto \
-          --model ${{ inputs.model }} \
+          --model "${{ inputs.model }}" \
+          --agent "${{ inputs.agent }}" \
           --format json \
-          --agent explore "${{ inputs.prompt }}"
+          "${{ inputs.prompt }}" > "$RUNNER_TEMP/oc-output.jsonl" 2> "$RUNNER_TEMP/oc-stderr.log"
+        echo "rc=$?" >> "$GITHUB_OUTPUT"
+
+    # -------------------------------------------------------------------
+    # 出力の要約を $GITHUB_STEP_SUMMARY へ。
+    # opencode run --format json は JSONL。最後のメッセージが text とは限らないため、
+    # 後ろから遡って最初の text パートを採用する (v2 の subagent と同手法)。
+    # 見つからない場合はデバッグ用に末尾の生イベントを出力。
+    # -------------------------------------------------------------------
+    - name: Write step summary
+      shell: bash
+      run: |
+        python3 - "$RUNNER_TEMP/oc-output.jsonl" >> "$GITHUB_STEP_SUMMARY" <<'PY'
+        import json, sys
+        path = sys.argv[1]
+        summary = None
+        try:
+            lines = open(path, encoding="utf-8").read().splitlines()
+        except OSError:
+            lines = []
+        events = []
+        for ln in lines:
+            ln = ln.strip()
+            if not ln.startswith("{"):
+                continue
+            try:
+                events.append(json.loads(ln))
+            except json.JSONDecodeError:
+                pass
+
+        def texts(ev):
+            """イベント内の全 text パートを (役割, テキスト) で返す"""
+            out = []
+            def walk(o):
+                if isinstance(o, dict):
+                    if o.get("type") == "text" and isinstance(o.get("text"), str):
+                        out.append(o["text"])
+                    for v in o.values():
+                        walk(v)
+                elif isinstance(o, list):
+                    for v in o:
+                        walk(v)
+            walk(ev)
+            return out
+
+        # 後ろから遡り、十分な長さのある text を探す (assistant 優先)
+        best = None
+        for ev in reversed(events):
+            if isinstance(ev, dict) and ev.get("type") in ("message.updated", "message.part.updated", "session.idle"):
+                for t in texts(ev):
+                    t = t.strip()
+                    if len(t) >= 40:
+                        best = t
+                        break
+            if best:
+                break
+        if best is None:
+            for ev in reversed(events):
+                for t in texts(ev):
+                    t = t.strip()
+                    if len(t) >= 40:
+                        best = t
+                        break
+                if best:
+                    break
+
+        print("## OpenCode result")
+        print()
+        if best:
+            print(best[:20000])
+        else:
+            print("_No textual summary found in opencode output. Raw tail:_")
+            print("```")
+            print("\n".join(lines[-30:])[:8000])
+            print("```")
+        PY
+        echo "" >> "$GITHUB_STEP_SUMMARY"
+        echo "events: $(wc -l < "$RUNNER_TEMP/oc-output.jsonl" 2>/dev/null || echo 0)"
