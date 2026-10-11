@@ -15,8 +15,8 @@
 
 ## 環境
 
-- repo は checkout 済み。ツール: uv/pnpm/node26/bun/python3.14/zstd/opencode。emsdk・Ghidra 等の重い道具は初回使用時にセットアップすること。
-- 素材: FL Studio・プラグインは R2 から `$HOME/ダウンロード`・`$HOME/work/analysis` に展開済み。環境変数 `FL_WIN_INSTALLER`・`FA_DL`・`WS_ANALYSIS` を参照。
+- repo は checkout 済み。ツール: uv/pnpm/node26/bun/python3.14/opencode (zstd は runner イメージ同梱)。emsdk・Ghidra 等の重い道具は初回使用時にセットアップすること。
+- 素材: FL Studio・プラグインは R2 から `$HOME/artifacts` にダウンロード済み (`.tar.zst`。使うときに `tar --zstd -xf` で展開すること)。環境変数 `ARTIFACTS_DIR` を参照。
 - e2e の大物は `TMPDIR=$RUNNER_TEMP`。ディスクは Runner の空きを見て使用可。
 
 ## ドメイン知識

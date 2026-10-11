@@ -12,19 +12,8 @@ on:
     inputs:
       prompt:
         type: string
-        description: 'the task for the OpenCode'
+        description: 'the task for the OpenCode agent'
         required: true
-      allow_write:
-        type: boolean
-        description: 'whether to allow writing'
-        required: false
-        default: false
-      token-mode:
-        type: choice
-        description: 'token source: app = GitHub App, gat = standard github.token'
-        required: false
-        default: app
-        options: [app, gat]
 
 # 同一 PR/issue での並行実行は最新のみ
 concurrency:
@@ -41,65 +30,34 @@ jobs:
        (contains(github.event.comment.body, '/oc') || contains(github.event.comment.body, '/opencode')))
     runs-on: ubuntu-latest
     env:
-      OC_APP_ID: ${{ vars.OC_APP_CLIENT_ID }}
-    outputs:
-      pr-url: ${{ steps.make-pr.outputs.pr-url || steps.oc.outputs.pr-url }}
+      # workflow_dispatch は write 権限を持つ人手による起動なので書き込み可。
+      # issue_comment は本文に oc_actions_allow_write を含む場合だけ書き込み可。
+      OC_PERMISSION: >-
+        ${{ (github.event_name == 'workflow_dispatch'
+        || contains(github.event.comment.body, 'oc_actions_allow_write'))
+        && 'write' || 'read' }}
     steps:
-      - name: Pre-judge step
-        id: judge
-        run: |
-          if [ "${{ github.event_name }}" = "issue_comment" ]; then
-            if printf '%s' "${{ github.event.comment.body }}" | grep -q 'oc_actions_allow_write'; then
-              echo "permission=write" >> $GITHUB_OUTPUT
-            else
-              echo "permission=read" >> $GITHUB_OUTPUT
-            fi
-          else
-            if [ "${{ github.event.inputs.allow_write }}" = "true" ]; then
-              echo "permission=write" >> $GITHUB_OUTPUT
-            else
-              echo "permission=read" >> $GITHUB_OUTPUT
-            fi
-          fi
-
-      # 実装 App トークン (issue_comment が PR 上のコメントなら PR にも触る)
-      # read モードでは contents:read のみ要求する (installation が write 権限を
-      # 未grant の環境でも read-only 検証が通るようにするため)
-      # token-mode=gat のときは標準 github.token を使用 (App 未設定時のフォールバック)
+      # 実装 App トークン。read モードでは contents:read のみ要求する
+      # (installation が write 権限を未 grant の環境でも read-only 検証が通るようにするため)
       - uses: actions/create-github-app-token@v3
-        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.token-mode != 'gat' }}
         id: app-token
         with:
           client-id: ${{ vars.OC_APP_CLIENT_ID }}
           private-key: ${{ secrets.OC_APP_PRIVATE_KEY }}
-          permission-contents: ${{ steps.judge.outputs.permission }}
-          permission-issues: ${{ steps.judge.outputs.permission == 'write' && 'write' || 'read' }}
-          permission-pull-requests: ${{ steps.judge.outputs.permission == 'write' && 'write' || 'read' }}
-
-      - name: Fallback to github.token
-        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.token-mode == 'gat' }}
-        id: gat-token
-        run: echo "token=${{ github.token }}" >> "$GITHUB_OUTPUT"
-
-      - name: Resolve token
-        id: tok
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.token-mode }}" = "gat" ]; then
-            echo "token=${{ steps.gat-token.outputs.token }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "token=${{ steps.app-token.outputs.token }}" >> "$GITHUB_OUTPUT"
-          fi
+          permission-contents: ${{ env.OC_PERMISSION }}
+          permission-issues: ${{ env.OC_PERMISSION == 'write' && 'write' || 'read' }}
+          permission-pull-requests: ${{ env.OC_PERMISSION == 'write' && 'write' || 'read' }}
 
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
-          token: ${{ steps.tok.outputs.token }}
+          token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 0
 
-      - if: ${{ steps.judge.outputs.permission == 'write' }}
+      - if: ${{ env.OC_PERMISSION == 'write' }}
         id: setup-credentials
         env:
-          GH_TOKEN: ${{ steps.tok.outputs.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           USER_ID=$(gh api "/users/${{ steps.app-token.outputs.app-slug }}[bot]" --jq .id)
           git config --global user.name '${{ steps.app-token.outputs.app-slug }}[bot]'
@@ -109,11 +67,10 @@ jobs:
       - name: Setup Agent Environment
         uses: ./.github/actions/agent-setup
         with:
-          artifacts: fl-win64
           app-id: ${{ vars.OC_APP_CLIENT_ID }}
           app-private-key: ${{ secrets.OC_APP_PRIVATE_KEY }}
           # read-only モードでは定期再発行トークンも読み取り専用に制限する
-          token-permissions: ${{ steps.judge.outputs.permission == 'read' && '{"contents":"read","issues":"read","pull-requests":"read"}' || '' }}
+          token-permissions: ${{ env.OC_PERMISSION == 'read' && '{"contents":"read","issues":"read","pull-requests":"read"}' || '' }}
           cf-account-id: ${{ secrets.CF_ACCOUNT_ID }}
           cf-r2-access-key-id: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
           cf-r2-secret-access-key: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
@@ -125,7 +82,7 @@ jobs:
         run: |
           {
             echo "EVENT_NAME=${{ github.event_name }}"
-            echo "PERMISSION=${{ steps.judge.outputs.permission }}"
+            echo "PERMISSION=${{ env.OC_PERMISSION }}"
             echo "ISSUE_NUMBER=${{ github.event.issue.number || '' }}"
             echo "PR_NUMBER=${{ github.event.issue.number || github.event.pull_request.number || '' }}"
             echo "COMMENT_BODY<<OCCTXEOF"
@@ -151,6 +108,8 @@ jobs:
           agent: build
           auth-export: ${{ secrets.OC_AUTH_EXPORT }}
           prompt: ${{ steps.prompt.outputs.prompt }}
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
 
   review:
     # レビュワーエージェント: PR opened で起動。Approve/Deny し、
@@ -160,17 +119,8 @@ jobs:
     steps:
       # レビュワーは実装 App と別アイデンティティの方が approve できる
       # (同一 App は自分自身の PR を approve できない)。
-      # OC_REVIEW_APP_CLIENT_ID / OC_REVIEW_APP_PRIVATE_KEY が未設定の場合は
-      # 実装 App を使う (この場合 approve はできず、コメント+マージ試行のみ)
-      - name: Detect reviewer credentials
-        id: creds
-        run: |
-          if [ -n "${{ vars.OC_REVIEW_APP_CLIENT_ID }}" ] && [ -n "${{ secrets.OC_REVIEW_APP_PRIVATE_KEY }}" ]; then
-            echo "use-reviewer=true" >> $GITHUB_OUTPUT
-          else
-            echo "use-reviewer=false" >> $GITHUB_OUTPUT
-          fi
-
+      # OC_REVIEW_APP_CLIENT_ID / OC_REVIEW_APP_PRIVATE_KEY が未設定・失敗時は
+      # 実装 App を使う (この場合 approve はできず comment+merge のみ)
       - uses: actions/create-github-app-token@v3
         id: app-token
         with:
@@ -182,28 +132,12 @@ jobs:
       - uses: actions/create-github-app-token@v3
         id: reviewer-token
         continue-on-error: true
-        if: ${{ steps.creds.outputs.use-reviewer == 'true' }}
+        if: ${{ vars.OC_REVIEW_APP_CLIENT_ID != '' && secrets.OC_REVIEW_APP_PRIVATE_KEY != '' }}
         with:
           client-id: ${{ vars.OC_REVIEW_APP_CLIENT_ID }}
           private-key: ${{ secrets.OC_REVIEW_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write
-
-      # レビュワー App が未インストール/失敗した場合は実装 App にフォールバック
-      # (その場合 approve はできず comment+merge のみ)
-      # ※ トークン生成ステップの後に置くこと (steps コンテキストは先行ステップのみ参照できる)
-      - name: Resolve review identity
-        id: reviewer-tok
-        run: |
-          if [ "${{ steps.creds.outputs.use-reviewer }}" = "true" ] && [ -n "${{ steps.reviewer-token.outputs.token }}" ]; then
-            echo "token=${{ steps.reviewer-token.outputs.token }}" >> "$GITHUB_OUTPUT"
-            echo "identity=reviewer" >> "$GITHUB_OUTPUT"
-            echo "GH_TOKEN=${{ steps.reviewer-token.outputs.token }}" >> "$GITHUB_ENV"
-          else
-            echo "token=${{ steps.app-token.outputs.token }}" >> "$GITHUB_OUTPUT"
-            echo "identity=implementer" >> "$GITHUB_OUTPUT"
-            echo "GH_TOKEN=${{ steps.app-token.outputs.token }}" >> "$GITHUB_ENV"
-          fi
 
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -214,7 +148,7 @@ jobs:
 
       - name: Configure git
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ steps.reviewer-token.outputs.token || steps.app-token.outputs.token }}
         run: |
           SLUG=${{ steps.app-token.outputs.app-slug }}
           USER_ID=$(gh api "/users/${SLUG}[bot]" --jq .id)
@@ -225,16 +159,15 @@ jobs:
       - name: Setup Agent Environment
         uses: ./.github/actions/agent-setup
         with:
-          artifacts: fl-win64
           app-id: ${{ vars.OC_APP_CLIENT_ID }}
           app-private-key: ${{ secrets.OC_APP_PRIVATE_KEY }}
           # create-github-app-token と同じ権限セットに制限する
-          token-permissions: ${{ '{"contents":"write","pull-requests":"write"}' }}
+          token-permissions: '{"contents":"write","pull-requests":"write"}'
           cf-account-id: ${{ secrets.CF_ACCOUNT_ID }}
           cf-r2-access-key-id: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
           cf-r2-secret-access-key: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
 
-      - name: "PR diff context"
+      - name: PR diff context
         id: diff
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -262,7 +195,7 @@ jobs:
             echo '```diff'
             head -c 100000 "$DIFF_FILE" 2>/dev/null || echo "(diff unavailable)"
             echo '```'
-            if [ "${{ steps.reviewer-tok.outputs.identity }}" = "reviewer" ]; then
+            if [ -n "${{ steps.reviewer-token.outputs.token }}" ]; then
               echo "gh はレビュワー App identity で認証済み。approve / merge を実行できる。"
             else
               echo "NOTE: reviewer App identity unavailable; gh is authenticated as the implementer App. You cannot approve your own PR. Post the review as comment and merge directly if the project allows."
@@ -277,3 +210,5 @@ jobs:
           agent: build
           auth-export: ${{ secrets.OC_AUTH_EXPORT }}
           prompt: ${{ steps.prompt.outputs.prompt }}
+        env:
+          GH_TOKEN: ${{ steps.reviewer-token.outputs.token || steps.app-token.outputs.token }}

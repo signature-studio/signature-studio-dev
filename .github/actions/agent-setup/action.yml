@@ -7,7 +7,7 @@ inputs:
     required: false
     default: signature-studio-artifacts
   artifacts:
-    description: 'Space-separated list of artifact bundle names (without .tar.zst) to download'
+    description: 'Space-separated list of artifact prefixes (without .tar.zst) to download'
     required: false
     default: 'fl-win64'
   app-id:
@@ -44,9 +44,6 @@ runs:
       run: pnpm runtime set node 26.10.0
     - name: Setup Bun
       uses: oven-sh/setup-bun@v2
-    - name: Setup zstd
-      shell: bash
-      run: sudo apt-get update -qq && sudo apt-get install -y -qq zstd
     - name: Setup OpenCode
       shell: bash
       run: |
@@ -54,13 +51,12 @@ runs:
         echo "$HOME/.opencode/bin" >> $GITHUB_PATH
 
     # ---------------------------------------------------------------
-    # GitHub App token auto-refresh (1h expiry mitigation)
-    # エージェントが 1 時間を超えて動作する場合に備え、トークンを定期再発行する。
-    # トークンは $RUNNER_TEMP/gh_token に書き出され、gh ラッパーと git
-    # credential helper が都度読み取るため、実行中プロセスでも新しいトークンが使われる。
+    # GitHub App token auto-refresh (App token は 1 時間で切れる)
+    # 発行スクリプトと unit は .github/scripts・.github/systemd のファイルをそのまま置く。
+    # git は credential helper で $RUNNER_TEMP/gh_token を都度読むので、ジョブ途中の
+    # push でも常に有効なトークンが使われる。
     # ---------------------------------------------------------------
-    - name: Install token refresh loop + gh/git wrappers
-      # env コンテキストは composite の if で評価できないことがあるため inputs で判定する
+    - name: Install token refresh
       if: ${{ inputs.app-id != '' && inputs.app-private-key != '' }}
       shell: bash
       env:
@@ -68,85 +64,59 @@ runs:
         OC_APP_PRIVATE_KEY: ${{ inputs.app-private-key }}
         OC_TOKEN_PERMISSIONS: ${{ inputs.token-permissions }}
       run: |
-        set -e
-        mkdir -p "$RUNNER_TEMP/bin"
-        cat > "$RUNNER_TEMP/bin/mint-token.sh" <<'MINT'
-        #!/bin/bash
-        # GitHub App installation token を再発行して $RUNNER_TEMP/gh_token に書く
-        set -e
-        NOW=$(date +%s)
-        IAT=$((NOW - 60)); EXP=$((NOW + 600))
-        HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | openssl base64 -A | tr '+/' '-_' | tr -d '=')
-        PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$IAT" "$EXP" "$OC_APP_ID" | openssl base64 -A | tr '+/' '-_' | tr -d '=')
-        SIGNING="$HEADER.$PAYLOAD"
-        SIG=$(printf '%s' "$SIGNING" | openssl dgst -sha256 -sign <(printf '%s' "$OC_APP_PRIVATE_KEY") | openssl base64 -A | tr '+/' '-_' | tr -d '=')
-        JWT="$SIGNING.$SIG"
-        INSTALL_ID=$(curl -fsSL -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" \
-          https://api.github.com/app/installations | jq -r '.[0].id')
-        # OC_TOKEN_PERMISSIONS が設定されていれば権限を制限する (read-only モード用)
-        PERM_ARGS=()
-        if [ -n "${OC_TOKEN_PERMISSIONS:-}" ]; then
-          PERM_ARGS=(-H "Content-Type: application/json" --data "$OC_TOKEN_PERMISSIONS")
-        fi
-        TOKEN=$(curl -fsSL -X POST "${PERM_ARGS[@]}" -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" \
-          https://api.github.com/app/installations/$INSTALL_ID/access_tokens | jq -r '.token')
-        printf '%s' "$TOKEN" > "$RUNNER_TEMP/gh_token"
-        MINT
-        chmod +x "$RUNNER_TEMP/bin/mint-token.sh"
-        # 定期リフレッシュ (50 分間隔・最大 6 時間)
-        cat > "$RUNNER_TEMP/bin/refresh-loop.sh" <<'LOOP'
-        #!/bin/bash
-        for i in $(seq 1 8); do
-          "$RUNNER_TEMP/bin/mint-token.sh" || true
-          sleep 3000
-        done
-        LOOP
-        chmod +x "$RUNNER_TEMP/bin/refresh-loop.sh"
-        # gh ラッパー: 実行時に最新トークンを読む
-        cat > "$RUNNER_TEMP/bin/gh" <<'GH'
-        #!/bin/bash
-        export GH_TOKEN="${GH_TOKEN:-$(cat "$RUNNER_TEMP/gh_token" 2>/dev/null)}"
-        exec /usr/bin/gh "$@"
-        GH
-        chmod +x "$RUNNER_TEMP/bin/gh"
-        # git は credential helper で都度読み取る (ラッパー不要)
-        git config --global credential.helper "!f() { echo username=x-access-token; echo password=$(cat "$RUNNER_TEMP/gh_token"); }; f"
-        # 初回ミント + バックグラウンド refresh 開始
-        "$RUNNER_TEMP/bin/mint-token.sh"
-        setsid "$RUNNER_TEMP/bin/refresh-loop.sh" >/dev/null 2>&1 &
-        echo "$RUNNER_TEMP/bin" >> $GITHUB_PATH
-        echo "token refresh installed (app id: ${OC_APP_ID})"
+        set -euo pipefail
+        mkdir -p "$HOME/.local/bin" "$HOME/.config/systemd/user"
+        cp .github/scripts/mint-token.sh "$HOME/.local/bin/"
+        cp .github/systemd/token-refresh.service \
+           .github/systemd/token-refresh.timer "$HOME/.config/systemd/user/"
+        printf '%s\n' "$OC_APP_PRIVATE_KEY" > "$HOME/.config/token-refresh.pem"
+        {
+          echo "OC_APP_ID=$OC_APP_ID"
+          echo "OC_APP_PRIVATE_KEY_FILE=$HOME/.config/token-refresh.pem"
+          echo "TOKEN_FILE=$RUNNER_TEMP/gh_token"
+          [ -z "$OC_TOKEN_PERMISSIONS" ] || echo "OC_TOKEN_PERMISSIONS='$OC_TOKEN_PERMISSIONS'"
+        } > "$HOME/.config/token-refresh.env"
+        chmod 600 "$HOME/.config/token-refresh.env" "$HOME/.config/token-refresh.pem"
+        # 単一引用符なので $( ) は helper 実行時に展開される
+        helper='!f() { echo username=x-access-token; echo password=$(cat "$RUNNER_TEMP/gh_token" 2>/dev/null); }; f'
+        git config --global credential.helper "$helper"
+        # gh auth setup-git は URL 限定 helper を設定するので、それも上書きする
+        git config --global credential.https://github.com.helper "$helper"
+        systemctl --user daemon-reload && systemctl --user enable --now token-refresh.timer \
+          && echo "token refresh timer enabled" \
+          || echo "::warning::systemctl --user unavailable on this runner; the token is not refreshed during this job"
+        . "$HOME/.config/token-refresh.env"
+        "$HOME/.local/bin/mint-token.sh"
 
     # ---------------------------------------------------------------
-    # R2 artifacts (FL Studio・プラグイン素材一式)
-    # 認証情報は repository secrets から (未設定なら skip・read-only モードで動作)
+    # R2 artifacts (未設定なら notice を出してスキップ)
     # ---------------------------------------------------------------
-    - name: Download artifacts from R2
+    - name: Download artifacts
       shell: bash
       env:
+        AWS_ACCESS_KEY_ID: ${{ inputs.cf-r2-access-key-id }}
+        AWS_SECRET_ACCESS_KEY: ${{ inputs.cf-r2-secret-access-key }}
+        AWS_DEFAULT_REGION: auto
+        AWS_EC2_METADATA_DISABLED: 'true'
+        R2_BUCKET: ${{ inputs.r2-bucket }}
         CF_ACCOUNT_ID: ${{ inputs.cf-account-id }}
-        CF_R2_ACCESS_KEY_ID: ${{ inputs.cf-r2-access-key-id }}
-        CF_R2_SECRET_ACCESS_KEY: ${{ inputs.cf-r2-secret-access-key }}
+        R2_ARTIFACTS: ${{ inputs.artifacts }}
       run: |
-        BUCKET="${{ inputs.r2-bucket }}"
-        ENDPOINT="https://$CF_ACCOUNT_ID.r2.cloudflarestorage.com"
-        mkdir -p "$HOME/ダウンロード" "$HOME/work/analysis"
-        for n in ${{ inputs.artifacts }}; do
-          curl -fsSL --retry 3 \
-            --aws-sigv4 "aws:amz:auto:s3" \
-            --user "$CF_R2_ACCESS_KEY_ID:$CF_R2_SECRET_ACCESS_KEY" \
-            "$ENDPOINT/$BUCKET/artifacts/$n.tar.zst" \
-          | tar -x -C "$HOME" --zstd \
-          && echo "extracted $n" \
-          || echo "::warning::artifact $n unavailable; agent runs without these binaries"
+        set -uo pipefail
+        if [ -z "$CF_ACCOUNT_ID" ] || [ -z "$AWS_ACCESS_KEY_ID" ]; then
+          echo "::notice::R2 credentials not set; skipping artifact download"
+          exit 0
+        fi
+        mkdir -p "$HOME/artifacts"
+        endpoint="https://$CF_ACCOUNT_ID.r2.cloudflarestorage.com"
+        for name in $R2_ARTIFACTS; do
+          aws s3 cp "s3://$R2_BUCKET/artifacts/$name" "$HOME/artifacts" \
+            --recursive --endpoint-url "$endpoint" --only-show-errors || true
         done
-        # e2e が参照する環境変数の既定値を素材の場所に合わせる
+        [ -n "$(ls -A "$HOME/artifacts")" ] \
+          || echo "::warning::no R2 artifacts available; the agent runs without the binaries"
+        du -sh "$HOME/artifacts" 2>/dev/null || true
         {
-          echo "FL_WIN_INSTALLER=$HOME/ダウンロード/flstudio_win64_26.1.7.5653.exe"
-          echo "FA_DL=$HOME/ダウンロード"
-          echo "WS_ANALYSIS=$HOME/work/analysis"
-          echo "PATH=$HOME/.local/share/pnpm/bin:$HOME/.bun/bin:$HOME/.opencode/bin:$PATH"
+          echo "ARTIFACTS_DIR=$HOME/artifacts"
           echo "TMPDIR=$RUNNER_TEMP"
         } >> "$GITHUB_ENV"
-        echo "artifacts ready:"
-        du -sh "$HOME/ダウンロード" "$HOME/work/analysis" 2>/dev/null || true
