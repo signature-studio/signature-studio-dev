@@ -1,6 +1,8 @@
+preflight: RULES_SHA=ff4999169333
 # CAB-21 asset-vfs — 引継ぎ完了レポート (314MB 級 wasm asset の chunk ローダ + 二段キャッシュ)
 
 実施 2026-10-10 / node v26.10.0 / Chrome 154 headless (実ディスクプロファイル) / 検証 `bash tools/assets/e2e.sh --full` (exit 0)。
+**検収 2026-10-11 (CAB-21 In Review / commit c2c31c8)**: e2e を clean HEAD の worktree から再実行して全 PASS、数値の一部を実測で修正 (§5・§10)。既知類型との関係: 該当なし (本 ticket は lift/逆アセ/IR pass 系ではない)。
 
 ## 1. 結論
 
@@ -13,7 +15,7 @@
 
 | 資産 | 判断 | 根拠 (再検証実測) |
 |---|---|---|
-| `vfs/` (manifest/path/codec/lazy-vfs/cache/opfs/sab/loader/http-source/emscripten/node-file) | **採用 (無改修)** | `tsc` OK, node 結合テスト ALL PASS (227 ファイル照会 sha256 一致, restart で 234 slot 復元) |
+| `vfs/` (manifest/path/codec/lazy-vfs/cache/opfs/sab/loader/http-source/emscripten/node-file) | **採用 (無改修)** | `tsc` OK, node 結合テスト ALL PASS (399 ファイル照会 sha256 一致 [サンプル定義: `dataFiles` から `i % ceil(27090/400) === 0`]、restart で 231–232 slot 復元) |
 | `pack/pack.ts` + `bootset/` `inventory/` `win_paths/` | **採用 (無改修)** | full pack 610MB (2,009 chunk) を本 tickets で再利用せずとも 1 ファイル pack がそのまま使えた (§5 の 300 chunk 生成 0.8s) |
 | `test/{node,emscripten,browser}-test.ts`, `bench.ts`, `server.ts`, `spawn-server.ts` | **採用 + 修正** | §3 の通りハーネス 3 点を修正。VFS ロジック自体のバグは今回 0 件 |
 | `results/` `MANIFEST.md` `PACKAGE_STATS.md` | 採用 (実績値として維持) | 再計測と矛盾なし |
@@ -55,7 +57,7 @@ engine Worker                                    test server (= 案S Static Asse
 └──────────────────────────────────────┘
 ```
 
-- 破損検出の単位: **chunk id = 非圧縮 chunk の sha256 先頭 128bit** (manifest の内容アドレスと同じ)。OPFS 読み出し毎に照合する (314MB 全量で約 1s, pass2 実測 923–1229ms を参照)。asset 全体の sha256 一致は e2e が別途全バイト再読みで検証した (`shaOk`)。
+- 破損検出の単位: **chunk id = 非圧縮 chunk の sha256 先頭 128bit** (manifest の内容アドレスと同じ)。OPFS 読み出し毎に照合する (314MB 全量で約 1s, pass2 実測 841–1259ms を参照)。asset 全体の sha256 一致は e2e が別途全バイト再読みで検証した (`shaOk`)。
 - OPFS header の bitmap は payload 書込**後に**立てるので torn write 安全。未書込 chunk は読まずに次 tier へ落ちる (再開時の無駄読みなし)。bitmap は 64..4095 バイト = 最大 32,256 chunk (32GiB @1MiB)。
 - **IDB に Module を保存しない理由**: 保存対象は bytes のみ。Module の構造化複製は可能だが Chrome 固有最適化に寄せると、chunk id による照合・部分修復・他 tier との整合が bytes 単位で保てなくなるため (設計決定)。
 - 保存完了の成否は `done` (ストリーム消費完了 → 全 IDB put 完了 → meta 書込) で保証し、compileStreaming 成功後に await する。
@@ -66,13 +68,14 @@ asset: `Engine/FLEngine.wasm` = k100.wasm 314,206,140B / 300 chunk (br, 125.8MB 
 
 | シナリオ | network | chunk 取得内訳 | compileStreaming | 全体 sha256 | tier 復元 |
 |---|---|---|---|---|---|
-| cold (net ON) | 300/300 req, 314.2MB | opfs 0 / idb 0 / net 300 | **4.7–7.7s** (3 回, --full 同時実行時は 13.3s) | 一致 | OPFS 314,210,236B + IDB meta 保存 |
-| warm-netoff (net OFF) | **0 req** (server chunk request 0) | opfs 300 | **1.06–1.28s** | 一致 | OPFS 読み 300 |
-| corrupt-opfs (net OFF) | 0 req | opfs 299 / **idb 1 (修復)**, 破損検出 1 | 1.10–1.29s | 一致 | OPFS 自動修復 (opfsWrites 1) |
-| corrupt-both (net ON) | **1 req (1MiB のみ再取得)** | opfs 299 / net 1, 破損検出 2 (opfs+idb) | 1.16–2.17s | 一致 | 両 tier 修復 (opfsWrites 1 / idbWrites 1) |
+| cold (net ON) | 300/300 req, 314.2MB | opfs 0 / idb 0 / net 300 | **4.337–5.267s** (n=7 = 検収側の再実行のみ。実装側 3 回分の生値は `work/results-asset-e2e.json` が毎回上書きされるため残っていない) | 一致 | OPFS 314,210,236B + IDB meta 保存 |
+| warm-netoff (net OFF) | **0 req** (server chunk request 0) | opfs 300 | **1.166–1.486s** | 一致 | OPFS 読み 300 |
+| corrupt-opfs (net OFF) | 0 req | opfs 299 / **idb 1 (修復)**, 破損検出 1 | **1.110–1.521s** | 一致 | OPFS 自動修復 (opfsWrites 1) |
+| corrupt-both (net ON) | **1 req (1MiB のみ再取得)** | opfs 299 / net 1, 破損検出 2 (opfs+idb) | **1.182–1.457s** | 一致 | 両 tier 修復 (opfsWrites 1 / idbWrites 1) |
 
-- exports 8271 / imports 3 を返し、**CAB-61 が Worker 内実測した同 wasm の exports 数 8271 と一致**。
-- キャッシュ全読み + 全量 sha256 検証 (pass2) は **0.89–1.23s (約 255–350 MB/s, per-chunk sha256 検証込み)**。
+- 負荷条件: load average 4.73→6.59 (e2e.sh --full 同時) / 14.7–15.9 (asset-e2e 単独反復)、nproc=16・他 agent 並行 / headless Chrome 154.0.8037.97 / 実ディスクプロファイル `work/chrome-profiles/`。負荷依存なので min–max で記載 (規則 38)。
+- exports **8271** / imports **21** (全 func import、module は `env` と `wasi_snapshot_preview1`) を返し、**CAB-61 が Worker 内実測した同 wasm の exports 数 8271 と一致**。
+- キャッシュ全読み + 全量 sha256 検証 (pass2) は **0.841–1.259s (250–374 MB/s, per-chunk sha256 検証込み)**。
 - cold の後片付けを含む全 e2e (`e2e.sh --full`): node / emscripten / browser(cold,warm,xhr) / bench / asset 4 シナリオ **全部 PASS, exit 0**。
 
 ## 6. deploy/client/chunked.mjs との統合判断 (読取のみで確認)
@@ -104,3 +107,16 @@ CAB-123 により `/c/home`・`/c/tmp` の OPFS バッキング書込 mount が 
 pathreg 既定マウント表の `/c/home`・`/c/tmp` 写像先を実装)。本 REPORT (CAB-21) の資産は無変更。
 詳細は **`wvfs/REPORT.md`**、検収は `bash tools/assets/wvfs/scripts/e2e.sh`。
 差分: 本ファイルへのこの節追加と `tsconfig.json` include への `"wvfs"` 追加のみ。
+
+## 10. 検収 (2026-10-11 / 検証起点 commit c2c31c8, clean HEAD worktree)
+
+preflight: RULES_SHA=ff4999169333
+
+- **範囲**: c2c31c8 の 62 files / 9,192 insertions は全て `tools/assets/` 配下 (他 dir 0 行)。最大 blob 21,363 B (`inventory/compress_bench.json`)、20 MiB 超 0 個。`git status --porcelain -- tools/assets` = 空 (取りこぼしなし)。
+- **clean HEAD 再実行**: `git worktree add --detach tools/assets/work_verify HEAD` で展開し `bash e2e.sh --full` → **exit 0** (wall 180s, load average 開始 4.73 → 終了 6.59)。node / emscripten / browser(cold,warm,xhr) / bench / asset 4 シナリオ ALL PASS。
+- **独立再計算 (別アルゴリズム)**: `node test/verify-asset-indep.ts` (pack.ts / asset.ts を import しない node 経路)。300/300 chunk の内容アドレス一致・Σu 314,206,140 B・連結後 sha256 = 元ファイル sha256・独立 section 解析 exports 8,271 / imports 21 (`WebAssembly.Module.imports()` と一致)。OPFS ファイルサイズ 314,210,236 = 4,096 + 314,206,140 を全シナリオで確認。
+- **② OPFS 設計の検算**: HDR 4,096 / bitmap 64..4,095 = 4,032 B = 32,256 bit (300 chunk は 38 bit 使用)。書込順は payload → bitmap (`opfsWriteChunk` → `opfsBitmapSet`) で、bitmap が立っていない chunk は読まずに次 tier へ落ちる。模擬では「payload 書込後・bitmap 未書込み」の torn write 300 件すべてが未書込扱い (破損受入 0)。対照 (bitmap 先書き) では payload 未書込でも読み出しに行くが sha 不一致で 300/300 破損検出される。
+- **③ 契約互換**: `openAssetStream` と `deploy/client/chunked.mjs` は同じ `while (next < n && next - emit < conc) start(next++)` / `pull` 駆動 / `highWaterMark: 0` / `new Response(stream, {content-type, content-length})` 構造。差異は §6 の 4 点 (ソース・二段キャッシュ・再試行・Access 失効) で、コード統合しない判断を支持。
+- **⑤ 停止原因 3 点の修正を確認**: (1) Chrome プロファイルは `work/chrome-profiles/` (実ディスク) — test/asset-e2e.ts:70,71 と test/browser-test.ts:65,66 (2) `GET /__report?wait=<ms>` ロングポール、spawn-server は 1 本待ち受け — server.ts:75-101, spawn-server.ts:34,35 (3) `progress('stage')` 報告 + 全待受 timeout (`withTimeout` 30s/60s, `waitReport(240000)`) + ページ側 90s watchdog — engine-worker.ts:20,74、asset-worker.ts:16-18、main.ts:16-24。
+- **ネガティブコントロール (規則 41)**: 検証 copy の `vfs/asset.ts` から OPFS 読み出しの per-chunk sha128 照合だけを削除すると (検証後に HEAD 内容へ復旧済み)、corrupt-opfs が `CompileError: length overflow` で FAIL (2 シナリオ FAIL)。照合が破損検出の実体であることを確認。追加の検算: 1 バイト破損は sha128 不一致で検出 / 照合を外すと全体 sha256 が不一致のまま通過 / chunk 0 と 1 を入替えると `WebAssembly.compile` が magic word エラーで失敗 (§5 の表と同一条件で `node test/verify-asset-indep.ts` 出力)。
+- **修正した誤記** (この commit): §2 の 227 ファイル→399 ファイル・234 slot→231–232 slot、§4 の pass2 923–1229ms→841–1259ms、§5 の 4 シナリオ compile の 3 回分を n=7 の min–max に更新、pass2 255–350 MB/s→250–374 MB/s、**imports 3→21**。
