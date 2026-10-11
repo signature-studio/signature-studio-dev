@@ -1597,8 +1597,8 @@
   "err_grid_mismatch_thunk": 0
  },
  "wasm_bytes": {
-  "ipp_shim.wasm": 151179,
-  "ipp_shim_simd.wasm": 194158
+  "ipp_shim.wasm": 151931,
+  "ipp_shim_simd.wasm": 194910
  },
  "selftest": "shim_selftest: checks=1441 failed=0",
  "shimx_glue": "shimx_glue_test: PASS (resolved 420/420)"

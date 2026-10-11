@@ -187,7 +187,7 @@ CAB-136 時点の上位: `ippiResizeSqrPixel_8u_C1R/C3R/C4R` (143 モジュー�
 ### 12-4. 補間カーネル (実測フィット)
 - **Cubic**: 4-tap `f(d)=0.5d³−d²−0.5d+1 (d≤1)`, `f(d)=−(1/6)(d−1)(d−2)(d−3) (1<d≤2)` — 全位相で partition of unity (fit13)。スパイク+回帰で A=−0.5 Keys ではないことを確認 (負ローブの分布が異なる)。
 - **Super**: 面積平均。footprint `[start, start+1/fx)`, `start=(x−sx)/fx`。**ROI 外の面積は最近接エッジ画素へ fold してから総面積で正規化** (spike 重み表 fx=0.3/0.5/0.75 × sx 4 種と全一致)。
-- **interp 5/6/7** (`CUBIC2P_*` 系と推定): H-pass 重み回帰で 6 のみ cubic と一致。5/7 は独立カーネル (spike で負ローブ+非対称を確認, spike行列を work/resize/spikes.log に記録) — **完全再現は後続チケットへ** (現実装は cubic 代用)。
+- **interp 5/6/7** (`CUBIC2P_*` 系と推定): ~~H-pass 重み回帰で 6 のみ cubic と一致~~ **[CAB-274 で訂正: 誤り。it=6 の H-pass 重みも cubic とは不一致 (d=0.25 で 221 vs 209、最大 12/255)。回帰が「一致」としたのは近似の分解能不足]**。5/6/7 はすべて Mitchell-Netravalli (B,C) カーネル (§15-1) — **CAB-274 で完全再現**。
 
 ### 12-5. 残差 (許容差の根拠 — 受入条件の「bit-exact または許容差」)
 オラクル 74,456 resize ケース (591 万画素) の画素差率: **NN 0.000% / Cubic 0.027% / Linear 0.101% / Super 0.643% / Lanczos 6.913%**。差分は **|d|≤1 の丸め境界差** (Lanczos big8=16/72.9 万 = 0.002%)。
@@ -321,3 +321,86 @@ it=5 の 4 タップ正規化重みの `w[0] += 0.02; w[3] -= 0.02` (1 行) を�
 - `impl/ipp_resize.c`: `ker_bspl3` + `mode 35` (interp_base(5)=35、`interp_base(6/7)=4` は従来どおり)
 - `test/sp57.c` (新規, スパイク採取) / `test/sweep2.c` (新規, 位相スイープ)
 - `shim/REPORT.md` 本节。spike 行列・フィット過程物は `work/resize/` (gitignore)
+
+## 15. CAB-274 (IPP-8): interp 6/7 カーネル特定と実装 — it7 13.169%→0.005% / it6 9.768%→0.000% (2026-10-11)
+
+**結論**: it=7・it=6 のカーネルを **Mitchell-Netravalli 2 パラメータ三次カーネル** (CUBIC2P) と特定し closed form で実装。オラクル画素差率 **it7 13.169% → 0.005%** (受入 <1% 達成)、**it6 9.768% → 0.000% (bit-exact)**。it=5 = 0.021% 不変、it=4 = 0.027% 不変。`shim_e2e.sh` 13 checks PASS、wasm replay **1,728 records mismatch=0**。
+
+### 15-1. カーネル特定 (1D spike + 2D インパルス応答の2系統で確定)
+
+| interp | カーネル | 同定根拠 |
+|---|---|---|
+| it=4 | `0.5d³−d²−0.5d+1` (線形項付き cubic、MN ではない) | 従来実装のまま (0.027%) |
+| it=5 | MN(B=1, C=0) = 3次 B-スプライン | CAB-261 で確定 (§14-2) |
+| it=6 | **MN(B=0, C=0.5)** = Catmull-Rom | 1D spike `sw6.txt` の 13 点と MN 予測が **diff 0** |
+| it=7 | **MN(B=0.5, C=0.3)** = CUBIC2P_B05C03 | 1D spike `sw7.txt` の 19 点と MN 予測が **diff 0** |
+
+- 2D インパルス応答 (`work/resize/ksw4..7.txt`、1 画素スパイクの 3x3 応答、シフト 1/64 刻み 64 点) から (B,C) を
+  最小二乗フィット (別アルゴリズム): it=5 → (1.000, −0.002)、it=6 → (0.000, 0.504)、it=7 → (0.502, 0.300)。
+  採用した closed form の 3x3 応答予測は **it6/it7 で 576 点中不一致 0** (負ローブは最終 clamp で 0 — 分離モデル+clamp で完全一致)。
+- 数表 (Q16/float 33 エントリ) は不要になった (closed form が同一)。ticket の「数表実装」要件は closed form で充足。
+- MN は partition of unity (窓の重み和 = 1、任意位相) → **per-pixel 正規化不要**。flat image (128/200/255) の
+  through を実測で確認 (probe274/flat2.c: 全 interp で入力値一致)。
+
+### 15-2. it=6 の 9.768% 原因特定 (ticket 要件2: V-pass spike)
+
+`work/resize/sweepv.c 6 > swv6.txt` で垂直 1D spike を採取 → **H-pass (`sw6.txt`) と V-pass は同一カーネル (13 点不一致 0)**。
+したがって背景の推定「H-pass 回帰一致なので V-pass/丸め差」は**誤り**で、原因は **カーネル自体の差**:
+
+| d | 0 | 0.125 | 0.25 | 0.375 | 0.5 | 0.625 | 0.75 | 0.875 | 1.0 |
+|---|---|---|---|---|---|---|---|---|---|
+| it=6 spike | 255 | 246 | 221 | 186 | 143 | 99 | 58 | 23 | 0 |
+| cubic (=旧実装) | 255 | 235 | 209 | 178 | 143 | 107 | 70 | 34 | 0 |
+| 差 | 0 | +11 | +12 | +8 | 0 | −8 | −12 | −11 | 0 |
+
+重み差 8〜12/255 が画素差 9.768% (76,293 px) に拡大。MN(0,0.5) 実装後は **0 px (bit-exact)**。
+
+### 15-3. オラクル結果 (native + wasm replay)
+
+| interp | 変更前 pxdiff | 変更後 pxdiff | 変更前% | 変更後% |
+|---|---|---|---|---|
+| it=4 | 233 | 233 | 0.027% | 0.027% (不変) |
+| it=5 | 159 | 159 | 0.021% | 0.021% (不変) |
+| it=6 | 76,293 | **0** | 9.768% | **0.000%** |
+| it=7 | 88,546 | **31** | 13.169% | **0.005%** |
+| it=8 / it=16 | 4,004 / 50,390 | 同左 | 0.643% / 6.913% | 不変 (対象外) |
+
+- 定義: pxdiff = native 実 DLL と自前実装の出力が異なる dst バイト数、px 分母 = 当該 interp の比較总バイト数
+  (oracle.log の `it<n>: px=.. pxdiff=..`) 。wasm replay 1,728 records mismatch=0。
+- it=7 の残差 31 px は all |d|=1 (丸め差)。it=6 は完全一致。
+
+### 15-4. GetBufSize の it=5/6/7 (副作用修正)
+
+実 DLL は **it=5/6/7 のバッファサイズが cubic (4) と同一** (work/resize/gbs.log: interp 別 96 ケースずつ全 CUBIC 一致)。
+旧実装は it=5 が mode 35 で Lanczos 式に落ちており**不一致だった** (潜在バグ: 過大サイズ)。本章で 5/6/7 → 4 に修正し、
+オラクルの GetBufSize 族に it=5/6/7 (dw 1..96/dh 1..48/ch∈{1,3,4} = 1,800 ケース) を追加して **mismatch=0** を確認。
+
+### 15-5. ネガティブコントロール (規則 41)
+
+`work/negc274/` と `work/negc274b/` のコピーに1行だけ破壊を入れ、オラクルを再実行:
+
+| 破壊 | it6 pxdiff | it7 pxdiff |
+|---|---|---|
+| 破壊前 | 0 (0.000%) | 31 (0.005%) |
+| it=7 の B を 0.5 → 0.52 | 0 (不変) | **37,037 (5.509%)** |
+| it=6 の C を 0.5 → 0.54 | **51,445 (6.587%)** | 31 (不変) |
+
+→ 両カーネルが実効的であることを数値で確認 (壊すと FAIL、触らない方は不変)。
+
+### 15-6. 独立再計算 (規則 37)・検証範囲外
+
+`python3 shim/verify_cab274_kernel.py` (impl 非リンク・別アルゴリズム):
+1D spike 予測 (it4/5/6/7) 不一致 0、2D インパルスからの (B,C) フィット、3x3 応答予測 576/576、
+V==H (it=6)、cubic との差の定量化、GetBufSize 実測。
+
+- **検証範囲外**: 他 interp (NN/linear/Super/Lanczos) のカーネル変更は行っていない。wasm は replay (ネイティブ出力との
+  ハッシュ一致) のみで、wasm 側の単独テストはしていない。it=7 の残差 31 px の原因 (丸め経路) は未追跡 (it=5 と同種の ±1)。
+- **未解決**: it=4 のカーネルが MN でない理由 (線形項付き) は未解明 — 影響なし (0.027%) で起票先なし (既存許容差)。
+  GetBufSize の it=5/6/7 旧値 (Lanczos 式) を踏んでいた呼出元はなし (FL は ResizeSqrPixel 使用・§12-3)。
+
+### 15-7. 更新物
+
+- `shim/impl/ipp_resize.c`: `ker_mn(d,B,C)` 追加、`interp_base` で it=6→36 / it=7→37 のモード、GetBufSize の 5/6/7→4 修正
+- `shim/test/resize_oracle.c`: GetBufSize 族に it=5/6/7 (1,800 ケース) を追加
+- `shim/verify_cab274_kernel.py` (新規, 独立再計算)、`work/resize/probe274/` (flat/spk2d/imp2d/ksweep/gbs probe)
+- spike ログ `work/resize/swv6.txt` (it=6 V-pass)、`ksw{4,5,6,7}.txt` (2D インパルス) は gitignore (再生成コマンドはスクリプト docstring)

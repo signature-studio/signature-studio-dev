@@ -22,9 +22,11 @@
               (spike 重み表と全一致: fx=0.3/0.5/0.75 × sx=0/0.25/0.5/0.75)
    - 出力丸め: round-half-up。実 DLL は重み量子化の独自経路を持ち、255·w が .5 近傍
      (±0.006) の位相で ±1 差が生じうる → 実測率を REPORT §12-5 に記録 (受入条件の許容差)。
-   - interp は {1,2,4,5,6,7,8,16} のみ有効 (probe3-E 実測)。本実装は 5/6/7 を 4 (CUBIC) として処理
-      (6 の H-pass 重みは cubic と一致, 5/7 は独立カーネル — 実 DLL とは it5 14.5% / it7 13.2% の画素差が残る, REPORT §12-4)。
-     それ以外は -22。factor <= 0 → -23、Super で factor > 1 → -23 (実測)。
+   - interp は {1,2,4,5,6,7,8,16} のみ有効 (probe3-E 実測)。カーネルはすべて spike 実測に基づく
+      (REPORT §12-4 / §14 / §15): it=4 = cubic conv (0.5d^3-d^2-0.5d+1)、it=5 = 3次 B-スプライン
+      = MN(B=1,C=0)、it=6 = MN(B=0,C=0.5) (Catmull-Rom)、it=7 = MN(B=0.5,C=0.3) (CUBIC2P_B05C03)。
+      MN 系は partition of unity (窓和=1) なので正規化不要。負ローブは最終 clamp で 0 に落ちる。
+      それ以外は -22。factor <= 0 → -23、Super で factor > 1 → -23 (実測)。
      srcSize/ROI 寸法 < 1 → -6。NULL (src/dst/pBuffer) → -8。
    - GetBufSize 2 関数:
      ippiResizeSqrPixelGetBufSize は実 DLL が「常時 -8・書込なし」(逆アセ mov eax,-8; ret 実測 +
@@ -50,7 +52,8 @@
 static int interp_ok(int it) {
   return it == 1 || it == 2 || it == 4 || it == 5 || it == 6 || it == 7 || it == 8 || it == 16;
 }
-static int interp_base(int it) { return it == 5 ? 35 : ((it == 6 || it == 7) ? 4 : it); }
+/* カーネル mode: 5=bspl3(MN B=1,C=0), 6=MN(B=0,C=0.5)=Catrom, 7=MN(B=0.5,C=0.3)=CUBIC2P_B05C03 */
+static int interp_base(int it) { return it == 5 ? 35 : (it == 6 ? 36 : (it == 7 ? 37 : it)); }
 
 static Ipp8u clamp_u8(double v) {
   long r = (long)(v + 0.5);  /* round-half-up (可搬: lround のプラットフォーム差を排除) */
@@ -72,6 +75,24 @@ static double ker_bspl3(double d) {
   double a = fabs(d);
   if (a < 1.0) return 2.0 / 3.0 - a * a + a * a * a / 2.0;
   if (a < 2.0) { double q = 2.0 - a; return q * q * q / 6.0; }
+  return 0.0;
+}
+/* Mitchell-Netravalli 2 パラメータ三次カーネル (CUBIC2P 系)。partition of unity なので
+   正規化は不要 (任意の位相で窓の重み和 = 1)。負ローブ (|d|≳1.25) は最終 clamp で 0 に落ちる。
+   実測 (CAB-274: 1D spike work/resize/sw6.txt / sw7.txt の重みを予測 → d<=1 の全点で diff 0):
+     it=6 = MN(B=0,   C=0.5) = Catmull-Rom
+     it=7 = MN(B=0.5, C=0.3) = CUBIC2P_B05C03 */
+static double ker_mn(double d, double B, double C) {
+  double a = fabs(d);
+  if (a < 1.0) {
+    return ((12.0 - 9.0 * B - 6.0 * C) / 6.0) * a * a * a -
+           ((18.0 - 12.0 * B - 6.0 * C) / 6.0) * a * a +
+           (6.0 - 2.0 * B) / 6.0;
+  }
+  if (a < 2.0) {
+    return ((-B - 6.0 * C) * a * a * a + (6.0 * B + 30.0 * C) * a * a +
+            (-12.0 * B - 48.0 * C) * a + (8.0 * B + 24.0 * C)) / 6.0;
+  }
   return 0.0;
 }
 /* 可搬 sin(pi*d) (d ∈ [0,3]): native/wasm で同一演算順序 (libm 差異の排除, wasm 突合用)。
@@ -139,6 +160,14 @@ static int build_taps(int mode, double p, int *base, double w[8]) {
     double s = 0.0;
     for (int t = 0; t < 4; t++) { double v = ker_bspl3(p - (i0 - 1 + t)); w[t] = v; s += v; }
     if (s > 0.0) for (int t = 0; t < 4; t++) w[t] /= s;
+    return 4;
+  }
+  if (mode == 36 || mode == 37) {
+    /* interp 6 = MN(0,0.5) (Catmull-Rom) / interp 7 = MN(0.5,0.3) (CUBIC2P_B05C03)。
+       MN は partition of unity (和=1) なので正規化不要。窓は [i0-1, i0+2] の 4 タップ。 */
+    double B = (mode == 36) ? 0.0 : 0.5, C = (mode == 36) ? 0.5 : 0.3;
+    *base = i0 - 1;
+    for (int t = 0; t < 4; t++) w[n++] = ker_mn(p - (i0 - 1 + t), B, C);
     return 4;
   }
   *base = i0 - 3;
@@ -349,7 +378,8 @@ IppStatus ippiResizeGetBufSize(IppiRect srcRoi, IppiRect dstRoi, int nChannel, i
   if (nChannel == 2) return IPP_STS_CH2;
   if (nChannel < 1 || nChannel > 4) return IPP_STS_BADARG;
   if (!interp_ok(interpolation)) return IPP_STS_INTERP;
-  const int mode = interp_base(interpolation);
+  /* バッファサイズの mode: 5/6/7 は cubic (4) と同一 (実 DLL 実測: work/resize/gbs.log, 96 ケース) */
+  const int mode = (interpolation == 5 || interpolation == 6 || interpolation == 7) ? 4 : interp_base(interpolation);
   const int dw = dstRoi.width, dh = dstRoi.height, sw = srcRoi.width;
   long sz;
   if (mode == 1) {
