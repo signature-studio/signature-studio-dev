@@ -10,8 +10,14 @@ inputs:
     description: 'Space-separated list of artifact bundle names (without .tar.zst) to download'
     required: false
     default: 'fl-win64'
+  app-id:
+    description: 'GitHub App id (client id) used for token auto-refresh. Pass via workflow: ${{ vars.OC_APP_CLIENT_ID }}'
+    required: false
   app-private-key:
     description: 'GitHub App private key (PEM) for token auto-refresh. Pass via workflow: ${{ secrets.OC_APP_PRIVATE_KEY }}'
+    required: false
+  token-permissions:
+    description: 'JSON fragment limiting the refreshed token permissions, e.g. {"contents":"read"}. Empty = installation defaults.'
     required: false
   cf-account-id:
     description: 'Cloudflare account id for R2'
@@ -60,11 +66,13 @@ runs:
     # credential helper が都度読み取るため、実行中プロセスでも新しいトークンが使われる。
     # ---------------------------------------------------------------
     - name: Install token refresh loop + gh/git wrappers
-      if: ${{ env.OC_APP_ID != '' }}
+      # env コンテキストは composite の if で評価できないことがあるため inputs で判定する
+      if: ${{ inputs.app-id != '' && inputs.app-private-key != '' }}
       shell: bash
       env:
-        OC_APP_ID: ${{ env.OC_APP_ID }}
+        OC_APP_ID: ${{ inputs.app-id }}
         OC_APP_PRIVATE_KEY: ${{ inputs.app-private-key }}
+        OC_TOKEN_PERMISSIONS: ${{ inputs.token-permissions }}
       run: |
         set -e
         mkdir -p "$RUNNER_TEMP/bin"
@@ -81,7 +89,16 @@ runs:
         JWT="$SIGNING.$SIG"
         INSTALL_ID=$(curl -fsSL -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" \
           https://api.github.com/app/installations | python3 -c 'import json,sys; print(json.load(sys.stdin)[0]["id"])')
-        TOKEN=$(curl -fsSL -X POST -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" \
+        # OC_TOKEN_PERMISSIONS が設定されていれば権限を制限する (read-only モード用)
+        PERM_ARGS=()
+        if [ -n "${OC_TOKEN_PERMISSIONS:-}" ]; then
+          if ! printf '%s' "$OC_TOKEN_PERMISSIONS" | python3 -c 'import json,sys; json.load(sys.stdin)' 2>/dev/null; then
+            echo "ERROR: OC_TOKEN_PERMISSIONS is not valid JSON: $OC_TOKEN_PERMISSIONS" >&2
+            exit 1
+          fi
+          PERM_ARGS=(-H "Content-Type: application/json" --data "$OC_TOKEN_PERMISSIONS")
+        fi
+        TOKEN=$(curl -fsSL -X POST "${PERM_ARGS[@]}" -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" \
           https://api.github.com/app/installations/$INSTALL_ID/access_tokens \
           | python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])')
         printf '%s' "$TOKEN" > "$RUNNER_TEMP/gh_token"

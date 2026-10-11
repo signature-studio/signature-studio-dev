@@ -40,7 +40,11 @@ runs:
           --agent "${{ inputs.agent }}" \
           --format json \
           "${{ inputs.prompt }}" > "$RUNNER_TEMP/oc-output.jsonl" 2> "$RUNNER_TEMP/oc-stderr.log"
-        echo "rc=$?" >> "$GITHUB_OUTPUT"
+        rc=$?
+        echo "rc=$rc" >> "$GITHUB_OUTPUT"
+        echo "opencode exit code: $rc"
+        echo "jsonl lines: $(wc -l < "$RUNNER_TEMP/oc-output.jsonl")"
+    # 要約の書き出しは opencode が失敗しても行う (失敗原因の手がかりを残す)
 
     # -------------------------------------------------------------------
     # 出力の要約を $GITHUB_STEP_SUMMARY へ。
@@ -117,3 +121,17 @@ runs:
         PY
         echo "" >> "$GITHUB_STEP_SUMMARY"
         echo "events: $(wc -l < "$RUNNER_TEMP/oc-output.jsonl" 2>/dev/null || echo 0)"
+
+    # opencode が異常終了していたらジョブを失敗させる
+    # (セットアップだけ成功して agent が動いていない状態を検知するため)
+    - name: Fail if OpenCode did not succeed
+      shell: bash
+      env:
+        OC_RC: ${{ steps.run.outputs.rc }}
+      run: |
+        if [ "${OC_RC:-1}" != "0" ]; then
+          echo "::error::opencode run exited with code ${OC_RC}"
+          echo "--- opencode stderr (tail) ---"
+          tail -c 8000 "$RUNNER_TEMP/oc-stderr.log" 2>/dev/null || true
+          exit 1
+        fi

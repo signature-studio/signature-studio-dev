@@ -110,7 +110,10 @@ jobs:
         uses: ./.github/actions/agent-setup
         with:
           artifacts: fl-win64
+          app-id: ${{ vars.OC_APP_CLIENT_ID }}
           app-private-key: ${{ secrets.OC_APP_PRIVATE_KEY }}
+          # read-only モードでは定期再発行トークンも読み取り専用に制限する
+          token-permissions: ${{ steps.judge.outputs.permission == 'read' && '{"contents":"read","issues":"read","pull-requests":"read"}' || '' }}
           cf-account-id: ${{ secrets.CF_ACCOUNT_ID }}
           cf-r2-access-key-id: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
           cf-r2-secret-access-key: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
@@ -162,19 +165,6 @@ jobs:
             echo "use-reviewer=false" >> $GITHUB_OUTPUT
           fi
 
-      # レビュワー App が未インストール/失敗した場合は実装 App にフォールバック
-      # (その場合 approve はできず comment+merge のみ)
-      - name: Reviewer token fallback
-        id: reviewer-tok
-        run: |
-          if [ "${{ steps.creds.outputs.use-reviewer }}" = "true" ] && [ "${{ steps.reviewer-token.outputs.token != '' }}" ]; then
-            echo "token=${{ steps.reviewer-token.outputs.token }}" >> "$GITHUB_OUTPUT"
-            echo "identity=reviewer" >> "$GITHUB_OUTPUT"
-          else
-            echo "token=${{ steps.app-token.outputs.token }}" >> "$GITHUB_OUTPUT"
-            echo "identity=implementer" >> "$GITHUB_OUTPUT"
-          fi
-
       - uses: actions/create-github-app-token@v3
         id: app-token
         with:
@@ -192,6 +182,22 @@ jobs:
           private-key: ${{ secrets.OC_REVIEW_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write
+
+      # レビュワー App が未インストール/失敗した場合は実装 App にフォールバック
+      # (その場合 approve はできず comment+merge のみ)
+      # ※ トークン生成ステップの後に置くこと (steps コンテキストは先行ステップのみ参照できる)
+      - name: Resolve review identity
+        id: reviewer-tok
+        run: |
+          if [ "${{ steps.creds.outputs.use-reviewer }}" = "true" ] && [ -n "${{ steps.reviewer-token.outputs.token }}" ]; then
+            echo "token=${{ steps.reviewer-token.outputs.token }}" >> "$GITHUB_OUTPUT"
+            echo "identity=reviewer" >> "$GITHUB_OUTPUT"
+            echo "GH_TOKEN=${{ steps.reviewer-token.outputs.token }}" >> "$GITHUB_ENV"
+          else
+            echo "token=${{ steps.app-token.outputs.token }}" >> "$GITHUB_OUTPUT"
+            echo "identity=implementer" >> "$GITHUB_OUTPUT"
+            echo "GH_TOKEN=${{ steps.app-token.outputs.token }}" >> "$GITHUB_ENV"
+          fi
 
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -214,7 +220,10 @@ jobs:
         uses: ./.github/actions/agent-setup
         with:
           artifacts: fl-win64
+          app-id: ${{ vars.OC_APP_CLIENT_ID }}
           app-private-key: ${{ secrets.OC_APP_PRIVATE_KEY }}
+          # create-github-app-token と同じ権限セットに制限する
+          token-permissions: ${{ '{"contents":"write","pull-requests":"write"}' }}
           cf-account-id: ${{ secrets.CF_ACCOUNT_ID }}
           cf-r2-access-key-id: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
           cf-r2-secret-access-key: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
@@ -227,14 +236,6 @@ jobs:
           gh pr diff ${{ github.event.pull_request.number }} --repo ${{ github.repository }} > "$RUNNER_TEMP/pr.diff" || true
           gh pr view ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --json title,body,isDraft --jq '.title' > "$RUNNER_TEMP/pr.title" || true
           echo "diff-lines=$(wc -l < "$RUNNER_TEMP/pr.diff")" >> $GITHUB_OUTPUT
-
-      - name: Run OpenCode (reviewer)
-        uses: ./.github/actions/opencode
-        with:
-          model: "opencode-go/step-5-preview-free"
-          agent: build
-          auth-export: ${{ secrets.OC_AUTH_EXPORT }}
-          prompt: ${{ steps.prompt.outputs.prompt }}
 
       - name: Assemble reviewer prompt
         id: prompt
@@ -256,9 +257,17 @@ jobs:
             head -c 100000 "$DIFF_FILE" 2>/dev/null || echo "(diff unavailable)"
             echo '```'
             if [ "${{ steps.reviewer-tok.outputs.identity }}" = "reviewer" ]; then
-              echo "REVIEWER_TOKEN=${{ steps.reviewer-tok.outputs.token }}"
+              echo "gh はレビュワー App identity で認証済み。approve / merge を実行できる。"
             else
-              echo "NOTE: reviewer App identity unavailable; you cannot approve your own PR. Post the review as comment and merge directly if the project allows."
+              echo "NOTE: reviewer App identity unavailable; gh is authenticated as the implementer App. You cannot approve your own PR. Post the review as comment and merge directly if the project allows."
             fi
             echo "OCEOF"
           } >> "$GITHUB_OUTPUT"
+
+      - name: Run OpenCode (reviewer)
+        uses: ./.github/actions/opencode
+        with:
+          model: "opencode-go/step-5-preview-free"
+          agent: build
+          auth-export: ${{ secrets.OC_AUTH_EXPORT }}
+          prompt: ${{ steps.prompt.outputs.prompt }}
