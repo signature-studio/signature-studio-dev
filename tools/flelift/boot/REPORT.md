@@ -2,17 +2,42 @@
 
 ## 0. 結論 (先出し)
 
-- **判定 (FLE-3): boot 連鎖は unit#126 まで完走** (FLE-2 末 40 → FLE-3 で **126**)。
-  本 round で突破したもの:
+- **判定 (累積, FLE-4 末): unit 進行 209 止まりだが survey は全 942 unit で functional**
+  (FLE-1 17 → FLE-2 40 → FLE-3 209 → FLE-4 は unit 209 で blocker 変更)。
+  **FLE-2/FLE-3 で突破したもの** (累積):
   1. **Delphi switch テーブルの case body 自動 harvest** (`gen_boot.py`): `.text` 内の
-     「`.text` を指す 8B 値が 2〜32 個連続する」領域から、**shape `48 83 c1 <imm8> e9 <rel32>`
-     (`add rcx,-imm; jmp`)** のものだけ root 化。roots 20,899 → **21,307**、
-     関数数 29,420 → 29,753。実測テーブル: `0x5275b0` (4 entry) / `0x433090`+`0x4330a8` (4+5) /
-     `0x642e78` (20 entry)。
+     「`.text` を指す 8B 値が 2〜32 個連続」領域から shape `48 83 c1 <imm8> e9` のものだけ root 化。
+     roots 20,899 → 21,307、関数数 29,420 → 29,753。実測テーブル: `0x5275b0`(4) /
+     `0x433090`+`0x4330a8`(4+5) / `0x642e78`(20 entry)。
   2. **`boot_e2e.sh` の既定 closure を 0 → 2 に変更** (`FLE_LIFT_CLOSURE` で上書き可)。
-     16 unit → 40 unit (FLE-2 で実測済み) を既定化。
-  3. **`shimx_set_cs_null_ok(1)`** 導入: unit 111 で `InitializeCriticalSectionEx(NULL/misaligned)`
-     が shimx の fail-fast に掛かり abort していたのを R7 互換モードで回避 (単一スレッド前提)。
+  3. **`shimx_set_cs_null_ok(1)`** 導入 (`InitializeCriticalSectionEx(NULL)` の fail-fast 回避)。
+- **FLE-4 の成果 (unit#209 OOB の原因特定と修正)**:
+  1. **原因特定**: `chk` variant の `fle_chk` が報告する `__LINE__` は **lift 生成 C の行番号**
+     (= 1015940) で、これを辿ると **`0x8157c1: call qword ptr [rbx + 0x18]`** (仮想呼出)。
+     `f_815050` の実測: `obj = *(0x15F6F78)` (VMT 0x666fa0 を持つ正常ヒープオブジェクト) だが
+     **`obj->field_8 == 0`**。`mov rbx,[rax]; call [rbx+0x18]` は **NULL 仮想呼出**になる。
+     ネイティブ Windows では AV だが、wasm では linear address 0 に emscripten magic
+     (`"emsc"` = 0x63736d65) があるため `call [0x63736d7d]` で OOB。
+     **「文字列内容が @var として渡される型混同」という前ラウンド報告は誤りで、
+     実際は NULL フィールドへの仮想呼出** (訂正)。
+  2. **NULL ページ guard** (`fle_boot.c`): 初回 install 時に `[0, 0x1000)` を 0 埋めする。
+     guest イメージは 0x400000 始まりで未使用領域。NULL 仮想呼出は `ott_unlifted(0)` →
+     m11 と同じ icall-miss 規約 (ret 0) で graceful に継続する。
+     `fle_boot_set_nullpage(1)` で無効化可能。
+  3. **次の blocker も特定**: `unlifted 0x6a7b70` は `f_6a7f50` (unit 終了フック) が 0x15F4B80 に
+     設定する **fill コールバック**。root 化すると `f_6c7900` の fill ループが未初期化幅
+     (0xffffa = 1,048,570 回) で暴走して ExitProcess → survey が成立しない。
+     **boot_roots.json からは除外** (unlifted で止める方が survey は functional)。
+- **FLE-4 実測値**:
+  - **survey (942 unit 隔離, closure 2)**: **ok 888 / oob 2 / unlifted 5 / empty 46 / noproc 1**
+    (FLE-3 末 ok 888 / oob 2 / unlifted 5 / empty 46 / noproc 1 と同一 — NULL page guard は
+    unit#209 の OOB を除く survey 結果を変えない)。
+  - **verdict 混在採点** (`gen_mixed.py` の target 別レポート):
+    関数級 (target=flelift) 7,421 行 + unit 級 (target=flelift-boot) 943 行 = 8,364 行。
+    一致 4,942 / 不一致 777 / 実行不能 2,645。
+    unit 級の **x-route_diff 143** のうち **native_fault = 89** (native 側 fault / x64c ok = x64c 優位)。
+  - **variant 4 種 link**: plain / strict / nosx / chk 全て error 0
+    (chk の `fle_chk` は `fle_cpu.c` も `-DFLE_CHK` でビルドする必要がある — boot スクリプト修正)。
 - **FLE-2 の 3 バグ修正 (前ラウンド、そのまま有効)**:
   1. **FreeMem 戻り値の判定逆転** (`fle_ov_freemem`): 実機 `System._FreeMem` 0x409440 は
      `mov ebx,eax / test ebx,ebx / je ok / mov cl,2 / call @Error` — **0 = 成功 / 非 0 = エラー**。
@@ -49,7 +74,7 @@
 | `fle_boot.c` | boot ドライバ: 敷設 + shimx wiring (cbtrans/resolver/LB_BASE=0x10000) + 計数 + `--override` C 実装 (longjmp/GetMem/FreeMem/InitUnits) + curated import。**FLE-2: FreeMem 判定と RSP 釣合を修正** |
 | `fle_boot.mjs` | runner: boot 実行 + 分類 + survey (942 隔離, FLE_SURVEY_FROM/TO) + summary/JSONL 出力 |
 | `blkdiag` (fle_boot.c 内) | System._GetMem/_FreeMem トラッキング (alloc/free 時系列・16B snapshot canary・二重解放/未追跡/header dump・FastMM dispatch カウント)。`fle_boot_set_blkdiag(int)` / `fle_blkdiag_stat(int)` で外部操作 |
-| `boot_roots.json` | 実行時発見 roots **82 本** (累積)。FLE-2 で 0x403579/0x403582/0x40358b (jump table thunk)・0x40fb40・0x40f960・0x527b5b (VMT slot) を追加 |
+| `boot_roots.json` | 実行時発見 roots **110 本** (累積)。0x403579/0x403582/0x40358b (jump table thunk)・0x40fb40/0x40f960・0x527b5b 等を追加。**0x6a7b70 は意図的に除外** (§3-4) |
 | `survey_drive.sh` + `merge_survey.py` | survey を 180s セグメント実行 (timeout 再開) → results/survey.json に統合 |
 | `gen_verdict.py` | survey 差分 → liftdiff FORMAT v1 JSONL (results/verdict_boot.jsonl) |
 | `gen_mixed.py` | **関数級 (liftdiff) + unit 級 (boot) verdict を 1 ファイルに混在**させて `liftdiff.py summary` で採点。32MB 超のため JSONL は work/boot/ (gitignore)、採点結果は results/mixed_summary.md |
@@ -77,63 +102,45 @@ unit 進行の推移 (FLE-3 中の実測): 40 (FLE-2 末) → **43** (0x403579/5
 
 ## 3. unit#17 停止原因の特定 (本 round の主成果)
 
-### 3-1. FreeMem 戻り値の判定逆転 (`fle_ov_freemem`)
+### 3-1. (FLE-2 累積) 3 バグ修正の要点
 
-`System._FreeMem` 0x409440 の実機機械語:
+1. **FreeMem 戻り値の判定逆転** (`fle_ov_freemem`): 実機 `System._FreeMem` 0x409440 は
+   `mov ebx,eax / test ebx,ebx / je ok / mov cl,2 / call @Error` — **0 = 成功 / 非 0 = エラー**。
+   (FastMM 0x40801f は `mov eax,-1`)。旧コードは `if (!ok)` で `@Error` を呼び正常 free を
+   エラー扱いしていた。
+2. **guest stack の push/pop 不釣合** (`fle_ov_getmem`/`fle_ov_freemem`): C override が
+   `ott_dispatch` 前に独自の偽 retaddr を push して 1 呼出 8B 沈下。呼出元の `pop rbx` が
+   8B 低い slot を読み `rbx = 0x43000000000000` → OOB。`R[4] += 8` を dispatch 直後に追加して解決。
+3. **`gen_boot.py` のポインタ typedef 誤分割**: `typedef WCHAR* BSTR;` を
+   `body='WCHAR* BST'` と誤分割 → `SysAllocStringLen` が soft stub (常に 0) → nil → raise。
+   22 typedef 対象。修正後 `noproto` 0 / shimx.h 603 prototype の戻り値型未解決 0。
 
-```
-0x40944e  call qword ptr [rip + 0xf9c844]   ; = mm table FreeMem (0x407e20)
-0x409454  mov  ebx, eax
-0x409456  test ebx, ebx
-0x409458  je   0x409461                     ; = 成功
-0x40945a  mov  cl, 2 ; call 0x409730        ; @Error(reInvalidPtr)
-```
-
-FastMM 側 (`0x407e20`) は**成功で `xor eax,eax` (0)**、異常で `0x40801f mov eax,0xffffffff` を返す。
-旧 `fle_ov_freemem` は `if (!ok)` で `@Error` を呼んでいたため、**1 回目の正常 free で必ず raise**。
-blkdiag の `FastMM dispatch: freemem=1` と header 正常から invalid ではないことを確認。
-
-### 3-2. guest stack の push/pop 不釣合 (`fle_ov_getmem` / `fle_ov_freemem`)
-
-`--override` で置き換えた C 実装は `ott_dispatch` 前に偽 retaddr を 1 段 push する:
-
-```c
-R[4] -= 8; ST64(R[4], 0x409424ull);
-ott_dispatch(t_);        // callee の ret が 1 段 pop
-// -> guest の `call` が push した本来の retaddr は消費されない (8B 沈下)
-```
-
-lift 産物に `ST64/ST32/ST16/ST8/LD64` のワイルド宛先フックを一時実装 (work/ 内の診断 build) し、
-OOB の瞬間の R[RSP]/R[RBP]/regs/stack slot を全出しして実測:
-
-```
-[f413060] entry rcx=0x1159a970 ... ret0=0x670061006d0049   (ret0 が UTF-16 文字列!)
-[f413060-store] rbx=0x43000000000000 rax=0x11ef72b0 rsp=0x1159a8a0 rbp=0x1159a8a8
-```
-
-`rcx` は entry で有効な stack アドレスだったが store 時点の `rbx` は `0x43000000000000`。
-guest の `call 0x409410` (0x412c4b) → `f_412c20` の `pop rbx` が 8B 低い slot を読んだため。
-**`R[4] += 8` を dispatch 直後に追加して解決**。
-
-### 3-3. gen_boot.py のポインタ typedef 誤分割
-
-修正後の連鎖: unit#23 `0x457860` → `0x4149e0` → `0x4130c0` → `imp_SysAllocStringLen` (結果 nil)
-→ `f_412d10` → `0x4096d0` → `@Error` → `@RaiseExcept` → RaiseException(0xEEDFADE)。
-
-原因は `parse_shimx_h()` の typedef 正規表現が `typedef WCHAR* BSTR;` を
-`body='WCHAR* BST' / names='R'` と分割し `BSTR` が `ptr_names` に入らなかったこと。
-対象 22 typedef。修正後 `noproto` は 0、shimx.h 603 prototype の戻り値型未解決も 0。
-
-### 3-4. lift closure の重要性 (実測: closure 0 vs closure 2)
+### 3-2. lift closure の重要性 (closure 0 vs closure 2 の実測)
 
 | closure | 関数数 | unlifted callees | unit 進行 | 停止原因 |
 |---|--:|--:|--:|---|
 | 0 | 20,479 | 5,807 | 16 | unlifted 0x40fb40 |
 | 2 | 29,415 | 1,678 | **40** (39 完走) | unlifted 0x527b5b (fn 0x5274c0 の途中) |
 
-VMT harvest を「.pdata 開始点」から「.text を指す全 word」に広げると root が 6 万超
-(= 全域 lift, C が 700MB 超) で非実用的なため、関数途中の VMT スロットは
-**boot_roots.json への累積** (実行時に unlifted として発見) で対応する既存方式を維持した。
+### 3-3. (FLE-4) unit#209 の OOB 原因と NULL ページ guard
+
+`chk` variant の `fle_chk` が報告する `__LINE__` は **lift 生成 C の行番号** (= 1015940) で、
+これを辿ると **`0x8157c1: call qword ptr [rbx + 0x18]`** (仮想呼出)。`f_815050` の実測:
+`obj = *(0x15F6F78)` (VMT 0x666fa0 を持つ正常ヒープオブジェクト) だが **`obj->field_8 == 0**。
+`mov rbx,[rax]; call [rbx+0x18]` は **NULL 仮想呼出**になる。
+ネイティブ Windows では AV、wasm では linear address 0 の emscripten magic
+(`"emsc"` = 0x63736d65) を読んで `call [0x63736d7d]` で OOB。
+**前ラウンド報告の「文字列内容が @var として渡される型混同」は誤り** (訂正)。
+対策: `fle_boot.c` が初回 install 時に `[0, 0x1000)` を 0 埋めし、NULL 仮想呼出は
+`ott_unlifted(0)` → m11 と同じ icall-miss 規約 (ret 0) で継続。
+
+### 3-4. (FLE-4) unit#209 の次の blocker
+
+`unlifted 0x6a7b70` は `f_6a7f50` (unit 終了フック) が 0x15F4B80 に設定する **fill コールバック**。
+root 化すると `f_6c7900` の fill ループが未初期化幅 (0xffffa = 1,048,570 回) で暴走して
+ExitProcess となり **survey が成立しない**。boot_roots.json からは除外
+(unlifted で止める方が survey は functional)。根本対策はループ幅
+(`[rbp+0x48]-[rbp+0x40]`) が未初期化な理由の特定。
 
 ## 4. survey (942 unit 隔離) — baseline との unit 単位照合
 
@@ -188,32 +195,22 @@ native_fault 89 = 「baseline は fault / x64c は ok」= x64c 優位の unit �
 
 **`x-route_diff` が native_fault 89 の内訳**で、unit 級の差分として liftdiff の summary に混在する。
 
-### 4-3. unit#209 OOB の診断 (`chk` variant の `fle_chk` 出力)
-
-```
-[fle] bad guest address 0x63736d7d (fle_cpu.h line 1015940)
-[fle]   RSP=0x1157c0c8 ret=0x12d5b500
-[fle]   stack[+41] = 0x653963 (f_653660)   stack[+19] = 0x414f11 (f_414f20)
-[fle]   stack[+7]  = 0x4130b4 (f_413060)   stack[+63] = 0x412de9 (f_412e40)
-[fle]   regs: rax=0 rcx=0 rbx=0x63736d65 rbp=0x1157c0f8 rsi=0xc8 rdi=0xffffffff
-```
-
-`0x63736d7d` = ASCII `"usm}"`、`rbx=0x63736d65` = `"esme"` — **文字列内容がポインタとして
-使われている**。連鎖は `f_653660 → f_412e40 (@DynArrayClear 相当) → f_413060
-(_WStrSetLength 系) → f_412c20 (alloc) → ST64 [rbx]`。
-`f_653660` が文字列バッファを `@var` として渡している型混同の疑い (次ラウンドの課題)。
-
 ## 5. 未解決・限界 (実測ベース)
 
-1. **unit#209 の OOB が次の blocker** (chk variant で診断済み、§4-3)。
-   `f_653660 → f_412e40 → f_413060 → f_412c20` で文字列内容 (`0x63736d7d`) が
-   `@var` として渡される型混同。x64c 側の lift 誤りか guest の未初期化変数のいずれか。
-2. **残 1,684 unlifted callees** はほぼ VMT slot (実行時構成ポインタ) で、data リファレンスが 0。
-   boot_roots.json への累積 (109 → 110 本) と closure で 1 本ずつ減るが、根本解決には
-   「実行時に発見した VMT target を次ラウンドで root 化」の自動化が必要。
-3. `shimx_set_cs_null_ok(1)` の副作用: lock 依存 unit の survey 判定が実機とずれる可能性
-   (CRITICAL_SECTION が no-op になるため)。実測では survey は全分類で改善している。
-4. D12 (Delphi landing pad, 879 site) は未対応 (CAB-227 管轄)。
+1. **unit#209 の次の blocker は `unlifted 0x6a7b70`** (fill コールバック、§3)。root 化しても
+   `f_6c7900` の fill ループが未初期化幅 1,048,570 回で暴走 → ExitProcess となり
+   **survey が成立しなくなる**ため、boot_roots.json には追加していない。
+   根本対策は `f_6c7900` のループ幅 (`[rbp+0x48]-[rbp+0x40]`) が未初期化な理由の特定。
+2. **unit 進行 209 で横ばい**。前ラウンド目標の 250+ には未達。unit#209 以降は
+   上記 fill コールバックの lint が塞いでいる。
+3. **VMT slot の自動 root 化 (RTTI/COL walk) は非適用**: 対象 0x6a7b70 は `.pdata` 整齊の
+   実関数だが **image 内のあらゆるセクションに qword 参照を持たない** (実行時構築)。
+   `.text` 内の連続 .text 参照 (VMT メソッド配列) の scan も実装したが拾えず、
+   boot_roots.json への実行時累積が有効な手段と確認。
+4. **chk variant のビルド**: `fle_chk` は `fle_cpu.c` の `A_()` マクロから呼ばれるため
+   `fle_cpu.c` も `-DFLE_CHK` が必要 (boot_e2e.sh / build.sh で修正済み)。
+5. `shimx_set_cs_null_ok(1)` の副作用: lock 依存 unit の survey 判定が実機とずれる可能性
+   (CRITICAL_SECTION が no-op になるため)。実測 survey は FLE-3 末と同一値。
 
 ## 6. CAB-129/231 (RetDec route 修正) の x64c での要否
 
@@ -221,15 +218,14 @@ native_fault 89 = 「baseline は fault / x64c は ok」= x64c 優位の unit �
 x64c は `rep stosq` を正しく展開し定数折畳みを持たないため 8B alloca への潰れが発生し得ない。
 CAB-129 / CAB-231 の適用は x64c route では不要。D7/D10/D11 も x64c 非依存。
 
-## 7. 引継ぎ (CAB-101 / CAB-233 / 次担当)
+## 7. 引継ぎ (次ラウンド)
 
-1. **unit#209 の OOB (`f_816e80`)** を `chk` variant (`-DFLE_CHK`) で特定する
-   (`fle_chk` が RSP/RBP/regs/stack を出す)。lift 側なら x64c 修正、env 側なら stub 修正。
-2. **VMT slot の自動 root 化**: 実行時の unlifted target を boot_roots.json に自動累積する
-   (現状は手動/ループ)。あるいは `x64c.py` の `known` に「survey 中の dispatch 先」を
-   フィードバックする方式。
-3. `gen_mixed.py` の `x-route_diff 143` / `native_fault 89` を CAB-232/233 の本格採点に接続
-   (unit 級 row と関数級 row は `function.va` が同一 PE VA 空間なので混在可)。
+1. **unit#209 の次の blocker `unlifted 0x6a7b70`** — `f_6c7900` の fill ループ幅が
+   未初期化 (1,048,570 回暴走) な理由を特定する。root 化は survey を壊すので非推奨。
+2. **chk variant の `fle_chk` 活用** — `__LINE__` が lift 生成 C の行番号を指すので、
+   次に OOB/trap が出たときは同じ手順で即座に命令を特定できる。
+3. **verdict 混在** (`gen_mixed.py`) — unit 級 `x-route_diff 143` / `native_fault 89` を
+   CAB-232/233 の本格採点に接続 (両 target は同一 PE VA 空間)。
 
 ## 8. 再現
 

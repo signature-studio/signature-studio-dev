@@ -3,9 +3,8 @@
  "boot": {
   "rc": null,
   "threw": {
-   "cls": "oob",
-   "msg": "memory access out of bounds",
-   "stack": "RuntimeError: memory access out of bounds\n    at wasm://wasm/1e463ea2:wasm-function[10200]:0x1f95714\n    at wasm://wasm/1e463ea2:wasm-function[10201]:0x1f9a10e\n    at wasm://wasm/1e463ea2:wasm-function[10197]:0x1f8e87f\n    at wasm://wasm/1e463ea2:wasm-function[10149]:0x1f7814e\n    at wasm://wasm/1e463ea2:wasm-function[8748]:0x18bf039"
+   "cls": "unlifted",
+   "target": 6978416
   },
   "units_run": 209,
   "units_total": 942,
@@ -13,15 +12,15 @@
   "rax": "0x0",
   "longjmp": 0,
   "stage": 1,
-  "getmem": 1886,
+  "getmem": 1890,
   "freemem": 776,
   "va_calls": 20,
   "va_bytes": 15470544,
   "getproc": 88,
   "exit": 0,
   "cb_calls": 0,
-  "soft_calls": 63,
-  "soft_uniq": 20,
+  "soft_calls": 64,
+  "soft_uniq": 21,
   "mm_after": {
    "getmem": "0x407a50",
    "freemem": "0x407e20",
@@ -51,7 +50,8 @@
   "268447755:1",
   "268448099:1",
   "268448382:1",
-  "268437795:1"
+  "268437795:1",
+  "268437231:1"
  ],
  "notes": {
   "entry": "0x1376820",
