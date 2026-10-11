@@ -26,6 +26,8 @@ preflight: RULES_SHA=ff4999169333
 | `build_native.sh` `build_wasm.sh` `shim_e2e.sh` `shim_check.py` | native/wasm ビルド、1 コマンド e2e、合否判定 (`data/shim_results.json`) |
 | `test/` | `shim_selftest.c` (ABI/ローダ/stub)、`shim_ref.c` (実 DLL オラクル vs thunk)、`tramp_x86_64.c` (手書き asm: 本物の MS x64 呼出 → ブロック)、`ipp_shim_wasm.mjs` (golden 突合)、`shimx_glue_test.c`、`proto_check.c` |
 | `impl/README.md` | CAB-136 以降の実装追加契約 (置くだけで stub → 型付き thunk に自動切替) |
+| `verify_cab261_kernel.py` `test/verify_cab262_quirks.c` | **検収の独立再計算** (§13-8/§14-6): spike ログと数式モデルの突き合わせ (`work/resize/sw5.txt`・`sw7.txt` が必要・再生成コマンドは docstring) / quirk を実装を参照せず実 DLL だけで確認する probe |
+| `count_fill3.py` | CAB-262 の stub 充填の独立再計算 (nm ベース・実装側) |
 
 ## 2. 署名: 導出・確度・検算
 
@@ -201,7 +203,7 @@ CAB-136 時点の上位: `ippiResizeSqrPixel_8u_C1R/C3R/C4R` (143 モジュー�
 
 ## 13. CAB-262 (IPP-7 ipp-fill-3): 残 stub 次層 29 関数の静的優先順充填 (2026-10-11)
 
-**結論**: win 呼出モジュール数降順の上位 **29 関数** (すべて使用集合 239 内) を実装し **typed thunk 99 → 128** (stub 321 → 292)。`shim_e2e.sh` は **13 checks PASS** (S13 を新設、S1〜S11 維持)。オラクル (実 DLL vs 自前実装, **727 ケース / 297 ハッシュレコード**) で **status 格子 61 関数分すべて一致 (mismatch 0)**・wasm replay **297 レコード mismatch=0**。実装は `impl/ipp_sig_fill3.c` のみ (契約どおり `gen_shim.py` が自動 thunk 化)。**29 関数中 28 関数はデータも bit-exact**、1 関数 (`ippsVectorSlope_64f`) のみ ±1 ULP の既知残差 (§13-5)。
+**結論**: win 呼出モジュール数降順の上位 **29 関数** (すべて使用集合 239 内) を実装し **typed thunk 99 → 128** (stub 321 → 292)。`shim_e2e.sh` は **13 checks PASS** (S13 を新設、S1〜S11 維持)。オラクル (実 DLL vs 自前実装, **727 ケース / 297 ハッシュレコード**) で **status 不一致 0** (データ + エラー格子の 61 検証エントリすべて)・wasm replay **297 レコード mismatch=0**。実装は `impl/ipp_sig_fill3.c` のみ (契約どおり `gen_shim.py` が自動 thunk 化)。**オラクルでデータ比較したのは 29 関数のうち 28 関数** (`ippsCplxToReal_32fc` は未比較) で、そのうち **27 関数が byte 単位で bit-exact**、`ippsWinKaiser_32f_I` は許容差 (max abs err 2.444e-06)、`ippsVectorSlope_64f` は 9 ケース中 7 ケースが不一致 (§13-5)。検収の独立再計算は §13-8。
 
 ### 13-1. 実装関数と優先順根拠 (独立再計算: `python3 shim/count_fill3.py`)
 win_modules 降順 (data/ipp_matrix.csv)。全 29 関数が used239=True。
@@ -237,14 +239,14 @@ win_modules 降順 (data/ipp_matrix.csv)。全 29 関数が used239=True。
 ### 13-2. `ippsWinKaiser_32f_I` の実測式 (kaiser_fit.py / probe_u,probe_kap3,kap4)
 実測 (n, alpha) 全組合せ 140 点のフィット:
 - `beta = alpha·(len−1)/2`、`r_i = 2i/(len−1) − 1`、`w[i] = I0(beta·√(1−r²)) / I0(beta)`
-- **I0 は級数 60 項** (beta=37.5 まで必要。24 項だと 1.5e-03 の誤差)
-- **beta ≥ 38 では実 DLL が -39 を返し書込しない** (probe_kap3/kap4 で境界を実測: beta=38.0 は -39、37.975 は 0)
+- **I0 は級数 60 項** (beta=37.5 まで必要。24 項だと beta=30 で最大 2.6e-04・beta≈37.5 で最大 6.5e-03 の誤差 — 検収実測 `test/verify_cab262_quirks.c`)
+- **beta ≥ 38 では実 DLL が -39 を返し書込しない** (probe_kap3/kap4 で境界を実測: beta=38.0 は -39、37.975 は 0。検収が N=256 で 0.00005 刻みに細分: beta=37.995 は 0・38.001 は -39)
 - 典型値: len=16, alpha=2 → w[0]=2.944e-06, w[15]=0.9683 (実測と max abs err 2.4e-06)
 - self-check: `t ≤ 0` のとき `I0(0)/I0(beta)` を書く (0 ではなく — probe_kap5 で発見)
 
-### 13-3. エラー格子で確定した quirk (オラクル error grid、全 61 関数一致)
+### 13-3. エラー格子で確定した quirk (オラクル error grid、23 エントリ・254 点すべて一致)
 - **`ippsRealToCplx_32f`**: dst NULL → -8 が**最優先**、次に len<1 → -6。len≥1 では re/im の**片方 NULL はエラーにならず**その成分だけ書込 (書けない側は 0 充填)、両方 NULL のときだけ -8 (probe_q/r2c 実測)。
-- **`ippsAddProductC_32f`**: IPP は **double で乗算・加算してから float に丸める** (= `fmaf(val,src,dst)`)。float のままだと 1 ULP 差 (apcz fit で全 8 ケース確認)。
+- **`ippsAddProductC_32f`**: IPP は **double で乗算・加算してから float に丸める** (= `fmaf(val,src,dst)`)。float のままだと 1 ULP 差 (apcz fit で全 8 ケース確認。検収が 180 組合せで「モデル A (float 2 段丸め) と B (double 1 段丸め) が不一致になる 7 組合せ」を抽出 → DLL は **7/7 で B に一致**)
 - **`ippsRound_32f`**: round-half-**away**-from-zero。±0 は符号保存。`|結果| ≥ 2^31` では入力をそのまま返す (float はその域で全て整数値)。
 - **Interleave/Deinterleave**: nCh<1 → **-53** (ptr 検査より先)、pSrc NULL → -8、len<1 → -6、pDst NULL → -8。
 
@@ -254,14 +256,14 @@ SUM {"fns":61,"cases":727,"st_mis":0,"case_diff":7,"byte_diff":4757}
 dump records=297
 wasm replay: records=297 mismatch=0 -> PASS
 ```
-- 61 = 検証エントリ数 (29 実装関数 + エラー格子の追加検査 32)。`st_mis=0` が status 不一致 0。`case_diff=7` は §13-5 の VectorSlope_64f の 7 ケース。
+- 61 = 検証エントリ数 (**データ比較 38** エントリ + **エラー格子 23** エントリ)。データ比較 38 = case_diff 比較 37 行 + WinKaiser 許容差 1 行 (うち reorder 系 14 行は nch 別)。エラー格子 23 エントリ = 254 点。ケース数 727 = データ 473 + エラー格子 254。`st_mis=0` が status 不一致 0。`case_diff=7` は §13-5 の VectorSlope_64f の 7 ケース。
 - 再現: `bash shim/test/fill3_oracle_run.sh` (native + wasm replay)
 - 独立再計算: `python3 shim/count_fill3.py` (nm で実装シンボルを直接数えて data/ipp_sigs.json の impl 集合と照合、差 0 を assert)
 
 ### 13-5. 未解決 (起票先付き)
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `ippsVectorSlope_64f` が実 DLL と **±1 ULP** (80 要素中 24 要素 = 30%、絶対値は相対 1e-16 帯)。実 DLL は SIMD ブロック累積経路で値を生成していると推定されるが、block8/16/32 × mul/fma × 直接積の 14 通りを総当たりしてもどれも一致せず (work/fill7/vs*.c, vs4.txt)。`ippsVectorSlope_32f` も同種のブロック累積で bit 再現未解決 (REPORT §4)。 | 64f の厳密 bit 一致。FL の呼出は 49 モジュールだが音階生成用途のため 1 ULP の実害は限定的 (推定)。 | 本チケット §13-5 に記録。win カーネル逆アセ (CPU dispatch 込み) で解明する子チケットを提案 |
+| `ippsVectorSlope_64f` が実 DLL と bit 不一致 (オラクル 9 ケース L={1,2,3,7,16,17,33,1000,4097} の計 **5,176 要素中 4,757 要素 = 91.9%**。ULP 距離は大半が 1〜数 ULP だが n=4097 では最大 52 ULP、最大絶対差 5.912e-12・最大相対差 5.77e-15 を検収が実測。実装は `offset + (double)i*slope` の 1 行)。実 DLL は SIMD ブロック累積経路で値を生成していると推定されるが、block8/16/32 × mul/fma × 直接積の 14 通り (work/fill7/vs*.c, vs4.txt) および増分累積 (検収の B=1..64 総当たり) を試しても n=7 は一致するが n>=16 で不一致。`ippsVectorSlope_32f` も同種で bit 再現未解決 (REPORT §4)。 | 64f の厳密 bit 一致。相対 1e-15 帯で絶対値は 1e-12 以下、FL の呼出は 49 モジュールだが音階生成用途のため実害は限定的 (推定)。 | 本チケット §13-5 に記録。win カーネル逆アセ (CPU dispatch 込み) で解明する子チケットを提案 |
 
 ### 13-6. ネガティブコントロール (規則 41)
 `impl/ipp_sig_fill3.c` の `ippsAddProductC_32f` の `+1.0` を 1 行追加 → オラクルが検出:
@@ -274,7 +276,31 @@ wasm replay: records=297 mismatch=0 -> PASS
 ### 13-7. 残 stub (使用集合 239 中 130) と次タスク
 上位: `ippsExp_32f_I` (50)・`ippsSum_32f` (49)・`ippsSin_64f_A50` (49)・`ippsMulPack_32f` (49)・`ippsConvert_32f24s_Sfs` (49)・`ippsConvert_16s32f_Sfs` (49)・`ippsLn_32f_A11` (39)・`ippsLog10_32f_A11` (37)。`ippsSin_64f_A50` は実 DLL 自体が Segv するため要調査 (probe_k で n=1 でも Segv を実測)。
 
-| S13 | CAB-262 オラクル (実 DLL vs 自前実装, native + wasm replay): 次層 29 関数のデータ + エラー格子 61 関数分 | **727 ケース status 不一致 0**、wasm replay **297 レコード mismatch=0** (§13) |
+| S13 | CAB-262 オラクル (実 DLL vs 自前実装, native + wasm replay): 次層 29 関数のうち 28 関数のデータ + エラー格子 23 エントリ | **727 ケース status 不一致 0**、wasm replay **297 レコード mismatch=0** (§13) |
+
+### 13-8. 検収の独立再計算 (2026-10-11 検収 subagent・別アルゴリズム)
+
+本検収は SUBAGENT_RULES.md **RULES_SHA=ff4999169333** で着手。セッション中に同ファイルが更新 (RULES_SHA=**c8361d4dce5e**・「GitHub remote/worktree 出現時の対応」節の追加)。本検収はローカル flock コミットのみで remote/worktree 操作は行っていないため手順への影響なし。
+
+実装側の集計 (`count_fill3.py` = nm ベース) とは**別アルゴリズム**で再計算し、quirk は実装を参照しない独立 probe で確認した。
+
+| 検算した数値 | 独立再計算 (アルゴリズム) | 結果 |
+|---|---|---|
+| 型付き thunk 128 / stub 292 | (a) `gen/ipp_shim_tab.c` の `static void blk_` 定義を数える (b) `impl/*.c` `src/*.c` を正規表現で走査して `ipp*` 定義を数える (nm を使わない) | どちらも **128**、`ipp_sigs.json` の impl 集合と**完全一致**。stub = 420−128 = **292** |
+| 使用集合 239 中 stub 130 | `data/ipp_matrix.csv` の `used_win/used_mac_x86/used_mac_arm64` から使用集合を数え直す (ipp_sigs.json 側の集計と別ファイル) | 使用集合 **239** / うち impl 109 / stub **130** |
+| 29 関数・win_modules 総和 1,219 | `count_fill3.py` 出力をそのまま再実行 | **29 関数 / 総和 1,219** (上位 61,61,55,51,50,50… と一致) |
+| 727 ケース / status 不一致 0 | オラクルログの `cases=` と `errgrid=` を再集計 | データ 473 + エラー格子 254 = **727**、`st_mis=0`・各 errgrid `mismatch=0` |
+| 61 エントリの内訳 | ログの行を数える (データ 38 行 + エラー格子 23 行) | **38 + 23 = 61**。実装側の註記 (「29 実装関数 + エラー格子 32」) は誤りだったため本節で修正 |
+| bit-exact 関数数 | `case_diff=0` の行を集計 (byte 比較した関数のみ) | **27 関数が完全一致**。`ippsWinKaiser_32f_I` は許容差 (max abs err 2.444e-06・`case_diff` 未集計)、`ippsVectorSlope_64f` は 7/9 ケース不一致、`ippsCplxToReal_32fc` は**データ比較なし** (29 関数中 28 関数しかオラクルが触っていない) |
+| wasm replay 297 レコード mismatch=0 | `work/fill7/oracle_wasm.log` の最終行 | records=297 mismatch=0 → PASS |
+
+- quirk の裏取り (独立 probe `test/verify_cab262_quirks.c`、実装 (`impl/ipp_sig_fill3.c`) をリンクしない):
+  - `gcc -O1 -I ../../src -I ../../ref -o /tmp/vq test/verify_cab262_quirks.c ../../ref/pe_load.c -lm && /tmp/vq <DLL>`
+  - RealToCplx: `dst=NULL,len=0 → -8` / `dst=NULL,len=-1 → -8` / `dst=ok,len=0 → -6` / `re=NULL,len=4 → 0 (im 書込のみ)` / `im=NULL,len=4 → 0 (re 書込のみ)` / `両NULL,len=4 → -8` → §13-3 の優先順 (dst NULL 最優先) を確認
+  - AddProductC: 判別入力 180 組合せのうち「float 2 段丸め ≠ double 1 段丸め」が 7 組合せ → DLL は **7/7 で double 側** (float 側 0) に一致
+  - Round_32f: 0.5→1, −0.5→−1, 1.5→2, −1.5→−2, 2.5→3, −2.5→−3, 3.5→4, −3.5→−4 (half-away)、±0 は符号保存、|x|≥2^31 は入力をそのまま返す
+  - WinKaiser: I0 級数を 20〜80 項で当てると beta≈30 では 24 項 2.6e-04 vs 60 項 8.3e-07、beta≈37.5 では 24 項 6.5e-03 vs 60 項 2.0e-06 → **60 項が必要**。beta 境界を N=256・a を 0.00005 刻みで走査: beta=37.995 は status 0・38.001 は −39
+- ネガティブコントロール: §13-6 の `+1.0` を `work/negc262/` のコピーに適用 → `SUM {"fns":61,"cases":727,"st_mis":0,"case_diff":16,"byte_diff":9933}` (AddProductC 行 `case_diff=9 byte_diff=5176`) を再現。
 
 ## 14. CAB-261 (IPP-6): interp 5/7 (CUBIC2P 系) カーネル再現 — it5 は 3 次 B-スプラインで解決、it7 は spike 行列を記録 (2026-10-11)
 
@@ -321,3 +347,14 @@ it=5 の 4 タップ正規化重みの `w[0] += 0.02; w[3] -= 0.02` (1 行) を�
 - `impl/ipp_resize.c`: `ker_bspl3` + `mode 35` (interp_base(5)=35、`interp_base(6/7)=4` は従来どおり)
 - `test/sp57.c` (新規, スパイク採取) / `test/sweep2.c` (新規, 位相スイープ)
 - `shim/REPORT.md` 本节。spike 行列・フィット過程物は `work/resize/` (gitignore)
+
+### 14-6. 検収の独立再計算 (2026-10-11 検収 subagent・別アルゴリズム)
+
+実装 (impl) を一切リンクせず、実 DLL の spike ログ (`work/resize/sw5.txt`・`sw7.txt`) と数式モデルを突き合わせた。再現: `python3 shim/verify_cab261_kernel.py` (ログは `./work/resize/sweep2 <it> > work/resize/sw<it>.txt` で再生成可)。
+
+| 検算した数値 | 独立再計算 | 結果 |
+|---|---|---|
+| it=5 = 3 次 B-スプライン・64/64 位相一致 | `sw5.txt` の位相 64 点 × 4 タップを `px = (dst_x + 0.5 − sx) − srcRoi.x − 0.5`、`w_t = bspl3(px − k)`、`round(255·(5/6)·w_t)` と比較 | **256 点不一致 0** → §14-2 の「64/64 位相」「ゲイン 255·5/6=212.5」を確認 |
+| it=7 の未正規化重み 195,189,173,151,123,94,65,39,19,6,0 | `sw7.txt` の dst_x=6・位相 0,8,16,…,56 のタップ値から距離 d=0,0.125,…,1.125 の重みを抽出 | 表と**全数一致**。正規化ピーク 195/233=0.8369・189/234=0.8077・173/238=0.7269・151/245=0.6163・123/246=0.5 も一致。サポート: 位相 13 の tap4 (距離 1.203125) が最後の非ゼロ → **|d| ≤ 1.2031** を確認 |
+| closed form 不確定 | 11 点の表に対して `(1−d²/R²)^p` と 3 次多項式を min-max / 最小二乗で当てる | min-max 最適 (R=1.483, p=3.81) でも max err **8.9e-03**、3 次多項式で 6.3e-03 (=255 換算 ~1.6)。closed form での bit 再現不可を確認 (最適パラメータは当時の fit とは異なるが誤差の位数は一致) |
+| 14.541% → 0.021% | `work/negc261/` のコピーで `interp_base(5)` を 35 → 4 (bspl3 を cubic に戻す) にしてオラクル再実行 | `it5: px=754704 pxdiff=109741 (14.541%)` を**再現**。SUM も `byte_diff=329978` (破壊前 220396)。§14-3b の `w[0] += 0.02; w[3] -= 0.02` についても同じ方法で `pxdiff=91175 (12.081%)`・`byte_diff=311412` を再現 |
