@@ -284,7 +284,7 @@ CAB-215 の主眼 (writeEntry ↔ 実機比較) は **ini セクション経由�
 
 - **範囲内**: 生成 → pathreg 経路 → wvfs 書込 → 読み戻し → FL reader 模型 (`fle:0x910cd0` 準拠) + tools/flp 独立パーサでの受理・往復・仮想 FS 永続・vreg seed とのパス整合。
 - **範囲外 (未実行)**: ① **lift 済み FL の PluginManager 経路 (`fle:0x910cd0` / `0xaba430`) に生成 DB を読ませる実行検証** — boot 貫通後 (CAB-252 [FLE-2] x64c M11 boot chain) に段階分離して実施する (本節の「受理 50/50」は reader **模型**の判定であり FL 実物の判定ではない)。② Fruity Wrapper が生成 `.fst` を読んで VST2/VST3 を起動できるか (§6-2 / H10)。③ `ps_file_filename` の実バイナリ存在 (モジュール本体は asset VFS / H4 スタブ側)。④ 32bit・AU・CLAP 系 (本 spec 集合に無し)。⑤ Firefox/Safari (OPFS SyncAccessHandle 非対応)。
-- **クリーン HEAD**: 本節の数値は `b8e762d` 以降の本チケットのコミット (下記) から再現。起点は preflight 出力の HEAD=`b8e762d`。
+- **クリーン HEAD**: 本節の数値は commit `4b162ce` (`feat(nfo): generate db to virtual fs (CAB-216)`) から再現。検証方法: ① コミット済み HEAD の実ディレクトリで `bash h4_e2e.sh` (3 回連続 PASS) ② `git archive HEAD` のスナップショット (`work/verify_4b162ce/`、物置に symlink で node_modules を接続) では **node 側 5 段 + 独立再計算は全 PASS、Chrome フェーズのみ `report timeout`** (spawn-server の URL 解決が入れ子 `work/verify_*/` パスで失敗するハーネス側の事象。実ディレクトリでは 3 回連続で PASS)。③ 既存 `nfo_e2e.sh` にも exit 0 で通る。
 
 ### 13.7 規約・注意
 
