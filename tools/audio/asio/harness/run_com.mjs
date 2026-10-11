@@ -1,12 +1,17 @@
 // CAB-97 シナリオランナー: 1 つの headless Chrome で COM 経由の全シナリオを実行し判定する。
-// 使い方: node harness/run_com.mjs [--quick] [--only name,name] [--out work/results_com.json]
-// chrome 駆動は既存 tools/audio/harness/chrome.mjs を流用 (読取専用の参照利用)。
+// 使い方: node harness/run_com.mjs [--quick] [--only name,name] [--soak <秒>] [--out work/results_com.json]
+//   --soak <秒> : soak シナリオの秒数 (既定 120)。短縮確認は --soak 10 / --quick では soak 自体を実行しない。
+//   chrome 駆動は既存 tools/audio/harness/chrome.mjs を流用 (読取専用の参照利用)。
 import { withChrome } from "../../harness/chrome.mjs";
 import path from "node:path"; import fs from "node:fs"; import { fileURLToPath } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
 const quick = args.includes("--quick");
 const only = args.includes("--only") ? args[args.indexOf("--only") + 1].split(",") : null;
+const soakSecsRaw = args.includes("--soak") ? +args[args.indexOf("--soak") + 1] : 120;
+// 0 は「実質 soak なし」= ネガティブコントロール用に許容 (e2e gate が FAIL を検出する)。負値・非数は用法エラー。
+if (!Number.isFinite(soakSecsRaw) || soakSecsRaw < 0) { console.error("--soak には 0 以上の秒数が必要です"); process.exit(2); }
+const soakSecs = soakSecsRaw;
 const outFile = args.includes("--out") ? args[args.indexOf("--out") + 1] : path.join(here, "../work/results_com.json");
 const secs = (n) => (quick ? Math.min(n, 3) : n);
 
@@ -41,6 +46,11 @@ const reportedOk = (r) => {
   if (rep.lat_out <= 0) probs.push(`lat_out=${rep.lat_out}`);
   return [probs.length === 0, probs.length ? "報告値: " + probs.join(", ") : `getChannels 2/2, getBufferSize 0x100/0x1000/gran0, type 0x13, lat_out=${rep.lat_out}f`];
 };
+const rampExact = (r) => [r.verify?.ramp && r.verify.ramp.mismatches === 0 && r.verify.ramp.frames_checked > 0, `ramp ${r.verify?.ramp?.mismatches}/${r.verify?.ramp?.frames_checked}`];
+// bufferSwitchTimeInfo: FL が kAsioSupportsTimeInfo=1 を受けるので本体はこの経路。位置単調・sr 一致 (bad=0)。
+// flasio 内部の timeinfo_cb と host mock の呼出数の差は Stop 直後の 1 通し分のずれまで許容 (親 e2e と同基準)。
+const timeinfoOk = (r) => [r.timeinfo && r.timeinfo.bad === 0 && r.timeinfo.calls > 0 && Math.abs(r.timeinfo.calls - r.stats.timeinfo_cb) <= 16,
+  `bufferSwitchTimeInfo ${r.timeinfo?.calls} calls bad=${r.timeinfo?.bad} (flasio timeinfo_cb=${r.stats?.timeinfo_cb})`];
 
 const scenarios = [
   { name: "com_ramp_b256_d2", q: `mode=ramp&buf=256&secs=${secs(5)}`,
@@ -56,6 +66,23 @@ const scenarios = [
       const a3 = s && s.max_abs_err < 1e-5 && s.zero_runs_ge16 === 0;
       return [a1 && a2 && a3, [m1, m2, `sine maxErr=${s ? s.max_abs_err.toExponential(2) : "n/a"} rms=${s ? s.rms?.toFixed(4) : "-"}`].join("; ")]; } },
 ];
+
+// COM 経由 soak (CAB-270 / CAB-97 完了条件): CoCreateInstance → IASIO 19 メソッド通しで既定 120 秒。
+// 親 e2e の asio_ramp_b256_soak120 (flasio_* 直接経路) と同一のランプ基準 + COM 面・bufferSwitchTimeInfo 照合。
+// --quick では実行しない (親 e2e 規約)。--soak N で秒数変更 (短縮確認用)。
+// 合格条件 = underrun 0 / silence 0 / ramp bit-exact / timeinfo bad 0 / 実フレーム数 ≥ 公称の 99% / COM 面一致。
+if (!quick) {
+  const soakCover = (r) => {
+    const want = soakSecs * (r.ctx?.sampleRate ?? r.sr ?? 48000) * 0.99;
+    const covered = r.verify?.ramp?.frames_checked ?? 0;
+    return [covered >= want && covered > 0, `soak 実フレーム ${covered}f ≥ 公称 ${soakSecs}s の 99% (${Math.floor(want)}f)`];
+  };
+  scenarios.push({ name: `com_soak${soakSecs}_b256`, q: `mode=ramp&buf=256&secs=${soakSecs}`, soak: soakSecs,
+    expect: (r) => {
+      const rs = [comOk(r), underrunFree(r), reportedOk(r), rampExact(r), timeinfoOk(r), soakCover(r)];
+      return [rs.every((x) => x[0]), rs.map((x) => x[1]).join("; ")];
+    } });
+}
 
 const sel = scenarios.filter((s) => !only || only.includes(s.name));
 const results = [];

@@ -49,7 +49,10 @@ typedef struct PathRegPaths {
 } PathRegPaths;
 
 /* マウント表の操作 (全て大小無視の最長一致)。pathreg_set_paths は表を再構築し、
- * 以降の add_mount は追加 (呼び出し順で後勝ちではなく「最長一致優先・同長は後勝ち」)。戻り 0=OK / -1=引数不正・満杯 */
+ * 以降の add_mount は追加 (呼び出し順で後勝ちではなく「最長一致優先・同長は後勝ち」)。戻り 0=OK / -1=引数不正・満杯
+ * 注意 (CAB-271): pathreg_set_paths() は「明示設定」。実行以降は既定マウント表の遅延ロードは起こらない
+ * (旧実装では set_paths 直後の初回 pathreg_map() が既定表を作り直して上書きしていた)。
+ * 既定表を使いたい経路は set_paths を一度も呼ばないこと (そのときだけ遅延ロードされる)。 */
 void pathreg_paths_init(PathRegPaths* p);                 /* p を既定値で埋める */
 int  pathreg_set_paths(const PathRegPaths* p);            /* 既定マウント表を p 由来で再構築 */
 int  pathreg_add_mount(const char* winPrefix, const char* vfsTarget, uint32_t flags);

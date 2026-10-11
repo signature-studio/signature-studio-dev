@@ -1,11 +1,13 @@
-/* CAB-262 (IPP-7 ipp-fill-3): 残 stub 次層 — win 呼出モジュール数降順の静的優先順で 12 関数を実装。
+/* CAB-262 (IPP-7 ipp-fill-3): 残 stub 次層 — win 呼出モジュール数降順の静的優先順で 29 関数を実装。
    契約: ../impl/README.md — 宣言は ../gen/ipp_proto.h と一致 (コンパイラが署名検査)。
    引数順序・数式の根拠: 実 win64 dsp_ippv2_x64.dll を pe_load ネイティブ実行した probe (work/fill7/probe_*.c)
    とオラクル (test/fill3_oracle.c) の実測。
 
    1. ippsRealToCplx_32f / ippsCplxToReal_32fc (61 モジュール)
-      — 舞台裏の interleave/deinterleave。RealToCplx は「len 検査が NULL 検査より先」という
-        実 DLL の顺序 quirk を持つ (len<1 → -6, それ以外で ptr NULL → -8)。
+      — 舞台裏の interleave/deinterleave。RealToCplx は「dst NULL → -8 が最優先、次に
+        len<1 → -6」という実 DLL の順序 quirk を持ち、len>=1 では re/im の片方 NULL は
+        エラーにならずその成分だけ書込する (書けない側は 0 充填)。両方 NULL のときだけ -8
+        (実装先頭の ippsRealToCplx_32f コメントと test/fill3_oracle.c の err_grid_r2c = 32 点で実測)。
       CplxToReal は通常順 (NULL → -8, len → -6)。
       出力は Ipp32fc = {re, im} の 8 バイト値をそのまま (GPR ではなく *pDst 書込)。
    2. ippsCopy_8u (55) / ippsZero_32s (51) / ippsCopy_64s (19) / ippsZero_64s (14)
@@ -304,9 +306,10 @@ IppStatus ippsDeinterleave_16s(const Ipp16s *pSrc, int nChannels, int len, Ipp16
 /* 実測 (work/fill7/probe_u → kaiser_fit.py):
      beta = alpha*(len-1)/2,  r_i = 2i/(len-1) - 1
      w[i] = I0(beta*sqrt(1-r^2)) / I0(beta)
-   I0 は級数 (項数は beta<=37.5 で 24 項あれば単精度飽和)。
-   beta >= 38 では実 DLL が -39 (ippStsNotSupportedMode) を返し書込なし (probe_kap3/kap4 実測)。
-   実測精度: float 出力で max abs err 3.4e-07 (I0 級数の打ち切り誤差) — bit-exact ではない。 */
+   I0 は級数 60 項が必要 (検証: 24 項だと beta=30 で最大 2.6e-04、beta≈37.5 で 6.5e-03 の
+   誤差になり実 DLL と合わない。60 項なら 3e-06 以下)。beta >= 38 では実 DLL が -39
+   (ippStsNotSupportedMode) を返し書込なし (境界を実測: beta=37.995 は 0、38.001 は -39)。
+   実測精度: float 出力で max abs err 2.4e-06 (I0 級数の打ち切り誤差) — bit-exact ではない。 */
 static double bessel_i0(double x) {
   double h = x * x / 4.0, s = 1.0, t = 1.0;
   for (int k = 1; k < 60; k++) { t *= h / ((double)k * (double)k); s += t; }

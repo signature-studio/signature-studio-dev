@@ -226,6 +226,8 @@ def main():
     if a.cov:
         out['cov'] = {'insn': sorted(insn), 'calltgt': sorted(calltgt), 'per_scen': per_scen}
     json.dump(out, open(a.out, 'w'))
+    if a.cov:
+        json.dump(out['cov'], open(a.cov, 'w'))   # lift 入力用に coverage 単体でも出力
     print('[entry_nat] wrote %s (%d scenarios)' % (a.out, len(results)))
 
 

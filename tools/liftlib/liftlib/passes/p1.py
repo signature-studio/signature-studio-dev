@@ -11,6 +11,7 @@ RetDec は `comisd/ucomisd/comiss/ucomiss` を `call void @__asm_*comis*(a, b)` 
   - br が無い (dropped) 場合は機械語の脱落側断片を mini-lifter で IR 化して分岐を再構成
 する。解釈不能な形は `unsupported` として報告する (黙って変えない)。
 """
+import os
 import re
 
 from .. import ir as IR
@@ -360,6 +361,21 @@ class Region:
         return a in self._domreg.get(b, ())
 
     def _value_ok(self, name, use_va):
+        # ablation (SUBAGENT_RULES 規則 41): LL_NO_VDB_DOM=1 で LIFTLIB-4 の vdb ベース
+        # 領域値支配判定を止め, LIFTLIB-3 迄の「名前に埋めた VA を def VA と誤認」に戻す。
+        if os.environ.get("LL_NO_VDB_DOM") and P1R_NAME.match(name):
+            m = P1R_NAME.match(name)
+            if m.group(2) == self.salt:
+                try:
+                    dva = int(m.group(1), 16)
+                except ValueError:
+                    return False
+                u = use_va if use_va is not None else self.cur_va
+                if u is None:
+                    return True
+                db, ub = self.mf.block_of(dva), self.mf.block_of(u)
+                return db == ub or self._dom_region(db, ub)
+            return False
         """IR 値 name が use_va の地点から合法に参照できるか (支配の確認)。
 
         LIFTLIB-4: 領域値 (`%p1r_…`) の支配判定を修正した。従来は名前に埋めた VA

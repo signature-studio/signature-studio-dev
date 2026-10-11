@@ -1,10 +1,18 @@
 #!/usr/bin/env bash
-# 1 コマンド検収 (CAB-97): node check (COM 面静的検証) → headless Chrome で FLEngine 呼出を模した実行。
-# 使い方: bash tools/audio/asio/e2e.sh [--quick]    終了コード 0 = 全 PASS
-#   --quick : Chrome シナリオを各 3 秒に短縮 (既定 5 秒)
+# 1 コマンド検収 (CAB-97 / CAB-270): node check (COM 面静的検証) → headless Chrome で FLEngine 呼出を模した実行。
+# 使い方: bash tools/audio/asio/e2e.sh [--quick] [--soak <秒>]    終了コード 0 = 全 PASS
+#   --quick   : Chrome シナリオを各 3 秒に短縮 (既定 5 秒)。soak シナリオは実行しない (親 e2e 規約)
+#   --soak <秒> : soak シナリオ (com_soak<秒>_b256) の秒数 (既定 120 = CAB-97 完了条件)
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
-QUICK=0; [ "${1:-}" = "--quick" ] && QUICK=1
+QUICK=0; SOAK=""
+for a in "$@"; do
+  case "$a" in
+    --quick) QUICK=1 ;;
+    --soak=*) SOAK="${a#--soak=}" ;;
+    *) echo "unknown option: $a (see --help)" >&2; exit 2 ;;
+  esac
+done
 export PATH="/home/ubuntu/.local/share/pnpm/bin:$PATH"
 command -v node >/dev/null || { echo "node not found" >&2; exit 1; }
 
@@ -19,4 +27,5 @@ if (bad.length) { for (const c of bad) console.error(`  FAIL ${c.name}: got=${c.
 ' "$HERE/work/node_check.json"
 
 echo "[iasio] 2/2 headless Chrome (FLEngine 呼出を模した全経路)"
-node "$HERE/harness/run_com.mjs" $([ "$QUICK" = 1 ] && echo --quick) --out "$HERE/work/results_com.json"
+SOAK_ARGS=(); [ -n "$SOAK" ] && SOAK_ARGS=(--soak "$SOAK")
+node "$HERE/harness/run_com.mjs" $([ "$QUICK" = 1 ] && echo --quick) "${SOAK_ARGS[@]}" --out "$HERE/work/results_com.json"
