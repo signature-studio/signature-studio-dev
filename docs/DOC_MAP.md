@@ -48,6 +48,8 @@
 
 ## 3. REPORT.md 索引
 
+`tools/misc/` は `loader_smoke.mjs` のみでドキュメントが無いため**索引対象外**。
+
 ### 全体・デプロイ
 
 | パス | 行数目安 | 何が書かれているか |
@@ -59,7 +61,7 @@
 | `tools/e2e/REPORT.md` | ~120 | ブラウザ E2E ハーネスと配信構成の実測 |
 | `tools/hosting/REPORT.md` | ~135 | 既定ホスト名だけで COOP/COEP を成立させる配信構成 (案 S の根拠) |
 | `tools/perf/REPORT.md` | ~150 | wasm 実時間性能・compile 時間・巨大 wasm 実験 |
-| `tools/perf/PERF.md` | ~150 | 性能の設計メモ・読み替え注記 |
+| `tools/perf/PERF.md` | ~150 | 性能の設計メモ (bit-exact 版の実測は `tools/perf/REPORT.md` §2.1・完走路の正本は `tools/ott/REPORT.md`) |
 
 ### 解析・lift 基盤
 
@@ -125,7 +127,7 @@
 | `tools/hostbridge/REPORT.md` | ~95 | Fruity Wrapper の VST2 ロード経路解析 + wasm 同梱プラグイン表 |
 | `tools/hostbridge/cb/REPORT.md` | ~145 | shimx R2 コールバック変換の実体接続 |
 | `tools/hostbridge/h2/REPORT.md` | ~150 | hostbridge surrogate の駆動と ott_run 接続 |
-| `tools/hostbridge/lowbase/REPORT.md` | ~125 | VA 敷設 base 可変化 |
+| `tools/hostbridge/lowbase/REPORT.md` | ~125 | VA 敷設 base 可変化 (+ `x64c/` に x64c ラッパ 3 本目: `x64c/lb_x64c.py` は `tools/ott/lift/x64c.py` を無改変 import) |
 | `tools/hostbridge/nfo/REPORT.md` | ~375 | Plugin database (`.nfo`/`.fst`) 書式解読 + 合成 DB 生成器 |
 | `tools/gui/REPORT.md` | ~100 | gui-shim (Win32 user32/gdi32 → OffscreenCanvas) |
 | `tools/audio/REPORT.md` | ~100 | ASIO/WASAPI/DirectSound → AudioWorklet + SAB リング |

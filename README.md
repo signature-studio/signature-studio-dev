@@ -15,12 +15,13 @@ FL Studio 26.1.7 をブラウザ (wasm) 上で完全に動作させるプロジ�
 
 docs 索引・各ファイルの責務・行数上限ルールは **[`docs/DOC_MAP.md`](docs/DOC_MAP.md) が正本**。
 正史は `docs/` に集約している (`ARCHITECTURE` / `STATUS` / `DECISIONS` / `WORKFLOW` /
-`REFERENCES` / `DOC_MAP` / `DEFECTS` / `LEGAL` / `HANDOFF/`)。エージェント規約は
+`REFERENCES` / `DOC_MAP` / `DEFECTS` / `LEGAL` / `pm/` / `HANDOFF/`)。エージェント規約は
 [`AGENTS.md`](AGENTS.md) (要約) と [`docs/WORKFLOW.md`](docs/WORKFLOW.md) (運用の詳細)。
 
-## tools 索引 (37 サブシステム)
+## tools 索引
 
-測定値・実測は各 `REPORT.md` が単一の正本。索引は [`docs/DOC_MAP.md`](docs/DOC_MAP.md)。
+tools 直下は **33 dir** (下表は下位 dir を含め 51 名を列挙)。測定値・実測は各 `REPORT.md` が単一の正本。
+索引は [`docs/DOC_MAP.md`](docs/DOC_MAP.md)。
 
 | 系統 | ディレクトリ | 正本 |
 |---|---|---|
@@ -33,6 +34,8 @@ docs 索引・各ファイルの責務・行数上限ルールは **[`docs/DOC_M
 | 共通 | `python`,`flp`,`shared`,`ipp`(+`shim`,`shim/fft`)・`plugins`(+`framework`,`p0c`) | 各 `REPORT.md`・`tools/plugins/ABI.md` |
 | ターゲット | `targets/{serum2,massivex,kilohearts,freshair}` とその下位 dir | 各 `targets/*/REPORT.md` |
 | 検証/配信 | `e2e`,`hosting`,`deploy`,`perf` | `tools/e2e/REPORT.md`・`deploy/README.md` |
+
+`tools/misc/` (`loader_smoke.mjs` のみ・ドキュメント無し) は**索引対象外**。
 
 ## 開発
 
