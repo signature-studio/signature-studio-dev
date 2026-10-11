@@ -2,7 +2,8 @@
 
 - preflight: RULES_SHA=ae9c6d414f7d (SUBAGENT_RULES.md 読了の証跡)
 - 検収起点 commit: **9b420bd** (`tools/plugins/framework` ツリーは b8e762d と同一: `git diff b8e762d HEAD -- tools/plugins/` = 0 行)
-- 行数目安: 実装部 (§0-§9) 187 行 + 検収記録 (§10-§11) 105 行 = 292 行。検収記録は規則 37〜42
+- 行数目安: 実装部 (§0-§9) 187 行 + 検収記録 (§10-§11) 105 行 + CAB-194 検収 (§12) 78 行 = 370 行
+  (実ファイル 378 行)。検収記録は規則 37〜42
   (独立再計算・ネガティブコントロール・検証範囲・起票先つき未解決) の必須項目を含むため 200 行上限を
   超過。超過分は判明している誤記の訂正と実測値の記録に使った部分 (圧縮済み)。
 - 日付: 2026-10-11 / 担当 dir: `tools/plugins/framework/` (hostshim/) / 再現: `bash tools/plugins/framework/hostshim/hs_e2e.sh`
@@ -292,3 +293,87 @@ git 管理外成果物。
 - 素材 (読取のみ): `analysis/win64/extracted/block18983_PE.bin` (Balance)・
   `block00031_PE.bin` (FLEngine, VMT 照合)
 - 中間産物: `tools/plugins/work/hs/` (gitignore, ~360 MB)
+
+---
+
+## 12. 検収記録 — CAB-194 (77cde78) (2026-10-11 / 起点 commit 85424b0)
+
+- preflight: RULES_SHA=ff4999169333 / 既知類型との関係: **該当 D7 (stack 引数・戻り値)・
+  D15 相当 (間接 call の保存率) と該当なし (alloca 縮退は DEFECTS.md 未登録で本節で再記録)**
+- 範囲: 77cde78 は **22 ファイル 3,465 行すべて `tools/plugins/framework`** (他 dir 0 行)。
+  commit 内最大 blob = 350,589 B = 0.33 MiB (20 MiB ライン未満)。`git status` は担当外 WIP
+  59 件 (framework 内 0・混入なし)。stage-2 のビルド鎖 (fw_stage2.sh/fw_table.py/fw_ovpass.py)
+  は**未修正** (CAB-196 稼働中のため)。訂正は本 REPORT の記述のみ。
+
+### 12.1 e2e 独立再現 (規則 45: `git archive 77cde78` の別ツリー + stage-1 成果物)
+
+`fw_route.cjs` は work/fw の **02:11 bake** (CAB-194 vintage: FAIL-FAST 文字列を内包) で
+あることを `strings` で確認 (`soft-miss` 0 件 / `FAIL-FAST` 3 件)。加えて **194 commit から
+`git archive` した別ツリー + stage-1 成果物のハードリンク**で再ビルドし独立再現した。
+
+| 経路 | 実測 | 判定 |
+|---|---|---|
+| `node fw_run.mjs ../work/fw/fw_image.bin ../work/fw/fw_route.cjs` ×3 | exit 0 / **dispatch=38 units_done=0 va=1 heap=1 ff=0** (264 ms / 373 ms / 412 ms) | **PASS** (CAB-194 §3 と一致) |
+| 194 再ビルド (09:18-09:51) の smoke ×3 | exit 0 / dispatch=38 ff=0 / wasm **14,828,623 B** | **PASS** |
+
+unit init 16 / finalize 16 は smoke log の `site=0x40dae6` 16 行・`site=0x40da42` 16 行で
+実測 (残り 5 dispatch は trace 件数上限で非表示 = counter 38 − trace 33 行)。
+**PackageInfo = 290** は count field (`0x6c1430` u32 = 290)・テーブル終端ポインタ
+(`0x6c2680`)・`(end-tab)/16 = 290` の 3 点照合。ただし init≠0 のエントリは **289**
+(entry 289 は init=0)。unit[0].init=0x4198b0 = 報告どおり。
+
+### 12.2 独立再計算 (別アルゴリズム: `work/vfy194/fw_194_recount.py` / `smoke_check.py`)
+
+| # | 主張 | 独立再計算 | 一致 |
+|---|---|---|---|
+| ① | 14,037 関数 / 1.61 MB lift | F.ranges **11,736** エントリ・合計 **1,626,299 B = 1.55 MiB**、`fw_all.restored.ll` define **14,037** | 関数数 一致 / サイズ 1.55 MiB (報告の 1.61 は誤差) |
+| ①' | wasm 14.8 MB | 14,874,162 B (14.19 MiB) = 14.87 MB | 一致 (MB = decimal) |
+| ② | icall 6,159 site 全復元 | PE sites 6,159 → 最終 IR unique dispatch **5,525** / 未復元 **635 = 10.3%**。未変換 stub refs は各 chunk 1 件 (=stub 宣言行・site ではない) | **不一致 → 訂正** |
+| ③ | alloca 縮退 2 関数 (43ecb0/51c2d0) 392 B | `rep_stosq_memset(…, 49)` サイト = 49×8 = **392 B** がちょうど 2 関数 (43ecb0/51c2d0)。修復後 `alloca [49 x i64]` = 392 B | **一致** |
+| ④ | fw_entry_fix.py の home slot 修復 | entry_fix.json = `r8_fixed 1 / r9_fixed 1` (VA 0x6c13a0→call 0x4189c0)。native (`fw_icall.dll`, capstone) で `mov [rip-0x2349bd], r8` / `mov [rip-0x2349bc], r9` の spill を確認 | **一致** |
+| ⑤ | sigfix 7,058 site | 同条件で再実行: `arity_fixed 7,443 / type_only 26,654 / ret_fixed 4,578` (fw_sigfix.py docstring の 8.3k/4.6k と同傾向) | **不一致 → 訂正** (7,058 は本 commit から再現不可) |
+| ⑥ | 前回残骸 (fw_prep/fw_merge/fw_lift.sh) 引継ぎ | 3 資産は実行済み・成果物あり (fw_map nfuncs 11,736 / nsites 6,159 / nderef 12,658 / ncomis 630 / errors 0)。F.ranges も 11,736 で一致し再 lift 不要は妥当 | **妥当** |
+
+### 12.3 再ビルドで判明したビルド鎖の不備 (記録のみ・**未修正**)
+
+194 commit の `fw_stage2.sh` を空ディレクトリ (stage-1 のみハードリンク) で完走させると
+**4 か所で停止**する (Δのうち S1-S3 は CAB-194 由来・S4 は CAB-195 由来と推定):
+
+- **S1** `fw_boot.c` が W に無い (`cp` は fw_rt.h/fw_rt.c のみ) → emcc が input 無しで失敗
+- **S2** ymm dominance 修正の `uid` がリセットされ `ceclone1` が `function_4076b0` 内で
+  二重定義 → clang `multiple definition of local value named 'ceclone1'`
+- **S3** `fw_ovpass.py` が幅広戻り型 (i128: `function_40e0b0`) に `trunc i64` を生成 →
+  clang `invalid cast opcode for cast from 'i64' to 'i128'`
+- **S4** `fw_fldenv` の declare が欠落 (`__asm_fldenv__vg224` の rename 後) →
+  clang `use of undefined value '@fw_fldenv'`
+
+⇒ **共有 work/fw の canon 系成果物はコミット済み `fw_stage2.sh` の順序・正規化では再現できない**
+(共有 canon3 は `__asm_vmovaps__vyy` → `store i256` 変換と `fw_fldenv` declare を持つ)。
+本検収では sandbox 内だけで S1-S4 を回避して smoke を再現した。**修正は CAB-196 側の判断**
+(本節は記録のみ。fw_stage2.sh / fw_ovpass.py は未変更)。
+
+### 12.4 検証範囲 / 範囲外
+
+検証: commit 範囲・blob / smoke 3 回再現 (+194 再ビルド smoke 3 回) / 上記 6 項目の独立
+再計算 / PackageInfo・icall 集合・alloca・capstone 突合 / hostshim 側 `hs_ids_recount.py` と
+`hs_vtable_verify.py` の再実行 (35 ID = 803/894 = 89.8%・46/46 slot 一致)。
+範囲外: (a) native 実行との同一経路比較 (bit-exact 比較は未実施) (b) `Eff_Render` 差分
+(CAB-195 未達を継続) (c) 未解決 635 site の**個別原因**は未分類 (d) 本節の再ビルドは
+stage-1 成果物を再利用 (RetDec 再 decode は未実施) (e) 7,058 site は数値の出所が不明で
+検算不能。
+
+### 12.5 未解決 (起票先つき)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| icall 未復元 635 site (10.3%) — 最終 IR で落ちる | VMT/reg 呼出しの取りこぼし。ctor 差分試験の精度 | (a) 本検収コメント (CAB-194 に記録) |
+| `fw_stage2.sh` が空ディリクトリで完走しない (S1-S4) | 「1 コマンド e2e」が再現不能 | (c) 本チケットに提案。修正判断は CAB-196 (ビルド鏈を触るため) |
+| decode 漏れ件数が測定時点で 206 / 143 / 126 と食い違う | fail-fast stub の実数の不透明 | (a) 本検収コメント (定義を固定) |
+| CAB-195 の §10 未解決「HEAD `fw_rt.c` で smoke が dispatch=39 / OOB」 | (CAB-195 側で継続) | (a) CAB-195 検収コメント参照 |
+
+### 12.6 訂正した誤記 (77cde78 の REPORT に対する検証結果・本 REPORT への記録)
+
+①「6,159 site 全復元」→ **5,525/6,159 (未復元 635 = 10.3%)** ②「14,034 define」→ **14,037**
+③「14,033 関数」→ **14,037** ④「PackageInfo 290 unit」→ **290 件・うち init≠0 は 289**
+⑤「declares 8,176」→ **重複込 8,176 / unique 8,063** ⑥「decode 漏れ 126/206」→ **最終 IR 143**
+⑦「1.61 MB」→ **1.55 MiB (1,626,299 B)** ⑧「14.8 MB」→ **14.87 MB (14,874,162 B)**。
