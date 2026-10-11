@@ -184,7 +184,7 @@ delay closure 142 関数の近似命令は rcpps 4 箇所のみ (すべて 0x180
 
 ## 15. CAB-273 (2026-10-11) — tol gate 撤去: 比較を tolerance なし完全一致に統一
 
-起点 `49f7dd4` (HEAD・snapins ツリー clean)。既知類型 (DEFECTS.md): **該当なし** (lift/IR は不変 = ハーネス判定層のみの改修)。撤去 = ① `harness/compare.mjs` の `--tol` 相対誤差 gate (`|a-b| > 1.6·2⁻¹²·max(|a|,|b|) + absFloor`、CAB-224 由来)・② `snapins.json` の `tol` (resonator 5 region / stereo 4 / delay 5)・③ `lift/build.py` の tolarg/tol.json 生成・④ `scripts/make_table.py` の「`cfg['tol']` の有無 → 許容誤差/bit-exact」判定 (→ 実測に変更)。撤去後は比較が常に全バイト strict 一致 = 14 snap-in すべて `bit-exact` 表記 (§13-4 の tol 残存は解消)。
+起点 `49f7dd4`。本改修 = commit `5d0d321` (初回 `e407a4f` は**他セッションの共有ワークツリーへの `git reset` で消えた**ため同内容を再コミット。差分は `git diff e407a4f 5d0d321 -- snapins` = 0 行で確認済)。既知類型 (DEFECTS.md): **該当なし** (lift/IR は不変 = ハーネス判定層のみの改修)。撤去 = ① `harness/compare.mjs` の `--tol` 相対誤差 gate (`|a-b| > 1.6·2⁻¹²·max(|a|,|b|) + absFloor`、CAB-224 由来)・② `snapins.json` の `tol` (resonator 5 region / stereo 4 / delay 5)・③ `lift/build.py` の tolarg/tol.json 生成・④ `scripts/make_table.py` の「`cfg['tol']` の有無 → 許容誤差/bit-exact」判定 (→ 実測に変更)。撤去後は比較が常に全バイト strict 一致 = 14 snap-in すべて `bit-exact` 表記 (§13-4 の tol 残存は解消)。
 
 | 検証 | 実測 |
 |---|---|
