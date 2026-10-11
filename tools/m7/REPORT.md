@@ -4,8 +4,8 @@
   t1 run complete / t3 OK / trap_test OK 6 FAIL 13) を前提に subagent 実行。
 - 成果物: `tools/m7/` 配下のみ。`tools/m6/` / `tools/m5/` / `tools/shim/` は読取のみ
   (work/ 直下の未管理再生成物を除く; tools/m6 スクリプト自体の改変は 0 行)。
-- `analysis/strategy.md` は本 tree に存在しない (find で確認)。M7 の完了条件は
-  `tools/docs/MILESTONES.md` §4 と tools/m6/REPORT.md §8 を根拠に代読。
+- `docs/REFERENCES.md` `[STRATEGY]` (repo 外) は本 tree に存在しない (find で確認)。M7 の完了条件は
+  `docs/REFERENCES.md` `[STRATEGY]` §4 と tools/m6/REPORT.md §8 を根拠に代読。
 - 検証環境: node v26 / emcc 6.0.12 / Python 3.14 / RetDec 5.0 / llvm-as 21.1.8 (parse 検証)。
 
 ## 0. 結論
@@ -13,7 +13,7 @@
 | 項目 | 結果 |
 |---|---|
 | (1) m6.sh 1 コマンド E2E 化 | **達成** — `bash tools/m7/m6_e2e.sh` (exit 0)。m6_lift.sh (既設手順) → ir6 pass 鎖 (ir6_pass/ir6_shift/ir6_gdata) → m6_build.sh (memfix/extract 内蔵) → m6_simd_check → node t1/t3/trap_test 直列化。検収数値の数値照合組込 + e2e_result.json 出力。lift 再実行の非決定性 artifact (`add i64 0, i64 %X` 系 / 重複 declare) への lift 直後 fixup を内蔵し、再 lift 後も検収数値が bit まで再現 (t1_out.hex SHA 一致) |
-| (2) missing 11 分類表 | **作成** — `tools/m7/missing11.md` (11 種 → hand C stub 7 種 / no-op 1 種 / Win API 参照値 2 種 / 既存方針 (lock, caller broken-lift 待ち) 1 種; DSP 数値経路外確認) |
+| (2) missing 11 分類表 | **作成** — (11 種 → hand C stub 7 種 / no-op 1 種 / Win API 参照値 2 種 / 既存方針 (lock, caller broken-lift 待ち) 1 種; DSP 数値経路外確認)。2026-10-12 の再編で報告内容は本節に吸収しファイルは削除 |
 | (3) f32 引数接続 IR pass PoC | **PoC 達成 (pattern B 接続 + pattern A 本体再生成)** — tools/m7/ir7_argpass.py が (i) closure lift の setParameter 2-arg 本体退化・签名失失を検出し (ii) 呼出 site の xmm2 bits (呼出直前 `__asm_movss(i32)` で IR 上に回収可能なまま捨てられている) を 3rd arg 化し (iii) dsm から jump table 20 case (store slot / clamp 定数 / flag 群) を機械抽出して本体 define を再生成する。駆動実測: value bits → member slot (obj+0x2dc/0x2d8) と param chunk (`[obj+0x138] + sext(i32 obj+0x28)*108` → 0x108cd890) へ bit 保存まで接続確認。index 19 = 0 (flag byte 0x326 をクリア) で `processReplacing` が rc 0 に復帰し、t1 出力が baseline の 9 種 denormal 群 `{0, 0x19DEE8xx…}` から実数値 `{0, -6.0f (0xffc00000)}` へ変化 (2 run bit-determinism ✓)。bit-exact 512/512 は未達 — 理由は §3-(d) |
 
 ## 1. (1) m6.sh 1 コマンド化 — m6_e2e.sh
@@ -52,7 +52,7 @@
 - e2e 中 trap_test 実測: OK 6 / FAIL 13 (missing 11 = wasm import "missing function"
   fail-fast abort + broken-lift OOB 2 = function_1801c69cc / c91cc, ir6_shift が
   算術合成 base を remap できずの OOB のまま — M6 REPORT §7-6)。
-- 分類表: `tools/m7/missing11.md`。要点:
+- 分類表 (2026-10-12 の再編で本節に吸収済み)。要点:
   - runtime 到達 missing 11 は **すべて DSP 数値経路外** (CRT lock / UCRT
     invalid-parameter 報告 / PE app-policy (GetModuleHandleW) / locale・wide 変換
     (MultiByteToWideChar) / module refcount 管理 (lock inc/xadd))。
@@ -161,7 +161,7 @@ tools/m7 配下で独立実装 (pass 鎖実行は m6 スクリプトを復用)�
 4. bit-exact 参照: JS 参照実装 (M5 式) か native unit bit-exact 分割 (SEH 依存の
    部分を除く) かを M8 冒頭で決定 (M6 REPORT §8 (ii) 踏襲)。
 5. missing 11 対応 (hand C stub 9 種) は m6_rt.c 追補 1 単位として M8 bit-exact
-   評価前に実施可 (tools/m7/missing11.md)。
+   評価前に実施可 (分類表の内容・本節に吸収済み)。
 
 ## 4. コミット内容と検証手法
 
@@ -172,7 +172,7 @@ tools/m7 配下で独立実装 (pass 鎖実行は m6 スクリプトを復用)�
   - `tools/m7/t1_argpass.mjs` — (3) t1 相当 harness (3-arg setParameter + 固定パス)
   - `tools/m7/t1_sel.mjs` — (3) index/value 提出 harness (T1SET/T1Z/T1VAL 環境変数)
   - `tools/m7/t1_dbg.mjs` — (3) store 接続観測 harness
-  - `tools/m7/missing11.md` — (2) 分類表
+  - (2) 分類表 (本 REPORT §3 に吸収済み・独立ファイルは 2026-10-12 に削除)
   - `tools/m7/REPORT.md` — 本書
 - 検証手法: m6_lift → ir6 → m6_build → m6_simd_check → node 3 系統を tools/m7 の
   wrapper から再実行し、exit code + 行数/ SHA 数値の自動判定で記録 (生成物は
@@ -196,7 +196,7 @@ tools/m7 配下で独立実装 (pass 鎖実行は m6 スクリプトを復用)�
   mismatch 0 / undefined 57 種 (function_18*: 33 / __asm_*: 0 / Win・CRT API: 24) /
   simd 0-0 / t1 512 行 (2 run SHA256 一致 f34a6a46798b0a65…cf7c835) / t3
   mem[0x30260ce0]==0x2DDFA232 / trap_test OK 6 FAIL 13 (= missing-function abort 11 +
-  broken-lift OOB 2, missing11.md 表の 11 関数名と FAIL 一致)。再実行後 `git status`
+  broken-lift OOB 2, missing11 11 関数名と FAIL 一致)。再実行後 `git status`
   管理下差分 0 (work/ 系未追跡のみ)。
 - `--full` (RetDec 再 lift鎖 全再生) も **exit 0**: lift_fixup 実測 `add i64 0, i64`
   → 4 件 / 重複 declare → 2 件 (本書記載値どおり) で、t1_out SHA は baseline

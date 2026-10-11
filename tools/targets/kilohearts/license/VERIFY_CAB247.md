@@ -1,7 +1,7 @@
 # CAB-247 検証レポート (検収担当)
 
 - 検証日: 2026-10-11 / 検証起点 commit: **2a762a0** `feat(kh): editor model partial lift (CAB-247)`
-- preflight: RULES_SHA=ae9c6d414f7d (SUBAGENT_RULES.md 154 行・2026-10-11 06:42:09)
+-
 - 検証方法: `git archive HEAD -- tools/targets/kilohearts/license | tar -x -C work/verify_2a762a0` (規則 45①。再現に必要な未捆込ファイル `work/ctors47.json`・`../work/winpkg/HeartCore.core_64` はシンボリンク/コピーで接続。**絶対パス依存は `lic_build.py` の `CORE` と `work/ctors47.json` のみ**)
 - 担当 dir: `tools/targets/kilohearts/license/` (snapins/ は読取のみ)
 

@@ -149,7 +149,7 @@ bind xmm1 **2** / bind xmm5 **2** / 間接 call **1** / region live-out **1** (�
 ## 7. 再現手順
 
 ```sh
-SNAP=/home/ubuntu/work/webstudio/tools/liftlib/work/wt_cab238/tools/liftlib   # a137396 + CAB-238 の snapshot
+SNAP=<worktree>/tools/liftlib/work/wt_cab238/tools/liftlib   # a137396 + CAB-238 の snapshot (検証用 worktree・gitignore 対象)
 # site 別評価 (1 tag = 1 process で並列, 既定 34 tag / 実測 約 1 分) → tools/ott/work/cab238/<tag>/result.json
 LIFTLIB_PKG=$SNAP P1_HANG_PROBE=1 P1_FNMAP=1 bash tools/ott/f7eval/run_eval.sh
 LIFTLIB_PKG=$SNAP P1_HANG_PROBE=1 python3 tools/ott/f7eval/cab238_eval.py <tag> [--reuse]   # 単体

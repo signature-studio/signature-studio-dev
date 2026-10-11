@@ -89,7 +89,7 @@ FastMM4 の初期化関数群 (InitializeMemoryManager 相当) を単体で検�
 ## 6. ブロッカー / ユーザ依頼
 
 * ブロッカー: RetDec 出力の意味保証が無い (上記 §2)。以降の進捗は lift 検証ハーネス or 別 lifter の導入に依存。
-* ユーザ依頼事項: **なし** (素材は `analysis/win64/extracted/block00031_PE.bin` で足りた)。
+* ユーザ依頼事項: **なし** (素材は `docs/REFERENCES.md` `[WIN64]` の `extracted/block00031_PE.bin` で足りた)。
   将来 RTL を OSS ソースから差し替える場合は Delphi (FPC 可否含む) toolchain の選定判断が必要。
 
 ## 7. 成果物 (tools/m11/)

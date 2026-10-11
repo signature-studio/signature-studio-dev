@@ -1,5 +1,9 @@
 # tools/plugins/p0c REPORT — kernel 表妥当性検証 + f80 assessment (CAB-196)
 
+> 正本: `tools/plugins/p0c/REPORT.md`。
+> **行数目安**: 本ファイルは 250 行を超過 (`docs/DOC_MAP.md` §1 の上限ルール参照)。
+> 超過分は Git 履歴に残る形での分割移動を推奨 (**内容は削除しない**)。
+
 作成: 2026-10-10 / HEAD = 1c4b7c7 時点 / 担当 dir: tools/plugins/p0c のみ
 
 ## 0. 結論 (先出し)
@@ -281,7 +285,7 @@ f80_lower に ext-emulation mode を追加するのが正しい設計位置。
 ## 10. P0c-4 追記 (CAB-196 継続): ext-emulation mode のバグ修正と 2 kernel bit-exact 化
 
 作成: 2026-10-11 / 担当 dir: tools/plugins/p0c のみ / 起点 HEAD (WIP 評価前): `016f91c`
-preflight: RULES_SHA=ff4999169333
+検証手順: `docs/WORKFLOW.md` §6 (旧 `preflight RULES_SHA` 証跡は廃止・`docs/DECISIONS.md` D6)
 
 ### 10.0 結論 (先出し)
 
@@ -454,7 +458,7 @@ work/verify_19c2cd2 --strip-components=3` で展開 (リポジトリ非破壊)�
 
 **注記**: `p0c4_e2e.py` の [6] は相対パス `../inventory/kernel_table.py` を解決するため、
 work/verify_* の展開先からは実行不能 (絶対パス参照)。REPORT に明記 (規則 45)。
-実測は絶対パス `/home/ubuntu/work/webstudio/tools/plugins/inventory/kernel_table.py` で
+実測は `tools/plugins/inventory/kernel_table.py` で
 同一出力を確認済み。
 
 ### 10.9 環境前提 (規則 43)
@@ -467,7 +471,7 @@ work/verify_* の展開先からは実行不能 (絶対パス参照)。REPORT �
 ## 11. P0c-4 追記 (CAB-253): ARG pass の ABI 推定強化 (mid-function push・crash 4 kernel 救済・xmm 位置規約)
 
 作成: 2026-10-11 / 担当 dir: tools/plugins/p0c のみ / 起点 HEAD (WIP 評価前): `ae18b1e`
-preflight: RULES_SHA=ff4999169333
+検証手順: `docs/WORKFLOW.md` §6 (旧 `preflight RULES_SHA` 証跡は廃止・`docs/DECISIONS.md` D6)
 既知類型との関係 (DEFECTS.md): **D7/D8 (stack 引数・戻り値) 該当**。本節で新たに確認した
 「FP 引数の default promotion による値橋渡し不一致」と「OOB getelementptr による UB」は
 DEFECTS.md 未登録のため §11.7 に行案を書く (DEFECTS.md 本体は他担当領域で編集しない)。
@@ -641,7 +645,7 @@ python3 tools/plugins/p0c/p0c4_e2e.py 2000        # ext IR パス (別トラッ�
 tools/plugins/p0c | tar -x -C work/verify_ae18b1e --strip-components=3`) で展開し、
 work/ 内の既存 lift IR (work/k80.lift.ll) を入力として p0c4_abi_e2e.py を再現する。
 [6] の kernel_table 参照は絶対パス
-`/home/ubuntu/work/webstudio/tools/plugins/inventory/kernel_table.py` で解決する。
+`tools/plugins/inventory/kernel_table.py` で解決する。
 
 ### 11.10 環境前提 (規則 43)
 
@@ -656,8 +660,8 @@ work/ 内の既存 lift IR (work/k80.lift.ll) を入力として p0c4_abi_e2e.py
   子 **#277** (native crash 残 7 + abi-mismatch 残 7)、**#269** ([P0c-5] / CAB-268、ext 精度)、
   #242 ([P0c-2] / CAB-241)。milestone は M-App (親から継承)。
 - PR: **#278** (branch `254-arg-pass-abi`)。worktree 内クリーン HEAD から e2e 再現済み。
-- 規約変更: SUBAGENT_RULES.md は 2026-10-11 14:06 に「worktree + PR (直接 master commit 禁止)」
-  へ改訂 (RULES_SHA=4d7380074852)。着手時の RULES_SHA は ff4999169333 (本節冒頭)。
+- 規約変更: 運用ルールは 2026-10-11 14:06 に「worktree + PR (直接 master commit 禁止)」
+  へ改訂された (正本: \`docs/WORKFLOW.md\` §1〜§2・\`docs/DECISIONS.md\` D4)。
   改訂前に同内容を共有 master へ直接 commit した (ca5ac3f) ため、PR は origin/master から
   の cherry-pick (00996d5)。共有 master の ca5ac3f は reset/revert せず残置 (他担当の
   staged WIP を巻き込むため)。扱いは main 判断。

@@ -146,7 +146,7 @@ REX が legacy prefix の前にある場合 (REX 無効) も扱う (KH の data-
 - ただし liftdiff/liftlib が将来 `disp_offset/disp_size` を読む (関数 fingerprint・relocation 風マスク・命令書換え) 場合に備え、DEFECTS に **メタデータ欠陥の信号**を追加することを提案:
   1. 起動時 canary: `DF.capstone_has_d9()` をレポートヘッダに記録 (capstone 更新で自動的に False になる)。
   2. 命令単位の信号: `DF.d9_affected(ins)` を `Insn` の flag にし、DEFECTS 集計で「D9 該当命令数 / 関数数」を出す (閾値無し・情報用)。
-  3. 命名: 本件 D9 は icall の欠陥番号。`kilohearts/snapins/DEFECTS.md` の D9 (`jmp reg` → `ret undef`) とは別物なので、レジストリでは `CS-D9 (capstone disp_size)` のように接頭辞で区別することを推奨。
+  3. 命名: 本件 D9 は icall の欠陥番号。`docs/DEFECTS.md` の D9 (`jmp reg` → `ret undef`) とは別物なので、レジストリでは `CS-D9 (capstone disp_size)` のように接頭辞で区別することを推奨。
 - 66 prefix 起因の別の capstone 症状は未発見 (matrix で imm/offset/値は 0 誤り)。ただし `translateImmediate` が displacementSize を rel 符号拡張に使う点 (§2) は未検証。
 
 ## 8. 限界・次タスク

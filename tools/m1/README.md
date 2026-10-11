@@ -1,6 +1,6 @@
 # M1: 極小 PE→wasm PoC の E2E 自動化
 
-戦略文書 (`/home/ubuntu/work/analysis/strategy.md`) §4 M1 / §2.1 パイプラインの検証条件を満たすため、
+戦略文書 (`docs/REFERENCES.md` `[STRATEGY]`) §4 M1 / §2.1 パイプラインの検証条件を満たすため、
 toolchain_setup.md の E2E 実証 (`/opt/_test/`) を **1 本のスクリプトで再生産可能** にしたもの。
 
 ## 使い方
@@ -54,7 +54,7 @@ toolchain_setup.md 実績値 (M1 で検証済):
 
 ## ハマりどころ・形式 (PE/ELF) 特有の問題 — 実測メモ
 
-- **mingw CRT の全体展開**: `x86_64-mingw32-gcc` でビルドした PE32+ を RetDec に通すと、CRT 一式まで C コードとして再構築され出力は 230KB+。wasm 直リンクは非現実的なので **`main` だけ抽出 → 最小ハーネスに結合** するのが確実 (strategy.md §2.2 の「lifter 品質リスク」とも整合)。
+- **mingw CRT の全体展開**: `x86_64-mingw32-gcc` でビルドした PE32+ を RetDec に通すと、CRT 一式まで C コードとして再構築され出力は 230KB+。wasm 直リンクは非現実的なので **`main` だけ抽出 → 最小ハーネスに結合** するのが確実 (`docs/REFERENCES.md` `[STRATEGY]` §2.2 の「lifter 品質リスク」とも整合)。
 - **`__mingw_printf`**: RetDec は mingw の `printf` 実装を CRT 内部ラッパ名 (`__mingw_printf` 系) で復元する。抽出側で一律 `printf` に置換して emcc libc に落とす。
 - **`__main()`**: mingw C runtime 固有の CRT 初期化呼び出し。wasm 化では意味を持たない (グローバルコンストラクタ登録経路) ので行ごと除去。
 - **`__stdcall` / `dllexport` / `dllimport`**: x64 PE では呼出規約が x64 ABI に一元化されるため `__stdcall` は no-op。今回の `main` は裸シグネチャで出力され declspec 由来の問題は発生しなかった。RetDec は装飾名 (`__imp_` 接頭など) を原型名に復元済みで、IAT 参照は通常の関数呼び出しとして落地する。ただし **32bit PE や明示 `__declspec(dllexport)` を付けた DLL 形式では名前装飾 (mangling) の差が出得るため、M2 以降の抽出では要再確認**。

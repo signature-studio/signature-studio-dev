@@ -1,6 +1,6 @@
 # REPORT — CAB-168 (SHX-T3): パス写像・レジストリ永続化の shimx 側インタフェース接続
 
-preflight: RULES_SHA=ff4999169333
+検証手順: `docs/WORKFLOW.md` §6 (旧 `preflight RULES_SHA` 証跡は廃止・`docs/DECISIONS.md` D6)
 日付: 2026-10-10 (CAB-168 実装) / **2026-10-11 (CAB-271 既定ロード上書きバグの根本修正)** / 親: CAB-11 (shimx, Done) / 関連: CAB-94・CAB-104・CAB-98・CAB-213・CAB-101
 書込範囲: `tools/shimx/pathreg/` のみ (shimx 既存ファイル・tools/startup・tools/assets・tools/hostbridge は無変更, `git status` で `?? tools/shimx/pathreg/` のみ)
 検収: **`bash tools/shimx/pathreg/scripts/e2e.sh` → exit 0 (12.9〜15.4 秒・実測 n=7・§8-3)**。`bash tools/shimx/test.sh --quick` も PASS (影響 0)

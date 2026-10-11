@@ -1,5 +1,11 @@
-# FL (win64 FLEngine_x64.dll) GUI 系 import と shim 優先度
+# 自動生成: `python3 tools/gui/analysis/gui_imports.py && python3 tools/gui/gen_api.py`
 
+> **人手編集禁止** (生成元を直す)。本ファイルは測定・抽出結果の**単一の正本**。
+> **行数目安**: 本ファイルは 250 行を超過 (`docs/DOC_MAP.md` §1 の上限ルール参照)。
+> 超過分は Git 履歴に残る形での分割移動を推奨 (**内容は削除しない**)。
+
+
+# FL (win64 FLEngine_x64.dll) GUI 系 import と shim 優先度
 自動生成: `python3 tools/gui/analysis/gui_imports.py && python3 tools/gui/gen_api.py` (入力 `tools/m2/work/block00031_PE.bin` = FLEngine_x64.dll 22,227,016 B)。
 
 使用頻度 = `.text` の静的 xref 推定 (FF15/FF25/mov [rip+IAT] と、IAT へ jmp する thunk への E8/E9 call の件数; Ghidra 非使用の推定値)。

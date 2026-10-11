@@ -1,5 +1,8 @@
-# PACKAGE_STATS (fl-studio-26.1.7.5653-win64)
+# 自動生成: `tools/assets` pack 統計 (`pack/pack.ts`)
 
+> **人手編集禁止** (生成元を直す)。本ファイルは測定・抽出結果の**単一の正本**。
+
+# PACKAGE_STATS (fl-studio-26.1.7.5653-win64)
 - 配信対象 unique 内容: 24827 個 / 非圧縮 1047.4 MB → 格納 610.0 MB (0.582)
 - stub (本体非配信): 239 個 / 871.5 MB (元バイナリ。wasm 化/再ビルド後に別経路で配信)
 - chunk: 2009 個 (chunkSize 1048576, pack ≤ 131072B 小ファイル同居)  manifest: 1181781 B → br 266038 B

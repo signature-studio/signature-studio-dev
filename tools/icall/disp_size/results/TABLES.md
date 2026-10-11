@@ -1,5 +1,8 @@
-### census (capstone の disp 位置/長さ vs dispfix 真値)
+# 自動生成: `python3 tools/icall/disp_size/report_tables.py`
 
+> **人手編集禁止** (生成元を直す)。本ファイルは測定・抽出結果の**単一の正本**。
+
+### census (capstone の disp 位置/長さ vs dispfix 真値)
 | サンプル | 命令数 | disp 有 | rip 相対 | rip 誤り (率) | disp32 非 rip 誤り | 誤り計 (nop 除く) | 関数 誤り有/全 |
 |---|--:|--:|--:|--:|--:|--:|--:|
 | OTT F (icall closure 282 関数) | 17789 | 5134 | 985 | 103 (10.46%) | 29 | 132 (115) | 17/282 |

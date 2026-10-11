@@ -1,6 +1,6 @@
 # 検収 REPORT — CAB-137 (OTT-T4 VST entry lift) + CAB-138 (OTT-T5 CRT init / override 置換)
 
-preflight: RULES_SHA=ff4999169333 (着手時 preflight 出力・SUBAGENT_RULES.md 2026-10-11 08:45 版の読了証跡)
+検証手順: `docs/WORKFLOW.md` §6 (旧 `preflight RULES_SHA` 証跡は廃止・`docs/DECISIONS.md` D6)
 
 ## 0. 結論 (先出し)
 
@@ -194,12 +194,12 @@ cd $SNAP && OTT_CRTINIT=0 MOD=$PWD/work/crtlift/ottl_crt.cjs SCEN=$PWD/work/crtl
 
 ## 11. 環境前提 (規則 43)
 
-- `source <(bash /home/ubuntu/work/analysis/preflight.sh --env tools/ott)` で PATH (node 26.10 / emsdk) と TMPDIR を修復。`crt_e2e.sh` は node を `/opt/emsdk/node/24.19.0_64bit/bin/node` に固定 (`NODE` で切替可) し相対パスを参照するため **cwd = tools/ott で実行**すること。必要: python3 (capstone, pefile), gcc/clang, emsdk 6.0.12, node ≥ 22。DLL = `/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll`。snapshot の `../m6 ../m8 ../m9 ../m10 ../shim` は symlink (読取専用)。
+- 環境: `bash tools/ott/env.sh` で PATH (node 26.10 / emsdk 6.0.12、所在は `docs/REFERENCES.md` `[EMSDK]`) と TMPDIR を修復。`crt_e2e.sh` は node を `$EMSDK/node/24.19.0_64bit/bin/node` に固定 (`NODE` で切替可) し相対パスを参照するため **cwd = tools/ott で実行**すること。必要: python3 (capstone, pefile), gcc/clang, node ≥ 22。DLL = `docs/REFERENCES.md` `[ANALYSIS-PLUGINS]` の `plugins/ott/binaries/OTT_vst2_win64.dll`。snapshot の `../m6 ../m8 ../m9 ../m10 ../shim` は symlink (読取専用)。
 - **教訓**: clean tree で e2e を回すと `work/` が空のため step 間の依存 (.so・coverage・scen.json) が露出する。**e2e は `work/` クリア後に 1 回通すまで信用しない** (今回 2 件が隠れていた)。**新規資産** `tools/ott/accept/` (5 本) は他系統でも流用可。
 
 ## 12. 既知欠陥類型 (DEFECTS.md) との関係 (規則 44)
 
-`tools/targets/kilohearts/snapins/DEFECTS.md` を読了。該当 ID / 該当なし:
+`docs/DEFECTS.md` を読了。該当 ID / 該当なし:
 
 - **該当あり**: **D11 / D14 / D16** (data 窓の過小/過大 — 本 e2e の textref 窓 96→256 B と同型・対処済)、
   **D15** (メモリ間接 call 脱落 — `call [rax+0x58/0x60]` と CRT の api-set `jmp rax` (0x1801d2750) が同型・伏線)、

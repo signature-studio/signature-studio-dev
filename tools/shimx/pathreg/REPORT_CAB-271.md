@@ -1,6 +1,6 @@
 # REPORT (CAB-271 / SHX-T11) — pathreg `pathreg_set_paths()` 直後の初回 `pathreg_map()` が既定マウント表で上書きするバグの根本修正
 
-preflight: RULES_SHA=ff4999169333
+検証手順: `docs/WORKFLOW.md` §6 (旧 `preflight RULES_SHA` 証跡は廃止・`docs/DECISIONS.md` D6)
 日付: 2026-10-11 / 親: **CAB-168** (Done) / 発見元: **CAB-101** (startup-glue 検収 §5.1, Done) / dir: `tools/shimx/pathreg/` / milestone: ブラウザ初回起動 (654c816c-07d2-401b-bd9b-8a52cf056b0a)
 既知類型 (DEFECTS.md) との関係: **該当なし** (本 ticket は shimx インタフェース層の C 修正。lift/逆アセ/IR pass を扱わない)
 書込範囲: `tools/shimx/pathreg/` **のみ** (`tools/shimx/` 既存ファイル・`tools/startup/` は 0 行・読取のみ。以下 §3 で実測)

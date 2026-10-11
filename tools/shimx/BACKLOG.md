@@ -1,5 +1,9 @@
 # BACKLOG — shimx 実装バックログ (優先度順, 実測)
 
+> 正本: `tools/shimx/BACKLOG.md` (未解決一覧・解決済みは削除可)。
+> **行数目安**: 本ファイルは 250 行を超過 (`docs/DOC_MAP.md` §1 の上限ルール参照)。
+> 超過分は Git 履歴に残る形での分割移動を推奨 (**内容は削除しない**)。
+
 優先度の定義 (必須性→使用頻度): **P0** = M11 init closure が declare する API または OTT undefined 24 種 / **P1** = FLEngine 静的呼出サイト ≥10 または 3 プラグイン以上が使用 / **P2** = FLEngine 静的 import のその他 / **P3** = delay-load・プラグイン専用 / **X** = 他担当 DLL (対象外)。
 呼出サイト数 = FLEngine_x64.dll の `jmp [IAT]` thunk への call/jmp/lea 参照数 (静的, `scripts/import_scan.py`)。
 

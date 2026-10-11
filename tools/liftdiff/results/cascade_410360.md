@@ -1,3 +1,7 @@
+# 自動生成: `liftdiff` batch (CAB-238 採点・`cascade_410360` 出力)
+
+> **人手編集禁止** (生成元を直す)。本ファイルは測定・抽出結果の**単一の正本**。
+
 wasm_trap case 個別化 (f_410360 カスケード) — batch_closure_hybrid.jsonl
 trap case 計 941 / 関数 211
 

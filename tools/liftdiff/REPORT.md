@@ -1,6 +1,10 @@
 # liftdiff — flelift (x64c) 全数採点 (CAB-232) + native 全起動の参照化 (CAB-233)
 
-preflight: RULES_SHA=ae9c6d414f7d
+> 正本: `tools/liftdiff/REPORT.md`。書式仕様は `docs/FORMAT.md`。
+> **行数目安**: 本ファイルは 250 行を超過 (`docs/DOC_MAP.md` §1 の上限ルール参照)。
+> 超過分は Git 履歴に残る形での分割移動を推奨 (**内容は削除しない**)。
+
+検証手順: `docs/WORKFLOW.md` §6 (旧 `preflight RULES_SHA` 証跡は廃止・`docs/DECISIONS.md` D6)
 検証起点 commit: 01d5cb5 (CAB-233)。A/B は fba272c (CAB-232) 側。検収は b8e762d (HEAD) から実施。
 既知類型との関係 (DEFECTS.md, 規則 44): 該当 **D15** (メモリ間接 call 脱落) — 残 3 unit の VMT 仮想 call
 `call qword ptr [rdi+0x18]` (0x513da9) 診断で参照。jump table **D9 (DEFECTS.md)** は未使用。
@@ -262,9 +266,9 @@ m11 sample:800・残 3 unit の原因・`ld_tls_next` の limit 性・e2e 再現
 (3) revert 済み experiment の `rbp=0x7fff00000000` は HEAD では再現不能。
 (4) tools/liftlib・tools/flelift は読取のみ (CAB-252 続 の未コミット WIP の影響は評価対象外)。
 
-**環境前提 (規則 43)** — `source <(bash /home/ubuntu/work/analysis/preflight.sh --env tools/liftdiff)`
+**環境前提 (docs/WORKFLOW.md §5 の環境恒久化)** — `bash tools/liftdiff/env.sh`
 (PATH/TMPDIR 修正。TMPDIR = `tools/liftdiff/work/tmp` 実ディスク。/tmp は tmpfs 3.7 GB)。
-入力 (読取のみ): `/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin`・
+入力 (読取のみ): `docs/REFERENCES.md` `[WIN64]` の `extracted/block00031_PE.bin`・
 `tools/m11/work/{boot_final3.ll,boot_final.ll,m11_image.bin}`・`tools/ott/work/ott.ll`・
 `tools/flelift/work/lift/*` (CAB-252 続 が稼働中・未コミット差分あり)。
 ビルド: `gcc -O1 -g -Wall -Wno-unused-function -o work/ld_native rt/ld_native.c rt/ld_ms_call.S -lm`

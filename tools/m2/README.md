@@ -1,6 +1,6 @@
 # M2: mac x86_64 slice 抽出 + 静的解析成果物の機械化 + Delphi 品質確認
 
-`strategy.md` §4 M2 / §5.7 Delphi-PE 品質確認を M1 の土台 (`tools/m1/`) の上で
+`docs/REFERENCES.md` `[STRATEGY]` §4 M2 / §5.7 Delphi-PE 品質確認を M1 の土台 (`tools/m1/`) の上で
 実施する一連のスクリプト群。**結論/評価本体は `tools/m2/REPORT.md`**
 (`m2.sh` で得た `work/` 成果物の数値をもとに手動で維持される)。
 
@@ -21,7 +21,7 @@ Ghidra headless / RetDec の全体解析は 30 分〜数時間かかるため `m
 ```sh
 # Ghidra headless (win64 FLEngine; ~12 min, Heap 16GB)
 /opt/ghidra/ghidra_12.1.4_PUBLIC/support/analyzeHeadless \
-  <work_dir_abs> ghproj_dll -import analysis/win64/extracted/block00031_PE.bin \
+  <work_dir_abs> ghproj_dll -import <WIN64 extracted>/block00031_PE.bin \
   -scriptPath tools/m2/ghidra_scripts \
   -postScript DumpFunctions.java <abs>/tools/m2/work/ghidra_dll/functions_dll.csv \
   -analysisTimeoutPerFile 5400

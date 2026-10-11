@@ -1,7 +1,6 @@
 # 検収 REPORT — CAB-238 (`ott --auto f7,p1` 既定化) + CAB-135 (AVX/VEX lift / FMA bit-exact)
 
-preflight: RULES_SHA=ae9c6d414f7d (着手時 preflight 出力 = SUBAGENT_RULES.md 154 行・2026-10-11 06:42 の読了証跡)
-※ 本ファイル執筆中 (2026-10-11 08:45) に SUBAGENT_RULES.md が 46 → 50 規則へ更新された (RULES_SHA=ff4999169333)。
+検証手順: `docs/WORKFLOW.md` §6 (旧 `preflight RULES_SHA` 証跡は廃止・`docs/DECISIONS.md` D6)
    手持ちの 46 規則で検収を実施。差分の規則 47 (検収 agent: 合格 → Done + 検収コメント / 条件付き → **In Review 維持**)
    は本検収の選択 (無限ルーブ未修のため In Review 維持・所見コメント) と整合するため再実行は不要と判断。
 
@@ -198,9 +197,9 @@ OTT_CJS=work/cab238/p1_one_1801204b9/ott_gen.cjs V=0.9 F=1 A=0 timeout 30 \
 
 ## 10. 環境前提 (規則 43)
 
-- `source <(bash /home/ubuntu/work/analysis/preflight.sh --env tools/ott)` で PATH (node 26.10 / emsdk)
+- 環境: `bash tools/ott/env.sh` (PATH: node 26.10 / emsdk、所在は `docs/REFERENCES.md` `[EMSDK]`)
   と TMPDIR を修復。`avx/avx_e2e.sh` は node を `/opt/emsdk/node/24.19.0_64bit/bin/node` に固定し
   相対パス `work/avx/...` を参照するため **cwd = tools/ott で実行**すること。
 - 必要: python3 (capstone, pefile), gcc/clang, emsdk 6.0.12, node ≥ 22, setarch。
-  DLL は `/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll`。
+  DLL は `docs/REFERENCES.md` `[ANALYSIS-PLUGINS]` の `plugins/ott/binaries/OTT_vst2_win64.dll`。
 - snapshot の `../m6 ../m8 ../m9 ../m10 ../shim` は symlink (読取専用・改変 0 行)。

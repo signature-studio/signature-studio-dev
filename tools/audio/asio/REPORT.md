@@ -1,6 +1,6 @@
 # tools/audio/asio — IASIO COM アダプタ (CAB-97 [AU-1]) + IASIO COM 経由 120s soak (CAB-270 [AU-1b]) REPORT
 
-preflight: RULES_SHA=ff4999169333
+検証手順: `docs/WORKFLOW.md` §6 (旧 `preflight RULES_SHA` 証跡は廃止・`docs/DECISIONS.md` D6)
 既知欠陥類型 (DEFECTS.md) との関係: **該当なし** (本 ticket は lift/逆アセ/IR pass ではなく wasm shim の e2e ハーネス追加。D15 メモリ間接 call / D9 (DEFECTS.md) jump table 等は発生経路に無い)。
 
 ## 0. 結論

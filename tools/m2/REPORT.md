@@ -28,7 +28,7 @@
 ## 2. 関数境界合意検証 (`function_boundary.py`)
 
 **素材**:
-- win64 = `analysis/win64/extracted/block00031_PE.bin` (FLEngine_x64.dll 22.27MB, PE32+ Delphi x64)
+- win64 = `docs/REFERENCES.md` `[WIN64]` の `extracted/block00031_PE.bin` (FLEngine_x64.dll 22.27MB, PE32+ Delphi x64)
 - mac = 上記 slice (Mach-O x86_64, 31.6MB)
 
 | 対象 | ground truth (静的表) | Ghidra | Ghidra-vs-static | Jaccard |

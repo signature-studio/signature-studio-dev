@@ -101,7 +101,7 @@
 
 ## 6. ユーザ依頼事項
 
-特に無し (素材・認証・外部通信は不要。使用した DLL は既存の `/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll`)。
+特に無し (素材・認証・外部通信は不要。使用した DLL は既存の `docs/REFERENCES.md` `[ANALYSIS-PLUGINS]` の `plugins/ott/binaries/OTT_vst2_win64.dll`)。
 
 ## 7. 再現
 

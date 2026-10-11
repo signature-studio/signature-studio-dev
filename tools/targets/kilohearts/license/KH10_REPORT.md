@@ -89,14 +89,14 @@ thunkB(9) = (0x40001a0>>9)&1 = **0** → writer (1) は不発、(2) は 0 を書
 4. apply_key は stub seam ([rcx]=0x1a, rax=1)。実 0x1800219b0 の鍵検証経路は KH-9 から引き続き未検証。
 5. **module E は emcc -O0**: -O1 では LLVM が (a) TailCallElim が `call; …; ret load(@rax)` を tail call 化して中間の副作用 (stub 呼出・property 更新) を削除し、(b) shim の return 省略が noreturn 推論を誘導して呼出側の後続を `unreachable` 化する、という不具合が **作業中に観測された**。-O0 採用はその安全側の選択 (`--volatile-ret` 対策も併用)。**ただし検証 (CAB-247 検収) では HEAD 2a762a0 で -O0/-O1 × `--volatile-ret` 有無の 4 組合せすべてが ok=50/ng=0・ctx-fuzz 200/700 と 1000/10000 を満たした (= 上記 (a)(b) は再現せず)**。-O1 は wasm 88,098 B (-O0 比 142,168 B に対し 62%) なので、-O1 採用判断は KH-11 の実測事項として残す (「不具合が再現する」とは書けない)。
 6. quickeq wasm が KH-9 REPORT から **+4B** (186,285→186,289 / 187,641→187,645): shim の明示 return 追加による (差分の attributable な切り分しは 2 点比較のみ = 検証範囲外)。bit-exact 200/200 は維持。
-7. 編集可否の「表示」(padlock/mute icon) と実際の Editor 起動可否の接続は UI 層 (M7 以降)。
+7. 編集可否の「表示」(padlock/mute icon) と実際の Editor 起動可否の接続は UI 層 (MS7 以降・`docs/STATUS.md` §2)。
 
 ## 6. KH-11 (CAB-248) への引継ぎ
 1. **subscribe 経路の解除**: 0x180024bd0/0x180025080/0x18001bf70/0x18001c0b0 の lift + 間接 call 復元 (tools/icall 統合) または functor 経路の shim 設計 → 「LicenseManager 状態変化 → poll1 起火 → +0x548 更新」の通し E2E。
 2. **listener/observer ありの通知** ([sub+0x630]/[sub+0x1170] 非 null、observer vector 非空) — 同じく icall 前提。
 3. **0x1800f6540 (editor content setup) の lift** — `[+0x1088] = !thunkA(status)` の書込側 (2) を実機相当で実証。
 4. module E の -O1 化 (TCE/DSE 対策の精査 — `musttail` 禁止 or副作用秘匿のIR構造)。**判定材料 (検証 2a762a0 の実測)**: -O0/-O1 × `--volatile-ret` 有無の 4 組合せすべて ok=50/ng=0・200/700・1000/10000 を満たす。-O1 は wasm 88,098 B (-O0 142,168 B の 62%)。採用可否は KH-11 で実測判断する。
-5. banner/UI の lift は M7 以降 ( getStatus≡9 → バナー解除 0x180130560 経路の実機確認は CAB-59 §6-6 と合流)。
+5. banner/UI の lift は MS7 以降 ( getStatus≡9 → バナー解除 0x180130560 経路の実機確認は CAB-59 §6-6 と合流)。
 
 ## 7. 成果物
 `lic_config.json` (module E 追加) / `lic_stub.py` (retderef + override + synth_zeroarg) / `lic_build.py` (module E の abi/shims/raw_va/volatile_ret/emcc_opt) / `lift/kh_lower.py` (stack args + raw_va + volatile_ret + ret i32) / `lift/gen_stubs_sigs.py` (shim 追加 + return rax) / `harness/{ctxfuzz.h,native_ref.c,compare.mjs,scen_em.h,scenarios.c,scen_clipper.h}` (8 引数 + EM scenario + image パッチ) / `em_check.mjs` (47 製品デモ) / `em_dbg.mjs` (デバッグ用リプレイ) / `scripts/{f1088.py,xrefscan.py,xrq.py}` (+0x1088 全走査・xref) / `run_all.sh` ([4] 追加) / `REPORT.md` §9 (追記)。`work/` (gitignore): em_stage0.ll / f1088.json / xrefscan*.json / licE / em_200_1.bin / empoll_1000_7.bin / native_ref。

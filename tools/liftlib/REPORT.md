@@ -1,5 +1,9 @@
 # liftlib REPORT — 共通 lift 修復基盤の統合 (CAB-49 / CAB-54 / CAB-55 / CAB-220 / CAB-239 / LIFTLIB-2)
 
+> 正本: `tools/liftlib/REPORT.md`。
+> **行数目安**: 本ファイルは 250 行を超過 (`docs/DOC_MAP.md` §1 の上限ルール参照)。
+> 超過分は Git 履歴に残る形での分割移動を推奨 (**内容は削除しない**)。
+
 - 日付: 2026-10-11 / 担当 dir: `tools/liftlib/` (他 dir は読取のみ) / 再現: `bash tools/liftlib/liftlib_e2e.sh` (キャッシュ時 約 25 秒 + leaf spec 約 4 分, `--fresh` で FA/KH を RetDec lift から約 1 分)
 - 数値はすべて本 dir で実測。推定は「推定」と明記。
 
@@ -347,8 +351,7 @@ python3 tools/liftlib/work/hang_bisect.py p1_one_18012024b
 
 ## 13. LIFTLIB-3 (CAB-264) — 汎用 xmm0-ret bind + tan 入口誤解析修正
 
-- preflight: RULES_SHA=ff4999169333
-- 既知類型との関係 (規則 44): **該当なし** (`tools/targets/kilohearts/snapins/DEFECTS.md` の D1a〜D16 は ucomis 誤配線/load 脱落/xmm 引数落ち/store 欠落等で, 本チケットで扱う「callee の戻り値レジスタ推定」と「entry 純 move の live-in 誤判定」は未登録 → REPORT 末に新類型行案を記載)
+- 検証手順: \`docs/WORKFLOW.md\` §6。既知類型との関係: **該当なし** (`docs/DEFECTS.md` の D1a〜D16 は ucomis 誤配線/load 脱落/xmm 引数落ち/store 欠落等で, 本チケットで扱う「callee の戻り値レジスタ推定」と「entry 純 move の live-in 誤判定」は未登録 → REPORT 末に新類型行案を記載)
 - 検証起点 commit: `ae18b1e` (clean HEAD から `git worktree` 展開で再現・下記の検証を全て再実行して確認)
 
 ### 13.1 結論
@@ -438,8 +441,7 @@ LIFTLIB-2 §12.7 は「`_bind_call_ret` は明示的 C port 名のみ bind で�
 
 ## 14. LIFTLIB-4 (CAB-272) — leaf region の phi 合成 (残 15 → 6)
 
-- preflight: RULES_SHA=ff4999169333
-- 既知類型との関係 (規則 44): **該当なし** (`DEFECTS.md` D1a〜D16 と `icall §4` の別体系とも未登録。新類型行案を末に記載)
+- 検証手順: \`docs/WORKFLOW.md\` §6。既知類型との関係: **該当なし** (`DEFECTS.md` D1a〜D16 と `icall §4` の別体系とも未登録。新類型行案を末に記載)
 - 検証起点 commit: `fcaaf5f`。clean HEAD を `git archive` で展開し T1..T15 + e2e を再実行して確認 (下記 §14.6)
 
 ### 14.1 結論

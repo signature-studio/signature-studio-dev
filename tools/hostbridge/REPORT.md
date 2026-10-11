@@ -90,6 +90,6 @@
 
 ## 6'. 規約遵守メモ
 
-- 書込は `tools/hostbridge/` のみ。`tools/m2,m6..m10` は読取 (Ghidra project は `work/` へコピー、`ott_m10.ll` も `work/` へコピー)。README/MILESTONES/HANDOFF/ルート package.json 無改変。
+- 書込は `tools/hostbridge/` のみ。`tools/m2,m6..m10` は読取 (Ghidra project は `work/` へコピー、`ott_m10.ll` も `work/` へコピー)。README/docs/・ルート package.json 無改変。
 - 外部通信・認証系・Vital/Surge/Dexed は不使用。`work/` (471 MB: Ghidra project コピー/抽出 PE 等) は `.gitignore`、再生成は `analysis/reproduce.sh`。
 - EULA: 事実整理のみ — 本成果物は **lift 済み wasm/PE 実体をコミットしない** (評価時にユーザ手元のインストーラから生成)。`evidence/` には FL 実バイナリの Ghidra decompile/disasm 抜粋 (~75 KB) を含む。VST2 SDK ヘッダ不使用 (ABI は binary 証拠から自作)。

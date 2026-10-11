@@ -1,4 +1,7 @@
-# ldfix 常設化 + stage 5 進捗 REPORT (CAB-131) — tools/m11/ldfix/
+# 付録: ldfix 常設化 A/B 検証 (CAB-131) — tools/m11/ldfix/
+
+> **正本**: `tools/m11/ldfix/REPORT.md` (概要・§7)。本書はその付録で、CAB-131 常設化の
+> A/B 詳細・halt0 対応表・CAB-233 引継ぎを扱う。検証手順は `docs/WORKFLOW.md` §6。
 
 **判定: 達成 (stage 5 進捗測定込み)**。CAB-231 の ldfix (load 取り違え修復 pass) を `m11_gen_ir2.sh` に常設組み込みし、
 残存していた load_dropped 変種 3 関数を **F1v pass (新設) で吸収して load_dropped 892→0 (liftdiff closure 全数実測)**。

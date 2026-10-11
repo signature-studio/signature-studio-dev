@@ -1,5 +1,11 @@
-# PLUGIN_MATRIX — FL Studio 26.1.7 同梱 Fruity プラグイン 141 種 (Effects 90 + Generators 51) 実測マトリクス
+# 自動生成: `tools/plugins` plugin-matrix driver
 
+> **人手編集禁止** (生成元を直す)。本ファイルは測定・抽出結果の**単一の正本**。
+> **行数目安**: 本ファイルは 250 行を超過 (`docs/DOC_MAP.md` §1 の上限ルール参照)。
+> 超過分は Git 履歴に残る形での分割移動を推奨 (**内容は削除しない**)。
+
+
+# PLUGIN_MATRIX — FL Studio 26.1.7 同梱 Fruity プラグイン 141 種 (Effects 90 + Generators 51) 実測マトリクス
 生成: `bash tools/plugins/build_all.sh` (inventory/*.py → lift/plugin_closure.py → tier.py)。数値は全て実測 (mac: pkg_extract, win: NSIS 展開 + 自作 NSIS ヘッダ解析で復元した名称対応)。
 
 ## 0. サマリ

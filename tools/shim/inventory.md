@@ -1,8 +1,11 @@
-# M4 shim: Windows API 相当 実装インベントリ
+# 自動生成: `tools/shim` の export 走査 (`gen_inventory`)
 
+> **人手編集禁止** (生成元を直す)。本ファイルは測定・抽出結果の**単一の正本**。
+
+# M4 shim: Windows API 相当 実装インベントリ
 ## 結論
 
-**strategy.md §3 のうち #2 / #3 / #4 / #7 (+ #8 の最小面) に相当する 53 API を `tools/shim/src/` 配下に実装し、MT (pthread) / ST (シングルスレッド) の両ビルドで node 上の単体テストが ALL PASS (`bash tools/shim/test.sh` で exit 0)**。未対応 import は `shim_unimplemented()` で即 abort + 関数名出力する fail-fast を実装済み。FLEngine (Delphi) 実リンクは M5 以降であり、本成果物は「shim の土台 + テスト規律」の確立を目的とした v1 (最小面) である。
+**`docs/REFERENCES.md` `[STRATEGY]` §3 のうち #2 / #3 / #4 / #7 (+ #8 の最小面) に相当する 53 API を `tools/shim/src/` 配下に実装し、MT (pthread) / ST (シングルスレッド) の両ビルドで node 上の単体テストが ALL PASS (`bash tools/shim/test.sh` で exit 0)**。未対応 import は `shim_unimplemented()` で即 abort + 関数名出力する fail-fast を実装済み。FLEngine (Delphi) 実リンクは M5 以降であり、本成果物は「shim の土台 + テスト規律」の確立を目的とした v1 (最小面) である。
 
 ## 実装配置
 

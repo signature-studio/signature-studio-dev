@@ -1,5 +1,8 @@
-# m11 IR の GUI declare ↔ shim exports 突合表 (自動生成)
+# 自動生成: `python3 tools/gui/integ/gen_adapt.py`
 
+> **人手編集禁止** (生成元を直す)。本ファイルは測定・抽出結果の**単一の正本**。
+
+# m11 IR の GUI declare ↔ shim exports 突合表 (自動生成)
 生成: `python3 tools/gui/integ/gen_adapt.py` / 入力 IR: `integ/fixtures/boot_final_gui_declares.ll (m11 boot_final.ll の GUI declare 抜粋)` (10669 B, sha1 03a45205b0)。shim 側は `build/gui_reach_tab.json` (gen_api.py 産; 実装 312 + stub 159)。
 
 ## 1. 要約

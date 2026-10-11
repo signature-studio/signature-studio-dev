@@ -92,7 +92,7 @@ CSV の key 数は startup REPORT の 46 (31/5/10) に対し本集計は 47 (33/
 - 確認できていること: 登録検査 `FUN_008e6150` (Registrations 配下を `RegEnumKeyExW` で列挙→`FL Studio ` 前方一致→`ILRegKey` 非空) は静的読解どおり満たす (`observeRegistration()` true / Trial で false を自動テスト)。
 - **未確認**: `0x10c7cd0` (32 KB 登録パーサ) が MachineGuid/ComputerName 等と突合してプレースホルダを拒否するか。拒否されると bit0 は未登録のまま (`expectedLicense()` の期待 bit0=0 は seed 側の意図で、実 byte の観測は CAB-106)。bit0 の語義 (0=登録) も**推定**のまま。
   追加観察候補: `General\TrialEdition` (既定 `2`, `0x11bddf0` ReadInt / `0x11444e0` WriteInt) はエディション/Trial に関連する可能性があり seed は既定値のまま。
-- 拒否された場合の次手: ユーザが `.reg` を `vreg/resources/cracked/` (git 管理外) に置き `externalReg` で投入 / または `0x10c7cd0` の検証解読 (別チケット)。`Token`(FL Cloud 認証) は SUBAGENT_RULES の外部通信対象外に従い seed しない。
+- 拒否された場合の次手: ユーザが `.reg` を `vreg/resources/cracked/` (git 管理外) に置き `externalReg` で投入 / または `0x10c7cd0` の検証解読 (別チケット)。`Token`(FL Cloud 認証) は外部通信対象外 (`docs/DECISIONS.md` D3) に従い seed しない。
 
 ## 7. 境界メモ (実装していないもの / 他担当への連絡)
 

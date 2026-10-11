@@ -1,6 +1,6 @@
 # REPORT — CAB-101 startup-glue (THostInstance + CreateFruityInstance 呼出 + 終了処理 / ST-T1, 親 CAB-22)
 
-preflight: RULES_SHA=ae9c6d414f7d ／ 書込範囲: `tools/startup/glue/`(新規) のみ。`tools/shimx/`・`tools/startup/{vreg,pump,winstubs}/`・`tools/assets/wvfs/`・`src/runtime/` は **読取のみ** (include / import / コンパイル参照のみ・変更 0 行)。
+検証手順: `docs/WORKFLOW.md` §6 (旧 `preflight RULES_SHA` 証跡は廃止・`docs/DECISIONS.md` D6)
 既知類型 (DEFECTS.md) との関係: **該当なし** (本 ticket は glue/結線規約で、lift/逆アセ/IR pass を扱わない)。
 検証起点: 本 REPORT 記載の commit (HEAD 化後に `git archive` で再現・下記 §7)。
 

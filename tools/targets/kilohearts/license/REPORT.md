@@ -116,7 +116,7 @@ DSP 固有 closure (42 効果) にはライセンス/ネット系参照が無く
 - 回帰: lic_check 70/70 / license run_all.sh exit=0 / snapins e2e exit=0 (無劣化)。
 - §5-2 の残課題は KH-11 (CAB-248) へ引継: subscribe 経路 (0x180024bd0/0x180025080) の解除 (間接 call 復元が前提) と listener/observer ありの通知、0x1800f6540 の lift。
 
-## 10. KH-11 追記 (CAB-247 残スコープ・詳細は `KH11_REPORT.md`、検証起点 0d589e6、preflight RULES_SHA=ae9c6d414f7d)
+## 10. KH-11 追記 (CAB-247 残スコープ・詳細は `KH11_REPORT.md`、検証起点 commit `0d589e6`)
 
 - **subscribe 経路を実 IR 化して bit-exact 達成** (残スコープ 1): kh_lower [icall] pass を snapins 5d30dff から移植 (DEFECTS.md D15 / icall §4 D1 修復) + module E lift 25→44 関数。`em` 200/200 (700/700 call)・`empoll` 1000/1000 (10,000/10,000 call) bit-exact。subscribe no-op seam を撤去し EditorModel ctor → 0x1800526f0 の manager EventSlot 登録が wasm で動く。
 - **functor offset 未初期化 qword コピーを 0 確定化**: clone (0x18005b430/0x18003f7d0) の `mov rcx,[rcx+0x18]` → `xor ecx,ecx` (native image パッチ) と kh_lower の同ブロック store 0 化 (wasm) の対称修正。抜くと invoke rcx ワイルド → SIGSEGV (負律対照 §5.2-1)。

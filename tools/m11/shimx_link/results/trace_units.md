@@ -1,5 +1,8 @@
-# shimx 呼出トレース (lifted コード → shim; 計数ラッパ経由, SHIMX_TRACE=1, soft+fix ビルド)
+# 自動生成: `SHIMX_TRACE=1` の shimx 呼出トレース出力
 
+> **人手編集禁止** (生成元を直す)。本ファイルは測定・抽出結果の**単一の正本**。
+
+# shimx 呼出トレース (lifted コード → shim; 計数ラッパ経由, SHIMX_TRACE=1, soft+fix ビルド)
 停止: init_count_var=18 (InitUnits が unit #18 の init 実行中に memory access out of bounds)
 
 ## A. 17 unit 完走区間 (unit 0=InitUnits 前 〜 unit 17)
