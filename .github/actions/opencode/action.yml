@@ -31,15 +31,23 @@ runs:
     - name: Run OpenCode
       id: run
       shell: bash
+      # prompt はバッククォートを含むため env 経由で渡す
+      # (run スクリプト中に直接展開すると $( ) として評価されてしまう)
+      env:
+        OC_PROMPT: ${{ inputs.prompt }}
+        OC_MODEL: ${{ inputs.model }}
+        OC_AGENT: ${{ inputs.agent }}
       run: |
         set +e
+        printf '%s' "$OC_PROMPT" > "$RUNNER_TEMP/oc-prompt.txt"
         opencode run \
           --standalone \
           --auto \
-          --model "${{ inputs.model }}" \
-          --agent "${{ inputs.agent }}" \
+          --model "$OC_MODEL" \
+          --agent "$OC_AGENT" \
           --format json \
-          "${{ inputs.prompt }}" > "$RUNNER_TEMP/oc-output.jsonl" 2> "$RUNNER_TEMP/oc-stderr.log"
+          "$(cat "$RUNNER_TEMP/oc-prompt.txt")" < "$RUNNER_TEMP/oc-prompt.txt" \
+          > "$RUNNER_TEMP/oc-output.jsonl" 2> "$RUNNER_TEMP/oc-stderr.log"
         rc=$?
         echo "rc=$rc" >> "$GITHUB_OUTPUT"
         echo "opencode exit code: $rc"
