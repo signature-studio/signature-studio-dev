@@ -54,10 +54,10 @@
   証明不能な lift) が判明し、修復コストが x64c 自作を上回った (`tools/ott/REPORT.md` §2)。
 - **影響**: 旧 README の「x64 ELF/PE → RetDec → emcc」という記述は削除された (現状と不一致)。
 
-## D6 — RULES_SHA / preflight 運用の廃止
+## D6 — ルール読了証跡 (preflight ハッシュ転記) 運用の廃止
 
 - **状態**: 廃止 (2026-10-12)
-- **決定**: REPORT 冒頭の `preflight: RULES_SHA=...` 証跡と、外部 `analysis/SUBAGENT_RULES.md` の
+- **決定**: REPORT 冒頭の preflight 読了証跡 (ハッシュ 1 行) と、外部 `analysis/SUBAGENT_RULES.md` の
   ハッシュ運用は**廃止**。ルールの正本は repo 内 `docs/WORKFLOW.md` に一本化した。
 - **理由**: rules を更新するたびに全 REPORT (15 箇所以上) の証跡行が陳腐化し、全面修正の労力が
   肥大化していた。原本 repo 外・repo に存在しないため新しい参加者が読めない問題もあった。

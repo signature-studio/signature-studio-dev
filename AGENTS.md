@@ -137,7 +137,7 @@ Signature Studio (webstudio) のリポジトリで作業する**全エージェ�
 
 1. **repo 外絶対パス (`/home/ubuntu/work/...`, `/opt/...`) の羅列を repo 内 .md に書く** —
    外部パスは `docs/REFERENCES.md` のエントリ ID (`[WIN64]`・`[EMSDK]` 等) で参照する。
-2. **`preflight: RULES_SHA=...` の羅列** — 廃止 (`docs/DECISIONS.md` D6)。
+2. **preflight 読了証跡 (ハッシュ 1 行) の羅列** — 廃止 (`docs/DECISIONS.md` D6・`docs/WORKFLOW.md` 冒頭参照)。
    検証手順は `docs/WORKFLOW.md` §6 に一本化。
 3. **同一測定値の二重 (以上) 記載** — 測定値は `tools/<area>/REPORT.md` だけに書く。
 4. **`tools/**/work/` と `tools/**/venv/` への作業** — vendored / 検証スナップショット。
