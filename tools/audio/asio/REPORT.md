@@ -7,7 +7,7 @@ preflight: RULES_SHA=ff4999169333
 
 **完了。** FLEngine が `CoCreateInstance(IID_IASIO)` で取得できる ASIO ドライバ面 (IASIO vtable 24 スロット = IUnknown 3 + IASIO 21) を実装し、実体を検収済み `flasio_*` (tools/audio/src/flasio.c) へ委譲した。1 コマンド検収 `bash tools/audio/asio/e2e.sh` (exit 0) = **node 静的検証 126/126 PASS + headless Chrome 4/4 PASS** (3 シナリオ + **COM 経由 120s soak**)。既存 tools/audio e2e は **22 シナリオ系で 21/22** (唯一 `asio_sine_b256_96k` = 既知 AU-11 の load 依存 FAIL。本チケットの変更 0 行の clean HEAD 731e32e でも同一結果、§4)。親 e2e への組込みは行っていない (本 e2e が単独で完結、§6)。
 
-**CAB-270 (COM 経由 120s soak)**: `com_soak120_b256` を追加。既定 120 秒で **underrun 0 / silence 0 / ramp 0 mismatch / bufferSwitchTimeInfo bad 0 / COM 面 (sellog・参照カウント) 一致**を 8 回連続で実測 (§3-2)。`--quick` では soak を実行しない (親 e2e 規約)、`--soak N` で秒数変更可。
+**CAB-270 (COM 経由 120s soak)**: `com_soak120_b256` を追加。既定 120 秒で **underrun 0 / silence 0 / ramp 0 mismatch / bufferSwitchTimeInfo bad 0 / COM 面 (sellog・参照カウント) 一致**を 9 回連続で実測 (§3-2)。`--quick` では soak を実行しない (親 e2e 規約)、`--soak N` で秒数変更可。
 
 ## 1. 前回中断 (insufficient_credits) の残骸精査 → **引継ぎ採用**
 
@@ -52,7 +52,7 @@ win64 レイアウト static_assert (BufferInfo64=24B/buffers@8, Callbacks64=32B
 | com_ramp_b256_d2 | ramp 不一致 **0 / 240,640〜241,152 frame** (bit-exact), underruns **0** silence 0, bufferSwitchTimeInfo **942〜947 calls bad=0** (samplePosition 単調 + sr 一致), cb_max **64〜494µs** (負荷依存), QI 1 / alive 0 (Release で自己解放), sellog `[[1,2],[2,0],[1,7],[7,0]]` (= flasio_create_buffers ハンドシェイクの実測問合せ順) |
 | com_ramp_b1024_d2 | ramp **0/240,640〜241,664**, underruns **0**, cb_max **15〜6,260µs** (負荷依存), T=3072 (64.0ms) |
 | com_sine_b256_d2 | sine maxErr **1.49e-8** (< 1e-5 基準), zeroRuns 0, underruns **0**, rms 0.3536 (= 0.5/√2 理論値) |
-| com_soak120_b256 (CAB-270) | **§3-2 参照** |
+| com_soak120_b256 (CAB-270) | **§3-2 参照** (9/9 PASS) |
 
 全シナリオで `getChannels 2/2, getBufferSize 0x100/0x1000/gran 0 (作成後 pref=B), type 0x13, lat_out>0` を確認。`output_ready = -1000 (ASE_NotPresent)` も実測一致。
 
@@ -65,10 +65,10 @@ win64 レイアウト static_assert (BufferInfo64=24B/buffers@8, Callbacks64=32B
 ネガティブコントロール: 上記 1 回の実 FAIL 出力 (`underruns=1 silence=512`) は run_com.mjs の判定が空振りでない
 ことの実証。soak の判定 (§3-2) については §7-2 で別途 3 経路の ablation を実施。
 
-#### 3-2. COM 経由 120s soak (CAB-270) — **8/8 実行で PASS**
-定義 (規則 36): 「8 回」= `bash tools/audio/asio/e2e.sh` (既定 = soak あり) の実行回数。1 実行 = 3 短シナリオ + 120s soak。
-所要 (e2e 1 本の wall time): **実測 139 / 139 / 140 / 141 秒** (4 回の計測値。内訳: node check + emcc build 約 18 秒 + Chrome 4 シナリオ約 121 秒)。
-load average (計測 4 回の 1 分値, 16 コア共有ホスト): 開始 2.36〜3.36 / 終了 2.02〜5.08。
+#### 3-2. COM 経由 120s soak (CAB-270) — **9/9 実行で PASS**
+定義 (規則 36): 「9 回」= `bash tools/audio/asio/e2e.sh` (既定 = soak あり) の実行回数。1 実行 = 3 短シナリオ + 120s soak。
+所要 (e2e 1 本の wall time): **実測 139 / 139 / 140 / 141 / 142 秒** (5 回の計測値。内訳: node check + emcc build 約 18 秒 + Chrome 4 シナリオ約 121 秒)。
+load average (計測の 1 分値, 16 コア共有ホスト): 開始 2.36〜3.36 / 終了 2.02〜5.32。
 
 | 実行 | ramp (bit-exact) | underruns / silence | bufferSwitchTimeInfo | cb_count | cb_max | burst→T |
 |---|---|---|---|---|---|---|
@@ -80,17 +80,18 @@ load average (計測 4 回の 1 分値, 16 コア共有ホスト): 開始 2.36�
 | 6 | **0 / 5,762,048 f** | **0 / 0** | 22,513 calls bad=0 | 22,506 | 104 µs | 1024→1536 (32.0ms) |
 | 7 | **0 / 5,762,048 f** | **0 / 0** | 22,513 calls bad=0 | 22,506 | 620 µs | 1024→1536 (32.0ms) |
 | 8 | **0 / 5,764,096 f** | **0 / 0** | 22,519 calls bad=0 | 22,514 | 179 µs | 512→1024 (21.3ms) |
+| 9 (**clean HEAD 検証**, §4-1) | **0 / 5,764,096 f** | **0 / 0** | 22,521 calls bad=0 | 22,514 | 665 µs | 512→1536 (32.0ms) |
 
-- 走査フレーム **5,758,464〜5,764,096 f** で、8 回すべて公称 120 s × 48,000 = 5,760,000 f の 99% (5,702,400 f) 以上。
+- 走査フレーム **5,758,464〜5,764,096 f** で、9 回すべて公称 120 s × 48,000 = 5,760,000 f の 99% (5,702,400 f) 以上。
   wasm 側 wall (`secs_wall`) = 実測 **120.068 / 120.071 s** (2 回の記録)、実効レート **47,988.7〜48,001.7 f/s** (公称 48,000 の −0.024%〜+0.004%)。
   未消費ぶん (`produced_frames` − covered) = 768〜1,280 f は ring 内でまだ消費されていない生成分。
-- COM 面は 8 回とも `sellog [[1,2],[2,0],[1,7],[7,0]]` / `refs_last=0` / `alive=0` / `qi_ok=1` / `hr=0/0/0` / `driver="FL Studio ASIO"` / `output_ready=-1000` / `dialogs=0` / `cmd17=0` / `getChannels 2/2` / `getBufferSize 0x100/0x1000/gran 0` / `type 0x13`。
+- COM 面は 9 回とも `sellog [[1,2],[2,0],[1,7],[7,0]]` / `refs_last=0` / `alive=0` / `qi_ok=1` / `hr=0/0/0` / `driver="FL Studio ASIO"` / `output_ready=-1000` / `dialogs=0` / `cmd17=0` / `getChannels 2/2` / `getBufferSize 0x100/0x1000/gran 0` / `type 0x13`。
 - capture SAB (120 s 分): frames=5,768,192 / **44.2 MiB** (定義: `64 + frames×(outCh+inCh)×4 + (frames/128)×4` B, outCh=2, inCh=0)。
 - short mode: `--soak 8` でも **4/4 PASS** (soak ramp 0/384,512 f = 8.01 s 分, underruns 0)。`--quick` は soak を実行しない (親 e2e `asio_ramp_b256_soak120` と同一規約)。
 
 ## 4. 既存 e2e への影響 (非破壊確認)
 
-`bash tools/audio/e2e.sh` (22 シナリオ, 本アダプタは未リンク = 影響経路なし) を 2 周実行: いずれも **21/22** で、唯一 `asio_sine_b256_96k` が 96kHz 時のブラウザ burst 観測値依存の FAIL-FAST (`fla_open: effective depth > 16` — flaudio.c の親コード内, 実行時観測) で落ちたが、**単独再実行では 2 回とも PASS** (underruns 0 / clock 95,939.9Hz・96,017.0Hz)。並行 subagent の負荷で burst 観測が伸びる環境依存であり、CAB-97 とは無関係 (HEAD の検収結果 results.json も 22/22 PASS を記録)。**マージ後の results.json は 22/22 PASS**。ASIO B=128–1024 の underrun 0 水準 (asio_loop_noise_b128/256/512, asio_ramp_b256_load, soak120 など) は維持。
+`bash tools/audio/e2e.sh` (22 シナリオ, 本アダプタは未リンク = 影響経路なし) を 2 周実行: いずれも **21/22** で、唯一 `asio_sine_b256_96k` が 96kHz 時のブラウザ burst 観測値依存の FAIL-FAST (`fla_open: effective depth > 16` — flaudio.c の親コード内, 実行時観測) で落ちたが、**単独再実行では 2 回とも PASS** (underruns 0 / clock 95,939.9Hz・96,017.0Hz)。並行 subagent の負荷で burst 観測が伸びる環境依存であり、CAB-97 とは無関係。ASIO B=128–1024 の underrun 0 水準 (asio_loop_noise_b128/256/512, asio_ramp_b256_load, soak120 など) は維持。
 
 検証時の再実行 (2026-10-11, `bash tools/audio/e2e.sh --quick`, load 1分 15.58→20.14): **21/21 PASS / exit 0 / 65 秒**。
 `--quick` は `asio_ramp_b256_soak120` を落とすので、上記の 21 シナリオには soak が含まれない
@@ -103,6 +104,7 @@ load average (計測 4 回の 1 分値, 16 コア共有ホスト): 開始 2.36�
 - `asio_sine_b256_96k` を単独 10 回再実行: 作業ツリー・clean HEAD の**両方で 10/10 abort** (`fla_open: effective depth > 16`)、すなわち今回は常時再現する既知事象。
 - 本チケットの変更は `tools/audio/asio/` のみ。親 e2e が参照するファイル (`tools/audio/{src,test,harness}`・`public/worklets/fl-audio-worklet.js`・`src/runtime`) は HEAD と**差分 0** (`diff -r` と `git status --porcelain` の両方で確認)。→ **本チケット起因の親 e2e 劣化は 0**。96k は CAB-210 (AU-11) として別途起票済み。
 - クリーン検証結果 `tools/audio/work/results_96k_head.json`・`results_parent_head.json`・`results_parent_regress.json` は `work/` (gitignore) 配下。
+- **asio e2e 自身も clean HEAD 検証**: `tools/audio/work/verify_head_final` (HEAD から `git archive`・`node_modules` symlink、作業ツリーと `diff -r` で差分 0) で `bash tools/audio/asio/e2e.sh` → **4/4 PASS / 実測 142 秒** (soak ramp 0/5,764,096・underruns 0・bsti 22,521 bad=0)。§3-2 の実行 9。
 
 ## 5. 再現手順
 
@@ -110,7 +112,7 @@ load average (計測 4 回の 1 分値, 16 コア共有ホスト): 開始 2.36�
 bash tools/audio/asio/e2e.sh              # 1 コマンド検収 (node 126/126 + Chrome 4/4 に 120s soak を含む・実測 139〜141 秒)
 bash tools/audio/asio/e2e.sh --quick      # Chrome シナリオ 3 秒短縮・soak は実行しない
 bash tools/audio/asio/e2e.sh --soak=8     # soak を 8 秒に短縮した 4 シナリオ (short mode 確認)
-node tools/audio/asio/harness/soak_recount.mjs          # 独立再計算 + JSON ablation (25 項目)
+node tools/audio/asio/harness/soak_recount.mjs          # 独立再計算 + JSON ablation (16 項目)
 node tools/audio/asio/harness/soak_recount.mjs --only-selftest   # 合成 SAB による検出器 selftest (9 項目)
 IASIO_FORCE_SHIMX_SRC=1 bash tools/audio/asio/build.sh   # shimx をソースからビルド (クリーンチェックアウト用の常設 path もある)
 bash tools/audio/e2e.sh --out tools/audio/work/results_parent.json   # 親 e2e 22 シナリオ (実測 372〜374 秒・21/22)
@@ -135,7 +137,7 @@ bash tools/audio/e2e.sh --out tools/audio/work/results_parent.json   # 親 e2e 2
 
 ### 7-1. 独立再計算 (規則 37) — `harness/soak_recount.mjs`
 実装側 `run_com.mjs` の期待関数とは**別アルゴリズム**で `work/results_com.json` を再計算する。
-コマンド: `node tools/audio/asio/harness/soak_recount.mjs` → **25/25 PASS (0 FAIL)** (14 再計算 + 2 ablation + 9 selftest)。
+コマンド: `node tools/audio/asio/harness/soak_recount.mjs` → **16/16 PASS (0 FAIL)** (14 再計算 + 2 JSON ablation)。`--selftest` を付けると合成 SAB selftest 9 項目が加わり **25/25 PASS**。
 
 | ID | 突合するもの (別導線) | 実測 |
 |---|---|---|
