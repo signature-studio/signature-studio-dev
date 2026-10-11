@@ -2,6 +2,10 @@
 // 実装側スクリプト (pack.ts / asset.ts) を一切 import せず、node の fs + zlib + crypto だけで
 // manifest → chunk 取得 → 連結 → wasm 検証 をやり直す。加えて ③④ のネガティブコントロールを含む。
 //
+// 再現 (work/ は gitignore なので都度生成する):
+//   node test/make-asset-pkg.ts && node test/asset-e2e.ts && node test/verify-asset-indep.ts
+// 既定では work/asset-expected.json と work/pkg-asset と work/results-asset-e2e.json を読む。
+//
 // 数え方の定義 (規則 36):
 //   chunk 数 = manifest の chunks.n (= c/ 配下のユニーク object 数と一致することを別途確認)
 //   chunk 一致 = brotli 復号後の sha256 先頭 32 hex (=128bit) が manifest chunks.id の該当 32 文字と一致
