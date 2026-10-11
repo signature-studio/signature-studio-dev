@@ -122,9 +122,9 @@ matrix 全体 (89 scenario × 出力 50,236 cell) の native bit 一致: 旧 cha
    (SR は harness が `obj+0x18` を直接書く)。native coverage 外の経路で未 lift callee 17 (CRT 誤差報告・lock) に入ると fail-fast。
 4. DllMain (CRT 初期化・static ctor) は実行しない。`__use_fma3`/`__isa_available` 等は DLL 静的値 (0) のまま。lock は no-op (単スレッド)。
 5. NaN の符号・payload は engine 依存 (x86 sqrtsd の default NaN は負符号)。有限値出力に影響しない。
-6. 旧 REPORT 群 (m6–m10) の記述は下記 §6.1 の通り誤りだが、tools/m6..m10・README・MILESTONES は読取専用/メイン担当ゆえ未改訂 (T6)。
+6. 旧 REPORT 群 (m6–m10) の記述は下記 §6.1 の通り誤りだが、tools/m6..m10 は読取専用・状態表はメイン (PM) 担当ゆえ未改訂 (T6)。
 
-### 6.1 旧説の訂正 (m6–m10 REPORT / README / MILESTONES の M9・M10 記述に対して)
+### 6.1 旧説の訂正 (m6–m10 REPORT / README / 旧状態表の M9・M10 記述に対して)
 
 | 旧記述 | 訂正 (本回の実測) |
 |---|---|
@@ -133,7 +133,7 @@ matrix 全体 (89 scenario × 出力 50,236 cell) の native bit 一致: 旧 cha
 | M10→M11 引継: 「[0x248]=1 の x cell denormal 入力 deref 欠落」 | 同上 (二次症状)。lifter 版は [0x248]=0/1 とも native と 512/512 bit 一致 |
 | M8–M10 harness の `U8[obj+0x326]=0` / setParameter(19,0) 経由で junk 経路に入る | 標準 sequence の旧 chain は出力全 0。上記操作で処理経路へ入っていた (観測条件の人為性, §2.1-2) |
 | bit-exact 参照は native 不可 (SEH 依存) / mac AU 等が必要 | 誤り。DLL 機械語を Linux に敷設して直接実行可能 (§3) |
-| MILESTONES: bit-exact 判定は junk-free 確保後 / native poly tan ulp マージ留保 | 解消: 0 ulp 達成 (tan/exp/log/pow も DLL 自身の機械語を lift) |
+| 旧状態表 (現 `docs/STATUS.md`): bit-exact 判定は junk-free 確保後 / native poly tan ulp マージ留保 | 解消: 0 ulp 達成 (tan/exp/log/pow も DLL 自身の機械語を lift) |
 | M10 の junk 閾値 (\|v\|≥4) | 目安に過ぎない: params=1.0 では正当出力が 472 まで出る。junk = native と bit が異なる cell と再定義 |
 
 ## 7. 下流チケット案
@@ -147,7 +147,7 @@ matrix 全体 (89 scenario × 出力 50,236 cell) の native bit 一致: 旧 cha
   AudioWorklet から駆動する wasm ABI (`ott_run` → 型付き export) を M7/M8 (オーディオパス) に接続。
   → **入口 lift 拡張は実施済み** (CAB-137): `tools/ott/entry/` — VST entry 41 関数を lift し native 実機械語と 85 scenario 全突合 (REPORT 同梱)。AudioWorklet ABI 結線は別チケット (CAB-122 系)
 - **T5**: CRT 初期化を実行する経路 (DllMain → `__scrt_*` → static ctor) を native/wasm 双方で再現し、override 4 件を native 実測で置換。
-- **T6 (docs)**: MILESTONES/README の M10 記述に「junk 原因 = RetDec の間接 call 脱落ほか D1–D6、解決 = tools/ott の自作 lifter」を追記 (メイン担当)。
+- **T6 (docs)**: `docs/STATUS.md` / README の M10 記述に「junk 原因 = RetDec の間接 call 脱落ほか D1–D6、解決 = tools/ott の自作 lifter」を追記 (PM 担当・2026-10-12 再編で反映済み)。
 
 ## 8. 再現
 

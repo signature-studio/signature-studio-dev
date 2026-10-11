@@ -1,6 +1,5 @@
 # KH-11 — subscribe 経路の実 IR 化 + module E -O1 化 (CAB-247 残スコープ, 親 CAB-59/CAB-13)
 
-- preflight: RULES_SHA=ae9c6d414f7d (2026-10-11 2 回目)
 - 1 コマンド再現: `bash tools/targets/kilohearts/license/run_all.sh` (実測 33〜36 s 単発・load average 2.79→2.90 (nproc=16)、`--zero-stack` はデフォルトで compare に付与済み)
 - 独立再計算: `python3 scripts/kh11_audit.py` (出力は §4 に転記)
 - 検証起点: HEAD `0d589e6` (feat(liftlib): leaf region phi synthesis) + 本変更。作業ツリー変更のみで clean HEAD 検証は §5 の手順参照
@@ -106,7 +105,7 @@ V28 検収時点で subscribe 0x1800526f0 は `ret` no-op seam (scen_em.h の im
 | subscribe 経路有効化に伴う functor offset の未初期化 qword コピー | native image パッチ + wasm IR 対称修正で 0 確定にしたが、FL コード本来の UB (パディング未初期化) | (a) 本 REPORT / (b) 親 CAB-13 |
 
 ## 7. 環境前提 (規則 43)
-- `run_all.sh` が `PATH=/opt/emsdk/node/24.19.0_64bit/bin` を設定。TMPDIR 未設定 (/tmp tmpfs) だが大物は `license/work/` (gitignore) のみ。
+- `run_all.sh` が `[EMSDK]` 同梱 node 24.19.0 (`node/24.19.0_64bit/bin`) を PATH に設定。TMPDIR 未設定 (/tmp tmpfs) だが大物は `license/work/` (gitignore) のみ。
 - `CORE=../work/winpkg/HeartCore.core_64` は**相対パス**。work/ 配下に別 snapshot を展開する場合のみ `work/winpkg -> ../winpkg` symlink が必要 (本ラウンドでは未使用)。
 - ネイティブ oracle の image パッチ (functor offset 0 確定化) は `patch_em()` 内で毎 run 適用 (bytes 検証付き・不一致時 exit(9))。
 

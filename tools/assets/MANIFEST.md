@@ -53,7 +53,7 @@
 ## パッキング規則 (`pack/pack.ts`)
 
 1. 内容 SHA-256 で重複除去 (同一内容の複数配置は同一葉を共有)。
-2. 並び順 = (tier, 大ファイルか, path 小文字)。tier は `bootset/classify_bootset.py` の `work/tiers.json`。**同 tier の小ファイルが連続して同じ pack chunk に入り、ブート chunk 群が連続範囲 (groups.T0/T0p) になる**。
+2. 並び順 = (tier, 大ファイルか, path 小文字)。tier は `bootset/classify_bootset.py` が出力する `work/tiers.json` (推定 tier の内訳と根拠は **自動生成** `bootset/BOOTSET.md`)。**同 tier の小ファイルが連続して同じ pack chunk に入り、ブート chunk 群が連続範囲 (groups.T0/T0p) になる**。
 3. 小ファイル (≤128KiB) は同 tier 内で 1MiB まで pack。tier が変わるたび flush。大ファイルは 1MiB 毎に専用 chunk。
 4. 圧縮: 拡張子で不可能なもの (wv/flac/ogg/mp3/png/jpg/zip) は raw。256KiB 超は先頭 64KiB を br q3 で試し >98.5% なら raw。本圧縮後に >97% なら raw。
 5. chunk 内容ハッシュが既出なら再書き込みしない (`stats.dedupeSavedUsize`)。

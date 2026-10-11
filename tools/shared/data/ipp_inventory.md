@@ -1,3 +1,7 @@
+# 自動生成: `tools/shared` の IPP export 実測抽出 driver
+
+> **人手編集禁止** (生成元を直す)。本ファイルは測定・抽出結果の**単一の正本**。
+
 dsp_ippv2 export: win x64 446 (ipps 366 / ippi 71 / core+Agg 9), mac 434
 ※ 以下 win/mac 使用数は VAR 直接参照のみの下限値 (二段間接を除く)。確定値は tools/ipp: win 229 / mac 234 / 和集合 239 / loader 420 名
 win 使用 (VAR 直接参照のみ): distinct 12 / PE 54  族別 {'memory': 4, 'arith_reduce': 3, 'transcendental': 3, 'dsp_filter_fft': 1, 'image': 1}

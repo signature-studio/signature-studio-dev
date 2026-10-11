@@ -1,5 +1,10 @@
 # RetDec lift の silent miscompile 類型 (CAB-55 検出器入力) — Kilohearts snap-in 6 本で観測
 
+> **正本**: 本ファイル (`docs/DEFECTS.md`) が lift / 逆アセ / IR pass / ハーネス系の
+> silent miscompile 類型 (D1a〜D16) の横断正本。lift 系の作業は着手前に必ず読む (`docs/WORKFLOW.md` §4)。
+> **番号体系の注意**: `tools/icall/REPORT.md` §4 の `D1〜D13` は**別体系** (そこでは D1=間接 call/jmp 脱落、
+> D9=capstone disp_size 誤り)。「D9」等と書くときは `(DEFECTS.md)` / `(icall §4)` を必ず併記する。
+
 - 凡例: **既知** = Gain PoC / M5〜M9 で既出と同型、**新規** = 本タスクで初観測。層: `fe` = RetDec frontend (capstone2llvmir; stage-0 で既に欠陥) / `opt` = RetDec 内部最適化 (stage-0 は正しい) / `ours` = 我々のパイプライン/ハーネス。
 - 検証: 各行の「証拠」は `work/<snap-in>/abl_*` の ablation (200 trial, 一致 trial 数)。
 

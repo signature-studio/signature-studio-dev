@@ -1,6 +1,8 @@
 # tools/ipp/shim — dsp_ippv2 ローダ shim + 署名 thunk 自動生成 (CAB-134)
 
-preflight: RULES_SHA=ff4999169333
+> 正本: `tools/ipp/shim/REPORT.md`。
+> **行数目安**: 本ファイルは 250 行を超過 (`docs/DOC_MAP.md` §1 の上限ルール参照)。
+> 超過分は Git 履歴に残る形での分割移動を推奨 (**内容は削除しない**)。
 
 再現: `bash tools/ipp/shim/shim_e2e.sh` (前提 `tools/ipp/ipp_e2e.sh` の成果が `work/` にあること。無ければ自動実行。前提ありで実測 21.3〜22.5 秒 (§15 参照・負荷依存)、exit 0 = **13 checks PASS** [CAB-262 で S13 追加])。検証起点 commit: `b8e762d` (HEAD, 自分の起点)。大物は `tools/ipp/work/shim/` (gitignore)。数値はすべて実測、推定は「推定」と明記。
 
@@ -411,7 +413,7 @@ V==H (it=6)、cubic との差の定量化、GetBufSize 実測。
   ハッシュ一致) のみで、wasm 側の単独テストはしていない。it=7 の残差 31 px の原因 (丸め経路) は未追跡 (it=5 と同種の ±1)。
 - **未解決**: it=4 のカーネルが MN でない理由 (線形項付き) は未解明 — 影響なし (0.027%) で起票先なし (既存許容差)。
   GetBufSize の it=5/6/7 旧値 (Lanczos 式) を踏んでいた呼出元はなし (FL は ResizeSqrPixel 使用・§12-3)。
-- **環境前提**: `/opt/emsdk` (emcc)、実 DLL の絶対パス `/home/ubuntu/work/analysis/win64/extracted/block24356_PE.bin` (pe_load が直接読む)、
+- **環境前提**: Emscripten (`[EMSDK]`・emcc)、実 DLL は `docs/REFERENCES.md` `[WIN64]` の `extracted/block24356_PE.bin` (pe_load が直接読む)、
   `tools/ipp/work/` の gitignore データ (golden・win_refs・baseline・spike ログ — `tools/ipp/ipp_e2e.sh` が生成)。
   TMPDIR は未指定 (ネイティブ gcc/emcc は小物のみ)。/tmp は tmpfs 3.7GB だが本節の産物はすべて `work/` (実ディスク)。
 - **独立再計算の実行出力** (`python3 shim/verify_cab274_kernel.py`、impl 非リンク):

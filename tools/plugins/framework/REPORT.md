@@ -1,6 +1,5 @@
 # P0b REPORT — TFruityHost shim (CAB-195)
 
-- preflight: RULES_SHA=ae9c6d414f7d (SUBAGENT_RULES.md 読了の証跡)
 - 検収起点 commit: **9b420bd** (`tools/plugins/framework` ツリーは b8e762d と同一: `git diff b8e762d HEAD -- tools/plugins/` = 0 行)
 - 行数目安: 実装部 (§0-§9) 187 行 + 検収記録 (§10-§11) 105 行 + CAB-194 検収 (§12) 78 行 + CAB-269 (§13) 118 行 = 488 行
   (実ファイル 476 行)。検収記録・修正記録は規則 37〜42
@@ -178,8 +177,8 @@ FLE 側 case 別応答値の**意味論**は未解析 (FL 本体の case 分岐�
 
 ## 8. ユーザ依頼事項
 
-- なし (Balance = `analysis/win64/extracted/block18983_PE.bin` で足りた)
-- FLEngine_x64.dll (win64) 本体を `analysis/win64/extracted/` に置いていただければ
+- なし (Balance = `docs/REFERENCES.md` `[WIN64]` の `extracted/block18983_PE.bin` で足りた)
+- FLEngine_x64.dll (win64) 本体を `docs/REFERENCES.md` `[WIN64]` の `extracted/` に置いていただければ
   `hs_vtable_gen.py` で slot VAs を再生成・assert 検証できる (現在は ABI.md §2.3 確定値を使用)。
 
 ## 9. 次タスク提案 (下流チケット案)
@@ -287,10 +286,10 @@ git 管理外成果物。
 
 ## 11. 環境前提
 
-- emsdk: `source /opt/emsdk/emsdk_env.sh`。node は `/opt/emsdk/node/24.19.0_64bit/bin/node`
+- emsdk: `[EMSDK]` の `emsdk_env.sh` を source。node は同梱 `node/24.19.0_64bit/bin/node`
   (既定 PATH に `node` が無い)
 - TMPDIR は実ディスク (`tools/plugins/work/hs/tmp`, gitignore)
-- 素材 (読取のみ): `analysis/win64/extracted/block18983_PE.bin` (Balance)・
+- 素材 (読取のみ): `docs/REFERENCES.md` `[WIN64]` の `extracted/block18983_PE.bin` (Balance)・
   `block00031_PE.bin` (FLEngine, VMT 照合)
 - 中間産物: `tools/plugins/work/hs/` (gitignore, ~360 MB)
 
@@ -298,7 +297,7 @@ git 管理外成果物。
 
 ## 12. 検収記録 — CAB-194 (77cde78) (2026-10-11 / 起点 commit 85424b0)
 
-- preflight: RULES_SHA=ff4999169333 / 既知類型との関係: **該当 D7 (stack 引数・戻り値)・
+- 既知類型との関係: **該当 D7 (stack 引数・戻り値)・
   D15 相当 (間接 call の保存率) と該当なし (alloca 縮退は DEFECTS.md 未登録で本節で再記録)**
 - 範囲: 77cde78 は **22 ファイル 3,465 行すべて `tools/plugins/framework`** (他 dir 0 行)。
   commit 内最大 blob = 350,589 B = 0.33 MiB (20 MiB ライン未満)。`git status` は担当外 WIP
@@ -401,7 +400,7 @@ stage-1 成果物を再利用 (RetDec 再 decode は未実施) (e) 7,058 site �
 
 ## 13. CAB-269 (2026-10-11) — `fw_stage2.sh` S1-S4 修正と 1 コマンド e2e 復旧
 
-- preflight: RULES_SHA=ff4999169333 (読了の証跡) / 既知類型との関係: **該当 D7 (stack 引数・戻り値)・
+- 既知類型との関係: **該当 D7 (stack 引数・戻り値)・
   該当なし** (S2 は手書き pass の採番衝突で DEFECTS.md 未登録 → §13.7 に行案)
 - 検証起点: 本節の全実測は `git archive HEAD -- tools/plugins/framework` の **snapshot** から再実行
   (snapshot commit c737c4a。`git diff db6565c c737c4a -- tools/plugins/framework` = 0 行 = 本修正ツリーと同一)。

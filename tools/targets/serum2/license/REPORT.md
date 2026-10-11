@@ -1,6 +1,6 @@
 # Serum2 認可機構 呼出点マップ (CAB-71 / SR-2)
 
-- 解析日: 2026-10-10 / 対象: Win x64 `Serum2.vst3` (19,236,864B, .text 10,593,334B, .pdata 33,791 関数) / 方針: `tools/docs/LEGAL.md` §6.0 (ライセンス機構無力化・無条件アクティベーション・ライセンス状態データはユーザ承認の下で配置/合成可)
+- 解析日: 2026-10-10 / 対象: Win x64 `Serum2.vst3` (19,236,864B, .text 10,593,334B, .pdata 33,791 関数) / 方針: `docs/LEGAL.md` §6.0 (ライセンス機構無力化・無条件アクティベーション・ライセンス状態データはユーザ承認の下で配置/合成可)
 - 本タスクは **特定まで** (stub 実装は下流)。再現: `python3 license/scripts/authmap.py work/Serum2_win64.vst3 license/work` → `python3 license/scripts/zone.py license/work/graph.pkl <VA>` → `bash license/scripts/ghidra_auth.sh` (Ghidra light でターゲット 167 関数を decompile, 約3分)。
 - 断定の凡例: confidence **high** = デコンパイル実測 / **med** = 静的照合 (xref・vtable・定数) / **low** = 推定 (明記)。
 

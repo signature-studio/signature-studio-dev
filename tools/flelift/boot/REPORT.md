@@ -1,5 +1,9 @@
 # tools/flelift/boot — FLE-2〜FLE-5: x64c lift による FLEngine boot 連鎖 (DllMain → _InitLib → InitUnits)
 
+> 正本: `tools/flelift/boot/REPORT.md`。boot 連鎖 (FLE-2〜FLE-5) の詳細。
+> **行数目安**: 本ファイルは 250 行を超過 (`docs/DOC_MAP.md` §1 の上限ルール参照)。
+> 超過分は Git 履歴に残る形での分割移動を推奨 (**内容は削除しない**)。
+
 ## 0. 結論 (先出し)
 
 - **判定 (累積, FLE-5 末): unit 進行は 209 止まり、survey は全 942 unit で functional**

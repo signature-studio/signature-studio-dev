@@ -1,5 +1,8 @@
-# shimx inventory — 実装済み / 未実装 / 対象外 (実測)
+# 自動生成: `tools/shimx` の export 走査
 
+> **人手編集禁止** (生成元を直す)。本ファイルは測定・抽出結果の**単一の正本**。
+
+# shimx inventory — 実装済み / 未実装 / 対象外 (実測)
 ## 結論
 
 - **FLEngine_x64.dll 静的 import 738 個のうち shimx 実装 358 (機能 243 + スタブ 115) = 48.5%** (libc 解決の `memset` 込み 48.6%)。

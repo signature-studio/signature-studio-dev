@@ -1,7 +1,5 @@
 # 検収 REPORT — CAB-238 (`ott --auto f7,p1` 既定化) + CAB-135 (AVX/VEX lift / FMA bit-exact)
 
-preflight: RULES_SHA=ae9c6d414f7d (着手時 preflight 出力 = SUBAGENT_RULES.md 154 行・2026-10-11 06:42 の読了証跡)
-※ 本ファイル執筆中 (2026-10-11 08:45) に SUBAGENT_RULES.md が 46 → 50 規則へ更新された (RULES_SHA=ff4999169333)。
    手持ちの 46 規則で検収を実施。差分の規則 47 (検収 agent: 合格 → Done + 検収コメント / 条件付き → **In Review 維持**)
    は本検収の選択 (無限ルーブ未修のため In Review 維持・所見コメント) と整合するため再実行は不要と判断。
 
@@ -111,7 +109,7 @@ census は §1 の定義 (256 sample / param 0.5)。
 | fpctl 10/10 | flags=0: **10/10 PASS** / FMA 強制: **10/10 PASS** (mxcsr dance / rcr site 両側 hit) | **PASS** |
 | VEXCOV (buffer 0x35c00000, node OOM 解消) | native 実行 insn **5,436** / wasm VEX hit **182 種** / **hit ⊆ native 実行 OK**。mavx_cov も **9/9 PASS** (旧 run2.log の `memory access out of bounds` 4 FAIL は **解消**) | **PASS** |
 | pcfuzz2 pcmpistri 0x40 実機 150,000 case | `pcfuzz2 150000 12345`: **model == hw (150,000 cases)** = 0 不一致 (実測 0.077 s) | **PASS** |
-| 回帰 (crt_e2e / ott_e2e 89/50,236 / entry) | `crt_e2e.sh` **PASS** (crt 9/9 + entry 85/85 + 陰性対照 both OK + ott_e2e PASS + entry_e2e PASS)。`ott_e2e.sh`: **89 scenario / 50,236 cell / max_ulp 0 / state 差 0 qword**。`entry_e2e.sh --quick`: **10/10 PASS** (dsp_verified 30 / entry_new_verified 14) | **PASS** |
+| 回帰 (crt_e2e / ott_e2e / entry) | `crt_e2e.sh` **PASS** (crt 9/9 + entry 85/85 + 陰性対照 both OK + ott_e2e PASS + entry_e2e PASS)。`ott_e2e.sh`: **89 scenario / 全 cell max_ulp 0 / state 差 0 qword** (cell 総数の正本は `tools/ott/REPORT.md` §2)。`entry_e2e.sh --quick`: **10/10 PASS** (dsp_verified 30 / entry_new_verified 14) | **PASS** |
 
 - Gate A (flags=0): crt 9/9 + entry 85/85 = **94/94 PASS**。
 - `__isa_available` は DLL 静的値 (SSE2) 固定維持で決定 (実装 REPORT §3 と同旨)。強制切替でも
@@ -198,9 +196,9 @@ OTT_CJS=work/cab238/p1_one_1801204b9/ott_gen.cjs V=0.9 F=1 A=0 timeout 30 \
 
 ## 10. 環境前提 (規則 43)
 
-- `source <(bash /home/ubuntu/work/analysis/preflight.sh --env tools/ott)` で PATH (node 26.10 / emsdk)
-  と TMPDIR を修復。`avx/avx_e2e.sh` は node を `/opt/emsdk/node/24.19.0_64bit/bin/node` に固定し
+- 環境: `bash tools/ott/env.sh` (PATH: node 26.10 / emsdk、所在は `docs/REFERENCES.md` `[EMSDK]`)
+  と TMPDIR を修復。`avx/avx_e2e.sh` は node を `[EMSDK]` 同梱 (`node/24.19.0_64bit/bin/node`) に固定し
   相対パス `work/avx/...` を参照するため **cwd = tools/ott で実行**すること。
 - 必要: python3 (capstone, pefile), gcc/clang, emsdk 6.0.12, node ≥ 22, setarch。
-  DLL は `/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll`。
+  DLL は `docs/REFERENCES.md` `[ANALYSIS-PLUGINS]` の `plugins/ott/binaries/OTT_vst2_win64.dll`。
 - snapshot の `../m6 ../m8 ../m9 ../m10 ../shim` は symlink (読取専用・改変 0 行)。

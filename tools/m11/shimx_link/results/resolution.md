@@ -1,5 +1,8 @@
-# 外部参照の解決状況 (gen_link.py 分類; shimx は nm 実測)
+# 自動生成: `python3 tools/m11/shimx_link/gen_link.py`
 
+> **人手編集禁止** (生成元を直す)。本ファイルは測定・抽出結果の**単一の正本**。
+
+# 外部参照の解決状況 (gen_link.py 分類; shimx は nm 実測)
 | 区分 | boot_final2.ll (shimx REPORT の 557) | 現行リンク対象 boot_final3.ll |
 |---|---|---|
 | 外部参照 総数 | 557 | 570 |

@@ -11,7 +11,7 @@
 - **設計決定**: 「1 DLL = 1 wasm instance = 専用 linear memory」+ VST2 境界の table 駆動 marshalling (共有メモリ方式は VA 焼付け/関数名 `function_<VA>` 衝突で不採用)。
   `LoadLibrary/GetProcAddress/FreeLibrary` は事前登録モジュール表へ解決し、関数ポインタは bridge 払い出しの合成 VA (thunk slot)。詳細 `HOSTBRIDGE.md` §2。
 - **PoC**: FL 側の代役 mini host (freestanding wasm32 C, 3.7 KB) が Wrapper と同手順で **M10 の lift 済み OTT wasm** をロードし `processReplacing` を駆動。
-  bridge 経由出力は直接呼出と **512/512 bit 一致**。`obj+0x248=0` (M10 e2e 条件) では **M10 の出力と 512/512 一致 (junk census 132/69/175/136 同値)** = 「M10 到達水準をそのまま bridge 越しに再現」。音質正当性は別チケット。
+  bridge 経由出力は直接呼出と **512/512 bit 一致**。`obj+0x248=0` (M10 e2e 条件) では **M10 の出力と 512/512 一致 (junk census は `tools/ott/REPORT.md` §2.3 の旧 chain 行と同値)** = 「M10 到達水準をそのまま bridge 越しに再現」。音質正当性は別チケット。
   **注意 (参照の性質)**: この 512/512 一致の両辺はどちらも **RetDec lift 済み wasm (M10 chain) の出力**であり、native 機械語実行との比較ではない。M10 chain の出力は junk (census: junkHi 175 / junkTiny 136 / 512) を含むため、これは「bridge が lift 済み plugin の挙動を変えない (透過性)」の証明であって **DSP 正当性の証明ではない** (junk 同士の一致)。tools/ott (R, f4e0514) が native OTT 機械語の VA 敷設実行を参照に、RetDec lift の間接 call 脱落 (D1) 等が junk の主因と結論済み (正解出力は junk 0/512)。bridge を R の x64c lift 版 closure へ差し替えての native 照合は未実施 → 下流 H2 で実施。
 
 ## 1. 実測 (全て `work/poc_result.json` / `work/e2e.log` 由来)
@@ -22,7 +22,7 @@
 | AEffect (host 側 proxy) | name/vendor/product=OTT/Xfer Records/OTT, uniqueID=0x58665454 ('XfTT'), in/out=2/2, numParams=20, numPrograms=1, flags=0x18 (CanReplacing, HasEditor 無) |
 | upcall | audioMasterVersion×1 (VSTPluginMain 内, ネイティブ同様 NULL→0 なら失敗), GetSampleRate×1 (effOpen 内) |
 | bit 一致 (bridge vs 直接) | `processReplacing` 256f×2ch: **0/512 diff**。A/B 2 本交互 2×128f: diffA=0, diffB=0。2 本目 instance 出力 = 1 本目 (同一 HMODULE, refcount=2, 別 AEffect) |
-| bit 一致 (vs M10 e2e) | `[0x248]=0` 条件: **0/512 diff** (census zero 132 / normal 69 / junkHi 175 / junkTiny 136 = M10 と同値) |
+| bit 一致 (vs M10 e2e) | `[0x248]=0` 条件: **0/512 diff** (census は `tools/ott/REPORT.md` §2.3 の旧 chain 行 = M10 と同値) |
 | 自然フローの経路 | `obj+0x248` 既定値 = **1** (ctor 直後も 1)。census zero 4 / normal 254 / junkHi 252 / junkTiny 2 (= M10 REPORT §3.3 の `[0x248]=1`)。M10 は手で 0 に強制 |
 | bridge オーバーヘッド | getParameter 往復の bridge 経由絶対値 **0.39–0.44 µs/call** (静穏時の最良値; 直接呼出 0.11 µs → 純増 ≈0.3 µs)。検収で 5 回再実測すると CPU 共有のため 0.77–1.62 µs (純増 0.48–1.33 µs) まで変動。128f processReplacing の bridge−直接差は静穏時 −21〜−4 µs だが再実測では −303〜+92 µs (予算 2902 µs の −10.4%〜+3.2%) とばらつく = 測定誤差大で「±1% 未満」は静穏時のみ。RT 予算比では概ね 10% 未満 (T7) |
 | DSP 自体 (参考) | `-O0 -g1` 版 lift で 128f あたり 395–887 µs (予算比 14–31%) |
@@ -90,6 +90,6 @@
 
 ## 6'. 規約遵守メモ
 
-- 書込は `tools/hostbridge/` のみ。`tools/m2,m6..m10` は読取 (Ghidra project は `work/` へコピー、`ott_m10.ll` も `work/` へコピー)。README/MILESTONES/HANDOFF/ルート package.json 無改変。
+- 書込は `tools/hostbridge/` のみ。`tools/m2,m6..m10` は読取 (Ghidra project は `work/` へコピー、`ott_m10.ll` も `work/` へコピー)。README/docs/・ルート package.json 無改変。
 - 外部通信・認証系・Vital/Surge/Dexed は不使用。`work/` (471 MB: Ghidra project コピー/抽出 PE 等) は `.gitignore`、再生成は `analysis/reproduce.sh`。
 - EULA: 事実整理のみ — 本成果物は **lift 済み wasm/PE 実体をコミットしない** (評価時にユーザ手元のインストーラから生成)。`evidence/` には FL 実バイナリの Ghidra decompile/disasm 抜粋 (~75 KB) を含む。VST2 SDK ヘッダ不使用 (ABI は binary 証拠から自作)。

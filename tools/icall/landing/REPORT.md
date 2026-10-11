@@ -155,7 +155,7 @@ typed except (kind>2, filter 付き) は全体で 183 entry / 216 descriptor / 2
      検収: 例外を投げる unit 初期化関数 1 本の native vs wasm 通し一致。
   3. **OTT funclet の実行検証** — MSVC funclet ABI 整形 + `__CxxFrameHandler` スタブ、母数 +2,094。
   4. **lift_pad.py のループ対応** — backedge phi 反復解決で OTT +474 断片 (静的)。
-- ユーザ依頼事項: なし (素材は既設の analysis/ 配下を使用)。
+- ユーザ依頼事項: なし (素材は `docs/REFERENCES.md` `[WIN64]` / `[MAC]` / `[DOWNLOAD]` の既設抽出物を使用)。
 
 ## 10. 再現
 
