@@ -289,3 +289,6 @@ FVN hash 比較のみの harness に対し、以下を自前実装して検算 (
 
 ### 12.6 ファイル (本節の検出物)
 `oss/ffmpeg/build.sh` (emconfigure 引数修正) / `scripts/indep_audio_verify.py` (独立再計算・別アルゴリズム) / `data/ilsvg_version.json` (svgren 下限・agg・papki の訂正) / `work/` は gitignore。
+
+### 12.7 検収時の運用変更 (記録)
+着手時の RULES_SHA は **ff4999169333** (SUBAGENT_RULES.md 228 行)。検収中にファイルが更新され、報告時点 (2026-10-11 14:06) は **RULES_SHA=4d7380074852** (285 行) になっている。主な変更は ① \`git reset\`/\`stash\`/\`checkout --\` の全面禁止と「reset せず fix コミットを積む」、② **Linear free issue limit 到達 (**新規起票禁止**・起票案はコメントに) — 本検収でも子チケット作成を試み \`invalid_request: You've exceeded the free issue limit\` で失敗し起票案コメントに変更した、③ **Linear 廃止・GitHub Issues + worktree/PR フローへの移行** (旧 Linear は 2026-10-12 以降読み取り専用、対応表 \`analysis/CAB_TO_GH.md\`)。Linear 側の検収コメント・状態変更は変更前に実施済み。GitHub 側への反映は main 判断。
