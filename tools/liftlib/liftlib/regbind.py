@@ -144,10 +144,57 @@ class Binder:
         self.ix = ix if ix is not None else FuncIndex(mod, fn)
         self.params = fn.params()          # [(type, %name)]
         self.notes = []
+        self._xmm0_ret = {}               # callee VA -> True/False/None (未決) のキャッシュ
+
+    # ---- xmm0 戻り関数の判定 (LIFTLIB-3 汎用 xmm0-ret bind) -------------------
+    def callee_returns_xmm0(self, target):
+        """callee が xmm0 に double bits を返す (結果を xmm0 へ書く) と推定する。
+
+        命名規則 (関数名・C port 名) に依存せず, callee の機械語だけで決める:
+          1. 全 `ret` ブロックで xmm0 の到達定義が関数内 (ENTRY でない) = 値を書いて返す
+          2. 入口で xmm0 が引数として live-in (読まれる) — 読み取り専用/参照渡しは除外
+          3. 戻り先 (call site) で xmm0 が call 後に読まれる (結果を消費する)
+        の 3 条件。判定不能 (命令が取れない等) は None (= 使わない)。
+        """
+        if target in self._xmm0_ret:
+            return self._xmm0_ret[target]
+        r = None
+        try:
+            rng = self.mf.img.func_at(target)
+            if rng is not None:
+                from .mc import MFunc
+                cmf = MFunc(self.mf.img, *rng)
+                rets = [va for va in cmf.order if cmf.insns[va].is_ret]
+                if rets:
+                    ok = all(cmf.defs_before(v, "xmm0") and 0 not in cmf.defs_before(v, "xmm0")
+                             for v in rets)
+                    live = cmf.live_in()
+                    ok = ok and ("xmm0" in live)
+                else:
+                    ok = False
+                if ok:
+                    r = True
+                else:
+                    r = False
+        except Exception:                # noqa — 判定不能は「使わない」
+            r = None
+        self._xmm0_ret[target] = r
+        return r
+
+    def xmm0_ret_of_call(self, va):
+        """call 命令 va の戻りが xmm0 (double bits) と推定できるなら True。"""
+        it = self.mf.insns.get(va)
+        if it is None or not it.is_call or it.target is None:
+            return False
+        return bool(self.callee_returns_xmm0(it.target))
 
     # ---- 値の def 検索 ----------------------------------------------------
     def value_defined_at(self, reg, va):
-        """命令 va で reg に書かれた値を表す IR (name, type)。"""
+        """命令 va で reg に書かれた値を表す IR (name, type)。
+
+        LIFTLIB-3: reg が xmm0 で, va が xmm0 戻り callee への call のとき, call の
+        i64/i32 戻り (rax) を xmm0 のビット列として拾う (従来は明示的 C port 名のみ)。
+        """
         want_xmm = reg.startswith("xmm")
         cand = None
         for (bi, li, ln) in self.ix.instrs_at(va):
@@ -158,6 +205,8 @@ class Binder:
             if want_xmm:
                 if ty == "i128":
                     cand = (d, ty)
+                elif ty in ("i64", "i32") and self.xmm0_ret_of_call(va):
+                    cand = (d, ty)          # xmm0 bits = i64 戻り (zext は呼出側で)
             else:
                 if ty in ("i64", "i32", "i16", "i8"):
                     cand = (d, ty)
@@ -285,6 +334,16 @@ class Binder:
             elif eff and eff <= covered:
                 if best is None or len(covered) < len(best[1]):
                     best = (a, covered)
+        if best is None and reg == "xmm0":
+            # LIFTLIB-3 フォールバック: def のうち xmm0 戻り callee への call が 1 つでも
+            # あれば, 複数経路の合流値を「最後に call した結果」と見なせる場合に限り採る。
+            # (def 集合が「同一 call の前後 (ENTRY 含む) 」= 実質その call の戻り, 例 tan 0x1801a9e39)
+            calls = [d for d in want if d and self.mf.insns.get(d) is not None
+                     and self.mf.insns[d].is_call and self.xmm0_ret_of_call(d)]
+            if calls and len(calls) == 1:
+                v = self.value_defined_at("rax", calls[-1])
+                if v is not None and v[1] in ("i64", "i32"):
+                    return v                 # call の i64/i32 戻り = xmm0 bits
         if best is None:
             return None
         a = best[0]

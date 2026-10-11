@@ -88,8 +88,17 @@ def run(workdir, build=True, helpers="gen", auto=(), lb_base=None):
     text, brep = B.run_base(raw, B.make_args())
     mod0 = IR.Module.parse(text)
     if auto:
-        from ..passes import f7 as F7, p1 as P1
+        from ..passes import f7 as F7, p1 as P1, f2 as F2
         st_a, lg_a = {}, []
+        # LIFTLIB-3: f2 の callee 相を auto の先頭に入れる。CRT leaf (exp/log/tan 系) が
+        # 入口 xmm を読むのに IR 側に値が無く p1 の dropped 領域で `bind xmm0/xmm1` が
+        # 失敗していた (残留 21 の主因)。%xmmK_bits 引数を先に足しておくことで
+        # 残留 21 → 15, bind xmm0 6 → 1 に減る (実測 xmm0_ret_census.py / dbg_reason.py)。
+        # callsite 相は recipe 側の名前依存 wiring (m9_d* C port) と衝突するため既定では
+        # 入れない (--auto f2 で明示指定時のみ有効)。
+        if "f2" in auto:
+            F2.run(mod0, img, lg_a, st_a, phase="callee")
+            st_a, lg_a = {}, []
         for fn in mod0.funcs():
             if "f7" in auto:
                 F7.run_function(mod0, fn, img, True, lg_a, st_a)

@@ -107,7 +107,10 @@ def simd_report():
 
 
 # CAB-238: ott の既定 auto pass 群。旧既定 (m10 chain 再現, 修復無し) は --auto none で切替可。
-OTT_AUTO_DEFAULT = "f7,p1"
+# LIFTLIB-3: f2 (callee 相) を既定に加えた。CRT leaf の入口 xmm を %xmmK_bits 引数化
+# してから f7/p1 を流すと, p1 の dropped 領域で `bind xmm0/xmm1` が成功するようになり
+# 残留 21 → 15 / bind xmm0 6 → 1 に減る (census・checks・SHA は不変)。
+OTT_AUTO_DEFAULT = "f2,f7,p1"
 # CAB-238 検収②: auto f7,p1 の census[0x248]=0 junkHi 実測値 (m10 参照 175 から改善)。悪化 (超過) は FAIL。
 OTT_AUTO_JUNKHI_MAX = 104
 

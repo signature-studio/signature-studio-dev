@@ -58,13 +58,20 @@ for (const line of lines) {
     case 'A': args.push({ slot: parseInt(w[1]), kind: w[2], v: w[3] }); break;
     case 'C': {
       const slotval = (a) => a.kind === 'ptr' ? BigInt(bufs[find(a.v)].p) : BigInt('0x' + a.v);
+      // native_runner と同じ MS x64 ABI 分割 (LIFTLIB-3): f32/f64 の A 行は xmm 仮引数
+      // (%xmmK_bits), それ以外は gpr 仮引数 (%argN) に対応させる。位置対応だと
+      // RetDec が誤解析した余分な %argN (tan = 実体 xmm0 1 引数なのに %arg1..3) が
+      // f64 の値を横取りし %xmm0_bits が 0 になる (tan 1/40 の主因)。
+      const fa = [], ga = [];
+      for (const a of args) (a.kind === 'f32' || a.kind === 'f64' ? fa : ga).push(a);
+      // native_runner と同じ独立カウンタ: xmm 仮引数は登場順に fa, gpr 仮引数は ga
+      let fi = 0, gi = 0;
       const call = [];
-      // sig (define の仮引数順) と A 行 (spec の args 宣言順) を 1:1 に対応させる
-      sig.forEach((s, j) => {
-        const a = args[j];
-        let v = a ? slotval(a) : 0n;
+      for (const s of sig) {
+        const a = (s.xmm !== undefined) ? fa[fi++] : ga[gi++];
+        const v = a ? slotval(a) : 0n;
         if (s.ty === 'i32') call.push(Number(v & 0xFFFFFFFFn)); else call.push(BigInt.asUintN(64, v));
-      });
+      }
       let crashed = 0, ret = 0n;
       try { ret = M['_' + fname](...call); } catch (e) { crashed = 1; if (process.env.LL_VERBOSE) console.error('trap:', String(e).slice(0, 200)); }
       out.push(`R ${scen} ${step} ${crashed} ${crashed ? '0'.padStart(16, '0') : BigInt.asUintN(64, BigInt(ret ?? 0)).toString(16).padStart(16, '0')} ${'0'.padStart(16, '0')}`);

@@ -19,6 +19,13 @@ from ..regbind import Binder, FuncIndex
 
 SS_RE = re.compile(r"(ss|ps2pd|cvtss|ss2)$")
 
+# dest だけを書く move 命令 (上が 64bit は 0 化されるため dest の旧値は消費しない)。
+# capstone の regs_access はこれらを dest も read と報告するので, live-in 判定から除外する
+# (tan 0x1801a9be0 の `movsd xmm1, xmm0` が xmm1 を live-in と誤判定していた — LIFTLIB-3)。
+_PURE_MOVE = ("movsd", "movss", "movapd", "movaps", "movupd", "movups", "movdqa", "movdqu",
+              "movd", "movq", "vmovsd", "vmovss", "vmovapd", "vmovaps", "vmovupd", "vmovups",
+              "vmovdqa", "vmovdqu", "vmovd", "vmovq")
+
 
 def classify_kind(mf, k):
     """xmm_k の入口 live-in 読取命令から kind を決める。"""
@@ -27,18 +34,30 @@ def classify_kind(mf, k):
     readers = []
     for va in mf.order:
         it = mf.insns[va]
-        if reg in it.reads and 0 in mf.defs_before(va, reg):
-            readers.append(va)
-            m = it.mnem.lstrip("v")
-            if m.endswith("ss") or m in ("cvtss2sd", "comiss", "ucomiss") or m.endswith("ss2si"):
-                kinds.add("f32")
-            elif m.endswith("sd") or m in ("cvtsd2ss", "comisd", "ucomisd") or m.endswith("sd2si"):
-                kinds.add("f64")
-            elif m in ("movq", "movd", "movmskps", "movmskpd"):
-                # GPR への bits 抽出は double/float bits として受ける (wasm ABI は i64/i32)
-                kinds.add("f64" if m in ("movq", "movmskpd") else "f32")
-            else:
-                kinds.add("v128")
+        if reg not in it.reads or 0 not in mf.defs_before(va, reg):
+            continue
+        # dest のみを書く move は reg の旧値を消費しない (LIFTLIB-3)。
+        # dest == src (`movq xmm0, xmm0` = 上位 zero 化の恒等) は旧値をそのまま使うので
+        # 除外しない。`movsd xmm1, xmm0` (dest が xmm1, src が xmm0) では xmm1 の旧値は
+        # 上書かれ完全に失われる = xmm1 は live-in ではない (capstone は dest も read と
+        # 誤報告するため, live_in() だけでは tan 0x1801a9be0 の xmm1 を落とせない)。
+        m0 = it.mnem.lstrip("v")
+        if m0 in _PURE_MOVE and len(it.ops) == 2 and it.ops[0].type == 1 and it.ops[1].type == 1:
+            from ..mc import _canon_reg
+            opsrc = _canon_reg(it._ci, it.ops[1].reg)
+            if opsrc != reg and _canon_reg(it._ci, it.ops[0].reg) == reg:
+                continue
+        readers.append(va)
+        m = it.mnem.lstrip("v")
+        if m.endswith("ss") or m in ("cvtss2sd", "comiss", "ucomiss") or m.endswith("ss2si"):
+            kinds.add("f32")
+        elif m.endswith("sd") or m in ("cvtsd2ss", "comisd", "ucomisd") or m.endswith("sd2si"):
+            kinds.add("f64")
+        elif m in ("movq", "movd", "movmskps", "movmskpd"):
+            # GPR への bits 抽出は double/float bits として受ける (wasm ABI は i64/i32)
+            kinds.add("f64" if m in ("movq", "movmskpd") else "f32")
+        else:
+            kinds.add("v128")
     if not readers:
         return None, []
     kind = "f32" if "f32" in kinds else ("f64" if "f64" in kinds else "v128")
@@ -69,8 +88,16 @@ UNDEF_RE = re.compile(r"^\s*(%[\w$.\-]+) = xor i128 0, 0\s*(?:,.*)?$")
 
 
 def find_undef_for(mod, fn, ix, readers):
-    """readers (機械語アドレス) を users に持つ undef 定義行 (xor i128 0,0) を探す: (bi, li, name)"""
+    """readers (機械語アドレス) を users に持つ undef 定義行 (xor i128 0,0) を探す: (bi, li, name)
+
+    LIFTLIB-3: 同一 alloca の load が複数 undef になっていると「どれがその reg の値か」が
+    曖昧になる (例: tan 0x1801a9be0 は xmm0 も xmm1 も同じ undef に解決していた)。
+    機械語順で最も早い reader アドレスで使われている undef を選ぶ (xmm0 の最初の読取
+    0x1801a9c00 は `movq rdx, xmm0` / `movaps xmm6, xmm0` = %6 側, xmm1 の読取
+    0x1801a9c38 は %5 側)。
+    """
     rs = set(readers)
+    best = None
     for bi, b in enumerate(fn.blocks):
         for li, ln in enumerate(b.lines):
             m = UNDEF_RE.match(IR.strip_tokens(ln))
@@ -78,15 +105,22 @@ def find_undef_for(mod, fn, ix, readers):
                 continue
             name = m.group(1)
             pat = re.compile(r"(?<![\w$.%\-])" + re.escape(name) + r"(?![\w$.\-])")
+            mn = None
             for b2 in fn.blocks:
                 for l2 in b2.lines:
                     if l2 is ln:
                         continue
                     if pat.search(IR.strip_tokens(l2)):
                         a = mod.addr_of(l2)
-                        if a in rs:
-                            return bi, li, name
-    return None
+                        if a in rs and (mn is None or a < mn):
+                            mn = a
+            if mn is None:
+                continue
+            if best is None or mn < best[0]:
+                best = (mn, bi, li, name)
+    if best is None:
+        return None
+    return best[1], best[2], best[3]
 
 
 def run(mod, img, log=None, stats=None, repair=True, only=None, phase="both", ix_map=None):
@@ -238,7 +272,7 @@ def run(mod, img, log=None, stats=None, repair=True, only=None, phase="both", ix
             for k in sorted(info[callee]["params"]):
                 pty = info[callee]["pty"][k]
                 v = binder.bind("xmm%d" % k, C)
-                if v is None or v[0].startswith("@@load:"):
+                if v is None or str(v[0]).startswith("@@load:") or str(v[0]).startswith("@@callret:"):
                     log.append("F2 call %s@%x: xmm%d unbound" % (callee, C, k))
                     stats["site_unbound"] = stats.get("site_unbound", 0) + 1
                     ok = False

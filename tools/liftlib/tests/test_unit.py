@@ -260,7 +260,107 @@ def t12():
              st.get("vocab_phi_join", 0), st.get("vocab_join_merge_store", 0), len(split)))
 
 
+def t13():
+    """[LIFTLIB-3] f2 callee 相 → p1 で dropped 領域の `bind xmm0/xmm1` が解ける事を固定。
+
+    LIFTLIB-2 時点 (f2 無し) の残留は 21 (bind xmm0 6 / bind xmm1 5 / ...)。CRT leaf が
+    入口 xmm を読むのに IR 側に値が無いのが原因なので, f2 の callee 相 (%xmmK_bits 引数の
+    付与) を先に流すと bind が成功する。数え方: dbg_reason.py と同じく p1.run_function の
+    UNSUPPORTED 行を理由で集計する。
+    """
+    raw = os.path.join(T, "m6/work/ott.drc.ll")
+    if not os.path.exists(raw):
+        print("T13 skip (OTT raw .ll 無し)")
+        return
+    import collections
+    from liftlib.passes import p1, f2
+    img = Image(OTT_DLL)
+    text, _ = base.run_base(open(raw).read(), base.make_args())
+    mod = IR.Module.parse(text)
+    log = []
+    st = {}
+    f2.run(mod, img, log, st, phase="callee")          # LIFTLIB-3: 入口 xmm 引数化を先に
+    log2 = []
+    for fn in mod.funcs():
+        va = int(fn.name.split("_")[1], 16) if re.match(r"function_[0-9a-f]+$", fn.name) else None
+        if va is None or img.func_at(va) is None:
+            continue
+        p1.run_function(mod, fn, img, True, log2, st)
+    cnt = collections.Counter()
+    for l in log2:
+        if l.startswith("UNSUPPORTED"):
+            r = l.split(": ", 1)[1]
+            r = re.sub(r"@[0-9a-f]+", "@X", r)
+            r = re.sub(r"%[^\s]+", "%V", r)
+            cnt[r] += 1
+    # 実測固定 (LIFTLIB-3): 残留 15 以下, bind xmm0 は 6 → 1
+    assert st.get("unsupported", 0) <= 15, st
+    assert cnt.get("bind xmm0 @X", 0) <= 1, cnt
+    print("T13 ok (f2 callee → p1: unsupported=%d 再構成=%d bind_xmm0=%d bind_xmm1=%d)"
+          % (st.get("unsupported", 0), st.get("reconstructed", 0),
+             cnt.get("bind xmm0 @X", 0), cnt.get("bind xmm1 @X", 0)))
+
+
+def t14():
+    """[LIFTLIB-3] 汎用 xmm0-ret bind の検出と leafabi 自動拡張を固定。
+
+    xmm0_ret_census.py と同じ母集合 (leaf module の function define) で
+    ret_in_xmm0() を数え, 別アルゴリズム (ENTRY→ret の未書経路の非存在) と一致する事を
+    確認する。さらに tan 0x1801a9be0 → function_1801aa1a0 (tan の kernel) が検出される事
+    (cfg の ret_xmm0 明示リストに無い = 漏れていた callee) を固定する。
+    """
+    raw = os.path.join(T, "m6/work/ott.drc.ll")
+    if not os.path.exists(raw):
+        print("T14 skip (OTT raw .ll 無し)")
+        return
+    from liftlib.mc import MFunc
+    img = Image(OTT_DLL)
+    text, _ = base.run_base(open(raw).read(), base.make_args())
+    mod = IR.Module.parse(text)
+    hit, alt = [], []
+    for fn in mod.funcs():
+        nm = fn.name
+        if not re.match(r"function_[0-9a-f]+$", nm):
+            continue
+        va = int(nm.split("_")[1], 16)
+        rng = img.func_at(va)
+        if rng is None:
+            continue
+        mf = MFunc(img, *rng)
+        if mf.ret_in_xmm0():
+            hit.append(nm)
+        # 別アルゴリズム: ENTRY→ret の未書経路が無い事
+        cfg = mf.cfg()
+        rets = set(v for v in mf.order if mf.insns[v].is_ret)
+        if not rets:
+            continue
+        seen, todo, bad = set(), [(mf.start, False)], False
+        while todo and not bad:
+            blk, wrote = todo.pop()
+            if (blk, wrote) in seen:
+                continue
+            seen.add((blk, wrote))
+            w = wrote
+            for v in cfg[blk]["vas"]:
+                if v in rets and not w:
+                    bad = True
+                    break
+                if "xmm0" in mf.insns[v].writes:
+                    w = True
+            if bad:
+                break
+            for sc in cfg[blk]["succ"]:
+                todo.append((sc, w))
+        if not bad:
+            alt.append(nm)
+    assert set(hit) == set(alt), "検出不一致: %s" % sorted(set(hit) ^ set(alt))
+    assert len(hit) >= 100, "検出数が少なすぎる: %d" % len(hit)
+    # tan の kernel は cfg の ret_xmm0 明示リストに無い (従来の漏れ)
+    assert "function_1801aa1a0" in hit, "tan kernel が未検出"
+    print("T14 ok (xmm0-ret 検出 %d 関数, 別アルゴリズムと一致, tan kernel 検出)" % len(hit))
+
+
 if __name__ == "__main__":
-    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12):
+    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14):
         f()
     print("ALL UNIT TESTS PASS")

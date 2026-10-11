@@ -133,6 +133,7 @@ class MFunc:
             self.order.append(it.va)
         self._cfg = None
         self._rd = None
+        self._ret_reg = None
 
     def __getitem__(self, va):
         return self.insns[va]
@@ -269,6 +270,79 @@ class MFunc:
                     LIVE_IN[l] = new
                     changed = True
         return LIVE_IN[self.start]
+
+    # ---- 戻り値レジスタ推定 (MS x64 ABI, 命名非依存) -------------------------
+    def ret_reg_raw(self):
+        """ret での intra 定義だけで候補を計算: 'xmm0' | 'rax' | 'both' | None (LIFTLIB-3)。
+
+        「両方が成立」は xmm0 を pins しているだけの関数だけでなく, **ほぼ全ての
+        呼出を含む関数**でも成立する。`defs_before` は call を volatile として rax の
+        def にするため, 経路に call があれば rax はほぼ常に「関数内定義」になる
+        (実測: log/tanf = 実は xmm0 戻りなのに 'both')。よって rax は戻り値判定に
+        使えない — ret_in_xmm0 は xmm0 だけを見る。
+        """
+        if self._ret_reg is not None:
+            return self._ret_reg
+        rets = [va for va in self.order if self.insns[va].is_ret]
+        if not rets:
+            self._ret_reg = None
+            return None
+        cands = []
+        for reg in ("xmm0", "rax"):
+            intra = True
+            for va in rets:
+                d = self.defs_before(va, reg)
+                if not d or 0 in d:
+                    intra = False
+                    break
+            if intra:
+                cands.append(reg)
+        if not cands:
+            self._ret_reg = None
+        elif len(cands) == 1:
+            self._ret_reg = cands[0]
+        else:
+            self._ret_reg = "both"
+        return self._ret_reg
+
+    def _writes_at_all_ret(self, reg):
+        """**到達可能な** 全 ret で reg の到達定義が関数内 (ENTRY でない) なら True。
+
+        到達不能な ret (ENTRY から predecessor の無い孤立ブロック) は見ない:
+        pdata 無し関数の範囲誤読が巨大な孤立ブロック列を生む事があり (例:
+        0x1801a30d0 = 実際の本体は 0x1801a3198 まで, その後 0x1801a31fe.. は
+        孤立), それらは実行されないので戻り値判定に含めると誤って「対象外」になる。
+        到達可能性は cfg() の pred 伝播で判定する (ENTRY ブロック自身は到達可能)。
+        """
+        cfg = self.cfg()
+        reach = set()
+        todo = [self.start]
+        while todo:
+            l = todo.pop()
+            if l in reach:
+                continue
+            reach.add(l)
+            todo.extend(cfg[l]["succ"])
+        for va in self.order:
+            if not self.insns[va].is_ret:
+                continue
+            blk = self.block_of(va)
+            if blk is None or blk not in reach:
+                continue
+            d = self.defs_before(va, reg)
+            if not d or 0 in d:
+                return False
+        return True
+
+    def ret_in_xmm0(self):
+        """全 ret で xmm0 が関数内定義 (= 結果を xmm0 に書いて返す) なら True。
+
+        rax とは独立に xmm0 だけを見る。rax が同時に intra 定義でも構わない
+        (実測: function_1801aa1a0 = tan の kernel, xmm0 と rax 双方が全 ret で
+        関数内定義。結果は xmm0 = double, rax は return flag)。
+        ret が 1 つも無い関数は False (判定不能)。
+        """
+        return bool([va for va in self.order if self.insns[va].is_ret]) and self._writes_at_all_ret("xmm0")
 
     def comis_sites(self):
         return [va for va in self.order if self.insns[va].mnem.lstrip("v") in ("comisd", "comiss", "ucomisd", "ucomiss")]

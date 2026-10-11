@@ -405,14 +405,20 @@ class Region:
         RetDec は double 戻り (xmm0) を持つ CRT 数学関数を `call i64 @f()` と lift し,
         xmm0 の値を IR に残さない (bind xmm0 失敗の主因)。F6 (ir9_bootstraps) が
         exp/log/tan を i64 ビット列を授受する C port へ置換するため, これらの callee の
-        i64 戻りは xmm0 のビット列そのものとして扱える。"""
+        i64 戻りは xmm0 のビット列そのものとして扱える。
+
+        LIFTLIB-3: callee の選定を**機械語 (命名非依存)** に変えた。従来は
+        function_1801b{4220,4900,ba860} という OTT 固有の名前パターンだったが,
+        Binder.callee_returns_xmm0() を使い「全 ret で結果を xmm0 に書く callee」なら
+        どの callee でも適用する (ott_e2e の m9_d* C port 名と合わせて緩和)。"""
         if not reg.startswith("xmm"):
             return None
         it = self.mf.insns.get(d)
         if it is None or not it.is_call or it.target is None:
             return None
         callee = "function_%x" % it.target
-        if not (re.match(r"function_1801b(4220|4900|ba860)$", callee) or callee.startswith("m9_d")):
+        ok_generic = self.b.callee_returns_xmm0(it.target)
+        if not (ok_generic or callee.startswith("m9_d")):
             return None
         v = self.b.value_defined_at("rax", d)
         if v is None or v[1] not in ("i64", "i32"):
