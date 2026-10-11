@@ -15,10 +15,12 @@
 ① 解析 (tools/m2)         関数境界・Delphi 品質・shim 照合・インベントリ生成 (機械化)
    │
    ▼
-② lift (x64c / flelift)   capstone ベースの自作 x86-64 → C lifter。
+② lift (x64c / flelift)   capstone ベースの自作 x86-64 → C lifter (`x64c.py`)。
+   │                      FLEngine 向け汎用化は `tools/flelift`、OTT 向けの本家は
+   │                      `tools/ott/lift/x64c.py` (vendored fork の元)。
    │                      ネイティブ依存 (DirectSound/ASIO/Win32 FS/registry/window) は
    │                      shim 層でブラウザ API に吸収。FL 側コードは極力変更しない。
-   │                      旧路線 RetDec は CHARACTER 欠陥が多く主役を退いた (DECISIONS D5)
+   │                      旧路線 RetDec は構造欠陥が多く主役を退いた (DECISIONS D5)
    ▼
 ③ IR pass (liftlib)       共通 lift 修復基盤。load 取り違え / 2 段 deref / 引数脱落 /
    │                      value-flow / 間接 call 復元 / alloca 縮退 / global 窓 等
@@ -42,7 +44,7 @@
 |---|---|---|---|
 | 素材・解析 | `analysis/` (repo 外) | `docs/REFERENCES.md` `[WIN64]` / `[MAC]` | — |
 | ① 解析機械化 | `tools/m2` | `tools/m2/REPORT.md` | `tools/m2/delphi_inventory.md`・`SHIM_INVENTORY.md` |
-| ② lift | `tools/flelift`, `tools/liftlib`, `tools/x64c` | `tools/flelift/REPORT.md`・`tools/liftlib/REPORT.md` | `tools/liftlib/README.md` |
+| ② lift | `tools/flelift`, `tools/ott/lift` (`x64c.py`), `tools/liftlib` | `tools/flelift/REPORT.md`・`tools/ott/REPORT.md`・`tools/liftlib/REPORT.md` | `tools/liftlib/README.md` |
 | ②' OTT 路線 (歴史) | `tools/m5`〜`tools/m10`, `tools/ott` | 各 `REPORT.md`・`tools/ott/REPORT.md` | — |
 | ③ IR pass | `tools/liftlib/liftlib/passes/` | `tools/liftlib/REPORT.md` | — |
 | ③' 修復 pass 群 | `tools/m11/{alloca,ldfix}`, `tools/icall/*`, `tools/startup/{glue,keyfix,pump,vreg}` | 各 `REPORT.md` | — |
