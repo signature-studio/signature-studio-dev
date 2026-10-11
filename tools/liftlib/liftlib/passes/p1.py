@@ -278,14 +278,21 @@ class Region:
         self.relay_n = 0
         self._resolving = set()    # bind 値合成の再帰ガード
         self._blk_live = None      # block 開始点 live-in の cache
-        self._domreg = None        # 自領域の機械語 block 支配関係 (cache)
+        self._domreg = None
+        self._domfull = None        # 自領域の機械語 block 支配関係 (cache)
+        self.vdb = {}               # 領域値 SSA 名 -> 定義した機械語 block VA (LIFTLIB-4)
+        self.vdbld = {}             # 領域値 SSA 名 -> (alloca, ty) (reissue した load のみ)
         self.cur_va = None         # 現在 lift 中の機械語 block 先頭
         self.tail_lines = []       # 生存側尾部 (reconstruct が設定)
         self.labmap = {}           # va -> ラベル (領域内で idempotent)
 
     def nm(self, va, tag):
         self.cnt += 1
-        return "%%p1r_%x_%s_%s%d" % (va, self.salt, tag, self.cnt)
+        n = "%%p1r_%x_%s_%s%d" % (va, self.salt, tag, self.cnt)
+        # LIFTLIB-4: 値が「どの領域 block で定義されたか」を記録する。名前に埋めた
+        # va はタグなので def の機械語 VA ではない (relay は他所の VA をタグに使う)。
+        self.vdb[n] = self.cur_va
+        return n
 
     # ---- LIFTLIB-2: 値の「支配」検証 (領域 DAG リフトの健全性) ----------------
     # 領域 block は head block の br からのみ入る。したがって領域内で参照できる値は
@@ -293,6 +300,38 @@ class Region:
     #   (c) 自領域内で, 定義 block が使用 block を支配する値
     # のいずれかに限る。それ以外 (他 site の領域 block の値 / 別経路の load 結果) を
     # 参照すると clang が "Instruction does not dominate all uses!" で拒絕する。
+
+    def _dom_func(self, a, b):
+        """関数全体の機械語 block a が b を支配するか (cache 付き, LIFTLIB-4)。
+
+        他 site の領域値 (`%p1r_<他salt>_…`) を採れるかどうかの判定に使う。
+        領域単位の支配 (`_dom_region`) は「この領域の入口 D から」の支配なので,
+        別領域が作った経路固有 SSA が自分たちの use に届くかを判定できない。
+        機械語 CFG 全体で a が b を支配するなら, その値は use に必ず届く。
+        """
+        if self._domfull is None:
+            cfg = self.mf.cfg()
+            nodes = set(cfg)
+            dom = {n: set(nodes) for n in nodes}
+            dom[self.mf.start] = {self.mf.start}
+            ch = True
+            while ch:
+                ch = False
+                for n in nodes:
+                    if n == self.mf.start:
+                        continue
+                    ps = cfg[n]["pred"]
+                    if not ps:
+                        continue
+                    new = set(nodes)
+                    for p in ps:
+                        new &= dom[p]
+                    new.add(n)
+                    if new != dom[n]:
+                        dom[n] = new
+                        ch = True
+            self._domfull = dom
+        return a in self._domfull.get(b, ())
 
     def _dom_region(self, a, b):
         """自領域の機械語 block a が b を支配するか (入口 D からの支配, 1 fixpoint)。"""
@@ -321,25 +360,56 @@ class Region:
         return a in self._domreg.get(b, ())
 
     def _value_ok(self, name, use_va):
-        """IR 値 name が use_va の地点から合法に参照できるか (支配の確認)。"""
+        """IR 値 name が use_va の地点から合法に参照できるか (支配の確認)。
+
+        LIFTLIB-4: 領域値 (`%p1r_…`) の支配判定を修正した。従来は名前に埋めた VA
+        (group(1)) を「値の機械語 VA」と見なしていたが, あれは **タグ** であって
+        def の VA ではない (relay 値は他所の VA をタグに使う)。そのため正当な
+        自領域値を「非支配」と誤判定し, leaf の phi 合成が落ちていた。
+        自領域の値は `self.vdb` (定義 block) で, 他領域の値は IR の defs で判定する。
+        """
         m = P1R_NAME.match(name)
         if m:
-            if m.group(2) != self.salt:
-                return False                       # 他 site の領域 block の値
-            dva = int(m.group(1), 16)
-            if dva == 0:
-                return True                        # 変換補助 (同一 block 内で消費)
             u = use_va if use_va is not None else self.cur_va
+            if m.group(2) == self.salt:
+                # 自領域の値: vdb の定義 block が use block を支配するか
+                dv = self.vdb.get(name)
+                if dv is None:
+                    return True             # 変換補助 (同一 block 内で消費)
+                if u is None:
+                    return True
+                db, ub = self.mf.block_of(dv), self.mf.block_of(u)
+                return db == ub or self._dom_region(db, ub)
+            # 他 site の領域値: IR レベルの支配で判定する。領域値は経路固有 SSA を持つ
+            # が, その def block が use を支配するなら (機械語 CFG 全体で) 合法。
+            d = self.ix.defs.get(name)
+            if d is None:
+                return False
+            dbi = d[0]
+            if dbi == self.head_bi:
+                return False                # 他領域が head を分割した値は別経路
+            if not self.ix.dominates(dbi, self.head_bi):
+                return False
+            # さらに機械語レベルで, その領域の入口 (タグの VA) が use を支配する事
+            try:
+                dva = int(m.group(1), 16)
+            except ValueError:
+                return False
             if u is None:
-                return True
+                return False
             db, ub = self.mf.block_of(dva), self.mf.block_of(u)
-            return db == ub or self._dom_region(db, ub)
+            if db is None or ub is None or db not in self.mf.cfg() or ub not in self.mf.cfg():
+                return False
+            ok = db == ub or self._dom_func(db, ub)
+            if ok:
+                self.used("bind_other_region")
+            return ok
         d = self.ix.defs.get(name)
         if d is None:
-            return True                            # 引数 / alloca (入口 block) は全域を支配
+            return True                        # 引数 / alloca (入口 block) は全域を支配
         dbi, dli = d
         if dbi == self.head_bi:
-            return dli < self.split_li              # head の分割点より前の行のみ
+            return dli < self.split_li          # head の分割点より前の行のみ
         return self.ix.dominates(dbi, self.head_bi)
 
     def _reissue_load(self, name, use_va, out):
@@ -363,6 +433,7 @@ class Region:
         ty = m.group(1).rstrip(",")
         n = self.nm(use_va if use_va is not None else 0, "rl")
         out.append("  %s = load %s, ptr %s%s" % (n, ty, a, self.mod.tag(use_va or 0)))
+        self.vdbld[n] = (a, ty)          # LIFTLIB-4: relay 兄弟 block 用に再発行できるよう覚える
         self.used("load_reissue")
         return (n, ty)
 
@@ -1572,6 +1643,7 @@ class Region:
             return self.edge_target(D, st0, D)
         entry = None
         for va in self.topo:
+            self.cur_va = va          # LIFTLIB-4: merge_in が合成する値の def block 基準
             if va == D:
                 st = {k: (set(v) if k == "__w" else (dict(v) if k == "rsp" else v)) for k, v in st0.items()}
                 pre = []
@@ -1750,6 +1822,27 @@ class Region:
         out.append("  %s = %s %s %s to %s" % (n, op, vty, name, ty))
         return n
 
+    def _for_block(self, v, out):
+        """値 v を「この block から合法に参照できる形」にして返す (LIFTLIB-4)。
+
+        relay block は 1 終点ごとに新規に作られる。`_reissue_load` が *或る pred の*
+        終端前に load を挿入して作った値は, その兄弟 relay block からは非支配になる
+        (clang "does not dominate all uses")。兄弟に同じ値を store する必要があるときは
+        その relay 自身でもう一度 load し直す。"""
+        if out is None:
+            return v
+        nm = v[0] if isinstance(v, tuple) else None
+        if nm in self.vdbld:
+            src = self.vdb.get(nm)
+            if src is not None and src != self.cur_va:
+                a, ty = self.vdbld[nm]
+                n2 = self.nm(self.cur_va or 0, "rl")
+                out.append("  %s = load %s, ptr %s" % (n2, ty, a))
+                self.vdbld[n2] = (a, ty)
+                self.used("load_reissue2")
+                return (n2, v[1])
+        return v
+
     def emit_merge_stores(self, L, st, out):
         """既存ブロック L の先頭で load される reg2mem alloca へ, この辺の値を store する。"""
         fn, ix = self.fn, self.ix
@@ -1771,12 +1864,12 @@ class Region:
             rm = re.match(r"^%(r[a-z0-9]+|xmm\d+)\.\d+(?:\.in)?\.reg2mem$", a)
             val = None
             if rm and rm.group(1) in st["__w"]:
-                val = self._conv_inline(out, st[rm.group(1)], ty)
+                val = self._conv_inline(out, self._for_block(st[rm.group(1)], out), ty)
             elif rm:
                 # LIFTLIB-2: 生存側 store の無い alloca は, この辺の到達値 (機械語 bind) で埋める
                 try:
                     v = self.read_reg(st, rm.group(1), L, out)
-                    val = self._conv_inline(out, v, ty)
+                    val = self._conv_inline(out, self._for_block(v, out), ty)
                     self.used("relay_bind")
                 except Unsupported:
                     val = None

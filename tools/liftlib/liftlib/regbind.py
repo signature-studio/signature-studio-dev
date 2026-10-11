@@ -189,14 +189,27 @@ class Binder:
         return bool(self.callee_returns_xmm0(it.target))
 
     # ---- 値の def 検索 ----------------------------------------------------
+    # p1 が領域を再構成すると「同一機械語アドレスに対応する IR 命令が 2 本」になる
+    # (原本 block のもの + 領域 block の `%p1r_…` を dst にするもの)。従来は末尾
+    # (= 領域側) を拾っていたが, 領域値は経路固有 SSA を持つため他経路から参照すると
+    # 非支配 (clang "does not dominate all uses") になり, p1 が「非支配/他領域」で
+    # 落としていた (LIFTLIB-4: bind xmm1 5 件のうち 3 件がこの形)。
+    # 注意: 領域 block の **ラベル** は `dec_label_pc_<va>` で原本と区別できないので,
+    # dst の SSA 名 (`%p1r_` / `%p1tail_` / `%p1relay_` / `%p1srelay_`) で判別する。
+    _REGION_DST = ("%p1r_", "%p1tail_", "%p1relay_", "%p1srelay_")
+
+    def _is_region_dst(self, name):
+        return isinstance(name, str) and name.startswith(self._REGION_DST)
+
     def value_defined_at(self, reg, va):
         """命令 va で reg に書かれた値を表す IR (name, type)。
 
         LIFTLIB-3: reg が xmm0 で, va が xmm0 戻り callee への call のとき, call の
         i64/i32 戻り (rax) を xmm0 のビット列として拾う (従来は明示的 C port 名のみ)。
+        LIFTLIB-4: 同一アドレスに原本/領域の 2 命令が在るとき原本を優先する (上記参照)。
         """
         want_xmm = reg.startswith("xmm")
-        cand = None
+        orig, last = None, None
         for (bi, li, ln) in self.ix.instrs_at(va):
             d = IR.instr_dst(ln)
             if not d:
@@ -204,13 +217,19 @@ class Binder:
             ty = result_type(ln)
             if want_xmm:
                 if ty == "i128":
-                    cand = (d, ty)
+                    ok = True
                 elif ty in ("i64", "i32") and self.xmm0_ret_of_call(va):
-                    cand = (d, ty)          # xmm0 bits = i64 戻り (zext は呼出側で)
+                    ok = True              # xmm0 bits = i64 戻り (zext は呼出側で)
+                else:
+                    ok = False
             else:
-                if ty in ("i64", "i32", "i16", "i8"):
-                    cand = (d, ty)
-        return cand
+                ok = ty in ("i64", "i32", "i16", "i8")
+            if not ok:
+                continue
+            last = (d, ty)
+            if not self._is_region_dst(d):
+                orig = (d, ty)              # 原本側を記憶 (後の領域命令で上書きしない)
+        return orig if orig is not None else last
 
     def _is_copy(self, va):
         it = self.mf.insns.get(va)

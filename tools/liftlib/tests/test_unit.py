@@ -241,23 +241,29 @@ def t12():
         if va is None or img.func_at(va) is None:
             continue
         p1.run_function(mod, fn, img, True, log, st)
-    # 実測固定 (LIFTLIB-2): 再構成 25 以上 / UNSUPPORTED 21 以下 / DAG 語彙 (phi_join, join_merge_store)
+    # 実測固定 (LIFTLIB-2): 再構成 25 以上 / UNSUPPORTED 21 以下 / DAG 語彙 (phi_join)
+    # LIFTLIB-4: 未使用 vocab (join_merge_store / join split) への依存は外す。
+    #   _value_ok の領域値支配判定を修正したことで, 脱落側入口 D が head block 自身の
+    #   ラベルになる site (18011ffdd / 18012024b) は join split ではなく DAG 側で
+    #   扱えるようになった。重要なのは **性質** (自己辺が無い = 無限ループしない) なので
+    #   そちらを assert する。
     assert st.get("reconstructed", 0) >= 25, st
     assert st.get("unsupported", 0) <= 21, st
     assert st.get("vocab_phi_join", 0) >= 1, st          # 領域内合流の phi 合成
-    assert st.get("vocab_join_merge_store", 0) >= 1, st  # join split のマージ store
-    # CAB-238 6: 脱落側入口 D が head block 自身のラベル (= 自己辺) だった site が
-    # join split で解消されていること
+    # CAB-238 6 の性質: 自己辺 (br label %自分自身) が 1 本も無いこと。
+    # join split が発動していればそれも読む (情報目的)。
     split = [l for l in log if "join split" in l]
-    assert any("D=180120336" in l for l in split), split
-    assert all("merge 1" in l for l in split), split
-    # IR 健全性: 同一 site の region block が head 自身を指す br を出していないこと
+    self_edges = 0
     for fn in mod.funcs():
-        body = "\n".join(l for b in fn.blocks for l in b.lines)
-        assert "br label %dec_label_pc_p1relay" in body or not body.strip() or True
-    print("T12 ok (DAG/phi: reconstructed=%d unsupported=%d phi_join=%d join_merge=%d join_split=%d)"
+        for b in fn.blocks:
+            for ln in b.lines:
+                m2 = re.match(r"^\s*br label %([\w$.\-]+)", IR.strip_tokens(ln))
+                if m2 and m2.group(1) == b.label:
+                    self_edges += 1
+    assert self_edges == 0, "自己辺 %d 本 (CAB-238 6 の無限ループ)" % self_edges
+    print("T12 ok (DAG/phi: reconstructed=%d unsupported=%d phi_join=%d join_merge=%d join_split=%d self_edges=%d)"
           % (st.get("reconstructed", 0), st.get("unsupported", 0),
-             st.get("vocab_phi_join", 0), st.get("vocab_join_merge_store", 0), len(split)))
+             st.get("vocab_phi_join", 0), st.get("vocab_join_merge_store", 0), len(split), self_edges))
 
 
 def t13():
@@ -293,12 +299,14 @@ def t13():
             r = re.sub(r"@[0-9a-f]+", "@X", r)
             r = re.sub(r"%[^\s]+", "%V", r)
             cnt[r] += 1
-    # 実測固定 (LIFTLIB-3): 残留 15 以下, bind xmm0 は 6 → 1
-    assert st.get("unsupported", 0) <= 15, st
-    assert cnt.get("bind xmm0 @X", 0) <= 1, cnt
+    # 実測固定: LIFTLIB-3 で 15 以下, LIFTLIB-4 で **6 以下** (bind xmm0 1 → 0)
+    assert st.get("unsupported", 0) <= 6, st
+    assert cnt.get("bind xmm0 @X", 0) <= 0, cnt
     print("T13 ok (f2 callee → p1: unsupported=%d 再構成=%d bind_xmm0=%d bind_xmm1=%d)"
           % (st.get("unsupported", 0), st.get("reconstructed", 0),
              cnt.get("bind xmm0 @X", 0), cnt.get("bind xmm1 @X", 0)))
+    # LIFTLIB-4: 領域値の支配判定と原本優先の効果 (bind xmm1 5 → 1, merge 系 4+2 → 0)
+    assert cnt.get("bind xmm1 @X", 0) <= 1, cnt
 
 
 def t14():
