@@ -1,0 +1,33 @@
+name: Setup Agent Environment
+description: Setup the agent environment for the workflow
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup uv
+      uses: astral-sh/setup-uv@v10.3.0
+    - name: Setup Python using uv
+      shell: bash
+      run: uv python install --default 3.14
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v6
+    - name: Setup Node.js using pnpm
+      shell: bash
+      run: pnpm runtime set node 26.10.0
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+    - name: Setup OpenCode
+      shell: bash
+      run: |
+        curl -fsSL https://opencode.ai/v2/install | bash
+        echo "$HOME/.opencode/bin" >> $GITHUB_PATH
+    - name: Verify setup
+      shell: bash
+      run: |
+        which opencode uv pnpm bun node python
+        echo "opencode: $(opencode --version)"
+        echo "uv: $(uv --version)"
+        echo "pnpm: $(pnpm --version)"
+        echo "bun: $(bun --version)"
+        echo "node: $(node --version)"
+        echo "python: $(python --version)"
