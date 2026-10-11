@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# build.sh — FLE-2: 単一 variant の再 build (診断・反復用)。
+#   bash tools/flelift/boot/build.sh [variant]     # plain|strict|nosx|chk (既定 plain)
+# lift 済み (work/boot/lift/fle_lifted.c) と生成物 (fle_imp_bridge.c / fle_textwin.c) を
+# そのまま使い、fle_boot.c 等の C 変更だけを反映して link し直す。boot_e2e.sh は全 variant
+# を一括で作るので、C 側の反復中はこちらを使う (wasm 142MB の link は 1 本あたり数十秒)。
+set -euo pipefail
+HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
+FLE="$(cd "$HERE/.." && pwd)"
+SX="$(cd "$FLE/../shimx" && pwd)"
+W="$FLE/work/boot"
+PE="${FLE_PE:-/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin}"
+V="${1:-plain}"
+case "$V" in plain|strict|nosx|chk) ;; *) echo "usage: build.sh [plain|strict|nosx|chk]"; exit 1;; esac
+mkdir -p "$W/obj" "$W/tmp"
+export TMPDIR="$W/tmp"
+set +u; source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1; set -u
+
+# ---- 生成物が無い場合のみ gen (entries/link_defs/imp bridge/textwin) ----
+[ -f "$W/fle_entries_boot.json" ] || python3 "$HERE/gen_boot.py" --pe "$PE" --out "$W"
+[ -f "$W/fle_imp_bridge.c" ]       || python3 "$HERE/gen_boot.py" --pe "$PE" --meta "$W/lift/lift_meta.json" --out "$W"
+[ -f "$W/nosx/fle_imp_bridge.c" ]  || python3 "$HERE/gen_boot.py" --pe "$PE" --meta "$W/lift/lift_meta.json" --out "$W/nosx" --nosx
+[ -f "$W/fle_textwin.c" ]          || python3 "$HERE/gen_boot.py" --pe "$PE" --out "$W"
+if [ ! -f "$W/obj/.sx_done" ]; then
+  for f in "$SX"/src/*.c; do b="$(basename "$f" .c)"; emcc -c "$f" -o "$W/obj/sx_$b.o" -O1 -w \
+    -Wno-error=int-conversion -Wno-implicit-function-declaration -fno-strict-aliasing -I"$SX/src"; done
+  touch "$W/obj/.sx_done"
+fi
+
+CCF="-O0 -w -Wno-error=int-conversion -Wno-implicit-function-declaration -g1"
+cc() { local src="$1" obj="$2"; shift 2
+  if [ ! -f "$obj" ] || [ "$src" -nt "$obj" ]; then emcc -c "$src" -o "$obj" "$@"; fi; }
+CPUDEFS="$(cat "$W/fle_link_defs.txt")"
+BRIDGE="$W/fle_imp_bridge.c"; NOSX=0
+[ "$V" = nosx ] && { BRIDGE="$W/nosx/fle_imp_bridge.c"; NOSX=1; }
+CHKF=""; [ "$V" = chk ] && CHKF="-DFLE_CHK"
+NOSX_DEF=$([ "$V" = nosx ] && echo 1 || echo 0)
+EXPORTS="_fle_boot_enter,_fle_boot_set_strict,_fle_units_run,_fle_units_total,_fle_units_empty,_fle_boot_stage,_fle_n_getmem,_fle_n_freemem,_fle_n_longjmp,_fle_n_exit,_fle_n_getproc,_fle_n_soft,_fle_n_soft_uniq,_fle_soft_name,_fle_soft_count,_fle_va_calls,_fle_va_bytes,_fle_n_cb,_fle_unit_proc,_fle_run,_fle_rget,_fle_data_install,_fle_init,_fle_reset,_fle_boot_set_blkdiag,_fle_blkdiag_stat"
+[ "$NOSX_DEF" = 1 ] || EXPORTS="$EXPORTS,_shimx_set_trace,_shimx_init"
+cc "${FLE_LIFT_DIR:-$W/lift}/fle_lifted.c"  "$W/obj/${V}_lifted.o"  $CCF $CHKF -I"$FLE/rt" -I"$HERE"
+cc "${FLE_LIFT_DIR:-$W/lift}/fle_data.c"    "$W/obj/${V}_data.o"    $CCF $CHKF -I"$FLE/rt"
+cc "$FLE/rt/fle_cpu.c"     "$W/obj/${V}_cpu.o"     $CCF $CHKF -I"$FLE/rt" $CPUDEFS
+cc "$FLE/rt/fle_glue.c"    "$W/obj/${V}_glue.o"    $CCF $CHKF -I"$FLE/rt"
+cc "$BRIDGE"               "$W/obj/${V}_bridge.o"  $CCF $CHKF -I"$FLE/rt" -I"$HERE"
+cc "$W/fle_textwin.c"      "$W/obj/${V}_tw.o"      $CCF $CHKF -I"$FLE/rt" -I"$HERE"
+cc "$HERE/fle_boot.c"      "$W/obj/${V}_boot.o"    $CCF $CHKF -I"$FLE/rt" -I"$HERE" -I"$SX/src" \
+   -DFLEBOOT_STRICT=$([ "$V" = strict ] && echo 1 || echo 0) -DFLEBOOT_NOSX=$NOSX_DEF
+OBJS="$W/obj/${V}_lifted.o $W/obj/${V}_data.o $W/obj/${V}_cpu.o $W/obj/${V}_glue.o $W/obj/${V}_bridge.o $W/obj/${V}_tw.o $W/obj/${V}_boot.o"
+[ $NOSX = 1 ] || OBJS="$OBJS $W/obj/sx_*.o"
+emcc $OBJS -o "$W/fleboot_$V.cjs.tmp" \
+  -O0 -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8MB -sGLOBAL_BASE=268435456 \
+  -sENVIRONMENT=node -sMODULARIZE=1 -sEXPORT_NAME=flebootcreate -sEXIT_RUNTIME=1 \
+  -sEXPORTED_FUNCTIONS=$EXPORTS -sEXPORTED_RUNTIME_METHODS=UTF8ToString,HEAPU8,HEAPU32 \
+  -Wl,--initial-memory=$((0x36000000)) -Wl,--max-memory=$((0x36000000)) 2> "$W/link_$V.log" || { tail -40 "$W/link_$V.log"; exit 1; }
+mv "$W/fleboot_$V.cjs.tmp" "$W/fleboot_$V.cjs"
+echo "[build] $V: mismatch=$(grep -c 'signature mismatch' "$W/link_$V.log" || true) undefined=$(grep -c 'undefined symbol' "$W/link_$V.log" || true) dup=$(grep -c 'duplicate symbol' "$W/link_$V.log" || true) -> $W/fleboot_$V.cjs ($(stat -c%s "$W/fleboot_$V.cjs.wasm") B)"

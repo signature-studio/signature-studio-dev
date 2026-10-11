@@ -42,7 +42,11 @@ PKGINFO_VA = 0x13768b0     # _StartLib の rdx (= InitContext.InitTable の値)
 #   間接 call で dispatch 不解決になるため m11 旧 stub 揃え) / LoadStringW = buf[0]=0 (gui_compat.c 同一挙動) /
 #   memset = CRT 実体 / MessageBox* = 自動 IDOK / VirtualAlloc = shimx 委譲 + 計数
 CURATED = {'ExitProcess', 'TerminateProcess', 'GetProcAddress', 'LoadStringW', 'memset',
-           'MessageBoxA', 'MessageBoxW', 'VirtualAlloc', 'RaiseException'}
+           'MessageBoxA', 'MessageBoxW', 'VirtualAlloc', 'RaiseException',
+           # FLE-2: コールバック引数を取る列挙 API。shimx の cbtrans トランポリンは wasm
+           # 関数 index をそのまま call_indirect しようとして "table index is out of bounds"
+           # に trap する (m11 REPORT #3 と同一)。lift 側で直接 fle_icall9 に落とす。
+           'EnumCalendarInfoW', 'EnumSystemLocalesW'}
 
 # ---------------- shimx.h パーサ ----------------
 
@@ -89,6 +93,18 @@ def parse_shimx_h(path):
             continue
         m = re.match(r'^typedef\s+(?:struct\s+_?\w+\s*)?\{?(?P<body>[^{}]*)\}?\s*(?P<names>[A-Za-z_]\w*(?:\s*,\s*\**\s*[A-Za-z_]\w*)*)\s*$', st)
         if m and not re.match(r'^typedef\s+.*\(', st):
+            # `typedef <base>* NAME;` / `typedef <base>* A, *B;` — ポインタ typedef。
+            # 元の正規表現は body 側に識別子の末尾を食われる (`typedef WCHAR* BSTR` → body='WCHAR* BST')
+            # ため ptr_names に入らず、戻り値型 kind_of() が None になって soft stub (常に 0 返却) に
+            # なり、guest の BSTR/SysAllocStringLen などが nil を返して raise 0xEEDFADE していた (FLE-2)。
+            pm = re.match(r'^typedef\s+(?P<base>.+?)\s*\*\s*(?P<names>[A-Za-z_]\w*(?:\s*,\s*\**\s*[A-Za-z_]\w*)*)\s*$', st)
+            if pm:
+                for nm2 in [re.sub(r'[\s*]', '', x) for x in pm.group('names').split(',')]:
+                    if nm2: ptr_names.add(nm2)
+                # `, *PLARGE_INTEGER` のような後続ポインタ名も拾う
+                for extra in re.findall(r',\s*\*\s*([A-Za-z_]\w*)', st):
+                    ptr_names.add(extra)
+                continue
             base = m.group('body').strip()
             for nm in [re.sub(r'[\s*]', '', x) for x in m.group('names').split(',')]:
                 if not nm: continue
@@ -208,6 +224,11 @@ def main():
                     pdata.append(IMG + b)
                 break
         pset = set(pdata)
+        # FLE-2: VMT スロットが「.pdata 整列でない関数途中」を指す場合がある。
+        # 全 .text word を root にすると root が 6 万超 (= 全域 lift) になって実用的でないため、
+        # **boot_roots.json に明記された target のみ** を追加で root にする
+        # (実行時に unlifted として発見 → 累積する既存方式。実測 0x527b5b は fn 0x5274c0 の途中)。
+        extra_targets = {int(x, 16) for x in json.load(open(extra_path))} if os.path.exists(extra_path) else set()
         for s in pe.sections:
             n = s.Name.rstrip(b'\0').decode()
             if n not in ('.data', '.reloc', '.rdata', '.didata', '.text'):
@@ -216,7 +237,7 @@ def main():
             data = bytes(img[va:va + min(sz, rawsz) if rawsz else sz])
             for off in range(0, len(data) - 7, 8):
                 v = struct.unpack_from('<Q', data, off)[0]
-                if v in pset:
+                if v in pset or v in extra_targets:
                     roots.add(v)
     json.dump({'roots': sorted(roots), 'calltgt': base.get('calltgt', [])},
               open(os.path.join(a.out, 'fle_entries_boot.json'), 'w'), indent=1)

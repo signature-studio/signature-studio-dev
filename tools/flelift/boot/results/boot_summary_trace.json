@@ -1,0 +1,44 @@
+{
+ "variant": "trace",
+ "boot": {
+  "rc": null,
+  "threw": {
+   "cls": "unlifted",
+   "target": 5404059
+  },
+  "units_run": 40,
+  "units_total": 942,
+  "units_empty": 3,
+  "rax": "0x5275b0",
+  "longjmp": 0,
+  "stage": 1,
+  "getmem": 662,
+  "freemem": 209,
+  "va_calls": 1,
+  "va_bytes": 1310704,
+  "getproc": 29,
+  "exit": 0,
+  "cb_calls": 0,
+  "soft_calls": 0,
+  "soft_uniq": 0,
+  "mm_after": {
+   "getmem": "0x407a50",
+   "freemem": "0x407e20",
+   "realloc": "0x408040",
+   "slot3": "0x4083b0"
+  },
+  "stopped_at_1based": 40
+ },
+ "survey": null,
+ "soft_top": [],
+ "notes": {
+  "entry": "0x1376820",
+  "longjmp_target": "0x1376840",
+  "init_table": "0x13768b0",
+  "baseline_retdec": {
+   "boot_units": "17 dispatched (16 completed), raise 0xEEDFADE in unit#17 (0x454090)",
+   "survey": "m11 sx 純リンク baseline (tools/m11/work/shimx_link/baseline/m11_boot.survey.json): ok 800 / oob 50 / halt0 44 / closure外 46 / abort 1 / noproc 1。なお --fix 変種は ok 800 / oob 41 / halt0 53 (CAB-129 halt0 対応表適用)。",
+   "route_diff": "results/verdict_boot.jsonl (gen_verdict.py: baseline を native 側、x64c を wasm 側に対応)"
+  }
+ }
+}

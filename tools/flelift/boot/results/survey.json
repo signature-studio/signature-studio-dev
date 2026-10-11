@@ -1,99 +1,26 @@
 {
- "units_covered": 895,
+ "units_covered": 942,
  "byCls": {
-  "ok": 808,
-  "oob": 66,
-  "unlifted": 12,
-  "halt0": 9
+  "ok": 859,
+  "empty": 46,
+  "unlifted": 22,
+  "oob": 9,
+  "trap": 5,
+  "noproc": 1
  },
  "details": [
-  [
-   17,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   22,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   35,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   42,
-   "unlifted",
-   4208002
-  ],
   [
    45,
    "unlifted",
    4403326
   ],
   [
-   53,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   54,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   56,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   58,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   59,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   60,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   61,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   62,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   63,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   86,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
    95,
-   "oob",
-   "memory access out of bounds"
+   "unlifted",
+   4262656
   ],
   [
    101,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   106,
    "oob",
    "memory access out of bounds"
   ],
@@ -103,137 +30,87 @@
    "memory access out of bounds"
   ],
   [
-   136,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   137,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
    138,
    "unlifted",
-   4208002
+   6565475
   ],
   [
    144,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   145,
-   "oob",
-   "memory access out of bounds"
+   "unlifted",
+   4262656
   ],
   [
    149,
-   "oob",
-   "memory access out of bounds"
+   "unlifted",
+   4262656
   ],
   [
    153,
-   "oob",
-   "memory access out of bounds"
+   "unlifted",
+   4262656
   ],
   [
    158,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   189,
    "unlifted",
-   300599152
+   4262656
   ],
   [
    190,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   232,
-   "oob",
-   "memory access out of bounds"
+   "unlifted",
+   4262656
   ],
   [
    233,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   235,
-   "oob",
-   "memory access out of bounds"
+   "unlifted",
+   7368704
   ],
   [
    237,
-   "oob",
-   "memory access out of bounds"
+   "unlifted",
+   7368704
   ],
   [
    238,
-   "oob",
-   "memory access out of bounds"
+   "unlifted",
+   7368704
   ],
   [
    239,
-   "oob",
-   "memory access out of bounds"
+   "unlifted",
+   7368704
   ],
   [
    245,
-   "oob",
-   "memory access out of bounds"
+   "unlifted",
+   4262656
   ],
   [
    265,
-   "oob",
-   "memory access out of bounds"
+   "unlifted",
+   4262656
   ],
   [
    272,
-   "oob",
-   "memory access out of bounds"
+   "unlifted",
+   4262656
   ],
   [
    275,
-   "unlifted",
-   2169000790
-  ],
-  [
-   276,
    "oob",
    "memory access out of bounds"
   ],
   [
    280,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   283,
-   "oob",
-   "memory access out of bounds"
+   "unlifted",
+   4262656
   ],
   [
    291,
-   "halt0",
-   250477278
-  ],
-  [
-   296,
-   "halt0",
-   250477278
-  ],
-  [
-   298,
    "oob",
    "memory access out of bounds"
   ],
   [
-   302,
+   296,
    "oob",
    "memory access out of bounds"
   ],
@@ -243,64 +120,9 @@
    "memory access out of bounds"
   ],
   [
-   307,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   311,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   314,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   357,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
    365,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   415,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   426,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   477,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   484,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   492,
-   "halt0",
-   250477278
-  ],
-  [
-   493,
-   "halt0",
-   250477278
-  ],
-  [
-   496,
-   "oob",
-   "memory access out of bounds"
+   "trap",
+   "Aborted(native code called abort())"
   ],
   [
    509,
@@ -308,139 +130,69 @@
    4685446
   ],
   [
-   513,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   520,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
    555,
-   "halt0",
-   250477278
-  ],
-  [
-   584,
-   "halt0",
-   250477278
-  ],
-  [
-   589,
    "oob",
    "memory access out of bounds"
-  ],
-  [
-   604,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   615,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   616,
-   "unlifted",
-   300217408
-  ],
-  [
-   647,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   649,
-   "unlifted",
-   13213456
   ],
   [
    659,
-   "oob",
-   "memory access out of bounds"
+   "unlifted",
+   4262656
   ],
   [
    666,
    "unlifted",
-   13690496
-  ],
-  [
-   712,
-   "oob",
-   "memory access out of bounds"
+   13705952
   ],
   [
    745,
-   "halt0",
-   250477278
-  ],
-  [
-   800,
    "oob",
    "memory access out of bounds"
   ],
   [
    830,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   838,
-   "oob",
-   "memory access out of bounds"
+   "unlifted",
+   4262656
   ],
   [
    876,
-   "oob",
-   "memory access out of bounds"
+   "trap",
+   "Aborted(native code called abort())"
   ],
   [
    880,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   882,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   885,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   890,
-   "unlifted",
-   14289416
+   "trap",
+   "Aborted(native code called abort())"
   ],
   [
    891,
-   "unlifted",
-   9604528
+   "trap",
+   "Aborted(native code called abort())"
   ],
   [
    895,
-   "oob",
-   "memory access out of bounds"
+   "unlifted",
+   9306096
   ],
   [
    898,
    "unlifted",
-   2827848520
+   9306096
   ],
   [
    923,
-   "halt0",
-   250477278
+   "oob",
+   "memory access out of bounds"
   ],
   [
    935,
-   "halt0",
-   250477278
+   "trap",
+   "Aborted(native code called abort())"
+  ],
+  [
+   941,
+   "noproc",
+   0
   ]
  ]
 }

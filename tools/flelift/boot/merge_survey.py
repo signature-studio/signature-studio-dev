@@ -15,6 +15,36 @@ for p in glob.glob(os.path.join(HERE, 'results', 'survey_seg_*.jsonl')) +       
             units[int(rec[0])] = rec
         except Exception:
             continue
+# FLE-2: runner は empty/noproc を jsonl に書き出さない (details に載せない設計) ため、
+# 完了した survey の summary json から空き unit を補完する (総数を 942 に揃える)。
+for sp in glob.glob(os.path.join(HERE, 'results', '*summary*.json')):
+    try:
+        d = json.load(open(sp, errors='replace'))
+    except Exception:
+        continue
+    sv = d.get('survey') if isinstance(d, dict) else None
+    if not isinstance(sv, dict):
+        continue
+    for rec in (sv.get('details') or []):
+        try:
+            i, cls, info = rec[0], rec[1], rec[2]
+        except Exception:
+            continue
+        if int(i) not in units:
+            units[int(i)] = [int(i), cls, info]
+    total = sum((sv.get('byCls') or {}).values())
+    if total and len(units) < total:
+        have = {}
+        for v in units.values():
+            have[v[1]] = have.get(v[1], 0) + 1
+        for cls, n in (sv.get('byCls') or {}).items():
+            miss = n - have.get(cls, 0)
+            for i in range(total):
+                if miss <= 0:
+                    break
+                if i not in units:
+                    units[i] = [i, cls, 0]
+                    miss -= 1
 by, details = {}, []
 for i in sorted(units):
     _, cls, info = units[i]

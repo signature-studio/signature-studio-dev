@@ -41,7 +41,29 @@ void ott_missing_import(const char* nm) {
 void fle_chk(uint64_t a, int line) {
     /* wasm linear 上限 (initial-memory) と emcc static 領域 (GLOBAL_BASE 0x10000000..) を避ける */
     if (a >= 0x36000000ull || (a >= 0x10000000ull && a < 0x1D00000ull) || (a >= 0x1e00000ull && a < 0x2000000ull)) {
-        fprintf(stderr, "[fle] bad guest address %#llx (fle_cpu.h line %d)\n", (unsigned long long)a, line); abort();
+        fprintf(stderr, "[fle] bad guest address %#llx (fle_cpu.h line %d)\n", (unsigned long long)a, line);
+        /* FLE-2: どこから来たか (guest return address 連鎖) を出して巻き戻れるようにする */
+        fprintf(stderr, "[fle]   RSP=%#llx ret=%#llx xrip=%#llx\n",
+                (unsigned long long)R[RSP], (unsigned long long)LD64(R[RSP]), (unsigned long long)ott_xrip);
+        for (int i = 0; i < 64; i++) {
+            uint64_t v = LD64(R[RSP] + 8ull * i);
+            if (v >= 0x401000ull && v < 0x13a44b0ull) fprintf(stderr, "[fle]   stack[+%d] = %#llx\n", i, (unsigned long long)v);
+        }
+        /* 壊れたアドレスの出所: 不正値がどのレジスタ由来か (直近命令の痕跡) を出す */
+        fprintf(stderr, "[fle]   regs: rax=%#llx rcx=%#llx rdx=%#llx rbx=%#llx rbp=%#llx rsi=%#llx rdi=%#llx r8=%#llx r9=%#llx\n",
+                (unsigned long long)R[RAX], (unsigned long long)R[RCX], (unsigned long long)R[RDX],
+                (unsigned long long)R[RBX], (unsigned long long)R[RBP], (unsigned long long)R[RSI],
+                (unsigned long long)R[RDI], (unsigned long long)R[8], (unsigned long long)R[9]);
+        /* live chain 再現: rbp chain を辿る (Delphi MSVC 形はフレームポインタ有り) */
+        {
+            uint64_t fr = R[RBP];
+            for (int k = 0; k < 12 && fr >= 0x100000ull && fr < 0x3000000ull; k++) {
+                uint64_t ra = LD64(fr + 8);
+                if (ra >= 0x401000ull && ra < 0x13a44b0ull) fprintf(stderr, "[fle]   frame[%d] ret=%#llx\n", k, (unsigned long long)ra);
+                fr = LD64(fr);
+            }
+        }
+        abort();
     }
 }
 #endif
