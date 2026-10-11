@@ -10,7 +10,8 @@
 
 ## 1. 手順
 ```sh
-cd /home/ubuntu/work/webstudio && export PATH=$HOME/.local/share/pnpm/bin:$HOME/.bun/bin:$PATH
+本リポジトリのルート (worktree または main のクローン) に cd し:
+export PATH=$HOME/.local/share/pnpm/bin:$HOME/.bun/bin:$PATH
 cp deploy/env.example deploy/.env && $EDITOR deploy/.env     # WORKER_NAME 既定 signature-studio。ACCESS_ALLOW_EMAILS は未指定可 (= Everyone、§4)
 
 # (a) ビルド (未作成なら)。tools/e2e/work/dist を使う場合は E2E 担当の検収終了後に
