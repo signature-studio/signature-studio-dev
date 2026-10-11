@@ -1,0 +1,156 @@
+# WORKFLOW — subagent 運用・PR・レビュー・検収 (repo 内正本)
+
+本ファイルは**subagent 運用ルールの repo 内正本**である。外部 `analysis/SUBAGENT_RULES.md` から
+必要な規則を import して repo 内自己完結化したもの。
+
+- 原本: `docs/REFERENCES.md` `[SUBAGENT-RULES]` (repo 外・凍結)。原本に無い規則はここに追加してよく、
+  矛盾時は本ファイルを正とする。
+- 旧 `preflight: RULES_SHA=...` 証跡は廃止 (`docs/DECISIONS.md` D6)。検証手順は本ファイル §6。
+- Linear は 2026-10-12 に廃止。issue 管理は GitHub Issues。旧 `CAB-xxx` と issue `#N` の対応は
+  `docs/REFERENCES.md` `[CAB_TO_GH]`。
+
+---
+
+## 1. 絶対遵守 (事故防止・上書き)
+
+1. **`master` / `main` の共有ワークツリー (`/home/ubuntu/work/webstudio`) では作業しない。**
+   変更は branch → worktree → PR のみ。`git push origin master` 禁止。
+2. **禁止 git 操作**: `git reset` / `git reset --hard` / `git stash` / `git checkout -- <他人のfile>` /
+   `git checkout .` / `git restore` / `git clean` / **`git push --force` / `--force-with-lease`**。
+   他セッションのコミット・WIP を消す実事故が 2 件発生している。
+3. **commit はスコープ付き** (`git add <自分のdir>` + `git commit -- <自分のdir>`)。`git add -A` / `git add .` 禁止。
+   `flock /tmp/opencode/git.lock` で直列化する。
+4. **誤りを見つけたら `fix(<name>): report corrections` で別コミットを積む** (reset/rebase -i で歴史を巻き戻さない)。
+5. **最大 blob 20 MiB 超の commit 禁止。** `work/`・`__pycache__/`・`node_modules/` は commit しない (gitignore)。
+6. **`tools/**/work/` と `tools/**/venv/` は vendored / 検証スナップショット。絶対に触らない・commit しない。**
+
+## 2. フロー (branch → worktree → 実装 → レビュー → merge)
+
+```
+PM (main)                      subagent (実装)                  subagent (検収)
+   │                                │                                  │
+   ├ issue 起票 (gh issue create) ──┤                                  │
+   ├ worktree 指名 ─────────────────┤                                  │
+   │                                ├ gh issue view N                  │
+   │                                ├ git worktree add ../ws-N         │
+   │                                ├ 実装 + e2e + REPORT              │
+   │                                ├ commit (scope)                   │
+   │                                ├ push -u origin <N>-<slug>        │
+   │                                ├ gh pr create --base master       │
+   │                                ├ gh issue comment N (進捗・実測)   │
+   │                                └ Status → In review を依頼 ────────┤
+   │                                                                   ├ 自分の worktree で
+   │                                                                   │  PR branch を checkout
+   │                                                                   ├ e2e 独立再実行 + 別算法検算
+   │                                                                   ├ ネガティブコントロール
+   │                                                                   ├ PR review (approve / request changes)
+   │                                                                   └ 誤記は fix commit で同 branch に push
+   ├ review approve 確認 ──────────────────────────────────────────────┤
+   └ gh pr merge --squash ──→ branch/worktree 削除
+```
+
+- **worktree の場所**: `/home/ubuntu/work/ws-<N>` (`git worktree add /home/ubuntu/work/ws-<N> -b <N>-<slug> origin/master`)。
+  既存 worktree は `git worktree list` で確認。**他人の worktree には触れない** (消さない・checkout しない)。
+- **merge は PM のみ**。merge 後、`git worktree remove --force` で**自分が使った worktree** を片付ける。
+- **競合時**: `git rebase origin/master` で解消してから `push --force-with-lease` (自分 branch のみ)。
+
+## 3. ステータスと責任区分
+
+| 役割 | 着手時 | 完了時 | 禁止 |
+|---|---|---|---|
+| 実装 subagent | In progress | **In review** (自分を Done にしない) | Done への変更・他チケットの Status 変更 |
+| 検収 subagent | 対象が In review 確認 | 合格 → Done + コメント / 条件付き → **In review 維持** + 所見 | In review でないものを Done にしない |
+| PM (main) | 起票・milestone 確定 | merge・方針変更・是正 | — |
+
+- **状態の唯一の正は Project V2 の Status フィールド + issue の open/closed。**
+  不変条件: `CLOSED ⇔ Done`、`OPEN ⇔ Backlog|Ready|In progress|In review`。
+- **label `state:*` は使わない** (2026-10-12 実測で全削除済み・0 件)。新規作成・付与しない。
+- **1 状態遷移 = 1 コメント**。コメントなしの状態変更は禁止。
+- **Status を変えるのは PM の責務**。subagent は依頼コメントを書く (PM が委任プロンプトで明示許可した場合を除く)。
+- **中断・ブロックで終了する場合**: Status は In progress のまま、中断コメント (到達点・WIP 所在・再開手順) を残し、
+  最終回答の冒頭に「未完・In Progress のまま」と明記。
+
+## 4. 着手前の確認 (毎回・省略不可)
+
+1. `gh issue view <N>` でスコープ・受入条件・親 issue・検証方法を確認。
+2. 同一チケット / 同一 dir に In progress または In review があれば**着手せず報告**。
+3. lift / 逆アセ / IR pass / ハーネス系は `docs/DEFECTS.md` を先に読み、REPORT 冒頭に
+   「既知類型との関係: 該当 ID / 該当なし」を 1 行書く。
+   **番号体系の注意**: `docs/DEFECTS.md` の D1〜D16 と `tools/icall/REPORT.md` §4 の D1〜D13 は
+   **別体系**。参照時は `(DEFECTS.md)` / `(icall §4)` を必ず併記。
+4. **担当 dir 以外の未コミット変更は他担当の WIP**: 触らない・commit に含めない・stash/checkout/clean しない。
+5. ユーザへ追加アーティファクトを依頼する前に必ず検証する (`docs/REFERENCES.md` `[DOWNLOADS]` と
+   既存抽出物で足りないことを確認し、確認コマンドと結果を併記)。
+
+## 5. 成果物の書き方 (報告の質)
+
+- **結論先出し・日本語**。`REPORT.md` は**日本語 250 行以内**を基本 (`docs/DOC_MAP.md` の上限ルール)。
+- 数値はすべて**実測**。推定は「推定」と明記し根拠を添える。「約」「≈」「ほぼ」で丸めない。
+- 所要は実測秒 + load average + 並列数。変動する値は n≥3 の **min–max レンジ**。
+- 「N 関数/件/%/B」には**単位・分母・除外・集計コマンド**を添える。定義を書けない数値は書かない。
+- 主要数値ごとに **1 コマンド再現スクリプト**を `<dir>/` に置く。検収側は**別アルゴリズム**の検算を 1 本追加する。
+- 主要検査ごとに **ネガティブコントロール** (1 件を壊して FAIL することを確認) を数値で書く。
+- 「検証範囲 / 範囲外」を明記。範囲外の主張は弱める。
+- 未解決・限界は **1 件ごとに起票先** (既存 issue にコメント / 新規子チケット / 親への提案) を付ける。
+  `| 未解決 | 影響 | 起票先 |` の表形式。
+- 環境の恒久化: PATH/TMPDIR 等は `<dir>/env.sh` に書き e2e スクリプト自身が source する。
+  `/tmp` は tmpfs なので大物は `<dir>/work/` (gitignore) へ。
+- 新しく見つけた silent miscompile 類型は `docs/DEFECTS.md` 形式 (症状/根本原因/観測/検出信号/修復) の
+  行案を REPORT に書いて報告する。DEFECTS.md 自体の直接編集は PM 判断。
+
+## 6. 検証 (preflight 代替・旧 RULES_SHA 証跡の廃止)
+
+旧「preflight 実行 → RULES_SHA 転記」は廃止。代わりに以下を**報告前に**自分で実行し結果を REPORT/最終回答に書く。
+
+```sh
+git status --porcelain=v1 -- <自分のdir>      # 取りこぼし・他担当 WIP 混入がないこと
+git diff <検証起点commit> HEAD -- <dir>      # 範囲が自分の dir のみか
+git rev-list --objects --all | awk '$2 ~ /^[0-9a-f]{40}$/' >/dev/null  # (任意) blob 監査
+find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無いこと
+```
+
+- 検証起点の commit hash を REPORT に書く (`規則 45 相当`)。
+- 検証は**コミット済み HEAD の内容**で再現してから報告する。未コミット WIP に依存した数値を報告しない。
+- クリーン HEAD 検証: `git worktree add --detach <dir>/work/wt_verify HEAD` で展開して実行し、
+  終了時に `git worktree remove --force`。`work_verify/` を使う場合は gitignore 外なので **commit 前に必ず削除**。
+- 長時間の待機に `sleep` を繋げない。完了確認は 1 コマンドのポーリングか、結果が返る仕組みを使う。
+
+## 7. コミット・PR
+
+- commit メッセージは **conventional commits**。scope はサブシステム名。観察された既存書式:
+  `fix(ipp): ...` / `feat(flelift): ... (CAB-252)`。過去の `CAB-xxx` 採番を参照してもよい。
+- 例: `docs(liftlib): ...`・`fix(plugins): report corrections (CAB-269)`・
+  `feat(kh): add DecompAt2 ghidra postScript`。
+- PR は `--base master` を基本 (repo の既定ブランチに従う)。body に `Closes #N`・受入条件・検証結果を書く。
+- **1 チケット = 1 subagent。** チケット化されていない作業も subagent 委任する。
+  10 回以上の tool call が必要になる作業は必ず subagent に委任すること。
+
+## 8. 最終回答 (必須)
+
+テキスト報告なしの完了は禁止。以下を必ず含める:
+
+1. commit ハッシュ / PR URL
+2. 成果 (実測値 + 数え方の定義)
+3. 検証結果 (秒・load average・ネガティブコントロール)
+4. 未解決 (起票先付き)・ブロッカー
+5. ユーザ依頼事項 (あれば・事前検証の結果付き)
+6. 次タスク提案 (下流チケット案)
+7. 事前推定と実測の差 (あれば・推定ラベル付き)
+
+## 9. Issue / PR の命名規則
+
+- タイトル: **`[AREA-n]` prefix** + 英語表題。`AREA` は `AGENTS.md` の AREA 一覧
+  (`KH`/`PLG`/`SHX`/`AU`/`HB`/`IPP`/`LIFTLIB`/`RT`/`GUI`/`SR`/`MX`/`FA`/`E2E`/`LGL`/`ST`/`PY`/`PERF` 等)。
+- 過去の採番は尊重する (例: `[IPP-7]`・`[KH-2b]`)。`[HB-H4']` のような記号付きは作らない。
+- 起票前に `gh issue list --search "<kw>"` で重複確認。**重複タイトルを作らない。**
+- 子チケットは親と同じ milestone を付ける (milestone の確定は PM)。
+- PR タイトルは commit と同じ conventional commits 書式。
+- 本文: 背景 (実測値・推定はラベル付き) / 受入条件 / 範囲 / 検証方法 / 親 issue。
+
+## 10. CI 期待事項
+
+- **現状の CI**: `.github/workflows/opencode.yaml` (OpenCode セットアップ・検証用)。
+- PR では最低限これが緑であること。typecheck / build / `pnpm runtime:e2e` はローカルで実行して結果を REPORT に書く。
+- `feat/add-opencode` への移行が進行中。整備後は本節を更新する。
+- commit 前に `find <dir> -type f -size +20M` で巨大 blob がないことを確認すること (GitHub の hard limit 対策)。
+
