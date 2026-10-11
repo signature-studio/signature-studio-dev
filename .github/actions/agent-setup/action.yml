@@ -10,6 +10,18 @@ inputs:
     description: 'Space-separated list of artifact bundle names (without .tar.zst) to download'
     required: false
     default: 'fl-win64'
+  app-private-key:
+    description: 'GitHub App private key (PEM) for token auto-refresh. Pass via workflow: ${{ secrets.OC_APP_PRIVATE_KEY }}'
+    required: false
+  cf-account-id:
+    description: 'Cloudflare account id for R2'
+    required: false
+  cf-r2-access-key-id:
+    description: 'R2 access key id'
+    required: false
+  cf-r2-secret-access-key:
+    description: 'R2 secret access key'
+    required: false
 
 runs:
   using: "composite"
@@ -52,7 +64,7 @@ runs:
       shell: bash
       env:
         OC_APP_ID: ${{ env.OC_APP_ID }}
-        OC_APP_PRIVATE_KEY: ${{ secrets.OC_APP_PRIVATE_KEY }}
+        OC_APP_PRIVATE_KEY: ${{ inputs.app-private-key }}
       run: |
         set -e
         mkdir -p "$RUNNER_TEMP/bin"
@@ -106,9 +118,9 @@ runs:
     - name: Download artifacts from R2
       shell: bash
       env:
-        CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
-        CF_R2_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
-        CF_R2_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+        CF_ACCOUNT_ID: ${{ inputs.cf-account-id }}
+        CF_R2_ACCESS_KEY_ID: ${{ inputs.cf-r2-access-key-id }}
+        CF_R2_SECRET_ACCESS_KEY: ${{ inputs.cf-r2-secret-access-key }}
       run: |
         set -e
         BUCKET="${{ inputs.r2-bucket }}"

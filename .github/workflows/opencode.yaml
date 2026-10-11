@@ -110,6 +110,10 @@ jobs:
         uses: ./.github/actions/agent-setup
         with:
           artifacts: fl-win64
+          app-private-key: ${{ secrets.OC_APP_PRIVATE_KEY }}
+          cf-account-id: ${{ secrets.CF_ACCOUNT_ID }}
+          cf-r2-access-key-id: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          cf-r2-secret-access-key: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
 
       - name: Assemble prompt
         id: prompt
@@ -210,6 +214,10 @@ jobs:
         uses: ./.github/actions/agent-setup
         with:
           artifacts: fl-win64
+          app-private-key: ${{ secrets.OC_APP_PRIVATE_KEY }}
+          cf-account-id: ${{ secrets.CF_ACCOUNT_ID }}
+          cf-r2-access-key-id: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          cf-r2-secret-access-key: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
 
       - name: "PR diff context"
         id: diff
