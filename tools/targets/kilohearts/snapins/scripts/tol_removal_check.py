@@ -114,6 +114,30 @@ def main():
     if bad_rows:
         fails.append('REPORT.md has unmarked tolerance description (%d lines)' % len(bad_rows))
 
+    # (6) 独立再計算 (規則 37): 実測 snapshot (work/<n>/s0/stat.json) から 14 snap-in の
+    #     判定を自分で数え直す。数え方: 分母 = work/<name>/s0/stat.json が存在する snap-in 14 本
+    #     (ORDER 順)。bit-exact = trials_ok == trials かつ calls_ok == calls かつ
+    #     compare 文字列に '[tolerance]' または 'tol(' が含まれないこと。
+    import json as _json
+    ORDER = ['matrix', 'gain', 'haas', 'clipper', 'gate', 'quickeq', 'resonator', 'stereo',
+             'disperser', 'formant', 'phaser', 'delay', 'limiter', 'khbase']
+    inexact, legacy_tag, missing = [], [], []
+    for n in ORDER:
+        sp = os.path.join(ROOT, 'work', n, 's0', 'stat.json')
+        if not os.path.exists(sp):
+            missing.append(n)
+            continue
+        s = _json.load(open(sp))
+        cmp_ = s.get('compare', '')
+        if not (s.get('trials_ok') == s.get('trials') and s.get('calls_ok') == s.get('calls')):
+            inexact.append(n)
+        if '[tolerance]' in cmp_ or 'tol(' in cmp_:
+            legacy_tag.append(n)
+    print('[6] independent recount of work/<n>/s0/stat.json (分母=%d): not-exact %s / legacy tol tag %s / missing %s'
+          % (len(ORDER), inexact or 'なし', legacy_tag or 'なし', missing or 'なし'))
+    if inexact or legacy_tag or (len(missing) == len(ORDER)):
+        fails.append('stat.json recount: not-exact=%s legacy=%s missing=%d' % (inexact, legacy_tag, len(missing)))
+
     print('---')
     if fails:
         print('FAIL: ' + '; '.join(fails))
