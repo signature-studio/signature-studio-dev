@@ -442,7 +442,22 @@ python3 tools/plugins/p0c/k80_diff.py --ir work/ext/k80.ext.ll \
   --only 0x5dfbe0,0x5dfc90,0x5dfd30,0x5dfdb0 --cases 2000
 ```
 
-### 10.8 環境前提 (規則 43)
+### 10.8 クリーン HEAD 検証 (規則 45)
+
+起点 commit = **19c2cd2** (本節の commit)。`git archive HEAD -- tools/plugins/p0c | tar -x -C
+work/verify_19c2cd2 --strip-components=3` で展開 (リポジトリ非破壊)、work/ 内の既存 lift IR
+(`work/diff3/k80.x87fix.ll`) を入力としてコピーして再実行。全数値が一致:
+
+  p0c4_e2e.py : 0x5dfbe0=0 / 0x5dfc90=0 / 0x5dfd30=102,353 / 0x5dfdb0=508,385
+                回帰 7 kernel = 0 / kernel_table 45 変数・80 実装・10,886 B・x87 28
+  p0c4_nega.py: 0x5dfd30=136,953 / 0x5dfdb0=841,308 (negative control OK)
+
+**注記**: `p0c4_e2e.py` の [6] は相対パス `../inventory/kernel_table.py` を解決するため、
+work/verify_* の展開先からは実行不能 (絶対パス参照)。REPORT に明記 (規則 45)。
+実測は絶対パス `/home/ubuntu/work/webstudio/tools/plugins/inventory/kernel_table.py` で
+同一出力を確認済み。
+
+### 10.9 環境前提 (規則 43)
 
 - TMPDIR は実ディスク: `export TMPDIR=tools/plugins/p0c/work/tmp` (`/tmp` は tmpfs 3.7 GB)。
   `preflight.sh --env tools/plugins/p0c` と同じ。
