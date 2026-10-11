@@ -132,7 +132,7 @@ jobs:
       - uses: actions/create-github-app-token@v3
         id: reviewer-token
         continue-on-error: true
-        if: ${{ vars.OC_REVIEW_APP_CLIENT_ID != '' && secrets.OC_REVIEW_APP_PRIVATE_KEY != '' }}
+        if: ${{ vars.OC_REVIEW_APP_CLIENT_ID != '' }}
         with:
           client-id: ${{ vars.OC_REVIEW_APP_CLIENT_ID }}
           private-key: ${{ secrets.OC_REVIEW_APP_PRIVATE_KEY }}
