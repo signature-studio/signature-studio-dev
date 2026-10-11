@@ -45,7 +45,10 @@ window.__done = new Promise((resolveAll, rejectAll) => {
       window.__shim = shim;
       (async () => {
         const donePtr = () => new Int32Array(M.wasmMemory.buffer, M._com_test_done_ptr(), 1);
-        const deadline = performance.now() + (cfg.secs + 40) * 1000;
+        // 余裕: 実行秒数 + max(40, 秒数×0.5)。120s soak (CAB-270) は wasm 側の emscripten_get_now() で 120s で抜けるため、
+        // ここは main thread スタベの検出のみが役目。短シナリオの既存動作 (40s) は変えない。
+        const slack = Math.max(40, Math.ceil(cfg.secs * 0.5));
+        const deadline = performance.now() + (cfg.secs + slack) * 1000;
         for (;;) {
           const d = donePtr();
           if (Atomics.load(d, 0) !== 0) break;
