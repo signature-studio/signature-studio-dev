@@ -46,9 +46,7 @@ runs:
       uses: oven-sh/setup-bun@v2
     - name: Setup OpenCode
       shell: bash
-      run: |
-        curl -fsSL --retry 10 --retry-delay 3 https://opencode.ai/v2/install | bash
-        echo "$HOME/.opencode/bin" >> $GITHUB_PATH
+      run: bash .github/scripts/install-opencode.sh
 
     # ---------------------------------------------------------------
     # GitHub App token auto-refresh (App token は 1 時間で切れる)
