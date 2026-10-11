@@ -18,7 +18,7 @@
 4. 設計決定: **「プラグイン 1 DLL = 1 wasm instance = 専用 linear memory」+ VST2 境界の table 駆動 marshalling** (共有メモリ方式は不採用, §2.4)。
    LoadLibrary/GetProcAddress/FreeLibrary は「事前登録モジュール表」へ解決、関数ポインタは bridge が払い出す合成 VA (thunk slot) で返す (§2.2)。
 5. PoC (`bash tools/hostbridge/hostbridge.sh`, 4〜10 s, **65/65 PASS**): FL 側の代役 mini VST2 host (freestanding wasm32 C) が Fruity Wrapper と同じ手順で
-   M10 の lift 済み OTT wasm をロードし `processReplacing` を駆動。出力は直接呼出と **512/512 bit 一致**、`[0x248]=0` 条件では M10 e2e の出力と **512/512 bit 一致 (junk census 132/69/175/136 同値)** (§3)。
+   M10 の lift 済み OTT wasm をロードし `processReplacing` を駆動。出力は直接呼出と **512/512 bit 一致**、`[0x248]=0` 条件では M10 e2e の出力と **512/512 bit 一致 (junk census は `tools/ott/REPORT.md` §2.3 の旧 chain 行と同値)** (§3)。
 
 ---
 

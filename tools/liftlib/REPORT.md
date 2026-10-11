@@ -11,7 +11,7 @@
 
 | 項目 | 結果 (実測) |
 |---|---|
-| (a) OTT | liftlib 側のみで再現: **各段 IR がテキスト完全一致** (base=ott_lift.ll / P1→shift→gdata=ir7e_p1..p3 / memfix0 / memfix1 / 最終 ott_m10.ll の 7 段すべて true) → emcc → **checks 7 / broken 0, band 係数 maxdev=0.0 (nbad 0)**, E7 OOB 不発, census([0x248]=0) 132/69/175/136 = M10 と同値。helper は **自動生成 153 本**で署名不一致 0 / undefined 46 (M10 と同数)。processReplacing 出力 42 組合せ (param×[0x248]×入力振幅) の SHA が **元 m10 成果物と 42/42 一致** |
+| (a) OTT | liftlib 側のみで再現: **各段 IR がテキスト完全一致** (base=ott_lift.ll / P1→shift→gdata=ir7e_p1..p3 / memfix0 / memfix1 / 最終 ott_m10.ll の 7 段すべて true) → emcc → **checks 7 / broken 0, band 係数 maxdev=0.0 (nbad 0)**, E7 OOB 不発, census([0x248]=0) は `tools/ott/REPORT.md` §2.3 の旧 chain 行 = M10 と同値。helper は **自動生成 153 本**で署名不一致 0 / undefined 46 (M10 と同数)。processReplacing 出力 42 組合せ (param×[0x248]×入力振幅) の SHA が **元 m10 成果物と 42/42 一致** |
 | (b) Fresh Air Gain | **400/400 シナリオ bit-exact** (全バッファ+guard 比較, 手書きパッチ無し。P1 は機械語から自動再構成)。対照: P1 無効 85 不一致 / F7 無効 376 不一致+trap 2 / F2 無効 400 不一致 |
 | (c) Kilohearts Gain | **61 シーケンス×6 ブロック = 366/366 ステップ bit-exact** (元 6 ブロック列を含む)。対照: P1 無効 305 不一致 / F7 無効 全シナリオ hang→trap / F2 は KH では不要 (callee 0) |
 | SIMD helper (CAB-54) | 宣言駆動で自動生成。KH census 205 mnemonic の **未被覆 83(効果)/31(共通基盤)/90(合算)/92(host 込) → 1/1/2/2** (残: `pcmpistri`, `vinsertf128`)。**実機 inline asm vs wasm を 192 mnemonic・281 form・95,400 ベクタで突合: 不一致 0** (近似命令 4 種は相対誤差 <1.6·2⁻¹² を許容して 489 件合格) |
@@ -131,7 +131,7 @@ FA の P1' (comisd×2+jbe/jae+xorps/movaps+jmp, 合流先は reg2mem alloca) が
 | lb_layout 共有化 | `liftlib/lb_layout.py` 新設 (lowbase 正本の取り込み。T8 が両者の同一性を検査)。legacy (0x30000000) レイアウトも LB_* 変数で表現し emcc フラグ生成を 1 本化 (`resolve_layout`) |
 | C ランタイム | `runtime_lb.py` が m6_rt.c (`M6base` + **d2750 memcpy 範囲ガード** 追加) / m8_rt.c (`M8BASE` + 上限) / m6_stubs_hand.c (直値 4 箇所) / m10_boot.c (`MSCR` 静的配列化) を `#ifndef LB_IMG_BASE / LB_MAX_MEM` 付きで work へマクロ化コピー (T9, 置換数 assert 付き) |
 | emcc | legacy: 旧フラグ完全維持 (`-Wl,--initial-memory=0x36000000`) / lowbase: `-sGLOBAL_BASE/-sINITIAL_MEMORY/-sMAXIMUM_MEMORY` + `-DLB_IMG_BASE/-DLB_MAX_MEM` (`-Wl,--initial-memory` は emscripten initial-heap 16MiB 加算で "too small")。init_mib は GLOBAL_BASE+stack 8MB から自動算出 (0x1230000 で wasm-ld required 実測 31,089,728B) |
-| ott --lb-base 0x10000 | checks 7/0, band 係数 maxdev 0.0/nbad 0, trap rc 0, **outhash 42/42 equal**, census[0x248]=0 132/69/175/136 = m10 同値。layout: base 0x10000 / arena 0x320000 / GLOBAL_BASE 0x420000 / initial 24MiB / max 64MiB |
+| ott --lb-base 0x10000 | checks 7/0, band 係数 maxdev 0.0/nbad 0, trap rc 0, **outhash 42/42 equal**, census[0x248]=0 は `tools/ott/REPORT.md` §2.3 の旧 chain 行 = m10 同値。layout: base 0x10000 / arena 0x320000 / GLOBAL_BASE 0x420000 / initial 24MiB / max 64MiB |
 | ott --lb-base 0x1230000 | 同じく checks 7/0 + outhash 42/42 (base 依存バグ無しの証拠)。initial 39MiB |
 | audit_va.py 0x10000 | DIR64 13,000 全て image 内 (image 外 0) / IAT 375 slot の VA 保持 0 / base 64KiB 境界 → exit 0 |
 | x64c 3 構成再現 | 0x10000/16MiB, 0x1230000/40MiB, 0x10000/8MiB の各 89 scenario 全 cell — **3 構成とも bit 一致 (max_ulp 0 / state_diff 0)**。cell 総数の正本は `tools/ott/REPORT.md` §2 |
@@ -288,7 +288,7 @@ bind rcx 1 / bind xmm5 1。
 | census[0x248]=0 | 132 / 140 / **junkHi 104** / 136 / nan 0 / absmax 1.67e18 | 104 ≤ 104 OK |
 | census[0x248]=1 | 4 / 259 / junkHi 248 / 1 / absmax 1.13e34 | (CAB-238 と同値) |
 | **E7 param sweep** | 0.0/0.1/0.9/1.0 × [0x248]=0/1 の **8 combo すべて完走** (timeout 60 s) | PASS (無限ループ解消) |
-| 旧既定 `--auto none` | checks 7/0, census 132/69/175/136, SHA 42/42, IR 一致 | PASS (継続) |
+| 旧既定 `--auto none` | checks 7/0, census は `tools/ott/REPORT.md` §2.3 の旧 chain 行, SHA 42/42, IR 一致 | PASS (継続) |
 | link | signature mismatch 0 / undefined 46 / `undefined __asm_*` 0 | PASS |
 | simd helper | 自動生成 159 本 (CAB-239 時 153) | — |
 
