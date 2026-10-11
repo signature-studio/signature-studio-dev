@@ -1,6 +1,5 @@
 # KH-11 — subscribe 経路の実 IR 化 + module E -O1 化 (CAB-247 残スコープ, 親 CAB-59/CAB-13)
 
--
 - 1 コマンド再現: `bash tools/targets/kilohearts/license/run_all.sh` (実測 33〜36 s 単発・load average 2.79→2.90 (nproc=16)、`--zero-stack` はデフォルトで compare に付与済み)
 - 独立再計算: `python3 scripts/kh11_audit.py` (出力は §4 に転記)
 - 検証起点: HEAD `0d589e6` (feat(liftlib): leaf region phi synthesis) + 本変更。作業ツリー変更のみで clean HEAD 検証は §5 の手順参照

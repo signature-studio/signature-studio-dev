@@ -1,6 +1,5 @@
 # P0b REPORT — TFruityHost shim (CAB-195)
 
--
 - 検収起点 commit: **9b420bd** (`tools/plugins/framework` ツリーは b8e762d と同一: `git diff b8e762d HEAD -- tools/plugins/` = 0 行)
 - 行数目安: 実装部 (§0-§9) 187 行 + 検収記録 (§10-§11) 105 行 + CAB-194 検収 (§12) 78 行 + CAB-269 (§13) 118 行 = 488 行
   (実ファイル 476 行)。検収記録・修正記録は規則 37〜42
@@ -401,7 +400,7 @@ stage-1 成果物を再利用 (RetDec 再 decode は未実施) (e) 7,058 site �
 
 ## 13. CAB-269 (2026-10-11) — `fw_stage2.sh` S1-S4 修正と 1 コマンド e2e 復旧
 
-- / 既知類型との関係: **該当 D7 (stack 引数・戻り値)・
+- 既知類型との関係: **該当 D7 (stack 引数・戻り値)・
   該当なし** (S2 は手書き pass の採番衝突で DEFECTS.md 未登録 → §13.7 に行案)
 - 検証起点: 本節の全実測は `git archive HEAD -- tools/plugins/framework` の **snapshot** から再実行
   (snapshot commit c737c4a。`git diff db6565c c737c4a -- tools/plugins/framework` = 0 行 = 本修正ツリーと同一)。
