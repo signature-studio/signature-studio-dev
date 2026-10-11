@@ -41,13 +41,21 @@ static void blk_ippiResizeSqrPixel_8u_C4R(IppBlk *b) { b->rax = (uint64_t)(uint3
 static void blk_ippiSet_8u_C3R(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippiSet_8u_C3R((const Ipp8u*)IPP_GUEST_PTR(b->gp[0]), (Ipp8u*)IPP_GUEST_PTR(b->gp[1]), (int)(int32_t)b->gp[2], DEC_STRUCT(IppiSize, b->gp[3])); b->xmm0ret = 0; }
 static void blk_ippiSubC_8u_C3IRSfs(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippiSubC_8u_C3IRSfs((const Ipp8u*)IPP_GUEST_PTR(b->gp[0]), (Ipp8u*)IPP_GUEST_PTR(b->gp[1]), (int)(int32_t)b->gp[2], DEC_STRUCT(IppiSize, b->gp[3]), (int)(int32_t)STK(0)); b->xmm0ret = 0; }
 static void blk_ippiSubC_8u_C4IRSfs(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippiSubC_8u_C4IRSfs((const Ipp8u*)IPP_GUEST_PTR(b->gp[0]), (Ipp8u*)IPP_GUEST_PTR(b->gp[1]), (int)(int32_t)b->gp[2], DEC_STRUCT(IppiSize, b->gp[3]), (int)(int32_t)STK(0)); b->xmm0ret = 0; }
+static void blk_ippsAbs_32f(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsAbs_32f((const Ipp32f*)IPP_GUEST_PTR(b->gp[0]), (Ipp32f*)IPP_GUEST_PTR(b->gp[1]), (int)(int32_t)b->gp[2]); b->xmm0ret = 0; }
 static void blk_ippsAddC_32f(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsAddC_32f((const Ipp32f*)IPP_GUEST_PTR(b->gp[0]), ipp_f32(b->xmm[1]), (Ipp32f*)IPP_GUEST_PTR(b->gp[2]), (int)(int32_t)b->gp[3]); b->xmm0ret = 0; }
 static void blk_ippsAddC_32f_I(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsAddC_32f_I(ipp_f32(b->xmm[0]), (Ipp32f*)IPP_GUEST_PTR(b->gp[1]), (int)(int32_t)b->gp[2]); b->xmm0ret = 0; }
+static void blk_ippsAddProductC_32f(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsAddProductC_32f((const Ipp32f*)IPP_GUEST_PTR(b->gp[0]), ipp_f32(b->xmm[1]), (Ipp32f*)IPP_GUEST_PTR(b->gp[2]), (int)(int32_t)b->gp[3]); b->xmm0ret = 0; }
 static void blk_ippsAdd_32f_I(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsAdd_32f_I((const Ipp32f*)IPP_GUEST_PTR(b->gp[0]), (Ipp32f*)IPP_GUEST_PTR(b->gp[1]), (int)(int32_t)b->gp[2]); b->xmm0ret = 0; }
 static void blk_ippsAtan_32f_A11(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsAtan_32f_A11((const Ipp32f*)IPP_GUEST_PTR(b->gp[0]), (Ipp32f*)IPP_GUEST_PTR(b->gp[1]), (int)(int32_t)b->gp[2]); b->xmm0ret = 0; }
+static void blk_ippsConvert_16s32f(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsConvert_16s32f((const Ipp16s*)IPP_GUEST_PTR(b->gp[0]), (Ipp32f*)IPP_GUEST_PTR(b->gp[1]), (int)(int32_t)b->gp[2]); b->xmm0ret = 0; }
 static void blk_ippsConvert_32f32s_Sfs(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsConvert_32f32s_Sfs((const Ipp32f*)IPP_GUEST_PTR(b->gp[0]), (Ipp32s*)IPP_GUEST_PTR(b->gp[1]), (int)(int32_t)b->gp[2], (int)(int32_t)b->gp[3], (int)(int32_t)STK(0)); b->xmm0ret = 0; }
 static void blk_ippsCopy_32f(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsCopy_32f((const Ipp32f*)IPP_GUEST_PTR(b->gp[0]), (Ipp32f*)IPP_GUEST_PTR(b->gp[1]), (int)(int32_t)b->gp[2]); b->xmm0ret = 0; }
 static void blk_ippsCopy_32s(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsCopy_32s((const Ipp32s*)IPP_GUEST_PTR(b->gp[0]), (Ipp32s*)IPP_GUEST_PTR(b->gp[1]), (int)(int32_t)b->gp[2]); b->xmm0ret = 0; }
+static void blk_ippsCopy_64s(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsCopy_64s((const Ipp64s*)IPP_GUEST_PTR(b->gp[0]), (Ipp64s*)IPP_GUEST_PTR(b->gp[1]), (int)(int32_t)b->gp[2]); b->xmm0ret = 0; }
+static void blk_ippsCopy_8u(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsCopy_8u((const Ipp8u*)IPP_GUEST_PTR(b->gp[0]), (Ipp8u*)IPP_GUEST_PTR(b->gp[1]), (int)(int32_t)b->gp[2]); b->xmm0ret = 0; }
+static void blk_ippsCplxToReal_32fc(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsCplxToReal_32fc((const Ipp32fc*)IPP_GUEST_PTR(b->gp[0]), (Ipp32f*)IPP_GUEST_PTR(b->gp[1]), (Ipp32f*)IPP_GUEST_PTR(b->gp[2]), (int)(int32_t)b->gp[3]); b->xmm0ret = 0; }
+static void blk_ippsDeinterleave_16s(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsDeinterleave_16s((const Ipp16s*)IPP_GUEST_PTR(b->gp[0]), (int)(int32_t)b->gp[1], (int)(int32_t)b->gp[2], (Ipp16s* const*)IPP_GUEST_PTR(b->gp[3])); b->xmm0ret = 0; }
+static void blk_ippsDeinterleave_32f(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsDeinterleave_32f((const Ipp32f*)IPP_GUEST_PTR(b->gp[0]), (int)(int32_t)b->gp[1], (int)(int32_t)b->gp[2], (Ipp32f* const*)IPP_GUEST_PTR(b->gp[3])); b->xmm0ret = 0; }
 static void blk_ippsExp_32f_A11(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsExp_32f_A11((const Ipp32f*)IPP_GUEST_PTR(b->gp[0]), (Ipp32f*)IPP_GUEST_PTR(b->gp[1]), (int)(int32_t)b->gp[2]); b->xmm0ret = 0; }
 static void blk_ippsFFTFwd_RToCCS_32f(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsFFTFwd_RToCCS_32f((const Ipp32f*)IPP_GUEST_PTR(b->gp[0]), (Ipp32f*)IPP_GUEST_PTR(b->gp[1]), (const void*)IPP_GUEST_PTR(b->gp[2]), (Ipp8u*)IPP_GUEST_PTR(b->gp[3])); b->xmm0ret = 0; }
 static void blk_ippsFFTFwd_RToCCS_32f_I(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsFFTFwd_RToCCS_32f_I((Ipp32f*)IPP_GUEST_PTR(b->gp[0]), (const void*)IPP_GUEST_PTR(b->gp[1]), (Ipp8u*)IPP_GUEST_PTR(b->gp[2])); b->xmm0ret = 0; }
@@ -81,8 +89,16 @@ static void blk_ippsFIRInitAlloc64f_32f(IppBlk *b) { b->rax = (uint64_t)(uint32_
 static void blk_ippsFIRInitAlloc_32f(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsFIRInitAlloc_32f((void**)IPP_GUEST_PTR(b->gp[0]), (const Ipp32f*)IPP_GUEST_PTR(b->gp[1]), (int)(int32_t)b->gp[2], (const Ipp32f*)IPP_GUEST_PTR(b->gp[3])); b->xmm0ret = 0; }
 static void blk_ippsFIRMRInitAlloc64f_32f(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsFIRMRInitAlloc64f_32f((void**)IPP_GUEST_PTR(b->gp[0]), (const Ipp64f*)IPP_GUEST_PTR(b->gp[1]), (int)(int32_t)b->gp[2], (int)(int32_t)b->gp[3], (int)(int32_t)STK(0), (int)(int32_t)STK(1), (int)(int32_t)STK(2), (const Ipp32f*)IPP_GUEST_PTR(STK(3))); b->xmm0ret = 0; }
 static void blk_ippsFIRMRInitAlloc_32f(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsFIRMRInitAlloc_32f((void**)IPP_GUEST_PTR(b->gp[0]), (const Ipp32f*)IPP_GUEST_PTR(b->gp[1]), (int)(int32_t)b->gp[2], (int)(int32_t)b->gp[3], (int)(int32_t)STK(0), (int)(int32_t)STK(1), (int)(int32_t)STK(2), (const Ipp32f*)IPP_GUEST_PTR(STK(3))); b->xmm0ret = 0; }
+static void blk_ippsFlip_16u_I(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsFlip_16u_I((Ipp16u*)IPP_GUEST_PTR(b->gp[0]), (int)(int32_t)b->gp[1]); b->xmm0ret = 0; }
+static void blk_ippsFlip_32f_I(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsFlip_32f_I((Ipp32f*)IPP_GUEST_PTR(b->gp[0]), (int)(int32_t)b->gp[1]); b->xmm0ret = 0; }
 static void blk_ippsIIRGetStateSize64f_BiQuad_32f(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsIIRGetStateSize64f_BiQuad_32f((int)(int32_t)b->gp[0], (int*)IPP_GUEST_PTR(b->gp[1])); b->xmm0ret = 0; }
 static void blk_ippsIIRInit64f_BiQuad_32f(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsIIRInit64f_BiQuad_32f((void**)IPP_GUEST_PTR(b->gp[0]), (const Ipp64f*)IPP_GUEST_PTR(b->gp[1]), (int)(int32_t)b->gp[2], (const Ipp64f*)IPP_GUEST_PTR(b->gp[3]), (Ipp8u*)IPP_GUEST_PTR(STK(0))); b->xmm0ret = 0; }
+static void blk_ippsInterleave_16s(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsInterleave_16s((const Ipp16s* const*)IPP_GUEST_PTR(b->gp[0]), (int)(int32_t)b->gp[1], (int)(int32_t)b->gp[2], (Ipp16s*)IPP_GUEST_PTR(b->gp[3])); b->xmm0ret = 0; }
+static void blk_ippsInterleave_32f(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsInterleave_32f((const Ipp32f* const*)IPP_GUEST_PTR(b->gp[0]), (int)(int32_t)b->gp[1], (int)(int32_t)b->gp[2], (Ipp32f*)IPP_GUEST_PTR(b->gp[3])); b->xmm0ret = 0; }
+static void blk_ippsMax_16s(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsMax_16s((const Ipp16s*)IPP_GUEST_PTR(b->gp[0]), (int)(int32_t)b->gp[1], (Ipp16s*)IPP_GUEST_PTR(b->gp[2])); b->xmm0ret = 0; }
+static void blk_ippsMinMax_16s(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsMinMax_16s((const Ipp16s*)IPP_GUEST_PTR(b->gp[0]), (int)(int32_t)b->gp[1], (Ipp16s*)IPP_GUEST_PTR(b->gp[2]), (Ipp16s*)IPP_GUEST_PTR(b->gp[3])); b->xmm0ret = 0; }
+static void blk_ippsMinMax_32f(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsMinMax_32f((const Ipp32f*)IPP_GUEST_PTR(b->gp[0]), (int)(int32_t)b->gp[1], (Ipp32f*)IPP_GUEST_PTR(b->gp[2]), (Ipp32f*)IPP_GUEST_PTR(b->gp[3])); b->xmm0ret = 0; }
+static void blk_ippsMin_16s(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsMin_16s((const Ipp16s*)IPP_GUEST_PTR(b->gp[0]), (int)(int32_t)b->gp[1], (Ipp16s*)IPP_GUEST_PTR(b->gp[2])); b->xmm0ret = 0; }
 static void blk_ippsMove_32f(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsMove_32f((const Ipp32f*)IPP_GUEST_PTR(b->gp[0]), (Ipp32f*)IPP_GUEST_PTR(b->gp[1]), (int)(int32_t)b->gp[2]); b->xmm0ret = 0; }
 static void blk_ippsMove_8u(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsMove_8u((const Ipp8u*)IPP_GUEST_PTR(b->gp[0]), (Ipp8u*)IPP_GUEST_PTR(b->gp[1]), (int)(int32_t)b->gp[2]); b->xmm0ret = 0; }
 static void blk_ippsMulC_32f(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsMulC_32f((const Ipp32f*)IPP_GUEST_PTR(b->gp[0]), ipp_f32(b->xmm[1]), (Ipp32f*)IPP_GUEST_PTR(b->gp[2]), (int)(int32_t)b->gp[3]); b->xmm0ret = 0; }
@@ -90,8 +106,12 @@ static void blk_ippsMulC_32f_I(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsMul
 static void blk_ippsMul_32f(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsMul_32f((const Ipp32f*)IPP_GUEST_PTR(b->gp[0]), (const Ipp32f*)IPP_GUEST_PTR(b->gp[1]), (Ipp32f*)IPP_GUEST_PTR(b->gp[2]), (int)(int32_t)b->gp[3]); b->xmm0ret = 0; }
 static void blk_ippsMul_32f_I(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsMul_32f_I((const Ipp32f*)IPP_GUEST_PTR(b->gp[0]), (Ipp32f*)IPP_GUEST_PTR(b->gp[1]), (int)(int32_t)b->gp[2]); b->xmm0ret = 0; }
 static void blk_ippsOrC_32u_I(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsOrC_32u_I((unsigned)(uint32_t)b->gp[0], (Ipp32u*)IPP_GUEST_PTR(b->gp[1]), (int)(int32_t)b->gp[2]); b->xmm0ret = 0; }
+static void blk_ippsPowerSpectr_32fc(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsPowerSpectr_32fc((const Ipp32fc*)IPP_GUEST_PTR(b->gp[0]), (Ipp32f*)IPP_GUEST_PTR(b->gp[1]), (int)(int32_t)b->gp[2]); b->xmm0ret = 0; }
+static void blk_ippsRealToCplx_32f(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsRealToCplx_32f((const Ipp32f*)IPP_GUEST_PTR(b->gp[0]), (const Ipp32f*)IPP_GUEST_PTR(b->gp[1]), (Ipp32fc*)IPP_GUEST_PTR(b->gp[2]), (int)(int32_t)b->gp[3]); b->xmm0ret = 0; }
+static void blk_ippsRound_32f(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsRound_32f((const Ipp32f*)IPP_GUEST_PTR(b->gp[0]), (Ipp32f*)IPP_GUEST_PTR(b->gp[1]), (int)(int32_t)b->gp[2]); b->xmm0ret = 0; }
 static void blk_ippsSet_32f(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsSet_32f(ipp_f32(b->xmm[0]), (Ipp32f*)IPP_GUEST_PTR(b->gp[1]), (int)(int32_t)b->gp[2]); b->xmm0ret = 0; }
 static void blk_ippsSet_32s(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsSet_32s((int)(int32_t)b->gp[0], (Ipp32s*)IPP_GUEST_PTR(b->gp[1]), (int)(int32_t)b->gp[2]); b->xmm0ret = 0; }
+static void blk_ippsSet_64f(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsSet_64f(ipp_f64(b->xmm[0]), (Ipp64f*)IPP_GUEST_PTR(b->gp[1]), (int)(int32_t)b->gp[2]); b->xmm0ret = 0; }
 static void blk_ippsSet_64s(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsSet_64s((Ipp64s)b->gp[0], (Ipp64s*)IPP_GUEST_PTR(b->gp[1]), (int)(int32_t)b->gp[2]); b->xmm0ret = 0; }
 static void blk_ippsSqr_32f(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsSqr_32f((const Ipp32f*)IPP_GUEST_PTR(b->gp[0]), (Ipp32f*)IPP_GUEST_PTR(b->gp[1]), (int)(int32_t)b->gp[2]); b->xmm0ret = 0; }
 static void blk_ippsSqr_32f_I(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsSqr_32f_I((Ipp32f*)IPP_GUEST_PTR(b->gp[0]), (int)(int32_t)b->gp[1]); b->xmm0ret = 0; }
@@ -100,12 +120,21 @@ static void blk_ippsSqrt_32f_A21(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsS
 static void blk_ippsSubCRev_32f(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsSubCRev_32f((const Ipp32f*)IPP_GUEST_PTR(b->gp[0]), ipp_f32(b->xmm[1]), (Ipp32f*)IPP_GUEST_PTR(b->gp[2]), (int)(int32_t)b->gp[3]); b->xmm0ret = 0; }
 static void blk_ippsSubCRev_32f_I(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsSubCRev_32f_I(ipp_f32(b->xmm[0]), (Ipp32f*)IPP_GUEST_PTR(b->gp[1]), (int)(int32_t)b->gp[2]); b->xmm0ret = 0; }
 static void blk_ippsSub_32f_I(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsSub_32f_I((const Ipp32f*)IPP_GUEST_PTR(b->gp[0]), (Ipp32f*)IPP_GUEST_PTR(b->gp[1]), (int)(int32_t)b->gp[2]); b->xmm0ret = 0; }
+static void blk_ippsSwapBytes_16u_I(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsSwapBytes_16u_I((Ipp16u*)IPP_GUEST_PTR(b->gp[0]), (int)(int32_t)b->gp[1]); b->xmm0ret = 0; }
+static void blk_ippsSwapBytes_32u_I(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsSwapBytes_32u_I((Ipp32u*)IPP_GUEST_PTR(b->gp[0]), (int)(int32_t)b->gp[1]); b->xmm0ret = 0; }
 static void blk_ippsThreshold_GT_32f(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsThreshold_GT_32f((const Ipp32f*)IPP_GUEST_PTR(b->gp[0]), (Ipp32f*)IPP_GUEST_PTR(b->gp[1]), (int)(int32_t)b->gp[2], ipp_f32(b->xmm[3])); b->xmm0ret = 0; }
 static void blk_ippsThreshold_GT_32f_I(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsThreshold_GT_32f_I((Ipp32f*)IPP_GUEST_PTR(b->gp[0]), (int)(int32_t)b->gp[1], ipp_f32(b->xmm[2])); b->xmm0ret = 0; }
 static void blk_ippsThreshold_GT_32s_I(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsThreshold_GT_32s_I((Ipp32s*)IPP_GUEST_PTR(b->gp[0]), (int)(int32_t)b->gp[1], (int)(int32_t)b->gp[2]); b->xmm0ret = 0; }
+static void blk_ippsThreshold_LTValGTVal_32f_I(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsThreshold_LTValGTVal_32f_I((Ipp32f*)IPP_GUEST_PTR(b->gp[0]), (int)(int32_t)b->gp[1], ipp_f32(b->xmm[2]), ipp_f32(b->xmm[3]), ipp_f32(STK(0)), ipp_f32(STK(1))); b->xmm0ret = 0; }
 static void blk_ippsThreshold_LT_32f_I(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsThreshold_LT_32f_I((Ipp32f*)IPP_GUEST_PTR(b->gp[0]), (int)(int32_t)b->gp[1], ipp_f32(b->xmm[2])); b->xmm0ret = 0; }
+static void blk_ippsThreshold_LT_32s_I(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsThreshold_LT_32s_I((Ipp32s*)IPP_GUEST_PTR(b->gp[0]), (int)(int32_t)b->gp[1], (int)(int32_t)b->gp[2]); b->xmm0ret = 0; }
+static void blk_ippsThreshold_LT_64f_I(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsThreshold_LT_64f_I((Ipp64f*)IPP_GUEST_PTR(b->gp[0]), (int)(int32_t)b->gp[1], ipp_f64(b->xmm[2])); b->xmm0ret = 0; }
 static void blk_ippsVectorSlope_32f(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsVectorSlope_32f((Ipp32f*)IPP_GUEST_PTR(b->gp[0]), (int)(int32_t)b->gp[1], ipp_f32(b->xmm[2]), ipp_f32(b->xmm[3])); b->xmm0ret = 0; }
+static void blk_ippsVectorSlope_64f(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsVectorSlope_64f((Ipp64f*)IPP_GUEST_PTR(b->gp[0]), (int)(int32_t)b->gp[1], ipp_f64(b->xmm[2]), ipp_f64(b->xmm[3])); b->xmm0ret = 0; }
+static void blk_ippsWinKaiser_32f_I(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsWinKaiser_32f_I((Ipp32f*)IPP_GUEST_PTR(b->gp[0]), (int)(int32_t)b->gp[1], ipp_f32(b->xmm[2])); b->xmm0ret = 0; }
 static void blk_ippsZero_32f(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsZero_32f((Ipp32f*)IPP_GUEST_PTR(b->gp[0]), (int)(int32_t)b->gp[1]); b->xmm0ret = 0; }
+static void blk_ippsZero_32s(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsZero_32s((Ipp32s*)IPP_GUEST_PTR(b->gp[0]), (int)(int32_t)b->gp[1]); b->xmm0ret = 0; }
+static void blk_ippsZero_64s(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsZero_64s((Ipp64s*)IPP_GUEST_PTR(b->gp[0]), (int)(int32_t)b->gp[1]); b->xmm0ret = 0; }
 static void blk_ippsZero_8u(IppBlk *b) { b->rax = (uint64_t)(uint32_t)ippsZero_8u((Ipp8u*)IPP_GUEST_PTR(b->gp[0]), (int)(int32_t)b->gp[1]); b->xmm0ret = 0; }
 
 const IppShimEntry ipp_shim_table[] = {
@@ -187,7 +216,7 @@ const IppShimEntry ipp_shim_table[] = {
   {"ippiWarpBilinearQuad_8u_C4R", 0, "B+", 0, 10, "IppStatus ippiWarpBilinearQuad_8u_C4R(const Ipp8u* pSrc, IppiSize srcSize, int srcStep, IppiRect srcRoi, const double* srcQuad, Ipp8u* pDst, int dstStep, IppiRect dstRoi, const double* dstQuad, int interpolation)"},
   {"ippiWarpPerspectiveQuad_8u_C3R", 0, "B-", 0, 10, "IppStatus ippiWarpPerspectiveQuad_8u_C3R(const Ipp8u* pSrc, IppiSize srcSize, int srcStep, IppiRect srcRoi, const double* srcQuad, Ipp8u* pDst, int dstStep, IppiRect dstRoi, const double* dstQuad, int interpolation)"},
   {"ippiWarpPerspectiveQuad_8u_C4R", 0, "B+", 0, 10, "IppStatus ippiWarpPerspectiveQuad_8u_C4R(const Ipp8u* pSrc, IppiSize srcSize, int srcStep, IppiRect srcRoi, const double* srcQuad, Ipp8u* pDst, int dstStep, IppiRect dstRoi, const double* dstQuad, int interpolation)"},
-  {"ippsAbs_32f", 0, "B+", 0, 3, "IppStatus ippsAbs_32f(const Ipp32f* pSrc, Ipp32f* pDst, int len)"},
+  {"ippsAbs_32f", blk_ippsAbs_32f, "A", 1, 3, "IppStatus ippsAbs_32f(const Ipp32f* pSrc, Ipp32f* pDst, int len)"},
   {"ippsAbs_32f_I", 0, "B+", 0, 2, "IppStatus ippsAbs_32f_I(Ipp32f* pSrcDst, int len)"},
   {"ippsAbs_64f", 0, "B-", 0, 3, "IppStatus ippsAbs_64f(const Ipp64f* pSrc, Ipp64f* pDst, int len)"},
   {"ippsAbs_64f_I", 0, "B-", 0, 2, "IppStatus ippsAbs_64f_I(Ipp64f* pSrcDst, int len)"},
@@ -196,7 +225,7 @@ const IppShimEntry ipp_shim_table[] = {
   {"ippsAddC_32fc", 0, "B-", 0, 4, "IppStatus ippsAddC_32fc(const Ipp32fc* pSrc, Ipp32fc val, Ipp32fc* pDst, int len)"},
   {"ippsAddC_64f", 0, "B-", 0, 4, "IppStatus ippsAddC_64f(const Ipp64f* pSrc, Ipp64f val, Ipp64f* pDst, int len)"},
   {"ippsAddC_64f_I", 0, "B+", 0, 3, "IppStatus ippsAddC_64f_I(Ipp64f val, Ipp64f* pSrcDst, int len)"},
-  {"ippsAddProductC_32f", 0, "B+", 0, 4, "IppStatus ippsAddProductC_32f(const Ipp32f* pSrc, const Ipp32f val, Ipp32f* pSrcDst, int len)"},
+  {"ippsAddProductC_32f", blk_ippsAddProductC_32f, "A", 1, 4, "IppStatus ippsAddProductC_32f(const Ipp32f* pSrc, const Ipp32f val, Ipp32f* pSrcDst, int len)"},
   {"ippsAddProduct_32f", 0, "B-", 0, 4, "IppStatus ippsAddProduct_32f(const Ipp32f* pSrc1, const Ipp32f* pSrc2, Ipp32f* pSrcDst, int len)"},
   {"ippsAddProduct_32fc", 0, "B-", 0, 4, "IppStatus ippsAddProduct_32fc(const Ipp32fc* pSrc1, const Ipp32fc* pSrc2, Ipp32fc* pSrcDst, int len)"},
   {"ippsAddProduct_64f", 0, "B-", 0, 4, "IppStatus ippsAddProduct_64f(const Ipp64f* pSrc1, const Ipp64f* pSrc2, Ipp64f* pSrcDst, int len)"},
@@ -242,7 +271,7 @@ const IppShimEntry ipp_shim_table[] = {
   {"ippsConj_64fc_I", 0, "B-", 0, 2, "IppStatus ippsConj_64fc_I(Ipp64fc* pSrcDst, int len)"},
   {"ippsConv_32f", 0, "B+", 0, 5, "IppStatus ippsConv_32f(const Ipp32f* pSrc1, int src1Len, const Ipp32f* pSrc2, int src2Len, Ipp32f* pDst)"},
   {"ippsConv_64f", 0, "B-", 0, 5, "IppStatus ippsConv_64f(const Ipp64f* pSrc1, int src1Len, const Ipp64f* pSrc2, int src2Len, Ipp64f* pDst)"},
-  {"ippsConvert_16s32f", 0, "B+", 0, 3, "IppStatus ippsConvert_16s32f(const Ipp16s* pSrc, Ipp32f* pDst, int len)"},
+  {"ippsConvert_16s32f", blk_ippsConvert_16s32f, "A", 1, 3, "IppStatus ippsConvert_16s32f(const Ipp16s* pSrc, Ipp32f* pDst, int len)"},
   {"ippsConvert_16s32f_Sfs", 0, "B+", 0, 4, "IppStatus ippsConvert_16s32f_Sfs(const Ipp16s* pSrc, Ipp32f* pDst, int len, int scaleFactor)"},
   {"ippsConvert_16s32s", 0, "B+", 0, 3, "IppStatus ippsConvert_16s32s(const Ipp16s* pSrc, Ipp32s* pDst, int len)"},
   {"ippsConvert_16s64f_Sfs", 0, "B-", 0, 4, "IppStatus ippsConvert_16s64f_Sfs(const Ipp16s* pSrc, Ipp64f* pDst, int len, int scaleFactor)"},
@@ -265,8 +294,8 @@ const IppShimEntry ipp_shim_table[] = {
   {"ippsCopy_32f", blk_ippsCopy_32f, "A", 1, 3, "IppStatus ippsCopy_32f(const Ipp32f* pSrc, Ipp32f* pDst, int len)"},
   {"ippsCopy_32s", blk_ippsCopy_32s, "A", 1, 3, "IppStatus ippsCopy_32s(const Ipp32s* pSrc, Ipp32s* pDst, int len)"},
   {"ippsCopy_64f", 0, "B+", 0, 3, "IppStatus ippsCopy_64f(const Ipp64f* pSrc, Ipp64f* pDst, int len)"},
-  {"ippsCopy_64s", 0, "B+", 0, 3, "IppStatus ippsCopy_64s(const Ipp64s* pSrc, Ipp64s* pDst, int len)"},
-  {"ippsCopy_8u", 0, "B+", 0, 3, "IppStatus ippsCopy_8u(const Ipp8u* pSrc, Ipp8u* pDst, int len)"},
+  {"ippsCopy_64s", blk_ippsCopy_64s, "A", 1, 3, "IppStatus ippsCopy_64s(const Ipp64s* pSrc, Ipp64s* pDst, int len)"},
+  {"ippsCopy_8u", blk_ippsCopy_8u, "A", 1, 3, "IppStatus ippsCopy_8u(const Ipp8u* pSrc, Ipp8u* pDst, int len)"},
   {"ippsCos_32f_A11", 0, "B+", 0, 3, "IppStatus ippsCos_32f_A11(const Ipp32f* a, Ipp32f* r, Ipp32s n)"},
   {"ippsCos_32f_A21", 0, "B-", 0, 3, "IppStatus ippsCos_32f_A21(const Ipp32f* a, Ipp32f* r, Ipp32s n)"},
   {"ippsCos_32f_A24", 0, "B-", 0, 3, "IppStatus ippsCos_32f_A24(const Ipp32f* a, Ipp32f* r, Ipp32s n)"},
@@ -274,11 +303,11 @@ const IppShimEntry ipp_shim_table[] = {
   {"ippsCos_64f_A50", 0, "B-", 0, 3, "IppStatus ippsCos_64f_A50(const Ipp64f* a, Ipp64f* r, Ipp32s n)"},
   {"ippsCos_64f_A53", 0, "B-", 0, 3, "IppStatus ippsCos_64f_A53(const Ipp64f* a, Ipp64f* r, Ipp32s n)"},
   {"ippsCplxToReal_16sc", 0, "B+", 0, 4, "IppStatus ippsCplxToReal_16sc(const Ipp16sc* pSrc, Ipp16s* pDstRe, Ipp16s* pDstIm, int len)"},
-  {"ippsCplxToReal_32fc", 0, "B+", 0, 4, "IppStatus ippsCplxToReal_32fc(const Ipp32fc* pSrc, Ipp32f* pDstRe, Ipp32f* pDstIm, int len)"},
+  {"ippsCplxToReal_32fc", blk_ippsCplxToReal_32fc, "A", 1, 4, "IppStatus ippsCplxToReal_32fc(const Ipp32fc* pSrc, Ipp32f* pDstRe, Ipp32f* pDstIm, int len)"},
   {"ippsCplxToReal_64fc", 0, "B-", 0, 4, "IppStatus ippsCplxToReal_64fc(const Ipp64fc* pSrc, Ipp64f* pDstRe, Ipp64f* pDstIm, int len)"},
   {"ippsCrossCorr_32f", 0, "B+", 0, 7, "IppStatus ippsCrossCorr_32f(const Ipp32f* pSrc1, int src1Len, const Ipp32f* pSrc2, int src2Len, Ipp32f* pDst, int dstLen, int lowLag)"},
-  {"ippsDeinterleave_16s", 0, "B+", 0, 4, "IppStatus ippsDeinterleave_16s(const Ipp16s* pSrc, int nChannels, int len, Ipp16s* const* pDst)"},
-  {"ippsDeinterleave_32f", 0, "B+", 0, 4, "IppStatus ippsDeinterleave_32f(const Ipp32f* pSrc, int nChannels, int len, Ipp32f* const* pDst)"},
+  {"ippsDeinterleave_16s", blk_ippsDeinterleave_16s, "A", 1, 4, "IppStatus ippsDeinterleave_16s(const Ipp16s* pSrc, int nChannels, int len, Ipp16s* const* pDst)"},
+  {"ippsDeinterleave_32f", blk_ippsDeinterleave_32f, "A", 1, 4, "IppStatus ippsDeinterleave_32f(const Ipp32f* pSrc, int nChannels, int len, Ipp32f* const* pDst)"},
   {"ippsDivCRev_32f_I", 0, "B+", 0, 3, "IppStatus ippsDivCRev_32f_I(Ipp32f val, Ipp32f* pSrcDst, int len)"},
   {"ippsDiv_32f_A11", 0, "B-", 0, 4, "IppStatus ippsDiv_32f_A11(const Ipp32f* a, const Ipp32f* b, Ipp32f* r, Ipp32s n)"},
   {"ippsDiv_32f_A21", 0, "B-", 0, 4, "IppStatus ippsDiv_32f_A21(const Ipp32f* a, const Ipp32f* b, Ipp32f* r, Ipp32s n)"},
@@ -338,9 +367,9 @@ const IppShimEntry ipp_shim_table[] = {
   {"ippsFIR_32f", 0, "B+", 0, 4, "IppStatus ippsFIR_32f(const Ipp32f* pSrc, Ipp32f* pDst, int numIters, void* pState)"},
   {"ippsFIR_32f_I", 0, "B+", 0, 3, "IppStatus ippsFIR_32f_I(Ipp32f* pSrcDst, int numIters, void* pState)"},
   {"ippsFilterMedian_32f_I", 0, "B-", 0, 6, "IppStatus ippsFilterMedian_32f_I(Ipp32f* pSrcDst, int len, int maskSize, const Ipp32f* pDlySrc, Ipp32f* pDlyDst, Ipp8u* pBuffer)"},
-  {"ippsFlip_16u_I", 0, "B+", 0, 2, "IppStatus ippsFlip_16u_I(Ipp16u* pSrcDst, int len)"},
+  {"ippsFlip_16u_I", blk_ippsFlip_16u_I, "A", 1, 2, "IppStatus ippsFlip_16u_I(Ipp16u* pSrcDst, int len)"},
   {"ippsFlip_32f", 0, "B-", 0, 3, "IppStatus ippsFlip_32f(const Ipp32f* pSrc, Ipp32f* pDst, int len)"},
-  {"ippsFlip_32f_I", 0, "B+", 0, 2, "IppStatus ippsFlip_32f_I(Ipp32f* pSrcDst, int len)"},
+  {"ippsFlip_32f_I", blk_ippsFlip_32f_I, "A", 1, 2, "IppStatus ippsFlip_32f_I(Ipp32f* pSrcDst, int len)"},
   {"ippsFlip_32fc_I", 0, "B+", 0, 2, "IppStatus ippsFlip_32fc_I(Ipp32fc* pSrcDst, int len)"},
   {"ippsFlip_64f_I", 0, "B-", 0, 2, "IppStatus ippsFlip_64f_I(Ipp64f* pSrcDst, int len)"},
   {"ippsIIR64f_32f_I", 0, "B-", 0, 3, "IppStatus ippsIIR64f_32f_I(Ipp32f* pSrcDst, int len, void* pState)"},
@@ -348,8 +377,8 @@ const IppShimEntry ipp_shim_table[] = {
   {"ippsIIRInit64f_BiQuad_32f", blk_ippsIIRInit64f_BiQuad_32f, "A", 1, 5, "IppStatus ippsIIRInit64f_BiQuad_32f(void** ppState, const Ipp64f* pTaps, int numBq, const Ipp64f* pDlyLine, Ipp8u* pBuf)"},
   {"ippsImag_32fc", 0, "B-", 0, 3, "IppStatus ippsImag_32fc(const Ipp32fc* pSrc, Ipp32f* pDst, int len)"},
   {"ippsImag_64fc", 0, "B-", 0, 3, "IppStatus ippsImag_64fc(const Ipp64fc* pSrc, Ipp64f* pDst, int len)"},
-  {"ippsInterleave_16s", 0, "B+", 0, 4, "IppStatus ippsInterleave_16s(const Ipp16s* const* pSrc, int nChannels, int len, Ipp16s* pDst)"},
-  {"ippsInterleave_32f", 0, "B+", 0, 4, "IppStatus ippsInterleave_32f(const Ipp32f* const* pSrc, int nChannels, int len, Ipp32f* pDst)"},
+  {"ippsInterleave_16s", blk_ippsInterleave_16s, "A", 1, 4, "IppStatus ippsInterleave_16s(const Ipp16s* const* pSrc, int nChannels, int len, Ipp16s* pDst)"},
+  {"ippsInterleave_32f", blk_ippsInterleave_32f, "A", 1, 4, "IppStatus ippsInterleave_32f(const Ipp32f* const* pSrc, int nChannels, int len, Ipp32f* pDst)"},
   {"ippsInv_32f_A21", 0, "B-", 0, 3, "IppStatus ippsInv_32f_A21(const Ipp32f* a, Ipp32f* r, Ipp32s n)"},
   {"ippsInv_32f_A24", 0, "B-", 0, 3, "IppStatus ippsInv_32f_A24(const Ipp32f* a, Ipp32f* r, Ipp32s n)"},
   {"ippsLn_32f_A11", 0, "B+", 0, 3, "IppStatus ippsLn_32f_A11(const Ipp32f* a, Ipp32f* r, Ipp32s n)"},
@@ -368,20 +397,20 @@ const IppShimEntry ipp_shim_table[] = {
   {"ippsMagnitude_64fc", 0, "B-", 0, 3, "IppStatus ippsMagnitude_64fc(const Ipp64fc* pSrc, Ipp64f* pDst, int len)"},
   {"ippsMaxAbs_16s", 0, "B-", 0, 3, "IppStatus ippsMaxAbs_16s(const Ipp16s* pSrc, int len, Ipp16s* pRes)"},
   {"ippsMaxAbs_32s", 0, "B-", 0, 3, "IppStatus ippsMaxAbs_32s(const Ipp32s* pSrc, int len, Ipp32s* pRes)"},
-  {"ippsMax_16s", 0, "B+", 0, 3, "IppStatus ippsMax_16s(const Ipp16s* pSrc, int len, Ipp16s* pRes)"},
+  {"ippsMax_16s", blk_ippsMax_16s, "A", 1, 3, "IppStatus ippsMax_16s(const Ipp16s* pSrc, int len, Ipp16s* pRes)"},
   {"ippsMax_32f", 0, "B+", 0, 3, "IppStatus ippsMax_32f(const Ipp32f* pSrc, int len, Ipp32f* pRes)"},
   {"ippsMax_32s", 0, "B-", 0, 3, "IppStatus ippsMax_32s(const Ipp32s* pSrc, int len, Ipp32s* pRes)"},
   {"ippsMax_64f", 0, "B-", 0, 3, "IppStatus ippsMax_64f(const Ipp64f* pSrc, int len, Ipp64f* pRes)"},
   {"ippsMinAbs_16s", 0, "B-", 0, 3, "IppStatus ippsMinAbs_16s(const Ipp16s* pSrc, int len, Ipp16s* pRes)"},
   {"ippsMinAbs_32s", 0, "B-", 0, 3, "IppStatus ippsMinAbs_32s(const Ipp32s* pSrc, int len, Ipp32s* pRes)"},
-  {"ippsMinMax_16s", 0, "B+", 0, 4, "IppStatus ippsMinMax_16s(const Ipp16s* pSrc, int len, Ipp16s* pMin, Ipp16s* pMax)"},
+  {"ippsMinMax_16s", blk_ippsMinMax_16s, "A", 1, 4, "IppStatus ippsMinMax_16s(const Ipp16s* pSrc, int len, Ipp16s* pMin, Ipp16s* pMax)"},
   {"ippsMinMax_16u", 0, "B-", 0, 4, "IppStatus ippsMinMax_16u(const Ipp16u* pSrc, int len, Ipp16u* pMin, Ipp16u* pMax)"},
-  {"ippsMinMax_32f", 0, "B+", 0, 4, "IppStatus ippsMinMax_32f(const Ipp32f* pSrc, int len, Ipp32f* pMin, Ipp32f* pMax)"},
+  {"ippsMinMax_32f", blk_ippsMinMax_32f, "A", 1, 4, "IppStatus ippsMinMax_32f(const Ipp32f* pSrc, int len, Ipp32f* pMin, Ipp32f* pMax)"},
   {"ippsMinMax_32s", 0, "B-", 0, 4, "IppStatus ippsMinMax_32s(const Ipp32s* pSrc, int len, Ipp32s* pMin, Ipp32s* pMax)"},
   {"ippsMinMax_32u", 0, "B-", 0, 4, "IppStatus ippsMinMax_32u(const Ipp32u* pSrc, int len, Ipp32u* pMin, Ipp32u* pMax)"},
   {"ippsMinMax_64f", 0, "B-", 0, 4, "IppStatus ippsMinMax_64f(const Ipp64f* pSrc, int len, Ipp64f* pMin, Ipp64f* pMax)"},
   {"ippsMinMax_8u", 0, "B-", 0, 4, "IppStatus ippsMinMax_8u(const Ipp8u* pSrc, int len, Ipp8u* pMin, Ipp8u* pMax)"},
-  {"ippsMin_16s", 0, "B+", 0, 3, "IppStatus ippsMin_16s(const Ipp16s* pSrc, int len, Ipp16s* pRes)"},
+  {"ippsMin_16s", blk_ippsMin_16s, "A", 1, 3, "IppStatus ippsMin_16s(const Ipp16s* pSrc, int len, Ipp16s* pRes)"},
   {"ippsMin_32f", 0, "B-", 0, 3, "IppStatus ippsMin_32f(const Ipp32f* pSrc, int len, Ipp32f* pRes)"},
   {"ippsMin_32s", 0, "B-", 0, 3, "IppStatus ippsMin_32s(const Ipp32s* pSrc, int len, Ipp32s* pRes)"},
   {"ippsMin_64f", 0, "B-", 0, 3, "IppStatus ippsMin_64f(const Ipp64f* pSrc, int len, Ipp64f* pRes)"},
@@ -417,7 +446,7 @@ const IppShimEntry ipp_shim_table[] = {
   {"ippsPow_32f_A11", 0, "B-", 0, 4, "IppStatus ippsPow_32f_A11(const Ipp32f* a, const Ipp32f* b, Ipp32f* r, Ipp32s n)"},
   {"ippsPow_32f_A21", 0, "B-", 0, 4, "IppStatus ippsPow_32f_A21(const Ipp32f* a, const Ipp32f* b, Ipp32f* r, Ipp32s n)"},
   {"ippsPow_32f_A24", 0, "B-", 0, 4, "IppStatus ippsPow_32f_A24(const Ipp32f* a, const Ipp32f* b, Ipp32f* r, Ipp32s n)"},
-  {"ippsPowerSpectr_32fc", 0, "B+", 0, 3, "IppStatus ippsPowerSpectr_32fc(const Ipp32fc* pSrc, Ipp32f* pDst, int len)"},
+  {"ippsPowerSpectr_32fc", blk_ippsPowerSpectr_32fc, "A", 1, 3, "IppStatus ippsPowerSpectr_32fc(const Ipp32fc* pSrc, Ipp32f* pDst, int len)"},
   {"ippsPowerSpectr_64fc", 0, "B-", 0, 3, "IppStatus ippsPowerSpectr_64fc(const Ipp64fc* pSrc, Ipp64f* pDst, int len)"},
   {"ippsPowx_32f_A11", 0, "B-", 0, 4, "IppStatus ippsPowx_32f_A11(const Ipp32f* a, const Ipp32f b, Ipp32f* r, Ipp32s n)"},
   {"ippsPowx_32f_A21", 0, "B+", 0, 4, "IppStatus ippsPowx_32f_A21(const Ipp32f* a, const Ipp32f b, Ipp32f* r, Ipp32s n)"},
@@ -428,11 +457,11 @@ const IppShimEntry ipp_shim_table[] = {
   {"ippsRandUniform_Direct_32f", 0, "B+", 0, 5, "IppStatus ippsRandUniform_Direct_32f(Ipp32f* pDst, int len, Ipp32f low, Ipp32f high, unsigned int* pSeed)"},
   {"ippsRandUniform_Direct_64f", 0, "B+", 0, 5, "IppStatus ippsRandUniform_Direct_64f(Ipp64f* pDst, int len, Ipp64f low, Ipp64f high, unsigned int* pSeed)"},
   {"ippsRealToCplx_16s", 0, "B+", 0, 4, "IppStatus ippsRealToCplx_16s(const Ipp16s* pSrcRe, const Ipp16s* pSrcIm, Ipp16sc* pDst, int len)"},
-  {"ippsRealToCplx_32f", 0, "B+", 0, 4, "IppStatus ippsRealToCplx_32f(const Ipp32f* pSrcRe, const Ipp32f* pSrcIm, Ipp32fc* pDst, int len)"},
+  {"ippsRealToCplx_32f", blk_ippsRealToCplx_32f, "A", 1, 4, "IppStatus ippsRealToCplx_32f(const Ipp32f* pSrcRe, const Ipp32f* pSrcIm, Ipp32fc* pDst, int len)"},
   {"ippsRealToCplx_64f", 0, "B-", 0, 4, "IppStatus ippsRealToCplx_64f(const Ipp64f* pSrcRe, const Ipp64f* pSrcIm, Ipp64fc* pDst, int len)"},
   {"ippsReal_32fc", 0, "B-", 0, 3, "IppStatus ippsReal_32fc(const Ipp32fc* pSrc, Ipp32f* pDst, int len)"},
   {"ippsReal_64fc", 0, "B-", 0, 3, "IppStatus ippsReal_64fc(const Ipp64fc* pSrc, Ipp64f* pDst, int len)"},
-  {"ippsRound_32f", 0, "B+", 0, 3, "IppStatus ippsRound_32f(const Ipp32f* pSrc, Ipp32f* pDst, int len)"},
+  {"ippsRound_32f", blk_ippsRound_32f, "A", 1, 3, "IppStatus ippsRound_32f(const Ipp32f* pSrc, Ipp32f* pDst, int len)"},
   {"ippsRound_64f", 0, "B-", 0, 3, "IppStatus ippsRound_64f(const Ipp64f* pSrc, Ipp64f* pDst, int len)"},
   {"ippsSet_16s", 0, "B+", 0, 3, "IppStatus ippsSet_16s(Ipp16s val, Ipp16s* pDst, int len)"},
   {"ippsSet_16sc", 0, "B-", 0, 3, "IppStatus ippsSet_16sc(Ipp16sc val, Ipp16sc* pDst, int len)"},
@@ -440,7 +469,7 @@ const IppShimEntry ipp_shim_table[] = {
   {"ippsSet_32fc", 0, "B-", 0, 3, "IppStatus ippsSet_32fc(Ipp32fc val, Ipp32fc* pDst, int len)"},
   {"ippsSet_32s", blk_ippsSet_32s, "A", 1, 3, "IppStatus ippsSet_32s(Ipp32s val, Ipp32s* pDst, int len)"},
   {"ippsSet_32sc", 0, "B-", 0, 3, "IppStatus ippsSet_32sc(Ipp32sc val, Ipp32sc* pDst, int len)"},
-  {"ippsSet_64f", 0, "B+", 0, 3, "IppStatus ippsSet_64f(Ipp64f val, Ipp64f* pDst, int len)"},
+  {"ippsSet_64f", blk_ippsSet_64f, "A", 1, 3, "IppStatus ippsSet_64f(Ipp64f val, Ipp64f* pDst, int len)"},
   {"ippsSet_64fc", 0, "B-", 0, 3, "IppStatus ippsSet_64fc(Ipp64fc val, Ipp64fc* pDst, int len)"},
   {"ippsSet_64s", blk_ippsSet_64s, "A", 1, 3, "IppStatus ippsSet_64s(Ipp64s val, Ipp64s* pDst, int len)"},
   {"ippsSet_64sc", 0, "B-", 0, 3, "IppStatus ippsSet_64sc(Ipp64sc val, Ipp64sc* pDst, int len)"},
@@ -480,11 +509,11 @@ const IppShimEntry ipp_shim_table[] = {
   {"ippsSum_32f", 0, "B+", 0, 4, "IppStatus ippsSum_32f(const Ipp32f* pSrc, int len, Ipp32f* pSum, int hint)"},
   {"ippsSum_64f", 0, "B+", 0, 3, "IppStatus ippsSum_64f(const Ipp64f* pSrc, int len, Ipp64f* pRes)"},
   {"ippsSwapBytes_16u", 0, "B-", 0, 3, "IppStatus ippsSwapBytes_16u(const Ipp16u* pSrc, Ipp16u* pDst, int len)"},
-  {"ippsSwapBytes_16u_I", 0, "B+", 0, 2, "IppStatus ippsSwapBytes_16u_I(Ipp16u* pSrcDst, int len)"},
+  {"ippsSwapBytes_16u_I", blk_ippsSwapBytes_16u_I, "A", 1, 2, "IppStatus ippsSwapBytes_16u_I(Ipp16u* pSrcDst, int len)"},
   {"ippsSwapBytes_24u", 0, "B-", 0, 3, "IppStatus ippsSwapBytes_24u(const Ipp8u* pSrc, Ipp8u* pDst, int len)"},
   {"ippsSwapBytes_24u_I", 0, "B-", 0, 2, "IppStatus ippsSwapBytes_24u_I(Ipp8u* pSrcDst, int len)"},
   {"ippsSwapBytes_32u", 0, "B-", 0, 3, "IppStatus ippsSwapBytes_32u(const Ipp32u* pSrc, Ipp32u* pDst, int len)"},
-  {"ippsSwapBytes_32u_I", 0, "B+", 0, 2, "IppStatus ippsSwapBytes_32u_I(Ipp32u* pSrcDst, int len)"},
+  {"ippsSwapBytes_32u_I", blk_ippsSwapBytes_32u_I, "A", 1, 2, "IppStatus ippsSwapBytes_32u_I(Ipp32u* pSrcDst, int len)"},
   {"ippsTanh_32f_A11", 0, "B-", 0, 3, "IppStatus ippsTanh_32f_A11(const Ipp32f* a, Ipp32f* r, Ipp32s n)"},
   {"ippsTanh_32f_A21", 0, "B-", 0, 3, "IppStatus ippsTanh_32f_A21(const Ipp32f* a, Ipp32f* r, Ipp32s n)"},
   {"ippsTanh_32f_A24", 0, "B+", 0, 3, "IppStatus ippsTanh_32f_A24(const Ipp32f* a, Ipp32f* r, Ipp32s n)"},
@@ -500,7 +529,7 @@ const IppShimEntry ipp_shim_table[] = {
   {"ippsThreshold_LTAbs_32f", 0, "B-", 0, 4, "IppStatus ippsThreshold_LTAbs_32f(const Ipp32f* pSrc, Ipp32f* pDst, int len, Ipp32f level)"},
   {"ippsThreshold_LTAbs_32f_I", 0, "B-", 0, 3, "IppStatus ippsThreshold_LTAbs_32f_I(Ipp32f* pSrcDst, int len, Ipp32f level)"},
   {"ippsThreshold_LTValGTVal_32f", 0, "B-", 0, 7, "IppStatus ippsThreshold_LTValGTVal_32f(const Ipp32f* pSrc, Ipp32f* pDst, int len, Ipp32f levelLT, Ipp32f valueLT, Ipp32f levelGT, Ipp32f valueGT)"},
-  {"ippsThreshold_LTValGTVal_32f_I", 0, "B+", 0, 6, "IppStatus ippsThreshold_LTValGTVal_32f_I(Ipp32f* pSrcDst, int len, Ipp32f levelLT, Ipp32f valueLT, Ipp32f levelGT, Ipp32f valueGT)"},
+  {"ippsThreshold_LTValGTVal_32f_I", blk_ippsThreshold_LTValGTVal_32f_I, "A", 1, 6, "IppStatus ippsThreshold_LTValGTVal_32f_I(Ipp32f* pSrcDst, int len, Ipp32f levelLT, Ipp32f valueLT, Ipp32f levelGT, Ipp32f valueGT)"},
   {"ippsThreshold_LTValGTVal_32s", 0, "B-", 0, 7, "IppStatus ippsThreshold_LTValGTVal_32s(const Ipp32s* pSrc, Ipp32s* pDst, int len, Ipp32s levelLT, Ipp32s valueLT, Ipp32s levelGT, Ipp32s valueGT)"},
   {"ippsThreshold_LTValGTVal_32s_I", 0, "B-", 0, 6, "IppStatus ippsThreshold_LTValGTVal_32s_I(Ipp32s* pSrcDst, int len, Ipp32s levelLT, Ipp32s valueLT, Ipp32s levelGT, Ipp32s valueGT)"},
   {"ippsThreshold_LTVal_32f", 0, "B-", 0, 5, "IppStatus ippsThreshold_LTVal_32f(const Ipp32f* pSrc, Ipp32f* pDst, int len, Ipp32f level, Ipp32f value)"},
@@ -510,8 +539,8 @@ const IppShimEntry ipp_shim_table[] = {
   {"ippsThreshold_LT_32f", 0, "B-", 0, 4, "IppStatus ippsThreshold_LT_32f(const Ipp32f* pSrc, Ipp32f* pDst, int len, Ipp32f level)"},
   {"ippsThreshold_LT_32f_I", blk_ippsThreshold_LT_32f_I, "A", 1, 3, "IppStatus ippsThreshold_LT_32f_I(Ipp32f* pSrcDst, int len, Ipp32f level)"},
   {"ippsThreshold_LT_32s", 0, "B-", 0, 4, "IppStatus ippsThreshold_LT_32s(const Ipp32s* pSrc, Ipp32s* pDst, int len, Ipp32s level)"},
-  {"ippsThreshold_LT_32s_I", 0, "B+", 0, 3, "IppStatus ippsThreshold_LT_32s_I(Ipp32s* pSrcDst, int len, Ipp32s level)"},
-  {"ippsThreshold_LT_64f_I", 0, "B+", 0, 3, "IppStatus ippsThreshold_LT_64f_I(Ipp64f* pSrcDst, int len, Ipp64f level)"},
+  {"ippsThreshold_LT_32s_I", blk_ippsThreshold_LT_32s_I, "A", 1, 3, "IppStatus ippsThreshold_LT_32s_I(Ipp32s* pSrcDst, int len, Ipp32s level)"},
+  {"ippsThreshold_LT_64f_I", blk_ippsThreshold_LT_64f_I, "A", 1, 3, "IppStatus ippsThreshold_LT_64f_I(Ipp64f* pSrcDst, int len, Ipp64f level)"},
   {"ippsTone_Direct_32f", 0, "B+", 0, 6, "IppStatus ippsTone_Direct_32f(Ipp32f* pDst, int len, Ipp32f magn, Ipp32f rFreq, Ipp32f* pPhase, int hint)"},
   {"ippsTone_Direct_32fc", 0, "B-", 0, 6, "IppStatus ippsTone_Direct_32fc(Ipp32fc* pDst, int len, Ipp32f magn, Ipp32f rFreq, Ipp32f* pPhase, int hint)"},
   {"ippsTone_Direct_64f", 0, "B-", 0, 6, "IppStatus ippsTone_Direct_64f(Ipp64f* pDst, int len, Ipp64f magn, Ipp64f rFreq, Ipp64f* pPhase, int hint)"},
@@ -519,15 +548,15 @@ const IppShimEntry ipp_shim_table[] = {
   {"ippsTrunc_64f", 0, "B-", 0, 3, "IppStatus ippsTrunc_64f(const Ipp64f* pSrc, Ipp64f* pDst, int len)"},
   {"ippsVectorSlope_32f", blk_ippsVectorSlope_32f, "A", 1, 4, "IppStatus ippsVectorSlope_32f(Ipp32f* pDst, int len, Ipp32f offset, Ipp32f slope)"},
   {"ippsVectorSlope_32s", 0, "B-", 0, 4, "IppStatus ippsVectorSlope_32s(Ipp32s* pDst, int len, Ipp32f offset, Ipp32f slope)"},
-  {"ippsVectorSlope_64f", 0, "B+", 0, 4, "IppStatus ippsVectorSlope_64f(Ipp64f* pDst, int len, Ipp64f offset, Ipp64f slope)"},
-  {"ippsWinKaiser_32f_I", 0, "B+", 0, 3, "IppStatus ippsWinKaiser_32f_I(Ipp32f* pSrcDst, int len, Ipp32f alpha)"},
+  {"ippsVectorSlope_64f", blk_ippsVectorSlope_64f, "A", 1, 4, "IppStatus ippsVectorSlope_64f(Ipp64f* pDst, int len, Ipp64f offset, Ipp64f slope)"},
+  {"ippsWinKaiser_32f_I", blk_ippsWinKaiser_32f_I, "A", 1, 3, "IppStatus ippsWinKaiser_32f_I(Ipp32f* pSrcDst, int len, Ipp32f alpha)"},
   {"ippsWinKaiser_64f_I", 0, "B+", 0, 3, "IppStatus ippsWinKaiser_64f_I(Ipp64f* pSrcDst, int len, Ipp64f alpha)"},
   {"ippsXorC_32u_I", 0, "B+", 0, 3, "IppStatus ippsXorC_32u_I(Ipp32u val, Ipp32u* pSrcDst, int len)"},
   {"ippsZero_16s", 0, "B-", 0, 2, "IppStatus ippsZero_16s(Ipp16s* pDst, int len)"},
   {"ippsZero_32f", blk_ippsZero_32f, "A", 1, 2, "IppStatus ippsZero_32f(Ipp32f* pDst, int len)"},
-  {"ippsZero_32s", 0, "B+", 0, 2, "IppStatus ippsZero_32s(Ipp32s* pDst, int len)"},
+  {"ippsZero_32s", blk_ippsZero_32s, "A", 1, 2, "IppStatus ippsZero_32s(Ipp32s* pDst, int len)"},
   {"ippsZero_64f", 0, "B+", 0, 2, "IppStatus ippsZero_64f(Ipp64f* pDst, int len)"},
-  {"ippsZero_64s", 0, "B+", 0, 2, "IppStatus ippsZero_64s(Ipp64s* pDst, int len)"},
+  {"ippsZero_64s", blk_ippsZero_64s, "A", 1, 2, "IppStatus ippsZero_64s(Ipp64s* pDst, int len)"},
   {"ippsZero_8u", blk_ippsZero_8u, "A", 1, 2, "IppStatus ippsZero_8u(Ipp8u* pDst, int len)"},
 };
 const int ipp_shim_table_count = (int)(sizeof ipp_shim_table / sizeof *ipp_shim_table);

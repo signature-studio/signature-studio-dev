@@ -46,6 +46,16 @@ wmis = _re.search(r'wasm replay: records=(\d+) mismatch=(\d+)', wlog)
 chk('S11 CAB-245 オラクル wasm replay (native ハッシュ突合)',
     wmis is not None and wmis.group(2) == '0',
     f"records={wmis.group(1) if wmis else '?'} mismatch={wmis.group(2) if wmis else '?'}")
+# S13: CAB-262 (IPP-7) 次層 28 関数オラクル
+f3 = open(f'{IPP}/work/fill7/oracle.log').read()
+f3w = open(f'{IPP}/work/fill7/oracle_wasm.log').read()
+f3m = _re.search(r'SUM (\{.*\})', f3)
+f3wm = _re.search(r'wasm replay: records=(\d+) mismatch=(\d+)', f3w)
+f3_st = json.loads(f3m.group(1))['st_mis'] if f3m else -1
+f3_bit = 'BAD' if f3m is None else 'OK'
+chk('S13 CAB-262 オラクル: 次層 29 関数 (エラー格子全一致 + wasm replay mismatch=0)',
+    f3_st == 0 and 'mismatch=0' in f3w and f3wm is not None,
+    f"SUM={f3m.group(1) if f3m else '?'} wasm records={f3wm.group(1) if f3wm else '?'}")
 gl = open(f'{W}/shimx_glue.log').read().strip().splitlines()[-1]
 chk('S9 shimx 結合: LoadLibraryW(dsp_ippv2_x64.dll) -> GetProcAddress 420/420 -> dispatch (MulC 実行, stub fail-soft)', gl.startswith('shimx_glue_test: PASS'), gl)
 sz = {p: os.path.getsize(f'{W}/{p}') for p in ('ipp_shim.wasm', 'ipp_shim_simd.wasm')}

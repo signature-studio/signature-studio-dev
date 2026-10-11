@@ -1,17 +1,19 @@
 # tools/ipp/shim — dsp_ippv2 ローダ shim + 署名 thunk 自動生成 (CAB-134)
 
-再現: `bash tools/ipp/shim/shim_e2e.sh` (前提 `tools/ipp/ipp_e2e.sh` の成果が `work/` にあること。無ければ自動実行。前提ありで約 10 秒、exit 0 = 10 checks PASS)。大物は `tools/ipp/work/shim/` (gitignore)。数値はすべて実測、推定は「推定」と明記。
+preflight: RULES_SHA=ff4999169333
+
+再現: `bash tools/ipp/shim/shim_e2e.sh` (前提 `tools/ipp/ipp_e2e.sh` の成果が `work/` にあること。無ければ自動実行。前提ありで約 10 秒、exit 0 = **13 checks PASS** [CAB-262 で S13 追加])。検証起点 commit: `b8e762d` (HEAD, 自分の起点)。大物は `tools/ipp/work/shim/` (gitignore)。数値はすべて実測、推定は「推定」と明記。
 
 ## 0. 結論
 
 | 項目 | 結果 |
 |---|---|
 | 420 名の関数表 + ローダ | **完了**。`LoadLibraryW("…dsp_ippv2_x64.dll")` → `GetProcAddress(420 名)` を shimx 経由で 420/420 解決 (絶対パス・`legacy90` 接頭辞も可)。取得値は cookie (表要素のアドレス) |
-| thunk | **92 件 (型付き thunk)** = 実装済み全部 (CAB-134 43 + CAB-139 FFT 14 + CAB-136 優先順上位 35)。残 **328 件は fail-soft stub** (eax=0 / xmm0=0 を返し、関数別カウンタと初回順を記録。STRICT モードで trap) |
+| thunk | **128 件 (型付き thunk)** = 実装済み全部 (CAB-134 43 + CAB-139 FFT 14 + CAB-136 優先順上位 35 + CAB-245 7 + CAB-262 29)。残 **292 件は fail-soft stub** (eax=0 / xmm0=0 を返し、関数別カウンタと初回順を記録。STRICT モードで trap) |
 | 署名 | **420/420 導出 (不明 0)**。確度 A 92 / B+ 129 / B- 199 (CAB-136/139 完了時点。§2 の導出監査時は A 43 / B+ 157 / B- 220 — 実装済み 92 関数は A に繰り上げ)。呼出箇所実績 (win 145 モジュール 19,018 箇所) との**型・個数の矛盾 0** |
 | thunk 経路の回帰 | 既存オラクル **24 関数 × 216 ケース (5,184)** を「実 MS x64 呼出 → asm トランポリン → dispatch → thunk → 実装」で再実行し、**直呼び・既存 baseline (`work/cmp_avx512.json`) と全統計が完全一致、実 IPP に対し 21 関数 bit-exact** (通常/特殊値入力とも)。エラー格子 222 点一致。wasm (scalar/simd128) の golden 突合も同じ 21 bit-exact、FFT 48 ケース NRMS 32f 1.34e-7 / 64f 5.87e-16 (thunk 経由) |
 | 「最大の統合リスク」(呼出規約の橋渡し) | **thunk 側は解消、lift 側との接点が残る** (§6): レジスタブロック契約を icall の memory-ABI と同一配置で定義し、`stk`(第 5 引数以降) ポインタ +0x48 の追加が **icall 側に 1 点必要** |
-| 実装の穴 (重要) | 使用集合 239 のうち stub は **166 関数** (CAB-136 完了時点; 実装済 73)。残る上位は `ippiResizeSqrPixel_8u_{C1,C3,C4}R` (143 モジュール)・`ippsThreshold_GT_32s_I` / `ippsSub_32f_I` / `ippsCopy_32s` / `ippsAtan_32f_A11` (125) ほか (§10-6) |
+| 実装の穴 (重要) | 使用集合 239 のうち stub は **130 関数** (CAB-262 完了時点; 実装済 109)。残る上位は `ippsExp_32f_I` (50 モジュール)・`ippsSum_32f` / `ippsSin_64f_A50` / `ippsMulPack_32f` / `ippsConvert_32f24s_Sfs` / `ippsConvert_16s32f_Sfs` (49)・`ippsLn_32f_A11` (39)・`ippsLog10_32f_A11` (37) ほか (§13-7) |
 
 ## 1. 成果物
 
@@ -68,17 +70,17 @@
 
 fail-soft の注意 (**サイレントに誤る**): stub は status 0 (=成功) を返し出力バッファを触らない。`Init/Alloc/GetSize` 系 10 関数 (`ippsFIRInitAlloc*` `ippsFIRMRInitAlloc*` `ippsIIRInit64f_BiQuad_32f` `ippsIIRGetStateSize…` `ippiResize*GetBufSize` `ippiFilterBoxBorderGetBufferSize` `ippiFilterRoundGetBufSize32f_8u_C1R`) は出力ハンドル/サイズ未更新のまま 0 戻りになる → 後続は NULL state で stub を呼ぶ連鎖 (クラッシュはしない設計)。**統合後の初回 E2E は STRICT で回して踏む stub を洗い出す**ことを推奨。
 
-## 5. 検証 (`shim_e2e.sh` の 10 checks, 実測)
+## 5. 検証 (`shim_e2e.sh` の 13 checks, 実測)
 
 | # | 内容 | 結果 |
 |---|---|---|
 | S1 | 420 名の署名・thunk 件数 | 不明 0 / 型付き 43 / stub 377 |
 | S2 | 呼出実績との矛盾 | **0** (agree 173 / weak 24 / nodata 223) |
-| S3 | native 自己検査 (ABI プローブ 6・420 名解決・legacy90・LoadLibraryW 名 8 形・stub 全数を呼んで fail-soft/カウンタ/初回順) | 1,513 checks 失敗 0 (CAB-136/139 後の stub 328×2 実測。CAB-134 当初は 377 stub で 1,611) |
+| S3 | native 自己検査 (ABI プローブ 6・420 名解決・legacy90・LoadLibraryW 名 8 形・stub 全数を呼んで fail-soft/カウンタ/初回順) | 1,441 checks 失敗 0 (CAB-262 後の stub 292×2 実測。CAB-134 当初は 377 stub で 1,611) |
 | S4/S5 | 実 DLL オラクル (AVX-512 経路) vs thunk、通常入力/特殊値入力: thunk 統計 = 直呼び統計 = 既存 baseline JSON、バッファ全語・状態コードの thunk-直呼び差 0 | 24 関数 5,184 ケース ×2 入力種、不一致 0 |
 | S6 | thunk 経由でも実 IPP に bit-exact | **21 関数** (NaN 仮数ペイロード差は既存と同じ扱い・同じ件数) |
 | S7 | NULL×len エラー格子 | 222 点、実 IPP との不一致 0 |
-| S8 | wasm scalar / simd128 (83,467 / 84,488 B): golden を ABI ブロック経由 (JS 側で署名から MS ABI 配置を再現、上位 32bit ゴミ) | 21 bit-exact・fail 0、FFT 48 ケース NRMS 32f 1.34e-7 / 64f 5.87e-16、stub fail-soft |
+| S8 | wasm scalar / simd128 (150,523 / 193,502 B): golden を ABI ブロック経由 (JS 側で署名から MS ABI 配置を再現、上位 32bit ゴミ) | 21 bit-exact・fail 0、FFT 48 ケース NRMS 32f 1.34e-7 / 64f 5.87e-16、stub fail-soft |
 | S9 | shimx 結合 (wasm): `LoadLibraryW`(裸名・絶対パス) → `GetProcAddress` 420/420 → MulC_32f_I を FL 同様のレジスタ配置で実行 → stub fail-soft | PASS |
 
 非 bit-exact 3 関数 (Sqrt/Exp_A11, VectorSlope) は既存 REPORT §4 のとおり (実 IPP 自身が CPU 依存/低精度) で、thunk 経由でも同一統計。
@@ -149,8 +151,8 @@ fail-soft の注意 (**サイレントに誤る**): stub は status 0 (=成功) 
 - `ippiFilterBox_8u_C*IR` の in-place: 実カーネルの内部読み順 (ROI 端・隣接行オーバーラップ分) を完全には再現できず、特定形状で最大 ~24%/ケースの画素差が残る (fit13 マップ: 200 構成中 156 が 2〜48 画素差)。一般的な blur 用途 (H≫mh) への実害は限定的。**win カーネル逆アサ (CPU dispatch 込み) による読み順完全再現**を残課題に。
 - `ippiAlphaCompC` type 1..5: 数式フィットの残差 0.15% (type 0 は FL 実績どおり最優先で 0.017%)。
 
-### 10-6. 残 stub (使用集合 239 中 166) と次タスク
-上位: `ippiResizeSqrPixel_8u_C1R/C3R/C4R` (143 モジュール, 13 引数 + 補間 + pBuffer — `ippiResizeSqrPixelGetBufSize` がエラーコード返却のため lift 側は fail-fast になる) / `ippsThreshold_GT_32s_I`・`ippsSub_32f_I`・`ippsCopy_32s`・`ippsAtan_32f_A11` (125) / `ippsRealToCplx_32f`・`ippsCplxToReal_32fc` (61) / `ippsCopy_8u` (55) / `ippsZero_32s` (51)。次善: `ippiResizeSqrPixel` 群 (線形/NN 補間) と 125 モジュール群の 4 関数。
+### 10-6. 残 stub (使用集合 239 中 166 → CAB-245 で 159 → CAB-262 で **130**) と次タスク
+CAB-136 時点の上位: `ippiResizeSqrPixel_8u_C1R/C3R/C4R` (143 モジュール) ほか。以下 CAB-245 §12 と CAB-262 §13 で実施。**CAB-262 後の残 stub 上位は §13-7**。
 
 
 ## 12. CAB-245 (IPP-5 ipp-fill-2): ResizeSqrPixel + GetBufSize 実測式 + 125 モジュール群 4 関数 (2026-10-10)
@@ -196,3 +198,80 @@ fail-soft の注意 (**サイレントに誤る**): stub は status 0 (=成功) 
 ### 12-6. 更新物
 - `impl/ipp_resize.c` (新規 351 行) / `impl/ipp_sig_fill2.c` (新規 47 行) / `impl/ipp_img_fill.c` (Resize 系 GetBufSize を移設) / `test/resize_oracle.c` + `test/resize_oracle_run.sh` (新規, オラクルハーネス) / `shim_e2e.sh` (S10/S11 追加) / `shim_check.py` / `test/ipp_shim_wasm.mjs` (stub 抽出サンプルを WARP 系へ — ResizeSqrPixel が型付き化したため)
 - 検証ハーネスの開発過程物 (probe1〜10, fit1〜21, callsite 解析) は `work/resize/` (gitignore)
+
+## 13. CAB-262 (IPP-7 ipp-fill-3): 残 stub 次層 29 関数の静的優先順充填 (2026-10-11)
+
+**結論**: win 呼出モジュール数降順の上位 **29 関数** (すべて使用集合 239 内) を実装し **typed thunk 99 → 128** (stub 321 → 292)。`shim_e2e.sh` は **13 checks PASS** (S13 を新設、S1〜S11 維持)。オラクル (実 DLL vs 自前実装, **727 ケース / 297 ハッシュレコード**) で **status 格子 61 関数分すべて一致 (mismatch 0)**・wasm replay **297 レコード mismatch=0**。実装は `impl/ipp_sig_fill3.c` のみ (契約どおり `gen_shim.py` が自動 thunk 化)。**29 関数中 28 関数はデータも bit-exact**、1 関数 (`ippsVectorSlope_64f`) のみ ±1 ULP の既知残差 (§13-5)。
+
+### 13-1. 実装関数と優先順根拠 (独立再計算: `python3 shim/count_fill3.py`)
+win_modules 降順 (data/ipp_matrix.csv)。全 29 関数が used239=True。
+
+| win_modules | 関数 | 内容 | 検証 |
+|---|---|---|---|
+| 61 | `ippsRealToCplx_32f` | re/im interleave | **bit-exact** (格子 32 点も全一致。dst NULL 優先・len 次・片方 src NULL は書込のみ — §13-3) |
+| 61 | `ippsCplxToReal_32fc` | re/im split | **bit-exact** |
+| 55 | `ippsCopy_8u` | memcpy | **bit-exact** (エラー格子 10 点一致) |
+| 51 | `ippsZero_32s` | 0 充填 | **bit-exact** |
+| 50 | `ippsMinMax_32f` | min/max | **bit-exact** |
+| 50 | `ippsConvert_16s32f` | (int16)→(float) 変換 | **bit-exact** |
+| 49 | `ippsWinKaiser_32f_I` | Kaiser 窓 | **max abs err 2.4e-06** (140 (len,alpha) 組合せ、式は §13-2) |
+| 49 | `ippsVectorSlope_64f` | 直線生成 | **±1 ULP** (§13-5 未解決) |
+| 49 | `ippsThreshold_LT_64f_I` | 閾値 | **bit-exact** |
+| 49 | `ippsMinMax_16s` | min/max | **bit-exact** |
+| 49 | `ippsInterleave_32f` / `_16s` | channel interleave | **bit-exact** (nch 1..4) |
+| 49 | `ippsDeinterleave_32f` / `_16s` | channel deinterleave | **bit-exact** (nch 2..4) |
+| 38 | `ippsRound_32f` | round-half-away | **bit-exact** (§13-3 丸め規則) |
+| 38 | `ippsPowerSpectr_32fc` | re²+im² | **bit-exact** |
+| 38 | `ippsMin_16s` / `ippsMax_16s` | 単極 min/max | **bit-exact** |
+| 38 | `ippsCopy_64s` | memcpy | **bit-exact** |
+| 38 | `ippsAddProductC_32f` | dst += val·src | **bit-exact** (§13-3 double 精度) |
+| 37 | `ippsThreshold_LT_32s_I` | 閾値 | **bit-exact** |
+| 36 | `ippsSwapBytes_32u_I` | byte swap | **bit-exact** |
+| 33 | `ippsFlip_32f_I` / `ippsFlip_16u_I` | 要素反転 | **bit-exact** |
+| 30 | `ippsSwapBytes_16u_I` | byte swap | **bit-exact** |
+| 27 | `ippsZero_64s` | 0 充填 | **bit-exact** |
+| 26 | `ippsAbs_32f` | 絶対値 | **bit-exact** |
+| 25 | `ippsSet_64f` | 定数充填 | **bit-exact** |
+| 24 | `ippsThreshold_LTValGTVal_32f_I` | 双閾値 | **bit-exact** |
+
+### 13-2. `ippsWinKaiser_32f_I` の実測式 (kaiser_fit.py / probe_u,probe_kap3,kap4)
+実測 (n, alpha) 全組合せ 140 点のフィット:
+- `beta = alpha·(len−1)/2`、`r_i = 2i/(len−1) − 1`、`w[i] = I0(beta·√(1−r²)) / I0(beta)`
+- **I0 は級数 60 項** (beta=37.5 まで必要。24 項だと 1.5e-03 の誤差)
+- **beta ≥ 38 では実 DLL が -39 を返し書込しない** (probe_kap3/kap4 で境界を実測: beta=38.0 は -39、37.975 は 0)
+- 典型値: len=16, alpha=2 → w[0]=2.944e-06, w[15]=0.9683 (実測と max abs err 2.4e-06)
+- self-check: `t ≤ 0` のとき `I0(0)/I0(beta)` を書く (0 ではなく — probe_kap5 で発見)
+
+### 13-3. エラー格子で確定した quirk (オラクル error grid、全 61 関数一致)
+- **`ippsRealToCplx_32f`**: dst NULL → -8 が**最優先**、次に len<1 → -6。len≥1 では re/im の**片方 NULL はエラーにならず**その成分だけ書込 (書けない側は 0 充填)、両方 NULL のときだけ -8 (probe_q/r2c 実測)。
+- **`ippsAddProductC_32f`**: IPP は **double で乗算・加算してから float に丸める** (= `fmaf(val,src,dst)`)。float のままだと 1 ULP 差 (apcz fit で全 8 ケース確認)。
+- **`ippsRound_32f`**: round-half-**away**-from-zero。±0 は符号保存。`|結果| ≥ 2^31` では入力をそのまま返す (float はその域で全て整数値)。
+- **Interleave/Deinterleave**: nCh<1 → **-53** (ptr 検査より先)、pSrc NULL → -8、len<1 → -6、pDst NULL → -8。
+
+### 13-4. 検証 (S13, 実測)
+```
+SUM {"fns":61,"cases":727,"st_mis":0,"case_diff":7,"byte_diff":4757}
+dump records=297
+wasm replay: records=297 mismatch=0 -> PASS
+```
+- 61 = 検証エントリ数 (29 実装関数 + エラー格子の追加検査 32)。`st_mis=0` が status 不一致 0。`case_diff=7` は §13-5 の VectorSlope_64f の 7 ケース。
+- 再現: `bash shim/test/fill3_oracle_run.sh` (native + wasm replay)
+- 独立再計算: `python3 shim/count_fill3.py` (nm で実装シンボルを直接数えて data/ipp_sigs.json の impl 集合と照合、差 0 を assert)
+
+### 13-5. 未解決 (起票先付き)
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `ippsVectorSlope_64f` が実 DLL と **±1 ULP** (80 要素中 24 要素 = 30%、絶対値は相対 1e-16 帯)。実 DLL は SIMD ブロック累積経路で値を生成していると推定されるが、block8/16/32 × mul/fma × 直接積の 14 通りを総当たりしてもどれも一致せず (work/fill7/vs*.c, vs4.txt)。`ippsVectorSlope_32f` も同種のブロック累積で bit 再現未解決 (REPORT §4)。 | 64f の厳密 bit 一致。FL の呼出は 49 モジュールだが音階生成用途のため 1 ULP の実害は限定的 (推定)。 | 本チケット §13-5 に記録。win カーネル逆アセ (CPU dispatch 込み) で解明する子チケットを提案 |
+
+### 13-6. ネガティブコントロール (規則 41)
+`impl/ipp_sig_fill3.c` の `ippsAddProductC_32f` の `+1.0` を 1 行追加 → オラクルが検出:
+```
+(破壊前) SUM {"fns":61,"cases":727,"st_mis":0,"case_diff":7,"byte_diff":4757}
+(+1.0)  SUM {"fns":61,"cases":727,"st_mis":0,"case_diff":16,"byte_diff":9933}
+```
+→ case_diff 7→16, byte_diff 4757→9933 で FAIL を確認 (オラクルが実効的)。
+
+### 13-7. 残 stub (使用集合 239 中 130) と次タスク
+上位: `ippsExp_32f_I` (50)・`ippsSum_32f` (49)・`ippsSin_64f_A50` (49)・`ippsMulPack_32f` (49)・`ippsConvert_32f24s_Sfs` (49)・`ippsConvert_16s32f_Sfs` (49)・`ippsLn_32f_A11` (39)・`ippsLog10_32f_A11` (37)。`ippsSin_64f_A50` は実 DLL 自体が Segv するため要調査 (probe_k で n=1 でも Segv を実測)。
+
+| S13 | CAB-262 オラクル (実 DLL vs 自前実装, native + wasm replay): 次層 29 関数のデータ + エラー格子 61 関数分 | **727 ケース status 不一致 0**、wasm replay **297 レコード mismatch=0** (§13) |

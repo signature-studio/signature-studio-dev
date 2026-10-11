@@ -1,13 +1,13 @@
 {
  "sigs_summary": {
   "names": 420,
-  "thunks_typed(impl)": 99,
-  "stubs(fail-soft)": 321,
+  "thunks_typed(impl)": 128,
+  "stubs(fail-soft)": 292,
   "unknown_sig": 0,
   "confidence": {
-   "A": 99,
+   "A": 128,
    "B-": 199,
-   "B+": 122
+   "B+": 93
   },
   "evidence_check": {
    "agree": 173,
@@ -88,15 +88,15 @@
   "conflict": [],
   "stub_with_output_handles(hazard)": [],
   "union_used_239": 239,
-  "union_used_impl": 80,
+  "union_used_impl": 109,
   "detail": {
-   "A(impl)": 99,
-   "B+ agree": 104,
-   "B+ weak(型一致・引数の一部が実績で未観測)": 18,
+   "A(impl)": 128,
+   "B+ agree": 76,
+   "B+ weak(型一致・引数の一部が実績で未観測)": 17,
    "B- 実績なし かつ 使用集合239内(mac のみ呼出 or 低サンプル)": 37,
    "B- 実績なし かつ どの platform からも呼ばれない": 162,
-   "rule-derived(non-A)": 235,
-   "hand-written(non-A)": 86
+   "rule-derived(non-A)": 212,
+   "hand-written(non-A)": 80
   },
   "hand_written_unverified_in_239": [
    "ippiFilter_Round32f_8u_C1R",
@@ -164,8 +164,6 @@
    "ippsConv_32f",
    "ippsConv_64f",
    "ippsCrossCorr_32f",
-   "ippsDeinterleave_16s",
-   "ippsDeinterleave_32f",
    "ippsDivCRev_32f_I",
    "ippsEqual_8u",
    "ippsFIR64f_32f",
@@ -180,8 +178,6 @@
    "ippsFIR_32f_I",
    "ippsFilterMedian_32f_I",
    "ippsIIR64f_32f_I",
-   "ippsInterleave_16s",
-   "ippsInterleave_32f",
    "ippsRandGauss_Direct_32f",
    "ippsRandGauss_Direct_64f",
    "ippsRandUniform_Direct_32f",
@@ -190,14 +186,12 @@
    "ippsSet_16sc",
    "ippsSet_32fc",
    "ippsSet_32sc",
-   "ippsSet_64f",
    "ippsSet_64fc",
    "ippsSet_64sc",
    "ippsSet_8u",
    "ippsTone_Direct_32f",
    "ippsTone_Direct_32fc",
    "ippsTone_Direct_64f",
-   "ippsWinKaiser_32f_I",
    "ippsWinKaiser_64f_I"
   ]
  },
@@ -1603,9 +1597,9 @@
   "err_grid_mismatch_thunk": 0
  },
  "wasm_bytes": {
-  "ipp_shim.wasm": 142847,
-  "ipp_shim_simd.wasm": 185021
+  "ipp_shim.wasm": 150523,
+  "ipp_shim_simd.wasm": 193502
  },
- "selftest": "shim_selftest: checks=1499 failed=0",
+ "selftest": "shim_selftest: checks=1441 failed=0",
  "shimx_glue": "shimx_glue_test: PASS (resolved 420/420)"
 }

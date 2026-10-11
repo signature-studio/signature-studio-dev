@@ -33,6 +33,8 @@ emcc -O1 -w -I"$SX" -Isrc -I"$IPP/src" test/shimx_glue_test.c src/ipp_shim_shimx
 node "$W/shimx_glue_test.cjs" | tee "$W/shimx_glue.log" | sed 's/^/  /'
 step "5c. Resize/GetBufSize/信号4関数 オラクル (実 DLL vs 自前実装, native + wasm replay)"
 bash "$HERE/test/resize_oracle_run.sh" | sed 's/^/  /'
+step "5d. 次層 28 関数オラクル (CAB-262: 実 DLL vs 自前実装, native + wasm replay)"
+bash "$HERE/test/fill3_oracle_run.sh" | sed 's/^/  /'
 
 step "6. 判定"
 python3 shim_check.py

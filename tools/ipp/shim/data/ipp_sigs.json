@@ -4826,11 +4826,11 @@
   {
    "name": "ippsAbs_32f",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp32f* pSrc, Ipp32f* pDst, int len",
    "family": "unary",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -5148,11 +5148,11 @@
   {
    "name": "ippsAddProductC_32f",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp32f* pSrc, const Ipp32f val, Ipp32f* pSrcDst, int len",
    "family": "addproduct-c",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -6828,11 +6828,11 @@
   {
    "name": "ippsConvert_16s32f",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp16s* pSrc, Ipp32f* pDst, int len",
    "family": "convert",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -7745,11 +7745,11 @@
   {
    "name": "ippsCopy_64s",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp64s* pSrc, Ipp64s* pDst, int len",
    "family": "mem",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -7780,11 +7780,11 @@
   {
    "name": "ippsCopy_8u",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp8u* pSrc, Ipp8u* pDst, int len",
    "family": "mem",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -8067,11 +8067,11 @@
   {
    "name": "ippsCplxToReal_32fc",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp32fc* pSrc, Ipp32f* pDstRe, Ipp32f* pDstIm, int len",
    "family": "cplx-split",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -8214,11 +8214,11 @@
   {
    "name": "ippsDeinterleave_16s",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp16s* pSrc, int nChannels, int len, Ipp16s* const* pDst",
    "family": "reorder",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -8256,11 +8256,11 @@
   {
    "name": "ippsDeinterleave_32f",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp32f* pSrc, int nChannels, int len, Ipp32f* const* pDst",
    "family": "reorder",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -10622,11 +10622,11 @@
   {
    "name": "ippsFlip_16u_I",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "Ipp16u* pSrcDst, int len",
    "family": "unary-I",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -10685,11 +10685,11 @@
   {
    "name": "ippsFlip_32f_I",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "Ipp32f* pSrcDst, int len",
    "family": "unary-I",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -10951,11 +10951,11 @@
   {
    "name": "ippsInterleave_16s",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp16s* const* pSrc, int nChannels, int len, Ipp16s* pDst",
    "family": "reorder",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -10993,11 +10993,11 @@
   {
    "name": "ippsInterleave_32f",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp32f* const* pSrc, int nChannels, int len, Ipp32f* pDst",
    "family": "reorder",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -11658,11 +11658,11 @@
   {
    "name": "ippsMax_16s",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp16s* pSrc, int len, Ipp16s* pRes",
    "family": "reduce",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -11868,11 +11868,11 @@
   {
    "name": "ippsMinMax_16s",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp16s* pSrc, int len, Ipp16s* pMin, Ipp16s* pMax",
    "family": "reduce-minmax",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -11952,11 +11952,11 @@
   {
    "name": "ippsMinMax_32f",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp32f* pSrc, int len, Ipp32f* pMin, Ipp32f* pMax",
    "family": "reduce-minmax",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -12162,11 +12162,11 @@
   {
    "name": "ippsMin_16s",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp16s* pSrc, int len, Ipp16s* pRes",
    "family": "reduce",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -13513,11 +13513,11 @@
   {
    "name": "ippsPowerSpectr_32fc",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp32fc* pSrc, Ipp32f* pDst, int len",
    "family": "cplx-unary",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -13989,11 +13989,11 @@
   {
    "name": "ippsRealToCplx_32f",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp32f* pSrcRe, const Ipp32f* pSrcIm, Ipp32fc* pDst, int len",
    "family": "cplx-join",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -14143,11 +14143,11 @@
   {
    "name": "ippsRound_32f",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "const Ipp32f* pSrc, Ipp32f* pDst, int len",
    "family": "unary",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -14423,11 +14423,11 @@
   {
    "name": "ippsSet_64f",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "Ipp64f val, Ipp64f* pDst, int len",
    "family": "mem-set",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -15865,11 +15865,11 @@
   {
    "name": "ippsSwapBytes_16u_I",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "Ipp16u* pSrcDst, int len",
    "family": "swap-I",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -15991,11 +15991,11 @@
   {
    "name": "ippsSwapBytes_32u_I",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "Ipp32u* pSrcDst, int len",
    "family": "swap-I",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -16621,11 +16621,11 @@
   {
    "name": "ippsThreshold_LTValGTVal_32f_I",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "Ipp32f* pSrcDst, int len, Ipp32f levelLT, Ipp32f valueLT, Ipp32f levelGT, Ipp32f valueGT",
    "family": "threshold",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -17097,11 +17097,11 @@
   {
    "name": "ippsThreshold_LT_32s_I",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "Ipp32s* pSrcDst, int len, Ipp32s level",
    "family": "threshold",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -17132,11 +17132,11 @@
   {
    "name": "ippsThreshold_LT_64f_I",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "Ipp64f* pSrcDst, int len, Ipp64f level",
    "family": "threshold",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -17489,11 +17489,11 @@
   {
    "name": "ippsVectorSlope_64f",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "Ipp64f* pDst, int len, Ipp64f offset, Ipp64f slope",
    "family": "gen",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -17531,11 +17531,11 @@
   {
    "name": "ippsWinKaiser_32f_I",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "Ipp32f* pSrcDst, int len, Ipp32f alpha",
    "family": "siggen",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
@@ -17692,11 +17692,11 @@
   {
    "name": "ippsZero_32s",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "Ipp32s* pDst, int len",
    "family": "mem",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "weak",
    "evidence_note": "slot0: 期待 gp / 観測なし(gp=53 xmm=0 of 149); slot1: 期待 gp / 観測なし(gp=53 xmm=0 of 149)",
    "params": [
@@ -17748,11 +17748,11 @@
   {
    "name": "ippsZero_64s",
    "known": true,
-   "impl": false,
+   "impl": true,
    "ret": "IppStatus",
    "params_c": "Ipp64s* pDst, int len",
    "family": "mem",
-   "conf": "B+",
+   "conf": "A",
    "evidence": "agree",
    "evidence_note": "",
    "params": [
