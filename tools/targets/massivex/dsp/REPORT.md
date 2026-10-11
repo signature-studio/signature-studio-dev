@@ -130,10 +130,10 @@ Bus/Unit/Parameter 等) または `MassiveX`/`MX` 前缀。
 | # | 未解決 | 影響 | 起票先 |
 |---|---|---|---|
 | U1 | `process` slot の内容シグネチャが 0/47 slot で不発 (ProcessData `[rdx+4]`/`[rdx+8]` 参照パターン無し)。off=128 の partial (11 slot) も未確認 | process 起点 closure の厳密な root が決まらない / 案 B の前提 | (a) CAB-244 (MX-1) にコメント — IAudioProcessor vtable の slot index 表を突合 |
-| U2 | 再帰降下が round 3 で 320,877 に発散。code/data の区別が無いため target の一部が偽 | closure 上限が未確定 / lift scope が決まらない | (b) 新規子チケット CAB-264 [MX-3b] |
-| U3 | vectorcall 独自規約の有無が未確定 (x64c は import 修飾子を無視) | 呼出規約モデル欠落で silent miscompile の恐れ | (c) CAB-264 |
+| U2 | 再帰降下が round 3 で 320,877 に発散。code/data の区別が無いため target の一部が偽 | closure 上限が未確定 / lift scope が決まらない | (b) 新規子チケット CAB-265 [MX-3b] |
+| U3 | vectorcall 独自規約の有無が未確定 (x64c は import 修飾子を無視) | 呼出規約モデル欠落で silent miscompile の恐れ | (c) CAB-265 |
 | U4 | MSVC C++ EH (chained .pdata の unwind チェイン) の構造が未解析 | CAB-227 と同型の欠陥が潜伏しうる | (a) CAB-227 |
-| U5 | leaf 関数サイズを「次の pdata begin まで」で近似 | closure バイト数は参考値 | (c) CAB-264 |
+| U5 | leaf 関数サイズを「次の pdata begin まで」で近似 | closure バイト数は参考値 | (c) CAB-265 |
 | U6 | Mac dmg (BitRock JL) 未展開で win/mac closure 比較が不能 | mac 優先度判断材料が無い | (a) CAB-244 [MX-4] |
 
 ## 7. ユーザ依頼事項
@@ -144,7 +144,7 @@ Bus/Unit/Parameter 等) または `MassiveX`/`MX` 前缀。
 
 - `MX_PE` / `MX_X64C` 環境変数で PE・x64c パスを差し替え可。
 - 依存: python3 + capstone 5.0.7 + pefile 2024.8.26。/opt/ghidra 12.1.4 は未使用 (案 A 向け)。
-- TMPDIR は実ディスク (`work/tmp`)。生成物は全て `dsp/work/` (gitignore 済、164 MB)。
+- TMPDIR は実ディスク (`work/tmp`)。生成物は全て `dsp/work/` (gitignore 済、48 MB)。
 - x64c は `tools/flelift/x64c.py` (CAB-252 が継続稼働中につき**読取実行のみ**、1 行も未変更)。
 
 ## 9. 再現・検証
@@ -215,15 +215,17 @@ tools/targets/massivex/dsp/
 ├── scripts/mx_closure.py           再帰降下 closure (round 毎の入口数)
 ├── scripts/mx_roots.py              slot 別 ProcessData シグネチャ検査
 └── work/                           (gitignore 済: rtti_vtables.json, surface*.json,
-                                    lift_seeds/lift_meta.json, logs/, cg.pkl 等 164 MB)
+                                    lift_seeds/lift_meta.json, logs/, cg.pkl 等 48 MB)
 ```
 
 ## 12. 実施記録・ブロッカー
 
 - `work/lift_one/` (round-1 closure 3,226 関数の x64c lift) は 20 分で完了せず中断。完了分
   (seeds 567 関数) の結果を §3 の実測値として採用。
-- 検証起点: 本 REPORT の全数値は未 commit 作業ツリーの `dsp/` で生成 (§12b で commit 後に再確認)。
-- **Linear**: MX-3 = CAB-263 を起票 (parent=CAB-244, project=signature-studio, milestone=
+- 検証起点: commit **e6c6e91** (git archive 展開で e2e.sh を再実行し全数値一致を確認)。
+- **Linear**: MX-3 = **CAB-263** を起票 (parent=CAB-244, project=signature-studio, milestone=
   アプリケーション完成 1533c107-4f7d-45c0-b4fd-6ae8fba924f2, assignee=me) → In Progress 設定済み。
-  重複確認は `list_issues` で 3 クエリ、既存該当 0 件。In Review 遷移と CAB-244/CAB-46 への
-  コメントは未実施 → **main への委譲事項**。
+  重複確認は `list_issues` で 3 クエリ、既存該当 0 件。
+  完了時: CAB-263 を **In Review** に遷移、CAB-244 [MX-1] と CAB-46 に完了コメントを投稿。
+  未解決 U2/U3/U5 の起票先として子チケット **CAB-265 [MX-3b]** を作成 (parent=CAB-244、
+  project=signature-studio、milestone アプリケーション完成、assignee=me)。
