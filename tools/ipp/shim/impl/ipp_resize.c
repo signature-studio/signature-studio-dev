@@ -50,7 +50,7 @@
 static int interp_ok(int it) {
   return it == 1 || it == 2 || it == 4 || it == 5 || it == 6 || it == 7 || it == 8 || it == 16;
 }
-static int interp_base(int it) { return (it == 5 || it == 6 || it == 7) ? 4 : it; }
+static int interp_base(int it) { return it == 5 ? 35 : ((it == 6 || it == 7) ? 4 : it); }
 
 static Ipp8u clamp_u8(double v) {
   long r = (long)(v + 0.5);  /* round-half-up (可搬: lround のプラットフォーム差を排除) */
@@ -63,6 +63,15 @@ static Ipp8u clamp_u8(double v) {
 static double ker_cubic(double d) {
   if (d < 1.0) return 0.5 * d * d * d - d * d - 0.5 * d + 1.0;
   if (d <= 2.0) { double q = d - 1.0; return -(1.0 / 6.0) * q * (q - 1.0) * (q - 2.0); }
+  return 0.0;
+}
+/* interp 5 (CUBIC2P 系) = 3 次 B-スプライン (実測: work/resize/sp57.c + sweep2 の spike で
+   位相 64 点の 1D 重みを抽出 → bspl3 が 0/64 mismatch で一致、ゲイン 255*5/6=212.5)。
+   分離実装では重みの和が 1 になるよう正規化して使う (clamp_u8 は round-half-up)。 */
+static double ker_bspl3(double d) {
+  double a = fabs(d);
+  if (a < 1.0) return 2.0 / 3.0 - a * a + a * a * a / 2.0;
+  if (a < 2.0) { double q = 2.0 - a; return q * q * q / 6.0; }
   return 0.0;
 }
 /* 可搬 sin(pi*d) (d ∈ [0,3]): native/wasm で同一演算順序 (libm 差異の排除, wasm 突合用)。
@@ -121,6 +130,15 @@ static int build_taps(int mode, double p, int *base, double w[8]) {
   if (mode == 4) {
     *base = i0 - 1;
     for (int t = 0; t < 4; t++) { w[n++] = ker_cubic(fabs(p - (i0 - 1 + t))); }
+    return 4;
+  }
+  if (mode == 35) {
+    /* interp 5: 3 次 B-スプライン。窓は [i0-1, i0+2] の 4 タップ (実測 sp57/sweep2)。
+       和が 1 になるよう正規化 (分離路の clamp_u8 は round-half-up で 0..255 を期待)。 */
+    *base = i0 - 1;
+    double s = 0.0;
+    for (int t = 0; t < 4; t++) { double v = ker_bspl3(p - (i0 - 1 + t)); w[t] = v; s += v; }
+    if (s > 0.0) for (int t = 0; t < 4; t++) w[t] /= s;
     return 4;
   }
   *base = i0 - 3;

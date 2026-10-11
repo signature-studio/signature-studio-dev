@@ -102,6 +102,7 @@ FFT (`ipp_fft.c`, 倍精度基数2 の素朴実装): ippsFFTGetSize/Init/Fwd_RTo
 | `ref/` | PE ローダ + 差分ハーネス (`ipp_ref.c` cmp/isa/gen/err, `ipp_acc.c` 精度, `ipp_fft_ref.c`, `ipp_bench.c`) と探索 probe 3 本 |
 | `ipp_wasm_cmp.mjs` `ipp_wasm_fft.mjs` `ipp_wasm_bench.mjs` | wasm と golden(実 IPP 出力) の突合・性能 |
 | `shim/impl/ipp_sig_fill3.c` `shim/test/fill3_oracle.c` `shim/test/fill3_oracle_run.sh` `shim/count_fill3.py` | **CAB-262**: 次層 29 関数の実装 + オラクル (native/wasm replay) + 独立再計算 (`shim/REPORT.md` §13) |
+| `shim/test/sp57.c` `shim/test/sweep2.c` | **CAB-261**: interp 4/5/6/7 の 1D 重みをスパイク法で抽出 (`shim/REPORT.md` §14) |
 | `data/` | `ipp_usage_summary.json`, `ipp_matrix.csv`(420 名×使用/提供/実装), `arm64_ipp_map.json`, `diff_results.json` |
 
 ## 7. 性能 (n=4096 float, ns/call。既知の問題として記録。単発測定でラン間ばらつきが大きい: 検収で 4 回測った範囲を括弧内に併記)
