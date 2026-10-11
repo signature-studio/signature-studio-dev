@@ -326,6 +326,8 @@ it=5 の 4 タップ正規化重みの `w[0] += 0.02; w[3] -= 0.02` (1 行) を�
 
 **結論**: it=7・it=6 のカーネルを **Mitchell-Netravalli 2 パラメータ三次カーネル** (CUBIC2P) と特定し closed form で実装。オラクル画素差率 **it7 13.169% → 0.005%** (受入 <1% 達成)、**it6 9.768% → 0.000% (bit-exact)**。it=5 = 0.021% 不変、it=4 = 0.027% 不変。`shim_e2e.sh` 13 checks PASS、wasm replay **1,728 records mismatch=0**。
 
+検証起点: 本 feat commit のツリー (クリーン HEAD 検証 = 規則 45: `git archive HEAD -- tools/ipp` を `work/verify_head/` に展開し、`work/` の gitignore データ (spike ログ・golden・baseline) をコピーして同一 e2e を再現。5b の `tools/shimx` 参照のみ symlink)。`bash shim/shim_e2e.sh` 実測 **21.3〜22.5 秒** (n=3: 21.29 / 22.47 / 22.11 秒。負荷依存値: load average 開始 3.22〜3.44、3 本目直後の uptime = 3.44 / 2.87 / 2.59。nproc=16・他セッションと共有)。クリーン HEAD 再実行結果: **13 checks PASS / SUM 同一 (px_diff=55588, cases=82056) / wasm replay 1,728 records mismatch=0**。
+
 ### 15-1. カーネル特定 (1D spike + 2D インパルス応答の2系統で確定)
 
 | interp | カーネル | 同定根拠 |

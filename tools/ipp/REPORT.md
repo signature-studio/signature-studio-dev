@@ -1,6 +1,6 @@
 # tools/ipp — Intel IPP (`dsp_ippv2`) 再現要否の評価と最小実装 PoC
 
-preflight: RULES_SHA=c8361d4dce5e (CAB-274 着手時。CAB-274 検証起点 commit: `feca670`)
+preflight: RULES_SHA=c8361d4dce5e (CAB-274 着手時。CAB-274 検証起点 commit: `79a9fd0`)
 
 再現: `bash tools/ipp/ipp_e2e.sh` (約 40 秒 [検収実測 38 秒], exit 0 = 12 checks PASS) / `bash tools/ipp/shim/shim_e2e.sh` (exit 0 = **13 checks PASS** [CAB-262 で S13 追加])。大物中間物は `work/` (gitignore)。数値はすべて実測、推定は「推定」と明記。検証起点 commit: `b8e762d` (HEAD, 自分の起点)。
 
