@@ -368,7 +368,82 @@ def t14():
     print("T14 ok (xmm0-ret 検出 %d 関数, 別アルゴリズムと一致, tan kernel 検出)" % len(hit))
 
 
+def t15():
+    """[LIFTLIB-4] 領域値の支配判定修正 + 原本優先 bind の効果を固定。
+
+    LIFTLIB-4 (CAB-272) の 2 つの修正:
+      1. `Region._value_ok` が領域値の名前に埋めた VA を「値の機械語 VA」と誤認していた
+         (あれはタグ。relay は他所の VA をタグに使う)。`self.vdb` (定義 block) で
+         判定するようにした → merge 系の誤 FAIL が消える。
+      2. `regbind.value_defined_at` が同一アドレスの IR 命令の**末尾** (領域側) を
+         拾っていたため, 別領域の経路固有 SSA を参照して非支配になっていた。原本を
+         優先するようにした → bind xmm1 が解ける。
+
+    効果 (f2 callee + p1, dbg_reason_f2.py と同条件): 残留 15 → **6**。
+    ネガティブコントロール (規則 41) も同時に固定する。
+    """
+    raw = os.path.join(T, "m6/work/ott.drc.ll")
+    if not os.path.exists(raw):
+        print("T15 skip (OTT raw .ll 無し)")
+        return
+    import collections
+    import subprocess
+    from liftlib.passes import p1, f2
+    img = Image(OTT_DLL)
+
+    def run(env=None):
+        text, _ = base.run_base(open(raw).read(), base.make_args())
+        mod = IR.Module.parse(text)
+        f2.run(mod, img, [], {}, phase="callee")
+        log, st = [], {}
+        for fn in mod.funcs():
+            va = int(fn.name.split("_")[1], 16) if re.match(r"function_[0-9a-f]+$", fn.name) else None
+            if va is None or img.func_at(va) is None:
+                continue
+            p1.run_function(mod, fn, img, True, log, st)
+        cnt = collections.Counter()
+        for l in log:
+            if l.startswith("UNSUPPORTED"):
+                r = l.split(": ", 1)[1]
+                r = re.sub(r"@[0-9a-f]+", "@X", r)
+                r = re.sub(r"%[^\s]+", "%V", r)
+                cnt[r] += 1
+        return st, cnt
+
+    HERE = os.path.dirname(os.path.abspath(__file__))
+    # 再計算スクリプトは必ずコミット済みの物を使う (規則 37)。work/ 配下の開発用
+    # スクリプトに依存すると clean HEAD で再現できない (LIFTLIB-4 で実測)。
+    dbg = os.path.join(HERE, "..", "p1_residual_census.py")
+
+    def run_env(extra):
+        e = dict(os.environ, **extra)
+        r = subprocess.run([sys.executable, os.path.abspath(dbg), "--json"], capture_output=True,
+                           text=True, env=e, timeout=1800)
+        assert r.returncode == 0, r.stderr[-500:]
+        return json.loads(r.stdout)["stats"]
+
+    st0, cnt0 = run()
+    # LIFTLIB-4 実測固定: 残留 6 以下 / bind xmm0 0 / bind xmm1 1以下 / merge xmm2 0
+    assert st0.get("unsupported", 99) <= 6, st0
+    assert cnt0.get("bind xmm0 @X", 0) <= 0, cnt0
+    assert cnt0.get("bind xmm1 @X", 0) <= 1, cnt0
+    assert cnt0.get("merge xmm2 @X", 0) == 0, cnt0
+    # ネガコン 1: 原本優先を止めると bind xmm1 が 1 → 4 に戻る (残留 6 → 9)
+    st1 = run_env({"LL_NO_ORIG_PREF": "1"})
+    assert st1["unsupported"] > st0["unsupported"], (st1, st0)
+    assert st1["unsupported"] <= 9, st1
+    # ネガコン 2: vdb 支配判定を止めると merge 系が 0 → 6 に戻る (残留 6 → 13)
+    st2 = run_env({"LL_NO_VDB_DOM": "1"})
+    assert st2["unsupported"] > st0["unsupported"], (st2, st0)
+    assert st2["unsupported"] <= 14, st2
+    # 両方を止めると LIFTLIB-4 着手前 (15) に戻る
+    st3 = run_env({"LL_NO_ORIG_PREF": "1", "LL_NO_VDB_DOM": "1"})
+    assert st3["unsupported"] == 15, st3
+    print("T15 ok (LIFTLIB-4: unsupported 6, orig優先OFF %d, vdb支配OFF %d, 両OFF %d)"
+          % (st1["unsupported"], st2["unsupported"], st3["unsupported"]))
+
+
 if __name__ == "__main__":
-    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14):
+    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15):
         f()
     print("ALL UNIT TESTS PASS")
