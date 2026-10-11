@@ -4,7 +4,6 @@
 > **行数目安**: 本ファイルは 250 行を超過 (`docs/DOC_MAP.md` §1 の上限ルール参照)。
 > 超過分は Git 履歴に残る形での分割移動を推奨 (**内容は削除しない**)。
 
-検証手順: `docs/WORKFLOW.md` §6 (旧 `preflight RULES_SHA` 証跡は廃止・`docs/DECISIONS.md` D6)
 検証起点 commit: 01d5cb5 (CAB-233)。A/B は fba272c (CAB-232) 側。検収は b8e762d (HEAD) から実施。
 既知類型との関係 (DEFECTS.md, 規則 44): 該当 **D15** (メモリ間接 call 脱落) — 残 3 unit の VMT 仮想 call
 `call qword ptr [rdi+0x18]` (0x513da9) 診断で参照。jump table **D9 (DEFECTS.md)** は未使用。

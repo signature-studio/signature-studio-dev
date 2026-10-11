@@ -298,7 +298,7 @@ git 管理外成果物。
 
 ## 12. 検収記録 — CAB-194 (77cde78) (2026-10-11 / 起点 commit 85424b0)
 
-- 検証手順: \`docs/WORKFLOW.md\` §6。既知類型との関係: **該当 D7 (stack 引数・戻り値)・
+- 既知類型との関係: **該当 D7 (stack 引数・戻り値)・
   D15 相当 (間接 call の保存率) と該当なし (alloca 縮退は DEFECTS.md 未登録で本節で再記録)**
 - 範囲: 77cde78 は **22 ファイル 3,465 行すべて `tools/plugins/framework`** (他 dir 0 行)。
   commit 内最大 blob = 350,589 B = 0.33 MiB (20 MiB ライン未満)。`git status` は担当外 WIP

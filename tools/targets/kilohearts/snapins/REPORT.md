@@ -2,7 +2,7 @@
 
 - 解析日: 2026-10-11 / 担当 dir: `tools/targets/kilohearts/snapins/` (大物は `work/`, gitignore) / Linear: CAB-246 (KH-4) / CAB-258 (KH-6, parent CAB-53) / CAB-56 (KH-4b, parent CAB-13) / CAB-273 (§15, parent CAB-53)
 - 1 コマンド再現: `bash tools/targets/kilohearts/snapins/run_all.sh` (13 snap-in + **khbase** + Path A 対照 + libm 単体 + **CAB-56 ホストハーネス**。実測秒 + load average は §13-5・§15)。1000 trial / seed 7 は `TRIALS=1000 SEED=7 bash .../run_all.sh` (全 13 本 + khbase + ハーネスが 1000 trial になる)。§9/§10 の 1000 trial 数値はこの形で取得
-- 検証手順: `docs/WORKFLOW.md` §6。既知類型 (DEFECTS.md): **D14 修復 (CAB-242) / D15 修復 (CAB-246) / D16 検出器 (CAB-258) が該当**、D2/D3/D7/D8/D9/D11 は非該当 (§15 も非該当)。検収 (=§14) も独立再計算・別アルゴリズム・ネガコン・baseline diff を実施
+- 既知類型 (DEFECTS.md): **D14 修復 (CAB-242) / D15 修復 (CAB-246) / D16 検出器 (CAB-258) が該当**、D2/D3/D7/D8/D9/D11 は非該当 (§15 も非該当)。検収 (=§14) も独立再計算・別アルゴリズム・ネガコン・baseline diff を実施
 - 本報は KH-4 (§1〜§8) と KH-6 (§9, §11) と CAB-56 (§10) の合本。**第 2 弾 = §13** (rcpps/rsqrtps 実機近似表で Resonator/Stereo/Delay が bit-exact 化, D16 検出器化)、**第 3 弾 = §15** (CAB-273: tol gate 撤去)。既存 10 snap-in (KH-1a/1b/1c) と KH-2b (D14 修復) の詳細は前版 (git log fe57c01) を参照
 
 ## 0. 結論 (先出し)

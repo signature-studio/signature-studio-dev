@@ -4,8 +4,6 @@
 > **行数目安**: 本ファイルは 250 行を超過 (`docs/DOC_MAP.md` §1 の上限ルール参照)。
 > 超過分は Git 履歴に残る形での分割移動を推奨 (**内容は削除しない**)。
 
-検証手順: `docs/WORKFLOW.md` §6 (旧 `preflight RULES_SHA` 証跡は廃止・`docs/DECISIONS.md` D6)
-
 再現: `bash tools/ipp/shim/shim_e2e.sh` (前提 `tools/ipp/ipp_e2e.sh` の成果が `work/` にあること。無ければ自動実行。前提ありで実測 21.3〜22.5 秒 (§15 参照・負荷依存)、exit 0 = **13 checks PASS** [CAB-262 で S13 追加])。検証起点 commit: `b8e762d` (HEAD, 自分の起点)。大物は `tools/ipp/work/shim/` (gitignore)。数値はすべて実測、推定は「推定」と明記。
 
 ## 0. 結論

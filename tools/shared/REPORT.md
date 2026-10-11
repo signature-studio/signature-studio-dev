@@ -4,8 +4,6 @@
 > **行数目安**: 本ファイルは 250 行を超過 (`docs/DOC_MAP.md` §1 の上限ルール参照)。
 > 超過分は Git 履歴に残る形での分割移動を推奨 (**内容は削除しない**)。
 
-検証手順: `docs/WORKFLOW.md` §6 (旧 `preflight RULES_SHA` 証跡は廃止・`docs/DECISIONS.md` D6)
-
 日付: 2026-10-10 (検収・訂正 2026-10-10: §8) / 2026-10-11 (OSS 実クロスビルド追加: §9〜§12) / 担当: F shared-libs
 再現: `bash tools/shared/run_all.sh` (~6 分, 素材は `docs/REFERENCES.md` `[MAC]` / `[WIN64]` / `[ANALYSIS-PLUGINS]` を読むのみ) / OSS 実ビルドは `bash tools/shared/oss/flac/build.sh` 等
 素材: mac `Contents/Resources/FL/Shared` (+ `Libs/FLEngine`, Plugins 全 dylib = Mach-O 222 本) / win `docs/REFERENCES.md` `[WIN64]` の `extracted` (PE 313 本; 対応 DLL は PDB・export・VERSIONINFO・文字列で特定)
@@ -235,8 +233,6 @@ libFLAC ~90 s / LAME ~40 s / WavPack ~60 s / FFmpeg ~10 分 (native 180 s + wasm
 
 ## 12. 検収記録 (2026-10-11, 検収 subagent / tools/shared / CAB-146,147,148,150,18)
 
-検証手順: `docs/WORKFLOW.md` §6 (旧 `preflight RULES_SHA` 証跡は廃止・`docs/DECISIONS.md` D6)
-
 ### 12.0 run_all.sh e2e (\`bash tools/shared/run_all.sh\`) も clean HEAD から再現
 **rc=0 / 実測 178 s** (load average 開始 1.29 → 終了 4.56, nproc=16, 直列実行)。分類 22 項目・FreeType 40 行一致 + export 被覆 190/190 (win 254/271・欠 17 は FT_Alloc 系)・ogg 30,695B hash cac14495a26b1641 3 arch identical・Blend2D \`PASS: native(no-JIT) == wasm(no-JIT) pixel-exact\` (差 0/230,400B)・libkio difftable 228/760 → 621/760。※ REPORT §0・§11.3 の「~6 分」「~90 s / ~40 s / ~60 s / ~10 分」は単発の負荷依存値で、本検収の実測 178 s (一括)・FLAC 29 s・LAME 36 s・WavPack 36 s・FFmpeg 119 s とは異なる (負荷とキャッシュ状態依存)。
 **\`status.sh\` は tools/shared に存在しない** (run_all.sh のみ)。
@@ -295,4 +291,4 @@ FVN hash 比較のみの harness に対し、以下を自前実装して検算 (
 `oss/ffmpeg/build.sh` (emconfigure 引数修正) / `scripts/indep_audio_verify.py` (独立再計算・別アルゴリズム) / `data/ilsvg_version.json` (svgren 下限・agg・papki の訂正) / `work/` は gitignore。
 
 ### 12.7 検収時の運用変更 (記録)
-検収中に運用ルールが改訂された。**ルールの正本は \`docs/WORKFLOW.md\`** (import 済み・旧 \`preflight RULES_SHA\` 証跡は \`docs/DECISIONS.md\` D6 で廃止)。当時の主な変更は ① \`git reset\`/\`stash\`/\`checkout --\` の全面禁止と「reset せず fix コミットを積む」、② **Linear free issue limit 到達** (子チケット作成を試み \`invalid_request: You've exceeded the free issue limit\` で失敗し起票案コメントに変更した)、③ **Linear 廃止・GitHub Issues + worktree/PR フローへの移行** (旧 Linear は 2026-10-12 以降読み取り専用、対応表は \`docs/REFERENCES.md\` \`[CAB_TO_GH]\`)。Linear 側の検収コメント・状態変更は変更前に実施済み。GitHub 側への反映は main 判断。
+検収中に運用ルールが改訂された。**ルールの正本は `docs/WORKFLOW.md`** (repo 内に import 済み。旧 preflight 読了証跡は `docs/DECISIONS.md` D6 で廃止)。当時の主な変更は ① `git reset`/`stash`/`checkout --` の全面禁止と「reset せず fix コミットを積む」、② **Linear free issue limit 到達** (子チケット作成を試み \`invalid_request: You've exceeded the free issue limit\` で失敗し起票案コメントに変更した)、③ **Linear 廃止・GitHub Issues + worktree/PR フローへの移行** (旧 Linear は 2026-10-12 以降読み取り専用、対応表は \`docs/REFERENCES.md\` \`[CAB_TO_GH]\`)。Linear 側の検収コメント・状態変更は変更前に実施済み。GitHub 側への反映は main 判断。

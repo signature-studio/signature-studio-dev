@@ -4,8 +4,6 @@
 > **行数目安**: 本ファイルは 250 行を超過 (`docs/DOC_MAP.md` §1 の上限ルール参照)。
 > 超過分は Git 履歴に残る形での分割移動を推奨 (**内容は削除しない**)。
 
-検証手順: `docs/WORKFLOW.md` §6 (旧 `preflight RULES_SHA` 証跡は廃止・`docs/DECISIONS.md` D6)
-
 最終更新 2026-10-11 / 担当 subagent (hostbridge-nfo) / 再現: `bash tools/hostbridge/nfo/nfo_e2e.sh` (exit 0 = 全 PASS / §13 の h4 結線 e2e を含む) + `bash tools/hostbridge/nfo/h4_e2e.sh` (CAB-216 単独) + `node tools/hostbridge/nfo/analysis/real_ini_check.mjs` (実機照合 21 checks) + `node tools/hostbridge/nfo/h4_recount.mjs` (実装側 独立再計算) + `node tools/hostbridge/nfo/h4_accept_check.mjs` / `node tools/hostbridge/nfo/h4_accept_chrome.mjs` (検収側 独立再計算) / 仕様: `FORMAT.md`
 
 所要 (実測。定義: `bash <script>` の wall time・`/usr/bin/time`・n=3 ・min–max 表記。/tmp/opencode 上、他 subagent 稼働中の load average は並記):
@@ -321,8 +319,6 @@ CAB-215 の主眼 (writeEntry ↔ 実機比較) は **ini セクション経由�
 ---
 
 ## 14. 検収 (CAB-216 / HB-H4') — 検収側 独立再計算・別アルゴリズム検算
-
-検証手順: `docs/WORKFLOW.md` §6 (旧 `preflight RULES_SHA` 証跡は廃止・`docs/DECISIONS.md` D6)
 
 ### 14.1 検収側 独立再計算スクリプト (規則 37: 実装側とは別アルゴリズム)
 

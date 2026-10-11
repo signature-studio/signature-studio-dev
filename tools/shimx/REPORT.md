@@ -143,7 +143,7 @@ bash tools/hostbridge/cb/cb_e2e.sh                 # R2/R3 実体接続の往復
 | R7 | EnterCriticalSection(NULL) の方針 | **実装** (方針決定 + 選択式) | **既定 = fail-fast のまま** (= Win32 実機のアクセス違反相当。survey unit 115 は旧 M4 shim でも同一 unit で abort する lift 側ポインタ不正であり、黙って成功させると lift 誤りを隠す)。許容モード `shimx_set_cs_null_ok(1)` を追加: Enter/Leave は no-op、TryEnter=FALSE、Initialize 何もしない、SleepConditionVariableCS=FALSE。null_ok モード自体も fail-fast モード (`node x.cjs csnull`) で検査 |
 | R8 | 未検証 133 名の実機検証 | **手順整備** (実検証は unit 完走後) | `scripts/reach_check.py` (M11 `reach.json` の `static_reach_but_never_called` 133 名と実行トレースの差分集計) + `scripts/rem11_check.sh` (§9.2)。現時点の純リンク実行では 133 名の呼出 0 (起動経路は 17 unit まででレジストリ・ファイル系大半に未到達) — REPORT のとおり T9 (CAB-176) の unit 完走後の後続 |
 
-### 9.2 「CAB-129 修正後、--fix なし純リンクで 17 unit 再測」の検証手順 (1 コマンド)
+### 9.2 「CAB-129 修正後、--fix なし純リンクで 17 unit 再測」の再現手順 (1 コマンド)
 
 ```
 bash tools/shimx/scripts/rem11_check.sh

@@ -1,7 +1,5 @@
 # 検収 REPORT — CAB-137 (OTT-T4 VST entry lift) + CAB-138 (OTT-T5 CRT init / override 置換)
 
-検証手順: `docs/WORKFLOW.md` §6 (旧 `preflight RULES_SHA` 証跡は廃止・`docs/DECISIONS.md` D6)
-
 ## 0. 結論 (先出し)
 
 - **CAB-137 = PASS (受入・条件 1 件)**。`bash tools/ott/entry/entry_e2e.sh` = **PASS**。native 実機械語 vs
