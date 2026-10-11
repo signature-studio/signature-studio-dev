@@ -411,7 +411,9 @@ def t15():
         return st, cnt
 
     HERE = os.path.dirname(os.path.abspath(__file__))
-    dbg = os.path.join(HERE, "..", "work", "tmp", "dbg_reason_f2.py")
+    # 再計算スクリプトは必ずコミット済みの物を使う (規則 37)。work/ 配下の開発用
+    # スクリプトに依存すると clean HEAD で再現できない (LIFTLIB-4 で実測)。
+    dbg = os.path.join(HERE, "..", "p1_residual_census.py")
 
     def run_env(extra):
         e = dict(os.environ, **extra)
