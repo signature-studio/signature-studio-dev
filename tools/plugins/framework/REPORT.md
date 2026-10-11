@@ -322,13 +322,32 @@ unit init 16 / finalize 16 は smoke log の `site=0x40dae6` 16 行・`site=0x40
 (`0x6c2680`)・`(end-tab)/16 = 290` の 3 点照合。ただし init≠0 のエントリは **289**
 (entry 289 は init=0)。unit[0].init=0x4198b0 = 報告どおり。
 
-### 12.2 独立再計算 (別アルゴリズム: `work/vfy194/fw_194_recount.py` / `smoke_check.py`)
+### 12.2 独立再計算 (別アルゴリズム)
+
+再現 script は `tools/plugins/framework/work/vfy194/` (gitignore・commit 対象外) に置いた
+(`fw_194_recount.py` / `smoke_check.py`)。commit 済みツリーだけでも同等に再現できる最小手順
+(以下は共有 `work/fw` の成果物に対する実行例):
+
+```
+# icall: PE sites 集合 vs 最終 IR の dispatch 集合 (別アルゴリズム)
+python3 -c "import json,re;m=json.load(open('fw_map.json'));s=set(x['va'] for x in m['sites']);\
+t=open('fw_flat4_canon3.ll',errors='replace').read();\
+d=set(int(x) for x in re.findall(r'call void @__icall_dispatch\\(i64 (\\d+)\\)',t));\
+print(len(s),len(d),len(s-d))"          # -> 6159 5526 634
+# alloca: rep_stosq サイト走査 (memset 正規表現ではなく call 引数から)
+grep -n '__asm_rep_stosq' fw_lift3.ll   # -> 152380 / 621787 = 2 site (i64 49 → 392 B)
+# PackageInfo: テーブル終端ポインタから件数計算
+python3 -c "import struct;i=open('fw_image.bin','rb').read();\
+u=lambda va:struct.unpack_from('<Q',i,va-0x400000)[0];print((u(0x6c1430+24)-0x6c1460)//16)"  # -> 290
+```
+
+主要な集計・計測の再現 (実装側 script・別アルゴリズム):
 
 | # | 主張 | 独立再計算 | 一致 |
 |---|---|---|---|
 | ① | 14,037 関数 / 1.61 MB lift | F.ranges **11,736** エントリ・合計 **1,626,299 B = 1.55 MiB**、`fw_all.restored.ll` define **14,037** | 関数数 一致 / サイズ 1.55 MiB (報告の 1.61 は誤差) |
 | ①' | wasm 14.8 MB | 14,874,162 B (14.19 MiB) = 14.87 MB | 一致 (MB = decimal) |
-| ② | icall 6,159 site 全復元 | PE sites 6,159 → 最終 IR unique dispatch **5,525** / 未復元 **635 = 10.3%**。未変換 stub refs は各 chunk 1 件 (=stub 宣言行・site ではない) | **不一致 → 訂正** |
+| ② | icall 6,159 site 全復元 | PE sites 6,159 → 共有 canon3 の unique dispatch **5,526** / 未復元 **634 = 10.3%** (194 再ビルド canon3 は 5,525 / 635)。7 呼出は `!insn.addr` 欠落で site=0 | **不一致 → 訂正** |
 | ③ | alloca 縮退 2 関数 (43ecb0/51c2d0) 392 B | `rep_stosq_memset(…, 49)` サイト = 49×8 = **392 B** がちょうど 2 関数 (43ecb0/51c2d0)。修復後 `alloca [49 x i64]` = 392 B | **一致** |
 | ④ | fw_entry_fix.py の home slot 修復 | entry_fix.json = `r8_fixed 1 / r9_fixed 1` (VA 0x6c13a0→call 0x4189c0)。native (`fw_icall.dll`, capstone) で `mov [rip-0x2349bd], r8` / `mov [rip-0x2349bc], r9` の spill を確認 | **一致** |
 | ⑤ | sigfix 7,058 site | 同条件で再実行: `arity_fixed 7,443 / type_only 26,654 / ret_fixed 4,578` (fw_sigfix.py docstring の 8.3k/4.6k と同傾向) | **不一致 → 訂正** (7,058 は本 commit から再現不可) |
@@ -358,7 +377,7 @@ unit init 16 / finalize 16 は smoke log の `site=0x40dae6` 16 行・`site=0x40
 再計算 / PackageInfo・icall 集合・alloca・capstone 突合 / hostshim 側 `hs_ids_recount.py` と
 `hs_vtable_verify.py` の再実行 (35 ID = 803/894 = 89.8%・46/46 slot 一致)。
 範囲外: (a) native 実行との同一経路比較 (bit-exact 比較は未実施) (b) `Eff_Render` 差分
-(CAB-195 未達を継続) (c) 未解決 635 site の**個別原因**は未分類 (d) 本節の再ビルドは
+(CAB-195 未達を継続) (c) 未解決 634 site の**個別原因**は未分類 (d) 本節の再ビルドは
 stage-1 成果物を再利用 (RetDec 再 decode は未実施) (e) 7,058 site は数値の出所が不明で
 検算不能。
 
@@ -366,14 +385,14 @@ stage-1 成果物を再利用 (RetDec 再 decode は未実施) (e) 7,058 site �
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| icall 未復元 635 site (10.3%) — 最終 IR で落ちる | VMT/reg 呼出しの取りこぼし。ctor 差分試験の精度 | (a) 本検収コメント (CAB-194 に記録) |
+| icall 未復元 634 site (10.3%) — 最終 IR で落ちる | VMT/reg 呼出しの取りこぼし。ctor 差分試験の精度 | (a) 本検収コメント (CAB-194 に記録) |
 | `fw_stage2.sh` が空ディリクトリで完走しない (S1-S4) | 「1 コマンド e2e」が再現不能 | (b) 子チケット **CAB-269** (親 CAB-194・milestone「統合」。修正は CAB-196 連鎖終了後) |
 | decode 漏れ件数が測定時点で 206 / 143 / 126 と食い違う | fail-fast stub の実数の不透明 | (a) 本検収コメント (定義を固定) |
 | CAB-195 の §10 未解決「HEAD `fw_rt.c` で smoke が dispatch=39 / OOB」 | (CAB-195 側で継続) | (a) CAB-195 検収コメント参照 |
 
 ### 12.6 訂正した誤記 (77cde78 の REPORT に対する検証結果・本 REPORT への記録)
 
-①「6,159 site 全復元」→ **5,525/6,159 (未復元 635 = 10.3%)** ②「14,034 define」→ **14,037**
+①「6,159 site 全復元」→ **5,526/6,159 (未復元 634 = 10.3%)** ②「14,034 define」→ **14,037**
 ③「14,033 関数」→ **14,037** ④「PackageInfo 290 unit」→ **290 件・うち init≠0 は 289**
 ⑤「declares 8,176」→ **重複込 8,176 / unique 8,063** ⑥「decode 漏れ 126/206」→ **最終 IR 143**
 ⑦「1.61 MB」→ **1.55 MiB (1,626,299 B)** ⑧「14.8 MB」→ **14.87 MB (14,874,162 B)**。
