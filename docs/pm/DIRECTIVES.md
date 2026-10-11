@@ -81,7 +81,7 @@ PM を含む全てのセッションは ephemeral で中断・削除される可
 
 | 指示 (逐語の要点) | PM の解釈 | 運用への反映 (正本) |
 |---|---|---|
-| main は clean に・topic ブランチ→main への PR・独立 subagent レビュー通過まで | 既定ブランチは `main`。旧 `master` は凍結枝 (祖先) として read-only 扱い | `docs/WORKFLOW.md` §PR (base は `main`・`git push origin master` 禁止)・`docs/DECISIONS.md` D-追記 |
+| main は clean に・topic ブランチ→main への PR・独立 subagent レビュー通過まで | 既定ブランチは `main`。旧 `master` は凍結枝 (祖先) として read-only 扱い | `docs/WORKFLOW.md` §7 (base は `main`・`git push origin master` 禁止)・`docs/DECISIONS.md` D4 |
 | 「=masterには基本的に変更を加えない」 | master への pull/push・master base の PR は行わない | 同上 (`docs/WORKFLOW.md`)・`AGENTS.md` の導線 |
 | まずドキュメント整備・大きく変更可・古い記述が混在 | 中間リファクタリングとして docs/ を正史化。削除できる行/ファイルは容赦なく削除 | `docs/STATUS.md`・`docs/DOC_MAP.md` (本再編)・`README.md` |
 | 「重複・齟齬が無いこと」「重複を徹底して排除」 | **第一優先の完了条件**。同じ数値/事実を 2 ファイルに書かない。外側は「結論 1 行 + リンク」 | `docs/DOC_MAP.md` §4 (単一責任の正本)・各 REPORT の正本参照化 |
@@ -89,8 +89,8 @@ PM を含む全てのセッションは ephemeral で中断・削除される可
 | 「ドキュメント」は .md・コード内コメント・ソース本体・Issues/PR を含む | Issues/PR の記述も正史と整合させる。`state:*` 系ラベルは Project V2 の Status と二重表現なので全削除 | Issue/PR 運用 (`docs/WORKFLOW.md` §9)・Project V2 |
 | Issues/PR とソースに齟齬があればソースコード側に合わせる | 現状の正はソースコードと REPORT の実測。未着手を in progress に戻す等の修正可 | Issue 整理 (PM が実施)・`docs/STATUS.md` |
 | 前任者の混乱原因・手落ちをドキュメント化 | 解任理由 (指示違反)・証跡 boilerplate の陳腐化問題を ADR 化 | `docs/DECISIONS.md` D6 (preflight 証跡廃止)・`docs/DEFECTS.md` |
-| 1 チケット = 1 subagent・全作業を subagent 委任・10 tool call 超は委任 | チケット単位の実験・レビューは独立 subagent。PM は指示役 | `docs/WORKFLOW.md` §1 (1 チケット = 1 subagent) |
+| 1 チケット = 1 subagent・全作業を subagent 委任・10 tool call 超は委任 | チケット単位の実験・レビューは独立 subagent。PM は指示役 | `docs/WORKFLOW.md` §7 (1 チケット = 1 subagent) |
 | feat/add-opencode を整備し PR 作成まで | ドキュメント整備と並行可能な優先タスク。PR は PM が委任で作成 | 進行中 (`docs/HANDOFF/<日付>.md`) |
 | 常に同時に 10〜20 チケットを並行 | 並行度の目標。ブロッカーは切り出して他を進める | `docs/HANDOFF/<日付>.md` (方針) |
 | 全指示を文書化 (セッションは ephemeral) | 原本は repo 内の本ファイルに逐語保管。要約は HANDOFF §6 | 本ファイル |
-| 「プロジェクトは混乱の中にあり、破壊的なブレークスルーを先導する」 (指示 2) | 部分最適の修復ではなく、構造から作り直す判断を許容する許可。docs/ 正史化・99 ファイルの再編 (削除 454 行) として体現 | 本再編 (`docs/restructure-2026-10`)・`docs/DECISIONS.md` (D1〜D6) |
+| 「プロジェクトは混乱の中にあり、破壊的なブレークスルーを先導する」 (指示 2) | 部分最適の修復ではなく、構造から作り直す判断を許容する許可。docs/ 正史化・107 ファイルの再編 (実 diff: 1,421 行追加・512 行削除) として体現 | 本再編 (`docs/restructure-2026-10`)・`docs/DECISIONS.md` (D1〜D6) |
