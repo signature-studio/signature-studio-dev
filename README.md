@@ -13,18 +13,10 @@ FL Studio 26.1.7 をブラウザ (wasm) 上で完全に動作させるプロジ�
 
 ## ドキュメント地図
 
-| ファイル | 内容 |
-|---|---|
-| [`AGENTS.md`](AGENTS.md) | エージェント規約・ドキュメント責務マップ・命名規則 |
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | パイプライン全体像 |
-| [`docs/STATUS.md`](docs/STATUS.md) | **状態の唯一の正本** (MS 番号・サブシステム 1 行ステータス) |
-| [`docs/DECISIONS.md`](docs/DECISIONS.md) | 方式決定と理由 (ADR) |
-| [`docs/WORKFLOW.md`](docs/WORKFLOW.md) | subagent 運用・PR・レビュー・検収 |
-| [`docs/REFERENCES.md`](docs/REFERENCES.md) | 外部ソース・素材・ツール・vendored 台帳 |
-| [`docs/DOC_MAP.md`](docs/DOC_MAP.md) | REPORT.md 索引・行数上限ルール |
-| [`docs/DEFECTS.md`](docs/DEFECTS.md) | lift silent miscompile 類型 |
-| [`docs/LEGAL.md`](docs/LEGAL.md) | ライセンス/規約上の運用制約 |
-| [`docs/HANDOFF/`](docs/HANDOFF/) | 日付付き引継ぎ (最新のみ) |
+docs 索引・各ファイルの責務・行数上限ルールは **[`docs/DOC_MAP.md`](docs/DOC_MAP.md) が正本**。
+正史は `docs/` に集約している (`ARCHITECTURE` / `STATUS` / `DECISIONS` / `WORKFLOW` /
+`REFERENCES` / `DOC_MAP` / `DEFECTS` / `LEGAL` / `HANDOFF/`)。エージェント規約は
+[`AGENTS.md`](AGENTS.md) (要約) と [`docs/WORKFLOW.md`](docs/WORKFLOW.md) (運用の詳細)。
 
 ## tools 索引 (37 サブシステム)
 
@@ -62,5 +54,6 @@ Cloudflare Access は `worker` 型。R2 / zone Transform Rules は不要 (旧構
 
 ## 運用
 
-ブランチ → worktree → 実装 subagent → レビュー subagent → PM がマージ。`master`/`main` には変更を加えない。
-詳細は [`AGENTS.md`](AGENTS.md)・[`docs/WORKFLOW.md`](docs/WORKFLOW.md)。
+ブランチ → worktree → 実装 subagent → レビュー subagent → PM がマージ。既定ブランチ `main`
+(旧 `master` は凍結) には変更を加えない。詳細は [`AGENTS.md`](AGENTS.md)・
+[`docs/WORKFLOW.md`](docs/WORKFLOW.md)。

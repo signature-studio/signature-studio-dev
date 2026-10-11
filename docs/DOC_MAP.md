@@ -87,7 +87,7 @@
 | `tools/ott/crtinit/REPORT.md` | ~180 | OTT-T5: CRT 初期化の等価置換 + override 4 件の実機械語 lift 置換 |
 | `tools/ott/entry/REPORT.md` | ~120 | OTT-T4: x64c lift の入口拡張 (bit 突合) |
 | `tools/ott/f7eval/REPORT.md` | ~180 | CAB-238 評価: `ott --auto f7,p1` 既定化 |
-| `tools/ott/ACCEPTANCE_CAB138_CAB137.md` | ~210 | OTT CRT/entry 検収記録 |
+| `tools/ott/ACCEPTANCE_CAB137_CAB138.md` | ~210 | OTT CRT/entry 検収記録 |
 | `tools/ott/ACCEPTANCE_CAB238_CAB135.md` | ~210 | OTT f7 既定化・AVX 検収記録 |
 | `tools/m6/REPORT.md`・`tools/m7/REPORT.md`・`tools/m8/REPORT.md`・`tools/m9/REPORT.md`・`tools/m10/REPORT.md` | ~280/210/160/115/105 | 旧 RetDec 路線 M6〜M10 の経緯 (歴史) |
 
@@ -164,19 +164,27 @@
 | `tools/targets/freshair/REPORT.md` | ~145 | Fresh Air インストーラ解析 + lift 可否 |
 | `tools/targets/freshair/lift2/REPORT.md` | ~200 | Fresh Air Compressor/Filter/制御層 lift |
 
-## 4. 横断正本 (`docs/`)
+## 4. ドキュメント責務 (単一責任の正本)
 
-| ファイル | 単一責任 |
-|---|---|
-| `README.md` | 何のプロジェクトか / docs・tools の地図と索引 / 開発コマンド / デプロイ 3 行要約 (測定値なし) |
-| `AGENTS.md` | エージェント規約・ドキュメント責務マップ・命名規則・禁止事項 |
-| `docs/ARCHITECTURE.md` | パイプライン全体像 |
-| `docs/STATUS.md` | **状態の唯一の正本** (MS 番号再定義・サブシステム 1 行ステータス・次の一手) |
-| `docs/DECISIONS.md` | ADR (方式決定と理由) |
-| `docs/WORKFLOW.md` | subagent 運用・PR・レビュー・検収 |
-| `docs/REFERENCES.md` | 外部ソース・素材・ツール・vendored 台帳 (絶対パスはここだけ) |
-| `docs/LEGAL.md` | ライセンス/利用規約上の運用制約 |
-| `docs/DOC_MAP.md` | 本書。REPORT.md の索引と行数上限ルール |
-| `docs/DEFECTS.md` | RetDec lift の silent miscompile 類型 D1〜D16 (横断正本) |
-| `docs/HANDOFF/<日付>.md` | 日付付き引継ぎ (最新のみ保持) |
+**「何をどこに書くか」の割り当て。** 鉄則: 同じ数値を 2 ファイルに書かない。外側は
+「結論 1 行 + リンク」に縮める。`AGENTS.md` は本表の原則要約と導線のみを持つ。
+
+| ファイル | 単一責任 | **書いてはいけないもの** |
+|---|---|---|
+| `README.md` | 何のプロジェクトか (1〜2 行) / **docs・tools の地図と索引** / 開発コマンド / デプロイ 3 行要約 | 測定値・実測数値・repo 外絶対パス・進捗の詳細 |
+| `AGENTS.md` | エージェント規約の**要約と導線** (規約の本文は `docs/WORKFLOW.md`・本表) | 測定値・技術的な手順・状態の詳細・他ファイルの規約の複製 |
+| `docs/ARCHITECTURE.md` | パイプライン全体像 (x64c → liftlib → wasm → shim → runtime → deploy) | 測定値・個別バグ・issue 個別の経緯 |
+| `docs/STATUS.md` | **技術進捗の正本** (MS 番号・サブシステム 1 行ステータス・次の一手)。チケット状態は Project V2 が正本 | 測定値・数値の詳細 (REPORT へのリンクにする) |
+| `docs/DECISIONS.md` | ADR: 方式決定・理由・日付 | 測定値・手順の詳細 |
+| `docs/WORKFLOW.md` | subagent 運用・PR・レビュー・検収・自己点検・**AREA 一覧** | 技術的な実装手順・測定値 |
+| `docs/REFERENCES.md` | 外部ソース・素材・ツール・**vendored 台帳**。**repo 外絶対パスはここだけ** | repo 内パス・技術内容 |
+| `docs/LEGAL.md` | ライセンス/規約上の運用制約と事実整理 | 技術実装・数値実測 |
+| `docs/DOC_MAP.md` | 本書。REPORT.md 索引・行数上限ルール・自動生成一覧・本章 | 技術内容・測定値 |
+| `docs/DEFECTS.md` | lift silent miscompile 類型 D1a〜D16 (横断正本) | 個別ケースの詳細 (report 側) |
+| `docs/HANDOFF/<日付>.md` | 引継ぎ要約 (方針・ブロッカー・次の一手)。最新のみ保持 | 状態の正本 (STATUS.md へ)・数値の羅列 |
+| `tools/<area>/REPORT.md` | **測定値・実測数値・検証結果の単一の正本** (日本語/英文を問わず) | なし (ここが正本) |
+| `tools/<area>/README.md` | **ナビゲーションのみ** (何をする dir か・E2E コマンド・関連ファイル) | 測定値・状態表 |
+| `tools/<area>/{PROTOCOL,FORMAT,ABI,MANIFEST,STARTUP,GATES,BACKLOG,inventory}.md` | 仕様・台帳 (現状は良い設計・維持) | 測定値 |
+| `tools/<area>/results/*.md`・inventory 系 | **自動生成**。先頭 1 行に `自動生成: <cmd>` | **人手編集禁止** |
+| `deploy/` | デプロイ単独 (README からは 3 行 + リンクだけ残す) | 測定値 |
 
