@@ -1,0 +1,25 @@
+name: OpenCode
+description: 'Run OpenCode tasks based on the provided prompt'
+
+inputs:
+  model:
+    description: 'the model to use for OpenCode'
+    required: true
+  prompt:
+    description: 'the prompt for OpenCode'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    # - name: Start OpenCode Background Service
+    #   shell: bash
+    #   run: opencode serve --port 14096
+    - name: Run OpenCode
+      shell: bash
+      run: |
+        opencode run \
+          --auto \
+          --model ${{ inputs.model }} \
+          --format json \
+          --agent explore "${{ inputs.prompt }}"

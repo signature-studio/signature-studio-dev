@@ -1,6 +1,12 @@
 name: Setup Agent Environment
 description: Setup the agent environment for the workflow
 
+inputs:
+  r2-artifact-url:
+    description: 'The URL of the artifact to download from R2'
+    required: false
+  # and other credentials for r2
+
 runs:
   using: "composite"
   steps:
@@ -31,3 +37,6 @@ runs:
         echo "bun: $(bun --version)"
         echo "node: $(node --version)"
         echo "python: $(python --version)"
+
+    # - name: Download artifact from R2
+    #   shell: bash

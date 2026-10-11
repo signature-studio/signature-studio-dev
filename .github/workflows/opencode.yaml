@@ -1,23 +1,78 @@
 name: OpenCode
 
 on:
+  # Issuesに `/oc` または `/opencode` がコメントされたとき、実装エージェントが開始される
+  # `oc_actions_allow_write` がコメントに含まれている場合、エージェントはコンテンツを編集でき、含まれていない場合Issues/PRのみ編集できる。
+  issue_comment:
+    types: [created]
+  # PRがOpenになったとき、レビューエージェントが開始される。
+  # コンテンツはデフォルトで読み取り専用となる。
+  pull_request:
+    types: [opened]
+  # Issues/PRに紐づかないエージェントは、workflow_dispatchを介して開始できる。
   workflow_dispatch:
+    inputs:
+      prompt:
+        type: string
+        description: 'the task for the OpenCode'
+        required: true
+      allow_write:
+        type: boolean
+        description: 'whether to allow writing'
+        required: false
+        default: false
 
 jobs:
   opencode:
     runs-on: ubuntu-latest
+    if: ${{ (github.event_name == 'issue_comment' && (contains(github.event.comment.body, '/oc') || contains(github.event.comment.body, '/opencode'))) || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' }}
     steps:
+      - name: Pre-judge step
+        id: judge
+        run: |
+          if [ "${{ github.event_name }}" = "issue_comment" ]; then
+            if ${{ contains(github.event.comment.body, 'oc_actions_allow_write') }}; then
+              echo "permission=write" >> $GITHUB_OUTPUT
+            else
+              echo "permission=read" >> $GITHUB_OUTPUT
+            fi
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "permission=read" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ "${{ github.event.inputs.allow_write }}" = "true" ]; then
+              echo "permission=write" >> $GITHUB_OUTPUT
+            else
+              echo "permission=read" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "permission=read" >> $GITHUB_OUTPUT
+          fi
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          client-id: ${{ vars.OC_APP_CLIENT_ID }}
+          private-key: ${{ secrets.OC_APP_PRIVATE_KEY }}
+          permission-contents: ${{ steps.judge.outputs.permission }}
+          permission-issues: write
+          permission-pull-requests: write
+
       - name: Checkout repository
         uses: actions/checkout@v7
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+      - if: ${{ steps.judge.outputs.permission == 'write' }}
+        id: setup-credentials
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          USER_ID=$(gh api "/users/${{ steps.app-token.outputs.app-slug }}[bot]" --jq .id)
+          echo "user-id=$USER_ID" >> "$GITHUB_OUTPUT"
+          git config --global user.name '${{ steps.app-token.outputs.app-slug }}[bot]'
+          git config --global user.email '${USER_ID}+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com'
+          gh auth setup-git
       - name: Setup Agent Environment
         uses: ./.github/actions/agent-setup
-      - name: Verify setup
-        run: |
-          which opencode uv pnpm bun node python
-          echo "opencode: $(opencode --version)"
-          echo "uv: $(uv --version)"
-          echo "pnpm: $(pnpm --version)"
-          echo "bun: $(bun --version)"
-          echo "node: $(node --version)"
-          echo "python: $(python --version)"
-
+      - name: Run OpenCode
+        uses: ./.github/actions/opencode
+        with:
+          model: "opencode-go/step-5-preview-free"
