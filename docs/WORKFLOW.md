@@ -148,6 +148,11 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
 - 過去の採番は尊重する (例: `[IPP-7]`・`[KH-2b]`・`[HB-H2]`)。
   `[HB-H4']` のような記号付き・`[ユーザ依頼]` のような日本語 prefix は**作らない**
   (`needs-user-input` ラベルとの二重表現もしない)。
+- **既存 prefix の正規化方針**: 新規 Issue は `[AREA-n]` に統一する。既存の `[HB-H2]`・
+  `[PLG-P0c]` のような接頭の入れ子、`[HB-H4']` のような記号付き prefix、prefix 無し
+  (GitHub テンプレ残骸 #4〜#6 を含む)・完全重複タイトル (`[FA-2c]` #260/#261・
+  `[KH-6]` #61/#259/#274) は**追跡のみ**とし、**PM が Issue 整理時に正規化する**
+  (実装 subagent は勝手にリネームしない)。
 - 起票前に `gh issue list --search "<kw>"` で重複確認。**重複タイトルを作らない。**
 - 子チケットは親と同じ milestone を付ける (milestone の確定は PM)。
 - PR タイトルは commit と同じ conventional commits 書式。
