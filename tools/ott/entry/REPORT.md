@@ -4,10 +4,16 @@
 
 ## 0. 結論 (先出し)
 
-- **判定: 要件を満たす。** `bash tools/ott/entry/entry_e2e.sh` = **PASS**。scenario matrix **85 本** (dispatcher op 網羅 63 op / getParameter×20 / getChunk・setChunk round-trip / program・文字列系 / processReplacing thunk / effClose) で **native 実機械語と全突合項目一致** (rax・xmm0・文字列 buffer・obj 0x328B 全 qword・HeapAlloc 配置・audioMaster 呼出回数)。FAIL 0。
-- **lift 拡張**: lift 関数 75 → **209** (命令 5,790 → **13,694**)。入口 roots 41 関数を追加 (VSTPluginMain / createEffectInstance / dispatcher 両 switch / AEffect 静的 thunk 群 / getParameter・setParameter override / getChunk・setChunk / program・文字列系 / getAeffect / dtor / operator new・delete)。
+- **判定: 要件を満たす。** `bash tools/ott/entry/entry_e2e.sh` = **PASS**。scenario matrix **85 本** (dispatcher op 網羅 **69 op 値** / getParameter×20 idx / getChunk・setChunk round-trip / program・文字列系 / processReplacing thunk / effClose) で **native 実機械語と全突合項目一致** (rax・xmm0・文字列 buffer・obj 0x328B 全 qword・HeapAlloc 配置・audioMaster 呼出回数)。FAIL 0。
+  数え方 (再計算: `python3 tools/ott/accept/acc_scen_count.py`)。
+  - **85 scenario** = `entry_scen.scen_list()` が生成する 86 エントリのうち runner / `cmp_entries` が dict キーで保持した**一意名**の数。`op12` を (op=12,val=1) と (op=12,val=0) の 2 本で使い、両者が同名のため 1 件に統合される。64 dispatcher op 値 (op* 名 64 個) + GUI 4 op (op13/14/15/19) + op1 (effClose) + op0 (full_cycle/close) = 全 69 op 値。
+  - 実装報告時の「63 op」は根拠を辿れないため **訂正** (上記の定義で 69 op 値。nat_crash 0 のため 69 すべてが突合対象)。
+- **lift 拡張**: lift 関数 75 → **207** (命令 5,790 → **13,690**)。入口 roots 41 関数を追加 (VSTPluginMain / createEffectInstance / dispatcher 両 switch / AEffect 静的 thunk 群 / getParameter・setParameter override / getChunk・setChunk / program・文字列系 / getAeffect / dtor / operator new・delete)。
+  数え方 (再計算: `python3 tools/ott/accept/acc_lift_set.py`): 関数 = `work/entrylift/lift_meta.json` の `functions` 配列長 (override 対象は lift しないため除外)。命令 = `ninsn`。DSP 版 75/5,790 は `bash tools/ott/ott_e2e.sh` の `[x64c] functions 75, insns 5790`。
+  ※ **コミット済み scenario 定義から再現した値**。実装報告時の 209/13,694 は、coverage の `getp_range` が idx 25..30 まで実行された状態 (uncommitted) で採られたもので、コミット済み `entry_scen.py` (`getp_range` = idx 0..19) では到達しない経路の +2 関数 / +4 命令を含む。詳細は検収 REPORT (tools/ott/ACCEPTANCE_CAB137_CAB138.md §3.1)。
 - **既存 DSP e2e は継続 PASS**: `bash tools/ott/ott_e2e.sh` = 89 scenario / 50,236 cell **max_ulp 0 / state 差 0** (x64c.py・data_gen.py の改変後も再確認済)。
-- **性能** (node 24.19, 256f×2000 block, tools/ott/diff/perf.mjs): DSP 版 181.3 µs/blk (実時間 **32.0x**) → 入口拡張版 202.6 µs/blk (**28.7x**)。≈12% 増 (dispatch switch 209 case 化 + コード増) だが余裕は維持 (bit-exact build のまま)。
+- **性能** (node 24.19, 256f×2000 block, tools/ott/diff/perf.mjs; 共有 16 コア・load average 2.1〜4.4 で 5 回実測の範囲): DSP 版 **203.1〜223.5 µs/blk** (実時間 **26.0〜28.6x**) → 入口拡張版 **202.8〜228.3 µs/blk** (**25.4〜28.6x**)。単発値 202.6 µs/blk (28.7x) は実測範囲内 (bit-exact build のまま)。
+  数え方: µs/blk = 2000 block × 256 sample の計測区間 / block 数。実時間 x = 11.61 s 音声 / 実測秒数。負荷で振れるためレンジで記載 (規則 38)。再計算: `MOD=<cjs> REPEAT=7 node tools/ott/accept/acc_perf.mjs`。
 - **新規入手の実測知見**: ① OTT の getParameter (vtbl+0x58) は SDK 署名 (index, float* value) と異なり **float を xmm0 で返す** (31 path 全て実測、float* は未書き) — hostbridge PoC が疑っていた「戻り xmm0」を確定。② dispatcher は op 0..24 を 0x180126c60、op 25..79 を 0x180127800 の 2 段 switch で処理 (vtbl[1]=0x180127800 → 既定を 0x180126c60 へ委譲)。③ getParamLabel は **byte permutation 表 + dword 表の 2 段 jump table** (image base 相対 data-in-code) で、data 敷設に新仕組みが必要だった (§3)。
 
 ## 1. 成果物 (tools/ott/entry/)
@@ -15,8 +21,7 @@
 | パス | 役割 |
 |---|---|
 | `entry_e2e.sh` | 1 コマンド検収 (scen 生成 → native build → coverage → lift → matrix → 突合 → DSP e2e 継続確認)。`--quick` = coverage/lift 再利用 + matrix 縮小 |
-| `entry_scen.py` | scenario 定義 (native / wasm 両ランナの唯一のソース)。85 scenario + buffer 配置 + 定数 |
-| `entry_native.c` | native 参照ハーネス。`../native/ott_native.c` を **無改変 include** し audioMaster 実装 (MS x64 ABI) とカウンタだけ追加 |
+| `entry_scen.py` | scenario 定義 (native / wasm 両ランナの唯一のソース)。85 scenario + buffer 配置 + 定数 || `entry_native.c` | native 参照ハーネス。`../native/ott_native.c` を **無改変 include** し audioMaster 実装 (MS x64 ABI) とカウンタだけ追加 |
 | `am_host.h` | audioMaster 応答表の共有実装 (native / wasm で同一ソースを 2 コンパイル。LD/ST マクロで guest メモリ統一) |
 | `rt_entry.c` | wasm 側 override body: `ovr_editor_null` (0x180120ff0) + `ovr_am_shim` (0x1802f8000 = audioMaster 仮想入口) |
 | `entry_roots.py` | entries.json 生成 (DSP coverage + entry coverage + 入口 roots 41) |
@@ -41,7 +46,7 @@
 
 | 系統 | scenario | 結果 |
 |---|---|---|
-| dispatcher op (0..79 のうち native 実測 OK の 63 op + GUI 4 op) | op0..op79, op30, op60 | 全 PASS (op7・op10・op34 は §2.3) |
+| dispatcher op (0..79 のうち native 実測 OK の **69 op 値** + GUI 4 op) | op0..op79, op30, op60 | 全 PASS (op7・op10・op34 は §2.3) |
 | VSTPluginMain → AEffect 生成 | 全 scenario の共通 prefix | AEffect 全欄 (magic / thunk RVA / numPrograms=1 / numParams=20 / numInputs=2 / numOutputs=2 / **flags=0x18** / initialDelay=2 / ioRatio=1.0f / uniqueID='XfTT' / version=1) 一致 |
 | setParameter / getParameter 往復 (AEffect thunk 経由) | getp0..19, getp_range, setp_all | xmm0 返値 (f32 bit) 含め全一致 |
 | 直接 virtual 呼出 | virt_sr / virt_bs / virt_prog / virt_plabel / virt_pname / virt_pdisplay / virt_setp_ovr / virt_aeffect / virt_misc | 全一致 |

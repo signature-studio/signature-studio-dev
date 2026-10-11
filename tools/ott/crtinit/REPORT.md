@@ -25,8 +25,14 @@
 - **陰性対照**: `OTT_CRTINIT=0` で native **SIGSEGV (CFG dispatch 0x1801d2750 `jmp rax`, rax=
   0xae64b77e88c8000 = ror(cookie,50))** / wasm **`ott_unlifted` 同一 garbage VA** — 旧 fail-fast が
   両側で bit レベル同一に再現 (ret も native 0x1801c3e06 / wasm 0x301c3e06 で対応)。
-- lift 集合: 209 関数 / 13,694 命令 (CAB-137) → **260 関数 / 16,378 命令** (+51 関数: CRT 解決・getptd・
-  vsnprintf・数学エラー経路)。native coverage 実測は **90 関数 / 5,949 命令** (entry 比 +35 関数)。
+- lift 集合: 207 関数 / 13,690 命令 (CAB-137 のコミット済み scenario からの再現値) → **258 関数 / 16,374 命令** (+51 関数: CRT 解決・getptd・
+  vsnprintf・数学エラー経路)。native coverage 実測は **91 関数 / 5,974 命令** (entry 比 +35 関数)。
+  数え方 (再計算: `python3 tools/ott/accept/acc_lift_set.py`): 関数 = `work/crtlift/lift_meta.json` の `functions` 配列長
+  (override 対象 8 件は lift しないため除外)。命令 = `ninsn`。native coverage = `cov_crt.json` の `insn` を `.pdata` 関数境界で
+  マップした関数数 / `insn` の要素数 (実装報告時の「90 関数 / 5,949 命令」は誤記・検収 REPORT §4.1)。
+  ※ 実装報告時の 260/16,378 は、coverage の `getp_range` が idx 25..30 まで実行された状態 (uncommitted) で採られたもの。
+  差は +2 関数 (0x180126310 / 0x180126320) / +4 命令で、いずれもコミット済み `entry_scen.py` の `getp_range` (idx 0..19)
+  からは到達しない getParameter の idx 25..30 case。詳細は tools/ott/ACCEPTANCE_CAB137_CAB138.md §3.1。
 
 ## 1. 成果物 (tools/ott/crtinit/)
 
@@ -134,7 +140,7 @@ CAB-137 で「wasm も同一 fail-fast」と記録されていた現象の正体
 | entry e2e (`entry_e2e.sh` 全 85, 旧 build) | **PASS** (matrix 85/85 突合; §9 再現コマンド) |
 | 陰性対照 native | `OTT_CRTINIT=0` → **SIGSEGV st=95** (rip=0x1801d2750, rax=0xae64b77e88c8000) — 旧 fail-fast 再現 |
 | 陰性対照 wasm | `OTT_CRTINIT=0` → **`ott_unlifted 0xae64b77e88c8000`** — native と同一 garbage VA / 対応 ret |
-| 性能 | node 24.19, 256f×2000 block (`diff/perf.mjs`): crt build **186.3 µs/blk (31.2x)** — entry 版 160.0 µs (36.3x) から +16% (CRT 経路の分岐・dispatch 260 case 化)。bit-exact build のまま |
+| 性能 | node 24.19, 256f×2000 block (`diff/perf.mjs`; load average 2.2〜2.8・5 回実測の範囲): crt build **217.4〜229.0 µs/blk (26.7〜25.3x)**。単発値 186.3 µs/blk (31.2x) は本検収の実測範囲の下限より低く、共有 16 コアの負荷差と snapshot の 2 関数差分に依存するため **実測レンジで記載** (規則 38)。bit-exact build のまま | (再計算: `MOD=<cjs> REPEAT=7 node tools/ott/accept/acc_perf.mjs`) |
 
 ## 7. 未解決・制約
 
@@ -151,7 +157,7 @@ CAB-137 で「wasm も同一 fail-fast」と記録されていた現象の正体
 
 ## 8. CAB-135 (AVX/FMA unsup 72種) への引き継ぎ
 
-- **unsup 現状**: 75 種 / 約 560 箇所 (crt build lift 集合 260 関数時点)。内訳は AVX/VEX 系が大半 +
+- **unsup 現状**: 75 種 / 約 560 箇所 (crt build lift 集合 258 関数時点)。内訳は AVX/VEX 系が大半 +
   `rcr` 6 (0x1801bc890) + `int` 3 (fail-fast 経路) + `pcmpistri` 2。
 - **mxcsr は本チケットで解消済み**: stmxcsr/ldmxcsr (VEX 含む) は software shadow で lift 可能になった。
   0x1801bc890 (vldmxcsr/vstmxcsr/rcr を含む FP 制御切替の大きい関数) 自体は依然未実行。
