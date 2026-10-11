@@ -87,3 +87,19 @@ test('既定表の構造 (flags / 正規 profile のみ / C:) ', () => {
   const custom = defaultMounts({ ...DEFAULT_PATHS, sharedDataDir: 'D:\\FLData' });
   assert.ok(custom.some((m) => m.win === 'D:\\FLData' && m.target === '/c/home/Documents/Image-Line'));
 });
+
+test('mapper: 明示設定 (userProfile/vfsHome/vfsInstall) が表を作り直す (CAB-271 の C 側と同一契約)', () => {
+  // C 側 pathreg_set_paths() は明示設定として既定表を作り直し、後続の pathreg_map() で上書きされない (CAB-271)。
+  // JS ミラーは createMapper({paths}) で同じ表を組み、test_pathreg.c の test_defaults_vs_explicit と同値を返す。
+  const paths = { ...DEFAULT_PATHS, userProfile: 'C:\\Users\\alpha', vfsHome: '/home/alpha', vfsInstall: '/fl-alpha' };
+  const m = createMapper({ paths });
+  const mounts = defaultMounts(paths);
+  assert.equal(mounts.length, 8);
+  assert.ok(!mounts.some((x) => /webstudio/i.test(x.win)), '既定 webstudio は 1 本も残らない');
+  assert.equal(mounts.filter((x) => /alpha/i.test(x.win)).length, 6);
+  assert.equal(m.map('C:\\Users\\alpha\\Desktop\\x.txt'), '/home/alpha/Desktop/x.txt');          // <profile> → vfsHome
+  assert.equal(m.map('C:\\Program Files\\Image-Line\\FL Studio 2026\\Data\\Empty.flp'), '/fl-alpha/Data/Empty.flp');
+  assert.equal(m.unmap('/home/alpha/Desktop/x.txt'), 'C:\\Users\\alpha\\Desktop\\x.txt');
+  // webstudio は alpha 表に無い → 残余 C: 規則 (C と同じ)
+  assert.equal(m.map('C:\\Users\\webstudio\\Documents\\Image-Line\\x.txt'), '/c/Users/webstudio/Documents/Image-Line/x.txt');
+});

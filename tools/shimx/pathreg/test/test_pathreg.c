@@ -43,6 +43,66 @@ static void test_normalize(void) {
 }
 
 /* ---------------------------------------------------------------
+ * 1.5 既定ロードと明示設定の相互作用 (CAB-271)
+ *   main() の最初に呼ぶこと (モジュール static 状態が pristine = 既定ロード未実行)。
+ *   - 明示設定経路: pristine な状態で pathreg_set_paths() を呼び、その後続の
+ *     pathreg_map() 等が既定マウント表で上書きしないことを検証する (← バグの再現条件)。
+ *   - 既定経路 (set_paths 未使用の遅延ロード) は test_defaults.c (別プロセス) が検証する。
+ *     set_paths は既定ロードを抑制するため、同一プロセスでは両方を开头で検証できない。
+ * --------------------------------------------------------------- */
+static void test_defaults_vs_explicit(void) {
+    /* --- 明示設定経路: pristine 状態で set_paths → 以降の照合で上書きされない --- */
+    PathRegPaths p;
+    pathreg_paths_init(&p);
+    p.userProfile = "C:\\Users\\alpha";
+    p.vfsHome     = "/home/alpha";
+    p.vfsInstall  = "/fl-alpha";
+    CHECK(pathreg_set_paths(&p) == 0);
+    CHECK(pathreg_mount_count() == 8);
+    /* 表の中身が alpha になっている (既定 webstudio が 1 本も残っていない) */
+    int nAlpha = 0, nWebstudio = 0;
+    for (int i = 0; i < pathreg_mount_count(); i++) {
+        PathRegMount mm;
+        CHECK(pathreg_get_mount(i, &mm) == 0);
+        if (strstr(mm.winPrefix, "alpha")) nAlpha++;
+        if (strstr(mm.winPrefix, "webstudio")) nWebstudio++;
+    }
+    CHECK(nAlpha == 6);                                       /* profile 依存 6 本がすべて alpha */
+    CHECK(nWebstudio == 0);                                   /* 既定 webstudio は残存 0 */
+
+    /* map / unmap が alpha 表を参照する (vfsHome と vfsInstall が効いている) */
+    CHECK(pathreg_map("C:\\Users\\alpha\\Desktop\\x.txt", g_buf, sizeof g_buf) == 0);
+    CHECK(strcmp(g_buf, "/home/alpha/Desktop/x.txt") == 0);   /* <profile> → vfsHome */
+    CHECK(pathreg_map("C:\\Program Files\\Image-Line\\FL Studio 2026\\Data\\Empty.flp", g_buf, sizeof g_buf) == 0);
+    CHECK(strcmp(g_buf, "/fl-alpha/Data/Empty.flp") == 0);    /* installDir → vfsInstall */
+    CHECK(pathreg_unmap("/home/alpha/Desktop/x.txt", g_buf, sizeof g_buf) == 0);
+    CHECK(strcmp(g_buf, "C:\\Users\\alpha\\Desktop\\x.txt") == 0);
+    /* webstudio は alpha 表に無いので残余 C: 規則に落ちる (既定表なら /c/home/... になる) */
+    CHECK(pathreg_map("C:\\Users\\webstudio\\Documents\\Image-Line\\x.txt", g_buf, sizeof g_buf) == 0);
+    CHECK(strcmp(g_buf, "/c/Users/webstudio/Documents/Image-Line/x.txt") == 0);
+
+    /* shimx 結合: install 済み mapper 経由でも alpha 表が使われる */
+    pathreg_install();
+    CHECK(shimx_path_to_posix("C:\\Users\\alpha\\AppData\\Roaming\\Image-Line\\c.xml", g_buf, sizeof g_buf) == 0);
+    CHECK(strcmp(g_buf, "/c/home/AppData/Roaming/Image-Line/c.xml") == 0);
+
+    /* 明示設定以降は既定表が遅延ロードされない (clear しても既定表は復活しない) */
+    pathreg_clear_mounts();
+    CHECK(pathreg_mount_count() == 0);
+    CHECK(pathreg_map("C:\\Users\\alpha\\Desktop\\x.txt", g_buf, sizeof g_buf) == -1);
+
+    /* --- set_paths 経由で既定表を組み直せる (paths_init の値) --- */
+    pathreg_paths_init(&p);
+    CHECK(pathreg_set_paths(&p) == 0);
+    CHECK(pathreg_mount_count() == 8);
+    CHECK(pathreg_map("C:\\Users\\webstudio\\Documents\\Image-Line\\x.txt", g_buf, sizeof g_buf) == 0);
+    CHECK(strcmp(g_buf, "/c/home/Documents/Image-Line/x.txt") == 0);
+    CHECK(pathreg_map("C:\\Users\\alpha\\Desktop\\x.txt", g_buf, sizeof g_buf) == 0);
+    CHECK(strcmp(g_buf, "/c/Users/alpha/Desktop/x.txt") == 0);   /* alpha は残余 C: 規則に落ちる */
+    printf("OK pathreg: defaults vs explicit set_paths (CAB-271)\n");
+}
+
+/* ---------------------------------------------------------------
  * 2. マウント表 + 写像
  * --------------------------------------------------------------- */
 static void test_mounts(void) {
@@ -218,6 +278,7 @@ static void test_regpersist(void) {
 }
 
 int main(void) {
+    test_defaults_vs_explicit();   /* 最初に実行する (pristine 状態を前提・CAB-271) */
     test_normalize();
     test_mounts();
     test_map();
