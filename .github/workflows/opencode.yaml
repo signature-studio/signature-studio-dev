@@ -19,6 +19,12 @@ on:
         description: 'whether to allow writing'
         required: false
         default: false
+      token-mode:
+        type: choice
+        description: 'token source: app = GitHub App, gat = standard github.token'
+        required: false
+        default: app
+        options: [app, gat]
 
 # 同一 PR/issue での並行実行は最新のみ
 concurrency:
@@ -59,7 +65,9 @@ jobs:
       # 実装 App トークン (issue_comment が PR 上のコメントなら PR にも触る)
       # read モードでは contents:read のみ要求する (installation が write 権限を
       # 未grant の環境でも read-only 検証が通るようにするため)
+      # token-mode=gat のときは標準 github.token を使用 (App 未設定時のフォールバック)
       - uses: actions/create-github-app-token@v3
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.token-mode != 'gat' }}
         id: app-token
         with:
           client-id: ${{ vars.OC_APP_CLIENT_ID }}
@@ -68,16 +76,30 @@ jobs:
           permission-issues: ${{ steps.judge.outputs.permission == 'write' && 'write' || 'read' }}
           permission-pull-requests: ${{ steps.judge.outputs.permission == 'write' && 'write' || 'read' }}
 
+      - name: Fallback to github.token
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.token-mode == 'gat' }}
+        id: gat-token
+        run: echo "token=${{ github.token }}" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve token
+        id: tok
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.token-mode }}" = "gat" ]; then
+            echo "token=${{ steps.gat-token.outputs.token }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "token=${{ steps.app-token.outputs.token }}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
-          token: ${{ steps.app-token.outputs.token }}
+          token: ${{ steps.tok.outputs.token }}
           fetch-depth: 0
 
       - if: ${{ steps.judge.outputs.permission == 'write' }}
         id: setup-credentials
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ steps.tok.outputs.token }}
         run: |
           USER_ID=$(gh api "/users/${{ steps.app-token.outputs.app-slug }}[bot]" --jq .id)
           git config --global user.name '${{ steps.app-token.outputs.app-slug }}[bot]'
@@ -136,6 +158,19 @@ jobs:
             echo "use-reviewer=false" >> $GITHUB_OUTPUT
           fi
 
+      # レビュワー App が未インストール/失敗した場合は実装 App にフォールバック
+      # (その場合 approve はできず comment+merge のみ)
+      - name: Reviewer token fallback
+        id: reviewer-tok
+        run: |
+          if [ "${{ steps.creds.outputs.use-reviewer }}" = "true" ] && [ "${{ steps.reviewer-token.outputs.token != '' }}" ]; then
+            echo "token=${{ steps.reviewer-token.outputs.token }}" >> "$GITHUB_OUTPUT"
+            echo "identity=reviewer" >> "$GITHUB_OUTPUT"
+          else
+            echo "token=${{ steps.app-token.outputs.token }}" >> "$GITHUB_OUTPUT"
+            echo "identity=implementer" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/create-github-app-token@v3
         id: app-token
         with:
@@ -145,8 +180,9 @@ jobs:
           permission-pull-requests: write
 
       - uses: actions/create-github-app-token@v3
-        if: ${{ steps.creds.outputs.use-reviewer == 'true' }}
         id: reviewer-token
+        continue-on-error: true
+        if: ${{ steps.creds.outputs.use-reviewer == 'true' }}
         with:
           client-id: ${{ vars.OC_REVIEW_APP_CLIENT_ID }}
           private-key: ${{ secrets.OC_REVIEW_APP_PRIVATE_KEY }}
@@ -211,8 +247,8 @@ jobs:
             echo '```diff'
             head -c 100000 "$DIFF_FILE" 2>/dev/null || echo "(diff unavailable)"
             echo '```'
-            if [ "${{ steps.creds.outputs.use-reviewer }}" = "true" ]; then
-              echo "REVIEWER_TOKEN=${{ steps.reviewer-token.outputs.token }}"
+            if [ "${{ steps.reviewer-tok.outputs.identity }}" = "reviewer" ]; then
+              echo "REVIEWER_TOKEN=${{ steps.reviewer-tok.outputs.token }}"
             else
               echo "NOTE: reviewer App identity unavailable; you cannot approve your own PR. Post the review as comment and merge directly if the project allows."
             fi
