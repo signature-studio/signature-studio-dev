@@ -62,13 +62,14 @@ for (const line of lines) {
       // (%xmmK_bits), それ以外は gpr 仮引数 (%argN) に対応させる。位置対応だと
       // RetDec が誤解析した余分な %argN (tan = 実体 xmm0 1 引数なのに %arg1..3) が
       // f64 の値を横取りし %xmm0_bits が 0 になる (tan 1/40 の主因)。
-      const fa = [], ga = [];
-      for (const a of args) (a.kind === 'f32' || a.kind === 'f64' ? fa : ga).push(a);
-      // native_runner と同じ独立カウンタ: xmm 仮引数は登場順に fa, gpr 仮引数は ga
-      let fi = 0, gi = 0;
+      // LIFTLIB-5: MS x64 ABI は位置対応 (native_runner と同じ)。xmm K 仮引数 = 第 K 引数が f32/f64 の時のみ,
+      // gpr slot K 仮引数 = 第 K 引数が非 float の時のみ (他方のレジスタは 0)。
+      const isF = (a) => a.kind === 'f32' || a.kind === 'f64';
       const call = [];
       for (const s of sig) {
-        const a = (s.xmm !== undefined) ? fa[fi++] : ga[gi++];
+        const a = (s.xmm !== undefined)
+          ? args.find((x) => x.slot === s.xmm && isF(x))
+          : args.find((x) => x.slot === s.slot && !isF(x));
         const v = a ? slotval(a) : 0n;
         if (s.ty === 'i32') call.push(Number(v & 0xFFFFFFFFn)); else call.push(BigInt.asUintN(64, v));
       }

@@ -117,11 +117,14 @@ int main(int argc, char** argv) {
         }
         if (line[0] == 'C') {
             struct ms_ctx c; memset(&c, 0, sizeof c); c.fn = (void*)(uintptr_t)fva;
-            /* MS x64 ABI: float 引数は xmm を独立カウント, それ以外は gpr を独立カウント (A 行は宣言順) */
-            int gp = 0, xp = 0;
+            /* MS x64 ABI (LIFTLIB-5): 引数レジスタは**位置**で決まる (第 N 引数 = rcx/rdx/r8/r9 または
+             * xmm0..3 の N 番目, 他方は未使用)。従来の「gpr/xmm 独立カウント」は SysV の発想で,
+             * (this, float, float) の 2 つ目の float が xmm1 でなく xmm0 に入り xmm2 が 0 になっていた。 */
             for (int i = 0; i < nargs; i++) {
                 u64 val = !strcmp(args[i].kind, "ptr") ? (u64)(uintptr_t)bufs[args[i].pb].p : args[i].v;
-                if (!strcmp(args[i].kind, "f32") || !strcmp(args[i].kind, "f64")) c.xmm[xp++] = val; else c.gpr[gp++] = val;
+                int sl = args[i].slot;
+                if (sl < 0 || sl > 3) continue;
+                if (!strcmp(args[i].kind, "f32") || !strcmp(args[i].kind, "f64")) c.xmm[sl] = val; else c.gpr[sl] = val;
             }
             crashed = 0;
             if (sigsetjmp(jb, 1) == 0) ll_ms_call(&c);
