@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """leafscan.py — HeartCore から微小 leaf (this+disp 返却 / [rdx] 16B copy+addref) を探す (読取専用)。
 usage: leafscan.py"""
+import os as _os, sys as _sys
+_sys.path.append(_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', '..', '..', '..', 'shared'))
+from paths import REPO_ROOT
 import struct
 import pefile
 import capstone
 
-P = '/home/ubuntu/work/webstudio/tools/targets/kilohearts/work/winpkg/HeartCore.core_64'
+P = _os.path.join(REPO_ROOT, 'tools/targets/kilohearts/work/winpkg/HeartCore.core_64')
 pe = pefile.PE(P, fast_load=True)
 data = open(P, 'rb').read()
 BASE = pe.OPTIONAL_HEADER.ImageBuffer if hasattr(pe, 'ImageBuffer') else pe.OPTIONAL_HEADER.ImageBase
