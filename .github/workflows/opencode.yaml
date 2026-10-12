@@ -145,6 +145,8 @@ jobs:
           opencode-version: ${{ inputs.opencode-version || vars.OPENCODE_VERSION }}
           opencode-release-version: ${{ inputs.opencode-release-version || vars.OPENCODE_RELEASE_VERSION }}
           opencode-install-source: ${{ inputs.opencode-install-source || vars.OPENCODE_INSTALL_SOURCE }}
+          # 本文の `oc_artifacts:` 行 (allowlist 検証済み)。空なら既定の fl-win64
+          artifacts: ${{ steps.context.outputs.artifacts || 'fl-win64' }}
           cf-account-id: ${{ secrets.CF_ACCOUNT_ID }}
           cf-r2-access-key-id: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
           cf-r2-secret-access-key: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}

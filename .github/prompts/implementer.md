@@ -43,6 +43,10 @@
   挟めないための設定。破壊的な操作は規約 (上記 4) 側で禁止されている。
 - **素材 (FL Studio・プラグイン)**: R2 から `$HOME/artifacts` に `.tar.zst` のまま置かれる
   (使うときに `tar --zstd -xf` で展開)。オブジェクト名は `artifacts/<prefix>.tar.zst`。
+  - 既定で取得されるのは `fl-win64` のみ。plugins 素材が必要なら、依頼コメントに
+    `oc_artifacts: fl-win64 plugins-ott` のような行を足して再起動してもらう
+    (指定できる名前: fl-win64 / plugins-ott / plugins-freshair / plugins-serum2 /
+    plugins-massivex / plugins-kilohearts)。必要な素材名を報告して停止すること。
   - **取得できていない場合がある**。agent-setup は素材が欠けているときにジョブを落とすが、
     `artifacts-required=false` で起動したジョブでは空の可能性がある。
   - `$ARTIFACTS_DIR` を `ls` して**実在を確認してから**使うこと。空なら:

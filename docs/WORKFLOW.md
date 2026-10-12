@@ -170,3 +170,17 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
 - OpenCode 基盤は 2026-10-12 に main で稼働開始 (PR #282, merge `bec32da`)。PR では review ジョブが OpenCode レビュワーを自動起動し、approve と必要に応じたマージまで実行する (実行実績あり: run 38220632379 / 38228263935)。
 - commit 前に `find <dir> -type f -size +20M` で巨大 blob がないことを確認すること (GitHub の hard limit 対策)。
 
+## 11. Actions 上での実行 (依頼者指示 112: 全作業は Actions へ移行済み)
+
+実装・調査は Actions 上の OpenCode が行う。ローカルは起動・監視 (`gh run watch`)・検収・統合のみ。
+
+- **起動**: issue に `/oc oc_actions_allow_write` をコメントする (1 issue = 1 run)。
+  `oc_actions_allow_write` が無いと read 専用で、PR は作れない。
+- **素材**: 既定で取得されるのは `fl-win64` のみ。他は本文に `oc_artifacts: fl-win64 plugins-ott` の
+  行を書く (許可名: fl-win64 / plugins-ott / plugins-freshair / plugins-serum2 / plugins-massivex /
+  plugins-kilohearts。それ以外は run が失敗する)。全素材は約 16 GiB のため必要分だけ指定する。
+- **結果**: agent の最終回答は run のログ (`gh run view <id> --log` の `Write step summary`) と
+  `$GITHUB_STEP_SUMMARY` の両方に出る。issue へのコメントは agent が `gh issue comment` で行う。
+- **上限**: job は 60 分。収まらない作業は中間 commit + draft PR で区切る。
+- 稼働本数は「走っている Actions run 数」で数える (`gh run list --status in_progress`)。
+
