@@ -104,10 +104,10 @@ FLEngine rodata の `name\0doc\0…<module>` 並びから機械抽出 (`flapi_ex
 
 `provider/` = `fl_api_call(fn_id, const fl_slot* argv, int argc, fl_slot* ret)` (16B スロット ABI は §5 / BRIDGE.md §2 と同一)。`gen_provider.py` が `flapi_table.json` + `flapi_ids.json` から `provider/gen/fl_table.c` (fn_id 順の記述子 435 行: 戻り型・引数数・型列) を生成し、`fl_dispatch.c` が個数/型検査・戻り型・エラー code を担う。ハンドラ (`fl_engine.c`) は `FL_H(module, name)` を weak 参照するだけなので、未実装は表に NULL で入り "Unspecified error (not implemented: …)" (code 2) を返す。`host/fl_provider.mjs` が `createMockEngine()` と同じ `engine.call(name,args)` で包む (Worker/SAB RPC は無変更)。
 
-| 項目 | 実測 (コミット済み HEAD, node 22, 16 core, load avg 0.3〜0.6) |
+| 項目 | 実測 (HEAD b76d221, GitHub Actions runner, node 22.23.3, load average 0.08〜0.46) |
 |---|---|
 | 実装ハンドラ | **60** = MCPTools 静的参照の全て (公開 52: channels 18 / mixer 18 / plugins 7 / playlist 4 / ui 3 / transport 2 + ilmcp 8)。残り 375 は未実装 (`tests/provider_check.mjs` が 60/375 を assert) |
-| `tests/all_tools.mjs` (`FL_ENGINE=wasm`) | **48/48 ok**、soft_error 0・raised 0、host_calls 37,424、callback 往復 true。所要 1.96〜2.04 秒 (mock 2.03 秒)。tool 別の結果文字列・api_calls は mock と **48/48 完全一致** (`tool_coverage.json` との差 0 件) |
+| `tests/all_tools.mjs` (`FL_ENGINE=wasm`) | **48/48 ok**、soft_error 0・raised 0、host_calls 37,424、callback 往復 true。所要 2.08 / 2.11 / 2.25 秒 (3 回、b76d221 クリーン再ビルド後。mock 2.06 秒)。`provider_check` 0.33 秒、`poc_mcp` (mock) 1.21 秒 POC OK で回帰なし。tool 別の結果文字列・api_calls は mock と **48/48 完全一致** (`tool_coverage.json` との差 0 件) |
 | `tests/provider_check.mjs` | PASS: 戻り型 (C 側: float=`D`/int=`I`/bool/str/None/JSON) が Python 型で float/int/bool/str/dict、kwargs 経由、code 4 → `IndexError`、code 5 → `TypeError`、未実装 → `RuntimeError` |
 | wasm | `flprov.wasm` 42,953B (`-O2`、provider 単体)。CPython と同一 wasm にはまだ入れていない (T2) |
 | ネガティブコントロール | `mixer.getTrackName` ハンドラを削除して再ビルド → all_tools **33/48 ok・soft_error 15・host_calls 1,079**、provider_check は「MCP 使用 mixer.getTrackName が未実装」で失敗 (= テストが実際に C 実装を踏んでいる) |
