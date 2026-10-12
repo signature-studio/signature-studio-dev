@@ -10,7 +10,8 @@ export PATH="$HOME/.local/share/pnpm/bin:$HOME/.bun/bin:$PATH"
 NODE="$(command -v node || ls /opt/emsdk/node/*/bin/node 2>/dev/null | head -1)"; [ -n "$NODE" ] || { echo "node 無し" >&2; exit 2; }
 export NODE; export PATH="$(dirname "$NODE"):$PATH"
 CHROME=1; QUICK=""; for a in "$@"; do [ "$a" = "--no-chrome" ] && CHROME=0; [ "$a" = "--quick" ] && QUICK="--quick"; done
-DLL=/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll
+source "$T/shared/env.sh"
+DLL="$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll"
 W="$LB/work"; mkdir -p "$W"; : > "$W/e2e.log"
 need() { [ -e "$1" ] || { echo "[lowbase_e2e] 前提無し: $1  → $2" >&2; exit 2; }; }
 need "$DLL" "素材"; need "$T/m10/work/ott_m10.ll" "bash tools/m10/m10_e2e.sh"; need "$HB/work/ott_hb.cjs" "bash tools/hostbridge/hostbridge.sh"

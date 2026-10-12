@@ -20,7 +20,10 @@ import pefile
 from capstone import Cs, CS_ARCH_X86, CS_MODE_64
 from capstone.x86 import X86_OP_IMM, X86_OP_REG
 
-PE = '/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin'
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', '..', '..', 'shared'))
+from paths import FL_WIN64_DIR, REPO_ROOT
+PE = _os.path.join(FL_WIN64_DIR, 'extracted', 'block00031_PE.bin')
 DISP = 0x13173a0
 WANT = [int(a, 0) for a in sys.argv[1:]] or [0x47, 0x56, 0x0d, 0x2e, 0x1d, 0x32, 0x0a]
 REGS = ('eax', 'rax', 'r8d', 'r8')

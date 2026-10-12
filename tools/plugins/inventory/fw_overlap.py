@@ -15,7 +15,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, '..', '..', 'icall', 'disp_size'))
 import dispfix as DF      # CAB-229: capstone の disp_size は 66 prefix 付き disp32 で 2 を返す (D9)
 WORK = os.path.join(HERE, '..', 'work')
-EXT = '/home/ubuntu/work/analysis/win64/extracted'
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'shared'))
+from paths import FL_WIN64_DIR  # noqa: E402
+EXT = os.path.join(FL_WIN64_DIR, 'extracted')
 BALANCE = 18983
 
 

@@ -11,7 +11,9 @@ import os, re, json, collections, struct, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOTD = os.path.join(HERE, '..')
 WORK = os.path.join(ROOTD, 'work')
-MAC_FL = '/home/ubuntu/work/analysis/mac/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL'
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'shared'))
+from paths import FL_MAC_DIR  # noqa: E402
+MAC_FL = os.path.join(FL_MAC_DIR, 'pkg_extract', 'payload_out', 'Applications', 'FL Studio 2026.app', 'Contents', 'Resources', 'FL')
 sys.path.insert(0, HERE)
 from family_table import FAMILY, SCOPE  # noqa
 

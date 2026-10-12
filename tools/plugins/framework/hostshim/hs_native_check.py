@@ -14,7 +14,7 @@ hs_e2e の wasm トレースとは別経路 (native x86 を capstone で読み�
     `call 0x6b8e80` (TDelphiFruityPlug base ctor) の存在を確認する。
 
 使い方: python3 hs_native_check.py [PEパス]
-  PE パス既定 = /home/ubuntu/work/analysis/win64/extracted/block18983_PE.bin
+  PE パス既定 = $FL_WIN64_DIR/extracted/block18983_PE.bin
 """
 import sys
 import capstone
@@ -22,7 +22,10 @@ from capstone import Cs, CS_ARCH_X86, CS_MODE_64
 from capstone.x86 import X86_OP_REG, X86_OP_IMM, X86_OP_MEM
 import pefile
 
-PE = sys.argv[1] if len(sys.argv) > 1 else '/home/ubuntu/work/analysis/win64/extracted/block18983_PE.bin'
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', '..', '..', 'shared'))
+from paths import FL_WIN64_DIR, REPO_ROOT
+PE = sys.argv[1] if len(sys.argv) > 1 else _os.path.join(FL_WIN64_DIR, 'extracted', 'block18983_PE.bin')
 
 SITES = [
     (0x6bd253, 0x47, 'Balance init 0x6bd210: Host.Dispatcher(Tag, 0x47, 0, 0)'),

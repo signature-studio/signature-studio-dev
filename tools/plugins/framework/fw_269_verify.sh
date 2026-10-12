@@ -13,7 +13,8 @@
 # 出力: work/verify_269/run.log / smoke{1,2,3}.log
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
-T=/home/ubuntu/work/webstudio
+source "$HERE/../../shared/env.sh"
+T="$REPO_ROOT"
 SRC="${1:-$T/tools/plugins/work/fw}"
 V="$HERE/work/verify_269"
 SNAP="$V/snap"

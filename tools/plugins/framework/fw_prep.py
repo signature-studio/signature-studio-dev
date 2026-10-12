@@ -20,7 +20,10 @@ from capstone import Cs, CS_ARCH_X86, CS_MODE_64
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 W = os.path.join(HERE, '..', 'work', 'fw')
-EXT = '/home/ubuntu/work/analysis/win64/extracted'
+import sys as _sys
+_sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'shared'))
+from paths import FL_WIN64_DIR
+EXT = os.path.join(FL_WIN64_DIR, 'extracted')
 BAL = os.path.join(EXT, 'block18983_PE.bin')          # Fruity Balance_x64.dll (framework 正本)
 FLE = os.path.join(EXT, 'block00031_PE.bin')          # FLEngine_x64.dll (M11 の教訓来源)
 

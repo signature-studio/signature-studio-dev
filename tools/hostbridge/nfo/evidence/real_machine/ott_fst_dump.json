@@ -245,7 +245,7 @@
     "realMachine": "0x507D08",
     "shippedCorpusCounts": {},
     "shippedWrapperChunkFst": 0,
-    "corpusRoot": "/home/ubuntu/work/analysis/mac/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL",
+    "corpusRoot": "$FL_MAC_DIR/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL",
     "note": "shipped corpus has 0 wrapper-chunk .fst (REPORT §1) — this real file is the first observed record-2 flags value; 0x507D08 = 0x407908 | 0x400 | 0x100000 matches the fst.ts model for a 64-bit-only single-file entry"
   }
 }

@@ -1,5 +1,7 @@
 # tools/m8/REPORT.md — M8 (pattern C value-flow 接続 + idx_store32 正本差分 + missing 10 stub)
 
+> **参照専用 (LIFTLIB-1 / #224)**: 本 dir の lift IR pass・スクリプトは新規実行・改変しない。IR pass の正本は `tools/liftlib` (対応表: `tools/liftlib/README.md`「旧 dir pass → liftlib 対応表」)。既存 e2e 成果物・本 REPORT は歴史として残置し、旧成果物に対する既存 e2e (`tools/m7/m6_e2e.sh`・m8/m9/m10 の `*_e2e.sh`) が引き続き PASS することは `tools/liftlib/REPORT.md` §15 で実測。
+
 - 日付: 2026-10-10。基点 HEAD = 805110b (M7 検収後)。工域: tools/m8/ のみ新規追加
   (tools/m5/m6/m7 は読取のみ, 改変 0 行; work/, __pycache__ は tools/m8/.gitignore で除外)。
 - 検証環境: node v26 / emcc 6.0.12 (`[EMSDK]`) / Python 3.14 / RetDec 5.0 産物を m6 work 再利用。

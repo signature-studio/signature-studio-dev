@@ -111,7 +111,10 @@ const PLAYLIST_BASE: Layout['fields'] = [['position', 0, 'u32'], ['patternBase',
  * Measured on the corpus (cli/pl_stride in REPORT.md); the version rule is validated by divisibility and falls back to a field-sanity vote.
  */
 export function playlistStride(d: Uint8Array, ver: FlVersion): number {
-  const pref = ver.build >= 4700 || ver.major >= 25 ? 80 : ver.build >= 3000 || ver.major >= 21 ? 60 : 32;
+  // Engine rule (FlpLoad helper 0xf558e0): version < 20.99.1 -> 32B; else by event 169 flags: bit1 clear -> 60B, bit1 set & bit3 clear -> 80B.
+  // Corpus: 169 = 0x5 (60B side) up to build 4701, 0x7 (80B side) from build 4720; builds 4702-4719 are unobserved, so 4720 is the first build
+  // known to be 80B (the old 4700 guess is contradicted by 4701 = 0x5). The data vote below is authoritative when a payload is present.
+  const pref = ver.build >= 4720 || ver.major >= 25 ? 80 : ver.build >= 3000 || ver.major >= 21 ? 60 : 32;
   if (d.length === 0) return pref;
   const dv = new DataView(d.buffer, d.byteOffset, d.byteLength);
   const score = (st: number): number => {
