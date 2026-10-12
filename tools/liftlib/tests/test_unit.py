@@ -74,7 +74,10 @@ def t3():
 
 
 def t4():
-    fa = gen.scan_decls(open(os.path.join(T, "targets/freshair/work/lift_gain/gain_lift.ll")).read())
+    fa_src = os.path.join(T, "targets/freshair/work/lift_gain/gain_lift.ll")
+    if not os.path.exists(fa_src):    # 旧 FA 中間成果物が無い環境 (Actions) は liftlib 自前の RetDec 生出力 (同じ __asm_mulss 宣言) を使う
+        fa_src = os.path.join(T, "liftlib/work/fa_gain/fa_gain.drc.ll")
+    fa = gen.scan_decls(open(fa_src).read())
     ott = gen.scan_decls(open(os.path.join(T, "m6/work/ott_shift3b.ll")).read())
     fm = {d.name: d.sig for d in fa if d.base == "mulss"}
     om = {d.name: d.sig for d in ott if d.base == "mulss"}
