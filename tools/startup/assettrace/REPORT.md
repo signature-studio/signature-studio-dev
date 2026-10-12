@@ -41,7 +41,7 @@ other = persist 2・tmp 1・unmapped 1。`diffTiers`: promote 1 (`Thumbnails/a.p
 
 | 項目 | 結果 |
 |---|---|
-| `bash tools/startup/assettrace/e2e.sh` | exit 0 / **0.203 秒** (`time`) / load average 開始 0.01 0.10 0.06 → 終了 0.01 0.10 0.06 / 並列 1 / 単体 pass 10 fail 0 |
+| `bash tools/startup/assettrace/e2e.sh` (コミット `c61a16b` を `git worktree add --detach` で展開して実行) | exit 0 / **0.208 秒** (`time`) / load average 開始 0.00 0.08 0.05 / 並列 1 / 単体 pass 10 fail 0。作業ツリーでの先行実測は 0.203 秒 (load 0.01 0.10 0.06) |
 | ネガコン NC1 (installDir を別パスに) | files 5 → 1 (POSIX 直指定のみ残る)。写像を壊すと検査が落ちる |
 | ネガコン NC2 (inventory から 1 件除去) | files 5 → 4・unknown 1 → 2 |
 | ネガコン CLI (`/fl` への書込み open) | exit 1 |
