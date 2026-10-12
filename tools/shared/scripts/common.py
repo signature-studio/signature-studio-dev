@@ -2,11 +2,13 @@
 """tools/shared 共通: 素材パス・fat 分割・コマンド実行"""
 import os, struct, subprocess, json, sys, re
 
-ANALYSIS = "/home/ubuntu/work/analysis"
-MAC_FL = f"{ANALYSIS}/mac/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL"
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from paths import ANALYSIS_DIR as ANALYSIS, FL_MAC_DIR, FL_WIN64_DIR
+
+MAC_FL = f"{FL_MAC_DIR}/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL"
 MAC_SHARED = f"{MAC_FL}/Shared"
-MAC_APP = f"{ANALYSIS}/mac/pkg_extract/payload_out/Applications/FL Studio 2026.app"
-WIN_EXTRACTED = f"{ANALYSIS}/win64/extracted"
+MAC_APP = f"{FL_MAC_DIR}/pkg_extract/payload_out/Applications/FL Studio 2026.app"
+WIN_EXTRACTED = f"{FL_WIN64_DIR}/extracted"
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 WORK = os.path.join(ROOT, "work")
