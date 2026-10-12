@@ -32,7 +32,7 @@ deploy 経路: `bash deploy/scripts/deploy.sh --src <dist>` が 05-stage (入力
 - allow-list (`allowlist.json`): `{path: glob, sha256, kinds, reason(必須)}`。自作コード・shim・OSS 再ビルド物を運用形態 (LGL-1) に従って許容する。既定は空。
 - deny-list 本体 (windows.bin) は素材由来の指紋 (8 B ハッシュ) であり原バイトは復元できないが、素材由来物なので **commit しない** (`work/` は gitignore)。
 
-## 実測 (検証起点: 下記コミット済み HEAD。素材 = `fl-win64.tar.zst` 展開 3,419,555,130 B / 25,168 files)
+## 実測 (検証起点: コミット 1503742 (クリーン HEAD で単体テスト 12/12・クリーン走査 PASS 1970 files・違反走査 exit 6 を再現)。素材 = `fl-win64.tar.zst` 展開 3,419,555,130 B / 25,168 files)
 
 環境: GitHub Actions runner、node v22.23.3、ほぼ単独実行 (load average 0.2〜1.3、並列 1)。
 
@@ -41,7 +41,7 @@ deploy 経路: `bash deploy/scripts/deploy.sh --src <dist>` が 05-stage (入力
 | deny-list 生成 | 34.3 s (n=2: 34.306 / 34.325) | 25,168 files を 1 パス (sha256 + サンプル) |
 | deny-list 規模 | windows 2,067,704 件 (windows.bin 16.5 MB) / file sha256 18,351 件 | file は 512 B 以上のファイルの distinct sha256 |
 | クリーン走査 | PASS 1970 files 23,421,976 B / 0.82 s | `git ls-files` の追跡全ファイルを別 dir にコピーしたもの |
-| 単体テスト | 12/12 PASS (所要は下の「クリーン HEAD 再現」) | `pnpm release-guard:test` |
+| 単体テスト | 12/12 PASS・0.749 s (クリーン HEAD 1503742 の detached worktree。load average 0.29、並列 1) | `pnpm release-guard:test` |
 
 ### ネガティブコントロール (実 FL 素材。いずれも exit 6 = FAIL を確認)
 
