@@ -38,6 +38,9 @@
 
 - repo は checkout 済み。ツール: uv/pnpm/node26/bun/python3.14/opencode
   (zstd は runner イメージ同梱)。emsdk・Ghidra 等の重い道具は初回使用時にセットアップすること。
+- opencode は `opencode run --standalone --auto` で起動される。`--auto` は
+  permission を明示 deny したもの以外を自動承認するモードで、CI 上で人の確認を
+  挟めないための設定。破壊的な操作は規約 (上記 4) 側で禁止されている。
 - **素材 (FL Studio・プラグイン)**: R2 から `$HOME/artifacts` に `.tar.zst` のまま置かれる
   (使うときに `tar --zstd -xf` で展開)。オブジェクト名は `artifacts/<prefix>.tar.zst`。
   - **取得できていない場合がある**。agent-setup は素材が欠けているときにジョブを落とすが、

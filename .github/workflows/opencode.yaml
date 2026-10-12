@@ -96,9 +96,14 @@ jobs:
           permission-pull-requests: ${{ env.OC_PERMISSION == 'write' && 'write' || 'read' }}
 
       # persist-credentials: false — checkout の既定はローカルの extraheader に
-      # 永続 token を書き込む方式で、App トークンとは別の認証経路밍になる
+      # 永続 token を書き込む方式で、App トークンとは別の認証経路になる
       # (credential helper より優先され、後で token を入れ替えても反映されない)。
       # 認証は「App トークンを明示的に渡す」経路だけに統一する。
+      #
+      # 注: この step 以降に現れる ${{ steps.app-token.outputs.* }} の式展開は
+      # with: / env: 経由だけ。run スクリプト中には 1 箇所も展開していない
+      # (展開しても shell には文字列として入るだけで、untrusted なイベント値を
+      # 経由しないので script injection にはならない)。
       - name: Checkout repository
         if: steps.context.outputs.should_run == 'true'
         uses: actions/checkout@v7
@@ -196,7 +201,7 @@ jobs:
           permission-contents: write
           permission-pull-requests: write
 
-      # continue-on-error で飲みえている失敗なので、原因が「installation の権限不足」
+      # continue-on-error で飲み込んでいる失敗なので、原因が「installation の権限不足」
       # なのか「secret 未設定」なのかを明示する (Medium-1 / H7)。
       - name: Explain a missing reviewer token
         if: steps.reviewer-token.outcome == 'failure'

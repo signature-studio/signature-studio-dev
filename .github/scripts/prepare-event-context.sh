@@ -20,7 +20,7 @@
 #      jq の文字列スライス (codepoint 単位) に置き換えた。
 #   4. コマンド判定: 旧 workflow の `contains(body, '/oc')` は部分一致なので
 #      `.../ocean/...` や URL 内の `/oc/` でも発火する。行頭アンカーの正規表現に
-#      置き換えた。job の if: は粗い前筛选に留まり、確定判定はここが正本。
+#      置き換えた。job の if: は粗い前フィルタに留まり、確定判定はここが正本。
 set -euo pipefail
 
 : "${GITHUB_EVENT_PATH:?GITHUB_EVENT_PATH is not set}"
@@ -66,7 +66,7 @@ chmod 600 "$PR_BODY_FILE"
 # ときだけ起動する。`/ocean` や URL 内の `/oc/` では発火しない。
 #
 # 判定をこのスクリプトに置く理由: Actions の式には正規表現がないため、job レベルの
-# `if:` は contains() による粗い前筛选に留まらざるを得ない。確定した判定を
+# `if:` は contains() による粗い前フィルタに留まらざるを得ない。確定した判定を
 # should_run output に出すことで、以降の高コスト step (App トークン発行・checkout・
 # agent-setup・opencode 実行) を丸ごとスキップでき、job は緑のままにできる。
 COMMAND_RE='^[[:space:]]*/(oc|opencode)([[:space:]]|$)'
