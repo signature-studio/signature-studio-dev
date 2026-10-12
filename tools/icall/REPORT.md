@@ -152,7 +152,7 @@ python3 tools/icall/tests/test_icall.py
 `rt/icall_ovr.c` + `ir_override.py` で `1801c8c00` (_handle_error) / `1801a9a6c` (sqrt) / `1801a9b38` (sqrtf) を C 実装に置換。
 native は CRT 未初期化で SIGSEGV するため突合不能 (UCRT の観測可能な意味から導出; 根拠は `tools/ott/rt/ott_ovr.c`)。
 実行確認 (wasm): sqrt(-1) = `0xfff8000000000000`・sqrt(4) = 2.0・sqrt(-0.0) = -0.0・sqrtf(inf) = inf。置換前は未登録の間接 call target で fail-fast。
-`1801a9a6c` の関数単位比較は xmm0 のみ 600/600 (rax は native が rax=入力由来の不定値のため 0/600 = 比較対象外)。
+`1801a9a6c` の関数単位比較は xmm0 のみ 600/600 (rax は 0/600 一致: 原因は未調査。BLK 経由の rax と native の rax で意味が違う可能性があり、本 gate は xmm0 のみを判定に使う)。
 
 ### 8.4 検証 (clean HEAD `fd86159` の worktree, load average は開始→終了)
 | コマンド | 結果 | 所要 | load |
@@ -167,7 +167,7 @@ native は CRT 未初期化で SIGSEGV するため突合不能 (UCRT の観測�
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | **FMA3 経路 (`__use_fma3=1`) の `1801a9be0` が 42/600** (他 4 関数は 600/600)。RetDec が `vmovapd [rsp+0x40], xmm0` を void helper にして store を落とすため `[rsp+0x40]` の再読込 (`1801aa0d6`) が未初期化になる疑い (未確認) | OTT 既定 (`__use_fma3=0`) は無影響。AVX2 CPU で DllMain を通す経路のみ | 親 #90 に子チケット提案 (RetDec の VEX 256bit/stack store 落ち, D7 (本書 §4) 類似) |
-| `1801a9b38` (sqrtf)・`1801c1398` 本体は native 突合不能 (CRT 未初期化) | override は UCRT 仕様由来で native bit 突合は無し | #9 (CRT 初期化 lift 済みの x64c 側 `tools/ott/crtinit` で突合済み) |
+| `1801a9b38` (sqrtf)・`1801c1398` 本体は native 突合不能 (CRT 未初期化) | override は UCRT 仕様由来で native bit 突合は無し | 親 #90 にコメント (x64c 側 `tools/ott/crtinit/REPORT.md` §7 が同じ限界を記載) |
 | `_handle_errorf` (1801c8cb8) は route の closure F に無く未 lift | float 版エラー経路に到達すると fail-fast | #231 続報 (到達 scenario が構築できた時点で) |
 | 関数単位 gate は SSE2 経路の 6 関数のみ。他の CRT 関数 (exp/log/pow の 1801b4220 等) は DSP matrix の bit 一致のみ | OTT が踏まない入力域の 1ulp は残り得る | #231 続報 (候補選別 `fn_diff.py` は rip/rsp 相対 leaf の 8 関数に限定) |
 | #9 (OTT bit-exact 512/512) への反映: route でも 512/512 (t1 std 512 cell: zero 5 / normal 507 / junkHi 0 / junkTiny 0, |max| 0.2516) | — | #9 にコメントで報告 |
