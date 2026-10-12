@@ -73,7 +73,7 @@
 | `tools/liftlib/REPORT.md` | ~530 | 共通 lift 修復基盤の統合 (CAB-49/54/55/220/239/LIFTLIB-2) |
 | `tools/flelift/REPORT.md` | ~155 | x64c を FLEngine 向けに汎用化 |
 | `tools/flelift/boot/REPORT.md` | ~350 | FLE-2〜FLE-5: x64c lift による FLEngine boot 連鎖 |
-| `tools/liftdiff/REPORT.md` | ~270 | flelift (x64c) 全数採点 + native 全起動の参照化 |
+| `tools/liftdiff/REPORT.md` | ~230 | flelift (x64c) 全数採点 + native 全起動の参照化 (§5/§6.1/§6.2 は `REPORT_APPENDIX.md` に分割) |
 | `tools/icall/REPORT.md` | ~125 | 間接 call/jmp 落ち監査 + 復元 pass |
 | `tools/icall/disp_size/REPORT.md` | ~160 | capstone `disp_size` 誤り (D9) の水平展開監査 |
 | `tools/icall/landing/REPORT.md` | ~165 | Delphi unwind landing pad の抽出と lift |
