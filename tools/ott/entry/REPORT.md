@@ -118,3 +118,33 @@ python3 -u tools/ott/entry/cmp_entries.py work/entrylift/matrix/nat_result.json 
   --cov work/entrylift/cov_entry.json --covdsp tools/ott/ref/cov_all.json --out work/entrylift/summary.json --table work/entrylift/fn_table.md
 # 前提: tools/ott/ott_e2e.sh が PASS する環境 (python3 capstone/pefile, gcc, emsdk 6.0.12, node ≥22)
 ```
+
+## 8. 環境パス置換 (#367, 親 #294・先行 #312): /home/ubuntu 絶対パスを tools/shared へ
+
+既知類型との関係 (DEFECTS.md): 該当なし (パス参照の置換のみで lift/IR には触れない)。
+
+### 8.1 変更
+
+`*.sh *.py *.json *.ts *.mjs` (work/ 除く) の `/home/ubuntu` 参照 4 行を置換。既定値は従来と同一 (環境変数未設定のローカル挙動は不変)。
+
+| ファイル | 置換 |
+|---|---|
+| `lift_entry.sh` `entry_e2e.sh` | `source tools/shared/env.sh` + `DLL="$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll"` |
+| `entry_nat.py` `cmp_entries.py` | `tools/shared/paths.py` の `PLUGINS_DIR` から `DLL` を組む |
+
+### 8.2 検証 (検証起点 `origin/main` = 1353c62、素材は `fl-win64` のみ)
+
+- 受入条件 1: `grep -rn '/home/ubuntu' tools/ott/entry --include=*.sh --include=*.py --include=*.json --include=*.ts --include=*.mjs --exclude-dir=work | wc -l` → 0 (置換前 4)。
+- 受入条件 2 (既定値同一性): env 未設定 (`ANALYSIS_DIR`/`PLUGINS_DIR` unset) で bash (`env.sh`) と python (`paths.py`) が組む DLL パスを、置換前の固定文字列と文字列比較 → 両方一致
+  (`/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll`)。n=1・直列、load average 0.77 (1 分値)。
+- ネガティブコントロール: `PLUGINS_DIR=/nonexistent bash entry_e2e.sh --quick` → `[entry_e2e] /nonexistent/ott/binaries/OTT_vst2_win64.dll 無し`・exit 2 (変数が効いている)。env 未設定は既定パスを指して exit 2 (この run に DLL が無いため)。
+- 構文: `python3 -m py_compile` 5 本・`bash -n` 2 本 OK。
+
+### 8.3 検証範囲 / 範囲外 / 未解決
+
+範囲外: `entry_e2e.sh` / `lift_entry.sh` / `entry_nat.py` / `cmp_entries.py` の実行 (e2e 本体)。`OTT_vst2_win64.dll` は `analysis-ott-binaries` 素材、lift/emcc は `toolchain-emsdk`・`work-m6-ott` 等が要り、この run は `fl-win64` のみで取得していたため。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| e2e (`entry_e2e.sh --quick`) を素材付きで未実行 | 置換行以外の挙動は未検証 (置換は DLL パス定義のみ) | 本 PR のレビュー run (PR 本文の `oc_artifacts:` 行) |
+| `entry_nat.py` は import 時に `tools/ott/work/libottnative.so` (ビルド成果物) が無く `OSError` で止まる (`OTT_NOASLR=1` で実測) ため `entry_nat.DLL` の単体確認は不可 | `DLL` 解決は grep・構文確認のみ | 同上 |
