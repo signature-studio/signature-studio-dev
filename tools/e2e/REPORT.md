@@ -110,7 +110,7 @@ dev は `__e2e__/add.wasm` fixture が配信されないため wasm-load 内の 
   `run.sh --url <ローカル edge-sim> --driver both` = **PASS 16 / FAIL 0 / SKIP 2**、所要 3.9s (1 回)。
 - ネガティブコントロール: edge-policy の COEP キーを除いたコピーを `EDGE_POLICY_FILE` で与えると
   edge-sim × 2 driver で **FAIL 8** (4 check × 2)・exit 1 (CI ジョブが赤になる条件)。
-- 範囲外: GitHub Actions 上での workflow 実行結果 (未配置のため未実行) (PR の check で確認)、実 URL への `--url` (Access 保護下の実 token での実行は未実施 =
+- 範囲外: GitHub Actions 上での workflow 実行結果 (workflow は `.proposed` のため PR の check では実行されない。`.github/workflows/e2e.yaml` へ配置後に確認)、実 URL への `--url` (Access 保護下の実 token での実行は未実施 =
   `E2E_URL` と secrets の登録はユーザ操作)。
 
 | 未解決 | 影響 | 起票先 |
