@@ -3,7 +3,8 @@
 # usage: bash tools/ipp/shim/shim_e2e.sh   (前提: tools/ipp/ipp_e2e.sh を一度実行済み = work/ に golden / 420 名 / win_refs がある。無ければ自動実行)
 set -euo pipefail
 cd "$(dirname "$0")"; HERE=$PWD; IPP=$(dirname "$HERE"); W=$IPP/work/shim; mkdir -p "$W" /tmp/opencode
-DLL=/home/ubuntu/work/analysis/win64/extracted/block24356_PE.bin; ALL=0xFFFFFFFFFFFFFFFF
+source "$IPP/../shared/env.sh"
+DLL="$FL_WIN64_DIR/extracted/block24356_PE.bin"; ALL=0xFFFFFFFFFFFFFFFF
 [ -f "$IPP/work/golden/manifest.json" ] && [ -f "$IPP/work/win_refs.json" ] && [ -f "$IPP/work/flengine_ipp_names.json" ] || { echo "## prerequisite: tools/ipp/ipp_e2e.sh"; bash "$IPP/ipp_e2e.sh" > "$W/ipp_e2e.log" 2>&1; }
 step() { echo; echo "## $*"; }
 step "1. 呼出箇所実績の採取 (win64 全 145 モジュール, 署名の独立検算用)"
