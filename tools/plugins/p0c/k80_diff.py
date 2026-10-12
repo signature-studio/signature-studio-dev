@@ -473,10 +473,14 @@ def gen_driver(kernels, funcs, cases, proto=None):
                 # clip_index kernel (添字アクセス) は fp scalar を有限・非負に制限する
                 # (負または inf/NaN の gain → trunc が 0x8000.. → 負添字 → OOB read → SIGSEGV)
                 gate = '' if (clip and os.environ.get('K80_NO_NNEGF') != '1') else 'if ((rnd() >> 40) > 5) '
+                # clip_index kernel: gain が大きいと cvttsd2si が 0x80000000 を返し、neg でも INT_MIN の
+                # まま clamp を素通りして負添字 OOB (0x5e0c00; 2000 case 中に発生。仮説は
+                # K80_NO_CLIPRANGE=1 で sig11 再現を確認)。gain 指数を 2^-9..2^-1 に絞る (#277)
+                nexp = 9 if (clip and os.environ.get('K80_NO_CLIPRANGE') != '1') else 25
                 gen = ('{ double v = (double)(int64_t)(rnd() %% 4000001) / 1000.0; vA[%d].f = vI[%d].f = v; }'
                        % (pid, pid)) if w == 64 else (
-                    '{ uint32_t rr = (uint32_t)rnd(); %srr = (rr & 0x807fffffu) | ((((rnd() >> 40) & 0xffu) %% 25u + 118u) << 23); vA[%d].f = vI[%d].f = %s; }'
-                    % (gate, pid, pid, ('nnegf((double)bits2f(rr))'
+                    '{ uint32_t rr = (uint32_t)rnd(); %srr = (rr & 0x807fffffu) | ((((rnd() >> 40) & 0xffu) %% %du + 118u) << 23); vA[%d].f = vI[%d].f = %s; }'
+                    % (gate, nexp, pid, pid, ('nnegf((double)bits2f(rr))'
                                        if (clip and os.environ.get('K80_NO_NNEGF') != '1')
                                        else '(double)bits2f(rr)')))
                 out.append('    ' + gen)

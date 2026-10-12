@@ -195,6 +195,7 @@ def scan_function(MD, td, tva, va, fend):
             copies.append((COPYREG[i.operands[0].reg], COPYREG[i.operands[1].reg]))
     # copy 逆向き伝播 (mov dst, src で dst が base なら src の値も base として
     # 使われ得る — 顺方向は shr 等の変換を挟むため伝播しない)
+    direct_base = set(gpr_base)
     for _ in range(8):
         ch = False
         for dst, src in copies:
@@ -206,6 +207,12 @@ def scan_function(MD, td, tva, va, fend):
                 ch = True
         if not ch:
             break
+    # index として使われる reg (0x5e02b0 の r8: `lea [rcx+r8*4]`) がコピー伝播だけで base 扱いに
+    # なったものは個数/添字引数であってポインタではない (#277)
+    # 全 kernel に適用すると index と pointer を兼ねる reg (0x5de390 の rcx 等) を落として crash が増える
+    # ため、ptr_struct を持つ kernel (record{ptr,ptr} 経由で書く) に限定する。
+    if ptr_struct and os.environ.get('K80_NO_IDX_NOT_BASE') != '1':
+        gpr_base -= {r for r in gpr_idx if r in GORD and r not in direct_base and r not in ptr_struct}
     # stack args: entry_rsp 相対 offset ≥ 8 (retaddr の上) を read-before-write で
     seen = {}
     for off, ins in stack_reads:
