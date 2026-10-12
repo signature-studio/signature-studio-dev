@@ -188,4 +188,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   `$GITHUB_STEP_SUMMARY` の両方に出る。issue へのコメントは agent が `gh issue comment` で行う。
 - **上限**: job は 60 分。収まらない作業は中間 commit + draft PR で区切る。
 - 稼働本数は「走っている Actions run 数」で数える (`gh run list --status in_progress`)。
+- **PM の watch ルール (依頼者指示 116)**: 起動した全ての run は無条件で `gh run watch` する。PM が
+  応答を終える時は、background で `gh run watch` が 1 本以上走っていること。完了通知を受けたら、
+  結果の処理に入る前に、次の watcher を起動し直す。
 
