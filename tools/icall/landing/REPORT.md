@@ -166,3 +166,42 @@ python3 tools/icall/landing/verify_pads.py --pe <FLEngine PE> \
   --ir work/pads_verify.ll --out work/verify --max 20   # 検証のみ (サンプル)
 前提: python3 (pefile, capstone), emsdk 6.0.12, node, /usr/bin/llvm-as
 ```
+
+## 11. 環境パス置換 (#381, 親 #294・先行 #312): /home/ubuntu 絶対パスを tools/shared へ
+
+既知類型との関係 (DEFECTS.md): 該当なし (パス参照の置換のみで lift/IR には触れない)。
+
+### 11.1 変更
+
+`*.sh *.py *.json *.ts *.mjs` (work/ 除く) の `/home/ubuntu` 参照 6 行 (3 ファイル) を置換。既定値は従来と同一。
+
+| ファイル | 置換 |
+|---|---|
+| `landing_e2e.sh` | `source tools/shared/env.sh`。`PE=$FL_WIN64_DIR/extracted/block00031_PE.bin` `OTT=$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll` `FUNCS=$REPO_ROOT/tools/icall/work/fle_F.txt`。判定 heredoc の `W` は環境変数 `W` 経由 |
+| `verify_pads.py` | `REPO` = `tools/shared/paths.py` の `REPO_ROOT` |
+| `gap_fragments.py` | `audit_icall` の import パスをスクリプト相対 (`../`) に。`import os` 追加 |
+
+### 11.2 検証 (検証起点 `origin/main` = ee8f70c、素材は `fl-win64` のみ)
+
+- 受入条件 1: `grep -rn '/home/ubuntu' tools/icall/landing --include=*.sh --include=*.py --include=*.json --include=*.ts --include=*.mjs --exclude-dir=work | wc -l` → 0。
+- 受入条件 2 (before/after): before = `origin/main` の detached worktree + `/home/ubuntu/work/{analysis/win64,webstudio}` を symlink で用意。
+  after = symlink と `/home/ubuntu` を削除し `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` のみ指定。各 n=1。
+  `fle_F.txt` は M11 closure が無いため `.pdata` の全 RUNTIME_FUNCTION (57,816 関数) で代替生成 (before/after 同一入力)。
+  - `gap_fragments.py` 単体: before 1m13.9s / after 1m14.2s、load (1 分値) 0.92 / 0.95。stdout と `fle_fragments.json` 相当出力が `cmp` 一致 (sha256 先頭 12 桁 85cc333f8570 / stdout d9a89578ccd1)。
+  - `landing_e2e.sh --quick` 全体: before 1m18.7s / after 1m17.9s、load 0.97 / 0.99。stdout は絶対パス正規化後、step 3 の traceback 行番号 (+1 行) を除き一致。
+    `fle_scopes.json` `pads_meta.json` は `cmp` 一致。`fle_fragments.json` `fle_xdata.json` は先頭の `pe` パス文字列のみ差 (sed 正規化後に `diff` 0 件)。
+- ネガティブコントロール: `FL_WIN64_DIR=/nonexistent landing_e2e.sh` → `FileNotFoundError: /nonexistent/extracted/block00031_PE.bin` (環境変数が効く)。
+  `bash tools/shared/test_paths.sh` → PASS 4/4。
+- 実行環境: uv venv に `pefile` `capstone`、apt で `llvm` (llvm-as)。
+
+### 11.3 検証範囲 / 範囲外 / 未解決
+
+PASS 判定 (step 6) までは到達していない。before/after ともに step 3 `lift_pad.py` が `TypeError: Object of type generator is not JSON serializable`
+(`meta-out` の `filter` 値) で停止し、step 4 以降が連鎖失敗する。**before (origin/main) でも同一の失敗**で、本 PR のパス置換とは無関係
+(python 3.14 での `lift_pad.py` 側の挙動と推測、未切り分け)。step 4 (`verify_pads.py` の native/wasm 差分) と step 5 (OTT、`plugins-ott` 素材が必要) は未実行。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `lift_pad.py` が meta JSON 出力で TypeError (before でも再現) | landing_e2e の step 3 以降が検証できない | 本 PR 完了後に別 issue 起票を PM へ依頼 (本 area の fix は範囲外) |
+| `verify_pads.py` の `LIFTDIFF`/emsdk 経路 (step 4) 未実行 | `REPO_ROOT` 置換の実効は import path 解決のみ未確認 | 上記解消後に `oc_artifacts: fl-win64 toolchain-emsdk` で再検証 |
+| `OTT` (step 5) 未実行 | `PLUGINS_DIR` 置換未検証 | `oc_artifacts: fl-win64 plugins-ott` |

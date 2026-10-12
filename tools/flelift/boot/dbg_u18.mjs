@@ -4,9 +4,10 @@
 // 呼出元を特定する (再ビルド不要)。結果は JSON でも出力 (work/boot/u18_chain.json)。
 import { readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { FL_WIN64_DIR } from '../../shared/paths.mjs';
 
 const cjs = process.argv[2];
-const PE = process.argv[3] || '/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin';
+const PE = process.argv[3] || `${FL_WIN64_DIR}/extracted/block00031_PE.bin`;
 const mod = await import(cjs);
 const m = await (mod.default ? mod.default() : mod());
 const U8 = m.HEAPU8;

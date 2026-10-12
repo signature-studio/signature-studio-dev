@@ -5,7 +5,7 @@
   "threw": {
    "cls": "trap",
    "msg": "Aborted(native code called abort())",
-   "stack": "RuntimeError: Aborted(native code called abort())\n    at abort (/home/ubuntu/work/webstudio/tools/flelift/work/boot/fleboot_chk.cjs:528:11)\n    at __abort_js (/home/ubuntu/work/webstudio/tools/flelift/work/boot/fleboot_chk.cjs:3894:7)\n    at wasm://wasm/22fbcfb2:wasm-function[31521]:0x7866d7b\n    at wasm://wasm/22fbcfb2:wasm-function[29952]:0x78342f1\n    at wasm://wasm/22fbcfb2:wasm-function[10200]:0x24b20d7"
+   "stack": "RuntimeError: Aborted(native code called abort())\n    at abort (<REPO_ROOT>/tools/flelift/work/boot/fleboot_chk.cjs:528:11)\n    at __abort_js (<REPO_ROOT>/tools/flelift/work/boot/fleboot_chk.cjs:3894:7)\n    at wasm://wasm/22fbcfb2:wasm-function[31521]:0x7866d7b\n    at wasm://wasm/22fbcfb2:wasm-function[29952]:0x78342f1\n    at wasm://wasm/22fbcfb2:wasm-function[10200]:0x24b20d7"
   },
   "units_run": 209,
   "units_total": 942,

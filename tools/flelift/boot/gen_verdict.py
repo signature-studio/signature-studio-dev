@@ -13,11 +13,13 @@
 usage: python3 gen_verdict.py [--pe PE]
 """
 import argparse, bisect, glob, json, os, struct, sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'shared'))
+from paths import FL_WIN64_DIR, REPO_ROOT
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 FLE = os.path.dirname(HERE)
-PE_DEF = '/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin'
-BASELINE = '/home/ubuntu/work/webstudio/tools/m11/work/shimx_link/baseline/m11_boot.survey.json'
+PE_DEF = f'{FL_WIN64_DIR}/extracted/block00031_PE.bin'
+BASELINE = f'{REPO_ROOT}/tools/m11/work/shimx_link/baseline/m11_boot.survey.json'
 IMG = 0x400000
 PKG = 0x13768b0
 

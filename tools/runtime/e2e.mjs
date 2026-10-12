@@ -6,7 +6,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { createServer, build, preview } from "vite";
 import { launchChrome } from "./lib/chrome.mjs";
 
@@ -15,6 +15,17 @@ const root = path.resolve(here, "../..");
 const args = new Map(process.argv.slice(2).map((a) => { const [k, v] = a.replace(/^--/, "").split("="); return [k, v ?? true]; }));
 const wasmDir = path.join(here, "work/wasm");
 
+// RT-2: 本番 pthread ビルド (shim MT + emcc glue)。--neg は非 atomic カウンタ版 (ネガティブコントロール: counter チェックが FAIL すべき)
+// 毎回ビルドする (1.8 s)。--neg の成果物が work/prod に残って次の通常実行に混入するのを防ぐ。emsdk が無ければ skip-mt 相当で続行。
+if (!args.has("skip-stage") && !args.has("skip-mt")) {
+  try {
+    execFileSync("bash", [path.join(here, "prod/build_pthread.sh")], { stdio: ["ignore", "inherit", "inherit"], env: { ...process.env, MT_NEG: args.has("neg") ? "1" : "0" } });
+  } catch (e) {
+    if (args.has("neg")) throw e;
+    console.error("[e2e] pthread ビルド失敗 → mt-boot は stage されません (emsdk 無し?):", e.message);
+    rmSync(path.join(here, "work/prod/fl-mt.wasm"), { force: true });
+  }
+}
 if (!args.has("skip-stage")) execFileSync(process.execPath, [path.join(here, "stage_wasm.mjs")], { stdio: ["ignore", "inherit", "inherit"] });
 const manifest = JSON.parse(readFileSync(path.join(wasmDir, "manifest.json"), "utf8"));
 const byId = Object.fromEntries(manifest.entries.map((e) => [e.id, e]));
@@ -90,6 +101,17 @@ try {
   for (const run of rep.runs) {
     ck(`${run.id}: driver checks`, run.ok && !run.error, run.error ?? run.checks.filter((c) => !c.ok).map((c) => c.name).join("; "));
     const ref = refs[run.id], d = run.data;
+    if (run.id === "mt-boot") {
+      const e = byId["mt-boot"], r = run.resource;
+      for (const c of run.checks) if (c.name.startsWith("4 thread")) ck(`mt-boot: ${c.name}`, c.ok, c.detail ?? "");
+      // 事前圧縮 (br) 配信: 展開後サイズ = manifest.bytes、転送量は圧縮後 (HTTP キャッシュ命中時は 0)
+      ck("mt-boot: wasm は Content-Encoding: br で配信 (decodedBodySize == manifest.bytes, transferSize < decoded)",
+        r.decodedBodySize === e.bytes && (r.transferSize === 0 || (r.transferSize > 0 && r.transferSize < e.bytes)),
+        `decoded=${r.decodedBodySize} transfer=${r.transferSize} encoded(br)=${e.encodedBytes?.wasm} raw=${e.bytes} delivery=${r.deliveryType}`);
+      ck("mt-boot: ファイル名が内容 hash (sha256 先頭 12 桁)", e.file === `mt-boot.${e.sha256.slice(0, 12)}.wasm` && /^mt-boot\.[0-9a-f]{12}\.mjs$/.test(e.glue ?? ""), `${e.file} / ${e.glue}`);
+      if (args.has("neg")) console.log(`[neg] mt-boot counter=${d.counter} (期待: 4000000 未満 → 上の counter チェックが FAIL)`);
+      continue;
+    }
     if (!ref) continue;
     let same;
     if (run.id === "m1-hello") same = d.stdout === ref.stdout && d.rc === ref.rc;

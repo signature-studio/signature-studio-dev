@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 """pedis.py 部分: FLEngine_x64.dll の指定 VA 範囲を capstone で逆アセンブル (RIP 相対の文字列/データ注釈付き)"""
-import sys, pefile
+import os, sys, pefile
 from capstone import Cs, CS_ARCH_X86, CS_MODE_64
 
-DLL = '/home/ubuntu/work/webstudio/tools/startup/work/FLEngine_x64.dll'
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', '..', 'shared'))
+from paths import REPO_ROOT, FL_WIN64_DIR  # noqa: E402
+
+DLL = os.path.join(REPO_ROOT, 'tools', 'startup', 'work', 'FLEngine_x64.dll')
+if not os.path.exists(DLL):
+    DLL = os.path.join(FL_WIN64_DIR, 'extracted', 'block00031_PE.bin')
 pe = pefile.PE(DLL, fast_load=True)
 BASE = pe.OPTIONAL_HEADER.ImageBase
 md = Cs(CS_ARCH_X86, CS_MODE_64)

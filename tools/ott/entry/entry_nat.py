@@ -20,6 +20,9 @@ STR, OUT_F, CKPT, CHUNK = 0x30320000, 0x30321000, 0x30322000, 0x30323000
 IN_A, OU_A, BUF = 0x30330000, 0x30331000, 0x30340000
 STR_FILL = b"0.50\x00" + b"\xcc" * 0x1fc
 
+sys.path.insert(0, os.path.join(HERE, '..', '..', 'shared'))
+from paths import PLUGINS_DIR  # noqa: E402
+DLL = os.path.join(PLUGINS_DIR, 'ott', 'binaries', 'OTT_vst2_win64.dll')
 sys.path.insert(0, os.path.join(HERE, '..', 'native'))
 import ottnat as N  # ASLR 固定 re-exec を内蔵
 
@@ -35,7 +38,7 @@ def load_lib():
     lib.ott_am_addr.restype = ctypes.c_uint64
     lib.ott_am_counts.restype = ctypes.c_void_p
     lib.ott_install_segv()
-    assert lib.ott_load(b'/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll') == 0
+    assert lib.ott_load(DLL.encode()) == 0
     # editor ctor surrogate: OTTEditor ctor (0x180120ff0) を `xor eax,eax; ret` (48 31 C0 C3) に差し替え
     # → createEffectInstance が editor=NULL を obj+0x10 に保存。GUI 対象外の両側一致置換 (wasm は override)。
     import ctypes as _c

@@ -9,6 +9,7 @@ import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { FL_WIN64_DIR } from '../../../shared/paths.mjs';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const POC = path.join(HERE, '../../poc');
 const { ModuleTable, HostBridge, EmscriptenGuest } = await import(path.join(POC, 'hb_bridge.mjs'));
@@ -17,7 +18,7 @@ const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > 0 ?
 const OTT = arg('ott'), BAL = arg('bal'), NMOD = Number(arg('nmod', 4)), OUT = arg('out'), LABEL = arg('label', 'lb');
 const HOSTWASM = arg('host', path.join(HERE, '../work/hb_0x10000/host_vst2.wasm'));
 const NATIVE_REF = arg('native-ref', path.join(HERE, '../../../plugins/work/balance/native_ref'));
-const BAL_DLL = '/home/ubuntu/work/analysis/win64/extracted/block18983_PE.bin';
+const BAL_DLL = `${FL_WIN64_DIR}/extracted/block18983_PE.bin`;
 const SR = 44100, NCH = 2, HALF = 128, NBLK = 500;
 
 const st = () => { const t = fs.readFileSync('/proc/self/status', 'utf8'); const g = (k) => Number(t.match(new RegExp(k + ':\\s+(\\d+) kB'))[1]) / 1024; return { rss: g('VmRSS'), vmdata: g('VmData'), vmsize: g('VmSize') }; };

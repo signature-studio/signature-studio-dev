@@ -6,10 +6,12 @@
  .reloc DIR64 の指す値 (image 内ポインタ) は VA→LVA (-0x400000) 補正する (m11_data_gen.py と同一規則).
  出力: work/m11_image.bin  (offset 0 = RVA 0)   使い方: python3 m11_image_gen.py"""
 import sys, os, struct
-sys.path.insert(0, '/home/ubuntu/work/webstudio/tools/m6')
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', 'shared'))
+from paths import REPO_ROOT, FL_WIN64_DIR
+sys.path.insert(0, os.path.join(REPO_ROOT, 'tools', 'm6'))
 from ottlib import Bin
 HERE = os.path.dirname(os.path.abspath(__file__))
-WINF = '/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin'
+WINF = os.path.join(FL_WIN64_DIR, 'extracted', 'block00031_PE.bin')
 OUT = os.path.join(HERE, 'work', 'm11_image.bin')
 KEEP = ('.text', '.data', '.rdata', '.didata')
 IMG_BASE = 0x400000

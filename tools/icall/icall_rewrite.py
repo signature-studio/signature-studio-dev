@@ -305,7 +305,7 @@ def abi_ret_load(em, blk):
 
 
 BLK_CA, BLK_CB, BLK_CFLAGS, BLK_CKIND = 0xA0, 0xA8, 0xB0, 0xB8
-COMIS_KIND = {'comisd': 0, 'ucomisd': 1, 'comiss': 2, 'ucomiss': 3}
+COMIS_KIND = {'comisd': 0, 'ucomisd': 1, 'comiss': 2, 'ucomiss': 3, 'vcomisd': 0, 'vucomisd': 1, 'vcomiss': 2, 'vucomiss': 3}
 
 
 def modrm_tail_len(raw, mo):

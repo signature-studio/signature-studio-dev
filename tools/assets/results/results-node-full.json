@@ -1,5 +1,5 @@
 {
- "pkg": "/home/ubuntu/work/webstudio/tools/assets/work/pkg-full",
+ "pkg": "tools/assets/work/pkg-full",
  "shaping": {
   "latencyMs": 0,
   "mbps": 0

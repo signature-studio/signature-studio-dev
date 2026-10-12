@@ -93,7 +93,7 @@ ok('ini: VST3 filenames = inner-binary form 15 + module-file form 164 (両形と
   inner.length === 15 && plain.length === 164, `${inner.length}+${plain.length}/${vst3fn.length}`);
 // single-file proof: OTT/kHs sizes match the actual installer payloads on disk
 const ott = vst3fn.find((v) => v.section === 'Effects\\VST3\\OTT');
-const ottInstaller = `${homedir()}/ダウンロード/Install_Xfer_OTT_137.exe`; // [DOWNLOADS]
+const ottInstaller = process.env.OTT_INSTALLER ?? `${homedir()}/ダウンロード/Install_Xfer_OTT_137.exe`;
 if (existsSync(ottInstaller) && ott) {
   const { execSync } = await import('node:child_process');
   // NSIS -slt leaves Size empty; stream the file out and count bytes (the installed single-file module)

@@ -184,7 +184,7 @@ def cmd_inject(a):
     if os.path.exists(m6raw):
         text, _ = base.run_base(open(m6raw).read(), base.make_args())
         mod = IR.Module.parse(text)
-        img = Image("/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll")
+        img = Image(env.OTT_DLL)
         out["ott"] = dict(F7=inject.eval_f7(mod, img, limit=3, max_total=150), P1_fold=inject.eval_p1_fold(mod, img))
     for k, v in out.items():
         print("[inject] %s: %s" % (k, json.dumps(v, ensure_ascii=False)))

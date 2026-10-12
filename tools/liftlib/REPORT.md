@@ -567,3 +567,27 @@ T12 は「join split が発動すること」を assert していたが、LIFTLI
 | `OTT_vst2_win64.dll` 等の `/home/ubuntu/work/...` 決め打ち (`tests/test_unit.py`・`m8_e2e.sh` ほか多数) | runner では symlink 必須 | `tools/shared/env.sh` (`ANALYSIS_DIR`) への統一を別チケット (PM が `[LIFTLIB-n]` で起票) |
 | `pefile`/`capstone` の依存宣言が無い (requirements 無し) | 新規環境で `ModuleNotFoundError` | 同上 / #284 (CI 基盤) にコメント |
 | 旧 dir スクリプトの実行を禁止する機械的な仕組みは無い (注記のみ) | 参照専用は運用依存 | PM 判断 (SUBAGENT_RULES 側の「読取専用」更新と合わせて) |
+
+## 16. 環境パス置換 (#386, 親 #294・先行 #312): tools/liftlib/liftlib の /home/ubuntu を tools/shared へ
+
+既知類型との関係 (DEFECTS.md): 該当なし (パス参照の置換のみで lift/IR には触れない)。
+
+### 16.1 変更
+`tools/liftlib/liftlib` の `*.sh *.py *.json *.ts *.mjs` (work/ 除く) の `/home/ubuntu` 参照 2 行を置換。
+`liftlib/env.py` が `tools/shared/paths.py` の `PLUGINS_DIR` から `OTT_DLL` を組み、`cli.py` (inject-eval) と `recipes/ott.py` (`DLL`) がそれを参照する。
+`tools/liftlib/` 直下 (`tests/test_unit.py`・`lowbase_e2e.sh`・`p1_residual_census.py`・`xmm0_ret_census.py`・`targets/ott_leaf.json`) は本チケット範囲外 (§16.3)。
+
+### 16.2 検証 (検証起点 `origin/main` = ee8f70c、素材は `fl-win64` のみ)
+- 受入条件 1: `grep -rn '/home/ubuntu' tools/liftlib/liftlib --include=*.sh --include=*.py --include=*.json --include=*.ts --include=*.mjs --exclude-dir=work | wc -l` → 0 (置換前 2)。
+- 受入条件 2 (既定値同一性): `ANALYSIS_DIR`/`PLUGINS_DIR` を unset して `env.OTT_DLL` と `recipes.ott.DLL` を置換前の固定文字列
+  `/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll` と文字列比較 → 両方一致 (True)。n=1・直列、load average 0.55 (1 分値)。
+- ネガティブコントロール: `PLUGINS_DIR=/nonexistent` → `/nonexistent/ott/binaries/OTT_vst2_win64.dll`、`ANALYSIS_DIR=/x` (PLUGINS_DIR unset) → `/x/plugins/ott/binaries/OTT_vst2_win64.dll` (変数が効いている)。
+- 構文: `python3 -m py_compile` 3 本 OK。
+
+### 16.3 検証範囲 / 範囲外 / 未解決
+範囲外: `liftlib_e2e.sh` / `python3 -m liftlib ott` の実行。`OTT_vst2_win64.dll` は `analysis-ott-binaries`、lift 入力は `work-m6-ott`・`work-liftlib`、emcc は `toolchain-emsdk` が要り、この run は `fl-win64` のみ取得のため。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| e2e を素材付きで未実行 | 置換行以外の挙動は未検証 (置換は DLL パス定義のみ) | 本 PR のレビュー run (PR 本文の `oc_artifacts:` 行) |
+| `tools/liftlib/` 直下 5 ファイルに `/home/ubuntu` が残る | runner では symlink 必須 | 未起票 (2026-10-13 時点で `gh issue list --search "CI-4-liftlib"` は #386 のみ)。親 #294 にコメントで起票を提案 |

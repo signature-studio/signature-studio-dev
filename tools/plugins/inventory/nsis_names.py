@@ -16,7 +16,9 @@ EXE = os.path.expanduser('~/ダウンロード/flstudio_win64_26.1.7.5653.exe')
 HERE = os.path.dirname(os.path.abspath(__file__))
 WORK = os.path.join(HERE, '..', 'work')
 OUT = os.path.join(WORK, 'nsis_blockmap.json')
-MANIFEST = '/home/ubuntu/work/analysis/win64/block_manifest.json'
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'shared'))
+from paths import FL_WIN64_DIR  # noqa: E402
+MANIFEST = os.path.join(FL_WIN64_DIR, 'block_manifest.json')
 DATA0 = 0x61eb2
 ES = 36
 
