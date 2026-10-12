@@ -141,7 +141,9 @@ runs:
         extract_failed=""
         for f in "$artifacts_dir"/toolchain-*.tar.zst; do
           [ -e "$f" ] || continue
-          if sudo tar --zstd -xf "$f" -C /opt; then
+          # root で展開すると emsdk の cache (emcc が書き込む) が runner から書けず、
+          # emcc が PermissionError で落ちる (#223 の run)。展開後に所有者を runner にする。
+          if sudo tar --zstd -xf "$f" -C /opt && sudo chown -R "$(id -u):$(id -g)" "/opt/$(basename "$f" .tar.zst | sed 's/^toolchain-//')"; then
             echo "extracted $(basename "$f") -> /opt"
           else
             extract_failed="$extract_failed $(basename "$f")"
@@ -181,3 +183,7 @@ runs:
           echo "ARTIFACTS_DIR=$artifacts_dir"
           echo "TMPDIR=$RUNNER_TEMP"
         } >> "$GITHUB_ENV"
+        # emsdk の upstream/bin (llvm-nm・wasm-ld ほか) を PATH に通す。emsdk_env.sh は通さない。
+        if [ -d /opt/emsdk/upstream/bin ]; then
+          echo "/opt/emsdk/upstream/bin" >> "$GITHUB_PATH"
+        fi
