@@ -83,3 +83,38 @@
 - **CAB-106 への引継**: bit0 常時 0 仮説の動的確認 (`0x11be5b8` 系読み側の観測)。
   `gradeChar` (obj `0x15e4790`+0xd0) とボタン ID (`0x15e0488`) を観測変数に追加推奨。
 - vreg への reader 組込 (§3) は CAB-213 完了後が安全 (VM 無しでは外部 .reg の検証表示が不完備)。
+
+## 7. 再検証 (GitHub issue #213 / コミット済み HEAD `3ae2d0d`, ilreg 本体は `4da0feb`)
+
+既知類型との関係: 該当なし (登録パーサの静的読解であり lift の silent miscompile を扱わない。`docs/DEFECTS.md` D1〜D16 / icall §4 D1〜D13 のいずれにも非該当)。
+
+| 項目 | 実測 |
+|---|---|
+| 実行 | `node tools/startup/vreg/ilreg/verify/test_golden.mjs` を worktree `ws-213` (HEAD `3ae2d0d`, 未コミット変更なし) で 3 回 |
+| 結果 | 3/3 回とも 20 passed, 0 failed |
+| 所要 | 0.034s / 0.035s / 0.034s (load average 1.15, 並列 1, 4 コア runner) |
+| 受入 1 (入力・検証手順) | `FORMAT.md` §2 (registry 値 8 項目 + AppData/ComputerName/MachineGuid), §3, §7 |
+| 受入 2 (placeholder 判断) | `FORMAT.md` §8 (通らない / 例外・bit0 立てなし / seed 変更不要) |
+
+ネガティブコントロール (`verify/reader.mjs` を 1 箇所壊して実行。実行後に元へ復元済み):
+
+| 破壊 | 結果 |
+|---|---|
+| checksum の `c*2-3` を `c*2-4` | 19 passed, 1 failed |
+| `sha256` を `sha1` | 19 passed, 1 failed |
+| 8 文字区切りを 7 文字 | 19 passed, 1 failed |
+
+別アルゴリズム検算: Python `hashlib` による独立実装で、固定ベクタ
+(AppData=`C:\Users\u\AppData\Roaming`, ComputerName=`PC1`, MachineGuid=`12345678-aaaa-bbbb-cccc-1234567890ab`)
+の machineString を算出し、`reader.mjs` の出力と 74 文字全一致
+(`75BB0FAB-07CFA8E6-4DAB7FCB-50193B01-4B9A7DAC-CAF6F5B8-D0BE5803-206B09DA-6d`)。
+
+検証範囲: reader 模擬検証器の内部整合 (制御フロー移植・machineString 書式) と文書の存在・節対応。
+範囲外: 機械語読解そのものの再確認 (Ghidra 素材 `work/` は本 run で未使用)、VM 復号、実ユーザ `.reg`。
+`$ARTIFACTS_DIR` には `fl-win64.tar.zst` のみ存在し、本再検証は素材を使わない。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| VM オペコード表の実装 (§4-1) | 外部 `.reg` の ILRegKey を平文化できない | 新規子チケット案 `[ST-T14]` (親 #23)。issue #213 のコメントが「#214」と記すが #214 は別件 (ST-T13, closed) のため番号は PM が確定 |
+| 平文 head 構造 (§4-2) | strictHead の実データ確定 | #116 (ST-T9, ユーザ起点 .reg) |
+| bit0 常時 0 仮説の動的確認 (§6) | Trial 表示分岐 | #107 (ST-T11) |
