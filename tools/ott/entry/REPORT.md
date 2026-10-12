@@ -147,4 +147,4 @@ python3 -u tools/ott/entry/cmp_entries.py work/entrylift/matrix/nat_result.json 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | e2e (`entry_e2e.sh --quick`) を素材付きで未実行 | 置換行以外の挙動は未検証 (置換は DLL パス定義のみ) | 本 PR のレビュー run (PR 本文の `oc_artifacts:` 行) |
-| `entry_nat.py` は import 時に ottnat が re-exec するため DLL 変数の単体 import 確認は不可 | `DLL` 解決は grep・構文確認のみ | 同上 |
+| `entry_nat.py` は import 時に `tools/ott/work/libottnative.so` (ビルド成果物) が無く `OSError` で止まる (`OTT_NOASLR=1` で実測) ため `entry_nat.DLL` の単体確認は不可 | `DLL` 解決は grep・構文確認のみ | 同上 |
