@@ -49,7 +49,7 @@ def main():
         d = os.path.join(out, case)
         os.makedirs(d, exist_ok=True)
         for side in ("processor", "controller"):
-            dom, ver = pc.decode(pc.encode(seeds[side][0])), seeds[side][1]  # deep copy (Float32 保持)
+            ver = seeds[side][1]
             dom = pc.decode(pc.encode(seeds[side][0]))  # deep copy (Float32 保持)
             if case in ("lic_sent", "demo_payload"):
                 if side == "processor":
