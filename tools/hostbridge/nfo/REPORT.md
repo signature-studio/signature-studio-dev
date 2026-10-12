@@ -372,3 +372,15 @@ CAB-215 の主眼 (writeEntry ↔ 実機比較) は **ini セクション経由�
 - **クリーン HEAD**: `git worktree add --detach work/wt_h4 HEAD` で `h4_e2e.sh` を再実行 → node 側 42 ok / 0 FAIL・`h4_recount.mjs` exit 0。**Chrome フェーズのみ `report timeout`** (入れ子 `work/wt_*` パスで spawn-server の URL 解決が失敗するハーネス事象。実装側 §13.6 の記載と一致。実ディレクトリでは 3 回連続 exit 0)。検証後の worktree は撤去済。
 
 
+
+## 15. 追記 (#347 / CI-4, 2026-10-13): /home/ubuntu 絶対パスを tools/shared の環境変数へ置換
+
+既知類型との関係: 該当なし (パス定義のみの変更・lift 無関係)。検証起点 commit: `2c3e526` (origin/main)。
+
+- 置換: `test/_fl.ts`・`analysis/real_fst_check.mjs` (`FL_MAC_DIR`)、`cli/metrics.ts`・`h4/h4_e2e.ts` (`REPO_ROOT`)、`analysis/reproduce.sh` (`source tools/shared/env.sh` → `FL_WIN64_DIR`)、`analysis/kh_magic_check.mjs` (`os.homedir()` + `[DOWNLOADS]`)。`ott_fst_dump.json` の `corpusRoot` は `$FL_MAC_DIR/...` 表記にした (`real_fst_check.mjs` も同形式で出力)。
+- `tsconfig.json` に `allowJs` / `checkJs:false` を追加 (`paths.mjs` を型検査で解決するため)。
+- 既定値は従来パスと同一: `env -u FL_ROOT -u ANALYSIS_DIR -u FL_MAC_DIR` で `_fl.ts` の `FL_ROOT` が旧ハードコード値と文字列一致 (true)、`FL_WIN64_DIR` も旧 `FLE_PE` と一致。
+- 検証 (再現: `grep -rn '/home/ubuntu' tools/hostbridge/nfo --include=*.sh --include=*.py --include=*.json --include=*.ts --include=*.mjs --exclude-dir=work` → 0 件):
+  - `SKIP_H4=1 bash nfo_e2e.sh`: 置換前・後とも exit 0、stdout (所要行除く) と `work/` 生成物が `diff` 空。素材は fl-win64 のみで mac コーパスが無く、corpus テストは SKIP (36 pass / 4 skipped / 0 fail)。
+  - `bash h4_e2e.sh --no-chrome`: 置換前・後とも exit 1・`FAILED: 12` で出力一致 (mac コーパス/ Chrome 無しの環境差)。
+  - Chrome 段: 置換前の origin/main でも配置により `report timeout` (ws-347-base) / `FAILED: 19` (wt_base) と不安定。置換との因果は無い (未パッチ側で再現)。

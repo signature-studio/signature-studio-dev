@@ -4,7 +4,8 @@
 set -euo pipefail
 NFO="$(cd -- "$(dirname -- "$0")/.." && pwd)"
 HB="$NFO/.."; W="$NFO/work"; E="$NFO/evidence"
-FLE_PE=/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin   # FLEngine_x64.dll 26.1.7.5653
+source "$NFO/../../shared/env.sh"
+FLE_PE="$FL_WIN64_DIR/extracted/block00031_PE.bin"   # FLEngine_x64.dll 26.1.7.5653
 mkdir -p "$W/tmp" "$E"
 export _JAVA_OPTIONS="-Djava.io.tmpdir=$W/tmp"
 [ -d "$W/ghidra_fle" ] || cp -r "$HB/../m2/work/ghidra_dll" "$W/ghidra_fle"
