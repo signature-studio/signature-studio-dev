@@ -9,7 +9,10 @@
     "typecheck": "tsc --noEmit",
     "runtime:stage": "node tools/runtime/stage_wasm.mjs",
     "runtime:e2e": "node tools/runtime/e2e.mjs",
-    "runtime:e2e:prod": "node tools/runtime/e2e.mjs --prod"
+    "runtime:e2e:prod": "node tools/runtime/e2e.mjs --prod",
+    "release-guard:build": "node tools/legal/release-guard/cli.mjs build",
+    "release-guard": "node tools/legal/release-guard/cli.mjs scan",
+    "release-guard:test": "node --test tools/legal/release-guard/guard.test.mjs"
   },
   "keywords": [],
   "author": "",

@@ -77,6 +77,25 @@ if [ "$EVENT_NAME" = issue_comment ] && ! grep -qE "$COMMAND_RE" "$COMMENT_FILE"
 fi
 printf 'should_run=%s\n' "$should_run" >> "${GITHUB_OUTPUT:-/dev/null}"
 
+# ---------------------------------------------------------------- 素材 (R2 artifacts)
+# 本文に `oc_artifacts: fl-win64 plugins-ott` の行があれば、その素材を agent-setup が
+# R2 から取得する。本文は untrusted なので allowlist に一致する語だけを通す。
+# 指定が無ければ空 (workflow 側で既定の fl-win64 になる)。
+# 注意: 全素材で約 16 GiB。runner の空きに収まるよう必要なものだけ指定すること。
+ARTIFACT_RE='^(fl-win64|plugins-(ott|freshair|serum2|massivex|kilohearts)|toolchain-(retdec|emsdk)|work-(m11|liftdiff))$'
+artifacts=""
+artifacts_line="$(grep -m1 -E '^[[:space:]]*oc_artifacts:' "$COMMENT_FILE" || true)"
+if [ -n "$artifacts_line" ]; then
+  for name in $(printf '%s' "${artifacts_line#*oc_artifacts:}" | tr -cd 'a-z0-9 -'); do
+    if ! printf '%s' "$name" | grep -qE "$ARTIFACT_RE"; then
+      printf '::error::oc_artifacts: unknown artifact "%s" (allowed: fl-win64, plugins-{ott,freshair,serum2,massivex,kilohearts}, toolchain-{retdec,emsdk}, work-{m11,liftdiff})\n' "$name"
+      exit 1
+    fi
+    artifacts="${artifacts:+$artifacts }$name"
+  done
+fi
+printf 'artifacts=%s\n' "$artifacts" >> "${GITHUB_OUTPUT:-/dev/null}"
+
 # ---------------------------------------------------------------- 権限
 # 権限の正本は workflow の job-level env 式 (OC_PERMISSION)。ここは値域を検証して
 # そのまま後続 step に引き継ぐ。'read' / 'write' 以外の値は受け入れない。

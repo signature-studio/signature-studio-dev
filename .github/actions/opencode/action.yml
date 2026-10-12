@@ -1,5 +1,5 @@
 name: OpenCode
-description: 'Run OpenCode tasks based on a prompt file; summary goes to $GITHUB_STEP_SUMMARY'
+description: 'Run OpenCode tasks based on a prompt file; summary goes to $GITHUB_STEP_SUMMARY and the job log'
 
 inputs:
   model:
@@ -88,12 +88,14 @@ runs:
       env:
         SID: ${{ steps.run.outputs.sid }}
       run: |
+        # step summary は API/UI からしか読めず `gh run view --log` に出ないため、
+        # 同じ内容をログにも出す (tee)。
         {
           echo "## OpenCode result"
           echo
           opencode api --standalone get "/api/session/$SID/message" \
             | jq -r '[.data[] | select(.type == "assistant")] | last | .content[]? | select(.type == "text") | .text'
-        } >> "$GITHUB_STEP_SUMMARY" || echo "::warning::could not extract summary for session $SID"
+        } | tee -a "$GITHUB_STEP_SUMMARY" || echo "::warning::could not extract summary for session $SID"
 
     - name: Fail if OpenCode did not succeed
       if: ${{ steps.run.outputs.rc != '0' }}

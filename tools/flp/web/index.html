@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <title>flp harness</title>
+  <style>
+    body { font: 13px/1.4 system-ui, sans-serif; margin: 16px; background: #111; color: #ddd; }
+    #drop { border: 2px dashed #666; padding: 24px; margin: 12px 0; text-align: center; }
+    #drop.over { border-color: #6c6; }
+    pre { background: #1b1b1b; padding: 8px; overflow: auto; max-height: 50vh; }
+    table { border-collapse: collapse; }
+    td, th { border: 1px solid #444; padding: 2px 8px; text-align: right; }
+    td:first-child, th:first-child { text-align: left; }
+    .err { color: #f66; }
+  </style>
+</head>
+<body>
+  <main id="flp-harness">
+    <h1>FLP parse / dump (browser)</h1>
+    <p>FL 同梱ファイルは配布物に含まれない。ファイル選択またはドラッグ&amp;ドロップで .flp / .fst / .fsc を渡す。</p>
+    <input id="flp-file" type="file" multiple />
+    <div id="drop">ここにドロップ</div>
+    <div id="status">待機中</div>
+    <table id="summary"></table>
+    <pre id="dump"></pre>
+  </main>
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

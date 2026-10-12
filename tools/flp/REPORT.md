@@ -119,4 +119,36 @@
 | L-5 | STFT/LUFS 判定 (`src/wav.ts` D クラス) と最初の差分位置レポート | ORACLE §4.4 |
 | L-6 | エンジン読込 switch (`0xa9e7a0` 以降の FlpLoad) 逆アセンブルで低信頼 47 ID を確定 | `unknown_events.json` の undocumented → 0 |
 | L-7 | VST2/VST3/CLAP ラッパ (213) の実データ検証 | §7 依頼 (2) |
-| L-8 | `flp_e2e.sh` を `agent-browser` E2E に接続 (ブラウザで parse/dump) | M12 |
+| L-8 | `flp_e2e.sh` を `agent-browser` E2E に接続 (ブラウザで parse/dump) | M12 — **実装済 (#112, §9)** |
+
+## 9. ブラウザ E2E (L-8 / #112)
+
+既知類型との関係 (`docs/DEFECTS.md`): 該当なし (lift 無関係)。
+
+- **ハーネス** `web/` (`index.html` + `main.ts`): `src/` の `parseFlp`/`writeFlp`/`dumpText`/`summarize` をブラウザで実行。入力は `<input type=file>` と drag&drop のみ (FL 同梱ファイルは配布物に含めない)。結果を `window.__flp` に公開。`?sabotage` は書込結果を 1 byte 壊すネガティブコントロール用。
+- **スイート** `tools/e2e/suite/flp.mjs` (`bash tools/e2e/run.sh --suite flp [--driver both]`)。vite build → 静的配信 → agent-browser (puppeteer-core も可) で file input (`upload`) と drop (合成 `DragEvent`) の両経路を検証。ブラウザ結果を (a) Node 側で別プロセス実行した `src/` の結果、(b) `corpus/manifest.json` (events/version/tempo/channels) の 2 つと突合。
+- **フィクスチャ** `suite/flp-fixtures.mjs`: `E2E_FLP_WIN_DIR` (= `fl-win64.tar.zst` の `extracted/`; `block*_DATA.bin` のうち先頭 `FLhd`。`.flp` は manifest の sha256 で特定、`.fst/.fsc` は size + イベント数) か `FL_ROOT` (mac)。代表 6 件: Empty.flp / NewStuff.flp (0xAC 拡張 ID) / Basic with limiter.flp (26.1) / Never Out.flp (7.1 MB) / Accordeon 2.fst / 4 steps.fsc。無ければ SKIP、`E2E_REQUIRE_FLP=1` で FAIL。
+- **検査 7 件**: page-load (node グローバル無し) / file-input (6 件の byte-exact 往復 + 突合) / dump-view (画面の dump が Node の `dumpText` と一致) / drop (5 件) / bad-input (`not an FLhd file` を error 表示しページは継続) / console-clean / negative-control (1 byte 破壊を検出)。
+- `flp_e2e.sh` は web/ の `node:` import 禁止検査を追加し、`E2E_FLP_WIN_DIR` か `FL_ROOT` があれば末尾で本スイートを `E2E_REQUIRE_FLP=1` で実行 (`BROWSER_E2E=0` で無効化)。
+
+**実測** (検証起点 commit `1769513` (n=3 は rebase 前の同一内容 `d9689f8` で取得し、rebase 後 HEAD `9874680` で 1 回再実行して PASS 14 / FAIL 0, 9.3 s, load 0.98 を確認), クリーン HEAD, Chrome 154.0.8037.97 headless, Node v22.23.3, 素材 = `fl-win64.tar.zst` の `extracted/` 9,128 FLhd ブロック, CI runner):
+
+| 項目 | 結果 |
+|---|---|
+| `bash tools/e2e/run.sh --suite flp --driver both` (n=3) | 3/3 とも **PASS 14 / FAIL 0** (7 検査 × 2 driver)。所要 11.6 / 9.4 / 9.7 s (load average 1 分値 1.04 / 2.00 / 2.06, 並列 1) |
+| ブラウザ往復 (file input 経路, 6 件) | 6/6 byte-exact (入力 sha256 == 書出 sha256 == Node 別プロセス結果)。イベント数は Node・manifest と一致: 1,413 / 4,403 / 1,614 / 7,120 / 40 / 3 |
+| 最大ファイル (Never Out.flp, 7,142,631 B, 7,120 ev) の parse+write+summarize+dump+sha256 | agent-browser 804–1,528 ms (n=6 の min–max は両 driver 込み) |
+| 既存 app スイート (`run.sh --targets preview,edge-sim`) への影響 | PASS 15 / FAIL 0 / SKIP 3 (`tools/runtime/REPORT.md` の基準値と同一) |
+| win 抽出物の FLhd ブロック | 9,128 個。manifest の `.flp` 164 件の sha256 は **164/164** が win ブロックに存在 (`.fst/.fsc` は manifest に sha256 が無いため size + イベント数一致で特定) |
+
+- **ネガティブコントロール**: `?sabotage` (書込結果の末尾 1 byte を反転) のページに Empty.flp を渡すと、検出器 `compare()` が **3 項目**で不一致 (`roundtrip` / `outSha(=inSha)` / `outSha(node)`) を報告 = 検査が FAIL 側に倒れることを確認 (`flp-negative-control` が PASS)。
+- **素材なし**: `E2E_FLP_WIN_DIR` / `FL_ROOT` が無いと `run.sh --suite flp` は SKIP (rc 0)、`E2E_REQUIRE_FLP=1` では FAIL (rc 1) を実測。
+- `tsc -p tools/flp/tsconfig.json` (web/ を include) rc 0、`src/` `web/` に `from 'node:` 0 件。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `flp_e2e.sh` 全体 (往復 9,740 件 / census 等) は mac 抽出ツリー (`FL_ROOT`) が前提で、CI の win 素材だけでは前半を実行できない。今回はブラウザ段のみ単体実行 | CI から `flp_e2e.sh` を 1 本で回せない | #112 にコメント (win ブロック入力対応は別チケット案) |
+| 代表 6 件のみブラウザで検証。全 9,740 件のブラウザ往復は未実施 | ブラウザ固有の差異 (巨大 FLP のメモリ等) は代表件数の範囲でのみ保証 | 必要なら新規子チケット (親 #16) |
+| Firefox / Safari は未検証 | Chrome 以外の挙動不明 | `docs/STATUS.md` の MS12 / GUI-8 (Firefox 依存) に従う |
+
+範囲外: Firefox/Safari、FL 本体のロード、実 URL (`--url`) への FLP スイート適用。
