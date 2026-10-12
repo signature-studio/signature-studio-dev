@@ -642,8 +642,8 @@ python3 tools/plugins/p0c/p0c4_e2e.py 2000        # ext IR パス (別トラッ�
 起点 commit = `ae18b1e` (本節の WIP 評価前)。REPORT §10.8 と同手法 (`git archive HEAD --
 tools/plugins/p0c | tar -x -C work/verify_ae18b1e --strip-components=3`) で展開し、
 work/ 内の既存 lift IR (work/k80.lift.ll) を入力として p0c4_abi_e2e.py を再現する。
-[6] の kernel_table 参照は絶対パス
-`tools/plugins/inventory/kernel_table.py` で解決する。
+[6] の kernel_table 参照はスクリプトが `__file__` から REPO を導出し、
+`tools/plugins/inventory/kernel_table.py` を解決する。
 
 ### 11.10 環境前提 (規則 43)
 
@@ -658,8 +658,9 @@ work/ 内の既存 lift IR (work/k80.lift.ll) を入力として p0c4_abi_e2e.py
   子 **#277** (native crash 残 7 + abi-mismatch 残 7)、**#269** ([P0c-5] / CAB-268、ext 精度)、
   #242 ([P0c-2] / CAB-241)。milestone は M-App (親から継承)。
 - PR: **#278** (branch `254-arg-pass-abi`)。worktree 内クリーン HEAD から e2e 再現済み。
-- 規約変更: 運用ルールは 2026-10-11 14:06 に「worktree + PR (直接 master commit 禁止)」
-  へ改訂された (正本: `docs/WORKFLOW.md` §1〜§2・`docs/DECISIONS.md` D4)。
+- 規約変更: 運用ルール (旧 SUBAGENT_RULES.md) は 2026-10-11 14:06 に「worktree + PR (直接 master commit 禁止)」
+  へ改訂 (RULES_SHA=4d7380074852、正本: `docs/WORKFLOW.md` §1〜§2・`docs/DECISIONS.md` D4)。
+  着手時の RULES_SHA は ff4999169333 (改訂前の preflight 値)。
   改訂前に同内容を共有 master へ直接 commit した (ca5ac3f) ため、PR は origin/master から
   の cherry-pick (00996d5)。共有 master の ca5ac3f は reset/revert せず残置 (他担当の
   staged WIP を巻き込むため)。扱いは main 判断。
