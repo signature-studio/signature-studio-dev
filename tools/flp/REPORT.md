@@ -199,7 +199,7 @@
 
 仕様 = ORACLE.md §4.4 / §4.3。実装 = `src/stft.ts` (FFT・STFT 比較・LUFS-I・true-peak)、`src/wav.ts` (`judgeWav` / `judgeSpectral` / `firstDiff` / `firstViolation`)、`cli/wavcmp.ts` (JSON に `spectral`・`firstDiff` を追加)。`judge(m,'D-spectral')` は `SpectralMetrics` 無しだと fail-closed (従来は時間領域のみで PASS していた)。
 
-**11.1 検証 (HEAD `__HEAD__` / 実測)**。素材不要 (合成 WAV のみ)。Node v22.23.3。
+**11.1 検証 (HEAD `fb04035` / 実測)**。素材不要 (合成 WAV のみ)。Node v22.23.3。
 - `tsc -p tsconfig.json`: クリーン。`node --test test/oracle.test.ts`: 13/13 PASS (旧 5 + 新 8; n=3: 0.99 / 1.02 / 1.01 s、load average 0.17)。`node --test test/*.test.ts`: tests 32 / pass 29 / fail 0 (残 3 は素材 (mac .app) 不在による skip)。
 - 単体テストが固定する値: LUFS-I = 997 Hz −23 dBFS ステレオで −23.0 ±0.05 LUFS (EBU R128 基準)、モノは 3.0103 LU 低い、−70 LUFS 絶対ゲートで無音区間を除外、fs/4 の 45° 位相正弦 (サンプルピーク −3.01 dB) の true-peak ≈ 0 dBTP (±0.05)、FFT = 直接 DFT (<1e-9)、STFT 先頭差分フレーム = 最初に差分へ触れる窓、−80 dBFS の副信号はフロア (−60 dB) 以下で無視、+0.5 dB ゲイン誤差は STFT/LUFS/TP 全て FAIL、位相のみ違う同一スペクトルは STFT PASS。
 - CLI (`cli/wavcmp.ts`, 48 kHz ステレオ 3 s の 1 kHz 正弦, `D-spectral`): 同一 → exit 0 (STFT 0/3864 bin 超過)、+0.003 dB ゲイン → exit 0 (rmsDiff/ref −69.2 dB)、ch1 の 2.000 s から 3000 f にバースト → exit 1、`firstDiff` = `{channel:1, frame:91, startSample:93184, timeSec:1.9413, bin:79, freqHz:925.8, diffDb:0.826}` (TP 差 0.828 dB)。
