@@ -86,6 +86,7 @@ def scan_function(MD, td, tva, va, fend):
     gpr_w, xmm_w = set(), set()
     xmm_width = {}                                         # xmmN -> 32/64 (初回 read 命令から)
     stack_reads = []                                       # (entry_rsp 相対 offset, insn)
+    stack_written = set()
     xmm_insns = []                                         # (mnemonic, [(op idx, reg name)])
     scaled_index = False
     clip_index = False                                     # movsx/movzx [base+idx*scale>=2] (負添字 OOB 対策)
@@ -151,9 +152,11 @@ def scan_function(MD, td, tva, va, fend):
                     if o.mem.base in COPYREG:
                         gpr_idx.add(COPYREG[o.mem.index])
                 if (o.mem.base == x86.X86_REG_RBP and rbp_established) or o.mem.base == x86.X86_REG_RSP:
-                    if o.access & 1:                       # mem が読み替数のときだけ arg 候補
-                        rel = (o.mem.disp - frame_fixed) if o.mem.base == x86.X86_REG_RBP \
-                            else (o.mem.disp - 8 * push_n - sub_rsp)
+                    rel = (o.mem.disp - frame_fixed) if o.mem.base == x86.X86_REG_RBP \
+                        else (o.mem.disp - 8 * push_n - sub_rsp)
+                    if (o.access & 2) and not (o.access & 1) and os.environ.get('K80_NO_STACKW') != '1':
+                        stack_written.add(rel)              # 先に書いた home slot の読み戻しは引数ではない
+                    if o.access & 1 and rel not in stack_written:   # mem が読み替数のときだけ arg 候補
                         stack_reads.append((rel, i))
         # ゼロ化イディオム (xorps r,r / pxor r,r / xor r,r / subsd r,r): 同一レジスタの
         # read は引数ではない (0 にする write)。read set から除外する (CAB-253)。
