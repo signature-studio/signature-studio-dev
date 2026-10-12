@@ -127,7 +127,7 @@ FastMM4 の初期化関数群 (InitializeMemoryManager 相当) を単体で検�
 
 `m11_bounds.py` / `m11_tail.py` / `m11_icall_audit.py` は VA 空間 (LB 非依存) なので変更不要。GLOBAL_BASE 0x10000000 は image 終端 0x18c0000+0x10000 より後ろで変更不要 (assert 済み)。initial 288MiB / max 1.8GiB も未変更。
 
-### 実測 (コミット済み HEAD `9969e34`, FLEngine_x64.dll 22,227,016 B)
+### 実測 (コミット済み HEAD `95054de`, FLEngine_x64.dll 22,227,016 B)
 
 | 項目 | 実測 |
 |---|---|
@@ -136,7 +136,7 @@ FastMM4 の初期化関数群 (InitializeMemoryManager 相当) を単体で検�
 | 非 reloc バイト不一致 / 先頭 64KiB の非 0 バイト | 0 / 0 |
 | LB=0 の image | 旧 `m11_image_gen.py` 出力と `cmp` 一致 (22,515,781 B) |
 | LB=0x10000 の image | 22,581,317 B (+65,536 B) |
-| 実行 (HEAD, n=3, load 0.13–0.38, 直列) | image_gen + lb_check: 8.38–8.53 秒, 3/3 PASS |
+| 実行 (HEAD, n=3, load 0.17–0.36, 直列) | image_gen + lb_check: 8.21–8.40 秒, 3/3 PASS |
 | ネガティブコントロール | reloc 1 件の LB 補正を落とすと `dir64_value_mismatch=1` で FAIL; LB=0 image を LB=0x10000 で検査すると FAIL (長さ不足) |
 | IR remap pass 単体 | 試料 IR で store 即値 4096 (LB=0) → 69632 (LB=0x10000) を確認 (全 IR での件数は未計測) |
 
