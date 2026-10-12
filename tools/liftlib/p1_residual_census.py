@@ -29,7 +29,7 @@ from liftlib import ir as IR                      # noqa: E402
 from liftlib.pe import Image                      # noqa: E402
 from liftlib.passes import base, p1, f2           # noqa: E402
 
-DLL = "/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll"
+from liftlib.env import OTT_DLL as DLL          # noqa: E402
 RAW = os.path.join(HERE, "..", "m6", "work", "ott.drc.ll")
 
 
