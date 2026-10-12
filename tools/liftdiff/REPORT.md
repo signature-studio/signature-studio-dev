@@ -274,3 +274,15 @@ m11 sample:800・残 3 unit の原因・`ld_tls_next` の limit 性・e2e 再現
 (format-truncation warning は既知・動作影響なし)。wasm は emcc (`[EMSDK]`)。
 所要 (実測・負荷依存): bootstate flelift hybrid **24.4 s** (load 0.79→2.62)、e2e [1/4]-[3/4] **62.5 s**、
 m11 sample:800 (12 shard) **93〜95 s**、flelift closure (14 shard) **585 s** (load 4.80→12.06)。
+
+## 8. m11 wasm_trap 578 関数のトリアージ (LD-5 / #236)
+
+集計 = `tests/triage_wasm_trap.py` → `results/m11_wasm_trap_triage.md` (表・内訳はそちらが正本)。
+入力は既存 closure の batch jsonl (`work/m11/batch_closure.jsonl`、再走なし)。
+
+- **unreachable 218 は署名不一致 thunk 由来ではない**: 全件が `function_4128b0__lifted` で trap し、frame 名に signature/thunk を含むものは 0、
+  wasm の name section に `signature_mismatch` も無い (M11 §2.4 の thunk は sigfix 済み)。wasm 側の import 呼出列には全件 `ExitProcess` があり、
+  native 側には 0 件。IR 上 `ExitProcess` 呼出の直後が `unreachable` なので、stub が戻る wasm でここに落ちる。
+  実際の分岐点は `ExitProcess` へ至る手前 (`function_4096b0` / `function_412a60` 経由の終了経路に wasm だけが入る) で、native とのずれは上流にある (未特定)。
+- OOB 222 は最上位 frame が 71 種に分散 (`function_414ad0` 68 件が最多)。hang 39・badjson 25・indirect_sig 3・arith/stack/other 計 4。個別原因は未確定。
+- TSV 578 のうち 67 件は今の jsonl に wasm_trap case が無い (jsonl 側のみ 71 件)。TSV と jsonl は別 run のため (§6.2)。
