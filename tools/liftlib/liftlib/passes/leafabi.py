@@ -19,9 +19,89 @@ import re
 
 from .. import ir as IR
 from ..mc import MFunc
-from ..regbind import Binder
+from ..regbind import Binder, result_type as regbind_result_type
 
 CALL_RE = re.compile(r"^\s*(?:%[\w$.\-]+ = )?call (\S+) @(function_[0-9a-f]+)\((.*?)\)\s*(?:,.*)?$")
+
+
+# ablation (規則 41): LL_NO_RET_PHI=1 で LIFTLIB-5 の「複製 call 結果の ret phi 合成」を止める
+_NO_RET_PHI = bool(os.environ.get("LL_NO_RET_PHI"))
+
+
+def _canon_xmm(it):
+    from ..mc import _canon_reg
+    return _canon_reg(it._ci, it.ops[0].reg)
+
+
+def _relocate(fn, bi, ln):
+    """前方の挿入で ret 行の位置がずれた場合に備え, 同一 block 内で行を再探索する。"""
+    b = fn.blocks[bi]
+    return bi, b.lines.index(ln)
+
+
+def _def_values(binder, d):
+    """機械語 def d の xmm0 値を表す IR 命令 [(bi, ln, dst, ty)] (複製コピー全部)。
+    i128 結果, または xmm0 戻り callee への call の i64/i32 戻り。"""
+    out = []
+    for (bi, li, ln) in binder.ix.instrs_at(d):
+        dst = IR.instr_dst(ln)
+        if not dst or not re.match(r"^\s*%[\w$.\-]+ = call ", IR.strip_tokens(ln)):
+            continue                      # load / trunc 等の同一アドレス別命令は def の値ではない
+        ty = regbind_result_type(ln)
+        if ty == "i128" or (ty in ("i64", "i32") and binder.xmm0_ret_of_call(d)):
+            out.append((bi, ln, dst, ty))
+    return out
+
+
+def _store_phi(mod, fn, used, tag_va, a_name, vals):
+    """vals の各 IR 値の直後に alloca (i128) へ store する。alloca は entry 先頭 (0 初期化)。"""
+    a = a_name
+    k = 0
+    while a in used:
+        k += 1
+        a = "%s%d" % (a_name, k)
+    used.add(a)
+    entry = fn.blocks[0]
+    entry.lines.insert(0, "  store i128 0, ptr %s" % a)
+    entry.lines.insert(0, "  %s = alloca i128" % a)
+    t = mod.tag(tag_va)
+    for (bi, ln, dst, ty) in vals:
+        b = fn.blocks[bi]
+        i = b.lines.index(ln)
+        z = "%%lf_%x_pz%d" % (tag_va, len(used))
+        used.add(z)
+        if ty == "i128":
+            b.lines.insert(i + 1, "  store i128 %s, ptr %s%s" % (dst, a, t))
+        else:
+            b.lines.insert(i + 1, "  store i128 %s, ptr %s%s" % (z, a, t))
+            b.lines.insert(i + 1, "  %s = zext %s %s to i128%s" % (z, ty, dst, t))
+    return a
+
+
+def _call_phi(mod, fn, binder, va, used):
+    """ret @va の xmm0 の到達 def (複数可) を全て同一 alloca (i128) に集める (reg2mem phi)。
+
+    p1 は領域再構成で同一機械語アドレスの IR 命令を複製し, 単一 SSA が ret を支配しなくなる。
+    各 def の全複製の直後で store し, ret 前で load する (最後に実行された def が勝つ)。
+    ENTRY を含む / どれかの def に IR 値が無い場合は None (IR は変更しない)。"""
+    r = binder.root_def("xmm0", va)
+    if r[0] == "def":
+        defs = {r[1]}
+    elif r[0] == "multi":
+        defs = set(r[1])
+    else:
+        return None
+    if 0 in defs:
+        return None
+    vals = []
+    for d in sorted(defs):
+        v = _def_values(binder, d)
+        if not v:
+            return None
+        vals.extend(v)
+    if len(vals) < 2:
+        return None
+    return _store_phi(mod, fn, used, va, "%%lf_%x_phia" % va, vals)
 
 
 def _ret_thread(mod, fn, mf, binder, log, stats):
@@ -54,6 +134,23 @@ def _ret_thread(mod, fn, mf, binder, log, stats):
         if va is None:
             continue
         v = binder.bind("xmm0", va)
+        if (v is None or v[1] == "i1" or not dominates_use(v[0], bi)) and not _NO_RET_PHI:
+            # LIFTLIB-5: xmm0 の唯一の機械語 def が xmm0 戻り callee への call で, p1 の領域再構成が
+            # その call を複製した (生存側 + 領域側の IR 命令が複数) とき, どの単一 SSA も ret を
+            # 支配しない。各複製の直後で alloca に store し, ret 前で load する (reg2mem phi)。
+            ph = _call_phi(mod, fn, binder, va, used)
+            if ph is not None:
+                bi, li = _relocate(fn, bi, ln)
+                b = fn.blocks[bi]
+                t = mod.tag(va)
+                nn = fresh("ph")
+                t64 = fresh("t")
+                b.lines[li] = "  ret i64 %s%s" % (t64, t)
+                b.lines.insert(li, "  %s = trunc i128 %s to i64%s" % (t64, nn, t))
+                b.lines.insert(li, "  %s = load i128, ptr %s%s" % (nn, ph, t))
+                n += 1
+                stats["ret_phi"] = stats.get("ret_phi", 0) + 1
+                continue
         if v is None or v[1] == "i1":
             stats["ret_unbound"] = stats.get("ret_unbound", 0) + 1
             continue
@@ -118,6 +215,8 @@ def _rx_thread(mod, fn, img, callee_set, log, stats):
         return 0
     mf = MFunc(img, *rng)
     n = 0
+    phis = {}
+    fb_done = set()
     for bi, b in enumerate(fn.blocks):
         for li, ln in enumerate(list(b.lines)):
             s = IR.strip_tokens(ln)
@@ -147,13 +246,52 @@ def _rx_thread(mod, fn, img, callee_set, log, stats):
             if reader is None:
                 continue
             lines = [x for x in binder.ix.instrs_at(reader) if stale[0] in IR.strip_tokens(x[2])]
+            md0 = re.match(r"^\s*(%[\w$.\-]+) = call ", IR.strip_tokens(ln))
+            if not lines and not _NO_RET_PHI and mf.defs_before(reader, "xmm0") == {C} \
+                    and md0 and not binder._is_region_dst(md0.group(1)) and (C, reader) not in fb_done:
+                fb_done.add((C, reader))
+                # LIFTLIB-5: reader の xmm0 (第 1 引数) が RetDec の古い値 (call 前) を指しているが, bind(C) は
+                # 多定義で別値に解決され照合できない。reader 行の第 1 i128 引数を stale として採る
+                # (reader が xmm0 を dst/第1 operand に取る SSE 2 operand 形に限る)。
+                rop = mf.insns[reader].ops
+                if rop and rop[0].type == 1 and _canon_xmm(mf.insns[reader]) == "xmm0":
+                    for x in binder.ix.instrs_at(reader):
+                        mm = re.search(r"call i128 @__asm_\w+\(i128 (%[\w$.\-]+)", IR.strip_tokens(x[2]))
+                        if mm:
+                            stale = (mm.group(1), "i128")
+                            lines = [x]
+                            break
             if not lines:
                 continue
             bi2, li2, ln2 = lines[0]
             # 支配チェック: call を含む IR block が reader 行の block を支配する事
             cb = binder.ix.by_addr.get(C)
             if not cb or not binder.ix.dominates(cb[0][0], bi2):
-                stats["rx_nodomin"] = stats.get("rx_nodomin", 0) + 1
+                # LIFTLIB-5: reader が call を支配しない (p1 が call を複製した / 別 block) 時,
+                # 機械語で xmm0 の唯一の到達 def が C なら, call 結果 (全複製) を alloca phi 経由で渡す
+                if _NO_RET_PHI or mf.defs_before(reader, "xmm0") != {C}:
+                    stats["rx_nodomin"] = stats.get("rx_nodomin", 0) + 1
+                    continue
+                if C not in phis:
+                    vals = _def_values(binder, C)
+                    if not vals:
+                        stats["rx_nodomin"] = stats.get("rx_nodomin", 0) + 1
+                        continue
+                    used = {IR.instr_dst(x) for b_ in fn.blocks for x in b_.lines if IR.instr_dst(x)}
+                    phis[C] = _store_phi(mod, fn, used, C, "%%rx_%x_phia" % C, vals)
+                rb = fn.blocks[bi2]
+                ri = rb.lines.index(ln2)
+                ldn = "%%rx_%x_pl" % reader
+                k2 = 0
+                while any(ldn in x for x in rb.lines):
+                    k2 += 1
+                    ldn = "%%rx_%x_pl%d" % (reader, k2)
+                tagr = mod.tag(reader)
+                pat = re.compile("(?<![\\w$.\\-])" + re.escape(stale[0]) + "(?![\\w$.\\-])")
+                rb.lines[ri] = pat.sub(ldn, ln2)
+                rb.lines.insert(ri, "  %s = load i128, ptr %s%s" % (ldn, phis[C], tagr))
+                n += 1
+                stats["rx_phi"] = stats.get("rx_phi", 0) + 1
                 continue
             tag = mod.tag(reader)
             # 呼出結果 (call の dst) を探す: 同一 call 行の dst
@@ -162,6 +300,10 @@ def _rx_thread(mod, fn, img, callee_set, log, stats):
                 continue
             cret = md.group(1)
             z = "%%rx_%x_z" % reader
+            zk = 0
+            while any(z == IR.instr_dst(x_) for b_ in fn.blocks for x_ in b_.lines):
+                zk += 1
+                z = "%%rx_%x_z%d" % (reader, zk)
             newtok = "%s" % z
             fn.blocks[bi2].lines.insert(li2, "  %s = zext i64 %s to i128%s" % (z, cret, tag))
             # ln2 内の stale トークンだけを差し替え (他の metadata (!range 等) はそのまま保持)
