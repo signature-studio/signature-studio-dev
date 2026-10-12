@@ -6,8 +6,9 @@
   x64c (tools/ott/lift/x64c.py の vendored fork) で lift し、**未対応 site を 1,105 (0.32%) → 0 にした**。
   `bash tools/flelift/fle_e2e.sh` (約 2.7 分) = **PASS**。
 - **wasm build 成功**: emcc -O0 で **wasm 27.6MB** を生成 (lift 35 秒 + data gen + emcc 28 秒、合計約 60 秒)。
-- **spot 差分検証 (native 実機械語直実行 vs wasm)**: 7 関数 / 16 case のうち **14 case が戻り値・xmm0・
-  メモリ書換 (.data/.bss/TEB/scratch/arena) 全て bit 一致**。verdict は tools/liftdiff FORMAT.md (v1) §3 準拠の
+- **spot 差分検証 (native 実機械語直実行 vs wasm)**: 7 関数 / 16 case のうち **16 case が戻り値・xmm0・
+  メモリ書換 (.data/.bss/TEB/scratch/arena) 全て bit 一致** (初版は 14/16。残 2 case は harness の scratch 初期化バグで
+  CAB-232 で修正済、§4/§9。#133 で再実測 16/16)。verdict は tools/liftdiff FORMAT.md (v1) §3 準拠の
   JSONL (`results/verdict_flelift.jsonl`)。採点は CAB-232/233 (本 tickets の範囲外、liftdiff e2e は未実行)。
 - **D7–D11 の x64c 版対策を完了** (§3)。D9 は **136,333 rip-rel site 全件で capstone disp = 手動 modrm 解釈
   (不一致 0)** を実証 — x64c は disp_size フィールド非依存ゆえ D9 の影響なし。
@@ -83,7 +84,7 @@ lift 結果 `unsup = {}` (1,105 → 0)。被覆率 100% (lift 集合 340,774 命
 ### 5.2 wasm build — **成功**
 emcc -O0 で **27,630,238 byte** wasm (flel.cjs + flel.wasm)。build 約 28 秒。node で instantiate 成功。
 
-### 5.3 spot 差分 (native vs wasm) — **14/16 case bit 一致**
+### 5.3 spot 差分 (native vs wasm) — 初版 14/16 → **16/16 case bit 一致** (§9 で再実測)
 方法: native = 実機械語を ImageBase 0x400000 に敷設して MS x64 ABI で直接実行 (fle_natdrv)、
 wasm = flelift 産物 (fle_run)。双方同じ敷設 (TEB/scratch/arena 同一 VA, alloc bump 同一) で
 rax / xmm0 / .data+.bss / TEB / scratch / arena の 8B block 差分を比較。
@@ -96,7 +97,7 @@ rax / xmm0 / .data+.bss / TEB / scratch / arena の 8B block 差分を比較。
 | 0x6a7180 SSE2 mix (7th stack 引数 + rip-rel .data 定数) | 1 | **match** |
 | 0x69a130 min/max→cvtps2dq (movhlps/movlhps/movlps) | 2 | **match** |
 | 0x660c40 MMX blend (pxor/punpcklbw/pshufw/psubsw/psllw/pmulhw/paddw/packuswb/emms) | 2 | **match** |
-| 0x6a7990 MMX RGB 乗算 (stack 引数 mm7 + r9 mm6) | 2 | **mismatch** — dst 1-3 block の一部 byte が不一致 (§6) |
+| 0x6a7990 MMX RGB 乗算 (stack 引数 mm7 + r9 mm6) | 2 | 初版 mismatch → **harness バグ修正後 match** (tools/liftdiff/REPORT.md §4) |
 
 verdict JSONL: `results/verdict_flelift.jsonl` (FORMAT.md §3: `liftdiff_version` / `function` / `verdict` /
 `cases[].outcome` / `static.machine`)。**tools/liftdiff の e2e は実行していない** (V12 検収との衝突回避) —
@@ -115,7 +116,7 @@ fail-fast) (3) self-assign ✓。`Move(0x409c80)` n=392 (**M11 の 0x188 record 
 
 ## 6. 未解決・限界 (実測ベース)
 
-1. **0x6a7990 (MMX RGB 乗算) の dst 1-3 block が byte 単位で不一致** (16 case 中 2 case)。r戻り値・xmm0・他の
+1. **[解消済 CAB-232] 0x6a7990 (MMX RGB 乗算) の dst 1-3 block が byte 単位で不一致** (16 case 中 2 case) — 原因は lift ではなく wasm 側 harness の scratch 初期化 no-op。以下は初版時の記述:r戻り値・xmm0・他の
    メモリは一致。packuswb/pmulhuw の primitive 単位は実機 probe で式を確認済みゆえ、ループ内の状態伝搬
    (eax leftover の `shl eax,16` 経由引継ぎ等) の差と推定。再現: `python3 fle_diff.py` (harness 完備)。
    → CAB-232/233 の liftdiff 本格採点で原因特定を推奨。
@@ -153,3 +154,73 @@ bash tools/ott/ott_e2e.sh                         # OTT 回帰 (読取のみ, �
 ```
 前提: python3 (capstone, pefile), emsdk 6.0.12, node, gcc, setarch。PE は
 `docs/REFERENCES.md` `[WIN64]` の `extracted/block00031_PE.bin` (FLE_PE で差し替え可)。
+
+## 9. #133 (OTT-T2) 完了条件の検収 — 再実測と RetDec ルート比較
+
+検証起点: コミット済み HEAD (`2647223` + 本節追記)。環境: Actions runner (4 vCPU)、素材 `fl-win64` + `toolchain-emsdk`
+(`oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk work-m11 work-liftdiff`)。
+既知類型との関係 (DEFECTS.md): 該当なし (新規の lift 欠陥は未発見。D7–D11 の x64c 版対策は §4 のとおり)。
+
+### 9.1 再実測 (`bash tools/flelift/fle_e2e.sh`, クリーン lift から)
+
+| 項目 | 実測 |
+|---|---|
+| e2e 総所要 | **2 分 48.9 秒** (real, 1 回目 fle_natdrv 未 build で途中失敗した run は 1 分 22.7 秒で除外)。load average 0.52 (終了時) |
+| lift | **7,018 関数 / 340,761 命令 / unsup 0 / unlifted callees 0 / import 354** (lift 39 秒 + emcc 40 秒、wasm 27,639,303 B) |
+| smoke | _UStrAsg 3 case + Move 7 case 全 OK (lock xadd 経路 refcnt 2) |
+| spot diff | 7 関数 / **16 case 中 16 equal** (全関数 match) |
+| D9 | rip-rel **136,333 site 中 capstone と手動 modrm の不一致 0** |
+| ネガティブコントロール | native 側 PE の 0x69a130+0x20 の 1 byte を XOR 0x01 → 同関数 2 case 中 1 case が `native_fault`、equal 16 → **15** に低下 (harness が差を検出) |
+
+注: §0/§5.2 の初版値 (7,031 関数 / 340,774 命令) と今回 (7,018 / 340,761) は **13 関数 / 13 命令の差**。原因は未特定
+(capstone 5.0.7・Python 3.14 の環境差、または初版時点の `fle_entries.json` との差が候補。推定)。unsup = 0 は不変。
+差は 0 関数単位ではなく e2e の PASS 条件 (unsup 0) には影響しないが、再現性の観点で下記未解決に載せる。
+
+### 9.2 完了条件 1: M11 初期化 closure の native 一致
+
+| 範囲 | 結果 (出典) |
+|---|---|
+| M11 unit#18 leaf `_UStrAsg` 0x4133f0 / Move 0x409c80 / SSE2・MMX 4 関数 | **spot 16/16 一致** (§9.1) |
+| FLEngine closure 7,421 関数の全数採点 (liftdiff, 928 unit 到達状態) | 一致 4,182 / 不一致 741 / 実行不能 2,498 (`tools/liftdiff/REPORT.md` §1) — **全 cell 一致には未達** |
+| unit#18 連鎖の上位 3 関数 (0x455790 / 0x44bb70 / 0x446400) | liftdiff verdict = **unexec (native 側 fault / null deref)**。native 参照が得られず比較不能 (`tools/liftdiff/results/flelift_closure_verdicts.tsv`) |
+
+→ leaf の bit 一致は達成。ただし「小規模 closure の全 cell 一致」は **未達** (上位関数は native 参照側が boot 状態不足で落ちる)。
+
+### 9.3 完了条件 2: RetDec ルート (#90) との比較表
+
+数値は既存 REPORT の実測値を再掲せず参照する。本表は 3 行の差分結論のみ。
+
+| 観点 | RetDec + icall pass (m11 / icall) | x64c 拡張 (flelift) | 出典 |
+|---|---|---|---|
+| 正確性 (7,421 関数 closure の突合) | m11 route で mismatch だった関数のうち **2,226 が flelift で match**、逆 (m11 match → flelift mismatch) は **5** | 同左 | `tools/liftdiff/results/flelift_vs_m11_routes.md` |
+| 正確性 (unit#18 原因) | `_UStrAsg` 旧値読出し欠落 / 0x188 byte record の `alloca i64` 縮退で OOB | 該当欠陥なし (§4 D7, §5.4) | `tools/m11/REPORT.md` §1 / §2 |
+| 工数 (実装) | pass 群 約 1,900 行 + 手転記 override (`m11_ov.c`) + 反復 16 件の個別修正 | x64c 1 ファイル + rt。未対応 1,105 site → 0 を同一 lifter 内で解消 | `tools/icall/REPORT.md` §5 / 本 §2 |
+| lift 所要 | RetDec 4 並列 約 1–2 分 (icall REPORT の記載値、`約` は原典のまま) | **lift 39 秒 + emcc 40 秒** (今回実測) | 本 §9.1 |
+| wasm サイズ | m11: 6.0 MB (RetDec route, 7,421 IR 定義) | **27.6 MB** (-O0, 7,018 関数) — サイズは x64c が大きい | `tools/m11/REPORT.md` §1 / 本 §9.1 |
+| 実行速度 | 未測 | 未測 (OTT -O1 は実時間 29 倍の別測定のみ) | `tools/icall/REPORT.md` §5 |
+
+総合: **正確性と保守性で x64c 優位、wasm サイズと (未測の) 速度は劣後または不明**。サイズ差は命令 1:1 生成と -O0 に由来
+(推定。-O1/-O2 での再測定は未実施)。推奨 (x64c 本番ルート) は icall REPORT §5 / ユーザ判断 2026-10-10 と整合。
+
+### 9.4 #122 (LIFTDIFF) との枠組み統合の判断
+
+- **判断: 共有済み・統合は完了、二重実装は残す理由がある範囲に限定**。flelift は `tools/liftdiff/targets/flelift.json` として
+  liftdiff の 1 target になり (全数採点 / hybrid boot は liftdiff 側が正)、`fle_diff.py` は **FORMAT v1 準拠 verdict を出す
+  7 関数 spot の軽量 regression** として存置する (liftdiff の e2e は boot 状態構築を含み重い)。
+- verdict スキーマは FORMAT.md v1 で共通 (`results/verdict_flelift.jsonl`)。
+
+### 9.5 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| closure 全 cell 一致 (不一致 741 / 実行不能 2,498) | 完了条件 1 の「全 cell 一致」未達 | #122 (LD-6) にコメント |
+| unit#18 上位 0x455790/0x44bb70/0x446400 の native 参照が fault | 小 closure 全体の比較不能 | #253 (FLE-2) にコメント |
+| lift 関数数 7,031 → 7,018 の差 13 の原因 | 再現性 (unsup 0 は不変) | #133 に残置 (環境固定後に再調査) |
+| wasm -O0 27.6 MB / 速度未測 | 比較表の速度・サイズ行 | #133 に残置 (本番ビルドの最適化は別チケット) |
+| `tools/flelift/boot/` の `/home/ubuntu` 絶対パス | CI 再現性 | #348 (既存) |
+
+### 9.6 本チケットで入れた修正
+
+- `fle_e2e.sh` が `fle_natdrv` を build しないため、クリーン環境で spot diff が `rc=127` で失敗していた → e2e に gcc build 工程 [3a] を追加
+  (`-D_GNU_SOURCE` が必要: 無いと `REG_RIP` 未宣言で build 失敗)。
+- PE パスの既定を `/home/ubuntu/...` 固定から `FL_WIN64_DIR` (`tools/shared/env.sh`) 経由に変更 (`FLE_PE` での上書きは従来どおり)。
