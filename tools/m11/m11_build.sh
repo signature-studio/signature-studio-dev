@@ -29,8 +29,20 @@ for st in ir_lb_base img_lb_base; do
 done
 
 if [ ! -f work/boot_final.ll ]; then echo "[m11build] work/boot_final.ll 無し: m11_gen_ir2.sh を先に" >&2; exit 2; fi
-if [ ! -f work/boot_final3.ll ] || [ work/boot_final.ll -nt work/boot_final3.ll ] || [ m11_post.py -nt work/boot_final3.ll ]; then
-  python3 m11_post.py work/boot_final.ll work/boot_final3.ll --report work/post_report.json
+# #131: sigfix 復元モードが変わったら post 結果を無効化 (stamp)
+if [ "$(cat work/sigfix_recover.stamp 2>/dev/null || echo 0)" != "${M11_SIGFIX_RECOVER:-0}" ]; then rm -f work/boot_final3.ll; fi
+echo "${M11_SIGFIX_RECOVER:-0}" > work/sigfix_recover.stamp
+if [ ! -f work/boot_final3.ll ] || [ work/boot_final.ll -nt work/boot_final3.ll ] || [ m11_post.py -nt work/boot_final3.ll ] || [ m11_argrecover.py -nt work/boot_final3.ll ]; then
+  # M11_SIGFIX_RECOVER=1 (#131): sigfix の 0 詰め site を機械語突合し、定数代入が確定する引数だけ復元 (m11_argrecover.py)
+  if [ "${M11_SIGFIX_RECOVER:-0}" = 1 ]; then
+    PE="${PE:-${FL_WIN64_DIR:-/home/ubuntu/work/analysis/win64}/extracted/block00031_PE.bin}"
+    python3 m11_post.py work/boot_final.ll work/boot_final3.ll --report work/post_report.json --pads work/sigfix_pads.json
+    FIXES="${M11_SIGFIX_FIXES:-work/sigfix_fixes.json}"
+    [ -n "${M11_SIGFIX_FIXES:-}" ] || python3 m11_argrecover.py work/sigfix_pads.json --pe "$PE" --lb "$M11_LB_BASE" --out "$FIXES"
+    python3 m11_post.py work/boot_final.ll work/boot_final3.ll --report work/post_report.json --fixes "$FIXES"
+  else
+    python3 m11_post.py work/boot_final.ll work/boot_final3.ll --report work/post_report.json
+  fi
 fi
 # SIMD helper (C) は IR の declare から署名駆動で再生成 (m11_simd2.py)
 if [ ! -f work/m11_simd.c ] || [ work/boot_final.ll -nt work/m11_simd.c ] || [ m11_simd2.py -nt work/m11_simd.c ]; then
