@@ -414,13 +414,14 @@ static void fam_sig(void) {
 
 int main(int argc, char **argv) {
   setvbuf(stdout, NULL, _IONBF, 0);
-  const char *dll = fl_ipp_dll_path();
+  const char *dll = NULL;
   const char *path = NULL;
   for (int i = 1; i < argc; i++) {
     if (!strcmp(argv[i], "--dump") && i + 1 < argc) { path = argv[++i]; }
     else if (!strcmp(argv[i], "--replay") && i + 1 < argc) { path = argv[++i]; }
     else dll = argv[i];
   }
+  if (!dll) dll = fl_ipp_dll_path();
 #ifdef WASM_REPLAY
   g_wasm = 1;
   if (!path) { fprintf(stderr, "usage: resize_oracle.wasm --replay <hashfile>\n"); return 2; }

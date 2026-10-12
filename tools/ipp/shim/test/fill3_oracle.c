@@ -567,13 +567,14 @@ static void err_grid_il(const char *nm, int kind, int nch) {
 
 int main(int argc, char **argv) {
   setvbuf(stdout, NULL, _IONBF, 0);
-  const char *dll = fl_ipp_dll_path();
+  const char *dll = NULL;
   const char *path = NULL;
   for (int i = 1; i < argc; i++) {
     if (!strcmp(argv[i], "--dump") && i + 1 < argc) path = argv[++i];
     else if (!strcmp(argv[i], "--replay") && i + 1 < argc) path = argv[++i];
     else dll = argv[i];
   }
+  if (!dll) dll = fl_ipp_dll_path();
 #ifndef WASM_REPLAY
   if (pe_load(dll, &pe)) return 1;
   ((int (MS *)(uint64_t))ex("ippSetCpuFeatures"))(~0ULL);
