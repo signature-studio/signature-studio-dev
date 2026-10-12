@@ -26,7 +26,7 @@ from liftlib.pe import Image                       # noqa: E402
 from liftlib.mc import MFunc                       # noqa: E402
 
 FA_PE = os.path.join(T, "targets/freshair/work/win/Fresh Air/C__ProgramData_Slate Digital/Fresh Air/SlateCore.core_64")
-OTT_DLL = "/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll"
+from liftlib.env import OTT_DLL                    # noqa: E402
 DUP = ("declare i64 @function_1803ded20", "declare i64 @function_18004cf20")
 
 
@@ -465,17 +465,30 @@ def t16():
     pre = iargs.scan(mod, img)
     assert len(pre["define_short"]) == 15 and len(pre["sites_short"]) == 15, (len(pre["define_short"]), len(pre["sites_short"]))
     assert ("function_180127550", 1, 4) in pre["define_short"], pre["define_short"]
+    # sites_entry: 引数の個数は足りているが入口値素通し位置に別値 (undef 等) を渡している site (実測 17)
+    assert len(pre["sites_entry"]) == 17, len(pre["sites_entry"])
+    assert ("function_180127550", 0x180127559, "function_180126920", 1) in pre["sites_entry"], pre["sites_entry"]
     st, lg = {}, []
     iargs.run(mod, img, lg, st)
     post = iargs.scan(mod, img)
-    assert not post["define_short"] and not post["sites_short"], post
+    assert not post["define_short"] and not post["sites_short"] and not post["sites_entry"], post
     ctor = [l for l in mod.func("function_18011d400").blocks[0].lines if "@function_180127550(" in l]
     assert len(ctor) == 1 and "(i64 %arg1, i64 %arg2, i64 1, i64 20)" in ctor[0], ctor
+    # 復元済みの site の rcx (入口素通し) を undef に戻すと detect-only が検出する (逆方向の被覆)
+    fn = mod.func("function_18011d400")
+    li = next(i for i, l in enumerate(fn.blocks[0].lines) if "@function_180127550(" in l)
+    good = fn.blocks[0].lines[li]
+    fn.blocks[0].lines[li] = good.replace("(i64 %arg1, ", "(i64 undef, ", 1)
+    assert fn.blocks[0].lines[li] != good
+    bad = iargs.scan(mod, img)
+    assert [s for s in bad["sites_entry"] if s[0] == "function_18011d400" and s[2] == "function_180127550" and s[3] == 0], bad["sites_entry"]
+    fn.blocks[0].lines[li] = good
+    assert not iargs.scan(mod, img)["sites_entry"]
     st2, lg2 = {}, []
     iargs.run(mod, img, lg2, st2)
     assert not st2.get("define_fixed") and not st2.get("sites_fixed"), st2
-    print("T16 ok (iargs: define %d / site %d 検出 → 復元 define_fixed=%d sites_fixed=%d site_unbound=%d, 再走査 0/0, 冪等)"
-          % (len(pre["define_short"]), len(pre["sites_short"]), st["define_fixed"], st["sites_fixed"], st.get("site_unbound", 0)))
+    print("T16 ok (iargs: define %d / site %d / entry %d 検出 → 復元 define_fixed=%d sites_fixed=%d site_unbound=%d, 再走査 0/0/0, 冪等)"
+          % (len(pre["define_short"]), len(pre["sites_short"]), len(pre["sites_entry"]), st["define_fixed"], st["sites_fixed"], st.get("site_unbound", 0)))
 
 
 if __name__ == "__main__":

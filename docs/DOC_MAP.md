@@ -70,7 +70,7 @@
 | `tools/m2/REPORT.md` | ~230 | M2: function boundary 合意 / Delphi lift 品質 / shim inventory / wasm PoC |
 | `tools/m3/REPORT.md` | ~100 | M3: 中規模 lift → wasm (純計算 4 関数 bit-exact) |
 | `tools/m5/REPORT.md` | ~120 | M5: Delphi lift → wasm E2E + native bit-exact |
-| `tools/liftlib/REPORT.md` | ~530 | 共通 lift 修復基盤の統合 (CAB-49/54/55/220/239/LIFTLIB-2) |
+| `tools/liftlib/REPORT.md` | ~600 | 共通 lift 修復基盤の統合 (CAB-49/54/55/220/239/LIFTLIB-2)。§17 (iargs) は `REPORT_APPENDIX.md` に分割 |
 | `tools/flelift/REPORT.md` | ~155 | x64c を FLEngine 向けに汎用化 |
 | `tools/flelift/boot/REPORT.md` | ~350 | FLE-2〜FLE-5: x64c lift による FLEngine boot 連鎖 |
 | `tools/liftdiff/REPORT.md` | ~230 | flelift (x64c) 全数採点 + native 全起動の参照化 (§5/§6.1/§6.2 は `REPORT_APPENDIX.md` に分割) |
