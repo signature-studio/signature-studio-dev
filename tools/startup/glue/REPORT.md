@@ -206,7 +206,7 @@ node tools/startup/glue/scripts/accept_recount.mjs    # 検収の独立再計算
 | Send は失敗表示 | `send()` は `ERROR_INTERNET_DISCONNECTED` (12163) を返すだけ。ネットワーク不使用 | send 中の `fetch` 呼出 0 回 (fetch を throw に差替) |
 | `/restartfl` でページ再ロード | winstubs の `winstubs_restart_requested()` を wasm export し、`GlueHost.checkRestart()` を `onYield()` 末尾から呼ぶ。flush 後に `onRestart` (既定 `location.reload()`) を **1 回だけ** | 陰性対照 + 本命 + 非反復 |
 
-実測 (クリーンな worktree、emsdk 6.0.12、node v22.23.3): `bash tools/startup/glue/glue.sh` = **ALL PASS 6.5 秒** (load 1/5/15 分 = 0.42/0.37/0.18)。
+実測 (クリーンな worktree、emsdk 6.0.12、node v22.23.3): `bash tools/startup/glue/glue.sh` = **ALL PASS 6.5 秒** (load 1/5/15 分 = 0.42/0.37/0.18。コミット済み HEAD 3d91c24 を別 worktree に展開しても ALL PASS / 11.3 秒 / load 0.39/0.36/0.19)。
 新規 `test/crash_restart_unit.ts` = **20 checks / fail 0** (数え方: `CRASH-RESTART ... (pass=X fail=Y)`)。既存 C 単体 66/66・TS 単体 49・SIGKILL 跨ぎ・trace 監査 5 項目は不変。`count_checks.mjs` の e2e 静的 `ok(` は 12→13 (phase 6 を追加したため)。
 ネガティブコントロール: `ws_shell.c` の `g_restart = 1` を一時的に `0` にすると 20 中 **3 件 FAIL** (flag=false / onRestart 0 回 ×2)、戻して全 PASS。非 restart の ShellExecute (`fldiagnostic /version`、`ControlCreator.exe /restartfl`) は再ロードしない。
 追加した wasm export: `_winstubs_init`, `_winstubs_restart_requested`, `_winstubs_stats`、C 検証口 `glue_probe_shell_execute`。
