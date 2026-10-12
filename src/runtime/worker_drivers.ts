@@ -6,13 +6,15 @@
 
 import { createEmJsImports, createEnvImports, flushStdio, type EnvHost } from "./imports_env";
 import { instantiateCompiled } from "./loader";
-import { buildImports, initEmscripten } from "./loader_boot";
+import { buildImports, createEmscriptenPthreadModule, initEmscripten } from "./loader_boot";
 import { MemoryView, describeMemory } from "./mem";
 import type { ManifestEntry, ProgramResult, Check } from "./worker_protocol";
 
 export type DriverCtx = {
   module: WebAssembly.Module;
   entry: ManifestEntry;
+  /** emscripten glue (.mjs) の絶対 URL (manifest entry に glue があるときのみ) */
+  glueUrl?: string;
   log: (stream: "stdout" | "stderr" | "info", text: string) => void;
 };
 
@@ -182,8 +184,56 @@ async function m11Boot(ctx: DriverCtx): Promise<ProgramResult> {
   };
 }
 
+// ---------------------------------------------------------------- 本番 pthread ビルド (shim MT + emcc glue)
+// tools/runtime/prod/boot_main.c が最終行に出す MT_BOOT_RESULT {json} を検証する (RT-2 #120)。
+async function mtBoot(ctx: DriverCtx): Promise<ProgramResult> {
+  if (!ctx.glueUrl) throw new Error("mt-boot: manifest entry に glue が無い");
+  const lines: string[] = [];
+  const t0 = performance.now();
+  const h = await createEmscriptenPthreadModule(ctx.glueUrl, ctx.module, {
+    print: (s) => { lines.push(s); ctx.log("stdout", s); },
+    printErr: (s) => ctx.log("stderr", s),
+  });
+  const tCreated = performance.now();
+  const exitCode = await h.exited;
+  const tExit = performance.now();
+  const raw = lines.find((l) => l.startsWith("MT_BOOT_RESULT "));
+  const r = raw ? (JSON.parse(raw.slice("MT_BOOT_RESULT ".length)) as Record<string, number>) : null;
+  const shimPass = lines.some((l) => l.includes("[M4-test] ALL PASS (build=mt(pthreads))"));
+  const mem = h.mod.wasmMemory;
+  const buf = mem?.buffer as (SharedArrayBuffer & { growable?: boolean }) | undefined;
+  const shared = typeof SharedArrayBuffer !== "undefined" && buf instanceof SharedArrayBuffer;
+  const checks: Check[] = [
+    { name: "crossOriginIsolated (SAB/Atomics.wait の前提)", ok: self.crossOriginIsolated === true },
+    { name: "instantiateWasm 注入が 1 回だけ使われた (glue の自前 fetch/compile を迂回)", ok: h.injectCalls() === 1, detail: `calls=${h.injectCalls()}` },
+    { name: "wasm メモリは shared + growable SAB (GROWABLE_ARRAYBUFFERS=2)", ok: shared && buf?.growable === true, detail: `shared=${shared} growable=${String(buf?.growable)}` },
+    { name: "PROXY_TO_PTHREAD: main が pthread 上で実行 (proxied=1)", ok: r?.["proxied"] === 1 },
+    { name: "shim MT 自己テスト ALL PASS (pthread 上)", ok: shimPass && r?.["shimRc"] === 0 },
+    { name: "4 thread x 1M atomic add == 4,000,000", ok: r?.["counter"] === 4000000, detail: `counter=${r?.["counter"]}` },
+    { name: "memory grow (192MiB malloc) を別 pthread から読めた", ok: r?.["growOk"] === 1, detail: `heap ${r?.["heapBeforeMiB"]}→${r?.["heapAfterMiB"]} MiB` },
+    { name: "exit code == 0 (EXIT_RUNTIME)", ok: exitCode === 0, detail: String(exitCode) },
+  ];
+  return {
+    ok: checks.every((c) => c.ok),
+    checks,
+    data: {
+      instantiateMs: +(tCreated - t0).toFixed(1),
+      initMs: +(tExit - tCreated).toFixed(1),
+      counter: r?.["counter"] ?? null,
+      cores: r?.["cores"] ?? null,
+      incMs: r?.["incMs"] ?? null,
+      exitCode,
+      injectCalls: h.injectCalls(),
+      createMs: +(tCreated - t0).toFixed(1),
+      runToExitMs: +(tExit - tCreated).toFixed(1),
+      memory: mem ? describeMemory(mem) : null,
+    },
+  };
+}
+
 export const DRIVERS: Record<string, (ctx: DriverCtx) => Promise<ProgramResult>> = {
   "m1-hello": m1Hello,
   "ott-t1": ottT1,
   "m11-boot": m11Boot,
+  "mt-boot": mtBoot,
 };
