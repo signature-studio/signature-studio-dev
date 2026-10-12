@@ -98,6 +98,7 @@
 | パス | 行数目安 | 何が書かれているか |
 |---|---:|---|
 | `tools/m11/REPORT.md` | ~110 | FLEngine_x64.dll 部分起動 PoC (stage 4/6・残 trap・次の一手) |
+| `tools/m11/rtl/REPORT.md` | ~155 | Delphi RTL の VA 範囲確定 + RTL 帯 (System/Types/SysUtils 1,172 関数) の lifter 別 liftdiff 採点 (#129) |
 | `tools/m11/alloca/REPORT.md` | ~150 | alloca 縮退修正 (CAB-129) |
 | `tools/m11/ldfix/REPORT.md` | ~165 | load 取り違え (値↔アドレス / 1 段 deref 脱落) IR 修復 pass |
 | `tools/m11/shimx_link/REPORT.md` | ~165 | M11 × shimx リンク |

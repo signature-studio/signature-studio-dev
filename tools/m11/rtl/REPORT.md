@@ -4,6 +4,10 @@
 同一条件採点までを実測した。「RTL 関数が native と一致」「m11_ov.c の RTL 手転記を撤去」は未達 (§4)。
 OSS 差替え案 (b) は toolchain 選定の判断が要るため未着手 (§5)。
 
+既知類型との関係: 該当なし (`docs/DEFECTS.md` D1〜D16 のいずれの新規発見でもない。本書は採点と範囲確定で、lift 欠陥の新類型は見ていない。
+主因タグの callee_divergence 等は liftdiff の分類名で DEFECTS.md の ID ではない)。
+検証起点 commit: `e56e176` (初回採点と §7 の n=3 再実行・ネガコンはこの tree 上で実施。以後の変更は docs / 本 REPORT / `negctl.sh` / `rtl_runs_summary.py` / `results/*.txt` の追加のみで、採点に使うコード (`rtl_range.py` / `rtl_compare.py`) は不変)。
+
 関係: #132 (stage 5/6) は #129 (RTL) / #130 (override) / #90 (間接 call) の成果取込みが前提。#253 (tools/flelift/boot) は
 案 (a)「別 lifter で再 lift」を x64c で既に実施済み (RTL 専用 lifter は作らず FLEngine 全体を x64c で lift)。本書はその RTL 帯だけを切り出して測った。
 
@@ -24,8 +28,10 @@ OSS 差替え案 (b) は toolchain 選定の判断が要るため未着手 (§5)
 | System.WideStrings / Contnrs `0x53e698..0x544388` | 3 / 3 |
 | FL 側の最初の unit (AudioPlayer) `0x545a90` | 1 |
 
-RTL コードの帯は **`0x401000`〜`0x545000` 付近** (FL 固有 unit の最初の VMT が 0x545a90)。VMT は unit の code 内にあるため、unit 境界は
-VMT 先頭からの近似でしかない (code の厳密な開始/終了は未確定)。`System.Generics.Collections` / `System.Generics.Defaults` は
+RTL コードの帯は **`0x401000`〜`0x545000` 付近** (FL 固有 unit の最初の VMT が 0x545a90)。ただし **§2 で採点したのは
+`0x401000`〜`0x456e98` (System / System.Types / System.SysUtils) の 1,172 関数だけ**で、`0x456e98`〜`0x545000`
+(System.VarUtils / Variants / TypInfo / Hash / Generics.Defaults / SyncObjs / Rtti / Classes / WideStrings / Contnrs) は**未採点** (範囲外)。
+VMT は unit の code 内にあるため、unit 境界は VMT 先頭からの近似でしかない (code の厳密な開始/終了は未確定)。`System.Generics.Collections` / `System.Generics.Defaults` は
 VMT が 0x136e828 / 0x5279a0 まで散る (原因は未調査) ため、帯は VMT 範囲でなく code 帯で見る。
 FastMM4 のクラスは本走査に出ていない (FastMM_GetMem `0x407a50` / FreeMem `0x409440` は System 帯 `0x401000..0x41fd40` の内側)。
 InitTable `0x13768b0` は 942 unit。
@@ -34,6 +40,9 @@ InitTable `0x13768b0` は 942 unit。
 
 両 route に同一 VA 集合・同一パターンを与えた (`batch --set file:`)。boot 状態は m11 = units 22 / flelift = hybrid 928 unit
 (`bootstate --mode hybrid`; 素材 snapshot の flelift boot_state は 17 unit の旧版だったため作り直した)。突合: `rtl_compare.py` → `results/rtl_compare.md` / `rtl_verdicts.tsv`。
+
+以下の表・数値は **commit 済み `results/` (初回 run = 検証起点 e56e176 での採点) の値**。batch は**セッション (別の Actions run) 間で値が動く**
+(同一セッション内の n=3 では 1,172 関数とも不変)。レンジは §7 を正とし、書き分けは次のとおり:
 
 | route | 一致 | 不一致 | 実行不能 | 自己欠陥確定 (leaf) |
 |---|--:|--:|--:|--:|
@@ -67,18 +76,21 @@ InitTable `0x13768b0` は 942 unit。
 
 ## 5. 未解決・次の一手
 
-1. **x64c 側 `no_wasm_definition` 359 関数 (RTL 帯)**: 既存 closure (7,421 関数) のうち x64c が lift していない。RetDec 側は 270 一致で採点できるため、
-   x64c 側の lift 集合に足せば採点対象になる (足した結果の一致数は未測定)。tools/flelift 側の作業 (本 run は tools/flelift を読取のみとした)。
-2. **x64c 不一致 125 の個別化**: 自己欠陥確定は 17。残りは callee 起因 (callee_divergence 42 / unlifted_callee 12 ほか) のため、leaf から順に。
-3. **実行不能 (native_fault / null_deref 計 131)**: boot 状態に依存する関数 (`_InitLib`・`0x412510`・`0x4123c0` 等)。#234 の native 全起動で状態を足す。
-4. **(b) OSS 差替え**: 採否は toolchain 選定 (Delphi / FPC の可否) で、ユーザ判断が要る。本 run では未調査。
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| x64c 側 `no_wasm_definition` 359 関数 (RTL 帯): 既存 closure (7,421 関数) のうち x64c が lift していない。RetDec 側は 270 一致で採点できるため、x64c の lift 集合に足せば採点対象になる (足した結果の一致数は未測定。tools/flelift 側の作業で、本 run は tools/flelift を読取のみ) | 受入条件「RTL 関数が native と一致」が 1,172 中 535 で止まる主因 | #410 (受入条件 1 つ目) |
+| x64c 不一致 125 の個別化: 自己欠陥確定は 17。残りは callee 起因 (callee_divergence 42 / unlifted_callee 12 ほか) のため leaf から順に。一致→不一致の退行 (初回 7 / 再実行 5。§7) の原因特定を含む | 同上 (不一致 123–125。§7) | #410 (受入条件 2 つ目) |
+| batch のセッション間変動 (x64c 18 関数・m11 10 関数が commit 済み TSV とずれる; §7)。原因 (native 側の状態・タイミング・環境差のいずれか) は未調査 | 一致数の増減を 1 run で評価すると誤る | #410 (コメント済み: 原因切り分けを一致数評価の前に行う / n>=3 min–max で比較) |
+| 実行不能 (native_fault / null_deref 計 131) 関数: boot 状態に依存する関数 (`_InitLib`・`0x412510`・`0x4123c0` 等)。native 側の状態を足す必要がある | 関数単位差分で判定不能 | #235 [LD-4] (liftdiff 実行不能の被覆拡大)。#234 は CLOSED のため引継ぎ先にしない |
+| (b) OSS 差替え: 採否は toolchain 選定 (Delphi / FPC の可否) で、ユーザ判断が要る。本 run では未調査 | #129 の案 (b) が未着手のまま | #441 (`needs-user-input`) |
+| RTL 帯の未採点範囲 `0x456e98`〜`0x545000` (VarUtils / Variants / TypInfo / Rtti / Classes 等) の採点 | RTL 全体の一致率は不明 (§1) | #410 (コメントで追記済み) |
 
 ## 6. 再現
 
 ```sh
-export FL_WIN64_DIR=<fl-win64 の展開先> PATH=/opt/emsdk/upstream/bin:$PATH   # work-m11 / work-liftdiff を tools/*/work に展開
+export FL_WIN64_DIR=<[WIN64] の展開先> PATH=<[EMSDK]>/upstream/bin:$PATH   # work-m11 / work-liftdiff を tools/*/work に展開
 uv run --with pefile python tools/m11/rtl/rtl_range.py $FL_WIN64_DIR/extracted/block00031_PE.bin --json tools/m11/rtl/results/rtl_units.json
-# RTL 帯 VA (0x401000..0x456e98) を m11_closure_verdicts.tsv から抜いて /tmp 等に保存 → liftdiff:
+# RTL 帯 VA (0x401000..0x456e98) を m11_closure_verdicts.tsv から抜いて <VA 一覧> (1 行 1 VA) に保存 (`results/rtl_verdicts.tsv` の 1 列目と同一) → liftdiff:
 cd tools/liftdiff
 uv run --with numpy --with capstone --with pefile python3 liftdiff.py bootstate targets/flelift.json --mode hybrid --nobuild
 uv run --with numpy --with capstone --with pefile python3 liftdiff.py batch targets/m11.json    --set file:<VA 一覧> --shards 4 --nobuild --state auto --out work/m11/batch_rtl_core.jsonl
@@ -86,10 +98,14 @@ uv run --with numpy --with capstone --with pefile python3 liftdiff.py batch targ
 cd ../.. && python3 tools/m11/rtl/rtl_compare.py tools/m11/rtl/results/rtl_units.json tools/liftdiff/work/m11/batch_rtl_core.jsonl tools/liftdiff/work/flelift/batch_rtl_core_h928.jsonl --md tools/m11/rtl/results/rtl_compare.md --tsv tools/m11/rtl/results/rtl_verdicts.tsv
 ```
 
-素材 snapshot 内 `/home/ubuntu/...` ハードコード (`work/flelift/build.json` の wasm パス等) は `--nobuild` のため未参照で、symlink は不要だった
-(tools/m11/work, tools/liftdiff/work は main の checkout 側 work/ への symlink とした; `.git/info/exclude` で commit 対象外)。
+`tools/shared/env.sh` の既定 `ANALYSIS_DIR` (`docs/REFERENCES.md` `[ANALYSIS-DIR]`) 配下の `win64/` を `[WIN64]` の展開先へ向ける必要がある
+(`ANALYSIS_DIR=<任意>` に `win64` symlink を作る)。これが無いと `bootstate` が PE 読込で FileNotFoundError になる。
+素材 snapshot の `work/flelift/build.json` 等に埋まる絶対パスは `--nobuild` のため未参照。tools/m11/work, tools/liftdiff/work は
+snapshot 展開先への symlink とし、`.git/info/exclude` で commit 対象外にした。
 
 ## 7. 実測 (GitHub Actions runner, 4 core)
+
+### 7-1. 所要 (初回 run)
 
 | 項目 | 実測 |
 |---|---|
@@ -98,3 +114,41 @@ cd ../.. && python3 tools/m11/rtl/rtl_compare.py tools/m11/rtl/results/rtl_units
 | `batch m11` (1,172 関数, 4 shard) | 2 分 28.5 秒, load 2.28 |
 | `batch flelift` (1,172 関数, 4 shard; 17 unit 旧 boot 状態) | 1 分 28.5 秒 (参考: 結果 一致 542 / 不一致 130 / 実行不能 500。本書の表は 928 unit 状態) |
 | `batch flelift` (1,172 関数, 4 shard; 928 unit 状態) | 3 分 12.0 秒 |
+
+### 7-2. 再現性 (batch はセッション間で動く)
+
+後処理 (`rtl_range.py` / `rtl_compare.py`) は同じ入力 jsonl から同じ `results/` を出す。**batch 自体の結果は保証しない**。
+「commit 済み results と cmp 一致」が保証するのは後処理だけで、batch の再現ではない。
+
+同一入力 (RTL 帯 1,172 VA, `--shards 4 --state auto`) の観測 (一致/不一致/実行不能):
+
+| 観測 | m11 | x64c | 両 route 採点可の遷移 (不一致→一致 / 一致→不一致) |
+|---|---|---|---|
+| 初回 run (e56e176, commit 済み TSV) | 486/537/149 | 535/125/512 | 312 / 7 (採点可 643) |
+| reviewer 再実行 (e56e176) | 486/537/149 | 535/123/514 | 311 / 5 |
+| 本 run 再実行 n=3 (bootstate hybrid 20.4 秒, first_fail 830, 同 928/942) | 494/529/149 を 3 回とも同値 | 535/123/514 を 3 回とも同値 | 308 / 5 を 3 回とも同値 (採点可 641) |
+
+* **本 run の n=3 内では 1,172 関数のうち verdict が動いた関数は 0** (m11 / x64c とも)。揺れは**セッション間**にある。
+* commit 済み TSV との差 (本 run n=3 の 1 回目 vs TSV, VA 単位): m11 10 関数 (不一致→一致 9 / 一致→不一致 1)、x64c 18 関数
+  (一致→不一致 5 / 不一致→一致 5 / 不一致→実行不能 5 / 実行不能→不一致 3)。reviewer の報告は x64c で 20 関数。
+  x64c の不一致→実行不能 5 は `native_fault_all_patterns` (native 側が失敗)。原因は**未調査** (環境・native 側の状態・タイミングのいずれかは未確定)。
+* min–max (上の 3 観測): m11 一致 486–494 / 不一致 529–537 / 実行不能 149。x64c 一致 535 / 不一致 123–125 / 実行不能 512–514。
+  本 run の実行不能内訳 (x64c, 3 回同値): no_wasm_definition 359 / native_fault 73 / native_null_deref 58 / unsupported_sig 11 / hang 13
+  (初回は 359 / 79 / 52 / 11 / 11、reviewer は 359 / 73 / 57 / 11 / 14)。
+* 本 run の x64c 一致→不一致 5 関数: 0x4090e0 / 0x41cd70 / 0x42d830 / 0x44a590 / 0x4511d0 (初回の 7 から `0x412020` / `0x455650` が外れる)。
+* 本 run 所要 (4 shard, load は終了時の 1/5/15 分平均): batch flelift 154.6 / 153.2 / 151.4 秒 (load 2.90 / 3.64 / 3.02)、
+  batch m11 114.9 / 114.7 / 116.2 秒 (load 2.46 / 2.60 / 2.41)。
+* n=3 は `rtl_runs_summary.py` で集計 (`results/rtl_runs_summary.txt`)。3 回は同一セッション内の連続実行で、セッション間のレンジではない。
+
+### 7-3. ネガティブコントロール (`negctl.sh`, `results/negctl.txt`)
+
+`_UStrAsg 0x4133f0` の x64c verdict (match) を 1 件だけ `mismatch` に書き換えて `rtl_compare.py` を再実行した:
+
+| 集計 | 元 | 書換え後 |
+|---|---|---|
+| x64c 一致/不一致/実行不能 | 535/123/514 | **534/124/514** |
+| 遷移 不一致→一致 / 不一致→不一致 | 308 / 117 | **307 / 118** |
+| TSV の差分 | - | 1 行 (`0x4133f0`: 列 x64c が match → mismatch) |
+
+m11 側の集計 (494/529/149) は不変。書換え 1 件が集計に 1 件ぶん現れ、他の行は動かない (差分 1 行) ことを確認した。
+(`negctl.sh` は本 run の n=3 の 1 回目 jsonl で実行。)
