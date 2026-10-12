@@ -6,6 +6,7 @@ import { readNativePluginNfo, entryFromBytes } from '../src/entry.ts';
 import { assembleFst } from '../src/fst.ts';
 import { generateDb, DEFAULT_DB_PATH, type PluginSpec } from '../src/generate.ts';
 import { FL_ROOT, HAVE_FL, filesWithExt, read } from '../test/_fl.ts';
+import { REPO_ROOT } from '../../../shared/paths.mjs';
 
 const out: Record<string, unknown> = { flRoot: FL_ROOT, haveFl: HAVE_FL };
 if (HAVE_FL) {
@@ -50,7 +51,7 @@ if (HAVE_FL) {
   });
 }
 const specs: PluginSpec[] = JSON.parse(readFileSync(new URL('../specs/wasm_plugins.json', import.meta.url), 'utf8')).plugins;
-const khp = '/home/ubuntu/work/webstudio/tools/targets/kilohearts/work/macpkg/product_index.json';
+const khp = `${REPO_ROOT}/tools/targets/kilohearts/work/macpkg/product_index.json`;
 if (existsSync(khp)) {
   for (const p of JSON.parse(readFileSync(khp, 'utf8')).plugins as Array<{ id: string; fileName: string; formats: string[] }>) {
     // "Effect" on all 44 KH VST2 fx; Phase Plant is the only KH generator (Generators\VST, category "Synth") — same rule as cli/gen.ts / h4/specs.ts.
