@@ -443,7 +443,38 @@ def t15():
           % (st1["unsupported"], st2["unsupported"], st3["unsupported"]))
 
 
+def t16():
+    """[LIFTLIB #241] i256 ABI + pcmpistri + F2 xmm 戻り搬送。
+    (a) gen.py が i256 形を u64×4 平坦化 / Y 戻りで生成し, 実体 (kernels) を持つ (stub でない)
+    (b) pcmpistri (void / i32 形) が生成される
+    (c) F2 xmm 戻り: LL_XRET_LL (RetDec raw .ll) と LL_XRET_DLL (OTT_x64.dll) があれば検出→修復→再検出 + 注入評価を固定"""
+    ll = ("declare i256 @__asm_vinsertf128(i256, i128, i8)\ndeclare void @__asm_vmovaps__3(i256, i256)\n"
+          "declare void @__asm_vpcmpistri(i128, i128, i8)\ndeclare i32 @__asm_pcmpistri__2(i128, i128, i8)\n")
+    c, rep = gen.emit_c(gen.scan_decls(ll), use_names="canon")
+    assert not rep["unsupported"], rep["unsupported"]
+    assert "Y __asm_vinsertf128__yyxb(u64 p0_0, u64 p0_1, u64 p0_2, u64 p0_3, u128 p1, u8 p2)" in c, c
+    assert "__builtin_trap" not in c and "ll_pcmpistr_ecx" in c
+    print("T16a ok (i256 ABI: u64x4 平坦化 + Y 戻り / pcmpistri void,i32 形とも生成)")
+    xl, xd = os.environ.get("LL_XRET_LL"), os.environ.get("LL_XRET_DLL")
+    if not (xl and xd and os.path.exists(xl) and os.path.exists(xd)):
+        print("T16b skip (LL_XRET_LL / LL_XRET_DLL 未設定)")
+        return
+    from liftlib import inject
+    from liftlib.passes import f2
+    img = Image(xd)
+    text, _ = base.run_base(open(xl).read(), base.make_args())
+    mod = IR.Module.parse(text)
+    st = {}
+    f2.run_xmm_ret(mod, img, [], st, repair=True)
+    assert st["xret_callees_pending"] == 3 and st["xret_rets_pending"] == 11, st
+    assert st["xret_threaded"] == 9 and st["xret_rets_after"] == 2, st
+    ev = inject.eval_f2_xret(mod, img)
+    assert ev["injected"] == 9 and ev["detected"] == 9, ev
+    print("T16b ok (F2 xmm 戻り: 検出 %d callee/%d ret → 搬送 %d → 残 %d, 注入 %d/%d 検出)"
+          % (st["xret_callees_pending"], st["xret_rets_pending"], st["xret_threaded"], st["xret_rets_after"], ev["detected"], ev["injected"]))
+
+
 if __name__ == "__main__":
-    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15):
+    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16):
         f()
     print("ALL UNIT TESTS PASS")

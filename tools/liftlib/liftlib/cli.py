@@ -186,6 +186,14 @@ def cmd_inject(a):
         mod = IR.Module.parse(text)
         img = Image("/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll")
         out["ott"] = dict(F7=inject.eval_f7(mod, img, limit=3, max_total=150), P1_fold=inject.eval_p1_fold(mod, img))
+    xl, xd = os.environ.get("LL_XRET_LL"), os.environ.get("LL_XRET_DLL")
+    if xl and xd and os.path.exists(xl) and os.path.exists(xd):         # F2 xmm 戻り注入 (LIFTLIB #241)
+        from .passes import f2 as F2
+        text, _ = base.run_base(open(xl).read(), base.make_args())
+        mod = IR.Module.parse(text)
+        img = Image(xd)
+        F2.run_xmm_ret(mod, img, [], {}, repair=True)
+        out["xret"] = dict(F2=inject.eval_f2_xret(mod, img))
     for k, v in out.items():
         print("[inject] %s: %s" % (k, json.dumps(v, ensure_ascii=False)))
     os.makedirs(os.path.join(PKG, "work"), exist_ok=True)
