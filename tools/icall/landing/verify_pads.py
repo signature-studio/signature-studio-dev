@@ -24,9 +24,10 @@ import subprocess
 import sys
 import collections
 
-REPO = '/home/ubuntu/work/webstudio'
-LIFTDIFF = REPO + '/tools/liftdiff'
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, '..', '..', 'shared'))
+from paths import REPO_ROOT as REPO  # noqa: E402
+LIFTDIFF = REPO + '/tools/liftdiff'
 sys.path.insert(0, LIFTDIFF)
 
 import pefile
