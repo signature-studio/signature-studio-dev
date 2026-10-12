@@ -1,5 +1,7 @@
 /* ネットワーク / 認証系 / MIDI の「常にエラー」スタブ (対象外方針)。
- * - wininet: 接続不可。InternetGetConnectedState=FALSE, Open*=NULL (ERROR_INTERNET_DISCONNECTED)
+ * - wininet: 常時オフライン (fail-soft, trap しない)。接続系 (InternetOpen/Connect/OpenUrl, HttpOpenRequest/HttpSendRequest 各種)=NULL/FALSE +
+ *   GetLastError=ERROR_INTERNET_DISCONNECTED(12163)。InternetGetConnectedState/InternetCheckConnection=FALSE。
+ *   shimx_wininet_call_count() = 接続系 API の呼出回数 (全て失敗を返す。成功は 0 回 — boot 検査用)
  * - ws2_32: Windows 固有名のみ。BSD ソケット名 (socket/bind/...) と ntohs 等は Emscripten libc の同名シンボルが
  *   解決する (衝突回避のためここでは定義しない)。WSAStartup は WSASYSNOTREADY を返す。
  * - wintrust/crypt32: 署名検証・証明書は常に「無し」(shimx_set_trust_ok(1) で WinVerifyTrust のみ成功にできる)
@@ -12,12 +14,16 @@ static int g_trust_ok;
 void shimx_set_trust_ok(int on) { g_trust_ok = on; }
 
 /* ---- wininet ---- */
-static void net_err(void) { SetLastError(ERROR_INTERNET_CANNOT_CONNECT); }
+static unsigned g_wininet_calls;
+unsigned shimx_wininet_call_count(void) { return g_wininet_calls; }
+static void net_err(void) { g_wininet_calls++; SetLastError(ERROR_INTERNET_DISCONNECTED); }
 LPVOID InternetOpenW(LPCWSTR agent, DWORD access, LPCWSTR proxy, LPCWSTR bypass, DWORD flags) {
     (void)agent; (void)access; (void)proxy; (void)bypass; (void)flags;
-    SetLastError(ERROR_INTERNET_DISCONNECTED); return NULL;
+    net_err(); return NULL;
 }
-BOOL InternetGetConnectedState(LPDWORD flags, DWORD rsv) { (void)rsv; if (flags) *flags = 0; return FALSE; }
+BOOL InternetGetConnectedState(LPDWORD flags, DWORD rsv) { (void)rsv; g_wininet_calls++; if (flags) *flags = 0; return FALSE; }
+BOOL InternetCheckConnectionW(LPCWSTR url, DWORD flags, DWORD rsv) { (void)url; (void)flags; (void)rsv; net_err(); return FALSE; }
+BOOL InternetCheckConnectionA(LPCSTR url, DWORD flags, DWORD rsv) { (void)url; (void)flags; (void)rsv; net_err(); return FALSE; }
 BOOL InternetCloseHandle(LPVOID h) { (void)h; SetLastError(ERROR_INVALID_HANDLE); return FALSE; }
 LPVOID InternetConnectW(LPVOID h, LPCWSTR s, WORD port, LPCWSTR u, LPCWSTR p, DWORD svc, DWORD fl, ULONG_PTR c) {
     (void)h; (void)s; (void)port; (void)u; (void)p; (void)svc; (void)fl; (void)c; net_err(); return NULL;
@@ -32,13 +38,15 @@ BOOL InternetGetLastResponseInfoW(LPDWORD e, LPWSTR b, LPDWORD n) { if (e) *e = 
 LPVOID HttpOpenRequestW(LPVOID h, LPCWSTR v, LPCWSTR o, LPCWSTR ver, LPCWSTR r, LPCWSTR* a, DWORD fl, ULONG_PTR c) {
     (void)h; (void)v; (void)o; (void)ver; (void)r; (void)a; (void)fl; (void)c; net_err(); return NULL;
 }
+BOOL HttpSendRequestW(LPVOID h, LPCWSTR hdr, DWORD hl, LPVOID opt, DWORD ol) { (void)h; (void)hdr; (void)hl; (void)opt; (void)ol; net_err(); return FALSE; }
+BOOL HttpSendRequestA(LPVOID h, LPCSTR hdr, DWORD hl, LPVOID opt, DWORD ol) { (void)h; (void)hdr; (void)hl; (void)opt; (void)ol; net_err(); return FALSE; }
 BOOL HttpSendRequestExW(LPVOID h, LPVOID in, LPVOID out, DWORD fl, ULONG_PTR c) { (void)h; (void)in; (void)out; (void)fl; (void)c; net_err(); return FALSE; }
 BOOL HttpEndRequestW(LPVOID h, LPVOID out, DWORD fl, ULONG_PTR c) { (void)h; (void)out; (void)fl; (void)c; net_err(); return FALSE; }
 BOOL HttpAddRequestHeadersW(LPVOID h, LPCWSTR hdr, DWORD n, DWORD mod) { (void)h; (void)hdr; (void)n; (void)mod; net_err(); return FALSE; }
 BOOL HttpQueryInfoW(LPVOID h, DWORD lvl, LPVOID b, LPDWORD n, LPDWORD i) { (void)h; (void)lvl; (void)b; (void)n; (void)i; net_err(); return FALSE; }
 BOOL HttpQueryInfoA(LPVOID h, DWORD lvl, LPVOID b, LPDWORD n, LPDWORD i) { (void)h; (void)lvl; (void)b; (void)n; (void)i; net_err(); return FALSE; }
 LPVOID InternetOpenA(LPCSTR agent, DWORD access, LPCSTR proxy, LPCSTR bypass, DWORD flags) {
-    (void)agent; (void)access; (void)proxy; (void)bypass; (void)flags; SetLastError(ERROR_INTERNET_DISCONNECTED); return NULL;
+    (void)agent; (void)access; (void)proxy; (void)bypass; (void)flags; net_err(); return NULL;
 }
 LPVOID InternetOpenUrlA(LPVOID h, LPCSTR url, LPCSTR hdr, DWORD hl, DWORD fl, ULONG_PTR c) {
     (void)h; (void)url; (void)hdr; (void)hl; (void)fl; (void)c; net_err(); return NULL;
