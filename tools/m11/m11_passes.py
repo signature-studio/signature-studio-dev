@@ -13,7 +13,9 @@
 import sys, re, json, argparse, os, itertools
 from collections import Counter
 
-BASE_VA = 0x400000
+from lb_base import LB as LB_BASE   # M11_LB_BASE (既定 0): LVA = VA - 0x400000 + LB_BASE
+
+BASE_VA = 0x400000 - LB_BASE
 IMG_LO = 0x400000
 IMG_HI = 0x1abf400   # 全 image 末尾 (.rsrc 終端 VA)
 

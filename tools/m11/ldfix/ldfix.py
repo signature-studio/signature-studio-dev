@@ -36,7 +36,10 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ldmach import Machine, FnMach  # noqa: E402
 
-BASE = 0x400000
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from lb_base import LB, IMG_BASE  # noqa: E402
+
+BASE = IMG_BASE - LB   # IR の LVA 定数 c0 → rip_rva(VA) は c0 + BASE (M11_LB_BASE 補正込み)
 DEF_RE = re.compile(r'^define (?P<ret>[^@]*?)@(?P<name>function_[0-9a-f]+)\((?P<args>[^)]*)\)(?P<rest>[^{]*)\{', re.M)
 BLK_RE = re.compile(r'^dec_label_pc_(?P<va>[0-9a-f]+):', re.M)
 XOR0_RE = re.compile(r'^(\s*)(%[\w.$-]+) = xor i64 0, 0\s*$', re.M)

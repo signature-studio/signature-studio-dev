@@ -19,7 +19,7 @@
 #   -sMEMORY64=1 (wasm64) は configure の try-compile を壊すため ffbuild/config.mak の
 #   CFLAGS に直接注入する (configure 後・make 前)。
 set -euo pipefail
-PATH="/home/ubuntu/.local/share/pnpm/bin:$PATH"
+PATH="$HOME/.local/share/pnpm/bin:$PATH"
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; ROOT="$HERE/../.."
 S="$ROOT/work/src"; B="$ROOT/work/build/ffmpeg"
 V=${1:-4.4.2}

@@ -62,7 +62,7 @@
 - **FL 21〜24 初出 (21)**: 41(6,314: plugin 付随 flag), 42, 43(27,000: track 毎), 44, 45/46/101/168(time marker 4 点), 47/167/242(28B)/243(8B)(mixer prelude), 48, 49, 50/104(24.2.99.4720), 51/170(24.2.99.4831), 103, 169(347 ファイル, 値 7), 240(UTF-16 text: "Instruments"/"Drums"/"Bass"/"Sidechain"/"SFX" — insert グループ名か, 1 ファイル)。
 - **FL≤20 に既出だが PyFLP 非収録 (20)**: 19, 25, 27(6,198), 31, 35–40, 91, 92, 157/158(pattern, 0xFFFFFFFF=未設定), 165/166(insert), 210, 216, 220, 230(UTF-16 text, 式様)。
 - **エンジンのみ (コーパス未出現, 11)**: 0x0F, 0xF5–0xF9, 0xFA, 0xFE, 0xFF, 0xC0000100 (拡張 text, URL の直後), 0xC0000102。
-- 辞書上 **低信頼 (名前は位置由来のみ) のイベントは 47 ID = 全イベントの 12.5% (69,138/552,878)**。残りは PyFLP/エンジン書込順と構造から高/中信頼で命名。意味の最終確定にはエンジンの読込 switch 逆アセンブル (チケット L-6) が必要。
+- 辞書上 **低信頼 (名前は位置由来のみ) のイベントは 47 ID = 全イベントの 12.5% (69,138/552,878)** だった (L-6 前)。**L-6 (#109) で全 47 ID を FlpLoad 読込 switch から再ラベルし 0 件に** (§10)。上記の 47 ID 数・分母は L-6 前の値。
 
 ## 5. 使用 plugin 集計 (`corpus/plugins.json`, 上位)
 
@@ -103,7 +103,7 @@
 
 ## 7. 未解決 / ブロッカー / ユーザ依頼
 
-- 未解決: ① 低信頼 47 ID の意味 (読込 switch 未解析), ② native plugin state (event 213) は blob のまま (plugin 毎デコーダ未実装), ③ 版境界 build 4213–4719 の playlist stride は標本無し, ④ ORACLE の STFT 判定 (D クラス) 未実装 / C・D 閾値は暫定。
+- 未解決: ① ~~低信頼 47 ID~~ → L-6 で解消 (§10; med 25 件の役割確定は §10.4), ② native plugin state (event 213) は blob のまま (plugin 毎デコーダ未実装), ③ ~~版境界 stride~~ → §10 で規則を engine から確定 (build 4702–4719 の実標本のみ無し), ④ ORACLE の STFT 判定 (D クラス) 未実装 / C・D 閾値は暫定。
 - ブロッカー: なし (ネイティブ FL 不在は設計で回避)。
 - **ユーザ依頼**: (1) 可能ならネイティブ FL 26.1.7 で **Render tests 82 本 + Demo 3 本を 48kHz/32bit float/dither off で WAV 書出し** (ORACLE.md §7) — T5 の golden。(2) Serum 2 / OTT / Fresh Air / Kilohearts を実際に使った `.flp` (第三者 VST の 213 解析と tools/plugins の実使用検証用)。
 - 法務は事実整理のみ: Demo/Template/preset は Image-Line 同梱素材。リポジトリには複製せず派生メタデータのみコミット。PyFLP は GPL-3.0 で **参照のみ** (コード非流用; `id_sets.ts` は ID 番号のみ, 名前とレイアウトは本実装で独立に記述)。
@@ -117,7 +117,7 @@
 | L-3 | 上位 plugin の state (213) デコーダ + 単体 DSP 3 者比較 (T3): Fruity Parametric EQ 2 / Limiter / Reeverb 2 / Maximus / Delay 3 から | クラス A/B 判定表 |
 | L-4 | ネイティブ golden 取込 (T5) と C/D 閾値再校正 | §7 依頼 (1) |
 | L-5 | STFT/LUFS 判定 (`src/wav.ts` D クラス) と最初の差分位置レポート | ORACLE §4.4 |
-| L-6 | エンジン読込 switch (`0xa9e7a0` 以降の FlpLoad) 逆アセンブルで低信頼 47 ID を確定 | `unknown_events.json` の undocumented → 0 |
+| L-6 | エンジン読込 switch (`0xa9e7a0` 以降の FlpLoad) 逆アセンブルで低信頼 47 ID を確定 | `unknown_events.json` の undocumented → 0 (**済 §10, #109**) |
 | L-7 | VST2/VST3/CLAP ラッパ (213) の実データ検証 | §7 依頼 (2) |
 | L-8 | `flp_e2e.sh` を `agent-browser` E2E に接続 (ブラウザで parse/dump) | M12 — **実装済 (#112, §9)** |
 
@@ -152,3 +152,45 @@
 | Firefox / Safari は未検証 | Chrome 以外の挙動不明 | `docs/STATUS.md` の MS12 / GUI-8 (Firefox 依存) に従う |
 
 範囲外: Firefox/Safari、FL 本体のロード、実 URL (`--url`) への FLP スイート適用。
+
+## 10. L-6 (#109): FlpLoad 読込 switch による低信頼 47 ID の確定
+
+既知類型との関係: 該当なし (lift ではなく静的な逆アセンブル読み。DEFECTS.md は未参照)。検証起点 commit: `3ae2d0d` (origin/main)。
+
+**手法**。読込ループは `FlpLoad` = VA `0xf46490..0xf50e06` (43,382 B; `.pdata` の RUNTIME_FUNCTION で境界確定)。各反復が `0xa9e7a0` (ストリーム読込; `0xAC` なら u32 ID) を呼び、`eax=[stream+0x100020]` を `0xf46bff` から cmp/sub/jcc の二分木で分岐する。木を ID 0..0x100 ごとに記号実行して ID→ハンドラ VA を得た (`scripts/load_switch.py` → `corpus/load_switch.json`)。ハンドラは全て共通エピローグ `0xf4ec9c` へ戻る。ID の元値は `[stream+0x10002c]`、サイズは `[+0x100024]`。
+
+**結果** (数え方: 分母 = 旧 `unknown_events.json` の undocumented 47 ID、`corpus/event_census.json` の出現数合計 69,138 イベント/552,878):
+- case ハンドラを持つ ID: 46 / 47。残り 1 つ (**ID 37**, 3,804 件) は **default arm = 読込時に無視** (`load_switch.json.defaultArmIds`)。エンジンは書くが読まない。
+- 役割を確定 (conf=high) 22 ID = 60,667 イベント。ハンドラの書込先フィールド・値変換・範囲検査まで読めたもの。conf=med 25 ID = 8,471 イベント: 書込先は確定したが、そのフィールドの意味は推定 (`src/events.ts` の note に VA と書込先を記載)。
+- `undocumented` = **0** (47 → 0。`cli/restatus.ts` が辞書から再判定、`event_census.json` の 151 ID 全てが named)。`cli/corpus.ts` の再実行は素材パス依存のため行わず、census の count/firstSeen は不変。
+
+**10.1 主な確定事項**
+| ID | 確定した意味 (ハンドラ VA) |
+|---|---|
+| 103 | mixer insert 数。**3..502 でなければ読込失敗** (`0xf4ea07`)。コーパス 30/30 ファイルで id 236 の個数と一致 |
+| 104 | **RoutedTo(22) と同じ arm** (`0xf47bae`、channel.+0x258 = insert 番号、範囲 0..501)。FL ≥ 24.2.99 は 22 の代わりに 104 を使う (104 を持つ 1,130 channel のうち 22 も持つもの 0) |
+| 169 | 読込コンテキストに保持され **playlist レコード長を決める** (`0xf558e0`: 20.99.1 未満 32B、以降は bit1 クリア→60B / bit1 セット・bit3 クリア→80B / bit3 セット→エンジン固有長)。値 0x1=2, 0x5=41, 0x7=226, 0xf=37 ファイル |
+| 45/46/101/168 | time marker (205) 適用時にまとめて書かれるラッチ (`0xf4abf7`): 45→+0x28 bool, 46→+0x30 byte, 101→12 個の bool (+0x1c..), 168→+0x2c |
+| 41/42/43/48/50/51/52 | 単純な bool/byte フィールド (plugin+0xf9, insert+0, track+0x70, channel+0x224/+0x1fc/+0x738…, pattern+0xa4)。43 は 0 のとき track+0x2c を既定値に戻す |
+| 49/165/166/167 | 列挙: 49→insert+0x1472 (0..2 のみ), 165→insert+0x2f (0..5、範囲外は 3), 166→insert+0x30 (0..3、範囲外は 3), 167→0..2 のみ有効 |
+| 27 | 旧 insert フラグのビットマスク (b0..b4 を 5 つの insert フィールドへ; b4 は反転) |
+| 242/243 | 構造体 (28B/8B 必須; 長さ不一致なら無視) |
+| 252/253/157/158/171 | pattern 末尾のプロパティ (pattern+0xa4/+0xac/+0xb4/+0x10/+0x18/+0xa8) |
+| 256 (0x100) | 拡張 ID。global オブジェクトの vtable+0x10(value≠0) |
+
+**10.2 playlist stride 境界の確定 (#109 の副目的)**。現行閾値 build 4700 は**誤り側に推定**していた: `169=0x5` は build 4701 まで、`0x7` (80B) は build 4720 から (win 側 9,128 ブロック中 playlist を持つ 52 ファイルで実測)。エンジンの規則 (169 の bit) を `src/decode.ts` に反映し、版フォールバックを 4700 → **4720** に修正 (`playlistStride` は playlist payload があれば従来どおりデータ投票が優先で、コーパスの出力は不変)。build 4702–4719 の実標本は無く、そこは 4701 側 (169 の値) では判定できない = **未解決**。独立検算 (別アルゴリズム = 格子間隔 `u16@4==0x5000` の全行一致で実測した stride と、169 の bit から導いた stride の照合): 52/52 一致 (32B:25, 60B:11, 80B:16)。
+
+**10.3 検証 (全て HEAD 上 / 実測)**。素材 = `$ARTIFACTS_DIR/fl-win64.tar.zst` の win インストーラ抽出物 (FLhd ブロック 9,128; mac 側 .app は不在のため `FL_ROOT` を FLhd ブロックのみのディレクトリに設定)。Node v22.23.3 (`node --test test/*.test.ts`; `test/` ディレクトリ指定は v22 で不可)。
+- `tsc -p tsconfig.json`: クリーン。`node --test`: decode/dictionary/flp/oracle の 21/21 PASS (n=3: 0.36–0.37 s、load average 0.17)。`test/corpus.test.ts` は 3 件中 1 件 PASS・**2 件 FAIL (本変更前の main でも同じ 2 件が FAIL)**: `sampled fst/fsc` (`others.length > 100`) と `NewStuff.flp` の存在確認は mac 素材 (.fst/Demo) 前提で、win ブロックのみの root では満たせない。= 本変更の回帰ではなく**素材不足** (mac .app は R2 の `fl-win64` に無い)。
+- 往復 (`node cli/roundtrip.ts`): 9,128/9,128 L0・9,128/9,128 L1 (535,401 イベント)、31.9 s・load average 0.55→0.75 (1 プロセス; rebase 後 HEAD `7ccd9e9` のクリーン worktree)。rebase 前 `eac8f55` では 33.0 s。
+- ネガティブコントロール: ① `load_switch.json` から ID 41 を削除 → `dictionary.test.ts` が `id 41 ... is neither a FlpLoad case` で FAIL (2 件 FAIL)。② 辞書の ID 41 を conf=low に戻す → undocumented 検査が FAIL (1 件 FAIL)。両方元に戻して 3/3 PASS。
+- 別アルゴリズム検算 (記号実行とは独立): FlpLoad の cmp/je 葉を生バイト正規表現で走査し、`load_switch.json` と突合: 41/41 一致。
+- 再現: `python3 scripts/load_switch.py <FLEngine_x64.dll> corpus/load_switch.json` → `node cli/restatus.ts` → `node --test test/dictionary.test.ts`。
+
+**10.4 範囲外 / 未解決** (`| 未解決 | 影響 | 起票先 |`)
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| conf=med 25 ID (19,25,31,35,36,39,40,42,44,47,91,92,157,158,170,171,210,216,220,230,240,242,243,251,253) は書込先は確定、書込先フィールド自体の意味が未確定 | 辞書名は役割推定 (`Flag`/`Dword` 等)。値の解釈を使う下流 (L-1 の load→save ハーネス) には影響なし (バイト保持) | #109 へコメント (PM 判断で子チケット化) |
+| playlist build 4702–4719 の実標本なし | 規則は engine から確定だが標本で未確認 | #109 コメント |
+| FL 26.1.7 以外の版の読込 switch は未確認 (版依存分岐はハンドラ内の定数比較で存在: 例 104 の `build<3006005`) | 古い版の変換の記述は本 DLL の読み出しのみ | 範囲外 |
+| `cli/corpus.ts` の full 再スキャンは未実施 (mac .app 不在) | manifest.json 等は不変 | #109 コメント |

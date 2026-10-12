@@ -531,3 +531,63 @@ T15 (unit test) がこの数値とネガティブコントロールを自動固�
 
 ### 14.9 既存テスト T12 の更新理由 (規則 45 に基づく訂正)
 T12 は「join split が発動すること」を assert していたが、LIFTLIB-4 で領域値支配が直ったため **join split は発動しなくなった** (対象 site は DAG 側で扱える)。重要なのは**性質** (自己辺が無い = CAB-238 §6 の無限ループが起きない) なので、assert を「自己辺 0 本」に変更した (実測 self_edges=0)。E7 param sweep 8 combo も ott e2e で完走を確認済み。
+
+## 15. LIFTLIB-1 (#224) — 旧 dir 参照専用化の検収 (2026-10-13, Actions runner)
+
+既知類型との関係: 該当なし (pass 変更なし。テスト/ e2e スクリプトの入力依存の修正のみ)。
+
+### 15.1 結論
+- 対応表 (検収条件 3) を `README.md`「旧 dir pass → liftlib 対応表」に追記。旧 dir `tools/m5〜m10` の REPORT 冒頭に参照専用注記を追加 (スクリプト・成果物は無改変)。
+- `liftlib_e2e.sh` は **通常・`--fresh` とも ALL PASS** (条件 1)。旧 e2e 4 本は旧成果物で **全 PASS** (条件 2)。
+- 条件 1 の最初の実測は rc=1 だった: unit T4 が旧 FA 中間成果物 `targets/freshair/work/lift_gain/gain_lift.ll` を無条件に読み、`work-liftlib-targets` 素材 (SlateCore/HeartCore のみ) に無かったため。FA の `@__asm_mulss` 宣言は liftlib 自前の RetDec 生出力 `work/fa_gain/fa_gain.drc.ll` にもある (署名 `x(x,d)` / `x(x,x)`) ので、旧成果物が無いときだけそちらへフォールバックさせた。加えて `--fresh` が T4 の入力を先に消していたため、削除を unit の後ろへ移動。
+
+### 15.2 実測 (runner 4 core, 並列 1, 検証 HEAD はこのコミットのコード部。以降の差分は docs のみ)
+| コマンド | 結果 | 所要 (実測) / load |
+|---|---|---|
+| `bash tools/liftlib/liftlib_e2e.sh` (修正前) | rc=1 (unit T4 のみ FAIL, 他は全 PASS) | 73.1 s |
+| `bash tools/liftlib/liftlib_e2e.sh` | **ALL PASS**: unit T1..T15 / FA 400/400 / KH 366/366 / OTT 既定 checks 8/0 junkHi 104 / OTT `--auto none` checks 8/0 + IR 7 段一致 + 出力 SHA 42/42 / SIMD 95,400 vector 不一致 0 / 注入 94/94 偽陽性 0 / leafspec PASS | 143.2 s / load 0.93 |
+| `bash tools/liftlib/liftlib_e2e.sh --fresh` | **ALL PASS** (同上。RetDec 再 lift 込み regress 84.4 s) | 186.9 s / load 1.31 |
+| `M10_SKIP_BUILD=1 bash tools/m10/m10_e2e.sh` | PASS checks 7/0, band 係数 maxdev=0 nbad=0, junkHi 175 | 0.318 s |
+| `M9_SKIP_BUILD=1 bash tools/m9/m9_e2e.sh` | PASS checks 6/0 | 0.187 s |
+| `bash tools/m8/m8_e2e.sh` (build 含む) | OK: sig mismatch 0 / undefined 47 / trap8 14/5 / rt_leaf 19/0 / t1 SHA b5a91b9b… 2 run 一致 | 4.67 s |
+| `bash tools/m7/m6_e2e.sh` | OK: sig mismatch 0 / undefined 57 / t1 SHA f34a6a46… 一致 / trap 6/13 | 3.10 s |
+
+注: 「m6_e2e.sh」の実体は `tools/m6/` ではなく **`tools/m7/m6_e2e.sh`** (`tools/m6/` に e2e スクリプトは無い)。m9/m10 は `*_SKIP_BUILD=1` で旧成果物 (`work/ott_m9.cjs`・`ott_m10.cjs`) を直接検査した (build 再実行は検査対象外)。ネガティブコントロールは本チケットでは追加していない (pass 変更なし; liftlib 側の検出力は §5 / `inject-eval` 94/94 が継続ゲート)。
+
+### 15.3 前提 (Actions 上での再現条件)
+`pip install pefile capstone` / `/home/ubuntu/work/analysis → $HOME/analysis`・`/home/ubuntu/work/webstudio → worktree` の symlink / `tools/*/work` は素材 (`work-m6-ott` `work-liftlib` `work-liftlib-targets` `work-icall` `analysis-ott-binaries`) を展開した checkout を worktree に symlink。
+
+### 15.4 検証範囲・範囲外
+- 範囲: 上表の e2e が旧成果物・liftlib 成果物に対し PASS すること、対応表の記載。
+- 範囲外: 旧 dir スクリプトへの実行禁止の機械的強制 (注記のみ)。`recipes/ott` (#12–16, 18) の insn.addr 駆動汎用化。
+
+### 15.5 未解決 (起票先付き)
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `OTT_vst2_win64.dll` 等の `/home/ubuntu/work/...` 決め打ち (`tests/test_unit.py`・`m8_e2e.sh` ほか多数) | runner では symlink 必須 | `tools/shared/env.sh` (`ANALYSIS_DIR`) への統一を別チケット (PM が `[LIFTLIB-n]` で起票) |
+| `pefile`/`capstone` の依存宣言が無い (requirements 無し) | 新規環境で `ModuleNotFoundError` | 同上 / #284 (CI 基盤) にコメント |
+| 旧 dir スクリプトの実行を禁止する機械的な仕組みは無い (注記のみ) | 参照専用は運用依存 | PM 判断 (SUBAGENT_RULES 側の「読取専用」更新と合わせて) |
+
+## 16. 環境パス置換 (#386, 親 #294・先行 #312): tools/liftlib/liftlib の /home/ubuntu を tools/shared へ
+
+既知類型との関係 (DEFECTS.md): 該当なし (パス参照の置換のみで lift/IR には触れない)。
+
+### 16.1 変更
+`tools/liftlib/liftlib` の `*.sh *.py *.json *.ts *.mjs` (work/ 除く) の `/home/ubuntu` 参照 2 行を置換。
+`liftlib/env.py` が `tools/shared/paths.py` の `PLUGINS_DIR` から `OTT_DLL` を組み、`cli.py` (inject-eval) と `recipes/ott.py` (`DLL`) がそれを参照する。
+`tools/liftlib/` 直下 (`tests/test_unit.py`・`lowbase_e2e.sh`・`p1_residual_census.py`・`xmm0_ret_census.py`・`targets/ott_leaf.json`) は本チケット範囲外 (§16.3)。
+
+### 16.2 検証 (検証起点 `origin/main` = ee8f70c、素材は `fl-win64` のみ)
+- 受入条件 1: `grep -rn '/home/ubuntu' tools/liftlib/liftlib --include=*.sh --include=*.py --include=*.json --include=*.ts --include=*.mjs --exclude-dir=work | wc -l` → 0 (置換前 2)。
+- 受入条件 2 (既定値同一性): `ANALYSIS_DIR`/`PLUGINS_DIR` を unset して `env.OTT_DLL` と `recipes.ott.DLL` を置換前の固定文字列
+  `/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll` と文字列比較 → 両方一致 (True)。n=1・直列、load average 0.55 (1 分値)。
+- ネガティブコントロール: `PLUGINS_DIR=/nonexistent` → `/nonexistent/ott/binaries/OTT_vst2_win64.dll`、`ANALYSIS_DIR=/x` (PLUGINS_DIR unset) → `/x/plugins/ott/binaries/OTT_vst2_win64.dll` (変数が効いている)。
+- 構文: `python3 -m py_compile` 3 本 OK。
+
+### 16.3 検証範囲 / 範囲外 / 未解決
+範囲外: `liftlib_e2e.sh` / `python3 -m liftlib ott` の実行。`OTT_vst2_win64.dll` は `analysis-ott-binaries`、lift 入力は `work-m6-ott`・`work-liftlib`、emcc は `toolchain-emsdk` が要り、この run は `fl-win64` のみ取得のため。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| e2e を素材付きで未実行 | 置換行以外の挙動は未検証 (置換は DLL パス定義のみ) | 本 PR のレビュー run (PR 本文の `oc_artifacts:` 行) |
+| `tools/liftlib/` 直下 5 ファイルに `/home/ubuntu` が残る | runner では symlink 必須 | 未起票 (2026-10-13 時点で `gh issue list --search "CI-4-liftlib"` は #386 のみ)。親 #294 にコメントで起票を提案 |

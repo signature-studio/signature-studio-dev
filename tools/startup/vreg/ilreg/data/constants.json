@@ -1,6 +1,6 @@
 {
  "dll": {
-  "path": "/home/ubuntu/work/webstudio/tools/startup/work/FLEngine_x64.dll",
+  "path": "tools/startup/work/FLEngine_x64.dll",
   "image_base": 4194304,
   "size": 22227016
  },

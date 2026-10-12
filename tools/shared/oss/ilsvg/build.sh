@@ -11,7 +11,7 @@
 #   upstream 構成では header パスが解決しない (詳細は下記 LOG)。
 #   -> svgdom/svgren の連結ビルドは子チケット (本 REPORT §6 未解決に起票)。
 set -euo pipefail
-PATH="/home/ubuntu/.local/share/pnpm/bin:$PATH"
+PATH="$HOME/.local/share/pnpm/bin:$PATH"
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; ROOT="$HERE/../.."
 S="$ROOT/work/src"; B="$ROOT/work/build/ilsvg"
 source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1

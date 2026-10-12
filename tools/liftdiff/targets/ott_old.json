@@ -1,7 +1,7 @@
 {
   "name": "ott_old",
   "desc": "OTT (Xfer) VST2 win64 — 旧 RetDec chain (M6-M9 pass 済 ott.ll, tools/ott/ott_build.sh 産物)。既知欠陥 D1〜D6 の検出対象",
-  "pe": "/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll",
+  "pe": "${PLUGINS_DIR}/ott/binaries/OTT_vst2_win64.dll",
   "ir": "tools/ott/work/ott.ll",
   "image": null,
   "wasm_origin": "0x30000000",

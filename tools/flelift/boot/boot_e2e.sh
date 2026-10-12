@@ -14,9 +14,10 @@
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 FLE="$(cd "$HERE/.." && pwd)"
+source "$HERE/../../shared/env.sh"
 SX="$(cd "$FLE/../shimx" && pwd)"
 W="$FLE/work/boot"
-PE="${FLE_PE:-/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin}"
+PE="${FLE_PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}"
 FAST=0; [ "${1:-}" = "--fast" ] && FAST=1
 mkdir -p "$W/obj" "$W/tmp" "$HERE/results"
 export TMPDIR="$W/tmp"

@@ -4,6 +4,7 @@
 # (RetDec lift は work/lift/authstub.drc.ll があれば再利用、無ければ ~30s で生成)
 set -e
 cd "$(dirname "$0")"
+source ../../../../shared/env.sh
 W=work
 mkdir -p $W/lift $W/tmp
 PE=../../work/Serum2_win64.vst3
@@ -24,7 +25,8 @@ python3 authstub_irpass.py "$LIFT" $W/patched.ll --report $W/irpatch_report.json
 echo "== [3] base 修復 (liftlib ライブラリ利用, 無改変) — patched / raw の両方 =="
 python3 - <<'EOF'
 import sys
-sys.path.insert(0, '/home/ubuntu/work/webstudio/tools/liftlib')
+import os
+sys.path.insert(0, os.environ['REPO_ROOT'] + '/tools/liftlib')
 from liftlib.passes import base as B
 for src, dst in (('work/patched.ll', 'work/patched_base.ll'),
                  ('work/lift/authstub.drc.ll', 'work/raw_base.ll')):

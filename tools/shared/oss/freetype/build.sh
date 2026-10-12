@@ -10,6 +10,7 @@
 #   - wasm64 (-sMEMORY64=1, long=64bit): 無改変で一致
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; ROOT="$HERE/../.."
+source "$ROOT/env.sh"
 SRC="$ROOT/work/src/freetype-2.7"; B="$ROOT/work/build/freetype"
 [ -d "$SRC" ] || bash "$ROOT/oss/fetch_sources.sh"
 source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1
@@ -43,7 +44,7 @@ emcc -O2 -sMEMORY64=1 -I"$INC" "$HERE/test_ft.c" "$B/wasm64/src/objs/.libs/libfr
   -sENVIRONMENT=node -sNODERAWFS=1 -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1
 echo "[ft] sizes: libfreetype.a native=$(stat -c %s "$B/native/src/objs/.libs/libfreetype.a") wasm32=$(stat -c %s "$B/wasm32/src/objs/.libs/libfreetype.a")  test wasm32=$(stat -c %s "$B/test_wasm32.wasm") wasm64=$(stat -c %s "$B/test_wasm64.wasm")"
 
-FONT="${FONT:-/home/ubuntu/work/analysis/mac/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL/Shared/Artwork/Fonts/OpenSans-Regular.ttf}"
+FONT="${FONT:-$FL_MAC_DIR/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL/Shared/Artwork/Fonts/OpenSans-Regular.ttf}"
 "$B/test_native" "$FONT" > "$B/out_native.txt"
 node "$B/test_wasm32.cjs" "$FONT" > "$B/out_wasm32.txt"
 node --experimental-wasm-memory64 "$B/test_wasm64.cjs" "$FONT" > "$B/out_wasm64.txt" 2>"$B/out_wasm64.err" || node "$B/test_wasm64.cjs" "$FONT" > "$B/out_wasm64.txt"

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # fw_lift.sh — P0a (CAB-194) framework lift stage 1: PE 敷設 → icall_rewrite → RetDec (chunk 並列) → 復元 → merge
 #   bash fw_lift.sh [--full] [--chunks N]
-#   入力: /home/ubuntu/work/analysis/win64/extracted/block18983_PE.bin (Fruity Balance = framework 正本)
+#   入力: $FL_WIN64_DIR/extracted/block18983_PE.bin (Fruity Balance = framework 正本)
 #         work/fw/F.ranges (fw_prep.py)
 #   出力: work/fw/fw_all.ll (merge 済み raw RetDec IR, insn.addr 保持)
 #   教訓 (tools/icall, 稼働中): RetDec は間接 call/jmp を IR から全て落とすため,
@@ -10,9 +10,10 @@
 #   元 VA 体系に戻す。これで IR に間接 call が残る (M11 では 0 件だった)。
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
-ICALL="/home/ubuntu/work/webstudio/tools/icall"
+source "$HERE/../../shared/env.sh"
+ICALL="$REPO_ROOT/tools/icall"
 W="$HERE/../work/fw"
-PE=/home/ubuntu/work/analysis/win64/extracted/block18983_PE.bin
+PE="$FL_WIN64_DIR/extracted/block18983_PE.bin"
 CHUNKS=8
 FULL=0
 for a in "$@"; do case "$a" in --full) FULL=1 ;; --chunks) CHUNKS="$2"; shift ;; esac; done

@@ -12,9 +12,10 @@
 # 成果物: work/diff/{k80.lower.ll,k80.argfix.ll,k80diff}, work/p0c2_sweep.csv
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
+source "$HERE/../../shared/env.sh"
 LIFTP="$(cd "$HERE/../lift/passes" && pwd)"
 CASES="${1:-2000}"
-PE=/home/ubuntu/work/analysis/win64/extracted/block18983_PE.bin
+PE="$FL_WIN64_DIR/extracted/block18983_PE.bin"
 mkdir -p "$HERE/work/diff"
 
 echo "== [1] k80abi (機械語 ABI 抽出) =="

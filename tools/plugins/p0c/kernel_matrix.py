@@ -19,9 +19,11 @@ from capstone import Cs, CS_ARCH_X86, CS_MODE_64
 from capstone.x86 import X86_OP_MEM, X86_OP_REG, X86_OP_IMM, X86_REG_RIP
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, '..', '..', 'shared'))
+from paths import FL_WIN64_DIR  # noqa: E402
 sys.path.insert(0, os.path.join(HERE, '..', '..', 'icall', 'disp_size'))
 import dispfix as DF      # CAB-229: capstone の disp_size は 66 prefix 付き disp32 で 2 を返す (D9)
-EXT = '/home/ubuntu/work/analysis/win64/extracted'
+EXT = os.path.join(FL_WIN64_DIR, 'extracted')
 BALANCE = 18983
 INIT_VA = 0x5e19f0
 KT = json.load(open(os.path.join(HERE, '..', 'work', 'kernel_table.json')))

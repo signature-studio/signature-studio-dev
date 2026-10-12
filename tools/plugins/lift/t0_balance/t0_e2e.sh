@@ -4,7 +4,8 @@
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"                 # tools/plugins
-PE=/home/ubuntu/work/analysis/win64/extracted/block18983_PE.bin   # Fruity Balance_x64.dll (NSIS block 18983)
+source "$ROOT/../shared/env.sh"
+PE="$FL_WIN64_DIR/extracted/block18983_PE.bin"   # Fruity Balance_x64.dll (NSIS block 18983)
 W="$ROOT/work/balance"
 mkdir -p "$W"
 export PATH=/opt/emsdk/node/24.19.0_64bit/bin:$PATH

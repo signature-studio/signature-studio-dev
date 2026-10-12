@@ -15,10 +15,12 @@ ALL PASS 条件:
 import json, os, sys, re, collections
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SEED = '/home/ubuntu/work/webstudio/tools/startup/vreg/data/seed.json'
-KEYS = '/home/ubuntu/work/webstudio/tools/startup/vreg/data/keys.json'
-PATHMAP_JS = '/home/ubuntu/work/webstudio/tools/shimx/pathreg/js/pathmap.mjs'
-PATHMAP_C = '/home/ubuntu/work/webstudio/tools/shimx/pathreg/src/pathmap.c'
+sys.path.insert(0, os.path.join(HERE, '..', '..', 'shared'))
+from paths import REPO_ROOT  # noqa: E402
+SEED = os.path.join(REPO_ROOT, 'tools', 'startup', 'vreg', 'data', 'seed.json')
+KEYS = os.path.join(REPO_ROOT, 'tools', 'startup', 'vreg', 'data', 'keys.json')
+PATHMAP_JS = os.path.join(REPO_ROOT, 'tools', 'shimx', 'pathreg', 'js', 'pathmap.mjs')
+PATHMAP_C = os.path.join(REPO_ROOT, 'tools', 'shimx', 'pathreg', 'src', 'pathmap.c')
 
 CANON = 'webstudio'          # 正規 username (CAB-213 確定 / CAB-214 で shimx 内蔵値も統一)
 RETIRED = 'user'             # 旧 shimx 内蔵値 — pathreg 予備 profile (user2Profile) は退役済み

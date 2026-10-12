@@ -8,7 +8,7 @@
  * ここでは該当関数のみを C に転記 (命令単位で disasm 照合済; weak define を強シンボルで上書き).
  * 他の lifted 関数・データ配置は一切変更しない.
  *
- * アドレス表記: VA_* = 実 VA, LVA = VA - 0x400000 (wasm linear memory 上の実座標).
+ * アドレス表記: VA_* = 実 VA, LVA = VA - 0x400000 + M11_LB_BASE (wasm linear memory 上の実座標).
  */
 #include <stdint.h>
 #include <stdio.h>
@@ -20,6 +20,11 @@ typedef unsigned long long u64;
 typedef unsigned int u32;
 typedef unsigned char u8;
 
+/* LVA = RVA + M11_LB_BASE (-DM11_LB_BASE; 既定 0 = LVA=RVA, #222). R(rva) = RVA 定数 → LVA */
+#ifndef M11_LB_BASE
+#define M11_LB_BASE 0
+#endif
+#define R(rva) ((u64)(rva) + (u64)M11_LB_BASE)
 #define Q(lva) (*(volatile u64*)(uintptr_t)(lva))
 #define D(lva) (*(volatile u32*)(uintptr_t)(lva))
 #define B(lva) (*(volatile u8*)(uintptr_t)(lva))
@@ -56,7 +61,7 @@ static m11_tr_t disp_find(u32 va) {
 
 /* 間接 call: target は .data ポインタ表由来 (LVA; reloc 補正済) か lea [rip] 由来の VA. */
 u64 m11_icall(u64 target, u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) {
-    m11_tr_t f = disp_find((u32)(target + 0x400000ull));
+    m11_tr_t f = disp_find((u32)(target + (0x400000ull - M11_LB_BASE)));
     if (!f) {
         f = disp_find((u32)target);
         if (f) g_icall_viaVA++;
@@ -90,23 +95,23 @@ EMSCRIPTEN_KEEPALIVE void m11_set_survey(int v) { g_survey = v; }
 
 /* survey 用: unit i の Init を 1 本だけ呼ぶ (JS が try/catch で trap を隔離). 戻り 0=proc 無し 1=実行 2=closure 外(miss) */
 EMSCRIPTEN_KEEPALIVE int m11_call_unit(int i) {
-    u64 tbl = Q(0x11eac90);
+    u64 tbl = Q(R(0x11eac90));
     if (!tbl || i < 0 || i >= (int)D(tbl)) return -1;
     u64 proc = Q(Q(tbl + 8) + (u64)i * 16);
     if (!proc) return 0;
     u32 m0 = (u32)g_icall_miss;
-    D(0x11eac98) = (u32)(i + 1);
+    D(R(0x11eac98)) = (u32)(i + 1);
     m11_icall(proc, 0, 0, 0, 0, 0, 0, 0, 0);
     return (u32)g_icall_miss != m0 ? 2 : 1;
 }
 EMSCRIPTEN_KEEPALIVE unsigned m11_unit_va(int i) {
-    u64 tbl = Q(0x11eac90);
+    u64 tbl = Q(R(0x11eac90));
     if (!tbl || i < 0 || i >= (int)D(tbl)) return 0;
     return (unsigned)Q(Q(tbl + 8) + (u64)i * 16);
 }
 
 u64 function_4120c0(void) {
-    u64 tbl = Q(0x11eac90);
+    u64 tbl = Q(R(0x11eac90));
     if (g_survey) { g_units_total = tbl ? D(tbl) : 0; return 0; }
     if (g_trace) fprintf(stderr, "[m11][InitUnits] InitTable=0x%llx\n", tbl);
     if (!tbl) return 0;
@@ -117,7 +122,7 @@ u64 function_4120c0(void) {
     while (i < count) {
         u64 proc = Q(units + (u64)i * 16);
         i++;
-        D(0x11eac98) = (u32)i;
+        D(R(0x11eac98)) = (u32)i;
         if (!proc) continue;
         u32 miss0 = (u32)g_icall_miss;
         if (g_trace) fprintf(stderr, "[m11][unit %d/%d] init=0x%llx\n", i, count, proc);
@@ -133,7 +138,7 @@ u64 function_4120c0(void) {
 u64 m11_InitLib(u64 ctx, u64 a1, u64 a2, u64 tbl, u64 dllproc, u64 hinst, u64 reason64, u64 reserved) {
     u32 reason = (u32)reason64;
     if (g_trace) fprintf(stderr, "[m11][InitLib] ctx=0x%llx a1=0x%llx a2=0x%llx tbl=0x%llx dllproc=0x%llx hinst=0x%llx reason=%u reserved=0x%llx\n", ctx, a1, a2, tbl, dllproc, hinst, reason, reserved);
-    u64 r13 = reason < 2 ? 0x11eac80 : 0x11eada8;
+    u64 r13 = R(reason < 2 ? 0x11eac80 : 0x11eada8);
     u64 tmp[30];
     memcpy(tmp, (void*)(uintptr_t)(ctx + 0x38), 240);
     memcpy((void*)(uintptr_t)ctx, (void*)(uintptr_t)r13, 296);
@@ -143,17 +148,17 @@ u64 m11_InitLib(u64 ctx, u64 a1, u64 a2, u64 tbl, u64 dllproc, u64 hinst, u64 re
     Q(r13) = ctx;
     D(r13 + 0x34) = (u32)function_406f90();
     if (reason == 0) D(r13 + 0x18) = D(Q(r13 + 0x10)); else D(r13 + 0x18) = 0;
-    Q(0x11e6030) = 0x406fd0;
-    Q(0x11e6038) = 0x406fe0;
+    Q(R(0x11e6030)) = 0x406fd0;
+    Q(R(0x11e6038)) = 0x406fe0;
     Q(r13 + 8) = 1;
     B(r13 + 0x30) = (u8)(reason + 1);
     Q(r13 + 0x28) = Q(tbl);
     if (reason == 1 || reason == 2) m11_icall(Q(tbl + (u64)reason * 8), reason, 0, 0, 0, 0, 0, 0, 0);
     if (dllproc) m11_icall(dllproc, reason, reserved, 0, 0, 0, 0, 0, 0);
     if (reason == 3) m11_icall(Q(tbl + (u64)reason * 8), reason, 0, 0, 0, 0, 0, 0, 0);
-    if (Q(0x11e6078) == 0) {
-        B(0x11e6084) = 1;
-        D(0xfa5054) = (u32)function_40a3b0();
+    if (Q(R(0x11e6078)) == 0) {
+        B(R(0x11e6084)) = 1;
+        D(R(0xfa5054)) = (u32)function_40a3b0();
     }
     if (reason == 1) return function_4120c0();
     return function_4128b0();
@@ -169,16 +174,16 @@ unsigned long long function_412160(unsigned long long a, unsigned long long b, v
 u64 function_41d8f0(u64 rcx, u64 rdx, u64 r8, u64 r9, u64 reserved) {
     u32 reason = (u32)r9;
     if (reason == 1) {
-        B(0x11ec290) = 1;
-        B(0x11ec2d8) = 1;
-        Q(0x11ec298) = r8;
-        Q(0xfa93b8) = r8;
-        Q(0xfa93c0) = 0;
-        Q(0xfa93c8) = 0;
-        Q(0xfa93d8) = rdx + 0x10;
+        B(R(0x11ec290)) = 1;
+        B(R(0x11ec2d8)) = 1;
+        Q(R(0x11ec298)) = r8;
+        Q(R(0xfa93b8)) = r8;
+        Q(R(0xfa93c0)) = 0;
+        Q(R(0xfa93c8)) = 0;
+        Q(R(0xfa93d8)) = rdx + 0x10;
         function_41d170();
     }
-    return m11_InitLib(rcx, rdx, 0xfa93b0, 0xfa9410, Q(0x11ec2a8), r8, reason, reserved);
+    return m11_InitLib(rcx, rdx, R(0xfa93b0), R(0xfa9410), Q(R(0x11ec2a8)), r8, reason, reserved);
 }
 
 /* function_412510  VA 0x412510  (Delphi RTL: 再配置表の適用)

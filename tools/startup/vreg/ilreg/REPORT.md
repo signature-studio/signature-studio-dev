@@ -118,3 +118,42 @@
 | VM オペコード表の実装 (§4-1) | 外部 `.reg` の ILRegKey を平文化できない | 新規子チケット案 `[ST-T14]` (親 #23)。issue #213 のコメントが「#214」と記すが #214 は別件 (ST-T13, closed) のため番号は PM が確定 |
 | 平文 head 構造 (§4-2) | strictHead の実データ確定 | #116 (ST-T9, ユーザ起点 .reg) |
 | bit0 常時 0 仮説の動的確認 (§6) | Trial 表示分岐 | #107 (ST-T11) |
+
+## 環境パス置換 (#379, 親 #294・先行 #312): /home/ubuntu 絶対パスを tools/shared へ
+
+既知類型との関係 (DEFECTS.md): 該当なし (パス参照の置換のみで lift/IR には触れない)。
+
+### 変更
+
+`tools/startup/vreg` 配下の `*.sh *.py *.json *.ts *.mjs` (work/ 除く) の `/home/ubuntu` 参照 3 行 (3 ファイル) を置換。
+
+| ファイル | 置換 |
+|---|---|
+| `scripts/extract_constants.py` | 既定 DLL = `REPO_ROOT/tools/startup/work/FLEngine_x64.dll` (`tools/shared/paths.py`)。無ければ `FL_WIN64_DIR/extracted/block00031_PE.bin` にフォールバック。argv[1] 指定は従来どおり優先 |
+| `scripts/pedis.py` | 同上 (argv 無し・同じ解決順) |
+| `data/constants.json` | `dll.path` を絶対パスからリポ相対 `tools/startup/work/FLEngine_x64.dll` へ。他の値は不変 |
+
+`extract_constants.py` は出力 `dll.path` を使用 DLL の実パスではなく固定の相対表記 (`DLL_REL`) にした。出力がチェックアウト位置に依存せず決定的になる。
+
+### 検証 (検証起点 `origin/main` = ee8f70c、素材は `fl-win64` のみ)
+
+- 受入条件 1: `grep -rn '/home/ubuntu' tools/startup/vreg --include=*.sh --include=*.py --include=*.json --include=*.ts --include=*.mjs --exclude-dir=work | wc -l` → 0。
+- 受入条件 2: `tools/startup/work/FLEngine_x64.dll` は gitignore のスナップショットで fl-win64 素材に無い。
+  代わりに `fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B = `constants.json` の `dll.size` と一致) を `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` で使い、
+  `python scripts/extract_constants.py` を引数なしで実行 (0.050 s、load average 1 分値 0.25、n=1)。
+  生成した `data/constants.json` はコミット内容と `cmp` で完全一致。
+  `origin/main` の `constants.json` から `/home/ubuntu/work/webstudio/` を除去したものとも `cmp` 一致 (差分は `dll.path` の 1 行のみ)。
+- `scripts/pedis.py 0x10c7cd0 0x20` が `55 push rbp` から逆アセンブルを出力 (同上の PE を使用)。
+- `node tools/startup/vreg/ilreg/verify/test_golden.mjs`: 20 passed, 0 failed (置換前後とも同じ)。
+- ネガティブコントロール: `FL_WIN64_DIR=/nonexistent` で `extract_constants.py` / `pedis.py` とも `FileNotFoundError: /nonexistent/extracted/block00031_PE.bin` (環境変数が実際に効く)。
+- 既定値の同一性: 従来の `/home/ubuntu/work/webstudio/tools/startup/work/FLEngine_x64.dll` は、リポが `/home/ubuntu/work/webstudio` にある作業 VM では `REPO_ROOT` 解決結果と同一パス (文字列比較・実機 VM は未実施)。
+- 実行環境: `uv pip install pefile capstone`。
+
+### 検証範囲 / 範囲外 / 未解決
+
+範囲外: `tools/startup/work/FLEngine_x64.dll` 本体での実行 (素材に無い。上記のとおり同サイズの PE 抽出物で出力一致を確認)。
+`tools/startup/vreg` の他 e2e (`vreg.sh`・`build.sh`・`test/e2e_chrome.mjs`) は `/home/ubuntu` 参照が無く未変更・未実行。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `tools/startup/work/FLEngine_x64.dll` が素材化されていない | 作業 VM 以外では `FL_WIN64_DIR` のフォールバックに依存 | #294 の素材整備 |

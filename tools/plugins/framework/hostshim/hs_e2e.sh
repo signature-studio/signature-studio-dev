@@ -15,7 +15,8 @@
 #   Phase B: hs_route.cjs (下記の派生ビルド) で CreatePlugInstance→ctor 連鎖 + host shim 記録照合。
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
-T=/home/ubuntu/work/webstudio
+source "$HERE/../../../shared/env.sh"
+T="$REPO_ROOT"
 FW="$T/tools/plugins/framework"
 WFW="$T/tools/plugins/work/fw"
 W="$T/tools/plugins/work/hs"
