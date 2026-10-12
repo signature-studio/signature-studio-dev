@@ -21,7 +21,10 @@ from capstone.x86 import X86_OP_MEM, X86_OP_REG, X86_OP_IMM
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 WORK = os.path.join(HERE, '..', '..', 'work')
-EXT = '/home/ubuntu/work/analysis/win64/extracted'
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', '..', '..', 'shared'))
+from paths import FL_WIN64_DIR, REPO_ROOT
+EXT = _os.path.join(FL_WIN64_DIR, 'extracted')
 
 
 def load_pes():
