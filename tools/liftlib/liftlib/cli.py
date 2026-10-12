@@ -70,7 +70,7 @@ def cmd_simd(a):
     if a.sub == "test":
         d = json.load(open(os.path.join(PKG, "data/kh_mnemonics.json")))
         bases = sorted(set(d["effects"]) | set(d["infra"]) | set(d["hosts"]))
-        forms, stat = simdtest.run(bases=bases, n=a.n, out_dir=os.path.join(PKG, "work/simdtest"))
+        forms, stat = simdtest.run(bases=bases, n=a.n, out_dir=os.path.join(PKG, "work/simdtest"), ybases=simdtest.YMM_BASES)
         by = simdtest.summarize(stat)
         bad = [(k, v) for k, v in by.items() if v["mismatch"]]
         tested = sorted(set(k[0] for k in by))

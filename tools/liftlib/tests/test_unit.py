@@ -5,7 +5,7 @@
   T2 p1_legacy / shift / gdata_legacy が OTT 元チェーンの中間成果物と一致
   T3 SIMD 生成が RetDec の接尾番号 (`__N`) に依存しない (接尾を付け替えても生成 C が同一)
   T4 同じ名前でも署名が違えば別 helper になる (FA の mulss(i128,i32) と OTT の mulss(i128,i128))
-  T5 mnemonic 被覆: KH census 205 種のうち未被覆は pcmpistri / vinsertf128 のみ
+  T5 mnemonic 被覆: KH census 205 種のうち未被覆 0 (pcmpistri / vinsertf128 は LIFTLIB #241 で被覆)
   T6 機械語解析: FA gain の live-in / 到達定義
 """
 import json
@@ -87,7 +87,7 @@ def t5():
     d = json.load(open(os.path.join(HERE, "..", "data/kh_mnemonics.json")))
     allm = sorted(set(d["effects"]) | set(d["infra"]) | set(d["hosts"]))
     cov, unc = gen.coverage(allm)
-    assert unc == ["pcmpistri", "vinsertf128"], unc
+    assert unc == [], unc
     print("T5 ok (mnemonic %d 種中 未被覆 %s)" % (len(allm), unc))
 
 
