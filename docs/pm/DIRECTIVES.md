@@ -854,7 +854,7 @@ PM を含む全てのセッションは ephemeral で中断・削除される可
 | 全指示を文書化 (セッションは ephemeral) | 原本は repo 内の本ファイルに逐語保管。要約は HANDOFF §6 | 本ファイル |
 | 「プロジェクトは混乱の中にあり、破壊的なブレークスルーを先導する」 (指示 2) | 部分最適の修復ではなく、構造から作り直す判断を許容する許可。docs/ 正史化・107 ファイルの再編 (実 diff: 1,421 行追加・512 行削除) として体現 | 本再編 (`docs/restructure-2026-10`)・`docs/DECISIONS.md` (D1〜D6) |
 | 指示 110・111: dcp compress を即時実行・コンテキスト全体をもっと圧縮 | コンテキスト圧縮は PM の継続的責務。指示されてから行うのではなく、定期的に自発実施する | PM セッション運用 (compress ツール) |
-| 指示 116: 応答を停止する時に background terminal が 0 件の状態を作らない。全 run を無条件で常に watch するマイルールを定めてよい | PM ルール化: **全ての Actions run は起動した時点で watch 対象。応答を終える時は必ず `gh run watch` 系の background が 1 本以上走っている。完了通知を受けたら、結果の処理より先に次の watcher を起動し直す** (watcher が 0 件の瞬間を作らない) | `docs/WORKFLOW.md` §11・`/home/ubuntu/work/analysis/watch_runs.sh` (PM 用。repo 外) |
+| 指示 116: 応答を停止する時に background terminal が 0 件の状態を作らない。全 run を無条件で常に watch するマイルールを定めてよい | PM ルール化: **全ての Actions run は起動した時点で watch 対象。応答を終える時は必ず `gh run watch` 系の background が 1 本以上走っている。完了通知を受けたら、結果の処理より先に次の watcher を起動し直す** (watcher が 0 件の瞬間を作らない) | `docs/WORKFLOW.md` §11 |
 | 指示 113〜115: 承認・PM への全権委任・コマンド実行制限の撤廃 | プロジェクトの所有者は PM。ユーザーは進捗を後から確認するのみで、チケット・タスク全般を PM の判断で進める。VM と GitHub/Cloudflare の運用責任も PM。**ただし無断の Cloudflare リソース/トークン作成の禁止 (指示 4・9) と破壊的 git 操作の禁止は撤廃されていない** (権限の拡大は責任の拡大であり、事前連絡なしの本番リソース変更の許可ではない)。確認できる情報は自分で取りに行く (step summary を含む) | 本ファイル・`docs/WORKFLOW.md` §11 |
 | 指示 112: 全作業は GitHub Actions へ移行済みで、ローカルでの作業は基本的に行われない | 作業の実行主体は Actions 上の OpenCode (issue に `/oc oc_actions_allow_write` をコメントして起動)。ローカル subagent を「稼働本数 15」の数え方の前提にしない。PM のローカル作業は「Actions 起動・監視・検収・統合」に限る | `.github/workflows/opencode.yaml` (implement / review job)・`.github/README.md`・`docs/WORKFLOW.md` (Actions 運用の追記が必要) |
 
