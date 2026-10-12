@@ -106,7 +106,7 @@ PM を含む全てのセッションは ephemeral で中断・削除される可
 | # | 確定事項 | 根拠・影響 |
 |---|---|---|
 | 1 | **PR の作成・更新は push 権限を持つ collaborator のみ (GitHub の設計: head branch を push する必要がある)。一方 public repo の Issue は第三者も作成・コメントできる** | repo が public なので、**読み取りは誰にでも開かれている** (情報漏洩の面)。Issue/PR・コメント本文は第三者の入力になり得るため、全て**信頼できない入力 (untrusted input) として扱う** — 元の content は人間が書いたものであり、作成者の権限と内容の検証は別問題である。指示 1 が「Issues/PR の記述とソースに齟齬があればタスク失敗」と定めた所以。PR #282 (`feat/add-opencode`) の `issue_comment` トリガは `author_association` COLLABORATOR/MEMBER/OWNER に限定し、第三者が `/oc` + `oc_actions_allow_write` で write モードの agent を起動する経路を閉じている |
-| 2 | `anomalyco/opencode-beta` に **CLI 資産は存在しない**。OpenCode CLI は `anomalyco/opencode` を用いる | repo 検証 (Releases API 実測: beta の公開資産はすべて `opencode-desktop-*` 用で CLI の tarball/zip は 0 件)。対象ファイル `.github/scripts/install-opencode.sh`・`.github/actions/*/action.yml` は本追記時点で **`feat/add-opencode` に存在** (`main` には未マージ)。誤った repo を指定すると取得に失敗する |
+| 2 | `anomalyco/opencode-beta` に **CLI 資産は存在しない**。OpenCode CLI は `anomalyco/opencode` を用いる | repo 検証 (Releases API 実測: beta の公開資産はすべて `opencode-desktop-*` 用で CLI の tarball/zip は 0 件)。対象ファイル `.github/scripts/install-opencode.sh`・`.github/actions/*/action.yml` は PR #282 で **`main` にマージ済** (2026-10-12T09:34Z・セキュリティ強化は `486cd38`)。workflow は `main` 上の `.github/scripts/*.sh` を参照する。誤った repo を指定すると取得に失敗する |
 | 3 | リポジトリ設定: **public / merge commit のみ可** (squash・rebase は無効) | repo API 検証。PR のマージは merge commit になる (PR #280 等)。`docs/WORKFLOW.md` §2 の「merge は PM のみ」と整合 |
 
 上記は運用の前提であり、規約本文の正本は `docs/WORKFLOW.md`・`docs/DOC_MAP.md` §4 (本書は繰り返さない)。
