@@ -47,6 +47,13 @@
 - **踏んだ落とし穴**: glue (`.mjs`) は pthread Worker のスクリプトにもなる。`vite preview` では独自ミドルウェアが `preview.headers` より先に応答するため、`COEP: require-corp` を付けないと `--prod` だけ Worker がロード失敗 (`Uncaught [object Event]`)。`wasmAssets` が COOP/COEP/CORP を明示付与するよう修正。本番 R2 でも glue に COEP/CORP を付ける必要がある (RT-7 の入力)。
 - **範囲外 (未検証)**: 実 FLEngine の lift 成果物ではなく **shim MT の自己テスト main** での boot。この run には `work-m11` / `work-liftdiff` が無く、既存 M1/M6/M10/M11 の e2e は **stage 時に skip** (回帰比較は未実施 = 下記未解決)。Firefox/Safari 未測定。
 
+**RT-3 GUI 結線 (#121)** — 既知類型との関係: 該当なし (lift 無し・TS のみ)。検証起点 HEAD `07fd3e2` (コミット済み内容)、Chrome 154.0.8037.97 / 4 コア runner / 素材なし (`fl-win64` 未展開・emsdk なし)。
+- **実装**: `gui_input.ts` (`PumpInput`: DOM → WM_* → `PumpRing.push`、**pointermove coalesce は producer 側** = rAF で最新 1 件のみ、他イベント直前に保留 move を吐いて順序保存)、`gui_selftest.ts` (fl-runtime Worker: OffscreenCanvas + ring consumer)、`gui_boot.ts` (main 側: `transferControlToOffscreen` + `/?gui=selftest[&present=yield|blocking]` / `/?gui=render-selftest`)、`gui_renderer.ts` (`gui_worker.ts` から描画本体を切り出し = 専用描画 Worker と共用)。`?runtime=` とは独立 (`index.ts` で別 mount)。
+- **e2e** `pnpm runtime:gui-e2e` (`--prod` / `--neg` / `--present=`): CDP 実入力 → DOM → PumpInput → ring → Worker → OffscreenCanvas → `Page.captureScreenshot` の画素で検証 (条件待ち、固定 sleep なし)。dev 3 回 + prod 1 回、各 **FAIL 0 / OK 22 / ALL OK** (全体 4.13 / 3.49 / 3.59 / 3.60 s、load average 0.13〜1.71)。入力→画素反映 28〜81 ms (yield)。500 pointermove → ring へ 1 件 (coalesce 499)。ring dropped 0 / rejected 0。
+- **ネガティブコントロール** (`--neg` = 入力リスナーを外す): 画素・Worker 受信チェック 7 件が FAIL、exit 1。
+- **発見 (設計に影響)**: Worker が `getMessage` (`Atomics.wait`) に居座ったまま描くと OffscreenCanvas は画面へ commit されない (Chrome 154 は `OffscreenCanvas.commit()` 無し; 1500 ms 待っても画素不変、ループを抜けて 1 タスク終了後 30 ms で出現)。→ **ブロッキング UI スレッドと描画は分離**する (DESIGN §2.6)。e2e が「commit されない」制約自体を固定する。
+- **回帰**: `pnpm typecheck` OK、`tools/gui` の tsc (`gui_worker` 分割後) OK、`gui_worker` 経由の描画は合成 GuiShared で BGRA→RGBA 画素一致 (e2e `[render]` 3 件)、既存 `pnpm runtime:e2e` の pump 4 項目 OK (1.62 s、M1/M6/M10/M11/mt-boot は素材・emsdk 無しで skip)。
+
 **その他の確定事実**: AudioWorklet 内で `Atomics.wait` は TypeError (消費専用)、Worker 内 OffscreenCanvas(WebGL2/2D/rAF)・OPFS sync handle・nested Worker すべて可、`Memory.toResizableBuffer` あり、JSPI あり、shared wasm32 4GiB / memory64 8GiB grow 可。
 
 ## 設計上の要点 (実装済み)
@@ -56,6 +63,7 @@
 - `MemoryView` は grow による buffer 差替えを自動追従。wasm64 は BigInt 引数 (`n()`) と iov 幅 (ptrSize) を吸収。
 
 ## 未解決・ブロッカー
+0. **RT-3 (#121)**: (a) 実 FLEngine / `tools/gui/e2e.sh` (emsdk+RetDec 要) 経由の実 shim での入力往復は未実施 (本 run は素材・emsdk 無し)。(b) **入力経路が 2 本** (GuiShared 入力リング `gui.ts` と PumpRing): どちらを正とするかは GUI-3 #174 / GUI-11 #32 で決定 (DESIGN §2.6)。(c) index.html の `#screen` は `setupCanvas` が 2d context 取得済みで `transferControlToOffscreen` 不可 → FL 結合時に寄せる。(d) Firefox/Safari の OffscreenCanvas commit 挙動は未測定 (RT-9)。
 1. **Firefox / Safari 未測定** (環境に Chrome のみ): memory64・JSPI・threads・OffscreenCanvas の互換マトリクスは Chrome のみ。
 2. **実 FL サイズ wasm が未生成** → 合成 (≤52 MiB) からの外挿 (推定)。実測は FLEngine lift 完成後。
 3. 本番 pthread ビルドの boot e2e は **shim MT 自己テスト main で実証済み (#120)**。残: 実 FLEngine lift を同フラグでビルドした boot (起票先: #227 ICALL-1 / RT-10)。
