@@ -866,7 +866,7 @@ argfix の `helper_xmm` が 9 → 12 に増え 0x5e09f0 / 0x5e0a70 / 0x5e0b10 �
 | コマンド | 結果 |
 |---|---|
 | `p0c4_abi_e2e.py 2000` | rc=0、26.7〜27.1 s (load average 0.5〜0.9)、`run=67 ok=67 sig11=0`、起点は `run=61 ok=54 sig11=7` |
-| `p0c4_abi_e2e.py 2000` (origin/main = `35bdf9d` を merge した後の HEAD) | rc=0、16.7 s (load average 0.62→0.73)、`run=67 ok=67 sig11=0`、ok かつ buf_diff=0 は 45 |
+| `p0c4_abi_e2e.py 2000` (origin/main = `35bdf9d` を merge した後のコミット済み HEAD `330ada8`) | rc=0、14.5 s (load average 0.28→0.44)、`run=67 ok=67 sig11=0`、ok かつ buf_diff=0 は 45 |
 | `p0c4_e2e.py 2000` | rc=0、111.8 s / 112.5 s (2 回)、判定 bit-exact 7/14 (§12.2 と同じ) |
 | `p0c2_e2e.sh 2000` | rc=0、50.5 s |
 | `p0c3_e2e.sh 2000` | rc=0 (回帰判定から 0x5de3e0 を除外した後。除外前は FAIL-REGRESS、下記) |
