@@ -15,8 +15,10 @@ const sp0 = mod._emscripten_stack_get_current();
 const stubCounts = () => { const o = {}; for (let i = 0; i < mod._m11_stub_uniq(); i++) o[mod.UTF8ToString(mod._m11_stub_name(i))] = mod._m11_stub_count(i); return o; };
 const per = [];
 const only = process.env.SV_ONLY ? process.env.SV_ONLY.split(',').map(Number) : null;
+const skip = process.env.SV_SKIP ? process.env.SV_SKIP.split(',').map(Number) : [];
 for (let i = 0; i < 942; i++) {
   if (only && !only.includes(i)) continue;
+  if (skip.includes(i)) { per.push({ unit: i, va: '0x' + mod._m11_unit_va(i).toString(16), kind: 'hang' }); continue; }
   if (process.env.SV_TRACE_AT && String(i) === process.env.SV_TRACE_AT) mod._m11_set_trace(1);
   const before = stubCounts(); const va0 = Number(mod._m11_va_used());
   const e0 = errs.length;

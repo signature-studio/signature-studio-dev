@@ -61,3 +61,58 @@ python3 tools/m11/trap_triage/disasm_fn.py 417b70 ...   # PE (.pdata 区間) の
 - `409470` ReallocMem の転記でハングする原因 (unit 884) と、`409470 → 408040/407e20` OOB 11 unit。
 - OOB 44 の個別原因 (`8cc190` 系 9 unit は上流 `8c5cc0`/`8c7a10`)。
 - 完了条件 (trap < 20) は未達 (66)。
+
+## 6. OOB 44 件の分類と最多分類 (`8cc190` 系 11) の調査 (#419)
+
+素材: work-m11 スナップショット + `m11_build.sh` + `survey_units.mjs` (PE 無しで実行可。逆アセンブルは PE の代わりに
+`work/m11_image.bin` を読む `disasm_img.py`)。ベースライン = #414 HEAD `fa918df` の m11_ov.c を build し直した survey:
+ok 830 / oob 44 / halt0 20 / abort 1 / miss 46 / noproc 1 (§1 の 829/66 とは halt0 21→20・ok 829→830 が 1 unit 違う。原因未調査)。
+
+### 6.1 最上位 frame 別の分類 (実測、unit 番号)
+
+| 最上位 frame | unit 数 | 原因の状態 |
+|---|--:|---|
+| `8cc190` (←`8c7a10`←`8c5cc0`) | 11 (53 54 56 58 59 60 61 62 63 307 311) | **原因特定 (§6.2)**: TObject.Create の VMT 間接 call 脱落 |
+| `410730` (←`4fb8a0`/`4fb910`) | 6 (101 291 296 304 555 923) | 未調査 |
+| `414bb0` (←`652500`←`653660`←`6539e0`) | 5 (144 149 158 280 659) | 未調査 |
+| `904190` | 4 (477 484 513 520) | 未調査 |
+| `409470` ReallocMem | 4 (830 884 898 936) | §3-2 (転記でハング) |
+| `47d460` (←`92d4f0`) | 4 (876 880 891 935) | 未調査 |
+| 各 1 unit | 12: `446400`(17) `5b53f0`(95) `407e20`(138) `8674a0`(275) `8dfd70`(314) `96ef10`(365) `417fc0`(503) `6664c0`(547) `407a50`(745) `40ffe0`(895) ほか | 未調査 |
+
+(abort 1 = unit 114 `EnterCriticalSection` shim_unimplemented は OOB ではない。)
+
+### 6.2 `8cc190` 系の原因
+
+`8cc190` 内の OOB 地点は `8cbcb0` の `[[rcx+8]-8]` (wasm offset 0x271497)。`rcx` は `8c7a10` が
+`[g+0x410]` (= `8cbfa0` が作った TDictionary 様オブジェクト) から取り出した値。unit 53 で実測すると
+`g+0x410 = 0x4c70c0` は **インスタンスではなくコードバイト列** (`[+0]=0x68ec834853565800` は機械語) だった。
+`8cbfa0 → 40f9e0 (TObject.Create) → 410320 (ClassCreate stub) / 410360 (AfterConstruction stub)` で、
+RetDec は 410320 / 410360 の **VMT 間接 call (`call [rax-0x30]` NewInstance / `call [rbx-0x50]`) を落とし `ret arg1` だけの関数**にしていた
+(DEFECTS D15 型。call site は IR 上 410320 が 493、410360 が 492)。このため TObject.Create は確保せず VMT/コード領域を `this` として扱う。
+
+**修正の試行** (`m11_ov.c` に `-DM11_OV_CLASSCREATE=1` で有効化する形で保存、既定 OFF):
+`410320`/`410360` を C に転記し、NewInstance 実体 `40f960`(GetMem→InitInstance) と `40fb40`/`40fac0` (InitInstance・管理フィールド初期化) を
+逆アセンブル (`disasm_img.py`) から C で再実装。加えて `8cbda0`/`8cbce0` (TDictionary の comparer 間接 call 脱落) も転記。
+
+| 構成 | ok | oob | halt0 | miss | 備考 |
+|---|--:|--:|--:|--:|---|
+| ベースライン (既定 OFF) | 830 | 44 | 20 | 46 | |
+| 410320/410360 のみ | 830 | 30 | 31 | 49 | unit 114 が**ハング** (abort→hang、`5c00e0`→`439670` の探索ループ) |
+| + 8cbda0/8cbce0 | 830 | 41 | 20 | 49 | 8cc190 系 11 unit は**全て OOB のまま** |
+
+unit 遷移 (+8cbda0/8cbce0): oob→ok 4 / ok→miss 3 (42 45 415) / ok→oob 2 (85 719) / abort→hang 1 / oob→halt0 1 / halt0→ok 1。
+**trap 総数は減っていない (ok 830 のまま、退行 5 件が改善 4 件を相殺)** → 受入条件「最多 1 分類を修正し trap が減る」は **未達**。
+退行 5 件は 410320 転記が実際にオブジェクトを確保するようになった副作用で、確保後に別の欠陥 (85: `409470` 経由, 719: `409410` 内 `407a50`) が顕在化した。
+8cc190 系 11 unit が OOB のままなのは、確保後もなお `8c7a10` の入力 (`rcx` 先) が不正なため (unit 53 でも `8cbcb0` で OOB)。
+次の調査対象は NewInstance 後の `[g+0x410]` の中身と `8cbfa0` の `cls` 引数 (VA 0x4bd878→LVA 同値) の VMT 内容。
+
+**ネガコン**: 既定 OFF で build し直した survey は ベースラインと unit 単位で完全一致 (差 0、ok 830 / oob 44 / halt0 20 / abort 1 / miss 46)。
+OFF のまま e2e 入口 (`m11_run.mjs`) は不変、units_run 17/942。
+
+### 6.3 #307 (liftdiff OOB 222) との関係
+
+liftdiff は hybrid closure の per-case 採点 (#307 は `414ad0` 系 68 が最多)、本調査は m11 の 942 unit survey で最多は `8cc190` 系 11。
+**`414ad0` は m11 survey の OOB 最上位 frame に現れない** (最上位 frame は上表 16 種)。重なるのは 410360 カスケード
+(liftdiff `results/cascade_410360.md`: innermost `f_410360` 573 case、`f_410360<40f9e0` 100 case) と本件の根因 (410320/410360 の VMT 間接 call 脱落) で、
+**同一欠陥の別症状である可能性が高い (未検証)**。ただし両者の trap 件数は比較軸 (case と unit) が違うため数値の突合はしていない。

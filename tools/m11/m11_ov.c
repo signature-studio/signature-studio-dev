@@ -329,3 +329,93 @@ unsigned long long function_417b70(unsigned long long a, unsigned long long ti, 
     Q(a) = data;
     return 0;
 }
+
+#ifdef M11_OV_CLASSCREATE
+/* function_410320 / function_410360  VA 0x410320 / 0x410360  (System.TObject: ClassCreate / AfterConstruction 呼出し stub) (#419) — 実験: 既定 OFF (-DM11_OV_CLASSCREATE=1 で有効)。有効化すると OOB 44→30 だが halt0 20→31・ok→miss/oob 5 件の退行 (trap_triage/REPORT.md §6)
+ * RetDec は VMT 経由の間接 call (`call [rax-0x30]` = NewInstance / `call [rbx-0x50]` = AfterConstruction) を落とし, 両関数を
+ * `ret arg1` に誤 lift した (DEFECTS D15 型)。TObject.Create (40f9e0 ほか call site 493) がインスタンスを確保せず,
+ * VMT 自身を this として扱うため以後のフィールド書込みが VMT/データを破壊する (survey OOB 8cc190 系の根因)。
+ * NewInstance 実体 40f960 (GetMem → InitInstance) と InitInstance 40fb40 / 40fac0 は boot closure 外なので C に転記 (逆アセンブル突合済)。
+ *   40f960: size=(i32)[cls-0x80]; p=GetMem(size); return InitInstance(cls,p)
+ *   40fb40: FillChar(p,size,0); [p]=cls; cls 鎖を辿り interface 表 [cls-0xc0] の (+0x10 vtbl, +0x18 offset) を [p+off] へ;
+ *           init table [cls-0xb0] の先頭 byte が 0x16 の class があれば InitManagedFields(40fac0)
+ *   40fac0: 親鎖を再帰し (親側から), init table (tkRecord 0x16) の管理フィールド配列があれば InitializeRecord(p, tbl) (417150) */
+extern u64 function_417150(u64, u64);
+static void m11_init_managed(u64 cls, u64 p) {
+    u64 c = cls, s, par;
+    for (;;) {
+        s = Q(c - 0xb0);
+        par = Q(c - 0x78); if (par) par = Q(par);
+        if (!par) break;
+        if (s && B(s) == 0x16) { m11_init_managed(par, p); break; }
+        c = par;
+    }
+    if (s && B(s) == 0x16) {
+        u64 e = s + B(s + 1);
+        e = e + (u64)(D(e + 6)) * 2 * 8 + 0xa;
+        if (B(e) > 0 && (Q(e + 1) & 1)) function_417150(p, s);
+    }
+}
+static u64 m11_init_instance(u64 cls, u64 p) {
+    long long size = (int)D(cls - 0x80);
+    function_40d210((void*)(uintptr_t)p, (u64)size, 0, 0);
+    Q(p) = cls;
+    int need_init = 0;
+    for (u64 c = cls; c;) {
+        u64 it = Q(c - 0xc0);
+        if (it) {
+            int n = (int)D(it);
+            for (int i = 0; i < n; i++) {
+                u64 ent = it + 8 + (u64)(long long)i * 40;
+                u64 vt = Q(ent + 0x10);
+                if (vt) Q(p + (u64)(long long)(int)D(ent + 0x18)) = vt;
+            }
+        }
+        u64 ip = Q(c - 0xb0);
+        if (ip && B(ip) == 0x16) need_init = 1;
+        c = Q(c - 0x78); if (c) c = Q(c);
+    }
+    if (need_init) m11_init_managed(cls, p);
+    return p;
+}
+/* VMT slot 呼出し: closure 外の TObject 既定実装 (NewInstance 40f960 / AfterConstruction 410070=ret) は C で直接処理 */
+static u64 m11_vcall(u64 target, u64 self) {
+    if (target == R(0xf960)) return m11_init_instance(self, function_409410((unsigned)(long long)(int)D(self - 0x80)));
+    if (target == R(0x10070)) return self;
+    return m11_icall(target, self, 0, 0, 0, 0, 0, 0, 0);
+}
+unsigned long long function_410320(unsigned long long cls, unsigned int alloc) {
+    if ((signed char)(alloc & 0xff) < 0) return cls;
+    return m11_vcall(Q(cls - 0x30), cls);
+}
+unsigned long long function_410360(unsigned long long inst) {
+    m11_vcall(Q(Q(inst) - 0x50), inst);
+    return inst;
+}
+/* function_8cbda0 / function_8cbce0  (Generics.Collections TDictionary: comparer の GetHashCode / Equals = interface slot 0x20 / 0x18 の間接 call 脱落)
+ *   8cbda0(this): c=[this+0x18]; h=c->vtbl[0x20](c); return ((h & 0x7fffffff)+1) & 0x7fffffff
+ *   8cbce0(this,key,hash): 開番地 probe。items=[this+8] (24B/entry: +0 hash, +8 key), n=[items-8]; hash==-1 → ~i; 一致 → comparer->vtbl[0x18](c, entry.key, key) */
+u64 function_8cbda0(u64 self) {
+    u64 c = Q(self + 0x18);
+    u64 h = m11_icall(Q(Q(c) + 0x20), c, 0, 0, 0, 0, 0, 0, 0);
+    return (u64)(((u32)h & 0x7fffffffu) + 1u & 0x7fffffffu);
+}
+u64 function_8cbce0(u64 self, u64 key, u64 hash) {
+    u64 items = Q(self + 8);
+    long long n = items ? (long long)Q(items - 8) : 0;
+    if (n == 0) return 0x8000000000000000ull;
+    long long i = (long long)(int)(u32)hash & (n - 1);
+    u64 e = Q(self + 8) + (u64)i * 24;
+    for (;;) {
+        u32 h = D(e);
+        if (h == 0xffffffffu) return ~(u64)i;
+        if (h == (u32)hash) {
+            u64 c = Q(self + 0x18);
+            u64 r = m11_icall(Q(Q(c) + 0x18), c, Q(e + 8), key, 0, 0, 0, 0, 0);
+            if (r & 0xff) return (u64)i;
+        }
+        i++; e += 24;
+        if (i >= n) { i = 0; e = Q(self + 8); }
+    }
+}
+#endif /* M11_OV_CLASSCREATE */
