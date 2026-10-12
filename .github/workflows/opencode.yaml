@@ -162,7 +162,7 @@ jobs:
         if: steps.context.outputs.should_run == 'true'
         uses: ./.github/actions/opencode
         with:
-          model: "opencode-go/step-5-preview-free"
+          model: ${{ vars.OC_MODEL_ID }}
           agent: build
           auth-export: ${{ secrets.OC_AUTH_EXPORT }}
           prompt-file: ${{ steps.prompt.outputs.prompt_file }}
@@ -291,7 +291,7 @@ jobs:
       - name: Run OpenCode (reviewer)
         uses: ./.github/actions/opencode
         with:
-          model: "opencode-go/step-5-preview-free"
+          model: ${{ vars.OC_MODEL_ID }}
           agent: build
           auth-export: ${{ secrets.OC_AUTH_EXPORT }}
           prompt-file: ${{ steps.prompt.outputs.prompt_file }}
