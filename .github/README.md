@@ -3,8 +3,10 @@
 Signature Studio の Issue/PR 駆動エージェント実行基盤。
 
 このリポジトリの Issue / PR は作成が Collaborators のみに制限されている。
-外部の第三者がコメントを投稿できない前提で、`/oc` 起動のアクセス制御は
-コメント本文に `oc_actions_allow_write` を含めるかどうかで行っている。
+ただし public repo では第三者も既存 Issue にコメントできるため、
+issue_comment での `/oc` 起動は `author_association` COLLABORATOR / MEMBER /
+OWNER に限定している。アクセス制御はそのうえで、コメント本文に
+`oc_actions_allow_write` を含めるかどうかで行っている。
 
 `/oc` / `/opencode` は**行頭に 1 コマンドだけ**書いた行で発火する (箇条書き行や
 文中の `/oc`・URL 内の `/oc/` では発火しない)。指示は同じ行か続く行に書くこと。

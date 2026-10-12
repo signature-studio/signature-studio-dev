@@ -50,10 +50,18 @@ jobs:
     # この if: は費用対効果のための粗い前フィルタにすぎない。contains() は部分一致
     # なので `/ocean` にも発火しうる。確定判定は prepare-event-context.sh の
     # should_run output で、それ以降の全 step をゲートする。
+    #
+    # public repo では第三者も Issue にコメントできるため、/oc コメントでの
+    # 起動は author_association COLLABORATOR/MEMBER/OWNER に限定する。
+    # 本文の oc_actions_allow_write 経由で第三者が write モードを起動する
+    # 経路を閉じる。
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'issue_comment' &&
-       (contains(github.event.comment.body, '/oc') || contains(github.event.comment.body, '/opencode')))
+      (github.event.comment.author_association == 'COLLABORATOR' ||
+      github.event.comment.author_association == 'MEMBER' ||
+      github.event.comment.author_association == 'OWNER') &&
+      (contains(github.event.comment.body, '/oc') || contains(github.event.comment.body, '/opencode')))
     runs-on: ubuntu-latest
     # opencode が暴走しても runner を既定の 6 時間は占有しない
     timeout-minutes: 60
