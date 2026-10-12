@@ -1072,6 +1072,8 @@ UINT    timeGetDevCaps(void* caps, UINT n);
 /* ネットワーク (常にエラー返却) */
 LPVOID  InternetOpenW(LPCWSTR agent, DWORD access, LPCWSTR proxy, LPCWSTR bypass, DWORD flags);
 BOOL    InternetGetConnectedState(LPDWORD flags, DWORD rsv);
+BOOL    InternetCheckConnectionW(LPCWSTR url, DWORD flags, DWORD rsv);
+BOOL    InternetCheckConnectionA(LPCSTR url, DWORD flags, DWORD rsv);
 BOOL    InternetCloseHandle(LPVOID h);
 LPVOID  InternetConnectW(LPVOID h, LPCWSTR server, WORD port, LPCWSTR user, LPCWSTR pass, DWORD service, DWORD flags, ULONG_PTR ctx);
 LPVOID  InternetOpenUrlW(LPVOID h, LPCWSTR url, LPCWSTR hdr, DWORD hdrLen, DWORD flags, ULONG_PTR ctx);
@@ -1080,6 +1082,8 @@ BOOL    InternetWriteFile(LPVOID h, LPCVOID buf, DWORD n, LPDWORD written);
 BOOL    InternetSetOptionW(LPVOID h, DWORD opt, LPVOID buf, DWORD n);
 BOOL    InternetGetLastResponseInfoW(LPDWORD err, LPWSTR buf, LPDWORD n);
 LPVOID  HttpOpenRequestW(LPVOID h, LPCWSTR verb, LPCWSTR obj, LPCWSTR ver, LPCWSTR ref, LPCWSTR* accept, DWORD flags, ULONG_PTR ctx);
+BOOL    HttpSendRequestW(LPVOID h, LPCWSTR hdr, DWORD hl, LPVOID opt, DWORD ol);
+BOOL    HttpSendRequestA(LPVOID h, LPCSTR hdr, DWORD hl, LPVOID opt, DWORD ol);
 BOOL    HttpSendRequestExW(LPVOID h, LPVOID in, LPVOID out, DWORD flags, ULONG_PTR ctx);
 BOOL    HttpEndRequestW(LPVOID h, LPVOID out, DWORD flags, ULONG_PTR ctx);
 BOOL    HttpAddRequestHeadersW(LPVOID h, LPCWSTR hdr, DWORD n, DWORD mod);
@@ -1141,6 +1145,7 @@ void shimx_set_load_hook(HMODULE (*fn)(const char* nameUtf8, DWORD flags));
 void shimx_set_resource_provider(const void* (*fn)(HMODULE m, const WCHAR* name, const WCHAR* type, DWORD* size));
 void shimx_set_shell_execute_hook(int (*fn)(const char* verb, const char* file, const char* params));
 void shimx_set_trust_ok(int on);
+unsigned shimx_wininet_call_count(void);   /* wininet 接続系 API の呼出回数 (全て失敗扱い) */
 void shimx_set_version(DWORD major, DWORD minor, DWORD build, DWORD fileHi, DWORD fileLo);
 int  shimx_setenv_utf8(const char* name, const char* value);
 void shimx_handle_stats(int* open, int* peak);

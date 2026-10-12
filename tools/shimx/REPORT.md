@@ -334,3 +334,14 @@ username 統一により、winstubs (CAB-96) が wrap していた **5 API が s
 | `bash tools/startup/winstubs/winstubs.sh` | **exit 0** (8/8 step: 131/131 行一致 ST/MT / リンク 67/67 / boot 21/21 / IR 署名 mismatch 0 + 陰性対照 1 / shimx 回帰 ST/MT PASS / **gui 共存**: 重複は既知記録 `WTSRegisterSessionNotification` 1 件のみ・winstubs 由来 0・GetProcAddress 不整合 0・gui 強定義 6/8) |
 | `bash tools/startup/pump/pump.sh` (波及確認; winstubs src を別 work で再ビルド) | **exit 0** (全 PASS) |
 
+
+## 13. WinInet 常時オフライン化 (#111, ST-T4)
+
+**結論**: wininet は #111 以前から `net.c` に fail-soft のオフライン実装があった (InternetOpenW/A=NULL, InternetGetConnectedState=FALSE, WSAStartup=10091)。差分だけ埋めた: 接続系の `GetLastError` を 12029 から stub_plan §5 C の **12163 (ERROR_INTERNET_DISCONNECTED)** に統一、未実装だった `HttpSendRequestW/A`・`InternetCheckConnectionW/A` を追加、接続系の呼出回数 `shimx_wininet_call_count()` を追加 (成功を返す経路は無いので boot 中の成功呼出は 0 回。起動検査はこのカウンタで差し引きできる)。
+
+| 検証 | 結果 (2026-10-13 実測, Actions runner) |
+|---|---|
+| `bash tools/shimx/test.sh` | **exit 0**, 22 s: MT 5 グループ / ST PASS / fail-fast 8 / M4 互換 PASS / 未実装 0。`test_sys.c` に接続系 10 呼出が全て 12163 + 失敗値 / カウンタ +10 の検査を追加 |
+
+- `verify_ott` と M11 closure の突合は `work-m11` / `work-m6-ott` 素材が無く SKIP。このため `test.sh` が再生成した inventory.md / BACKLOG.md / coverage.json / inventory.csv は m11 closure が空になるので**コミットしていない** (次回素材付き run で再生成)。`exports.txt` と `proctable.c` は差分 5 行のみ反映。
+- `shimx_wininet_call_count` 以外の公開面変更は `shimx.h` の 4 宣言のみ。
