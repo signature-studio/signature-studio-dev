@@ -777,8 +777,9 @@ K80_NO_ASMSTORES=1 python3 tools/plugins/p0c/p0c4_abi_e2e.py 2000               
 | 0x5de5a0 / 0x5e07b0 / 0x5e0830 / 0x5de8e0 | 1,260,951 / 1,260,951 / 631,030 / 2,365,445 | **0** | — |
 | 0x5df340 | 1,291,379 | 1,283,847 | — (残) |
 
-- 回帰: `p0c4_abi_e2e.py 2000` で起点 buf_diff=0 だった 29 kernel はすべて 0 のまま (29/29)。buf_diff==0 の kernel 数
-  は 61 run 中 35 → 42。status センサス run=61 ok=54 sig11=7 (起点と同一)。冪等性・llvm-as OK、受入基準 ①-④ OK。
+- 回帰: `p0c4_abi_e2e.py 2000` で起点 buf_diff=0 だった 29 kernel (status ok のみ) はすべて 0 のまま (29/29)。
+  「status ok かつ buf_diff==0」の kernel 数は status ok 54 kernel 中 29 → 35 (sig11 7 kernel は buf_diff 列が 0 でも
+  未実行なので数えない)。status センサス run=61 ok=54 sig11=7 (起点と同一)。冪等性・llvm-as OK、受入基準 ①-④ OK。
   所要 24.9 s (load average 0.59→0.97, 並列 1)。起点の同スクリプト実測は 27.7 s。
 - `p0c4_e2e.py 2000` (ext IR): bit-exact 7/14 で起点と同一 (0x5dfbe0/0x5dfc90/0x5dfd30/0x5dfdb0/0x5e0b70/0x5e1590/0x5e1780)。
   所要 117.0 s (load average 0.97, 並列 1)。
@@ -790,7 +791,7 @@ K80_NO_ASMSTORES=1 python3 tools/plugins/p0c/p0c4_abi_e2e.py 2000               
 | NC1 `K80_NO_UCOMISIGN=1` | ucomiss 符号修復 | 0x5e0d80 0 → **910,077** (0x5df610 は 0 のまま) |
 | NC2 `K80_NO_SPILLFIX=1` | spill placeholder 除外 | 0x5df610 0 → **2,404,917** / 0x5de5a0 0 → 1,260,951 / 0x5e07b0 0 → 1,260,951 / 0x5e0830 0 → 631,030 / 0x5de8e0 0 → 2,365,445 (0x5e0d80 は 0 のまま) |
 
-NC は互いに独立 (NC1 は 0x5df610 に、NC2 は 0x5e0d80 に影響しない)。buf_diff==0 の kernel 数: 通常 42 / NC1 41 / NC2 37。
+NC は互いに独立 (NC1 は 0x5df610 に、NC2 は 0x5e0d80 に影響しない)。「status ok かつ buf_diff==0」の kernel 数 (status ok 54 kernel 中): 起点 29 / 修正後 35 / NC1 34 / NC2 30。
 
 ### 13.4 DEFECTS.md 行案・未解決・起票先
 
