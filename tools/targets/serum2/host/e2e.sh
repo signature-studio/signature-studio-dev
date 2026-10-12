@@ -46,7 +46,7 @@ wine64 "$HOSTDIR/work/build/vst3host.exe" "$DLL_PATCH" - "$ZS2\\host\\work\\out_
 echo "== [4/6] case 生成 =="
 (cd "$S2" && python3 host/make_cases.py host/work/state host/work/out_seed host/work/cases) || exit 1
 
-echo "== [5/6] 2x2 matrix + process-only =="
+echo "== [5/6] 2x2 matrix + process-only + payload 注入 A/B =="
 run() { # $1=dll $2=case $3=out(Z:パス) $4=blocks — console は work/<outdir名>.console に
   local tag
   tag="${3##*\\}"
@@ -62,6 +62,15 @@ run "$DLL_PATCH" "$CASES_DEMO" "$OUTB\\out_p_demo" 64
 run "$DLL_ORIG"  "$CASES_LIC" "$OUTB\\out_u_lic"  64
 run "$DLL_ORIG"  "$CASES_DEMO" "$OUTB\\out_u_demo" 64
 run "$DLL_ORIG"  "-"           "$OUTB\\out_u_proc" 64
+
+# payload 注入 A/B (#255): sentinel 対照 (lic_sent) と demo payload (demo_payload) × (patched|unpatched)
+CASES_LS="$ZS2\\host\\work\\cases\\lic_sent"
+CASES_DP="$ZS2\\host\\work\\cases\\demo_payload"
+mkdir -p "$W/out_p_lsent" "$W/out_u_lsent" "$W/out_p_dpl" "$W/out_u_dpl"
+run "$DLL_PATCH" "$CASES_LS" "$OUTB\\out_p_lsent" 16
+run "$DLL_ORIG"  "$CASES_LS" "$OUTB\\out_u_lsent" 16
+run "$DLL_PATCH" "$CASES_DP" "$OUTB\\out_p_dpl" 16
+run "$DLL_ORIG"  "$CASES_DP" "$OUTB\\out_u_dpl" 16
 
 # corrupt payload run (payload が setState 内で実処理されることの実証)
 python3 - <<'PYEOF'

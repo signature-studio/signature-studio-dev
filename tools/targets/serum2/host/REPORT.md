@@ -2,7 +2,7 @@
 
 - 日付: 2026-10-10 / 対象: Win x64 `Serum2.vst3` (19,236,864 B, 実 DLL) / 方針: bc07970 (無条件アクティベーション) + CAB-237 authstub 適用 DLL
 - 範囲: 本 dir (`tools/targets/serum2/host/`) 新設。`license/` は REPORT 末尾メモ追記のみ。`work/` (実 DLL・展開物・ビルド物・wine prefix) は gitignore。
-- 再現: `bash tools/targets/serum2/host/e2e.sh` (1 コマンド。build → authstub DLL → seed → case 生成 → 6 run → 判定 **14/14 OK**)
+- 再現: `bash tools/targets/serum2/host/e2e.sh` (1 コマンド。build → authstub DLL → seed → case 生成 → 6 run → 判定 **23/23 OK** (#255 で 14→23))
 
 ## 0. 結論 (先出し)
 
@@ -69,6 +69,30 @@
 - prefs singleton (N8): plugin が wine prefix の `%APPDATA%/Xfer/Serum 2/Serum2Prefs.json` を**実ファイルとして生成・保存**することを実確認 ("Automatically Check for Updates": true 等)。2 回目以降の起動はこれを読む。
 - 通信系 (N5): 更新チェックは prefs 有りの起動で走る可能性があるが、本 e2e (WINEDEBUG=-all, タイムアウト付き) では停止・遅延なし。wasm shim 側の no-op/fail-fast 受口は未実装 (CAB-237 §4 の設計どおり下流)。
 
+### 3-5. [SR-1b #255] payload 解読 + demoVersion 注入 A/B (実測 2026-10-12, wine 9.0 / Actions runner)
+- **payload の正体 = CBOR (RFC 8949)**。zstd 展開後の先頭 `0xb8 0xa4` は msgpack 風ではなく CBOR の map(1B 長=164) / `0xb8 0x3b` = 59 entries、続く `0x64 'Arp0'` は text(4)、`0xa2` = map(2)、`0xa0` = 空 map。key は text・辞書順昇順。processor 164 key / controller 59 key。
+  - float は float32 (`0xfa`) 無損失なら `0xfa`、でなければ `0xfb` (nlohmann::json::to_cbor の挙動と一致。DLL に nlohmann json v3.12 の型名あり)。
+  - 最上位に meta JSON と同名キー (component/product/productVersion/tags/version…) が重複。**setState が見る DOM = この CBOR 側**。
+  - コンテナ: `u32 展開後長 + u32 版本(=2) + zstd`。0x1801bf1c0 は版本 2 → 0x1801bf480 (0x176e0 B ctx + BMI2 cpuid 検査 = zstd 展開と推定, med) → 0x1801bfb00、版本 0/1 → 0x180571dc0 → 0x1801bf5f0。**どちらが CBOR parser かは未特定** (writer 0x1801be2e0 は `"XferJson"` + 版本 2 + `hash` を組む箇所までを確認、lift は未実施)。
+- **`payload_codec.py`** (decode/encode/split_state/join_state): seed の既定 state で **processor 5,364 B / controller 1,878 B とも encode(decode(x)) がバイト一致**。zstd 再圧縮は processor 1,053 B 一致 / controller は 651 B vs 元 647 B (zstd 内部差。展開後は一致)。
+- **demo 注入 A/B** (`make_cases.py` v3 に `lic_sent` / `demo_payload` 追加、sentinel = processor `mpePitchBendRange` 24 (既定 48) / controller `presetName` "SENTINEL"):
+
+  | run | processor sentinel 適用 | controller sentinel 適用 | 解釈 |
+  |---|---|---|---|
+  | patched + lic_sent | 適用 | 適用 | 対照 (復元は走る) |
+  | unpatched + lic_sent | 適用 | 適用 | 対照 |
+  | patched + demo_payload | 適用 | 適用 | authstub が demo 分岐を無効化 |
+  | **unpatched + demo_payload** | **非適用 (48 のまま)** | 適用 | **0x18004fad0 の demo 分岐発火 = 復元打切り** |
+
+  - setState 戻りはすべて kResultOk (0)。**demo 分岐は戻り値には出ず、状態が適用されないことでのみ観測できる** (#69 で戻り値・dialog queue 無変化だったのはこのため。meta 注入は no-op)。
+  - demoVersion は payload 最上位キー `demoVersion` (text) で効く。meta のみに入れる従来の `demo` case は引き続き無変化。
+- **未達 (本チケット範囲だが成立せず)**:
+  1. dialog queue probe (+0x139bc8 の xor) は run ごとに値が揺れ (heap 未初期化領域を含む、unpatched+lic_sent と unpatched+demo_payload で setState 前後とも同値) **dialog 発火の判定には使えない**。
+  2. controller 側: payload に `kAudioUnitParameterFlag_IsHighResolution=false` を入れても **demo bit (this+0x22792) = 0、0x800010 未受信、保存 state にマーカ無し**。ゲート +0x10c == 2 のまま (§3-3 と同じ。SR-1c)。
+  3. writer/reader の lift・型タグ体系の IR 化は未実施 (CBOR と判明したため独自 binary の型表は不要。nlohmann 相当は OSS 境界として扱える可能性 — 要判断)。
+- #238 契約との突合: 「demoVersion 検出 → 復元打切り」は **実 DLL で processor 側のみ確認**。「productVersion 2.1.5 ≥ 2.0.20 → store 無し」は §3-4 (meta) のとおり変化なし、payload 側 productVersion を下げる A/B は未実施。
+- e2e: `bash tools/targets/serum2/host/e2e.sh` = **23/23 OK, 39.7 s** (ベースライン 14/14 は 43.0 s)。
+
 ## 4. 受け入れ条件との対合 (CAB-68)
 
 | # | 条件 | 実測 |
@@ -80,9 +104,9 @@
 
 ## 5. 引継ぎ (CAB-74 / SR-3 系)
 
-1. **payload (Serum binary serialization) の解読** — demo 経路 E2E の本体。fixstr 風 `[type][len][str]` + 未知ヘッダ (先頭 0xb8...)。zstd 展開後 5,364 B (processor) / 1,878 B (controller)、既定 Init 内容 ("Arp0"/"activeClip"/"plainParams"/"ArpClipN"/"clip" 等のキー)。writer 0x1801be2e0 / reader 0x1801bf480 の lift が最短。
+1. ~~payload の解読~~ — **完了 (#255, §3-5): CBOR と判明**。残: writer/reader の lift 要否判断、payload 側 productVersion 下げ A/B。
 2. **controller +0x10c の setter 特定** — 0x800010 観測の前提。候補: IConnectionPoint notify ("SerumDSPSharedData") 処理部 / editor open 完走 / FX-class 区別。gdb watchpoint (wine) か lift で特定。
-3. **demoVersion 注入後の A/B E2E** — 本 host の case 生成に payload 合成を足すだけで良い (make_cases.py に組み込める構造)。
+3. ~~demoVersion 注入後の A/B E2E~~ — **processor 側は完了 (#255, §3-5)**。controller demo bit / 0x800010 は SR-1c。
 4. **WINEDEBUG=+relay による呼出 API 一覧化** — CAB-68 受け入れ #3 の API レベル証跡 (wine 固有の代役を除くリスト化)。
 5. mac 版 (universal2) 未実施 — Win を正とする方針どおり。
 
