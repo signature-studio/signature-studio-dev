@@ -134,6 +134,18 @@ runs:
           echo "::warning::continuing without them because artifacts-required=false"
         fi
 
+        # toolchain-* は /opt へ、work-* は repo 直下 (tools/<area>/work) へ展開する。
+        # tarball 内の相対パスがそのまま配置先になる (retdec/・emsdk/・tools/<area>/work/)。
+        # fl-win64 / plugins-* は agent が必要時に展開するのでここでは触らない。
+        for f in "$artifacts_dir"/toolchain-*.tar.zst; do
+          [ -e "$f" ] || continue
+          sudo tar --zstd -xf "$f" -C /opt && echo "extracted $(basename "$f") -> /opt"
+        done
+        for f in "$artifacts_dir"/work-*.tar.zst; do
+          [ -e "$f" ] || continue
+          tar --zstd -xf "$f" -C "$GITHUB_WORKSPACE" && echo "extracted $(basename "$f") -> $GITHUB_WORKSPACE"
+        done
+
         du -sh "$artifacts_dir" 2>/dev/null || true
         {
           echo "ARTIFACTS_DIR=$artifacts_dir"
