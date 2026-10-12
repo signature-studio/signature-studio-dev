@@ -1,25 +1,30 @@
 #!/usr/bin/env bash
 # M11 closure に tools/shimx をリンクする (CAB-166)。
-#   bash tools/m11/shimx_link/build.sh [--trace] [--soft] [--fix]   → tools/m11/work/shimx_link/m11_sx_<variant>_<gui>[_fix].cjs
+#   bash tools/m11/shimx_link/build.sh [--trace] [--soft] [--fix] [--ws]   → tools/m11/work/shimx_link/m11_sx_<variant>_<gui>[_fix][_ws].cjs
 #     (既定)   plain / GUI fail-fast : IR は無改変, shimx を直接リンク。署名不一致/重複の検査用 (CAB-166 本体)
 #     --trace  lifted 側の shimx/GUI 呼出を __sxt_ ラッパ経由にして計数 (IR の識別子を改名した別 IR を使う)
 #     --soft   GUI/audio 未提供 API を fail-fast ではなく「0 返却+m11_stub_hit 計数」にする (M11 既存挙動と同じ)
 #     --fix    fix_alloca.py で IR の縮退 alloca を拡幅 + sx_liftfix.c (_WStrClr)。CAB-129 計測用回避
 #              (旧 cb_adapt.c の列挙コールバック変換は CAB-177 で shimx R2 実体 (cbtrans) + sx_cbboot に置換済み。
 #               R2/R3 接続は --fix 無しの全 variant で constructor 実行: -Wl,--wrap=m11_icall 含む)
+#     --ws   tools/startup/winstubs を結線 (#223): winstubs 全ソース + wrap_list.txt の -Wl,--wrap=<api> (12 本)、
+#            sx_winstubs.c (constructor で winstubs_init(0))、__asm_cpuid の実体を winstubs_cpuid 委譲に置換 (m11_simd2.py --cpuid=winstubs)。
+#            winstubs が定義する API (weak 含む) は gui/audio スタブを生成しない (gen_link の m11 nm に ws_*.o を加える)
 #   tools/shimx と tools/m11 既存ファイルは読取のみ。成果物は全て tools/m11/work/shimx_link/ (gitignore 済)。
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 M11="$(cd "$HERE/.." && pwd)"
 SX="$(cd "$M11/../shimx" && pwd)"
 W="$M11/work/shimx_link"
-TRACE=0; SOFT=0; FIX=0
-for a in "$@"; do case "$a" in --trace) TRACE=1 ;; --soft) SOFT=1 ;; --fix) FIX=1 ;; esac; done
+TRACE=0; SOFT=0; FIX=0; WS=0
+for a in "$@"; do case "$a" in --trace) TRACE=1 ;; --soft) SOFT=1 ;; --fix) FIX=1 ;; --ws) WS=1 ;; esac; done
 VARIANT=plain; [ $TRACE = 1 ] && VARIANT=trace
 GUIV=failfast; [ $SOFT = 1 ] && GUIV=soft
 SUF=""; [ $FIX = 1 ] && SUF="_fix"
-TAG="${VARIANT}_${GUIV}${SUF}"
-GEN="$W/gen${SUF}"; mkdir -p "$GEN"
+WSUF=""; [ $WS = 1 ] && WSUF="_ws"
+TAG="${VARIANT}_${GUIV}${SUF}${WSUF}"
+GEN="$W/gen${SUF}${WSUF}"; mkdir -p "$GEN"
+WSD="$(cd "$M11/../startup/winstubs" && pwd)"
 set +u; source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1; set -u
 export TMPDIR="$W/tmp"; mkdir -p "$W/obj" "$W/tmp"
 CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1"
@@ -54,6 +59,25 @@ cc "$HERE/sx_liftfix.c" "$W/obj/m11_sxfix.o" $CF
 cc "$HERE/sx_cbboot.c" "$W/obj/sx_cbboot.o" $CF   # CAB-177: R2 translator 実体 + R3 トークン (全 variant, constructor)
 llvm-nm --defined-only -g "$W"/obj/m11_*.o > "$W/m11_nm.txt"
 
+# 2a. winstubs 結線 (--ws, #223) -------------------------------------------------------
+#   winstubs 全ソース (tools/startup/winstubs/src は読取のみ) + link 側 glue + cpuid 委譲版 simd helper。
+#   m11_simd_ws.c は work/ (m11_simd.c と同階層) に置く: 生成物の "../msimd11_core.h" がそのまま解決される。
+WSOBJS=""; WSLINK=""
+if [ $WS = 1 ]; then
+  mkdir -p "$W/obj_ws"
+  for f in "$WSD"/src/*.c; do b="$(basename "$f" .c)"; cc "$f" "$W/obj_ws/$b.o" $SXF -I"$SX/src" -I"$WSD/src"; done
+  cc "$HERE/sx_winstubs.c" "$W/obj_ws/sx_winstubs.o" $CF -I"$SX/src" -I"$WSD/src"
+  SIMD_WS="$M11/work/m11_simd_ws.c"
+  if [ ! -f "$SIMD_WS" ] || [ "$M11/work/boot_final.ll" -nt "$SIMD_WS" ] || [ "$M11/m11_simd2.py" -nt "$SIMD_WS" ]; then
+    python3 "$M11/m11_simd2.py" "$M11/work/boot_final.ll" --cpuid=winstubs > "$SIMD_WS" 2> "$M11/work/simd2_ws.log"
+  fi
+  cc "$SIMD_WS" "$W/obj_ws/m11_simd_ws.o" $CF -I"$M11"
+  llvm-nm --defined-only -g "$W"/obj_ws/*.o > "$W/ws_nm.txt"
+  cat "$W/m11_nm.txt" "$W/ws_nm.txt" > "$W/m11ws_nm.txt"
+  WSOBJS="$W/obj_ws/*.o"
+  while read -r s; do [ -z "$s" ] || WSLINK="$WSLINK -Wl,--wrap=$s"; done < <(grep -v '^#' "$WSD/wrap_list.txt")
+fi
+
 # 2b. alloca 拡幅 (--fix) ----------------------------------------------------------
 #   (旧 --fix 構成要素の cb_adapt.c は sx_cbboot.c + shimx cbtrans に置換済み = CAB-177 正式化)
 if [ $FIX = 1 ]; then
@@ -62,11 +86,12 @@ if [ $FIX = 1 ]; then
 fi
 
 # 3. 分類 + スタブ + トレースラッパ生成 ------------------------------------------
-if [ ! -f "$GEN/classes.json" ] || [ "$IR" -nt "$GEN/classes.json" ] || [ "$HERE/gen_link.py" -nt "$GEN/classes.json" ] || [ "$W/shimx_nm.txt" -nt "$GEN/classes.json" ]; then
-  python3 "$HERE/gen_link.py" --ir "$IR" --shimx-nm "$W/shimx_nm.txt" --m11-nm "$W/m11_nm.txt" --out "$GEN" | tee "$GEN/gen_link.log"
+M11NM="$W/m11_nm.txt"; [ $WS = 1 ] && M11NM="$W/m11ws_nm.txt"
+if [ ! -f "$GEN/classes.json" ] || [ "$IR" -nt "$GEN/classes.json" ] || [ "$HERE/gen_link.py" -nt "$GEN/classes.json" ] || [ "$W/shimx_nm.txt" -nt "$GEN/classes.json" ] || [ "$M11NM" -nt "$GEN/classes.json" ]; then
+  python3 "$HERE/gen_link.py" --ir "$IR" --shimx-nm "$W/shimx_nm.txt" --m11-nm "$M11NM" --out "$GEN" | tee "$GEN/gen_link.log"
 fi
-cc "$GEN/gui_stubs_$GUIV.c" "$W/obj/gui_$GUIV$SUF.o" $CF
-GUIOBJ="$W/obj/gui_$GUIV$SUF.o"
+cc "$GEN/gui_stubs_$GUIV.c" "$W/obj/gui_$GUIV$SUF$WSUF.o" $CF
+GUIOBJ="$W/obj/gui_$GUIV$SUF$WSUF.o"
 # CAB-177: --wrap=m11_icall (R3 トークン → lifttab thunk → 実体。それ以外は __real_m11_icall)
 WRAP="-Wl,--wrap=m11_icall"
 if [ $SOFT = 1 ]; then cc "$HERE/gui_compat.c" "$W/obj/gui_compat.o" $CF; GUIOBJ="$GUIOBJ $W/obj/gui_compat.o"; fi
@@ -85,7 +110,9 @@ fi
 # 5. リンク (重複定義は error のまま = SHIM_BIND 廃止後の衝突検出)
 #    ※ $W/obj/sx_*.o glob は shimx 各 .o に加え sx_cbboot.o も拾う (CAB-177)
 OBJS="$W/obj/sx_*.o $W/obj/m11_rt.o $W/obj/m11_ov.o $W/obj/m11_simd.o $W/obj/m11_fnstubs.o $W/obj/m11_data.o $W/obj/m11_sxfix.o $GUIOBJ $BOOT"
-EXPORTS=_m11_boot_enter,_entry_point,_m11_init_count,_m11_boot_stage,_m11_va_used,_m11_va_calls,_m11_set_trace,_m11_icall_ok,_m11_icall_miss,_m11_icall_miss_uniq,_m11_icall_miss_at,_m11_disp_count,_m11_units_run,_m11_units_total,_m11_units_skipped,_m11_stub_total,_m11_stub_uniq,_m11_stub_name,_m11_stub_count,_m11_probe_count,_m11_longjmp_hit,_m11_set_survey,_m11_call_unit,_m11_unit_va,_shimx_set_trace,_shimx_init,__emscripten_stack_restore,_emscripten_stack_get_current
+if [ $WS = 1 ]; then OBJS="${OBJS/$W\/obj\/m11_simd.o/} $WSOBJS"; fi
+WSEXP=""; [ $WS = 1 ] && WSEXP=_sx_ws_probe_cpuid,_sx_ws_probe_g03,_sx_ws_probe_g12,_sx_ws_stat,_sx_ws_loadlib_miss,_winstubs_stats,_winstubs_loadlib_miss,_winstubs_cpuid,
+EXPORTS=_m11_boot_enter,_entry_point,_m11_init_count,_m11_boot_stage,_m11_va_used,_m11_va_calls,_m11_set_trace,_m11_icall_ok,_m11_icall_miss,_m11_icall_miss_uniq,_m11_icall_miss_at,_m11_disp_count,_m11_units_run,_m11_units_total,_m11_units_skipped,_m11_stub_total,_m11_stub_uniq,_m11_stub_name,_m11_stub_count,_m11_probe_count,_m11_longjmp_hit,_m11_set_survey,_m11_call_unit,_m11_unit_va,_shimx_set_trace,_shimx_init,${WSEXP}__emscripten_stack_restore,_emscripten_stack_get_current
 OUT="$W/m11_sx_$TAG"
 emcc $OBJS -o "$OUT.cjs.tmp" \
   -O0 -g1 -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8MB -sGLOBAL_BASE="$((0x10000000))" \
@@ -94,7 +121,7 @@ emcc $OBJS -o "$OUT.cjs.tmp" \
   --no-entry -Wl,--export-all \
   -sEXPORTED_RUNTIME_METHODS=UTF8ToString,HEAPU8,HEAPF32,HEAP32,HEAPF64,HEAPU32,HEAP64,wasmTable,addFunction,ENV \
   -sEXPORTED_FUNCTIONS=$EXPORTS \
-  -Wl,--initial-memory="$((0x13000000))" -Wl,--max-memory="$((0x72000000))" $WRAP 2> "$W/link_$TAG.log" || { tail -30 "$W/link_$TAG.log"; echo "[sxlink] リンク失敗 ($TAG)"; exit 1; }
+  -Wl,--initial-memory="$((0x13000000))" -Wl,--max-memory="$((0x72000000))" $WRAP $WSLINK 2> "$W/link_$TAG.log" || { tail -30 "$W/link_$TAG.log"; echo "[sxlink] リンク失敗 ($TAG)"; exit 1; }
 mv "$OUT.cjs.tmp" "$OUT.cjs"
 python3 "$M11/m11_postjs.py" "$OUT.cjs" 2>/dev/null || true
 echo "[sxlink] OK $TAG: signature mismatch=$(grep -c 'signature mismatch' "$W/link_$TAG.log" || true) undefined symbol=$(grep -c 'undefined symbol' "$W/link_$TAG.log" || true) duplicate=$(grep -c 'duplicate symbol' "$W/link_$TAG.log" || true)  -> $OUT.cjs"
