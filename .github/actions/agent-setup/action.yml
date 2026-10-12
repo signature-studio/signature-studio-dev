@@ -19,6 +19,9 @@ inputs:
   token-permissions:
     description: 'JSON fragment limiting the refreshed token permissions, e.g. {"contents":"read"}. Empty = installation defaults.'
     required: false
+  opencode-version:
+    description: 'Pinned opencode CLI version. Empty = the default pinned in .github/scripts/install-opencode.sh'
+    required: false
   cf-account-id:
     description: 'Cloudflare account id for R2'
     required: false
@@ -46,7 +49,22 @@ runs:
       uses: oven-sh/setup-bun@v2
     - name: Setup OpenCode
       shell: bash
+      env:
+        OPENCODE_VERSION: ${{ inputs.opencode-version }}
       run: bash .github/scripts/install-opencode.sh
+
+    # install-opencode.sh は既に --version の一致を検証するが、$GITHUB_PATH は
+    # この step には効かないので、次の step が PATH 経由で見つかることを別途確かめる。
+    # 「インストール済みでも PATH に無い」状態の検出が目的。
+    - name: Verify OpenCode on PATH
+      shell: bash
+      run: |
+        set -euo pipefail
+        if ! command -v opencode >/dev/null 2>&1; then
+          echo "::error::opencode is not on PATH for subsequent steps"
+          exit 1
+        fi
+        echo "opencode: $(command -v opencode) -> $(opencode --version 2>&1)"
 
     # ---------------------------------------------------------------
     # GitHub App token auto-refresh (App token は 1 時間で切れる)

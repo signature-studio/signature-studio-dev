@@ -14,6 +14,11 @@ on:
         type: string
         description: 'the task for the OpenCode agent'
         required: true
+      opencode-version:
+        type: string
+        description: 'pin an opencode CLI version (empty = the default pinned in scripts/install-opencode.sh)'
+        required: false
+        default: ''
 
 # 同一 PR/issue での並行実行は最新のみ
 concurrency:
@@ -71,6 +76,8 @@ jobs:
           app-private-key: ${{ secrets.OC_APP_PRIVATE_KEY }}
           # read-only モードでは定期再発行トークンも読み取り専用に制限する
           token-permissions: ${{ env.OC_PERMISSION == 'read' && '{"contents":"read","issues":"read","pull-requests":"read"}' || '' }}
+          # dispatch 入力 > repository variable > スクリプト既定の pin
+          opencode-version: ${{ inputs.opencode-version || vars.OPENCODE_VERSION }}
           cf-account-id: ${{ secrets.CF_ACCOUNT_ID }}
           cf-r2-access-key-id: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
           cf-r2-secret-access-key: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
