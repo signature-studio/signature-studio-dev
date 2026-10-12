@@ -106,7 +106,7 @@ dev は `__e2e__/add.wasm` fixture が配信されないため wasm-load 内の 
   `E2E_URL` (repo variable) 未設定なら skip。service token は secrets `E2E_ACCESS_CLIENT_ID/SECRET`。
   運用・ローテーションは `deploy/README.md` §CI / E2E の秘密情報。
 - 実測 (Actions runner 上、Chrome 154.0.8037.97、load average 0.43 → 0.66):
-  `run.sh --driver both --targets preview,edge-sim` = **PASS 30 / FAIL 0 / SKIP 6**、所要 12.8s (build 込み、1 回)。
+  `run.sh --driver both --targets preview,edge-sim` = **PASS 30 / FAIL 0 / SKIP 6**、所要 10.7–12.8s (build 込み、n=2: 作業ツリー 1 回 + コミット済み HEAD 0f60391 のクリーン worktree 1 回、load average 0.05–0.66)。
   `run.sh --url <ローカル edge-sim> --driver both` = **PASS 16 / FAIL 0 / SKIP 2**、所要 3.9s (1 回)。
 - ネガティブコントロール: edge-policy の COEP キーを除いたコピーを `EDGE_POLICY_FILE` で与えると
   edge-sim × 2 driver で **FAIL 8** (4 check × 2)・exit 1 (CI ジョブが赤になる条件)。
