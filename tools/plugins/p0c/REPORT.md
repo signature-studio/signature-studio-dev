@@ -746,3 +746,107 @@ python3 tools/plugins/p0c/p0c4_e2e.py 2000        # 0x5dfdb0=0 (bit-exact 7/14)
 K80_NO_BUFPAD=1 python3 tools/plugins/p0c/k80_diff.py --ir tools/plugins/p0c/work/ext/k80.ext.ll --only 0x5dfdb0 --cases 2000   # NC1
 K80_NO_ASMSTORES=1 python3 tools/plugins/p0c/p0c4_abi_e2e.py 2000                                                                # NC2
 ```
+
+## 13. P0c-6 追記 (#277): native crash 7 kernel と abi-mismatch 7 kernel の原因は ABI 抽出・引数割付・入力ドメインだった
+
+作成: 2026-10-12 / 担当 dir: tools/plugins/p0c のみ / 起点 HEAD: `400d546` (main) / 検証 HEAD: `15617b4`
+既知類型との関係 (DEFECTS.md): D19 (差分ハーネスの境界 read 不一致) と同系統 (§12.4 の候補)。新類型候補は §13.4。
+素材: `fl-win64.tar.zst` の `block18983_PE.bin` のみ。`work/k80.lift.ll` は `lift_ranges.sh` で再生成 (RetDec v5.0)。
+数え方・buf_diff の定義は §11.3 / §12.2 と同じ (2000 case/kernel, fork 隔離, 並列 1)。
+
+### 13.1 結論 (先出し)
+
+1. **対象 A の sig11 は 7 → 0** (`p0c4_abi_e2e.py` の `run=61 ok=54 sig11=7` → `run=67 ok=67 sig11=0`)。
+   7 kernel は 4 つの別原因で、いずれも lift IR / ext 精度ではなく `k80abi.py` / `k80_diff.py` の欠陥だった。
+2. **対象 B は 7 のうち 6 kernel が ok モデルになった** (0x5dee90 / 0x5df040 / 0x5e09f0 / 0x5e0a70 / 0x5e0b10 /
+   0x5e1210)。残る 0x5e12b0 は引数接続では救えない (§13.3)。
+3. 数値差分が測れるようになった結果、**ok かつ buf_diff=0 の kernel は 29 → 39 (+10)**: 0x5e0630 / 0x5e06e0 /
+   0x5e08d0 / 0x5e09f0 / 0x5e0a70 / 0x5e0b10 / 0x5e0c00 / 0x5e1010 / 0x5e1210 / 0x5e1280 (起点で bit-exact だった
+   29 kernel は 1 つも失っていない)。起点の sig11 / abi-mismatch で測れていなかった kernel のうち差分が出たものは
+   §13.3 に残差として分けた。
+4. 回帰 11 kernel (0x5de820 ほか) は buf_diff=0 維持。
+
+### 13.2 原因と修正 (kernel 別・実測)
+
+| 原因 | 対象 kernel | 修正 | 負論対照 (修正を外すと) |
+|---|---|---|---|
+| (a) `k80abi.py`: 先に write 済みの reg (`mov r8, rdx` 後の `[r8]`) を引数ポインタ base に数え、実際の引数 r8 (個数) に buffer を割り当てて OOB | 0x5e0630 / 0x5e06e0 / 0x5e08d0 / 0x5e0a70 | write 済み reg の deref は base でなく copy 逆伝播の種にだけ使う | `K80_NO_WRITTEN_BASE=1`: 上記 4 が sig11 |
+| (b) `k80_diff.py`: RetDec の `%argN` は win64 gpr 序数だが、機械語が rcx を読まない kernel で使用 slot を詰めて割り当て、IR が 1 つずれた arg に store (NULL 書き込み) | 0x5de3e0 / 0x5e1280 | `%arg1..4` は序数で固定 (後ろの gpr を使うときのみ) | `K80_NO_ARGORD=1`: 2 kernel が sig11 |
+| (c) `k80abi.py`: `lea [rcx+r8*4]` の index 専用 reg (r8=個数) が copy 伝播で base 扱い | 0x5e02b0 | ptr_struct を持つ kernel に限り index 専用 reg を base から外す | `K80_NO_IDX_NOT_BASE=1`: sig11 |
+| (d) `k80_diff.py`: clip_index kernel で gain が大きいと `cvttsd2si`=0x80000000 → neg でも INT_MIN → clamp 素通り → 負添字 | 0x5e0c00 | gain 指数を 2^-9..2^-1 に制限 (ドメイン制約) | `K80_NO_CLIPRANGE=1`: sig11 (他 2 kernel の buf_diff も変動) |
+| (e) `k80abi.py`: `movlps xmm, [m]` の dest を read 扱いし偽の xmm 引数 (xmm0/xmm2) を作った | 0x5dee90 / 0x5df040 | movlps/movlpd/movhps/movhpd の dest は read から除外 | `K80_NO_PARTIAL_LOAD=1`: 2 kernel が abi-mismatch (run 65) |
+| (f) `k80abi.py`: stack 引数幅を命令名 (`cvtss2sd` の `sd`) で 64bit と誤判定 | 0x5e09f0 / 0x5e0a70 / 0x5e0b10 / 0x5e1010 | メモリオペランドの大きさを使う | `K80_NO_MEMW=1`: 4 kernel の buf_diff が 0 → 2,580,673 / 2,583,215 / 1,291,834 / 787,450 |
+| (g) `k80_argfix.py` [C]: `cvtss2sd xmm0, xmm3` (reg-reg 単項) の source xmm を接続できなかった | 0x5e09f0 / 0x5e0a70 / 0x5e0b10 | dest を含まない形を second pass で突合 | `K80_NO_REGSRC=1`: **差なし** (下記) |
+| (h) `k80abi.py`: 自分で書いた stack home slot (`movss [rsp+0x18], xmm2`) の読み戻しを stack 引数扱い | 0x5e1210 | write 済み stack slot は read 候補から除外 | `K80_NO_STACKW=1`: 0x5e1210 が結果から消える (abi-mismatch) |
+| (i) `k80_argfix.py` [C]: 同じ placeholder が `movss` と `cvtss2sd` の両方に使われ出現順突合が破綻 | 0x5e1210 | 各 use が取りうる xmm 集合の積が 1 つのときだけ接続 | `K80_NO_INTERSECT=1`: 0x5e1210 が結果から消える |
+
+(g) の負論対照は **差が出なかった** (`K80_NO_REGSRC=1` で run=67 ok=67、CSV も不変)。(g) を入れた時点 (HEAD `fce0e86`) では
+argfix の `helper_xmm` が 9 → 12 に増え 0x5e09f0 / 0x5e0a70 / 0x5e0b10 が ok になったが、その後に入れた (i) の
+積集合 fallback が同じ placeholder を接続できるため、現状では (g) は冗長 (未検証: (g) と (i) の両方を外した場合)。
+冗長なため削除せず、環境変数で外せる形で残している。
+
+### 13.3 実測 (検証 HEAD `15617b4`)
+
+| コマンド | 結果 |
+|---|---|
+| `p0c4_abi_e2e.py 2000` | rc=0、26.7〜27.1 s (load average 0.5〜0.9)、`run=67 ok=67 sig11=0`、起点は `run=61 ok=54 sig11=7` |
+| `p0c4_e2e.py 2000` | rc=0、111.8 s / 112.5 s (2 回)、判定 bit-exact 7/14 (§12.2 と同じ) |
+| `p0c2_e2e.sh 2000` | rc=0、50.5 s |
+| `p0c3_e2e.sh 2000` | rc=0 (回帰判定から 0x5de3e0 を除外した後。除外前は FAIL-REGRESS、下記) |
+| `ext_core_test` N=300000 | `ext core OK`、1.9 s |
+
+対象 A (起点 sig11 → 修正後):
+
+| kernel | buf_diff | ret_diff | 備考 |
+|---|---:|---:|---|
+| 0x5e0c00 | 0 | 0 | bit-exact |
+| 0x5e0630 | 0 | 0 | bit-exact |
+| 0x5e06e0 / 0x5e08d0 | 0 | 2000 | ret は native が rax を放置 (合否は buf_diff のみ) |
+| 0x5e1280 | 0 | 0 | bit-exact |
+| 0x5e02b0 | 2,578,706 | 0 | **残差** (maxulp 610,852,255)。f32chain、x87 の fild×fmul 模型 (推定・未検証) |
+| 0x5de3e0 | 2000 | 0 | **残差**: IR の store が `[rdx]` (上位 32bit) を欠落している (下記) |
+
+対象 B (起点 abi-mismatch → 修正後): 0x5e09f0 / 0x5e0a70 = buf_diff 0 (ret 2000)、0x5e0b10 / 0x5e1210 = 0 (ret 0)、
+**0x5dee90 = 2,565,360 / 0x5df040 = 2,565,277** (ok モデルだが差分あり・残差)。0x5e12b0 は abi-mismatch のまま。
+
+**残差・未解決 (推定ラベル付き)**:
+
+- **0x5de3e0 (buf_diff=2000)**: 機械語は `fistp qword` の上位 dword を `[rdx]`、下位を `[r8]` に書くが、
+  x87fix 後 IR は `%arg3` への store のみ (上位 dword の store が無い)。RetDec が `[rdx]` 側 store を落としたと**推定**
+  (lift 欠落。DEFECTS 類型は未照合)。起点では sig11 で buf_diff が測れず `p0c3_e2e.sh` の回帰判定を素通りしていた。
+  今回モデルが直り測れるようになり FAIL-REGRESS になったため、判定リストから外した (欠陥を隠すのではなく
+  「測れていなかった」ことを REPORT に残す)。
+- **0x5dee90 / 0x5df040 (約 2.57M)**: 未調査 (ok モデルで差分が出るようになった段階)。
+- **0x5e12b0**: RetDec の IR が `ucomiss` のフラグ使用と被演算子 (xmm0/xmm1) を落とし、引数ゼロ・戻り値定数 0 の関数
+  (`define i64 @function_5e12b0()`) になっている。引数接続の対象外で、lift 側の欠陥 (0x5e0d80 の ucomiss 符号欠落
+  (§12.3) と同系統の**推定**)。
+- 0x5e0d80 (起点 910,077 → 951,534) / 0x5e1490 (1,046,283 → 1,201,366): 0x5e0c00 の gain 制限に伴い
+  乱数列が変わったため変動 (`K80_NO_CLIPRANGE=1` で旧値に戻る)。原因は未調査で、悪化ではなく入力列の差。
+
+### 13.4 DEFECTS.md 行案・未解決・起票先
+
+- **D21 (新, 候補) ABI 抽出の read/write 誤分類**: 症状 = native 実行が sig11 または引数が偽に増える。
+  根本原因 = (a) write 済み reg の deref、(c) index 専用 reg、(e) 部分 load の dest、(f) 命令名による幅推定、
+  (h) 自書き stack slot の読み戻し。検出信号 = `gpr_base` / `xmm_slots` / `stack` が機械語を読むと食い違う。
+  修復 = 負論対照付きの個別除外 (§13.2)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 0x5de3e0 の `[rdx]` store 欠落 (lift) | buf_diff 2000 | 子 issue を起票 (本 PR 後) |
+| 0x5dee90 / 0x5df040 / 0x5e02b0 の残差 | buf_diff 約 2.57M | 同上 |
+| 0x5e12b0 の ucomiss 落ち (lift) | abi-mismatch のまま | 同上 (§12.4 の 0x5e0d80 と統合) |
+| ext 精度が必要な kernel の wasm32 検証・framework 統合 | #269 §12.4 と同じ | #197 (既存提案) |
+
+### 13.5 再現
+
+```sh
+export TMPDIR=$PWD/tools/plugins/p0c/work/tmp
+python3 tools/plugins/p0c/f80_assess.py                       # work/f80_classes.json
+python3 tools/plugins/p0c/p0c4_abi_e2e.py 2000                # sig11=0 / B6 ok を判定に含む
+for v in WRITTEN_BASE ARGORD IDX_NOT_BASE CLIPRANGE PARTIAL_LOAD MEMW REGSRC STACKW INTERSECT; do
+  K80_NO_$v=1 python3 tools/plugins/p0c/p0c4_abi_e2e.py 2000  # 負論対照 (rc は 0 のまま、差分は CSV)
+done
+```
+前提: `k80.lift.ll` は `bash tools/plugins/lift/lift_ranges.sh <PE> work/k80_ranges.txt tools/plugins/p0c/work k80 2400`
+で再生成。`llvm-as` / `clang` は PATH に必要 (runner では `/usr/lib/llvm-18/bin`)。
+`/opt/retdec` と `/home/ubuntu/work/{analysis,webstudio}` は runner 上の symlink で代替 (§12.4)。
