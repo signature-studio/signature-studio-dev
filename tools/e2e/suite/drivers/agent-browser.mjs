@@ -66,6 +66,10 @@ export async function createDriver({
     async click(selector) {
       await ab(["click", selector]);
     },
+    // <input type=file> に絶対パスのファイルを設定する (file picker 相当)
+    async upload(selector, files) {
+      await ab(["upload", selector, ...files], { timeoutMs: 120000 });
+    },
     // expr が truthy になるまで 100ms polling。タイムアウトなら false
     async waitFn(expr, timeoutMs = 15000) {
       const deadline = Date.now() + timeoutMs;

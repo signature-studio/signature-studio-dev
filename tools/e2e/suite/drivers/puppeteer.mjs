@@ -30,6 +30,11 @@ export async function createDriver({ chrome = "/usr/bin/google-chrome", headers 
     async click(selector) {
       await page.click(selector);
     },
+    async upload(selector, files) {
+      const el = await page.$(selector);
+      if (!el) throw new Error(`upload: ${selector} が見つからない`);
+      await el.uploadFile(...files);
+    },
     async waitFn(expr, timeoutMs = 15000) {
       try {
         await page.waitForFunction(expr, { timeout: timeoutMs, polling: 100 });

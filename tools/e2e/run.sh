@@ -6,6 +6,7 @@
 #   bash tools/e2e/run.sh --targets preview,edge-sim,dev
 #   bash tools/e2e/run.sh --url https://studio.example.com   # デプロイ済み URL を検証 (ビルド/ローカルサーバ無し)
 #       Access 保護時: E2E_ACCESS_CLIENT_ID / E2E_ACCESS_CLIENT_SECRET (service token)
+#   bash tools/e2e/run.sh --suite flp          # FLP パーサのブラウザ E2E (E2E_FLP_WIN_DIR=<extracted/> か FL_ROOT)
 #   E2E_SKIP_BUILD=1  ビルド省略 / E2E_REQUIRE_FL=1  fl-boot チェックを必須化
 #
 # 成果物: tools/e2e/work/{dist,shots,results,logs}  (gitignore 済み)
@@ -17,9 +18,11 @@ cd "$E2E"
 
 RUN_ARGS=()
 REMOTE=""
+SUITE="app"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --url) REMOTE="$2"; shift 2 ;;
+    --suite) SUITE="$2"; shift 2 ;;
     *) RUN_ARGS+=("$1"); shift ;;
   esac
 done
@@ -33,6 +36,12 @@ if [[ ! -x node_modules/.bin/agent-browser ]]; then
 fi
 echo "agent-browser $(node_modules/.bin/agent-browser --version | awk '{print $2}')"
 [[ -x /usr/bin/google-chrome || -n "${E2E_CHROME:-}" ]] || { echo "google-chrome が無い (E2E_CHROME で指定)"; exit 2; }
+
+if [[ "$SUITE" == "flp" ]]; then
+  # tools/flp/web (parseFlp/dump のブラウザハーネス) を build → file input / drop で FL 同梱ファイルを検証
+  step "FLP ブラウザ E2E (tools/flp/web; E2E_FLP_WIN_DIR または FL_ROOT が必要)"
+  exec node suite/flp.mjs "${RUN_ARGS[@]}"
+fi
 
 if [[ -n "$REMOTE" ]]; then
   step "リモート検証: $REMOTE"
