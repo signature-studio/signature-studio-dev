@@ -7,11 +7,15 @@ import ast
 import json
 import os
 import re
+import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 WORK = os.path.join(HERE, "..", "work")
 OUT = os.path.join(HERE, "flapi")
-WIN_PE = "/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin"
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "shared"))
+from paths import FL_MAC_DIR, FL_WIN64_DIR  # noqa: E402
+
+WIN_PE = f"{FL_WIN64_DIR}/extracted/block00031_PE.bin"
 
 raw = json.load(open(os.path.join(OUT, "raw_mac_x86_64.json")))
 raw_arm = json.load(open(os.path.join(OUT, "raw_mac_arm64.json")))
@@ -109,7 +113,7 @@ objects = {
 
 def binary_callbacks():
     """FLEngine rodata の `pycbOn*` 表 (Delphi 側 Python callback 名)。"""
-    D = "/home/ubuntu/work/analysis/mac/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Libs/FLEngine_x64.dylib"
+    D = f"{FL_MAC_DIR}/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Libs/FLEngine_x64.dylib"
     if not os.path.exists(D):
         return []
     b = open(D, "rb").read()
