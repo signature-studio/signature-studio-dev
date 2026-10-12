@@ -45,9 +45,7 @@
   (使うときに `tar --zstd -xf` で展開)。オブジェクト名は `artifacts/<prefix>.tar.zst`。
   - 既定で取得されるのは `fl-win64` のみ。plugins 素材が必要なら、依頼コメントに
     `oc_artifacts: fl-win64 plugins-ott` のような行を足して再起動してもらう
-    (指定できる名前: fl-win64 / plugins-ott / plugins-freshair / plugins-serum2 /
-    plugins-massivex / plugins-kilohearts / toolchain-retdec (→/opt/retdec) /
-    toolchain-emsdk (→/opt/emsdk) / work-m11 / work-liftdiff (→tools/<area>/work))。
+    (指定できる名前と展開先は `docs/WORKFLOW.md` §11 が正本)。
     必要な素材名を報告して停止すること。
   - **取得できていない場合がある**。agent-setup は素材が欠けているときにジョブを落とすが、
     `artifacts-required=false` で起動したジョブでは空の可能性がある。

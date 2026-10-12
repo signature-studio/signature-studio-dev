@@ -137,14 +137,31 @@ runs:
         # toolchain-* は /opt へ、work-* は repo 直下 (tools/<area>/work) へ展開する。
         # tarball 内の相対パスがそのまま配置先になる (retdec/・emsdk/・tools/<area>/work/)。
         # fl-win64 / plugins-* は agent が必要時に展開するのでここでは触らない。
+        # 展開に失敗した素材は取得失敗と同じ扱い (required なら job を落とす)。
+        extract_failed=""
         for f in "$artifacts_dir"/toolchain-*.tar.zst; do
           [ -e "$f" ] || continue
-          sudo tar --zstd -xf "$f" -C /opt && echo "extracted $(basename "$f") -> /opt"
+          if sudo tar --zstd -xf "$f" -C /opt; then
+            echo "extracted $(basename "$f") -> /opt"
+          else
+            extract_failed="$extract_failed $(basename "$f")"
+          fi
         done
         for f in "$artifacts_dir"/work-*.tar.zst; do
           [ -e "$f" ] || continue
-          tar --zstd -xf "$f" -C "$GITHUB_WORKSPACE" && echo "extracted $(basename "$f") -> $GITHUB_WORKSPACE"
+          if tar --zstd -xf "$f" -C "$GITHUB_WORKSPACE"; then
+            echo "extracted $(basename "$f") -> $GITHUB_WORKSPACE"
+          else
+            extract_failed="$extract_failed $(basename "$f")"
+          fi
         done
+        if [ -n "$extract_failed" ]; then
+          echo "::error::failed to extract:$extract_failed"
+          if [ "${R2_REQUIRED:-true}" = 'true' ]; then
+            exit 1
+          fi
+          echo "::warning::continuing without them because artifacts-required=false"
+        fi
 
         du -sh "$artifacts_dir" 2>/dev/null || true
         {
