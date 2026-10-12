@@ -1,5 +1,7 @@
 # tools/icall → tools/liftlib 統合手順 (CAB-89)
 
+**状態 (#229): `liftlib_icall.patch` は `tools/liftlib` に適用済み** (`liftlib/passes/icall.py` + `pipeline.py`)。以降の liftlib 側変更は直接編集。patch は履歴/再現用に残す。cfg 例は `tools/liftlib/targets/ott_route.json`。
+
 liftlib (CAB-49/54/55, 別 subagent が編集中) は **直接編集しない**。ここには「適用すれば入る」patch と API/回帰試験の定義を置く。
 
 ## 1. 適用
@@ -41,7 +43,9 @@ closure 外 (CRT 等) の direct call は従来どおり RetDec の推定 signat
 | liftlib 側 | `bash tools/liftlib/liftlib_e2e.sh` に `python3 -m liftlib ott --icall` 相当 (ott_route.sh を呼ぶ) を追加 | 上と同一基準 |
 
 ## 4. 既知の制約 (統合時の注意)
-- closure 内の **stack 渡し引数 (5 個目以降)** は未対応 (BLK は rcx/rdx/r8/r9/xmm0-3 のみ)。FLEngine の `_InitLib` (8 引数) 等は個別 BLK 拡張が必要 → 子チケット。
+- **stack 渡し引数 (5 個目以降)**: #229 で対応。BLK `+0x48` = `ICALL_BLK+0x100` (STKBUF) のアドレス、STKBUF[k] = 呼出し点の `[rsp+0x20+8k]` (最大 12 語)。
+  RetDec は rsp を連続領域にせず stack_var 別 alloca に分割するため「rsp+0x20 のアドレス」を渡す方式は不可 (OTT で非整列値 0x102cbecf を実測して不採用) → 呼出し直前に実際に store されたスロットだけを値コピー (`stk_slots_stored`)。
+  検出は site 直前 48 命令内 (直前の call/ret/jmp まで) の `[rsp+0x20+8k]` 書込み。**限界**: 他の基本ブロックで store された引数・`rep movs` 等の一括 store・13 語以上は検出外。tail `jmp` 経由は引数が呼出し元スロットのまま (コピーしない)。
 - jump table: `jmp reg` 形のみ cmp/je 列へ展開。`jmp [idx*8+tbl]` (メモリ直接) 形は表パッチのみ (RetDec 任せ)。Delphi の in-code 表 (`lea B,[rip+x]; jmp [B+i*8+d]`) は解決器が対応するが cmp/je 展開は未実装。
 - CFG unreachable code (Delphi unwind landing pad = try/finally の dtor 呼出し, FLEngine で 879 site) は RetDec が decode しない → 別 pass (unwind info → 到達エッジ追加) が必要。
 - FPU(x87)/MMX/AVX/`lock` 命令は RetDec の translator 依存 (本 pass の対象外)。`rep movs/stos` は RetDec 任せ。
