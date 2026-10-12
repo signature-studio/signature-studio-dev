@@ -178,7 +178,12 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   `oc_actions_allow_write` が無いと read 専用で、PR は作れない。
 - **素材**: 既定で取得されるのは `fl-win64` のみ。他は本文に `oc_artifacts: fl-win64 plugins-ott` の
   行を書く (許可名: fl-win64 / plugins-ott / plugins-freshair / plugins-serum2 / plugins-massivex /
-  plugins-kilohearts。それ以外は run が失敗する)。全素材は約 16 GiB のため必要分だけ指定する。
+  plugins-kilohearts / toolchain-retdec / toolchain-emsdk / work-m11 / work-liftdiff。それ以外は
+  run が失敗する)。全素材は約 17 GiB のため必要分だけ指定する。
+  - `toolchain-retdec` → `/opt/retdec`、`toolchain-emsdk` → `/opt/emsdk` に展開される。
+  - `work-m11` → `tools/m11/work/`、`work-liftdiff` → `tools/liftdiff/work/` に展開される
+    (gitignore 対象の検証スナップショット。commit しない)。
+  - 追加の `work-*` は R2 に置いて、`prepare-event-context.sh` の allowlist に足す (#293)。
 - **結果**: agent の最終回答は run のログ (`gh run view <id> --log` の `Write step summary`) と
   `$GITHUB_STEP_SUMMARY` の両方に出る。issue へのコメントは agent が `gh issue comment` で行う。
 - **上限**: job は 60 分。収まらない作業は中間 commit + draft PR で区切る。
