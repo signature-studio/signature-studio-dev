@@ -109,3 +109,48 @@ FastMM4 の初期化関数群 (InitializeMemoryManager 相当) を単体で検�
 | `m11_icall_audit.py` | capstone による closure 内間接 call 数 vs IR 間接 call 数の監査 (ott D1 の FLEngine 版; `work/icall_audit.json`) |
 
 `work/` (RetDec 出力・IR・wasm・image) は `.gitignore`。実バイナリ由来の image は wasm に埋め込まず実行時に読込む。
+
+## 8. LB_BASE=0x10000 適用 (#222, 部分達成: 静的層のみ検証・wasm 実行は未検証)
+
+既知類型との関係: 該当なし (関連: DEFECTS.md D11 = PE VA リテラルの wasm32 切捨て。本件は VA→LVA 規約の変更で別件)。
+
+`M11_LB_BASE` (既定 0 = 従来 LVA=RVA / `0x10000` で LVA=RVA+0x10000) で全層を切替可能にした。既定 0 は従来と byte 一致。
+
+| 層 | 変更 |
+|---|---|
+| `lb_base.py` | `M11_LB_BASE` の単一定義 (64KiB 境界を assert) |
+| `m11_image_gen.py` / `m11_data_gen.py` | reloc 補正 `-0x400000` → `-0x400000+LB`、image 先頭に LB 分の 0 領域 / data の memcpy 先に +LB |
+| `m11_passes.py` | IR の VA→LVA remap (M1/M2/M2b) の差分 `BASE_VA = 0x400000 - LB` |
+| `m11_ov.c` `m11_rt.c` `shimx_link/trace_rt.c` | 手書き RVA 定数 (`R()` 経由)・icall 表引き `target+(0x400000-LB)`・`hinst` を `-DM11_LB_BASE` で補正 |
+| `ldfix/ldfix.py` `ldfix/halt0_map.py` `shimx_link/analyze.py` `run_trace.mjs` | LVA↔VA 換算に LB を反映 |
+| `m11_build.sh` / `m11_e2e.sh` | `-DM11_LB_BASE`・stamp 不一致時の再生成/拒否・GLOBAL_BASE 衝突 assert・`lb_check.py` 実行 |
+
+`m11_bounds.py` / `m11_tail.py` / `m11_icall_audit.py` は VA 空間 (LB 非依存) なので変更不要。GLOBAL_BASE 0x10000000 は image 終端 0x18c0000+0x10000 より後ろで変更不要 (assert 済み)。initial 288MiB / max 1.8GiB も未変更。
+
+### 実測 (コミット済み HEAD `9969e34`, FLEngine_x64.dll 22,227,016 B)
+
+| 項目 | 実測 |
+|---|---|
+| DIR64 reloc 総数 / 指す先 RVA<0x10000 (LB 適用前) | 278,531 / 55,929 (`lb_check.py` が別実装で再計算し `audit_va.py` と一致) |
+| LB=0x10000 適用後 linear<0x10000 の reloc 先 | **0** (全 278,531 が >=0x10000; 値は `v-0x400000+0x10000` と全件一致, 不一致 0) |
+| 非 reloc バイト不一致 / 先頭 64KiB の非 0 バイト | 0 / 0 |
+| LB=0 の image | 旧 `m11_image_gen.py` 出力と `cmp` 一致 (22,515,781 B) |
+| LB=0x10000 の image | 22,581,317 B (+65,536 B) |
+| 実行 (HEAD, n=3, load 0.13–0.38, 直列) | image_gen + lb_check: 8.38–8.53 秒, 3/3 PASS |
+| ネガティブコントロール | reloc 1 件の LB 補正を落とすと `dir64_value_mismatch=1` で FAIL; LB=0 image を LB=0x10000 で検査すると FAIL (長さ不足) |
+| IR remap pass 単体 | 試料 IR で store 即値 4096 (LB=0) → 69632 (LB=0x10000) を確認 (全 IR での件数は未計測) |
+
+再現: `M11_LB_BASE=0x10000 python3 tools/m11/m11_image_gen.py <PE> && uv run --with pefile python tools/m11/lb_check.py <PE> work/m11_image.bin 0x10000`
+
+### IAT 738 スロット (要確認項目 4)
+全 738 スロットは `.idata` 内の hint/name RVA を持ち (IAT==ILT 738/738, by-name 738)、`.reloc` に載るのは 0 件、image 範囲値に見えるのは RVA を VA と誤認しているだけ。m11 の image は `.idata` を敷設せず (`KEEP` に無し)、`m11_genstubs.py` / `m11_win.c` は IAT を参照しない (grep 0 件; Win32 は IR の declare 名で stub 化)。**LVA 化への追従は不要**。`audit_va.py` の IAT 判定 (exit 1) は Delphi 側ではなく PE 標準の bound 前 IAT の誤検知で、FLEngine には不適。
+
+### 未検証 / 範囲外
+* `m11_e2e.sh` (stage 進行 / survey trap 数が現行と同水準か) は未実行: この runner に emsdk / RetDec / ghidra 関数表 (`m2/work/ghidra_dll/functions_dll.csv`) / `work/` の lift 成果物が無い。
+* 全 IR での remap 件数・wasm ビルド・実行後の guest ポインタ assert は未検証。IR の VA→LVA remap は regex の桁数固定パターン (`m11_passes.py` M2b の `0x4xxxxx|0x1[0-3a]xxxxxx`) に依存し、LB 適用後も VA 側を見るので影響しないはずだが実行で未確認。
+* `#221` (liftlib `dataimage.py:37` フィルタ) は別 issue のまま。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `m11_e2e.sh` を LB=0 / 0x10000 で実行し stage / survey を比較 | 完了条件の本体 | #222 (本 PR は draft) — 必要素材: emsdk 6.0.12 / RetDec v5.0 / ghidra 関数表 (`functions_dll.csv`) か `m11/work/` スナップショット |
+| `audit_va.py` の IAT 判定が FLEngine で常に exit 1 | CI 検査に使えない | #91 にコメント (PE 標準 IAT は除外すべき) |
