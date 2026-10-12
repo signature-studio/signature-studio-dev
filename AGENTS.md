@@ -17,6 +17,7 @@ Signature Studio (webstudio) のリポジトリで作業する**全エージェ�
 | 9 | `docs/LEGAL.md` | ライセンス/規約上の運用制約 |
 | 10 | `docs/HANDOFF/<日付>.md` | 最新の引継ぎ |
 | 11 | `docs/pm/DIRECTIVES.md` | ユーザ指示の逐語原文 (依頼の正本) |
+| 12 | `docs/pm/PREDECESSOR_ANALYSIS.md` | 前任 PM セッションの分析 (現行規約がこうなった理由) |
 
 ---
 
