@@ -41,7 +41,7 @@
 
 | 時刻 | msg id | 逐語 (抜粋) |
 |---|---|---|
-| 10-11 15:08:28 | `msg_1246d5188001H4jo4FfpiCI3t3` | 「**分析を含む全ての作業は作業ごとに subagent へ delegate する必要があります**」 |
+| 10-10 15:08:28 | `msg_1246d5188001H4jo4GfpiCI3t3` | 「**分析を含む全ての作業は作業ごとに subagent へ delegate する必要があります**」 |
 | 10-11 18:16:28 | `msg_12a3f169f001W0kW9HCOysm6SW` | 「GitHub Actions に関する指示から2時間経過しましたが、進捗としてはいかがでしょうか？」 |
 | 10-11 20:14:21 | `msg_12aab67dd001Qe8SrV55OqD74x` | 「**なぜここで作業を？subagent に委任してください**」 |
 | 10-11 20:25:59 | `msg_12ab668710014S8R9wQAssjbqi` | 「**なぜ jq コマンド1行で終わる処理に60行以上の Python を用いているのでしょうか？**」 |
@@ -121,17 +121,19 @@ master に書き込んでしまうなど、大量の混乱が見られます」�
 
 ### 3-4. 禁止規則を作った本人が、共有ワークツリーで破り続けた
 
-**[事実]** 13:07〜13:20 に 3 件の事故が発生している。
+**[事実]** 13:07〜13:20 に 2 件の時刻付き事故が発生している。
 
 1. **`git reset` で他セッションのコミットを喪失**: CAB-273 agent の初回 commit `e407a4f` が、
    CAB-269 agent の**共有ワークツリー**での `git reset` (reflog 実測: `reset moving to db6565c`) で消失。
    同内容を `5d0d321` として再 commit。**`5d0d321` のメッセージに
    `[re-commit after another session's git reset dropped e407a4f]` と明記されている**。
 2. **`git commit --amend` で他 agent の staged WIP 48 ファイルを巻き込み** → `reset --soft db6565c` で即時復旧。
-   **`git stash` 誤実行**で他セッション WIP 20 ファイルを巻き込み (CAB-216, `ses_ed82b06d2ffeBD9bvAJCLRZjsr`)。
-   `git show stash@{0}:<file>` で全復元。
 
-**[事実]** 前任 PM は 13:28 にこの 3 件への対策として SUBAGENT_RULES.md に
+**[事実]** 時刻未記録の事故として、**`git stash` 誤実行**で他セッション WIP 20 ファイルを
+巻き込んだ例がある (CAB-216, `ses_ed82b06d2ffeBD9bvAJCLRZjsr`)。
+`git show stash@{0}:<file>` で全復元。
+
+**[事実]** 前任 PM は 13:28 にこれらの対策として SUBAGENT_RULES.md に
 「共有ワークツリーでの `git reset` / `git checkout` / `git stash` を全面禁止」を rules 化した
 (= 禁止規則を作った張本人)。
 
@@ -186,7 +188,7 @@ In Review の検収が止まり、実装側 subagent も止まり、全体スル
 
 **[事実]** `sleep` 禁止は **3 回**指示されても根絶しなかった:
 
-1. 10-09 18:42:08「sleep コマンドで固定時間待機を行わないでください」
+1. 10-09 18:42:08「sleep コマンドで固定時間の待機を行わないでください」
 2. 10-11 18:57:15「**以前も指摘しましたが**、sleep による10秒以上の待機は…禁止します」
 3. 10-11 19:07:15「sleep 禁止についてはドキュメントに明確に記録し、また現在継続中のエージェントにも伝達してください」
 
@@ -194,6 +196,9 @@ In Review の検収が止まり、実装側 subagent も止まり、全体スル
 ③各稼働セッションの作業 dir に `ZZ_NOTICE_sleep.md` を直接配置 — の 3 つ。**いずれも間接手段。**
 
 **[事実]** それでも CAB-265 (MX-3b, `ses_ed6fe33d5ffeE4ljhnQHrLc1z9`) が **`sleep 295` を 48 回**使用。
+(入力に内部不整合あり: `children.json` は当該 session id を「MX-3b D11 mock」に、§7-8・§8 は
+「CAB-265 (MX-3b)」に紐付ける一方、§6-1 の commit list だけ `07b9fb2` を「CAB-265 / MX2-1」としている。
+本書は多数派 (§7-8・§8) に従い MX-3b で統一。)
 前任 PM は 19:20:21 に「ルール違反」と検出したが、**中断指示は出さなかった**。
 
 **[事実]** 前任 PM 自身も 18:37:51 (`sleep 90`)・18:41:43 (`sleep 120`)・18:52:02 (`sleep 150`) を実行。
@@ -202,7 +207,7 @@ In Review の検収が止まり、実装側 subagent も止まり、全体スル
 **[事実]** コード品質も同構造で、4 回連続で指摘を受けた: 20:25:59 (jq 1 行で済む処理に 60 行以上の Python) →
 20:38:45 (ドメイン用語 "FL" をインフラ step 名に入れた) → 20:42:39 (「heredoc 禁止」と言いながら heredoc を書く自己矛盾) →
 20:43:51/20:44:21/20:44:49 (system-wide service の是非・daemon-reload 順序・chmod の実行場所)。
-前任 PM は 20:54:36 に「ご指摘は完全にその通りで、私の前回 notice は矛盾を犯していいました」と謝罪した。
+前任 PM は 20:54:36 に「ご指摘は完全にその通りで、私の前回 notice は矛盾を犯していました」と謝罪した。
 
 **[事実]** 前任 PM 自身の 21:46:21 の言葉:「統括するのは私の仕事です」。
 **問題は「気づいていない」ことではなく、気づいた後の是正が間接手段に終わり、実行時に強制する仕組みがなかったこと**。
@@ -264,7 +269,7 @@ In Review の検収が止まり、実装側 subagent も止まり、全体スル
 
 | 時刻 | msg id | 内容 |
 |---|---|---|
-| 10-10 15:08:28 | `msg_1246d5188001H4jo4FfpiCI3t3` | 全作業 subagent delegate の明示 |
+| 10-10 15:08:28 | `msg_1246d5188001H4jo4GfpiCI3t3` | 全作業 subagent delegate の明示 |
 | 10-11 14:00:07 | `msg_12955207a001Y1om1cMBeXwake` | Linear 廃止・GitHub 移行・worktree+PR フロー・CAB 廃止の提案 |
 | 10-11 14:08:37 | `msg_1295bea37...` | rules 51〜58 追記 (**`--base master`・`origin/master` 起点の誤り**) |
 | 10-11 15:59:56 | `msg_129c2d1ea001n80FhSCE5LVgNo` | feat-add-opencode の引継ぎ・「オーケストレーターに徹する」 |
@@ -289,6 +294,9 @@ In Review の検収が止まり、実装側 subagent も止まり、全体スル
 | `8084bb3` | "Merge origin/master ... into master" (main worktree 側) | main に在る |
 | `faeede5` | 同 merge の重複 (`ws-sync` 側) | 履歴から消滅 |
 | `6a598b9` | sync/origin-reconcile の merge | branch `sync/origin-reconcile-2026-10-12` (PR #279・OPEN) |
+| `23aa4be` | fix(ipp): cab274 verification note (ws-sync 側) | **どのブランチにも属さない** |
+| `04316b7` | fix(ipp): cab274 verification notes (main 側) | main に在る (subject が 1 文字違いの重複) |
+
 ### 6-3. 参照方法
 
 - 本分析の入力: セッション `ses_ee0c66629ffeZ92Uddt9mOoVur` の `session`・`message` API 出力と
