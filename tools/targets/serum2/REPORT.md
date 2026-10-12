@@ -246,6 +246,5 @@ GHIDRA=1 bash tools/targets/serum2/scripts/run_all.sh   # +Ghidra 全自動解�
 | `.pdata` 外 19,115 ブロックの関数性が未確定 | lift 入口として使えない | #71 継続 |
 
 ### 11.6 検証記録
-- 検証起点: commit `699addb` (クリーン worktree `git worktree add --detach … HEAD` で `sr3_run.sh` を再実行, 40.8 秒, load average 1.58, 4 core・並列 4)。`out/sr3_{cut_table.tsv,signature_db.json,gap_blocks.tsv,anchors.json,verify.txt}` の 5 ファイルが commit 済みと `cmp` 一致。`find tools/targets/serum2 -type f -size +20M -not -path '*/work/*'` = 0 件。
-- ネガティブコントロール: §11.3 (zstd 窓 0 関数 / ±1〜3 倍シフト窓 6 通りとも 0 関数)。範囲外: 検算者による別アルゴリズム再計算 (レビュワーが実施)。
+- 検証起点: commit `699addb` (クリーン worktree `git worktree add --detach … HEAD` で `sr3_run.sh` を再実行, 40.8 秒, load average 1.58, 4 core・並列 4)。`out/sr3_{cut_table.tsv,signature_db.json,gap_blocks.tsv,anchors.json,verify.txt}` の 5 ファイルが commit 済みと `cmp` 一致。`find tools/targets/serum2 -type f -size +20M -not -path '*/work/*'` = 0 件。ネガティブコントロール: §11.3 (zstd 窓 0 関数 / ±1〜3 倍シフト窓 6 通りとも 0 関数)。範囲外: 検算者による別アルゴリズム再計算 (レビュワーが実施)。
 
