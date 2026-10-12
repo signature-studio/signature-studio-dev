@@ -20,9 +20,13 @@ mkdir -p "$W"
 
 WINEPREFIX=${WINEPREFIX:-$W/wineprefix}
 export WINEPREFIX WINEDEBUG=-all
-CONTENT='Z:\home\ubuntu\work\webstudio\tools\targets\serum2\work\exe_extract'
-DLL_ORIG='Z:\home\ubuntu\work\webstudio\tools\targets\serum2\work\Serum2_win64.vst3'
-DLL_PATCH='Z:\home\ubuntu\work\webstudio\tools\targets\serum2\host\work\Serum2_win64.authstub.vst3'
+# wine の Z: ドライブは / を指す。リポジトリ位置から導出する (旧: /home/ubuntu/work/webstudio 固定)
+export PATH="/usr/lib/wine:$PATH"
+S2ABS=$(cd "$S2" && pwd)
+ZS2='Z:'"${S2ABS//\//\\}"
+CONTENT="$ZS2\\work\\exe_extract"
+DLL_ORIG="$ZS2\\work\\Serum2_win64.vst3"
+DLL_PATCH="$ZS2\\host\\work\\Serum2_win64.authstub.vst3"
 
 echo "== [1/6] host build =="
 bash build.sh || exit 1
@@ -36,7 +40,7 @@ if [ ! -f "$W/state/host/processor_state.json" ]; then
 fi
 
 echo "== [3/6] seed run (既定 state 取得) =="
-wine64 "$HOSTDIR/work/build/vst3host.exe" "$DLL_PATCH" - 'Z:\home\ubuntu\work\webstudio\tools\targets\serum2\host\work\out_seed' 4 "$CONTENT" > /dev/null 2>&1
+wine64 "$HOSTDIR/work/build/vst3host.exe" "$DLL_PATCH" - "$ZS2\\host\\work\\out_seed" 4 "$CONTENT" > /dev/null 2>&1
 [ -f "$W/out_seed/saved_processor_state.bin" ] || { echo "seed run 失敗"; exit 1; }
 
 echo "== [4/6] case 生成 =="
@@ -49,9 +53,9 @@ run() { # $1=dll $2=case $3=out(Z:パス) $4=blocks — console は work/<outdir
   wine64 "$HOSTDIR/work/build/vst3host.exe" "$1" "$2" "$3" "$4" "$CONTENT" > "$HOSTDIR/work/$tag.console" 2>&1
   echo "  exit=$? -> $3"
 }
-CASES_LIC='Z:\home\ubuntu\work\webstudio\tools\targets\serum2\host\work\cases\licensed'
-CASES_DEMO='Z:\home\ubuntu\work\webstudio\tools\targets\serum2\host\work\cases\demo'
-OUTB='Z:\home\ubuntu\work\webstudio\tools\targets\serum2\host\work'
+CASES_LIC="$ZS2\\host\\work\\cases\\licensed"
+CASES_DEMO="$ZS2\\host\\work\\cases\\demo"
+OUTB="$ZS2\\host\\work"
 mkdir -p "$W/out_p_lic2" "$W/out_p_demo" "$W/out_u_lic" "$W/out_u_demo" "$W/out_u_proc"
 run "$DLL_PATCH" "$CASES_LIC" "$OUTB\\out_p_lic2" 64
 run "$DLL_PATCH" "$CASES_DEMO" "$OUTB\\out_p_demo" 64
@@ -71,7 +75,7 @@ for side in ("processor", "controller"):
     open(os.path.join(w, "cases_corrupt", f"{side}_state.json"), "wb").write(bytes(d))
 print("  corrupt case 生成 ok")
 PYEOF
-run "$DLL_ORIG" 'Z:\home\ubuntu\work\webstudio\tools\targets\serum2\host\work\cases_corrupt' "$OUTB\\out_u_corrupt" 16
+run "$DLL_ORIG" "$ZS2\\host\\work\\cases_corrupt" "$OUTB\\out_u_corrupt" 16
 
 echo "== [6/6] 判定 =="
 python3 summarize.py "$W" | tee "$W/e2e_result.txt"
