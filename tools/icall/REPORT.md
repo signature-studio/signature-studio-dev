@@ -196,6 +196,13 @@ python3 tools/icall/diff/fn3_diff.py 1801a9be0 --n 600 --dump    # native / rout
 - **ネガティブコントロール**: 上記 ③ の誤検出入力 (`movaps [rsp+0x20], xmm6`) が unit `stk: movaps ... 引数でない` で 0 語になること / 直前 call より前の store が無視されること。
 - **検証範囲外 (正直な限界)**: OTT で stack 引数あり 2 site は matrix で**実行されない** (executed 0 / dispatch 1,337 中) ため、**stack 引数が実際に被呼側へ届くことの動的検証は未実施** (`tests/stk_check.mjs` は dispatch 総数 1,337・STKBUF 非 0 = 0 件を確認するのみ)。
   動的検証には 5 引数以上を取る間接 call 先を持つ PE (IPP 結合 or FLEngine) が必要。`ICALL_IPP_SHIM` フック (`__icall_dispatch` 先頭) は `-DICALL_IPP_SHIM` でのみ有効、shim とのリンクは未検証。
+- **レビュー対応 (PR #326 Copilot 指摘 7 件, HEAD `4d30c1f` で実測, 4 core)**:
+  ① `stk_slots_stored` は operand access に write を要求 (cmp/test の読み取りを除外)。unit 新規 3 件 (cmp/test は 0 語・cmp の後の mov は 1 語): 修正前 FAIL 2 (cmp/test) → 修正後 `RESULT PASS (0 failed)`。
+  ② `ICALL_CHECK_STK` の dispatch ごとに BLK+0x48 の「期待値一致 / 8 byte 整列 / STKBUF 12 語が線形メモリ内」を runtime 検査 (`icall_stk_ptr_bad`)。`stk_check.mjs` は `dispatch>0 && ptr_bad==0` を終了コードで assert (nonzero_stkbuf は診断のみ)。
+  実測: 正常 build `dispatch=1337 ptr_bad=0` rc=0 / ネガティブコントロール (pointer を +1 で非整列化) `dispatch=1337 ptr_bad=1337` rc=1。
+  ③ `ott_route.json` の image を `${PLUGINS_DIR}/...` に (`pipeline.rpath()` が tools/shared/paths.py の変数を展開)。`run_all('targets/ott_route.json', detect_only=True)` 32.5 s 完走。
+  ⑤⑥⑦ docs: integration/README.md は「再適用不可の履歴スナップショット」と明記し patch 適用コマンドを削除、実測値は本節へのリンクのみ。`passes/icall.py` の docstring は funcs ファイル必須に修正。
+  回帰 `icall_e2e.sh`: PASS 91.5 s (load 1.28)、unit 0 failed / OTT F 落ち 70→0・tail-jmp 11→0 / matrix 89 scenario・50,236 cell 全 bit 一致 (max_ulp 0, state_diff 0 qword) / crt_fn_gate PASS。
 - 追加 build オプション: `ICALL_EMCC_FLAGS` / `ICALL_EXTRA_EXPORTS` (`ott_route.sh`)、`stub_len` / `comis_stub_len` を map.json に出力 (stub 長が 78 固定でなくなったため ranges 計算 4 箇所を map 由来に変更)。
 
 | 未解決 | 影響 | 起票先 |
