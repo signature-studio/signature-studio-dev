@@ -157,6 +157,22 @@ runs:
             extract_failed="$extract_failed $(basename "$f")"
           fi
         done
+        # work-* の中には /home/ubuntu/work/webstudio/... を指す絶対 symlink が含まれる
+        # (作成元の VM のパス)。runner では dangling になるので、workspace 内を指すよう
+        # 張り直す。対象は work-* を展開した範囲 (tools/*/work 以下) の symlink のみ。
+        if ls "$artifacts_dir"/work-*.tar.zst >/dev/null 2>&1; then
+          relinked=0
+          while IFS= read -r -d '' link; do
+            target="$(readlink "$link")"
+            case "$target" in
+              /home/ubuntu/work/webstudio/*)
+                ln -sfn "$GITHUB_WORKSPACE/${target#/home/ubuntu/work/webstudio/}" "$link"
+                relinked=$((relinked + 1))
+                ;;
+            esac
+          done < <(find "$GITHUB_WORKSPACE/tools" -type l -path '*/work/*' -lname '/home/ubuntu/work/webstudio/*' -print0 2>/dev/null)
+          echo "relinked $relinked absolute work symlinks -> $GITHUB_WORKSPACE"
+        fi
         # analysis-* は ANALYSIS_DIR (tools/shared/env.sh の既定の親。#294) へ展開する。
         # tarball の先頭が plugins/... なので $ANALYSIS_DIR/plugins/... になる。
         analysis_dir="$HOME/analysis"
