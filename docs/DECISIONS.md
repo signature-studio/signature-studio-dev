@@ -63,3 +63,15 @@
   肥大化していた。原本 repo 外・repo に存在しないため新しい参加者が読めない問題もあった。
 - **影響**: 各 `REPORT.md` の証跡行は削除済み。検証手順は `docs/WORKFLOW.md` を参照。
 
+
+## D7 — Fresh Air UI は lift 対象外・素材は非同梱 (HUD 方針に合流)
+
+- **状態**: 採用 (2026-10-13, issue #53 [FA-6])
+- **決定**: Fresh Air の UI (Skia 静的リンク・`.rsrc` 内 PNG/vec 等) は **lift 対象外**とし、DSP のみ wasm 化する。
+  UI 素材はリポジトリ・配信物に**同梱せず**、ユーザ手元の正規インストーラから抽出して使う非同梱運用とする。
+  Canvas/WebGL による UI 表示は M7 HUD 方針 ([GUI-10] #10, `tools/gui/`) に合流させ、Fresh Air 専用の UI 実装系は作らない。
+- **理由**: UI/Skia はコアの大半で、DSP (Filter/Compressor/Gain の合成) とは別 vtable・別経路のため分離できる。
+  素材の非同梱は `docs/LEGAL.md` §6 の緩和策 1 (再配布物にバイナリを含めない) と整合する。
+  根拠の実測値は `tools/targets/freshair/REPORT.md` §1・§2・§6 B6・§7 FA-6。
+- **影響**: lift 作業 (`tools/targets/freshair/lift2` 等) は GUI/エディタ層を対象にしない。UI 素材の抽出・配置の
+  具体実装は HUD 側 (#10) の範囲。法的な可否の結論は含まない (Slate/Audiotonix ToS の論点は `docs/LEGAL.md` §4.3)。
