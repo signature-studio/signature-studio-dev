@@ -1,0 +1,30 @@
+{
+ "name": "ott_iargs",
+ "image": "/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll",
+ "raw_ll": "tools/m6/work/ott.drc.ll",
+ "funcs": [
+  "function_180127550",
+  "function_180126920",
+  "function_1801a30d0",
+  "function_1801a30b0"
+ ],
+ "passes": {
+  "p1": false,
+  "f7": false,
+  "f2": false,
+  "iargs": true,
+  "gdata": "all"
+ },
+ "exports": [
+  "function_180127550",
+  "function_180126920"
+ ],
+ "leaf_specs": [
+  "specs/ott_iargs_ctor.json"
+ ],
+ "emcc": {
+  "opt": "-O1"
+ },
+ "stub_externals": true,
+ "gdata_pad": true
+}
