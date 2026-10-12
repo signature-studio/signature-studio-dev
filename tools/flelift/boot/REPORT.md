@@ -188,3 +188,27 @@ bash tools/flelift/fle_e2e.sh                # 親チケットの回帰 (PASS)
 ```
 前提: tools/flelift/fle_lift.sh と同一 (python3 capstone/pefile, emsdk 6.0.12, node)。
 PE = block00031_PE.bin。生成物は work/boot/ (gitignore)。20MB 超 blob は git に入れない。
+
+## 9. 再現検証 (CI runner, 2026-10-12, 検証起点 3ae2d0d = main HEAD)
+
+GitHub Actions runner (4 vCPU / RAM 16GB + swap 16GB 追加) で `boot_e2e.sh` を素の状態から実行した実測。
+`FLE_PE` = `fl-win64.tar.zst` 内 `extracted/block00031_PE.bin`、emsdk 6.0.12、capstone/pefile は venv。
+
+| 工程 | 実測 |
+|---|---|
+| lift (x64c, closure 2) | 227 s、関数 29,907 / 命令 1,557,882 (§2 FLE-5 列と一致) |
+| `fle_lifted.c` の clang -O0 (1 variant) | 約 6.5 分 (RSS 最大 14.8GB。RAM 16GB では swap 必須) |
+| link plain | mismatch 0 / undefined 0 / duplicate 0、wasm 126,995,230 B |
+| boot 実行 plain (`--boot-only`) | 5.87 s (load average 1.70)、units_run 209 / units_total 942、`boot_threw=unlifted`、getmem 1,890 / freemem 776、exit 0 |
+
+- boot 実測は FLE-5 末の記載 (209 dispatch、GetMem 1,890 / FreeMem 776) と**完全一致**し、再現性を確認した。
+- strict / nosx / chk の link・実行および survey (942 unit) は本 run では未実施 (clang 1 本 6.5 分 × variant 数 + 60 分のジョブ上限)。
+  FLE-5 末の値 (§4-1, §4) は据え置き。
+- ネガティブコントロール: 未実施 (本 run はコード変更なし。REPORT 分割のみ)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `f_43c5e0` → `f_414ec0` (UStr copy) が out=0 を返す理由 (§3-5 / 付録 B) | unit 進行 209 で停止、`0x15F34A0` 未登録 | 本 issue (#253) に継続 |
+| survey 非 ok 3 (unit 280/659 `0x6a7b70`、895 `0x976da0`) | survey 完全 ok 未達 | 本 issue (#253) に継続 |
+| lifted C コンパイルが 14.8GB 使う | CI (RAM 16GB) では swap なしで不可 | CI 整備 issue (#284) へ提案 |
+
