@@ -155,6 +155,19 @@ runs:
             extract_failed="$extract_failed $(basename "$f")"
           fi
         done
+        # analysis-* は ANALYSIS_DIR (tools/shared/env.sh の既定の親。#294) へ展開する。
+        # tarball の先頭が plugins/... なので $ANALYSIS_DIR/plugins/... になる。
+        analysis_dir="$HOME/analysis"
+        for f in "$artifacts_dir"/analysis-*.tar.zst; do
+          [ -e "$f" ] || continue
+          mkdir -p "$analysis_dir"
+          if tar --zstd -xf "$f" -C "$analysis_dir"; then
+            echo "extracted $(basename "$f") -> $analysis_dir"
+            echo "ANALYSIS_DIR=$analysis_dir" >> "$GITHUB_ENV"
+          else
+            extract_failed="$extract_failed $(basename "$f")"
+          fi
+        done
         if [ -n "$extract_failed" ]; then
           echo "::error::failed to extract:$extract_failed"
           if [ "${R2_REQUIRED:-true}" = 'true' ]; then
