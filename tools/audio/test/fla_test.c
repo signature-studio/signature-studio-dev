@@ -14,7 +14,7 @@
 
 static struct {
     int asio; int apikind; int mode; /* 0 sine 1 ramp 2 loop */
-    uint32_t buf, depth, sr, stress, work_us, hiccup_ms, hiccup_every, timeinfo, sr_after;
+    uint32_t buf, depth, sr, stress, work_us, hiccup_ms, hiccup_every, timeinfo, sr_after, burst_floor;
     double secs;
 } P = { .asio = 1, .mode = 0, .buf = 256, .depth = 2, .sr = 48000, .secs = 10 };
 
@@ -116,6 +116,7 @@ static int run_asio(char *j, size_t jn) {
     if (flasio_can_sample_rate((double)P.sr) != ASE_OK) { snprintf(j, jn, "{\"error\":\"canSampleRate\"}"); return 1; }
     if (P.sr != 48000 && flasio_set_sample_rate((double)P.sr) != ASE_OK) { snprintf(j, jn, "{\"error\":\"setSampleRate\"}"); return 1; }
     flasio_configure(P.depth, 0);
+    fla_test_set_burst_floor(P.burst_floor);
     ASIOBufferInfo infos[4]; int n = 0;
     for (int c = 0; c < 2; c++) { infos[n].isInput = 0; infos[n].channelNum = c; n++; }
     if (P.mode == 2) for (int c = 0; c < 2; c++) { infos[n].isInput = 1; infos[n].channelNum = c; n++; }
@@ -233,6 +234,20 @@ static int run_wasapi(char *j, size_t jn) {
     return 0;
 }
 
+/* burst 超過 → CreateBuffers エラー返却 (abort しない) と、失敗後の再 CreateBuffers 成功 (CLOSED へ復帰) を確認 */
+static int run_nomem(char *j, size_t jn) {
+    ASIOCallbacks cb = { bufferSwitch, NULL, NULL, NULL };
+    ASIOBufferInfo infos[2] = { { 0, 0, { 0, 0 } }, { 0, 1, { 0, 0 } } };
+    flasio_init(NULL);
+    fla_test_set_burst_floor(P.burst_floor);
+    ASIOError e1 = flasio_create_buffers(infos, 2, (ASIOLong)P.buf, &cb);
+    fla_test_set_burst_floor(0);
+    ASIOError e2 = flasio_create_buffers(infos, 2, (ASIOLong)P.buf, &cb);
+    ASIOError e3 = e2 == ASE_OK ? flasio_dispose_buffers() : -1;
+    snprintf(j, jn, "{\"api\":\"nomem\",\"codes\":{\"first\":%d,\"retry\":%d,\"dispose\":%d},\"buf\":%u,\"burst_floor\":%u}", e1, e2, e3, P.buf, P.burst_floor);
+    return 0;
+}
+
 /* 検証系 API の戻り値確認 (AudioContext を開かない) */
 static void cb_dummy(ASIOLong i, ASIOBool d) { (void)i; (void)d; }
 static int run_apicheck(char *j, size_t jn) {
@@ -260,7 +275,8 @@ int main(int argc, char **argv) {
         char *a = argv[i], *v = strchr(a, '=');
         if (!v) continue;
         *v++ = 0;
-        if (!strcmp(a, "api")) { P.asio = strcmp(v, "wasapi") != 0; P.apikind = !strcmp(v, "ff_uninit") ? 2 : !strcmp(v, "ff_excl") ? 3 : !strcmp(v, "apicheck") ? 4 : 0; }
+        if (!strcmp(a, "api")) { P.asio = strcmp(v, "wasapi") != 0; P.apikind = !strcmp(v, "ff_uninit") ? 2 : !strcmp(v, "ff_excl") ? 3 : !strcmp(v, "apicheck") ? 4 : !strcmp(v, "nomem") ? 5 : 0; }
+        else if (!strcmp(a, "burst_floor")) P.burst_floor = (uint32_t)atoi(v);
         else if (!strcmp(a, "mode")) P.mode = !strcmp(v, "ramp") ? 1 : !strcmp(v, "loop") ? 2 : 0;
         else if (!strcmp(a, "buf")) P.buf = (uint32_t)atoi(v);
         else if (!strcmp(a, "depth")) P.depth = (uint32_t)atoi(v);
@@ -277,6 +293,7 @@ int main(int argc, char **argv) {
     if (P.apikind == 2) { ASIOLong a, b; flasio_get_channels(&a, &b); rc = 0; }                 /* init 前の呼出 → fail-fast abort */
     else if (P.apikind == 3) { flwasapi_fmt_t f = { 48000, 2 }; flwasapi_initialize(1, 0, 0, 0, &f); rc = 0; }   /* exclusive → fail-fast */
     else if (P.apikind == 4) rc = run_apicheck(g_result, sizeof g_result);
+    else if (P.apikind == 5) rc = run_nomem(g_result, sizeof g_result);
     else rc = P.asio ? run_asio(g_result, sizeof g_result) : run_wasapi(g_result, sizeof g_result);
     __atomic_store_n(&g_done, rc ? 2 : 1, __ATOMIC_SEQ_CST);
     __builtin_wasm_memory_atomic_notify((int *)&g_done, 0x7fffffff);

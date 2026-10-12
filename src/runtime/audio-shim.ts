@@ -239,6 +239,7 @@ export class FlAudioShim {
   }
 
   private async cmdClose(): Promise<number> {
+    this.pendingOpen = null;
     this.teardownNode();
     if (this.ctx) { const c = this.ctx; this.ctx = null; this.moduleLoadedFor = null; await c.close().catch(() => {}); }
     return 0;
