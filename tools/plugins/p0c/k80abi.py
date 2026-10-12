@@ -176,6 +176,12 @@ def scan_function(MD, td, tva, va, fend):
         for r in writes:
             if r in GPR:
                 gpr_w.add(GPR[r])
+        # movlps/movlpd/movhps/movhpd xmm, mem は片側 64bit のみ load する。capstone は dest を
+        # read|write と付けるが、残り半分は引数値ではない (0x5dee90 の xmm0/xmm2 が偽の引数になる, #277)
+        if m in ('movlps', 'movlpd', 'movhps', 'movhpd') and len(i.operands) == 2 \
+                and i.operands[0].type == X86_OP_REG and i.operands[1].type == X86_OP_MEM \
+                and os.environ.get('K80_NO_PARTIAL_LOAD') != '1':
+            reads = [r for r in reads if r != i.operands[0].reg]
         for r in reads:
             if r in XMM:
                 xn = XMM[r]
@@ -228,6 +234,12 @@ def scan_function(MD, td, tva, va, fend):
             op = ins.operands[0] if ins.operands else None
             if op is not None and getattr(op, 'size', 0) in (4, 8) and not mn.startswith('fld'):
                 w = op.size * 8
+            # cvtss2sd xmm, dword [m] / cvtsd2ss xmm, qword [m]: 幅はニーモニック末尾ではなく
+            # メモリオペランドの大きさ (0x5e09f0 の stack 引数は 32bit float, #277)
+            if os.environ.get('K80_NO_MEMW') != '1' and not mn.startswith('fld'):
+                mo = [o for o in ins.operands if o.type == X86_OP_MEM and getattr(o, 'size', 0) in (4, 8)]
+                if mo:
+                    w = mo[0].size * 8
         if off not in seen:
             seen[off] = (isfp, w, ins.mnemonic, ins.op_str)
     # movsq (16B struct コピー) からの二重 deref: 直前 4 命令の `mov rX, <gpr slot>`
