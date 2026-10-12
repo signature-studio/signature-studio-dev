@@ -389,6 +389,24 @@ def fix_helper_operand_xmm(header, body, habi, rep, fname):
                 if not site_ok:
                     ok = False
                     break
+            if (not ok or len(slots) != 1) and os.environ.get('K80_NO_INTERSECT') != '1':
+                # fallback (#277): 出現順の突合が破綻する placeholder (0x5e1210: xmm3 が movss と
+                # cvtss2sd の両方に使われ、順序対応が合わない)。各 use が取り得る xmm 引数 slot の
+                # 集合 (同ニーモニックの全 site の reg) の積が 1 つに決まるときだけ接続する
+                inter = None
+                for l, hname in helper_uses:
+                    mn = hname[len('__asm_'):].split('__')[0]
+                    am = re.search(r'@' + re.escape(hname) + r'\(([^)]*)\)', l)
+                    ops = [x.strip() for x in am.group(1).split(',') if x.strip()] if am else []
+                    n = len(ops) - sum(1 for x in ops if re.match(r'^i\d+ -?\d+$', x))
+                    regs = set()
+                    for nn in (n, n + 1):
+                        for d in sites.get((mn, nn), []):
+                            regs.update(d.values())
+                    regs &= argslots
+                    inter = regs if inter is None else (inter & regs)
+                if inter is not None and len(inter) == 1:
+                    slots, ok = set(inter), True
             if not ok or len(slots) != 1:
                 continue
             xmm = slots.pop()
