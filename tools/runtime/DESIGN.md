@@ -111,6 +111,15 @@ Worker "fl-runtime" ── wasm インスタンス = Win32 UI スレッド ─�
 ### 2.5 同期/非同期の橋渡し方針 (下流)
 OPFS は Worker 内 `createSyncAccessHandle` が同期で使える (実測) → VFS は OPFS 同期ハンドルを第一候補。ネットワーク/IDB を要する場合のみ JSPI または補助 Worker + `Atomics.wait` の sync-RPC。
 
+### 2.6 GUI 結線 (RT-3 #121): OffscreenCanvas と入力イベント
+- **入力 (producer)**: `gui_input.ts` `PumpInput` が canvas/window の DOM イベントを Win32 メッセージ (WM_MOUSEMOVE/L,M,R BUTTON/MOUSEWHEEL/KEYDOWN,UP/SYSKEY*/CHAR/SETFOCUS,KILLFOCUS) に変換し `PumpRing.push`。純関数 (`mouseMoveMsg` 等) は DOM 非依存。
+  **マウス移動の coalesce は producer 側**: pointermove は最新 1 件だけを保持し rAF で push、他種イベント (down/up/key/wheel/focus) の直前に保留 move を吐いて順序を保つ。
+- **描画 (OffscreenCanvas)**: `canvas.transferControlToOffscreen()` で渡した先で 2D 描画する。主は **yield 方式** (非ブロッキングで ring を掃く → `Atomics.waitAsync` でイベントループへ戻る → タスク終了で commit)。
+  **blocking 方式** (`getMessage` = `Atomics.wait` に居座ったまま描く = 実 FL の UI スレッドの形) は、Worker のタスクが終わるまで OffscreenCanvas が画面へ commit されない (Chrome 154 は `OffscreenCanvas.commit()` 無し、e2e で実測)。
+  → **GetMessage でブロックする wasm UI スレッドと描画スレッドは分離する**: 描画は GuiShared の out ring を `waitAsync` で消費する専用描画 Worker (`gui_worker.ts` = `gui_renderer.ts`) が担う (tools/gui PROTOCOL §1 の構成)。fl-runtime Worker が OffscreenCanvas を直接持つのは (A) ブロックしない駆動 (yield) か (B) 描画だけをブロックしない別タスクへ逃がす場合に限る。
+- **2 つの入力経路の関係** (統合は未決): tools/gui の GuiShared 入力リング (`gui.ts`, shim が `translate_input` で消費) と、本節の PumpRing (`worker_pump.ts` ABI, startup/pump の C ポンプが消費)。GUI shim とポンプ shim は同時リンク不可 (duplicate strong symbol: tools/startup/pump REPORT §8)。どちらを正にするかは GUI-3 (#174) / GUI-11 (#32) で決める。
+- **`?runtime=` 共存**: `/?gui=selftest[&present=yield|blocking]` と `/?gui=render-selftest` は `?runtime=` と独立に併用可 (index.ts でそれぞれ別に mount)。
+
 ## 3. ブート手順とキャッシュ (`bench/run_compile_bench.mjs`)
 フロー: `main: loadManifest(/wasm/manifest.json)` → `spawnRuntimeWorker` → Worker: `fetch(hash名.wasm)` → `compileStreaming` (進捗は `Response.clone()` の並行消費、compileStreaming には**元の Response**を渡す = コードキャッシュ連携を壊さない) → `buildImports` (Module.imports() を introspection、未解決は fail-fast フォワーダ) → instantiate → `emscripten_stack_init` / `__wasm_call_ctors` → driver。
 
