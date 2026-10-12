@@ -6,7 +6,9 @@ if (_libc.personality(0xffffffff) & 0x0040000) == 0 and os.environ.get('OTT_NOAS
     os.environ['OTT_NOASLR'] = '1'
     os.execvp('setarch', ['setarch', 'x86_64', '-R', sys.executable] + sys.argv)
 HERE = os.path.dirname(os.path.abspath(__file__))
-DLL = '/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll'
+sys.path.insert(0, os.path.join(HERE, '..', '..', 'shared'))
+from paths import PLUGINS_DIR
+DLL = os.path.join(PLUGINS_DIR, 'ott', 'binaries', 'OTT_vst2_win64.dll')
 _lib = ctypes.CDLL(os.path.join(HERE, '..', 'work', 'libottnative.so'))
 _lib.ott_call.restype = ctypes.c_uint64
 _lib.ott_call.argtypes = [ctypes.c_uint64, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_long, ctypes.c_void_p]
