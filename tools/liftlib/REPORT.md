@@ -597,7 +597,7 @@ RetDec は `void(i128,i128,i8)` と lift し ECX/EFLAGS を捨てる → **void 
 
 | 検証 | 結果 | real | load average (nproc=4) |
 |---|---|---|---|
-| `python3 -m liftlib simd test --n 200` (HEAD `dfea6d2`) | 223 mnemonic / 347 form / 182,400 vec: exact 181,895 / approx_ok 505 / **mismatch 0** | 5.9 秒 | 0.43 / 0.40 / 0.24 |
+| `python3 -m liftlib simd test --n 200` (clean HEAD `8476a82`) | 223 mnemonic / 347 form / 182,400 vec: exact 181,895 / approx_ok 505 / **mismatch 0** | 5.8 秒 | 0.33 / 0.37 / 0.24 |
 | `python3 -m liftlib simd report` | 未被覆 0/0/0/0 | — | — |
 | `python3 -m liftlib inject-eval` (`LL_XRET_*` 設定) | injected 9 / detected 9 / false_positive 0 | — | — |
 | unit T5 / T16a / T16b | 全 ok | — | — |
