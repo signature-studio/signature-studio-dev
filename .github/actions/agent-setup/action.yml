@@ -1,5 +1,5 @@
 name: Setup Agent Environment
-description: Setup the agent environment for the workflow (toolchain + R2 artifacts + token refresh)
+description: Setup the agent environment for the workflow (toolchain + R2 artifacts)
 
 inputs:
   r2-bucket:
@@ -20,7 +20,13 @@ inputs:
     description: 'JSON fragment limiting the refreshed token permissions, e.g. {"contents":"read"}. Empty = installation defaults.'
     required: false
   opencode-version:
-    description: 'Pinned opencode CLI version. Empty = the default pinned in .github/scripts/install-opencode.sh'
+    description: 'Pinned opencode CLI version for the npm channel (@opencode/cli-<target>). Empty = the default in .github/scripts/install-opencode.sh'
+    required: false
+  opencode-release-version:
+    description: 'Pinned opencode release tag for the GitHub Releases channel (anomalyco/opencode). Empty = the default in .github/scripts/install-opencode.sh'
+    required: false
+  opencode-install-source:
+    description: 'Where to install opencode from: auto (GitHub Releases, then npm, then the official installer), releases, or npm'
     required: false
   cf-account-id:
     description: 'Cloudflare account id for R2'
@@ -51,11 +57,13 @@ runs:
       shell: bash
       env:
         OPENCODE_VERSION: ${{ inputs.opencode-version }}
+        OPENCODE_RELEASE_VERSION: ${{ inputs.opencode-release-version }}
+        OPENCODE_INSTALL_SOURCE: ${{ inputs.opencode-install-source }}
       run: bash .github/scripts/install-opencode.sh
 
-    # install-opencode.sh は既に --version の一致を検証するが、$GITHUB_PATH は
-    # この step には効かないので、次の step が PATH 経由で見つかることを別途確かめる。
-    # 「インストール済みでも PATH に無い」状態の検出が目的。
+    # install-opencode.sh は取得した版を `opencode --version` で検証済み。
+    # ここでは「後続 step が PATH 経由で見つかる」ことだけを確認する。
+    # ($GITHUB_PATH はこの step には効かないので、スクリプト内の検証はフルパスで行う)
     - name: Verify OpenCode on PATH
       shell: bash
       run: |
