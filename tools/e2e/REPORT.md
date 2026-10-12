@@ -98,7 +98,9 @@ dev は `__e2e__/add.wasm` fixture が配信されないため wasm-load 内の 
 - frames の供給: `GuiHost.attach({ onFrame })` の累計フレーム数を `controller.setFrames()` に渡す (`src/runtime/gui.ts`)。
   **実 FL の GuiHost 接続は未実装** (FL 本体がページに統合されていないため。ハーネスのテストフレームは計上しない)。
 - e2e: `webstudio-contract` は常時 (形状)、`fl-boot` は `E2E_REQUIRE_FL=1` で `state==='running' && frames>0` を 180s 待ち、canvas の画素を検査 (#32 の受入に接続)。
-  FL 未統合の現状では `E2E_REQUIRE_FL=1` は FAIL する (意図通り・下記実測)。
+  FL 未統合の現状では `E2E_REQUIRE_FL=1` は FAIL する (意図通り)。
+- 実測 (HEAD 8bf83d9、Chrome 154、node v22.23.3): `--driver both --targets preview,edge-sim,dev` = **PASS 50 / FAIL 0 / SKIP 10** (28.1s、`webstudio-contract` 6/6 PASS = `{"state":"booting","frames":0}`、fl-boot 6 SKIP + edge-policy 4 SKIP)。
+  `E2E_REQUIRE_FL=1 --targets preview` (agent-browser) = PASS 8 / **FAIL 1 (fl-boot: 180146ms 待って `{"state":"booting","frames":0}`)** / SKIP 1、合計 3m2.9s。
 - 単体テスト: `node --test tools/e2e/webstudio_state.test.mjs` (遷移 6 ケース)。
 - 未実施: `agent-browser diff screenshot` による FL 画面のスクリーンショット差分 (基準画像となる FL 起動画面が無いため。#32 後)。
 
