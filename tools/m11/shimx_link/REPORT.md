@@ -182,7 +182,7 @@ GetCurrentThreadId 3, GetModuleHandleW, GetProcAddress, InitializeCriticalSectio
 | 項目 | 実測 |
 |---|---|
 | リンク (`--soft --fix --ws`) | **signature mismatch 0 / undefined symbol 0 / duplicate 0**。所要 5.4 秒 (obj キャッシュ無し)。wasm 6,250,610 B (ws 無し 6,239,337 B) |
-| `ws_e2e.mjs` | **PASS 19 / FAIL 0** (所要 0.6 秒) |
+| `ws_e2e.mjs` | **PASS 17 / FAIL 0** (所要 0.54 秒)。うち **9 件は `[probe由来]`** (G03 ×4 / G12 ×3 / `WRAP.symbols_in_wasm` / `LOG.loadlib_miss_available`: `sx_ws_probe_*` か wasm バイト列検査で得た証拠で、lift の自然経路ではない)。残り 8 件 (G05 ×7 + `WRAP.count`) のうち、boot 中に lift が自然に踏んだと言えるのは `G05.boot_cpuid_from_lift` (`winstubs_cpuid` 8 回) のみ (他の G05 6 件も `sx_ws_probe_cpuid` 経由の値検査だが、依頼範囲外のため表記は未変更)。旧記載の「PASS 19」は件数の誤記 (check は元から 17 件) |
 | G05 (lift `__asm_cpuid` 経由) | leaf1.EDX=`0x078bfbff` / cmov=1 / leaf1.ECX=0 / leaf7 AVX2=0。**boot 中に lift から `winstubs_cpuid` が 8 回呼ばれた** (自然経路) |
 | G03 (`--wrap` 経由 probe) | engine ×2 + host exe とも signer_match=1。`WinVerifyTrust` 計数 6 (VERIFY+CLOSE ×3) |
 | G12 (probe) | CreateProcessW 試行 1 / 成功 **0**、`WebView2Loader.dll` は NULL・GetLastError=126、loadlib_blocked=1 |

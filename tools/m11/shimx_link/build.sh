@@ -62,7 +62,7 @@ llvm-nm --defined-only -g "$W"/obj/m11_*.o > "$W/m11_nm.txt"
 # 2a. winstubs 結線 (--ws, #223) -------------------------------------------------------
 #   winstubs 全ソース (tools/startup/winstubs/src は読取のみ) + link 側 glue + cpuid 委譲版 simd helper。
 #   m11_simd_ws.c は work/ (m11_simd.c と同階層) に置く: 生成物の "../msimd11_core.h" がそのまま解決される。
-WSOBJS=""; WSLINK=""
+WSLINK=""
 if [ $WS = 1 ]; then
   mkdir -p "$W/obj_ws"
   for f in "$WSD"/src/*.c; do b="$(basename "$f" .c)"; cc "$f" "$W/obj_ws/$b.o" $SXF -I"$SX/src" -I"$WSD/src"; done
@@ -74,7 +74,6 @@ if [ $WS = 1 ]; then
   cc "$SIMD_WS" "$W/obj_ws/m11_simd_ws.o" $CF -I"$M11"
   llvm-nm --defined-only -g "$W"/obj_ws/*.o > "$W/ws_nm.txt"
   cat "$W/m11_nm.txt" "$W/ws_nm.txt" > "$W/m11ws_nm.txt"
-  WSOBJS="$W/obj_ws/*.o"
   while read -r s; do [ -z "$s" ] || WSLINK="$WSLINK -Wl,--wrap=$s"; done < <(grep -v '^#' "$WSD/wrap_list.txt")
 fi
 
@@ -109,12 +108,18 @@ fi
 
 # 5. リンク (重複定義は error のまま = SHIM_BIND 廃止後の衝突検出)
 #    ※ $W/obj/sx_*.o glob は shimx 各 .o に加え sx_cbboot.o も拾う (CAB-177)
-OBJS="$W/obj/sx_*.o $W/obj/m11_rt.o $W/obj/m11_ov.o $W/obj/m11_simd.o $W/obj/m11_fnstubs.o $W/obj/m11_data.o $W/obj/m11_sxfix.o $GUIOBJ $BOOT"
-if [ $WS = 1 ]; then OBJS="${OBJS/$W\/obj\/m11_simd.o/} $WSOBJS"; fi
+#    --ws 時は m11_simd.o を外し (cpuid 委譲版 m11_simd_ws.o で置換)、obj_ws/*.o を足す。
+#    配列 + "$W" 引用で組む: $W に glob 文字/空白が入っても展開されるのは sx_*.o / obj_ws/*.o の意図した glob だけ。
+OBJS=("$W"/obj/sx_*.o "$W/obj/m11_rt.o" "$W/obj/m11_ov.o")
+[ $WS = 1 ] || OBJS+=("$W/obj/m11_simd.o")
+OBJS+=("$W/obj/m11_fnstubs.o" "$W/obj/m11_data.o" "$W/obj/m11_sxfix.o")
+read -ra _multi <<< "$GUIOBJ $BOOT"   # GUIOBJ/BOOT は複数 .o の空白区切り。read -a は分割のみで glob 展開しない
+OBJS+=("${_multi[@]}")
+[ $WS = 1 ] && OBJS+=("$W"/obj_ws/*.o)
 WSEXP=""; [ $WS = 1 ] && WSEXP=_sx_ws_probe_cpuid,_sx_ws_probe_g03,_sx_ws_probe_g12,_sx_ws_stat,_sx_ws_loadlib_miss,_winstubs_stats,_winstubs_loadlib_miss,_winstubs_cpuid,
 EXPORTS=_m11_boot_enter,_entry_point,_m11_init_count,_m11_boot_stage,_m11_va_used,_m11_va_calls,_m11_set_trace,_m11_icall_ok,_m11_icall_miss,_m11_icall_miss_uniq,_m11_icall_miss_at,_m11_disp_count,_m11_units_run,_m11_units_total,_m11_units_skipped,_m11_stub_total,_m11_stub_uniq,_m11_stub_name,_m11_stub_count,_m11_probe_count,_m11_longjmp_hit,_m11_set_survey,_m11_call_unit,_m11_unit_va,_shimx_set_trace,_shimx_init,${WSEXP}__emscripten_stack_restore,_emscripten_stack_get_current
 OUT="$W/m11_sx_$TAG"
-emcc $OBJS -o "$OUT.cjs.tmp" \
+emcc "${OBJS[@]}" -o "$OUT.cjs.tmp" \
   -O0 -g1 -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8MB -sGLOBAL_BASE="$((0x10000000))" \
   -sENVIRONMENT=node -sMODULARIZE=1 -sEXPORT_NAME=m11create \
   -sERROR_ON_UNDEFINED_SYMBOLS=0 -sEXIT_RUNTIME=1 \

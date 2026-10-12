@@ -15,8 +15,11 @@ const err = [];
 const mod = await (m2.default || m2)({ printErr: (s) => err.push(String(s)) });
 mod.HEAPU8.set(fs.readFileSync(M11 + '/work/m11_image.bin'), 0);
 
-let fails = 0;
-const check = (name, ok, detail) => { console.log(`${ok ? 'PASS' : 'FAIL'} ${name}  ${detail ?? ''}`); if (!ok) fails++; };
+let fails = 0, probeChecks = 0, totalChecks = 0;
+const check = (name, ok, detail) => { totalChecks++; console.log(`${ok ? 'PASS' : 'FAIL'} ${name}  ${detail ?? ''}`); if (!ok) fails++; };
+// probe 由来 = sx_ws_probe_* (本 e2e 用の検査口) や wasm バイト列の直接検査で得た証拠で、lift の自然な実行経路ではない。
+// 名前に [probe由来] を付け、PASS 件数を「lift が実際に踏んだ証拠」と読み違えないようにする。
+const checkProbe = (name, ok, detail) => { probeChecks++; check(`[probe由来] ${name}`, ok, detail); };
 const hx = (v) => '0x' + (v >>> 0).toString(16).padStart(8, '0');
 
 // boot (到達点のみ記録。unit 18 の OOB は CAB-231 の既知停止点)
@@ -41,16 +44,16 @@ check('G05.stat_counted', mod._sx_ws_stat(3) === bootStat.cpuid + 6, `winstubs c
 
 // G03 (engine module ×2 + host exe=0)
 const s1 = mod._sx_ws_probe_g03(1), s2 = mod._sx_ws_probe_g03(1), s3 = mod._sx_ws_probe_g03(0);
-check('G03.engine_self_1', s1 === 1, `signer_match=${s1}`);
-check('G03.engine_self_2', s2 === 1, `signer_match=${s2}`);
-check('G03.host_exe', s3 === 1, `signer_match=${s3}`);
-check('G03.verify_trust_wrapped', mod._sx_ws_stat(0) === 6, `__wrap_WinVerifyTrust 計数=${mod._sx_ws_stat(0)} (VERIFY+CLOSE ×3)`);
+checkProbe('G03.engine_self_1', s1 === 1, `signer_match=${s1}`);
+checkProbe('G03.engine_self_2', s2 === 1, `signer_match=${s2}`);
+checkProbe('G03.host_exe', s3 === 1, `signer_match=${s3}`);
+checkProbe('G03.verify_trust_wrapped', mod._sx_ws_stat(0) === 6, `__wrap_WinVerifyTrust 計数=${mod._sx_ws_stat(0)} (VERIFY+CLOSE ×3)`);
 
 // G12
 const g12 = mod._sx_ws_probe_g12();
-check('G12.create_process_success', mod._sx_ws_stat(5) === 0 && (g12 & 1) === 0, `attempts=${mod._sx_ws_stat(4)} success=${mod._sx_ws_stat(5)}`);
-check('G12.webview2_null_126', (g12 & 2) === 0 && (g12 >> 8) === 126, `loaded=${(g12 >> 1) & 1} err=${g12 >> 8}`);
-check('G12.loadlib_blocked', mod._sx_ws_stat(8) >= 1, `blocked=${mod._sx_ws_stat(8)}`);
+checkProbe('G12.create_process_success', mod._sx_ws_stat(5) === 0 && (g12 & 1) === 0, `attempts=${mod._sx_ws_stat(4)} success=${mod._sx_ws_stat(5)}`);
+checkProbe('G12.webview2_null_126', (g12 & 2) === 0 && (g12 >> 8) === 126, `loaded=${(g12 >> 1) & 1} err=${g12 >> 8}`);
+checkProbe('G12.loadlib_blocked', mod._sx_ws_stat(8) >= 1, `blocked=${mod._sx_ws_stat(8)}`);
 
 // --wrap 結線: wasm の function section に __wrap_ 12 本分の実体があること (wrap_list.txt と突合)
 const wl = fs.readFileSync(path.join(M11, '../startup/winstubs/wrap_list.txt'), 'utf8').split('\n').filter((l) => l && !l.startsWith('#'));
@@ -58,13 +61,14 @@ const wasmBytes = fs.readFileSync(cjs + '.wasm');
 const nameSec = Buffer.from(wasmBytes).toString('latin1');
 const wrapped = wl.filter((n) => nameSec.includes('__wrap_' + n));
 check('WRAP.count', wl.length === 12, `wrap_list.txt=${wl.length} 本`);
-check('WRAP.symbols_in_wasm', wrapped.length === wl.length, `__wrap_* 名が name section に ${wrapped.length}/${wl.length}`);
+checkProbe('WRAP.symbols_in_wasm', wrapped.length === wl.length, `__wrap_* 名が name section に ${wrapped.length}/${wl.length}`);
 
 // loadlib_miss ログ (lift 実機で取得できること = 受入 2)
 const miss = [];
 for (let i = 0; i < 32; i++) { const p = mod._sx_ws_loadlib_miss(i); if (!p) break; miss.push(mod.UTF8ToString(p)); }
 console.log('LOADLIB_MISS ' + JSON.stringify(miss));
-check('LOG.loadlib_miss_available', miss.length >= 1, `${miss.length} 件 (WebView2Loader.dll を含む=${miss.some((m) => /webview2loader/i.test(m))})`);
+checkProbe('LOG.loadlib_miss_available', miss.length >= 1, `${miss.length} 件 (WebView2Loader.dll を含む=${miss.some((m) => /webview2loader/i.test(m))})`);
 
+console.log(`CHECKS total=${totalChecks} probe由来=${probeChecks} 非probe=${totalChecks - probeChecks}`);
 console.log(fails ? `RESULT FAIL (${fails})` : 'RESULT PASS');
 process.exit(fails ? 1 : 0);

@@ -6,7 +6,7 @@
  *     (engine モジュール登録 / 環境 seed / trust_ok / ShellExecute hook / GetProcAddress 表)。
  *     m11_boot_enter より前に必ず実行されるので、THostInstance 構築前という要件を満たす。
  *   - __asm_cpuid の実体は m11_simd2.py が winstubs_cpuid を呼ぶ形で生成 (m11_simd.c)。
- *   - sx_ws_probe_*: 同一 wasm 内から --wrap 経由のシンボルを叩く検査口 (winstubs_e2e.mjs が呼ぶ)。
+ *   - sx_ws_probe_*: 同一 wasm 内から --wrap 経由のシンボルを叩く検査口 (ws_e2e.mjs が呼ぶ)。
  *     lift 側が __wrap_<api> に束縛されていることの実測に使う (export 名は wrap されないので JS 側から直接は叩けない)。
  */
 #include <emscripten.h>
