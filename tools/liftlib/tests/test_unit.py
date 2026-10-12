@@ -446,7 +446,39 @@ def t15():
           % (st1["unsupported"], st2["unsupported"], st3["unsupported"]))
 
 
+def t16():
+    """[HB-H3 / #93] iargs: 整数引数 (rdx/r8/r9) 脱落の機械検出と復元 (OTT, RetDec raw .ll)。
+
+    - 検出: AudioEffect ctor の委譲 (function_180127550 は rcx のみ, 機械語は r8/r9 まで素通し) を含む
+      define 15 / call site 15 を検出する (実測値)。
+    - 復元: 復元後は再走査で 0 / 0。ctor の呼出しが (this, audioMaster, 1, 20) になる。
+    - 冪等: 2 回流しても変化なし。
+    """
+    raw = os.path.join(T, "m6/work/ott.drc.ll")
+    if not os.path.exists(raw):
+        print("T16 skip (OTT raw .ll 無し)")
+        return
+    from liftlib.passes import iargs
+    img = Image(OTT_DLL)
+    text, _ = base.run_base(open(raw).read(), base.make_args())
+    mod = IR.Module.parse(text)
+    pre = iargs.scan(mod, img)
+    assert len(pre["define_short"]) == 15 and len(pre["sites_short"]) == 15, (len(pre["define_short"]), len(pre["sites_short"]))
+    assert ("function_180127550", 1, 4) in pre["define_short"], pre["define_short"]
+    st, lg = {}, []
+    iargs.run(mod, img, lg, st)
+    post = iargs.scan(mod, img)
+    assert not post["define_short"] and not post["sites_short"], post
+    ctor = [l for l in mod.func("function_18011d400").blocks[0].lines if "@function_180127550(" in l]
+    assert len(ctor) == 1 and "(i64 %arg1, i64 %arg2, i64 1, i64 20)" in ctor[0], ctor
+    st2, lg2 = {}, []
+    iargs.run(mod, img, lg2, st2)
+    assert not st2.get("define_fixed") and not st2.get("sites_fixed"), st2
+    print("T16 ok (iargs: define %d / site %d 検出 → 復元 define_fixed=%d sites_fixed=%d site_unbound=%d, 再走査 0/0, 冪等)"
+          % (len(pre["define_short"]), len(pre["sites_short"]), st["define_fixed"], st["sites_fixed"], st.get("site_unbound", 0)))
+
+
 if __name__ == "__main__":
-    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15):
+    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16):
         f()
     print("ALL UNIT TESTS PASS")
