@@ -37,6 +37,16 @@
 
 **pthread (emcc)**: 4×1M atomic add = 4,000,000 一致、spawn+join 31.8 ms、cond RTT 19 µs、`instantiateWasm` による Module 注入と worker 共有 OK。
 
+**RT-2 本番 pthread ビルドの boot e2e (#120)** — 既知類型との関係: 該当なし (lift 無し・shim C + emcc のみ)。検証起点 HEAD `bfd0ea0` (コミット済み内容で実行)、emcc 6.0.12 / Chrome 154.0.8037.97 / 4 コア runner。
+- **確定フラグ** (`prod/flags.sh`): `-pthread -sPROXY_TO_PTHREAD -sPTHREAD_POOL_SIZE=12 -sALLOW_MEMORY_GROWTH=1 -sGROWABLE_ARRAYBUFFERS=2 -sMODULARIZE -sEXPORT_ES6 -sENVIRONMENT=web,worker -sEXIT_RUNTIME=1 -sERROR_ON_UNDEFINED_SYMBOLS=1`。`-O1`、shim は `tools/shim/src/*.c`。
+- **ビルド**: `bash tools/runtime/prod/build_pthread.sh` (1.8 s、wasm 65,806 B / glue 156,753 B)。`/opt/emsdk` のキャッシュが読み取り専用の環境では `EM_CACHE` を `$RUNNER_TEMP/em_cache` へ複製して自動回避 (なければ `PermissionError: .../cache/js_output.lock`)。
+- **経路**: Worker 内 `fetch → compileStreaming` で得た Module を glue の `instantiateWasm` フックへ注入 (`createEmscriptenPthreadModule`, `loader_boot.ts`)。glue は同じ Module を pthread Worker へ配る。`mt-boot` ドライバが 8 項目を検証: crossOriginIsolated / 注入が 1 回だけ使われた / メモリが shared+growable SAB / main が pthread 上で動作 (PROXY_TO_PTHREAD) / shim MT 自己テスト ALL PASS / 4 スレッド×1M atomic add = 4,000,000 / 192 MiB malloc(grow) を別 pthread から読めた / exit code 0。
+- **配信**: `stage_wasm.mjs` が wasm と glue を `mt-boot.<sha256 先頭 12 桁>.{wasm,mjs}` で配置し、glue 内の自己名・wasm 名参照を hash 名へ置換 (pthread Worker 起動が hash 名 glue を指す)。`.br` (brotli q11) を隣に生成し、dev/preview サーバが `Accept-Encoding: br` に `Content-Encoding: br` で応答。wasm 65,806 → 22,040 B、glue 156,753 → 35,498 B。e2e は `decodedBodySize == manifest.bytes` かつ `transferSize(22,340) < 展開後` を検査。
+- **e2e 実測** (`bfd0ea0` で `pnpm runtime:e2e` 系を各 3 回、各回ビルド込みの全体 3.22〜3.36 s、load average 1.09〜1.33、直列 1 本): dev / `--prod` / `--cache=cacheapi --compile=bytes` すべて **FAIL 0 / OK 10 / ALL OK** (9/9 回)。mt-boot の fetch+compile 5.0〜13.5 ms、run-to-exit 258.8〜308.8 ms、total 264.5〜314.2 ms。pump p50 0.0051 ms / p99 0.9802 ms (n=2000、dev、load 1.88)。OK 10 の内訳は mt-boot 関連 4 + crossOriginIsolated + state の計 6 + pump 4 (M1/M6/M10/M11 は素材無しで 0)。
+- **ネガティブコントロール** (`node tools/runtime/e2e.mjs --neg` = カウンタを非 atomic にした版): counter=1,358,511 / 1,683,852 (2 回) で `4 thread x 1M` チェックが FAIL、exit 1。通常実行へ復帰して ALL OK (成果物が混入しない)。
+- **踏んだ落とし穴**: glue (`.mjs`) は pthread Worker のスクリプトにもなる。`vite preview` では独自ミドルウェアが `preview.headers` より先に応答するため、`COEP: require-corp` を付けないと `--prod` だけ Worker がロード失敗 (`Uncaught [object Event]`)。`wasmAssets` が COOP/COEP/CORP を明示付与するよう修正。本番 R2 でも glue に COEP/CORP を付ける必要がある (RT-7 の入力)。
+- **範囲外 (未検証)**: 実 FLEngine の lift 成果物ではなく **shim MT の自己テスト main** での boot。この run には `work-m11` / `work-liftdiff` が無く、既存 M1/M6/M10/M11 の e2e は **stage 時に skip** (回帰比較は未実施 = 下記未解決)。Firefox/Safari 未測定。
+
 **その他の確定事実**: AudioWorklet 内で `Atomics.wait` は TypeError (消費専用)、Worker 内 OffscreenCanvas(WebGL2/2D/rAF)・OPFS sync handle・nested Worker すべて可、`Memory.toResizableBuffer` あり、JSPI あり、shared wasm32 4GiB / memory64 8GiB grow 可。
 
 ## 設計上の要点 (実装済み)
@@ -48,7 +58,9 @@
 ## 未解決・ブロッカー
 1. **Firefox / Safari 未測定** (環境に Chrome のみ): memory64・JSPI・threads・OffscreenCanvas の互換マトリクスは Chrome のみ。
 2. **実 FL サイズ wasm が未生成** → 合成 (≤52 MiB) からの外挿 (推定)。実測は FLEngine lift 完成後。
-3. 本番 pthread ビルド (shim MT + emcc glue + 本ローダ) の boot e2e は未実施 (spike で個別要素は実証)。
+3. 本番 pthread ビルドの boot e2e は **shim MT 自己テスト main で実証済み (#120)**。残: 実 FLEngine lift を同フラグでビルドした boot (起票先: #227 ICALL-1 / RT-10)。
+3b. この run は `work-m11` 無しで M1/M6/M10/M11 の既存 e2e が skip された。`oc_artifacts: fl-win64 work-m11` で再実行し、本変更後も 4 本が ALL OK のままか確認 (起票先: #120 に再検証コメント / PM 判断)。
+3c. 本番 R2 配信では glue (.mjs) にも COOP/COEP/CORP を付ける必要 (起票先: RT-7)。
 4. ヘッドレス WebGL2 は SwiftShader。実 GPU/OffscreenCanvas の fps は未測定。
 5. Memory 個数上限 ~125 とプラグイン=1 Memory 方針の整合 (遅延ロード/統合が必要)。
 6. Memory64 性能の定量は共有 VM 上でノイズ大。
@@ -82,6 +94,7 @@ bash tools/runtime/bench/build_ott_variants.sh && bash tools/runtime/bench/build
 bash tools/runtime/bench/build_asyncify.sh && node tools/runtime/bench/asyncify_cost.mjs
 bash tools/runtime/spike/build_pump_spike.sh && node tools/runtime/spike/run_pump_spike.mjs
 node tools/runtime/spike/run_pthread_test.mjs
+bash tools/runtime/prod/build_pthread.sh && pnpm runtime:e2e      # RT-2 (e2e が毎回ビルド。--neg でネガティブコントロール、EMSDK_ENV で emsdk 指定)
 python3 tools/runtime/bench/make_big_wasm.py <in.wasm> <out.wasm> <K> && node tools/runtime/bench/run_compile_bench.mjs
 ```
 (PATH に node が必要: `export PATH=$HOME/.local/share/pnpm/bin:$PATH`)

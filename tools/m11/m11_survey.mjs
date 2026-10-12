@@ -16,13 +16,16 @@ const res = { ok: 0, noproc: 0, miss: 0, trap: 0 };
 const kinds = {}, topFrames = {}, halted = [];
 const sp0 = mod._emscripten_stack_get_current();
 const first = [];
+const perUnit = [];
 for (let i = 0; i < 942; i++) {
   try {
     const r = mod._m11_call_unit(i);
+    perUnit.push(r === 1 ? 'ok' : r === 0 ? 'noproc' : r === 2 ? 'miss' : 'r' + r);
     if (r === 1) res.ok++; else if (r === 0) res.noproc++; else if (r === 2) res.miss++;
   } catch (e) {
     res.trap++;
     let k;
+    perUnit.push('trap');
     if (e && e.m11_dllmain_done !== undefined) { k = 'halt0->longjmp (unit が Halt を呼んだ)'; halted.push('0x' + mod._m11_unit_va(i).toString(16)); }
     else k = ((e && e.message) || String(e)).split('\n')[0];
     kinds[k] = (kinds[k] || 0) + 1;
@@ -32,6 +35,7 @@ for (let i = 0; i < 942; i++) {
     mod.__emscripten_stack_restore(sp0);
   }
 }
+if (process.env.M11_SURVEY_UNITS) fs.writeFileSync(process.env.M11_SURVEY_UNITS, JSON.stringify(perUnit));
 const ff = {};
 for (const l of errs) { const m = /unresolved function call: (\S+)/.exec(l); if (m) ff[m[1]] = (ff[m[1]] || 0) + 1; }
 const stubs = [];

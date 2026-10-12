@@ -32,7 +32,8 @@ async function boot(msg: Extract<ToWorker, { t: "boot" }>): Promise<void> {
   const { module, resource } = await fetchCompile(url, {
     cacheMode: msg.opts.cacheMode,
     compile: msg.opts.compile,
-    onProgress: (l, t) => progress("fetch", l, t || msg.entry.bytes),
+    // 事前圧縮配信 (br) では content-length が圧縮後サイズで loaded (展開後) と単位が違うため展開後サイズを分母にする
+    onProgress: (l, t) => progress("fetch", l, msg.entry.encoding ? msg.entry.bytes : t || msg.entry.bytes),
   });
   const tCompiled = performance.now();
   progress("compile", 1, 1, true);
@@ -43,7 +44,8 @@ async function boot(msg: Extract<ToWorker, { t: "boot" }>): Promise<void> {
   if (!driver) throw new Error(`driver '${msg.entry.program}' 未登録`);
   progress("run", 0, 1, true);
   const tRun = performance.now();
-  const result = await driver({ module, entry: msg.entry, log });
+  const glueUrl = msg.entry.glue ? new URL(msg.entry.glue, msg.baseUrl).href : undefined;
+  const result = await driver({ module, entry: msg.entry, glueUrl, log });
   const tEnd = performance.now();
   progress("run", 1, 1, true);
 

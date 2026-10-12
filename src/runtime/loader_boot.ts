@@ -128,6 +128,54 @@ export function initEmscripten(exports: WebAssembly.Exports): string[] {
   return done;
 }
 
+export type EmscriptenModuleLike = {
+  wasmMemory?: WebAssembly.Memory;
+  HEAPU8?: Uint8Array;
+  [k: string]: unknown;
+};
+
+export type EmscriptenPthreadHandle = {
+  mod: EmscriptenModuleLike;
+  /** onExit (EXIT_RUNTIME=1 で PROXY_TO_PTHREAD の main が戻ったとき) の exit code */
+  exited: Promise<number>;
+  /** instantiateWasm フックが呼ばれた回数 (注入経路が使われたことの検証用) */
+  injectCalls: () => number;
+};
+
+/**
+ * emcc の pthread glue (MODULARIZE + EXPORT_ES6) を、自前で compile 済みの Module を注入して起動する。
+ * - `instantiateWasm` フックで glue の fetch/compile を迂回 (compileStreaming 済み Module を使う)。
+ *   glue は同じ Module を pthread Worker へ postMessage で配る (再 compile なし)。
+ * - pthread Worker は glue 自身が `new Worker(new URL(<glue>, import.meta.url))` で起こす (ネスト Worker)。
+ * - glue URL は hash 名の .mjs。呼び出し側 (Worker) から動的 import する。
+ */
+export async function createEmscriptenPthreadModule(
+  glueUrl: string,
+  module: WebAssembly.Module,
+  hooks: { print: (s: string) => void; printErr: (s: string) => void; timeoutMs?: number },
+): Promise<EmscriptenPthreadHandle> {
+  const glue = (await import(/* @vite-ignore */ glueUrl)) as { default: (m: Record<string, unknown>) => Promise<EmscriptenModuleLike> };
+  let injects = 0;
+  let resolveExit!: (c: number) => void;
+  let rejectExit!: (e: Error) => void;
+  const exited = new Promise<number>((res, rej) => { resolveExit = res; rejectExit = rej; });
+  exited.catch(() => {});
+  const timer = setTimeout(() => rejectExit(new Error(`[emscripten] ${hooks.timeoutMs ?? 60000}ms 以内に exit せず`)), hooks.timeoutMs ?? 60000);
+  void exited.finally(() => clearTimeout(timer)).catch(() => {});
+  const mod = await glue.default({
+    print: hooks.print,
+    printErr: hooks.printErr,
+    instantiateWasm: (imports: WebAssembly.Imports, done: (i: WebAssembly.Instance, m: WebAssembly.Module) => void) => {
+      injects++;
+      WebAssembly.instantiate(module, imports).then((inst) => done(inst, module), (e) => rejectExit(e as Error));
+      return {};
+    },
+    onExit: (c: number) => resolveExit(c),
+    onAbort: (w: unknown) => rejectExit(new Error(`[emscripten] abort: ${String(w)}`)),
+  });
+  return { mod, exited, injectCalls: () => injects };
+}
+
 /** manifest 生成側と同じ: import/export 数の概算 (起動ログ用) */
 export function describeModule(module: WebAssembly.Module): { imports: number; exports: number; unresolvedKinds: Record<string, number> } {
   const kinds: Record<string, number> = {};

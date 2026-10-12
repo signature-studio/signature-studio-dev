@@ -6,6 +6,7 @@
 #   bash tools/m11/m11_e2e.sh           # work/ の成果物があれば再利用 (無ければ自動で全再生成), build は増分
 #   bash tools/m11/m11_e2e.sh --full    # RetDec lift から全再生成 (scan→bounds→lift 4chunk→tail 固定点→IR→build; 約 10 分)
 #   bash tools/m11/m11_e2e.sh --trace   # icall / unit init のトレースを stderr に出す
+#   M11_LB_BASE=0x10000 bash tools/m11/m11_e2e.sh   # LVA = RVA + 0x10000 (#222; 既定 0 = 従来 LVA=RVA). 変更時は --full 推奨 (IR の VA→LVA remap が変わる)
 # 前提: /opt/emsdk, /opt/retdec, node(v26: ~/.local/share/pnpm/bin), analysis/win64/extracted/block00031_PE.bin
 set -u
 cd "$(dirname "$0")"
@@ -42,10 +43,19 @@ if [ $FULL = 1 ] || [ $need_lift = 1 ]; then
     run "gen_ir2 #$it" bash m11_gen_ir2.sh
   done
 else
-  [ -f work/boot_final.ll ] || run "gen_ir2" bash m11_gen_ir2.sh
+  # #222: IR の VA→LVA remap は M11_LB_BASE 依存。stamp が違えば lift 成果物 (LB 非依存) から IR だけ再生成
+  if [ ! -f work/boot_final.ll ] || [ "$(cat work/ir_lb_base.stamp 2>/dev/null)" != "${M11_LB_BASE:-0}" ]; then
+    run "gen_ir2 (M11_LB_BASE=${M11_LB_BASE:-0})" bash m11_gen_ir2.sh
+  fi
 fi
+echo "${M11_LB_BASE:-0}" > work/ir_lb_base.stamp
+if [ "$(cat work/img_lb_base.stamp 2>/dev/null)" != "${M11_LB_BASE:-0}" ]; then rm -f work/m11_data.c work/m11_image.bin; fi
+echo "${M11_LB_BASE:-0}" > work/img_lb_base.stamp
 [ -f work/m11_data.c ] || run "m11_data_gen" python3 m11_data_gen.py
 [ -f work/m11_image.bin ] || run "m11_image_gen" python3 m11_image_gen.py
+if python3 -c 'import pefile' 2>/dev/null; then  # #222: LB_BASE 適用の静的検査 (M11_LB_BASE 未指定 = 0 では reloc 値のみ検査)
+  run "lb_check (M11_LB_BASE=${M11_LB_BASE:-0})" python3 lb_check.py "$PE" work/m11_image.bin "${M11_LB_BASE:-0}"
+fi
 run "build (emcc 増分)" bash m11_build.sh
 
 if [ ! -f work/m11_boot.cjs.wasm ]; then

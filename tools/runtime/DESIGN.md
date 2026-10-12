@@ -106,6 +106,7 @@ Worker "fl-runtime" ── wasm インスタンス = Win32 UI スレッド ─�
 
 ### 2.4 pthread (`spike/pthread_test.c`, `run_pthread_test.mjs`)
 `-pthread -sPROXY_TO_PTHREAD -sPTHREAD_POOL_SIZE=6 -sEXIT_RUNTIME -sMODULARIZE -sEXPORT_ES6` がヘッドレス Chrome で完走: 4 スレッド×1M `atomic_fetch_add` = **4,000,000 (一致)**、4 スレッド spawn+join 31.8ms (プール事前確保)、`pthread_cond` ping-pong RTT **19.0µs**、`emscripten_num_logical_cores`=16。`Module.instantiateWasm` で自前 compileStreaming した Module を注入し、worker 側にも共有された (`injectedModule: true`)。→ 本番 FL ビルド (`tools/shim` MT 経路) はこの glue を採用し、boot.ts の compile 経路を `instantiateWasm` から差し込む。
+**RT-2 (#120) で確定**: フラグは `tools/runtime/prod/flags.sh` (`-sGROWABLE_ARRAYBUFFERS=2` を含む)、注入は `loader_boot.ts` `createEmscriptenPthreadModule`、配信は hash 名 + brotli 事前圧縮 (`stage_wasm.mjs`)。glue (.mjs) は pthread Worker スクリプトでもあるため hash 名へ書換え、COEP/CORP を付けて配信する。実測は REPORT.md。
 
 ### 2.5 同期/非同期の橋渡し方針 (下流)
 OPFS は Worker 内 `createSyncAccessHandle` が同期で使える (実測) → VFS は OPFS 同期ハンドルを第一候補。ネットワーク/IDB を要する場合のみ JSPI または補助 Worker + `Atomics.wait` の sync-RPC。
@@ -144,7 +145,7 @@ e2e (`pnpm runtime:e2e`): stage → Vite dev (COOP/COEP) → headless Chrome →
 ## 5. 未解決・要確認
 1. Firefox / Safari の memory64・JSPI・threads・OffscreenCanvas は**未測定** (環境に Chrome のみ)。
 2. 実 FL サイズ (22MiB PE × lift 膨張) の wasm は未生成 — 合成スケール試験 (≤52MiB) からの外挿のみ。
-3. 本番 FL ビルドを pthread 化した状態での boot e2e (shim MT + glue + 本ローダ) は未実施。
+3. 本番 FL ビルドを pthread 化した boot e2e: shim MT 自己テストでは実証済み (RT-2 #120, 実測は REPORT.md)。実 FLEngine lift での確認は未実施。
 4. ヘッドレス WebGL2 は SwiftShader。実 GPU での OffscreenCanvas 性能は未測定。
 5. Memory 個数上限 (~125) と「プラグイン=1 Memory」方針の整合 (§1.4)。
 6. 性能ベンチは共有 VM 上 (load 9–20)。メモリ64 の定量は静かな機で再測が必要。

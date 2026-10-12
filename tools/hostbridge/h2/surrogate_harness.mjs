@@ -210,7 +210,8 @@ ck('G1f vstVersion=2400 category=1 vendorVersion = native (op49) と一致', I.v
   const got = host.outBits(au);
   const natCalls = NAT['h2_full']['calls'];
   const natHex = natCalls[natCalls.length - 2]['out'];
-  const nat = Array.from(new Uint32Array(Buffer.from(natHex, 'hex').buffer));
+  const natBuf = Buffer.from(natHex, 'hex');
+  const nat = Array.from(new Uint32Array(natBuf.buffer.slice(natBuf.byteOffset, natBuf.byteOffset + natBuf.length)));
   let eq = 0; for (let i = 0; i < got.length; i++) if (got[i] === nat[i]) eq++;
   const f = new Float32Array(new Uint32Array(got).buffer);
   const nz = [...f].filter((v) => v !== 0 && !Number.isNaN(v)).length;

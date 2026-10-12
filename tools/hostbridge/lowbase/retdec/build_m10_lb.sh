@@ -5,7 +5,9 @@
 #   env: LB_BASE(0x10000) LB_INIT_MIB(24) LB_MAX_MIB(64) LB_PREFIX('') LB_OUT LB_NAME(ott_hb)
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; LB="$HERE/.."; T="$LB/../.."
-M6="$T/m6"; M8="$T/m8"; M9="$T/m9"; M10="$T/m10"; HB="$T/hostbridge"; DLL=/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll
+M6="$T/m6"; M8="$T/m8"; M9="$T/m9"; M10="$T/m10"; HB="$T/hostbridge"
+source "$T/shared/env.sh"
+DLL="$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll"
 LB_BASE="${LB_BASE:-0x10000}"; LB_INIT_MIB="${LB_INIT_MIB:-24}"; LB_MAX_MIB="${LB_MAX_MIB:-64}"; LB_PREFIX="${LB_PREFIX:-}"
 OUT="${LB_OUT:-$LB/work/m10_$LB_BASE}"; NAME="${LB_NAME:-ott_hb}"; SRC="$OUT/src"
 mkdir -p "$SRC"
@@ -24,9 +26,9 @@ done
 sed -i 's/#define HB_ARENA 0x30400000u/#define HB_ARENA LB_ARENA_ADDR/' "$SRC/plugin_ott_entry.c"
 grep -q 'HB_ARENA LB_ARENA_ADDR' "$SRC/plugin_ott_entry.c" || { echo "plugin_ott_entry.c: HB_ARENA 定義が変わった (要追従)" >&2; exit 1; }
 python3 "$LB/x64c/lb_data_gen.py" "$DLL" "$SRC/m6_data.c" - "$LB_BASE" --m6 | tail -1
-EXPORTS=$(python3 - <<'PYEOF'
-import re
-src=open('m6_build.sh').read() if False else open('/home/ubuntu/work/webstudio/tools/m6/m6_build.sh').read()
+EXPORTS=$(python3 - "$M6/m6_build.sh" <<'PYEOF'
+import re, sys
+src=open(sys.argv[1]).read()
 print(re.search(r'-sEXPORTED_FUNCTIONS=(\S+)', src).group(1))
 PYEOF
 )

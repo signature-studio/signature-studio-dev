@@ -5,7 +5,8 @@
 # Phase B のみ (CreatePlugInstance → ctor 連鎖) を実行して trap 直前の到達点を出す。
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
-T=/home/ubuntu/work/webstudio
+source "$HERE/../../../shared/env.sh"
+T="$REPO_ROOT"
 FW="$T/tools/plugins/framework"
 W="$T/tools/plugins/work/hs/dbg"
 WHS="$T/tools/plugins/work/hs"

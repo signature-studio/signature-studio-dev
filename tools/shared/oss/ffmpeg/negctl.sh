@@ -6,7 +6,7 @@
 #   3) WAV の PCM データ 1 サンプルを +1 -> 復号 PCM hash 不一致 (検出)
 # usage: bash oss/ffmpeg/negctl.sh (事前に bash oss/ffmpeg/build.sh)
 set -euo pipefail
-PATH="/home/ubuntu/.local/share/pnpm/bin:$PATH"
+PATH="$HOME/.local/share/pnpm/bin:$PATH"
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; ROOT="$HERE/../.."
 B="$ROOT/work/build/ffmpeg"
 FLAC="$ROOT/work/build/flac/negctl/ok.flac"

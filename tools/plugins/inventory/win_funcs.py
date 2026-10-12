@@ -19,7 +19,9 @@ sys.path.insert(0, os.path.join(HERE, '..', '..', 'icall', 'disp_size'))
 import dispfix as DF
 WORK = os.path.join(HERE, '..', 'work')
 OUTD = os.path.join(WORK, 'winfuncs')
-EXT = '/home/ubuntu/work/analysis/win64/extracted'
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'shared'))
+from paths import FL_WIN64_DIR  # noqa: E402
+EXT = os.path.join(FL_WIN64_DIR, 'extracted')
 # CAB-229 (D9): capstone の disp_size は 66 prefix 付き disp32 で 2 を返す。補正は opt-in (WINFUNCS_DISPFIX=1)。
 # 既定 OFF の理由: ここで出すハッシュは framework/fw_prep.py (CAB-194 稼働中・編集禁止) が同一規約で再計算して
 # work/fw_hash_counts.json と突合するため、片側だけ規約を変えると framework 判定が静かに縮む。移行手順は icall/disp_size/REPORT.md §5。

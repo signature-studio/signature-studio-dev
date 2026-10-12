@@ -18,7 +18,9 @@ from capstone import Cs, CS_ARCH_X86, CS_MODE_64
 from capstone.x86 import X86_OP_MEM, X86_REG_RIP
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-EXT = '/home/ubuntu/work/analysis/win64/extracted'
+sys.path.insert(0, os.path.join(HERE, '..', '..', 'shared'))
+from paths import FL_WIN64_DIR  # noqa: E402
+EXT = os.path.join(FL_WIN64_DIR, 'extracted')
 BALANCE = 18983
 MD = Cs(CS_ARCH_X86, CS_MODE_64)
 MD.detail = True

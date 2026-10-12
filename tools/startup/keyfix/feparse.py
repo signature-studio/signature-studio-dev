@@ -9,9 +9,11 @@
 
 入力は読取専用: analysis/win64/extracted/block00031_PE.bin (FLEngine_x64.dll 22,227,016 B)
 """
-import struct, os, json, bisect
+import struct, os, sys, json, bisect
 
-PE_PATH = '/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin'
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'shared'))
+from paths import FL_WIN64_DIR  # noqa: E402
+PE_PATH = os.path.join(FL_WIN64_DIR, 'extracted', 'block00031_PE.bin')
 
 _IMAGE_BASE = None
 _SECTIONS = None
