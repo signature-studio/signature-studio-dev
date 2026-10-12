@@ -445,3 +445,39 @@ V==H (it=6)、cubic との差の定量化、GetBufSize 実測。
 - `shim/test/resize_oracle.c`: GetBufSize 族に it=5/6/7 (1,800 ケース) を追加
 - `shim/verify_cab274_kernel.py` (新規, 独立再計算)、`work/resize/probe274/` (flat/spk2d/imp2d/ksweep/gbs probe)
 - spike ログ `work/resize/swv6.txt` (it=6 V-pass)、`ksw{4,5,6,7}.txt` (2D インパルス) は gitignore (再生成コマンドはスクリプト docstring)
+
+## 環境パス置換 (#364, 親 #294・先行 #312): /home/ubuntu 絶対パスを tools/shared へ
+
+既知類型との関係 (DEFECTS.md): 該当なし (パス参照の置換のみ)。
+
+### 変更
+
+`tools/ipp/shim` の `/home/ubuntu` 参照 10 行 (work/ 除く) を置換。既定値は従来と同一 (`tools/shared/env.sh` の `ANALYSIS_DIR=/home/ubuntu/work/analysis` → `FL_WIN64_DIR=$ANALYSIS_DIR/win64`)。
+
+| ファイル | 置換 |
+|---|---|
+| `shim_e2e.sh` `fft/fft_e2e.sh` `test/resize_oracle_run.sh` `test/fill3_oracle_run.sh` | `source "$IPP/../shared/env.sh"` + `DLL="$FL_WIN64_DIR/extracted/block24356_PE.bin"` |
+| `sigscan.py` | `tools/shared/paths.py` の `FL_WIN64_DIR` から `EXT` を組む |
+| `test/{fill3_oracle,resize_oracle,sp57,sweep2,verify_cab262_quirks}.c` | 新規 `test/fl_dll_path.h` の `fl_ipp_dll_path()` (`getenv("FL_WIN64_DIR")` + `/extracted/block24356_PE.bin`。未設定は exit 2)。C 単体ビルドは `source tools/shared/env.sh` 後に実行する |
+
+### 検証 (検証起点 `origin/main` = 1353c62、素材は `fl-win64` のみ)
+
+- 受入条件 1: `grep -rn '/home/ubuntu' tools/ipp/shim --include=*.sh --include=*.py --include=*.json --include=*.ts --include=*.mjs --exclude-dir=work | wc -l` → 0 (`--include` を付けず REPORT 以外の全ファイルでも 0)。
+- 受入条件 2: 置換前 (`origin/main` の detached worktree) と置換後を gcc でビルドし、DLL を開くパスを `strace -e trace=openat` で採取。
+  置換前は `/home/ubuntu/work/analysis/win64/extracted/block24356_PE.bin` (symlink → `$RUNNER_TEMP/fl-win64`)、置換後は `$FL_WIN64_DIR/extracted/block24356_PE.bin` を開く。
+  3 バイナリ (`verify_cab262_quirks` `resize_oracle` `fill3_oracle`) 全て、置換前後で同一ファイル内容を参照。env 未設定時の既定値は `paths.py` が `/home/ubuntu/work/analysis/win64/extracted` を返す (置換前の固定値と同一)。
+- 出力比較: `resize_oracle` (25 行・sha256 先頭 12 桁 18ef187dc344) と `fill3_oracle` (7 行・63f77eb814f9) の stdout は 1 行目 (`--dump` 出力先パス) を除き置換前後で `cmp` 一致。
+  **ただし 3 本とも実 DLL の初期化 (`ippSetCpuFeatures(~0)` の AVX-512 経路) で `Illegal instruction`** (Runner = AMD EPYC 7763、`/proc/cpuinfo` の avx512 フラグ 0 件)。
+  上記一致は SIGILL までの出力の一致で、オラクル本体の比較結果 (mismatch 数) は **未検証**。
+- ネガティブコントロール: `FL_WIN64_DIR=/nonexistent` → `/nonexistent/extracted/block24356_PE.bin: No such file or directory` (rc=1)。`FL_WIN64_DIR` 未設定 → `fl_ipp_dll_path` が exit 2。
+- 構文: `bash -n` 5 本・`py_compile` `sigscan.py`・gcc ビルド 3 本 OK。
+- 所要: ビルド + 実行 各 1 秒未満。load average 0.20–0.27 (1 分値)、直列。
+
+### 検証範囲 / 範囲外 / 未解決
+
+範囲外: `shim_e2e.sh` `fft_e2e.sh` `*_oracle_run.sh` の通し実行 (emcc = `toolchain-emsdk` と `work-liftlib` 等の生成物が要る)、`sigscan.py` の実行 (`work/win_refs.json` が要る。`EXT` 定義行のみ確認)、`sp57.c` `sweep2.c` (ビルド・実行せず置換行のみ)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| AVX-512 非対応 Runner で実 DLL オラクルが SIGILL (mismatch 数を再現できない) | 本 PR の before/after が出力同一性まで | #294 にコメント (AVX-512 対応 Runner か `ippSetCpuFeatures` を絞った実行が必要) |
+| shim_e2e.sh 通し実行を `oc_artifacts: fl-win64 toolchain-emsdk work-liftlib` 付きで未実施 | 置換行以外の挙動は未検証 | 本 PR のレビュー run |

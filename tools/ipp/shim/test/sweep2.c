@@ -1,6 +1,7 @@
 /* CAB-261: it 別の位相スイープ。dst 行全体を記録し、書込のある dst 位置の重みを使う。 */
 #define _GNU_SOURCE
 #include "../../ref/pe_load.h"
+#include "fl_dll_path.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -14,7 +15,7 @@ static void *ex(const char *n) { void *p = pe_export(&pe, n); if (!p) { fprintf(
 static uint8_t src[SZN * SZN], dst[SZN * SZN], pbuf[1 << 22];
 int main(int argc, char **argv) {
   setvbuf(stdout, NULL, _IONBF, 0);
-  if (pe_load("/home/ubuntu/work/analysis/win64/extracted/block24356_PE.bin", &pe)) return 1;
+  if (pe_load(fl_ipp_dll_path(), &pe)) return 1;
   ((F_SetCpu)ex("ippSetCpuFeatures"))(~0ULL);
   F_RSP rsp = (F_RSP)ex("ippiResizeSqrPixel_8u_C1R");
   int it = argc > 1 ? atoi(argv[1]) : 7;
