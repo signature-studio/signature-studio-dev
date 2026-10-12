@@ -1,13 +1,14 @@
 name: OpenCode
 
 on:
-  # Issues/PR に `/oc` または `/opencode` コマンドが投稿されたとき
-  # `oc_actions_allow_write` を含む場合のみコンテンツ書き込み可
+  # Issues/PR に `/oc` または `/opencode` コマンドが投稿されたとき。
+  # 本文に `oc_actions_allow_write` を含む場合のみコンテンツ書き込み可。
+  # 実行可否の確定判定は prepare-event-context.sh (行頭アンカーの正規表現)。
   issue_comment:
     types: [created]
-  # PR が Open になったとき → レビュワーエージェントが起動
+  # PR が Open / 更新 / 再オープンされたとき → レビュワーエージェントが起動
   pull_request:
-    types: [opened]
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
     inputs:
       prompt:
@@ -16,11 +17,27 @@ on:
         required: true
       opencode-version:
         type: string
-        description: 'pin an opencode CLI version (empty = the default pinned in scripts/install-opencode.sh)'
+        description: 'pin the opencode CLI version for the npm channel (empty = the default in scripts/install-opencode.sh)'
+        required: false
+        default: ''
+      opencode-release-version:
+        type: string
+        description: 'pin the opencode release tag for the GitHub Releases channel (empty = the default)'
+        required: false
+        default: ''
+      opencode-install-source:
+        type: string
+        description: 'auto | releases | npm'
         required: false
         default: ''
 
-# 同一 PR/issue での並行実行は最新のみ
+# すべての GitHub API 認証は
+# actions/create-github-app-token が発行する App installation token が担う。
+# したがって GITHUB_TOKEN の権限は最小のまま (job 単位で拡大しない)。
+permissions: {}
+
+# 同一 PR/issue での並行実行は直列化する。cancel-in-progress は false:
+# 実行中のエージェントを push で中断すると作業内容が失われる。
 concurrency:
   group: opencode-${{ github.event.pull_request.number || github.event.issue.number || github.ref }}
   cancel-in-progress: false
@@ -29,23 +46,48 @@ jobs:
   implement:
     # 実装エージェント: issue_comment (/oc) または workflow_dispatch で起動。
     # PR 上の /oc コメントは conflict 解消などの追加作業。
+    #
+    # この if: は費用対効果のための粗い前フィルタにすぎない。contains() は部分一致
+    # なので `/ocean` にも発火しうる。確定判定は prepare-event-context.sh の
+    # should_run output で、それ以降の全 step をゲートする。
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'issue_comment' &&
        (contains(github.event.comment.body, '/oc') || contains(github.event.comment.body, '/opencode')))
     runs-on: ubuntu-latest
+    # opencode が暴走しても runner を既定の 6 時間は占有しない
+    timeout-minutes: 60
     env:
       # workflow_dispatch は write 権限を持つ人手による起動なので書き込み可。
       # issue_comment は本文に oc_actions_allow_write を含む場合だけ書き込み可。
+      # 式評価であり untrusted 文字列を shell に展開していないので injection はない。
+      # 値域の検証は prepare-event-context.sh が行う。
       OC_PERMISSION: >-
         ${{ (github.event_name == 'workflow_dispatch'
         || contains(github.event.comment.body, 'oc_actions_allow_write'))
         && 'write' || 'read' }}
     steps:
+      # ---------------------------------------------------------------------
+      # 1. untrusted input の隔離 (script injection / env injection の防止)。
+      #    最も安価なステップなので最初に置き、コマンド判定和外れたコメントでは
+      #    App トークン発行にも到達しない。untrusted 値は式展開で shell に埋め込まず
+      #    $GITHUB_EVENT_PATH 経由で受け取る。
+      # ---------------------------------------------------------------------
+      - name: Prepare event context
+        id: context
+        shell: bash
+        run: bash .github/scripts/prepare-event-context.sh
+
+      - name: No agent command in this comment
+        if: steps.context.outputs.should_run != 'true'
+        shell: bash
+        run: echo "::notice::the agent was not started (no /oc or /opencode command on its own line)"
+
       # 実装 App トークン。read モードでは contents:read のみ要求する
-      # (installation が write 権限を未 grant の環境でも read-only 検証が通るようにするため)
+      # (installation が write 権限を未 grant の環境でも read-only 検証が通るため)
       - uses: actions/create-github-app-token@v3
         id: app-token
+        if: steps.context.outputs.should_run == 'true'
         with:
           client-id: ${{ vars.OC_APP_CLIENT_ID }}
           private-key: ${{ secrets.OC_APP_PRIVATE_KEY }}
@@ -53,81 +95,93 @@ jobs:
           permission-issues: ${{ env.OC_PERMISSION == 'write' && 'write' || 'read' }}
           permission-pull-requests: ${{ env.OC_PERMISSION == 'write' && 'write' || 'read' }}
 
+      # persist-credentials: false — checkout の既定はローカルの extraheader に
+      # 永続 token を書き込む方式で、App トークンとは別の認証経路밍になる
+      # (credential helper より優先され、後で token を入れ替えても反映されない)。
+      # 認証は「App トークンを明示的に渡す」経路だけに統一する。
       - name: Checkout repository
+        if: steps.context.outputs.should_run == 'true'
         uses: actions/checkout@v7
         with:
           token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 0
+          persist-credentials: false
 
-      - if: ${{ env.OC_PERMISSION == 'write' }}
+      - if: steps.context.outputs.should_run == 'true' && env.OC_PERMISSION == 'write'
         id: setup-credentials
+        shell: bash
         env:
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          USER_ID=$(gh api "/users/${{ steps.app-token.outputs.app-slug }}[bot]" --jq .id)
-          git config --global user.name '${{ steps.app-token.outputs.app-slug }}[bot]'
-          git config --global user.email "${USER_ID}+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com"
+          set -euo pipefail
+          USER_ID="$(gh api "/users/${APP_SLUG}[bot]" --jq .id)"
+          git config --global user.name "${APP_SLUG}[bot]"
+          git config --global user.email "${USER_ID}+${APP_SLUG}[bot]@users.noreply.github.com"
           gh auth setup-git
 
       - name: Setup Agent Environment
+        if: steps.context.outputs.should_run == 'true'
         uses: ./.github/actions/agent-setup
         with:
           app-id: ${{ vars.OC_APP_CLIENT_ID }}
           app-private-key: ${{ secrets.OC_APP_PRIVATE_KEY }}
-          # read-only モードでは定期再発行トークンも読み取り専用に制限する
+          # read-only モードではトークンの permissions も読み取り専用に制限する
           token-permissions: ${{ env.OC_PERMISSION == 'read' && '{"contents":"read","issues":"read","pull-requests":"read"}' || '' }}
           # dispatch 入力 > repository variable > スクリプト既定の pin
           opencode-version: ${{ inputs.opencode-version || vars.OPENCODE_VERSION }}
+          opencode-release-version: ${{ inputs.opencode-release-version || vars.OPENCODE_RELEASE_VERSION }}
+          opencode-install-source: ${{ inputs.opencode-install-source || vars.OPENCODE_INSTALL_SOURCE }}
           cf-account-id: ${{ secrets.CF_ACCOUNT_ID }}
           cf-r2-access-key-id: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
           cf-r2-secret-access-key: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
 
-      # イベント文脈を $GITHUB_ENV に書く (後続 step で参照できる)
-      - name: Prepare event context
-        id: context
-        shell: bash
-        run: |
-          {
-            echo "EVENT_NAME=${{ github.event_name }}"
-            echo "PERMISSION=${{ env.OC_PERMISSION }}"
-            echo "ISSUE_NUMBER=${{ github.event.issue.number || '' }}"
-            echo "PR_NUMBER=${{ github.event.issue.number || github.event.pull_request.number || '' }}"
-            echo "COMMENT_BODY<<OCCTXEOF"
-            printf '%s' "${{ github.event.comment.body || github.event.inputs.prompt || '' }}" | head -c 20000
-            echo ""
-            echo "OCCTXEOF"
-            echo "REPO=${{ github.repository }}"
-            echo "GITHUB_REF_NAME=${GITHUB_REF_NAME}"
-          } >> "$GITHUB_ENV"
-
-      # $GITHUB_ENV の内容はこの step から見える (前行で書き出したもの)
+      # プロンプトはファイルに組み立て、step output にはパスの 1 行だけを載せる。
+      # heredoc で $GITHUB_OUTPUT に流すと delimiter injection の余地があるため。
       - name: Assemble prompt
         id: prompt
+        if: steps.context.outputs.should_run == 'true'
         shell: bash
-        run: |
-          bash .github/scripts/assemble-prompt.sh >> "$GITHUB_OUTPUT"
+        run: bash .github/scripts/assemble-prompt.sh
 
       - name: Run OpenCode (implementer)
         id: oc
+        if: steps.context.outputs.should_run == 'true'
         uses: ./.github/actions/opencode
         with:
           model: "opencode-go/step-5-preview-free"
           agent: build
           auth-export: ${{ secrets.OC_AUTH_EXPORT }}
-          prompt: ${{ steps.prompt.outputs.prompt }}
+          prompt-file: ${{ steps.prompt.outputs.prompt_file }}
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
 
   review:
-    # レビュワーエージェント: PR opened で起動。Approve/Deny し、
-    # Auto Merge が使えない場合は Cognos がマージまで実行する。
-    if: ${{ github.event_name == 'pull_request' }}
+    # レビュワーエージェント: PR opened / synchronize / reopened で起動し、
+    # approve/request-changes を出したうえで必要ならマージまで行う。
+    #
+    # fork PR ガード: pull_request イベントでは fork 由来の PR に secrets が渡らない
+    # (OC_APP_PRIVATE_KEY 等が空)。App トークン生成は private-key が必須なので、
+    # ガードが無いと fork PR は最初の token step で必ず失敗する。checkout が
+    # head.ref を origin に要求するのも fork では成立しない。よって同一 repo の
+    # PR だけを受ける (fork PR のレビューは人手)。
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
+      # PR のタイトル・本文・diff はすべて untrusted。式展開で run に埋め込まず、
+      # $GITHUB_EVENT_PATH から jq で取り出してファイルに隔離する。
+      - name: Prepare PR context
+        shell: bash
+        env:
+          OC_PERMISSION: write
+        run: bash .github/scripts/prepare-event-context.sh
+
       # レビュワーは実装 App と別アイデンティティの方が approve できる
-      # (同一 App は自分自身の PR を approve できない)。
-      # OC_REVIEW_APP_CLIENT_ID / OC_REVIEW_APP_PRIVATE_KEY が未設定・失敗時は
-      # 実装 App を使う (この場合 approve はできず comment+merge のみ)
+      # (同一 App は自分が作った PR を approve できない)。
+      # reviewer App が未設定・失敗時は実装 App にフォールバックする。
       - uses: actions/create-github-app-token@v3
         id: app-token
         with:
@@ -146,19 +200,36 @@ jobs:
           permission-contents: write
           permission-pull-requests: write
 
+      # continue-on-error で飲みえている失敗なので、原因が「installation の権限不足」
+      # なのか「secret 未設定」なのかを明示する (Medium-1 / H7)。
+      - name: Explain a missing reviewer token
+        if: steps.reviewer-token.outcome == 'failure'
+        shell: bash
+        run: |
+          echo "::warning::the reviewer App token could not be minted; gh will act as the implementer App"
+          echo "::warning::likely cause: OC_REVIEW_APP_PRIVATE_KEY is unset, or the reviewer App installation does not grant contents:write / pull-requests:write"
+          echo "::warning::the reviewer can still comment and merge, but cannot approve the implementer App's PR"
+
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
           token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.ref }}
+          persist-credentials: false
 
       - name: Configure git
+        shell: bash
         env:
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+          REVIEWER_SLUG: ${{ steps.reviewer-token.outputs.app-slug }}
           GH_TOKEN: ${{ steps.reviewer-token.outputs.token || steps.app-token.outputs.token }}
         run: |
-          SLUG=${{ steps.app-token.outputs.app-slug }}
-          USER_ID=$(gh api "/users/${SLUG}[bot]" --jq .id)
+          set -euo pipefail
+          # reviewer App のトークンが取れていれば、そのアイデンティティに揃える。
+          # 取れていない場合は実装 App の slug/email をそのまま使う。
+          SLUG="${REVIEWER_SLUG:-$APP_SLUG}"
+          USER_ID="$(gh api "/users/${SLUG}[bot]" --jq .id)"
           git config --global user.name "${SLUG}[bot]"
           git config --global user.email "${USER_ID}+${SLUG}[bot]@users.noreply.github.com"
           gh auth setup-git
@@ -170,45 +241,31 @@ jobs:
           app-private-key: ${{ secrets.OC_APP_PRIVATE_KEY }}
           # create-github-app-token と同じ権限セットに制限する
           token-permissions: '{"contents":"write","pull-requests":"write"}'
+          opencode-version: ${{ vars.OPENCODE_VERSION }}
+          opencode-release-version: ${{ vars.OPENCODE_RELEASE_VERSION }}
+          opencode-install-source: ${{ vars.OPENCODE_INSTALL_SOURCE }}
           cf-account-id: ${{ secrets.CF_ACCOUNT_ID }}
           cf-r2-access-key-id: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
           cf-r2-secret-access-key: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
 
-      - name: PR diff context
-        id: diff
+      - name: Fetch PR diff
+        shell: bash
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          gh pr diff ${{ github.event.pull_request.number }} --repo ${{ github.repository }} > "$RUNNER_TEMP/pr.diff" || true
-          gh pr view ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --json title,body,isDraft --jq '.title' > "$RUNNER_TEMP/pr.title" || true
-          echo "diff-lines=$(wc -l < "$RUNNER_TEMP/pr.diff")" >> $GITHUB_OUTPUT
+          set -uo pipefail
+          # PR 番号・repo 名は式展開で run に埋め込まず、前のステップが
+          # $GITHUB_ENV に出した OC_PR_NUMBER / OC_REPO として読む。
+          gh pr diff "$OC_PR_NUMBER" --repo "$OC_REPO" > "$RUNNER_TEMP/pr.diff" \
+            || echo "::warning::could not fetch the diff for PR $OC_PR_NUMBER"
+          echo "diff-lines=$(wc -l < "$RUNNER_TEMP/pr.diff")"
 
       - name: Assemble reviewer prompt
         id: prompt
         shell: bash
-        run: |
-          DIFF_FILE="$RUNNER_TEMP/pr.diff"
-          TITLE_FILE="$RUNNER_TEMP/pr.title"
-          {
-            echo "prompt<<OCEOF"
-            cat .github/prompts/reviewer.md
-            echo ""
-            echo "## PR"
-            echo "repo: ${{ github.repository }}"
-            echo "number: ${{ github.event.pull_request.number }}"
-            echo "title: $(cat "$TITLE_FILE" 2>/dev/null || echo '')"
-            echo ""
-            echo "## diff"
-            echo '```diff'
-            head -c 100000 "$DIFF_FILE" 2>/dev/null || echo "(diff unavailable)"
-            echo '```'
-            if [ -n "${{ steps.reviewer-token.outputs.token }}" ]; then
-              echo "gh はレビュワー App identity で認証済み。approve / merge を実行できる。"
-            else
-              echo "NOTE: reviewer App identity unavailable; gh is authenticated as the implementer App. You cannot approve your own PR. Post the review as comment and merge directly if the project allows."
-            fi
-            echo "OCEOF"
-          } >> "$GITHUB_OUTPUT"
+        env:
+          OC_HAS_REVIEWER_TOKEN: ${{ steps.reviewer-token.outputs.token != '' }}
+        run: bash .github/scripts/assemble-reviewer-prompt.sh
 
       - name: Run OpenCode (reviewer)
         uses: ./.github/actions/opencode
@@ -216,6 +273,6 @@ jobs:
           model: "opencode-go/step-5-preview-free"
           agent: build
           auth-export: ${{ secrets.OC_AUTH_EXPORT }}
-          prompt: ${{ steps.prompt.outputs.prompt }}
+          prompt-file: ${{ steps.prompt.outputs.prompt_file }}
         env:
           GH_TOKEN: ${{ steps.reviewer-token.outputs.token || steps.app-token.outputs.token }}

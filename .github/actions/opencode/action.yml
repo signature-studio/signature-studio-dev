@@ -1,12 +1,12 @@
 name: OpenCode
-description: 'Run OpenCode tasks based on the provided prompt; summary goes to $GITHUB_STEP_SUMMARY'
+description: 'Run OpenCode tasks based on a prompt file; summary goes to $GITHUB_STEP_SUMMARY'
 
 inputs:
   model:
     description: 'the model to use for OpenCode'
     required: true
-  prompt:
-    description: 'the prompt for OpenCode'
+  prompt-file:
+    description: 'Path to a file holding the prompt. A path is used instead of the prompt text so that a multi-line prompt never has to travel through a step input or a heredoc delimiter.'
     required: true
   agent:
     description: 'the opencode agent to run'
@@ -25,34 +25,61 @@ runs:
       env:
         OC_AUTH_EXPORT: ${{ inputs.auth-export }}
       run: |
+        set -euo pipefail
         printf '%s' "$OC_AUTH_EXPORT" | opencode auth import
         opencode auth list
 
-    # prompt は env 経由で渡す (run スクリプト中に直接展開すると $( ) として評価されてしまう)
-    # 1 回だけリトライ: プロバイダ接続が transient に切れることがある
+    # prompt は env 経由で渡す (run スクリプト中に直接展開すると $( ) として
+    # 評価されてしまう)。プロンプト本文はファイルから読む。
+    # リトライは指数バックオフ入り: 直ちに再試行してもプロバイダ側の 429/5xx が
+    # 回復しない限り無駄で、コストだけ二重になる。
     - name: Run OpenCode
       id: run
       shell: bash
       env:
-        OC_PROMPT: ${{ inputs.prompt }}
+        OC_PROMPT_FILE: ${{ inputs.prompt-file }}
         OC_MODEL: ${{ inputs.model }}
         OC_AGENT: ${{ inputs.agent }}
       run: |
-        set +e
+        set -uo pipefail
+        if [ ! -r "$OC_PROMPT_FILE" ]; then
+          echo "::error::prompt file is not readable: $OC_PROMPT_FILE"
+          exit 1
+        fi
+        prompt="$(cat "$OC_PROMPT_FILE")"
         rc=1
-        for attempt in 1 2; do
+        attempt=1
+        wait_s=15
+        while [ "$attempt" -le 2 ]; do
           opencode run --standalone --auto \
             --model "$OC_MODEL" --agent "$OC_AGENT" \
-            --format json --print-logs "$OC_PROMPT" \
+            --format json --print-logs "$prompt" \
             > "$RUNNER_TEMP/oc-output.jsonl" 2> "$RUNNER_TEMP/oc-stderr.log"
           rc=$?
           if [ "$rc" = 0 ]; then break; fi
-          echo "::warning::opencode run failed (attempt $attempt, exit $rc); retrying"
+          echo "::warning::opencode run failed (attempt $attempt/2, exit $rc)"
+          if [ "$attempt" -lt 2 ]; then
+            echo "waiting ${wait_s}s before retrying"
+            sleep "$wait_s"
+            wait_s=$((wait_s * 2))
+          fi
+          attempt=$((attempt + 1))
         done
-        echo "rc=$rc" >> "$GITHUB_OUTPUT"
-        echo "sid=$(jq -r 'select(.sessionID != null) | .sessionID' \
-          "$RUNNER_TEMP/oc-output.jsonl" | head -1)" >> "$GITHUB_OUTPUT"
+
+        # sid 抽出: 旧実装は `jq ... | head -1` で、head が先に閉じると jq が
+        # SIGPIPE で死に、step の shell は -o pipefail なので step 全体が落ちていた。
+        # また 1 行でも不正 JSON があると jq 全体が失敗する。
+        # ここでは行を raw で読み、不正行は fromjson? で黙って捨て、
+        # sed -n '1p' (早期 close しない) で先頭 1 件を取る。
+        sid="$(jq -Rr 'fromjson? | .sessionID? | select(. != null)' \
+          "$RUNNER_TEMP/oc-output.jsonl" 2>/dev/null | sed -n '1p')"
+
+        {
+          printf 'rc=%s\n' "$rc"
+          printf 'sid=%s\n' "$sid"
+        } >> "$GITHUB_OUTPUT"
         echo "opencode exit code: $rc"
+        echo "opencode session: ${sid:-none}"
 
     # 最終回答は opencode api から取得する (JSONL の解析はしない)
     - name: Write step summary
