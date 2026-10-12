@@ -163,3 +163,49 @@
 | 2 | ~~build_seed.py 取込~~ **完了** | follow-up c72f220 で移設済み (正本=build_seed.py OVERRIDES / apply_keys.py は no-op 後処理として残置) |
 | 3 | shimx username 統一 | shimx 取込時に env.c/shell.c を webstudio へ (pathreg secondary 退役) |
 | 4 | vreg REPORT/§3・§4 更新 | 本成果 (236/81/3) への数値更新 — tools/startup/vreg/REPORT.md は本チケット範囲外のため main 側で |
+
+## 11. 環境パス置換 (#366, 親 #294・先行 #312): /home/ubuntu 絶対パスを tools/shared へ
+
+既知類型との関係 (DEFECTS.md): 該当なし (パス参照の置換のみで lift/IR には触れない)。
+
+### 11.1 変更
+
+`*.sh *.py *.json *.ts *.mjs` (work/ 除く) の `/home/ubuntu` 参照 7 行 (4 ファイル) を置換。既定値は従来と同一。
+
+| ファイル | 置換 |
+|---|---|
+| `feparse.py` | `PE_PATH = FL_WIN64_DIR/extracted/block00031_PE.bin` (`tools/shared/paths.py`) |
+| `resolve_keys.py` `apply_keys.py` | `SEED = REPO_ROOT/tools/startup/vreg/data/seed.json` |
+| `verify_consistency.py` | `SEED` `KEYS` `PATHMAP_JS` `PATHMAP_C` を `REPO_ROOT` 基準に (旧: `/home/ubuntu/work/webstudio/...` 固定) |
+
+### 11.2 検証 (検証起点 `origin/main` = 856be6b、素材は `fl-win64` のみ)
+
+- 受入条件 1: `grep -rn '/home/ubuntu' tools/startup/keyfix --include=*.sh --include=*.py --include=*.json --include=*.ts --include=*.mjs --exclude-dir=work | wc -l` → 0。
+- 受入条件 2 (before/after): `resolve_keys.py` → `apply_keys.py` → `verify_consistency.py` を直列実行し出力を `cmp`。
+  before = `origin/main` の detached worktree + `/home/ubuntu/work/{analysis/win64,webstudio}` を symlink で用意。
+  after = symlink と `/home/ubuntu` を削除し `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` のみ指定。
+  所要 before 3.04 s / after 3.06 s、load average (1 分値) 0.53 / 0.56、各 n=1。
+  verify_consistency は `RESULT: ALL PASS` (entries=236 apply=81 key確定=113 key推定=120 key=null=3)。
+
+| 出力 | before/after | sha256 先頭 12 桁 |
+|---|---|---|
+| resolve_keys stdout (3 行) | 一致 | 070b758df620 |
+| apply_keys stdout (127 行) | 一致 | dfb9c8103071 |
+| verify_consistency stdout (9 行) | 一致 | ec5b058f5d5e |
+| `work/resolved_keys.json` | 一致 | 2531d6d95861 |
+| `work/keyfix_report.json` | 一致 | 2665e88a8f9a |
+| `vreg/data/seed.json` (apply_keys 後) | 一致 | 9728d3652d8f |
+
+- ネガティブコントロール: `FL_WIN64_DIR=/nonexistent resolve_keys.py` → `FileNotFoundError: /nonexistent/extracted/block00031_PE.bin`、
+  `REPO_ROOT=/nonexistent verify_consistency.py` / `apply_keys.py` → `FileNotFoundError: /nonexistent/tools/startup/vreg/data/seed.json` (いずれも FAIL = 環境変数が実際に効く)。
+- 実行環境: python venv に `pefile` 5.x / `capstone` 5.0.7 を追加 (`uv pip install pefile capstone`)。
+
+### 11.3 検証範囲 / 範囲外 / 未解決
+
+範囲外: `keyfix_e2e.sh` 全体 (step 1 の vreg `build_seed.py`、step 2 の emsdk + Chrome、step 3 の pathreg e2e)。本 PR で変更したのは上記 4 本の定数定義のみで、
+`keyfix_e2e.sh` 自体は `/home/ubuntu` 参照を持たず未変更。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `keyfix_e2e.sh` 全体を `toolchain-emsdk` 付きで未実行 | 置換行以外の挙動は未検証 | 本 PR のレビュー run (`oc_artifacts:` 行を PR 本文に記載) |
+| `keyflow.py` `keyflow2.py` `dynkeys.py` 等は `feparse` 経由で間接的に `FL_WIN64_DIR` を使うが個別実行は未実施 (`resolve_keys.py` が `keyflow2`→`feparse` を実行済み) | 他は未検証 | #294 の該当 area 子 issue |
