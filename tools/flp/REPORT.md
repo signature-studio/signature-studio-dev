@@ -182,7 +182,7 @@
 
 **10.3 検証 (全て HEAD 上 / 実測)**。素材 = `$ARTIFACTS_DIR/fl-win64.tar.zst` の win インストーラ抽出物 (FLhd ブロック 9,128; mac 側 .app は不在のため `FL_ROOT` を FLhd ブロックのみのディレクトリに設定)。Node v22.23.3 (`node --test test/*.test.ts`; `test/` ディレクトリ指定は v22 で不可)。
 - `tsc -p tsconfig.json`: クリーン。`node --test`: decode/dictionary/flp/oracle の 21/21 PASS (n=3: 0.36–0.37 s、load average 0.17)。`test/corpus.test.ts` は 3 件中 1 件 PASS・**2 件 FAIL (本変更前の main でも同じ 2 件が FAIL)**: `sampled fst/fsc` (`others.length > 100`) と `NewStuff.flp` の存在確認は mac 素材 (.fst/Demo) 前提で、win ブロックのみの root では満たせない。= 本変更の回帰ではなく**素材不足** (mac .app は R2 の `fl-win64` に無い)。
-- 往復 (`node cli/roundtrip.ts`): 9,128/9,128 L0・9,128/9,128 L1 (535,401 イベント)、33.0 s・load average 0.12→0.47 (1 プロセス)。
+- 往復 (`node cli/roundtrip.ts`): 9,128/9,128 L0・9,128/9,128 L1 (535,401 イベント)、31.9 s・load average 0.55→0.75 (1 プロセス; rebase 後 HEAD `7ccd9e9` のクリーン worktree)。rebase 前 `eac8f55` では 33.0 s。
 - ネガティブコントロール: ① `load_switch.json` から ID 41 を削除 → `dictionary.test.ts` が `id 41 ... is neither a FlpLoad case` で FAIL (2 件 FAIL)。② 辞書の ID 41 を conf=low に戻す → undocumented 検査が FAIL (1 件 FAIL)。両方元に戻して 3/3 PASS。
 - 別アルゴリズム検算 (記号実行とは独立): FlpLoad の cmp/je 葉を生バイト正規表現で走査し、`load_switch.json` と突合: 41/41 一致。
 - 再現: `python3 scripts/load_switch.py <FLEngine_x64.dll> corpus/load_switch.json` → `node cli/restatus.ts` → `node --test test/dictionary.test.ts`。
