@@ -353,22 +353,41 @@ def fix_helper_operand_xmm(header, body, habi, rep, fname):
                 k = ptr.get(key, 0)
                 cand = sites.get(key, [])
                 if k >= len(cand):
-                    ok = False
-                    break
-                regmap = cand[k]
+                    cand = []
+                    regmap = {}
+                else:
+                    regmap = cand[k]
                 ptr[key] = k + 1
                 # IR の i128 オペランド (順) ↔ 機械語の xmm reg オペランド (順)
                 i128pos = [i for i, x in enumerate(ops) if x.startswith('i128 %')]
+                site_ok = True
                 for oi, op in enumerate(ops):
                     if op.split()[-1] != z:
                         continue
                     j = i128pos.index(oi) if oi in i128pos else None
                     reg = regmap.get(j) if j is not None else None
                     if reg is None or reg not in argslots:
-                        ok = False
+                        site_ok = False
                         break
                     slots.add(reg)
-                if not ok:
+                if not site_ok and os.environ.get('K80_NO_REGSRC') != '1':
+                    # reg-reg 形の単項変換 (cvtss2sd xmm0, xmm3 → __asm_cvtss2sd(i128 xmm3)):
+                    # RetDec は dest を被演算子に含めないので、機械語の xmm 数が 1 多い (#277)。
+                    # 手前の突合で mem 形 (cvtss2sd xmm1, [m]) を誤って引いた分を戻し、
+                    # xmm reg が 2 個の site の source (位置 1) を探す
+                    ptr[key] = k
+                    alt = sites.get((mn, len(ops) - nimm + 1), [])
+                    kk = ptr.get((mn, 'rr'), 0)
+                    alt = [d for d in alt if 1 in d]
+                    site_ok = False
+                    if kk < len(alt) and len(i128pos) == 1 and ops[i128pos[0]].split()[-1] == z:
+                        reg = alt[kk].get(1)
+                        if reg in argslots:
+                            slots.add(reg)
+                            ptr[(mn, 'rr')] = kk + 1
+                            site_ok = True
+                if not site_ok:
+                    ok = False
                     break
             if not ok or len(slots) != 1:
                 continue
