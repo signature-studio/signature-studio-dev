@@ -198,16 +198,20 @@ jobs:
           permission-contents: write
           permission-pull-requests: write
 
-      # 承認済みリスク: PR head を secrets が効く状態で checkout する。
-      # この repo の脅威モデルでは PR は collaborator 限定 (fork PR は
-      # job の if で除外済み) のため受入。マージ後は base ref へ切り
-      # 替える follow-up issue を起票する。
+      # review ジョブは base ref を checkout する。composite action
+      # (./.github/actions/*) や scripts (.github/scripts/*) は必ず main の
+      # 正本が使われ、PR 提供コードが secrets (App token / R2 認証情報 /
+      # OC_AUTH_EXPORT) 付きで実行されることはない。
+      # diff・タイトル・本文は gh pr diff / API で取得するため PR head の
+      # 作業ツリーは不要。
+      # トレードオフ: PR が .github/ を変更する場合、その変更はマージ後に
+      # レビューで反映される (レビューは常に正本のスクリプトで走る)。
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
           token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.ref }}
+          ref: ${{ github.event.pull_request.base.ref }}
           persist-credentials: false
 
       # prepare-event-context.sh は $GITHUB_EVENT_PATH を読むだけでリポジトリ
