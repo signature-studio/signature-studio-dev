@@ -81,6 +81,7 @@ def scan_function(MD, td, tva, va, fend):
     gpr_arg, xmm_arg = [], []
     gpr_deref = set()
     gpr_base = set()
+    gpr_derived = set()
     gpr_idx = set()
     gpr_w, xmm_w = set(), set()
     xmm_width = {}                                         # xmmN -> 32/64 (初回 read 命令から)
@@ -139,7 +140,12 @@ def scan_function(MD, td, tva, va, fend):
                     scaled_index = True
                 if o.mem.base in COPYREG:
                     gpr_deref.add(COPYREG[o.mem.base])
-                    gpr_base.add(COPYREG[o.mem.base])
+                    # 既に write 済みの引数 reg (0x5e0630: `mov r8, rdx` 後の [r8]) は入力値の deref
+                    # ではない。コピー逆伝播の種 (gpr_derived) にのみ入れ、引数 base には数えない (#277)
+                    if COPYREG[o.mem.base] in gpr_w and os.environ.get('K80_NO_WRITTEN_BASE') != '1':
+                        gpr_derived.add(COPYREG[o.mem.base])
+                    else:
+                        gpr_base.add(COPYREG[o.mem.base])
                 if o.mem.index in COPYREG:
                     gpr_deref.add(COPYREG[o.mem.index])
                     if o.mem.base in COPYREG:
@@ -192,7 +198,7 @@ def scan_function(MD, td, tva, va, fend):
     for _ in range(8):
         ch = False
         for dst, src in copies:
-            if dst in gpr_base and src not in gpr_base:
+            if (dst in gpr_base or dst in gpr_derived) and src not in gpr_base:
                 gpr_base.add(src)
                 ch = True
             if dst in gpr_idx and src not in gpr_idx:

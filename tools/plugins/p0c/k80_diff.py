@@ -175,6 +175,20 @@ def build_argmodel(func, abi):
             irmap.append(('slot', j))
             named.add(j)
         else:
+            # RetDec の %argN は win64 gpr 序数 (rcx,rdx,r8,r9) そのもの。機械語が rcx を読まない
+            # kernel (0x5e1280: rdx,r8 のみ) でも arg1=rcx のため、使用 slot を詰めて割り当てると
+            # 1 つずれて IR 側が NULL へ store する (#277)
+            # 末尾の未使用 gpr (0x5de710 の r9) は RetDec が詰めるため序数固定しない:
+            # その slot か、より後ろの gpr slot を機械語が使う (= 手前に穴がある) ときだけ固定する
+            ma = re.match(r'%arg(\d+)$', pn)
+            if (ma and 1 <= int(ma.group(1)) <= 4 and pt not in ('float', 'double')
+                    and os.environ.get('K80_NO_ARGORD') != '1'):
+                n = int(ma.group(1)) - 1
+                if any(g in gused for g in GORD[n:]):
+                    j = next(k for k, s in enumerate(mslots) if s[0] == 'gpr' and s[1] == GORD[n])
+                    irmap.append(('slot', j))
+                    named.add(j)
+                    continue
             irmap.append(('pos', pt))
     pool_gpr = [k for k, (kind, d, u, dr) in enumerate(mslots) if kind == 'gpr' and u and k not in named]
     pool_xmm = [k for k, (kind, d, u, dr) in enumerate(mslots) if kind == 'xmm' and k not in named]
