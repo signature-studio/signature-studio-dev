@@ -8,7 +8,9 @@ load dylib/コンパイラ判定文字列)。
 import os, sys, json, struct, re, collections, hashlib
 from multiprocessing import Pool
 
-ROOT = '/home/ubuntu/work/analysis/mac/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL/Plugins/Fruity'
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'shared'))
+from paths import FL_MAC_DIR  # noqa: E402
+ROOT = os.path.join(FL_MAC_DIR, 'pkg_extract', 'payload_out', 'Applications', 'FL Studio 2026.app', 'Contents', 'Resources', 'FL', 'Plugins', 'Fruity')
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'work', 'mac_scan.json')
 
 CPU = {0x01000007: 'x86_64', 0x0100000c: 'arm64', 7: 'i386'}

@@ -14,7 +14,9 @@ from capstone import Cs, CS_ARCH_X86, CS_MODE_64
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 WORK = os.path.join(HERE, '..', 'work')
-EXT = '/home/ubuntu/work/analysis/win64/extracted'
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'shared'))
+from paths import FL_WIN64_DIR  # noqa: E402
+EXT = os.path.join(FL_WIN64_DIR, 'extracted')
 SLOTS = ['DestroyObject', 'Dispatcher', 'Idle_Public', 'SaveRestoreState', 'GetName', 'ProcessEvent',
          'ProcessParam', 'Eff_Render', 'Gen_Render', 'TriggerVoice', 'Voice_Release', 'Voice_Kill',
          'Voice_ProcessEvent', 'Voice_Render', 'NewTick', 'MIDITick', 'MIDIIn', 'MsgIn',
