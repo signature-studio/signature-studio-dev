@@ -329,3 +329,10 @@ unsigned long long function_417b70(unsigned long long a, unsigned long long ti, 
     Q(a) = data;
     return 0;
 }
+
+/* function_40a3b0 (System.Math.GetMXCSR: stmxcsr [rsp]; pop rax; ret): RetDec は pop rax を落とし常に 0 を返す
+ * (__asm_stmxcsr(0); ret 0)。MXCSR マスクビット (0x1f80) が 0 = 全 FP 例外アンマスク扱いとなり,
+ * 40a1c0 (FP 例外送出) → 409730 Error → Halt0 に至る (#417)。wasm に MXCSR は無いので既定値 0x1f80 を返す。 */
+unsigned long long function_40a3b0(void) {
+    return 0x1f80;
+}
