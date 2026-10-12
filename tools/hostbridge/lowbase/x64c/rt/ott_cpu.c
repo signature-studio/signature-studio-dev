@@ -7,6 +7,7 @@
 #endif
 uint64_t R[16];
 X128 X[16];
+X128 XH[16];   /* CAB-135: ymm 上位 128bit (VEX.256 / VEX zeroing 用) — tools/ott/rt/ott_cpu.c と同等 */
 uint8_t fZF, fSF, fCF, fOF, fPF;
 uint64_t ott_xrip;
 
