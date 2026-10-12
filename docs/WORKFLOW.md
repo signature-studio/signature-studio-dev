@@ -202,6 +202,9 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
 
   agent-setup での自動展開・`$GITHUB_ENV` への `FL_WIN64_DIR` 設定は未実施 (必要なら別 PR)。
   `PLUGINS_DIR` も同様に `plugins-*` の展開先を指定する。
+- **レビュー run の素材**: review ジョブも PR 本文の `oc_artifacts:` 行を読んで素材を取得する
+  (素材を要する e2e をレビュワーが独立再実行するため)。PR 作成者は、素材を要する PR の本文に
+  実装時と同じ行を書くこと。
 - **結果**: agent の最終回答は run のログ (`gh run view <id> --log` の `Write step summary`) と
   `$GITHUB_STEP_SUMMARY` の両方に出る。issue へのコメントは agent が `gh issue comment` で行う。
 - **上限**: job は 60 分。収まらない作業は中間 commit + draft PR で区切る。
