@@ -3,10 +3,12 @@
 # 出力: argv[2]
 import sys, os, re
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', 'shared'))
+from paths import PLUGINS_DIR
 from ottlib import Bin
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-WINF = '/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll'
+WINF = os.path.join(PLUGINS_DIR, 'ott', 'binaries', 'OTT_vst2_win64.dll')
 DATAB = 0x30000000
 
 def fn(n):
