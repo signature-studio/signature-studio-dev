@@ -42,6 +42,22 @@ check('derefix 対象外 [rcx+8]', R.derefix_pieces(ins) is None)
 ins = next(cs.disasm(bytes.fromhex('660f2f0510000000'), 0x1000))
 check('capstone disp_size 誤り (66 prefix rip-rel) を検知', ins.disp_size != 4, 'disp_size=%d' % ins.disp_size)
 
+# ---- stack 引数 (5 個目以降) の検出 (BLK+0x48 / STKBUF)
+class _It:
+    def __init__(self, hexs, addr):
+        self.kind = 'ins'; self.ins = next(cs.disasm(bytes.fromhex(hexs), addr))
+def _seq(*hs):
+    return [_It(h, 0x1000 + 16 * i) for i, h in enumerate(hs)] + [_It('ffd0', 0x2000)]
+mov_5th = '4889442420'        # mov [rsp+0x20], rax
+mov_6th = '4889442428'        # mov [rsp+0x28], rax
+movaps_x = '0f29742420'       # movaps [rsp+0x20], xmm6 (xmm 退避)
+check('stk: 5 引数 (rsp+0x20) -> 1 語', R.stk_slots_stored(_seq(mov_5th), 1) == 1)
+check('stk: 6 引数 (rsp+0x28) -> 2 語', R.stk_slots_stored(_seq(mov_5th, mov_6th), 2) == 2)
+check('stk: 引数なし -> 0', R.stk_slots_stored(_seq('4889c8'), 1) == 0)
+check('stk: movaps [rsp+0x20] (xmm 退避) は引数でない', R.stk_slots_stored(_seq(movaps_x), 1) == 0)
+check('stk: 直前の call より前の store は無視', R.stk_slots_stored([_It(mov_5th, 0x1000), _It('e800000000', 0x1010), _It('ffd0', 0x1020)], 2) == 0)
+check('stk: SITE_TAIL 長さが nstk に比例', R.site_tail_len(3) - R.site_tail_len(0) == 3 * R.STK_COPY_ONE)
+
 # ---- pe: OTT closure に対する固定値
 if os.path.exists(OTT):
     img = A.Image(OTT)

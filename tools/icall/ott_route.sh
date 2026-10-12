@@ -24,7 +24,7 @@ python3 - "$W" <<'PY'
 import json, sys
 W = sys.argv[1]
 m = json.load(open(W + '/map.json'))
-open(W + '/ranges.txt', 'w').write(open(W + '/map.json.ranges').read() + ',0x%x-0x%x,0x%x-0x%x' % (m['stub'], m['stub'] + 78, m['comis_stub'], m['comis_stub'] + 29))
+open(W + '/ranges.txt', 'w').write(open(W + '/map.json.ranges').read() + ',0x%x-0x%x,0x%x-0x%x' % (m['stub'], m['stub'] + m.get('stub_len', 78), m['comis_stub'], m['comis_stub'] + m.get('comis_stub_len', 29)))
 PY
 # 3. RetDec decode-only
 ( cd "$W" && TMPDIR="$W/tmp" /opt/retdec/bin/retdec-decompiler ott_icall.dll -o oi.drc.c --select-ranges "$(cat ranges.txt)" --select-decode-only --timeout 2400 > retdec.log 2>&1 )
@@ -38,9 +38,9 @@ python3 "$HERE/ir_flatten.py" "$W/oi.p1.ll" "$W/oi.flat.ll" --table "$W/oi.table
 python3 "$T/m11/m11_simd2.py" "$W/oi.flat.ll" 2> "$W/simd.log" | sed 's#"../msimd11_core.h"#"'"$T"'/m11/msimd11_core.h"#' | grep -v -E '__asm_(cmplesd|cmpnltsd|cvttpd2dq|cvtpd2dq|sqrtpd)\(' > "$W/oi.simd.c"
 # 6. build
 emcc "$W/oi.flat.ll" "$W/oi.simd.c" "$W/oi.table.c" "$HERE/rt/icall_rt.c" "$HERE/rt/icall_simd_extra.c" "$T/ott/work/lift/ott_data.c" \
-  -w -O"${ICALL_OPT:-0}" -g -ffp-contract=off -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=2MB -sGLOBAL_BASE=268435456 \
+  ${ICALL_EMCC_FLAGS:-} -w -O"${ICALL_OPT:-0}" -g -ffp-contract=off -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=2MB -sGLOBAL_BASE=268435456 \
   -sENVIRONMENT=node -sMODULARIZE=1 -sEXPORT_NAME=createModule -sEXIT_RUNTIME=1 -sERROR_ON_UNDEFINED_SYMBOLS=0 \
-  -sEXPORTED_FUNCTIONS=_ott_run,_ott_xmm0,_ott_data_install,_malloc -sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAPU32,HEAPF32,HEAPF64 \
+  -sEXPORTED_FUNCTIONS=_ott_run,_ott_xmm0,_ott_data_install,_malloc${ICALL_EXTRA_EXPORTS:-} -sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAPU32,HEAPF32,HEAPF64 \
   -Wl,--initial-memory=$((0x36000000)) -Wl,--max-memory=$((0x36000000)) -o "$W/ott_route.cjs" 2> "$W/emcc.log" || { grep -v 'warning\|>>>\|^$' "$W/emcc.log" | head; exit 1; }
 ls -la "$W/ott_route.cjs"
 echo "[route] OK: $W/ott_route.cjs"
