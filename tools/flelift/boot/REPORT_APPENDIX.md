@@ -6,6 +6,7 @@
 
 ## A. §0 から移動: FLE-2〜FLE-5 ラウンド詳細
 
+  **FLE-2/FLE-3 で突破したもの** (累積):
   1. **Delphi switch テーブルの case body 自動 harvest** (`gen_boot.py`): `.text` 内の
      「`.text` を指す 8B 値が 2〜32 個連続」領域から shape `48 83 c1 <imm8> e9` のものだけ root 化。
      roots 20,899 → 21,307、関数数 29,420 → 29,753。実測テーブル: `0x5275b0`(4) /
@@ -104,7 +105,7 @@
 
 ## B. §3 から移動: unit 停止原因の特定 (FLE-2〜FLE-5)
 
-## 3. unit#17 停止原因の特定 (本 round の主成果)
+元 REPORT.md §3 の見出しは「unit#17 停止原因の特定 (本 round の主成果)」。
 
 ### 3-1. (FLE-2 累積) 3 バグ修正の要点
 
@@ -181,4 +182,3 @@ FLE-5 は `boot/dbg_lift.py` (任意 guest VA を lift 生成 C の行に埋め�
 なお (3) の「image 全体に store 0 件」は **rip-rel disp32 バイト走査**の結果で、
 `f_653dd0` は `mov rcx,[rbp+0x28]; mov [rcx],rax` という**動的ストア**なので
 即値検索では決して出てこない (`boot/dbg_lift.py` の `--at` で解決)。
-

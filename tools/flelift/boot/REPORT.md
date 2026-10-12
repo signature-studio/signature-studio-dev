@@ -11,7 +11,7 @@
   **unit 進行は 209 で横ばい** — ただし FLE-5 で unit 進行の blocker は
   `f_6c7900` の fill ループ幅「未初期化」ではなく、
   **`f_653f40` (VCL フォーム登録ルーチン) が早期 return して
-  fill コールバック `0x15F34A0` が未設定** であることを 5 段の逆引きで実証 (§3-5)。
+  fill コールバック `0x15F34A0` が未設定** であることを 5 段の逆引きで実証 (付録 §B 3-5)。
 - ラウンドごとの詳細 (FLE-2〜FLE-5 の成果・修正 3 件・FLE-4/5 の逆引き 5 段) は `REPORT_APPENDIX.md` §A・§B。
 
 
@@ -25,7 +25,7 @@
 | `fle_boot.c` | boot ドライバ: 敷設 + shimx wiring (cbtrans/resolver/LB_BASE=0x10000) + 計数 + `--override` C 実装 (longjmp/GetMem/FreeMem/InitUnits) + curated import。**FLE-2: FreeMem 判定と RSP 釣合を修正** |
 | `fle_boot.mjs` | runner: boot 実行 + 分類 + survey (942 隔離, FLE_SURVEY_FROM/TO) + summary/JSONL 出力 |
 | `blkdiag` (fle_boot.c 内) | System._GetMem/_FreeMem トラッキング (alloc/free 時系列・16B snapshot canary・二重解放/未追跡/header dump・FastMM dispatch カウント)。`fle_boot_set_blkdiag(int)` / `fle_blkdiag_stat(int)` で外部操作 |
-| `boot_roots.json` | 実行時発見 roots **110 本** (累積)。0x403579/0x403582/0x40358b (jump table thunk)・0x40fb40/0x40f960・0x527b5b 等を追加。**0x6a7b70 は意図的に除外** (§3-4) |
+| `boot_roots.json` | 実行時発見 roots **110 本** (累積)。0x403579/0x403582/0x40358b (jump table thunk)・0x40fb40/0x40f960・0x527b5b 等を追加。**0x6a7b70 は意図的に除外** (付録 §B 3-4) |
 | `survey_drive.sh` + `merge_survey.py` | survey を 180s セグメント実行 (timeout 再開) → results/survey.json に統合 |
 | `gen_verdict.py` | survey 差分 → liftdiff FORMAT v1 JSONL (results/verdict_boot.jsonl) |
 | `gen_mixed.py` | **関数級 (liftdiff) + unit 級 (boot) verdict を 1 ファイルに混在**させて `liftdiff.py summary` で採点。32MB 超のため JSONL は work/boot/ (gitignore)、採点結果は results/mixed_summary.md |
@@ -41,7 +41,7 @@ link 実績 (4 variant 全て): signature mismatch 0 / undefined 0 / duplicate 0
 | 項目 | FLE-2 | FLE-3 | FLE-4 | **FLE-5** |
 |---|---|---|---|---|
 | unit 進行 | 40 dispatch / 39 完走 | 209 dispatch / 208 完走 | 209 / 208 | **209 / 208 (横ばい)** |
-| 停止原因 | unlifted 0x527b5b | oob @ `f_816e80` | unlifted `0x6a7b70` | **unlifted `0x6a7b70` (真因は §3-5)** |
+| 停止原因 | unlifted 0x527b5b | oob @ `f_816e80` | unlifted `0x6a7b70` | **unlifted `0x6a7b70` (真因は 付録 §B 3-5)** |
 | 関数数 | 29,420 | 29,902 | 29,902 | **29,907** |
 | unlifted callees | 1,678 | 1,684 | 1,684 | **1,681** |
 | roots (entries) | 20,899 | 21,307 | 21,307 | **21,309** |
@@ -133,13 +133,13 @@ FLE-5 末の残 3 件は `unlifted 280 / 659` (`0x6a7b70`, blocklist 対象) と
 
 ## 5. 未解決・限界 (実測ベース)
 
-1. **unit#209 の次の blocker は `unlifted 0x6a7b70`** (fill コールバック、§3-4)。
+1. **unit#209 の次の blocker は `unlifted 0x6a7b70`** (fill コールバック、付録 §B 3-4)。
    root 化しても `f_6c7900` の fill ループが暴走 → ExitProcess → **survey が成立しない**
    ため `FLE_ROOT_BLOCKLIST` (既定 `0x6a7b70`) で自動累積から除外している。
-   真因は §3-5 の通り **`f_653f40` が `f_53c5e0` 側の VCL リソース読み出し失敗で
+   真因は 付録 §B 3-5 の通り **`f_653f40` が `f_53c5e0` 側の VCL リソース読み出し失敗で
    早期 return し、fill コールバック `0x15F34A0` を登録できない**こと。
 2. **unit 進行 209 で横ばい**。前ラウンド目標の 250+ には未達。
-   次の一手は §3-5 の `f_43c5e0` / `f_414ec0` が out = 0 を返す理由の特定
+   次の一手は 付録 §B 3-5 の `f_43c5e0` / `f_414ec0` が out = 0 を返す理由の特定
    (VCL リーダのクラス解決 or リソース未検出)。
 3. **残 survey 非 ok 3** = unit 280 / 659 (`0x6a7b70`, blocklist 対象) + unit 895
    (`0x976da0`、未調査)。`0x976da0` は次の調査対象。
@@ -160,7 +160,7 @@ CAB-129 / CAB-231 の適用は x64c route では不要。D7/D10/D11 も x64c 非
 
 ## 7. 引継ぎ (次ラウンド)
 
-1. **最優先: `f_43c5e0` / `f_414ec0` が out = 0 を返す理由の特定** (§3-5)。
+1. **最優先: `f_43c5e0` / `f_414ec0` が out = 0 を返す理由の特定** (付録 §B 3-5)。
    VCL リーダのクラス解決 or リソース未検出のいずれか。ここが外れれば
    `f_653f40` がコールバック `0x15F34A0` を登録し、unit 進行が 209 を超える。
 2. **`boot/dbg_lift.py --at 0x...` を常用** — guest VA を直接指定して lift C に
@@ -208,7 +208,6 @@ GitHub Actions runner (4 vCPU / RAM 16GB + swap 16GB 追加) で `boot_e2e.sh` �
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `f_43c5e0` → `f_414ec0` (UStr copy) が out=0 を返す理由 (§3-5 / 付録 B) | unit 進行 209 で停止、`0x15F34A0` 未登録 | 本 issue (#253) に継続 |
+| `f_43c5e0` → `f_414ec0` (UStr copy) が out=0 を返す理由 (付録 §B 3-5) | unit 進行 209 で停止、`0x15F34A0` 未登録 | 本 issue (#253) に継続 |
 | survey 非 ok 3 (unit 280/659 `0x6a7b70`、895 `0x976da0`) | survey 完全 ok 未達 | 本 issue (#253) に継続 |
 | lifted C コンパイルが 14.8GB 使う | CI (RAM 16GB) では swap なしで不可 | CI 整備 issue (#284) へ提案 |
-
