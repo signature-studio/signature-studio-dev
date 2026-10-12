@@ -35,7 +35,8 @@ for n in matrix gain haas clipper gate quickeq; do
   python3 lic_build.py --dsp "$n" --tag lic --trials "$TRIALS" --seed "$SEED" | tail -1
 done
 
-echo "== [4] KH-10 (CAB-247): EditorModel 層部分 lift (module E) → native oracle ctx-fuzz + 47 製品デモ"
+echo "== [4] KH-10/KH-11 (CAB-247): EditorModel 層部分 lift (module E: ctor+poll1+poll2+EventSlot+writer)
+    + subscribe 経路 (0x1800526f0 等) の実 IR 化 → native oracle ctx-fuzz + 47 製品「編集可能」デモ"
 python3 lic_build.py --module E | tail -1
 if [ ! -x work/native_ref ]; then
   cc -O1 -Wall -o work/native_ref harness/native_ref.c harness/scenarios.c -Iharness
@@ -45,6 +46,13 @@ node harness/compare.mjs work/em_200_1.bin work/licE/mod.cjs work/licE/sigs.json
 ./work/native_ref "$CORE" empoll 1000 7 work/empoll_1000_7.bin
 node harness/compare.mjs work/empoll_1000_7.bin work/licE/mod.cjs work/licE/sigs.json --json work/empoll_1000_7.json | tail -1
 node em_check.mjs | tail -1
+# emfire (manager EventSlot 起火 E2E、CAB-247 残スコープ): native oracle は完走するが wasm 側の
+# vector-compact ctrl vtable delete thunk (0x180003360・尾 `jmp rax`) が未 lift のため bit 不一致
+# = 未解決 (KH-11 REPORT に root cause と起票先を記載)。exit code には影響させない (情報提供)。
+echo "--- emfire (manager slot 起火 E2E / 参考実行・未解決)"
+./work/native_ref "$CORE" emfire 200 1 work/emfire_200_1.bin && \
+node harness/compare.mjs work/emfire_200_1.bin work/licE/mod.cjs work/licE/sigs.json --json work/emfire_200_1.json | tail -1 || \
+  echo "WARN emfire: wasm 側の未 lift thunk (0x180003360) により bit 不一致 (KH-11 REPORT 未解決・起票先: 親 CAB-13)"
 
 echo "== [5] まとめ"
 node -e '

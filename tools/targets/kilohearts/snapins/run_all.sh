@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Kilohearts snap-in 13 本 (Channel Mixer / Gain / Haas / Clipper / Gate / 3-Band EQ / Resonator / Stereo / Disperser / Formant Filter
 #   + KH-6 Tier-M: Phaser / Delay / Limiter) の lift → wasm → 実機機械語と ctx-fuzz 突合
-#   (既存 = bit-exact 11 本 / Resonator+Stereo は許容誤差 (CAB-224))。
+#   (CAB-273 で tol gate 撤去 = 13 本すべて tolerance なし strict bit-exact 判定)。
 #   bash tools/targets/kilohearts/snapins/run_all.sh                 本編 (Path B: RetDec stage-0 + kh_lower) 13 本 + Path A 対照 (matrix/gain/haas) + libm 単体 (qemath + qebig) + khbase + CAB-56 ホストハーネス (khmrel/khmaster/khmring) + 一覧表
 #   ABLATE=1 bash .../run_all.sh                                     + 修復 pass を 1 本ずつ外す ablation (数分)
 #   TRIALS=1000 SEED=7 bash .../run_all.sh                           試行数 / seed 変更 (既定 200 / 1)

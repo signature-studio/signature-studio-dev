@@ -1,5 +1,8 @@
-# INVENTORY — FL(win/mac) のオーディオ/MIDI import・API 呼出面 (実測)
+# 自動生成: `tools/audio` の import/API 呼出面抽出 driver
 
+> **人手編集禁止** (生成元を直す)。本ファイルは測定・抽出結果の**単一の正本**。
+
+# INVENTORY — FL(win/mac) のオーディオ/MIDI import・API 呼出面 (実測)
 再生成: `bash tools/audio/inventory.sh` → `results/inventory_raw.txt` (生出力)・`results/xref.json`。
 対象: win64 `FLEngine_x64.dll` (block00031, image base 0x400000, Delphi) / `ILWASAPI2ASIO_x64.dll` (block00001) / mac `FLEngine_x64.dylib` x86_64 スライス。アドレスは win64 VA。
 

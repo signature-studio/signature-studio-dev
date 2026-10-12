@@ -16,6 +16,7 @@ typedef uint64_t u64; typedef uint32_t u32; typedef uint16_t u16; typedef uint8_
 
 #define ARENA_BASE 0x04000000UL
 #define ARENA_SIZE (8UL << 20)
+#define ARENA_CLEAR 0x10000UL   /* trial 冒頭に zero 化する固定窓 (mgr slot 0x0400F020 を含む。wasm 側 compare.mjs と同値) */
 
 enum { RET_NONE = 0, RET_I32 = 1, RET_F32 = 2, RET_I64 = 3, RET_F64 = 4 };
 
@@ -44,7 +45,9 @@ static inline u64 dbits(double d) { u64 u; memcpy(&u, &d, 8); return u; }
 #define CD0(va, rk, d0)                do_call(va, rk, 0, 0, 0, 0, dbits(d0), 0, 0, 0, 0, 0, 0, 0)       /* xmm0 = double */
 #define CF0(va, rk, f0)                do_call(va, rk, 0, 0, 0, 0, fbits(f0), 0, 0, 0, 0, 0, 0, 0)       /* xmm0 = float */
 
-typedef struct { const char* name; void (*trial)(int idx); int ncalls_hint; } Scenario;
+typedef struct { const char* name; void (*trial)(int idx); int ncalls_hint; int rec_stack; } Scenario;
+/* rec_stack=1: native のスタック残差 (return address スロット等) を sidecar に記録し
+ * wasm の kh_stack に replay する (未初期化スタック読みの bit 精密比較用。DSP 系は 0) */
 extern Scenario SCEN_LIST[];
 
 #endif

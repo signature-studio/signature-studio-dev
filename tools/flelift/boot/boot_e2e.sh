@@ -30,7 +30,9 @@ python3 "$HERE/gen_boot.py" --pe "$PE" --out "$W"
 # ---- 2. lift (boot 用 entries: +entry_point 0x1376820, +longjmp 断片 0x1376840, +override) ----
 if [ ! -f "$LIFT/fle_lifted.c" ] || [ "$FAST" = 0 ] || [ "$W/fle_entries_boot.json" -nt "$LIFT/fle_lifted.c" ]; then
   echo "[boot_e2e] lift (x64c) ..."
-  python3 "$FLE/x64c.py" --pe "$PE" --entries "$W/fle_entries_boot.json" --out "$LIFT" --closure ${FLE_LIFT_CLOSURE:-0} \
+  # closure 既定 2 (FLE-2 実測: closure 0 = 16 unit / closure 2 = 40 unit。20,479 → 29,415 関数)。
+  # FLE_LIFT_CLOSURE=0 で旧既定に戻せる。
+  python3 "$FLE/x64c.py" --pe "$PE" --entries "$W/fle_entries_boot.json" --out "$LIFT" --closure ${FLE_LIFT_CLOSURE:-2} \
     --img 0x400000 --shift 0 --img-size 0x18c0000 --impbase 0x1D80000 \
     --override 0x4126f0=fle_ov_longjmp --override 0x409410=fle_ov_getmem \
     --override 0x409440=fle_ov_freemem --override 0x4120c0=fle_ov_initunits
@@ -73,7 +75,7 @@ BUILD() { # BUILD <variant> <bridge.c> [extra emcc flags...] [-- nosx]
      -DFLEBOOT_STRICT=$([ "$v" = strict ] && echo 1 || echo 0) -DFLEBOOT_NOSX=$([ "$v" = nosx ] && echo 1 || echo 0)
   local OBJS="$W/obj/${v}_lifted.o $W/obj/${v}_data.o $W/obj/${v}_cpu.o $W/obj/${v}_glue.o $W/obj/${v}_bridge.o $W/obj/${v}_tw.o $W/obj/${v}_boot.o"
   [ $nosx = 1 ] || OBJS="$OBJS $W/obj/sx_*.o"
-  local EXPORTS=_fle_boot_enter,_fle_boot_set_strict,_fle_units_run,_fle_units_total,_fle_units_empty,_fle_boot_stage,_fle_n_getmem,_fle_n_freemem,_fle_n_longjmp,_fle_n_exit,_fle_n_getproc,_fle_n_soft,_fle_n_soft_uniq,_fle_soft_name,_fle_soft_count,_fle_va_calls,_fle_va_bytes,_fle_n_cb,_fle_unit_proc,_fle_run,_fle_rget,_fle_data_install,_fle_init,_fle_reset,_fle_boot_set_blkdiag,_fle_blkdiag_stat
+  local EXPORTS=_fle_boot_enter,_fle_boot_set_strict,_fle_units_run,_fle_units_total,_fle_units_empty,_fle_boot_stage,_fle_n_getmem,_fle_n_freemem,_fle_n_longjmp,_fle_n_exit,_fle_n_getproc,_fle_n_soft,_fle_n_soft_uniq,_fle_soft_name,_fle_soft_count,_fle_va_calls,_fle_va_bytes,_fle_n_cb,_fle_unit_proc,_fle_run,_fle_rget,_fle_data_install,_fle_init,_fle_reset,_fle_boot_set_nullpage,_fle_boot_set_blkdiag,_fle_blkdiag_stat
   [ $nosx = 1 ] || EXPORTS="$EXPORTS,_shimx_set_trace,_shimx_init"
   emcc $OBJS -o "$W/fleboot_$v.cjs.tmp" \
     -O0 -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8MB -sGLOBAL_BASE=268435456 \

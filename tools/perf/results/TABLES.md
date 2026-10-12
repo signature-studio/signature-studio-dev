@@ -1,5 +1,10 @@
-# PERF TABLES (自動生成: 2026-10-10T15:57:20+09:00)
+# 自動生成: `bash tools/perf/perf.sh` (`results/TABLES.md`・各 `tables_*.mjs`)
 
+> **人手編集禁止** (生成元を直す)。本ファイルは測定・抽出結果の**単一の正本**。
+> **行数目安**: 自動生成ファイルのため行数上限はなし (`docs/DOC_MAP.md` §1)。
+
+
+# PERF TABLES (自動生成: 2026-10-10T15:57:20+09:00)
 ## node (v26.10.0 / V8 14.6)
 
 #### A. emcc -O 水準 (SIMD 無し, gc-sections, min exports)

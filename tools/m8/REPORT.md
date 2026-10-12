@@ -2,7 +2,7 @@
 
 - 日付: 2026-10-10。基点 HEAD = 805110b (M7 検収後)。工域: tools/m8/ のみ新規追加
   (tools/m5/m6/m7 は読取のみ, 改変 0 行; work/, __pycache__ は tools/m8/.gitignore で除外)。
-- 検証環境: node v26 / emcc 6.0.12 (/opt/emsdk) / Python 3.14 / RetDec 5.0 産物を m6 work 再利用。
+- 検証環境: node v26 / emcc 6.0.12 (`[EMSDK]`) / Python 3.14 / RetDec 5.0 産物を m6 work 再利用。
 - 検収コマンド: `bash tools/m8/m8_e2e.sh` (**exit 0**, tools/m8/work/e2e_result.json)。
 
 ## 0. 結論一覧
@@ -142,7 +142,7 @@ tools/m7 REPORT §3-(a) pattern C (xmm 引数は i32 raw-bits + `__asm_*` 疑似
   trap8_test.mjs / t1_sel8.mjs / t3.m8.mjs / idx_store_check.mjs / crumbs.mjs (label
   breadcrumb tracer) / nanring.mjs + msimd8_dbg.c + msimd8_core.h (NaN tracer) /
   .gitignore (work/, __pycache__/) / REPORT.md (本書)。
-- tools/m5/m6/m7, src/, tools/shim/, tools/docs/, README は **読取のみ (改変 0 行)**。
+- tools/m5/m6/m7, src/, tools/shim/, README・docs/ は **読取のみ (改変 0 行)**。
 - work/ 産物 (ott_m8.ll / ott_m8.cjs / t1_out 系 hex / log / json) は commit 対象外
   (tools/m8/.gitignore)。
 

@@ -1,5 +1,9 @@
 # M6 REPORT — OTT (Xfer) VST2 win64 DSP コア lifter → wasm PoC
 
+> 正本: `tools/m6/REPORT.md` (旧 RetDec 路線の経緯・歴史)。完走路の正本は `tools/ott/REPORT.md`。
+> **行数目安**: 本ファイルは 250 行を超過 (`docs/DOC_MAP.md` §1 の上限ルール参照)。
+> 超過分は Git 履歴に残る形での分割移動を推奨 (**内容は削除しない**)。
+
 - 日付: 2026-10-10。HEAD 基点: 901ce24。**M6b (2026-10-10 追記)**: SIMD helper 接続
   (msimd6_core.h 補完) / wasm-ld signature mismatch 12→0 / t1 run-complete / t3 mem 照合
   / trap_test probe 引数是正 7 件 (うち 6 件 OK, c91cc は broken-lift OOB で FAIL)。
@@ -22,7 +26,7 @@ DLL の PE 実データを VA 一致で wasm 線形メモリに敷設し、OTT D
 
 ## 2. 素材
 
-抽出元: `Install_Xfer_OTT_137.exe` → `/home/ubuntu/work/analysis/plugins/ott/binaries/`
+抽出元: `Install_Xfer_OTT_137.exe` → `docs/REFERENCES.md` `[ANALYSIS-PLUGINS]` の `plugins/ott/binaries/`
 
 - **正本: `OTT_vst2_win64.dll`** — 関数境界 (`.pdata` RUNTIME_FUNCTION) 走査、RetDec lift、
   データ敷設すべてこの DLL が対象。

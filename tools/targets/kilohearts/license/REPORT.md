@@ -115,3 +115,12 @@ DSP 固有 closure (42 効果) にはライセンス/ネット系参照が無く
 - 検証: **47/47 製品が「編集可能」として成立** (`em_check.mjs` ok=50/ng=0) + native oracle (実機機械語・アリーナ ms_abi・image パッチで stub seam 両系一致) との ctx-fuzz **200/200 (700 call) + 1000/1000 (10,000 call) bit-exact**。
 - 回帰: lic_check 70/70 / license run_all.sh exit=0 / snapins e2e exit=0 (無劣化)。
 - §5-2 の残課題は KH-11 (CAB-248) へ引継: subscribe 経路 (0x180024bd0/0x180025080) の解除 (間接 call 復元が前提) と listener/observer ありの通知、0x1800f6540 の lift。
+
+## 10. KH-11 追記 (CAB-247 残スコープ・詳細は `KH11_REPORT.md`、検証起点 commit `0d589e6`)
+
+- **subscribe 経路を実 IR 化して bit-exact 達成** (残スコープ 1): kh_lower [icall] pass を snapins 5d30dff から移植 (DEFECTS.md D15 / icall §4 D1 修復) + module E lift 25→44 関数。`em` 200/200 (700/700 call)・`empoll` 1000/1000 (10,000/10,000 call) bit-exact。subscribe no-op seam を撤去し EditorModel ctor → 0x1800526f0 の manager EventSlot 登録が wasm で動く。
+- **functor offset 未初期化 qword コピーを 0 確定化**: clone (0x18005b430/0x18003f7d0) の `mov rcx,[rcx+0x18]` → `xor ecx,ecx` (native image パッチ) と kh_lower の同ブロック store 0 化 (wasm) の対称修正。抜くと invoke rcx ワイルド → SIGSEGV (負律対照 §5.2-1)。
+- **module E -O1 採用** (残スコープ 5): -O0/-O1 × `--volatile-ret` の 4 組合せすべて回帰全項目 PASS。wasm 439,208 B → **364,770 B** (83.0%)。
+- 回帰: run_all.sh **exit=0** (33 s)・lic_check **70/70**・em_check **ok=52 ng=0**・snapin 6 種 base/lic 200/200。
+- 未解決 (起票先付き): emfire (manager slot 起火 0x18010b180) の post-state bit 不一致 (vector-compact の ctrl vtable delete thunk 0x180003360 = 尾 `jmp rax` 未 lift) → 親 CAB-13 に次タスク提案。0x1800f6540 lift・listener [sub+0x1170] 通知検証も未実施 → 親 CAB-13。
+- 独立再計算: `python3 scripts/kh11_audit.py` (lift 44 関数 / icall raw 97 サイト (空ブロック 77) / slot map 4,934 スロット完全一致)。

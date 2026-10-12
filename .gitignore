@@ -15,3 +15,7 @@ coverage/
 # 先頭の / でリポジトリ直下だけに限定し、tools/ 以下の同名ディレクトリは対象外のままにする。
 /artifacts/**/*
 !/artifacts/.gitkeep
+
+.wrangler/
+*.flac
+*.whl

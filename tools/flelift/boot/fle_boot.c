@@ -58,6 +58,7 @@ void fle_blk_free_post(u32 p, u32 ok, u32 ret);
 /* ---------------- 計数 ---------------- */
 static u32 g_units_run, g_units_total, g_units_empty, g_boot_stage;
 static u32 g_n_getmem, g_n_freemem, g_n_longjmp, g_n_exit, g_n_getproc, g_n_soft, g_n_cb, g_n_loadstr, g_n_cb_enum;
+static int g_nullpage_off = 0;   /* FLE-4: 1 = NULL ページ guard を無効化 (既定 0 = 有効) */
 static u32 g_va_calls; static u64 g_va_bytes;
 static u32 g_survey;
 /* dispatch probe: 直近 128 target のリング + 計数 (FastMM 0x407a50 系 / VMT 由来の観測) */
@@ -183,7 +184,7 @@ void imp_RaiseException(void) {  /* Delphi SEH raise → JS 例外化 (boot/surv
 }
 void imp_VirtualAlloc(void) {  /* shimx VirtualAlloc (weak) へ委譲 + 計数 */
     u64 addr = R[1], size = R[2]; u32 type = R[8] & 0xffffffff, prot = R[9] & 0xffffffff;
-#ifdef FLEBOOT_NOSX
+#if FLEBOOT_NOSX
     /* nosx: shimx 未 link なので fle_cpu.c の bump allocator を使う */
     static uint64_t cur = 0x2100000ull;
     uint64_t sz = (size + 0xffff) & ~0xffffull;
@@ -224,6 +225,8 @@ static u32 g_bd_alloc_n, g_bd_free_n, g_bd_free_ok, g_bd_free_fail, g_bd_dblfree
 static u32 g_bd_canary_hit;                     /* 最初に canary 不一致を検出した seq */
 static u32 g_bd_lo = 0xffffffffu, g_bd_hi;
 EMSCRIPTEN_KEEPALIVE void fle_boot_set_blkdiag(int v) { g_bd_verbose = (u32)(v != 0); }
+/* NULL ページ guard の ON/OFF (既定 ON)。0 にすると元の wasm 内容に戻す。 */
+EMSCRIPTEN_KEEPALIVE void fle_boot_set_nullpage(int off) { g_nullpage_off = (int)(off != 0); }
 
 static u32 bd_site(int k) {                    /* guest stack 上の直近 .text retaddr (k 段上) */
     u64 sp = R[4];
@@ -455,6 +458,10 @@ void fle_ov_initunits(void) {
     }
 }
 
+/* FLE-5 診断フック (既定 0 = 無効)。gentrace/dbg lift の fprintf を有効にする。
+ * 設定は fle_boot_set_dbg(int)。diagnostic lift (work/boot/dbgout/) のみ参照。 */
+int g_dbg_6c = 0;
+EMSCRIPTEN_KEEPALIVE void fle_boot_set_dbg(int v) { g_dbg_6c = (int)(v != 0); }
 static int g_installed;
 EMSCRIPTEN_KEEPALIVE void fle_boot_set_strict(int v) { fle_g_strict = (unsigned char)(v != 0); }
 EMSCRIPTEN_KEEPALIVE void fle_test_throw(void) { fle_throw_kind((long)(intptr_t)"test", 5); }
@@ -495,7 +502,17 @@ EMSCRIPTEN_KEEPALIVE void fle_boot_enter(int survey) {
         fle_data_install();
         fle_textwin_install();
         fle_init();
-#ifndef FLEBOOT_NOSX
+        /* FLE-4: NULL ページ guard。guest が field_8 == NULL のオブジェクトに対して
+         * `mov rax,[rax+8]; mov rcx,rax; mov rbx,[rax]; call [rbx+0x18]` (仮想呼出) を
+         * 実行すると、wasm では linear address 0 に emscripten の magic ("emsc" =
+         * 0x63736d65) があるため `call [0x63736d7d]` で OOB trap する
+         * (unit#209 で実測: chk variant が __LINE__=1015940 → lift C の
+         *  `0x8157c1: call qword ptr [rbx + 0x18]` を指した)。
+         * ネイティブ Windows では AV になるところを、m11 の icall-miss 規約と同じ
+         * 「NULL 参照は 0 扱い」にして boot 連鎖を続行する。
+         * guest イメージは 0x400000 始まりなので [0, 0x1000) は未使用領域。 */
+        if (!g_nullpage_off) memset((void*)A_(0), 0, 0x1000);
+#if !FLEBOOT_NOSX
         /* nosx variant は shimx を link しない (fle_cpu.c の imp_ のみ) ので、shimx 依存の
          * wiring は丸ごと落とす。旧実装はここが無条件で nosx が link できなかった
          * (FLE-2 実測: wasm-ld undefined symbol shimx_cbtrans_* 等 8 件)。 */
@@ -503,11 +520,17 @@ EMSCRIPTEN_KEEPALIVE void fle_boot_enter(int survey) {
         shimx_cbtrans_install();
         shimx_set_proc_resolver(shimx_lifttab_proc_resolver);
         shimx_set_intptr_limit(0x10000);
+        /* FLE-3: R7 互換モード。unit 111 で `InitializeCriticalSectionEx(NULL/misaligned)` が
+         * shimx の fail-fast に掛かり abort していた (実測: work/boot/run_plain.log)。
+         * CRITICAL_SECTION は単一スレッド前提では意味を持たないので no-op で通し、
+         * boot 連鎖の先を伸ばす。副作用: Enter/Leave/TryEnter の意味が失われる
+         * (survey の lock 依存 unit は誤判定する可能性 — REPORT §5 に記録)。 */
+        shimx_set_cs_null_ok(1);
 #endif
         fle_ff_hook = fle_ff;
         fle_dispatch_probe = fle_probe_dispatch;
         g_installed = 1;
-#ifdef FLEBOOT_NOSX
+#if FLEBOOT_NOSX
         fprintf(stderr, "[fleboot] image + textwin installed (nosx: shimx 未 link)\n");
 #else
         fprintf(stderr, "[fleboot] image + textwin installed, shimx cbtrans/resolver wired\n");

@@ -3,34 +3,36 @@
  "boot": {
   "rc": null,
   "threw": {
-   "cls": "unlifted",
-   "target": 5404059
+   "cls": "soft",
+   "name": "GetDC"
   },
-  "units_run": 40,
+  "units_run": 93,
   "units_total": 942,
   "units_empty": 3,
-  "rax": "0x5275b0",
+  "rax": "0x15ec501",
   "longjmp": 0,
   "stage": 1,
-  "getmem": 662,
-  "freemem": 209,
-  "va_calls": 1,
-  "va_bytes": 1310704,
+  "getmem": 1224,
+  "freemem": 332,
+  "va_calls": 18,
+  "va_bytes": 14155744,
   "getproc": 29,
   "exit": 0,
   "cb_calls": 0,
-  "soft_calls": 0,
-  "soft_uniq": 0,
+  "soft_calls": 1,
+  "soft_uniq": 1,
   "mm_after": {
    "getmem": "0x407a50",
    "freemem": "0x407e20",
    "realloc": "0x408040",
    "slot3": "0x4083b0"
   },
-  "stopped_at_1based": 40
+  "stopped_at_1based": 93
  },
  "survey": null,
- "soft_top": [],
+ "soft_top": [
+  "268449149:1"
+ ],
  "notes": {
   "entry": "0x1376820",
   "longjmp_target": "0x1376840",

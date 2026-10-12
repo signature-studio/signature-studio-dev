@@ -1,9 +1,12 @@
 # LEGAL.md — ライセンス/利用規約上の運用制約サマリ (事実整理)
 
+> **行数目安**: 本ファイルは 250 行を超過 (`docs/DOC_MAP.md` §1 の上限ルール参照)。
+> 超過分は Git 履歴に残る形での分割移動を推奨 (**内容は削除しない**)。
+
 > **法的助言ではない。** 本書は同梱テキスト (一部は公式サイトの公開文面) から条項を抽出し、技術チームが「何を同梱・公開しないか」「どんなアクセス制御が要るか」を決めるための論点整理である。適用可否・有効性・解釈は断定していない (「論点」と記したものは未決)。実際の判断は弁護士等の専門家が、ユーザが実際に承諾した版の規約に基づいて行うこと。
 >
 > 作成: 2026-10-10 (担当 O: legal) / 対象: FL Studio 26.1.7 (mac 5419 / win64 5653)、Xfer OTT 1.37・Serum 2 2.1.5、Fresh Air 1.0.9、Kilohearts Installer (2026-03 release)。
-> 方針前提: `analysis/strategy.md` §6 (成果物の再配布はしない / 外部通信機能は対象外 / DRM 回避を目的としない)。
+> 方針前提: `docs/REFERENCES.md` `[STRATEGY]` §6 (成果物の再配布はしない / 外部通信機能は対象外 / DRM 回避を目的としない)。
 > 運用規程 (確定 2026-10-10): ライセンス機構の無力化 / アクティベーション無条件通過 / 運用形態 B — §6.0。OSS 再配布論点は別件・未回答のまま (§6.0-7)。
 
 ## 目次
@@ -38,13 +41,14 @@
 
 ## 1. 対象文書・出典の凡例と所在
 
-パス短縮: `MAC` = `/home/ubuntu/work/analysis/mac/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL` / `WIN` = `/home/ubuntu/work/analysis/win64/extracted` / `TGT` = `/home/ubuntu/work/webstudio/tools/targets`。
+パス短縮: `MAC` = `mac/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL` / `WIN` = `win64/extracted` / `TGT` = `tools/targets`。
+**外部パスの正本は `docs/REFERENCES.md` (`[MAC]` / `[WIN]` / `[ANALYSIS-PLUGINS]` / `[LEGAL-WORK]`)。本書ではその配下を上記の相対表記で示す。**
 行番号は原ファイルの行 (HTML/テキスト)。RTF・NSIS ヘッダ由来は条項番号で示す。
 
 | 凡例 | 文書 | 所在 | 検証した事実 |
 |---|---|---|---|
 | `[FL-EULA]` | IMAGE LINE SOFTWARE EULA (HTML, 23 条) | `MAC/System/Legal/EULA.html` (247,104 B, mtime 2025-09-24)。win: `WIN/block24719_DATA.bin` | win/mac は `cmp` で **バイト同一**。win の NSIS ファイル一覧 (`block25163`) にも `System\Legal\EULA.html/247104` |
-| `[FL-ToU]` | Image-Line **TERMS OF USE** (RTF, 約 32 条) = インストーラのライセンス画面 | mac: `analysis/mac/pkg_extract/Resources/en.lproj/license.rtf` (88,736 B, mtime 2026-07-02、`Distribution` に `<license file="license.rtf"/>`)。win: `WIN/block00029_DATA.bin` | 両者 `cmp` で **バイト同一**。win は NSIS ヘッダ (LZMA 解凍 3,519,116 B) 内に同文があり、同ヘッダに "License Agreement / You must accept the agreement to install" を確認 → ライセンスページ本文と判断 (推定)。条項番号は RTF 印字の番号 (原文に "19." が 2 回出る誤番あり) |
+| `[FL-ToU]` | Image-Line **TERMS OF USE** (RTF, 約 32 条) = インストーラのライセンス画面 | mac: `MAC/../Resources/en.lproj/license.rtf` (88,736 B, mtime 2026-07-02、`Distribution` に `<license file="license.rtf"/>`)。win: `WIN/block00029_DATA.bin` | 両者 `cmp` で **バイト同一**。win は NSIS ヘッダ (LZMA 解凍 3,519,116 B) 内に同文があり、同ヘッダに "License Agreement / You must accept the agreement to install" を確認 → ライセンスページ本文と判断 (推定)。条項番号は RTF 印字の番号 (原文に "19." が 2 回出る誤番あり) |
 | `[FL-LIC]` | OSS 表記 15 ファイル `System/Texts/Licenses/*.txt` | `MAC/System/Texts/Licenses/` / win: `WIN/block24735`–`24749` | win/mac 各 15 本が **空白・BOM・文字コード差を除き同一** (自作比較) |
 | `[FL-LAME]` | `System/Legal/LAME MP3 encoder/LGPL.txt` (18,329 B) | `MAC/System/Legal/...` / win `block24720` | win/mac `cmp` 同一。**中身は GNU GPL v2 本文** (1991 年版) |
 | `[FL-ABOUT]` | クレジット/"Used technologies" | `MAC/System/Texts/About/AboutTxt.txt` | 第三者技術の一覧 (ライセンス本文なし) |
@@ -55,7 +59,7 @@
 | `[SLATE-ToS]` | Audiotonix General Terms of Use (Slate Digital) | <https://slatedigital.com/terms-of-service/> を 2026-10-10 に取得 | **同梱ではない**。Fresh Air に適用される版かは未確認 |
 | `[NI-EULA]` | Native Instruments EULA | <https://www.native-instruments.com/pages/end-user-license-agreement> (2026-10-10。作成時は検索スニペットのみ、検収時に全文を取得: 契約主体 inMusic NI GmbH、ページ表記 "Latest Version 2026-07-01") | **同梱ではない**。Massive X のインストーラは未入手 (同梱版の有無・Web 版との同一性は未確認) |
 
-補足: FL mac の dmg に Software License Agreement リソースは無い (dmg XML plist に `LPic`/`STR#`/`RTF `/`TEXT` 無し)。抽出物の置き場はリポジトリ外 `/home/ubuntu/work/analysis/legal_work/` (tools/docs/work/ は `.gitignore` 対象外だったため)。
+補足: FL mac の dmg に Software License Agreement リソースは無い (dmg XML plist に `LPic`/`STR#`/`RTF `/`TEXT` 無し)。抽出物の置き場はリポジトリ外 (`docs/REFERENCES.md` `[LEGAL-WORK]`) (抽出作業用 dir は当時 `.gitignore` 対象外だったため)。
 
 ---
 
@@ -108,9 +112,9 @@
 
 ### 2.4 認証・アクティベーション・オンライン検証・テレメトリ・アカウント
 
-外部通信機能は本プロジェクトで対象外 (SUBAGENT_RULES / strategy §6.7)。条項との関係:
+外部通信機能は本プロジェクトで対象外 (`docs/DECISIONS.md` D3 / 元戦略 `docs/REFERENCES.md` `[STRATEGY]` §6.7)。条項との関係:
 
-- **アンロックはアカウント認証前提**: ToU art.5-1 "unlock FL Studio by email and password"、"logging in and unlocking FL Studio confirms … the Software activation"。インストーラ画面文言 `[NSIS-FL]` も "enter your Image-Line account e-mail and password in the About window to unlock the program from trial mode"。既存解析の外部 URL: `support.image-line.com/member/regfile_unlock.php`, `/action/license/serial`, `/action/redirect/FLStudioAuthentication` (`analysis/mac/REPORT.md` §5.3)。→ オンライン認証不能なので wasm 版は**未登録 (トライアル) 状態が既定**になる (※ 2026-10-10 ユーザ指示により設計上方針確定: ライセンス機構を無力化し「登録済み」として振る舞う — §6.0)。
+- **アンロックはアカウント認証前提**: ToU art.5-1 "unlock FL Studio by email and password"、"logging in and unlocking FL Studio confirms … the Software activation"。インストーラ画面文言 `[NSIS-FL]` も "enter your Image-Line account e-mail and password in the About window to unlock the program from trial mode"。既存解析の外部 URL: `support.image-line.com/member/regfile_unlock.php`, `/action/license/serial`, `/action/redirect/FLStudioAuthentication` (`docs/REFERENCES.md` `[MAC]` の REPORT §5.3)。→ オンライン認証不能なので wasm 版は**未登録 (トライアル) 状態が既定**になる (※ 2026-10-10 ユーザ指示により設計上方針確定: ライセンス機構を無力化し「登録済み」として振る舞う — §6.0)。
 - **未登録でも主要機能は使える** (ToU art.8-1: "fully-functional … does not require registration to enable its primary functionality")。ただし無料版は "does not allow the User to open stored items after closing the Software" (art.4-4)、デモ版 plugin は保存プロジェクト再読込時に空スロットへ置換 (`[FL-EULA] §4` 末尾 / ToU art.10-6)。登録が無効なら demo モードで動作する旨の画面文言あり (`NotReggedTxt.txt`)。
 - **Cracked の定義**と無権利条項 (§0-3)。登録コード/アンロック用データを自作・偽装・流通させる設計は避け、必要なら **利用者本人の正規データをローカルに入れる**形に限る (※ 2026-10-10 ユーザ指示により、ライセンス状態データの配置・合成は正規保有者であるユーザの承認の下で許容する方針に確定 — §6.0。本節は条項の事実整理のまま残す)。
 - **キー管理**: ToU art.12-7 "In case the Users registration key is found to be available or accessible to any third party on any website, ftp site or otherwise, … blocked and rendered unusable"。サーバ (R2) に利用者のキー・アカウント情報を保存しない (strategy §6.7 の「ローカル IndexedDB のみ」と整合)。art.12-3: 不正使用/配布を知った場合は Image-Line へ通知義務、art.13: 身分証による所有者確認の可能性。
@@ -132,7 +136,7 @@
 
 | 名称 (出典 `System/Texts/Licenses/…`) | ライセンス | wasm 再ビルド/配布時に効く主な条件 |
 |---|---|---|
-| FFmpeg (`ffmpeg.txt`) — mac 同梱 n4.4.3 / win 同梱 n4.4.2 (`avcodec-58` 系、`WIN/block24433`–`24439`。※ `analysis/win64/REPORT.md` §4.2 の「FFmpeg 6.x」は誤り) | `ffmpeg.txt` 冒頭は LGPL-2.1+ と記載 (本文 LGPL-2.1)。**win 実ビルド**の configure 文字列は `--enable-version3` (=LGPLv3+)、`--disable-libx264/x265/xvid`、`--enable-libmp3lame --enable-libopus --enable-libvorbis --enable-libsrt …`、`--enable-gpl` は無し。バイナリ内の license 文字列は win `libavcodec license: LGPL version 3 or later`、mac (x86_64/arm64 とも) `LGPL version 2.1 or later` (mac の configure 文字列 `--enable-shared --disable-programs --disable-avfilter …` に `--enable-gpl`/`--enable-version3` 無し) | 通知・ライセンス本文の同梱 (§6 L105)、完全なソース or 書面オファー (§6a/c, L107–109)、**差し替え可能なリンク機構** (§6b, L108)、結合物条件が改変とそのデバッグ目的 RE を許すこと (§6, L103)。GPL 部品 (`--enable-gpl`/libx264 等) を有効にしない。version3 系の部品を避ければ v2.1 のまま。「GPL 部分が使われると全体に GPL」(`ffmpeg.txt` L3) |
+| FFmpeg (`ffmpeg.txt`) — mac 同梱 n4.4.3 / win 同梱 n4.4.2 (`avcodec-58` 系、`WIN/block24433`–`24439`。※ `docs/REFERENCES.md` `[WIN64]` の REPORT §4.2 の「FFmpeg 6.x」は誤り) | `ffmpeg.txt` 冒頭は LGPL-2.1+ と記載 (本文 LGPL-2.1)。**win 実ビルド**の configure 文字列は `--enable-version3` (=LGPLv3+)、`--disable-libx264/x265/xvid`、`--enable-libmp3lame --enable-libopus --enable-libvorbis --enable-libsrt …`、`--enable-gpl` は無し。バイナリ内の license 文字列は win `libavcodec license: LGPL version 3 or later`、mac (x86_64/arm64 とも) `LGPL version 2.1 or later` (mac の configure 文字列 `--enable-shared --disable-programs --disable-avfilter …` に `--enable-gpl`/`--enable-version3` 無し) | 通知・ライセンス本文の同梱 (§6 L105)、完全なソース or 書面オファー (§6a/c, L107–109)、**差し替え可能なリンク機構** (§6b, L108)、結合物条件が改変とそのデバッグ目的 RE を許すこと (§6, L103)。GPL 部品 (`--enable-gpl`/libx264 等) を有効にしない。version3 系の部品を避ければ v2.1 のまま。「GPL 部分が使われると全体に GPL」(`ffmpeg.txt` L3) |
 | LAME (`lame.txt`; `System/Legal/LAME MP3 encoder/LGPL.txt`) | `lame.txt`: LGPL。**別ライブラリとしてリンク**、LAME への謝辞とサイトリンク、改変は LGPL で還元。**デコード機能 (mpglib) は GPL** で GPL でないプログラムは使えない旨の注意 (L18–27)。同梱 `LGPL.txt` は実体 **GPL v2 本文** (名称不一致) | encoder のみ使用・差し替え可能な別モジュール化・mpglib デコード部を使わない。upstream から再ビルドする場合は upstream の COPYING を採用 |
 | Python 3.12.1 (`python.txt`, mac `Python.framework/.../LICENSE.txt`, win `Shared\Python\LICENSE.txt`) | PSF License (+ BeOpen/CNRI/CWI/0BSD の歴史的文書、組込 SW の表記: OpenSSL (Apache-2.0)、expat、zlib、libffi、mpdecimal 等) | PSF 著作権表示の保持 (§2)、派生物提供時に変更の要約 (§3)。組込ライブラリの表記一式を NOTICE に |
 | FreeType (`freetype.txt`) | FreeType Project License (BSD 系 + 謝辞条項) | 配布物の文書に "based in part of the work of the FreeType Team" 相当の **謝辞必須** (§2, L118–)、ソース再配布時は FTL.TXT 保持・変更明示 (§2, L111–)、名称の広告利用禁止 (§3, L129) |
@@ -146,7 +150,7 @@
 | フォント (`MAC/Shared/Artwork/Fonts/*`) | ライセンス本文あり: SIL OFL (Cuprum, Francois One, Barlow, Italianno, Josefin Sans, Khand, Orbitron, Oswald, PT Sans, Revalia, Share, WebSymbols) / Apache-2.0 (Open Sans Condensed, Roboto Condensed)。**本文なし**: Ubuntu 系、04b03、American-Captain、Antaris、Chosence、ornamentsFont ほか | OFL: 単体販売不可・予約フォント名・同ライセンス維持。Apache: NOTICE/表示の維持。本文なしのフォントは出所未確認のため、wasm 同梱前に要確認 |
 
 メモ:
-- Xfer OTT 自体も Roboto Condensed (Apache-2.0)、zlib 1.2.3 を内蔵 (`analysis/plugins/ott/REPORT.md` / binaries strings)。Kilohearts Installer は Roboto フォントを同梱 (`Resources/fonts`、ライセンス本文は未確認。Roboto は通常 Apache-2.0)。
+- Xfer OTT 自体も Roboto Condensed (Apache-2.0)、zlib 1.2.3 を内蔵 (`docs/REFERENCES.md` `[ANALYSIS-PLUGINS]` の `plugins/ott/REPORT.md` / binaries strings)。Kilohearts Installer は Roboto フォントを同梱 (`Resources/fonts`、ライセンス本文は未確認。Roboto は通常 Apache-2.0)。
 - `[FL-ABOUT]` の "FFmpeg … under the LGPLv2.1" と win 実ビルド (`--enable-version3`) の **記載差** がある。LGPLv3 の追加条項 (ユーザ製品での Installation Information 等) が効くかは再ビルド側が選べば避けられる。
 
 ### 3.2 LGPL 等 — wasm 静的リンク時に効く論点
@@ -223,7 +227,7 @@ zplane (Auftakt / élastique Pro / Metering / Restore)、Chicken Systems (Sample
 
 1. **運用形態 B (確定)**: Cloudflare Access で限定公開・非頒布。ユーザは FL Studio および対象プラグイン (Serum 2 / Massive X / Kilohearts / Fresh Air) の正規保有者であり、限定公開環境での自己運用を目的とする。
 2. **ライセンス/アクティベーション機構の無力化**: FL 本体・同梱プラグインの全ライセンス/アクティベーション機構を無効化する。ライセンス状態は常に「アクティブ済み/登録済み」として振る舞う (無条件アクティベーション)。
-3. **オフライン**: オンライン認証・アクティベーション通信は行わない。Gopher / FL Cloud / 更新確認など他の外部通信も既定方針どおり無効のまま (HANDOFF「ユーザ確定方針」参照)。
+3. **オフライン**: オンライン認証・アクティベーション通信は行わない。Gopher / FL Cloud / 更新確認など他の外部通信も既定方針どおり無効のまま (方針の正本は `docs/DECISIONS.md` D3)。
 4. **ライセンス状態データ**: レジストリ値・ライセンスファイル等、ライセンス状態を示すデータはユーザ (正規保有者) の承認の下で配置・合成してよい (「必要であれば cracked リソースを配置可能」の指示を含む)。
 5. **stub 方針の確定**: §0-3 / §8 で「未回答」だった「未登録のまま起動 vs 登録済みを装う」は **「登録済みとして振る舞う (無条件アクティベーション)」** に確定 (ユーザ指示 2026-10-10)。
 6. **Cracked 定義との関係 (事実の参照のみ)**: `[FL-EULA] §1` の "Cracked" 定義・無権利条項との関係は §0-3 / §2.4 の既存記載を参照すること。本節では新たな判断・断定を行わない (本書は法的助言ではない)。
@@ -274,7 +278,7 @@ zplane (Auftakt / élastique Pro / Metering / Restore)、Chicken Systems (Sample
 - 以上からファイルだけでは「正規の未改変インストーラか」を確認できない。Image-Line ToU の "Cracked" 定義は Image-Line 製品に関するもので、Slate 製品側の同種条項は ToS (§6 "circumvent any access or use restrictions") を参照。**入手元の確認をユーザに依頼 (§8)。**
 
 整合しない記述 (メモ):
-- `analysis/win64/REPORT.md` §4.2 (L110) と §7 の表 (L185) は FFmpeg を「6.x」とするが、同梱 DLL の ident は `n4.4.2-2-g7ffb7d4b04-20220622` (`avcodec-58`/`avutil-56`)。mac 同梱 dylib は `n4.4.3-1-ga1f13b592b`。
+- `docs/REFERENCES.md` `[WIN64]` の REPORT §4.2 (L110) と §7 の表 (L185) は FFmpeg を「6.x」とするが、同梱 DLL の ident は `n4.4.2-2-g7ffb7d4b04-20220622` (`avcodec-58`/`avutil-56`)。mac 同梱 dylib は `n4.4.3-1-ga1f13b592b`。
 - `LAME MP3 encoder/LGPL.txt` が GPL v2 本文。`[FL-ABOUT]` は FFmpeg を LGPLv2.1 と記載するが win ビルドは `--enable-version3`。
 - README の「プロプリエタリ plugin を wasm 化して**同梱**」の「同梱」は、strategy §6 の「第三者へ頒布しない」と文言上緊張関係 (意図の確認、§8)。
 
@@ -292,7 +296,7 @@ zplane (Auftakt / élastique Pro / Metering / Restore)、Chicken Systems (Sample
 
 次タスク案 (下流チケット):
 - **LGL-1**: 運用形態を確定し本書 §6 を単一形態の「運用規程」に書き換え (M11「EULA/非再配布運用固定化」と統合)。
-- **LGL-2**: `release guard` — 公開前に dist/R2 同期対象を走査し、FL/プラグイン由来バイト列・資産ハッシュ (analysis/* から生成した deny-list) を検出したら失敗させる。
+- **LGL-2**: `release guard` — 公開前に dist/R2 同期対象を走査し、FL/プラグイン由来バイト列・資産ハッシュ (`[ANALYSIS-DIR]`/* から生成した deny-list) を検出したら失敗させる。
 - **LGL-3**: `THIRD_PARTY_NOTICES` 自動生成 (FreeType 謝辞、BSD/MIT 表示、PSF、Apache NOTICE) + upstream バージョン/configure 記録。
 - **LGL-4**: FFmpeg/LAME 等の LGPL 部品を side module (差し替え可能) として upstream から再ビルドする設計 + `--enable-gpl`/`--enable-version3` 検出 CI。
 - **LGL-5**: 規約差分監視 (FL ToU/EULA.html、Xfer、Kilohearts、Slate、NI の最新版取得・ハッシュ比較) を FL 追従プロセスに追加。
@@ -307,14 +311,14 @@ zplane (Auftakt / élastique Pro / Metering / Restore)、Chicken Systems (Sample
 python3 -c "import re,html,sys;s=open(sys.argv[1],encoding='utf-8',errors='replace').read();s=re.sub(r'(?is)<(script|style).*?</\1>','',s);s=re.sub(r'(?i)<br\s*/?>|</(p|div|li|h\d|tr)>','\n',s);print(html.unescape(re.sub(r'<[^>]+>','',s)))" "$MAC/System/Legal/EULA.html"
 # win/mac 同一性
 cmp "$WIN/block24719_DATA.bin" "$MAC/System/Legal/EULA.html"                      # EULA.html
-cmp "$WIN/block00029_DATA.bin" analysis/mac/pkg_extract/Resources/en.lproj/license.rtf   # ToU (RTF)
+cmp "$WIN/block00029_DATA.bin" "$MAC/../Resources/en.lproj/license.rtf"   # ToU (RTF)
 # FFmpeg ビルド構成 (win)
 rg -a -o -m1 -- '--prefix=/ffbuild[^\x00]{0,3000}' "$WIN/block24434_PE.bin"
 rg -a -o 'FFmpeg version [^\x00]{0,60}' "$WIN/block24433_PE.bin"
 # NSIS ヘッダ (非 BI 版: OTT/Serum 2) のライセンスページ文: 先頭 2MB から DEADBEEF"NullsoftInst" を探し
 #   [u32 flags][sig16][u32 hdrsize][u32 arcsize][u32 csize|bit31] の後を zlib raw (-15) か LZMA で解凍し、
-#   UTF-16LE として "Licensee is prohibited" 周辺を取り出す (実装: analysis/legal_work/nsis_hdr.py)
-# FL win (BI flags=0x30) は analysis/win64/tools/nsis_extract.py と同じ LZMA(raw, lc3 lp0 pb2, dict 8MB) でヘッダ解凍
+#   UTF-16LE として "Licensee is prohibited" 周辺を取り出す (実装: `docs/REFERENCES.md` `[LEGAL-WORK]` の `nsis_hdr.py`)
+# FL win (BI flags=0x30) は `docs/REFERENCES.md` `[WIN64]` の `tools/nsis_extract.py` と同じ LZMA(raw, lc3 lp0 pb2, dict 8MB) でヘッダ解凍
 # win ファイル一覧: WIN/block25163_DATA.bin (path/size/mtime のテキスト)
 ```
-抽出物 (リポジトリ外): `/home/ubuntu/work/analysis/legal_work/{fl_mac_eula.txt, win_terms_of_use.txt, ott_nsis_license.txt, serum2_nsis_license.txt, nsis_hdr.py, fa/guide.txt}`。
+抽出物 (リポジトリ外・所在は `docs/REFERENCES.md` `[LEGAL-WORK]`): `{fl_mac_eula.txt, win_terms_of_use.txt, ott_nsis_license.txt, serum2_nsis_license.txt, nsis_hdr.py, fa/guide.txt}`。

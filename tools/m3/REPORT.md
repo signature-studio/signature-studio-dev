@@ -5,7 +5,7 @@
 
 ## 判定サマリ
 
-| M3 検証条件 (analysis/strategy.md) | 状態 | 実測 |
+| M3 検証条件 (`docs/REFERENCES.md` `[STRATEGY]`) | 状態 | 実測 |
 |---|---|---|
 | 1. 対象 wasm bit-exact ユニット一致 | **部分達成** | 純計算 4 関数 (EasyFLAC slice) は bit-exact 50/50 PASS (`m3.sh`)。ただし「中規模 dylib 丸ごと wasm 動作」(FastMM/Delphi closure 677 関数) は llvm コンパイル未通過 |
 | 2. 性能比の記録 (>10x なら route 再評価) | **達成 (本検証で新規測定)** | 同一 lifted IR の native(-O2) vs wasm/node: crc8 1.44x, crc16 1.33x, silog2+mulbits 約 36x* — *i64 FFI の BigInt ボックス化込みでオーバーヘッド主導。データ主導の crc 系はどちらも **10x 未満 → route 再評価不要** (§1.5 条件適用なし) |

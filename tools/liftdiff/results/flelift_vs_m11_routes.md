@@ -1,3 +1,7 @@
+# 自動生成: `liftdiff` batch (m11 経路比較)
+
+> **人手編集禁止** (生成元を直す)。本ファイルは測定・抽出結果の**単一の正本**。
+
 共通関数 7421 (flelift 7421, m11 7421)
 
 | m11 \ flelift | match | mismatch | unexec |

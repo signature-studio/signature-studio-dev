@@ -21,7 +21,7 @@
 - **census 寄与 (実測)**: junkHi 175→104 の改善は **P1 tail 6 site の再構成が全量** (`p1_tail` 単独で 104)。
   **F7 単独は census0 不変 (175)**。**F7@0x180120632 は例悪**: これ 1 個を外すだけで census0 104→**52** /
   census1 248→**0** (absmax 1.13e34→**2.2e-3**)。残る 6 site は個別の census 寄与 ≈0 (§3)。
-- **bit 一致影響**: x64c bit-exact 参照 (native 実機械語と 50,236 cell 一致) との突合 (6 combo × 512 cell = 3072) は
+- **bit 一致影響**: x64c bit-exact 参照 (native 実機械語と全 cell 一致・正本 `tools/ott/REPORT.md` §2) との突合 (6 combo × 512 cell = 3072) は
   **P1 再構成の有無で 765/3072 ↔ 0/3072** に分かれる (F7 の有無は無関係)。
 - **新規発見 (要対応, §6)**: auto f7,p1 の既定ビルドは **params=0.9 / [0x248]=1 / amp=0.0,1.0 の 2 combo で
   processReplacing が停止しない (無限ルーブ)**。原因は P1 再構成 site **0x18012024b と 0x1801204b9** (単体で再現,
@@ -47,7 +47,7 @@
 | └ x64c bit-exact 参照 | 6 combo / 3072 cell 一致 **0** | (設計どおり, §5) |
 | 旧既定 (--auto none) | checks 7/0, trap 0, census 132/69/**175**/136 (旧値どおり), IR 一致 O1〜O4 **全 true**, 出力 SHA **42/42 equal** (f0 21/21), RESULT **PASS** | PASS |
 | `liftlib_e2e.sh --full` | unit PASS / FA Gain **400/400** / KH Gain **366/366** / regress `{"fa_gain":"PASS","kh_gain":"PASS","ott":"PASS","ott_auto_none":"PASS"}` (21.9 s) / inject 94 detected 94 FP 0 / leafspec PASS / **ALL PASS** | PASS |
-| `ott_e2e.sh` (x64c, liftlib 非依存) | 89 scenario / 50,236 cell bit-exact, state 差 0 qword — PASS (x64c 依存のみで auto 既定の影響を受けない) | PASS |
+| `ott_e2e.sh` (x64c, liftlib 非依存) | 89 scenario / 全 cell bit-exact (正本 `tools/ott/REPORT.md`), state 差 0 qword — PASS (x64c 依存のみで auto 既定の影響を受けない) | PASS |
 
 ## 3. 新規 F7 サイト別評価 (production と 1 site 外しを比較)
 
@@ -149,7 +149,7 @@ bind xmm1 **2** / bind xmm5 **2** / 間接 call **1** / region live-out **1** (�
 ## 7. 再現手順
 
 ```sh
-SNAP=/home/ubuntu/work/webstudio/tools/liftlib/work/wt_cab238/tools/liftlib   # a137396 + CAB-238 の snapshot
+SNAP=<worktree>/tools/liftlib/work/wt_cab238/tools/liftlib   # a137396 + CAB-238 の snapshot (検証用 worktree・gitignore 対象)
 # site 別評価 (1 tag = 1 process で並列, 既定 34 tag / 実測 約 1 分) → tools/ott/work/cab238/<tag>/result.json
 LIFTLIB_PKG=$SNAP P1_HANG_PROBE=1 P1_FNMAP=1 bash tools/ott/f7eval/run_eval.sh
 LIFTLIB_PKG=$SNAP P1_HANG_PROBE=1 python3 tools/ott/f7eval/cab238_eval.py <tag> [--reuse]   # 単体
@@ -160,7 +160,7 @@ bash tools/ott/f7eval/outhash_gate.sh            # 既定ビルド vs m10 参照
 # bit 一致 (対象 build vs x64c 参照): MOD_A=<build>.cjs MOD_B=tools/ott/work/lift/ottl.cjs
 #   node tools/ott/f7eval/cab238_bitcmp.mjs
 # 無限ルーブ probe: OTT_CJS=<build>.cjs V=0.9 F=1 A=0 timeout 30 node tools/ott/f7eval/cab238_probe.mjs
-bash tools/ott/ott_e2e.sh                       # x64c 参照 (89 scenario / 50,236 cell bit-exact)
+bash tools/ott/ott_e2e.sh                       # x64c 参照 (89 scenario / 全 cell bit-exact・正本 tools/ott/REPORT.md)
 ```
 
 ## 8. 次タスク提案 (下流チケット案)

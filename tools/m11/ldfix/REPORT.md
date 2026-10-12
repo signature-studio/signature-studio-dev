@@ -139,7 +139,21 @@ F3a/F3b/F3c と同根。icall では PE 書換え (`lea B,[B+8]; op [B-8]` 補�
 4. m11 側は `m11_gen_ir2.sh` の最後に `python3 ldfix.py boot_final.ll boot_final_ldfix.ll --pe ...`
    を 1 行足すだけ (m11_e2e.sh 等の既存ファイル変更は要承認 — 本 ticket では未実施、ldfix_e2e.sh で代替)。
 
-## 7. 成果物 (tools/m11/ldfix/)
+## 7. 常設化 (CAB-131) — 概要と付録への導線
+
+**判定: 達成 (stage 5 進捗測定込み)**。CAB-231 の ldfix を `m11_gen_ir2.sh` に常設組み込みし、
+残存していた `load_dropped` 変種 3 関数を **F1v pass (新設) で吸収して `load_dropped` 892→0**。
+
+- **再現**: `bash tools/m11/m11_e2e.sh --full` (ldfix 込みで再生成) + `bash tools/m11/ldfix/embed_e2e.sh --batch` (A/B 検収)
+- **主要実測** (全て `REPORT_APPENDIX_AB.md` に詳細):
+  - 既存 e2e 回帰 (stage4 / survey / shimx_link 純リンク) は base↔fix **全数値完全同一** (非劣化)
+  - 通常起動の `units_run` は **17/942 のまま** (stage 5 未達)。進捗は「残欠陥の確定」と「halt0 53 unit の対応表更新」
+  - F1v 4 関数のうち 3 関数 (`10d35b0` / `106d220` / `108ec70`) は match 化。`126c000` は icall_drop 支配で不反転
+- **変更したファイルは 2 件のみ**: `m11_gen_ir2.sh` (+13 行)・`ldfix.py` (+180 行 = F1v pass)
+- **付録 (詳細・A/B 全表・halt0 対応表)**: [`REPORT_APPENDIX_AB.md`](REPORT_APPENDIX_AB.md)
+  (常設化の組込手順・A/B 検証・残存ボトルネック優先順・halt0 53 unit 対応表・CAB-233 引継ぎ)
+
+## 8. 成果物 (tools/m11/ldfix/)
 
 | パス | 役割 |
 |---|---|
@@ -147,8 +161,14 @@ F3a/F3b/F3c と同根。icall では PE 書換え (`lea B,[B+8]; op [B-8]` 補�
 | `ldmach.py` | capstone 機械語スキャナ (.pdata 関数区間 / memop 解析 / IR ブロック割当て) |
 | `ldfix_e2e.sh` | 1 コマンド検証 (pass 適用 → emcc 検証 → stage4 base/fix → survey → judge; `--batch` で liftdiff A/B) |
 | `stage4.sh` / `run_stage4.mjs` / `survey_stage4.mjs` / `judge_e2e.py` | m11_e2e.sh 相当 stage4 回帰の自 dir ラッパ (既存 tools/m11 ファイル未変更) |
-| `targets/m11_ldfix.json` | liftdiff 用 target (修復 IR を指す) |
+| `embed_e2e.sh` / `embed_sx_ab.sh` / `sx_halt0_ab.sh` | 常設化 A/B 検収 (stage4 + survey・`--batch` で liftdiff 全数 / alloca 足場 mainline+shimx 純リンク A/B / halt0 足場 survey A/B) |
+| `halt0_map.py` | survey JSON → halt0 発生点 × unit 対応表抽出 |
+| `targets/m11_ldfix.json`・`targets/m11_ldfix_embedded{,_post}.json` | liftdiff 用 target (修復 IR / 常設化 IR / post 後・F1v 分離用) |
+| `results/halt0_map_*.json` | halt0 対応表実測 (CAB-129 受入時 / 今日 base / 今日 fix) |
 | `work/` | 生成物 (gitignore): ldfix_fixed.ll, ldfix_report.json, batch_base*.jsonl, batch_ldfix*.jsonl, stage4/{base,fix}/ |
+
+> **正本**: 本ファイル (`REPORT.md`) が ldfix の正本。CAB-131 常設化の A/B 詳細は付録
+> [`REPORT_APPENDIX_AB.md`](REPORT_APPENDIX_AB.md)。
 
 ## 8. 未解決・次タスク提案
 
@@ -160,6 +180,6 @@ F3a/F3b/F3c と同根。icall では PE 書換え (`lea B,[B+8]; op [B-8]` 補�
    展開できる (m11 REPORT §2-2/2-3 の残課題)。
 3. **spill 複合欠陥の個別修復**: F2 適用 8 関数が `arg_drop` / `zero_init_drop` / `icall_drop` を併発
    (§3)。verdict 反転には複数 pass の同時適用が必要 (icall pass との結合試験を推奨)。
-4. **m11 への常設組み込み**: §6-4 の 1 行追加 (既存ファイル変更のため別 ticket 承認要)。
+4. ~~**m11 への常設組み込み**: §6-4 の 1 行追加~~ → **CAB-131 で実施済み** (詳細は付録 `REPORT_APPENDIX_AB.md`)。
 5. bitcast 残存による静的タグの残存: F2 修復後に使われなくなった bitcast 行の DCE (分類器の
    `regslot_deref` が静的カウントのため付き続ける。意味上の問題なし)。

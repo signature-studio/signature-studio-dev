@@ -1,6 +1,6 @@
 # PERF.md — wasm 性能・起動時間の設計提言 (tools/perf)
 
-> **検収追記**: 以下の OTT 数値/LTO 17〜52× は M10 RetDec lift (junk 出力・`__asm_*` helper が別 C ファイル) 固有。bit-exact な自作 x64c lift (tools/ott) では LTO 効果は 1.15×、RTF 0.015〜0.019 (REPORT §2.1)。P1 の「LTO 必須」は「LTO は無害・O2 以上が必須・RetDec chain では決定的」に読み替えること。
+> **検収追記**: 以下の OTT 数値/LTO 17〜52× は M10 RetDec lift (junk 出力・`__asm_*` helper が別 C ファイル) 固有。bit-exact な自作 x64c lift (`tools/ott/REPORT.md` が正本) では **LTO は無害 (効果は 1.15× 程度)・O2 以上が必須**で、LTO の桁違い効果は RetDec chain 固有 (数値: `tools/perf/REPORT.md` §2.1)。
 
 実測根拠はすべて `results/*.jsonl` / `results/TABLES.md` (自動生成表) / `REPORT.md`。推定は「(推定)」と明記。
 測定環境: AMD Ryzen 9 9950X (16C, Zen5), node 26.10 (V8 14.6), Chrome 154.0.8037.97 (V8 15.4, headless=new, Dedicated Worker)。
@@ -52,7 +52,7 @@
 
 | 項目 | 実測効果 (OTT 128f) | サイズ | 推奨 |
 |---|---|---|---|
-| **LTO (`-flto` / thin)** | O2: 72.7→4.3 µs (17×)。call 数 715→1。thin も同等 (4.5 µs) | -6% (622→586KB) | **必須化**。OTT 規模でビルド 2〜12 s |
+| **LTO (`-flto` / thin)** | O2: 72.7→4.3 µs (17×)。call 数 715→1。thin も同等 (4.5 µs) | -6% (622→586KB) | **無害** (bit-exact 版では 1.15× 程度・RetDec chain では決定的)。OTT 規模でビルド 2〜12 s |
 | -O3 vs -O2 | 1.45× (LTO 無し) / 1.1× (LTO 有) | +2% | O3 |
 | -Os / -Oz | O2 比 1.05× / 0.89× | -1〜2% | 不要 |
 | binaryen `wasm-opt -O3` (LTO 無し・O2 object 入力) | 1.35× (74→55 µs)。-O2/-Os/-Oz/-O1 は 0〜1.05×。`--converge`・`--flatten --rereloop` は上乗せ無し | -9% (-O2) | LTO 採用なら不要 (o3lto + `--lto-O3` も同値)。M11 規模 5.65MB で -O3 1.1 s / `--converge` 3.2 s |

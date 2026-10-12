@@ -1,5 +1,9 @@
 # liftlib REPORT — 共通 lift 修復基盤の統合 (CAB-49 / CAB-54 / CAB-55 / CAB-220 / CAB-239 / LIFTLIB-2)
 
+> 正本: `tools/liftlib/REPORT.md`。
+> **行数目安**: 本ファイルは 250 行を超過 (`docs/DOC_MAP.md` §1 の上限ルール参照)。
+> 超過分は Git 履歴に残る形での分割移動を推奨 (**内容は削除しない**)。
+
 - 日付: 2026-10-11 / 担当 dir: `tools/liftlib/` (他 dir は読取のみ) / 再現: `bash tools/liftlib/liftlib_e2e.sh` (キャッシュ時 約 25 秒 + leaf spec 約 4 分, `--fresh` で FA/KH を RetDec lift から約 1 分)
 - 数値はすべて本 dir で実測。推定は「推定」と明記。
 
@@ -7,7 +11,7 @@
 
 | 項目 | 結果 (実測) |
 |---|---|
-| (a) OTT | liftlib 側のみで再現: **各段 IR がテキスト完全一致** (base=ott_lift.ll / P1→shift→gdata=ir7e_p1..p3 / memfix0 / memfix1 / 最終 ott_m10.ll の 7 段すべて true) → emcc → **checks 7 / broken 0, band 係数 maxdev=0.0 (nbad 0)**, E7 OOB 不発, census([0x248]=0) 132/69/175/136 = M10 と同値。helper は **自動生成 153 本**で署名不一致 0 / undefined 46 (M10 と同数)。processReplacing 出力 42 組合せ (param×[0x248]×入力振幅) の SHA が **元 m10 成果物と 42/42 一致** |
+| (a) OTT | liftlib 側のみで再現: **各段 IR がテキスト完全一致** (base=ott_lift.ll / P1→shift→gdata=ir7e_p1..p3 / memfix0 / memfix1 / 最終 ott_m10.ll の 7 段すべて true) → emcc → **checks 7 / broken 0, band 係数 maxdev=0.0 (nbad 0)**, E7 OOB 不発, census([0x248]=0) は `tools/ott/REPORT.md` §2.3 の旧 chain 行 = M10 と同値。helper は **自動生成 153 本**で署名不一致 0 / undefined 46 (M10 と同数)。processReplacing 出力 42 組合せ (param×[0x248]×入力振幅) の SHA が **元 m10 成果物と 42/42 一致** |
 | (b) Fresh Air Gain | **400/400 シナリオ bit-exact** (全バッファ+guard 比較, 手書きパッチ無し。P1 は機械語から自動再構成)。対照: P1 無効 85 不一致 / F7 無効 376 不一致+trap 2 / F2 無効 400 不一致 |
 | (c) Kilohearts Gain | **61 シーケンス×6 ブロック = 366/366 ステップ bit-exact** (元 6 ブロック列を含む)。対照: P1 無効 305 不一致 / F7 無効 全シナリオ hang→trap / F2 は KH では不要 (callee 0) |
 | SIMD helper (CAB-54) | 宣言駆動で自動生成。KH census 205 mnemonic の **未被覆 83(効果)/31(共通基盤)/90(合算)/92(host 込) → 1/1/2/2** (残: `pcmpistri`, `vinsertf128`)。**実機 inline asm vs wasm を 192 mnemonic・281 form・95,400 ベクタで突合: 不一致 0** (近似命令 4 種は相対誤差 <1.6·2⁻¹² を許容して 489 件合格) |
@@ -127,10 +131,10 @@ FA の P1' (comisd×2+jbe/jae+xorps/movaps+jmp, 合流先は reg2mem alloca) が
 | lb_layout 共有化 | `liftlib/lb_layout.py` 新設 (lowbase 正本の取り込み。T8 が両者の同一性を検査)。legacy (0x30000000) レイアウトも LB_* 変数で表現し emcc フラグ生成を 1 本化 (`resolve_layout`) |
 | C ランタイム | `runtime_lb.py` が m6_rt.c (`M6base` + **d2750 memcpy 範囲ガード** 追加) / m8_rt.c (`M8BASE` + 上限) / m6_stubs_hand.c (直値 4 箇所) / m10_boot.c (`MSCR` 静的配列化) を `#ifndef LB_IMG_BASE / LB_MAX_MEM` 付きで work へマクロ化コピー (T9, 置換数 assert 付き) |
 | emcc | legacy: 旧フラグ完全維持 (`-Wl,--initial-memory=0x36000000`) / lowbase: `-sGLOBAL_BASE/-sINITIAL_MEMORY/-sMAXIMUM_MEMORY` + `-DLB_IMG_BASE/-DLB_MAX_MEM` (`-Wl,--initial-memory` は emscripten initial-heap 16MiB 加算で "too small")。init_mib は GLOBAL_BASE+stack 8MB から自動算出 (0x1230000 で wasm-ld required 実測 31,089,728B) |
-| ott --lb-base 0x10000 | checks 7/0, band 係数 maxdev 0.0/nbad 0, trap rc 0, **outhash 42/42 equal**, census[0x248]=0 132/69/175/136 = m10 同値。layout: base 0x10000 / arena 0x320000 / GLOBAL_BASE 0x420000 / initial 24MiB / max 64MiB |
+| ott --lb-base 0x10000 | checks 7/0, band 係数 maxdev 0.0/nbad 0, trap rc 0, **outhash 42/42 equal**, census[0x248]=0 は `tools/ott/REPORT.md` §2.3 の旧 chain 行 = m10 同値。layout: base 0x10000 / arena 0x320000 / GLOBAL_BASE 0x420000 / initial 24MiB / max 64MiB |
 | ott --lb-base 0x1230000 | 同じく checks 7/0 + outhash 42/42 (base 依存バグ無しの証拠)。initial 39MiB |
 | audit_va.py 0x10000 | DIR64 13,000 全て image 内 (image 外 0) / IAT 375 slot の VA 保持 0 / base 64KiB 境界 → exit 0 |
-| x64c 3 構成再現 | 0x10000/16MiB, 0x1230000/40MiB, 0x10000/8MiB の各 89 scenario 50,236 cell — **計 150,708 cell bit 一致 (max_ulp 0 / state_diff 0)** |
+| x64c 3 構成再現 | 0x10000/16MiB, 0x1230000/40MiB, 0x10000/8MiB の各 89 scenario 全 cell — **3 構成とも bit 一致 (max_ulp 0 / state_diff 0)**。cell 総数の正本は `tools/ott/REPORT.md` §2 |
 | lowbase_e2e (hostbridge) | ALL PASS: 検収 65/65 (evidence 21+stub 3+marshal 13+PoC 28), 同居 512/512×2, Chrome Worker, prefix 差 0, E3 切り分け差 0 |
 
 ### 発見と修正 (lowbase 化で顕在化したもの)
@@ -229,7 +233,7 @@ e2e の gate は spec の `expect_match_min` (crash を除く一致率) のみ�
 ② 領域リフトを DAG 化する phi 合成で **多定義 bind の残留 9 → 4 / region join 8 → 0**,
 **脱落分岐の再構成 19 → 25・理由付き残留 30 → 21** (LIFTLIB-2 着地で既定ビルドが初めて build 通過も達成)。
 ③ e2e gate を **param 0.0/0.1/0.9/1.0 の sweep + ハード timeout** に拡張 (CAB-238 提案④)。
-④ 回帰すべて緑 (`liftlib_e2e.sh` ALL PASS / `ott_e2e.sh` 89 scenario 50,236 cell bit-exact)。
+④ 回帰すべて緑 (`liftlib_e2e.sh` ALL PASS / `ott_e2e.sh` 89 scenario 全 cell bit-exact・正本 `tools/ott/REPORT.md`)。
 
 ### 12.1 無限ルーブの原因と修復 (CAB-238 §6)
 
@@ -284,7 +288,7 @@ bind rcx 1 / bind xmm5 1。
 | census[0x248]=0 | 132 / 140 / **junkHi 104** / 136 / nan 0 / absmax 1.67e18 | 104 ≤ 104 OK |
 | census[0x248]=1 | 4 / 259 / junkHi 248 / 1 / absmax 1.13e34 | (CAB-238 と同値) |
 | **E7 param sweep** | 0.0/0.1/0.9/1.0 × [0x248]=0/1 の **8 combo すべて完走** (timeout 60 s) | PASS (無限ループ解消) |
-| 旧既定 `--auto none` | checks 7/0, census 132/69/175/136, SHA 42/42, IR 一致 | PASS (継続) |
+| 旧既定 `--auto none` | checks 7/0, census は `tools/ott/REPORT.md` §2.3 の旧 chain 行, SHA 42/42, IR 一致 | PASS (継続) |
 | link | signature mismatch 0 / undefined 46 / `undefined __asm_*` 0 | PASS |
 | simd helper | 自動生成 159 本 (CAB-239 時 153) | — |
 
@@ -329,7 +333,7 @@ python3 -m liftlib ott
 python3 -m liftlib ott --auto none
 # 1 コマンド回帰 (unit T1..T11 + FA 400/400 + KH 366/366 + OTT + SIMD 95,400 + 注入 94/94 + leafspec)
 bash tools/liftlib/liftlib_e2e.sh
-# x64c 参照 (liftlib 非依存): 89 scenario / 50,236 cell bit-exact
+# x64c 参照 (liftlib 非依存): 89 scenario / 全 cell bit-exact (正本: tools/ott/REPORT.md)
 bash tools/ott/ott_e2e.sh
 # site 単体 bisect (LIFTLIB-2 追加): V=0.9/F=1 無限ループの切り分け
 python3 tools/liftlib/work/hang_bisect.py p1_one_18012024b
@@ -347,8 +351,7 @@ python3 tools/liftlib/work/hang_bisect.py p1_one_18012024b
 
 ## 13. LIFTLIB-3 (CAB-264) — 汎用 xmm0-ret bind + tan 入口誤解析修正
 
-- preflight: RULES_SHA=ff4999169333
-- 既知類型との関係 (規則 44): **該当なし** (`tools/targets/kilohearts/snapins/DEFECTS.md` の D1a〜D16 は ucomis 誤配線/load 脱落/xmm 引数落ち/store 欠落等で, 本チケットで扱う「callee の戻り値レジスタ推定」と「entry 純 move の live-in 誤判定」は未登録 → REPORT 末に新類型行案を記載)
+- 既知類型との関係: **該当なし** (`docs/DEFECTS.md` の D1a〜D16 は ucomis 誤配線/load 脱落/xmm 引数落ち/store 欠落等で, 本チケットで扱う「callee の戻り値レジスタ推定」と「entry 純 move の live-in 誤判定」は未登録 → REPORT 末に新類型行案を記載)
 - 検証起点 commit: `ae18b1e` (clean HEAD から `git worktree` 展開で再現・下記の検証を全て再実行して確認)
 
 ### 13.1 結論
@@ -415,7 +418,7 @@ LIFTLIB-2 §12.7 は「`_bind_call_ret` は明示的 C port 名のみ bind で�
 | `bash liftlib_e2e.sh` (clean HEAD: `ae18b1e`) | unit T1..T14 + FA 400/400 + KH 366/366 + OTT 既定/旧既定 + SIMD 95,400 + 注入 94/94 + leafspec | **115 秒** (10:28:19 → 10:30:14) | 10.25 / 5.22 / 4.75 |
 | `python3 tests/test_unit.py` (clean HEAD) | T1..T14 (T13 = f2→p1 残留, T14 = xmm0-ret 検出と別アルゴリズム一致) | 同 e2e 内 | 同上 |
 | `python3 xmm0_ret_census.py` (clean HEAD) | 103/169 + 別アルゴリズム一致 | 同 e2e 内 | 同上 |
-| `bash tools/ott/ott_e2e.sh` | 89 scenario / 50,236 cell bit-exact / E7 8 combo / OTT 既定 checks 8/0 | 前掲 (読取のみ) | — |
+| `bash tools/ott/ott_e2e.sh` | 89 scenario / 全 cell bit-exact / E7 8 combo / OTT 既定 checks 8/0 | 前掲 (読取のみ・正本 `tools/ott/REPORT.md`) | — |
 | `python3 -m liftlib ott` (develop 側) | checks 8/0・junkHi 104/248・trap 0・RESULT PASS | 10 秒 | — |
 
 ### 13.7 未解決 (起票先付き・規則 42)
@@ -438,13 +441,12 @@ LIFTLIB-2 §12.7 は「`_bind_call_ret` は明示的 C port 名のみ bind で�
 
 ## 14. LIFTLIB-4 (CAB-272) — leaf region の phi 合成 (残 15 → 6)
 
-- preflight: RULES_SHA=ff4999169333
-- 既知類型との関係 (規則 44): **該当なし** (`DEFECTS.md` D1a〜D16 と `icall §4` の別体系とも未登録。新類型行案を末に記載)
+- 既知類型との関係: **該当なし** (`DEFECTS.md` D1a〜D16 と `icall §4` の別体系とも未登録。新類型行案を末に記載)
 - 検証起点 commit: `fcaaf5f`。clean HEAD を `git archive` で展開し T1..T15 + e2e を再実行して確認 (下記 §14.6)
 
 ### 14.1 結論
 
-**OTT 既定 p1 の残留 UNSUPPORTED 15 → 6** (再構成 31 → 34)。**tan 8/40 → 11/40**。exp 40/40・log 32/40 維持。census junkHi 104/248・checks 8/0・trap 0・HANG 0・ott_e2e 50,236 cell bit-exact すべて不変。回帰 ALL PASS。
+**OTT 既定 p1 の残留 UNSUPPORTED 15 → 6** (再構成 31 → 34)。**tan 8/40 → 11/40**。exp 40/40・log 32/40 維持。census junkHi 104/248・checks 8/0・trap 0・HANG 0・ott_e2e 全 cell bit-exact すべて不変。回帰 ALL PASS。
 
 | 項目 | LIFTLIB-3 (5bad530) | LIFTLIB-4 (fcaaf5f) | 差分 |
 |---|---|---|---|
@@ -499,7 +501,7 @@ T15 (unit test) がこの数値とネガティブコントロールを自動固�
 | `python3 tests/test_unit.py` (clean HEAD `fcaaf5f`) | T1..T15 | e2e 内 | 4.48, 4.20, 3.96 |
 | `python3 p1_residual_census.py` (clean HEAD) | 残留 6 内訳の再計算 | 数秒 | — |
 | `bash liftlib_e2e.sh` (clean HEAD `git archive` 展開) | unit T1..T15 + FA 400/400 + KH 366/366 + OTT 既定/旧既定 + SIMD 95,400 + 注入 94/94 + leafspec | **138 秒** (12:01:29 → 12:03:47) | 4.48, 4.20, 3.96 |
-| `bash tools/ott/ott_e2e.sh` | 89 scenario / 50,236 cell bit-exact / E7 8 combo | 前掲 | — |
+| `bash tools/ott/ott_e2e.sh` | 89 scenario / 全 cell bit-exact / E7 8 combo | 前掲 (正本 `tools/ott/REPORT.md`) | — |
 | `python3 -m liftlib ott` | checks 8/0・junkHi 104/248・trap 0・RESULT PASS | 10 秒 | — |
 
 ### 14.6 検証範囲・範囲外 (規則 40)

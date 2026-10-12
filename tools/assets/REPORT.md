@@ -1,4 +1,3 @@
-preflight: RULES_SHA=ff4999169333
 # CAB-21 asset-vfs — 引継ぎ完了レポート (314MB 級 wasm asset の chunk ローダ + 二段キャッシュ)
 
 実施 2026-10-10 / node v26.10.0 / Chrome 154 headless (実ディスクプロファイル) / 検証 `bash tools/assets/e2e.sh --full` (exit 0)。
@@ -110,8 +109,6 @@ pathreg 既定マウント表の `/c/home`・`/c/tmp` 写像先を実装)。本 
 差分: 本ファイルへのこの節追加と `tsconfig.json` include への `"wvfs"` 追加のみ。
 
 ## 10. 検収 (2026-10-11 / 検証起点 commit c2c31c8, clean HEAD worktree)
-
-preflight: RULES_SHA=ff4999169333
 
 - **範囲**: c2c31c8 の 62 files / 9,192 insertions は全て `tools/assets/` 配下 (他 dir 0 行)。最大 blob 21,363 B (`inventory/compress_bench.json`)、20 MiB 超 0 個。`git status --porcelain -- tools/assets` = 空 (取りこぼしなし)。
 - **clean HEAD 再実行**: `git worktree add --detach tools/assets/work_verify HEAD` で展開し `bash e2e.sh --full` → **exit 0** (wall 180s, load average 開始 4.73 → 終了 6.59)。node / emscripten / browser(cold,warm,xhr) / bench / asset 4 シナリオ ALL PASS。

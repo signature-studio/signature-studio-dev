@@ -174,12 +174,8 @@ def main():
         nat = os.path.join(ROOT, 'work', 'native_ref')
         if not os.path.exists(vec):
             sh('%s %s %s %d %d %s.tmp && mv %s.tmp %s' % (nat, CORE, cfg['scenario'], a.trials, a.seed, vec, vec, vec))
-        tolarg = ''
-        if cfg.get('tol'):
-            tp = P('tol.json')
-            json.dump(cfg['tol'], open(tp, 'w'))
-            tolarg = '--tol %s' % tp
-        r, _ = sh('timeout 180 node %s/harness/compare.mjs %s %s %s %s --json %s' % (ROOT, vec, P('mod.cjs'), P('sigs.json'), tolarg, P('compare.json')), check=False,
+        # CAB-273: tol gate は撤去済み。compare.mjs は常に全バイト strict 一致で判定する。
+        r, _ = sh('timeout 180 node %s/harness/compare.mjs %s %s %s --json %s' % (ROOT, vec, P('mod.cjs'), P('sigs.json'), P('compare.json')), check=False,
                   log=P('compare.log'))
         stat['compare'] = r.stdout.strip().split('\n')[-1]
         cj = json.load(open(P('compare.json'))) if os.path.exists(P('compare.json')) else {}

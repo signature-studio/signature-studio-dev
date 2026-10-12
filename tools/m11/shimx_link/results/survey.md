@@ -1,5 +1,8 @@
-# unit 隔離 survey (942 unit を 1 本ずつ実行; soft+fix ビルド, 計数ラッパ経由)
+# 自動生成: `bash tools/m11/shimx_link/*e2e*` (unit 隔離 survey)
 
+> **人手編集禁止** (生成元を直す)。本ファイルは測定・抽出結果の**単一の正本**。
+
+# unit 隔離 survey (942 unit を 1 本ずつ実行; soft+fix ビルド, 計数ラッパ経由)
 | 結果 | shimx リンク (soft+fix) | M11 既存ビルド (同じ手順で再測) |
 |---|---|---|
 | abort | 1 | 1 |

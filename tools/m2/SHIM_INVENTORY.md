@@ -1,16 +1,19 @@
-# SHIM_INVENTORY (M2 機械生成 + 人手チェック版)
+# 自動生成: `python3 tools/m2/shim_inventory*.py` (M2 機械生成・人手チェック版)
 
-自動生成: `tools/m2/shim_inventory.py` (win/mac/libwinbridge の import/export 走査 → strategy.md §3 12 行への写影)。
+> **人手編集禁止** (生成元を直す)。本ファイルは測定・抽出結果の**単一の正本**。
+
+# SHIM_INVENTORY (M2 機械生成 + 人手チェック版)
+自動生成: `tools/m2/shim_inventory.py` (win/mac/libwinbridge の import/export 走査 → `docs/REFERENCES.md` `[STRATEGY]` §3 12 行への写影。shim 一覧の正本は `tools/shim/README.md`)。
 
 ## (0) 入力と成立条件
 
 | 項目 | 値 |
 |---|---|
-| win64 DLL | /home/ubuntu/work/webstudio/tools/m2/work/block00031_PE.bin |
+| win64 DLL | `tools/m2/work/block00031_PE.bin` (gitignore・検証時に再抽出) |
 | win64 import 名数 | 738 (依存 DLL 24) |
-| mac slide | /home/ubuntu/work/webstudio/tools/m2/work/FLEngine_x86_64.dylib |
+| mac slide | `tools/m2/work/FLEngine_x86_64.dylib` (gitignore) |
 | mac slice exports | 1 / imports(外部シンボル) 337 |
-| libwinbridge slice | /home/ubuntu/work/webstudio/tools/m2/work/libwinbridge.dylib_x86_64.dylib |
+| libwinbridge slice | `tools/m2/work/libwinbridge.dylib_x86_64.dylib` (gitignore) |
 | libwinbridge exports | 34 (Win32 shim 面) |
 
 ## (1) libwinbridge exports 一覧 (= shim 実装面の機械採取初版)

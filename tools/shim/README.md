@@ -16,5 +16,5 @@ bash tools/shim/test.sh        # ビルド + node 単体テスト + fail-fast �
 
 ## M5 以降に向けて
 
-- `strategy.md` M4 検証条件 2 (M3 wasm 成果物からの shim 呼出連結) は M3 成果物と本 shim の結合時に行う。
+- `docs/REFERENCES.md` `[STRATEGY]` M4 検証条件 2 (M3 wasm 成果物からの shim 呼出連結) は M3 成果物と本 shim の結合時に行う。
 - import 面 diff (FLEngine 実 import ↔ exports.txt) を M5 で機械照合し、不足面を追加する。

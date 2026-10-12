@@ -1,5 +1,8 @@
-# capstone disp 依存コード棚卸し (consumers.py, 自動生成)
+# 自動生成: `python3 tools/icall/disp_size/consumers.py`
 
+> **人手編集禁止** (生成元を直す)。本ファイルは測定・抽出結果の**単一の正本**。
+
+# capstone disp 依存コード棚卸し (consumers.py, 自動生成)
 | 区分 | 意味 | ファイル数 | 補正要否 |
 |---|---|--:|---|
 | A | `disp_size`/`disp_offset` を読む | 3 | **要** (D9 直接被害) |

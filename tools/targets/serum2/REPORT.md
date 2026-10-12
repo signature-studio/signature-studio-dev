@@ -1,6 +1,6 @@
 # Xfer Serum 2 v2.1.5 インストーラ解析 + lift 可否評価 (J serum2)
 
-- 解析日: 2026-10-10 / 形式: `analysis/plugins/ott/REPORT.md` に準拠 / 再現: `bash tools/targets/serum2/scripts/run_all.sh` (展開済みなら約1.5分, 全出力は `out/`)
+- 解析日: 2026-10-10 / 形式: `docs/REFERENCES.md` `[ANALYSIS-PLUGINS]` の `plugins/ott/REPORT.md` に準拠 / 再現: `bash tools/targets/serum2/scripts/run_all.sh` (展開済みなら約1.5分, 全出力は `out/`)
 - 素材 (`~/ダウンロード`): `Install_Xfer_Serum2_2.1.5.exe` 1,313,084,056 B / `Xfer Serum2 v2.1.5.pkg` 1,325,553,209 B
 - 大物 (展開物 2.8GB・Ghidra proj) は `work/` (`tools/targets/serum2/.gitignore` で除外)。実測以外は「推定」と明記。
 

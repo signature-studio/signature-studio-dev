@@ -111,4 +111,4 @@ OK   E5 t1 出力 param/入力 応答 (非 zero 値 190 sample)
   `m9_boot.c` (resume 修復 + band filter setup 追加), `m9_build.sh` (out copy pass 接続), `m9_e2e.sh` (新),
   `m9_tablebind.py` (新, optional 試作), `.gitignore`, `REPORT.md` (本書)。
 - work/ 産物 (dsm / ott_m9.ll / wasm / log) は `.gitignore` で除外。
-- README/MILESTONES/src/tools/m1-m8/shim/docs は編集・add 0 行。
+- README・docs・src/tools/m1-m8/shim は編集・add 0 行。
