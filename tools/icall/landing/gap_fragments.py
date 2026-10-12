@@ -21,6 +21,7 @@ import argparse
 import bisect
 import collections
 import json
+import os
 import struct
 import sys
 
@@ -144,7 +145,7 @@ def main():
     ap.add_argument('--label', default='fle')
     a = ap.parse_args()
 
-    sys.path.insert(0, '/home/ubuntu/work/webstudio/tools/icall')
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
     import audit_icall as A
 
     img = A.Image(a.pe)
