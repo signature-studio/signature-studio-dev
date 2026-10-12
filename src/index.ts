@@ -3,6 +3,11 @@ import { setupCanvas, blitFrame, type FrameTarget } from "./runtime/canvas";
 import { createImportForwarder } from "./runtime/imports";
 import { instantiateWasm } from "./runtime/loader";
 import { mountRuntimePanel } from "./runtime/boot_ui";
+import { installWebstudioContract } from "./runtime/webstudio_state";
+
+// FL 起動契約 (tools/e2e/REPORT.md §FL 起動契約)。実 FL 統合後は GuiHost の onFrame で setFrames を呼ぶ。
+// このハーネスのテストフレーム (下の blitFrame) は FL の GUI フレームではないので計上しない。
+export const webstudio = installWebstudioContract();
 
 const startBtn = document.getElementById("start-audio") as HTMLButtonElement;
 const statusEl = document.getElementById("status") as HTMLSpanElement;
