@@ -111,7 +111,7 @@
 
 e2e 追加 3 本 (`harness/run.mjs`, 計 25 シナリオ): `asio_sine_b512_96k` / `asio_sine_b256_96k_burst4096` / `asio_createbuffers_burst_overflow` (B=256, burst 40000 → depth 197, (197+2)×256=50944 > 32768)。後 2 本は burst をテスト専用フック `fla_test_set_burst_floor()` (`burst_floor=` クエリ) で強制し、環境依存の揺れを決定的に再現する。
 
-実測 (コミット `14fa86a` の HEAD でビルド, headless Chrome / emcc 6.0.12, GitHub runner, 並列 1):
+実測 (コミット `14fa86a` でビルド (main へリベース後は同内容の `57c9143`。実装 5 ファイルの diff が 0 行であることを確認済み), headless Chrome / emcc 6.0.12, GitHub runner, 並列 1):
 
 | 検証 | 結果 |
 |---|---|
