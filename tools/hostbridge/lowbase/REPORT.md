@@ -5,7 +5,7 @@
 - **判定: 完了条件を満たす。** `bash tools/hostbridge/lowbase/lowbase_e2e.sh` = **ALL PASS (約 65 秒, 全ビルド込みでキャッシュ不要)**。
   OTT の V-shift 先を引数 `LB_BASE` (既定 `0x10000`) 化し、wasm の **initial memory を 864 MiB → 16 MiB (x64c 版) / 24 MiB (RetDec 版 = hostbridge の OTT module)** に低下 (x64c は 8 MiB でも 89/89 通過)。max は 64 MiB。
 - **方式: (a) lift 時定数 shift を採用** (+ (b) の GLOBAL_BASE 配置で image 用の低位 hole を確保)。(c) 実行時 MemBase 相対は全 load/store に加算が要り不採用 (§2)。
-- **bit-exact 側 (tools/ott の自作 lifter x64c)**: base `0x10000`(16 MiB) と `0x1230000`(40 MiB) の 2 通りで **native 実機械語 vs wasm の 89 scenario / 50,236 cell が全 bit 一致 (max_ulp 0, 最終 heap/obj state 差 0 qword)**。8 MiB probe も同値 (計 3 構成 × 89 scenario = 267 run / 150,708 cell, 不一致 0)。
+- **bit-exact 側 (tools/ott の自作 lifter x64c)**: base `0x10000`(16 MiB) と `0x1230000`(40 MiB) の 2 通りで **native 実機械語 vs wasm の 89 scenario・全 cell bit-exact (max_ulp 0, 最終 heap/obj state 差 0 qword・正本 `tools/ott/REPORT.md`)**。8 MiB probe も同値 (計 3 構成 × 89 scenario = 267 run・全 cell 一致, 不一致 0)。
 - **hostbridge 側 (RetDec chain = 既存 PoC の OTT module)**: 検収 65 項目相当 (evidence 21 + PE stub 3 + marshal 13 + **PoC 28 を lowbase module で実行**) = **65/65 PASS**。
   `[0x248]=0` 条件は M10 の 864 MiB module (再配置前) と **512/512 bit 一致** (T4c)。自然経路 (`[0x248]=1`) は 500 blk × 256 cell = 128,000 cell 中 **2 cell のみ差分 (|v|≤7.3e-34 の junk-tiny)**。
   image/arena だけ低位化し heap/stack 位置を旧のままにすると **0/128,000 差分** (§4.3) = 差分は VA 再配置ではなく RetDec chain の junk (未初期化読み) が stack/heap 絶対位置に依存するため。x64c 版は address 非依存で bit-exact。
@@ -74,7 +74,7 @@
 ### 4.2 出力一致 (件数 / 試行数)
 | 検査 | 結果 |
 |---|---|
-| x64c vs native 実機械語 (matrix.py), base 0x10000 / 0x1230000 / 0x10000-8MiB | 各 89/89 scenario, 50,236/50,236 cell (計 150,708), max_ulp 0, state_diff 0 qword |
+| x64c vs native 実機械語 (matrix.py), base 0x10000 / 0x1230000 / 0x10000-8MiB | 各 89/89 scenario・全 cell bit-exact (計 3 構成, max_ulp 0, state_diff 0 qword・正本 `tools/ott/REPORT.md`) |
 | x64c 4 module 同時 (base 0x10000×3 + 0x1230000) 標準 scenario | 512/512 ×4 (native 一致済み単体出力と比較) |
 | x64c 同居 1 memory (base 0x10000 / 0x400000) | 512/512 ×2 |
 | hostbridge 検収相当 (lowbase module) | evidence 21 + stub 3 + marshal 13 + PoC 28 = **65/65** (PoC 28 には T4a「bridge=直接 512/512」、T4c「M10(864 MiB) と 512/512」、T5 A/B 交互 2×128、T6〜T8 を含む) |

@@ -17,7 +17,8 @@ Scenario SCEN_LIST[] = {
     {"qemath", trial_qemath, 96},
     {"qeclass", trial_qeclass, 20},
     {"qeclass2", trial_qeclass2, 12},
-    {"em", trial_em, 6},
-    {"empoll", trial_empoll, 20},
-    {0, 0, 0},
+    {"em", trial_em, 6, 1},
+    {"empoll", trial_empoll, 20, 1},
+    {"emfire", trial_emfire, 12, 1},
+    {0, 0, 0, 0},
 };

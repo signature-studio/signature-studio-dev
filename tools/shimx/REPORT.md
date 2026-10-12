@@ -1,5 +1,9 @@
 # tools/shimx REPORT — Win32/CRT shim 拡張 (担当 Q)
 
+> 正本: `tools/shimx/REPORT.md`。
+> **行数目安**: 本ファイルは 250 行を超過 (`docs/DOC_MAP.md` §1 の上限ルール参照)。
+> 超過分は Git 履歴に残る形での分割移動を推奨 (**内容は削除しない**)。
+
 - 日付: 2026-10-10 (初版) / **2026-10-10 更新: CAB-211 — M11 リンク フィードバック R1〜R8 対応 (§9)** / **2026-10-10 更新: CAB-214 — vreg reg.c 本体取込 + username 統一 (§11)** / **2026-10-10 更新: CAB-214 follow-up — 後始末 3 件 (vreg 薄ラッパ化 / pathreg 予備 profile 退役 / winstubs wrap 5 API 退役, §12)** / 検証環境: emcc 6.0.12, node v24.19.0 (emsdk 同梱), llvm-nm
 - 書込範囲: `tools/shimx/` のみ。`tools/shim` `tools/m2` `tools/m6` `tools/m8` `tools/m11` `tools/plugins` `tools/startup` `tools/targets` は読取のみ (改変 0 行)。
 - 検収: `bash tools/shimx/test.sh` → **exit 0** (約 20 秒。`--quick` で OTT 再リンクを省略)
@@ -120,7 +124,7 @@ bash tools/hostbridge/cb/cb_e2e.sh                 # R2/R3 実体接続の往復
 
 ## 8. 検収記録 (CAB-11)
 
-- 独立再計算 (pefile で `analysis/win64/extracted/block00031_PE.bin` を直接解析; 呼出サイトは E8/E9 rel32 を独自走査) で主要数値は一致。差異は M11 外部参照 553→557 (ir_undef の declare 正規表現が struct 戻り値 `__asm_cpuid*` 4 件を取りこぼし。lift 由来のみ・shimx/GUI 件数に影響なし) の 1 件のみで修正済み。
+- 独立再計算 (pefile で `[WIN64]` の `extracted/block00031_PE.bin` を直接解析; 呼出サイトは E8/E9 rel32 を独自走査) で主要数値は一致。差異は M11 外部参照 553→557 (ir_undef の declare 正規表現が struct 戻り値 `__asm_cpuid*` 4 件を取りこぼし。lift 由来のみ・shimx/GUI 件数に影響なし) の 1 件のみで修正済み。
 
 ## 9. M11 リンク フィードバック対応 — R1〜R8 (CAB-211)
 
@@ -139,7 +143,7 @@ bash tools/hostbridge/cb/cb_e2e.sh                 # R2/R3 実体接続の往復
 | R7 | EnterCriticalSection(NULL) の方針 | **実装** (方針決定 + 選択式) | **既定 = fail-fast のまま** (= Win32 実機のアクセス違反相当。survey unit 115 は旧 M4 shim でも同一 unit で abort する lift 側ポインタ不正であり、黙って成功させると lift 誤りを隠す)。許容モード `shimx_set_cs_null_ok(1)` を追加: Enter/Leave は no-op、TryEnter=FALSE、Initialize 何もしない、SleepConditionVariableCS=FALSE。null_ok モード自体も fail-fast モード (`node x.cjs csnull`) で検査 |
 | R8 | 未検証 133 名の実機検証 | **手順整備** (実検証は unit 完走後) | `scripts/reach_check.py` (M11 `reach.json` の `static_reach_but_never_called` 133 名と実行トレースの差分集計) + `scripts/rem11_check.sh` (§9.2)。現時点の純リンク実行では 133 名の呼出 0 (起動経路は 17 unit まででレジストリ・ファイル系大半に未到達) — REPORT のとおり T9 (CAB-176) の unit 完走後の後続 |
 
-### 9.2 「CAB-129 修正後、--fix なし純リンクで 17 unit 再測」の検証手順 (1 コマンド)
+### 9.2 「CAB-129 修正後、--fix なし純リンクで 17 unit 再測」の再現手順 (1 コマンド)
 
 ```
 bash tools/shimx/scripts/rem11_check.sh

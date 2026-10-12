@@ -15,9 +15,9 @@
  *   2. 戻り値判定を独立に実装 (rk=3 は BigInt 変換未対応を避け undefined ガード、
  *      rk=4 は Float64Array 経由で 64bit 比較)。compare.mjs の rk=3 は `BigInt(r)` で
  *      float が来ると例外になる経路があるため、ここでは安全側に倒す。
- *   3. **tol gate を持たない** = 常に bit-exact 判定 (compare.mjs は --tol で近似許容)。
- *      tol 対象 3 本 (resonator/stereo/delay) は §13 主張どおり exact 一致するはずで、
- *      これは tol を外した stricter な検証になる (規則 41 の対照にもなる)。
+ *   3. **tol gate を持たない** = 常に bit-exact 判定。legacy な `--tol` は CAB-273 で
+ *      harness/compare.mjs 本体からも撤去された (比較は tolerance なし完全一致に統一)。
+ *      本スクリプトは独立再計算として stricter な検証の位置づけを維持する。
  *   4. region 名は trial 末尾テーブルから読み、不一致 byte の位置を region+offset で報告
  *      (compare.mjs は word index のみ)。
  *

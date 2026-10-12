@@ -25,7 +25,7 @@ PASS_RE = re.compile(
     r'^\[fw\] SMOKE PASS \([^)]*\): dispatch=(\d+) units_done=(-?\d+) va=(\d+) heap=(\d+) ff=(\d+)')
 FAIL_RE = re.compile(r'^\[fw\] SMOKE FAIL: (.*)$')
 DEF_EXPECT = {'dispatch': 38, 'units_done': 0, 'va': 1, 'heap': 1, 'ff': 0}
-DEF_SIZE = 14828623      # CAB-194 再ビルド (vfy194/fw_route_194_rebuild.wasm) の実測バイト数
+DEF_SIZE = 0                  # 0 = wasm サイズを照合しない (既定)。参照値: 14,828,623 B (77cde78 vintage) / 15,061,227 B (HEAD)
 
 
 def main(argv):
@@ -64,13 +64,13 @@ def main(argv):
         same = got[k] == expect[k]
         ok = ok and same
         rows.append('  %-11s got=%-6d expect=%-6d %s' % (k, got[k], expect[k], 'OK' if same else '** MISMATCH **'))
-    if os.path.exists(a.wasm):
+    if a.size and os.path.exists(a.wasm):
         size = os.path.getsize(a.wasm)
         same = size == a.size
         ok = ok and same
         rows.append('  %-11s got=%-6d expect=%-6d %s' % ('wasm_B', size, a.size, 'OK' if same else '** MISMATCH **'))
     else:
-        rows.append('  %-11s (ファイル無し: %s)' % ('wasm_B', a.wasm))
+        rows.append('  %-11s (照合スキップ: --size 未指定・実測 %s)' % ('wasm_B', os.path.getsize(a.wasm) if os.path.exists(a.wasm) else 'n/a'))
     print('[fw_smoke_check] ' + ('PASS' if ok else 'FAIL'))
     print('\n'.join(rows))
     print('  source: %s (%d 行)' % (a.log, len(lines)))

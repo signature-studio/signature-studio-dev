@@ -1,7 +1,5 @@
 # tools/ipp — Intel IPP (`dsp_ippv2`) 再現要否の評価と最小実装 PoC
 
-preflight: RULES_SHA=ff4999169333
-
 再現: `bash tools/ipp/ipp_e2e.sh` (約 40 秒 [検収実測 38 秒], exit 0 = 12 checks PASS) / `bash tools/ipp/shim/shim_e2e.sh` (exit 0 = **13 checks PASS** [CAB-262 で S13 追加])。大物中間物は `work/` (gitignore)。数値はすべて実測、推定は「推定」と明記。検証起点 commit: `b8e762d` (HEAD, 自分の起点)。
 
 ## 0. 結論 (ユーザ質問への回答)
@@ -102,7 +100,8 @@ FFT (`ipp_fft.c`, 倍精度基数2 の素朴実装): ippsFFTGetSize/Init/Fwd_RTo
 | `ref/` | PE ローダ + 差分ハーネス (`ipp_ref.c` cmp/isa/gen/err, `ipp_acc.c` 精度, `ipp_fft_ref.c`, `ipp_bench.c`) と探索 probe 3 本 |
 | `ipp_wasm_cmp.mjs` `ipp_wasm_fft.mjs` `ipp_wasm_bench.mjs` | wasm と golden(実 IPP 出力) の突合・性能 |
 | `shim/impl/ipp_sig_fill3.c` `shim/test/fill3_oracle.c` `shim/test/fill3_oracle_run.sh` `shim/count_fill3.py` | **CAB-262**: 次層 29 関数の実装 + オラクル (native/wasm replay) + 独立再計算 (`shim/REPORT.md` §13) |
-| `shim/test/sp57.c` `shim/test/sweep2.c` | **CAB-261**: interp 4/5/6/7 の 1D 重みをスパイク法で抽出 (`shim/REPORT.md` §14) |
+| `shim/test/sp57.c` `shim/test/sweep2.c` `shim/test/sweepv` | **CAB-261**: interp 4/5/6/7 の 1D 重み (H/V) をスパイク法で抽出 (`shim/REPORT.md` §14) |
+| `shim/impl/ipp_resize.c` `shim/verify_cab274_kernel.py` | **CAB-274**: it=6/7 カーネルを Mitchell-Netravalli (it6=MN(0,0.5), it7=MN(0.5,0.3)=CUBIC2P_B05C03) と特定・実装 → オラクル it7 13.169%→**0.005%** / it6 9.768%→**0.000%** + 独立再計算 (`shim/REPORT.md` §15) |
 | `data/` | `ipp_usage_summary.json`, `ipp_matrix.csv`(420 名×使用/提供/実装), `arm64_ipp_map.json`, `diff_results.json` |
 
 ## 7. 性能 (n=4096 float, ns/call。既知の問題として記録。単発測定でラン間ばらつきが大きい: 検収で 4 回測った範囲を括弧内に併記)
@@ -130,7 +129,7 @@ FFT (`ipp_fft.c`, 倍精度基数2 の素朴実装): ippsFFTGetSize/Init/Fwd_RTo
 ## 9. 次タスク提案
 
 1. **ipp-shim**: `LoadLibrary("dsp_ippv2")`/`GetProcAddress` を `ipp_lookup` に接続 + MS x64 ABI thunk 自動生成 (署名表は IPP ヘッダ由来)。
-2. **ipp-fill**: `data/ipp_matrix.csv` の優先順 (win モジュール数降順) で残関数を実装し、`ref/ipp_ref.c` の FN 表に追加して差分テストを広げる。**CAB-136 で 35 / CAB-245 で 7 / CAB-262 で 29 関数を実施** (残 stub 292、使用集合 239 中 130 — `shim/REPORT.md` §13-7)。FLEngine 本体の ippi 33 関数 (GUI) は M7 と連携。
+2. **ipp-fill**: `data/ipp_matrix.csv` の優先順 (win モジュール数降順) で残関数を実装し、`ref/ipp_ref.c` の FN 表に追加して差分テストを広げる。**CAB-136 で 35 / CAB-245 で 7 / CAB-262 で 29 関数を実施** (残 stub 292、使用集合 239 中 130 — `shim/REPORT.md` §13-7)。FLEngine 本体の ippi 33 関数 (GUI) は M7 と連携。3. **ipp-resize 残差**: it=7 の 31 px (|d|=1 丸め差) と it=16 (Lanczos, 6.913%) は未解明 (§15-6)。
 3. **ipp-fft**: pffft 等で置換 (RToPack/CCS, 32f/64f)。
 4. **ipp-profile**: lift 済 FLEngine で実呼出関数を採取 → 実使用集合の確定 (本 REPORT の 239 を絞る)。
 

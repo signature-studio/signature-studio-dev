@@ -4,480 +4,54 @@
   "rc": null,
   "threw": {
    "cls": "unlifted",
-   "target": 5404059
+   "target": 6978416
   },
-  "units_run": 40,
+  "units_run": 209,
   "units_total": 942,
-  "units_empty": 3,
-  "rax": "0x5275b0",
+  "units_empty": 37,
+  "rax": "0x0",
   "longjmp": 0,
   "stage": 1,
-  "getmem": 662,
-  "freemem": 209,
-  "va_calls": 1,
-  "va_bytes": 1310704,
-  "getproc": 29,
+  "getmem": 1890,
+  "freemem": 776,
+  "va_calls": 20,
+  "va_bytes": 15470544,
+  "getproc": 88,
   "exit": 0,
   "cb_calls": 0,
-  "soft_calls": 0,
-  "soft_uniq": 0,
+  "soft_calls": 64,
+  "soft_uniq": 21,
   "mm_after": {
    "getmem": "0x407a50",
    "freemem": "0x407e20",
    "realloc": "0x408040",
    "slot3": "0x4083b0"
   },
-  "stopped_at_1based": 40
+  "stopped_at_1based": 209
  },
- "survey": {
-  "from": 0,
-  "to": 942,
-  "total": 942,
-  "byCls": {
-   "ok": 859,
-   "empty": 46,
-   "unlifted": 22,
-   "oob": 9,
-   "trap": 5,
-   "noproc": 1
-  },
-  "halt0_total_longjmp": 0,
-  "details": [
-   [
-    29,
-    "empty",
-    20616080
-   ],
-   [
-    38,
-    "empty",
-    20616080
-   ],
-   [
-    39,
-    "empty",
-    20616080
-   ],
-   [
-    45,
-    "unlifted",
-    "0x43307e"
-   ],
-   [
-    95,
-    "unlifted",
-    "0x410b00"
-   ],
-   [
-    101,
-    "oob",
-    "memory access out of bounds"
-   ],
-   [
-    105,
-    "empty",
-    20616080
-   ],
-   [
-    114,
-    "oob",
-    "memory access out of bounds"
-   ],
-   [
-    115,
-    "empty",
-    20616080
-   ],
-   [
-    121,
-    "empty",
-    20616080
-   ],
-   [
-    122,
-    "empty",
-    20616080
-   ],
-   [
-    123,
-    "empty",
-    20616080
-   ],
-   [
-    124,
-    "empty",
-    20616080
-   ],
-   [
-    125,
-    "empty",
-    20616080
-   ],
-   [
-    127,
-    "empty",
-    20616080
-   ],
-   [
-    131,
-    "empty",
-    20616080
-   ],
-   [
-    132,
-    "empty",
-    20616080
-   ],
-   [
-    138,
-    "unlifted",
-    "0x642e63"
-   ],
-   [
-    144,
-    "unlifted",
-    "0x410b00"
-   ],
-   [
-    149,
-    "unlifted",
-    "0x410b00"
-   ],
-   [
-    153,
-    "unlifted",
-    "0x410b00"
-   ],
-   [
-    158,
-    "unlifted",
-    "0x410b00"
-   ],
-   [
-    190,
-    "unlifted",
-    "0x410b00"
-   ],
-   [
-    196,
-    "empty",
-    20616080
-   ],
-   [
-    197,
-    "empty",
-    20616080
-   ],
-   [
-    198,
-    "empty",
-    20616080
-   ],
-   [
-    199,
-    "empty",
-    20616080
-   ],
-   [
-    200,
-    "empty",
-    20616080
-   ],
-   [
-    201,
-    "empty",
-    20616080
-   ],
-   [
-    202,
-    "empty",
-    20616080
-   ],
-   [
-    203,
-    "empty",
-    20616080
-   ],
-   [
-    205,
-    "empty",
-    20616080
-   ],
-   [
-    206,
-    "empty",
-    20616080
-   ],
-   [
-    207,
-    "empty",
-    20616080
-   ],
-   [
-    208,
-    "empty",
-    20616080
-   ],
-   [
-    209,
-    "empty",
-    20616080
-   ],
-   [
-    210,
-    "empty",
-    20616080
-   ],
-   [
-    211,
-    "empty",
-    20616080
-   ],
-   [
-    212,
-    "empty",
-    20616080
-   ],
-   [
-    213,
-    "empty",
-    20616080
-   ],
-   [
-    214,
-    "empty",
-    20616080
-   ],
-   [
-    215,
-    "empty",
-    20616080
-   ],
-   [
-    216,
-    "empty",
-    20616080
-   ],
-   [
-    217,
-    "empty",
-    20616080
-   ],
-   [
-    218,
-    "empty",
-    20616080
-   ],
-   [
-    219,
-    "empty",
-    20616080
-   ],
-   [
-    225,
-    "empty",
-    20616080
-   ],
-   [
-    233,
-    "unlifted",
-    "0x707000"
-   ],
-   [
-    237,
-    "unlifted",
-    "0x707000"
-   ],
-   [
-    238,
-    "unlifted",
-    "0x707000"
-   ],
-   [
-    239,
-    "unlifted",
-    "0x707000"
-   ],
-   [
-    245,
-    "unlifted",
-    "0x410b00"
-   ],
-   [
-    265,
-    "unlifted",
-    "0x410b00"
-   ],
-   [
-    272,
-    "unlifted",
-    "0x410b00"
-   ],
-   [
-    275,
-    "oob",
-    "memory access out of bounds"
-   ],
-   [
-    280,
-    "unlifted",
-    "0x410b00"
-   ],
-   [
-    287,
-    "empty",
-    20616080
-   ],
-   [
-    288,
-    "empty",
-    20616080
-   ],
-   [
-    289,
-    "empty",
-    20616080
-   ],
-   [
-    290,
-    "empty",
-    20616080
-   ],
-   [
-    291,
-    "oob",
-    "memory access out of bounds"
-   ],
-   [
-    292,
-    "empty",
-    20616080
-   ],
-   [
-    293,
-    "empty",
-    20616080
-   ],
-   [
-    296,
-    "oob",
-    "memory access out of bounds"
-   ],
-   [
-    304,
-    "oob",
-    "memory access out of bounds"
-   ],
-   [
-    356,
-    "empty",
-    20616080
-   ],
-   [
-    365,
-    "trap",
-    "Aborted(native code called abort())"
-   ],
-   [
-    499,
-    "empty",
-    20616080
-   ],
-   [
-    509,
-    "unlifted",
-    "0x477e86"
-   ],
-   [
-    555,
-    "oob",
-    "memory access out of bounds"
-   ],
-   [
-    659,
-    "unlifted",
-    "0x410b00"
-   ],
-   [
-    666,
-    "unlifted",
-    "0xd122e0"
-   ],
-   [
-    745,
-    "oob",
-    "memory access out of bounds"
-   ],
-   [
-    830,
-    "unlifted",
-    "0x410b00"
-   ],
-   [
-    876,
-    "trap",
-    "Aborted(native code called abort())"
-   ],
-   [
-    880,
-    "trap",
-    "Aborted(native code called abort())"
-   ],
-   [
-    891,
-    "trap",
-    "Aborted(native code called abort())"
-   ],
-   [
-    895,
-    "unlifted",
-    "0x8dfff0"
-   ],
-   [
-    898,
-    "unlifted",
-    "0x8dfff0"
-   ],
-   [
-    913,
-    "empty",
-    20616080
-   ],
-   [
-    923,
-    "oob",
-    "memory access out of bounds"
-   ],
-   [
-    935,
-    "trap",
-    "Aborted(native code called abort())"
-   ],
-   [
-    941,
-    "noproc",
-    0
-   ]
-  ]
- },
+ "survey": null,
  "soft_top": [
-  "268448244:21",
-  "268438333:8",
-  "268448117:7",
-  "268448782:4",
-  "268448813:4",
-  "268447748:4",
-  "268437791:3",
-  "268437077:3",
-  "268440958:1",
-  "268448052:1",
-  "268447912:1",
-  "268436520:1",
-  "268437755:1",
-  "268448062:1",
-  "268437732:1",
-  "268447805:1",
-  "268447559:1"
+  "268448583:21",
+  "268437140:7",
+  "268438456:5",
+  "268449149:3",
+  "268437854:3",
+  "268449180:3",
+  "268448456:3",
+  "268448237:3",
+  "268447986:3",
+  "268448354:2",
+  "268441122:1",
+  "268448169:1",
+  "268436570:1",
+  "268437818:1",
+  "268448223:1",
+  "268448028:1",
+  "268447755:1",
+  "268448099:1",
+  "268448382:1",
+  "268437795:1",
+  "268437231:1"
  ],
  "notes": {
   "entry": "0x1376820",

@@ -106,7 +106,7 @@
 
 ## 5. 制限 / lift 範囲外
 
-1. **UI 表示系は lift 範囲外**: バナー 0x180c194f0 / ブラウザ 0x180ef7fc0 / Import 0x180d5e820 自体は lift 対象でなく、stub 定数の正しさは IR 解析 + thunk/マージの実行検証による間接保証。GUI closure の lift は M7 以降。
+1. **UI 表示系は lift 範囲外**: バナー 0x180c194f0 / ブラウザ 0x180ef7fc0 / Import 0x180d5e820 自体は lift 対象でなく、stub 定数の正しさは IR 解析 + thunk/マージの実行検証による間接保証。GUI closure の lift は MS7 以降 (`docs/STATUS.md` §2)。
 2. **EditorModel+0x1088 (編集可否 flag) の書込側は未解決** (CAB-59 §6-5 引継)。poll の「編集可」は thunk A 通過時に `[+0x1088]==0` を読むため、+0x1088 が非 0 に書かれる経路が残る限り編集不可表示の可能性 — vtable 経由と推定。
 3. **ソース再計算の停止** (isMaster≡1) により、ライセンスファイル監視 (boost FileWatcher) / PACE ソースは動かない。外部通信なしで「鍵済み」固定になるのが本 stub の意図だが、`+0x140/+0x310` の実ライセンスファイル読み挙動は未検証 (実機確認は CAB-59 §6-6 引継)。
 4. **鍵文字列の +8 保持を省略** (apply_key stub)。getStatus / 0x180054150 は読まないため観測差はないが、将来キー文字列を表示する UI を lift する場合は要保持に拡張。

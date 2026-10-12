@@ -240,6 +240,21 @@ static void fam_getbufsize(void) {
           if (mism <= 8) printf("  GBS-S-MISMATCH sw=%d sh=%d ch=%d real=(%d,%d) ours=(%d,%d)\n", sw, sh, ch, sr_, zr, so_, zo);
         }
       }
+  /* CAB-274: interp 5/6/7 のサイズが cubic (4) と同一かの実測検証 (size mode 5/6/7 -> 4 の裏付け) */
+  for (int it = 5; it <= 7; it++)
+    for (int dw = 1; dw <= 96; dw += 5)
+      for (int dh = 1; dh <= 48; dh += 5)
+        for (int ch = 1; ch <= 4; ch++) {
+          if (ch == 2) continue;
+          int zr = -12345, zo = -12345;
+          IppStatus sr_ = real((R4){0, 0, 64, 64}, (R4){0, 0, dw, dh}, ch, it, &zr);
+          IppStatus so_ = ippiResizeGetBufSize((IppiRect){0, 0, 64, 64}, (IppiRect){0, 0, dw, dh}, ch, it, &zo);
+          cases++;
+          if (sr_ != so_ || zr != zo) {
+            mism++;
+            if (mism <= 8) printf("  GBS5-MISMATCH dw=%d dh=%d ch=%d it=%d real=(%d,%d) ours=(%d,%d)\n", dw, dh, ch, it, sr_, zr, so_, zo);
+          }
+        }
   /* 拡張ランダム (dw,dh ≤ 600 — 式の外挿検証) */
   for (int k = 0; k < 4000; k++) {
     int dw = 1 + (int)(rnd64() % 600), dh = 1 + (int)(rnd64() % 600);

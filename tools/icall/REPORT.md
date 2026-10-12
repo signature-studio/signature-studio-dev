@@ -3,7 +3,8 @@
 ## 0. 結論 (先出し)
 
 - **判定: 達成**。RetDec route に「間接 call 復元 pass」を入れるだけで **OTT は native 実機械語と全 bit 一致**した (x64c.py 不使用)。
-  `bash tools/icall/icall_e2e.sh` (約 85 秒) = **PASS**: scenario matrix **89/89 本, 50,236/50,236 cell が native と bit 一致 (max_ulp 0), 最終 heap/obj state 差 0 qword**
+  `bash tools/icall/icall_e2e.sh` (約 85 秒) = **PASS**: scenario matrix **89/89 本・全 cell が native と bit 一致 (max_ulp 0), 最終 heap/obj state 差 0 qword**
+  (cell 総数・内訳の正本は `tools/ott/REPORT.md` §2)
   (t1 標準 512 cell: zero 5 / normal 507 / **junkHi 0 / junkTiny 0**, |max| 0.2516 = native と同値)。旧 RetDec chain は同 matrix で 4,791 cell (9.5%) のみ一致。
 - 手法は「**RetDec の入力 PE を decode 専用に書換える (binary pre-rewrite)**」: 間接 call/jmp を memory-ABI (固定 BLK への引数 store → 共有 stub call → 戻り load) に展開 →
   RetDec が引数の SSA 配線を普通の store として保持 → 後段で stub call を `__icall_dispatch(site_va)` に置換 (VA→関数表 = call_indirect 相当)。
@@ -65,7 +66,8 @@
 ### 3.2 OTT 検証 (`icall_e2e.sh` [4/4])
 | 指標 | 旧 RetDec chain (m6–m10) | **RetDec + icall pass (本回)** | x64c (R) |
 |---|--:|--:|--:|
-| matrix 89 scenario 出力 cell native 一致 | 4,791 / 50,236 (9.5%) | **50,236 / 50,236** | 50,236 / 50,236 |
+| matrix 89 scenario 出力 cell native 一致 | 4,791 cell (9.5%) | **全 cell 一致** | 全 cell 一致 |
+| ※ cell 総数 (89 scenario × 出力 cell) は正本 `tools/ott/REPORT.md` §2 参照 | | | |
 | 最終 heap/obj state 差 (qword) | 260,657 | **0** | 0 |
 | t1 std 512 cell | 全 0 (旧 chain は 0x326 で早期 return) | **512/512 bit-exact, junk 0** | 512/512 |
 - 使う既存 pass: ir_normalize, ir5_patch (m2/m5)、SIMD helper は m11_simd2.py (署名駆動) + 補完 5 種 (`cmplesd cmpnltsd cvttpd2dq cvtpd2dq sqrtpd`)。**M8/M9/M10 の OTT 専用 hand port (ir7_argpass, ir8_valueflow, ir9_bootstraps, gate box C port 等) は不要**。
@@ -122,4 +124,4 @@ bash tools/icall/icall_e2e.sh --full    # + FLEngine 7,421 関数 (RetDec 4 並�
 bash tools/icall/x64c_fle_probe.sh   # x64c を FLEngine に当てた対応度 (36 秒)
 python3 tools/icall/tests/test_icall.py
 ```
-前提: python3 (capstone, pefile), emsdk 6.0.12, /opt/retdec, node, setarch。keystone は raw 試験 (`work/probe`) のみ。
+前提: python3 (capstone, pefile), emsdk 6.0.12 (`[EMSDK]`), RetDec (`[RETDEC]`), node, setarch。keystone は raw 試験 (`work/probe`) のみ。

@@ -152,4 +152,4 @@ node tools/flelift/t_ustrasg.mjs                  # smoke のみ
 bash tools/ott/ott_e2e.sh                         # OTT 回帰 (読取のみ, 約 15 秒)
 ```
 前提: python3 (capstone, pefile), emsdk 6.0.12, node, gcc, setarch。PE は
-`/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin` (FLE_PE で差し替え可)。
+`docs/REFERENCES.md` `[WIN64]` の `extracted/block00031_PE.bin` (FLE_PE で差し替え可)。

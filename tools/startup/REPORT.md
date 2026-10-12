@@ -77,6 +77,6 @@ T9 license-import (任意・ユーザ起点) / T10 crash-restart / T11 license-o
 
 ## 7. 参照した既存資産 (読取のみ)
 
-`analysis/win64/REPORT.md`, `analysis/mac/REPORT.md` (記述のうち「FL64.exe が WebView2 を使う」は**誤り**で、WebView2 はエンジン側に動的束縛される。「Electron/CEF 無し」は正しい),
+`docs/REFERENCES.md` `[WIN64]` / `[MAC]` の REPORT (記述のうち「FL64.exe が WebView2 を使う」は**誤り**で、WebView2 はエンジン側に動的束縛される。「Electron/CEF 無し」は正しい),
 `tools/m2/{REPORT.md,SHIM_INVENTORY.md,work/ghidra_dll}`, `tools/m11/` (存在確認のみ)。既存 REPORT の「registry/ファイル関連付けは Web では memory/cookie」は、本調査で
 **エンジンの全設定が REG_SZ の TRegistry 経由**と判明したため、cookie ではなく **vreg (IndexedDB)** を推奨に修正。

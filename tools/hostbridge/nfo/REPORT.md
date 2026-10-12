@@ -1,6 +1,8 @@
 # REPORT — H9 / CAB-98: Plugin database (`.nfo` / `.fst`) 書式解読 + 合成 DB 生成器
 
-preflight: RULES_SHA=ff4999169333 (SUBAGENT_RULES.md 228 行・追加規則 36〜50 準拠)
+> 正本: `tools/hostbridge/nfo/REPORT.md`。書式仕様は `FORMAT.md`。
+> **行数目安**: 本ファイルは 250 行を超過 (`docs/DOC_MAP.md` §1 の上限ルール参照)。
+> 超過分は Git 履歴に残る形での分割移動を推奨 (**内容は削除しない**)。
 
 最終更新 2026-10-11 / 担当 subagent (hostbridge-nfo) / 再現: `bash tools/hostbridge/nfo/nfo_e2e.sh` (exit 0 = 全 PASS / §13 の h4 結線 e2e を含む) + `bash tools/hostbridge/nfo/h4_e2e.sh` (CAB-216 単独) + `node tools/hostbridge/nfo/analysis/real_ini_check.mjs` (実機照合 21 checks) + `node tools/hostbridge/nfo/h4_recount.mjs` (実装側 独立再計算) + `node tools/hostbridge/nfo/h4_accept_check.mjs` / `node tools/hostbridge/nfo/h4_accept_chrome.mjs` (検収側 独立再計算) / 仕様: `FORMAT.md`
 
@@ -113,7 +115,7 @@ Windows 実機から `Installed\` 配下の **実機 v2 `.nfo` / `.fst` 単体�
 
 ## 9. 規約遵守メモ
 
-- 書込は `tools/hostbridge/nfo/` のみ (`work/` は gitignore: Ghidra project コピー約 280 MB・PluginManager/FLEngine 抽出)。`tools/flp` / `tools/targets` / `tools/m2` / `tools/hostbridge` 既存ファイルは読取のみ。README/MILESTONES/HANDOFF 無改変。`evidence/` は FL 実バイナリの decompile 抜粋 (約 130 KB)・定数表・実機キャッシュファイル 2 件 (`evidence/real_machine/` — ユーザ提供の Plugin database ファイル) を含む (EULA は事実整理のみ: 実バイナリ本体・lift 済み wasm はコミットしない)。外部通信・認証系は不使用。
+- 書込は `tools/hostbridge/nfo/` のみ (`work/` は gitignore: Ghidra project コピー約 280 MB・PluginManager/FLEngine 抽出)。`tools/flp` / `tools/targets` / `tools/m2` / `tools/hostbridge` 既存ファイルは読取のみ。README/docs/ 無改変。`evidence/` は FL 実バイナリの decompile 抜粋 (約 130 KB)・定数表・実機キャッシュファイル 2 件 (`evidence/real_machine/` — ユーザ提供の Plugin database ファイル) を含む (EULA は事実整理のみ: 実バイナリ本体・lift 済み wasm はコミットしない)。外部通信・認証系は不使用。
 
 ## 10. 追記 (CAB-215 部分実施, 2026-10-10): 実機 OTT.fst 照合
 
@@ -317,8 +319,6 @@ CAB-215 の主眼 (writeEntry ↔ 実機比較) は **ini セクション経由�
 ---
 
 ## 14. 検収 (CAB-216 / HB-H4') — 検収側 独立再計算・別アルゴリズム検算
-
-preflight: RULES_SHA=ff4999169333。コミット範囲 `4b162ce` + `85424b0` = `tools/hostbridge/nfo` のみ・最大 blob 47,906 B (REPORT.md, 20 MiB 未満)・`git status` で担当外 WIP 混入 0 (tools/hostbridge は作業物 0、他 dir の WIP 64 ファイルは他担当のため未接触)。**検証起点**: `85424b0` (HEAD=`a76310f` 時点で `git diff 85424b0 HEAD -- tools/hostbridge/nfo` は空 = nfo ツリーは同一)。
 
 ### 14.1 検収側 独立再計算スクリプト (規則 37: 実装側とは別アルゴリズム)
 

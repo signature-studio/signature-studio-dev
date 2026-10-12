@@ -11,7 +11,7 @@
 - **lift 拡張**: lift 関数 75 → **207** (命令 5,790 → **13,690**)。入口 roots 41 関数を追加 (VSTPluginMain / createEffectInstance / dispatcher 両 switch / AEffect 静的 thunk 群 / getParameter・setParameter override / getChunk・setChunk / program・文字列系 / getAeffect / dtor / operator new・delete)。
   数え方 (再計算: `python3 tools/ott/accept/acc_lift_set.py`): 関数 = `work/entrylift/lift_meta.json` の `functions` 配列長 (override 対象は lift しないため除外)。命令 = `ninsn`。DSP 版 75/5,790 は `bash tools/ott/ott_e2e.sh` の `[x64c] functions 75, insns 5790`。
   ※ **コミット済み scenario 定義から再現した値**。実装報告時の 209/13,694 は、coverage の `getp_range` が idx 25..30 まで実行された状態 (uncommitted) で採られたもので、コミット済み `entry_scen.py` (`getp_range` = idx 0..19) では到達しない経路の +2 関数 / +4 命令を含む。詳細は検収 REPORT (tools/ott/ACCEPTANCE_CAB137_CAB138.md §3.1)。
-- **既存 DSP e2e は継続 PASS**: `bash tools/ott/ott_e2e.sh` = 89 scenario / 50,236 cell **max_ulp 0 / state 差 0** (x64c.py・data_gen.py の改変後も再確認済)。
+- **既存 DSP e2e は継続 PASS**: `bash tools/ott/ott_e2e.sh` = 89 scenario・**全 cell bit-exact (max_ulp 0 / state 差 0・正本 `tools/ott/REPORT.md`)** (x64c.py・data_gen.py の改変後も再確認済)。
 - **性能** (node 24.19, 256f×2000 block, tools/ott/diff/perf.mjs; 共有 16 コア・load average 2.1〜4.4 で 5 回実測の範囲): DSP 版 **203.1〜223.5 µs/blk** (実時間 **26.0〜28.6x**) → 入口拡張版 **202.8〜228.3 µs/blk** (**25.4〜28.6x**)。単発値 202.6 µs/blk (28.7x) は実測範囲内 (bit-exact build のまま)。
   数え方: µs/blk = 2000 block × 256 sample の計測区間 / block 数。実時間 x = 11.61 s 音声 / 実測秒数。負荷で振れるためレンジで記載 (規則 38)。再計算: `MOD=<cjs> REPEAT=7 node tools/ott/accept/acc_perf.mjs`。
 - **新規入手の実測知見**: ① OTT の getParameter (vtbl+0x58) は SDK 署名 (index, float* value) と異なり **float を xmm0 で返す** (31 path 全て実測、float* は未書き) — hostbridge PoC が疑っていた「戻り xmm0」を確定。② dispatcher は op 0..24 を 0x180126c60、op 25..79 を 0x180127800 の 2 段 switch で処理 (vtbl[1]=0x180127800 → 既定を 0x180126c60 へ委譲)。③ getParamLabel は **byte permutation 表 + dword 表の 2 段 jump table** (image base 相対 data-in-code) で、data 敷設に新仕組みが必要だった (§3)。
@@ -83,7 +83,7 @@
 | `lift/x64c.py` | ① `strip_prefix()`: `bnd `/`lock ` prefix を base mnemonic に正規化 ② `i_xadd` 追加 ③ `lift()`: `lea reg,[rip→IMG]` (image base anchor) を持つ関数で、mem operand の disp が .text RVA に見える場合 textref 窓に追加 | ① CRT 文字列 path に MPX 付き `bnd jne/ret`、locale refcount に `lock inc/xadd` (単 thread では no-op prefix / xadd は同一意味) ② getParamLabel (0x18011e7b0) が **byte permutation 表 (0x11e80c) + dword 表 (0x11e800) の 2 段 jump table** を image base 相対 (data-in-code) で持ち、従来の jt 検出では byte 表が敷設されず param 5 以降の label が誤る (実測: param4 = ' ' が '%' に化ける) |
 | `lift/data_gen.py` | textref 窓 96 → **256 byte** | 上記 2 段表 (19B) とその周辺を 1 窓で確実に覆う。窓は PE 実 byte の追送なので余分は無害 |
 
-改変後も `tools/ott/ott_e2e.sh` 89 scenario / 50,236 cell max_ulp 0 を再確認 (§0)。
+改変後も `tools/ott/ott_e2e.sh` 89 scenario・全 cell bit-exact (正本 `tools/ott/REPORT.md`) を再確認 (§0)。
 
 ## 4. lift 実装メモ (入口拡張の仕組み)
 
@@ -101,7 +101,7 @@
 
 ## 6. ユーザ依頼事項
 
-特に無し (素材・認証・外部通信は不要。使用した DLL は既存の `/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll`)。
+特に無し (素材・認証・外部通信は不要。使用した DLL は既存の `docs/REFERENCES.md` `[ANALYSIS-PLUGINS]` の `plugins/ott/binaries/OTT_vst2_win64.dll`)。
 
 ## 7. 再現
 

@@ -1,5 +1,8 @@
-# FL 26.1.7 組込 Python API 面 (FLEngine rodata 抽出; mac x86_64/arm64 一致、win は ペア一致で照合)
+# 自動生成: `tools/python/analysis/flapi/` 抽出 driver
 
+> **人手編集禁止** (生成元を直す)。本ファイルは測定・抽出結果の**単一の正本**。
+
+# FL 26.1.7 組込 Python API 面 (FLEngine rodata 抽出; mac x86_64/arm64 一致、win は ペア一致で照合)
 | module | 関数数 | stubs(旧)に無い新規 | win ペア一致 | MCP 使用 |
 |---|---|---|---|---|
 | playlist | 42 | 1 (selectTool) | 42/42 | 4 |

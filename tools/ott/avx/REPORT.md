@@ -23,7 +23,7 @@
   (`stmxcsr → or 0x1f80 → ldmxcsr → 復元`) は software shadow (=0x1f80 固定) と意味的に整合
   (dance が設定する値は 0x1f80 のみゆえ shadow の仮定「round-nearest 固定」と不変)。
 - **回帰 (要件 4)**: `crt_e2e.sh` 全工程 = 新 scenario 9/9 + entry 85/85 + 陰性対照 (OTT_CRTINIT=0) + DSP e2e
-  (ott_e2e.sh 89 scenario / 50,236 cell) + entry e2e — **全 PASS** (§5)。
+  (ott_e2e.sh 89 scenario・全 cell bit-exact・正本 `tools/ott/REPORT.md`) + entry e2e — **全 PASS** (§5)。
 - **残 unsup: 0**。lift 済みだが実行 coverage の無い経路 (§6) と、検証の前提 (§7) を明記。
 
 ## 1. unsup 分類表 (要件 1 — (a) 実行 coverage で必要 / (b) 非到達)
@@ -117,7 +117,7 @@ unsup 627 箇所は **17 関数**に集中し、その内訳:
 |---|---|
 | `bash tools/ott/crtinit/crt_e2e.sh` (全工程) | **PASS** — 新 scenario **9/9** + entry **85/85** (crt build 再突合) + 陰性対照 (OTT_CRTINIT=0 → native SIGSEGV / wasm ott_unlifted 同一 garbage VA) |
 | lift 集計 (crt_e2e 内) | 260 関数 / 16,378 命令 / **unsup 0 種 0 箇所** (旧: 72 種 627 箇所) |
-| `bash tools/ott/ott_e2e.sh` (DSP 89 scenario) | **PASS** — 50,236 cell / max_ulp 0 / state 差 0 |
+| `bash tools/ott/ott_e2e.sh` (DSP 89 scenario) | **PASS** — 全 cell bit-exact / max_ulp 0 / state 差 0 (正本 `tools/ott/REPORT.md`) |
 | `bash tools/ott/entry/entry_e2e.sh --quick` (entry 85) | **PASS** |
 | Gate A (flags=0, avx build): crt 9 + entry 85 | **9/9 + 85/85 PASS** |
 | Gate B (FMA/AVX 強制): avx 9 + crt 9 + entry 85 | **9/9 + 9/9 + 85/85 PASS** |

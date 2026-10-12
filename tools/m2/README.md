@@ -1,6 +1,6 @@
 # M2: mac x86_64 slice 抽出 + 静的解析成果物の機械化 + Delphi 品質確認
 
-`strategy.md` §4 M2 / §5.7 Delphi-PE 品質確認を M1 の土台 (`tools/m1/`) の上で
+`docs/REFERENCES.md` `[STRATEGY]` §4 M2 / §5.7 Delphi-PE 品質確認を M1 の土台 (`tools/m1/`) の上で
 実施する一連のスクリプト群。**結論/評価本体は `tools/m2/REPORT.md`**
 (`m2.sh` で得た `work/` 成果物の数値をもとに手動で維持される)。
 
@@ -19,35 +19,36 @@ Ghidra headless / RetDec の全体解析は 30 分〜数時間かかるため `m
 1 回だけ実行して `work/` に置く (取得済なら `m2.sh` は再利用する)。
 
 ```sh
+# 外部ツールの install root: <ghidra> = `docs/REFERENCES.md` `[GHIDRA]` / <retdec> = `[RETDEC]`
 # Ghidra headless (win64 FLEngine; ~12 min, Heap 16GB)
-/opt/ghidra/ghidra_12.1.4_PUBLIC/support/analyzeHeadless \
-  <work_dir_abs> ghproj_dll -import analysis/win64/extracted/block00031_PE.bin \
+<ghidra>/support/analyzeHeadless \
+  <work_dir_abs> ghproj_dll -import <WIN64 extracted>/block00031_PE.bin \
   -scriptPath tools/m2/ghidra_scripts \
   -postScript DumpFunctions.java <abs>/tools/m2/work/ghidra_dll/functions_dll.csv \
   -analysisTimeoutPerFile 5400
 # 2 度目以降: 同 project に -process block00031_PE.bin -noanalysis で再取り出し可
 
 # Ghidra headless (mac FLEngine x86_64 slice; ~12 min)
-/opt/ghidra/ghidra_12.1.4_PUBLIC/support/analyzeHeadless \
+<ghidra>/support/analyzeHeadless \
   <work_dir_abs> ghproj_slice -import tools/m2/work/FLEngine_x86_64.dylib \
   -scriptPath tools/m2/ghidra_scripts \
   -postScript DumpFunctions.java <abs>/tools/m2/work/ghidra_slice/functions_slice.csv \
   -analysisTimeoutPerFile 7200
 
 # RetDec selective リフト (§5.7 5観点; 数秒〜数十秒)
-/opt/retdec/bin/retdec-decompiler tools/m2/work/block00031_PE.bin \
+<retdec>/bin/retdec-decompiler tools/m2/work/block00031_PE.bin \
   -o tools/m2/work/d5fast.drc.c --select-ranges "0x40ace0-0x40ad60,..." \
   --select-decode-only --timeout 900
 
 # FLEngine 規模の全体リフトは ~2-3h / ~15GB RAM で後段 LLVM optimization が
 # 完了しにくい (--timeout 7200 / 10800 の 2 実行とも後段で打切り)。境界照合には
 # decode 完了時点で書かれる .dsm の '; function:' ラベルで十分:
-#   (win) /opt/retdec/bin/retdec-decompiler work/block00031_PE.bin \
+#   (win) <retdec>/bin/retdec-decompiler work/block00031_PE.bin \
 #         -o engine_win.drc.c --keep-unreachable-funcs --backend-no-opts \
 #         --max-memory 20000000000 --timeout 10800   (3h 設定推奨)
 #   照合: function_boundary.py --retdec-dsm work/engine_win.drc.dsm \
 #         --dsm-shift -0x400000   (VA→RVA 変換)
-#   (mac) /opt/retdec/bin/retdec-decompiler work/FLEngine_x86_64.dylib \
+#   (mac) <retdec>/bin/retdec-decompiler work/FLEngine_x86_64.dylib \
 #         -o macbound.drc.c --select-ranges "0x2b50-0x10d964c" \
 #         --select-decode-only --timeout 5400 --max-memory 20000000000
 #   照合: 既定で --dsm-shift 0 (mac slice は address==file offset)

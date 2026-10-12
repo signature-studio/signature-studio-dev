@@ -1,198 +1,24 @@
 {
- "units_covered": 942,
+ "units_covered": 895,
  "byCls": {
-  "ok": 859,
-  "empty": 46,
-  "unlifted": 22,
-  "oob": 9,
-  "trap": 5,
-  "noproc": 1
+  "ok": 892,
+  "unlifted": 3
  },
  "details": [
   [
-   45,
-   "unlifted",
-   4403326
-  ],
-  [
-   95,
-   "unlifted",
-   4262656
-  ],
-  [
-   101,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   114,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   138,
-   "unlifted",
-   6565475
-  ],
-  [
-   144,
-   "unlifted",
-   4262656
-  ],
-  [
-   149,
-   "unlifted",
-   4262656
-  ],
-  [
-   153,
-   "unlifted",
-   4262656
-  ],
-  [
-   158,
-   "unlifted",
-   4262656
-  ],
-  [
-   190,
-   "unlifted",
-   4262656
-  ],
-  [
-   233,
-   "unlifted",
-   7368704
-  ],
-  [
-   237,
-   "unlifted",
-   7368704
-  ],
-  [
-   238,
-   "unlifted",
-   7368704
-  ],
-  [
-   239,
-   "unlifted",
-   7368704
-  ],
-  [
-   245,
-   "unlifted",
-   4262656
-  ],
-  [
-   265,
-   "unlifted",
-   4262656
-  ],
-  [
-   272,
-   "unlifted",
-   4262656
-  ],
-  [
-   275,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
    280,
    "unlifted",
-   4262656
-  ],
-  [
-   291,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   296,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   304,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   365,
-   "trap",
-   "Aborted(native code called abort())"
-  ],
-  [
-   509,
-   "unlifted",
-   4685446
-  ],
-  [
-   555,
-   "oob",
-   "memory access out of bounds"
+   6978416
   ],
   [
    659,
    "unlifted",
-   4262656
-  ],
-  [
-   666,
-   "unlifted",
-   13705952
-  ],
-  [
-   745,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   830,
-   "unlifted",
-   4262656
-  ],
-  [
-   876,
-   "trap",
-   "Aborted(native code called abort())"
-  ],
-  [
-   880,
-   "trap",
-   "Aborted(native code called abort())"
-  ],
-  [
-   891,
-   "trap",
-   "Aborted(native code called abort())"
+   6978416
   ],
   [
    895,
    "unlifted",
-   9306096
-  ],
-  [
-   898,
-   "unlifted",
-   9306096
-  ],
-  [
-   923,
-   "oob",
-   "memory access out of bounds"
-  ],
-  [
-   935,
-   "trap",
-   "Aborted(native code called abort())"
-  ],
-  [
-   941,
-   "noproc",
-   0
+   9924000
   ]
  ]
 }

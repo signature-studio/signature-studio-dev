@@ -27,7 +27,7 @@
 - ルート `package.json` が `"type":"module"` のため stock python.js(CJS) は node で `require is not defined` → ES module 出力に統一。
 - `-sUSE_ZLIB/-sUSE_BZIP2` は emsdk 6.0.12 で動作 (port 自動取得、INFO ログのみ)。`-sWASM_BIGINT` は deprecated 警告のみ。
 
-## 2. FL 同梱 Python の実測 (`analysis/python_inventory.json`, `scripts_inventory.json`)
+## 2. FL 同梱 Python の実測 (`python_inventory.json`, `scripts_inventory.json` — repo 外の解析出力。入力素材は `docs/REFERENCES.md` `[MAC]`)
 
 - **mac**: `Python.framework` 64.75MB。`Python` 本体 15.99MB (universal2)、stdlib `.py` 737 本、`lib-dynload` 77 本 (非 test 65)、`site-packages` は README のみ、`test/` 無し。同梱 dylib: libssl/libcrypto/ncursesw/form/menu/panel。**FL 固有の C 拡張は lib-dynload に 0 件 — FL 独自 module は全て FLEngine_x64.dylib(Delphi/Python4Delphi) 内**。
 - **win**: python312.dll + 26 .pyd (win REPORT)。`MCPTools.pyc` は mac と **byte 一致** (100,674B, magic `cb0d0d0a`=3.12)。
@@ -36,7 +36,7 @@
 - **FL 同梱 Python スクリプト 65 本**: pyscript (Audio scripts 12 / Remote Scripts 5 / Piano roll 5)、device .py 1、Chord progression 41 (pyc 39 + pyscript 2)、MCPTools.pyc 1、(Hardware specific の `.scr` 95 本は旧形式で Python ではない)。import する stdlib は **22 module のみ** (`__future__ abc ast collections copy enum functools inspect itertools json math operator os pathlib random re sys time traceback types typing zlib`) — wasm で全て解決済。FL module は 17 (`enveditor flpianoroll flcpt flrack` を含む)。
 - FL の Python 組込み方: Python.framework は **dlopen/dlsym で後付け** (LC_LOAD_DYLIB に無い)。C API 関数名は rodata に平文で残らず**未抽出**。Delphi 型名から `PyInterpreterConfig`(サブインタプリタ示唆)・`PythonSession`/`TMCPPythonSession`・`pycb*` callback 表・`fl.FLTextOutput`(stdout 差替)・`_ilmeta` を確認。
 
-## 3. FL 組込 API 面 (`analysis/flapi/`)
+## 3. FL 組込 API 面 (本 repo 側の生成物は `python/analysis/flapi/FLAPI.md`)
 
 FLEngine rodata の `name\0doc\0…<module>` 並びから機械抽出 (`flapi_extract.py`)。mac x86_64 と arm64 は **完全一致**、win PE は同一 (名前,doc) ペアが 388/399 (97%) で一致 (差は doc 末尾空白・コード連結)。公開 stubs (IL-Group/FL-Studio-API-Stubs, LGPL, 参照のみ) の署名で補完。
 
@@ -54,7 +54,7 @@ FLEngine rodata の `name\0doc\0…<module>` 並びから機械抽出 (`flapi_ex
 - MIDI scripting: callback は rodata の `pycb*` 表で **27** (公開 26 + 新規 `OnInitAll`)、event 型 `flmidimsg` 23 フィールド。
 - 詳細表: `FLAPI.md`、全関数 (doc/署名/MCP 使用): `flapi_table.json`、fn_id 正本: `flapi_ids.json`。
 
-## 4. MCPTools.pyc 48 tools (`analysis/mcp/MCP_TOOLS.md`, `mcp_classification.json`)
+## 4. MCPTools.pyc 48 tools (本 repo 側は `python/analysis/mcp/MCP_TOOLS.md`, `mcp_classification.json`)
 
 - 構造: `@mcp_tool`(= `_is_mcp_tool=True`) 付き関数を `get_mcp_tools_json()` が `sys.modules['__main__']` から走査して name/description/inputSchema(型は Annotated から生成) を JSON 化。FLEngine 側 `TMCPServer`/`TMCPPythonSession`/`TMCPSyncCall` が JSON-RPC 2.0 応答 (`result.content[{type:text}], isError`) を組立て、結果は WebView の `window.flHelper.onMCPTools/onRunJson` へ渡る (rodata の JS 呼出し文字列からの推定)。
 - 使う FL API は **8 module / 61 参照** (channels 18, mixer 18, ilmcp 8, plugins 7, playlist 4, ui 3, transport 2, midi 定数 1)。静的 61 参照 = flapi 関数 60 (公開 52 + ilmcp 8) + `midi.PIM_None` 定数 1。実行実測で 55 を踏み (`mcp_classification.json` の `api_arity_observed` も 55)、未実行 6 は分岐違いで静的閉包に含まれるもの (isChannelSelected, mixer.focusEditor, mixer.isTrackSelected, plugins.getParamValueString, ui.hideWindow, midi.PIM_None)。**実行時に呼ばれた API は静的閉包の部分集合** (不一致 0)。
@@ -95,7 +95,7 @@ FLEngine rodata の `name\0doc\0…<module>` 並びから機械抽出 (`flapi_ex
 - 引数名 (kwargs) は stubs 由来の署名がある関数のみ。新規 43 関数と ilmcp は位置引数のみ (rodata の書式文字列 `i if sdd…` は順序対応が曖昧で未採用)。
 - 旧 stubs (LGPL) は**参照入力のみ**でリポジトリ非同梱 (`fetch_inputs.sh` が clone)。FL 由来 pyc/py も非同梱 — 利用者の FL から実行時供給。EULA 判断は行わない (事実整理のみ)。
 - 呼出しコストは node/Chrome headless の mock 実測。実 FLEngine(wasm) 結合時に再計測要。
-- **MCPTools 内のテンポ規約が不整合に見える**: `get_session_context` は `mixer.getCurrentTempo()` (引数なし) を `/1000` して BPM 化、`get_tempo` は `getCurrentTempo(1)` を素の BPM として表示、`set_tempo` は `setCurrentTempo(bpm, 1)`。モックは後者に合わせたため `get_session_context` が `tempo_bpm: 0.13` を返す (`analysis/mcp/tool_coverage.json`)。どちらが実 FL の挙動かは未確認。
+- **MCPTools 内のテンポ規約が不整合に見える**: `get_session_context` は `mixer.getCurrentTempo()` (引数なし) を `/1000` して BPM 化、`get_tempo` は `getCurrentTempo(1)` を素の BPM として表示、`set_tempo` は `setCurrentTempo(bpm, 1)`。モックは後者に合わせたため `get_session_context` が `tempo_bpm: 0.13` を返す (`mcp_classification.json` 側の解析メモ)。どちらが実 FL の挙動かは未確認。
 - flapi 435 関数のうち doc 無し 36 (ui 27 + ilmcp 9): ui の 27 は stubs の関数名辞書と rodata 窓内トークンの一致で補完 (`flapi_extract.py`)。doc 無しの *新規* 関数は stubs 辞書に無いため抽出漏れの可能性がある (doc 付きの新規 34 は rodata から直接抽出)。
 - 「LGPL stubs 非同梱」はファイルとしての話: stubs 由来の署名 (引数名/型/既定値、394 関数・535 引数) と callback 名 26 が `flapi_table.json` に取り込み済み (docstring 本文は無し)。`flapi_table.json` の doc 欄 (≤66 字) と `raw_*.json` は FLEngine rodata の抽出文字列、`mcp_tools.json` / `MCP_TOOLS.md` の description は MCPTools.pyc の先頭 160 字。
 - 再ビルドで成果物バイト数は ±0.2% 程度変動 (クリーン再ビルドで wasm 5,921,416 / data 3,204,697 / js 120,269、検収時)。

@@ -1,6 +1,5 @@
 # REPORT (CAB-271 / SHX-T11) — pathreg `pathreg_set_paths()` 直後の初回 `pathreg_map()` が既定マウント表で上書きするバグの根本修正
 
-preflight: RULES_SHA=ff4999169333
 日付: 2026-10-11 / 親: **CAB-168** (Done) / 発見元: **CAB-101** (startup-glue 検収 §5.1, Done) / dir: `tools/shimx/pathreg/` / milestone: ブラウザ初回起動 (654c816c-07d2-401b-bd9b-8a52cf056b0a)
 既知類型 (DEFECTS.md) との関係: **該当なし** (本 ticket は shimx インタフェース層の C 修正。lift/逆アセ/IR pass を扱わない)
 書込範囲: `tools/shimx/pathreg/` **のみ** (`tools/shimx/` 既存ファイル・`tools/startup/` は 0 行・読取のみ。以下 §3 で実測)
@@ -220,7 +219,7 @@ glue e2e が `ERR_MODULE_NOT_FOUND` で失敗する (本 § の archive コマ�
 ## 9. ユーザ依頼事項
 
 なし (~/ダウンロード・既存抽出物とも未使用。素材・認証は不要)。規則 49-4 の確認:
-`ls ~/ダウンロード/`・`ls analysis/win64/extracted`・`ls analysis/mac/pkg_extract` はいずれも本 ticket で不要なため未参照。
+`ls ~/ダウンロード/`・`ls [WIN64] の extracted/`・`ls [MAC] の pkg_extract/` はいずれも本 ticket で不要なため未参照。
 
 ## 10. 次タスク提案 (下流チケット案)
 

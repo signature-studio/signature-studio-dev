@@ -1,7 +1,7 @@
 # M1: 極小 PE→wasm PoC の E2E 自動化
 
-戦略文書 (`/home/ubuntu/work/analysis/strategy.md`) §4 M1 / §2.1 パイプラインの検証条件を満たすため、
-toolchain_setup.md の E2E 実証 (`/opt/_test/`) を **1 本のスクリプトで再生産可能** にしたもの。
+戦略文書 (`docs/REFERENCES.md` `[STRATEGY]`) §4 M1 / §2.1 パイプラインの検証条件を満たすため、
+toolchain_setup.md の E2E 実証 (`[_TEST]`) を **1 本のスクリプトで再生産可能** にしたもの。
 
 ## 使い方
 
@@ -20,7 +20,7 @@ M1_STRICT=1 bash tools/m1/m1.sh   # 固定バージョンと不一致なら失�
 | 2 | native 実行 → 比較 reference 採取 | `build/ref.out` (PE は実行環境がないため ELF native 出力を reference にする) |
 | 3 | RetDec 逆コンパイル | RetDec v5.0 `-o`: ELF → `retdec_elf.c`, PE → `retdec_pe.c` |
 | 4 | 必要関数抽出 | `extract_main.awk` で `main` 定義ブロックのみ抽出。PE 固有の後処理: `__mingw_printf` → `printf` 置換、`__main()` 行除去 |
-| 5 | emcc 再コンパイル → wasm | `flags.sh` の `EMCC_FLAGS_M1` (toolchain_setup.md 実績値) |
+| 5 | emcc 再コンパイル → wasm | `flags.sh` の `EMCC_FLAGS_M1` (`[TOOLCHAIN]` 実績値) |
 | 6 | node 実行 | emcc が生成した JS glue を node で実行 |
 | 7 | 出力比較 | `compare.sh ref.out wasm_elf.out wasm_pe.out` (3-way: native ELF = wasm ELF = wasm PE) |
 
@@ -44,7 +44,7 @@ M1_STRICT=1 bash tools/m1/m1.sh   # 固定バージョンと不一致なら失�
 
 ## 定型フラグ
 
-toolchain_setup.md 実績値 (M1 で検証済):
+`[TOOLCHAIN]` 実績値 (M1 で検証済):
 
 ```
 -emcc: -w -Wno-error=int-conversion -Wno-implicit-function-declaration -sERROR_ON_UNDEFINED_SYMBOLS=0
@@ -54,7 +54,7 @@ toolchain_setup.md 実績値 (M1 で検証済):
 
 ## ハマりどころ・形式 (PE/ELF) 特有の問題 — 実測メモ
 
-- **mingw CRT の全体展開**: `x86_64-mingw32-gcc` でビルドした PE32+ を RetDec に通すと、CRT 一式まで C コードとして再構築され出力は 230KB+。wasm 直リンクは非現実的なので **`main` だけ抽出 → 最小ハーネスに結合** するのが確実 (strategy.md §2.2 の「lifter 品質リスク」とも整合)。
+- **mingw CRT の全体展開**: `x86_64-mingw32-gcc` でビルドした PE32+ を RetDec に通すと、CRT 一式まで C コードとして再構築され出力は 230KB+。wasm 直リンクは非現実的なので **`main` だけ抽出 → 最小ハーネスに結合** するのが確実 (`docs/REFERENCES.md` `[STRATEGY]` §2.2 の「lifter 品質リスク」とも整合)。
 - **`__mingw_printf`**: RetDec は mingw の `printf` 実装を CRT 内部ラッパ名 (`__mingw_printf` 系) で復元する。抽出側で一律 `printf` に置換して emcc libc に落とす。
 - **`__main()`**: mingw C runtime 固有の CRT 初期化呼び出し。wasm 化では意味を持たない (グローバルコンストラクタ登録経路) ので行ごと除去。
 - **`__stdcall` / `dllexport` / `dllimport`**: x64 PE では呼出規約が x64 ABI に一元化されるため `__stdcall` は no-op。今回の `main` は裸シグネチャで出力され declspec 由来の問題は発生しなかった。RetDec は装飾名 (`__imp_` 接頭など) を原型名に復元済みで、IAT 参照は通常の関数呼び出しとして落地する。ただし **32bit PE や明示 `__declspec(dllexport)` を付けた DLL 形式では名前装飾 (mangling) の差が出得るため、M2 以降の抽出では要再確認**。

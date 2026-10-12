@@ -104,4 +104,4 @@
   m10_coefref.py (dsm register-exact 参照転記), m10_probe.mjs, trace pass 群
   (m10_bandtrace.mjs, m10_dumpcoef.mjs, m10_junktrace.mjs, m10_ringtrace.mjs, m10_junksrc.mjs,
   m10_junksrc2.mjs), .gitignore (work/ 除外), REPORT.md。
-- README/MILESTONES/docs/tools/m1-m9 等への編集 = 0 (README 提案文言は最終報告に記載)。
+- README・docs・tools/m1-m9 等への編集 = 0 (README 提案文言は最終報告に記載)。

@@ -1,5 +1,8 @@
-# shimx スタブ (inventory status=S) のうち起動経路で呼ばれたもの
+# 自動生成: `python3 tools/m11/shimx_link/gen_link.py`
 
+> **人手編集禁止** (生成元を直す)。本ファイルは測定・抽出結果の**単一の正本**。
+
+# shimx スタブ (inventory status=S) のうち起動経路で呼ばれたもの
 - FLEngine 静的 import に対するスタブ: 115 本 (inventory S, 全 scope 重複除く: 126)
 - 17 unit 通常起動 + #18 で呼ばれたスタブ: なし
 - 942 unit survey (隔離実行) で呼ばれたスタブ: SetErrorMode, acmMetrics

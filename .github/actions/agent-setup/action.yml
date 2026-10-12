@@ -1,0 +1,141 @@
+name: Setup Agent Environment
+description: Setup the agent environment for the workflow (toolchain + R2 artifacts)
+
+inputs:
+  r2-bucket:
+    description: 'R2 bucket holding artifact bundles'
+    required: false
+    default: signature-studio-artifacts
+  artifacts:
+    description: 'Space-separated list of artifact prefixes. Each is fetched as s3://<bucket>/artifacts/<prefix>.tar.zst'
+    required: false
+    default: 'fl-win64'
+  artifacts-required:
+    description: 'Fail the job when an artifact bundle is missing (true) or continue without it (false). Without the FL Studio / plugin binaries the agent cannot run e2e.'
+    required: false
+    default: 'true'
+  opencode-version:
+    description: 'Pinned opencode CLI version for the npm channel (@opencode/cli-<target>). Empty = the default in .github/scripts/install-opencode.sh'
+    required: false
+  opencode-release-version:
+    description: 'Pinned opencode release tag for the GitHub Releases channel (anomalyco/opencode). Empty = the default in .github/scripts/install-opencode.sh'
+    required: false
+  opencode-install-source:
+    description: 'Where to install opencode from: auto (npm, then GitHub Releases, then the official installer), releases, or npm'
+    required: false
+  cf-account-id:
+    description: 'Cloudflare account id for R2'
+    required: false
+  cf-r2-access-key-id:
+    description: 'R2 access key id'
+    required: false
+  cf-r2-secret-access-key:
+    description: 'R2 secret access key'
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup uv
+      uses: astral-sh/setup-uv@v10.3.0
+    - name: Setup Python using uv
+      shell: bash
+      run: uv python install --default 3.14
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v6
+    - name: Setup Node.js using pnpm
+      shell: bash
+      run: pnpm runtime set node 26.10.0
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+    - name: Setup OpenCode
+      shell: bash
+      env:
+        OPENCODE_VERSION: ${{ inputs.opencode-version }}
+        OPENCODE_RELEASE_VERSION: ${{ inputs.opencode-release-version }}
+        OPENCODE_INSTALL_SOURCE: ${{ inputs.opencode-install-source }}
+      run: bash .github/scripts/install-opencode.sh
+
+    # install-opencode.sh は取得した版を `opencode --version` で検証済み。
+    # ここでは「後続 step が PATH 経由で見つかる」ことだけを確認する。
+    # ($GITHUB_PATH はこの step には効かないので、スクリプト内の検証はフルパスで行う)
+    - name: Verify OpenCode on PATH
+      shell: bash
+      run: |
+        set -euo pipefail
+        if ! command -v opencode >/dev/null 2>&1; then
+          echo "::error::opencode is not on PATH for subsequent steps"
+          exit 1
+        fi
+        echo "opencode: $(command -v opencode) -> $(opencode --version 2>&1)"
+
+    # ---------------------------------------------------------------
+    # R2 artifacts (未設定なら notice を出してスキップ)
+    # ---------------------------------------------------------------
+    - name: Download artifacts
+      shell: bash
+      env:
+        AWS_ACCESS_KEY_ID: ${{ inputs.cf-r2-access-key-id }}
+        AWS_SECRET_ACCESS_KEY: ${{ inputs.cf-r2-secret-access-key }}
+        AWS_DEFAULT_REGION: auto
+        AWS_EC2_METADATA_DISABLED: 'true'
+        R2_BUCKET: ${{ inputs.r2-bucket }}
+        CF_ACCOUNT_ID: ${{ inputs.cf-account-id }}
+        R2_ARTIFACTS: ${{ inputs.artifacts }}
+        R2_REQUIRED: ${{ inputs.artifacts-required }}
+      run: |
+        set -uo pipefail
+        artifacts_dir="$HOME/artifacts"
+        mkdir -p "$artifacts_dir"
+
+        # 認証情報の確認は endpoint を組み立てる前に行う。${VAR:-} で読むのは、
+        # 未設定時に set -u の生のシェルエラーを出す代わりに ::error:: へ
+        # 案内できるようにするため。
+        if [ -z "${CF_ACCOUNT_ID:-}" ] || [ -z "${AWS_ACCESS_KEY_ID:-}" ] || [ -z "${AWS_SECRET_ACCESS_KEY:-}" ]; then
+          if [ "${R2_REQUIRED:-true}" = 'true' ]; then
+            echo "::error::R2 credentials are missing but artifacts are required"
+            echo "::error::set CF_ACCOUNT_ID / CF_R2_ACCESS_KEY_ID / CF_R2_SECRET_ACCESS_KEY, or pass artifacts-required=false when the task does not need the binaries"
+            exit 1
+          fi
+          echo "::notice::R2 credentials not set and artifacts are optional; continuing without them"
+          # 後続 step は $GITHUB_ENV の ARTIFACTS_DIR / TMPDIR を読むため、
+          # happy path と同じ値を export してから抜ける。
+          {
+            echo "ARTIFACTS_DIR=$artifacts_dir"
+            echo "TMPDIR=$RUNNER_TEMP"
+          } >> "$GITHUB_ENV"
+          exit 0
+        fi
+        endpoint="https://${CF_ACCOUNT_ID}.r2.cloudflarestorage.com"
+
+        # 命名は <prefix>.tar.zst で固定。--recursive の prefix 指定だと fl-win64 が
+        # fl-win64-anything.tar.zst も拾うため、オブジェクトを明示して取得する。
+        missing=""
+        for name in ${R2_ARTIFACTS:-}; do
+          key="artifacts/${name}.tar.zst"
+          if aws s3 cp "s3://${R2_BUCKET}/$key" "$artifacts_dir" \
+            --endpoint-url "$endpoint" --only-show-errors; then
+            echo "fetched $key"
+          else
+            missing="$missing $key"
+          fi
+        done
+
+        if [ -n "$missing" ]; then
+          # 何がバケットに実在するかを一緒に出して、認証エラーと「空/命名違い」を
+          # 切り分けられるようにする。
+          echo "::error::missing R2 object(s) in s3://${R2_BUCKET}:$missing"
+          echo "::error::objects actually present under artifacts/ (first 20):"
+          aws s3 ls "s3://${R2_BUCKET}/artifacts/" --endpoint-url "$endpoint" 2>&1 | head -20 || true
+          if [ "${R2_REQUIRED:-true}" = 'true' ]; then
+            echo "::error::the agent cannot run e2e without these binaries; failing instead of continuing"
+            exit 1
+          fi
+          echo "::warning::continuing without them because artifacts-required=false"
+        fi
+
+        du -sh "$artifacts_dir" 2>/dev/null || true
+        {
+          echo "ARTIFACTS_DIR=$artifacts_dir"
+          echo "TMPDIR=$RUNNER_TEMP"
+        } >> "$GITHUB_ENV"

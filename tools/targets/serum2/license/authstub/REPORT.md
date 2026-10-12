@@ -1,7 +1,7 @@
 # SR-2b — Serum2 authorization stub 設計・実装 (CAB-237)
 
 - 日付: 2026-10-10 / 親: CAB-13 (アプリケーション完成 マイルストーン) / 前段: CAB-71 (5012887, REPORT §7 の N1–N8 が入力)
-- 方針根拠: `tools/docs/LEGAL.md` §6.0-4 (bc07970: 全ライセンス機構無力化・アクティベーション無条件通過・ライセンス状態データの配置/合成はユーザ承認済み)
+- 方針根拠: `docs/LEGAL.md` §6.0-4 (bc07970: 全ライセンス機構無力化・アクティベーション無条件通過・ライセンス状態データの配置/合成はユーザ承認済み)
 - 範囲: 本 dir (`tools/targets/serum2/license/authstub/`) のみ新設。CAB-71 既存ファイルは無変更 (license/REPORT.md への §10 追記のみ)。
 - 再現: `bash tools/targets/serum2/license/authstub/e2e.sh` (1 コマンド, lift キャッシュ利用時 約 25 秒)
 

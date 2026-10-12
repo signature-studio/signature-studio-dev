@@ -2,7 +2,7 @@
 
 日付: 2026-10-10 / 担当: ilreg / 書込範囲: `tools/startup/vreg/ilreg/` のみ
 再現: `python3 tools/startup/vreg/ilreg/scripts/extract_constants.py` &&
-`node tools/startup/vreg/ilreg/verify/test_golden.mjs` (要 node: `~/.nvm` or `/opt/emsdk/node/*/bin/node`)
+`node tools/startup/vreg/ilreg/verify/test_golden.mjs` (要 node: `~/.nvm` or `[EMSDK]` 同梱 node `node/*/bin/node`)
 
 ## 0. 結論 (数値は全て実測。推定は (推定) 明記)
 
