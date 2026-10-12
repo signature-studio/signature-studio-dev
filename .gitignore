@@ -10,5 +10,8 @@ coverage/
 *.pyc
 *.hex
 
+# /artifacts は R2 から取得した素材 (.tar.zst) のローカル展開先の置き場。
+# 追跡するのは .gitkeep だけで、実体は runner では $HOME/artifacts に置かれる。
+# 先頭の / でリポジトリ直下だけに限定し、tools/ 以下の同名ディレクトリは対象外のままにする。
 /artifacts/**/*
 !/artifacts/.gitkeep

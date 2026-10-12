@@ -1,67 +1,143 @@
 # OpenCode GitHub Actions
 
-Signature Studio の Issue/PR 駆動エージェント実行基盤。**この内容はコミット前にユーザーレビュー待ち。**
+Signature Studio の Issue/PR 駆動エージェント実行基盤。
+
+このリポジトリの Issue / PR は作成が Collaborators のみに制限されている。
+外部の第三者がコメントを投稿できない前提で、`/oc` 起動のアクセス制御は
+コメント本文に `oc_actions_allow_write` を含めるかどうかで行っている。
 
 ## 構成
 
 | ファイル | 役割 |
 |---|---|
-| `workflows/opencode.yaml` | 起動トリガ (issue_comment `/oc` / `opencode`、pull_request opened、workflow_dispatch) と2ジョブ (implement / review) |
-| `actions/agent-setup/action.yml` | ツールチェイン (uv/pnpm/node26/bun/opencode) + **GitHub App トークン自動リフレッシュ** + **R2 からの素材ダウンロード** |
-| `actions/opencode/action.yml` | `opencode auth import` (Console 認証) + `opencode run --format json` 実行 + sessionID から `opencode api` で最後の assistant text を `$GITHUB_STEP_SUMMARY` へ |
-| `scripts/mint-token.sh` | App 秘密鍵から installation token を再発行して `$RUNNER_TEMP/gh_token` に書く |
-| `systemd/token-refresh.service` | `mint-token.sh` を 1 回実行する oneshot unit |
-| `systemd/token-refresh.timer` | 50 分ごとに service を起こす timer (App token の有効期限は 1 時間) |
-| `scripts/assemble-prompt.sh` | イベント文脈 (コメント本文・issue/PR 番号・権限) をプロンプトテンプレートに流し込む |
-| `prompts/implementer.md` | 実装エージェントの行動規範 (スコープ・commit 規約・e2e 実測必須・PR 作成) |
-| `prompts/reviewer.md` | レビュワーエージェントの役割 (approve/deny・**Auto Merge が使えない場合はレビュワーがマージまで担当**) |
+| `workflows/opencode.yaml` | 起動トリガ (issue_comment `/oc`・pull_request・workflow_dispatch) と 2 ジョブ (implement / review) |
+| `actions/agent-setup/action.yml` | ツールチェイン (uv/pnpm/node26/bun/opencode) と R2 からの素材ダウンロード |
+| `actions/opencode/action.yml` | `opencode auth import` → `opencode run --format json` → sessionID から `opencode api` で最後の assistant text を `$GITHUB_STEP_SUMMARY` へ |
+| `scripts/install-opencode.sh` | opencode CLI のインストール (pin・指数バックオフ・フォールバック) |
+| `scripts/prepare-event-context.sh` | untrusted なイベント値をファイルに隔離し、制御変数を `$GITHUB_ENV` へ 1 行ずつ書く |
+| `scripts/assemble-prompt.sh` | イベント文脈を実装エージェント用プロンプトに流し込む |
+| `scripts/assemble-reviewer-prompt.sh` | 同じ方式でレビュワー用プロンプトを組み立てる |
+| `prompts/implementer.md` | 実装エージェントの行動規範 (スコープ・commit 規約・実測必須・マージ方法・規約への導線) |
+| `prompts/reviewer.md` | レビュワーエージェントの役割 (approve/request-changes・マージ) |
 
-設計方針: **ロジックはファイルに、YAML には数行だけ**。インライン bash の heredoc・ループ・python は置かず、必要な処理は `scripts/`・`systemd/` のファイルをコミットして `cp` + `systemctl --user` で配置する。
+設計方針: **ロジックはファイルに、YAML には数行だけ**。プロンプトとイベント文脈は
+`$RUNNER_TEMP` のファイルとして扱い、`$GITHUB_OUTPUT` / `$GITHUB_ENV` には
+1 行のスカラー値だけを書き込む (heredoc のデリミタは入力で閉じられるため使わない)。
 
 ## フロー
 
 1. Issue に `/oc <instruction>` をコメント (`oc_actions_allow_write` を含めると書き込み可)
-   → **implement ジョブ**: App トークン取得 → checkout → 素材 DL → プロンプト組み立て → OpenCode 実装 → コミット/push/PR 作成・Auto Merge 有効化
-2. PR が open → **review ジョブ**: PR diff を取得 → レビュワーエージェントが検証 → approve/request-changes → 必要なら `gh pr merge --squash --delete-branch`
+   → **implement ジョブ**: イベント文脈の隔離 → App トークン取得 → checkout →
+   素材 DL → プロンプト組み立て → OpenCode 実装 → コミット/push/PR 作成・Auto Merge 有効化
+2. PR が open / synchronize / reopen → **review ジョブ**: 差分取得 →
+   レビュワーエージェントが検証 → approve/request-changes → 必要なら `gh pr merge --merge --delete-branch`
 3. PR に `/oc <instruction>` → コンフリクト解決などの追加作業
 
-## トークン期限対策
+fork からの PR は review ジョブの対象外 (`head.repo.full_name == github.repository`)。
+`pull_request` イベントでは fork PR に secrets が渡らないため、App トークンの生成が
+必ず失敗する。fork PR のレビューは人手で行う。
 
-`actions/create-github-app-token` のトークンは 1 時間。エージェントが長時間動作すると push/gh が失敗する。
-対策: agent-setup が `scripts/mint-token.sh` と `systemd/` の unit を `~/.local/bin`・`~/.config/systemd/user` に配置し、
-**user service** の timer (`token-refresh.timer`) で 50 分ごとにトークンを再発行して `$RUNNER_TEMP/gh_token` を更新する。
-git は credential helper がこのファイルを都度読むので、実行中プロセスの push でも新しいトークンが使われる (sudo 不要)。
+## opencode のインストール
 
-`systemctl --user` が使えない runner では警告を出してタイマー起動を諦める (ジョブは継続)。
+インストールは **pin したバージョンを取得して `opencode --version` で実測確認する**。
+`opencode.ai` の metadata API には依存しない。
+
+取得元は次の順 (auto の場合):
+
+1. **GitHub Releases の tarball** (`anomalyco/opencode` の `opencode-<target>.tar.gz` / `.zip`)
+2. **npm registry の tarball** (`@opencode/cli-<target>`)
+3. **公式インストーラ** (`--version` を渡すので metadata API を経由しない)
+
+> `anomalyco/opencode-beta` は取得元にできない。2026-10-12 時点で公開済 release の
+> 資産は `opencode-desktop-*` と electron-updater のメタデータのみで、CLI の tarball を
+> 持たない (最新 tag は `v0.0.0-beta-19723` で、CLI 版より古い)。
+
+Releases 系統と npm 系統はバージョントラックが異なる (Releases は 1.x、npm は 2.x)。
+そのため pin も 2 本ある。既定値:
+
+| 変数 | 既定 | 対象 |
+|---|---|---|
+| `OPENCODE_RELEASE_VERSION` | `v1.19.0` | Releases の tag |
+| `OPENCODE_VERSION` | `2.0.26` | npm の `@opencode/cli-<target>` |
+| `OPENCODE_INSTALL_SOURCE` | `auto` | `auto` / `releases` / `npm` |
+| `OPENCODE_RELEASE_SHA256` | (空) | 指定すると tarball の SHA-256 を検証する |
+
+上書きは `workflow_dispatch` の入力、または repository variable
+(`OPENCODE_VERSION` / `OPENCODE_RELEASE_VERSION` / `OPENCODE_INSTALL_SOURCE`) で行う。
+
+## トークン
+
+`actions/create-github-app-token` が返す installation token は 1 時間有効。
+**runner 上で再発行する仕組みは無い。** GitHub-hosted runner には systemd の user
+session が無いため、user timer による自動更新は動作しない。曾经的
+`mint-token.sh` + `systemd/token-refresh.*` は削除済み (更新されたトークンを
+git / `gh` のどちらにも反映できない経路だった)。
+
+そのため `actions/checkout` は `persist-credentials: false` とし、認証は
+App トークンを明示的に渡す経路だけに統一している。ジョブは `timeout-minutes: 60`
+で 1 時間以内に収まるようにしてある。
 
 ## R2 素材
 
-バケット `signature-studio-artifacts` (2026-10-11 作成)。`artifacts/` 配下:
+バケット `signature-studio-artifacts`、オブジェクトは `artifacts/<prefix>.tar.zst`
+という命名 (`.tar.zst` のまま置き、エージェントが必要に応じて `tar --zstd -xf` で展開)。
 
 ```
-aws s3 cp s3://signature-studio-artifacts/artifacts/<prefix> "$HOME/artifacts" \
-  --recursive --endpoint-url "https://$CF_ACCOUNT_ID.r2.cloudflarestorage.com"
+aws s3 cp s3://signature-studio-artifacts/artifacts/<prefix>.tar.zst "$HOME/artifacts" \
+  --endpoint-url "https://$CF_ACCOUNT_ID.r2.cloudflarestorage.com"
 ```
 
-`.tar.zst` のまま置く (展開はエージェントが必要に応じて `tar --zstd -xf`)。認証情報は repository secrets から (未設定なら notice を出してスキップ)。
+**2026-10-12 時点でバケットは空** (全実行 404)。agent-setup は素材が欠けているとき
+ジョブを落とすが、`artifacts-required: false` を渡せば警告付きで続行する。
+その場合エージェントは素材なしで動くので、`$ARTIFACTS_DIR` を `ls` で確認し、
+空なら「素材なしで e2e は実行できない」と報告して停止する。
 
-## 設定 (要ユーザー)
+## 設定
 
-**Variables** (作成済み): `OC_APP_CLIENT_ID`
-**Secrets** (要追加):
-- `OC_APP_PRIVATE_KEY` — 登録済み
-- `OC_AUTH_EXPORT` — `opencode auth export` の出力 (OpenCode Console エントリのみを残した JSON)
-- `CF_ACCOUNT_ID` / `CF_R2_ACCESS_KEY_ID` / `CF_R2_SECRET_ACCESS_KEY` — R2 読み取り用
+**Variables**: `OC_APP_CLIENT_ID` (必須)、`OC_REVIEW_APP_CLIENT_ID` (任意)、
+`OPENCODE_VERSION` / `OPENCODE_RELEASE_VERSION` / `OPENCODE_INSTALL_SOURCE` (任意)
 
-**任意**: `OC_REVIEW_APP_CLIENT_ID` + `OC_REVIEW_APP_PRIVATE_KEY` (レビュワー用の第 2 App)。
-設定がない場合、レビュワーは実装 App と同一 identity になり **自分自身の PR を approve できない**。
-(comment + 直接 merge にフォールバック)
+**Secrets**: `OC_APP_PRIVATE_KEY`、`OC_AUTH_EXPORT`、
+`CF_ACCOUNT_ID` / `CF_R2_ACCESS_KEY_ID` / `CF_R2_SECRET_ACCESS_KEY`
 
-`workflow_dispatch` の入力は `prompt` のみ。dispatch は write 権限を持つ人手による起動なので、常に書き込み可として扱う。
+**任意**: `OC_REVIEW_APP_PRIVATE_KEY`。設定がない場合、レビュワーは実装 App と同一
+identity になり **自分自身の PR を approve できない** (comment + 直接 merge に
+フォールバック)。設定していても installation が `contents:write` /
+`pull-requests:write` を grant していない場合は同じフォールバックになる。
+
+`workflow_dispatch` の入力は `prompt` と opencode の pin 3 つ。dispatch は write
+権限を持つ人手による起動なので、常に書き込み可として扱う。
+
+## マージ戦略
+
+このリポジトリは merge commit のみ許可されている:
+
+```
+allow_merge_commit: true
+allow_squash_merge: false
+allow_rebase_merge: false
+```
+
+`gh pr merge --squash` は必ず失敗する。プロンプトも `gh pr merge --auto --merge` /
+`gh pr merge --merge --delete-branch` を使う。
+
+## 規約
+
+エージェントが従う規約の正本はリポジトリ内にある。
+`AGENTS.md` (要約) と `docs/WORKFLOW.md` (詳細) を参照すること。
+プロンプトには導線のみを記載し、規約本文は複製していない。
 
 ## 検証手順 (コミット後)
 
 ```
-gh workflow run opencode.yaml --ref feat/add-opencode -f prompt="..."
+gh workflow run opencode.yaml --ref <branch> -f prompt="..."
 # Issue コメント / PR open での自動起動も確認
+```
+
+ローカルで静的検査:
+
+```
+bash -n .github/scripts/*.sh
+shellcheck .github/scripts/*.sh
+actionlint .github/workflows/*.yaml
 ```
