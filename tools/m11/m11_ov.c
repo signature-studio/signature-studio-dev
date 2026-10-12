@@ -234,7 +234,7 @@ unsigned long long function_4133f0(unsigned long long dest, unsigned long long s
  * 実機では戻らない (DllMain の setjmp が eax=1 で再返却 → DllMain は TRUE を返す).
  * lift 版は longjmp を表現できず, 通常 return して Halt0 が ExitProcess まで進んでしまう (実測).
  * wasm では JS 例外で呼出しスタックを巻き戻し, ハーネスが「DllMain attach 完走」と判定する. */
-EM_JS(void, m11_throw_dllmain_done, (int code), { throw { m11_dllmain_done: code }; });
+EM_JS(void, m11_throw_dllmain_done, (int code), { throw { m11_dllmain_done: code, stack: new Error().stack }; });
 static int g_longjmp_hit = 0;
 EMSCRIPTEN_KEEPALIVE int m11_longjmp_hit(void) { return g_longjmp_hit; }
 unsigned long long function_412770(void* ctx) {
@@ -260,4 +260,72 @@ unsigned long long function_450560(unsigned long long src, unsigned long long de
         if (r == 0) function_44cb40(0, 0);
     }
     return dest;
+}
+
+/* function_417b70  VA 0x417b70  (System.DynArraySetLength(var a: Pointer; ti: PDynArrayTypeInfo; dimCnt: NativeInt; lengths: PNativeInt))
+ * RetDec は `mov rax,[rbp+0xb0]; mov rax,[rax]` (= *a) と `mov rax,[rbp+0xc8]; mov rax,[rax]` (= *lengths) の
+ * 1 段 deref を 2 箇所とも落とし, lengths (スタックアドレス) を配列長, a を配列本体として扱った.
+ * → GetMem に巨大サイズが渡り 0 を返して Error(reOutOfMemory) → Halt0 (survey halt0 の 17 unit 直接原因, #130).
+ * 逆アセンブル (417b70..417fa2) から転記. 動的配列ヘッダ: hdr = data-16, [hdr+4]=refcnt, [hdr+8]=length. */
+unsigned long long function_417b70(unsigned long long a, unsigned long long ti, unsigned long long dimcnt, unsigned long long lengths) {
+    u64 p = Q(a);
+    u64 len = Q(lengths);
+    if ((long long)len <= 0) {
+        if ((long long)len < 0) function_409730(4);
+        function_418190(a, ti, 0);
+        return 0;
+    }
+    u64 oldlen = 0, hdr = p;
+    if (p) { hdr = p - 0x10; oldlen = Q(hdr + 8); }
+    u64 nm = ti + B(ti + 1);
+    long long elsz = (long long)(int)D(nm + 2);
+    u64 elp = Q(nm + 6);
+    u64 elt = elp ? Q(elp) : 0;
+    long long sz = (long long)len * elsz;
+    if (sz / (long long)len != elsz) function_409730(4);
+    sz += 0x10;
+    if (sz < 0) function_409730(4);
+    u64 nkeep = oldlen < len ? oldlen : len;   /* min(oldlen, len) */
+    u64 nh;
+    if (hdr == 0 || D(hdr + 4) == 1) {
+        nh = hdr;
+        if (elt) {
+            if (function_417b10(elt) & 0xff) {
+                nh = function_409410((unsigned)sz);
+                function_40d210((void*)(uintptr_t)(nh + 0x10), nkeep * (u64)elsz, 0, 0);
+                if (hdr) {
+                    function_416f80(nh + 0x10, hdr + 0x10, elt, (unsigned)nkeep);
+                    if ((long long)len < (long long)oldlen) function_417130(hdr + 0x10 + len * (u64)elsz, elt, oldlen - len);
+                    function_409440(hdr);
+                }
+            } else {
+                if ((long long)len < (long long)oldlen) function_417130(hdr + 0x10 + len * (u64)elsz, elt, oldlen - len);
+                function_409470((void*)(uintptr_t)&nh, (unsigned long long)sz);
+            }
+        } else {
+            function_409470((void*)(uintptr_t)&nh, (unsigned long long)sz);
+        }
+    } else {
+        nh = function_409410((unsigned)sz);
+        if (elt) {
+            function_40d210((void*)(uintptr_t)(nh + 0x10), nkeep * (u64)elsz, 0, 0);
+            function_416db0(nh + 0x10, p, elt, (unsigned)nkeep);
+        } else {
+            function_409c80(p, nh + 0x10, nkeep * (u64)elsz);
+        }
+        function_418190(a, ti, 0);
+    }
+    D(nh + 4) = 1;
+    Q(nh + 8) = len;
+    u64 data = nh + 0x10;
+    if ((long long)len > (long long)oldlen) {
+        function_40d210((void*)(uintptr_t)(data + oldlen * (u64)elsz), (len - oldlen) * (u64)elsz, 0, 0);
+        if (elt && (function_415b30(elt) & 0xff)) function_417310(data + oldlen * (u64)elsz, elt, len - oldlen);
+    }
+    if ((long long)dimcnt > 1) {
+        u64 lv = lengths + 8, dc = dimcnt - 1;
+        for (u64 i = 0; (long long)i < (long long)len; i++) function_417b70(data + i * 8, elt, dc, lv);
+    }
+    Q(a) = data;
+    return 0;
 }
