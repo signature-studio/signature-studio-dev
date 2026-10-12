@@ -468,6 +468,7 @@ V==H (it=6)、cubic との差の定量化、GetBufSize 実測。
   3 バイナリ (`verify_cab262_quirks` `resize_oracle` `fill3_oracle`) 全て、置換前後で同一ファイル内容を参照。env 未設定時の既定値は `paths.py` が `/home/ubuntu/work/analysis/win64/extracted` を返す (置換前の固定値と同一)。
 - 出力比較: `resize_oracle` (25 行・sha256 先頭 12 桁 18ef187dc344) と `fill3_oracle` (7 行・63f77eb814f9) の stdout は 1 行目 (`--dump` 出力先パス) を除き置換前後で `cmp` 一致。
   **ただし 3 本とも実 DLL の初期化 (`ippSetCpuFeatures(~0)` の AVX-512 経路) で `Illegal instruction`** (Runner = AMD EPYC 7763、`/proc/cpuinfo` の avx512 フラグ 0 件)。
+  SIGILL ハンドラ (LD_PRELOAD) で採取した停止命令: rip=0x180c3b2eb・先頭バイト `62 f2 7d 28 7c c5` (0x62 = EVEX プリフィックス = AVX-512 命令)。Runner の avx 系フラグは fma/avx/bmi1/avx2/bmi2 のみ。
   上記一致は SIGILL までの出力の一致で、オラクル本体の比較結果 (mismatch 数) は **未検証**。
 - ネガティブコントロール: `FL_WIN64_DIR=/nonexistent` → `/nonexistent/extracted/block24356_PE.bin: No such file or directory` (rc=1)。`FL_WIN64_DIR` 未設定 → `fl_ipp_dll_path` が exit 2。
 - 構文: `bash -n` 5 本・`py_compile` `sigscan.py`・gcc ビルド 3 本 OK。
