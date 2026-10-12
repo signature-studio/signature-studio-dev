@@ -102,7 +102,7 @@ def main():
     rep_path = sys.argv[sys.argv.index('--report') + 1] if '--report' in sys.argv else None
     src = open(src_path, errors='replace').read()
     funcs = list(re.finditer(r'^define [^\n]*@([\w.$-]+)\([^\n]*\{\n.*?^\}\n', src, re.S | re.M))
-    det = {'R1_rep_stos': 0, 'R2_rep_movs': 0, 'R3_fillchar': 0, 'R4_llvm_mem': 0, 'R5_api_out': 0, 'R6_count_buf': 0, 'R7_wide_store': 0}
+    det = {'R1_rep_stos': 0, 'R2_rep_movs': 0, 'R3_fillchar': 0, 'R4_llvm_mem': 0, 'R5_api_out': 0, 'R6_count_buf': 0, 'R7_wide_store': 0, 'R8_escape_gap': 0}
     widened, over_cap, gep_warn = [], [], []
     pieces, last = [], 0
     for fm in funcs:
@@ -178,6 +178,31 @@ def main():
             sz = SZ.get(m.group(1))
             if sz:
                 require(m.group(2), sz, 'R7_wide_store')
+
+        # R8: alloca のアドレスが call / ptrtoint で escape する場合, callee が [arg+K] で自フレーム内の隣接領域を
+        #     読み書きする (例: 44bae0 → 44ba50 が rcx=rbp から +0x2c..+0x3e を書く)。callee の参照幅は静的に分からないため、
+        #     RetDec の `stack_var_-N` 名 (N = フレーム上端からの距離) から「次の stack var までの間隔」(最上位は N 全体) へ拡幅する。
+        #     拡幅は stack を増やすだけで安全 (別 alloca とは重ならない)。
+        svars = {}
+        for v in allocas:
+            sm = re.match(r'^%stack_var_-(\d+)$', v)
+            if sm:
+                svars[v] = int(sm.group(1))
+        if svars:
+            ns = sorted(set(svars.values()))
+            gap = {}
+            for i, n in enumerate(ns):
+                gap[n] = n - (ns[i - 1] if i > 0 else 0)
+            for v, n in svars.items():
+                esc = False
+                aliases = {v} | {c for c, r in cast.items() if root(c) == v}
+                for m in re.finditer(r'^\s*(?:%[\w.$-]+ = )?(call [^\n]*|ptrtoint [^\n]*)$', body, re.M):
+                    line = m.group(1)
+                    if any(re.search(re.escape(a) + r'(?![\w.$-])', line) for a in aliases):
+                        esc = True
+                        break
+                if esc:
+                    require(v, gap[n], 'R8_escape_gap')
 
         nb = body
         for v, sz in sorted(need.items()):
