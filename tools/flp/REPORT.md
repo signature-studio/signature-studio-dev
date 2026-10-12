@@ -131,7 +131,7 @@
 - **検査 7 件**: page-load (node グローバル無し) / file-input (6 件の byte-exact 往復 + 突合) / dump-view (画面の dump が Node の `dumpText` と一致) / drop (5 件) / bad-input (`not an FLhd file` を error 表示しページは継続) / console-clean / negative-control (1 byte 破壊を検出)。
 - `flp_e2e.sh` は web/ の `node:` import 禁止検査を追加し、`E2E_FLP_WIN_DIR` か `FL_ROOT` があれば末尾で本スイートを `E2E_REQUIRE_FLP=1` で実行 (`BROWSER_E2E=0` で無効化)。
 
-**実測** (検証起点 commit `d9689f8`, クリーン HEAD, Chrome 154.0.8037.97 headless, Node v22.23.3, 素材 = `fl-win64.tar.zst` の `extracted/` 9,128 FLhd ブロック, CI runner):
+**実測** (検証起点 commit `1769513` (n=3 は rebase 前の同一内容 `d9689f8` で取得し、rebase 後 HEAD `9874680` で 1 回再実行して PASS 14 / FAIL 0, 9.3 s, load 0.98 を確認), クリーン HEAD, Chrome 154.0.8037.97 headless, Node v22.23.3, 素材 = `fl-win64.tar.zst` の `extracted/` 9,128 FLhd ブロック, CI runner):
 
 | 項目 | 結果 |
 |---|---|
