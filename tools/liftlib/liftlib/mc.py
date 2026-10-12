@@ -40,8 +40,14 @@ _ZERO_IDIOMS = {"xor", "pxor", "xorps", "xorpd", "vxorps", "vxorpd", "vpxor", "s
                 "psubq", "pcmpeqb", "pcmpeqw", "pcmpeqd", "vpcmpeqd", "andnps", "pandn"}
 
 import os
-# ablation (規則 41): LL_NO_CALLEE_PRESERVE=1 で LIFTLIB-5 の「call は callee が書く volatile のみ def」を止める
-_NO_CALLEE_PRESERVE = bool(os.environ.get("LL_NO_CALLEE_PRESERVE"))
+# LIFTLIB-5: leaf cfg (pipeline が cfg["leaf_ext"] で設定) のときだけ有効にする拡張の総スイッチ。
+# 既定 False = FA/KH/OTT legacy・p1 census (T15) は LIFTLIB-4 と不変。
+LEAF_EXT = False
+
+
+def leaf_ext(name):
+    """拡張 name が有効か。ablation (規則 41): LL_NO_<name>=1 で個別に止められる。"""
+    return LEAF_EXT and not os.environ.get("LL_NO_" + name)
 
 _md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
 _md.detail = True
@@ -138,7 +144,7 @@ class MFunc:
         self._cfg = None
         self._rd = None
         self._ret_reg = None
-        if refine and not _NO_CALLEE_PRESERVE:
+        if refine and leaf_ext("CALLEE_PRESERVE"):
             self._refine_call_writes()
 
     def _refine_call_writes(self):

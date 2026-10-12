@@ -18,16 +18,19 @@ import os
 import re
 
 from .. import ir as IR
-from ..mc import MFunc
+from ..mc import MFunc, leaf_ext
 from ..regbind import Binder, result_type as regbind_result_type
 
 CALL_RE = re.compile(r"^\s*(?:%[\w$.\-]+ = )?call (\S+) @(function_[0-9a-f]+)\((.*?)\)\s*(?:,.*)?$")
 
 
-# ablation (規則 41): LL_NO_RET_PHI=1 で LIFTLIB-5 の「複製 call 結果の ret phi 合成」を止める
-_NO_RET_PHI = bool(os.environ.get("LL_NO_RET_PHI"))
-# ablation: LL_RX_FIRST_ONLY=1 で LIFTLIB-5 の「call 後の xmm0 読み手を全て差し替え」を最初の 1 件に戻す
-_ALL_READERS = not os.environ.get("LL_RX_FIRST_ONLY")
+# LIFTLIB-5 (leaf cfg の leaf_ext 時のみ). ablation: LL_NO_RET_PHI=1 / LL_NO_RX_ALL=1
+def _no_ret_phi():
+    return not leaf_ext("RET_PHI")
+
+
+def _all_readers():
+    return leaf_ext("RX_ALL")
 
 
 def _canon_xmm(it):
@@ -149,7 +152,7 @@ def _ret_thread(mod, fn, mf, binder, log, stats):
         if va is None:
             continue
         v = binder.bind("xmm0", va)
-        if (v is None or v[1] == "i1" or not dominates_use(v[0], bi)) and not _NO_RET_PHI:
+        if (v is None or v[1] == "i1" or not dominates_use(v[0], bi)) and not _no_ret_phi():
             # LIFTLIB-5: xmm0 の唯一の機械語 def が xmm0 戻り callee への call で, p1 の領域再構成が
             # その call を複製した (生存側 + 領域側の IR 命令が複数) とき, どの単一 SSA も ret を
             # 支配しない。各複製の直後で alloca に store し, ret 前で load する (reg2mem phi)。
@@ -252,7 +255,7 @@ def _rx_thread(mod, fn, img, callee_set, log, stats):
                 it = mf.insns[v]
                 if "xmm0" in it.reads:
                     readers.append(v)
-                    if not _ALL_READERS or binder._is_region_dst(IR.instr_dst(ln) or ""):
+                    if not _all_readers() or binder._is_region_dst(IR.instr_dst(ln) or ""):
                         break                   # 従来: 最初の読み手のみ (領域複製の call は 1 件)
                 if "xmm0" in it.writes:
                     break
@@ -273,7 +276,7 @@ def _rx_one(mod, fn, binder, mf, ln, C, reader, stale, phis, fb_done, stats):
     if True:
         lines = [x for x in binder.ix.instrs_at(reader) if stale[0] in IR.strip_tokens(x[2])]
         md0 = re.match(r"^\s*(%[\w$.\-]+) = call ", IR.strip_tokens(ln))
-        if not lines and not _NO_RET_PHI and mf.defs_before(reader, "xmm0") == {C} \
+        if not lines and not _no_ret_phi() and mf.defs_before(reader, "xmm0") == {C} \
                 and md0 and not binder._is_region_dst(md0.group(1)) and (C, reader) not in fb_done:
             fb_done.add((C, reader))
             # LIFTLIB-5: reader の xmm0 (第 1 引数) が RetDec の古い値 (call 前) を指しているが, bind(C) は
@@ -295,7 +298,7 @@ def _rx_one(mod, fn, binder, mf, ln, C, reader, stale, phis, fb_done, stats):
         if not cb or not binder.ix.dominates(cb[0][0], bi2):
             # LIFTLIB-5: reader が call を支配しない (p1 が call を複製した / 別 block) 時,
             # 機械語で xmm0 の唯一の到達 def が C なら, call 結果 (全複製) を alloca phi 経由で渡す
-            if _NO_RET_PHI or mf.defs_before(reader, "xmm0") != {C}:
+            if _no_ret_phi() or mf.defs_before(reader, "xmm0") != {C}:
                 stats["rx_nodomin"] = stats.get("rx_nodomin", 0) + 1
                 return n
             if C not in phis:

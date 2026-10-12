@@ -65,7 +65,20 @@ def retdec_lift(cfg, workdir, log):
 
 
 def repair_ll(cfg, raw_path, img, log, detect_only=False):
-    """raw .ll → 修復済み Module。返値 (Module, stats)"""
+    """raw .ll → 修復済み Module。返値 (Module, stats)
+
+    LIFTLIB-5: leaf cfg (passes.leafabi を持つ) のときだけ mc.LEAF_EXT を有効にする (tan/SVF 用の
+    call preserve / GPR spill / setcc i1 / 多定義 def 限定 / ret・RX phi)。FA/KH/OTT 既定は不変。"""
+    from . import mc as _mc
+    prev = _mc.LEAF_EXT
+    _mc.LEAF_EXT = bool(cfg.get("passes", {}).get("leafabi"))
+    try:
+        return _repair_ll(cfg, raw_path, img, log, detect_only)
+    finally:
+        _mc.LEAF_EXT = prev
+
+
+def _repair_ll(cfg, raw_path, img, log, detect_only=False):
     stats = {}
     t0 = time.time()
     text, brep = B.run_base(open(raw_path).read(), B.make_args())

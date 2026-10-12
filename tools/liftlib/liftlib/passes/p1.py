@@ -15,7 +15,7 @@ import os
 import re
 
 from .. import ir as IR
-from ..mc import MFunc, _canon_reg
+from ..mc import MFunc, _canon_reg, leaf_ext
 from ..regbind import Binder, FuncIndex, TYPE_BITS, result_type
 
 # jcc の condition code -> (fcmp predicate, 反転か)
@@ -48,14 +48,6 @@ def label_target(label):
 # 「未 lift」扱いで自分の経路値で再 lift する (領域 block は経路固有の SSA を持つため,
 # 他経路の辺 (relay 等) が直接飛び込むと支配が壊れる — LIFTLIB-2)
 _REGION_VAS = set()
-# ablation (規則 41): LL_NO_DEAD_JOIN=1 で LIFTLIB-5 の「合流点で dead な reg は束縛不能でも捨てる」を止める
-_NO_DEAD_JOIN = bool(os.environ.get("LL_NO_DEAD_JOIN"))
-# ablation: LL_NO_GPR_SPILL=1 で LIFTLIB-5 の GPR rsp slot spill/reload 語彙を止める
-_NO_GPR_SPILL = bool(os.environ.get("LL_NO_GPR_SPILL"))
-# ablation: LL_NO_SETCC_I1=1 で LIFTLIB-5 の「setcc の i1 結果を GPR 値として復元」を止める
-_NO_SETCC_I1 = bool(os.environ.get("LL_NO_SETCC_I1"))
-# ablation: LL_NO_REGION_DEFS=1 で LIFTLIB-5 の「多定義 bind を領域に流れる def に限定」を止める
-_NO_REGION_DEFS = bool(os.environ.get("LL_NO_REGION_DEFS"))
 
 # p1 が領域内で生成した値の名前: %p1r_<機械語va>_<salt>_<tag><n>
 # (salt = "<A>_<J>" = site 識別子で自体内に "_" を含む。他 site の領域値の流入検出に使う — LIFTLIB-2)
@@ -673,7 +665,7 @@ class Region:
 
         GPR bind は i1 を弾くため多定義 bind が復元不能になっていた (tan @1801a9cd9 の r10 =
         入口 sign)。直前 8 命令以内に同 reg のゼロ化 (xor r,r) がある時だけ上位 56bit = 0 と言える。"""
-        if _NO_SETCC_I1:
+        if not leaf_ext("SETCC_I1"):
             return None
         it = self.mf.insns.get(d)
         if it is None or not it.mnem.startswith("set") or len(it.ops) != 1 or it.ops[0].type != 1:
@@ -745,7 +737,7 @@ class Region:
         不一致の場合はここでは合成しない (誤った値の選択より unsupported を優先)。
         領域内合流による多定義は collect/merge_in の reg2mem 合成が正しい値を選ぶ。"""
         vals = []
-        if not _NO_REGION_DEFS:
+        if leaf_ext("REGION_DEFS"):
             # LIFTLIB-5: 領域は D からしか入らない。生存側 S (領域外) の命令だけが書く def は
             # この経路に流れないので除外する (def が領域内 block か, 分岐点 J に到達する def のみ残す)。
             at_j = self.mf.defs_before(self.J, reg)
@@ -1292,7 +1284,7 @@ class Region:
             if (xr0 or xr1) and m.lstrip("v") in ("movsd", "movss", "movaps", "movapd", "movups", "movupd", "movdqa", "movdqu"):
                 return self._rsp(it, st, out, va, tag, write=mem["write"])
             # LIFTLIB-5: 64bit GPR の spill/reload (mov [rsp+k], r64 / mov r64, [rsp+k])
-            if m == "mov" and not _NO_GPR_SPILL and mem["size"] == 8 and len(it.ops) == 2 \
+            if m == "mov" and leaf_ext("GPR_SPILL") and mem["size"] == 8 and len(it.ops) == 2 \
                     and (it.ops[1].type == 1 if mem["write"] else it.ops[0].type == 1):
                 return self._rsp_gpr(it, st, out, va, tag, write=mem["write"])
         # 断片内 call
@@ -1797,7 +1789,7 @@ class Region:
                         except Unsupported:
                             # LIFTLIB-5: 入口値 (f2 引数なし) など束縛不能でも, 合流点で
                             # live でない reg (直後に上書きされる) なら合成不要 → 捨てる
-                            if _NO_DEAD_JOIN or r in self.block_live_in().get(va, set()):
+                            if not leaf_ext("DEAD_JOIN") or r in self.block_live_in().get(va, set()):
                                 raise
                             dead_skip = True
                             break
