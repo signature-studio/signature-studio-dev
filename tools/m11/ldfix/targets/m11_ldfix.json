@@ -1,7 +1,7 @@
 {
   "name": "m11_ldfix",
   "desc": "FLEngine_x64.dll M11 closure + ldfix (CAB-231 load restoration pass) — boot_final3.ll 修復版",
-  "pe": "/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin",
+  "pe": "${FL_WIN64_DIR}/extracted/block00031_PE.bin",
   "ir": "tools/m11/ldfix/work/ldfix_fixed.ll",
   "image": "tools/m11/work/m11_image.bin",
   "wasm_origin": "0x0",

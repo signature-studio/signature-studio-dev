@@ -164,6 +164,7 @@ F3a/F3b/F3c と同根。icall では PE 書換え (`lea B,[B+8]; op [B-8]` 補�
 | `embed_e2e.sh` / `embed_sx_ab.sh` / `sx_halt0_ab.sh` | 常設化 A/B 検収 (stage4 + survey・`--batch` で liftdiff 全数 / alloca 足場 mainline+shimx 純リンク A/B / halt0 足場 survey A/B) |
 | `halt0_map.py` | survey JSON → halt0 発生点 × unit 対応表抽出 |
 | `targets/m11_ldfix.json`・`targets/m11_ldfix_embedded{,_post}.json` | liftdiff 用 target (修復 IR / 常設化 IR / post 後・F1v 分離用) |
+| `render_target.py` | targets/*.json の `${FL_WIN64_DIR}` 等を `tools/shared/paths.py` の値で展開し `work/targets/` に出力 (liftdiff は env を展開しないため e2e が経由する) |
 | `results/halt0_map_*.json` | halt0 対応表実測 (CAB-129 受入時 / 今日 base / 今日 fix) |
 | `work/` | 生成物 (gitignore): ldfix_fixed.ll, ldfix_report.json, batch_base*.jsonl, batch_ldfix*.jsonl, stage4/{base,fix}/ |
 
@@ -183,3 +184,23 @@ F3a/F3b/F3c と同根。icall では PE 書換え (`lea B,[B+8]; op [B-8]` 補�
 4. ~~**m11 への常設組み込み**: §6-4 の 1 行追加~~ → **CAB-131 で実施済み** (詳細は付録 `REPORT_APPENDIX_AB.md`)。
 5. bitcast 残存による静的タグの残存: F2 修復後に使われなくなった bitcast 行の DCE (分類器の
    `regslot_deref` が静的カウントのため付き続ける。意味上の問題なし)。
+
+## 9. 絶対パス除去 (#351、親 #294)
+
+`/home/ubuntu` 直書き 6 箇所 (`ldfix_e2e.sh`・`embed_e2e.sh`・`halt0_map.py`・`targets/*.json` x3) を
+`tools/shared` の `FL_WIN64_DIR` に置換 (既定値は従来と同一)。sh は `source tools/shared/env.sh`、py は `paths.py`。
+JSON は `${FL_WIN64_DIR}` プレースホルダとし、e2e が `render_target.py` で展開した `work/targets/*.json` を liftdiff に渡す
+(liftdiff `build_wasm.load_target` は area 外で env を展開しないため)。
+
+既知類型との関係: 該当なし (lift 出力に触れない)。検証起点: `origin/main` 2c3e526。
+
+| 検査 | コマンド | 実測 |
+|---|---|---|
+| 残存 | `grep -rn '/home/ubuntu' tools/m11/ldfix --include=*.sh --include=*.py --include=*.json --include=*.ts --include=*.mjs` (work/ 除く) | 0 件 (置換前 6 件) |
+| 構文 | `bash -n *.sh` / `py_compile halt0_map.py render_target.py` | 5 sh・2 py すべて OK |
+| 既定値で同一 | env 未設定で `render_target.py` → `git show HEAD:<json>` と `cmp` | 3/3 byte 同一 |
+| 上書き | `FL_WIN64_DIR=/x/y` で render / `halt0_map.py` の `FL_WIN64_DIR` | `pe` が `/x/y/extracted/...` / `/x` |
+
+範囲外: `ldfix_e2e.sh` 全工程は `tools/m11/work/boot_final3.ll` (work-m11)・`/opt/emsdk`・capstone が必要で、本 run の素材は fl-win64 のみ。
+fl-win64 展開 (8.2 秒) 後の `ldfix_e2e.sh` は `boot_final3.ll 無し` で停止 (PE 確認 `-f "$PE"` は通過、load average 0.87)。
+置換前後の e2e 出力同一性は未実測。根拠: 置換は PE パス文字列のみで、既定値 (`/home/ubuntu/work/analysis/win64`) は旧リテラルと文字列一致。

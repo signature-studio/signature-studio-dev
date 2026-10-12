@@ -14,6 +14,8 @@ import sys
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'shared'))
+from paths import FL_WIN64_DIR
 MSG_RE = re.compile(r"Runtime error\s+(\d+) at ([0-9A-Fa-f]+)")
 
 
@@ -39,7 +41,7 @@ def fn_at(m, vas, va):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('surveys', nargs='+')
-    ap.add_argument('--pe', default='/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin')
+    ap.add_argument('--pe', default=f'{FL_WIN64_DIR}/extracted/block00031_PE.bin')
     ap.add_argument('--out')
     a = ap.parse_args()
     m, vas = load_fn_table(a.pe)
