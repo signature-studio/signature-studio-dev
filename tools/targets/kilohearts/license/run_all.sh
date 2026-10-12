@@ -70,6 +70,7 @@ for (const n of ["matrix","gain","haas","clipper","gate","quickeq"]) {
   for (const t of ["base","lic"]) {
     const s = JSON.parse(fs.readFileSync("work/"+n+"/"+t+"/stat.json","utf8"));
     r.push(`${t}: ${s.trials_ok}/${s.trials} trial bit-exact (${s.calls_ok}/${s.calls} call), wasm ${s.wasm_bytes}B, licFn参照 ${s.lic_va_hits_total}`);
+    if (!(s.trials > 0 && s.trials_ok === s.trials)) { console.log("FAIL", n, t, "bit-exact 未達 (比較未実行 = null を含む)"); process.exitCode = 1; }
   }
   console.log(n.padEnd(9), r.join(" | "));
 }'
