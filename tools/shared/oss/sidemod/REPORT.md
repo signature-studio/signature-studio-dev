@@ -42,9 +42,21 @@
 - 本 PoC の host は FL を含まない。FL 側 wasm からこの ABI を呼ぶ結線 (FL 由来 wasm が `ss_*` を呼ぶ経路) は未実施 (未解決 2)。
 
 ## 4. 実測
-(下記はコミット済み HEAD で `bash tools/shared/oss/sidemod/e2e.sh` を再実行した値)
+検証対象コミット 9935a07 (`work/build/sidemod` と `work/tmp` を削除した状態から再実行)。環境: GitHub Actions runner, nproc=4, emsdk 6.0.12。
 
-TODO_MEASURED
+| 項目 | 実測 |
+|---|---|
+| `e2e.sh` (build 込み) | **rc=0 / ALL PASS / 88 s** (loadavg 終了時 2.49 2.16 1.25) |
+| side module サイズ | ffmpeg.wasm 872,830 B / lame.wasm 144,541 B / host.wasm 581,072 B |
+| ロード | ffmpeg.wasm abi=1 license=`LGPL version 2.1 or later` / lame.wasm abi=1 version=3.99.5 |
+| LAME 出力 | 16,181 B, stream hash `18dd8a4a4c91ee23` (native `.so` と一致、MP3 バイト列も `cmp` 一致。`oss/lame/build.sh` の §10.2 値と同じ) |
+| FFmpeg 復号 | pcm_s16le 22050 samples `9249b2e1bb6ce0b2` / mp3 (LAME 出力) 39168 samples `1d45943fec1748ca` (native と一致。`oss/ffmpeg/build.sh` の値と同じ) |
+| 差し替え | 別パスにコピーした side module で同一結果。存在しないパスは dlopen 失敗 rc!=0 |
+| side module の import | `env` / `GOT.mem` / `GOT.func` のみ |
+| 検出 selftest | 18/18 |
+| 検出ネガコン | `--enable-gpl` / `--enable-version3` / `--enable-nonfree` / `--enable-libx264` / `--enable-libx265` / LAME `--disable-decoder` 欠落 / `CONFIG_GPL=1` を単体で検出。`build.sh` に `FF_EXTRA_ARGS=--enable-gpl` と `--enable-version3` を注入すると configure 前に失敗 (全 9 件 CAUGHT) |
+
+所要時間は 1 回の単発値 (build 込み)。ネガコンの 2 回の build.sh 失敗は configure 前なので時間にほぼ影響しない。
 
 ## 5. 未解決
 
