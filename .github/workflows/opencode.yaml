@@ -68,7 +68,20 @@ jobs:
         && 'write' || 'read' }}
     steps:
       # ---------------------------------------------------------------------
-      # 1. untrusted input の隔離 (script injection / env injection の防止)。
+      # 1. Checkout — prepare-event-context.sh は $GITHUB_EVENT_PATH を読むだけで
+      #    リポジトリ内容を必要としないため、Checkout を前に置いても安全。
+      #    これにより准备ステップが .github/scripts/ 以下のファイルにアクセス可能。
+      #    should_run 依存ではなく無条件で実行する。
+      # ---------------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      # ---------------------------------------------------------------------
+      # 2. untrusted input の隔離 (script injection / env injection の防止)。
       #    最も安価なステップなので最初に置き、コマンド判定和外れたコメントでは
       #    App トークン発行にも到達しない。untrusted 値は式展開で shell に埋め込まず
       #    $GITHUB_EVENT_PATH 経由で受け取る。
@@ -104,14 +117,6 @@ jobs:
       # with: / env: 経由だけ。run スクリプト中には 1 箇所も展開していない
       # (展開しても shell には文字列として入るだけで、untrusted なイベント値を
       # 経由しないので script injection にはならない)。
-      - name: Checkout repository
-        if: steps.context.outputs.should_run == 'true'
-        uses: actions/checkout@v7
-        with:
-          token: ${{ steps.app-token.outputs.token }}
-          fetch-depth: 0
-          persist-credentials: false
-
       - if: steps.context.outputs.should_run == 'true' && env.OC_PERMISSION == 'write'
         id: setup-credentials
         shell: bash
@@ -174,11 +179,6 @@ jobs:
     steps:
       # PR のタイトル・本文・diff はすべて untrusted。式展開で run に埋め込まず、
       # $GITHUB_EVENT_PATH から jq で取り出してファイルに隔離する。
-      - name: Prepare PR context
-        shell: bash
-        env:
-          OC_PERMISSION: write
-        run: bash .github/scripts/prepare-event-context.sh
 
       # レビュワーは実装 App と別アイデンティティの方が approve できる
       # (同一 App は自分が作った PR を approve できない)。
@@ -190,6 +190,23 @@ jobs:
           private-key: ${{ secrets.OC_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write
+
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.ref }}
+          persist-credentials: false
+
+      # prepare-event-context.sh は $GITHUB_EVENT_PATH を読むだけでリポジトリ
+      # 内容を必要としないが、Checkout 後に置くことで .github/scripts/ 配下へ
+      # アクセスできるようにする (review ジョブでも同様)。
+      - name: Prepare PR context
+        shell: bash
+        env:
+          OC_PERMISSION: write
+        run: bash .github/scripts/prepare-event-context.sh
 
       - uses: actions/create-github-app-token@v3
         id: reviewer-token
@@ -210,14 +227,6 @@ jobs:
           echo "::warning::the reviewer App token could not be minted; gh will act as the implementer App"
           echo "::warning::likely cause: OC_REVIEW_APP_PRIVATE_KEY is unset, or the reviewer App installation does not grant contents:write / pull-requests:write"
           echo "::warning::the reviewer can still comment and merge, but cannot approve the implementer App's PR"
-
-      - name: Checkout repository
-        uses: actions/checkout@v7
-        with:
-          token: ${{ steps.app-token.outputs.token }}
-          fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.ref }}
-          persist-credentials: false
 
       - name: Configure git
         shell: bash
