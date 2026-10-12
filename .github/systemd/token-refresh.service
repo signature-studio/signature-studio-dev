@@ -1,7 +1,0 @@
-[Unit]
-Description=Refresh the GitHub App token used by the agent workflow
-
-[Service]
-Type=oneshot
-EnvironmentFile=%h/.config/token-refresh.env
-ExecStart=%h/.local/bin/mint-token.sh

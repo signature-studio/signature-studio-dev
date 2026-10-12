@@ -10,15 +10,6 @@ inputs:
     description: 'Space-separated list of artifact prefixes (without .tar.zst) to download'
     required: false
     default: 'fl-win64'
-  app-id:
-    description: 'GitHub App id (client id) used for token auto-refresh. Pass via workflow: vars.OC_APP_CLIENT_ID'
-    required: false
-  app-private-key:
-    description: 'GitHub App private key (PEM) for token auto-refresh. Pass via workflow: secrets.OC_APP_PRIVATE_KEY (composite actions cannot read the secrets context directly)'
-    required: false
-  token-permissions:
-    description: 'JSON fragment limiting the refreshed token permissions, e.g. {"contents":"read"}. Empty = installation defaults.'
-    required: false
   opencode-version:
     description: 'Pinned opencode CLI version for the npm channel (@opencode/cli-<target>). Empty = the default in .github/scripts/install-opencode.sh'
     required: false
@@ -73,44 +64,6 @@ runs:
           exit 1
         fi
         echo "opencode: $(command -v opencode) -> $(opencode --version 2>&1)"
-
-    # ---------------------------------------------------------------
-    # GitHub App token auto-refresh (App token は 1 時間で切れる)
-    # 発行スクリプトと unit は .github/scripts・.github/systemd のファイルをそのまま置く。
-    # git は credential helper で $RUNNER_TEMP/gh_token を都度読むので、ジョブ途中の
-    # push でも常に有効なトークンが使われる。
-    # ---------------------------------------------------------------
-    - name: Install token refresh
-      if: ${{ inputs.app-id != '' && inputs.app-private-key != '' }}
-      shell: bash
-      env:
-        OC_APP_ID: ${{ inputs.app-id }}
-        OC_APP_PRIVATE_KEY: ${{ inputs.app-private-key }}
-        OC_TOKEN_PERMISSIONS: ${{ inputs.token-permissions }}
-      run: |
-        set -euo pipefail
-        mkdir -p "$HOME/.local/bin" "$HOME/.config/systemd/user"
-        cp .github/scripts/mint-token.sh "$HOME/.local/bin/"
-        cp .github/systemd/token-refresh.service \
-           .github/systemd/token-refresh.timer "$HOME/.config/systemd/user/"
-        printf '%s\n' "$OC_APP_PRIVATE_KEY" > "$HOME/.config/token-refresh.pem"
-        {
-          echo "OC_APP_ID=$OC_APP_ID"
-          echo "OC_APP_PRIVATE_KEY_FILE=$HOME/.config/token-refresh.pem"
-          echo "TOKEN_FILE=$RUNNER_TEMP/gh_token"
-          [ -z "$OC_TOKEN_PERMISSIONS" ] || echo "OC_TOKEN_PERMISSIONS='$OC_TOKEN_PERMISSIONS'"
-        } > "$HOME/.config/token-refresh.env"
-        chmod 600 "$HOME/.config/token-refresh.env" "$HOME/.config/token-refresh.pem"
-        # 単一引用符なので $( ) は helper 実行時に展開される
-        helper='!f() { echo username=x-access-token; echo password=$(cat "$RUNNER_TEMP/gh_token" 2>/dev/null); }; f'
-        git config --global --replace-all credential.helper "$helper"
-        # gh auth setup-git は URL 限定 helper を設定するので、それも上書きする
-        git config --global --replace-all credential.https://github.com.helper "$helper"
-        systemctl --user daemon-reload && systemctl --user enable --now token-refresh.timer \
-          && echo "token refresh timer enabled" \
-          || echo "::warning::systemctl --user unavailable on this runner; the token is not refreshed during this job"
-        . "$HOME/.config/token-refresh.env"
-        "$HOME/.local/bin/mint-token.sh"
 
     # ---------------------------------------------------------------
     # R2 artifacts (未設定なら notice を出してスキップ)

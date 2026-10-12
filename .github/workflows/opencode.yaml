@@ -124,10 +124,6 @@ jobs:
         if: steps.context.outputs.should_run == 'true'
         uses: ./.github/actions/agent-setup
         with:
-          app-id: ${{ vars.OC_APP_CLIENT_ID }}
-          app-private-key: ${{ secrets.OC_APP_PRIVATE_KEY }}
-          # read-only モードではトークンの permissions も読み取り専用に制限する
-          token-permissions: ${{ env.OC_PERMISSION == 'read' && '{"contents":"read","issues":"read","pull-requests":"read"}' || '' }}
           # dispatch 入力 > repository variable > スクリプト既定の pin
           opencode-version: ${{ inputs.opencode-version || vars.OPENCODE_VERSION }}
           opencode-release-version: ${{ inputs.opencode-release-version || vars.OPENCODE_RELEASE_VERSION }}
@@ -237,10 +233,6 @@ jobs:
       - name: Setup Agent Environment
         uses: ./.github/actions/agent-setup
         with:
-          app-id: ${{ vars.OC_APP_CLIENT_ID }}
-          app-private-key: ${{ secrets.OC_APP_PRIVATE_KEY }}
-          # create-github-app-token と同じ権限セットに制限する
-          token-permissions: '{"contents":"write","pull-requests":"write"}'
           opencode-version: ${{ vars.OPENCODE_VERSION }}
           opencode-release-version: ${{ vars.OPENCODE_RELEASE_VERSION }}
           opencode-install-source: ${{ vars.OPENCODE_INSTALL_SOURCE }}
