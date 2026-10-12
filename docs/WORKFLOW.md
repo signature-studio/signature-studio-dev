@@ -144,7 +144,10 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
 
 - タイトル: **`[AREA-n]` prefix** + 英語表題。`AREA` は**次の一覧が正本**で `n` は AREA 内の連番
   (同名族・重複タイトルを作らない):
-  `KH`・`PLG` / `P0c`・`SHX` / `T-SH`・`AU`・`HB`・`IPP`・`LIFTLIB` / `L`・`RT`・`GUI`・`SR`・`MX`・`FA`・`OTT`・`E2E`・`LGL`・`ST`・`PY`・`PERF`・`LD` / `ICALL`・`M11`。
+  `KH`・`PLG` / `P0c`・`SHX` / `T-SH`・`AU`・`HB`・`IPP`・`LIFTLIB` / `L`・`RT`・`GUI`・`SR`・`MX`・`FA`・`OTT`・`E2E`・`LGL`・`ST`・`PY`・`PERF`・`LD` / `ICALL`・`M11`・`CI`・`DOCS`・`FLE`。
+- `CI`: CI 基盤・GitHub Actions (Issue #284 など)
+- `DOCS`: ドキュメント整備 (Issue #281 など)
+- `FLE`: x64c lift による FLEngine boot 連鎖 (tools/flelift/boot/, DOC_MAP が FLE-2〜FLE-5 シリーズを既に参照、親チケットは [ICALL-1] #227)
 - 過去の採番は尊重する (例: `[IPP-7]`・`[KH-2b]`・`[HB-H2]`)。
   `[HB-H4']` のような記号付き・`[ユーザ依頼]` のような日本語 prefix は**作らない**
   (`needs-user-input` ラベルとの二重表現もしない)。
@@ -153,6 +156,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   (GitHub テンプレ残骸 #4〜#6 を含む)・完全重複タイトル (`[FA-2c]` #260/#261・
   `[KH-6]` #61/#259/#274) は**追跡のみ**とし、**PM が Issue 整理時に正規化する**
   (実装 subagent は勝手にリネームしない)。
+- 旧 Linear からの移行フッタ（`元 Linear:` ブロック）は **provenance として保持**する。書式は統一済み（全 203 open Issue 中 200 件が同一形式）なので清理は不要。クローズ時に除去してよい。
 - 起票前に `gh issue list --search "<kw>"` で重複確認。**重複タイトルを作らない。**
 - 子チケットは親と同じ milestone を付ける (milestone の確定は PM)。
 - PR タイトルは commit と同じ conventional commits 書式。
