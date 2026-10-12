@@ -90,8 +90,10 @@ def main():
         sys.path.insert(0, LIFTDIFF)
         import ldlib.build_wasm as BW
         tjson = os.path.join(a.out, 'target.json')
+        # initial_memory: ld_wasm.c の静的領域 (arena 1MB + heap 96MB + g_inbuf 192MB・CAB-233 で
+        # 8MB→192MB) + stack 8MB + initial heap 16MB が 331,529,392 B 必要 → 256MiB では link 失敗
         json.dump({'name': 'lpads227', 'pe': a.pe, 'ir': os.path.abspath(a.ir), 'image': None,
-                   'wasm_origin': '0x0', 'global_base': 0x40000, 'initial_memory': 0x10000000},
+                   'wasm_origin': '0x0', 'global_base': 0x40000, 'initial_memory': 0x14000000},
                   open(tjson, 'w'))
         t = BW.load_target(tjson)
         t['work'] = os.path.abspath(a.out)
