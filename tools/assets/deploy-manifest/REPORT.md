@@ -47,7 +47,7 @@
 
 検証範囲: ローカルの policy 準拠サーバ (edge-sim 相当) への配信。範囲外: 実 Workers URL (Access 配下)、25MiB 超の part 分割 (05-stage 既存機能・本変更の対象外)、FL 由来の実 wasm (`tools/*/work` 素材なし)。
 
-注: コミット後の clean HEAD (`git worktree add --detach`) での再実行結果は PR 本文に追記する。
+clean HEAD 検証 (commit `cddfa58`, `git worktree add --detach` で展開): unit 7/7、verify-release 5 files OK、serve-check OK、`run.sh --url` PASS=8 FAIL=0 SKIP=1、**5.93s** (load average 1.09 開始時, 並列 1)。上表 n=3 の所要は作業ツリー (コミット前) での実測。
 
 ## 4. 未解決
 
