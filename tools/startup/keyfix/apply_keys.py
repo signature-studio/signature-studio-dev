@@ -23,7 +23,9 @@
 import json, os, sys, collections
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SEED = '/home/ubuntu/work/webstudio/tools/startup/vreg/data/seed.json'
+sys.path.insert(0, os.path.join(HERE, '..', '..', 'shared'))
+from paths import REPO_ROOT  # noqa: E402
+SEED = os.path.join(REPO_ROOT, 'tools', 'startup', 'vreg', 'data', 'seed.json')
 
 FLK = 'Software\\Image-Line\\FL Studio 26'
 PVS = FLK + '\\Plugin version specific'

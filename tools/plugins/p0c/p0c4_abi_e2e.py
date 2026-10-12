@@ -143,7 +143,7 @@ def main():
         if r is None or r[7].startswith('sig'):
             fails.append('%s %s (期待: sig なし)' % (k, r[7] if r else 'not-run'))
     # #277: native crash (sig) の kernel が 0 / 対象 B の 6 kernel が ok モデルで CSV に出る
-    # (0x5e12b0 は RetDec が ucomiss のフラグと被演算子を落とすため引数接続では救えない: REPORT §13)
+    # (0x5e12b0 は RetDec が ucomiss のフラグと被演算子を落とすため引数接続では救えない: REPORT §14)
     for k in sorted(rows):
         if rows[k][7].startswith('sig'):
             fails.append('%s %s (期待: sig なし)' % (k, rows[k][7]))

@@ -13,7 +13,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, '..', '..', 'icall', 'disp_size'))
 import dispfix as DF      # CAB-229: capstone の disp_size は 66 prefix 付き disp32 で 2 を返す (D9)
 WORK = os.path.join(HERE, '..', 'work')
-ROOT = '/home/ubuntu/work/analysis/mac/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL/Plugins/Fruity'
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'shared'))
+from paths import FL_MAC_DIR  # noqa: E402
+ROOT = os.path.join(FL_MAC_DIR, 'pkg_extract', 'payload_out', 'Applications', 'FL Studio 2026.app', 'Contents', 'Resources', 'FL', 'Plugins', 'Fruity')
 FP_RE = re.compile(r'^v?(add|sub|mul|div|sqrt|min|max|rcp|rsqrt|fmadd|fmsub|fnmadd|fnmsub|hadd|dp)(ss|sd|ps|pd)$')
 
 

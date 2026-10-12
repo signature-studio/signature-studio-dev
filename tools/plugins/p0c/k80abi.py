@@ -34,8 +34,10 @@ from capstone import Cs, CS_ARCH_X86, CS_MODE_64
 from capstone.x86 import X86_OP_MEM, X86_OP_REG
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, '..', '..', 'shared'))
+from paths import FL_WIN64_DIR  # noqa: E402
 GORD = ['rcx', 'rdx', 'r8', 'r9']   # win64 整数引数 slot 順
-PE = '/home/ubuntu/work/analysis/win64/extracted/block18983_PE.bin'
+PE = os.path.join(FL_WIN64_DIR, 'extracted', 'block18983_PE.bin')
 
 GPR = {}
 for name, canon in [('RCX', 'rcx'), ('ECX', 'rcx'), ('CX', 'rcx'), ('CL', 'rcx'),

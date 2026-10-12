@@ -23,10 +23,13 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-LIFTP = '/home/ubuntu/work/webstudio/tools/plugins/lift/passes'
-PE = '/home/ubuntu/work/analysis/win64/extracted/block18983_PE.bin'
+sys.path.insert(0, os.path.join(HERE, '..', '..', 'shared'))
+from paths import FL_WIN64_DIR, REPO_ROOT  # noqa: E402
+LIFTP = os.path.join(REPO_ROOT, 'tools', 'plugins', 'lift', 'passes')
+PE = os.path.join(FL_WIN64_DIR, 'extracted', 'block18983_PE.bin')
 
 HELPER_CIMPL = {
     'function_409d00': 'u64 function_409d00(u128 a) { return (u64)(i64)llrint(lane0_d(a)); }   /* cvtsd2si RC=nearest */',

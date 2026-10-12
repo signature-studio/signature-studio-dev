@@ -19,10 +19,12 @@ import re
 import subprocess
 import sys
 import tempfile
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', '..', 'shared'))
+from paths import REPO_ROOT
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 GEN = os.path.join(HERE, '..', 'lift', 'gen_globals.py')
-CORE = '/home/ubuntu/work/webstudio/tools/targets/kilohearts/work/winpkg/HeartCore.core_64'
+CORE = os.path.join(REPO_ROOT, 'tools/targets/kilohearts/work/winpkg/HeartCore.core_64')
 
 # 小さな再現入力: IR 型が 8B 超 (16B/32B 配列) の global_var。
 # D16 の本質は「map に載らない VA の窓が型サイズ以下に縮む」ことなので、

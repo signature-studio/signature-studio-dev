@@ -67,7 +67,7 @@ python3 "$HERE/k80_diff.py" --ir "$HERE/work/diff3/k80.x87fix.ll" --cases "$CASE
 head -1 "$HERE/work/p0c3_sweep.csv"
 TARGETS="0x5de820 0x5dedf0 0x5dfb60 0x5dfbe0 0x5dfc90 0x5dfd30 0x5dfdb0"
 # 0x5de3e0 は除外 (#277): 従来は sig11 行 (buf_diff=0 固定) がこの判定を素通りしていただけで、
-# モデル修復後に測ると IR が [rdx] (上位 32bit) の store を欠落しており buf_diff=2000 (REPORT §13)
+# モデル修復後に測ると IR が [rdx] (上位 32bit) の store を欠落しており buf_diff=2000 (REPORT §14)
 REGRESS="0x5df210 0x5df240 0x5e0760 0x5e0b70 0x5e0bb0 0x5e1590 0x5e1780 0x5e0330"
 awk -F, 'NR>1 && $1 ~ /^0x/ {last[$1]=$0} END {for (k in last) print last[k]}' "$HERE/work/p0c3_sweep.csv" \
   | sort > "$HERE/work/diff3/last.csv"

@@ -15,7 +15,8 @@
 # 書込は tools/plugins/framework/hostshim/ と tools/plugins/work/hs/ のみ (work/fw は読取のみ)。
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
-T=/home/ubuntu/work/webstudio
+source "$HERE/../../../shared/env.sh"
+T="$REPO_ROOT"
 FW="$T/tools/plugins/framework"
 WFW="$T/tools/plugins/work/fw"
 W="$T/tools/plugins/work/hs/fwdiff"

@@ -732,8 +732,8 @@ work/ 内の既存 lift IR (work/k80.lift.ll) を入力として p0c4_abi_e2e.py
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 0x5e0d80 の ucomiss 符号 lift 欠落 (§12.3) | buf_diff 910,077 | #331 |
-| 0x5df610 の残差 (§12.3) | buf_diff 2,404,917 | 同上 |
+| ~~0x5e0d80 の ucomiss 符号 lift 欠落 (§12.3)~~ → §13 で buf_diff 0、現状も 0 (§14.3)。#331 の対象は 0x5de3e0 / 0x5dee90 / 0x5df040 / 0x5e02b0 / 0x5e12b0 (§14.4) | (解消) | — |
+| ~~0x5df610 の残差 (§12.3)~~ → §13 で buf_diff 0 | (解消) | — |
 | wasm32 バックエンド検証・framework 統合 (fw_f80.py → f80_lower --ext) | #269 作業案 4 は未実施 | #197 に提案 |
 | 環境: `/opt/retdec`・`/home/ubuntu/work/{analysis,webstudio}` への絶対パス依存 (k80_diff.py 等) | CI 上では symlink で代替 | #197 に提案 (スクリプトの REPO 相対化) |
 
@@ -834,9 +834,11 @@ python3 tools/plugins/p0c/p0c4_e2e.py 2000                              # 回帰
    7 kernel は 4 つの別原因で、いずれも lift IR / ext 精度ではなく `k80abi.py` / `k80_diff.py` の欠陥だった。
 2. **対象 B は 7 のうち 6 kernel が ok モデルになった** (0x5dee90 / 0x5df040 / 0x5e09f0 / 0x5e0a70 / 0x5e0b10 /
    0x5e1210)。残る 0x5e12b0 は引数接続では救えない (§14.3)。
-3. 数値差分が測れるようになった結果、**ok かつ buf_diff=0 の kernel は 29 → 39 (+10)**: 0x5e0630 / 0x5e06e0 /
-   0x5e08d0 / 0x5e09f0 / 0x5e0a70 / 0x5e0b10 / 0x5e0c00 / 0x5e1010 / 0x5e1210 / 0x5e1280 (起点で bit-exact だった
-   29 kernel は 1 つも失っていない)。起点の sig11 / abi-mismatch で測れていなかった kernel のうち差分が出たものは
+3. 数値差分が測れるようになった結果、**ok かつ buf_diff=0 の kernel は +10**: 0x5e0630 / 0x5e06e0 /
+   0x5e08d0 / 0x5e09f0 / 0x5e0a70 / 0x5e0b10 / 0x5e0c00 / 0x5e1010 / 0x5e1210 / 0x5e1280。起点 (#277 単独の検証 HEAD
+   `15617b4`) では 29 → 39 で、起点で bit-exact だった 29 kernel は 1 つも失っていない。§13 (#310) を取り込んだ
+   merge 後 HEAD の実測は **45** (`p0c4_abi_e2e.py 2000` の CSV で status ok かつ buf_diff=0 を数えた値。
+   45 のうち上記 10 を除く 35 は件数が §13 の「修正後 35」と一致するが、kernel 集合の照合は未実施)。起点の sig11 / abi-mismatch で測れていなかった kernel のうち差分が出たものは
    §14.3 に残差として分けた。
 4. 回帰 11 kernel (0x5de820 ほか) は buf_diff=0 維持。
 
@@ -864,6 +866,7 @@ argfix の `helper_xmm` が 9 → 12 に増え 0x5e09f0 / 0x5e0a70 / 0x5e0b10 �
 | コマンド | 結果 |
 |---|---|
 | `p0c4_abi_e2e.py 2000` | rc=0、26.7〜27.1 s (load average 0.5〜0.9)、`run=67 ok=67 sig11=0`、起点は `run=61 ok=54 sig11=7` |
+| `p0c4_abi_e2e.py 2000` (origin/main = `35bdf9d` を merge した後の HEAD) | rc=0、16.7 s (load average 0.62→0.73)、`run=67 ok=67 sig11=0`、ok かつ buf_diff=0 は 45 |
 | `p0c4_e2e.py 2000` | rc=0、111.8 s / 112.5 s (2 回)、判定 bit-exact 7/14 (§12.2 と同じ) |
 | `p0c2_e2e.sh 2000` | rc=0、50.5 s |
 | `p0c3_e2e.sh 2000` | rc=0 (回帰判定から 0x5de3e0 を除外した後。除外前は FAIL-REGRESS、下記) |
@@ -892,10 +895,12 @@ argfix の `helper_xmm` が 9 → 12 に増え 0x5e09f0 / 0x5e0a70 / 0x5e0b10 �
   「測れていなかった」ことを REPORT に残す)。
 - **0x5dee90 / 0x5df040 (約 2.57M)**: 未調査 (ok モデルで差分が出るようになった段階)。
 - **0x5e12b0**: RetDec の IR が `ucomiss` のフラグ使用と被演算子 (xmm0/xmm1) を落とし、引数ゼロ・戻り値定数 0 の関数
-  (`define i64 @function_5e12b0()`) になっている。引数接続の対象外で、lift 側の欠陥 (0x5e0d80 の ucomiss 符号欠落
-  (§12.3) と同系統の**推定**)。
-- 0x5e0d80 (起点 910,077 → 951,534) / 0x5e1490 (1,046,283 → 1,201,366): 0x5e0c00 の gain 制限に伴い
-  乱数列が変わったため変動 (`K80_NO_CLIPRANGE=1` で旧値に戻る)。原因は未調査で、悪化ではなく入力列の差。
+  (`define i64 @function_5e12b0()`) になっている。引数接続の対象外で、lift 側の欠陥 (0x5e0d80 で §13 が修復した
+  ucomiss 符号欠落と同系統の**推定**)。
+- 0x5e0d80: 検証 HEAD `15617b4` 時点は 951,534 だったが、§13 (#310) の ucomiss 符号修復を取り込んだ merge 後は
+  **buf_diff=0** (`p0c4_abi_e2e.py 2000` 実測)。#331 の対象ではない。
+- 0x5e1490 (1,046,283 → 1,201,366): 0x5e0c00 の gain 制限に伴い乱数列が変わったため変動
+  (`K80_NO_CLIPRANGE=1` で旧値に戻る)。原因は未調査で、悪化ではなく入力列の差。
 
 ### 14.4 DEFECTS.md 行案・未解決・起票先
 
@@ -908,7 +913,9 @@ argfix の `helper_xmm` が 9 → 12 に増え 0x5e09f0 / 0x5e0a70 / 0x5e0b10 �
 |---|---|---|
 | 0x5de3e0 の `[rdx]` store 欠落 (lift) | buf_diff 2000 | #331 |
 | 0x5dee90 / 0x5df040 / 0x5e02b0 の残差 | buf_diff 約 2.57M | #331 |
-| 0x5e12b0 の ucomiss 落ち (lift) | abi-mismatch のまま | #331 (§12.4 の 0x5e0d80 と統合は別途) |
+| 0x5e12b0 の ucomiss 落ち (lift) | abi-mismatch のまま | #331 |
+
+#331 の対象 kernel は 0x5de3e0 / 0x5dee90 / 0x5df040 / 0x5e02b0 / 0x5e12b0 の 5 つ (0x5e0d80 は含まない)。
 | ext 精度が必要な kernel の wasm32 検証・framework 統合 | #269 §12.4 と同じ | #197 (既存提案) |
 
 ### 14.5 再現
@@ -918,9 +925,61 @@ export TMPDIR=$PWD/tools/plugins/p0c/work/tmp
 python3 tools/plugins/p0c/f80_assess.py                       # work/f80_classes.json
 python3 tools/plugins/p0c/p0c4_abi_e2e.py 2000                # sig11=0 / B6 ok を判定に含む
 for v in WRITTEN_BASE ARGORD IDX_NOT_BASE CLIPRANGE PARTIAL_LOAD MEMW REGSRC STACKW INTERSECT; do
-  K80_NO_$v=1 python3 tools/plugins/p0c/p0c4_abi_e2e.py 2000  # 負論対照 (rc は 0 のまま、差分は CSV)
+  env K80_NO_$v=1 python3 tools/plugins/p0c/p0c4_abi_e2e.py 2000  # 負論対照 (rc は下記)
 done
 ```
+負論対照の rc (merge 後 HEAD 実測): **MEMW と REGSRC は rc=0** (受入判定を通る。MEMW は §14.2 のとおり buf_diff が
+増えるが判定対象外、REGSRC は差なし)。**それ以外の 7 種は rc=1** (WRITTEN_BASE `run=67 ok=63 sig11=4` / ARGORD
+`ok=65 sig11=2` / IDX_NOT_BASE `ok=66 sig11=1` / CLIPRANGE `ok=66 sig11=1` / PARTIAL_LOAD `run=65` / STACKW `run=66` /
+INTERSECT `run=66`)。MEMW の差は CSV の buf_diff でのみ検出できる。
 前提: `k80.lift.ll` は `bash tools/plugins/lift/lift_ranges.sh <PE> work/k80_ranges.txt tools/plugins/p0c/work k80 2400`
 で再生成。`llvm-as` / `clang` は PATH に必要 (runner では `/usr/lib/llvm-18/bin`)。
 `/opt/retdec` と `/home/ubuntu/work/{analysis,webstudio}` は runner 上の symlink で代替 (§12.4)。
+
+## 15. 環境パス置換 (#346, 親 #294・先行 #312): /home/ubuntu 絶対パスを tools/shared へ
+
+既知類型との関係 (DEFECTS.md): 該当なし (パス参照の置換のみで lift/IR には触れない)。
+
+### 15.1 変更
+
+`*.sh *.py *.json *.ts *.mjs` (work/ 除く) の `/home/ubuntu` 参照 9 行を置換。既定値は従来と同一なので、環境変数未設定のローカル挙動は変わらない。
+
+| ファイル | 置換 |
+|---|---|
+| `p0c_e2e.sh` `p0c2_e2e.sh` | `source tools/shared/env.sh` + `PE="$FL_WIN64_DIR/extracted/block18983_PE.bin"` |
+| `f80_assess.py` `k80chop.py` `k80abi.py` | `tools/shared/paths.py` の `FL_WIN64_DIR` から `PE` を組む |
+| `kernel_matrix.py` `verify_table.py` | 同 `EXT = FL_WIN64_DIR/extracted` |
+| `k80_diff.py` | `PE` は同上。`LIFTP` は `REPO_ROOT/tools/plugins/lift/passes` (旧: `/home/ubuntu/work/webstudio/...` 固定) |
+
+`p0c_e2e.sh` step 1 は `inventory/kernel_table.py` に `$PE` を引数で渡す。同スクリプトの既定値が `/home/ubuntu` 固定 (p0c の外・本 PR の範囲外) のため。
+
+### 15.2 検証 (検証起点 `origin/main` = 2c3e526、素材は `fl-win64` のみ)
+
+- 受入条件 1: `grep -rn '/home/ubuntu' tools/plugins/p0c --include=*.sh --include=*.py --include=*.json --include=*.ts --include=*.mjs --exclude-dir=work | wc -l` → 0。
+- 受入条件 2 (before/after): 同一サブセットを置換前 (`origin/main` の detached worktree・`/home/ubuntu/work/analysis/win64` を symlink で用意) と
+  置換後 (symlink 削除・`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` のみ) で実行し出力を `cmp`。
+  サブセット = `kernel_table.py` → `f80_assess.py` → `f80_micro` (2000000 case) → `k80abi.py` → `k80chop.py`。
+  所要 before 1.06 s / after 1.06 s、load average 0.45 / 0.38 (1 分値)、各 n=1・直列。
+
+| 出力 | before/after | sha256 先頭 12 桁 |
+|---|---|---|
+| kernel_table stdout / `kernel_table.json` | 一致 | 55b1810cba94 / ce8c15353720 |
+| f80_assess stdout / `f80_classes.json` | 一致 | 7b13c98d9494 / ef4fdcd06cf9 |
+| f80_micro stdout | 一致 | d092659b28a9 |
+| k80abi `k80abi.json` | 一致 | b30e176cd3eb |
+| k80chop stdout | 一致 | e9192d1bbce2 |
+| k80abi stdout | 1 行目のみ差 (出力先絶対パスに worktree 名が入る) | — |
+
+- ネガティブコントロール: `FL_WIN64_DIR=/nonexistent python3 k80chop.py` → `FileNotFoundError: /nonexistent/extracted/block18983_PE.bin` で FAIL (`FL_WIN64_DIR` が実際に効いている)。
+- 構文: `python3 -m py_compile` 6 本・`bash -n` 2 本 OK。
+
+### 15.3 検証範囲 / 範囲外 / 未解決
+
+範囲外: `kernel_matrix.py` `verify_table.py` `k80_diff.py` `p0c2_e2e.sh` `p0c_e2e.sh` の実行。前 3 本は `nsis_blockmap.json` や `/opt/retdec` の lift 成果物
+(`toolchain-retdec`・`work-m6-ott` 等) が要る。置換は `PE` / `EXT` / `LIFTP` の定義行のみで、構文確認と `FL_WIN64_DIR` 解決の確認に留めた。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `inventory/kernel_table.py:15`・`lift/batch_lift.sh:31` に `/home/ubuntu` 既定が残る (p0c 外) | 他 area の置換 issue 待ち | #294 の該当 area 子 issue |
+| `kernel_matrix.py` `verify_table.py` `k80_diff.py` と e2e 全体を `oc_artifacts` 付きで未実行 | 置換行以外の挙動は未検証 | #360 (本 PR のレビュー run でも `oc_artifacts:` で再実行可) |
+| §13.4 の「絶対パス依存 (#294)」のうち p0c 内の `/home/ubuntu` 参照は解消 (`/opt/retdec` は残る) | — | #294 |

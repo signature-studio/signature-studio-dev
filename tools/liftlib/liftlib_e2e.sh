@@ -31,14 +31,14 @@ need "$HERE/../m6/work/ott.drc.ll" "bash tools/m6/m6_lift.sh (OTT RetDec lift �
 need "$HERE/../m6/work/full_t1.drc.ll" "OTT full lift 成果物 (tools/m6/work)"
 need /opt/retdec/bin/retdec-decompiler "RetDec"
 
+RC=0
+echo "=== (0) ユニット/性質テスト (base==m2+m5, p1_legacy/shift/gdata==m6 鎖, helper 名前非依存 ほか)"
+python3 tests/test_unit.py || RC=1
+# --fresh の削除は unit テスト (T4 が work/fa_gain/fa_gain.drc.ll を読む) の後
 if [ "$FRESH" = 1 ]; then
   rm -f work/fa_gain/fa_gain.drc.* work/kh_gain/kh_gain.drc.*
   echo "[liftlib_e2e] --fresh: RetDec raw .ll を再生成"
 fi
-
-RC=0
-echo "=== (0) ユニット/性質テスト (base==m2+m5, p1_legacy/shift/gdata==m6 鎖, helper 名前非依存 ほか)"
-python3 tests/test_unit.py || RC=1
 echo "=== (a)(b)(c) 回帰: FA Gain / KH Gain / OTT"
 python3 -m liftlib regress || RC=1
 if [ "$QUICK" = 0 ]; then

@@ -15,7 +15,8 @@
 # 判定: 全件が期待するエラー文字列で FAIL すること (PASS しか出ない検査は判別力なし)。
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
-T=/home/ubuntu/work/webstudio
+source "$HERE/../../shared/env.sh"
+T="$REPO_ROOT"
 SRCW="${1:-$HERE/work/verify_269/fw}"
 N="$HERE/work/nc269"
 FW="$HERE"

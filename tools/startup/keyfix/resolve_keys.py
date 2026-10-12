@@ -14,7 +14,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from keyflow2 import resolve_func, full_key
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SEED = '/home/ubuntu/work/webstudio/tools/startup/vreg/data/seed.json'
+sys.path.insert(0, os.path.join(HERE, '..', '..', 'shared'))
+from paths import REPO_ROOT  # noqa: E402
+SEED = os.path.join(REPO_ROOT, 'tools', 'startup', 'vreg', 'data', 'seed.json')
 
 NAME2VA = {
     'RenderOptions.save': 0xeeac20, 'RenderOptions.load': 0xeec630,
