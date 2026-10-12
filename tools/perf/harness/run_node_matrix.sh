@@ -2,7 +2,7 @@
 # node 側 OTT マトリクス実測 (default tier 全変種 + liftoff/tf サブセット) と M5 カーネル
 set -uo pipefail
 cd "$(dirname "$0")"
-export PATH=/home/ubuntu/.local/share/pnpm/bin:$PATH
+export PATH="$HOME/.local/share/pnpm/bin:$PATH"
 ALL=$(ls ../work/ott | grep -v '^wo_' | tr '\n' ',' | sed 's/,$//')
 WO=$(ls ../work/ott | grep '^wo_' | tr '\n' ',' | sed 's/,$//')
 SUB=o0,o2,o2simd,o3,o2lto
