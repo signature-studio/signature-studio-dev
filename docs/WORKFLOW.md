@@ -184,6 +184,18 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   - `work-m11` → `tools/m11/work/`、`work-liftdiff` → `tools/liftdiff/work/` に展開される
     (gitignore 対象の検証スナップショット。commit しない)。
   - 追加の `work-*` は R2 に置いて、`prepare-event-context.sh` の allowlist に足す (#293)。
+- **fl-win64 の展開と `FL_WIN64_DIR`**: tarball は最上位に `extracted/` と installer exe を持つ
+  (`extracted/block00031_PE.bin` 等)。展開先ディレクトリがそのまま `FL_WIN64_DIR` になる。
+  tools/ のスクリプトは `tools/shared/env.sh` (bash)・`paths.py`・`paths.mjs` 経由でこの変数を読む
+  (使い方は `docs/REFERENCES.md` §4)。`block_manifest.json` 等は tarball に含まれない。
+
+  ```sh
+  mkdir -p "$RUNNER_TEMP/fl-win64" && tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C "$RUNNER_TEMP/fl-win64"
+  export FL_WIN64_DIR="$RUNNER_TEMP/fl-win64"
+  ```
+
+  agent-setup での自動展開・`$GITHUB_ENV` への `FL_WIN64_DIR` 設定は未実施 (必要なら別 PR)。
+  `PLUGINS_DIR` も同様に `plugins-*` の展開先を指定する。
 - **結果**: agent の最終回答は run のログ (`gh run view <id> --log` の `Write step summary`) と
   `$GITHUB_STEP_SUMMARY` の両方に出る。issue へのコメントは agent が `gh issue comment` で行う。
 - **上限**: job は 60 分。収まらない作業は中間 commit + draft PR で区切る。
