@@ -1,7 +1,7 @@
 # 付録: liftdiff 回帰 A/B・Ablation・検収・再現性 (CAB-232/233) — tools/liftdiff/
 
 > **正本**: `tools/liftdiff/REPORT.md` (結論・§1〜§4・§6 成果物・§7 未解決)。本書は 250 行上限 (`docs/DOC_MAP.md` §1) のため
-> 本体から**そのまま分割移動**した §5 / §5.1 / §5.2 / §6.1 / §6.2 の全文 (節番号は本体の参照と一致)。
+> 本体から**そのまま分割移動**した §5 / §5.1 / §5.2 / §6.1 / §6.2 / §8 / §9 の全文 (節番号は本体の参照と一致)。
 
 ## 5. 回帰 — fresh HEAD との A/B (本チケットで実測)
 
@@ -102,3 +102,34 @@ case 単位分類 (完全再現) を基準にすること。「実行不能 2,49
 - IR の `function_4128b0__lifted` では `ExitProcess` 呼出 (`dec_label_pc_4129f7`) の直後が `unreachable` (1 箇所)。
   stub `ExitProcess` が戻る wasm でここに落ちる、という推論は**未検証** (stub の挙動を変えた再走はしていない)。
 - 分岐点 (native では `ExitProcess` に入らず wasm だけが入る理由) は上流にあり**未特定** → #307。
+
+## 9. wasm_trap の個別原因 (LD-7 / #307、#305 上に積んだ分)
+
+集計 = `tests/trace_diverge_unreachable.py` → `results/m11_unreachable_diverge.md`、`tests/oob_414ad0.py` → `results/m11_oob_414ad0.md` (数値・表はそちらが正本)。
+入力は §8 と同じ既存 batch jsonl (再走なし) と PE (`LD_M11_PE` または `--pe`)。
+
+- **unreachable (最初の trap が unreachable の 220 関数) の分岐点**: native/wasm の `trace_head` を先頭から比べ、最初に食い違う直前の関数を数えると
+  `function_410320` が最多 (83 件)。機械語は `test dl,dl; jl; call qword ptr [rax-0x30]` (VMT 間接 call) だが、lift 後 IR は `ret %arg1` のみで call が脱落している
+  (D15 型、DEFECTS.md)。native は 410320 の次に 0x409410 へ進み (例 0x6ae290)、wasm は 0x40f9e0 へ進む。
+  同型 (メモリ間接 call を持ち IR の call 数 ≤ 機械語の直接 call 数) は 0x40f9e0・0x1253610・0x678480 を含め合計 87/220。
+  残り 133 件は別の分岐 (0x417b70 32 / 0x40a3d0 24 / 0x418be0 20 ほか)。**未特定**。
+- ExitProcess へ至る連鎖 (例 0x6ae290: wasm のみ `409470 → 409730 → 4096d0 → 4096b0 → 412a40 → 4128b0`) は「alloc 失敗を示す Delphi の runerror 経路」と読めるが、
+  410320 の call 脱落からその経路に入るまでの因果は trace_head (最大 12 件) に収まらず**直接確認していない** (推定)。
+- **OOB function_414ad0 系 (68 件)**: 機械語は入口 rcx (var 文字列のアドレス) の 1 段 deref `mov r,[rbx]` が 4 箇所 (0x414af3/0x414b49/0x414b64/0x414b78)。
+  lift 後 IR には `%arg1` を ptr とする load が 0 件で、`%arg1` を値のまま `icmp`/`add` に使っている (ldfix F3a/F3b 型の値↔アドレス取り違え)。
+  実測: 単体 `run --fn 0x414ad0 --pattern q0` で callee 0x414850 arg0 が native=0x22479388 / wasm=0x5。
+- **修正の検証 (限定的)**: 4 箇所に `load` を足した IR (`work/ld7/`、commit しない) で再ビルドして単体実行すると、
+  callee_divergence タグが消え memory_semantics になり、z / s / p0 は wasm=trap/ok → wasm=ok (native_fault) になった。
+  p1 / p01 / pall / pall2 / qall は native・wasm とも fault のまま。**68 件が全て解消するかは未確認**。
+  また 414ad0 に到達しない 27 件 (wasm trace_head に現れない) は別原因 (上流の呼出元側、**未特定**)。
+
+### 再現手順
+```
+tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C "$RUNNER_TEMP/fl" extracted/block00031_PE.bin
+export LD_M11_PE=$RUNNER_TEMP/fl/extracted/block00031_PE.bin
+pip install numpy capstone pefile
+cd tools/liftdiff
+python3 tests/trace_diverge_unreachable.py > results/m11_unreachable_diverge.md
+python3 tests/oob_414ad0.py > results/m11_oob_414ad0.md
+```
+単体実行は `targets/m11.json` の `pe` を書き換えた複製 (`/home/ubuntu` 固定のため) で `python3 liftdiff.py run <target.json> --fn 0x414ad0 --state auto --nobuild -v`。
