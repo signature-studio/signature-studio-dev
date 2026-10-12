@@ -220,6 +220,7 @@ jobs:
       # 内容を必要としないが、Checkout 後に置くことで .github/scripts/ 配下へ
       # アクセスできるようにする (review ジョブでも同様)。
       - name: Prepare PR context
+        id: context
         shell: bash
         env:
           OC_PERMISSION: write
@@ -264,6 +265,9 @@ jobs:
       - name: Setup Agent Environment
         uses: ./.github/actions/agent-setup
         with:
+          # PR 本文の `oc_artifacts:` 行 (allowlist 検証済み)。素材を要する PR の e2e を独立再実行するため。
+          # 空なら既定の fl-win64。
+          artifacts: ${{ steps.context.outputs.artifacts || 'fl-win64' }}
           opencode-version: ${{ vars.OPENCODE_VERSION }}
           opencode-release-version: ${{ vars.OPENCODE_RELEASE_VERSION }}
           opencode-install-source: ${{ vars.OPENCODE_INSTALL_SOURCE }}

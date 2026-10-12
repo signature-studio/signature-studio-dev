@@ -22,7 +22,7 @@ TAG="${VARIANT}_${GUIV}${SUF}"
 GEN="$W/gen${SUF}"; mkdir -p "$GEN"
 set +u; source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1; set -u
 export TMPDIR="$W/tmp"; mkdir -p "$W/obj" "$W/tmp"
-CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1"
+CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=${M11_LB_BASE:-0}"
 SXF="-O1 -w -Wno-error=int-conversion -Wno-implicit-function-declaration -fno-strict-aliasing"   # shimx 自身のフラグ (scripts/build_objs.sh と同じ, ST)
 IR0="$M11/work/boot_final3.ll"; IR="$IR0"
 [ -f "$IR" ] || { echo "[sxlink] $IR 無し: bash tools/m11/m11_e2e.sh を先に (M11 成果物の生成)" >&2; exit 2; }

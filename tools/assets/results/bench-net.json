@@ -1,5 +1,5 @@
 {
- "pkg": "/home/ubuntu/work/webstudio/tools/assets/work/pkg-full",
+ "pkg": "tools/assets/work/pkg-full",
  "bigFile": "Data/Patches/Packs/FLEX/Packs/General Midi Library.flexpack",
  "bigMB": 42.260901,
  "scenarios": [

@@ -12,7 +12,9 @@ from capstone import Cs, CS_ARCH_X86, CS_MODE_64
 from capstone.x86 import X86_OP_MEM, X86_OP_REG, X86_REG_RIP
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PE = sys.argv[1] if len(sys.argv) > 1 else '/home/ubuntu/work/analysis/win64/extracted/block18983_PE.bin'
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'shared'))
+from paths import FL_WIN64_DIR  # noqa: E402
+PE = sys.argv[1] if len(sys.argv) > 1 else os.path.join(FL_WIN64_DIR, 'extracted', 'block18983_PE.bin')
 INIT = int(sys.argv[2], 16) if len(sys.argv) > 2 else 0x5e19f0
 X87 = re.compile(r'^f(ld|st|stp|add|mul|sub|div|ild|ist|istp|xch|sqrt|sin|cos|abs|chs|comp|ucom|ucomi|ldcw|nclex|rndint|scale|2xm1|ld\w+|imul|isub|cmov\w+|\w*p)$')
 

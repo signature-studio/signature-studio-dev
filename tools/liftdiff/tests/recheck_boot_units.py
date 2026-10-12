@@ -124,7 +124,9 @@ def main():
     args = [a for a in sys.argv[1:] if not a.startswith('-')]
     if args:
         tgt = args[0]
-    pe_path = json.load(open(os.path.join(ROOT, tgt)))['pe']
+    sys.path.insert(0, ROOT)
+    from ldlib.build_wasm import expand_vars
+    pe_path = expand_vars(json.load(open(os.path.join(ROOT, tgt)))['pe'])
     pe = load_pe(pe_path)
     base = pe['base']
     units, ntot = read_units(pe)

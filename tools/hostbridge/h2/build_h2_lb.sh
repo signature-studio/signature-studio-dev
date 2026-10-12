@@ -10,7 +10,8 @@ set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 HB="$(cd -- "$HERE/.." && pwd)"; T="$HB/.."
 OTT="$T/ott"; LB="$HB/lowbase"; POC="$HB/poc"
-DLL=/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll
+source "$T/shared/env.sh"
+DLL="$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll"
 LB_BASE="${LB_BASE:-0x10000}"; LB_INIT_MIB="${LB_INIT_MIB:-16}"; LB_MAX_MIB="${LB_MAX_MIB:-64}"
 OUT="$HERE/work"; mkdir -p "$OUT"
 

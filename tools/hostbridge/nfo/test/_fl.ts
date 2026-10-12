@@ -1,9 +1,10 @@
 import { readdirSync, lstatSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { FL_MAC_DIR } from '../../../shared/paths.mjs';
 
 export const FL_ROOT =
   process.env.FL_ROOT ??
-  '/home/ubuntu/work/analysis/mac/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL';
+  `${FL_MAC_DIR}/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL`;
 
 export const HAVE_FL = existsSync(FL_ROOT);
 

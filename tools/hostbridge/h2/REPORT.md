@@ -147,3 +147,23 @@ node tools/hostbridge/h2/surrogate_harness.mjs        # 15 checks
 node tools/hostbridge/lowbase/multi/multi_load.mjs --ott $PWD/tools/hostbridge/h2/work/ott_h2.cjs --bal $PWD/tools/hostbridge/lowbase/work/bal_lb/bal_hb.cjs --nmod 2 --label h2
 # 前提: bash tools/ott/entry/entry_e2e.sh 済みの coverage (tools/ott/work/entrylift/cov_entry.json), emsdk, node ≥22
 ```
+
+## 8. Actions (CI runner) 上での再現 (#92 再実行, 検証起点 main 0a9e9d3)
+
+`oc_artifacts: plugins-ott toolchain-retdec toolchain-emsdk work-m6-ott work-liftlib analysis-ott-binaries` で
+`ANALYSIS_DIR=$HOME/analysis` とし、h2_e2e.sh の [1/4]〜[3/4] を実行 (runner: 4 vCPU, node v22.23.3, load average 0.1〜0.7)。
+
+- 修正 1: `build_h2_lb.sh` の DLL パス `/home/ubuntu/...` 固定を `tools/shared/env.sh` の `$PLUGINS_DIR` 経由へ (lowbase #365 と同方式)。
+- 修正 2: `surrogate_harness.mjs` G8 の native 参照読込が `Buffer.from(hex).buffer` (Node の Buffer pool 共有 ArrayBuffer,
+  byteOffset=8) を byteOffset 無視で `Uint32Array` 化していたため、Node 22 で native 参照が 8 byte ずれ **1/256 cell** の偽 FAIL になっていた
+  (ずれた値: 先頭 cell が 0x30350025 等)。byteOffset を考慮して slice するよう修正し **256/256 cell 一致** に復帰。
+  native 参照自体は 3 回再実行で sha256 先頭 12 桁が同一 (4bea16a22553) = 決定的。
+- 実測 (コミット前の同一ソース内容): build_h2_lb.sh 6.3 s / harness 15 checks 全 PASS・broken 0 / bridge 経由 128f = 123.6 µs/call。
+  同一 runner での `m10_e2e.sh` PASS (checks 7 / broken 0, 4.1 s)、`hostbridge.sh` ALL PASS (run_poc checks 28 / broken 0, 7.6 s)。
+- ネガティブコントロール: natref の 1 bit (byte 40) を反転 → G8 = 255/256 cells で FAIL (checks 15 / broken 1)。
+- 事前準備 (gitignore 済み `work/`): `tools/m8/work`・`tools/m9/work` を mkdir しないと `m10_build.sh` が FileNotFound で落ちる。
+  python 依存 `pefile capstone numpy` は runner に無く pip install が必要。
+
+| 未達 | 理由 | 起票先 |
+|---|---|---|
+| h2_e2e.sh [4/4] lowbase 既存 e2e・Balance 同時ロード (multi_load) の再現 | `tools/plugins/work/balance/k.final.ll` 生成に `fl-win64` (block18983_PE.bin) が必要で今回の素材に無い。`oc_artifacts: fl-win64` を足した再起動が必要 | #92 コメント |

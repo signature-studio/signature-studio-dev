@@ -27,8 +27,10 @@ usage: gen_boot.py [--pe PE] [--meta lift_meta.json] [--out work/boot] [--nosx] 
             (実挙動は fle_boot.c の g_soft_failfast で切るので生成物は同一。link 構成の証跡用)
 """
 import argparse, json, os, re, struct, sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'shared'))
+from paths import FL_WIN64_DIR
 
-PE_DEF = '/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin'
+PE_DEF = f'{FL_WIN64_DIR}/extracted/block00031_PE.bin'
 FLE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))          # tools/flelift
 REPO = os.path.dirname(FLE)                                                # tools/..
 IMG = 0x400000

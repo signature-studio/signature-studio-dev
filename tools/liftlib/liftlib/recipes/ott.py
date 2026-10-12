@@ -23,7 +23,7 @@ ROOT = os.path.abspath(os.path.join(HERE, "..", "..", "..", ".."))
 TOOLS = os.path.join(ROOT, "tools")
 M6, M8, M9, M10 = (os.path.join(TOOLS, x) for x in ("m6", "m8", "m9", "m10"))
 RECIPES = os.path.join(HERE, "ott")
-DLL = "/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll"
+DLL = env.OTT_DLL
 SIMD_DIR = os.path.join(HERE, "..", "simd")
 
 
