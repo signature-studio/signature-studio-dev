@@ -178,14 +178,38 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   `oc_actions_allow_write` が無いと read 専用で、PR は作れない。
 - **素材**: 既定で取得されるのは `fl-win64` のみ。他は本文に `oc_artifacts: fl-win64 plugins-ott` の
   行を書く (許可名: fl-win64 / plugins-ott / plugins-freshair / plugins-serum2 / plugins-massivex /
-  plugins-kilohearts / toolchain-retdec / toolchain-emsdk / work-m11 / work-liftdiff。それ以外は
-  run が失敗する)。全素材は約 17 GiB のため必要分だけ指定する。
+  plugins-kilohearts / toolchain-retdec / toolchain-emsdk / work-m11 / work-liftdiff / work-m6-ott /
+  work-liftlib-targets / work-liftlib / work-icall / analysis-ott-binaries。それ以外は
+  run が失敗する)。全素材は約 17.7 GiB (2026-10-13 実測) のため必要分だけ指定する。
   - `toolchain-retdec` → `/opt/retdec`、`toolchain-emsdk` → `/opt/emsdk` に展開される。
+  - `work-m6-ott` → `tools/m6/work/` + `tools/ott/work/`、`work-liftlib` → `tools/liftlib/work/`、
+    `work-icall` → `tools/icall/work/`、`work-liftlib-targets` → `tools/targets/{freshair,kilohearts}/work/`
+    の HeartCore / SlateCore のみ (liftlib_e2e.sh の `need` 対象) に展開される
+  - `analysis-ott-binaries` → `$HOME/analysis/plugins/ott/binaries/` (OTT_vst2_win64.dll ほか実機バイナリ。
+    展開後は `ANALYSIS_DIR=$HOME/analysis` が環境に入る。tools/shared/env.sh の既定 /home/ubuntu/work/analysis を上書きする)
   - `work-m11` → `tools/m11/work/`、`work-liftdiff` → `tools/liftdiff/work/` に展開される
     (gitignore 対象の検証スナップショット。commit しない)。
   - 追加の `work-*` は R2 に置いて、`prepare-event-context.sh` の allowlist に足す (#293)。
+- **fl-win64 の展開と `FL_WIN64_DIR`**: tarball は最上位に `extracted/` と installer exe を持つ
+  (`extracted/block00031_PE.bin` 等)。展開先ディレクトリがそのまま `FL_WIN64_DIR` になる。
+  tools/ のスクリプトは `tools/shared/env.sh` (bash)・`paths.py`・`paths.mjs` 経由でこの変数を読む
+  (使い方は `docs/REFERENCES.md` §4)。`block_manifest.json` 等は tarball に含まれない。
+
+  ```sh
+  mkdir -p "$RUNNER_TEMP/fl-win64" && tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C "$RUNNER_TEMP/fl-win64"
+  export FL_WIN64_DIR="$RUNNER_TEMP/fl-win64"
+  ```
+
+  agent-setup での自動展開・`$GITHUB_ENV` への `FL_WIN64_DIR` 設定は未実施 (必要なら別 PR)。
+  `PLUGINS_DIR` も同様に `plugins-*` の展開先を指定する。
+- **レビュー run の素材**: review ジョブも PR 本文の `oc_artifacts:` 行を読んで素材を取得する
+  (素材を要する e2e をレビュワーが独立再実行するため)。PR 作成者は、素材を要する PR の本文に
+  実装時と同じ行を書くこと。
 - **結果**: agent の最終回答は run のログ (`gh run view <id> --log` の `Write step summary`) と
   `$GITHUB_STEP_SUMMARY` の両方に出る。issue へのコメントは agent が `gh issue comment` で行う。
 - **上限**: job は 60 分。収まらない作業は中間 commit + draft PR で区切る。
 - 稼働本数は「走っている Actions run 数」で数える (`gh run list --status in_progress`)。
+- **PM の watch ルール (依頼者指示 116)**: 起動した全ての run は無条件で `gh run watch` する。PM が
+  応答を終える時は、background で `gh run watch` が 1 本以上走っていること。完了通知を受けたら、
+  結果の処理に入る前に、次の watcher を起動し直す。
 

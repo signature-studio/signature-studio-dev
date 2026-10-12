@@ -76,6 +76,13 @@ def main():
          os.path.join(d3, 'k80.lower.ll'), os.path.join(d3, 'k80.argfix.ll'),
          '--abi', os.path.join(HERE, 'work', 'k80abi.json'),
          '--report', os.path.join(d3, 'k80.argfix.json')])
+    # P0c-7 (#310): ucomiss 結果を捨てて符号が定数化された lift (0x5e0d80) の修復
+    if os.environ.get('K80_NO_UCOMISIGN') != '1':
+        ucs = os.path.join(d3, 'k80.argfix.ucs.ll')
+        run(['python3', os.path.join(HERE, 'k80_ucomi_sign.py'),
+             os.path.join(d3, 'k80.argfix.ll'), ucs, '--func', 'function_5e0d80',
+             '--report', os.path.join(d3, 'k80.ucomi_sign.json')])
+        os.replace(ucs, os.path.join(d3, 'k80.argfix.ll'))
     rep = json.load(open(os.path.join(d3, 'k80.argfix.json')))
     print('   argfix: movd=%d helper_xmm=%d struct_copy=%d orphan(gpr/float)=%d/%d' % (
         rep['movd_fixed'], rep['helper_xmm_fixed'], rep['struct_copy_fixed'],
