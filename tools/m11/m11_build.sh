@@ -8,7 +8,25 @@ cd "$HERE"
 source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1
 export TMPDIR="$HERE/work/tmp"
 mkdir -p work/tmp work/obj
-CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1"
+M11_LB_BASE="${M11_LB_BASE:-0}"; export M11_LB_BASE   # #222: LVA = RVA + M11_LB_BASE (0 = 従来)
+CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=$M11_LB_BASE"
+# image 終端 (SizeOfImage 0x18c0000) + LB_BASE が GLOBAL_BASE (0x10000000) 以内であること
+python3 - <<PYEOF
+import sys
+lb = int("$M11_LB_BASE", 0)
+assert lb % 0x10000 == 0 and lb + 0x18c0000 <= 0x10000000, "M11_LB_BASE=0x%x が image 配置制約に反する" % lb
+PYEOF
+# LB_BASE が変わったら LB 依存成果物 (IR 後処理 / .o) を無効化
+if [ "$(cat work/lb_base.stamp 2>/dev/null || echo 0)" != "$M11_LB_BASE" ]; then
+  rm -f work/boot_final3.ll work/obj/*.o
+fi
+echo "$M11_LB_BASE" > work/lb_base.stamp
+# IR (boot_final.ll) の VA→LVA remap と image/data は同じ LB_BASE で生成済みであること (m11_e2e.sh が stamp を管理)
+for st in ir_lb_base img_lb_base; do
+  if [ -f work/$st.stamp ] && [ "$(cat work/$st.stamp)" != "$M11_LB_BASE" ]; then
+    echo "[m11build] work/$st.stamp=$(cat work/$st.stamp) != M11_LB_BASE=$M11_LB_BASE: bash m11_e2e.sh で再生成を" >&2; exit 2
+  fi
+done
 
 if [ ! -f work/boot_final.ll ]; then echo "[m11build] work/boot_final.ll 無し: m11_gen_ir2.sh を先に" >&2; exit 2; fi
 if [ ! -f work/boot_final3.ll ] || [ work/boot_final.ll -nt work/boot_final3.ll ] || [ m11_post.py -nt work/boot_final3.ll ]; then

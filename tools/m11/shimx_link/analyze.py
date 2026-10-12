@@ -163,7 +163,7 @@ if sv and os.path.exists(ir) and c570:
     funcs = {}
     for m in re.finditer(r'^define [^\n]*@([\w.$-]+)\([^\n]*\{\n(.*?)^\}\n', src, re.S | re.M):
         funcs[m.group(1)] = set(re.findall(r'@([\w.$-]+)', m.group(2)))
-    roots = ['entry_point'] + ['function_%x' % (int(u['lva'], 16) + 0x400000) for u in sv['per_unit'] if u['kind'] != 'noproc']
+    roots = ['entry_point'] + ['function_%x' % (int(u['lva'], 16) + 0x400000 - int(os.environ.get('M11_LB_BASE', '0'), 0)) for u in sv['per_unit'] if u['kind'] != 'noproc']
     seen, stack = set(), [r for r in roots if r in funcs]
     ext = set()
     while stack:
