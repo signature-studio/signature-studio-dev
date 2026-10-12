@@ -6,7 +6,7 @@
 
 1. **FL のオーディオ入口は事実上 ASIO 1 本で足りる**。FLEngine は `waveOut*`/WASAPI を一切 import せず (実測 0 件)、既定は同梱ドライバ `ILWASAPI2ASIO` (COM/IASIO) 経由。DirectSound (`DirectSoundCreate/EnumerateA`) と WinMM MIDI 20 関数は代替経路。mac は CoreAudio/AudioUnit render callback (ASIO bufferSwitch と同型) + CoreMIDI 16 関数。→ **P0 = ASIO 風コールバック駆動**、P1 = DirectSound/MIDI、P2 = WASAPI 風。
 2. **FL が呼ぶ IASIO は 19 メソッド**で、FL が渡すコールバックと `asioMessage` の応答まで静的に特定した (INVENTORY §2)。特に **FL は `kAsioSupportsTimeInfo` に 1 を返す → ドライバは `bufferSwitchTimeInfo` を呼ぶ**、`kAsioLatenciesChanged(6)` は内部コマンド 0x17 発行に配線されている (動的レイテンシ変更を既定で通知しない根拠)。
-3. **PoC 実装は動作**: C shim (ASIO 風 19 API / WASAPI 風 render) + AudioWorkletProcessor + main thread コントローラ。emcc `-pthread -sPROXY_TO_PTHREAD=1` の wasm から SAB リング経由で worklet に出力し、headless Chrome で **22 シナリオ全 PASS** (原コミット時の 1 回の実行。検収の独立再実行では 2 件の不安定さを検出・1 件修正、§9)。
+3. **PoC 実装は動作**: C shim (ASIO 風 19 API / WASAPI 風 render) + AudioWorkletProcessor + main thread コントローラ。emcc `-pthread -sPROXY_TO_PTHREAD=1` の wasm から SAB リング経由で worklet に出力し、headless Chrome で **22 シナリオ全 PASS (AU-11 で 25 シナリオ化, §10)** (原コミット時の 1 回の実行。検収の独立再実行では 2 件の不安定さを検出・1 件修正、§9)。
 4. **実測 (fake シンク)**: 120 秒ソーク (B=256, 48kHz) で **underrun 0・5,764,608 フレーム bit-exact** (ランプ照合; フレーム数は停止タイミングで run ごとに変動、検収再実行は 5,765,632)。128/256/512/1024 × 20 秒の ASIO で underrun 0・各 約 96.1 万フレーム bit-exact (原実行 961,024〜961,536、再実行 961,024〜962,560)。正弦 440/660Hz は最大誤差 1.49e-8、RMS 0.3536 (理論 0.3536)。44.1k は PASS。96k は **B=256 だと burst 次第で不安定** (§5, §9)。
 5. **最大の発見 = バースト**: ブラウザは 128f quantum を 1 つずつでなく OS バッファ単位でまとめて呼ぶ (48k で 512f/10.7ms、96k で 2048–4096f: 原実行 2048、検収再実行 3072/4096)。`baseLatency` は 96k で実態の 1/3。→ ring 目標充填 `T ≥ burst×1.25 + B` が必須で、OPEN 時の較正プローブ + 実行中の動的拡張で自動化した。**T が FL から見える出力レイテンシの下限**を決める。
 6. **shim の入出力往復 (in→out) = T フレームちょうど** (相互相関 1.0000, 同一 worklet クロック上): B=128 → 1408f (29.3ms)、B=256 → 1536f (32.0ms)、B=512 → 2048f (42.7ms) (原実行。T は OPEN 時の burst 較正値 512/1024 で決まり run ごとに変動: 検収フル再実行は 768/1024/1536f = 16.0/21.3/32.0ms、クイック再実行は原実行と同値)。これに Chrome の `baseLatency` 10.7ms + `outputLatency` ≈35ms (いずれも fake シンクの報告値) が加わる。**実機の遅延は未計測** (§6)。
@@ -48,7 +48,7 @@
 | シナリオ | 結果 |
 |---|---|
 | ASIO ランプ B=128/256/512/1024 (各 20s) | underrun 0, 各 961,024〜961,536f 全 bit-exact。T = 768/1536/1536/2048 f (16.0/32.0/32.0/42.7 ms), `burst_obs` 512f (T は OPEN 較正値で決まり run ごとに変動: 再実行 B=1024 は 3072f) |
-| ASIO 正弦 (B=256 48k / B=512 44.1k / B=256 96k) | underrun 0, 最大誤差 1.49e-8, 無音ラン 0。96k は 実行中 `burst_obs` 2048f、OPEN 較正 burst ≈3072f → depth=16 (上限ぎりぎり) → T=4096f (42.7ms) (原実行)。**検収再実行では 96k/B=256 は OPEN 較正 burst が 3072 (depth=16 で成功) / 4096 (depth>16 → `fla_open` fail-fast abort) に揺れ、8 回中 5 回 abort** (AU-11) |
+| ASIO 正弦 (B=256 48k / B=512 44.1k / B=256 96k) | underrun 0, 最大誤差 1.49e-8, 無音ラン 0。96k は 実行中 `burst_obs` 2048f、OPEN 較正 burst ≈3072f → depth=16 (上限ぎりぎり) → T=4096f (42.7ms) (原実行)。**検収再実行では 96k/B=256 は OPEN 較正 burst が 3072 / 4096 に揺れ、旧実装は 4096 で `fla_open` が depth>16 abort (8 回中 5 回)** → §10 で修正済み (AU-11, #211) |
 | **ソーク 120s** (B=256 48k ランプ) | **underrun 0**, 5,764,608f bit-exact, コールバック 22,516 回, 最大 cb 504 µs, wake 遅延 <1ms 96.2% / 1–2ms 3.7% / 2–8ms 10 回 |
 | `bufferSwitchTimeInfo` (ASIOTime 148B) | 1,883 回, 位置単調・sampleRate 一致 (bad 0), 正弦 PASS。※検収で起動時の samplePosition 巻き戻り (bad=1) が 2/8 回で再現 → `flasio.c` 修正済み (§9) |
 | 過負荷 (busy 6 本 + main 30ms/100ms 停止 + cb 毎 1.5ms 演算) | underrun 0 (別実行では 1〜3 回/256〜1024f: 負荷依存で記録のみ), 復帰後ランプ一致 |
@@ -84,7 +84,7 @@
 8. **[audio-worklet-wasm]** (任意) FL ミキサを Wasm Audio Worklet 内で直接走らせる案との遅延比較 (ブロッキング不可のため FL スレッド構造の再設計が前提)。
 9. **[audio-ui-integration]** `src/index.ts` への組込 (ユーザジェスチャで `FlAudioShim.attach`, 既存 `audio.ts` ハーネスとの統合/置換)。
 10. **[audio-soak30]** 30 分ソーク (CAB-9 検証条件。既存は 120 秒のみ)。検収で追加。
-11. **[audio-96k-depth]** 96kHz/B=256 で OPEN 較正 burst=4096 のとき `fla_open` が depth>16 で abort する問題 (abort → エラー返却 or 上限拡大)。検収で追加。
+11. ~~**[audio-96k-depth]**~~ 解決 (#211, §10)。
 
 対応表: AU-1 audio-com-adapter=CAB-97 / AU-2 realdevice=CAB-186 / AU-3 midi=CAB-187 / AU-4 directsound=CAB-188 / AU-5 input-ui=CAB-191 / AU-6 latency-policy=CAB-189 / AU-7 fl-profile=CAB-192 / AU-8 worklet-wasm=CAB-193 / AU-9 ui-integration=CAB-184 / AU-10 soak30=CAB-190 / AU-11 96k-depth=CAB-210 (親は全て CAB-9)。
 
@@ -97,3 +97,32 @@
 | 修正 (本コミット) | (1) `flasio.c`: worklet が新 gen を認識する前 (wl_state=IDLE) は ASIOTime.samplePosition を 0 固定。修正前 2/8 回で bad=1 → 修正後 22/22 回で bad=0 (他 2 回は無関係な Chrome 起動失敗)。(2) `harness/chrome.mjs`: 終了時 `rmSync` を retry+握り潰し。(3) `harness/run.mjs`: `expect` 例外・想定外 abort を FAIL として記録 (runner を落とさない) |
 | 未修正 (チケット化) | 96k/B=256 の abort (AU-11)、30 分ソーク未実施 (AU-10)、`Atomics.wait` 記述の誤り (本 REPORT で訂正済み) |
 
+
+## 10. AU-11 (#211) 96kHz/B=256 の burst 4096 abort の解消
+
+既知類型との関係: 該当なし (lift 欠陥ではなくランタイム shim の容量判定)。方針は両案の併用: **(b) depth 固定上限 16 を撤廃** (制約は ring 容量 `(depth+2)×B ≤ FLA_MAX_RING=32768` のみ。+2B は動的 T 拡張 `Tmax=ring−2B` の余地) し、**(a) それでも収まらない burst は abort でなく `fla_open` が `FLA_E_BURST_TOO_LARGE` を返し `flasio_create_buffers` が `ASE_NoMemory(-994)` を返す** (AudioContext は CLOSE して CLOSED に戻すので再 CreateBuffers 可)。FL 側は CreateBuffers エラー ("Couldn't create the streaming ASIO buffer." が出る経路) になる。`fla_open` の fail-fast は引数不正・二重 open など呼び側バグに限定。
+
+| 条件 (96kHz) | 挙動 |
+|---|---|
+| B=256, burst 3072 | depth=16, T=4096f (従来どおり) |
+| B=256, burst 4096 | depth=21, T=5376f (56.0ms) で成功 (旧: abort)。ring=32768 に収まる |
+| B=512, burst 4096 | depth=11 (計算値) で成功 |
+| `(depth+2)×B > 32768` | `ASE_NoMemory`、abort なし。計算上の限界 burst は B=128/256/512 で 25856/25600/24960f (`need=(b+b/4+2B-1)/B` を b=128 刻みで走査) |
+
+e2e 追加 3 本 (`harness/run.mjs`, 計 25 シナリオ): `asio_sine_b512_96k` / `asio_sine_b256_96k_burst4096` / `asio_createbuffers_burst_overflow` (B=256, burst 40000 → depth 197, (197+2)×256=50944 > 32768)。後 2 本は burst をテスト専用フック `fla_test_set_burst_floor()` (`burst_floor=` クエリ) で強制し、環境依存の揺れを決定的に再現する。
+
+実測 (コミット `14fa86a` の HEAD でビルド, headless Chrome / emcc 6.0.12, GitHub runner, 並列 1):
+
+| 検証 | 結果 |
+|---|---|
+| フル e2e 1 回 (`node harness/run.mjs`) | **25/25 PASS**, exit 0, 所要 440.51 s (開始時 load average 0.22 / 終了時 0.03)。soak120: underrun 0・5,763,328f 一致 |
+| 96k 3 シナリオ × 6 周 (`--quick`, load average 0.00 開始) | **18/18 PASS** (b256_96k / b512_96k / b256_96k_burst4096 各 6/6)。burst4096 は毎回 T=5376, underrun 0, 正弦最大誤差 1.49e-8 (7 周目以降は打切りのため集計外) |
+| burst 溢れ | `first=-994, retry=0, dispose=0, aborted=false` |
+
+検証範囲 / 範囲外: 本 runner の fake シンクでは自然な OPEN 較正 burst は 1024 で、**検収環境で見えた burst 4096 は自然には再現していない**。burst 4096 の経路は強制フックでの検証。実機 burst 分布は未計測。**ネガティブコントロール (旧コードで burst4096 が abort することの再実行) は未実施**。旧挙動の根拠は検収記録 §9 と旧コードの `depth > 16` 判定 (`git show 14fa86a^:tools/audio/src/flaudio.c`) のみ。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| T 縮小が未実装 (burst 4096 で T=56ms 固定) | 96k/B=256 の遅延が burst 最大値に引きずられる | #190 (AU-6) にコメント |
+| 実機 burst 分布が未計測 | 自然な burst 4096 の発生頻度・遅延影響が不明 | #187 (AU-2) にコメント |
+| 旧コードでの abort 再現 (ネガティブコントロール) 未実施 | 修正前後の差を本 runner で実測していない | 本 PR 本文に明記 |
