@@ -373,14 +373,19 @@ CAB-215 の主眼 (writeEntry ↔ 実機比較) は **ini セクション経由�
 
 
 
-## 15. 追記 (#347 / CI-4, 2026-10-13): /home/ubuntu 絶対パスを tools/shared の環境変数へ置換
+## 15. 追記 (#347 / PR #391, 2026-10-13): nfo_e2e.sh の typecheck 破損 (TS7016) を修正
 
-既知類型との関係: 該当なし (パス定義のみの変更・lift 無関係)。検証起点 commit: `2c3e526` (origin/main)。
+既知類型との関係: 該当なし (型検査設定のみ・lift 無関係)。
 
-- 置換: `test/_fl.ts`・`analysis/real_fst_check.mjs` (`FL_MAC_DIR`)、`cli/metrics.ts`・`h4/h4_e2e.ts` (`REPO_ROOT`)、`analysis/reproduce.sh` (`source tools/shared/env.sh` → `FL_WIN64_DIR`)、`analysis/kh_magic_check.mjs` (`os.homedir()` + `[DOWNLOADS]`)。`ott_fst_dump.json` の `corpusRoot` は `$FL_MAC_DIR/...` 表記にした (`real_fst_check.mjs` も同形式で出力)。
-- `tsconfig.json` に `allowJs` / `checkJs:false` を追加 (`paths.mjs` を型検査で解決するため)。
-- 既定値は従来パスと同一: `env -u FL_ROOT -u ANALYSIS_DIR -u FL_MAC_DIR` で `_fl.ts` の `FL_ROOT` が旧ハードコード値と文字列一致 (true)、`FL_WIN64_DIR` も旧 `FLE_PE` と一致。
-- 検証 (再現: `grep -rn '/home/ubuntu' tools/hostbridge/nfo --include=*.sh --include=*.py --include=*.json --include=*.ts --include=*.mjs --exclude-dir=work` → 0 件):
-  - `SKIP_H4=1 bash nfo_e2e.sh`: 置換前・後とも exit 0、stdout (所要行除く) と `work/` 生成物が `diff` 空。素材は fl-win64 のみで mac コーパスが無く、corpus テストは SKIP (36 pass / 4 skipped / 0 fail)。
-  - `bash h4_e2e.sh --no-chrome`: 置換前・後とも exit 1・`FAILED: 12` で出力一致 (mac コーパス/ Chrome 無しの環境差)。
-  - Chrome 段: 置換前の origin/main でも配置により `report timeout` (ws-347-base) / `FAILED: 19` (wt_base) と不安定。置換との因果は無い (未パッチ側で再現)。
+- `/home/ubuntu` 絶対パスの置換 (`_fl.ts`・`metrics.ts`・`h4_e2e.ts`・`real_fst_check.mjs`・`reproduce.sh`・`kh_magic_check.mjs`・`ott_fst_dump.json`) は **#362 / PR #376 (`1c54e11`, merged) で main に入っている**。#347 は #362 の重複起票で、#347 の完了根拠は「#362 で完了済み」。本 PR はこの置換を含まない。
+- 本 PR の差分: `tsconfig.json` に `allowJs: true` / `checkJs: false` を追加、`nfo_e2e.sh` の env コメント更新、本節。
+- 修正の理由: #376 で `cli/metrics.ts`・`test/_fl.ts` が `tools/shared/paths.mjs` を import するようになり、型宣言が無いため main の `nfo_e2e.sh` typecheck が TS7016 で失敗していた。`allowJs` で `.mjs` を解決する (`checkJs:false` なので `.mjs` 自体は検査しない)。
+- 検証 (検証起点: 現 main `fac2c47` vs head `563b11e`、fl-win64 展開済み・`FL_WIN64_DIR` 指定、4 コア / load 1.00、`cd tools/hostbridge/nfo && SKIP_H4=1 bash nfo_e2e.sh`):
+
+| 対象 | exit | 所要 | 結果 |
+|---|---|---|---|
+| main `fac2c47` | **1** | 0.168 s | typecheck で `cli/metrics.ts(9,27)` / `test/_fl.ts(3,28)` が TS7016 |
+| head `563b11e` | **0** | 2.635 s | typecheck 出力なし・browser-safety ok・ini 406/406・CAB-218 failed 0 |
+
+  `node --test test/*.test.ts`: main・head とも tests 40 / pass 36 / fail 0 / skipped 4 (mac コーパス `FL_MAC_DIR` 素材なしで corpus 4 件 SKIP)。Chrome 段 (`h4_e2e.sh`) は本変更と無関係のため `SKIP_H4=1`。
+- 行数: 本 REPORT は 250 行上限 (DOC_MAP §1) を main 時点で超過済み (374 行)。分割は #437 (DOCS-5) で追跡する (#378 は p0c 領域で別件)。
