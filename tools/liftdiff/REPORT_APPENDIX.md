@@ -66,3 +66,26 @@ timeout (native 248 / wasm 346) が負荷で変動**することで、同一 boo
 **結論: 全数採点の絶対値 (2,498 / 941 / 4,182 / 741) は 1 run の snapshot で数十オーダー変動する。**
 下流の判断は (a) `compare_bootstate.py` の遷移 (旧→新) の方向性、(b) `cascade_410360.py` の
 case 単位分類 (完全再現) を基準にすること。「実行不能 2,498」は target 値に使えない。
+
+## 8. m11 wasm_trap 578 関数のトリアージ (LD-5 / #236)
+
+集計 = `python3 tools/liftdiff/tests/triage_wasm_trap.py > tools/liftdiff/results/m11_wasm_trap_triage.md` (cwd 非依存。表・内訳はそちらが正本)。
+入力は既存 closure の batch jsonl (`work/m11/batch_closure.jsonl`、再走なし)。Refs #236 / 個別原因は #307 (LD-7) へ。
+
+再現済み (スクリプトが `results/` に出力。TSV を 1 行壊すと 578 → 577 になることを確認):
+
+- **unreachable 218 は全件 `function_4128b0__lifted` で trap**。frame 名に signature / thunk を含むものは 0。
+  wasm 側 import 呼出列には全件 `ExitProcess` があり、native 側は 0 件。
+- 連鎖は `__lifted < function_4128b0 < function_412a40 < {function_4096b0 (144) | function_412a60 (74)}`。
+  frame [3] = **`function_412a40` の呼出元** (旧版は `function_412a60` の呼出元と誤表記していた)。
+- OOB 222 は最上位 frame が 71 種に分散 (`function_414ad0` 68 件が最多)。hang 39・badjson 25・indirect_sig 3・arith/stack/other 計 4。個別原因は未確定 (#307)。
+- TSV 578 のうち 67 件は今の jsonl に wasm_trap case が無い (jsonl 側のみ 71 件)。TSV と jsonl は別 run のため (§6.2)。
+
+現スナップショット (`work/m11/` の wasm / IR / build.json) での観測 (`results/` §6 に出力。**jsonl を作った build と同一かは未確認**。
+スナップショットの mtime は jsonl より新しい):
+
+- wasm バイナリ中に `signature_mismatch` / `sig_mismatch` / `thunk` は 0 件、`build.json` の wasm-ld `signature mismatch` 警告も 0 件。
+  M11 §2.4 の thunk は sigfix 済みと整合するが、jsonl 取得時点の build での確認ではない。
+- IR の `function_4128b0__lifted` では `ExitProcess` 呼出 (`dec_label_pc_4129f7`) の直後が `unreachable` (1 箇所)。
+  stub `ExitProcess` が戻る wasm でここに落ちる、という推論は**未検証** (stub の挙動を変えた再走はしていない)。
+- 分岐点 (native では `ExitProcess` に入らず wasm だけが入る理由) は上流にあり**未特定** → #307。
