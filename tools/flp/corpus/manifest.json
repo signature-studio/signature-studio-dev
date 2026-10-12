@@ -1,5 +1,5 @@
 {
- "root": "/home/ubuntu/work/analysis/mac/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL",
+ "root": "$FL_MAC_DIR/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL",
  "generated": "cli/corpus.ts",
  "count": 164,
  "projects": [
