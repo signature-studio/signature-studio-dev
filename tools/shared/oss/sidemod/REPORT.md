@@ -65,4 +65,4 @@
 | LGPL-2.1 §6(b) に「side module + dlopen」が当たるか、LGPL §6 の再リンク可能性を wasm でどう満たすかは専門家確認 | #87 コメント (`docs/LEGAL.md` §3.2 と同じ未確定事項) |
 | FL 由来 wasm から `ss_*` を呼ぶ結線、および LGL-3 (THIRD_PARTY_NOTICES・ソース提供の記録) との連動 | LGL-3 の issue |
 | 禁止フラグ表は手転記。FFmpeg 更新時の追従は人手 | #87 コメント |
-| CI (GitHub Actions) への組込み。`.github/workflows` はこの run のスコープ外 (opencode.yaml のみ) | 新規 issue を #87 コメントで提案 |
+| CI (GitHub Actions) への組込み。`.github/workflows` に e2e ジョブは追加していない (workflows 権限の有無は未確認) | 新規 issue を #87 コメントで提案 |
