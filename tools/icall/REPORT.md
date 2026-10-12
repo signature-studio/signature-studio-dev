@@ -188,7 +188,7 @@ python3 tools/icall/diff/fn3_diff.py 1801a9be0 --n 600 --dump    # native / rout
 | liftlib 統合 patch 適用 | **済** (`patch -p1 --dry-run` OK / pipeline.py hunk #2 は offset 23 行で成功) | `liftlib.passes.icall` import OK。`liftlib.pipeline.run_all('targets/ott_route.json', detect_only=True)` = prelift (280 関数・96 site・errors {}) → RetDec 17.5 s → restore (dispatch 96 / comis 100) → repair_ll、全体 29.9 s (load 0.74) |
 | stack 引数 BLK (+0x48 / STKBUF 12 語) | **済 (静的 + OTT 回帰のみ)** | OTT F: site 96 中 stack 引数あり 2 (`0x1801a1ce6`・`0x1801aa528`, 各 1 語), 94 は 0 語。`function_1801aa4dc` の IR に STKBUF store を確認 |
 | 回帰 `icall_e2e.sh` (HEAD `60a68c2`) | **PASS** 82.6 s (load 0.94, 4 core) | unit PASS 0 failed (新規 stk 6 件含む) / OTT F 落ち 70→0 / tail-jmp 11→0 / matrix 89 scenario・50,236 cell 全 bit 一致・max_ulp 0・state_diff 0 qword |
-| 前提再現 (`ott_e2e.sh`) | PASS 23.4 s | OTT_x64.dll = `Install_Xfer_OTT_137.exe` の `$_13_/OTT_x64.dll` を `/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll` に配置 (m6_scan.py で `tools/m6/work/ott_ranges.txt` 生成) |
+| 前提再現 (`ott_e2e.sh`) | PASS 23.4 s | OTT_x64.dll = `Install_Xfer_OTT_137.exe` の `$_13_/OTT_x64.dll` を `[ANALYSIS-DIR]`/plugins/ott/binaries/OTT_vst2_win64.dll に配置 (m6_scan.py で `tools/m6/work/ott_ranges.txt` 生成) |
 
 - **設計の経緯 (実測)**: ① 当初案「BLK+0x48 = rsp+0x20 のアドレス」は、`ICALL_CHECK_STK` 計測で 1,337 dispatch 中 1 件が非整列値 (0x102cbecf, site 0x1801a03d3) になり不採用 (RetDec が rsp を連続領域として持たない)。
   ② 全 site 無条件に 12 語コピーすると leaf の `i64 f(void)` 一様 ABI が崩れ ctor entry が表から消えた (`ott_run: unknown entry 0x3011d400`) → 実際に store された語数だけコピー。

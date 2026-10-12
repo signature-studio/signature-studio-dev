@@ -1,7 +1,8 @@
 """liftlib.passes.icall — 間接 call/jmp 脱落 (RetDec D1) の根絶: lift 前に PE を書換え (tools/icall/icall_rewrite.py), lift 後に復元 (ir_icall_restore.py).
 
 cfg (JSON) の passes.icall:
-  {"funcs": "work/xxx_F.txt" | "0xA-0xB,..." (書換え対象関数集合; 閉包は tools/icall/closure.py で作れる),
+  {"funcs": "work/xxx_F.txt" (必須: 書換え対象関数集合を書いたファイルのパス。inline の range 文字列 ("0xA-0xB,...") は不可 =
+            pipeline.rpath() 経由で icall_rewrite.py が open() するため。閉包は tools/icall/closure.py で作れる),
    "rip_data": true, "derefix": true, "abi": true, "comis": true, "jtchain": true}      (全て既定 true; 個別 off 用)
 効果: ① call/jmp [reg+off] / reg / [rip+data] / CFG thunk を memory-ABI stub 経由で IR に残し __icall_dispatch(site_va) へ復元
       ② RetDec D7 (zero-disp 参照が live-in reg 経由だと load が消える) を lea 補償で回避  ③ closure 内 ABI を BLK 経由に仮想化 (xmm/r8/r9 引数脱落 D3 を根絶)

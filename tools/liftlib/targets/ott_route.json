@@ -1,6 +1,6 @@
 {
  "name": "ott_route",
- "image": "/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll",
+ "image": "${PLUGINS_DIR}/ott/binaries/OTT_vst2_win64.dll",
  "retdec": {"ranges": "", "timeout": 2400},
  "passes": {
   "icall": {"funcs": "tools/icall/work/route/F.txt"},

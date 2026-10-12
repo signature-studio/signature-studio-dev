@@ -23,13 +23,17 @@ from .passes import icall as ICALL
 from .simd import gen as SG
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+sys.path.insert(0, os.path.join(ROOT, "tools", "shared"))
+import paths as _SHARED  # noqa: E402  (ANALYSIS_DIR / PLUGINS_DIR 等)
 HERE = os.path.abspath(os.path.dirname(__file__))
 SIMD_DIR = os.path.join(HERE, "simd")
 
 
 def rpath(p):
+    """repo 相対 / 絶対パス。`${PLUGINS_DIR}` 等 (tools/shared/paths.py の変数名) は環境変数優先で展開する"""
     if p is None:
         return None
+    p = re.sub(r"\$\{(\w+)\}", lambda m: str(_SHARED.ALL.get(m.group(1), m.group(0))), p)
     return p if os.path.isabs(p) else os.path.join(ROOT, p)
 
 

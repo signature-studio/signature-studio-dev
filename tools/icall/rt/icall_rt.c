@@ -39,15 +39,20 @@ static long long (*lookup(uint32_t va))(void) {
 extern int ipp_shim_dispatch(void* blk);
 #endif
 #ifdef ICALL_CHECK_STK
-static unsigned long long g_stk_n, g_stk_bad;
+static unsigned long long g_stk_n, g_stk_bad, g_stk_ptr_bad;
 unsigned long long icall_stk_checked(void) { return g_stk_n; }
 unsigned long long icall_stk_nonzero(void) { return g_stk_bad; }
+unsigned long long icall_stk_ptr_bad(void) { return g_stk_ptr_bad; }
 #endif
 
 void __icall_dispatch(uint64_t site) {
     BLKQ(BLK_STK_OFF) = ICALL_BLK + BLK_STKBUF_OFF;
 #ifdef ICALL_IPP_SHIM
     if (ipp_shim_dispatch((void*)(uintptr_t)ICALL_BLK)) return;
+#endif
+#ifdef ICALL_CHECK_STK   /* BLK+0x48 の pointer が ICALL_BLK+0x100 と一致 / 8 byte 整列 / STKBUF 全体 (12 語) が線形メモリ内か。外れは g_stk_ptr_bad */
+    { uint64_t p = BLKQ(BLK_STK_OFF);
+      if (p != ICALL_BLK + BLK_STKBUF_OFF || (p & 7) || p + 8 * 12 > (uint64_t)__builtin_wasm_memory_size(0) * 65536) g_stk_ptr_bad++; }
 #endif
 #ifdef ICALL_CHECK_STK   /* 統計: 呼出し点ごとの stack コピー 12 語のうち非 0 の語数 (全 0 の site は stack 引数なし or 未配線) */
     { g_stk_n++; for (int k = 0; k < 12; k++) if (BLKQ(BLK_STKBUF_OFF + 8 * k)) { g_stk_bad++; break; } }

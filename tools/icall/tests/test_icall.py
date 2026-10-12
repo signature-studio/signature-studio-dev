@@ -56,6 +56,9 @@ check('stk: 6 引数 (rsp+0x28) -> 2 語', R.stk_slots_stored(_seq(mov_5th, mov_
 check('stk: 引数なし -> 0', R.stk_slots_stored(_seq('4889c8'), 1) == 0)
 check('stk: movaps [rsp+0x20] (xmm 退避) は引数でない', R.stk_slots_stored(_seq(movaps_x), 1) == 0)
 check('stk: 直前の call より前の store は無視', R.stk_slots_stored([_It(mov_5th, 0x1000), _It('e800000000', 0x1010), _It('ffd0', 0x1020)], 2) == 0)
+check('stk: cmp [rsp+0x20],0 (読み取り) は引数でない', R.stk_slots_stored(_seq('48837c242000'), 1) == 0)
+check('stk: test [rsp+0x28],rax (読み取り) は引数でない', R.stk_slots_stored(_seq('4885442428'), 1) == 0)
+check('stk: cmp 後の mov [rsp+0x20] は 1 語', R.stk_slots_stored(_seq('48837c242000', mov_5th), 2) == 1)
 check('stk: SITE_TAIL 長さが nstk に比例', R.site_tail_len(3) - R.site_tail_len(0) == 3 * R.STK_COPY_ONE)
 
 # ---- ICALL-5 追加 pass (ir_fix_mask / ir_override / simd_merge): PE 不要

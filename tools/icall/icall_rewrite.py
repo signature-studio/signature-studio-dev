@@ -60,8 +60,8 @@ def stk_slots_stored(items, idx):
         mn = ins.mnemonic
         if mn in ('call', 'ret', 'retf', 'jmp'):
             break
-        if not ins.operands or ins.operands[0].type != x86.X86_OP_MEM:
-            continue
+        if not ins.operands or ins.operands[0].type != x86.X86_OP_MEM or not (ins.operands[0].access & capstone.CS_AC_WRITE):
+            continue   # cmp/test [rsp+..] 等の読み取りは store ではない
         m = ins.operands[0].mem
         if ins.reg_name(m.base) == 'rsp' and not m.index and not m.segment:
             sz = ins.operands[0].size

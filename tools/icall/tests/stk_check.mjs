@@ -1,5 +1,6 @@
 // stk_check.mjs MOD.cjs: ICALL_CHECK_STK 付き build で OTT ctor→setParameter→resume→process を実行し、
-// dispatch 時点の BLK+0x48 (stack 引数スロット先頭) が 非 0 / 8 byte 整列 / 線形メモリ内 かを集計する。
+// dispatch ごとに BLK+0x48 (stack 引数スロット先頭) が ICALL_BLK+0x100 と一致 / 8 byte 整列 / STKBUF 12 語が線形メモリ内 かを runtime で検査する。
+// assert: dispatch>0 かつ ptr_bad==0 (終了コード)。nonzero_stkbuf は診断値 (stack 引数ありの site が実行された dispatch 数) で assert しない。
 import { load } from '../../ott/diff/api.mjs';
 const api = await load(process.argv[2]);
 const m = api.mod;
@@ -10,6 +11,6 @@ U32[IN_A / 4] = BUF; U32[IN_A / 4 + 2] = BUF + N * 4; U32[OU_A / 4] = BUF + N * 
 api.ctor(OBJ);
 for (let p = 0; p < 19; p++) api.setParam(OBJ, p, 0.5);
 api.resume(OBJ); api.process(OBJ, IN_A, OU_A, N);
-const n = Number(m._icall_stk_checked()), bad = Number(m._icall_stk_nonzero());
-console.log(`stk_check dispatch=${n} nonzero_stkbuf=${bad}`);
-process.exit(n > 0 ? 0 : 1);
+const n = Number(m._icall_stk_checked()), bad = Number(m._icall_stk_nonzero()), pbad = Number(m._icall_stk_ptr_bad());
+console.log(`stk_check dispatch=${n} ptr_bad=${pbad} nonzero_stkbuf=${bad}`);
+process.exit(n > 0 && pbad === 0 ? 0 : 1);
