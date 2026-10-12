@@ -746,3 +746,77 @@ python3 tools/plugins/p0c/p0c4_e2e.py 2000        # 0x5dfdb0=0 (bit-exact 7/14)
 K80_NO_BUFPAD=1 python3 tools/plugins/p0c/k80_diff.py --ir tools/plugins/p0c/work/ext/k80.ext.ll --only 0x5dfdb0 --cases 2000   # NC1
 K80_NO_ASMSTORES=1 python3 tools/plugins/p0c/p0c4_abi_e2e.py 2000                                                                # NC2
 ```
+
+## 13. P0c-7 追記 (#310): 0x5df610 / 0x5e0d80 は bit-exact (buf_diff 0) になった
+
+作成: 2026-10-13 / 担当 dir: tools/plugins/p0c のみ / 起点 HEAD: `400d546` / 検証 HEAD: `2c38a22` (コミット済み・`git status --porcelain` 空)
+既知類型との関係 (DEFECTS.md): 該当なし (D21・D22 候補を §13.4 に行案)。素材: `fl-win64.tar.zst` の `block18983_PE.bin` のみ。
+`work/k80.lift.ll` は `lift_ranges.sh` (RetDec v5.0) で再生成 (4.1 s)。`work/f80_classes.json` / `kernel_table.json` は
+`f80_assess.py` / `inventory/kernel_table.py` で再生成。
+
+### 13.1 結論 (先出し)
+
+1. **0x5e0d80 (910,077 → 0)**: §12.3 の推定 (ucomiss 結果が捨てられ符号が定数) を**実測で確認**した。機械語は
+   `ucomiss xmm0,xmm6; jbe` で `r14d = (0.0 > src) ? -1 : +1`。lift IR は `@__asm_ucomiss` の戻りを使わず、符号 alloca
+   (`%cf.0.reg2mem`) が初回 `select(count==0, 1, -1)`・以降 `store -1` の定数だった。`k80_ucomi_sign.py` (新規) が
+   ucomiss 直後に `select (fcmp ogt A.lane0, B.lane0), -1, 1` を作り `%cf.N.reload` の use を置換する。ext 精度ではなかった。
+2. **0x5df610 (2,404,917 → 0)**: ext 精度でも lane 模型でもなく **k80_argfix.py [A] の xmm slot 割当の誤り**。
+   `movdqa [rbp+0x10],xmm7` / `movdqa [rbp],xmm6` (非 volatile xmm6/7 の spill) の placeholder (`xor i128 0,0`) を [A] が
+   「`__asm_movdqa` のみ使用 → 引数」と見て `%in.xmm3.bits` を先に割り当て、実際に xmm3 を読む `movss xmm7,xmm3` の
+   placeholder は未接続のまま (0 扱い) だった。scale (xmm3) が 0 になり出力が全面不一致。修正 = `__asm_movdqa` のみの
+   placeholder は引数にしない (`SKIP_SPILLFIX`)。`movaps xmm6,xmm3` 形 (0x5de5a0 / 0x5e07b0 / 0x5e0830) は幅 32 bit で接続する。
+3. 副次: **同原因の 0x5de5a0 (1,260,951) / 0x5e07b0 (1,260,951) / 0x5e0830 (631,030) / 0x5de8e0 (2,365,445) も 0**。
+   0x5df340 は 1,291,379 → 1,283,847 (残。未調査)。
+
+### 13.2 実測 (2000 case/kernel, fork 隔離, 検証 HEAD `2c38a22`, 数え方は §11.3)
+
+| kernel | 起点 (400d546) | 修正後 buf_diff | ret_diff (修正後) |
+|---|---:|---:|---:|
+| 0x5df610 | 2,404,917 | **0** | 2000 (native が rax を放置。判定対象外 §11.3) |
+| 0x5e0d80 | 910,077 | **0** | 0 |
+| 0x5de5a0 / 0x5e07b0 / 0x5e0830 / 0x5de8e0 | 1,260,951 / 1,260,951 / 631,030 / 2,365,445 | **0** | — |
+| 0x5df340 | 1,291,379 | 1,283,847 | — (残) |
+
+- 回帰: `p0c4_abi_e2e.py 2000` で起点 buf_diff=0 だった 29 kernel (status ok のみ) はすべて 0 のまま (29/29)。
+  「status ok かつ buf_diff==0」の kernel 数は status ok 54 kernel 中 29 → 35 (sig11 7 kernel は buf_diff 列が 0 でも
+  未実行なので数えない)。status センサス run=61 ok=54 sig11=7 (起点と同一)。冪等性・llvm-as OK、受入基準 ①-④ OK。
+  所要 24.9 s (load average 0.59→0.97, 並列 1)。起点の同スクリプト実測は 27.7 s。
+- `p0c4_e2e.py 2000` (ext IR): bit-exact 7/14 で起点と同一 (0x5dfbe0/0x5dfc90/0x5dfd30/0x5dfdb0/0x5e0b70/0x5e1590/0x5e1780)。
+  所要 117.0 s (load average 0.97, 並列 1)。
+
+### 13.3 負論対照 (修正を外すと数値が戻る, 2000 case)
+
+| 対照 | 外した修正 | 観測 |
+|---|---|---|
+| NC1 `K80_NO_UCOMISIGN=1` | ucomiss 符号修復 | 0x5e0d80 0 → **910,077** (0x5df610 は 0 のまま) |
+| NC2 `K80_NO_SPILLFIX=1` | spill placeholder 除外 | 0x5df610 0 → **2,404,917** / 0x5de5a0 0 → 1,260,951 / 0x5e07b0 0 → 1,260,951 / 0x5e0830 0 → 631,030 / 0x5de8e0 0 → 2,365,445 (0x5e0d80 は 0 のまま) |
+
+NC は互いに独立 (NC1 は 0x5df610 に、NC2 は 0x5e0d80 に影響しない)。「status ok かつ buf_diff==0」の kernel 数 (status ok 54 kernel 中): 起点 29 / 修正後 35 / NC1 34 / NC2 30。
+
+### 13.4 DEFECTS.md 行案・未解決・起票先
+
+- **D21 (新, 候補) 比較フラグの結果を捨てた lift**: 症状 = `call void @__asm_ucomiss` の戻り未使用で、`jbe` 由来の分岐/選択値が
+  定数化。検出信号 = IR に void の `__asm_*comis*` call があり、同 block の後続が `%cf.N.reload` を使う。修復 = fcmp で SSA 化。
+- **D22 (新, 候補) callee-save spill の placeholder を引数と誤認**: 症状 = `movdqa [mem],xmm6/7` の `xor i128 0,0` に引数 xmm slot
+  を割当て、本当の引数 read が未接続 (0)。検出信号 = `__asm_movdqa` のみ使用の placeholder に `%in.xmmN.bits` が付く。
+  修復 = 除外し、movaps 全 reg コピー形は幅付きで接続。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 0x5df340 buf_diff 1,283,847 (未調査) | 80 kernel bit-exact の残 | 子 issue を起票 (本 PR 後・#197 親) |
+| `k80_ucomi_sign.py` は `--func function_5e0d80` の opt-in (jbe→±1 を機械語で確認済みの 1 site のみ) | 他 kernel の同形は未走査 | #197 にコメント |
+| sig11 7 kernel / abi-mismatch 7 kernel (§11.7) | 数値差分の対象外 | 子 #277 |
+| `/opt/retdec`・`/home/ubuntu/work/*` 絶対パス依存 (runner では symlink で代替) | CI 再現性 | #294 |
+
+### 13.5 再現
+
+```sh
+sudo ln -sfn <fl-win64 extracted> /home/ubuntu/work/analysis/win64/extracted ; sudo ln -sfn $PWD /home/ubuntu/work/webstudio   # #294 回避 (PR #301 と同方法)
+bash tools/plugins/lift/lift_ranges.sh <PE> tools/plugins/lift/kernel_ranges_balance.txt tools/plugins/p0c/work k80
+mkdir -p tools/plugins/work && python3 tools/plugins/inventory/kernel_table.py && python3 tools/plugins/p0c/f80_assess.py
+export TMPDIR=$PWD/tools/plugins/p0c/work/tmp
+python3 tools/plugins/p0c/p0c4_abi_e2e.py 2000                          # 0x5df610=0 / 0x5e0d80=0
+K80_NO_UCOMISIGN=1 python3 tools/plugins/p0c/p0c4_abi_e2e.py 2000       # NC1
+K80_NO_SPILLFIX=1  python3 tools/plugins/p0c/p0c4_abi_e2e.py 2000       # NC2
+python3 tools/plugins/p0c/p0c4_e2e.py 2000                              # 回帰 (bit-exact 7/14)
+```

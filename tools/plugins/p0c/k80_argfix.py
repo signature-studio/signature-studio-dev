@@ -45,6 +45,7 @@ import re
 
 SLOT_GPR = ['rcx', 'rdx', 'r8', 'r9']
 SLOT_XMM = ['xmm0', 'xmm1', 'xmm2', 'xmm3']
+SKIP_SPILLFIX = os.environ.get('K80_NO_SPILLFIX') == '1'
 
 
 def func_name(header):
@@ -254,8 +255,15 @@ def fix_movd_from_zero(header, body, habi, rep, fname):
             uses = [l for l in lines if re.search(r'(?<![\w.%-])' + esc + r'(?![\w.-])', l) and l != dline]
             if not uses:
                 continue
-            calls = [l for l in uses if re.search(r'call (?:i32|i64) @__asm_mov\w*\(i128 ' + esc + r'\)', l)]
+            calls = [l for l in uses if re.search(r'call (?:i32|i64) @__asm_mov\w*\(i128 ' + esc + r'\)', l)
+                     or (not SKIP_SPILLFIX
+                         and re.search(r'call i128 @__asm_movaps\(i128 ' + esc + r'\)', l))]
             if len(calls) != len(uses):
+                continue
+            # movdqa [rsp/rbp+N], xmmK は非 volatile xmm6-15 の callee-save spill で引数ではない
+            # (0x5df610: spill の placeholder に xmm3 を割り当て、実際に xmm3 を読む
+            # `movss xmm7, xmm3` の placeholder が未接続のままだった)。
+            if not SKIP_SPILLFIX and all('@__asm_movdqa(' in l for l in calls):
                 continue
             site = rep['movd_sites'].get(fname, 0)
             xs = [x for x in habi.get('xmm_slots', []) if int(x[3:]) < 4]
@@ -263,7 +271,7 @@ def fix_movd_from_zero(header, body, habi, rep, fname):
             rep['movd_sites'][fname] = site + 1
             pname = '%%in.%s.bits' % xmm
             helper = re.search(r'@(__asm_mov\w*)', calls[0]).group(1)
-            if 'movd' in helper:
+            if 'movd' in helper or (helper == '__asm_movaps' and habi.get('xmm_width', {}).get(xmm, 32) == 32):
                 stmts = ['  %%trunc.%s = trunc i64 %s to i32' % (pname[1:], pname),
                          '  %s = zext i32 %%trunc.%s to i128' % (z, pname[1:])]
             else:                                          # movq 等は 64bit
