@@ -29,6 +29,19 @@ HEAD (b8e762d) でも FAIL (native 67 / wasm 46)。原因は tools/m11/work/boot
 **本チケット (liftdiff) とは無関係**で fix 対象外。
 `liftdiff_e2e.sh` は check 3 で exit 1 になるため、検収时は [4/4] を別途手動実行した (§6 参照)。
 
+### 5.1.1 check 3 の判定条件更新と Actions 上の再現 (#122)
+
+`check 3` の閾値 `wasm_trace <= 6` は boot_final3.ll 再生成前 (wasm 4〜6) の値で、現 IR (native 67 / wasm 46) では FAIL し
+`liftdiff_e2e.sh` が exit 1 になっていた。欠陥 (callee 0x41c820 arg1 が wasm で 0 = `callsite_arg_drop`、heap への 7 件の
+resourcestring 書込み欠落 = mem diff) は同じ形で残っているため、判定を `native_trace > wasm_trace` ∧ `callsite_arg_drop` ∧ `mem diff > 0` に変更した。
+あわせて `liftdiff_e2e.sh` に `--m11-only` (OTT 旧 chain の ott.ll が無い環境用)・入力/依存 (numpy capstone pefile) の事前検査を追加した。
+
+Actions runner (4 core, 実測 2026-10-12): 素材 `oc_artifacts: fl-win64 toolchain-emsdk work-m11 work-liftdiff`、`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`。
+`bash tools/liftdiff/liftdiff_e2e.sh --m11-only` が **exit 0 / 128 s** (load average 開始 0.91 → 終了 4.72、batch は 12 shard で 81 s)。
+unit#18 check 1-3 PASS、m11 sample:800 = **一致 353 / 不一致 217 / 実行不能 230** (§5 の CAB-233 値と同一)。
+(別に 4 shard で走らせた batch は 346/224/230 = shard 数・負荷によるぶれ、§6.2。)
+OTT 旧 chain (D1〜D6) は `tools/ott/work/ott.ll` (`work-m6-ott`) と OTT_vst2_win64.dll (`analysis-ott-binaries`) が必要で、この run では**未実施**。
+
 ## 5.2 Ablation (規則 41)
 
 主要な効果に対して、その修正だけを外した対照を 3 つ実施した (いずれも `work/abl/` にビルド、
