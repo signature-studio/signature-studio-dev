@@ -53,3 +53,5 @@ for f, r in res.items():
 print('callers=%d rtti_resolved=%d' % (len(res), sum(1 for r in res.values() if r['rtti'])))
 if outj:
     json.dump(res, open(outj, 'w'), indent=1)
+    # em_check.mjs が読む work/ctors47.json ([{ctor: <呼出元関数 VA>}] × 47) も再生成する (clean HEAD 再現用)
+    json.dump([{'ctor': f, 'rtti': r['rtti']} for f, r in res.items()], open(os.path.join(os.path.dirname(outj), 'ctors47.json'), 'w'), indent=1)

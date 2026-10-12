@@ -38,6 +38,9 @@ done
 echo "== [4] KH-10/KH-11 (CAB-247): EditorModel 層部分 lift (module E: ctor+poll1+poll2+EventSlot+writer)
     + subscribe 経路 (0x1800526f0 等) の実 IR 化 → native oracle ctx-fuzz + 47 製品「編集可能」デモ"
 python3 lic_build.py --module E | tail -1
+# 47 ctor 呼出元 (work/ctors47.json = em_check.mjs の入力) を clean 環境でも再生成 (xref 全 .text 走査 ≈ 80 s は初回のみ)
+[ -f work/xref_kh11.json ] || python3 scripts/xrefscan.py 180051af0,180d5f190,180d52990,180ef7fc0,180d5e820 --json work/xref_kh11.json > /dev/null
+python3 scripts/kh249_ctor_ids.py --json work/ctor_ids.json | tail -1
 if [ ! -x work/native_ref ]; then
   cc -O1 -Wall -o work/native_ref harness/native_ref.c harness/scenarios.c -Iharness
 fi
@@ -57,8 +60,6 @@ node harness/compare.mjs work/emfire_200_1.bin work/licE/mod.cjs work/licE/sigs.
 echo "== [4b] KH-11b (#249): snap-in ブラウザ分類 0x180ef7fc0 の lift (module F) → 分類ゲート/カテゴリ実行検証 + 47 ctor の RTTI 同定"
 python3 lic_build.py --module F | tail -1
 node kh249_check.mjs | tail -1
-[ -f work/xref_kh11.json ] || python3 scripts/xrefscan.py 180051af0,180d5f190,180d52990,180ef7fc0,180d5e820 --json work/xref_kh11.json > /dev/null
-python3 scripts/kh249_ctor_ids.py --json work/ctor_ids.json | tail -1
 python3 scripts/kh249_id_scan.py --json work/id_scan.json | tail -1
 
 echo "== [5] まとめ"
