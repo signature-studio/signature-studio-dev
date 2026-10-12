@@ -26,11 +26,26 @@ CALL_RE = re.compile(r"^\s*(?:%[\w$.\-]+ = )?call (\S+) @(function_[0-9a-f]+)\((
 
 # ablation (規則 41): LL_NO_RET_PHI=1 で LIFTLIB-5 の「複製 call 結果の ret phi 合成」を止める
 _NO_RET_PHI = bool(os.environ.get("LL_NO_RET_PHI"))
+# ablation: LL_RX_FIRST_ONLY=1 で LIFTLIB-5 の「call 後の xmm0 読み手を全て差し替え」を最初の 1 件に戻す
+_ALL_READERS = not os.environ.get("LL_RX_FIRST_ONLY")
 
 
 def _canon_xmm(it):
     from ..mc import _canon_reg
     return _canon_reg(it._ci, it.ops[0].reg)
+
+
+def _canon_xmm_op(it, k):
+    from ..mc import _canon_reg
+    return _canon_reg(it._ci, it.ops[k].reg)
+
+
+def _i128_args(s):
+    """`... call iNN @__asm_x(i128 %a, i128 %b)` の i128 引数名 (順) を返す。"""
+    m = re.search(r"call \S+ @__asm_[\w.]+\((.*)\)", s)
+    if not m:
+        return []
+    return [a.split()[1] for a in IR.split_args(m.group(1)) if a.strip().startswith("i128 ")]
 
 
 def _relocate(fn, bi, ln):
@@ -232,87 +247,97 @@ def _rx_thread(mod, fn, img, callee_set, log, stats):
                 continue
             # 機械語を C の直後から進め, xmm0 を最初に読む命令を探す (xmm0 再定義で打切り)
             v = C + mf.insns[C].size if C in mf.insns else None
-            reader = None
+            readers = []
             while v is not None and v in mf.insns:
                 it = mf.insns[v]
                 if "xmm0" in it.reads:
-                    reader = v
-                    break
+                    readers.append(v)
+                    if not _ALL_READERS or binder._is_region_dst(IR.instr_dst(ln) or ""):
+                        break                   # 従来: 最初の読み手のみ (領域複製の call は 1 件)
                 if "xmm0" in it.writes:
                     break
                 if it.is_jmp or it.is_ret or it.is_call:
                     break                       # ブロック/呼出境界では追わない (保守的)
                 v = it.next
-            if reader is None:
-                continue
-            lines = [x for x in binder.ix.instrs_at(reader) if stale[0] in IR.strip_tokens(x[2])]
-            md0 = re.match(r"^\s*(%[\w$.\-]+) = call ", IR.strip_tokens(ln))
-            if not lines and not _NO_RET_PHI and mf.defs_before(reader, "xmm0") == {C} \
-                    and md0 and not binder._is_region_dst(md0.group(1)) and (C, reader) not in fb_done:
-                fb_done.add((C, reader))
-                # LIFTLIB-5: reader の xmm0 (第 1 引数) が RetDec の古い値 (call 前) を指しているが, bind(C) は
-                # 多定義で別値に解決され照合できない。reader 行の第 1 i128 引数を stale として採る
-                # (reader が xmm0 を dst/第1 operand に取る SSE 2 operand 形に限る)。
-                rop = mf.insns[reader].ops
-                if rop and rop[0].type == 1 and _canon_xmm(mf.insns[reader]) == "xmm0":
-                    for x in binder.ix.instrs_at(reader):
-                        mm = re.search(r"call i128 @__asm_\w+\(i128 (%[\w$.\-]+)", IR.strip_tokens(x[2]))
-                        if mm:
-                            stale = (mm.group(1), "i128")
-                            lines = [x]
-                            break
-            if not lines:
-                continue
-            bi2, li2, ln2 = lines[0]
-            # 支配チェック: call を含む IR block が reader 行の block を支配する事
-            cb = binder.ix.by_addr.get(C)
-            if not cb or not binder.ix.dominates(cb[0][0], bi2):
-                # LIFTLIB-5: reader が call を支配しない (p1 が call を複製した / 別 block) 時,
-                # 機械語で xmm0 の唯一の到達 def が C なら, call 結果 (全複製) を alloca phi 経由で渡す
-                if _NO_RET_PHI or mf.defs_before(reader, "xmm0") != {C}:
-                    stats["rx_nodomin"] = stats.get("rx_nodomin", 0) + 1
-                    continue
-                if C not in phis:
-                    vals = _def_values(binder, C)
-                    if not vals:
-                        stats["rx_nodomin"] = stats.get("rx_nodomin", 0) + 1
-                        continue
-                    used = {IR.instr_dst(x) for b_ in fn.blocks for x in b_.lines if IR.instr_dst(x)}
-                    phis[C] = _store_phi(mod, fn, used, C, "%%rx_%x_phia" % C, vals)
-                rb = fn.blocks[bi2]
-                ri = rb.lines.index(ln2)
-                ldn = "%%rx_%x_pl" % reader
-                k2 = 0
-                while any(ldn in x for x in rb.lines):
-                    k2 += 1
-                    ldn = "%%rx_%x_pl%d" % (reader, k2)
-                tagr = mod.tag(reader)
-                pat = re.compile("(?<![\\w$.\\-])" + re.escape(stale[0]) + "(?![\\w$.\\-])")
-                rb.lines[ri] = pat.sub(ldn, ln2)
-                rb.lines.insert(ri, "  %s = load i128, ptr %s%s" % (ldn, phis[C], tagr))
-                n += 1
-                stats["rx_phi"] = stats.get("rx_phi", 0) + 1
-                continue
-            tag = mod.tag(reader)
-            # 呼出結果 (call の dst) を探す: 同一 call 行の dst
-            md = re.match(r"^\s*(%[\w$.\-]+) = call ", IR.strip_tokens(ln))
-            if not md:
-                continue
-            cret = md.group(1)
-            z = "%%rx_%x_z" % reader
-            zk = 0
-            while any(z == IR.instr_dst(x_) for b_ in fn.blocks for x_ in b_.lines):
-                zk += 1
-                z = "%%rx_%x_z%d" % (reader, zk)
-            newtok = "%s" % z
-            fn.blocks[bi2].lines.insert(li2, "  %s = zext i64 %s to i128%s" % (z, cret, tag))
-            # ln2 内の stale トークンだけを差し替え (他の metadata (!range 等) はそのまま保持)
-            pat = re.compile("(?<![\\w$.\\-])" + re.escape(stale[0]) + "(?![\\w$.\\-])")
-            fn.blocks[bi2].lines[li2 + 1] = pat.sub(newtok, ln2)
-            n += 1
+            for reader in readers:
+                n += _rx_one(mod, fn, binder, mf, ln, C, reader, stale, phis, fb_done, stats)
     stats["rx_threaded"] = stats.get("rx_threaded", 0) + n
     if n:
         log.append("leafabi rx %s: %d sites" % (fn.name, n))
+    return n
+
+
+def _rx_one(mod, fn, binder, mf, ln, C, reader, stale, phis, fb_done, stats):
+    """call C (IR 行 ln) の戻りを, xmm0 の読み手 reader (機械語) の IR 行へ差し替える。差し替えた数 (0/1)。"""
+    n = 0
+    if True:
+        lines = [x for x in binder.ix.instrs_at(reader) if stale[0] in IR.strip_tokens(x[2])]
+        md0 = re.match(r"^\s*(%[\w$.\-]+) = call ", IR.strip_tokens(ln))
+        if not lines and not _NO_RET_PHI and mf.defs_before(reader, "xmm0") == {C} \
+                and md0 and not binder._is_region_dst(md0.group(1)) and (C, reader) not in fb_done:
+            fb_done.add((C, reader))
+            # LIFTLIB-5: reader の xmm0 (第 1 引数) が RetDec の古い値 (call 前) を指しているが, bind(C) は
+            # 多定義で別値に解決され照合できない。reader 行の第 1 i128 引数を stale として採る
+            # (reader が xmm0 を dst/第1 operand に取る SSE 2 operand 形に限る)。
+            rop = mf.insns[reader].ops
+            if rop and rop[0].type == 1 and _canon_xmm(mf.insns[reader]) == "xmm0":
+                for x in binder.ix.instrs_at(reader):
+                    mm = re.search(r"call i128 @__asm_\w+\(i128 (%[\w$.\-]+)", IR.strip_tokens(x[2]))
+                    if mm:
+                        stale = (mm.group(1), "i128")
+                        lines = [x]
+                        break
+        if not lines:
+            return n
+        bi2, li2, ln2 = lines[0]
+        # 支配チェック: call を含む IR block が reader 行の block を支配する事
+        cb = binder.ix.by_addr.get(C)
+        if not cb or not binder.ix.dominates(cb[0][0], bi2):
+            # LIFTLIB-5: reader が call を支配しない (p1 が call を複製した / 別 block) 時,
+            # 機械語で xmm0 の唯一の到達 def が C なら, call 結果 (全複製) を alloca phi 経由で渡す
+            if _NO_RET_PHI or mf.defs_before(reader, "xmm0") != {C}:
+                stats["rx_nodomin"] = stats.get("rx_nodomin", 0) + 1
+                return n
+            if C not in phis:
+                vals = _def_values(binder, C)
+                if not vals:
+                    stats["rx_nodomin"] = stats.get("rx_nodomin", 0) + 1
+                    return n
+                used = {IR.instr_dst(x) for b_ in fn.blocks for x in b_.lines if IR.instr_dst(x)}
+                phis[C] = _store_phi(mod, fn, used, C, "%%rx_%x_phia" % C, vals)
+            rb = fn.blocks[bi2]
+            ri = rb.lines.index(ln2)
+            ldn = "%%rx_%x_pl" % reader
+            k2 = 0
+            while any(ldn in x for x in rb.lines):
+                k2 += 1
+                ldn = "%%rx_%x_pl%d" % (reader, k2)
+            tagr = mod.tag(reader)
+            pat = re.compile("(?<![\\w$.\\-])" + re.escape(stale[0]) + "(?![\\w$.\\-])")
+            rb.lines[ri] = pat.sub(ldn, ln2)
+            rb.lines.insert(ri, "  %s = load i128, ptr %s%s" % (ldn, phis[C], tagr))
+            n += 1
+            stats["rx_phi"] = stats.get("rx_phi", 0) + 1
+            return n
+        tag = mod.tag(reader)
+        # 呼出結果 (call の dst) を探す: 同一 call 行の dst
+        md = re.match(r"^\s*(%[\w$.\-]+) = call ", IR.strip_tokens(ln))
+        if not md:
+            return n
+        cret = md.group(1)
+        z = "%%rx_%x_z" % reader
+        zk = 0
+        while any(z == IR.instr_dst(x_) for b_ in fn.blocks for x_ in b_.lines):
+            zk += 1
+            z = "%%rx_%x_z%d" % (reader, zk)
+        newtok = "%s" % z
+        # 同一 block の前回挿入で行位置がずれているため, 位置 (li2) でなく行の同一性で探し直す
+        li2 = fn.blocks[bi2].lines.index(ln2)
+        fn.blocks[bi2].lines.insert(li2, "  %s = zext i64 %s to i128%s" % (z, cret, tag))
+        # ln2 内の stale トークンだけを差し替え (他の metadata (!range 等) はそのまま保持)
+        pat = re.compile("(?<![\\w$.\\-])" + re.escape(stale[0]) + "(?![\\w$.\\-])")
+        fn.blocks[bi2].lines[li2 + 1] = pat.sub(newtok, ln2)
+        n += 1
     return n
 
 

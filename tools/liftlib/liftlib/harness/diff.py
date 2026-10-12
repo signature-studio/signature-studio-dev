@@ -119,8 +119,11 @@ def run_diff(image, func_va, spec, cjs, ll_path, wasm_func, out_dir, n=None, see
                 bad.append((nm, offs[:6], len(offs), tok != tb))
         if cmp_ret and a["rax"] != b["rax"]:
             bad.append(("<rax>", [], 1, False))
-        if ret_xmm0 and a["xmm0"][:16] != b["rax"]:
-            bad.append(("<xmm0>", [], 1, False))
+        if ret_xmm0:
+            # ret_bits=32: f32 戻りは xmm0 の下位 32bit のみ有意 (上位は native では残骸)
+            nb = int(spec.get("ret_bits", 64)) // 4
+            if a["xmm0"][:16][16 - nb:] != b["rax"][16 - nb:]:
+                bad.append(("<xmm0>", [], 1, False))
         if bad:
             summ["mismatch"] += 1
             summ["mismatch_scen"].add(s)
