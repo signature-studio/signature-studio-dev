@@ -7,9 +7,13 @@ inputs:
     required: false
     default: signature-studio-artifacts
   artifacts:
-    description: 'Space-separated list of artifact prefixes (without .tar.zst) to download'
+    description: 'Space-separated list of artifact prefixes. Each is fetched as s3://<bucket>/artifacts/<prefix>.tar.zst'
     required: false
     default: 'fl-win64'
+  artifacts-required:
+    description: 'Fail the job when an artifact bundle is missing (true) or continue without it (false). Without the FL Studio / plugin binaries the agent cannot run e2e.'
+    required: false
+    default: 'true'
   opencode-version:
     description: 'Pinned opencode CLI version for the npm channel (@opencode/cli-<target>). Empty = the default in .github/scripts/install-opencode.sh'
     required: false
@@ -78,22 +82,54 @@ runs:
         R2_BUCKET: ${{ inputs.r2-bucket }}
         CF_ACCOUNT_ID: ${{ inputs.cf-account-id }}
         R2_ARTIFACTS: ${{ inputs.artifacts }}
+        R2_REQUIRED: ${{ inputs.artifacts-required }}
       run: |
         set -uo pipefail
-        if [ -z "$CF_ACCOUNT_ID" ] || [ -z "$AWS_ACCESS_KEY_ID" ]; then
-          echo "::notice::R2 credentials not set; skipping artifact download"
+        artifacts_dir="$HOME/artifacts"
+        mkdir -p "$artifacts_dir"
+
+        # 認証情報の確認は endpoint を組み立てる前に行う。${VAR:-} で読むのは、
+        # 未設定時に set -u の素のシェルエラーにFriendly な ::error:: を
+        # 差し替わらないようにするため。
+        if [ -z "${CF_ACCOUNT_ID:-}" ] || [ -z "${AWS_ACCESS_KEY_ID:-}" ] || [ -z "${AWS_SECRET_ACCESS_KEY:-}" ]; then
+          if [ "${R2_REQUIRED:-true}" = 'true' ]; then
+            echo "::error::R2 credentials are missing but artifacts are required"
+            echo "::error::set CF_ACCOUNT_ID / CF_R2_ACCESS_KEY_ID / CF_R2_SECRET_ACCESS_KEY, or pass artifacts-required=false when the task does not need the binaries"
+            exit 1
+          fi
+          echo "::notice::R2 credentials not set and artifacts are optional; continuing without them"
           exit 0
         fi
-        mkdir -p "$HOME/artifacts"
-        endpoint="https://$CF_ACCOUNT_ID.r2.cloudflarestorage.com"
-        for name in $R2_ARTIFACTS; do
-          aws s3 cp "s3://$R2_BUCKET/artifacts/$name" "$HOME/artifacts" \
-            --recursive --endpoint-url "$endpoint" --only-show-errors || true
+        endpoint="https://${CF_ACCOUNT_ID}.r2.cloudflarestorage.com"
+
+        # 命名は <prefix>.tar.zst で固定。--recursive の prefix 指定だと fl-win64 が
+        # fl-win64-anything.tar.zst も拾うため、オブジェクトを明示して取得する。
+        missing=""
+        for name in ${R2_ARTIFACTS:-}; do
+          key="artifacts/${name}.tar.zst"
+          if aws s3 cp "s3://${R2_BUCKET}/$key" "$artifacts_dir" \
+            --endpoint-url "$endpoint" --only-show-errors; then
+            echo "fetched $key"
+          else
+            missing="$missing $key"
+          fi
         done
-        [ -n "$(ls -A "$HOME/artifacts")" ] \
-          || echo "::warning::no R2 artifacts available; the agent runs without the binaries"
-        du -sh "$HOME/artifacts" 2>/dev/null || true
+
+        if [ -n "$missing" ]; then
+          # 何がバケットに実在するかを一緒に出して、認証エラーと「空/命名違い」を
+          # 切り分けられるようにする。
+          echo "::error::missing R2 object(s) in s3://${R2_BUCKET}:$missing"
+          echo "::error::objects actually present under artifacts/ (first 20):"
+          aws s3 ls "s3://${R2_BUCKET}/artifacts/" --endpoint-url "$endpoint" 2>&1 | head -20 || true
+          if [ "${R2_REQUIRED:-true}" = 'true' ]; then
+            echo "::error::the agent cannot run e2e without these binaries; failing instead of continuing"
+            exit 1
+          fi
+          echo "::warning::continuing without them because artifacts-required=false"
+        fi
+
+        du -sh "$artifacts_dir" 2>/dev/null || true
         {
-          echo "ARTIFACTS_DIR=$HOME/artifacts"
+          echo "ARTIFACTS_DIR=$artifacts_dir"
           echo "TMPDIR=$RUNNER_TEMP"
         } >> "$GITHUB_ENV"
