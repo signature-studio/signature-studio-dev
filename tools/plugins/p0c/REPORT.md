@@ -732,7 +732,7 @@ work/ 内の既存 lift IR (work/k80.lift.ll) を入力として p0c4_abi_e2e.py
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 0x5e0d80 の ucomiss 符号 lift 欠落 (§12.3) | buf_diff 910,077 | 子 issue を起票 (本 PR 後) |
+| 0x5e0d80 の ucomiss 符号 lift 欠落 (§12.3) | buf_diff 910,077 | #331 |
 | 0x5df610 の残差 (§12.3) | buf_diff 2,404,917 | 同上 |
 | wasm32 バックエンド検証・framework 統合 (fw_f80.py → f80_lower --ext) | #269 作業案 4 は未実施 | #197 に提案 |
 | 環境: `/opt/retdec`・`/home/ubuntu/work/{analysis,webstudio}` への絶対パス依存 (k80_diff.py 等) | CI 上では symlink で代替 | #197 に提案 (スクリプトの REPO 相対化) |
@@ -832,9 +832,9 @@ argfix の `helper_xmm` が 9 → 12 に増え 0x5e09f0 / 0x5e0a70 / 0x5e0b10 �
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 0x5de3e0 の `[rdx]` store 欠落 (lift) | buf_diff 2000 | 子 issue を起票 (本 PR 後) |
-| 0x5dee90 / 0x5df040 / 0x5e02b0 の残差 | buf_diff 約 2.57M | 同上 |
-| 0x5e12b0 の ucomiss 落ち (lift) | abi-mismatch のまま | 同上 (§12.4 の 0x5e0d80 と統合) |
+| 0x5de3e0 の `[rdx]` store 欠落 (lift) | buf_diff 2000 | #331 |
+| 0x5dee90 / 0x5df040 / 0x5e02b0 の残差 | buf_diff 約 2.57M | #331 |
+| 0x5e12b0 の ucomiss 落ち (lift) | abi-mismatch のまま | #331 (§12.4 の 0x5e0d80 と統合は別途) |
 | ext 精度が必要な kernel の wasm32 検証・framework 統合 | #269 §12.4 と同じ | #197 (既存提案) |
 
 ### 13.5 再現
