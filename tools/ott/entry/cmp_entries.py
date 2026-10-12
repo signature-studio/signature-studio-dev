@@ -12,6 +12,9 @@
 """
 import sys, os, json, struct, argparse
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'shared'))
+from paths import PLUGINS_DIR  # noqa: E402
+
 IMG = 0x180000000
 
 
@@ -128,7 +131,7 @@ def main():
     N = json.load(open(a.native))['scenarios']
     Wj = json.load(open(a.wasm))
     W = Wj['scenarios'] if 'scenarios' in Wj else Wj
-    DLL = '/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll'
+    DLL = os.path.join(PLUGINS_DIR, 'ott', 'binaries', 'OTT_vst2_win64.dll')
     pdata = pdata_funcs(DLL)
 
     rows, okn = [], 0

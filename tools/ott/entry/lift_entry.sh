@@ -5,9 +5,10 @@
 #   env: ENTRY_CLOSURE (既定 3 — dispatcher の vtbl 経由呼出を追うため DSP 既定 2 より 1 深い)
 set -euo pipefail
 OTT="$(cd -- "$(dirname -- "$0")/.." && pwd)"
+source "$OTT/../shared/env.sh"
 ENTRY="$OTT/entry"
 OUT="$OTT/work/entrylift"
-DLL=/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll
+DLL="$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll"
 CLOSURE="${ENTRY_CLOSURE:-3}"
 mkdir -p "$OUT"
 

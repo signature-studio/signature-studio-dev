@@ -37,11 +37,27 @@ function wasmAssets(): Plugin {
       res.end("not found");
       return;
     }
-    const st = statSync(file);
     const isWasm = file.endsWith(".wasm");
-    res.setHeader("Content-Type", isWasm ? "application/wasm" : "application/json");
+    const isGlue = file.endsWith(".mjs");
+    // glue (.mjs) は pthread Worker のスクリプトとしても読まれる。COEP: require-corp 下の Worker script は
+    // 応答自身に COEP が無いとロードに失敗する (preview ではこのミドルウェアが preview.headers より先に走るため明示する)
+    res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+    res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
+    res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
+    res.setHeader("Content-Type", isWasm ? "application/wasm" : isGlue ? "text/javascript" : "application/json");
+    res.setHeader("Cache-Control", isWasm || isGlue ? "public, max-age=31536000, immutable" : "no-cache");
+    // 事前圧縮 (`<file>.br`, stage_wasm.mjs が生成) があり Accept-Encoding: br なら Content-Encoding: br で返す (本番 R2 配信と同形)
+    const br = `${file}.br`;
+    if ((isWasm || isGlue) && existsSync(br) && /\bbr\b/.test(String(req.headers["accept-encoding"] ?? ""))) {
+      const bst = statSync(br);
+      res.setHeader("Content-Encoding", "br");
+      res.setHeader("Vary", "Accept-Encoding");
+      res.setHeader("Content-Length", bst.size);
+      createReadStream(br).pipe(res);
+      return;
+    }
+    const st = statSync(file);
     res.setHeader("Accept-Ranges", "bytes");
-    res.setHeader("Cache-Control", isWasm ? "public, max-age=31536000, immutable" : "no-cache");
     const m = /bytes=(\d+)-(\d*)/.exec(String(req.headers.range ?? ""));
     if (m) {
       const s = Number(m[1]);

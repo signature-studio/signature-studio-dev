@@ -6,8 +6,9 @@
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 FLE="$(cd "$HERE/.." && pwd)"
+source "$HERE/../../shared/env.sh"
 W="$FLE/work/boot"
-PE="${FLE_PE:-/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin}"
+PE="${FLE_PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}"
 MAX="${1:-6}"
 export PATH="$HOME/.local/share/pnpm/bin:$PATH"
 set +u; source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1; set -u
@@ -34,10 +35,10 @@ for round in $(seq 1 "$MAX"); do
   python3 "$HERE/gen_boot.py" --pe "$PE" --meta "$W/lift/lift_meta.json" --out "$W" >/dev/null
 
   # lifted C の即値 → .pdata 開始点 → 未 lift のものを boot_roots.json へ累積 (address-taken 収束)
-  python3 - "$W" "$HERE" <<'PYEOF'
+  python3 - "$W" "$HERE" "$PE" <<'PYEOF'
 import re, struct, pefile, json, sys
-W, HERE = sys.argv[1], sys.argv[2]
-pe = pefile.PE('/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin')
+W, HERE, PE = sys.argv[1], sys.argv[2], sys.argv[3]
+pe = pefile.PE(PE)
 raw = None
 for s in pe.sections:
     if s.Name.startswith(b'.pdata'):

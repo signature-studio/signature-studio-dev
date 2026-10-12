@@ -1,5 +1,5 @@
 {
- "file": "/home/ubuntu/work/analysis/mac/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Libs/FLEngine_x64.dylib",
+ "file": "${FL_MAC_DIR}/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Libs/FLEngine_x64.dylib",
  "slice": "arm64",
  "modules": {
   "playlist": [

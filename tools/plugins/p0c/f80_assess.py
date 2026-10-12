@@ -19,7 +19,9 @@ from capstone import Cs, CS_ARCH_X86, CS_MODE_64
 from capstone.x86 import X86_OP_MEM
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PE = '/home/ubuntu/work/analysis/win64/extracted/block18983_PE.bin'
+sys.path.insert(0, os.path.join(HERE, '..', '..', 'shared'))
+from paths import FL_WIN64_DIR  # noqa: E402
+PE = os.path.join(FL_WIN64_DIR, 'extracted', 'block18983_PE.bin')
 MD = Cs(CS_ARCH_X86, CS_MODE_64)
 MD.detail = True
 

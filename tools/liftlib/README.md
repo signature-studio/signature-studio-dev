@@ -56,6 +56,23 @@ targets/*.json specs/*.json  data/kh_mnemonics.json  tests/test_unit.py
 - **SIMD helper**: `(base mnemonic, 戻り型, 引数型)` だけで C を生成 (RetDec の引数規約=capstone の read operand 順)。IR は `__asm_<base>__<ret><args>` に正規名化。
 - **差分ハーネス**: spec(JSON) の乱数 context を native(VA 敷設) と wasm の両方に与え, 全バッファ (+ guard 64B, ポインタ欄は buf+off トークン) を bit 比較。ステップ列 (状態持越し) 対応。
 
+## 旧 dir (tools/m2〜m10) pass → liftlib 対応表 (LIFTLIB-1 / #224 検収条件 3)
+旧 dir は**参照専用** (既存 e2e 成果物・REPORT は残置、新規 lift/修復は liftlib 経由)。昇格元ごとの置換先と一致検証:
+
+| 昇格元 | pass | liftlib の置換先 | 一致の担保 |
+|---|---|---|---|
+| m2 `ir_normalize.py` | A0 (opaque ptr / datalayout) | `passes/base.py` `m2_normalize` | unit T1 (base == m2+m5, IR テキスト完全一致) |
+| m3 `ir_patch.py` / m5 `ir5_patch.py` | A1–A8, A9L/A9L2, B1, S1a/S1b, C1/C9/C11–C13 | `passes/base.py` (`normalize`/`lift_residual_constexpr`/`lower_asm_store`/`closure_select`/`redirect_calls`, `run_base`) | unit T1 + `ott` O1 (ott_lift.ll と一致) |
+| m6 `ir6_pass.py` | [P1] (SSA 名パターン) | `passes/p1_legacy.py` (参照実装, IR 完全一致) / `passes/p1.py` (insn.addr 駆動の正本) | unit T2 (ir7e_p1.ll と一致) / `ott` O2a |
+| m6 `ir6_shift.py` | VA remap | `passes/remap.py` `shift_va` | unit T2 (ir7e_p2.ll) / O2b |
+| m6 `ir6_gdata.py` + `m6_data_gen.py` | データ実体化 | `passes/remap.py` `gdata`/`gdata_legacy` + `passes/dataimage.py` | unit T2 (ir7e_p3.ll) / O2c |
+| m6 `gen_msimd6.py` + `m6_simd_check.py` | SIMD helper 生成 | `simd/gen.py` + `simd/kernels.py` | `simd test` (192 mnemonic / 281 form / 95,400 vector) |
+| m9 `ir9_outcopy.py` / targets ir_kh_f7 / FA F7' | F7 (load 脱落) | `passes/f7.py` | `inject-eval` / FA 400/400 / KH 366/366 |
+| m7 `ir7_argpass` / m8 `ir7_argpass_fixed`・`ir8_valueflow` の引数接続 | F2 (xmm 引数落ち) | `passes/f2.py` (本体再生は固有) | FA 400/400 / `ott` 7 段 |
+| m6 `m6_memfix.py`・`m6_full_extract.py` / m8 `ir7_argpass_fixed.py`・`ir8_valueflow.py` / m9 `ir9_bootstraps.py`・`ir9_outcopy.py` / m9 `m9_tablebind` / m10 `m10_boot` | OTT 固有 (固定名・dsm・VA) | `recipes/ott` (vendored 無改変, `runtime_lb.py` が C ランタイムをマクロ化) | `ott --auto none` の 7 段 IR 一致 + 出力 SHA 42/42 |
+
+範囲外 (別起票): vendored 固有部 (#12–16, 18) の insn.addr 駆動汎用化。
+
 ## 新ターゲットの追加
 1. `targets/<name>.json` (`image`, `retdec.ranges`, `funcs`, `exports`, `spec`, `func_va`, `wasm_func`) を書く
 2. `python3 -m liftlib specgen <image> <va>` で spec 雛形 → ループ回数など整数フィールドの範囲を手で絞る
