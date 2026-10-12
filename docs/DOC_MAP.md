@@ -99,6 +99,7 @@
 |---|---:|---|
 | `tools/m11/REPORT.md` | ~110 | FLEngine_x64.dll 部分起動 PoC (stage 4/6・残 trap・次の一手) |
 | `tools/m11/alloca/REPORT.md` | ~150 | alloca 縮退修正 (CAB-129) |
+| `tools/m11/trap_triage/REPORT.md` | ~60 | M11 survey trap の個別原因切り分け (#130) |
 | `tools/m11/ldfix/REPORT.md` | ~165 | load 取り違え (値↔アドレス / 1 段 deref 脱落) IR 修復 pass |
 | `tools/m11/shimx_link/REPORT.md` | ~165 | M11 × shimx リンク |
 
