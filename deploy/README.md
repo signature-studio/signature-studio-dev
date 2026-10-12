@@ -42,6 +42,11 @@ APPLY=1 bash deploy/scripts/deploy.sh --src <dist> [--manifest ...]       # 実�
 ```
 CAB-35 の具体手順・確認項目は `RUNBOOK.md`。
 
+## release guard (LGL-2。upload 前ゲート)
+
+`05-stage.mjs` (入力) と `20-worker.mjs --phase release` (配備物) は `tools/legal/release-guard` の deny-list と照合し、一致で exit 6 (deny-list 欠落は exit 4・fail-closed)。
+バイパスは `--skip-release-guard` の明示のみ (`deploy.sh` は両方へ伝搬)。deny-list 生成・allow-list・実測は `tools/legal/release-guard/REPORT.md`。
+
 ## 大物 (>24MiB。tools/perf の 335MB 級 wasm など)
 
 Static Assets は 1 ファイル 25MiB 上限 (26MiB は `Asset too large` で拒否: 実測)、Range 非対応。`05-stage.mjs` が自動で分割する:

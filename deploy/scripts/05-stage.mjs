@@ -10,6 +10,7 @@
 //      クライアントは deploy/client/chunked.mjs で連結 ReadableStream -> WebAssembly.compileStreaming に流す
 //   3. edge-policy.json から `_headers` を生成 (tools/hosting/headers-from-policy.mjs --check)
 //   4. 制約検査 (ファイル数, 25MiB, immutable 配下のハッシュ名) と release.json の生成
+//   0. (最初に) release guard: 入力が tools/legal/release-guard の deny-list に一致したら中止 (exit 4/5/6)。--skip-release-guard で明示バイパス
 // manifest 形式 (tools/assets と同じ契約): { "version":1, "files":[{ "path":"wasm/ott.1a2b3c4d.wasm", "src":"相対/絶対", "contentType":"任意" }] }
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
@@ -19,6 +20,7 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { contentTypeFor, loadPolicy, POLICY_PATH } from "../lib/policy.mjs";
+import { gate as releaseGuard } from "../../tools/legal/release-guard/lib.mjs";
 
 const MiB = 1024 * 1024;
 const args = process.argv.slice(2);
@@ -72,6 +74,9 @@ if (manifestPath) {
   }
 }
 for (const reserved of ["_headers", "_redirects", "release.json"]) entries.delete(reserved); // 本スクリプトが生成
+
+// release guard (LGL-2): FL/プラグイン由来バイト列を含む入力は stage せず中止。バイパスは --skip-release-guard の明示のみ
+await releaseGuard({ entries: [...entries.values()], skip: has("skip-release-guard"), label: "05-stage" });
 
 const HASHED = /[.-][0-9A-Za-z_-]{8,}\.[A-Za-z0-9]+$/;
 const ID_NAMED = /^[0-9a-f]{16,}\.[A-Za-z0-9]+$/; // tools/assets の c/<xx>/<id>.raw
