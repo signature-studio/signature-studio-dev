@@ -22,6 +22,8 @@ import os
 import re
 import subprocess
 import sys
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', '..', 'shared'))
+from paths import REPO_ROOT
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REL = 'tools/targets/kilohearts/snapins'
@@ -49,7 +51,7 @@ def main():
         fails.append('snapins.json tol %d keys' % len(tols))
 
     # git HEAD との差分: tol キー削除のみであること
-    r = subprocess.run(['git', '-C', '/home/ubuntu/work/webstudio', 'show',
+    r = subprocess.run(['git', '-C', REPO_ROOT, 'show',
                         'HEAD:%s/snapins.json' % REL], capture_output=True, text=True)
     if r.returncode == 0:
         old = json.loads(r.stdout)
