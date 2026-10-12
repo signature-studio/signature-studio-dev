@@ -110,6 +110,12 @@ dev は `__e2e__/add.wasm` fixture が配信されないため wasm-load 内の 
   `run.sh --url <ローカル edge-sim> --driver both` = **PASS 16 / FAIL 0 / SKIP 2**、所要 3.9s (1 回)。
 - ネガティブコントロール: edge-policy の COEP キーを除いたコピーを `EDGE_POLICY_FILE` で与えると
   edge-sim × 2 driver で **FAIL 8** (4 check × 2)・exit 1 (CI ジョブが赤になる条件)。
+  workflow の step と同じ `bash -eo pipefail -c 'bash tools/e2e/run.sh ... 2>&1 | tee <log>'` で再現 (コミット済み HEAD 6456cbc、Node v22.23.3、
+  `--driver both --targets preview,edge-sim`、`E2E_SKIP_BUILD=1`): 所要 6.0s、load average 1.43 → 2.27、`PASS=22 FAIL=8 SKIP=6`、**パイプライン exit 1** (n=1)。
+  同条件の正常系は `PASS=30 FAIL=0 SKIP=6`・exit 0・18.6s (build 込み、n=1)。
+  `shell: bash` 明示の根拠: `bash -e -c 'false 2>&1 | tee /dev/null'` は exit 0、`bash -eo pipefail -c` は exit 1。同じ COEP 除去 run (edge-sim のみ) を
+  `-e` のみ (pipefail 無し) で流すと exit 0 (= step が緑のまま FAIL を握り潰す) ことも確認。`shell:` 無指定の `run` は
+  `bash -e {0}` で実行されるため、両 E2E step に `shell: bash` (= `bash --noprofile --norc -eo pipefail {0}`) を明示した。
 - 範囲外: GitHub Actions 上での workflow 実行結果 (workflow は `.proposed` のため PR の check では実行されない。`.github/workflows/e2e.yaml` へ配置後に確認)、実 URL への `--url` (Access 保護下の実 token での実行は未実施 =
   `E2E_URL` と secrets の登録はユーザ操作)。
 
