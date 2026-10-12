@@ -556,7 +556,7 @@ C は `i256` を表現できないが、LLVM IR の i256 は wasm32 で **引数
 `h (i32, i64×6)` ← `i128 h(i128, i256)` は sret を持たず `i128` 戻りは別規約に注意)。
 - `gen.py`: i256 引数は `u64 pN_0..pN_3` に平坦化し prologue で `Y` (= `struct{u64 q[4]}`) に束ねる。戻り値は C の `Y` 返し (wasm32 の C ABI は
   struct 戻りを sret にするので IR の i256 戻りと一致)。`liftlib_simd.h` に `Y`/`YLO`/`YHI`/`MKY`。
-- 128bit レーン独立の packed 命令 (`YMM_LANEWISE` 49 mnemonic) は xmm 版 kernel を下位/上位に適用 (`Spec.lanes`)。レーン横断は個別実装:
+- 128bit レーン独立の packed 命令 (`YMM_LANEWISE` 62 mnemonic) は xmm 版 kernel を下位/上位に適用 (`Spec.lanes`)。レーン横断は個別実装:
   `vinsertf128` / `vextractf128` / `vperm2f128` / `vshufpd` (ymm 版は上位レーンが imm bit[3:2] を使う — 実機突合で判明し個別化)。
 - **突合方法**: C は i256 を書けないので `simdtest.wasm_ir()` が **LLVM IR wrapper** (`load i256` → `call i256 @helper` → `store i256`) を生成し、
   emcc で C と一緒にリンクする。native 側は gcc inline asm (`v256` / `-mavx2`) の実 ymm 命令。ABI 不一致は mismatch として現れる (§15.4 NC2)。
@@ -587,9 +587,10 @@ RetDec は `void(i128,i128,i8)` と lift し ECX/EFLAGS を捨てる → **void 
   → 搬送 **9 ret** (exp 7 + tan kernel 2) → 修復後も未搬送 **2 ret**。
 - 注入評価 (`inject.eval_f2_xret`): 搬送済み 9 ret を `ret i64 0` に 1 件ずつ戻し scan が検出するか → **9/9 検出**。`inject-eval` 全体 RESULT
   `injected=9 detected=9 false_positive_on_clean=0` (この run は FA/KH/OTT 入力が無く xret のみ)。
-- 残 2 ret の理由 (実測): `ret_unbound 2`。(1) `function_1801b4220` の `ret i64 %rax.0.reload` (@1801b4468 `pxor xmm0,xmm0; ret` を RetDec が
-  rax.0 に畳んだ経路; leafabi が xmm0 の定義を bind できない)、(2) `function_1801b4610` は RetDec が `ret i64 (xor 0,0)` 1 本に退化させた関数
-  (機械語は `vpxor xmm0` + 複数 jmp 合流先) — 合流先 phi の bind は未実装。**→ 未解決表へ**。
+- 残 2 ret (実測: `ret_unbound 2`, 機械語 VA で特定): (1) `function_1801b4220` の `ret` @`1801b4474` — 複数経路 (@1801b43db/43fb/4430 ほか) が
+  `jmp 0x1801b4470` で合流する共有 ret で、xmm0 の到達定義が複数 (多定義 phi) のため leafabi の bind が値を 1 つに決められない
+  (IR 側は `ret i64 %rax.0.reload`)。(2) `function_1801b4610` の `ret` @`1801b4614` — RetDec が関数全体を `ret i64 (xor 0,0)` 1 本に
+  退化させており (機械語は `vpxor xmm0` + 合流先)、xmm0 の元値が IR に無い。どちらも「合流先 ret の多定義 xmm0」で LIFTLIB-4 の領域 phi 合成と同系 (**未解決表へ**)。
 - `tan` 本体 `1801a9be0` は `ret_in_xmm0()` が False (entry/call の phi が ret に混ざる、LIFTLIB-4 §14.7 と同件) のため対象外。
 
 ### 15.6 検証 (実測秒・load average・並列数)
@@ -616,7 +617,7 @@ liftdiff の 4 スナップショット (`ir_instr.ll`) の declare で C 生成
 |---|---|---|
 | FA/KH/OTT 回帰 (`liftlib_e2e.sh`) を本変更で再実行できていない | gen.py/kernels.py の変更が既存実 IR に無影響である確証が無い | **新規子チケット (親 #50): liftlib 用 work スナップショットを R2 allowlist (`prepare-event-context.sh`, #293) に追加 → 回帰を再実行** |
 | `pcmpistri` の ECX/フラグを後続命令へ配線 (void 形は shadow global に残すのみ) | KH/OTT の実 IR で pcmpistri 結果を消費する経路は未接続 | 新規子チケット (P1 系 pass の flags 配線) |
-| F2 xmm 戻り 残 2 ret (rax.0 畳み込み / 退化関数の合流先 phi) | 1801b4220 の `pxor xmm0` 経路と 1801b4610 が xmm0 を返さない | 既存 #272 系 (領域 phi 合成) へコメント |
+| F2 xmm 戻り 残 2 ret (合流先 ret の多定義 xmm0 phi: 1801b4474 / 1801b4614) | 該当経路で xmm0 を返さない | 既存 #272 系 (領域 phi 合成) へコメント |
 | F2 xmm 戻りのスタック引数・GPR 引数個数不一致 | issue 記載の F2 未対応面のうち本 run は xmm 戻りのみ | 新規子チケット |
 | `gen.py` stub が未知型 (`?`) で `void` 変数宣言になり emcc 失敗 (m11 snapshot 4 本で実測) | 未知型を含む IR の helper 生成 | 新規子チケット |
 | ymm 幅変更/レーン横断の命令 (vcvtdq2pd ymm・vpmovmskb ymm・vperm*d・vbroadcast*) は未実装 | Convolver / Filter Table の実 closure で必要になる可能性 | 親 #50 に提案 |
