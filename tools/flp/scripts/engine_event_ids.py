@@ -10,10 +10,13 @@ Every `call` to these helpers is located by a rel32 scan of .text and the neares
 `mov edx, imm32` (opcode BA) is taken as the event id. Result: engine_event_ids.json.
 Usage: engine_event_ids.py [FLEngine_x64.dll] [out.json]
 """
-import collections, json, re, struct, sys
+import collections, json, os, re, struct, sys
 import pefile
 
-DLL = sys.argv[1] if len(sys.argv) > 1 else '/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin'
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'shared'))
+from paths import FL_WIN64_DIR
+
+DLL = sys.argv[1] if len(sys.argv) > 1 else f'{FL_WIN64_DIR}/extracted/block00031_PE.bin'
 OUT = sys.argv[2] if len(sys.argv) > 2 else 'corpus/engine_event_ids.json'
 HELPERS = {0xa9ec60: 'header', 0xa9eb60: 'text16', 0xa9ea80: 'data'}
 
