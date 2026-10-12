@@ -820,3 +820,51 @@ K80_NO_UCOMISIGN=1 python3 tools/plugins/p0c/p0c4_abi_e2e.py 2000       # NC1
 K80_NO_SPILLFIX=1  python3 tools/plugins/p0c/p0c4_abi_e2e.py 2000       # NC2
 python3 tools/plugins/p0c/p0c4_e2e.py 2000                              # 回帰 (bit-exact 7/14)
 ```
+
+## 14. 環境パス置換 (#346, 親 #294・先行 #312): /home/ubuntu 絶対パスを tools/shared へ
+
+既知類型との関係 (DEFECTS.md): 該当なし (パス参照の置換のみで lift/IR には触れない)。
+
+### 14.1 変更
+
+`*.sh *.py *.json *.ts *.mjs` (work/ 除く) の `/home/ubuntu` 参照 9 行を置換。既定値は従来と同一なので、環境変数未設定のローカル挙動は変わらない。
+
+| ファイル | 置換 |
+|---|---|
+| `p0c_e2e.sh` `p0c2_e2e.sh` | `source tools/shared/env.sh` + `PE="$FL_WIN64_DIR/extracted/block18983_PE.bin"` |
+| `f80_assess.py` `k80chop.py` `k80abi.py` | `tools/shared/paths.py` の `FL_WIN64_DIR` から `PE` を組む |
+| `kernel_matrix.py` `verify_table.py` | 同 `EXT = FL_WIN64_DIR/extracted` |
+| `k80_diff.py` | `PE` は同上。`LIFTP` は `REPO_ROOT/tools/plugins/lift/passes` (旧: `/home/ubuntu/work/webstudio/...` 固定) |
+
+`p0c_e2e.sh` step 1 は `inventory/kernel_table.py` に `$PE` を引数で渡す。同スクリプトの既定値が `/home/ubuntu` 固定 (p0c の外・本 PR の範囲外) のため。
+
+### 14.2 検証 (検証起点 `origin/main` = 2c3e526、素材は `fl-win64` のみ)
+
+- 受入条件 1: `grep -rn '/home/ubuntu' tools/plugins/p0c --include=*.sh --include=*.py --include=*.json --include=*.ts --include=*.mjs --exclude-dir=work | wc -l` → 0。
+- 受入条件 2 (before/after): 同一サブセットを置換前 (`origin/main` の detached worktree・`/home/ubuntu/work/analysis/win64` を symlink で用意) と
+  置換後 (symlink 削除・`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` のみ) で実行し出力を `cmp`。
+  サブセット = `kernel_table.py` → `f80_assess.py` → `f80_micro` (2000000 case) → `k80abi.py` → `k80chop.py`。
+  所要 before 1.06 s / after 1.06 s、load average 0.45 / 0.38 (1 分値)、各 n=1・直列。
+
+| 出力 | before/after | sha256 先頭 12 桁 |
+|---|---|---|
+| kernel_table stdout / `kernel_table.json` | 一致 | 55b1810cba94 / ce8c15353720 |
+| f80_assess stdout / `f80_classes.json` | 一致 | 7b13c98d9494 / ef4fdcd06cf9 |
+| f80_micro stdout | 一致 | d092659b28a9 |
+| k80abi `k80abi.json` | 一致 | b30e176cd3eb |
+| k80chop stdout | 一致 | e9192d1bbce2 |
+| k80abi stdout | 1 行目のみ差 (出力先絶対パスに worktree 名が入る) | — |
+
+- ネガティブコントロール: `FL_WIN64_DIR=/nonexistent python3 k80chop.py` → `FileNotFoundError: /nonexistent/extracted/block18983_PE.bin` で FAIL (`FL_WIN64_DIR` が実際に効いている)。
+- 構文: `python3 -m py_compile` 6 本・`bash -n` 2 本 OK。
+
+### 14.3 検証範囲 / 範囲外 / 未解決
+
+範囲外: `kernel_matrix.py` `verify_table.py` `k80_diff.py` `p0c2_e2e.sh` `p0c_e2e.sh` の実行。前 3 本は `nsis_blockmap.json` や `/opt/retdec` の lift 成果物
+(`toolchain-retdec`・`work-m6-ott` 等) が要る。置換は `PE` / `EXT` / `LIFTP` の定義行のみで、構文確認と `FL_WIN64_DIR` 解決の確認に留めた。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `inventory/kernel_table.py:15`・`lift/batch_lift.sh:31` に `/home/ubuntu` 既定が残る (p0c 外) | 他 area の置換 issue 待ち | #294 の該当 area 子 issue |
+| `kernel_matrix.py` `verify_table.py` `k80_diff.py` と e2e 全体を `oc_artifacts` 付きで未実行 | 置換行以外の挙動は未検証 | 本 PR のレビュー run (`oc_artifacts:` 行を PR 本文に記載) |
+| §13.4 の「絶対パス依存 (#294)」のうち p0c 内の `/home/ubuntu` 参照は解消 (`/opt/retdec` は残る) | — | #294 |

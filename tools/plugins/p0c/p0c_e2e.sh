@@ -10,13 +10,14 @@
 #   [6] f80_micro.c build+run         — long double(x87) vs double(f64 lowering) bit 差分 + 実機械語 4 本で検証
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
+source "$HERE/../../shared/env.sh"
 ROOT="$(cd "$HERE/.." && pwd)"                      # tools/plugins
 REPO="$(cd "$ROOT/.." && pwd)"                      # webstudio
-PE=/home/ubuntu/work/analysis/win64/extracted/block18983_PE.bin
+PE="$FL_WIN64_DIR/extracted/block18983_PE.bin"
 mkdir -p "$HERE/work"
 
 echo "== [1] kernel_table.py =="
-python3 "$ROOT/inventory/kernel_table.py"
+python3 "$ROOT/inventory/kernel_table.py" "$PE"
 git -C "$REPO" diff --quiet -- tools/plugins/lift/kernel_ranges_balance.txt \
   || { echo "[e2e] WARN: lift/kernel_ranges_balance.txt が再生成で変化した"; git -C "$REPO" diff --stat -- tools/plugins/lift/kernel_ranges_balance.txt | cat; }
 
