@@ -329,3 +329,47 @@ unsigned long long function_450560(unsigned long long src, unsigned long long de
     }
     return dest;
 }
+
+/* function_467c40  VA 0x467c40  (System.SysUtils 系 unit 0x467f00 の初期化: VarBstrFromBool 経由の TrueBoolStrs/FalseBoolStrs 初期化)
+ * RetDec は `mov rax,[rip+0x15e3af0]; call [rax]` (.data の関数ポインタ変数 → .bss 0x15f10e0 の VarBstrFromBool 実体) を 2 箇所とも落とし
+ * (D15 型: 0x467cc9 / 0x467d5d), 戻り値 (HRESULT) の代わりに slot ポインタの下位 32bit を 45a640 に渡して例外 0xEEDFADE → Halt0 に進んでいた.
+ * 0x15f10e0 は 457c70 が GetProcAddress(oleaut32,"VarBstrFromBool") で埋める (wasm では 0 → fallback 0x457860, closure の boot5).
+ * 機械語 0x467c40〜0x467e28 と 1 命令ずつ突合 (stack slot: a[i] = rbp+0x28+8*i (i=0..8, 467e10 で _LStrArrayClr 相当に 9 本まとめて解放), s78 = rbp+0x78). */
+unsigned long long function_467c40(void) {
+    u64 a[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+    u64 s78 = 0;
+    u64 slot = Q(R(0x11e3af0));
+    if (Q(slot) != 0) {
+        function_412e00(&s78);
+        u64 r = m11_icall(Q(Q(R(0x11e3af0))), 0, 0x400, 0, (u64)(uintptr_t)&s78, 0, 0, 0, 0);
+        function_45a640((u32)r, 0xb, 8);
+        function_4149b0((void*)(uintptr_t)R(0x11f1118), s78);
+        function_4149b0(&a[7], s78);                   /* rbp+0x60 */
+        function_439930(&a[8], a[7]);                  /* rbp+0x68 */
+        function_4133f0(R(0x11f1120), a[8]);
+        function_4149b0(&a[5], s78);                   /* rbp+0x50 */
+        function_4398f0(&a[6], a[5]);                  /* rbp+0x58 */
+        function_4133f0(R(0x11f1128), a[6]);
+        function_412e00(&s78);
+        r = m11_icall(Q(Q(R(0x11e3af0))), 0xffffffffull, 0x400, 0, (u64)(uintptr_t)&s78, 0, 0, 0, 0);
+        function_45a640((u32)r, 0xb, 8);
+        function_4149b0((void*)(uintptr_t)R(0x11f1130), s78);
+        function_4149b0(&a[3], s78);                   /* rbp+0x40 */
+        function_439930(&a[4], a[3]);                  /* rbp+0x48 */
+        function_4133f0(R(0x11f1138), a[4]);
+        function_4149b0(&a[1], s78);                   /* rbp+0x30 */
+        function_4398f0(&a[2], a[1]);                  /* rbp+0x38 */
+        function_4133f0(R(0x11f1140), a[2]);
+        u32 ebx = 0xffffff80u;
+        u64 rsi = R(0x11f1148);
+        do {
+            function_43a7e0(&a[0], ebx, 0, 0);
+            function_4133f0(rsi, a[0]);
+            ebx++;
+            rsi += 8;
+        } while (ebx != 0x100u);
+    }
+    function_412e40((u64)(uintptr_t)&a[0], 9);
+    function_412e00(&s78);
+    return 0;
+}
