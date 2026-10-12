@@ -19,6 +19,7 @@ import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from '
 import { createHash } from 'node:crypto';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { FL_MAC_DIR } from '../../../shared/paths.mjs';
 import { parseFlp, writeFlp, firstDiff, kindOf } from '../../../flp/src/flp.ts';
 import { parseWrapperData } from '../../../flp/src/summary.ts';
 import { assembleFst, buildWrapperFst } from '../src/fst.ts';
@@ -229,7 +230,7 @@ console.log(`    record ids real=${JSON.stringify(realIds)} vs generated=${JSON.
 ok(true, 'diff recorded (VST2 spec vs real VST3 registration — see REPORT appendix)');
 
 // ---------- corpus contrast: record-2 flags in shipped 11.5.5 .fst (VST2-era writers) ----------
-const FL_ROOT = process.env.FL_ROOT ?? '/home/ubuntu/work/analysis/mac/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL';
+const FL_ROOT = process.env.FL_ROOT ?? `${FL_MAC_DIR}/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL`;
 const flagCounts = {};
 if (existsSync(FL_ROOT)) {
   const walkFs = (dir) => readdirSync(dir).sort().flatMap((n) => {
@@ -251,7 +252,7 @@ if (existsSync(FL_ROOT)) {
     } catch { /* not an fst we can parse */ }
   }
   const realFlags = r2 ? new DataView(r2.bytes.buffer).getUint32(9, true) : 0;
-  dump.record2FlagsContrast = { realMachine: '0x' + realFlags.toString(16).toUpperCase(), shippedCorpusCounts: flagCounts, shippedWrapperChunkFst: Object.values(flagCounts).reduce((a, b) => a + b, 0), corpusRoot: FL_ROOT, note: 'shipped corpus has 0 wrapper-chunk .fst (REPORT §1) — this real file is the first observed record-2 flags value; 0x507D08 = 0x407908 | 0x400 | 0x100000 matches the fst.ts model for a 64-bit-only single-file entry' };
+  dump.record2FlagsContrast = { realMachine: '0x' + realFlags.toString(16).toUpperCase(), shippedCorpusCounts: flagCounts, shippedWrapperChunkFst: Object.values(flagCounts).reduce((a, b) => a + b, 0), corpusRoot: FL_ROOT.startsWith(FL_MAC_DIR) ? `$FL_MAC_DIR${FL_ROOT.slice(FL_MAC_DIR.length)}` : FL_ROOT, note: 'shipped corpus has 0 wrapper-chunk .fst (REPORT §1) — this real file is the first observed record-2 flags value; 0x507D08 = 0x407908 | 0x400 | 0x100000 matches the fst.ts model for a 64-bit-only single-file entry' };
   console.log(`[+] record-2 flags: real=0x${r2 ? new DataView(r2.bytes.buffer).getUint32(9, true).toString(16).toUpperCase() : '-'}, shipped corpus=${JSON.stringify(flagCounts)}`);
 } else {
   console.log('[+] FL corpus not available, skipping flags contrast');

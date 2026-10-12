@@ -17,6 +17,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { build } from '../../../assets/node_modules/esbuild/lib/main.js';
 import { spawnServer } from '../../../assets/test/spawn-server.ts';
+import { REPO_ROOT } from '../../../shared/paths.mjs';
 
 const HERE = path.dirname(new URL(import.meta.url).pathname); // tools/hostbridge/nfo/h4
 const NFO = path.join(HERE, '..'); // tools/hostbridge/nfo
@@ -74,7 +75,7 @@ process.kill(process.pid, 'SIGKILL');
 // bundler へ渡すデータは work/h4 にコピーする (tools/startup は読取専用なので直接読むだけ)。
 const VREG_SEED = path.join(NFO, '..', '..', 'startup', 'data', 'vreg_seed.json');
 const SPECS = path.join(NFO, 'specs', 'wasm_plugins.json');
-const KH_INDEX = '/home/ubuntu/work/webstudio/tools/targets/kilohearts/work/macpkg/product_index.json';
+const KH_INDEX = `${REPO_ROOT}/tools/targets/kilohearts/work/macpkg/product_index.json`;
 
 const readText = (p: string): string | null => (fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : null);
 const seedJson = readText(VREG_SEED) ?? '{}';
