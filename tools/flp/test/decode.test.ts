@@ -34,6 +34,7 @@ test('playlist stride follows the measured FL version table', () => {
   assert.equal(playlistStride(new Uint8Array(0), v('24.1.0.4212')), 60);
   assert.equal(playlistStride(new Uint8Array(0), v('24.2.99.4720')), 80);
   assert.equal(playlistStride(new Uint8Array(0), v('25.2.5')), 80);
+  assert.equal(playlistStride(new Uint8Array(0), v('24.2.99.4701')), 60);
 });
 
 test('VST wrapper chunk list parses (kind 10, name/vendor)', () => {
