@@ -177,8 +177,7 @@ python3 tests/compare_bootstate.py work/flelift/batch_closure_hybrid.jsonl \
   results/flelift_closure_verdicts.tsv --md results/flelift_vs_bootstate.md
 python3 tests/cascade_410360.py work/flelift/batch_closure_hybrid.jsonl \
   --md results/cascade_410360.md
-bash tools/liftdiff/liftdiff_e2e.sh   # OTT/unit#18 (check3 は CAB-131 IR 由来で FAIL → exit 1)
-# (check3 は FAIL するので [4/4] は手動で)
+bash tools/liftdiff/liftdiff_e2e.sh [--m11-only] [--full]   # check3 は #122 で判定条件を更新済み (付録 §5.1)。--m11-only は OTT 旧 chain を省略
 python3 liftdiff.py batch targets/m11.json --set sample:800 --shards 12 --nobuild --state auto \
   --out work/m11/batch_sample_800.jsonl
 ```
