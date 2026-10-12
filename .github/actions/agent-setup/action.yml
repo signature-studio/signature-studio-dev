@@ -21,7 +21,7 @@ inputs:
     description: 'Pinned opencode release tag for the GitHub Releases channel (anomalyco/opencode). Empty = the default in .github/scripts/install-opencode.sh'
     required: false
   opencode-install-source:
-    description: 'Where to install opencode from: auto (GitHub Releases, then npm, then the official installer), releases, or npm'
+    description: 'Where to install opencode from: auto (npm, then GitHub Releases, then the official installer), releases, or npm'
     required: false
   cf-account-id:
     description: 'Cloudflare account id for R2'
@@ -89,8 +89,8 @@ runs:
         mkdir -p "$artifacts_dir"
 
         # 認証情報の確認は endpoint を組み立てる前に行う。${VAR:-} で読むのは、
-        # 未設定時に set -u の素のシェルエラーにFriendly な ::error:: を
-        # 差し替わらないようにするため。
+        # 未設定時に set -u の生のシェルエラーを出す代わりに ::error:: へ
+        # 案内できるようにするため。
         if [ -z "${CF_ACCOUNT_ID:-}" ] || [ -z "${AWS_ACCESS_KEY_ID:-}" ] || [ -z "${AWS_SECRET_ACCESS_KEY:-}" ]; then
           if [ "${R2_REQUIRED:-true}" = 'true' ]; then
             echo "::error::R2 credentials are missing but artifacts are required"

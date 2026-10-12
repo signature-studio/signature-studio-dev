@@ -6,6 +6,9 @@ Signature Studio の Issue/PR 駆動エージェント実行基盤。
 外部の第三者がコメントを投稿できない前提で、`/oc` 起動のアクセス制御は
 コメント本文に `oc_actions_allow_write` を含めるかどうかで行っている。
 
+`/oc` / `/opencode` は**行頭に 1 コマンドだけ**書いた行で発火する (箇条書き行や
+文中の `/oc`・URL 内の `/oc/` では発火しない)。指示は同じ行か続く行に書くこと。
+
 ## 構成
 
 | ファイル | 役割 |
@@ -33,6 +36,10 @@ Signature Studio の Issue/PR 駆動エージェント実行基盤。
    レビュワーエージェントが検証 → approve/request-changes → 必要なら `gh pr merge --merge --delete-branch`
 3. PR に `/oc <instruction>` → コンフリクト解決などの追加作業
 
+`pull_request` の `synchronize` (PR が更新されるたび) でも review ジョブが起動する。
+同時実行は `concurrency.group` (PR/issue 単位) で直列化し、
+`cancel-in-progress: false` なので、小さい push でも reviewer が 1 回ずつ走る。
+
 fork からの PR は review ジョブの対象外 (`head.repo.full_name == github.repository`)。
 `pull_request` イベントでは fork PR に secrets が渡らないため、App トークンの生成が
 必ず失敗する。fork PR のレビューは人手で行う。
@@ -44,9 +51,16 @@ fork からの PR は review ジョブの対象外 (`head.repo.full_name == gith
 
 取得元は次の順 (auto の場合):
 
-1. **GitHub Releases の tarball** (`anomalyco/opencode` の `opencode-<target>.tar.gz` / `.zip`)
-2. **npm registry の tarball** (`@opencode/cli-<target>`)
+1. **npm registry の tarball** (`@opencode/cli-<target>`)
+2. **GitHub Releases の tarball** (`anomalyco/opencode` の `opencode-<target>.tar.gz` / `.zip`)
 3. **公式インストーラ** (`--version` を渡すので metadata API を経由しない)
+
+> なぜ npm が先か: `anomalyco/opencode` には tag `v2.0.26` / `v2.0.27` が
+> 存在するが、`releases/download/v2.0.26/opencode-<target>.tar.gz` は 404 で、
+> 2.x の release 資産は publish されていない (2026-10-12 時点)。
+> `releases/latest` も `v1.19.0` のままで、**Releases 経路では 2.x を取れない**。
+> 既定は「今の CLI」である 2.x に固定したいので、Releases (1.x の別 pin) は
+> フォールバックに回す。
 
 > `anomalyco/opencode-beta` は取得元にできない。2026-10-12 時点で公開済 release の
 > 資産は `opencode-desktop-*` と electron-updater のメタデータのみで、CLI の tarball を
@@ -57,9 +71,9 @@ Releases 系統と npm 系統はバージョントラックが異なる (Release
 
 | 変数 | 既定 | 対象 |
 |---|---|---|
-| `OPENCODE_RELEASE_VERSION` | `v1.19.0` | Releases の tag |
-| `OPENCODE_VERSION` | `2.0.26` | npm の `@opencode/cli-<target>` |
-| `OPENCODE_INSTALL_SOURCE` | `auto` | `auto` / `releases` / `npm` |
+| `OPENCODE_VERSION` | `2.0.26` | npm の `@opencode/cli-<target>` (第一経路) |
+| `OPENCODE_RELEASE_VERSION` | `v1.19.0` | Releases の tag (フォールバック) |
+| `OPENCODE_INSTALL_SOURCE` | `auto` | `auto` = npm → Releases → 公式 / `releases` / `npm` |
 | `OPENCODE_RELEASE_SHA256` | (空) | 指定すると tarball の SHA-256 を検証する |
 
 上書きは `workflow_dispatch` の入力、または repository variable
@@ -69,7 +83,7 @@ Releases 系統と npm 系統はバージョントラックが異なる (Release
 
 `actions/create-github-app-token` が返す installation token は 1 時間有効。
 **runner 上で再発行する仕組みは無い。** GitHub-hosted runner には systemd の user
-session が無いため、user timer による自動更新は動作しない。曾经的
+session が無いため、user timer による自動更新は動作しない。旧実装の
 `mint-token.sh` + `systemd/token-refresh.*` は削除済み (更新されたトークンを
 git / `gh` のどちらにも反映できない経路だった)。
 
