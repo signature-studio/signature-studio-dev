@@ -60,8 +60,15 @@ def main():
     print('   ptr_struct=%s' % {k: v['ptr_struct'] for k, v in abi.items() if v['ptr_struct']})
 
     print('== [2] f80_lower → k80_argfix → x87fix ==')
+    # lift_ranges.sh は ir5_patch の後に fix_asm_stores (movlps/movsd 等の 64bit 部分 store 復元) を
+    # 適用するが、k80.lift.ll はその前段出力。本 e2e でも同 pass を先に通す (P0c-5 / #269)。
+    st_in = os.path.join(HERE, 'work', 'k80.lift.ll')
+    if os.environ.get('K80_NO_ASMSTORES') != '1':
+        st_in = os.path.join(d3, 'k80.lift.st.ll')
+        run(['python3', os.path.join(HERE, '..', 'lift', 'passes', 'fix_asm_stores.py'),
+             os.path.join(HERE, 'work', 'k80.lift.ll'), st_in])
     run(['python3', os.path.join(HERE, 'f80_lower.py'),
-         os.path.join(HERE, 'work', 'k80.lift.ll'), os.path.join(d3, 'k80.lower.ll'),
+         st_in, os.path.join(d3, 'k80.lower.ll'),
          '--report', os.path.join(d3, 'k80.lower.json'),
          '--chop-funcs', 'function_5dfbe0,function_5dfc90,function_5dfdb0'])
     run(['python3', os.path.join(HERE, 'k80_argfix.py'),

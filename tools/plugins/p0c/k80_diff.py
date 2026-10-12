@@ -349,6 +349,7 @@ def build_param_layout(abi):
 def gen_driver(kernels, funcs, cases, proto=None):
     if proto is None:
         proto = os.environ.get('K80_NO_PROTO') != '1'
+    bufpad = 0 if os.environ.get('K80_NO_BUFPAD') == '1' else 64
     out = ['/* k80_diff driver.c — auto-generated (手編集禁止) */',
            '#include <stdint.h>', '#include <stdio.h>', '#include <stdlib.h>', '#include <string.h>',
            '#include <math.h>', '#include <sys/wait.h>', '#include <unistd.h>', '#include <sys/types.h>', '#include "msimd11_core.h"',
@@ -471,7 +472,10 @@ def gen_driver(kernels, funcs, cases, proto=None):
             if si in struct_slots:
                 continue
             out.append('    memcpy(bA%d, bK%d, NBUF_B); memcpy(bI%d, bK%d, NBUF_B);' % (si, si, si, si))
-            out.append('    vA[%d].u = (u64)(uintptr_t)bA%d; vI[%d].u = (u64)(uintptr_t)bI%d;' % (si, si, si, si))
+            # 先頭 BUFPAD byte 内側を渡す: 0x5dfdb0 は添字を [-1, bound] にクランプして
+            # tbl[-1] を読むため、先頭を渡すと nat/IR で別 static 配列の直前 byte を読み差分になる
+            out.append('    vA[%d].u = (u64)(uintptr_t)bA%d + %d; vI[%d].u = (u64)(uintptr_t)bI%d + %d;'
+                       % (si, si, bufpad, si, si, bufpad))
         for k, ps in enumerate(struct_slots):
             # struct buffer 先頭 16B = {extra buf, extra buf} (nat/IR で別領域を指す)
             t0, t1 = 200 + 10 * k, 200 + 10 * k + 1
