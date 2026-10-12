@@ -90,7 +90,7 @@ DEFECTS.md への採番は PM に委ねる (本 PR は触らない)。
 `m11_passes.py` の M2 は `inttoptr i64 0x… to ptr` (16 進) だけを remap する。RetDec は絶対アドレスを `%x = inttoptr i64 <10進> to ptr` でも出し、
 `boot_allfx.ll` に 4449 件、うち VA 範囲 (0x400000..0x1ac0000) が **4364 件**残る。`814d30` の `inttoptr i64 200376` / `154720` は LVA ではなく VA 側の値。
 `pass_m2p_dec_inttoptr` を実装し 4364 件を全て remap して再 build すると:
-- 単体実行 (`SV_ONLY=<unit>`, 25 s timeout): unit 22 / 509 は ok、189/245/279/647 は oob、492/493 は halt0 のまま (halt0 6 → 2 ではなく、oob が増える)
+- 単体実行 (`SV_ONLY=<unit>`, 25 s timeout): unit 22 / 509 は ok、189/245/279/647 は oob、492/493 は halt0 のまま (最終 HEAD の halt0 8 unit のうち ok 化は 2 件のみ、4 件は oob に変わる)
 - 全 unit の survey は **unit 503 でハング** (300 s タイムアウト)、503 を除いても 200 s 以内に完走しなかった
 
 全件 remap は副作用が大きく、どの定数が VA のままで正しいか (例: Delphi の RTTI/VMT ポインタ) の仕分けが要るため、`M11_M2P=1` の opt-in とし **既定は OFF**。
