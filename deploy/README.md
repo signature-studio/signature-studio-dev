@@ -96,3 +96,4 @@ Account: Workers Scripts **Edit**、Access: Apps and Policies **Edit**、Access:
 
 R2 バケット + カスタムドメイン + ゾーン Transform/Cache/Compression Rules + hostname 型 Access。ゾーン (cabbagelettuce.com 等) 前提のため現在は未使用。
 パスは移動のみで内容は不変 (`deploy-r2.sh` が旧 `deploy.sh`)。`lib/policy.mjs` の `build*Rules` はこの構成用。
+事前圧縮保存 (`20-upload.mjs --backend aws --precompress br [--no-transform]`) の仕様と判断は `REPORT.md` §7。
