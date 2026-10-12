@@ -1,0 +1,4 @@
+{
+  "_doc": "許容する成果物 (自作コード・shim・OSS 再ビルド物) の allow-list。entries[] = { path: glob (任意), sha256: hex (任意), kinds: [file|chunk|window] (既定: 全部), reason: 必須 }。path と sha256 は両方指定すると AND。運用形態 (LGL-1) の確定に従い追加する。",
+  "entries": []
+}

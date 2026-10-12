@@ -13,6 +13,7 @@
 import { spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { gate as releaseGuard, walk } from "../../tools/legal/release-guard/lib.mjs";
 
 const DEPLOY = path.resolve(import.meta.dirname, "..");
 const args = process.argv.slice(2);
@@ -33,6 +34,10 @@ if (phase !== "release") {
   writeFileSync(path.join(placeholder, "_headers"), "/*\n  Cross-Origin-Opener-Policy: same-origin\n  Cross-Origin-Embedder-Policy: require-corp\n  Cross-Origin-Resource-Policy: same-origin\n");
 }
 const site = phase === "release" ? realSite : placeholder;
+if (phase === "release") {
+  // upload 直前の最終ゲート (LGL-2)。stage 後の配備物 (part 分割後を含む) を走査する。バイパスは --skip-release-guard の明示のみ
+  await releaseGuard({ entries: walk(site), skip: args.includes("--skip-release-guard"), label: "20-worker release" });
+}
 const cfg = {
   ...base,
   name,

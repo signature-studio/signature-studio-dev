@@ -13,6 +13,10 @@ source "$HERE/lib.sh"
 WORKER_NAME="${WORKER_NAME:-signature-studio}"; export WORKER_NAME
 # ACCESS_ALLOW_EMAILS は任意 (未指定なら Access の人間ポリシーは include: Everyone。40-access.mjs 参照)
 
+GUARD_ARGS=()
+for a in "$@"; do [[ "$a" == "--skip-release-guard" ]] && GUARD_ARGS=(--skip-release-guard); done
+
+# release guard (LGL-2): upload 前ゲート。stage (05) と release (20) の両方で deny-list 走査する。バイパスは --skip-release-guard の明示のみ
 bash "$HERE/00-preflight.sh"
 
 step "stage (deploy/work/site)"
@@ -22,7 +26,7 @@ if [[ "$APPLY" == "1" ]]; then
   node "$HERE/20-worker.mjs" --phase closed
   node "$HERE/40-access.mjs" --apply
   node "$HERE/20-worker.mjs" --phase open
-  node "$HERE/20-worker.mjs" --phase release
+  node "$HERE/20-worker.mjs" --phase release "${GUARD_ARGS[@]}"
   bash "$HERE/90-verify.sh"
 else
   node "$HERE/20-worker.mjs" --phase closed --dry-run
