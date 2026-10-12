@@ -18,11 +18,14 @@ import struct
 import sys
 import pefile
 
-PE = sys.argv[1] if len(sys.argv) > 1 else '/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin'
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', '..', '..', 'shared'))
+from paths import FL_WIN64_DIR, REPO_ROOT
+PE = sys.argv[1] if len(sys.argv) > 1 else _os.path.join(FL_WIN64_DIR, 'extracted', 'block00031_PE.bin')
 VMT = 0x1314108
 VTB = VMT + 0x70
 NSLOT = 46
-SRC = '/home/ubuntu/work/webstudio/tools/plugins/framework/hostshim/hostshim.c'
+SRC = _os.path.join(REPO_ROOT, 'tools/plugins/framework/hostshim/hostshim.c')
 
 d = open(PE, 'rb').read()
 pe = pefile.PE(data=d)
