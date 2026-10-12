@@ -6,7 +6,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { createServer, build, preview } from "vite";
 import { launchChrome } from "./lib/chrome.mjs";
 
@@ -16,10 +16,14 @@ const args = new Map(process.argv.slice(2).map((a) => { const [k, v] = a.replace
 const wasmDir = path.join(here, "work/wasm");
 
 // RT-2: 本番 pthread ビルド (shim MT + emcc glue)。--neg は非 atomic カウンタ版 (ネガティブコントロール: counter チェックが FAIL すべき)
+// 毎回ビルドする (1.8 s)。--neg の成果物が work/prod に残って次の通常実行に混入するのを防ぐ。emsdk が無ければ skip-mt 相当で続行。
 if (!args.has("skip-stage") && !args.has("skip-mt")) {
-  const prodWasm = path.join(here, "work/prod/fl-mt.wasm");
-  if (args.has("neg") || args.has("rebuild-mt") || !existsSync(prodWasm)) {
+  try {
     execFileSync("bash", [path.join(here, "prod/build_pthread.sh")], { stdio: ["ignore", "inherit", "inherit"], env: { ...process.env, MT_NEG: args.has("neg") ? "1" : "0" } });
+  } catch (e) {
+    if (args.has("neg")) throw e;
+    console.error("[e2e] pthread ビルド失敗 → mt-boot は stage されません (emsdk 無し?):", e.message);
+    rmSync(path.join(here, "work/prod/fl-mt.wasm"), { force: true });
   }
 }
 if (!args.has("skip-stage")) execFileSync(process.execPath, [path.join(here, "stage_wasm.mjs")], { stdio: ["ignore", "inherit", "inherit"] });
