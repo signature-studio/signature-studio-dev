@@ -70,19 +70,18 @@ jobs:
       # ---------------------------------------------------------------------
       # 1. Checkout — prepare-event-context.sh は $GITHUB_EVENT_PATH を読むだけで
       #    リポジトリ内容を必要としないため、Checkout を前に置いても安全。
-      #    これにより准备ステップが .github/scripts/ 以下のファイルにアクセス可能。
+      #    これにより準備ステップが .github/scripts/ 以下のファイルにアクセス可能。
       #    should_run 依存ではなく無条件で実行する。
       # ---------------------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
-          token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 0
           persist-credentials: false
 
       # ---------------------------------------------------------------------
       # 2. untrusted input の隔離 (script injection / env injection の防止)。
-      #    最も安価なステップなので最初に置き、コマンド判定和外れたコメントでは
+      #    最も安価なステップなので最初に置き、コマンド判定を外れたコメントでは
       #    App トークン発行にも到達しない。untrusted 値は式展開で shell に埋め込まず
       #    $GITHUB_EVENT_PATH 経由で受け取る。
       # ---------------------------------------------------------------------
@@ -191,6 +190,10 @@ jobs:
           permission-contents: write
           permission-pull-requests: write
 
+      # 承認済みリスク: PR head を secrets が効く状態で checkout する。
+      # この repo の脅威モデルでは PR は collaborator 限定 (fork PR は
+      # job の if で除外済み) のため受入。マージ後は base ref へ切り
+      # 替える follow-up issue を起票する。
       - name: Checkout repository
         uses: actions/checkout@v7
         with:

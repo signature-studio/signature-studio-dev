@@ -98,6 +98,12 @@ runs:
             exit 1
           fi
           echo "::notice::R2 credentials not set and artifacts are optional; continuing without them"
+          # 後続 step は $GITHUB_ENV の ARTIFACTS_DIR / TMPDIR を読むため、
+          # happy path と同じ値を export してから抜ける。
+          {
+            echo "ARTIFACTS_DIR=$artifacts_dir"
+            echo "TMPDIR=$RUNNER_TEMP"
+          } >> "$GITHUB_ENV"
           exit 0
         fi
         endpoint="https://${CF_ACCOUNT_ID}.r2.cloudflarestorage.com"

@@ -109,7 +109,7 @@ detect_target() {
   if [ -n "$suffix" ] && [ "$arch" = arm64 ]; then
     suffix="${suffix%-baseline}"
   fi
-  printf '%s-%s%s' "$os" "$arch" "$suffix"
+  printf '%s-%s%s' "$os" "$arch" "${suffix:+-$suffix}"
 }
 
 TARGET="${OPENCODE_TARGET:-}"

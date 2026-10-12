@@ -88,11 +88,12 @@ runs:
       env:
         SID: ${{ steps.run.outputs.sid }}
       run: |
-        echo "## OpenCode result"
-        echo
-        opencode api --standalone get "/api/session/$SID/message" \
-          | jq -r '[.data[] | select(.type == "assistant")] | last | .content[]? | select(.type == "text") | .text' \
-          >> "$GITHUB_STEP_SUMMARY" || echo "::warning::could not extract summary for session $SID"
+        {
+          echo "## OpenCode result"
+          echo
+          opencode api --standalone get "/api/session/$SID/message" \
+            | jq -r '[.data[] | select(.type == "assistant")] | last | .content[]? | select(.type == "text") | .text'
+        } >> "$GITHUB_STEP_SUMMARY" || echo "::warning::could not extract summary for session $SID"
 
     - name: Fail if OpenCode did not succeed
       if: ${{ steps.run.outputs.rc != '0' }}

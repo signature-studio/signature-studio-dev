@@ -33,7 +33,7 @@ body=""
 diff=""
 if [ -s "$DIFF_FILE" ]; then
   # codepoint 単位で切ってから出力する。head -c はバイト単位なので UTF-8 境界を壊す。
-  diff="$(jq -Rs --argjson max "$MAX_DIFF_BYTES" '.[0:$max]' < "$DIFF_FILE")"
+  diff="$(jq -Rsr --argjson max "$MAX_DIFF_BYTES" '.[0:$max]' < "$DIFF_FILE")"
 else
   printf '::warning::%s is empty; the reviewer will have no diff to inspect\n' "$DIFF_FILE"
 fi
@@ -41,7 +41,8 @@ fi
 # untrusted テキストを囲む fence は、本文中の最長バックティック連続より長いものを使う。
 # 3 連続未満しか無い場合は既定値 3 のままにする (awk が空を返しても fence は壊れない)。
 untrusted_text="$title
-$body"
+$body
+$diff"
 longest_fence=3
 fence_run="$(printf '%s' "$untrusted_text" \
   | grep -o '`\{3,\}' \
@@ -64,7 +65,7 @@ fence="$(awk -v n="$longest_fence" 'BEGIN { s = ""; while (length(s) < n) s = s 
     printf '\n### 説明\n\n%s\n%s\n%s\n' "$fence" "$body" "$fence"
   fi
 
-  printf '\n## diff\n\n%s\ndiff\n%s\n' "$fence" "$fence"
+  printf '\n## diff\n\n%sdiff\n' "$fence"
   if [ -n "$diff" ]; then
     printf '%s\n' "$diff"
   else
