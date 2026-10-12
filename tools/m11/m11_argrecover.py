@@ -11,6 +11,7 @@
                     stack 引数 = callee 全体に [rbp+0x30+8*(pos-4)] / rsp 相対の読出しが無い。 → 0 詰めは無害
     set_const     : callee が使う + caller の直前窓 (同一基本ブロック内, 直前の call/jmp/ret/分岐先まで) で
                     定数 (mov imm / xor self / lea [rip+x]) が代入 → 定数を復元可能 (--out の fix に載せる).
+    set_const_xmm_callee : set_const だが callee が xmm0..3 を引数として読む (IR に xmm 引数が無い) → 部分復元しない (実測: 復元で survey 退行 3 unit)
     set_other     : callee が使う + 窓内で非定数が代入 (レジスタ/メモリ由来) → SSA 値対応が要る (未復元).
     inherit       : callee が使う + 窓内で未代入 (caller 自身の引数 / 遠方 def を素通し) → 未復元.
     stack_*       : 位置>=4 の同分類 (窓内の [rsp+disp] 書込を見る).
@@ -86,6 +87,26 @@ class Fn:
                     elif r in W:
                         state[r] = 'def'
         return {i: state[r] != 'def' for i, r in enumerate(REGS)}
+
+    def xmm_args_read(self):
+        """入口の直線部分で xmm0..3 を書込前に読むか (= xmm 引数あり; RetDec IR には現れない = 部分復元が無意味)."""
+        seen = set()
+        for ins in self.ins:
+            if ins.mnemonic == 'call' or ins.mnemonic.startswith('j') or ins.mnemonic.startswith('ret'):
+                break
+            try:
+                rd, wr = ins.regs_access()
+            except capstone.CsError:
+                continue
+            for r in rd:
+                n = self.cs.reg_name(r)
+                if n in ('xmm0', 'xmm1', 'xmm2', 'xmm3') and n not in seen:
+                    return True
+            for r in wr:
+                n = self.cs.reg_name(r)
+                if n in ('xmm0', 'xmm1', 'xmm2', 'xmm3'):
+                    seen.add(n)
+        return False
 
     def stack_arg_read(self, pos):
         """pos>=4: callee entry 側で受け stack 引数 (return addr 後の 0x28+8*(pos-4) off rsp@entry) を読むか.
@@ -189,8 +210,8 @@ def main():
             ci = calls[p['k']]
             if tva not in usecache:
                 tf = F(tva)
-                usecache[tva] = (tf, tf.callee_uses() if tf.ins else None)
-            tf, uses = usecache[tva]
+                usecache[tva] = (tf, tf.callee_uses() if tf.ins else None, tf.xmm_args_read() if tf.ins else False)
+            tf, uses, xmm = usecache[tva]
             for pos in range(p['have'], p['want']):
                 if uses is None:
                     kind = 'callee_nopdata'; c = None
@@ -203,7 +224,9 @@ def main():
                         kind = 'callee_unused'; c = None
                     else:
                         s, c = classify_set(cf, ci, pos, lb)
-                        if s == 'none':
+                        if xmm and s == 'set' and c is not None:
+                            kind = 'set_const_xmm_callee'; c = None
+                        elif s == 'none':
                             kind = 'inherit' if pos < 4 else 'stack_inherit'
                         elif c is not None:
                             kind = 'set_const'
