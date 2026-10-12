@@ -14,7 +14,8 @@ import sys
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-LB_BASE = int(os.environ.get('M11_LB_BASE', '0'), 0)   # #222: LVA = RVA + LB_BASE
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from lb_base import LB as LB_BASE, IMG_BASE  # noqa: E402  (#222: LVA = RVA + LB_BASE)
 MSG_RE = re.compile(r"Runtime error\s+(\d+) at ([0-9A-Fa-f]+)")
 
 
@@ -56,7 +57,7 @@ def main():
                 if not mm:
                     continue
                 err, addr = int(mm.group(1)), int(mm.group(2), 16)
-                va = addr + 0x400000 - LB_BASE
+                va = addr + IMG_BASE - LB_BASE
                 fn = fn_at(m, vas, va)
                 key = (name, addr, err)
                 e = agg.setdefault(key, {'units': [], 'fn': fn})
@@ -64,7 +65,7 @@ def main():
     rows = []
     for (name, addr, err), e in sorted(agg.items(), key=lambda kv: (-len(kv[1]['units']), kv[0][1])):
         rows.append({'survey': name, 'err': err, 'lva': '0x%X' % addr,
-                     'va': '0x%X' % (addr + 0x400000 - LB_BASE), 'fn': e['fn'],
+                     'va': '0x%X' % (addr + IMG_BASE - LB_BASE), 'fn': e['fn'],
                      'n_units': len(e['units']), 'units': sorted(e['units'])})
     for r in rows:
         print('%-28s err=%d at %s (%s) n=%d units=%s' % (

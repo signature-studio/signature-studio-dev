@@ -48,6 +48,10 @@ res = dict(lb_base=hex(LB), image_bytes=len(img), reloc_total=len(relocs))
 errs = []
 if len(img) < LB + top:
     errs.append('image が短い: %d < %d' % (len(img), LB + top))
+    res['errors'] = errs
+    res['verdict'] = 'FAIL'
+    print(json.dumps(res, indent=1, ensure_ascii=False))
+    sys.exit(1)
 relset = set(relocs)
 # 1+4: 非 reloc バイトの一致 / NULL 領域
 bad_bytes = 0
