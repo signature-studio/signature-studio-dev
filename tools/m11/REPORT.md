@@ -2,7 +2,8 @@
 
 **判定: 部分達成** (到達 stage 4/6)。`entry_point`(DllMain attach) → `_StartLib` → `_InitLib` → `InitUnits` が
 wasm 上で動作し、**FastMM4 が実際に GetMem → VirtualAlloc でプールを確保するところまで**は実測で到達。
-ただし 942 unit の初期化は通常起動で **17 本完走後、unit #18 (VA 0x455790) で trap**、`DllMain` の正常終了(Halt0→longjmp)には未達。
+ただし 942 unit の初期化は通常起動で **22 本完走後、unit #23 (VA 0x467f00) が Delphi 例外 → Halt0 (§9, #132 で #18 の OOB を解消)**、stage 5 (survey trap 無し完走) は未達。
+(下の §1 表と §2〜§8 は #132 以前 = unit #18 OOB 時点の実測。最新値は §9。)
 
 再現: `bash tools/m11/m11_e2e.sh` (増分約 10 秒 / `--full` で RetDec lift から全再生成 約 10 分)。常に exit 0。
 
@@ -185,3 +186,40 @@ GitHub Actions runner (4 core, load 0.6–0.9)。素材は work-m11 スナップ
 |---|---|---|
 | unit 745 / 873 の副次カウンタ差 (SelectObject 3 回 / VirtualAlloc 要求有無) の原因 | 集計には無影響。LB 依存の分岐が残っていないかの確認 | #222 コメントに記録 (未起票。要なら PM が起票) |
 | `audit_va.py` の IAT 判定が FLEngine で常に exit 1 | CI 検査に使えない | #91 にコメント (PE 標準 IAT は除外すべき) |
+
+## 9. #132: unit #18 OOB の真因解消 (通常起動 17 → 22 unit)
+
+既知類型との関係: DEFECTS.md D7/D10 (alloca 縮退) の変種 (callee へ escape した stack_var) + D1 系 (旧値 load 脱落, `_UStrAsg` と同型)。
+
+| 項目 | 変更前 (HEAD 0a9e9d3) | 変更後 (HEAD 499bdfa) |
+|---|---|---|
+| reached_stage (m11_e2e.sh) | 4/6 | **4/6 (不変, stage 5 未達)** |
+| 通常起動 units_run | 17 / 942 (unit #18 OOB) | **22 / 942** (unit #23 = 0x467f00 が Halt0、例外なし) |
+| survey ok / trap / miss / noproc | 812 / 83 / 46 / 1 | **817 / 78 / 46 / 1** (trap = halt0 39 + OOB 39) |
+| m11_e2e.sh 所要 | 39.5 s | 86.5 s (build 増分 + alloca pass 毎回適用) |
+| 負荷 (load average, 終了時) | 0.91 | 1.08 |
+
+**真因 (実測)**: 44bb70 の record (392B, CAB-129 で拡幅済) の +16 が、直前に呼ぶ `function_44bae0` の呼出し前後で 0 → 0x100000000 に変化
+(`m11_site` を IR に埋めて前後値を実測)。44bae0 の `stack_var_-88` が `alloca i64` (8B) だが、`call 44ba50(ptr)` で escape し
+callee が `[rcx+0x2c..0x3e]` (GetCPInfo の LeadByte 表) に書くため、呼出し元フレーム (= 44bb70 の record) を破壊していた。
+
+修正 (3 点, すべて通常起動 17→22 に必要):
+1. `alloca/m11_alloca.py` **R8**: escape する `stack_var_-N` を「次の stack_var までの間隔」に拡幅 (4,077 サイト → 2,417 alloca / 1,355 関数, +1.15 MB stack)。
+   R8 だけでは OOB 解消のみ (units_run 17 のまま, unit #18 が Halt0 へ)。
+2. `m11_build.sh`: alloca pass を build 時に常設 (idempotent, 内容が同じなら mtime を触らない)。`m11_e2e.sh` の既定経路で pass が掛かる。
+3. `m11_ov.c`: `function_412d60` (`_UStrClr`) / `418190` (`_LStrArrayClr` 系) / `416db0` (`_CopyArray`) を C 転記。いずれも RetDec が
+   `mov rax,[rbx]` 型の旧値/kind の load を脱落 (D1 系)。**416db0 は `movzx rcx,[r8]` の kind 読出しが脱落し常に未知 kind → Error → Halt0** だった
+   (unit #18: TFormatSettings の string フィールド kind=18)。逆アセンブル 0x416db0〜0x416f65 の分岐表 (10/11/12/13/14/15/17/18/22) と突合。
+
+ネガティブコントロール: HEAD から修正 3 点 (m11_ov.c の 3 関数と build の alloca pass) を外して同手順で再ビルド → units_run 17 / OOB に戻ることを確認 (同環境)。
+
+**次 blocker (unit #23 = 0x467f00)**: `467f00 → 467c40 → 45a640 → 45a2a0 → 411e80 → 411d20 → 412a60 → Halt0`。467c40 は
+`call [rax]` (IAT 経由の Win32 API, `mov ecx,eax` で戻り値を 45a640 に渡す) の結果で `45a640(ecx, dx=11, r8w=8)` を呼び、ecx が 0 以外・
+`0x7ffdfffb` 系でない値のとき 45a2a0 (例外送出, 0xEEDFADE) に進む。戻り値を返す import の実体は未特定 (次ラウンド)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| unit #23 (0x467f00) の Halt0 (467c40 の IAT 呼出し戻り値) | 通常起動 22 で停止、stage 5/6 未達 | #132 に継続 |
+| survey trap 78 (halt0 39 / OOB 39)・closure 外 46 | stage 5 判定 (survey trap 無し) 未達 | #132 に継続 |
+| `m11_site` 型の診断 (IR へ guest VA を埋める) が m11 に無い | 反復が手作業 | boot/dbg_lift.py (flelift/boot) の m11 版を要検討 |
+| `wasm-objdump` が runner に無く m11_judge/m11_trap の関数名注釈が `?` になる | trap frame 名が出ない | exports の index→名前を node で引く簡易版で代用 (本 run) |
