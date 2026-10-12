@@ -1,7 +1,7 @@
 # liftdiff — flelift (x64c) 全数採点 (CAB-232) + native 全起動の参照化 (CAB-233)
 
 > 正本: `tools/liftdiff/REPORT.md`。書式仕様は `docs/FORMAT.md`。
-> 付録: [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) (§5 回帰 A/B・§5.1・§5.2 Ablation・§6.1 検収・§6.2 再現性の全文)。
+> 付録: [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) (§5 回帰 A/B・§5.1・§5.2 Ablation・§6.1 検収・§6.2 再現性の全文・§8 wasm_trap トリアージ)。
 
 検証起点 commit: 01d5cb5 (CAB-233)。A/B は fba272c (CAB-232) 側。検収は b8e762d (HEAD) から実施。
 既知類型との関係 (DEFECTS.md, 規則 44): 該当 **D15** (メモリ間接 call 脱落) — 残 3 unit の VMT 仮想 call
@@ -225,3 +225,8 @@ m11 sample:800・残 3 unit の原因・`ld_tls_next` の limit 性・e2e 再現
 (format-truncation warning は既知・動作影響なし)。wasm は emcc (`[EMSDK]`)。
 所要 (実測・負荷依存): bootstate flelift hybrid **24.4 s** (load 0.79→2.62)、e2e [1/4]-[3/4] **62.5 s**、
 m11 sample:800 (12 shard) **93〜95 s**、flelift closure (14 shard) **585 s** (load 4.80→12.06)。
+
+## 8. m11 wasm_trap トリアージ (LD-5 / #236)
+
+578 関数の種別内訳 (oob 222 / unreachable 218 / hang 39 …)・unreachable は署名不一致 thunk 由来ではない: 全文は
+[`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §8、集計は `results/m11_wasm_trap_triage.md` (`tests/triage_wasm_trap.py`)。個別原因は #307 (LD-7)。
