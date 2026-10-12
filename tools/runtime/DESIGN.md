@@ -55,7 +55,7 @@
 | **OTT lifted DSP (M10 IR, 256 サンプル/ブロック)** | **0.925** (164.8 vs 178.1 µs/block) | 0.83 |
 
 - 外れ値 call_mix は node 側の分解で A(呼出のみ)=2.7×, B(storeのみ)=1.16×, 間接呼出=1.21×, D(元)=0.57× と**方向が反転**する → V8 のインライン/tier-up 判断の揺れで、メモリモデル固有の定数倍ではない。結論: 「一様な X 倍」は無く、実コード (OTT) では差なし (むしろ −7.5%)。
-- **同一 lifted IR を p:64 datalayout に書換えるだけで wasm64 ビルドが通り、出力ハッシュが wasm32 と完全一致** (`824c6c48`)。必要なのは `datalayout` の `f128:64` 付き p:64 と shim の `size_t` 引数幅の整合のみ (`HeapAlloc` 署名不一致 warning 1 件 = i32 vs i64 size)。→ 退避路は実証済み (`bench/build_ott_variants.sh`)。
+- **同一 lifted IR を p:64 datalayout に書換えるだけで wasm64 ビルドが通り、出力ハッシュが wasm32 と完全一致** (`824c6c48`)。必要なのは `datalayout` の `f128:64` 付き p:64 と shim の `size_t` 引数幅の整合のみ (`HeapAlloc` 署名不一致 warning 1 件 = i32 vs i64 size)。→ 退避路は実証済み。常時ビルド検査は `ci/wasm64_check.sh` ([REPORT](REPORT.md) RT-8 実測)。
 
 ### 1.4 Memory 個数上限 (`probe/run_memcount.mjs`) — **新規に判明した制約**
 1 レンダラ内で作れる WebAssembly.Memory は **wasm32: 124–125 個 / wasm64(max 16GiB): 61–62 個** (2 回測定) (max/initial/shared に依存せず一定。約 1TiB の VA 予約上限と整合する値だが、内部上限の正体は**推定**)。

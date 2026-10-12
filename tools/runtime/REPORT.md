@@ -15,7 +15,7 @@
 | ランタイム実装 | `src/runtime/{mem,worker,worker_pump,worker_protocol,worker_drivers,boot,boot_ui,loader_boot,imports_env}.ts`、`loader.ts` に `instantiateCompiled` 追加 (既存 API 不変)、`src/index.ts` に `?runtime=` フック、`vite.config.ts` (`/wasm/*` 配信・Worker ES 形式・watch 除外)、`package.json` scripts |
 | e2e | `tools/runtime/e2e.mjs` (`stage_wasm.mjs` が M1/M6/M10/M11 の wasm を hash 名で stage し `manifest.json` 生成) |
 | 実機プローブ | `probe/run_features.mjs` (機能マトリクス), `probe/run_memcount.mjs` (Memory 個数上限) |
-| ベンチ | `bench/build_ott_variants.sh` + `run_bench.mjs` (wasm32/64), `bench/asyncify_cost.mjs`, `bench/make_big_wasm.py` + `run_compile_bench.mjs` |
+| ベンチ | `bench/build_ott_variants.sh` + `run_bench.mjs` (wasm32/64。※ emcc 6.0.12 では `--max-memory` と `ALLOW_MEMORY_GROWTH=0` が衝突し wasm-ld エラー。ビルドは `ci/wasm64_check.sh` が代替), `bench/asyncify_cost.mjs`, `bench/make_big_wasm.py` + `run_compile_bench.mjs` |
 | spike | `spike/build_pump_spike.sh` + `run_pump_spike.mjs` (ポンプ 4 方式), `spike/run_pthread_test.mjs` (emcc pthread) |
 | CDP クライアント | `lib/chrome.mjs` (依存ゼロ、puppeteer 不要), `lib/serve.mjs` |
 
@@ -76,7 +76,7 @@
 - **RT-5 (VFS)** OPFS `createSyncAccessHandle` を第一候補、async 必須経路は JSPI または補助 Worker sync-RPC。
 - **RT-6 (plugin loader)** 同時ロード DLL <100 の予算管理 (遅延ロード/アンロード時の参照解放/小プラグイン統合) と 100+ ロードの負荷試験。
 - **RT-7 (deploy / M12)** R2: COOP/COEP/CORP 注入、wasm は同一オリジン、`Content-Encoding: br`、hash 名 immutable、`manifest.json` は no-cache。
-- **RT-8 (CI)** lift 成果物ごとに wasm32/wasm64 両ビルドを回し 4GiB 超仮定を早期検出 (`bench/build_ott_variants.sh` が雛形)。
+- **RT-8 (CI)** lift 成果物ごとに wasm32/wasm64 両ビルドを回し 4GiB 超仮定を早期検出。**OTT 分は実装済み** (`ci/wasm64_check.sh`、下記「RT-8 実測」)。未了: (a) M11 boot closure 等 OTT 以外の target (`ci/targets/<name>.sh` を足す方式)、(b) GitHub Actions への常設 (素材が R2 の work-* のため workflow 化には素材取得の設計が要る)。
 - **RT-9 (互換)** Firefox/Safari マトリクス取得と JSPI/memory64 の機能検出フォールバック設計。
 - **RT-10 (soak)** 実 FLEngine lift で download→compile→instantiate→初回フレームの総時間と tier-up 影響を計測。
 
@@ -98,3 +98,10 @@ bash tools/runtime/prod/build_pthread.sh && pnpm runtime:e2e      # RT-2 (e2e �
 python3 tools/runtime/bench/make_big_wasm.py <in.wasm> <out.wasm> <K> && node tools/runtime/bench/run_compile_bench.mjs
 ```
 (PATH に node が必要: `export PATH=$HOME/.local/share/pnpm/bin:$PATH`)
+
+## RT-8 実測 (CI: wasm32/wasm64 同一 IR 両ビルド照合)
+`bash tools/runtime/ci/wasm64_check.sh [--neg] [target ...]` (既定 target `ott`)。`ci/targets/<name>.sh` が入力 IR・ソース・フラグ・ドライバを定義。wasm64 側は IR の `target datalayout` を `p:64` (`f128:64` 付き) に sed 書換え、両者を並列に同一フラグ (-O2) でビルドし、node (`EMSDK_NODE`, v24。Memory64 は v22 では compile 不可) で同一入力を駆動して FNV-1a 出力ハッシュを比較。判定: wasm32/wasm64 不一致・期待ハッシュ (`824c6c48,cdd4ee04`) 不一致・memory section の memory64 flag が期待と逆、のいずれかで exit 1。emsdk は `EMSDK_ENV` (既定 `/opt/emsdk/emsdk_env.sh`)、repo パスは `tools/shared/env.sh` の `REPO_ROOT`。
+- 入力 IR は `bash tools/m10/m10_build.sh` で再生成 (work-m6-ott 素材のみ。`ott_shift3b.ll` 在中のため retdec 不要)。再生成 `ott_m10.ll` の sha256 は素材スナップショットと一致 (`989cf685…`)、`m10_build.sh` 4.1 s。
+- 実測 (GitHub runner 4 vCPU, emcc 6.0.12, load average 0.3–0.7): ビルド 2–3 s (32/64 並列)、`ott32.wasm` 659854 B / `ott64.wasm` 659327 B、全体 2.8 s。**PASS: wasm32/wasm64 とも `824c6c48,cdd4ee04`**。
+- ネガティブコントロール `--neg` (wasm64 側 IR の `fadd float`→`fsub float`): wasm64 が `4d7705c5,4d7705c5` となり不一致を検出 (`NEG-CONTROL OK`)。期待ハッシュを故意に変えると exit 1、未知 target は exit 2。
+- 既存ドライバ `bench/ott_driver.mjs` の `is64` は `memory.type()` (node 24 でも非対応) 依存で常に false → 検査では wasm バイナリの memory section を直接読む。
