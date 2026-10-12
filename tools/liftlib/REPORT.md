@@ -590,4 +590,4 @@ T12 は「join split が発動すること」を assert していたが、LIFTLI
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | e2e を素材付きで未実行 | 置換行以外の挙動は未検証 (置換は DLL パス定義のみ) | 本 PR のレビュー run (PR 本文の `oc_artifacts:` 行) |
-| `tools/liftlib/` 直下 5 ファイルに `/home/ubuntu` が残る | runner では symlink 必須 | 別チケット (PM が `[CI-4-*]` で起票済みの liftlib 直下分に統合) |
+| `tools/liftlib/` 直下 5 ファイルに `/home/ubuntu` が残る | runner では symlink 必須 | 未起票 (2026-10-13 時点で `gh issue list --search "CI-4-liftlib"` は #386 のみ)。親 #294 にコメントで起票を提案 |
