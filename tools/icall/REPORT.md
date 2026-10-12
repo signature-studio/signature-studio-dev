@@ -71,9 +71,7 @@
 | 最終 heap/obj state 差 (qword) | 260,657 | **0** | 0 |
 | t1 std 512 cell | 全 0 (旧 chain は 0x326 で早期 return) | **512/512 bit-exact, junk 0** | 512/512 |
 - 使う既存 pass: ir_normalize, ir5_patch (m2/m5)、SIMD helper は m11_simd2.py (署名駆動) + 補完 5 種 (`cmplesd cmpnltsd cvttpd2dq cvtpd2dq sqrtpd`)。**M8/M9/M10 の OTT 専用 hand port (ir7_argpass, ir8_valueflow, ir9_bootstraps, gate box C port 等) は不要**。
-- CRT 数学 (exp/log/tan/pow) は libm 置換でなく DLL 自身の機械語を lift (D4 解消)。関数単位の native 差分 (`diff/fn_diff.py`, 乱数入力 120 点) は 8 関数中 4 が全 bit 一致、tan 本体 `1801a9be0` は 111/120 (残り 9 は 1 ulp 差: 大引数 ≈1e4 の reduction 経路)、
-  2 本は誤差報告経路で fail-fast、`1801c1240` は 0/120 (xmm0 以外の戻り経路, 未調査)。leaf kernel (`1801aa1a0`) は隠れ入力 (xmm4/5 等) があり単独呼出しでは native 側も不定のため比較不能。**matrix 89 scenario は全 bit 一致**だが、
-  OTT が踏まない CRT 経路 (大引数 tan 等) に 1 ulp 級の残差が有り得る — 子チケットで扱う。
+- CRT 数学 (exp/log/tan/pow) は libm 置換でなく DLL 自身の機械語を lift (D4 解消)。関数単位の native 差分は **§8 (ICALL-5)** に移した (旧記述 = tan 111/120・`1801c1240` 0/120 は §8 で原因特定・修復済み)。**matrix 89 scenario は全 bit 一致**。
 - 反復の過程 (全て修復済み): rewriter の capstone `disp_size` 誤り (66-prefix SSE の rip-rel 103/916 命令が定数誤参照) → tan が桁違い、jump table 未展開で setParameter 不動作、
   `mov r11,rax` を call 後に置いて rax 喪失、chained 断片 (`0x1801207f1`) の単独関数化、closure の条件 jmp 追従漏れ。各段で `ott/diff/cmp.py` の stage 差分が原因特定に効いた
   (例: ctor 直後 obj 差 2 qword → 0, setp 段の +0x248 差 → jump table)。
@@ -111,7 +109,7 @@
 - FLEngine は監査と書換え/復元の構造検証まで。wasm ビルドと実行 (M11 boot) は未。残 382 site (巨大 2 関数 366) と gap 879 site は未復元。
 - 5 引数目以降 (stack 渡し) は BLK 未対応 (`_InitLib` 8 引数など)。`jmp [idx*8+tbl]` 形 jump table、x87/MMX/AVX、`rep` 系は RetDec 任せ。
 - OTT の F 集合は native coverage 由来 (x64c と同条件)。coverage 外の vtable target は `__icall_dispatch` が fail-fast する (未登録 target を site VA 付きで表示)。
-- route build は -O0 (性能は評価していない)。CRT エラー経路 override 4 件 (R の `ott_ovr.c`) は未移植 (matrix 89 scenario は通る)。
+- route build は -O0 (性能は評価していない)。CRT エラー経路 override は 4 件中 3 件を移植済み (§8)。残り `_handle_errorf` (1801c8cb8) は route の closure に無く lift 対象外。
 - Fruity/KH/FA の wasm 実行検証は未 (監査のみ)。comis/derefix は OTT で bit-exact を確認したが他 PE では静的件数のみ。
 - 作業中に `pkill -f retdec-decompiler` を実行してしまい、同時刻に他 subagent が走らせていた RetDec が落ちた可能性がある (原因は本担当の誤操作)。
 
@@ -125,3 +123,59 @@ bash tools/icall/x64c_fle_probe.sh   # x64c を FLEngine に当てた対応度 (
 python3 tools/icall/tests/test_icall.py
 ```
 前提: python3 (capstone, pefile), emsdk 6.0.12 (`[EMSDK]`), RetDec (`[RETDEC]`), node, setarch。keystone は raw 試験 (`work/probe`) のみ。
+
+## 8. ICALL-5: CRT 経路の関数単位差分 (#231)
+
+既知類型との関係 (`docs/DEFECTS.md` D1〜D16 / 本書 §4 D1〜D13 とは別体系): **新規 2 件 (下記 N1・N2)**。DEFECTS.md の D7 (silent miscompile 系) とは別。
+検証起点 commit: `b82052e` (main) → 実装 `fd86159`。DLL = plugins-ott 内 NSIS インストーラの `OTT_x64.dll` (sha256 `ecd51e056860a37dbff4223c4dcab1a12f91e3f280161bec249fe8d97ab2378e`)。
+
+### 8.1 結果 (route = RetDec + icall pass, native = 実機械語, 600 点/関数, seed 3, xmm0 raw 64bit の bit 比較)
+| 関数 | 修復前 | 修復後 | 原因 |
+|---|--:|--:|---|
+| `1801a9be0` tan 本体 | 556/600 (max 1ulp, 差の x は 0.9 以上から) | **600/600** | N1 |
+| `1801aa1a0` leaf kernel (r8=1 経路) | 555/600 | **600/600** | N1 |
+| `1801c1240` (AVX/FMA 版 reduction) | 0/600 | **600/600** | N2 |
+| `1801a9a6c` `1801b4154` `1801c12f4` | 600/600 | 600/600 | — |
+| `1801a9b38` `1801c1398` (誤差報告経路) | wasm fail-fast, native も SIGSEGV | `1801a9b38` は override で動作 (§8.3) | CRT 未初期化 |
+
+- **N1 (新規): RetDec が `and r64, 0xffffffff00000000` (Dekker 風の上位 32bit 切出し) を `select (x <u 0xFFFFFFFF00000001), x, x + 0xFFFFFFFF` に誤 lower する。** 症状: tan/atan 系の hi 部が 1ulp ずれる。
+  発見の手がかり: issue 本文は「大引数 ≈1e4」としていたが、実測の差分入力は x = 0.908… から出ていた (reduction 経路ではない)。`oi.drc.ll` (RetDec 直後) に既に誤り。
+  検出信号: `icmp ult i64 X, -4294967295` + `add i64 X, 4294967295` + `select`。修復: `ir_fix_mask.py` で `and i64 X, -4294967296` に戻す (OTT で 2 箇所)。
+- **N2 (新規): `m11_simd2.py` の未実装 VEX helper は stderr を出して 0 を返す (silent)。** AVX/FMA 版 CRT (`1801c1240`) が xmm0=0 を返していた。修復: `vex_gen.py` が IR の宣言署名から VEX.128 helper 66 種を生成
+  (FMA3 は `fma()` 単一丸め)、`vcomisd/vucomisd` は comis の flag 経路 (`icall_rewrite.py` の COMIS_KIND) に追加、残る未実装 stub は `simd_merge.py` で abort に変更 (残 6 種: int / int3 / movntps / pcmpistri / rep movsb / rep stosb)。
+
+### 8.2 ネガティブコントロール
+- `ICALL_FIX_MASK=0 bash tools/icall/ott_route.sh` (N1 補正を外す): gate が `1801a9be0` 556/600・`1801aa1a0` 555/600 で FAIL。
+- `vex_gen.py` の FMA132 の被乗数を 1 箇所取り違え: `1801c1240` が 0/600 で FAIL (他は 600/600 のまま)。
+
+### 8.3 CRT エラー経路 override (R の `ott_ovr.c` 移植)
+`rt/icall_ovr.c` + `ir_override.py` で `1801c8c00` (_handle_error) / `1801a9a6c` (sqrt) / `1801a9b38` (sqrtf) を C 実装に置換。
+native は CRT 未初期化で SIGSEGV するため突合不能 (UCRT の観測可能な意味から導出; 根拠は `tools/ott/rt/ott_ovr.c`)。
+実行確認 (wasm): sqrt(-1) = `0xfff8000000000000`・sqrt(4) = 2.0・sqrt(-0.0) = -0.0・sqrtf(inf) = inf。置換前は未登録の間接 call target で fail-fast。
+`1801a9a6c` の関数単位比較は xmm0 のみ 600/600 (rax は native が rax=入力由来の不定値のため 0/600 = 比較対象外)。
+
+### 8.4 検証 (clean HEAD `fd86159` の worktree, load average は開始→終了)
+| コマンド | 結果 | 所要 | load |
+|---|---|--:|---|
+| `OTT_SKIP_INFO=1 bash tools/ott/ott_e2e.sh` | PASS: 89 scenario / 50,236 cell 全一致, max_ulp 0, state diff 0 | 20.9 s | 0.42→1.23 |
+| `bash tools/icall/icall_e2e.sh` | PASS: 89 scenario / 50,236 cell 全一致, state diff 0, 監査 落ち 70→0, CRT gate PASS | 86.5 s | 1.13→1.62 |
+| `bash tools/icall/diff/crt_fn_gate.sh` | PASS (6 関数 × 600 点) | 2.6 s | — |
+| `python3 tools/icall/tests/test_icall.py` | PASS (0 failed; ICALL-5 追加 4 件を含む) | — | — |
+(修復前の同 e2e: 80.9 s・PASS。cell 数は変わらず、差は関数単位 gate のみに現れる。)
+
+### 8.5 範囲外・未解決
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| **FMA3 経路 (`__use_fma3=1`) の `1801a9be0` が 42/600** (他 4 関数は 600/600)。RetDec が `vmovapd [rsp+0x40], xmm0` を void helper にして store を落とすため `[rsp+0x40]` の再読込 (`1801aa0d6`) が未初期化になる疑い (未確認) | OTT 既定 (`__use_fma3=0`) は無影響。AVX2 CPU で DllMain を通す経路のみ | 親 #90 に子チケット提案 (RetDec の VEX 256bit/stack store 落ち, D7 (本書 §4) 類似) |
+| `1801a9b38` (sqrtf)・`1801c1398` 本体は native 突合不能 (CRT 未初期化) | override は UCRT 仕様由来で native bit 突合は無し | #9 (CRT 初期化 lift 済みの x64c 側 `tools/ott/crtinit` で突合済み) |
+| `_handle_errorf` (1801c8cb8) は route の closure F に無く未 lift | float 版エラー経路に到達すると fail-fast | #231 続報 (到達 scenario が構築できた時点で) |
+| 関数単位 gate は SSE2 経路の 6 関数のみ。他の CRT 関数 (exp/log/pow の 1801b4220 等) は DSP matrix の bit 一致のみ | OTT が踏まない入力域の 1ulp は残り得る | #231 続報 (候補選別 `fn_diff.py` は rip/rsp 相対 leaf の 8 関数に限定) |
+| #9 (OTT bit-exact 512/512) への反映: route でも 512/512 (t1 std 512 cell: zero 5 / normal 507 / junkHi 0 / junkTiny 0, |max| 0.2516) | — | #9 にコメントで報告 |
+| `/home/ubuntu/work/analysis/...` ハードコード | runner で動かない | #294 (issue #231 コメントに列挙) |
+
+### 8.6 再現
+```sh
+bash tools/ott/ott_e2e.sh && bash tools/icall/icall_e2e.sh      # 前提 + 全体 (関数単位 gate を含む)
+bash tools/icall/diff/crt_fn_gate.sh                             # gate のみ (2.6 秒)
+python3 tools/icall/diff/fn3_diff.py 1801a9be0 --n 600 --dump    # native / route / x64c の 3 者比較 (--kernel / --fma 0|1 / --wide)
+```
