@@ -535,7 +535,7 @@ T12 は「join split が発動すること」を assert していたが、LIFTLI
 ## 15. LIFTLIB #241 — ymm(i256) helper ABI + pcmpistri + F2 xmm 戻り搬送
 
 - 既知類型との関係: **該当なし** (`docs/DEFECTS.md` D1a〜D16 / `icall §4` とも未登録。新類型行案は §15.7)
-- 検証起点 commit: `main` = `400d546` (着手時)。数値はコミット済み HEAD `dfea6d2` で取得 (§15.5)。
+- 検証起点 commit: `main` = `400d546` (着手時)。数値はコミット済み HEAD `8476a82` の clean worktree (`git worktree add --detach`) で再現して取得 (§15.6)。
 - 環境: GitHub Actions runner (nproc=4, emcc 6.0.12, gcc `-mavx2 -mfma`)。**`tools/m6/work` / `targets/*/work` は未展開**のため
   FA/KH/OTT の回帰 (`liftlib_e2e.sh` の (a)(b)(c)(f)) は**この run では未実施** (§15.6)。
 
