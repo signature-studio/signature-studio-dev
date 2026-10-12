@@ -186,3 +186,34 @@ python3 tools/ott/avx/unsup_scan.py tools/ott/work/avx/entries.json \
 
 # 前提: tools/ott/ott_e2e.sh が PASS する環境 (python3 capstone/pefile, gcc, emsdk 6.0.12, node ≥22)
 ```
+
+## 10. 環境パス置換 (#385, 親 #294・先行 #312 / #367): /home/ubuntu 絶対パスを tools/shared へ
+
+既知類型との関係 (DEFECTS.md): 該当なし (パス参照の置換のみで lift/IR には触れない)。
+
+### 10.1 変更
+
+`*.sh *.py *.json *.ts *.mjs` (work/ 除く) の `/home/ubuntu` 参照 2 行を置換。既定値は従来と同一 (環境変数未設定のローカル挙動は不変)。
+`*.log` 5 本 (`baseline_e2e.log` ほか) の `/home/ubuntu/work/webstudio/...` は過去実行の出力記録で、受入条件の対象拡張子外のため変更しない。
+
+| ファイル | 置換 |
+|---|---|
+| `build_avx.sh` | `source tools/shared/env.sh` + `DLL="$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll"` |
+| `unsup_scan.py` | `tools/shared/paths.py` の `PLUGINS_DIR` から `DLL` を組む |
+
+### 10.2 検証 (検証起点 `origin/main` = ee8f70c、素材は `fl-win64` のみ)
+
+- 受入条件 1: `grep -rn '/home/ubuntu' tools/ott/avx --include=*.sh --include=*.py --include=*.json --include=*.ts --include=*.mjs --exclude-dir=work | wc -l` → 0 (置換前 2)。
+- 受入条件 2 (既定値同一性): `ANALYSIS_DIR`/`PLUGINS_DIR` unset で bash (`env.sh`) と python (`paths.py`) が組む DLL パスを、置換前の固定文字列と文字列比較 → 両方一致
+  (`/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll`)。n=1・直列、load average 0.98 (1 分値)。
+- ネガティブコントロール: `PLUGINS_DIR=/nonexistent` で両方が `/nonexistent/ott/binaries/OTT_vst2_win64.dll` を返す (変数が効いている)。
+- 構文: `python3 -m py_compile unsup_scan.py`・`bash -n build_avx.sh` OK。
+
+### 10.3 検証範囲 / 範囲外 / 未解決
+
+範囲外: `avx_e2e.sh` / `build_avx.sh` / `unsup_scan.py` の実行 (e2e 本体)。`OTT_vst2_win64.dll` は `analysis-ott-binaries`、`tools/ott/work/{entrylift,crtlift}` は `work-m6-ott`、emcc は `toolchain-emsdk` が要り、この run は `fl-win64` のみ取得
+(`$HOME/artifacts` に `fl-win64.tar.zst` のみ)。実測: `PLUGINS_DIR=/nonexistent bash build_avx.sh` は DLL 参照前に `cov_entry.json` 無しで停止、`unsup_scan.py` は `pefile` 未導入で import 停止。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `avx_e2e.sh` を素材付きで未実行 | 置換行以外の挙動は未検証 (置換は DLL パス定義のみ) | 本 PR のレビュー run (PR 本文の `oc_artifacts:` 行) |

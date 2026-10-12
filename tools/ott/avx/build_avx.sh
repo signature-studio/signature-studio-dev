@@ -5,9 +5,10 @@
 #   usage: build_avx.sh [ENTRIES.json]  (既定 work/avx/entries.json — 無ければ生成)
 set -euo pipefail
 OTT="$(cd -- "$(dirname -- "$0")/.." && pwd)"
+source "$OTT/../shared/env.sh"
 AVX="$OTT/avx"
 OUT="$OTT/work/avx"
-DLL=/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll
+DLL="$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll"
 CLOSURE="${AVX_CLOSURE:-3}"
 NAME="${AVX_OUT:-ottl_avx}"
 mkdir -p "$OUT"
