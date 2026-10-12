@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <emscripten.h>
+extern int m11_trace_flag;
 
 static int g_dummy_heap;
 void* GetProcessHeap(void) { return &g_dummy_heap; }
@@ -71,7 +72,9 @@ int GetVersionExW(void* p) {
     return 1;
 }
 unsigned LoadStringW(void* h, unsigned id, unsigned short* buf, unsigned n) { (void)h; (void)id; if (buf && n) buf[0] = 0; return 0; }
+EM_JS(void, m11_js_stack, (void), { Error.stackTraceLimit = 60; console.error(new Error().stack.split("\n").slice(2, 60).join("\n")); });
 unsigned MessageBoxA(void* h, const char* text, const char* cap, unsigned type) {
+    if (m11_trace_flag) m11_js_stack();   /* --trace 時: 呼出し元 wasm frame を表示 */
     fprintf(stderr, "[m11][MessageBoxA] caption='%s' text='%s' type=0x%x (自動 IDOK)\n", cap ? cap : "", text ? text : "", type);
     (void)h; return 1;
 }

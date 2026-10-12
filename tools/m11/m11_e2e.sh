@@ -43,10 +43,18 @@ if [ $FULL = 1 ] || [ $need_lift = 1 ]; then
     run "lift boot4 #$it" bash m11_lift.sh work/boot_ranges_extra.txt boot4 600
     run "gen_ir2 #$it" bash m11_gen_ir2.sh
   done
+  [ -f m11_extra_ranges5.txt ] && { run "lift boot5 (RetDec)" bash m11_lift.sh m11_extra_ranges5.txt boot5 600; run "gen_ir2 (boot5 追加)" bash m11_gen_ir2.sh; }
 else
   # #222: IR の VA→LVA remap は M11_LB_BASE 依存。stamp が違えば lift 成果物 (LB 非依存) から IR だけ再生成
   if [ ! -f work/boot_final.ll ] || [ "$(cat work/ir_lb_base.stamp 2>/dev/null)" != "${M11_LB_BASE:-0}" ]; then
     run "gen_ir2 (M11_LB_BASE=${M11_LB_BASE:-0})" bash m11_gen_ir2.sh
+  fi
+fi
+# #132: boot5 = 間接 call 先の fallback 実装 (m11_extra_ranges5.txt, 25 関数). 無ければ RetDec で lift して IR を作り直す
+if [ -f m11_extra_ranges5.txt ]; then
+  [ -f work/boot5.lift.ll ] || run "lift boot5 (RetDec)" bash m11_lift.sh m11_extra_ranges5.txt boot5 600
+  if [ work/boot5.lift.ll -nt work/boot_final.ll ] || ! grep -q '^define [^@]*@function_457860(' work/boot_final.ll; then
+    run "gen_ir2 (boot5 追加)" bash m11_gen_ir2.sh
   fi
 fi
 echo "${M11_LB_BASE:-0}" > work/ir_lb_base.stamp
