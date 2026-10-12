@@ -117,6 +117,6 @@
 1. **FLEngine 本体の起動突破** — MS5/MS6 の中核。`m11` の残 trap 削減 → `flelift/boot` の起動連鎖完成。
 2. **lift 品質ハーネス** — 関数単位の native 実行 (wine/unicorn) と wasm の比較で誤 lift を機械検出 (`m11/REPORT.md` §5-1)。
 3. **audio / gui の FLEngine 接続** — MS7/MS8。`tools/audio`・`tools/gui` の設計を runtime へ実装。
-4. **`feat/add-opencode` (GitHub Actions)** — 優先度高・他作業と並行可能。
+4. **OpenCode Actions 基盤 (GitHub Actions)** — 2026-10-12 main 稼働開始 (PR #282, merge `bec32da`)。残 follow-ups は [CI-1] #284 で管理。
 5. **Issue/PR の整理** — `[AREA-n]` prefix 統一・`state:*` ラベル不使用 (PM 担当)。
 

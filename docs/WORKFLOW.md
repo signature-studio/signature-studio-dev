@@ -46,7 +46,7 @@ PM (main)                      subagent (実装)                  subagent (検�
    │                                                                   ├ PR review (approve / request changes)
    │                                                                   └ 誤記は fix commit で同 branch に push
    ├ review approve 確認 ──────────────────────────────────────────────┤
-   └ gh pr merge --squash ──→ branch/worktree 削除
+   └ gh pr merge --merge ──→ branch/worktree 削除
 ```
 
 - **worktree の場所**: リポジトリの**親ディレクトリの `ws-<N>`**
@@ -144,10 +144,11 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
 
 - タイトル: **`[AREA-n]` prefix** + 英語表題。`AREA` は**次の一覧が正本**で `n` は AREA 内の連番
   (同名族・重複タイトルを作らない):
-  `KH`・`PLG` / `P0c`・`SHX` / `T-SH`・`AU`・`HB`・`IPP`・`LIFTLIB` / `L`・`RT`・`GUI`・`SR`・`MX`・`FA`・`OTT`・`E2E`・`LGL`・`ST`・`PY`・`PERF`・`LD` / `ICALL`・`M11`・`CI`・`DOCS`・`FLE`。
+  `KH`・`PLG` / `P0c`・`SHX` / `T-SH`・`AU`・`HB`・`IPP`・`LIFTLIB` / `L`・`RT`・`GUI`・`SR`・`MX`・`FA`・`OTT`・`E2E`・`LGL`・`ST`・`PY`・`PERF`・`LD` / `ICALL`・`M11`・`CI`・`DOCS`・`FLE`・`H`。
 - `CI`: CI 基盤・GitHub Actions (Issue #284 など)
 - `DOCS`: ドキュメント整備 (Issue #281 など)
 - `FLE`: x64c lift による FLEngine boot 連鎖 (tools/flelift/boot/, DOC_MAP が FLE-2〜FLE-5 シリーズを既に参照、親チケットは [ICALL-1] #227)
+- `H`: 静的配信・ホスティング (R2 / Cloudflare / Cloudflare Access)。repo 前例 [H-1] #62 (closed)。Issue #8 が [H-2] として採番済。
 - 過去の採番は尊重する (例: `[IPP-7]`・`[KH-2b]`・`[HB-H2]`)。
   `[HB-H4']` のような記号付き・`[ユーザ依頼]` のような日本語 prefix は**作らない**
   (`needs-user-input` ラベルとの二重表現もしない)。
@@ -166,6 +167,6 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
 
 - **現状の CI**: `.github/workflows/opencode.yaml` (OpenCode セットアップ・検証用)。
 - PR では最低限これが緑であること。typecheck / build / `pnpm runtime:e2e` はローカルで実行して結果を REPORT に書く。
-- `feat/add-opencode` への移行が進行中。整備後は本節を更新する。
+- OpenCode 基盤は 2026-10-12 に main で稼働開始 (PR #282, merge `bec32da`)。PR では review ジョブが OpenCode レビュワーを自動起動し、approve と必要に応じたマージまで実行する (実行実績あり: run 38220632379 / 38228263935)。
 - commit 前に `find <dir> -type f -size +20M` で巨大 blob がないことを確認すること (GitHub の hard limit 対策)。
 
