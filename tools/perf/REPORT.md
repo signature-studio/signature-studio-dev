@@ -150,3 +150,34 @@ PERF_QUICK=1 bash tools/perf/perf.sh     # 代表変種・反復 1 (数分)
 ```
 注: 巨大 wasm 実験の K 倍素材は M11 の 5,655,905B スナップショット (sha256 先頭 `af1599814c9898e2`; M11 側は以後更新され得る — 現在 6,008,101B)。
 前提: `tools/m10/work/ott_m10.ll` 等 (`bash tools/m10/m10_build.sh` で生成)、`tools/m11/work/boot_final2.ll`。`work/` は gitignore (≈1.9GB)。
+
+## 9. perf 回帰ゲート (PERF-P5 / #164) — bit-exact OTT (x64c) 対象
+
+既知類型との関係: 該当なし (計測ゲートの追加。lift 自体は未変更)。検証起点 commit: `aa4306b` (クリーン detached worktree で実行。数値表は同内容の事前 commit 76fdcad (未 push) での 3 回実測、aa4306b では 1 回再実行し PASS 11/11・36 s・load 0.78〜0.98)。
+
+`bash tools/perf/gate/perf_gate.sh` (1 コマンド。CI 用 workflow は `tools/perf/gate/perf-gate.workflow.yaml.txt`) = `tools/ott/ott_e2e.sh --quick` (native 実機械語との bit-exact; 22 シナリオ・9,620 cell・max_ulp 0) → `ott_x64c_build.sh o0 o2 o3lto` → `ott_x64c_bench.mjs` を 3 反復 (変種を反復内で交互) → `gate/judge.mjs` で判定。
+判定は**相対指標のみ** (絶対 µs は参考表示): 署名 `6b1696f0` 一致・出力非ゼロ 256 cell・o0/o2 p50 比 ≥ 3.0・o2/o3lto p50 比 ∈ [0.9, 2.0]・wasm bytes 上限 (o0 1,200,000 / o2 810,000 / o3lto 780,000)。閾値は env (`GATE_*`) で上書き可。
+
+実測 (GitHub-hosted 相当 runner, node v22.23.3, loadavg 0.45〜1.40, 3 回実行・各 3 反復の中央値。`perf_gate.sh` 全体の所要 36〜38 s, 実測 3 回):
+
+| 指標 | 実測 (3 回の min–max) | 閾値 |
+|---|---|---|
+| 署名 (o0/o2/o3lto 全反復) | `6b1696f0` 一致 | 一致 |
+| o0/o2 p50 比 | 5.68〜5.80 (別途 5 反復の単体測定 5.3〜5.9) | ≥ 3.0 |
+| o2/o3lto p50 比 | 1.18〜1.20 (単体測定 1.15〜1.29) | 0.9〜2.0 |
+| wasm bytes o0 / o2 / o3lto | 1,030,416 / 707,139 / 680,905 | 上記上限 |
+| p50 µs (参考) o0 / o2 / o3lto | 328.65〜335.24 / 57.74〜57.88 / 48.39〜49.12 | 判定に使わない |
+
+ネガティブコントロール (`judge.mjs` へ入力を壊して FAIL を確認; いずれも exit 1): 期待署名を `deadbeef` → 3 件 FAIL (8/11) / o2 bytes 上限 700,000 → FAIL (707,139) / o0/o2 比下限 8 → FAIL (5.52) / o2 の p50 を 3 倍 (o2 退行の模擬) → o0/o2 1.84・o2/o3lto 3.71 で 2 件 FAIL / 1 行だけ署名を `6b1696f1` に改ざん → FAIL。
+
+パス修正 (ハードコード → `tools/shared/env.sh` / `paths.py`): `ott_e2e.sh`・`lift/lift_build.sh`・`native/ottnat.py`・`diff/count_icall.py`・`perf/flags.sh` (`EMSDK_DIR` 既定 `/opt/emsdk`)。
+
+範囲外 / 未解決:
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| **CI workflow 未設置**: GitHub App に `workflows` 権限が無く `.github/workflows/` への push が拒否された (`refusing to allow a GitHub App to create or update workflow ... without workflows permission`)。テンプレートを `tools/perf/gate/perf-gate.workflow.yaml.txt` に置いた。設置後の Actions 実行も未確認 | CI 化 (受入条件) が未達 | #164 (PM が `.github/workflows/perf-gate.yaml` へ移して設置) |
+| 閾値は 1 台の低負荷 runner の実測 (反復 3〜5) から設定。高負荷時の誤検知率は未測 | flaky 化の可能性 | #164 |
+| `perf.sh` (PERF_QUICK, junk 版 M10 RetDec) は本ゲートに含めない。Chrome・M5 カーネル・巨大 wasm は対象外 | 回帰検知範囲は x64c の node 実行のみ | #164 に分割提案 |
+| ゲートは node のみ (Chrome 計測なし) | Chrome 側回帰は検知できない | PERF-P9 (§7) |
+| runner の node は v22.23.3 (§2.1 は node 26) | 絶対値の比較は不可。比のみ判定 | — |
