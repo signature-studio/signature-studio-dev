@@ -185,3 +185,57 @@ GitHub Actions runner (4 core, load 0.6–0.9)。素材は work-m11 スナップ
 |---|---|---|
 | unit 745 / 873 の副次カウンタ差 (SelectObject 3 回 / VirtualAlloc 要求有無) の原因 | 集計には無影響。LB 依存の分岐が残っていないかの確認 | #222 コメントに記録 (未起票。要なら PM が起票) |
 | `audit_va.py` の IAT 判定が FLEngine で常に exit 1 | CI 検査に使えない | #91 にコメント (PE 標準 IAT は除外すべき) |
+
+## 9. sigfix 0 詰めの計測・機械語分類・定数復元 (#131, 部分達成)
+
+既知類型との関係: 該当 (icall §4 の `callsite_arg_drop` = liftdiff 分類、`ldfix/REPORT_APPENDIX_AB.md` 優先 1)。`docs/DEFECTS.md` D1〜D16 に直接の行は無く、D7 (stack 引数のずれ) は別件 (新規行案は下記)。
+
+### 計測 (コミット済み HEAD `3e49295`, `bash tools/m11/m11_sigfix_stats.sh`, 3.50 / 3.49 / 3.48 秒, load 0.52, n=3 直列)
+単位: **0 詰め site** = `m11_post.py` sigfix が「call site の実引数数 < callee 定義の引数数」で書換えた call (分母: sigfix 書換え 6,675 site)。**0 詰め引数** = 補われた引数の総数。集計は `m11_post.py --pads`。
+
+| 項目 | 実測 |
+|---|---|
+| 0 詰め site / 0 詰め引数 | **1,049 site / 2,064 引数** (217 callee / 475 caller。位置 0..3 = 1,892、位置 4 以降 (stack) = 172) |
+| 既定出力 | 従来の `work/boot_final3.ll` と `cmp` byte 一致 (計測追加で出力不変) |
+| 機械語と突合できた site | 1,004 / 1,049 (`no_pdata` 23 = caller が .pdata 区間外、`unmatched` 22 = IR の callee 呼出し数と機械語の直接 call 数が不一致で k 番目の対応が取れない) |
+
+突合済み 1,004 site の 0 詰め引数 1,963 の分類 (`m11_argrecover.py`, capstone の線型 disasm。Win64: rcx/rdx/r8/r9 → `[rsp+0x20+8(i-4)]`):
+
+| 分類 | 引数数 | 意味 |
+|---|---:|---|
+| callee_unused | 313 | callee 入口の直線部で読む前に全幅書込み (stack 引数は callee 全体に読出し無し)。**0 詰めは無害** |
+| set_const | 18 | caller の直前窓 (同一基本ブロック) で定数代入。**復元済み** (`M11_SIGFIX_RECOVER=1`) |
+| set_const_xmm_callee | 48 | 定数代入だが callee が xmm0..3 を引数に読む。復元しない (下記退行) |
+| set_other | 378 / stack_set_other 32 | 窓内で非定数 (reg/メモリ由来) を代入。SSA 値との対応づけが必要で**未復元** |
+| inherit | 1,172 | 窓内で未代入 (caller 引数の素通し/遠方 def)。**未復元** |
+| callee_nopdata | 2 | callee が .pdata 外 |
+
+**削減**: 0 詰め引数 2,064 のうち 18 (0.87%) を実値に置換、313 (15.2%) は無害と判定。残り (set_other 378 + stack_set_other 32 + inherit 1,172 + xmm 48 + nopdata 2 + 未突合 101) は意味未保証のまま。残りの site 別一覧: `results/sigfix_zeropad_remaining.tsv` (1,049 行, 引数ごとの分類付き)。1 site が全引数 callee_unused or set_const で**完全解決**するのは 31 site。
+
+### 検証 (実測)
+| 項目 | 結果 |
+|---|---|
+| 別アルゴリズム検算 `m11_argrecover_verify.py` (capstone の regs_access を使わず op_str の文字列で後ろ向き走査) | 復元 18 件が 18/18 一致 (初版 63 件では xor r9,r9 の 64bit 形を検算側が拾えず 10 件不一致 → 検算側の誤りと機械語で確認して修正し 63/63) |
+| ネガティブコントロール (値を 3 件 +1) | 15/18 一致・不一致 3 で exit 1 |
+| `m11_e2e.sh` (HEAD `3e49295`, `M11_SIGFIX_RECOVER=1`, 31.3 秒 (増分), load 0.88) | stage 4/6, 通常起動 17/942, survey **ok 812 / trap 83 / miss 46 / noproc 1** = 復元なし (60.6 秒, 全 obj 再生成) と同一。trap 内訳 OOB 34 / Halt0 48 / abort 1 も同一。unit 別 (942 本) 比較で差 0 |
+| 初版 (定数 63 件復元) | survey **ok 809 / trap 86** に**退行** (unit 838, 882, 885: ok → OOB)。二分探索で `function_c349a0` → `function_6a3d50` の 1 site (rcx=`lea` の ptr 定数) に特定。callee は xmm1..3 を引数に読むが IR に xmm 引数が無く 0 になる (推定: 実在オブジェクトへ xmm=0 で書込みが進み OOB)。xmm 引数を読む callee は部分復元しない規則を追加し、同等に戻った |
+
+つまり**定数復元は survey の数値を改善しなかった** (18 件は ok/trap どの unit にも影響しない)。意味補完の本体 (set_other / inherit の 1,550 引数) は未達。
+
+### 使い方・成果物
+* `m11_post.py --pads P.json` (0 詰め site 一覧出力) / `--fixes F.json` (復元適用)。`m11_argrecover.py` (分類+fix 生成)、`m11_argrecover_verify.py` (検算)、`m11_sigfix_stats.sh` (1 コマンド再現)。
+* `M11_SIGFIX_RECOVER=1 bash m11_e2e.sh` で復元を有効化 (既定 0 = 従来と byte 一致)。`M11_SURVEY_UNITS=<path>` で survey が unit 別結果 JSON を出す。
+* runner では `m11_e2e.sh` の PE パスが `/home/ubuntu/work/analysis/win64/extracted` ハードコードのため symlink で回避 (`m11_build.sh` は `FL_WIN64_DIR` 参照)。
+
+### 新規類型の行案 (DEFECTS.md 形式; 直接編集は PM 判断)
+| 症状 | 根本原因 | 観測 | 検出信号 | 修復 |
+|---|---|---|---|---|
+| 0 詰め引数を一部だけ実値化すると退行 | callee が xmm 引数 (IR に現れない) を読むのに整数引数だけ実値化し、callee が実オブジェクトを触って OOB | unit 838/882/885 ok→OOB (survey) | survey の unit 別差分 + 二分探索 | xmm 引数を読む callee は復元対象外 (本 PR) |
+
+### 未解決
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| set_other 410 / inherit 1,172 引数の復元 (機械語 reg → IR SSA 値対応のデータフロー; #90 の間接 call 復元と共通基盤) | 0 詰めの大半が意味未保証のまま | #131 に残 (Refs)。新規子チケットは PM 起票 |
+| xmm 引数 (xmm_arg_drop) の復元 (IR に xmm 引数が無い) | xmm を読む callee では整数引数だけ復元できない (48 引数) | #131 コメントで PM に提案 |
+| `unmatched` 22 / `no_pdata` 23 site | 突合不能 | 同上 |
+| #122 差分ハーネスで 0 詰め箇所を優先検証 | 未実施 (本 PR は survey の unit 比較まで) | #131 コメント |
