@@ -183,7 +183,14 @@ runs:
           echo "ARTIFACTS_DIR=$artifacts_dir"
           echo "TMPDIR=$RUNNER_TEMP"
         } >> "$GITHUB_ENV"
-        # emsdk の upstream/bin (llvm-nm・wasm-ld ほか) を PATH に通す。emsdk_env.sh は通さない。
+        # emsdk の upstream/bin の llvm-* (llvm-nm ほか) を ~/.local/bin に symlink する。
+        # build.sh が `source /opt/emsdk/emsdk_env.sh` で PATH を作り直しても、~/.local/bin は
+        # 残る (#223 の run: GITHUB_PATH への追加は emsdk_env.sh の後では効かなかった)。
+        # upstream/bin を丸ごと PATH に入れないのは、runner の clang 等を隠さないため。
         if [ -d /opt/emsdk/upstream/bin ]; then
-          echo "/opt/emsdk/upstream/bin" >> "$GITHUB_PATH"
+          mkdir -p "$HOME/.local/bin"
+          for t in /opt/emsdk/upstream/bin/llvm-*; do
+            ln -sf "$t" "$HOME/.local/bin/$(basename "$t")"
+          done
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
         fi
