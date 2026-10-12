@@ -5,7 +5,8 @@
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; LB="$HERE/.."; OTT="$LB/../../ott"
 LB_BASE="${LB_BASE:-0x10000}"; LB_INIT_MIB="${LB_INIT_MIB:-16}"; LB_MAX_MIB="${LB_MAX_MIB:-64}"; LB_PREFIX="${LB_PREFIX:-}"
-DLL="${LB_DLL:-/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll}"
+source "$LB/../../shared/env.sh"
+DLL="${LB_DLL:-$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll}"
 OUT="${LB_OUT:-$LB/work/x64c_$LB_BASE}"; NAME="${LB_NAME:-ottl}"
 mkdir -p "$OUT"
 eval "$(python3 "$LB/lb_layout.py" --base "$LB_BASE" --init-mib "$LB_INIT_MIB" --max-mib "$LB_MAX_MIB")"

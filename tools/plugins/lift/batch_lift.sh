@@ -8,6 +8,7 @@
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
+source "$ROOT/../shared/env.sh"
 export PATH=/opt/emsdk/node/24.19.0_64bit/bin:$PATH
 cd "$ROOT"
 BLOCKS=("$@")
@@ -28,7 +29,7 @@ mkdir -p work/batch
 [ -f work/batch/status.csv ] || echo "block,name,closure_funcs,closure_bytes,lift_rc,defines,declares_unimpl,f80_funcs,emcc_c_rc,seconds" > work/batch/status.csv
 python3 lift/plugin_closure.py "${BLOCKS[@]}" > /dev/null
 for b in "${BLOCKS[@]}"; do
-  PE="/home/ubuntu/work/analysis/win64/extracted/block$(printf %05d "$b")_PE.bin"
+  PE="$FL_WIN64_DIR/extracted/block$(printf %05d "$b")_PE.bin"
   OUT="work/batch/$b"; mkdir -p "$OUT"
   NAME="$(python3 -c "
 import json

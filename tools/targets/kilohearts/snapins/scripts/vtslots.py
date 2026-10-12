@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """vtslots.py — RTTI vtable (work/rtti_vtables.json) から <ns>::<Cls> の slot VA と extent を表示。
 Dsp vtable (20 slot): 0 dtor / 7 prepare(float sr) / 13 skip-block? / 14 process(this, ctx, AudioBuffer*) / 15 reset / 17,18,19 補助"""
+import os as _os, sys as _sys
+_sys.path.append(_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', '..', '..', '..', 'shared'))
+from paths import REPO_ROOT
 import json, sys
 from fnscan import extent, PDATA
-VT = '/home/ubuntu/work/webstudio/tools/targets/kilohearts/work/rtti_vtables.json'
+VT = _os.path.join(REPO_ROOT, 'tools/targets/kilohearts/work/rtti_vtables.json')
 def slots(ns, cls):
     vt = json.load(open(VT))
     return [int(s, 16) for s in vt['.?AV%s@%s@@' % (cls, ns)][0]['slots']]

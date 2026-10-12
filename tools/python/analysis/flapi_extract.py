@@ -8,9 +8,13 @@ rodata 上は `name\0 doc\0 name\0 doc\0 ... <module>\0 <fmt>\0.. <kwarg>\0..` �
 モジュール名トークンの直前までの (識別子, 大文字始まり/空白含む説明) 交互列を関数表として回収する。
 """
 import json
+import os
 import re
 import struct
 import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "shared"))
+from paths import FL_MAC_DIR, FL_WIN64_DIR  # noqa: E402
 
 MODULES = ["transport", "mixer", "channels", "patterns", "playlist", "plugins", "general", "device",
            "arrangement", "launchMapPages", "screen", "ui", "ilmcp", "flpianoroll", "enveditor", "harmonicscale"]
@@ -98,6 +102,14 @@ def extract(data):
     return res
 
 
+def portable(path):
+    """入力パスの FL_MAC_DIR / FL_WIN64_DIR 接頭辞を変数名表記に置換 (出力を環境に依存させない)。"""
+    for var, base in (("FL_MAC_DIR", FL_MAC_DIR), ("FL_WIN64_DIR", FL_WIN64_DIR)):
+        if path == base or path.startswith(base + "/"):
+            return "${" + var + "}" + path[len(base):]
+    return path
+
+
 def main():
     path = sys.argv[1]
     arch = None
@@ -106,7 +118,7 @@ def main():
     b = open(path, "rb").read()
     sl = slices(b)
     key = arch or next(iter(sl))
-    out = {"file": path, "slice": key, "modules": extract(sl[key])}
+    out = {"file": portable(path), "slice": key, "modules": extract(sl[key])}
     json.dump(out, sys.stdout, indent=1, ensure_ascii=False)
 
 

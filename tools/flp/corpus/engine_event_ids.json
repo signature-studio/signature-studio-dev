@@ -1,5 +1,5 @@
 {
- "dll": "/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin",
+ "dll": "$FL_WIN64_DIR/extracted/block00031_PE.bin",
  "imageBase": "0x400000",
  "unresolvedCallSites": 6,
  "ids": {

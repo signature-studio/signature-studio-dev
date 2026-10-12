@@ -30,6 +30,10 @@
   コメント + マージ (許可されていれば) を行う。プロジェクト設定で approve が必須なら、
   その旨をコメントして終了する。
 - diff が 10 万文字を超える場合は前半を重点的にレビューし、残りは「未レビュー」と明記する。
+- **素材は PR 本文の `oc_artifacts:` 行で指定される** (例: `oc_artifacts: plugins-serum2 toolchain-retdec`)。
+  指定名と展開先は `docs/WORKFLOW.md` §11 が正本。PR 本文に行が無く、e2e の再実行に素材が要るときは、
+  必要な名前を request-changes の本文に書くこと。PR 本文に行を足して push (または close → reopen)
+  するとレビューが再起動する (workflow のトリガは opened / synchronize / reopened のみ。本文だけの編集では再起動しない)。
 - **素材 (FL Studio・プラグイン) は R2 から取得できたとは限らない**。
   `$ARTIFACTS_DIR` を `ls` して実在を確認してから再実行する。空なら手元の検証
   スナップショットを使う。どちらも無ければ「素材なしで e2e は実行できない」と報告して

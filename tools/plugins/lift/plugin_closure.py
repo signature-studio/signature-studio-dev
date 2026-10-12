@@ -9,6 +9,8 @@
 使い方: plugin_closure.py <block番号> ...   |  --all
 """
 import os, sys, json, struct, re, collections
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'shared'))
+from paths import FL_WIN64_DIR
 import pefile
 from capstone import Cs, CS_ARCH_X86, CS_MODE_64
 from capstone.x86 import X86_OP_MEM, X86_REG_RIP
@@ -16,7 +18,7 @@ from capstone.x86 import X86_OP_MEM, X86_REG_RIP
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, '..')
 WORK = os.path.join(ROOT, 'work')
-EXT = '/home/ubuntu/work/analysis/win64/extracted'
+EXT = os.path.join(FL_WIN64_DIR, 'extracted')
 FWTHR = 13
 
 

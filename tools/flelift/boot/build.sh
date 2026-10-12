@@ -7,9 +7,10 @@
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 FLE="$(cd "$HERE/.." && pwd)"
+source "$HERE/../../shared/env.sh"
 SX="$(cd "$FLE/../shimx" && pwd)"
 W="$FLE/work/boot"
-PE="${FLE_PE:-/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin}"
+PE="${FLE_PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}"
 V="${1:-plain}"
 case "$V" in plain|strict|nosx|chk) ;; *) echo "usage: build.sh [plain|strict|nosx|chk]"; exit 1;; esac
 mkdir -p "$W/obj" "$W/tmp"

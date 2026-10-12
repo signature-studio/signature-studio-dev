@@ -42,6 +42,41 @@ check('derefix 対象外 [rcx+8]', R.derefix_pieces(ins) is None)
 ins = next(cs.disasm(bytes.fromhex('660f2f0510000000'), 0x1000))
 check('capstone disp_size 誤り (66 prefix rip-rel) を検知', ins.disp_size != 4, 'disp_size=%d' % ins.disp_size)
 
+# ---- ICALL-5 追加 pass (ir_fix_mask / ir_override / simd_merge): PE 不要
+import tempfile
+def _run(script, *args):
+    r = subprocess.run([sys.executable, os.path.join(ROOT, script)] + list(args), capture_output=True, text=True)
+    return r.returncode, r.stdout
+_td = tempfile.mkdtemp()
+_ll = os.path.join(_td, 'a.ll')
+open(_ll, 'w').write("""define i64 @function_1801aa1a0() {
+  %96 = icmp ult i64 %94, -4294967295
+  %97 = add i64 %94, 4294967295
+  %98 = select i1 %96, i64 %94, i64 %97, !insn.addr !7357
+  %99 = icmp ult i64 %5, -4294967295
+  %100 = add i64 %5, 7
+  %101 = select i1 %99, i64 %5, i64 %100
+  ret i64 %98
+}
+define i64 @function_1801c8c00(i64 %arg1) {
+  ret i64 0
+}
+""")
+_rc, _o = _run('ir_fix_mask.py', _ll, _ll + '.o')
+_t = open(_ll + '.o').read()
+check('fix_mask: select 形 1 件を and -4294967296 に置換 (別定数の同形は触らない)', json.loads(_o)['hi32_mask_fixed'] == 1 and '%98 = and i64 %94, -4294967296, !insn.addr !7357' in _t and '%101 = select' in _t, _o)
+_rc, _o = _run('ir_override.py', _ll, _ll + '.o2', '1801c8c00')
+_t = open(_ll + '.o2').read()
+check('override: define → declare (引数個数保持)', _rc == 0 and 'declare i64 @function_1801c8c00(i64)' in _t and 'define i64 @function_1801c8c00' not in _t, _o)
+_rc, _o = _run('ir_override.py', _ll, _ll + '.o3', '1801c8c00,deadbeef')
+check('override: IR に無い VA は exit 1 (取りこぼし検知)', _rc == 1 and 'deadbeef' in json.loads(_o)['missing'], _o)
+_gen = os.path.join(_td, 'g.c'); _ex = os.path.join(_td, 'e.c'); _out = os.path.join(_td, 'o.c')
+open(_gen, 'w').write('static int m11_simd_unimpl_once(const char* n) { return 0; }\nEMSCRIPTEN_KEEPALIVE u128 __asm_foo(u128 a) { m11_simd_unimpl_once("__asm_foo"); return 0; }\nEMSCRIPTEN_KEEPALIVE u128 __asm_bar(u128 a) { m11_simd_unimpl_once("__asm_bar"); return 0; }\n')
+open(_ex, 'w').write('u128 __asm_foo(u128 a) { return a; }\n')
+_rc, _o = _run('simd_merge.py', _gen, _out, _ex)
+_t = open(_out).read()
+check('simd_merge: extra 定義済みの stub を除き、残る stub は abort する', '__asm_foo(u128 a) { m11' not in _t and 'abort()' in _t and '__asm_bar' in _t, _o)
+
 # ---- pe: OTT closure に対する固定値
 if os.path.exists(OTT):
     img = A.Image(OTT)

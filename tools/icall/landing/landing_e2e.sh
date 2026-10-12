@@ -10,10 +10,12 @@
 #   ④ native vs wasm 差分検証: 493 pad × 3 pattern = 1479 case 全て equal
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
-PE=/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin
-OTT=/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll
-FUNCS=/home/ubuntu/work/webstudio/tools/icall/work/fle_F.txt
+source "$HERE/../../shared/env.sh"
+PE="$FL_WIN64_DIR/extracted/block00031_PE.bin"
+OTT="$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll"
+FUNCS="$REPO_ROOT/tools/icall/work/fle_F.txt"
 W="$HERE/work"
+export W
 QUICK="${1:-}"
 RC=0
 
@@ -43,8 +45,8 @@ python3 "$HERE/lift_pad.py" --fragments "$W/ott_fragments.json" --verify-out "$W
 
 echo "[6/6] 判定"
 python3 - <<'PY' || RC=1
-import json, sys
-W = '/home/ubuntu/work/webstudio/tools/icall/landing/work'
+import json, os, sys
+W = os.environ['W']
 fr = json.load(open(W + '/fle_fragments.json'))
 sc = json.load(open(W + '/fle_scopes.json'))
 xs = json.load(open(W + '/fle_xdata.json'))
