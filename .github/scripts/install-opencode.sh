@@ -10,9 +10,16 @@
 #   インストーラ内部のこの 1 リクエストに効かない。さらに旧ループの待ち時間は 0 秒
 #   だったので 3 回の試行が 1.28 秒で潰え、workflow は一度も完走していない。
 #
-# 取得元 (第一候補 = GitHub Releases の tarball 直接取得):
-#   anomalyco/opencode の release asset を直接ダウンロードする。metadata API を
-#   一切経由しないので、500 の影響を受けない。
+# 取得元 (第一候補 = npm registry の tarball 直接取得):
+#   @opencode/cli-<target>@<pin> を registry.npmjs.org から直接ダウンロードする。
+#   metadata API を一切経由しないので、500 の影響を受けない。
+#
+#   なぜ Releases より npm を先に置くか: anomalyco/opencode には tag v2.0.26 /
+#   v2.0.27 が存在するが、releases/download/v2.0.26/opencode-<target>.tar.gz は
+#   404 で、2.x の release 資産は publish されていない (2026-10-12 実測)。
+#   releases/latest も v1.19.0 のままで、Releases 経路では 2.x を絶対に取れない。
+#   既定は「今の CLI」である 2.x に固定したいので、Releases (1.x の別 pin) は
+#   フォールバックに回す。
 #
 #   なお `anomalyco/opencode-beta` は Releases に CLI 資産を持たない
 #   (2026-10-12 時点、公開済 release はすべて opencode-desktop-* と
@@ -20,20 +27,21 @@
 #   古い)。そのため beta リポジトリは取得元として使わない。
 #
 #   注意: Releases 系統と npm 系統はバージョントラックが異なる。
-#     Releases: v1.19.0 まで (1.x 系)
-#     npm:      2.0.26 (2.x 系 / @opencode/cli-<target>)
-#   よって pin は 2 本持つ (OPENCODE_RELEASE_VERSION / OPENCODE_VERSION)。
+#     npm:      2.0.26 (2.x 系 / @opencode/cli-<target>) ← 既定・第一経路
+#     Releases: v1.19.0 まで (1.x 系) ← フォールバック用の別 pin
+#   よって pin は 2 本持つ (OPENCODE_VERSION / OPENCODE_RELEASE_VERSION)。
 #
 # 検証は、最後に `opencode --version` を実際に実行して
-# 「 whichever 経路が勝ったかに応じた期待値」と一致することを確認してから exit 0。
+# 「経路が勝ったかに応じた期待値」と一致することを確認してから exit 0。
 #
 # 注意: 「sleep による 10 秒以上の待機禁止」は opencode エージェント (opencode run)
 # 向けの規約で、CI のセットアップ step には適用されない。ここでは待避を優先する。
 set -euo pipefail
 
-# デフォルトの pin (2026-10-12 実測)。
-# - Releases tag v1.19.0 / asset opencode-linux-x64.tar.gz の SHA-256
+# デフォルトの pin (2026-10-12 実測)。npm が既定 (第一経路) で、Releases は
+# フォールバック用の別 pin。
 # - npm @opencode/cli-linux-x64@2.0.26
+# - Releases tag v1.19.0 / asset opencode-linux-x64.tar.gz の SHA-256
 DEFAULT_RELEASE_VERSION="v1.19.0"
 DEFAULT_NPM_VERSION="2.0.26"
 
@@ -54,7 +62,7 @@ warn() { printf '::warning::%s\n' "$*"; }
 err() { printf '::error::%s\n' "$*"; }
 
 # 一時ディレクトリは RUNNER_TEMP (runner 上の作業領域) に作る。
-# /tmp は小さい・共有され得る الحجمなので、200MB 弱の tarball 展開には使わない。
+# /tmp は小さい・共有され得るサイズなので、200MB 弱の tarball 展開には使わない。
 SCRATCH="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
 new_tmpdir() { mktemp -d "$SCRATCH/oc-install.XXXXXXXX"; }
 
@@ -94,7 +102,10 @@ detect_target() {
   [ "$needs_baseline" = false ] || suffix="baseline"
   [ "$is_musl" = false ] || suffix="${suffix:+$suffix-}musl"
 
-  # arm64 には baseline ビルドが存在しない
+  # musl は glibc とは別軸の判定なので、baseline と独立に後ろへ連結する
+  # (順序が baseline → musl なのはこのため)。
+  # ただし arm64 には baseline ビルドが存在しないので、arm64 では
+  # baseline だけを suffix から外す (musl は残る)。
   if [ -n "$suffix" ] && [ "$arch" = arm64 ]; then
     suffix="${suffix%-baseline}"
   fi
@@ -126,8 +137,9 @@ verify_sha256() {
   log "sha256 verified: $actual"
 }
 
-# --- 経路 1: GitHub Releases の tarball を直接取得 --------------------------
-# 第一候補。metadata API を経由しないので transient 500 の影響を受けない。
+# --- 経路 2: GitHub Releases の tarball を直接取得 (フォールバック) ----------
+# 2.x の release 資産は publish されていないので、この経路は 1.x (別 pin) 専用。
+# metadata API を経由しないので transient 500 の影響を受けない。
 install_via_github_release() {
   local url tmpdir ext="tar.gz" src
   case "$TARGET" in
@@ -161,8 +173,9 @@ install_via_github_release() {
   rm -rf "$tmpdir"
 }
 
-# --- 経路 2: npm registry の tarball を直接取得 ------------------------------
-# 経路 1 が使えないときのフォールバック。公式インストーラが使うのと同じ配布物。
+# --- 経路 1: npm registry の tarball を直接取得 (既定) ----------------------
+# 第一候補。公式が v2 系で推している配布経路で、公式インストーラが --version
+# 指定時に参照するのと同じ配布物。
 # @opencode/cli-<target> は package.json に bin フィールドが無いため npm i -g では
 # PATH に乗らない。tarball を展開して package/bin/opencode を配置する。
 install_via_npm_tarball() {
@@ -170,6 +183,8 @@ install_via_npm_tarball() {
   command -v tar >/dev/null 2>&1 || { err "tar is required"; return 1; }
 
   # 旧スコープ @opencode-ai へのフォールバック (公式インストーラと同じ扱い)。
+  # ただし旧スコープの latest は 1.18.18 で 2.x を持たないため、既定 pin (2.x) を
+  # 当てた場合は必ず 404 になる。1.x pin を設定したときだけ意味を持つ互換経路。
   for scope in @opencode @opencode-ai; do
     pkg="$scope/cli-$TARGET"
     # スコープ込みのパッケージ名を URL パスに載せる。スコープだけをエンコードして
@@ -196,7 +211,7 @@ install_via_official_installer() {
 }
 
 # --- 指数バックオフ付き試行 --------------------------------------------------
-# attempt ごとに 2 倍로増える待ち時間を入れる (上限 60s)。
+# attempt ごとに 2 倍で増える待ち時間を入れる (上限 60s)。
 try_with_backoff() {
   local label="$1" expect="$2"
   shift 2
@@ -225,6 +240,7 @@ case "$SOURCE" in
   releases) source_releases=true ;;
   npm) source_npm=true ;;
   auto)
+    # 両方の経路を有効にする。試行順は下の if 連鎖 (npm → Releases) で決まる。
     source_releases=true
     source_npm=true
     ;;
@@ -238,20 +254,24 @@ installed=false
 installed_from=""
 
 # 公式インストーラは INSTALL_DIR を $HOME/.opencode/bin でハードコードしていて、
-# 渡された値を無視する。経路 2/3 と事後検証だけがこの変数を読むので、
+# 渡された値を無視する。npm / Releases 経路と事後検証だけがこの変数を読むので、
 # CI では既定値 (インストーラと同じパス) のまま使うのが前提。
+#
+# auto の順序は npm (既定 2.x) → Releases (1.x の別 pin) → 公式インストーラ。
+# かつては Releases を先にしていたが、2.x の release 資産が publish されて
+# いないため既定が 1.x に釘付けになる。npm を第一経路に固定した。
 
-if [ "$source_releases" = true ]; then
-  if try_with_backoff "github release v$RELEASE_VERSION" "$RELEASE_VERSION" install_via_github_release; then
-    installed=true
-    installed_from="github release anomalyco/opencode v$RELEASE_VERSION"
-  fi
-fi
-
-if [ "$installed" = false ] && [ "$source_npm" = true ]; then
+if [ "$source_npm" = true ]; then
   if try_with_backoff "npm @opencode/cli-$TARGET@$NPM_VERSION" "$NPM_VERSION" install_via_npm_tarball; then
     installed=true
     installed_from="npm @opencode/cli-$TARGET@$NPM_VERSION"
+  fi
+fi
+
+if [ "$installed" = false ] && [ "$source_releases" = true ]; then
+  if try_with_backoff "github release v$RELEASE_VERSION" "$RELEASE_VERSION" install_via_github_release; then
+    installed=true
+    installed_from="github release anomalyco/opencode v$RELEASE_VERSION"
   fi
 fi
 
