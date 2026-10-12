@@ -53,7 +53,9 @@ const specs: PluginSpec[] = JSON.parse(readFileSync(new URL('../specs/wasm_plugi
 const khp = '/home/ubuntu/work/webstudio/tools/targets/kilohearts/work/macpkg/product_index.json';
 if (existsSync(khp)) {
   for (const p of JSON.parse(readFileSync(khp, 'utf8')).plugins as Array<{ id: string; fileName: string; formats: string[] }>) {
-    if (p.formats.includes('vst2') && p.id.length === 4) specs.push({ name: p.fileName, vendor: 'Kilohearts', format: 'vst2', kind: 'effect', magic: p.id, path: `C:\\Program Files\\Common Files\\VST2\\Kilohearts\\${p.fileName}.dll`, category: 'Kilohearts' });
+    // "Effect" on all 44 KH VST2 fx; Phase Plant is the only KH generator (Generators\VST, category "Synth") — same rule as cli/gen.ts / h4/specs.ts.
+    const gen = p.fileName === 'Phase Plant';
+    if (p.formats.includes('vst2') && p.id.length === 4) specs.push({ name: p.fileName, vendor: 'Kilohearts', format: 'vst2', kind: gen ? 'generator' : 'effect', magic: p.id, path: `C:\\Program Files\\Common Files\\VST2\\Kilohearts\\${p.fileName}.dll`, category: gen ? 'Synth' : 'Effect' });
   }
 }
 const g = generateDb(specs);
