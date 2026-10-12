@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""kh12_ctor_ids.py — EditorModel ctor (0x180051af0) 呼出元 47 関数 (= 製品別 EditorModel 派生 ctor) を
+"""kh249_ctor_ids.py — EditorModel ctor (0x180051af0) 呼出元 47 関数 (= 製品別 EditorModel 派生 ctor) を
 RTTI クラス名で同定する (KH-11 #249 の 47 vs 46 差分用)。
 手順: 各呼出元の先頭 24 命令内の `lea reg,[rip+X]` (= 派生 vtable) → vtable[-1] = COL → TypeDescriptor 名 (MSVC 装飾名)。
-usage: kh12_ctor_ids.py [--xref work/xref_kh11.json] [--json OUT]"""
+usage: kh249_ctor_ids.py [--xref work/xref_kh11.json] [--json OUT]"""
 import sys, os, json, struct, re
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import capstone

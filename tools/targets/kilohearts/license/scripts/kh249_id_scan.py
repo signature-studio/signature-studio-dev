@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""kh12_id_scan.py — .text 全域で製品 id (FourCC, BE dword) の imm32 を持つ命令を列挙し、含む関数の直接 call 先 ∩ EditorModel 派生 ctor (47) を求める。
-usage: kh12_id_scan.py --ctors work/ctor_ids.json --json OUT"""
+"""kh249_id_scan.py — .text 全域で製品 id (FourCC, BE dword) の imm32 を持つ命令を列挙し、含む関数の直接 call 先 ∩ EditorModel 派生 ctor (47) を求める。
+usage: kh249_id_scan.py --ctors work/ctor_ids.json --json OUT"""
 import sys, os, json, struct, bisect, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import capstone
