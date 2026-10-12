@@ -4,7 +4,8 @@
 #   出力: work/coresident/co.cjs  (exports: _run_a/_run_b/_a_data_install/_b_data_install/_ott_alog_addr/_malloc), layout.sh
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; LB="$HERE/.."; OTT="$LB/../../ott"
-DLL=/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll
+source "$LB/../../shared/env.sh"
+DLL="$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll"
 BA=0x10000; BB=0x400000; OUT="$LB/work/coresident"; mkdir -p "$OUT/a" "$OUT/b"
 source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1
 python3 "$OTT/lift/mkentries.py" "$OTT/ref/cov_all.json" "$OUT/entries.json" >/dev/null
