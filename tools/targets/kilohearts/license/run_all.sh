@@ -54,6 +54,12 @@ echo "--- emfire (manager slot 起火 E2E / 参考実行・未解決)"
 node harness/compare.mjs work/emfire_200_1.bin work/licE/mod.cjs work/licE/sigs.json --json work/emfire_200_1.json | tail -1 || \
   echo "WARN emfire: wasm 側の未 lift thunk (0x180003360) により bit 不一致 (KH-11 REPORT 未解決・起票先: 親 CAB-13)"
 
+echo "== [4b] KH-11b (#249): snap-in ブラウザ分類 0x180ef7fc0 の lift (module F) → 分類ゲート/カテゴリ実行検証 + 47 ctor の RTTI 同定"
+python3 lic_build.py --module F | tail -1
+node kh12_check.mjs | tail -1
+python3 scripts/xrefscan.py 180051af0 --json work/xref_kh11.json | head -2 | tail -1
+python3 scripts/kh12_ctor_ids.py --json work/ctor_ids.json | tail -1
+
 echo "== [5] まとめ"
 node -e '
 const fs = require("fs");
