@@ -53,15 +53,35 @@ IppStatus ippsThreshold_LT_32f_I(Ipp32f *sd, int n, Ipp32f lv) { NP1(sd); LEN(n)
 #endif
 IppStatus ippsVectorSlope_32f(Ipp32f *d, int n, Ipp32f off, Ipp32f slope) {
   NP1(d); LEN(n);
-  for (int i = 0; i < n; i++) {
 #if VSLOPE == 0
-    d[i] = off + slope * (float)i;
-#elif VSLOPE == 1
+  /* IPP-9 (#276): 実 DLL の算法 (全 ISA 経路同一)。幅 16 ブロックの累積。
+     レーン k=4g+j の初期値 = off + (j*s に 4s を g 回加算)、以降 step=16*s を加算。
+     端数は先頭 = 次ブロックのレーン0、以降は直前要素 + s の直列加算。FMA 融合禁止。 */
+  {
+    const float s4 = 4.0f * slope, step = 16.0f * slope;
+    float lane[16];
+    for (int k = 0; k < 16; k++) {
+      float v = (float)(k & 3) * slope;
+      for (int g = 0; g < (k >> 2); g++) v = v + s4;
+      lane[k] = off + v;
+    }
+    int i = 0;
+    for (; i + 16 <= n; i += 16)
+      for (int k = 0; k < 16; k++) { d[i + k] = lane[k]; lane[k] += step; }
+    if (i < n) {
+      d[i] = lane[0];
+      for (i++; i < n; i++) d[i] = d[i - 1] + slope;
+    }
+  }
+#else
+  for (int i = 0; i < n; i++) {
+#if VSLOPE == 1
     d[i] = (float)((double)off + (double)slope * (double)i);
 #else
     d[i] = fmaf(slope, (float)i, off);
 #endif
   }
+#endif
   return 0;
 }
 

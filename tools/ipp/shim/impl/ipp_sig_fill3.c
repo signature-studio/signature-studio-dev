@@ -249,16 +249,26 @@ IppStatus ippsConvert_16s32f(const Ipp16s *pSrc, Ipp32f *pDst, int len) {
 }
 
 /* ============ 7. VectorSlope ============ */
-/* 実測 (probe_d/vs4): offset + i*slope の直接積。
-   **残差 (未解決・起票先: 本チケット REPORT)**: 実 DLL の 64f 版は SIMD ブロック累積経路で
-   値を生成しており、80 要素中 24 要素 (30%) が自前実装と **±1 ULP** 異なる (絶対値は
-   相対 1e-16 帯)。VectorSlope_32f も同種のブロック累積で bit 再現未解決 (REPORT §4) であり、
-   64f は double 精度のため相対誤差は 32f より小さい。bit-exact は次のチケットで
-   win カーネル逆アセ (CPU dispatch 込み) により解明する。 */
+/* IPP-9 (#276): 実 DLL の生成算法 (全 ISA 経路で同一出力・ブロック幅 8 の累積)。
+   - 8 要素ブロックの 8 レーン k の初期値: o+k*s (k=0..4,6)、レーン5 = o+(3s+2s)、
+     レーン7 = o+((3s+2s)+2s) (積の丸めを挟んだ加算経路)。
+   - 以降のブロックは各レーンに step=8*s を加算して更新 (len/8 ブロック)。
+   - 端数 (len%8) は先頭要素 = 次ブロックのレーン0 累積値、以降は直前要素 + s の直列加算。
+   乗算と加算は融合しない (-ffp-contract=off 必須)。 */
 IppStatus ippsVectorSlope_64f(Ipp64f *pDst, int len, Ipp64f offset, Ipp64f slope) {
   if (!pDst) return ippStsNullPtrErr;
   if (len < 1) return ippStsSizeErr;
-  for (int i = 0; i < len; i++) pDst[i] = offset + (double)i * slope;
+  const double s = slope, s2 = 2.0 * s, s3 = 3.0 * s, s5 = s3 + s2;
+  double lane[8] = {offset,         offset + s,        offset + s2,           offset + s3,
+                    offset + 4.0 * s, offset + s5, offset + 6.0 * s, offset + (s5 + s2)};
+  const double step = 8.0 * s;
+  int i = 0;
+  for (; i + 8 <= len; i += 8)
+    for (int k = 0; k < 8; k++) { pDst[i + k] = lane[k]; lane[k] += step; }
+  if (i < len) {
+    pDst[i] = lane[0];
+    for (i++; i < len; i++) pDst[i] = pDst[i - 1] + s;
+  }
   return ippStsNoErr;
 }
 
