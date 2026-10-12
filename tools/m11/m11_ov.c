@@ -230,6 +230,74 @@ unsigned long long function_4133f0(unsigned long long dest, unsigned long long s
     return 0;
 }
 
+/* function_412d60  VA 0x412d60  (System._UStrClr(dest: PPointer))
+ * RetDec は `mov rax,[rbx]` (旧値の読出し) を落とし, dest のアドレス自体を文字列ポインタとして refcnt を触った (4133f0 と同型).
+ *   old=*dest; old!=nil → *dest=0; refcnt(old-8)>0 → --refcnt==0 なら 0x409440(old-0x10) (FreeMem). 戻り値 = dest */
+unsigned long long function_412d60(unsigned long long dest, unsigned long long unused) {
+    (void)unused;
+    u64 old = Q(dest);
+    if (old) {
+        u64 hdr = old - 0x10;
+        Q(dest) = 0;
+        int rc = (int)D(hdr + 8);
+        if (rc > 0) {
+            D(hdr + 8) = (u32)(rc - 1);
+            if (rc - 1 == 0) function_409440(hdr);
+        }
+    }
+    return dest;
+}
+
+/* function_418190  VA 0x418190  (System._LStrArrayClr/_DynArrayClear 系: dest=PPointer, rdx=type info)
+ * 同上: `mov rsi,[rbx]` の旧値読出しが落ちている. refcnt は old-0xc (int32), length は old-8.
+ *   old=*dest; old!=nil → *dest=0; refcnt(old-0xc)>0 → --refcnt==0 なら
+ *   elem=Q(ti+6+B(ti+1)) があり len=Q(old-8)!=0 なら 0x416230(old, Q(elem), len) (要素 finalize) → 0x409440(old-0x10). 戻り値 = dest */
+unsigned long long function_418190(unsigned long long dest, unsigned long long ti, unsigned long long unused) {
+    (void)unused;
+    u64 old = Q(dest);
+    if (old) {
+        Q(dest) = 0;
+        int rc = (int)D(old - 0xc);
+        if (rc > 0) {
+            D(old - 0xc) = (u32)(rc - 1);
+            if (rc - 1 == 0) {
+                u64 elem = Q(ti + 6 + (u64)B(ti + 1));
+                if (elem) {
+                    u64 len = Q(old - 8);
+                    if (len) function_416230(old, Q(elem), (unsigned int)len);
+                }
+                function_409440(old - 0x10);
+            }
+        }
+    }
+    return dest;
+}
+
+/* function_416db0  VA 0x416db0  (System._CopyArray 系: rcx=dst, rdx=src, r8=型情報(kind byte 先頭), r9=要素数; kind で要素 copy を分岐)
+ * RetDec は `movzx rcx, byte ptr [rax]` (rax=r8=型情報) の kind 読出しを落とし, kind が常に 0 → 未知 kind の Error (Halt0) に直行した
+ * (unit #18: TFormatSettings の string フィールド (kind=18) が 416750 → 416db0 で Halt0). 逆アセンブル 0x416db0-0x416f65 と突合:
+ *   10→413540 / 11→4134e0 / 15→41a7b0 (8B 刻み) / 17→418210(…, ti) / 18→_UStrAsg(4133f0) / 12→416720 (0x18 刻み)
+ *   13→自己再帰 (ti+B(ti+1) の {+6:count, +2:stride, +0xa:elemti**}) / 14,22→416750(dst,src,ti) (stride=D(r14+2)) / 他→Error(2) */
+unsigned long long function_416db0(unsigned long long dst, unsigned long long src, unsigned long long ti, unsigned int cnt) {
+    u64 rbx = dst, rsi = src, r13 = (u64)cnt;
+    if (r13 == 0) return 0;
+    u64 rax = 0;
+    u32 kind = B(ti);
+    u64 r14 = ti + (u64)B(ti + 1);
+    switch (kind) {
+    case 10: do { rax = function_413540(rbx, Q(rsi)); rbx += 8; rsi += 8; } while (--r13); break;
+    case 11: do { rax = function_4134e0(rbx, Q(rsi)); rbx += 8; rsi += 8; } while (--r13); break;
+    case 12: do { rax = function_416720(rbx); (void)rsi; rbx += 0x18; rsi += 0x18; } while (--r13); break;
+    case 13: do { u64 et = Q(Q(r14 + 0xa)); rax = function_416db0(rbx, rsi, et, D(r14 + 6)); u64 st = D(r14 + 2); rbx += st; rsi += st; } while (--r13); break;
+    case 14: case 22: do { rax = function_416750(rbx, rsi, ti); u64 st = D(r14 + 2); rbx += st; rsi += st; } while (--r13); break;
+    case 15: do { rax = function_41a7b0(rbx, Q(rsi)); rbx += 8; rsi += 8; } while (--r13); break;
+    case 17: do { rax = function_418210(rbx, Q(rsi), ti); rbx += 8; rsi += 8; } while (--r13); break;
+    case 18: do { rax = function_4133f0(rbx, Q(rsi)); rbx += 8; rsi += 8; } while (--r13); break;
+    default: function_409730(2); break;
+    }
+    return rax;
+}
+
 /* function_412770  VA 0x412770  (System: InitContext 復元 + longjmp(setjmp 点=entry_point 内) )
  * 実機では戻らない (DllMain の setjmp が eax=1 で再返却 → DllMain は TRUE を返す).
  * lift 版は longjmp を表現できず, 通常 return して Halt0 が ExitProcess まで進んでしまう (実測).
