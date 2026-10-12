@@ -8,6 +8,7 @@
 uint64_t R[16];
 X128 X[16];
 X128 XH[16];   /* CAB-135: ymm 上位 128bit (VEX.256 / VEX zeroing 用) — tools/ott/rt/ott_cpu.c と同等 */
+uint32_t ott_mxcsr = 0x1f80u;   /* CAB-138: MXCSR software shadow (既定 0x1f80, ldmxcsr/stmxcsr 用) */
 uint8_t fZF, fSF, fCF, fOF, fPF;
 uint64_t ott_xrip;
 
