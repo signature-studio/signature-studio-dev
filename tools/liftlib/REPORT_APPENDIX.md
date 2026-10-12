@@ -61,13 +61,13 @@ cd tools/liftlib && python3 -m liftlib leafspec targets/ott_iargs.json --n 200  
 |---|---|---|
 | 1 | `scan()` の `sites_entry` が常に空 | **実装を選択** (検出不能が意図ではない: `run()` は同じ判定 `defs_before(C, reg) == {0}` で修理している)。`scan()` が各 call site の callee live 位置 k について、IR に引数 k があり・機械語の到達定義が入口のみで・IR 引数が呼出元自身の `%arg{k+1}` でも `run()` 生成の `%ia_*` でもないものを `sites_entry` に列挙 |
 | 2 | `targets/ott_iargs.json` の `/home/ubuntu` 固定 | target json の `image` を `${OTT_DLL}` にし、`pipeline.rpath()` が `liftlib/env.py` の `PATH_VARS` (`ANALYSIS_DIR` / `PLUGINS_DIR` / `OTT_DLL`) で展開。同じ固定パスを持つ `targets/ott_leaf.json`・`tests/test_unit.py`・`p1_residual_census.py`・`xmm0_ret_census.py` も `env.OTT_DLL` に統一 (`lowbase_e2e.sh` は範囲外: 未解決) |
-| 3 | REPORT.md が 250 行上限超過 | §17 を本書へ**そのまま分割移動** (削除なし)。REPORT.md 側は要約 + link |
+| 3 | REPORT.md が 250 行上限超過 | §17 を本書へ**そのまま分割移動** (削除なし)。REPORT.md 側は要約 + link。**REPORT.md は 644 → 600 行 (実測 `wc -l`) で 250 行上限には未達** (§1〜§16 が先行 PR で既に 550 行超。追加の分割移動は別チケット) |
 | 4 | REPORT の外部絶対パス | §17 冒頭の runner 絶対パスを `[ANALYSIS-PLUGINS]` と repo 相対 `work/` の記述に置換 |
 
 実測 (runner 4 core, 直列):
 - `iargs.scan()` (OTT `ott.drc.ll`, base 正規化後): define_short **15** / sites_short **15** / sites_entry **17** (7 caller / 引数位置のべ 17)。`run()` 後の再走査は **0 / 0 / 0**。sites_entry はすべて引数個数は足りているが入口素通し位置の IR 引数が別値の site (`function_180127550` → `function_180126920` の k=1..3 ほか)。なお引数不足 site (sites_short) 内の入口素通し位置は 9 (`run()` の `args_entry_fixed` 26 = 17 + 9)。
 - unit T16 に被覆追加: 検出前 17 件、復元後 0 件、復元済み ctor 呼出しの rcx を `undef` に戻すと `sites_entry` が検出 (逆方向)。
-- `python3 tools/liftlib/tests/test_unit.py` のうち T7〜T16: **PASS** (T1〜T5 も ok。T6 は FA の SlateCore を要し `work-liftlib-targets` 未取得のため未実行)。T7〜T16 の合計 160 s / load average 0.97。
+- unit: T7〜T16 **PASS** (T1〜T5 も ok。T6 は FA の SlateCore を要し `work-liftlib-targets` 未取得のため未実行)。T7〜T16 一括 160 s / load 0.97。コミット済み HEAD `2db928d` での T16 単体 **123.4 s** / load 0.94 (scan を 4 回走らせるため)。
 - `python3 -m liftlib leafspec targets/ott_iargs.json --n 200`: **match=200 mismatch=0 (200/200)**, gate PASS, 23.6 s。
 - ネガコン (同 json の `passes.iargs=false`): **match=0 mismatch=200 (0/200)**, 2.9 s。
 
