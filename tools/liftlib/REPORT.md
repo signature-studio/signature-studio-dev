@@ -642,3 +642,31 @@ T12 は「join split が発動すること」を assert していたが、LIFTLI
 python3 tools/liftlib/tests/test_unit.py            # T16 = iargs の検出/復元/冪等 (素材: work-m6-ott, analysis-ott-binaries)
 cd tools/liftlib && python3 -m liftlib leafspec targets/ott_iargs.json --n 200   # ctor 200/200 (emsdk 要)
 ```
+
+## 18. lowbase_e2e.sh の DLL パス環境変数化 (#440, 親 #294 / 発見 #427)
+
+既知類型との関係 (DEFECTS.md): 該当なし (lift 欠陥ではなくスクリプトのパス固定の解消)。
+
+- 変更: `tools/liftlib/lowbase_e2e.sh` の `DLL=/home/ubuntu/work/analysis/...` 固定を
+  `source tools/shared/env.sh` + `DLL="${OTT_DLL:-$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll}"` に置換。
+  `PLUGINS_DIR` 未設定時の既定は `/home/ubuntu/work/analysis/plugins` で従来と同一パス。DLL が無い場合は exit 2。
+- 検証 (コミット済み HEAD 100b550、Actions runner 4 vCPU、`ANALYSIS_DIR=$HOME/analysis`、直列 n=1):
+
+| 項目 | 実測 |
+|---|---|
+| 変更後 `bash tools/liftlib/lowbase_e2e.sh` | ALL PASS / rc=0 / 1:19.00 / load average 1.39 (1 分値) |
+| 変更前 (origin/main 版の DLL 行のみ runner の実在パスに差替) | ALL PASS / rc=0 / 1:19.78 |
+| SUMMARY 節 (liftlib ott ×2・x64c 3 構成・合計 150,708 cell) の diff | 差 0 (`SUMMARY_IDENTICAL`) |
+| ネガコン `PLUGINS_DIR=/nonexistent` | `/nonexistent/ott/binaries/OTT_vst2_win64.dll 無し` exit 2 |
+| ネガコン `OTT_DLL=/nonexistent/x.dll` | `/nonexistent/x.dll 無し` exit 2 |
+| 環境変数なし (既定値) | `/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll` を指す (この runner には無く exit 2) |
+
+- 検証範囲外: `--full` (hostbridge の RetDec chain + Chrome)。`tools/hostbridge/lowbase/lowbase_e2e.sh` 内の同種固定は未確認・未変更。
+- 検証メモ: `work-liftlib` 素材内の `work/ott_*/work/full_t1.drc.{ll,dsm}` は `/home/ubuntu/work/webstudio/...` への絶対 symlink で、
+  runner では dangling となり `recipes/ott.py` が `FileExistsError` で落ちる (初回 run で観測)。gitignore 対象の `work/` 内のため
+  runner 上で `ws-440` の同名ファイルへ張り直して検証した (commit 対象外)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `work-liftlib` / `work-m6-ott` 素材の絶対 symlink (`/home/ubuntu/work/webstudio/...`) が runner で dangling。lowbase_e2e [2] が素材展開直後は FAIL | Actions 上で lowbase_e2e を再実行する度に手動張り直しが要る | #440 にコメントで提案 (素材の相対 symlink 化 or `recipes/ott.py` の `os.path.lexists` 判定) |
+| `tools/ott/avx/build_avx.sh`・`tools/ott/crtinit/lift_crt.sh`・`tools/ott/accept/acc_crt_table.py`・`tools/ott/avx/unsup_scan.py`・`tools/m9/m9_tablebind.py`・`tools/shimx/scripts/import_scan.py`・`tools/liftlib/tests/test_unit.py`・`tools/liftlib/xmm0_ret_census.py` にも同一の固定パスが残る | 同種の移植性欠陥 (本 issue の範囲外) | 新規子チケット案 (CI-4 系列) |
