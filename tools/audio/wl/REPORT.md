@@ -57,7 +57,7 @@
 | 静的 negctl (`--negctl`: gate の API 名を実在しない名に差替え) | gate 4/4 FAIL → exit 0 (検出能力あり) |
 | 動的 negctl 5 件 (全て「壊した入力で検査器が FAIL を出す」を確認) | ①負荷 1.5 倍で直走行の健全性 gate が FAIL (rt_ratio 0.635 < 0.99) ②ring の underrun 443 (>0) ③入力を接続しない loop は corr 0 で lag gate が FAIL ④ring の lag 1536 f を直走行用 gate (lag==B) に通すと FAIL ⑤ramp を 1 件壊した結果を gate が FAIL |
 
-クリーン HEAD 再検証 (コミット済み HEAD を `git worktree add --detach` で展開して実行): 本節の下に追記する (§7)。
+**クリーン HEAD 再検証** (検証起点 commit `fea636d`, `git worktree add --detach` で展開, `bash tools/audio/wl/e2e.sh` = 両ビルド + 静的 gate/negctl + 比較 e2e): **exit 0, 全体 246 s (うち run.mjs 230.6 s), load average 開始 0.03 / 終了 0.17, 並列 1, 32/32 合格 (negctl 5 件を含む), 静的 gate 4/4 PASS・静的 negctl 4/4 FAIL (期待どおり)**。lag は作業ツリー実行と同値 (wl = B f, ring = 1408/1536/2048 f)。`results/results.json` は作業ツリー実行 (230.9 s) の保存物。
 
 検証範囲 / 範囲外: 範囲 = fake シンクの headless Chrome・48 kHz・テスト音ミキサ代役・FLEngine PE の静的 import 解析。**範囲外 = 実 FL ミキサ / 実機 (Windows/mac の実デバイス) の遅延 / Firefox・Safari / 96 kHz / burst が大きい環境での直走行の挙動 / ミキサ到達関数の特定**。
 
