@@ -88,6 +88,16 @@ IR 表 (`tools/m11/work/` = `work-m11` の既存ファイル。本 run で検証
 - `audit_lsf_disp.py` は `python3 -m py_compile` が通る (本 run で確認)。本 run では IR・image が無く、実行による再測定はしていない。
 - 判定 (採用しない・未突合 3 件は #1091) は、上記の元 run の数値に依る。再測定で数値が変われば判定を見直す。
 
+fix run の確認 (レビュー指摘 2・3 への対応):
+- 確認時刻の `$ARTIFACTS_DIR` (`/home/runner/artifacts`) は `fl-win64.tar.zst` (2,324,302,252 bytes) の 1 件のみ。`work-m11` は無い。`tools/m11/ldfix/work/` も無い。
+- `boot_final.ll` / `m11_image.bin` を `/` 以下から探したが時間切れで見つからず、入力の sha256 は取れていない。
+- よって再実行・135 / 4 件の再確認は本 fix run では未実施。`audit_lsf_disp.py` の py_compile のみ通る。
+- 次回の再測定 (PR 本文の `oc_artifacts: fl-win64 work-m11` で素材を取得してから実行する):
+  1. `python3 tools/m11/ldfix/audit_lsf_disp.py <work-m11 の boot_final.ll> <work-m11 の m11_image.bin> '<work-m11 の boot*.drc.config.json>' --json tools/m11/ldfix/work/audit_735_disp.json`
+     (`work/` は gitignore。`--json` の出力先をこの 1 行の固定パスとして定める。入力の相対パスは素材展開後に確定する)
+  2. 3 入力の `sha256sum` を REPORT に記録。
+  3. 結果 (LSF 列挙関数数・SUSPECT 関数) を上の表と照合し、一致・不一致を書く。不一致なら判定を見直す。
+
 ## 3. 再現
 
 機械語 (本 run で実行済み。`fl-win64` の `block00031_PE.bin` が必要。依存は `pip install capstone pefile`):
