@@ -18,7 +18,8 @@
 ### #1141 [M11-N66] 再測定 (起点 96e608df = origin/main)
 
 環境: Actions runner (4 vCPU・load 0.4〜1.1)。素材 `work-m11` を展開し IR 再生成経路で測定。PE は `fl-win64` の `extracted/block00031_PE.bin` (sha256 b2c64da4…) を使用。
-注意: `work-m11` に `lift_pe.sha256` が無く、全再生成 (`m11_bounds.py`) は素材に無い `functions_dll.csv` (Ghidra 中間物) を要求して失敗した。そのため `lift_pe.sha256` に展開 PE の sha256 を手で書いて差分経路に入れた。
+注意: `work-m11` に `lift_pe.sha256` が無く、全再生成 (`m11_bounds.py`) は素材に無い `functions_dll.csv` (Ghidra 中間物) を要求して失敗した。そのため `lift_pe.sha256` に展開 PE の sha256 を手で書いて差分経路に入れた (測定入力を手で変えた限界)。
+未解決 (起票先): 上の 2 件 (全再生成が `functions_dll.csv` を要求する問題・手書き `lift_pe.sha256` の差分経路) はいずれも #1141 のコメント https://github.com/signature-studio/signature-studio-dev/issues/1141#issuecomment-6155478121 で追跡する (新規起票なし・既存 issue への追記)。
 
 | 構成 | units_run | 停止 | survey ok/trap/miss/noproc | e2e 所要 | IR sha256 |
 |---|---|---|---|---|---|
