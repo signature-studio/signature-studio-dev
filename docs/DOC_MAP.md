@@ -132,6 +132,7 @@
 | `tools/m11/trap_triage/REPORT_663.md` | ~158 | survey の oob frames が最上位 wasm frame を 1 段捨てる (`.slice(1)`) 欠陥の修正・filter の `/^\s*at /` アンカー化・annotate の最上位集計の再計算 (#663、基準 (c) は未実施。最終 HEAD の再測定は REPORT_663 §8) |
 | `tools/m11/trap_triage/REPORT_596.md` | ~125 | work-m11 snapshot 基準の OOB 21 unit の最上位 frame 分類・4f9f40 系/414ad0 系の観測・#307 の OOB との同軸突合 (#596) |
 | `tools/m11/trap_triage/REPORT_494.md` | ~125 | survey の per-unit JSON に間接 call の site / target 別 hit 数 (`icall` 欄) を常設・#482 の復元を hit 数だけで検収 (#494) |
+| `tools/m11/trap_triage/REPORT_683.md` | ~110 | function_414ad0 (SetLength) の `[arg1]` deref 復元の C 転記 (gate `M11_OV_414AD0`) と IR 版の A/B。結論・測定値は REPORT_683 (#683) |
 | `tools/m11/trap_triage/REPORT_483.md` | ~205 | oob→halt0 12 unit の Error() 原因 = TDictionary 比較器チェーンの D4/D15 脱落 (#483)・merge 後 head の再測と ok→非 ok の原因分類 |
 | `tools/m11/trap_triage/REPORT_682.md` | ~200 | 4f9f40 系 5 unit の TList items 書込み元 = `function_47b260` (D4 の新事例) の特定と C 転記修復 (`M11_FIX_682`)・全 store 計装・ネガコン・notify (D15) の unit 別実測 (#682) |
 | `tools/m11/trap_triage/REPORT_684.md` | ~184 | #684 単発 OOB 4 unit (95/275/477/895) の個別原因: §8.2 の OOB 最上位 frame の訂正 (survey の `slice(1)` 不具合)・477 の D11 変種 (10 進 `inttoptr` の VA 未変換)・95/275/895 の最上位命令 |
