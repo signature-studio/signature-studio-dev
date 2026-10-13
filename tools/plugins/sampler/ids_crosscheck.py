@@ -20,7 +20,9 @@ fpath = sys.argv[sys.argv.index('--facts') + 1] if '--facts' in sys.argv else os
 F = json.load(open(fpath))
 md = Cs(CS_ARCH_X86, CS_MODE_64)
 md.detail = True
+HS = json.load(open(os.path.join(P, 'framework', 'hostshim', 'hs_ids.json')))['ids']
 bad = tot = 0
+extra_all = collections.Counter()
 for name, blk0, _ in targets.SHELLS:
     f = F.get(name)
     if f is None:
@@ -59,8 +61,13 @@ for name, blk0, _ in targets.SHELLS:
         if found.get(int(k), 0) < v:
             ok = False
     bad += not ok
+    for k, v in found.items():
+        if k != 'dyn' and str(k) not in f['host']['ids']:
+            extra_all[(name, k)] += v
     print('%-28s taint(imm ID: site)=%s  独立走査(imm ID: site)=%s  %s' % (
         name, {k: v for k, v in f['host']['ids'].items() if k != 'dyn'},
         {str(k): v for k, v in sorted(found.items(), key=lambda x: str(x[0])) if k != 'dyn'}, 'OK' if ok else 'NG'))
+for (name, k), v in sorted(extra_all.items()):
+    print('  独立走査のみ (taint 版に無い): %-18s ID %-4s %d site  hs_ids.json %s' % (name, k, v, '収載' if str(k) in HS else '**未収載**'))
 print('ids_crosscheck: %d/%d プラグインで取りこぼしなし (照合した taint 版 即値 ID site 計 %d)' % (len(targets.SHELLS) - bad, len(targets.SHELLS), tot))
 sys.exit(1 if bad or tot == 0 else 0)
