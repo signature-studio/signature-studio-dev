@@ -4,10 +4,14 @@
 対象: VA 0x180001000..0x180002000 (c38c8 family の算術合成 table base が置く
   JMP-thunk 領域)。memcpy 先 = 0x35d01000 (linear memory 空領域, MSCRATCH 0x35e00000 より下)。
 """
+import os
 import struct
 import sys
 
-DLL = '/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll'
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'shared'))
+from paths import PLUGINS_DIR  # noqa: E402
+
+DLL = os.path.join(PLUGINS_DIR, 'ott', 'binaries', 'OTT_vst2_win64.dll')
 TABLE_LO = 0x180001000
 TABLE_HI = 0x180002000
 LMEM = 0x35d01000

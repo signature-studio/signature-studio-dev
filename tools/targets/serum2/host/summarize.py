@@ -15,7 +15,12 @@ RUNS = [
     ("unpatched+demo", "out_u_demo"),
     ("unpatched+process-only", "out_u_proc"),
     ("unpatched+licensed+corrupt-payload", "out_u_corrupt"),
+    ("patched+sentinel", "out_p_lsent"),
+    ("unpatched+sentinel", "out_u_lsent"),
+    ("patched+demo-payload", "out_p_dpl"),
+    ("unpatched+demo-payload", "out_u_dpl"),
 ]
+SENT_PBR, SENT_PRESET = 24, "SENTINEL"  # make_cases.py と一致
 
 
 def load(work, run):
@@ -55,11 +60,32 @@ def saved_meta(work, run, side):
     d = open(p, "rb").read()
     if d[:9] != b"XferJson\x00":
         return None
-    jlen, _ = struct.unpack("<II", d[9:17])
+    jlen = struct.unpack("<Q", d[9:17])[0]
     try:
         return json.loads(d[17:17 + jlen])
     except Exception:
         return None
+
+
+def saved_dom(work, run, side):
+    """保存 state の payload (CBOR DOM)。無ければ None。"""
+    p = os.path.join(work, run, f"saved_{side}_state.bin")
+    if not os.path.exists(p):
+        return None
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import payload_codec as pc
+    try:
+        return pc.split_state(open(p, "rb").read())[1]
+    except Exception:
+        return None
+
+
+def sentinel_applied(work, run):
+    """復元が payload を適用したか: processor mpePitchBendRange==24 / controller presetName==SENTINEL。"""
+    pd, cd = saved_dom(work, run, "processor"), saved_dom(work, run, "controller")
+    if pd is None or cd is None:
+        return None
+    return (pd.get("mpePitchBendRange") == SENT_PBR, cd.get("presetName") == SENT_PRESET)
 
 
 def main():
@@ -83,11 +109,13 @@ def main():
             "audio_total": s.get("audio_total_cells"),
             "audio_peak": s.get("audio_peak"),
             "out_events": s.get("output_events_count"),
+            "sent": sentinel_applied(work, run),
         }))
 
     # 表
     print("== CAB-68 E2E matrix (native wine host) ==")
     hdr = f"{'case':24} {'restore(c/cS/c)':22} {'0x800010':10} {'restart flags':16} {'bit':4} {'marker':7} {'audio nonzero':16} {'rt2':4}"
+    hdr += f" {'sent(p/c)':10}"
     print(hdr)
     for label, r in rows:
         if r is None:
@@ -104,7 +132,7 @@ def main():
         rc = f"{r['restore_comp']}/{r['restore_ctrl_cs']}/{r['restore_ctrl']}"
         nz = f"{r['audio_nonzero']}/{r['audio_total']}"
         print(f"{label:24} {rc:22} {str(has_800010):10} {fl:16} {str(r['demo_bit']):4} "
-              f"{str(r['saved_marker']):7} {nz:16} {str(r['roundtrip2']):4}")
+              f"{str(r['saved_marker']):7} {nz:16} {str(r['roundtrip2']):4} {str(r['sent']):10}")
 
     # 判定
     print("\n== 判定 ==")
@@ -149,6 +177,20 @@ def main():
     if r:
         chk("corrupt-payload: setState が S_FALSE に変化 (payload 処理の実証)",
             r["restore_comp"] == 1 and r["restore_ctrl"] == 1)
+    # 4b. payload 注入 A/B (#255)。sentinel 適用 = 復元が走った / 非適用 = 復元打切り (demo 分岐発火)
+    for lbl in ("patched+sentinel", "unpatched+sentinel"):
+        r = by.get(lbl)
+        if r:
+            chk(f"{lbl}: sentinel 対照 — 復元が適用 (proc,ctrl とも)", r["sent"] == (True, True))
+    r = by.get("patched+demo-payload")
+    if r:
+        chk("patched+demo-payload: 復元が適用 (authstub が demo 分岐を無効化)", r["sent"] == (True, True))
+        chk("patched+demo-payload: 3 setState 系が成功 (kResultOk=0)",
+            r["restore_comp"] == 0 and r["restore_ctrl"] == 0)
+    r = by.get("unpatched+demo-payload")
+    if r:
+        chk("unpatched+demo-payload: processor 復元が打切られ sentinel 非適用 (0x18004fad0 demo 分岐発火)",
+            r["sent"] is not None and r["sent"][0] is False)
     # 5. 0x800010 は本 host セッションでは未発火 (restartComponent(0x10) は観測) — 記録
     r = by.get("patched+licensed")
     if r:

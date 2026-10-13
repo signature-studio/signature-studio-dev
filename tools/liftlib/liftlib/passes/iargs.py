@@ -100,7 +100,10 @@ def scan(mod, img, mach=None):
     """検出のみ。返値 dict:
       define_short : [(name, ir_params, machine_argc)]  — 仮引数が機械語より少ない define
       sites_short  : [(caller, site_va, callee, ir_args, machine_argc)] — 引数が足りない call site
-      sites_entry  : [(caller, site_va, callee, k)] — 入口値が素通しなのに IR が別値 (undef) を渡す site
+      sites_entry  : [(caller, site_va, callee, k)] — 入口値が素通しなのに IR が別値 (undef 等) を渡す site
+                     (IR に引数 k がある site のみ。引数が無い位置は sites_short 側)。run() の入口素通し修復と同じ判定:
+                     機械語の到達定義が ENTRY のみ (defs_before == {0}) の位置 k で、IR の引数が呼出元自身の
+                     `%arg{k+1}` でも run() 生成値 (`%ia_*`) でもないもの。
     """
     mach = mach or Machine(img)
     fns = {f.name: f for f in mod.funcs()}
@@ -123,6 +126,9 @@ def scan(mod, img, mach=None):
         mf = mach.mf(va) if va is not None else None
         if mf is None:
             continue
+        own_params = fn.params()
+        own_named = all(re.match(r"%arg\d+$", p[1]) for p in own_params)
+        own_n = max(len(own_params), need.get(nm, 0)) if own_named else len(own_params)
         for b in fn.blocks:
             for ln in b.lines:
                 m = CALL_RE.search(IR.strip_tokens(ln))
@@ -136,9 +142,19 @@ def scan(mod, img, mach=None):
                 gc = mach.argc(gv)
                 if not gc:
                     continue
-                na = len([a for a in IR.split_args(m.group(3)) if a.strip()])
+                cur = [a.strip() for a in IR.split_args(m.group(3)) if a.strip()]
+                na = len(cur)
                 if na < gc:
                     res["sites_short"].append((nm, C, g, na, gc))
+                live = mach.live(gv) or frozenset()
+                for k in sorted(live):
+                    if k >= na or k >= own_n or mf.defs_before(C, GPR_ARGS[k]) != {0}:
+                        continue
+                    # run() が直す後の仮引数名 (define_short の呼出元は %arg{k+1} が追加される)
+                    pnm = own_params[k][1] if k < len(own_params) else "%%arg%d" % (k + 1)
+                    cur_tok = cur[k].split(None, 1)[-1]
+                    if cur_tok != pnm and not cur_tok.startswith("%ia_"):
+                        res["sites_entry"].append((nm, C, g, k))
     return res
 
 

@@ -4,7 +4,7 @@
  * WebAssembly.Module は AudioWorklet へ postMessage できない (messageerror) ため、bytes を transfer し
  * worklet 内 (public/worklets/wasm-host-worklet.js) で compile → instantiate → pre-warm する。
  * `keepModule` なら main でも同じ bytes を compile して Module を保持する (同一プロセスの NativeModule
- * 共有で worklet 側 compile を短縮する狙い。効果の実測は tools/perf/REPORT.md §10)。
+ * 共有で worklet 側 compile を短縮する狙い。効果の実測は tools/perf/REPORT.md §11)。
  *
  * 消去可能な TS 構文のみ (node の stripTypeScriptTypes で e2e からそのまま実行する)。
  */

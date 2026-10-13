@@ -1,0 +1,1839 @@
+[
+ {
+  "lib": "sqlite",
+  "name": "sqlite_source_id_prefix",
+  "kind": "str",
+  "pattern": "2025-",
+  "hits": [],
+  "n_hits_total": 0
+ },
+ {
+  "lib": "sqlite",
+  "name": "sqlite_source_id_prefix24",
+  "kind": "str",
+  "pattern": "2024-",
+  "hits": [],
+  "n_hits_total": 0
+ },
+ {
+  "lib": "sqlite",
+  "name": "fileheader",
+  "kind": "str",
+  "pattern": "SQLite format 3\u0000",
+  "hits": [
+   {
+    "file_off": 11427840,
+    "section": ".rdata",
+    "rva": 11433472,
+    "va": 6453884416,
+    "ref_funcs": [
+     "0x1807dfa60"
+    ]
+   },
+   {
+    "file_off": 11444768,
+    "section": ".rdata",
+    "rva": 11450400,
+    "va": 6453901344,
+    "ref_funcs": [
+     "0x1807bc890"
+    ]
+   }
+  ],
+  "n_hits_total": 2
+ },
+ {
+  "lib": "sqlite",
+  "name": "ver_fn",
+  "kind": "str",
+  "pattern": "sqlite_version",
+  "hits": [
+   {
+    "file_off": 16546224,
+    "section": ".rdata",
+    "rva": 16551856,
+    "va": 6459002800,
+    "ref_funcs": []
+   }
+  ],
+  "n_hits_total": 1
+ },
+ {
+  "lib": "sqlite",
+  "name": "src_id_fn",
+  "kind": "str",
+  "pattern": "sqlite_source_id",
+  "hits": [
+   {
+    "file_off": 16566302,
+    "section": ".rdata",
+    "rva": 16571934,
+    "va": 6459022878,
+    "ref_funcs": []
+   }
+  ],
+  "n_hits_total": 1
+ },
+ {
+  "lib": "sqlite",
+  "name": "sqlite_master",
+  "kind": "str",
+  "pattern": "sqlite_master",
+  "hits": [
+   {
+    "file_off": 16533998,
+    "section": ".rdata",
+    "rva": 16539630,
+    "va": 6458990574,
+    "ref_funcs": [
+     "0x1807cf430",
+     "0x1807ea260",
+     "0x18080db50",
+     "0x18080e350",
+     "0x1808103a0",
+     "0x1808121c0",
+     "0x18081c060",
+     "0x180820650",
+     "0x180820c30",
+     "0x180822b50",
+     "0x180823030",
+     "0x180823680"
+    ]
+   },
+   {
+    "file_off": 16600125,
+    "section": ".rdata",
+    "rva": 16605757,
+    "va": 6459056701,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16600205,
+    "section": ".rdata",
+    "rva": 16605837,
+    "va": 6459056781,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16600447,
+    "section": ".rdata",
+    "rva": 16606079,
+    "va": 6459057023,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16614778,
+    "section": ".rdata",
+    "rva": 16620410,
+    "va": 6459071354,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16614809,
+    "section": ".rdata",
+    "rva": 16620441,
+    "va": 6459071385,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16617827,
+    "section": ".rdata",
+    "rva": 16623459,
+    "va": 6459074403,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16617882,
+    "section": ".rdata",
+    "rva": 16623514,
+    "va": 6459074458,
+    "ref_funcs": []
+   }
+  ],
+  "n_hits_total": 8
+ },
+ {
+  "lib": "sqlite",
+  "name": "sqlite_schema",
+  "kind": "str",
+  "pattern": "sqlite_schema",
+  "hits": [],
+  "n_hits_total": 0
+ },
+ {
+  "lib": "sqlite",
+  "name": "cant_open",
+  "kind": "str",
+  "pattern": "unable to open database file",
+  "hits": [
+   {
+    "file_off": 16560995,
+    "section": ".rdata",
+    "rva": 16566627,
+    "va": 6459017571,
+    "ref_funcs": []
+   }
+  ],
+  "n_hits_total": 1
+ },
+ {
+  "lib": "sqlite",
+  "name": "corrupt",
+  "kind": "str",
+  "pattern": "database disk image is malformed",
+  "hits": [
+   {
+    "file_off": 16568804,
+    "section": ".rdata",
+    "rva": 16574436,
+    "va": 6459025380,
+    "ref_funcs": []
+   }
+  ],
+  "n_hits_total": 1
+ },
+ {
+  "lib": "sqlite",
+  "name": "keywords",
+  "kind": "str",
+  "pattern": "REINDEXEDESCAPEACHECKEYBEFOREIGNOREGEXPLAINSTEADDATABASELECT",
+  "hits": [
+   {
+    "file_off": 11429872,
+    "section": ".rdata",
+    "rva": 11435504,
+    "va": 6453886448,
+    "ref_funcs": [
+     "0x1807cfb40",
+     "0x180806d60",
+     "0x180839260"
+    ]
+   }
+  ],
+  "n_hits_total": 1
+ },
+ {
+  "lib": "sqlite",
+  "name": "opnames",
+  "kind": "str",
+  "pattern": "Savepoint",
+  "hits": [
+   {
+    "file_off": 16487545,
+    "section": ".rdata",
+    "rva": 16493177,
+    "va": 6458944121,
+    "ref_funcs": []
+   }
+  ],
+  "n_hits_total": 1
+ },
+ {
+  "lib": "sqlite",
+  "name": "fts5",
+  "kind": "str",
+  "pattern": "fts5",
+  "hits": [],
+  "n_hits_total": 0
+ },
+ {
+  "lib": "sqlite",
+  "name": "json_each",
+  "kind": "str",
+  "pattern": "json_each",
+  "hits": [],
+  "n_hits_total": 0
+ },
+ {
+  "lib": "sqlite",
+  "name": "compile_opt",
+  "kind": "str",
+  "pattern": "COMPILER=",
+  "hits": [
+   {
+    "file_off": 16593179,
+    "section": ".rdata",
+    "rva": 16598811,
+    "va": 6459049755,
+    "ref_funcs": [
+     "0x1807b4e40",
+     "0x18081c4e0"
+    ]
+   }
+  ],
+  "n_hits_total": 1
+ },
+ {
+  "lib": "nlohmann_json",
+  "name": "rtti_abi",
+  "kind": "str",
+  "pattern": ".?AVjson_abi_v3_12_0",
+  "hits": [],
+  "n_hits_total": 0
+ },
+ {
+  "lib": "nlohmann_json",
+  "name": "abi_str",
+  "kind": "str",
+  "pattern": "json_abi_v3_12_0",
+  "hits": [
+   {
+    "file_off": 17956102,
+    "section": ".data",
+    "rva": 17965318,
+    "va": 6460416262,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 17956181,
+    "section": ".data",
+    "rva": 17965397,
+    "va": 6460416341,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 17956940,
+    "section": ".data",
+    "rva": 17966156,
+    "va": 6460417100,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 17957752,
+    "section": ".data",
+    "rva": 17966968,
+    "va": 6460417912,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 17960657,
+    "section": ".data",
+    "rva": 17969873,
+    "va": 6460420817,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 17960720,
+    "section": ".data",
+    "rva": 17969936,
+    "va": 6460420880,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 17961050,
+    "section": ".data",
+    "rva": 17970266,
+    "va": 6460421210,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 17961113,
+    "section": ".data",
+    "rva": 17970329,
+    "va": 6460421273,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 17961457,
+    "section": ".data",
+    "rva": 17970673,
+    "va": 6460421617,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 17961520,
+    "section": ".data",
+    "rva": 17970736,
+    "va": 6460421680,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 17961850,
+    "section": ".data",
+    "rva": 17971066,
+    "va": 6460422010,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 17961913,
+    "section": ".data",
+    "rva": 17971129,
+    "va": 6460422073,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 17962257,
+    "section": ".data",
+    "rva": 17971473,
+    "va": 6460422417,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 17962320,
+    "section": ".data",
+    "rva": 17971536,
+    "va": 6460422480,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 17962650,
+    "section": ".data",
+    "rva": 17971866,
+    "va": 6460422810,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 17962713,
+    "section": ".data",
+    "rva": 17971929,
+    "va": 6460422873,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 17963057,
+    "section": ".data",
+    "rva": 17972273,
+    "va": 6460423217,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 17963120,
+    "section": ".data",
+    "rva": 17972336,
+    "va": 6460423280,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 17963450,
+    "section": ".data",
+    "rva": 17972666,
+    "va": 6460423610,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 17963513,
+    "section": ".data",
+    "rva": 17972729,
+    "va": 6460423673,
+    "ref_funcs": []
+   }
+  ],
+  "n_hits_total": 45
+ },
+ {
+  "lib": "nlohmann_json",
+  "name": "parse_error",
+  "kind": "str",
+  "pattern": "parse error",
+  "hits": [
+   {
+    "file_off": 16530454,
+    "section": ".rdata",
+    "rva": 16536086,
+    "va": 6458987030,
+    "ref_funcs": [
+     "0x180248070",
+     "0x180258890"
+    ]
+   },
+   {
+    "file_off": 16590501,
+    "section": ".rdata",
+    "rva": 16596133,
+    "va": 6459047077,
+    "ref_funcs": []
+   }
+  ],
+  "n_hits_total": 2
+ },
+ {
+  "lib": "nlohmann_json",
+  "name": "type_error",
+  "kind": "str",
+  "pattern": "type must be",
+  "hits": [
+   {
+    "file_off": 16620728,
+    "section": ".rdata",
+    "rva": 16626360,
+    "va": 6459077304,
+    "ref_funcs": [
+     "0x1800905c0",
+     "0x180090e20",
+     "0x1800f1310",
+     "0x1800f1900",
+     "0x180106080",
+     "0x180298220",
+     "0x1802988c0",
+     "0x1802bd0a0",
+     "0x1802bf440",
+     "0x18030f170",
+     "0x18030fd00",
+     "0x18031da00"
+    ]
+   },
+   {
+    "file_off": 16620756,
+    "section": ".rdata",
+    "rva": 16626388,
+    "va": 6459077332,
+    "ref_funcs": [
+     "0x1800225e0",
+     "0x180088820",
+     "0x180091470",
+     "0x1800f1ed0",
+     "0x180298800",
+     "0x180298eb0",
+     "0x1802ea9f0",
+     "0x1802f00f0",
+     "0x1803102d0"
+    ]
+   },
+   {
+    "file_off": 16620785,
+    "section": ".rdata",
+    "rva": 16626417,
+    "va": 6459077361,
+    "ref_funcs": [
+     "0x18001f020",
+     "0x1800506b0",
+     "0x18007b280",
+     "0x1800bd8a0",
+     "0x180422f00"
+    ]
+   },
+   {
+    "file_off": 16620815,
+    "section": ".rdata",
+    "rva": 16626447,
+    "va": 6459077391,
+    "ref_funcs": [
+     "0x180021520"
+    ]
+   }
+  ],
+  "n_hits_total": 4
+ },
+ {
+  "lib": "nlohmann_json",
+  "name": "invalid_iter",
+  "kind": "str",
+  "pattern": "cannot use operator[] with a string argument",
+  "hits": [
+   {
+    "file_off": 16621496,
+    "section": ".rdata",
+    "rva": 16627128,
+    "va": 6459078072,
+    "ref_funcs": [
+     "0x180022530",
+     "0x180023460",
+     "0x1800c3080"
+    ]
+   }
+  ],
+  "n_hits_total": 1
+ },
+ {
+  "lib": "nlohmann_json",
+  "name": "ver_3_12",
+  "kind": "str",
+  "pattern": "3.12.0",
+  "hits": [],
+  "n_hits_total": 0
+ },
+ {
+  "lib": "muparser",
+  "name": "rtti_parser",
+  "kind": "str",
+  "pattern": ".?AVParser@mu@@",
+  "hits": [
+   {
+    "file_off": 18474928,
+    "section": ".data",
+    "rva": 18484144,
+    "va": 6460935088,
+    "ref_funcs": []
+   }
+  ],
+  "n_hits_total": 1
+ },
+ {
+  "lib": "muparser",
+  "name": "rtti_base",
+  "kind": "str",
+  "pattern": ".?AVParserBase@mu@@",
+  "hits": [
+   {
+    "file_off": 18474960,
+    "section": ".data",
+    "rva": 18484176,
+    "va": 6460935120,
+    "ref_funcs": []
+   }
+  ],
+  "n_hits_total": 1
+ },
+ {
+  "lib": "muparser",
+  "name": "rtti_err",
+  "kind": "str",
+  "pattern": ".?AVParserError@mu@@",
+  "hits": [
+   {
+    "file_off": 18474880,
+    "section": ".data",
+    "rva": 18484096,
+    "va": 6460935040,
+    "ref_funcs": []
+   }
+  ],
+  "n_hits_total": 1
+ },
+ {
+  "lib": "muparser",
+  "name": "sin",
+  "kind": "str",
+  "pattern": "sin",
+  "hits": [
+   {
+    "file_off": 1829977,
+    "section": ".text",
+    "rva": 1833049,
+    "va": 6444283993,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 1831279,
+    "section": ".text",
+    "rva": 1834351,
+    "va": 6444285295,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 9544656,
+    "section": ".text",
+    "rva": 9547728,
+    "va": 6451998672,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 9545289,
+    "section": ".text",
+    "rva": 9548361,
+    "va": 6451999305,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 9545773,
+    "section": ".text",
+    "rva": 9548845,
+    "va": 6451999789,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 11358080,
+    "section": ".rdata",
+    "rva": 11363712,
+    "va": 6453814656,
+    "ref_funcs": [
+     "0x18072a600"
+    ]
+   },
+   {
+    "file_off": 11358099,
+    "section": ".rdata",
+    "rva": 11363731,
+    "va": 6453814675,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 11358131,
+    "section": ".rdata",
+    "rva": 11363763,
+    "va": 6453814707,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16502276,
+    "section": ".rdata",
+    "rva": 16507908,
+    "va": 6458958852,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16521360,
+    "section": ".rdata",
+    "rva": 16526992,
+    "va": 6458977936,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16521496,
+    "section": ".rdata",
+    "rva": 16527128,
+    "va": 6458978072,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16524074,
+    "section": ".rdata",
+    "rva": 16529706,
+    "va": 6458980650,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16527940,
+    "section": ".rdata",
+    "rva": 16533572,
+    "va": 6458984516,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16535486,
+    "section": ".rdata",
+    "rva": 16541118,
+    "va": 6458992062,
+    "ref_funcs": [
+     "0x180861ff0"
+    ]
+   },
+   {
+    "file_off": 16536377,
+    "section": ".rdata",
+    "rva": 16542009,
+    "va": 6458992953,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16544484,
+    "section": ".rdata",
+    "rva": 16550116,
+    "va": 6459001060,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16551021,
+    "section": ".rdata",
+    "rva": 16556653,
+    "va": 6459007597,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16553545,
+    "section": ".rdata",
+    "rva": 16559177,
+    "va": 6459010121,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16553569,
+    "section": ".rdata",
+    "rva": 16559201,
+    "va": 6459010145,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16556528,
+    "section": ".rdata",
+    "rva": 16562160,
+    "va": 6459013104,
+    "ref_funcs": []
+   }
+  ],
+  "n_hits_total": 79
+ },
+ {
+  "lib": "muparser",
+  "name": "sign",
+  "kind": "str",
+  "pattern": "sign",
+  "hits": [
+   {
+    "file_off": 9547242,
+    "section": ".text",
+    "rva": 9550314,
+    "va": 6452001258,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 10619330,
+    "section": ".rdata",
+    "rva": 10624962,
+    "va": 6453075906,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 10619740,
+    "section": ".rdata",
+    "rva": 10625372,
+    "va": 6453076316,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16481299,
+    "section": ".rdata",
+    "rva": 16486931,
+    "va": 6458937875,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16485901,
+    "section": ".rdata",
+    "rva": 16491533,
+    "va": 6458942477,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16488059,
+    "section": ".rdata",
+    "rva": 16493691,
+    "va": 6458944635,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16488087,
+    "section": ".rdata",
+    "rva": 16493719,
+    "va": 6458944663,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16493466,
+    "section": ".rdata",
+    "rva": 16499098,
+    "va": 6458950042,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16493943,
+    "section": ".rdata",
+    "rva": 16499575,
+    "va": 6458950519,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16493966,
+    "section": ".rdata",
+    "rva": 16499598,
+    "va": 6458950542,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16497321,
+    "section": ".rdata",
+    "rva": 16502953,
+    "va": 6458953897,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16508507,
+    "section": ".rdata",
+    "rva": 16514139,
+    "va": 6458965083,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16511835,
+    "section": ".rdata",
+    "rva": 16517467,
+    "va": 6458968411,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16521831,
+    "section": ".rdata",
+    "rva": 16527463,
+    "va": 6458978407,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16538575,
+    "section": ".rdata",
+    "rva": 16544207,
+    "va": 6458995151,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16538808,
+    "section": ".rdata",
+    "rva": 16544440,
+    "va": 6458995384,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16545514,
+    "section": ".rdata",
+    "rva": 16551146,
+    "va": 6459002090,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16546945,
+    "section": ".rdata",
+    "rva": 16552577,
+    "va": 6459003521,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16546996,
+    "section": ".rdata",
+    "rva": 16552628,
+    "va": 6459003572,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16550020,
+    "section": ".rdata",
+    "rva": 16555652,
+    "va": 6459006596,
+    "ref_funcs": []
+   }
+  ],
+  "n_hits_total": 100
+ },
+ {
+  "lib": "muparser",
+  "name": "rnd",
+  "kind": "str",
+  "pattern": "rnd",
+  "hits": [
+   {
+    "file_off": 6734263,
+    "section": ".text",
+    "rva": 6737335,
+    "va": 6449188279,
+    "ref_funcs": []
+   }
+  ],
+  "n_hits_total": 1
+ },
+ {
+  "lib": "muparser",
+  "name": "msg_unexp",
+  "kind": "str",
+  "pattern": "Unexpected token",
+  "hits": [
+   {
+    "file_off": 16606239,
+    "section": ".rdata",
+    "rva": 16611871,
+    "va": 6459062815,
+    "ref_funcs": [
+     "0x18099a6d0"
+    ]
+   }
+  ],
+  "n_hits_total": 1
+ },
+ {
+  "lib": "muparser",
+  "name": "msg_unassigned",
+  "kind": "str",
+  "pattern": "Unassigned token",
+  "hits": [],
+  "n_hits_total": 0
+ },
+ {
+  "lib": "muparser",
+  "name": "ver",
+  "kind": "str",
+  "pattern": "2.3.",
+  "hits": [],
+  "n_hits_total": 0
+ },
+ {
+  "lib": "libsfz",
+  "name": "rtti_sound",
+  "kind": "str",
+  "pattern": ".?AVSound@libsfz@@",
+  "hits": [
+   {
+    "file_off": 18018928,
+    "section": ".data",
+    "rva": 18028144,
+    "va": 6460479088,
+    "ref_funcs": []
+   }
+  ],
+  "n_hits_total": 1
+ },
+ {
+  "lib": "libsfz",
+  "name": "generated",
+  "kind": "str",
+  "pattern": "// SFZ Generated by libSFZ",
+  "hits": [
+   {
+    "file_off": 16623968,
+    "section": ".rdata",
+    "rva": 16629600,
+    "va": 6459080544,
+    "ref_funcs": [
+     "0x18043e570"
+    ]
+   }
+  ],
+  "n_hits_total": 1
+ },
+ {
+  "lib": "libsfz",
+  "name": "lokey",
+  "kind": "str",
+  "pattern": "lokey",
+  "hits": [
+   {
+    "file_off": 16481031,
+    "section": ".rdata",
+    "rva": 16486663,
+    "va": 6458937607,
+    "ref_funcs": [
+     "0x180436cc0"
+    ]
+   }
+  ],
+  "n_hits_total": 1
+ },
+ {
+  "lib": "libsfz",
+  "name": "pitch_keycenter",
+  "kind": "str",
+  "pattern": "pitch_keycenter",
+  "hits": [
+   {
+    "file_off": 16534188,
+    "section": ".rdata",
+    "rva": 16539820,
+    "va": 6458990764,
+    "ref_funcs": [
+     "0x180436cc0"
+    ]
+   }
+  ],
+  "n_hits_total": 1
+ },
+ {
+  "lib": "libsndfile",
+  "name": "invalid_fmt",
+  "kind": "str",
+  "pattern": "Invalid file format",
+  "hits": [
+   {
+    "file_off": 16491038,
+    "section": ".rdata",
+    "rva": 16496670,
+    "va": 6458947614,
+    "ref_funcs": [
+     "0x1805dc170"
+    ]
+   }
+  ],
+  "n_hits_total": 1
+ },
+ {
+  "lib": "libsndfile",
+  "name": "riff",
+  "kind": "str",
+  "pattern": "RF64",
+  "hits": [
+   {
+    "file_off": 6080358,
+    "section": ".text",
+    "rva": 6083430,
+    "va": 6448534374,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 11122952,
+    "section": ".rdata",
+    "rva": 11128584,
+    "va": 6453579528,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16522307,
+    "section": ".rdata",
+    "rva": 16527939,
+    "va": 6458978883,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16538274,
+    "section": ".rdata",
+    "rva": 16543906,
+    "va": 6458994850,
+    "ref_funcs": []
+   }
+  ],
+  "n_hits_total": 4
+ },
+ {
+  "lib": "libsndfile",
+  "name": "caff",
+  "kind": "str",
+  "pattern": "caff",
+  "hits": [
+   {
+    "file_off": 6080900,
+    "section": ".text",
+    "rva": 6083972,
+    "va": 6448534916,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 11122960,
+    "section": ".rdata",
+    "rva": 11128592,
+    "va": 6453579536,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16554567,
+    "section": ".rdata",
+    "rva": 16560199,
+    "va": 6459011143,
+    "ref_funcs": []
+   }
+  ],
+  "n_hits_total": 3
+ },
+ {
+  "lib": "libsndfile",
+  "name": "nist",
+  "kind": "str",
+  "pattern": "NIST_1A",
+  "hits": [
+   {
+    "file_off": 16623785,
+    "section": ".rdata",
+    "rva": 16629417,
+    "va": 6459080361,
+    "ref_funcs": [
+     "0x1805cc7a0"
+    ]
+   }
+  ],
+  "n_hits_total": 1
+ },
+ {
+  "lib": "libsndfile",
+  "name": "snd",
+  "kind": "str",
+  "pattern": ".snd",
+  "hits": [
+   {
+    "file_off": 6077543,
+    "section": ".text",
+    "rva": 6080615,
+    "va": 6448531559,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 11122940,
+    "section": ".rdata",
+    "rva": 11128572,
+    "va": 6453579516,
+    "ref_funcs": []
+   }
+  ],
+  "n_hits_total": 2
+ },
+ {
+  "lib": "libsndfile",
+  "name": "ver_str",
+  "kind": "str",
+  "pattern": "libsndfile-1.",
+  "hits": [],
+  "n_hits_total": 0
+ },
+ {
+  "lib": "libsndfile",
+  "name": "sf_err",
+  "kind": "str",
+  "pattern": "File contains data in an unknown format",
+  "hits": [],
+  "n_hits_total": 0
+ },
+ {
+  "lib": "flac",
+  "name": "hdr_fail",
+  "kind": "str",
+  "pattern": "Failed to decode FLAC header",
+  "hits": [
+   {
+    "file_off": 16527339,
+    "section": ".rdata",
+    "rva": 16532971,
+    "va": 6458983915,
+    "ref_funcs": [
+     "0x1805cacc0"
+    ]
+   }
+  ],
+  "n_hits_total": 1
+ },
+ {
+  "lib": "flac",
+  "name": "fLaC",
+  "kind": "str",
+  "pattern": "fLaC",
+  "hits": [
+   {
+    "file_off": 11123004,
+    "section": ".rdata",
+    "rva": 11128636,
+    "va": 6453579580,
+    "ref_funcs": []
+   }
+  ],
+  "n_hits_total": 1
+ },
+ {
+  "lib": "flac",
+  "name": "ver",
+  "kind": "str",
+  "pattern": "reference libFLAC",
+  "hits": [],
+  "n_hits_total": 0
+ },
+ {
+  "lib": "flac",
+  "name": "vendor",
+  "kind": "str",
+  "pattern": "reference libFLAC 1.",
+  "hits": [],
+  "n_hits_total": 0
+ },
+ {
+  "lib": "vorbis",
+  "name": "vorbis",
+  "kind": "str",
+  "pattern": "\u0001vorbis",
+  "hits": [],
+  "n_hits_total": 0
+ },
+ {
+  "lib": "vorbis",
+  "name": "ogg",
+  "kind": "str",
+  "pattern": "OggS",
+  "hits": [
+   {
+    "file_off": 6320594,
+    "section": ".text",
+    "rva": 6323666,
+    "va": 6448774610,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 11123012,
+    "section": ".rdata",
+    "rva": 11128644,
+    "va": 6453579588,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 18109304,
+    "section": ".data",
+    "rva": 18118520,
+    "va": 6460569464,
+    "ref_funcs": [
+     "0x1805fcaf0",
+     "0x1806017d0"
+    ]
+   }
+  ],
+  "n_hits_total": 3
+ },
+ {
+  "lib": "vorbis",
+  "name": "xiph",
+  "kind": "str",
+  "pattern": "Xiph.Org libVorbis",
+  "hits": [],
+  "n_hits_total": 0
+ },
+ {
+  "lib": "pffft",
+  "name": "pffft",
+  "kind": "str",
+  "pattern": "pffft",
+  "hits": [
+   {
+    "file_off": 18107607,
+    "section": ".data",
+    "rva": 18116823,
+    "va": 6460567767,
+    "ref_funcs": []
+   }
+  ],
+  "n_hits_total": 1
+ },
+ {
+  "lib": "pffft",
+  "name": "ver_sse",
+  "kind": "str",
+  "pattern": "PFFFT",
+  "hits": [
+   {
+    "file_off": 18107236,
+    "section": ".data",
+    "rva": 18116452,
+    "va": 6460567396,
+    "ref_funcs": []
+   }
+  ],
+  "n_hits_total": 1
+ },
+ {
+  "lib": "zita",
+  "name": "zita",
+  "kind": "str",
+  "pattern": "zita",
+  "hits": [],
+  "n_hits_total": 0
+ },
+ {
+  "lib": "zita",
+  "name": "zl",
+  "kind": "str",
+  "pattern": "ZL",
+  "hits": [
+   {
+    "file_off": 99903,
+    "section": ".text",
+    "rva": 102975,
+    "va": 6442553919,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 143399,
+    "section": ".text",
+    "rva": 146471,
+    "va": 6442597415,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 143421,
+    "section": ".text",
+    "rva": 146493,
+    "va": 6442597437,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 435717,
+    "section": ".text",
+    "rva": 438789,
+    "va": 6442889733,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 606354,
+    "section": ".text",
+    "rva": 609426,
+    "va": 6443060370,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 606393,
+    "section": ".text",
+    "rva": 609465,
+    "va": 6443060409,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 606426,
+    "section": ".text",
+    "rva": 609498,
+    "va": 6443060442,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 911538,
+    "section": ".text",
+    "rva": 914610,
+    "va": 6443365554,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 913282,
+    "section": ".text",
+    "rva": 916354,
+    "va": 6443367298,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 939110,
+    "section": ".text",
+    "rva": 942182,
+    "va": 6443393126,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 2560051,
+    "section": ".text",
+    "rva": 2563123,
+    "va": 6445014067,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 2560428,
+    "section": ".text",
+    "rva": 2563500,
+    "va": 6445014444,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 2845934,
+    "section": ".text",
+    "rva": 2849006,
+    "va": 6445299950,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 2908625,
+    "section": ".text",
+    "rva": 2911697,
+    "va": 6445362641,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 2993051,
+    "section": ".text",
+    "rva": 2996123,
+    "va": 6445447067,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 3521686,
+    "section": ".text",
+    "rva": 3524758,
+    "va": 6445975702,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 4186898,
+    "section": ".text",
+    "rva": 4189970,
+    "va": 6446640914,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 4377195,
+    "section": ".text",
+    "rva": 4380267,
+    "va": 6446831211,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 4481549,
+    "section": ".text",
+    "rva": 4484621,
+    "va": 6446935565,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 4763313,
+    "section": ".text",
+    "rva": 4766385,
+    "va": 6447217329,
+    "ref_funcs": []
+   }
+  ],
+  "n_hits_total": 159
+ },
+ {
+  "lib": "zita",
+  "name": "rtti_conv",
+  "kind": "str",
+  "pattern": ".?AVConvolver",
+  "hits": [],
+  "n_hits_total": 0
+ },
+ {
+  "lib": "zita",
+  "name": "rtti_zl",
+  "kind": "str",
+  "pattern": ".?AVZL",
+  "hits": [
+   {
+    "file_off": 18107184,
+    "section": ".data",
+    "rva": 18116400,
+    "va": 6460567344,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 18107536,
+    "section": ".data",
+    "rva": 18116752,
+    "va": 6460567696,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 18107920,
+    "section": ".data",
+    "rva": 18117136,
+    "va": 6460568080,
+    "ref_funcs": []
+   }
+  ],
+  "n_hits_total": 3
+ },
+ {
+  "lib": "zlib",
+  "name": "inflate_err_hdr",
+  "kind": "str",
+  "pattern": "incorrect header check",
+  "hits": [],
+  "n_hits_total": 0
+ },
+ {
+  "lib": "zlib",
+  "name": "inflate_err_blk",
+  "kind": "str",
+  "pattern": "invalid block type",
+  "hits": [],
+  "n_hits_total": 0
+ },
+ {
+  "lib": "zlib",
+  "name": "zlib_ver",
+  "kind": "str",
+  "pattern": "deflate 1.",
+  "hits": [],
+  "n_hits_total": 0
+ },
+ {
+  "lib": "zlib",
+  "name": "zlib_ver2",
+  "kind": "str",
+  "pattern": "inflate 1.",
+  "hits": [],
+  "n_hits_total": 0
+ },
+ {
+  "lib": "zlib",
+  "name": "zver",
+  "kind": "str",
+  "pattern": "1.3",
+  "hits": [
+   {
+    "file_off": 262321,
+    "section": ".text",
+    "rva": 265393,
+    "va": 6442716337,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 10841856,
+    "section": ".rdata",
+    "rva": 10847488,
+    "va": 6453298432,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16594250,
+    "section": ".rdata",
+    "rva": 16599882,
+    "va": 6459050826,
+    "ref_funcs": []
+   }
+  ],
+  "n_hits_total": 3
+ },
+ {
+  "lib": "zlib_or_crc",
+  "name": "crc32_table_start",
+  "kind": "hex",
+  "pattern": "00000000963007772c610eeeba51099919c46d07",
+  "hits": [
+   {
+    "file_off": 11097440,
+    "section": ".rdata",
+    "rva": 11103072,
+    "va": 6453554016,
+    "ref_funcs": []
+   }
+  ],
+  "n_hits_total": 1
+ },
+ {
+  "lib": "zlib_or_crc",
+  "name": "crc32_table_start_be",
+  "kind": "hex",
+  "pattern": "0000000077073096ee0e612c990951ba",
+  "hits": [],
+  "n_hits_total": 0
+ },
+ {
+  "lib": "zlib",
+  "name": "inflate_lbase",
+  "kind": "hex",
+  "pattern": "03000400050006000700080009000a000b000d000f001100130017001b001f00",
+  "hits": [],
+  "n_hits_total": 0
+ },
+ {
+  "lib": "zlib",
+  "name": "inflate_dbase",
+  "kind": "hex",
+  "pattern": "01000200030004000500070009000d001100190021003100410061008100c100",
+  "hits": [],
+  "n_hits_total": 0
+ },
+ {
+  "lib": "zlib",
+  "name": "deflate_base_length",
+  "kind": "hex",
+  "pattern": "0001020304050607080a0c0e1014181c202830384050607080a0c0e000",
+  "hits": [],
+  "n_hits_total": 0
+ },
+ {
+  "lib": "zstd",
+  "name": "frame_magic",
+  "kind": "hex",
+  "pattern": "28b52ffd",
+  "hits": [
+   {
+    "file_off": 2052398,
+    "section": ".text",
+    "rva": 2055470,
+    "va": 6444506414,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 2055756,
+    "section": ".text",
+    "rva": 2058828,
+    "va": 6444509772,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 2138855,
+    "section": ".text",
+    "rva": 2141927,
+    "va": 6444592871,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 2138879,
+    "section": ".text",
+    "rva": 2141951,
+    "va": 6444592895,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 2138969,
+    "section": ".text",
+    "rva": 2142041,
+    "va": 6444592985,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 18995472,
+    "section": ".rsrc",
+    "rva": 34660624,
+    "va": 6477111568,
+    "ref_funcs": []
+   }
+  ],
+  "n_hits_total": 6
+ },
+ {
+  "lib": "zstd",
+  "name": "xxh64_prime1",
+  "kind": "hex",
+  "pattern": "8b7a51b1b979379e",
+  "hits": [],
+  "n_hits_total": 0
+ },
+ {
+  "lib": "zstd",
+  "name": "xxh64_prime2",
+  "kind": "hex",
+  "pattern": "4f4a4b8b3d77ecc2",
+  "hits": [],
+  "n_hits_total": 0
+ },
+ {
+  "lib": "zstd",
+  "name": "LL_bits",
+  "kind": "hex",
+  "pattern": "00000000000000000000000000000000010101010202030304060708090a0b0c0d0e0f10",
+  "hits": [
+   {
+    "file_off": 10771376,
+    "section": ".rdata",
+    "rva": 10777008,
+    "va": 6453227952,
+    "ref_funcs": [
+     "0x1801c2d80",
+     "0x1801d7a40",
+     "0x1801fcdf0",
+     "0x1801fe3a0",
+     "0x18020bcd0",
+     "0x18020d020",
+     "0x18021e3f0"
+    ]
+   }
+  ],
+  "n_hits_total": 1
+ },
+ {
+  "lib": "zstd",
+  "name": "ML_bits",
+  "kind": "hex",
+  "pattern": "000000000000000000000000000000000000000000000000000000000000000001010101020203030404050708090a0b0c0d0e0f10",
+  "hits": [
+   {
+    "file_off": 10771088,
+    "section": ".rdata",
+    "rva": 10776720,
+    "va": 6453227664,
+    "ref_funcs": [
+     "0x1801c2d80",
+     "0x1801d7a40",
+     "0x1801fcdf0",
+     "0x1801fe3a0",
+     "0x18020bcd0",
+     "0x18020d020",
+     "0x18021e3f0"
+    ]
+   }
+  ],
+  "n_hits_total": 1
+ },
+ {
+  "lib": "zstd",
+  "name": "err_prefix_unknown",
+  "kind": "str",
+  "pattern": "Unknown frame descriptor",
+  "hits": [],
+  "n_hits_total": 0
+ },
+ {
+  "lib": "zstd",
+  "name": "ver_zstd",
+  "kind": "str",
+  "pattern": "zstd",
+  "hits": [],
+  "n_hits_total": 0
+ },
+ {
+  "lib": "mts_esp",
+  "name": "libmts",
+  "kind": "str",
+  "pattern": "LIBMTS.dll",
+  "hits": [],
+  "n_hits_total": 0
+ },
+ {
+  "lib": "mts_esp",
+  "name": "mts_esp_dir",
+  "kind": "str",
+  "pattern": "MTS-ESP",
+  "hits": [
+   {
+    "file_off": 239666,
+    "section": ".text",
+    "rva": 242738,
+    "va": 6442693682,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 486189,
+    "section": ".text",
+    "rva": 489261,
+    "va": 6442940205,
+    "ref_funcs": []
+   },
+   {
+    "file_off": 16480973,
+    "section": ".rdata",
+    "rva": 16486605,
+    "va": 6458937549,
+    "ref_funcs": [
+     "0x1800377b0",
+     "0x1806631e0"
+    ]
+   },
+   {
+    "file_off": 16584815,
+    "section": ".rdata",
+    "rva": 16590447,
+    "va": 6459041391,
+    "ref_funcs": [
+     "0x1806631e0",
+     "0x18079a7b0"
+    ]
+   }
+  ],
+  "n_hits_total": 4
+ },
+ {
+  "lib": "vst3sdk",
+  "name": "rtti_audioeffect",
+  "kind": "str",
+  "pattern": ".?AVAudioEffect@Vst@Steinberg@@",
+  "hits": [
+   {
+    "file_off": 17953552,
+    "section": ".data",
+    "rva": 17962768,
+    "va": 6460413712,
+    "ref_funcs": []
+   }
+  ],
+  "n_hits_total": 1
+ },
+ {
+  "lib": "vst3sdk",
+  "name": "rtti_editctl",
+  "kind": "str",
+  "pattern": ".?AVEditController@Vst@Steinberg@@",
+  "hits": [
+   {
+    "file_off": 17954336,
+    "section": ".data",
+    "rva": 17963552,
+    "va": 6460414496,
+    "ref_funcs": []
+   }
+  ],
+  "n_hits_total": 1
+ },
+ {
+  "lib": "vstgui",
+  "name": "rtti_cview",
+  "kind": "str",
+  "pattern": ".?AVCView@VSTGUI@@",
+  "hits": [
+   {
+    "file_off": 18002000,
+    "section": ".data",
+    "rva": 18011216,
+    "va": 6460462160,
+    "ref_funcs": []
+   }
+  ],
+  "n_hits_total": 1
+ },
+ {
+  "lib": "vstgui",
+  "name": "rtti_cframe",
+  "kind": "str",
+  "pattern": ".?AVCFrame@VSTGUI@@",
+  "hits": [
+   {
+    "file_off": 18002048,
+    "section": ".data",
+    "rva": 18011264,
+    "va": 6460462208,
+    "ref_funcs": []
+   }
+  ],
+  "n_hits_total": 1
+ }
+]
