@@ -54,23 +54,31 @@ IppStatus ippsThreshold_LT_32f_I(Ipp32f *sd, int n, Ipp32f lv) { NP1(sd); LEN(n)
 IppStatus ippsVectorSlope_32f(Ipp32f *d, int n, Ipp32f off, Ipp32f slope) {
   NP1(d); LEN(n);
 #if VSLOPE == 0
-  /* IPP-9 (#276): 実 DLL の算法 (全 ISA 経路同一)。幅 16 ブロックの累積。
-     レーン k=4g+j の初期値 = off + (j*s に 4s を g 回加算)、以降 step=16*s を加算。
-     端数は先頭 = 次ブロックのレーン0、以降は直前要素 + s の直列加算。FMA 融合禁止。 */
+  /* IPP-9 (#276) / IPP-11 (#473): 実 DLL (SSE2 カーネルを逆アセ。全 ISA 経路同一) の算法。FMA 融合禁止。
+     head: 出力先が 16B 境界に揃うまで (0〜3 要素) 1 要素ずつ peel。peel の p 番目 = lane[0] + off で、
+           lane[j] は初期 j*s に s を p 回直列加算した値。peel 数はポインタ値 & 15 で決まる。
+     body: peel 後の lane[0..3] から 4 ベクトル = 幅 16 ブロック。レーン k=4g+j の値 = (lane[j] に 4s を g 回加算) + off、
+           以降 step=16*s を加算。
+     tail (rem%16): 先頭 = 次ブロックのレーン0、以降は直前要素 + s の直列加算。 */
   {
     const float s4 = 4.0f * slope, step = 16.0f * slope;
-    float lane[16];
-    for (int k = 0; k < 16; k++) {
-      float v = (float)(k & 3) * slope;
-      for (int g = 0; g < (k >> 2); g++) v = v + s4;
-      lane[k] = off + v;
-    }
+    float x[4], lane[16];
+    for (int j = 0; j < 4; j++) x[j] = (float)j * slope;
     int i = 0;
-    for (; i + 16 <= n; i += 16)
-      for (int k = 0; k < 16; k++) { d[i + k] = lane[k]; lane[k] += step; }
-    if (i < n) {
-      d[i] = lane[0];
-      for (i++; i < n; i++) d[i] = d[i - 1] + slope;
+    while (((uintptr_t)(d + i) & 15) != 0) {
+      d[i] = x[0] + off;
+      if (++i >= n) return 0;
+      for (int j = 0; j < 4; j++) x[j] += slope;
+    }
+    for (int g = 0; g < 4; g++)
+      for (int j = 0; j < 4; j++) { lane[4 * g + j] = x[j] + off; x[j] += s4; }
+    const int rem = n - i;
+    int b = 0;
+    for (; b + 16 <= rem; b += 16)
+      for (int k = 0; k < 16; k++) { d[i + b + k] = lane[k]; lane[k] += step; }
+    if (b < rem) {
+      d[i + b] = lane[0];
+      for (b++; b < rem; b++) d[i + b] = d[i + b - 1] + slope;
     }
   }
 #else

@@ -249,25 +249,32 @@ IppStatus ippsConvert_16s32f(const Ipp16s *pSrc, Ipp32f *pDst, int len) {
 }
 
 /* ============ 7. VectorSlope ============ */
-/* IPP-9 (#276): 実 DLL の生成算法 (全 ISA 経路で同一出力・ブロック幅 8 の累積)。
-   - 8 要素ブロックの 8 レーン k の初期値: o+k*s (k=0..4,6)、レーン5 = o+(3s+2s)、
-     レーン7 = o+((3s+2s)+2s) (積の丸めを挟んだ加算経路)。
-   - 以降のブロックは各レーンに step=8*s を加算して更新 (len/8 ブロック)。
-   - 端数 (len%8) は先頭要素 = 次ブロックのレーン0 累積値、以降は直前要素 + s の直列加算。
+/* IPP-9 (#276) / IPP-11 (#473): 実 DLL (dsp_ippv2_x64.dll の SSE2 カーネルを逆アセ。全 ISA 経路で同一出力) の算法。
+   - head: 出力先が 16B 境界に揃うまで 1 要素ずつ peel。p 番目 (p=0,1,..) の値 = p*s + o (積→加算)。
+     64f の peel は 0 か 1 要素 (出力先が 8B 境界のとき)。peel 数 p はポインタ値 & 15 で決まる。
+   - body: peel 後の {p*s, (p+1)*s} から 2 レーン × 4 ベクトル = 8 要素ブロック。
+     ベクトル m の値 = (初期 + m 回の 2s 累積) + o。以降のブロックは各レーンに step=8*s を加算 (rem/8 ブロック)。
+   - tail (rem%8): 先頭要素 = 次ブロックのレーン0 累積値、以降は直前要素 + s の直列加算。
    乗算と加算は融合しない (-ffp-contract=off 必須)。 */
 IppStatus ippsVectorSlope_64f(Ipp64f *pDst, int len, Ipp64f offset, Ipp64f slope) {
   if (!pDst) return ippStsNullPtrErr;
   if (len < 1) return ippStsSizeErr;
-  const double s = slope, s2 = 2.0 * s, s3 = 3.0 * s, s5 = s3 + s2;
-  double lane[8] = {offset,         offset + s,        offset + s2,           offset + s3,
-                    offset + 4.0 * s, offset + s5, offset + 6.0 * s, offset + (s5 + s2)};
-  const double step = 8.0 * s;
+  const double s = slope, s2 = 2.0 * s, step = 8.0 * s;
   int i = 0;
-  for (; i + 8 <= len; i += 8)
-    for (int k = 0; k < 8; k++) { pDst[i + k] = lane[k]; lane[k] += step; }
-  if (i < len) {
-    pDst[i] = lane[0];
-    for (i++; i < len; i++) pDst[i] = pDst[i - 1] + s;
+  while (((uintptr_t)(pDst + i) & 15) != 0) {
+    pDst[i] = (double)i * s + offset;
+    if (++i >= len) return ippStsNoErr;
+  }
+  double x[2] = {(double)i * s, ((double)i + 1.0) * s}, lane[8];
+  for (int m = 0; m < 4; m++)
+    for (int c = 0; c < 2; c++) { lane[2 * m + c] = x[c] + offset; x[c] += s2; }
+  const int rem = len - i;
+  int b = 0;
+  for (; b + 8 <= rem; b += 8)
+    for (int k = 0; k < 8; k++) { pDst[i + b + k] = lane[k]; lane[k] += step; }
+  if (b < rem) {
+    pDst[i + b] = lane[0];
+    for (b++; b < rem; b++) pDst[i + b] = pDst[i + b - 1] + s;
   }
   return ippStsNoErr;
 }
