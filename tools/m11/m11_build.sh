@@ -31,16 +31,30 @@ for st in ir_lb_base img_lb_base; do
 done
 
 if [ ! -f work/boot_final.ll ]; then echo "[m11build] work/boot_final.ll 無し: m11_gen_ir2.sh を先に" >&2; exit 2; fi
+# #680: ldfix 適用の記録が無い IR (旧スナップショット等) は build しない (m11_gen_ir2.sh で作り直す)
+if [ "$(python3 m11_cond.py --get ldfix)" != applied ]; then
+  echo "[m11build] ERROR: work/ir_conditions.json に ldfix=applied の記録無し (現在: '$(python3 m11_cond.py --get ldfix)')。m11_gen_ir2.sh で IR を作り直すこと" >&2; exit 2
+fi
 # qstore (#516): 機械語 `mov qword [rbp+X],imm` が IR で `store ptr null`/`store i32 imm` (4B) に縮む site を `store i64` に戻す
 #   (capstone 突合で確定した site のみ; idempotent)。M11_QSTORE=0 で無効化 (ネガコン; 無効化は m11_gen_ir2.sh で IR を作り直してから)。
+#   #680: skip は失敗扱い (fail-closed)。適用有無は work/ir_conditions.json に記録する (m11_cond.py)。
+PE_QS="${PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}"
 if [ "${M11_QSTORE:-1}" = 1 ]; then
-  PE_QS="${PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}"
   if [ -f "$PE_QS" ] && python3 -c 'import capstone, pefile' 2>/dev/null; then
     python3 qstore/m11_qstore.py work/boot_final.ll work/boot_final.qstore.tmp.ll --pe "$PE_QS" --report work/qstore_report.json > work/qstore.log
     if ! cmp -s work/boot_final.ll work/boot_final.qstore.tmp.ll; then mv work/boot_final.qstore.tmp.ll work/boot_final.ll; else rm -f work/boot_final.qstore.tmp.ll; fi
+    python3 m11_cond.py qstore=applied
   else
-    echo "[m11build] WARNING: qstore skip (PE または capstone/pefile 無し)" >&2
+    python3 m11_cond.py qstore=skipped
+    echo "[m11build] ERROR: qstore skip (PE 無し: $PE_QS / capstone・pefile 無し) — fail-closed で失敗。明示的に外すなら M11_QSTORE=0" >&2
+    exit 1
   fi
+else
+  if [ "$(python3 m11_cond.py --get qstore)" = applied ]; then
+    echo "[m11build] ERROR: work/boot_final.ll は qstore 適用済み (ir_conditions.json)。M11_QSTORE=0 の前に m11_gen_ir2.sh で IR を作り直すこと" >&2
+    exit 2
+  fi
+  python3 m11_cond.py qstore=disabled
 fi
 # alloca 縮退修正 (CAB-129 + #132 R8): RetDec が `alloca i64` (8B) に潰したローカルを拡幅 (idempotent)。
 #   unit #18 OOB の真因 = 44bae0 の stack_var が callee 44ba50 に書かれ 44bb70 の record を破壊 (R8)。
