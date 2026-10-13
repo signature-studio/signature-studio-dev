@@ -144,3 +144,34 @@ survey の集計は ok 870 / trap 24 / noproc 1 / miss 47 で、§7 (ok 869 / tr
   - `tools/m11/results/sigfix_zeropad_liftdiff.tsv` (新規 1,050 行)
   - 経路外の根拠: `grep -rn` で両ファイルを参照するのは `REPORT_N55.md` と `docs/DOC_MAP.md` のみ。`m11_gen_ir2.sh`・`m11_build.sh`・`m11_survey.mjs`・`trap_triage/check_682.py` はいずれも liftdiff を参照しない。両ファイルは 0 詰め site の集計 TSV 出力だけで、IR・image・survey の入力にならない。
 - **集計差 (870 / 869) は未特定**。§7 には測定 commit が書かれていないため、比較基準は仮定 (§6 の計測 HEAD `1d7b619e`) として扱う。`1d7b619e..92cfb784` の間に、survey・build・IR 生成に効く m11 ファイルが 47 件変わっている (`m11_ov.c`・`m11_build.sh`・`m11_passes.py`・`m11_post.py`・`m11_survey.mjs` を含む)。候補は `9af7827f` (#1043、`function_980ed0` の 10 進 inttoptr を LVA に remap、IR を変える) と `b57371e9` (#1004、survey に guest ポインタ検査を追加) など。ただし unit 別の結果 (JSON) が §7 と §9 のどちらにも残っておらず、どの unit が trap→ok に移ったかは確認できない。判定 (check_682 の 2/5) には影響しない。
+
+## 10. 再現の実測と OOB 実値の採取計画 (2026-10-13, 追補 run 4、n=1)
+
+測定 commit `a67af27b` (本 PR の作業ベース。コード変更なし)。`git diff a67af27b HEAD -- tools/m11` は本 PR 追記の REPORT_714.md のみ。素材は `$RUNNER_TEMP` と worktree の `tools/m11/work/` に展開 (fl-win64・toolchain-retdec・toolchain-emsdk・work-m11・work-liftdiff)。`FL_WIN64_DIR`・`RETDEC_ROOT` で参照。`M11_FIX_535BF2` 既定 0 (OFF)。
+
+| 工程 | 結果 | 所要 |
+|---|---|---|
+| `m11_gen_ir2.sh` | rc=0 (`boot_final.ll` 490693 行) | 35.6 秒 |
+| `m11_build.sh` | rc=0 (`m11_boot.cjs(+.wasm)`) | 22.8 秒 |
+| `m11_survey.mjs` | rc=0 / ok 870 / trap 24 / noproc 1 / miss 47 / units 942 | 13.3 秒 |
+| `check_682.py` | 2/5 (304=trap 555=trap 923=trap 291=ok 296=ok) rc=1 | - |
+
+load average は工程中 1.3〜2.4。§9 の ok 870 / trap 24 と一致した (§7 の 869 / 25 との差は今回の HEAD でも残る)。
+
+**先頭フレームの逆引き** (`M11_SURVEY_STACK=304,555,923`、`trap_triage/oob_insn.py`):
+
+- 304・555: `function_535bf2` (wasm 3372, 0x1a336f)。`i32.load offset=0` (`tbl + cnt*24` の sentinel 比較)。§9 と同一。
+- 923: `function_410b10` (wasm 14900, 0x354f17)。`i32.load offset=0` (`*(*(obj)-0x80)`)。§9 と同一。
+- IR の呼出し鎖 (`work/boot_final.ll`): `function_535240` → `function_535b30` (`obj` は `function_535240` の第 1 引数)。`function_4fad10` は `function_535ab0` を呼び、その先頭で `function_4133f0(%0, %14)` を呼ぶ。
+
+**判定**: 受入 1・2 は**未達のまま**。今回の実測は §9 の追認で、OOB 時の `tbl`・`cnt`・`obj` の**実値**は未採取。
+
+### 次の一手 (実値の採取)
+
+wasm の外から、OOB 直前の値を読む計測が必要。
+
+1. 304・555: `function_535bf2` の入口で `obj`・`*(obj+8)`・`*(obj+8)+8`・`obj+0x10` を JS 側で読み、`tbl`/`cnt` が線形メモリ内か確認する。
+2. 923: `function_410b10` の入口で `obj` を読み、`obj-0x80` が範囲外か確認する。
+3. 両者の `obj` を作る関数 (`function_4fad10` / `function_4fb910` の arg1・arg2) まで遡る。
+
+子 issue を起票する (`[M11-N91]`、`親: #714`)。既存 `[M11-N62]` (halt0 unit 492 の 4133f0 系 OOB) と対象 unit が別なので重複にはしない。
