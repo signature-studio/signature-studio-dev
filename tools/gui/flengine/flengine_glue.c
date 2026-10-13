@@ -1,6 +1,6 @@
 /* GUI-3 (#174): m11 closure に tools/gui shim を結線する薄い糊 (-pthread, node 向け headless host 内蔵)。
  *   - 起動前 (constructor): host_ready=1 (gui_headless_attach) / out ring は host 不在なので満杯時に破棄 / WNDPROC は m11_icall へ。
- *   - 到達 API ログは gui_reach_dump (GUI-REACH 行) / gui_reach_json で JS が回収する。 */
+ *   - 到達 API ログは gui_reach_dump が出す GUI-REACH 行を JS ハーネスが回収する。 */
 #include <stdint.h>
 #include <stdio.h>
 #include <emscripten.h>

@@ -1,6 +1,6 @@
 # INTEGRATION — 実 FLEngine への GUI shim 結合手順書 (CAB-173 向け; 準備: CAB-156)
 
-実 FLEngine の結合そのもの (CAB-173) は CAB-5 (m11 完走) 後。ここは「結合時にやること・守る ABI 制約・結果の見方」と、実 FLEngine 無しで検証済みの準備物をまとめる。
+実 FLEngine の結合そのもの (CAB-173 = #174) は `flengine/build.sh` に実装済み (実測は [flengine/REPORT.md](flengine/REPORT.md))。以下は結合時の守る ABI 制約と準備物の手順書 (§2 の手順を build.sh が自動化)。ここは「結合時にやること・守る ABI 制約・結果の見方」と、実 FLEngine 無しで検証済みの準備物をまとめる。
 数値はすべて `bash tools/gui/e2e.sh` / 各スクリプトの実測。
 
 ## 1. 準備物 (すべて tools/gui/ 配下)
