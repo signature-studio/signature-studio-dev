@@ -126,21 +126,21 @@ python3 tools/targets/serum2/license/authstub/authstub_irpass.py \
 ## 11. LF2〜LF7 束縛の fp_bind 共通プリミティブ化 (PR #778, Refs #250)
 
 - 対象: `tools/liftlib/liftlib/passes/fp_bind.py` (新規。`fn_span` / `replace_lines` / `bind_slot_loads` / `insert_after`、件数 expect で一致を検査) と `authstub_irpass.py` の `apply_liftfix` (fp_bind 経由に変更。束縛内容は不変)。
-- 測定 commit: 45f63732 (main 3418333a 取り込み後)。素材: `plugins-serum2.tar.zst` の `Install_Xfer_Serum2_2.1.5.exe` を 7z で展開 → `$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3` を `tools/targets/serum2/work/Serum2_win64.vst3` に配置。19,236,864 B, sha256 `501e7bb3…5283` (展開前に一致確認)。toolchain-retdec・toolchain-emsdk 使用。Python は pefile 2024.8.26 / capstone / numpy を venv に入れて実行。
-- 前提: 旧 PR 本文の転記値 (e2e 30.3 s / 4.0 s 等) は再測定の対象外。下表の「変更前」は未再測定のため空欄。
-- 再測定 (`bash e2e.sh`、`rm -rf work` 後の cold 1 回目と、直後の warm 2 回目):
+- 測定 commit: 0114f384 (コード HEAD)。本 commit は REPORT のみの変更で、コードは測定時と同一。
+- 素材 (Actions run の `$HOME/artifacts` で実在を確認): `plugins-serum2` / `toolchain-retdec` / `toolchain-emsdk`。`plugins-serum2` の `Install_Xfer_Serum2_2.1.5.exe` を 7z で展開 → `Serum2.vst3/Contents/x86_64-win/Serum2.vst3` を `tools/targets/serum2/work/Serum2_win64.vst3` に配置 (19,236,864 B, sha256 `501e7bb3…5283`、展開後に一致確認)。
+- Python: runner 既定の `python3` には pefile が無いため、`pefile==2024.8.26` / `capstone` / `numpy` を venv に入れて PATH 先頭に置いてから実行。
+- 再測定 (`bash e2e.sh`、`work/` 削除後の cold 1 回目と、直後の warm 2 回目。両回 exit 0):
 
 | 項目 | cold (lift 新規生成) | warm (lift キャッシュ利用) |
 |---|---|---|
-| `e2e.sh` 所要 (`time` real) | 34.9 s | 5.3 s |
-| load (`/proc/loadavg` 1 分平均) | 0.44 → 0.69 | 0.71 → 0.71 |
+| `e2e.sh` 所要 (`time` real) | 32.2 s | 4.1 s |
+| load (`/proc/loadavg` 1 分平均、開始 → 終了) | 0.64 → 0.92 | 0.71 → 0.71 |
 | wasm ハーネス | 23/23 PASS | 23/23 PASS |
 | `patched_base_lf.ll` sha256 | `c62d9316…8793` | `c62d9316…8793` |
 | `raw_base_lf.ll` sha256 | `79ab30ca…0d20` | `79ab30ca…0d20` |
 
-- 両回とも N4 OK (process / funclet 非変更)、LF1〜LF7 全適用。`patched_base_lf.ll` / `raw_base_lf.ll` の sha256 は旧 PR 本文の値と一致した。
-- 注: 最初の試行は venv 未導入で `data_globals_gen.py` が `pefile` 不足により step [6] で停止した (環境要因。コード変更なし)。venv 導入後に上記の cold / warm を取り直した。
-- 残: 「変更前 (main 側 authstub 版) の再測定」は未実施。baseline 比較は行わない。
-
-- N4 (process / funclet 無変更) assert OK。変更関数は 18004fad0 / 1800c2b50 / 1800c6090 の 3 件。
-- 本束縛の共通化で達成したのは「既存 e2e の再現」と「束縛プリミティブの共通化」まで。L1 の復元 pass と LF 規則の一般化 (RetDec 出力からの規則導出) は未達。追跡 issue は未起票のため PM に起票を依頼する。
+- 両回とも N4 OK (process / funclet 非変更)、LF1〜LF7 全適用。
+- 変更前 (main 側 authstub 版) の再測定は未実施。baseline 比較は行わない。
+- 本束縛の共通化で達成したのは「既存 e2e の再現」と「束縛プリミティブの共通化」まで。未達は次の追跡 issue で扱う:
+  - L1 (直接 vtable 通知 call の raw IR 脱落) の復元 pass → #823
+  - LF 規則の一般化 (RetDec 出力からの規則導出。VA・slot 値を authstub 専用表から外す) → #824
