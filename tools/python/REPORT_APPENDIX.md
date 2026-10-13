@@ -18,7 +18,7 @@
 - 副次: 旧 `flapi_table.py` は `FLAPI.md` 先頭の「自動生成・人手編集禁止」ヘッダを出力せず、再生成で追跡中のファイルが差分になっていた。生成側に移した。
 - 検証: `FL_WIN64_DIR=<fl-win64 展開先> bash tests/flapi_table_check.sh` (出力先は一時ディレクトリ。追跡中のファイルは書き換えない)。判定: 再生成 3 ファイルが追跡中とバイト一致 + `win_pair_verified=true` > 0 + ネガコン 6 本が全て exit 非 0 + 理由表示 + 出力不変。前提入力が無ければ exit 3 (NOT VERIFIED)。
 - 実測 (Actions runner、oc_artifacts: fl-win64 toolchain-emsdk、直列、n=3): 3 回とも exit 0・wall 2.20 / 2.20 / 2.20 秒・load average 0.13〜0.20。正常系 3 / 3 ファイル一致 (差分 0)、`win_pair_verified=true` 388 件 (REPORT §3 の 388/399 と一致)。ネガコン 6 本 (PE 無し / PE 空 / PE が別物 / stubs 無し / emsdk 無し / dylib も既存 table も無し) は全て exit=2 + 理由表示。
-- gate 自体のネガコン: 入力 PE を乱数 1 MB に差し替えると `flapi_table_check.sh` は exit 1、PE 無しは exit 3 (どちらも緑にならない)。範囲外: `build_flpy.sh` の emcc link 段 (CPython wasm の事前ビルド `build_cpython_wasm.sh` が必要で未実施。emsdk の実在 `[EMSDK]` の `emsdk_env.sh` のみ確認)、`fetch_inputs.sh` / `run_all.sh` の `/home/ubuntu` 固定パス (run_all.sh の `FL_MAC` / `FL_WIN`)。
+- gate 自体のネガコン: 入力 PE を乱数 1 MB に差し替えると `flapi_table_check.sh` は exit 1、PE 無しは exit 3 (どちらも緑にならない)。範囲外: `build_flpy.sh` の emcc link 段 (CPython wasm の事前ビルド `build_cpython_wasm.sh` が必要で未実施。emsdk の実在 `[EMSDK]` の `emsdk_env.sh` のみ確認)、`run_all.sh` の `FL_MAC` / `FL_WIN` 固定パス (#630)。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
@@ -152,7 +152,7 @@ cases 6122
 | `mcp_kwcalls_bind.py` (本 PR) | 14 パターン | 14/14 PASS | 0 |
 
 **wasm 回帰 (本 PR head。`fetch_inputs.sh`・`build_flpy.sh`・`provider/build.sh` を同一 worktree で実行)**
-- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` (2,324,302,252 B) を `tar --zstd -xf` で `$RUNNER_TEMP/fl-win64` に展開 (6.4 秒、`extracted/` 25,166 件)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`。`$ARTIFACTS_DIR/toolchain-emsdk.tar.zst` の実在を確認し、`[EMSDK]` (emcc 6.0.12) を使用。
+- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` (2,324,302,252 B) を `tar --zstd -xf` で `$RUNNER_TEMP/fl-win64` に展開 (6.4 秒、`extracted/` 25,166 件)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`。`$ARTIFACTS_DIR/toolchain-emsdk.tar.zst` は実在を確認したが展開せず、runner 既存の `[EMSDK]` (emcc 6.0.12) を使用。
 - CPython 3.12.1 wasm: `build_cpython_wasm.sh` rc=0、4 分 07 秒 (native + wasm)。
 - `fetch_inputs.sh` + `build_flpy.sh` + `provider/build.sh`: rc=0、8.9 秒。WARN は mac dylib 無し (既存の `midi_script_callbacks_in_binary` 27 件を引き継ぎ・既知)。ビルド後 `git status` に tracked の差分なし。
 - `node tests/all_tools.mjs` (JS mock): 48/48 ok、soft_error 0、raised 0、host_calls 37,425、callback_roundtrip true、rc=0、1.967 秒。
@@ -160,9 +160,9 @@ cases 6122
 - `node tests/provider_check.mjs`: PASS (functions 435、implemented 60、unimplemented 375、rc=0、0.347 秒)。
 - 計測時の load average: 0.67〜1.38 (`uptime`、4 vCPU)。n=1 (all_tools / provider_check)。
 - `analysis/mcp/tool_coverage.json` (`all_tools.mjs` JS mock の生成物) は tracked 版 (host_calls 37,424) と一致しない。旧 main の src で同じ回帰を回すと 37,425 で、48 件の結果・api_calls は本 PR と全件一致 (差分 0)。tracked 版が main の既存コードより古いため、本 PR では更新せず差分を戻した (範囲外)。
-- 未実行: `run_all.sh` 全体 (step 4 が `/home/ubuntu` 固定。#630)、`browser_check.mjs` / `mcp_ui_check.mjs` / `midi_ui_check.mjs` (headless Chrome・Vite が要る)、`poc_mcp.mjs` / `midi_script.mjs` / `subinterp_probe.mjs` (本 PR の変更範囲外として未実行)。
+- 未実行: `run_all.sh` 全体 (step 4 が `FL_MAC` / `FL_WIN` 固定パスを使うため。#630)、`browser_check.mjs` / `mcp_ui_check.mjs` / `midi_ui_check.mjs` (headless Chrome・Vite が要る)、`poc_mcp.mjs` / `midi_script.mjs` / `subinterp_probe.mjs` (本 PR の変更範囲外として未実行)。
 
-**検証の組み込み**: `kwsig_bind_check.py` は `run_all.sh` の step 8b に接続 (wasm 不要、`python3 tests/kwsig_bind_check.py` が FAIL で止まる)。`mcp_kwcalls_*.py` と `kwsig_behavior_diff.py` は手動 (`mcp_kwcalls_extract.py` は python3.12 と fl-win64 展開が要るため run_all に入れていない)。
+**検証の組み込み**: `kwsig_bind_check.py` は `run_all.sh` の step 8b に接続 (wasm 不要、`python3 tests/kwsig_bind_check.py` が FAIL で止まる)。ただし `run_all.sh` は手動 E2E で `.github` の workflow からは呼ばれないため、`kwsig_bind_check.py` は **CI 未接続・手動実行**。`mcp_kwcalls_*.py` と `kwsig_behavior_diff.py` は手動 (`mcp_kwcalls_extract.py` は python3.12 と fl-win64 展開が要るため run_all に入れていない)。
 
 **限界**: 期待値は stubs の同名既定値を正として組んでいる。C 側の実既定値との一致は未確認 (#81 (a) の実機確認)。
 
@@ -172,6 +172,6 @@ cases 6122
 | 省略引数の C 側既定値との一致 (実機) | 期待値は stubs 同名既定値を正とする | #81 (a) |
 | kwlist なし `channels.incEventValue` の `1 / 24` 既定値の消失 | 検証範囲外。kwlist なし関数の省略時の値が変わる (上の追補) | #711 (PY-17) |
 | provider の `None` と JS mock の `undefined` による省略の表し方の統一 | 本 PR は省略を短い tuple で渡す。provider・mock 側の扱いは未確認 | #712 (PY-18) |
-| `run_all.sh` step 4 の `/home/ubuntu` 固定 | run_all 全体は本 run で未実行 | #630 (既存) |
+| `run_all.sh` の `FL_MAC` / `FL_WIN` 固定パス | run_all 全体は本 run で未実行 | #630 (既存) |
 | `tool_coverage.json` の tracked 版が main の既存コードの出力と不一致 (37,424 vs 37,425) | 生成物の更新漏れ。本 PR の変更とは無関係 (旧 main でも同じ出力) | #712 (PY-18) |
 | `browser_check` / `mcp_ui_check` / `midi_ui_check` 未実行 | UI 側の影響は未検証 | #712 (PY-18) |
