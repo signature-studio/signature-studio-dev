@@ -1,0 +1,7 @@
+{
+ "name": "synth",
+ "spec": "tests/std/synth_spec.json",
+ "wasm_func": "function_1000",
+ "exports": ["function_1000"],
+ "emcc": {"sources": ["tools/liftlib/tests/std/synth_helper.c"]}
+}

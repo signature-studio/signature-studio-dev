@@ -1,6 +1,8 @@
 """cli.py — python3 -m liftlib <command>
 
-  lift <cfg.json> [--n N] [--no-diff]   RetDec → 修復 pass → helper 自動生成 → emcc → 差分ハーネス (実機 vs wasm)
+  build <cfg.json> [--profile std]      標準ビルド入口 (PERF-P1 / #155): RetDec → 修復 → helper → 標準設定 (-O3 -flto + gc-sections + 最小 export)
+                                        + 署名ガード (ref/o2/o3/std の全変種で出力署名が一致しなければ exit 1・<name>.cjs を作らない)
+  lift <cfg.json> [--n N] [--no-diff]   RetDec → 修復 pass → helper 自動生成 → emcc (旧 -O1) → 差分ハーネス (実機 vs wasm)
   detect <cfg.json>                     修復せず検出器だけ実行 (P1/F7/F2 の所見を JSON で出力)
   diagnose <cfg.json>                   pass 単位の対照実験 (どの修復が必須か) + 未修復所見
   simd gen <ll...> -o out.c [--canon]   __asm_* 宣言から C helper 生成
@@ -18,6 +20,7 @@ import sys
 import time
 
 from . import pipeline, env
+from . import stdbuild as SB
 from .harness import diff as D
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -50,6 +53,20 @@ def cmd_lift(a):
     return 0 if ok else 1
 
 
+def cmd_build(a):
+    variants = [v for v in a.variants.split(",") if v] if a.variants else None
+    try:
+        cfg, wd, cjs, stats, log, rep = pipeline.run_build(a.cfg, workdir=a.workdir, profile=a.profile, variants=variants, n=a.n,
+                                                           expect=a.expect, timeout=a.timeout)
+    except SB.SignatureMismatch as e:
+        print("[build] FAIL (署名ガード): %s" % e, file=sys.stderr)
+        return 1
+    for v, r in rep["variants"].items():
+        print("[build]   %-5s wasm %8d B  build %5.1fs  sig %s" % (v, r["wasm_bytes"], r["build_s"], r["sig"]))
+    print("[build] PASS %s: profile=%s 署名 %s (%d 変種一致) → %s" % (cfg["name"], a.profile, rep["guard"]["unique"][0], len(rep["variants"]), cjs))
+    return 0
+
+
 def cmd_detect(a):
     cfg, wd, cjs, stats, log = pipeline.run_all(a.cfg, workdir=a.workdir, detect_only=True)
     print(json.dumps(dict(stats=stats, log=log), indent=1, ensure_ascii=False, default=str))
@@ -70,7 +87,7 @@ def cmd_simd(a):
     if a.sub == "test":
         d = json.load(open(os.path.join(PKG, "data/kh_mnemonics.json")))
         bases = sorted(set(d["effects"]) | set(d["infra"]) | set(d["hosts"]))
-        forms, stat = simdtest.run(bases=bases, n=a.n, out_dir=os.path.join(PKG, "work/simdtest"))
+        forms, stat = simdtest.run(bases=bases, n=a.n, out_dir=os.path.join(PKG, "work/simdtest"), ybases=simdtest.YMM_BASES)
         by = simdtest.summarize(stat)
         bad = [(k, v) for k, v in by.items() if v["mismatch"]]
         tested = sorted(set(k[0] for k in by))
@@ -186,6 +203,14 @@ def cmd_inject(a):
         mod = IR.Module.parse(text)
         img = Image(env.OTT_DLL)
         out["ott"] = dict(F7=inject.eval_f7(mod, img, limit=3, max_total=150), P1_fold=inject.eval_p1_fold(mod, img))
+    xl, xd = os.environ.get("LL_XRET_LL"), os.environ.get("LL_XRET_DLL")
+    if xl and xd and os.path.exists(xl) and os.path.exists(xd):         # F2 xmm 戻り注入 (LIFTLIB #241)
+        from .passes import f2 as F2
+        text, _ = base.run_base(open(xl).read(), base.make_args())
+        mod = IR.Module.parse(text)
+        img = Image(xd)
+        F2.run_xmm_ret(mod, img, [], {}, repair=True)
+        out["xret"] = dict(F2=inject.eval_f2_xret(mod, img))
     for k, v in out.items():
         print("[inject] %s: %s" % (k, json.dumps(v, ensure_ascii=False)))
     os.makedirs(os.path.join(PKG, "work"), exist_ok=True)
@@ -278,6 +303,11 @@ def main(argv=None):
     p = sp.add_parser("lift")
     p.add_argument("cfg"); p.add_argument("--n", type=int); p.add_argument("--no-diff", action="store_true")
     p.add_argument("--workdir"); p.add_argument("--timeout", type=int, default=300); p.set_defaults(fn=cmd_lift)
+    p = sp.add_parser("build")
+    p.add_argument("cfg"); p.add_argument("--profile", default=SB.load()["default_profile"], choices=SB.profile_names())
+    p.add_argument("--variants", default="", help="署名ガードの変種 (カンマ区切り; 既定 %s)" % ",".join(SB.load()["guard_variants"]))
+    p.add_argument("--expect", help="期待署名 (cfg.signature.expect でも可)"); p.add_argument("--n", type=int, help="署名用シナリオ数 (cfg.signature.n / spec.scenarios)")
+    p.add_argument("--workdir"); p.add_argument("--timeout", type=int, default=300); p.set_defaults(fn=cmd_build)
     p = sp.add_parser("detect")
     p.add_argument("cfg"); p.add_argument("--workdir"); p.set_defaults(fn=cmd_detect)
     p = sp.add_parser("diagnose")
