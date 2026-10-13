@@ -37,6 +37,7 @@ CI や他人の環境では存在しないため、再現手順は本ファイ�
 
 | ID | 所在 | 内容 |
 |---|---|---|
+| `[WORK-M11]` | `$ARTIFACTS_DIR/work-m11.tar.zst` (Actions では `$HOME/artifacts/` に R2 から配置。取得指定は `docs/WORKFLOW.md` §11 の `oc_artifacts: work-m11`。展開先は `tools/m11/work/`) | `tools/m11/` の検証スナップショット (`boot*.drc.config.json` 等)。gitignore 対象で commit しない。#516 以前の生成物を含む (`docs/WORKFLOW.md` §11 #680) |
 | `[DOWNLOADS]` | `~/ダウンロード/` | 元インストーラ・プラグイン素材 (FL win/mac、OTT、Kilohearts、Serum2、Fresh Air、Massive X)。Vital / Surge XT / Dexed は対象外 |
 | `[PLUGINS-SERUM2]` | `$ARTIFACTS_DIR/plugins-serum2.tar.zst` (Actions では `$HOME/artifacts/` に R2 から配置。取得指定は `docs/WORKFLOW.md` §11 の `oc_artifacts: plugins-serum2`) | Xfer Serum 2 のインストーラ `Install_Xfer_Serum2_2.1.5.exe` を含む `.tar.zst` (展開は `tar --zstd -xf` で行い、展開先は各 REPORT で `work/` 配下に指定) |
 
