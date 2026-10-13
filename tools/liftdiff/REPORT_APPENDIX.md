@@ -156,7 +156,7 @@ pip install numpy capstone pefile
 python3 tools/liftdiff/tests/trace_diverge_unreachable.py > tools/liftdiff/results/m11_unreachable_diverge.md
 python3 tools/liftdiff/tests/oob_414ad0.py > tools/liftdiff/results/m11_oob_414ad0.md
 ```
-LD-17 (#864) の型分類は `results/m11_unreachable_diverge.md` §1b (同じスクリプトの出力)。PE 展開は `block00031_PE.bin` 1 ファイルで足りる (約 22 MB)。
+LD-17 (#864) の型分類は `results/m11_unreachable_diverge.md` §1b (同じスクリプトの出力)。PE 展開は `block00031_PE.bin` 1 ファイルで足りる (実測 22227016 bytes)。
 単体実行 (手動実測) は `[WIN64]` の PE を指す `pe` に書き換えた `targets/m11.json` の複製で `python3 liftdiff.py run <target.json> --fn 0x414ad0 --state auto --nobuild -v` (`targets/m11.json` 自体の固定パスは #294)。
 
 ## 10. OTT 旧 chain (D1〜D6) の Actions 再現 (LD-8 / #406)
