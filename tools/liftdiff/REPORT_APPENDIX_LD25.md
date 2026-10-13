@@ -19,7 +19,7 @@ native も wasm も同じく ok を返すため、**空振り一致**になる�
 
 ## 2. 実測 (`tests/check_initunits.py`・`liftdiff_e2e.sh --m11-only` の [3b/4])
 
-HEAD (#977 ブランチ) で `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tests/check_initunits.py` を実行 (2026-10-13 実測)。
+測定 commit `3b689b25` (#977 ブランチ・main `dee83f6c` を merge 済み) で `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/liftdiff/liftdiff_e2e.sh --m11-only` を実行 (2026-10-13 実測: exit 0 / 198s / PASS、[3b/4] CHECK_INITUNITS PASS)。
 11 pattern すべて:
 
 | state | precondition (InitTable ptr / InitCount / TLS set) | 11 pattern の結果 | 空振り (EMPTY) |
@@ -33,15 +33,16 @@ HEAD (#977 ブランチ) で `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tests/c
 
 ## 3. 既存 pattern への影響 (sample:800・受入条件 3)
 
-既定 batch 経路 (units) は**変更していない**。hybrid で sample:800 を再実行し、判定遷移を比較 (実測 4m30s):
+既定 batch 経路 (units) は**変更していない**。hybrid で sample:800 を再実行し、判定遷移を比較 (測定 commit `3b689b25`・実測 282s・load 4.05→8.86):
 
 | state | match | mismatch | unexec |
 |---|---|---|---|
-| units (HEAD 既定) | 360 | 230 | 210 |
-| hybrid | 352 | 258 | 190 |
+| units (既定・`--m11-only` の [4/4]) | 360 | 230 | 210 |
+| hybrid (`batch --state work/m11/boot_state_hybrid.json`) | 352 | 258 | 190 |
 
 遷移 (units → hybrid): match→mismatch 25 / mismatch→match 13 / unexec→match 5 / unexec→mismatch 19 /
 mismatch→unexec 3 / match→unexec 1。計 66 関数 (800 中 8.3%)。
+(件数は両 JSONL (`work/m11/batch_sample_800.jsonl`・`batch_sample_800_hybrid_head.jsonl`) の function.va 単位の突合で算出。)
 
 判断: 既定を hybrid に切り替えると既存の判定基準が変わるため、**既定は units のまま**とした。
 hybrid を既定にするかは別 issue で、遷移表 (上記) を根拠に判断する。
@@ -59,3 +60,11 @@ hybrid を既定にするかは別 issue で、遷移表 (上記) を根拠に�
 
 - 既定 batch 状態を hybrid にするか (上記 §3 の 66 関数の遷移を伴う)。起票先: 親 #235 にコメント。
 - hybrid の unit 830 segv (残 3 unit) は REPORT §2.2 の既存の下流課題。
+
+## 6. 検証 (測定 commit と差分)
+
+- 測定 commit: `3b689b25` (`9fb30a45` に main `dee83f6c` を merge。#977 fix モード)。
+- 差分: `git diff 5d2df224 3b689b25 -- tools/liftdiff` は 11 ファイル / +615 −7 (`ldlib/cases.py` +29・`ldlib/session.py` +35 を含む)。旧 `5d2df224` の値は無効として、本節の値で置き換えた。
+- 素材: `fl-win64 work-m11 work-liftdiff` を `$RUNNER_TEMP` に展開し `tools/` 配下へ配置 (gitignore 対象)。`toolchain-emsdk` は `emsdk install 6.0.12` で `/opt/emsdk` に pin 版を導入。
+- `liftdiff_e2e.sh --m11-only`: exit 0 / 198s / load 0.68→6.07 / **LIFTDIFF_E2E PASS**。[3b/4] **CHECK_INITUNITS PASS**。[4/4] sample:800 一致 360 / 不一致 230 / 実行不能 210 (116s)。
+- hybrid (`batch --state work/m11/boot_state_hybrid.json --set sample:800`): 一致 352 / 不一致 258 / 実行不能 190 (282s・load 4.05→8.86)。units→hybrid の遷移 66 関数 (§3 と一致)。
