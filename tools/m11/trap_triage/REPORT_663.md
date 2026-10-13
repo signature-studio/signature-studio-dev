@@ -34,6 +34,7 @@ unit 56 の生の鎖は Issue 本文どおり `function_417b70 ← function_417f
 
 `frames_check.py` の規則 (942 unit 全部): (1) kind 一致 (2) oob 以外は全欄一致 (3) oob は frames 以外の欄一致、
 `post.frames[1:] == pre.frames[:len(post.frames)-1]`、`len(post.frames) == min(len(pre.frames)+1, 30)`。
+別実装の検算 `recount_483.mjs pre.json post.json` (wasm 名前表を直接パース): 遷移は全て同 kind (`ok->ok 818` 他)、`ok->non-ok 0`、基準側 oob 最上位は §2-1 の修正前列と一致。
 JS の末尾 frame `file:///…/survey_units*.mjs` は配置場所だけで決まるため比較前に正規化 (`file://<survey>`)。空判定 (oob 0 件) は不合格。
 
 ### 2-1. 最上位 frame の変化 (`annotate.py` の出力, oob 21 unit)
@@ -67,12 +68,13 @@ JS の末尾 frame `file:///…/survey_units*.mjs` は配置場所だけで決�
 
 (b) は kind 差 0 の検査が「修正後に frames が変わった」だけで落ちないことの裏返し。(c) は kind 変化を確実に検出することの確認。
 
-## 4. 所要と load (実測, n=3 は §4 末尾)
+## 4. 所要と load (実測)
 
 - `m11_build.sh` (再リンク): 7.728 s real (cached obj を流用)
-- survey 1 回 (942 unit): 修正前 8.41 s (初回, `base_head`)、`negctl_663.sh` 内 pre 8.10 s / post 8.04 s
-- `negctl_663.sh` 全体: 16.27 s (survey 2 本 + checker 3 本 + survey_diff 2 本)
-- load average (1 分): 0.20–0.61 (実行中 `uptime` 計測)、並列数 1 (node は単一プロセス)、node `v22.23.3` (PATH の node)
+- survey 1 回 (942 unit): 修正前 8.41 s (初回 `base_head`)。`negctl_663.sh` の pre / post は、作業ツリー段階で 8.10 / 8.04 s。コミット済み HEAD (`442c46e`) での 2 回: pre 8.08 / 8.10 s、post 8.11 / 8.04 s (min–max、n=2)
+- `negctl_663.sh` 全体: 16.27 s (survey 2 本 + checker 3 本 + survey_diff 2 本)。HEAD 上の 2 回とも `NEGCTL_663 ALL EXPECTED`
+- 基準 JSON の md5 は全 run で一致: pre `9d9f778d9481`、post `b2815724d940`
+- load average (1 分): 0.13–0.52 (各 run の前後 `uptime`)、並列数 1 (node は単一プロセス)、node `v22.23.3` (PATH の node)
 
 ## 5. 検証範囲 / 範囲外 / 未解決
 
