@@ -10,7 +10,7 @@ REPORT.md §15 相当。REPORT.md の 250 行上限のため別置き。親 #853
 
 測定 run: PR #1247 の fix モード (レビュー指摘への対応)。HEAD `44d70d74` を `ws-1025` worktree で checkout して実行。
 
-素材: `work-icall` を `tools/icall/work/` に展開 (`tar --zstd -xf`)。`plugins-kilohearts` / `toolchain-*` は `$ARTIFACTS_DIR` に実在を確認したが、本 build 経路では展開していない (emsdk は `/opt/emsdk` を使用)。
+素材: `work-icall` を `tools/icall/work/` に展開 (`tar --zstd -xf`)。`plugins-kilohearts` / `toolchain-*` は `$ARTIFACTS_DIR` に実在を確認したが、本 build 経路では展開していない (emsdk は [EMSDK] を使用)。
 
 | 項目 | 結果 | 実測 |
 |---|---|---|
@@ -25,14 +25,14 @@ REPORT.md §15 相当。REPORT.md の 250 行上限のため別置き。親 #853
 
 ## 鮮度 (測定 commit から現 HEAD まで)
 
-測定 commit `44d70d74` (コード最終変更 `0b761625`) から現 HEAD `292232a0` までのコード差分は 0 行。`44d70d74..292232a0` の変更は本付録 (`REPORT_APPENDIX_1025.md`) のみ。
+検証 HEAD `ae54f97f` (本節を書いた時点) まで、測定 commit `44d70d74` からのコード差分は 0 行。`44d70d74..ae54f97f` の変更は本付録 (`REPORT_APPENDIX_1025.md`) のみ。
 
 ```
-$ git diff 44d70d74 292232a0 -- tools/icall/kh_route_build.sh tools/icall/ir_*.py tools/icall/rt tools/m*
+$ git diff 44d70d74 ae54f97f -- tools/icall/kh_route_build.sh tools/icall/ir_*.py tools/icall/rt tools/m*
 (出力 0 行・exit 0)
-$ git diff --stat 44d70d74 292232a0
- tools/icall/REPORT_APPENDIX_1025.md | 15 +++++++--------
- 1 file changed, 7 insertions(+), 8 deletions(-)
+$ git diff --stat 44d70d74 ae54f97f
+ tools/icall/REPORT_APPENDIX_1025.md | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 ```
 
 よって上表の数値は現 HEAD のコードに対しても有効 (再測定は不要, WORKFLOW §6)。
