@@ -39,7 +39,7 @@ fi
 # verdict は APPROVED / CHANGES_REQUESTED だけ。「verdict を持つ最後の review」で判定する
 # (APPROVED の後に COMMENTED が付いても、最後の review の state だけで見ると verdict 無しと誤判定する)。
 rv="$(gh api --paginate "repos/$OC_REPO/pulls/$OC_PR_NUMBER/reviews" \
-  | jq -s --arg h "$head" '[.[][] | select((.user.login | startswith("oc-reviewer")) and .commit_id == $h and (.state == "APPROVED" or .state == "CHANGES_REQUESTED"))] | last // {}')"
+  | jq -s --arg h "$head" --arg l "$REVIEWER_LOGIN" '[.[][] | select(.user.login == $l and .commit_id == $h and (.state == "APPROVED" or .state == "CHANGES_REQUESTED"))] | last // {}')"
 st="$(jq -r '.state // "NONE"' <<< "$rv")"
 
 case "$st" in

@@ -21,7 +21,6 @@ STUCK_LABEL="${OC_STUCK_LABEL:-oc:stuck}"
 # 起動主体は完全一致で見る (前方一致だと意図しないアカウント名でも通り、write 権限の fix が起動しうる)。
 REVIEWER_LOGIN="${OC_REVIEWER_LOGIN:-oc-reviewer-for-signature-studio[bot]}"
 IMPLEMENTER_LOGIN="${OC_IMPLEMENTER_LOGIN:-opencode-for-signature-studio[bot]}"
-LIMIT_MARKER='<!-- oc-fix-limit -->'
 # 差し戻しの往復 (changes_requested -> fix -> push -> review -> changes_requested) と、
 # push せず根拠だけ返す往復 (answered -> reopen -> review -> changes_requested) は、どちらも
 # 1 周に oc-reviewer の CHANGES_REQUESTED review を 1 件ずつ増やす。件数で両方を抑える。
@@ -44,9 +43,9 @@ case "${1:-}" in
     else
       # 直前の停止コメント (bot 投稿・マーカー付き) の時刻。無ければ全期間の差し戻しを数える。
       since="$(gh api --paginate "repos/$OC_REPO/issues/$OC_PR_NUMBER/comments" \
-        | jq -s -r --arg m "$STOP_MARK" '[.[][] | select((.user.login | startswith("opencode-for-signature-studio")) and (.body | contains($m))) | .created_at] | max // ""')"
+        | jq -s -r --arg m "$STOP_MARK" --arg il "$IMPLEMENTER_LOGIN" '[.[][] | select(.user.login == $il and (.body | contains($m))) | .created_at] | max // ""')"
       n="$(gh api --paginate "repos/$OC_REPO/pulls/$OC_PR_NUMBER/reviews" \
-        | jq -s --arg since "$since" '[.[][] | select((.user.login | startswith("oc-reviewer")) and .state == "CHANGES_REQUESTED" and ($since == "" or (.submitted_at // "") > $since))] | length')"
+        | jq -s --arg since "$since" --arg l "$REVIEWER_LOGIN" '[.[][] | select(.user.login == $l and .state == "CHANGES_REQUESTED" and ($since == "" or (.submitted_at // "") > $since))] | length')"
       echo "oc-reviewer CHANGES_REQUESTED reviews on PR #$OC_PR_NUMBER since ${since:-the start}: $n (limit $MAX_FIX_REVIEWS)"
       if [ "$n" -ge "$MAX_FIX_REVIEWS" ]; then
         stop=true

@@ -6,6 +6,8 @@ on:
   pull_request:
     paths:
       - '.github/scripts/**'
+      - '.github/actions/**'
+      - '.github/workflows/opencode.yaml'
       - '.github/workflows/scripts-test.yaml'
 
 permissions:

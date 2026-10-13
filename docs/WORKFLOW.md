@@ -239,8 +239,8 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     確認し、無ければ PR にコメントを残して close -> reopen で review を再起動する (同じ head に 3 回まで。超えたら警告して失敗)。
     close -> reopen は `reopen-pr.sh` が行い、reopen が 3 回失敗したら PR に `oc:stuck` を付けて失敗する (closed のまま放置しない)。
     reviewer の step に 50 分の上限 (`timeout-minutes: 50`) を置くと、verify を job の 60 分と App token の 1 時間寿命の内側で
-    必ず走らせられる (実測: review job の setup は約 1 分、reviewer は 3〜9 分)。この workflow 変更は App に `workflows` 権限が
-    無く push できないため PM 適用待ち (#721 のコメント)。適用されるまでは reviewer の上限は job の 60 分。
+    必ず走らせられる (実測: review job の setup は約 1 分、reviewer は 3〜9 分)。この変更は App に `workflows` 権限が無く
+    agent は push できないため、PM が `.github/workflows/` を直接 push して適用した。
     COMMENT だけの review は verdict と認めない。**Copilot の review を待って verdict を保留することはしない**
     (直近 15 PR に Copilot の review は 0 件で、保留した PR は誰にも動かされず止まるため)。Copilot の review が
     approve 前に既にあれば読んで判断する。run の途中で head が進んだ場合は、その push の synchronize が起動する
@@ -254,6 +254,11 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     ラベル `oc:stuck` を付けて止める (`changes_requested -> fix -> review` と `answered -> reopen -> review` の
     どちらの循環も 1 周に 1 件増えるため)。件数は直前の停止コメント (`<!-- oc-fix-limit -->`、bot 投稿) 以降の差し戻しに限る。
     ラベルを外すと再開し、次の差し戻しから数え直す (停止前の件数を持ち越さない)。
+  - **起動主体は完全一致**: fix を起動する reviewer (`oc-reviewer-for-signature-studio[bot]`、`user.type == 'Bot'`) と、
+    停止コメント・完了コメントの実装 App (`opencode-for-signature-studio[bot]`) は login の完全一致で見る
+    (前方一致だと別名のアカウントでも write 権限の fix が起動し、停止コメントを偽装して数え直しもできてしまう)。
+  - **テスト**: `.github/scripts/tests/test-pr-loop.sh` (fake gh) を `.github/workflows/scripts-test.yaml` が
+    `.github/scripts/**`・`.github/actions/**`・`opencode.yaml` の変更ごとに実行する。
   - **並行制御**: implement job は `opencode-impl-<N>`、review job は `opencode-review-<N>` と group を分ける。
     同じ group だと fix が pending の間に review が入って fix が黙って取り消される (pending は 1 件しか持てない)。
     その代わり fix と review が重なりうるので、reviewer は `gh pr merge --match-head-commit <レビューした head>` で
