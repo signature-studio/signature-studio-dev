@@ -26,7 +26,7 @@ ret_only	6
 arg_drop	4
 xmm_arg_drop	1
 
-## 一致→不一致の退行 (TSV 由来 VA 一覧)
+## 一致→退行候補 (TSV 由来 VA 一覧。status は batch 側の値)
 0x4090e0	mismatch	memory_semantics
 0x412020	unexec	(none)
 0x41cd70	mismatch	unlifted_callee,wasm_trap

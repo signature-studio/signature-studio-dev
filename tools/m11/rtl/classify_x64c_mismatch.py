@@ -34,7 +34,7 @@ def main(path, regress_path=None):
 
     if regress_path:
         by_va = {r["function"]["va"]: r for r in rows}
-        print("\n## 一致→不一致の退行 (TSV 由来 VA 一覧)")
+        print("\n## 一致→退行候補 (TSV 由来 VA 一覧。status は batch 側の値)")
         for line in open(regress_path):
             va = line.strip()
             if not va:
