@@ -205,3 +205,18 @@ before は 515.7 s で `p0c/work/kernel_table.json` の置き場所違いによ�
 範囲外 / 未解決: `inventory/kernel_table.py:15` と `lift/batch_lift.sh:31` ほか `lift/` 配下の `/home/ubuntu` 既定は別 area の置換 issue (#294 配下) で扱う。
 `k80_diff.py` は `p0c2_e2e.sh` [6] 経由で実行済み (`LIFTP` は `REPO_ROOT` 基準で解決)。RetDec の非決定性は §15.4 に実測を残すのみで、RetDec 非決定は #668、`p0c_e2e.sh` [4] の `kernel_table.json` 置き場所と `nsis_blockmap.json` 生成は #669 に起票。
 
+
+### 15.5 #346 受入条件 2 の実測 (run 3・検証 HEAD b1e5f88a / 比較 before 8af7eb0 / after 856be6b)
+
+素材は `fl-win64` のみ (`toolchain-retdec` `toolchain-emsdk` は runner の `/opt/retdec` `/opt/emsdk` を使用)。`nsis_blockmap.json` は `f2/mk_blockmap.py` で 182 行再構成。before は `/home/ubuntu/work/analysis/win64` と `/home/ubuntu/work/webstudio` を symlink で用意。各 n=1・直列・4 コア runner。
+
+| 項目 | before (8af7eb0) | after (856be6b) | HEAD (b1e5f88a) |
+|---|---|---|---|
+| `p0c_e2e.sh` 初回 (kernel_matrix 込み) | rc=0、354.4 s (全体 5 分 54 秒、load 5.58→0.55) | rc=0、350.9 s (全体 5 分 50 秒、load 8.56→3.57) | rc=0、6.7 s (kernel_matrix・lift skip) |
+| `p0c2_e2e.sh 200` | rc=0、9.4 s、load 0.6 前後 | rc=0、14.7 s | rc=0、7.5 s |
+
+判定: `p0c_e2e.sh` と `p0c2_e2e.sh` の stdout (パス正規化後) は before/after で一致 (`p0c_e2e.sh` 132 行、`p0c2_e2e.sh` 75 行系)。`cmp` 一致: `k80.final.ll` `table_verify.json` `kernel_matrix.json` `f80_classes.json` `f80_kernels.json` `p0c2_sweep.csv` `k80abi.json` `diff/k80.argfix.ll` `diff/k80.argfix.wasm.o`。
+不一致は `build.log` と `k80diff` バイナリのみで、実行時プロセスのアドレス (`nat=` `ir=`) の ASLR 差。
+
+段階 [4] の不具合: `p0c_e2e.sh` の `kernel_table.json` 参照が `p0c/work/` を見ていた (実体は `tools/plugins/work/`)。HEAD b1e5f88a で 1 行修正。before 側にも同じ修正を当てて比較。#669 で扱う。
+ネガティブコントロール・`/home/ubuntu` の grep は §15.2 のとおり。
