@@ -177,3 +177,40 @@ python3 tools/liftdiff/tests/oob_414ad0.py > tools/liftdiff/results/m11_oob_414a
 |---|---|---|
 | `liftdiff_e2e.sh` (--m11-only なし) 全体 exit 0 未確認 | Issue #406 受入条件 1 が未達 | #406 に残す。`oc_artifacts: fl-win64 toolchain-emsdk work-m11 work-liftdiff work-m6-ott analysis-ott-binaries` で再起動 |
 | runner に numpy/capstone/pefile が無く e2e 前に `python3 -m pip install` が必要 | 素の Actions で e2e が exit 2 | 別 issue 化を PM に提案 (agent-setup への追加) |
+
+## 11. 比較系の偽陽性 2 類型の修正 (LD-11 / #548) — 全文
+
+既知類型との関係: 該当なし (DEFECTS.md の lift 欠陥ではなく比較器側の偽陽性。f2 REPORT §7 起点)。本体 [`REPORT.md`](REPORT.md) §11 の要約から分割移動。
+
+- `cmp_mem`: 部分上書きされた ptr 入りワードを byte 単位で比較 (変化 byte は生値、未変更 byte のみ ptr 正規化)。`ldlib/compare.py` `eq_block_bytewise`。
+- wasm timeout: target JSON `wasm_timeout_ms` (既定 1000・正の整数) と `wasm_slowdown_bound` (既定 20・正の数) を `compare.wasm_timing_params` で検証 (0・負数・非数は ValueError)。検証済み値を `ld_runner.mjs`/`fle_runner.mjs` の `--timeout-ms=` に渡す。native ランナが case 所要 `ms` を出力し、`ms × wasm_slowdown_bound ≥ wasm_timeout_ms` なら `wasm_trap` でなく `wasm_timeout_native_long` (verdict は unexec 側)。
+- 単体テスト `tests/test_compare_ld11.py` 23 件 (ネガコン込み。修正前 15 件 + 検証のネガコン 6 件 + 正例 2 件) は e2e の [0/4] で実行。
+
+### 実測 (本 run・Actions runner)
+
+素材: `fl-win64` (`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`)・`work-m11`・`work-liftdiff` 展開、`toolchain-emsdk` 展開。コマンド: `bash tools/liftdiff/liftdiff_e2e.sh --m11-only` (HEAD = f694ef0)。
+
+| run | exit | 所要 | [0/4] 単体テスト | sample:800 一致 / 不一致 / 実行不能 | wasm_timeout_native_long |
+|---|---|---|---|---|---|
+| 1 | 0 | 148 s | 23 OK | 358 / 212 / 230 | 0 件 |
+| 2 | 0 | 149 s | 23 OK | 357 / 213 / 230 | 0 件 |
+| 3 | 0 | 143 s | 23 OK | 357 / 213 / 230 | 0 件 |
+
+[4/4] の不一致の主因は run 1 で callee_divergence 52・wasm_trap 35・memory_semantics 25・callsite_arg_drop 24 ほか (全文は run ログ)。
+
+### origin/main との比較 (レビュー run の実測を引用・本 run では未再実測)
+
+oc-reviewer の review (c002821 対象・同素材) で origin/main と PR head を各 3 run。main は 3 run とも 353 / 217 / 230。
+PR head は 358 / 212 / 230 ×2 と 357 / 213 / 230 ×1 (本 run の 3 回と一致)。
+
+- mismatch → match に変わった 4 関数: 0x1062200・0x1266e70・0x441500・0x9cecc0 (3/3 で安定)。いずれも main 側の差分は arena の ptr 1 ブロック (delta=0x400000 のずれ・部分上書き)。`cmp_mem` の変更の意図どおり。
+- 0x959a40 は run 依存: main では 3/3 で `ret`・`trace` 差分あり、PR head では 2/3 で差分ゼロ (1/3 は差分あり)。`ret`/`trace` は `cmp_mem` の対象外のため、この変化は PR と無関係の非決定性。
+- main 同士でも case outcome は run ごとに 3〜6 件揺れる (hang ↔ both_fault)。件数の変化を説明するときはこの揺らぎを前提にする。
+- 閾値 `native_ms × 20 ≥ wasm_timeout_ms` は native が 50 ms を超える case の wasm 無限ループも unexec 側に入る。設計として受け入れ、件数は sample:800 で 0 件。
+
+### 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 受入条件 1: 0x6cd8a0 の 9 パターン実 PE 実測 (sample:800 に含まれない・f2 系素材が必要) | #548 を Closes できない | f2 系素材の許可名追加 = #293 (PM 判断) |
+| 非決定性: main 同士の case outcome の揺らぎ・0x959a40 の ret/trace 差分の run 依存 | 「+5」ではなく「安定 +4 + 揺らぎ 1 件」として扱う必要 | PM 判断: #548 へのコメントか新規 issue (未起票) |

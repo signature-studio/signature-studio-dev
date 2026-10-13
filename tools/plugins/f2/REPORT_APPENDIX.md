@@ -35,13 +35,13 @@
 
 | # | block | plugin | VA | 機械語 B | IR 署名 | 主採点 (9 パターン) | 補助 case | **最終** | タグ |
 |--:|--:|---|---|--:|---|---|---|---|---|
-| 1 | 18953 | EQUO | 0x6cd8a0 | 8 | `i64(i64)` | mismatch 4/6/9 | match 2/2 | **match** (偽陽性確定) | memory_semantics |
+| 1 | 18953 | EQUO | 0x6cd8a0 | 8 | `i64(i64)` | mismatch 4/6/9 | match 2/2 | **match** (偽陽性、根拠 §8.1 本体) | memory_semantics |
 | 2 | 18975 | Emphasizer | 0x6bfec0 | 56 | `i64(i64)` | match 6/6/9 | mismatch 1/5 | **mismatch** | fp_flag_unreflected,xmm_arg_drop |
 | 3 | 18975 | Emphasizer | 0x6c8fc0 | 63 | `float(i64)` | mismatch 0/6/9 | - | **mismatch** | xmm_arg_drop |
 | 4 | 18975 | Emphasizer | 0x6c9b60 | 83 | `float(i64,i64)` | match 2/2/9 | mismatch 2/4 | **mismatch** | fp_flag_unreflected,xmm_arg_drop |
 | 5 | 18979 | Frequency Splitter | 0x662fc0 | 15 | `i64(i64)` | match 6/6/9 | - | **match** | - |
 | 6 | 18979 | Frequency Splitter | 0x73e640 | 29 | `i64(i64)` | unexec(native_fault_all_patterns) 0/0/9 | match 7/7 | **match** | - |
-| 7 | 18979 | Frequency Splitter | 0x73fa20 | 65 | `i64(i64,i64,i64)` | mismatch 4/5/9 | match 7/7 | **match** (偽陽性確定) | wasm_trap |
+| 7 | 18979 | Frequency Splitter | 0x73fa20 | 65 | `i64(i64,i64,i64)` | mismatch 4/5/9 | match 7/7 | **match** (偽陽性、根拠 §8.1 本体) | wasm_trap |
 | 8 | 18979 | Frequency Splitter | 0x73fa70 | 73 | `i64(i64,i32,i64,i64)` | unexec(hang) 0/0/9 | match 7/7 | **match** | - |
 | 9 | 18982 | Fruity 7 Band EQ | 0x6b0ef0 | 1554 | `i64(i64,i64)` | mismatch 0/6/9 | - | **mismatch** | arg_drop,spill_slot_deref,xmm_arg_drop |
 | 10 | 19005 | Fruity Fast LP | 0x5de300 | 31 | `i64(i64,i64,i64)` | match 1/1/9 | match 4/4 | **match** | - |
@@ -50,7 +50,7 @@
 | 13 | 19006 | Fruity Filter | 0x6cc2e0 | 171 | `i64(i64,i64,i64,i64)` | mismatch 0/3/9 | - | **mismatch** | arg_drop,fp_flag_unreflected,spill_slot_deref,xmm_arg_drop |
 | 14 | 19013 | Fruity Free Filter | 0x6ca5c0 | 1554 | `i64(i64,i64)` | mismatch 0/6/9 | - | **mismatch** | arg_drop,spill_slot_deref,xmm_arg_drop |
 | 15 | 19059 | Fruity Parametric EQ 2 | 0x6e9440 | 29 | `i64(i64)` | unexec(native_fault_all_patterns) 0/0/9 | match 7/7 | **match** | - |
-| 16 | 19059 | Fruity Parametric EQ 2 | 0x6ec2a0 | 65 | `i64(i64,i64,i64)` | mismatch 4/5/9 | match 7/7 | **match** (偽陽性確定) | wasm_trap |
+| 16 | 19059 | Fruity Parametric EQ 2 | 0x6ec2a0 | 65 | `i64(i64,i64,i64)` | mismatch 4/5/9 | match 7/7 | **match** (偽陽性、根拠 §8.1 本体) | wasm_trap |
 | 17 | 19059 | Fruity Parametric EQ 2 | 0x6ec2f0 | 73 | `i64(i64,i32,i64,i64)` | unexec(hang) 0/0/9 | match 7/7 | **match** | - |
 | 18 | 19059 | Fruity Parametric EQ 2 | 0x6f1650 | 28 | `float()` | mismatch 0/9/9 | - | **mismatch** | xmm_arg_drop |
 | 19 | 19059 | Fruity Parametric EQ 2 | 0x6f1c40 | 29 | `i64(i64)` | match 6/6/9 | - | **match** | - |
@@ -138,6 +138,16 @@ python3 tools/plugins/f2/nc_leaf.py      # ネガティブコントロール (ki
 - 前提 `f2_step1.sh` を `tools/plugins/work/` 無しで実行した初回 = **6 分 55.8 秒** (`time` 実測、`win_funcs.py` が支配的; load average は Pool(14) で最大 16.3)。work/ があれば §1 のとおり 51 秒。
 - `nc_leaf.py`: kind ごとに並列 (3 プロセス) で 55.4 秒 (`store_drop`) / 65.1 秒 (`load_drop`) / 81.3 秒 (`offset_shift`)。
 - `find tools/plugins/f2 -type f -size +20M` = 0 件、`git status --porcelain=v1 -- tools/plugins/f2` はコミット前にクリーン。
+
+### 8.8 HEAD faacabb での再実測 (差し戻し修正後、4 core runner、逐次、同一 run)
+
+| コマンド | rc | 所要 (秒) | load average (1 分) 開始 → 終了 | 結果 |
+|---|--:|--:|---|---|
+| `f2_step1.sh` | 0 | 302 | 0.18 → 8.31 | IR leaf 55 / 機械語でも間接 call 無し 23、dispatch 549 + waived 1 = 550 |
+| `leaf_diff.sh` | 0 | 131 | 7.64 → 1.22 | 最終判定 一致 15 / 不一致 8 / 実行不能 0。主採点 一致 9 / 不一致 9 / 実行不能 5、case 207 (native 完走 93)、補助 66 |
+| `nc_leaf.py` | 0 | 194 | 1.13 → (終了時 未採取) | store_drop 6/6、load_drop 11/11、offset_shift 13/13 検出 |
+
+- `f2_step1.sh` の 302 秒は §8.7 の 51 秒 (work/ あり) と異なる。この worktree では `tools/plugins/work/` を再生成したため (win_funcs が支配的)。
 
 ## 9. PLG-F2-4 (#547): xmm 引数復元 pass の接続 (**未達: 不一致 8 のまま・中間報告**)
 

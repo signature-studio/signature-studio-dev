@@ -10,6 +10,7 @@
 #include "gui_headless.h"
 
 extern GuiShared *gui_shared_native(void);
+extern int gui_surf_snapshot(int id, uint32_t **px, uint32_t *w, uint32_t *h);
 
 static GuiShared *S;
 static uint32_t *g_desk; static uint32_t g_dw, g_dh;
@@ -23,14 +24,15 @@ static uint32_t g_in_seq;
 static void blit_surf(int id, WRECT r /* surface coords */) {
   GuiSurface *s = &S->surf[id];
   if (!s->state || !s->visible) return;
-  WRECT sr = r_isect(r, (WRECT){ 0, 0, (int32_t)s->w, (int32_t)s->h });
-  extern uint8_t *gui_surf_ptr(int);
-  uint32_t *px = (uint32_t *)gui_surf_ptr(id);
+  /* px/w/h は shim が公開する不変スナップショットから一組で取る (GUI-12)。処理中のレコードが ring head を通過するまで shim は free しない */
+  uint32_t *px, sw, sh;
+  if (!gui_surf_snapshot(id, &px, &sw, &sh)) return;
+  WRECT sr = r_isect(r, (WRECT){ 0, 0, (int32_t)sw, (int32_t)sh });
   for (int y = sr.top; y < sr.bottom; y++) {
     int dy = s->y + y; if (dy < 0 || dy >= (int)g_dh) continue;
     for (int x = sr.left; x < sr.right; x++) {
       int dx = s->x + x; if (dx < 0 || dx >= (int)g_dw) continue;
-      g_desk[(size_t)dy * g_dw + dx] = px[(size_t)y * s->w + x] | 0xFF000000u;
+      g_desk[(size_t)dy * g_dw + dx] = px[(size_t)y * sw + x] | 0xFF000000u;
     }
   }
 }
@@ -42,7 +44,7 @@ static void recompose_all(void) {
     for (int i = 0; i < (int)GUI_MAX_SURF; i++) if (S->surf[i].state && !done[i] && (best < 0 || S->surf[i].z < bz)) { best = i; bz = S->surf[i].z; }
     if (best < 0) break;
     done[best] = 1;
-    blit_surf(best, (WRECT){ 0, 0, (int32_t)S->surf[best].w, (int32_t)S->surf[best].h });
+    blit_surf(best, (WRECT){ 0, 0, 0x7fffffff, 0x7fffffff });   /* blit_surf がスナップショットの w/h へ clip */
   }
 }
 static void present(int id, WRECT r) {
