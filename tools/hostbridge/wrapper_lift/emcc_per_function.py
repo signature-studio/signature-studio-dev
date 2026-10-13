@@ -59,9 +59,6 @@ def attribute(text, out, errs_out, fname):
     return bad
 
 
-FILE_NOW = [""]
-
-
 def _bisect_right(a, x):
     lo, hi = 0, len(a)
     while lo < hi:
@@ -108,7 +105,6 @@ def main():
     for f in files:
         with open(f, errors="replace") as fh:
             text = fh.read()
-        FILE_NOW[0] = f
         fdefs = {int(m.group(1), 16) for m in DEF_RE.finditer(text)}
         defined |= fdefs
         if f in a.force_fail_file:

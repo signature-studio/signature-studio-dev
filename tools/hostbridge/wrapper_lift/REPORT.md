@@ -86,7 +86,7 @@
 |---|---|---|---|
 | block19091: 関数数 | 19,816 | 19,816 | 未測定 |
 | block19091: lift 成功 (関数単位) | 19,723 (99.53%) | — | 未測定 |
-| block19091: emcc `-c` 通過 (修復なし, 関数単位) | 17,243 / 19,816 (87.02%) (前回 run, ba13c9dc 環境。本 HEAD の runner に emcc 無く未再測定) | — | 未測定 |
+| block19091: emcc `-c` 通過 (修復なし, 関数単位) | 未計測 (旧値 17,243 / 19,816 は測定スクリプト版が不明で fail-open 経路の可能性があるため撤回。本 HEAD の runner に emcc 無し) | — | 未測定 |
 | block23676: 関数数 / lift 成功 | 19,826 / 19,733 (99.53%) | — | 未測定 |
 | 未対応命令数 (block19091 / block23676) | — | 3,697 / 3,697 (0.56% / 0.56%) | 未測定 |
 | build 可否 (wasm) | 未実施 | 未実施 | 未実施 |
@@ -110,7 +110,7 @@
 
 **未解決 (受入条件の残り)**
 - liftlib (RetDec 出力 → 修復 → emcc) を Wrapper に適用した成否と、wasm build 可否。RetDec の batch 出力 C を結合して emcc する経路は未着手。
-- 採用方式の判定。RetDec は分割 lift で 99.53% が通るが、修復なしの emcc 通過は 87.02% (前回 run, ba13c9dc 環境の計測値。本 HEAD の runner には emcc が無く再測定していない) で、出力の build と実行 (bit 一致) が未確認のため、単独で採用とは言えない。x64c は命令カバレッジ 99.44% だが実 lift 未実施。
+- 採用方式の判定。RetDec は分割 lift で 99.53% が通るが、修復なしの emcc 通過は未計測 (旧値 87.02% は撤回) で、出力の build と実行 (bit 一致) が未確認のため、単独で採用とは言えない。x64c は命令カバレッジ 99.44% だが実 lift 未実施。
 - 上記は子 issue #917 ([HB-H23]) として起票する (§4 の 2 行)。
 
 ## 6. 比較表 (#917 受入条件 1〜3。検証 HEAD: 本 PR、2026-10-13 run)
@@ -147,15 +147,18 @@
 | 項目 | block19091 | block23676 |
 |---|---|---|
 | RetDec 分割 lift 成功 (§5 の再現) | 19,723 / 19,816 (99.53%)・188 s | 19,733 / 19,826 (99.53%)・194 s |
-| RetDec 出力 C の emcc `-c` 通過 (修復なし, 関数単位) | 無効 (旧 fail-open 版の値。下記 #1340 参照。再計測待ち) | 無効 (同左) |
-| 同 (`-Wno-implicit-function-declaration -Wno-int-conversion -Wno-incompatible-pointer-types`) | 19,650 / 19,816 (99.16%)・ファイル単位で 40 中 16 が exit 0 | 未測定 |
+| RetDec 出力 C の emcc `-c` 通過 (修復なし, 関数単位) | 未計測 (旧 fail-open 版の値は無効・撤回。下記 #1340 参照) | 未計測 (同左) |
+| 同 (`-Wno-implicit-function-declaration -Wno-int-conversion -Wno-incompatible-pointer-types`) | 未計測 (旧 fail-open 版の 19,650 / 19,816 は無効・撤回。ファイル単位の exit 0 件数も撤回) | 未測定 |
 | x64c 生成 (`ULLULL` 吸収後) | 19,816 関数・`ULLULL` 0 行・60 s | 19,826 関数・`ULLULL` 0 行・60 s |
 | x64c `emcc -c` (`-I tools/ott/rt`) | exit 0・34.5 s・error 0 | exit 0・34.4 s・error 0 |
 | x64c wasm link (`-Wl,--export-all -Wl,--allow-undefined`) | exit 0・0.66 s・43,828,879 B | exit 0・0.47 s・43,833,146 B |
 
 - **#1340 による訂正 (旧 emcc_per_function.py は fail-open)**: 旧版は timeout で `rc=None`・`out=""` となり、`ERR_RE` が `error:` 行のみを拾うため、
   帰属 0 件のファイルの全関数を通過扱いにしていた。`fatal error:` と `emcc: error:` (行番号なし) も帰属 0 件となり、同じく全通過になっていた。
-  上の「修復なし通過」の 17,155 / 17,161 はこの旧版の値のため、**無効**とする。修正後の値は実 emcc での再計測まで出せない (下記)。
+  旧版で測った修復なし通過 (17,155 / 19,816、17,161 / 19,826)、`-Wno-*` 付きの 19,650 / 19,816、ファイル単位の exit 0 件数 (16 / 40) は、
+  いずれも fail-open 経路を通りうるため**撤回** (無効)。修復なし run の emcc exit 内訳 (exit 0 / 非 0 / timeout のファイル数) と未帰属 error 行数も**未測定**。
+  修正後の値は実 emcc での再計測まで出せない (下記)。
+- **修復なし通過の受入状態**: 未計測 (fail-open 版は無効)。修正後のスクリプトによる数値は本 PR に含めない。emcc 系の行は測定値を持たないため、測定 commit と freshness (`git diff <測定 commit> HEAD -- tools/hostbridge/wrapper_lift`) の対象も無い。
 - **#1340 修正後のスクリプト** (`emcc_per_function.py`): `rc != 0` (timeout 含む) で、ファイル内の関数帰属が無い、または帰属できない error 行がある場合は、
   そのファイルの全 defined 関数を失敗にする (fail-closed、`failclosed_files` で件数を出す)。`fatal error:` を `ERR_RE` に含める。
   帰属できなかった error 行は `unattributed_error_lines` に別計上する。`--cc` でコンパイラを差し替え可能にした。
@@ -183,5 +186,5 @@
 - **注意 2**: `--allow-undefined` のため、link が通っても未解決シンボルの有無は未検証。
 - **注意 3**: 93 件の `no_definition` (§5) の原因は未特定のまま。
 
-**採用方式 (暫定、受入条件 4)**: **x64c (Wrapper 経由) を採用候補とする**。両 block が生成・`emcc -c`・wasm link を通る。RetDec 分割 lift は batch 40 ファイル中 24 件が、警告を抑止しても `emcc -c` で落ち、修復 (undeclared helper・goto/label) が必要なため build 可否が出ない。
+**採用方式 (暫定、受入条件 4)**: **x64c (Wrapper 経由) を採用候補とする**。両 block が生成・`emcc -c`・wasm link を通る。RetDec 分割 lift は、修復なしの `emcc -c` 通過が未計測 (旧値は撤回) で、修復 (undeclared helper・goto/label) が必要なため build 可否が出ない。
 ただし x64c の実行結果 (bit 一致) と CreatePlugInstance 到達 (#829) は未検証。よって「採用」は build 経路の判定であり、実行検証は残る。
