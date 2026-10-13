@@ -54,11 +54,11 @@
 - 対照 Gain の before は closure 160 関数。REPORT §4 の Gain 固有 1,727 B は own (共通基盤除く) の数であり、本表とは別。
 - 未解決 call の内訳: `reg` / `indexed` / `other` / `rip_data` はいずれも解決未着手 (`rip_data` は #849 で扱う)。
 
-## 3. 判定
+## 3. 判定 (#782 の受入条件)
 
-- 受入 1 (間接 call を追跡して 3 種の closure を再計算し before/after を表にする): **部分達成**。IAT 分離後の HEAD で再計測した表を出した。after は過大評価で、真の closure ではない。
-- 受入 2 (lift / build の最初の失敗点): **未達**。正確な closure が無いため lift 対象を確定できない。
-- 受入 3 (数え方と再計算スクリプトを REPORT に書く): **達成** (§1・§2、スクリプトは `scripts/vtable_closure.py`)。
+- #782 受入 1 (間接 call を追跡して 3 種の closure を再計算し before/after を表にする): **部分達成**。IAT 分離後の HEAD で再計測した表を出した。after は過大評価で、真の closure ではない。
+- #782 受入 2 (lift / build の最初の失敗点): **未達**。正確な closure が無いため lift 対象を確定できない。
+- #782 受入 3 (数え方と再計算スクリプトを REPORT に書く): **達成** (§1・§2、スクリプトは `scripts/vtable_closure.py`)。
 
 ## 4. 未解決
 
@@ -69,10 +69,11 @@
 | 確定 closure の lift / build 最初の失敗点 | 受入 2 未達 | #850 |
 | 人手の検収 (lift 結果の bit-exact 化は本 issue の範囲外) | — | — |
 
-## 5. #848 (this 型の 1 段追跡) の試行結果 (HEAD `0760e367`, 4 vCPU, 各 1 回)
+## 5. #848 (this 型の 1 段追跡) の試行結果 (HEAD `c36afb68`, 4 vCPU, 各 1 回)
 
-素材 `plugins-kilohearts` を `KH_SRC` で展開 → `extract_installer.sh` (win のみ。mac の `llvm-lipo` は本 run で未使用) →
-`rtti_walk.py` (6,307 class) → `callgraph.py` (120,856 関数, 4 round) → `vtable_closure.py` で §2 の Gain 行を再現 (before 160 / after 555 nogui・1,995 all で一致)。
+- 計測コードは HEAD `c36afb68`。`scripts/` は `0760e367` と同一で、差分は `vtable_probe_this.py` のみ (`git diff 0760e367 c36afb68 -- scripts` で確認)。
+- 表の値は前回 run の実測。素材 `plugins-kilohearts` を `KH_SRC` で展開 → `extract_installer.sh` (win のみ) → `rtti_walk.py` (6,307 class) → `callgraph.py` (120,856 関数, 4 round) → `vtable_closure.py` の Gain 行 (before 160 / after 555 nogui・1,995 all) を §2 と照合したと報告されている。
+- **本 fix run では `plugins-kilohearts` が `$ARTIFACTS_DIR` に無く、表の再実行は未実施。** 再現は未確認。
 
 試行は `scripts/vtable_probe_this.py` (1 行 JSON を出力)。規則: 呼び出し元 f の所有 class が ns 内で一意に決まれば、
 vtable call の候補をその class の同 slot に限る (narrow)。一意に決まらなければ従来どおり ns 全 class の同 slot (wide)。
@@ -87,6 +88,12 @@ vtable call の候補をその class の同 slot に限る (narrow)。一意に�
 - 含意: vtable 規則の精度は「呼び出し元の所有」では上がらない。次の候補は (a) 呼び出し点の `rcx` (this) を
   直前の代入 (`mov rcx, reg` / 引数レジスタ) から逆方向に追う、(b) 登録側 (`new ...Dsp` 生成箇所) から class を
   伝播させる、のいずれか。どちらも本 run の範囲外 (要 Ghidra 等の基盤または別 run)。
-- 受入 1 (before/after 表と未解決 call の内訳): §2 と本節で達成。受入 2・3 は未達 (§3)。
+#### #848 の受入条件への対応 (本節)
+
+- 受入 1 (this 型を追跡し、Snap Heap / Multipass / Phase Plant の 3 種の間接 call 候補を型に限定して closure を再計算): **部分達成**。Gain のみ narrow を実装・計測。3 種は未実施。
+- 受入 2 (対照 Gain の closure が手検証の 160 関数と差分 0): **未達**。narrow は 1,994 関数 (差分 1,834)。
+- 受入 3 (before/after 表と未解決 call の内訳を REPORT に書く): **部分達成**。本節の表は Gain のみ。§2 の表は #782 の wide 規則による値で、3 種の narrow 表は無い。
+
+#782 の受入 (lift / build の最初の失敗点) は未達で、§3 に記載。
 
 未解決の起票先: (a)/(b) の this 型伝播は #848 に残す (#848 は部分達成・open のまま)。rip_data は #849、lift 失敗点は #850 (§4)。
