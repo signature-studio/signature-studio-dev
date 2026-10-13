@@ -26,11 +26,19 @@
 - 想定外エントリ検査は `verify` に検査対象 tarball を渡した場合の結果。`pack` は `$FILES` のみを tar に入れるため pack 経路では発生しない。
 - pack 既定 OUT (`artifacts/work-fw-stage1.tar.zst`) で生成 → `verify` rc=0 を確認済み (合成入力)。
 - allowlist: `work-fw-stage1` を通し、`work-fw-bogus` と `work-fw-stage1x` を rc=1 で拒否。
-- e2e (`fw_269_verify.sh` / `hs_e2e.sh`): 未実行。`$HOME/artifacts` には `fl-win64.tar.zst` と `toolchain-emsdk.tar.zst` のみで、`work-fw-stage1` は無い。
-- **未達**: 実 stage-1 成果物はこの runner に無く (`tools/plugins/work/fw` 不在)、R2 への upload 権限も無いため、素材の実体・`fw_269_verify.sh` / `hs_e2e.sh` の PASS (FW_EXT_FUNCS 未指定/指定)・ext 対象関数一覧は未作成。
+- e2e (2026-10-13, runner): `$ARTIFACTS_DIR` に `work-fw-stage1.tar.zst` (23,640,747 B) が実在。`fw_pack_stage1.sh verify` 12/12 OK → `tools/plugins/work/fw/` に展開。
+- 初回 `fw_269_verify.sh` は三段で落ちた (いずれも既存コードの不備。修正して後段へ進んだ):
+  1. snapshot が `tools/shared/env.sh` を含まず `fw_stage2.sh` が 0 s で exit 1 → `git archive` に `tools/shared` を追加。
+  2. `liftlib/simd/gen.py` の `_params` が `CT[t]` で落ちる (`KeyError: 'g224'`)。`fw_stage2.sh` の DynTag が `iN` を `gN` に変換し `CT` に無いキーを渡す (b8e6855f #241 で `_stub` が `_params` 経由になった回帰)。→ `CT.get(t, "u128")` の寛容化。
+  3. `pefile` / `capstone` 未導入 (WORKFLOW §11 の注記どおり) → `pip install --user`。`llvm-as` が emsdk 同梱に無く `/usr/lib/llvm-18/bin` を PATH に追加 (IR 検証用。emcc は emsdk の clang 24 のまま)。
+- **実測 (commit d0e15d52 → 382c345a を含む HEAD、空の W から stage-2 全再構築)**:
+  - `fw_269_verify.sh`: rc=0, `fw_stage2.sh` 428 s (load 2.78 2.22 1.35 → 継続), smoke ×3 PASS (dispatch=38 units_done=0 va=1 heap=1 ff=0)、smoke 同値 差分行=0/0、wasm 15,062,176 B (HEAD 参照 15,061,227 B に対し +949 B。`--size` 未指定のため照合は警告止まり)。
+  - `hs_e2e.sh`: rc=0, 137 s。Phase B は `Phase B 例外: memory access out of bounds` を出すが、判定 (hs.mjs §判定) は `plug===0` 時の ID prefix 照合のみで、GOLDEN 6 ID すべて一致 → `E2E PASS`。`plug != 0` の完全生成は REPORT §7.1 の次段扱い (既存仕様)。
+- 副作用の確認: `liftlib/simd/gen.py` の既知型 (x/d/q/b/y 等) の `_stub` 出力は origin/main と一致 (5 形で diff 0)。`tests/test_unit.py` は `m6/work` 等の素材が無く実行不可 (既存の前提)。
+- **未達 (受入 3 の FW_EXT_FUNCS 指定経路)**: 本 run は既定経路 (FW_EXT_FUNCS 未指定) のみ検証。ext 指定時の e2e は未実施。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 実 stage-1 の梱包と R2 upload (`fw_pack_stage1.sh pack` → `artifacts/work-fw-stage1.tar.zst`) | 素材が無いと `oc_artifacts: work-fw-stage1` は `missing R2 object(s)` で失敗 | #610 (依頼者作業) |
-| fw_269_verify.sh / hs_e2e.sh の FW_EXT_FUNCS 未指定・指定での再検証 | #311 受入条件 3 | #610 (素材 upload 後に再 run: `oc_artifacts: fl-win64 toolchain-emsdk work-fw-stage1`) |
-| FW_EXT_FUNCS 対象 x87 関数の一覧と選定根拠 | 未決 | #197 / #610 |
+| FW_EXT_FUNCS 指定 (ext 対象関数あり) 時の fw_269_verify.sh / hs_e2e.sh 再検証 | #311 受入条件 3 の残り | #197 (選定後に再 run) |
+| FW_EXT_FUNCS 対象 x87 関数の一覧と選定根拠 | 未決 | #197 |
+| `tests/test_unit.py` の素材依存 (`m6/work/ott.drc.ll` 等) | 単体テストが素材無しで実行不可 | 別途 (未起票・次 PM 判断) |
