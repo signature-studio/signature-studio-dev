@@ -1,12 +1,10 @@
 # liftdiff — flelift (x64c) 全数採点 (CAB-232) + native 全起動の参照化 (CAB-233)
 
 > 正本: `tools/liftdiff/REPORT.md`。書式仕様は `docs/FORMAT.md`。
-> 付録: [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) (§5 回帰 A/B・§5.1・§5.2 Ablation・§6.1 検収・§6.2 再現性の全文・§8 wasm_trap トリアージ・§9 wasm_trap 個別原因)。
+> 付録: [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) (§5 回帰 A/B・§5.1・§5.2 Ablation・§6.1 検収・§6.2 再現性の全文・§8 wasm_trap トリアージ・§9 wasm_trap 個別原因・§12 被覆拡大 2 パターンの全文)。
 
 検証起点 commit: 01d5cb5 (CAB-233)。A/B は fba272c (CAB-232) 側。検収は b8e762d (HEAD) から実施。
-既知類型との関係 (DEFECTS.md, 規則 44): 該当 **D15** (メモリ間接 call 脱落) — 残 3 unit の VMT 仮想 call
-`call qword ptr [rdi+0x18]` (0x513da9) 診断で参照。jump table **D9 (DEFECTS.md)** は未使用。
-icall REPORT §4 体系 (D1=間接 call / D9=disp_size) とは別物。
+既知類型との関係 (DEFECTS.md, 規則 44): 該当 **D15** (メモリ間接 call 脱落) — 残 3 unit の VMT 仮想 call `call qword ptr [rdi+0x18]` (0x513da9) 診断で参照。jump table **D9 (DEFECTS.md)** は未使用。icall REPORT §4 体系 (D1=間接 call / D9=disp_size) とは別物。
 
 **判定: CAB-232 達成 / CAB-233 達成 (残 3 unit は下流)**。CAB-232 では FLEngine closure **7,421 関数の全数採点**
 (9 pattern × native/wasm) で **一致 4,143 / 不一致 633 / 実行不能 2,645** を実測し、m11 RetDec route との突合で
@@ -246,3 +244,6 @@ run 3 (全素材展開): `liftdiff_e2e.sh` (--m11-only なし) **exit 0 / 170 s*
 - 修正: `cmp_mem` の byte 単位比較 (`eq_block_bytewise`) と wasm timeout の別 outcome `wasm_timeout_native_long` (verdict は unexec)。target 値は `compare.wasm_timing_params` が正の値のみ受理。単体テスト 23 件 (ネガコン込み) は e2e [0/4] で全 PASS。
 - 実測 (HEAD f694ef0・`--m11-only` 3 回 全 exit 0): sample:800 = 一致 358/357/357 · 不一致 212/213/213 · 実行不能 230。origin/main は 353/217/230。安定 +4 (0x1062200・0x1266e70・0x441500・0x9cecc0) と run 依存 1 件 (0x959a40)。`wasm_timeout_native_long` は 0 件。
 - **未検証**: 0x6cd8a0 の 9 パターン実 PE 実測 (sample:800 に含まれず f2 系素材が必要)。全文・3 run 表・未解決: [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §11。
+
+## 12. 被覆拡大 2 パターン (LD-4 / #235、部分達成)
+`vm0` (this/VMT 疑似オブジェクト) と `u16` (UTF-16 文字列 blob) を追加。sample:800 で 一致 358→361 / 不一致 212→229 / 実行不能 230→210 (base 97f28539 比)。未達 (受入条件) は #235 に残す。全文・実測・未達の内訳: [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §12。
