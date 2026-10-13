@@ -2,13 +2,13 @@
 //   node --test tools/legal/notices/notices.test.mjs
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import zlib from "node:zlib";
 import {
-  checkArtifact, checkRegistry, decodeText, generate, INCOMPLETE_MARK, loadFonts, loadRecords, loadRegistry, NOTICES_HTML, NOTICES_TXT, REL_LICENSE_NAME, REPO, scanFile, sha256, validateRecord, walk,
+  checkArtifact, checkRegistry, decodeText, validateFontAsset, generate, INCOMPLETE_MARK, loadFonts, loadRecords, loadRegistry, NOTICES_HTML, NOTICES_TXT, REL_LICENSE_NAME, REPO, scanFile, sha256, validateRecord, walk,
 } from "./lib.mjs";
 
 const tmp = mkdtempSync(path.join(process.env.RUNNER_TEMP ?? tmpdir(), "notices-test-"));
@@ -267,6 +267,106 @@ test("checkArtifact: NOTICES 自身の文字列は走査対象外 (謝辞に部�
   const reg = synthRegistry({ attribution: "FOO-MARKER acknowledgement" });
   const a = artifact({ registry: reg, files: { "index.html": "<html>" } });
   assert.deepEqual(check(a).problems, []);
+});
+
+// ---- font-asset (GUI-9 の代替フォント Open Sans / Barlow, #616) ------------------------------------------------------
+const realFont = (id) => clone(loadRegistry().components.find((c) => c.id === id));
+
+test("実 registry: Open Sans / Barlow は font-asset として同梱登録され、NOTICES に版・取得元・sha256・OFL 本文・著作権が出る", () => {
+  const reg = loadRegistry();
+  const flDir = process.env.FL_WIN64_DIR;
+  const { txt, model } = generate({ registry: reg, records: loadRecords(), fonts: loadFonts(), flDir });
+  for (const [id, ver, copy, file, sha] of [
+    ["open-sans", "3.003", "The Open Sans Project Authors", "OpenSans-Regular.ttf", "c53aceea2dcf5b4098099c0c4d0a061d17e178a049317b42a422b1a9f7f8eb59"],
+    ["barlow", "1.408", "The Barlow Project Authors", "Barlow-Regular.ttf", "95aa02c7c43096e0dd44d787ba6216864a67157e402adab59b35572e0c1577ea"],
+  ]) {
+    const c = reg.components.find((x) => x.id === id);
+    assert.equal(c.kind, "font-asset");
+    assert.equal(c.bundled, true);
+    assert.equal(c.version, ver);
+    assert.deepEqual(validateFontAsset(c), []);
+    assert.ok(model.components.some((x) => x.id === id));
+    for (const needle of [`[component:${id}] ${c.name} ${ver}`, copy, file, `sha256:${sha}`, c.fontAsset.commit, "SIL OPEN FONT LICENSE Version 1.1", "Reserved Font Name: none"]) assert.ok(txt.includes(needle), `${id}: ${needle}`);
+  }
+});
+
+test("validateFontAsset: 正常な実データは通る", () => assert.deepEqual(validateFontAsset(realFont("barlow")), []));
+
+for (const [name, mutate, re] of [
+  ["取得スクリプトの検証 sha256 と食い違う", (c) => { c.fontAsset.files[0].sha256 = "1".repeat(64); }, /取得スクリプトの検証値に無い/],
+  ["ライセンス本文の改ざん", (c) => { c.fontAsset.licenseFile.text += "x"; }, /licenseFile の sha256 が本文と一致しない/],
+  ["ライセンス本文が無い", (c) => { delete c.fontAsset.licenseFile.text; }, /licenseFile .* が無い/],
+  ["upstream が commit 固定でない", (c) => { c.fontAsset.commit = "main"; }, /40hex/],
+  ["ファイル URL が commit 固定でない", (c) => { c.fontAsset.files[0].url = c.fontAsset.files[0].url.replace(c.fontAsset.commit, "main"); }, /url が commit 固定でない/],
+  ["著作権表示が無い", (c) => { delete c.fontAsset.copyright; }, /fontAsset\.copyright/],
+  ["版が無い", (c) => { delete c.version; }, /version が無い/],
+  ["release-guard の allowlist に無い sha256", (c) => { c.fontAsset.files[0].sha256 = "2".repeat(64); c.coveredBy = ["tools/legal/notices/e2e.sh"]; }, /allowlist\.json に無い/],
+  ["取得スクリプトが無い", (c) => { c.coveredBy = ["tools/gui/test"]; }, /取得スクリプト/],
+  ["fontAsset 自体が無い", (c) => { delete c.fontAsset; }, /fontAsset が無い/],
+]) {
+  test(`validateFontAsset NEG: ${name}`, () => {
+    const c = realFont("open-sans");
+    mutate(c);
+    const p = validateFontAsset(c);
+    assert.ok(p.some((m) => re.test(m)), JSON.stringify(p));
+  });
+}
+
+test("checkRegistry NEG: 実 registry の font-asset を壊すと check が失敗する (component 経由で届く)", () => {
+  const reg = loadRegistry();
+  reg.components.find((c) => c.id === "barlow").fontAsset.files[0].sha256 = "3".repeat(64);
+  const p = checkRegistry({ registry: reg, records: loadRecords(), fonts: loadFonts() }).problems;
+  assert.ok(p.some((m) => /component barlow: .*取得スクリプトの検証値に無い/.test(m)), JSON.stringify(p));
+});
+
+test("release-guard allowlist: font-asset の sha256 は window のみ許容 (file / chunk 一致は許容しない)", () => {
+  const al = JSON.parse(readFileSync(path.join(REPO, "tools/legal/release-guard/allowlist.json"), "utf8")).entries;
+  for (const id of ["open-sans", "barlow"]) {
+    const sum = loadRegistry().components.find((c) => c.id === id).fontAsset.files[0].sha256;
+    const e = al.filter((x) => x.sha256 === sum);
+    assert.equal(e.length, 1, id);
+    assert.deepEqual(e[0].kinds, ["window"]);
+    assert.ok(e[0].reason.length > 10);
+  }
+});
+
+function fontArtifact(reg, { bytes, notices = true }) {
+  const g = { registry: reg, records: loadRecords(), fonts: loadFonts() };
+  const d = mkdtempSync(path.join(tmp, "fontart-"));
+  if (notices) {
+    const r = generate({ ...g, flDir: process.env.FL_WIN64_DIR });
+    writeFileSync(path.join(d, NOTICES_TXT), r.txt);
+    writeFileSync(path.join(d, NOTICES_HTML), r.html);
+  }
+  writeFileSync(path.join(d, "fonts/OpenSans-Regular.ttf".split("/").pop()), bytes);
+  return { ...g, entries: walk(d), repoRoot: REPO };
+}
+const FONT_FILE = path.join(REPO, "tools/gui/work/OpenSans-Regular.ttf");
+const haveFont = (() => { try { return readFileSync(FONT_FILE).length > 0; } catch { return false; } })();
+const haveFl = Boolean(process.env.FL_WIN64_DIR);
+
+test("checkArtifact: 実 OpenSans-Regular.ttf (fetch_fonts.sh の取得物) を載せると open-sans を検出し、NOTICES があれば通る", { skip: !(haveFont && haveFl) && "tools/gui/work (fetch_fonts.sh) と FL_WIN64_DIR が要る" }, () => {
+  const a = fontArtifact(loadRegistry(), { bytes: readFileSync(FONT_FILE) });
+  const r = checkArtifact(a);
+  assert.deepEqual(r.problems, []);
+  assert.deepEqual(Object.keys(r.detected), ["open-sans"]);
+});
+
+test("checkArtifact NEG: 実 OpenSans-Regular.ttf を載せ registry が bundled=false だと失敗 (登録なしの同梱フォント)", { skip: !(haveFont && haveFl) && "tools/gui/work (fetch_fonts.sh) と FL_WIN64_DIR が要る" }, () => {
+  const reg = loadRegistry();
+  const c = reg.components.find((x) => x.id === "open-sans");
+  c.bundled = false;
+  c.reason = "test";
+  const a = fontArtifact(reg, { bytes: readFileSync(FONT_FILE) });
+  const p = checkArtifact(a).problems;
+  assert.ok(p.some((m) => /open-sans の痕跡.*bundled=false/.test(m)), JSON.stringify(p));
+});
+
+test("checkArtifact NEG: 同じフォントでも 1 バイト違えば font-asset としては検出されない (範囲外の明示)", { skip: !(haveFont && haveFl) && "tools/gui/work (fetch_fonts.sh) と FL_WIN64_DIR が要る" }, () => {
+  const b = Buffer.from(readFileSync(FONT_FILE));
+  b[b.length - 1] ^= 1;
+  const r = checkArtifact(fontArtifact(loadRegistry(), { bytes: b }));
+  assert.deepEqual(Object.keys(r.detected), []);
 });
 
 // ---- CLI -----------------------------------------------------------------------------------------------------------
