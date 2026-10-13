@@ -51,13 +51,13 @@ pass は次の場合に**出力を書かず非 0 終了**する (`lift_ranges.sh
 
 回帰テスト: `bash tools/plugins/lift/passes/test_fix_i32_ptr_arg.sh` (5 ケース: 定数 / trunc 定義 (定義と呼出が 30 行以上離れる) → 変換して clang 構文検証 / 仮引数の受け渡し → 失敗 / 本体が i32 を別用途に使う → 失敗 / icmp の被演算子が変数 → 失敗)。
 
-実測 (`bash tools/plugins/synth/cpp_lift.sh 21202 1500`、fl-win64 の 21202 PE・RetDec v5.0・emcc 6.0.12 を使用。測定 HEAD = fc53b943):
+実測 (`bash tools/plugins/synth/cpp_lift.sh 21202 1500`、fl-win64 の 21202 PE・RetDec v5.0・emcc 6.0.12 を使用。測定 HEAD = 05a73875。fc53b943 から 05a73875 までの lift 経路の差分は `lift_ranges.sh` の opt-in 変数 `PLUG_NO_STATIC_DETECT` のみで、未設定時は動作不変):
 
 | 条件 | lift rc | summary.csv | `emcc_c_rc` | 最初のエラー |
 |---|--:|---|--:|---|
 | 修復前 (main f3ffd7ba) | 0 | `21202,1579,0,1393,0,3,3,1,0,1,36,211,25828,67,23,1391,0` | 1 | `e.final.ll:114486:21 '%arg2' defined with type 'i32' but expected 'i64'` |
-| 既定 (opt-in 無効、fc53b943) | 0 | `21202,1579,0,1393,0,3,3,1,0,1,45,211,25828,67,23,1391,0` | 1 | 同上 (baseline と同一) |
-| `PLUG_I32PTR_FUNCS=function_180049450` (fc53b943) | 1 | `21202,1579,1,-1,-1,-1,-1,-1,0,-1,42,-1,-1,-1,-1,-1,0` (pass 停止のため emcc 列は未生成) | — | `[P-T2] FAIL: 呼出の実引数 %arg1 が trunc 定義でも定数でもない (line 134718)` |
+| 既定 (opt-in 無効、05a73875) | 0 | `21202,1579,0,1393,0,3,3,1,0,1,42,211,25828,67,23,1391,0` | 1 | 同上 (baseline と同一) |
+| `PLUG_I32PTR_FUNCS=function_180049450` (05a73875) | 1 | `21202,1579,1,-1,-1,-1,-1,-1,0,-1,42,-1,-1,-1,-1,-1,0` (pass 停止のため emcc 列は未生成) | — | `[P-T2] FAIL: 呼出の実引数 %arg1 が trunc 定義でも定数でもない (line 134718)` |
 
 - opt-in 経路は、仕様どおり `function_180056120(i32 %arg1, …)` の呼出で止まる。出力 `.i3.ll` は作られず、`.final.ll` も無い。
   外側の `i32` 署名を i64 化すると範囲が広がるため、本 pass では扱わない (下記 未解決)。
