@@ -743,6 +743,42 @@ def lower_asm_store(blocks):
     return blocks, n
 
 
+def lower_asm_lane_store(blocks):
+    """[S1c] `call void @__asm_movlps|movlpd|movhps|movhpd(i64 旧値, i128 値)` を store i64 へ復元 (SR-4 / #75)。
+    RetDec は `movlps m64, xmm` を「m64 の旧値を読む read operand + xmm」の void call にし, 書込みを落とす
+    (S1a の movups と同型だが i64 幅)。旧値が直前の `load i64, ptr P` なら P へ xmm の低 (movl*) / 高 (movh*) 64bit を store する。
+    旧値が load 由来でない形は触らない (残れば simd 生成側が unsupported として報告)。"""
+    n = 0
+    pat = re.compile(r"^  call void @__asm_(movlps|movlpd|movhps|movhpd)(?:__\d+|\.\d+)?\(i64 (%[\w.\-]+), i128 (%[\w.\-]+)\)(?:,? ?.*)?$")
+    for name, body in list(blocks.items()):
+        if "@__asm_mov" not in body:
+            continue
+        loads = {}
+        for ln in body.split("\n"):
+            mm = re.match(r"  (%[\w.\-]+) = load i64, ptr (%[\w.\-]+)", ln)
+            if mm:
+                loads[mm.group(1)] = mm.group(2)
+        out = []
+        for ln in body.split("\n"):
+            mm = pat.match(ln)
+            ptr = loads.get(mm.group(2)) if mm else None
+            if not mm or ptr is None:
+                out.append(ln); continue
+            mn, val = mm.group(1), mm.group(3)
+            tag = "%%s1c_%d" % n
+            src = val
+            if mn.startswith("movh"):
+                out.append(f"  {tag}_sh = lshr i128 {val}, 64")
+                src = f"{tag}_sh"
+            out.append(f"  {tag}_lo = trunc i128 {src} to i64")
+            out.append(f"  store i64 {tag}_lo, ptr {ptr}")
+            n += 1
+        blocks[name] = "\n".join(out)
+    if n:
+        stage("S1c", f"__asm_movl/h(ps|pd) store 復元 {n} 件")
+    return blocks, n
+
+
 def prune_asm_lane_helpers(blocks):
     """[S1b] 純 lane 入出力形式の __asm_* を命令へ置換。
     - movss.3(i32) → zext i32 to i128 (0 埋め broadcast 無し; load と同じ意味で使用)
@@ -957,6 +993,7 @@ def run_base(full, args):
 
     # [S1] SSE lower (store 復元 / lane 入出力)
     blocks, n_stores = lower_asm_store(blocks)
+    blocks, n_lane_store = lower_asm_lane_store(blocks)
     blocks, n_lane = prune_asm_lane_helpers(blocks)
 
     # [C8] xmm 引数取り込み
@@ -1161,7 +1198,7 @@ def run_base(full, args):
     stage("FIX", f"add i64 0, i64 %X 修復 {n_fix} 行 / 重複 declare 除去 {n_dup} 行")
     a9_res_fin = count_constexpr(text)
     sum_fin = sum(a9_res_fin.values())
-    rep = {"fixups_add0": n_fix, "dup_declares_removed": n_dup, "b1_fixed": nfix, "s1_stores": n_stores, "s1_lane": n_lane,
+    rep = {"fixups_add0": n_fix, "dup_declares_removed": n_dup, "b1_fixed": nfix, "s1_stores": n_stores, "s1_lane_store": n_lane_store, "s1_lane": n_lane,
            "c8_xmm": n_c8, "c9_redirect": redirect,
            "a9_residual_constexpr": sum_fin,
            "a9_residual_by_op": {k: v for k, v in a9_res_fin.items() if v},

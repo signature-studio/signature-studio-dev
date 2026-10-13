@@ -842,6 +842,54 @@ PM を含む全てのセッションは ephemeral で中断・削除される可
 
 ※ 逐語の原本は同上。要旨: OC_MODEL_ID variable を `console-cloudflare-ai-gateway-custom/claude-sonnet-5-5#xhigh` (サブスクリプション、枠が尽きると停止) から `console-openrouter/anthropic/claude-sonnet-5.5#xhigh` (OpenRouter BYOK → Bedrock、基本停止しない) に更新した。依頼者が利用状況を見て調整する。PM は基本操作せず、トラブル時は `gh variable get -R signature-studio/signature-studio-dev OC_MODEL_ID` で状況を確認する。
 
+### 指示 119（2026-10-13、古い PR がマージされない理由の質問と恒久指示）
+
+> 質問: 古いPRはなぜマージされていないのですか？特に、#329,#371など10以上のPRが3時間以上前にOpenedされ、一部のPRは6時間以上経過しています。
+> 恒久指示: 基本的に、実装が始まったチケットはマージまでノンストップで動き続けている必要があります。
+
+### 指示 120（2026-10-13、作業の中断の禁止）
+
+> 指示に従わずに作業を中断することを禁止します。
+
+### 指示 121（2026-10-13、ショートレトロ・既存 PR の解決を最優先・新規着手の禁止）
+
+> - ショートレトロを実施してください。GitHub Actions移行後から今までの開発の流れを集計し、問題点を列挙してください。
+> - 今から既存PRの解決を第一に作業してください。新規タスクは着手しないようにしてください。
+>   - In Reviewが0件になるまでこの制約は解除されません。
+
+### 指示 122（2026-10-13、1 タスク = 1 チケット = 1 PR・In review と open PR の不整合の指摘）
+
+> > Project V2 の「In review」は 11 件（すべて issue）、実質の滞留は open PR 76 件です。
+>
+> まず、1タスク=1チケット=1PRである必要があります。In Reviewが11件であればOpened(not draft) PRは11件のみのはずであり、現在の状態は大きな不整合を引き起こしています。
+
+### 指示 123（2026-10-13、レビュー差し戻し後の自発修正・Opened PR は 2 状態のみ）
+
+> - implementとreviewerは自動的に呼び出しされるようになったのですか？報告してください。
+> - コンテキスト全域を圧縮してください。
+> また、レビュワーエージェントが突き返したとき、実装エージェントはPMの力を借りずに自発的に動作するべきです。現状そうなっていますか？全てのOpened PRは「レビュー中」「レビューを受けて修正中」の2種類の状態のみ許容され、「修正もレビューもされていない状態」は1秒も存在しないようにしてください。
+
+### 指示 124（2026-10-13、全 Opened PR に担当 run があるかの確認）
+
+> 質問: 全てのOpened PRは、Reviewerもしくは修正Implementが稼働中、もしくは待機中ですか？漏れはありませんか？
+
+### 指示 125（2026-10-13、Actions の同時実行数と Team プラン）
+
+> > 待機中の run の滞留: 待機は約 30 本あり、実行枠は 20 です。担当ありの中には、まだ実行されていない run が含まれます。
+>
+> 今Freeだけど、今月だけTeamプランに上げた方が良い？同時実行数が20から60に増える
+> 別に4ドルくらい今すぐ払えるし、私はそれに4ドル以上の価値を感じているので
+> https://docs.github.com/en/actions/reference/limits#job-concurrency-limits-for-github-hosted-runners
+
+### 指示 126（2026-10-13、Team プランへの課金完了・モデル変更・モデル変数を変更する 2 コマンドの許可）
+
+> 支払いました。状況を確認してください。
+>
+> LLM率については、Sonnet 5.5 XhighからHaiku 5.5 Maxに変更済みです。ベンチマークスコアから以前このワークスペースで使用していたGLM-5.3-Flashと遜色ない性能を期待できること、今確認したところ5h quotaが約20分で1%ほど増加していた=レート制限に対し全く問題ないことから、当分は問題ないものとして決定します。
+> もしレートリミットによりactionsが失敗する場合、あなたが `gh variable set -R signature-studio/signature-studio-dev OC_MODEL_ID -b "console-openrouter/anthropic/claude-haiku-5.5#xhigh"` を実行しモデルを従量課金に変更してください。その場合の料金も閾値内であることは立証済みです。サブスクに戻す場合は `gh variable set -R signature-studio/signature-studio-dev OC_MODEL_ID -b "console-cloudflare-ai-gateway-custom/claude-haiku-5-5#max"` です。
+> モデル管理は私の領域ですが、継続的な監視と変更に関して上記2コマンドのみあなたに許可します。
+> あなた（PM）は常に従量課金で稼働しているため、いかなる場合も止まらないと考えて大丈夫です。
+
 ---
 
 ## 2. PM による解釈・運用への反映
@@ -866,7 +914,14 @@ PM を含む全てのセッションは ephemeral で中断・削除される可
 | 指示 113〜115: 承認・PM への全権委任・コマンド実行制限の撤廃 | プロジェクトの所有者は PM。ユーザーは進捗を後から確認するのみで、チケット・タスク全般を PM の判断で進める。VM と GitHub/Cloudflare の運用責任も PM。**ただし無断の Cloudflare リソース/トークン作成の禁止 (指示 4・9) と破壊的 git 操作の禁止は撤廃されていない** (権限の拡大は責任の拡大であり、事前連絡なしの本番リソース変更の許可ではない)。確認できる情報は自分で取りに行く (step summary を含む) | 本ファイル・`docs/WORKFLOW.md` §11 |
 | 指示 117: jsonl をそのまま出す / text のみ出す提案 | text ブロックの全出力と作業の流れ (tool 名・状態・所要・入力の先頭・cost) は採用。**生 JSONL は採用しない**: repo が public でログも公開、tool の入出力に認証情報・FL 由来物が入り得て、secret マスクは登録値との完全一致でしか効かない (PR #477 の Copilot High・reviewer 指摘)。指示 90 (jsonl を読まず opencode api) とも整合 | `.github/actions/opencode/action.yml`・`docs/WORKFLOW.md` §11・#476 |
 | 指示 118: OC_MODEL_ID の変更 | モデル枠の管理は依頼者。PM は variable を変更しない。失敗が続く時は variable と失敗ログ (`rate_limit_error` 等) を確認して依頼者に共有 | `restart_failed.sh` (失敗 run の再投入) |
+| 指示 119・120: 古い PR がマージされない理由の質問、実装が始まったチケットは merge までノンストップ、作業の中断禁止 | 原因 (2026-10-13 時点の open PR の分類。件数は測定値のため本ファイルに書かない): 競合 (CONFLICT) の PR は review run が立たないのに review を再起動し続けた、reviewer の request-changes 後に修正依頼を出していなかった、Copilot の review 待ちで保留された PR があった。いずれも PR 単位の「次の一手」を PM が手で追えなくなったことが原因。**運用**: PR ごとに状態 (CONFLICT / FIX / NOREVIEW / DRAFT / COPILOT / APPROVED) を機械的に判定し、止まっている PR を必ず次の run に載せる。`sweep_prs.sh` を常駐させ (15 分間隔)、競合は main を merge する run、request-changes は修正 run、review 未投稿・draft は review 再起動、Copilot 待ちは reopen を自動で依頼する。approve 済み未 merge の PR は PM が merge 順を判断して merge する。着手報告だけで終わった run は `find_silent_runs.sh` で検出して再投入する。6 時間を超えた PR は確認の最初に見る | `docs/REFERENCES.md` `[PM-SCRIPTS]` (`sweep_prs.sh`・`watch_runs.sh.notes`)・`docs/WORKFLOW.md` §11 |
 | 指示 112: 全作業は GitHub Actions へ移行済みで、ローカルでの作業は基本的に行われない | 作業の実行主体は Actions 上の OpenCode (issue に `/oc oc_actions_allow_write` をコメントして起動)。ローカル subagent を「稼働本数 15」の数え方の前提にしない。PM のローカル作業は「Actions 起動・監視・検収・統合」に限る | `.github/workflows/opencode.yaml` (implement / review job)・`.github/README.md`・`docs/WORKFLOW.md` (Actions 運用の追記が必要) |
+| 指示 121: ショートレトロ、既存 PR の解決を最優先、新規タスクの着手禁止 (In review が 0 件になるまで解除されない) | **新規着手の禁止**: 新しい issue への `/oc` 投入・新規子チケットの実装 run を止める。起票は『未解決の追跡』のために行ってよいが、実装 run は投入しない。進行中の run (着手済み issue の続き・PR への修正依頼) は新規ではないので継続する。**解除条件**: Project V2 の Status が In review の件数 0 件 (実質は open PR の解消を含めて 0 に近づける)。**運用**: `sweep_prs.sh` の巡回を既存 PR の解決に集中させる (競合解消・修正・review 再起動・approve 済みの merge 判断)。レトロは `docs/pm/RETRO_2026-10-13.md` に記録し、問題点と対策を列挙する | `docs/pm/RETRO_2026-10-13.md`・`docs/REFERENCES.md` の `[PM-SCRIPTS]` (`watch_runs.sh.notes`) |
+| 指示 122: 1 タスク = 1 チケット = 1 PR。In review が 11 件なら Opened (not draft) PR も 11 件のはず、現状は大きな不整合 | 実測 (2026-10-13 11:03Z): open PR はチケットと 1 対 1 で、同一チケットの open PR の重複は無い。不整合の原因は **Project V2 の Status が PR の実態に追従していない**こと (In review の残骸は open PR を持たない issue で、open PR のあるチケットに In review は無かった)。Status を PR の実態に合わせた。数値は `tools/pm/REPORT.md` §1〜§5 が正本。stacked PR と draft の滞留は禁止する (PR #721 の prompts) | `docs/pm/RETRO_2026-10-13.md` §1・§2 #8・#11 |
+| 指示 123: レビュワーが突き返したとき、実装 agent は PM の力を借りず自発的に動作する。全ての Opened PR は『レビュー中』『レビューを受けて修正中』の 2 種類のみで、どちらでもない状態は 1 秒も存在しない | **現状は実現できていない**: 実測 (2026-10-13 09:20Z、PM の分類) で open PR の過半がどちらでもない状態だった (数値は `tools/pm/REPORT.md` §4)。原因は、差し戻しで実装 run を起動する仕組みが workflow に無かったこと、競合 PR・draft・stacked・Copilot 待ち・merge 順待ちが『どちらでもない』を作ること。対策: PR #721 (差し戻しで fix モードの実装 run を自動起動、往復の上限と `oc:stuck`)・watchdog (PR #724、5 分おきに IDLE を検出して動かす)。PR #721 は 2026-10-13 10:36:05Z に merge 済み。**未検証は main 上の実 Actions 動作のみ** | `docs/pm/RETRO_2026-10-13.md` §2 #5・#6・§4、PR #721、issue #719 |
+| 指示 124: 全ての Opened PR に、Reviewer または修正 Implement が稼働中・待機中か。漏れはないか | **実測で答える**。`watchdog.sh` を `DRY=1` で本物のリポジトリに当て、open PR を『担当 run あり / 担当なし』に数える。漏れは理由別に分け、その場で依頼を投入して再測定する。主観では答えない | `docs/WORKFLOW.md` §11 (watchdog)・PR #724 |
+| 指示 125: Actions の同時実行数 (Free 20) を、今月だけ Team (60) に上げた方が良いか | 課金は依頼者の判断領域であり、PM は操作しない。実測 (所有者の組織のプラン・席数・リポジトリの公開範囲・同時実行の飽和) と公式の制限値を根拠に推奨と注意点を提示する。費用の本体は GitHub の席代ではなく LLM の推論費用と、API の率制限 | 本ファイル・`docs/WORKFLOW.md` §11 |
+| 指示 126: Team プランへの課金完了、モデルを Haiku 5.5 Max に変更、率制限で失敗したら `OC_MODEL_ID` を従量課金に切り替える 2 コマンドのみ PM に許可 | モデル管理は依頼者の領域。PM に許可されたのは **`OC_MODEL_ID` の 2 つの値への切り替えだけ**: 従量課金 `console-openrouter/anthropic/claude-haiku-5.5#xhigh`、サブスク `console-cloudflare-ai-gateway-custom/claude-haiku-5-5#max`。切り替えの条件は『率制限 (`rate_limit_error` など) による run の失敗』を**ログで確認した場合**に限る。他の原因 (例: `Argument list too long`) の失敗では切り替えない。切り替えたら依頼者に報告する。他のモデル・他の variable・課金の操作はしない | 本ファイル・`restart_failed.sh` |
 
 ---
 

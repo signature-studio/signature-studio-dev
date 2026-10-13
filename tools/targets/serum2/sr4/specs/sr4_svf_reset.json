@@ -1,0 +1,160 @@
+{
+ "name": "sr4_svf_reset",
+ "func": "0x1802f74f0",
+ "wasm_func": "function_1802f74f0",
+ "scenarios": 50,
+ "steps": 1,
+ "seed": 75003,
+ "args": [
+  {
+   "ptr": "this"
+  }
+ ],
+ "buffers": {
+  "this": {
+   "size": 256,
+   "fields": [
+    {
+     "off": "0x40",
+     "type": "u32",
+     "gen": {
+      "bits32": 1
+     }
+    },
+    {
+     "off": "0x44",
+     "type": "u32",
+     "gen": {
+      "bits32": 1
+     }
+    },
+    {
+     "off": "0x48",
+     "type": "u32",
+     "gen": {
+      "bits32": 1
+     }
+    },
+    {
+     "off": "0x4c",
+     "type": "u32",
+     "gen": {
+      "bits32": 1
+     }
+    },
+    {
+     "off": "0x50",
+     "type": "u32",
+     "gen": {
+      "bits32": 1
+     }
+    },
+    {
+     "off": "0x54",
+     "type": "u32",
+     "gen": {
+      "bits32": 1
+     }
+    },
+    {
+     "off": "0x58",
+     "type": "u32",
+     "gen": {
+      "bits32": 1
+     }
+    },
+    {
+     "off": "0x5c",
+     "type": "u32",
+     "gen": {
+      "bits32": 1
+     }
+    },
+    {
+     "off": "0x60",
+     "type": "u32",
+     "gen": {
+      "bits32": 1
+     }
+    },
+    {
+     "off": "0x64",
+     "type": "u32",
+     "gen": {
+      "bits32": 1
+     }
+    },
+    {
+     "off": "0x68",
+     "type": "u32",
+     "gen": {
+      "bits32": 1
+     }
+    },
+    {
+     "off": "0x6c",
+     "type": "u32",
+     "gen": {
+      "bits32": 1
+     }
+    },
+    {
+     "off": "0x70",
+     "type": "u32",
+     "gen": {
+      "bits32": 1
+     }
+    },
+    {
+     "off": "0x74",
+     "type": "u32",
+     "gen": {
+      "bits32": 1
+     }
+    },
+    {
+     "off": "0x78",
+     "type": "u32",
+     "gen": {
+      "bits32": 1
+     }
+    },
+    {
+     "off": "0x7c",
+     "type": "u32",
+     "gen": {
+      "bits32": 1
+     }
+    },
+    {
+     "off": "0x80",
+     "type": "u32",
+     "gen": {
+      "bits32": 1
+     }
+    },
+    {
+     "off": "0x84",
+     "type": "u32",
+     "gen": {
+      "bits32": 1
+     }
+    },
+    {
+     "off": "0x88",
+     "type": "u32",
+     "gen": {
+      "bits32": 1
+     }
+    },
+    {
+     "off": "0x8c",
+     "type": "u32",
+     "gen": {
+      "bits32": 1
+     }
+    }
+   ]
+  }
+ }
+}

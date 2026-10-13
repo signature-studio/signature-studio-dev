@@ -1,0 +1,44 @@
+{
+ "name": "sr4_svf_process",
+ "func": "0x1802f7510",
+ "wasm_func": "function_1802f7510",
+ "scenarios": 200,
+ "steps": 1,
+ "seed": 75002,
+ "vars": [
+  {"name": "n", "gen": {"mix": [[0.4, {"choice": [0, 1, 2, 3, 4, 5, 7, 8, 16, 31, 64]}], [0.6, {"int": [1, 96]}]]}},
+  {"name": "mode", "gen": {"mix": [[0.9, {"int": [4, 38]}], [0.1, {"choice": [0, 3, 39, 40, 100]}]]}}
+ ],
+ "args": [{"ptr": "this"}, {"ptr": "buf"}, {"int": "n"}, {"int": "mode"}],
+ "buffers": {
+  "this": {"size": 256, "fields": [
+    {"off": "0x20", "type": "f32", "gen": {"unif": [0.0, 0.5]}},
+    {"off": "0x24", "type": "f32", "gen": {"unif": [0.0, 0.5]}},
+    {"off": "0x28", "type": "f32", "gen": {"unif": [0.0, 0.5]}},
+    {"off": "0x2c", "type": "f32", "gen": {"unif": [0.0, 0.5]}},
+    {"off": "0x30", "type": "f32", "gen": {"unif": [0.0, 0.5]}},
+    {"off": "0x34", "type": "f32", "gen": {"unif": [0.0, 0.5]}},
+    {"off": "0x38", "type": "f32", "gen": {"unif": [0.0, 0.5]}},
+    {"off": "0x3c", "type": "f32", "gen": {"unif": [0.0, 0.5]}},
+    {"off": "0x40", "type": "f32", "gen": {"unif": [0.0, 0.5]}},
+    {"off": "0x44", "type": "f32", "gen": {"unif": [0.0, 0.5]}},
+    {"off": "0x48", "type": "f32", "gen": {"unif": [0.0, 0.5]}},
+    {"off": "0x4c", "type": "f32", "gen": {"unif": [0.0, 0.5]}},
+    {"off": "0x50", "type": "f32", "gen": {"unif": [0.0, 0.5]}},
+    {"off": "0x54", "type": "f32", "gen": {"unif": [-0.5, 0.5]}},
+    {"off": "0x58", "type": "f32", "gen": {"unif": [-0.5, 0.5]}},
+    {"off": "0x5c", "type": "f32", "gen": {"unif": [-0.5, 0.5]}},
+    {"off": "0x60", "type": "f32", "gen": {"unif": [-0.5, 0.5]}},
+    {"off": "0x64", "type": "f32", "gen": {"unif": [-0.5, 0.5]}},
+    {"off": "0x68", "type": "f32", "gen": {"unif": [-0.5, 0.5]}},
+    {"off": "0x6c", "type": "f32", "gen": {"unif": [-0.5, 0.5]}},
+    {"off": "0x70", "type": "f32", "gen": {"unif": [-0.5, 0.5]}},
+    {"off": "0x74", "type": "f32", "gen": {"unif": [-0.5, 0.5]}},
+    {"off": "0x78", "type": "f32", "gen": {"unif": [-0.5, 0.5]}},
+    {"off": "0x7c", "type": "f32", "gen": {"unif": [-0.5, 0.5]}},
+    {"off": "0x80", "type": "f32", "gen": {"unif": [0.0, 0.5]}},
+    {"off": "0x84", "type": "u8", "gen": {"choice": [0, 1]}}
+  ]},
+  "buf": {"size": "4*n+8", "fill": {"type": "f32", "count": "n", "gen": {"unif": [-1.0, 1.0]}}}
+ }
+}

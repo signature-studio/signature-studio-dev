@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """fw_f80.py — x86_fp80 (x87) を wasm32 でコンパイル可能な f64 に coerce する (P0a smoke 用の近似; 本命は CAB-196 の f80→f64 lowering pass).
 
-  python3 fw_f80.py IN.ll OUT.ll [--report r.json]
+  python3 fw_f80.py IN.ll OUT.ll [--report r.json] [--ext-funcs f1,f2,... [--chop-funcs ..] [--chop-ranges ..]]
+
+--ext-funcs (P0c-8 / #311): f64 coerce 後に tools/plugins/p0c/f80_lower.py --ext を呼び、指定関数の x87
+  演算を 64-bit 仮数 (double-double) で再現する。未指定なら従来どおり (出力は byte 一致)。
 
 * x86_fp80 → double (全置換), @llvm.X.f80 → @llvm.X.f64
 * 0xK<16進> (f80 ビットパターン) → 0xH<16進> (f64 bits, 最近接丸め)
@@ -9,7 +12,7 @@
 * i3 (x87 スタック index) → i32 (wasm が i3 を legalization しないケースの回避; 演算は trunc/zext で整合)
 * f80 関数を init 経路で呼ぶと精度が f64 に落ちる (80bit mantissa → 53bit) — 実測は REPORT に記録
 """
-import argparse, json, re, struct
+import argparse, json, os, re, struct, subprocess, sys
 
 
 def f80_to_f64(khex):
@@ -41,6 +44,9 @@ def main():
     ap.add_argument('src')
     ap.add_argument('dst')
     ap.add_argument('--report')
+    ap.add_argument('--ext-funcs', default='', help='ext-emulation 対象関数 (カンマ区切り)')
+    ap.add_argument('--chop-funcs', default='')
+    ap.add_argument('--chop-ranges', default='')
     a = ap.parse_args()
     text = open(a.src, errors='replace').read()
     rep = {'f80_tokens': text.count('x86_fp80'), 'i3_tokens': 0, 'consts': 0, 'same_type_fix': 0}
@@ -74,6 +80,27 @@ def main():
     rep['i3_tokens'] = n3
     text = re.sub(r'\bi3\b', 'i32', text)
     open(a.dst, 'w').write(text)
+    if a.ext_funcs:
+        lower = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'p0c', 'f80_lower.py')
+        ext_rep = a.dst + '.ext.json'
+        cmd = [sys.executable, lower, a.dst, a.dst, '--ext', '--ext-funcs', a.ext_funcs, '--report', ext_rep]
+        if a.chop_funcs:
+            cmd += ['--chop-funcs', a.chop_funcs]
+        if a.chop_ranges:
+            cmd += ['--chop-ranges', a.chop_ranges]
+        subprocess.run(cmd, check=True)
+        er = json.load(open(ext_rep))
+        rep['ext_functions'] = er.get('ext_functions', [])
+        bad = [f for f in rep['ext_functions'] if f['status'] != 'ext']
+        want = [x for x in a.ext_funcs.replace(',', ' ').split() if x]
+        done = {f['name'] for f in rep['ext_functions']}
+        missing = [w for w in want if w not in done]
+        if bad or missing:
+            # 指定した関数が ext 化されなかった (skip/未発見) のに成功扱いにしない
+            print('[f80] FAIL: ext 化されなかった関数: skip=%s missing=%s' % (bad, missing), file=sys.stderr)
+            if a.report:
+                json.dump(rep, open(a.report, 'w'), indent=1)
+            sys.exit(1)
     if a.report:
         json.dump(rep, open(a.report, 'w'), indent=1)
     print('[f80]', json.dumps(rep))

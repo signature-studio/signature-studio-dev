@@ -734,7 +734,7 @@ work/ 内の既存 lift IR (work/k80.lift.ll) を入力として p0c4_abi_e2e.py
 |---|---|---|
 | ~~0x5e0d80 の ucomiss 符号 lift 欠落 (§12.3)~~ → §13 で buf_diff 0、現状も 0 (§14.3)。#331 の対象は 0x5de3e0 / 0x5dee90 / 0x5df040 / 0x5e02b0 / 0x5e12b0 (§14.4) | (解消) | — |
 | ~~0x5df610 の残差 (§12.3)~~ → §13 で buf_diff 0 | (解消) | — |
-| wasm32 バックエンド検証・framework 統合 (fw_f80.py → f80_lower --ext) | #269 作業案 4 は未実施 | #197 に提案 |
+| wasm32 バックエンド検証・framework 統合 (fw_f80.py → f80_lower --ext) | #269 作業案 4 は未実施 → §16 (#311) で実施 (受入 3 のみ未検証) | #311 |
 | 環境: `/opt/retdec`・`/home/ubuntu/work/{analysis,webstudio}` への絶対パス依存 (k80_diff.py 等) | CI 上では symlink で代替 | #197 に提案 (スクリプトの REPO 相対化) |
 
 ### 12.5 再現
@@ -983,3 +983,102 @@ INTERSECT `run=66`)。MEMW の差は CSV の buf_diff でのみ検出できる�
 | `inventory/kernel_table.py:15`・`lift/batch_lift.sh:31` に `/home/ubuntu` 既定が残る (p0c 外) | 他 area の置換 issue 待ち | #294 の該当 area 子 issue |
 | `kernel_matrix.py` `verify_table.py` `k80_diff.py` と e2e 全体を `oc_artifacts` 付きで未実行 | 置換行以外の挙動は未検証 | #360 (本 PR のレビュー run でも `oc_artifacts:` で再実行可) |
 | §13.4 の「絶対パス依存 (#294)」のうち p0c 内の `/home/ubuntu` 参照は解消 (`/opt/retdec` は残る) | — | #294 |
+
+### 15.4 #360: 追加素材での full e2e before/after (検証 HEAD 856be6b / 比較元 8af7eb0)
+
+素材: `fl-win64` `toolchain-retdec` `toolchain-emsdk` `work-m6-ott` `work-liftlib` (`oc_artifacts`)。before = `856be6b^1` (= `8af7eb0`、置換前)、after = `856be6b` (#359 merge)。
+before は `/home/ubuntu/work/analysis/win64` と `/home/ubuntu/work/webstudio` を symlink で用意、after は `/home/ubuntu` を削除し `FL_WIN64_DIR` のみ。各 n=1・直列・4 コア runner。
+
+結論: **`p0c_e2e.sh` / `p0c2_e2e.sh` は置換前後とも rc=0、決定的な成果物はすべて一致**。不一致は RetDec が同一入力でも出力を変えることだけで、置換とは無関係 (下記)。
+
+| 項目 | before | after |
+|---|---|---|
+| `p0c_e2e.sh` | rc=0、12.9 s (kernel_matrix は skip。前段で別実行) | rc=0、8.6 s (同) |
+| `p0c_e2e.sh` 初回 ([2] kernel_matrix.py 12 = 181 DLL 走査を含む) | 515.7 s、rc=1 ([4] で上記の理由)、load 12.09 (開始 1 分値) | 512.5 s、rc=0、load 1.97 (同) |
+| `p0c2_e2e.sh` | rc=0、47.8 s、load 3.82 | rc=0、44.7 s、load 1.80 |
+
+(表の `p0c_e2e.sh` 行は `work/kernel_matrix.json` が既にあり [2] を skip した再実行。kernel_matrix を実行した初回の `p0c_e2e.sh` 全体が、after は rc=0・512.5 s (その中の [2])、
+before は 515.7 s で `p0c/work/kernel_table.json` の置き場所違いにより [4] で rc=1 だったため、同ファイルを `p0c/work/` に置いて再実行した。after の再実行 (8.6 s) の load は記録に失敗。)
+
+一致を `cmp` / sha256 で確認したもの (先頭 12 桁):
+
+| 出力 | 結果 |
+|---|---|
+| `kernel_matrix.json` / `kernel_used_norm.json` / `table_verify.json` | 一致 (487412af06e6 / 0b123bd6264f / e5709ebd4e62) |
+| `verify_table.py` stdout ([3])、`f80_assess` + `f80_micro` stdout ([5][6]) | 一致 (8623cae11386 / 83bf33956334) |
+| `k80abi.json`、`diff/k80.lower.ll`、`diff/k80.argfix.ll` | 一致 |
+| `p0c2_sweep.csv` (194 行) | 一致 (52d0c45c63f9) |
+| `p0c2_e2e.sh` stdout (パス正規化後) | 一致 (idempotent OK / argfix idempotent OK / wasm32 compile OK 100972 bytes) |
+
+**RetDec は非決定的** (置換と無関係): `retdec-decompiler` に同一 PE・同一 ranges を与えて 2 回走らせると `k80.drc.ll` の sha256 が変わる (alloca の並びと `uselistorder`)。
+このため before/after で再 lift した `k80.lift.ll` は 58 行差になる。lift 以降を比較するため、after では `k80.lift.ll` を before のものに揃えてから `p0c2_e2e.sh` を再実行し、上表の一致を得た。
+差が残るのは lift 由来の `k80.*.ll` / `k80_simd.c` / `k80.drc.*`、実行ごとにアドレスが変わるログ (`build.log` `run.err`)、`k80diff` バイナリ、`diff/driver.c` の `map_image(...)` の PE パス 1 行 (これは置換の意図した差)。
+
+`nsis_blockmap.json`: どの素材にも無く (`block_manifest.json` も無い)、`f2/mk_blockmap.py` で `PLUGIN_MATRIX.json` から再構成した (182 行、sha256 9dfb59584586)。
+`kernel_matrix.py` が使うのは `kind=PE` で `Fruity\Effects|Generators` 配下の行のみで、181 DLL / 133 delphi / init 発見 130 は before/after で同じ。
+
+ネガティブコントロール (after、すべて rc=1): `FL_WIN64_DIR=/nonexistent` で `p0c_e2e.sh` / `p0c2_e2e.sh` / `verify_table.py` / `k80abi.py` が
+`FileNotFoundError: /nonexistent/extracted/block18983_PE.bin`。`FL_WIN64_DIR` 未設定かつ `/home/ubuntu` 無しでは `p0c2_e2e.sh` が旧既定 `/home/ubuntu/...` を見て失敗する (既定値が従来のまま)。
+`grep -rn '/home/ubuntu' tools/plugins/p0c ... --exclude-dir=work | wc -l` → 0。
+
+範囲外 / 未解決: `inventory/kernel_table.py:15` と `lift/batch_lift.sh:31` ほか `lift/` 配下の `/home/ubuntu` 既定は別 area の置換 issue (#294 配下) で扱う。
+`k80_diff.py` は `p0c2_e2e.sh` [6] 経由で実行済み (`LIFTP` は `REPO_ROOT` 基準で解決)。RetDec の非決定性は §15.4 に実測を残すのみで、RetDec 非決定は #668、`p0c_e2e.sh` [4] の `kernel_table.json` 置き場所と `nsis_blockmap.json` 生成は #669 に起票。
+
+## 16. P0c-8 (#311, 親 #197・先行 #269): ext IR の wasm32 検証 + framework 統合 (fw_f80.py → f80_lower --ext)
+
+検証起点 commit: `d5e6f98` (origin/main)。担当 dir: `tools/plugins/p0c` / `tools/plugins/framework` (fw_f80.py, fw_stage2.sh のみ)。
+既知類型との関係: DEFECTS.md の D1〜D16 に **該当なし** (ext 生成器の丸め論理バグ。native では乱数 case で顕在化せず、固定 edge/tie 集合でのみ出る)。
+
+### 16.0 結論
+
+1. **ext IR を wasm32 (emcc -O2) でビルドし native x87 と bit 比較: 24,001,062 case で 0 不一致** (§16.2)。ネガコン (Dekker 定数破壊) は 2,704,752 不一致で FAIL。
+2. wasm32 比較で **f80_lower.py --ext の生成器バグを 4 件発見・修正** (§16.1)。native の ext_core_test (3M) と p0c4_e2e (7 kernel) はどれも検出できなかった。
+3. **framework 統合**: `fw_f80.py --ext-funcs` が f64 coerce 後に `f80_lower.py --ext` を呼ぶ。`fw_stage2.sh` は `FW_EXT_FUNCS` 指定時のみ有効 (未指定なら従来と byte 一致)。指定関数が ext 化されなければ exit 1。
+4. **受入条件 3 (fw_269_verify.sh / hs_e2e.sh 維持) は未検証**。理由は §16.4。したがって PR は `Refs #311` とし Closes にしない。
+
+### 16.1 修正した生成器バグ (すべて f80_lower.py の --ext。ext_core_test.c の同一箇所も同期)
+
+| # | 場所 | 症状 (固定集合 case) | 原因 | 修正 |
+|---|---|---|---|---|
+| E1 | `_ext_round64` grid shift | hi=-2^k, lo<0 の mul/add の lo が 2^-63 刻みで 1 ずれ | shift 64 の条件が lo<0 のみ。hi<0 では大きさが増える向きなのに shift 64 にしていた | `(hi>0 ? lo<0 : lo>0)` (大きさが減る向き) のときだけ shift 64 |
+| E2 | `_ext_fist_round` (nearest) | hi=n+0.5, lo>0 / hi=n-0.5, lo<0 の fist が 1 ずれ | `d=(hi-n0)+lo` を f64 で丸めて 0.5 と比較し lo の符号を失う | `d0=hi-n0==±0.5` と lo の符号で tie 判定 |
+| E3 | 同 em 選択 | tie の -0.5 側で even 判定が逆 | `em` の select の真偽の枝が逆 (odd→n0, even→n0-1) | odd→n0-1, even→n0 |
+| E4 | `_ext_store_f32` | f32 store の tie (hi=1+2^-24, lo≠0) が 1ulp ずれ | `nearadj` (nd 条件抜き) を使用。さらに mid 判定 `lo_` が bit 0..51 全体を見ていた (正: 下位 29 bit) | `nearadj2` を使用、mask を 0x1FFFFFFF |
+
+### 16.2 wasm32 検証 (1 コマンド: `bash tools/plugins/p0c/p0c8_e2e.sh`)
+
+方法: `ext_wasm_gen.py` が `f80_lower.py` の実生成関数 (`_ext_arith` / `_ext_fist_round` / `_ext_store_f32`、chop=0/1) から .ll を作り、`ext_wasm_test.c` が決定的入力 (ext_core_test.c と同じ xorshift・mode 0..3 各 N 件×chop 2 + 固定 edge/tie 集合) で実行して mul/add/sub の (hi,lo) (TwoSum 正準化)・fist(i32)・f32 store 2 個を native x87 (`long double`、`-O0`) の期待値と bit 比較する。期待値は native 側 (`-DGEN`) が書き、wasm32 側 (emcc → node) が読む。
+
+| 項目 | 実測 |
+|---|---|
+| case 数 (分母) | 24,001,062 (乱数 mode 0..3 × chop 2 × N=3,000,000 + 固定集合。固定集合は 506 組を既知限界で除外) |
+| wasm32 (emcc -O2) 不一致 | **0** (dd 0 / fist 0 / f32 0) |
+| wasm32 バイナリ | 26,009 B (試験 harness 込み) |
+| native clang -O2 で同 IR を実行 | 不一致 0 (同一ファイル・同一入力) |
+| ネガコン: Dekker 定数 2^27+1→2^26+1 | 2,704,752 不一致 → exit 1 (p0c8_e2e.sh が exit 非 0 を要求) |
+| ext_core_test (native C, N=3,000,000) | 全 PASS (修正後) |
+| p0c4_e2e 2000 case/kernel (修正後) | 0x5dfbe0 / 0x5dfc90 / 0x5dfd30 / 0x5dfdb0 / 0x5de820 / 0x5dedf0 / 0x5dfb60 すべて buf_diff=0。回帰 7 kernel も 0 (修正前と同一) |
+| 実 kernel の ext IR | `llvm-as` OK・idempotent OK・wasm32 clang -O1 で 113,950 B (k80.ext.ll、80 define) |
+| p0c8_e2e.sh 所要 | 33 s (load average 1 分値 0.72→1.02、直列、n=1) |
+
+最初の実行 (修正前) は 948,340 / 2,401,568 case 不一致 (N=300,000)。内訳は試験 harness 側の native 参照の誤り (x87 を `-O2` で `(float)` 変換すると丸めモード切替が最適化で動く) と上記 E1〜E4。harness は参照側を `-O0` + volatile にして解消した。
+
+数え方: case = (入力 a,b, chop) 1 組。不一致 = 1 case で dd / fist / f32 のいずれか 1 つでも bit 不一致。fist は |a|,|b|<1e9 の組のみ比較 (ext_core_test.c と同条件)。
+
+### 16.3 framework 統合の検証
+
+| 検査 | 結果 |
+|---|---|
+| `fw_f80.py` 既定 (--ext-funcs なし) の出力 | 変更前 (`d5e6f98`) と `cmp` で byte 一致 (入力 = k80.lift.ll、968 f80 token) |
+| `--ext-funcs function_5dfd30,function_5dfbe0` | ext 2 関数・llvm-as OK・wasm32 clang -O1 で 106,942 B |
+| ネガコン: `--ext-funcs function_nonexistent` | exit 1 (`ext 化されなかった関数: missing=[...]`) |
+
+### 16.4 範囲外 / 未解決
+
+範囲外: framework 全体 (fw_269_verify.sh / hs_e2e.sh) の再実行。stage-1 成果物 (fw_icall.dll・fw[0-7].restored.ll 等) は許可素材名 (WORKFLOW §11) に無く、RetDec で再生成すると 8 chunk の timeout 3600 s で 60 分上限に収まらない。したがって受入条件 3 は**未検証**。`fw_f80.py` 既定動作の byte 一致 (§16.3) までが根拠で、fw_stage2.sh の既定経路の差分は `EXT_ARGS=()` の空展開のみ (`bash -n` OK)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 受入条件 3 (fw_269_verify.sh / hs_e2e.sh 維持) 未検証 | framework 統合の回帰確認 | 新規 issue: stage-1 成果物を素材化 (`work-fw-stage1`) して再検証 |
+| dd 積は al·bl を捨て、al·bh / ah·bl を f64 に丸める | lo 付き × 24bit 超 hi の積で不一致の可能性 (固定 506 組を除外。kernel 内の ext 値で顕在化した例は p0c4 2000 case で 0) | #197 に提案 |
+| `FW_EXT_FUNCS` に入れる関数の選定 (framework 内の x87 関数一覧) | 統合は配線のみ。どの関数を ext 化するかは未決 | #197 に提案 |
