@@ -12,7 +12,7 @@ Issue 記載の unit 85/719 の退行・unit 114 のハングは、**現 main (#
 `node trap_triage/survey_units.mjs out.json` → `python3 trap_triage/survey_diff.py a.json b.json`。942 unit。
 ベース = 本 PR の merge commit `8445b39` (main `8d883c3` を取り込み済み。#446 は `8d883c3` でマージ済み)。コードはこの commit と同一 (以降の変更は docs のみ)。旧ベース (`5ff73ff`・`0865903`) の値は §1 の旧ベース表だけに残す。逆アセンブルは `disasm_img.py` (capstone は venv に導入)。
 
-## 1. 測定 (本ベース。build と survey は各構成 1 回ずつの単発。load average 0.6〜0.8)
+## 1. 測定 (本ベース。build と survey は各構成 1 回ずつの単発。load average (1 分値) 0.54〜0.89 を計測中の `uptime` で記録)
 
 build 5.3〜10.1 s、survey 12.4〜12.8 s (いずれも wall の単発。既定 OFF の build 10.1 s は m11_simd / winstubs / fnstubs / m11_ov の再 cc を含み、ON の build 5.3 s は ov.o の再 cc のみ)。
 
