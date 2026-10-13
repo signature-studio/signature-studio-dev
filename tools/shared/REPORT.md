@@ -79,6 +79,7 @@
   `unpatched_check.sh`: 素の wasm32 は **26/40 行**ずれ (OpenSans の 30/40 とはフォント依存で差)。分解 (差分行数/40): patch のみ (FORCE_INT64 無し) 26、FORCE_INT64 のみ (patch 無し) 6、両方 0 → **2 つとも必須**。
   build.sh の wasm64 実行を修正: システム node v22 は wasm64 の table64 を compile できず CompileError → `EMSDK_NODE` (v24) を使う。旧 `||` フォールバックは失敗を隠すため廃止。
 - **win freetype.dll の version 帯** (`bash oss/freetype/win_version_probe.sh`; 判定 = 17 名が upstream tag の `src/ include/` に語として存在するか): **2.4.12 以前 17/17、2.5.0 以降 3/17 以下** → win の FreeType は **2.4.x 以前の旧版** (2.5.0 で内部 API 名が消えた)。厳密な patch 版は未特定 (実バイナリの version 文字列/`FT_Library_Version` を未確認: fl-win64 素材が必要)。
+- **#145 追記 (fl-win64 実測)**: `extracted/block24358_PE.bin` (i386, export 270) と `block24359_PE.bin` (x64, export 271) の 2 つが `freetype.dll`。両方とも前回の欠け 17 本を含み、差は `FT_MulFix` 1 本のみ。export 宣言の突き合わせ (`name(` の grep) は **2.4.10 / 2.4.11 / 2.4.12 で 271/271**、2.4.9 は `FT_Outline_EmboldenXY` 欠け (270/271)、2.5.0 は 14 本欠け。x64 DLL の PE timestamp は 2012-09-20 (2.4.10 = 2012-06-15 と 2.4.11 = 2012-12-20 の間)。**結論: win freetype.dll は FreeType 2.4.10〜2.4.12 のいずれか** (厳密な 1 版は未確定; `FT_Library_Version` の出力先は構造体で、版定数は PE 内に直接の文字列が無い)。
 
 ### 3.2 libogg 1.3.2 + libvorbis 1.3.5 — `bash oss/ogg/build.sh` (~15s)
 - 23 ソースを直接 emcc (autotools は cross 判定で Ogg check が落ちる)。合成 PCM 2s→Vorbis VBR(0.4) エンコード→Ogg→復号。**ogg 30,695B hash 一致 (wasm32/64)**、復号 88,200 frame の PCM hash 一致。wasm 504KB (wasm32)。
