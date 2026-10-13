@@ -8,10 +8,11 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 SCRIPTS="$HERE/.."
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
-export OC_REPO=o/r RUNNER_TEMP="$TMP" OC_REOPEN_WAIT=0 GH_TOKEN=x
+export OC_REPO=o/r RUNNER_TEMP="$TMP" OC_REOPEN_WAIT=0 OC_MERGEABLE_WAIT=0 GH_TOKEN=x
 
 # fake gh: `gh api [--paginate] repos/... [--jq E]` は $FIX/<path の / を _ にした名前> を返す。
 # `gh pr|label ...` は $LOG に記録するだけ (FAKE_MERGE_FAILS=1 なら `gh pr merge` は失敗する)。
+# FAKE_FAIL=<部分文字列> を設定すると、path にその文字列を含む `gh api` は失敗する (読み取り失敗の再現)。
 FIX="$TMP/fixtures"
 LOG="$TMP/gh.log"
 mkdir -p "$FIX" "$TMP/bin"
@@ -35,6 +36,10 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
+if [ -n "${FAKE_FAIL:-}" ] && [[ "$path" == *"$FAKE_FAIL"* ]]; then
+  echo "fake gh: injected failure for $path" >&2
+  exit 1
+fi
 f="$FAKE_FIX/${path//\//_}"
 [ -f "$f" ] || { echo "fake gh: no fixture for $path" >&2; exit 1; }
 if [ -n "$jq_expr" ]; then jq -r "$jq_expr" < "$f"; else cat "$f"; fi
@@ -52,7 +57,7 @@ not_logged() { ! grep -q -- "$1" "$LOG"; }
 OLD="2020-01-01T00:00:00Z"
 REVIEWER="oc-reviewer-for-signature-studio[bot]"
 
-reset() { rm -rf "$FIX"; mkdir -p "$FIX"; : > "$LOG"; : > "$TMP/out"; unset FAKE_MERGE_FAILS; }
+reset() { rm -rf "$FIX"; mkdir -p "$FIX"; : > "$LOG"; : > "$TMP/out"; unset FAKE_MERGE_FAILS FAKE_FAIL; }
 fx() { printf '%s' "$2" > "$FIX/${1//\//_}"; } # fx <path> <json>
 # runs / PR 一覧は全ケース共通の形。active_runs は workflow_runs の JSON (既定は空)。
 base() { # base <prs json> [active runs json]
@@ -62,6 +67,8 @@ base() { # base <prs json> [active runs json]
   done
   fx "repos/o/r/pulls?state=open&per_page=100" "$1"
 }
+# run <path> <pr番号...>: 実行中 run の JSON (workflow の path と担当 PR)
+run() { local p="$1" nums="" ; shift; for n in "$@"; do nums="$nums{\"number\":$n},"; done; printf '{"event":"pull_request","display_title":"x","path":"%s","pull_requests":[%s]}' "$p" "${nums%,}"; }
 # pr <n> <head> <draft> <updated_at> <labels json>
 pr() { printf '{"number":%s,"title":"PR %s","head":{"sha":"%s"},"draft":%s,"updated_at":"%s","labels":%s}' "$1" "$1" "$2" "$3" "$4" "${5:-[]}"; }
 # detail <n> <mergeable> <reviews json> <comments json>
@@ -157,18 +164,84 @@ expect "watchdog re-requests exhausted -> oc:stuck, no more re-request" $?
 # 11. review の再起動が尽きた (マーカー 3 件) head は oc:stuck で止める
 reset
 base "[$(pr 11 kkk111 false "$OLD")]"
-detail 11 true "[]" '[{"body":"a <!-- review-retry:kkk111 -->"},{"body":"b <!-- review-retry:kkk111 -->"},{"body":"c <!-- review-retry:kkk111 -->"}]'
+RETRY_BOT="[{\"user\":{\"login\":\"$REVIEWER\",\"type\":\"Bot\"},\"body\":\"a <!-- review-retry:kkk111 -->\"},{\"user\":{\"login\":\"$REVIEWER\",\"type\":\"Bot\"},\"body\":\"b <!-- review-retry:kkk111 -->\"},{\"user\":{\"login\":\"$REVIEWER\",\"type\":\"Bot\"},\"body\":\"c <!-- review-retry:kkk111 -->\"}]"
+detail 11 true "[]" "$RETRY_BOT"
 wd
 logged 'pr edit 11 .*--add-label oc:stuck' && not_logged 'pr reopen 11'
 expect "review retries exhausted -> oc:stuck, no reopen" $?
 
-# 12. 実行中の run が PR を担当していれば何もしない
+# 12. 実行中の opencode.yaml の run が PR を担当していれば何もしない
 reset
-base "[$(pr 12 lll222 false "$OLD")]" '[{"event":"pull_request","display_title":"PR 12","pull_requests":[{"number":12}]}]'
+base "[$(pr 12 lll222 false "$OLD")]" "[$(run .github/workflows/opencode.yaml 12)]"
 detail 12 true
 wd
 not_logged 'pr reopen 12' && not_logged 'pr review 12'
-expect "PR with a running run is covered" $?
+expect "PR with a running opencode.yaml run is covered" $?
+
+# 16. 実行中 run の一覧が取れなければ何も操作しない (exit 1)
+reset
+base "[$(pr 16 rrr160 false "$OLD")]"
+detail 16 false
+FAKE_FAIL='actions/runs?status=in_progress' wd; rc=$?
+[ "$rc" = 1 ] && not_logged '^gh pr ' && not_logged 'gh pr comment'
+expect "runs list fails -> no action at all, exit 1" $?
+
+# 17. PR 一覧が取れなければ何も操作しない (exit 1)
+reset
+base "[$(pr 17 sss170 false "$OLD")]"
+detail 17 false
+FAKE_FAIL='pulls?state=open' wd; rc=$?
+[ "$rc" = 1 ] && not_logged 'gh pr '
+expect "PR list fails -> no action at all, exit 1" $?
+
+# 18. reviews の取得が失敗した PR は skip する (承認済みでも NOREVIEW 扱いで reopen しない)
+reset
+base "[$(pr 18 ttt180 false "$OLD")]"
+detail 18 true "[$(review "$REVIEWER" ttt180 APPROVED)]"
+FAKE_FAIL='pulls/18/reviews' wd
+not_logged 'gh pr ' && grep -q 'failed to read reviews' "$TMP/out"
+expect "reviews read fails -> skipped, no action" $?
+
+# 19. scripts-test.yaml の run だけでは PR を担当しているとみなさない
+reset
+base "[$(pr 19 uuu190 false "$OLD")]" "[$(run .github/workflows/scripts-test.yaml 19)]"
+detail 19 true
+wd
+logged 'pr reopen 19'
+expect "scripts-test run alone does not cover the PR -> recovery" $?
+
+# 20. APPROVED の後に reviewer の COMMENTED が付いても verdict は APPROVED -> merge
+reset
+base "[$(pr 20 vvv200 false "$OLD")]"
+detail 20 true "[$(review "$REVIEWER" vvv200 APPROVED),$(review "$REVIEWER" vvv200 COMMENTED)]"
+wd
+logged 'pr merge 20 .*--match-head-commit vvv200' && not_logged 'pr reopen 20'
+expect "APPROVED then COMMENTED -> still merged" $?
+
+# 21. mergeable が null (未確定) の PR は操作せず次回に回す
+reset
+base "[$(pr 21 www210 false "$OLD")]"
+detail 21 null
+wd
+not_logged 'gh pr ' && grep -q 'mergeability is still unknown' "$TMP/out"
+expect "mergeable null -> skipped, no action" $?
+
+# 22. 第三者 (reviewer 以外・Bot 以外) の試行マーカーは数えない
+reset
+base "[$(pr 22 xxx220 false "$OLD")]"
+detail 22 true "[]" '[{"user":{"login":"someone","type":"User"},"body":"a <!-- review-retry:xxx220 -->"},{"user":{"login":"someone","type":"User"},"body":"b <!-- review-retry:xxx220 -->"},{"user":{"login":"someone","type":"User"},"body":"c <!-- review-retry:xxx220 -->"},{"user":{"login":"oc-reviewer-for-signature-studio[bot]","type":"User"},"body":"d <!-- review-retry:xxx220 -->"}]'
+wd
+logged 'pr reopen 22' && not_logged 'pr edit 22'
+expect "third-party retry markers are not counted" $?
+
+# 23. 試行上限の oc:stuck 付与も OC_MAX_ACTIONS の枠を使う (枠を使い切ったら次回へ)
+reset
+base "[$(pr 23 yyy230 false 2019-01-01T00:00:00Z),$(pr 24 zzz240 true "$OLD")]"
+detail 23 true "[$(for _ in 1 2 3 4 5 6; do printf '%s,' "$(review "$REVIEWER" yyy230 CHANGES_REQUESTED '[watchdog] x (watchdog)')"; done | sed 's/,$//')]"
+detail 24 true
+OC_MAX_ACTIONS=1 wd
+logged 'pr edit 23' && not_logged 'pr ready 24' && grep -q 'deferred=1' "$TMP/out"
+expect "exhausted oc:stuck counts as an action under OC_MAX_ACTIONS" $?
 
 # 13. 更新直後 (SETTLE 内) の PR は触らない
 reset

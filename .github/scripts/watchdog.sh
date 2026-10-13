@@ -6,7 +6,7 @@
 # イベントが起きないので、push to main と schedule (5 分) でこのスクリプトが全 open PR を点検して戻す。
 #
 # 判定 (PR ごと)。まず「カバー済み」か:
-#   REVIEWING/FIXING : その PR に紐づく実行中/待機中の run がある (pull_request 系は pull_requests に番号が出る。
+#   REVIEWING/FIXING : その PR に紐づく実行中/待機中の opencode.yaml の run がある (pull_request 系は pull_requests に番号が出る。
 #                      PM の /oc コメント起動は run のタイトルが PR タイトルと一致する)
 # カバーされていなければ IDLE であり、理由ごとに戻す (updated_at が SETTLE 分以内なら、直前の操作の
 # イベントが伝播中とみなして次回に回す):
@@ -20,7 +20,8 @@
 # oc:stuck ラベルを付けて止める。fix-progress.sh が差し戻しの上限 (OC_MAX_FIX_REVIEWS) で付けるラベルも同じで、ラベル付きの PR は
 # 人 (PM) の判断待ちとして一切触らない (ラベルを外すと再開する)。
 # merge は --match-head-commit で、点検した head 以外 (その後に push された未レビューの commit) を巻き込まない。
-# 1 回の点検で行う操作は OC_MAX_ACTIONS 件まで (古い更新の PR から)。残りは次回に回す。
+# 1 回の点検で行う操作 (oc:stuck の付与を含む) は OC_MAX_ACTIONS 件まで (古い更新の PR から)。残りは次回に回す。
+# 読み取りに失敗した PR・mergeable が未確定の PR は、その回は何も操作せず次回に回す (fail-closed)。
 #
 # 入力 (env): GH_TOKEN (reviewer App。review の提出・merge・ready・close/reopen に使う), OC_REPO,
 #             RUNS_TOKEN (actions:read。省略時は GH_TOKEN), DRY=1 で操作せず計画だけ表示
@@ -54,14 +55,28 @@ reopen() { # reopen <PR> <head>: 試行を数えるマーカー付きのコメ�
     --body "[watchdog] 現在の head (${2:0:7}) に verdict が無いため、review を再起動します。<!-- $marker -->" || true
   OC_REPO="$R" OC_PR_NUMBER="$1" bash "$(dirname "$0")/reopen-pr.sh"
 }
+mark_stuck() { # mark_stuck <PR>
+  gh label create oc:stuck --repo "$R" --color B60205 --description "automatic review/fix recovery exhausted; needs a human decision" --force > /dev/null 2>&1 || true
+  gh pr edit "$1" --repo "$R" --add-label oc:stuck > /dev/null 2>&1 || true
+}
 
-# 実行中/待機中の run (pull_requests と タイトル)
-active="$(for s in in_progress queued pending waiting; do
-  GH_TOKEN="$RUNS_TOKEN" gh api "repos/$R/actions/runs?status=$s&per_page=100" \
-    --jq '.workflow_runs[] | {event, title: .display_title, prs: [.pull_requests[].number]}'
-done | jq -s '.')"
+# 実行中/待機中の run (pull_requests・タイトル・workflow のファイル)。一覧が取れなければ何も操作しない。
+active_raw=""
+for s in in_progress queued pending waiting; do
+  if ! out="$(GH_TOKEN="$RUNS_TOKEN" gh api "repos/$R/actions/runs?status=$s&per_page=100" \
+    --jq '.workflow_runs[] | {event, title: .display_title, path, prs: [.pull_requests[].number]}')"; then
+    echo "::error::failed to list $s runs; no action this pass"
+    exit 1
+  fi
+  active_raw+="$out"$'\n'
+done
+active="$(jq -s '.' <<< "$active_raw")"
 
-prs="$(gh api --paginate "repos/$R/pulls?state=open&per_page=100" | jq -s 'add | sort_by(.updated_at)')"
+if ! pr_raw="$(gh api --paginate "repos/$R/pulls?state=open&per_page=100")"; then
+  echo "::error::failed to list open PRs; no action this pass"
+  exit 1
+fi
+prs="$(jq -s 'add // [] | sort_by(.updated_at)' <<< "$pr_raw")"
 total="$(jq length <<< "$prs")"
 covered_n=0
 acted=0
@@ -78,7 +93,7 @@ for i in $(seq 0 $((total - 1))); do
   upd_age="$(age_min "$(jq -r .updated_at <<< "$pr")")"
 
   if jq -e --argjson n "$n" --arg t "$title" \
-    'any(.[]; ((.prs | index($n)) != null) or ((.event == "issue_comment" or .event == "workflow_dispatch") and .title == $t))' \
+    'any(.[]; .path == ".github/workflows/opencode.yaml" and (((.prs | index($n)) != null) or ((.event == "issue_comment" or .event == "workflow_dispatch") and .title == $t)))' \
     <<< "$active" > /dev/null; then
     covered_n=$((covered_n + 1))
     continue
@@ -90,21 +105,37 @@ for i in $(seq 0 $((total - 1))); do
     continue
   fi
 
-  # --- IDLE: 理由を判定する ---
+  # --- IDLE: 理由を判定する。読めなかった PR・未確定の mergeable は操作せず次回に回す ---
   mergeable=null
   for _ in 1 2 3; do
-    mergeable="$(gh api "repos/$R/pulls/$n" --jq .mergeable)"
+    if ! detail="$(gh api "repos/$R/pulls/$n")"; then
+      echo "#$n skip: failed to read the PR (no action this pass)"
+      continue 2
+    fi
+    mergeable="$(jq -r .mergeable <<< "$detail")"
     [ "$mergeable" != null ] && break
-    sleep 2
+    sleep "${OC_MERGEABLE_WAIT:-2}"
   done
-  rvs="$(gh api --paginate "repos/$R/pulls/$n/reviews" \
-    | jq -s --arg h "$head" --arg who "$REVIEWER_LOGIN" \
-      '[.[][] | select(.user.login == $who and .user.type == "Bot" and .commit_id == $h)]')"
-  rv="$(jq -c 'last // {}' <<< "$rvs")"
+  if [ "$mergeable" = null ]; then
+    echo "#$n skip: mergeability is still unknown (checked next pass)"
+    continue
+  fi
+  if ! rvs_raw="$(gh api --paginate "repos/$R/pulls/$n/reviews")"; then
+    echo "#$n skip: failed to read reviews (no action this pass)"
+    continue
+  fi
+  if ! cm_raw="$(gh api --paginate "repos/$R/issues/$n/comments")"; then
+    echo "#$n skip: failed to read comments (no action this pass)"
+    continue
+  fi
+  rvs="$(jq -s --arg h "$head" --arg who "$REVIEWER_LOGIN" \
+    '[.[][] | select(.user.login == $who and .user.type == "Bot" and .commit_id == $h)]' <<< "$rvs_raw")"
+  # verdict を持つ最後の review で判定する (verify-review-verdict.sh と同じ。COMMENTED は verdict ではない)
+  rv="$(jq -c '[.[] | select(.state == "APPROVED" or .state == "CHANGES_REQUESTED")] | last // {}' <<< "$rvs")"
   st="$(jq -r '.state // "NONE"' <<< "$rv")"
   wd_n="$(jq '[.[] | select((.body // "") | contains("(watchdog)"))] | length' <<< "$rvs")"
-  retry_n="$(gh api --paginate "repos/$R/issues/$n/comments" \
-    | jq -s --arg m "review-retry:${head:0:12}" '[.[][] | select(.body | contains($m))] | length')"
+  retry_n="$(jq -s --arg m "review-retry:${head:0:12}" --arg who "$REVIEWER_LOGIN" \
+    '[.[][] | select(.user.login == $who and .user.type == "Bot" and (.body | contains($m)))] | length' <<< "$cm_raw")"
 
   reason=""
   if [ "$mergeable" = false ]; then
@@ -123,16 +154,6 @@ for i in $(seq 0 $((total - 1))); do
   summary="$summary- $line"$'\n'
   echo "$line"
 
-  # 復旧に失敗し続ける PR を延々と叩かない。同じ head への watchdog の差し戻しが WD_MAX 回、または
-  # review の自動再実行が尽きた (review-retry が 3 回) PR は oc:stuck を付けて止める (人の判断が要る)。
-  if { [ "$reason" != NOREVIEW ] && [ "$wd_n" -ge "$WD_MAX" ]; } || { [ "$reason" = NOREVIEW ] && [ "$retry_n" -ge 3 ]; }; then
-    echo "  STUCK: automatic recovery exhausted on ${head:0:7} (watchdog=$wd_n review-retry=$retry_n): labelled oc:stuck, no further action"
-    if [ "$DRY" != 1 ]; then
-      gh label create oc:stuck --repo "$R" --color B60205 --description "automatic review/fix recovery exhausted; needs a human decision" --force > /dev/null 2>&1 || true
-      gh pr edit "$n" --repo "$R" --add-label oc:stuck > /dev/null 2>&1 || true
-    fi
-    continue
-  fi
   if [ "$upd_age" -lt "$SETTLE_MIN" ]; then
     echo "  skip: a recent update is still propagating"
     continue
@@ -143,6 +164,14 @@ for i in $(seq 0 $((total - 1))); do
     continue
   fi
   acted=$((acted + 1))
+
+  # 復旧に失敗し続ける PR を延々と叩かない。同じ head への watchdog の差し戻しが WD_MAX 回、または
+  # review の自動再実行が尽きた (review-retry が 3 回) PR は oc:stuck を付けて止める (人の判断が要る)。
+  if { [ "$reason" != NOREVIEW ] && [ "$wd_n" -ge "$WD_MAX" ]; } || { [ "$reason" = NOREVIEW ] && [ "$retry_n" -ge 3 ]; }; then
+    echo "  STUCK: automatic recovery exhausted on ${head:0:7} (watchdog=$wd_n review-retry=$retry_n): labelled oc:stuck, no further action"
+    do_it "oc:stuck on #$n" mark_stuck "$n"
+    continue
+  fi
 
   case "$reason" in
     CONFLICT)
