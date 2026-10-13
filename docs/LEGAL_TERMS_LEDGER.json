@@ -1,0 +1,83 @@
+{
+  "docs": {
+    "fl-eula-html": {
+      "current": {
+        "chars": 33313,
+        "firstSeen": "2026-10-13",
+        "origin": "fl-win64:block24719_DATA.bin",
+        "sha256": "d9a00ad5984eca97607062c221244f5676d6b388942556875347abbdaa78cd7c",
+        "version": null
+      },
+      "firstSeen": "2026-10-13",
+      "history": [],
+      "lastChecked": "2026-10-13",
+      "pendingReview": false
+    },
+    "fl-tou-rtf": {
+      "current": {
+        "chars": 64633,
+        "firstSeen": "2026-10-13",
+        "origin": "fl-win64:block00029_DATA.bin",
+        "sha256": "607ad3c54b5ea1aab4ac79bac20f5f355a1e991e15da9f308356ae93ff7a9739",
+        "version": null
+      },
+      "firstSeen": "2026-10-13",
+      "history": [],
+      "lastChecked": "2026-10-13",
+      "pendingReview": false
+    },
+    "fl-tou-web": {
+      "current": {
+        "chars": 65263,
+        "firstSeen": "2026-10-13",
+        "origin": "https://www.image-line.com/image-line-software-eula",
+        "sha256": "750a88a1918fbe54a9d7879812ee0e336f740aae319c44b56962be23b7c2b4d2",
+        "version": null
+      },
+      "firstSeen": "2026-10-13",
+      "history": [],
+      "lastChecked": "2026-10-13",
+      "pendingReview": false
+    },
+    "kilohearts-eula": {
+      "current": {
+        "chars": 8920,
+        "firstSeen": "2026-10-13",
+        "origin": "https://kilohearts.com/resources/media_static/documents/eula.pdf",
+        "sha256": "60e06deacbfd615c71f573af3a2b457c077f03461e807588796af1bd87b72a6b",
+        "version": "2025-12-08"
+      },
+      "firstSeen": "2026-10-13",
+      "history": [],
+      "lastChecked": "2026-10-13",
+      "pendingReview": false
+    },
+    "ni-eula": {
+      "current": {
+        "chars": 10466,
+        "firstSeen": "2026-10-13",
+        "origin": "https://www.native-instruments.com/pages/end-user-license-agreement",
+        "sha256": "e080961c3ba885ed5387bfee1d1c4d5cce6aabcd8ea73dfd1e7ad7bb3fae5631",
+        "version": "2026-07-01"
+      },
+      "firstSeen": "2026-10-13",
+      "history": [],
+      "lastChecked": "2026-10-13",
+      "pendingReview": false
+    },
+    "slate-audiotonix-terms": {
+      "current": {
+        "chars": 47034,
+        "firstSeen": "2026-10-13",
+        "origin": "https://slatedigital.com/terms-of-service/",
+        "sha256": "0d29b197ffdd83793a1344ef2a1763fe0d2ddb7ad9edcf335e4a10ab0423ddec",
+        "version": null
+      },
+      "firstSeen": "2026-10-13",
+      "history": [],
+      "lastChecked": "2026-10-13",
+      "pendingReview": false
+    }
+  },
+  "schema": 1
+}

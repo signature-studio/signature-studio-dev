@@ -1,0 +1,85 @@
+[
+  {
+    "id": "fl-eula-html",
+    "vendor": "Image-Line",
+    "title": "IMAGE LINE SOFTWARE EULA (EULA.html、アプリ同梱)",
+    "kind": "fl-extracted",
+    "format": "html",
+    "match": { "headRegex": "<title>[^<]*IMAGE LINE SOFTWARE EULA" },
+    "mustContain": ["reverse engineer", "Cracked"],
+    "minChars": 20000,
+    "version": null
+  },
+  {
+    "id": "fl-tou-rtf",
+    "vendor": "Image-Line",
+    "title": "TERMS OF USE (license.rtf 相当、インストーラのライセンス画面)",
+    "kind": "fl-extracted",
+    "format": "rtf",
+    "match": { "headRegex": "^\\{\\\\rtf1", "containsRegex": ["TERMS OF USE", "Applicability", "Cracked"] },
+    "mustContain": ["reverse engineer", "Cracked"],
+    "minChars": 20000,
+    "version": null
+  },
+  {
+    "id": "fl-tou-web",
+    "vendor": "Image-Line",
+    "title": "Image Line Terms of Use (Web 公開版)",
+    "kind": "url",
+    "url": "https://www.image-line.com/image-line-software-eula",
+    "format": "html",
+    "start": "^\\s*Image Line Terms of Use\\s*$",
+    "mustContain": ["reverse engineer", "Cracked"],
+    "minChars": 20000,
+    "version": null
+  },
+  {
+    "id": "xfer-eula",
+    "vendor": "Xfer Records",
+    "title": "Xfer Records EULA (OTT / Serum 2 インストーラ同梱)",
+    "kind": "file",
+    "optional": true,
+    "pathEnv": "TERMS_WATCH_XFER_EULA",
+    "format": "text",
+    "note": "公開 Web 版が見つからない (xferrecords.com は /privacy_policy のみ)。インストーラ同梱の License.txt (Serum 2 mac pkg の Resources/License.txt 等) のパスを TERMS_WATCH_XFER_EULA に指定する",
+    "mustContain": ["Licensee", "reverse engineering"],
+    "minChars": 1000,
+    "version": null
+  },
+  {
+    "id": "kilohearts-eula",
+    "vendor": "Kilohearts",
+    "title": "END USER LICENSE AGREEMENT (eula.pdf)",
+    "kind": "url",
+    "url": "https://kilohearts.com/resources/media_static/documents/eula.pdf",
+    "format": "pdf",
+    "mustContain": ["KILOHEARTS", "reverse engineer"],
+    "minChars": 5000,
+    "version": "Last updated:\\s*(\\d{4}-\\d{2}-\\d{2})"
+  },
+  {
+    "id": "slate-audiotonix-terms",
+    "vendor": "Slate Digital / Audiotonix",
+    "title": "Audiotonix General Terms of Use",
+    "kind": "url",
+    "url": "https://slatedigital.com/terms-of-service/",
+    "format": "html",
+    "start": "^\\s*Audiotonix General Terms of Use\\s*$",
+    "mustContain": ["reverse engineer", "hosted service"],
+    "minChars": 20000,
+    "version": null
+  },
+  {
+    "id": "ni-eula",
+    "vendor": "Native Instruments",
+    "title": "End User License Agreement of NI (第三者ライセンス節を除く)",
+    "kind": "url",
+    "url": "https://www.native-instruments.com/pages/end-user-license-agreement",
+    "format": "html",
+    "start": "^\\s*END USER LICENSE AGREEMENT\\s*$",
+    "end": "^\\s*SOFTWARE LICENSE AGREEMENTS OF THIRD PARTIES\\s*$",
+    "mustContain": ["reverse engineer", "Licensee"],
+    "minChars": 10000,
+    "version": "Latest Version\\s+(\\d{4}-\\d{2}-\\d{2})"
+  }
+]
