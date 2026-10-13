@@ -1,6 +1,7 @@
 // FLEngine 模擬ホスト (PoC)。実装版では FLEngine wasm の export に置換される同一インタフェース:
 //   engine.call("mixer.getTrackName", [index, ...]) -> any
 // 返す number は整数なら int、実数なら float になる。整数値の float は F(x) で明示。
+import { createIlmcp } from "./ilmcp.mjs";
 const F = (v) => ({ t: "D", v });
 
 class FlError extends Error {
@@ -35,6 +36,9 @@ export function createMockEngine() {
 
   const impl = {
     "channels.channelCount": () => st.channels.length,
+    "channels.selectedChannel": (canBeNone = false, offset = 0) => st.selectedChannel + offset,
+    // 5 番目引数 useGlobalIndex は未モデル化 (index 0 のみを使う検査では差が出ない)
+    "channels.fillEachNSteps": (i, stride, offset, vel) => { ch(i); for (let p = offset; p < 64; p += stride) ch(i).steps[p] = 1; },
     "channels.getChannelName": (i) => ch(i).name,
     "channels.setChannelName": (i, n) => { ch(i).name = n; },
     "channels.isChannelSelected": (i) => ch(i).sel,
@@ -97,14 +101,12 @@ export function createMockEngine() {
     "device.setHasMeters": () => { st.hasMeters = true; },
     "device.forwardMIDICC": (message, mode = 1) => { st.midiOut.push({ api: "forwardMIDICC", message, mode }); },
     "device.midiOutMsg": (...a) => { st.midiOut.push({ api: "midiOutMsg", args: a }); },
-    "ilmcp.getBrowserNames": (name, rec) => ({ name, items: ["Fruity Slicer", "3x Osc", "Sampler"].map((n) => `${name || ""}/${n}`) }),
-    "ilmcp.getHighlightNames": () => ["Toolbar: Show Piano roll", "Toolbar: Show playlist", "Toolbar: Show Mixer", "Toolbar: Show Channel Rack"],
-    "ilmcp.showHighlight": (item, name, caption, cb) => { st.highlight = { item, name, caption, cb }; return true; },
-    "ilmcp.addChannel": (plugin) => { st.channels.push({ name: plugin, plugin, vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: false, fx: 0, steps: new Array(64).fill(0) }); return st.channels.length - 1; },
-    "ilmcp.removeChannel": (i) => { st.channels.splice(i, 1); },
-    "ilmcp.addEffect": (plugin, track, slot) => { tr(track).slots[slot] = plugin; return true; },
-    "ilmcp.storePRScript": (name, src) => { st.prScripts[name] = src; return true; },
-    "ilmcp.runPRScript": (src) => { st.log.push(["runPRScript", src.length]); return true; },
+    ...createIlmcp(st, {
+      RANGE,
+      INVALID: (m) => new FlError(m, 1),
+      makeChannel: (plugin) => ({ name: plugin, plugin, vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: false, fx: 0, steps: new Array(64).fill(0) }),
+      nMixer: st.mixer.length,
+    }),
   };
 
   const record = [];
