@@ -229,7 +229,7 @@ def main():
                                      win_unique_total=len(wsha), mac_unique_total=len(msha),
                                      win_only_bytes=sum(wsha[s]['size'] for s in set(wsha) - common),
                                      mac_only_bytes=sum(msha[s]['size'] for s in set(msha) - common))
-    json.dump(out, open(os.path.join(HERE, 'summary.json'), 'w'), indent=1, ensure_ascii=False)
+    json.dump(out, open(os.environ.get('INVENTORY_SUMMARY_OUT') or os.path.join(HERE, 'summary.json'), 'w'), indent=1, ensure_ascii=False)
     for k in ('win', 'mac'):
         s = out[k]
         print(k, s['files'], 'files', s['bytes'], 'B; unique', s['unique_content_files'], s['unique_content_bytes'],

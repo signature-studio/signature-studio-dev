@@ -129,11 +129,13 @@ pathreg 既定マウント表の `/c/home`・`/c/tmp` 写像先を実装)。本 
   集計 (files / bytes): T0 142→137 / 2212908→1869977、T0p 258→253 / 5595646→5676790、T1 1700→1704 / 76414481→70394241、T2 24990→24996 / 1001026635→1007308662。X-* は無変更。
 - **ネガティブコントロール**: (a) 期待表の #2 の新 tier を壊す → 検査 exit 1 (期待どおり検出)。(b) 規則 `Help/*.scr` を T1 に戻して再生成 → 検査 exit 1 (差分 22 件・期待 24 件) かつ再生成物がコミットと不一致 (`git diff --exit-code` exit 1)。
 - **再現性**: 変更前の規則で再生成した `bootset.json` は旧ファイルとバイト一致 (入力の素材が同一であることの確認)。コミット済み HEAD 4c8f034 で n=3: 再生成 + 検査 + ネガコン + 生成物一致 2.94–2.98 秒 / load average 1.44–1.52 / 並列 1、全回 exit (検査 0・ネガコン 1・生成物差分 0)。
-- **Actions 向け修正**: `inventory/mk_inputs.py` を新設 (素材に無い `block_manifest.json` / `pe_metadata.json` を `extracted/` から再構成。PE 313 件 / x86 55 件)。`inventory.py` / `strings_scan.py` / `e2e.sh` は `FL_WIN64_DIR` を読む。`e2e.sh` に検査・ネガコン・生成物一致を追加 (いずれも不合格なら exit 1)。
+- **Actions 向け修正** (素材 `fl-win64` = installer + `extracted/` のみの環境): `block_manifest.json` / `pe_metadata.json` が素材に無いので `e2e.sh` が再構成する。`startup/loadpaths/mk_manifest.py` が `{idx, payload_off}` を作り (`recover_paths.py` の入力)、`inventory/mk_inputs.py <extracted> <out> <offsets.json>` が `{idx, path, kind, dsize, payload_off}` 入りの manifest と `pe_metadata.json` (PE 313 件 / x86 55 件) を作る (`recover_paths.py` と `inventory.py` の両方の入力)。`inventory.py` / `strings_scan.py` は `FL_WIN64_DIR` を読み、この経路では `inventory.py` の `summary.json` を `INVENTORY_SUMMARY_OUT` で `work/` に逃がす (tracked の `inventory/summary.json` を汚さない)。`e2e.sh` に検査・ネガコン・生成物一致を追加 (いずれも不合格なら exit 1)。
+- **変更前の bootset.json**: 検査の入力は `bootset/bootset.pre592.json` (8f55002 の `bootset.json` と同一内容の固定ファイル)。`git show 8f55002:...` に依存しないので shallow clone でも動く。
+- **クリーン work/ からの実測** (コミット済み HEAD で再実行。`work/` を空にして素材 `fl-win64` のみ・`tsc` の手前まで = mk_manifest → mk_inputs → recover_paths → inventory → strings_scan → classify → 差分検査 → ネガコン → 生成物一致): n=3 で 12.34–12.76 秒 / load average 0.88–0.94 / 並列 1 / 全回 exit 0。以降は `tsc` が main 時点の既存不具合 (#637) で止まる (`node_modules/.bin/tsc` が無い環境では exit 127) ため、`pack` 以降 (node-test / browser-test / emscripten-test / asset-e2e) はこの経路では未到達。実行後の作業ツリーは clean (tracked ファイルの変更なし)。
 - **既存 e2e の維持 (この run で実行できた範囲)**: `node test/node-test.ts` 15 項目 ALL PASS (1.38 秒) / `node test/browser-test.ts` 17 項目 ALL PASS (3.72 秒、Chrome)。pack は bootset の tier を入力にするため `work/pkg-small` を再生成して実行。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | `e2e.sh` の `emscripten-test.ts` を未実行 (`toolchain-emsdk` 未取得) | 受入条件 2 (既存 e2e 維持) の一部が未検証 | #592 (`oc_artifacts: fl-win64 toolchain-emsdk` で再実行) |
 | `e2e.sh` の `asset-e2e.ts` を未実行 (`tools/perf/work/huge/k100.wasm` が許可素材に無い) | 同上 (tier 規則は触らないため影響は小さい。推定) | #592 (素材の置き場の確認は PM) |
-| `tsc -p tsconfig.json --noEmit` が main 時点で exit 1 (`../../shared/paths.mjs` の型宣言なし・esbuild の解決不可) | `e2e.sh` が tsc で止まる (本 PR 由来ではない。origin/main の clean worktree で同じ 4 件を確認) | 新規子チケット (PM) |
+| `tsc -p tsconfig.json --noEmit` が main 時点で exit 1 (`../../shared/paths.mjs` の型宣言なし・esbuild の解決不可) | `e2e.sh` が tsc で止まる (本 PR 由来ではない。origin/main の clean worktree で同じ 4 件を確認) | #637 [CI-12] |

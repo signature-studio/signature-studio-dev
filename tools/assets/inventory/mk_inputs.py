@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """fl-win64 素材 (extracted/ のみ) から inventory.py の入力 block_manifest.json / pe_metadata.json を再構成する。
 
-Usage: mk_inputs.py <extracted_dir> <out_dir>
-  block_manifest.json: [{idx, path, kind, dsize}]  (kind = ファイル名の拡張子前の種別: PE/DATA/PNG/...)
+Usage: mk_inputs.py <extracted_dir> <out_dir> [<offsets.json>]
+  block_manifest.json: [{idx, path, kind, dsize, payload_off}]  (kind = ファイル名の拡張子前の種別: PE/DATA/PNG/...)
+    payload_off は <offsets.json> (startup/loadpaths/mk_manifest.py の出力 [{idx, payload_off}]) を渡したときだけ入る。
+    入ると recover_paths.py (payload_off を要求) と inventory.py (idx/kind/dsize を要求) の両方の入力になる
   pe_metadata.json:    [{file, machine}]           (PE ヘッダの Machine: 0x14c=x86, 0x8664=x64, それ以外は hex)
 """
 import json, os, re, struct, sys
 
 ext, out = sys.argv[1:3]
+offs = {o['idx']: o['payload_off'] for o in json.load(open(sys.argv[3]))} if len(sys.argv) > 3 else {}
 os.makedirs(out, exist_ok=True)
 man, pe = [], []
 for fn in sorted(os.listdir(ext)):
@@ -15,7 +18,11 @@ for fn in sorted(os.listdir(ext)):
     if not m:
         continue
     p = os.path.join(ext, fn)
-    man.append(dict(idx=int(m.group(1)), path=p, kind=m.group(2), dsize=os.path.getsize(p)))
+    idx = int(m.group(1))
+    ent = dict(idx=idx, path=p, kind=m.group(2), dsize=os.path.getsize(p))
+    if idx in offs:
+        ent['payload_off'] = offs[idx]
+    man.append(ent)
     if m.group(2) == 'PE':
         with open(p, 'rb') as f:
             h = f.read(4096)
