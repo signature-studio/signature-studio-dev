@@ -213,3 +213,10 @@ VEX-256 は 344 関数 189,611 B 中 **closure 内は 6 関数のみ** (Convolve
 - callee 5 関数 (`0x180fd62dc` `0x180fd6320` `0x180fb6ce0` `0x180fd648c` `0x180fbdef4`) を追加 decompile: 計 12 件 OK。ただし Ghidra 出力の `func_0x…` は未関数化アドレスのため、emcc の未解決は残る。
 - shim に `ushort` を追加 (機械的な型定義のみ)。128bit レーンと `rcpps` は未対応。
 - 突合・ablation・ネガコンは未実施。Stereo / Delay は未着手。
+
+#### 10-7c. #556 3 回目 run (callee 12 関数を converter の `also` に追加)
+- 素材: `plugins-kilohearts` の Windows Installer zip → payload.dat → windows.zip → HeartCore.core_64 を手で展開 (dmg 不要)。Ghidra 12.1.4 = GitHub release, sha256 `ddac49f9…d2db` 一致。emsdk 6.0.12 は `/opt/emsdk` で動作。
+- Ghidra 再 decompile: 13 関数 (Resonator + callee 12 + `0x180fe5dfc`) すべて OK。import 込み 17.8 s (n=1)。
+- `ghidra_to_c.py` の `resonator.also` に callee 12 件を追加 (commit 本 PR)。emcc は **依然失敗** (`-ferror-limit` 20 件で打ち切り)。前 run の 16 件から増えたのは callee を足した結果、新たな未解決 callee が見えたため。
+- 残る未解決 (emcc 出力): (a) V128 lane `_8_8_`/`_4_12_`/`_0_8_`、(b) `rcpps` 未実装 (`gen_simd.py` の `kh_rcp_exact` 系を移植すれば入る見込み。未検証)、(c) 引数なし呼出の `param_1` 不足、(d) 推移的な未関数化 callee `0x180fd6498`・`0x180fd662c`・`0x180fe5f40`・`0x180fd3144`、(e) `UNK_182280000` 未定義。
+- 突合・ablation・ネガコンは本 run でも未実施。Stereo / Delay は未着手。
