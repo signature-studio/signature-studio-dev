@@ -8,7 +8,7 @@
 - 受入条件 2 (独立 gate): `M11_OV_413060=1` で 413060 だけを C 転記版に切替。OFF/ON の survey 判定ラベルは 942 unit 全て一致。
 - 受入条件 3 (ネガコン): dest 観測 (§2) で既知変更 (b) `Q(dest)=p+0x40` が OFF と**指紋差と呼出し数差を作る** (感度あり)。
 
-測定 commit: **`9d8f6c3f`** (コードを変えた最後の commit。`git diff 9d8f6c3f HEAD -- tools/m11` は空)。
+測定 commit: **`9d8f6c3f`** (コードを変えた最後の commit)。以降の差分は本ファイル (REPORT_944.md) のみで、コードの差分は無い (`git diff 9d8f6c3f HEAD -- tools/m11 ':!tools/m11/trap_triage/REPORT_944.md'` は空)。
 
 ## 0. ベースラインと計測 gate
 
