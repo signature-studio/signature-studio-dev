@@ -61,7 +61,7 @@ Chrome Dedicated Worker で M=130 のオブジェクトを 1 Memory に畳み、
 ## 3. Chrome 実測 (受入条件: N=130 の駆動)
 
 `tools/perf/p15/chrome_shared.mjs --m 1,4,130 --reps 7 --blk 1000 --runs 3`。1 Worker 内で instance 1 本 (Memory 864 MiB)、M obj を畳み込み。条件×反復ごとに Chrome を新規起動。
-生データ: `tools/perf/p15/results/chrome_shared.jsonl` (9 行)。
+生データ: `tools/perf/p15/results/chrome_shared.jsonl` (10 行。下表の 9 行 + HEAD 再実行 1 行。HEAD 再実行は中央値の計算には含めていない)。
 
 | M | run | µs/block p50 [min–max] | RTF@44.1k / obj | load ms | setup ms | 署名 | renderer RSS 増分 MiB |
 |---|---|---|---|---|---|---|---|
@@ -74,6 +74,7 @@ Chrome Dedicated Worker で M=130 のオブジェクトを 1 Memory に畳み、
 | 130 | 0 | 140.56 [140.28–141.68] | 0.04843 | 14.24 | 998.8 | `6b1696f0` (130/130) | -150.5 |
 | 130 | 1 | 140.75 [140.47–141.28] | 0.04849 | 18.15 | 807.46 | `6b1696f0` (130/130) | -123.1 |
 | 130 | 2 | 139.73 [138.80–141.15] | 0.04814 | 11.17 | 789.91 | `6b1696f0` (130/130) | 368.5 |
+| 130 | HEAD 再実行 (`862ef65b`) | 139.02 [138.56–139.62] | 0.04790 | 11.13 | 779.63 | `6b1696f0` (130/130) | -152.2 |
 
 - M=130 の µs/block p50 の中央値は 140.56 µs (3 回の中央値)。M=1 の中央値は 138.50 µs。obj 数に依らず定常はほぼ平坦 (+1.5%)。
 - RTF は 1 obj あたり 0.0477〜0.0485 (128 サンプル/44.1 kHz 換算)。

@@ -7,9 +7,4 @@ window.probeWorkers = (k, max) => Promise.all(Array.from({ length: k }, () => ne
   w.onerror = (e) => rej(new Error('worker error ' + e.message));
   w.postMessage({ max });
 }))).then((rs) => ({ k, max, per_worker: rs.map((r) => r.ok), total_ok: rs.reduce((a, r) => a + r.ok, 0), errors: [...new Set(rs.map((r) => r.err).filter(Boolean))] }));
-// 親ページからの依頼 (iframe 経由 = 別 site = 別 renderer プロセス) に応答する。
-window.addEventListener('message', (ev) => {
-  if (!ev.data || ev.data.p15 !== 'probe') return;
-  window.probeWorkers(ev.data.k, ev.data.max).then((r) => ev.source.postMessage({ p15: 'reply', r }, ev.origin));
-});
 </script>
