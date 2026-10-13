@@ -173,6 +173,8 @@ reader が読む id の表は上のとおり (`h10_check.py` が dispatch tree �
 
 **検証・ネガコン**: `bash h10_e2e.sh` が probe を emcc でビルドして `test/nonascii.test.ts` (7 件) を走らせ、さらに `analysis/neg_nonascii.sh` が**複製に 1 箇所ずつ変異を入れて FAIL を確認** (対照: 無変異複製が PASS) — 生成器の ASCII ガード除去 / version 範囲の開放 / UTF-8 を latin1 で出力 / reader の v9 UTF-8 判定の無効化 / reader の ACP 無視 / shimx 既定 ACP を 932 に / `shimx_set_acp` を無効化、の **7 / 7 検出**。検出されないと e2e は非 0 で終わる。
 
+**実測 (検証起点 commit `9197a1c`、`$RUNNER_TEMP` の detached clean worktree、4 コア runner、fl-win64 + toolchain-emsdk 展開済み、並列数 1)**: `bash h10_e2e.sh` n = 3 → exit 0 × 3、wall **77.40–77.55 s** (77.40 / 77.55 / 77.54)、load average (1/5/15 分) 開始 0.46 0.34 0.16 → 終了 1.21 0.81 0.40。内訳は各回: PE 検査 62 PASS / 0 FAIL、FLEngine 15 / 0、evidence 19 / 0 (§6 と同値)、reader 模型 + 非 ASCII test **tests 17 / pass 17 / fail 0 / skipped 0** (§6 の 10 件 + 本件 7 件)、`neg_nonascii.sh` 7/7 検出 + 対照 PASS。`nfo` 側: typecheck エラー 0、`node --test test/*.test.ts` tests 40 / pass 36 / fail 0 / skipped 4 (skipped = 実機素材 `HAVE_FL` 無しの既存 4 件)、`SKIP_H4=1 bash nfo_e2e.sh` exit 0 (生成 5 entry・12 files・readerAccepted 5、回帰なし)。範囲外: FL 実機/FLEngine 上での version 9–12 chunk 受理 (上表の未解決 1 行目)。
+
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | FL 自身の reader (`fle:0xf46490`) が version 9–12 の chunk を受理するか (Wrapper は 5–12 を受理 [確])。FL は 213 を不透明な塊として Wrapper へ渡すと推定だが**未確認** | version 9–12 の opt-in を実機 FL で使う前に必要。既定 (version 8・ASCII) には影響なし | (a) #267 [HB-H4d] にコメント (boot 貫通後に実行検証) |
