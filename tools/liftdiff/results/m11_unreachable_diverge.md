@@ -1,7 +1,7 @@
 <!-- 自動生成: python3 tools/liftdiff/tests/trace_diverge_unreachable.py > tools/liftdiff/results/m11_unreachable_diverge.md (既定入力 = tools/liftdiff/work/m11/batch_closure.jsonl, tools/m11/work/boot_final3.ll, PE = $LD_M11_PE。cwd 非依存) (LD-7, #307) -->
 # m11 unreachable の native/wasm trace 分岐点 (LD-7, #307)
 
-対象 = 最初の wasm_trap case が unreachable の関数 **220** (batch jsonl 7421 行)。うち trace_head 内で食い違いを観測した **212**、trace_head が native/wasm で完全一致し食い違い未観測 **8** (分岐点集計から除外、§3)。
+対象 = 最初の wasm_trap case が unreachable の関数 **220** (batch jsonl 7421 行)。うち trace_head 内で食い違いを観測した **212**、trace_head が native/wasm で完全一致し食い違い未観測 **8** (分岐点集計から除外、§4)。
 trace_head (関数入口 VA 列、最大 12 件) を native/wasm で先頭から比較し、最初に食い違う直前の関数 L を求める。
 
 ## 1. 最後の共通 entry L ごとの件数
@@ -48,7 +48,23 @@ trace_head (関数入口 VA 列、最大 12 件) を native/wasm で先頭から
 候補条件 = メモリ間接 call を持ち、かつ IR の call 数 ≤ 機械語の直接 call 先 (distinct) 数。該当 L の件数: **86 / 212** (分母 = 食い違い観測 212)。
 call site / block は対応づけていない (直接 call の脱落や重複 call の集約でも成立しうる) ため **D15 型の確定ではなく候補**。
 
-## 2. 分岐 (L, native 次, wasm 次) 上位
+## 2. 分岐の型 (LD-17 / #864)
+
+§1 の D15 型候補を先に除き、残りを排他的に分類する (上から順に判定)。L の直接 call 先 = 機械語の直接 call 先集合 d。
+
+| 型 | 件数 | 上位 L (件数) |
+|---|---:|---|
+| A: D15 型候補 (§1) | 86 | 0x410320 (82), 0x40f9e0 (2), 0x1253610 (1) |
+| B: L が leaf (ret まで call 無し・tail jump 無し)。食い違いは L の戻り後の呼出元で起きる (推定。根拠: 下記 tail jump 検出) | 34 | 0x40a3d0 (24), 0x40c660 (3), 0x12f9ed0 (3) |
+| C: L の直接 call 先で分岐 (native/wasm の次 entry のどちらかが d に含まれる) | 67 | 0x417b70 (32), 0x476c30 (8), 0x462ed0 (3) |
+| D: L の直接 call 先に含まれない分岐 (未特定) | 25 | 0x418be0 (20), 0x407e20 (2), 0x409470 (1) |
+| E: trace_head 先頭から不一致 (L 無し) | 0 |  |
+
+型 B の根拠: 型 B の L 以外に、call 無し leaf のうち tail jump 先を持つ L は なし (これらは型 D に入る)。
+
+内訳の合計 = 食い違い観測 212。型 A 以外 (B+C+D) = 未特定の残り **126**。
+
+## 3. 分岐 (L, native 次, wasm 次) 上位
 
 | L | native 次 | wasm 次 | 件数 | 例 |
 |---|---|---|---:|---|
@@ -65,7 +81,7 @@ call site / block は対応づけていない (直接 call の脱落や重複 ca
 | 0x410320 | 0x409410 | 0x6503a0 | 4 | 0x66e010 |
 | 0x410320 | 0x409410 | 0x452960 | 3 | 0x95c600 |
 
-## 3. trace_head が完全一致で食い違い未観測の関数 (分岐点集計から除外)
+## 4. trace_head が完全一致で食い違い未観測の関数 (分岐点集計から除外)
 
 | native trace_len | wasm trace_len | 件数 | 備考 |
 |---:|---:|---:|---|
@@ -76,7 +92,7 @@ call site / block は対応づけていない (直接 call の脱落や重複 ca
 | 23 | 28 | 1 | trace_head 上限 12 で打切り (以降の食い違いは不明) |
 | 57 | 35 | 1 | trace_head 上限 12 で打切り (以降の食い違いは不明) |
 
-## 4. ネガティブコントロール (候補判定の検査)
+## 5. ネガティブコントロール (候補判定の検査)
 
 候補 L の IR に call を 1 行足すと、判定が外れることを確認する (IR 本文を文字列で書き換えて同じ関数で再判定)。
 

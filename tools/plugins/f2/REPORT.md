@@ -208,18 +208,17 @@ python3 tools/plugins/f2/xcheck_icall.py 18953 18975 18979 18982 18984 19005 190
 - **ネガコン**: waiver 無し (`--waivers` で空配列) → **FAIL (exit 1)、F1 missing=2 (19148)・missing=2 (19245)**。`attributed()` は raw IR に実在する VA (0x40ad30) を検出し、waiver の 4 site は raw IR に 0 件 (F4 不発 = waiver 有効)。
 - **残る前提 (未検証)**: waiver の reason は「通常制御フローからは到達不能と推定」まで。根拠は scope table の構造と raw IR に命令が無いことで、到達不能の証明ではない。「DSP 経路に例外を投げる箇所が無い」は未検証。例外が DSP 内で送出されれば pad が実行され、間接 call が翻訳されないまま動く (silent miscompile)。Delphi では `_RaiseExcept` 系 RTL helper や、整数除算 0 などのハードウェア例外 (SEH 経由で unwind) が pad を起動し得る。IAT 0 件の確認では不足。追跡 #529。
 
+### 7.7b #529 追補: 例外経路の一次スキャン
+
+- 結論: 直接 call の範囲では W の unwind 元になる trap は閉包内に無い。ただし未確認 3 項目が残り「無い」の証明ではない。実測表・判定・再現は付録 `REPORT_APPENDIX_529.md` §1。
+
 ### 7.8 未解決
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| waiver 4 site の「DSP 経路に例外を投げる箇所が無い」の確認 (受入条件の併記項目) | 未検証。例外が DSP 内で送出されると pad が実行され、waiver の前提が崩れる。閉包の call graph と `_RaiseExcept` 系 helper・trap 命令の到達性を機械的に確認する必要がある | #529 (PR は Refs #529。Closes は付けない) |
+| waiver 4 site の「DSP 経路に例外を投げる箇所が無い」の確認 (7.7b の 1〜3) | 未検証。W の間接 call と frontier 先の trap/raise が残る。例外が DSP 内で送出されると pad が実行され、waiver の前提が崩れる | #529 (PR は Refs #529。Closes は付けない) |
 
 ### 7.9 未解決 (§7.7 から継続)
-| 未解決 | 影響 | 起票先 |
-|---|---|---|
-| `icall_rewrite.py` の配置修正を OTT 素材で回帰していない (`icall_e2e.sh` の 89 scenario、`test_icall.py` pe 部) | 連続しない配置はバイト一致のはずだが未実測 | **#530** `[ICALL-7]` |
-| restored IR の wasm リンク・実行 (BLK、`__icall_dispatch` の VA→関数表、`ir_flatten --table`)、Host shim、差分試験 | 出口条件 (#199 手順 2〜4)。本 PR は IR 上の被覆まで | 既存 #195 / #196 / #197、#199 に残す |
-| `closure_stats.py` の leaf 定義: 復元後は `__icall_dispatch` 呼出しが外部呼出しになり leaf が減る (18953: 8 → 1)。ABI も `i64 f(void)` (引数は BLK 経由) | #515 の leaf 23 関数の選定は `PLUG_ICALL=0` (`f2_step1.sh`) の IR か機械語側 (`icall_summary.py`) を使うこと。native ms_abi との差分には BLK 経由の harness が要る | 既存 **#515** にコメント |
-| 18979 の waiver は手作業の到達不能推定 (前提: `[rbp+0x40]` が書換わらない) | 1 site。誤りなら F1 を隠す | waiver の `evidence` に根拠を残した。反証が出たら waiver を削除すれば FAIL に戻る (NC5) |
+未解決 4 件 (#530・#195〜#197・#515・18979 waiver の推定) の表は付録 `REPORT_APPENDIX_529.md` §2。
 
 ## 8. PLG-F2-3 (#515): leaf 23 関数の関数単位差分試験 → 付録
 

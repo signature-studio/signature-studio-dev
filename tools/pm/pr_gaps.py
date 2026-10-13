@@ -34,7 +34,7 @@ while True:
 
 active = []
 for s in ("in_progress", "queued", "pending", "waiting"):
-    active += json.loads(run("gh", "api", f"repos/{R}/actions/runs?status={s}&per_page=100"))["workflow_runs"]
+    active += [json.loads(l) for l in run("gh", "api", "--paginate", f"repos/{R}/actions/runs?status={s}&per_page=100", "--jq", ".workflow_runs[]").splitlines()]
 rev_sha = {r["head_sha"] for r in active if r["event"] == "pull_request"}
 fix_titles = {r["display_title"] for r in active if r["event"] in ("issue_comment", "workflow_dispatch")}
 

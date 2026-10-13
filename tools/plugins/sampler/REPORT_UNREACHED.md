@@ -101,7 +101,8 @@
 |---|---|---|---|
 | 対照 | `closure_unreached.py` (無改変) | rc 0 | **rc 0** ✓ |
 | NC1 | BFS の seed から (a) RVA32 の根を外す | U2 FAIL | **rc 1 (U2)** ✓ |
-| NC2 | BFS の辺から命令内即値を外す (即値辺を含む閉包 `make_edge3` の即値項を外す) | U6 FAIL | **rc 1 (U6)** ✓。 実データ (即値辺 0 件) では識別できないため、U6 (合成入力) で示す (§2f) |
+| NC2 | BFS の辺から命令内即値を外す (即値辺を含む閉包 `make_edge3` の即値項を外す) | U6 FAIL | **rc 1 (U6)** ✓。 実データ (即値辺 0 件) では識別できないため、U6 (合成入力) で示す (§2f)。 別案の合成入力 NC2a / NC2b は §2g |
+| NC2 (別案) | 合成入力 `nc2_imm_synth.py` で BFS から即値辺を外す (NC2b) | U2 FAIL | **rc 1 ✓** (§2g。 対照 NC2a は rc 0 ✓) |
 | NC3 | 排他分類の (c) に (a) を二重計上 | U4 FAIL | **rc 1 (U4)** ✓ |
 | NC4 | capstone 側の RVA32 集合に偽の値 0x7fffff01 を注入 | U1 FAIL | **rc 1 (U1)** ✓ |
 | NC5 対照 | `judge.py shells` (無改変 status_run.csv) | rc 0 | **rc 0** ✓ |
@@ -197,6 +198,33 @@ NC 実行後、`status_run.csv` は元の 8 行 (header + 7) に復元した。 
 | `unr_nega.sh` | elapsed 128 s、**rc 0**、`[unr_nega] OK`。 NC0〜NC8 全て期待どおり (NC2 = U6 FAIL rc 1) |
 
 **検証範囲 / 範囲外**: 範囲内は「即値辺の件数 (7 本別の実測)」と「即値辺の識別力 (合成入力の U6 と NC2)」。 範囲外: 実データに即値参照が現れた場合の閉包の正しさ (現データには無い)、wasm リンク、実行時の到達性、差分試験。 通過 ≠ 正しさ。
+
+## 2g. #879 別案: NC2 (即値辺の除去) の合成入力による識別力
+
+**結論 (先出し)**: 実データは即値辺が 0 件のため、NC2 は実データでは識別しない。 即値辺を持つ合成入力 (`nc2_imm_synth.py`) で識別力を示し、NC2 の合成検査 (NC2a / NC2b) を別案として併記した。 即値検査の識別力は、即値参照を持つ実データが出るまで実データ上では未確認のまま (§2d-3 の 0 件は 7 本とも確定)。
+
+**実測 (即値辺の件数、`closure_unreached.imm_capstone` の全 nonfw 本体。 commit `07894a58` の worktree で `unr_e2e.sh` 実行後)**
+
+| プラグイン | nonfw 関数 | 即値辺 imm_va | 即値辺 imm_rva |
+|---|--:|--:|--:|
+| FL Keys | 153 | 0 | 0 |
+| FPC | 801 | 0 | 0 |
+| Fruity Granulizer | 264 | 0 | 0 |
+| Fruity Slicer | 341 | 0 | 0 |
+| Fruity Slicer 2 | 498 | 0 | 0 |
+| Slicex | 1,172 | 0 | 0 |
+| Soundfont Player | 3,240 | 0 | 0 |
+
+**合成入力 (`sampler/nc2_imm_synth.py`)**: 関数 4 件 (E `0x1200` = total2、R `0x1000` = RVA32 表から載る根、F `0x1100`・G `0x1300` = outside)。 R は `mov eax, 0x1100` (imm_rva) と `mov rcx, 0x140001300` (imm_va) を持つ。 即値辺は va 1 / rva 1。
+
+| 入力 | 期待 | 実測 |
+|---|---|---|
+| NC2a 対照 (即値辺を BFS に含める) | U2 PASS、rc 0 | **rc 0**、total3 = 0x1000, 0x1100, 0x1200, 0x1300、漏れ 0・根の漏れ 0 |
+| NC2b BFS から即値辺を外す (`--drop-imm-bfs`) | U2 FAIL、rc 1 | **rc 1**、total3 = 0x1000, 0x1200、漏れ 2・根の漏れ 0 |
+
+**限界 (明記)**: 合成検査は `closure_unreached.py` の BFS と U2 の式を `nc2_imm_synth.py` に複製している。 実物の `main()` への変異ではない。 `imm_capstone` だけは実物を呼ぶ。 実データでの即値辺の識別は未確認。
+
+**検証 (commit `07894a58` を含む worktree、`unr_nega.sh`)**: rc 0、`[unr_nega] OK: 全ネガコンが期待通り`。 NC0〜NC8 (NC2a・NC2b を含む) すべて期待どおり。 `unr_e2e.sh` は前提生成込みで rc 0 (real 10 min 59 s、17:48:14 → 17:59:13 UTC)。 終了後の `uptime` は load average 1 分 0.21・5 分 3.64 (4 core)。 `count_imm_edges.py` は `work/` の生成物 (gitignore) で commit していない。
 
 ## 6c. 検証起点・取りこぼし確認
 
