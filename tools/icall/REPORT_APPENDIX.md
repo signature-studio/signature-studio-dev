@@ -107,23 +107,27 @@ python3 tools/icall/diff/rax_callers.py 1801a9a6c 1801c8cb8 1801c8c98
 - 範囲分割で落ちは減らない (CHUNKS=2 で 366 のまま)。仮説 A (RetDec の打ち切り回避) は**棄却**。
 - 補足 (DEFECTS 候補): RetDec は `0x128c320` 直前の関数を `data inside code section 0x128c281--0x128c320` と誤認し、`0x128c320` を 1 バイト関数にする。`NonRecursiveCFGBuilder` が `function_128c320` への edge を毎回捨てる警告 (5 件) が出る。本件の 366 落ちとの因果は未検証。
 
-### 12.1 ICALL-9 (#847): stub 呼出しが減る段の特定 (HEAD `f452bb79`)
+### 12.1 ICALL-9 (#847): stub 呼出しが減る段の特定 (HEAD `cc816715`)
 
-実測 (HEAD `5c7ed042` ではなく測定時 HEAD `f452bb79` の `measure_flengine_split.sh` を再実行, 117.96 s, load 0.63 開始 → 1.64 終了, 4 core): base 366 / c2 366 (§12 と一致)。
-再現手順 (検証 HEAD はコミット後に更新):
+検証 (本 HEAD `cc816715`, 本 run で実機再実行): `measure_flengine_split.sh` 151 s (load 0.14 → 1.57, 4 core) で base 366 / c2 366 (§12 と一致)。`sccp_stub_drop.py` 62 s で dump 709 本。素材は `fl-win64` の `block00031_PE.bin` と `toolchain-retdec` (`/opt/retdec/bin/retdec-decompiler`) を使用。表と `sccp_pairs.tsv` の数値は実 dump の値。未再計測は「stub を含む基本ブロック 114」のみ (`dumps.tsv` の集計対象外、前回測定の値)。
+再現手順:
 ```sh
 FL_WIN64_DIR=<fl-win64 展開先>/extracted bash tools/icall/measure_flengine_split.sh $OUT   # base/rw.dll・base/after.ranges を作る
 RETDEC_BIN=<RetDec>/bin/retdec-decompiler python3 tools/icall/sccp_stub_drop.py $OUT/base/rw.dll $OUT/base/after.ranges $OUT/sccp_stub_drop
 ```
-`sccp_stub_drop.py` は `--print-after-all` の全 dump (709 本) を読み、関数ごとに stub 数・IR 行数・基本ブロック (ラベル数)・`br i1 undef`・0x1dc0080 の load/store を `dumps.tsv` に出す。段名 (pass) ごとの合計は同じ実行が `passes.tsv` に出す (段の集計を手で足さない)。stub 数が変わった関数の直前・直後は `sccp_pairs.tsv`。`passes_stub_count.py` は段の変化点しか出さず、本節の行数・基本ブロック・`br i1 undef` は出さない。
+`sccp_stub_drop.py` は `--print-after-all` の全 dump (709 本) を読み、関数ごとに stub 数・IR 行数・基本ブロック (ラベル数)・`br i1 undef`・0x1dc0080 の load/store を `dumps.tsv` に出す (1 行 = 1 dump の 1 関数、`idx` は dump 番号)。`passes.tsv` は段名ごとの全 dump 合計 (例: SCCP は 8 dump 分の合計) で、下表の範囲集計とは別物。stub 数が変わった関数の直前・直後は `sccp_pairs.tsv`。`passes_stub_count.py` は段の変化点しか出さず、本節の行数・基本ブロック・`br i1 undef` は出さない。
 
-段ごとの実測 (`$OUT/sccp_stub_drop/passes.tsv` の値。関数 `function_1cc0000` / `function_1cc9b70` / `function_1cd3f30` / `function_1cd3fe0` の 4 関数が段ごとに 1 組ずつ出る):
+下表の値は `dumps.tsv` の dump idx 範囲の合計。列 4=stub, 5=行数, 6=基本ブロック, 7=`br i1 undef`。1 行で再現できる:
+```sh
+awk -F'\t' -v a=401 -v b=404 'NR>1 && $1>=a && $1<=b {s+=$4; l+=$5; n+=$6; u+=$7} END{print s,l,n,u}' $OUT/sccp_stub_drop/dumps.tsv
+```
+(a/b を変える。下表 3 行は 401–404 / 405–408 / 629–632。対象の 4 関数は `function_1cc0000` / `function_1cc9b70` / `function_1cd3f30` / `function_1cd3fe0`。)
 
-| 段 (dump 名) | stub 呼出し (関数合計) | 関数 IR 行数 (4 関数) | 基本ブロック | `br i1 undef` |
-|---|--:|--:|--:|--:|
-| `Global Value Numbering` (SCCP の直前, dump idx 401–404) | 377 (183 + 192 + 1 + 1) | 16,380 | 621 | 0 |
-| `Sparse Conditional Constant Propagation` (idx 405–408) | **11** (0 + 9 + 1 + 1) | 4,256 | 621 | **322** |
-| `Strip Unused Function Prototypes` 以降 (dump idx 625–632 の組) | 11 | 1,828 | 60 | 0 |
+| 段 (dump 名) | dump idx | stub 呼出し (関数合計) | 関数 IR 行数 (4 関数) | 基本ブロック | `br i1 undef` |
+|---|---|--:|--:|--:|--:|
+| `Global Value Numbering` (SCCP の直前) | 401–404 | 377 (183 + 192 + 1 + 1) | 16,380 | 621 | 0 |
+| `Sparse Conditional Constant Propagation` | 405–408 | **11** (0 + 9 + 1 + 1) | 4,256 | 621 | **322** |
+| 2 回目の `Sparse Conditional Constant Propagation` (直前は 2 回目の GVN, idx 625–628) | 629–632 | 11 (0 + 9 + 1 + 1) | 1,828 | 60 | 0 |
 
 - **減る段は SCCP の 1 段** (SCCP の前後の段で stub 数が 377 → 11 に変わるのは SCCP のみ)。377 − 11 = 366 は落ちた site 数と一致する。ただし site と stub の対応は未確認 (算術の一致のみ)。
 - 関数単位 (`sccp_pairs.tsv`): `function_1cc0000` は stub 183 → 0・IR 7,943 → 1,884 行・基本ブロック 303 → 303 (ラベル数は不変)・`br i1 undef` 0 → 161。`function_1cc9b70` は stub 192 → 9・IR 8,380 → 2,315 行・`br i1 undef` 0 → 161。
