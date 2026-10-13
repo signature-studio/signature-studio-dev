@@ -10,7 +10,7 @@
 
 | 項目 | 値 |
 |---|--:|
-| wall | 96 s (b01cd70 で再実行、emcc 増分込み) |
+| wall | 30 s (HEAD a6b58d7e = main `97f28539` を merge した状態。emcc 増分ビルド済みで実測。初回 96 s は emcc 込み。load avg 0.54/0.65/0.42) |
 | reached_stage | 4/6 (不変) |
 | units_run (通常起動) | 53 (※ 前回記録 17 から変化。IR 再生成後の値) |
 | survey ok | **870** |
