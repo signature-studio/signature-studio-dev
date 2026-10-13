@@ -1,5 +1,5 @@
 {
- "boot_dllmain_done": true,
+ "boot_dllmain_done": false,
  "hinstance": 0,
  "classes": [
   {
@@ -45,7 +45,7 @@
   }
  ],
  "abi": {
-  "gui_shared_ptr": 271662080,
+  "gui_shared_ptr": 271662144,
   "gui_shared_ptr_ge_0x10000": true,
   "screen_dc": "0x120000f",
   "screen_dc_in_31bit": true
@@ -54,7 +54,7 @@
   {
    "order": 1,
    "name": "LoadStringW",
-   "calls": 4,
+   "calls": 3,
    "kind": "IMPL",
    "prio": "1"
   },
@@ -101,5 +101,5 @@
    "prio": "0"
   }
  ],
- "icall_miss": 2
+ "icall_miss": 7
 }
