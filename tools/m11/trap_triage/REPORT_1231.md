@@ -1,13 +1,15 @@
-# #1231: M11_FIX_652500=1 時の unit 888 退行の再測定 (current main)
+# #1231: M11_FIX_652500=1 時の unit 888 退行の再測定 (測定 commit 2b2faf52)
+
+既知類型との関係: 該当なし (IR・build・harness の再測定で、`docs/DEFECTS.md` の類型は新規確定しない)。
 
 **判定: 退行は再現しなかった。** 受入条件 1 (VA 上限か論理差か) と 2 (survey 2 系統の食い違いの理由) は、比較対象の退行が存在しないため判定できない。**Refs #1231** (Closes しない)。
 
-親: #1019 (M11-N58) / 前提: PR #1018 (gate `M11_FIX_652500`)。REPORT_1019 §1 の退行 (888: ok → halt0) を、現 main で再測定した結果。
+親: #1019 (M11-N58) / 前提: PR #1018 (gate `M11_FIX_652500`)。REPORT_1019 §1 の退行 (888: ok → halt0) を、測定 commit `2b2faf52` で再測定した結果。
 
 ## 0. 測定環境
 
-- 測定 commit: `2b2faf52` (origin/main。本 PR はコード変更なし)。HEAD は本 PR の commit。
-- 素材: `fl-win64` は `$RUNNER_TEMP/fl-win64` に展開。`work-m11` / `work-liftdiff` は `tools/m11/work/`・`tools/liftdiff/work/` に展開。`toolchain-retdec` / `toolchain-emsdk` は既存の `/opt` を使用 (PATH・`/opt/retdec/bin`・`/opt/emsdk` で確認)。
+- 測定 commit: `2b2faf52` (本 PR head のコードが測った commit。PR head `26a1c481` までの `git diff 2b2faf52 HEAD -- tools/m11` はこの REPORT のみ = 差分 0 の証跡)。
+- 素材: `fl-win64` は `$RUNNER_TEMP/fl-win64` に展開。`work-m11` / `work-liftdiff` は `tools/m11/work/`・`tools/liftdiff/work/` に展開。`toolchain-retdec` / `toolchain-emsdk` は [OPT-TOOLS] 配下の [RETDEC]・[EMSDK] を使用 (PATH・[RETDEC] の bin・[EMSDK] で確認)。
 - `m11_gen_ir2.sh`: rc=0, 43 s, `ldfix=applied`, `ir_sha256=2c68ceae…` (2 回実行で同一)。
 - build (`m11_build.sh`): OFF rc=0 24.5 s / ON rc=0 18.5 s。load 1 分値 0.8 前後。
 - **注意**: `m11_build.sh` は build 時に qstore 後処理で `boot_final.ll` を書き換える (`qstore=applied`, `ir_sha256=16d1bae6…`)。REPORT_1019 の `ir_sha256=f5b27a23…` とは IR が一致しない。以下は qstore 適用版 (既定) と qstore 無効版 (`M11_QSTORE=0`) の両方で測った。
@@ -41,7 +43,7 @@
 
 ## 4. 結論
 
-- REPORT_1019 §1 の「888: ok → halt0 (ON)」は、現 main では再現しない (4 構成のいずれでも 888 は ok)。
+- REPORT_1019 §1 の「888: ok → halt0 (ON)」は、測定 commit `2b2faf52` (測定時点の main) では再現しない (4 構成のいずれでも 888 は ok)。
 - REPORT_1019 §2 の「survey 2 系統で 888 の判定が食い違う」も再現しない。両 survey とも 888 は ok。
 - 退行の原因が IR の差 (REPORT_1019 は `f5b27a23…`) か、その後の main の変更 (qstore・#1046 など) かは未確認。切り分けには REPORT_1019 時点の commit での再測定が要る。
 - 受入条件 1・2 は判定不能 (対象の退行が無い)。受入条件 3 (本 REPORT の記録) は本 PR で満たす。
@@ -50,6 +52,6 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| REPORT_1019 時点の commit で 888 退行を再現し、現 main との差分 (IR・qstore・#1046) を切り分ける | 退行の有無と原因の確定 | 本 issue #1231 のコメントで PM 判断 |
+| REPORT_1019 時点の commit で 888 退行を再現し、測定 commit `2b2faf52` との差分 (IR・qstore・#1046) を切り分ける | 退行の有無と原因の確定 | 本 issue #1231 のコメントで PM 判断 |
 | survey_units.mjs の OFF→ON 差 (unit 895 halt0→oob、qstore 有無で件数が変わる) | survey 数値の信頼性 | 本 issue の続きとして PM 判断 |
 | REPORT_1019 の受入条件 1・2 (unit 149 の原因特定、gate 既定 ON 化) | #1019 の残り | #1230 (M11-N75) |
