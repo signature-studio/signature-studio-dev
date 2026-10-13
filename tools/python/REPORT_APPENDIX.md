@@ -214,3 +214,25 @@ stubs (LGPL 参照) 署名との照合 (kwlist のある 103 のうち stubs 署
 | 回帰 | `smoke_direct` exit 0 / `poc_mcp` POC OK / `all_tools` 48/48 ok・host_calls 37,425 / `midi_script` 23 checks OK・`--neg` exit 1 |
 | NC 実測 | (a) 改変版 41 ノート vs oracle 39 ノート / (b) time 値列 [200,248,296,344] vs 期待 [203,251,299,347] (詳細は §15 の NC 段落) |
 | 副作用 | `all_tools` は tracked の `analysis/mcp/tool_coverage.json` を書き換える (実測 37,425 vs 保存値 37,424)。検証後に元の内容へ戻し、commit には含めない |
+
+## 15. 本 PR head の wasm 回帰 (検証 HEAD `a92cd53`、node v22.23.3、4 vCPU)
+
+§14 の wasm 数値 (`bdd2f7c`) は src が main 取り込みで変わったため、本 head で再計測した。`src/` は `53a013d` 以降不変で、`a70b4c8`→`a92cd53` は docs のみ。
+
+| 手順 (直列・前景) | 結果 | rc | 所要 |
+|---|---|---|---|
+| `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`FL_WIN64_DIR`) | `extracted/` 展開済み | 0 | 5.401 秒 |
+| `fetch_inputs.sh` | 完了 (mac pkg なしのため win64 DATA から取得) | 0 | 0.282 秒 |
+| `build_cpython_wasm.sh` | `python.wasm` 生成 | 0 | 4 分 03.8 秒 |
+| `build_flpy.sh` | `flpy.wasm` 生成 | 0 | 7.037 秒 |
+| `provider/build.sh` | `flprov.wasm` 生成 | 0 | 1.214 秒 |
+| `tests/provider_check.mjs` | PASS (functions 435・implemented 60) | 0 | 0.924 秒 |
+| `tests/all_tools.mjs` (JS mock) | 48/48 ok・host_calls 37,425・callback_roundtrip true | 0 | 3.194 秒 |
+| `FL_ENGINE=wasm tests/all_tools.mjs` | 48/48 ok・host_calls 37,425・callback_roundtrip true | 0 | 3.277 秒 |
+| `tests/kwsig_bind_check.py` | PASS (103 関数・6122 ケース、misbind 0・mismatch 0) | 0 | 0.238 秒 |
+| `tests/mcp_kwcalls_bind.py` (`src` と `analysis/mcp` の calls.json を引数指定) | 14/14 PASS | 0 | — |
+| 同 `--neg` (不合格 1 件を追加) | distinct 15: pass 14, fail 1 → FAIL | 1 | — |
+
+- 実行後の `git status` は空 (`tool_coverage.json` の書き換えなし)。生成物 (`work/`・`dist/`) は gitignore 対象。
+- 差分の手順は `run_all.sh` の step 1・2・5・9b を個別に実行したもの。`run_all.sh` 全体は step 4 の固定パス (#630) のため使えない。
+- 範囲外 (未実行): `mcp_ui_check.mjs` / `midi_ui_check.mjs` (Vite が要る)、`browser_check.mjs`・`midi_script.mjs` 等の §14 記載分は本 head では再計測していない。
