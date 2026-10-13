@@ -216,11 +216,11 @@ FLE 側 case 別応答値の**意味論**は未解析 (FL 本体の case 分岐�
   - smoke ×3: 137 / 135 / 132 ms (n=3・min–max 132–137 ms) / `dispatch=38 units_done=0 va=1 heap=1 ff=0`
   - wasm 15,062,176 B (参照 HEAD 15,061,227 B。HEAD ツリーでは `--size` 未指定のため照合は未実施)
   - 結果: `ALL PASS (e2e + smoke ×3 同値)`
-- **この fix run での再現: 未実施**。`$ARTIFACTS_DIR` は `fl-win64.tar.zst` のみ (`ls` 実測)。`work-fw-stage1` 未展開・`[EMSDK]` (`/opt/emsdk`)・`[RETDEC]` (`/opt/retdec`) とも無いため e2e は実行不能。上の実測値は実装 run の記録であり、独立再現ではない。
+- **この fix run での再現: 未実施**。`$ARTIFACTS_DIR` は `fl-win64.tar.zst` のみ (`ls` 実測)。`work-fw-stage1` 未展開・`[EMSDK]`・`[RETDEC]` (`docs/REFERENCES.md`) とも無いため e2e は実行不能。上の実測値は実装 run の記録であり、独立再現ではない。
 - `clang -x ir -c` 回帰ガードの実測 (この fix run・clang 18.1.3): 不正 trunc (i64→i128) exit=1 / 未定義値 `%nope` exit=1 / SSA 再定義 exit=1 / 正しい IR exit=0。
 - 未解決 (起票先):
   - 上記 e2e の独立再現 (stage-1 素材と emsdk が揃う run) → #195 残部
-  - `fw_stage2.sh` が `[EMSDK]`・`[RETDEC]` を絶対パスで参照 → #270
+  - `fw_stage2.sh` が `[EMSDK]`・`[RETDEC]` を固定パスで参照 → #270
   - bit-exact 比較 (RTL fold deref 解消後) → #195 残部
 
 ---
