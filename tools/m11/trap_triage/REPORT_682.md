@@ -117,11 +117,12 @@ IR (boot_final3.ll 行 176793 以降) は `%13 = arg1 + 8*Count` (= `rbx + rdi*8
 | 計装 build の ok が 870 (通常 868)、oom 内訳が配置依存 | 計装の透過性は ok/trap 単位で 2 unit ぶれる | PM 判断 (計装は診断専用) |
 | 16.23 秒の外れ値 (survey n=3) の原因 | 計測の信頼性 | 未確認 |
 | 596 の入口 probe 結論 (書込み元の未特定、窓 410360〜536c20) の訂正 | 596 REPORT の §3 は本件で解消 | #596 にコメント (PM) |
+| `m11_e2e.sh` の PE 固定パス (`/home/ubuntu/...`) と合否に使えない exit 0 固定 (§11) | e2e 単体で合否判定できない。本 run は PE 行を差し替えて実行 | 新規 M11 子チケット (PM 起票) |
 
 ## 8. 検証範囲 / 範囲外
 
 - 範囲内: 通常 build の survey 全 942 unit、5 unit の個別ラベル、unit 45/144 の chain 観測、store 計装 (全 store)、ネガコン (転記の on/off)。
-- 範囲外: `m11_e2e.sh` 全体の実行 (PE の固定パス `/home/ubuntu/work/analysis/win64/extracted/` が無く、`m11_e2e.sh` は前提不足で即終了する。代わりに `m11_build.sh` と `m11_survey.mjs` を直接実行)。gen_ir2 (ldfix/qstore の再実行) は未実施 (work/ の既存 IR を使用)。`m11_e2e.sh` の stamp (`*_lb_base.stamp`) が snapshot に無かったため `0` を書いて補った。
+- 範囲外: gen_ir2 (ldfix/qstore の再実行) は未実施 (work/ の既存 IR を使用)。`m11_e2e.sh` の stamp (`*_lb_base.stamp`) が snapshot に無かったため `0` を書いて補った。`m11_e2e.sh` の全体実行は §11 (PE の固定パスだけ差し替え)。
 - 計装 build は診断専用 (`store_watch_682.sh` が終了時に通常 build へ復元)。
 - 修復の影響範囲: 47b260 の 25 call site 全て。survey の 942 unit では回帰 0。
 
