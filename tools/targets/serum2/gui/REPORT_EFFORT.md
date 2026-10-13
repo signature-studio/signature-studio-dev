@@ -12,7 +12,7 @@
 | (b) で upstream をそのまま使える view | 12 種 / 223 参照 (`CViewContainer` `CTextLabel` `CView` `CControl` 等) |
 | sub-controller | 61 種 / 159 参照。**upstream 宣言は 0 件** (全て Xfer 固有) |
 | template の依存 | 123 件のうち、Xfer 固有 class も sub-controller も無いのは **3 件** (`ArpBrowser` `ClipBrowser` `Empty`)。**120 件が Xfer 側の置換を要する** |
-| (a) 全 lift の対象 | GUI closure 7,138 関数 / 4.21 MB (`gui/REPORT.md` §5-1 の保存値と一致) |
+| (a) 全 lift の対象 | GUI closure 7,138 関数 / 4.21 MB (`gui/REPORT.md` §5-1 の保存値と一致。ただし静的・過大近似の値) |
 | 判定 | 推奨 (b) は**維持**。ただし (b) の置換対象は「Xfer 固有 87 種の差し替え」ではなく「uidesc の 91 種 + sub-controller 61 種」で、想定より広い |
 
 ## 1. 再現手順と入力確認
