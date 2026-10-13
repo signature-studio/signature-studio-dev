@@ -8,6 +8,58 @@ import sys
 
 CT = {'i128': 'u128', 'i64': 'u64', 'i32': 'u32', 'i16': 'unsigned short', 'i8': 'u8', 'float': 'float', 'double': 'double', 'void': 'void', 'ptr': 'void*'}
 
+# ---- Win32 named import shim (snapins/lift/gen_stubs_sigs.py から移植・#710)。レジスタグローバル ABI: 引数 rcx/rdx/r8..., 戻り rax。
+# 割当アドレス KH_HEAP (0x05000000, 1MB) は arena(0x04000000..0x04800000) の直後で wasm リニアメモリ内。
+# カーソルは static 変数に持つ (arena の operator new 域 0x04000100.. と重ならない・#710 review)。
+# TlsGetValue / FlsGetValue の返却値 KH_TLS は KH_HEAP_END 直後の未使用域 (arena・heap・cave と非重複)。
+HEAP_C = r'''
+#include <stdlib.h>
+#define KH_HEAP 0x05000000ULL
+#define KH_HEAP_END (0x05000000ULL + 0x100000ULL)
+#define KH_TLS 0x05200000ULL
+static u64 kh_cursor = 0;
+static u64 kh_heap_alloc(u64 bytes) {
+  u64 cur = kh_cursor;
+  if (cur == 0) cur = KH_HEAP + 16;
+  u64 a = (cur + 15) & ~(u64)15;
+  if (bytes > KH_HEAP_END - KH_HEAP) return 0;
+  u64 n = (bytes + 15) & ~(u64)15;
+  if (a + n > KH_HEAP_END) return 0;
+  unsigned char* m = (unsigned char*)(unsigned int)a;
+  for (u64 i = 0; i < n; i++) m[i] = 0;
+  kh_cursor = a + n;
+  return a;
+}
+'''
+
+# emscripten libc と名前が重なる named import は abort stub にすると libc を上書きする。到達したら生成段で止める。
+LIBC_NAMES = {'memcpy', 'memmove', 'memset', 'memcmp', 'strlen', 'strcmp', 'strncmp', 'strcpy', 'strncpy', 'strcat',
+              'malloc', 'calloc', 'realloc', 'free', 'abort', 'exit', 'atexit', 'printf', 'sprintf', 'puts', 'qsort',
+              'sqrt', 'floor', 'ceil', 'fabs', 'pow', 'exp', 'log', 'sin', 'cos', 'modf', 'fmod'}
+
+IMP_SHIM = {
+    'HeapAlloc': 'rax = kh_heap_alloc(r8);',
+    'HeapFree': 'rax = 1;',
+    'GetProcessHeap': 'rax = 1;',
+    'GetLastError': 'rax = 0;',
+    'SetLastError': 'rax = 0;',
+    'EnterCriticalSection': 'rax = 0;',
+    'LeaveCriticalSection': 'rax = 0;',
+    'InitializeCriticalSection': 'rax = 0;',
+    'InitializeCriticalSectionAndSpinCount': 'rax = 1;',
+    'InitializeCriticalSectionEx': 'rax = 1;',
+    'DeleteCriticalSection': 'rax = 0;',
+    'IsProcessorFeaturePresent': 'rax = 1;',
+    'IsDebuggerPresent': 'rax = 0;',
+    'GetCurrentProcess': 'rax = 0xffffffffffffffffULL;',
+    'GetCurrentProcessId': 'rax = 1234;',
+    'GetCurrentThreadId': 'rax = 1;',
+    'TlsGetValue': 'rax = KH_TLS;',
+    'FlsGetValue': 'rax = KH_TLS;',
+    'FlsSetValue': 'rax = 1;',
+    'RaiseException': 'rax = 1;',
+}
+
 
 def main():
     src, stubs, sigs = sys.argv[1:4]
@@ -49,6 +101,23 @@ def main():
                   ' else { u32 m = (1U << r) - 1; res = (b & m) ? 0xffff : 0; b &= ~m; memcpy(p, &b, 4); } } rax = res; }')
     if shims:
         out.append('extern u64 rax, rcx, rdx, r8;')
+    # ---- named import (Win32/CRT) の使用確認 → shim または fail-fast stub (レジスタグローバル ABI)
+    body = '\n'.join(x for x in text if not x.startswith('declare '))
+    local = {m.group(1) for m in (re.match(r'^define\b[^@]*@([A-Za-z]\w*)\(', x) for x in text) if m}
+    used_names = sorted({n for n in re.findall(r'@([A-Za-z][\w]*)\(', body)
+                         if not n.startswith(('function_', 'kh_', 'llvm', 'global_var')) and n not in local})
+    clash = [n for n in used_names if n in LIBC_NAMES]
+    if clash:
+        sys.exit('gen_stubs_sigs: named import が libc/CRT 名と衝突 (abort stub が libc を上書きする): %s。shim 化か除外が必要' % ', '.join(clash))
+    if used_names:
+        out.append(HEAP_C)
+        out.append('extern u64 rax, rcx, rdx, r8, r9;')
+    for n in used_names:
+        if n in IMP_SHIM:
+            out.append('EMSCRIPTEN_KEEPALIVE u64 %s(void) { %s return rax; }' % (n, IMP_SHIM[n]))
+        else:
+            out.append('EMSCRIPTEN_KEEPALIVE u64 %s(void) { abort(); return 0; }   /* Win32 import: fail-fast (到達したら fuzz が検出) */' % n)
+        nstub += 1
     for l in text:
         m = re.match(r'^declare (\S+) @function_([0-9a-f]+)\(([^)]*)\)', l)
         if m and m.group(2) in shims and m.group(2) not in defined:
