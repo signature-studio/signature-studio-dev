@@ -246,7 +246,5 @@ for p in "vstgui4_14_0 vstgui4_14_1" "vstgui4_14_1 vstgui4_14_2" "vstgui4_14_2 v
 done
 ```
 
-- 照合段の出力は「段 | バイナリ内の出現数 | リテラル」。`grep -o -a -F | wc -l` は出現回数を数える (`grep -c` は行数で、バイナリでは出現数と一致しないため使わない)。表の「バイナリ内の出現」列はこの出現数と一致させる。
-- 前提: `work/Serum2_win64.vst3` は §9-1 の手順 (`plugins-serum2` の展開と `7z` 抽出) で用意する。`work/vstgui4` は §9-1 の clone。
-- 本 run の照合: **未実施** (素材 `plugins-serum2` が `$ARTIFACTS_DIR` に無く、`work/` が無いため)。上表の出現数は前 run の値。
-- 所要 (real, 逐次): `vstgui_version.py` 1.80 s。差分 3 段と照合は未計測 (load 未計測)。
+- 前提: `work/Serum2_win64.vst3` と `work/vstgui4` は §9-1 で用意。照合の出力は「段 | 出現数 | リテラル」で、表の「バイナリ内の出現」列と一致させる (`grep -c` は行数なので使わない)。
+- 本 run の照合: **未実施** (`plugins-serum2` 不在・`work/` 無し)。上表の出現数は前 run の値。所要・load は未計測。
