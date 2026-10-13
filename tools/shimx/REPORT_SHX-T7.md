@@ -127,6 +127,6 @@
 | HeartCore Gate | 同上 | 0 | 0 / 0 | 0 | **0** | 7.0 s |
 
 - 正規化前の mismatch も全件 0 で、adapter は 0 件。今回の IR では署名の揺れが発生していない。
-- **注意 1 (手作業の前処理)**: Gain (HeartCore) の RetDec 出力は `function_18004cf20` の `declare` が同一内容で 2 回出ており、`emcc` が `invalid redefinition` で落ちた。同一行の 2 つ目を除く (awk で完全一致行のみ) ことで解消した。これは既存の lift パイプライン (`ir5_patch` / `kh_lower`) に無い手作業であり、恒常化するなら該当 pass への組み込みが必要 (未起票・下記)。
+- **注意 1 (手作業の前処理)**: Gain (HeartCore) の RetDec 出力は `function_18004cf20` の `declare` が同一内容で 2 回出ており、`emcc` が `invalid redefinition` で落ちた。同一行の 2 つ目を除く (awk で完全一致行のみ) ことで解消した。これは既存の lift パイプライン (`ir5_patch` / `kh_lower`) に無い手作業であり、恒常化するなら該当 pass への組み込みが必要 (#1170 の受入条件 5 項目目に起票済み)。
 - **注意 2**: Fresh Air gain は `gain_e2e.sh` 同様の修復 pass (`fa_fix_gain`) を通した IR で検証した。修復前の生 RetDec IR は `emcc` で 'linking' 段が失敗するため、gate の対象は修復後 IR。
-- **未実測 (受入条件の残り)**: SlateCore / HeartCore の snap-in 残り (Kilohearts 42 効果のうち gain・matrix・haas・clipper・gate 以外、SlateCore の他 snap-in) は本節では未実測。`sig_test.sh` ALL PASS は HEAD cf0a08bf で再現した (25 s, load 0.77→0.85)。。
+- **未実測 (受入条件の残り)**: SlateCore / HeartCore の snap-in 残り (Kilohearts 42 効果のうち gain・matrix・haas・clipper・gate 以外、SlateCore の他 snap-in) は本節では未実測 (#1170 に起票済み)。`sig_test.sh` ALL PASS は HEAD cf0a08bf で再現した (25 s, load 0.77→0.85)。
