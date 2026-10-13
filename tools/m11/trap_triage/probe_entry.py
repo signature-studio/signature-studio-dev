@@ -4,7 +4,7 @@
   生成: <out>/boot_probe.ll (IR) と <out>/probe.c (m11_pe: stderr に `[pe] <fn> a1 a2 a3 a4 | q(a1) q(a2)` を出す)
   build: emcc -c <out>/boot_probe.ll -o work/obj/boot.o (+ probe.c を work/obj/probe.o) → m11_build.sh と同じ link
         (probe_entry.sh が一式やる). 引数は IR の arg1..arg4 (arity が足りなければ 0). q(x) は x が image 内ポインタ候補 (0x10000..0x20000000) のときだけ読む
-  同じ build で survey_units.mjs を SV_PROG=1 で走らせると stderr に `unit N` と `[pe]` が交互に出る → oob_probe_report.py で unit 別に最後の n 行を出す"""
+  同じ build で survey_units.mjs を SV_PROG=1 で走らせると stderr に `unit N` と `[pe]` が交互に出る (probe_entry.sh が <tag>.err に残す)"""
 import re, sys, os
 HERE = os.path.dirname(os.path.abspath(__file__)); W = os.path.join(HERE, '..', 'work')
 WATCH = None   # --watch <lva_hex>:<off_hex>:... → 全関数の入口で値が変わったら [chg] <直前に走っていた fn> -> <この fn> を出す (書込元の特定, #596)
