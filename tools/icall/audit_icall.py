@@ -196,7 +196,20 @@ class Disasm:
         for taddr, scale, relb in cand:
             lim = n if n else 256
             tl = []
-            for i in range(lim):
+            # Delphi の `sub idx,8; jmp [B+idx*8+d]` 形は index が負側 (基点より前) に伸びる。
+            # 絶対 8 byte 表に限り、基点から後退して関数内 target が続く間だけ先頭を延ばす。
+            back = 0
+            if relb is None and scale == 8:
+                while back < 256:
+                    raw = img.read(taddr - (back + 1) * scale, scale)
+                    if raw is None:
+                        break
+                    t = struct.unpack('<Q', raw)[0]
+                    if not (fstart <= t < fend):
+                        break
+                    back += 1
+                taddr -= back * scale
+            for i in range(back + lim):
                 raw = img.read(taddr + i * scale, scale)
                 if raw is None:
                     break
@@ -205,13 +218,13 @@ class Disasm:
                 if scale == 4 and relb is not None and t > 0xFFFFFFFFFFFF:
                     break
                 if not (fstart <= t < fend):
-                    if n is None:
+                    if n is None and i >= back:
                         break
                     continue
                 tl.append(t)
             if tl:
                 self.last_jt = (taddr, scale, relb, len(tl))
-                self.data_ranges.append((taddr, taddr + max(len(tl), n or 0) * scale))
+                self.data_ranges.append((taddr, taddr + (max(len(tl), n or 0) + back) * scale))
                 return tl
         return None
 
