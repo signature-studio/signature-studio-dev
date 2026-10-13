@@ -1,7 +1,7 @@
 # #509 (LD-9): ldfix F3c 門の拡張と LSF 脱落 8 関数 / 11 site の IR 修復
 
 **判定: 部分達成**。store 形の脱落 8 関数 / 11 site に IR 修復を入れ、`audit_lsf.py` の store 形 SUSPECT は 12 → **0** (§3)。survey の ok 退行は 0。
-ただし **SUSPECT 0 は「修復が正しい」の証明ではない**。`audit_lsf.py` は件数で数えるため、値の取り違えを検出しない。実際、次の 2 点は修復後も誤りが残る (機械語と突合して確認、§4.4・§7):
+ただし **SUSPECT 0 は「修復が正しい」の証明ではない**。`audit_lsf.py` は件数で数えるため、値の取り違えを検出しない。実際、次の 2 点は修復後も誤りが残る (機械語との突合は oc-reviewer の逆アセンブル確認による。§4.4・§7):
 - **41a670 の 41a6a3 は未修復**。修復後 IR は head 解除経路で `store i64 %2, ptr @head` (`%2 = load [arg1+8]`) のままで、機械語 (41a69c〜41a6a3: `mov rax,[rbp+0x50]; mov rax,[rax]; mov [head],rax`) は `*arg1` を書く。head 解除経路を head=N, N.next=0x2222 で呼ぶと head=0 (期待 0x2222) という観測は本 REPORT 初版 §6 の記録による。§4.4 の動的確認 (O.next 更新経路、PASS) はこの経路を測っていない。
 - **666a60 のループ内 store も誤り**。5 行の置換 (`%26`・`%15` 以降の N 基準) は機械語と一致するが、ループ内 `store i64 %29, ptr %36` はスロットアドレスを書いている。機械語 666b0c〜666b13 (`mov r8,[rbp+0x28]; mov r8,[r8]; mov [rcx+0x10], r8`) は `*arg1` (= N) を書く。666a60 は**部分修復・残存誤りあり**。
 未達は (1) 消費者形 (666a60 型) の監査が残 30 関数 + 自動修復対象外 118 関数、(2) liftdiff での動的確認 (native 側に fl-win64 の PE が要る)、(3) 上記 41a670 / 666a60 の残存誤り。→ §6 に起票依頼として列挙。PR は `Refs #509` (Closes しない)。
@@ -140,7 +140,7 @@ n=3 の所要 **146 / 147 / 147 s** (並列数 1、4 コア)、終了時 load av
 |---|---|---|
 | 消費者形 pure の残 30 関数 (33 引数、§3 の内訳)。ptr 型引数 (型変換が要る) と、最初の deref が entry 外 (IR ブロックの支配関係が要る) | 脱落形のまま (survey で実行されるかは未測定) | PM 起票依頼 (番号未採番・PR コメント参照)。`reach_509.sh` に VA を渡して到達を測る |
 | 消費者形 mixed 118 関数: argN をポインタとしても deref した値としても使う (例 408540: `mov rdx,[rcx]` の rdx を IR が `%arg1` で代用し、`[rcx-8]` の rcx も `%arg1`) | IR のどの使用が値側かは reg ↔ IR 値の対応 (SSA 対応) が要る | #510 (SSA 対応 or 動的差分) に追記 (PM 判断) |
-| 41a670 の 41a6a3: `mov rax,[rax]` (rax = arg1 の home) が、直前の `mov rcx,[rax+8]` の SSA 値 (`%2`) に化けている (§7)。head 解除経路で head=N, N.next=0x2222 で呼ぶと head=0 (期待 0x2222)。666a60 のループ内 `mov r8,[r8]` (IR は `store i64 %29`) は同型の誤り (機械語 666b0c〜666b13 と突合済み、§1) | 41a670 は修復後も 1 site が誤り。survey で 17 unit が通るが結果は不変 | PM 起票依頼 (番号未採番・新規類型候補、DEFECTS.md 行案は §7) |
+| 41a670 の 41a6a3: `mov rax,[rax]` (rax = arg1 の home) が、直前の `mov rcx,[rax+8]` の SSA 値 (`%2`) に化けている (§7)。head 解除経路で head=N, N.next=0x2222 で呼ぶと head=0 (期待 0x2222)。666a60 のループ内 `mov r8,[r8]` (IR は `store i64 %29`) は同型の誤り (機械語 666b0c〜666b13 との突合は oc-reviewer の逆アセンブル確認による、§1) | 41a670 は修復後も 1 site が誤り。survey で 17 unit が通るが結果は不変 | PM 起票依頼 (番号未採番・新規類型候補、DEFECTS.md 行案は §7) |
 | 旧 F3c (block-local) の 16 関数のうち 15 は LSF の形ではなく (§2.1)、「修復」の正しさが未検証 | 戻り値が `[arg1]` に変わっている可能性 (survey には差が出ていない) | PM 起票依頼 (番号未採番。`fix_f3c_block` の門の再点検。動的確認が要る) |
 | liftdiff での脱落の動的確認 (native 側に PE が要る)。66e080・806740・666a60 の動的確認 | 受入条件 4 の後半が未達 | 再依頼時に `oc_artifacts: fl-win64 toolchain-emsdk work-m11 work-liftdiff` + numpy を足す。起票先は本 issue (#509) |
 | 修復した 26 関数のうち survey で実行されるのは 4 関数。残り 22 関数 (5c0270 / 417b70 は C 上書き) の効果は survey では測れない | 修復の波及先 (trap/halt0 の減少) は不明 | #130 (M11-N2)。`ldfix_509_e2e.sh` の IR を `m11_gen_ir2.sh` (PE 付き) の出力へ反映する運用は #351 |
