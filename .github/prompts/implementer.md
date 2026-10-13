@@ -53,8 +53,9 @@
     1 run に収まらない作業の残りと未解決は、子 issue として**自分で起票してよい** (`docs/WORKFLOW.md` §3。題名の
     `[AREA-n]` の n は既存の最大 + 1 を確認し、重複を作らない (`<AREA>` は親 issue の AREA に置換。確認コマンドは
     `docs/WORKFLOW.md` §3 ① の `gh issue list ... | grep -oE '^\[<AREA>-[0-9]+[a-z]?\]' | grep -oE '[0-9]+' | sort -n | tail -1`)。
+    起票の直前に同じ確認を再度行い、`grep -cF '[<AREA>-<n>]'` が 0 件であることを確かめてから起票する。
     本文に `親: #N`・受入条件・`oc_artifacts:` 行。
-    milestone と Status は触らない)。起票した番号は最終回答と issue コメントに書く。
+    milestone・優先度・Status は触らない)。起票した番号は最終回答と issue コメントに書く。
     前提となる別 PR が未 merge の作業は着手せず、issue にコメントして停止する。
 12. **reviewer に差し戻されたら、PM を待たずに自分で直す**。差し戻し (changes_requested) を受けると
     workflow があなたを fix モードで自動起動する。その PR ブランチを直して push すれば review が
