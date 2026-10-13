@@ -1,0 +1,7 @@
+# LD-32 (#1070) m11 sample:800 n=3 on HEAD c4e93550 (batch only, same binary/build)
+run1: match 360 mismatch 230 unexec 210
+run2: match 360 mismatch 230 unexec 210 (報告値・一次ログ無し)
+run3: match 360 mismatch 230 unexec 210 (報告値・一次ログ無し)
+# run1 のみ一次ログ (liftdiff_e2e_ld32_head_c4e93550_n1.log 123 行) で確認。run2・run3 は commit されたログ・verdict が無い。
+# 件数のみ記録。関数単位の verdict TSV と比較結果は未 commit (素材 work-m11 / work-liftdiff が必要)。
+# 「判定が変わった関数 0 件」は未検証のため記録しない。
