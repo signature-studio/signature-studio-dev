@@ -70,7 +70,7 @@ OOB 16 件の最上位 frame (現行 build): 144 `407e20` / 149 `412e40` / 275 `
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 現行 main で unit 95 / 895 の trap が消えたことの原因 (main 側のどの変更か) | REPORT_684 の前提の再検証 | PM 判断: #684 へのコメント (main 差分の切り分けを含む) |
-| 895 の `412770` の null memcpy が Runtime error 210 の直接原因か | 895 の halt0 原因 | PM 判断: 新規子 issue (親 #684) |
+| 895 の `412770` の null memcpy が Runtime error 210 の直接原因か (#1080) | 895 の halt0 原因 | #1080 (親 #684) |
 | 477 (`903d20`) / 275 (`864fe0`) の残存 OOB | REPORT_684 §3・§4 の未解決 | 既存: #684 |
 | `m11_e2e.sh` 全再生成の `tools/m2/work/ghidra_dll` 素材の欠落 (Ghidra 経路は §1 のとおり未試行) | e2e 全体を再現できない | PM 判断: `prepare-event-context.sh` の allowlist に `work-m2` を追加し、R2 に素材を置く。`docs/WORKFLOW.md` §11 の許可名に `work-m2` は無く、`work-m6-ott` は `tools/m2` を展開しないため、現状の `oc_artifacts` 指定では届かない |
 
@@ -83,10 +83,12 @@ OOB 16 件の最上位 frame (現行 build): 144 `407e20` / 149 `412e40` / 275 `
 
 ## 7. main `8bc34ed9` での再確認 (再実行)
 
-- 起点: origin/main `8bc34ed9` (PR #1242 取込み後、`7736a5c5` から 473 commit 先)。素材は `work-m11` / `work-liftdiff` / `fl-win64` / `toolchain-*` を展開して使用 (`FL_WIN64_DIR=$HOME/analysis/win64`)。
+- 起点: origin/main `8bc34ed9` (PR #1242 取込み後、`7736a5c5` から 473 commit 先)。
+- 素材: `fl-win64` (展開先は `docs/REFERENCES.md` の `[WIN64]`)、`work-m11`、`work-liftdiff`、`toolchain-emsdk`、`toolchain-retdec` の 5 つを PR 本文の `oc_artifacts:` 行に記載する。ただし元の検証 run の展開ログは確認できていない。
+- 注記: 差し戻し対応の run (`pull_request_review`) の `$ARTIFACTS_DIR` には `fl-win64` しか無く、`work-m11` は無かった。このため fix run では §7 の数値を再実行していない。上の数値は元の run の記録で、再現は `oc_artifacts` 指定で素材を取得した run で行う。
 - `m11_gen_ir2.sh`: rc=0、46.2 s、`ldfix` F1=902 F2=30 F3c=36 errors=0。
 - `m11_build.sh`: rc=0、27.1 s、`wasm-ld signature mismatch: 0`。
-- `survey_units.mjs` (`SV_RAW=1`): rc=0、20.0 s、`SURVEY_UNITS {"ok":869,"miss":47,"other":1,"halt0":8,"oob":16,"noproc":1}`。`7736a5c5` の集計と完全一致。
+- `survey_units.mjs` (`SV_RAW=1`): rc=0、20.0 s。集計は §6 の `7736a5c5` の値と一致 (JSON は §6 に記載済みのため重複させない)。
 - unit 95 (`0x1d2680`): `kind=ok`、GDI stub 14 件 (`GetDC` 等、0 を返して継続)。OOB は発火しない。
 - unit 895 (`0xeddfe0`): `kind=halt0`、`MessageBoxA` `Runtime error 210 at 0000000010251460`、最上位 `function_412770`。`40ffe0` は `function_40c820` の caller 経由で到達する。
 - 結論: §0 の前提 (対象 OOB が現行 main に無い) は `8bc34ed9` でも成立する。受入条件 1・2 (`47ad70` の index / arg1、`40ffe0` のリスト先頭) は対象の観測が無いため未達のまま。受入条件 3 (DEFECTS 行案) は新規類型が無く、§6 の既出 D11 変種の範囲に留まる。
