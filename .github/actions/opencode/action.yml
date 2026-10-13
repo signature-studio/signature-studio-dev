@@ -49,6 +49,28 @@ runs:
           echo "::error::prompt file is not readable: $OC_PROMPT_FILE"
           exit 1
         fi
+        # runner の状態を 60 秒おきに step のログへ出す (#765)。fix run が実装 step の途中で
+        # 'The runner has received a shutdown signal' (exit 143) で打ち切られることがあり、そのときは
+        # 後続の always() step も走らず、打ち切り直前の状態が残らない。標準出力へ直接出せば、
+        # step が落ちてもログに残る。プロセスは comm (コマンド名のみ) を出し、引数は出さない。
+        sys_sampler() {
+          while :; do
+            echo "[sys] $(date -u +%H:%M:%S) mem=$(free -m | awk '/^Mem:/{printf "%d/%dMB", $3, $2}') swap=$(free -m | awk '/^Swap:/{printf "%dMB", $3}') disk=$(df --output=pcent / | tail -1 | tr -d ' ') load=$(cut -d' ' -f1-3 /proc/loadavg)"
+            ps -eo rss=,etimes=,comm= --sort=-rss | head -3 | awk '{printf "[sys]   rss=%dMB up=%ds %s\n", $1 / 1024, $2, $3}'
+            timeout "${OC_SAMPLE_SECS:-60}" tail -f /dev/null
+          done
+        }
+        stop_sampler() {
+          [ -n "${sampler_pid:-}" ] || return 0
+          pkill -P "$sampler_pid" 2>/dev/null
+          kill "$sampler_pid" 2>/dev/null
+          wait "$sampler_pid" 2>/dev/null
+          sampler_pid=
+        }
+        sys_sampler &
+        sampler_pid=$!
+        trap stop_sampler EXIT
+
         rc=1
         attempt=1
         wait_s=15
@@ -74,6 +96,7 @@ runs:
           fi
           attempt=$((attempt + 1))
         done
+        stop_sampler
 
         # sid 抽出: 旧実装は `jq ... | head -1` で、head が先に閉じると jq が
         # SIGPIPE で死に、step の shell は -o pipefail なので step 全体が落ちていた。

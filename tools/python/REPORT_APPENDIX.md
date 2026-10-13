@@ -232,3 +232,19 @@ stubs (LGPL 参照) 署名との照合 (kwlist のある 103 のうち stubs 署
 - **限界**: 検証は mock flapi 上 (実 FLEngine 非接続)。`event.status` に ch が含まれるか (0xB5 のように) は FL 本体の渡し方次第で、公開 stubs 文書の例 (`status=191` = 0xBF) は含む形だが 26.1.7 実機では未確認 — 含むなら実機でもこの script は ch0 以外の CC を転送しない (script 側の仕様)。
 
 **#601 (load 失敗の巻き戻し)**: `fl_rt.load_device_script` は exec 成功後に `_scripts` へ登録し、例外時は `sys.modules` も戻して再送出する (旧: 登録後に exec → top-level 例外で半端な module が残り midiIn / callback が配送された)。同名の既存 script は先に unload 済みで復元しない。UI (`src/runtime/midi_script.ts`) は読込失敗時に `flMidi.stop()` で巻き戻し (started=false・接続ボタン無効・起動ボタン再有効)。回帰: `midi_script.mjs` §4b (fixture `device_import_fails.py`、29 check)・`midi_ui_check.mjs` 失敗経路 (20 check)。ネガコン (exit 1 = 検出): `midi_script.mjs --neg-legacy` (旧ローダへ差し戻し → 必須 3 check (`LEGACY_KEYS`: listDeviceScripts・sys.modules・midiIn 配送) が FAIL、非 MIDI 配送・同名再読込は FAIL しても可)・`midi_ui_check.mjs --neg-rollback` (UI の stop を無効化 → started・起動ボタン・midiIn の 3 check が FAIL。接続ボタンは catch 節が直接 disabled にするため stop の有無では変わらず検出対象外)。接続ボタン check は起動前に有効化してから失敗させ、失敗後に無効へ戻ることを観測する形に変更 (起動前から disabled だった旧 check は常に PASS で無意味だった)。実測 (HEAD 238353e = main 5d7822a を merge した状態。emsdk 6.0.12 で CPython wasm・flpy をビルド。build_flpy.sh 後の `git status` は空): `midi_script.mjs` exit 0 (29 check 全 PASS)・`--neg-legacy` exit 1 (29 check 中 FAIL 4 件: 必須 3 件 + 非 MIDI 配送 = LEGACY_KEYS 3 本が全て FAIL)・`midi_ui_check.mjs` exit 0 (20 check 全 PASS)・`--neg-rollback` exit 1 (19 check 中 FAIL 3 件: started・起動ボタン・midiIn)。接続ボタンは検出対象外。
+
+## 7b-2 (全文) ilmcp.getBrowserNames の固定バッファ修正 — REPORT.md §7b-2 から分割移動
+
+
+原因: `b[2048]` へ `w += snprintf(w, 残量, ...)` で連結していたため、切り詰められた出力でも snprintf の戻り値 (= 切り詰めなければ書いた長さ) が `w` に加わり、`w` が `b + sizeof b` を越えると次の `(size_t)(b + sizeof b - w)` が巨大な値になって境界なしに書いた。`q[512]` / `full[288]` / `e[576]` と `json_str` も黙って切り詰めていた。修正 (`provider/fl_engine.c`): `json_str` と `buf_add` が残量 (`size_t`) を持ち、`n >= remaining` なら何も書かず失敗 → ハンドラは `Range error` (code 4) を返す。`full` も `snprintf` の戻り値 `>= sizeof full` で失敗にする。
+
+| 項目 | 実測 (HEAD b2225e1, GitHub Actions runner, node 22.23.3, emsdk 6.0.12, load average 0.53〜1.84) |
+|---|---|
+| 回帰ケース | `tests/provider_check.mjs` 節 2b: 収まる 7 + 溢れる 5 = **12 ケース**。収まる: `""` / `"db"` / 引用符・バックスラッシュ / 制御文字 4 / 日本語 90 字 (270B) / `a`×273 (full 287B ちょうど) / 制御文字×80 + `a`×17 (b[2048] に 2047B ちょうど)。溢れる: `a`×274 (full 288B) / 制御文字×80 + `a`×18 (q・full・e は収まり b だけ溢れる、2051B) / 制御文字×85 (q) / 制御文字×100 (reviewer 再現) / `a`×100000。溢れた後に `getBrowserNames("db")` が正常応答することも各ケースで確認。b の長さ = 59 + 4X (X = エスケープ後の名前長) |
+| 旧コード (d2706e1) × 新テスト | **FAIL**: 溢れる 5 ケース中 5 つ。`a`×274 と `a`×100000 は黙って切り詰めた ok (`…/Fruity Slice`)、他 3 つは不正 JSON (`position 2047` の SyntaxError / `Unexpected end of JSON input`)。収まる 7 ケースは旧コードでも一致 (= 正常系の挙動は不変) |
+| 修正後 × 新テスト | **PASS**: `provider_check` 0.31 / 0.29 / 0.28 秒 (3 回)。節 1〜3 全体 (Python 側の型・例外写像を含む) |
+| メモリ安全 (ASan) | `emcc -fsanitize=address` で旧・新を同テスト (節 1〜2b) 実行: 旧 = **`stack-buffer-overflow` WRITE of size 1**、新 = 検出 0 件で PASS |
+| 回帰なし | `FL_ENGINE=wasm node tests/all_tools.mjs` **48/48 ok**、soft_error 0・raised 0、host_calls 37,424、callback 往復 true、1.59 / 1.61 / 1.61 秒 (3 回)。`tool_coverage.wasm.json` と追跡中の `tool_coverage.json` の tool 別差 **0/48**。`poc_mcp` (mock) POC OK 1.06 秒 |
+| ネガティブコントロール | `full` の判定 `>=` → `>` : 溢れる `a`×274 で FAIL。`buf_add` が溢れても 0 を返す: `98 文字` で FAIL (`",]}"` の不正 JSON)。生き残り 2 件 (等価変異): q の `json_str` 失敗を無視 / `json_str` の残量判定を 2B 緩める — q・e の境界は API 経由では b[2048] (4X) が先に律速して到達できないため (いずれも b が先に失敗するので出力は同じ)。これらの個別境界は `json_str` 単体の C テスト無しでは検出できない |
+
+検証範囲: 上記は mac pkg 無しで `fetch_inputs.sh` の win64 DATA block 経路から配置した MCPTools.pyc / midi.py / utils.py で実行した (b76d221 時点の自己申告値 host_calls 37,424・48/48 と同値)。範囲外: `run_all.sh` 全体・headless Chrome (`browser_check`) は未実施。
