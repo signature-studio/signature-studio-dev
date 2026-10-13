@@ -87,7 +87,7 @@ chmod 600 "$PR_BODY_FILE"
 
 # review は push (pull_request の synchronize) で起動するが、agent は「push → 本文に oc_artifacts を追記」の
 # 順に動くことがあり、payload の本文は起動時点の古い値になる。そのままだと素材が fl-win64 だけになって
-# reviewer が e2e を再実行できない (#807)。トークンがあれば API で現在の本文を取り直す。
+# reviewer が e2e を再実行できない (#820)。トークンがあれば API で現在の本文を取り直す。
 # 取れなければ payload の本文のまま進む (警告のみ)。
 case "$MAX_CHARS" in '' | *[!0-9]*) MAX_CHARS=20000 ;; esac
 case "$EVENT_NAME" in

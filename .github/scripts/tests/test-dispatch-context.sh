@@ -73,7 +73,7 @@ GITHUB_EVENT_PATH="$TMP/ev.json" RUNNER_TEMP="$TMP/rt" GITHUB_ENV="$TMP/env" GIT
 out_has 'should_run=true' && env_has 'OC_PR_NUMBER=9'
 expect "issue_comment with /oc still runs (unchanged)" $?
 
-# 8. pull_request の本文は API で取り直す (push の直後に本文へ追記された oc_artifacts を拾う。#807)
+# 8. pull_request の本文は API で取り直す (push の直後に本文へ追記された oc_artifacts を拾う。#820)
 mkdir -p "$TMP/fakebin"
 cat > "$TMP/fakebin/gh" <<'GHEOF'
 #!/bin/bash
