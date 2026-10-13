@@ -124,7 +124,7 @@
 | `tools/m11/trap_triage/REPORT_495.md` | ~115 | `SV_TRACE_AT` 付き survey で unit 134 が ok→oob になる原因 (trace の fprintf が残す stack 残骸 × `function_413870` の引数脱落) と trace の透過化 (#495) |
 | `tools/m11/trap_triage/REPORT_494.md` | ~125 | survey の per-unit JSON に間接 call の site / target 別 hit 数 (`icall` 欄) を常設・#482 の復元を hit 数だけで検収 (#494) |
 | `tools/m11/trap_triage/REPORT_483.md` | ~205 | oob→halt0 12 unit の Error() 原因 = TDictionary 比較器チェーンの D4/D15 脱落 (#483)・merge 後 head の再測と ok→非 ok の原因分類 |
-| `tools/m11/trap_triage/REPORT_682.md` | ~159 | 4f9f40 系 5 unit の TList items 書込み元 = `function_47b260` (D4 の新事例・disp=0 deref 2 点脱落) の特定と C 転記修復 (`M11_FIX_682`・291/296 ok)・全 store 計装・ネガコン・`m11_e2e.sh` 全体の実測 (#682) |
+| `tools/m11/trap_triage/REPORT_682.md` | ~177 | 4f9f40 系 5 unit の TList items 書込み元 = `function_47b260` (D4 の新事例・disp=0 deref 2 点脱落) の特定と C 転記修復 (`M11_FIX_682`・291/296 ok)・全 store 計装・ネガコン・`m11_e2e.sh` 全体の実測 (#682) |
 | `tools/m11/ldfix/REPORT.md` | ~165 | load 取り違え (値↔アドレス / 1 段 deref 脱落) IR 修復 pass |
 | `tools/m11/ldfix/REPORT_484.md` | ~130 | ldfix が 5c0270 の D4 脱落を検出できなかった理由 (F3c の門 G1〜G5) と load→store 脱落の全数監査 (#484) |
 | `tools/m11/ldfix/REPORT_510.md` | ~150 | base が引数由来でない load→store (370 site / 169 関数) の判定軸: SSA 対応の静的判定 vs liftdiff 動的差分の実測比較と脱落数 (#510) |

@@ -157,3 +157,21 @@ bash trap_triage/store_watch_682.sh w2                                   # 全 s
 - survey の ok・trap・clobber・miss は §4.1 の修復行と一致。stage と units_run は §10 の最終 HEAD と一致。
 - 注意: `m11_e2e.sh` は未達・前提欠如でも `exit 0` を返す (スクリプト冒頭の注記どおり)。rc=0 は合否の根拠にしない。合否は `check_682.py` (不合格で rc=1) で判定する。
 - 未解決: `m11_e2e.sh` の PE 固定パス (`[WIN64]` の `extracted/block00031_PE.bin` を直書き) と exit 0 固定は、本 PR の範囲外として残す (起票先 #715、§7 の表)。
+
+## 12. レビュー指摘の修正 commit の検証 (#706、対象 HEAD `8be7b5d`)
+
+- 変更: `REPORT_682.md` (§7・§9・§11 の表記)、`docs/DOC_MAP.md` (§3 索引行)、`trap_triage/store_watch_682.sh` (第 2 引数・`SV_TRACE_AT`・no-op の `cp` を削除。`m11_survey.mjs` に対応処理が無かったため)。`m11_ov.c` と判定スクリプトは不変。
+- 環境: `fl-win64` は `extracted/block00031_PE.bin` (22 MB) のみ展開、`work-m11` は `tools/m11/work/` に展開。`toolchain-emsdk` は展開せず、runner の既存の `[EMSDK]` (emcc 6.0.12、pin と一致) を使用。node v22.23.3。capstone・pefile は pip で導入。
+- 実測 (n=1、いずれも 8be7b5d のツリーで実行):
+
+| 手順 | 結果 | 所要 | load (1 分平均) |
+|---|---|---:|---|
+| `m11_build.sh` | rc=0、signature mismatch 0・undefined 0、qstore 実行 (警告 0) | 17.99 s | — |
+| `m11_survey.mjs` (修復あり) | ok 868・noproc 1・miss 46・trap 27 (oom 0)・clobber 0 | 4.79 s | 0.66→0.69 |
+| `check_682.py units_fix.json` | 2/5 (291=ok 296=ok 304=trap 555=trap 923=trap)、**rc=1** | — | — |
+| `store_watch_682.sh w2` (修正後の引数) | rc=0、計装 store 54,041 件、計装 build の survey ok 870・noproc 1・miss 46・trap 25 (oom 6)・clobber 0、`[sw]` hits 15 | 71.72 s | 0.58→0.87 |
+| `negctl_682.sh nc` (`M11_FIX_682=0`) | rc=0、survey ok 864・noproc 1・miss 46・trap 31 (oom 1)、`check_682.py units_nc.json` 0/5・**rc=1** | 32.26 s | — |
+
+- §9 の stamp 補完の削除: `work/` に `ir_lb_base`・`img_lb_base`・`lb_base` の stamp が無い状態 (展開直後は `msimd.stamp` のみ) で `m11_build.sh` が rc=0 で通ったことを確認した。
+- 各数値は §4.1・§5・§7 の値と一致 (survey の unit 合計は 942 で、ok+noproc+miss+trap が一致)。
+- 未実施: `chain_682.sh` (本 commit で変更なし。REPORT §3 の値は再測していない)。`m11_e2e.sh` 全体 (§11 は前 HEAD `c922c19` での実測のまま。本 commit で挙動は変わらない)。
