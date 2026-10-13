@@ -51,3 +51,10 @@ REPORT §6 の旧版を移動した (250 行上限)。 入力は 7ffab50 の sam
 | T1 `batch_lift.sh --tier T1` | 45 行: lift_rc 0 = 45、`emcc -c` rc 0 = 44。 失敗 1 = ReWired (f80 2、既知)。 479 s |
 
 - 無効 run (記録のみ): 初回の T0/T1 は `batch_lift.sh` が `pefile` の venv を見ずに全行 rc=1 で落ちた (driver の rc=0 は偽陽性)。 `sampler/env.sh` を source して再実行した値のみ掲載。
+
+## D. RetDec の C 出力段の経緯 (REPORT §5 から分割移動、検証起点 53c2eb6 / 初版 e2e)
+
+- `lift_ranges.sh` 直行 (`sampler_e2e.sh` 初版、engine 2 本を並列) では、`LLVM IR -> HLL` 段の開始 (= `.ll` 出力後) は RetDec 開始後 23664 で 114.24 s・23677 で 69.49 s (スクリプト一本版の run では 93.05 s / 46.51 s) だったが、その後の C 出力段が終わらなかった。
+- 23664 は 614.57 s 時点 (`variable renaming`) で RSS 8.15 GiB、"out of memory; trying to recover" を 3 回出した (RetDec の既定メモリ上限は搭載 RAM の半分 = 約 8 GiB、`--no-memory-limit` で解除可)。 23677 は 758.98 s 時点 (`emission of the target code [c]`) で RSS 6.85 GiB。
+- 同時使用は 14.4 GiB / 15.6 GiB (空き 1.6 GiB) まで逼迫したため、621 s / 838 s で RetDec を停止した (この初版 e2e は engine 判定で exit 1。 未完の run を成功と報告しない)。
+- C は使わないので、`lift_from_ll.sh` で `.ll` 出力後に RetDec を止めて後段 pass 鎖だけ走らせる方式に変えた (`lift_ranges.sh` 本体から後段を切り出す。 共有鎖は変更していない)。 `.ll` の出力から `emcc -c` までの結果は、停止して再開した版とスクリプト一本の版で同一だった (23664: define 5,993 / 欠落 3 / 未実装 215 / f80 2、23677: define 2,525 / 欠落 1 / 未実装 151 / f80 1。 `.ll` は 23664 で 333 B 異なるが各列は一致)。
