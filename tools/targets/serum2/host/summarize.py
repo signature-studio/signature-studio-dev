@@ -51,7 +51,11 @@ def marker_in_saved(work, run):
     if not os.path.exists(p):
         return None
     d = open(p, "rb").read()
-    return b"kAudioUnitParameterFlag_IsHighResolution" in d
+    if b"kAudioUnitParameterFlag_IsHighResolution" in d:
+        return True
+    # payload は zstd 圧縮のため生バイト検索では見えない (#341 で判明)。CBOR DOM の最上位キーも見る
+    dom = saved_dom(work, run, "controller")
+    return bool(dom) and "kAudioUnitParameterFlag_IsHighResolution" in dom
 
 
 def demo_bit(work, run):
@@ -239,6 +243,13 @@ def main():
         bit_n("patched+g1+lowver") == 0 and not has800010("patched+g1+lowver"))
     chk("patched+g1+demo_payload: demo bit 0・0x800010 無し (authstub がマーカ経路を中和)",
         bit_n("patched+g1+demo_payload") == 0 and not has800010("patched+g1+demo_payload"))
+    # getState (0x1800c6090) のマーカ書込: bit==1 の run だけ保存 state にマーカが出る (DOM 判定。圧縮越しでも見える)
+    chk("unpatched+g1+lowver: 保存 controller state にマーカ有り (bit 1 → getState が書込)",
+        by.get("unpatched+g1+lowver") and by["unpatched+g1+lowver"]["saved_marker"] is True)
+    chk("unpatched+g1+lic_sent: 保存 controller state にマーカ無し",
+        by.get("unpatched+g1+lic_sent") and by["unpatched+g1+lic_sent"]["saved_marker"] is False)
+    chk("patched+g1+lic_sent: 保存 controller state にマーカ無し (bit 1 でも N3 が書込を抑止)",
+        by.get("patched+g1+lic_sent") and by["patched+g1+lic_sent"]["saved_marker"] is False)
     # 既知の不一致 (pin): mpatch N2a-1 `xor al,1→0` は demo bit = IR pass の「常時 0」ではなく「lookup 値そのまま」
     # (marker キー不在 = 既定 true → bit 1)。0x800010 は N2b-2 で抑止され、getState の marker 書込は N3 で抑止される。
     chk("[KNOWN-DIVERGENCE] patched+g1+lic_sent: demo bit == 1 (IR pass は 0 の設計。REPORT §3-6 の未解決 1)",
