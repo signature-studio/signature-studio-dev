@@ -158,6 +158,43 @@ def main():
     for (L, nn, ww), n in div.most_common(12):
         w('| %s | %s | %s | %d | %s |' % (f(L), f(nn), f(ww), n, ex[(L, nn, ww)]))
     w('')
+    w('## 1b. 分岐の型 (LD-17 / #864)')
+    w('')
+    w('§1 の D15 型候補を先に除き、残りを排他的に分類する (上から順に判定)。L の直接 call 先 = 機械語の直接 call 先集合 d。')
+    w('')
+    w('| 型 | 件数 | 上位 L (件数) |')
+    w('|---|---:|---|')
+    kinds = collections.OrderedDict([
+        ('A', 'D15 型候補 (§1)'),
+        ('B', 'L が leaf (call 無し)。L の戻り後の共通呼出元で分岐'),
+        ('C', 'L の直接 call 先で分岐 (native/wasm の次 entry のどちらかが d に含まれる)'),
+        ('D', 'L の直接 call 先に含まれない分岐 (未特定)'),
+        ('E', 'trace_head 先頭から不一致 (L 無し)'),
+    ])
+    by_kind = collections.defaultdict(collections.Counter)
+    for (L, nn, ww), n in div.items():
+        if L is None:
+            k = 'E'
+        else:
+            d, mi, ri = mach(L)
+            ic = ir_calls(irs, L)
+            if is_cand(d, mi, ic):
+                k = 'A'
+            elif not d and not mi and not ri:
+                k = 'B'
+            elif nn in d or ww in d:
+                k = 'C'
+            else:
+                k = 'D'
+        by_kind[k][L] += n
+    for k, label in kinds.items():
+        tot = sum(by_kind[k].values())
+        top = ', '.join('%s (%d)' % (f(L), m) for L, m in by_kind[k].most_common(3))
+        w('| %s: %s | %d | %s |' % (k, label, tot, top))
+    w('')
+    w('内訳の合計 = 食い違い観測 %d。型 A 以外 (B+C+D) = 未特定の残り **%d**。' % (
+        n_div, n_div - sum(by_kind['A'].values())))
+    w('')
     w('## 3. trace_head が完全一致で食い違い未観測の関数 (分岐点集計から除外)')
     w('')
     w('| native trace_len | wasm trace_len | 件数 | 備考 |')
