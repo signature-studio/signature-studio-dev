@@ -246,3 +246,5 @@ python3 tools/plugins/f2/xcheck_icall.py 18953 18975 18979 18982 18984 19005 190
 - 残 6 不一致: 0x6bfec0・0x6c8fc0・0x6c9b60 (no_placeholder)、0x6c8c90・0x6cc2e0 (slot_occupied + spill_slot_deref)、0x6f1650 (署名は一致だが値が届かない)。起票先は #871 ([PLG-F2-6])。
 - 再現: `source tools/shared/env.sh; source tools/plugins/f2/env.sh; cd tools/plugins && PLUG_XMMARG=1 PLUG_LDFIX=1 PLUG_ICALL=0 bash lift/batch_lift.sh 18975 18982 19005 19006 19013 19059; cd ../..; bash tools/plugins/f2/leaf_diff.sh`
 - 既定化 (`PLUG_LDFIX` ON 化) は未実施。全 block・全 closure での回帰は範囲外。
+## 10.1 (#871 部分) 0x6f1650 の切り分け → 付録
+0x6f1650 (19059) の不一致は image 配置 (RVA) と IR 絶対 VA 定数のずれが原因と確定。修正は未実施で #871 に残す。詳細は [`REPORT_APPENDIX_871.md`](REPORT_APPENDIX_871.md)。
