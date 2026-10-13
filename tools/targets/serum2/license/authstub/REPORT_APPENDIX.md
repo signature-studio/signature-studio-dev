@@ -24,20 +24,20 @@
 
 ### 数え方 (census)
 
-`python3 tools/targets/serum2/license/authstub/l1_census.py <PE> <raw.ll>` が出力するのは次の 4 指標のみ:
-機械語側の直接 call site 数 (`sites`)・`edx=0x800010` 即値ロード数 (`edx_const`)・site への入口 edge 数 (`into`)、
-および raw IR 側の `insn.addr` 被覆数とブロック `dec_label_pc_1800c2ef4` の有無。
-IR 側の「直接 call」「`edx=0x800010`」「入口 edge」の件数は**スクリプトの出力に含まれない**。
+`python3 tools/targets/serum2/license/authstub/l1_census.py <PE> <raw.ll>` が出力する指標 (#1029 で raw IR 側を拡張):
+機械語側は直接 call site 数 (`sites`)・`edx=0x800010` 即値ロード数 (`edx_const`)・site への入口 edge 数 (`into`)。
+raw IR 側は `insn.addr` が site 範囲にある命令数・そのうち直接 `call`・site 範囲内の `0x800010` 即値・
+`br`/`switch` で site ブロックを指す edge・`insn.addr` 被覆数・ブロック `dec_label_pc_1800c2ef4` の有無。
 
-| 指標 | 機械語 (スクリプト出力) | raw IR (スクリプト出力) | raw IR (手確認・スクリプト外) |
+| 指標 | 機械語 (スクリプト出力) | raw IR (スクリプト出力) | raw IR (手確認) |
 |---|---|---|---|
-| 直接 `call [reg+0x30]` site (0x1800c2ef4–f05) | `sites` = 1 | — | 0 件 (9872–9900 行の `call` は `@function_180034560` の 1 件のみ。`add ..., 48` は 1461・2178・2649 行の 3 件で、いずれも本 site の範囲外) |
-| `edx=0x800010` 即値ロード | `edx_const` = 1 | — | `i32 8388608` / `8388624` の即値は 0x800010 を含む `or` が 9878 行の 1 件のみ (rax≠0 の deferred 側) |
-| 0x1800c2ef4 への入口 edge | `into` = 1 (`je` @0x1800c2d69) | — | `dec_label_pc_1800c2ef4` の参照 0 件 (grep `dec_label_pc_1800c2ef4`) |
-| `insn.addr` が site 範囲を被覆 | — | 0 件 (`covered`) | — |
-| ブロック `dec_label_pc_1800c2ef4` | — | 不在 (`has_block`) | — |
+| 直接 `call [reg+0x30]` site (0x1800c2ef4–f05) | `sites` = 1 | `direct call in site range` = 0 | 0 件 (9872–9900 行の `call` は `@function_180034560` の 1 件のみ。`add ..., 48` は 1461・2178・2649 行の 3 件で、いずれも本 site の範囲外) |
+| `edx=0x800010` 即値ロード | `edx_const` = 1 | `edx=0x800010 immediates in site` = 0 (ファイル全体の `8388624` は 1 件) | `i32 8388608` / `8388624` の即値は 0x800010 を含む `or` が 9878 行の 1 件のみ (rax≠0 の deferred 側、`insn.addr` は 0x1800c2d6f) |
+| 0x1800c2ef4 への入口 edge | `into` = 1 (`je` @0x1800c2d69) | `edges (br/switch) into site block` = 0 | `dec_label_pc_1800c2ef4` の参照 0 件 (grep `dec_label_pc_1800c2ef4`) |
+| `insn.addr` が site 範囲を被覆 | — | `insn.addr entries covering site` = 0 | — |
+| ブロック `dec_label_pc_1800c2ef4` | — | `has_block` = False | — |
 
-- 手確認の列は raw `.ll` を grep / sed で読んだ事実のみ。スクリプトの出力には含まれない (census 拡張は子 issue #1029)。
+- 2026-10-13 実測 (#1029): 上記スクリプト出力と手確認列は一致。census 拡張で手確認が不要になった。
 - 9872 行の `br i1 %110, label %dec_label_pc_1800c2f08, label %dec_label_pc_1800c2d6f` は、null 枝 (`%110` = true) が skip 先 `0x1800c2f08` を指す。`0x1800c2ef4` を指す枝は IR に無い。
 
 ### 実測の記録 (e2e・census)
