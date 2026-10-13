@@ -112,10 +112,12 @@
 - 判定: N6 読み手の呼び出し元は直接参照では見つからない。間接呼び出し (関数ポインタ表・vtable 経由) か、テーブル基準の相対参照の可能性が残る。N5 の読み手は本節でも未特定。
 - 結論: 差し替え点は依然として未特定。`mx_lic_stub.py` の N5/N6 ルールは追加しない (根拠なしに br_force/store を入れると silent miscompile になるため)。#1017 で間接参照の総当たりを行う。
 
-### 12.6 N6 読み手の直接呼び出し元 (#1017 run・再実測)
-- 素材: `plugins-massivex` を `tools/targets/massivex/license/work/` に展開 → `scripts/parse_setup_headers.py <exe> work` → `scripts/extract_massivex.py <exe> work key` (`work/` は tools 直下)。`Massive X.vst3` md5 `622993e76565f49c094063a2b717d6ca` (95,356,824 B) で §11.1 と一致。抽出時の 16B checksum 125/125 不一致は §1・§8 の既知事象。
-- 測定 HEAD: `a893d1f2` (origin/main) + 本 commit の `license/scripts/mx_callers_probe.py` (lift コードは未変更)。
-- `scripts/mx_xref_fn.py --all` (1 分 52 秒・exit 0): N6-1 4 件 / N6-2 1 件 / N6-3 1 件 / N6-4 5 件 / N6-5 1 件 / N6-6 1 件 (§12.2a と一致)。N5 の 4 範囲は 0 件 (一致)。
-- `scripts/mx_callers_probe.py` (0.7 秒・exit 0): 読み手 5 関数 (0x180f95e20 / 0x181142370 / 0x181144570 / 0x181142640 / 0x1811453f0) への E8 call / E9 jmp は **いずれも 0 件**。
-- 判定: 読み手の呼び出し元は直接 call/jmp・RIP 参照・絶対 8B では見つからない。間接呼び出し (vtable / 関数ポインタ表) か、文字列 index 経由のテーブル参照の可能性が残る。N5 の読み手は未特定。
-- 次の一手 (子 issue で扱う): vtable / 関数ポインタ表の走査 (`.rdata` 内の 8B 値 = 読み手 VA) と、N5 の QML プロパティ名テーブルの走査。
+### 12.6 N6 読み手の直接呼び出し元 (#1017 run)
+- 作業ディレクトリ (全手順で共通): `tools/targets/massivex` 直下。展開先は `work/` (gitignore)。
+  `plugins-massivex` を `$RUNNER_TEMP/mx` に展開 → `python3 scripts/parse_setup_headers.py <exe> work` → `python3 scripts/extract_massivex.py <exe> work key` で `work/extracted/VST3/Massive X.vst3` を作る。走査スクリプト (`license/scripts/mx_callers_probe.py` / `mx_callers_linear.py` / `mx_xref_fn.py`) は同じ起点で `work/extracted/...` を読む。
+- 検出器の陽性対照 (素材不要): `python3 license/scripts/mx_callers_probe.py --selftest` と `python3 license/scripts/mx_callers_linear.py --selftest`。既知 E8 call 1 件 (0x180f95e20) と 2 件 (0x181142370) を含む合成 .text を走査し、期待 3 件 / 検出 3 件 (他の 3 関数は 0 件) で PASS。0 件の出力はこの陽性対照が PASS の場合のみ根拠とする。
+- 検算器 (別アルゴリズム): `mx_callers_linear.py` は capstone で .text を線形逆アセンブルし、命令の call/jmp オペランドを数える。`mx_callers_probe.py` はバイト走査 (E8/E9 + rel32)。両者の一致で 0 件を判定する。
+- 実 PE の走査結果: **未測定**。本 run では `plugins-massivex` が `$HOME/artifacts` に無く (`fl-win64` のみ)、`work/extracted/` を生成できなかった。素材付きで再実行するまで、読み手の直接呼び出し元 0 件は実 PE では確認されていない。
+- 実 PE 上の e2e (`license/e2e.sh`、`MX_OPT=-O0/-O1/-O2`) も本 run では未実行。PR 本文に載せていた 73.8 s / 12.0 s / 5.2 s・11/11 PASS は、この run の実測ではないため撤回する。
+- 判定 (実 PE 未測定のため暫定): 直接 call/jmp・RIP 参照・絶対 8B で読み手の呼び出し元は見つからない、という 12.2a までの結果を前提にする。間接呼び出し (vtable / 関数ポインタ表) か、文字列 index 経由のテーブル参照の可能性が残る。N5 の読み手は未特定。
+- 次の一手 (子 issue で扱う): 素材付きで §12.6 の手順を再実行し、本節の数値を埋める。vtable / 関数ポインタ表の走査 (`.rdata` 内の 8B 値 = 読み手 VA) と、N5 の QML プロパティ名テーブルの走査。
