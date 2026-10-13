@@ -216,11 +216,14 @@ WebView2 の挙動確認は**不要** (ローカル Help は WebView2 経路を�
 | `bash tools/gui/test/selftest.sh` (native gcc + ASan/UBSan。新セクション `ShellExecuteW(Help)`: 受理 4 パス・verb open・大文字小文字・host 拒否・拒否 8 パス・print/runas・https 回帰・host 未接続) | exit 0、**426 passed / 0 failed** (所要 6.9 秒、load average 0.19 開始) | `help_path_ok` を `return 1` に壊すと **4 FAIL** (exit 1) |
 | `node --test help_viewer.test.mjs hostcall_help.test.mjs` | 14 pass / 0 fail (新規 3 本: openHelp の true/false/未接続/例外、openUrl 回帰) | — |
 
-検証は作業ツリー (コミット前) での実行。コミット済み HEAD での再現と §6 の `e2e.sh` 全体 (Chrome/typecheck) の再実行は**未実施** (job の 60 分上限のため)。
+コミット済み HEAD `11e79a8` をクリーン detached worktree に展開して再検証 (n=3、並列 1): `selftest.sh` は **run1 = exit 1 (ASan heap-use-after-free)** / run2 = exit 0・426 passed・7.0 秒 / run3 = exit 0・426 passed・6.9 秒 (load average 1 分値 0.25–0.49)、`node --test` 14 pass / 0 fail。
+run1 の失敗は `gui_headless.c:33 blit_surf` が `surf_free` 済みの面を読む**既存の flake** (`tools/gui/shimx_coexist/REPORT.md` §4.2 / §6 に base でも発生と記録済み)。本変更と無関係であることの確認: base `e3b9202` を同じ手順で 12 回実行して 1 回同じ ASan エラー (11 回 exit 0)。新セクションの 426 件中の FAIL はどの実行にも 0 件。
+§6 の `e2e.sh` 全体 (Chrome/typecheck) の再実行は**未実施** (job の 60 分上限のため)。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | U7: §7.1 の `TServerComms` 経路を `engine_claims.json` / `verify_engine.py` に追加していない (読みのまま) | 機械照合なし | #554 にコメント (後続) |
 | U8: **lift 済みエンジンの F1 / Help メニュー / `WhatsNew` → viewer の実行 e2e は未達** (boot が `CreateFruityInstance` 未到達で実行不可、#227 closed でも実行未確認)。本 PR は C 側 hook 受理と host 橋渡しの単体検証まで | 受入条件 3 未達 → `Refs #554` | #554 は open のまま。#105 (ST-T5) の open() trace 待ち |
 | U9: `HostCallBridge.start()` + `openHelp` → `flHelp.shellExecute` を呼ぶ起動 glue (src 側) 未結線 (coexist REPORT §6 と同じ未結線) | 実アプリで viewer が開かない | #177 [SHX-T9] |
+| U11: `selftest.sh` の既存 flake (`blit_surf` use-after-free、base 12 回中 1 回) | CI で偶発 FAIL | 既存記録 (#172 shimx_coexist REPORT §6)。本件では起票せず #172 に追記済みの範囲 |
 | U10: emcc (`toolchain-emsdk`) 未取得のため `tools/gui/shimx_coexist/coexist.sh` (wasm リンク) を再実行していない | wasm 共存リンクへの影響未確認 | 再実行は `oc_artifacts: fl-win64 toolchain-emsdk work-m11` を付けて #554 |
