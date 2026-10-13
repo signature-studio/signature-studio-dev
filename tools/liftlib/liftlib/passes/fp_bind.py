@@ -68,7 +68,7 @@ def site_at(lines, fnva, va, pat):
     return hits[0]
 
 
-def replace_at(lines, fnva, va, pat, new, tag):
+def replace_at(lines, fnva, va, pat, new):
     """機械語 VA va の行 (pat 一致) を new の行列で置換する。"""
     i = site_at(lines, fnva, va, pat)
     lines[i:i + 1] = new

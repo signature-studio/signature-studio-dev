@@ -279,7 +279,7 @@ def apply_liftfix(lines, report):
     # machine は call 後に [rbp-0x28] を読む → 呼出後に mock が書く global から読む)
     replace_at(lines, C, 0x1800c2c1f, r'\s*%\S+ = trunc i128 %\S+ to i64, ',
                ['  %36 = load i64, ptr @__authstub_str_len0, !insn.addr !2583 '
-                '; LIFTFIX LF1 (旧: trunc of undef-fold)'], 'LF1')
+                '; LIFTFIX LF1 (旧: trunc of undef-fold)'])
     applied.append('LF1')
 
     # LF5/LF6: DOM root ポインタ (alloca 配置が machine と異なるため global に束縛)

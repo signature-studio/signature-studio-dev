@@ -141,6 +141,8 @@ python3 tools/targets/serum2/license/authstub/authstub_irpass.py \
 - 両回とも N4 OK (process / funclet 非変更)、LF1〜LF7 全適用。`patched_base_lf.ll` / `raw_base_lf.ll` の sha256 は旧 PR 本文の値と一致した。
 - 注: 最初の試行は venv 未導入で `data_globals_gen.py` が `pefile` 不足により step [6] で停止した (環境要因。コード変更なし)。venv 導入後に上記の cold / warm を取り直した。
 - 残: 「変更前 (main 側 authstub 版) の再測定」は未実施。baseline 比較は行わない。
+- N4 (process / funclet 無変更) assert OK。変更関数は 18004fad0 / 1800c2b50 / 1800c6090 の 3 件。
+- 本束縛の共通化で達成したのは「既存 e2e の再現」と「束縛プリミティブの共通化」まで。L1 の復元 pass と LF 規則の一般化 (RetDec 出力からの規則導出) は未達。追跡は #1007 [SR-11] (OPEN) で行う。
 
 ## 12. LF 束縛の機械語 VA キー化 (SR-9, Refs #824)
 
@@ -160,7 +162,6 @@ python3 tools/targets/serum2/license/authstub/authstub_irpass.py \
 
 - 負例: 誤 VA (0x18004fe47) は 0 件で失敗、誤 slot (-64) は 0 件で失敗 (サイレント一致しない)。
 - 実測 (commit 829efcc6, 作業ツリー clean): `bash e2e.sh` 23/23 PASS, 所要 5.4 s (lift キャッシュ利用), load 0.16→0.29, N4 OK。cold lift の 35.8 s は同 HEAD の前段 (変更前) 実測。
-- 未達 (子 issue へ): 値 (slot オフセット・global 名・LF4 の定数) は依然 literal。RetDec 出力から規則を導出する部分は未実装。
-
-- N4 (process / funclet 無変更) assert OK。変更関数は 18004fad0 / 1800c2b50 / 1800c6090 の 3 件。
-- 本束縛の共通化で達成したのは「既存 e2e の再現」と「束縛プリミティブの共通化」まで。L1 の復元 pass と LF 規則の一般化 (RetDec 出力からの規則導出) は未達。追跡 issue は未起票のため PM に起票を依頼する。
+- 測定 commit の扱い: 829efcc6 がコード変更 (fp_bind.py / authstub_irpass.py)、9dcf17be はこの §12 の追記のみを行う docs commit (コード差分なし)。そのため実測の commit は 829efcc6 と記す。
+- 後続 commit で `replace_at` の未使用引数 `tag` を削除した (挙動不変・呼出 1 箇所のみ更新)。素材 `plugins-serum2` が無く e2e の再実行は未実施 (`python3 -m py_compile` のみ確認)。
+- 未達 (#1007 [SR-11] で追跡): 値 (slot オフセット・global 名・LF4 の定数) は依然 literal。RetDec 出力から規則を導出する部分は未実装。
