@@ -201,6 +201,16 @@ JSON は `${FL_WIN64_DIR}` プレースホルダとし、e2e が `render_target.
 | 既定値で同一 | env 未設定で `render_target.py` → `git show HEAD:<json>` と `cmp` | 3/3 byte 同一 |
 | 上書き | `FL_WIN64_DIR=/x/y` で render / `halt0_map.py` の `FL_WIN64_DIR` | `pe` が `/x/y/extracted/...` / `/x` |
 
-範囲外: `ldfix_e2e.sh` 全工程は `tools/m11/work/boot_final3.ll` (work-m11)・`/opt/emsdk`・capstone が必要で、本 run の素材は fl-win64 のみ。
-fl-win64 展開 (8.2 秒) 後の `ldfix_e2e.sh` は `boot_final3.ll 無し` で停止 (PE 確認 `-f "$PE"` は通過、load average 0.87)。
-置換前後の e2e 出力同一性は未実測。根拠: 置換は PE パス文字列のみで、既定値 (`/home/ubuntu/work/analysis/win64`) は旧リテラルと文字列一致。
+置換前後の e2e 出力同一性 (#351 受入 2) の実測 (2026-10-13, runner, 素材 fl-win64 / work-m11 / work-liftdiff / toolchain-emsdk 展開, capstone+pefile は venv):
+
+| 比較 | 方法 | 結果 |
+|---|---|---|
+| 工程 1 (`ldfix.py`) | 置換後 HEAD を、PE パスだけ旧 `/home/ubuntu/work/analysis/win64` に揃えて実行 | `ldfix_fixed.ll` (21,771,834 B) と `ldfix_report.json` が**バイト一致** (F3c=26) |
+| render 済み target | 旧 JSON (`5984f7e^`) と `render_target.py` 既定展開 | 3/3 byte 同一 |
+| `ldfix_e2e.sh` 全工程 | 置換前 (`33fd25a2` のうち置換対象 6 ファイルだけを `5984f7e^` に戻した tree) と置換後 (`33fd25a2`) のログ | パス正規化後に**完全一致** (30 行。置換前 50 秒 / 置換後 61 秒) |
+
+注意 (置換とは無関係): 比較基点を `5984f7e^` 全体にすると、その間の他 PR の `ldfix.py` 変更で F3c が 0 → 26 と変わる。比較は置換対象以外が同一の tree で行うこと。
+
+既存欠陥: 上記の全工程で **stage4 が到達せず** (`m11_simd.c: '../msimd11_core.h' file not found`・boot `missing function: __asm_movapd__112`)、
+base / fix とも survey ok 0・units_run 0 だが `judge_e2e.py` は PASS と判定する。置換前後で同一の失敗。起票 #757。
+したがって本 e2e は「置換前後の同一性」の検証には使えるが、「ldfix の効果」の検証にはなっていない。

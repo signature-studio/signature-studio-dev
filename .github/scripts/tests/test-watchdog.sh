@@ -94,6 +94,14 @@ expect "conflict -> repository_dispatch oc-fix (no request-changes)" $?
 logged 'client_payload\[artifacts\]=toolchain-emsdk plugins-ott$'
 expect "dispatch artifacts keep only allowlisted names from the PR body" $?
 
+# 1a2. analysis-mac-shared は allowlist に含まれ、競合解消の dispatch に素材として渡る (#761)
+reset
+base "[$(pr 1 aaa111 false "$OLD" '[]' $'oc_artifacts: fl-win64 analysis-mac-shared\n本文')]"
+detail 1 false
+wd
+logged 'client_payload\[artifacts\]=fl-win64 analysis-mac-shared$'
+expect "analysis-mac-shared passes the watchdog allowlist" $?
+
 # 1b. dispatch の前に、試行を数えるマーカー付きのコメントを残す
 logged 'pr comment 1 .*oc-dispatch:aaa111'
 expect "a counted marker comment precedes the dispatch" $?
