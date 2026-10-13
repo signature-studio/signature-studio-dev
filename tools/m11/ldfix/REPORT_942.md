@@ -136,7 +136,7 @@ python3 tools/m11/m11_wasmnames.py tools/m11/ldfix/work/stage4/base/m11_boot.cjs
 ## 8. 現 main 生成 IR での再判定 (#1292・受入 1〜4)
 
 測定 commit: `604e900f` (origin/main、PR の親。測定に使った `tools/` はこの commit と同一)。
-検証 HEAD: `8702c274` (コード差分 0。`git diff 604e900f HEAD -- tools/ ':!*.md'` は 0 行。§8-5)。runner: nproc=4。load average は各回の前後を採取 (§8-1)。
+検証 HEAD: `8702c274` (コード差分 0。`git diff 604e900f 8702c274 -- tools/ ':!*.md'` は 0 行。§8-5)。runner: nproc=4。load average は各回の前後を採取 (§8-1)。
 素材: fl-win64 / work-m11 / work-liftdiff / toolchain-emsdk (`[EMSDK]`) / toolchain-retdec (`[RETDEC]`) を展開。
 IR は `bash tools/m11/m11_gen_ir2.sh` (現 main の手順) で作り、`ldfix_e2e.sh` の base は `M11_LDFIX=0` の IR から `m11_build.sh` で作った `boot_final3.ll`。
 
@@ -220,7 +220,8 @@ survey (n=3 とも同値。min–max は全 run で同一):
   ```
   `ldfix_e2e.sh` は `boot_final3.ll` を base として読み、その上に ldfix を掛けて fix を作る (ldfix_e2e.sh:28)。base が ldfix 適用済みだと ldfix が 2 回掛かる (§8-1 の参考)。
 - 最後の `work/` の状態: 検証の最後に `M11_LDFIX=0 bash tools/m11/m11_gen_ir2.sh` を実行して戻したため、`ir_conditions.json` は `ldfix=disabled` (`ir_sha256` 25e931f2…)。`boot_final3.ll` は ldfix 無しの base IR から作ったもの。
-- 差分 0 の証跡 (本 HEAD 時点): `git diff 604e900f HEAD -- tools/ ':!*.md'` の出力は 0 行。`git diff 604e900f HEAD --stat -- tools/` は `tools/m11/ldfix/REPORT_942.md` のみ。
+- 測定基準は `8702c274` に統一 (§8 冒頭の「検証 HEAD」と同じ)。`8702c274` 以降 (`bff2ac54`) の差は REPORT の記述修正のみ。
+- 差分 0 の証跡: `git diff 604e900f 8702c274 -- tools/ ':!*.md'` の出力は 0 行 (`bff2ac54` まででも 0 行)。`git diff 604e900f 8702c274 --stat -- tools/` は `tools/m11/ldfix/REPORT_942.md` と `REPORT_942_APPENDIX.md` のみ (本文の記述修正は `*.md` のため上記の差分には含まれない)。
 - 未解決 (起票先):
 
 | 未解決 | 影響 | 起票先 |
