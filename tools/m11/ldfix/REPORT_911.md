@@ -90,7 +90,7 @@ IR (`boot_final.ll` L225098〜225175、前 run の記録。本 run では未再�
 
 ## 6. 再現
 
-素材 (本 run で全件展開。`/usr/bin/time` 実測 5.51 秒、最大 RSS 7.3MB。`block00031_PE.bin` sha256 `b2c64da4…9496d`):
+素材 (本 run で全件展開。最大 RSS 7.3MB (`/usr/bin/time` 実測)。展開時間は実行環境に依存するため記載しない。`block00031_PE.bin` sha256 `b2c64da4…9496d`):
 
 ```
 mkdir -p "$RUNNER_TEMP/ld19/extracted"
