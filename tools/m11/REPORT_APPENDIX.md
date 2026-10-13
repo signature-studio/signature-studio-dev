@@ -145,11 +145,27 @@ GitHub Actions runner (4 core, load 0.6–0.9)。素材は work-m11 スナップ
 | `m11_e2e.sh --full` (`7e149974`) | 626.99 秒 (10 分 27 秒), rc 0, load 0.68 |
 | survey (全再生成直後, unit 別 942 本) | **ok 872 / trap 23 / miss 46 / noproc 1** (trap 内訳 OOB 15 / Halt0 7 / unreachable 1) |
 | survey (増分再実行, unit 別 JSON 出力) | 46.94 秒, ok 872 / trap 23 / miss 46 / noproc 1 (全再生成直後と一致) |
-| 0 詰め site / 引数 (`m11_sigfix_stats.sh`, 同 HEAD) | **1,061 site / 2,084 引数** (argrecover 突合 1,016 site, 引数 1,983 = callee_unused 313 / inherit 1,185 / set_const 18 / set_const_xmm_callee **49**) |
+| 0 詰め site / 引数 (`m11_sigfix_stats.sh`, 同 HEAD) | **1,061 site / 2,084 引数** (argrecover 突合 1,016 site, 突合済み引数 **1,983**。未突合 101 = 2,084 − 1,983。内訳は下表) |
+
+突合済み引数 1,983 の全カテゴリ (`m11_sigfix_stats.sh` の出力 `work/sigfix_stats/argrecover.txt` の値):
+
+| 分類 | 引数数 | 備考 |
+|---|---:|---|
+| callee_unused | 313 | |
+| inherit | 1,185 | |
+| set_const | 18 | |
+| set_const_xmm_callee | 49 | |
+| set_other | **未取得** | 下記 |
+| stack_set_other | **未取得** | 下記 |
+| callee_nopdata | **未取得** | 下記 |
+| 既知 4 項目の和 | 1,565 | 1,983 との差 418 は上記 3 項目で埋まる必要がある (未確定) |
+
+**未取得の理由**: 本 run の runner には `work/` の入力 (`boot_final.ll`・`functions_dll.csv`) と RetDec・Ghidra・emcc が無く、`7e149974` の全再生成 (`m11_e2e.sh --full`) と `m11_sigfix_stats.sh` を再実行できなかった。上の 3 項目の値は**このファイルでは確定できない**。出力を取得してから表を埋め、和が 1,983 になることを確認すること (未達のまま本 PR を merge しない)。
 | unit 838 / 882 / 885 | ok / ok / ok (基準の退行チェック対象) |
 
 注記:
 * §9 (3e49295) の記録 (1,049 site / 2,064 引数 / set_const_xmm_callee 48 / survey ok 812) とは HEAD の差で数値が動いている。本表は `7e149974` の値で、比較の基準はこちら。
+* **差の説明 (inherit 1,172 → 1,185、set_const_xmm_callee 48 → 49)**: `git diff 3e49295 7e149974 -- tools/m11/m11_argrecover.py` の分類ロジックは不変 (`classify_set` の戻り値に `why` を足し、`none` の判定条件は同一)。よって数値差は分類器ではなく**入力側**から来る (`work/boot_final.ll` を作る `m11_passes.py` / `m11_gen_ir2.sh` / `m11_post.py` の変更、または `m11_post.py --pads` の site 列挙の変化)。どの commit が 1,172→1,185 を生んだかは、3e49295 と 7e149974 で `m11_sigfix_stats.sh` を実行して site 単位に突き合わせるまで**未特定** (本 run では入力が無く未実施)。
 * 統計スクリプトで `tools/m11/results/sigfix_zeropad_remaining.tsv` が 1,050 → 1,062 行に再生成された (未コミット。再生成物のため本 PR に含めない)。
 * 再測定 (after) と `fix_xmm_args.py` の接続は本 run では時間が足りず未実施 (下記の子 issue)。
 
