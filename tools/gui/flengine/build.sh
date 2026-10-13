@@ -3,8 +3,8 @@
 #   bash tools/gui/flengine/build.sh [--plain] [--soft]   → $GF_W/m11_gui[_soft|_plain].cjs(+wasm)
 #     --plain: --reach 無し = 到達ログ無しの通常ビルド / --soft: 未実装 (STUB) API を fail-fast 例外ではなく 0 返却+SOFT-STUB 行にする
 #       (1 unit 目の未実装 API で脱出せず、後続の API まで含めた到達集合を取る計測用。shim の実装ではない)
-# 前提: bash tools/m11/m11_build.sh が一度通っていること (boot_final3.ll / *_sigs.h / simd / fnstubs / data / image が tools/m11/work に出る)。
-# tools/m11 は読取のみ。m11_build.sh の除外リスト方式 (M11_EXCLUDE) で GUI 名を winstubs から外し shim 定義へ切替える。
+# 前提: GF_M11 (e2e.sh では複製先 $GF_W/tree/m11) で m11_build.sh が一度通っていること (boot_final3.ll / *_sigs.h / simd / fnstubs / data / image が $GF_M11/work に出る)。
+# GF_M11 は読取のみ。m11_build.sh の除外リスト方式 (M11_EXCLUDE) で GUI 名を winstubs から外し shim 定義へ切替える。
 # 全 TU を -pthread で揃える (INTEGRATION.md §4-3)。成果物は tools/gui/work/flengine/ (gitignore 済)。
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; source "$HERE/env.sh"
@@ -16,7 +16,8 @@ for f in boot_final.ll boot_final3.ll boot_final3_sigs.h m11_simd.c m11_fnstubs.
   [ -f "$MW/$f" ] || { echo "[gf] $MW/$f 無し: bash tools/m11/m11_build.sh を先に" >&2; exit 2; }
 done
 M11_LB_BASE="${M11_LB_BASE:-0}"
-CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -pthread -DM11_LB_BASE=$M11_LB_BASE"
+M11_OV_CLASSCREATE="${M11_OV_CLASSCREATE:-0}"   # m11_build.sh と同じ -D を揃える (m11_ov.c の既定も 0)
+CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -pthread -DM11_LB_BASE=$M11_LB_BASE -DM11_OV_CLASSCREATE=$M11_OV_CLASSCREATE"
 cc() { local src="$1" obj="$2"; shift 2
   if [ ! -f "$obj" ] || [ "$src" -nt "$obj" ]; then echo "[gf] cc $(basename "$src")"; emcc -c "$src" -o "$obj" "$@"; fi; }
 

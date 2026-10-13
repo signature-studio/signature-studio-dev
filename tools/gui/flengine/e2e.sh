@@ -3,18 +3,24 @@
 #   bash tools/gui/flengine/e2e.sh
 # 終了コード: 0 = 全 gate PASS かつ全ネガティブコントロールが期待どおり FAIL / 1 = gate FAIL またはネガコンが FAIL しなかった / 2 = 前提欠如。
 # 前提: tools/m11/work/ (work-m11 素材 + gen_ir2 済み IR)・emsdk・node・python3 (+ x86_64-w64-mingw32-gcc: tools/gui/gen_api.py の arity 表)。
-#   FL_WIN64_DIR は gen_ir2 の ldfix にだけ必要 (本スクリプトは IR を再生成しない)。PATH は env.sh の GF_EXTRA_PATH で足せる。
+#   FL_WIN64_DIR は gen_ir2 の ldfix と m11_build.sh の qstore 段 (PE 突合) に必要。PATH は env.sh の GF_EXTRA_PATH で足せる。
+#   tools/m11 は読取専用: m11_build.sh は work/ を in-place 更新するため、素材を $GF_W/tree へ複製し複製側で baseline / build を回す。
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; source "$HERE/env.sh"
-W="$GF_W"; M="$GF_M11"; R="$HERE/results"; mkdir -p "$W/res" "$R"
+W="$GF_W"; SRC="$GF_M11"; TREE="$W/tree"; R="$HERE/results"; mkdir -p "$W/res" "$R"
 S() { echo "[gf_e2e] $*"; }
 t0=$(date +%s); S "start load=$(cut -d' ' -f1-3 /proc/loadavg) nproc=$(nproc)"
-for f in boot_final.ll boot_final3.ll m11_image.bin; do [ -f "$M/work/$f" ] || { S "前提欠如: tools/m11/work/$f (work-m11 素材 + m11_gen_ir2.sh)"; exit 2; }; done
+for f in boot_final.ll boot_final3.ll m11_image.bin; do [ -f "$SRC/work/$f" ] || { S "前提欠如: tools/m11/work/$f (work-m11 素材 + m11_gen_ir2.sh)"; exit 2; }; done
 [ -f "${FL_WIN64_DIR:-/nonexistent}/extracted/block00031_PE.bin" ] || { S "前提欠如: FL_WIN64_DIR/extracted/block00031_PE.bin (import thunk 表)"; exit 2; }
 command -v x86_64-w64-mingw32-gcc >/dev/null || { S "前提欠如: x86_64-w64-mingw32-gcc (gen_api.py の arity 表)"; exit 2; }
 
-S "0/6 baseline (GUI shim 無し, 同一 IR): m11_build.sh → m11_run.mjs / m11_survey.mjs"
+S "0/6 複製: tools/m11 + tools/shim + tools/shared → $TREE (m11_build.sh の相対参照を保つ)"
+rm -rf "$TREE"; mkdir -p "$TREE"; cp -a "$SRC" "$GF_GUI/../shim" "$GF_GUI/../shared" "$TREE/"
+export GF_M11="$TREE/m11"; M="$GF_M11"
+(cd "$SRC/work" && sha256sum boot_final.ll boot_final3.ll | sed 's/^/material  /') > "$R/ir_sha256.txt"   # 素材そのままの IR (provenance)
+S "0/6 baseline (GUI shim 無し, 同一 IR): m11_build.sh → m11_run.mjs / m11_survey.mjs (複製側)"
 ( cd "$M" && bash m11_build.sh > "$W/res/m11_build.log" 2>&1 ) || { S "m11_build.sh 失敗"; tail -5 "$W/res/m11_build.log"; exit 2; }
+(cd "$M/work" && sha256sum boot_final.ll boot_final3.ll | sed 's/^/after_m11_build  /') >> "$R/ir_sha256.txt"   # m11_build.sh (qstore/alloca/post) 後の IR
 ( cd "$M" && node m11_run.mjs 2>/dev/null | sed -n 's/^M11_RESULT //p' > "$W/res/baseline_boot.json" && node m11_survey.mjs 2>/dev/null | sed -n 's/^M11_SURVEY //p' > "$W/res/baseline_survey.json" )
 [ -s "$W/res/baseline_boot.json" ] && [ -s "$W/res/baseline_survey.json" ] || { S "baseline 取得失敗"; exit 2; }
 
