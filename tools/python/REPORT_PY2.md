@@ -1,8 +1,8 @@
 # python 付録: PY-2 静的リンク + Py_* 動的束縛の対応表 (#83 / #115)
 
-(REPORT.md の 250 行上限のため §11 を無変更で分割移動。本体からは §7c として参照)
+(REPORT.md の 250 行上限のため分割移動。本体からは §7c として参照。REPORT.md の §11 (MIDI, PY-6) とは別節)
 
-## 11. CPython を provider と同一 wasm に静的リンク (PY-2, #83 / #115 の対応表)
+## 7c. CPython を provider と同一 wasm に静的リンク (PY-2, #83 / #115 の対応表)
 
 既知類型との関係: 該当なし (lift / 逆アセの欠陥類型ではない。PE 側は束縛名の機械抽出のみ)。flapi の実体は §7b の provider (最小エンジン状態) で、**実 FLEngine wasm ではない** (範囲外の節参照)。
 
@@ -39,7 +39,7 @@ FL は `LoadLibrary("Python312")` 後に `Py_*` を動的束縛する。`analysi
 | 束縛名 | **110** (重複 0)。関数 93 + データ 16 (`PyExc_*`・`Py*_Type`・`_Py_{None,True,False}Struct`・`Py_DontWriteBytecodeFlag`) + lib に無い 1。保存先スロット 110/110 |
 | `libpython3.12.a` との照合 | 109 件が定義済み (`llvm-nm --defined-only`)。残り 1 件 `_PyInterpreterState_GetRefTotal` は CPython 3.12.1 の `Objects/object.c` で `#ifdef Py_REF_DEBUG` 内のみ定義 = release build に存在しない。FL 同梱の python312.dll は `Py_REF_DEBUG` 付きではないので束縛は実行時に失敗し得るが、FL 側の使用有無は未確認 (下記未解決)。`ALLOW_ABSENT` に根拠付きで 1 件だけ許容し、根拠が成立しなくなったら gate が落ちる |
 | 静的版での解決 | `flpy_resolve(name)` が 109 件全てを非 NULL で返す (`pybind_refs.inc` を生成して `src/pybind_resolve.c` が表を持つ)。`wasmTable.get(resolve("Py_IsInitialized"))()` が 1、`PyEval_SaveThread` → `PyEval_RestoreThread` の後も tool が動く |
-| サブインタプリタ | `Py_NewInterpreterFromConfig`・`Py_EndInterpreter`・`PyInterpreterState_*`・`PyThreadState_{New,Clear,DeleteCurrent,Swap,Get}` を FL が束縛し、`libpython3.12.a` にも在る。**wasm で実際に新規サブインタプリタを作れるかは未検証** (#76 PY-6) |
+| サブインタプリタ | `Py_NewInterpreterFromConfig`・`Py_EndInterpreter`・`PyInterpreterState_*`・`PyThreadState_{New,Clear,DeleteCurrent,Swap,Get}` を FL が束縛し、`libpython3.12.a` にも在る。`flpy.wasm` (SAB 版) は REPORT.md §11 で 3 構成 (isolated+OWN_GIL / isolated+SHARED_GIL / legacy) の成功を実測済み。**静的版 (`flpy_static`) では未検証** (#76 PY-6) |
 | FL が使う初期化 | `PyConfig_InitIsolatedConfig` + `Py_InitializeFromConfig` + `Py_DecodeLocale` + `PyWideStringList_Append`、`PyImport_AppendInittab` (組込 module 登録は `flpy.c` と同方式)、`Py_DontWriteBytecodeFlag`。`PyGILState_*` は束縛されない = FL は `PyEval_SaveThread/RestoreThread` と `PyThreadState_New/Swap` で GIL を扱う |
 
 gate (`pybind_extract.py --check`、不合格は exit 1): 抽出件数 = 110、全名が lib に在る (許容 1 件を除く)、許容の根拠が成立、must-have 5 名 (`Py_InitializeEx` `Py_NewInterpreterFromConfig` `PyRun_SimpleString` `PyEval_SaveThread` `PyImport_AppendInittab`) が抽出済み、重複なし、スロット抽出率。
@@ -66,7 +66,7 @@ gate (`pybind_extract.py --check`、不合格は exit 1): 抽出件数 = 110、�
 
 - **HEAD 再現 (5a0b3c3、クリーン worktree にコミット済み内容を展開し、`build_flpy.sh` → `provider/build.sh` → `build_flpy_static.sh` を再実行)**: `pybind_extract --check` OK、SAB+provider `all_tools` 48/48・37,424、`static_check` 3 回とも STATIC CHECK OK (差 0/48 ×2)、0.29 / 0.30 / 0.28 秒 (load 1.10)。
 - 範囲: node (メインスレッド) での静的版 48 tool と対応表。入力 (MCPTools.pyc 100,674B / midi.py / utils.py / `block00031_PE.bin`) は `fl-win64` 素材から配置。CPython wasm は本 run でクリーンビルド 3m21.904s (4 core)、`build_flpy_static.sh` 5.0 秒。
-- 範囲外: **実 FLEngine wasm へのリンクは未実施** (実 FLEngine は MS5 部分起動止まりで `fl_api_call` を持たない)。本節の「FLEngine 側」は `provider/fl_engine.c` の最小エンジン状態。headless Chrome・Worker 内での静的版・`run_all.sh` 全体は未実施。サブインタプリタ・複数スレッド・Memory64 は未検証。
+- 範囲外: **実 FLEngine wasm へのリンクは未実施** (実 FLEngine は MS5 部分起動止まりで `fl_api_call` を持たない)。本節の「FLEngine 側」は `provider/fl_engine.c` の最小エンジン状態。headless Chrome・Worker 内での静的版・`run_all.sh` 全体は未実施。静的版でのサブインタプリタ・複数スレッド・Memory64 は未検証。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|

@@ -63,4 +63,4 @@ C. FL 側に固有の Python C API 使用 (`PythonSession`/`TMCPPythonSession`, 
 - Python を実行してよいのは **UI スレッドと MIDI スレッドのみ**。audio スレッド (AudioWorklet) からは呼ばない (FL API 自身が audio 側で "Operation unsafe at current time" を返す設計。AudioWorklet 内は `Atomics.wait` 不可)。
 - 静的リンク版では `_flhost.call` が呼出し元スレッド上で同期に完結し、callback も同一スレッドで戻る (FL 本来の動作)。
 - FL は `PyGILState_*` を束縛せず `PyEval_SaveThread/RestoreThread` + `PyThreadState_New/Swap` を使う (PE `0xc395a0` から抽出した 110 名の対応表: `analysis/pybind/pybind_map.tsv`)。静的版は SaveThread→RestoreThread 往復後の動作を確認済み。
-- 未検証: pthread 版での複数スレッド同時利用、サブインタプリタ (`Py_NewInterpreterFromConfig`)、Memory64 でのリンク (#76)。
+- 未検証: pthread 版での複数スレッド同時利用、静的版 (`flpy_static`) でのサブインタプリタ (`Py_NewInterpreterFromConfig`。SAB 版 `flpy.wasm` は REPORT §11 で 3 構成成功)、Memory64 でのリンク (#76)。
