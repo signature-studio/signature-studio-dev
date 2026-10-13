@@ -7,24 +7,21 @@
  "units_run": 0,
  "init_count": 895,
  "survey": {
-  "ok": 815,
+  "ok": 828,
   "noproc": 1,
   "miss": 46,
-  "trap": 80,
+  "trap": 67,
   "kinds": {
-   "halt0->longjmp": 65,
-   "memory access out of bounds": 14,
-   "gui_failfast": 1
+   "halt0->longjmp": 54,
+   "memory access out of bounds": 13
   },
-  "failfast_units": {
-   "EnumFontFamiliesExW": 1
-  }
+  "failfast_units": {}
  },
  "reach": [
   {
    "order": 1,
    "name": "LoadStringW",
-   "calls": 48116197,
+   "calls": 48069975,
    "kind": "IMPL",
    "prio": "1"
   },
@@ -45,7 +42,7 @@
   {
    "order": 4,
    "name": "ReleaseDC",
-   "calls": 2,
+   "calls": 3,
    "kind": "IMPL",
    "prio": "0"
   },
@@ -73,7 +70,7 @@
   {
    "order": 8,
    "name": "MessageBoxA",
-   "calls": 55,
+   "calls": 52,
    "kind": "IMPL",
    "prio": "2"
   },
@@ -151,16 +148,14 @@
    "order": 19,
    "name": "EnumFontFamiliesExW",
    "calls": 1,
-   "kind": "STUB",
+   "kind": "IMPL",
    "prio": "2"
   }
  ],
- "reach_summary": "reached=19 impl=18 stub=1",
- "failfast_apis": {
-  "EnumFontFamiliesExW": 1
- },
+ "reach_summary": "reached=19 impl=19 stub=0",
+ "failfast_apis": {},
  "softstub_apis": {},
- "failfast_count": 1,
+ "failfast_count": 0,
  "gui_icall_calls": 1,
  "gui_ring_discarded": 0,
  "icall_miss": 47,
@@ -177,13 +172,13 @@
   "GetCurrentThread:1"
  ],
  "probes": {
-  "GetMem": 24058513,
+  "GetMem": 24035567,
   "FreeMem": 21,
-  "FastMM_GetMem(407a50)": 24058555,
+  "FastMM_GetMem(407a50)": 24035618,
   "FastMM_FreeMem(407e20)": 24,
   "InitUnits": 0,
-  "Halt0": 66
+  "Halt0": 55
  },
- "va_calls": 1248,
- "va_bytes": 1554251776
+ "va_calls": 1244,
+ "va_bytes": 1552941056
 }

@@ -5,11 +5,13 @@
 一方 **`RegisterClass*` / `CreateWindowEx*` は自然起動でも survey でも未到達** (通常起動は unit #23 で Halt0、#134 / #490 の先)。実 WNDCLASS を JS から指向呼出した場合は
 `RegisterClassW` ×2 が shim に届き、`TApplication` の窓 (hwnd 31bit) が生成できる。再現: `bash tools/gui/flengine/e2e.sh` (gate 12 + ネガコン 5。FAIL なら exit 1)。
 
+> **注 (review #576 指摘 2)**: §1・§3・§4 の数値は merge 前 (`b867b94` 以前) の測定。`main` 取込後の HEAD (`a608f18`) の実測は **§6c が正**。`EnumFontFamiliesExW` は現在 IMPL で fail-fast stub ではない。
+
 既知類型との関係: 該当 `docs/DEFECTS.md` D1b 系 (比較が定数に畳まれ分岐が誤る) の入力側変種 1 件 (§5-2, 新規行案あり) / D1 系は m11 REPORT §10 と同根。他は該当なし。
 
 ## 1. 結論と実測
 
-検証起点: コード commit `d4665eb` (以降 docs と results の再生成のみ)。環境: runner 4 vCPU, node v22.23.3, emcc (`/opt/emsdk`), 素材 work-m11 + fl-win64。m11 は `m11_gen_ir2.sh` (ldfix 有効, 20.5 秒) → `m11_build.sh` で現 main の IR を再生成してから測った。
+検証起点: コード commit `d4665eb` (以降 docs と results の再生成のみ)。環境: runner 4 vCPU, node v22.23.3, emcc (`[EMSDK]`), 素材 work-m11 + fl-win64。m11 は `m11_gen_ir2.sh` (ldfix 有効, 20.5 秒) → `m11_build.sh` で現 main の IR を再生成してから測った。
 
 | 項目 | 実測 | 定義 / 分母 |
 |---|---|---|
@@ -74,7 +76,7 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 
 ## 4. 指向呼出 (`probe.mjs`; 自然到達ではない)
 
-自然起動は `RegisterClass*` に届かないため、DllMain attach 後に JS から lift 済み関数を直接呼ぶ。**呼出元が JS である点で自然到達とは区別する**。
+自然起動は `RegisterClass*` に届かないため、DllMain attach 後に JS から lift 済み関数を直接呼ぶ。**呼出元が JS である点で自然到達とは区別する**。下表は merge 前 (`b867b94`) の値 (WNDPROC seed 前のため `TLightweightLayeredControl` = NULL)。seed 後の HEAD では hwnd `0x110000e` (§6b / §6c)。
 実 FLEngine の RegisterClassW 呼出点は IR 全体で 5 (`lift_fnmap.py --ir`: `function_425260` (= RegisterClassW ラッパ)・`function_52a7f0`・SetWindowLongPtrW 2・SetClassLongPtrW 1)。
 `function_425260` の呼出元は `function_71dd80` と `function_867e10`。
 
@@ -156,7 +158,23 @@ reach_test 11 / adapt_test 28 passed、sigprobe は adapter 有り mismatch 0 / 
 - `bash tools/gui/e2e.sh` (受入条件 3): 1 回目 **rc 1** — step 1 の native selftest (ASan) が `heap-use-after-free` (`gui_headless.c:33 blit_surf` を render スレッドが読み、`gui_core.c:174 surf_free` を main スレッドが先に解放)。同じ HEAD で再実行した 2 回目は **rc 0 / 61 秒** (selftest 324 passed、native lift・Chrome とも golden EXACT MATCH 0/64000 px、reach_test 11 / adapt_test 28 passed)。
   この PR は `tools/gui/src`・`test`・`include` を **変更していない** (`git diff a38ba81 HEAD` が空)。selftest 単体を 3 連続実行した結果は 3 回とも 324 passed / 0 failed。1/6 回の失敗の原因 (render スレッドと surface 解放の競合と推定、**未確認**) は未調査 → §7。
   なお最初の rc 1 の前に、新規 worktree に `node_modules` が無く step 5 (tsc) で rc 1 になる環境起因の失敗が 1 回あった (本 PR と無関係。symlink で解消)。
-- 環境: runner 4 vCPU、素材 work-m11 + fl-win64、`/home/ubuntu/...` 固定パスは symlink。`m11_wndseed.sh` の lift 実測: RetDec 1,212 range が 2 分 0.5 秒 (3 回目) / gen_ir2 30.0 秒。
+- 環境: runner 4 vCPU、素材 work-m11 + fl-win64 (PE は `FL_WIN64_DIR` 参照。§6c の再測は symlink 無しで実行)。`m11_wndseed.sh` の lift 実測: RetDec 1,212 range が 2 分 0.5 秒 (3 回目) / gen_ir2 30.0 秒。
+
+## 6c. HEAD 再測 (review #576 指摘 2・8・9 への対応。merge 後の木 `a608f18`)
+
+`main` 取込後の HEAD で再測した。順序は `m11_wndseed.sh` (boot5 取込と最終 IR 生成) → `flengine/e2e.sh` → `gui/e2e.sh`。素材は work-m11 / work-liftdiff / fl-win64 (`FL_WIN64_DIR`)、`toolchain-retdec` / `toolchain-emsdk`、`gcc-mingw-w64-x86-64`、capstone / pefile。
+
+| 実行 | 結果 | 所要 (load 開始→終了) |
+|---|---|---|
+| `bash tools/m11/m11_wndseed.sh` | rc 0。WNDCLASS 11 件 / fn WNDPROC 8 / 最終 IR で未定義 0 (`WNDCLASS-CHECK PASS`)。`results/wndclass_scan.json` は再生成で差分 0 | 2 分 54 秒 |
+| `bash tools/gui/flengine/e2e.sh` | rc 1。**judge 13/14** (FAIL は S1 のみ)。ネガコン 9/9 が期待どおり FAIL。native selftest 431 passed / 0 failed | 198 秒 (0.90 → 1.05) |
+| `bash tools/gui/e2e.sh` | 3 回実行。1 回目 rc 1 (step 2b の native selftest 段で出力が途切れて終了。ASan 出力は grep で除外され未確認。§7 の UAF と同じ段)。2 回目 rc 127 (worktree に `node_modules` が無い環境要因。`pnpm install --frozen-lockfile` で解消)。**3 回目 rc 0 ALL PASS** | 3 回目 94 秒 |
+
+judge の 14 gate の内訳:
+- PASS 13: L1 (ff・soft) / A1 / B1 (units_run 22・init 23 は baseline と一致) / R1 (`LoadStringW` IMPL ×4) / R2 (到達 19 = floor 19) / S2 / P1〜P4 / P5 (`TLightweightLayeredControl` hwnd `0x110000e`) / W1。
+- **FAIL: S1** (survey parity, soft): `ok/noproc/miss/trap = 828/1/46/67`、baseline は `864/1/46/31`。merge 前 (`b867b94`) は 816/1/46/79 で一致していた。baseline は main の m11 変更で 864 に動いたが、GUI 結合 (soft) は 828 にしか動かず、**36 unit が baseline では ok、GUI 結合では trap**。survey の結果 JSON は unit 単位の内訳を持たないため、原因の切り分けは未実施 (§7)。この状態は merge 不可。
+- `survey_ff` と `survey_soft` が一致 (828/67) し、fail-fast 例外は 0 件。`EnumFontFamiliesExW` は実装済み。
+- `IMPORTS.md` §4 の「到達 & STUB 経路」は **なし** (実行時 `kind` で分類する版に変更、`gen_api.py`)。
 
 ## 7. 未解決
 
@@ -166,12 +184,13 @@ reach_test 11 / adapt_test 28 passed、sigprobe は adapter 有り mismatch 0 / 
 | `function_52a7f0` の `TempClass.lpfnWndProc` load 脱落 (§5-2) | AllocateHWnd 経路 (TPUtilWindow = Timer / 非同期 window) が全滅 | [M11] / ldfix 子チケットを PM が起票 (本 REPORT の DEFECTS 行案) |
 | ~~WNDCLASS 静的実体の WNDPROC を closure seed に追加する pass~~ | **解消 (#565, §6b)** | — |
 | probe の `m11_icall` miss target `0x6c6f` (3 件) の由来 | 窓生成は成功。WM_NCCREATE の WNDPROC 差替え経路と推定 (未確認) | #565 に所見 (未起票。PM 判断) |
-| `bash tools/gui/e2e.sh` step 1 (ASan) の `heap-use-after-free` (`blit_surf` ↔ `surf_free`) が 2 回中 1 回出た (shim は本 PR で未変更) | gui e2e が非決定的に FAIL。受入条件 3 の「ALL PASS 維持」は 2 回目で満たしたが安定とは言えない | GUI-2 系で PM が起票 (再現頻度の測定から) |
+| `bash tools/gui/e2e.sh` step 1 (ASan) の `heap-use-after-free` (`blit_surf` ↔ `surf_free`) が 2 回中 1 回出た (shim は本 PR で未変更) | gui e2e が非決定的に FAIL。受入条件 3 の「ALL PASS 維持」は 2 回目で満たしたが安定とは言えない | 起票依頼 (PM): GUI-2 系。HEAD `a608f18` で 3 回中 1 回 rc 1 を再現 (§6c) |
+| flengine S1 の回帰: GUI 結合 (soft) で 36 unit が ok→trap (`828/67` vs baseline `864/31`) | merge 前は一致。merge 後のみ発生 (§6c)。merge 保留の理由 | 起票依頼 (PM): #174 / GUI-3 の後続。切り分けは unit 単位の survey 出力が必要 |
 | 動的に作られる WNDCLASS (スタック/ヒープ上で組む `RegisterClass`) の WNDPROC | 静的走査では拾えない。`function_52a7f0` 等 5 呼出点のうち静的実体を渡すのは 2 点 | m11 / icall 系で PM が起票 |
 | `EnumFontFamiliesExW` 実装 (コールバック `gui_call4` 経由) | survey の 1 unit が fail-fast | GUI-2 系 (P2 stub 昇格, #174 に所見) |
 | `LoadStringW` 48M 回の unit 特定と資源供給 hook (`gui_set_resource_provider` ← shimx / PE .rsrc) の接続 | LoadStringW が常に空文字 | #174 に所見 / GUI-2 または shimx |
 | 受入「`__pe_image` を m11_data_gen 方式の data 実体化へ統合」(スコープ 3) | 未着手 (本 PR は m11 の image 敷設をそのまま利用) | 新規子チケットを PM が起票 |
 | 実ブラウザ host 結線 (`GuiHost.attach`・FL ワーカ化・UI スレッドのスタック量 §2-2 #8) | node の headless host のみ。描画 (#32) は別 | #32 / #121 |
-| `tools/m11/m11_e2e.sh` と `m11_gen_ir2.sh` が PE パスを `/home/ubuntu/...` 固定 | runner では ldfix が黙ってスキップされ数値が変わる (本 PR は sed で回避) | m11 に `FL_WIN64_DIR` 参照を提案 (#132 の未解決と同件) |
+| `tools/m11/m11_e2e.sh` 等が PE パスを作業 VM の固定値で持つ (`m11_lift.sh` / `m11_gen_ir2.sh` / `m11_wndseed.sh` は本 PR で `FL_WIN64_DIR` 参照に修正済み) | 修正していない箇所は runner で動かない。ldfix は黙ってスキップされ数値が変わる | 起票依頼 (PM): m11 系の残りを `FL_WIN64_DIR` 参照へ (#132 の未解決と同件) |
 
 範囲外: 実ブラウザ・Canvas 描画、audio、UI スレッドのスタック量、`gui_reach` の性能影響 (INTEGRATION §4-12 の未計測は継続)。
