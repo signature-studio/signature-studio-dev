@@ -47,14 +47,23 @@
 
 ## GUI-20 (#1217): e2e.sh 連続実行と 6h CDP タイムアウトの再現確認
 
-検証 commit `f7bebc7b` (origin/main、コード変更なし。本節は docs のみ追記)。`TMPDIR=$RUNNER_TEMP`、`bash tools/gui/e2e.sh` を foreground で実行。素材: fl-win64 は既定取得、toolchain-emsdk / toolchain-retdec 展開済み。`x86_64-w64-mingw32-gcc` は runner 既設。
+測定 commit `0e9fcaae` (head = origin/main `31553dd9` を merge した commit。`git diff f7bebc7b 0e9fcaae -- tools/gui` = 6 files / +190 −4 で、e2e 経路に `gui_core_ext.inc` +2 行を含む)。本節の数値はこの commit の実測。`TMPDIR=$RUNNER_TEMP`、`bash tools/gui/e2e.sh` を foreground で実行。素材: fl-win64 / toolchain-emsdk / toolchain-retdec を `ls` で実在確認。`/opt/emsdk`・`/opt/retdec` 展開済み。
 
-- **初回 (run1)**: rc=127。worktree に `node_modules` が無く step 5 の `tsc` が見つからなかったための環境起因の失敗 (e2e の判定ではない)。`pnpm install --frozen-lockfile --ignore-scripts` (worktree 内、0 秒) 後は解消。
-- **注記**: run2〜run11 は `pnpm install` を挟んだ後の環境であり、「同一環境での連続 10 回」ではない (run1 の除外は環境起因と判断)。
-- **連続実行 (run2〜run11、10 回)**: rc 0 / `ALL PASS` が **10/10**。1 回あたり 211〜214 s。開始 load 1 分値は 0.70〜3.23 (run2〜11 の範囲)。
-- **6h ストレス (step 6h, 各 run 2 本の本番 + 2 本のネガコン)**: 本番 2 本は全 run で PASS (50,010 frames, inDropped 0, outFullWaits 0, gens {"0":1})。`CDP command timed out` は **0 件 / 10 run**。ネガコン burst・leak は全 run で exit 1 を検出。
-- **判定**: 受入条件 2 (n≥10 連続 rc 0 と所要・load の記録) は **達成**。受入条件 1 (6h の CDP タイムアウト原因の特定) は **未達**: 本 run で再現しなかったため原因を実測で特定できていない。以前の 1 回の失敗の再現条件 (並行負荷の有無・agent-browser の eval 待ち時間) は未確定。
-- **受入条件 3 (#740 の修正前 ASan 再現ログ)**: 本 run では取得していない (未達)。
+- **前処理 (記録のみ・判定外)**: 初回 run は `x86_64-w64-mingw32-gcc` 不在 (3 s で step 3 失敗)、続く run は worktree に `node_modules` が無く step 5 の `tsc` が見つからず rc 127。それぞれ `gcc-mingw-w64-x86-64` の apt 導入と `pnpm install --frozen-lockfile` で解消し、以下の 6 run は同一環境 (前処理後) で連続実行。
+- **連続実行 (head `0e9fcaae`、foreground、6 回)**:
+
+| run | rc | 実時間 | 開始時 load (1 分値) | 結果 | step 6h CDP timeout |
+|---|---|---|---|---|---|
+| 1 | 0 | 203 s | 1.33 | ALL PASS | 0 |
+| 2 | 0 | 201 s | 3.13 | ALL PASS | 0 |
+| 3 | 0 | 202 s | 2.47 | ALL PASS | 0 |
+| 4 | 0 | 201 s | 2.22 | ALL PASS | 0 |
+| 5 | **1** | 223 s | 2.69 | FAIL (step 6h `stress.sh` 2/4 で `agent-browser eval: CDP command timed out: Runtime.evaluate`) | **1** |
+| 6 | 0 | 201 s | 1.51 | ALL PASS | 0 |
+
+- **run5 の失敗**: step 6h の 2/4 (ALLOW_MEMORY_GROWTH + memory.grow 注入、50000 frames) で CDP 呼び出しがタイムアウトし、`stress.sh` が非 0 で終了して e2e が rc 1。step 1〜6g は run5 でも PASS。他 5 run の 6h は本番 2 本 PASS (50,010 frames, inDropped 0, outFullWaits 0) かつネガコン burst・leak exit 1。失敗の再現条件 (負荷・eval 待ち時間) は本 run では未特定で、#1217 の受入条件 1 の対象。
+- **判定**: 受入条件 2 (n≥10 連続 rc 0) は **未達** (head 上で 6 回中 5 回 rc 0)。10 連続の取得は fix モードの時間上限 (40 分) を超えるため、本 run では 6 回で打ち切った。受入条件 1 (6h の CDP タイムアウト原因の特定) は **未達**。受入条件 3 (#740 の修正前 ASan 再現ログ) は **未達** (未取得)。
+- 未解決の起票先: #1217 (本 issue を open のまま残す)。
 
 未解決の起票先: #1217 (本 issue を open のまま残す)。
 
