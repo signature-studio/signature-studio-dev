@@ -243,6 +243,7 @@ FMA3 経路 `1801a9be0` を 42/600 → **600/600** (N3: RetDec の `vmovapd xmm�
 ## 13. #1026 (ICALL-18): Fresh Air 残落ち 6 件
 
 Fresh Air SlateCore の復元後の残落ち 6 件 (全て vtable 直接 call `call [rax+disp]`、2 関数) を分類。結論と未解決は REPORT_APPENDIX.md §13 (全文)。wasm 実行と native 差分は未実施 (子 issue へ)。
+段別の切り分け (復元前は RetDec 段で既に欠落、2 関数で形が異なる) は `REPORT_APPENDIX_1067.md` (#1067)。
 
 ## 14. #852 (ICALL-11): FLEngine jump table の取りこぼし修正
 
