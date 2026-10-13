@@ -126,6 +126,10 @@ mock との差で見つかったもの: mock は引数の個数/型を検査し�
 原因 (`snprintf` 連結の戻り値で境界を越えて書いた) と修正 (`json_str`/`buf_add` の残量判定・code 4)・ASan と NC の全文は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §7b-2。
 現況 (8674fa6): 固定バッファは消滅 (`json_str`/`buf_add` 削除、結果は malloc して `fl_ret_json` でコピー)。このため `provider_check.mjs` 節 2b の溢れ 5 ケースを削除し、長大入力 (`\x01`×100000 → code 1) の検査に置換した。
 
+### 7b-4. device 5 関数 (MIDI scripting 用) を C 実装 (#74)
+
+実装 60 → 65 (未実装 370)。mock と戻り値・件数の差分 0 (`tests/device_diff.mjs`)。全 48 tool (wasm/mock) は 48/48 ok。詳細・実測は [REPORT_PY74.md](REPORT_PY74.md) §7b-4。
+
 ### 7b-3. ilmcp 8 ハンドラを `host/ilmcp.mjs` の意味論に合わせる (#74, PR #763 / 8674fa6)
 
 getBrowserNames (木・不明パス code 1)・getHighlightNames (21 件)・addChannel/addEffect/storePRScript の検証を JS ホストと一致させた。データは `gen_provider.py` が `analysis/ilmcp/*.json` から `provider/gen/ilmcp_data.h` を生成 (dir 28 / plugin 141 / highlight 21)。`tests/ilmcp_diff.mjs` (新規): 呼出し 32 + 状態 9、diffs 0。ネガティブコントロール (addEffect の plugin 名検証を外す) で 2 件差分。実測・検証表は [REPORT_PY74.md](REPORT_PY74.md) §7b-3。
