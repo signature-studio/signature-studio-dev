@@ -56,7 +56,10 @@ runs:
           # プロンプトは引数でなく標準入力で渡す。Linux は 1 引数を 128KB (131072 バイト) に制限し、
           # 日本語の diff を含む review のプロンプトはそれを超える ("Argument list too long"、終了コード 126)。
           # 再試行のたびにファイルを開き直す。
-          opencode run --standalone --auto \
+          # setsid -w: opencode を別セッションで起動する。エージェントが後始末で `kill 0` や
+          # `kill -- -PGID` を実行しても、この step の bash に SIGTERM が届かない (届くと exit 143 で
+          # step が落ち、rc の記録・リトライ・後続の診断 step が全て走らない。#744)。
+          setsid -w opencode run --standalone --auto \
             --model "$OC_MODEL" --agent "$OC_AGENT" \
             --format json --print-logs \
             < "$OC_PROMPT_FILE" \
