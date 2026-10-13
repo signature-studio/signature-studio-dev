@@ -16,6 +16,9 @@ const cfg = {
   timeinfo: +(q.get("timeinfo") ?? 0),
   sr_after: +(q.get("sr_after") ?? 0),
   burst_floor: +(q.get("burst_floor") ?? 0),
+  ds_fmt: q.get("ds_fmt") ?? "pcm16",   // api=ds*: pcm16 | f32 (FL の primary SetFormat 組立の 2 経路)
+  ds_mode: q.get("ds_mode") ?? "poll",  // poll | notify
+  ds_size: +(q.get("ds_size") ?? 16384),
   input: q.get("input") ?? "none", // noise | gum
   jank: q.get("jank") === "1",     // main thread を 30ms/100ms ブロック
   suspend: q.get("suspend") === "1", // 中間で ctx.suspend()/resume()
@@ -42,7 +45,7 @@ window.__done = new Promise((resolveAll, rejectAll) => {
     arguments: [
       `api=${cfg.api}`, `mode=${cfg.mode}`, `buf=${cfg.buf}`, `depth=${cfg.depth}`, `secs=${cfg.secs}`, `sr=${cfg.sr}`,
       `stress=${cfg.stress}`, `work_us=${cfg.work_us}`, `hiccup_ms=${cfg.hiccup_ms}`, `hiccup_every=${cfg.hiccup_every}`, `timeinfo=${cfg.timeinfo}`, `sr_after=${cfg.sr_after}`,
-      `burst_floor=${cfg.burst_floor}`,
+      `burst_floor=${cfg.burst_floor}`, `ds_fmt=${cfg.ds_fmt}`, `ds_mode=${cfg.ds_mode}`, `ds_size=${cfg.ds_size}`,
     ],
     print: (t) => log("[wasm] " + t),
     printErr: (t) => { stderr.push(String(t)); log("[wasm!] " + t); if (String(t).includes("FAIL-FAST")) setTimeout(() => resolveAll({ aborted: true, what: "fail-fast", stderr, cfg }), 500); },
@@ -153,7 +156,16 @@ function verify(capSpec, cfg, result) {
   for (let k = start; k < nq; k++) { const f = fill[k]; fmin = Math.min(fmin, f); fmax = Math.max(fmax, f); fsum += f; cnt++; }
   v.device_fill = { min: fmin, max: fmax, avg: cnt ? fsum / cnt : 0, unit: "frames (リング充填, worklet 消費直前)" };
   const ch0 = out.subarray(0, frames), ch1 = out.subarray(frames, 2 * frames);
-  if (cfg.mode === "ramp") {
+  if (cfg.api === "ds" && cfg.ds_fmt === "pcm16") {
+    // 16bit PCM 経路: クライアントは int16 ランプ (n%30000+1, 右は符号反転) を書く → shim は v/32768 の float32 へ変換 (2 の冪除算なので厳密)
+    let ok = 0, firstBad = -1, bad = 0;
+    for (let p = 0; p < covered; p++) {
+      const e0 = Math.fround(((p % 30000) + 1) / 32768);
+      if (ch0[p] === e0 && ch1[p] === -e0) ok++;
+      else { bad++; if (firstBad < 0) firstBad = p; }
+    }
+    v.ramp16 = { frames_checked: covered, bit_exact: ok, mismatches: bad, first_mismatch_frame: firstBad };
+  } else if (cfg.mode === "ramp") {
     let ok = 0, firstBad = -1, bad = 0;
     for (let p = 0; p < covered; p++) {
       const e0 = p + 1;

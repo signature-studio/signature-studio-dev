@@ -12,7 +12,7 @@ command -v emcc >/dev/null || { echo "[audio] emcc not found" >&2; exit 1; }
 mkdir -p "$OUT/worklets" "$OUT/js"
 emcc "${FLA_CLANG_FLAGS[@]}" "${FLA_EMCC_FLAGS[@]}" \
   -I"$HERE/src" \
-  "$HERE/src/flaudio.c" "$HERE/src/flasio.c" "$HERE/src/flwasapi.c" "$HERE/test/fla_test.c" \
+  "$HERE/src/flaudio.c" "$HERE/src/flasio.c" "$HERE/src/flwasapi.c" "$HERE/src/flds.c" "$HERE/test/fla_test.c" \
   -o "$OUT/fla_test.js"
 # JS 側: TS を ES module へトランスパイル (型検査は pnpm typecheck 側)、worklet は public/ をそのまま配置
 cp "$ROOT/public/worklets/fl-audio-worklet.js" "$OUT/worklets/"

@@ -5,7 +5,8 @@ set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 OUT="$HERE/results/inventory_raw.txt"
 mkdir -p "$HERE/results"
-WIN=/home/ubuntu/work/analysis/win64/extracted
+. "$HERE/../shared/env.sh"
+WIN="$FL_WIN64_DIR/extracted"
 MAC=/home/ubuntu/work/webstudio/tools/m2/work/FLEngine_x86_64.dylib   # M2 が lipo 抽出した x86_64 スライス (読取のみ)
 {
   echo "### [1] FLEngine_x64.dll: audio/MIDI import 参照元 (fl_audio_xref.py, thunk 経由 e8 解決)"
