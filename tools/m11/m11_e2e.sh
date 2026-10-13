@@ -22,7 +22,7 @@ run() { # run <label> <cmd...> : 失敗しても継続 (rc を記録)
   if "$@" >> "$LOG" 2>&1; then step "$label: ok"; return 0; else step "$label: FAILED (rc=$?; $LOG 参照)"; return 1; fi
 }
 
-PE=/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin
+PE="${PE:-${FL_WIN64_DIR:-/home/ubuntu/work/analysis/win64}/extracted/block00031_PE.bin}"; export M11_PE="${M11_PE:-$PE}"
 miss=0
 [ -f "$PE" ] || { step "PE バイナリ無し: $PE"; miss=1; }
 [ -x /opt/emsdk/emsdk_env.sh ] || [ -f /opt/emsdk/emsdk_env.sh ] || { step "emsdk 無し"; miss=1; }
