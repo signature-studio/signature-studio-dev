@@ -193,27 +193,47 @@ python3 tools/ott/avx/unsup_scan.py tools/ott/work/avx/entries.json \
 
 ### 10.1 変更
 
-`*.sh *.py *.json *.ts *.mjs` (work/ 除く) の `/home/ubuntu` 参照 2 行を置換。既定値は従来と同一 (環境変数未設定のローカル挙動は不変)。
-`*.log` 5 本 (`baseline_e2e.log` ほか) の `/home/ubuntu/work/webstudio/...` は過去実行の出力記録で、受入条件の対象拡張子外のため変更しない。
+- `/home/ubuntu` 参照の置換そのものは #450 (`a4f8a08`) で main に入っている (`build_avx.sh` の `DLL`、`unsup_scan.py` の `paths.PLUGINS_DIR` 経由を含む)。
+- 本 PR の差分は `build_avx.sh` の 1 行移動だけ: `source "$OTT/../shared/env.sh"` を `OUT=` の後から `OTT=` の直後へ動かした (競合解消 `6c6645d` で `source` 行を 1 本にまとめた位置)。`env.sh` は `OTT`・`AVX`・`OUT` を設定も参照もしないため挙動は不変。`git diff --stat origin/main...HEAD` = `build_avx.sh` 1 行 + `REPORT.md` 31 行追加。
+- `unsup_scan.py` は本 PR で変更しない。
+- `*.log` 5 本の `/home/ubuntu/work/webstudio/...` は過去実行の出力記録で、受入条件の対象拡張子外のため変更しない。
 
-| ファイル | 置換 |
-|---|---|
-| `build_avx.sh` | `source tools/shared/env.sh` + `DLL="$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll"` |
-| `unsup_scan.py` | `tools/shared/paths.py` の `PLUGINS_DIR` から `DLL` を組む |
-
-### 10.2 検証 (検証起点 `origin/main` = ee8f70c、素材は `fl-win64` のみ)
-
-- 受入条件 1: `grep -rn '/home/ubuntu' tools/ott/avx --include=*.sh --include=*.py --include=*.json --include=*.ts --include=*.mjs --exclude-dir=work | wc -l` → 0 (置換前 2)。
-- 受入条件 2 (既定値同一性): `ANALYSIS_DIR`/`PLUGINS_DIR` unset で bash (`env.sh`) と python (`paths.py`) が組む DLL パスを、置換前の固定文字列と文字列比較 → 両方一致
-  (`/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll`)。n=1・直列、load average 0.98 (1 分値)。
-- ネガティブコントロール: `PLUGINS_DIR=/nonexistent` で両方が `/nonexistent/ott/binaries/OTT_vst2_win64.dll` を返す (変数が効いている)。
-- 構文: `python3 -m py_compile unsup_scan.py`・`bash -n build_avx.sh` OK。
-
-### 10.3 検証範囲 / 範囲外 / 未解決
-
-範囲外: `avx_e2e.sh` / `build_avx.sh` / `unsup_scan.py` の実行 (e2e 本体)。`OTT_vst2_win64.dll` は `analysis-ott-binaries`、`tools/ott/work/{entrylift,crtlift}` は `work-m6-ott`、emcc は `toolchain-emsdk` が要り、この run は `fl-win64` のみ取得
-(`$HOME/artifacts` に `fl-win64.tar.zst` のみ)。実測: `PLUGINS_DIR=/nonexistent bash build_avx.sh` は DLL 参照前に `cov_entry.json` 無しで停止、`unsup_scan.py` は `pefile` 未導入で import 停止。
-
-| 未解決 | 影響 | 起票先 |
+| ファイル | `origin/main` | 本 PR (`HEAD`) |
 |---|---|---|
-| `avx_e2e.sh` を素材付きで未実行 | 置換行以外の挙動は未検証 (置換は DLL パス定義のみ) | 本 PR のレビュー run (PR 本文の `oc_artifacts:` 行) |
+| `build_avx.sh` | 置換済み (#450) | `source` 行の位置のみ変更 |
+| `unsup_scan.py` | 置換済み (#450) | 変更なし |
+
+### 10.2 検証 (基準 rev ごとに分けて記録)
+
+- 受入条件 1: `git grep -n '/home/ubuntu' <rev> -- tools/ott/avx/*.sh tools/ott/avx/*.py tools/ott/avx/*.json tools/ott/avx/*.ts tools/ott/avx/*.mjs` の行数 (`work/` は未追跡で対象外)。
+
+| 基準 rev | 件数 |
+|---|---|
+| `ee8f70c` (旧 REPORT の検証起点・置換前) | 2 |
+| `a4f8a08^` (#450 の親・置換前) | 2 |
+| `origin/main` (#450 込み) | 0 |
+| `HEAD` (`6c6645d`) | 0 |
+
+- 受入条件 2 (既定値同一性): `env -u ANALYSIS_DIR -u PLUGINS_DIR` で bash (`source tools/shared/env.sh`) と python (`paths.PLUGINS_DIR`) が組む DLL パスは、どちらも置換前の固定文字列 (`/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll`) と文字列一致 (`[ "$a" = ... ]` で判定)。
+- ネガティブコントロール: `PLUGINS_DIR=/nonexistent` で両方が `/nonexistent/ott/binaries/OTT_vst2_win64.dll` を返す (変数が効いている)。
+- 構文: `bash -n build_avx.sh`・`python3 -m py_compile unsup_scan.py` とも OK。
+- 測定条件: n=1・直列、load average 0.59 (測定時の 1 分値)。
+
+### 10.3 e2e 実測 (素材付き・HEAD `6c6645d`)
+
+- 実行: `tools/ott` を cwd として `bash avx/avx_e2e.sh` (スクリプト内 heredoc が `work/avx/` を cwd 相対で開くため)。素材は `analysis-ott-binaries` (`ANALYSIS_DIR` 展開先)・`fl-win64` (`FL_WIN64_DIR` 展開先)・`work-m6-ott` (`tools/ott/work/`)・`toolchain-emsdk` (`/opt/emsdk`、emcc 6.0.12)・`plugins-ott`。展開先は `docs/WORKFLOW.md` §11。
+- 所要: real 6m3.455s (user 59.8s / sys 5m8.3s)。load average (1 分値) 開始 0.63 → 終了 1.08。n=1・直列。
+- 結果: `[avx_e2e] PASS` (exit=0)。
+
+| gate | 結果 |
+|---|---|
+| [1/6] build (VEX 有効 lift → wasm 通常 + VEXCOV probe) | OK (両 build) |
+| [2/6] Gate A (flags=0 回帰) | crt 9 PASS 9 / entry 85 PASS 85、FAIL 0 |
+| [3/6] Gate B (AVX/FMA 強制) | avx 9 / crt 9 / entry 85 すべて PASS、FAIL 0 |
+| [4/6] VEX coverage | avx_cov 9 PASS。native 実行 insn 5436 / wasm VEX hit 182 種、hit⊆native 実行 OK |
+| [5/6] fma_fuzz | native/wasm bit 一致 OK (300012 cases) |
+
+- 置換行の経路: `build_avx.sh` の `DLL` は `x64c.py --pe` と `data_gen.py` の入力になるため、gate [1] は置換後の `PLUGINS_DIR` 経由の DLL パスで走っている。
+- gate 単位の結果は、同 head の oc-reviewer 独立再実行と一致 (所要は別 run のため異なる)。
+- 範囲外: `ott_e2e.sh` / `entry_e2e.sh` / `crt_e2e.sh` の単体実行 (`avx_e2e.sh` の [6/6] は手動・回帰扱い)。
+- 前版の未解決「`avx_e2e.sh` 未実行」は本実測で解消したため削除。
