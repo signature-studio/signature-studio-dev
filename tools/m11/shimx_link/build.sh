@@ -97,10 +97,10 @@ if [ $SOFT = 1 ]; then cc "$HERE/gui_compat.c" "$W/obj/gui_compat.o" $CF; GUIOBJ
 
 # 4. IR → obj (plain: 無改変 / trace: 識別子改名済み) -----------------------------
 if [ $TRACE = 1 ]; then
-  cc "$GEN/boot_trace.ll" "$W/obj/boot_trace$SUF.o" $CF
-  cc "$GEN/trace_wrap.c" "$W/obj/trace_wrap$SUF.o" $CF
+  cc "$GEN/boot_trace.ll" "$W/obj/boot_trace$SUF$WSUF.o" $CF
+  cc "$GEN/trace_wrap.c" "$W/obj/trace_wrap$SUF$WSUF.o" $CF
   cc "$HERE/trace_rt.c" "$W/obj/trace_rt.o" $CF
-  BOOT="$W/obj/boot_trace$SUF.o $W/obj/trace_wrap$SUF.o $W/obj/trace_rt.o"
+  BOOT="$W/obj/boot_trace$SUF$WSUF.o $W/obj/trace_wrap$SUF$WSUF.o $W/obj/trace_rt.o"
 else
   cc "$IR" "$W/obj/boot_plain$SUF.o" $CF
   BOOT="$W/obj/boot_plain$SUF.o"

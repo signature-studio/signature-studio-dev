@@ -27,6 +27,10 @@ let rc = null, threw = null;
 try { rc = mod._m11_boot_enter(0n, 1n); } catch (e) { if (e && e.m11_dllmain_done !== undefined) rc = BigInt(e.m11_dllmain_done); else threw = (e && e.message) || String(e); }
 console.log('BOOT ' + JSON.stringify({ boot_stage: mod._m11_boot_stage(), init_count: mod._m11_init_count(), units_run: mod._m11_units_run(), units_total: mod._m11_units_total(), threw, rc: rc === null ? null : String(rc) }));
 
+// 到達点の回帰検査: 下限 (>=) のみ。#236 / #307 が解消して先へ進んでも落ちない (threw の等値比較はしない)
+check('BOOT.init_count_ge_18', mod._m11_init_count() >= 18, `init_count=${mod._m11_init_count()} (基準 18)`);
+check('BOOT.units_run_ge_17', mod._m11_units_run() >= 17, `units_run=${mod._m11_units_run()}/${mod._m11_units_total()} (基準 17)`);
+
 // boot 由来 (probe 前) の winstubs 呼出: lift IR が実際に winstubs / --wrap に束縛されている証拠
 const bootStat = { cpuid: mod._sx_ws_stat(3), verify_trust: mod._sx_ws_stat(0), loadlib_calls: mod._sx_ws_stat(6), loadlib_miss: mod._sx_ws_stat(7), createprocess: mod._sx_ws_stat(4), pump_calls: mod._sx_ws_stat(9), find_window: mod._sx_ws_stat(10), sysmetrics: mod._sx_ws_stat(11), shell_calls: mod._sx_ws_stat(12) };
 console.log('BOOT_WS_STATS ' + JSON.stringify(bootStat));

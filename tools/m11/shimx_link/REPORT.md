@@ -182,7 +182,7 @@ GetCurrentThreadId 3, GetModuleHandleW, GetProcAddress, InitializeCriticalSectio
 | 項目 | 実測 |
 |---|---|
 | リンク (`--soft --fix --ws`) | **signature mismatch 0 / undefined symbol 0 / duplicate 0**。所要 5.4 秒 (obj キャッシュ無し)。wasm 6,250,610 B (ws 無し 6,239,337 B) |
-| `ws_e2e.mjs` | **PASS 17 / FAIL 0** (所要 0.54 秒)。うち **9 件は `[probe由来]`** (G03 ×4 / G12 ×3 / `WRAP.symbols_in_wasm` / `LOG.loadlib_miss_available`: `sx_ws_probe_*` か wasm バイト列検査で得た証拠で、lift の自然経路ではない)。残り 8 件 (G05 ×7 + `WRAP.count`) のうち、boot 中に lift が自然に踏んだと言えるのは `G05.boot_cpuid_from_lift` (`winstubs_cpuid` 8 回) のみ (他の G05 6 件も `sx_ws_probe_cpuid` 経由の値検査だが、依頼範囲外のため表記は未変更)。旧記載の「PASS 19」は件数の誤記 (check は元から 17 件) |
+| `ws_e2e.mjs` | **PASS 19 / FAIL 0** (所要 0.76 秒)。うち **9 件は `[probe由来]`** (G03 ×4 / G12 ×3 / `WRAP.symbols_in_wasm` / `LOG.loadlib_miss_available`: `sx_ws_probe_*` か wasm バイト列検査で得た証拠で、lift の自然経路ではない)。残り 10 件 (BOOT ×2 + G05 ×7 + `WRAP.count`) のうち、boot 中に lift が自然に踏んだと言えるのは `BOOT.*` ×2 (到達点) と `G05.boot_cpuid_from_lift` (`winstubs_cpuid` 8 回) (他の G05 6 件も `sx_ws_probe_cpuid` 経由の値検査)。`BOOT.init_count_ge_18` / `BOOT.units_run_ge_17` は下限のみ (#236 / #307 で先へ進んでも落ちない) |
 | G05 (lift `__asm_cpuid` 経由) | leaf1.EDX=`0x078bfbff` / cmov=1 / leaf1.ECX=0 / leaf7 AVX2=0。**boot 中に lift から `winstubs_cpuid` が 8 回呼ばれた** (自然経路) |
 | G03 (`--wrap` 経由 probe) | engine ×2 + host exe とも signer_match=1。`WinVerifyTrust` 計数 6 (VERIFY+CLOSE ×3) |
 | G12 (probe) | CreateProcessW 試行 1 / 成功 **0**、`WebView2Loader.dll` は NULL・GetLastError=126、loadlib_blocked=1 |
@@ -196,4 +196,4 @@ GetCurrentThreadId 3, GetModuleHandleW, GetProcAddress, InitializeCriticalSectio
 - **boot は従来どおり unit #18 の OOB (CAB-231/#236) で止まる**。G03 署名・G12 CreateProcessW/WebView2Loader は FL が自然に呼ぶ前に停止するため、これらは同一 wasm 内の probe で `__wrap_*` 経由の挙動を測った (boot 中に自然経路で呼ばれた winstubs は cpuid の 8 回のみ。他の統計は boot 時点で 0)。
   「lift 実機で `winstubs_loadlib_miss` を取得し retval_table を実測校正」は、unit 18 の先へ進むまで**実施不可** (probe の 1 件は校正根拠にならない)。
 - #103 引継ぎ 3 点のうち未着手: (1) `m11_genstubs.py` の除外リストへの pump API 追加は、`shimx_link` 系が genstubs の `m11_winstubs.c` を使わず pump TU も未リンクのため**現構成では不要** (pump を closure に入れる #102 で必要)。(2) `pump_ring_addr()` → `new PumpRing(...)` 結線も #102。(3) 時計較正は ctrl 単体を使わない — 本結線は時計に触れない。
-- `--trace` と `--ws` の併用は未検証 (trace_wrap の改名 IR は ws の定義済み名と未突合)。
+- `--trace` と `--ws` の併用は未検証 (trace_wrap の改名 IR は ws の定義済み名と未突合)。リンクのみ確認 (`--trace --soft --fix --ws`: mismatch 0 / undefined 0 / duplicate 0)、実行は未確認。trace の obj / `BOOT` パスは `$WSUF` 付きで WS 有無のキャッシュを分離済み (`boot_trace_fix.o` 4,282,726 B と `boot_trace_fix_ws.o` 4,282,642 B は別内容)。
