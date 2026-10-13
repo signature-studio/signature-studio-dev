@@ -643,6 +643,7 @@ extern int shimx_drag_accepts(size_t hwnd) __attribute__((weak));
 extern size_t shimx_hdrop_create(const uint16_t *const *wpaths, uint32_t n, int x, int y, int nc) __attribute__((weak));
 extern void DragFinish(size_t hdrop) __attribute__((weak));
 extern void *shimx_get_drop_target(size_t hwnd) __attribute__((weak));
+extern int shimx_drop_invoke(void *target, uint64_t hwnd, size_t hdrop, int x, int y) __attribute__((weak));
 
 #define GUI_STAGE_WIN_DIR "C:\\Users\\webstudio\\Documents\\WebImport"
 #define WM_DROPFILES_ 0x233
@@ -843,5 +844,6 @@ GUI_EXPORT int gui_shimx_attach(void) {
   int m = 0;
   if (shimx_set_notify_hook) { shimx_set_notify_hook(gui_doorbell); g_kernel_notify_attached = 1; m |= 1; }
   if (shimx_set_shell_execute_hook) { shimx_set_shell_execute_hook(gui_shell_execute); m |= 2; }
+  if (shimx_drop_invoke) { gui_set_drop_target_invoker(shimx_drop_invoke); m |= 4; }   /* #1388 SHX-T23: RegisterDragDrop 窓の IDropTarget 呼出し */
   return m;
 }
