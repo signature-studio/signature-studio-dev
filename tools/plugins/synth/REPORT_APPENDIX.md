@@ -38,3 +38,50 @@
 | Morphine (23944) の HLL 段を含む通常経路の実測 | 未実測 (再開経路のみ) | #1301 (PLG-G2-13) |
 | VEX helper 未実装 (未実装 helper 件数 83〜121) と `PLUG_AVX256` 有効時の再測定 | lift 結果の完全性 | #534 (本 issue) |
 | E2 (SSA 値入り定数式) / E4 (`fix_asm_stores` の def 欠落) | 今回の最初のエラーには出ず未再現。 網羅の確認は未実施 | #534 (本 issue) |
+
+## C. #1486: BooBass_Eng (21202) の define 欠落 211 件の原因分類
+
+- 測定 commit: **0b233323** (コードを変えた最後の commit。`git diff 0b233323 HEAD -- tools/plugins/lift tools/plugins/synth` は 0 行)。 測定 HEAD も 0b233323。
+- 素材: `fl-win64` / `toolchain-retdec` / `toolchain-emsdk` / `work-liftlib` / `work-fw-stage1` / `plugins-ott` を `$HOME/artifacts` から展開して使用。
+- 測定: `bash tools/plugins/synth/cpp_lift.sh 21202 1500` (既定) = 40 s、 load (測定前後) `0.20 0.35 0.25` → `0.59 0.43 0.29`。
+  `summary.csv` = `21202,1579,0,1393,0,3,3,1,0,1,39,211,25828,67,23,1391,0` (欠落 211 / 25,828 B / 参照 67 は #1301 の実測と一致)。
+- 分類コマンド: `python3 tools/plugins/synth/missing_define_classify.py tools/plugins/work/synth/cpp21202` (新規)。
+
+### C-1. 原因の分類 (件数)
+
+| 原因 | 件数 | 参照あり (`missing_ref`) | 長さ合計 (B) | 切り分けの根拠 |
+|---|--:|--:|--:|---|
+| (a) RetDec の静的コード検出で `statically linked function` 扱い | **209** | 67 | 25,411 | `e.drc.dsm` が `; statically linked function: ... at <VA>` と label。 `define` が出ない |
+| (b) RetDec が関数名で `define` を出す (`function_<VA>` でない) | **2** | 0 | 417 | `CreatePlugInstance` (0x1800029a0) と `entry_point` (0x180005a50)。 `e.drc.ll` に `@CreatePlugInstance` / `@entry_point` として定義あり |
+| (c) 未分類 | 0 | 0 | 0 | — |
+
+- 209 件の内訳 (長さ): 64 B 以下 137 件 / 65〜256 B 60 件 / 257 B 以上 12 件。
+- 「pass 鎖で消える」は **0 件**。 `e.drc.ll` の define 数 (1391) は、正規化 → `ir5_patch` → … → `e.final.ll` の全段で変わらない (`for f in e.*.ll` の計数で確認)。 欠落は RetDec 段で生じる。
+- 別名化 (`function_<VA>` が無く、範囲の内側に別の define がある) は 0 件。 23 件の余分な define (range 開始 VA でない) は既存で、欠落とは別。
+
+### C-2. 代表例と再現コマンド
+
+- (a) 代表 `0x180002bf0-0x180002c1a` (len 43, 参照なし):
+  `RetDec` を単独 range で実行すると `; statically linked function: ??_G?$codecvt@DDU_Mbstatet@@@std@@MEAAPEAXI@Z at 0x180002bf0` と出て `define` が無い。
+  再現: `/opt/retdec/bin/retdec-decompiler $RUNNER_TEMP/fl-win64/extracted/block21202_PE.bin -o x.c --select-ranges 0x180002bf0-0x180002c1a --select-decode-only` → `grep -c ^define x.ll` = 0。
+  同じ range に `--disable-static-code-detection` を付けると `define i64 @function_180002bf0(i64, i64)` が出る。
+  参照ありの代表 `0x180005a98-0x180005acb` (len 52) も同じ経路 (`__raise_securityfailure`)。
+- (b) 代表 `0x1800029a0-0x180002b03` (`CreatePlugInstance`, len 356):
+  `grep -n '^define .*@CreatePlugInstance' work/synth/cpp21202/e.drc.ll` でヒット。 `function_1800029a0` は無い。 `missing_define` 判定 (開始 VA の `function_<VA>` 有無) では欠落扱いになるが、関数としては出力されている。
+
+### C-3. 修復 (opt-in)
+
+- `tools/plugins/lift/lift_ranges.sh` に `PLUG_NO_STATIC_DETECT=1` を追加 (既定 0 = 挙動不変)。 RetDec に `--disable-static-code-detection` を渡す。 pass 鎖 (`lift/passes/`) は触らない (原因は RetDec 段のため)。
+- 実測 (0b233323、 `PLUG_NO_STATIC_DETECT=1 bash tools/plugins/synth/cpp_lift.sh 21202 1500`): 40 s、 `summary.csv` = `21202,1579,0,1602,0,21,3,1,0,1,39,2,417,0,23,1600,0`。
+  欠落 **211 → 2** (B 25,828 → 417)、参照欠落 **67 → 0**。 未実装 helper 3 → 21 (`__asm_vroundsd` / `__asm_vucomisd` 等。 新規に見えた関数の VEX 命令。 今回は未対処)。
+- `emcc -c` は既定と同じく **rc 1** (最初のエラーは既存の E3 `'%arg2' defined with type 'i32' but expected 'i64'`)。 emcc は最初のエラーで止まるため、回復した 209 関数に後段の型エラーがあるかは未確認。
+- 既定にしない理由: 既定化は `lift_ranges.sh` を使う全 lift の出力を変える。 8 本の他 C++ DLL は `static_labels=0` で出力不変 (下記) だが、 他の batch への影響を未確認のため opt-in に留める。
+- 他 8 本 (`PLUG_NO_STATIC_DETECT=1` と既定の両方で測定、 HEAD 0b233323): `summary.csv` は 8 本とも両者で同一。 `emcc_c_rc` は 604e900f の表 (§A) と同一 (23914=0 / 23916=1 / 23944=0 / 24159=0 / 24163=1 / 24167=1 / 24216=1 / 24298=0)。 `static_labels` は 8 本とも 0。
+
+### C-4. 未解決 (起票先)
+
+| 未解決 | 件数 | 起票先 |
+|---|--:|---|
+| 静的検出の既定化 (`PLUG_NO_STATIC_DETECT` を既定 1 にする) と他 batch への影響確認 | 209 件 (BooBass_Eng) | 子 issue (本 run で起票) |
+| 関数名で出る 2 件 (`CreatePlugInstance` / `entry_point`) の `function_<VA>` への正規化 | 2 件 | 子 issue (本 run で起票) |
+| 回復 209 関数の後段 (emcc 型エラー) の確認。 E3 が先に止めるため未確認 | 209 件 | #1301 (PLG-G2-13) |
