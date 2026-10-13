@@ -103,7 +103,7 @@
 
 ## 7. 未解決 / ブロッカー / ユーザ依頼
 
-- 未解決: ① ~~低信頼 47 ID~~ → L-6 で解消 (§10; med 25 件の役割確定は §10.4), ② native plugin state (event 213) は blob のまま (plugin 毎デコーダ未実装), ③ ~~版境界 stride~~ → §10 で規則を engine から確定 (build 4702–4719 の実標本のみ無し), ④ ~~ORACLE の STFT 判定 (D クラス) 未実装~~ → L-5 で実装 (§11) / C・D 閾値は暫定。
+- 未解決: ① ~~低信頼 47 ID~~ → L-6 で解消 (§10; med 25 件の役割確定は §10.4), ② native plugin state (event 213): 上位 5 plugin は L-3 でデコーダ実装 (§12)、他 plugin は blob のまま, ③ ~~版境界 stride~~ → §10 で規則を engine から確定 (build 4702–4719 の実標本のみ無し), ④ ~~ORACLE の STFT 判定 (D クラス) 未実装~~ → L-5 で実装 (§11) / C・D 閾値は暫定。
 - ブロッカー: なし (ネイティブ FL 不在は設計で回避)。
 - **ユーザ依頼**: (1) 可能ならネイティブ FL 26.1.7 で **Render tests 82 本 + Demo 3 本を 48kHz/32bit float/dither off で WAV 書出し** (ORACLE.md §7) — T5 の golden。(2) Serum 2 / OTT / Fresh Air / Kilohearts を実際に使った `.flp` (第三者 VST の 213 解析と tools/plugins の実使用検証用)。
 - 法務は事実整理のみ: Demo/Template/preset は Image-Line 同梱素材。リポジトリには複製せず派生メタデータのみコミット。PyFLP は GPL-3.0 で **参照のみ** (コード非流用; `id_sets.ts` は ID 番号のみ, 名前とレイアウトは本実装で独立に記述)。
@@ -114,7 +114,7 @@
 |---|---|---|
 | L-1 | wasm FLEngine の FLP load→save ハーネス (T1) | 26.1 保存ファイルで `flpdiff` identical, 書込 ID ⊆ `ENGINE_WRITTEN_IDS` |
 | L-2 | headless offline render 入口 + 決定論ランナー (T2): Render tests 82 本 × 3 回 SHA 一致 | ORACLE §2 |
-| L-3 | 上位 plugin の state (213) デコーダ + 単体 DSP 3 者比較 (T3): Fruity Parametric EQ 2 / Limiter / Reeverb 2 / Maximus / Delay 3 から | クラス A/B 判定表 |
+| L-3 | 上位 plugin の state (213) デコーダ + 単体 DSP 3 者比較 (T3): Fruity Parametric EQ 2 / Limiter / Reeverb 2 / Maximus / Delay 3 から | クラス A/B 判定表 (**デコーダ済 §12 / 3 者比較は未実施**) |
 | L-4 | ネイティブ golden 取込 (T5) と C/D 閾値再校正 | §7 依頼 (1) |
 | L-5 | STFT/LUFS 判定 (`src/wav.ts` D クラス) と最初の差分位置レポート | ORACLE §4.4 (**済 §11, #108**) |
 | L-6 | エンジン読込 switch (`0xa9e7a0` 以降の FlpLoad) 逆アセンブルで低信頼 47 ID を確定 | `unknown_events.json` の undocumented → 0 (**済 §10, #109**) |
@@ -210,3 +210,46 @@
 | true-peak の補間 FIR は BS.1770 Annex 2 の係数表ではなく Kaiser sinc 近似 (fs/4 付近までの正弦で ≤0.001 dB) | ±0.1 dB 判定には十分。規格準拠の係数表が必要なら差替 | #108 コメント |
 | 実機 golden が無いため STFT フロア −60 dB・0.1 dB 等の閾値は暫定のまま | 実 render での偽陽性/偽陰性率は未測定 | L-4 (T5, §8) |
 | 乱数変調 plugin 等 (非相関ノイズ) は STFT 振幅が bin 単位で揺れるため本判定では FAIL する (テストで固定) | 該当 plugin の D 判定には統計的スペクトル (帯域平均) 版が別途必要 | #108 コメント (PM 判断で子チケット化) |
+
+## 12. L-3 (#104): 上位 5 plugin の state (event 213) デコーダ + DSP クラス静的所見
+
+既知類型との関係 (`docs/DEFECTS.md`): 該当なし (lift 無関係。逆アセンブルの静的読みのみ)。検証起点 commit: `0ce863a` (ブランチ `104-plugin-state-decoders`)。**受入条件 (クラス A/B 判定表) は未達**: デコーダは完了、X/L/W の 3 者比較は未実施 (§12.4)。
+
+**手法**。各 plugin DLL の `CreatePlugInstance` → class ref → vtable[3] = `SaveRestoreState` (`tools/plugins/ABI.md` §3.1) を `scripts/plugin_slot3.py` で逆アセンブルし、Save 分岐の `Stream->Write(buf,len)` 列 (`scripts/save_writes.py`) と Load 分岐の `cmp [version],N` ゲートからレイアウトを転記 (`src/plugstate.ts`)。コード由来の根拠: Delay 3 `0x6e8da0` (u32 ver=1 + 0x68 B)、Reeverb 2 `0x6d4920` (ver 10001 = 0x2711 + 0x3e B、10000 は 0x35 B)、Limiter `0x6d3760` (ver 7, 本体 0xa4 B, v7 のみ flags 1 B)、EQ2 `0x6ec340` (ver 8, 本体 0x120 B + 版ゲート付き 12 フィールド)、Maximus `0x83f8f0` (先頭 u32 の上位 word が版, 本体 126×i32 + 2 B + v≥14 で 33 B + 4 band 副ストリーム)。
+
+**12.1 結果** (数え方: 分母 = win 抽出物 FLhd 9,128 ファイル中、`201` 内部名が各 plugin の `213` イベント。再現 `node cli/plugstate.ts $E2E_FLP_WIN_DIR` / `corpus/plugstate.json`):
+| plugin | 213 件数 | 対応版 (件) | layout 適合 | 予測長 = 実長 | 非対応 (旧版・raw 保持) |
+|---|--:|--:|--:|--:|--:|
+| Fruity Parametric EQ 2 | 1,127 | 1,104 | 1,104 | 1,104/1,104 | 23 (v2) |
+| Fruity Limiter | 351 | 338 | 338 | 338/338 | 13 (v5) |
+| Fruity Reeverb 2 | 328 | 321 | 321 | 321/321 | 7 (v19–v400) |
+| Maximus | 165 | 129 | 129 | 副ストリームのため長さ予測なし | 36 (v2–v6, v11) |
+| Fruity Delay 3 | 119 | 119 | 119 | 119/119 | 0 |
+
+- 全 2,090 件で `encode(decode(x)) == x` **byte-exact (2,090/2,090)**。非対応版は tail に全バイト保持するため無損失。
+- Maximus: 本体 510 B (v≤11) / 543 B (v≥14) までを名前付きフィールド化。残り (4 band × 副ストリーム 736–976 B) は各 band オブジェクト自身の `vtable+0x10` が書く可変長で **未デコード** (tail)。
+- 所要 (クリーン HEAD, 1 プロセス): `cli/plugstate.ts` 0.692–0.694 s (n=3, load average 0.56) / `test/plugstate.test.ts` 5/5 PASS 0.148–0.152 s (n=3) / 既存 4 ファイル 29/29 PASS / `tsc` rc 0 / `src/` の `node:` import 0 件。出力 JSON は 3 回で同一。
+- ネガティブコントロール: ① Delay 3 の本体を 26→25 要素にすると layoutOk 119→**0**・予測長 0/119・`plugstate.test.ts` 3 件 FAIL (rc 1)。② Limiter の flags ゲートを v7→v8 にすると layoutOk 338→**157**・予測長 157/338 (rc 1)。いずれも元に戻して rc 0。
+
+**12.2 フィールド意味の範囲**: 名前は DLL の保存対象オフセット (`at`, plugin オブジェクト先頭からの値) まで。EQ2/Limiter/Reeverb 2/Delay 3 の `params` は int32 配列で、各要素のパラメータ名・物理単位への変換は未確定 (実値域のみ観測: 例 EQ2 gain ±1800, Limiter/Maximus は 1000 = 1.0)。
+
+**12.3 DSP クラスの静的所見 (推定。X/L/W 実測ではない)** — `scripts/dsp_class.py` (`corpus/dsp_class.json`): `Eff_Render` (vtable[7]) から `call/jmp rel32` で到達する .pdata 関数を走査。
+| plugin | 閉包 (関数 / B) | x87 超越 | libm import | 間接呼出 | 暫定クラス (推定) |
+|---|--:|--:|--:|--:|---|
+| Parametric EQ 2 | 182 / 38,562 | 0 | 0 | 81 | A 候補 (biquad; 係数計算に `divsd`31・`sqrtsd`1) |
+| Limiter | 35 / 5,751 | 0 | 0 | 53 | A 候補 |
+| Reeverb 2 | 60 / 11,389 | 0 | 0 | 28 | C 候補 (帰還系; ORACLE §4.2) |
+| Maximus | 202 / 50,705 | 0 | 0 | 134 | B–C (マルチバンド圧縮; 閉包外 kernel 表を要確認) |
+| Delay 3 | 1 / 123 | 0 | 0 | 3 | **判定不能** (DSP は別 engine DLL。殻のみ走査) |
+- 間接呼出 (framework の SIMD kernel 表・仮想呼出) は辿っていないため、閉包外の libm 経由は除外できない。A と書いたものは「閉包内に超越関数が見えない」だけで、**bit-exact の証明ではない**。
+
+**12.4 未解決** (`| 未解決 | 影響 | 起票先 |`)
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| X/L/W の 3 者比較 (原本機械語の native 実行 / lift IR / wasm) 未実施。受入「クラス A/B 判定表」は §12.3 の推定止まり | #104 は **Closes にできない** | #104 に継続コメント。次 run で EQ2 (T1) の `Eff_Render` を `tools/plugins/lift/t0_balance` 方式で比較 |
+| Maximus の band 副ストリーム (tail 可変長) 未デコード | Maximus の band 設定は raw | 新規子チケット案 (親 #104) |
+| `params` 要素のパラメータ名・単位変換が未確定 | 値の意味は使えない (バイト保持のみ) | #104 コメント |
+| 旧版 (EQ2 v2 / Limiter v5 / Reeverb 2 v19–400 / Maximus v2–6,11) の Load 変換未転記 | 計 79 件は raw | #104 コメント |
+| Delay 3 の DSP 本体は engine DLL (`PLUGIN_MATRIX.md` #23: shell 3,939K + engine 1,195K) | 判定不能 | #104 コメント |
+| `flp_e2e.sh` 全体は mac 素材前提 (§9 既出)。plugstate 段は `E2E_FLP_WIN_DIR` のみで動く | — | §9 既出 |
+
