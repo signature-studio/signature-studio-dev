@@ -6,9 +6,14 @@ RetDec は Delphi の集成体ローカル (record / OSVERSIONINFOEXW 等) を `
 潰れた alloca への記録域書込み (rep stos / FillChar / Win32 API の出力パラメータ) は shadow stack を
 破壊し、unit survey の OOB / halt0 の主要因だった (tools/m11/REPORT.md §4, tools/m11/shimx_link/REPORT.md §3)。
 
-本 pass は closure IR (boot_final.ll, 全 7,421 定義) を走査し、**使用箇所の要求サイズが alloca 実体積を
+本 pass は closure IR (boot_final.ll, 全 7,421 定義) を走査し、**使用箇所から求めた要求サイズが alloca 実体積を
 超える場合だけ** alloca を [K x i64] に拡幅する。ポインタ値・他の IR は一切変更しない (idempotent:
-既に要求サイズ以上なら不変)。
+既に要求サイズ以上なら不変)。要求サイズの出どころは 2 種類ある:
+  * R1〜R7 = 使用箇所が**具体的なサイズを供給する**もの (定数長・API 仕様・store の型幅)。証拠が無ければ拡幅しない。
+  * R8     = 使用箇所はサイズを供給しない。alloca のアドレスが call / ptrtoint に渡る (escape) だけで、
+             callee の参照幅は静的に分からないため、フレーム上の隣接領域までを要求サイズと**推定する (ヒューリスティクス)**。
+             証拠は「escape した」ことだけなので、実際には使われない stack を足す過大拡幅がありうる (拡幅は別 alloca とは
+             重ならないので安全側)。RetDec の `%stack_var_-N` 命名に依存し、他の名前の alloca には効かない。
 
 検出規則 (証拠 → 要求バイト数):
   R1 rep stos  : __asm_rep_stos{b,w,d,q}_memset(dst, v, N)   → dst >= N*幅      (定数 N のみ)
@@ -19,9 +24,14 @@ RetDec は Delphi の集成体ローカル (record / OSVERSIONINFOEXW 等) を `
   R6 Win32 (buf, count) 表 (COUNT_BUF): count が定数の呼出し → buf >= count*要素幅
       (GetLocaleInfoW の cch*2 等。halt0 53 unit × GetLocaleInfoW 相関の対策)
   R7 直接広 store: store T, ptr %bc (root が alloca) で sizeof(T) > alloca 実体積 → sizeof(T)
+  R8 escape gap : %stack_var_-N が call / ptrtoint の引数に渡る (bitcast 別名含む) → 次の stack_var までの間隔
+                  (N の昇順に並べた隣との差。最小の N は N 全体)。推定であり証拠サイズではない (上記)。
+                  実例: 44bae0 の stack_var_-88 を callee 44ba50 が [rcx+0x2c..0x3e] (GetCPInfo) へ書き 44bb70 の
+                  record を壊していた (#132, tools/m11/REPORT.md §10)。R1〜R7 とは別集計 (detector_counts / widened_by_rule の `R8_escape_gap`)
 
-dst/%bc は bitcast 連鎖 (RetDec が多段に出す) を辿って alloca に帰着させ、GEP/ptrtoint+add 経由の
-参照は closure 実測 0 件であることを確認済み (pass 実行時に検出したら警告を出す)。
+dst/%bc は bitcast 連鎖 (RetDec が多段に出す) を辿って alloca に帰着させ、R1〜R7 の検出が使う GEP 経由の
+参照は closure 実測 0 件であることを確認済み (pass 実行時に検出したら警告を出す)。R8 の escape 判定だけは
+ptrtoint も数える (ptrtoint+add で作った別アドレスへの書込みは追跡しない)。
 
 使い方: m11_alloca.py <in.ll> <out.ll> [--report report.json]
 """

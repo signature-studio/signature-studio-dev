@@ -288,8 +288,12 @@ unsigned long long function_418190(unsigned long long dest, unsigned long long t
 /* function_416db0  VA 0x416db0  (System._CopyArray 系: rcx=dst, rdx=src, r8=型情報(kind byte 先頭), r9=要素数; kind で要素 copy を分岐)
  * RetDec は `movzx rcx, byte ptr [rax]` (rax=r8=型情報) の kind 読出しを落とし, kind が常に 0 → 未知 kind の Error (Halt0) に直行した
  * (unit #18: TFormatSettings の string フィールド (kind=18) が 416750 → 416db0 で Halt0). 逆アセンブル 0x416db0-0x416f65 と突合:
- *   10→413540 / 11→4134e0 / 15→41a7b0 (8B 刻み) / 17→418210(…, ti) / 18→_UStrAsg(4133f0) / 12→416720 (0x18 刻み)
- *   13→自己再帰 (ti+B(ti+1) の {+6:count, +2:stride, +0xa:elemti**}) / 14,22→416750(dst,src,ti) (stride=D(r14+2)) / 他→Error(2) */
+ *   10→413540 / 11→4134e0 / 15→41a7b0 (8B 刻み) / 17→418210(…, ti) / 18→_UStrAsg(4133f0)
+ *   13→自己再帰 (ti+B(ti+1) の {+6:count, +2:stride, +0xa:elemti**}) / 14,22→416750(dst,src,ti) (stride=D(r14+2)) / 他→Error(2)
+ * **kind 12 (0x18 刻み) だけは突合済みでも正しい転記でもない (未対応)**: 機械語は `mov rcx,rbx; mov rdx,rsi; call 0x416720` で dst と src を
+ *   渡すが, 下の case 12 は src を渡さず RetDec 版 function_416720(dst) を呼ぶだけ (src が結果に反映されない). さらに 0x416720 自体も
+ *   `cmp [0x13A5028],0; je → Error(0x10); call [0x13A5028]` (VA 0x13A5028 の関数ポインタ経由で (rcx,rdx) をそのまま渡す) のうち
+ *   RetDec が間接 call (D15) を落としている. kind 12 を実行する unit は未測定 (unit #18 で必要だったのは kind=18). 正しい転記は #490 で追跡 */
 unsigned long long function_416db0(unsigned long long dst, unsigned long long src, unsigned long long ti, unsigned int cnt) {
     u64 rbx = dst, rsi = src, r13 = (u64)cnt;
     if (r13 == 0) return 0;
@@ -299,7 +303,7 @@ unsigned long long function_416db0(unsigned long long dst, unsigned long long sr
     switch (kind) {
     case 10: do { rax = function_413540(rbx, Q(rsi)); rbx += 8; rsi += 8; } while (--r13); break;
     case 11: do { rax = function_4134e0(rbx, Q(rsi)); rbx += 8; rsi += 8; } while (--r13); break;
-    case 12: do { rax = function_416720(rbx); (void)rsi; rbx += 0x18; rsi += 0x18; } while (--r13); break;
+    case 12: do { rax = function_416720(rbx); (void)rsi; rbx += 0x18; rsi += 0x18; } while (--r13); break;   /* 未対応 (src 不使用の近似, #490) */
     case 13: do { u64 et = Q(Q(r14 + 0xa)); rax = function_416db0(rbx, rsi, et, D(r14 + 6)); u64 st = D(r14 + 2); rbx += st; rsi += st; } while (--r13); break;
     case 14: case 22: do { rax = function_416750(rbx, rsi, ti); u64 st = D(r14 + 2); rbx += st; rsi += st; } while (--r13); break;
     case 15: do { rax = function_41a7b0(rbx, Q(rsi)); rbx += 8; rsi += 8; } while (--r13); break;
