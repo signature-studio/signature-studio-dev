@@ -64,6 +64,38 @@ static void L(const char* fmt, ...) {
   }
 }
 
+// SR-1c #256: x86 デバッグレジスタ DR0 で 4 byte 書込 watch を張り、VEH で書込 RIP と値を記録する。
+static volatile int* gWatchAddr = nullptr;
+static int gWatchHits = 0;
+static LONG CALLBACK watchVeh(PEXCEPTION_POINTERS ep) {
+  if (ep->ExceptionRecord->ExceptionCode == EXCEPTION_SINGLE_STEP && gWatchAddr && (ep->ContextRecord->Dr6 & 0xF) &&
+      gWatchHits < 64) {
+    CONTEXT* c = ep->ContextRecord;
+    c->Dr6 = 0;
+    gWatchHits++;
+    HMODULE m = nullptr;
+    GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, (LPCSTR)(uintptr_t)c->Rip, &m);
+    char mod[MAX_PATH] = "?";
+    if (m) GetModuleFileNameA(m, mod, MAX_PATH);
+    L("[watch] hit#%d RIP=%p (base=%p, %s) value=%d", gWatchHits, (void*)c->Rip, (void*)m,
+      strrchr(mod, '\\') ? strrchr(mod, '\\') + 1 : mod, *gWatchAddr);
+    return EXCEPTION_CONTINUE_EXECUTION;
+  }
+  return EXCEPTION_CONTINUE_SEARCH;
+}
+static void armWatch(volatile int* addr) {
+  gWatchAddr = addr;
+  AddVectoredExceptionHandler(1, watchVeh);
+  // DR0 = addr, DR7: L0=1, RW0=01 (write), LEN0=11 (4 byte)
+  CONTEXT c = {};
+  c.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+  GetThreadContext(GetCurrentThread(), &c);
+  c.Dr0 = (DWORD64)addr;
+  c.Dr7 = (1ULL << 0) | (1ULL << 16) | (3ULL << 18);
+  SetThreadContext(GetCurrentThread(), &c);
+  L("[watch] armed DR0=%p (controller iface+0xdc)", (void*)addr);
+}
+
 static void S(const char* key, const char* value) {  // summary へ "key": value
   if (gSum) fprintf(gSum, "  \"%s\": %s,\n", key, value);
 }
@@ -804,6 +836,8 @@ int main(int argc, char** argv) {
   SI("create_controller_ok", (r == kResultOk && ctrl) ? 1 : 0);
   if (!ctrl) return 1;
   dumpVtable("SerumController_IEditController", ctrl, 20);
+  // S2HOST_WATCH=1: ctrl iface+0xdc (= controller base+0x10c) への書込 PC を DR0 で捕まえる (SR-1c #256)
+  if (getenv("S2HOST_WATCH")) armWatch((volatile int*)((unsigned char*)ctrl + 0xdc));
 
   r = ctrl->initialize((FUnknown*)hostApp);  // IPluginBase slot3
   L("controller->initialize(hostApp) = %s", tresName(r));
