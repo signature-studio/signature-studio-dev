@@ -1,12 +1,12 @@
 # m11 本番 harness の shimx file trace 実 boot 収集 (#1050 / 親 #789)
 
-既知類型との関係: 該当なし (ftrace 0 行は収集経路・file API 呼出の有無に関する結果で、lift 欠陥の類型 (DEFECTS.md) には当たらない)。ただし §4 の trap 位置 `function_8c5eb0` は DEFECTS.md の D19 と同一関数で、同一原因かは未確認。
+既知類型との関係: 該当なし (trace.calls 上の file API 0 件は収集経路・file API 呼出の有無に関する結果で、lift 欠陥の類型 (DEFECTS.md) には当たらない)。ただし §4 の trap 位置 `function_8c5eb0` は DEFECTS.md の D19 と同一関数で、同一原因かは未確認。
 
 ## 1. 結論
 
 - 全再生成 `m11_e2e.sh --full` は rc=0 で通り、`reached_stage=4` (期待値 `M11_EXPECT_STAGE=4` と一致)。実測 604.7 s。
 - `--trace --soft` の trace variant は `_shimx_set_trace_file` を export し、実 boot で `dllmain_done=true` まで進んだ。
-- 実 boot の `<tag>.ftrace.jsonl` は **0 行** (元 run の実測)。boot 中 (17 unit) に file API (CreateFileW / CreateFileA / GetFileAttributesW / FindFirstFileW / FindFirstFileExW / FindNextFileW / ReadFile) の呼出が 1 件も無いため。
+- 実 boot の trace.calls 上に file API 名 (CreateFileW / CreateFileA / GetFileAttributesW / FindFirstFileW / FindFirstFileExW / FindNextFileW / ReadFile) は **0 件** (元 run の実測)。ftrace ファイル自体の行数は未実測 (§5)。
 - 受入条件「件数と api 内訳」は **未達**。0 件は実測結果として記録するが、目的 (実 boot の file API trace の取得) は達成していない。#1050 に残す。
 - 収集経路が file API の呼出を記録できることは、SHX-T12 単体テストのネガコン付き実行で確認済み (§3-2)。ただし m11 本番 wasm 上での probe は未実施。
 
@@ -20,7 +20,7 @@
 | 全再生成 | `FL_WIN64_DIR=... bash tools/m11/m11_e2e.sh --full` | rc=0 / 604.7 s / `reached_stage=4` (`trap "unreachable" @ function_8c5eb0`) |
 | trace variant build | `bash tools/m11/shimx_link/build.sh --trace --soft` | rc=0 / `signature mismatch=1 undefined symbol=0 duplicate=0` (§4 で説明) |
 | 実 boot (trace) | `SHIMX_TRACE_FILE=... node tools/m11/shimx_link/run_trace.mjs m11_sx_trace_soft.cjs --out ...` | rc=0 / `boot_stage=1` `units_run=17` `icall_ok=24` `icall_miss=1` `dllmain_done=true` `longjmp_hit=1` / trace `total_calls=106` `distinct_called=29` |
-| ftrace | 同上 | `m11_sx_trace_soft.ftrace.jsonl` 0 行 (元 run の記録。ファイル自体の再計測は §5) |
+| ftrace | 同上 | trace.calls 上の file API 名 0 件 (元 run の記録)。`m11_sx_trace_soft.ftrace.jsonl` の行数は未実測 (§5) |
 
 - 回帰ゲート: `m11_judge.py --require-stage 4 --min-survey-ok 800` は rc=0 (`survey_ok=870` / `survey_trap=25` / `survey_miss=46`)。`units_run_full=53`。
 - `--trace` (fail-fast GUI) 版は `LoadStringW` 未実装で `Aborted` (0.45 s)。`--soft` 版を採用。
@@ -50,8 +50,8 @@
 
 本修正 run で次を実行した:
 
-- 前提: emsdk 6.0.12 を `/home/runner/work/_temp/emsdk` に install (pin 版。`[EMSDK]` の代替。素材 `toolchain-emsdk` は本 run では未展開)。
-- コマンド: `bash tools/shimx/test/ftrace/ftrace_test.sh` (HEAD = `945d2fd8` の worktree 上の tools/shimx は main と同一)
+- 前提: emsdk 6.0.12 (pin 版) を run 内に install (`[EMSDK]` の pin 版。素材 `toolchain-emsdk` は本 run では未展開)。
+- コマンド: `bash tools/shimx/test/ftrace/ftrace_test.sh` (実行 HEAD は fix の PR head。`tools/shimx` は main と同一)
 - 結果: rc=0 / 5.98 s。
   - `events=10` / `by_api` = CreateFileW 2・CreateFileA 1・GetFileAttributesW 2・FindFirstFileW 2・FindNextFileW 2・ReadFile 1。file API の呼出が JSON 行として記録された。
   - ネガコン ✓ トレース無効時は JSON 行なし。
