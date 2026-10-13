@@ -1,5 +1,7 @@
 # G python-mcp — CPython wasm + flapi/MCP 解析 + ブリッジ設計 (2026-10-10)
 
+> 行数上限 (250 行) のため、§7c (#82)・§9 (T1〜T9 表)・§PY-13 (#588) と §12・§13 (#81) の全文は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) に分割移動 (本体は要約のみ)。
+
 ## 結論 (先出し)
 
 1. **CPython 3.12.1 (FL 同梱版と完全一致) の emscripten/wasm ビルド成功**。パッチ無し、emsdk 6.0.12 でクリーンビルド 3m19s。node で `print(1+1)`=2、struct/json/zlib/hashlib/decimal/re/datetime/inspect 等が動作。`flpy.wasm` **5.92MB** (gzip 2.07MB) + `flpy.data` (stdlib zip) 3.20MB。
@@ -92,7 +94,7 @@ FLEngine rodata の `name\0doc\0…<module>` 並びから機械抽出 (`flapi_ex
 - **FL 側 Python C API 呼出し面は未抽出**: dlsym 先の関数名が平文で無い。サブインタプリタ運用 (`PyInterpreterConfig` 型の存在から示唆のみ) の実態は不明。wasm で `Py_NewInterpreterFromConfig` が動くかも未検証 (→ §11 で検証: 動く。`_flhost` は未対応)。
 - `mixer.getCurrentTempo(1)`/`setCurrentTempo(bpm,1)` の第 2 引数の意味 (MCPTools は素の BPM 扱い、公式 docs は ×1000) は**実機で未確認**。モックは MCPTools 側に合わせた。
 - FLEngine 側 flapi 実装は**モック(27 API を実装、他は None)**。実エンジンとの意味差 (引数省略時の既定値、-1 の意味) は実機/lift 後に検証が必要。
-- 引数名 (kwargs) は stubs 由来の署名がある関数のみ。新規 43 関数と ilmcp は位置引数のみ (rodata の書式文字列 `i if sdd…` は順序対応が曖昧で未採用)。
+- **kwargs 署名の静的復元 (PY-9 b, #81) 済み**: rodata の並び順ではなく、FLEngine (win PE) の `.data` 内メソッド表 (name/fn/flags/doc, 32B 刻み) と各ラッパー冒頭の `lea [rip+x]` から `PyArg_ParseTupleAndKeywords` の書式と kwlist を復元 (`analysis/flapi_kwargs.py` → `analysis/flapi/flapi_kwargs.json`、`flapi_table.json` の各関数に `kwsig` を追記)。結果は §12。
 - 旧 stubs (LGPL) は**参照入力のみ**でリポジトリ非同梱 (`fetch_inputs.sh` が clone)。FL 由来 pyc/py も非同梱 — 利用者の FL から実行時供給。EULA 判断は行わない (事実整理のみ)。
 - 呼出しコストは node/Chrome headless の mock 実測。実 FLEngine(wasm) 結合時に再計測要。
 - **MCPTools 内のテンポ規約が不整合に見える**: `get_session_context` は `mixer.getCurrentTempo()` (引数なし) を `/1000` して BPM 化、`get_tempo` は `getCurrentTempo(1)` を素の BPM として表示、`set_tempo` は `setCurrentTempo(bpm, 1)`。モックは後者に合わせたため `get_session_context` が `tempo_bpm: 0.13` を返す (`mcp_classification.json` 側の解析メモ)。どちらが実 FL の挙動かは未確認。
@@ -141,7 +143,7 @@ mock との差で見つかったもの: mock は引数の個数/型を検査し�
 
 ## 9. 下流チケット案
 
-T1〜T9 の表は 250 行上限のため [REPORT_APPENDIX.md](REPORT_APPENDIX.md) に無変更で分割移動した。T3 = PY-3 (本 §7c)・T4 = PY-4 (§10)・T6 = PY-6 (§11) は着手済み。
+T1〜T9 の表は 250 行上限のため [REPORT_APPENDIX.md](REPORT_APPENDIX.md) に分割移動した。T3 = PY-3 (本 §7c)・T4 = PY-4 (§10)・T6 = PY-6 (§11) は着手済み。
 
 ## 7c. ilmcp 9 関数の実装 (PY-3 / #82) — `host/ilmcp.mjs`
 
@@ -221,24 +223,10 @@ T1〜T9 の表は 250 行上限のため [REPORT_APPENDIX.md](REPORT_APPENDIX.md
 | PY-4 の `poc_mcp.mjs` / `all_tools.mjs` / `mcp_ui_check.mjs` は MCPTools.pyc が無く再実行不可 (本 run で `dispatch_midi` の PoC 区間のみ `midi_script.mjs` に複製して同結果を確認) | `fl_rt.py` / `fl_mock.mjs` の変更の回帰を全体では未確認 | #76 再実行時に `run_all.sh` 相当を実行 |
 
 ## PY-13 (#588): `build_flpy.sh` の flapi_table 再生成を環境変数化
+入力 (win PE / stubs / mac dylib / 出力先 / emsdk) を環境変数化し、欠落時は exit 2 (旧: 空入力で緑)。検証 `tests/flapi_table_check.sh` (3 回とも exit 0・2.20 秒・正常系 3/3 一致・ネガコン 6 本 exit 2)。全文・未解決 (#630 PY-15 ほか): [REPORT_APPENDIX.md](REPORT_APPENDIX.md)
 
-既知類型との関係 (DEFECTS.md): 該当なし (lift ではなくビルド入力の扱い。「入力が無いのに緑」型の gate 欠陥の予防)。
+## 12. kwargs シグネチャの静的復元 (PY-9 b, #81)
+FLEngine の PyMethodDef 表から 435/435 関数を対応付け、書式 303 関数・kwlist 103 関数を復元 (flags=4 の 125 件は書式無し)。`fl_api.bind` は kwlist 名を stubs 名より優先し、既定値が静的に不明な引数の省略後は後続の既定値を足さない (`getGridBit(index=1)` → `(1,)`)。stubs 名とは 66 一致 / 28 不一致 (バイナリを正とする)。再現: `FL_WIN64_DIR=<fl-win64 展開先> python3 analysis/flapi_kwargs.py` の後 `python3 tests/kwsig_check.py` (0.03〜0.04 秒)。wasm 回帰 (`all_tools.mjs` 48/48 ほか)・stubs 照合の例・`arrangement.selectionSet` の kwlist 重複の CPython 実測: [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §12。
 
-| 入力 | 環境変数 | 既定 (従来どおり) | 欠落時 |
-|---|---|---|---|
-| win PE | `FL_WIN_PE` または `FL_WIN64_DIR` | `$FL_WIN64_DIR/extracted/block00031_PE.bin` (`tools/shared/env.sh`) | exit 2 (旧: 空 bytes 扱いで `win_pair_verified` 全 false の表を出力) |
-| stubs clone | `FL_STUBS_DIR` | `tools/python/work/fl-stubs` (`fetch_inputs.sh` が clone) | exit 2 (旧: 例外) |
-| mac dylib | `FL_ENGINE_DYLIB` | `$FL_MAC_DIR/.../FLEngine_x64.dylib` | WARN + 出力先の既存 `flapi_table.json` の `midi_script_callbacks_in_binary` を引き継ぐ。引き継ぎ元も無ければ exit 2 (旧: 空配列で上書き) |
-| 出力先 | `FLAPI_OUT_DIR` | `analysis/flapi` | — |
-| emsdk | `EMSDK_DIR` | `/opt/emsdk` | exit 2 (link 段のみ) |
-
-- PE 照合が 1 件も一致しない (別ファイル・破損) 場合も exit 2。`FLPY_TABLE_ONLY=1 bash build_flpy.sh` は table / ids / `FLAPI.md` の再生成だけで終了 (emsdk・CPython wasm 不要)。
-- 副次: 旧 `flapi_table.py` は `FLAPI.md` 先頭の「自動生成・人手編集禁止」ヘッダを出力せず、再生成で追跡中のファイルが差分になっていた。生成側に移した。
-- 検証: `FL_WIN64_DIR=<fl-win64 展開先> bash tests/flapi_table_check.sh` (出力先は一時ディレクトリ。追跡中のファイルは書き換えない)。判定: 再生成 3 ファイルが追跡中とバイト一致 + `win_pair_verified=true` > 0 + ネガコン 6 本が全て exit 非 0 + 理由表示 + 出力不変。前提入力が無ければ exit 3 (NOT VERIFIED)。
-- 実測 (Actions runner、oc_artifacts: fl-win64 toolchain-emsdk、直列、n=3): 3 回とも exit 0・wall 2.20 / 2.20 / 2.20 秒・load average 0.13〜0.20。正常系 3 / 3 ファイル一致 (差分 0)、`win_pair_verified=true` 388 件 (REPORT §3 の 388/399 と一致)。ネガコン 6 本 (PE 無し / PE 空 / PE が別物 / stubs 無し / emsdk 無し / dylib も既存 table も無し) は全て exit=2 + 理由表示。
-- gate 自体のネガコン: 入力 PE を乱数 1 MB に差し替えると `flapi_table_check.sh` は exit 1、PE 無しは exit 3 (どちらも緑にならない)。範囲外: `build_flpy.sh` の emcc link 段 (CPython wasm の事前ビルド `build_cpython_wasm.sh` が必要で未実施。emsdk の実在 `/opt/emsdk/emsdk_env.sh` のみ確認)、`fetch_inputs.sh` / `run_all.sh` の `/home/ubuntu` 固定パス (run_all.sh の `FL_MAC` / `FL_WIN`)。
-
-| 未解決 | 影響 | 起票先 |
-|---|---|---|
-| `run_all.sh` が `FL_MAC` / `FL_WIN` を `/home/ubuntu/...` に固定している | Actions で `run_all.sh` 全体を回せない | #630 (PY-15) |
-| mac dylib が無い環境では `midi_script_callbacks_in_binary` を既存値から引き継ぐだけで再抽出できない | 26.1.7 以外の版で更新漏れの恐れ (WARN は出る) | #588 コメントに記載 |
+## 13. 未解決 (#81)
+(a) 実機 FL での `mixer.getCurrentTempo(1)` 確認 (#81 のブロッカー)、`device.flrMidiNote` / `flrMidiCC` の書式未復元、省略引数のホストへの渡し方・stubs 既定値 `midi.*` の `eval` NameError は PM 判断待ち (PR #463 コメントに起票依頼)。詳細: [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §13。
