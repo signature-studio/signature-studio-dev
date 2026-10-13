@@ -198,7 +198,7 @@ NC1 (capstone 未導入) は `bash tools/m11/m11_gen_ir2.sh` が exit 1 にな�
 
 ## 13. #936: `73532f8` (c) の trap 内訳 (halt0 54 / oob 13) と現 HEAD 実測 (halt0 8 / oob 16) の差の切り分け
 - 測定 head: `b4dac086` (origin/main)。素材 fl-win64 (PE 1 member, sha256 `b2c64da4…`)・work-m11・work-liftdiff・toolchain-retdec・toolchain-emsdk (展開先は [EMSDK]・[RETDEC])・capstone 5.0.7 / pefile 2024.8.26。`FL_WIN64_DIR` は展開先。
-- 旧 (c) の数値は `trap_triage/survey_units.mjs` (`73532f8` の REPORT.md §8.2) で取った。現 HEAD で同じビルドに `survey_units.mjs` と `m11_survey.mjs` (e2e) を当てると、ok・halt0・miss・trap 合計が一致する (下表 F0 / F0')。oob だけ 1 件違う (16 と 17) が、これは oom 1 の分類差 (下記)。
+- 旧 (c) の数値は `trap_triage/survey_units.mjs` (`73532f8` の REPORT.md §8.2) で取った。現 HEAD で同じビルドに `survey_units.mjs` (F0') を当てた実測を、F0 の転記値と照合する (下表)。ok・halt0・miss・trap は転記値と一致する。oob は転記 17 と実測 16 で 1 件違う。この差は oom 1 の分類差によると推定するが、未確認。
 
 | 測定 | IR 条件 (ir_conditions.json) | rc | 所要秒 | load (終了) | ok | oob | halt0 | trap | miss | noproc | clobber |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -208,7 +208,7 @@ NC1 (capstone 未導入) は `bash tools/m11/m11_gen_ir2.sh` が exit 1 にな�
 | X2 | 実際の条件: ldfix 無し・qstore 無し (`M11_LDFIX=0` で gen)。**注記: 測定時に `work/ir_conditions.json` を applied に書き換えて build を通した。保存された条件ファイルは実際の IR 条件と一致しない。この数値は採用しない (条件の再現・再記録は未実施)** | 0 | 36 | – | 867 | 18 | 9 | 28 (`m11_survey`) | 46 | 1 | 0 |
 
 - F0 の oob 17・halt0 8 は §11 (R1〜R3: 870/17/8/25) の実測値の転記である。本節では F0 の内訳を再測定していない (`m11_survey` の出力は本 run に残っていない)。
-- F0 と F0' の対比は**転記値との照合**であり、再測定の一致ではない。F0' を同一 IR で実測した ok 870・halt0 8・miss 46・trap 25 は、§11 の転記値 (870/8/46/25) と一致する。oob は転記 17 と実測 16 で 1 件違う。F0' の内訳は oob 16 + halt0 8 + oom 1 = 25 で trap と合う。転記 F0 は oob 17 + halt0 8 = 25 で、oom 1 が oob 側に含まれていると読めば合う。この分類の違いは推定であり、未確認。
+- F0 と F0' の対比は**転記値との照合**であり、再測定の一致ではない。F0' を同一 IR で実測した ok 870・halt0 8・miss 46・trap 25 は、§11 の転記値 (870/8/46/25) と一致する。oob は転記 17 と実測 16 で 1 件違う。F0' の内訳は oob 16 + halt0 8 + oom 1 = 25 で trap と合う。転記 F0 は oob 17 + halt0 8 = 25 で、oom 1 が oob 側に含まれていると読めば合うと推定する。この分類の違いは推定であり、未確認。
 - X1 の差は ok −2・trap +2 にとどまる。(c) の trap 67 (oob 13 / halt0 54) とは一桁以上違う。X2 は採用しない (上表の注記)。
 - 結論: 73532f8 (c) の halt0 54 は、本測定の範囲では再現しない。qstore を外した X1 でも halt0 は 8 のままで、ldfix・qstore の組合せでは halt0 は動かないと読める (ldfix 無しの条件は採用しない数値のみ)。halt0 の大半 (54 件) は **IR 生成前段 (RetDec lift・work-m11 の世代) の違い**に由来すると推定されるが、本測定では切り分け未了。
 - 未解決 (起票先): 73532f8 (c) の lift 成果物の再構成 (当時の lift 入力・RetDec 版の特定) = #729。(a) 818/21 の再測定は本 run 未実施 (旧 IR snapshot を `work-m11` から直接測る手順が必要) = #729。
