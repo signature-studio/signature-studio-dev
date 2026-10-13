@@ -9,6 +9,7 @@
 **CAB-270 (COM 経由 120s soak)**: `com_soak120_b256` を追加。既定 120 秒で **underrun 0 / silence 0 / ramp 0 mismatch / bufferSwitchTimeInfo bad 0 / COM 面 (sellog・参照カウント) 一致**を 9 回連続で実測 (§3-2)。`--quick` では soak を実行しない (親 e2e 規約)、`--soak N` で秒数変更可。
 
 > AU-17 (#1102) の COM 経由 30 分ソーク・p+1 照合の 24bit 修正の実測は `REPORT_APPENDIX_1102.md` に分割移動 (250 行上限)。
+> AU-19 (#1358) のキャプチャ分割照合 (ring 16 MiB・ソーク PASS 30 分 28 秒) は `REPORT_APPENDIX_1358.md`。
 
 ## 1. 前回中断 (insufficient_credits) の残骸精査 → **引継ぎ採用**
 
