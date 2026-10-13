@@ -22,7 +22,7 @@ emcc <lift IR / runtime> tools/shimx/src/*.c ... -sGLOBAL_BASE=<64KB 以上>    
 - 未対応 API は `shim_unimplemented("関数名")` で名前を出して abort (M4 方針を維持)。lift 産物 IR の未提供 API 用スタブは
   `python3 scripts/ir_undef.py <ir.ll> --emit-stubs stubs.c` で署名付き生成できる。
 - IR の declare 署名と shimx 定義の wasm 署名の一致検査: `bash scripts/verify_sig.sh <ir.ll> <tag>`。
-- 署名の正規化 + 検査 (SHX-T7): `bash scripts/sig_gate.sh <ir.ll> <tag>` (`sig_normalize.py` で declare を `data/sigs.json` の shimx 署名へ寄せ、`verify_sig.sh` で mismatch 0 を強制。`data/sigs.json` は `scripts/gen_sigs.py` で再生成)。REPORT §14。
+- 署名の正規化 + 検査 (SHX-T7): `bash scripts/sig_gate.sh <ir.ll> <tag>` (`sig_normalize.py` で declare を `data/sigs.json` の shimx 署名へ寄せ、`verify_sig.sh` で mismatch 0 を強制。`data/sigs.json` は `scripts/gen_sigs.py` で再生成)。REPORT §15。
 - 構造体は Win64 レイアウト (ポインタ 8B スロット)。ポインタ値 < 0x10000 は整数 (序数/MAKEINTRESOURCE/単一文字) とみなすので GLOBAL_BASE は 64KB 以上。
 
 ## 運用フック (`shimx_*`, 詳細は shimx.h 末尾)

@@ -4799,6 +4799,38 @@
 ],
 "ret": "void"
 },
+"shimx_seh_current_exception": {
+"params": [],
+"ret": "ptr"
+},
+"shimx_seh_depth": {
+"params": [],
+"ret": "i32"
+},
+"shimx_seh_enter": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"shimx_seh_leave": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"shimx_seh_set_pad_resolver": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"shimx_seh_set_typed_matcher": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
 "shimx_set_acp": {
 "params": [
 "i32"
