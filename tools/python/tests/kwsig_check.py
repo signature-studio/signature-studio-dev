@@ -209,8 +209,10 @@ ch.setChannelPitch(1, value=5, pitchUnit=1, useGlobalIndex=False)  # pickupMode 
 assert last() == (1, 5, 1, FAKE["PIM_None"], False), last()
 tr.rewind(startStop=1)  # flags (midi.GT_All)
 assert last() == (1, FAKE["GT_All"]), last()
-tr.globalTransport(index=1, value=2)  # pmeFlags (midi.PME_System) と flags (midi.GT_All)
-assert last() == (1, 2, FAKE["PME_System"], FAKE["GT_All"]), last()
+# stubs の既定値は同名のみ引き継ぐ (stubs は pmeflags・kwlist は pmeFlags で名前違い)。よって kw 省略の末尾は C 側既定値に任せ、(1, 2) になる
+tr.globalTransport(index=1, value=2)
+assert last() == (1, 2), last()
+assert fl_api._default_value("midi.PME_System") == FAKE["PME_System"]  # 代わりに midi.PME_System の評価を直接検証
 mx.getEventValue(index=1)  # value (midi.MaxInt)。smoothTarget (stubs 既定 1) も同時に入る
 assert last() == (1, FAKE["MaxInt"], 1), last()
 # (b') midi. 以外の既定値は従来の eval と同じ値・同じ型 (既存挙動を変えない)
