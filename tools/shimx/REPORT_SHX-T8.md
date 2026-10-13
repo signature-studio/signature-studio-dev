@@ -73,8 +73,9 @@ exports.txt の再生成差分: 並べ替えに加えて **9 本が追加** (削
 | 項目 | 実測 |
 |---|---|
 | コマンド | `bash tools/shimx/test.sh` (`--quick` なし, 素材 `work-m11` / `work-m6-ott` 展開済み, `plugins-*` は未使用) |
-| 検証 HEAD | `270a32d7` (生成器修正 commit。本 fix の検証は同 HEAD で実施) |
-| 結果 | **exit 0**, real **55.8 s** (user 44.4 s / sys 12.5 s), load average 0.70 (開始直前) |
+| 検証 HEAD | `14e4eb35` (生成器修正 `270a32d7` + 生成物・REPORT 修正 `14e4eb35`) |
+| 結果 | **exit 0**, real **52.9 s** (user 41.1 s / sys 11.9 s)。直前の HEAD `270a32d7` での 1 回目は exit 0, 55.8 s |
+| 再生成後の差分 | `git status` 空 (再生成物は commit 済みの内容と一致) |
 | MT / ST / M4 | MT PASS (7 グループ) / ST PASS / M4 テスト MT・ST PASS |
 | 署名 | verify_sig m11 / m11_3 / ott: signature mismatch = 0。sig_test (a)〜(h) ALL PASS |
 | R6 | 構造体展開スタブ + 重複 declare 正規化 OK |
