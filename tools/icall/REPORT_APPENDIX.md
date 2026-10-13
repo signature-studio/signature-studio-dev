@@ -51,6 +51,8 @@
 | `ir_fix_vstore.py` の store 出力を `pass` に置換 | `tests/test_icall.py` が FAIL (1 件) |
 | 両方有効 (既定) | gate PASS |
 
+再現 (レビュー指摘, HEAD `b23593c`, 各 build 作り直し + `crt_fn_gate.sh`, runner 4 core): `ICALL_ABI_XMM1=0` = gate FAIL (`--fma 1` 42/600, `--neg --fma 1` 48/600; build+gate 35.4 s)。`ICALL_FIX_VSTORE=0` = gate FAIL (`--neg --fma 1` 321/600・他は 600/600; 37.5 s)。既定で再 build すると gate PASS。
+
 ### 11.3 `1801a9a6c` の rax
 native の rax は **全入力で `0x7fffffffffffff00`** (測定 8 入力: 4.0, 2.0, 0.25, 100.0, 0.0, 1.5, 12345.678, 0.001)。`1801a9b02 movabs rax, 0x7fffffffffffffff` ... `setb al` の残りで、sqrt の戻り値ではない scratch。
 `diff/rax_callers.py 1801a9a6c` (capstone, 各 call 元の直後 8 命令で rax/eax/ax/al の最初のアクセスを判定) の実測: 直接 call 元 46 件 (`call`; tail jmp は 0) のうち、rax を先に**書く** 39 件・8 命令内で触れない 7 件・**読む 0 件** (exit 0)。よって rax は戻り値として使われず、gate は xmm0 のみ判定でよい。
