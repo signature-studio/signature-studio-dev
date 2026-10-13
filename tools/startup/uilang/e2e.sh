@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # uilang 1 コマンド検証 (ST-T19 / #591):
 #   bash tools/startup/uilang/e2e.sh
-# 前提: FL_WIN64_DIR (fl-win64 展開先。直下に extracted/)、emsdk (/opt/emsdk)、node、python3。
+# 前提: FL_WIN64_DIR (fl-win64 展開先。直下に extracted/)、emsdk (docs/REFERENCES.md [EMSDK])、node、python3。
 # [1] verify_uilang.py: FLEngine_x64.dll の静的根拠 (A〜E) を機械照合 + ネガコン (DLL/spec を壊して FAIL を確認)
 # [2] probe: shimx の GetUserPreferredUILanguages を FL と同じ呼び方 (flags=8 / 2 段階) で実測し、期待表と照合 + ネガコン
 set -euo pipefail

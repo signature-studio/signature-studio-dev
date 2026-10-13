@@ -231,7 +231,7 @@
           "role": "Artwork\\Fonts 配下の .ilfont 読込 (ILGlyphsEx.ilfont)"
         }
       ],
-      "note": "segoeui/tahoma/consola/lucon は Windows 側のシステムフォント。VFS には無いので代替フォント (OpenSans 等) への解決が shim 側で必要"
+      "note": "segoeui/tahoma/consola/lucon は Windows 側のシステムフォント。VFS には無い。存在確認 (segoeui.ttf 等) で不在なら FL 自身が OpenSans 等へ落とすのでマッピング不要。GDI の face 名 (Tahoma/Arial/Segoe UI/Calibri/Lucida Console 等) で直接要求する箇所は shim 側で代替フォントへの写像が要る (uilang/REPORT.md §3)"
     },
     {
       "id": "help-scr",

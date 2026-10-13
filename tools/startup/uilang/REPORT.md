@@ -89,7 +89,7 @@ lang = 0x9dece0(…, 1)                              ← 'Program Language' (既
 | P_Monospaced | `consola` (0x66ba22) → `lucon` (0x66bbc9) | **Artwork に等幅フォントは無い** (§3.3) |
 | P_ILGlyphs / P_WebSymbols / P_DescriptionLarge | — | `ILGlyphsEx.ilfont` / `WebSymbols-Regular.otf` / `PT_Sans-Web-Regular.ttf` (Artwork 固定) |
 
-- `verify_uilang.py` が保証するのは「0x668d30 がこれらのリテラルを参照すること」と、`segoeui.ttf` 不在の枝 (0x6691ff `je 0x6693b8`) が `OpenSans-Regular` (0x6693e4) に至ることまで (E1・E6・E7)。表中の他の対応は目視の読み。
+- `verify_uilang.py` が保証するのは「0x668d30 がこれらのリテラルを参照すること」(E1) と、`segoeui.ttf` 不在時の `je` の飛び先が 0x6693b8 であること (E6) まで。`OpenSans-Regular` (0x6693e4) が 0x6693b8 から到達することは検査していない (E7 はアドレス順の確認のみ)。表中の他の対応は目視の読み。
 
 - **VFS 方針**: `C:\Windows\Fonts\*.ttf` は pathreg 既定表で `/c/Windows/...` に落ちる (`tools/shimx/pathreg/REPORT.md` の `C:\Windows\notepad.exe` → `/c/Windows/notepad.exe` の例からの推定。Fonts 配下の個別確認はしていない)。VFS に置かなければ `GetFileAttributesW` は不在を返し、`segoeui.ttf` の枝は FL が自分で OpenSans-Regular に落とす → **この枝はマッピング不要** (実 boot での確認は §5)。**Windows フォント実体を置かない** (#186 の PM 判断と整合)。
 
@@ -115,11 +115,11 @@ lang = 0x9dece0(…, 1)                              ← 'Program Language' (既
 
 ## 4. 検証 (実測)
 
-`bash tools/startup/uilang/e2e.sh` (前提: `FL_WIN64_DIR`、`/opt/emsdk`)。コミット済み HEAD をクリーン worktree に展開して実行した結果は §4.1。
+`bash tools/startup/uilang/e2e.sh` (前提: `FL_WIN64_DIR`、emsdk `[EMSDK]`)。コミット済み HEAD をクリーン worktree に展開して実行した結果は §4.1。
 
 | 項目 | 内容 |
 |---|---|
-| `verify_uilang.py` | 49 件の照合 (A: 遅延 import スロット・thunk・呼出元 / B: flags=8・2 回呼出・呼出元 2 関数 / C: 呼出順 read→os→save→read・'zh' 符号化・保存を飛ばす分岐・書込む 3 値 / D: `.svg` 参照関数・直接 call 0・lea・published 表の名前 / E: フォント表の分岐・SHGetFolderPath の CSIDL_FONTS・存在確認・落ち先) |
+| `verify_uilang.py` | 48 件の照合 (A: 遅延 import スロット・thunk・呼出元 / B: flags=8・2 回呼出・呼出元 2 関数 / C: 呼出順 read→os→save→read・'zh' 符号化・保存を飛ばす分岐・書込む 3 値 / D: `.svg` 参照関数・直接 call 0・lea・published 表の名前 (ShortString 長さバイト付き) / E: フォント表の参照・SHGetFolderPath の CSIDL_FONTS・存在確認・`je` の飛び先。E7 はアドレス順のみ) |
 | ネガコン (DLL のバイトを壊す) | zh の符号化 1 byte 反転 → C4 / `jne` を `je` に反転 → C5 / `mov ecx, 8` を 4 に → B2 / published 表ポインタ 1 byte → D5 / spec の呼出元期待値 → A3。**5/5 が期待した ID で FAIL** |
 | probe (shimx 実測) | 10 ケースが期待表と一致 (`zh-CN` だけが `fl_writes_program_language=1`)。期待表 1 件反転で検査器が検出 (NC 1/1) |
 | 既存回帰 | `bash tools/shimx/test.sh --quick` (shimx 687 公開関数 × MT/ST × M4 互換 × fail-fast) 全 PASS (修正前 16.09 秒・修正後 16.19 秒、exit 0)。`bash tools/startup/loadpaths/e2e.sh` PASS (readers 34・fail 0) |
@@ -134,7 +134,7 @@ lang = 0x9dece0(…, 1)                              ← 'Program Language' (既
 | 2 | 0 | 16.26 | 0.24 → 0.41 |
 | 3 | 0 | 16.50 | 0.41 → 0.58 |
 
-範囲 15.75–16.50 秒。いずれも `verify_uilang.py` 49 件 fail 0 / ネガコン 5/5 検出 / probe 10 件一致 / NC 1/1。同じ HEAD で `tools/startup/loadpaths/e2e.sh` PASS (8.68 秒・readers 34・fail 0)、`tools/shimx/test.sh --quick` 全 PASS。
+範囲 15.75–16.50 秒。いずれも `verify_uilang.py` 48 件 fail 0 / ネガコン 5/5 検出 / probe 10 件一致 / NC 1/1。同じ HEAD で `tools/startup/loadpaths/e2e.sh` PASS (8.68 秒・readers 34・fail 0)、`tools/shimx/test.sh --quick` 全 PASS。
 再現: `source tools/shared/env.sh` (または `FL_WIN64_DIR` 指定) → `bash tools/startup/uilang/e2e.sh`。fl-win64 展開は `docs/WORKFLOW.md` §11。
 
 ## 5. 検証範囲 / 範囲外 / 未解決
@@ -146,7 +146,7 @@ lang = 0x9dece0(…, 1)                              ← 'Program Language' (既
 |---|---|---|
 | `[0x15e43a8]` (言語の上書き値) の実体 (起動引数由来か) と既定値。`zh` のときの 0x9deaa0 先頭分岐の意味 (+0x18/+0x20 の設定)。`FlagBtnPaint` の初回描画が起動中か | §1 の「既定は en 固定」は上書き値が `zh` 以外という前提。`lang-svg` の phase も絞れない | #105 (boot 到達後の `assettrace`) |
 | 0x668d30 の `segoeuisl.ttf` / `tahoma` / `consola` / `lucon` 不在時の最終的な落ち先、`P_*` ごとの対応の確定 | P_Tiny / P_NormalLight / P_Monospaced の表示 | #660 [GUI-14] (フォント配信と face/alias 登録。本 REPORT §3 を入力にする) |
-| Open Sans 本体のライセンス本文が LEGAL §3.1 に無い | OpenSans を代替の本命にする前提 | #616 [LGL-8] (Open Sans / Barlow の license 登録) にコメント |
+| Open Sans 本体のライセンス本文が LEGAL §3.1 に無い (LEGAL §3.1 は Open Sans Condensed の Apache-2.0 のみ) | OpenSans を代替の本命にする前提 | **起票依頼 (PM)**: #616 [LGL-8] は CLOSED のため追跡先にしない。新規 issue を起票して LEGAL §3.1 に Open Sans 本文の license を登録する |
 | 等幅フォントの調達 (VFS に無い) | P_Monospaced | #660 [GUI-14] にコメント (同梱方針は PM 判断) |
 | ブラウザ言語 → LCID の渡し方 (`zh` のときだけ起動時に `zh.moe` を読む) | zh ブラウザの初回起動が重くなる (847827 byte) | `tools/runtime` 側の子チケットを PM が起票 (本 REPORT §1.2 を入力) |
 | `loadpaths` の tier (`lang-moe`=T2 推奨) との整合 | `zh` 環境だけ起動で読む | #105 の実トレースで答え合わせ |

@@ -170,7 +170,6 @@ def main(argv):
     elif br[:2] == b'\x0f\x85':
         tgt = 0x9deb8c + 6 + struct.unpack_from('<i', br, 2)[0]
     check(tgt == 0x9debab, f'C5 0x9deb8c の jne は 0x9debab (保存を飛ばす) へ (実測 {hex(tgt) if tgt else None})')
-    check(0x9df010 in call_sites(pe, d, 0x9df010, (f, ends[f])) or True, 'C6 (予約)')
     l10 = {s for _a, s in literals_in(pe, d, 0x9df010)}
     check({'Software\\Image-Line\\Shared\\Language', 'Program language', 'Regional note names', 'Accidental Mode'} <= l10,
           f'C7 0x9df010 が書くキー/値 = Language 配下の Program language / Regional note names / Accidental Mode (実測 {sorted(l10)})')
@@ -218,8 +217,8 @@ def main(argv):
     # 同じ published 表内にクラス名 TToolbarForm (ToolbarLanguagesMenu / FlagBtn / FlagBtnPanel も)
     base = pe.rva2off(0xdc7000 - B)
     win = d[base:base + 0x1000]
-    for nmx in (b'\x14ToolbarLanguagesMenu', b'\x0cFlagBtnPanel', b'\x07FlagBtn', b'\x0cTToolbarForm'.replace(b'\x0c', b'\x0c')):
-        check(nmx[1:] in win, f'D7 Delphi 名 {nmx[1:].decode()} が 0xdc7000 台のクラス表にある')
+    for nmx in (b'\x14ToolbarLanguagesMenu', b'\x0cFlagBtnPanel', b'\x07FlagBtn', b'\x0cTToolbarForm'):
+        check(nmx in win, f'D7 Delphi ShortString {nmx[1:].decode()} (長さバイト付き) が 0xdc7000 台のクラス表にある')
     # ---- E
     fonts = {}
     for name in spec['font_names']:
@@ -241,7 +240,7 @@ def main(argv):
           'E6 0x6691ff: segoeui 不在 (je) → 0x6693b8')
     seq_i = {s: [a for a, x in sel if x == s] for s in ('segoeui.ttf', 'OpenSans-Regular')}
     check(0x6690df in seq_i['segoeui.ttf'] and 0x6693e4 in seq_i['OpenSans-Regular'] and 0x6693b8 < 0x6693e4,
-          'E7 0x6693b8 以降に OpenSans-Regular (0x6693e4) を選ぶ枝がある')
+          'E7 segoeui.ttf (0x6690df) と OpenSans-Regular (0x6693e4) が 0x668d30 内にあり 0x6693b8 < 0x6693e4 (アドレス順のみ。到達性は未検査)')
     o81 = {c + B for c in calls.get(0x81bca0 - B, set())}
     check({0x593450, 0x81bb20} <= o81, 'E5 0x81bca0 は 0x593450 (SHGetFolderPathW の delay thunk) と 0x81bb20 (GetWindowsDirectory 系フォールバック) を呼ぶ')
     json_out = {'font_literal_refs': fonts, 'select_sequence_0x668d30': [(hex(a), s) for a, s in sel]}
