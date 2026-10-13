@@ -39,14 +39,13 @@
 
 ## 4. LD-47 (#1375) 実測: 現 HEAD での基準値と訂正 (2026-10-14)
 
-測定 commit: `12586095` (run 開始時の origin/main。`tools/m11` の検証はこの HEAD のコードで行った)。
-素材: `work-m11` を `$HOME/artifacts` から `tar --zstd -xf ... -C <repo>` で展開 (展開先は `tools/m11/work/`)、`toolchain-emsdk` は `/opt/emsdk` (emcc 6.0.12)。
+測定 commit: `12586095` (前回 fix run で測定。`tools/m11` の非 md 差分は `12586095` から `70d02dba` まで 0 件)。
 
 - 訂正: §3 の「修復前 53 site」は誤り。`REPORT_968.md` §2 の表では 53 は**修復後**の値。現 HEAD の修復前は store 宛 CELL_COLLAPSED **86 site / 49 関数**。
 - 訂正: §1 の鮮度記述「`916d9932` 以降はドキュメントのみ」は誤り。`git diff --name-only 916d9932 HEAD -- tools/m11` の非 md は **18 件**、`git diff --numstat 916d9932 HEAD -- tools/m11` の非 md は **+698 / -27** (本節の旧記載「51 件・988 行」は誤り。LD-47 review で計測し直した)。`tools/m11` のコードを最後に変えた commit は `02e2c5a2` (`12586095` の祖先)。
 - 訂正: §1 の「空 = コード差分 0」の証跡も誤り (上記 18 件と矛盾する)。測定 commit `12586095` から本 PR の HEAD までの `tools/m11` の非 md 差分は 0 件 (`git diff --name-only 12586095 HEAD -- tools/m11 | grep -v '\.md$'` の結果は空)。したがって §4 の数値は本 PR の HEAD でも有効。上記の再現は測定 commit `12586095` の tools/m11 で行った。
 
-e2e (`bash tools/m11/ldfix/fix_d17_e2e.sh`、現 HEAD、foreground、31 秒、emcc rc=0):
+e2e (`bash tools/m11/ldfix/fix_d17_e2e.sh`、foreground、31 秒、emcc rc=0。測定 commit `12586095`):
 
 | 項目 | 修復前 | 修復後 (fix_d17.py) |
 |---|--:|--:|
@@ -60,3 +59,7 @@ e2e (`bash tools/m11/ldfix/fix_d17_e2e.sh`、現 HEAD、foreground、31 秒、em
 - 再現: K を読む IR load が複数本の K 組は 28 関数・32 K 組 (issue の 28 関数 / 32 組と一致)。この 28 関数に含まれる store 宛 CELL_COLLAPSED は修復前で 56 site。
 - 1:1 規則は未実装。ネガコンも未実装 (対象の修復関数が無いため)。受入条件 1・3 は未達。受入条件 4 (emcc 構文検証) は `fix_d17.py` の修復 IR (単一 load 規則のみ) に対して通過を確認した。
 - 残作業: 機械語 site ごとの rip セル → レジスタ → load の連鎖追跡 (未着手)。issue #1375 のまま継続する。
+
+再測定 (PR #1539 fix run、2026-10-14、HEAD `70d02dba` + 本 commit の REPORT のみ差分。コードは `12586095` と同一):
+素材 `[WORK-M11]` と `[EMSDK]` を展開 (`$ARTIFACTS_DIR` に配置済み。`tools/m11/work/` に展開)。`bash tools/m11/ldfix/fix_d17_e2e.sh` を foreground で実行: 31 秒、emcc rc=0、load 0.37→0.68。
+出力 JSON (`$RUNNER_TEMP/fix_d17_e2e/ssa_{base,fix}.json`) から数えた値は上表と一致: 修復前 store CC site 86 / 関数 49、store CELL_DEEP 19、spill CC 37 → 修復後 store CC 53 / 関数 28、store CELL_DEEP 52、spill CC 37。alg3 flagged 77 → 58。
