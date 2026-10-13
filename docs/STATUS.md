@@ -46,7 +46,7 @@
 | MS8 | オーディオパス (AudioWorklet + SAB ring) | 設計・PoC あり (`tools/audio/`) |
 | MS9 | プロジェクト入出力 + FL 純正プラグイン in-process | 部分 (`tools/flp`, `tools/plugins/`) |
 | MS10 | 性能・安定性チューニング | 計測基盤あり (`tools/perf/`) |
-| MS11 | E2E 統合 + FL 追従 + EULA/非再配布運用固定化 | 未達 |
+| MS11 | E2E 統合 + FL 追従 + EULA/非再配布運用固定化 | 未達。FL 新版取り込み手順は素材ありで `pnpm terms-watch` (FL 同梱 2 文書 + Xfer) を呼ぶこと (週次 workflow `terms-watch.yaml` は Web 4 文書のみ (配置待ち)。`tools/legal/terms-watch/REPORT.md`) |
 | MS12 | ホストデプロイ + `agent-browser` E2E 検証 | **部分達成** (デプロイ実績あり・FLEngine 起動は未達) |
 
 状態の判断基準: 「完了」= 各段の検証条件が満たされたこと。「部分達成」= 一部の検証項目のみクリア。
@@ -79,9 +79,12 @@
 | `shimx/pathreg` | パス写像/レジストリ接続 | `tools/shimx/pathreg/REPORT.md` |
 | `startup` | 起動シーケンス設計+stub 計画 | `tools/startup/REPORT.md` |
 | `startup/{glue,keyfix,pump,vreg,winstubs}` | 各実装済 | 各 `REPORT.md` |
+| `startup/helpviewer` | Help viewer 実装済 (エンジン結線は未) | `tools/startup/helpviewer/REPORT.md` |
+| `startup/loadpaths` | 言語 .moe/スキン/Help のロード経路を静的解析で確定・VFS 配置 group 定義 (実トレース確定は未了) | `tools/startup/loadpaths/REPORT.md` |
 | `runtime` | 設計・基盤 | `tools/runtime/REPORT.md` |
 | `hostbridge` | 設計+mini VST2 host PoC | `tools/hostbridge/REPORT.md` |
 | `hostbridge/{cb,h2,lowbase,nfo}` | 各実装済 | 各 `REPORT.md` |
+| `hostbridge/h10` | Wrapper chunk reader 静的解析済 (実行検証は #267) | `tools/hostbridge/h10/REPORT.md` |
 | `gui` | 設計+PoC | `tools/gui/REPORT.md` |
 | `audio` | 設計+PoC (e2e で既知 FAIL 1 件あり・詳細は REPORT) | `tools/audio/REPORT.md`・`tools/audio/asio/REPORT.md` |
 | `audio/asio` | COM アダプタ+soak | `tools/audio/asio/REPORT.md` |

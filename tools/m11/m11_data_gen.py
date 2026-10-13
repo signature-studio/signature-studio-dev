@@ -47,7 +47,7 @@ def main():
     for (n, lo, sd) in secs:
         c = 0
         for r in relocs:
-            if lo <= r < lo + len(sd) - 8:
+            if lo <= r <= lo + len(sd) - 8:  # #572: セクション末尾の 8B slot も対象 (旧 `<` は off-by-one)
                 off = r - lo
                 v = struct.unpack_from('<Q', sd, off)[0]
                 nt = v - LVA_SH + LB

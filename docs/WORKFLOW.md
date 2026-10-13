@@ -179,14 +179,17 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
 - **素材**: 既定で取得されるのは `fl-win64` のみ。他は本文に `oc_artifacts: fl-win64 plugins-ott` の
   行を書く (許可名: fl-win64 / plugins-ott / plugins-freshair / plugins-serum2 / plugins-massivex /
   plugins-kilohearts / toolchain-retdec / toolchain-emsdk / work-m11 / work-liftdiff / work-m6-ott /
-  work-liftlib-targets / work-liftlib / work-icall / analysis-ott-binaries。それ以外は
+  work-liftlib-targets / work-liftlib / work-icall / analysis-ott-binaries / apt-mingw。それ以外は
   run が失敗する)。全素材は約 17.7 GiB (2026-10-13 実測) のため必要分だけ指定する。
   - `toolchain-retdec` → `/opt/retdec`、`toolchain-emsdk` → `/opt/emsdk` に展開される。
-  - `work-m6-ott` → `tools/m6/work/` + `tools/ott/work/`、`work-liftlib` → `tools/liftlib/work/`、
+  - `work-m6-ott` → `tools/m6/work/` + `tools/ott/work/` + `tools/m8/work/` + `tools/m9/work/` + `tools/m10/work/`
+    (`tar --zstd -tf` で実測)、`work-liftlib` → `tools/liftlib/work/`、
     `work-icall` → `tools/icall/work/`、`work-liftlib-targets` → `tools/targets/{freshair,kilohearts}/work/`
     の HeartCore / SlateCore のみ (liftlib_e2e.sh の `need` 対象) に展開される
   - `analysis-ott-binaries` → `$HOME/analysis/plugins/ott/binaries/` (OTT_vst2_win64.dll ほか実機バイナリ。
     展開後は `ANALYSIS_DIR=$HOME/analysis` が環境に入る。tools/shared/env.sh の既定 /home/ubuntu/work/analysis を上書きする)
+  - `apt-mingw` は R2 の素材ではなく、`gcc-mingw-w64-x86-64` を runner に apt 導入する
+    (`x86_64-w64-mingw32-gcc`。PE を作るテスト用で tools/ の 22 ファイルが使う。#646)。
   - `work-m11` → `tools/m11/work/`、`work-liftdiff` → `tools/liftdiff/work/` に展開される
     (gitignore 対象の検証スナップショット。commit しない)。
   - 追加の `work-*` は R2 に置いて、`prepare-event-context.sh` の allowlist に足す (#293)。
@@ -215,4 +218,21 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
 - **PM の watch ルール (依頼者指示 116)**: 起動した全ての run は無条件で `gh run watch` する。PM が
   応答を終える時は、background で `gh run watch` が 1 本以上走っていること。完了通知を受けたら、
   結果の処理に入る前に、次の watcher を起動し直す。
+- **実装が始まったチケットは merge まで止めない (依頼者指示 119・120)**: open PR は常に次のいずれかの状態で、
+  各状態に「次の一手」が決まっている。止まっている PR を残さない。
+  判定は表の上から順に評価し、**最初に該当した行**を採る。draft の PR は、CONFLICT・FIX に該当しなければ
+  review の有無・種別によらず DRAFT になる。
+
+  | 状態 | 判定 | 次の一手 |
+  |---|---|---|
+  | CONFLICT | main と競合 (`mergeable=CONFLICTING`)。draft でも適用。**競合 PR は review run が起動しない** | main を merge して競合を解消する run |
+  | FIX | oc-reviewer の最新 review が現在の head に CHANGES_REQUESTED。draft でも適用 | 指摘 (reviewer・Copilot・inline) の修正 run。妥当でない指摘は実測を添えて理由を PR に残す。draft なら修正後に ready にする |
+  | NOREVIEW | ready で現在の head に review が無い | review 再起動 (run が既にあれば待つ) |
+  | DRAFT | draft (CONFLICT・FIX に該当せず、review の有無・種別を問わない) | ready にして review 再起動 |
+  | COPILOT | reviewer が COMMENTED (Copilot の review 待ち) | 30 分経ったら close→reopen |
+  | APPROVED | approve 済みで未 merge | merge。PR 本文にマージ順があれば先行 PR の後。base が別 PR のブランチなら先行 merge 後に付け替え |
+
+  `sweep_prs.sh` が 15 分間隔で全 open PR を判定し、止まっているものを自動で次の run に載せる。
+  着手報告だけで終わった run は `find_silent_runs.sh` で検出して再投入する。
+  どちらも repo 外の PM 運用スクリプトで、所在は `docs/REFERENCES.md` `[PM-SCRIPTS]` が正本 (repo からは挙動を検証できない)。
 
