@@ -172,7 +172,7 @@ python3 tools/plugins/f2/nc_leaf.py      # ネガティブコントロール (ki
 1. `ir7_argpass.py` は OTT `setParameter` (function_180120af0) 専用 (jump table を dsm から再生成する) で、汎用の xmm 復元ではない。鎖に繋げても eq-filter には効かない。汎用品は kernel 向け `p0c/k80_argfix.py` + `p0c/k80abi.py` (#254 系) だったので、その [A]/[C] を再利用する `lift/passes/fix_xmm_args.py` を新規作成した。k80abi の `scan_function` で関数ごとの xmm 入力 slot を機械語から求め、IR 署名の slot 位置 N に `float`/`double` 引数を足す (隙間は `i64 %padN`)。closure 内の呼出し元には 0 / 0.0 を渡す。
 2. `lift_ranges.sh` に **opt-in `PLUG_XMMARG=1` (既定 0)** で接続した。既定 ON にしていないのは、下記 3 の結果が出ておらず全 plugin への影響を測っていないため。
 3. **受入条件 1 は未達**: `PLUG_XMMARG=1 PLUG_ICALL=0` で 6 block (18975 18982 19005 19006 19013 19059) を lift し直した `leaf_diff.sh` の最終判定は **一致 15 / 不一致 8 / 実行不能 0** (接続前と同一)。タグ集計は `xmm_arg_drop 7`・`ret_only 1` (接続前は `xmm_arg_drop 8`; 差の 1 は 0x6f1650 の分類が分類器修正 (9.5 の C1) で変わったもので、不一致自体は残っている)。
-4. 受入条件 2 (回帰) は、一致 15 が一致のままであることだけ確認 (上記 3 の同判定)。**ablation (pass を外すと 8 関数が戻る) は無意味**: pass 有無で不一致が同数のため、ネガコンとして成立していない。
+4. 受入条件 2 (回帰) は、一致 15 が一致のままであることだけ確認 (上記 3 の同判定)。**ablation (pass を外すと 8 関数が戻る) はネガコンとして不成立** (PR 本文の受入条件 2 と同じ判定): pass 有無で不一致が同数のため、pass の効果を検出する対照にならない。
 5. 受入条件 3 (#232 / #233 の適用可否判定) は未実施。
 
 ### 9.2 実測 (`PLUG_XMMARG=1`、block ごとの `p.xa.json`、HEAD 2f77ace。復元・skip 件数は 1191aef と同一を再確認)
