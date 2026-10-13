@@ -65,7 +65,7 @@
 ## 6. 限界と未実装 (正直ベース)
 
 - **fake シンクの数値**: 音声 HW が無いため `outputLatency` 35ms/`baseLatency` 10.7ms は fake 値。実デバイス (Windows WASAPI/mac CoreAudio, Firefox, Safari) での burst・遅延・underrun は**未計測**。往復の総遅延 (入力ブラウザバッファ含む) も未計測。
-- **未実装**: COM vtable アダプタ (win64 ABI/8 バイトポインタの ASIOCallbacks・ASIOBufferInfo・ASIOTime への変換; リフタ呼出規約待ち)、レジストリ `SOFTWARE\ASIO\FL Studio ASIO` と `CoCreateInstance` 配線 (別 shim 行)、DirectSound shim、WebMIDI shim、getUserMedia のデバイス選択 UI、WASAPI capture/exclusive/loopback、T の縮小 (拡張のみ)、macOS 固有 (AudioUnit 面) の薄いアダプタ。
+- **未実装**: COM vtable アダプタ (win64 ABI/8 バイトポインタの ASIOCallbacks・ASIOBufferInfo・ASIOTime への変換; リフタ呼出規約待ち)、レジストリ `SOFTWARE\ASIO\FL Studio ASIO` と `CoCreateInstance` 配線 (別 shim 行)、DirectSound shim、WebMIDI shim、getUserMedia のデバイス選択の**製品 UI** (部品は §11 で実装、画面は AU-9 #184)、WASAPI capture/exclusive/loopback、T の縮小 (拡張のみ)、macOS 固有 (AudioUnit 面) の薄いアダプタ。
 - B=128 は ILWASAPI2ASIO の min 256 より小さい (shim 既定プロファイル min=128/gran=128 の結果であり FL 実運用値ではない)。`-DFLASIO_PROFILE_ILWASAPI=1` での e2e は未実施。
 - 未確認 (推定): `asioMessage` selector 6 → コマンド 0x17 が再起動かどうか、FL が granularity=128/min=128 を受理するか (ILWASAPI 値は `-DFLASIO_PROFILE_ILWASAPI=1` に用意)、DS バッファの 16/32bit、Web MIDI の Worker 内実装状況 (W3C 仕様上は `Exposed=(Window,Worker)`, 実装未確認)。
 - `ctx.outputLatency` は起動直後 0 → 約 250ms 後に更新される。`getLatencies` は呼出時の値で、FL が起動直後に読むと小さく見える。
@@ -78,7 +78,7 @@
 2. **[audio-realdevice]** 実機 Chrome/Firefox/Safari での burst・outputLatency・underrun 行列、ループバックケーブルによる総往復遅延、T 下限の再評価。
 3. **[audio-midi]** WebMIDI shim (SAB MIDI ring, `midiIn/Out` 20 関数, CALLBACK_FUNCTION スレッド, SysEx バッファ, 再スキャン) と Worker 直受信の実機検証。
 4. **[audio-directsound]** DirectSound shim (ring を循環バッファ化, Lock/Unlock/GetCurrentPosition/Notify)。FL の DS バッファ形式 (16/float) の確認を含む。
-5. **[audio-input-ui]** getUserMedia デバイス選択 + `controlPanel` UI + `kAsioResetRequest` 連携、入力遅延実測。
+5. **[audio-input-ui]** (#192, 部品は §11 で実装済み。FL 本体側の再初期化確認と入力遅延実測は未達) getUserMedia デバイス選択 + `controlPanel` UI + `kAsioResetRequest` 連携、入力遅延実測。
 6. **[audio-latency-policy]** T の縮小 (安定時に B 刻みで減衰)、安全モード/低遅延モードの UI、FL の selector 6 (0x17) 挙動確認後に `kAsioLatenciesChanged` を使うか決定。
 7. **[audio-fl-profile]** FLEngine 起動後に granularity=128 / ILWASAPI プロファイルのどちらが必要か実機検証、`pbtrackingmode` 各モードでのカーソル追従確認。
 8. **[audio-worklet-wasm]** (任意) FL ミキサを Wasm Audio Worklet 内で直接走らせる案との遅延比較 (ブロッキング不可のため FL スレッド構造の再設計が前提)。
@@ -126,3 +126,29 @@ e2e 追加 3 本 (`harness/run.mjs`, 計 25 シナリオ): `asio_sine_b512_96k` 
 | T 縮小が未実装 (burst 4096 で T=56ms 固定) | 96k/B=256 の遅延が burst 最大値に引きずられる | #190 (AU-6) にコメント |
 | 実機 burst 分布が未計測 | 自然な burst 4096 の発生頻度・遅延影響が不明 | #187 (AU-2) にコメント |
 | 旧コードでの abort 再現 (ネガティブコントロール) 未実施 | 修正前後の差を本 runner で実測していない | 本 PR 本文に明記 |
+
+## 11. AU-5 (#192) 入力デバイス選択・controlPanel・入力喪失リセット (main thread 部品)
+
+既知類型との関係: 該当なし (lift 欠陥ではなくランタイム shim)。
+
+| 追加 | 内容 |
+|---|---|
+| `src/runtime/audio-input.ts` (`FlAudioInput`) | 権限の取得/要求 (`permission()`/`requestPermission()`)、audioinput 列挙、`select(deviceId)` (接続中はライブ切替、選択は storage に永続化)、MediaStreamSource を worklet node へ接続。選択 device が消えたら既定へフォールバック。track ended / device 消失は `lost` イベント |
+| `FlAudioShimOptions.input` | in_ch>0 の ATTACH 毎に接続 (失敗しても出力は継続)。`lost` → `dev_events` に `FLA_EV_INPUT_CHANGED` (=16) → producer が `kAsioResetRequest` を発行 (`ctx.suspend` と同経路) |
+| `FLA_CMD_CONTROL_PANEL` (=8) / `FlAudioShimOptions.controlPanel` | `flasio_control_panel()` が main の UI 代替を呼ぶ。UI 未登録なら `ASE_NotPresent` (FL 側は "Could not open ASIO control panel" 経路) |
+
+検証 (コミット `1809e67`、`inventory.sh` 以外の e2e.sh 手順 = tsc → build.sh → `node harness/run.mjs` フル、headless Chrome 154 の fake device/UI、load average 0.04 開始、所要 485 s): **30/30 PASS** (新規 5 本 + 既存 25 本, `results/results.json`)。`inventory.sh` は `/home/ubuntu` 固定パスを参照するため本 run では未実行。
+
+| 新規シナリオ | 結果 |
+|---|---|
+| `asio_input_ui_connect_b256` | FlAudioInput 経由で RMS 0.141・相関 1.000・lag 1536f (従来の gum 直結と同値)・resets 0 |
+| `asio_input_ui_controlpanel_switch` | `controlPanel` code=0、UI 代替が列挙 3 デバイス (Fake Default / Fake Audio Input 1 / 2) → `Fake Default Audio Input` から `Fake Audio Input 1` へライブ切替、切替後もループバック継続 (RMS 0.141) |
+| `asio_controlpanel_no_ui` | UI 未登録 → `-1000` (ASE_NotPresent)、abort なし |
+| `asio_input_lost_reset` | track ended → `kAsioResetRequest` 1 回受信、underruns 0 |
+| `asio_input_denied_output_ok` | getUserMedia が NotAllowedError でも `permission: denied` イベント、出力は継続 (underruns 0, cb 1125) |
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| FL 本体側の kAsioResetRequest 再初期化確認 | shim は ASIO コールバックまで発行を確認済み。FL がそれで再初期化するかは FL ブートが必要で未検証 | #192 (Refs) |
+| 入力遅延の実機実測 | fake device の lag (1536f) までしか出ない | #187 (AU-2) |
+| 製品 UI (パネル画面・ユーザジェスチャ導線) | 本 PR は部品と UI 代替フックまで | #184 (AU-9) |
