@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ldfix_509_e2e.sh — #509 (LD-9) 1 コマンド再現。PE (fl-win64) 無しで、work-m11 の
-#   work/{boot*.lift.ll, boot*.drc.config.json, m11_image.bin, boot_final.ll, boot_final3.ll} と /opt/emsdk, node だけで走る。
+#   work/{boot*.lift.ll, boot*.drc.config.json, m11_image.bin, boot_final.ll, boot_final3.ll} と [EMSDK], node だけで走る。
 #   1/7 修復前 IR を再生成 (audit_lsf_e2e.sh と同じ)
 #   2/7 ldfix 旧版 ($PREV_REF) / 新版 (HEAD) を同じ修復前 IR に適用 → 出力が異なる関数の一覧 (他の関数は byte 一致)
 #   3/7 audit_lsf.py (store 形 + 消費者形) を 修復前 / 旧版 / 新版 に実行
@@ -8,7 +8,7 @@
 #   5/7 ネガティブコントロール (旧版 = 修復を外す / 新版の store 1 本・消費者 1 関数を戻す)
 #   6/7 修復前後の wasm を作り survey 942 unit を unit ごとに突合 + 修復した関数の動的到達 (reach_509.sh)
 #   7/7 修復前後の wasm で 5 関数を直接呼んで期待値と突き合わせ (dyn_509.mjs)
-# 使い方: bash tools/m11/ldfix/ldfix_509_e2e.sh      環境変数: M11_WORK (既定 tools/m11/work) / PY (capstone+pefile 入り python) / PREV_REF (既定 009e823)
+# 使い方: EMSDK_ENV=<[EMSDK] の emsdk_env.sh> bash tools/m11/ldfix/ldfix_509_e2e.sh      環境変数: EMSDK_ENV (必須、[EMSDK] の emsdk_env.sh) / M11_WORK (既定 tools/m11/work) / PY (capstone+pefile 入り python) / PREV_REF (既定 009e823)
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 REPO="$(cd -- "$HERE/../../.." && pwd)"
@@ -25,10 +25,10 @@ step() { echo "[ldfix_509_e2e] $*"; }
 FNS="5c0270,41a670,66e080,7e5240,806740,c62780,417b70,409c80,666a60,1062c50,1063090,12cb4f0,12f9730,4087a0,40ffe0,447ee0,44f110,44f1d0,44f2c0,44f740,6074b0,7763d0,8239d0,86a7c0,8c7710,f3dd20"
 
 step "1/7 修復前 IR を再生成"
-mkdir -p "$OUT/gen/tools"; cp -r "$REPO/tools/m11" "$OUT/gen/tools/"; rm -rf "$OUT/gen/tools/m11/work"; mkdir -p "$OUT/gen/tools/m11/work"
+mkdir -p "$OUT/gen/tools"; cp -r "$REPO/tools/m11" "$REPO/tools/shared" "$OUT/gen/tools/"; rm -rf "$OUT/gen/tools/m11/work"; mkdir -p "$OUT/gen/tools/m11/work"
 for f in boot0 boot1 boot2 boot3 boot4; do cp "$W/$f.lift.ll" "$OUT/gen/tools/m11/work/"; done
 find "$W" -maxdepth 1 -type f -size -3M -exec cp {} "$OUT/gen/tools/m11/work/" \;
-( cd "$OUT/gen/tools/m11" && bash m11_gen_ir2.sh > "$OUT/gen_ir2.log" 2>&1 ) || { echo "gen_ir2 失敗: $OUT/gen_ir2.log"; exit 1; }
+( cd "$OUT/gen/tools/m11" && M11_LDFIX=0 bash m11_gen_ir2.sh > "$OUT/gen_ir2.log" 2>&1 ) || { echo "gen_ir2 失敗: $OUT/gen_ir2.log"; exit 1; }
 PRE="$OUT/gen/tools/m11/work/boot_final.ll"
 
 step "2/7 ldfix 旧版 ($PREV_REF) / 新版 (HEAD)"
@@ -97,7 +97,7 @@ for k in prev nc_store nc_use; do
 done
 
 step "6/7 survey 前後 (wasm 再ビルド) と動的到達"
-B="$OUT/build"; mkdir -p "$B/tools"; cp -a "$REPO/tools/shim" "$B/tools/"; cp -a "$REPO/tools/m11" "$B/tools/m11_src"; rm -rf "$B/tools/m11_src/work"; mv "$B/tools/m11_src" "$B/tools/m11"; cp -a "$W" "$B/tools/m11/work"
+B="$OUT/build"; mkdir -p "$B/tools"; cp -a "$REPO/tools/shim" "$REPO/tools/shared" "$B/tools/"; cp -a "$REPO/tools/m11" "$B/tools/m11_src"; rm -rf "$B/tools/m11_src/work"; mv "$B/tools/m11_src" "$B/tools/m11"; cp -a "$W" "$B/tools/m11/work"
 mkdir -p "$OUT/basewasm"
 ( cd "$B/tools/m11" && rm -f work/boot_final3.ll && bash m11_build.sh > "$OUT/build_base.log" 2>&1 \
   && cp work/m11_boot.cjs work/m11_boot.cjs.wasm "$OUT/basewasm/" && node trap_triage/survey_units.mjs "$OUT/sv_base.json" | tail -1 )

@@ -2,8 +2,8 @@
 # reach_509.sh — #509 (LD-9): 指定した関数の「動的到達」を測る (survey 942 unit で各関数の入口を通る回数)。
 #   boot_final3.ll の対象関数の入口へ `call void @m11_fnhit(i32 K)` を挿入 → emcc → reach_survey.mjs。
 #   m11_ov.c が C で上書きした関数は IR 版が実行されない (hit 0) ことも、この計装で分かる。
-# 使い方: bash tools/m11/ldfix/reach_509.sh VA,VA,... [OUT.json]    環境変数: M11_WORK (既定 tools/m11/work) / IR (既定 $M11_WORK/boot_final3.ll)
-# 前提: /opt/emsdk, node, m11_build.sh を 1 回実行済み (work/obj/*.o)
+# 使い方: EMSDK_ENV=<[EMSDK] の emsdk_env.sh> bash tools/m11/ldfix/reach_509.sh VA,VA,... [OUT.json]    環境変数: EMSDK_ENV (必須) / M11_WORK (既定 tools/m11/work) / IR (既定 $M11_WORK/boot_final3.ll)
+# 前提: [EMSDK], node, m11_build.sh を 1 回実行済み (work/obj/*.o)
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 M11="$(cd -- "$HERE/.." && pwd)"
@@ -36,7 +36,7 @@ unsigned m11_fnhit_get(int k) { return m11_fnhit_c[k & 255]; }
 void m11_fnhit_reset(void) { for (int i = 0; i < 256; i++) m11_fnhit_c[i] = 0; }
 int m11_fnhit_n(void) { return $(cat "$D/probe.ll.n"); }
 C
-source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1
+source "${EMSDK_ENV:?EMSDK_ENV=<[EMSDK] の emsdk_env.sh> を指定してください}" > /dev/null 2>&1
 export TMPDIR="$D"
 CF="-w -O0 -g1 -DM11_LB_BASE=${M11_LB_BASE:-0}"
 emcc -c "$D/probe.ll" -o "$D/boot.o" $CF
