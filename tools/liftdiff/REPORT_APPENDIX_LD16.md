@@ -7,11 +7,14 @@
 - OTT 旧 chain の集計差分は **commit 間の `ldlib/cases.py` の pattern 追加** (`79584ef7` feat(liftdiff): add this/VMT and UTF-16 string case patterns (#235)、9→11 pattern) で説明できる。
 - 分類: **main の変更** (採点基準・非決定性ではない)。`cases.py` 単独の差し替えで 33→35 / 110→112 / 69→65 が再現し、他のファイル (`compare.py`・`classify.py`・`pe.py`・`rt/`) は単独では集計を変えない。
 - 非決定性: 旧 `59eea5c` も現 HEAD `986e7415` も OTT 集計は 3 回とも同一 (下表)。
+- **ログの扱い**: 現 HEAD `986e7415` の 3 回分は `tools/liftdiff/results/liftdiff_e2e_head986e7415_n{1,2,3}.log` として commit 済み。旧 `59eea5c` の 3 回分と §2 の差し替え実行のログは **commit されていない**。再生成には `work-m6-ott` / `work-m11` / `work-liftdiff` / `analysis-ott-binaries` の素材が要り、後続 run の `$HOME/artifacts` には `fl-win64` しか無かったため再実行できていない。よって §1 の旧 `59eea5c` の行と §2 の表の数値は、ログで検証できない報告値として扱う。検証するには素材を揃え、`git worktree add --detach <dir> 59eea5c` で §5 の手順により再実行する必要がある。
 - issue 本文の **38/108/66 は今回の素材・commit では再現しなかった**。main 側 `tools/liftdiff/work/ott_old/` (2026-10-12 18:27) の batch は今回の `59eea5c` 再計算と一致せず、関数単位で 16 件が異なる。その由来は未特定 (PR #802 の run 時点の素材・環境差と推定。未確認)。
 
 ## 1. 実測 (本 run・Actions runner・4 vCPU)
 
-OTT 旧 chain (`build ott_old` + `batch --set closure --shards 4` + `tests/check_ott.py`)。素材 `fl-win64` `work-m11` `work-liftdiff` `work-m6-ott` `analysis-ott-binaries` (`$HOME/artifacts` の実在を確認して展開)。
+OTT 旧 chain (`build ott_old` + `batch --set closure --shards 4` + `tests/check_ott.py`)。素材 `fl-win64` `work-m11` `work-liftdiff` `work-m6-ott` `analysis-ott-binaries` を使用した実行の記録 (旧 `59eea5c` 分は報告値)。
+
+ログ区分: 上の表で `986e7415` の行は commit 済みログで検証可能。`59eea5c` の行はログ無し (上記「ログの扱い」参照)。
 
 | commit | 回 | 集計 (一致 / 不一致 / 実行不能) | D1 / D2 / D3 / D4_D5 / D6 |
 |---|---|---|---|
@@ -39,10 +42,11 @@ OTT 旧 chain (`build ott_old` + `batch --set closure --shards 4` + `tests/check
 | 現 HEAD の `ldlib` のみ (rt 旧) | 35 / 112 / 65 |
 
 注: build を省いた途中の実行は無効として採用しない。結論は build を毎回入れた再実行で確定した。
+**ログ無し**: 上表の各行 (`cases.py` のみ・全 9 ファイル等) の実行ログは commit していない。この表は検証可能な一次ログではなく報告値。`ldlib/cases.py` 単独差し替えの再現は、素材を揃えて §5 の手順で再実行する必要がある (未実施・未検証)。
 
 ## 3. 関数単位の突合 (旧 `59eea5c` 3 回目 vs 現 HEAD 3 回目)
 
-判定が変わった関数 (`tests/ott_delta.py`):
+旧 `59eea5c` と現 HEAD の関数単位の差分 (`tests/ott_delta.py`)。変化は 8 件: verdict 変化 4 件 (unexec→match 2 件・unexec→mismatch 2 件) と、tag または unexec 理由のみの変化 4 件。
 
 | 関数 | 旧 | 新 | 変化 |
 |---|---|---|---|
