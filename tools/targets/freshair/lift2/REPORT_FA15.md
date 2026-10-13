@@ -35,7 +35,7 @@
 ## 4. 素材と環境
 
 - 展開: `plugins-freshair` → `$RUNNER_TEMP/plugins-freshair`、`FA_DL=... bash tools/targets/freshair/fetch.sh` で factory `.epf` 8 本を確認。
-- `fl-win64` / `toolchain-retdec` / `toolchain-emsdk` は本 run で展開していない。`lift2_e2e.sh` は `SlateCore.core_64` (plugins-freshair 由来) と `/opt/emsdk`・`/opt/retdec` (既存) を使う。
+- `fl-win64` / `toolchain-retdec` / `toolchain-emsdk` は本 run で展開していない。`lift2_e2e.sh` は `SlateCore.core_64` (plugins-freshair 由来) と `[EMSDK]`・`[RETDEC]` (既存。`docs/REFERENCES.md`) を使う。
 
 ## 5. 未解決・限界
 
