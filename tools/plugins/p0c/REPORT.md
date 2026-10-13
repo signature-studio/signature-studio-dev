@@ -1022,7 +1022,7 @@ before は 515.7 s で `p0c/work/kernel_table.json` の置き場所違いによ�
 `grep -rn '/home/ubuntu' tools/plugins/p0c ... --exclude-dir=work | wc -l` → 0。
 
 範囲外 / 未解決: `inventory/kernel_table.py:15` と `lift/batch_lift.sh:31` ほか `lift/` 配下の `/home/ubuntu` 既定は別 area の置換 issue (#294 配下) で扱う。
-`k80_diff.py` は `p0c2_e2e.sh` [6] 経由で実行済み (`LIFTP` は `REPO_ROOT` 基準で解決)。RetDec の非決定性は §15.4 に実測を残すのみで、起票: 下記 issue (RetDec 非決定)。
+`k80_diff.py` は `p0c2_e2e.sh` [6] 経由で実行済み (`LIFTP` は `REPO_ROOT` 基準で解決)。RetDec の非決定性は §15.4 に実測を残すのみで、RetDec 非決定は #668、`p0c_e2e.sh` [4] の `kernel_table.json` 置き場所と `nsis_blockmap.json` 生成は #669 に起票。
 
 ## 16. P0c-8 (#311, 親 #197・先行 #269): ext IR の wasm32 検証 + framework 統合 (fw_f80.py → f80_lower --ext)
 
