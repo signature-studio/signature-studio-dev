@@ -127,6 +127,7 @@
 | `tools/m11/trap_triage/REPORT_679.md` | ~110 | icall site 0x41037d の hit 23,053,861 の内訳 (unit 101 = #513 の暴走 loop に 99.999% が集中)・既定 ON の 0x41032e 併記・再現手順と検査スクリプト `icall_41037d_679.py` (#679) |
 | `tools/m11/trap_triage/REPORT_418.md` | ~70 | 409470 転記ハングの原因特定 (#418) |
 | `tools/m11/trap_triage/REPORT_595.md` | ~90 | ClassCreate ON (`M11_OV_CLASSCREATE=1`) の ok 退行の原因切り分けと C 転記 (`41c130` / `413060`)・残る unit 415 の原因・既定 OFF のネガコン (#595) |
+| `tools/m11/trap_triage/REPORT_704.md` | ~60 | unit 415 の `9b4b00` (と `9b5450`) の C 転記 (ON 時のみ) と、現 IR での ON 退行 4 件 (101/190/291/296) の再測定 (#704) |
 | `tools/m11/trap_triage/REPORT_474.md` | ~100 | 410320 補完後の unit 114 ハング = 5c0270 の unlink deref 脱落 (#474)・409470/410320 再採用 |
 | `tools/m11/trap_triage/REPORT_482.md` | ~100 | `5c03d0` の node 差替え通知 `call [rbx+0x18]` の D15 脱落を復元 (#482)・survey 不変の実測 |
 | `tools/m11/trap_triage/REPORT_594.md` | ~95 | 8cc190 系 OOB は入力不正ではなく `417b70` の `Q(a)` 上位 4B 未初期化 (D17 型)・#552 での解消の実測・unit 56 の別原因・`negctl_594.sh` gate (#594) |
