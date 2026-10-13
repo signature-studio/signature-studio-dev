@@ -119,6 +119,11 @@ case 単位分類 (完全再現) を基準にすること。「実行不能 2,49
   410320 の call 脱落からその経路に入るまでの因果は trace_head (最大 12 件) に収まらず**直接確認していない** (推定)。
 - **分岐の型 (LD-17 / #864)**: 残りを排他的に型 B (L が ret まで call 無し・tail jump 無し) / C (L の直接 call 先で分岐) / D (直接 call 先に無い) に分類した。件数は `results/m11_unreachable_diverge.md` §2 が正本。
   型 B は「L の内部では食い違わず、L の戻り後の呼出元で次 entry が現れる」と読める (推定)。根拠は B に入る L の機械語を ret まで読んで jmp 先 (tail jump) が無いことを確認した点のみ (`tail_jmps`)。戻り後の実際の呼出元は未確認。個別原因は未特定 → 子 issue #1034 (型 B)・#1035 (型 C・D)。
+- **型 B の再検証 (LD-27 / #1034)**: `tests/trace_fullcompare_typeb.py` で型 B の case を完全 trace (xfill 既定 1 と 0) で取り直した。
+  - **xfill 仮説は棄却**: 型 B の root entry で x0 が食い違うのは xfill=1 が署名外 xmm に 1.25+i を入れるため (`rt/ld_native.c`)。xfill=0 で同じ case を流しても、全件で native/wasm の分岐は残る。
+  - **trace_head 基準の L は不正確**: batch jsonl の `trace_head` (最大 12 件) で求めた L は、完全 trace では 5 件 (xfill 間で変わる) で別の entry になる。型 B の件数は完全 trace 基準で数え直す必要がある。
+  - 0x40a380 (`stmxcsr`/`ldmxcsr` の MXCSR 設定、ret まで call 無し) が完全 trace の L に現れる件がある。分岐は 0x40a180 の戻り後 (wasm 側は 0x409730 → 0x4096d0 → … → ExitProcess 経路) で起きる。
+  - 個別原因・類型 (D15 / ldfix / その他) の分類は未完 → #1034 は Refs。
 - **OOB function_414ad0 系 (68 件)**: 機械語は入口 rcx (var 文字列のアドレス) の 1 段 deref `mov r,[rbx]` が 4 箇所 (0x414af3/0x414b49/0x414b64/0x414b78)。
   lift 後 IR には `%arg1` を ptr とする load が 0 件で、`%arg1` を値のまま `icmp`/`add` に使っている (ldfix F3a/F3b 型の値↔アドレス取り違え)。
   68 件は全て最上位 trap frame が `function_414ad0` (= wasm は 414ad0 に到達している)。wasm trace_head に 414ad0 が現れるのは 41 件で、
