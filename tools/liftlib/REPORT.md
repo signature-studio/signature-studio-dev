@@ -131,7 +131,7 @@ FA の P1' (comisd×2+jbe/jae+xorps/movaps+jmp, 合流先は reg2mem alloca) が
 | §13 | LIFTLIB-3 (CAB-264): 汎用 xmm0-ret bind + tan 入口誤解析修正 | leafabi/regbind/mc/f2 に xmm0-ret bind を実装し残留 dropped と tan を改善。census junkHi は不変 (記録のみ) | [`REPORT_APPENDIX_B.md`](REPORT_APPENDIX_B.md) §13 |
 | §14 | LIFTLIB-4 (CAB-272): leaf region の phi 合成 | OTT 既定 p1 の残留 UNSUPPORTED をさらに削減, tan 改善。回帰 ALL PASS | [`REPORT_APPENDIX_B.md`](REPORT_APPENDIX_B.md) §14 |
 | §15 | LIFTLIB-1 (#224): 旧 dir 参照専用化の検収 | 対応表を `README.md` に追記, 旧 dir REPORT に参照専用注記。`liftlib_e2e.sh` 通常・`--fresh` とも ALL PASS | [`REPORT_APPENDIX_B.md`](REPORT_APPENDIX_B.md) §15 |
-| §16 | 環境パス置換 (#386): `tools/liftlib/liftlib` の `/home/ubuntu` を `tools/shared` へ | DLL パスを `tools/shared/paths.py` 経由に置換 (既定値同一)。`tools/liftlib/` 直下 5 ファイルの残りは §16.3 の未解決表 | [`REPORT_APPENDIX_B.md`](REPORT_APPENDIX_B.md) §16 |
+| §16 | 環境パス置換 (#386): `tools/liftlib/liftlib` の `<HOME>/work` 固定を `tools/shared` へ | DLL パスを `tools/shared/paths.py` 経由に置換 (既定値同一)。`tools/liftlib/` 直下 5 ファイルの残りは §16.3 の未解決表 | [`REPORT_APPENDIX_B.md`](REPORT_APPENDIX_B.md) §16 |
 
 ## 17. HB-H3 (#93): 整数引数脱落 (D3) の機械検出・復元 pass `iargs` — 付録へ移動
 
