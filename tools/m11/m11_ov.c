@@ -242,6 +242,49 @@ unsigned long long function_4133f0(unsigned long long dest, unsigned long long s
     return 0;
 }
 
+/* function_412d60  VA 0x412d60  (System._UStrClr(dest: PPointer))
+ * RetDec は `mov rax,[rbx]` (旧値の読出し) を落とし, dest のアドレス自体を文字列ポインタとして refcnt を触った (4133f0 と同型).
+ *   old=*dest; old!=nil → *dest=0; refcnt(old-8)>0 → --refcnt==0 なら 0x409440(old-0x10) (FreeMem). 戻り値 = dest */
+unsigned long long function_412d60(unsigned long long dest, unsigned long long unused) {
+    (void)unused;
+    u64 old = Q(dest);
+    if (old) {
+        u64 hdr = old - 0x10;
+        Q(dest) = 0;
+        int rc = (int)D(hdr + 8);
+        if (rc > 0) {
+            D(hdr + 8) = (u32)(rc - 1);
+            if (rc - 1 == 0) function_409440(hdr);
+        }
+    }
+    return dest;
+}
+
+/* function_418190  VA 0x418190  (System._LStrArrayClr/_DynArrayClear 系: dest=PPointer, rdx=type info)
+ * 同上: `mov rsi,[rbx]` の旧値読出しが落ちている. refcnt は old-0xc (int32), length は old-8.
+ *   old=*dest; old!=nil → *dest=0; refcnt(old-0xc)>0 → --refcnt==0 なら
+ *   elem=Q(ti+6+B(ti+1)) があり len=Q(old-8)!=0 なら 0x416230(old, Q(elem), len) (要素 finalize) → 0x409440(old-0x10). 戻り値 = dest */
+unsigned long long function_418190(unsigned long long dest, unsigned long long ti, unsigned long long unused) {
+    (void)unused;
+    u64 old = Q(dest);
+    if (old) {
+        Q(dest) = 0;
+        int rc = (int)D(old - 0xc);
+        if (rc > 0) {
+            D(old - 0xc) = (u32)(rc - 1);
+            if (rc - 1 == 0) {
+                u64 elem = Q(ti + 6 + (u64)B(ti + 1));
+                if (elem) {
+                    u64 len = Q(old - 8);
+                    if (len) function_416230(old, Q(elem), (unsigned int)len);
+                }
+                function_409440(old - 0x10);
+            }
+        }
+    }
+    return dest;
+}
+
 /* function_412770  VA 0x412770  (System: InitContext 復元 + longjmp(setjmp 点=entry_point 内) )
  * 実機では戻らない (DllMain の setjmp が eax=1 で再返却 → DllMain は TRUE を返す).
  * lift 版は longjmp を表現できず, 通常 return して Halt0 が ExitProcess まで進んでしまう (実測).
@@ -473,6 +516,31 @@ unsigned long long function_417b70(unsigned long long a, unsigned long long ti, 
     }
     Q(a) = data;
     return 0;
+}
+
+/* function_410b10  VA 0x410b10  (System.TMonitor の GetMonitor 相当: obj の monitor スロット = obj + InstanceSize - 8 を返し, 無ければ 410650 で作って cmpxchg で差す)
+ * RetDec は `mov rax,[rcx]` (obj → VMT) を落とし, `[obj-0x80]` (InstanceSize = [VMT-0x80]) を読んだ (D4: disp=0 の deref 脱落).
+ * _ClassCreate が TClass 自身を「オブジェクト」として返していた間は [obj-0x80] が偶然 InstanceSize になっていたが, 40fb40 以降の実オブジェクトでは
+ * ヒープ上の任意値になり, 不正アドレスに TMonitor の LockCount/Recursion/Owner を書いて FastMM のプールヘッダを壊した (unit #18 OOB の再発).
+ *   rsi = obj + sext([[obj]-0x80]) - 8; cur = *rsi; (cur & ~1) があればそれを返す.
+ *   無ければ new = 410650() (TMonitor 作成); lock cmpxchg(*rsi, cur → new | (cur & 1)); 再読込して (*rsi & ~1) == 0 なら再試行;
+ *   勝った値が new と異なれば new を 407e20 (FreeMem) で解放. 戻り = *rsi & ~1. */
+extern unsigned long long function_410650(void);
+extern unsigned long long function_407e20(unsigned long long);
+unsigned long long function_410b10(unsigned long long obj) {
+    u64 slot = obj + (u64)(long long)(int)D(Q(obj) - 0x80) - 8;
+    u64 cur = Q(slot);
+    u64 mon = cur & ~1ull;
+    if (mon) return mon;
+    u64 nw = function_410650();
+    for (;;) {
+        if (Q(slot) == cur) Q(slot) = nw | (cur & 1);
+        cur = Q(slot);
+        mon = cur & ~1ull;
+        if (mon) break;
+    }
+    if (mon != nw) function_407e20(nw);
+    return mon;
 }
 
 /* function_40a3b0 (System.Math.GetMXCSR: stmxcsr [rsp]; pop rax; ret): RetDec は pop rax を落とし常に 0 を返す

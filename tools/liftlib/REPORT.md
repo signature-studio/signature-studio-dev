@@ -139,3 +139,8 @@ FA の P1' (comisd×2+jbe/jae+xorps/movaps+jmp, 合流先は reg2mem alloca) が
 - 結論: `passes.iargs` (既定 off) が RetDec の整数引数 (rdx/r8/r9) 脱落を機械語基準で検出・復元する。OTT ctor の native 突合は iargs ON 200/200・ネガコン (OFF) 0/200 (§17.2)。
 - 検出 `iargs.scan()` は define 15 / 引数不足 site 15 / 入口素通し位置の誤値 site 17 (`sites_entry`, #427 で実装) を返す (§17.7)。
 - 未達: getParameter の xmm0 戻り (RetDec route; jump table 欠落が先, §17.3)。未解決は §17.5。
+
+## 18. LIFTLIB #241 — ymm(i256) helper ABI + pcmpistri + F2 xmm 戻り搬送 — 付録へ移動
+
+全文は **[`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §18** (本体の 250 行上限対応で分割移動。内容は削除していない)。
+- 結論: ymm(i256) helper の ABI と `pcmpistri` を実装して SIMD helper 自動生成の未被覆を解消し、F2 に xmm 戻り搬送 (`xmm_ret_scan` / `run_xmm_ret`) を追加した。実測値・未解決は付録 §18.1・§18.6・§18.7。
