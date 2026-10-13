@@ -52,6 +52,7 @@ REGLIVE 2,509 (関数入口 live-in 等で脱落でない) / **FRAME_IN_ESCAPED 
 | 通常起動 units_run / init_count | 52 / 54 | 同 | 同 |
 | survey ok / noproc / miss / trap | 869 / 1 / 47 / 25 | 同 | 同 |
 
+**#577 fix (PM 判断 3) の追記 (HEAD `18bbe03a` 実測、foreground)**: `f4_e2e.sh` rc 0 / 403 s。post の `function_52a7f0` ret は **0x110000f** (本 run の実測)。一方 `gui/flengine/e2e.sh` の `results/probe.json` (`c994306b` 生成、本 run でも再生成し同値) は **0x1100010**。PM 判断により受入条件の正は `probe.json` の `0x1100010` とする。`0x110000f` は main 取り込み前 build の値ではなく、`f4_e2e` の `tools/m11/work` IR から作った wasm の値 (履歴として残す)。同一 IR での値の一致確認は未実施 (§5)。
 **ret の出所 (HEAD `703b4857` 実測)**: `f4_e2e` の post (`0x110000f`) は `tools/m11/work` の `boot_final.ll` (sha256 `fd059f2f…`) から作った wasm の値。`flengine/e2e.sh` の `results/probe.json` (`0x1100010`) は flengine の複製 tree (`tools/gui/work/flengine/tree/m11/work`、`boot_final.ll` sha256 `a57be8fd…`) から作った wasm の値。同じ tree の ff build と soft build で probe を取ると、どちらも `0x1100010` で一致した (build 差は否定)。したがって差は IR の出所 (複製 tree は `m11_wndseed.sh` で IR を作り直している) によるものと推定する。どちらの IR が正しいかは未判定で、同一 IR での比較は未実施。PR の受入条件は値を「`f4_e2e` の post (`tools/m11/work` の IR) の値」と明記して読む。
 
 `f4_judge.py` 6 gate (F1 修復対象 / F2 IR 形 / D1 到達 / D2 load だけでは未到達 / P1 起動・survey 不変 / A1 監査分類) 全 PASS。
