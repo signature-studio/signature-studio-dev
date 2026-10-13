@@ -26,7 +26,7 @@ except Exception:
 print(sum(1 for f in re.split(r'\n(?=define )', s) if f.startswith('define') and 'x86_fp80' in f))
 PY
 )
-erc=-1; erc2=-1; NP=0
+erc=-1; erc2=-1; erc3=-1; NP=0
 emcc_c() { ( source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1; TMPDIR="$OUT/tmp" emcc -c "$1" -o "$OUT/e.o" -w -O0 -msimd128 > "$2" 2>&1 ); echo $?; }
 if [ -f "$OUT/e.final.ll" ]; then
   erc=$(emcc_c "$OUT/e.final.ll" "$OUT/emcc.log")
