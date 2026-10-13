@@ -95,6 +95,59 @@ def measure(name):
     print(json.dumps({k: v for k, v in res.items() if k != "exports"}, ensure_ascii=False))
 
 
+def negative_control(name="block19091_PE.bin"):
+    img = Image(os.path.join(FL, name))
+    md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
+    md.detail = False
+
+    def bad_of(code, fb):
+        bad = 0
+        off = 0
+        while off < len(code):
+            n = 0
+            for ins in md.disasm(code[off:off + 16], fb + off):
+                n = ins.size
+                break
+            if n == 0:
+                bad += 1
+                off += 1
+            else:
+                off += n
+        return bad
+
+    funcs = []
+    seen = set()
+    for (b, e) in img.pdata_functions():
+        rng = img.func_at(b, merge=True)
+        if rng is None or rng in seen:
+            continue
+        seen.add(rng)
+        funcs.append(rng)
+    ok = 0
+    bad = 0
+    first_clean = None
+    for fb, fe in funcs:
+        code = img.read(fb, fe - fb)
+        fbad = bad_of(code, fb)
+        bad += fbad
+        if fbad == 0:
+            ok += 1
+            if first_clean is None:
+                first_clean = (fb, fe, code)
+    fb, fe, code = first_clean
+    inj = bytearray(code)
+    inj[0] = 0x06
+    inj_bad = bad_of(bytes(inj), fb)
+    print(json.dumps({
+        "baseline": {"funcs": len(funcs), "decode_clean": ok, "bad": bad},
+        "injected": {"func": hex(fb), "byte0": "0x06", "bad_in_func": inj_bad},
+        "after": {"decode_clean": ok - (1 if inj_bad else 0), "bad": bad + inj_bad},
+    }, ensure_ascii=False))
+
+
 if __name__ == "__main__":
-    for n in ["block19091_PE.bin", "block23676_PE.bin"]:
-        measure(n)
+    if "--nc" in sys.argv:
+        negative_control()
+    else:
+        for n in ["block19091_PE.bin", "block23676_PE.bin"]:
+            measure(n)
