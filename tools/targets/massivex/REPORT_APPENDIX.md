@@ -71,7 +71,7 @@
   - 呼び出し元は未確定。E8 直接呼び出し 0 件は前版の記録 (本走査は呼び出し元を集計していない)。間接呼び出し経由と推定 [推]。
 - **N6-2〜6 の読み手 (未確定の役割・呼び出し元)**: 関数 0x181142370 / 0x181144570 / 0x181142640 / 0x1811453f0 が読む。役割と呼び出し元は本節の対象外 (#1017 で扱う)。
 - **N5 の読み手 (未特定)**: 4 範囲とも RIP 相対参照 0 件。前版の rel32 候補 (0x1834606c4 / 0x182d0841f) は RIP 相対の走査対象外で、未確定のまま。
-- 検証 HEAD: `d838c825`。全走査の実測は `d838c825` と同一の `mx_xref_fn.py` (`cbfcff96` で最終化) で行った。`a89d4ea3..d838c825` の差分は本 PR の 3 ファイル (`REPORT.md` §12・`REPORT_APPENDIX.md` §12・`mx_xref_fn.py`) のみで、e2e 対象コード (`mx_lic_stub.py` 等) は変更なし。
+- 検証 HEAD: `b83223e6` (main 取り込み後)。全走査は `mx_xref_fn.py` (`cbfcff96` で最終化) を `b83223e6` で実行した。`d838c825..b83223e6` の差分は main 取り込み (`ea88196e`) と massivex の調査スクリプト・REPORT のみで、e2e 対象コード (`license/e2e.sh`・`scripts/mx_lic_stub.py`・`tools/liftlib/liftlib/passes/base.py`) は `b5969e5a` から変更なし (`git diff --quiet b5969e5a b83223e6 -- <3 ファイル>` が 0)。main 取り込みで変わった `liftlib` の iargs・fp_bind・l1_restore は e2e.sh から呼ばれない。
 - e2e 数値 (`-O0` 5 s / `-O1` 78 s・lift キャッシュ無し / `-O2` 6 s, 11/11 PASS) は作成者の記録 (`b5969e5a` 時点)。本 fix run では `toolchain-retdec` が無く lift を伴う e2e は再測定していない。
 
 ### 12.3 未達と起票先
@@ -81,9 +81,11 @@
 | N5 demo UI 抑制 (QML 側の demoExpired / subscriptionExpired / MXDemoPopup 表示経路の特定と差し替え)。N5 の 4 範囲は RIP 相対の参照元 0 件 | 受入条件 1 未達 | #1017 [MX-4] (OPEN) |
 | N6 Native Access 誘導文言 6 種の抑制 (N6-1 の読み手 0x180f95e20 の呼び出し元の特定。N6-2〜6 の読み手関数 0x181142370 / 0x181144570 / 0x181142640 / 0x1811453f0 の役割と呼び出し元の特定 → 差し替え点の決定) | 受入条件 2 未達 | #1017 [MX-4] (OPEN) |
 | `acpt_verify_mx2.py` の N5/N6 検査は文字列実在のみ | 「抑制済み」の機械検証が無い | #1017 [MX-4] (OPEN) |
-| e2e の再測定 (`toolchain-retdec` 素材が必要) | 本節の e2e 数値は作成者の記録のまま | #1183 (素材付き再測定) |
+| e2e の再測定 (`toolchain-retdec` 素材が必要) | 本節の e2e 数値は作成者の記録のまま | #1280 (素材付き再測定・`[MX-7]`) |
 
-### 12.4 #1017 の再確認 (HEAD = `c2d47fda` の素材付き実測。スクリプト差分なし・同一測定)
+### 12.4 #1017 の再確認 (main 側の素材付き実測。本 PR の HEAD `b83223e6` でも同一スクリプトで再実行済み)
+
+- 注: 以下は main 側で `c2d47fda` 時に取った記録。本 PR の検証 HEAD `b83223e6` での再実行結果は PR 本文の「main 取り込み」節に記載。
 
 - **素材**: `plugins-massivex` (`$ARTIFACTS_DIR/plugins-massivex.tar.zst`) を `$RUNNER_TEMP/mx` に展開 → `scripts/parse_setup_headers.py` → `scripts/extract_massivex.py <exe> work key` で `work/extracted/VST3/Massive X.vst3` (95,356,824 B) を生成。md5 `622993e76565f49c094063a2b717d6ca` は REPORT.md §11.1 (2026-10-13 の記録) の値と一致。
   - 注: extract の 16B checksum は 125/125 不一致 (REPORT.md §1・§8 と同じ既知事象)。展開物の同一性は md5 の一致で確認した。
