@@ -8,10 +8,10 @@
 
 | tier | files | bytes | MB | unique-content files | unique-content MB |
 |---|---:|---:|---:|---:|---:|
-| T0 | 142 | 2212908 | 2.21 | 138 | 2.21 |
-| T0p | 258 | 5595646 | 5.60 | 116 | 5.58 |
-| T1 | 1700 | 76414481 | 76.41 | 649 | 53.37 |
-| T2 | 24990 | 1001026635 | 1001.03 | 23924 | 986.25 |
+| T0 | 137 | 1869977 | 1.87 | 133 | 1.87 |
+| T0p | 253 | 5676790 | 5.68 | 111 | 5.66 |
+| T1 | 1704 | 70394241 | 70.39 | 653 | 47.35 |
+| T2 | 24996 | 1007308662 | 1007.31 | 23930 | 992.53 |
 | X-lift | 196 | 771827960 | 771.83 | 195 | 768.23 |
 | X-rebuild | 43 | 99622456 | 99.62 | 43 | 99.62 |
 | X-skip | 72 | 189736312 | 189.74 | 65 | 189.36 |
@@ -20,7 +20,14 @@
 
 | tier | glob | files | KB | 証拠 found/total | 理由 |
 |---|---|---:|---:|---|---|
-| T0 | `Artwork/Skins/Default/*` | 7 | 506.3 | 7/7 | 既定スキン (起動画面/UI 素材, 起動音) |
+| T0p | `Artwork/Skins/Default/StartSnd.wv` | 1 | 70.4 | 1/1 | 起動音 (flags&8 の条件付き; ST-T14 §4 #4) |
+| T1 | `Artwork/Skins/Default/BigFruit.png` | 1 | 162.6 | 1/1 | 操作時のみ (ST-T14 §4 #5) |
+| T1 | `Artwork/Skins/Default/ClipHanger.png` | 1 | 12.0 | 1/1 | 操作時のみ (ST-T14 §4 #5) |
+| T1 | `Artwork/Skins/Default/PickerChan.png` | 1 | 23.1 | 1/1 | 操作時のみ (ST-T14 §4 #5) |
+| T1 | `Artwork/Skins/Default/ScopeGradient.bmp` | 1 | 1.6 | 1/1 | 操作時のみ (ST-T14 §4 #5) |
+| T1 | `Artwork/Skins/Default/RenderSnd.wv` | 1 | 65.3 | 1/1 | 操作時のみ (ST-T14 §4 #5) |
+| T0 | `Artwork/Skins/Default/*` | 1 | 171.3 | 2/2 | 既定スキン (起動画面/UI 素材) |
+| T0 | `Artwork/Wallpapers/Default.txt` | 1 | 0.1 | 2/2 | 起動中のフォーム生成で読む既定壁紙定義 (ST-T14 §4 #2) |
 | T0 | `Artwork/Themes/thmDefault.png` | 1 | 36.2 | 1/1 | 既定テーマ画像 |
 | T0 | `Artwork/Themes/tweak_default.png` | 1 | 6.6 | 1/1 | 既定テーマ調整画像 |
 | T0 | `Artwork/Fonts/Fruity microfont.ttf` | 1 | 19.6 | 2/2 | マイクロフォント |
@@ -41,10 +48,10 @@
 | T0p | `System/Config/FL Studio Remote Scripts/*` | 5 | 1.8 | 1/1 | リモートスクリプト列挙 |
 | T1 | `System/Config/Thumbnails/*` | 163 | 6754.8 | 2/2 | ブラウザ/エディション サムネイル |
 | T0 | `System/Plugin Formats/*` | 0 | 0.0 | 2/2 | プラグイン形式定義 |
-| T0p | `System/Texts/*.txt` | 8 | 1.8 | 4/4 | エディション/案内文 |
-| T1 | `System/Texts/*` | 16 | 105.8 | 1/1 | About/ライセンス文 |
+| T1 | `System/Texts/*` | 24 | 107.7 | 4/4 | エディション/案内文・About/ライセンス文 (ダイアログ経路のみ; 直下 .txt は ST-T14 §4 #6 で T0p→T1) |
 | T0p | `System/Internet/*` | 8 | 468.1 | 2/2 | ニュース/オフライン案内 (外部通信は対象外, 既定ページのみ) |
-| T1 | `System/Languages/*` | 15 | 6138.8 | 2/2 | 言語ファイル (英語は内蔵; 選択言語のみ 1 ファイル) |
+| T2 | `System/Languages/*.moe` | 7 | 6134.9 | 2/2 | 言語 .moe (既定 en では開かない; ST-T14 §4 #3) |
+| T1 | `System/Languages/*` | 8 | 3.9 | 2/2 | 言語補助 (.svg 等) |
 | T1 | `System/Hardware specific/*` | 118 | 820.9 | 1/1 | MIDI コントローラ定義 (デバイス接続時) |
 | T0 | `Data/System/*.fst` | 40 | 251.3 | 6/6 | チャンネル既定 state (.fst) |
 | T0 | `Data/System/Empty.flp` | 1 | 45.3 | 2/2 | 空プロジェクト |
@@ -61,7 +68,7 @@
 | T0p | `Plugins/Fruity/*/*/Plugin.nfo` | 141 | 3.3 | 3/3 | プラグインスキャン用メタ |
 | T0p | `Plugins/Fruity/*/*.nfo` | 0 | 0.0 | 2/2 | プラグインスキャン用メタ |
 | T1 | `Help/index_offline.html` | 1 | 3.9 | 1/1 | オフラインヘルプ入口 |
-| T1 | `Help/*.scr` | 2 | 10.7 | 2/2 | ヘルプ別名表 |
+| T0p | `Help/*.scr` | 2 | 10.7 | 2/2 | ヘルプ別名表 (LoadSettings の Initialize the help file で起動時に読む; ST-T14 §4 #1) |
 | T1 | `WhatsNew.rtf` | 1 | 1012.2 | 1/1 | 更新情報 |
 | T1 | `Shared/Python/*` | 6 | 4348.2 | 1/1 | Python 3.12 標準ライブラリ (スクリプト実行時) |
 

@@ -1,0 +1,20 @@
+{
+ "name": "sr4_wt_const",
+ "func": "0x180087b10",
+ "wasm_func": "function_180087b10",
+ "scenarios": 20,
+ "steps": 1,
+ "seed": 75013,
+ "args": [
+  {
+   "ptr": "this"
+  }
+ ],
+ "buffers": {
+  "this": {
+   "size": 64,
+   "fields": []
+  }
+ },
+ "ret_from_xmm0": true
+}

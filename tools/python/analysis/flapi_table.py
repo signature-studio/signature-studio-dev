@@ -173,6 +173,16 @@ n_win = sum(1 for v in modules.values() for e in v.values() if e["win_pair_verif
 if n_win == 0:
     die(f"win PE と (名前,doc) ペアが 1 件も一致しない: {WIN_PE} ({len(pe)} B)。FL 26.1.7 の block00031_PE.bin ではない可能性")
 
+# 実バイナリ由来の引数仕様 (flapi_kwargs.py の出力。無ければ付けない)
+_kwp = os.path.join(OUT, "flapi_kwargs.json")
+if os.path.exists(_kwp):
+    sys.path.insert(0, HERE)
+    from flapi_kwargs import kwsig_of  # noqa: E402
+    for _m, _fs in json.load(open(_kwp))["modules"].items():
+        for _n, _e in _fs.items():
+            if _n in modules.get(_m, {}):
+                modules[_m][_n]["kwsig"] = kwsig_of(_e)
+
 tot = sum(len(v) for v in modules.values())
 res = {"fl_version": "26.1.7", "python": "3.12.1", "function_total": tot,
        "function_counts": {m: len(v) for m, v in modules.items()}, "modules": modules, "objects": objects,

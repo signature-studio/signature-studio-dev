@@ -13,5 +13,5 @@ if ! python3 -c 'import pefile, capstone' 2>/dev/null; then
   export PATH="$_v/bin:$PATH"
   unset _v
 fi
-# emcc は batch_lift.sh / nc_f2.sh が /opt/emsdk/emsdk_env.sh を自前で source する
+# emcc は batch_lift.sh / nc_f2.sh が [EMSDK] (docs/REFERENCES.md) の emsdk_env.sh を自前で source する
 true

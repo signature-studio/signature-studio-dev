@@ -984,6 +984,46 @@ INTERSECT `run=66`)。MEMW の差は CSV の buf_diff でのみ検出できる�
 | `kernel_matrix.py` `verify_table.py` `k80_diff.py` と e2e 全体を `oc_artifacts` 付きで未実行 | 置換行以外の挙動は未検証 | #360 (本 PR のレビュー run でも `oc_artifacts:` で再実行可) |
 | §13.4 の「絶対パス依存 (#294)」のうち p0c 内の `/home/ubuntu` 参照は解消 (`/opt/retdec` は残る) | — | #294 |
 
+### 15.4 #360: 追加素材での full e2e before/after (検証 HEAD 856be6b / 比較元 8af7eb0)
+
+素材: `fl-win64` `toolchain-retdec` `toolchain-emsdk` `work-m6-ott` `work-liftlib` (`oc_artifacts`)。before = `856be6b^1` (= `8af7eb0`、置換前)、after = `856be6b` (#359 merge)。
+before は `/home/ubuntu/work/analysis/win64` と `/home/ubuntu/work/webstudio` を symlink で用意、after は `/home/ubuntu` を削除し `FL_WIN64_DIR` のみ。各 n=1・直列・4 コア runner。
+
+結論: **`p0c_e2e.sh` / `p0c2_e2e.sh` は置換前後とも rc=0、決定的な成果物はすべて一致**。不一致は RetDec が同一入力でも出力を変えることだけで、置換とは無関係 (下記)。
+
+| 項目 | before | after |
+|---|---|---|
+| `p0c_e2e.sh` | rc=0、12.9 s (kernel_matrix は skip。前段で別実行) | rc=0、8.6 s (同) |
+| `p0c_e2e.sh` 初回 ([2] kernel_matrix.py 12 = 181 DLL 走査を含む) | 515.7 s、rc=1 ([4] で上記の理由)、load 12.09 (開始 1 分値) | 512.5 s、rc=0、load 1.97 (同) |
+| `p0c2_e2e.sh` | rc=0、47.8 s、load 3.82 | rc=0、44.7 s、load 1.80 |
+
+(表の `p0c_e2e.sh` 行は `work/kernel_matrix.json` が既にあり [2] を skip した再実行。kernel_matrix を実行した初回の `p0c_e2e.sh` 全体が、after は rc=0・512.5 s (その中の [2])、
+before は 515.7 s で `p0c/work/kernel_table.json` の置き場所違いにより [4] で rc=1 だったため、同ファイルを `p0c/work/` に置いて再実行した。after の再実行 (8.6 s) の load は記録に失敗。)
+
+一致を `cmp` / sha256 で確認したもの (先頭 12 桁):
+
+| 出力 | 結果 |
+|---|---|
+| `kernel_matrix.json` / `kernel_used_norm.json` / `table_verify.json` | 一致 (487412af06e6 / 0b123bd6264f / e5709ebd4e62) |
+| `verify_table.py` stdout ([3])、`f80_assess` + `f80_micro` stdout ([5][6]) | 一致 (8623cae11386 / 83bf33956334) |
+| `k80abi.json`、`diff/k80.lower.ll`、`diff/k80.argfix.ll` | 一致 |
+| `p0c2_sweep.csv` (194 行) | 一致 (52d0c45c63f9) |
+| `p0c2_e2e.sh` stdout (パス正規化後) | 一致 (idempotent OK / argfix idempotent OK / wasm32 compile OK 100972 bytes) |
+
+**RetDec は非決定的** (置換と無関係): `retdec-decompiler` に同一 PE・同一 ranges を与えて 2 回走らせると `k80.drc.ll` の sha256 が変わる (alloca の並びと `uselistorder`)。
+このため before/after で再 lift した `k80.lift.ll` は 58 行差になる。lift 以降を比較するため、after では `k80.lift.ll` を before のものに揃えてから `p0c2_e2e.sh` を再実行し、上表の一致を得た。
+差が残るのは lift 由来の `k80.*.ll` / `k80_simd.c` / `k80.drc.*`、実行ごとにアドレスが変わるログ (`build.log` `run.err`)、`k80diff` バイナリ、`diff/driver.c` の `map_image(...)` の PE パス 1 行 (これは置換の意図した差)。
+
+`nsis_blockmap.json`: どの素材にも無く (`block_manifest.json` も無い)、`f2/mk_blockmap.py` で `PLUGIN_MATRIX.json` から再構成した (182 行、sha256 9dfb59584586)。
+`kernel_matrix.py` が使うのは `kind=PE` で `Fruity\Effects|Generators` 配下の行のみで、181 DLL / 133 delphi / init 発見 130 は before/after で同じ。
+
+ネガティブコントロール (after、すべて rc=1): `FL_WIN64_DIR=/nonexistent` で `p0c_e2e.sh` / `p0c2_e2e.sh` / `verify_table.py` / `k80abi.py` が
+`FileNotFoundError: /nonexistent/extracted/block18983_PE.bin`。`FL_WIN64_DIR` 未設定かつ `/home/ubuntu` 無しでは `p0c2_e2e.sh` が旧既定 `/home/ubuntu/...` を見て失敗する (既定値が従来のまま)。
+`grep -rn '/home/ubuntu' tools/plugins/p0c ... --exclude-dir=work | wc -l` → 0。
+
+範囲外 / 未解決: `inventory/kernel_table.py:15` と `lift/batch_lift.sh:31` ほか `lift/` 配下の `/home/ubuntu` 既定は別 area の置換 issue (#294 配下) で扱う。
+`k80_diff.py` は `p0c2_e2e.sh` [6] 経由で実行済み (`LIFTP` は `REPO_ROOT` 基準で解決)。RetDec の非決定性は §15.4 に実測を残すのみで、RetDec 非決定は #668、`p0c_e2e.sh` [4] の `kernel_table.json` 置き場所と `nsis_blockmap.json` 生成は #669 に起票。
+
 ## 16. P0c-8 (#311, 親 #197・先行 #269): ext IR の wasm32 検証 + framework 統合 (fw_f80.py → f80_lower --ext)
 
 検証起点 commit: `d5e6f98` (origin/main)。担当 dir: `tools/plugins/p0c` / `tools/plugins/framework` (fw_f80.py, fw_stage2.sh のみ)。
