@@ -3,6 +3,7 @@
 #   usage: negctl_482.sh [構成名 ...]   (省略時は全構成)  各構成の結果を work/negctl_482/<名>.{json,out,err} + 1 行サマリで出す
 #   構成: full(現行) no5c03d0(5c03d0 の転記を外す = IR の weak 版 = #481 HEAD と同じ) no5c0e70(通知先 5c0e70/5c0810 の転記を外す = 通知は icall miss)
 #         probe(full + 5c03d0 の呼出し/通知先解決と 5c0e70 の入口を stderr に記録) probe_no5c03d0(no5c03d0 + 5c0e70 の入口だけ記録)
+#   icall 列は最小集合 {1,17,45,95,114} を trace (SV_TRACE_AT=114) 付きで別に実行して数える: 5c0e70 宛の m11_icall が解決できた回数 / miss した回数.
 #   終了時に work/obj/ov.o を現行 m11_ov.c から再生成する.
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")/.." && pwd)"; cd "$HERE"
@@ -39,8 +40,10 @@ for c in "${CFGS[@]}"; do
   s=$(date +%s.%N)
   SV_PROG=1 SV_TRACE_AT=99999 timeout "$HANG_S" node trap_triage/survey_units.mjs "$OUT/$c.json" > "$OUT/$c.out" 2> "$OUT/$c.err"; rc=$?
   e=$(date +%s.%N)
+  # icall 解決の有無は trace (unit 114 以降) で見る. trace 自体が全 survey の結果を変える (unit 134 が ok→oob) ため, 最小集合 {1,17,45,95,114} だけで取る
+  SV_ONLY=1,17,45,95,114 SV_PROG=1 SV_TRACE_AT=114 timeout "$HANG_S" node trap_triage/survey_units.mjs /dev/null > /dev/null 2> "$OUT/$c.trace.err"
   if [ $rc = 124 ]; then r="HANG (timeout ${HANG_S}s)"; else r=$(grep -a SURVEY_UNITS "$OUT/$c.out" | head -1); fi
-  p3=$(grep -ac '^\[probe5c03d0\]' "$OUT/$c.err"); p3r=$(grep -ac '^\[probe5c03d0\].* changed=1 .* resolved=1' "$OUT/$c.err"); pe=$(grep -ac '^\[probe5c0e70\]' "$OUT/$c.err")
-  printf '%-14s rc=%-3s %.1fs  %s  5c03d0(calls=%s changed&resolved=%s) 5c0e70 enter=%s\n' "$c" "$rc" "$(echo "$e - $s" | bc)" "$r" "$p3" "$p3r" "$pe"
+  p3=$(grep -ac '^\[probe5c03d0\]' "$OUT/$c.err"); p3r=$(grep -ac '^\[probe5c03d0\].* changed=1 .* resolved=1' "$OUT/$c.err"); pe=$(grep -ac '^\[probe5c0e70\]' "$OUT/$c.err"); ih=$(grep -ac '^\[m11\]\[icall\] 0x1c0e70' "$OUT/$c.trace.err"); im=$(grep -ac '^\[m11\]\[icall-miss\] target=0x1c0e70' "$OUT/$c.trace.err")
+  printf '%-14s rc=%-3s %.1fs  %s  5c03d0(calls=%s changed&resolved=%s) 5c0e70 enter=%s icall(0x5c0e70) ok=%s miss=%s\n' "$c" "$rc" "$(echo "$e - $s" | bc)" "$r" "$p3" "$p3r" "$pe" "$ih" "$im"
 done
 rm -f work/ov_ablate.c; touch m11_ov.c; bash m11_build.sh > /dev/null 2>&1; echo "ov.o を現行 m11_ov.c から再生成した"
