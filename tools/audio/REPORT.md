@@ -234,3 +234,4 @@ underrun が 3 秒続くと +B を 1 段ずつ戻す (下限は下げない)。`
 最終 HEAD `948e6fb3` (REPORT §10 の件数修正のみ・コード差分なし、`FL_WIN64_DIR` 展開 `fl-win64`): `bash tools/audio/integration/e2e.sh` を 3 回実行 → **13/13 PASS・exit 0 が 3 回** (7.9 s / 7.8 s / 7.7 s、wall 12.0 s / 10.6 s / 10.4 s、load 0.48 / 0.47 / 0.81)。FAIL 0 件。
 
 残り: `public/worklets/dummy-worklet.js` は `deploy/probe/policy-check.mjs`・`tools/e2e/suite/checks.mjs` が参照するため今回は削除せず、追跡 **#839** (E2E-5)。`tools/e2e` スイートの再実行は未実施 (#839 で実施)。
+**状態注記 (#839 で更新)**: 上の「削除せず」は当時の記述。#839 で参照を `fl-audio-worklet.js` へ差し替え `dummy-worklet.js` を削除済み。`tools/e2e` の `audioworklet`・`console-clean` は `run.sh` が `stage_app.sh` でテスト音 wasm を配置するようになったため PASS (実測は `tools/e2e/REPORT.md` の「839 E2E-5」節)。
