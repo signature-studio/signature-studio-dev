@@ -18,8 +18,8 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| f80 (x86_fp80) の libcall (`fp_extend` / `fp_round` / `frem`) | `emcc -c` 不通過の要因 (旧記録では 4 本) | #534 (本 issue)。 f80 の扱い (f64 化の精度・同値試験) は別判断 |
-| E3 (i32 仮引数の i64 使用) BooBass_Eng `function_180049450` | 1 本 (旧記録) | #534 (本 issue) |
+| f80 (x86_fp80) の libcall (`fp_extend` / `fp_round` / `frem`) | `emcc -c` 不通過の要因 (件数は未測定) | #534 (本 issue)。 f80 の扱い (f64 化の精度・同値試験) は別判断 |
+| E3 (i32 仮引数の i64 使用) BooBass_Eng `function_180049450` | 件数は未測定 | #534 (本 issue) |
 | Morphine (23944) の HLL 段を含む通常経路の実測 | 未測定 | #534 (本 issue) |
 | VEX helper 未実装 (Kepler 79 本等) と `PLUG_AVX256` 有効時の再測定 | lift 結果の完全性 | #534 (本 issue) |
 | define 欠落 (BooBass_Eng 211 件) の原因 | 1 本 | #534 (本 issue) |
