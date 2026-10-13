@@ -64,11 +64,14 @@ for (const line of lines) {
       // f64 の値を横取りし %xmm0_bits が 0 になる (tan 1/40 の主因)。
       const fa = [], ga = [];
       for (const a of args) (a.kind === 'f32' || a.kind === 'f64' ? fa : ga).push(a);
-      // native_runner と同じ独立カウンタ: xmm 仮引数は登場順に fa, gpr 仮引数は ga
-      let fi = 0, gi = 0;
+      // native_runner と同じ独立カウンタ: K 番目の float 引数 → xmm K (native の c.xmm[K])。
+      // %xmmK_bits 仮引数は K 番目の float 引数に対応させる (SR-4: xmm1 だけを読む関数で xmm1_bits が
+      // 先頭の float 引数 (= native では xmm0) を拾う不一致の修正。xmm0 から連続する既存 sig では従来と同じ)。
+      // gpr 仮引数は登場順に ga
+      let gi = 0;
       const call = [];
       for (const s of sig) {
-        const a = (s.xmm !== undefined) ? fa[fi++] : ga[gi++];
+        const a = (s.xmm !== undefined) ? fa[s.xmm] : ga[gi++];
         const v = a ? slotval(a) : 0n;
         if (s.ty === 'i32') call.push(Number(v & 0xFFFFFFFFn)); else call.push(BigInt.asUintN(64, v));
       }

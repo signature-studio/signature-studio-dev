@@ -12,6 +12,8 @@ HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 source "$HERE/env.sh"
 cd "$HERE/.."
 B="$1"; TMO="${2:-2400}"
+# C++ DLL 9 本 (#534) の結果列を #535 の fix_avx256 で変えない (shell 12 本だけが対象)。 resume / 通常の両経路に効く
+export PLUG_AVX256="${PLUG_AVX256:-0}"
 OUT="work/synth/cpp$B"
 HLLCAP="${HLL_CAP:-300}"
 resume_script() {

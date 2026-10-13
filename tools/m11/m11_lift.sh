@@ -5,7 +5,7 @@ set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 cd "$HERE"
 mkdir -p work
-BIN=/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin
+BIN="${M11_PE:-${FL_WIN64_DIR:-/home/ubuntu/work/analysis/win64}/extracted/block00031_PE.bin}"
 export TMPDIR="$HERE/work/tmp"
 mkdir -p work/tmp
 

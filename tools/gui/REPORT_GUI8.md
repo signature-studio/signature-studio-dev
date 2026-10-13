@@ -1,6 +1,6 @@
 # GUI-8 (#184) — e2e 載せ替え・長時間ストレス・Firefox 取込み
 
-(`tools/gui/REPORT.md` §11 から 250 行上限のため分割。内容は同一)
+(`tools/gui/REPORT.md` §13 から 250 行上限のため分割。内容は同一)
 
 ## 11. GUI-8 (#184): e2e の agent-browser 載せ替え・長時間ストレス・Firefox 取込み
 
