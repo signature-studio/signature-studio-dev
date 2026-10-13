@@ -104,7 +104,7 @@ PR は `Refs #668` (Closes は使わない)。k80 の実測が残るため。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| k80 (block18983_PE.bin) の alloca 並び差 (`%0 = alloca i3` と `i64` の入替) と `k80.lift.ll` の 58 行差 (p0c §15.4)。OTT では再現せず、A7 後に残るかは未検証 | p0c の k80 系 before/after 比較は lift 段を揃えないと成立しない | 新規子 issue `[LIFTLIB-10]` (fl-win64 が必要。`oc_artifacts` に `fl-win64` を追加して再実行を依頼) |
+| k80 (block18983_PE.bin) の alloca 並び差 (`%0 = alloca i3` と `i64` の入替) と `k80.lift.ll` の 58 行差 (p0c §15.4)。OTT では再現せず、A7 後に残るかは未検証 | p0c の k80 系 before/after 比較は lift 段を揃えないと成立しない | 子 issue `[LIFTLIB-10]` #695 (fl-win64 が必要。`oc_artifacts` に `fl-win64` を追加して再実行を依頼) |
 | RetDec 内部の use-list 順序を決める箇所 (ソース位置) が未特定 | 原因は推定のまま。A7 で運用上は吸収済み | 本件では上流報告しない (箇所未特定)。`[LIFTLIB-10]` の結果を見て判断 |
 | 他 chain (`tools/plugins/lift/` の `lift_ranges.sh` など) の A7 後一致は未測定 | 同じ A7 系コードだが実測していない | 範囲外として明記。必要なら `[LIFTLIB-10]` で併せて測定 |
 | `setarch -R` で決定的にできるか (環境条件を固定すれば足りるか) | 採らない方針 (§22.4) | 不要 (A7 で足りる) |
