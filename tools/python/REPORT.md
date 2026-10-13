@@ -133,6 +133,7 @@ FLEngine rodata の `name\0doc\0…<module>` 並びから機械抽出 (`flapi_ex
 | 未知 tool は isError=true | 達成 | `no_such_tool` と非 tool 属性 `get_mcp_tools_json` が isError=true、既知 tool に不正引数も isError=true |
 
 検証環境: Actions runner (4 core, node 22.23.3, Chrome 154.0.8037.97)。入力は `fl-win64` 素材の `extracted/block25159_DATA.bin` (MCPTools.pyc, 100,674B, magic cb0d0d0a) / `block24429_DATA.bin` (midi.py) / `block24430_DATA.bin` (utils.py) を `work/` へコピー。CPython wasm は本 run でクリーンビルド (3m13.8s)。
+実測 (コミット 281784f の HEAD、n=3): `mcp_ui_check.mjs` 全 14 check PASS、スクリプト内計測 1.261 / 1.362 / 1.308 秒 (wall 1.39 / 1.49 / 1.44 秒、load average 0.18〜0.57、直列 1 本)。同 HEAD で `pnpm typecheck` / `pnpm build` 成功、既存 `poc_mcp.mjs` POC OK・`all_tools.mjs` 48/48 ok (host_calls 37,424)・`browser_check.mjs` BROWSER OK。範囲外: `run_all.sh` 全体 (runner に win PE が無く analysis 再生成が走らないため未実施)。
 ネガティブコントロール: MCPTools.pyc の先頭 1 バイトを壊す (`--neg`) → `UI: tools/list = 48` が FAIL し、原因が `pyc magic mismatch` として UI に出る (ハングしない)。
 
 | 未解決 | 影響 | 起票先 |
