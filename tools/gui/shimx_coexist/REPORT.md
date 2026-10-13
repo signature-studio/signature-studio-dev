@@ -135,3 +135,30 @@ bash tools/gui/test/selftest.sh              # native 回帰
 bash tools/gui/e2e.sh                        # gui 単体 wasm 回帰
 ```
 前提: emsdk (`toolchain-emsdk`)、node 22 以上、`x86_64-w64-mingw32-gcc` (`gen_api.py` が arity 表に使う)、`wasm-objdump` (wabt; `sigprobe.sh` の `unresolved-imports` 判定。無いと 0 を空振りで出す)。Ubuntu runner では `apt-get install gcc-mingw-w64-x86-64 wabt`。`e2e.sh` は repo 直下の `node_modules` (tsc) も要る。M11 IR は `work-m11`。
+
+## 8. 実ブラウザ確認 (SHX-T19 #1159、HEAD `a1d8de06`)
+
+方式: `bash tools/gui/shimx_coexist/browser_e2e.sh`。`coexist.sh` の objects から `ENVIRONMENT=web,worker` の wasm を link (`coexistWeb`、INVOKE_RUN=0)し、`src/runtime/gui_hostcall.ts` を ES モジュール化して page から読む。headless Chrome (CDP) で page を開き、wasm の hostcall 要求 (`gui_hostcall.h` と同じ手順) を **`browserEnv` (実 `window.open` / 実 `showOpenFilePicker` / `showSaveFilePicker`)** に処理させる。Chrome 154.0.8037.97。
+
+- user activation: CDP `Runtime.evaluate` の `userGesture:true` で与える。activation 無しの試験は、前の gesture の失効 (`navigator.userActivation.isActive` が false) を待ってから行う。
+- picker の UI だけ差し替え: headless では native picker を操作できないため、**activation 下の呼出のみ** mock handle (`getFile` / `createWritable`) を返す。呼出時点の `navigator.userActivation.isActive` を記録し、activation 下で呼ばれたことを検査する。activation 無しの呼出は差し替えず、実 API が返す拒否を見る。
+- 含めないもの: 実 native picker の選択操作、実 FL guest の CALL 経路 (guest 側の呼出は coexist の C 側 58 項目で確認済み)。
+
+| 検査 | 結果 |
+|---|---|
+| web build wasm が実 Chrome の page で起動 (`crossOriginIsolated` / SharedArrayBuffer) | PASS |
+| ShellExecute https → `window.open` (user activation 下) | PASS (result=1) |
+| `window.open` を activation 無しで呼ぶ → Chrome のポップアップブロックで失敗 | PASS (result=0 → SE_ERR) |
+| `javascript:` は host 側で拒否 (window.open 未呼出) | PASS |
+| GetOpenFileNameW → `showOpenFilePicker`: activation 無しは実 API が「user gesture 要求」で失敗 (result=-16) | PASS |
+| 同: activation 下で呼ばれ、選択結果 `kick.wav` が guest の応答 buffer に反映 | PASS (`calls` の active=true) |
+| 選択ファイルの内容がステージング FS へ書き出される `[1,2,3]` | PASS |
+| GetSaveFileNameW → `showSaveFilePicker`: activation 無しは失敗 (result=-16) / 下で呼ばれ `song.flp` が返る | PASS |
+| save: FL が書いた内容 `[70,76,80]` が選択 handle の `createWritable` へ反映 | PASS |
+| host log は想定内 4 件 (activation 無し blocked 1 / javascript 拒否 1 / picker 失敗 2) のみ・page 例外 0 | PASS |
+
+- 実測: `browser_e2e.sh` HEAD `a1d8de06` で **12 PASS / 0 FAIL** × 2 回 (所要 **11.675 s / 11.707 s**、load average 1 分値 0.59 付近)。
+- 回帰 `coexist.sh` HEAD `a1d8de06`: ALL PASS、所要 **14.405 s**。C 側 58 / 0、host 側 13 / 0、link duplicate 0 / warning 0 / undefined 0、NC1 duplicate 7、NC2 C 側 fail 14。
+- ネガコントロール: activation を常時付与 (`withoutActivation` を gesture 付きに置換) すると **4 FAIL / 8 PASS** (exit 1、所要 1.593 s)。activation 無しの 3 検査と想定内 log の件数検査が、activation の有無を実際に区別していることを確認した。
+
+未解決 (起票先): 実 native picker の操作 (headless 不可。手動採取または GUI-9 の入力注入で扱う)・実 FL guest 結合での `window.open` / picker 呼出 (#177 SHX-T9)。
