@@ -182,6 +182,16 @@ NC1 (capstone 未導入) は `bash tools/m11/m11_gen_ir2.sh` が exit 1 にな�
   - (c) PATH・RETDEC 無し、RETDEC_ROOT 未設定: 解決先 `<[RETDEC]>/bin/retdec-decompiler`、実行可 (`exec-ok`)。
 - **PE の紐付け**: `work/lift_pe.sha256` に lift 生成時の PE sha256 を記録し、不一致なら lift を作り直す (`m11_e2e.sh`)。ただし作り直し経路の再実行 (指紋一致で skip・不一致で再生成) は**未実測**。
 - **fail-open の修正**: `m11_lift_all.sh` は chunk の rc 非 0 で止まる。`m11_lift.sh` は `retdec-decompiler` を PATH → `$RETDEC_ROOT/bin` (未設定時は [RETDEC] の既定位置) の順で解決し、無ければ fail。
-- **指紋の作り直し経路**: `work/lift_pe.sha256` 無し (既存スナップショット) では毎回 full 再生成になる。指紋一致で skip・不一致で再生成の経路は未実測。
+- **指紋の作り直し経路 (実測・G1〜G3)**: 同一 runner・2026-10-13・head `551931b7` 相当・素材 fl-win64 / toolchain-retdec / work-m11 / work-liftdiff。Ghidra 12.1.4 で `functions_dll.csv` 再生成 (10 分 10 秒・rc 0・59 010 行・JDK 21・MAXMEM 8G)。
+
+| 測定 | 条件 | rc | 所要秒 | 経路 | ir_sha256 | ok / trap / miss |
+|---|---|---|---|---|---|---|
+| G1 | `work/lift_pe.sha256` 無し | 0 | 621 | 全再生成 → 指紋記録 | `fd628f3d…` | 870 / 25 / 46 |
+| G2 | 指紋一致 (G1 の直後) | 0 | 45 | lift 段 skip・build 増分・実行 A/B | `fd628f3d…` | 870 / 25 / 46 |
+| G3 | 指紋を 0 埋めで不一致化 | 0 | 605 | 全再生成 → 指紋を正値へ再記録 | `a8c36b84…` | 870 / 25 / 46 |
+
+- 結論: 指紋無し・不一致で全再生成し指紋を書き直す。一致で lift を skip する。3 経路とも実測で動く。G1 と G3 は同一 PE・同一コードだが `ir_sha256` が異なる (#960 と同じ非決定性。IR の一致は保証されない)。
+- G3 の `m11_tail` が `tools/m11/m11_extra_seeds.txt` に `0x4572b0` を 1 行追加した (`m11_tail.py` の「コミット対象」仕様)。この commit には含めない (main 側の seeds が別途変わっているため)。
+- 旧記述: 指紋無し・不一致で再生成する経路は未実測。
 - **未解決**: (a) F2 と F3 で IR の `ir_sha256` が異なる。RetDec・ir5_patch・gen_ir2 の出力が実行ごとに変わる可能性があるが、原因は未切り分け。(b) `reached_stage` 4 の trap (§6 と同類の未解決。lift 成果物が正しいかは未判定)。(c) Ghidra 中間物 `functions_dll.csv` を素材に含めない場合、`--full` は Ghidra 再生成 (WORKFLOW §11 手順) が前提。
 - 起票: (a)(b) は子 issue を #728 の下に起票 (番号はコメント参照)。

@@ -6,7 +6,7 @@
  *   解決する (衝突回避のためここでは定義しない)。WSAStartup は WSASYSNOTREADY を返す。
  * - wintrust/crypt32: 署名検証・証明書は常に「無し」(shimx_set_trust_ok(1) で WinVerifyTrust のみ成功にできる)
  * - mpr: ネットワークリソース無し
- * - winmm MIDI: デバイス 0 台 (weak: Web MIDI 連携側が強定義で上書き可)
+ * - winmm MIDI: midi_conv.c が担当 (未登録時は 0 台 / backend 表は shimx_set_midi_backend で登録)
  */
 #include "shimx_internal.h"
 
@@ -95,27 +95,9 @@ BOOL CryptDecodeObject(DWORD enc, LPCSTR type, const BYTE* b, DWORD n, DWORD fl,
     (void)enc; (void)type; (void)b; (void)n; (void)fl; (void)out; (void)cb; SetLastError(0x80092002u /* CRYPT_E_BAD_ENCODE */); return FALSE;
 }
 
-/* ---- winmm MIDI: デバイス 0 台 (weak) ---- */
+/* ---- winmm MIDI: 実体は midi_conv.c (backend 表経由)。ErrorText のみここ ---- */
 #define MMSYSERR_BADDEVICEID 2u
 #define MMSYSERR_INVALHANDLE 5u
-SHIMX_WEAK UINT midiInGetNumDevs(void) { return 0; }
-SHIMX_WEAK UINT midiOutGetNumDevs(void) { return 0; }
-SHIMX_WEAK UINT midiInGetDevCapsW(UINT_PTR_T id, LPVOID caps, UINT n) { (void)id; (void)caps; (void)n; return MMSYSERR_BADDEVICEID; }
-SHIMX_WEAK UINT midiOutGetDevCapsW(UINT_PTR_T id, LPVOID caps, UINT n) { (void)id; (void)caps; (void)n; return MMSYSERR_BADDEVICEID; }
-SHIMX_WEAK UINT midiInOpen(LPHANDLE h, UINT id, ULONG_PTR cb, ULONG_PTR inst, DWORD flags) { (void)id; (void)cb; (void)inst; (void)flags; if (h) *h = 0; return MMSYSERR_BADDEVICEID; }
-SHIMX_WEAK UINT midiOutOpen(LPHANDLE h, UINT id, ULONG_PTR cb, ULONG_PTR inst, DWORD flags) { (void)id; (void)cb; (void)inst; (void)flags; if (h) *h = 0; return MMSYSERR_BADDEVICEID; }
-SHIMX_WEAK UINT midiInClose(HANDLE h) { (void)h; return MMSYSERR_INVALHANDLE; }
-SHIMX_WEAK UINT midiOutClose(HANDLE h) { (void)h; return MMSYSERR_INVALHANDLE; }
-SHIMX_WEAK UINT midiInStart(HANDLE h) { (void)h; return MMSYSERR_INVALHANDLE; }
-SHIMX_WEAK UINT midiInStop(HANDLE h) { (void)h; return MMSYSERR_INVALHANDLE; }
-SHIMX_WEAK UINT midiInReset(HANDLE h) { (void)h; return MMSYSERR_INVALHANDLE; }
-SHIMX_WEAK UINT midiInAddBuffer(HANDLE h, LPVOID hdr, UINT n) { (void)h; (void)hdr; (void)n; return MMSYSERR_INVALHANDLE; }
-SHIMX_WEAK UINT midiInPrepareHeader(HANDLE h, LPVOID hdr, UINT n) { (void)h; (void)hdr; (void)n; return MMSYSERR_INVALHANDLE; }
-SHIMX_WEAK UINT midiInUnprepareHeader(HANDLE h, LPVOID hdr, UINT n) { (void)h; (void)hdr; (void)n; return MMSYSERR_INVALHANDLE; }
-SHIMX_WEAK UINT midiOutPrepareHeader(HANDLE h, LPVOID hdr, UINT n) { (void)h; (void)hdr; (void)n; return MMSYSERR_INVALHANDLE; }
-SHIMX_WEAK UINT midiOutUnprepareHeader(HANDLE h, LPVOID hdr, UINT n) { (void)h; (void)hdr; (void)n; return MMSYSERR_INVALHANDLE; }
-SHIMX_WEAK UINT midiOutShortMsg(uint64_t h, DWORD msg) { (void)h; (void)msg; return MMSYSERR_INVALHANDLE; }
-SHIMX_WEAK UINT midiOutLongMsg(HANDLE h, LPVOID hdr, UINT n) { (void)h; (void)hdr; (void)n; return MMSYSERR_INVALHANDLE; }
 static UINT mm_errtext(UINT err, LPWSTR buf, UINT n) {
     const char* t = err == MMSYSERR_BADDEVICEID ? "The specified device ID is out of range." :
                     err == MMSYSERR_INVALHANDLE ? "The specified device handle is invalid." : "MIDI error.";
