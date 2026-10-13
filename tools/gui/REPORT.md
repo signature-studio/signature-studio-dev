@@ -160,9 +160,9 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
 ### 範囲外・未達
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-`bash tools/gui/e2e.sh` 全体 ALL PASS → 付録 §16 で実測。現 HEAD `e11701db` で ALL PASS (rc=0, 188 s, 1 回)。1/6 の selftest は同 HEAD で 20 回連続 PASS (ASan 0 件)。修正前 src では 7 回中 2 回発火 | 修正後の e2e 全体は 1 回のみ。受入扱いは PM 判断 | #489 `[GUI-12]` (既存)・PM |
+`bash tools/gui/e2e.sh` 全体 ALL PASS → 付録 §16 で実測。現 HEAD `fcd564bc` で ALL PASS (rc=0, 185 s, 1 回。同 HEAD の 1 回目は 6/6 の依存欠落で rc=2)。1/6 の selftest は `e11701db` で 20 回連続 PASS (ASan 0 件)。修正前 src では 7 回中 2 回発火 | 修正後の e2e 全体の PASS は 1 回のみ。受入扱いは PM 判断 | #489 `[GUI-12]` (既存)・PM |
 | 実 FLEngine が要求する bpp/ROP の確定 (GUI-3 #174 の到達ログ待ち)・16bpp DIB・DIB_PAL_COLORS・`CreateBitmap` 4/8/16bpp の初期 bits・RLE/JPEG/PNG 圧縮 DIB | 実 FL が要求したら fail-fast で止まる (理由付き) | #174 到達後に #181 へ追記 |
-| Chrome 上の lift 済みアプリ込みの API 単位 frame time → §15 (wasm shim 全体は取得済み。Chrome 上のアプリ込みは未取得、理由は §15) | — | #181 |
+| Chrome 上の lift 済みアプリ込みの API 単位 frame time → 付録 §16 §2 (wasm shim 全体は取得済み。Chrome 上のアプリ込みは未取得、理由は付録 §16 §2) | — | #181 |
 | mono / パレットの色写像の実 Windows との照合 (近似) | 色が実機と数階調ずれる可能性 | #181 (実機比較はユーザ依頼候補) |
 | native selftest の ASan UAF (20 回中 4 回) | `e2e.sh` 1/6 が約 20% で FAIL | #489 `[GUI-12]` で修正 (本 REPORT §12) |
 | `integ/sigprobe.sh` の `unresolved-imports=0` が `wasm-objdump` 不在で空振り (今回も `command not found`) | 未解決 import なし確認が無効 | #180 (既存コメント) |
@@ -221,4 +221,4 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
 
 ## 16. GUI-5 (#181) 続き: e2e.sh 全体 ALL PASS と wasm shim 全体の SIMD/scalar 比較
 
-本文は `REPORT_APPENDIX.md` §16 (250 行上限による分割)。結論 (現 HEAD `e11701db`): RetDec 付き `bash tools/gui/e2e.sh` は ALL PASS (rc=0, 188 s, 1 回)。1/6 selftest は 20 回連続 PASS (ASan 0 件)。修正前 src の有効 7 回中 2 回の UAF (#489) は、修正後の連続試行で発火していない。wbench (`bash tools/gui/test/wbench.sh 5`): rc=0, 20 s, v128 simd=831 / scalar=0 (測定値は付録 §15 §2)。
+本文は `REPORT_APPENDIX.md` §16 (250 行上限による分割)。検証起点 HEAD `fcd564bc` (`tools/gui/src`・`include` は `e11701db` と同一)。結論: RetDec 付き `bash tools/gui/e2e.sh` は ALL PASS (rc=0, 185 s, 1 回。同 HEAD の 1 回目は 6/6 の依存欠落で rc=2)。1/6 selftest は `e11701db` で 20 回連続 PASS (ASan 0 件)。修正前 src の有効 7 回中 2 回の UAF (#489) は、修正後の連続試行で発火していない。wbench (`bash tools/gui/test/wbench.sh 5`): rc=0, 19 s, v128 simd=831 / scalar=0 (測定値は付録 §16 §2)。
