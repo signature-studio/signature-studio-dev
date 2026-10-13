@@ -76,7 +76,7 @@
 
 ## 5. 本修正 (差し戻し対応) の実施内容と未実施
 
-- 実施: §2-1 の検証起点、§3-2 のネガコン (SHX-T12 単体テスト rc=0 / 3.62 s、実行 HEAD `8597b970`)、§4 の既知類型・signature mismatch・未解決の表形式化。
+- 実施: §2-1 の検証起点、§3-2 のネガコン (SHX-T12 単体テスト rc=0 / 3.89 s、実行 HEAD `1aa0f211`)、§4 の既知類型・signature mismatch・未解決の表形式化。
 - 未実施 (理由つき):
   - **ftrace ファイル自体の `wc -l`**: `work-m11.tar.zst` (`$ARTIFACTS_DIR` に存在) には `tools/m11/work/shimx_link/` の `run.json` / `stderr.txt` / `cjs.wasm` 等が入るが、`ftrace` を含むエントリは 0 件 (`tar --zstd -tf | grep -c ftrace` = 0)。よって tarball からは `<tag>.ftrace.jsonl` の行数を再計測できない。
   - **全再生成・trace build の再実行**: Ghidra 600 s + regen 605 s が fix の上限 40 分に収まらないため、この run では再実行しない。実 boot は展開済み `.cjs` で再実行した (§2)。
