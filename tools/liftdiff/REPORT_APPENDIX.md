@@ -160,14 +160,18 @@ python3 tools/liftdiff/tests/oob_414ad0.py > tools/liftdiff/results/m11_oob_414a
 
 既知類型との関係 (DEFECTS.md): 新規類型なし (D1〜D6 は OTT 旧 chain の既存分類 = `check_ott.py`)。
 
-### 実測 run (現 head `dc6e71bc`・受入条件 1 の再実行)
+### 実測 run (受入条件 1 の再実行)
 
-- **Actions run ID**: `38423629378` / URL: https://github.com/signature-studio/signature-studio-dev/actions/runs/38423629378 (`GITHUB_RUN_ID`。この run の中で `liftdiff_e2e.sh` を実行)
-- **実行**: `bash tools/liftdiff/liftdiff_e2e.sh` (`--m11-only` なし・既定 `sample:800`)。検証 HEAD `dc6e71bc` (`main` 取り込み前の PR head)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`・`ANALYSIS_DIR=$HOME/analysis`・`PATH` に emsdk。
-- **結果**: exit 0 / 所要 155 s (実測、開始→終了の wall clock) / load (1 分平均) 2.87 (開始時) → 4.56 (終了時)。
-- **最終行**: `LIFTDIFF_E2E PASS`
-- **[2/4] 集計行**: `OTT_SUMMARY` 212 関数 = 一致 **33** / 不一致 **110** / 実行不能 **69** (D1 4 / D2 6 / D3 13 / D4_D5 19 / D6 26)
-- **ネガコン**: 無加工 exit 0 + NC[D1] / NC[D2] / NC[D3] / NC[D6] が各 exit 1 = 5/5 PASS
+- **Actions run ID**: `38423629378` / URL: https://github.com/signature-studio/signature-studio-dev/actions/runs/38423629378 (`GITHUB_RUN_ID`。この run の中で以下 2 回の `liftdiff_e2e.sh` を実行)
+- **実行**: `bash tools/liftdiff/liftdiff_e2e.sh` (`--m11-only` なし・既定 `sample:800`)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`・`ANALYSIS_DIR=$HOME/analysis`・`PATH` に emsdk。
+
+| 検証 HEAD | 結果 | 所要 (wall clock) | load (1 分平均 開始→終了) | [2/4] 212 関数 (一致 / 不一致 / 実行不能) | D1 / D2 / D3 / D4_D5 / D6 |
+|---|---|---|---|---|---|
+| `dc6e71bc` (PR head・`main` 取り込み前) | exit 0・`LIFTDIFF_E2E PASS` | 155 s | 2.87 → 4.56 | **33 / 110 / 69** | 4 / 6 / 13 / 19 / 26 |
+| `6c83d78d` (`main` `967e1bfc` を merge・PR の現 head) | exit 0・`LIFTDIFF_E2E PASS` | 166 s | 0.05 → 5.24 | **35 / 112 / 65** | 4 / 6 / 14 / 20 / 26 |
+
+- **ネガコン** (両 head とも): 無加工 exit 0 + NC[D1] / NC[D2] / NC[D3] / NC[D6] が各 exit 1 = 5/5 PASS
+- **注意**: 同じ `dc6e71bc` の数値 (33/110/69) を現 head の数値として扱わないこと。`main` 取り込みで OTT 集計が変わった (D3 13→14・D4_D5 19→20・一致 33→35・不一致 110→112・実行不能 69→65)。原因は #825。
 - **他段**: [0/4] 単体 PASS / [3/4] unit #18 3 件 PASS (`UStrAsg` mem diff・`Move(409c80)` spill_slot_deref・`4123c0` 脱落 native 67 > wasm 46) / [4/4] `sample:800` 一致 357 / 不一致 213 / 実行不能 230 (batch 86 s)。boot は unit 22 で native segv (`units_run=22/942`、判定条件外)。
 - **素材 (`oc_artifacts`)**: `fl-win64 toolchain-retdec toolchain-emsdk work-m11 work-liftdiff work-m6-ott analysis-ott-binaries` (PR 本文と同一)。`$HOME/artifacts` の 7 件の実在を確認して展開:
   - `fl-win64` → `$RUNNER_TEMP/fl-win64` (`FL_WIN64_DIR`)
@@ -175,11 +179,11 @@ python3 tools/liftdiff/tests/oob_414ad0.py > tools/liftdiff/results/m11_oob_414a
   - `analysis-ott-binaries` → `$HOME/analysis/plugins/ott/binaries/` (`ANALYSIS_DIR=$HOME/analysis`)
   - `toolchain-retdec` → `/opt/retdec`・`toolchain-emsdk` → `/opt/emsdk` (展開済み)
   - python 依存: 実行環境に `numpy capstone pefile` が既に入っていたため追加導入なし (素の runner では要導入)
-- **前回比**: 前回 (`59eea5c`) 38 / 108 / 66 (D3 14・D4_D5 18) → 本 run 33 / 110 / 69 (D3 13・D4_D5 19)。D1・D2・D6 は不変。差分の原因切り分けは #825。
+- **前回比**: 前回 (`59eea5c`) 38 / 108 / 66 (D3 14・D4_D5 18) → 現 head `6c83d78d` 35 / 112 / 65 (D3 14・D4_D5 20)。D1・D2・D6 は不変。差分の原因切り分けは #825。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 前回比の OTT 集計差分 (38/108/66 → 33/110/69) の原因切り分け | D3 14→13・D4_D5 18→19 の変化理由が不明 | #825 |
+| 前回比の OTT 集計差分 (38/108/66 → 35/112/65、merge 前 head は 33/110/69) の原因切り分け。`main` 取り込みで D3・D4_D5・一致・実行不能が変わった | D3・D4_D5 の変化理由が不明。受入判定 (D1〜D6 検出) には影響しない | #825 |
 | runner に numpy/capstone/pefile が無く e2e 前に `pip install` が必要 | 素の Actions で e2e が exit 2 | PM に起票依頼 (agent-setup への追加) |
 | `fl-win64` / `analysis-ott-binaries` が agent-setup で自動展開されず手動展開が必要 | 同上 | PM に起票依頼 (agent-setup の別 issue) |
 
