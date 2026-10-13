@@ -205,8 +205,9 @@ sed -n 9872p $LIFT   # => br i1 %110, label %dec_label_pc_1800c2f08, label %dec_
 
 ## 14. L1 復元 pass (#1009 / SR-12, 追跡 #823)
 
-- 実装: `tools/liftlib/liftlib/passes/l1_restore.py`。raw IR の `br` (0x1800c2d69 の `je` の null 枝, IR 行 9872) の真の枝を新設ブロック `dec_label_pc_1800c2ef4` へ戻す。ブロックは `host=[rsi+0x10]` の null 判定と `call @__icall_dispatch(i64 0x1800c2f05)` (#228 の `ir_icall_restore.py` と同じ宣言) を持つ。site は機械語 VA で指定し、1 件でなければ失敗する。
-- 対照 (census, `l1_census.py`, PE sha256 `501e7bb3…5283`):
+- 実装: `tools/liftlib/liftlib/passes/l1_restore.py`。raw IR の `br` (0x1800c2d69 の `je` の null 枝, IR 行 9872) の真の枝を新設ブロック `dec_label_pc_1800c2ef4` へ戻す。ブロックは `host=[rsi+0x10]` の null 判定と `call @__icall_dispatch(i64 0x1800c2f05)` (#228 の `ir_icall_restore.py` と同じ宣言) を持つ。site は機械語 VA で指定し、1 件でなければ失敗する。元行の `!insn.addr !N` は正規表現で捕捉して再利用する (番号の固定値は使わない)。
+- `%arg1` = rsi の根拠: 同関数 0x1800c2b50 の demo bit `[rsi+0x22792]` (機械語 0x1800c2cfe) は IR で `%x = add i64 %arg1, 141202` (141202 = 0x22792) として現れる (`authstub_irpass.py` の demo bit 検出, L233)。よって IR の `%arg1` は関数引数 this = rsi。raw IR 行の直接確認は本 fix の run では未実施 (raw lift 無し)。
+- 対照 (census, `l1_census.py`, PE sha256 `501e7bb3…5283`。機械語側は raw / restored で同値。pass は IR のみを変え機械語は変えないため、効果は IR 側 2 行だけ):
 
   | 指標 | pass 無し (raw) | pass 有り (restored) |
   |---|---|---|
@@ -218,7 +219,7 @@ sed -n 9872p $LIFT   # => br i1 %110, label %dec_label_pc_1800c2f08, label %dec_
 
 - 到達性 (`authstub_irpass.reachable_set`): restored では `dec_label_pc_1800c2ef4` と `l1_call` が関数入口から到達可能。
 - 構文: `base` 修復 (`liftlib.passes.base.run_base`) 後の raw / restored の両方を `llvm-as-18` で検査し、rc=0 (未修復の RetDec 出力は constexpr の `or` で `llvm-as-18` が落ちるため、検査は base 後で行う)。
-- e2e (commit a5adb2fc = origin/main 取り込み時点, `plugins-serum2` 展開 sha256 一致): 変更前 cold = **30.15 s**・23/23 PASS (rc 0, load 0.30→0.66)。変更後 (pass は独立 IR にのみ適用し e2e チェーンは不変) warm = **3.72 s**・23/23 PASS (rc 0, load 0.15)。
+- e2e (commit a5adb2fc = origin/main 取り込み時点, `plugins-serum2` 展開 sha256 一致): cold = **30.15 s**・23/23 PASS (rc 0, load 0.30→0.66)。warm = **3.72 s**・23/23 PASS (rc 0, load 0.15)。cold と warm は実行条件が違い比較できない。pass は e2e チェーンに入っていないため、この 2 行は **e2e チェーン不変の確認であり本変更の検証ではない**。本 fix commit ではこれらを再実行していない。
 - 未達 (受入条件のうち未完): (1) 復元した `call` の引数 (rcx=host, edx=0x800010) の実行時 ABI は #228 (icall の BLK 経由) の界面に従う別工程で、本 pass は site の VA と制御辺のみ復元する。(2) e2e チェーン (`e2e.sh`) への組込みは未実施。
 - 既存の子 issue への紐付け: census 拡張 (受入 2 の IR 側指標) は #1029 [SR-13]、復元 pass の本体と前後表・ネガコン (受入 2〜3 の残り) は #1030 [SR-14]、LF 規則の導出は #1213 [SR-11] (`1007-sr-11-authstub-binding`)、global 名の規則化は #1208 [SR-15]。いずれも open。
 

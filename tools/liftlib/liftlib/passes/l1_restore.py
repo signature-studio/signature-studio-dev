@@ -51,11 +51,12 @@ def restore_l1(lines):
     if any(l.startswith(ENTRY_LAB + ':') for l in lines):
         raise SystemExit('l1_restore: 0x1800c2ef4 ブロックが既に存在する (二重適用)')
     s, e = fn_span(lines, FN)
-    pat = r'\s*br i1 %110, label %' + SKIP_LAB + r', label %dec_label_pc_1800c2d6f'
+    pat = r'\s*br i1 %110, label %' + SKIP_LAB + r', label %dec_label_pc_1800c2d6f, (!insn\.addr !\d+)'
     i_br = site_at(lines, FN, SITE_JE, pat)
+    meta_br = re.match(pat, lines[i_br]).group(1)
     mid = _next_meta_id(lines)
     m_entry, m_call = mid, mid + 1
-    lines[i_br] = '  br i1 %110, label %' + ENTRY_LAB + ', label %dec_label_pc_1800c2d6f, !insn.addr !2636'
+    lines[i_br] = '  br i1 %110, label %' + ENTRY_LAB + ', label %dec_label_pc_1800c2d6f, ' + meta_br
     i_skip = next(i for i in range(s + 1, e) if lines[i].startswith(SKIP_LAB + ':'))
     lines[i_skip:i_skip] = _block(m_entry, m_call)
     lines.append('!%d = !{i64 %d}' % (m_entry, ENTRY))
