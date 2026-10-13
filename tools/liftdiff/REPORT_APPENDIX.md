@@ -167,12 +167,7 @@ LD-17 (#864) の型分類は `results/m11_unreachable_diverge.md` §2 (同じス
 単体実行 (手動実測) は `[WIN64]` の PE を指す `pe` に書き換えた `targets/m11.json` の複製で `python3 liftdiff.py run <target.json> --fn 0x414ad0 --state auto --nobuild -v` (`targets/m11.json` 自体の固定パスは #294)。
 
 #### 型 C・D の原因候補 (LD-28 / #1035)
-集計 = `tests/trace_diverge_cd.py` → `results/m11_unreachable_cd.md` (件数の正本)。型 A・B (#864 の D15 候補・leaf) を除いた型 C・D の食い違いを対象にする。
-- 結論: 型 C・D の食い違いは原因候補 (P1・P2・P3) に分類した。P2 は L が F の直接 call 先であることを条件に含む。内訳は results 参照。
-- P2 の代表例 0x418be0 (呼出元 0x41c820) は P2 候補に分類した。IR 側 (`call 0x407030` の欠落) は再確認していない。call site と IR block の対応づけは未実施。
-- P2 の全 20 件で F→L の直接 call 辺 (`L ∈ direct_calls(F)`) が成立することを PE 実測で確認した。
-- `results/m11_unreachable_cd.md` は F→L 条件を入れた後の出力と一致することを HEAD で確認済み (生成元を再実行して diff 0 行)。
-- 候補判定は call 先の集合差分のみ。P1・P2 は候補であり確定ではない。
+全文・測定 commit・鮮度の証跡・数値例は [`REPORT_APPENDIX_LD28.md`](REPORT_APPENDIX_LD28.md) (分割移動)。結論: 型 C・D は原因候補 P1・P2・P3 に分類 (候補であり確定ではない)。0x417b70 の idiv/udiv 仮説は動的未確認 → #1238 (LD-41)。
 
 ## 10. OTT 旧 chain (D1〜D6) の Actions 再現 (LD-8 / #406)
 
