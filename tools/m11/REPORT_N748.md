@@ -8,7 +8,7 @@
 - 数値の出所: コミット済みの生データ `tools/m11/results/N748/` (測定コード head `41d0516b`)。本節は、その測定時の条件を記録したもの。**本 fix run では再測定していない** (`$ARTIFACTS_DIR` に `fl-win64` が無く、`m11_gen_ir2.sh` を実行できないため)。
 - 測定 base: **`origin/main` `6e96689d`** (PR ブランチの merge-base)。**main 追従後の再測定は未実施** (本 PR で base に関する数値を記載する箇所はこの 1 つ)。
 - 測定コード: PR HEAD `41d0516b` (`935fdc65` + `m11_survey.mjs` の `M11_SURVEY_DETAIL` 追加)。
-- 素材 (測定時): `fl-win64` (`$RUNNER_TEMP/fl-win64`)、`work-m11` (`tools/m11/work/` 233 件)、`toolchain-emsdk` (`/opt/emsdk`, emcc 6.0.12)、`toolchain-retdec` (`/opt/retdec`)。展開は `tar --zstd -xf` (work-m11 含め計 8 秒)。
+- 素材 (測定時): `fl-win64` (`[WIN64]`)、`work-m11` (`tools/m11/work/` 233 件)、`toolchain-emsdk` (`[EMSDK]`, emcc 6.0.12)、`toolchain-retdec` (`[RETDEC]`)。展開は `tar --zstd -xf` (work-m11 含め計 8 秒)。
 - 依存: `capstone 5.0.7` / `pefile 2024.8.26` を `pip install --user` (`m11_gen_ir2.sh` の ldfix が要求)。
 - 手順: `m11_gen_ir2.sh` → `M11_FIX_652500={0,1} m11_build.sh` → `M11_SURVEY_UNITS=… M11_SURVEY_DETAIL=… node m11_survey.mjs` (OFF/ON 直列)。
 - 実測時間 (wall, 秒): `m11_gen_ir2.sh` 43 / build OFF 24 / survey OFF 14 / build ON 19 / survey ON 9。runner は 4 vCPU・15 GiB。load average は未記録。
