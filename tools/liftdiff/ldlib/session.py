@@ -61,6 +61,10 @@ class Session:
             data, fix = cases.make_blob(seed, pfrac=pf)
             L.append('BLOB %s %s' % (name, data.hex()))
             L.append('FIX %s %s' % (name, ','.join('%x' % f for f in fix)))
+        for name, mk in cases.SPECIAL_BLOBS.items():
+            data, fix = mk()
+            L.append('BLOB %s %s' % (name, data.hex()))
+            L.append('FIX %s %s' % (name, ','.join('%x' % f for f in fix)))
         L.append('SNAPSHOT')
         return L
 
