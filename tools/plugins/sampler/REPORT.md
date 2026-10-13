@@ -207,8 +207,6 @@ Fruity Slicer 2 は殻 (block 23663) とは別に C++ engine DLL (block 23664、
 | NC7 | `judge.py engines` に lift_rc=1 の行 / 末尾行欠落の engines.csv | 対照 rc 0 → **2 種とも rc 1** |
 | NC8 | `judge.py engines` に最終 `emcc_c_rc_after_f80`=1 / -1、`missing_ref`=1、旧 header | 対照 rc 0 → **1 / 1 / 1**、旧 header rc 2 |
 
-NC4 は #506 の reviewer が再現した「不合格行を追記しても exit 0」と同じ入力で、本 PR は exit 1 になる。
-
 検証範囲: 閉包の機械的な到達性 (RetDec+pass 鎖 → `emcc -c`)、host / kernel 依存の静的な数え上げ、閉包外の固有関数の静的な数え上げ。
 範囲外 (本書は何も主張しない): wasm のリンクと実行、native との出力比較、framework / host shim との結合、Render test .flp、クリーン worktree での再現。
 
