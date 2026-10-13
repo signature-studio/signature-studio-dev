@@ -28,7 +28,7 @@
 | `[LINEAR-AUDIT]` | `../analysis/LINEAR_AUDIT_LOG.md` | 旧 Linear 運用の定期監査ログ (歴史資料) |
 | `[PREFLIGHT]` | `../analysis/preflight.sh` | 環境検査・`--env` / `--lock` ヘルパ (歴史的。repo 内手順は `docs/WORKFLOW.md`) |
 | `[MODEL-POLICY]` | `../analysis/MODEL_POLICY.md` | モデル指定・ゾンビ監視の方針 (PM 管理) |
-| `[PM-SCRIPTS]` | `../analysis/sweep_prs.sh` ほか | PM が VM 上で常駐・実行する PR/run 運用スクリプト (repo 外・repo に未取込)。`sweep_prs.sh` (open PR の状態判定と次の run の自動依頼、`docs/WORKFLOW.md` §11)・`find_silent_runs.sh` (着手報告だけで終わった run の検出)・`restart_failed.sh` (失敗 run の再投入)・`watch_runs.sh` (+ `watch_runs.sh.notes`)。所在が記録されているのは `sweep_prs.sh` のみ。他は `[ANALYSIS-DIR]` 配下かどうか未確認 (#582 のコメントで PM に確認依頼済み。#582 は確認が済むまで open) |
+| `[PM-SCRIPTS]` | `tools/pm/` | PM が VM 上で常駐・実行する PR / Issue / run の運用スクリプト (repo に取込済み。#793)。`watch_runs.sh` (run 監視)・`launch_issues.py` (自動着手)・`rest_heal.py` (担当なし PR の補完)・`sync_status.py` (Project Status 同期)・`heartbeat.sh` ほか。一覧と前提は `tools/pm/README.md`。`sweep_prs.sh` (GraphQL 版) は廃止、後継は `.github/scripts/watchdog.sh` と `rest_heal.py` |
 
 `../analysis/` は **作業用 VM 上のリポジトリ外ディレクトリ**。リポジトリには含めない (`.gitignore` 対象外・クローン先に無い)。
 CI や他人の環境では存在しないため、再現手順は本ファイルの所在情報を前提としない。
