@@ -65,9 +65,9 @@
 ## 6. 限界と未実装 (正直ベース)
 
 - **fake シンクの数値**: 音声 HW が無いため `outputLatency` 35ms/`baseLatency` 10.7ms は fake 値。実デバイス (Windows WASAPI/mac CoreAudio, Firefox, Safari) での burst・遅延・underrun は**未計測**。往復の総遅延 (入力ブラウザバッファ含む) も未計測。
-- **未実装**: COM vtable アダプタ (win64 ABI/8 バイトポインタの ASIOCallbacks・ASIOBufferInfo・ASIOTime への変換; リフタ呼出規約待ち)、レジストリ `SOFTWARE\ASIO\FL Studio ASIO` と `CoCreateInstance` 配線 (別 shim 行)、DirectSound shim、WebMIDI shim、getUserMedia のデバイス選択 UI、WASAPI capture/exclusive/loopback、T の縮小 (拡張のみ)、macOS 固有 (AudioUnit 面) の薄いアダプタ。
+- **未実装**: COM vtable アダプタ (win64 ABI/8 バイトポインタの ASIOCallbacks・ASIOBufferInfo・ASIOTime への変換; リフタ呼出規約待ち)、レジストリ `SOFTWARE\ASIO\FL Studio ASIO` と `CoCreateInstance` 配線 (別 shim 行)、~~DirectSound shim~~ (AU-4 で実装, §11)、WebMIDI shim、getUserMedia のデバイス選択 UI、WASAPI capture/exclusive/loopback、T の縮小 (拡張のみ)、macOS 固有 (AudioUnit 面) の薄いアダプタ。
 - B=128 は ILWASAPI2ASIO の min 256 より小さい (shim 既定プロファイル min=128/gran=128 の結果であり FL 実運用値ではない)。`-DFLASIO_PROFILE_ILWASAPI=1` での e2e は未実施。
-- 未確認 (推定): `asioMessage` selector 6 → コマンド 0x17 が再起動かどうか、FL が granularity=128/min=128 を受理するか (ILWASAPI 値は `-DFLASIO_PROFILE_ILWASAPI=1` に用意)、DS バッファの 16/32bit、Web MIDI の Worker 内実装状況 (W3C 仕様上は `Exposed=(Window,Worker)`, 実装未確認)。
+- 未確認 (推定): `asioMessage` selector 6 → コマンド 0x17 が再起動かどうか、FL が granularity=128/min=128 を受理するか (ILWASAPI 値は `-DFLASIO_PROFILE_ILWASAPI=1` に用意)、~~DS バッファの 16/32bit~~ (§11 で静的確定)、Web MIDI の Worker 内実装状況 (W3C 仕様上は `Exposed=(Window,Worker)`, 実装未確認)。
 - `ctx.outputLatency` は起動直後 0 → 約 250ms 後に更新される。`getLatencies` は呼出時の値で、FL が起動直後に読むと小さく見える。
 
 ## 7. ユーザ依頼事項
@@ -77,7 +77,7 @@
 1. **[audio-com-adapter]** IASIO COM アダプタ生成 (win64 ABI ⇄ `flasio_*`)、`ASIOCallbacks` 4 関数 (0xc57420/0xc576b0/0xc576c0/0xc56ae0) の受け渡し、`DllGetClassObject`/`CoCreateInstance` と `SOFTWARE\ASIO` レジストリ配線 (registry shim 担当と連携)。依存: リフタの呼出規約 (M11)。
 2. **[audio-realdevice]** 実機 Chrome/Firefox/Safari での burst・outputLatency・underrun 行列、ループバックケーブルによる総往復遅延、T 下限の再評価。
 3. **[audio-midi]** WebMIDI shim (SAB MIDI ring, `midiIn/Out` 20 関数, CALLBACK_FUNCTION スレッド, SysEx バッファ, 再スキャン) と Worker 直受信の実機検証。
-4. **[audio-directsound]** DirectSound shim (ring を循環バッファ化, Lock/Unlock/GetCurrentPosition/Notify)。FL の DS バッファ形式 (16/float) の確認を含む。
+4. ~~**[audio-directsound]**~~ 実装済み (AU-4 #189, §11)。
 5. **[audio-input-ui]** getUserMedia デバイス選択 + `controlPanel` UI + `kAsioResetRequest` 連携、入力遅延実測。
 6. **[audio-latency-policy]** T の縮小 (安定時に B 刻みで減衰)、安全モード/低遅延モードの UI、FL の selector 6 (0x17) 挙動確認後に `kAsioLatenciesChanged` を使うか決定。
 7. **[audio-fl-profile]** FLEngine 起動後に granularity=128 / ILWASAPI プロファイルのどちらが必要か実機検証、`pbtrackingmode` 各モードでのカーソル追従確認。
@@ -126,3 +126,30 @@ e2e 追加 3 本 (`harness/run.mjs`, 計 25 シナリオ): `asio_sine_b512_96k` 
 | T 縮小が未実装 (burst 4096 で T=56ms 固定) | 96k/B=256 の遅延が burst 最大値に引きずられる | #190 (AU-6) にコメント |
 | 実機 burst 分布が未計測 | 自然な burst 4096 の発生頻度・遅延影響が不明 | #187 (AU-2) にコメント |
 | 旧コードでの abort 再現 (ネガティブコントロール) 未実施 | 修正前後の差を本 runner で実測していない | 本 PR 本文に明記 |
+
+## 11. AU-4 (#189) DirectSound shim (`src/flds.{h,c}`) と FL の DS バッファ形式の静的確認
+
+既知類型との関係: 該当なし (ランタイム shim 新規実装。lift 欠陥ではない)。検証起点 commit `4483b84` (実装 + e2e)。設計は `docs/PROTOCOL.md` §8。
+
+**FL の DS バッファ形式 (静的, `bash tools/audio/ds_static.sh` → `results/ds_static.txt`)**: primary `SetFormat` の WAVEFORMATEX 組立は設定 bool `byte[0x15d3296]` で分岐 (0x12afcd0)。0 → `WAVE_FORMAT_PCM` 16bit ステレオ (組立 0x674e10)、非 0 → `WAVE_FORMAT_EXTENSIBLE` + `IEEE_FLOAT` 32bit・mask=3 (組立 0x674e50)。secondary は同じ wfx (0x16bd4b0) を渡す。secondary への書込みも `wBitsPerSample==0x20` で float 直コピー / 16bit 変換に分岐 (0x12af12b)。**結論: FL はユーザ設定で 16bit PCM と float32 の両方を使う** → shim は両形式を受理し、16bit は `v/32768` で float 化 (厳密)。静的イメージの初期値は 0 (=16bit) だが実値は保存設定由来で静的には不定。**推定**: この bool が UI の `ds_32bitbufbox` に対応する (設定 3 bool のうち用途が消去法で残る 1 つ。DFM フィールド表は未解析)。
+
+**呼出面の訂正**: `fl_asio_surface.py` / INVENTORY §2 の DS 集計 (SetVolume×3, SetFrequency, GetFormat×3 等) は disp のみの集計で Delphi オブジェクトへの同 disp 呼出を含んでいた。受け手 (rcx のロード元グローバル) で分類した結果 (`fl_ds_surface.py`): IDirectSound {CreateSoundBuffer×2, SetCooperativeLevel×1}、primary {GetFormat×1, SetFormat×1}、secondary {GetCurrentPosition×2 (play のみ / write のみ), Lock×2, Unlock×2, Play, Stop, SetCurrentPosition, QueryInterface×1}、IDirectSoundNotify {SetNotificationPositions×1}。**SetVolume/SetFrequency は DS オブジェクトに呼ばれない**。(INVENTORY.md は生成物扱いのため本 PR では未更新 — 下表)
+
+**実装**: secondary = shim 内循環バイト列、pump スレッドが ring を T まで充填 (flasio と同じ T 拡張則)。play cursor = `out_read` 由来、write cursor = 変換済み + P。Notify は offset 通過で bit (合体)。`SetCurrentPosition` は停止中のみ。非 LOOPING / EXCLUSIVE / WRITEPRIMARY は fail-fast。
+
+**e2e (追加 10 シナリオ, `harness/run.mjs`)**: poll/notify × pcm16/f32 のランプ bit-exact・正弦・44.1k・極小バッファ (4096f)・過負荷・Stop/再開・API 境界 37 項目・EXCLUSIVE fail-fast。
+
+| 検証 (HEAD `4483b84`, headless Chrome / emcc 6.0.12, GitHub runner 4 コア, 並列 1) | 結果 |
+|---|---|
+| フル e2e 1 回 (`node harness/run.mjs`, 既存 25 + DS 10) | **35/35 PASS**, exit 0, 実測 539 s (開始 load average 0.27 / 終了 1.28)。DS: underrun 0・ramp16 / ramp 不一致 0 (最大 721,408f)・write cursor − play cursor = 1152..2560f (許容 [P, T+2P]) |
+| ネガティブコントロール: `flds.c` の 16bit 係数 1/32768 → 1/32767 に壊して `ds_pcm16_poll_ramp_b256 --quick` | **FAIL** (ramp16 mismatches 192384/192384)。戻し後は diff 0 行 |
+
+検証範囲 / 範囲外: fake シンク + 合成クライアント (FL の呼出手順の再現) のみ。**実 FL (FLEngine) からの呼出は未実施** (COM vtable アダプタ = AU-1 待ち)。DS の `Lock`→`Unlock` を介さない書込みや、FL の play cursor 利用方式 (`pbtrackingmode` 連動) は未検証。16bit 変換の FL 側係数・ディザは未解析 (shim は厳密 /32768)。独立検収の別算法検算は検収側に委ねる。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `byte[0x15d3296]` = `ds_32bitbufbox` の対応は推定 (DFM 未解析) | 形式の既定が 16/32 のどちらかは不明 (両対応なので shim 影響なし) | #189 コメント (PM 判断で DFM 解析を別チケット化) |
+| INVENTORY.md §2 の DS 集計の訂正反映 (生成物扱いのため未編集) | 旧集計 (SetVolume 等) が残る | #11 にコメント (PM が生成元整備) |
+| 実 FL からの DS 呼出 e2e | COM アダプタ未実装 | #98 (AU-1) |
+| 実機での DS cursor 精度・write-ahead | fake シンクのみ | #187 (AU-2) |
+

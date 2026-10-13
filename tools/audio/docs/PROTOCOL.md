@@ -88,12 +88,24 @@ FLEngine は WASAPI を直接呼ばない (GUID/IAT 走査で 0 件)。ILWASAPI2
 | `Start/Stop/Reset` | `go=1` / `go=0`(index 保持) / index リセット |
 | exclusive / loopback / capture | 未実装 (exclusive は fail-fast、capture は fail-fast スタブ + §9 設計) |
 
-## 8. DirectSound 風 (設計のみ, P1 — 実装は FLEngine 移植後)
+## 8. DirectSound 風 (`flds_*`, 実装済み: AU-4 #189)
 
-FL は `DirectSoundCreate` → `CreateSoundBuffer`(primary/secondary) → `SetFormat/SetCooperativeLevel` → `Lock/Unlock/GetCurrentPosition/Play/Stop/SetCurrentPosition/SetFrequency/SetVolume` (+ `IDirectSoundNotify` GUID) を使う (INVENTORY §1)。ring を DS の循環バッファとみなす:
-- `Lock(offset,bytes)` → ring 上のポインタ(wrap 時 2 区間)、`Unlock` → `out_write` を進める。
-- `GetCurrentPosition(play, write)`: `play = out_read·frameBytes mod size`, `write = play + safety`、safety = 実測バースト + B。
-- `Play(LOOPING)` = `go=1`、`Stop` = `go=0`。`SetFrequency/SetVolume/SetFormat` は ctx 再生成/無視。16-bit PCM バッファは変換ポンプ (producer 側) で float 化。`pollbox` (ポーリング) モードは `GetCurrentPosition` ループで成立、Notify モードは `tick` futex で供給。
+FL が実際に呼ぶ面 (受け手別, `results/ds_static.txt`): `IDirectSound` {SetCooperativeLevel(PRIORITY), CreateSoundBuffer×2 = primary + secondary}、primary {GetFormat, SetFormat}、secondary {Lock, Unlock, GetCurrentPosition (play のみ / write のみの 2 呼出), SetCurrentPosition, Play(LOOPING), Stop, QueryInterface→IDirectSoundNotify}、`IDirectSoundNotify::SetNotificationPositions` (2 点)。`SetVolume`/`SetFrequency` は DS オブジェクトには呼ばれない (INVENTORY §2 の集計は Delphi オブジェクトへの同 disp 呼出を含んでいた)。
+
+secondary は shim 内の循環バイト列 (PCM16 または float32, interleaved)。Play で pump スレッドが起動し、`fla_out_wait_fill_le` で ring が T-P 以下になる度に P フレーム (既定 256) を secondary から planar f32 へ変換して `fla_out_write` する (flasio と同じ動的 T 拡張則)。
+
+| DS | shim |
+|---|---|
+| `CreateSoundBuffer(secondary)` | `fla_open` (rate/ch は WAVEFORMATEX から)。`LOCHARDWARE`→`DSERR_ALLOCATED`、バッファ < T+2P フレームは `INVALIDPARAM` |
+| `Lock/Unlock` | secondary 上のポインタ (wrap 時 2 区間)。Unlock は Lock 区間との一致のみ検査 (変換は pump が「その時点の内容」を読む) |
+| play cursor | `(base + out_read 拡張 64bit) mod size` (underrun 中は worklet 無音で止まる) |
+| write cursor | `(base + 変換済み総フレーム + P) mod size` (それ以前は凍結扱い)。play との差は [P, T+2P] |
+| `Play(LOOPING)` / `Stop` | pump 起動 + `go=1` / pump 停止 + `go=0`、停止時 play cursor を保持。非 LOOPING・EXCLUSIVE/WRITEPRIMARY は fail-fast |
+| `SetCurrentPosition` | 停止中のみ (再生中は `INVALIDCALL`) |
+| Notify | play cursor が各 offset を通過 (開始位置自身は数えない) する度に bit。`flds_wait_notify` が futex 短周期 (≤4ms) で判定。取りこぼしは合体 |
+| 形式 | PCM16 / IEEE float32 (PCM・FLOAT・EXTENSIBLE) を受理。16bit は `v/32768` で float 化 (厳密)。再サンプル/ch 変換なし |
+
+FL のバッファ形式 (`ds_32bitbufbox` 経路, 静的確認): primary SetFormat の組立は設定 bool (0x15d3296) で分岐 — 0 → `WAVE_FORMAT_PCM` 16bit ステレオ (0x674e10)、非 0 → `WAVE_FORMAT_EXTENSIBLE` + `KSDATAFORMAT_SUBTYPE_IEEE_FLOAT` 32bit (0x674e50)。secondary も同じ wfx。両形式とも本 shim が受理する。`pollbox` (ポーリング) は GetCurrentPosition ループ、非ポーリング時は `DSBCAPS_CTRLPOSITIONNOTIFY` + Notify。COM vtable アダプタ (win64 ABI) は AU-1 側で生成 (未実装)。
 
 ## 9. WebMIDI / オーディオ入力 (設計)
 
