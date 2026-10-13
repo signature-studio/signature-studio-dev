@@ -230,10 +230,14 @@ OTT_ULP_TOL=2 bash tools/ott/ott_e2e.sh  # 許容 ulp 指定
 - 結論: **既定 base (0x30000000) での同一性のみ確認**。相対化の実証 (別 base・複数インスタンス N=16) は未実施 → #1200 に残す。
 - 実装: `lift/x64c.py` の `OTT_RELOC=1` で画像 VA 定数を `(ott_gbase + RVA)` で出力。`OTT_RELOC=1` と `OTT_VEXCOV=1` は fail-fast (VEXCOV の shifted VA 定数は相対化未対応)。
   `rt/ott_glue.c` に `ott_gbase` (既定 0x30000000) と `ott_set_gbase`。`crtinit/ott_crt.c` は cookie・api-set 表・encoded slot・`__FlsIndex`・trampoline 番地を RVA + `ott_gbase` で持つ。
-- 既定 lift (`OTT_RELOC` 未設定): 生成 `ott_lifted.c` / `ott_data.c` が main 版と byte 一致 (`cmp`)。
-- 測定 (HEAD 80cd4a2a, 素材 `analysis-ott-binaries` + `toolchain-emsdk`): 既定 lift real 6.8 s、`functions 75, insns 5790, unsup {}`。
-  相対化 lift も `functions 75, insns 5790, unsup {}`、`ott_lifted.c` の `ott_gbase` 参照 776 箇所。
-  署名 (node 22.23.3, SIG_ONLY): 既定 `6b1696f0` / 相対化 `6b1696f0` (N=1, gbase 既定値)。
-- 後続 commit で追加した修正 (指摘対応): VEXCOV+RELOC の fail-fast、`ott_crt.c` の絶対番地を gbase 相対化、`ott_cpu.c` の unlifted 診断を `va - ott_gbase` に変更。
-  これらは本 commit 時点で compile (gcc -c) のみ確認。e2e の再実行は素材未展開のため未実施。
+- 既定 lift (`OTT_RELOC` 未設定): 生成 `ott_lifted.c` / `ott_data.c` が main 版 (558b47b0) と byte 一致 (`cmp`)。
+- 測定 commit: **110d65e7** (素材 `analysis-ott-binaries` + `toolchain-emsdk` 展開、node 22.23.3 / emsdk node 24.19.0 は SIG_ONLY の実行)。
+  - 既定 lift: real 6.3 s、`functions 75, insns 5790, unsup {}`。
+  - 相対化 lift (`OTT_RELOC=1`): real 3 m 36 s、`functions 75, insns 5790, unsup {}`、`ott_lifted.c` の `ott_gbase` 参照 807 箇所。
+  - main 558b47b0 の既定 lift: real 6.1 s、`ott_lifted.c` / `ott_data.c` とも既定 lift と `cmp` 一致。
+  - 署名 (SIG_ONLY, N=1, gbase 既定値): 既定 `6b1696f0` / 相対化 `6b1696f0` / main `6b1696f0`。nonzeroOut 256。
+  - 負荷: load average 1.08 (1 分値)、直列実行。
+- 前版 (80cd4a2a): 既定 6.8 s、相対化の `ott_gbase` 参照 776 箇所、署名は同じ `6b1696f0`。110d65e7 で `x64c.py` / `ott_crt.c` / `ott_cpu.c` が変わったため、以後はこちらを正とする。
+- 110d65e7 の指摘対応 (VEXCOV+RELOC の fail-fast、`ott_crt.c` の絶対番地の gbase 相対化、`ott_cpu.c` の unlifted 診断) は上記測定に含まれる。
+  ただし crtinit の chain (cookie・trampoline) の e2e 実行は未実施 (lift・署名の範囲のみ)。
 - 未達: N=16 / 別 base での `ott_set_gbase` 経路 → #1200 に残す。相対化の CPU コスト・SIDE_MODULE PIC 税 → #1201。
