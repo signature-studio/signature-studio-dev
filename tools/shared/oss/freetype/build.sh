@@ -47,7 +47,8 @@ echo "[ft] sizes: libfreetype.a native=$(stat -c %s "$B/native/src/objs/.libs/li
 FONT="${FONT:-$FL_MAC_DIR/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL/Shared/Artwork/Fonts/OpenSans-Regular.ttf}"
 "$B/test_native" "$FONT" > "$B/out_native.txt"
 node "$B/test_wasm32.cjs" "$FONT" > "$B/out_wasm32.txt"
-node --experimental-wasm-memory64 "$B/test_wasm64.cjs" "$FONT" > "$B/out_wasm64.txt" 2>"$B/out_wasm64.err" || node "$B/test_wasm64.cjs" "$FONT" > "$B/out_wasm64.txt"
+node64="${EMSDK_NODE:-node}"   # wasm64 (table64) は node >= 24 が必要。システム node v22 では CompileError (emsdk 同梱 node を使う)
+"$node64" "$B/test_wasm64.cjs" "$FONT" > "$B/out_wasm64.txt" 2>"$B/out_wasm64.err"
 rc=0
 for v in wasm32 wasm64; do
   if diff -q "$B/out_native.txt" "$B/out_$v.txt" >/dev/null; then
