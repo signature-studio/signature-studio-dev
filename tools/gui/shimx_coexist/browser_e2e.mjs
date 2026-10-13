@@ -54,6 +54,10 @@ try {
   // ---- 1. ShellExecute → window.open ----
   const o1 = await ev(`window.__req(1, ["https://example.com/a?b=1"])`, true);
   ck("window.open: user activation 下の https は開く (result=1)", o1.result === 1, JSON.stringify(o1));
+  const o1h = await ev(`window.__req(1, ["http://example.com/h?x=1"])`, true);
+  ck("window.open: user activation 下の http は開く (result=1)", o1h.result === 1, JSON.stringify(o1h));
+  const o1m = await ev(`window.__req(1, ["mailto:someone@example.com?subject=hi"])`, true);
+  ck("window.open: user activation 下の mailto は開く (result=1)", o1m.result === 1, JSON.stringify(o1m));
   const o2 = await withoutActivation(`window.__req(1, ["https://example.com/no-activation"])`);
   ck("window.open: user activation 無しは Chrome のポップアップブロックで失敗 (result=0 → ShellExecute 失敗)", o2.result === 0, JSON.stringify(o2));
   const o3 = await ev(`window.__req(1, ["javascript:alert(1)"])`, true);

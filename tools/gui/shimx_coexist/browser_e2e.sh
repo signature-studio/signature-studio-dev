@@ -3,11 +3,11 @@
 #   1. coexist.sh の objects (work/gui_obj・sx_obj) から ENVIRONMENT=web,worker の wasm を link (INVOKE_RUN=0: main は走らせない)
 #   2. src/runtime/gui_hostcall.ts を ES モジュール化 (work/js)
 #   3. browser_e2e.mjs が headless Chrome (CDP) で page を開き、wasm の hostcall 要求を browserEnv で処理させて検査
-#   env: COEXIST_WORK (既定 work), EMSDK_ENV (既定 /opt/emsdk/emsdk_env.sh), CHROME (既定 google-chrome)
+#   env: COEXIST_WORK (既定 work), EMSDK_ENV (emsdk の emsdk_env.sh。未指定なら PATH の emcc を使う。場所は docs/REFERENCES.md の [EMSDK]), CHROME (既定 google-chrome)
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; GUI="$HERE/.."; SX="$GUI/../shimx"; REPO="$(cd "$GUI/../.." && pwd)"
 W="${COEXIST_WORK:-$HERE/work}"
-set +u; . "${EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}" >/dev/null 2>&1 || true; set -u
+set +u; if [ -n "${EMSDK_ENV:-}" ]; then . "$EMSDK_ENV" >/dev/null 2>&1 || true; fi; set -u
 command -v emcc >/dev/null || { echo "[browser] emcc が無い"; exit 2; }
 source "$SX/flags.sh"
 [ -f "$W/gui_obj/gui_adapt_w32.o" ] && [ -f "$W/sx_obj/shell.o" ] || { echo "[browser] objects 無し → coexist.sh を先に実行"; bash "$HERE/coexist.sh" >/dev/null; }
