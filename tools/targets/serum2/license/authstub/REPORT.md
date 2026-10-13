@@ -3,7 +3,7 @@
 - 日付: 2026-10-10 / 親: CAB-13 (アプリケーション完成 マイルストーン) / 前段: CAB-71 (5012887, REPORT §7 の N1–N8 が入力)
 - 方針根拠: `docs/LEGAL.md` §6.0-4 (bc07970: 全ライセンス機構無力化・アクティベーション無条件通過・ライセンス状態データの配置/合成はユーザ承認済み)
 - 範囲: 本 dir (`tools/targets/serum2/license/authstub/`) のみ新設。CAB-71 既存ファイルは無変更 (license/REPORT.md への §10 追記のみ)。
-- 再現: `bash tools/targets/serum2/license/authstub/e2e.sh` (1 コマンド, lift キャッシュ利用時 約 25 秒)
+- 再現: `bash tools/targets/serum2/license/authstub/e2e.sh` (1 コマンド, lift キャッシュ利用時 wall 5.6 s・再検証 2 回の実測 (§12))
 
 ## 0. 結論 (先出し)
 
@@ -148,16 +148,18 @@ python3 tools/targets/serum2/license/authstub/authstub_irpass.py \
 ## 12. L1 の再現条件 (実測・追跡 #823)
 
 - 測定 commit: origin/main 36edc993。素材: plugins-serum2 → `Install_Xfer_Serum2_2.1.5.exe` の `$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3` (19,236,864 B, sha256 `501e7bb3…5283`)。
-- baseline `bash e2e.sh` (lift キャッシュ利用): 5.7 s, load 0.92 → 0.35, **23/23 PASS**。cold 再生成は未実施。
+- 再検証 (HEAD `c5f49a76`, runner 4 core, 2026-10-13 UTC, `plugins-serum2` 取得・sha256 一致): `e2e.sh` を 2 回実行し、どちらも lift キャッシュ利用 (step [1] スキップ) で wall 5.58 s / 5.53 s、**23/23 PASS**。実行前後の 1 分 loadavg は 0.17→0.24 / 0.24→0.30。
+- cold lift: step [1] と同一引数の RetDec 単独実行は 33.6 s で `authstub.drc.ll` (710,975 B) を生成。
+- 元測定の `load 0.92 → 0.35` は採取方法が本節に無く、この再検証では 0.92 は再現していない。実測値は上記を正とする。
 - 機械語 (0x1800c2d59–d76): `[rsi+0x90]` が非 0 なら `or dword [rax+8], 0x800010` (deferred 経路)、0 なら `je 0x1800c2ef4` で直接経路 `mov rcx,[rsi+0x10]; mov rax,[rcx]; mov edx,0x800010; call [rax+0x30]` へ分岐する。
-- raw IR では `dec_label_pc_1800c2d5f` の `br i1 (icmp eq %109, 0)` の 0 側が機械語の `je 0x1800c2ef4` ではなく `dec_label_pc_1800c2f08` に付け替えられており、`0x1800c2ef4` 相当のブロックは関数内のどの分岐からも到達しない (`insn.addr` 0 件)。
+- raw IR では `dec_label_pc_1800c2d5f` の `icmp eq i64 %109, 0` の 0 側 (true 側) が機械語の `je 0x1800c2ef4` ではなく `dec_label_pc_1800c2f08` に付け替えられており、`0x1800c2ef4` 相当のブロックは関数内のどの分岐からも到達しない (`insn.addr` 0 件)。
 - 結論: 脱落は「`0x1800c2ef4` へ向かう辺が lift 時に `0x1800c2f08` へ付け替わる」形で起きている。raw IR の `0x800010` 即値は `or i32 …, 8388624` (L9878, `0x1800c2d6f` 側の deferred 経路) の 1 箇所のみ。
-- 残: 失われた辺を復元する pass の実装と検証は未着手 (#823)。N2b (`0x1800c2d59` → f08 の強制) は deferred 経路除去であり、直接経路の復元とは別問題。
+- 残: 失われた辺を復元する pass の実装と検証は未着手 (#823)。N2b (表 §1 参照。`0x1800c2d59` → f08 の強制 = deferred 経路除去) は直接経路の復元とは別問題。
 
 ### 12.1 確認手順 (中間物と再生)
 
 - 中間物: `e2e.sh` の step [1] が出力する `tools/targets/serum2/license/authstub/work/lift/authstub.drc.ll` (RetDec raw IR、select-ranges に 0x1800c2b50-0x1800c2f99 を含む)。`work/` は gitignore。
-- 素材: `plugins-serum2` (§11 と同じ PE)。`work/lift/` が無い場合は `bash e2e.sh` の step [1] で生成する (約 30 s)。
+- 素材: `plugins-serum2` (§11 と同じ PE)。`work/lift/` が無い場合は `bash e2e.sh` の step [1] で生成する (RetDec 単独実行 33.6 s 実測)。
 - 再生コマンド (`authstub/` で実行):
 
 ```sh
@@ -167,9 +169,13 @@ VA=$(printf '%d' 0x1800c2ef4)
 grep -cE "^![0-9]+ = !\{i64 $VA\}" $LIFT
 # (b) 0x800010 即値 (or i32 ..., 8388624) の出現箇所 (期待: L9878 の 1 箇所)
 grep -nE 'or i32 .*, 8388624' $LIFT
-# (c) 0x1800c2d5f の br i1 (icmp eq %109, 0) の 0 側ターゲット (期待: dec_label_pc_1800c2f08)
-grep -nE 'br i1 \(?icmp eq %109, 0\)?' $LIFT
+# (c) 0x1800c2d5f の icmp eq の 0 側 (true 側) ターゲット (期待: dec_label_pc_1800c2f08)
+grep -nE 'icmp eq i64 %109, 0' $LIFT
+sed -n 9872p $LIFT   # => br i1 %110, label %dec_label_pc_1800c2f08, label %dec_label_pc_1800c2d6f
 ```
 
-- 注 (未再現): 上記 (a)〜(c) の期待値は元 PR の記述 (測定 commit 36edc993) で、**この fix run では再実行していない** (`plugins-serum2` 未取得・`work/lift/` 無し)。コマンドの正しさ (IR の表記揺れ等) も未検証。再検証は `oc_artifacts: fl-win64 plugins-serum2` を付けた run で、上記コマンドを実行して結果を本節に書き直すこと。
-- 原因の一本化 (記述上の整理。機構の再確認は上記の再検証待ち): §6 L1 の「insn.addr メタが 0 個」は (a) の結果で、「`0x1800c2ef4` へ向かう辺が lift 時に `0x1800c2f08` へ付け替わる」ことが脱落の機構。
+- 再検証結果 (HEAD `c5f49a76`, `work/lift/authstub.drc.ll` = 710,975 B, RetDec v5.0 の cold lift):
+  - (a) `0x1800c2ef4` の insn.addr メタ件数 = **0** (期待どおり)。同じ式で `0x1800c2d5f` と `0x1800c2f08` は各 1 件ヒットし、検索式が機能していることも確認した。
+  - (b) `or i32 …, 8388624` = **L9878 の 1 箇所** (`%114 = or i32 %113, 8388624`) (期待どおり)。
+  - (c) 元の検索式 `br i1 (icmp eq %109, 0)` は **0 件** で、表記が違った。実 IR は `%110 = icmp eq i64 %109, 0` (L9870) で、`br i1 %110, label %dec_label_pc_1800c2f08, label %dec_label_pc_1800c2d6f` (L9872)。0 側 (true 側) は `dec_label_pc_1800c2f08` で期待値を満たす。上記の検索式は修正済み。
+- 原因の一本化 (記述上の整理。機構は上記 (a)〜(c) で再確認済み): §6 L1 の「insn.addr メタが 0 個」は (a) の結果で、「`0x1800c2ef4` へ向かう辺が lift 時に `0x1800c2f08` へ付け替わる」ことが脱落の機構。
