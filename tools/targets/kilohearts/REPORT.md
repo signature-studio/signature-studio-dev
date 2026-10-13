@@ -196,9 +196,9 @@ VEX-256 は 344 関数 189,611 B 中 **closure 内は 6 関数のみ** (Convolve
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | Resonator の emcc 失敗 (128bit レーン・rcpps 近似表・プロトタイプ・stub) | 受入条件 1〜4 (実ビルド・突合・ネガコン・結論) が全て未達 | #556 (本 PR は `Refs #556`) |
-| Stereo / Delay の Ghidra 実ビルド・突合は未実施 (rsqrtps・sincos_a の引数なし呼出・k_dfdb0 の 128bit 演算。`rcpps` 表・128bit・ABI 復元の規則化が前提)。§10-4 の「手作業が桁違いに増える」は census (構文の有無) に基づく推定のまま | 受入条件 1〜4 未達 | #556。子チケット案 `[KH-5b]` (親 #58。起票は PM) |
-| 人手の所要時間 (Ghidra ルートの修復工数) は未計測。記録したのは手パッチ規則の件数 (§10-2) と各段の実測秒 (§10-3) のみ | #58 受入条件「工数」を人手時間では比較できていない | #58 (open のまま追跡) |
-| KH-3 優先度とフロント選択の決定 | 材料は §10-5 のみ。決定が無いため PR は `Closes` でなく `Refs #58` | #58 (PM 判断) |
+| Stereo / Delay の Ghidra 実ビルド・突合は未実施 (rsqrtps・sincos_a の引数なし呼出・k_dfdb0 の 128bit 演算。`rcpps` 表・128bit・ABI 復元の規則化が前提)。§10-4 の「手作業が桁違いに増える」は census (構文の有無) に基づく推定のまま | 受入条件 1〜4 未達 | #556 (OPEN)。子チケット案 `[KH-5b]` の親は #58 (CLOSED) のため、親の付け替えは PM 判断。起票は PM |
+| 人手の所要時間 (Ghidra ルートの修復工数) は未計測。記録したのは手パッチ規則の件数 (§10-2) と各段の実測秒 (§10-3) のみ | #58 受入条件「工数」を人手時間では比較できていない (#58 は 2026-10-13 に CLOSED) | #556 (OPEN) に追跡を付け替え。再 open の要否は PM 判断 |
+| KH-3 優先度とフロント選択の決定 | 材料は §10-5 のみ。決定が無いため PR は `Closes` でなく `Refs #556` (`#58` は CLOSED) | PM 判断 (追跡先は PM 指定) |
 
 ### 10-7. KH-12 (#556) 途中経過: Resonator / Stereo / Delay の Ghidra 実ビルド (部分)
 - 環境: Ghidra 12.1.4 = GitHub release `Ghidra_12.1.4_build` の `ghidra_12.1.4_PUBLIC_20260921.zip` (570 MB, sha256 `ddac49f9…d2db`)、JDK 21、`GHIDRA_HOME` で指定。素材 `plugins-kilohearts` は Installer (zip/dmg) で、`scripts/extract_installer.sh` が HeartCore を抽出 (3m34s)。
