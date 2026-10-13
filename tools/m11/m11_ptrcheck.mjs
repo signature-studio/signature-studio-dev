@@ -1,7 +1,7 @@
 // M11 実行後の guest ポインタ検査 (#1004 / #403 受入 3 の後半).
 // 実行後の guest メモリ全体で、4 バイト整列 word の値が image VA 範囲 [0x400000, 0x400000+0x1ac0000) に入るものを数える。
 // ただし実行前 (イメージ載せ直後) から既に範囲内だった word は、PE の定数データであり remap 漏れではないので除外する。
-// 残件 (= 実行で新たに範囲内になった word) が 1 件でもあれば不合格 (呼び出し側は exit 3)。
+// 残件 (= 実行で新たに範囲内になった word) は情報出力のみ (JSON の ptrcheck.image_va_words_new)。exit は変えない。
 // M11_PTRCHECK_INJECT=<offset> を与えると、その offset に既知の未 remap 値 0x400000 を書き込む (ネガティブコントロール)。
 export const IMG_VA_LO = 0x400000;
 export const IMG_VA_SIZE = 0x1ac0000;

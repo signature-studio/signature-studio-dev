@@ -62,4 +62,3 @@ console.log('M11_RESULT ' + JSON.stringify({
   threw,
   ptrcheck: ptrCheckRes,
 }));
-

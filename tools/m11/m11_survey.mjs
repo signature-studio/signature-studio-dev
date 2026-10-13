@@ -108,4 +108,3 @@ console.log('M11_SURVEY ' + JSON.stringify({
   icall_miss: mod._m11_icall_miss(), icall_miss_uniq: mod._m11_icall_miss_uniq(),
   stub_total: mod._m11_stub_total(), stub_uniq: mod._m11_stub_uniq(), stub_hits: stubs,
 }));
-

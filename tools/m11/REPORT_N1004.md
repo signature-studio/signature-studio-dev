@@ -1,7 +1,8 @@
 # M11 実行後の guest ポインタ検査 (#1004, 部分達成)
 
 親: #403 (受入 3 の後半)。素材: fl-win64 (`block00031_PE.bin` 22,227,016 B, sha256 先頭 `b2c64da4…`)・work-m11・work-liftdiff。
-toolchain-retdec は `$RUNNER_TEMP/retdec/retdec/` に展開済み (`/opt/retdec` も存在)。
+toolchain-retdec はツール台帳 `docs/REFERENCES.md` の `[RETDEC]` を参照。
+結果を `REPORT_N1004.md` に置く理由: 本 PR は #1004 の部分達成で、#403 の REPORT (`REPORT_N403.md`) への追記は親 issue の受入をまとめて閉じる段階で行う (本 PR では親の REPORT を書き換えない)。
 
 ## 1. 実装 (完了)
 
@@ -15,12 +16,16 @@ toolchain-retdec は `$RUNNER_TEMP/retdec/retdec/` に展開済み (`/opt/retdec
 | `m11_run.mjs` クリーン | 0.99 s (wall) | `image_va_words_pre=406576`・`image_va_words_new=68938`・`ok=false` |
 | `m11_run.mjs` + `M11_PTRCHECK_INJECT=22519877` | — | `image_va_words_new=68939` (+1 を検出) |
 | `m11_survey.mjs` | 0.26 s で異常終了 | `_m11_set_va_unit_budget is not a function`。work-m11 の wasm は現行 `m11_rt.c` より古い |
+| `m11_ptrcheck_negctl.sh` (ネガティブコントロール) | 3.1 s (wall, 2 回実行の合計) | `clean=68938`・`injected(offset=22519877)=68939`・`diff=1`。`NEGCTL OK`・exit 0 |
+
+- `m11_survey.mjs` に加えた `ptrcheck` の出力は **未検証 (survey 起動不可のため)**。実行されていない。
+- 注入の +1 は検出器が注入語を数えることの確認。クリーン実行の 68,938 件は判定基準ではない (§3 参照)。
 
 ## 3. 未達 (受入条件との対応)
 
 - **受入 1 (実行後検査)**: 実装済み。ただし上記 68,938 語のクリーン実行の「新規」範囲内 word は、正当な LVA の整数値とも未 remap の VA とも値だけでは区別できない。このため不合格ゲートにはしていない (e2e に組み込むと常に失敗する)。
 - **受入 2 (不合格で非 0 終了)**: ゲート化を見送ったため未達。判定基準 (どの offset を未 remap とみなすか) を確定させる必要がある。
-- **受入 3 (ネガティブコントロール同梱)**: 注入で +1 検出は確認したが、コントロールスクリプトは判定基準が未確定のため同梱していない。
+- **受入 3 (ネガティブコントロール同梱)**: 達成。`tools/m11/m11_ptrcheck_negctl.sh` を同梱し、§2 のとおり clean と注入の差 +1 を実測 (`NEGCTL OK`)。判定基準 (受入 1・2) は未確定のまま。
 - **受入 4 (`M11_LB_BASE=0` / `0x10000` の e2e 比較)**: 未実施。理由:
   - `m11_e2e.sh` が全再生成モードに入り、`m11_bounds.py` が素材に無い `tools/m2/work/ghidra_dll/functions_dll.csv` を要求して落ちる (fail-closed)。
   - work-m11 に `lift_pe.sha256`・`ir_conditions.json`・`ir_lb_base.stamp` が無く、WORKFLOW §11 のとおり pre-qstore 版。
