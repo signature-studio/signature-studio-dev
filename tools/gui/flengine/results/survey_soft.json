@@ -7,14 +7,14 @@
  "units_run": 0,
  "init_count": 895,
  "survey": {
-  "ok": 869,
+  "ok": 870,
   "noproc": 1,
   "miss": 47,
-  "trap": 25,
+  "trap": 24,
   "clobber": 0,
   "kinds": {
    "unreachable": 1,
-   "halt0->longjmp": 8,
+   "halt0->longjmp": 7,
    "memory access out of bounds": 16
   },
   "failfast_units": {}
@@ -247,7 +247,7 @@
   {
    "order": 33,
    "name": "MessageBoxA",
-   "calls": 3,
+   "calls": 2,
    "kind": "IMPL",
    "prio": "2"
   }
@@ -286,15 +286,15 @@
   "GetFileVersionInfoSizeW:1"
  ],
  "probes": {
-  "GetMem": 2007,
+  "GetMem": 2011,
   "FreeMem": 162,
-  "FastMM_GetMem(407a50)": 2092,
+  "FastMM_GetMem(407a50)": 2095,
   "FastMM_FreeMem(407e20)": 166,
   "InitUnits": 0,
-  "Halt0": 9,
+  "Halt0": 8,
   "ListFind(4fa210)": 2,
   "ListRaise(47a250)": 0
  },
- "va_calls": 37,
+ "va_calls": 36,
  "va_bytes": 1412366336
 }

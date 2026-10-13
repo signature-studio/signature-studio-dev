@@ -44,8 +44,8 @@
  "units_run": 52,
  "init_count": 54,
  "icall_miss": 5,
- "ok": 869,
+ "ok": 870,
  "noproc": 1,
  "miss": 47,
- "trap": 25
+ "trap": 24
 }
