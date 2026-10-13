@@ -33,16 +33,17 @@ native も wasm も同じく ok を返すため、**空振り一致**になる�
 
 ## 3. 既存 pattern への影響 (sample:800・受入条件 3)
 
-既定 batch 経路 (units) は**変更していない**。hybrid で sample:800 を再実行し、判定遷移を比較 (測定 commit `3b689b25`・実測 282s・load 4.05→8.86):
+既定 batch 経路 (units) は**変更していない**。実行 HEAD `feef8ce6` で hybrid と突き合わせ、判定遷移を比較 (実測: units は e2e 経由 109s・単独 107s/111s、hybrid は単独 229s):
 
 | state | match | mismatch | unexec |
 |---|---|---|---|
 | units (既定・`--m11-only` の [4/4]) | 360 | 230 | 210 |
+| units (単独実行) | 361 | 229 | 210 |
 | hybrid (`batch --state work/m11/boot_state_hybrid.json`) | 352 | 258 | 190 |
 
-遷移 (units → hybrid): match→mismatch 25 / mismatch→match 13 / unexec→match 5 / unexec→mismatch 19 /
-mismatch→unexec 3 / match→unexec 1。計 66 関数 (800 中 8.3%)。
-(件数は両 JSONL (`work/m11/batch_sample_800.jsonl`・`batch_sample_800_hybrid_head.jsonl`) の function.va 単位の突合で算出。)
+遷移 (units e2e 経由 → hybrid): match→mismatch 25 / mismatch→match 13 / unexec→match 5 / unexec→mismatch 19 /
+mismatch→unexec 3 / match→unexec 1。計 66 関数 (800 中 8.3%)。単独 units との突合では 67 関数 (差は `0x959a40` の揺れ 1 件)。
+(件数は JSONL (`work/m11/batch_sample_800.jsonl`・`work/m11/batch_sample_800_hybrid.jsonl`) の function.va 単位の突合で算出。)
 
 判断: 既定を hybrid に切り替えると既存の判定基準が変わるため、**既定は units のまま**とした。
 hybrid を既定にするかは別 issue で、遷移表 (上記) を根拠に判断する。
@@ -65,6 +66,7 @@ hybrid を既定にするかは別 issue で、遷移表 (上記) を根拠に�
 
 - 測定 commit: `3b689b25` (`9fb30a45` に main `dee83f6c` を merge。#977 fix モード)。
 - 差分: `git diff 5d2df224 3b689b25 -- tools/liftdiff` は 11 ファイル / +615 −7 (`ldlib/cases.py` +29・`ldlib/session.py` +35 を含む)。旧 `5d2df224` の値は無効として、本節の値で置き換えた。
-- 素材: `fl-win64 work-m11 work-liftdiff` を `$RUNNER_TEMP` に展開し `tools/` 配下へ配置 (gitignore 対象)。`toolchain-emsdk` は `emsdk install 6.0.12` で `/opt/emsdk` に pin 版を導入。
-- `liftdiff_e2e.sh --m11-only`: exit 0 / 198s / load 0.68→6.07 / **LIFTDIFF_E2E PASS**。[3b/4] **CHECK_INITUNITS PASS**。[4/4] sample:800 一致 360 / 不一致 230 / 実行不能 210 (116s)。
-- hybrid (`batch --state work/m11/boot_state_hybrid.json --set sample:800`): 一致 352 / 不一致 258 / 実行不能 190 (282s・load 4.05→8.86)。units→hybrid の遷移 66 関数 (§3 と一致)。
+- 素材: `fl-win64 work-m11 work-liftdiff` を `$RUNNER_TEMP` に展開し `tools/` 配下へ配置 (gitignore 対象)。`toolchain-emsdk` は `emsdk install 6.0.12` で [EMSDK] に pin 版を導入。
+- 実行 HEAD `feef8ce6` (`tools/liftdiff` は `3b689b25` から docs のみ変更) で `liftdiff_e2e.sh --m11-only`: exit 0 / 189s / load 6.15→6.02 / **LIFTDIFF_E2E PASS**。[3b/4] **CHECK_INITUNITS PASS**。[4/4] sample:800 一致 360 / 不一致 230 / 実行不能 210 (batch 109s)。
+- 揺れ: 同じ HEAD で `batch --set sample:800` を単独実行 (`--state auto`) すると 2 回とも 361 / 229 / 210 (107s・111s)。差は `0x959a40` の 1 件のみ (`p1`・`pall`・`qall` の判定が diff と equal の間で揺れる)。e2e 経由では mismatch、単独では match。sample:800 の一致は 360〜361 の範囲で揺れる。
+- hybrid (`batch --state work/m11/boot_state_hybrid.json --set sample:800`・単独 1 回): 一致 352 / 不一致 258 / 実行不能 190 (229s)。units (単独 r2) → hybrid の遷移は 67 関数 (e2e 経由の units 結果では 66)。
