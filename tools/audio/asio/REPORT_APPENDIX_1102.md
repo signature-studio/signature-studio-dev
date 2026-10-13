@@ -19,9 +19,23 @@
 - `com_soak1800_b256`: **PASS**。underrun 0 / silence 0 / ramp **0 / 86,385,664 f** (bit-exact) / bufferSwitchTimeInfo **337,475 calls bad=0** / 実フレーム 86,385,664 f ≥ 公称 1800 s の 99% (85,536,000 f) / COM 面一致 (sellog・QI 1・alive 0)。
 - `com_ramp_b1024_d2`: PASS (ramp 0/240,896, underrun 0)。
 - `com_sine_b256_d2`: PASS (maxErr 1.49e-8, underrun 0)。
-- `com_ramp_b256_d2`: **FAIL**。underrun 1 / silence 640 f。ramp mismatch 195,328/240,384 は underrun 後の出力ずれと思われるが**原因は未調査**。REPORT §3-1 の負荷依存事象と同形。
+- `com_ramp_b256_d2`: **FAIL**。underrun 1 / silence 640 f。ramp mismatch 195,328/240,384 は underrun 後の出力ずれと思われるが**原因は未調査**。REPORT §12 (#998 [AU-16]) と同じ負荷依存 underrun の同形事象。
 - 同一 run の 30 分ソーク自体は underrun 0 で PASS。短シナリオの FAIL とは別に扱い、再現の有無は次回 e2e で確認する (未確定)。
+- **e2e 全体の終了コード**: 本 run は exit 1 (`com_ramp_b256_d2` の上記 FAIL による)。ソーク単体 (`com_soak1800_b256`) は PASS。#1102 受入条件 1 の文言 (`e2e.sh --soak 1800` が PASS) は**未達**のまま。e2e 全体 exit 0 の記録は、head での再測定を別途行うまで未達のまま残す (本 fix run では実施せず。§6 参照)。
 
 ## 4. 未達 (子 issue へ分割)
 
-- 受入条件 1 (キャプチャ SAB 約 661 MiB を一括保持せず分割照合): **未実装**。現行 `com_page.mjs` は `captureFactory` で frames 全量の SAB を一括確保する。分割照合の設計変更は別 issue に分離した (下記)。
+- 受入条件 1 (キャプチャ SAB 約 661 MiB を一括保持せず分割照合): **未実装**。現行 `com_page.mjs` は `captureFactory` で frames 全量の SAB を一括確保する。分割照合の設計変更は子 issue **#1358 [AU-19]** に分割 (範囲は分割照合のみ)。
+- `com_ramp_b256_d2` の underrun 1 / silence 640 f の追跡先は **#998 [AU-16]** (負荷依存 underrun の正本。WORKFLOW §12)。#1358 では扱わない。
+- #1102 は本 PR で Close しない (`Refs #1102`)。受入条件 1 の未達が残るため。
+
+## 5. 測定 commit と差分 0 の証跡 (WORKFLOW §6)
+
+- 測定 commit: `35c6fa15d18c3de624e821503365bf3a4754ea5b` (§3 の e2e 実測の対象コード)。
+- 差分 (コード部分。`*.md` を除く。`git diff 35c6fa15 HEAD -- tools/audio/asio ':!*.md'`): 出力 0 行。
+- 本節を追記した commit (文書のみ) の後、`git diff --stat 35c6fa15 HEAD -- tools/audio/asio` の対象は `*.md` のみ。コード・harness・test への差分 0。
+
+## 6. 未実施 (次回の検証として残す)
+
+- head での `bash tools/audio/asio/e2e.sh --soak=1800` の再実行: 本 fix run では未実施。理由は emsdk (`/opt/emsdk`) が runner に無く、30 分ソーク + 導入が fix モードの上限 (40 分) に収まらないため。exit 0 / exit 1 のいずれも未記録。
+- 追跡: 再実行と exit 0 の記録は #1102 (受入条件 1) の未達として #1102 側で扱う。
