@@ -82,6 +82,7 @@ typedef struct {
     uint32_t reset_requests;
     uint32_t wake_hist[6];
     uint32_t latency_changes, T, burst_obs, timeinfo_cb;
+    uint32_t grows, shrinks, T_max, T0;   /* T の拡張回数 / 減衰回数 / セッション内最大 T / 開始 T の下限 (frames) */
 } flasio_stats_t;
 void flasio_get_stats(flasio_stats_t *s);
 void flasio_configure(uint32_t depth, uint32_t latency_hint);   /* create_buffers 前のみ */

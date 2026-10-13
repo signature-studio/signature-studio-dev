@@ -54,7 +54,7 @@ fail-fast: 未初期化/`bufferSwitch==NULL`/チャネル外/`buffer_frames` が
 - **重要な実測**: ブラウザは quantum を 1 つずつでなく **バースト** (OS 出力バッファ単位) で連続呼出する。headless Chrome では 48k で 512f (10.7ms) 周期、96k では 2048–3072f。`ctx.baseLatency` は 96k で実態 (3072f) より小さい (1024f) ため当てにならない。
 - よって目標充填 `T = depth*B` は **T ≥ burst×1.25 + B** が必要 (1 バースト通過で ring が枯渇しないこと)。決定手順:
   1. OPEN 時に 96 quanta の較正プローブ (`fl-burst-probe`, 約 0.25s) で実バーストを測定、`max(baseLatency, probe)` を ACK で返す → `fla_open` が `depth` を引き上げ。
-  2. 実行中は worklet が `burst_obs` を更新、producer が `T` を拡張 (underrun 毎に +B も加算)。拡張のみ (縮小なし)。`kAsioLatenciesChanged` 通知は既定 OFF (FL の `asioMessage` は selector 6 を内部コマンド 0x17 に配線 = 再起動の疑い: INVENTORY §2) 。
+  2. 実行中は worklet が `burst_obs` を更新、producer が `T` を拡張 (underrun 毎に +B も加算)。underrun が `FLASIO_SHRINK_STABLE_MS` (3000ms) 続くと +B を 1 段ずつ戻す (下限 `max(burst 由来 need, T0)` は下げない。REPORT §17)。`kAsioLatenciesChanged` 通知は既定 OFF (FL の `asioMessage` は selector 6 を内部コマンド 0x17 に配線 = 再起動の疑い: INVENTORY §2) 。
 - 報告レイテンシ: `output = T + 128 + (baseLatency + outputLatency)·sr`, `input = B + 128 + baseLatency·sr` (推定。実測 shim in→out = T フレーム)。
 - `outputLatency` は起動直後 0 で約 250ms 後に更新される。FL は createBuffers 直後の getLatencies を一度だけ読むため、ATTACH は outputLatency>0 になるまで最大 600ms 待ってから CreateBuffers を返す (`FlAudioShimOptions.outputLatencyWaitMs`, 0 で無効)。上限まで 0 のブラウザは 0 のまま進む。
 - サンプルレート: `AudioContext({sampleRate})` を要求 (ブラウザが必要ならリサンプル)。`SetSampleRate` は停止中のみ → `SET_SR` コマンドで ctx 再生成 → ring はそのまま再接続、`sampleRateDidChange` をホストへ。
