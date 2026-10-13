@@ -6,11 +6,14 @@
 
 ## 0. 結論 (先出し)
 
-1. **受入 #3 (呼出 Win32 API 一覧) は一覧化まで完了**。`WINEDEBUG=+relay` の実 host 実行 (licensed, 16 block) で relay 行 2,592,952。PE import 327 件のうち **110 件が呼出確認**、217 件は未呼出 (§2)。API 名の分類と「Serum2 が直接必要とする面」の判定は未了。
+1. **受入 #3 (呼出 Win32 API 一覧) は件数の集計まで。API 名一覧は未 commit**。`WINEDEBUG=+relay` の実 host 実行 (licensed, 16 block) で relay 行 2,592,952。PE import **334 件**のうち **110 件が呼出確認**、**224 件は未呼出** (§2。旧版の 327 / 217 は表と合わず撤回)。API 名の一覧と分類、「Serum2 が直接必要とする面」の判定は未了。
 2. **+0x10c の writer 特定は未達**。静的に全 `.text` を走査すると、`+0x10c` への書込は 29 件。ゲート値の由来は有力候補 1 件 (copy ctor 0x18000d1b0, §3) まで絞れたが、実行時に値が 2 になる経路は確認していない。
 3. **0x800010 受信観測は未達** (本付録の範囲で再確認はしていない。e2e 50/50 の再現で `REPORT.md` §3-6 の既存結果と一致、§4)。
 
 ## 1. 検証環境と実行
+
+- 検証起点: `33fd25a2` (main)。付録の内容 (`sr1c_*.py`・本文) の head: `82cb458f` (`docs(serum2): add SR-1c API surface and gate writer scan (Refs #256)`)。上記 e2e・relay・静的走査は **82cb458f 相当の内容** で実行したと PR 本文に記載されているが、実行 commit の SHA は記録されていない。現 run での再実行は素材不在で未実施。
+- e2e 50/50 の run ログ抜粋 (末尾数行) は、元 run の出力が repo に残っていないため付録に入れられない (**未解決**)。
 
 - 素材: `plugins-serum2` (`Install_Xfer_Serum2_2.1.5.exe` + pkg)。`7z x` で `Serum2.vst3/Contents/x86_64-win/Serum2.vst3` (19,236,864 B) を抽出。REPORT §0 の 19,236,864 B と一致。
 - wine 9.0 (`apt install wine`)、`g++-mingw-w64-x86-64`、Python venv (`pefile` `capstone` `numpy` `zstandard`)。
@@ -21,7 +24,8 @@
 
 - 取得: `WINEDEBUG=+relay wine64 vst3host.exe <authstub DLL> cases/licensed out_relay 16` (7 s、exit 0)。
 - 突合: `host/sr1c_api_surface.py` (PE import テーブルと relay 呼出 `Call <dll>.<name>` を照合)。
-- 結果: **import 327 件 / 呼出確認 110 件 / 未呼出 217 件** (`sr1c_api_surface.py` 出力)。
+- 結果: **import 334 件 / 呼出確認 110 件 / 未呼出 224 件**。下表の行の合計と一致する値。
+- 注: 旧版は「327 / 217」と書いたが、下表の合計 (334 / 224) と合わず誤り。`sr1c_api_surface.py` は合計行を出力しない (出力は `import N 件 / relay で呼出確認 M 件 / 未呼出 K 件` の 1 行のみ) ため、下表は別途集計したもの。**スクリプトの生出力の再取得は素材 `plugins-serum2` が無く未実施** (§5 参照)。
 
 | DLL | import | 呼出確認 | 未呼出 |
 |---|---:|---:|---:|
@@ -33,11 +37,13 @@
 | shell32.dll | 8 | 1 | 7 |
 | advapi32.dll | 8 | 8 | 0 |
 | wininet / dwmapi / shlwapi / dwrite / d3d11 | 18 | 2 | 16 |
+| **合計** | **334** | **110** | **224** |
 
 - 呼出回数の上位 (kernel32): `HeapFree` 188,988、`MultiByteToWideChar` 11,106、`GetLastError` 870、`CompareStringW` 726、`GetProcAddress` 489 ほか。`HeapFree` 等は wine 内部の経路を含む件数で、Serum2 の直接呼出数ではない。
 - `Call ntdll.*` (heap・SRW lock 等 130 万行超) は PE import に無いため突合対象外。
 - 未呼出の大半は user32 / gdi32 / dwmapi (GUI)・wininet / ws2_32 (ネット) で、headless 実行では到達しない想定 (**推定**。GUI open 未実施のため未確認)。
-- 全行の一覧: `host/work/sr1c/api_surface.tsv` (gitignore, 再現は `sr1c_api_surface.py`)。
+- 全行の一覧: `host/work/sr1c/api_surface.tsv` (gitignore, 再現は `sr1c_api_surface.py`)。**この TSV は repo に commit されていない** (現 run では実物が無い)。
+- 名前照合の限界: `sr1c_api_surface.py` は PE import 名と `Call <dll>.<name>` の完全一致で判定するため、`kernelbase` 経由の呼出 (kernel32 名での import を kernelbase が実装する経路) は拾えない。未呼出 224 件には、この経路で実際には呼ばれたものが含まれ得る (**未確認**)。
 
 shim 候補 (SR-3/SR-4 入力) は呼出確認 110 件のうち kernel32 (メモリ・文字変換・ファイル I/O・同期) と advapi32 が中心。ole32 は呼出 0 件で、COM は PE import 外の経路 (CoCreate 相当の手動 vtable) と推定 (**推定**)。
 
@@ -68,7 +74,7 @@ shim 候補 (SR-3/SR-4 入力) は呼出確認 110 件のうち kernel32 (メモ
 |---|---|---|
 | +0x10c の実行時 writer 確定 (wine watchpoint 未実施) | 既定 host で +0xdc が 2 のまま。0x800010 経路の前提が未解明 | #256 (本 issue、次回 run) |
 | 0x800010 の既定 host での受信 | 同上 | #256 |
-| 呼出 API の shim 分類 (kernel32 同期・COM 系の詳細) | SR-3/SR-4 の入力が粗い | #256 (本付録 §2 の表を入力に) |
+| 呼出 Win32 API 一覧 (呼出 110 件・未呼出 224 件の API 名) の commit と shim 分類 | 件数のみで名前が repo に無い。SR-3/SR-4 の入力が粗い | #256 (素材 plugins-serum2 で TSV を生成して commit する) |
 | 静的走査は下限 (間接参照・多段 base を拾えない) | writer の取りこぼし | #256 (watchpoint で補完) |
 
 ## 6. 再現
