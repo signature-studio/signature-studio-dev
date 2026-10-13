@@ -478,6 +478,7 @@ static void ime_input(const uint32_t *r) {
       send_message(w->h, WM_IME_COMPOSITION_, 0, GCS_RESULTSTR_);
       g_ime_composing = 0; send_message(w->h, WM_IME_ENDCOMPOSITION_, 0, 0); break;
     case 4:
+      if (!g_ime_composing) break;   /* composition 中でない cancel は無視 (START 無しの END を送らない) */
       g_ime_ncomp = 0; g_ime_cursor = 0;
       send_message(w->h, WM_IME_COMPOSITION_, 0, 0); g_ime_composing = 0; send_message(w->h, WM_IME_ENDCOMPOSITION_, 0, 0); break;
   }

@@ -50,4 +50,6 @@ bash "$HERE/integ/sigprobe.sh" | tail -1
 python3 "$HERE/integ/reach_report.py" "$BUILD/e2e/reach.log" >/dev/null
 echo "[gui-e2e] 6f/6 present e2e (GUI-4: WebGL2 golden 一致 / 複数矩形 / rAF / seqlock; 模擬 guest, bench 省略)"
 PRESENT_SKIP_BENCH=1 bash "$HERE/present/e2e.sh" | grep -E "^# (pass|fail)|ALL PASS|FAIL"
+echo "[gui-e2e] 6g/6 GUI-6 入力品質 e2e (キー配列 / IME / タッチ・ジェスチャ / Pointer Lock; CDP 実入力, 入力リング drop 0; RetDec 不要)"
+bash "$HERE/input/e2e.sh" | grep -E "FAIL|ALL PASS|input ring"
 echo "[gui-e2e] ALL PASS"

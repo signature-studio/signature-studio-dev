@@ -117,6 +117,9 @@ static void run_gui6(void) {
   g_g6_n = 0; g6_ime(4, NULL, 0, 0);
   { uint32_t t0 = gui_now_ms(); while (g_g6_n < 2 && gui_now_ms() - t0 < 3000) { g6_drain(h); gui_futex_wait(&gui_shared_native()->doorbell, gui_shared_native()->doorbell, 5); } }
   CHK(g_g6_n == 2 && g_g6_log[0] == 0x10F && g_g6_l[0] == 0 && g_g6_log[1] == 0x10E && ImmGetCompositionStringW(0x7D000001, 0x8, 0, 0) == 0, "cancel: COMPOSITION(lParam 0) + END, composition cleared");
+  g_g6_n = 0; g6_ime(4, NULL, 0, 0);   /* composition 中でない cancel は何も送らない */
+  { uint32_t t0 = gui_now_ms(); while (gui_now_ms() - t0 < 150) { g6_drain(h); gui_futex_wait(&gui_shared_native()->doorbell, gui_shared_native()->doorbell, 5); } }
+  CHK(g_g6_n == 0, "cancel while not composing sends no WM_IME_* (n=%d)", g_g6_n);
   { int32_t cf[6] = { 2, 0, 0, 0, 0, 0 }; cf[1] = 10; cf[2] = 20; CHK(ImmSetCompositionWindow(0x7D000001, PTR(cf)) == 1, "ImmSetCompositionWindow"); }
   { int32_t cf[4] = { 0, 0x10, 30, 40 }; CHK(ImmSetCandidateWindow(0x7D000001, PTR(cf)) == 1, "ImmSetCandidateWindow"); }
   CHK(ImmSetOpenStatus(0x7D000001, 0) == 1 && ImmGetOpenStatus(0x7D000001) == 0 && ImmSetOpenStatus(0x7D000001, 1) == 1 && ImmGetOpenStatus(0x7D000001) == 1, "ImmSetOpenStatus round trip");

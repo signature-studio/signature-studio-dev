@@ -241,3 +241,42 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
 - **8×8 経路の `DrawText` 挙動差 (実測; 旧 = main 59c1169、新 = HEAD 5813bea の engine 未登録、100×40・stock フォント・FNV 画素ハッシュ)**: DT_LEFT 複数行・CRLF DT_LEFT・単一行 DT_CENTER の画素と戻り値は 3 件とも一致。複数行 `ab\ncdef` の DT_CENTER は 1 行目の最小 x が 34→42、DT_RIGHT は 68→84 (旧は全行がブロック幅基準の同一 x0、新は行ごとに配置 = Windows の挙動)。`tools/gui` の既存 golden/selftest/gui_app に `DrawText` 呼出は無い (grep)。`e2e.sh` 全体での確認は未 (下記未解決 (1))。
 - **既知の限界**: カーニング・ClearType・合成 bold/italic・lpDx・DT_WORDBREAK/DT_END_ELLIPSIS/`&` プレフィックス・GetTextExtentExPoint/GetTextFace は未実装 (8×8 時代から DT 簡略のまま)。advance は整数 px (サブピクセル位置決めなし)。`GetTextMetrics` の `tmAveCharWidth` は OS/2 `xAvgCharWidth` (Windows の算出と異なりうる)。
 - **未解決** (本 PR は `Refs #186`): (1) `bash tools/gui/e2e.sh` 全体 ALL PASS は未確認 (この run は RetDec 不在で PE lift 層が走らない。native/wasm 層の GUI-9 検査のみ実行) → #186 に `oc_artifacts: toolchain-emsdk toolchain-retdec` で再実行を依頼。(2) 実 FL が要求する face/サイズの確定 (blockedBy GUI-3 #174) と alias 表の実値。(3) VFS (#22) からの実フォント遅延取得の結線 (口 `gui_ft_register_lazy` のみ)・ブラウザ (wasm 全体) 上のテキスト描画 e2e。(THIRD_PARTY_NOTICES (#86) への Open Sans/Barlow の license 登録は #616 で対応: `tools/legal/notices/REPORT.md`。)(4) `wasm32` の `gui_wasm.sh` ビルドへ `gui_ft.c` + libfreetype の組込み (本 PR は既定 e2e のビルドへ未リンク = 既存 wasm 経路は 8×8 のまま)。
+
+## 12. GUI-6 (#182): 入力品質 (キー配列 / IME / タッチ・ジェスチャ / Pointer Lock・ClipCursor)
+既知類型との関係: lift 欠陥ではなく shim/host の意味論 (`docs/DEFECTS.md` D1a〜D16 に該当なし)。検証起点: 実装コミットは本 PR の最終 HEAD (下記の数値はコミット済み tree で実測)。
+
+### 結論
+- **FL 非依存で CDP 再現できる範囲を実装し e2e 済み。受入条件は未達 → PR は `Refs #182`** (理由は「範囲外・未達」: `bash tools/gui/e2e.sh` 全体の ALL PASS は RetDec 不在で PE lift 層が走らず未確認、WM_POINTER*、実機確認)。
+- **キー配列**: 入力 `GUI_IN_KEY_*` の flags に host が set 1 スキャンコード/extended を載せ (`SCAN_BY_CODE`)、shim が現配列で scancode→VK を引く (`kbd_layout_vk`)。`GUI_IN_LAYOUT` で US(0x0409)/DE(0x0407)/FR(0x040C) を切替え、`MapVirtualKeyW` (VK↔VSC/VSC→VK/VK→CHAR)・`ToUnicode`/`ToAscii` (Shift/Caps/AltGr=Ctrl+Alt)・`GetKeyboardLayout`/`GetKeyboardLayoutNameW`/`LoadKeyboardLayoutW` (未対応 KLID は 0 で失敗)/`ActivateKeyboardLayout` が配列に従う。host は Keyboard API の `getLayoutMap` から自動推定 (`layoutFromMap`)。
+- **IME**: 隠し textarea の composition イベント → `GUI_IN_IME` (4 UTF-16/レコードで連結) → `WM_IME_STARTCOMPOSITION`/`WM_IME_COMPOSITION` (GCS_COMPSTR|GCS_CURSORPOS / GCS_RESULTSTR)/`WM_IME_ENDCOMPOSITION`。imm32 は `ImmGetContext`/`ReleaseContext`/`GetCompositionStringW`/`SetCompositionWindow`/`SetCandidateWindow` (位置を host へ `GUI_CMD_IME_POS`)/`Get/SetOpenStatus`/`Get/SetConversionStatus`/`NotifyIME`/`IsIME`/`AssociateContextEx` の STUB→IMPL (12 名)。composition 中の入力から WM_CHAR は合成しない。
+- **タッチ**: `PointerEvent(pointerType=touch)` → `GUI_IN_TOUCH`。`RegisterTouchWindow` 済み窓へ `WM_TOUCH` (`GetTouchInputInfo` = Win64 TOUCHINPUT 48B)、未登録窓は primary 接触をマウスへ昇格。`SetGestureConfig` で許可した GID_ZOOM (2 本指距離) / GID_PAN を `WM_GESTURE` (`GetGestureInfo` = Win64 GESTUREINFO 56B) で配送。
+- **Pointer Lock / ClipCursor**: 「カーソル非表示 (`ShowCursor(FALSE)`) かつ capture 中またはボタン押下中」に `GUI_CMD_POINTER_LOCK` で host へ `requestPointerLock` を要求。ロック中 host は `movementX/Y` を `cursor_x/y` へ積算 (ClipCursor 矩形へ clamp)。`SetCursorPos` は ClipCursor 矩形へ clamp、`GetClipCursor` は矩形を返す。
+- プロトコル追加は enum 値のみ (`GuiShared` のオフセットは不変・`_Static_assert` 更新なし)。`gui_proto.h` ↔ `gui_proto.ts` を同時更新。
+- FL の GUI import 面: 実装済み 280 → 292 (`IMPORTS.md` は `gen_api.py` が再生成)。
+
+### 検証 (4 vCPU runner、load 0.2〜1.3)
+| 層 | 結果 |
+|---|---|
+| native `bash tools/gui/test/selftest.sh` (ASan/UBSan) | **490 passed / 0 failed** (既存 426 + GUI-6 の 64 assertion; `test/selftest_gui6.inc`)。DE/FR/US 配列・AltGr・IME 分割再構成・タッチ/ジェスチャ・ClipCursor を含む |
+| **Chrome e2e `bash tools/gui/input/e2e.sh`** (CDP `Input.dispatchKeyEvent` / `imeSetComposition` / `insertText` / `dispatchTouchEvent` / `dispatchMouseEvent`) | **ALL PASS (21 検査 / 0 FAIL, 8.5〜9.3 s, load 0.2〜0.3)**: 入力リング `in_pushed=41 in_dropped=0 in_consumed=41` (drop 0)。ゲストは `input/input_app.c` を emcc で直接 wasm 化 (RetDec 不要) |
+| 既存層 (同一 tree) | `reach_test` 11 + `adapt_test` 28 passed、`bpp_golden` ALL PASS (ネガコン 2/2)、`simd_e2e` ALL PASS、`present/e2e.sh` 7 pass / 0 fail、`check_p1_tests` 51/51 |
+- **ネガティブコントロール** (`bash tools/gui/input/negctl.sh`; 壊したコピーを `build/negctl` に作りリポジトリのソースは変更しない。変異が効かなければ「broken control」として未検出扱い): 結果は下の「ネガコン実測」。
+- 数え方: selftest の passed は `CHK` 成立数 (assertion)。Chrome e2e の検査は `ck()` 行数。
+
+### 範囲外・未達
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `bash tools/gui/e2e.sh` 全体 ALL PASS は未確認 (runner に RetDec なし → PE lift 層 2/6・3/6・4/6・6/6〜6d が走らない)。6g/6 (本機能) は追加済み | 完了条件「e2e.sh ALL PASS 維持」未確認 → `Refs #182` | #182 に `oc_artifacts: fl-win64 toolchain-emsdk toolchain-retdec apt-mingw` での再実行を依頼 |
+| WM_POINTER* / RegisterPointerInputTarget 系 (FL の import に無い) と慣性ジェスチャ (GID_PAN の GF_INERTIA)・GID_ROTATE/TWOFINGERTAP/PRESSANDTAP | issue スコープ「タッチ → WM_POINTER*」の一部が未実装 | #182 (実到達ログ: #174 で FL が呼ぶと確定したら) |
+| 配列は US/DE/FR のみ・dead key・IME 配列・実 Windows の KBD テーブルとの照合なし (表は公開仕様から手作成)。Caps の数字行 shift-lock 近似 | 他配列では US 相当に落ちる | #182 (日本語 JIS/実機確認はユーザ依頼候補; 着手時に具体依頼を起票) |
+| 実機確認 (OS の日本語 IME・実タッチ端末・実 Pointer Lock 成立) は未実施。headless Chrome では Pointer Lock は要求呼出回数と `movementX` 積算のみ検証 (ロック成立は `locked` を直接設定して代用) | 実環境での成立可否・IME 候補ウィンドウ位置が未確認 | #182 (ユーザ依頼: 実機 Chrome での手動確認) |
+| IME 属性/文節 (GCS_COMPATTR/COMPCLAUSE) と変換候補リスト (ImmGetCandidateList) は未提供 | FL が使えば fail-fast ではなく空を返す | #174 到達ログ後に #182 |
+| WM_CHAR 合成は host (gui.ts `key()`) のまま (pump 側 TranslateMessage は未変更) | #103 の補足にある pump 側合成との統合は未決 | #121 (RT-3: 入力 producer 結線) と合わせて決定 |
+| 既存: native selftest の ASan UAF flake | `e2e.sh` 1/6 が時々 FAIL | #489 (既存) |
+
+### 再現
+```
+bash tools/gui/test/selftest.sh        # native 490 assertion
+bash tools/gui/input/e2e.sh            # Chrome + CDP 入力 (tsc → emcc → headless Chrome)
+bash tools/gui/input/negctl.sh         # ネガコン (shim 6 + host 4)
+```
