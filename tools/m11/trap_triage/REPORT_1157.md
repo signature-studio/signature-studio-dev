@@ -38,8 +38,9 @@
 
 ## 3. 再現の注意 (本 run で判明した環境上の点)
 
-- `m11_gen_ir2.sh` の 34 行目 `PE=/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin` は `FL_WIN64_DIR` を見ない。CI の runner では `/home/ubuntu` が無いため ldfix が skip され、`ir_conditions.json` が `ldfix=applied` と書かれたまま未適用の IR になる (`WARNING: ldfix skip` が出る)。本 run では `5ff73ff` の IR 生成で実際にこの状態になり、PE パスを差し替えた一時コピー (`m11_gen_ir2_ci.sh`、commit していない) で再生成した。`ir_sha256` は `16d1bae6…` で ldfix 適用済みの値。**gen スクリプトの PE 解決を `M11_PE`/`FL_WIN64_DIR` 優先にする修正は別 issue で扱うべき** (本 PR では変更していない)。
-- `/opt/emsdk` `/opt/retdec` は展開先の symlink で用意した。emsdk は `emsdk_env.sh` 経由だと `emcc` が PATH に乗らず、`upstream/emscripten` と `upstream/bin` と `node/24.19.0_64bit/bin` を直接 PATH に通して解決した。
+- 基点 `5ff73ff` の `m11_gen_ir2.sh` は PE を固定パス (`[WIN64]` 配下の `extracted/block00031_PE.bin` を repo 外の作業先で指していた旧版の絶対パス) で解決していた。CI の runner ではそのパスが存在せず ldfix が skip され、`ir_conditions.json` が `ldfix=applied` と書かれたまま未適用の IR になる (`WARNING: ldfix skip` が出る)。本 run では `5ff73ff` の IR 生成で実際にこの状態になり、PE パスを差し替えた一時コピー (commit していない) で再生成した。`ir_sha256` は `16d1bae6…` で ldfix 適用済みの値。
+- **main (`711b58ca` 以降) では解決済み**: `m11_gen_ir2.sh` は `PE="${M11_PE:-${PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}}"` で `M11_PE` / `FL_WIN64_DIR` を見る。したがって「`5ff73ff` で ldfix が skip された」のは当該 commit の固定パスが原因であり、main の IR 生成では起きない。PE 解決の修正は本 PR の対象外。
+- `[EMSDK]` (`emsdk`) と `[RETDEC]` は展開先の symlink で用意した。emsdk は `emsdk_env.sh` 経由だと `emcc` が PATH に乗らず、`upstream/emscripten` と `upstream/bin` と `node/24.19.0_64bit/bin` を直接 PATH に通して解決した。
 
 ## 4. 未解決 (起票先付き)
 
@@ -47,4 +48,3 @@
 |---|---|---|
 | 二分探索の判定基準 (対象 unit と始点) が未確定。現在の前提は基点で再現しない | #1157 の受入条件 1・2 が達成できない | PM 判断 (#1157 にコメント) |
 | 現 main の 719 OFF が REPORT_595 §3 (halt0) と食い違う (本 run は ok) | IR 再生成の差の切り分け未了 | #595 (Refs) |
-| `m11_gen_ir2.sh` の PE 固定パス (`/home/ubuntu`) で ldfix が skip する | CI で IR 条件が静かに変わる | PM 判断 (新規 issue を要望) |
