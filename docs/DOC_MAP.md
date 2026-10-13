@@ -188,6 +188,7 @@
 | `tools/gui/shimx_coexist/REPORT.md` | ~110 | shimx weak × gui 強定義の共存リンクと Web 実装接続 (ShellExecute/ファイルダイアログ/D&D) (#172) |
 | `tools/audio/REPORT.md` | ~100 | ASIO/WASAPI/DirectSound → AudioWorklet + SAB リング |
 | `tools/audio/REPORT_MIDI.md` | ~65 | AU-3 (#188) Web MIDI shim の検証全文 (REPORT.md §13 から分割) |
+| `tools/audio/REPORT_AU10.md` | ~30 | AU-10 (#191) 30 分ソーク (`--soak30`) の検証全文 (REPORT.md §16 から分割) |
 | `tools/audio/asio/REPORT.md` | ~200 | IASIO COM アダプタ + 120s soak |
 | `tools/audio/wl/REPORT.md` | ~75 | AU-8 (#194): ring 方式 vs worklet 直走行の遅延比較 (テスト音ミキサ代役) + FLEngine スレッド/待機面の静的見積り |
 | `tools/assets/REPORT.md` | ~125 | 314MB 級 wasm asset の chunk ローダ + 二段キャッシュ |
