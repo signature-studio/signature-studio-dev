@@ -970,14 +970,14 @@ def _canon_alloca_body(lines, s, e):
             continue
         ms = [_ALLOCA_LINE.match(lines[x]) for x in run]
         names = [m.group(2) for m in ms]
-        types = [m.group(3) for m in ms]
-        order = sorted(range(len(run)), key=lambda q: types[q])
+        bodies = [m.group(3) + m.group(4) for m in ms]
+        keys = [(re.sub(r",\s*align\s+\d+", "", b), b) for b in bodies]
+        slots = sorted(names, key=int)
+        order = sorted(range(len(run)), key=lambda q: keys[q])
         for p, q in enumerate(order):
-            if p != q:
-                rename[names[q]] = names[p]
-        for p, q in enumerate(order):
-            m = ms[q]
-            lines[run[p]] = f"{m.group(1)}%{names[p]} = alloca {m.group(3)}{m.group(4)}"
+            if names[q] != slots[p]:
+                rename[names[q]] = slots[p]
+            lines[run[p]] = f"{ms[q].group(1)}%{slots[p]} = alloca {bodies[q]}"
             fixed.add(run[p])
     if rename:
         for x in range(s + 1, e):
