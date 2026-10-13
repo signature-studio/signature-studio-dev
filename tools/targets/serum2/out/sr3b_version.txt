@@ -1,0 +1,38 @@
+## zlib z_errmsg (upstream zutil.c の 9 項目, NUL 終端単独の出現数)
+  1  need dictionary
+  1  stream end
+  1  file error
+  1  stream error
+  1  data error
+  0  insufficient memory
+  0  buffer error
+  0  incompatible version
+  => 5/8 項目が単独出現
+## muParser (upstream muParserError_<tag>.cpp の文字列リテラル, 単独 NUL 終端一致)
+  muParserError_v2.1.0.cpp: 取得不可 (404)
+  muParserError_v2.2.0.cpp: 取得不可 (404)
+  muParserError_v2.2.4.cpp: 取得不可 (404)
+  muParserError_v2.2.5.cpp: リテラル 39 / 単独一致 36 / 不一致 3
+  muParserError_v2.2.6.cpp: 取得不可 (404)
+  muParserError_v2.3.0.cpp: 取得不可 (404)
+  muParserError_v2.3.1.cpp: 取得不可 (404)
+  muParserError_v2.3.2.cpp: リテラル 42 / 単独一致 34 / 不一致 8
+  muParserError_v2.3.3.cpp: 取得不可 (404)
+  muParserError_v2.3.4.cpp: リテラル 42 / 単独一致 34 / 不一致 8
+## 判別用 muParser 文言 (NUL 終端単独の出現数)
+  1  The "$TOK$" operator must be preceeded by a closing bracket.
+  0  The "$TOK$" operator must be preceded by a closing bracket.
+  1  Function result is a string.
+  0  Expression too long.
+  0  Identifier too long.
+  0  Strings must only be used as function arguments!
+## zstd・PFFFT・libsfz の版文字列 (0 件 = 版文字列なし)
+  0  ZSTD_versionString
+  0  ZSTD_getErrorString
+  0  Corrupted block
+  0  Destination buffer is too small
+  0  Input and output buffers overlap
+  1  libSFZ
+  1  PFFFT
+  1  pffft
+## 単独の 1.x.y 文字列 (NUL 終端): 0 件

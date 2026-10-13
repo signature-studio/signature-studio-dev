@@ -89,7 +89,7 @@ PM (main)                      subagent (実装)                  subagent (検�
 2. 同一チケット / 同一 dir に In progress または In review があれば**着手せず報告**。
 3. lift / 逆アセ / IR pass / ハーネス系は `docs/DEFECTS.md` を先に読み、REPORT 冒頭に
    「既知類型との関係: 該当 ID / 該当なし」を 1 行書く。
-   **番号体系の注意**: `docs/DEFECTS.md` の D1a〜D19 と `tools/icall/REPORT.md` §4 の D1〜D13 は
+   **番号体系の注意**: `docs/DEFECTS.md` の D1a〜D20 と `tools/icall/REPORT.md` §4 の D1〜D13 は
    **別体系**。参照時は `(DEFECTS.md)` / `(icall §4)` を必ず併記。
 4. **担当 dir 以外の未コミット変更は他担当の WIP**: 触らない・commit に含めない・stash/checkout/clean しない。
 5. ユーザへ追加アーティファクトを依頼する前に必ず検証する (`docs/REFERENCES.md` `[DOWNLOADS]` と
@@ -192,7 +192,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   work-liftlib-targets / work-liftlib / work-icall / work-fw-stage1 / analysis-ott-binaries / analysis-mac-shared / apt-mingw。それ以外は
   run が失敗する)。`oc_artifacts: none` は「追加素材なし」の明示で、単独なら空扱い (既定の fl-win64 になる)。他の名前との混在は失敗する。
   全素材は約 17.7 GiB (2026-10-13 実測) のため必要分だけ指定する。
-  - `toolchain-retdec` → [RETDEC]、`toolchain-emsdk` → [EMSDK] に展開される (環境変数の対応は `docs/REFERENCES.md` §4)。
+  - `toolchain-retdec` → [RETDEC]、`toolchain-emsdk` → [EMSDK] に展開される (環境変数の対応は `docs/REFERENCES.md` §4)。`m11_lift.sh` は PATH に無ければ `$RETDEC_ROOT/bin` → 既定 `/opt/retdec/bin` の順で解決するため、PATH 設定は不要 (#928)。
   - `work-m6-ott` → `tools/m6/work/` + `tools/ott/work/` + `tools/m8/work/` + `tools/m9/work/` + `tools/m10/work/`
     (`tar --zstd -tf` で実測)、`work-liftlib` → `tools/liftlib/work/`、
     `work-icall` → `tools/icall/work/`、`work-liftlib-targets` → `tools/targets/{freshair,kilohearts}/work/`
