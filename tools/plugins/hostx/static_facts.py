@@ -3,7 +3,7 @@
 
   1. PE 外形: サイズ・言語・export 数・import DLL (名前 -> 関数数)・delay import
   2. API 分類: import 名を正規表現で分類 (net / process / dynload / opengl / d3d / midi / hid / registry / thread / gdi / audio / com)
-  3. 文字列証跡: 第三者ライブラリ・外部 SDK・URL の ASCII 文字列ヒット (存在 = 使用の証明ではない)
+  3. 文字列証跡: 第三者ライブラリ・外部 SDK・URL の文字列ヒット (ASCII + UTF-16LE; 存在 = 使用の証明ではない)
 出力: work/hostx/static.json と stdout の Markdown 表。 使い方: static_facts.py [--json out.json]
 """
 import os, sys, re, json, collections
@@ -66,7 +66,7 @@ STR = collections.OrderedDict([
     ('libpng', rb'libpng version [0-9.]+'),
     ('FLAC', rb'reference libFLAC [0-9.]+'),
     ('vorbis', rb'Xiph.Org libVorbis [0-9.]+'),
-    ('Bullet', rb'Bullet[A-Za-z ]{0,20}'),
+    ('Bullet', rb'zbt[A-Z][A-Za-z0-9]+|btDiscreteDynamicsWorld|Bullet Physics[A-Za-z0-9. ]{0,10}'),
     ('ReWire', rb'ReWire[A-Za-z_]{0,30}|Propellerhead'),
     ('Razer', rb'Razer[A-Za-z _.]{0,30}|RzChroma[A-Za-z]*|Chroma ?SDK|RzSBStart|RzSB[A-Za-z]+'),
     ('VST/CLAP/AU', rb'VSTPluginMain|clap_entry|AudioUnit|VST3'),
@@ -76,7 +76,6 @@ STR = collections.OrderedDict([
     ('Python', rb'python3[0-9]*\.dll|Py_[A-Za-z]{3,20}'),
     ('GoogleDrive', rb'googleapis[A-Za-z0-9./_-]{0,30}|drive\.google[A-Za-z0-9./_-]{0,20}'),
     ('FLCloud', rb'flcloud[A-Za-z0-9./_-]{0,30}|image-line\.com[A-Za-z0-9./_-]{0,30}'),
-    ('Mono/.NET', rb'mscoree\.dll|CorBindToRuntime[A-Za-z]*'),
     ('DirectWave', rb'DirectWave[A-Za-z ]{0,20}'),
     ('ILVideo', rb'ILVid[eE]o_[A-Za-z]+'),
     ('RzChromaSDK', rb'RzChromaSDK[0-9]*\.dll'),
@@ -109,8 +108,11 @@ def facts(plugin, role, block):
     exp = [(e.name.decode() if e.name else '#%d' % e.ordinal) for e in getattr(getattr(pe, 'DIRECTORY_ENTRY_EXPORT', None), 'symbols', [])]
     dlls, delay, cat = classify_imports(pe)
     strs = {}
+    # Delphi の string 定数は UTF-16LE なので、ASCII 文字列と UTF-16LE 文字列 (latin1 に落とす) の両方を走査する
+    wide = b'\n'.join(m.group(0).decode('utf-16le').encode('latin1', 'replace') for m in re.finditer(rb'(?:[\x20-\x7e]\x00){4,}', d))
+    hay = d + b'\n' + wide
     for k, rx in STR.items():
-        c = collections.Counter(m.group(0)[:60].decode('latin1') for m in re.finditer(rx, d))
+        c = collections.Counter(m.group(0)[:60].decode('latin1') for m in re.finditer(rx, hay))
         if c:
             strs[k] = {'hits': sum(c.values()), 'distinct': len(c), 'top': c.most_common(3)}
     return {'plugin': plugin, 'role': role, 'block': block, 'size': len(d), 'n_exports': len(exp), 'exports_head': exp[:8],
