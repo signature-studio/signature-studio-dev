@@ -1,3 +1,4 @@
+自動生成: python3 tools/m11/rtl/rtl_compare.py <rtl_units.json> <m11_batch.jsonl> <flelift_batch.jsonl> --md <out.md> --tsv <out.tsv> (引数の実値は tools/m11/rtl/REPORT.md §6)
 関数数 1172 (両 route 採点あり)
 
 | 帯 (VMT 先頭基準の近似。unit 境界ではない) | 関数 | m11 match/mismatch/unexec | x64c match/mismatch/unexec |

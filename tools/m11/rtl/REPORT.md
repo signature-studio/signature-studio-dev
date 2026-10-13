@@ -6,7 +6,7 @@ OSS 差替え案 (b) は toolchain 選定の判断が要るため未着手 (§5)
 
 既知類型との関係: 該当なし (`docs/DEFECTS.md` D1〜D16 のいずれの新規発見でもない。本書は採点と範囲確定で、lift 欠陥の新類型は見ていない。
 主因タグの callee_divergence 等は liftdiff の分類名で DEFECTS.md の ID ではない)。
-検証起点 commit: `e56e176` (初回採点と §7 の n=3 再実行・ネガコンはこの tree 上で実施。以後の変更は docs / 本 REPORT / `negctl.sh` / `rtl_runs_summary.py` / `results/*.txt` の追加のみで、採点に使うコード (`rtl_range.py` / `rtl_compare.py`) は不変)。
+検証起点 commit: `e56e176` (初回採点と §7 の n=3 再実行・ネガコンはこの tree 上で実施。以後の変更は docs / 本 REPORT / `negctl.sh` / `rtl_runs_summary.py` / `results/*.txt` の追加と、レビュー指摘対応 `ff28834` (`rtl_range.py` の ImageBase 化・`rtl_compare.py` の RTL 帯フィルタと `--md` 先頭行) のみ。`ff28834` は採点値 (`results/rtl_units.json` / `rtl_verdicts.tsv`) を変えない — §7-4)。
 
 関係: #132 (stage 5/6) は #129 (RTL) / #130 (override) / #90 (間接 call) の成果取込みが前提。#253 (tools/flelift/boot) は
 案 (a)「別 lifter で再 lift」を x64c で既に実施済み (RTL 専用 lifter は作らず FLEngine 全体を x64c で lift)。本書はその RTL 帯だけを切り出して測った。
@@ -98,6 +98,9 @@ uv run --with numpy --with capstone --with pefile python3 liftdiff.py batch targ
 cd ../.. && python3 tools/m11/rtl/rtl_compare.py tools/m11/rtl/results/rtl_units.json tools/liftdiff/work/m11/batch_rtl_core.jsonl tools/liftdiff/work/flelift/batch_rtl_core_h928.jsonl --md tools/m11/rtl/results/rtl_compare.md --tsv tools/m11/rtl/results/rtl_verdicts.tsv
 ```
 
+`rtl_compare.py` は両 route の VA 積集合のうち RTL 帯 `0x401000 <= VA < 0x456e98` (定数 `RTL_LO` / `RTL_HI`) だけを採点し、帯外は stderr に件数を出して除外する
+(上の `<VA 一覧>` を絞らなくても帯外が混ざらない)。`--md` の先頭 1 行は `自動生成: <cmd>` (`docs/DOC_MAP.md` §4)。
+
 `tools/shared/env.sh` の既定 `ANALYSIS_DIR` (`docs/REFERENCES.md` `[ANALYSIS-DIR]`) 配下の `win64/` を `[WIN64]` の展開先へ向ける必要がある
 (`ANALYSIS_DIR=<任意>` に `win64` symlink を作る)。これが無いと `bootstate` が PE 読込で FileNotFoundError になる。
 素材 snapshot の `work/flelift/build.json` 等に埋まる絶対パスは `--nobuild` のため未参照。tools/m11/work, tools/liftdiff/work は
@@ -152,3 +155,19 @@ snapshot 展開先への symlink とし、`.git/info/exclude` で commit 対象�
 
 m11 側の集計 (494/529/149) は不変。書換え 1 件が集計に 1 件ぶん現れ、他の行は動かない (差分 1 行) ことを確認した。
 (`negctl.sh` は本 run の n=3 の 1 回目 jsonl で実行。)
+
+### 7-4. レビュー指摘対応 (`ff28834`) の検証 (batch は再実行していない)
+
+採点値を変える変更ではないため batch (m11 / flelift) は再実行せず、後処理だけをコミット済み `ff28834` で検証した
+(初回 batch の jsonl は commit されていないので、`results/rtl_verdicts.tsv` の `va` + 各 route の verdict から `function.va` / `verdict` だけの jsonl を復元して入力にした。
+`rtl_compare.py` が読むのはこの 2 項目だけ)。GitHub Actions runner, 所要は `time`、load は終了時の 1 分平均 0.47:
+
+| 検証 | 結果 |
+|---|---|
+| `rtl_range.py` (`B = pe.OPTIONAL_HEADER.ImageBase`; この PE は `0x400000`), 0.13 秒 | 2,958 クラス / 527 unit。`results/rtl_units.json` と `cmp` 一致、stdout も修正前と一致 (PASS) |
+| `rtl_compare.py` を復元 jsonl (1,172 VA) で再生成, 0.03 秒 | `results/rtl_verdicts.tsv` は `cmp` 一致 (PASS)。`results/rtl_compare.md` は先頭 1 行 (`自動生成: <cmd>`) の追加のみで、本体は修正前と一致。再実行しても `cmp` 一致 |
+| 帯フィルタ: 帯外を含む実 batch (snapshot の `batch_closure.jsonl` 7,421 関数 × 2 route) | 修正前は 7,421 関数をそのまま採点 (計 m11 2273/2892/2256・x64c 4182/741/2498)。修正後は帯外 6,249 を除外して 1,172 関数 (この snapshot の run での計 m11 574/427/171・x64c 540/116/516。§2 の表とは別 run の値で、比較には使わない) |
+| 帯フィルタのネガコン: 復元 jsonl に `0x400fff` / `0x456e97` / `0x456e98` / `0x545a90` / `0x1000000` を追加 | 両 route 採点あり 1,177 → 1,173 (帯内は `0x456e97` のみ。上端 `0x456e98` は排他)。TSV の差分は `0x456e97` の 1 行だけ |
+| `negctl.sh` (復元 jsonl): `_UStrAsg 0x4133f0` の x64c を mismatch に書換え | x64c 535/125/512 → 534/126/512、TSV 差分 1 行 (PASS) |
+
+VA/RVA 変換の ImageBase 化は、`ImageBase` が `0x400000` の PE では出力が変わらないことの確認までで、別 ImageBase の PE での動作は確認していない (該当 PE が無い)。
