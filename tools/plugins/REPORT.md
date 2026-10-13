@@ -76,6 +76,16 @@ R1/S1c/S1d/C1 (§3), D1 重複 declare (T0 5/42 本), T1 ptr 仮引数不整合 
 
 (Wasp と Wasp XT は同一 block を共有するため T0 の閉包は 41 件で 42 プラグインを覆う。) 初回実行では D1/ptr 型不整合で T0 5/42・T1 8/45 が `emcc -c` 不通過 → `fix_dup_decls.py` / `fix_ptr_params.py` で解消 (差分: T1 の 7 本が同一原因)。
 
+### 4.4 `rep_stosb_memset` 実装 (#538, PLG-G3-4)
+既知類型との関係: 該当なし (`docs/DEFECTS.md` D1〜D16 は fe/opt 段の誤変換。 本件は `m11_simd2.py` が未知 base を空 stub 化して実行時に何もしない欠落で、署名駆動 helper 生成の未対応 base)。
+- 修正: `lift/passes/m11_simd2.py` の `gen_body` に `rep_stosb_memset` (署名 `ptr, i8, i64` のときだけ) を追加。 `memset(a, b & 0xff, c)` (rep stosb: AL を c バイト)。 署名が違えば従来どおり未実装として可視化する。
+- 検証起点: 本 PR の HEAD (commit 前の作業ツリーと同内容) と比較対象 `origin/main` bb76f7c。 inventory (`distortion/inventory.sh`) 534 s 生成済 `work/` を両 worktree で共有。 4 core、`batch_lift.sh` 開始時 load average 0.33〜1.13。
+- `batch_lift.sh --tier T1` (46 行 = 45 閉包 + header): main 8 min 0 s (479.9 s)、本 PR 8 min 3 s (483.3 s)。 `status.csv` を seconds 列 (10 列目) 除いて diff した差分は 4 行のみで、いずれも `declares_unimpl` 1 → 0 (19024 Love Philter, 23658 Granulizer, 23662 Slicer, 24161 ReWired)。 `lift_rc` / `defines` / `f80_funcs` / `emcc_c_rc` は 45 行全て一致 (ReWired は f80 2 関数で `emcc_c_rc=1` のまま = 本件の範囲外)。 `declares_unimpl` 合計: main 9 件 / 5 block → 本 PR 5 件 / 1 block (23738 Harmless: `cmpnltps` `movmskps` `prefetcht0` `vaddps` `vmovaps`、変化なし)。
+- `batch_lift.sh --tier T0` (42 行): main 3 min 33.6 s、本 PR 3 min 32.9 s。 `status.csv` (seconds 除く) 全行一致、`declares_unimpl` 合計 0、`emcc_c_rc != 0` は 0。
+- Granulizer (23658) / Slicer (23662) の `p.simd.log` の `unimplemented:` 行は 0。 生成 C: `__asm_rep_stosb_memset(void* a, u32 b, u64 c) { memset(a, (int)(b & 0xffu), (size_t)c); }` (main は `m11_simd_unimpl_once` のみの空 stub)。
+- 実行検証 `lift/passes/test_rep_stosb.sh` (emcc → node で 6 ケースを `memset` 参照とバイト比較: 49 B のゼロ埋め / 17 B の 0xab / 上位ビットにゴミのある b=0x1ab / c=0 / c=1 / 64 B): 6/6 一致、exit 0。 ネガコン `--negctl` (origin/main の旧 `m11_simd2.py` を同じ試験に通す): 5/6 不一致で FAIL することを確認 (一致した 1 件は c=0 の何もしないケース)、`--negctl` は exit 0。 旧版が PASS すると `--negctl` が exit 1 になる。
+- 範囲外 (限界): 差分試験 (bit-exact) は #208 の出口条件。 `rep_stosw/d` は `m11_simd2.py` に未実装のまま (今回の 46 閉包の `p.simd.log` に出現なし)。
+
 ## 5. 未解決・ブロッカー
 1. **F80** (kernel 25/80, ReWired 等): x87 混入 IR の wasm 化 (f80 lowering pass)。
 2. **float 引数/関数ポインタ/仮想呼出**: Eff_Render 本体の lift には `ir7_argpass`+VMT/関数ポインタ direct 化が必要 (T0 実証は pointer/int 引数の leaf kernel に限定)。
@@ -110,3 +120,8 @@ batch_plan.md §7 の通り (Linear 起票済み: CAB-194 P0a / CAB-195 P0b / CA
 ## 9. 検収 (2026-10-10, 独立再計算) 結果
 全主張を再計算し **PASS (訂正 3 点のみ)**。 訂正: ①kernel の f80 混入 **26→25/80** (IR 実測; 機械語 x87 は 28/80) ②framework「同一」→ 130/133 本でほぼ共通・3 本は別構成 (§0.2) ③T1 未実装 helper の件数 (§4.3)。
 再計算済 (一致): 141 本 (mac 90+51 を ls で直接数え JSON と集合一致) / Tier 42-45-34-20・工数 524.5 / x64 PE 258・全 313・`CreatePlugInstance` export 160 (tree 159)・`CreateFruityInstance` は FLEngine のみ / NSIS 25,164÷25,165 (未対応 1 = idx 29 DATA; Info.long と名称の交差検証 120/123 一致) / kernel 表 45 変数・80 実装・10,886 B (init 0x5e19f0 を逆アセンブルし独立復元、lift 実績 ranges と完全一致) / `t0_e2e.sh` 1,071/1,071 (2.1 s; **C1 修復を外すと 325/357 に落ちる陰性対照**で試験の識別力も確認) / バッチ lift を全 86 閉包で再実行し status.csv と完全一致 (T0 41/41, T1 44/45; 44 秒/12 並列) / ABI: TFruityPlug 基底 20 スロット・TTestPlug 26・TFruityHost 46 (slot0=0x13173a0)・Dispatcher ID 71 種/894 サイト。
+
+## 10. 未解決 (#538)
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 受入条件 4: `sampler/judge.py` と `targets.py` の `ALLOW_UNIMPL` / `ALLOW_UNIMPL_NAMES` から Granulizer / Slicer を外す。 該当ファイルは `origin/main` に無く #208 の作業ブランチ `208-sampler-lift` (PR #551、未マージ) にだけ存在する | 本 PR 後も #551 側の許容値 (`{23658: 1, 23662: 1}` / `['rep_stosb_memset']`) が残ると、`unimplemented` 0 の結果を許容 1 のまま通す (`0 <= v <= 許容` なので不合格にはならないが、回帰を検出できない) | #208 / PR #551 にコメント (本 PR マージ後に許容を 0 / `[]` にし、`sampler_e2e.sh` を再実行する)。 #538 は Closes にせず Refs とし open のまま残す |
