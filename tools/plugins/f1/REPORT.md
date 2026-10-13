@@ -137,7 +137,16 @@ kernel 表は Balance の初期化関数 (0x5e19f0) と位置非依存ハッシ�
 
 ## 8. 検証 (コミット済み HEAD)
 
-(§8 は検証起点 commit の確定後に追記する)
+検証起点 commit: **2b7275c** (`git worktree add --detach … 2b7275c` で展開。 inventory 4 ファイル (`win_pe_scan.json` / `nsis_blockmap.json` / `winfuncs/` / `win_abi.json`) だけを手元から複写し、batch lift 以降は全て HEAD のコードで再実行)。
+
+| 項目 | 結果 (実測) |
+|---|---|
+| `bash tools/plugins/f1/f1_e2e.sh` | **exit 0 / 68.9 秒** (load avg 1 分値 0.08 開始 → 0.78 終了, nproc=4, inventory は再利用) |
+| batch lift 9 本 | **26 秒**・9/9 `rc=0 emcc_c=0 f80=0` (§2 と一致; §2 の 3 回計測は 24.74–24.84 秒) |
+| 脱落 call 監査 | 9 block とも §4 の表と同値 (direct 1,047 / `call [mem]` 185 / IR 1,048 / dropped_est 186) |
+| Phase Inverter 差分 | 3 seed × {pi: 252/492, pir: 492/492, pin: 252/492} (§5 と同値) |
+
+衛生確認: `git status --porcelain=v1 -- tools/plugins/f1 tools/plugins/inventory/blockmap_from_matrix.py` = 空 / `git diff --stat origin/main 2b7275c` = 上記 10 ファイルのみ (782 行追加, 他 dir 0) / 20 MiB 超の blob なし。
 
 ### DEFECTS.md への行案 (PM 判断)
 
