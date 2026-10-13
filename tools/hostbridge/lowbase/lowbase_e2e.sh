@@ -77,7 +77,7 @@ chk ${PIPESTATUS[0]} "image/arena 再配置のみなら RetDec chain 出力は�
 
 step "[3c] module prefix (RetDec chain): function_<VA>/global_var_<VA> を ott_ 接頭にして再ビルドしても hostbridge ホストで動く"
 LB_BASE=0x10000 LB_PREFIX=ott LB_OUT="$W/m10_pfx" bash "$LB/retdec/build_m10_lb.sh" > "$W/build_pfx.log" 2>&1; chk $? "build prefix=ott"
-NPF=$(wasm-objdump -x "$W/m10_pfx/ott_hb.wasm" | grep -c 'ott_function_1'); NPL=$(wasm-objdump -x "$W/m10_pfx/ott_hb.wasm" | grep -c -- '-> "function_1')
+read NPF NPL < <(node -e "const m=new WebAssembly.Module(require('fs').readFileSync('$W/m10_pfx/ott_hb.wasm'));const e=WebAssembly.Module.exports(m).map(x=>x.name);console.log(e.filter(n=>n.startsWith('ott_function_')).length, e.filter(n=>/^function_/.test(n)).length)")
 [ "$NPF" -gt 100 ] && [ "$NPL" = 0 ]; chk $? "wasm 名前空間: ott_function_* ${NPF} 件 / 無接頭 function_* export ${NPL} 件"
 node "$LB/multi/multi_load.mjs" --ott "$W/m10_pfx/ott_hb.cjs" --nmod 1 --label pfx --out "$W/ml_pfx.json" --dump "$W/d_pfx.bin" --host "$W/host_vst2.wasm" > /dev/null; chk $? "prefix 版 module が hostbridge で LoadLibrary/process"
 python3 - "$W/d_lb.bin" "$W/d_pfx.bin" <<'PYEOF' | tee -a "$SUM"
