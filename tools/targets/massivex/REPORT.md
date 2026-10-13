@@ -215,3 +215,8 @@ work/ (gitignore): hdr_block1/2.bin, files.json, locations.json, header_parse.js
 - `e2e.sh` の retdec / emsdk は `RETDEC` / `EMSDK` 環境変数で上書き可能。既定は REFERENCES `[RETDEC]` / `[EMSDK]` (配下の `[OPT-TOOLS]`)。
 - `pefile` / `capstone` / `numpy` を pip 導入して実行する。
 - fresh checkout で `license/work/` `dsp/work/` が無くても動くよう、両 `e2e.sh` の先頭で `mkdir -p` している。
+
+## 12. MX2-3 (N5 / N6) 実測 — 2026-10-13 (#830)
+
+- 結論: N5/N6 は現行 IR pass の差し替え点を指定できない (文字列に参照元が無い)。e2e は 3 レベルとも 11/11 PASS (`d7cf3c77`)。
+- 詳細・実測表・§6 の N3 訂正: [REPORT_APPENDIX.md §12](REPORT_APPENDIX.md)。未達の起票先は同節 §12.3。
