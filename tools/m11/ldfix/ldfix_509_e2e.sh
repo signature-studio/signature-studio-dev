@@ -82,18 +82,18 @@ b = m.group(0)
 b2 = re.sub(r'(store i64 )%ldfxn\d+(, ptr %17, align 8)', r'\1%arg3\2', b)
 assert b2 != b
 open(sys.argv[2] + '/nc_store.ll', 'w').write(t.replace(b, b2))
-# NC-use: 1063090 の消費者置換を戻す (load を残したまま %ldfxu → %arg1)
+# NC-use: 1063090 の消費者置換を戻す (挿入した load 2 行を消し、%ldfxu* を %arg1 に戻す)
 m = re.search(r'^define [^\n]*@function_1063090\(.*?\n}\n', t, re.M | re.S)
 b = m.group(0)
-b2 = re.sub(r'%ldfxu\d+(?![\w_])', '%arg1', b)
-b2 = re.sub(r'^  %arg1_p = .*\n  %arg1 = load .*\n', '', b2, flags=re.M)
-assert b2 != b
+b2 = re.sub(r'^  %ldfxu\d+_p = .*\n  %ldfxu\d+ = load .*\n', '', b, flags=re.M)
+b2 = re.sub(r'%ldfxu\d+(?![\w.$-])', '%arg1', b2)
+assert b2 != b and 'ldfxu' not in b2
 open(sys.argv[2] + '/nc_use.ll', 'w').write(t.replace(b, b2))
 PYEOF
 for k in prev nc_store nc_use; do
   F="$OUT/$k.ll"
   "$PY" "$HERE/audit_lsf.py" "$F" "$IMG" "$CFG" > "$OUT/nc_$k.txt"
-  echo "[NC:$k] $(grep -o '"suspect_fns": [0-9]*, "suspect_sites": [0-9]*' "$OUT/nc_$k.txt" || echo 'store 形 SUSPECT 0') / $(grep '^SUSPECT_VAS' "$OUT/nc_$k.txt" | cut -c1-120) / use: $(grep '^SUSPECT_USE_VAS' "$OUT/nc_$k.txt" | wc -w) 語"
+  echo "[NC:$k] $(grep -o '"suspect_fns": [0-9]*, "suspect_sites": [0-9]*' "$OUT/nc_$k.txt" || echo 'store 形 SUSPECT 0') / $(grep '^SUSPECT_VAS' "$OUT/nc_$k.txt" | cut -c1-120) / use 形(pure): $(grep '^SUSPECT_USE_VAS' "$OUT/nc_$k.txt" | awk '{print NF-1}') 関数 (1063090 を含む: $(grep '^SUSPECT_USE_VAS' "$OUT/nc_$k.txt" | grep -c ' 1063090'))"
 done
 
 step "6/7 survey 前後 (wasm 再ビルド) と動的到達"
