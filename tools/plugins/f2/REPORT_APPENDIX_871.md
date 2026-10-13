@@ -99,3 +99,18 @@ leaf_diff は IR leaf かつ機械語に間接 call 無しの 23 関数のみを
 - 件数 (一致 16 / 不一致 7 / 実行不能 0) と回帰 0x5de250・改善 0x6f1650・0x6c8fc0 の判定は §10.4 の前 run 測定と一致。
 - 本 run の `nc_leaf.py` は再実行していない (§10.4 の HEAD `747c5fe0` 測定を残す。コード差分なし)。修正前 `78aa75ad` との関数単位の突き合わせ (遷移 14/6/1/2) は今回は再計算していない (ログ未保存のため)。
 - 範囲は leaf 23 関数のみ (§10.5)。残り 7 関数は未確認。
+
+## 10.7 (#871 fix モード 4) 0x5de250 の回帰: `ld_native` での実測 (部分)
+
+- 測定: `tools/liftdiff/work/ld_native` (liftdiff の native ランナ、ImageBase `0x400000` に PE を mapping) に block19006 PE (`[WIN64]` の `extracted/block19006_PE.bin`) をロードし、stdin の `PEEK` で読んだ。ドライバは run 内の一時領域のみ。
+- `/proc/<pid>/maps` (ロード後): image は `00400000-007b2000` (rwx) に mapping。**`0x30D0F4` を含む mapping は無い**。
+- `PEEK 0x30D0F4 16`: fault (ld_native の終了コード 98 = シグナルハンドラの `_exit(98)`)。対照 `PEEK 0x400000 1` は rc 0 で読めた。よって `ld_native` 内で `0x30D0F4` は**未 mapping**。
+- 0x5de250 の native 機械語 (逆アセンブル、capstone): `mov edx,[rcx]; and edx,0x7fffffff; cmp edx,[rip+0x12ecd6]` で、`rip` 相対の読み先は **`0x70CF34`** (image 内、RVA `0x30CF34`)。`PEEK 0x70CF34 4` の値は `0x00008033`。
+- IR (`tools/plugins/work/batch/19006/p.final.ll` 211 行) は `load i32, inttoptr (i64 3198772 = 0x30D0F4)`。native の読み先 `0x70CF34` とは一致しない (差は 0x400E40、ImageBase 補正 0x400000 では説明できない)。
+- 修正前に wasm が読んでいた RVA `0x30D0F4` の先頭 16 byte は `01120805126800000d79100000000803`。native が実際に読む `0x30CF34` (`00008033`) とは別の内容。
+
+### 結論 (部分)
+- 「native が読むのは `0x30D0F4`」という前提は**誤り**。IR の絶対 VA 定数 `0x30D0F4` は、native の機械語が読む `0x70CF34` と一致しない。
+- よって「修正後の wasm の扱い (image 外) が native より正しい」とも、「修正前 (RVA 読み) が正しかった」とも**言えない**。native の正しい読み先は `0x70CF34` (= RVA `0x30CF34`) と確定。修正前 wasm は `0x30D0F4` (RVA) を読んでおり、これも `0x30CF34` ではない。両方とも native が読む `0x30CF34` とは一致しない。修正前の match がどの読み値で成立したかは未確認。
+- **未確定**: wasm 側 (修正前・修正後) が 0x5de250 の入力で実際に読んだ値と、native が `0x70CF34` から読んだ値 (`00008033`) の直接比較は未実施 (wasm trace の読み値を取る必要がある)。よって回帰の機序は確定していない。
+- 判定: 回帰 0x5de250 は**未解決のまま**。「期待される差分」としての許容根拠は無い。#923 で wasm 側の読み値 (trace) と `0x70CF34` の比較を行う。
