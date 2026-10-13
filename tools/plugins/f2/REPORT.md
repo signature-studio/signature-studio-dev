@@ -335,3 +335,38 @@ python3 tools/plugins/f2/nc_leaf.py      # ネガティブコントロール (ki
 - 前提 `f2_step1.sh` を `tools/plugins/work/` 無しで実行した初回 = **6 分 55.8 秒** (`time` 実測、`win_funcs.py` が支配的; load average は Pool(14) で最大 16.3)。work/ があれば §1 のとおり 51 秒。
 - `nc_leaf.py`: kind ごとに並列 (3 プロセス) で 55.4 秒 (`store_drop`) / 65.1 秒 (`load_drop`) / 81.3 秒 (`offset_shift`)。
 - `find tools/plugins/f2 -type f -size +20M` = 0 件、`git status --porcelain=v1 -- tools/plugins/f2` はコミット前にクリーン。
+
+## 9. PLG-F2-4 (#547): xmm 引数復元 pass の接続 (**未達: 不一致 8 のまま・中間報告**)
+
+- 検証起点 commit: **875ab8e** (`547-plg-f2-4-xmm-argpass`、#553 の branch `515-plg-f2-3-leaf-diff` 758a06b 基点)。
+- 既知類型との関係: **(DEFECTS.md) D5** (xmm 引数脱落)。D4 系 `spill_slot_deref` 4 / D1a `fp_flag_unreflected` 4 は本件では未着手。
+- 範囲: pass の実装と鎖への opt-in 接続、eq-filter 6 block での lift/`emcc -c`/`leaf_diff.sh` 実測。既定鎖への ON 化・ablation 完走は範囲外 (下記)。
+
+### 9.1 結論
+1. `ir7_argpass.py` は OTT `setParameter` (function_180120af0) 専用 (jump table を dsm から再生成する) で、汎用の xmm 復元ではない。鎖に繋げても eq-filter には効かない。汎用品は kernel 向け `p0c/k80_argfix.py` + `p0c/k80abi.py` (#254 系) だったので、その [A]/[C] を再利用する `lift/passes/fix_xmm_args.py` を新規作成した。k80abi の `scan_function` で関数ごとの xmm 入力 slot を機械語から求め、IR 署名の slot 位置 N に `float`/`double` 引数を足す (隙間は `i64 %padN`)。closure 内の呼出し元には 0 / 0.0 を渡す。
+2. `lift_ranges.sh` に **opt-in `PLUG_XMMARG=1` (既定 0)** で接続した。既定 ON にしていないのは、下記 3 の結果が出ておらず全 plugin への影響を測っていないため。
+3. **受入条件 1 は未達**: `PLUG_XMMARG=1 PLUG_ICALL=0` で 6 block (18975 18982 19005 19006 19013 19059) を lift し直した `leaf_diff.sh` (133 秒、load average 0.29) の最終判定は **一致 15 / 不一致 8 / 実行不能 0** (接続前と同一)。タグ集計も `xmm_arg_drop 8` のまま。
+4. 受入条件 2 (回帰) は、一致 15 が一致のままであることだけ確認 (上記 3 の同判定)。**ablation (pass を外すと 8 関数が戻る) は無意味**: pass 有無で不一致が同数のため、ネガコンとして成立していない。
+5. 受入条件 3 (#232 / #233 の適用可否判定) は未実施。
+
+### 9.2 実測 (`PLUG_XMMARG=1`、block ごとの `p.xa.json`)
+| block | 復元した関数 | skip した関数 | call site に 0 を渡した数 | `emcc -c` rc |
+|--:|--:|--:|--:|--:|
+| 18975 | 4 | 11 (`no_placeholder` / `slot_occupied`) | 5 | 0 |
+| 18982 | 1 | 2 | 1 | 0 |
+| 19005 | 3 | 2 | 4 | 0 |
+| 19006 | 2 | 2 | 2 | 0 |
+| 19013 | 3 | 1 | 3 | 0 |
+| 19059 | 2 | 10 | 2 | 0 |
+
+- 不一致 8 関数の内訳: IR 署名が機械語 ABI と一致するようになったのは 4 関数 (0x6b0ef0 `i64(i64,i64,double)`、0x6ca5c0 同、0x6f1650 `float(i64,float)`、0x6c9b60 ではなし)。0x6bfec0・0x6c8fc0・0x6c9b60 は `no_placeholder` で署名が変わらない (RetDec の placeholder が `xor i128 0,0` の形をしていない: 0x6bfec0 は `__asm_movss__4` 結果を `ucomiss` に渡す形、0x6c8fc0 は `__asm_addss(i128 %1, ...)` の %1 が `xor i128 0,0` だが [C] の突合が不成立)。0x6c8c90・0x6cc2e0 は `slot_occupied` (RetDec が slot 3 を整数 `%arg4` で宣言済み)。
+- 署名が直った 0x6f1650 でも、case z で native x0=0x3f11c71c、wasm x0=0xffc00000 (NaN) で不一致のまま。引数が値として届いていない。**原因は未特定** (候補: `mk_targets.py` の i128 ABI アダプタが `%pad0` を含む仮引数をそのまま実引数に使う / liftdiff の float 引数の割当て位置 / `__asm_movaps` の i128 上位ビット)。
+
+### 9.3 未解決
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 署名が直った 0x6f1650 / 0x6b0ef0 / 0x6ca5c0 でも差分が残る原因の特定 | 受入条件 1 | 新規 [PLG-F2-5] |
+| `no_placeholder` 3 関数・`slot_occupied` 2 関数 (RetDec が xmm 位置を整数引数で宣言) の復元 | 受入条件 1 | 同上 |
+| 呼出し元の xmm 値の接続 (現状 0 を渡す) | closure 内の呼出し経由では float 値が失われたまま | 同上 |
+| spill_slot_deref 4 / fp_flag_unreflected 4 の #232 / #233 適用可否 | 受入条件 3 | 同上 |
+| PLUG_XMMARG 既定 ON 化と、全 block での `emcc -c`・matrix 突合の回帰 (6 block のみ実測) | 既定化の可否 | 同上 |
