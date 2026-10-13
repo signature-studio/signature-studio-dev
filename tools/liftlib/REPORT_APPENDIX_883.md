@@ -66,6 +66,34 @@ IR 上の読み (下記) は `work/ott_getparam/` の生成物を参照したも
 
 修正・ネガコン・regress 登録は子 issue で行う (本 issue #883 は受入条件 4 件のうち達成 0 件 (4 件とも未達) → 検証未了のため open のまま)。
 
+## #1269 (HB-H28) BLK 配置の実測 (HEAD b1d2fe82 / 測定 commit 604e900f, コード変更なし)
+
+素材 (展開実測): `analysis-ott-binaries` → `$HOME/analysis/plugins/ott/binaries/` (OTT_vst2_win64.dll)、`work-liftlib`・`work-m6-ott`・`work-icall` → 各 `tools/*/work/`。`fl-win64`・`toolchain-*` は本 run では不使用。
+
+| 項目 | 結果 |
+|---|---|
+| F.txt (`gen_ott_getparam_F.sh`) | `0x18011e5a0-0x18011e76c` (closure 1 関数, 460 bytes) |
+| `leafspec targets/ott_getparam.json --n 200` (ベースライン) | rc=1, 5.6 s, match 0 / mismatch 200 / wasm_trap 200 |
+| BLK | `0x184308000` (6512738304)。`ott_getparam_fixed.ll` 内の `inttoptr (i64 N to ptr)` 参照は 135 箇所、アドレスは BLK+0x00〜+0x88 の 13 種 |
+| `--blk-va 0x100308000` | rewriter が `struct.pack('<i')` で例外終了 (RIP 相対 int32 が範囲外)。map は生成されず |
+| `--blk-va 0x30000000` | 同上 (例外終了) |
+| `tests/test_icall.py` (測定 commit 604e900f) | RESULT PASS (0 failed) |
+| `icall_rt.c` の既定 BLK | `ICALL_BLK = 0x34308000` (rewriter の `0x184308000` と不一致。runtime 側の既定値) |
+
+測定 commit 604e900f → HEAD b1d2fe82 の実行コード差分: `git diff 604e900f b1d2fe82 -- tools/` は REPORT_APPENDIX_883.md のみ (26 行追加・コード差分 0)。
+
+### 方式の判定 (受入条件 1)
+
+- **(b) rewriter 側で wasm32 向け BLK を選ぶ**: 不採用。`--blk-va` で wasm 線形メモリ内 (4 GiB 未満・64 MiB 内) の番地を指定すると、RIP 相対 int32 の制約で rewriter が落ちる。`0x100308000` (section 直下) は RIP 相対変位が int32 範囲外でもある。よって rewriter 単独では BLK を wasm 内へ置けない。
+- **(a) module-local global への張り替え**: 採用候補 (未実装)。IR の `inttoptr (i64 BLK+off to ptr)` 135 箇所を、モジュール内の固定配列グローバルへの参照に置き換える。BLK は wasm の data/bss 内に入るため、線形メモリ範囲を超えない。`ir_icall_restore.py` が出す `blk + 0x80`・`blk + 0xb0` の参照も同じ置換が要る。
+- 実装は未着手。配置の置換 (IR 135 箇所 + restore の 2 系統) とビルド・ネガコン・`icall_e2e.sh` の前後測定が残るため、本 run では実装せず、#1269 に残す。
+
+### 残作業 (#1269 の受入条件のうち未達)
+
+1. (a) の実装と `leafspec` の wasm_trap 0 の確認 (match の判定は #1270 の受入条件)。
+2. `icall_e2e.sh` の前後測定。`ANALYSIS_DIR` は既定値が環境依存のため、環境変数で指定する (本 run では `$HOME/analysis` を指定)。また `tools/ott/work/` (`ott_e2e.sh` の成果物) が前提で、本 run では未展開。
+3. ネガコン (修正を外すと wasm_trap 200 に戻る) の実測。
+
 ## 再現
 
 ```sh

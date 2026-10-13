@@ -28,7 +28,12 @@ if len(name_at) != n_ann:
     sys.exit('annotation/name mismatch: annotations=%d names=%d' % (n_ann, len(name_at)))
 va_defs = {int(x, 16) for x in re.findall(r'^define [^@]*@function_([0-9a-f]+)\b', ll, re.M)}
 miss_va = [(a, e) for a, e in rg if a not in va_defs]
-named = [(a, e) for a, e in miss_va if name_at.get(a) in dnames]
+claim = {}
+for a, _ in miss_va:
+    if name_at.get(a) in dnames:
+        claim[name_at[a]] = claim.get(name_at[a], 0) + 1
+# 同じ define 名に欠落 range が複数割り当たる場合は解決扱いしない (偽 PASS 防止)
+named = [(a, e) for a, e in miss_va if name_at.get(a) in dnames and claim[name_at[a]] == 1]
 rest = [(a, e) for a, e in miss_va if (a, e) not in named]
 print('%d,%d,%d,%s' % (len(named), len(rest), sum(e - a + 1 for a, e in rest),
       ';'.join('%x:%s' % (a, name_at.get(a, '?')) for a, _ in named + rest)))
