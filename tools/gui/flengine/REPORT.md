@@ -202,22 +202,24 @@ main 取込後の木 (`c37522c`) で S1 が FAIL (828/67 vs 864/31) したため
 | `bash tools/gui/flengine/e2e.sh` (**HEAD `19ebb43`**) | rc 0。**JUDGE PASS 14/14**。S1 = 864/1/46/31 (base 一致)。ネガコン N1〜N9 は 9/9 が期待どおり FAIL。selftest 0 failed | 2 分 36 秒 (load 0.45 → 0.97) |
 | `bash tools/gui/e2e.sh` (**HEAD `19ebb43`**) | rc 0。ALL PASS (bpp / text / simd / present / Chrome E2E / fail-fast / reach-log / sigprobe)。ASan UAF は本回に出ず | 1 分 33 秒 |
 
-### 6c-3. 現 HEAD の再測 (main `fe53ba30` を merge commit で取込 + e2e の m6/ottlib 複製修正 `f1e88c82`・素材 `work-m11` 由来の IR を再生成)
+### 6c-3. 現 HEAD `e9007eca` の再測 (main `1adff847` を merge commit で取込済み。e2e の `m6/ottlib.py` 複製を追加)
 
-素材: `fl-win64` → `$RUNNER_TEMP/fl-win64` (`FL_WIN64_DIR`)、`work-m11` → `tools/m11/work/`、`toolchain-retdec` → `/opt/retdec` (RetDec 5.0)、`toolchain-emsdk` → `/opt/emsdk`、`apt-mingw` (`x86_64-w64-mingw32-gcc` 既存)、pefile 2024.8.26 / capstone 5.0.7 を `python3 -m pip install --user` で導入。`m11_gen_ir2.sh` は素材 IR に対して ldfix 適用済みの `ir_conditions.json` を生成 (27.5 秒)。
+素材: `fl-win64` → `$RUNNER_TEMP/fl-win64` (`FL_WIN64_DIR`)、`work-m11` → `tools/m11/work/`、`toolchain-retdec` → `/opt/retdec` (`RETDEC`)、`toolchain-emsdk` → `/opt/emsdk` (`EMSDK_ENV`)、`apt-mingw` (`x86_64-w64-mingw32-gcc`)、pefile 2024.8.26 / capstone 5.0.7 (`python3 -m pip install --user`)、`pnpm install --frozen-lockfile` (ルート)、`tools/e2e` は `npm install --no-save` (agent-browser 0.39.0。repo に lockfile が無いため `--no-save` で入れた)。
 
-| 実行 (HEAD `f1e88c82`、merge `95ae6e55` の後に修正) | 結果 | 所要 (実測) |
+手順は WORKFLOW どおり `m11_wndseed.sh` (boot6 lift + 最終 IR) → `flengine/e2e.sh` → `gui/e2e.sh`。
+
+| 実行 (HEAD `e9007eca`) | 結果 | 所要 (実測) |
 |---|---|---|
-| `bash tools/m11/m11_wndseed.sh` (boot6 を RetDec から lift) | rc 0。WNDCLASS 11 / fn WNDPROC 8 / 最終 IR 未定義 0 (`WNDCLASS-CHECK PASS`) | 132.8 秒 (2 分 13 秒) |
-| `bash tools/gui/flengine/e2e.sh` (1 回目 = 修正前 merge の実測・boot6 無し) | 2b で停止 (`ottlib` 不在)。`m6/ottlib.py` 複製を追加後、boot6 無しの IR では W1 FAIL (WNDPROC 8 件が未定義) | 2 分 04 秒 / 2 分 39 秒 |
-| `bash tools/gui/flengine/e2e.sh` run 3 (boot6 取込後) | rc 1。**judge 13/14 FAIL** (S1 のみ FAIL: 869/1/47/25 vs base 871/1/47/23)。W1 PASS (外 0)・P5 PASS (hwnd 0x110000e)。ネガコン 9 本は期待どおり FAIL。selftest 433 passed / 0 failed | 2 分 57 秒 (177 s) |
-| 同 run 4 | rc 1。judge 13/14 (S1 869/1/47/25 同値) | 177 秒 |
-| 同 run 5 | rc 1。judge 13/14 (S1 869/1/47/25 同値) | 186 秒 |
+| `bash tools/m11/m11_wndseed.sh` | rc 0。`WNDCLASS-CHECK PASS` (WNDCLASS 11 / fn WNDPROC 8 / 最終 IR 未定義 0) | 2 分 13 秒 (user 2 分 13 秒) |
+| `bash tools/gui/flengine/e2e.sh` run 1 | rc 0。**judge 14/14 PASS**。selftest 500 passed / 0 failed。ネガコン 9/9 が期待どおり FAIL | 175 秒 (load 0.99 → 0.90) |
+| 同 run 2 | rc 0。judge 14/14。S1 871/1/47/23 = base | 176 秒 (load 1.00 → 0.92) |
+| 同 run 3 | rc 0。judge 14/14。S1 871/1/47/23 = base | 175 秒 (load 1.01 → 0.95) |
+| `bash tools/gui/e2e.sh` | rc 0。**ALL PASS** (simd / text / present / input / stress / Chrome E2E。ネガコン含む。ASan UAF は本回に出ず) | 2 分 1 秒 (121 s。`node_modules` 準備後の 1 回) |
 
-- **n = 3 (run 3〜5) の判定は一致**: 13/14、FAIL は S1 のみ。同一 HEAD での再現性あり。
-- **S1 の差分の内訳** (base 同一 build の unit 別結果と突合): 942 unit のうち差は **2 件**のみ。unit 304 と 555 が base で `ok`、GUI soft で `trap (memory access out of bounds)`。unit 304 の soft 側ログには 125.3 MB の VA 割当 (`[m11][VA-big]`) が出ている。原因 (shim の STUB 経路 `GlobalAddAtomW` 等の戻り値差か、VA 上限の差か) は**未確認**。判定式は緩めていない。
-- 新規 lift 欠陥は本回では見つかっていない。`function_52a7f0` の `RegisterClassW` 脱落 (§5-2) は OPEN のまま (judge の OPEN 行)。
-- 本回で判明した素材の注意: `work-m11` の `boot0..4` は素材のまま、`boot6` は `m11_wndseed.sh` で作る必要がある。`m11_gen_ir2.sh` 単独では WNDPROC 8 件が未定義になり W1 FAIL (e2e run 2 で確認)。
+- judge の各 gate (run 1〜3 共通): L1 (ff・soft) PASS / A1 declare=193 = adapter=193 (impl 173 / stub 20) / B1 units_run 52 = base 52 / R1 `LoadStringW` IMPL / R2 reach 32 ≥ floor 19 / S1 871/1/47/23/0 = base / S2 ff・soft とも STUB `LoadImageW` / P1〜P4 PASS / W1 PASS (外 0) / P5 PASS (hwnd 0x110000e)。
+- 前段の 13/14 (S1 のみ FAIL: 869/1/47/25) は、取り込み前の main (`fe53ba30`) で出ていた値。main 取込後の `e9007eca` では base と一致し、判定式は一度も緩めていない。差分の詳細 (unit 304 / 555) は取込前の HEAD での調査結果で、現 HEAD では再現しない。
+- `gui/e2e.sh` の初回は step 5 (tsc) と step 6 (agent-browser) が worktree に依存が無いため落ちた (rc 1 / rc 2)。環境起因で本 PR の変更とは無関係。依存を入れて rc 0 を得た。
+- 素材の注意: `work-m11` の `boot0..4` は素材のまま、`boot6` は `m11_wndseed.sh` で作る必要がある。`m11_gen_ir2.sh` 単独では WNDPROC 8 件が未定義になり W1 FAIL。
 
 ### 6c-2. HEAD `b3819e2` の再測 (review #576 指摘 2 への対応・素材 `work-m11` / `toolchain-*` / `apt-mingw` を展開して実行)
 
