@@ -24,7 +24,7 @@ build 5.3〜10.1 s、survey 12.4〜12.8 s (いずれも wall の単発。既定 
 
 分母は 942 unit = ok + oob + halt0 + miss + noproc (全行で一致)。`noproc` は `_m11_call_unit` が 0 を返した unit で、3 構成とも unit 941 (VA 0x0) の 1 件。
 
-再実行 (同じ手順・単発・並列数 1。上表と同じ kind の結果を再現): OFF build 8.0 s / survey 8.8 s、ON build 3.9 s / survey 9.0 s、load average (uptime 1 分値) 0.38〜0.84。OFF 818 / 21 / 56 / 46 / 1、ON 817 / 21 / 56 / 47 / 1、ok 退行 415。
+再実行 (同じ手順・単発・並列数 1。上表と同じ kind の結果を再現): 初回 (work-m11 展開直後で再 cc を含む) OFF build 8.0 s / survey 8.8 s、ON build 3.9 s / survey 9.0 s。commit `d8f0e5d` での再実行 (差分 build) OFF build 3.7 s / survey 8.9 s、ON build 3.7 s / survey 8.9 s。load average (uptime 1 分値) 0.12〜0.84。OFF 818 / 21 / 56 / 46 / 1、ON 817 / 21 / 56 / 47 / 1、ok 退行 415。
 
 OFF → ON の遷移は ok→miss 1 (415) のみ。他は kind 不変 (oob→oob 21, halt0→halt0 56, noproc→noproc 1)。trap (oob+halt0) は OFF 77 / ON 77 で不変 (ON は halt0→ok を一つも作らない = 本ベースでも ON の利得が無い)。
 
@@ -60,7 +60,7 @@ RetDec は `mov rax,[rbx]` の deref を落とし (DEFECTS D4)、stack に dest 
 OFF でも `410320` は既定 ON (#474) で実オブジェクトを返すため同じ書込みは起きていると推定するが、OFF の `Q(inst)` は未測定。OFF の `410360` は `ret arg1` で `[inst]` を読まないため顕在化しない (未検証の推定)。
 上記の `Q(inst)`・`[inst]`・slot の数値は `448ee0` を C に置いて測った計測 (未コミット・再現なし)。
 
-再現 (commit 済み HEAD): `bash trap_triage/negctl_595.sh` (`413060` の `u64 old = Q(dest);` だけを D4 の欠陥形 `(u64)(uintptr_t)dest` に戻して ON で survey。単発、総計 35 s 実測)。
+再現 (commit `d8f0e5d` で実施): `bash trap_triage/negctl_595.sh` (`413060` の `u64 old = Q(dest);` だけを D4 の欠陥形 `(u64)(uintptr_t)dest` に戻して ON で survey。単発、総計 33 s 実測)。
 - 転記どおり (on): ok 817 / oob 21 / halt0 56 / miss 47 / noproc 1
 - 欠陥形 (d4): ok 816 / oob 21 / halt0 56 / miss 48 / noproc 1。ok→miss は unit 15 の 1 件のみ。unit 15 の icall `0x1407000` が miss 2 (on は 0)
 → 413060 の D4 が unit 15 の ok 退行の原因 (ネガコン)。
