@@ -359,7 +359,7 @@ python3 tools/plugins/f2/nc_leaf.py      # ネガティブコントロール (ki
 | 19013 | 3 | 1 | 3 | 0 |
 | 19059 | 2 | 10 | 2 | 0 |
 
-- 不一致 8 関数の内訳: IR 署名が機械語 ABI と一致するようになったのは 4 関数 (0x6b0ef0 `i64(i64,i64,double)`、0x6ca5c0 同、0x6f1650 `float(i64,float)`、0x6c9b60 ではなし)。0x6bfec0・0x6c8fc0・0x6c9b60 は `no_placeholder` で署名が変わらない (RetDec の placeholder が `xor i128 0,0` の形をしていない: 0x6bfec0 は `__asm_movss__4` 結果を `ucomiss` に渡す形、0x6c8fc0 は `__asm_addss(i128 %1, ...)` の %1 が `xor i128 0,0` だが [C] の突合が不成立)。0x6c8c90・0x6cc2e0 は `slot_occupied` (RetDec が slot 3 を整数 `%arg4` で宣言済み)。
+- 不一致 8 関数の内訳: IR 署名が機械語 ABI と一致するようになったのは **3 関数** (0x6b0ef0 `i64(i64,i64,double)`、0x6ca5c0 同、0x6f1650 `float(i64,float)`)。0x6bfec0・0x6c8fc0・0x6c9b60 は `no_placeholder` で署名が変わらない (RetDec の placeholder が `xor i128 0,0` の形をしていない: 0x6bfec0 は `__asm_movss__4` 結果を `ucomiss` に渡す形、0x6c8fc0 は `__asm_addss(i128 %1, ...)` の %1 が `xor i128 0,0` だが [C] の突合が不成立)。0x6c8c90・0x6cc2e0 は `slot_occupied` (RetDec が slot 3 を整数 `%arg4` で宣言済み)。
 - 署名が直った 0x6f1650 でも、case z で native x0=0x3f11c71c、wasm x0=0xffc00000 (NaN) で不一致のまま。引数が値として届いていない。**原因は未特定** (候補: `mk_targets.py` の i128 ABI アダプタが `%pad0` を含む仮引数をそのまま実引数に使う / liftdiff の float 引数の割当て位置 / `__asm_movaps` の i128 上位ビット)。
 
 ### 9.3 未解決
