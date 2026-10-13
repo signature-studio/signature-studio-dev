@@ -82,8 +82,47 @@ function wasmAssets(): Plugin {
   };
 }
 
+/**
+ * `/py/*` を tools/python から配信する (dev / preview 共通。PY-4 #77)。
+ * 許可リスト方式: host/ (ES module)・dist/ (flpy.js/wasm/data, build_flpy.sh 生成)・analysis/flapi/flapi_ids.json のみ。
+ * work/ (利用者の FL 由来 MCPTools.pyc / midi.py / utils.py) は配信しない — 利用者が UI から供給する。
+ * COEP: require-corp 下の module Worker script は応答側にも COEP/CORP が要る。
+ */
+function pyAssets(): Plugin {
+  const dir = path.join(here, "tools/python");
+  const allowed = /^(host\/[\w.-]+\.mjs|dist\/flpy\.(js|wasm|data)|analysis\/flapi\/flapi_ids\.json)$/;
+  const types: Record<string, string> = { ".mjs": "text/javascript", ".js": "text/javascript", ".wasm": "application/wasm", ".data": "application/octet-stream", ".json": "application/json" };
+  const mw = (req: IncomingMessage, res: ServerResponse, next: () => void): void => {
+    const url = new URL(req.url ?? "/", "http://x");
+    if (!url.pathname.startsWith("/py/")) return next();
+    const rel = decodeURIComponent(url.pathname.slice("/py/".length));
+    const file = path.join(dir, rel);
+    if (!allowed.test(rel) || !existsSync(file) || !statSync(file).isFile()) {
+      res.statusCode = 404;
+      res.end("not found");
+      return;
+    }
+    res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+    res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
+    res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
+    res.setHeader("Content-Type", types[path.extname(file)] ?? "application/octet-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Content-Length", statSync(file).size);
+    createReadStream(file).pipe(res);
+  };
+  return {
+    name: "py-assets",
+    configureServer(server) {
+      server.middlewares.use(mw);
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use(mw);
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [crossOriginIsolation(), wasmAssets()],
+  plugins: [crossOriginIsolation(), wasmAssets(), pyAssets()],
   server: {
     // tools/ 配下は巨大な work/ を多数抱える (inotify watch 枯渇 ENOSPC の原因)。HMR 対象外にする
     watch: { ignored: ["**/tools/**", "**/deploy/**", "**/dist/**", "**/node_modules/**"] },
