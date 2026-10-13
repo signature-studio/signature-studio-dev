@@ -46,3 +46,41 @@ stubs (LGPL 参照) 署名との照合 (kwlist のある 103 のうち stubs 署
 - (a) 実機 FL での `mixer.getCurrentTempo(1)` 等の意味差確認は実機が必要で未着手 (#81 のブロッカーのまま)。`device.flrMidiNote` / `flrMidiCC` の書式・kwlist も未復元 (2 件)。
 - stubs 既定値が C 側で不明な引数を飛ばす呼出し (`channels.soloChannel(1, useGlobalIndex=True)` 等 3 関数) は `TypeError`。実 FL は C 側の既定値で通すため意味差。ホストへの「省略」の渡し方 (provider は `None`=handler 既定値、JS mock の `tog` は `undefined` のみ省略扱い) が未統一で、PM 判断待ち (PR #463 コメントに起票依頼)。
 - stubs 既定値 `midi.*` 10 種 (21 引数: `PIM_None` 7、`GT_All` 5 ほか) は `eval(…, {})` で `NameError` (main 既存の問題)。PM が別 issue で追跡 (PR #463 コメントに起票依頼)。
+
+## 14. 省略引数のホスト受け渡し方式と誤束縛 0 検証 (PY-15, #653)
+
+既知類型との関係 (DEFECTS.md): 該当なし (lift ではなく Python 側の引数束縛。「別の引数の既定値が入る」は本 run の誤束縛の定義)。
+親: #81 (PY-9 b)。起点 HEAD: `8d883c3` (main)。検証版 HEAD: 本 PR の最終 commit (下記)。
+
+### 方式の決定 (3 案の比較)
+| 案 | 内容 | 判定 |
+|---|---|---|
+| センチネル | 省略を表す新タグを 16B スロット ABI に追加 | **不採用**。`flhost_lib.js` / `provider/fl_dispatch.c` / `fl_mock.mjs` / 実 FLEngine 側の 4 箇所を同時変更が要る。途中の省略を使う実呼出しが、本 run の MCPTools 20 箇所 (14 パターン) には 0 件 (下表) |
+| 位置省略 (末尾のみ) | tuple を短くし、C 側 (`fl_dispatch.c` の `nmin ≤ argc ≤ np`) の既定値に任せる | **採用 (末尾)** |
+| C 側既定値の静的特定 | 書式の既定値を binary から復元 | **不採用**。`PyArg_ParseTupleAndKeywords` の既定値は呼出し前の局所変数初期化で、静的に確定できない (#81 (a) の実機確認が必要) |
+
+途中の省略 (既定値不明の引数を飛ばして後続を kw 指定) は `TypeError` (推測で埋めない)。
+
+### 既定値の規則の変更 (誤束縛の原因)
+旧 (main, PY-9 b): stubs の既定値を「同名」または「同位置の名前違い」から引き継いでいた。
+- 名前違いの同位置 10 件は**別の引数の既定値**: 例 `channels.getChannelVolume` の `mode=False` → `useDb`、`mixer.getTrackVolume` の `mode=0` → `flag`、`general.saveUndo` の `update=True` → `updateHistory`、`device.forwardMIDICC` の `mode=1` → `forwardTo`。
+- `midi.*` 10 種 (21 引数) と `'1 / 24'` (1 引数) は `eval` で `NameError` / 数値化。
+- 新: 同名のみ引き継ぎ、単純リテラル (`ast.literal_eval` が通る値) のみ採用。`eval` 廃止。
+
+§12 の旧記述「stubs 名が kwlist の別位置に現れる 3 関数 (`channels.soloChannel` / `plugins.getColor` / `plugins.getParamValueString`) は既定値を引き継がない」は**誤り** (訂正)。実装は同名なら位置によらず引き継いでおり、今回の変更で残ったのは「既定値不明の位置を飛ばす」規則だけ。`plugins.getColor` では旧 main が `useGlobalIndex` の既定値を `paramIndex` の位置へ入れて誤束縛していた (新は TypeError)。
+
+### 計測 (全て本 run、`python3 --version` 3.14 / wasm 不要)
+| 検査 | 結果 | 所要 |
+|---|---|---|
+| `tests/kwsig_bind_check.py` (新規) | functions 103 / cases **6122** (期待 tuple 1123 + TypeError 4999) / ok **6122** / misbind **0** / mismatch **0** → PASS | 0.09 秒 (load average 2.26 = CPython wasm ビルドと並行) |
+| `tests/kwsig_bind_check.py --src <main の src>` (ネガコン) | ok 5995 / misbind **25** / mismatch **102** → **FAIL** (exit 1) | 同 |
+| `tests/kwsig_check.py` (更新) | OK。旧 (stubs 署名のみ) との比較 224 件のうち同結果 208、差 16 件 (11 関数)。差はすべて上の規則変更 (a)〜(c) で説明済み | 0.09 秒 (同 load) |
+| MCPTools の flapi kw 呼出し (`tests/mcp_kwcalls_extract.py` + `tests/mcp_kwcalls_bind.py`) | pyc (win64 `block25159_DATA.bin`, 100,674 B) から 20 箇所・**14 パターン**。新 bind で **14/14 通る**。途中の省略を要する呼出し **0** | 0.02 秒 (抽出 `mcp_kwcalls_extract.py` は python3.12 で別途) |
+
+- kwlist 関数の検証定義: misbind = 位置 j ≥ k の値が「その位置の kw 識別子 (値 200000+最初の位置)」でも「同名 stubs 既定値」でもない。mismatch = それ以外の不一致 (期待と違う例外・長さ・値)。
+- 期待値は `flapi_table.json` の仕様 (kwlist・required・同名リテラル既定値) から `tests/kwsig_bind_check.py` 内で組む (`src/fl_api.py` の実装は見ない)。positional のみ (kw 0 個) は既存仕様どおり素通し。
+- MCP 14 パターンは main の bind でも 14/14 通った (本 run の抽出形式 = positional 個数を CALL の argc から取得)。REPORT §12 の「旧 main は 13/14 (`getParamValueString` の NameError)」はこの形式では再現しなかった。原因未確定 (旧計測の呼出し形式が違う可能性)。**要確認**。
+
+### 検証環境
+- 実測 load average・秒は表の値。`tests/kwsig_bind_check.py` の並列 1 本、Python 3.14、`tools/python` の既存テスト (`kwsig_check.py`) と同一条件。
+- `tests/mcp_kwcalls_extract.py` は `python3.12` (`/usr/bin/python3.12`、3.12 の pyc を読むため)。入力は `fl-win64.tar.zst` の `extracted/block25159_DATA.bin` (`tar --zstd -xf ... extracted/block25159_DATA.bin`、2.4 秒)。

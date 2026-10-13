@@ -235,4 +235,9 @@ mock との差で見つかったもの: mock は引数の個数/型を検査し�
 FLEngine の PyMethodDef 表から 435/435 関数を対応付け、書式 303 関数・kwlist 103 関数を復元 (flags=4 の 125 件は書式無し)。`fl_api.bind` は kwlist 名を stubs 名より優先し、既定値が静的に不明な引数の省略後は後続の既定値を足さない (`getGridBit(index=1)` → `(1,)`)。stubs 名とは 66 一致 / 28 不一致 (バイナリを正とする)。再現: `FL_WIN64_DIR=<fl-win64 展開先> python3 analysis/flapi_kwargs.py` の後 `python3 tests/kwsig_check.py` (0.03〜0.04 秒)。wasm 回帰 (`all_tools.mjs` 48/48 ほか)・stubs 照合の例・`arrangement.selectionSet` の kwlist 重複の CPython 実測: [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §12。
 
 ## 13. 未解決 (#81)
-(a) 実機 FL での `mixer.getCurrentTempo(1)` 確認 (#81 のブロッカー)、`device.flrMidiNote` / `flrMidiCC` の書式未復元、省略引数のホストへの渡し方・stubs 既定値 `midi.*` の `eval` NameError は PM 判断待ち (PR #463 コメントに起票依頼)。詳細: [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §13。
+(a) 実機 FL での `mixer.getCurrentTempo(1)` 確認 (#81 のブロッカー)、`device.flrMidiNote` / `flrMidiCC` の書式未復元。省略引数の渡し方と `midi.*` 既定値の `eval` NameError は #653 (PY-15) で解決 (§14)。詳細: [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §13・§14。
+
+## 14. 省略引数のホスト受け渡し方式と誤束縛 0 検証 (PY-15, #653)
+- **方式**: 末尾の省略は positional tuple を短くして C 側の既定値に任せる。既定値不明の途中の省略は呼出しを `TypeError` にする (sentinel は不採用、推測値で埋めない)。既定値は stubs の**同名**引数の単純リテラルだけ。
+- **検証**: `tests/kwsig_bind_check.py` — kwlist 103 関数・6122 呼出し: 誤束縛 0 / 不一致 0 → PASS。ネガコン (main の `fl_api.py`) は misbind 25 / mismatch 102 で FAIL。
+- 詳細・計測・未解決: [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §14。
