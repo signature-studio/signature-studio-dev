@@ -162,3 +162,26 @@ leaf_diff は IR leaf かつ機械語に間接 call 無しの 23 関数のみを
 - 判定 (23 関数): 0x5de250 **match** (8/8/11、修正前 match 8/8/11 に戻った)、0x6f1650 **match** (11/11/11)、0x6c8fc0 **match** (8/8/11)。mismatch 6 は 0x6bfec0・0x6c9b60・0x6b0ef0・0x6c8c90・0x6cc2e0・0x6ca5c0 (修正前からの未解決と同じ集合)。
 - 修正前 (`78aa75ad`、§10.4 の前 run 引用) は一致 15 / 不一致 8。本 commit は一致 17 / 不一致 6 で、件数の整合は取れる (前 run の match 15 に 0x6c8fc0・0x6f1650 が加わり、不一致 6 は未解決 6 と同じ集合)。ただし**全 23 関数の直接突き合わせは本 run で再計算していない** (修正前の作業ツリーを再生成していないため)。
 - 注: この方式 (a') は 0x5de250 の機序を解消していない。block 19006 の RVA 配置を残すだけで、「0x30D0F4 の読み先」の正しさは未確定。この配置がなぜ native と一致するかは #923 で切り分ける。0x6cc2e0 (同 block の別関数) は mismatch のまま。
+
+## 10.12 (#871 fix モード 9) HEAD `3b38f81d` での再測定 (素材付き・PR 指摘 1・3 への対応)
+
+- 検証 HEAD: `3b38f81d`。コードは `2b84c6f5` と同一 (`git diff 2b84c6f5 HEAD -- tools/` は本付録 `REPORT_APPENDIX_871.md` の 11 行追記のみ。`mk_targets.py` は変更なし)。
+- 素材: `$HOME/artifacts/` に `fl-win64`・`toolchain-retdec`・`toolchain-emsdk` の 3 点実在を確認。`/opt/emsdk`・`/opt/retdec` 展開済み。`fl-win64` は `f2/env.sh` が `$RUNNER_TEMP/fl-win64` に `extracted/*_PE.bin` (313 本) を展開。
+- `f2_step1.sh`: rc 0、420 s (開始時 load 0.44)。`DIFF count = 0`。IR leaf 55 / うち機械語でも間接 call 無し 23。
+- `leaf_diff.sh`: rc 0、138 s (開始時 load 6.81、スクリプト記録 load 1.08)。**最終判定 一致 17 / 不一致 6 / 実行不能 0**。集合一致 EQ、IR から call 脱落 0。`2b84c6f5` の §10.11 と一致。
+  - 0x5de250 (19006): match 8/8/11。0x6f1650 (19059): match 11/11/11。0x6c8fc0 (18975): match 8/8/11。
+  - mismatch 6: 0x6bfec0・0x6c9b60・0x6b0ef0・0x6c8c90・0x6cc2e0・0x6ca5c0 (修正前からの未解決と同じ集合)。
+- `nc_leaf.py` (ネガティブコントロール、HEAD `3b38f81d`): rc 0、204 s (開始時 load 0.71)。実行には `FL_WIN64_DIR` を `$RUNNER_TEMP/fl-win64` に向ける必要があった (既定の `/home/ubuntu/...` では PE が無く失敗)。
+  - 結果 (変異後 mismatch 検出 / ベースライン match の変異対象):
+
+| kind | 変異対象 (ベースライン match) | 変異後 mismatch (検出) | match のまま (未検出) | unexec |
+|---|--:|--:|--:|--:|
+| store_drop | 6 | 6 | 0 | 0 |
+| load_drop | 11 | 11 | 0 | 0 |
+| offset_shift | 13 | 13 | 0 | 0 |
+| 計 | 30 | 30 | 0 | 0 |
+
+  - 前回 (`776e4155`、0x5de250 が mismatch だった時点) は 28 件 (store_drop 5 / load_drop 10 / offset_shift 13)。今回は 0x5de250 が match に戻ったため、store_drop・load_drop に各 1 件 (`nc_store_drop19006` / `nc_load_drop19006`) が加わって 30 件になった。offset_shift の対象 (13) は変わらない。
+- 残 mismatch の定義 (本付録・PR 本文で共通): 分母は leaf_diff の対象 23 関数。**残 mismatch 6 = 修正前からの未解決 6 関数** (回帰 0)。
+- 回帰 0x5de250 の機序 (wasm 側の読み値 vs native `0x70CF34`) は本 run でも未確定。`0x1C0` のずれの出どころと block 19006 の RVA 配置の扱いは #923 の子で切り分ける。
+- 影響範囲: 検証は leaf 23 関数に限る (§10.5)。非 leaf 7 関数 (30 − 23) の liftdiff は未実施 (#923)。
