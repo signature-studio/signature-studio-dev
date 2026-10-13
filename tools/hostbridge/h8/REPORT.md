@@ -5,14 +5,19 @@ H8 の 3 機構を headless Chrome 154 (`tools/runtime/lib/chrome.mjs`) 上で�
 
 実行: `node tools/hostbridge/h8/run_h8.mjs --out <json>` (約 15 s)。
 
-## 結果 (commit HEAD で再現)
+## 結果
 
-| 項目 | 内容 | 判定 |
-|---|---|---|
-| C1 | main thread で同期 `WebAssembly.Instance` 生成、`add(2,3)=5` | PASS (生成 25.0 ms, 初回のモジュール解決込み) |
-| C2 | Worker 内で同期 `WebAssembly.Instance` 生成、`crossOriginIsolated=true`・`SharedArrayBuffer` 利用可 | PASS (生成 0.125 ms, 同じ小 module) |
-| C3 | SAB + `Atomics.wait`/`notify` の RPC で Worker の wasm を 1000 回呼び、全件一致 | PASS (167.6 ms, 約 168 µs/call, `waitAsync` 経由) |
-| C4 | AudioWorklet (`ring-reader`) を配置、Worker が SAB ring に 65536 sample を書き、worklet が消費 | PASS (consumed 65536/65536, 総和一致 2147450880, process 517 回, sampleRate 44100, state running) |
+実行 2 回 (コミット 26226a0f の HEAD 上)。いずれも RESULT PASS。
+
+| 項目 | 内容 | 1 回目 | 2 回目 | 判定 |
+|---|---|---|---|---|
+| C1 | main thread で同期 `WebAssembly.Instance` 生成、`add(2,3)=5` | 生成 25.0 ms | 3.8 ms | PASS |
+| C2 | Worker 内で同期 `WebAssembly.Instance`、`crossOriginIsolated=true`・SAB 利用可 | 0.125 ms | 0.125 ms | PASS |
+| C3 | SAB + `Atomics.wait`/`notify` RPC で Worker の wasm を 1000 回呼び、全件一致 | 167.6 ms (168 µs/call) | 22.4 ms (22 µs/call) | PASS |
+| C4 | AudioWorklet (`ring-reader`) 配置、Worker が SAB ring に 65536 sample を書き、worklet が消費 | consumed 65536/65536, sum 一致, process 517 | 同左 | PASS |
+
+C3 の往復時間は実行間で約 7 倍ばらつく (headless 環境の負荷由来と推定。原因は未確定)。
+予算判断には複数回の計測が必要。
 
 ## 範囲と未検証
 
