@@ -4,7 +4,7 @@
 
 ## 12. MX2-3 (N5 / N6) 実測 — 2026-10-13 (#830)
 
-- 結論: N5/N6 は現行 IR pass の差し替え点を指定できない (文字列に参照元が無い)。e2e は 3 レベルとも 11/11 PASS (`d7cf3c77`)。
+- 結論: N6-1 の読み手関数 0x180f95e20 を確定 (§12.2a)。N6-2〜6 と N5 の読み手は未確定。現行 IR pass の差し替え点はまだ決められない。e2e は 3 レベルとも 11/11 PASS (`d7cf3c77` の記録)。
 - 詳細・実測表・訂正: [REPORT_APPENDIX.md §12](REPORT_APPENDIX.md)。未達の起票先は同節 §12.3。
 
 
@@ -25,34 +25,48 @@
 
 | 対象 | VA | 文字列 | 直接参照 (RIP / 絶対ポインタ / RVA32) |
 |---|---|---|---|
-| N6 | 0x184ffcf87 / 0x184ffcfe8 / 0x184ffd03f / 0x184ffd092 / 0x184ffd0d6 / 0x184ffd131 | 'Please (open\|use) Native Access to (re-)activate.' 系 6 件 | **0 件** (3 方式とも) |
-| N5 | 0x18415f411 | 'MXDemoPopup.qml' (QML 資源名。周辺は MX*.qml 列) | **0 件** |
-| N5 | 0x184879407 / 0x1848792b9 / 0x18487941a | QML property 'demoExpired' / 'demoExpiredChanged' / 'subscriptionExpired' | **0 件** |
+| N6 | 0x184ffcf87 / 0x184ffcfe8 / 0x184ffd03f / 0x184ffd092 / 0x184ffd0d6 / 0x184ffd131 | 'Please (open\|use) Native Access to (re-)activate.' 系 6 件 | 全 pdata 関数の RIP 相対走査で **14 件** (§12.2a)。旧記載の「0 件」は再現しない (原因未調査) |
+| N5 | 0x18415f411 | 'MXDemoPopup.qml' (UTF-16LE。QML 資源名。周辺は MX*.qml 列) | RIP 相対 **0 件** (正しい範囲 `[0x18415f411,0x18415f42f)` で §12.2a) |
+| N5 | 0x184879407 / 0x1848792b9 / 0x18487941a | QML property 'demoExpired' / 'demoExpiredChanged' / 'subscriptionExpired' | RIP 相対 **0 件** (§12.2a) |
 | N3 文言 | 0x185013ca8 (UTF-16) | 'Subscription expired.' | 関数 **0x18010e4e0** から RIP 参照 (1 件) |
 | N2 文言 | 0x184ffc425 | 'Your serial number is incorrect. Please run ' | 関数 0x181142160 / 0x181143c00 から RIP 参照 (各 1 件) |
 
 - **訂正**: §6・§11.2 の「N3 'Subscription expired.' 0x18010e4e0」は文字列アドレスではない。0x18010e4e0 は文言 0x185013ca8 を参照する**関数** (`.pdata` 登録済み)。文字列の正しい VA は 0x185013ca8。
 - 同 §6 の N5/N6 表の文字列 VA は本節の実測と一致する (文字列の実在は `license/work/mx_strings.json` で確認)。
+- 旧版の「N6 直接参照 0 件」は、全関数の RIP 相対走査 (§12.2a) で再現しなかった。原因は未調査。「N5 MXDemoPopup の範囲 `[0x18415f411,0x18415f412)`」は UTF-16 を 1 バイトとして扱った誤りで、正しい範囲は `[0x18415f411,0x18415f42f)`。
 
-- 参照走査は `license/work/cg.pkl` の `rip` 表 (RVA キー) と、`.rdata`/`.data`/`.pdata`/`.xdata` 全体の 8B・4B 絶対値検索による。
-- N6・N5 の文字列は `.rdata` の一般文字列プール内に並び、周辺は他の UI 文言・QML 資源名と混在する。**ネイティブ関数からの参照は見つからなかった**。QML ランタイム側 (Qt) が読む経路と推定 [推]。
-- よって現行の IR pass (`mx_lic_stub.py`, 差し替え点は関数の分岐・store) では N5/N6 の差し替え点を指定できない。`acpt_verify_mx2.py` の N5/N6 項目は文字列の実在確認のみで、差し替え点ではない。
+### 12.2a 読み手の追跡 (スクリプト `scripts/mx_xref_fn.py --all`・#1017)
 
-### 12.2a 読み手の追跡 (HEAD = `a89d4ea3`・#1017)
+- 素材: `plugins-massivex` (`Native Instruments Massive X v1.7.1.exe`) を本 run で `scripts/parse_setup_headers.py` → `scripts/extract_massivex.py` で抽出。`work/extracted/VST3/Massive X.vst3` = 95,356,824 B / md5 `622993e7…` (PR 本文と一致)。
+- 手順: `.pdata` の全関数 (`begin≠0` かつ `end>begin` の 187,061 件) を capstone で線形逆アセンブルし、RIP 相対メモリオペランドの参照先が範囲 `[lo,hi)` に入るものを列挙。ASCII 範囲は NUL 区切り、N5 `MXDemoPopup.qml` は UTF-16LE の既知長 (30 B)。
+- 注: 本走査は **RIP 相対のみ**。絶対 8B・RVA32 の参照は走査していない。
+- 実行時間: `--all` 2 min 25 s (`cbfcff96` の内容で実行)。
 
-- 手順: `.text` の rel32 候補を capstone で命令境界まで確定し (`scripts/mx_xref_fn.py`)、文字列を含む NUL 区切り範囲 `[lo,hi)` で照合。
-- **N6 の読み手 (確定)**: 関数 **0x180f95e20** (pdata `[0x180f95e20,0x180f960bf)`)。`r8d` (2〜5) で分岐する文字列生成関数で、N6 の 68 B 文字列 (`Your hardware has changed. / Please open Native Access to re-activate.` を含む範囲 `[0x184ffcf6c,0x184ffcfb0)`) を `movups` で 16B 単位に組み立てる (0x180f95f03 / 0x180f95f0d / 0x180f95f18 / 0x180f95f23)。
-  - 参照の内訳 (作成者の実測・未再検証): この範囲を読む命令は 0x180f95f03 / 0x180f95f0d / 0x180f95f18 / 0x180f95f23 の movups 4 箇所。関数内の他の分岐 (0x180f95e86 等) が読む範囲は未確認。
-  - N6 の 6 範囲 (`[lo,hi)` は `mx_xref_fn.py` の `cstr` で確定する): 0x184ffcf87 / 0x184ffcfe8 / 0x184ffd03f / 0x184ffd092 / 0x184ffd0d6 / 0x184ffd131 の各参照元は**本 run で未確認** (素材が無く `mx_xref_fn.py` を実行できなかった)。「6 件のうち 4 件」は根拠を再現できないため撤回する。
-  - **呼び出し元は未確定**: E8 直接呼び出し 0 件・絶対 8B 0 件。RVA32 は `.pdata` (0x185fc0ff8) と `.xdata` (0x18630d324) の 2 件のみ (pdata の begin 登録 / unwind 情報のため、呼び出しではない)。間接呼び出し (vtable・関数ポインタ) 経由と推定 [推]。
-- **N5 の読み手 (未特定)**: `MXDemoPopup.qml` 0x18415f411 は範囲内の参照 0 件。`demoExpired` 0x184879407 は rel32 候補 `0x1834606c4` (関数 `[0x183460653,0x18346088c)`)、`subscriptionExpired` 0x18487941a は候補 `0x182d0841f` (関数 `[0x182d083c8,0x182d084fc)`) があるが、capstone で RIP 相対オペランドとしては確定できなかった (候補 disp が命令内でない可能性)。`demoExpiredChanged` 0x1848792b9 は候補 0 件。
-- 検証 HEAD: `a89d4ea3`。`git diff a89d4ea3 b5969e5a` は本 PR の 2 ファイル (本節・`mx_xref_fn.py`) のみで、e2e 対象コード (`mx_lic_stub.py` 等) は同一。
-- 上記の e2e 数値 (`-O0` 11/11 PASS 5 s / `-O1` 11/11 PASS 78 s・lift キャッシュ無し / `-O2` 11/11 PASS 6 s) は作成者の実測 (`b5969e5a` 時点の記録)。素材 `plugins-massivex` が無い後続 run では再測定していない。
+| 範囲 | `[lo,hi)` | 参照元 (関数 @ 命令 VA) |
+|---|---|---|
+| N6-1 | `[0x184ffcf6c,0x184ffcfb0)` | 0x180f95e20 @ 0x180f95f03 / 0x180f95f0d / 0x180f95f18 / 0x180f95f23 (movups 4 件) |
+| N6-2 | `[0x184ffcfb1,0x184ffd010)` | 0x181142370 @ 0x1811424a9 |
+| N6-3 | `[0x184ffd011,0x184ffd067)` | 0x181144570 @ 0x181144699 |
+| N6-4 | `[0x184ffd068,0x184ffd0ba)` | 0x181142370 @ 0x181142426 / 0x181144570 @ 0x1811446c2, 0x18114472f, 0x181144796 / 0x1811453f0 @ 0x181145433 |
+| N6-5 | `[0x184ffd0bb,0x184ffd0fe)` | 0x181144570 @ 0x18114498b |
+| N6-6 | `[0x184ffd0ff,0x184ffd156)` | 0x181142640 @ 0x1811426b2 |
+| N5 MXDemoPopup.qml | `[0x18415f411,0x18415f42f)` | 0 件 |
+| N5 demoExpired | `[0x184879407,0x184879412)` | 0 件 |
+| N5 demoExpiredChanged | `[0x1848792b9,0x1848792cb)` | 0 件 |
+| N5 subscriptionExpired | `[0x18487941a,0x18487942d)` | 0 件 |
+
+- **N6-1 の読み手 (確定)**: 関数 **0x180f95e20** (pdata `[0x180f95e20,0x180f960bf)`) は N6-1 `[0x184ffcf6c,0x184ffcfb0)` のみを読む (`movups` 4 件)。N6 の他 5 範囲は別関数 (上表) で、この関数は読まない。
+  - 呼び出し元は未確定。E8 直接呼び出し 0 件は前版の記録 (本走査は呼び出し元を集計していない)。間接呼び出し経由と推定 [推]。
+- **N6-2〜6 の読み手 (未確定の役割・呼び出し元)**: 関数 0x181142370 / 0x181144570 / 0x181142640 / 0x1811453f0 が読む。役割と呼び出し元は本節の対象外 (#1017 で扱う)。
+- **N5 の読み手 (未特定)**: 4 範囲とも RIP 相対参照 0 件。前版の rel32 候補 (0x1834606c4 / 0x182d0841f) は RIP 相対の走査対象外で、未確定のまま。
+- 検証 HEAD: スクリプト実行は `cbfcff96` の内容。`git diff a89d4ea3 b5969e5a` は本 PR の 2 ファイル (本節・`mx_xref_fn.py`) のみで、e2e 対象コード (`mx_lic_stub.py` 等) は同一。
+- e2e 数値 (`-O0` 5 s / `-O1` 78 s・lift キャッシュ無し / `-O2` 6 s, 11/11 PASS) は作成者の記録 (`b5969e5a` 時点)。本 fix run では `toolchain-retdec` が無く lift を伴う e2e は再測定していない。
 
 ### 12.3 未達と起票先
 
 | 未達 | 影響 | 起票先 |
 |---|---|---|
-| N5 demo UI 抑制 (QML 側の demoExpired / subscriptionExpired / MXDemoPopup 表示経路の特定と差し替え) | 受入条件 1 未達 | #1017 [MX-4] (OPEN) |
-| N6 Native Access 誘導文言 6 種の抑制 (読み手関数 0x180f95e20 の呼び出し元の特定 → 差し替え点の決定) | 受入条件 2 未達 | #1017 [MX-4] (OPEN) |
+| N5 demo UI 抑制 (QML 側の demoExpired / subscriptionExpired / MXDemoPopup 表示経路の特定と差し替え)。N5 の 4 範囲は RIP 相対の参照元 0 件 | 受入条件 1 未達 | #1017 [MX-4] (OPEN) |
+| N6 Native Access 誘導文言 6 種の抑制 (N6-1 の読み手 0x180f95e20 の呼び出し元の特定。N6-2〜6 の読み手関数 0x181142370 / 0x181144570 / 0x181142640 / 0x1811453f0 の役割と呼び出し元の特定 → 差し替え点の決定) | 受入条件 2 未達 | #1017 [MX-4] (OPEN) |
 | `acpt_verify_mx2.py` の N5/N6 検査は文字列実在のみ | 「抑制済み」の機械検証が無い | #1017 [MX-4] (OPEN) |
+| e2e の再測定 (`toolchain-retdec` 素材が必要) | 本節の e2e 数値は作成者の記録のまま | #1183 (素材付き再測定) |
