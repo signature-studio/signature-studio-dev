@@ -213,26 +213,38 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   入力の先頭 200 文字・cost) が出る。repo が public のため、**tool の出力と生 JSONL はログに出さない**
   (認証情報・FL 由来物の漏洩防止。secret マスクは登録値との完全一致でしか効かない)。
   issue へのコメントは agent が `gh issue comment` で行う。
-- **上限**: job は 60 分。収まらない作業は中間 commit + draft PR で区切る。
+- **上限**: job は 60 分。収まらない作業は中間 commit + **ready PR (`Refs #N` + 未解決の起票)** で区切る (draft は禁止: REVIEWING でも FIXING でもない状態になる)。
 - 稼働本数は「走っている Actions run 数」で数える (`gh run list --status in_progress`)。
 - **PM の watch ルール (依頼者指示 116)**: 起動した全ての run は無条件で `gh run watch` する。PM が
   応答を終える時は、background で `gh run watch` が 1 本以上走っていること。完了通知を受けたら、
   結果の処理に入る前に、次の watcher を起動し直す。
-- **実装が始まったチケットは merge まで止めない (依頼者指示 119・120)**: open PR は常に次のいずれかの状態で、
-  各状態に「次の一手」が決まっている。止まっている PR を残さない。
-  判定は表の上から順に評価し、**最初に該当した行**を採る。draft の PR は、CONFLICT・FIX に該当しなければ
-  review の有無・種別によらず DRAFT になる。
+- **open PR は 2 状態のみ (依頼者指示 119・120・122・123)**: 実装が始まったチケットは merge まで止めない。
+  open PR は常に次の **どちらか** であり、「レビューも修正もされていない状態」(IDLE) を 1 秒も作らない。
 
-  | 状態 | 判定 | 次の一手 |
-  |---|---|---|
-  | CONFLICT | main と競合 (`mergeable=CONFLICTING`)。draft でも適用。**競合 PR は review run が起動しない** | main を merge して競合を解消する run |
-  | FIX | oc-reviewer の最新 review が現在の head に CHANGES_REQUESTED。draft でも適用 | 指摘 (reviewer・Copilot・inline) の修正 run。妥当でない指摘は実測を添えて理由を PR に残す。draft なら修正後に ready にする |
-  | NOREVIEW | ready で現在の head に review が無い | review 再起動 (run が既にあれば待つ) |
-  | DRAFT | draft (CONFLICT・FIX に該当せず、review の有無・種別を問わない) | ready にして review 再起動 |
-  | COPILOT | reviewer が COMMENTED (Copilot の review 待ち) | 30 分経ったら close→reopen |
-  | APPROVED | approve 済みで未 merge | merge。PR 本文にマージ順があれば先行 PR の後。base が別 PR のブランチなら先行 merge 後に付け替え |
+  | 状態 | 意味 | 担い手 | 次の遷移 (人手 = PM を介さない) |
+  |---|---|---|---|
+  | REVIEWING | review job が走っている / 待機中 | oc-reviewer | approve -> 同じ run で merge (PR は閉じる)。request-changes -> FIXING |
+  | FIXING | 差し戻しを受けた implement job (fix モード) が走っている / 待機中 | 実装 agent | push -> `pull_request:synchronize` で REVIEWING |
 
-  `sweep_prs.sh` が 15 分間隔で全 open PR を判定し、止まっているものを自動で次の run に載せる。
-  着手報告だけで終わった run は `find_silent_runs.sh` で検出して再投入する。
-  どちらも repo 外の PM 運用スクリプトで、所在は `docs/REFERENCES.md` `[PM-SCRIPTS]` が正本 (repo からは挙動を検証できない)。
+  遷移は workflow のイベントで自動に起きる (`.github/workflows/opencode.yaml`)。
+
+  | きっかけ | 動くもの |
+  |---|---|
+  | PR opened / synchronize / reopened / ready_for_review | review job |
+  | oc-reviewer が `changes_requested` を提出 (`pull_request_review`) | implement job (fix モード)。`gh pr checkout` した PR ブランチを直して push |
+  | copilot-pull-request-reviewer が review を提出 (`pull_request_review`) | review job (Copilot 待ち `copilot-pending` で保留した PR を進める) |
+
+  無音終了を許さない仕組み:
+
+  - **review**: run の最後に `verify-review-verdict.sh` が現在の head への verdict (APPROVED / CHANGES_REQUESTED) を
+    確認し、無ければ PR にコメントを残して close -> reopen で review を再起動する (同じ head に 3 回まで。超えたら警告して失敗)。
+    Copilot 待ちの保留は本文に `copilot-pending` を含む COMMENT で、PR 作成から 20 分未満のときだけ正当。
+  - **fix**: run の最後に `fix-progress.sh` が「head が進んだ (pushed)」「push せずコメントした (answered: close -> reopen で
+    review を起動)」「どちらもしていない (none: 1 回再試行し、なお none なら job を失敗させる)」を判定する。
+  - PR は **常に ready・base は main** で作る (draft / stacked は REVIEWING でも FIXING でもない状態を作るため禁止)。
+    未完でも ready で出して `Refs #N` と未解決を書く。前提 PR が未 merge の作業は着手しない。
+
+  PM の運用スクリプト (`pr_gaps.py` で IDLE を計測、`sweep_prs.sh` で復旧) は **バックストップ**であり、
+  IDLE が 1 件でも出たらそれ自体を workflow の不具合として扱う (所在は `docs/REFERENCES.md` `[PM-SCRIPTS]`)。
+  着手報告だけで終わった実装 run は `find_silent_runs.sh` で検出する。
 

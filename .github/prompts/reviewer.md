@@ -13,7 +13,17 @@
      含まれていないか
    - 規約違反がないか: `git add -A` / `git add .`、main への直接 push、
      10 秒以上の連続 sleep、`work/`・`venv/`・`node_modules/` への作業
-2. **レビュー実行**:
+2. **verdict は必須** (指示 122/123: open PR は「レビュー中」か「レビューを受けて修正中」の
+   どちらかであり、「レビューされず修正もされない」状態を作らない):
+   - 最終回答の前に、必ず `gh pr review <N> --approve` か `--request-changes` のどちらかを投稿する。
+     コメントだけ・何も投稿せずに終えることは禁止 (終えた run は workflow が検知して再実行する)。
+   - `--request-changes` を投稿すると、実装 agent が PM を介さず自動で起動して直し、push で
+     この review が再起動する。したがって指摘は「直せば approve できる」具体的な内容にする。
+   - 例外は Copilot 待ちだけ: copilot-pull-request-reviewer の review がまだ無く PR 作成から
+     20 分未満のとき、本文に `copilot-pending` と書いた `--comment` review を投稿して終了してよい
+     (Copilot の review が提出されると自動で再 review が走る)。20 分を超えたら Copilot 未着のまま判断する。
+   - draft の PR は approve 前に `gh pr ready <N>` で ready にする (draft は merge できない)。
+3. **レビュー実行**:
    - 承認できる場合: `gh pr review <N> --approve --body "..."`
    - 問題がある場合: `gh pr review <N> --request-changes --body "..."` (理由を具体的に)
    - **マージ前に、Copilot Code Review の指摘 (`copilot-pull-request-reviewer[bot]` の review と
@@ -24,12 +34,15 @@
      指摘は、approve 本文に「対応しない理由」と追跡 issue 番号を書く (issue が無ければ起票を PM に求める)。
      経緯: PR #416 は Copilot の妥当な指摘 4 件 (scan() の未実装の戻り値・固定パス・REPORT 行数超過・
      外部絶対パス) が残ったまま merge された。
-3. **マージ**: Auto Merge が有効な場合はそのまま待つ。
+4. **マージ**: approve したら **同じ run で必ず merge まで行う** (approve 済みで未 merge の状態を作らない)。
+   Auto Merge が有効な場合はそのまま待つ。
    Auto Merge が使えない/失敗する場合は、**レビュワーがマージまで担当してよい**:
    - `gh pr merge <N> --merge --delete-branch` (approve 後のみ)
    - このリポジトリは merge commit のみ許可されている
      (`allow_squash_merge: false` / `allow_rebase_merge: false` / `allow_merge_commit: true`)。
      **`--squash` と `--rebase` は必ず失敗する**ので使わない。
+   - merge が競合・checks で失敗したら、approve のまま放置せず `--request-changes` に切り替えて理由
+     (main との競合なら「main を merge して解消」) を書く。実装 agent が自動で直す。
    - マージ後は issue に結果コメントを残す。
 
 ## 注意
