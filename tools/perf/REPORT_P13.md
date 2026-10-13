@@ -83,7 +83,7 @@
 
 - 結果: **12/12 PASS** (全件 instantiate 成功、`f0=null`)。
 - `fetchCompile` 経路 (src の本物・受入条件 1): `bun tools/perf/delivery/fetch_compile_chunked_check.ts tools/perf/work/chunked/site big.b92b83ae3549.wasm` → streaming 199.2 ms (f0=null, exports=24) / bytes 186.7 ms (f0=null, exports=24)、progress 4 回、PASS (測定 commit `82c30421` の作業ツリー)。
-- 測定 commit `82c30421` から HEAD (`8dbeddf5`) までの差分 (`git diff 82c30421 8dbeddf5 -- tools/perf/delivery deploy/client deploy/scripts/05-stage.mjs src/runtime/loader_boot.ts tools/runtime/lib/chrome.mjs` の出力。変更行のみ抜粋):
+- 測定 commit `82c30421` から HEAD (`593f54e7`) までの差分 (`git diff 82c30421 593f54e7 -- tools/perf/delivery deploy/client deploy/scripts/05-stage.mjs src/runtime/loader_boot.ts tools/runtime/lib/chrome.mjs` の出力。変更行のみ抜粋。`593f54e7` 以降の本修正 commit は `tools/perf/REPORT_P13.md` のみ変更なので、この範囲の結果は変わらない):
 
 ```diff
 diff --git a/deploy/client/chunked.test.mjs b/deploy/client/chunked.test.mjs
@@ -93,6 +93,6 @@ diff --git a/deploy/client/chunked.test.mjs b/deploy/client/chunked.test.mjs
 ```
 
   測定経路 (`tools/perf/delivery`・`chunked.mjs`・`05-stage.mjs`・`loader_boot.ts`・`chrome.mjs`) の差分は 0。差分は `chunked.test.mjs` のテスト引数 (main 由来) のみ。
-- 今回の再測定 (新 HEAD) では 100 Mbps/接続 が 1448 ms (旧 測定 1422 ms と同水準)。按分値 (合成 1458 ms × 26.4/32.6 ≈ 1181 ms) との差は依然として約 23% で、原因は未切り分け (part 数 3→2、wasm の中身の差などが候補。確定には別測定が要る)。
+- 測定 commit `82c30421` の 100 Mbps/接続 は 1448 ms (旧 測定 1422 ms と同水準)。按分値 (合成 1458 ms × 26.4/32.6 ≈ 1181 ms) との差は依然として約 23% で、原因は未切り分け (part 数 3→2、wasm の中身の差などが候補。確定には別測定が要る)。
 - 注記: 帯域制限は接続ごと (§2 と同じ)。
 - 残り (未解決): 本番 runtime の manifest 経路は未接続 → #1166 `[PERF-P18]`。
