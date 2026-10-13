@@ -173,7 +173,7 @@ work/ (gitignore): hdr_block1/2.bin, files.json, locations.json, header_parse.js
 - **入力の同一性 (reviewer 必須 3)**:
   - 本体 `Massive X.vst3` の md5 は `622993e76565f49c094063a2b717d6ca` (`858fbfcd` で再展開して一致確認)。`dsp/REPORT.md` 先頭の記録値と一致する。
   - ただし installer 内の 16B checksum は 125 件中 0 件一致 (`md5-ok 0/125`)。§8.1 の「repack 由来の stale 値」仮説と整合するが、**展開物が実機 installer と同一であることは外部照合できていない**。
-  - よって下表の PASS は「この展開物に対する回帰」の証拠であり、「Massive X 実バイナリに対する回帰」の証拠としては**暫定**。受入「回帰」の達成判定は保留する (起票先: #266)。
+  - よって下表の PASS は「この展開物に対する回帰」の証拠であり、「Massive X 実バイナリに対する回帰」の証拠としては**暫定**。「実バイナリに対する回帰」の判定は保留する (起票先: #266)。
 - `MX_OPT=-O0` の初回 exit 1 (`patch site 0x18115dec2` assert): **再現せず**。
   - 同一 head で 3 回連続 exit 0 / 11/11 PASS (下表)。
   - 切り詰めコピー (展開物の前半 47.7 MB) を `mx_pefix.py` に通すと、`pefile` は読めて site は `e1 26` のまま、assert は出ない (前回入力とは別の状態)。
