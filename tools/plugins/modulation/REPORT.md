@@ -149,7 +149,7 @@ define = `p.final.ll` の `^define` 数。f80 = `x86_fp80` を含む define 数�
 | Vintage Chorus | 19266 | 204,800 | 127,663 | 542 / 115,986 | VSTPluginMain, main | 73 |
 | Vintage Phaser | 19268 | 313,344 | 157,493 | 626 / 141,439 | VSTPluginMain, main | 73 |
 
-`engine_lift.sh <block>` で全 `.pdata` 関数を `lift_ranges.sh` (RetDec+pass 鎖) → `emcc -c` に通した結果。RetDec rc・define 数・欠落 range・f80 は 519b3aa・8603db1・648383c・b9fe1d8 で同一。未実装 helper は main の m11_simd2 変更 (a824a1d / 9b5ea38、#535 / #538) で変わった (8603db1 の値は 86 (60) / 75 (57) / 64 (53) / 104 (77)、648383c 以降は下表の値)。`emcc -c` は 8603db1・648383c では 0/4 本だったが、main の lift 鎖変更 (`fix_icmp_ptr.py` P-E1 / `ir5_patch.py` P-F1・P-F2、`PLUG_F80_LOWER` は既定 0) を取り込んだ b9fe1d8 で 2/4 本になった (下表は b9fe1d8 の値)。lift 秒は全測定の min–max:
+`engine_lift.sh <block>` で全 `.pdata` 関数を `lift_ranges.sh` (RetDec+pass 鎖) → `emcc -c` に通した結果。RetDec rc・define 数・欠落 range・f80 は 519b3aa・8603db1・648383c・b9fe1d8 で同一。未実装 helper・`emcc -c` の経緯は付録 `REPORT_APPENDIX.md` の §E。下表は b9fe1d8 以降の値。lift 秒は全測定の min–max:
 
 | engine | RetDec rc | final.ll define | `.pdata` で define 無し (B) | range 内部に増えた define | f80 関数 | 未実装 helper (うち VEX) | `emcc -c` | 局所修復後の `emcc -c` | f80 段後の `emcc -c` (erc3) | lift 秒 |
 |--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|
