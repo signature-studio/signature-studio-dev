@@ -409,6 +409,15 @@ frame が 1 つも無い場合・捕捉 scope が無い場合・`RtlUnwindEx` �
 | GUI declare fixture (`tools/gui/integ/fixtures/boot_final_gui_declares.ll`) | adapter 0 (wasm スロットで既に一致。偽陽性なし) |
 
 - 検証範囲外: M11 closure (`boot_final2/3.ll`)・OTT (`ott_m8.ll`) と各プラグイン lift 成果物での実測。`work-m11` / `work-m6-ott` 素材が無く、`test.sh` 6b は SKIP。
+
+**main 取込後の再検証 (2026-10-13, Actions runner, 検証起点 = merge commit f6379b3 を detached worktree に展開, 各 n=3)**: §14 (SEH, #171) と本節の両方を含む HEAD で実行。
+
+| 検証 | 結果 |
+|---|---|
+| `test/sig/sig_test.sh` | 3 run とも exit 0 (ALL PASS), 11.9–12.7 s, load average (1 分値, run 開始前〜終了後) 0.34–0.63 |
+| `test.sh --quick` | 3 run とも exit 0, 33.3–33.7 s, load average (1 分値, run 開始前〜終了後) 0.58–1.09。MT 6 グループ PASS (`seh` 含む) / ST PASS / fail-fast 10 モード (`sehnomatch` `sehbadtarget` 含む) / M4 互換 PASS / 公開関数 680 / sig_test 内蔵 ALL PASS |
+| 陰性対照: merge 前の `sigs.json` (725 関数) を HEAD のソースに対して `gen_sigs.py --check` | exit 1 (main の `seh.c` が増やした `shimx_seh_*` 6 関数を検出)。再生成後 (731 関数) は exit 0 |
+
 - `test.sh` が再生成した inventory.md / BACKLOG.md / coverage.json / inventory.csv / exports.txt は m11 closure 不在で内容が変わるため、§13 と同様にコミットしていない。
 
 | 未解決 | 影響 | 起票先 |
