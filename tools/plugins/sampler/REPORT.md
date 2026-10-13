@@ -212,13 +212,15 @@ NC4 は #506 の reviewer が再現した「不合格行を追記しても exit 
 | Render test .flp の E2E (FL Keys / FPC / Granulizer / Slicer / Slicex / GMS の RT 列 Y) | 同上 | FLEngine 統合待ち。 親 #14 / #208 |
 | 閉包外の固有関数 (§2): 推移閉包を含む lift と見積の再計算 | 見積 57.5 人日の前提・wasm リンク | 新規 #537 [PLG-G3-3] (起票済み)。 dynamics #200 / PR #506 にも同じ制約があるため #200 にコメント |
 | `rep_stosb_memset` 未実装 stub (Granulizer / Slicer 各 1 call site) | silent な memset 欠落 | 新規 #538 [PLG-G3-4] (起票済み) |
-| C++ engine / 単体 DLL 2 本の `emcc -c` 未通過 (E1・dangling use・`zext 0 to i64`)、未実装 helper 215 / 151、f80 2 / 1、RetDec C バックエンドの規模耐性 | Slicer 2 (T3) の engine、GMS (T3) | 新規 #540 [PLG-G3-2] (起票済み) (同型: #523 [PLG-F4-2]・#527 [PLG-F5-2]) |
+| 未実装 helper 215 / 151 件 (VEX 系 139 / 101) が空 stub のまま `emcc -c` を通る (silent)。 CPUID 固定は静的に成立しない (§5)。 `m11_simd2.py` への VEX helper 実装 | engine の実行時の値 (差分試験で顕在化) | 既存 #527 ([PLG-F5-2]、VEX helper を課題に含む) にコメント。 起票済みの重複を避け新規は作らない |
+| engine の f80 関数 (23664 に 2 / 23677 に 1)。 `f80_lower.py` は適用して `emcc -c` を通したが、RC (fist/fistp 丸め) 方針の chop 関数指定は未評価 | f80→f64 の精度差 | #197 にコメント |
+| 共有 `lift_ranges.sh` への RetDec C バックエンド省略の導入可否は「入れない」と判断した (§5)。 `--backend-enabled-opts` / `--no-memory-limit` の実測評価は未実施 | 規模の大きい DLL の lift 時間 | #540 にコメント (継続課題) |
 | engine 内の f80 関数 (Slicer 2 engine 2 / GMS 1) | engine の wasm 化 | #197 (`f80_lower.py` の適用) にコメント |
 | host の Dispatcher ID 88 (FPC)・101 (Granulizer) が `hs_ids.json` 未収載、独立走査のみの ID 1 / 63 / 64、slot 0x28 / 0x30 / 0x68 / 0x78 / 0xb8 / 0xf0 / 0xf8 / 0x128 の意味 | P0b の応答表の網羅性 | #196 作業 5 (0x13173a0 全 case 解析) にコメント |
 | Soundfont Player の taint 版 host call が 0 site (独立走査は ID 2 を 1 site) | host 呼出面の過小計上 | #196 (ABI.md §6 の taint 精密化) にコメント |
 | Balance の 80 実装表に逆引きできない kernel 呼出先 (FPC 3 / Granulizer 4 / Slicer 4 / Slicex 2 site) | P0c の差分試験対象外 | #197 にコメント |
 | Slicex が使う 0x5dee90 / 0x5df040 | P0c の未解決 kernel | #331 にコメント |
-| Slicer 2 殻と engine の結合方式 (LoadLibrary 経路・`DispatchToEngine`) が未解析 | engine を殻に結線できない | 新規 #540 [PLG-G3-2] (起票済み) の受入条件 4 |
+| 結合方式のうち `DispatchToEngine` の呼出規約・引数の意味と `0x83e200` の引数 (LoadLibraryW に渡す実パス) は未解析 (§5 は LoadLibraryW → GetProcAddress の経路までを確認) | engine を殻に結線できない | #540 にコメント (継続課題) |
 | `docs/DOC_MAP.md` の REPORT 索引に本書が未掲載 | 索引漏れ | PM が追記 |
 
 ## 8. DEFECTS.md 行案 (候補・追加の可否は PM 判断)
