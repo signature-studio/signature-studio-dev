@@ -58,6 +58,32 @@ addEffect の plugin 名検証 (`fl_engine.c` の `if (pn[0] && !plugin_kind_ok(
 
 素材: `fl-win64` から `block25159/24429/24430/24618_DATA.bin` のみ展開 (`tar --zstd -xf` で 2.2 秒)。`build_cpython_wasm.sh` 3 分 08 秒、`FLPY_SKIP_TABLE=1 build_flpy.sh` 4.7 秒 (flapi 表は再生成せず、コミット済みの表を使用)。
 
+## 7b-5. transport.isPlaying の C 実装 (#941 / PY-21)
+
+`transport.isPlaying` の C 実装 (`fl_engine.c`、`playing` 状態を返す。mock の `st.playing` と同じ意味) は main 側で既に入っている (ハンドラ 70 / 未実装 365)。本 PR が追加するのは差分検査 `tests/transport_diff.mjs` (start/stop/isPlaying の 7 呼出しを mock と照合) と、その検出力のネガティブコントロール。`general.getVersion` は mock 側が固定のモック値 (未実測) のため対象外 (子 issue #1138 で扱う)。
+
+検証 (merge 後 HEAD = 48df7e9b, runner 4 core, node 22.23.3, emsdk 6.0.12。wall は実測。未計測は `—`):
+
+| コマンド | 結果 | wall |
+|---|---|---|
+| `bash provider/build.sh` | exit 0・ハンドラ 70 | — |
+| `build_cpython_wasm.sh` | exit 0 (dist/python.wasm 5.9 MB) | 3 分 04 秒 (184 秒) |
+| `FLPY_SKIP_TABLE=1 build_flpy.sh` | exit 0 (dist/flpy.wasm 5.9 MB) | 4 秒 |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 70 / 未実装 365 / MCP 静的 60) | 0.24 秒 |
+| `node tests/transport_diff.mjs` | calls 7、diffs 0、PASS | 0.03 秒 |
+| `node tests/device_diff.mjs` | calls 7 + reject 4、diffs 0、PASS | 0.04 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1 秒 |
+| `node tests/all_tools.mjs` (mock) | 48/48 ok、host_calls 37,425 | 1 秒 |
+| `node tests/midi_script.mjs` | checks 29、failed [] | — |
+| `node tests/ilmcp_diff.mjs` | calls 32、state_checks 9、diffs 0、PASS | — |
+| `node tests/midi_path_diff.mjs` | cases 30、diffs 0、PASS | — |
+
+wall の `1 秒` は `date +%s` の整数差。`—` は今回計時していない。
+
+素材: `fl-win64` から block25159/24429/24430/24618 のみ展開 (`tar --zstd -xf`)。`toolchain-emsdk` は `[EMSDK]` (docs/REFERENCES.md) を使用。
+
+ネガティブコントロール (`transport_diff.mjs` が壊れを検出することの確認): `provider/fl_engine.c` の `transport.isPlaying` の戻りを `!playing` に反転 → `provider/build.sh` 再ビルド → `transport_diff.mjs` は `transport 差分 4 件` で AssertionError・終了コード 1 (FAIL)。`git checkout` で復元 → 再ビルド → calls 7、diffs 0、PASS・終了コード 0。
+
 ### 既知の未解決 (文字の扱い)
 
 - JS の `host/ilmcp.mjs` `norm` は `String.prototype.trim()` (Unicode 空白も除去)、C の `browser_key` は `isspace` (ASCII のみ)。`"\u00a0Plugin database"` のような非 ASCII 空白を含むパスで JS は成功し C は code 1 になる。今回の差分テストは ASCII 入力のみのため検出されない。FL の木は ASCII のため現状の実害はない。扱いは #74 の子チケットで決める (起票先: #74)。

@@ -34,6 +34,7 @@ BATCH = int(os.environ.get("BATCH", "500"))
 TIMEOUT = int(os.environ.get("TIMEOUT", "300"))
 NC_N = 20
 TMP = os.path.join(WORK, "retdec_tmp")
+KEEP_DIR = os.environ.get("KEEP_DIR", "")
 DEF_RE = re.compile(r"^[^\s/][^;=]*\bfunction_([0-9a-f]+)\s*\([^;]*\)\s*\{", re.M)
 
 
@@ -81,6 +82,10 @@ def run_ranges(path, rngs, tag, stats):
         if rc == 0 and os.path.exists(out):
             with open(out, errors="replace") as fh:
                 text = fh.read()
+            if KEEP_DIR and text:
+                os.makedirs(KEEP_DIR, exist_ok=True)
+                with open(os.path.join(KEEP_DIR, tag + ".c"), "w") as fh:
+                    fh.write(text)
     except subprocess.TimeoutExpired:
         pass
     finally:

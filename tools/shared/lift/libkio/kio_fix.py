@@ -6,7 +6,7 @@
   [A] deref 落ち ([rsi] が rsi そのものに化ける): 参照渡し引数を持つ Get*/Set*Intel 6 関数のみ修復。
       unilen/wcslen16/str*compare の `cmp word ptr [rdi],0` 系、[B] float 引数落ち、[D] ucomiss flags 落ちは
       この PoC では修復しない (tools/m7 ir7_argpass / m8 ir8_valueflow 相当の関数別 pass が必要; REPORT §4)。"""
-import re, sys
+import os, re, sys
 WIDEN = ["__Z9Limit_RCSlll", "__Z9FixHi_RCSll", "__Z9CBool_RCSl"]
 s = open(sys.argv[1]).read()
 n = 0
@@ -81,5 +81,36 @@ for fn in sorted(set(re.findall(r"(?m)^define [^\n]*@(__Z\w+)\(", s))):
             return f"%fpbits{k} = bitcast {fty} %arg{k} to i{bits}\n  {v} = zext i{bits} %fpbits{k} to i128\n"
         new = re.sub(pat, rep, new)
     if new != body: s = s.replace(body, new); n += 1
+# [A'] 引数レジスタ接続の欠落 (汎用): RetDec は整数引数 k 番目を、store の無い未初期化 alloca からの k 番目の load
+#     として読むことがある (str2compare: %1=rdi, %2=rsi が同じ %0 を読み %arg2 が未参照)。SysV では k 番目の
+#     整数クラス引数は k 番目の整数レジスタ = 署名の k 番目の引数。署名の k 番目が P/PK のときだけ
+#     `ptrtoint ptr %argK` に置換する。f/d を含む署名は対象外。R は対象外にしない (参照引数は整数レジスタ 1 本を
+#     使うポインタ。ただし置換は P/PK 位置のみ)。前提: 単一 alloca に全引数が spill され、その k 番目の load が
+#     整数引数 k。R/K は独立トークンとして添字を数えるため、R/K の後ろに P が来る署名では添字がずれる。
+#     KIO_ARGREG=0 で無効化 (ネガティブコントロール)。
+def int_params(fn):
+    m = re.match(r"__Z(\d+)", fn)
+    if not m: return None
+    rest = fn[m.end() + int(m.group(1)):]
+    toks = re.findall(r"PK[a-zA-Z]|P[a-zA-Z]|[a-zA-Z]", rest)
+    if "".join(toks) != rest or any(t in ("f", "d") for t in toks): return None
+    return toks
+for fn in (sorted(set(re.findall(r"(?m)^define [^\n]*@(__Z\w+)\(", s))) if os.environ.get("KIO_ARGREG", "1") != "0" else []):
+    toks = int_params(fn)
+    if not toks or not any(t.startswith("P") for t in toks): continue
+    m = re.search(r"(?ms)^define [^\n]*@" + re.escape(fn) + r"\(.*?^}\n", s)
+    body = m.group(0); new = body
+    for al in sorted(set(re.findall(r"(%\w+) = alloca i64", new))):
+        if re.search(r"store [^\n]*, ptr " + re.escape(al) + r"[,\s]", new): continue
+        cnt = [0]
+        def rep(mm, toks=toks, cnt=cnt):
+            j = cnt[0]; cnt[0] += 1
+            if j < len(toks) and toks[j].startswith("P"):
+                return f"{mm.group(1)} = ptrtoint ptr %arg{j + 1} to i64\n"
+            return mm.group(0)
+        new = re.sub(r"(%\w+) = load i64, ptr " + re.escape(al) + r"\n", rep, new)
+    if new != body:
+        new = re.sub(r"(?m)^  uselistorder [^\n]*\n", "", new)
+        s = s.replace(body, new); n += 1
 open(sys.argv[2], "w").write(s)
 print(f"[kio_fix] widened {n} functions")

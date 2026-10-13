@@ -647,6 +647,9 @@ extern void *shimx_get_drop_target(size_t hwnd) __attribute__((weak));
 #define GUI_STAGE_WIN_DIR "C:\\Users\\webstudio\\Documents\\WebImport"
 #define WM_DROPFILES_ 0x233
 #define OFN_ALLOWMULTISELECT_ 0x200
+#define OFN_ENABLEHOOK_ 0x20
+#define OFN_ENABLETEMPLATE_ 0x40
+#define OFN_ENABLETEMPLATEHANDLE_ 0x80
 static uint32_t g_cderr;
 API CommDlgExtendedError(void) { return g_cderr; }
 
@@ -712,6 +715,8 @@ static I64 file_dialog(I64 ofnp, int save) {
   uint8_t *o = (uint8_t *)P_(ofnp);
   g_cderr = 0;
   if (!o || rd32(o) < 136) { g_cderr = 1; gui_set_last_error(87); return 0; }   /* CDERR_STRUCTSIZE */
+  if (rd32(o + 96) & (OFN_ENABLEHOOK_ | OFN_ENABLETEMPLATE_ | OFN_ENABLETEMPLATEHANDLE_))
+    gui_failfast(save ? "GetSaveFileNameW" : "GetOpenFileNameW", "lpfnHook / lpTemplateName (OFN_ENABLEHOOK / OFN_ENABLETEMPLATE) は未対応 (SHX-T14 #957)");   /* hook 付きの呼出しを黙って無視しない */
   uint16_t *file = (uint16_t *)P_(rd64(o + 48)); uint32_t maxfile = rd32(o + 56), flags = rd32(o + 96);
   if (!file || maxfile < 2) { g_cderr = 0x3002; gui_set_last_error(87); return 0; }   /* FNERR_INVALIDFILENAME */
   char in[GUI_HC_IN], sp[512]; uint32_t off = 0; int bad = 0;
