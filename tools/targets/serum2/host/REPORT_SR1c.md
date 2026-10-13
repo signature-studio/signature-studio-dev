@@ -1,7 +1,7 @@
 # REPORT 付録 — [SR-1c #256] controller ゲート (+0x10c / IEditController this+0xdc) の writer 探索と API 一覧化
 
 - 日付: 2026-10-13 / 検証起点: `33fd25a2` (main) / 作業ブランチ: `256-sr1c-ctrl-gate`
-- 検証 HEAD (本付録の全実測の実行 commit): **`23337740ca2e1a4ee9c0a4e8e7ab64acd0f1f1d6`** (完全 SHA は `git rev-parse` の値。下記 §1)
+- 検証 HEAD (本付録の全実測の実行 commit): **`23337740ca2e1a4ee9c0a4e8e7ab64acd0f1f1d6`** (完全 SHA は `git rev-parse` の値。下記 §1)。reviewer の再実行は `3552cabc` で行われ、e2e・relay・API 突合の判定は一致した。`23337740..3552cabc` の差分は本 REPORT・DOC_MAP・TSV のみで、script と e2e 本体は変更なし。
 - 既知類型との関係 (`docs/DEFECTS.md`): 該当なし (実 DLL の静的・動的観測。lift 前)
 - 本付録は `REPORT.md` §3-3・§4 #3・§5-2 の追補。本体の結論は変えない。
 
@@ -26,7 +26,7 @@
 - 実測: **50/50 OK, 72 s** (exit 0)。REPORT.md §3-6 の 66.94–66.98 s より遅い。
 - NC1/NC2 は期待どおり (exit=1, NG=1)。
 
-ログ末尾 (`/home/runner/work/_temp/s2/e2e.log` の最後 10 行、run 外には残らないため本文に保存):
+ログ末尾 (`e2e.sh` が出力するログ (`host/work/*.console` と e2e 結果) の末尾 10 行。run 外には残らないため本文に保存):
 
 ```
   [OK] patched+g1+lowver: demo bit 0・0x800010 無し (authstub が pv<2.0.20 経路も中和)
@@ -47,7 +47,7 @@
 
 - `WINEDEBUG=+relay wine64 work/build/vst3host.exe <authstub DLL> work/cases/licensed <out> 16 <exe_extract>`
 - 実測: **7 s, exit 0**, relay.log **2,596,923 行** (192,758,917 B)。`Call ` を含む行 1,298,416 (`LC_ALL=C grep -a`)。
-- 参考: 旧版の 2,592,952 行は別 run の値 (取得条件が同一か未確認のため、本付録は今回の実測を採る)。
+- 参考: 旧版の 2,592,952 行は別 run の値 (取得条件が同一か未確認のため、本付録は今回の実測を採る)。reviewer の再実行では 2,592,798 行だった。relay の行数と per-API 呼出回数は run ごとに数十〜数百の揺れがあるため、判定に使うのは **呼出の有無** のみ (件数は目安)。
 
 ## 2. 受入 #3: 呼出 Win32 API 一覧
 
