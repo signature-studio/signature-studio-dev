@@ -88,7 +88,11 @@
 
 ## D. Morphine (23944) 通常経路の実測 (f3ffd7ba、#1487)
 
-- 測定 commit: **f3ffd7ba** (= origin/main 取り込み後の HEAD)。`git diff f3ffd7ba HEAD -- tools/plugins ':!tools/plugins/synth/REPORT_APPENDIX.md'` は 0 行 (REPORT_APPENDIX.md を除くコード範囲の差分 0)。
+- 測定 commit: **f3ffd7ba**。 その後の `tools/plugins` 差分 (`git diff f3ffd7ba HEAD -- tools/plugins ':!tools/plugins/synth/REPORT_APPENDIX.md'`) は **5 files, +78 / -2** (main 取り込み #1486 由来と #1222 由来):
+  - `lift/lift_ranges.sh` (+1 行 env 分岐): `PLUG_NO_STATIC_DETECT` 未設定時は RetDec 引数が従来と同一 (`${PLUG_NO_STATIC_DETECT:+...}` が空展開)。測定は既定の環境変数で実行したため経路は不変。
+  - `framework/hostshim/hs_disp_emu.py` (+6 / -1): `HS_DISP_RET_ARG=1` のときだけ挙動が変わる。測定では未設定。
+  - `synth/missing_define_classify.py` (新規 30 行) / `reverb_delay/REPORT_APPENDIX.md` (+10) / `framework/hostshim/REPORT_DISPATCHER.md` (+29): 測定経路から呼ばれない (lift 本体ではない)。
+  - 上記により f3ffd7ba 以降のコード経路は変わっていない。測定値はそのまま f3ffd7ba の値として成立する。
 - 測定コマンド: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP HLL_CAP=100000000 bash tools/plugins/synth/cpp_lift.sh 23944 2400`。
   `HLL_CAP` を 1e8 秒にして HLL 段の kill 判定が発火しないようにした (= kill 無しの通常経路)。`timeout 2280` で包んで実行。
 - 所要時間: 壁時計 14 分 27 秒 (23:03:30 開始 → 23:17:57 終了、`date` 実測)。lift 秒 **854** (summary.csv)。
