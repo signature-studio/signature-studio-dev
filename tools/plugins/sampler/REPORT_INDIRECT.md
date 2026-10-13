@@ -39,7 +39,7 @@ total = base ∪ root から `call/jmp rel32` で到達する非共通関数 (fr
 | Slicex | 24172 | 680 / 257,677 | 684 | 4 | 0 | 0 | 0 | 23–24 |
 | Soundfont Player | 24175 | 1,998 / 760,611 | 2,012 | 14 | 0 | 0 | 0 | 65–66 |
 
-- **7/7 通過** (lift_rc 0 / `emcc -c` rc 0 / f80 0 / 未実装 helper は §6 の許容内)。 §1 と同じく通過 ≠ 正しさ。 未実装 helper が増えた block は無い (Granulizer・Slicer の `rep_stosb_memset` 各 1 のまま = #538)。
+- **7/7 通過** (lift_rc 0 / `emcc -c` rc 0 / f80 0 / 未実装 helper は §6 の許容内)。 **この 7/7 は `targets.py` の `ALLOW_UNIMPL` (Granulizer・Slicer の `rep_stosb_memset` 各 1 = 空 stub) の許容が効いた結果**。 許容 0 の block に未実装 1 を与えると rc 1 (NC5)。 §1 と同じく通過 ≠ 正しさ。 未実装 helper が増えた block は無い (Granulizer・Slicer の `rep_stosb_memset` 各 1 のまま = #538)。
 - `indirect_defs.py` (range 単位の監査): 全 7 本で ranges の全関数 (計 3,623) が final.ll に `define @function_<VA>` として存在 (欠落 0)。 judge の `defines>0` は range 欠落を検出できないため、この監査を gate に加えた。
 - Soundfont Player の host call 0 site (§3) は total でも未調査 (`closure_facts.py` の入力は base のまま。 total への拡張は未実施)。
 
@@ -52,8 +52,8 @@ total = base ∪ root から `call/jmp rel32` で到達する非共通関数 (fr
 | `indirect_e2e.sh` 全体 (3 回、inventory 済みから) | exit 0 × 3: **141 s / 139 s / 138 s** (終了時 load average (1 分) 0.99 / 1.00 / 1.01)。 3 回の `[indirect_lift]` 行 (秒を除く) の md5 が一致、算出表も一致 (`diff`) |
 | `indirect_nega.sh` | exit 0、19 s (NC0–NC7 全て期待通り) |
 
-`closure_indirect.py` の 4 検査 (不合格で exit 1): **C1** entry だけから BFS した結果が `plugin_closure.py` の ranges と完全一致 (BFS 実装の同一性) / **C2** root の関数数・バイトが `unreached.json` (§2、別スクリプト) と一致 /
-**C3** total ⊆ 非共通 かつ base ⊆ total (framework を lift 対象に混ぜない) / **C4** 別算法: 命令境界を見ず関数バイト列の `E8`/`E9` rel32 を全オフセットで拾う過大近似の閉包に total が含まれる。
+`closure_indirect.py` の 4 検査 (不合格で exit 1): **C1** entry だけから BFS した結果が `plugin_closure.py` の ranges と完全一致 (BFS 実装の同一性) / **C2** root の関数数・バイトが `unreached.json` (§2、`unreached_unique.py` の出力) と一致 (同一定義 = 8 バイト整列 qword 一致 の再計算。 独立検算ではない。 NC2・NC3 で検出力を確認) /
+**C3** total ⊆ 非共通 かつ base ⊆ total (framework を lift 対象に混ぜない) / **C4** 別算法: 命令境界を見ず関数バイト列の `E8`/`E9` rel32 を全オフセットで拾う過大近似の閉包に total が含まれる (独立検算は C4 のみ)。
 C4 の過大近似は 7 本とも total と同数 (3,623 関数) だった。 capstone 版が取りこぼしていないことは示すが、過大近似側に余分が出なかったので「偽の到達先を拾っていない」ことの強い裏付けではない。
 
 ### ネガティブコントロール (`indirect_nega.sh`、対照 = 無改変で rc 0)
