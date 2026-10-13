@@ -11,7 +11,7 @@
 **結論**: OTT vst2/vst3 = 147/147・151/151、Serum2 = 238/238 (import カバレッジ, `data/coverage.json` の `covered`/`in_scope`)。
 CP932 は MB→WC 全 DBCS 9,604 セルと WC→MB 往復が一致。Crypt は MD5/SHA-1/SHA-256 を実装し公開ベクトルと一致。
 
-### 15.1 序数 → 名前 (根拠: Wine `shell32.spec` / `shlwapi.spec` = Windows の序数表。呼出箇所の引数での裏取りは §15.5)
+### 15.1 序数 → 名前 (根拠: Wine `shell32.spec` / `shlwapi.spec` = Windows の序数表。呼出箇所の引数での裏取りは §15.5 で完了)
 
 | import | 同定 | 実装 | 備考 |
 |---|---|---|---|
@@ -50,10 +50,19 @@ MultiByteToWideChar / WideCharToMultiByte / GetCPInfo(Ex) / IsValidCodePage / Is
 `verify_ott` / M11 closure 突合は `work-m11` / `work-m6-ott` が無く SKIP (§13 と同じ)。このため `test.sh` が再生成した `BACKLOG.md` / `inventory.md` / `data/inventory.csv` は M11・OTT 列が空になり劣化するので **main 版のまま (未更新)** にした。`data/coverage.json` は生成器 (`gen_inventory.py`) の出力のうち `plugins` / `shimx_*` / `ordinal` のみ反映し、`m11_closure` / `ott_api_resolved` は main 版を保持。
 結果として `inventory.md` / `BACKLOG.md` は「ord74 等が未解決」と古いままで `coverage.json` と食い違う → 15.5 の未解決に計上 (素材 `work-m11 work-m6-ott` 付きで `bash tools/shimx/test.sh` を再実行すれば生成器が全て更新する。生成器側は本 PR で修正済み)。
 
-### 15.5 序数の裏取りの限界と未解決
+### 15.5 序数の裏取り (call site 引数) と残件
 
-| 未解決 | 影響 | 起票先 |
-|---|---|---|
-| 序数 → 名前は Wine の `.spec` (Windows の序数表と同一規約) で同定したが、**呼出箇所の引数での裏取り (OTT/Serum2 の call site 逆アセ) は未実施**。素材 `plugins-ott` / `plugins-serum2` が本 run に無い | 序数表が実 Windows 10/11 と食い違う場合、誤実装が silent に通る | #175 にコメント (再起動時 `oc_artifacts: fl-win64 plugins-ott plugins-serum2`)。新規子チケット案: `[SHX-T8b] 序数 import 5 件の call site 引数裏取り` |
-| d2d1 ord1 は同定対象外 (d2d1 = tools/gui 担当帯。分母 238 にも含まれない)。Wine `d2d1.spec` は序数を明示せず名前のみ列挙するため、序数 1 の根拠が取れていない | Serum2 GUI 経路のみ | tools/gui 担当 (issue #175 にコメントで引継ぎ) |
-| shlwapi #219 を `QISearch` とした点は Wine の `-import` 属性 (`QISearch(ptr ptr ptr ptr)`) に依拠 | 同上 | 上と同じ |
+**裏取り (SHX-T8 再開 run, 2026-10-13)**: 素材 `plugins-ott` (`Install_Xfer_OTT_137.exe` → `$_13_/OTT_x64.dll`) / `plugins-serum2` (`Install_Xfer_Serum2_2.1.5.exe` → `$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3`) を 7z で展開し、IAT の序数スロットを `call *disp(%rip)` で呼ぶ箇所の引数設定を逆アセブルした。
+
+| import | 呼出し箇所 (実 PE) | 引数形の観測 | 同定 (Wine spec と照合) |
+|---|---|---|---|
+| OTT shell32 #74 | `0x180138f63` (IAT `0x1801e2560`) | `cFmt=1`, `rgfmt`=FORMATETC 1 件 (`cf`=CF_HDROP 系, `tymed`=HGLOBAL), `ppenum`=`lea 0x20(%rsp)` | `SHCreateStdEnumFmtEtc(long ptr ptr)` 一致 |
+| Serum2 shlwapi #12 | `0x18017644e` (IAT `0x180fe3070`) | `rcx`=`pbData`, `edx`=`cbData` (`r9d` 経由) を渡し直後に IStream vtable を組む | `SHCreateMemStream(ptr long)` 一致 |
+| Serum2 shell32 #190 | `0x180267bef` (IAT `0x180fe2f20`) | `rcx`=`wstr` 相当 (`0x180267410` でパス文字列を埋めた後に呼ぶ) | `ILCreateFromPathW(wstr)` 一致 |
+| Serum2 shell32 #155 | `0x180267c55` (IAT `0x180fe2f28`) | `rcx`=直前の PIDL (`test rsi` で非 NULL 時のみ呼ぶ) | `ILFree(ptr)` 一致 |
+| Serum2 shlwapi #219 | `0x18094936d` / `0x1809499c1` → thunk `0x180a1b430` → IAT `0x180fe3068` | `QISearch(this, tab, riid, out)` の 4 引数を `rcx..r9` に配置。`tab`=`0x180f96370` が `QITAB` 2 エントリ (`piid` 有り, offset 0 / 8) | `QISearch(ptr ptr ptr ptr)` 一致 |
+| Serum2 d2d1 #1 | `0x1801668da` (thunk `0x180a1b150`) | `(rcx=1, rdx=riid, r8=0, r9=out)` | `D2D1CreateFactory(long ptr ptr ptr)` 一致 (`d2d1.spec` は名前のみで序数を明示しないため、引数形による裏取り) |
+
+以上により、受入条件の「呼出箇所の引数から裏取り」は 6 件すべて完了。`ORD_KNOWN` / `shord.c` の同定に変更は無い。裏取り用の逆アセ (`objdump -d`) は `work/` 配下 (commit しない)。
+
+**残件**: なし (序数の同定根拠は Wine spec + call site 引数の二重化で揃った。`ORD_KNOWN` の d2d1 ord1 は tools/gui 担当帯のままで、分母 238 外)。
