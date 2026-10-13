@@ -58,7 +58,13 @@ for f in ${PLUG_ORCOND_FUNCS:-}; do OC_ARGS="$OC_ARGS --func $f"; done
 python3 "$P/fix_orcond_xnor.py" "$OUT/$NAME.st.ll" "$OUT/$NAME.oc.ll" $OC_ARGS
 python3 "$P/fix_dup_decls.py" "$OUT/$NAME.oc.ll" "$OUT/$NAME.dd.ll"
 python3 "$P/fix_ptr_params.py" "$OUT/$NAME.dd.ll" "$OUT/$NAME.pp.ll"
-python3 "$P/m11_asmfix.py" "$OUT/$NAME.pp.ll" "$OUT/$NAME.asmfix.ll"
+# opt-in (PLUG_XMMARG=1): 機械語が xmm0..3 を入力に読むのに IR 署名に無い関数へ float/double 引数を復元 ((DEFECTS.md) D5, PLG-F2-4 #547)
+AF_IN="$OUT/$NAME.pp.ll"
+if [ "${PLUG_XMMARG:-0}" = "1" ]; then
+  python3 "$P/fix_xmm_args.py" "$OUT/$NAME.pp.ll" "$OUT/$NAME.xa.ll" --pe "$PE" --report "$OUT/$NAME.xa.json"
+  AF_IN="$OUT/$NAME.xa.ll"
+fi
+python3 "$P/m11_asmfix.py" "$AF_IN" "$OUT/$NAME.asmfix.ll"
 python3 "$P/m11_passes.py" "$OUT/$NAME.asmfix.ll" "$OUT/$NAME.final.ll" --report "$OUT/$NAME.passes.json"
 python3 "$P/m11_simd2.py" "$OUT/$NAME.final.ll" 2> "$OUT/$NAME.simd.log" | sed 's#"\.\./msimd11_core\.h"#"msimd11_core.h"#' > "$OUT/${NAME}_simd.c"
 echo "[lift] OK: $OUT/$NAME.final.ll ($(wc -l < "$OUT/$NAME.final.ll") lines), $(grep -c '^define' "$OUT/$NAME.final.ll") defines, helpers: $(tail -3 "$OUT/$NAME.simd.log" | tr '\n' ' ')"
