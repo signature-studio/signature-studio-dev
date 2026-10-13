@@ -35,7 +35,7 @@ fl-win64 素材 (`block00031_PE.bin`、image base 0x400000) の `.text` を caps
 | `442a50` | `i64 (i128)` | `lea rax,[rbp+0x3e]` を stack に置いて `call 0x4428c0` | 戻り/引数の一部を stack 経由で渡す形。i128 の 2 レジスタ分解とは別の形の可能性 |
 | `442b90` | `i64 (i128)` | `call 0x442420` 後に rax の上位 32bit を使う | 呼び先の戻り値 (rax) を読む wrapper。i128 引数は未確認 |
 | `653c80` | `i64 (i64,i64,i128)` | `cmp r8,0x7fffffff` → `shl r8,2` | 第 3 引数 (r8) を整数として読む。i128 の上位 64bit 位置 (r9) は読まれていない |
-| `691dd0` | `i64 (i64,i128,i64)` | `mov [rbp+0x68],rdx` / `mov byte [rbp+0x70],r8b` | 第 2 引数 (rdx) を 8 バイトで保存し、第 3 は r8b (下位 1 byte) だけ読む。候補 (a) では r8 は i128 の高位になり、第 3 引数の読みと合わない。候補 (b) (rdx = ポインタ) とは整合する |
+| `691dd0` | `i64 (i64,i128,i64)` | `mov [rbp+0x68],rdx` / `mov byte [rbp+0x70],r8b` | 第 2 引数 (rdx) を 8 バイトで保存し、第 3 は r8b (下位 1 byte) だけ読む。候補 (a) では r8 は i128 の高位になり、第 3 引数の読みと合わない。候補 (b) (rdx = ポインタ) とは整合する (§6.3 で撤回) |
 
 ### 観測の要点
 
@@ -82,18 +82,18 @@ fl-win64 素材 (`block00031_PE.bin`、image base 0x400000) の `.text` を caps
 ### 6.1 `4256c0` の import 先 (%tagPOINT)
 
 - IAT slot `0x1970df8` は `user32.dll!WindowFromPoint` (pefile の import テーブルで引いた実測)。
-- `POINT` は 8 バイトなので、値渡しは整数 1 本 (rcx、8 バイト) になる。呼出し側 4 箇所 (`6074b0`・`70a174` 等) は rcx に `qword` を読んで入れており、この読みと整合する。
+- `POINT` は 8 バイトなので、値渡しは整数 1 本 (rcx、8 バイト) になる。呼出し側 4 箇所 (`6065d2`・`6074c3`・`70a174`・`8660cc`、いずれも `call 4256c0` の位置。§6.6) は rcx に `qword` を読んで入れており、この読みと整合する。
 - 結論: %tagPOINT の値渡しは **rcx 1 本・8 バイトの値**。受入条件「tagPOINT の ABI」は本節で達成。
 
 ### 6.2 IR 署名と機械語の不一致 (`40c660` `40c750` `653c80`)
 
-呼出し側の実測は E8 (rel32) 全走査で数えた。内容は先頭数件 (`40c660` は先頭 4 件、`40c750` は 6 件、`653c80` は 3 件すべて) を読んだもの。全件は読んでいない。
+呼出し側は `tools/liftdiff/tests/ld39_callsites.py` の E8 (rel32) 全走査で数えた (件数は全件、読んだのは先頭数件のみ。全件は読んでいない)。
 
 | VA | IR 署名 | 呼出し側 (E8 走査の件数 / 読んだ件) | 読んだ範囲の観測 | 判定 |
 |---|---|---|---|---|
-| `40c660` | `i64 (i128)` | 5021 件 / 4 件 | 4 件とも直前に `xmm0` へ double を入れる (`movapd`・`movsd`・`cvtss2sd`)。`rdx`・`r8` に i128 の準備は見えない | IR 側の型が誤りの**疑い** (全件は未確認) |
-| `40c750` | `i64 (i128)` | 543 件 / 6 件 | 6 件とも `xmm0` に double (`mulsd`・`movapd`・`movsd`) | 同上 |
-| `653c80` | `i64 (i64,i64,i128)` | 3 件 / 3 件 | `r8` に整数 (`mov r8,[..]`・`movsxd`) を入れ、`r9` は設定しない (`6833c4`・`69b099`・`c7a451` は直前の読みが不確か) | 第 3 引数は整数 1 本として扱われている**疑い** |
+| `40c660` | `i64 (i128)` | 5021 件 / 4 件 (`440c50`・`440e7f`・`442435`・`45c430`) | 4 件とも直前に `xmm0` へ double を入れる (`movapd`・`movsd`・`cvtss2sd`)。`rdx`・`r8` に i128 の準備は見えない | IR 側の型が誤りの**疑い** (全件は未確認) |
+| `40c750` | `i64 (i128)` | 543 件 / 6 件 (`40b76e`・`42080a`・`420829`・`420848`・`420868`・`442dd6`) | 6 件とも `xmm0` に double (`mulsd`・`movapd`・`movsd`) | 同上 |
+| `653c80` | `i64 (i64,i64,i128)` | 3 件 / 3 件 (`6833c4`・`69b099`・`c7a451`) | `r8` に整数 (`mov r8,[..]`・`movsxd`) を入れ、`r9` は設定しない (`6833c4`・`c7a451` は `imul r8,rax` の結果、`69b099` は `movsxd r8`) | 第 3 引数は整数 1 本として扱われている**疑い** |
 
 - `irtool.parse_sigs` は IR の `define` 行をそのまま読むだけなので、不一致の位置は IR (lifter の型付け) 側と読める。署名解決側の誤りは見えていない。
 - 切り分けの結論は「IR 側が原因の疑いが強い」まで。全件の確認と、呼び先 (6.5) の確認が無いと確定しない。
@@ -122,4 +122,22 @@ fl-win64 素材 (`block00031_PE.bin`、image base 0x400000) の `.text` を caps
 | 呼び先 `476930` `476980` `476500` `4764c0` `476020` `476480` の署名確認 (wrapper は引数を素通しするため、呼び先が決め手) | #1546 (LD-53) |
 | i128 投入形 (a)/(b) の決定 | #1546 (LD-53)。IR 修正・呼び先確認の後に再判定 |
 
-- 検証コマンド (commit 対象の script、`work/` の probe は commit しない): `python3 tools/liftdiff/tests/ld39_abi_dump.py <PE> tools/m11/work/boot_final3.ll` → rc=0 (実測 0.13 秒)。
+### 6.6 再現コマンドと実出力 (LD-51 追記分)
+
+素材: `fl-win64.tar.zst` の `extracted/block00031_PE.bin` のみ `$RUNNER_TEMP/fl-win64/` に展開 (`tar --zstd -xf ... extracted/block00031_PE.bin`、2.9 秒)。`work-m11` は本 run に無いため `tools/m11/work/boot_final3.ll` は使えない。IR 無しで実行するため、`ld39_abi_dump.py` の署名列は空で出る (IR 依存の部分は §6.2 の値を参照)。
+
+```
+P="$RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin"
+python3 tools/liftdiff/tests/ld39_callsites.py "$P" --show 6 --list-dir work/ld39_callsites --iat 0x1970df8
+python3 tools/liftdiff/tests/ld39_abi_dump.py "$P" "$RUNNER_TEMP/empty.ll" > work/ld39_abi.txt
+```
+
+- `ld39_callsites.py` の rc=0 (実測 0.203 秒)。件数: `40c660` 5021 / `40c750` 543 / `4256c0` 4 / `664890` 26 / `6649b0` 3 / `6649c0` 8 / `664a80` 2 / `442a50` 14 / `442b90` 10 / `653c80` 3 / `691dd0` 13。
+- `--iat 0x1970df8` の出力: `== IAT 0x1970df8 -> user32.dll!WindowFromPoint` (pefile の import テーブルで引いた値。§6.1 の根拠)。
+- `ld39_abi_dump.py` の rc=0 (実測 0.093 秒)。IAT 行が `-> 0x0` と出るのは、ディスク上の IAT slot が未束縛のため。import 名は `--iat` で引く。
+- 全件の VA 一覧は `work/ld39_callsites/<VA>.txt` に出る (commit しない)。
+
+`40c660` の先頭 4 件 (E8 走査順): `440c50`・`440e7f`・`442435`・`45c430`。`40c750` の先頭 6 件: `40b76e`・`42080a`・`420829`・`420848`・`420868`・`442dd6`。`653c80` の 3 件: `6833c4`・`69b099`・`c7a451`。`691dd0` の 13 件のうち §6.3 で読んだ `682814`・`682e57`・`690291`・`a6465a`・`a9b5a0`・`a9b8c2`。`4256c0` の 4 件: `6065d2`・`6074c3`・`70a174`・`8660cc`。
+
+- 注: `ld39_callsites.py` は E8 のバイト走査で、命令境界・data 上の E8 を含む偽陽性の上限値。件数は「その VA に向かう E8 rel32 の数」で、真の呼出し件数とは限らない。
+- 検証 HEAD: 本節を含むコミット (PR の HEAD)。`git diff dee0e1ee HEAD -- tools/liftdiff` の差分は本節の script 追加と REPORT の変更のみ。
