@@ -235,10 +235,10 @@ acpt_recount_np = pdata 186,960 / sites 763,898 / targets 594,978 / non-begin 59
 **停止規則 (mx_slot_body.py)**: 最大 400 命令。ただし `ret` を 30 命令超の後に最初に見た地点で止める (ret/int3 の境界は見ない)。
 **ネガティブコントロール**: `mx_slot_body.py --selftest` (PE 不要・既知エンコード)。正例 `mov rax,[rdx+0x18]; mov ecx,[rdx+4]; ret` → rdx 参照 2 件 (offset 4・0x18) を検出、負例 `mov rax,[rcx+0x18]; ret` → 0 件。PE 上の既知 rdx 参照関数での確認は素材 plugins-massivex 未展開のため未実施。
 
-**未解決 (起票先)**: slot 9 が process であることの確証 (rdx の退避先追跡・Ghidra 参照解析) → #266 (MX-3b, OPEN) にコメント。closure 厳密化は #1122 (MX-5, CLOSED・成果は REPORT_MX5.md) のため、残件は #266 へのコメントで示す。vectorcall / C++ EH → #1123 (MX-6, OPEN)。
+**未解決 (起票先)**: slot 9 が process であることの確証 (rdx の退避先追跡・Ghidra 参照解析) → #266 (MX-3b, OPEN) のコメント https://github.com/signature-studio/signature-studio-dev/issues/266#issuecomment-6156301544 に記載済み。closure 厳密化は #1122 (MX-5, CLOSED・成果は REPORT_MX5.md) のため、残件は #266 へのコメントで示す。vectorcall / C++ EH → #1123 (MX-6, OPEN)。
 
 **検証 commit と差分 (docs/WORKFLOW.md §6)**: PE 実測の測定 commit = **133007f1**。その後 dsp のコードを変えた最後の commit = **59d2f022** (`mx_slot_body.py` を関数化し `--selftest` と停止規則を追加。解析ロジック・集計条件は不変)。
-- `git diff 133007f1 HEAD -- tools/targets/massivex/dsp` は **142 行** (差分 0 ではない。59d2f022 でコードを変えたため。0 行を主張していた旧記載は誤り)。
+- `git diff 133007f1 0cf4cb10 -- tools/targets/massivex/dsp` は **148 行** (0cf4cb10 時点の実測。差分 0 ではない。59d2f022 でコードを変えたため。0 行を主張していた旧記載は誤り)。以降の commit で変わるのは REPORT.md のみ。
 - `git diff 59d2f022 HEAD -- tools/targets/massivex/dsp/scripts` は **0 行** (59d2f022 以降にスクリプトの変更なし。以降の差分は本 REPORT.md のみ)。
 - selftest (59d2f022・PE 不要・実測): `selftest PASS: positive rdx refs=2 (offsets [(4, 1), (24, 1)]), negative rdx refs=0`。
 - PE 依存の数値 (slot アドレス・slot 9 本体の 83 insn / call 14 件) は素材未展開のため本 run では再測定していない (前回 run の値・未検証)。
