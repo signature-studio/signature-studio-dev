@@ -20,7 +20,7 @@ mod.__emscripten_stack_restore(sp);
 const dv = () => new DataView(mod.HEAPU8.buffer);
 const u64 = (a) => dv().getBigUint64(a, true);
 const u16s = (a) => { let s = ''; for (let i = 0; i < 80; i++) { const c = dv().getUint16(a + 2 * i, true); if (!c) break; s += String.fromCharCode(c); } return s; };
-const inst = Number(u64(18793112) & 0xffffffffn);   // HInstance (function_52a7f0 が [0x11e1798] から読む値)
+const inst = Number(u64(18793112) & 0xffffffffn);   // HInstance (boot_final.ll の function_52a7f0 が読む 0x11ec298)
 
 // PE の .data に静的実体がある実 WNDCLASS (function_71dd80 / function_867e10 / function_52a7f0 が RegisterClassW に渡す定数)
 const CLASSES = [

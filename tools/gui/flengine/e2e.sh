@@ -38,7 +38,7 @@ python3 "$M/m11_wndclass_scan.py" --pe "$FL_WIN64_DIR/extracted/block00031_PE.bi
 [ -s "$W/res/wndclass.json" ] || { S "wndclass.json が空"; exit 1; }
 S "3/6 judge"
 python3 judge.py --dir "$W/res"; rc=$?
-cp "$W/res/wndclass.json" "$R/wndclass.json"; cp "$W/res/boot_ff.json" "$R/boot.json"; cp "$W/res/survey_soft.json" "$R/survey_soft.json"; cp "$W/res/survey_ff.json" "$R/survey_ff.json"; cp "$W/res/probe.json" "$R/probe.json"
+cp "$W/res/boot_ff.json" "$R/boot.json"; cp "$W/res/survey_soft.json" "$R/survey_soft.json"; cp "$W/res/survey_ff.json" "$R/survey_ff.json"; cp "$W/res/probe.json" "$R/probe.json"
 cp "$W/res/baseline_boot.json" "$R/baseline_boot.json"; cp "$W/res/baseline_survey.json" "$R/baseline_survey.json"
 python3 "$GF_GUI/gen_api.py" > /dev/null    # IMPORTS.md の「実到達」列・§4 を今回の results で再生成
 
