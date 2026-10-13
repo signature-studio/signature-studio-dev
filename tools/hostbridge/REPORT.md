@@ -60,6 +60,28 @@
 6. **VST3 (Serum 2 は VST3 のみ)**: 境界が C++ vtable なので opcode 表は流用不可。plugin module 内に最小 VST3 host を同梱し VST2 風 facade を見せる案を推奨 (§2.9)。
 7. **新発見の制約**: Wrapper は LoadLibrary 前に DLL ファイルを 2 回読む (export 名検査/PE bitness 判定) → 仮想 FS に **最小 PE スタブ**が必要 (生成器は実装・検証済)。DB は entry export 名 hint を保持でき、多製品 core 用の機構が元からある。
 
+## 3-b. HB-H17 (#787): PE 事前検査を仮想 FS に結合 (実測)
+
+- 対象: Fruity Wrapper の事前検査 `fw:0x7a9030` (export 名に main / vstpluginmain / hint の一致) と bitness 判定 `fw:0x5bfc30`。
+- 結合: `poc/pe_stub.mjs` の PE スタブ (1024 B) を `tools/assets/wvfs` の `Wvfs` (`/c/home`、`pathreg` 写像 `C:\Users\webstudio\...\OTT_x64.dll` → `/Documents/...`) に書き、閉じて開き直した後の読み戻しバイト列を検査する。
+- 実 Wrapper: fl-win64 素材の `extracted/block19091_PE.bin` (x64 DLL, export `CreatePlugInstance` / `__dbk_fcall_wrapper` / `dbkFCallWrapperAddr`)。
+- 再計算: `bash tools/hostbridge/analysis/pe_precheck_vfs.sh` (`analysis/pe_precheck_vfs.mjs`, `pefile` 照合を含む)。
+
+| 区分 | ID | 内容 | 結果 |
+|---|---|---|---|
+| 正 | P-route | pathreg 写像で `/c/home/...` へ振り分け | PASS |
+| 正 | P-persist | reopen 後の読み戻し sha256 一致 (1024 B) | PASS |
+| 正 | P-precheck | 読み戻しバイトが事前検査を通過 (export `main`) | PASS |
+| 正 | P-pefile | pefile の machine / DLL / export 名と一致 | PASS |
+| ネガ | N1 | PE が仮想 FS に無い → ENOENT、事前検査も不合格 | FAIL 検出 (期待どおり) |
+| ネガ | N2 | export が `Foo`/`Bar` → 不合格 | FAIL 検出 |
+| ネガ | N3 | 実 Wrapper を VST として検査 → 不合格 (export 名に main 無し) | FAIL 検出 |
+| ネガ | N4 | machine を x86 (0x14c) に変更 → 不合格 | FAIL 検出 |
+| ネガ | N5 | 先頭 64 B に切り詰め → 不合格 | FAIL 検出 |
+
+数え方: 正 = `P-*` 4 件の PASS 数。ネガ = `N1`〜`N5` のうち「期待どおり不合格になった」件数 (5 件)。実測は `SUMMARY P=4/4 NEG=5/5 failed=0`。
+範囲外: 本ハーネスは事前検査の JS 実装 (`precheck`) で判定する。Wrapper 本体 (lift 済み) が仮想 FS の読込を実際に呼ぶ経路の結線は H4 の本体作業 (wasm 側)。`tools/assets/wvfs/test/wvfs-node.test.ts` の既存 `tmp routing` 行は `user` プロファイルが `pathmap` 既定表外のため既存で失敗 (本件と無関係・未修正)。
+
 ## 4. 未解決・ブロッカー
 
 1. **surrogate (SDK glue) 依存**: lift closure (M6〜M10, 166 関数) に `VSTPluginMain`/`createEffectInstance`/`dispatchEffectClass`/static thunk/`AudioEffectX::dispatcher` が無く、`plugin_ott_entry.c` が代行 (差し替え点は `hb_icall` のみ)。Chunk/Program/MIDI 等 opcode は OTT で未実装。
@@ -87,6 +109,21 @@
 | H6 (P2) | web UI G1 | OTT `.rsrc` PNG 抽出 + 宣言的ノブ UI + `effEdit*` 結線 |
 | H8 (P2) | ブラウザ実機 | 同期 `WebAssembly.Instance`、worker/AudioWorklet 配置、SAB RPC (§2.7) |
 | (DSP) | OTT 自然経路 `[0x248]=1` の junk | M11 の「per-sample 破れ」課題に、natural flow が `[0x248]=1` である事実を追記 |
+
+## 5'. Win32 shim 表 (#784 / H4 分割 b)
+
+- **実装**: `poc/hb_bridge.mjs` に `SafeLoadLibrary(path, mode)` (SetErrorMode → LoadLibraryW → 旧モード復元, fw:0x449770 と同形)、`SetErrorMode`、`timeGetTime` (起動からの経過 ms, DWORD 折返し)、`CreateProcessW` (呼ばれたら原因付き throw = fail-fast)、`ModuleTable.register` での bridge 種別の native 強制 (`bridge`→0, 要求値は `bridgeRequested` に保持)。`GetProcAddress`/`FreeLibrary`/`LoadLibraryW` は既存実装を流用。
+- **試験**: `poc/test_shim.mjs` (OTT 非依存)。`hostbridge.sh` の [3c] で実行。
+- **前提**: `poc/test_marshal.mjs` は `tools/hostbridge/work/host_vst2.wasm` を読むため、`hostbridge.sh` [2] (build) 実行後にのみ動く (clean checkout では ENOENT)。PR 記載の「checks 13 / broken 0」は build 後の結果。
+- **数え方の定義**: `checks` = 実装側の試験 S1〜S8 に含まれる check 行 (`OK`/`FAIL` の行、`S[0-9]+[a-z]? ` 形式) の件数。`ネガコン` = 実装を外した mutant 6 種 (SafeLoadLibrary のモード非復元 / GetProcAddress の大小無視 / FreeLibrary の refcount 無視 / timeGetTime 定数 / CreateProcessW 黙って成功 / bridged 強制の素通し) のうち、対応 check が 1 件以上 FAIL した数。期待値は 6/6。
+- **再計算**: `bash tools/hostbridge/poc/recount_shim.sh` (`test_shim.mjs` を実行し OK/FAIL 件数と negative controls caught を出力)。
+- **実測** (`recount_shim.sh`, HEAD = 784 ブランチ): real checks OK=18 FAIL=0; negative controls caught=6/6; `[shim] ALL PASS`。
+- **OTT e2e (受入 1) 実測** (HEAD b7d7c018, 素材 `oc_artifacts: fl-win64 toolchain-emsdk toolchain-retdec analysis-ott-binaries work-m6-ott` を取得して展開。`ANALYSIS_DIR=$HOME/analysis`):
+  - `bash tools/hostbridge/hostbridge.sh` (foreground): exit=0, 所要 4 秒 (build 済み `HB_SKIP_BUILD=1` での再実行。初回は [2] build を含めて実行)。[1] E1〜E20 OK / [3b] `checks 13 / broken 0` / [3c] `[shim] ALL PASS`・ネガコン 6/6 / [4] `[run_poc] checks 28 / broken 0` → `[hostbridge] ALL PASS`。
+  - 比較対象 `d78208de^` (shim 追加前, 同じ素材・同じ build 手順で `[2]`→`[4]`): exit=0, `[run_poc] checks 28 / broken 0`。
+  - 前後比較: `run_poc.mjs` の出力を時間・RSS・ビルド時刻・アドレス以外で diff → 差分なし (`bridge stats`・`T5c`〜`T8b` の結果行・`checks 28` が一致)。OTT 経路は shim 追加で不変。
+  - 前提の補足: `analysis/check_pe_stub.py` は `pefile` を要する。runner に未導入だと [3a] で `ModuleNotFoundError` により停止する (`pip install --user pefile` で解消)。`hostbridge.sh` 自体は依存を入れない。
+- **注意**: bridged 強制は `ModuleTable.register` 経由の全 descriptor に効くが、現行 descriptor に `bridge` 欄は無く実効値は常に 0。Wrapper 側 `this+0x761` の本物の制御 (Wrapper を lift した後) は H4 本体の範囲。
 
 ## 6'. 規約遵守メモ
 

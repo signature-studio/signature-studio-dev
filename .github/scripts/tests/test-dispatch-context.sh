@@ -73,5 +73,46 @@ GITHUB_EVENT_PATH="$TMP/ev.json" RUNNER_TEMP="$TMP/rt" GITHUB_ENV="$TMP/env" GIT
 out_has 'should_run=true' && env_has 'OC_PR_NUMBER=9'
 expect "issue_comment with /oc still runs (unchanged)" $?
 
+# 8. pull_request の本文は API で取り直す (push の直後に本文へ追記された oc_artifacts を拾う。#820)
+mkdir -p "$TMP/fakebin"
+cat > "$TMP/fakebin/gh" <<'GHEOF'
+#!/bin/bash
+# fake gh: FAKE_GH_BODY を返す。FAKE_GH_FAIL=1 なら失敗する。
+[ "${FAKE_GH_FAIL:-0}" = 1 ] && exit 1
+printf '%s' "$FAKE_GH_BODY"
+GHEOF
+chmod +x "$TMP/fakebin/gh"
+# prctx <event> <payload の本文> [GH_TOKEN]: 結果は $TMP/{out,env,log}
+prctx() {
+  rm -rf "$TMP/rt"; mkdir -p "$TMP/rt"
+  jq -cn --arg b "$2" '{pull_request:{number:77,title:"t",body:$b}}' > "$TMP/ev.json"
+  : > "$TMP/out"; : > "$TMP/env"
+  PATH="$TMP/fakebin:$PATH" GH_TOKEN="${3:-}" GITHUB_EVENT_PATH="$TMP/ev.json" RUNNER_TEMP="$TMP/rt" GITHUB_ENV="$TMP/env" GITHUB_OUTPUT="$TMP/out" \
+    GITHUB_EVENT_NAME="$1" OC_PERMISSION=write GITHUB_REPOSITORY=o/r \
+    bash "$SCRIPT" > "$TMP/log" 2>&1
+}
+STALE=$'説明のみ。素材の行はまだ無い'
+FRESH=$'oc_artifacts: fl-win64 toolchain-emsdk work-m11\n説明'
+
+FAKE_GH_BODY="$FRESH" prctx pull_request "$STALE" tok
+out_has 'artifacts=fl-win64 toolchain-emsdk work-m11' && grep -q 'refreshed the PR body' "$TMP/log"
+expect "pull_request: the stale payload body is replaced by the current body (artifacts picked up)" $?
+
+FAKE_GH_BODY="$FRESH" prctx pull_request "$STALE" ""
+out_has 'artifacts=' && ! grep -q 'refreshed' "$TMP/log"
+expect "pull_request without GH_TOKEN: the payload body is used (no API call)" $?
+
+FAKE_GH_FAIL=1 prctx pull_request $'oc_artifacts: plugins-ott\n本文' tok
+out_has 'artifacts=plugins-ott' && grep -q 'could not refresh' "$TMP/log"
+expect "pull_request: when the API fails, fall back to the payload body (warning)" $?
+
+FAKE_GH_BODY=$'oc_artifacts: fl-win64 curl-evil\n' prctx pull_request "$STALE" tok
+[ "$?" != 0 ] || ! out_has 'artifacts=fl-win64 curl-evil'
+expect "pull_request: names from the refreshed body still pass the allowlist (unknown name is rejected)" $?
+
+FAKE_GH_BODY="$FRESH" prctx pull_request_review "$STALE" tok
+out_has 'artifacts=fl-win64 toolchain-emsdk work-m11'
+expect "pull_request_review: the body is refreshed too" $?
+
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" = 0 ]

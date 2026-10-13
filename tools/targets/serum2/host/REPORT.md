@@ -124,10 +124,10 @@
   | unpatched + demo_payload (ctrl マーカ false) | 1 | 受信 | 有り | マーカ経路 → bit 1 + 0x800010 | 一致 (初の実 DLL 0x800010 観測) |
   | patched + lowver | 0 | 無し | 無し | authstub: 常時 bit 0 / 通知 skip | 一致 |
   | patched + demo_payload | 0 | 無し | 無し | 同上 | 一致 |
-  | **patched + lic_sent (pv 2.1.5)** | **1** | 無し | 無し | 常時 bit 0 (IR pass 設計) | **不一致 (bit のみ)** |
+  | patched + lic_sent (pv 2.1.5) | 0 | 無し | 無し | 常時 bit 0 (IR pass 設計) | 一致 (#623 修正後。修正前は bit 1 の不一致) |
 
   - 再現性: 強制ゲート × {patched, unpatched} × {lic_sent, lowver} を各 5 回 (計 20 run, 4 blocks): 各構成で 5/5 同値 (bit と 0x800010 の有無)。
-  - **不一致の原因 (逆アセンブル, high)**: mpatch N2a-1 は `xor al,1` → `xor al,0` (0x1800c2cfc)。bit = lookup 値そのもの (キー `kAudioUnitParameterFlag_IsHighResolution` 不在時の既定値 true=1)。IR pass の「store 常時 0」(`authstub/REPORT.md` N2a) と機械語パッチ (「xor al,0」) は**同値ではない**。影響は限定的: N2b-2 (jmp) が 0x800010 通知を、N3 が getState のマーカ書込を抑止するため、観測できる外部効果は demo bit 内部値のみ。
+  - **不一致の原因と修正 (#623, 逆アセンブル)**: 旧 mpatch N2a-1 は `xor al,1` → `xor al,0` (0x1800c2cfc) だった。`al` は直前の lookup 値 (キー `kAudioUnitParameterFlag_IsHighResolution` 不在時の既定値 true=1) のままなので、bit は lookup 値をそのまま store していた (IR pass の「常時 0」と非同値)。修正後は `mov al,0` (`b0 00`) に変更し定数 0 store とした。`mov` はフラグを変えず、直後の `jne` (0x1800c2d04) は N2b-1 で nop 化済みのため分岐条件への影響はない (capstone で確認)。修正後の patched+g1+lic_sent の demo bit は 0 (実測)。
   - 同じ強制ゲート下で、全 run (licensed 形の lic_sent 含む) に `restartComponent(0x1000010)` が 2 回追加で出る (+0x1000000 ビットの由来は未解析)。
 - **#238 契約との突合**: 「productVersion 2.1.5 ≥ 2.0.20 → store 無し」= unpatched/gate=1 で **一致** (bit 0)。逆向き (pv <2.0.20 → demo bit 1 + 0x800010) も **一致**。比較に使われる pv は **payload DOM 側** (meta は 2.1.5 固定でも効く)。ただし既定 host ではゲート不通過のため、契約の pv 比較は「到達すれば成立」の条件付き。
 - **判定ゲート**: `summarize.py` は上表の各行を個別に chk (合計 50 チェック)。`e2e.sh` はさらに**ネガティブコントロール**を内蔵 (summary を 1 つ差し替えて summarize が FAIL することを確認し、FAIL しなければ exit 3)。
