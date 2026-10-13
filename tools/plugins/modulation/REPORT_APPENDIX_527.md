@@ -29,7 +29,7 @@
 ### I.2 実測 (4 本、`engine_lift.sh <block> 300` の順次実行、`engine_judge.py` で判定)
 
 - 測定値の正本は `REPORT.md` §4 の表 (lift_rc・define 数・未実装 helper・erc3)。ここには持たない。
-- 判定結果 (前 run の記録): 4 本とも `define 無し (名前照合後)` 0 件 (0 B)、judge PASS (exit 0)。
+- 判定結果 (前 run の記録。本 PR では未再現): 4 本とも `define 無し (名前照合後)` 0 件 (0 B)、judge PASS (exit 0)。REPORT.md §4 の「4 本すべて `emcc -c` rc 0」も同じ前 run の記録。
   - 名前照合の内訳 (define 無し 2 件の解決先): 18977 `dispatch` + `entry_point` / 19143 `DispatchToEngine` + `entry_point` / 19266 `VSTPluginMain` + `entry_point` / 19268 `entry_point` + `VSTPluginMain`。
 - 測定 commit: origin/main 2b99366a の上に `engine_judge.py` を追加した worktree (`ws-527`)。lift 本体は未変更。
 
