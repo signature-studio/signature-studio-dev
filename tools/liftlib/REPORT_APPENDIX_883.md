@@ -24,17 +24,42 @@ REPORT_APPENDIX.md が 250 行上限を超えているため、#883 の実測は
 BLK の算出式・32bit 切り詰め・`ICALL_BLK` 不一致・パイプライン順序は §17.10 を参照 (本ファイルでは再掲しない)。
 本 PR で新たに確定できた差分はない。
 
-## 未確定 (次の作業)
+## 実測 (再現・IR 確認)
 
-前 run の IR 観測 (`tools/liftlib/work/ott_getparam/ott_getparam_fixed.ll`・gitignore・本 run では不在) に基づく以下は、再検証できていないため未確認扱いとする (§17.10 と同じ扱い)。
+素材 (`work-liftlib` / `work-icall` / `work-m6-ott` / `analysis-ott-binaries` / `toolchain-*`) を展開して再実行した。`gen_ott_getparam_F.sh` → `0x18011e5a0-0x18011e76c`。
+`leafspec targets/ott_getparam.json --n 200` は **rc=1, 9.1 s, match=0 / mismatch=200 / wasm_trap=200** で §17.9 と一致。
 
-- entry 先頭で BLK+0x10 (`idx`/rdx 相当) も直接 load するか。`%arg1` (this) と `%arg2` (idx) が本体で読まれないか。(§17.10 で未確認)
-- 戻り値の store 先が BLK 絶対アドレス (BLK+0x80 = rax・BLK+0x88 = xmm0) か。
-- 次 run で IR を再生成して上記を確認する (`gen_ott_getparam_F.sh` の出力を残す)。
+IR 再生成 (`work/ott_getparam/ott_getparam_fixed.ll`・`ott_getparam.drc.restored.ll`):
 
-- **修正方式の選択**: (a) entry の BLK 読みを `%arg` 読みに差し替える (`this`/`idx` を仮引数から取る)、(b) harness が BLK へ this/idx を書いてから呼ぶ、(c) BLK の配置自体を wasm 内の範囲に収める (`blk_va` 指定は rewriter の RIP 相対 int32 制約で不可 = §17.10 の試行)。
-- (a) と (b) のどちらが正しいかは、呼出し規約の正本 (`spec.py` / `native_runner.c` の引数 slot) と BLK の書込み主体を突合して決める。今回はその突合まで到達していない。
-- 本 run の harness 経路 (`wasm_runner.mjs`) は BLK を書く処理を持つかを確認していない。
+| 項目 | 観測 |
+|---|---|
+| entry 引数 | `define i64 @function_18011e5a0(i32 %arg1, i64 %arg2)` (fixed) / `(i32 %arg1)` (restored)。本体は `%arg` を一切読まない |
+| `this` の読み | `%0 = load i64, inttoptr 6512738312` = BLK+0x08 (rcx)。以降 `add i64 %0, 728/732/...` で使用 |
+| `idx` の読み | `%1 = load i64, inttoptr 6512738320` = BLK+0x10 (rdx)。`trunc %1 to i32` / `icmp ult ..., 31` で使用 |
+| 戻り値の store | `store i64 %12, inttoptr 6512738432` = BLK+0x80 (rax) (29 箇所)。`store ..., 6512738440` = BLK+0x88 (xmm0) (23 箇所) |
+| BLK 参照の範囲 | BLK+0x00〜+0x88 の全 inttoptr 定数 (fixed.ll で計 135 箇所)。`@global_var` 参照は 0 |
+| restored の `__icall_dispatch` | 7 箇所 (stub 呼出し → 本 leaf の build では `__builtin_trap()` stub。`stub_externals: true`) |
+
+wasm32 (`p:32:32`) では BLK+0x08 = `0x84308008` / BLK+0x80 = `0x84308080` に切り詰められ、いずれも wasm の線形メモリ外。load・store とも OOB で trap する。
+
+## 確定した因果
+
+1. **入力の欠落**: entry は `this`/`idx` を BLK から読み、`%arg1`/`%arg2` を読まない。harness は wasm 引数として渡すだけで BLK へは書かない (`wasm_runner.mjs` は BLK を書く処理を持たない)。よって仮に BLK が読めても値は 0 (`this` = 0)。
+2. **BLK の配置**: `icall_rewrite.py` L653 の `0x184308000` は wasm32 の線形メモリ外。load・store の両方が trap する。`blk_va` 指定は RIP 相対 int32 の制約で不可 (§17.10)。
+
+上の 2 点はどちらも単独で trap の原因になる。1 だけ直しても 2 の store/load で trap し、2 だけ直しても `this` が 0 のまま値が合わない。
+
+## 修正方式 (未決定・子 issue で実施)
+
+- (a) entry の BLK 読みを `%arg` 読みへ差し替える (`this` = `%arg1` を i64 化、`idx` = `%arg2`)。戻り値の BLK store は残るため、(c) と組み合わせる必要がある。
+- (b) harness が BLK+0x08/+0x10 へ this/idx を書いてから呼ぶ。BLK の wasm 内配置と同時に必要。
+- (c) BLK を wasm 線形メモリ内の範囲へ移す。RIP 相対 int32 制約のため、単純な `blk_va` 指定では不可。module-local global (`@__icall_blk` 相当) へ inttoptr 定数を張り替える方式が候補。
+
+(a)(b)(c) のどれを採るかは、呼出し規約 (`spec.py` の `A <slot>`・`native_runner.c` の gpr 配置) と BLK の書込み主体の突合で決める。本 run では方式選択までは行わない。
+
+## 次の作業
+
+修正・ネガコン・regress 登録は子 issue で行う (本 issue #883 は受入条件 4 件のうち未達 0 件 → 検証未了のため open のまま)。
 
 ## 再現
 
