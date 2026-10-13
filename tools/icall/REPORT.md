@@ -262,7 +262,14 @@ bash tools/icall/icall_e2e.sh                 # 全体 (gate は FMA3 5 + 負入
 bash tools/icall/diff/crt_fn_gate.sh          # gate のみ
 python3 tools/icall/diff/rax_callers.py 1801a9a6c 1801c8cb8 1801c8c98
 ```
-実測値 (clean HEAD での e2e) は下表。
+
+検証 (コミット済み HEAD `d383226`, runner 4 core, load average は開始→終了):
+| コマンド | 結果 | 所要 | load |
+|---|---|--:|---|
+| `OTT_SKIP_INFO=1 bash tools/ott/ott_e2e.sh` | PASS: 89 scenario / 50,236 cell 全一致, max_ulp 0, state_diff 0 | 25.0 s | 0.25→ |
+| `bash tools/icall/icall_e2e.sh` | PASS: 89 scenario / 50,236 cell 全一致, max_ulp 0, state_diff 0, 監査 落ち 70→0, tail-jmp 11→0, crt_fn_gate PASS (SSE2 6 + FMA3 5 + 負入力 2 + override 4/4) | 99.2 s | →1.23 |
+| `python3 tools/icall/tests/test_icall.py` | PASS (0 failed; fix_vstore 2 件を含む) | — | — |
+(修復前ベースライン同環境: ott_e2e 25.1 s PASS / icall_e2e 88.9 s PASS。ただし配布スナップショットの route wasm は N1/N2 未適用の古い build で gate FAIL だったため、`ott_route.sh` の再ビルドが必要 (icall_e2e.sh が行う)。)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
