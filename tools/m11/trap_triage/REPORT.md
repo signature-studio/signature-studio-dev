@@ -55,7 +55,7 @@ python3 tools/m11/trap_triage/annotate.py tools/m11/work/trap_triage/after.json 
 python3 tools/m11/trap_triage/disasm_fn.py 417b70 ...   # PE (.pdata 区間) の capstone 逆アセンブル
 ```
 
-環境変数: `SV_ONLY=884` (unit 限定)・`SV_TRACE_AT=884` (その unit 以降を trace。#495 で結果を変えないよう透過化済み `REPORT_495.md`)・`SV_PROG=1` (進捗を stderr)・`SV_STK_FILL=ff` (各 unit 直前に SP 下を埋める)。
+環境変数: `SV_ONLY=884` (unit 限定)・`SV_SKIP=114,...` (unit を飛ばし `hang` で記録 §8.2)・`SV_TRACE_AT=884` (その unit 以降を trace。#495 で結果を変えないよう透過化済み `REPORT_495.md`)・`SV_PROG=1` (進捗を stderr)・`SV_STK_FILL=ff` (各 unit 直前に SP 下を埋める)。
 `capstone` / `pefile` (pip) が要る。`disasm_fn.py` は `tools/shared/paths.py` の `FL_WIN64_DIR`
 (`docs/REFERENCES.md` `[WIN64]`、Actions での展開は `docs/WORKFLOW.md` §11) 配下の `extracted/block00031_PE.bin` を読む
 (`LD_M11_PE` で PE を直接指定も可)。`m11_e2e.sh` など既存スクリプトは作業 VM の固定パスを前提にするため、
@@ -149,10 +149,9 @@ M2p の opt-in 検証は `M11_M2P=1 python3 tools/m11/m11_passes.py work/boot_al
 
 ## 8. OOB 44 件の分類と最多分類 (`8cc190` 系 11) の調査 (#419)
 
-> **main 合流後の注記 (競合解消)**: 本節の測定・試行は #414 HEAD `fa918df` 時点の実測で、当時の `410320`/`410360` 転記は本 PR 独自のものだった。
+> **main 合流後の注記 (競合解消)**: 下の §8.1・§8.2 の「合流前」表は #414 HEAD `fa918df` 時点の実測で、当時の `410320`/`410360` 転記は本 PR 独自のものだった。
 > その後 main に #474 が `410320` / `40f960` / `40fb40` / `40fac0` を **既定 ON** で入れたため、`M11_OV_CLASSCREATE` ブロックは重複定義を避けて
-> `410360` (AfterConstruction stub) と `8cbda0`/`8cbce0` だけに縮めた (既定 OFF のまま)。下表の数値は合流前のもので、ON 構成の再測定はしていない。
-> 合流後 (既定 OFF) は `m11_build.sh` 9.8 s → `survey_units.mjs` ok 816 / halt0 65 / miss 46 / oob 14 / noproc 1 で、main 021fd75 単体の survey と 942 unit 全て一致 (差 0)。
+> `410360` (AfterConstruction stub) と `8cbda0`/`8cbce0` だけに縮めた (既定 OFF のまま)。**合流後の ON 構成は §8.2「合流後の再測定」で測り直した** (旧表の数値は現 tree の ON には当てはまらない)。
 
 素材: work-m11 スナップショット + `m11_build.sh` + `survey_units.mjs` (PE 無しで実行可。逆アセンブルは PE の代わりに
 `work/m11_image.bin` を読む `disasm_img.py`)。ベースライン = #414 HEAD `fa918df` の m11_ov.c を build し直した survey:
@@ -168,9 +167,9 @@ ok 830 / oob 44 / halt0 20 / abort 1 / miss 46 / noproc 1 (§1 の 829/66 とは
 | `904190` | 4 (477 484 513 520) | 未調査 |
 | `409470` ReallocMem | 4 (830 884 898 936) | §3-2 (転記でハング) |
 | `47d460` (←`92d4f0`) | 4 (876 880 891 935) | 未調査 |
-| 各 1 unit | 12: `446400`(17) `5b53f0`(95) `407e20`(138) `8674a0`(275) `8dfd70`(314) `96ef10`(365) `417fc0`(503) `6664c0`(547) `407a50`(745) `40ffe0`(895) ほか | 未調査 |
+| 各 1 unit | 10: `446400`(17) `5b53f0`(95) `407e20`(138) `8674a0`(275) `8dfd70`(314) `96ef10`(365) `417fc0`(503) `6664c0`(547) `407a50`(745) `40ffe0`(895) | 未調査 |
 
-(abort 1 = unit 114 `EnterCriticalSection` shim_unimplemented は OOB ではない。)
+(名前付き 6 グループ 34 + 各 1 unit 10 = OOB 44 / 最上位 frame 16 種。abort 1 = unit 114 `EnterCriticalSection` shim_unimplemented は OOB ではない。)
 
 ### 8.2 `8cc190` 系の原因
 
@@ -181,24 +180,46 @@ ok 830 / oob 44 / halt0 20 / abort 1 / miss 46 / noproc 1 (§1 の 829/66 とは
 RetDec は 410320 / 410360 の **VMT 間接 call (`call [rax-0x30]` NewInstance / `call [rbx-0x50]`) を落とし `ret arg1` だけの関数**にしていた
 (DEFECTS D15 型。call site は IR 上 410320 が 493、410360 が 492)。このため TObject.Create は確保せず VMT/コード領域を `this` として扱う。
 
-**修正の試行** (`m11_ov.c` に `-DM11_OV_CLASSCREATE=1` で有効化する形で保存、既定 OFF):
+**修正の試行 (合流前, #414 HEAD `fa918df`)** (`m11_ov.c` に `M11_OV_CLASSCREATE=1` で有効化する形で保存、既定 OFF):
 `410320`/`410360` を C に転記し、NewInstance 実体 `40f960`(GetMem→InitInstance) と `40fb40`/`40fac0` (InitInstance・管理フィールド初期化) を
 逆アセンブル (`disasm_img.py`) から C で再実装。加えて `8cbda0`/`8cbce0` (TDictionary の comparer 間接 call 脱落) も転記。
 
-| 構成 | ok | oob | halt0 | miss | 備考 |
+| 構成 (合流前) | ok | oob | halt0 | miss | 備考 |
 |---|--:|--:|--:|--:|---|
 | ベースライン (既定 OFF) | 830 | 44 | 20 | 46 | |
 | 410320/410360 のみ | 830 | 30 | 31 | 49 | unit 114 が**ハング** (abort→hang、`5c00e0`→`439670` の探索ループ) |
 | + 8cbda0/8cbce0 | 830 | 41 | 20 | 49 | 8cc190 系 11 unit は**全て OOB のまま** |
 
 unit 遷移 (+8cbda0/8cbce0): oob→ok 4 / ok→miss 3 (42 45 415) / ok→oob 2 (85 719) / abort→hang 1 / oob→halt0 1 / halt0→ok 1。
-**trap 総数は減っていない (ok 830 のまま、退行 5 件が改善 4 件を相殺)** → 受入条件「最多 1 分類を修正し trap が減る」は **未達**。
+合流前は **trap 総数が減っていない (ok 830 のまま、退行 5 件が改善 4 件を相殺)** 結果だった (現 tree での判定は下の「合流後の再測定」)。
 退行 5 件は 410320 転記が実際にオブジェクトを確保するようになった副作用で、確保後に別の欠陥 (85: `409470` 経由, 719: `409410` 内 `407a50`) が顕在化した。
 8cc190 系 11 unit が OOB のままなのは、確保後もなお `8c7a10` の入力 (`rcx` 先) が不正なため (unit 53 でも `8cbcb0` で OOB)。
 次の調査対象は NewInstance 後の `[g+0x410]` の中身と `8cbfa0` の `cls` 引数 (VA 0x4bd878→LVA 同値) の VMT 内容。
 
 **ネガコン**: 既定 OFF で build し直した survey は ベースラインと unit 単位で完全一致 (差 0、ok 830 / oob 44 / halt0 20 / abort 1 / miss 46)。
 OFF のまま e2e 入口 (`m11_run.mjs`) は不変、units_run 17/942。
+
+#### 合流後の再測定 (main 合流済み `1d6bfe5` + 本修正のコード HEAD `cf327ba`)
+
+手順: `bash m11_build.sh` (既定 OFF) / `M11_OV_CLASSCREATE=1 bash m11_build.sh` (ON) → `node trap_triage/survey_units.mjs out.json` → `survey_diff.py off.json on.json`。
+`m11_build.sh` が `M11_OV_CLASSCREATE` を `-D` で `m11_ov.c` に渡し、`work/ov_classcreate.stamp` で `work/obj/ov.o` を無効化する (ON/OFF の切替で古い ov.o を再リンクしない。
+ON ビルドで `cc m11_ov.c` が走り `ov.o` に `function_410360`/`function_8cbda0` が入ることを `llvm-nm` で確認)。マクロは値で判定 (`=0` は OFF)。
+build 8.0 s / survey 8.7 s (load average 0.4〜0.6、PE 無し・work-m11 スナップショット、942 unit)。
+
+| 構成 | ok | oob | halt0 | miss | trap (oob+halt0) | 備考 |
+|---|--:|--:|--:|--:|--:|---|
+| 既定 OFF | 816 | 14 | 65 | 46 | 79 | main の `m11_ov.c` を build した対照と 942 unit 全て一致 (kind 差 0、icall 差 0)。`=0` 明示も同一 |
+| ON | **847** | 36 | 8 | 50 | **44** | `SV_SKIP` 不要 (unit 114 は halt0。`SV_SKIP=114` 付きだと 114 が hang 扱いで trap 43)。同じ ON を作り直して 2 回測り unit 単位で一致 |
+
+遷移 (OFF → ON): halt0→ok 36 / halt0→oob 23 / oob→halt0 2 / halt0→halt0 6 / **ok 退行 5** (15 42 45 415 → miss、138 → oob)。
+`SV_SKIP=114` を付けた旧手順では unit 114 が skip マーカー (`hang`) になるだけで、付けなくても ON は 60 s 以内に完走する。
+`8cc190` 系 11 unit (53 54 56 58 59 60 61 62 63 307 311) は現 main の OFF では halt0 だが、ON では **11/11 が oob** (ok にはならない)。
+
+**受入条件 2 の再判定: 部分達成**。trap 総数は 79→44 (ok +31) と減ったが、減った分は最多分類 (`8cc190` 系) の修復ではない (11 unit は oob のまま)。
+`8cbda0`/`8cbce0` を足す前後の寄与の分離 (410360 単独など) は、マクロが 1 本のため本 PR では測っていない。ok 退行 5 件が残るため既定 ON への昇格はしない。
+ネガコン (既定 OFF で対照と差 0) は成立。ICALL_AT 経由にしたため、ON の `0x41037d` (410360 の `call [rbx-0x50]`) は site 計測に ok 888 / miss 22 で乗る (410070 直処理は ok 計上)。
+
+`SV_SKIP=<unit,...>`: 列挙した unit を実行せず `kind: "hang"` で記録する (ハングする unit を飛ばす用。上記 ON では不要)。
 
 ### 8.3 #307 (liftdiff OOB 222) との関係
 
