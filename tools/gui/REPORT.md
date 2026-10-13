@@ -236,3 +236,8 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
 - **ネガコン** `bash tools/gui/test/gui12_race.sh 50 30` (所要 4m36s, load 1.76/2.19): 修正版 exit≠0 0/50 (UAF 0) / `-DGUI12_NEGCTL_IMMEDIATE_FREE` 30/30 が UAF → PASS。
 - **未達 (#740 受入条件)**: (1) 修正前の ASan ログを用いた再現は本 run で得られず (修正後 94 回で発火せず)。(2) `e2e.sh` の n≥10 連続 rc 0 は未実施 (RetDec・emsdk を含む全体実行で 1 回約 3 分のため本 run の 60 分内に 10 回は収まらない)。(3) ネガコンは `gui12_race.sh` の 30/30 で代替確認済み。
 - **未解決 (起票先)**: #740 のまま、`e2e.sh` 全体の n≥10 連続 PASS と、修正前 ASan ログの再取得。PM 判断で #740 を #489 の重複として閉じるか決める。
+
+## 19. GUI-15 (#740) 続き: e2e.sh 連続実行 (HEAD 29f63707, load 1.4〜3.7)
+- 連続実行 (`bash tools/gui/e2e.sh`, 1 回 ~197 s): run1〜7 rc 0 (7/7)、run8 rc 1 (step 6h の `agent-browser eval: CDP command timed out: Runtime.evaluate`、ASan の UAF 0 件)。単発で先に取った run (rc 0) を含めると 8 回中 7 回 PASS。
+- 6h の CDP タイムアウトは GUI-15 の race とは別経路と推定 (未検証)。残件 (原因特定・n≥10 連続・修正前 ASan ログ) は子 issue #1217 (GUI-20) に起票。
+- n≥10 連続 rc 0 は本 run では未達 (7 連続まで)。
