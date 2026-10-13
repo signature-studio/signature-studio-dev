@@ -18,10 +18,16 @@ set -euo pipefail
 : "${OC_REPO:?}" "${OC_PR_NUMBER:?}"
 pr_head() { gh api "repos/$OC_REPO/pulls/$OC_PR_NUMBER" --jq .head.sha; }
 STUCK_LABEL="${OC_STUCK_LABEL:-oc:stuck}"
+# 起動主体は完全一致で見る (前方一致だと意図しないアカウント名でも通り、write 権限の fix が起動しうる)。
+REVIEWER_LOGIN="${OC_REVIEWER_LOGIN:-oc-reviewer-for-signature-studio[bot]}"
+IMPLEMENTER_LOGIN="${OC_IMPLEMENTER_LOGIN:-opencode-for-signature-studio[bot]}"
+LIMIT_MARKER='<!-- oc-fix-limit -->'
 # 差し戻しの往復 (changes_requested -> fix -> push -> review -> changes_requested) と、
 # push せず根拠だけ返す往復 (answered -> reopen -> review -> changes_requested) は、どちらも
 # 1 周に oc-reviewer の CHANGES_REQUESTED review を 1 件ずつ増やす。件数で両方を抑える。
-MAX_FIX_REVIEWS="${OC_MAX_FIX_REVIEWS:-10}"
+# 件数は最後の停止コメント (LIMIT_MARKER) より後の review だけ数える。ラベルを外して再開した PR が、
+# 累計のせいで次の差し戻しで即座に止まり直さないようにするため。
+MAX_FIX_REVIEWS="${OC_MAX_FIX_REVIEWS:-5}"
 
 case "${1:-}" in
   record)
@@ -36,16 +42,19 @@ case "${1:-}" in
       stop=true
       echo "PR #$OC_PR_NUMBER already has $STUCK_LABEL: the fix run is skipped"
     else
+      since="$(gh api --paginate "repos/$OC_REPO/issues/$OC_PR_NUMBER/comments" \
+        | jq -s -r --arg m "$LIMIT_MARKER" '[.[][] | select(.body | contains($m))] | last | .created_at // "1970-01-01T00:00:00Z"')"
       n="$(gh api --paginate "repos/$OC_REPO/pulls/$OC_PR_NUMBER/reviews" \
-        | jq -s '[.[][] | select((.user.login | startswith("oc-reviewer")) and .state == "CHANGES_REQUESTED")] | length')"
-      echo "oc-reviewer CHANGES_REQUESTED reviews on PR #$OC_PR_NUMBER: $n (limit $MAX_FIX_REVIEWS)"
+        | jq -s --arg l "$REVIEWER_LOGIN" --arg since "$since" \
+          '[.[][] | select(.user.login == $l and .state == "CHANGES_REQUESTED" and .submitted_at > $since)] | length')"
+      echo "oc-reviewer CHANGES_REQUESTED reviews on PR #$OC_PR_NUMBER since $since: $n (limit $MAX_FIX_REVIEWS)"
       if [ "$n" -ge "$MAX_FIX_REVIEWS" ]; then
         stop=true
         gh api -X POST "repos/$OC_REPO/labels" -f name="$STUCK_LABEL" -f color=B60205 \
           -f description="automation gave up: needs a human/PM decision" > /dev/null 2>&1 || true
         gh api -X POST "repos/$OC_REPO/issues/$OC_PR_NUMBER/labels" -f "labels[]=$STUCK_LABEL" > /dev/null
         gh pr comment "$OC_PR_NUMBER" --repo "$OC_REPO" \
-          --body "reviewer の差し戻しが ${n} 件に達したため、自動修正を止めます (上限 ${MAX_FIX_REVIEWS})。PM の判断が必要です。ラベル \`${STUCK_LABEL}\` を外すと再開できます。<!-- oc-fix-limit -->"
+          --body "reviewer の差し戻しが ${n} 件に達したため、自動修正を止めます (上限 ${MAX_FIX_REVIEWS})。PM の判断が必要です。ラベル \`${STUCK_LABEL}\` を外すと再開できます (この後の差し戻しから数え直します)。${LIMIT_MARKER}"
       fi
     fi
     echo "stop=$stop" >> "$GITHUB_OUTPUT"
@@ -56,7 +65,7 @@ case "${1:-}" in
       result=pushed
     else
       n="$(gh api --paginate "repos/$OC_REPO/issues/$OC_PR_NUMBER/comments" \
-        | jq -s --arg t "$OC_START_TS" '[.[][] | select(.created_at > $t and (.user.login | startswith("opencode-for-signature-studio")))] | length')"
+        | jq -s --arg t "$OC_START_TS" --arg l "$IMPLEMENTER_LOGIN" '[.[][] | select(.created_at > $t and .user.login == $l)] | length')"
       if [ "$n" -gt 0 ]; then result=answered; else result=none; fi
     fi
     echo "fix progress: $result (head before ${OC_HEAD_BEFORE:0:10})"
@@ -78,7 +87,13 @@ case "${1:-}" in
     ;;
   reopen)
     gh pr close "$OC_PR_NUMBER" --repo "$OC_REPO"
-    gh pr reopen "$OC_PR_NUMBER" --repo "$OC_REPO"
+    # reopen に失敗すると PR が closed のまま open PR の監視から外れるので、再試行し、駄目なら job を失敗させる
+    for _ in 1 2 3 4 5; do
+      if gh pr reopen "$OC_PR_NUMBER" --repo "$OC_REPO"; then exit 0; fi
+      sleep 3
+    done
+    echo "::error::PR #$OC_PR_NUMBER is closed and could not be reopened"
+    exit 1
     ;;
   *)
     echo "usage: $0 record|check|retry-prompt|reopen" >&2

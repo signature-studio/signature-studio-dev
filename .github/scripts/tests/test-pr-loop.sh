@@ -54,24 +54,48 @@ setup() { # <head> <labels json> <n changes_requested reviews>
   fx repos/o/r/issues/7 "{\"labels\":$2}"
   local r="[" i
   for ((i = 0; i < $3; i++)); do
-    r="$r{\"user\":{\"login\":\"oc-reviewer-for-signature-studio[bot]\"},\"state\":\"CHANGES_REQUESTED\",\"commit_id\":\"c$i\"},"
+    r="$r{\"user\":{\"login\":\"oc-reviewer-for-signature-studio[bot]\"},\"state\":\"CHANGES_REQUESTED\",\"commit_id\":\"c$i\",\"submitted_at\":\"2026-02-01T00:00:00Z\"},"
   done
   fx repos/o/r/pulls/7/reviews "${r%,}]"
   fx repos/o/r/issues/7/comments '[]'
 }
 run_fix() { GITHUB_ENV="$TMP/env" GITHUB_OUTPUT="$TMP/out" bash "$SCRIPTS/fix-progress.sh" "$@"; }
 
-echo "== fix-progress.sh record (往復の上限)"
+echo "== fix-progress.sh record (往復の上限、既定 5)"
 setup aaa '[]' 3
 run_fix record > /dev/null
 grep -qx 'stop=false' "$TMP/out"; expect "3 件の差し戻し -> stop=false" $?
 grep -qx 'OC_HEAD_BEFORE=aaa' "$TMP/env"; expect "起動時の head を記録する" $?
 
-setup aaa '[]' 10
+setup aaa '[]' 5
 run_fix record > /dev/null
-grep -qx 'stop=true' "$TMP/out"; expect "10 件で stop=true" $?
+grep -qx 'stop=true' "$TMP/out"; expect "5 件で stop=true" $?
 logged 'issues/7/labels'; expect "oc:stuck ラベルを付ける" $?
 logged 'pr comment 7'; expect "PR に停止のコメントを残す" $?
+
+# 停止コメント (oc-fix-limit) より前の差し戻しは数えない: ラベルを外して再開できる
+setup aaa '[]' 5
+fx repos/o/r/issues/7/comments '[{"created_at":"2026-03-01T00:00:00Z","body":"stop <!-- oc-fix-limit -->"}]'
+run_fix record > /dev/null
+grep -qx 'stop=false' "$TMP/out"; expect "停止コメントの後に差し戻し 0 件 (ラベルを外した直後) -> stop=false" $?
+
+setup aaa '[]' 5
+fx repos/o/r/issues/7/comments '[{"created_at":"2026-03-01T00:00:00Z","body":"stop <!-- oc-fix-limit -->"}]'
+fx repos/o/r/pulls/7/reviews "$(jq -c '. + [{"user":{"login":"oc-reviewer-for-signature-studio[bot]"},"state":"CHANGES_REQUESTED","commit_id":"n1","submitted_at":"2026-04-01T00:00:00Z"}]' < "$FIX/repos_o_r_pulls_7_reviews")"
+run_fix record > /dev/null
+grep -qx 'stop=false' "$TMP/out"; expect "停止コメントの後の差し戻し 1 件 -> stop=false (数え直し)" $?
+
+setup aaa '[]' 5
+fx repos/o/r/issues/7/comments '[{"created_at":"2026-03-01T00:00:00Z","body":"stop <!-- oc-fix-limit -->"}]'
+fx repos/o/r/pulls/7/reviews "$(jq -c '. + [range(0;5)|{"user":{"login":"oc-reviewer-for-signature-studio[bot]"},"state":"CHANGES_REQUESTED","commit_id":"n","submitted_at":"2026-04-01T00:00:00Z"}]' < "$FIX/repos_o_r_pulls_7_reviews")"
+run_fix record > /dev/null
+grep -qx 'stop=true' "$TMP/out"; expect "停止コメントの後に再び 5 件 -> stop=true" $?
+
+# 起動主体は完全一致: 名前が似ているだけの bot の差し戻しは数えない
+setup aaa '[]' 0
+fx repos/o/r/pulls/7/reviews "$(jq -nc '[range(0;9)|{"user":{"login":"oc-reviewer-evil[bot]"},"state":"CHANGES_REQUESTED","commit_id":"x","submitted_at":"2026-02-01T00:00:00Z"}]')"
+run_fix record > /dev/null
+grep -qx 'stop=false' "$TMP/out"; expect "前方一致するだけの別アカウントの差し戻しは数えない" $?
 
 setup aaa '[{"name":"oc:stuck"}]' 0
 run_fix record > /dev/null
@@ -118,6 +142,16 @@ vsetup NONE; verify; rc=$?
 
 vsetup COMMENTED; verify; rc=$?
 { [ $rc = 0 ] && logged 'pr reopen 7'; }; expect "COMMENT だけ (copilot-pending を含んでも) -> 再起動 (保留は廃止)" $?
+
+vsetup APPROVED
+fx repos/o/r/pulls/7/reviews '[{"user":{"login":"oc-reviewer-for-signature-studio[bot]"},"state":"APPROVED","commit_id":"hhh"},{"user":{"login":"oc-reviewer-for-signature-studio[bot]"},"state":"COMMENTED","commit_id":"hhh"}]'
+verify; rc=$?
+{ [ $rc = 0 ] && ! logged 'pr close'; }; expect "APPROVED の後に COMMENTED が付いても verdict あり (verdict を持つ最後の review で判定)" $?
+
+vsetup NONE
+fx repos/o/r/pulls/7/reviews '[{"user":{"login":"oc-reviewer-evil[bot]"},"state":"APPROVED","commit_id":"hhh"}]'
+verify; rc=$?
+{ [ $rc = 0 ] && logged 'pr reopen 7'; }; expect "名前が似ているだけの別アカウントの APPROVED は verdict と認めない" $?
 
 vsetup NONE
 fx repos/o/r/issues/7/comments '[{"body":"x <!-- review-retry:hhh -->"},{"body":"x <!-- review-retry:hhh -->"},{"body":"x <!-- review-retry:hhh -->"}]'

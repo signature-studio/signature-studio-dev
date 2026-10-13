@@ -18,6 +18,7 @@ set -euo pipefail
 
 : "${OC_REPO:?}" "${OC_PR_NUMBER:?}"
 MAX_ATTEMPTS="${OC_REVIEW_MAX_ATTEMPTS:-3}"
+REVIEWER_LOGIN="${OC_REVIEWER_LOGIN:-oc-reviewer-for-signature-studio[bot]}"
 
 pr="$(gh api "repos/$OC_REPO/pulls/$OC_PR_NUMBER")"
 state="$(jq -r .state <<< "$pr")"
@@ -35,8 +36,11 @@ if [ -n "$run_head" ] && [ "$run_head" != "$head" ]; then
   exit 0
 fi
 
+# verdict は APPROVED / CHANGES_REQUESTED だけ。「verdict を持つ最後の review」で判定する
+# (APPROVED の後に COMMENTED が付いても、最後の review の state だけで見ると verdict 無しと誤判定する)。
 rv="$(gh api --paginate "repos/$OC_REPO/pulls/$OC_PR_NUMBER/reviews" \
-  | jq -s --arg h "$head" '[.[][] | select((.user.login | startswith("oc-reviewer")) and .commit_id == $h)] | last // {}')"
+  | jq -s --arg h "$head" --arg l "$REVIEWER_LOGIN" \
+    '[.[][] | select(.user.login == $l and .commit_id == $h and (.state == "APPROVED" or .state == "CHANGES_REQUESTED"))] | last // {}')"
 st="$(jq -r '.state // "NONE"' <<< "$rv")"
 
 case "$st" in
@@ -61,5 +65,14 @@ gh pr comment "$OC_PR_NUMBER" --repo "$OC_REPO" \
   --body "review run が verdict (approve / request-changes) を投稿せずに終了したため、review を再実行します (試行 $((tries + 1))/${MAX_ATTEMPTS}、head ${head:0:7})。<!-- $marker -->"
 gh pr close "$OC_PR_NUMBER" --repo "$OC_REPO"
 sleep 3
-gh pr reopen "$OC_PR_NUMBER" --repo "$OC_REPO"
+# reopen に失敗すると PR が closed のまま監視から外れるので、再試行し、駄目なら job を失敗させる
+reopened=0
+for _ in 1 2 3 4 5; do
+  if gh pr reopen "$OC_PR_NUMBER" --repo "$OC_REPO"; then reopened=1; break; fi
+  sleep 3
+done
+if [ "$reopened" != 1 ]; then
+  echo "::error::PR #$OC_PR_NUMBER is closed and could not be reopened"
+  exit 1
+fi
 echo "re-triggered the review for PR #$OC_PR_NUMBER (retry $((tries + 1))/$MAX_ATTEMPTS)"

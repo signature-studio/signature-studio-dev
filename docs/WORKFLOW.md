@@ -236,18 +236,25 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   無音終了を許さない仕組み:
 
   - **review**: run の最後に `verify-review-verdict.sh` が現在の head への verdict (APPROVED / CHANGES_REQUESTED) を
-    確認し、無ければ PR にコメントを残して close -> reopen で review を再起動する (同じ head に 3 回まで。超えたら警告して失敗)。
+    確認し (APPROVED の後に COMMENTED が付いても、**verdict を持つ最後の review** で判定する)、無ければ PR に
+    コメントを残して close -> reopen で review を再起動する (同じ head に 3 回まで。超えたら警告して失敗。
+    reopen に失敗したら再試行し、駄目なら job を失敗させる: closed のまま監視から外れるのを防ぐ)。
     COMMENT だけの review は verdict と認めない。**Copilot の review を待って verdict を保留することはしない**
     (直近 15 PR に Copilot の review は 0 件で、保留した PR は誰にも動かされず止まるため)。Copilot の review が
     approve 前に既にあれば読んで判断する。run の途中で head が進んだ場合は、その push の synchronize が起動する
     review が担当するので検証は免除する。
   - **fix**: run の最後に `fix-progress.sh` が「head が進んだ (pushed)」「push せずコメントした (answered: close -> reopen で
     review を起動)」「どちらもしていない (none: 1 回再試行し、なお none なら job を失敗させる)」を判定する。
+    reviewer / 実装 App は login の**完全一致** (`oc-reviewer-for-signature-studio[bot]` /
+    `opencode-for-signature-studio[bot]`) で見る (前方一致だと別名のアカウントでも write 権限の fix が起動する)。
     判定・再試行・reopen・失敗の各 step は `always()` なので、agent step が失敗しても timeout しても走る
     (agent step には fix モードで 40 分の上限を置き、後続 step の時間を残す)。
-  - **往復の上限**: oc-reviewer の CHANGES_REQUESTED が 1 PR で 10 件に達すると、fix を起動せず PR にコメントを残し
+  - **往復の上限**: oc-reviewer の CHANGES_REQUESTED が 1 PR で 5 件に達すると、fix を起動せず PR にコメントを残し
     ラベル `oc:stuck` を付けて止める (`changes_requested -> fix -> review` と `answered -> reopen -> review` の
-    どちらの循環も 1 周に 1 件増えるため)。ラベルを外すと再開する。
+    どちらの循環も 1 周に 1 件増えるため)。件数は最後の停止コメントより後の差し戻しだけを数えるので、
+    ラベルを外すと次の差し戻しから数え直して再開する。
+  - **テスト**: `.github/scripts/tests/test-pr-loop.sh` (fake gh) を `.github/workflows/scripts-test.yaml` が
+    `.github/scripts/**` の変更ごとに実行する。
   - **並行制御**: implement job は `opencode-impl-<N>`、review job は `opencode-review-<N>` と group を分ける。
     同じ group だと fix が pending の間に review が入って fix が黙って取り消される (pending は 1 件しか持てない)。
     その代わり fix と review が重なりうるので、reviewer は `gh pr merge --match-head-commit <レビューした head>` で

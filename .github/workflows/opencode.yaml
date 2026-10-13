@@ -72,7 +72,8 @@ jobs:
       (contains(github.event.comment.body, '/oc') || contains(github.event.comment.body, '/opencode'))) ||
       (github.event_name == 'pull_request_review' &&
       github.event.review.state == 'changes_requested' &&
-      startsWith(github.event.review.user.login, 'oc-reviewer') &&
+      github.event.review.user.type == 'Bot' &&
+      github.event.review.user.login == 'oc-reviewer-for-signature-studio[bot]' &&
       github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     concurrency:
@@ -386,7 +387,10 @@ jobs:
           OC_HAS_REVIEWER_TOKEN: ${{ steps.reviewer-token.outputs.token != '' }}
         run: bash .github/scripts/assemble-reviewer-prompt.sh
 
+      # step に上限を置く: job の 60 分を使い切ると、下の verdict 検証 step が走る前に job ごと
+      # 打ち切られうる。検証 (verdict が無ければ review を再起動) の時間を残す。
       - name: Run OpenCode (reviewer)
+        timeout-minutes: 50
         uses: ./.github/actions/opencode
         with:
           model: ${{ vars.OC_MODEL_ID }}
