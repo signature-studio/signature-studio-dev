@@ -1,5 +1,7 @@
 # PY-38 (#1525): channels の 4 関数の実機意味論 (rerollLoopStarter{Loop,Sample,Steps} / setSwing)
 
+検証起点 commit: `9ca2b1254600ef7ff70e4d6d86ffc1b78da45b49` (main, PR #1518 merge)。本 PR のコード差分は REPORT 1 ファイルのみ (下記「測定条件」)。
+
 親: #1515 (PY-37 / #1343 の残り)。既知類型との関係: 該当なし (lift 作業ではない。PE の逆アセンブル読解のみ)。
 
 ## 結論
@@ -12,6 +14,10 @@
 
 - 素材: `oc_artifacts: fl-win64` の `flstudio_win64_26.1.7.5653.exe` 展開物のうち `extracted/block00031_PE.bin` (`analysis/flapi/raw_win64.json` と同じ PE)。
 - 解析: capstone 5.0.7 で逆アセンブル (`analysis/flapi_kwargs.py` の `Image` クラスを流用)。メソッド表 VA `0x15171c8`。
+- コード差分 0 の確認 (検証起点 `9ca2b125` → HEAD):
+  - `git diff 9ca2b1254600ef7ff70e4d6d86ffc1b78da45b49 HEAD -- tools/python/provider tools/python/host tools/python/tests` → **出力 0 行** (exit 0)。
+  - `git diff --stat 9ca2b125 HEAD -- tools/python/REPORT_PY38.md docs/DOC_MAP.md` → REPORT_PY38.md 79 行追加・DOC_MAP.md 1 行追加のみ。
+  - よって `provider_check.mjs` と `all_tools.mjs` は再測定していない (PY-32 と同じ扱い)。
 
 ## 関数表
 
@@ -40,7 +46,7 @@
 ## getSwing() -> float [0xd5dbf0]
 
 - `0x1046a30(ecx=0x40000001, edx=0, r8d=2)` で読み出し、`cvtsi2sd` して 128.0 で割る (`divsd` の定数 128.0 を確認)。
-- 戻りは間接 call `[rax]` で float を返す。
+- 戻りは間接 call `[rax]` で float を返す (**推定**: 呼び先の戻り型は未確認。`[rax]` の間接 call 形と `divsd` 後の値をそのまま返す形からの推定で、実機での戻り値確認は未実施)。
 
 ## rerollLoopStarterLoop(index, useGlobalIndex=0) -> None [loopCb 0xd5d950]
 
