@@ -17,6 +17,7 @@ SHELLS = [
 # Delphi 殻を持たない MSVC C++ 単体 DLL (framework 一致 0)
 MONOLITHS = [('GMS', 23677)]
 # 判定が許す未実装 __asm_* helper の上限 (block -> 件数) と、その名前の許可リスト。 ここに無い block は 0 件でなければ不合格
+# #538 (rep_stosb_memset) は #629 で解消済みのため許容は空
 ALLOW_UNIMPL = {}
 ALLOW_UNIMPL_NAMES = []
 

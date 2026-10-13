@@ -66,5 +66,7 @@ if [ "$JUDGE_ONLY" = 1 ]; then echo "[sampler_e2e] judge-only: shells PASS"; exi
 
 python3 sampler/closure_facts.py > work/sampler/facts.stdout.json 2> work/sampler/facts.err
 python3 sampler/matrix_check.py
+python3 sampler/ids_crosscheck.py
+python3 sampler/unreached_unique.py > /dev/null
 
 echo "[sampler_e2e] OK: work/sampler/{status.csv,facts.json}"
