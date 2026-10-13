@@ -152,6 +152,7 @@ RetDec の CFG 復元 (jcc の終端化) と命令翻訳 (フラグ) のどち�
 - **fail-fast 到達 unit 数 (限定)**: 全 trap 24 件の stack 取得では `unreachable` は unit 56 の 1 件のみ。ただし unit 56 の単独取得では OOB と出るため、到達 unit 数を 1 と断定しない。他 unit が `_t` に到達する可能性は未除外。
 - **e2e (`m11_e2e.sh`, n=3)**: 3 回とも rc=0。r1 85〜88 秒 (実測 88.2・85.1・85.0 秒)。停止理由は 3 回とも `trap "unreachable" @ function_8c5eb0 <- function_56fde0 <- ...` (fail-fast)。`survey_ok 869 / survey_trap 25 (うち oom 1)`。
 - 実行環境の補足: runner に `/opt/retdec` が無いため、`toolchain-retdec` を `$RUNNER_TEMP` に展開して PATH 側で代替 (`m11_lift.sh` は `/opt/retdec` 固定のまま)。`tools/m2/ir_normalize.py`・`tools/m6/ottlib.py` を作業コピーに追加した (欠落時は `m11_e2e.sh` が fail-closed)。
+- **最終 HEAD `93382f48` での再実測 (n=3)**: negctl_699.sh は rc=1 (G2 FAIL, 上記と同じ)、95 秒。G1・G3 PASS、`diff off->fix: n=0`、`diff off->ng: n=0`。e2e (`m11_e2e.sh`) は 3 回とも rc=0、所要 88.2・86.1・86.3 秒。停止理由は 3 回とも `trap "unreachable" @ function_8c5eb0`、`survey_ok 869 / survey_trap 25 (うち oom 1)`。
 - 限界: survey の ok/trap ラベル比較のみ。出力の同一性は未比較。
 
 ## 3-4. 判定の表 (受入条件との対応)
