@@ -14,7 +14,7 @@
 
 ## 2. 突合 (機械語 vs 修復後 IR)
 
-`ldmach.Machine.disasm_fn` で fl-win64 の `block00031_PE.bin` を逆アセンブルし、15 関数の全命令列を見た (capstone 5.x / pefile、`$RUNNER_TEMP/venv`)。
+`ldmach.Machine.disasm_fn` で fl-win64 の `block00031_PE.bin` を逆アセンブルし、15 関数の全命令列を見た (capstone 5.x / pefile、検証用 venv)。
 
 - **誤り (12 関数)**: 5c1030 / 607b90 / 6088a0 / 60f010 / 6214a0 / 737d10 / 73b300 / 7cbc20 / 7ff6e0 / 840720 / d243c0 / e404e0。
   戻り値は `mov rax,rcx` (引数ポインタ自身) で、`mov rbx,[rcx]` は `call [rbx+0x18]` の vtable 読みにしか使われない。旧修復は `store i64 %arg1, %rax.N.reg2mem` を `load i64 [%arg1]` 経由に変えており、戻り値が `*arg1` に化けていた。
@@ -37,7 +37,7 @@
 
 ### 3.1 コミット済み HEAD (`b5eeb32`) での再現
 
-`ldfix_509_e2e.sh` (HEAD, `EMSDK_ENV=/opt/emsdk/emsdk_env.sh`, 1 回実行、所要 142 s、load 1.03):
+`ldfix_509_e2e.sh` (HEAD, `EMSDK_ENV` は `docs/REFERENCES.md` の `[EMSDK]` の emsdk_env.sh、1 回実行、所要 142 s、load 1.03):
 
 - steps 1–5 完走。`ldfix` F1=902 / F1v=4 / F2=30 / F3a=3 / F3b=5 / F3c=36。
 - `audit_lsf.py` (修復前 → 新版): store 形 SUSPECT 8 関数 / 12 site → **0**。消費者形 pure 52 → **23**、mixed 124 → 119。

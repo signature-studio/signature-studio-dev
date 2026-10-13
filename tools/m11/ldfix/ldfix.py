@@ -1346,7 +1346,7 @@ def f3c_ir_stores(lines):
 
 
 def fix_f3c_block(fn, fv, rep, ctr):
-    """F3c-block (従来の block-local 門 G1〜G5。挙動は #509 前と同一): 機械語 `mov rD,[rB]` (zero-disp) の読みが IR で消え、
+    """F3c-block (従来の block-local 門 G1〜G5。#509 前と比べ、#736 で読んだ値 rD が同幅で store されない site を見送る `f3c_no_val_store` を追加): 機械語 `mov rD,[rB]` (zero-disp) の読みが IR で消え、
     ベースレジスタ (argN) の値がそのまま store されている形を復元する (_UStrAsg 409ca4 系 = D7 値↔アドレスの別形)。"""
     lines = fn.body.split('\n')
     blocks = fn.blocks()
