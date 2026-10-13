@@ -216,8 +216,8 @@ dest 読出しを止めても 871/23 のまま。よって dest 読出しが原�
 
 ## 8. #1389 追記: dest の値 (内容) の OFF/ON 差分と切り分け
 
-測定 commit: **本節のコード変更を含む commit** (`m11_rt.c`・`m11_build.sh`・`m11_survey.mjs`・`trap_triage/repro_1389.sh`・`trap_triage/cmp_1389.py` を変えた最後の commit。hash は PR 本文に記載)。
-コマンド: `bash tools/m11/trap_triage/repro_1389.sh` (OFF → OFF 再実行 → ON を直列・単発。`cmp_1389.py` で突き合わせ)。素材: `fl-win64`・`work-m11` (`m11_gen_ir2.sh` で `ir_conditions.json` を再生成)・`toolchain-emsdk`。
+測定 commit: **`32c10b13`** (コードを変えた最後の commit)。`git diff 32c10b13 HEAD -- tools/m11` は本節の文書追記のみ。
+コマンド: `bash tools/m11/trap_triage/repro_1389.sh` (OFF → OFF 再実行 → ON を直列・単発。`cmp_1389.py` で突き合わせ)。全体 103.97 s (`time` の real・load 開始 0.52 / 0.73 / 0.85)。判定 `PASS`。素材: `fl-win64`・`work-m11` (`m11_gen_ir2.sh` で `ir_conditions.json` を再生成)・`toolchain-emsdk`。
 
 観測の変更: 指紋 (ポインタ値の FNV) では値の差か割付の差か区別できないため、`m11_dest_obs` が**呼出し k ごとに dest の文字列の内容** (長さ・UTF-16 本体の FNV・refcount) を記録するように変えた (`m11_dest_rec`)。突き合わせは呼出しの番号ではなく **(unit VA, unit 内の順番 j)** で行う。
 
@@ -227,7 +227,7 @@ dest 読出しを止めても 871/23 のまま。よって dest 読出しが原�
 |---|--:|--:|--:|---|---|
 | OFF (`M11_OV_413060=0`) | 870 | 24 | 227 | ok | 基準 |
 | OFF 再実行 | 870 | 24 | 227 | ok | 記録 227 件すべて OFF と一致 (決定性) |
-| ON (`M11_OV_413060=1`・読出しあり) | 869 | 25 | 216 | **trap** | unit・順番で揃えた 216 件中の差分 1 件 (呼出しの揃う 35 unit のうち 34 unit は完全一致) |
+| ON (`M11_OV_413060=1`・読出しあり) | 869 | 25 | 216 | **trap** | unit・順番で揃えた 216 件中の差分 1 件 (呼出しの揃う 35 unit のうち 34 unit は完全一致)。指紋 `bdf43798da38f253` (OFF `acb2345ddb678281`) |
 | ON (`M11_DEST_READ=0`・読出しなし) | 870 | 24 | — | ok | 既存の ON 基準 (870/24) と一致 |
 
 - 差分 1 件: unit 158 (`0x26d1a0`) の j=12 (呼出し k=148)。OFF は `*dest` が NULL (len 0)、ON は長さ 1 の文字列 (refcount 1)。
