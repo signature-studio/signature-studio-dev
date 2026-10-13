@@ -221,7 +221,7 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
 ### 範囲外・未達
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| ~~`bash tools/gui/e2e.sh` 全体 ALL PASS の確認~~ → **§12 / REPORT_APPENDIX.md で解消** (RetDec 付きで ALL PASS を実測) | — | — |
+| `bash tools/gui/e2e.sh` 全体 ALL PASS → §12 で実測。最終 HEAD `1f20ec7` で 2/2 ALL PASS。ただし 1/6 の ASan UAF が同 src 群の 6 回中 2 回で発火し解消ではない | 受入扱いは PM 判断 | #489 `[GUI-12]` (既存)・PM |
 | 実 FLEngine が要求する bpp/ROP の確定 (GUI-3 #174 の到達ログ待ち)・16bpp DIB・DIB_PAL_COLORS・`CreateBitmap` 4/8/16bpp の初期 bits・RLE/JPEG/PNG 圧縮 DIB | 実 FL が要求したら fail-fast で止まる (理由付き) | #174 到達後に #181 へ追記 |
 | Chrome 上の lift 済みアプリ込みの API 単位 frame time → §12 (wasm shim 全体は取得済み。Chrome 上のアプリ込みは未取得、理由は §12) | — | #181 |
 | mono / パレットの色写像の実 Windows との照合 (近似) | 色が実機と数階調ずれる可能性 | #181 (実機比較はユーザ依頼候補) |
@@ -244,4 +244,4 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
 
 ## 12. GUI-5 (#181) 続き: e2e.sh 全体 ALL PASS と wasm shim 全体の SIMD/scalar 比較
 
-本文は `REPORT_APPENDIX.md` (250 行上限による分割)。結論: RetDec 付き `bash tools/gui/e2e.sh` 全層 ALL PASS (88.6 s)、wasm shim 全体の API 単位 SIMD128/scalar 比較は `bash tools/gui/test/wbench.sh` で取得 (AlphaBlend 7〜10x、ROP 6〜10x)。
+本文は `REPORT_APPENDIX.md` (250 行上限による分割)。結論 (最終 HEAD `1f20ec7`): RetDec 付き `bash tools/gui/e2e.sh` は 2/2 で ALL PASS (rc=0, 173 s / 102 s)。ただし 1/6 の ASan UAF (#489) が同 src 群の 6 回中 2 回で発火しており解消ではない。wasm shim 全体の API 単位 SIMD128/scalar は `bash tools/gui/test/wbench.sh 5` (min 比: AlphaBlend 7.2〜9.9x・SRCPAINT 10.0x・SRCINVERT 6.4x)。
