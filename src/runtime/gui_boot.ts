@@ -8,6 +8,7 @@
  */
 import { PumpInput, type PumpInputStats } from "./gui_input";
 import { spawnRuntimeWorker } from "./boot";
+import type { GuiPresentOptions } from "./gui_renderer";
 import type { FromWorker, GuiPresentMode, GuiSelfTestResult, ToWorker } from "./worker_protocol";
 import { PumpRing, WM } from "./worker_pump";
 
@@ -87,11 +88,12 @@ export async function mountGuiSelfTest(params: URLSearchParams): Promise<void> {
  * /?gui=render-selftest — 合成 GuiShared (wasm 無し) で GuiHost → gui_worker (GuiRenderer) → OffscreenCanvas を検証する。
  * gui_worker.ts を gui_renderer.ts へ切り出した回帰確認 (実 shim 経由の tools/gui/e2e.sh は emsdk 必須)。
  * surface 0 = (10,10) 32x32 BGRA(0x10,0x80,0xf0) → 画面上は RGB(240,128,16)。
+ * present 方式は URL で指定: `&backend=2d|webgl2|auto` `&sync=immediate|raf` `&seqlock=1` (未指定 = 従来の 2D)。
  */
-export async function mountGuiRenderSelfTest(): Promise<void> {
+export async function mountGuiRenderSelfTest(params: URLSearchParams = new URLSearchParams()): Promise<void> {
   const { GuiHost } = await import("./gui");
   const { CMD, GUI_MAGIC, OFF, S, SURF_WORDS, W } = await import("./gui_proto");
-  const out: { state: string; error?: string; frames?: number; readbackPixel?: number[]; logs?: string[] } = { state: "running" };
+  const out: { state: string; error?: string; frames?: number; readbackPixel?: number[]; logs?: string[]; present?: unknown } = { state: "running" };
   (window as unknown as { __guiRender: typeof out }).__guiRender = out;
   try {
     const memory = new WebAssembly.Memory({ initial: 4, maximum: 4, shared: true });
@@ -110,7 +112,12 @@ export async function mountGuiRenderSelfTest(): Promise<void> {
     canvas.id = "gui-render-canvas";
     canvas.style.cssText = "position:fixed;left:0;top:0;width:320px;height:200px;z-index:30";
     document.body.appendChild(canvas);
-    const host = await GuiHost.attach({ canvas, memory, base, width: 320, height: 200, worker: new Worker(new URL("./gui_worker.ts", import.meta.url), { type: "module", name: "gui-render" }) });
+    const backend = params.get("backend");
+    const sync = params.get("sync");
+    const present: GuiPresentOptions = { seqlock: params.get("seqlock") === "1" };
+    if (backend === "2d" || backend === "webgl2" || backend === "auto") present.backend = backend;
+    if (sync === "immediate" || sync === "raf") present.sync = sync;
+    const host = await GuiHost.attach({ canvas, memory, base, width: 320, height: 200, present, worker: new Worker(new URL("./gui_worker.ts", import.meta.url), { type: "module", name: "gui-render" }) });
     const push = (w: number[]) => {
       const tail = Atomics.load(i32, W.outTail) >>> 0;
       const o = (OFF.outRecs >> 2) + (tail & 2047) * 8;
@@ -127,6 +134,7 @@ export async function mountGuiRenderSelfTest(): Promise<void> {
     out.readbackPixel = at(20, 20);
     out.frames = host.frames;
     out.logs = host.logs;
+    out.present = host.presentInfo;
     out.state = "done";
   } catch (e) {
     out.state = "error";

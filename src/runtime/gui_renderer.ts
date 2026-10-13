@@ -96,6 +96,7 @@ export class GuiRenderer {
   private drawRects: DirtyRect[] = [];
   private drawAll = false;
   private ingestMs = 0;
+  private legacyMs = 0;
   private wdId: ReturnType<typeof setTimeout> | 0 = 0;
   private hasAck = false;
   private ackSeq = 0;
@@ -451,16 +452,24 @@ export class GuiRenderer {
       switch (r[0]) {
         case CMD.SURF_CREATE: case CMD.SURF_DESTROY: case CMD.SURF_CHANGE:
           if (this.deferred) { this.needRecompose = true; this.needFlush = true; }
-          else this.recompose();
+          else { const t0 = performance.now(); this.recompose(); this.stats.fullRecomposes++; this.legacyMs += performance.now() - t0; }
           break;
         case CMD.PRESENT:
           if (this.deferred) { this.pending.push({ id: r[1], l: r[2] | 0, t: r[3] | 0, r: r[4] | 0, b: r[5] | 0 }); this.armRetry(this.rafTimeoutMs); }
-          else this.present(r[1], r[2] | 0, r[3] | 0, r[4] | 0, r[5] | 0);
+          else {
+            const t0 = performance.now();
+            this.present(r[1], r[2] | 0, r[3] | 0, r[4] | 0, r[5] | 0);
+            this.legacyMs += performance.now() - t0;
+            this.stats.presents++; this.stats.rects++; this.stats.rectPixels += Math.max(0, (r[4] | 0) - (r[2] | 0)) * Math.max(0, (r[5] | 0) - (r[3] | 0));
+          }
           break;
         case CMD.FRAME_END:
           if (this.deferred) { this.needFlush = false; this.frameEnd(r[1]); }
           else {
             this.framesDone++;
+            this.stats.frameEnds++; this.stats.flushes++; this.stats.flushMs += this.legacyMs; this.stats.lastFlushMs = this.legacyMs;
+            if (this.legacyMs > this.stats.maxFlushMs) this.stats.maxFlushMs = this.legacyMs;
+            this.legacyMs = 0;
             Atomics.store(v.i32, W.presentDoneSeq, r[1] | 0);
             Atomics.notify(v.i32, W.presentDoneSeq);
             this.post({ type: "frame", seq: r[1] });
