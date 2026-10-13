@@ -62,6 +62,18 @@ def capture_stage0(rstr, dst, base):
     open(dst, 'w').write(''.join(cap))
 
 
+def decl_named_imports(txt):
+    """呼ばれているが宣言の無い Win32/CRT named import (`call i64 @Name()`) に declare を補う (#710)。
+    定義は gen_stubs_sigs.py の IMP_SHIM / fail-fast 節が stubs.c 側に出す。宣言が無いと emcc が未定義参照で落ちる。"""
+    defined = set(re.findall(r'^(?:define|declare) \S+ @([\w.\-]+)\(', txt, re.M))
+    called = set(re.findall(r'call \S+ @([A-Za-z][\w]*)\(', txt))
+    skip = ('function_', 'kh_', 'llvm', '__asm', 'global_var')
+    add = ['declare i64 @%s()' % n for n in sorted(called - defined) if not n.startswith(skip)]
+    if not add:
+        return txt
+    return re.sub(r'(?m)^declare void @llvm\.trap\(\)$', lambda m: '\n'.join(add) + '\n' + m.group(0), txt, count=1)
+
+
 def build(vas, tag_dir, tag, apply_stub, module=None, abi=None, jt=None, shims=None, emcc_extra_exports=None, raw_va=False, volatile_ret=False, emcc_opt='-O1'):
     """lift → (stub pass) → normalize → helper 生成 → emcc。stat dict を返す"""
     W = tag_dir
@@ -113,6 +125,7 @@ def build(vas, tag_dir, tag, apply_stub, module=None, abi=None, jt=None, shims=N
         nm = m.group(1)
         if len(re.findall(r'@' + re.escape(nm) + r'(?![\w.\-])', txt)) == 1:
             txt = txt.replace(m.group(0) + '\n', '')
+    txt = decl_named_imports(txt)
     open(P('final.ll'), 'w').write(txt)
     r, _ = sh('python3 %s/lift/gen_simd.py %s %s --report %s' % (ROOT, P('final.ll'), P('simd.c'), P('simd.json')))
     stat['simd'] = r.stdout.strip()
