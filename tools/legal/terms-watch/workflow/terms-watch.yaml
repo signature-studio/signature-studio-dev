@@ -36,7 +36,6 @@ jobs:
       contents: read
       issues: write # 失敗時の自動起票・コメント
     env:
-      TW_OUT: ${{ runner.temp }}/terms-watch
       NEG: ${{ github.event.inputs.negative_control || 'none' }}
     steps:
       - uses: actions/checkout@v7
