@@ -13,13 +13,14 @@ HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 cd "$HERE"
 N="${1:-4}"
 ANALYSIS_DIR="${ANALYSIS_DIR:-$HOME/analysis}"
-PE="$ANALYSIS_DIR/plugins/ott/binaries/OTT_vst2_win64.dll"
-RANGES_F="$HERE/../m6/work/ott_ranges.txt"
-OUT="$HERE/work/probe"
+# 既定は OTT。PROBE_PE / PROBE_RANGES で別入力 (例: k80 = block18983_PE.bin) に差し替え可能。
+PE="${PROBE_PE:-$ANALYSIS_DIR/plugins/ott/binaries/OTT_vst2_win64.dll}"
+RANGES_F="${PROBE_RANGES:-$HERE/../m6/work/ott_ranges.txt}"
+OUT="${PROBE_OUT:-$HERE/work/probe}"
 
 need() { [ -e "$1" ] || { echo "[lift_determinism_probe] 前提が無い: $1" >&2; exit 2; }; }
-need "$PE" "analysis-ott-binaries"
-need "$RANGES_F" "work-m6-ott"
+need "$PE" "PE (analysis-ott-binaries または PROBE_PE)"
+need "$RANGES_F" "ranges (work-m6-ott または PROBE_RANGES)"
 need /opt/retdec/bin/retdec-decompiler "toolchain-retdec"
 command -v setarch >/dev/null || { echo "[lift_determinism_probe] setarch が無い" >&2; exit 2; }
 

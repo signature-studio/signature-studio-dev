@@ -159,3 +159,35 @@ PR #696 の oc-reviewer review (`ae16a2f`、CHANGES_REQUESTED) への対応。�
 静的確認: `bash -n` と `python3 -m py_compile` が通過。`find tools/liftlib docs -size +20M` は 0 件。`git diff --check` は clean。変更は `tools/liftlib/` と `docs/DOC_MAP.md` (付録 D の行数欄) のみ。
 
 未解決は §22.10 のとおり (変更なし)。k80 の実測は `[LIFTLIB-10]` #695 で行う。
+
+## 23. LIFTLIB-10 (#695): k80 (block18983_PE.bin) の alloca 並び非決定の実測
+
+検証 HEAD: 本 PR 基点 (origin/main `67172db8`) + probe 入力差し替え。素材: `fl-win64` (`block18983_PE.bin` sha256 a399cbe060ec…)・`toolchain-retdec` (RetDec v5.0)・`work-liftlib`。
+入力: `tools/plugins/lift/kernel_ranges_balance.txt` (136 ranges、`PROBE_PE` / `PROBE_RANGES` で指定)。runner は `pefile`・`capstone` が無いため `kernel_table.py` は実行せず、同梱の ranges を使った。
+実行: `PROBE_PE=… PROBE_RANGES=… PROBE_OUT=… bash tools/liftlib/lift_determinism_probe.sh 4`。RetDec 1 回 2.3 s、probe 全体 10 s、load 0.53 (開始 1 分値)。
+
+### 23.1 probe 実測 (N=4)
+
+| mode | run | rc | raw sha256 | no_uselist sha256 | c sha256 |
+|---|---|---|---|---|---|
+| ASLR on | r1 / r2 / r3 | 0 | 30ee3dbce31f | 5297dcfbd19d | 0e15e718a2e6 |
+| ASLR on | r4 | 0 | b568d8f539cc | 5297dcfbd19d | 0e15e718a2e6 |
+| ASLR off | r1〜r4 | 0 | 53942ce274fa (4 run 同一) | 07ad6a3a4ff9 | 0e15e718a2e6 |
+
+distinct: ASLR on = raw 2 / no_uselist 1 / c 1。ASLR off = raw 1 / no_uselist 1 / c 1。
+
+### 23.2 A7 後 (`lift_determinism_check.py`、N=4)
+
+| mode | base.ll sha256 (4 run) | 判定 | negctrl |
+|---|---|---|---|
+| ASLR on | 48f92e937c00 (4 run 同一) | PASS | detected |
+| ASLR off | 08f018fba946 (4 run 同一) | PASS | detected |
+
+- **同一 ASLR 設定の中では A7 後に全 run 一致する。**
+- **ASLR on と off の間では base.ll が一致しない** (48f9… ≠ 08f0…)。差は 58 行で、すべて `alloca` 行の入替 (`alloca i3`/`i64`/`i128`)。`alloca` 以外の行は差 0 件。p0c REPORT_APPENDIX_E §15.4 の 58 行差と同一の現象。
+- A7 (`run_base`) は alloca の並びを正規化していない。ASLR 依存の順序は RetDec 内で決まり、A7 では消えない。
+
+### 23.3 未達 (起票先: 子 issue)
+
+- 受入条件のうち「alloca 並びの原因 (RetDec 内の順序か) の特定」と「決定化手段 (正規化 pass) の実装と回帰 gate 組込み」は本 run では未了。alloca 単位のソートによる正規化を試したが、`%N` 参照の付け替えが必要で単純ソートでは一致しなかった (36 行差が残る)。
+- p0c REPORT §15.4 の注記更新は、ASLR 固定 (`setarch -R`) で lift する運用にするか、正規化を入れるかの決定後に行う。
