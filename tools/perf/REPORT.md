@@ -124,11 +124,11 @@ M5 純 SSE カーネル (128 sample/call, µs): waveshaper O0 2.11 / O2 0.845 / 
 
 1. **junk 版の LTO 効果 (17×) は bit-exact 版に移らない** (§2.1 で 1.15×)。M5 カーネル (純 SSE) の SIMD 効果は別 (OTT x64c lift には SIMD 化余地なし)。bit-exact 版の Chrome Worker・実 AudioWorklet 実測は §12 で実施 (LTO 1.2×)。M11 級 closure での LTO 効果は未測 (§12 未解決)。
 2. 共有ホスト (loadavg 5〜25/16C): **単発 max に 5〜6 ms の外れ値** (O3+LTO の 4 µs ブロックでも発生)=スケジューラ起因。実 underrun 評価は低負荷+実オーディオデバイスで要再測 (headless は null sink)。
-3. Chrome 自動 wasm code cache は headless で未観測 (headful 未確認)。compilationHints は「無効果」までで機序未解明 (eager/bg/lazybase ヒントで global eager 時 CPU 9.3→5.7 s、wall 2.3→3.3〜4.1 s)。
+3. Chrome 自動 wasm code cache は headless で未観測 (Xvfb headful でも未観測・実ウィンドウ/GPU 有の実機は未確認: `REPORT_P7.md`)。compilationHints は「無効果」までで機序未解明 (eager/bg/lazybase ヒントで global eager 時 CPU 9.3→5.7 s、wall 2.3→3.3〜4.1 s)。
 4. FLEngine 実体の wasm は未存在: 規模は M11 closure の K 倍複製+x86 サイズ比の**外挿 (推定)**。`-O1/-O2` の M11 は到達可能関数のみ (619〜810 関数, code 44〜53KB) になり比較に使えない。
-5. Chrome 154 (Linux, Zen5) のみ。Firefox/Safari/モバイル CPU (3〜10× 低速想定) は未測。SIMD は AVX-512 機で有利な可能性。
+5. Chrome 154 (Linux, Zen5) が主。Firefox 157 の compile/上限/同期 compile は `REPORT_P7.md` で測定済み。Safari/モバイル CPU (3〜10× 低速想定)・実オーディオデバイスは未測 (PERF-P7 #165 に残置)。SIMD は AVX-512 機で有利な可能性。
 6. wasm vs native 比 (M3 は crc で 1.3〜1.4×): OTT x64c 版は `tools/ott/native` の実機械語参照と同一手順で測定可能になり §12 で測定 (旧 RetDec 版 (junk) は未測)。
-7. 動的リンク (MAIN/SIDE_MODULE, PIC 税) 未測定。
+7. 動的リンク (MAIN/SIDE_MODULE, PIC 税) → **PERF-P8 (#166) で合成カーネルを測定済み: 全文・表は `REPORT_P8.md`** (`bash tools/perf/p8/p8.sh`)。結論: 現行 lift (VA 固定) の plugin は plugin 別 module/instance/Memory、動的リンクは `-fvisibility=hidden` 必須 (既定 visibility の PIC 税の大きさはホスト依存)。実 OTT (x64c) / FLEngine 実体での再測は未実施。
 
 ## 6. ユーザ依頼事項
 

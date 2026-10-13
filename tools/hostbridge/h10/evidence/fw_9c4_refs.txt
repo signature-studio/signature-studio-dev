@@ -1,0 +1,7 @@
+=== grepins /\+ 0x9c4\]/ in [400000,9a0000]
+  00576d93: MOV word ptr [RCX + 0x9c4],0x0   [00576cf0]
+  007aac02: MOV dword ptr [RCX + 0x9c4],EAX   [007a9db0]
+  007aac0f: CMP dword ptr [RAX + 0x9c4],0x2   [007a9db0]
+  007aade9: CMP dword ptr [RAX + 0x9c4],0x2   [007a9db0]
+  007ab5d0: CMP dword ptr [RBX + 0x9c4],0x2   [007ab5b0]
+  00871867: MOV EAX,dword ptr [RBX + 0x9c4]   [008712b0]

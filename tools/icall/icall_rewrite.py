@@ -627,15 +627,21 @@ def main():
     sect_va = img.base + ((image_size + 0xfff) & ~0xfff)
     cur = sect_va
     new_start = {}
-    for f, (fs, fe, items) in funcs.items():
-        cur = (cur + 15) & ~15
+
+    def next_slot(c):
+        # 16 byte 整列。 直前の関数/stub の終端とちょうど連続する (終端が既に 16 の倍数) と、RetDec の --select-ranges が
+        # [a,b)+[b,c) を 1 関数に併合して後続関数の define が落ちる (#514: eq-filter 4 block で 5 関数) ので 1 paragraph 空ける
+        a = (c + 15) & ~15
+        return a + 16 if a == c else a
+    for k, (f, (fs, fe, items)) in enumerate(funcs.items()):
+        cur = next_slot(cur) if k else sect_va
         new_start[f] = cur
         for it in items:
             it.newva = cur; cur += it.newlen
-    cur = (cur + 15) & ~15
+    cur = next_slot(cur)
     stub_va = cur
     cur += STUB_LEN
-    cstub_va = (cur + 15) & ~15
+    cstub_va = next_slot(cur)
     cur = cstub_va + COMIS_STUB_LEN
     sect_end = cur
     blk = a.blk_va if a.blk_va else (img.base + image_size + 0x4000000 if img.base > 0x100000000 else img.base + image_size + 0x100000)
