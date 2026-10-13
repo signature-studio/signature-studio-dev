@@ -71,6 +71,6 @@ for i, f in enumerate(epfs):
     bad += not ok
     g = [c[3] for c in first] + [float('nan')] * 3
     print('%-20s %8.4f %8.4f | %.7f / %.7f     %.7f / %.7f     %.7f  %s' % (os.path.basename(f)[:-4], mid, high, g[0], e157, g[1], e158, g[2], 'OK' if ok else 'FAIL'))
-print('\nRESULT: macro->child map %s (%d/%d epf, calls/scenario=%s)' % ('OK' if bad == 0 else 'FAIL', len(epfs) - bad, len(epfs),
+print('\nRESULT: macro->child map %s (%d/%d epf, calls/scenario=%s)' % ('OK' if bad == 0 and len(epfs) == 8 else 'FAIL', len(epfs) - bad, len(epfs),
       sorted({len(tr.get(900 + i, [])) for i in range(len(epfs))})))
 sys.exit(1 if bad or len(epfs) != 8 else 0)
