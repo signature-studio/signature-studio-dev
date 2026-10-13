@@ -95,3 +95,14 @@ $ git diff 63ed695b HEAD -- tools/m11 ':(exclude)tools/m11/trap_triage/REPORT_73
 - §5 の数値の再取得。生出力と run ID / artifact 名を併記して記録し直す
 - 0x41037d の最上位が unit 898 である件 (REPORT_679 の「unit 101 集中」と不一致)。別 issue に分けるかは PM 判断
 - ON 固有の oob/abort (unit 190・304・555) は本 issue の範囲外
+
+## 8. lift 出力と fl-win64 PE の対応 (2026-10-14 確認)
+
+§5 の前提 (lift 出力の生成元 PE) を、素材だけで確認した結果。全再生成は行っていない。
+
+- fl-win64 `block00031_PE.bin` の sha256: `b2c64da40921cf262c15c5b25c2b0422e4d1851e953c87e0bc38ed2c19f9496d` (PE32+ / x64 / ImageBase `0x400000`)。§1 の記載と一致。
+- work-m11 の `boot0`〜`boot4.lift.ll` には PE の sha・`lift_pe.sha256` は含まれない。生成元の直接の証拠は無い。
+- 関数名は絶対 VA (`function_<VA>`)。unit の VA (RVA) + `0x400000` が lift 内の関数名として存在するかを 14 件照合した (`0x1de960` → `function_5de960` ほか)。14 件すべて存在。
+- 照合の範囲は関数名のみ。lift が現 PE から作られたことの証明にはならない (PE の sha が無いため)。
+
+この結果から言えること: lift 出力のアドレス体系は fl-win64 PE と整合する。言えないこと: lift 出力が同一 PE から作られたこと、および §5 の数値が再現可能なこと。後者は全再生成 (RetDec) で確かめる必要がある。
