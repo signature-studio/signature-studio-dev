@@ -310,6 +310,8 @@ mock との差で見つかったもの: mock は引数の個数/型を検査し�
 | 2 | 2.04 | 43 PASS / 0 FAIL, 1 s | 43 PASS / 0 FAIL, 1.1 s / 2.0 s | 同上 |
 | 3 | 2.04 | 43 PASS / 0 FAIL, 1 s | 43 PASS / 0 FAIL, 1.1 s / 2.0 s | 同上 |
 
+マージ後 HEAD (`cf0547f` = origin/main `e64ef6f` 取り込み後、`build_flpy.sh` 再リンク済み) でも step 9d を n=3 再実行: 3/3 とも node 43/43・Chrome 43/43・compare 不一致 0 (load average 1.04 / 1.44 / 1.44)。
+
 (別途の先行 3 回: Chrome スクリプト内 1.1〜1.2 s / wall 1.9〜2.1 s。node のスクリプト内秒は整数丸め (`toFixed(1)` の 0.9〜1.0)。)
 node 版は分離リファクタ後も 43/43 PASS (リファクタ前 #79 の check 数と同数)。
 
