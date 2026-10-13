@@ -4,8 +4,8 @@
       対象は demangle 署名 (Z9Limit_RCSlll / Z9FixHi_RCSll / Z9CBool_RCSl) の `l` 引数のみ。
   [E] idiv (符号付き除算) が urem に化ける符号欠陥: FixHi_RCS の `urem i64` を `srem i64` へ。
   [A] deref 落ち ([rsi] が rsi そのものに化ける): 参照渡し引数を持つ Get*/Set*Intel 6 関数のみ修復。
-      unilen/wcslen16/str*compare の `cmp word ptr [rdi],0` 系、[B] float 引数落ち、[D] ucomiss flags 落ちは
-      この PoC では修復しない (tools/m7 ir7_argpass / m8 ir8_valueflow 相当の関数別 pass が必要; REPORT §4)。"""
+      unilen/wcslen16/str*compare の `cmp word ptr [rdi],0` 系は [A] 汎用 pass の対象外 (REPORT §4)。
+      [D] ucomiss flags 落ちは LimitFloat_RCSfff のみ FLOAT_XMM (関数名直書き PoC) で修復する。汎用化は #1129。"""
 import re, sys
 WIDEN = ["__Z9Limit_RCSlll", "__Z9FixHi_RCSll", "__Z9CBool_RCSl"]
 s = open(sys.argv[1]).read()
@@ -81,15 +81,15 @@ for fn in sorted(set(re.findall(r"(?m)^define [^\n]*@(__Z\w+)\(", s))):
             return f"%fpbits{k} = bitcast {fty} %arg{k} to i{bits}\n  {v} = zext i{bits} %fpbits{k} to i128\n"
         new = re.sub(pat, rep, new)
     if new != body: s = s.replace(body, new); n += 1
-# [D] ucomiss flags 落ち: `ucomiss xmm1,xmm0; ja` は xmm1 > xmm0 (順序付き・非 NaN) の分岐。flags の load を fcmp ogt に接続する。
-# [B'] 個別規則 (xmm 番号が既知の関数): 逆アセンブル確認済みの対応 (xmm0=arg1, xmm1=arg2, xmm2=arg3)。Fix_RCSf は汎用 [B] で処理済み (no-op)。LimitFloat_RCSfff は fp 引数 3 つのため汎用 [B] の対象外。
+# [B'] 個別規則 (xmm 番号が既知の関数, PoC): 逆アセンブル確認済みの対応 (xmm0=arg1, xmm1=arg2, xmm2=arg3)。
+# LimitFloat_RCSfff は fp 引数 3 つのため汎用 [B] の対象外。Fix_RCSf は汎用 [B] で処理済みのため規則を置かない。
 def xmm_of(v, arg): return f"%fbits{v} = bitcast float %arg{arg} to i32\n  %{v} = zext i32 %fbits{v} to i128"
 FLOAT_XMM = {
-  "__Z7Fix_RCSf": {"%1 = load i128, ptr %0": xmm_of("1", 1)},
   "__Z14LimitFloat_RCSfff": {
     "%2 = load i128, ptr %0": xmm_of("2", 3),
     "%3 = load i128, ptr %0": xmm_of("3", 2),
     "%4 = load i128, ptr %0": xmm_of("4", 1),
+    # [D] ucomiss flags 落ち: `ucomiss xmm1,xmm0` の flags を fcmp に接続する。極性 (ja/jbe) は .ll の br で未検証 (要素材)
     "%5 = load i1, ptr %1": "%5 = fcmp ule float %arg2, %arg1",
     "%6 = load i1, ptr %1": "%6 = fcmp ule float %arg2, %arg1",
   },
