@@ -45,7 +45,7 @@
 | 改修後 HEAD 直後 (busy loop なし) | 1 | 13/13 PASS exit 0・ログ生成 | 13.7 s | 0.5 |
 | 改修後 HEAD・busy loop 6 本 (前 run の残存を含む) | 12 | 12/12 exit 0・13/13 PASS・FAIL 0 | 20〜29 s | 9.4〜13 |
 
-- 計 13 run (1 + 1 + 12) 全 PASS exit 0。`busy loop 6 本` の 12 run は旧表の 3 行 (負荷 6 run / 残存下 3 run / 負荷 3 run) を統合したもの。条件はいずれも busy loop 6 本で、開始時 load だけが違う。
+- 改修後 HEAD (`7d275cb0`) の run は 1 + 12 = 13 run で全 PASS exit 0 (改修前基準 1 run を含む総計 14 run)。`busy loop 6 本` の 12 run は旧表の 3 行 (負荷 6 run / 残存下 3 run / 負荷 3 run) を統合したもの。条件はいずれも busy loop 6 本で、開始時 load だけが違う。
 - 注: 「直後」の 1 run は開始時 load 0.5 だが、純粋な無負荷の再測定は未実施。
 - 鮮度: 測定 commit `7d275cb0` → HEAD (`5ca86ce0`・本 fix 時点) の `git diff 7d275cb0 HEAD -- tools/audio/integration` は出力 0 行 (差分 0)。HEAD 側の差分は `tools/audio/REPORT_APPENDIX_863.md` のみで、実行されるコードは変わらないため再測定は不要。
 - ログ出力先 `tools/audio/work/e2e_last.log` は gitignore 対象の生成物で、運用ルールでは生成物を `work/` に置く。よって e2e.sh は変えていない。
