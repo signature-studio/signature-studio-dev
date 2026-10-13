@@ -17,7 +17,7 @@
 #   NOREVIEW          現在の head に verdict (APPROVED / CHANGES_REQUESTED) が無い。COMMENT だけの review も含む
 #                     (Copilot 待ちの保留は廃止した) -> close -> reopen で review を再起動
 # 同じ head に対する復旧が尽きた PR (watchdog の差し戻し OC_WATCHDOG_MAX 回、または review の自動再実行 3 回) は
-# oc:stuck ラベルを付けて止める。fix-progress.sh が差し戻し 10 件で付けるラベルも同じで、ラベル付きの PR は
+# oc:stuck ラベルを付けて止める。fix-progress.sh が差し戻しの上限 (OC_MAX_FIX_REVIEWS) で付けるラベルも同じで、ラベル付きの PR は
 # 人 (PM) の判断待ちとして一切触らない (ラベルを外すと再開する)。
 # merge は --match-head-commit で、点検した head 以外 (その後に push された未レビューの commit) を巻き込まない。
 # 1 回の点検で行う操作は OC_MAX_ACTIONS 件まで (古い更新の PR から)。残りは次回に回す。
@@ -29,6 +29,7 @@ set -uo pipefail
 : "${OC_REPO:?}"
 R="$OC_REPO"
 DRY="${DRY:-0}"
+REVIEWER_LOGIN="${OC_REVIEWER_LOGIN:-oc-reviewer-for-signature-studio[bot]}"
 SETTLE_MIN="${OC_SETTLE_MINUTES:-4}"
 MAX_ACTIONS="${OC_MAX_ACTIONS:-12}"
 WD_MAX="${OC_WATCHDOG_MAX:-6}"
@@ -47,8 +48,11 @@ do_it() { # do_it <説明> <コマンド...>
   fi
 }
 request_changes() { gh pr review "$1" --repo "$R" --request-changes --body "$2"; }
-reopen() {
-  gh pr close "$1" --repo "$R" && sleep 3 && gh pr reopen "$1" --repo "$R"
+reopen() { # reopen <PR> <head>: 試行を数えるマーカー付きのコメントを残してから reopen する (verify-review-verdict.sh と同じ書式)
+  local marker="review-retry:${2:0:12}"
+  gh pr comment "$1" --repo "$R" \
+    --body "[watchdog] 現在の head (${2:0:7}) に verdict が無いため、review を再起動します。<!-- $marker -->" || true
+  OC_REPO="$R" OC_PR_NUMBER="$1" bash "$(dirname "$0")/reopen-pr.sh"
 }
 
 # 実行中/待機中の run (pull_requests と タイトル)
@@ -94,7 +98,8 @@ for i in $(seq 0 $((total - 1))); do
     sleep 2
   done
   rvs="$(gh api --paginate "repos/$R/pulls/$n/reviews" \
-    | jq -s --arg h "$head" '[.[][] | select((.user.login | startswith("oc-reviewer")) and .commit_id == $h)]')"
+    | jq -s --arg h "$head" --arg who "$REVIEWER_LOGIN" \
+      '[.[][] | select(.user.login == $who and .user.type == "Bot" and .commit_id == $h)]')"
   rv="$(jq -c 'last // {}' <<< "$rvs")"
   st="$(jq -r '.state // "NONE"' <<< "$rv")"
   wd_n="$(jq '[.[] | select((.body // "") | contains("(watchdog)"))] | length' <<< "$rvs")"
@@ -164,7 +169,7 @@ for i in $(seq 0 $((total - 1))); do
       fi
       ;;
     NOREVIEW)
-      do_it "reopen #$n (restart the review)" reopen "$n"
+      do_it "reopen #$n (restart the review)" reopen "$n" "$head"
       ;;
   esac
 done
