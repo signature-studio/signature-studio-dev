@@ -70,7 +70,7 @@
 | ymm (AVX2) 命令の lift 未対応 (`0x180f89cf0` / `0x180fb6124`) | 閉包を広げられない | #709 [KH-14] |
 | license 版 lift パイプラインの Win32 import 宣言・shim 節の欠落 (snapins 版から移植要) | 閉包を広げると emcc が失敗 | #710 [KH-15] |
 | 0x180ef7fc0 の native oracle (ctx-fuzz) 未作成 | 出力の bit 照合ができない | #656 継続 |
-| PR #329 未マージ → 解消 (#329 は main `4f33fdd` で merge 済み) | 本 PR の diff に含まれていた #329 の commit (merge `f3b8056`) は main 取り込みで解消 | 解消済み (起票不要) |
+| #329 merge 済み (main `4f33fdd`) | 本 PR の diff に含まれていた #329 の commit (merge `f3b8056`) は main 取り込みで解消 | 解消済み (起票不要) |
 | shim 4 件 (E と同一実装) の妥当性は F の経路で未検証 | 入口を越えるまで検証不能 | #656 継続 |
 
 ## 6. 検証範囲 / 範囲外
