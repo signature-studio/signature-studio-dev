@@ -83,6 +83,16 @@
 - version 特定: mac バイナリの C ABI が **camelCase `blArrayInit`**、asmjit 名前空間 `_abi_1_13` (asmjit 2024-01→2025-03)。upstream は 2025-09 (v0.20.0) で snake_case 化 → master(v0.21.3) は不一致。**blend2d fc827d5 (2024-12-13, 自己申告 v0.11.5) + asmjit 029075b** を採用。
 - 3 構成 (native JIT / native no-JIT / wasm32 no-JIT) で 320×240 シーン (rounded rect 線形グラデ・半透明円・放射グラデ楕円・stroke bezier・OpenSans テキスト 2 サイズ) を描画: **hash e467bd5b7dbcd277 全一致、画素差 0/230,400B (PPM payload 全域; 3 枚 sha256 同一)** (JIT と no-JIT も一致)。libblend2d.a: JIT 4.0MB / no-JIT 2.6MB / wasm 2.8MB。
 - **性能**: ms/frame (300 回平均): 初回 native JIT 0.054 / no-JIT 0.159 / wasm32 0.214 (node24)。**検収再計測 (node 26.10, 3 回)**: JIT 0.053–0.058 / no-JIT 0.121–0.137 / wasm 0.225–0.272 → wasm は JIT 比 **約 4–5x**、native no-JIT は 2.2–2.5x (測定は VM 共有で ±15% ぶれる)。`-msimd128` 試験と glue (Agg2D ~140 symbol) は T-SH-02。
+- **`-msimd128` 試験 (T-SH-02, `bash oss/blend2d/simd_bench.sh`, 検証起点 96c3a8f)**: GitHub Actions runner (nproc=4, emcc 6.0.12, node v22.23.3, フォント DejaVuSans = 上記 OpenSans 版とはハッシュ不一致が正常: hash f701c63bcdbcab67)。ms/frame (300 回平均, 2 スクリプト実行 × 各 3 / 5 回 = n=8, bench 前後の load average (1 分値) 2.92–3.58、build 直後の同一ホストで測定):
+
+  | 構成 | 画素 (vs native no-JIT, 320×240 全 230,400B) | ms/frame min–max | native no-JIT 比 | test.wasm |
+  |---|---|---|---|---|
+  | native no-JIT (g++ -O2) | — | 0.209–0.216 (n=8) | 1.0x | — |
+  | wasm32 no-JIT (base) | **PASS 一致** | 0.586–0.738 (n=8) | 2.7–3.5x | 1,199,061B |
+  | wasm32 no-JIT + `-msimd128` | **PASS 一致** | 0.516–0.769 (n=8) | 2.4–3.7x | 1,323,273B |
+  | wasm32 no-JIT + `-msimd128 -msse2` | **ビルド失敗** (`math_p.h:198 expected namespace name` / `Vec4xF32` 未定義: Blend2D の SSE2 経路は x86 intrinsics 前提の simd 層を要求し emscripten の SSE 互換層とは噛み合わない) | — | — | — |
+
+  結論: `-msimd128` (自動ベクトル化のみ) は画素を変えないが、レンジが base と重なり**有意な高速化は確認できない**。Blend2D 側に wasm SIMD 用の simd バックエンドを足さない限り SIMD 化の効果は出ない、と推定 (推定: 固定パイプラインの inner loop が x86 SSE2/AVX 専用に書かれているため。未検証)。**範囲外 (未実施)**: native JIT 比の再測定 (本 runner では build していない)、FL 実描画経路の画素比較 (fl-win64 素材が必要)、Agg2D glue の lift/再実装。
 
 ## 4. プロプラ lib 評価と lift PoC
 
