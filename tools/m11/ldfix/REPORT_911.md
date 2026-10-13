@@ -5,7 +5,7 @@
 **判定: 部分達成 (受入条件 1 の機構の手がかり、2 の突合まで)**。検出信号・修復・wasm 実測・DEFECTS 追記は未達。残りは子 issue `[LD-33]` (#1091) に起票済み (§5)。
 
 検証起点: PR の base (baseRefOid) = `6ae75e48`。HEAD は main `5182c3c2` を merge 済み (`f04e0f05` は HEAD の祖先だが PR の base ではない)。
-素材: `fl-win64` の `block00031_PE.bin` と `work-m11` (`tools/m11/work/` の `boot0.lift.ll` / `boot_final.ll`)。いずれも `tar --zstd -xf` で展開し (§6)、本 run で機械語と IR の両方を確認した。
+素材: `fl-win64` の `block00031_PE.bin` (機械語)。`tar --zstd -xf` で展開し (§6)、本 run で機械語を再確認した。IR (`work-m11` の `boot0.lift.ll` / `boot_final.ll`) は本 run の `$ARTIFACTS_DIR` に無く、IR 側の行番号は前 run の記録 (再確認なし)。
 
 ## 1. 受入条件 1: 41a670 の機構 (手がかり。RetDec 側は未確定)
 
@@ -27,7 +27,7 @@
 
 - **store は条件付き**: `41a6a3` の store は `41a693`〜`41a69a` の `cmp`/`jne` で guard されており、`arg1 == [0x13a5080]` のときだけ実行される。不一致時は `41a6ac` 以降の連結リスト走査に入る。以下の議論はこの前提に立つ。「無条件の store」として扱わない。
 - 機械語には `[arg1+8]` と `[arg1+0]` の **2 本の load** がある。
-- lift IR (`boot0.lift.ll` L25677〜25691、本 run で確認済み) では関数先頭の `%2 = load i64, ptr (%arg1+8)` (L25683) が 1 本だけで、41a6a3 相当の store (L25691 `store i64 %2, ptr @global_var_13a5080`) はこの `%2` を再利用している。`[arg1+0]` の load は IR に現れない。
+- lift IR (`boot0.lift.ll` L25677〜25691、前 run の記録。本 run では未再確認) では関数先頭の `%2 = load i64, ptr (%arg1+8)` (L25683) が 1 本だけで、41a6a3 相当の store (L25691 `store i64 %2, ptr @global_var_13a5080`) はこの `%2` を再利用している。`[arg1+0]` の load は IR に現れない。
 - guard も IR にある: L25685〜25688 の `load @global_var_13a5080` → `icmp eq %4, %arg1` → `br` が、機械語の `41a693`〜`41a69a` の `cmp`/`jne` に対応する。store (L25691) は分岐先 `dec_label_pc_41a69c` (L25690 のラベル) の中にあり、guard 成立時のみ実行される。
 
 仮説 (未検証): RetDec の lift で、同一ベースレジスタ (`arg1`) からの load を値番号付けする際に **displacement を鍵から落としている** (base だけで同一視)。REPORT_735 §1.1 の「offset が +8 にずれる」はこの見え方である。RetDec ソースでの該当箇所 (load forwarding / 値番号付け) は未調査。
@@ -64,7 +64,7 @@
 - **`rcx` の同一性 (指摘 4)**: `666aeb`〜`666af2` で各反復ごとに `rcx` を再計算してから使う。`666af7`〜`666b10` の間に `rcx` への書き込みは無く、`666afe`〜`666b10` が書くのは `r8`・`r9` のみ (`666b0c`〜`666b10` は `[rbp+0x28]` から読むだけ)。よって `666b13` の `rcx` は当該反復の slot 先頭 `r14 + 0x40 + 0x20*i`。`666a92` の call (0x409470) はループ前で、`rcx` は `666aeb` で再定義されるため影響しない。slot の大きさは 32 byte (`eax*4*8`)。
 - **`r8` の値 (前回の記述の訂正)**: `666b13` が書くのは `r14` ではなく、`666b0c`〜`666b10` で再ロードした `*(arg1)`。これが `r14` (= `666a9b` で取った `*(arg1)`) と一致するのは、その間に `*(arg1)` が変わらない場合に限る。`666ab9` (call 0x666960) と `666ad6` (間接 call) がその間にあるため、「`r14` を書く」とは断定しない。`r14` は Win64 ABI で非揮発のため call を跨いでも保持されるが、`*(arg1)` の値そのものが call で変わりうる点は残る。
 
-IR (`boot_final.ll` L225098〜225175、本 run で確認済み):
+IR (`boot_final.ll` L225098〜225175、前 run の記録。本 run では未再確認):
 
 - 先頭の `%15 = inttoptr %arg1` / `store i32 %10, ptr %15` は、機械語の `mov dword [r14], ebx` (r14 = `*(arg1)`) と対応させると **`*(arg1)` の 1 段の deref が IR に無い** (IR は `%arg1` を直接の書き込み先にしている)。
 - ループ内の `store i64 %29, ptr %36` (L225157) は、機械語では「`*(arg1)` を再ロードした値を slot+0x10 へ書く」だが、IR は `%29` (スロットアドレス側の計算値) を書く。値が一致しない。
@@ -90,7 +90,7 @@ IR (`boot_final.ll` L225098〜225175、本 run で確認済み):
 
 ## 6. 再現
 
-素材 (本 run で展開。所要 8.5 秒、実測):
+素材 (本 run で展開。所要 10.5 秒、実測。`block00031_PE.bin` sha256 `b2c64da4…9496d`):
 
 ```
 mkdir -p "$RUNNER_TEMP/ld19/extracted"
@@ -103,18 +103,18 @@ python3 -c "import sys; sys.path.insert(0,'tools/m11/ldfix'); from ldmach import
 ```
 
 - `disasm_735.py` の出力は `41a69c`〜`41a6a3` の 3 命令 (`mov rax,[rbp+0x50]` / `mov rax,[rax]` / `mov [rip+..],rax`) のみ。41a681〜41a689 と 41a68f〜41a69a は上記の全体出力から取った。
-- IR の確認 (§1・§2 の行番号) は `work-m11.tar.zst` を `tar --zstd -xf` で展開し、`tools/m11/work/` の `grep -n` と `sed -n` で行った (展開は約 2.5 秒、実測)。PR 本文の `oc_artifacts: fl-win64 work-m11` で取得する。
+- IR の確認 (§1・§2 の行番号) は `work-m11.tar.zst` を `tar --zstd -xf` で展開し、`tools/m11/work/` の `grep -n` と `sed -n` で行う想定。ただし本 run では `work-m11` が `$ARTIFACTS_DIR` に無く未実施。再現には `oc_artifacts: fl-win64 work-m11` で起動し直す必要がある。
 
 ## 6b. 検出信号の試行 (#735 run 3・不採用。コード変更は無し)
 
 目的: 受入 3 (検出信号) として「機械語の zero-disp load 値の store に対し、IR の store 値が `load (argN + c)` (c≠0) か」を `audit_lsf.py` に追加する。
 
-実測 (fl-win64 無し・`work-m11` の `boot_final3.ll` / `m11_image.bin` / `boot*.drc.config.json`、本 run で展開):
+機械語の実測 (fl-win64 `block00031_PE.bin`、本 run で再確認): `41a670`〜`41a6d9` と `666aeb`〜`666b1f` は §1・§2 の記述と一致 (`ldmach.Machine.disasm_fn`)。
 
-- 試作版の出力: 全 7421 関数中 `suspect_off_fns` = 8、`suspect_off_sites` = 19。`41a670` は検出された (`store i64 %2` = `load (%arg1+8)`、機械語 `41a6a3` / `41a6d6` の `[arg1+0]` と不一致)。
-- しかし他 7 関数 (`1064ed0` / `407520` / `442480` / `7e5240` / `821550` / `c3ed10` / `d237e0`) も同形で検出され、誤検出の割合が高い。原因: `transfer` は機械語側で disp=0 の load 値 (`('ld', n, w)`) しか追跡せず、IR 側の `c` と機械語の disp を照合できない。`(n, w)` だけで突き合わせると無関係な store を拾う。
+IR 側の検出試行 (参考値・再現手段なし): 前 run の試作では `41a670` が `load (argN+c)` (c≠0) の store 形として検出されたが、他の複数関数も同形で検出され、誤検出の割合が高かった。本 run では `work-m11` が無く再実行していない。件数・関数名は再現できないため記載しない。
+- 原因の推定: `transfer` は機械語側で disp=0 の load 値 (`('ld', n, w)`) しか追跡せず、IR 側の `c` と機械語の disp を照合できない。`(n, w)` だけで突き合わせると無関係な store を拾う。
 - 結論: 検出信号は機械語側の値に disp を持たせる (`('ld', n, w, disp)`) 改修が前提。`transfer` の状態表現を変えるため、全関数の既存判定 (`SUSPECT_VAS` / `SUSPECT_USE_VAS`) への影響を再測定する必要があり、1 run の範囲を超える。
-- 試作コードは取り消し済み (`audit_lsf.py` は未変更)。次 run は disp 追跡版を別 PR で作る。
+- 試作コードは取り消し済み (`audit_lsf.py` は未変更)。次 run は disp 追跡版を別 PR で作る (再現スクリプトは同 PR で `tools/m11/ldfix/` に置く)。
 
 ## 7. 検証 (`docs/WORKFLOW.md` §6)
 
@@ -122,5 +122,5 @@ python3 -c "import sys; sys.path.insert(0,'tools/m11/ldfix'); from ldmach import
 - 変更は `tools/m11/ldfix/REPORT_911.md` のみ。コード変更なし (`audit_lsf.py` 等は未変更)。
 - 20MiB 超の blob は含まない。素材は `$RUNNER_TEMP` 配下で repo 外。
 - 実測 (本 run、fl-win64): `41a69c`〜`41a6a3` は REPORT_735 §1.1 と一致 (`disasm_735.py`)。`41a670`〜`41a6aa` の全体、`666a60` の `666aeb`〜`666b1f` は上記 §6 のコマンドで取得。
-- 実測 (本 run、work-m11): `boot0.lift.ll` L25677〜25691 (guard L25685〜25688 を含む)、`boot_final.ll` L225098〜225175 (store L225157) を確認し、REPORT の記述と一致。
+- IR (`work-m11`): 本 run では未展開のため再確認していない。`boot0.lift.ll` L25677〜25691・`boot_final.ll` L225098〜225175 は前 run の記録 (§1・§2)。`boot_final3.ll` の sha256 は本 run では取得できない。
 - 未実測: 修復後の IR・wasm (§4)。
