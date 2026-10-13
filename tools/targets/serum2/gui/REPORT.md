@@ -26,7 +26,9 @@ python3 gui/decode_splice_url.py work/Serum2_win64.vst3                  # 0x180
 
 - 依存: `pefile` `capstone` `zstandard` (`python3 -m pip install --break-system-packages`)。
 - 実測: sha256 `501e7bb3dd9cafe4…` (先頭 16 桁) が REPORT §11 の入力と一致。uidesc 抽出 **2,093,822 B** (REPORT §2 と一致)。
-- 所要: 抽出 + 復号 + uidesc 解析 = **6.8 s** (real, 1 run, 逐次)。load は未計測 (参考値)。
+- 所要 (real, 逐次, load 未計測):
+  - 今回 run (HEAD `0dcf5f4e` + 修正, 2026-10-13): `extract_uidesc.py` **2.97 s** / `decode_splice_url.py` **3.00 s** (別プロセス・各 1 run)。
+  - 前回 run (HEAD `d692129c`, 修正前の値): 抽出 + 復号 + uidesc 解析 = 6.82 s。今回 run との差は環境差 (同一 run で再測定した値のみ採用)。
 
 ## 2. 残留 (1) Splice 3 テンプレートの実体化分岐
 
@@ -44,7 +46,8 @@ python3 gui/decode_splice_url.py work/Serum2_win64.vst3                  # 0x180
 ### 2-2. SpliceController のメソッド候補 (実測)
 
 - `0x180796320` (size 358): 状態フィールド `[rsi+0x168/0x178/0x170/0x160]` の比較で 4 分岐し、`0x1801bc300` (ShellExecuteEx ラッパ, authstub §4) か `0x1800ccf60` / `0x1800cbb90` を呼ぶ。
-- **復号結果 (`gui/decode_splice_url.py`)**: `https://support.splice.com/en/articles/10055412-serum-2-license-instructions` (末尾の数バイトはバッファ残余)。→ Splice 関連の「support 記事を開く」ボタン処理と判定 (high)。
+- **復号結果 (`gui/decode_splice_url.py`)**: `https://support.splice.com/en/articles/10055412-serum-2-license-instructions` (76 文字・全文)。→ Splice 関連の「support 記事を開く」ボタン処理と判定 (high)。
+- 復号の範囲: `0x180796320` の `movups xmmword ptr [rsp + 0x5d], xmm0` はバッファ offset 61 から 16 バイト (61〜76) を書く。バッファ長 76 の末尾 15 バイト (61〜75) を埋める。旧版は `off <= N - 16` (上限 60) でこの書き込みを捨てて文字化けしていた (旧出力 `...license-Ö×ØÙÚÛÜÝÞßàá`)。修正版は `0 <= off < N` で `min(16, N - off)` バイトを書く。
 - `0x180796090` (size 587) は未解析。`0x180542a20` (size 3,105) は起動直後の初期化側と推定 (med)。いずれも実体化分岐の確定根拠ではない。
 
 ### 2-3. 未確定

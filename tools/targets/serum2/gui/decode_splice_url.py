@@ -19,8 +19,9 @@ for ins in Cs(CS_ARCH_X86, CS_MODE_64).disasm(dm[fn - IMG:fn - IMG + 0x200], fn)
         pending = ins.address + ins.size + disp - IMG
     elif ins.mnemonic in ('movups', 'movaps') and ins.op_str.startswith('xmmword ptr [rsp + ') and pending is not None:
         off = int(re.search(r'\[rsp \+ (0x[0-9a-f]+)\]', ins.op_str).group(1), 16) - BASE
-        if 0 <= off <= N - 16:
-            buf[off:off + 16] = dm[pending:pending + 16]
+        if 0 <= off < N:
+            w = min(16, N - off)
+            buf[off:off + w] = dm[pending:pending + w]
         pending = None
     if ins.mnemonic == 'cmp' and ins.op_str == 'rax, 0x4c':
         break
