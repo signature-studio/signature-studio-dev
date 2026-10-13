@@ -105,7 +105,7 @@ python3 gui/decode_splice_url.py work/Serum2_win64.vst3                  # 0x180
 - **残留 (1) Splice 実体化分岐** は (a)(b) どちらでも同じ未解決 (§2-3)。SpliceController は Xfer 固有ビューなので (b) では置換側で扱う。
 - **PoC 境界 (次段)**: 最小 1 view (例 `CTextLabel` 系 + `XferOnOffButton`) を upstream VSTGUI で canvas 描画し、uidesc から 1 template を実体化する。ここまでを GUI 戦略の PoC とし、全 Xfer ビューの置換はこの後に起票する。
 
-本 run では (a)(b) の工数見積もりを実測していないため、**判定は推奨止まり**。最終決定はユーザ判断。
+(a)(b) の対象量は `gui/REPORT_EFFORT.md` で実測 (2026-10-14, #1351)。工数 (人日) は未測定のため**判定は推奨止まり**。最終決定はユーザ判断。
 
 ## 6. 検証 (実測)
 
