@@ -7,11 +7,11 @@ FA="$(cd -- "$(dirname -- "$0")" && pwd)"; DL="${FA_DL:-$HOME/ダウンロード
 FACTORY='Fresh Air/C__ProgramData_Slate Digital/Fresh Air/FACTORY Presets/Factory Bank'
 mkdir -p "$FA/work/win" "$FA/work/mac/x"
 if [ ! -d "$FA/work/win/Fresh Air" ]; then
-  unzip -q -o "$DL/Fresh Air.Win.zip" -d "$FA/work/win"
+  unzip -q -o "$DL/Fresh Air.Win.zip" -d "$FA/work/win" || true
 elif [ "$(ls "$FA/work/win/$FACTORY"/*.epf 2>/dev/null | wc -l)" -ne 8 ]; then
-  unzip -q -o "$DL/Fresh Air.Win.zip" "$FACTORY/*" -d "$FA/work/win"
+  unzip -q -o "$DL/Fresh Air.Win.zip" "$FACTORY/*" -d "$FA/work/win" || true
 fi
-n_epf=$(ls "$FA/work/win/$FACTORY"/*.epf 2>/dev/null | wc -l)
+n_epf=$(ls "$FA/work/win/$FACTORY"/*.epf 2>/dev/null | wc -l || true)
 [ "$n_epf" -eq 8 ] || { echo "[fetch] ERROR: factory .epf が 8 本ではない ($n_epf 本)" >&2; exit 1; }
 if [ -f "$DL/Fresh Air.pkg" ] && command -v xar >/dev/null 2>&1; then
   cd "$FA/work/mac"
