@@ -60,6 +60,28 @@
 6. **VST3 (Serum 2 は VST3 のみ)**: 境界が C++ vtable なので opcode 表は流用不可。plugin module 内に最小 VST3 host を同梱し VST2 風 facade を見せる案を推奨 (§2.9)。
 7. **新発見の制約**: Wrapper は LoadLibrary 前に DLL ファイルを 2 回読む (export 名検査/PE bitness 判定) → 仮想 FS に **最小 PE スタブ**が必要 (生成器は実装・検証済)。DB は entry export 名 hint を保持でき、多製品 core 用の機構が元からある。
 
+## 3-b. HB-H17 (#787): PE 事前検査を仮想 FS に結合 (実測)
+
+- 対象: Fruity Wrapper の事前検査 `fw:0x7a9030` (export 名に main / vstpluginmain / hint の一致) と bitness 判定 `fw:0x5bfc30`。
+- 結合: `poc/pe_stub.mjs` の PE スタブ (1024 B) を `tools/assets/wvfs` の `Wvfs` (`/c/home`、`pathreg` 写像 `C:\Users\webstudio\...\OTT_x64.dll` → `/Documents/...`) に書き、閉じて開き直した後の読み戻しバイト列を検査する。
+- 実 Wrapper: fl-win64 素材の `extracted/block19091_PE.bin` (x64 DLL, export `CreatePlugInstance` / `__dbk_fcall_wrapper` / `dbkFCallWrapperAddr`)。
+- 再計算: `bash tools/hostbridge/analysis/pe_precheck_vfs.sh` (`analysis/pe_precheck_vfs.mjs`, `pefile` 照合を含む)。
+
+| 区分 | ID | 内容 | 結果 |
+|---|---|---|---|
+| 正 | P-route | pathreg 写像で `/c/home/...` へ振り分け | PASS |
+| 正 | P-persist | reopen 後の読み戻し sha256 一致 (1024 B) | PASS |
+| 正 | P-precheck | 読み戻しバイトが事前検査を通過 (export `main`) | PASS |
+| 正 | P-pefile | pefile の machine / DLL / export 名と一致 | PASS |
+| ネガ | N1 | PE が仮想 FS に無い → ENOENT、事前検査も不合格 | FAIL 検出 (期待どおり) |
+| ネガ | N2 | export が `Foo`/`Bar` → 不合格 | FAIL 検出 |
+| ネガ | N3 | 実 Wrapper を VST として検査 → 不合格 (export 名に main 無し) | FAIL 検出 |
+| ネガ | N4 | machine を x86 (0x14c) に変更 → 不合格 | FAIL 検出 |
+| ネガ | N5 | 先頭 64 B に切り詰め → 不合格 | FAIL 検出 |
+
+数え方: 正 = `P-*` 4 件の PASS 数。ネガ = `N1`〜`N5` のうち「期待どおり不合格になった」件数 (5 件)。実測は `SUMMARY P=4/4 NEG=5/5 failed=0`。
+範囲外: 本ハーネスは事前検査の JS 実装 (`precheck`) で判定する。Wrapper 本体 (lift 済み) が仮想 FS の読込を実際に呼ぶ経路の結線は H4 の本体作業 (wasm 側)。`tools/assets/wvfs/test/wvfs-node.test.ts` の既存 `tmp routing` 行は `user` プロファイルが `pathmap` 既定表外のため既存で失敗 (本件と無関係・未修正)。
+
 ## 4. 未解決・ブロッカー
 
 1. **surrogate (SDK glue) 依存**: lift closure (M6〜M10, 166 関数) に `VSTPluginMain`/`createEffectInstance`/`dispatchEffectClass`/static thunk/`AudioEffectX::dispatcher` が無く、`plugin_ott_entry.c` が代行 (差し替え点は `hb_icall` のみ)。Chunk/Program/MIDI 等 opcode は OTT で未実装。

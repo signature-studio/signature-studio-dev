@@ -11,3 +11,6 @@ bash "$HERE/inventory.sh"
 "$ROOT/node_modules/.bin/tsc" --noEmit -p "$ROOT/tsconfig.json"
 bash "$HERE/build.sh"
 node "$HERE/harness/run.mjs" "$@" --out "$HERE/results/results.json"
+# IASIO COM 経由の検収 (#98): node check + COM 経由 120s soak (--quick 時は soak を省く)。asio/e2e.sh は --out を取らない
+ASIO_ARGS=(); for a in "$@"; do [ "$a" = "--quick" ] && ASIO_ARGS=(--quick); done
+bash "$HERE/asio/e2e.sh" "${ASIO_ARGS[@]}"

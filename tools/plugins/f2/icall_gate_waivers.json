@@ -1,5 +1,17 @@
 [
   {"block": "18979", "site": "0x741035", "function": "0x740e30",
-   "reason": "到達不能コード: RetDec が site を含む基本ブロック 0x741007-0x74103b を除去 (call [rdi+0x1f0])",
-   "evidence": "0x740e6a-0x740e70: eax=[rbp+0x40]; cmp eax,0xe; jge 0x74139c => 以降 v<14 (符号付き)。 0x740ee6 で再読込, 0x740ee9 cmp eax,5; jg 0x740f15 => v>=6, 0x740f15 sub eax,6; je => v>=7, 0x740f1c sub eax,8 => v-14 は -7..-1 (符号なしでは 6 以上), 0x740f22 jae 0x7411dd が必ず成立し、0x740f28 jmp 0x741007 は実行されない (Delphi case 14..19 ラベルの死コード。 [rbp+0x40] は 0x740e6a-0x740ee6 間で書かれず、介在する call 0x409fe0 も触らない前提)"}
+   "reason": "到達不能と推定 (RetDec が site を含む基本ブロック 0x741007-0x74103b を除去。call [rdi+0x1f0])",
+   "evidence": "0x740e6a-0x740e70: eax=[rbp+0x40]; cmp eax,0xe; jge 0x74139c => 以降 v<14 (符号付き)。 0x740ee6 で再読込, 0x740ee9 cmp eax,5; jg 0x740f15 => v>=6, 0x740f15 sub eax,6; je => v>=7, 0x740f1c sub eax,8 => v-14 は -7..-1 (符号なしでは 6 以上), 0x740f22 jae 0x7411dd が必ず成立し、0x740f28 jmp 0x741007 は実行されない (Delphi case 14..19 ラベルの死コード。 [rbp+0x40] は 0x740e6a-0x740ee6 間で書かれず、介在する call 0x409fe0 も触らない前提)"},
+  {"block": "19148", "site": "0x780d84", "function": "0x780d00",
+   "reason": "Delphi 例外 cleanup pad (D12): scope table kind=0 の handler 領域 [0x380d6a,0x380d96) (jt=0x380db0) 内の仮想 dtor 呼出し。通常制御フローからは到達不能と推定 (同関数内の分岐参照 0 件、直前は jmp で飛び越し)。例外 unwind 時に実行され得る。DSP 経路で例外が送出されるかは未検証 (#529)",
+   "evidence": "xdata_scope.py (CAB-227 抽出器) の scope table: idx1 kind=0 [380d6a,380d96) jt=380db0。領域内 0x380d6a-0x380d95 への分岐は同関数内 0 件 (je は領域内部へ飛ぶのみ)。0x380d66 jmp 0x380d96 が領域を飛び越す。raw IR に insn.addr=0x780d84 の命令無し (ゲート F4 で機械検証)。DSP 経路に例外を投げる箇所 (_RaiseExcept 系 helper・整数除算などの trap) が無いことは未検証 (追跡 #529)"},
+  {"block": "19148", "site": "0x78a727", "function": "0x78a660",
+   "reason": "Delphi 例外 cleanup pad (D12): scope table kind=0 の handler 領域 [0x38a70d,0x38a739) (jt=0x38a750) 内の仮想 dtor 呼出し。通常制御フローからは到達不能と推定。例外 unwind 時に実行され得る。DSP 経路で例外が送出されるかは未検証 (#529)",
+   "evidence": "scope table: idx1 kind=0 [38a70d,38a739) jt=38a750。領域への分岐 0 件、直前 0x38a709 jmp 0x38a739 で飛び越し。raw IR に insn.addr=0x78a727 の命令無し (ゲート F4 で機械検証)。DSP 経路に例外を投げる箇所 (_RaiseExcept 系 helper・整数除算などの trap) の無さは未検証 (追跡 #529)"},
+  {"block": "19245", "site": "0x77a5d4", "function": "0x77a550",
+   "reason": "Delphi 例外 cleanup pad (D12): scope table kind=0 の handler 領域 [0x37a5ba,0x37a5e6) (jt=0x37a600) 内の仮想 dtor 呼出し。通常制御フローからは到達不能と推定。例外 unwind 時に実行され得る。DSP 経路で例外が送出されるかは未検証 (#529)",
+   "evidence": "scope table: idx1 kind=0 [37a5ba,37a5e6) jt=37a600。領域への分岐 0 件、直前 0x37a5b6 jmp 0x37a5e6 で飛び越し。raw IR に insn.addr=0x77a5d4 の命令無し (ゲート F4 で機械検証)。DSP 経路に例外を投げる箇所 (_RaiseExcept 系 helper・整数除算などの trap) の無さは未検証 (追跡 #529)"},
+  {"block": "19245", "site": "0x783f77", "function": "0x783eb0",
+   "reason": "Delphi 例外 cleanup pad (D12): scope table kind=0 の handler 領域 [0x383f5d,0x383f89) (jt=0x383fa0) 内の仮想 dtor 呼出し。通常制御フローからは到達不能と推定。例外 unwind 時に実行され得る。DSP 経路で例外が送出されるかは未検証 (#529)",
+   "evidence": "scope table: idx1 kind=0 [383f5d,383f89) jt=383fa0。領域への分岐 0 件、直前 0x383f59 jmp 0x383f89 で飛び越し。raw IR に insn.addr=0x783f77 の命令無し (ゲート F4 で機械検証)。DSP 経路に例外を投げる箇所 (_RaiseExcept 系 helper・整数除算などの trap) の無さは未検証 (追跡 #529)"}
 ]

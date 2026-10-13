@@ -2,8 +2,8 @@
 # m11_simd2.py の rep_stosb_memset を実行で検証する (#538)。
 #   bash tools/plugins/lift/passes/test_rep_stosb.sh [<m11_simd2.py>]   既定は同ディレクトリの m11_simd2.py
 # declare だけの .ll から helper C を生成 → emcc → node で実行し、memset の結果をバイト単位で照合する。
-# 1 件でも不一致なら exit 1。 ネガコン: `--negctl` は origin/main の旧 m11_simd2.py (stub) を渡して「FAIL すること」を確認し、
-#   FAIL しなければ exit 1 (= 検査が緩い)。
+# 1 件でも不一致なら exit 1。 ネガコン: `--negctl` は #629 直前の m11_simd2.py (stub、9b5ea38^) を渡して「FAIL すること」を確認し、
+#   FAIL しなければ exit 1 (= 検査が緩い)。 基点は main に依存させない (main は実装済みで旧 stub が取れなくなるため)。
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 ROOT="$(cd "$HERE/../../../.." && pwd)"
@@ -12,7 +12,7 @@ source "$ROOT/tools/shared/env.sh"
 export PATH=/opt/emsdk/node/24.19.0_64bit/bin:$PATH
 if [ "${1:-}" = "--negctl" ]; then
   OLD="$(mktemp -d "$RUNNER_TEMP/stosb_old.XXXXXX")"
-  git -C "$ROOT" show origin/main:tools/plugins/lift/passes/m11_simd2.py > "$OLD/m11_simd2.py" || exit 2
+  git -C "$ROOT" show 9b5ea38^:tools/plugins/lift/passes/m11_simd2.py > "$OLD/m11_simd2.py" || exit 2
   if bash "$0" "$OLD/m11_simd2.py" > "$OLD/out.log" 2>&1; then
     echo "[test_rep_stosb] negctl FAIL: 旧 stub 版が PASS した (検査が緩い)"; exit 1
   fi
