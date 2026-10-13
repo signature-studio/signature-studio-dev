@@ -129,7 +129,7 @@ OOB 16 件の最上位 frame (現行 build): 144 `407e20` / 149 `412e40` / 275 `
 
 ## 9. 4 回目の run: unit 895 の trace 取得 (`SV_TRACE_AT`)
 
-測定 commit: `origin/main` `12586095` (worktree `~/ws-882` 起点)。素材は `$ARTIFACTS_DIR` の 5 本を展開 (`fl-win64` → `$RUNNER_TEMP/fl-win64`、`toolchain-retdec` / `toolchain-emsdk` → `$RUNNER_TEMP`、`work-m11` / `work-liftdiff` → worktree 直下)。全コマンド foreground、rc=0。
+測定 commit: `origin/main` `12586095` (測定用 worktree `ws-882` 起点)。素材は `$ARTIFACTS_DIR` の 5 本を展開 (`fl-win64` → `$RUNNER_TEMP/fl-win64`、`toolchain-retdec` / `toolchain-emsdk` → `$RUNNER_TEMP`、`work-m11` / `work-liftdiff` → worktree 直下)。全コマンド foreground、rc=0。
 
 - `m11_gen_ir2.sh`: rc=0、43.3 s、`ldfix` F1=902 F2=30 F3c=36 errors=0。
 - `m11_build.sh`: rc=0、24.9 s。
@@ -145,5 +145,6 @@ OOB 16 件の最上位 frame (現行 build): 144 `407e20` / 149 `412e40` / 275 `
 
 - `40ff70` の `p-144` の実値は、本 run でも**未取得**。受入条件 2 は未達のまま。
 - 単独 (oob) と全体 (halt0) の差は未切り分け。unit 895 の挙動を読むには全体 survey の文脈が要る。
+- `MessageBoxA` のアドレスは §8 (`f7bebc7b`) が `0000000010251440`、§9 (`12586095`) が `0000000010251450`。測定 commit が違い (間に `tools/m11` の変更あり)、commit 差によるものか未切り分け。
 - 次の一手: `40ff70` の入口で `p-144` と走査ノードの `word [rcx]` を出す probe を生成 IR に入れる (`m11_ov.c` 改修か `ov` 試験パッチ。`ov_409470_410320_experiment.patch` と同方式)。これは別 run の作業。
 - 受入条件 1・3 は本 run でも未達 (§3・§8.2 と同じ)。
