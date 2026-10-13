@@ -159,3 +159,34 @@ bash tools/gui/e2e.sh                        # gui 単体 wasm 回帰
 | OFN hook / テンプレートの扱いを決め、未対応なら fail-fast で明示 | **達成** (本 PR) |
 | フォルダ選択 (BIF 系) の扱いを決め、未対応なら明示 | **未達** → #1179 [SHX-T22] |
 | node + mock と REPORT 実測 | 本 PR 分は達成 (上の表)。子 issue 分は各 issue で |
+
+## 9. 実ブラウザ確認 (SHX-T19 #1159、HEAD `7f5807c7`)
+
+方式: `bash tools/gui/shimx_coexist/browser_e2e.sh`。`coexist.sh` の objects から `ENVIRONMENT=web,worker` の wasm を link (`coexistWeb`、INVOKE_RUN=0)し、`src/runtime/gui_hostcall.ts` を ES モジュール化して page から読む。headless Chrome (CDP) で page を開き、wasm の hostcall 要求 (`gui_hostcall.h` と同じ手順) を **`browserEnv` (実 `window.open` / 実 `showOpenFilePicker` / `showSaveFilePicker`)** に処理させる。Chrome 154.0.8037.97。
+
+- user activation: CDP `Runtime.evaluate` の `userGesture:true` で与える。activation 無しの試験は、前の gesture の失効 (`navigator.userActivation.isActive` が false) を待ってから行う。
+- picker の UI だけ差し替え: headless では native picker を操作できないため、**activation 下の呼出のみ** mock handle (`getFile` / `createWritable`) を返す。呼出時点の `navigator.userActivation.isActive` を記録し、activation 下で呼ばれたことを検査する。activation 無しの呼出は差し替えず、実 API が返す拒否を見る。
+- 含めないもの: 実 native picker の選択操作、実 FL guest の CALL 経路 (guest 側の呼出は coexist の C 側 58 項目で確認済み)。
+
+| 検査 | 結果 |
+|---|---|
+| web build wasm が実 Chrome の page で起動 (`crossOriginIsolated` / SharedArrayBuffer) | PASS |
+| ShellExecute https → `window.open` (user activation 下) | PASS (result=1) |
+| ShellExecute http → `window.open` (user activation 下) | PASS (result=1) |
+| ShellExecute mailto → `window.open` (user activation 下) | PASS (result=1) |
+| `window.open` を activation 無しで呼ぶ → Chrome のポップアップブロックで失敗 | PASS (result=0 → SE_ERR) |
+| `javascript:` は host 側で拒否 (window.open 未呼出) | PASS |
+| GetOpenFileNameW → `showOpenFilePicker`: activation 無しは実 API が「user gesture 要求」で失敗 (result=-16) | PASS |
+| 同: activation 下で呼ばれ、選択結果 `kick.wav` が guest の応答 buffer に反映 | PASS (`calls` の active=true) |
+| 選択ファイルの内容がステージング FS へ書き出される `[1,2,3]` | PASS |
+| GetSaveFileNameW → `showSaveFilePicker`: activation 無しは失敗 (result=-16) / 下で呼ばれ `song.flp` が返る | PASS |
+| save: FL が書いた内容 `[70,76,80]` が選択 handle の `createWritable` へ反映 | PASS |
+| host log は想定内 4 件 (activation 無し blocked 1 / javascript 拒否 1 / picker 失敗 2) のみ・page 例外 0 | PASS |
+
+- 実測: `browser_e2e.sh` HEAD `7f5807c7` で **14 PASS / 0 FAIL** × 2 回 (所要 **11.751 s / 11.806 s**、単独実行)。HEAD `cfd3f7b2` (コード同一) で再実行 **14 PASS / 0 FAIL** (所要 **19.538 s**、coexist 直後の単独実行)。
+- 回帰 `coexist.sh` HEAD `7f5807c7`: ALL PASS、所要 **14.430 s / 14.557 s**。HEAD `cfd3f7b2`: ALL PASS、所要 **17 s** (1 回)。C 側 58 / 0、host 側 13 / 0、link duplicate 0 / warning 0 / undefined 0、NC1 duplicate 7、NC2 C 側 fail 14。
+- 同時実行は不可: browser と coexist は `work/` を共有するため、並行すると browser が rc=1 で落ちる (単独再実行で PASS を確認)。
+- 環境: emsdk 6.0.12 (PATH 経由。`EMSDK_ENV` 未指定時は PATH の emcc を使う)、`llvm-nm` (llvm-18)、gcc-mingw-w64-x86-64、wabt。
+- ネガコントロール: activation を常時付与 (`withoutActivation` を gesture 付きに置換) すると **4 FAIL / 10 PASS** (14 検査中 4 FAIL、exit 1、所要 11.175 s、HEAD `cfd3f7b2`・`browser_e2e.mjs` は `7f5807c7` と同一)。activation 無しの検査と想定内 log の件数検査が、activation の有無を実際に区別していることを確認した。
+
+未解決 (起票先): 実 native picker の操作 (headless 不可。手動採取または GUI-9 の入力注入で扱う)・実 FL guest 結合での `window.open` / picker 呼出 (#177 SHX-T9)。

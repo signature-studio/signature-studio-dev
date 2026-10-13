@@ -264,7 +264,7 @@ iargs 未対応の 3 site (§17.2 の残 unbound: `1801a3117`・`1801c162b`・`1
 | C runtime の既定 BLK | `tools/icall/rt/icall_rt.c` / `icall_ovr.c` は `ICALL_BLK = 0x34308000` で、rewriter の `0x184308000` と不一致 |
 | harness の引数位置 | `spec.py` L182-184 が引数の宣言順を `A <slot>` で出力 (`this`=slot 0, `idx`=slot 1)。`native_runner.c` L128 (`c.gpr[sl]`) と `wasm_runner.mjs` L71 がその slot の位置で渡す。`ms_call.S` L18-19 が gpr[0]→rcx、gpr[1]→rdx に載せる。IR が BLK から読むなら、この値は届かない (前行の未確認事項に依存) |
 
-修正と検証 (ネガコン含む) は 1 run では終えられないため、**#883 (HB-H21) に残す**。再実測と確定事項は [`REPORT_APPENDIX_883.md`](REPORT_APPENDIX_883.md)。
+修正と検証 (ネガコン含む) は 1 run では終えられないため、**#883 (HB-H21) に残す**。再実測と確定事項は [`REPORT_APPENDIX_883.md`](REPORT_APPENDIX_883.md)。 #898 (HB-H22) の 3 site の bind は [`REPORT_APPENDIX_898.md`](REPORT_APPENDIX_898.md)。
 
 ### 17.11 HB-H25 (#1124): 5 番目の引数 (入口 rsp+0x28) の bind
 
