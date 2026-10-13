@@ -2,6 +2,7 @@
 
 - 日付: 2026-10-13 / Issue #666 `[FA-10]` / 起点 HEAD: 8d883c3 (origin/main) → 修正 commit a092759
 - 本付録は `REPORT.md` の上限 (250 行) のため分割した追記 (`docs/DOC_MAP.md` §1)。内容は削除していない。
+- `REPORT.md` の §12 (FA-4 #51) 全文は `REPORT_APPENDIX_FA4.md` に分割移動 (本 PR)。
 - 既知類型との関係: `docs/DEFECTS.md` (D1a〜D16) に rep 系・素材配線の類型は無い (該当なし。grep 実測)。
   `rep movs*` の未対応は lift の対応範囲の欠落で、mlift が `llvm.trap()` に置換するため実行時に検出される (silent ではない)。
 
@@ -21,17 +22,18 @@
 
 ## 2. 実測
 
-### 2.1 切り分け (A/B: 同じ lift コードで epf の有無だけを変えた)
+### 2.1 切り分け (A/B: 同一コード・同一 build で epf の有無だけを変えた)
 
-| 条件 | コード | epf | 生成シナリオ | build の failed 関数 | run_ctrl.sh 2 5 |
-|---|---|---|---|---|---|
-| B0 | 8d883c3 (origin/main) | 無 | 7 | 17 関数 (rep movsb 12 / rep stosw 3 / SSE 整数 2) | **MISMATCH** (native `ERR S2000 sig=11`, `free(): invalid size`), exit 1 |
-| B1 | a092759 | 有 (8) | 15 | 2 関数 (SSE 整数 pshuflw/pcmpeqw/vpcmpeqw) | **15/15 BIT-EXACT**, exit 0, 4.3 s |
-| B2 | a092759 | 無 | 7 | — | **exit 2** (`ERROR: factory .epf 8 本が無い`) |
+同一 HEAD (`7783af9`) の同一 `native_ctrl` / `ctrl_full.cjs` で、`FACTORY Presets` を一時退避する前後を比較した (退避は復元済み)。
 
-- B0 の内訳 (`$RUNNER_TEMP/build_ctrl_base.log` 相当の実測): `rep movsb` 16 命令 / `rep stosw` 6 命令 / `pcmpeqw|pshuflw` 4 命令。
-  mlift の `emit_insn` は `rep` 接頭辞で `stos{b,d,q}` のみ受理していた (`inner in (...)`) ため、`inner='movsb'` 等は
-  `Unsupported('rep prefix rep movsb')` になる。
+| 条件 | epf | 生成シナリオ | run_ctrl.sh 2 5 | 直接実行 (native / wasm, fma0) |
+|---|---|---|---|---|
+| A | 有 (8 本) | 15 | **15/15 BIT-EXACT** (3 回の e2e で再現, §2.2) | 15 行 / 15 行, 両側 ERR 1 件 (同一 scenario) |
+| B | 無 (退避) | 7 | **exit 2** (`ERROR: factory .epf 8 本が無い … 生成シナリオ 7 本`) | native: **exit 134** (`ERR S2000 sig=11`, `free(): invalid size`, 出力 2 行で停止) / wasm: S2000 で `ERR` (exit 0, 出力 9 行) |
+
+- B では native が S2000 で abort し、wasm も同じ S2000 で ERR を出す。両側の ERR scenario は一致するが、native の出力が途中で止まるため `ctrl_norm.py` は行数不一致で不合格 (`lines native/wasm 2/7`)。よって B は「gate で止まる + 素材なしで直接実行しても bit-exact は成立しない」ことの実測であり、「native/wasm が同一 ERR で完走する」ことの証明ではない。
+- 「同じ lift コードで epf の有無だけを変えた」は B0 (8d883c3) との比較では成立しない。B0 は別コードのため、上表はコードを固定した A/B に差し替えた。
+- B0 (8d883c3, origin/main) の失敗内訳 (参考・別コード): `rep movsb` 16 命令 / `rep stosw` 6 命令 / `pcmpeqw|pshuflw` 4 命令で build の failed が 17 関数。mlift の `emit_insn` は `rep` 接頭辞で `stos{b,d,q}` のみ受理していた (`inner in (...)`) ため、`inner='movsb'` 等は `Unsupported('rep prefix rep movsb')` になる。B0 の run_ctrl 結果 (MISMATCH) は B0 のコードでの結果であり、epf 欠落のみに帰属させない。
 - 乱数列のずれの根拠: `gen_ctrl_scen.py` の epf ループは `change()` 経由で `rnd` を消費する。epf が無いと
   structured/random シナリオの中身が変わり、ランダム先頭 `S2000` (`NR` の 0 番目) が native で OOB を起こす。
   `run_ctrl.sh` 冒頭が述べる「既知限界 (乱数注入の OOB)」と同型。**2/5 の回帰セットは epf を含む乱数列でのみ PASS する**
@@ -39,14 +41,23 @@
 - 旧 `run_ctrl.sh` の `EXPECT=NS+NR+8` は生成本数を見ていなかったため、epf 欠落でも表示上は "15/15" になり得た。
   本 PR で `EXPECT` を生成行数 (`wc -l`) に変え、8 本未満なら `exit 2` にした (B2)。
 
-### 2.2 lift2_e2e.sh 全体 (HEAD a092759, 作業ツリーはコミット済みで clean)
+### 2.2 lift2_e2e.sh 全体 (HEAD 7783af9, 実測 3 回)
 
-- 結果: **`RESULT: lift2_e2e ALL PASS`**, exit 0, `time` real **1m13.467s**, load (1 分平均) 0.32 → 0.87, nproc 4。
-  (開始 08:36:22Z → 終了 08:37:35Z。FA-2c 当時の記録 73 s と同程度。)
-- 工程別: comp 400/400 (non-grow 206/206, grow 194/194) / filter 200 × fma0+fma1 = 400/400 /
-  fuzz 4 組 × 1200 mismatch 0 / ABI violations 0 / ctrl 15/15 (fma0+fma1) /
+検証 HEAD は `7783af9` (`run_ctrl.sh` の判定コメントのみ修正したコミット。挙動は不変)。
+`TMPDIR=$RUNNER_TEMP bash tools/targets/freshair/lift2/lift2_e2e.sh` を worktree `ws-698` で実行。
+
+| 回 | exit | real | user / sys | 開始前 load (1 分) | 結果 |
+|---|---|---|---|---|---|
+| 1 | 0 | 1m19.336s | 1m12.087s / 5.636s | 0.19 (up 4 min) | `RESULT: lift2_e2e ALL PASS` |
+| 2 | 0 | 1m15.112s | — | 0.88 | `RESULT: lift2_e2e ALL PASS` |
+| 3 | 0 | 1m14.871s | — | 0.89 | `RESULT: lift2_e2e ALL PASS` |
+
+- min–max: real 1m14.871s–1m19.336s (n=3)。nproc 4。
+- 工程別 (1 回目の実測): comp fma0 200 / fma1 200 (計 400, mismatch 0, 両側 ERR 0) / filter 400 (mismatch 0) /
+  fuzz comp・filter × fma0・fma1 の各 1200 mismatch 0 / ABI violations 0 / ctrl 15/15 (fma0+fma1, 両側 ERR 1/1 同一 scenario) /
   ablation 注入 5 種すべて検出 (comis_noflags 200/200, xmm_args_drop 200/200, xmm_ret_drop 200/200,
   icall_drop 80/200, cmov_drop 172/200)。ablation が本 e2e の負のコントロール。
+- 参考 (旧 HEAD a092759, 1m13.467s) は本改訂前の記録で、現 HEAD の数値ではない。
 - 再現: `bash tools/targets/freshair/lift2/lift2_e2e.sh` (env.sh が capstone 5.0.7 の venv を作る。素材は下記 §3)。
 
 ### 2.3 rep movs / stosw の実行到達性 (負のコントロール, 実測)
@@ -61,12 +72,22 @@
 | build_filter.sh + run_filter.sh 200 | **400/400 PASS** (経路未実行) |
 
 → 既存 e2e は新経路を一度も実行していない。新経路の正しさは build (capstone 復号 + IR 生成) までの確認で、
-実行結果の bit-exact 検証は未達。元に戻して `cmp` で一致を確認した (`git status` clean)。
+**実行結果の bit-exact 検証は未達 (build のみ・実行未検証)**。元に戻して `cmp` で一致を確認した (`git status` clean)。
+
+注: 本表は trap 挿入版の結果で、2.2 の PASS は通常版 (trap 無し) の結果。新経路を実行させる e2e は無い。
 
 ### 2.4 epf 欠落時のゲート (負のコントロール)
 
 `FACTORY Presets` を一時退避して `bash run_ctrl.sh 2 5` → `exit 2`、
-`ERROR: factory .epf 8 本が無い … 生成シナリオ 7 本` を出力。復元後は 8 本。
+`ERROR: factory .epf 8 本が無い … 生成シナリオ 7 本` を出力 (2.1 B と同一の実測)。復元後は 8 本 (実測)。
+
+### 2.5 「15/15 BIT-EXACT」の内訳 (ERR 1 件の扱い)
+
+- `ctrl_norm.py` は両側で**同一 scenario** の ERR を許容する (ERR 集合が一致しない場合は不合格)。
+- 既定 seed (`0xFA2C0001`) の 15 シナリオでは **S2001 (native: `ERR S2001 sig=5`)** が native / wasm 両側で ERR (同一 scenario)。
+  実測: `ctrl_norm.py ... 1/1 (同一 scenario: yes)`。よって「15/15 BIT-EXACT」の中に **両側 ERR の 1 件を含む**。
+  ERR を含む scenario は bit-exact 比較の対象外 (出力は ERR 行のみ) で、残り 14 件が実際の出力比較。
+- `run_ctrl.sh` 冒頭コメントの旧記述 (「ERR 0 を含む 4 条件」) は実装と一致しなかったため、本改訂で「ERR は両側同一 scenario のみ許容」に修正した。
 
 ## 3. 再現手順 (素材)
 
