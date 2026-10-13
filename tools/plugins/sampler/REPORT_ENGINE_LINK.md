@@ -40,15 +40,56 @@
 - 選択子 6〜9 は同一 case (no-op)。 engine の `CreatePlugInstance` (VA 0x180147980) は `call 0x1801cc570` (サイズ 0x12310 の確保) の後、0x180145560 へ tail-jump する。
 - 殻の selector 値 (rdx) は未解析。 case 表だけでは `DispatchToEngine` の引数規約 (`rcx` の意味・`r8`/`r9` の意味) は確定しない。
 
-## 4. 受入条件 3・5 の扱い (前 run からの持ち越し)
+## 4. 殻の呼出し箇所と selector (受入条件 4 の残り・本 run で確定)
 
-- 受入条件 3 (RetDec C バックエンド省略): 既定経路は `sampler_engines.sh` → `engine_lift.sh` → `lift_from_ll.sh` (`.ll` 出力後に RetDec を止める) で、共有 `lift_ranges.sh` は変更していない。 判断は `REPORT.md` §5 と `REPORT_APPENDIX.md` §D の記録どおり。 `--backend-enabled-opts` / `--no-memory-limit` は未評価 (本 run では時間上限のため測定せず)。
-- 受入条件 5 (VEX helper の CPUID 分岐): 前 run の静的確認 (VEX 関数 229 / 94 のうち caller 鎖深さ 3 に cpuid/xgetbv 関数を持つもの 0) を引き継ぐ。 本 run では未再測定。
+測定: `disasm_range.py` (capstone) で殻 23663 の `.text` を逆アセンブル。
 
-## 5. 未解決 (起票先付き)
+- 結線ラッパ 0x843790: `[obj+0x1a8]` に engine ローダ 0x83e200 の戻り値 (engine オブジェクト) を保存し、`[obj+0x1b0]` 系の名前引数で `DispatchToEngine` 0x421d60 を引いて `[obj+0x1c0]` に保存する。 その後 `[obj+0x1a8]` の vtable `+8` を 2 回呼ぶ (0x843831, 0x843858)。
+- 殻が `DispatchToEngine` を呼ぶ形は `call qword ptr [reg+0x1c0]` で、`rcx = [obj+0x1b8]` (engine オブジェクト)、`rdx = selector` の直接呼出し。 この形の呼出しは 9 箇所 (以下、selector は `mov edx, imm` または `mov r9d, imm` → `mov edx, r9d` の直前代入から読んだ値)。
+
+| 殻の呼出し箇所 | selector (rdx) | 引数の意味 (逆アセンブル上) |
+|--|--:|---|
+| 0x846ab0 (関数 0x846a80) | 2 | `r9` を第 4 引数、`xmm0` = 浮動小数点引数 |
+| 0x846af4 (0x846ac0) | 4 | 第 5 引数 `[rsp+0x20]` = 0 |
+| 0x846b3c (0x846b10) | 3 | `xmm3` を第 5 引数 |
+| 0x846b8f (0x846b50) | 5 | 第 5 引数に `&local` (out ポインタ) |
+| 0x8439d1 (0x8439a0) | 10 (0xa) | `r8 = &local` (out)、`xmm0` = 浮動小数点引数 |
+| 0x847220 (0x8471f0) | 11 (0xb) | `r8 = &local` (out) |
+| 0x8473c8 (0x847380) | 13 (0xd) | 戻り値 `rax` を直後に 0x41b670 の第 2 引数へ渡す (戻り値を使う) |
+| 0x8474ad (0x847380 内) | 14 (0xe) | `r8 = &[rbp+0x57]` (直前の 0x55d0a0 で 0x200 バイトを埋めた領域を渡す) |
+| 0x847547 (0x847510) | 12 (0xc) | `r10 = edx` 符号拡張、`r11 = r8d` 符号拡張 (範囲 2 引数) |
+
+- 9 件の selector は engine 側 `DispatchToEngine` の case 表 (§3、有効 2..14) の内側に収まる。 case 6〜9 (no-op) は殻からは使われない。
+- 残りの `call qword ptr [reg+0x1c0]` (0x589137 / 0x590c92 / 0x594b6b / 0x594c0c / 0x59583e / 0x597510 / 0x5a7597 など) は `rbx = [obj]` の vtable 呼出しで、`DispatchToEngine` とは別の仮想メソッド。 本 run の範囲では DispatchToEngine と結び付けない。
+- 引数規約の残り: 戻り値は殻側で `rax` を読む箇所がある (0x8473c8) ため有効な結果を返す。 selector ごとの `r8`/`r9` の完全な意味は engine case ごとの読解が必要で、本 run では未完 (次の課題)。
+
+## 5. 受入条件 3・5 の測定
+
+### 3. RetDec の C バックエンド省略 (実測)
+
+| 方式 | 対象 | 結果 (実測) |
+|---|---|---|
+| 既定 `lift_ranges.sh` 直行 (前 run 再掲、REPORT §5) | 23664 | 614 s 時点で RSS 8.15 GiB、"out of memory; trying to recover" 3 回。 未完で手動停止 |
+| `--backend-no-opts` (本 run) | 23664 | **exit 0、441 s、Maximum RSS 3.52 GB**。 `.ll` 75 MB・`.c` 39.6 MB 出力まで完走 |
+
+- 結論: `--backend-no-opts` で RSS は 8.15 GiB → 3.52 GB に下がり、C 出力まで完走する。 ただし 441 s は `lift_from_ll.sh` (.ll 出力後に停止、既定経路) より長い。 共有 `lift_ranges.sh` は変更せず、既定経路は `lift_from_ll.sh` のまま (判断: 変更しない)。
+- 理由: `lift_from_ll.sh` は C 出力を使わず `.ll` の後段だけ使うため、`--backend-no-opts` を入れても時間の利点が無い。 `--no-memory-limit` は本 run では未測定 (RSS は 3.5 GB で上限に届かなかった)。
+
+### 5. VEX helper の CPUID 分岐 (再測定、main f0d65f32)
+
+`vex_guard.py` の実行結果 (同一値、前 run と一致):
+
+| block | pdata | VEX 関数 | cpuid 関数 | xgetbv 関数 | VEX 関数のうち caller 深さ 3 に cpuid/xgetbv を持つもの |
+|--:|--:|--:|--:|--:|--:|
+| 23664 | 5,160 | 229 | 29 | 4 | 0 |
+| 23677 | 2,355 | 94 | 28 | 3 | 0 |
+
+- 結論: 静的には CPUID 分岐で SSE 路に固定する経路が見えない (VEX 関数の caller 鎖に cpuid 関数が無い)。 SSE 固定は成立しない見込みで、判断は「静的に不成立」。 動的な分岐の実測は未実施。
+
+## 6. 未解決 (起票先付き)
 
 | 未解決 | 起票先 |
 |---|---|
-| 殻 `obj+0x1c0` の `DispatchToEngine` 呼出し箇所と selector 値 | 本 #540 (受入条件 4 の残り。 継続) |
-| `DispatchToEngine` の引数規約 (rcx/rdx/r8/r9 の意味、戻り値) | 本 #540 |
-| engine の `[rbx+0x30]` / `[rcx+0x1b0]` の構造体定義 | 本 #540 |
+| 殻の selector 9 件の `r8`/`r9` 引数の完全な意味・戻り値の型 (engine 側 case ごとの読解) | 本 #540 (継続) |
+| `--no-memory-limit` の実測 (今回 RSS 3.5 GB で未到達) | 本 #540 (継続) |
+| VEX helper の SSE 固定の動的確認 (静的には不成立) | #527 にコメント予定 (既存・重複起票せず) |
