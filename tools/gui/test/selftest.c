@@ -9,6 +9,7 @@
 #include "gui_api.h"
 #include "gui_internal.h"
 #include "gui_headless.h"
+#include "gui_simd.h"
 
 extern GuiShared *gui_shared_native(void);
 static int g_pass, g_fail;
@@ -86,6 +87,7 @@ static uint32_t rgb(int r, int g, int b) { return (uint32_t)(r << 16 | g << 8 | 
 static uint32_t cref(int r, int g, int b) { return (uint32_t)(r | g << 8 | b << 16); }
 
 #include "selftest_p1.inc"
+#include "selftest_gui5.inc"
 
 int main(void) {
   gui_hl_start(640, 480, 1);
@@ -322,6 +324,7 @@ int main(void) {
   gui_set_icall_hook(NULL);
 
   run_p1(h);
+  run_gui5(h);
 
   SECTION("SendMessage / cross-thread");
   CHK(SendMessageA(h, WM_USER + 9, 0, 0) == 4242, "SendMessage direct");
