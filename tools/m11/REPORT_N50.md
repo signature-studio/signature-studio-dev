@@ -27,3 +27,9 @@
 - retdec の PATH 解決に起因する失敗は再現しない (`m11_lift.sh` は既定 [RETDEC] で解決して rc 0)。
 - `--full` の再生成経路は現 HEAD で rc 0 (2 回)。受入条件 3 を満たす。
 - `--full` の残る trap (`unreachable` @ function_8c5eb0) は reached_stage 4 の既知事象で本 issue の対象外。build 失敗の残件は #1176 (`[M11-N71]`)。
+
+## 測定中の入力変更 (未解決)
+
+- `--full` の `m11_tail.py` (固定点処理) が測定中に `tools/m11/m11_extra_seeds.txt` へ seed `0x4572b0` を 1 行追記した (`git diff` で 1 insertion)。2 回の `--full` の ir_sha256 が異なる原因の候補。
+- 本 commit では seed ファイルを戻さず・含めない (測定の入力を変えないため)。次の PR で seed の扱い (コミットするか・測定ごとに固定するか) を決める。
+- 起票先: #1176 (`[M11-N71]`)。
