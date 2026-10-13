@@ -14,7 +14,7 @@ Issue 記載の unit 85/719 の退行・unit 114 のハングは、**現 main (#
 
 ## 1. 測定 (本ベース。build と survey は各構成 1 回ずつの単発。load average (1 分値) 0.54〜0.89 を計測中の `uptime` で記録)
 
-build 5.3〜10.1 s、survey 12.4〜12.8 s (いずれも wall の単発。既定 OFF の build 10.1 s は m11_simd / winstubs / fnstubs / m11_ov の再 cc を含み、ON の build 5.3 s は ov.o の再 cc のみ)。
+build 5.3〜10.1 s、survey 12.4〜12.8 s (いずれも wall の単発。既定 OFF の build 10.1 s は m11_simd / winstubs / fnstubs / m11_ov の再 cc を含み、ON の build 5.3 s は ov.o の再 cc のみ)。並列数 1 (各構成・各工程を逐次実行。構成間の並列実行は無し)。
 
 | 構成 | コード | ok | oob | halt0 | miss | noproc | ok 退行 |
 |---|---|--:|--:|--:|--:|--:|---|
@@ -76,3 +76,4 @@ Issue (#595) の退行 5 件 (85 719 42 45 415) とハング (114) は #446 の�
 | (1) unit 415 (ON で ok→miss): `9b4b00` (ユーザクラス AfterConstruction) の closure 外 miss。転記するか、miss を kind=ok 扱いにしない方針の決定 | ON で残る ok 退行 (1 件)。ON を既定にできない直接の理由 | #704 |
 | (2) `413060` の D4 は **OFF の IR にも存在する** (ON/OFF で同じ関数)。OFF での実害 (`Q(inst)` 破壊の有無) は未測定。同型の `412d60(&old)` 呼びを持つ他関数の洗い出し | 推定: OFF でも同じ書込みが起きていれば既定 OFF の survey に影響しうる (未測定)。既定 ON にするかの判断材料 | #705 |
 | (3) ON の利得は現 main では無い (trap 77 → 77)。`410360` / `410320` の ON 経路は `8cc190` 系 (`tools/m11/trap_triage/REPORT.md` §8.2) の再調査後に再評価 | ON にしない根拠は「利得 0・残退行 1」。再調査まで判断保留 | #595 (本 issue) |
+| (4) unit 85 / 719 が現 main で退行しなくなった理由が未特定 (§3)。どの変更で解消したかが分からない | 受入条件 1 の残り (退行の原因一覧が完全でない)。ON 判断の材料が一つ欠ける | #595 (本 issue) |
