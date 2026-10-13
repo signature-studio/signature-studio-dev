@@ -69,3 +69,16 @@
 
 - `test.sh --quick` が再生成した inventory.md / BACKLOG.md / coverage.json / inventory.csv / exports.txt は**コミットしていない** (差分 257 行追加・254 行削除)。素材あり run の再生成物だが、コミット可否は別判断 (本 PR の競合解消の範囲外)。
 - `sigs.json` の再生成は `gen_sigs.py --check` (sig_gate.sh が毎回実行) の要件。main 取込のたびに再生成が必要。
+
+**修文後の再検証 (2026-10-13, Actions runner, 検証起点 = commit 4e77193, 素材 work-m11 / work-m6-ott 展開済み)**: レビュー 5501305157 の文書訂正 (adapter 記録・零補間の silent 性・PIPESTATUS) を反映。
+
+| 検証 | 結果 |
+|---|---|
+| `test/sig/sig_test.sh` (n=3, `env -u EMSDK`) | 3 run とも exit 0 (ALL PASS, OK 8 件・FAIL 0), 16.17 / 15.89 / 15.49 s, load average (1 分値, 開始前→終了後) 0.02→0.30 / 0.30→0.52 / 0.48→0.60 |
+| 実 IR `tools/m11/work/boot_final2.ll` (`sig_gate.sh`, exit 0, 8.44 s, load 0.55→0.59) | 正規化 0 (adapter) + 重複統合 1 / 未解決 0 / adapter 定義 1 (`@__shx_sig_SHGetFolderPathW.1`, 呼出 1 site) / `signature mismatch = 0` |
+| 実 IR `tools/m11/work/boot_final3.ll` (`sig_gate.sh`, exit 0, 9.08 s, load 0.49→0.54) | 正規化 0 (adapter) + 重複統合 1 / 未解決 0 / adapter 定義 1 (`@__shx_sig_SHGetFolderPathW_D1`) / `signature mismatch = 0` |
+| 実 IR `tools/m8/work/ott_m8.ll` (`sig_gate.sh`, exit 0, 4.22 s, load 0.45→0.50) | 正規化 0 (adapter) + 重複統合 0 / 未解決 0 / adapter 定義 0 / `signature mismatch = 0` |
+| `bash tools/shimx/test.sh --quick` (実 IR あり, exit 0, 57.54 s, load 0.46→0.78) | 7/7 完了, 公開関数 687, MT 6 グループ PASS / ST PASS / M4 互換 PASS / 未実装 0。6b は SKIP 0 件で、m11・m11_3・ott とも sig_gate 経由で mismatch 0 |
+| 負の対照 (手順: `set -euo pipefail` 下で失敗コマンドを sed へ流し `\|\| die`) | `DIE x` を出して exit 1、後続は実行されない |
+
+- `test.sh --quick` が再生成した inventory.md / BACKLOG.md / coverage.json / inventory.csv / exports.txt はコミットしていない (§13・§14 と同様)。
