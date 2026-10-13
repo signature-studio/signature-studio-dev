@@ -47,7 +47,7 @@ try {
     mkdirSync(out, { recursive: true });
     writeFileSync(path.join(out, NOTICES_TXT), txt);
     writeFileSync(path.join(out, NOTICES_HTML), html);
-    console.log(`notices: ${path.join(out, NOTICES_TXT)} (${txt.length} B, components ${model.components.length}, ${model.complete ? "complete" : `INCOMPLETE: ${model.missing.length} 件`})`);
+    console.log(`notices: ${path.join(out, NOTICES_TXT)} (${Buffer.byteLength(txt)} B, components ${model.components.length}, ${model.complete ? "complete" : `INCOMPLETE: ${model.missing.length} 件`})`);
     if (!model.complete) for (const m of model.missing) console.error(`  - ${m}`);
   } else if (cmd === "check") {
     const registry = loadRegistry();
