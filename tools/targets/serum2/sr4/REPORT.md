@@ -79,7 +79,7 @@ RetDec は `movss [rcx+0xc], xmm1` で xmm1 を undef でなく `sext i64 %arg1 
 |---|---|---|
 | XferFilterSVF::process を jump table ごと lift (35 モード, 22,386 B) | 第 1 段の『filter 1 種』が未達 | **新規子チケット [SR-4a] 起票依頼** (親 #75, 関連 #494 #514 PR #539) |
 | xmm load の deref+disp 脱落 (D17 案)・FP 戻り (L1)・P1 の r8/eax 合流 (osc_setscale) | root の 5/56 止まり。Voice の getter/条件分岐 setter 全般に及ぶと推定 (件数は未集計) | #250 にコメント (本 REPORT §4・§5 を根拠に) |
-| 第 1 段残 root 52 関数 (うち Voice core 20 関数 31,113 B、WTOsc 3,682 B の process 0x1803d0980 を含む) | 第 1 段未完 | **新規子チケット [SR-4b] 起票依頼** (ポインタ連鎖 spec が必要。pilot 化の雛形は `sr4/specs/sr4_osc_setscale.json`) |
+| 第 1 段残 root 51 関数 (うち Voice core 20 関数 31,113 B、WTOsc 3,682 B の process 0x1803d0980 を含む) | 第 1 段未完 | **新規子チケット [SR-4b] 起票依頼** (ポインタ連鎖 spec が必要。pilot 化の雛形は `sr4/specs/sr4_osc_setscale.json`) |
 | Ladder process 0x1802f6000 (744 B) の callee 0x1809ebf20 / 0x1809e7910 (CRT libm と推定, 未確認) と 0x1802f62f0 | libm 差は dB 許容判定 (SR-5) 前提 | #73 (SR-5) へ共有 |
 | liftlib 既存回帰 (OTT/FA/KH の T1 ほか `liftlib_e2e.sh`) 未実行 — 素材 `work-m6-ott` `work-liftlib` `work-liftlib-targets` が本 run に無い | §3 の変更が既存 target を壊さない保証は『IR 不変の論理』のみ | PR 本文の `oc_artifacts:` 行でレビュー run に実行依頼 |
 | survey の closure は直接辺のみ (vtable/fp 表/間接経由を含まない) | closure 規模は下限。SR-3 §11 の cut 表・REPORT §4 の filter 34 methods も vtable 打ち切りの影響を受け得る | #71 (SR-3) にコメント |
