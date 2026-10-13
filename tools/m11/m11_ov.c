@@ -571,6 +571,71 @@ unsigned long long function_409470(void* pv, unsigned long long newsize) {
     return rsi;
 }
 
+/* function_414ad0  VA 0x414ad0  (System._LStrSetLength(var s: AnsiString; newLen: Integer))
+ * 逆アセンブル (block00031_PE.bin 0x414ad0..0x414ba9) から転記. rcx = &s (var 引数). 先頭で mov rax,[rbx] の 1 段 deref を要する.
+ * RetDec IR は rcx を文字列ポインタとして扱い, その deref を落とした (DEFECTS.md D4 型). 結果 realloc・長さ書込み・NUL 終端が
+ * スタックアドレスに対して働き, unit #23 (0x467f00) の IntToStr 表構築 (467c40 → 43a7e0 → 43a3f0) で OOB になった. */
+unsigned long long function_414ad0(unsigned long long s, unsigned long long newlen) {
+    int n = (int)(u32)newlen;
+    u64 p, tmp, rdi;
+    if (n <= 0) {
+        function_412d60(s, 0);
+        return 0;
+    }
+    p = Q(s);
+    if (p != 0 && D(p - 8) == 1) {
+        if (D(p - 4) == (u32)n) return 0;
+        tmp = p - 16;
+        u64 sz = (u64)(long long)(n + 1) * 2 + 16;
+        if ((long long)sz <= 0) function_40f560(s, 0);
+        function_409470((void*)(uintptr_t)&tmp, sz);
+        D(tmp + 0xc) = (u32)n;
+        Q(s) = tmp + 0x10;
+        u64 pc = function_414850(Q(s));
+        *(unsigned short*)(uintptr_t)(pc + (u64)(long long)n * 2) = 0;
+        return 0;
+    }
+    rdi = function_412c20((u64)(u32)n);
+    p = Q(s);
+    if (p != 0) {
+        int m = (int)D(p - 4);
+        if (m > n) m = n;
+        u64 pc = function_414850(Q(s));
+        function_409c80(pc, rdi, (u64)(long long)(m * 2));
+        function_412d60(s, 0);
+    }
+    Q(s) = rdi;
+    return 0;
+}
+
+/* function_43a3f0  VA 0x43a3f0  (System: 整数 → 10 進文字列の書込み; 符号 '-' 任意)
+ * 逆アセンブル (0x43a3f0..0x43a4ea) から転記. rcx = &s (var string), edx = 絶対値 (u32), r8b = 負符号フラグ.
+ * 414ad0 で桁数+符号ぶん確保した後, `mov r8,[rbx]` (= *s) の 1 段 deref を RetDec IR が落とし, r8 = &s として '-' と桁を書いた (DEFECTS.md D4 型).
+ * その結果 a[0] 自身 (= 文字列変数) が文字列の中身で上書きされ, 467c40 の IntToStr 表構築で次の反復に OOB となった. */
+unsigned long long function_43a3f0(unsigned long long s, unsigned long long value, unsigned long long sign) {
+    u32 v = (u32)value;
+    u8 sb = (u8)sign;
+    int nd;
+    if (v < 10000u) nd = v < 100u ? 1 + (v >= 10u) : 3 + (v >= 1000u);
+    else if (v < 1000000u) nd = 5 + (v >= 100000u);
+    else if (v < 100000000u) nd = 7 + (v >= 10000000u);
+    else nd = 9 + (v >= 1000000000u);
+    function_414ad0(s, (u64)(u32)(nd + sb));
+    u64 r8 = Q(s);
+    *(unsigned short*)(uintptr_t)r8 = 0x2d;
+    r8 += (u64)(long long)(signed char)sb * 2;
+    while (nd > 1) {
+        u32 q = v / 100u;
+        u32 rem = v - q * 100u;
+        nd -= 2;
+        u32 pair = (u32)('0' + rem / 10u) | ((u32)('0' + rem % 10u) << 16);
+        *(u32*)(uintptr_t)(r8 + (u64)(long long)nd * 2) = pair;
+        v = q;
+    }
+    if (nd != 0) *(unsigned short*)(uintptr_t)r8 = (unsigned short)(v | 0x30u);
+    return s;
+}
+
 /* function_417b70  VA 0x417b70  (System.DynArraySetLength(var a: Pointer; ti: PDynArrayTypeInfo; dimCnt: NativeInt; lengths: PNativeInt))
  * RetDec は `mov rax,[rbp+0xb0]; mov rax,[rax]` (= *a) と `mov rax,[rbp+0xc8]; mov rax,[rax]` (= *lengths) の
  * 1 段 deref を 2 箇所とも落とし, lengths (スタックアドレス) を配列長, a を配列本体として扱った.
