@@ -58,6 +58,27 @@ addEffect の plugin 名検証 (`fl_engine.c` の `if (pn[0] && !plugin_kind_ok(
 
 素材: `fl-win64` から `block25159/24429/24430/24618_DATA.bin` のみ展開 (`tar --zstd -xf` で 2.2 秒)。`build_cpython_wasm.sh` 3 分 08 秒、`FLPY_SKIP_TABLE=1 build_flpy.sh` 4.7 秒 (flapi 表は再生成せず、コミット済みの表を使用)。
 
+## 7b-5. transport.isPlaying の C 実装 (#941 / PY-21)
+
+`transport.isPlaying` を `fl_engine.c` に追加 (既存の `playing` 状態を返す。mock の `st.playing` と同じ意味)。実装 65 → 66、未実装 370 → 369。差分検査 `tests/transport_diff.mjs` (新規) は start/stop/isPlaying の呼出し列で mock と diffs 0。
+
+`general.getVersion` は mock 側が「実機値は未実測のため固定のモック値」のため今回は見送り (子 issue #1138 で扱う)。
+
+| 検証 (HEAD = 本 PR, runner 4 core, node 22.23.3, emsdk 6.0.12) | 結果 | wall |
+|---|---|---|
+| `bash provider/build.sh` | 成功・警告 0。ハンドラ 66 | 1.45 秒 |
+| `build_cpython_wasm.sh` | 成功 (exit 0) | 4 分 09 秒 |
+| `FLPY_SKIP_TABLE=1 build_flpy.sh` | 成功 (exit 0) | 6.3 秒 |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 66 / 未実装 369 / MCP 静的 60) | 0.36 秒 |
+| `node tests/transport_diff.mjs` | calls 7、diffs 0、PASS | 0.04 秒 |
+| `node tests/device_diff.mjs` | calls 7 + reject 4、diffs 0、PASS | 0.05 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 2.20 秒 |
+| `node tests/all_tools.mjs` (mock) | 48/48 ok、host_calls 37,425 | 2.21 秒 |
+| `node tests/midi_script.mjs` | checks 29、failed [] | 0.86 秒 |
+| `node tests/ilmcp_diff.mjs` | calls 32、diffs 0、PASS | — |
+
+素材: `fl-win64` から block25159/24429/24430/24618 のみ展開 (`tar --zstd -xf` で 2.9 秒)。`toolchain-emsdk` は `/opt/emsdk` を使用。
+
 ### 既知の未解決 (文字の扱い)
 
 - JS の `host/ilmcp.mjs` `norm` は `String.prototype.trim()` (Unicode 空白も除去)、C の `browser_key` は `isspace` (ASCII のみ)。`"\u00a0Plugin database"` のような非 ASCII 空白を含むパスで JS は成功し C は code 1 になる。今回の差分テストは ASCII 入力のみのため検出されない。FL の木は ASCII のため現状の実害はない。扱いは #74 の子チケットで決める (起票先: #74)。

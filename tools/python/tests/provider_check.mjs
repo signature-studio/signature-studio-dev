@@ -17,7 +17,7 @@ assert.deepEqual(flat, ids);
 const mcp = new Set(Object.entries(table.modules).flatMap(([m, fs_]) => Object.entries(fs_).filter(([, v]) => v.mcp_tools.length).map(([n]) => `${m}.${n}`)));
 assert.equal(mcp.size, 60);
 const direct = (name, ...a) => { try { return { ok: engine.call(name, a) }; } catch (e) { return { err: e.message, code: e.flCode }; } };
-const dev = new Set(["device.getPortNumber", "device.isAssigned", "device.setHasMeters", "device.forwardMIDICC", "device.midiOutMsg"]);
+const dev = new Set(["device.getPortNumber", "device.isAssigned", "device.setHasMeters", "device.forwardMIDICC", "device.midiOutMsg", "transport.isPlaying"]);
 let impl = 0, unimpl = 0;
 for (const id of ids) {
   const r = direct(id, ...Array(40).fill(null).slice(0, 0));
@@ -26,8 +26,8 @@ for (const id of ids) {
   else assert.ok(notImpl, `${id} は未実装のはず`);
   notImpl ? unimpl++ : impl++;
 }
-// 実装 = MCP 静的 60 + device 5 (MIDI scripting 用、tests/device_diff.mjs が mock と照合)
-assert.equal(impl, 65); assert.equal(unimpl, 370);
+// 実装 = MCP 静的 60 + device 5 (MIDI scripting 用、tests/device_diff.mjs が mock と照合) + transport.isPlaying
+assert.equal(impl, 66); assert.equal(unimpl, 369);
 
 // 2. エラー code (C 側): range / wrong param / 型 / unspecified
 const E = (name, ...a) => direct(name, ...a);

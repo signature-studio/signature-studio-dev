@@ -145,6 +145,7 @@ FL_H(mixer, setCurrentTempo) {
 /* ---- transport (2) / playlist (4) / ui (3) ---- */
 FL_H(transport, start) { playing = 1; return fl_ret_none(c); }
 FL_H(transport, stop) { playing = 0; return fl_ret_none(c); }
+FL_H(transport, isPlaying) { return fl_ret_b(c, playing); }
 #define PL(a) int64_t _p = A_INT((a), 0); if (_p < 1 || _p > NPL) RANGE(); Pl *p = &pl[_p - 1]
 FL_H(playlist, trackCount) { return fl_ret_i(c, NPL); }
 FL_H(playlist, getTrackName) {
