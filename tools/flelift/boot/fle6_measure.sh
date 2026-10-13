@@ -51,10 +51,12 @@ elapsed "clang-plain" "$T"
 # $1=label  $2=out.json  $3=FLE_IPP (1: shim 有 / 0: ネガコン)
 run_boot() {
   local log="$W/run_fle6_$1.log"
-  FLE_IPP="$3" FLE_BOOT_VARIANT=plain "$NODE" "$HERE/fle_boot.mjs" "$W/fleboot_plain.cjs" "$2" --boot-only > "$log" 2>&1
-  grep 'FLEBOOT_RESULT' "$log"
+  local rc=0
+  FLE_IPP="$3" FLE_BOOT_VARIANT=plain "$NODE" "$HERE/fle_boot.mjs" "$W/fleboot_plain.cjs" "$2" --boot-only > "$log" 2>&1 || rc=$?
+  grep 'FLEBOOT_RESULT' "$log" || true
   grep 'FLEBOOT_IPP_CHECK' "$log" || { echo "[fle6] $1: FLEBOOT_IPP_CHECK 行が無い ($log)"; exit 4; }
   [ -s "$2" ] || { echo "[fle6] $1: 結果 JSON が無い ($2)"; exit 4; }
+  [ "$rc" = 0 ] || { echo "[fle6] $1: fle_boot.mjs が rc=$rc で終了 (IPP 判定 NG なら 3) ($log)"; exit "$rc"; }
 }
 
 T=$(date +%s); stage "boot"
