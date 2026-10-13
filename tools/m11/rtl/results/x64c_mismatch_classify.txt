@@ -1,0 +1,46 @@
+band=1172 verdict={'unexec': 516, 'match': 540, 'mismatch': 116}
+mismatch=116
+
+## 主因 (先頭タグ)
+callee_divergence	42
+import_call_seq	18
+zero_init_drop	16
+callsite_arg_drop	11
+unlifted_callee	8
+memory_semantics	7
+ret_only	6
+arg_drop	4
+import_arg_diff	3
+xmm_arg_drop	1
+
+## 全タグ出現 (1 関数に複数タグあり)
+callee_divergence	54
+zero_init_drop	52
+unlifted_callee	47
+import_call_seq	32
+callsite_arg_drop	11
+wasm_trap	11
+memory_semantics	7
+import_arg_diff	6
+ret_only	6
+arg_drop	4
+xmm_arg_drop	1
+
+## rtl_verdicts.tsv の x64c 列 (帯内 1172 件)
+match/mismatch/unexec = 535/125/512
+
+## TSV x64c 列 (行) × batch 判定 (列)
+TSV\batch	match	mismatch	unexec
+match	534	1	0
+mismatch	5	114	6
+unexec	1	1	510
+
+## 一致→不一致の退行候補 (7 件; 定義: rtl_verdicts.tsv で m11=match かつ x64c=mismatch。status は batch 側)
+va	batch_verdict	batch_tags
+0x4090e0	mismatch	memory_semantics
+0x412020	unexec	(none)
+0x41cd70	mismatch	unlifted_callee,wasm_trap
+0x42d830	mismatch	callee_divergence
+0x44a590	mismatch	callee_divergence,unlifted_callee
+0x4511d0	mismatch	callee_divergence,unlifted_callee
+0x455650	unexec	(none)
