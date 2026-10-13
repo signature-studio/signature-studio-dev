@@ -44,6 +44,18 @@ export async function createDriver({ chrome = "/usr/bin/google-chrome", headers 
         throw e;
       }
     },
+    async mouse(action, x, y) {
+      if (action === "move") await page.mouse.move(x, y);
+      else if (action === "down") await page.mouse.down({ button: "left" });
+      else if (action === "up") await page.mouse.up({ button: "left" });
+      else throw new Error(`mouse: 未知の action ${action}`);
+    },
+    async press(key) {
+      await page.keyboard.press(key);
+    },
+    async setViewport(w, h) {
+      await page.setViewport({ width: w, height: h, deviceScaleFactor: 1 });
+    },
     async screenshot(file) {
       await page.screenshot({ path: file });
     },

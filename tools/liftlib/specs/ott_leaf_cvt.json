@@ -1,5 +1,6 @@
 {
  "name": "ott_leaf_cvt",
+ "abi": "ms_pos",
  "func": "0x1801bc890",
  "wasm_func": "function_1801bc890",
  "scenarios": 200,

@@ -315,12 +315,15 @@
     "180045130",
     "1800b4ac0",
     "1800b4ae0",
-    "180054bd0"
+    "180054bd0",
+    "1800524e0",
+    "1800b4b10"
    ],
    "stub_all": false,
    "stub_only": [
     "180054bd0"
    ],
+   "shims": {"180f878e0": "new", "180f8791c": "delete", "181384040": "memcpy", "180107430": "getManager"},
    "raw_va": true,
    "volatile_ret": true,
    "synth_zeroarg": true,

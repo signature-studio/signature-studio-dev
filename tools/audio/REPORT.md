@@ -83,7 +83,7 @@
 7. **[audio-fl-profile]** (AU-7 #193) 静的に確定できた部分は §11。実 FLEngine 起動後の profile / `pbtrackingmode` 各モード (Driver/Hybrid/Mixer) でのカーソル追従確認は #34 待ち。
 8. **[audio-worklet-wasm]** (任意) FL ミキサを Wasm Audio Worklet 内で直接走らせる案との遅延比較 (ブロッキング不可のため FL スレッド構造の再設計が前提)。
 9. **[audio-ui-integration]** `src/index.ts` への組込 (ユーザジェスチャで `FlAudioShim.attach`, 既存 `audio.ts` ハーネスとの統合/置換)。
-10. **[audio-soak30]** 30 分ソーク (CAB-9 検証条件。既存は 120 秒のみ)。検収で追加。
+10. ~~**[audio-soak30]**~~ 30 分ソーク: 無負荷は実施済み (#191, §16)。負荷下 30 分は未実施。
 11. ~~**[audio-96k-depth]**~~ 解決 (#211, §10)。
 
 対応表: AU-1 audio-com-adapter=CAB-97 / AU-2 realdevice=CAB-186 / AU-3 midi=CAB-187 / AU-4 directsound=CAB-188 / AU-5 input-ui=CAB-191 / AU-6 latency-policy=CAB-189 / AU-7 fl-profile=CAB-192 / AU-8 worklet-wasm=CAB-193 / AU-9 ui-integration=CAB-184 / AU-10 soak30=CAB-190 / AU-11 96k-depth=CAB-210 (親は全て CAB-9)。
@@ -229,3 +229,7 @@ winmm `midiIn`/`midiOut` 20 関数の Web MIDI 実体を `src/flmidi*.c` / `src/
 DirectSound shim を実装 (secondary = 循環バイト列, pump が T まで充填, Notify は offset 通過で bit)。FL の primary `SetFormat` は設定 bool `byte[0x15d3296]` で PCM16 / EXTENSIBLE-float32 に分岐するため、shim は両形式を受理 (16bit は `v/32768`)。**全文・静的確認の詳細・検証表・未解決は `REPORT_DS.md`**。
 
 統合後 HEAD `b394287c` の e2e: **43/43 PASS** (DS 10 シナリオ含む, 実測 647 s)。未解決: 実 FL からの DS 呼出 (#98 AU-1)、実機の DS cursor (#187)、`byte[0x15d3296]` の DFM 解析 (#189 コメント)。
+
+## 16. AU-10 (#191) 30 分ソーク (`--soak30`)
+
+無負荷 30 分 (1800 s, B=256 48k ランプ) は PASS (underrun 0・ramp mismatch 0)、負荷下は 420 s で PASS。ただし head `fc93f45` (main 取り込み後) 上の 30 分ソークは未実施 (未計測)。head `fc93f45` の 10 秒ソークは PASS (ramp 0 / 481,024 f)。head `57519ca` の 10 秒ソークは 4 回中 1 回 FAIL (ramp mismatch 411,392/480,512、原因未特定) で、他 3 回は PASS。実機・Firefox/Safari は未計測。実測値・再現・未解決は `REPORT_AU10.md` (分割移動先) を参照。

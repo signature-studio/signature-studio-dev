@@ -183,3 +183,15 @@ host は **レコード書込の前に** 共有 pointer 状態 (cursor/buttons/m
 - **無効領域**: surface あたり/ウィンドウあたり非重複矩形リスト (ウィンドウは 16 超で外接矩形へ縮退、surface の dirty は 8 超)。`BeginPaint` の DC クリップは無効領域そのもの (外接矩形ではない)。`ValidateRect` は部分的に差し引く。`GetUpdateRgn` は複数矩形の region を返す (2 矩形以上 = `COMPLEXREGION`)。surf の dirty は矩形ごとに `PRESENT` を出す (host は従来どおり併合して扱える)。
 - **DPI**: canvas 内部解像度 = 物理 px (画素は 1:1; ビットマップ拡縮はしない)。DPI context (`SetThreadDpiAwarenessContext` で設定。shim では全スレッド共通の 1 値) が UNAWARE (既定 -1 / -5) なら `GetDpiForWindow` / `GetDeviceCaps(LOGPIXELS*)` は 96、それ以外 (-2 SYSTEM / -3 / -4 PER_MONITOR[_V2]) は `dpr_x100 * 96 / 100`。shim が決める寸法 (NC 幅・`GetSystemMetrics` の SM_CYCAPTION/SM_CXVSCROLL/SM_CXFRAME/SM_CXBORDER・`AdjustWindowRect`) はその DPI に比例。アプリ自身の座標は拡縮しない (DPI 対応アプリは `GetDpiForWindow` で自分で拡縮する前提)。`WM_DPICHANGED`・複数モニタ別 DPI は未実装 (単一仮想モニタ)。
 - **未実装 (FL の窓種別が確定してから)**: `SetWindowRgn` の形状クリップ、リサイズ角の HT*、NC のテーマ描画、複数 canvas / DOM 重畳、メニュー (#175)。
+## 13. ブラウザ互換 fallback 方針 (GUI-8 #184; 入力 = #127 RT-9 の Firefox 157 headless 実測。Safari は未測定)
+測定値の正本は `tools/runtime/REPORT.md` (RT-9)。ここは gui host が取る方針のみ。
+| 機能 | Chrome 154 | Firefox 157 | gui host の方針 |
+|---|---|---|---|
+| SAB / `crossOriginIsolated` (COOP+COEP) | 可 | 可 | 必須。確認は `src/index.ts` の開始ボタン無効化 (`crossOriginIsolated` が偽なら無効化し理由を表示; 代替実装なし) で行う。`GuiHost.attach` 内での `crossOriginIsolated` / SAB の fail-fast は**未実装** |
+| `Atomics.waitAsync` (描画 worker の out ring 消費) | 可 | 可 | そのまま使う。無い環境 (Safari 未測定) は `setTimeout` ポーリングへ落とす案 (**未実装**; Safari 測定後に判断) |
+| Worker 内 `Atomics.wait` / メイン `Atomics.wait` 不可 | 同 | 同 | 既存設計どおり: wasm UI スレッドは worker、メインは `waitAsync`/イベントのみ |
+| OffscreenCanvas 2D (`transferControlToOffscreen`) | 可 | 可 | 既定経路 (2D + putImageData) は両者で使える |
+| Worker 内 WebGL2 (GUI-4 の WebGL2 present) | 可 (SwiftShader) | 判定不能 (headless で null) | `present.backend` は worker が実際に採用した方式を `presentInfo` で返す。WebGL2 を取れなければ 2D へ落ちる既存フォールバックを正とする。Firefox 実機で未確認 |
+| rAF (worker) | 可 | 可 | `present.sync="raf"` 可。無ければ `rafTimeoutMs` の timer flush |
+- **メモリ**: 非 shared memory64 の 8 GiB grow が Firefox で 35〜37 s (Chromium 0.5 ms)。gui の共有領域は wasm32 の shared memory 上なので該当しないが、memory64 版 FLEngine を同一 Memory で動かす場合は初期確保を前倒しする (Firefox での grow 戦略は #127 / RT 系で決定)。
+- **未確認 (起票先 #127)**: Safari 全般、Firefox の実描画 (gui e2e の Firefox 実行)。これらが取れるまで、サポート対象は Chrome のみとし、Firefox は「機能検出は通るが e2e 未実施」と扱う。
