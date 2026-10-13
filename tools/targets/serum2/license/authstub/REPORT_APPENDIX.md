@@ -121,4 +121,5 @@ REPORT §14 の詳細。pass の仕様・結論は REPORT §14 が正本。
 - **実測 (commit `87cb462b`・コード変更の最後の commit)**: `bash e2e.sh` cold (work 削除後) = **36.33 s** (real) → 23/23 PASS、load 0.19→0.55。warm = **5.52 s** → 23/23 PASS、load 0.08→0.15。素材: `plugins-serum2` の `Serum2_win64.vst3` sha256 `501e7bb3…5283` 19,236,864 B (展開後に一致確認)。baseline (変更前 HEAD `f7bebc7b`) は cold 36.27 s / 23/23 PASS / load 0.28→0.63 (同条件)。
 - コード差分: `git diff f7bebc7b 87cb462b -- tools/targets/serum2/license/authstub` → `authstub_irpass.py` +109/-15 行 (役割導出), `negctl_role.py` 新規 64 行。他ファイル無変更。
 
-- 未達 (#1213 [SR-11] で追跡・open): (1) `expect_slot` (-72/-80/-152) は照合用の literal のまま。slot 値そのものの導出は未実装。(2) 役割→global 対応 `ROLE_GLOBAL` は手書きの 3 行 (harness C が定義する名前に一致させるため)。
+- #1208 の受入条件 3 点は全て達成。範囲外の残り (起票なし・非ブロッカー): (1) `expect_slot` (-72/-80/-152) は照合用の literal のまま。slot 値そのものの導出は未実装。(2) 役割→global 対応 `ROLE_GLOBAL` は手書きの 3 行 (harness C が定義する名前に一致させるため)。
+- 関連: #1213 [SR-11] (slot 照合の追加) は既に MERGED。

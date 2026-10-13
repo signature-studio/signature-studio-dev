@@ -234,4 +234,4 @@ sed -n 9872p $LIFT   # => br i1 %110, label %dec_label_pc_1800c2f08, label %dec_
 ## 15. LF 束縛先 global の役割導出 (#1208, SR-15)
 
 - 結論: LF1/2/3/4/5/6/7 の束縛先 global 名を、束縛 site の値の**使われ方** (役割) から導く (`authstub_irpass.derive_role`)。役割 → global の対応は `ROLE_GLOBAL` の 3 行のみ。詳細・site 表・ネガコンは REPORT_APPENDIX.md §15。
-- 未達: `expect_slot` (-72/-80/-152) は照合用の literal のまま。役割→global 表は手書き (IR から global 名そのものは導かない)。
+- 残り (受入条件外・非ブロッカー): `expect_slot` (-72/-80/-152) は照合用の literal のまま。役割→global 表は手書き (IR から global 名そのものは導かない)。
