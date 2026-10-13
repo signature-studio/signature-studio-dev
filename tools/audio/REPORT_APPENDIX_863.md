@@ -35,18 +35,19 @@
 
 - 問題: `e2e.sh` の出力は stdout only で、失敗時の位置情報 (`first_err_frame` 等) が run 終了後に残らなかった。位置情報自体は `e2e.mjs` が FAIL 行の detail に出しており、コードは既にある。
 - 改修: `e2e.sh` の node 実行を `tee` で `tools/audio/work/e2e_last.log` (gitignore) に保存し、終了コードは node の値をそのまま返す。コミット `7d275cb0` (`tools/audio/integration/e2e.sh` のみ)。
-- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` へ展開 (`FL_WIN64_DIR`)、`toolchain-emsdk` は `/opt/emsdk` (6.0.12) を使用。`TMPDIR=$RUNNER_TEMP`。
+- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` へ展開 (`FL_WIN64_DIR`)、`toolchain-emsdk` は [EMSDK] (6.0.12) を `EMSDK_ENV` で使用。`TMPDIR=$RUNNER_TEMP`。
 - 測定 commit: `7d275cb0` (改修後 HEAD)。改修前の基準は `origin/main` `f3ffd7ba` で 13/13 PASS (22.5 s)。
 - 改修後 HEAD の実測 (foreground):
 
 | 区分 | run 数 | 結果 | wall | load (開始時) |
 |---|---|---|---|---|
 | 改修前 HEAD `f3ffd7ba` | 1 | 13/13 PASS exit 0 | 22.5 s | 0.6 |
-| 改修後 HEAD 直後 | 1 | 13/13 PASS exit 0・ログ生成 | 13.7 s | 0.5 |
-| 負荷 (busy loop 6 本) | 6 | 6/6 exit 0・13/13 PASS・FAIL 0 | 20〜29 s | 9〜13 (前 run の busy loop 残存) |
-| 改修後 HEAD・負荷残存下 | 3 | 3/3 exit 0・13/13 PASS | 20〜21 s | 9.4〜10.2 |
-| 改修後 HEAD・負荷 (busy loop 6 本) | 3 | 3/3 exit 0・13/13 PASS・FAIL 0 | 20〜29 s | 12〜13 |
+| 改修後 HEAD 直後 (busy loop なし) | 1 | 13/13 PASS exit 0・ログ生成 | 13.7 s | 0.5 |
+| 改修後 HEAD・busy loop 6 本 (前 run の残存を含む) | 12 | 12/12 exit 0・13/13 PASS・FAIL 0 | 20〜29 s | 9.4〜13 |
 
-- 注: 上表の「無負荷」は前 run の busy loop が残っていたため無負荷ではない。純粋な無負荷の再測定は未実施。
+- 計 13 run (1 + 1 + 12) 全 PASS exit 0。`busy loop 6 本` の 12 run は旧表の 3 行 (負荷 6 run / 残存下 3 run / 負荷 3 run) を統合したもの。条件はいずれも busy loop 6 本で、開始時 load だけが違う。
+- 注: 「直後」の 1 run は開始時 load 0.5 だが、純粋な無負荷の再測定は未実施。
+- 鮮度: 測定 commit `7d275cb0` → HEAD (`5ca86ce0`・本 fix 時点) の `git diff 7d275cb0 HEAD -- tools/audio/integration` は出力 0 行 (差分 0)。HEAD 側の差分は `tools/audio/REPORT_APPENDIX_863.md` のみで、実行されるコードは変わらないため再測定は不要。
+- ログ出力先 `tools/audio/work/e2e_last.log` は gitignore 対象の生成物で、運用ルールでは生成物を `work/` に置く。よって e2e.sh は変えていない。
 - 失敗は 0 件。producer (wasm 出力遅延) / consumer (worklet rebuffer) の切り分けは未実施。旧失敗 (§19) の条件は引き続き未特定。
 - 未解決: (a) CI に e2e を組み込んでいない (`.github` に参照なし) ため、失敗ログを CI artifact として残す経路は無い。(b) 失敗の再現条件の特定。追跡は **#863**。
