@@ -44,6 +44,7 @@
 | `tools/shim/inventory.md`・`tools/shimx/inventory.md`・`tools/audio/INVENTORY.md` | 各照合 |
 | `tools/shared/data/ipp_inventory.md` | IPP 実測 |
 | `tools/plugins/PLUGIN_MATRIX.md` | plugin-matrix driver |
+| `docs/LEGAL_TERMS_LEDGER.md` | `pnpm terms-watch` (正本は同 `.json`) |
 | `tools/startup/license_obs/results/{FLAG_SITES,CASES}.md` | `scan_consumers.py`・`run_cases.py` (license_obs) |
 | `tools/python/analysis/{flapi/FLAPI,mcp/MCP_TOOLS}.md` | 抽出 driver (repo 内 `tools/python/analysis/`) |
 
@@ -62,6 +63,7 @@
 | `tools/e2e/REPORT.md` | ~120 | ブラウザ E2E ハーネスと配信構成の実測 |
 | `tools/hosting/REPORT.md` | ~135 | 既定ホスト名だけで COOP/COEP を成立させる配信構成 (案 S の根拠) |
 | `tools/legal/release-guard/REPORT.md` | ~75 | release guard (LGL-2): 公開前に dist を走査し FL/プラグイン由来バイト列を検出して失敗させる deny-list ゲート |
+| `tools/legal/terms-watch/REPORT.md` | ~145 | terms-watch (LGL-5): 各社 EULA/ToU の取得 (Xfer は NSIS インストーラのヘッダから)・正規化ハッシュ比較・台帳更新・差分時非ゼロ終了 |
 | `tools/legal/notices/REPORT.md` | ~110 | THIRD_PARTY_NOTICES 自動生成 (LGL-3): OSS 再ビルド記録 (upstream 版・configure 引数・パッチ) + FL 同梱表記 15 本 + フォント一覧から NOTICES を生成し、記録なしの同梱 OSS を CI/stage ゲートで検出 |
 | `tools/perf/REPORT.md` | ~150 | wasm 実時間性能・compile 時間・巨大 wasm 実験 |
 | `tools/perf/REPORT_APPENDIX.md` | ~85 | perf REPORT §12 全文 (PERF-P9 #168: bit-exact OTT の RTF を node / Chrome Worker / 実 AudioWorklet / native 実機械語で再測) |
@@ -107,8 +109,10 @@
 
 | パス | 行数目安 | 何が書かれているか |
 |---|---:|---|
-| `tools/m11/REPORT.md` | ~240 | FLEngine_x64.dll 部分起動 PoC (stage 4/6・残 trap・次の一手)。§8 (LB_BASE #222) は `REPORT_APPENDIX.md` に分割 |
-| `tools/m11/REPORT_APPENDIX.md` | ~80 | m11 REPORT §8 全文 (LB_BASE=0x10000 適用 #222。250 行上限のため本体から無変更で分割移動) |
+| `tools/m11/REPORT.md` | ~250 | FLEngine_x64.dll 部分起動 PoC (stage 4/6・残 trap・次の一手)・§11 (#572, 要約のみ)・§12 survey の OOM/clobber 分離 (#513)。§8 (LB_BASE #222)・§9 (sigfix #131) は `REPORT_APPENDIX.md` に分割 |
+| `tools/m11/REPORT_APPENDIX.md` | ~140 | m11 REPORT §8 (LB_BASE=0x10000 適用 #222)・§9 (sigfix 0 詰め #131)・§12 の一部 (#513 新規類型の行案) の全文 (250 行上限のため本体から無変更で分割移動) |
+| `tools/m11/REPORT_N21.md` | ~35 | M11-N21 (#572): m11_data_gen.py の DIR64 補正境界 off-by-one の全数照合・参照経路・修正・ネガコン・実測 (REPORT §11 は要約のみ) |
+| `tools/m11/rtl/REPORT.md` | ~175 | Delphi RTL の VA 範囲確定 + RTL 帯 (System/Types/SysUtils 1,172 関数) の lifter 別 liftdiff 採点 (#129) |
 | `tools/m11/alloca/REPORT.md` | ~150 | alloca 縮退修正 (CAB-129) |
 | `tools/m11/trap_triage/REPORT.md` | ~60 | M11 survey trap の個別原因切り分け (#130) |
 | `tools/m11/trap_triage/REPORT_418.md` | ~70 | 409470 転記ハングの原因特定 (#418) |
@@ -126,7 +130,9 @@
 | パス | 行数目安 | 何が書かれているか |
 |---|---:|---|
 | `tools/shim/README.md` | ~50 | Win32 shim コア (53 export) のナビゲーション |
-| `tools/shimx/REPORT.md` | ~395 | Win32/CRT shim 拡張 |
+| `tools/shimx/REPORT.md` | ~199 | Win32/CRT shim 拡張。§9〜§12 は `REPORT_R1-R8.md`・`REPORT_CAB-214.md`、§15 は `REPORT_SHX-T8.md` に分割 (#584) |
+| `tools/shimx/REPORT_R1-R8.md` | ~78 | shimx §9 (CAB-211: M11 リンク フィードバック R1〜R8) + §10 (CAB-177: cbtrans R2/R3 実体接続) 全文 (REPORT.md から分割, #584) |
+| `tools/shimx/REPORT_CAB-214.md` | ~141 | shimx §11 (CAB-214: vreg reg.c 取込 + username 統一) + §12 (follow-up 後始末 3 件) 全文 (REPORT.md から分割, #584) |
 | `tools/shimx/REPORT_SHX-T8.md` | ~60 | SHX-T8 (#175): 序数 import・Crypt・CP932 (REPORT.md §15 から分割) |
 | `tools/shimx/BACKLOG.md` | ~540 | shimx の未解決一覧 |
 | `tools/shimx/pathreg/REPORT.md` | ~200 | パス写影/レジストリ永続化の shimx 側インタフェース接続 |
@@ -135,10 +141,11 @@
 | `tools/startup/helpviewer/REPORT.md` | ~185 | FL の Help 起動経路 (静的解析) + Help を sandbox iframe に出す viewer / error-offline.html 差替 |
 | `tools/startup/glue/REPORT.md` | ~200 | THostInstance + CreateFruityInstance 呼出 + 終了処理 |
 | `tools/startup/keyfix/REPORT.md` | ~165 | vreg low-key 112 エントリ確定 + username 二重表記の統一 |
+| `tools/startup/loadpaths/REPORT.md` | ~180 | ST-T14 (#39): 言語 .moe (暗号化 .mo) の形式・復号・ロード経路、スキン/Artwork/Help の読み手関数と起動/操作時の判定、VFS 配置 group と tier 差分 |
 | `tools/startup/pump/REPORT.md` | ~110 | user32 ポンプ shim (C) + runtime RING ABI 結線 |
 | `tools/startup/vreg/REPORT.md` | ~145 | 仮想レジストリ shim + 登録済み seed |
 | `tools/startup/vreg/ilreg/REPORT.md` | ~85 | 0x10c7cd0 登録パーサ / ILRegKey 書式解読 |
-| `tools/startup/license_obs/REPORT.md` | ~165 | 登録フラグ byte[0x14f84a8] の全サイト列挙 + gradeChar のサイト列挙 (連続形/レジスタ追跡形; 下限) + 0x10c7cd0 の実機械語実行 (ST-T11 #107) |
+| `tools/startup/license_obs/REPORT.md` | ~209 | 登録フラグ byte[0x14f84a8] の全サイト列挙 + gradeChar のサイト列挙 (連続形/レジスタ追跡形; 下限) + 0x10c7cd0 の実機械語実行 (ST-T11 #107) + unit 初期化後の ILRegKey 非空観測 (ST-T15 #525) |
 | `tools/startup/winstubs/REPORT.md` | ~100 | 起動 critical Win32 API の fail-soft stub |
 
 ### host / gui / audio / assets
@@ -146,6 +153,7 @@
 | パス | 行数目安 | 何が書かれているか |
 |---|---:|---|
 | `tools/runtime/REPORT.md` | ~90 | ブラウザ実行基盤 |
+| `tools/runtime/rt10/REPORT.md` | ~190 | 実 FLEngine x64c lift (126MB wasm) の Chrome 起動時間・帯域・tier-up・boot ループ soak (RT-10 #128) |
 | `tools/hostbridge/REPORT.md` | ~95 | Fruity Wrapper の VST2 ロード経路解析 + wasm 同梱プラグイン表 |
 | `tools/hostbridge/cb/REPORT.md` | ~145 | shimx R2 コールバック変換の実体接続 |
 | `tools/hostbridge/h10/REPORT.md` | ~155 | Fruity Wrapper の wrapper chunk reader 解析 (record 1/30–32 の要否・id 57 の正体・212 flags) |
@@ -213,6 +221,7 @@
 | `docs/pm/README.md` | `docs/pm/` の索引 (2 ファイルの役割のみ) | DIRECTIVES の内容の繰り返し・分析内容 |
 | `docs/pm/PREDECESSOR_ANALYSIS.md` | 解任された前任 PM セッションの分析 (混乱の原因・証拠・再発防止ルールへの反映) | 指示の逐語原文 (`DIRECTIVES.md` が正本)・状態や未解決事項 (`STATUS.md`・`HANDOFF` が正本)・repo 外絶対パス |
 | `docs/LEGAL.md` | ライセンス/規約上の運用制約と事実整理 | 技術実装・数値実測 |
+| `docs/LEGAL_TERMS_LEDGER.{json,md}` | 各社規約の取得台帳 (取得日・版表記・正規化テキストの SHA-256)。`.json` が正本、`.md` は自動生成 | 規約本文・手編集 (`pnpm terms-watch` が更新) |
 | `docs/DOC_MAP.md` | 本書。REPORT.md 索引・行数上限ルール・自動生成一覧・本章 | 技術内容・測定値 |
 | `docs/DEFECTS.md` | lift silent miscompile 類型 D1a〜D16 (横断正本) | 個別ケースの詳細 (report 側) |
 | `docs/HANDOFF/<日付>.md` | 引継ぎ要約 (方針・ブロッカー・次の一手)。最新のみ保持 | 状態の正本 (STATUS.md へ)・数値の羅列 |

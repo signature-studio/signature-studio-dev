@@ -59,7 +59,7 @@ static dd round64(double p, double l1, int chop, int mul) {
     /* grid 選択: 正確値 V = p + l1 が p の binade と異なるのは p が厳密に 2 の
      * べき乗で l1 < 0 のとき (V は下の binade に落ち ulp64 が半分になる) */
     int shift = 63;
-    if (l1 < 0.0 && (bt & 0x000fffffffffffffull) == 0 && oa != 0) shift = 64;
+    if (((p > 0.0) ? (l1 < 0.0) : (l1 > 0.0)) && (bt & 0x000fffffffffffffull) == 0 && oa != 0) shift = 64;
     double sc = bits2d((u64)(2046 + shift - (int)oa) << 52);
     double lk = l1 * sc;
     double k;
@@ -145,11 +145,12 @@ static long double dd_ld(dd a) {
  * tie は偶数側。chop 時は trunc(merge)。R10 clamp (|v|≥2^31 → -2^31) は上流。 */
 static int32_t dd_fist_near(dd a) {
     double n0 = rint(a.h);
-    double d = (a.h - n0) + a.l;
-    if (d > 0.5) return (int32_t)(n0 + 1.0);
-    if (d < -0.5) return (int32_t)(n0 - 1.0);
-    if (d == 0.5)  return ((d2bits(n0) & 1) != 0) ? (int32_t)(n0 + 1.0) : (int32_t)n0;
-    if (d == -0.5) return ((d2bits(n0) & 1) != 0) ? (int32_t)(n0 - 1.0) : (int32_t)n0;
+    double d0 = a.h - n0;                      /* exact, |d0| <= 0.5 */
+    double d = d0 + a.l;
+    if (d > 0.5 || (d0 == 0.5 && a.l > 0.0)) return (int32_t)(n0 + 1.0);
+    if (d < -0.5 || (d0 == -0.5 && a.l < 0.0)) return (int32_t)(n0 - 1.0);
+    if (d0 == 0.5 && a.l == 0.0)  return ((d2bits(n0) & 1) != 0) ? (int32_t)(n0 + 1.0) : (int32_t)n0;
+    if (d0 == -0.5 && a.l == 0.0) return ((d2bits(n0) & 1) != 0) ? (int32_t)(n0 - 1.0) : (int32_t)n0;
     return (int32_t)n0;
 }
 static int32_t dd_fist_chop(dd a) {
