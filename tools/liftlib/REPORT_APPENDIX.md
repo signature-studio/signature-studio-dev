@@ -75,7 +75,7 @@ cd tools/liftlib && python3 -m liftlib leafspec targets/ott_iargs.json --n 200  
 
 ## 18. PERF-P1 (#155): lift ビルド標準設定 + 出力 bit 署名ガード (`python3 -m liftlib build`)
 
-既知類型との関係: 該当なし (DEFECTS.md の D1a〜D16 はいずれも lift 内容の欠陥。本件は emcc フラグと検収ガードの追加で lift は未変更)。検証起点 commit: `18a6e58` (クリーン detached worktree `git worktree add --detach … HEAD` で 3 回実行)。
+既知類型との関係: 該当なし (DEFECTS.md の D1a〜D16 はいずれも lift 内容の欠陥。本件は emcc フラグと検収ガードの追加で lift は未変更)。検証起点 commit: `18a6e58` (クリーン detached worktree `git worktree add --detach … HEAD` で 3 回実行)。署名ガード fail-open 修正後の再検証は `84067cb` (下の「fail-open の封じ込め」)。
 **状態: 部分達成 (Closes しない)**。標準設定の正本・ビルド入口・署名ガード・合成入力での検証は完了。実 OTT / FA / KH を標準設定で通す検証は素材不足 (下の未解決表) で未実施。
 
 標準設定 (正本 `data/std_build.json`、実装 `liftlib/stdbuild.py`。根拠は `tools/perf/REPORT.md` §2.1 の bit-exact OTT 実測):
@@ -98,9 +98,17 @@ shell 側: `tools/ott/lift/lift_build.sh` が `python3 liftlib/stdbuild.py flags
 - 同 IR に `-ffast-math` 変種 (`variant_extra`、profile `dev`) を足す → `ref=ddd24d668fb43743` に対し `fastmath=e8a51f44250f360b`: SignatureMismatch・`<name>.cjs` 無し (別 TU helper の `x*y + 0.1f*x` が再結合される)。C 側も同じ変種で CLI exit 1 (署名 `d5e328bd` 対 `510de60e`)。
 - `--expect deadbeef…` 不一致 → exit 1 / `std` に `-msimd128` を混入 → `StdBuildError`。
 
+fail-open の封じ込め (PR #497 レビュー指摘、修正コミット `84067cb`): 署名が取れなかった失敗を「全変種で同値 = 一致」と見なしていた 3 点を fail-closed にした。
+- `stdbuild.guard()` は番兵署名 (`TIMEOUT` / `PROBE-FAIL*` / `NO-RESULT` / 空) を含めば全変種同値でも `SignatureMismatch`。`pipeline.build_variants` はタイムアウトを `TIMEOUT`、`canon_digest` 失敗を `NO-RESULT` として記録し guard に落とす (`<name>.sig.json` は残り `<name>.cjs` は作らない)。
+- `canon_digest` は R 行 0 件 (= 空文字の sha256 `e3b0c44298fc1c14`) で `StdBuildError`。CLI `guard` は引数パスをキーにし、同名 basename の別ファイルを 1 件に潰さない。重複パス・1 件のみは exit 1。
+- `tests/test_stdbuild.py` のネガコン N1〜N4 + C1 (同名 basename 2 件を 2 変種で比較) を追加。`stdbuild_e2e.sh <WORKDIR>` は既存 dir を消さず拒否 (省略時の `work/stdbuild_test` のみ作り直す)。
+- 実測 (クリーン detached worktree の HEAD `84067cb`): `bash tools/liftlib/stdbuild_e2e.sh` 3 回 3/3 PASS、所要 13 / 13 / 13 s、load(start) 0.77 / 0.82 / 0.85。S1 署名 `ddd24d668fb43743`・C1 `510de60e` は修正前と同値。
+- 旧コード (`085b829` の stdbuild.py / pipeline.py + 新テスト) では N1 (`TIMEOUT` 同士が guard を通る)・N2 (存在しない probe で CLI exit 0・「PASS: 1 変種」)・N3 (`canon_digest("")` が署名化)・N4 (全変種 TIMEOUT で `build_variants` 成功)・C1 (a/x.cjs b/x.cjs が「1 変種」に潰れる) がいずれも FAIL。
+- 実 OTT (同 HEAD、素材 `analysis-ott-binaries`): `LIFT_GUARD=1 LIFT_OUT=tools/ott/work/lift bash tools/ott/lift/lift_build.sh` PASS 8 s (std / ref とも署名 `6b1696f0`)。空 `.cjs` 2 件 + `ott_x64c_bench.mjs` (`SIG_ONLY=1`) の CLI guard は `PROBE-FAIL(rc=1)` 同士でも exit 1。
+
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 実 OTT (x64c) で `lift_build.sh` の std 既定 + `LIFT_GUARD=1` を未実行 (OTT_vst2_win64.dll = `analysis-ott-binaries` が今回の素材に無い)。`ott_e2e.sh` 22 シナリオ bit-exact と `perf_gate.sh` が std ビルドで PASS するか未確認 | lift_build.sh の既定変更が回帰を起こす可能性 | #155 (レビュー run で `oc_artifacts: toolchain-emsdk analysis-ott-binaries` を付けて `bash tools/ott/ott_e2e.sh --quick` と `bash tools/perf/gate/perf_gate.sh`) |
+| 実 OTT (x64c) の std 既定 + `LIFT_GUARD=1`: `OTT_SKIP_INFO=1 bash tools/ott/ott_e2e.sh --quick` は HEAD `84067cb` で PASS 11 s (22 シナリオ・9620 cell 全 bit-equal・max_ulp 0・state_diff 0)、`LIFT_GUARD=1` は上記のとおり署名 `6b1696f0` 一致。`perf_gate.sh` は本修正後は未実行 (レビュー run が `085b829` で 11/11 PASS を報告、署名ガード修正は perf ハーネスに触れない) | `perf_gate.sh` の修正後 HEAD 再実行のみ残る | #155 (再レビュー run で `oc_artifacts: toolchain-emsdk analysis-ott-binaries`) |
 | RetDec 経路 (FA/KH/OTT leaf) で `liftlib build` を未実行 (RetDec と plugin バイナリ無し)。期待署名 `cfg.signature.expect` も未記録 | 実ターゲットでの全変種署名一致が未確認 | #155 (素材: `toolchain-retdec work-liftlib-targets plugins-freshair plugins-kilohearts`) |
 | `lift` / `liftlib ott` (recipes/ott.py の -O0 -g1 固定) の既定を std に切替えていない | 標準設定が `build` と lift_build.sh だけ | #155 (上の実行後に切替) |
 | register file 局所化 (alloca → mem2reg) pass 自体は未実装 (#54 申し送り、REPORT は推定のみ・実測無し)。署名ガードの変種として載せる枠 (`variant_extra`) だけ用意 | Path B の wasm サイズ縮小は未着手 | 新規子チケット (`[PERF-n]`、親 #17。番号は PM 採番) を PM が起票 |
