@@ -36,6 +36,14 @@ fake = types.ModuleType("_flhost")
 fake.HostError = type("HostError", (Exception,), {})
 fake.call = lambda fid, a: calls.append((fid, a)) or 0
 sys.modules["_flhost"] = fake
+# 実 FL では midi モジュールがある。stubs の midi.* 既定値は、同名の偽値 (9000+i、名前順) として提供する
+MIDI_NAMES = ["PIM_None", "GT_All", "LB_Status_Default", "EKRes", "MaxInt",
+              "ST_Int", "PME_System", "REC_None", "GC_BackgroundColor", "FPN_Param"]
+midi = types.ModuleType("midi")
+MIDI = {f"midi.{n}": 9000 + i for i, n in enumerate(sorted(MIDI_NAMES))}
+for _k, _v in MIDI.items():
+    setattr(midi, _k.split(".")[1], _v)
+sys.modules["midi"] = midi
 sys.path.insert(0, args_ns.src)
 import fl_api  # noqa: E402
 
@@ -61,6 +69,8 @@ def spec(sig, ks):
             ok, v = literal_or_none(p["default"])
             if ok:
                 stub[p["name"]] = v
+            elif p["default"] in MIDI:
+                stub[p["name"]] = MIDI[p["default"]]
     D = {n: stub[n] for n in KL if n in stub}
     return KL, req, D
 
