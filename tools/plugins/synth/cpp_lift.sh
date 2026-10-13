@@ -16,8 +16,8 @@ B="$1"; TMO="${2:-2400}"
 export PLUG_AVX256="${PLUG_AVX256:-0}"
 OUT="work/synth/cpp$B"
 HLLCAP="${HLL_CAP:-300}"
-resume_script() {
-  sed -e "s#^HERE=.*#HERE=\"$PWD/lift\"#" -e '/^\/opt\/retdec\/bin\/retdec-decompiler/,/retdec\.log/d' lift/lift_ranges.sh > "$OUT/lift_resume.sh"
+resume_lift() {
+  PLUG_REUSE_DRC=1 bash lift/lift_ranges.sh "$PE" "$OUT/ranges.txt" "$OUT" e "$TMO" > "$OUT/lift.log" 2>&1
 }
 if [ "${RESUME:-0}" = 1 ]; then
   [ -f "$OUT/e.drc.ll" ] || { echo "RESUME=1 だが $OUT/e.drc.ll が無い" >&2; exit 2; }
@@ -31,8 +31,7 @@ PE="$FL_WIN64_DIR/extracted/block$(printf %05d "$B")_PE.bin"
 t0=$(date +%s)
 killed=0
 if [ "${RESUME:-0}" = 1 ]; then
-  resume_script
-  bash "$OUT/lift_resume.sh" "$PE" "$OUT/ranges.txt" "$OUT" e "$TMO" > "$OUT/lift.log" 2>&1
+  resume_lift
   rc=$?
 else
   bash lift/lift_ranges.sh "$PE" "$OUT/ranges.txt" "$OUT" e "$TMO" > "$OUT/lift.log" 2>&1 &
@@ -40,15 +39,14 @@ else
   while kill -0 "$lp" 2>/dev/null; do
     if [ -f "$OUT/e.drc.ll" ] && [ $(( $(date +%s) - $(stat -c %Y "$OUT/e.drc.ll") )) -gt "$HLLCAP" ]; then
       killed=$(( $(date +%s) - t0 ))
-      pkill -f "retdec-decompiler $PE" || true
+      for p in $(pgrep -f "retdec-decompiler $PE"); do kill "$p" 2>/dev/null || true; done
       break
     fi
     sleep 3
   done
   wait "$lp"; rc=$?
   if [ "$killed" != 0 ]; then
-    resume_script
-    bash "$OUT/lift_resume.sh" "$PE" "$OUT/ranges.txt" "$OUT" e "$TMO" > "$OUT/lift.log" 2>&1
+    resume_lift
     rc=$?
   fi
 fi
