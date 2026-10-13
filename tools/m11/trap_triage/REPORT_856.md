@@ -1,7 +1,7 @@
 # #856: unit 56 の trap 元 `8c5eb0` の fail-fast 辺の到達可否と機械語対応の確定
 
 **結論**: unit 56 (`0x16fde0`) の `unreachable` は、#699 が入れた `8c5eb0` の件数 0 ガードの fail-fast 辺 (`_t`) で起きる。この辺は unit 56 だけが到達する (survey の trap 25 件中 1 件のみ)。機械語では、この辺に対応する native の経路は `8c608d` の vtable 呼出し (`410360`) であり、fail-fast は native から外れた挙動である。native の呼出先は静的 PE からは確定できなかった (§4)。
-検証 HEAD: `02a49755` (本 PR の最新 commit。本節の実測は本 HEAD で実施)。`reach_856.sh` は `20f6835b` 以降変更なし (`9d6e859b`・`02a49755` は REPORT のみの差分)。
+検証 HEAD: `02a49755` (測定時の HEAD)。`reach_856.sh` は `20f6835b` 以降変更なし。`bf8ae24a` 以降は REPORT のみの差分。
 対象 IR: `tools/m11/work/ir_conditions.json` の `ir_sha256` = `835e8761043fa2fbd352ac7a4e7c9cd39ca0c2d9fbda3078cd47da2b3bed4321` (ldfix=applied・guard 適用後の `boot_final.ll`)。配布 `work-m11.tar.zst` 内の `boot_final.ll` (sha256 `69c774ded8aaf717c66d765925ff7435c65771ba63db952243daf5c5a7932a43`) は別 IR で、行番号は 196015 / 196028 行。
 既知類型との関係 (DEFECTS.md): D1b と同型の疑い (#699 §5 の行案が PM 判断待ち)。機構の切り分けは未着手 (#718 / M11-N35)。
 
