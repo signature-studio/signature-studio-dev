@@ -1,0 +1,238 @@
+{
+ "slot": 18763776,
+ "value": 4349696,
+ "rip_hits": [
+  {
+   "fn": 271488,
+   "at": 271533,
+   "ea": 18763768,
+   "asm": "mov rcx, qword ptr [rip + 0x11a2b44]"
+  },
+  {
+   "fn": 271568,
+   "at": 271603,
+   "ea": 18763768,
+   "asm": "mov rcx, qword ptr [rip + 0x11a2afe]"
+  },
+  {
+   "fn": 2549952,
+   "at": 2550093,
+   "ea": 18763760,
+   "asm": "mov rax, qword ptr [rip + 0xf7669c]"
+  },
+  {
+   "fn": 2717984,
+   "at": 2719610,
+   "ea": 18763760,
+   "asm": "mov rax, qword ptr [rip + 0xf4d06f]"
+  },
+  {
+   "fn": 2717984,
+   "at": 2719644,
+   "ea": 18763760,
+   "asm": "mov rax, qword ptr [rip + 0xf4d04d]"
+  },
+  {
+   "fn": 2723312,
+   "at": 2724585,
+   "ea": 18763760,
+   "asm": "mov rax, qword ptr [rip + 0xf4bd00]"
+  },
+  {
+   "fn": 2847680,
+   "at": 2848945,
+   "ea": 18763752,
+   "asm": "mov rdx, qword ptr [rip + 0xf2d730]"
+  },
+  {
+   "fn": 4280400,
+   "at": 4280534,
+   "ea": 18763744,
+   "asm": "mov rax, qword ptr [rip + 0xdcff03]"
+  },
+  {
+   "fn": 4280400,
+   "at": 4280546,
+   "ea": 18763744,
+   "asm": "mov rax, qword ptr [rip + 0xdcfef7]"
+  },
+  {
+   "fn": 6087824,
+   "at": 6088660,
+   "ea": 18763760,
+   "asm": "mov rax, qword ptr [rip + 0xc16815]"
+  },
+  {
+   "fn": 7086656,
+   "at": 7086684,
+   "ea": 18763736,
+   "asm": "mov rdx, qword ptr [rip + 0xb22d75]"
+  },
+  {
+   "fn": 7233424,
+   "at": 7233457,
+   "ea": 18763720,
+   "asm": "mov rdx, qword ptr [rip + 0xaff010]"
+  },
+  {
+   "fn": 7234256,
+   "at": 7234289,
+   "ea": 18763720,
+   "asm": "mov rdx, qword ptr [rip + 0xafecd0]"
+  },
+  {
+   "fn": 7266480,
+   "at": 7266521,
+   "ea": 18763712,
+   "asm": "mov rdx, qword ptr [rip + 0xaf6ee0]"
+  },
+  {
+   "fn": 7496880,
+   "at": 7496927,
+   "ea": 18763728,
+   "asm": "mov rdx, qword ptr [rip + 0xabeaea]"
+  },
+  {
+   "fn": 7496880,
+   "at": 7496977,
+   "ea": 18763728,
+   "asm": "mov rdx, qword ptr [rip + 0xabeab8]"
+  },
+  {
+   "fn": 7502288,
+   "at": 7502313,
+   "ea": 18763728,
+   "asm": "mov rdx, qword ptr [rip + 0xabd5e0]"
+  },
+  {
+   "fn": 7551392,
+   "at": 7551439,
+   "ea": 18763728,
+   "asm": "mov rdx, qword ptr [rip + 0xab15fa]"
+  },
+  {
+   "fn": 7551392,
+   "at": 7551489,
+   "ea": 18763728,
+   "asm": "mov rdx, qword ptr [rip + 0xab15c8]"
+  },
+  {
+   "fn": 7754256,
+   "at": 7754284,
+   "ea": 18763736,
+   "asm": "mov rdx, qword ptr [rip + 0xa7fda5]"
+  },
+  {
+   "fn": 7977568,
+   "at": 7978601,
+   "ea": 18763760,
+   "asm": "mov rax, qword ptr [rip + 0xa49180]"
+  },
+  {
+   "fn": 7977568,
+   "at": 7978625,
+   "ea": 18763760,
+   "asm": "mov rax, qword ptr [rip + 0xa49168]"
+  },
+  {
+   "fn": 7977568,
+   "at": 7978935,
+   "ea": 18763760,
+   "asm": "mov rax, qword ptr [rip + 0xa49032]"
+  },
+  {
+   "fn": 7977568,
+   "at": 7979004,
+   "ea": 18763760,
+   "asm": "mov rax, qword ptr [rip + 0xa48fed]"
+  },
+  {
+   "fn": 7977568,
+   "at": 7979028,
+   "ea": 18763760,
+   "asm": "mov rax, qword ptr [rip + 0xa48fd5]"
+  },
+  {
+   "fn": 7977568,
+   "at": 7979048,
+   "ea": 18763760,
+   "asm": "mov rax, qword ptr [rip + 0xa48fc1]"
+  },
+  {
+   "fn": 7977568,
+   "at": 7979066,
+   "ea": 18763760,
+   "asm": "mov rax, qword ptr [rip + 0xa48faf]"
+  },
+  {
+   "fn": 7994032,
+   "at": 7994102,
+   "ea": 18763760,
+   "asm": "mov r8, qword ptr [rip + 0xa454f3]"
+  },
+  {
+   "fn": 9158688,
+   "at": 9160657,
+   "ea": 18763760,
+   "asm": "mov rax, qword ptr [rip + 0x928818]"
+  },
+  {
+   "fn": 9213840,
+   "at": 9228016,
+   "ea": 18763760,
+   "asm": "mov rax, qword ptr [rip + 0x9180f9]"
+  },
+  {
+   "fn": 9243568,
+   "at": 9244574,
+   "ea": 18763760,
+   "asm": "mov rax, qword ptr [rip + 0x91404b]"
+  },
+  {
+   "fn": 9330976,
+   "at": 9331062,
+   "ea": 18763760,
+   "asm": "mov rax, qword ptr [rip + 0x8fee73]"
+  },
+  {
+   "fn": 9330976,
+   "at": 9331078,
+   "ea": 18763760,
+   "asm": "mov rax, qword ptr [rip + 0x8fee63]"
+  },
+  {
+   "fn": 10326080,
+   "at": 10327708,
+   "ea": 18763760,
+   "asm": "mov rax, qword ptr [rip + 0x80b94d]"
+  },
+  {
+   "fn": 10331072,
+   "at": 10331359,
+   "ea": 18763760,
+   "asm": "mov rax, qword ptr [rip + 0x80ab0a]"
+  },
+  {
+   "fn": 16102304,
+   "at": 16102835,
+   "ea": 18763744,
+   "asm": "mov rax, qword ptr [rip + 0x289a26]"
+  }
+ ],
+ "abs_hits": [
+  {
+   "sec": ".text",
+   "rva": 185304,
+   "v": 22958080
+  }
+ ],
+ "call_hits": [],
+ "same_value_dir64": [
+  {
+   "sec": ".data",
+   "rva": 18763776
+  }
+ ],
+ "target_is_fn_start": false,
+ "n_ins": 2566540
+}

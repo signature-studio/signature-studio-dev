@@ -179,14 +179,17 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
 - **素材**: 既定で取得されるのは `fl-win64` のみ。他は本文に `oc_artifacts: fl-win64 plugins-ott` の
   行を書く (許可名: fl-win64 / plugins-ott / plugins-freshair / plugins-serum2 / plugins-massivex /
   plugins-kilohearts / toolchain-retdec / toolchain-emsdk / work-m11 / work-liftdiff / work-m6-ott /
-  work-liftlib-targets / work-liftlib / work-icall / analysis-ott-binaries。それ以外は
+  work-liftlib-targets / work-liftlib / work-icall / analysis-ott-binaries / apt-mingw。それ以外は
   run が失敗する)。全素材は約 17.7 GiB (2026-10-13 実測) のため必要分だけ指定する。
   - `toolchain-retdec` → `/opt/retdec`、`toolchain-emsdk` → `/opt/emsdk` に展開される。
-  - `work-m6-ott` → `tools/m6/work/` + `tools/ott/work/`、`work-liftlib` → `tools/liftlib/work/`、
+  - `work-m6-ott` → `tools/m6/work/` + `tools/ott/work/` + `tools/m8/work/` + `tools/m9/work/` + `tools/m10/work/`
+    (`tar --zstd -tf` で実測)、`work-liftlib` → `tools/liftlib/work/`、
     `work-icall` → `tools/icall/work/`、`work-liftlib-targets` → `tools/targets/{freshair,kilohearts}/work/`
     の HeartCore / SlateCore のみ (liftlib_e2e.sh の `need` 対象) に展開される
   - `analysis-ott-binaries` → `$HOME/analysis/plugins/ott/binaries/` (OTT_vst2_win64.dll ほか実機バイナリ。
     展開後は `ANALYSIS_DIR=$HOME/analysis` が環境に入る。tools/shared/env.sh の既定 /home/ubuntu/work/analysis を上書きする)
+  - `apt-mingw` は R2 の素材ではなく、`gcc-mingw-w64-x86-64` を runner に apt 導入する
+    (`x86_64-w64-mingw32-gcc`。PE を作るテスト用で tools/ の 22 ファイルが使う。#646)。
   - `work-m11` → `tools/m11/work/`、`work-liftdiff` → `tools/liftdiff/work/` に展開される
     (gitignore 対象の検証スナップショット。commit しない)。
   - 追加の `work-*` は R2 に置いて、`prepare-event-context.sh` の allowlist に足す (#293)。
@@ -210,9 +213,62 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   入力の先頭 200 文字・cost) が出る。repo が public のため、**tool の出力と生 JSONL はログに出さない**
   (認証情報・FL 由来物の漏洩防止。secret マスクは登録値との完全一致でしか効かない)。
   issue へのコメントは agent が `gh issue comment` で行う。
-- **上限**: job は 60 分。収まらない作業は中間 commit + draft PR で区切る。
+- **上限**: job は 60 分。収まらない作業は中間 commit + **ready PR (`Refs #N` + 未解決の起票)** で区切る (draft は禁止: REVIEWING でも FIXING でもない状態になる)。
 - 稼働本数は「走っている Actions run 数」で数える (`gh run list --status in_progress`)。
 - **PM の watch ルール (依頼者指示 116)**: 起動した全ての run は無条件で `gh run watch` する。PM が
   応答を終える時は、background で `gh run watch` が 1 本以上走っていること。完了通知を受けたら、
   結果の処理に入る前に、次の watcher を起動し直す。
+- **open PR は 2 状態のみ (依頼者指示 119・120・122・123)**: 実装が始まったチケットは merge まで止めない。
+  open PR は常に次の **どちらか** であり、「レビューも修正もされていない状態」(IDLE) を 1 秒も作らない。
+
+  | 状態 | 意味 | 担い手 | 次の遷移 (人手 = PM を介さない) |
+  |---|---|---|---|
+  | REVIEWING | review job が走っている / 待機中 | oc-reviewer | approve -> 同じ run で merge (PR は閉じる)。request-changes -> FIXING |
+  | FIXING | 差し戻しを受けた implement job (fix モード) が走っている / 待機中 | 実装 agent | push -> `pull_request:synchronize` で REVIEWING |
+
+  遷移は workflow のイベントで自動に起きる (`.github/workflows/opencode.yaml`)。
+
+  | きっかけ | 動くもの |
+  |---|---|
+  | PR opened / synchronize / reopened / ready_for_review | review job |
+  | oc-reviewer が `changes_requested` を提出 (`pull_request_review`) | implement job (fix モード)。`gh pr checkout` した PR ブランチを直して push |
+
+  無音終了を許さない仕組み:
+
+  - **review**: run の最後に `verify-review-verdict.sh` が現在の head への verdict (APPROVED / CHANGES_REQUESTED) を
+    確認し、無ければ PR にコメントを残して close -> reopen で review を再起動する (同じ head に 3 回まで。超えたら警告して失敗)。
+    close -> reopen は `reopen-pr.sh` が行い、reopen が 3 回失敗したら PR に `oc:stuck` を付けて失敗する (closed のまま放置しない)。
+    reviewer の step に 50 分の上限 (`timeout-minutes: 50`) を置くと、verify を job の 60 分と App token の 1 時間寿命の内側で
+    必ず走らせられる。この変更は App に `workflows` 権限が無く
+    agent は push できないため、PM が `.github/workflows/` を直接 push して適用した。
+    COMMENT だけの review は verdict と認めない。**Copilot の review を待って verdict を保留することはしない**
+    (Copilot の review は来ないことがあり、保留した PR は誰にも動かされず止まるため)。Copilot の review が
+    approve 前に既にあれば読んで判断する。run の途中で head が進んだ場合は、その push の synchronize が起動する
+    review が担当するので検証は免除する。
+  - **fix**: run の最後に `fix-progress.sh` が「head が進んだ (pushed)」「push せずコメントした (answered: close -> reopen で
+    review を起動)」「どちらもしていない (none: 1 回再試行し、なお none なら job を失敗させる)」を判定する。
+    判定・再試行・reopen・失敗の各 step は `!cancelled()` なので、agent step が失敗しても走る。run の cancel では走らない
+    (step の timeout 後に走るかは未実測。merge 後の実 run で確認する)。
+    (fix モードの step 上限は agent 40 分・retry 15 分。setup を足すと job の 60 分に近い。素材指定で setup が長い PR では
+    retry の上限を縮めることを検討する)。
+  - **往復の上限**: oc-reviewer の CHANGES_REQUESTED が 1 PR で 5 件に達すると、fix を起動せず PR にコメントを残し
+    ラベル `oc:stuck` を付けて止める (`changes_requested -> fix -> review` と `answered -> reopen -> review` の
+    どちらの循環も 1 周に 1 件増えるため)。件数は直前の停止コメント (`<!-- oc-fix-limit -->`、bot 投稿) 以降の差し戻しに限る。
+    ラベルを外すと再開し、次の差し戻しから数え直す (停止前の件数を持ち越さない)。停止コメントの無いラベル (手動付与・reopen 失敗) は
+    数える起点が無く全期間を数えるため、外すと即座に再停止しうる (扱いは #719 で決める)。
+  - **起動主体は完全一致**: fix を起動する reviewer (`oc-reviewer-for-signature-studio[bot]`、`user.type == 'Bot'`) と、
+    停止コメント・完了コメントの実装 App (`opencode-for-signature-studio[bot]`) は login の完全一致で見る
+    (前方一致だと別名のアカウントでも write 権限の fix が起動し、停止コメントを偽装して数え直しもできてしまう)。
+  - **テスト**: `.github/scripts/tests/test-pr-loop.sh` (fake gh) を `.github/workflows/scripts-test.yaml` が
+    `.github/scripts/**`・`.github/actions/**`・`opencode.yaml` の変更ごとに実行する。
+  - **並行制御**: implement job は `opencode-impl-<N>`、review job は `opencode-review-<N>` と group を分ける。
+    同じ group だと fix が pending の間に review が入って fix が黙って取り消される (pending は 1 件しか持てない)。
+    その代わり fix と review が重なりうるので、reviewer は `gh pr merge --match-head-commit <レビューした head>` で
+    未レビューの commit を巻き込まない。
+  - PR は **常に ready・base は main** で作る (draft / stacked は REVIEWING でも FIXING でもない状態を作るため禁止)。
+    未完でも ready で出して `Refs #N` と未解決を書く。前提 PR が未 merge の作業は着手しない。
+
+  PM の運用スクリプト (`pr_gaps.py` で IDLE を計測、`sweep_prs.sh` で復旧) は **バックストップ**であり、
+  IDLE が 1 件でも出たらそれ自体を workflow の不具合として扱う (所在は `docs/REFERENCES.md` `[PM-SCRIPTS]`)。
+  着手報告だけで終わった実装 run は `find_silent_runs.sh` で検出する。
 
