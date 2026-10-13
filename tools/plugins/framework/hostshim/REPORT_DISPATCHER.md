@@ -12,6 +12,8 @@
 - 全 256 ID 実行 (基準): exit 0 / 256 件すべて `stop=ended` / distinct (rax, path) = 109。
   wall は n=2 で 51.44 秒・50.94 秒 (min–max 50.94–51.44 秒)。2 回の ID 別結果は完全一致 (差分 0)。
   開始時 load average 0.91 (並列数 1)。
+  本 commit での再測 (n=1、`hs_disp_emu.py` の集計追加後): wall 71.98 秒、開始 load 0.91、終了 load 1.00。
+  実行時間は負荷 (load・CPU) に依存するため、同一コードでも 51 秒台と 72 秒台の両方を実測している。
 - ネガティブコントロール run の wall (n=1): ret_tag 50.91 秒 / ret_one 51.02 秒 / nomap 6.59 秒。
   watch_broken は wall 未計測。
 
@@ -68,9 +70,13 @@ distinct (rax, path) = 109 / IDs = 256。WATCH 番地の到達 (`hit`) は次の
 ### 3.3 unmapped (未マップ領域へのアクセス)
 
 - 61 / 256 ID で未マップ領域へのアクセスが発生 (基準 run)。アクセス回数の合計 5,340 件、
-  1 ID あたり最大 197 件 (ID 0x09)。アクセスは 197 ページに分散。
-- 集計 (ページ, access 種別): 件数の多い順に `0x0`/access 19 が 44 件、`0x1000`〜 の各ページ/access 21 が 27 件ずつ。
-  アドレスは 0 付近の小さな値に集まる。
+  1 ID あたり最大 197 件 (ID 0x09)。
+- 集計 (`hs_disp_emu.py` の `on_unmapped` で (ページ, access 種別) ごとに数え、`HS_DISP_OUT` の JSON `unmapped_pages`
+  と標準出力の `unmapped:` 行に出力。キーは `<page>/<access>`)。基準 run の値:
+  - (ページ, access) の組は 200、ページは 197。access 種別は fetch 195 組 / read 3 組 / write 2 組。
+  - 件数が 27 の組は 195 (fetch・`0x1000`〜 の各ページ)、件数 44 は `0x0`/read の 1 組。
+  - ページの下限は `0x0`、上限は `0x54534000`。`0x10000` 未満は 16 ページ、以上は 181 ページ。
+  - 大半が fetch である理由は未確認 (関数外へ戻る経路の値か、ret 先の誤読かの切り分けは未実施)。
 - hook は当該 1 ページを 0 埋めで自動マップして実行を継続する。0 は実値ではない。
   `nomap` (自動マップ停止) では 59 ID で経路が変わり、28 ID で rax が変わる (例外停止を含む: 停止内訳 ended 195 / Invalid memory read 53 / write 8)。
   よって経路判定は「0 埋めという仮定」の上に立つ。実値 (struct 構造) は未確定。

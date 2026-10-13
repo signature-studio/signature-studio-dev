@@ -23,6 +23,7 @@ from collections import Counter
 
 import pefile
 from unicorn import Uc, UC_ARCH_X86, UC_MODE_64, UC_HOOK_CODE, UC_HOOK_MEM_UNMAPPED, UC_PROT_ALL
+from unicorn import UC_MEM_READ_UNMAPPED, UC_MEM_WRITE_UNMAPPED, UC_MEM_FETCH_UNMAPPED
 from unicorn.x86_const import UC_X86_REG_RAX, UC_X86_REG_RCX, UC_X86_REG_RDX, UC_X86_REG_RSP, UC_X86_REG_RBP, UC_X86_REG_R8, UC_X86_REG_R9, UC_X86_REG_RIP
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', 'shared'))
@@ -40,6 +41,7 @@ MAX_STEPS = 400000
 PAGE = 0x1000
 # 経路上の判定用 VA (hostshim.c / hs_disp_tree.py の主張の検証点)
 WATCH = {0x131bb5c, 0x13281af, 0x1320dd9, 0x1322b53, 0x131b8dd, 0x1320840}
+ACCESS_NAME = {UC_MEM_READ_UNMAPPED: 'read', UC_MEM_WRITE_UNMAPPED: 'write', UC_MEM_FETCH_UNMAPPED: 'fetch'}
 
 
 def load_image(pe_data):
@@ -59,7 +61,7 @@ def run_one(ident, image, base, size, pe_data_sections):
     uc.mem_map(SENT & ~(PAGE - 1), PAGE, UC_PROT_ALL)
     uc.mem_write(SENT, b'\xf4')  # hlt (SENT 到達の検出用)
 
-    st = {'steps': 0, 'stop': None, 'callouts': [], 'path': [], 'unmapped': 0, 'trail': [], 'hit': []}
+    st = {'steps': 0, 'stop': None, 'callouts': [], 'path': [], 'unmapped': 0, 'trail': [], 'hit': [], 'pages': Counter()}
     fn_range = (FN_LO, FN_HI)
 
     def on_code(uc_, addr, sz, _):
@@ -93,6 +95,7 @@ def run_one(ident, image, base, size, pe_data_sections):
         if st['unmapped'] > 2000:
             return False
         page = addr & ~(PAGE - 1)
+        st['pages'][(page, ACCESS_NAME.get(access, str(access)))] += 1
         try:
             uc_.mem_map(page, PAGE, UC_PROT_ALL)
             uc_.mem_write(page, b'\x00' * PAGE)
@@ -128,6 +131,7 @@ def run_one(ident, image, base, size, pe_data_sections):
         'path_hash': '%08x' % (hash(tuple(st['path'])) & 0xffffffff),
         'trail': ['0x%x' % a for a in st['trail']],
         'unmapped': st['unmapped'],
+        'unmapped_pages': {'0x%x/%s' % (p, a): n for (p, a), n in st['pages'].items()},
         'hit': st['hit'],
     }
 
@@ -147,6 +151,14 @@ def main():
             r['path_hash'], ','.join(r['callouts'][:6]) or '-'))
     keys = Counter((r['rax'], r['path_hash']) for r in res.values())
     print('distinct (rax, path) = %d / IDs = %d' % (len(keys), len(res)))
+    pages = Counter()
+    for r in res.values():
+        for k, n in r['unmapped_pages'].items():
+            pages[k] += n
+    print('unmapped: IDs with access = %d / total access = %d / (page,access) pairs = %d / pages = %d' % (
+        sum(1 for r in res.values() if r['unmapped']), sum(pages.values()), len(pages),
+        len(set(k.split('/')[0] for k in pages))))
+    print('unmapped top (page/access, count over all IDs): %s' % ', '.join('%s=%d' % kv for kv in pages.most_common(5)))
     out = os.environ.get('HS_DISP_OUT')
     if out:
         json.dump({'%d' % k: v for k, v in res.items()}, open(out, 'w'), indent=1)
