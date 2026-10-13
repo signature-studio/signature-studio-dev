@@ -11,10 +11,10 @@
 
 ## 1. 結論と実測
 
-検証起点: コード HEAD `472c7d5` (`SystemParametersInfoW` の未対応 action を `FALSE` 返却にした修正。その前提は main 取り込み `350d3ee` と判定器修正 `9500d02`)。環境: runner 4 vCPU, node v22.23.3, emcc (`[EMSDK]`)、素材 `work-m11` + `fl-win64`、`python3` の pefile・capstone、`x86_64-w64-mingw32-gcc` (`apt-mingw`)。
-IR は素材 `work-m11` の `boot_final.ll` / `boot_final3.ll` を `tools/gui/work/flengine/tree/` に複製し、複製側で `m11_build.sh` (qstore・alloca・post) を実行してから測った。`m11_gen_ir2.sh` は使っていない (e2e は IR を再生成しない。sha256 は §6)。
+検証起点: コード HEAD `14bde73` (main `4e872aa` を取り込んだ merge head `140a823` の上で、e2e の IR 再生成を追加 (`14bde73`)。`SystemParametersInfoW` の未対応 action を `FALSE` 返却にした修正は `472c7d5`)。環境: runner 4 vCPU, node v22.23.3, emcc (`[EMSDK]`)、素材 `work-m11` + `fl-win64`、`python3` の pefile・capstone、`x86_64-w64-mingw32-gcc` (`apt-mingw`)。
+IR は素材 `work-m11` の中間 IR (`boot0..4.lift.ll`) から、`tools/gui/work/flengine/tree/` の複製側で `m11_gen_ir2.sh` (ldfix 適用、main #680 の要件) を回して作り直し、続けて `m11_build.sh` (qstore・alloca・post) を実行してから測った。`tools/m11/work` (素材) は書き換えていない。sha256 は §6。
 
-| 項目 | 実測 (472c7d5, 3 回。全 rc 0・12/12 PASS) | 定義 / 分母 |
+| 項目 | 実測 (14bde73, 3 回。全 rc 0・12/12 PASS) | 定義 / 分母 |
 |---|---|---|
 | リンク | wasm-ld signature mismatch **0** / undefined **0** / duplicate **0** (ff・soft 両ビルド、3 回とも) | `build.sh` のリンクログ `[gf] OK:` 行 |
 | GUI declare ↔ adapter | IR の GUI declare **177** = adapter **177** (impl 158 / stub 19)、c=0 d=0 | `integ/gen_adapt.py`、`build_ff.log` |
@@ -26,7 +26,7 @@ IR は素材 `work-m11` の `boot_final.ll` / `boot_final3.ll` を `tools/gui/wo
 | `LoadStringW` の通算回数 | 8,364,871 回 (survey、最終 run の `survey_soft.json`)。1 unit が資源 ID を回している (§7) | `survey_soft.json` |
 | `RegisterClass*` / `CreateWindowEx*` の自然到達 | **`CreateWindowExW` ×1 のみ** (survey、unit 内で `GetClassInfoW` の直後)。`RegisterClassW` は自然到達 0。起動 (boot) では 0 | judge の INFO 行 |
 | 指向呼出 (§4) | `RegisterClassW` ×2 成功 (atom 0xC001 / 0xC002)、`TApplication` 窓 hwnd `0x210000e` (< 2^31)、`TLightweightLayeredControl` は NULL (WNDPROC が closure 外)。WNDPROC 4 引数が `m11_icall` 経由 | `probe.json` |
-| 親の受入条件 2 `bash tools/gui/e2e.sh` | **ALL PASS / rc 0** (本 HEAD `472c7d5`、1 回・1m34s。`pnpm install --frozen-lockfile` 後に実行) | `tools/gui/e2e.sh` の出力 |
+| 親の受入条件 2 `bash tools/gui/e2e.sh` | **ALL PASS / rc 0** (本 HEAD `14bde73`、1 回・1m43s。`pnpm install --frozen-lockfile` 後に実行) | `tools/gui/e2e.sh` の出力 |
 
 ## 2. 変更と成果物
 
@@ -124,21 +124,21 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 
 ## 6. 検証
 
-実行: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/gui/flengine/e2e.sh` (HEAD = `472c7d5`。4 vCPU, 3 回直列)。
+実行: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/gui/flengine/e2e.sh` (HEAD = `14bde73`。4 vCPU, 3 回直列)。
 前提: 素材 `work-m11` (`tools/m11/work/` に展開。e2e は読取のみで、複製 `tools/gui/work/flengine/tree/` 側で使う)、`fl-win64` (`$RUNNER_TEMP/fl-win64`)、`x86_64-w64-mingw32-gcc` (`apt-mingw` = `gcc-mingw-w64-x86-64`)、`python3` に pefile・capstone (`python3 -m pip install pefile capstone`。`pip` 単体は別の Python を指すことがあるため `python3 -m pip` を使う)。
 
-| 回 | rc | 所要 (wall) | load 開始 → 終了 | judge | native selftest (`tools/gui/test`) | ネガコン |
+| 回 | rc | 所要 (e2e.sh の done) | load 開始 → 終了 | judge | native selftest (`tools/gui/test`) | ネガコン |
 |---|---|---|---|---|---|---|
-| 1 | 0 | 138 s | 0.58 0.38 0.16 → 1.29 0.75 0.34 | 12/12 PASS | 433 passed / 0 failed | 5/5 期待どおり FAIL |
-| 2 | 0 | 131 s | 1.09 0.73 0.33 → 1.25 0.93 0.46 | 12/12 PASS | 433 passed / 0 failed | 5/5 期待どおり FAIL |
-| 3 | 0 | 131 s | 1.15 0.91 0.46 → 1.02 0.95 0.54 | 12/12 PASS | 433 passed / 0 failed | 5/5 期待どおり FAIL |
+| 1 | 0 | 153 s | 0.22 0.53 0.62 → 0.99 0.76 0.70 | 12/12 PASS | 433 passed / 0 failed | 5/5 期待どおり FAIL |
+| 2 | 0 | 155 s | 0.84 0.74 0.69 → 1.06 0.88 0.76 | 12/12 PASS | 433 passed / 0 failed | (run2 は judge・selftest のみ) |
+| 3 | 0 | 154 s | 0.97 0.86 0.75 → 1.00 0.92 0.80 | 12/12 PASS | 433 passed / 0 failed | (run3 は judge・selftest のみ) |
 
 - 3 回の一致: B1 `units_run 52 (base 52)` / `threw memory access out of bounds (base 同じ)`、L1 undefined/sigmismatch/duplicate `0/0/0`、A1 `177 = 177 (impl 158 / stub 19)`、S1 `865/1/47/29/0 (base 865/1/47/29/0)`、S2 `LoadImageW` のみ fail-fast (ff 1 unit) = soft STUB、R1 first `LoadStringW` ×3、R2 reached 32 (floor 19)、P1 atoms `[-16383, -16382]` / `RegisterClassW=2 CreateWindowExW=3`、P4 hwnd `0x210000e`。
-- 所要は 131–138 s (e2e.sh の `done` 行。wall は run1 2m17.8s・run2 2m11.5s・run3 2m11.6s)。runner 4 vCPU、load は 0.3–1.3 で推移。
-- IR provenance (`results/ir_sha256.txt`): 素材 `boot_final.ll` `69c774de…`・`boot_final3.ll` `010451ad…`。m11_build.sh 後 `boot_final.ll` `30a4e00d…`・`boot_final3.ll` `4f0a0cc6…` (全文は results/ir_sha256.txt)。
-- 親 `bash tools/gui/e2e.sh` (受入条件 2): **ALL PASS / rc 0** (本 HEAD、1 回・1m34s)。事前に `pnpm install --frozen-lockfile` を実行 (未実行だと `node_modules/.bin/tsc` が無く rc 127)。
+- 所要は 153–155 s (wall は run1 2m33.1s・run2 2m34.3s・run3 2m34.9s)。runner 4 vCPU。
+- IR provenance (`results/ir_sha256.txt`): 素材 `boot_final.ll` `69c774de…`・`boot_final3.ll` `010451ad…` (素材の旧 IR)。e2e step 0 で複製側に `m11_gen_ir2.sh` を回して IR を作り直し (main #680 の ldfix=applied 要件)、その後 `m11_build.sh` 後の sha256 を記録 (全文は results/ir_sha256.txt)。
+- 親 `bash tools/gui/e2e.sh` (受入条件 2): **ALL PASS / rc 0** (本 HEAD、1 回・1m43s)。事前に `pnpm install --frozen-lockfile` を実行 (未実行だと `node_modules/.bin/tsc` が無く rc 127)。
 
-ネガティブコントロール (全て「期待した FAIL 行が出る」まで検査。judge のクラッシュを FAIL 確認と誤認しない。run1・run2 で確認):
+ネガティブコントロール (全て「期待した FAIL 行が出る」まで検査。judge のクラッシュを FAIL 確認と誤認しない。run1 で確認):
 
 | NC | 壊し方 | 結果 |
 |---|---|---|
