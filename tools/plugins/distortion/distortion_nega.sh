@@ -94,7 +94,7 @@ w('audit_missing', '19004', 'missing_define', '1')
 w('audit_funcdefs', '19078', 'function_defines', str(int(next(r for r in body if r[0] == '19078')[hdr.index('function_defines')]) + 1))
 w('audit_extra', '18914', 'extra_inside', '0')
 PY
-for nmpat in audit_missing:missing_define=1 audit_funcdefs:function_defines=19 audit_extra:extra_inside; do
+for nmpat in audit_missing:missing_define=1 audit_funcdefs:function_defines=16 audit_extra:extra_inside; do
   nm=${nmpat%%:*}; pat=${nmpat#*:}
   read -r rc ok < <(ej control "$N/$nm.csv"); w=$(why control "$pat")
   echo "NC-J $nm: audit 側を破壊: exit=$rc OK 行=$ok $w [$pat]  (期待 非0 / 0 / 理由一致)"
