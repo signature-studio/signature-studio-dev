@@ -165,7 +165,7 @@ class FnLift:
                                 self.tail.add(va)       # 他関数への tail call
                             else:
                                 self.targets.add(t); work.append(t)
-                        elif op.type == X86_OP_REG:
+                        elif op.type == X86_OP_REG or (IA32 and op.type == X86_OP_MEM and op.mem.index != 0):
                             tg = self.jump_table(va, ins)
                             if tg:
                                 self.jtabs[va] = tg
@@ -188,6 +188,10 @@ class FnLift:
         """MSVC 形式 jump table: ... mov eY,[rX+rIdx*4+tbl]; add rY,rX; jmp rY (tbl = image RVA)"""
         cand = sorted([x for x in self.insns if x < va], reverse=True)[:24]
         tbl = None; n = None
+        if ins.operands[0].type == X86_OP_MEM:   # ia32: jmp dword ptr [idx*4+tbl] (tbl は絶対 VA)
+            m = ins.operands[0].mem
+            if m.scale == 4 and m.index != 0 and m.base == 0 and m.disp:
+                tbl = m.disp & 0xffffffff
         for x in cand:
             i = self.insns[x]
             if i.mnemonic == 'mov' and len(i.operands) == 2 and i.operands[1].type == X86_OP_MEM:

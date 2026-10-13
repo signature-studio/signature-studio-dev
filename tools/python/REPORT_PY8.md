@@ -70,6 +70,16 @@ flapi 呼出し数は `flapiCalls.n` で、`engine.call` ラッパを数えた�
 
 未解決 (本節): 静的版 C 側に `device.forwardMIDICC` を実装した上での計測 (provider handler 追加は `provider_check` の handler 数 60 を変えるため別 issue)。
 
+## MIDI 1 件の内訳 (run 5 追記、`tests/midi_path_split.mjs`)
+
+CC 1 件 (flapi 1.000/件) の所要時間を、mock engine ハンドラ内 (`handler_us`) と残り (`rest_us`) に分けて計測。
+
+- 測定 1 (`tests/midi_path_split.mjs 5000 5`、1 run、JSON の `load` = 終了時 `/proc/loadavg` 2.19): 中央値 total 262.60µs / handler 0.84µs / rest 261.71µs、flapi 1.000/件。試行別 total: 288.78 / 262.60 / 274.19 / 254.59 / 218.78µs
+- 測定 2 (`tests/midi_event_bench.mjs 5000 5`、測定 1 の直後の 1 run、JSON の `load` 1.64): CC 中央値 242.16µs (min 228.34 / max 278.98、flapi 1) / NoteOn 中央値 157.15µs (min 150.79 / max 158.05、flapi 0)
+- 読み: flapi ハンドラ自体は 1µs 未満。測定 2 の CC と NoteOn の差 約 85.0µs が flapi 1 回の経路 (RPC 往復と呼出し側の Python 処理) に当たる。NoteOn 側の約 157µs は flapi を使わない Python 配送の基底。
+- 比較の注意: 測定 1 と測定 2 は別プロセスで load (2.19 / 1.64) が揃っていない。比較できるのは測定 2 の CC と NoteOn の差 (同一 run) だけ。上の既存節の 230.0µs / 149.3µs (差 80.7µs) は load 0.56 の値で、本節とは load が違うため直接比べない。差がほぼ同程度 (80.7µs と 85.0µs) なのは偶然の一致で、1 run ずつのため誤差は未評価。
+- 限界: 差分は NoteOn と配送経路が完全には同一でない前提の推定。素の RPC 往復は本節の計測対象外で、上の「素の SAB 往復」節の値 (中央値 34〜44µs、別 run) を参照する。bimodal は本 run では再現せず (測定 1 の試行の散らばりは 219〜289µs)。
+
 ## 検証範囲 / 範囲外
 
 - 範囲内: Actions runner (4 core、node 22.23.3)、素材 `fl-win64` (MCPTools.pyc / midi.py / utils.py / device script は `fetch_inputs.sh` で配置)、CPython 3.12.1 wasm・flpy・provider・静的版をクリーンにビルド (`build_cpython_wasm.sh` 4 分 46 秒 (d36dbefe 時点の run)・4 分 03 秒 (HEAD 08c569ba の静的版検証 run)、`build_flpy.sh` rc=0、`build_flpy_static.sh` rc=0)。

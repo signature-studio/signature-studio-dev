@@ -70,7 +70,7 @@ OOB 16 件の最上位 frame (現行 build): 144 `407e20` / 149 `412e40` / 275 `
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 現行 main で unit 95 / 895 の trap が消えたことの原因 (main 側のどの変更か) | REPORT_684 の前提の再検証 | PM 判断: #684 へのコメント (main 差分の切り分けを含む) |
-| 895 の `412770` の null memcpy が Runtime error 210 の直接原因か | 895 の halt0 原因 | PM 判断: 新規子 issue (親 #684) |
+| 895 の `412770` の null memcpy が Runtime error 210 の直接原因か (#1080) | 895 の halt0 原因 | #1080 (親 #684) |
 | 477 (`903d20`) / 275 (`864fe0`) の残存 OOB | REPORT_684 §3・§4 の未解決 | 既存: #684 |
 | `m11_e2e.sh` 全再生成の `tools/m2/work/ghidra_dll` 素材の欠落 (Ghidra 経路は §1 のとおり未試行) | e2e 全体を再現できない | PM 判断: `prepare-event-context.sh` の allowlist に `work-m2` を追加し、R2 に素材を置く。`docs/WORKFLOW.md` §11 の許可名に `work-m2` は無く、`work-m6-ott` は `tools/m2` を展開しないため、現状の `oc_artifacts` 指定では届かない |
 
@@ -80,3 +80,11 @@ OOB 16 件の最上位 frame (現行 build): 144 `407e20` / 149 `412e40` / 275 `
 - `m11_build.sh` (foreground、rc=0、18.8 s): `_m11_icall_cnt_n` 2 件。
 - `survey_units.mjs` (`SV_RAW=1`、foreground、rc=0、9.8 s): `SURVEY_UNITS {"ok":869,"miss":47,"other":1,"halt0":8,"oob":16,"noproc":1}`。
 - `m11_e2e.sh` 全体: 未達 (§1 参照)。
+
+## 7. 元記録 (`7736a5c5`) と main `8bc34ed9` の差分確認 (本 PR では未再実行)
+
+- 起点: origin/main `8bc34ed9` (PR #1242 取込み後、`7736a5c5` から 473 commit 先)。
+- 本 PR の run では `fl-win64` のみ取得した。`work-m11` 等が無いため、`8bc34ed9` での build・survey は**未実施**。§6 の数値は `7736a5c5` 起点の元記録であり、`8bc34ed9` での値ではない。
+- main 側のどの変更が §2 の遷移を生んだかは未切り分け (§5 の #684 で扱う)。
+- 結論: §6 の元記録の範囲では §0 の前提と整合する。`8bc34ed9` での実測は未実施のため、前提が `8bc34ed9` でも成立するかは未検証。受入条件 1・2 (`47ad70` の index / arg1、`40ffe0` のリスト先頭) は対象の観測が無いため未達のまま。受入条件 3 (DEFECTS 行案) は §6 既出の D11 変種の範囲に留まる。
+- 未解決の起票先は §5 のとおり。

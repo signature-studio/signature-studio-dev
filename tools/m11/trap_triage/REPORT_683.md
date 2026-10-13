@@ -156,13 +156,25 @@ FL_WIN64_DIR=... PY=... bash tools/m11/trap_triage/liftdiff68_683.sh
 ### 8.1 #878: 815e10 系 (6cefb0 ← 815050 ← 815e10) の突合と分類
 
 - **対象**: unit 280 / 659 の最上位 frame `6cefb0`。上流 `815050` (呼出元 `815e10`)。
-- **機械語側の確認 (本 run で fl-win64 から再確認)**: `815e10` → `815050` の引数対応 (`ebx→ecx` / `esi→edx` / `edi→r8d`) は一致。`815050` の `8158f5: mov r8b, 1` (即値 1) → `8158f8: call 6cefb0`。`815050` 内の `call 6cefb0` は 1 箇所のみ。`6cefb0` の `6cf021: cmp byte ptr [rcx+0x496], r8b` / `6cf028: jg`。
-- **IR 側は本 run で未確認**: 以下は前版の作業者が `work-m11` の `boot_final.ll` で読んだ内容で、本 run では再確認できていない (`work-m11` は本 run で取得されていない。`tools/m11/work/` は作業者の手元にしか無い)。
-  - `boot_final.ll` 315539 行の第 3 引数が `ptr nonnull %stack_var_-255` (スタック slot のアドレス)。
-  - `6cefb0` 側の `%0 = ptrtoint %arg3` と `icmp slt i64 %0, %29` (`%29` = `[arg+0x496]` の sext byte) の対応。
-- **分類 (未判定)**: 機械語の差分 (`r8b` 即値 1 と IR 側の第 3 引数の違いの有無) は IR 側の突合が無いと判定できない。したがって「deref 脱落 (ldfix 型) ではない」とは結論しない。ldfix 型かどうかは未判定。
-- **`815050` 内の `6cefb0` 呼出は 1 箇所のみ** (機械語 `disasm_fn.py 815050` で確認。他の IR 呼出 318736 行・322975 行は別関数。IR 側の行番号は前版の記述で未再確認)。
-- **素材の注意**: 前版が読んだ IR は `work-m11` の `boot_final.ll` (#516/#680 以前の生成物、`ir_conditions.json` 無し、#729)。現 main の生成手順で再生成した IR では行番号・有無が変わる可能性がある。IR 側の再確認 (work-m11 の再投入後) は未実施。
-- **未確認**: 定数 1 がスタック slot のアドレスに置き換わった経路 (型推定・ptr 復元の pass) は未特定。`6cefb0` の OOB がこの分岐差から来るという因果も未検証。
-- **影響**: 修復の範囲 (ldfix 型か否か) は未判定。survey 再測定と退行確認は、修復を入れたときに行う。本 run では修復を入れていない (受入条件 2 は対象外)。
+- **出所**: 以下の機械語・IR の観測は、PR #1243 の作成時 (初版 `de8c9889` 時点) のもの。展開元 run ID は未記録。本 review run の `$ARTIFACTS_DIR` には `work-m11` が無く、`fl-win64` も展開していないため、この run では再検証していない。
+- **機械語側 (作成時の観測)**: `815e10` → `815050` の引数対応 (`ebx→ecx` / `esi→edx` / `edi→r8d`) は一致。`815050` の `8158f5: mov r8b, 1` (即値 1) → `8158f8: call 6cefb0`。`815050` 内の `call 6cefb0` は 1 箇所のみ。`6cefb0` の `6cf021: cmp byte ptr [rcx+0x496], r8b` / `6cf028: jg`。
+- **IR 側の突合 (作成時の観測。`work-m11` の `boot_final.ll` 490653 行を読んだもの)**:
+  - `815050` (定義 315047 行) の 315539 行: `%251 = call i64 @function_6cefb0(i64 %250, i64 %250, ptr nonnull %stack_var_-255)`。第 3 引数は機械語の即値 `r8b = 1` ではなく、`815050` の `alloca` (315076 行) の slot アドレス。
+  - その slot `%stack_var_-255` は `alloca` 宣言のみで、`815050` 内に store / load が無い (未初期化の slot のアドレスが渡る)。
+  - `6cefb0` (270434 行) は第 3 引数を `%0 = ptrtoint %arg3` して `icmp slt i64 %0, %29` (`%29` = `[arg+0x496]` の sext byte) と比較する。よって機械語の `cmp byte ptr [rcx+0x496], r8b` (即値 1) と、IR のアドレス比較が一致しない。
+  - `815050` 内の `6cefb0` 呼出は 315539 行の 1 箇所のみ。`815050` の呼出元は 315807 行の `815e10` 1 箇所。
+- **分類 (暫定)**: 機械語の即値 1 が IR で slot のアドレスに変わっている。観測から見ると deref 脱落とは見えにくい (定数の ptr 化に見える)。ただし置換を行った pass は未特定 (`m11_passes.py` / `ldfix/ldfix.py` / `alloca/m11_alloca.py` を grep したが該当箇所は確定していない)。因果 (この差で 6cefb0 の OOB が起きる) も未検証。よって「ldfix 型ではない」とは断定しない。
+- **注意**: 上記は `work-m11` 素材 (#516/#680 以前の生成物) の IR に対する作成時の観測。現 main の生成手順で再生成した IR では置換の有無が変わりうる (#729)。
+- **素材の注意**: 読んだ IR は `work-m11` の `boot_final.ll` (#516/#680 以前の生成物、`ir_conditions.json` 無し、#729)。現 main の生成手順で再生成した IR では行番号・有無が変わる可能性がある。本 review run では `work-m11` が無いため、IR 側の再確認は未実施。
+- **未確認**: 定数 1 がスタック slot のアドレスに置き換わった pass・関数は未特定 (置換の段は RetDec 段と観測済み。下記「経路の段の特定」)。`6cefb0` の OOB がこの分岐差から来るという因果も未検証。
+- **影響**: 修復の範囲 (ldfix 型か否か) は暫定でも判定しない (pass 未特定・因果未検証)。survey 再測定と退行確認は、修復を入れたときに行う。本 run では修復を入れていない (受入条件 2 は対象外)。
 - **起票**: 残り (型推定で byte 値が ptr 化される欠陥の特定と修復、280/659 の ok 化) は子 issue に分割する。
+- **経路の段の特定 (#1081)**: 置換が起きた段を RetDec 段と観測した。pass・関数の特定は未完 (#1293 へ)。
+  - 観測の出所: 素材 `work-m11` (#516/#680 以前の生成物。生成 commit は未特定) の `boot1.lift.ll` と、その上流の RetDec 出力 `boot1.drc.ll` / `boot1.drc.c`。**この run では素材が無く再確認していない** (作成時の観測の記録)。
+  - 機械語 (PE `block00031_PE.bin`): `815050` の `8158f5: mov r8b, 1` → `8158f8: call 6cefb0`。`6cefb0` は `6cf021: cmp byte ptr [rcx+0x496], r8b` で第 3 引数を比較に使う。
+  - `boot1.drc.c` では `int64_t v69; // bp-255` → `function_6cefb0(v68, v68, &v69)`。`boot1.drc.ll` 126348 行でも `i64* nonnull %stack_var_-255`。よって `drc` (RetDec 出力) の段で既に alloca アドレスが第 3 引数に入っている。
+  - 段の根拠: `tools/m11/m11_lift.sh` は `RetDec → drc.ll → m2/ir_normalize.py → m5/ir5_patch.py → lift.ll` の順。`tools/m2/*.py` には alloca / inttoptr を扱う処理が無い (grep 済み)。`ir5_patch.py` の `patch_uninit_alloca` (L286-311) は未初期化 alloca からの **load** を 0 (`xor` / `inttoptr i64 0 to ptr`) に置換する処理で、store は補完しない。今回の call 引数 (alloca アドレス自体) は load ではないため、この関数は触れない。`ir5_patch.py` には他に `lift_residual_constexpr` / `lower_asm_store` / `xmm_arg_inject` / `redirect_calls` 等もあり、ir5 段全体で値を ptr 化しないとは言えない (L495-514 は iN→ptr を inttoptr 命令化する)。ir5 段が原因かは未判定。
+  - 仮説 (未検証): RetDec の型推定が `r8b` 即値の引数を `int64_t*` として扱い、slot アドレスに置換した。
+  - 鮮度: 素材の生成 commit は未特定。`git diff c4e93550 HEAD -- tools/m2 tools/m5 tools/m11` は本 PR で REPORT_683.md の 6 行のみだが、素材の生成 commit から HEAD までの差分は未確認 (lift 系の変更で行番号・有無が変わり得る。#729)。鮮度は未確定。
+  - 再現手順 (未実行。作成時に実際に使ったコマンドは記録していない。素材が揃えば次の形で再確認できる): capstone で PE の `0x815050` / `0x6cefb0` を逆アセンブルし、`work/boot1.drc.ll` と `work/boot1.drc.c` に対して `grep -n "stack_var_-255\|function_6cefb0" work/boot1.drc.ll` / `grep -n "bp-255\|function_6cefb0" work/boot1.drc.c` を実行する。
+  - 未完 (起票先): 因果 (この差が 6cefb0 の OOB の原因か)・置換を行った pass・修復・survey 再測定と退行確認は #1293 (`[M11-N80]`)。
