@@ -41,14 +41,24 @@ lea root を足して `call/jmp rel32` で広げ、新たに入った関数の l
 - **L-3 f80 (新規の観測)**: lea 由来の関数が x87 を含む。 Granulizer の `function_7442c0` / `function_7443e0`、Slicer の `function_7534f0` / `function_753610`、Slicer 2 の `function_851760` / `function_851880` は lea root (total に無い)、各 block の残り 1 本 (`function_7594e0` / `function_770e00` / `function_8527b0`) は total 内の関数で、**#537 の final.ll には f80 を含む関数が無かった** (f80 0)。
   lowering 前の `emcc -c` は `no libcall available for fmul with type f80` / `do not know how to soften fp_extend` で rc 1 になる。 そこで `lea_lift.sh` は f80 を検出した block に限り **`p0c/f80_lower.py` (x86_fp80→f64、#197 の成果物) を明示の段として通し**、judge には lowering 後の値を渡す (raw 値は CSV の `f80_raw` / `emcc_c_rc_raw` / `lowered` 列に残す)。
   **f80→f64 は拡張精度の丸めが変わり bit-exact を保証しない** (#197)。 通過 ≠ 正しさ。 3 block とも lowering の適用は機械的に通ったが、差分試験は範囲外。 **該当 3 block の PASS は lowering 後の値による** (judge.py の出力「lowering 後の値で判定した block」に列挙。 raw は `f80_raw` / `emcc_c_rc_raw`)。
-   **機序 (#742 で実測。 上の「残り 1 本が f80」は計数の誤りだった)**: 3 block の `function_7594e0` / `function_770e00` / `function_8527b0` は `p.final.ll` で **最後の define** に当たり、後ろの module 直下の `declare __frontend_reg_{load,store}.fpr(..., x86_fp80)` を `lea_lift.sh` の `\n(?=define )` 分割が関数に含めてしまう。 関数本体の f80 は 0。 **実際に f80 を含むのは lea root の 2 本 / block** (Granulizer `function_7442c0` / `function_7443e0`、Slicer `function_7534f0` / `function_753610`、Slicer 2 `function_851760` / `function_851880`)。 この計数の修正は追跡 #1033。
-    **x87 突合 (`sampler/f80_split.py`、関数単位)**: `x87_of()` は `va` から `.pdata` の関数終端 (無ければ `ret`) までを逆アセンブルし、range 外に出たら打ち切る。 返り値は `None` = range 外で未検査 (x87 の有無は不明)、`[]` = 検査済みで x87 なし。 実行 (Granulizer block 23658 の PE は `fl-win64` tar 内 `extracted/block23658_PE.bin`、ranges は pdata 終端から組んだ):
+   **機序 (前回 HEAD 7c7d2d7c の記録。 上の「残り 1 本が f80」は計数の誤りだった)**: 3 block の `function_7594e0` / `function_770e00` / `function_8527b0` は `p.final.ll` で **最後の define** に当たり、後ろの module 直下の `declare __frontend_reg_{load,store}.fpr(..., x86_fp80)` を `lea_lift.sh` の `\n(?=define )` 分割が関数に含めてしまう。 関数本体の f80 は 0。 **実際に f80 を含むのは lea root の 2 本 / block** (Granulizer `function_7442c0` / `function_7443e0`、Slicer `function_7534f0` / `function_753610`、Slicer 2 `function_851760` / `function_851880`)。 この計数の修正は追跡 #1033。
+    **x87 突合 (関数単位)**: `sampler/f80_split.py` の `x87_of()` は `va` から `.pdata` の関数終端 (無ければ `ret`) までを逆アセンブルし、range 外に出たら打ち切る。 返り値は `None` = range 外で未検査 (x87 の有無は不明)、`[]` = 検査済みで x87 なし。 PE は `fl-win64` tar 内 `extracted/block23658_PE.bin` / `block23662_PE.bin` / `block23663_PE.bin` を `tools/plugins/work/x87/` に展開して使う (gitignore)。 p.final.ll と lift 中間成果は本 run に無いため、突合は PE と pdata だけで行う。
+    再現: `python3 sampler/x87_check.py work/x87/block23658_PE.bin 7442c0 7443e0 7594e0` (他 block も同様)。 `f80_split.py` の実行例 (`mini.ll` は手書きの合成入力で、`function_7442c0` は x86_fp80 を含み `function_7594e0` は含まない。 実 p.final.ll ではない。 ranges は pdata から組んだ `7442c0-74436f,7594e0-7595c1`): `python3 sampler/f80_split.py work/x87/block23658_PE.bin work/x87/ranges.txt work/x87/mini.ll` → `defines=2 body_f80_funcs=1 {'function_7442c0': 1}`、`function_7442c0: machine x87 mnemonics=['faddp', 'fcompp', 'fld', 'fmul', 'fnclex', 'fst', 'fstp', 'fsubp', 'fxch']`。 `x87_check.py` の実行出力 (HEAD: 本 commit):
     ```
-    $ python3 sampler/f80_split.py block23658_PE.bin ranges.txt mini.ll   # mini.ll = function_7442c0 (x86_fp80 を含む) と function_7594e0 (含まない) の 2 本
-    mini.ll: defines=2 body_f80_funcs=1 {'function_7442c0': 1}
-      function_7442c0: machine x87 mnemonics=['faddp','fcompp','fld','fmul','fnclex','fst','fstp','fsubp','fxch']
+    PE=work/x87/block23658_PE.bin ImageBase=0x400000 pdata_funcs=13996
+    0x7442c0 in_pdata=True func_bounded=['faddp', 'fcompp', 'fld', 'fmul', 'fnclex', 'fst', 'fstp', 'fsubp', 'fxch'] old_range_400B=['faddp', 'fcompp', 'fld', 'fmul', 'fnclex', 'fst', 'fstp', 'fsubp', 'fxch']
+    0x7443e0 in_pdata=True func_bounded=['fadd', 'faddp', 'fchs', 'fcompp', 'fld', 'fmul', 'fnclex', 'fstp'] old_range_400B=['fadd', 'faddp', 'fchs', 'fcompp', 'fld', 'fmul', 'fnclex', 'fstp']
+    0x7594e0 in_pdata=True func_bounded=[] old_range_400B=[]
+    PE=work/x87/block23662_PE.bin ImageBase=0x400000 pdata_funcs=14216
+    0x7534f0 in_pdata=True func_bounded=['faddp', 'fcompp', 'fld', 'fmul', 'fnclex', 'fst', 'fstp', 'fsubp', 'fxch'] old_range_400B=['faddp', 'fcompp', 'fld', 'fmul', 'fnclex', 'fst', 'fstp', 'fsubp', 'fxch']
+    0x753610 in_pdata=True func_bounded=['fadd', 'faddp', 'fchs', 'fcompp', 'fld', 'fmul', 'fnclex', 'fstp'] old_range_400B=['fadd', 'faddp', 'fchs', 'fcompp', 'fld', 'fmul', 'fnclex', 'fstp']
+    0x770e00 in_pdata=True func_bounded=[] old_range_400B=[]
+    PE=work/x87/block23663_PE.bin ImageBase=0x400000 pdata_funcs=17676
+    0x851760 in_pdata=True func_bounded=['faddp', 'fcompp', 'fld', 'fmul', 'fnclex', 'fst', 'fstp', 'fsubp', 'fxch'] old_range_400B=['faddp', 'fcompp', 'fld', 'fmul', 'fnclex', 'fst', 'fstp', 'fsubp', 'fxch']
+    0x851880 in_pdata=True func_bounded=['fadd', 'faddp', 'fchs', 'fcompp', 'fld', 'fmul', 'fnclex', 'fstp'] old_range_400B=['fadd', 'faddp', 'fchs', 'fcompp', 'fld', 'fmul', 'fnclex', 'fstp']
+    0x8527b0 in_pdata=True func_bounded=[] old_range_400B=[]
     ```
-    同じ PE で、各 VA を関数単位 (`func_bounded`) と旧方式相当の 0x400 B 固定 range (`old_range_400B`) で比べた結果 (一時スクリプト `x87cmp` / `x87old`):
+    同じ PE で、各 VA を関数単位 (`func_bounded`) と旧方式相当の 0x400 B 固定 range (`old_range_400B`) で比べた結果 (`sampler/x87_check.py`):
     | block | VA | func_bounded | old_range_400B |
     |---|---|---|---|
     | 23658 | 7442c0 | 9 種 (fld/fmul/faddp/fstp 他) | 同じ |
@@ -61,7 +71,7 @@ lea root を足して `call/jmp rel32` で広げ、新たに入った関数の l
     **旧方式との差は今回の 9 本では出なかった** (隣接関数に x87 が無いため)。 関数単位に直したのは、隣接関数の x87 が混ざりうる構造上の欠陥を塞ぐためで、混入の実例は本 run では確認していない。 3 名指し関数は `[]` (関数本体に x87 なし)、範囲外の `None` は 0 件。
     **再現できなかった点**: 段ごとの f80 数値 (7442c0 / 7443e0 の `p.drc.ll` 36 / 100 → `p.lower.ll` 0、total 158 / 190 / 193) は、lift 中間成果 (`work/sampler/lea/*`・`p.final.ll`) と RetDec が本 run の runner に無いため再実行できず、前回記録値のまま (未再測定)。
    **段ごと**: Granulizer では 7442c0 / 7443e0 の x86_fp80 が RetDec の `p.drc.ll` で既に 36 / 100 あり、以後の pass 鎖で 35 / 100 のまま、`f80_lower.py` (`p.lower.ll`) で 0。 **差の起点は RetDec decode 段**で、我々の pass ではない。
-   **#537 との差**: #537 の閉包 (`total`) は lea root の 2 本を含まない。 `total` の `p.final.ll` を同じ手順で lift すると f80 関数は 0 (Granulizer 158 define / Slicer 190 / Slicer 2 193)。 #537 の f80 0 は再現した (同値) が、x87 関数が閉包に入っていないことの反映で、lift の誤りではない。 同一関数 `function_7594e0` の本体は total と total2 で同一 (diff は declare 行のみ)。
+   **#537 との差**: #537 の閉包 (`total`) は lea root の 2 本を含まない。 `total` の f80 関数数は前回記録値 (HEAD 7c7d2d7c) で 0 (Granulizer 158 define / Slicer 190 / Slicer 2 193)。 x87 関数が閉包に入っていないことの反映で、lift の誤りではない。 同一関数 `function_7594e0` の本体は total と total2 で同一 (diff は declare 行のみ)。 本 HEAD では再測定していない (上の「再現できなかった点」を参照)。
    **CSV の注意**: `lea_lift.sh` の `f80_funcs` / `f80_raw` 列は上記の計数で 1 block あたり +1 (実数 2 → CSV 3)。 判定 (judge) は lowering 後の値 0 で通るため結論には影響しない。 計数の修正は未対応 (結論に影響なし。 `lea_lift.sh` の計数を `f80_split.py` の関数本体計数に差し替えるのは後続の小修正)。
 - 未実装 helper は main 上で 0 (`rep_stosb_memset` は #629 で実装済み、§6b)。 旧基点 (042f869) では Granulizer・Slicer 各 1 だった (#538 は解消済み)。
 
