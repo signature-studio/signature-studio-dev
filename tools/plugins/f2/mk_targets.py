@@ -18,6 +18,8 @@ REPO = os.path.abspath(os.path.join(PLUGINS, '..', '..'))
 sys.path.insert(0, os.path.join(PLUGINS, '..', 'shared'))
 from paths import FL_WIN64_DIR  # noqa: E402
 W = os.path.join(PLUGINS, 'work')
+# 0x5de250 (block 19006) の回帰の機序が未確定のため、この block だけ従来の RVA 配置に戻す (#871 方式 (a'))
+RVA_MODE_BLOCKS = {19006}
 
 
 def build_image(path, to_rva):
@@ -109,7 +111,8 @@ def main():
     rel = lambda p: os.path.relpath(p, REPO)
     for b in blocks:
         pe_path = os.path.join(FL_WIN64_DIR, 'extracted', 'block%05d_PE.bin' % b)
-        img, info = build_image(pe_path, to_rva=False)
+        rva_mode = b in RVA_MODE_BLOCKS
+        img, info = build_image(pe_path, to_rva=rva_mode)
         ip = os.path.join(W, 'f2', 'image', '%d.bin' % b)
         open(ip, 'wb').write(img)
         bd = os.path.join(W, 'batch', str(b))
@@ -132,7 +135,7 @@ def main():
             'pe': '${FL_WIN64_DIR}/extracted/block%05d_PE.bin' % b,
             'ir': rel(ir_path),
             'image': rel(ip),
-            'wasm_origin': '0x%x' % pe.OPTIONAL_HEADER.ImageBase,
+            'wasm_origin': '0x0' if rva_mode else '0x%x' % pe.OPTIONAL_HEADER.ImageBase,
             'fn_prefix': 'function_',
             'initial_memory': 671088640,   # ld_wasm.c の g_inbuf 192MB + g_heap 96MB + image が収まる最小級 (m11.json と同値)
             'simd': {'gen': 'cat %s' % rel(os.path.join(bd, 'p_simd.c')), 'ir': rel(ir_path),
