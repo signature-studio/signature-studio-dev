@@ -71,3 +71,10 @@ LD_M11_PE=$FL_WIN64_DIR/extracted/block00031_PE.bin python3 tools/m11/trap_triag
 - 測定 commit: `9aad4595` (§1・§2 の測定)。検証 HEAD: `b55c9f7c` (main `d7d91d26` を取り込み)。
 - `git diff --stat 9aad4595 b55c9f7c -- tools/m11/m11_gen_ir2.sh tools/m11/m11_build.sh tools/m11/trap_triage/ tools/shim tools/m11/*.py tools/m11/*.sh`: 出力は `tools/m11/trap_triage/REPORT_1046.md` (+67) と `REPORT_714.md` (+42) のみ。コード差分 0。
 - 同範囲外の差分 (`tools/shared/lift/libkio/*`・`tools/m11/ldfix/ldfix_509_e2e.sh`) は m11 の IR 生成・build・survey から参照されない (`grep` で 0 件)。
+
+## 9. 再着手 run の追加測定 (HEAD `a647ceba`、コード変更なし)
+
+- 再現: `m11_gen_ir2.sh` rc 0 (36.6 s、490,693 行) → `m11_build.sh` rc 0 (wasm-ld signature mismatch 0・undefined 0) → `survey_units.mjs` rc 0 (9.9 s)。結果 `ok 870 / oob 16 / halt0 7 / miss 47 / other 1 / noproc 1` で §2 と一致。
+- `.data` の表 (RVA `0xfac120` / `0xfac158`) の中身は絶対 VA (`0x4260f0`, `0x426100`, … / `0x426160`, `0x426170`, …、ImageBase `0x400000` 付き)。RVA の `.text` では読めず `.data` 配置で読んだ。§5-2 の「6 要素のポインタ配列」は同じ値で、表が VA を格納している点を追記する。
+- `SV_ONLY=492 SV_TRACE_AT=492` の単独実行: `oob` 1 件のみ (trace 行 4 件)。全 unit 実行の `SV_TRACE_AT=492` では trace 行 `[m11][UStrAsg]` が 146 件 (dest/src の 0 が 24 件、`src=0x10e1ac` が 9 件)。ただし unit 境界の行が出ないため、unit 492 の OOB 直前の `UStrAsg` を切り出せなかった。
+- 結論: 受入 1 (OOB 入力値 `src`) は未達のまま。入力値を取るには `function_4133f0` の入口で unit 番号つきの値を記録するビルドが要る (`m11_ov.c` の `M11_TRACE` は unit 番号を出さない)。受入 2・3 も未達。未解決は #1288 (`[M11-N79]`) に残す。
