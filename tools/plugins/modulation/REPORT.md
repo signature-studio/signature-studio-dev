@@ -1,11 +1,11 @@
 # tools/plugins/modulation/REPORT.md — PLG-F5 (#202) modulation 8 本: lift 前提の実測
 
-- 日付: 2026-10-13 / 担当 dir: `tools/plugins/modulation/` のみ (+ `docs/DOC_MAP.md` の索引 1 行) / 検証起点 commit: **8603db1** (スクリプト一式。 main の #514 (237010e) マージ後の判定修正と reach_check.py を含む) / 最新の検証 HEAD: **648383c** (main merge 版。 §6 に実測)
+- 日付: 2026-10-13 / 担当 dir: `tools/plugins/modulation/` のみ (+ `docs/DOC_MAP.md` の索引 1 行) / 検証起点 commit: **8603db1** (スクリプト一式。 main の #514 (237010e) マージ後の判定修正と reach_check.py を含む) / 最新の検証 HEAD: **b9fe1d8** (main の lift 鎖変更を取り込んだ版。 §6 に実測)
 - 再現: `bash tools/plugins/modulation/modulation_e2e.sh` (判定 + 実測) / `bash tools/plugins/modulation/modulation_nega.sh` (ネガティブコントロール) / `python3 tools/plugins/modulation/report_tables.py` (§1〜§4 の表)
 - 素材: `fl-win64` / `toolchain-retdec` (`[RETDEC]`) / `toolchain-emsdk` (`[EMSDK]`) (`docs/WORKFLOW.md` §11、 パスは `docs/REFERENCES.md`)。環境は `modulation/env.sh`
 - 方法の出典: PR #506 (PLG-F3 dynamics、マージ済) の `dynamics_e2e.sh` / `matrix_check.py` / `ids_crosscheck.py` と、PR #504 (PLG-F2、マージ済) の間接 call 監査。#506 の reviewer 指摘 (§5) は最初から回避した
 - 既知類型との関係: **(icall §4) D1 = 間接 call/jmp 脱落**は従来鎖 (`PLUG_ICALL=0`) で 8/8 本再現、 main の既定鎖 (#514 で復元を接続) では 0/8 本 (§3.2)。 (DEFECTS.md) D1〜D16 に該当する新規類型なし。
-  engine の `emcc -c` 失敗 2 類型 (§4) は emcc が拒否する loud な IR 型エラーで silent miscompile ではない (差分試験は未実施)
+  engine の `emcc -c` 失敗 (§4) は emcc が拒否する loud なエラーで silent miscompile ではない (差分試験は未実施)
 
 ## 0. 結論 (先出し)
 
@@ -21,7 +21,7 @@
 5. **SIMD kernel 表への依存: 閉包 + frontier の中では Fruity Flangus だけ** (閉包内 3 site / 3 変数。他 7 本は 0 site)。**ただし frontier より深い framework 関数に kernel 呼出がある**。
    Frequency Shifter / Hyper Chorus の kernel 呼出 5 site は閉包・frontier の外の 4 関数ずつにあり (framework 共通ハッシュ、33〜42 DLL が同一)、うち 3 関数 (4 site) は閉包から frontier の薄いラッパー経由の direct call で到達する (§3.1・§3.3)。
    よって FS / HC が kernel に依存しないとは言えず、**未確定**。
-6. **C++ engine 4 本 (全て MSVC) は RetDec まで通るが `emcc -c` は 0/4 本** (§4)。4 本とも同じ 2 類型の IR 型エラーが連鎖し (PR #506 の Transient engine と同型)、VEX の未実装 helper が 50〜71 (distinct、648383c)、`.pdata` で define が無い range が各 2 件ある。
+6. **C++ engine 4 本 (全て MSVC) は RetDec まで通り、`emcc -c` は 2/4 本** (18977・19143 が rc 0)。19266・19268 は f80 (x87) 系のエラー (`fp_extend` / `frem` / `fp_round`) で失敗する (§4)。VEX の未実装 helper は 50〜71 (distinct、648383c)、`.pdata` で define が無い range が各 2 件ある。
    殻の DSP 本体は engine 側にあるため、**殻 8/8 の通過は「8 本が wasm 化できる」を意味しない**。T1 の Hyper Chorus の見積りにこの engine の工数が含まれるかは未確認。
 7. **閉包の境界**: frontier の先で、framework 共通ハッシュに一致しない関数 (hash < 13 DLL) が閉包から direct call で到達する (8/8 本、計 61 関数 / 26,713 B、§3.3)。`plugin_closure.py` の閉包にも frontier にも入らない。追跡 issue の起票は PM 依頼 (§7)。
 
@@ -149,21 +149,20 @@ define = `p.final.ll` の `^define` 数。f80 = `x86_fp80` を含む define 数�
 | Vintage Chorus | 19266 | 204,800 | 127,663 | 542 / 115,986 | VSTPluginMain, main | 73 |
 | Vintage Phaser | 19268 | 313,344 | 157,493 | 626 / 141,439 | VSTPluginMain, main | 73 |
 
-`engine_lift.sh <block>` で全 `.pdata` 関数を `lift_ranges.sh` (RetDec+pass 鎖) → `emcc -c` に通した結果。RetDec rc・define 数・欠落 range・f80・`emcc -c` の結果は 519b3aa (3 回)・8603db1 (1 回)・648383c (1 回) で同一。未実装 helper の件数だけは main の m11_simd2 変更 (a824a1d / 9b5ea38、#535 / #538) の前後で変わった (8603db1 の値は 86 (60) / 75 (57) / 64 (53) / 104 (77))。下表は 648383c の値。lift 秒は全測定の min–max:
+`engine_lift.sh <block>` で全 `.pdata` 関数を `lift_ranges.sh` (RetDec+pass 鎖) → `emcc -c` に通した結果。RetDec rc・define 数・欠落 range・f80 は 519b3aa・8603db1・648383c・b9fe1d8 で同一。未実装 helper は main の m11_simd2 変更 (a824a1d / 9b5ea38、#535 / #538) で変わった (8603db1 の値は 86 (60) / 75 (57) / 64 (53) / 104 (77)、648383c 以降は下表の値)。`emcc -c` は 8603db1・648383c では 0/4 本だったが、main の lift 鎖変更 (`fix_icmp_ptr.py` P-E1 / `ir5_patch.py` P-F1・P-F2、`PLUG_F80_LOWER` は既定 0) を取り込んだ b9fe1d8 で 2/4 本になった (下表は b9fe1d8 の値)。lift 秒は全測定の min–max:
 
 | engine | RetDec rc | final.ll define | `.pdata` で define 無し (B) | range 内部に増えた define | f80 関数 | 未実装 helper (うち VEX) | `emcc -c` | 局所修復後の `emcc -c` | lift 秒 |
 |--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|
-| 18977 (Frequency Shifter) | 0 | 442 | 2 / 418 (777) | 24 | 0 | 70 (55) | 1 (失敗) | 1 (失敗) | 16–17 |
-| 19143 (Hyper Chorus) | 0 | 465 | 2 / 445 (91) | 20 | 0 | 64 (52) | 1 (失敗) | 1 (失敗) | 15–16 |
-| 19266 (Vintage Chorus) | 0 | 573 | 2 / 542 (159) | 31 | 1 | 60 (50) | 1 (失敗) | 1 (失敗) | 18 |
-| 19268 (Vintage Phaser) | 0 | 657 | 2 / 626 (420) | 31 | 1 | 92 (71) | 1 (失敗) | 1 (失敗) | 20–22 |
+| 18977 (Frequency Shifter) | 0 | 442 | 2 / 418 (777) | 24 | 0 | 70 (55) | 0 (成功) | 0 (適用 0 件) | 16–17 |
+| 19143 (Hyper Chorus) | 0 | 465 | 2 / 445 (91) | 20 | 0 | 64 (52) | 0 (成功) | 0 (適用 0 件) | 15–16 |
+| 19266 (Vintage Chorus) | 0 | 573 | 2 / 542 (159) | 31 | 1 | 60 (50) | 1 (失敗) | 1 (失敗、適用 0 件) | 18 |
+| 19268 (Vintage Phaser) | 0 | 657 | 2 / 626 (420) | 31 | 1 | 92 (71) | 1 (失敗) | 1 (失敗、適用 0 件) | 20–22 |
 
+- `emcc -c` の列は b9fe1d8 の実測 (`engines.csv`)。8603db1・648383c の 0/4 本から変わった。旧記述 (4 本とも E1 → E2) は P-E1 の共有鎖取り込み後は成り立たず、`engine_fixcmp.py` は 0 件 (E2 は b9fe1d8 で未確認: 19266・19268 は f80 で止まり、18977・19143 は emcc が通る)。
 - `.pdata` で define 無し = `function_<開始VA>` の define が final.ll に無い range 数 (`engine_defs.py`。分母は `.pdata` 関数数、括弧は欠けた range の合計 B)。4 本とも欠けた 2 件は call 先として参照されない (missing_ref 0)。原因 (RetDec の関数境界統合 / 復号失敗) は未調査。
-- 失敗の連鎖 (clang は最初の型エラーで止まるため 1 件ずつ露見。**4 本とも同一の 2 類型**):
-  1. `icmp eq ptr %x, %arg3` (`%arg3` は i64 仮引数) → "defined with type 'i64' but expected 'ptr'"。`engine_fixcmp.py` (engine 局所 pass、共有鎖には未組込) で 4 本とも各 4 operand を直す。
-  2. 直した後は `__asm_rep_stosq_memset` 呼出の引数が SSA 値を含む `zext` 定数式 → "zext constexprs are no longer supported" (4 本とも `e.fixcmp.ll` の同じ桁位置 87)。
-- VEX (AVX/FMA) の未実装 helper は distinct で 50〜71 (648383c)。CPUID 分岐で SSE 路に固定できるかは未確認 (T1 の AVX 2 種は CPUID 分岐で SSE 路固定と `plugins/REPORT.md` §4.3 に記録あり)。
-- f80 関数は Vintage Chorus の `function_18001c320` と Vintage Phaser の `function_1800218a0` (各 209 行) の 1 本ずつで、#197 の `f80_lower.py` の適用対象。
+- 失敗した 2 本 (19266・19268): 最初のエラーは `e.final.ll` の `emcc -c` (`first_errors.txt`) で、E1 (icmp ptr/i64) でも E2 (zext 定数式) でもない。エラーは 4 件 (`4 errors generated.`): `do not know how to soften fp_extend` ×2、`no libcall available for frem with type f80` ×1、`no libcall available for fp_round with type f80` ×1。どちらも `e.final.ll` に x86_fp80 を含む define が 8 個ある (`grep -c x86_fp80`) うちの、どの関数で出たかは未特定。f80 型の演算の legalize 失敗で、#197 の `f80_lower.py` (f80 → f64) の対象と見られる (未検証)。
+- VEX (AVX/FMA) の未実装 helper は distinct で 50〜71 (648383c・b9fe1d8 とも同値)。CPUID 分岐で SSE 路に固定できるかは未確認 (T1 の AVX 2 種は CPUID 分岐で SSE 路固定と `plugins/REPORT.md` §4.3 に記録あり)。
+- f80 関数は Vintage Chorus の `function_18001c320` と Vintage Phaser の `function_1800218a0` の 1 本ずつ (#197 の対象)。
 - 以上は到達性の実測で、engine の正しさは何も示していない。
 
 ## 5. 判定 (gate) の設計と PR #506 の reviewer 指摘への対応
@@ -184,12 +183,13 @@ define = `p.final.ll` の `^define` 数。f80 = `x86_fp80` を含む define 数�
 e2e の exit 0 が意味するのは「殻 8 本の judge / matrix_check / ids_crosscheck が全て合格し、`icall_check.py --gate` (脱落 0) と `reach_check.py` の検算が通り、engine 4 本の測定行が揃った」ことだけで、
 **閉包の取りこぼし (leak) と engine の `emcc -c` 結果は判定に含めない**。最終行にこの 2 つの件数を併記する (実行例は §6)。
 
-## 6. 検証 (スクリプトは 8603db1 から不変。 検証は 8603db1 と HEAD 648383c の 2 起点・4 core / 15 GiB の Actions runner・測定中は本検証の 1 プロセス列のみ)
+## 6. 検証 (スクリプトは 8603db1 から不変。 検証は 8603db1・648383c・b9fe1d8 の 3 起点・4 core / 15 GiB の Actions runner・測定中は本検証の 1 プロセス列のみ)
 
 | 項目 | 実測 |
 |---|---|
 | main (237010e = #514) を merge した 0e1e2f1 の `modulation_e2e.sh` (inventory 生成から) | **exit 1**、9 分 44 秒。judge が `batch_lift.sh` の 12 列ヘッダ (`icall,dispatch_calls` 追加) を入力不正として拒否。`judge.py` が 10 / 12 列を受理するよう修正 (NC3-9 / NC3-11) |
 | 修正後 (8603db1、inventory 済み) の `modulation_e2e.sh` 全体 | exit 0、**331 s** (`elapsed=331s`、終了時 load average 1.01 / 1.51 / 3.13、開始時は未記録)。判定 8/8・matrix 68/68・ID 8/8・icall 脱落 0/8 本・reach_check 検算 OK・engines の `emcc -c` rc=0 は 0/4 本。1 回のみ (n=1) |
+| 検証 HEAD **b9fe1d8** (main の lift 鎖変更を取り込んだ版) の `modulation_e2e.sh` (inventory 生成から、`work/` 無し、`tools/plugins/work/` を削除してから実行) | **exit 0、617 s** (`elapsed=617s`、終了時 loadavg 1.35 / 5.38 / 4.29、n=1)。judge 8/8・matrix 68/68・ID 8/8・icall 脱落 0/8 本 (静的 240 → IR 240)・reach_check 検算 OK・leak 8/8 本・engines の `emcc -c` rc=0 は **2/4 本** (18977・19143 が 0、19266・19268 が 1)。`modulation_nega.sh` も **exit 0、34 s** (`nega_gates: OK (0 件不一致)`) |
 | main merge 版 HEAD **648383c** の `modulation_e2e.sh` (inventory 生成から、`work/` 無しの worktree) | **exit 0、869 s** (`elapsed=869s`、終了時 loadavg 1.05 / 4.95 / 5.19、n=1)。judge 8/8・matrix 68/68・ID 8/8・icall 脱落 0/8 本 (静的 240 → IR 240)・reach_check 検算 OK・leak 8/8 本 (計 61 関数 / 26,713 B)・engines の `emcc -c` rc=0 は 0/4 本。`modulation_nega.sh` も **exit 0、45 s** (`nega_gates: OK`) |
 | 内訳 | `reach_check.py` 単体は 102.9 s / 105.2 s (2 回)。8 本の lift は 41 s (2 回とも)。engine 4 本の lift は 16 / 15 / 18 / 21 s |
 | `facts.json` | sha256 `c9911472…a8aa8` は 519b3aa の記録と一致 |
@@ -218,7 +218,7 @@ e2e の exit 0 が意味するのは「殻 8 本の judge / matrix_check / ids_c
 | 差分試験 bit-exact (出口条件 3)。Eff_Render 単位の native (ms_abi VA 敷設) ⟷ wasm harness が無く、P0a/P0b/P0c が OPEN | #202 を閉じられない | #195 / #196 / #197 の完了後に #202 を再開 (Closes はその時)。harness は #506 が PM に起票依頼済みの「[PLG-F3a] Eff_Render 単位 native ⟷ wasm 差分 harness」を本 8 本にも適用 (PM 未起票) |
 | Render test .flp の E2E (出口条件 4) | 同上 | FLEngine 統合待ち。#202 を継続 |
 | 間接 call 脱落: 従来鎖 (`PLUG_ICALL=0`) で静的 240 site → IR 0 (8/8 本)、既定鎖 (PR #539) で 0/8 本 | 解消済み (e2e が回帰ゲート) | #514 は PR #539 でマージ済みだが issue は OPEN。close は PM 判断 |
-| engine 4 本の `emcc -c` 未通過 (E1 → E2、VEX 50〜71、define 無し各 2) と殻との結合方式 (殻の dynload 2) | 4 本 (うち Hyper Chorus は T1) | **#527 [PLG-F5-2] (本 run で起票)**。同型 #523 / #506 提案の PLG-F3b と PM が統合判断 |
+| engine 4 本のうち 2 本 (Vintage Chorus / Vintage Phaser) の `emcc -c` 未通過 (f80 系: fp_extend / frem / fp_round、b9fe1d8)、VEX 50〜71、define 無し各 2、殻との結合方式 (殻の dynload 2) | 4 本 (うち Hyper Chorus は T1) | **#527 [PLG-F5-2] (本 run で起票)**。同型 #523 / #506 提案の PLG-F3b と PM が統合判断。f80 の 2 本は #197 にも関係する |
 | Vintage Chorus / Phaser の engine の f80 各 1 関数 | engine の wasm 化 | #197 (コメント済み) |
 | Fruity Flangus の kernel 3 変数 (6 実装、うち 0x5dea40 は x87 を含む) の差分試験記録が `p0c/REPORT.md` に無い | Flangus の kernel 保証 | #197 (コメント済み) |
 | host slot 0x120 (Frequency Shifter 1 site) と 0x100 / 0x108 (Flangus・Hyper Chorus 各 1 site) の意味 | host 結合 | #196 (コメント済み) |
@@ -233,8 +233,8 @@ e2e の exit 0 が意味するのは「殻 8 本の judge / matrix_check / ids_c
 
 | 類型 | 症状 | 観測 | 検出信号 | 修復 |
 |---|---|---|---|---|
-| E1 icmp ptr/i64 混在 | `icmp eq ptr %x, %argN` (argN は i64) | 本 4 engine で各 4 operand (PR #506 の 2 engine も同型) | emcc "defined with type 'i64' but expected 'ptr'" | `engine_fixcmp.py` (局所)。`fix_ptr_params.py` の拡張が本筋 |
-| E2 SSA 値入りの定数式 | `__asm_rep_stosq_memset` の引数に `zext (… i64 %v …)` | 本 4 engine (E1 を直した直後に露見) | emcc "zext constexprs are no longer supported" | 未修復 |
+| E1 icmp ptr/i64 混在 | `icmp eq ptr %x, %argN` (argN は i64) | 本 4 engine で各 4 operand (PR #506 の 2 engine も同型) | emcc "defined with type 'i64' but expected 'ptr'" | 共有鎖 `fix_icmp_ptr.py` (P-E1、main 取り込み済み)。b9fe1d8 で `engine_fixcmp.py` は 0 件 |
+| E2 SSA 値入りの定数式 | `__asm_rep_stosq_memset` の引数に `zext (… i64 %v …)` | 8603db1 時点の 4 engine (E1 を直した直後に露見)。b9fe1d8 では未確認 | emcc "zext constexprs are no longer supported" | 未修復 |
 
 ## 9. 成果物
 
