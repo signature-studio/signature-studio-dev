@@ -135,6 +135,28 @@ GitHub Actions runner (4 core, load 0.6–0.9)。素材は work-m11 スナップ
 | `unmatched` 22 / `no_pdata` 23 site | 突合不能 | 同上 |
 | #122 差分ハーネスで 0 詰め箇所を優先検証 | 未実施 (本 PR は survey の unit 比較まで) | #131 コメント |
 
+### 基準 (before) #1430: xmm 引数の callee 署名復元の前測定
+既知類型との関係: 該当 (icall §4 の `callsite_arg_drop` = liftdiff 分類、本 §9 の xmm 退行行案の続き)。
+
+測定 commit `7e149974` (origin/main, 本 branch の起点)。`work-m11` は `lift_pe.sha256`・`functions_dll.csv`・`ir_conditions.json` を含まないため `m11_e2e.sh --full` の全再生成経路に入った。`functions_dll.csv` は Ghidra 12.1.4 (公式 zip sha256 `ddac49f9…` 一致) + JDK 21 + `tools/m2/ghidra_scripts/DumpFunctions.java` で作成 (9 分 37 秒、59,010 行)。
+
+| 項目 | 実測 |
+|---|---|
+| `m11_e2e.sh --full` (`7e149974`) | 626.99 秒 (10 分 27 秒), rc 0, load 0.68 |
+| survey (全再生成直後, unit 別 942 本) | **ok 872 / trap 23 / miss 46 / noproc 1** (trap 内訳 OOB 15 / Halt0 7 / unreachable 1) |
+| survey (増分再実行, unit 別 JSON 出力) | 46.94 秒, ok 872 / trap 23 / miss 46 / noproc 1 (全再生成直後と一致) |
+| 0 詰め site / 引数 (`m11_sigfix_stats.sh`, 同 HEAD) | **1,061 site / 2,084 引数** (argrecover 突合 1,016 site, 引数 1,983 = callee_unused 313 / inherit 1,185 / set_const 18 / set_const_xmm_callee **49**) |
+| unit 838 / 882 / 885 | ok / ok / ok (基準の退行チェック対象) |
+
+注記:
+* §9 (3e49295) の記録 (1,049 site / 2,064 引数 / set_const_xmm_callee 48 / survey ok 812) とは HEAD の差で数値が動いている。本表は `7e149974` の値で、比較の基準はこちら。
+* 統計スクリプトで `tools/m11/results/sigfix_zeropad_remaining.tsv` が 1,050 → 1,062 行に再生成された (未コミット。再生成物のため本 PR に含めない)。
+* 再測定 (after) と `fix_xmm_args.py` の接続は本 run では時間が足りず未実施 (下記の子 issue)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| xmm 引数を読む callee の署名復元 (`fix_xmm_args` 接続 or 同等) と unit 別の after 測定 (unit 838/882/885 を含む) | set_const_xmm_callee 49 引数が未解決 | 子 issue (本 PR で起票) |
+
 ---
 
 ## 10a. (REPORT.md §10 から分割移動) #132: commit 別の測定表と注記
