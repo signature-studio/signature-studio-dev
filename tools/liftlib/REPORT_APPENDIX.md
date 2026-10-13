@@ -163,20 +163,24 @@ RetDec は `void(i128,i128,i8)` と lift し ECX/EFLAGS を捨てる → **void 
 
 `regress` の `ott_auto_none` (旧既定 `--auto none`) は FAIL (census junkHi 175)。reviewer が origin/main `89a1a30` でも census 値まで同一の FAIL を確認しており、**本 PR 起因ではない** (追跡: #478)。
 
-**#478 の途中調査 (未解決・素材不足で停止。以下の仮説は推定で、未実測)**:
+**#478 の調査結果 (本 run の再測定: 現 main では `ott_auto_none` は再現しない。元の FAIL の環境差は未特定)**:
 
-| 項目 | 内容 |
-|---|---|
-| 実測 (本 run, 検証起点 `d5e6f98`) | 既存スナップショット `tools/liftlib/work/ott/ott_gen.cjs` に `e2e_check.mjs` / `m10_coefdump.mjs`+`m10_coefref.py` / `e2e_trap10.mjs` を直接実行: checks 8 / broken 0, maxdev 0.0 / nbad 0, trap_rc 0, census[0x248]=0 junkHi 175 (m10 旧 chain 参照値と同値)。real 1.027 秒 (e2e_check のみ, load 0.37) |
-| コード読み (`cli.py` `cmd_ott`) | `--auto none` の合否に census 閾値は無い。`r["pass"]` (checks/maxdev/nbad/trap) と `all(v is True for v in ident.values())` (7 段 IR 一致) と outhash 突合のみ。junkHi 175 は表示値で FAIL 条件ではない |
-| 推定 (原因) | `ident` の参照は `tools/m6/work/{ott_lift,ir7e_p1..p3,ott_memfix0,1}.ll` と `tools/m10/work/ott_m10.ll`。ファイルが無いと `same()` は `None` を返し `is True` 判定が False になるため FAIL する。`tools/m10/work` はどの `oc_artifacts` 名にも含まれない (`docs/WORKFLOW.md` §11)。Actions 上では常に FAIL になる可能性 |
-| 未実施 | 上記の確認 (`ident` の実値出力) と修正・ネガコン。`tools/m6/work` が無く `python3 -m liftlib ott --auto none` が ott.drc.ll の読込で止まる |
+検証起点 HEAD `58be557` (origin/main `c4404a7` を merge 済み。`tools/liftlib` の差分なし)、nproc=4、並列なし。素材は PR 本文の `oc_artifacts` 7 本 (`plugins-ott`・`toolchain-emsdk`・`toolchain-retdec`・`work-liftlib`・`work-liftlib-targets`・`work-m6-ott`・`analysis-ott-binaries`)。
+`tools/{m6,m8,m9,m10,ott,liftlib}/work` と `OTT_vst2_win64.dll` の実在を `ls` で確認した (`tools/m10/work` は `work-m6-ott` が供給する)。
+
+| 実行 | 結果 | real (load 実行前) |
+|---|---|---|
+| `python3 -m liftlib ott --auto none` (依存未導入) | `liftlib/pe.py:10 import pefile` で `ModuleNotFoundError` (ott.drc.ll の読込には到達しない) | — |
+| 同 (pefile/capstone/numpy を `$RUNNER_TEMP` の uv venv に導入、node は `/opt/emsdk/node/24.19.0_64bit/bin`) | **RESULT: PASS (rc 0)**。IR 一致 O1/O2a/O2b/O2c/O3a/O3b/O4 全て `true`、checks 8 / broken 0、maxdev 0.0 / nbad 0、trap rc 0、census[0x248]=0 junkHi 175、outhash 42/42 equal (f0 21/21) | 9.207 秒 (load 1.25) |
+| `python3 -m liftlib regress` | `{"fa_gain":"PASS","kh_gain":"PASS","ott":"PASS","ott_auto_none":"PASS"}`、rc 0 | 31.283 秒 (load 1.09) |
+
+- コード読み (`cli.py` `cmd_ott`): `--auto none` の合否に census 閾値は無い。`r["pass"]` (checks/maxdev/nbad/trap) と `all(v is True for v in ident.values())` (7 段 IR 一致) と outhash 突合のみ。junkHi 175 は表示値で FAIL 条件ではない。
+- コード読み (`recipes/ott.py:57-60`・`cli.py:179`): 参照 `.ll` (`tools/m6/work/{ott_lift,ir7e_p1..p3,ott_memfix0,1}.ll`・`tools/m10/work/ott_m10.ll`) が無いと `same()` が `None` を返し FAIL する。これは参照欠落時の挙動で、**元の FAIL の説明としては未確認** (本 run は欠落状態を再現していない)。
+- 元の FAIL (census junkHi 175 を伴う FAIL 報告) は、素材・依存が揃った現 main では再現しない。元の run の素材構成・依存・HEAD との差は未特定 (推定: 素材欠落または依存未導入。未実測)。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `ott_auto_none` の FAIL 原因の実測特定 | #478 の受入条件 1〜3 が未達 | #478 (要 `oc_artifacts: work-m6-ott analysis-ott-binaries` を追加して再起動) |
-| `tools/m10/work` を供給する素材名が無い | `--auto none` の IR 一致・outhash 突合が Actions で成立しない可能性 | #478 にコメント (allowlist 追加は PM 判断, #293 系) |
-
+| 元の FAIL の環境差の切り分け (素材構成・依存・当時の HEAD の突合) | #478 の受入条件 1 の「FAIL 原因」は現 main で再現しないため確定できない。ott_auto_none を PASS にする修正 (条件 2) は現 main では不要 | #478 (not-reproducible で閉じるか環境差を追加調査するかは PM 判断) |
 
 **(3) 本更新 run の再測定** — HEAD `e86e6e8` (origin/main `91a83a5` を merge 済み)、nproc=4、並列なし。素材は `plugins-ott`・`toolchain-retdec`・`toolchain-emsdk`・`work-liftlib`・`work-liftlib-targets` のみ
 (RetDec の raw `.ll` は `work-liftlib` のキャッシュで `--fresh` ではない):
