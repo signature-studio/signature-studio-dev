@@ -27,24 +27,24 @@
 | unit | VA | 旧 (§8.2) 最上位 | 新 最上位 (trap 直上) | 生 stack の先頭 (wasm index, offset) |
 |--:|---|---|---|---|
 | 95 | 0x1d2680 | `536da0` | **`47ad70`** | [3067] 0x18f8df |
-| 149 | 0x264260 | `414bb0` | **`414ad0`** | [733] 0xbc57 |
-| 158 | 0x26d1a0 | `414bb0` | **`414ad0`** | [733] |
+| 149 | 0x264260 | `414bb0` | **`414ad0`** | [733] 0xbc57d |
+| 158 | 0x26d1a0 | `414bb0` | **`414ad0`** | [733] 0xbc57d |
 | 275 | 0x40e170 | `80e040` | **`864fe0`** | [388] 0x935bf |
-| 280 | 0x416010 | `414bb0` | **`414ad0`** | [733] |
-| 291 | 0x432660 | `4f9ff0` | **`4f9f40`** | [3134] 0x193.. |
-| 296 | 0x446130 | `4f9ff0` | **`4f9f40`** | [3134] |
-| 304 | 0x483140 | `4f9ff0` | **`4f9f40`** | [3134] |
+| 280 | 0x416010 | `414bb0` | **`414ad0`** | [733] 0xbc57d |
+| 291 | 0x432660 | `4f9ff0` | **`4f9f40`** | [3134] 0x193d5b |
+| 296 | 0x446130 | `4f9ff0` | **`4f9f40`** | [3134] 0x193d5b |
+| 304 | 0x483140 | `4f9ff0` | **`4f9f40`** | [3134] 0x193ccf |
 | 477 | 0x6bfd60 | `904190` | **`903d20`** | [5373] 0x2775c0 |
-| 555 | 0x7f2500 | `4f9ff0` | **`4f9f40`** | [3134] |
-| 659 | 0x8eaa30 | `414bb0` | **`414ad0`** | [733] |
+| 555 | 0x7f2500 | `4f9ff0` | **`4f9f40`** | [3134] 0x193ccf |
+| 659 | 0x8eaa30 | `414bb0` | **`414ad0`** | [733] 0xbc57d |
 | 895 | 0xeddfe0 | `40ffe0` | **`40ff70`** | [2001] 0x149cb9 |
-| 923 | 0xf6c660 | `4f9ff0` | **`4f9f40`** | [3134] |
+| 923 | 0xf6c660 | `4f9ff0` | **`4f9f40`** | [3134] 0x193ccf |
 
 ## 2. 最上位命令と caller 連鎖 (wasm バイトオフセット → 命令、`trap_triage/oob_insn.py`)
 
 命令境界の検証: 4 unit の offset はすべて命令境界に一致。境界でないオフセット `0x18f8e0` は `not an instruction boundary` で失敗 (ネガコン)。
 
-- **95** `function_47ad70` @ `0x18f8df` = `i64.load offset=0`。直前は `local.get 0; i64.const…; shl; i64.add`。
+- **95** `function_47ad70` @ `0x18f8df` = `i64.load offset=0`。直前は `local.get 5; i64.const 3; 0x86 (i64.shl); local.get 0; 0x7c (i64.add); 0xa7 (i32.wrap_i64)` (`oob_insn.py` の実出力)。`i32.wrap_i64` は `i64.add` の後・`i64.load offset=0` の前にある。
   ループ内で `*(arg0 + (v << 3))` を読む (v = record の `+8` の値)。caller: `536da0` ← `4fe150` ← `5d2680` (unit 本体)。
   この unit の直前に GDI 系 stub (GetDC / GetDeviceCaps / CreatePalette / GetStockObject / LoadIconW / MulDiv) が呼ばれる。
 - **275** `function_864fe0` @ `0x935bf` = `i64.load offset=0` (`this+8` = `GetMonitorInfoW` の hMonitor)。`this` (arg1) が不正。
@@ -106,12 +106,15 @@ IR (`work/boot_final3.ll`): `function_abfd60` 内の `%ce0n11_function_abfd60 = 
 ```sh
 export FL_WIN64_DIR=$RUNNER_TEMP/fl-win64          # PE: $FL_WIN64_DIR/extracted/block00031_PE.bin
 cd tools/m11
+mkdir -p work/trap_triage
 uv run --with capstone --with pefile bash m11_e2e.sh      # e2e (30.5〜30.7 s)
 SV_RAW=1 node trap_triage/survey_units.mjs work/trap_triage/head.json   # survey (12.4〜12.6 s) + 生 frame
 python3 trap_triage/oob_insn.py work/m11_boot.cjs.wasm 3067 18f8df 3   # 命令逆引き (wasm index, offset)
 node trap_triage/oob684_probe.mjs 477 0,22953608                          # unit 477 直前の値
 node trap_triage/oob684_probe.mjs 477 0 watch                             # address 0 の書込み元 unit
 ```
+
+`work-m11` 素材には `work/trap_triage/` が含まれず (`tar --zstd -tf` の grep で 0 件)、`survey_units.mjs` も出力先を作らないため、survey の前に `mkdir -p` が要る。
 
 ## 8. 検証結果 (実測、HEAD `6c1a34f`)
 

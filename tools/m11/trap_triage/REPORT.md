@@ -168,6 +168,8 @@ ok 830 / oob 44 / halt0 20 / abort 1 / miss 46 / noproc 1 (§1 の 829/66 とは
 | `47d460` (←`92d4f0`) | 4 (876 880 891 935) | 未調査 |
 | 各 1 unit | 10: `446400`(17) `5b53f0`(95) `407e20`(138) `8674a0`(275) `8dfd70`(314) `96ef10`(365) `417fc0`(503) `6664c0`(547) `407a50`(745) `40ffe0`(895) | 未調査 |
 
+> **#684 訂正**: `survey_units.mjs` の OOB frame の `slice(1, 30)` は `1eccbfa` (#130) で入っており、本表の基準 `fa918df` の時点で既にあった。したがって本表の最上位 frame も 1 段上の caller を含む可能性があり、同じ不具合の影響を受けた可能性あり・未再測。訂正後の 13 件は `REPORT_684.md` §1。
+
 (名前付き 6 グループ 34 + 各 1 unit 10 = OOB 44 / 最上位 frame 16 種。abort 1 = unit 114 `EnterCriticalSection` shim_unimplemented は OOB ではない。)
 
 ### 8.2 現 HEAD の実測 (`c6b24ec`。コードは merge `51075ef` = PR head + main `0183e74` 取込み)
