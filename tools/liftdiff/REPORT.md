@@ -236,7 +236,7 @@ OOB `function_414ad0` 系 68 件は `[rbx]` 1 段 deref の IR 脱落 (68 件は
 
 ## 10. OTT 旧 chain (D1〜D6) の Actions 再現 (LD-8 / #406、要約)
 
-Actions run `38423629378` で `liftdiff_e2e.sh` (--m11-only なし) を実測・exit 0・`LIFTDIFF_E2E PASS`・ネガコン 5/5 PASS。[2/4] 212 関数の集計は head `dc6e71bc` で 33 / 110 / 69、`main` 取り込み後の head `6c83d78d` で **35 / 112 / 65** (D3 14・D4_D5 20 へ変化)。旧 3 回実測 (38/108/66) との差分は #825 で切り分け。全文・素材・未解決表: [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §10。
+Actions run `38427784456` (head `d7cb6a5b`) で `liftdiff_e2e.sh` (--m11-only なし) を実測・exit 0・`LIFTDIFF_E2E PASS`・ネガコン 5/5 PASS。OTT 集計など詳細・ログ抜粋・未解決表: [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §10。
 
 ## 11. 比較系の偽陽性 2 類型の修正 (LD-11 / #548、要約)
 
