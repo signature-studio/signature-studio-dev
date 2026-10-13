@@ -548,6 +548,20 @@ static void test_process_module(void) {
     DWORD cf2 = 77;
     CHECK(InternetGetConnectedState(&cf2, 0) == FALSE && cf2 == 0);
     CHECK(InternetOpenW(W("ua"), 0, NULL, NULL, 0) == NULL && GetLastError() == ERROR_INTERNET_DISCONNECTED);
+    {
+        unsigned n0 = shimx_wininet_call_count();
+        SetLastError(0); CHECK(InternetOpenA("ua", 0, NULL, NULL, 0) == NULL && GetLastError() == 12163);
+        SetLastError(0); CHECK(InternetConnectW((LPVOID)1, W("h"), 80, NULL, NULL, 3, 0, 0) == NULL && GetLastError() == 12163);
+        SetLastError(0); CHECK(InternetOpenUrlW((LPVOID)1, W("http://x/"), NULL, 0, 0, 0) == NULL && GetLastError() == 12163);
+        SetLastError(0); CHECK(InternetOpenUrlA((LPVOID)1, "http://x/", NULL, 0, 0, 0) == NULL && GetLastError() == 12163);
+        SetLastError(0); CHECK(HttpOpenRequestW((LPVOID)1, W("GET"), W("/"), NULL, NULL, NULL, 0, 0) == NULL && GetLastError() == 12163);
+        SetLastError(0); CHECK(HttpSendRequestW((LPVOID)1, NULL, 0, NULL, 0) == FALSE && GetLastError() == 12163);
+        SetLastError(0); CHECK(HttpSendRequestA((LPVOID)1, NULL, 0, NULL, 0) == FALSE && GetLastError() == 12163);
+        SetLastError(0); CHECK(HttpSendRequestExW((LPVOID)1, NULL, NULL, 0, 0) == FALSE && GetLastError() == 12163);
+        SetLastError(0); CHECK(InternetCheckConnectionW(W("http://x/"), 1, 0) == FALSE && GetLastError() == 12163);
+        SetLastError(0); CHECK(InternetCheckConnectionA("http://x/", 1, 0) == FALSE && GetLastError() == 12163);
+        CHECK(shimx_wininet_call_count() == n0 + 10);   /* 成功を返した接続系呼出は無い (上の全 CHECK が失敗値) */
+    }
     uint8_t wsad[400] = {0};
     CHECK(WSAStartup(0x0202, wsad) == 10091);
     CHECK(WinVerifyTrust(0, NULL, NULL) == (LONG)TRUST_E_NOSIGNATURE);

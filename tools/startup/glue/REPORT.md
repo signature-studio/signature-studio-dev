@@ -194,3 +194,27 @@ node tools/startup/glue/scripts/accept_recount.mjs    # 検収の独立再計算
   `tools/shimx/pathreg/src/pathmap.c` (`pr_ensure_defaults()` が `g_defaults_loaded` を立てない) で
   **原因を確認し**、glue 側の回避 (`pathreg_mount_count()` を先に 1 回呼ぶ) が有効であることを単体 ⑩ で確認。
   起票先は CAB-168 (検収時にコメント済)。
+
+## 11. ST-T10 crash-restart (#117・G12 の代替)
+
+既知類型 (DEFECTS.md) との関係: **該当なし** (host 結線のみ。lift/IR には触れない)。検証起点: `git rev-parse HEAD` の本 PR HEAD。
+
+| 要件 (G12) | 実装 | 検証 |
+|---|---|---|
+| ログを `<UserData>\Crash\` に保存 (VFS) | `host/crash_restart.ts` `CrashReporter.saveCrashLog`: `C:\Users\<user>\Documents\Image-Line\FL Studio\Crash\<UTC ts>-<n>.log` を wvfs home に書き `onYield()` で flush | 書込→`readWin` 往復・Emscripten FS 経由可視・close/reopen 後の永続・同一 ms 衝突回避 |
+| ダウンロード提示 | `offerDownload` が**VFS から読み直した内容**を `download(name, bytes)` へ (既定 `browserDownload` = Blob + `<a download>`) | 提示バイト == 永続バイト |
+| Send は失敗表示 | `send()` は `ERROR_INTERNET_DISCONNECTED` (12163) を返すだけ。ネットワーク不使用 | send 中の `fetch` 呼出 0 回 (fetch を throw に差替) |
+| `/restartfl` でページ再ロード | winstubs の `winstubs_restart_requested()` を wasm export し、`GlueHost.checkRestart()` を `onYield()` 末尾から呼ぶ。flush 後に `onRestart` (既定 `location.reload()`) を **1 回だけ** | 陰性対照 + 本命 + 非反復 |
+
+実測 (クリーンな worktree、emsdk 6.0.12、node v22.23.3): `bash tools/startup/glue/glue.sh` = **ALL PASS 6.5 秒** (load 1/5/15 分 = 0.42/0.37/0.18。コミット済み HEAD 3d91c24 を別 worktree に展開しても ALL PASS / 11.3 秒 / load 0.39/0.36/0.19)。
+新規 `test/crash_restart_unit.ts` = **20 checks / fail 0** (数え方: `CRASH-RESTART ... (pass=X fail=Y)`)。既存 C 単体 66/66・TS 単体 49・SIGKILL 跨ぎ・trace 監査 5 項目は不変。`count_checks.mjs` の e2e 静的 `ok(` は 12→13 (phase 6 を追加したため)。
+ネガティブコントロール: `ws_shell.c` の `g_restart = 1` を一時的に `0` にすると 20 中 **3 件 FAIL** (flag=false / onRestart 0 回 ×2)、戻して全 PASS。非 restart の ShellExecute (`fldiagnostic /version`、`ControlCreator.exe /restartfl`) は再ロードしない。
+追加した wasm export: `_winstubs_init`, `_winstubs_restart_requested`, `_winstubs_stats`、C 検証口 `glue_probe_shell_execute`。
+
+### 範囲外・未解決
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `winstubs_init()` を boot glue が呼ぶ結線は未実施 (テストは host から呼ぶ) | 実 FL 起動時に ShellExecute hook が有効になるのは ST-T3b 後 | #223 (ST-T3b) に既記載の `winstubs_init(0)` 結線に依存 |
+| FL 本体のクラッシュ検知 (SEH/Delphi 例外 → `0x11f0540`) から `CrashReporter.report` を呼ぶ結線 | 現状は host 側 API のみ。実エンジンの例外経路は未観測 | #132 / #253 (FL boot 貫通) 後に別 issue 起票を PM に提案 |
+| ダイアログ UI (Send / Contact Support / Close ボタン) は未実装 | `send()` の戻りを UI が表示する側が必要 | GUI 系 (M7) に提案 |
+| Chrome 実機での `location.reload()` / Blob ダウンロードは未検証 (node 注入のコールバックのみ) | 実機差の可能性 | 同上 / 別 issue 提案 |

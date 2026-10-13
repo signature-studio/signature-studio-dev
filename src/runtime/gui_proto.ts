@@ -38,7 +38,7 @@ export const W = {
 } as const;
 
 /** surface 表エントリ (128B = 32 words) 内の word index */
-export const S = { state: 0, visible: 1, x: 2, y: 3, w: 4, h: 5, stride: 6, pixels: 7, z: 8, gen: 9, titleByte: 64 } as const;
+export const S = { state: 0, visible: 1, x: 2, y: 3, w: 4, h: 5, stride: 6, pixels: 7, z: 8, gen: 9, wseq: 10, titleByte: 64 } as const;
 export const SURF_WORDS = 32;
 
 export const IN = {

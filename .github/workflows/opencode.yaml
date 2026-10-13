@@ -36,11 +36,12 @@ on:
 # したがって GITHUB_TOKEN の権限は最小のまま (job 単位で拡大しない)。
 permissions: {}
 
-# 同一 PR/issue での並行実行は直列化する。cancel-in-progress は false:
+# 同一 PR/issue での並行実行の直列化は、workflow ではなく **job** に置く (concurrency は
+# 各 job 内)。workflow 単位だと、agent 自身の `gh issue comment` が起こす issue_comment run
+# (job の if で skipped になる) まで同じグループに入り、実装 run の実行中は pending になって
+# 次の bot コメントで cancelled される。待機中の /oc 依頼が黙って押し出される恐れがある (#434)。
+# job 単位なら、if で弾かれる job はグループに入らない。cancel-in-progress は false:
 # 実行中のエージェントを push で中断すると作業内容が失われる。
-concurrency:
-  group: opencode-${{ github.event.pull_request.number || github.event.issue.number || github.ref }}
-  cancel-in-progress: false
 
 jobs:
   implement:
@@ -63,6 +64,9 @@ jobs:
       github.event.comment.author_association == 'OWNER') &&
       (contains(github.event.comment.body, '/oc') || contains(github.event.comment.body, '/opencode')))
     runs-on: ubuntu-latest
+    concurrency:
+      group: opencode-${{ github.event.pull_request.number || github.event.issue.number || github.ref }}
+      cancel-in-progress: false
     # opencode が暴走しても runner を既定の 6 時間は占有しない
     timeout-minutes: 60
     env:
@@ -184,6 +188,9 @@ jobs:
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    concurrency:
+      group: opencode-${{ github.event.pull_request.number || github.event.issue.number || github.ref }}
+      cancel-in-progress: false
     timeout-minutes: 60
     steps:
       # PR のタイトル・本文・diff はすべて untrusted。式展開で run に埋め込まず、

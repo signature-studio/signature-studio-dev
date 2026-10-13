@@ -123,6 +123,21 @@ int main(void) {
   CHK(desk(10 + 50, 20 + 50) == rgb(255, 255, 255), "WM_ERASEBKGND via DefWindowProc class brush (COLOR_WINDOW): %06x", desk(60, 70));
   CHK(!PeekMessageA((int64_t)(uintptr_t)&m, 0, 0, 0, PM_REMOVE), "queue empty after paint validated");
 
+  SECTION("seqlock wseq (GUI-4): 描画で奇数, flush で偶数");
+  {
+    CHK((S->surf[0].wseq & 1) == 0, "wseq even after flush: %u", S->surf[0].wseq);
+    uint32_t w0 = S->surf[0].wseq;
+    int64_t sdc = GetDC(h); WRECT sr = { 60, 60, 70, 70 };
+    int64_t sbr = CreateSolidBrush(0x00FF00); FillRect(sdc, (int64_t)(uintptr_t)&sr, sbr); DeleteObject(sbr);
+    CHK(S->surf[0].wseq == w0 + 1 && (S->surf[0].wseq & 1), "wseq odd after window DC draw (before flush): %u -> %u", w0, S->surf[0].wseq);
+    GdiFlush();
+    CHK(S->surf[0].wseq == w0 + 2 && !(S->surf[0].wseq & 1), "wseq even again after flush (+2 per frame): %u", S->surf[0].wseq);
+    ReleaseDC(h, sdc);
+    flush_wait();
+    CHK(S->surf[0].wseq == w0 + 2, "no spurious bump without drawing: %u", S->surf[0].wseq);
+    CHK(desk(10 + 65, 20 + 65) == rgb(0, 255, 0), "seqlock does not alter pixels: %06x", desk(75, 85));
+  }
+
   SECTION("timers");
   g_nlog = 0;
   CHK(SetTimer(h, 7, 15, 0) == 7, "SetTimer returns id");

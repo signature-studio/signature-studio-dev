@@ -25,6 +25,10 @@ per = json.load(open(sys.argv[1]))
 def nm(f):
     m = re.search(r'wasm-function\[(\d+)\]', f)
     return names.get(int(m.group(1)), '?') if m else f
+def err_idx(fr):  # Error() 本体 frame (409730 優先, 無ければ 412a60 → 4096d0) の位置. 無い halt0 は -1
+    for e in ('function_409730', 'function_412a60', 'function_4096d0'):
+        if e in fr: return fr.index(e)
+    return -1
 tops = collections.defaultdict(list)
 for r in per:
     if r['kind'] in ('oob', 'other', 'abort'):
@@ -52,28 +56,28 @@ ec = collections.defaultdict(list)
 for r in per:
     if r['kind'] == 'halt0':
         fr = [nm(f) for f in r.get('frames', [])]
-        i = fr.index('function_409730') if 'function_409730' in fr else (fr.index('function_412a60') if 'function_412a60' in fr else -1)
-        ec[fr[i + 1] if 0 <= i + 1 < len(fr) else '?'].append(r['unit'])
+        i = err_idx(fr)
+        ec[fr[i + 1] if 0 <= i and i + 1 < len(fr) else '?'].append(r['unit'])
 for k, v in sorted(ec.items(), key=lambda x: -len(x[1])): print(len(v), k, v[:12])
 print('--- halt0 Error 呼出元の更に 3 段上')
 ec = collections.defaultdict(list)
 for r in per:
     if r['kind'] == 'halt0':
         fr = [nm(f) for f in r.get('frames', [])]
-        i = fr.index('function_409730') if 'function_409730' in fr else (fr.index('function_412a60') if 'function_412a60' in fr else -1)
-        ec[' <- '.join(fr[i + 1:i + 4])].append(r['unit'])
+        i = err_idx(fr)
+        ec[' <- '.join(fr[i + 1:i + 4]) if i >= 0 else '?'].append(r['unit'])
 for k, v in sorted(ec.items(), key=lambda x: -len(x[1])): print(len(v), k, v[:8])
 print('--- halt0: Error 呼出元 (409730/412a60 の次) から m11_tr_* までの鎖')
 ec = collections.defaultdict(list)
 for r in per:
     if r['kind'] == 'halt0':
         fr = [nm(f) for f in r.get('frames', [])]
-        i = next((fr.index(x) for x in ('function_409730', 'function_412a60', 'function_4096d0') if x in fr), 0)
+        i = err_idx(fr)
         ch = []
-        for f in fr[i + 1:]:
+        for f in (fr[i + 1:] if i >= 0 else []):
             if f.startswith('m11_'): break
             ch.append(f.replace('function_', ''))
-        ec[' < '.join(ch[:3]) + ' ... ' + ch[-1]].append(r['unit'])
+        ec[' < '.join(ch[:3]) + ' ... ' + ch[-1] if ch else '?'].append(r['unit'])
 for k, v in sorted(ec.items(), key=lambda x: -len(x[1])): print(len(v), k, v[:6])
 if len(sys.argv) > 2:
     print('--- full chains for units', sys.argv[2:])

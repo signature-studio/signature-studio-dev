@@ -36,7 +36,7 @@ before(async () => {
   writeFileSync(path.join(src, "index.html"), "<!doctype html>");
   writeFileSync(path.join(src, "wasm/big.0123456789ab.wasm"), paddedWasm());
   site = path.join(tmp, "site");
-  execFileSync("node", [path.join(here, "../scripts/05-stage.mjs"), "--src", src, "--out", site, "--max-file", "1024", "--part-size", "700"], { stdio: "pipe" });
+  execFileSync("node", [path.join(here, "../scripts/05-stage.mjs"), "--src", src, "--out", site, "--max-file", "1024", "--part-size", "700", "--skip-notices-gate"], { stdio: "pipe" });
   server = http.createServer(async (req, res) => {
     const p = decodeURIComponent(new URL(req.url, "http://x").pathname);
     hits.set(p, (hits.get(p) ?? 0) + 1);

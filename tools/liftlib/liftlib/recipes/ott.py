@@ -217,7 +217,7 @@ def e2e_checks(cjs, workdir, label="", env_extra=None, outhash=True):
     [0x248]=1 経路は未初期化読み (junk) が stack/heap 絶対位置に依存し, base/heap 移動で
     junk-tiny が変わり得るため (lowbase REPORT §4.3 実測: 128,000 cell 中 2 cell)。
     outhash=False (CAB-238: auto 既定モード) は SHA 突合を省略する — auto f7,p1 は修復由来で
-    m10 参照と SHA が一致しないのが正であり, 差分表は REPORT.md §12 を参照。
+    m10 参照と SHA が一致しないのが正であり, 差分表は REPORT_APPENDIX_A.md §12 を参照。
     """
     W = os.path.abspath(workdir)
     env.ensure()

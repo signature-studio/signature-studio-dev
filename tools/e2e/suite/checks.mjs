@@ -220,19 +220,58 @@ export const checks = [
     },
   },
   {
+    id: "webstudio-contract",
+    title: "window.__webstudio 契約の形状 ({state: booting|running|error, frames: number})",
+    async run(ctx) {
+      const st = await ctx.drv.eval(`JSON.stringify(window.__webstudio ?? null)`);
+      const s = JSON.parse(st);
+      assert(s !== null, "window.__webstudio が公開されていない");
+      assert(["booting", "running", "error"].includes(s.state), `state が契約外: ${st}`);
+      assertEq(typeof s.frames, "number", "frames の型");
+      assert(s.frames >= 0, `frames < 0: ${st}`);
+      if (s.state === "error") assertEq(typeof s.error, "string", "error の型 (state=error 時)");
+      else assert(s.error === undefined, `state=${s.state} なのに error がある: ${st}`);
+      // FL 未統合ハーネスは GUI フレームを転送しないので running にならない (running には frames>0 が必要)
+      if (s.state === "running") assert(s.frames > 0, `running なのに frames=0: ${st}`);
+      return st;
+    },
+  },
+  {
     id: "fl-boot",
-    title: "FL 起動 (契約: window.__webstudio.state==='running')",
+    title: "FL 起動 (契約: window.__webstudio.state==='running' && frames>0)",
     async run(ctx) {
       if (process.env.E2E_REQUIRE_FL !== "1") {
         throw new Skip("FL 未統合 (統合後 E2E_REQUIRE_FL=1。契約は REPORT.md §FL 起動契約)");
       }
-      const ok = await ctx.drv.waitFn(`window.__webstudio?.state === 'running'`, 180000);
+      const ok = await ctx.drv.waitFn(
+        `window.__webstudio?.state === 'running' || window.__webstudio?.state === 'error'`,
+        180000,
+      );
       const st = await ctx.drv.eval(`JSON.stringify(window.__webstudio ?? null)`);
-      assert(ok, `FL が running にならない: ${st}`);
+      assert(ok, `FL が 180s 以内に running にならない: ${st}`);
       const s = JSON.parse(st);
-      if (typeof s.frames === "number") assert(s.frames > 0, "GUI フレーム 0");
+      assertEq(s.state, "running", `state (${st})`);
+      assert(typeof s.frames === "number" && s.frames > 0, `GUI フレーム 0: ${st}`);
+      // 画素検査: 転送済みフレームが canvas に載っている (全面単色でない)。
+      // OffscreenCanvas 移譲後の canvas は getContext 不可なので temp canvas へ drawImage して読む
+      const px = await ctx.drv.eval(`(() => {
+        const c = document.getElementById('screen');
+        const t = document.createElement('canvas');
+        t.width = c.width; t.height = c.height;
+        const g = t.getContext('2d');
+        g.drawImage(c, 0, 0);
+        const d = g.getImageData(0, 0, t.width, t.height).data;
+        const seen = new Set(); let lit = 0;
+        for (let i = 0; i < d.length; i += 4) {
+          if (d[i] | d[i+1] | d[i+2]) lit++;
+          if (seen.size < 8) seen.add((d[i] << 16) | (d[i+1] << 8) | d[i+2]);
+        }
+        return { w: t.width, h: t.height, lit, colors: seen.size };
+      })()`);
+      assert(px.w > 0 && px.h > 0, `canvas サイズ 0: ${px.w}x${px.h}`);
+      assert(px.lit > 0 && px.colors >= 2, `FL フレームが canvas に描画されていない: ${JSON.stringify(px)}`);
       await ctx.shot("fl");
-      return st;
+      return `${st} canvas ${px.w}x${px.h} lit=${px.lit}px colors>=${px.colors}`;
     },
   },
 ];

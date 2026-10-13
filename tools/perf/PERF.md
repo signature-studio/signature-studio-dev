@@ -143,4 +143,4 @@ inline 閾値超過)。**提言: lift pass で `__asm_*` を直接 LLVM vector I
 | P6 | FLEngine 実 closure (M11 完成版) で起動〜初回 audio までの E2E 計測 (データ像 fetch・CRT 初期化含む) | §5 未測定 |
 | P7 | headful Chrome / Firefox / Safari / Android での compile・lazy 挙動・code cache の再測 (本測定は Chrome 154 headless のみ) | §4 |
 | P8 | プラグイン別 module vs 動的リンクの性能/メモリ比較 (PIC 税、instance 数 × memory) | §5.4 |
-| P9 | OTT の機能修復後に RTF を再測 (node 版は REPORT §2.1 で実施済み: LTO 1.15×; 残: Chrome・低負荷・M11 級) | §0.3 |
+| P9 | OTT の機能修復後に RTF を再測 (node 版は REPORT §2.1、Chrome Worker・実 AudioWorklet・低負荷・native 比は `REPORT_APPENDIX.md` §12 で実施済み; 残: M11 級 closure での LTO 効果) | §0.3 |
