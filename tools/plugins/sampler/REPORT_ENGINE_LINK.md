@@ -75,7 +75,7 @@
 - 選択子 6〜9 は同一 case (no-op)。 engine の `CreatePlugInstance` (VA 0x180147980) は `call 0x1801cc570` (サイズ 0x12310 の確保) の後、0x180145560 へ tail-jump する。
 - 殻の selector 値 (rdx) は未解析。 case 表だけでは `DispatchToEngine` の引数規約 (`rcx` の意味・`r8`/`r9` の意味) は確定しない。
 
-## 4. 殻の呼出し箇所と selector (受入条件 4 の残り・本 run で確定)
+## 4. 殻の呼出し箇所と selector (受入条件 4 の残り・本 HEAD で確定)
 
 測定: `disasm_range.py` (capstone) で殻 23663 の `.text` を逆アセンブル。
 
@@ -95,9 +95,9 @@
 | 0x847547 (0x847510) | 12 (0xc) | `r10 = edx` 符号拡張、`r11 = r8d` 符号拡張 (範囲 2 引数) |
 
 - 9 件の selector は engine 側 `DispatchToEngine` の case 表 (§3、有効 2..14) の内側に収まる。 case 6〜9 (no-op) は殻からは使われない。
-- 残りの 15 件 (§2a の vtable 呼出し 14 件 + 0x778469) は `DispatchToEngine` とは別の仮想メソッド / 自オブジェクトの関数ポインタで、本 run の範囲では DispatchToEngine と結び付けない。
+- 残りの 15 件 (§2a の vtable 呼出し 14 件 + 0x778469) は `DispatchToEngine` とは別の仮想メソッド / 自オブジェクトの関数ポインタで、本 HEAD の範囲では DispatchToEngine と結び付けない。
 - 9 件が完全である根拠: 殻 `.text` の `ff /2` disp32=0x1c0 候補を全件 (24 件) 逆アセンブルし、基底レジスタと引数の由来を §2a で確認した。 走査範囲は殻の実行可能セクション全体、判定基準は「第 1 引数 `rcx` が `[X+0x1b8]` (engine)、`edx` が即値 selector」。 0x778469 は `rcx = [rbx+0x1c8]`・`rdx = &local` で、selector 形ではないため除外。 残り 14 件は vtable の `+0x1c0` で、`rcx` が vtable 元オブジェクトのため除外。
-- 引数規約の残り: 戻り値は殻側で `rax` を読む箇所がある (0x8473c8) ため有効な結果を返す。 selector ごとの `r8`/`r9` の完全な意味は engine case ごとの読解が必要で、本 run では未完 (次の課題)。
+- 引数規約の残り: 戻り値は殻側で `rax` を読む箇所がある (0x8473c8) ため有効な結果を返す。 selector ごとの `r8`/`r9` の完全な意味は engine case ごとの読解が必要で、本 HEAD では未完 (次の課題)。
 
 ## 5. 受入条件 3・5 の測定
 
@@ -105,15 +105,15 @@
 
 | 方式 | 対象 | 結果 (実測) |
 |---|---|---|
-| 既定 `lift_ranges.sh` 直行 (前 run 再掲、REPORT §5) | 23664 | 614 s 時点で RSS 8.15 GiB、"out of memory; trying to recover" 3 回。 未完で手動停止 |
-| `--backend-no-opts` (本 run) | 23664 | **exit 0、441 s、Maximum RSS 3.52 GB**。 `.ll` 75 MB・`.c` 39.6 MB 出力まで完走 |
+| 既定 `lift_ranges.sh` 直行 (前 run #810 の実測、本 HEAD では未再測定) | 23664 | 614 s 時点で RSS 8.15 GiB、"out of memory; trying to recover" 3 回。 未完で手動停止。 run id 未確認 |
+| `--backend-no-opts` (前 run #810 の実測、本 HEAD では未再測定) | 23664 | **exit 0、441 s、Maximum RSS 3.52 GB**。 `.ll` 75 MB・`.c` 39.6 MB 出力まで完走。 run id 未確認 |
 
 - 結論: `--backend-no-opts` で RSS は 8.15 GiB → 3.52 GB に下がり、C 出力まで完走する。 ただし 441 s は `lift_from_ll.sh` (.ll 出力後に停止、既定経路) より長い。 共有 `lift_ranges.sh` は変更せず、既定経路は `lift_from_ll.sh` のまま (判断: 変更しない)。
-- 理由: `lift_from_ll.sh` は C 出力を使わず `.ll` の後段だけ使うため、`--backend-no-opts` を入れても時間の利点が無い。 `--no-memory-limit` は本 run では未測定 (RSS は 3.5 GB で上限に届かなかった)。
+- 理由: `lift_from_ll.sh` は C 出力を使わず `.ll` の後段だけ使うため、`--backend-no-opts` を入れても時間の利点が無い。 `--no-memory-limit` は本 HEAD では未測定 (RSS は 3.5 GB で上限に届かなかった)。
 
-### 5. VEX helper の CPUID 分岐 (再測定、main f0d65f32)
+### 5. VEX helper の CPUID 分岐 (前 run の引用、main f0d65f32。本 HEAD では未再測定)
 
-`vex_guard.py` の実行結果 (同一値、前 run と一致):
+`vex_guard.py` の数値 (前 run の記録の引用。本 HEAD の capstone 不在のため再現していない):
 
 | block | pdata | VEX 関数 | cpuid 関数 | xgetbv 関数 | VEX 関数のうち caller 深さ 3 に cpuid/xgetbv を持つもの |
 |--:|--:|--:|--:|--:|--:|
@@ -129,7 +129,7 @@
 | 殻の selector 9 件の `r8`/`r9` 引数の完全な意味・戻り値の型 (engine 側 case ごとの読解) | 本 #540 (継続) |
 | `--no-memory-limit` の実測 (今回 RSS 3.5 GB で未到達) | 本 #540 (継続) |
 | VEX helper の SSE 固定の動的確認 (静的には不成立) | #527 にコメント予定 (既存・重複起票せず) |
-| 受入条件 1・2 の再測定 (`sampler_engines.sh`) | 本 run は runner に `/opt/retdec` が無く未再現。 RetDec 環境のある run で再測定 (#540 継続) |
+| 受入条件 1・2 の再測定 (`sampler_engines.sh`) | 本 HEAD の検証 run は runner に [RETDEC] が無く未再現。 RetDec 環境のある run で再測定 (#540 継続) |
 
 ## 7. 本 HEAD (5880a9f6) での再測定
 
@@ -138,6 +138,6 @@
 | 素材展開 `fl-win64.tar.zst` → `$RUNNER_TEMP/fl-win64` | 8.0 s、`block23663_PE.bin` / `block23664_PE.bin` 存在を確認 |
 | 殻の `ff /2` disp32=0x1c0 候補 (block23663) | 24 件 (§2a)。 9 件の selector (2,3,4,5,10,11,12,13,14) は §4 のとおり |
 | 殻の結線 0x843790〜0x84386a | 逆アセンブル成功 (`disasm_range.py`)、`[obj+0x1c0]` 保存・`[obj+0x1b8]` engine 保存を確認 |
-| `sampler_engines.sh` (受入条件 1・2) | **未再現**。 exit 124 (900 s 打ち切り)。 `retdec-decompiler` 不在 (`/opt/retdec/bin/retdec-decompiler: No such file or directory`)、`.ll` が出ず後段に進めない。 `/opt/emsdk` も無し。 負荷 (load) は 0.02 前後で待機のみ |
+| `sampler_engines.sh` (受入条件 1・2) | **未再現**。 exit 124 (900 s 打ち切り)。 [RETDEC] の `retdec-decompiler` 不在 (`No such file or directory`)、`.ll` が出ず後段に進めない。 [EMSDK] も無し。 負荷 (load) は 0.02 前後で待機のみ |
 
-- 参照のみ (本 HEAD の実測ではない): 前 run #643 の `sampler_engines.sh` は main f0d65f32 で exit 0・321 s・`judge engines: PASS 2/2`。 受入条件 1・2 は、本 HEAD で再測定できるまで「未再現 (前 run #643 の値のみ)」として扱う。
+- 参照のみ (本 HEAD の実測ではない): 前 run #643 の記録では `sampler_engines.sh` が main f0d65f32 で exit 0・321 s・`judge engines: PASS 2/2`。 run id は未確認。 受入条件 1・2 は、本 HEAD で再測定できるまで「未再現 (前 run #643 の値のみ)」として扱う。
