@@ -15,8 +15,9 @@
   (pshufb 6 / pmulhrsw 4 / phaddw 4) → `x64c_qfc.py` で handler 注入して 0 に (tools/flelift は無改変)。
 - emcc -O0 で wasm 生成 (15,115,363 B, `work/`)。native 実機械語 vs wasm の spot diff: SSSE3 を含む 2 関数
   (0x57de50 / 0x57e2a0) × 6 case = **12/12 case で dst 4096 B・rax・xmm0 が bit 一致**。
-- **ネガコン 4 本全て FAIL 検出**: (a) handler 無効 → lift が unsup 14 を報告 / (b) pmulhrsw 丸め除去 → 不一致 2/12 case /
-  (c) pshufb の 0x80 ゼロ化除去 → 不一致 2/12 case / (d) phaddw に +1 → 不一致 2/12 case。
+- **ネガコン 4 本全て FAIL 検出**: (a) handler 無効 → lift が unsup 14 を報告 / (b) pmulhrsw 丸め除去 → 不一致 9/12 case /
+  (c) pshufb の 0x80 ゼロ化除去 → 不一致 10/12 case / (d) phaddw に +1 → 不一致 5/12 case。
+  (旧版の「各 2/12」は e2e ログが `tail -3` で末尾 2 行しか出さず、その 2 行を件数と取り違えた誤記。件数は全出力で再取得済み: §6。)
 
 ## 1. 成果物
 
@@ -47,14 +48,14 @@
 
 | 項目 | 値 |
 |---|---|
-| lift | functions 6,347 / insns 208,714 / unsup {} / unlifted callees 0 / imports 222 (lift 所要 21.9 s, 初回 1 回の実測) |
+| lift | functions 6,347 / insns 208,714 / unsup {} / unlifted callees 0 / imports 222 (lift 単独の所要 21.9 s は 1 回のみの参考値。n<3 のため min–max 対象外) |
 | spot diff | 12 case / equal 12 / mismatch 0。native dst が実際に変化した case 10/10 (w>0 の全 case: 非自明性) |
-| ネガコン | none_ssse3: unsup 14 (検出) / pmulhrsw: 2/12 mismatch / pshufb: 2/12 mismatch / phaddw: 2/12 mismatch |
-| e2e 全体 | 実行 1 (初版 phaddw ネガコンが +0 で素通り=NOT detected → exit 1): 196 s。ネガコンを修正し実行 2: **PASS 195 s (load 1.00 0.80 0.47, nproc 4)** |
-| クリーン HEAD 再現 | §6 |
+| ネガコン | none_ssse3: unsup 14 (検出) / pmulhrsw: 9/12 mismatch / pshufb: 10/12 mismatch / phaddw: 5/12 mismatch (4 本とも FAIL 検出) |
+| e2e 全体 (検証 HEAD `5c7a48a`) | PASS 3/3。**real 196.08–196.70 s (min–max, n=3)**、script 内計測 195–197 s。各 run の load・再取得手順は §6 |
 
 初回の e2e で phaddw ネガコンが「検出できない」(NOT detected → exit 1) となり、ネガコン自体の設計不備 (上位半分の複製が
-テスト入力で等値) を発見・修正した。gate は不合格時に exit 1 になることを実運用で確認済み。
+テスト入力で等値) を発見・修正した。その初回 run (修正前) は FAIL 196 s (exit 1) で、PASS 集計 (§6) には含めない。
+gate は不合格時に exit 1 になることを実運用で確認済み。
 
 ## 4. 検証範囲 / 範囲外
 
@@ -72,11 +73,30 @@
 | QFC の boot (InitDll → FontCache_*) 実行・unit 級検証未着手 | lift が実行時に正しいかは未確認 | #154 (継続) / FreeType 部は T-SH-01 |
 | 残り 6,345 関数の差分検証が無い (ランダム関数 diff / liftdiff 採点) | silent miscompile 残存の可能性 | #154 (継続)。liftdiff 採点は #129 系 |
 | wasm 15.1 MB が `work/` のみ (配信/ロード方式未決) | 統合時のサイズ・ロード時間 | #154 (継続) |
+| `qfc_e2e.sh` の negctl 行が `tail -3` で件数行を隠す (旧版の「2/12」誤記の原因) | 件数の目視誤読。PASS/FAIL の gate 判定 (exit code) には影響しない | #154 (継続・次の qfclift 改修で表示のみ修正) |
 
-## 6. クリーン HEAD 再現・取りこぼし検査
+## 6. 検証実行・再現 (実測)
 
-- 検証起点 commit: `204bba8` (lift + e2e 一式)。`git worktree add --detach <tmp> 204bba8` で展開して `qfc_e2e.sh` を実行:
-  **PASS 195 s (real 3m15.749s, load 1.28 0.94 0.59, nproc 4)**。lift 値・12/12 一致・ネガコン 4 本検出は §3 と同一。
-- 実行 2 (作業ツリー, 同一内容): PASS 195 s (real 3m14.790s)。
-- `find tools/qfclift -type f -size +20M -not -path '*/work/*'` → 該当なし。生成物 (wasm 15,115,363 B ほか) は `work/` (gitignore)。
-- 本 REPORT・`REPORT.md` 追記のみの後続 commit は検証対象のコード (`*.py`/`*.sh`/`*.c`/`*.mjs`) を変更しない。
+- **検証 HEAD = `5c7a48a`** (検証対象コードの最終 commit。`204bba8` からの差分は `x64c_qfc.py` の未使用 `_old` 行の削除のみ)。
+  以降の REPORT.md のみの commit は検証対象のコードを変更しない (`git diff --stat 5c7a48a..HEAD` で `*.py`/`*.sh`/`*.c`/`*.mjs` 無変更を確認)。
+- 実行: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` (`tar --zstd -xf fl-win64.tar.zst -C` で展開) / `QFC_PY=<capstone + pefile の venv>` /
+  `bash tools/qfclift/qfc_e2e.sh`。作業 worktree `ws-154` (branch `154-quickfontcache-lift`)。
+- 環境: AMD EPYC 7763 / nproc 4。run は逐次 (前 run 終了後に開始)。load は `/proc/loadavg` の 1 分平均 (script 出力。開始 = run 直前 / 終了 = run 完了時)。
+
+| run | HEAD | 結果 | script 計測 | real (`/usr/bin/time`) | load 開始 | load 終了 |
+|---|---|---|---|---|---|---|
+| P1 | `5c7a48a` | PASS (exit 0) | 197 s | 196.52 s | 0.18 0.18 0.08 | 0.98 0.59 0.27 |
+| P2 | `5c7a48a` | PASS (exit 0) | 196 s | 196.70 s | 0.90 0.58 0.27 | 1.09 0.82 0.43 |
+| P3 | `5c7a48a` | PASS (exit 0) | 195 s | 196.08 s | 1.16 0.84 0.43 | 1.02 0.97 0.57 |
+
+- **min–max (n=3, 全 PASS)**: real **196.08–196.70 s** / script 内計測 195–197 s。run 開始時 load 0.18–1.16。
+- 参考 (min–max に含めない):
+  - レビュー側 (oc-reviewer) の独立再実行 (`1d332ce`・クリーン worktree): PASS 138 s (load 0.50 0.39 0.17)。上の 3 run より 58 s 短い。
+    原因は未切り分け (実行機・負荷の差の可能性。同一機での再測は未実施)。
+  - 旧版 REPORT の記録 (run 対応を再構成できないため値のみ保持): 「実行 2 (load 1.00 0.80 0.47)」PASS 195 s /
+    「クリーン HEAD (204bba8)」PASS real 3m15.749s (load 1.28 0.94 0.59) / 「実行 2 (作業ツリー)」PASS real 3m14.790s。
+    同名の「実行 2」が 2 値を指していたため、以後は P1〜P3 のラベルのみを使う。
+- **ネガコン件数の再取得**: e2e ログは negctl 行を `tail -3` で切るため件数行が出ない。`qfc_e2e.sh` が作った
+  `work/neg_<name>/qfcl.cjs` に対し `$QFC_PY qfc_diff.py --pe <PE> --cjs work/neg_<name>/qfcl.cjs --out work/recheck_neg_<name> --expect-fail`
+  の全出力を取得: pmulhrsw equal 3 / mismatch 9、pshufb equal 2 / mismatch 10、phaddw equal 7 / mismatch 5 (3 本とも `native dst changed 10/10`、FAIL detected)。
+- `find tools/qfclift -type f -size +20M -not -path '*/work/*'` → 0 件。生成物は `work/` (gitignore): `work/lift/qfcl.wasm` 15,115,363 B ほか。
