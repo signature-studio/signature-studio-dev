@@ -5,5 +5,5 @@ GF_GUI="$(cd "$GF_HERE/.." && pwd)"
 GF_M11="${GF_M11:-$(cd "$GF_GUI/../m11" && pwd)}"   # 読取専用の素材元。e2e.sh は複製先 ($GF_W/tree/m11) を入れる
 GF_W="${GF_W:-$GF_GUI/work/flengine}"
 export GF_M11 PATH="${GF_EXTRA_PATH:+$GF_EXTRA_PATH:}$PATH"
-# EMSDK_ENV の既定値は [EMSDK] (docs/REFERENCES.md) の既定配置。別の場所なら環境変数で上書きする。
-set +u; . "${EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}" >/dev/null 2>&1 || true; set -u
+# EMSDK_ENV: [EMSDK] (docs/REFERENCES.md) の emsdk_env.sh。未設定なら source せず、emcc が PATH 上にある前提で進む。
+if [ -n "${EMSDK_ENV:-}" ]; then set +u; . "$EMSDK_ENV" >/dev/null 2>&1 || true; set -u; fi

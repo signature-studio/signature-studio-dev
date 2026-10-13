@@ -2,7 +2,7 @@
 # #564 e2e: ldfix F4 (escape 済み stack_var 内部の read が undef→xor 0,0 になる欠陥の修復) を、実 FLEngine lift に対して
 #   pre (--no-f4) / post / noand (--f4-no-consumer) の 3 構成で gen_ir2 → m11_build → gui 結合 build → probe + 起動 + survey まで実測し判定する。
 #   bash tools/m11/ldfix/f4_e2e.sh      終了コード: 0 = 全 gate PASS かつ全ネガコンが期待どおり FAIL / 1 = gate FAIL またはネガコン不発 / 2 = 前提欠如
-# 前提: tools/m11/work (work-m11) / FL_WIN64_DIR / emsdk / node / capstone+pefile / x86_64-w64-mingw32-gcc (gui の gen_api)。
+# 前提: tools/m11/work (work-m11) / FL_WIN64_DIR / EMSDK_ENV ([EMSDK] の emsdk_env.sh、必須) / node / capstone+pefile / x86_64-w64-mingw32-gcc (gui の gen_api)。
 #   tools/m11/work の boot_final.ll は本スクリプトが再生成して上書きする (最後は post 構成)。
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; REPO="$(cd "$HERE/../../.." && pwd)"; M="$REPO/tools/m11"; GF="$REPO/tools/gui/flengine"
@@ -13,7 +13,8 @@ PE="${FL_WIN64_DIR:-/nonexistent}/extracted/block00031_PE.bin"
 [ -f "$PE" ] || { S "前提欠如: FL_WIN64_DIR/extracted/block00031_PE.bin"; exit 2; }
 [ -f "$M/work/boot0.lift.ll" ] || { S "前提欠如: tools/m11/work (work-m11 素材)"; exit 2; }
 python3 -c 'import capstone, pefile' 2>/dev/null || { S "前提欠如: capstone/pefile"; exit 2; }
-set +u; . "${EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}" >/dev/null 2>&1; set -u
+[ -n "${EMSDK_ENV:-}" ] && [ -f "$EMSDK_ENV" ] || { S "前提欠如: EMSDK_ENV (docs/REFERENCES.md の [EMSDK] の emsdk_env.sh を指定)"; exit 2; }
+set +u; . "$EMSDK_ENV" >/dev/null 2>&1; set -u
 
 variant() { # variant <tag> <LDFIX_ARGS>  → $W/<tag>.json
   local tag="$1" args="$2"

@@ -55,18 +55,8 @@ REGLIVE 2,509 (関数入口 live-in 等で脱落でない) / **FRAME_IN_ESCAPED 
 `f4_judge.py` 6 gate (F1 修復対象 / F2 IR 形 / D1 到達 / D2 load だけでは未到達 / P1 起動・survey 不変 / A1 監査分類) 全 PASS。
 ネガコン 4/4 が「期待した FAIL 行」付きで FAIL: N1 pre を post として判定 (D1) / N2 noand を post として判定 (D1) / N3 到達増分 ≥5 を要求 (D1) / N4 survey 1 unit を ok→trap に改竄 (P1)。
 
-実測 (4 vCPU, `f4_e2e.sh`): コミット済み HEAD `7be6bab` で **175 s, rc 0, 6 gate 全 PASS / ネガコン 4/4** (開始時 load average 0.31 は初回。本回は終了時 0.99)。
-同一コード・初回実装時の再実行は 172 s / rc 0 (1 回目は監査集約の `riperead` キー誤記で rc 1・173 s。修正済み)。**n=2 (rc 0 の回)**、分散は未評価。
-
-**main 取り込み後の再実測** (merge commit `8637316`、Refs #577。`bash tools/m11/ldfix/f4_e2e.sh`、4 vCPU、開始 load 0.86 / 終了 1.00): **294 s, rc 0**、6 gate 全 PASS、ネガコン 4/4 が期待行付きで FAIL。RegisterClassW 2→3、ret 0x0→0x110000f は上の表と同じ。
-survey は **ok 864 / noproc 1 / miss 46 / trap 31** (pre・post 同一、units_run 22 / init_count 23 / icall_miss 0) で、上の表 (816/1/46/79) と一致しない。差 48 件のうち 36 件は main 取り込みで入った `m11_survey.mjs` の unit 別 VirtualAlloc 上限 (#513、既定 256 MB) の効果: 上限 0 (旧挙動) で再実行すると 828/1/46/67。残る 12 件 (828 vs 816) は未分離 (main 側 `m11_build.sh` 等の寄与の可能性)。`results/f4_564_{pre,noand,post}.json` は 8637316 の実行出力で上書きした。上の表の値は PR 時点 (7be6bab) の実測として残す。
-
-**main 取り込み後の再実測** (`bash tools/m11/ldfix/f4_e2e.sh`、`FL_WIN64_DIR` = `$RUNNER_TEMP/fl-win64`、4 vCPU、merge commit 後の head): **371 s, rc 0**、6 gate 全 PASS、ネガコン 4/4 が期待行付きで FAIL。
-pre / noand / post は **units_run 52 / init_count 54 / icall_miss 5** (main 取り込みで unit 数が 22→52 に増えた)、survey ok / noproc / miss / trap = **869 / 1 / 47 / 25** (3 構成とも同一)。RegisterClassW 2 → 2 → 3、`function_52a7f0` ret 0x0 → 0x0 → 0x110000f。
-`results/f4_564_{pre,noand,post}.json` は本回の出力で上書きした。`ok 864 / miss 46 / trap 31` (8637316 時点) とは別の値。main の F3c 等の取り込み後の変化と見られるが、原因は未分離。
-**現 head `c262c44e` の実測** (`bash tools/m11/ldfix/f4_e2e.sh`、`EMSDK_ENV=[EMSDK]/emsdk_env.sh FL_WIN64_DIR=<fl-win64 展開先>`、4 vCPU、開始 load 0.79 / 終了 1.04): **382 秒, rc 0**。6 gate 全 PASS、ネガコン 4/4 が期待行付きで FAIL。pre / noand / post とも units_run 52 / init_count 54 / icall_miss 5、survey ok / noproc / miss / trap = **869 / 1 / 47 / 25**。RegisterClassW 2 → 2 → 3、`function_52a7f0` ret 0x0 → 0x0 → 0x110000f。監査 sites 2,846 / FRAME_IN_ESCAPED 56 (変化なし)。
-監査 (`audit_undefload.py`): sites 2,846 / FRAME_IN_ESCAPED 56 (本回も同一)。
-(参考) 取り込み直後の一時的な実測として `62659d4` 時点の 865/1/47/29 がある (merge 解消前の ldfix.py 使用、rc 0)。
+**現 head `545883bb` の実測** (`EMSDK_ENV=<[EMSDK] の emsdk_env.sh> FL_WIN64_DIR=<[WIN64] の fl-win64 展開先> bash tools/m11/ldfix/f4_e2e.sh`、4 vCPU、開始 load 0.66 / 終了 1.22): **382 s, rc 0**。6 gate 全 PASS、ネガコン 4/4 が期待行付きで FAIL。pre / noand / post とも units_run 52 / init_count 54 / icall_miss 5、survey ok / noproc / miss / trap = **869 / 1 / 47 / 25**。RegisterClassW 2 → 2 → 3、`function_52a7f0` ret 0x0 → 0x0 → 0x110000f。監査 sites 2,846 / FRAME_IN_ESCAPED 56 (`results/audit_undefload_564.json`)。
+履歴 (1 行): PR 初回 `7be6bab` 175 s の 816/1/46/79 は main 取り込み前の値。main 取り込み後の survey 変化 (869/1/47/25) の原因は未分離 (§5)。
 
 ## 5. 未解決 / 限界
 
