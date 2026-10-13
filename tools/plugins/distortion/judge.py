@@ -24,6 +24,8 @@ AUDIT_COLS = ['block', 'missing_define', 'missing_bytes', 'missing_ref', 'extra_
 ENGINE_COLS = ['block', 'pdata_funcs', 'lift_rc', 'defines', 'f80_funcs', 'unimpl_helpers', 'emcc_c_rc',
                'f80_funcs_pre', 'emcc_c_rc_pre_f80', 'lift_s', 'missing_define', 'missing_bytes',
                'missing_ref', 'extra_inside', 'function_defines']
+CPP_COLS = ['block', 'seed_vtables', 'vtables_in_closure', 'closure_funcs', 'closure_bytes', 'pdata_funcs', 'indirect_call_sites',
+            'iat_call_sites', 'missing_define', 'missing_bytes', 'missing_ref', 'extra_inside', 'function_defines']
 
 
 def usage_error(msg):
@@ -153,11 +155,44 @@ def judge_engine(rows, blocks):
     return fails
 
 
+def judge_cpp(rows, blocks):
+    """C++ DLL の DSP 閉包 (closure_cpp.py): seed の vtable が取れ / 閉包が空でなく .pdata 全体より小さく / 閉包の全 range に engine final.ll の define がある"""
+    fails = 0
+    for r in rows:
+        if r['block'] not in {str(b) for b in blocks}:
+            fails += 1
+            print('FAIL  closure_cpp %s: 対象外の行' % r['block'])
+    for b in blocks:
+        mine = [r for r in rows if r['block'] == str(b)]
+        if len(mine) != 1:
+            fails += 1
+            print('FAIL  closure_cpp %d: 行数 %d (期待 1)' % (b, len(mine)))
+            continue
+        v = {k: to_int(x) for k, x in mine[0].items()}
+        if any(x is None for x in v.values()):
+            fails += 1
+            print('FAIL  closure_cpp %d: 非整数の列' % b)
+            continue
+        why = []
+        if v['seed_vtables'] < 1:
+            why.append('seed_vtables=%d' % v['seed_vtables'])
+        if not 1 <= v['closure_funcs'] < v['pdata_funcs']:
+            why.append('closure_funcs=%d pdata_funcs=%d (期待 1 <= closure < pdata)' % (v['closure_funcs'], v['pdata_funcs']))
+        if v['missing_define'] != 0:
+            why.append('missing_define=%d (閉包の range に engine final.ll の define が無い)' % v['missing_define'])
+        fails += bool(why)
+        print('%s  closure_cpp %d seed_vtables=%d vtables=%d closure=%d funcs / %d B (pdata %d funcs) indirect=%d iat=%d missing_define=%d%s' % (
+            'FAIL' if why else 'PASS', b, v['seed_vtables'], v['vtables_in_closure'], v['closure_funcs'], v['closure_bytes'], v['pdata_funcs'],
+            v['indirect_call_sites'], v['iat_call_sites'], v['missing_define'], ('  <- ' + '; '.join(why)) if why else ''))
+    return fails
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('csv')
     ap.add_argument('--blocks', required=True)
     ap.add_argument('--engines', action='store_true')
+    ap.add_argument('--closure-cpp', action='store_true')
     ap.add_argument('--allow-unimpl', action='append', default=[], metavar='BLOCK=N')
     ap.add_argument('--audit')
     a = ap.parse_args()
@@ -166,7 +201,9 @@ def main():
         allow = {int(k): int(n) for k, n in (s.split('=') for s in a.allow_unimpl)}
     except ValueError:
         usage_error('--blocks / --allow-unimpl の書式')
-    if a.engines:
+    if a.closure_cpp:
+        fails = judge_cpp(load(a.csv, CPP_COLS), blocks)
+    elif a.engines:
         fails = judge_engine(load(a.csv, ENGINE_COLS), blocks)
     else:
         if not a.audit:

@@ -71,4 +71,17 @@ if [ "${1:-}" != "--skip-lift" ]; then
   cat "$OUT/engines.csv" "$OUT"/engine*/first_errors.txt
   python3 distortion/judge.py "$OUT/engines.csv" --engines --blocks "$ENGINES_CSV"
 fi
+# C++ DLL の DSP 閉包 (CreatePlugInstance → vptr → vtable → 直接呼出)。 閉包の全 range が engine の final.ll に define を持つことも確認する
+echo "block,seed_vtables,vtables_in_closure,closure_funcs,closure_bytes,pdata_funcs,indirect_call_sites,iat_call_sites,missing_define,missing_bytes,missing_ref,extra_inside,function_defines" > "$OUT/closure_cpp.csv"
+for eb in "${ENGINES[@]}"; do
+  python3 distortion/closure_cpp.py "$eb" --ranges "$OUT/closure_cpp_$eb.txt" --json "$OUT/closure_cpp_$eb.json" > /dev/null
+  python3 - "$OUT/closure_cpp_$eb.json" "$eb" "$(python3 distortion/engine_defs.py --ranges "$OUT/closure_cpp_$eb.txt" --ll "$OUT/engine$eb/e.final.ll")" >> "$OUT/closure_cpp.csv" <<'PY'
+import json, sys
+j = json.load(open(sys.argv[1]))
+print(','.join(str(x) for x in [sys.argv[2], len(j['seed_vtables']), j['vtables_in_closure'], j['closure_funcs'], j['closure_bytes'], j['pdata_funcs'],
+                                  j['indirect_call_sites'], j['iat_call_sites'], sys.argv[3]]))
+PY
+done
+cat "$OUT/closure_cpp.csv"
+python3 distortion/judge.py "$OUT/closure_cpp.csv" --closure-cpp --blocks "$ENGINES_CSV"
 echo "[distortion_e2e] OK: $OUT/{status.csv,facts.json,engines.csv}"
