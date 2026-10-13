@@ -4,11 +4,12 @@
 import sys, struct, json, os
 from collections import defaultdict
 
-sys.path.insert(0, '/home/ubuntu/work/webstudio/tools/m6')
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, '..', 'm6'))
 from ottlib import Bin, Dis
 
-WINF = '/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin'
-OUT = '/home/ubuntu/work/webstudio/tools/m11/work/scan_index.json'
+WINF = os.environ.get('M11_PE') or os.path.join(os.environ.get('FL_WIN64_DIR') or '/home/ubuntu/work/analysis/win64', 'extracted', 'block00031_PE.bin')
+OUT = os.path.join(HERE, 'work', 'scan_index.json')
 
 b = Bin(WINF)
 d = Dis(b)

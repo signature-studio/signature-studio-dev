@@ -7,11 +7,11 @@ PER=1900
 src=work/boot_ranges.txt
 rm -f work/boot.N*.lift.DONE work/boot_all.DONE work/chunk_*.txt
 python3 - <<'PY'
-rs = open('/home/ubuntu/work/webstudio/tools/m11/work/boot_ranges.txt').read().split(',')
+rs = open('work/boot_ranges.txt').read().split(',')
 per = 1900
 n = 0
 for i in range(0, len(rs), per):
-    open('/home/ubuntu/work/webstudio/tools/m11/work/chunk_%d.txt' % n, 'w').write(','.join(rs[i:i + per]))
+    open('work/chunk_%d.txt' % n, 'w').write(','.join(rs[i:i + per]))
     n += 1
 print('chunks:', n)
 PY
