@@ -37,9 +37,8 @@ def names_and_imports(b, secs):
             elif kind == 2:
                 fl, j = leb(b, j); _, j = leb(b, j)
                 if fl & 1: _, j = leb(b, j)
-            else:
-                j += 1; fl, j = leb(b, j); _, j = leb(b, j)
-                if fl & 1: _, j = leb(b, j)
+            elif kind == 3:
+                j += 2
     for (s, e) in secs.get(7, []):
         n, j = leb(b, s)
         for _ in range(n):
@@ -59,6 +58,24 @@ CTL = {0x02: 'block', 0x03: 'loop', 0x04: 'if', 0x05: 'else', 0x0b: 'end', 0x0c:
        0x21: 'local.set', 0x22: 'local.tee', 0x23: 'global.get', 0x24: 'global.set', 0x00: 'unreachable',
        0x01: 'nop', 0x0e: 'br_table', 0x3f: 'memory.size', 0x40: 'memory.grow', 0x41: 'i32.const', 0x42: 'i64.const',
        0x43: 'f32.const', 0x44: 'f64.const', 0xd0: 'ref.null', 0xd2: 'ref.func'}
+NUMOP = {0x45 + i: n for i, n in enumerate('''
+i32.eqz i32.eq i32.ne i32.lt_s i32.lt_u i32.gt_s i32.gt_u i32.le_s i32.le_u i32.ge_s i32.ge_u
+i64.eqz i64.eq i64.ne i64.lt_s i64.lt_u i64.gt_s i64.gt_u i64.le_s i64.le_u i64.ge_s i64.ge_u
+f32.eq f32.ne f32.lt f32.gt f32.le f32.ge
+f64.eq f64.ne f64.lt f64.gt f64.le f64.ge
+i32.clz i32.ctz i32.popcnt i32.add i32.sub i32.mul i32.div_s i32.div_u i32.rem_s i32.rem_u
+i32.and i32.or i32.xor i32.shl i32.shr_s i32.shr_u i32.rotl i32.rotr
+i64.clz i64.ctz i64.popcnt i64.add i64.sub i64.mul i64.div_s i64.div_u i64.rem_s i64.rem_u
+i64.and i64.or i64.xor i64.shl i64.shr_s i64.shr_u i64.rotl i64.rotr
+f32.abs f32.neg f32.ceil f32.floor f32.trunc f32.nearest f32.sqrt f32.add f32.sub f32.mul f32.div f32.min f32.max f32.copysign
+f64.abs f64.neg f64.ceil f64.floor f64.trunc f64.nearest f64.sqrt f64.add f64.sub f64.mul f64.div f64.min f64.max f64.copysign
+i32.wrap_i64 i32.trunc_f32_s i32.trunc_f32_u i32.trunc_f64_s i32.trunc_f64_u
+i64.extend_i32_s i64.extend_i32_u i64.trunc_f32_s i64.trunc_f32_u i64.trunc_f64_s i64.trunc_f64_u
+f32.convert_i32_s f32.convert_i32_u f32.convert_i64_s f32.convert_i64_u f32.demote_f64
+f64.convert_i32_s f64.convert_i32_u f64.convert_i64_s f64.convert_i64_u f64.promote_f32
+i32.reinterpret_f32 i64.reinterpret_f64 f32.reinterpret_i32 f64.reinterpret_i64
+i32.extend8_s i32.extend16_s i64.extend8_s i64.extend16_s i64.extend32_s
+'''.split())}
 
 def decode_body(b, start, end):
     """(offset, text) の列. start は命令列の先頭 (locals の後)."""
@@ -105,7 +122,7 @@ def decode_body(b, start, end):
             elif sub in (12, 14): _, i = leb(b, i); _, i = leb(b, i); txt = 'table.init/copy 0x%x' % sub
             else: txt = 'fc.%d' % sub; _, i = leb(b, i) if sub in (13, 15, 16, 17) else (0, i)
         elif op in NOIMM or op in CTL or 0x45 <= op <= 0xc4:
-            txt = CTL.get(op, '0x%02x' % op)
+            txt = CTL.get(op) or NUMOP.get(op) or '0x%02x' % op
         else:
             txt = '?0x%02x' % op
         out.append((at, txt))
