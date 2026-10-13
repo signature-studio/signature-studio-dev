@@ -118,3 +118,11 @@
 - **比較した方式**: (a) CI で R2 素材 (`fl-win64`) から deny-list を毎回生成 (約 34 s + 素材取得が必要で、テスト 1 本のために素材を要求する)、(b) テストで `--skip-release-guard` (採用)、(c) deny-list を commit (素材由来の指紋を repo に置くことになるため不可)。
 - **理由**: (a) は素材取得に依存し、素材の無い run でテストが落ちる。(b) は fixture が素材由来でないことを前提に、テストに限ってゲートを外す。本番 stage (`deploy.sh`・`20-worker --phase release`) は従来どおり `--skip-release-guard` を渡さない。
 - **影響**: 本番 stage でこのフラグを使うと LGL-2 のゲートを通過するため、`deploy.sh` の呼び出し元はフラグを付けない。テストの fixture を素材由来に差し替える場合は、この決定を見直す。
+
+## D12 — liftdiff の既定 batch 状態は units のまま据え置く (hybrid への切替は根拠待ち)
+
+- **状態**: 保留 (2026-10-13, issue #1248 [LD-42]。子 issue #1464 [LD-50] で判断)
+- **決定**: `liftdiff_e2e.sh` [4/4] の既定 batch 状態は `units` のまま変えない。InitTable 充足の `hybrid` は `--state` で明示したときだけ使う。
+- **比較した方式**: (a) 既定を hybrid に切替 (InitUnits が実際に走り、空振り一致が 0 件になる)、(b) units のまま据え置き (採用・保留)。
+- **理由**: hybrid にすると sample:800 の判定が 67 関数変わる (実測 units 360/230/210 → hybrid 353/257/190・`tools/liftdiff/REPORT_APPENDIX_LD42.md` §1・§3)。どちらが正しいかは関数ごとの差分根拠が無いと決まらないため、根拠無しに基準値を動かさない。units の InitUnits 空振り一致は `check_initunits.py` で検出済み (LD-25) で、この検出は hybrid 側でのみ成立する。
+- **影響**: 既定 batch の 360 一致は「InitUnits が呼ばれない状態での一致」である。この数値を外部へ「実行初期化済みの一致」として出さない。
