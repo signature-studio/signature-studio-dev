@@ -132,28 +132,40 @@ class Fn:
 
 
 def classify_set(fn, call_idx, pos, lb):
-    """call 直前窓で pos 番引数が代入されているか. returns (kind, const|None)"""
+    """call 直前窓で pos 番引数が代入されているか. returns (kind, const|None, why)
+    why: none 時は 'entry' (関数入口まで代入なし = caller の live-in を素通し) / 'boundary' (call・jmp・jcc・ret・分岐先で窓が切れる)。
+         set 時は代入命令の型 ('load' = メモリ読出し / 'reg' = レジスタ由来 / 'arith' = 演算 / 'other')。"""
     ins_list = fn.ins
     reg = REGS[pos] if pos < 4 else None
     j = call_idx - 1
     while j >= 0:
         ins = ins_list[j]
-        if ins.mnemonic in ('call', 'ret', 'jmp') and not (ins.mnemonic == 'jmp' and False):
-            return 'none', None
-        if ins.mnemonic.startswith('j'):
-            return 'none', None
+        if ins.mnemonic in ('call', 'ret', 'jmp') or ins.mnemonic.startswith('j'):
+            return 'none', None, 'boundary'
         if reg:
             R, W = fn.rw(ins)
             if reg in W:
-                return 'set', const_of(fn, ins, reg, lb)
+                return 'set', const_of(fn, ins, reg, lb), _set_why(fn, ins)
         else:
             for m in ldmach.memops_of(fn.cs, ins):
                 if m['write'] and m['base'] == 'rsp' and m['disp'] == 0x20 + 8 * (pos - 4):
-                    return 'set', None
+                    return 'set', None, _set_why(fn, ins)
         if ins.address in fn.targets:
-            return 'none', None
+            return 'none', None, 'boundary'
         j -= 1
-    return 'none', None
+    return 'none', None, 'entry'
+
+
+def _set_why(fn, ins):
+    if ins.mnemonic in ('mov', 'movzx', 'movsx', 'movsxd') and len(ins.operands) == 2:
+        src = ins.operands[1]
+        if src.type == capstone.CS_OP_MEM:
+            return 'load'
+        if src.type == capstone.CS_OP_REG:
+            return 'reg'
+    if ins.mnemonic in ('add', 'sub', 'imul', 'shl', 'shr', 'sar', 'and', 'or', 'xor', 'lea', 'neg', 'not'):
+        return 'arith'
+    return 'other'
 
 
 def const_of(fn, ins, reg, lb):
@@ -223,7 +235,7 @@ def main():
                     if not used:
                         kind = 'callee_unused'; c = None
                     else:
-                        s, c = classify_set(cf, ci, pos, lb)
+                        s, c, why = classify_set(cf, ci, pos, lb)
                         if xmm and s == 'set' and c is not None:
                             kind = 'set_const_xmm_callee'; c = None
                         elif s == 'none':
@@ -233,6 +245,7 @@ def main():
                             fixes.append({'caller': p['caller'], 'callee': p['callee'], 'k': p['k'], 'pos': pos, 'const': c})
                         else:
                             kind = 'set_other' if pos < 4 else 'stack_set_other'
+                        stats['why:%s:%s' % (kind, why)] += 1
                 rec['args'][pos] = kind
                 stats['arg:' + kind] += 1
         stats['site:' + rec['status']] += 1

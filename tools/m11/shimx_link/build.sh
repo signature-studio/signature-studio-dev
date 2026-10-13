@@ -16,13 +16,14 @@ HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 M11="$(cd "$HERE/.." && pwd)"
 SX="$(cd "$M11/../shimx" && pwd)"
 W="$M11/work/shimx_link"
-TRACE=0; SOFT=0; FIX=0; WS=0
-for a in "$@"; do case "$a" in --trace) TRACE=1 ;; --soft) SOFT=1 ;; --fix) FIX=1 ;; --ws) WS=1 ;; esac; done
+TRACE=0; SOFT=0; FIX=0; WS=0; MIDI=0
+for a in "$@"; do case "$a" in --trace) TRACE=1 ;; --soft) SOFT=1 ;; --fix) FIX=1 ;; --ws) WS=1 ;; --midi) MIDI=1 ;; esac; done
 VARIANT=plain; [ $TRACE = 1 ] && VARIANT=trace
 GUIV=failfast; [ $SOFT = 1 ] && GUIV=soft
 SUF=""; [ $FIX = 1 ] && SUF="_fix"
 WSUF=""; [ $WS = 1 ] && WSUF="_ws"
-TAG="${VARIANT}_${GUIV}${SUF}${WSUF}"
+MSUF=""; [ $MIDI = 1 ] && MSUF="_midi"
+TAG="${VARIANT}_${GUIV}${SUF}${WSUF}${MSUF}"
 GEN="$W/gen${SUF}${WSUF}"; mkdir -p "$GEN"
 WSD="$(cd "$M11/../startup/winstubs" && pwd)"
 set +u; source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1; set -u
@@ -58,6 +59,20 @@ cc "$M11/work/m11_data.c" "$W/obj/m11_data.o" $CF
 cc "$HERE/sx_liftfix.c" "$W/obj/m11_sxfix.o" $CF
 cc "$HERE/sx_cbboot.c" "$W/obj/sx_cbboot.o" $CF   # CAB-177: R2 translator 実体 + R3 トークン (全 variant, constructor)
 llvm-nm --defined-only -g "$W"/obj/m11_*.o > "$W/m11_nm.txt"
+
+# 2c. winmm midi* 強定義 (--midi, #179 SHX-T6) ----------------------------------------
+#   audio 側の flm_midi* (flmidi*.c) を同リンクへ入れ、sx_midi_boot.c の constructor で
+#   flmidi_shimx_install() を呼んで shimx の midi* backend 表を登録する。--midi 無しの variant は不変。
+MIDIOBJ=""
+if [ $MIDI = 1 ]; then
+  AUD="$(cd "$M11/../audio/src" && pwd)"
+  mkdir -p "$W/obj_midi"
+  # flmidi.c は wasm atomics (shared memory) 前提。closure の本体は非 atomics のまま、MIDI objs だけ atomics を付ける
+  MIDIF="-O1 -w -matomics -mbulk-memory -pthread -fno-strict-aliasing"
+  for b in flmidi flmidi_winmm flmidi_shimx; do cc "$AUD/$b.c" "$W/obj_midi/$b.o" $MIDIF -I"$AUD" -I"$SX/src"; done
+  cc "$HERE/sx_midi_boot.c" "$W/obj_midi/sx_midi_boot.o" $MIDIF -I"$AUD"
+  MIDIOBJ="$W/obj_midi/flmidi.o $W/obj_midi/flmidi_winmm.o $W/obj_midi/flmidi_shimx.o $W/obj_midi/sx_midi_boot.o"
+fi
 
 # 2a. winstubs 結線 (--ws, #223) -------------------------------------------------------
 #   winstubs 全ソース (tools/startup/winstubs/src は読取のみ) + link 側 glue + cpuid 委譲版 simd helper。
@@ -116,7 +131,9 @@ OBJS+=("$W/obj/m11_fnstubs.o" "$W/obj/m11_data.o" "$W/obj/m11_sxfix.o")
 read -ra _multi <<< "$GUIOBJ $BOOT"   # GUIOBJ/BOOT は複数 .o の空白区切り。read -a は分割のみで glob 展開しない
 OBJS+=("${_multi[@]}")
 [ $WS = 1 ] && OBJS+=("$W"/obj_ws/*.o)
+[ $MIDI = 1 ] && read -ra _midi <<< "$MIDIOBJ" && OBJS+=("${_midi[@]}")
 WSEXP=""; [ $WS = 1 ] && WSEXP=_sx_ws_probe_cpuid,_sx_ws_probe_g03,_sx_ws_probe_g12,_sx_ws_stat,_sx_ws_loadlib_miss,_winstubs_stats,_winstubs_loadlib_miss,_winstubs_cpuid,
+[ $MIDI = 1 ] && WSEXP="${WSEXP}_sx_midi_probe_numdevs,_flm_init,"
 EXPORTS=_m11_boot_enter,_entry_point,_m11_init_count,_m11_boot_stage,_m11_va_used,_m11_va_calls,_m11_set_trace,_m11_icall_ok,_m11_icall_miss,_m11_icall_miss_uniq,_m11_icall_miss_at,_m11_disp_count,_m11_units_run,_m11_units_total,_m11_units_skipped,_m11_stub_total,_m11_stub_uniq,_m11_stub_name,_m11_stub_count,_m11_probe_count,_m11_longjmp_hit,_m11_set_survey,_m11_call_unit,_m11_unit_va,_shimx_set_trace,_shimx_set_trace_file,_shimx_init,${WSEXP}__emscripten_stack_restore,_emscripten_stack_get_current
 OUT="$W/m11_sx_$TAG"
 emcc "${OBJS[@]}" -o "$OUT.cjs.tmp" \

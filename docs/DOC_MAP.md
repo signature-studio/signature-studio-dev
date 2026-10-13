@@ -121,6 +121,7 @@
 | `tools/m11/REPORT.md` | ~229 | FLEngine_x64.dll 部分起動 PoC (stage 4/6・残 trap・次の一手)・§11 (#572, 要約のみ)・§12 survey の OOM/clobber 分離 (#513)・§13 (#516 qstore D17, 要約のみ)。§8 (LB_BASE #222)・§9 (sigfix #131)・§10 の commit 別測定表 (#132, §10a)・§10 の一部 (真因・修正 4 点・NC・次 blocker, §10b) は `REPORT_APPENDIX.md` に分割 |
 | `tools/m11/REPORT_N15.md` | ~16 | m11 REPORT §16 (#490 main HEAD の 4c3baa4 / faee5b6 状態の実測・ネガコン) の付録 (250 行上限のため分割) |
 | `tools/m11/REPORT_APPENDIX.md` | ~238 | m11 REPORT §8 (LB_BASE=0x10000 適用 #222)・§9 (sigfix 0 詰め #131)・§10a (#132 commit 別測定表と注記)・§10b (#132 真因・修正 4 点・NC・次 blocker・外した内容)・§12 の一部 (#513 新規類型の行案)・§12b (#513 巨大 VirtualAlloc の n の出所) の全文 (250 行上限のため本体から無変更で分割移動) |
+| `tools/m11/REPORT_N53.md` | ~49 | #953: sigfix 0 詰め引数の理由別 (why) 内訳・未復元件数 (kind 件数の正本は REPORT_APPENDIX §9)・`M11_SIGFIX_RECOVER=1` の退行検査 (#131 子) |
 | `tools/m11/REPORT_N21.md` | ~35 | M11-N21 (#572): m11_data_gen.py の DIR64 補正境界 off-by-one の全数照合・参照経路・修正・ネガコン・実測 (REPORT §11 は要約のみ) |
 | `tools/m11/REPORT_N715.md` | ~70 | #715: m11_e2e.sh 回帰ゲートの期待値 fail-closed 化・判定分岐の実測・e2e 再現試行 (`work-m11` 不足で fail-closed 停止)・PR 作成者の報告値 (未再現) の所在 |
 | `tools/m11/REPORT_N27.md` | ~130 | #680: survey 測定基準の固定化 (ldfix/qstore の fail-closed・PE パス env 化・IR 生成条件と指紋の記録・同一 runner の n=3 再現・NC 試験・`--full` は入力 CSV 欠落で未成功 (§10)・レビュー指摘の扱い・§13 73532f8 (c) 数値の切り分け) (環境間一致は未実測) |
@@ -152,6 +153,7 @@
 | `tools/m11/ldfix/REPORT_484.md` | ~130 | ldfix が 5c0270 の D4 脱落を検出できなかった理由 (F3c の門 G1〜G5) と load→store 脱落の全数監査 (#484) |
 | `tools/m11/ldfix/REPORT_509.md` | ~165 | F3c 門の拡張と LSF 脱落 8 関数 / 11 site の IR 修復、消費者形 (`fix_f3c_use`) の監査、残存誤り (41a670 / 666a60) (#509) |
 | `tools/m11/ldfix/REPORT_510.md` | ~150 | base が引数由来でない load→store (370 site / 169 関数) の判定軸: SSA 対応の静的判定 vs liftdiff 動的差分の実測比較と脱落数 (#510) |
+| `tools/m11/ldfix/REPORT_968.md` | ~50 | D17 修復 pass (rip 相対セルの 2 段 deref 潰れ) の部分達成: 単一 load の 24 関数を修復、残りは子 issue (#968) |
 | `tools/m11/ldfix/REPORT_930.md` | ~100 | 消費者形 pure 残 23 関数 (24 引数) の残件分類 (first-deref-not-entry 18 関数 ほか) とネガコン。survey 到達数は再現未了 (#930) |
 | `tools/m11/shimx_link/REPORT.md` | ~165 | M11 × shimx リンク |
 
