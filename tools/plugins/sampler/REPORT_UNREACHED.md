@@ -9,7 +9,7 @@
 - total2 外の非共通 **2,653 関数 / 1,200,793 B** の排他分類 (優先順位 (a)>(b)>(c)>(c-lea)>(d)): **(a) RVA32 表 314 関数 / 27,031 B**、(b) 命令内即値 **0 件**、(c) total2 外の呼出 **750 関数 / 406,591 B**、(c-lea) total2 外の lea **112 関数 / 28,227 B**、**(d) 参照なし 1,477 関数 / 738,944 B**。 排他合計 = 2,653 / 1,200,793 (検査 U4 PASS)。
 - 到達しうる根 = (a) ∪ (b_live) = 314 関数 / 27,031 B。 **total3 = 4,231 関数 / 1,456,503 B** (total2 から **+415 関数 / +65,994 B**、うち根 314 + 根から呼ばれて入った 101 (推定ではなく差分の実測))。 未到達 (非共通 − total3) = 2,238 関数 / 1,134,799 B。
 - **字義どおり根 = (a) ∪ (b) の上界は 7 本とも total3 と同値** (即値の参照が 0 件のため)。
-- **lift**: `judge.py shells` は 7/7 PASS (lift_rc / emcc_c_rc / f80 が全 0) だが、**range 欠落監査 (`indirect_defs.py`) が 5 関数 (4 block) で FAIL**。 `unr_e2e.sh` は exit 1 で `[unr_e2e] OK` は出ない。 欠落 5 件は RetDec が親関数の本体に畳み込んだもの (下記 §2d-3)。
+- **lift**: `judge.py shells` は 7/7 PASS (lift_rc / emcc_c_rc / f80 が全 0) だが、**range 欠落監査 (`indirect_defs.py`) が 5 関数 (4 block) で FAIL**。 `unr_e2e.sh` は exit 1 で `[unr_e2e] OK` は出ない。 欠落 5 件は RetDec が親関数の本体に畳み込んだもの (下記 §2d-4)。
 - **AC 達成状況**: AC1 達成 / AC2 **未達** (閉包と検査 U1–U5 は PASS、range 監査が FAIL) / AC3 達成 (d = 1,477 関数 / 738,944 B)。 Closes ではなく Refs・draft PR が妥当 (PM 判断)。
 
 **既知類型との関係** (`docs/DEFECTS.md`): **該当なし** (分類と到達性の判定。 lift の変換規則は変更していない)。 range 欠落 5 件は既知の D1a〜D16 のどれにも対応づけていない → 新規類型の候補 (§7d 参照。 DEFECTS.md は本 REPORT では編集しない)。
