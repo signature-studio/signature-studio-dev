@@ -35,3 +35,19 @@
 | 修正前後の `final.ll` 同一性 (`PLUGIN_MATRIX.json` の T0+T1 の `CreatePlugInstance` 持ち Delphi 86 ブロック、修正前 pass を `git show 190f1d8` から復元して `lift_ranges.sh` に差替。 `!insn.addr` と空行を除外して比較) | **84 ブロックが同一、2 ブロック (19148・19245) が差分**。 320 s |
 | 差分 2 ブロックの内容 | 各 6 行、`%m11op_1 = add i64 %ce.., 4` / `%m11INTP_1 = inttoptr` / `select` が `%ce0n13_.. = add` / `%ce0n14_.. = inttoptr` に**変数名だけ**変わる (A9L の固定点反復が行書換だけの変更を採用するようになり、`m11_passes` が付ける名前の前に A9L が命令化したため)。 演算は同じ。 値の同一性は差分試験していない |
 | NC (`sampler_nega.sh`、HEAD 82a99ac の作業ツリー) | exit 0。 NC7 / NC8 を含む全 NC が期待通り。 NC8: 最終 emcc rc=1 → 1、-1 → 1、`missing_ref`=1 → 1、旧 header → 2 |
+
+## C. 旧検証 (検証起点 7ffab50、main 取り込み (1ffb204) と fold 修正 (5bc59f1) の後、main 取り込み 4c3ae00 の前)
+
+REPORT §6 の旧版を移動した (250 行上限)。 入力は 7ffab50 の sampler / lift。 4 core / 15 GiB、逐次。
+
+| 項目 | 実測 (7ffab50) |
+|---|---|
+| `sampler_e2e.sh` | exit 0、873 s (開始時 load 0.63)。 judge shells PASS 7/7、matrix 54/54 |
+| `unreached_unique.py` / `ids_crosscheck.py` / `report_tables.py 2` | exit 0 / exit 0 / exit 0 |
+| `sampler_engines.sh` | exit 0、317 s (開始時 load 1.03)。 `judge engines` PASS 2/2。 23664 lift 295 s / 23677 lift 142 s |
+| `sampler_nega.sh` | exit 0、11 s。 NC1–NC8 が期待どおり |
+| `passes/test_fold_const_ops.py` | 4 件 OK (旧 `ir5_patch` 8a74e95 では 3 件 FAIL: 255 / 65535 / 2^64-1) |
+| T0 `batch_lift.sh --tier T0` | 42 行: lift_rc 0 = 42、`emcc -c` rc 0 = 42。 214 s |
+| T1 `batch_lift.sh --tier T1` | 45 行: lift_rc 0 = 45、`emcc -c` rc 0 = 44。 失敗 1 = ReWired (f80 2、既知)。 479 s |
+
+- 無効 run (記録のみ): 初回の T0/T1 は `batch_lift.sh` が `pefile` の venv を見ずに全行 rc=1 で落ちた (driver の rc=0 は偽陽性)。 `sampler/env.sh` を source して再実行した値のみ掲載。
