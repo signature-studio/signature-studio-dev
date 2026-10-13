@@ -159,7 +159,7 @@ python3 trap_triage/survey_diff.py work/negctl_663/pre.json work/negctl_663/post
 
 ## 8-3. 最終 HEAD `be3f1819` での実測 (IR 再生成 + PE あり、Closes #663 の判定根拠)
 
-素材 (`$ARTIFACTS_DIR` の実在を確認してから展開): `fl-win64` (`$RUNNER_TEMP/fl-win64`、`block00031_PE.bin` 22,227,016 B)・`toolchain-emsdk` (`/opt/emsdk`)・`toolchain-retdec` (`/opt/retdec`)・`work-m11` (`tools/m11/work/`)・`work-liftdiff` (`tools/liftdiff/work/`)。
+素材 (`$ARTIFACTS_DIR` の実在を確認してから展開): `fl-win64` (`$RUNNER_TEMP/fl-win64`、`block00031_PE.bin` 22,227,016 B)・`toolchain-emsdk` ([EMSDK])・`toolchain-retdec` ([RETDEC])・`work-m11` (`tools/m11/work/`)・`work-liftdiff` (`tools/liftdiff/work/`)。
 実行は HEAD で foreground、順に 3 本。
 
 | 手順 | 結果 (rc / wall) |
