@@ -130,6 +130,14 @@
 | 基線 (改名前、commit `3752fed`) | rc 1、欠落 5 件 / 4 block (§2d-4 と同じ) |
 | `unr_nega.sh` | rc 1。 NC0・NC1・NC3・NC4・NC5・NC6・**NC7 (改名を外すと indirect_defs FAIL)** は期待どおり。 **NC2 のみ不一致** (即値の辺が 7 本とも 0 件で U2 が FAIL しない。 §2d-7 の既知の非識別。 本 issue の範囲外、#667 に残す) |
 | 負荷 | 前提生成 (基線の初回) で uptime load 最大 16.32 (4 core、inventory の並列)。 本 run の load は未計測 (終了時の 1 分平均 1.00) |
+
+**再検証 (HEAD `7b7a7b9c`、main `c5df4657` を取り込んだ後。 検証起点はこの HEAD)**
+
+| 項目 | 結果 |
+|---|---|
+| `unr_e2e.sh` (前提生成込み、新規 worktree) | real 757.49 s / user 2447.20 s、**rc 0**、`[unr_e2e] OK`。 `judge.py shells` PASS 7/7、`indirect_defs` PASS 7/7 (欠落 0) |
+| `unr_nega.sh` | real 128.54 s / user 129.59 s、rc 1 (NC2 のみ不一致: 即値辺 0 件で非識別。 他は期待どおり。 NC8 (改名先が既存の衝突) は `export_rename.py` 非 0 で ok) |
+| total3 (7 本) | FL Keys 108 / Granulizer 180 / Slicer 214 / Slicer 2 240 / FPC 432 / Slicex 809 / Soundfont 2,248 (いずれも §2d-3 と同値。 U1–U5 PASS) |
 | `find tools/plugins/sampler -size +20M` | 0 件 |
 
 **検証 (コミット `273cc10`、改名失敗の rc 反映 + NC8 追加後。 レビュー指摘への対応)**
