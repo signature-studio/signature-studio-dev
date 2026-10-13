@@ -56,9 +56,17 @@
 - 追加の 10 件 (`rax_1_reload` 等) は A/B にも出るので 1 バイト化の原因ではない。出所 (どの IR 命令が起点か) は未特定。
 - 既知類型: `docs/DEFECTS.md` に 1 バイト stub (decode 範囲由来) の類型は無い。命令の誤復号ではないため、行案は未確定のまま。
 
-## #1285 (ICALL-22): edge 捨て段の特定と 183 site 突合 (HEAD `604e900f`)
+## #1285 (ICALL-22): edge 捨て段の特定と 183 site 突合 (測定 commit `604e900f`)
 
 素材: `fl-win64` (`block00031_PE.bin`)・`toolchain-retdec` (RetDec v5.0 `53e55b4b`)。foreground で実行。`load 0.53` (開始時)。
+測定 commit `604e900f` は tools/icall のコードを変えた最後の commit。以後の差分はこの節と REPORT のみで、鮮度の証跡は次の通り (`git diff 604e900f HEAD -- tools/icall`):
+
+```
+ tools/icall/REPORT_APPENDIX_851.md | 51 ++++++++++++++++++++++++++++++++++--
+ 1 file changed, 49 insertions(+), 2 deletions(-)
+```
+
+REPORT 以外 (`':!tools/icall/REPORT*'`) の差分は 0 行。よって `604e900f` での測定値は HEAD で有効。
 
 ### (1) 再現 (A〜D、`fn_boundary_repro.sh`)
 
@@ -94,8 +102,8 @@ D の `D.log` で `function_128c320()` を指す警告 5 件はすべて、こ�
 
 - C→D で既存 site の状態変化は **0 件** (`status change C->D: []`)。`0x128c320` 本体を足しても `0xc589b0` / `0x128f9e0` の site 落ちは変わらない。
 - したがって「183 site 落ち」と「`0x128c320` 本体の有無」は独立。`function_128c320` の edge 捨ては 183 site 落ちの原因ではない。
-- 注: 本節の数値は `audit_icall.py` の before 側 IR 直接監査で、REPORT (`roundtrip.sh` 経由・書換え後の 366 落ち) とは対象が違う。REPORT の 183 と本節の 183 (`0xc589b0`) は一致するが、`0x128f9e0` は 190 (REPORT 183) で一致しない。両者は別条件のため直接比べない。
-- 既存記載との不一致: 前節 (#851) の「C は 388 site 中 dropped 387」は、今回の C (`0xc589b0`+`0x128f9e0`、計 374 site) の再測定 (dropped 373) と一致しない。C に `0x128c320` 本体は含まれないため、前節の 388 (= D の site 数) は C の値として誤記だった可能性が高い。原因は未確定で、旧 run の入力を再現できないため判定できない。D の 388 / 386 は一致。
+- 注: 本節の数値は `audit_icall.py` の before 側 IR 直接監査で、REPORT (`roundtrip.sh` 経由・書換え後の 366 落ち) とは対象が違う。REPORT の 183 と本節の `0xc589b0` の 183 は一致するが、`0x128f9e0` は 190 (REPORT 183) で一致しない。両者は別条件のため直接比べない。
+- 前節 (#851) との比較: 前節の C「388 site 中 dropped 387」と本節の C (`0xc589b0`+`0x128f9e0`、計 374 site・dropped 373) は一致しない。本節の C は `--funcs "0xc589b0-0xc5d667,0x128f9e0-0x1294ab8"` (`fn_boundary_repro.sh` の run C 指定と同じ 2 関数)、D は同 + `0x128c320-0x128dc44`。前節の `--funcs` 関数一覧は未記録のため、前節の 388 が別の関数集合 (隣接 3 関数 `0x128c280`・`0x128c2f0`・`0x128c320` の 14 site を足すと 374 + 14 = 388 と一致) で測られた可能性を排除できない。確定は旧 run の `--funcs` 指定が判明してからとする。両節とも、比較は関数一覧を揃えた上で行う。
 
 ### (4) 結論と既知類型
 
