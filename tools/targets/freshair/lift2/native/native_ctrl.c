@@ -33,6 +33,32 @@ static void __attribute__((ms_abi)) map_hook(void* child, int id, float v, void*
     fprintf(stderr, "MAPTRACE S%d k=%d type=%s id=0x%x value=%08x keycnt=%u key0=%u\n", g_trSidx, k,
             k < 0 ? "?" : (CHAIN[k] == 0 ? "comp" : CHAIN[k] == 1 ? "filter" : "gain"), id, vb, kc, kidx);
 }
+
+/* FA-9 観測プローブ (FA_PROBE9=1): 0x180ca1480 (controller lookup) / 0x180da6c00 (param 書込) の入口で引数を記録し、
+ * 元の機械語を一時復元して本物を呼び、再度 jmp を敷く (unpatch-call-repatch)。FA_ALT9=1 は C+0x328 を C+0x2d0 と不一致にし
+ * 静的分岐 (map を引かず {C+0x308,C+0x470}) を強制する (ネガティブコントロール)。 */
+static unsigned char g_sv_ca[12], g_sv_da[12]; static unsigned char *g_p_ca, *g_p_da;
+static void patch12(unsigned char* p, const void* t, unsigned char* sv) { memcpy(sv, p, 12); p[0] = 0x48; p[1] = 0xb8; memcpy(p + 2, &t, 8); p[10] = 0xff; p[11] = 0xe0; }
+typedef void* (__attribute__((ms_abi)) *ca1480_t)(void*, void*, void*); typedef void (__attribute__((ms_abi)) *da6c00_t)(void*, int, int, int);
+static void* __attribute__((ms_abi)) ca1480_probe(void* C, void* out, void* key) {
+    uint64_t a2d0, a328, ctl, h[3]; memcpy(&a2d0, (char*)C + 0x2d0, 8); memcpy(&a328, (char*)C + 0x328, 8); memcpy(&ctl, (char*)C + 0x318, 8);
+    uint32_t kc = 0xffffffffu, k0 = 0xffffffffu; if (key) { memcpy(&kc, key, 4); memcpy(&k0, (char*)key + 4, 4); }
+    const char* pth = !key || kc == 0 ? "nokey" : a2d0 == a328 ? "map" : kc != 1 ? "zero" : k0 == 0 ? "static" : "map";
+    memcpy(h, (char*)ctl + 0xa8, 24);
+    { unsigned char tmp[12]; memcpy(tmp, g_sv_ca, 12); memcpy(g_p_ca, tmp, 12); }
+    void* r = ((ca1480_t)(g_p_ca))(C, out, key);
+    patch12(g_p_ca, (const void*)&ca1480_probe, g_sv_ca);
+    uint64_t o0, o1, o2; memcpy(&o0, out, 8); memcpy(&o1, (char*)out + 8, 8); memcpy(&o2, (char*)out + 0x10, 8);
+    fprintf(stderr, "FA9CA S%d eq=%d kc=%u k0=%u path=%s ret=%s out0=%llx out1=%llx found=%d hdr=%llx,%llx,%llx\n", g_trSidx, a2d0 == a328, kc, k0, pth,
+            r == out ? "out" : "?", (unsigned long long)o0, (unsigned long long)o1, o2 != 0, (unsigned long long)h[0], (unsigned long long)h[1], (unsigned long long)h[2]);
+    return r;
+}
+static void __attribute__((ms_abi)) da6c00_probe(void* T, int id, int idx, int r9) {
+    fprintf(stderr, "FA9DA S%d this_id=0x%x idx=%d r9=%d\n", g_trSidx, (unsigned)id, idx, r9);
+    unsigned char tmp[12]; memcpy(tmp, g_sv_da, 12); memcpy(g_p_da, tmp, 12);
+    ((da6c00_t)(g_p_da))(T, id, idx, r9);
+    patch12(g_p_da, (const void*)&da6c00_probe, g_sv_da);
+}
 #define W64(b, o, v) do { uint64_t _t = (uint64_t)(uintptr_t)(v); memcpy((b) + (o), &_t, 8); } while (0)
 #define W32(b, o, v) do { uint32_t _t = (uint32_t)(v); memcpy((b) + (o), &_t, 4); } while (0)
 static void build_tree(uint8_t* im, unsigned char** Fp, unsigned char** Mp, unsigned char** Ck, unsigned char** Wk,
@@ -63,6 +89,7 @@ static void build_tree(uint8_t* im, unsigned char** Fp, unsigned char** Mp, unsi
         W64(RB, 0, RB + 0x10); W32(RB, 8, 0x40); W32(RB, 0xc, 0x40); W64(RB, 0x18, 0x1803b4070ULL); W64(RB, 0x20, 0x1803b4070ULL);
         /* C: Snapin インスタンス (単層: 0x2d0 == 0x328, 空パラメタ map) */
         W64(C, 0x2d0, C + 0x2d0); W64(C, 0x328, C + 0x2d0);
+        if (getenv("FA_ALT9")) W64(C, 0x328, C + 0x2d8);   /* FA-9 ネガコン: 静的分岐を強制 (C+0x2d0 != C+0x328) */
         W64(C, 0x2e0, C + 0x600); W64(C + 0x600, 0, W);            /* arr1[0] = W */
         W64(C, 0x338, C + 0x610); W64(C + 0x610, 0, W);            /* arr2[0] = W */
         W64(C, 0x318, C + 0x2100);                                  /* controller */
@@ -110,6 +137,10 @@ int main(int argc, char** argv) {
     if (getenv("FA_MAP_TRACE")) {   /* mov rax, imm64 ; jmp rax */
         unsigned char* h = im + (0x180c9d700ULL - 0x180000000ULL); uint64_t t = (uint64_t)(uintptr_t)&map_hook;
         h[0] = 0x48; h[1] = 0xb8; memcpy(h + 2, &t, 8); h[10] = 0xff; h[11] = 0xe0;
+    }
+    if (getenv("FA_PROBE9")) {
+        g_p_ca = im + (0x180ca1480ULL - 0x180000000ULL); g_p_da = im + (0x180da6c00ULL - 0x180000000ULL);
+        patch12(g_p_ca, (const void*)&ca1480_probe, g_sv_ca); patch12(g_p_da, (const void*)&da6c00_probe, g_sv_da);
     }
     volatile int* fma = (int*)0x1813070f8ULL;
     int fma_v = argc > 3 ? atoi(argv[3]) : 0;

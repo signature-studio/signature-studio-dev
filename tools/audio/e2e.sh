@@ -4,7 +4,8 @@
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 ROOT="$(cd -- "$HERE/../.." && pwd)"
-export PATH="/home/ubuntu/.local/share/pnpm/bin:$PATH"
+. "$ROOT/tools/shared/env.sh"
+export PATH="${PNPM_HOME:-$HOME/.local/share/pnpm}/bin:$PATH"
 command -v node >/dev/null || { echo "node not found" >&2; exit 1; }
 bash "$HERE/inventory.sh"
 "$ROOT/node_modules/.bin/tsc" --noEmit -p "$ROOT/tsconfig.json"

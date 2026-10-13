@@ -1,8 +1,8 @@
 # AU-10 (#191) 30 分ソーク (`--soak30`) 全文 — tools/audio/
 
-> 本体 `REPORT.md` §15 から分割移動した全文 (内容は無変更。節番号は本体と一致させるため §15 を維持)。親: [`REPORT.md`](REPORT.md)。
+> 本体 `REPORT.md` §16 から分割移動した全文 (内容は無変更。節番号は本体と一致させるため §16 を維持)。親: [`REPORT.md`](REPORT.md)。
 
-## 15. AU-10 (#191) 30 分ソーク (`--soak30`)
+## 16. AU-10 (#191) 30 分ソーク (`--soak30`)
 
 既知類型との関係: 該当なし (ランタイム shim の長時間検証)。検証起点 commit: `0a721b0` (ブランチ `191-audio-soak30`, base `149f073`)。環境: GitHub runner 4 core / 15 GiB, headless Chrome 154.0.8037.97 (fake 出力シンク), emcc は toolchain-emsdk。
 
