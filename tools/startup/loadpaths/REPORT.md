@@ -229,5 +229,15 @@ DEFECTS.md 追記案: なし (新しい silent miscompile 類型は見つけて�
 
 ## 9. #590 の検証 (実測)
 
-(コミット済み HEAD での再現結果を追記)
+コミット済み `b159cf0` の clean worktree で `bash tools/startup/loadpaths/e2e.sh` (並列 1、node v22.23.3 / python3.14、capstone は調査時のみで本ツールは不要):
+
+| 項目 | 結果 |
+|---|---|
+| e2e 3 回 | exit 0 ×3 / 所要 **16.41 / 15.91 / 16.46 秒** / load average (1 分) 開始 0.08・0.34・0.49 → 終了 0.34・0.49・0.60 |
+| `svc_check.py` | 43/43 一致 |
+| ネガコン (`svc_check.py --mutate`) | vtable スロット / call 辺 / import 名 / 機械語の出現回数 / グローバル対応 / 別 level の 6 種を壊して全て検出 (exit 0)。見逃しがあれば exit 1 |
+| `lang_seed_check.mjs` | PASS (現行 seed 不出現 / 派生 ja 出現 / ネガコン 3 種) |
+| 既存 [1]〜[3] | 変更前と同じ結果 (PASS) |
+
+**この検証が示さないこと**: エンジンの実行 (boot 未到達)。受入条件 1 は未達 (§8-4)。
 
