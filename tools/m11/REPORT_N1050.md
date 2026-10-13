@@ -29,7 +29,7 @@
 ### 2-1. 検証起点
 
 - 全再生成・trace build・実 boot の**実行 commit hash は元 run のログに残っておらず、特定できない**。
-- 代わりに code tree を実測で固定した: `git diff 1ef8ccfb 945d2fd -- tools/m11 tools/shimx` の変更は `tools/m11/REPORT_N1050.md` の 37 行追加のみ。よって `tools/m11` / `tools/shimx` の code は main (`1ef8ccfb`) と PR head (`945d2fd`) で同一であり、元 run は同じ code tree で行われたと推定する (推定)。
+- 代わりに code tree を実測で固定した: `git diff 1ef8ccfb 8597b970 -- tools/m11 tools/shimx` の変更は `tools/m11/REPORT_N1050.md` の 79 行追加のみ (`tools/shimx` の差分は 0 行)。よって `tools/m11` / `tools/shimx` の code は main (`1ef8ccfb`) と PR head (`8597b970`) で同一であり、元 run は同じ code tree で行われたと推定する (推定)。
 - 以後の run は、実行前に `git rev-parse HEAD` を REPORT に書く。
 
 ## 3. 数え方・ネガティブコントロール
@@ -50,9 +50,9 @@
 
 本修正 run で次を実行した:
 
-- 前提: emsdk 6.0.12 (pin 版) を run 内に install (`[EMSDK]` の pin 版。素材 `toolchain-emsdk` は本 run では未展開)。
-- コマンド: `bash tools/shimx/test/ftrace/ftrace_test.sh` (実行 HEAD は fix の PR head。`tools/shimx` は main と同一)
-- 結果: rc=0 / 5.98 s。
+- 前提: `[EMSDK]` (pin 版) の既存 install を使用 (`/opt/emsdk/emsdk_env.sh` の存在を確認。素材 `toolchain-emsdk` は本 run では未展開)。
+- 実行 HEAD: `8597b970` (commit 済み)。コマンド: `bash tools/shimx/test/ftrace/ftrace_test.sh`
+- 結果: rc=0 / 3.62 s。
   - `events=10` / `by_api` = CreateFileW 2・CreateFileA 1・GetFileAttributesW 2・FindFirstFileW 2・FindNextFileW 2・ReadFile 1。file API の呼出が JSON 行として記録された。
   - ネガコン ✓ トレース無効時は JSON 行なし。
   - ネガコン ✓ `SHIMX_TRACE_FILE` 指定あり → JSON 行 1 件以上 / 指定なし → ファイル無し。
@@ -73,7 +73,7 @@
 
 ## 5. 本修正 (差し戻し対応) の実施内容と未実施
 
-- 実施: §2-1 の検証起点、§3-2 のネガコン (SHX-T12 単体テスト rc=0 / 5.98 s)、§4 の既知類型・signature mismatch・未解決の表形式化。
+- 実施: §2-1 の検証起点、§3-2 のネガコン (SHX-T12 単体テスト rc=0 / 3.62 s、実行 HEAD `8597b970`)、§4 の既知類型・signature mismatch・未解決の表形式化。
 - 未実施 (理由つき):
   - **ftrace ファイル自体の `wc -l`**: `tools/m11/work/ftrace/` が無く、元 run の ftrace ファイルを再計測できない。`work-m11` は `$ARTIFACTS_DIR` に無く (`ls` で `fl-win64.tar.zst` のみ確認)、fix run では展開できない。PR 本文の `oc_artifacts` 行で review run が取得して再計測する想定。
   - **全再生成・trace build・実 boot の再実行**: Ghidra 600 s + regen 605 s + 実 boot が fix の上限 40 分に収まらず、また `work-m11` が無いため不可。
