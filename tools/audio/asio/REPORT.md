@@ -183,7 +183,8 @@ bash tools/audio/e2e.sh --out tools/audio/work/results_parent.json   # 親 e2e 2
 | A | `bash tools/audio/asio/e2e.sh` (1 回目) | exit 1 · node 126/126 · Chrome **3/4** (`com_ramp_b256_d2` underruns=1 silence=1280, ramp 185984/241024) | 204 秒 | 0.49 → 0.03 |
 | B | 同 (2 回目) | exit 0 · node 126/126 · Chrome **4/4** (`com_ramp_b256_d2` underruns=0, ramp 0/240896 / soak underruns=0, ramp 0/5762816, bsti 22516 bad=0) | 203 秒 | 0.05 → 0.05 |
 | C | `bash tools/audio/e2e.sh --quick` (親 e2e・asio 呼出を含む) | exit 0 · 親 **42/42 PASS** · asio node 126/126 · Chrome 3/3 (quick は soak 省略) | 330 秒 | 0.23 → 0.66 |
-| D (最終 HEAD `b341b6e5` = main を merge) | `bash tools/audio/e2e.sh --quick` | exit 0 · 親 **42/42 PASS** · asio node 126/126 · Chrome 3/3 | 329 秒 | 0.11 → 0.18 |
+| D (HEAD `b341b6e5` = main を merge) | `bash tools/audio/e2e.sh --quick` | exit 0 · 親 **42/42 PASS** · asio node 126/126 · Chrome 3/3 | 329 秒 | 0.11 → 0.18 |
+| E (最終 HEAD `59c952e1`) | `bash tools/audio/asio/e2e.sh` (120s soak 込み) | exit 0 · node 126/126 · Chrome **4/4** (soak ramp 0/5762816, underruns 0, bsti bad=0 は実行ログ参照) | 203 秒 | 0.04 → 0.04 |
 
 - 指摘 1 への対応: `tools/audio/e2e.sh` の末尾で `bash tools/audio/asio/e2e.sh` を呼ぶ (`--quick` は引き継ぐ)。
 - **未解決 (再現性)**: 実行 A の短シナリオ underrun は B・C で再現せず、1/3 回の発生。120s soak は 3 回とも underrun 0。
