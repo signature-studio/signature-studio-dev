@@ -149,7 +149,23 @@ NC1 (capstone 未導入) は `bash tools/m11/m11_gen_ir2.sh` が exit 1 にな�
 - 結論: `--full` は本 runner では成功しない。WORKFLOW §11 の `--full` が正という記述は未検証のまま (#728)。
 - 検証 (推奨 6): `--full` の実走を試みた。「実走しない理由」は CSV 欠落 (上記)。
 
-## 11. #728: `--full` の実走 (head `2e128c5c`) と lift 成果物の PE 紐付け
+## 11. #729: head での survey n=3 (同一 runner・work-m11 から IR 再生成)
+- 条件: `1f83c5ee` (origin/main) に本 PR の `m11_lift.sh` の RetDec 解決修正のみ。素材は `fl-win64` (PE 1 member)・`work-m11`・`work-liftdiff`。`m11_gen_ir2.sh` を先に実行して `ir_conditions.json` を作成 (42.8 秒, ldfix applied, `ir_sha256` 995351f5…)。
+- 障害: `m11_e2e.sh` が boot5 の RetDec lift で fail-closed (`retdec-decompiler: command not found`)。`[RETDEC]` の bin が PATH に無いことが原因。`m11_lift.sh` の RetDec 解決を `command -v` → `[RETDEC]` の bin (スクリプト内の既定) に変更して解消。
+
+| 測定 | rc | 所要秒 | load (開始→終了) | ok | oob | halt0 | trap | miss | noproc | clobber | oom |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| R1 (初回。lift boot5 込み) | 0 | 148 | 0.05 → 1.07 | 870 | 17 | 8 | 25 | 46 | 1 | 0 | 1 |
+| R2 (増分) | 0 | 44 | 0.70 → 0.86 | 870 | 17 | 8 | 25 | 46 | 1 | 0 | 1 |
+| R3 (増分) | 0 | 44 | 0.86 → 1.26 | 870 | 17 | 8 | 25 | 46 | 1 | 0 | 1 |
+
+- n=3 の min–max: ok 870–870 / trap 25–25 / miss 46–46 / clobber 0–0 / oom 1–1。halt0 は trap 内の `halt0->longjmp` 8 件 (R1 は 8, R2・R3 も 8)。oob 17 件。
+- `reached_stage` 4 / `units_run_full` 53 / `wasm_bytes` 6,042,784 (R1)。
+- 注: 本節の ok 870 は §10-1 (head `4e084e1` で ok 866 / oob 21 / halt0 8 / trap 29) と**一致しない**。差の出所は未切り分け (本 run は work-m11 の旧スナップショットから `m11_gen_ir2.sh` で IR を作り直した。§10-1 は同 head の別 run で、IR の作り方・素材の版が同一かは未確認)。§3 の旧値 (864/23/31) とも異なる。
+- 未実施: 別環境 (別 runner / VM) での n>=2、work-m11 の R2 再投入 (素材権限者)、73532f8 (c) の trap 内訳差の原因調査。
+- HEAD 再現 (`a4aa766c`・retdec を PATH に入れない・`work/boot5.*` を削除して lift から): rc 0 / 101 秒 / load 0.07 → 0.83 / ok 870 · trap 25 · oom 1 · clobber 0 · miss 46。修正前は同条件で `retdec-decompiler: command not found` により 1 秒で rc 1。
+
+## 12. #728: `--full` の実走 (head `2e128c5c`) と lift 成果物の PE 紐付け
 実行環境: 本 runner (4 vCPU, 16 GiB)。素材 `fl-win64` (`block00031_PE.bin`, sha256 `b2c64da4…`)・`toolchain-retdec` (`/opt/retdec`)・`toolchain-emsdk`・`work-m11`・`work-liftdiff` を展開。Ghidra 12.1.4 (公式 release, JDK 21) で `functions_dll.csv` を再生成 (59 009 行, sha256 `90d1bbac…`, Ghidra headless 約 10 分)。capstone 5.0.7 / pefile 2024.8.26。
 
 | 測定 | コマンド | rc | 所要秒 | 結果 |

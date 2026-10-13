@@ -71,6 +71,8 @@ base() { # base <prs json> [active runs json]
 }
 # run <path> <pr番号...>: 実行中 run の JSON (workflow の path と担当 PR)
 run() { local p="$1" nums="" ; shift; for n in "$@"; do nums="$nums{\"number\":$n},"; done; printf '{"event":"pull_request","display_title":"x","path":"%s","pull_requests":[%s]}' "$p" "${nums%,}"; }
+# run_sha <path> <head_sha> <pr番号...>: head_sha を持つ pull_request run (古い head の担当判定用)
+run_sha() { local p="$1" sha="$2" nums="" ; shift 2; for n in "$@"; do nums="$nums{\"number\":$n},"; done; printf '{"event":"pull_request","display_title":"x","path":"%s","head_sha":"%s","pull_requests":[%s]}' "$p" "$sha" "${nums%,}"; }
 # pr <n> <head> <draft> <updated_at> <labels json> [body] [head repo full_name (既定 o/r)]
 pr() { printf '{"number":%s,"title":"PR %s","head":{"sha":"%s","repo":{"full_name":"%s"}},"draft":%s,"updated_at":"%s","labels":%s,"body":%s}' "$1" "$1" "$2" "${7:-o/r}" "$3" "$4" "${5:-[]}" "$(jq -Rn --arg b "${6:-}" '$b')"; }
 # detail <n> <mergeable> <reviews json> <comments json>
@@ -252,6 +254,22 @@ detail 12 true
 wd
 not_logged 'pr reopen 12' && not_logged 'pr review 12'
 expect "PR with a running opencode.yaml run is covered" $?
+
+# 12b. 古い head の pull_request run しか無い PR は担当外 (IDLE)。差し戻し無し・verdict 無しなので review を再起動する (#719)
+reset
+base "[$(pr 12 lll222 false "$OLD")]" "[$(run_sha .github/workflows/opencode.yaml fff000 12)]"
+detail 12 true
+wd
+logged 'pr reopen 12'
+expect "PR whose only running run is on an old head -> not covered, review restarted" $?
+
+# 12c. 現在の head の pull_request run が PR を担当していれば何もしない (#719)
+reset
+base "[$(pr 12 lll222 false "$OLD")]" "[$(run_sha .github/workflows/opencode.yaml lll222 12)]"
+detail 12 true
+wd
+not_logged 'pr reopen 12' && not_logged 'pr review 12'
+expect "PR with a running run on the current head is covered" $?
 
 # 16. 実行中 run の一覧が取れなければ何も操作しない (exit 1)
 reset

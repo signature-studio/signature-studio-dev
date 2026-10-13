@@ -11,7 +11,7 @@
 **結論**: OTT vst2/vst3 = 147/147・151/151、Serum2 = 238/238 (import カバレッジ, `data/coverage.json` の `covered`/`in_scope`)。
 CP932 は MB→WC 全 DBCS 9,604 セルと WC→MB 往復が一致。Crypt は MD5/SHA-1/SHA-256 を実装し公開ベクトルと一致。
 
-### 15.1 序数 → 名前 (根拠: Wine `shell32.spec` / `shlwapi.spec` = Windows の序数表。呼出箇所の引数での裏取りは §15.5)
+### 15.1 序数 → 名前 (根拠: Wine `shell32.spec` / `shlwapi.spec` = Windows の序数表。呼出箇所の引数での裏取りは §15.5 で完了)
 
 | import | 同定 | 実装 | 備考 |
 |---|---|---|---|
@@ -39,7 +39,7 @@ MultiByteToWideChar / WideCharToMultiByte / GetCPInfo(Ex) / IsValidCodePage / Is
 
 | 検証 | 結果 |
 |---|---|
-| `bash tools/shimx/test.sh --quick` (クリーン worktree, 検証起点 HEAD `365f7fd`, n=3) | **3/3 exit 0**, 所要 23.6–24.1 s (load average 0.20–0.65 = 実行直前, 並列なし)。MT 5 グループ / ST PASS / fail-fast 8 / M4 互換 MT・ST PASS / 未実装 0 / 公開関数 678 (本 PR 前 674)。`--quick` なしは `verify_ott` が素材なしで SKIP のため同等 (作業ツリー n=1: 24.3 s) |
+| `bash tools/shimx/test.sh --quick` (クリーン worktree, 検証起点 HEAD `365f7fd`, n=3) | **3/3 exit 0**, 所要 23.6–24.1 s (load average 0.20–0.65 = 実行直前, 並列なし)。MT 5 グループ / ST PASS / fail-fast 8 / M4 互換 MT・ST PASS / 未実装 0 / 公開関数 678 (本 PR 前 674)。`--quick` は `verify_ott` を省く (フル実行は §15.6) (作業ツリー n=1: 24.3 s) |
 | CP932 全 DBCS セル | **9,604 セル**: MB→WC 不一致 **0**、WC→MB→WC 往復不一致 **0** (`test_shord.inc`)。オラクル = Python 標準 codec `cp932` (表の出典と独立実装)。生成表 `src/cp932_tab.c` も同 codec と 11,340 セル全件突合し差 **0** |
 | Crypt | RFC 1321 / FIPS 180-4 の公開ベクトル 7 件 + 百万 `a` ×3 アルゴ + 境界長 (55/56/63/64/65 B) ×3 アルゴ全一致。1 バイトずつ流した場合も同値。期待値は Python `hashlib` で再検算 (手書き値との差 0) |
 | 序数 | `GetProcAddress` 序数 (shell32 74 / shlwapi 12・219)・lift トークン往復・IEnumFORMATETC / IStream / QISearch の実呼出を `test_link.c` / `test_cbtrans.c` / `test_shord.inc` で確認 |
@@ -47,13 +47,41 @@ MultiByteToWideChar / WideCharToMultiByte / GetCPInfo(Ex) / IsValidCodePage / Is
 | import カバレッジ (`data/coverage.json`) | OTT vst2 147/147, vst3 151/151, Serum2 238/238, FreshAir 98/98, FL64.exe 111/111 |
 
 範囲外: 実 PE (OTT/Serum2) を実際にリンク・実行しての import 解決は未実施 (`plugins-*` 素材なしで、coverage は `data/imports.json` の既存スナップショット (import_scan.py 出力) と `shimx` 定義の突合)。
-`verify_ott` / M11 closure 突合は `work-m11` / `work-m6-ott` が無く SKIP (§13 と同じ)。このため `test.sh` が再生成した `BACKLOG.md` / `inventory.md` / `data/inventory.csv` は M11・OTT 列が空になり劣化するので **main 版のまま (未更新)** にした。`data/coverage.json` は生成器 (`gen_inventory.py`) の出力のうち `plugins` / `shimx_*` / `ordinal` のみ反映し、`m11_closure` / `ott_api_resolved` は main 版を保持。
-結果として `inventory.md` / `BACKLOG.md` は「ord74 等が未解決」と古いままで `coverage.json` と食い違う → 15.5 の未解決に計上 (素材 `work-m11 work-m6-ott` 付きで `bash tools/shimx/test.sh` を再実行すれば生成器が全て更新する。生成器側は本 PR で修正済み)。
+**フル実行の実測 (本 PR 最終 HEAD, `work-m11` / `work-m6-ott` 展開済み)**: 下表 §15.6 参照。以前の「素材が無く SKIP・main 版のまま」の記述は誤りで、本 run では `verify_ott` は SKIP せず実行され、生成物は生成器の出力どおり更新されている。
 
-### 15.5 序数の裏取りの限界と未解決
+exports.txt の再生成差分: 並べ替えに加えて **9 本が追加** (削除 0)。`shimx_drag_accepts` `shimx_hdrop_create` `shimx_seh_current_exception` `shimx_seh_depth` `shimx_seh_enter` `shimx_seh_leave` `shimx_seh_set_pad_resolver` `shimx_seh_set_typed_matcher` `shimx_set_notify_hook`。いずれも `src/shell.c` / `src/seh.c` / `src/handles.c` に既に定義があり、main の exports.txt が古かっただけ (生成結果は正しい)。
 
-| 未解決 | 影響 | 起票先 |
-|---|---|---|
-| 序数 → 名前は Wine の `.spec` (Windows の序数表と同一規約) で同定したが、**呼出箇所の引数での裏取り (OTT/Serum2 の call site 逆アセ) は未実施**。素材 `plugins-ott` / `plugins-serum2` が本 run に無い | 序数表が実 Windows 10/11 と食い違う場合、誤実装が silent に通る | #175 にコメント (再起動時 `oc_artifacts: fl-win64 plugins-ott plugins-serum2`)。新規子チケット案: `[SHX-T8b] 序数 import 5 件の call site 引数裏取り` |
-| d2d1 ord1 は同定対象外 (d2d1 = tools/gui 担当帯。分母 238 にも含まれない)。Wine `d2d1.spec` は序数を明示せず名前のみ列挙するため、序数 1 の根拠が取れていない | Serum2 GUI 経路のみ | tools/gui 担当 (issue #175 にコメントで引継ぎ) |
-| shlwapi #219 を `QISearch` とした点は Wine の `-import` 属性 (`QISearch(ptr ptr ptr ptr)`) に依拠 | 同上 | 上と同じ |
+### 15.5 序数の裏取り (call site 引数) と残件
+
+**裏取り (SHX-T8 再開 run, 2026-10-13)**: 素材 `plugins-ott` (`Install_Xfer_OTT_137.exe` → `$_13_/OTT_x64.dll`) / `plugins-serum2` (`Install_Xfer_Serum2_2.1.5.exe` → `$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3`) を 7z で展開し、IAT の序数スロットを `call *disp(%rip)` で呼ぶ箇所の引数設定を逆アセブルした。
+
+| import | 呼出し箇所 (実 PE) | 引数形の観測 | 同定 (Wine spec と照合) |
+|---|---|---|---|
+| OTT shell32 #74 | `0x180138f63` (IAT `0x1801e2560`) | `cFmt=1`, `rgfmt`=FORMATETC 1 件 (`cf`=CF_HDROP 系, `tymed`=HGLOBAL), `ppenum`=`lea 0x20(%rsp)` | `SHCreateStdEnumFmtEtc(long ptr ptr)` 一致 |
+| Serum2 shlwapi #12 | `0x18017644e` (IAT `0x180fe3070`) | `rcx`=`pbData`, `edx`=`cbData` (`r9d` 経由) を渡し直後に IStream vtable を組む | `SHCreateMemStream(ptr long)` 一致 |
+| Serum2 shell32 #190 | `0x180267bef` (IAT `0x180fe2f20`) | `rcx`=`wstr` 相当 (`0x180267410` でパス文字列を埋めた後に呼ぶ) | `ILCreateFromPathW(wstr)` 一致 |
+| Serum2 shell32 #155 | `0x180267c55` (IAT `0x180fe2f28`) | `rcx`=直前の PIDL (`test rsi` で非 NULL 時のみ呼ぶ) | `ILFree(ptr)` 一致 |
+| Serum2 shlwapi #219 | `0x18094936d` / `0x1809499c1` → thunk `0x180a1b430` → IAT `0x180fe3068` | `QISearch(this, tab, riid, out)` の 4 引数を `rcx..r9` に配置。`tab`=`0x180f96370` が `QITAB` 2 エントリ (`piid` 有り, offset 0 / 8) | `QISearch(ptr ptr ptr ptr)` 一致 |
+| Serum2 d2d1 #1 | `0x1801668da` (thunk `0x180a1b150`) | `(rcx=1, rdx=riid, r8=0, r9=out)` | 引数形は `D2D1CreateFactory(long ptr ptr ptr)` と一致。ただし同定は tools/gui 担当で保留 (`d2d1.spec` は名前のみで序数を明示しない) |
+
+以上により、shell32 / shlwapi の 5 件は Wine spec と呼出し箇所の引数形が一致した。d2d1 #1 は引数形が一致するが、同定は tools/gui 担当で保留する (`ORD_KNOWN` には入れない)。`ORD_KNOWN` / `shord.c` の同定に変更は無い。裏取り用の逆アセ (`objdump -d`) は `work/` 配下 (commit しない)。
+
+**残件**: d2d1 ord1 (tools/gui 担当, 分母外)。`inventory.md` / `BACKLOG.md` の「名前解決不能」表記は、この保留と一致している。
+
+### 15.6 フル `test.sh` の実測 (fix run, 最終 HEAD)
+
+| 項目 | 実測 |
+|---|---|
+| コマンド | `bash tools/shimx/test.sh` (`--quick` なし, 素材 `work-m11` / `work-m6-ott` 展開済み, `plugins-*` は未使用) |
+| 検証 HEAD | `5bfaec5c` (生成器修正 `38c1167a` の後、`inventory.md` の再生成 `5bfaec5c`)。実行前に `work-m11` / `work-m6-ott` を展開 (`tools/m11/work/` `tools/m6/work/` `tools/m8/work/` `tools/m9/work/` `tools/m10/work/` `tools/ott/work/`) |
+| 結果 | **exit 0**, real **53.06s** (`time` 実測, load は実行直前 `uptime` 未取得のため記録なし)。SKIP なし、FAIL 0 |
+| 再生成後の差分 | `inventory.md` の 88 行目のみ (「プラグイン専用で未提供 …: 」→「… なし」)。他の生成物は commit 済みの内容と一致。素材が無い状態で走らせると `m11_closure` / `ott_api_resolved` が空・0 に化けるため、素材の展開は必須 |
+| MT / ST / M4 | MT PASS (7 グループ) / ST PASS / M4 テスト MT・ST PASS |
+| 署名 | verify_sig m11 / m11_3 / ott: signature mismatch = 0。sig_test (a)〜(h) ALL PASS |
+| R6 | 構造体展開スタブ + 重複 declare 正規化 OK |
+| verify_ott | baseline 47 → shimx 解決 **24 種** (残 API 0, 新規 undefined 0)。t1 出力 SHA baseline = shimx = `b5a91b9b2ee8da1e` (一致, 512 行) |
+| 完了 | 7/7 完了: shimx 687 公開関数 × MT/ST × M4 互換 × fail-fast 全 PASS。内訳: `exports.txt` 687 行 = shimx_* 63 + vreg_* 5 (運用フック計 68) + その他 619。`data/coverage.json` の `shimx_public_api` 618 は `gen_inventory.py` の `defined` 基準で、差 1 件は `shim_unimplemented` (`exports.txt` は T/W を全て書き出し、生成器は除外する)。両方とも生成器の仕様どおりで、件数の誤りではない |
+| 生成物の差分 (main 比較) | `data/coverage.json`: `shimx_hooks` 59 → 68 (main 版の値が古かった)。`m11_closure` / `ott_api_resolved` (24) は main と同値 |
+| 生成器修正の効果 | 再生成で `inventory.md` / `BACKLOG.md` の見出し注記・正本注記・SHX-T9 節 (`scripts/backlog_tail.md` から連結) は消えない。`exports.txt` も HEAD と一致 |
+
+検証ログ: `work/` 配下 (commit しない)。

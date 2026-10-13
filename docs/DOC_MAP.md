@@ -127,6 +127,7 @@
 | `tools/m11/trap_triage/REPORT_679.md` | ~110 | icall site 0x41037d の hit 23,053,861 の内訳 (unit 101 = #513 の暴走 loop に 99.999% が集中)・既定 ON の 0x41032e 併記・再現手順と検査スクリプト `icall_41037d_679.py` (#679) |
 | `tools/m11/trap_triage/REPORT_418.md` | ~70 | 409470 転記ハングの原因特定 (#418) |
 | `tools/m11/trap_triage/REPORT_595.md` | ~90 | ClassCreate ON (`M11_OV_CLASSCREATE=1`) の ok 退行の原因切り分けと C 転記 (`41c130` / `413060`)・残る unit 415 の原因・既定 OFF のネガコン (#595) |
+| `tools/m11/trap_triage/REPORT_704.md` | ~60 | unit 415 の `9b4b00` (と `9b5450`) の C 転記 (ON 時のみ) と、現 IR での ON 退行 4 件 (101/190/291/296) の再測定 (#704) |
 | `tools/m11/trap_triage/REPORT_474.md` | ~100 | 410320 補完後の unit 114 ハング = 5c0270 の unlink deref 脱落 (#474)・409470/410320 再採用 |
 | `tools/m11/trap_triage/REPORT_482.md` | ~100 | `5c03d0` の node 差替え通知 `call [rbx+0x18]` の D15 脱落を復元 (#482)・survey 不変の実測 |
 | `tools/m11/trap_triage/REPORT_594.md` | ~95 | 8cc190 系 OOB は入力不正ではなく `417b70` の `Q(a)` 上位 4B 未初期化 (D17 型)・#552 での解消の実測・unit 56 の別原因・`negctl_594.sh` gate (#594) |
@@ -242,6 +243,7 @@
 | `tools/plugins/slayer_engine_ia32/MARSHAL.md` | ~80 | 殻 (x64) ↔ Slayer_Engine.dll (ia32) の VST2 構造体 marshal 表の仕様 (#674 受入 3)。測定値は REPORT.md §9 |
 | `tools/shared/REPORT.md` | ~295 | FL Shared ライブラリの分類・IPP 実測・OSS wasm 再ビルド・プロプラ lift PoC |
 | `tools/shared/oss/sidemod/REPORT.md` | ~60 | FFmpeg/LAME を差し替え可能な side module として再ビルド + GPL 混入検出 (LGL-4) |
+| `tools/shared/oss/ilsvg/REPORT.md` | ~50 | ILSvg の版の組 probe (#877): svgdom 0.4.7 は emcc 26/26 cpp OK、svgren 0.6.3 / 0.5.9 は svgdom 0.4.7 と enum 名不一致で版の組は未確定 (未解決 #927) |
 | `tools/shared/oss/blend2d/REPORT_SIMD.md` | ~60 | Blend2D wasm `-msimd128` 試験 (T-SH-02, #146) の実測詳細・ネガティブコントロール・前版の実測・未解決の起票先 (`tools/shared/REPORT.md` §3.3 から分割移動) |
 | `tools/shared/oss/blend2d/REPORT_AGG2D.md` | ~45 | Agg2D glue 棚卸し (T-SH-02/#146): FL Blend2D.dll (block24339) の export 1 本・RTTI 44 個 (Agg2D 2)・import 実測と未解決の起票先 |
 | `tools/shared/lift/libreverb/REPORT.md` | ~60 | libreverb (win `Reverb.dll`) lift + 差分テスト (T-SH-15 #161 部分達成)。ildsp は §6 で一行参照のみ |
@@ -275,7 +277,7 @@
 | `tools/targets/kilohearts/snapins/REPORT.md` | ~200 | KH 共通基盤 lift + SnapinMasterDsp ホストハーネス |
 | `tools/targets/kilohearts/ui_eval/REPORT.md` | ~135 | KH-7 Kilohearts UI (Skia CPU ラスタ) → M7 HUD 接続可否評価 |
 | `tools/targets/freshair/REPORT.md` | ~145 | Fresh Air インストーラ解析 + lift 可否 |
-| `tools/targets/freshair/REPORT_APPENDIX_FA5.md` | ~25 | freshair REPORT §11 (FA-5 #52) の付録: 最大値の除外基準 (§A1) と `.rdata` 不一致 20 関数の分類詳細 (§A2)。250 行上限のため無変更で分割移動 |
+| `tools/targets/freshair/REPORT_APPENDIX_FA5.md` | ~42 | freshair REPORT §11 (FA-5 #52) の付録: 最大値の除外基準 (§A1)・`.rdata` 不一致 20 関数の分類詳細 (§A2)・Gain の意味同一性の差分実行 (§A3)。250 行上限のため無変更で分割移動 |
 | `tools/targets/freshair/lift2/REPORT.md` | ~210 | Fresh Air Compressor/Filter/制御層 lift (§12 は `REPORT_APPENDIX_FA4.md` に分割移動) |
 | `tools/targets/freshair/lift2/REPORT_APPENDIX.md` | ~120 | lift2 FA-10 (#666): ctrl 工程 FAILED の epf 素材切り分け (同一コード A/B)・rep movs/stosw の実装と e2e 未実行の実測・未解決 FA-11/FA-12 (REPORT §12 から参照) |
 | `tools/targets/freshair/lift2/REPORT_APPENDIX_FA4.md` | ~50 | lift2 REPORT §12 全文 (FA-4 #51: チェーン構成 / マクロ→子パラメタ ID 写像)。250 行上限のため無変更で分割移動 |

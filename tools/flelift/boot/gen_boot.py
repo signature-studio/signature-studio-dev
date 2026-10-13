@@ -214,6 +214,9 @@ def main():
     if os.path.exists(extra_path):
         for x in json.load(open(extra_path)):
             roots.add(int(x, 16))
+    # FLE-6 実測専用: FLE_EXTRA_ROOTS (カンマ区切り hex) を一時的に root に足す。boot_roots.json は汚さない
+    for x in filter(None, os.environ.get('FLE_EXTRA_ROOTS', '').split(',')):
+        roots.add(int(x.strip(), 16))
     if not a.no_vmt:
         pdata = []
         for s in pe.sections:

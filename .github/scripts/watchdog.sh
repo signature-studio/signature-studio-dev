@@ -86,7 +86,7 @@ mark_stuck() { # mark_stuck <PR>
 active_raw=""
 for s in in_progress queued pending waiting; do
   if ! out="$(GH_TOKEN="$RUNS_TOKEN" gh api "repos/$R/actions/runs?status=$s&per_page=100" \
-    --jq '.workflow_runs[] | {event, title: .display_title, path, prs: [.pull_requests[].number]}')"; then
+    --jq '.workflow_runs[] | {event, title: .display_title, path, sha: (.head_sha // ""), prs: [.pull_requests[].number]}')"; then
     echo "::error::failed to list $s runs; no action this pass"
     exit 1
   fi
@@ -114,8 +114,10 @@ for i in $(seq 0 $((total - 1))); do
   draft="$(jq -r .draft <<< "$pr")"
   upd_age="$(age_min "$(jq -r .updated_at <<< "$pr")")"
 
-  if jq -e --argjson n "$n" --arg t "$title" \
-    'any(.[]; .path == ".github/workflows/opencode.yaml" and (((.prs | index($n)) != null) or ((.event == "issue_comment" or .event == "workflow_dispatch") and .title == $t) or (.event == "repository_dispatch" and .title == ("oc-fix #" + ($n | tostring)))))' \
+  # pull_request 系の run は head が現在の head と一致するものだけ担当にする (古い head の run で IDLE を隠さない)。
+  # head_sha を持たない run (dispatch・comment 等) は従来どおり番号・タイトルで判定する。
+  if jq -e --argjson n "$n" --arg t "$title" --arg h "$head" \
+    'any(.[]; .path == ".github/workflows/opencode.yaml" and (((.prs | index($n)) != null and ((.sha // "") == "" or .sha == $h)) or ((.event == "issue_comment" or .event == "workflow_dispatch") and .title == $t) or (.event == "repository_dispatch" and .title == ("oc-fix #" + ($n | tostring)))))' \
     <<< "$active" > /dev/null; then
     covered_n=$((covered_n + 1))
     continue

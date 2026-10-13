@@ -9,13 +9,13 @@
 
 ## 集計
 
-| 優先 | API 数 | 機能実装 | スタブ | libc | 序数 | 未実装 | 対象外 |
-|---|---|---|---|---|---|---|---|
-| P0 | 194 | 176 | 18 | 0 | 0 | 0 | 0 |
-| P1 | 38 | 34 | 4 | 0 | 0 | 0 | 0 |
-| P2 | 165 | 64 | 100 | 1 | 0 | 0 | 0 |
-| P3 | 111 | 58 | 39 | 8 | 6 | 0 | 0 |
-| X | 544 | 0 | 0 | 0 | 0 | 0 | 544 |
+| 優先 | API 数 | 機能実装 | スタブ | libc | 序数(同定・実装済) | 序数(未解決) | 未実装 | 対象外 |
+|---|---|---|---|---|---|---|---|---|
+| P0 | 194 | 176 | 18 | 0 | 0 | 0 | 0 | 0 |
+| P1 | 38 | 34 | 4 | 0 | 0 | 0 | 0 | 0 |
+| P2 | 165 | 64 | 100 | 1 | 0 | 0 | 0 | 0 |
+| P3 | 111 | 63 | 34 | 8 | 5 | 1 | 0 | 0 |
+| X | 544 | 0 | 0 | 0 | 0 | 0 | 0 | 544 |
 
 ## 一覧 (P0〜P3。X は件数のみ — 全件は data/inventory.csv)
 
@@ -218,14 +218,14 @@
 | P1 | IsEqualGUID | ole32 | 114 |  |  |  | 機能実装 | ole.c |  |
 | P1 | CopyFileW | kernel32 | 35 |  |  |  | 機能実装 | file.c |  |
 | P1 | ReleaseStgMedium | ole32 | 18 |  |  |  | 機能実装 | ole.c |  |
-| P1 | RaiseException | kernel32 | 5 |  |  | FL64/FreshAir/OTT/Serum2 | 機能実装 | seh.c | VEH→UEF→fail-fast (継続可能例外のみ復帰) |
+| P1 | RaiseException | kernel32 | 5 |  |  | FL64/FreshAir/OTT/Serum2 | 機能実装 | seh.c | VEH→SEH frame 鎖 (longjmp 捕捉)→UEF→fail-fast (継続可能例外のみ復帰) |
 | P1 | GetCurrentDirectoryW | kernel32 | 4 |  |  | FL64/FreshAir/OTT/Serum2 | 機能実装 | file.c |  |
 | P1 | SetEndOfFile | kernel32 | 3 |  |  | FreshAir/OTT/Serum2 | 機能実装 | file.c |  |
 | P1 | GetFileInformationByHandle | kernel32 | 2 |  |  | FL64/FreshAir/Serum2 | 機能実装 | file.c |  |
 | P1 | GetFileType | kernel32 | 2 |  |  | FL64/FreshAir/OTT/Serum2 | 機能実装 | file.c |  |
 | P1 | GetUserDefaultLCID | kernel32 | 2 |  |  | FL64/FreshAir/OTT/Serum2 | 機能実装 | locale.c |  |
 | P1 | GetOEMCP | kernel32 | 1 |  |  | FL64/FreshAir/OTT/Serum2 | 機能実装 | str.c |  |
-| P1 | RtlUnwindEx | kernel32 | 1 |  |  | FL64/FreshAir/OTT/Serum2 | スタブ(エラー/無し返却) | seh.c | fail-fast |
+| P1 | RtlUnwindEx | kernel32 | 1 |  |  | FL64/FreshAir/OTT/Serum2 | スタブ(エラー/無し返却) | seh.c | SEH frame 巻き戻し (frame 未登録は fail-fast) |
 | P1 | SystemTimeToTzSpecificLocalTime | kernel32 | 1 |  |  | FL64/FreshAir/Serum2 | 機能実装 | timer.c |  |
 | P1 | TlsAlloc | kernel32 | 1 |  |  | FL64/FreshAir/OTT/Serum2 | 機能実装 | teb.c |  |
 | P1 | TlsFree | kernel32 | 1 |  |  | FL64/FreshAir/OTT/Serum2 | 機能実装 | teb.c |  |
@@ -249,7 +249,7 @@
 | P1 | LCMapStringEx | kernel32 | 0 |  |  | FL64/FreshAir/OTT/Serum2 | 機能実装 | str.c |  |
 | P1 | PeekNamedPipe | kernel32 | 0 |  |  | FL64/FreshAir/Serum2 | スタブ(エラー/無し返却) | file.c |  |
 | P1 | ReadConsoleW | kernel32 | 0 |  |  | FreshAir/OTT/Serum2 | スタブ(エラー/無し返却) | ini.c |  |
-| P1 | RtlUnwind | kernel32 | 0 |  |  | FreshAir/OTT/Serum2 | スタブ(エラー/無し返却) | seh.c | fail-fast (SEH 巻き戻しは lift 側課題) |
+| P1 | RtlUnwind | kernel32 | 0 |  |  | FreshAir/OTT/Serum2 | スタブ(エラー/無し返却) | seh.c | SEH frame 巻き戻し (frame 未登録は fail-fast) |
 | P1 | SetFilePointerEx | kernel32 | 0 |  |  | FL64/FreshAir/OTT/Serum2 | 機能実装 | file.c |  |
 | P1 | SetStdHandle | kernel32 | 0 |  |  | FL64/FreshAir/OTT/Serum2 | 機能実装 | file.c |  |
 | P1 | WaitForSingleObjectEx | kernel32 | 0 |  |  | FreshAir/OTT/Serum2 | 機能実装 | wait.c |  |
@@ -431,12 +431,12 @@
 | P3 | CreateMutexW | kernel32 | 0 |  |  | Serum2 | 機能実装 | wait.c |  |
 | P3 | CreateSymbolicLinkW | kernel32 | 0 |  |  |  | スタブ(エラー/無し返却) | file.c |  |
 | P3 | CreateThreadpoolWork | kernel32 | 0 |  |  | Serum2 | 機能実装 | thread.c |  |
-| P3 | CryptAcquireContextA | advapi32 | 0 |  |  | Serum2 | スタブ(エラー/無し返却) | reg.c |  |
-| P3 | CryptCreateHash | advapi32 | 0 |  |  | Serum2 | スタブ(エラー/無し返却) | reg.c |  |
+| P3 | CryptAcquireContextA | advapi32 | 0 |  |  | Serum2 | 機能実装 | crypt.c |  |
+| P3 | CryptCreateHash | advapi32 | 0 |  |  | Serum2 | 機能実装 | crypt.c |  |
 | P3 | CryptDecodeObject | crypt32 | 0 |  |  | FL64 | スタブ(エラー/無し返却) | net.c |  |
-| P3 | CryptDestroyHash | advapi32 | 0 |  |  | Serum2 | スタブ(エラー/無し返却) | reg.c |  |
-| P3 | CryptGetHashParam | advapi32 | 0 |  |  | Serum2 | スタブ(エラー/無し返却) | reg.c |  |
-| P3 | CryptHashData | advapi32 | 0 |  |  | Serum2 | スタブ(エラー/無し返却) | reg.c |  |
+| P3 | CryptDestroyHash | advapi32 | 0 |  |  | Serum2 | 機能実装 | crypt.c |  |
+| P3 | CryptGetHashParam | advapi32 | 0 |  |  | Serum2 | 機能実装 | crypt.c |  |
+| P3 | CryptHashData | advapi32 | 0 |  |  | Serum2 | 機能実装 | crypt.c |  |
 | P3 | DeleteFileA | kernel32 | 0 |  |  | Serum2 | 機能実装 | file.c |  |
 | P3 | DeviceIoControl | kernel32 | 0 |  |  | Serum2 | スタブ(エラー/無し返却) | file.c |  |
 | P3 | ExtractAssociatedIconW | shell32 | 0 |  |  | OTT | スタブ(エラー/無し返却) | shell.c |  |
@@ -521,11 +521,11 @@
 | P3 | lstrcmpA | kernel32 | 0 |  |  | FL64 | 機能実装 | str.c |  |
 | P3 | ntohs | ws2_32 | 0 |  |  | Serum2 | libc 解決 |  |  |
 | P3 | ord1 | d2d1 | 0 |  |  | Serum2 | 序数 import (未解決) |  |  |
-| P3 | ord12 | shlwapi | 0 |  |  | Serum2 | 序数 import (未解決) |  |  |
-| P3 | ord155 | shell32 | 0 |  |  | Serum2 | 序数 import (未解決) |  |  |
-| P3 | ord190 | shell32 | 0 |  |  | Serum2 | 序数 import (未解決) |  |  |
-| P3 | ord219 | shlwapi | 0 |  |  | Serum2 | 序数 import (未解決) |  |  |
-| P3 | ord74 | shell32 | 0 |  |  | OTT | 序数 import (未解決) |  |  |
+| P3 | ord12 | shlwapi | 0 |  |  | Serum2 | 序数 import (同定・実装済み) |  |  |
+| P3 | ord155 | shell32 | 0 |  |  | Serum2 | 序数 import (同定・実装済み) |  |  |
+| P3 | ord190 | shell32 | 0 |  |  | Serum2 | 序数 import (同定・実装済み) |  |  |
+| P3 | ord219 | shlwapi | 0 |  |  | Serum2 | 序数 import (同定・実装済み) |  |  |
+| P3 | ord74 | shell32 | 0 |  |  | OTT | 序数 import (同定・実装済み) |  |  |
 | P3 | recv | ws2_32 | 0 |  |  | Serum2 | libc 解決 |  |  |
 | P3 | send | ws2_32 | 0 |  |  | Serum2 | libc 解決 |  |  |
 | P3 | socket | ws2_32 | 0 |  |  | Serum2 | libc 解決 |  |  |
