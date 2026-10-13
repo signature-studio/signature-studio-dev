@@ -31,6 +31,13 @@
 `tools/m11/m11_build.sh`: `m11_rt.c` と `m11_win.c` の連結 sha256 を `work/rtwin.sha256` に記録し、
 一致しなければ `rt.o`・`win.o` を消して作り直す (mtime に依存しない)。
 
+## 3a. 修正後の測定 (commit `841aced7`・コミット済み HEAD で再現)
+
+- `touch work/obj/{rt,win}.o` 後の `m11_build.sh`: rc 0・18.5 s・`rt.o` の `set_va_bigtrace` 1 件・undefined 0。
+- 直後の無変更再実行: rc 0 (`cc` は winstubs/fnstubs のみ。`rt.o`・`win.o` は stamp 一致で再利用)。
+- 測定 commit `841aced7` からのコード差分 (`git diff 841aced7 HEAD -- tools/m11/*.sh tools/m11/*.c`): 本節の追記 commit で
+  `tools/m11/REPORT_N1176.md` のみ変わり、コードは無変更。
+
 ## 4. 未達・残り
 
 - 受入条件 1 (`m11_e2e.sh --full` が work-m11 展開直後に build を通る): **この runner では未検証**。`--full` は Ghidra の
