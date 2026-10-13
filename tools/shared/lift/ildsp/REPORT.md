@@ -25,7 +25,7 @@ FL_WIN64_DIR=<fl-win64 展開先> python3 tools/shared/scripts/ildsp_survey.py
 | `IPPCODE` SIMD 比 | 70.0% |
 | `.text` SIMD 比 | 48.68% (176,373 / 362,277) |
 
-上表は本 worktree (HEAD `a32d3eec` 相当の script、Python 3.14.8 / capstone 5.0.7 / pefile 2024.8.26) の script 出力 (JSON: `text_instructions` 362277 / `simd_ratio` 0.4868 / `ippcode_instructions` 129188) と一致することを 2 回の再実行で確認済み。別環境 (レビュー側) の報告値 362,280 / 129,192 とは食い違う。下記未解決を参照。
+上表は script 出力 (JSON: `text_instructions` 362277 / `simd_ratio` 0.4868 / `ippcode_instructions` 129188) と一致する。capstone の導入経路 (uv wheel / ソースビルド) を変えても同値。レビュー側の報告値 362,280 / 129,192 とは食い違う。下記未解決を参照。
 
 ### 未解決: `.text` SIMD 比の定義
 
