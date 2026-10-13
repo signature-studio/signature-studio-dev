@@ -9,6 +9,7 @@ export PATH="${PATH}:/home/ubuntu/.local/share/pnpm/bin"
 # shellcheck source=/dev/null
 source ../shared/env.sh   # FL_WIN64_DIR (= 直下に flstudio_win64_*.exe と extracted/)
 [[ -d node_modules/esbuild ]] || npm install --no-audit --no-fund --ignore-scripts >/dev/null
+[[ -x ../../node_modules/.bin/tsc ]] || (cd ../.. && pnpm install --frozen-lockfile --ignore-scripts >/dev/null)
 mkdir -p work
 EXE="${FL_WIN_INSTALLER:-$(ls "$FL_WIN64_DIR"/flstudio_win64_*.exe 2>/dev/null | head -1)}"
 [[ -n "$EXE" && -f "$EXE" ]] || EXE="$HOME/ダウンロード/flstudio_win64_26.1.7.5653.exe"

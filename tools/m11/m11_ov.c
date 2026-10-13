@@ -523,6 +523,35 @@ u64 function_47b260(u64 self, void* src, u64 unused) {
 }
 #endif
 
+/* function_535bf2 / function_535c11  VA 0x535bf2 / 0x535c11  (rcx = self; 24B 要素の配列を走査し dword = -1 で空と判定)
+ * 逆アセンブル: 535bf0 = jmp 535c11.
+ *   535c11: items = [[self+8]+8]; bound = (items ? [items-8] : 0) - 1; [self+0x10] < bound (signed) なら 535bf2, 否なら 0 を返す.
+ *   535bf2: [self+0x10] += 1; dword items[idx*24] ≠ -1 なら (items & ~0xff) | 1 を返す (al=1), = -1 なら 535c11 へ.
+ * RetDec は 535bf2 末尾の `ret` (VA 0x535c2e) を未定義の function_535c2e への call にし, 535c11 の jl 先 535bf2 を rcx=0 の call にした (#714).
+ * 同じ分岐を C で書き、closure 外参照を転記で消す (seed 追加では解けないため). */
+#ifndef M11_FIX_535BF2
+#define M11_FIX_535BF2 0
+#endif
+#if M11_FIX_535BF2
+u64 function_535c11(u64 self) {
+    for (;;) {
+        u64 items = Q(Q(self + 8) + 8);
+        long long bound = (long long)(items ? Q(items - 8) : 0) - 1;
+        if (!((long long)Q(self + 0x10) < bound)) return 0;
+        Q(self + 0x10) += 1;
+        items = Q(Q(self + 8) + 8);
+        if (*(volatile u32*)(uintptr_t)(items + Q(self + 0x10) * 24) != 0xffffffffu) return (items & ~0xffULL) | 1;
+    }
+}
+u64 function_535bf2(u64 self) {
+    u64 items;
+    Q(self + 0x10) += 1;
+    items = Q(Q(self + 8) + 8);
+    if (*(volatile u32*)(uintptr_t)(items + Q(self + 0x10) * 24) != 0xffffffffu) return (items & ~0xffULL) | 1;
+    return function_535c11(self);
+}
+#endif
+
 /* function_5c0270  VA 0x5c0270  (参照カウント付きキャッシュ node の Release: self = キャッシュ, node = function_5c00e0 の戻り)
  * 逆アセンブル転記 (5c0270..5c0392). node = {+0 next, +8 refcount(dword), +0xc 第 1 qword キー, +0x14 hash(word), +0x18 tid(dword), +0x1c payload}.
  * RetDec は 3 点を落とした (#474):

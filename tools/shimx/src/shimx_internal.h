@@ -23,7 +23,7 @@ typedef struct ShxObj {
     volatile uint32_t state;     /* event: signaled / thread,process: done */
     int manual;                  /* event */
     /* file */
-    int fd; char* path; DWORD access; int is_std; int is_dir;
+    int fd; char* path; DWORD access; int is_std; int is_dir; int ftr_read;
     /* thread */
 #if defined(__EMSCRIPTEN_PTHREADS__)
     pthread_t pt;
@@ -122,5 +122,20 @@ extern int g_shx_cs_null_ok;
 /* 統計 */
 extern int g_shx_trace;
 #define SHX_TRACE(...) do { if (g_shx_trace) { fprintf(stderr, "[shimx] " __VA_ARGS__); fputc('\n', stderr); } } while (0)
+
+/* SHX-T12: 構造化 file trace (trace.c)。SHX_FTRACE_ON() が偽なら呼出側は引数準備を省略してよい */
+typedef struct ShxFtrEv {
+    const char* api;
+    const char* guest; LPCWSTR guestw;     /* guest 側の元の文字列 (UTF-8 または UTF-16) */
+    const char* posix;                     /* 仮想 FS で解決した結果 (未解決は NULL) */
+    const char* name; LPCWSTR namew;       /* 検索結果のエントリ名 */
+    int has_open; DWORD access, disp, flags; int write;
+    int has_attr; DWORD attr;
+    int ok; DWORD err;                     /* err は ok=0 のときだけ出力 */
+} ShxFtrEv;
+extern volatile int g_shx_ftrace_on;
+#define SHX_FTRACE_ON() (g_shx_ftrace_on)
+void shx_ftrace_open_env(void);
+void shx_ftrace_emit(const ShxFtrEv* ev);
 
 #endif /* SHIMX_INTERNAL_H */

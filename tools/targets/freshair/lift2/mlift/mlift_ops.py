@@ -803,6 +803,16 @@ def emit_sse(fl, i, m, O):
         am = fl.t(); fl.e('%s = and <2 x i64> %s, <i64 4294967295, i64 4294967295>' % (am, A))
         bm = fl.t(); fl.e('%s = and <2 x i64> %s, <i64 4294967295, i64 4294967295>' % (bm, B))
         r = fl.t(); fl.e('%s = mul <2 x i64> %s, %s' % (r, am, bm)); fl.x_set(d, fl.v_from(r, '<2 x i64>')); return False
+    if b == 'pcmpeqw':
+        d, s1, s2 = x3(fl, i)
+        A = fl.v_to(s1, '<8 x i16>'); B = fl.v_to(vec_src(fl, s2), '<8 x i16>')
+        c = fl.t(); fl.e('%s = icmp eq <8 x i16> %s, %s' % (c, A, B))
+        r = fl.t(); fl.e('%s = sext <8 x i1> %s to <8 x i16>' % (r, c)); fl.x_set(d, fl.v_from(r, '<8 x i16>')); return False
+    if b == 'pshuflw':
+        d = xidx(fl, O[0]); src = fl.v_to(vec_src(fl, O[1]), '<8 x i16>'); imm = O[2].imm & 0xff
+        idx = [(imm >> (2 * k)) & 3 for k in range(4)] + [4, 5, 6, 7]
+        r = fl.t(); fl.e('%s = shufflevector <8 x i16> %s, <8 x i16> undef, <8 x i32> <%s>' % (r, src, ', '.join('i32 %d' % x for x in idx)))
+        fl.x_set(d, fl.v_from(r, '<8 x i16>')); return False
     if b == 'pextrw':
         v = fl.v_to(fl.x_get(xidx(fl, O[1])), '<8 x i16>'); e = fl.t(); fl.e('%s = extractelement <8 x i16> %s, i32 %d' % (e, v, O[2].imm & 7))
         z = fl.t(); fl.e('%s = zext i16 %s to i32' % (z, e)); fl.wr(O[0], z, 32) if O[0].size == 4 else fl.wr(O[0], z, 32); return False
@@ -811,6 +821,11 @@ def emit_sse(fl, i, m, O):
         s16 = fl.t(); fl.e('%s = trunc i32 %s to i16' % (s16, src)) if O[1].type != CS_OP_MEM else None
         val = s16 if O[1].type != CS_OP_MEM else src
         r = fl.t(); fl.e('%s = insertelement <8 x i16> %s, i16 %s, i32 %d' % (r, v, val, O[2].imm & 7)); fl.x_set(d, fl.v_from(r, '<8 x i16>')); return False
+    if b == 'pmovmskb':
+        v = fl.v_to(fl.x_get(xidx(fl, O[1])), '<16 x i8>')
+        neg = fl.t(); fl.e('%s = icmp slt <16 x i8> %s, zeroinitializer' % (neg, v))
+        m_ = fl.t(); fl.e('%s = bitcast <16 x i1> %s to i16' % (m_, neg))
+        z = fl.t(); fl.e('%s = zext i16 %s to i32' % (z, m_)); fl.wr(O[0], z, 32); return False
     if b in ('movmskpd', 'movmskps'):
         n = 2 if b == 'movmskpd' else 4; bits = 64 if n == 2 else 32
         v = fl.v_to(fl.x_get(xidx(fl, O[1])), '<2 x i64>' if n == 2 else '<4 x i32>')

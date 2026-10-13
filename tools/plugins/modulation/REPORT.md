@@ -21,7 +21,7 @@
 5. **SIMD kernel 表への依存: 閉包 + frontier の中では Fruity Flangus だけ** (閉包内 3 site / 3 変数。他 7 本は 0 site)。**ただし frontier より深い framework 関数に kernel 呼出がある**。
    Frequency Shifter / Hyper Chorus の kernel 呼出 5 site は閉包・frontier の外の 4 関数ずつにあり (framework 共通ハッシュ、33〜42 DLL が同一)、うち 3 関数 (4 site) は閉包から frontier の薄いラッパー経由の direct call で到達する (§3.1・§3.3)。
    よって FS / HC が kernel に依存しないとは言えず、**未確定**。
-6. **C++ engine 4 本 (全て MSVC) は RetDec まで通り、`emcc -c` は 2/4 本** (18977・19143 が rc 0)。19266・19268 は f80 (x87) 系のエラー (`fp_extend` / `frem` / `fp_round`) で失敗する (§4)。VEX の未実装 helper は 50〜71 (distinct、648383c)、`.pdata` で define が無い range が各 2 件ある。
+6. **C++ engine 4 本 (全て MSVC) は RetDec まで通り、`emcc -c` は b9fe1d8 で 2/4 本** (18977・19143 が rc 0)。19266・19268 は f80 (x87) 系のエラー (`fp_extend` / `frem` / `fp_round`) で失敗した。f80 段 (`p0c/f80_lower.py`) を足した 35d8f3d5 では 4/4 本 (§4 表の「f80 段後」列、付録 `REPORT_APPENDIX.md`)。VEX の未実装 helper は 50〜71 (distinct、648383c)、`.pdata` で define が無い range が各 2 件ある。
    殻の DSP 本体は engine 側にあるため、**殻 8/8 の通過は「8 本が wasm 化できる」を意味しない**。T1 の Hyper Chorus の見積りにこの engine の工数が含まれるかは未確認。
 7. **閉包の境界**: frontier の先で、framework 共通ハッシュに一致しない関数 (hash < 13 DLL) が閉包から direct call で到達する (8/8 本、計 61 関数 / 26,713 B、§3.3)。`plugin_closure.py` の閉包にも frontier にも入らない。追跡 issue の起票は PM 依頼 (§7)。
 
@@ -29,7 +29,7 @@
 
 定義: 閉包 = vtable override 実装 (DestroyObject / Dispatcher / SaveRestoreState / GetName / ProcessEvent / ProcessParam / Eff_Render) から `call/jmp rel32` で到達する、
 framework 共通ハッシュ (13 DLL 以上) でない `.pdata` 関数 (`lift/plugin_closure.py`)。frontier = 閉包から呼ぶ framework 関数 (P0a の共有 wasm 側)。vcall / ptr = 間接呼出 site 数。iat = `plugin_closure.py` が数える RIP 相対メモリ operand の call/jmp site (IAT 経由 Win32 呼出が大半だが IAT slot とは限らない。Fruity Chorus の 1 site は `.bss` 上の実行時設定の関数ポインタ変数 0x713060 への `call [rip+…]` @0x40e4b6)。
-define = `p.final.ll` の `^define` 数。f80 = `x86_fp80` を含む define 数。未実装 helper = `p.simd.log` の `unimplemented N`。`emcc -c` 列は `emcc -c -O0 -msimd128` の終了コード。lift 秒は既定鎖 (`PLUG_ICALL=1`、icall 復元を含む) の e2e 実行 (8603db1 の 1 回と 648383c の 1 回) の min–max。
+define = `p.final.ll` の `^define` 数。f80 = `x86_fp80` を含む define 数。未実装 helper = `p.simd.log` の `unimplemented N`。`emcc -c` 列は `emcc -c -O0 -msimd128` の終了コード。lift 秒は既定鎖 (`PLUG_ICALL=1`、icall 復元を含む) の e2e 実行の値 (出典は §4 直下の注)。
 
 | プラグイン | block | Tier | 閉包 関数 / B | frontier 関数 / B | vcall | ptr | iat | define | f80 | 未実装 helper | `emcc -c` | lift 秒 |
 |---|--:|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|
@@ -149,21 +149,21 @@ define = `p.final.ll` の `^define` 数。f80 = `x86_fp80` を含む define 数�
 | Vintage Chorus | 19266 | 204,800 | 127,663 | 542 / 115,986 | VSTPluginMain, main | 73 |
 | Vintage Phaser | 19268 | 313,344 | 157,493 | 626 / 141,439 | VSTPluginMain, main | 73 |
 
-`engine_lift.sh <block>` で全 `.pdata` 関数を `lift_ranges.sh` (RetDec+pass 鎖) → `emcc -c` に通した結果。RetDec rc・define 数・欠落 range・f80 は 519b3aa・8603db1・648383c・b9fe1d8 で同一。未実装 helper は main の m11_simd2 変更 (a824a1d / 9b5ea38、#535 / #538) で変わった (8603db1 の値は 86 (60) / 75 (57) / 64 (53) / 104 (77)、648383c 以降は下表の値)。`emcc -c` は 8603db1・648383c では 0/4 本だったが、main の lift 鎖変更 (`fix_icmp_ptr.py` P-E1 / `ir5_patch.py` P-F1・P-F2、`PLUG_F80_LOWER` は既定 0) を取り込んだ b9fe1d8 で 2/4 本になった (下表は b9fe1d8 の値)。lift 秒は全測定の min–max:
+`engine_lift.sh <block>` で全 `.pdata` 関数を `lift_ranges.sh` (RetDec+pass 鎖) → `emcc -c` に通した結果。RetDec rc・define 数・欠落 range・f80 は 519b3aa・8603db1・648383c・b9fe1d8 で同一。未実装 helper・`emcc -c` の経緯は付録 `REPORT_APPENDIX.md` の §E。下表は b9fe1d8 以降の値。lift 秒は全測定の min–max:
 
-| engine | RetDec rc | final.ll define | `.pdata` で define 無し (B) | range 内部に増えた define | f80 関数 | 未実装 helper (うち VEX) | `emcc -c` | 局所修復後の `emcc -c` | lift 秒 |
-|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|
-| 18977 (Frequency Shifter) | 0 | 442 | 2 / 418 (777) | 24 | 0 | 70 (55) | 0 (成功) | 0 (適用 0 件) | 16–17 |
-| 19143 (Hyper Chorus) | 0 | 465 | 2 / 445 (91) | 20 | 0 | 64 (52) | 0 (成功) | 0 (適用 0 件) | 15–16 |
-| 19266 (Vintage Chorus) | 0 | 573 | 2 / 542 (159) | 31 | 1 | 60 (50) | 1 (失敗) | 1 (失敗、適用 0 件) | 18 |
-| 19268 (Vintage Phaser) | 0 | 657 | 2 / 626 (420) | 31 | 1 | 92 (71) | 1 (失敗) | 1 (失敗、適用 0 件) | 20–22 |
+| engine | RetDec rc | final.ll define | `.pdata` で define 無し (B) | range 内部に増えた define | f80 関数 | 未実装 helper (うち VEX) | `emcc -c` | 局所修復後の `emcc -c` | f80 段後の `emcc -c` (erc3) | lift 秒 |
+|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|
+| 18977 (Frequency Shifter) | 0 | 442 | 2 / 418 (777) | 24 | 0 | 70 (55) | 0 (成功) | 0 (適用 0 件) | 0 (f80 段不要) | 13–17 |
+| 19143 (Hyper Chorus) | 0 | 465 | 2 / 445 (91) | 20 | 0 | 64 (52) | 0 (成功) | 0 (適用 0 件) | 0 (f80 段不要) | 13–16 |
+| 19266 (Vintage Chorus) | 0 | 573 | 2 / 542 (159) | 31 | 1 | 60 (50) | 1 (失敗) | 1 (失敗、適用 0 件) | 0 (f80 段後、f80 1 → 0) | 15–18 |
+| 19268 (Vintage Phaser) | 0 | 657 | 2 / 626 (420) | 31 | 1 | 92 (71) | 1 (失敗) | 1 (失敗、適用 0 件) | 0 (f80 段後、f80 1 → 0) | 17–22 |
 
-- `emcc -c` の列は b9fe1d8 の実測 (`engines.csv`)。8603db1・648383c の 0/4 本から変わった。旧記述 (4 本とも E1 → E2) は P-E1 の共有鎖取り込み後は成り立たず、`engine_fixcmp.py` は 0 件 (E2 は b9fe1d8 で未確認: 19266・19268 は f80 で止まり、18977・19143 は emcc が通る)。
+- `emcc -c` の列は b9fe1d8 の実測 (`engines.csv`)、「f80 段後」列は 35d8f3d5 の実測 (`summary.csv` erc3)。8603db1・648383c の 0/4 本から変わった。旧記述 (4 本とも E1 → E2) は P-E1 取り込み後は成り立たず、`engine_fixcmp.py` は 0 件 (E2 は b9fe1d8 で未確認)。lift 秒の出典は raw の `summary.csv`・`engines.csv` が無く (`work/` は gitignore)、run 番号も未記録のため commit 履歴の記載に基づく: (a) 4d57b9ef・8603db17 (8603db1 時点) と 4282160f (648383c 時点) の本体表 = 18977 16–17 / 19143 15–16 / 19266 18 / 19268 22 (58297bfe で 21–22、4282160f で 20–22)、(b) 9f661ead が統合した 35d8f3d5 の PR 作成時の追補 = 18977 13–14 / 19143 13 / 19266 15 / 19268 17–18。表は (a) と (b) の union。19268 の 20・21 は (a) の記載にのみ現れ、元の記録が無いため出典不明。
 - `.pdata` で define 無し = `function_<開始VA>` の define が final.ll に無い range 数 (`engine_defs.py`。分母は `.pdata` 関数数、括弧は欠けた range の合計 B)。4 本とも欠けた 2 件は call 先として参照されない (missing_ref 0)。原因 (RetDec の関数境界統合 / 復号失敗) は未調査。
 - 失敗した 2 本 (19266・19268): 最初のエラーは `e.final.ll` の `emcc -c` (`first_errors.txt`) で、E1 (icmp ptr/i64) でも E2 (zext 定数式) でもない。エラーは 4 件 (`4 errors generated.`): `do not know how to soften fp_extend` ×2、`no libcall available for frem with type f80` ×1、`no libcall available for fp_round with type f80` ×1。どちらも `e.final.ll` に x86_fp80 を含む define が 8 個ある (`grep -c x86_fp80`) うちの、どの関数で出たかは未特定。f80 型の演算の legalize 失敗で、#197 の `f80_lower.py` (f80 → f64) の対象と見られる (未検証)。
 - VEX (AVX/FMA) の未実装 helper は distinct で 50〜71 (648383c・b9fe1d8 とも同値)。CPUID 分岐で SSE 路に固定できるかは未確認 (T1 の AVX 2 種は CPUID 分岐で SSE 路固定と `plugins/REPORT.md` §4.3 に記録あり)。
-- f80 関数は Vintage Chorus の `function_18001c320` と Vintage Phaser の `function_1800218a0` の 1 本ずつ (#197 の対象)。
-- 以上は到達性の実測で、engine の正しさは何も示していない。
+- f80 関数は Vintage Chorus の `function_18001c320` と Vintage Phaser の `function_1800218a0` の 1 本ずつ (#197 の対象)。以上は到達性の実測で、engine の正しさは何も示していない。
+- **PLG-F5-2 / #527 追補**: `engine_lift.sh` に `p0c/f80_lower.py` の段を追加し、4 本すべて `emcc -c` rc 0 (表の「f80 段後」列)。4 本の順次実行の合計は 65.2 s (35d8f3d5、PR 作成時の実測。修正 run では未再実行)。f80→f64 は bit-exact ではなく (#197 で未検証)、通過は正しさを示さない。詳細は付録 `REPORT_APPENDIX.md`。
 
 ## 5. 判定 (gate) の設計と PR #506 の reviewer 指摘への対応
 
@@ -218,7 +218,7 @@ e2e の exit 0 が意味するのは「殻 8 本の judge / matrix_check / ids_c
 | 差分試験 bit-exact (出口条件 3)。Eff_Render 単位の native (ms_abi VA 敷設) ⟷ wasm harness が無く、P0a/P0b/P0c が OPEN | #202 を閉じられない | #195 / #196 / #197 の完了後に #202 を再開 (Closes はその時)。harness は #506 が PM に起票依頼済みの「[PLG-F3a] Eff_Render 単位 native ⟷ wasm 差分 harness」を本 8 本にも適用 (PM 未起票) |
 | Render test .flp の E2E (出口条件 4) | 同上 | FLEngine 統合待ち。#202 を継続 |
 | 間接 call 脱落: 従来鎖 (`PLUG_ICALL=0`) で静的 240 site → IR 0 (8/8 本)、既定鎖 (PR #539) で 0/8 本 | 解消済み (e2e が回帰ゲート) | #514 は PR #539 でマージ済みだが issue は OPEN。close は PM 判断 |
-| engine 4 本のうち 2 本 (Vintage Chorus / Vintage Phaser) の `emcc -c` 未通過 (f80 系: fp_extend / frem / fp_round、b9fe1d8)、VEX 50〜71、define 無し各 2、殻との結合方式 (殻の dynload 2) | 4 本 (うち Hyper Chorus は T1) | **#527 [PLG-F5-2] (本 run で起票)**。同型 #523 / #506 提案の PLG-F3b と PM が統合判断。f80 の 2 本は #197 にも関係する |
+| engine 4 本の VEX helper 50〜92 (未着手)、define 無し各 2、殻との結合方式 (殻の dynload 2)。`emcc -c` は f80 段で 4/4 本 (35d8f3d5) だが、stub を含む通過 | 4 本 (うち Hyper Chorus は T1) | **#527 [PLG-F5-2] (OPEN、本 PR で追跡)**。同型 #523 / #506 提案の PLG-F3b と PM が統合判断。f80 の 2 本は #197 にも関係する |
 | Vintage Chorus / Phaser の engine の f80 各 1 関数 | engine の wasm 化 | #197 (コメント済み) |
 | Fruity Flangus の kernel 3 変数 (6 実装、うち 0x5dea40 は x87 を含む) の差分試験記録が `p0c/REPORT.md` に無い | Flangus の kernel 保証 | #197 (コメント済み) |
 | host slot 0x120 (Frequency Shifter 1 site) と 0x100 / 0x108 (Flangus・Hyper Chorus 各 1 site) の意味 | host 結合 | #196 (コメント済み) |

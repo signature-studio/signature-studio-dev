@@ -5,10 +5,14 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 cd "$HERE"
 command -v node >/dev/null || export PATH="$HOME/.local/share/pnpm/bin:$PATH"
-FL_MAC="/home/ubuntu/work/analysis/mac/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Libs/FLEngine_x64.dylib"
-FL_WIN="/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin"
 # shellcheck disable=SC1091
-source "$HERE/../shared/env.sh"   # FL_WIN64_DIR 等 (環境変数があればそれを優先)
+source "$HERE/../shared/env.sh"   # FL_WIN64_DIR / FL_MAC_DIR 等 (環境変数があればそれを優先)
+FL_MAC="$FL_MAC_DIR/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Libs/FLEngine_x64.dylib"
+FL_WIN="$FL_WIN64_DIR/extracted/block00031_PE.bin"
+# step 3b (scripts_inventory) と step 4 (flapi 抽出) は mac pkg 全体が要る。欠けていれば空出力を作らず先頭で止める (#630)
+for f in "$FL_MAC" "$FL_WIN" "$FL_MAC_DIR/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL/System/Tools/MCP/MCPTools.pyc"; do
+  [ -f "$f" ] || { echo "ERROR: 前提不足で停止: $f が無い (mac は FL_MAC_DIR に pkg_extract が要る。analysis-mac-shared は Shared/ のみ / #630)" >&2; exit 2; }
+done
 step() { printf '\n== %s\n' "$*"; }
 PY312="$HERE/work/build-native/install/bin/python3.12"
 

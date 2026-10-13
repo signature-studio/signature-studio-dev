@@ -30,9 +30,29 @@ flapi 呼出し数は `flapiCalls.n` で、`engine.call` ラッパを数えた�
 - 結果: 単峰 (元計測の中央値 34〜44µs、表の追試・reviewer 追試では 17〜21µs)。遅い側は元計測 0.2〜0.5%、追試 0.1〜1.7%。bimodal は再現せず。**Python/flapi の処理量とは無関係に遅くなる経路は、素の RPC 単体では観測されなかった。**
 - 判定: 既存 REPORT §5 の bimodal (15µs / 100〜130µs) は本 runner では再現しない。当時の負荷・環境の差によるものと推定。原因の確定には、負荷を変えた追試 (未実施) が必要。
 
+## 静的版 (PY-2) の MIDI 1 件の配送時間 (run 3 追記、`tests/static_midi_bench.mjs`)
+
+既知類型との関係: 該当なし (性能計測)。
+
+| 項目 | 値 (µs/イベント) | 条件 |
+|---|---|---|
+| 静的版 MIDI CC 1 件 (device script 1 回実行) | 中央値 23.92 / 24.99 (2 回の実行、min 23.82〜24.48 / max 26.57〜27.10)、device 呼出し 1.000/件 | 20000 件 × 5 試行、flpy_static.wasm (node メインスレッド)、load 1.14 / 0.71 |
+| 静的版 MIDI NoteOn 1 件 (対照、device 呼出し 0) | 中央値 24.54 / 25.27 (min 24.44〜25.18 / max 25.37〜25.59)、0 | 同上 |
+
+受入 (1) の flapi 呼出し数: Python 計数のみ (`device.forwardMIDICC` 1.000/件)。C 経由の `fl_api_call` は未計測。所要時間は計測済み。
+
+- 静的版 CC 1 件 24〜25µs は、Worker+SAB 版 CC 1 件 230.0µs (REPORT 上表、load 0.56) の約 1/9。
+- CC と NoteOn の差 (CC − NoteOn) は両 run で同符号 (CC が小さい): run1 中央値 −0.62µs、run2 −0.28µs。ただし各 run の min–max 範囲が重なるため、device 呼出し 1 回の追加コストは本計測のノイズ以下で分離できない。
+- **計測の限界 (重要)**: 静的版の C 側 (`provider/fl_engine.c`) には `device.*` の handler が無い。そのため本計測は `device.forwardMIDICC` を Python 側の計数スタブに差し替えた。よって (a) C の `fl_api_call` を経由しない、(b) 測っているのは「Python の配送 (`dispatch_script_midi`) + device script 実行」である。「flapi 1 回の C コスト」は `static_bench.mjs` の `c_only_us` (中央値 0.017µs) を参照。
+- 比較時の注意: Worker+SAB 版 230µs は postMessage・Worker 往復を含み、静的版 23.9µs は含まない。両者の差はこの RPC 経路の分であり、flapi 呼出しそのものの差ではない。
+
+再現: `cd tools/python && node tests/static_midi_bench.mjs 20000 5` (前提: `build_flpy_static.sh` 済み、`work/` に fetch_inputs.sh の出力)。
+
+未解決 (本節): 静的版 C 側に `device.forwardMIDICC` を実装した上での計測 (provider handler 追加は `provider_check` の handler 数 60 を変えるため別 issue)。
+
 ## 検証範囲 / 範囲外
 
-- 範囲内: Actions runner (4 core、node 22.23.3)、素材 `fl-win64` (MCPTools.pyc / midi.py / utils.py / device script は `fetch_inputs.sh` で配置)、CPython 3.12.1 wasm・flpy・provider・静的版をクリーンにビルド (`build_cpython_wasm.sh` 4 分 46 秒、`build_flpy.sh` rc=0、`build_flpy_static.sh` rc=0)。
+- 範囲内: Actions runner (4 core、node 22.23.3)、素材 `fl-win64` (MCPTools.pyc / midi.py / utils.py / device script は `fetch_inputs.sh` で配置)、CPython 3.12.1 wasm・flpy・provider・静的版をクリーンにビルド (`build_cpython_wasm.sh` 4 分 46 秒 (d36dbefe 時点の run)・4 分 03 秒 (HEAD 08c569ba の静的版検証 run)、`build_flpy.sh` rc=0、`build_flpy_static.sh` rc=0)。
 - 範囲外: 実 FLEngine wasm への結線 (未実施)、headless Chrome、実 MIDI デバイス、実 FL の所要時間。所要時間は mock engine の JS 処理を含む。
 
 ## 未解決
