@@ -37,3 +37,30 @@
 - block19006 (`extracted/block19006_PE.bin`): ImageBase `0x400000`、SizeOfImage `0x3b2000`。IR の絶対 VA `0x30D0F4` は ImageBase より下 (image 外) だが、RVA `0x30D0F4` は `.data` (VA 0x2e0000、サイズ 0x3ca00) の内側。RVA `0x30D0F4` の先頭 16 byte は `01120805126800000d79100000000803`。
 - 機序は未確定のまま。native 側の `/proc/<pid>/maps` 実測は未実施。この静的事実だけでは「回帰を期待される差分として許容する」根拠にならない。
 - 未実施 (次の run で `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk` を指定して実施): f2_step1 → leaf_diff (修正前後) → nc_leaf.py ネガティブコントロール → 影響表 (30 関数 / 317 箇所)。
+
+## 10.4 (#871 fix モード 2) 実測: f2_step1 / leaf_diff (修正前後) / nc_leaf / 修正前後の突き合わせ
+
+前版 (10.3) の「素材なし」は誤り。RetDec 公式 Release (`RetDec-v5.0-Linux-Release.tar.xz`, avast/retdec v5.0) は取得でき、emsdk 6.0.12 (`tools/m1/flags.sh` の pin) は `/opt/emsdk` に入れた。fl-win64 は `$RUNNER_TEMP/fl-win64` に展開 (13 s, PE 313 本)。実行は run 内で完結。
+
+| 項目 | HEAD (`747c5fe0`, 修正後) | base (`78aa75ad`, 修正前) |
+|---|---|---|
+| `f2_step1.sh` | rc 0、7 m 04.8 s | rc 0、7 m 07.6 s |
+| `leaf_diff.sh` | rc 0、2 m 17.3 s、一致 **16** / 不一致 **7** / 実行不能 0 | rc 0、2 m 15.2 s、一致 **15** / 不一致 **8** / 実行不能 0 |
+| `nc_leaf.py` (HEAD) | rc 0、3 m 12.2 s。変異 28 件 (store_drop 5 / load_drop 10 / offset_shift 13) すべて mismatch、未検出 0、unexec 0 | - |
+
+### 修正前後の判定 (leaf_diff の対象 23 関数)
+遷移: match→match 14, mismatch→mismatch 6, **match→mismatch 1**, mismatch→match 2。
+- 回帰 (match→mismatch): 0x5de250 (19006) のみ。
+- 改善 (mismatch→match): 0x6c8fc0 (18975, base は xmm_arg_drop で mismatch→match)、0x6f1650 (19059)。
+- 不変の mismatch 6: 0x6bfec0, 0x6c9b60, 0x6b0ef0, 0x6c8c90, 0x6cc2e0, 0x6ca5c0。
+
+集計コマンド: `python3` で `leaf_diff.sh` の stdout 表 (`^| <#> | <block> | ... | **<verdict>**`) を VA で突き合わせ (base = `$RUNNER_TEMP/leaf_diff_base.log`、head = `$RUNNER_TEMP/leaf_diff_head.log`)。ログは work/ 外に残さない。
+
+### 0x5de250 回帰の切り分け (未解決)
+- IR (`tools/plugins/work/batch/19006/p.final.ll`) の `@function_5de250` は `i32 load (inttoptr i64 3198772)` = 絶対 VA `0x30D0F4` を読み、`(arg & 0x7fffffff) < 値` で分岐して `store i32 0, ptr %arg1` する。
+- block19006 PE: ImageBase `0x400000`、SizeOfImage `0x3b2000`。絶対 VA `0x30D0F4` は image 外。RVA `0x30D0F4` は `.data` (VA `0x2e0000`、サイズ `0x3c838`) の内側で、先頭 16 byte は `01120805126800000d79100000000803`。
+- 修正後の wasm は `wasm_origin = ImageBase` で image を置くため、IR の `0x30D0F4` は image 外を読む。修正前は RVA として image 内を読んでいた。
+- **native 側の実測は未完**: 通常プロセス (gcc 製プローブ) の `/proc/self/maps` には `0x30D0F4` が現れなかった (これは `ld_native` の実行環境ではない)。`ld_native` 内で `0x30D0F4` が何を指すか (mapping の有無・読んだ値) は未測定。その実測が無い限り、回帰の意味は決まらない。**機序は未確定のまま**。
+
+### 未実施: 残りの 7 関数 (30 − 23) と 317 箇所の影響表
+leaf_diff は IR leaf かつ機械語に間接 call 無しの 23 関数のみを対象とする。残りは非 leaf で、本 run では liftdiff にかけていない。したがって「絶対 VA 定数の修正で壊れていない」根拠は 7 関数分まだ無い。起票先: #923 (子として残す)。
