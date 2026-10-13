@@ -137,6 +137,7 @@ edge-sim の `audioworklet`・`console-clean` が `/wasm/audio/manifest.json` �
 | 修正前 `8e27b776` (ベース) | **PASS=26 FAIL=8 SKIP=6**, exit 1 | 92 s (1791912565 → 1791912657) | 0.34 → 0.42 |
 | 修正後 (本 PR head) | **PASS=34 FAIL=0 SKIP=6**, exit 0 | 15 s (1791912689 → 1791912704) | 0.23 → 2.07 |
 
+- コミット済み HEAD `22419ef4` で再実行 (同条件・Node v22.23.3): **PASS=34 FAIL=0 SKIP=6**, exit 0, 所要 13 s (1791912812 → 1791912825)、load 0.60 → 0.81 (ログ `head-22419ef4.log`)。
 - 修正前の FAIL 8 = `audioworklet` ×4 (preview/edge-sim × 2 driver) + `console-clean` ×4。全件 `/wasm/audio/manifest.json HTTP 404`。
   preview 側も同じ 404 で落ちていた (修正前は preview の `audioworklet` も FAIL)。
 - 修正後の `audioworklet` 実測 (samplePos 進行): preview agent-browser 40495 frames/s、preview puppeteer 47059、edge-sim agent-browser 39035、edge-sim puppeteer 51451 (いずれも 128f 単位)。
