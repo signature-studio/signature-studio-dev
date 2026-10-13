@@ -17,15 +17,15 @@ FL_WIN64_DIR=<fl-win64 展開先> python3 tools/shared/scripts/ildsp_survey.py
 
 | 項目 | 実測 |
 |---|---:|
-| `.text` 命令数 (線形走査・仮想サイズ) | 362,277 |
+| `.text` 命令数 (線形走査・仮想サイズ) | 362,280 |
 | `.pdata` 関数数 (生データ読み) | 2,622 |
 | 直接 call / 間接 call | 5,898 / 848 |
 | 間接 call 比 | 12.6% |
-| `IPPCODE` 命令数 | 129,188 |
+| `IPPCODE` 命令数 | 129,192 |
 | `IPPCODE` SIMD 比 | 70.0% |
-| `.text` SIMD 比 | 48.68% (176,373 / 362,277) |
+| `.text` SIMD 比 | 48.68% (176,373 / 362,280) |
 
-上表は script 出力 (JSON: `text_instructions` 362277 / `simd_ratio` 0.4868 / `ippcode_instructions` 129188) と一致する。capstone の導入経路 (uv wheel / ソースビルド) を変えても同値。レビュー側の報告値 362,280 / 129,192 とは食い違う。下記未解決を参照。
+上表は script 出力 (JSON: `text_instructions` 362280 / `simd_ratio` 0.4868 / `ippcode_instructions` 129192) と一致する。同一入力 (sha256 f4b23b0f…) で 2 回実行し JSON が完全一致 (`cmp` で確認) したため決定的。旧 REPORT の 362,277 / 129,188 は script で再現しなかった (下記未解決を参照)。
 
 ### 未解決: `.text` SIMD 比の定義
 
@@ -48,7 +48,7 @@ closure = export entry の関数 (`.pdata` 境界) から、直接 call と直�
 | GeneralPitchShifter_CreateInstance | 0x1aa290 | 8 | 238 | 8.8% | 14 | 4 | 22.2% |
 | LimiterLite_CreateInstance | 0x1aa540 | 10 | 417 | 5.0% | 18 | 5 | 21.7% |
 | Limiter_CreateInstance | 0x1aafd0 | 11 | 858 | 8.5% | 67 | 5 | 6.9% |
-| LowFreqEnhancer_CreateInstance | 0x1ab3d0 | 140 | 10,305 | 4.2% | 540 | 61 | 10.2% |
+| LowFreqEnhancer_CreateInstance | 0x1ab3d0 | 140 | 10,307 | 4.2% | 540 | 61 | 10.2% |
 | PSOLA_CreateInstance | 0x1ab540 | 8 | 238 | 8.8% | 14 | 4 | 22.2% |
 | Shimmer_CreateInstance | 0x1ab810 | 44 | 1,765 | 2.3% | 155 | 37 | 19.3% |
 | StereoEnhancer_CreateInstance | 0x1abca0 | 139 | 9,925 | 4.0% | 501 | 61 | 10.8% |
@@ -57,7 +57,7 @@ closure = export entry の関数 (`.pdata` 境界) から、直接 call と直�
 | WaveformColouring_CreateInstance | 0x1ac470 | 10 | 762 | 27.4% | 17 | 4 | 19.1% |
 
 - 最小: GeneralPitchShifter と PSOLA が同率 238 命令 (8 関数)。両者のバイト列は一致しない (sha1 713ff04f… / 0391d052…)。
-- 規模の大きい 2 つ (LowFreqEnhancer 10,305 / StereoEnhancer 9,925 命令) は 140 / 139 関数。残り 8 件は 8〜44 関数。
+- 規模の大きい 2 つ (LowFreqEnhancer 10,307 / StereoEnhancer 9,925 命令) は 140 / 139 関数。残り 8 件は 8〜44 関数。
 - closure は間接 call を辿らないため、実到達はこの表より大きい可能性がある。
 - 注意: `.pdata` 先頭でない entry は `owner()` で含む関数の先頭に正規化してから辿る。export の 10 件はすべて `.pdata` 先頭に一致した。
 
@@ -70,6 +70,6 @@ closure = export entry の関数 (`.pdata` 境界) から、直接 call と直�
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | `.text` SIMD 比 30.7% の定義・出典 | 旧 libreverb REPORT §6 の数値が再現できない | #161 継続 |
-| 命令数の環境差 (本環境: 362,277 / 129,188 / 10,305、レビュー報告: 362,280 / 129,192 / 10,307) | 同一入力 (sha256 f4b23b0f…) で版数も一致する環境間で値が違う。原因未特定。REPORT の値は本環境の実測 | #161 継続 (環境差の切り分け) |
+| 旧 REPORT 値 (362,277 / 129,188 / 10,305) の出典 | 現 script では再現しない (決定的な出力は 362,280 / 129,192 / 10,307)。旧値は別の版・別の script 状態の産物と推定するが未確認 | #161 継続 (旧値の出典確認) |
 | closure の間接 call 先の解決 | 表の命令数は下限 | 起票案 (PSOLA lift) で扱う |
 | ildsp の lift 本体 | #161 後半未達 | #161 継続 |
