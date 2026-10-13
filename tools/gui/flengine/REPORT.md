@@ -202,7 +202,22 @@ main 取込後の木 (`c37522c`) で S1 が FAIL (828/67 vs 864/31) したため
 | `bash tools/gui/flengine/e2e.sh` (**HEAD `19ebb43`**) | rc 0。**JUDGE PASS 14/14**。S1 = 864/1/46/31 (base 一致)。ネガコン N1〜N9 は 9/9 が期待どおり FAIL。selftest 0 failed | 2 分 36 秒 (load 0.45 → 0.97) |
 | `bash tools/gui/e2e.sh` (**HEAD `19ebb43`**) | rc 0。ALL PASS (bpp / text / simd / present / Chrome E2E / fail-fast / reach-log / sigprobe)。ASan UAF は本回に出ず | 1 分 33 秒 |
 
-### 6c-3. 現 HEAD `e9007eca` の再測 (main `1adff847` を merge commit で取込済み。e2e の `m6/ottlib.py` 複製を追加)
+### 6c-4. 現 HEAD `c4e3c064` の再測 (main `97f28539` を merge commit `986d8a67` で取込済み。`/opt` 絶対パスを REPORT から除去)
+
+素材: `fl-win64` → `$RUNNER_TEMP/fl-win64`、`work-m11` → `tools/m11/work/`、`toolchain-retdec` / `toolchain-emsdk` を [RETDEC] / [EMSDK] として使用 (`PATH` / `EMSDK_ENV`)、capstone 5.0.7 / pefile 2024.8.26、`pnpm install --frozen-lockfile`、`tools/e2e` は `npm install --no-save`。
+
+| 実行 (HEAD `c4e3c064`, 2026-10-13 UTC) | 結果 | 所要 (実測) |
+|---|---|---|
+| `bash tools/m11/m11_wndseed.sh` | rc 0。`WNDCLASS-CHECK PASS` (WNDCLASS 11 / fn WNDPROC 8 / 最終 IR 未定義 0) | 146 秒 (load 0.53 → 0.95) |
+| `bash tools/gui/flengine/e2e.sh` | rc 0。**JUDGE PASS 14/14**。native selftest 500 passed / 0 failed。ネガコン N1〜N9 は 9/9 が期待どおり FAIL | 188 秒 (load 0.80 → 1.11) |
+| `bash tools/gui/e2e.sh` | rc 0。**ALL PASS** (`stress` の readback は golden と EXACT MATCH 0 px / 64000) | 132 秒 (load 1.88) |
+
+- judge の各 gate: L1 (ff・soft) PASS / A1 declare=193 = adapter=193 (impl 173 / stub 20) / B1 units_run 52 = base 52 / R1 `LoadStringW` IMPL / R2 reach 32 ≥ floor 19 / **S1 871/1/47/23/0 = base 871/1/47/23/0 PASS** / S2 ff・soft とも STUB `LoadImageW` / P1〜P5 PASS (P5 hwnd `0x110000e`) / W1 PASS (外 0)。
+- 本 run は 1 回の実測。繰り返しは行っていない。
+- 初回失敗はいずれも環境要因で、コードの変更ではない: (a) `EMSDK_ENV` 未指定で `emcc` 不在 (rc 2)、(b) worktree の `node_modules` 不在 (rc 127)、(c) `tools/e2e/node_modules` 不在で agent-browser が ENOENT (rc 2)。(a)〜(c) を入れた後の rc 0 を上表に記録した。
+- 直前の `f1e88c82` / `3d433c6f` で出た S1 FAIL (869/1/47/25 vs base 871/1/47/23) は、`c4e3c064` と `e9007ec` の実測では再現しない。**原因は特定していない** (unit 304 / 555 の差は未切り分け)。判定式は緩めていない。
+
+### 6c-3. 旧 HEAD `e9007eca` の再測 (main `1adff847` を merge commit で取込済み。e2e の `m6/ottlib.py` 複製を追加)
 
 素材: `fl-win64` → `$RUNNER_TEMP/fl-win64` (`FL_WIN64_DIR`)、`work-m11` → `tools/m11/work/`、`toolchain-retdec` → [RETDEC] (`RETDEC`)、`toolchain-emsdk` → [EMSDK] (`EMSDK_ENV`)、`apt-mingw` (`x86_64-w64-mingw32-gcc`)、pefile 2024.8.26 / capstone 5.0.7 (`python3 -m pip install --user`)、`pnpm install --frozen-lockfile` (ルート)、`tools/e2e` は `npm install --no-save` (agent-browser 0.39.0。repo に lockfile が無いため `--no-save` で入れた)。
 
