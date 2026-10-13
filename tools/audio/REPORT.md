@@ -220,7 +220,7 @@ e2e 追加 3 本 (`harness/run.mjs`, 計 25 シナリオ): `asio_sine_b512_96k` 
 
 既知類型との関係: 該当なし (ランタイム shim の長時間検証)。検証起点 commit: `0a721b0` (ブランチ `191-audio-soak30`, base `149f073`)。環境: GitHub runner 4 core / 15 GiB, headless Chrome 154.0.8037.97 (fake 出力シンク), emcc は toolchain-emsdk。
 
-**実測の版の注意**: 下表の 30 分・負荷下・ネガコンは 0a721b0 (AU-7 取り込み前) の実測。head `85887e2` は main (`59c1169`) を取り込んでおり、`FLASIO_PROFILE_ILWASAPI` 既定 0→1 (報告 min/gran 128/128 → 256/0)・`audio-shim.ts` の ATTACH 待ち (outputLatency 0 の間 最大 600 ms)・`flasio.c` の systemTime を含む。head での 30 分は下の未解決表を参照。
+**実測の版の注意**: 下表の 30 分・負荷下・ネガコンは 0a721b0 (AU-7 取り込み前) の実測。head `85887e2` は main (`59c1169`) を取り込んでおり、`FLASIO_PROFILE_ILWASAPI` 既定 0→1 (報告 min/gran 128/128 → 256/0)・`audio-shim.ts` の ATTACH 待ち (outputLatency 0 の間 最大 600 ms)・`flasio.c` の systemTime を含む。head での 30 分は未計測 (下の未解決表を参照)。
 
 再現: `bash tools/audio/build.sh && node tools/audio/harness/run.mjs --soak30` (既定の全シナリオ実行・`e2e.sh` には含めない。`--soak <秒>` で秒数指定、`--inject-hiccup` でネガコン)。結果は `results/soak_<秒>.json` (既定の `results/results.json` は上書きしない)。合格条件 (AND): underrun 0 / silence 0 / ランプ全フレーム bit-exact / 実フレーム ≥ 公称×99% / `secs_wall` ≥ 公称 / worklet エラー 0・abort なし・exit=1(完了)。不合格は runner が exit 1。
 
@@ -240,5 +240,5 @@ e2e 追加 3 本 (`harness/run.mjs`, 計 25 シナリオ): `asio_sine_b512_96k` 
 | 負荷下 (load avg 10 超) の **30 分**ソーク未実施 | #191 スコープの「負荷下の結果も記録」は 420 s のみ | #191 にコメント (別 run で `--soak30` + busy 並走) |
 | COM 経由 (`asio/e2e.sh --soak 1800`) 30 分 | #271 が COM 経路。キャプチャ約 661 MiB の分割照合設計が要る | #191 に提案 |
 | COM 経路 harness の固定 `p + 1` 照合 (`asio/harness/com_page.mjs:95`)。生成元 `asio/test/com_test.c:84` は `(n & 0xFFFFFF)+1` で 2^24 f で巻き戻る = test/page.mjs と同一バグ | `asio/e2e.sh --soak` で 349.5 s 超は ramp mismatch → FAIL (コード読解による判断・未実行) | #191 にコメント。COM 側の修正は 360 s 以上の実測を添えて別 commit |
-| head `85887e2` での 30 分ソーク (無負荷) の再実測 | 表の 30 分行は 0a721b0 のもの。マージ後 shim での 30 分は本節の追記で確定する (追記前は未計測) | 本 PR 内で実施 (下の追記行) |
+| head `525cbd9` での 30 分ソーク (無負荷) は**未実施** (未計測)。上の表の 30 分行は `0a721b0` (AU-7 取り込み前) のもので、マージ後の shim (`audio-shim.ts` ATTACH 待ち・`FLASIO_PROFILE_ILWASAPI` 既定 1) では未計測 | #191 にコメント (別 run で `bash tools/audio/build.sh && node tools/audio/harness/run.mjs --soak30` を head で実施) |
 | 旧 page.mjs (巻き戻し非対応) での FAIL 再現未実施 | 修正の必要性は理屈のみ | 本 REPORT に明記 |
