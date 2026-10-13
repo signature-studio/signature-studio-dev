@@ -14,7 +14,8 @@ M = {p['name']: p for p in json.load(open(os.path.join(HERE, '..', 'PLUGIN_MATRI
 n = lambda x: format(x, ',')
 SECS = {}
 for r in csv.DictReader(open(os.path.join(HERE, '..', 'work', 'batch', 'status.csv'))):
-    SECS.setdefault(int(r['block']), []).append(int(r['seconds']))
+    if r['lift_rc'] == '0':   # 失敗 run の秒 (前提欠け等で即落ちた行) を lift 秒に混ぜない
+        SECS.setdefault(int(r['block']), []).append(int(r['seconds']))
 rng = lambda b: ('%d–%d' % (min(SECS[b]), max(SECS[b])) if min(SECS[b]) != max(SECS[b]) else str(SECS[b][0])) + ' (n=%d)' % len(SECS[b])
 SEC = sys.argv[1] if len(sys.argv) > 1 else ''
 import io, contextlib
