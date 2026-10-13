@@ -27,6 +27,7 @@ step "5. flpy link";           bash build_flpy.sh | tail -4
 step "6. smoke (print(1+1) + stdlib)"; node tests/smoke_direct.mjs
 step "7. builtin 一覧 / FL 同梱 Python 差分"; node tests/dump_builtins.mjs; python3 analysis/py_inventory.py > analysis/python_inventory.json
 step "8. PoC: MCPTools.pyc on wasm Python + flapi mock (Worker/SAB RPC)"; node tests/poc_mcp.mjs | grep -E '"(tools|init_ms|host_calls|roundtrip_us_per_flapi_call)"|POC'
+step "8b. kwargs 省略引数の誤束縛 0 検証 (PY-15 #653, wasm 不要)"; python3 tests/kwsig_bind_check.py
 step "9. 48 tools 全実行"; node tests/all_tools.mjs
 step "9b. C provider (fl_api_call) 版 flprov.wasm + 48 tools"; bash provider/build.sh | tail -2; node tests/provider_check.mjs; FL_ENGINE=wasm node tests/all_tools.mjs
 step "9c. PY-2 (#83): Py_* 動的束縛の対応表 + CPython/provider 同一 wasm 静的リンク + 48 tools"

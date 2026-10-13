@@ -81,6 +81,7 @@ void wnd_client_size(Wnd *w, int *cw, int *ch);
 /* ---- gdi (gui_gdi.c) ---- */
 U64 gdi_get_dc_for_wnd(Wnd *w, int window_dc, const RL *clip_override);
 void gdi_release_dc(U64 hdc);
+U64 gdi_get_screen_dc(void);   /* GetDC(NULL)/GetWindowDC(NULL): 既定 1x1 ビットマップ選択済みのメモリ DC (ReleaseDC/DeleteDC で解放) */
 void gdi_init(void);
 void gdi_fill_rect_dc(U64 hdc, WRECT r, uint32_t colorref);
 int  gdi_dc_is_valid(U64 hdc);
