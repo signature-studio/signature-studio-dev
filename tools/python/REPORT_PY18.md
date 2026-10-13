@@ -53,4 +53,17 @@
 ## 5. 未解決
 
 - `run_all.sh` 全体は step 4 (mac 固定パス) が要るため未実施 (#630)。
-- 3 チェックは commit 前の作業ツリーで実行した。commit 後の HEAD で再実行して結果を記録する (§6)。
+
+## 6. commit 済み HEAD での再現 (2256be5a、作業ツリー clean)
+
+| 検証 | 結果 (rc) |
+|---|---|
+| `all_tools.mjs` (mock) | 48/48 ok、host_calls 37,425、callback true |
+| `FL_ENGINE=wasm all_tools.mjs` | 48/48 ok、host_calls 37,425、callback true |
+| `provider_check.mjs` | PASS (§6 の mock/wasm 一致 assert を含む) |
+| `static_check.mjs` | STATIC CHECK OK |
+| `browser_check.mjs` | rc=0 (BROWSER OK) |
+| `mcp_ui_check.mjs` | rc=0 (MCP UI OK、tools/list = 48) |
+| `midi_ui_check.mjs` | rc=0 (MIDI UI OK) |
+
+実行後も `git status` は clean (`tool_coverage.json` の書き換えなし)。
