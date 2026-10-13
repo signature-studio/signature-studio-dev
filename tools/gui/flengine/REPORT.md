@@ -333,14 +333,31 @@ review `b9f0b32b` の指摘 1 (S1) と 2 (run.mjs のコメント) への対応�
 - **判定**: S1 は FAIL のまま (870/1/47/24/0 vs 872/1/47/22/0)。判定を PASS に動かす変更は入れていない。judge 13/14。
 - `run.mjs` 4 行目のコメントを実装 (既定 256 MiB) に合わせた。
 
-| 実行 (HEAD `bf9cf547`) | 結果 | 所要 |
-|---|---|---|
-| `bash tools/gui/flengine/e2e.sh` | rc 1。judge **13/14** (S1 のみ FAIL: 870/1/47/24/0 vs base 872/1/47/22/0)。ネガコン N1〜N9 は期待どおり FAIL。native selftest 506 passed / 0 failed | 412 s (測定 load 1.07) |
+本節の実測は **HEAD `125fefd2`** (コード差分なし。`bf9cf547` の測定値を含む) で取り直した値。実行環境: runner 4 vCPU、`apt-mingw` (`x86_64-w64-mingw32-gcc`) を apt 導入、`[EMSDK]` = `/opt/emsdk/emsdk_env.sh`、`fl-win64` / `work-m11` を展開。
 
-| 実行 (HEAD `a3f3be1a`。`bf9cf547` は run.mjs のコメント 1 行のみ差) | 結果 | 所要 |
-|---|---|---|
-| `bash tools/m11/ldfix/f4_e2e.sh` | rc 0。6 gate PASS・ネガコン 4/4。RegisterClassW 2→2→3、`function_52a7f0` ret 0x0→0x0→0x110000f。survey pre/noand/post = 870/1/47/24 | 328 s (load 0.18→1.00) |
-| `bash tools/gui/e2e.sh` (`FL_WIN64_DIR` 指定、`pnpm install --frozen-lockfile` 後) | rc 0。ALL PASS (SIMD / text / stress / pe_image / selftest 506/0)。前回 ASan 問題は出ず | 未計測 (rc 0 のみ確認) |
+| 実行 (HEAD `125fefd2`・foreground・1 回) | rc | 所要 | 結果 |
+|---|---|---|---|
+| `EMSDK_ENV=… FL_WIN64_DIR=… ANALYSIS_DIR=… RETDEC=/opt/retdec/bin/retdec-decompiler bash tools/gui/flengine/e2e.sh` | **1** | 466 s (load 0.68→1.09) | judge **13/14**。S1 のみ FAIL: `870/1/47/24/0` vs base `872/1/47/22/0`。他 13 gate PASS (L1×2・A1 declare=193 adapter=193 impl=173 stub=20・B1 units 52・R1 LoadStringW・R2 reach 33≥19・S2・P1〜P5・W1)。ネガコン N1〜N9 期待どおり FAIL。selftest 506 passed / 0 failed |
+| `EMSDK_ENV=… FL_WIN64_DIR=… bash tools/m11/ldfix/f4_e2e.sh` | **0** | 385 s (load 1.00) | 6 gate PASS (F1/F2/D1/D2/P1/A1)。ネガコン 4/4 期待行付き FAIL。RegisterClassW 2→2→3。`function_52a7f0` ret pre `0x0` → noand `0x0` → post **`0x110000f`**。survey pre/noand/post = `870/1/47/24`。`ir_sha256.txt` の `after_m11_build` 行は再生成で変化 (下記 §6d-2) |
+| `EMSDK_ENV=… FL_WIN64_DIR=… bash tools/gui/e2e.sh` | **0** | 302 s (load 2.28) | ALL PASS (SIMD / present / input / stress (negctl 2/2 exit 1) / pe_image / selftest 506/0) |
+
+**S1 の判定**: 上表のとおり FAIL のまま。判定式は変えていない。unit 304 / 555 の差 (soft 側のみ `memory access out of bounds`) の原因は未特定。同じ unit 304 / 555 の oob を扱う OPEN issue として [M11-N78] #1275 (`ClassCreate ON で unit 304/555 が oob→abort`) があるが、原因が同一かは未確認。起票先は #1275 にコメントで接続する。
+
+### 6d-2. `function_52a7f0` の ret 値の対応 (同一 build 内の不整合ではない)
+
+| 測定元 | IR の作り方 | 窓の採番 (probe) | `function_52a7f0` ret |
+|---|---|---|---|
+| `f4_e2e.sh` post (`0246df1f`〜`125fefd2`) | `m11_gen_ir2.sh` → `m11_build.sh` | `TLightweightLayeredControl` = `0x0` (未生成)、`TApplication` = `0x210000e` | `0x110000f` |
+| `flengine/e2e.sh` probe (`125fefd2`) | 上記に加え `m11_wndseed.sh` (boot6 seed。WNDPROC 閉包を追加) | `TLightweightLayeredControl` = `0x110000e`、`TApplication` = `0x110000f` | `0x1100010` |
+
+- 両者とも soft build・同じ `probe.mjs` で取っている。差は IR (`m11_wndseed.sh` の有無) で、`e2e.sh` は step 0 で wndseed を回し、`f4_e2e.sh` は回さない (スクリプトで確認済み)。窓の採番が変わる機構は推定 (未検証)。
+- したがって受入条件 3 の値は **「f4 の IR (wndseed 無し) では `0x110000f`、wndseed 込みの最終 IR では `0x1100010`」**。どちらも `0x0` からの修復を示す。一意の値は wndseed 込みの最終 IR (flengine の値) とする。f4 の値は f4 の構成でのみ有効。
+
+### 6d-3. 注記 (run 上の前提)
+
+- `x86_64-w64-mingw32-gcc` は runner に無かったため `apt-get install gcc-mingw-w64-x86-64` で導入 (`apt-mingw` 素材の代替)。初回の flengine e2e は前提欠如 (rc 2) で止まり、導入後に再実行。
+- `tools/m11/work` は `work-m11` の展開先 (gitignore。commit しない)。
+
 
 注記: `tools/gui/e2e.sh` の初回は `node_modules` 不在で step 5 (tsc) が rc 127 だった (`pnpm install` で解消。環境要件)。
 
