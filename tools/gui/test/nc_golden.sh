@@ -10,9 +10,13 @@ gcc -O1 -g -w -fsanitize=address,undefined -fno-sanitize-recover=undefined -pthr
 "$B/nc_golden" "$B/nc_scene.ppm"
 python3 "$ROOT/golden/gen_golden_nc.py" "$B/nc_scene.ppm"
 fail=0
-if python3 "$ROOT/golden/gen_golden_nc.py" "$B/nc_scene.ppm" --tamper >/dev/null 2>&1; then echo "NEGCTL FAIL: tampered golden was accepted"; fail=1; else echo "negctl 1/3 OK: tampered golden (1 px) rejected"; fi
+# ネガコンは「PPM が出て MISMATCH で exit 1」のときだけ検出扱い (PPM 欠落・クラッシュ・想定外のエラーは不合格)
+rejected() { [ "$1" = 1 ] && grep -q '^MISMATCH ' "$2"; }
+python3 "$ROOT/golden/gen_golden_nc.py" "$B/nc_scene.ppm" --tamper >"$B/nc_tamper.cmp" 2>&1 && rc=0 || rc=$?
+if rejected "$rc" "$B/nc_tamper.cmp"; then echo "negctl 1/3 OK: tampered golden (1 px) rejected"; else echo "NEGCTL FAIL: tampered golden not rejected as MISMATCH (rc=$rc)"; fail=1; fi
 for f in 1 2; do
   NC_FAULT=$f "$B/nc_golden" "$B/nc_scene_f$f.ppm" >"$B/nc_f$f.out" 2>&1 || true
-  if python3 "$ROOT/golden/gen_golden_nc.py" "$B/nc_scene_f$f.ppm" >"$B/nc_f$f.cmp" 2>&1; then echo "NEGCTL FAIL: NC_FAULT=$f was accepted"; fail=1; else echo "negctl $((f+1))/3 OK: NC_FAULT=$f rejected ($(cut -c1-50 "$B/nc_f$f.cmp"))"; fi
+  python3 "$ROOT/golden/gen_golden_nc.py" "$B/nc_scene_f$f.ppm" >"$B/nc_f$f.cmp" 2>&1 && rc=0 || rc=$?
+  if rejected "$rc" "$B/nc_f$f.cmp"; then echo "negctl $((f+1))/3 OK: NC_FAULT=$f rejected ($(cut -c1-50 "$B/nc_f$f.cmp"))"; else echo "NEGCTL FAIL: NC_FAULT=$f not rejected as MISMATCH (rc=$rc, $(cut -c1-80 "$B/nc_f$f.cmp"))"; fail=1; fi
 done
 [ "$fail" = 0 ] && echo "[nc-golden] ALL PASS" || { echo "[nc-golden] FAILED"; exit 1; }

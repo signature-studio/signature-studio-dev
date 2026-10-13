@@ -307,8 +307,9 @@ static void link_top(Wnd *w) {   /* desktop の子リスト (= z 順) の最前�
   if (at) at->next = w; else p->first = w;
   if (w->next) w->next->prev = w; else p->last = w;
 }
-/* DPI 方針 (PROTOCOL.md §12): canvas 内部解像度 = 物理 px。DPI 非対応 (既定) のスレッドには 96 を見せ画素は 1:1、
- * 対応 (SYSTEM/PER_MONITOR 系) のスレッドには dpr*96 を見せ、shim が決める寸法 (NC 幅・システムメトリクス) をその DPI に比例させる。 */
+/* DPI 方針 (PROTOCOL.md §12): canvas 内部解像度 = 物理 px。DPI 非対応 (既定) の context には 96 を見せ画素は 1:1、
+ * 対応 (SYSTEM/PER_MONITOR 系) の context には dpr*96 を見せ、shim が決める寸法 (NC 幅・システムメトリクス) をその DPI に比例させる。
+ * context はプロセス共通の 1 値 (SetThreadDpiAwarenessContext も同じ変数を書く。スレッド別には保持しない)。 */
 static I64 g_dpi_ctx = -1;   /* DPI_AWARENESS_CONTEXT_UNAWARE */
 int gui_dpi(void) { if (g_dpi_ctx == -1 || g_dpi_ctx == -5) return 96; uint32_t d = gui_sh()->dpr_x100; return (int)((96u * (d ? d : 100) + 50) / 100); }
 static int dscale(int v) { return (v * gui_dpi() + 48) / 96; }
@@ -659,7 +660,7 @@ API SetWindowPos(I64 h, I64 after, I64 x, I64 y, I64 cx, I64 cy, I64 flags) {
     Wnd *p = w->parent;
     if (after == HWND_BOTTOM_ || after == HWND_TOP_ || after == -1 || after == -2) {
       if (after == -1 && is_toplevel(w)) w->exstyle |= WS_EX_TOPMOST_;   /* HWND_TOPMOST / HWND_NOTOPMOST */
-      if (after == -2 && is_toplevel(w)) w->exstyle &= ~(uint32_t)WS_EX_TOPMOST_;
+      if ((after == -2 || after == HWND_BOTTOM_) && is_toplevel(w)) w->exstyle &= ~(uint32_t)WS_EX_TOPMOST_;   /* NOTOPMOST / BOTTOM は topmost を外す (MSDN) */
       unlink_child(w);
       if (after == HWND_BOTTOM_) { w->parent = p; w->next = p->first; w->prev = NULL; if (p->first) p->first->prev = w; else p->last = w; p->first = w; }
       else if (is_toplevel(w)) link_top(w);
@@ -667,11 +668,16 @@ API SetWindowPos(I64 h, I64 after, I64 x, I64 y, I64 cx, I64 cy, I64 flags) {
       if (is_toplevel(w) && w->surf >= 0) { gui_sh()->surf[w->surf].z = (after == HWND_BOTTOM_) ? 0 : next_z(w); out_cmd(GUI_CMD_SURF_CHANGE, (uint32_t)w->surf, 0, 0, 0, 0, 0); }
     } else if (wnd_from_h((U64)after)) {
       Wnd *a = wnd_from_h((U64)after);
-      unlink_child(w);
-      w->parent = p; w->prev = a; w->next = a->next;
-      if (a->next) a->next->prev = w; else p->last = w;
-      a->next = w;
-      if (is_toplevel(w) && w->surf >= 0) { gui_sh()->surf[w->surf].z = gui_sh()->surf[a->surf].z; out_cmd(GUI_CMD_SURF_CHANGE, (uint32_t)w->surf, 0, 0, 0, 0, 0); }
+      if (is_toplevel(w) && ((w->exstyle ^ a->exstyle) & WS_EX_TOPMOST_)) {   /* TOPMOST 群と非 TOPMOST 群は跨がない: 各群の先頭 (link_top) へ */
+        link_top(w);
+        if (w->surf >= 0) { gui_sh()->surf[w->surf].z = next_z(w); out_cmd(GUI_CMD_SURF_CHANGE, (uint32_t)w->surf, 0, 0, 0, 0, 0); }
+      } else {
+        unlink_child(w);
+        w->parent = p; w->prev = a; w->next = a->next;
+        if (a->next) a->next->prev = w; else p->last = w;
+        a->next = w;
+        if (is_toplevel(w) && w->surf >= 0) { gui_sh()->surf[w->surf].z = gui_sh()->surf[a->surf].z; out_cmd(GUI_CMD_SURF_CHANGE, (uint32_t)w->surf, 0, 0, 0, 0, 0); }
+      }
     }
   }
   apply_geometry(w, nx, ny, nw, nh, w->x != nx || w->y != ny, ww(w) != nw || wh(w) != nh);
@@ -1327,10 +1333,10 @@ static API defproc_impl(I64 h, I64 msg, I64 wp, I64 lp, int wide) {
     case WM_NCPAINT: {   /* window DC に枠 (4 辺) とキャプション帯を描く。client は塗らない */
       extern API GetWindowDC(I64); extern API ReleaseDC(I64, I64);
       I64 dc = GetWindowDC(h); if (!dc) return 0;
-      int W_ = ww(w), H_ = wh(w), bw = w->nl, cap = w->nt - w->nt % 1 - bw; if (cap < 0) cap = 0;
+      int W_ = ww(w), HH = wh(w), bw = w->nl, cap = w->nt - bw; if (cap < 0) cap = 0;
       if (bw) {
-        gdi_fill_rect_dc((U64)dc, (WRECT){ 0, 0, W_, bw }, 0x646464); gdi_fill_rect_dc((U64)dc, (WRECT){ 0, H_ - w->nb, W_, H_ }, 0x646464);
-        gdi_fill_rect_dc((U64)dc, (WRECT){ 0, bw, w->nl, H_ - w->nb }, 0x646464); gdi_fill_rect_dc((U64)dc, (WRECT){ W_ - w->nr, bw, W_, H_ - w->nb }, 0x646464);
+        gdi_fill_rect_dc((U64)dc, (WRECT){ 0, 0, W_, bw }, 0x646464); gdi_fill_rect_dc((U64)dc, (WRECT){ 0, HH - w->nb, W_, HH }, 0x646464);
+        gdi_fill_rect_dc((U64)dc, (WRECT){ 0, bw, w->nl, HH - w->nb }, 0x646464); gdi_fill_rect_dc((U64)dc, (WRECT){ W_ - w->nr, bw, W_, HH - w->nb }, 0x646464);
       }
       if (cap) gdi_fill_rect_dc((U64)dc, (WRECT){ w->nl, bw, W_ - w->nr, bw + cap }, 0xD1B499);
       ReleaseDC(h, dc); return 0;

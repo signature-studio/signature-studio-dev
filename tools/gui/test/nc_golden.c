@@ -87,6 +87,14 @@ int main(int argc, char **argv) {
   CHK(g_nclbd == 1 && g_ncl_ht == 2, "WM_NCLBUTTONDOWN delivered once with HTCAPTION (n=%d ht=%d)", g_nclbd, g_ncl_ht);
   settle();
   gui_hl_dump_ppm(argv[1]);
+  /* z 順 (PROTOCOL §12): 非 TOPMOST を TOPMOST 窓の直後へ置いても TOPMOST より前面に出ない / HWND_BOTTOM は topmost を外す */
+  { int64_t ht2 = CreateWindowExA(TOPMOST, PTR("NCpop"), 0, WS_POPUP | WS_VISIBLE, 30, 30, 30, 30, 0, 0, 0x400000, 0);
+    SetWindowPos(hm, ht2, 0, 0, 0, 0, 2 | 1 | 0x10);
+    CHK(WindowFromPoint(50 | (50LL << 32)) == ht2, "non-topmost after TOPMOST stays below it (got %llx)", (long long)WindowFromPoint(50 | (50LL << 32)));
+    CHK((GetWindowLongA(hm, GWL_EXSTYLE) & TOPMOST) == 0, "SetWindowPos(after=TOPMOST) must not make hm topmost");
+    SetWindowPos(ht2, 1, 0, 0, 0, 0, 2 | 1 | 0x10);
+    CHK((GetWindowLongA(ht2, GWL_EXSTYLE) & TOPMOST) == 0, "HWND_BOTTOM clears TOPMOST");
+    DestroyWindow(ht2); }
   /* DPI: 非対応スレッド = 96 / 対応 = dpr*96 にシステムメトリクス・NC 幅・LOGPIXELS が比例 */
   GuiShared *S = gui_shared_native(); S->dpr_x100 = 200;
   CHK(GetDpiForWindow(hm) == 96 && GetSystemMetrics(SM_CYCAPTION) == 23 && !IsProcessDPIAware(), "unaware thread sees 96 dpi");
