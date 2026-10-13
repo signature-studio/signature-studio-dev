@@ -43,7 +43,7 @@ if [ -n "${OC_COMMENT_BODY:-}" ]; then
   comment_body="$OC_COMMENT_BODY"
 else
   comment_body="$(jq -r --argjson max "$MAX_CHARS" '
-    (.comment.body // .pull_request.body // .inputs.prompt // "")
+    (.review.body // .comment.body // .pull_request.body // .inputs.prompt // "")
     | .[0:$max]
   ' "$GITHUB_EVENT_PATH")"
 fi
@@ -84,7 +84,10 @@ printf 'should_run=%s\n' "$should_run" >> "${GITHUB_OUTPUT:-/dev/null}"
 # 注意: 全素材で約 17.7 GiB (2026-10-13 実測)。runner の空きに収まるよう必要なものだけ指定すること。
 ARTIFACT_RE='^(fl-win64|plugins-(ott|freshair|serum2|massivex|kilohearts)|toolchain-(retdec|emsdk)|work-(m11|liftdiff|m6-ott|liftlib-targets|liftlib|icall|fw-stage1)|analysis-ott-binaries|apt-mingw)$'
 artifacts=""
-artifacts_line="$(grep -m1 -E '^[[:space:]]*oc_artifacts:' "$COMMENT_FILE" || true)"
+# pull_request_review (reviewer の差し戻し) の本文は reviewer の指摘であり、素材の指定は PR 本文にある。
+ARTIFACTS_SRC="$COMMENT_FILE"
+[ "$EVENT_NAME" = pull_request_review ] && ARTIFACTS_SRC="$PR_BODY_FILE"
+artifacts_line="$(grep -m1 -E '^[[:space:]]*oc_artifacts:' "$ARTIFACTS_SRC" || true)"
 if [ -n "$artifacts_line" ]; then
   for name in $(printf '%s' "${artifacts_line#*oc_artifacts:}" | tr -cd 'a-z0-9 -'); do
     if ! printf '%s' "$name" | grep -qE "$ARTIFACT_RE"; then

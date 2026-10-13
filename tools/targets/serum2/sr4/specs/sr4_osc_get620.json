@@ -1,0 +1,47 @@
+{
+ "name": "sr4_osc_get620",
+ "func": "0x1803d0970",
+ "wasm_func": "function_1803d0970",
+ "scenarios": 100,
+ "steps": 1,
+ "seed": 75011,
+ "args": [
+  {
+   "ptr": "this"
+  }
+ ],
+ "buffers": {
+  "this": {
+   "size": 1664,
+   "fields": [
+    {
+     "off": "0x620",
+     "type": "f64",
+     "gen": {
+      "mix": [
+       [
+        0.5,
+        {
+         "unif": [
+          -1000.0,
+          1000.0
+         ]
+        }
+       ],
+       [
+        0.5,
+        {
+         "loguni": [
+          -300,
+          300
+         ]
+        }
+       ]
+      ]
+     }
+    }
+   ]
+  }
+ },
+ "ret_from_xmm0": true
+}

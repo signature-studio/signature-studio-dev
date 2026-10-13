@@ -18,12 +18,12 @@ fi
 CFG="$W/boot*.drc.config.json"; IMG="$W/m11_image.bin"
 step() { echo "[audit_lsf_e2e] $*"; }
 
-step "1/4 修復前 IR を再生成 (tools/m11 を $OUT/gen にコピーして m11_gen_ir2.sh を実行。PE 無しなので ldfix は skip される) → ldfix_img.py で ldfix を再実行"
-rm -rf "$OUT/gen"; mkdir -p "$OUT/gen/tools"; cp -r "$REPO/tools/m11" "$OUT/gen/tools/"; rm -rf "$OUT/gen/tools/m11/work"
+step "1/4 修復前 IR を再生成 (tools/m11 と tools/shared を $OUT/gen にコピーして M11_LDFIX=0 で m11_gen_ir2.sh を実行 = ldfix 無しの明示 opt-out, #680) → ldfix_img.py で ldfix を再実行"
+rm -rf "$OUT/gen"; mkdir -p "$OUT/gen/tools"; cp -r "$REPO/tools/m11" "$REPO/tools/shared" "$OUT/gen/tools/"; rm -rf "$OUT/gen/tools/m11/work"
 mkdir -p "$OUT/gen/tools/m11/work"
 for f in boot0 boot1 boot2 boot3 boot4; do cp "$W/$f.lift.ll" "$OUT/gen/tools/m11/work/"; done
 find "$W" -maxdepth 1 -type f -size -3M -exec cp {} "$OUT/gen/tools/m11/work/" \;
-( cd "$OUT/gen/tools/m11" && bash m11_gen_ir2.sh > "$OUT/gen_ir2.log" 2>&1 ) || { echo "gen_ir2 失敗: $OUT/gen_ir2.log"; exit 1; }
+( cd "$OUT/gen/tools/m11" && M11_LDFIX=0 bash m11_gen_ir2.sh > "$OUT/gen_ir2.log" 2>&1 ) || { echo "gen_ir2 失敗: $OUT/gen_ir2.log"; exit 1; }
 PRE="$OUT/gen/tools/m11/work/boot_final.ll"
 "$PY" "$HERE/ldfix_img.py" "$PRE" "$OUT/ldfix_img_out.ll" "$IMG" "$CFG" --report "$OUT/ldfix_img_report.json" 2>&1 | tail -1
 "$PY" - "$W/ldfix_report.json" "$OUT/ldfix_img_report.json" <<'EOF'
