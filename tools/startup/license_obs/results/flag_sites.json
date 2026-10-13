@@ -52,7 +52,33 @@
   "slot_value": "0x14f84a8",
   "grade_slot_loads": 196,
   "grade_reads": 189,
-  "grade_writes": 7
+  "grade_writes": 7,
+  "grade_window": 13,
+  "grade_tracked_loads": 266,
+  "grade_tracked_funcs": 102,
+  "grade_tracked_continuous": 196,
+  "grade_tracked_extra": 70,
+  "grade_tracked_extra_by_kind": {
+   "addr": 69,
+   "store": 1
+  },
+  "grade_tracked_extra_funcs": 21,
+  "grade_tracked_funcs_outside_continuous": [
+   15180912,
+   16064464,
+   16711648,
+   16760816,
+   17025648,
+   18362672,
+   18715456,
+   18859888,
+   19075440,
+   19428768,
+   20284096,
+   20285552,
+   20341136
+  ],
+  "grade_raw_loads": 2422
  },
  "sites": [
   {
@@ -5084,6 +5110,2136 @@
    "path_cond_false": [],
    "at_0x40": "cond_true",
    "at_0x41": "cond_false"
+  }
+ ],
+ "grade_tracked": [
+  {
+   "func": 12781536,
+   "load": 12782774,
+   "use": 12782784,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 12785808,
+   "load": 12787197,
+   "use": 12787207,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 12790576,
+   "load": 12790845,
+   "use": 12790855,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 12796000,
+   "load": 12796285,
+   "use": 12796295,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 12945840,
+   "load": 12947852,
+   "use": 12947862,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 12945840,
+   "load": 12947987,
+   "use": 12947997,
+   "insn": "mov rdx, qword ptr [rdx + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 12945840,
+   "load": 12948022,
+   "use": 12948032,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 12945840,
+   "load": 12953537,
+   "use": 12953547,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 14461616,
+   "load": 14463309,
+   "use": 14463319,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15060256,
+   "load": 15070562,
+   "use": 15070572,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15060256,
+   "load": 15070697,
+   "use": 15070707,
+   "insn": "mov rdx, qword ptr [rdx + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15060256,
+   "load": 15070732,
+   "use": 15070742,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15060256,
+   "load": 15076247,
+   "use": 15076257,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15153488,
+   "load": 15156273,
+   "use": 15156283,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15153488,
+   "load": 15156408,
+   "use": 15156418,
+   "insn": "mov rdx, qword ptr [rdx + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15153488,
+   "load": 15156443,
+   "use": 15156453,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15153488,
+   "load": 15161958,
+   "use": 15161968,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15180912,
+   "load": 15181297,
+   "use": 15181307,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 15180912,
+   "load": 15181929,
+   "use": 15181939,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 15180912,
+   "load": 15182601,
+   "use": 15182611,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 15180912,
+   "load": 15183231,
+   "use": 15183241,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 15180912,
+   "load": 15183868,
+   "use": 15183878,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 15238928,
+   "load": 15240774,
+   "use": 15240784,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15238928,
+   "load": 15240909,
+   "use": 15240919,
+   "insn": "mov rdx, qword ptr [rdx + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15238928,
+   "load": 15240944,
+   "use": 15240954,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15238928,
+   "load": 15246459,
+   "use": 15246469,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15299280,
+   "load": 15300963,
+   "use": 15300973,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15299280,
+   "load": 15301098,
+   "use": 15301108,
+   "insn": "mov rdx, qword ptr [rdx + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15299280,
+   "load": 15301133,
+   "use": 15301143,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15299280,
+   "load": 15306648,
+   "use": 15306658,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15419040,
+   "load": 15420671,
+   "use": 15420681,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15419040,
+   "load": 15420806,
+   "use": 15420816,
+   "insn": "mov rdx, qword ptr [rdx + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15419040,
+   "load": 15420841,
+   "use": 15420851,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15419040,
+   "load": 15426356,
+   "use": 15426366,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15527024,
+   "load": 15527124,
+   "use": 15527134,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15528512,
+   "load": 15529325,
+   "use": 15529335,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15540160,
+   "load": 15540220,
+   "use": 15540230,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15708368,
+   "load": 15708695,
+   "use": 15708705,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15744176,
+   "load": 15744552,
+   "use": 15744562,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15829856,
+   "load": 15830216,
+   "use": 15830226,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15856112,
+   "load": 15856171,
+   "use": 15856181,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15871776,
+   "load": 15875616,
+   "use": 15875626,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15871776,
+   "load": 15875751,
+   "use": 15875761,
+   "insn": "mov rdx, qword ptr [rdx + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15871776,
+   "load": 15875786,
+   "use": 15875796,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15871776,
+   "load": 15881301,
+   "use": 15881311,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15871776,
+   "load": 15892257,
+   "use": 15892267,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15871776,
+   "load": 15892392,
+   "use": 15892402,
+   "insn": "mov rdx, qword ptr [rdx + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15871776,
+   "load": 15892427,
+   "use": 15892437,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15871776,
+   "load": 15897972,
+   "use": 15897982,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15915952,
+   "load": 15917716,
+   "use": 15917726,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15915952,
+   "load": 15917851,
+   "use": 15917861,
+   "insn": "mov rdx, qword ptr [rdx + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15915952,
+   "load": 15917886,
+   "use": 15917896,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15915952,
+   "load": 15923401,
+   "use": 15923411,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15915952,
+   "load": 15934409,
+   "use": 15934419,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 15915952,
+   "load": 15935039,
+   "use": 15935049,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 15915952,
+   "load": 15935671,
+   "use": 15935681,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 15915952,
+   "load": 15936349,
+   "use": 15936359,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 15915952,
+   "load": 15940012,
+   "use": 15940022,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 15976560,
+   "load": 15978138,
+   "use": 15978148,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15992896,
+   "load": 15993976,
+   "use": 15993986,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 15992896,
+   "load": 15994650,
+   "use": 15994660,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 15992896,
+   "load": 15998367,
+   "use": 15998377,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 15992896,
+   "load": 15998999,
+   "use": 15999009,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 15992896,
+   "load": 15999629,
+   "use": 15999639,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 15992896,
+   "load": 16000294,
+   "use": 16000304,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 15992896,
+   "load": 16000569,
+   "use": 16000579,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 16016416,
+   "load": 16016460,
+   "use": 16016470,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 16016528,
+   "load": 16037841,
+   "use": 16037851,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 16064464,
+   "load": 16064917,
+   "use": 16064927,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 16064464,
+   "load": 16065555,
+   "use": 16065565,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 16064464,
+   "load": 16066200,
+   "use": 16066210,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 16064464,
+   "load": 16066856,
+   "use": 16066866,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 16064464,
+   "load": 16070550,
+   "use": 16070560,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 16064464,
+   "load": 16071201,
+   "use": 16071211,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 16267840,
+   "load": 16270905,
+   "use": 16270915,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 16267840,
+   "load": 16271040,
+   "use": 16271050,
+   "insn": "mov rdx, qword ptr [rdx + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 16267840,
+   "load": 16271075,
+   "use": 16271085,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 16267840,
+   "load": 16276590,
+   "use": 16276600,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 16711648,
+   "load": 16711813,
+   "use": 16711823,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 16760816,
+   "load": 16761598,
+   "use": 16761608,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 16760816,
+   "load": 16762271,
+   "use": 16762281,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 16760816,
+   "load": 16765958,
+   "use": 16765968,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 16760816,
+   "load": 16766612,
+   "use": 16766622,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 16801696,
+   "load": 16801742,
+   "use": 16801752,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 16801696,
+   "load": 16801764,
+   "use": 16801774,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 16801920,
+   "load": 16802002,
+   "use": 16802012,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 17025648,
+   "load": 17026453,
+   "use": 17026463,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 17025648,
+   "load": 17027118,
+   "use": 17027128,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 17025648,
+   "load": 17030790,
+   "use": 17030800,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 17025648,
+   "load": 17031430,
+   "use": 17031440,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 17025648,
+   "load": 17032100,
+   "use": 17032110,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 17025648,
+   "load": 17032750,
+   "use": 17032760,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 17025648,
+   "load": 17033402,
+   "use": 17033412,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 17461872,
+   "load": 17461885,
+   "use": 17461895,
+   "insn": "mov rcx, qword ptr [rcx + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 17469808,
+   "load": 17469970,
+   "use": 17469980,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 17469808,
+   "load": 17470076,
+   "use": 17470086,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 17469808,
+   "load": 17470133,
+   "use": 17470143,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 17476320,
+   "load": 17477426,
+   "use": 17477436,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 17524384,
+   "load": 17524392,
+   "use": 17524402,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 17524480,
+   "load": 17524500,
+   "use": 17524510,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 17528688,
+   "load": 17528959,
+   "use": 17528969,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 17528688,
+   "load": 17529503,
+   "use": 17529513,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 17533664,
+   "load": 17533860,
+   "use": 17533870,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 17593648,
+   "load": 17593667,
+   "use": 17593677,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 17595600,
+   "load": 17605980,
+   "use": 17605990,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 17595600,
+   "load": 17611513,
+   "use": 17611523,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 17595600,
+   "load": 17617090,
+   "use": 17617100,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 17595600,
+   "load": 17626293,
+   "use": 17626303,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 17595600,
+   "load": 17626417,
+   "use": 17626427,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 17595600,
+   "load": 17626439,
+   "use": 17626449,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 17595600,
+   "load": 17626640,
+   "use": 17626650,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 17635456,
+   "load": 17635570,
+   "use": 17635580,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 17644080,
+   "load": 17644146,
+   "use": 17644156,
+   "insn": "mov rcx, qword ptr [rcx + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 17649872,
+   "load": 17650403,
+   "use": 17650413,
+   "insn": "mov qword ptr [rcx + 0xd0], rax",
+   "kind": "store",
+   "continuous": false
+  },
+  {
+   "func": 17649872,
+   "load": 17650428,
+   "use": 17650438,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 17775920,
+   "load": 17777742,
+   "use": 17777752,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 17775920,
+   "load": 17777877,
+   "use": 17777887,
+   "insn": "mov rdx, qword ptr [rdx + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 17775920,
+   "load": 17777912,
+   "use": 17777922,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 17775920,
+   "load": 17783427,
+   "use": 17783437,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 17849920,
+   "load": 17849980,
+   "use": 17849990,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18107584,
+   "load": 18107622,
+   "use": 18107632,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18108272,
+   "load": 18109436,
+   "use": 18109446,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18111088,
+   "load": 18111154,
+   "use": 18111164,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18111584,
+   "load": 18111641,
+   "use": 18111651,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18112912,
+   "load": 18113117,
+   "use": 18113127,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18112912,
+   "load": 18113857,
+   "use": 18113867,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18114640,
+   "load": 18114662,
+   "use": 18114672,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18123008,
+   "load": 18123157,
+   "use": 18123167,
+   "insn": "mov rcx, qword ptr [rcx + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18154272,
+   "load": 18154438,
+   "use": 18154448,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18157280,
+   "load": 18157592,
+   "use": 18157602,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18157280,
+   "load": 18157720,
+   "use": 18157730,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18157280,
+   "load": 18158075,
+   "use": 18158085,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18157280,
+   "load": 18158293,
+   "use": 18158303,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18157280,
+   "load": 18160140,
+   "use": 18160150,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18157280,
+   "load": 18160730,
+   "use": 18160740,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18162192,
+   "load": 18162289,
+   "use": 18162299,
+   "insn": "mov rcx, qword ptr [rcx + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18162656,
+   "load": 18162671,
+   "use": 18162681,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18162752,
+   "load": 18162882,
+   "use": 18162892,
+   "insn": "mov r10, qword ptr [r10 + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18163360,
+   "load": 18163379,
+   "use": 18163389,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18164480,
+   "load": 18164562,
+   "use": 18164572,
+   "insn": "mov r10, qword ptr [r10 + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18307216,
+   "load": 18308999,
+   "use": 18309009,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18307216,
+   "load": 18309134,
+   "use": 18309144,
+   "insn": "mov rdx, qword ptr [rdx + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18307216,
+   "load": 18309169,
+   "use": 18309179,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18307216,
+   "load": 18314684,
+   "use": 18314694,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18307216,
+   "load": 18325552,
+   "use": 18325562,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18362672,
+   "load": 18363227,
+   "use": 18363237,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 18362672,
+   "load": 18363868,
+   "use": 18363878,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 18362672,
+   "load": 18364678,
+   "use": 18364688,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 18362672,
+   "load": 18367803,
+   "use": 18367813,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 18393104,
+   "load": 18395177,
+   "use": 18395187,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18393104,
+   "load": 18395312,
+   "use": 18395322,
+   "insn": "mov rdx, qword ptr [rdx + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18393104,
+   "load": 18395347,
+   "use": 18395357,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18393104,
+   "load": 18400892,
+   "use": 18400902,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18393104,
+   "load": 18412878,
+   "use": 18412888,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 18438928,
+   "load": 18438967,
+   "use": 18438977,
+   "insn": "mov rdx, qword ptr [rdx + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18438928,
+   "load": 18439001,
+   "use": 18439011,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18443264,
+   "load": 18453945,
+   "use": 18453955,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18443264,
+   "load": 18454080,
+   "use": 18454090,
+   "insn": "mov rdx, qword ptr [rdx + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18443264,
+   "load": 18454115,
+   "use": 18454125,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18443264,
+   "load": 18459630,
+   "use": 18459640,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18503616,
+   "load": 18514922,
+   "use": 18514932,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18503616,
+   "load": 18515057,
+   "use": 18515067,
+   "insn": "mov rdx, qword ptr [rdx + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18503616,
+   "load": 18515092,
+   "use": 18515102,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18503616,
+   "load": 18520607,
+   "use": 18520617,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18555984,
+   "load": 18556180,
+   "use": 18556190,
+   "insn": "mov r8, qword ptr [r8 + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18603680,
+   "load": 18603837,
+   "use": 18603847,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18611216,
+   "load": 18611621,
+   "use": 18611631,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18611216,
+   "load": 18611811,
+   "use": 18611821,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 18611216,
+   "load": 18612475,
+   "use": 18612485,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 18611216,
+   "load": 18613114,
+   "use": 18613124,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 18641328,
+   "load": 18641546,
+   "use": 18641556,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18641328,
+   "load": 18641660,
+   "use": 18641670,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 18641328,
+   "load": 18643787,
+   "use": 18643797,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18657280,
+   "load": 18658180,
+   "use": 18658190,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 18657280,
+   "load": 18662235,
+   "use": 18662245,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 18657280,
+   "load": 18665665,
+   "use": 18665675,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18714416,
+   "load": 18714535,
+   "use": 18714545,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18715456,
+   "load": 18716179,
+   "use": 18716189,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 18715456,
+   "load": 18719807,
+   "use": 18719817,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 18715456,
+   "load": 18720438,
+   "use": 18720448,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 18715456,
+   "load": 18721112,
+   "use": 18721122,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 18715456,
+   "load": 18721775,
+   "use": 18721785,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 18715456,
+   "load": 18722405,
+   "use": 18722415,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 18726352,
+   "load": 18726463,
+   "use": 18726473,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18726352,
+   "load": 18726516,
+   "use": 18726526,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18733056,
+   "load": 18736874,
+   "use": 18736884,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18733056,
+   "load": 18737009,
+   "use": 18737019,
+   "insn": "mov rdx, qword ptr [rdx + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18733056,
+   "load": 18737044,
+   "use": 18737054,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18733056,
+   "load": 18742559,
+   "use": 18742569,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18733056,
+   "load": 18753612,
+   "use": 18753622,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 18733056,
+   "load": 18757263,
+   "use": 18757273,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 18733056,
+   "load": 18757920,
+   "use": 18757930,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 18733056,
+   "load": 18758545,
+   "use": 18758555,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 18733056,
+   "load": 18759212,
+   "use": 18759222,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 18733056,
+   "load": 18759843,
+   "use": 18759853,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 18733056,
+   "load": 18760534,
+   "use": 18760544,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 18802288,
+   "load": 18802529,
+   "use": 18802539,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18859888,
+   "load": 18862527,
+   "use": 18862537,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 18859888,
+   "load": 18864104,
+   "use": 18864114,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 18878720,
+   "load": 18880344,
+   "use": 18880354,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18878720,
+   "load": 18880479,
+   "use": 18880489,
+   "insn": "mov rdx, qword ptr [rdx + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18878720,
+   "load": 18880514,
+   "use": 18880524,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18878720,
+   "load": 18886029,
+   "use": 18886039,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18905792,
+   "load": 18911230,
+   "use": 18911240,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18905792,
+   "load": 18911300,
+   "use": 18911310,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18905792,
+   "load": 18911370,
+   "use": 18911380,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18928448,
+   "load": 18930158,
+   "use": 18930168,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18928448,
+   "load": 18930293,
+   "use": 18930303,
+   "insn": "mov rdx, qword ptr [rdx + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18928448,
+   "load": 18930328,
+   "use": 18930338,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18928448,
+   "load": 18935843,
+   "use": 18935853,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18959280,
+   "load": 18961088,
+   "use": 18961098,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18959280,
+   "load": 18961223,
+   "use": 18961233,
+   "insn": "mov rdx, qword ptr [rdx + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18959280,
+   "load": 18961258,
+   "use": 18961268,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18959280,
+   "load": 18966773,
+   "use": 18966783,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 18984384,
+   "load": 18984417,
+   "use": 18984427,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 19003248,
+   "load": 19003259,
+   "use": 19003269,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 19019904,
+   "load": 19021535,
+   "use": 19021545,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 19019904,
+   "load": 19021670,
+   "use": 19021680,
+   "insn": "mov rdx, qword ptr [rdx + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 19019904,
+   "load": 19021705,
+   "use": 19021715,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 19019904,
+   "load": 19027220,
+   "use": 19027230,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 19075440,
+   "load": 19075498,
+   "use": 19075508,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 19091872,
+   "load": 19094079,
+   "use": 19094089,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 19127232,
+   "load": 19129465,
+   "use": 19129475,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 19127232,
+   "load": 19129600,
+   "use": 19129610,
+   "insn": "mov rdx, qword ptr [rdx + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 19127232,
+   "load": 19129635,
+   "use": 19129645,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 19127232,
+   "load": 19135150,
+   "use": 19135160,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 19221776,
+   "load": 19223468,
+   "use": 19223478,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 19221776,
+   "load": 19223603,
+   "use": 19223613,
+   "insn": "mov rdx, qword ptr [rdx + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 19221776,
+   "load": 19223638,
+   "use": 19223648,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 19221776,
+   "load": 19229153,
+   "use": 19229163,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 19261952,
+   "load": 19273747,
+   "use": 19273757,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 19261952,
+   "load": 19273778,
+   "use": 19273788,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 19327488,
+   "load": 19329211,
+   "use": 19329221,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 19327488,
+   "load": 19329346,
+   "use": 19329356,
+   "insn": "mov rdx, qword ptr [rdx + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 19327488,
+   "load": 19329381,
+   "use": 19329391,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 19327488,
+   "load": 19334896,
+   "use": 19334906,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 19428768,
+   "load": 19429690,
+   "use": 19429700,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 19428768,
+   "load": 19430310,
+   "use": 19430320,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 19428768,
+   "load": 19430980,
+   "use": 19430990,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 19428768,
+   "load": 19434631,
+   "use": 19434641,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 19428768,
+   "load": 19435308,
+   "use": 19435318,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 19428768,
+   "load": 19435946,
+   "use": 19435956,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 19462624,
+   "load": 19465627,
+   "use": 19465637,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 19462624,
+   "load": 19465762,
+   "use": 19465772,
+   "insn": "mov rdx, qword ptr [rdx + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 19462624,
+   "load": 19465797,
+   "use": 19465807,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 19462624,
+   "load": 19471312,
+   "use": 19471322,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 19493456,
+   "load": 19495123,
+   "use": 19495133,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 19493456,
+   "load": 19495258,
+   "use": 19495268,
+   "insn": "mov rdx, qword ptr [rdx + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 19493456,
+   "load": 19495293,
+   "use": 19495303,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 19493456,
+   "load": 19500808,
+   "use": 19500818,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 19871920,
+   "load": 19874309,
+   "use": 19874319,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 19871920,
+   "load": 19874444,
+   "use": 19874454,
+   "insn": "mov rdx, qword ptr [rdx + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 19871920,
+   "load": 19874479,
+   "use": 19874489,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 19871920,
+   "load": 19880024,
+   "use": 19880034,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 20018080,
+   "load": 20039005,
+   "use": 20039015,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 20018080,
+   "load": 20039140,
+   "use": 20039150,
+   "insn": "mov rdx, qword ptr [rdx + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 20018080,
+   "load": 20039175,
+   "use": 20039185,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 20018080,
+   "load": 20044720,
+   "use": 20044730,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 20018080,
+   "load": 20065319,
+   "use": 20065329,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 20275936,
+   "load": 20276610,
+   "use": 20276620,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 20284096,
+   "load": 20284806,
+   "use": 20284816,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 20285552,
+   "load": 20285774,
+   "use": 20285784,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 20296608,
+   "load": 20300354,
+   "use": 20300364,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 20331248,
+   "load": 20331398,
+   "use": 20331408,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
+  },
+  {
+   "func": 20341136,
+   "load": 20341350,
+   "use": 20341360,
+   "insn": "lea rax, [rax + 0xd0]",
+   "kind": "addr",
+   "continuous": false
+  },
+  {
+   "func": 20395936,
+   "load": 20395940,
+   "use": 20395950,
+   "insn": "mov rax, qword ptr [rax + 0xd0]",
+   "kind": "load",
+   "continuous": true
   }
  ]
 }

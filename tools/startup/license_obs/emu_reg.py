@@ -131,7 +131,6 @@ class Emu:
                 nm = imp.name.decode() if imp.name else f'ord{imp.ordinal}'
                 a = self.stub_for(f'{dll}!{nm}')
                 self.uc.mem_write(imp.address, struct.pack('<Q', a))
-        d = getattr(self.pe, 'DIRECTORY_ENTRY_DELAY_IMPORT', None)
 
     def _patch_mm(self):
         for off, nm in ((0, 'GetMem'), (8, 'FreeMem'), (0x10, 'ReallocMem'), (0x18, 'AllocMem'), (0x20, 'RegLeak'), (0x28, 'UnregLeak')):

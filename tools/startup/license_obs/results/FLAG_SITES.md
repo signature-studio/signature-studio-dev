@@ -59,9 +59,9 @@
 | `0x1363af0` | `0x1363b9c` | test mask 0x04 | jne | untitled.flp / Warning / The project needs to be saved before it can be backed up to FL Cloud. / Save now | Warning / Project backups to FL Cloud are not available in Trial mode. |
 | `0x1375990` | `0x13763be` | test mask 0x02 | je | Fire edition / BasicInitialization failed. | BasicInitialization failed. |
 
-## gradeChar (`[[[0x15e4790]]+0xd0]` の 1 バイト) の全サイト
+## gradeChar (`[[[0x15e4790]]+0xd0]` の 1 バイト) の連続形サイト (下限。追跡で増える形は末尾の節)
 
-- 0x15e4790 ロード後に `+0xd0` を辿る形: 196 (read 189 / write 7)
+- 連続形 (0x15e4790 ロード → `mov r,[r]` → `mov r,[r+0xd0]` を辿る形): 196 (read 189 / write 7)
 - `条件` は gradeChar に対する比較。`@0x40` = 未登録 ("Update registration" 状態) のとき実行される側、`@0x41` = 登録 (tier A) のとき実行される側
 
 | 関数 | ロード VA | 操作 | 条件 | @0x40 (未登録) で実行される側の文字列 | @0x41 (登録) で実行される側の文字列 |
@@ -262,3 +262,81 @@
 | `0x135b3a0` | `0x135c242` | cmp imm 0x40 | gradeChar > 0x40 | (disabled in Trial mode) |  |
 | `0x1363af0` | `0x1363b86` | cmp imm 0x40 | gradeChar > 0x40 | Warning / Project backups to FL Cloud are not available in Trial mode. | untitled.flp / Warning / The project needs to be saved before it can be backed up to FL Cloud. |
 | `0x13737a0` | `0x13737a4` | cmp imm 0x40 | gradeChar == 0x40 |  |  |
+
+## gradeChar レジスタ追跡で増えた形 (連続形 196 に無い `[obj+0xd0]` 使用)
+
+- 追跡: `0x15e4790` ロード (全 2422) の直後が `mov r2,[r1]` のとき r2 を 13 命令追い、`[r2+0xd0]` を使う最初の命令を拾う (r2 書換え/ret/jmp で打切り)。追跡形 266 ロード/102 関数 = 連続形 196 + 追加 70 (21 関数、うち連続形に無い関数 13)
+- 追加の内訳 (命令種別): {'addr': 69, 'store': 1}。`addr` = `lea reg,[obj+0xd0]` (ポインタフィールドのアドレス取得 = 以降は退避先経由の間接アクセス)、`store` = フィールドへの書込
+
+| 関数 | ロード VA | 使用 VA | 種別 | 命令 | 連続形に無い関数 |
+|---|---|---|---|---|---|
+| `0xe7a470` | `0xe7a5f1` | `0xe7a5fb` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0xe7a470` | `0xe7a869` | `0xe7a873` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0xe7a470` | `0xe7ab09` | `0xe7ab13` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0xe7a470` | `0xe7ad7f` | `0xe7ad89` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0xe7a470` | `0xe7affc` | `0xe7b006` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0xf2dbb0` | `0xf323c9` | `0xf323d3` | addr | `lea rax, [rax + 0xd0]` |  |
+| `0xf2dbb0` | `0xf3263f` | `0xf32649` | addr | `lea rax, [rax + 0xd0]` |  |
+| `0xf2dbb0` | `0xf328b7` | `0xf328c1` | addr | `lea rax, [rax + 0xd0]` |  |
+| `0xf2dbb0` | `0xf32b5d` | `0xf32b67` | addr | `lea rax, [rax + 0xd0]` |  |
+| `0xf2dbb0` | `0xf339ac` | `0xf339b6` | addr | `lea rax, [rax + 0xd0]` |  |
+| `0xf40840` | `0xf40c78` | `0xf40c82` | addr | `lea rax, [rax + 0xd0]` |  |
+| `0xf40840` | `0xf40f1a` | `0xf40f24` | addr | `lea rax, [rax + 0xd0]` |  |
+| `0xf40840` | `0xf41d9f` | `0xf41da9` | addr | `lea rax, [rax + 0xd0]` |  |
+| `0xf40840` | `0xf42017` | `0xf42021` | addr | `lea rax, [rax + 0xd0]` |  |
+| `0xf40840` | `0xf4228d` | `0xf42297` | addr | `lea rax, [rax + 0xd0]` |  |
+| `0xf51fd0` | `0xf52195` | `0xf5219f` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0xf51fd0` | `0xf52413` | `0xf5241d` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0xf51fd0` | `0xf52698` | `0xf526a2` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0xf51fd0` | `0xf52928` | `0xf52932` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0xf51fd0` | `0xf53796` | `0xf537a0` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0xf51fd0` | `0xf53a21` | `0xf53a2b` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0xfeffe0` | `0xff0085` | `0xff008f` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0xffbff0` | `0xffc2fe` | `0xffc308` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0xffbff0` | `0xffc59f` | `0xffc5a9` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0xffbff0` | `0xffd406` | `0xffd410` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0xffbff0` | `0xffd694` | `0xffd69e` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0x103ca70` | `0x103cd95` | `0x103cd9f` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0x103ca70` | `0x103d02e` | `0x103d038` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0x103ca70` | `0x103de86` | `0x103de90` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0x103ca70` | `0x103e106` | `0x103e110` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0x103ca70` | `0x103e3a4` | `0x103e3ae` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0x103ca70` | `0x103e62e` | `0x103e638` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0x103ca70` | `0x103e8ba` | `0x103e8c4` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0x10d50d0` | `0x10d52e3` | `0x10d52ed` | store | `mov qword ptr [rcx + 0xd0], rax` |  |
+| `0x1183130` | `0x118335b` | `0x1183365` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0x1183130` | `0x11835dc` | `0x11835e6` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0x1183130` | `0x1183906` | `0x1183910` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0x1183130` | `0x118453b` | `0x1184545` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0x118a810` | `0x118f54e` | `0x118f558` | addr | `lea rax, [rax + 0xd0]` |  |
+| `0x11bfc10` | `0x11bfe63` | `0x11bfe6d` | addr | `lea rax, [rax + 0xd0]` |  |
+| `0x11bfc10` | `0x11c00fb` | `0x11c0105` | addr | `lea rax, [rax + 0xd0]` |  |
+| `0x11bfc10` | `0x11c037a` | `0x11c0384` | addr | `lea rax, [rax + 0xd0]` |  |
+| `0x11c71b0` | `0x11c72fc` | `0x11c7306` | addr | `lea rax, [rax + 0xd0]` |  |
+| `0x11cb000` | `0x11cb384` | `0x11cb38e` | addr | `lea rax, [rax + 0xd0]` |  |
+| `0x11cb000` | `0x11cc35b` | `0x11cc365` | addr | `lea rax, [rax + 0xd0]` |  |
+| `0x11d9340` | `0x11d9613` | `0x11d961d` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0x11d9340` | `0x11da43f` | `0x11da449` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0x11d9340` | `0x11da6b6` | `0x11da6c0` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0x11d9340` | `0x11da958` | `0x11da962` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0x11d9340` | `0x11dabef` | `0x11dabf9` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0x11d9340` | `0x11dae65` | `0x11dae6f` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0x11dd800` | `0x11e284c` | `0x11e2856` | addr | `lea rax, [rax + 0xd0]` |  |
+| `0x11dd800` | `0x11e368f` | `0x11e3699` | addr | `lea rax, [rax + 0xd0]` |  |
+| `0x11dd800` | `0x11e3920` | `0x11e392a` | addr | `lea rax, [rax + 0xd0]` |  |
+| `0x11dd800` | `0x11e3b91` | `0x11e3b9b` | addr | `lea rax, [rax + 0xd0]` |  |
+| `0x11dd800` | `0x11e3e2c` | `0x11e3e36` | addr | `lea rax, [rax + 0xd0]` |  |
+| `0x11dd800` | `0x11e40a3` | `0x11e40ad` | addr | `lea rax, [rax + 0xd0]` |  |
+| `0x11dd800` | `0x11e4356` | `0x11e4360` | addr | `lea rax, [rax + 0xd0]` |  |
+| `0x11fc770` | `0x11fd1bf` | `0x11fd1c9` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0x11fc770` | `0x11fd7e8` | `0x11fd7f2` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0x1231170` | `0x12311aa` | `0x12311b4` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0x12875a0` | `0x128793a` | `0x1287944` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0x12875a0` | `0x1287ba6` | `0x1287bb0` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0x12875a0` | `0x1287e44` | `0x1287e4e` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0x12875a0` | `0x1288c87` | `0x1288c91` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0x12875a0` | `0x1288f2c` | `0x1288f36` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0x12875a0` | `0x12891aa` | `0x12891b4` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0x13582c0` | `0x1358586` | `0x1358590` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0x1358870` | `0x135894e` | `0x1358958` | addr | `lea rax, [rax + 0xd0]` | ○ |
+| `0x1366190` | `0x1366266` | `0x1366270` | addr | `lea rax, [rax + 0xd0]` | ○ |
