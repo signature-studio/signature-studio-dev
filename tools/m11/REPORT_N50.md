@@ -2,10 +2,11 @@
 
 親: #715。修正本体は `74b365f6` (main 取込済み)。本書は同 issue の受入条件の実測記録。
 
-## 実測 (旧表記 HEAD `1f600c47`・2026-10-13・素材 fl-win64 sha256 `b2c64da4…`・PATH に retdec-decompiler 無し)
+## 実測 (測定 commit `1f600c47`・2026-10-13・素材 fl-win64 sha256 `b2c64da4…`・PATH に retdec-decompiler 無し)
 
-> **鮮度: 未確定**。下表は `1f600c47` 時点の測定で、現 head `e63b4f93` とは `tools/m11`・`tools/liftlib` の実行コードが異なる (`git diff 1f600c47 HEAD -- tools/m11 tools/liftlib`)。
-> 現 head での再測定は未実施 (素材 `toolchain-retdec`・`work-m11` 未取得のため)。再測定までは下表を現 head の根拠に使わない。
+> **鮮度: 未確定**。下表は測定 commit `1f600c47` の結果。現 HEAD (`5e68d99f`) との実行コード差分は
+> `git diff 1f600c47 HEAD -- tools/m11 tools/liftlib ':!*.md'` で 27 files (+1924/-32)。差分 0 でないため、下表を現 HEAD の根拠に使わない。
+> 現 HEAD での再測定は未実施 (素材 `toolchain-retdec`・`toolchain-emsdk`・`work-m11` が runner の `$HOME/artifacts` に無く、RetDec・emcc も無いため)。
 
 | 実行 | rc | 所要秒 | 結果 |
 |---|---|---|---|
