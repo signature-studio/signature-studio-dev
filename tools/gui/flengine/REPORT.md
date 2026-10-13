@@ -138,7 +138,7 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 - 前回 (`e6f2d7c` / `e391713`、main 取り込み前) の測定: judge 12/12、所要 108 / 109 / 113 秒。main 取り込みで baseline (`units_run` 22 → 52) が変わったため、旧値は現 HEAD では無効。
 - `bash tools/gui/e2e.sh` (GUI 本体 e2e) は本 run では未再実行。前回値 (取り込み前) は現 HEAD では無効。
 
-****現 HEAD で再実行できなかったもの (素材不足; `$ARTIFACTS_DIR` に fl-win64 のみ)**: `e2e.sh` / `build.sh` / `gen_api.py` (mingw 無し)、`pe_image_e2e.sh` (retdec 無し)、`gui/e2e.sh`。`results/*.json` と `IMPORTS.md` は `d46b024` 時点のまま。
+**現 HEAD で再実行できなかったもの (素材不足; `$ARTIFACTS_DIR` に fl-win64 のみ)**: `e2e.sh` / `build.sh` / `gen_api.py` (mingw 無し)、`pe_image_e2e.sh` (retdec 無し)、`gui/e2e.sh`。`results/*.json` と `IMPORTS.md` は `d46b024` 時点のまま。
 **注意**: `judge.py` は `build_ff.log` / `build_soft.log` (リンクログ・adapter 行) も読むため、`results/` だけでは再計算できない (`judge.py --dir results` は FileNotFoundError)。judge の再現は e2e の実行 (`build_*.log` を含む作業ディレクトリ) が必要。n≥3 の min–max 再測定と judge 12/12・ネガコン 5/5 の実測は素材の揃う run で行う。
 
 個別の単発計測 (開発中・取り込み前): baseline survey 16.9 秒 / 結合 build 10.6〜17.0 秒 / 結合起動 0.371 秒 / 結合 survey 18.2〜24.1 秒。
