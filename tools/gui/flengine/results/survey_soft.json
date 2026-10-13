@@ -7,42 +7,45 @@
  "units_run": 0,
  "init_count": 895,
  "survey": {
-  "ok": 828,
+  "ok": 864,
   "noproc": 1,
   "miss": 46,
-  "trap": 67,
+  "trap": 31,
   "kinds": {
-   "halt0->longjmp": 53,
-   "memory access out of bounds": 14
+   "halt0->longjmp": 6,
+   "memory access out of bounds": 24,
+   "gui_failfast": 1
   },
-  "failfast_units": {}
+  "failfast_units": {
+   "SystemParametersInfoW": 1
+  }
  },
  "reach": [
   {
    "order": 1,
    "name": "LoadStringW",
-   "calls": 48069976,
+   "calls": 8365790,
    "kind": "IMPL",
    "prio": "1"
   },
   {
    "order": 2,
    "name": "GetDC",
-   "calls": 3,
+   "calls": 4,
    "kind": "IMPL",
    "prio": "0"
   },
   {
    "order": 3,
    "name": "GetDeviceCaps",
-   "calls": 2,
+   "calls": 3,
    "kind": "IMPL",
    "prio": "0"
   },
   {
    "order": 4,
    "name": "ReleaseDC",
-   "calls": 3,
+   "calls": 4,
    "kind": "IMPL",
    "prio": "0"
   },
@@ -70,7 +73,7 @@
   {
    "order": 8,
    "name": "MessageBoxA",
-   "calls": 52,
+   "calls": 1,
    "kind": "IMPL",
    "prio": "2"
   },
@@ -97,88 +100,128 @@
   },
   {
    "order": 12,
+   "name": "LoadCursorW",
+   "calls": 1,
+   "kind": "IMPL",
+   "prio": "1"
+  },
+  {
+   "order": 13,
+   "name": "LoadImageW",
+   "calls": 21,
+   "kind": "STUB",
+   "prio": "2"
+  },
+  {
+   "order": 14,
+   "name": "GetKeyboardLayout",
+   "calls": 1,
+   "kind": "IMPL",
+   "prio": "0"
+  },
+  {
+   "order": 15,
+   "name": "EnumDisplayMonitors",
+   "calls": 2,
+   "kind": "IMPL",
+   "prio": "1"
+  },
+  {
+   "order": 16,
+   "name": "SystemParametersInfoW",
+   "calls": 2,
+   "kind": "IMPL",
+   "prio": "0"
+  },
+  {
+   "order": 17,
    "name": "RegisterClipboardFormatW",
    "calls": 4,
    "kind": "IMPL",
    "prio": "0"
   },
   {
-   "order": 13,
+   "order": 18,
    "name": "CharLowerBuffW",
-   "calls": 8,
+   "calls": 9,
    "kind": "IMPL",
    "prio": "1"
   },
   {
-   "order": 14,
+   "order": 19,
+   "name": "GetClipboardFormatNameW",
+   "calls": 1,
+   "kind": "IMPL",
+   "prio": "1"
+  },
+  {
+   "order": 20,
    "name": "EnumDisplaySettingsW",
    "calls": 1,
    "kind": "IMPL",
    "prio": "1"
   },
   {
-   "order": 15,
+   "order": 21,
    "name": "GetClipCursor",
    "calls": 1,
    "kind": "IMPL",
    "prio": "0"
   },
   {
-   "order": 16,
-   "name": "EnumDisplayMonitors",
-   "calls": 1,
-   "kind": "IMPL",
-   "prio": "1"
-  },
-  {
-   "order": 17,
-   "name": "SystemParametersInfoW",
-   "calls": 1,
-   "kind": "IMPL",
-   "prio": "0"
-  },
-  {
-   "order": 18,
+   "order": 22,
    "name": "GetMonitorInfoW",
-   "calls": 53,
+   "calls": 15,
    "kind": "IMPL",
    "prio": "1"
   },
   {
-   "order": 19,
+   "order": 23,
    "name": "EnumFontFamiliesExW",
    "calls": 1,
    "kind": "IMPL",
    "prio": "2"
   }
  ],
- "reach_summary": "reached=19 impl=19 stub=0",
- "failfast_apis": {},
- "softstub_apis": {},
- "failfast_count": 0,
- "gui_icall_calls": 1,
+ "reach_summary": "reached=23 impl=22 stub=1",
+ "failfast_apis": {
+  "SystemParametersInfoW": 1
+ },
+ "softstub_apis": {
+  "LoadImageW": 21
+ },
+ "failfast_count": 1,
+ "gui_icall_calls": 2,
  "gui_ring_discarded": 0,
- "icall_miss": 47,
- "m11_stub_total": 70,
+ "icall_miss": 48,
+ "m11_stub_total": 87,
  "m11_stubs": [
-  "GetLocaleInfoW:59",
-  "EnumCalendarInfoW:2",
+  "GetLocaleInfoW:64",
+  "EnumCalendarInfoW:4",
   "FormatMessageW:1",
   "GetTimeZoneInformation:1",
   "MulDiv:1",
   "GlobalAddAtomW:3",
+  "GetCurrentThread:1",
   "acmMetrics:1",
   "SHGetMalloc:1",
-  "GetCurrentThread:1"
+  "GetSystemDefaultLocaleName:1",
+  "GetTempPathW:1",
+  "VariantClear:3",
+  "FreeLibrary:1",
+  "GetComputerNameExW:1",
+  "RegOpenKeyExA:1",
+  "RegCloseKey:1",
+  "GetFileVersionInfoSizeW:1"
  ],
  "probes": {
-  "GetMem": 24035567,
-  "FreeMem": 21,
-  "FastMM_GetMem(407a50)": 24035618,
-  "FastMM_FreeMem(407e20)": 24,
+  "GetMem": 4184280,
+  "FreeMem": 31,
+  "FastMM_GetMem(407a50)": 4184351,
+  "FastMM_FreeMem(407e20)": 34,
   "InitUnits": 0,
-  "Halt0": 54
+  "Halt0": 7
  },
- "va_calls": 1244,
- "va_bytes": 1552941056
+ "va_calls": 225,
+ "va_bytes": 556138496
 }

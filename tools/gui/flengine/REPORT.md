@@ -5,7 +5,7 @@
 一方 **`RegisterClass*` / `CreateWindowEx*` は自然起動でも survey でも未到達** (通常起動は unit #23 で Halt0、#134 / #490 の先)。実 WNDCLASS を JS から指向呼出した場合は
 `RegisterClassW` ×2 が shim に届き、`TApplication` の窓 (hwnd 31bit) が生成できる。再現: `bash tools/gui/flengine/e2e.sh` (gate 12 + ネガコン 5。FAIL なら exit 1)。
 
-> **注 (review #576 指摘 2)**: §1・§3・§4 の数値は merge 前 (`b867b94` 以前) の測定。`main` 取込後の HEAD (`a608f18`) の実測は **§6c が正**。`EnumFontFamiliesExW` は現在 IMPL で fail-fast stub ではない。
+> **注 (review #576 指摘 2)**: §1・§3・§4 の数値は merge 前 (`b867b94` 以前) の測定。`main` 取込後の HEAD (`19ebb43`) の実測は **§6c が正**。`EnumFontFamiliesExW` は現在 IMPL で fail-fast stub ではない。
 
 既知類型との関係: 該当 `docs/DEFECTS.md` D1b 系 (比較が定数に畳まれ分岐が誤る) の入力側変種 1 件 (§5-2, 新規行案あり) / D1 系は m11 REPORT §10 と同根。他は該当なし。
 
@@ -76,7 +76,7 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 
 ## 4. 指向呼出 (`probe.mjs`; 自然到達ではない)
 
-自然起動は `RegisterClass*` に届かないため、DllMain attach 後に JS から lift 済み関数を直接呼ぶ。**呼出元が JS である点で自然到達とは区別する**。下表は merge 前 (`b867b94`) の値 (WNDPROC seed 前のため `TLightweightLayeredControl` = NULL)。seed 後の HEAD では hwnd `0x110000e` (§6b / §6c)。
+自然起動は `RegisterClass*` に届かないため、DllMain attach 後に JS から lift 済み関数を直接呼ぶ。**呼出元が JS である点で自然到達とは区別する**。下表は merge 前 (`b867b94`) の値 (WNDPROC seed 前のため `TLightweightLayeredControl` = NULL)。HEAD `19ebb43` の実測は `TApplication` hwnd `0x110000f` / `TLightweightLayeredControl` hwnd `0x110000e` (judge P4・P5 の PASS 行。§6c)。
 実 FLEngine の RegisterClassW 呼出点は IR 全体で 5 (`lift_fnmap.py --ir`: `function_425260` (= RegisterClassW ラッパ)・`function_52a7f0`・SetWindowLongPtrW 2・SetClassLongPtrW 1)。
 `function_425260` の呼出元は `function_71dd80` と `function_867e10`。
 
@@ -140,7 +140,7 @@ reach_test 11 / adapt_test 28 passed、sigprobe は adapter 有り mismatch 0 / 
 | seed の閉包 | 8 WNDPROC → call/jmp 即値を辿り **1,212 関数 / 398,396 B** を追加 (うち import thunk 6B 関数を含む) | 既存 lift 済みに当たったら止める。境界は `.pdata` + import thunk |
 | lift / IR | RetDec boot5 **2 分 0.5 秒** (1,212 range)。`m11_gen_ir2.sh` 30.0 秒。IR 定義関数 **7,421 → 8,647** (+1,226 = 閉包 1,212 + RetDec の内部入口別関数化 14)。未定義 `function_*` は **8 → 8 (同一集合)** | 初回 (thunk 抜き 1,179 range) は未定義が 33 に増えたため、import thunk と遅延 import スロットの 6B 関数を閉包に含めた (2 回目 1,210 → 3 回目 1,212 で収束) |
 | wasm | 6,021,637 → **6,905,826 B**、`wasm-ld` signature mismatch 0 / undefined 0 / duplicate 0 (m11 と GUI 結合の ff・soft) | `disp_entries` 7,399 → 8,621 |
-| 起動・survey の回帰 | units_run **22** / init_count **23** / dllmain_done true / GetMem 33 / FreeMem 20 / icall_miss 0 は不変。survey ok 816 / noproc 1 / miss 46 / trap 79 も不変 | baseline (m11 単体) と GUI 結合の双方を新 IR で再測 |
+| 起動・survey の回帰 | units_run **22** / init_count **23** / dllmain_done true / GetMem 33 / FreeMem 20 / icall_miss 0 は不変。survey の値は §6c (HEAD `19ebb43`: 864/1/46/31) | baseline (m11 単体) と GUI 結合の双方を新 IR で再測 |
 | 指向 probe | `TLightweightLayeredControl` の `CreateWindowExW` が **NULL → hwnd 0x110000e** (WNDPROC `0x31dd10` = closure 内の `function_71dd10` へ `m11_icall` ok)。`RegisterClassW` ×2 / `TApplication` hwnd 0x110000f も維持 | gate **P5** (旧 REPORT §4 の OPEN の解消)。hwnd 値は GUI 関数が増えて採番が変わった (旧 0x210000e) |
 
 残る観測: probe の `m11_icall` miss は 3 件 (target `0x6c6f` 1 種)。`function_71dd10` が WM_NCCREATE で `[lpCreateParams+0x78]` を `SetWindowLongPtrW(GWL_WNDPROC)` に渡す経路で、probe の `lpParam=NULL` だと低位メモリの値が WNDPROC になるためと**推定** (偽オブジェクトに `0x24920` を置いた追試でも 0x6c6f のままだったため、この仮説は**未確認**。再現・原因は未調査)。窓生成自体は成功する。
@@ -160,21 +160,31 @@ reach_test 11 / adapt_test 28 passed、sigprobe は adapter 有り mismatch 0 / 
   なお最初の rc 1 の前に、新規 worktree に `node_modules` が無く step 5 (tsc) で rc 1 になる環境起因の失敗が 1 回あった (本 PR と無関係。symlink で解消)。
 - 環境: runner 4 vCPU、素材 work-m11 + fl-win64 (PE は `FL_WIN64_DIR` 参照。§6c の再測は symlink 無しで実行)。`m11_wndseed.sh` の lift 実測: RetDec 1,212 range が 2 分 0.5 秒 (3 回目) / gen_ir2 30.0 秒。
 
-## 6c. HEAD 再測 (review #576 指摘 2・8・9 への対応。merge 後の木 `a608f18`)
+## 6c. HEAD 再測 (review #576 指摘 1・4 への対応。修正 HEAD `19ebb43`)
 
-`main` 取込後の HEAD で再測した。順序は `m11_wndseed.sh` (boot5 取込と最終 IR 生成) → `flengine/e2e.sh` → `gui/e2e.sh`。素材は work-m11 / work-liftdiff / fl-win64 (`FL_WIN64_DIR`)、`toolchain-retdec` / `toolchain-emsdk`、`gcc-mingw-w64-x86-64`、capstone / pefile。
+main 取込後の木 (`c37522c`) で S1 が FAIL (828/67 vs 864/31) したため切り分けし、`run.mjs --survey` の隔離手順の差を修正した (commit `19ebb43`)。順序は `m11_wndseed.sh` → `flengine/e2e.sh` → `gui/e2e.sh`。素材は work-m11 / fl-win64 (`FL_WIN64_DIR`)、`toolchain-retdec` / `toolchain-emsdk` ([RETDEC] / [EMSDK] の展開先)、`apt: gcc-mingw-w64-x86-64`、capstone / pefile、`pnpm install --frozen-lockfile`。
 
-| 実行 | 結果 | 所要 (load 開始→終了) |
+| 実行 | 結果 | 所要 (実測) |
 |---|---|---|
-| `bash tools/m11/m11_wndseed.sh` | rc 0。WNDCLASS 11 件 / fn WNDPROC 8 / 最終 IR で未定義 0 (`WNDCLASS-CHECK PASS`)。`results/wndclass_scan.json` は再生成で差分 0 | 2 分 54 秒 |
-| `bash tools/gui/flengine/e2e.sh` | rc 1。**judge 13/14** (FAIL は S1 のみ)。ネガコン 9/9 が期待どおり FAIL。native selftest 431 passed / 0 failed | 198 秒 (0.90 → 1.05) |
-| `bash tools/gui/e2e.sh` | 3 回実行。1 回目 rc 1 (step 2b の native selftest 段で出力が途切れて終了。ASan 出力は grep で除外され未確認。§7 の UAF と同じ段)。2 回目 rc 127 (worktree に `node_modules` が無い環境要因。`pnpm install --frozen-lockfile` で解消)。**3 回目 rc 0 ALL PASS** | 3 回目 94 秒 |
+| `bash tools/m11/m11_wndseed.sh` (HEAD `c37522c`) | rc 0。WNDCLASS 11 件 / fn WNDPROC 8 / 最終 IR で未定義 0 (`WNDCLASS-CHECK PASS`) | 2 分 44 秒 |
+| `bash tools/gui/flengine/e2e.sh` (修正前 `c37522c`) | rc 1。judge **13/14** (S1 のみ FAIL: 828/1/46/67) | 3 分 13 秒 |
+| `bash tools/gui/flengine/e2e.sh` (**HEAD `19ebb43`**) | rc 0。**JUDGE PASS 14/14**。S1 = 864/1/46/31 (base 一致)。ネガコン N1〜N9 は 9/9 が期待どおり FAIL。selftest 0 failed | 2 分 36 秒 (load 0.45 → 0.97) |
+| `bash tools/gui/e2e.sh` (**HEAD `19ebb43`**) | rc 0。ALL PASS (bpp / text / simd / present / Chrome E2E / fail-fast / reach-log / sigprobe)。ASan UAF は本回に出ず | 1 分 33 秒 |
 
-judge の 14 gate の内訳:
-- PASS 13: L1 (ff・soft) / A1 / B1 (units_run 22・init 23 は baseline と一致) / R1 (`LoadStringW` IMPL ×4) / R2 (到達 19 = floor 19) / S2 / P1〜P4 / P5 (`TLightweightLayeredControl` hwnd `0x110000e`) / W1。
-- **FAIL: S1** (survey parity, soft): `ok/noproc/miss/trap = 828/1/46/67`、baseline は `864/1/46/31`。merge 前 (`b867b94`) は 816/1/46/79 で一致していた。baseline は main の m11 変更で 864 に動いたが、GUI 結合 (soft) は 828 にしか動かず、**36 unit が baseline では ok、GUI 結合では trap**。survey の結果 JSON は unit 単位の内訳を持たないため、原因の切り分けは未実施 (§7)。この状態は merge 不可。
-- `survey_ff` と `survey_soft` が一致 (828/67) し、fail-fast 例外は 0 件。`EnumFontFamiliesExW` は実装済み。
-- `IMPORTS.md` §4 の「到達 & STUB 経路」は **なし** (実行時 `kind` で分類する版に変更、`gen_api.py`)。
+### S1 の切り分け (結論: shim の回帰ではなく survey ハーネスの隔離不足)
+
+- unit 単位の結果を取得した。baseline (shim 無し, `m11_survey.mjs` の `M11_SURVEY_UNITS`) と GUI 結合 (soft) を突き合わせると、差は **36 unit の ok→trap** のみで、全て `halt0->longjmp` だった。
+- 同じ GUI 結合 wasm を **`m11_survey.mjs` の手順で**回すと `864/1/46/31` になり、942 unit の結果が baseline と **1 件も違わない** (`GUI 結合 wasm × m11_survey.mjs` = baseline)。
+- 差は `run.mjs --survey` だけにあった。`m11_survey.mjs` は unit ごとに `_m11_va_unit_begin()` で VA 上限を張り直し、unit が書いた image を実行前へ戻すが (clobber 対策)、`run.mjs` はこれを省いていたため、前 unit の状態を引きずって 36 unit が Halt0 で落ちていた。
+- 修正: `run.mjs --survey` に `_m11_set_va_unit_budget` / `_m11_va_unit_begin` / unit 単位の image 復元を入れ、`m11_survey.mjs` と同じ手順にそろえた。shim 本体は変更していない。
+
+judge の 14 gate は全て PASS: L1 (ff・soft) / A1 / B1 (units_run 22・init 23) / R1 (`LoadStringW` IMPL ×4) / R2 (到達 23 ≥ floor 19) / S1 (864/31) / S2 / P1〜P4 / P5 (`TLightweightLayeredControl` hwnd `0x110000e`) / W1 (WNDCLASS 11・fn WNDPROC 8・外 0)。
+- R2 の到達は 23 (floor 19)。`run.mjs` の survey は unit 隔離の修正で到達集合が増えた (floor は未更新。下限として有効)。
+
+### 発見 (本 PR 外)
+
+- `tools/gui/flengine/e2e.sh` の前提: `x86_64-w64-mingw32-gcc` は runner 既定に無く `apt-get install gcc-mingw-w64-x86-64` が要る (`oc_artifacts` の `apt-mingw` で入る)。
+- `tools/m11/m11_survey.mjs` 単体の `M11_SURVEY_UNITS` 出力は、`run.mjs` と同じ `[i, label]` 形式ではなく `label` の配列 (`perUnit` は文字列配列)。比較時は index で突き合わせる。
 
 ## 7. 未解決
 
@@ -184,8 +194,8 @@ judge の 14 gate の内訳:
 | `function_52a7f0` の `TempClass.lpfnWndProc` load 脱落 (§5-2) | AllocateHWnd 経路 (TPUtilWindow = Timer / 非同期 window) が全滅 | [M11] / ldfix 子チケットを PM が起票 (本 REPORT の DEFECTS 行案) |
 | ~~WNDCLASS 静的実体の WNDPROC を closure seed に追加する pass~~ | **解消 (#565, §6b)** | — |
 | probe の `m11_icall` miss target `0x6c6f` (3 件) の由来 | 窓生成は成功。WM_NCCREATE の WNDPROC 差替え経路と推定 (未確認) | #565 に所見 (未起票。PM 判断) |
-| `bash tools/gui/e2e.sh` step 1 (ASan) の `heap-use-after-free` (`blit_surf` ↔ `surf_free`) が 2 回中 1 回出た (shim は本 PR で未変更) | gui e2e が非決定的に FAIL。受入条件 3 の「ALL PASS 維持」は 2 回目で満たしたが安定とは言えない | 起票依頼 (PM): GUI-2 系。HEAD `a608f18` で 3 回中 1 回 rc 1 を再現 (§6c) |
-| flengine S1 の回帰: GUI 結合 (soft) で 36 unit が ok→trap (`828/67` vs baseline `864/31`) | merge 前は一致。merge 後のみ発生 (§6c)。merge 保留の理由 | 起票依頼 (PM): #174 / GUI-3 の後続。切り分けは unit 単位の survey 出力が必要 |
+| `bash tools/gui/e2e.sh` step 1 (ASan) の `heap-use-after-free` (`blit_surf` ↔ `surf_free`)。再現条件: 過去 4 回中 2 回 rc 1 (HEAD `a608f18` で 3 回中 1 回、`96ce3eb` 以前に 1 回)。HEAD `19ebb43` の実行では出ず | gui e2e が非決定的に FAIL する。`blit_surf` と `surf_free` の間の shim 側 race の可能性 | 起票依頼 (PM): GUI-2 系 (issue 番号未割当)。再現時は `tools/gui/build` の ASan ログ (`heap-use-after-free`) を添付 |
+| ~~flengine S1 の回帰 (GUI 結合 soft で 36 unit が ok→trap)~~ | **解消 (§6c, `19ebb43`)**。原因は `run.mjs --survey` の unit 隔離不足で shim ではない | — |
 | 動的に作られる WNDCLASS (スタック/ヒープ上で組む `RegisterClass`) の WNDPROC | 静的走査では拾えない。`function_52a7f0` 等 5 呼出点のうち静的実体を渡すのは 2 点 | m11 / icall 系で PM が起票 |
 | `EnumFontFamiliesExW` 実装 (コールバック `gui_call4` 経由) | survey の 1 unit が fail-fast | GUI-2 系 (P2 stub 昇格, #174 に所見) |
 | `LoadStringW` 48M 回の unit 特定と資源供給 hook (`gui_set_resource_provider` ← shimx / PE .rsrc) の接続 | LoadStringW が常に空文字 | #174 に所見 / GUI-2 または shimx |
