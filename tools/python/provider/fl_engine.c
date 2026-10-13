@@ -67,6 +67,11 @@ void fl_engine_reset(void) {
 int64_t fl_engine_highlight_cb(void) { return hl_cb; }
 int fl_engine_channel_count(void) { return nch; }
 int fl_engine_midi_out_count(void) { return midi_out_n; }
+/* 検査用の読出し口: チャンネル c のステップ p (範囲外は -1)。tests/midi_path_diff.mjs が副作用を比べる */
+int fl_engine_grid_bit(int c, int p) {
+    if (c < 0 || c >= nch || p < 0 || p >= NSTEP) return -1;
+    return ch[c].steps[p];
+}
 
 #define WRONGN() return fl_err(c, FL_E_WRONG_PARAM, "Wrong number of function parameters or wrong parameter type")
 /* 署名なし (np=-1) の関数は dispatch が個数を見ないので handler が検査する */

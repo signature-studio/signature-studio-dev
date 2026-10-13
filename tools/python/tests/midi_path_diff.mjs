@@ -25,26 +25,48 @@ const norm = (r) => {
 
 const cases = [
   ["general.getVersion", []],
+  ["general.getVersion", [1]],
   ["transport.isPlaying", []],
+  ["transport.isPlaying", [0]],
   ["transport.start", []],
   ["transport.isPlaying", []],
   ["transport.stop", []],
   ["transport.isPlaying", []],
   ["channels.selectedChannel", []],
   ["channels.selectedChannel", [true, 1]],
+  ["channels.selectedChannel", ["x"]],
+  ["channels.selectedChannel", [false, 0, 0, 9]],
   ["channels.fillEachNSteps", [0, 4, 0, 100]],
+  ["channels.fillEachNSteps", [0, 4]],
+  ["channels.fillEachNSteps", [0]],
   ["channels.fillEachNSteps", [1, 2, 1]],
+  ["channels.fillEachNSteps", [2, 4, -3]],
+  ["channels.fillEachNSteps", [1, 4, 0, 100, true, 9]],
+  ["channels.fillEachNSteps", [0, 0]],
+  ["channels.fillEachNSteps", [0, -1]],
+  ["channels.fillEachNSteps", ["a", 4]],
+  ["channels.fillEachNSteps", [0.5, 4]],
   ["channels.fillEachNSteps", [999, 4]],
   ["ilmcp.forwardTutorialEvent", ["a", 1]],
   ["ilmcp.forwardTutorialEvent", []],
 ];
 
-let diffs = 0;
+// 戻り値と code に加えて副作用 (チャンネル 0..2 の全ステップ) を比べる。どちらも 1 呼出し毎に照合する
+const grid = (eng, wasmSide) => {
+  const out = [];
+  for (let c = 0; c < 3; c++) for (let p = 0; p < 64; p++) out.push(wasmSide ? eng.gridBit(c, p) : eng.state.channels[c].steps[p] ? 1 : 0);
+  return out.join("");
+};
+
+let diffs = 0, lit = 0;
 for (const [name, args] of cases) {
   const a = norm(run(wasm, name, args));
   const b = norm(run(mock, name, args));
+  const ga = grid(wasm, true), gb = grid(mock, false);
   const same = JSON.stringify(a) === JSON.stringify(b) || (a.err && b.err && a.code === b.code);
-  if (!same) { diffs++; console.log("DIFF", name, JSON.stringify(args), "wasm", JSON.stringify(a), "mock", JSON.stringify(b)); }
+  if (!same || ga !== gb) { diffs++; console.log("DIFF", name, JSON.stringify(args), "wasm", JSON.stringify(a), "mock", JSON.stringify(b), ga === gb ? "" : "grid"); }
+  lit = (ga.match(/1/g) || []).length;
 }
-console.log(JSON.stringify({ cases: cases.length, diffs, PASS: diffs === 0 }));
+console.log(JSON.stringify({ cases: cases.length, diffs, lit_steps: lit, PASS: diffs === 0 }));
 assert.equal(diffs, 0);
+assert.ok(lit > 0, "副作用の検査が空だと意味がない");

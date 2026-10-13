@@ -8,6 +8,7 @@ class FlError extends Error {
   constructor(msg, code) { super(msg); this.flCode = code; }
 }
 const RANGE = (m) => new FlError(m || "Index out of range", 4);
+const WRONG = (m) => new FlError(m || "Wrong number of function parameters or wrong parameter type", 5);
 
 export function createMockEngine() {
   const st = {
@@ -33,12 +34,34 @@ export function createMockEngine() {
   const ch = (i) => { if (!st.channels[i]) throw RANGE(); return st.channels[i]; };
   const tr = (i) => { if (!st.mixer[i]) throw RANGE(); return st.mixer[i]; };
   const tog = (cur, v) => (v === undefined || v === -1 ? !cur : !!v);
+  // fl_provider の引数検査 (fl_dispatch.c type_ok / fl_a_int) と同じ: None は既定値、bool と整数のみ可、他は code 5
+  const argI = (a, i, def) => {
+    const v = a[i];
+    if (i >= a.length || v === undefined) return def;
+    if (typeof v === "boolean") return +v;
+    if (Number.isInteger(v)) return v;
+    throw WRONG();
+  };
+  const arity = (a, lo, hi) => { if (a.length < lo || a.length > hi) throw WRONG(); };
 
   const impl = {
     "channels.channelCount": () => st.channels.length,
-    "channels.selectedChannel": (canBeNone = false, offset = 0) => st.selectedChannel + offset,
-    // 5 番目引数 useGlobalIndex は未モデル化 (index 0 のみを使う検査では差が出ない)
-    "channels.fillEachNSteps": (i, stride, offset, vel) => { ch(i); for (let p = offset; p < 64; p += stride) ch(i).steps[p] = 1; },
+    "channels.selectedChannel": (...a) => {
+      arity(a, 0, 3);
+      const offset = argI(a, 1, 0);
+      argI(a, 0, 0); argI(a, 2, 0);
+      return st.selectedChannel + offset;
+    },
+    // fl_engine.c の順に検査: 先頭 index → stride/offset/vel/5 番目 (型) → stride<1 は RANGE (ループに入らない)。
+    // 5 番目引数 useGlobalIndex は未モデル化 (型検査のみ、値は見ない)。6 番目以降は無視
+    "channels.fillEachNSteps": (...a) => {
+      const ci = argI(a, 0, 0);
+      ch(ci);
+      const stride = argI(a, 1, 1), offset = argI(a, 2, 0);
+      argI(a, 3, 0); argI(a, 4, 0);
+      if (stride < 1) throw RANGE();
+      for (let p = offset; p < 64; p += stride) if (p >= 0) ch(ci).steps[p] = 1;
+    },
     "channels.getChannelName": (i) => ch(i).name,
     "channels.setChannelName": (i, n) => { ch(i).name = n; },
     "channels.isChannelSelected": (i) => ch(i).sel,
@@ -78,7 +101,7 @@ export function createMockEngine() {
     "mixer.setCurrentTempo": (bpm) => { st.tempo = bpm >= 10000 ? bpm / 1000 : bpm; },
     "transport.start": () => { st.playing = true; },
     "transport.stop": () => { st.playing = false; },
-    "transport.isPlaying": () => st.playing,
+    "transport.isPlaying": (...a) => { arity(a, 0, 0); return st.playing; },
     "playlist.trackCount": () => st.playlist.length,
     "playlist.getTrackName": (i) => st.playlist[i - 1]?.name ?? "",
     "playlist.setTrackName": (i, n) => { st.playlist[i - 1].name = n; },
@@ -95,7 +118,7 @@ export function createMockEngine() {
     "plugins.setParamValue": (v, p) => { st.params[p].v = v; },
     // MIDI scripting (PY-6): device script が使う device.* の最小模擬。forwardMIDICC / midiOutMsg は呼出しを st.midiOut に記録する
     // general.getVersion = MIDI scripting API バージョン (int)。実機値は未実測のため固定のモック値 (同梱 script は print するだけ)
-    "general.getVersion": () => st.scriptingVersion ?? 1,
+    "general.getVersion": (...a) => { arity(a, 0, 0); return st.scriptingVersion ?? 1; },
     "device.getPortNumber": () => st.devicePort ?? 0,
     "device.isAssigned": () => true,
     "device.setHasMeters": () => { st.hasMeters = true; },
