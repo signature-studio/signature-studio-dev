@@ -144,7 +144,7 @@ def cmd_ott(a):
     print("[ott] census[0x248]=1:", r["census1"])
     if r.get("outhash"):
         # outhash は旧既定 (--auto none = m10 chain 再現) モードで実施する (CAB-238: auto 既定モードは
-        # 修復由来の SHA 変化が正のため突合を省略し, 差分は REPORT.md §12 の表を参照)。
+        # 修復由来の SHA 変化が正のため突合を省略し, 差分は REPORT_APPENDIX_A.md §12 の表を参照)。
         print("[ott] 出力 SHA (param×[0x248]×振幅): liftlib 生成 helper 版 vs 元 m10 成果物 =", json.dumps(r["outhash"]))
         if not auto:
             if r["outhash"].get("equal") is False and r["outhash"].get("f0_equal") != r["outhash"].get("f0_total"):
