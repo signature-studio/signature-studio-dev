@@ -232,15 +232,26 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   |---|---|
   | PR opened / synchronize / reopened / ready_for_review | review job |
   | oc-reviewer が `changes_requested` を提出 (`pull_request_review`) | implement job (fix モード)。`gh pr checkout` した PR ブランチを直して push |
-  | copilot-pull-request-reviewer が review を提出 (`pull_request_review`) | review job (Copilot 待ち `copilot-pending` で保留した PR を進める) |
 
   無音終了を許さない仕組み:
 
   - **review**: run の最後に `verify-review-verdict.sh` が現在の head への verdict (APPROVED / CHANGES_REQUESTED) を
     確認し、無ければ PR にコメントを残して close -> reopen で review を再起動する (同じ head に 3 回まで。超えたら警告して失敗)。
-    Copilot 待ちの保留は本文に `copilot-pending` を含む COMMENT で、PR 作成から 20 分未満のときだけ正当。
+    COMMENT だけの review は verdict と認めない。**Copilot の review を待って verdict を保留することはしない**
+    (直近 15 PR に Copilot の review は 0 件で、保留した PR は誰にも動かされず止まるため)。Copilot の review が
+    approve 前に既にあれば読んで判断する。run の途中で head が進んだ場合は、その push の synchronize が起動する
+    review が担当するので検証は免除する。
   - **fix**: run の最後に `fix-progress.sh` が「head が進んだ (pushed)」「push せずコメントした (answered: close -> reopen で
     review を起動)」「どちらもしていない (none: 1 回再試行し、なお none なら job を失敗させる)」を判定する。
+    判定・再試行・reopen・失敗の各 step は `always()` なので、agent step が失敗しても timeout しても走る
+    (agent step には fix モードで 40 分の上限を置き、後続 step の時間を残す)。
+  - **往復の上限**: oc-reviewer の CHANGES_REQUESTED が 1 PR で 10 件に達すると、fix を起動せず PR にコメントを残し
+    ラベル `oc:stuck` を付けて止める (`changes_requested -> fix -> review` と `answered -> reopen -> review` の
+    どちらの循環も 1 周に 1 件増えるため)。ラベルを外すと再開する。
+  - **並行制御**: implement job は `opencode-impl-<N>`、review job は `opencode-review-<N>` と group を分ける。
+    同じ group だと fix が pending の間に review が入って fix が黙って取り消される (pending は 1 件しか持てない)。
+    その代わり fix と review が重なりうるので、reviewer は `gh pr merge --match-head-commit <レビューした head>` で
+    未レビューの commit を巻き込まない。
   - PR は **常に ready・base は main** で作る (draft / stacked は REVIEWING でも FIXING でもない状態を作るため禁止)。
     未完でも ready で出して `Refs #N` と未解決を書く。前提 PR が未 merge の作業は着手しない。
 

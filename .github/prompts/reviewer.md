@@ -34,9 +34,9 @@
      コメントだけ・何も投稿せずに終えることは禁止 (終えた run は workflow が検知して再実行する)。
    - `--request-changes` を投稿すると、実装 agent が PM を介さず自動で起動して直し、push で
      この review が再起動する。したがって指摘は「直せば approve できる」具体的な内容にする。
-   - 例外は Copilot 待ちだけ: copilot-pull-request-reviewer の review がまだ無く PR 作成から
-     20 分未満のとき、本文に `copilot-pending` と書いた `--comment` review を投稿して終了してよい
-     (Copilot の review が提出されると自動で再 review が走る)。20 分を超えたら Copilot 未着のまま判断する。
+   - **Copilot の review を待って verdict を保留してはならない** (`--comment` だけで終えるのも禁止)。
+     Copilot が既に review を出していれば下の 3 のとおり読んで判断し、まだ無ければ無いまま判断する
+     (Copilot の review は来ないことが多く、保留した PR は誰にも動かされず止まる)。
    - draft の PR は approve 前に `gh pr ready <N>` で ready にする (draft は merge できない)。
 3. **レビュー実行**:
    - 承認できる場合: `gh pr review <N> --approve --body "..."`
@@ -52,7 +52,10 @@
 4. **マージ**: approve したら **同じ run で必ず merge まで行う** (approve 済みで未 merge の状態を作らない)。
    Auto Merge が有効な場合はそのまま待つ。
    Auto Merge が使えない/失敗する場合は、**レビュワーがマージまで担当してよい**:
-   - `gh pr merge <N> --merge --delete-branch` (approve 後のみ)
+   - `gh pr merge <N> --merge --delete-branch --match-head-commit <レビューした head の完全 SHA>`
+     (approve 後のみ。実装 agent は別の job で動くため、レビュー中に push された未レビューの commit を
+     巻き込んで merge しないよう、head を指定する。head が進んでいて失敗したら merge せず終える:
+     push の synchronize が新しい review を起動する)
    - このリポジトリは merge commit のみ許可されている
      (`allow_squash_merge: false` / `allow_rebase_merge: false` / `allow_merge_commit: true`)。
      **`--squash` と `--rebase` は必ず失敗する**ので使わない。
@@ -69,7 +72,7 @@
 - **素材は PR 本文の `oc_artifacts:` 行で指定される** (例: `oc_artifacts: plugins-serum2 toolchain-retdec`)。
   指定名と展開先は `docs/WORKFLOW.md` §11 が正本。PR 本文に行が無く、e2e の再実行に素材が要るときは、
   必要な名前を request-changes の本文に書くこと。PR 本文に行を足して push (または close → reopen)
-  するとレビューが再起動する (workflow のトリガは opened / synchronize / reopened のみ。本文だけの編集では再起動しない)。
+  するとレビューが再起動する (workflow のトリガは pull_request の opened / synchronize / reopened / ready_for_review のみ。本文だけの編集では再起動しない)。
 - **素材 (FL Studio・プラグイン) は R2 から取得できたとは限らない**。
   `$ARTIFACTS_DIR` を `ls` して実在を確認してから再実行する。空なら手元の検証
   スナップショットを使う。どちらも無ければ「素材なしで e2e は実行できない」と報告して

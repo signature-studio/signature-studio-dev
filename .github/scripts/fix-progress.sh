@@ -2,7 +2,8 @@
 # fix-progress.sh — reviewer の差し戻しを受けた fix モードの進捗を検証する (#719)。
 # 指示 122/123: 差し戻された PR が「修正もレビューもされていない」状態に戻らないようにする。
 #
-#   record        起動時点の PR head と時刻を $GITHUB_ENV に記録する
+#   record        起動時点の PR head と時刻を $GITHUB_ENV に記録し、上限に達した PR は stop=true を
+#                 $GITHUB_OUTPUT に出す (oc:stuck ラベルを付けて PR にコメントする)
 #   check         head が進んだか / 根拠コメントを投稿したかを判定し、result を $GITHUB_OUTPUT に出す
 #                   pushed   : head が進んだ (push が synchronize を起こし、review が再起動する)
 #                   answered : push せず PR にコメントした (review は起動しないので reopen が要る)
@@ -16,6 +17,11 @@ set -euo pipefail
 
 : "${OC_REPO:?}" "${OC_PR_NUMBER:?}"
 pr_head() { gh api "repos/$OC_REPO/pulls/$OC_PR_NUMBER" --jq .head.sha; }
+STUCK_LABEL="${OC_STUCK_LABEL:-oc:stuck}"
+# 差し戻しの往復 (changes_requested -> fix -> push -> review -> changes_requested) と、
+# push せず根拠だけ返す往復 (answered -> reopen -> review -> changes_requested) は、どちらも
+# 1 周に oc-reviewer の CHANGES_REQUESTED review を 1 件ずつ増やす。件数で両方を抑える。
+MAX_FIX_REVIEWS="${OC_MAX_FIX_REVIEWS:-10}"
 
 case "${1:-}" in
   record)
@@ -23,6 +29,26 @@ case "${1:-}" in
       printf 'OC_HEAD_BEFORE=%s\n' "$(pr_head)"
       printf 'OC_START_TS=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     } >> "$GITHUB_ENV"
+    # 上限ガード: ラベルが付いている / 差し戻しが MAX_FIX_REVIEWS 件に達した PR は fix を起動しない。
+    # 止めたことは PR に 1 回だけコメントし、ラベルで PM に引き渡す (watchdog もこのラベルで止まる)。
+    stop=false
+    if gh api "repos/$OC_REPO/issues/$OC_PR_NUMBER" --jq '.labels[].name' | grep -qx "$STUCK_LABEL"; then
+      stop=true
+      echo "PR #$OC_PR_NUMBER already has $STUCK_LABEL: the fix run is skipped"
+    else
+      n="$(gh api --paginate "repos/$OC_REPO/pulls/$OC_PR_NUMBER/reviews" \
+        | jq -s '[.[][] | select((.user.login | startswith("oc-reviewer")) and .state == "CHANGES_REQUESTED")] | length')"
+      echo "oc-reviewer CHANGES_REQUESTED reviews on PR #$OC_PR_NUMBER: $n (limit $MAX_FIX_REVIEWS)"
+      if [ "$n" -ge "$MAX_FIX_REVIEWS" ]; then
+        stop=true
+        gh api -X POST "repos/$OC_REPO/labels" -f name="$STUCK_LABEL" -f color=B60205 \
+          -f description="automation gave up: needs a human/PM decision" > /dev/null 2>&1 || true
+        gh api -X POST "repos/$OC_REPO/issues/$OC_PR_NUMBER/labels" -f "labels[]=$STUCK_LABEL" > /dev/null
+        gh pr comment "$OC_PR_NUMBER" --repo "$OC_REPO" \
+          --body "reviewer の差し戻しが ${n} 件に達したため、自動修正を止めます (上限 ${MAX_FIX_REVIEWS})。PM の判断が必要です。ラベル \`${STUCK_LABEL}\` を外すと再開できます。<!-- oc-fix-limit -->"
+      fi
+    fi
+    echo "stop=$stop" >> "$GITHUB_OUTPUT"
     ;;
   check)
     : "${OC_HEAD_BEFORE:?}" "${OC_START_TS:?}"

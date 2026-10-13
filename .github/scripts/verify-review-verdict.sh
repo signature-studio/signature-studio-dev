@@ -6,8 +6,10 @@
 # 正当な終わり方:
 #   - PR が merge / close された
 #   - 現在の head に対する oc-reviewer の review が APPROVED または CHANGES_REQUESTED
-#   - COMMENTED で本文に `copilot-pending` を含み、PR 作成から OC_COPILOT_PENDING_MINUTES 分未満
-#     (Copilot の review が提出されると pull_request_review で review job が再起動する)
+#   - この run が見ていた head より PR の head が進んでいる (進んだ push の synchronize が
+#     新しい review run を起動済みなので、古い head の欠落は問わない)
+# COMMENT だけの review は verdict と認めない (Copilot 待ちの保留は廃止した: 直近 15 PR に
+# Copilot の review は 0 件で、保留した PR が動かなくなるため)。
 # それ以外は close -> reopen で review を再起動する。同じ head に OC_REVIEW_MAX_ATTEMPTS 回
 # 再起動しても verdict が出なければ PR に警告を残して失敗する。
 #
@@ -16,7 +18,6 @@ set -euo pipefail
 
 : "${OC_REPO:?}" "${OC_PR_NUMBER:?}"
 MAX_ATTEMPTS="${OC_REVIEW_MAX_ATTEMPTS:-3}"
-PENDING_MINUTES="${OC_COPILOT_PENDING_MINUTES:-20}"
 
 pr="$(gh api "repos/$OC_REPO/pulls/$OC_PR_NUMBER")"
 state="$(jq -r .state <<< "$pr")"
@@ -25,7 +26,14 @@ if [ "$state" != open ]; then
   exit 0
 fi
 head="$(jq -r .head.sha <<< "$pr")"
-created="$(jq -r .created_at <<< "$pr")"
+
+# この run が起動された時点の head (pull_request イベントの payload)。push で進んでいれば、
+# その synchronize が起動した review run が現在の head を担当する。
+run_head="$(jq -r '.pull_request.head.sha // empty' "${GITHUB_EVENT_PATH:-/dev/null}" 2> /dev/null || true)"
+if [ -n "$run_head" ] && [ "$run_head" != "$head" ]; then
+  echo "head moved ${run_head:0:7} -> ${head:0:7} during the run: the review run for the new head handles it"
+  exit 0
+fi
 
 rv="$(gh api --paginate "repos/$OC_REPO/pulls/$OC_PR_NUMBER/reviews" \
   | jq -s --arg h "$head" '[.[][] | select((.user.login | startswith("oc-reviewer")) and .commit_id == $h)] | last // {}')"
@@ -35,13 +43,6 @@ case "$st" in
   APPROVED | CHANGES_REQUESTED)
     echo "verdict on ${head:0:7}: $st"
     exit 0
-    ;;
-  COMMENTED)
-    age_min=$((($(date -u +%s) - $(date -u -d "$created" +%s)) / 60))
-    if jq -e '.body | contains("copilot-pending")' <<< "$rv" > /dev/null && [ "$age_min" -lt "$PENDING_MINUTES" ]; then
-      echo "waiting for Copilot (copilot-pending, PR age ${age_min} min < $PENDING_MINUTES): the Copilot review will re-trigger this job"
-      exit 0
-    fi
     ;;
 esac
 
