@@ -55,7 +55,7 @@ trap 計 (oob+halt0+abort, shimx --fix survey) は 95 → **95**。目標 trap<2
 alloca には効かない。実際には使われない stack を足す過大拡幅がありうる (別 alloca とは重ならないので安全側)。導入理由は unit #18 OOB の
 真因 (`44bae0` の `stack_var_-88` が callee `44ba50` に渡り `[rcx+0x2c..0x3e]` を書いて 44bb70 の record を壊す; tools/m11/REPORT.md §10)。
 R1〜R7 だけの CAB-129 版では検出できなかった (サイズを供給する証拠が呼出し側に無い)。
-実測 (gen_ir2 で再生成した素の IR に R1〜R8 を適用, 本 REPORT 更新時 = commit `a71a404`): 拡幅 **2,408 alloca / 1,347 関数, 追加 stack +1,153,849 B (最大 1 件 188,408 B)**。
+実測 (gen_ir2 で再生成した素の IR に R1〜R8 を適用, 本 REPORT 更新時 = commit `b760fa2`): 拡幅 **2,408 alloca / 1,347 関数, 追加 stack +1,153,849 B (最大 1 件 188,408 B)**。
 最大の要求を出した規則別 (`widened_by_rule`): R8 2,392 / R3 7 / R5 4 / R6 4 / R2 1 (R8 が R1〜R7 より大きい要求を出した alloca は R8 に数える)。
 
 - **R1 の 4 サイトがチケットの対象そのもの**: `44bb70` / `59b100` / `95b400` / `ade4d0` が全て
