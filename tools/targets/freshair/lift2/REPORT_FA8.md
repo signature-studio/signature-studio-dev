@@ -1,7 +1,7 @@
 # lift2 REPORT FA-8 — Filter model setter の wasm 側 bit-exact と型別 ID 感度 (#648, Refs #452 #51)
 
-既知類型との関係: 該当なし (lift 欠陥の新規類型は無し)。ただし **FA-7 (`REPORT_FA7.md`) の probe に測定バグを 1 件発見・修正** (§3)。
-検証起点: base = `origin/452-fa-filter-param-id` e47f751 (FA-7 PR #649 の head)。FA-7 は未 merge のため本 PR の diff に #649 の commit を含む (merge 順: #649 → 本 PR)。
+既知類型との関係: 該当なし (lift 欠陥の新規類型は無し)。FA-7 (`REPORT_FA7.md`) の probe の測定バグ (setter と process の対象不一致) は **main の d97a757 (#649) で修正済み**。本 PR は `probe_setid.c` を変更しない (§3)。
+検証起点: PR branch `648-fa8-controller-map` (main の #649 merge `b6311f3` を取り込み済み)。FA-7 PR #649 は merge 済みのため、本 PR の diff は FA-8 の追加分のみ。
 
 ## 1. 結論 (先出し)
 
@@ -34,12 +34,11 @@ ID4 が type 4..6 でのみ効くのは、`run_fa7.sh` で `FA_TYPE=0..7` に変
 
 **既知の制約**: ID 416 (0x1a0) は整数 enum (descriptor 既定 1)。float bits を渡すと process が範囲外で落ちる (初版の生成器で 40 本中 4 本が native・wasm とも PROCERR)。`gen_setter_scen.py` は 416 に整数 0..4 だけを渡す。
 
-## 3. FA-7 probe の測定バグ修正 (重要)
+## 3. FA-7 probe の測定バグ (修正は main の d97a757 / #649。本 PR では probe 本体を変更しない)
 
-FA-7 の `probe_setid.c` は M0 に setter を適用してから **複製 T で process** を走らせていた。setter は M 内の descriptor を M0 内への絶対ポインタで引くため、
-書込みは M0 側に入り T の出力は構造的に変わらない。実際 **ID 2 (周波数) / ID 3 (Q) でも outChanged=0** だった (= FA-7 の「不変 18/18」は陽性対照の無い空洞な測定)。
-修正後 (setter を適用した M0 そのもので process): ID 2/3 は 3 値とも outChanged=1、ID 0x156..0x15b は従来どおり 18/18 不変。**FA-7 の結論は変わらないが、根拠が初めて有効になった**。
-`run_fa7.sh` に陽性対照 `ID2/ID3 の outChanged=1 が 6/6` を追加 (修正前 probe なら FAIL する)。
+FA-7 の `probe_setid.c` は M0 に setter を適用してから **複製 T で process** を走らせていた。モデルは自己参照ポインタを持つため、memcpy で複製したモデルに setter を掛けると書込みは元モデル側に入り、T の出力は構造的に変わらない。実際 **ID 2 (周波数) / ID 3 (Q) でも outChanged=0** だった (= FA-7 の「不変 18/18」は陽性対照の無い空洞な測定)。
+修正 (main の d97a757 / #649): 測定ごとに ctor を新規実行した fresh model を作り、setter と process を同一 T に対して行う (`measure()` / `fresh_model()`)。`run_fa7.sh` に陽性対照 `ID2/ID3 の outChanged=1 が 6/6` を追加 (修正前 probe なら FAIL する)。修正後は ID 2/3 が 3 値とも outChanged=1、ID 0x156..0x15b は従来どおり 18/18 不変。**FA-7 の結論は変わらないが、根拠が初めて有効になった**。
+同じ形の測定器 `native/probe_setval.c` (FA-8 で追加) は memcpy 複製に setter を掛けるため、ID 2 でも `POST` が `PRE` と完全一致する (書換えを見逃す偽陰性。fresh model 版の `probe_setid` では同じ条件で M の書換えが検出される)。どの run スクリプトからも REPORT からも使われていないため **削除した**。
 
 ## 4. 静的読み (推定。実行していない)
 
@@ -49,12 +48,14 @@ FA-7 の `probe_setid.c` は M0 に setter を適用してから **複製 T で 
 - 実機の `C+0x2d0` / `C+0x328` が等しいか、`C+0x318` の木に何が入るかは **PE の静的解析では決まらない** (実行時構築)。FLEngine 側の snapin 構築 (`FLEngine` boot 連鎖, #227 FLE 系) が必要。
 - 項目 5 の手掛かり: 即値 0x157 を `mov edx, 0x157` で使う関数が 6 (`180e38e10 180e6f3b0 180ea6b10 180f567e0 180fa1340 180fd5630`, 各 21 hit)、`imul rcx, rcx, 0x157/0x158/0x15a` を持つ関数が 6 (`180e5d6a0 180e94680 180f2b1b0 180f7c790 180fc4a20 180ffa240`) ある (`fa8_imm.py`、全 161 関数中。`sub rsp, 0x158` 等の無関係ヒットを含む)。他 model の descriptor 登録 ctor の可能性があるが **未解析**。
 
-## 5. 検証結果 (コミット済み HEAD 413f4e3, 実測)
+## 5. 検証結果 (実測)
 
 | 項目 | 結果 |
 |---|---|
-| `run_fa8.sh` (n=3) | **ALL PASS ×3**。所要 4.41 s / 4.39 s / 4.42 s (実行後 load average 1.07 / 1.14 / 1.13、並列 1) |
-| `run_fa7.sh` | **ALL PASS**, 2.96 s (判定 6 + ネガコン 3) |
+| `run_fa8.sh` (コード HEAD f39a6a8, 差し戻し対応) | **ALL PASS**。所要 5.41 s (実行前 load average 0.38 → 実行後 0.51。初回は build_setter 込みで 22.6 s) |
+| `run_fa7.sh` (コード HEAD f39a6a8, 差し戻し対応) | **ALL PASS**, 2.63 s (load 0.51 → 0.55。初回は build 込みで 39.5 s。判定 6 + ネガコン 5) |
+| `run_fa8.sh` (n=3, 413f4e3 時点) | **ALL PASS ×3**。所要 4.41 s / 4.39 s / 4.42 s (実行後 load average 1.07 / 1.14 / 1.13、並列 1) |
+| `run_fa7.sh` (413f4e3 時点の probe) | **ALL PASS**, 2.96 s (判定 6 + ネガコン 3) |
 | `lift2_e2e.sh` | **FAILED**, 71.84 s。内訳: comp 400/400 / filter 400/400 / fuzz 4×1200 mismatch 0 / ABI 0 違反 / **工程 6 (ctrl) が FAIL** (`mlift: rep prefix rep movsb` 非対応で ctrl wasm が作れず native_ctrl が Abort)。**`origin/main` 0865903 の clean worktree でも `build_ctrl.sh` + `run_ctrl.sh` が同一 FAIL を再現** (本 PR 無関係)。環境は capstone 5.0.7 / python 3.14.8 (capstone 4 は distutils 欠落で導入不可)。原因 (capstone 版) は未検証の推定。起票先は §6 |
 | ネガティブコントロール (`run_fa8.sh`) | NC1 wasm 出力 1 文字改竄 → mismatch=1 で FAIL / NC2 wasm 出力 399 行に欠落 → 行数不一致で FAIL / NC3 実判定に「0x157 行を ID2+3 行に差替え」を食わせ不変 type 集合が空 → 8/8 判定が FAIL / NC4 「ID2+3 行を base 行に差替え」で陽性対照 8/8 判定が FAIL。**4/4 が期待どおり FAIL** |
 | fail-closed | 行数 N 必須 (空・欠落 PASS 拒否) / ERR 1 件でも FAIL / 不合格は `exit 1` / 前提不足は `exit 2` |
