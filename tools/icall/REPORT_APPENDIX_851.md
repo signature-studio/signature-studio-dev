@@ -62,8 +62,8 @@
 測定 commit `604e900f` は tools/icall のコードを変えた最後の commit。以後の差分はこの節と REPORT のみで、鮮度の証跡は次の通り (`git diff 604e900f HEAD -- tools/icall`):
 
 ```
- tools/icall/REPORT_APPENDIX_851.md | 51 ++++++++++++++++++++++++++++++++++--
- 1 file changed, 49 insertions(+), 2 deletions(-)
+ tools/icall/REPORT_APPENDIX_851.md | 61 ++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 58 insertions(+), 3 deletions(-)
 ```
 
 REPORT 以外 (`':!tools/icall/REPORT*'`) の差分は 0 行。よって `604e900f` での測定値は HEAD で有効。
