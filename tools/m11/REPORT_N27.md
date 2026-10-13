@@ -205,12 +205,12 @@ NC1 (capstone 未導入) は `bash tools/m11/m11_gen_ir2.sh` が exit 1 にな�
 | F0 | HEAD 既定 (ldfix applied・qstore applied・ir_sha256 `1fc847d4…`)・`m11_e2e.sh` (`m11_survey`) | 0 | 43 | 1.16 | 870 | 17 (§11 転記) | 8 (§11 転記) | 25 (oom 1 含む) | 46 | 1 | 0 |
 | F0' | 同 IR・`survey_units.mjs` | 0 | 10 | – | 870 | 16 | 8 | 25 (oom 1 含む) | 46 | 1 | – |
 | X1 | qstore 無し (ldfix applied, `M11_QSTORE=0 m11_build.sh`) | 0 | 9 | – | 868 | 18 | 8 | 27 (`m11_survey`) | 46 | 1 | 0 |
-| X2 | ldfix 無し・qstore 無し (`M11_LDFIX=0` gen + build 時のみ ir_conditions を applied に書換え。測定専用) | 0 | 36 | – | 867 | 18 | 9 | 28 (`m11_survey`) | 46 | 1 | 0 |
+| X2 | 実際の条件: ldfix 無し・qstore 無し (`M11_LDFIX=0` で gen)。**注記: 測定時に `work/ir_conditions.json` を applied に書き換えて build を通した。保存された条件ファイルは実際の IR 条件と一致しない。この数値は採用しない (条件の再現・再記録は未実施)** | 0 | 36 | – | 867 | 18 | 9 | 28 (`m11_survey`) | 46 | 1 | 0 |
 
 - F0 の oob 17・halt0 8 は §11 (R1〜R3: 870/17/8/25) の実測値の転記である。本節では F0 の内訳を再測定していない (`m11_survey` の出力は本 run に残っていない)。
-- F0 と F0' の対比: ok 870・halt0 8・miss 46・trap 25 は一致する。oob は F0 が 17、F0' が 16 で 1 件違う。F0' の内訳は oob 16 + halt0 8 + oom 1 = 25 で trap と合う。F0 は oob 17 + halt0 8 = 25 で、oom 1 が oob 側に含まれていると読めば合う。この分類の違いは推定であり、未確認。
-- X1・X2 の差は ok で −2〜−3・trap で +2〜+3 にとどまる。(c) の trap 67 (oob 13 / halt0 54) とは一桁以上違う。
-- 結論: 73532f8 (c) の halt0 54 は、現 HEAD の lift 経路で ldfix・qstore のどの組合せでも再現しない。ldfix/qstore は halt0 を 8 → 9 程度しか動かさない。halt0 の大半 (54 件) は **IR 生成前段 (RetDec lift・work-m11 の世代) の違い**に由来すると考えられるが、本測定では切り分け未了。
+- F0 と F0' の対比は**転記値との照合**であり、再測定の一致ではない。F0' を同一 IR で実測した ok 870・halt0 8・miss 46・trap 25 は、§11 の転記値 (870/8/46/25) と一致する。oob は転記 17 と実測 16 で 1 件違う。F0' の内訳は oob 16 + halt0 8 + oom 1 = 25 で trap と合う。転記 F0 は oob 17 + halt0 8 = 25 で、oom 1 が oob 側に含まれていると読めば合う。この分類の違いは推定であり、未確認。
+- X1 の差は ok −2・trap +2 にとどまる。(c) の trap 67 (oob 13 / halt0 54) とは一桁以上違う。X2 は採用しない (上表の注記)。
+- 結論: 73532f8 (c) の halt0 54 は、本測定の範囲では再現しない。qstore を外した X1 でも halt0 は 8 のままで、ldfix・qstore の組合せでは halt0 は動かないと読める (ldfix 無しの条件は採用しない数値のみ)。halt0 の大半 (54 件) は **IR 生成前段 (RetDec lift・work-m11 の世代) の違い**に由来すると推定されるが、本測定では切り分け未了。
 - 未解決 (起票先): 73532f8 (c) の lift 成果物の再構成 (当時の lift 入力・RetDec 版の特定) = #729。(a) 818/21 の再測定は本 run 未実施 (旧 IR snapshot を `work-m11` から直接測る手順が必要) = #729。
 - 検証範囲: 本 runner の 1 ホスト・PE 1 member・n=1 (F0 のみ 2 ハーネス)。環境間一致は未実測。
 - 再現: `FL_WIN64_DIR=<fl-win64 展開先> bash tools/m11/m11_gen_ir2.sh && bash tools/m11/m11_e2e.sh` (lift 成果物が無ければ `work/lift_pe.sha256` で全再生成に入る。work-m11 は `lift_pe.sha256` を含まないため、本 run は PE の sha256 を手で書いて増分経路で回した。§12 G2)。
