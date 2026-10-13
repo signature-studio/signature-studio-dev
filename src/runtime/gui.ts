@@ -7,6 +7,7 @@
  *  3. DOM 入力 (pointer/wheel/key/focus) を入力リングへ書き、shim の doorbell を鳴らす
  *  4. worker からの通知 (log/frame/title/cursor/exit) を購読可能にする (E2E の同期点にも使う: sleep 不要)
  */
+import type { GuiPresentOptions, GuiRenderStats } from "./gui_renderer.js";
 import { CSS_CURSOR, GUI_IN_RECS, GuiView, IN, MOD, OFF, W, vkFromCode } from "./gui_proto.js";
 
 export type GuiHostOptions = {
@@ -22,7 +23,11 @@ export type GuiHostOptions = {
   worker?: Worker;
   /** frame 通知ごとに累計フレーム数で呼ばれる (window.__webstudio.frames の更新用) */
   onFrame?: (totalFrames: number) => void;
+  /** present 方式 (backend / sync / seqlock / upload)。未指定 = 従来の 2D + putImageData */
+  present?: GuiPresentOptions;
 };
+
+export type GuiPresentInfo = { backend: "2d" | "webgl2"; sync: "immediate" | "raf"; seqlock: boolean; upload: string };
 
 type Waiter<T> = { match: (v: T) => boolean; resolve: (v: T) => void };
 
@@ -32,6 +37,8 @@ export class GuiHost {
   frames = 0;
   lastFrameSeq = 0;
   exitCode: number | null = null;
+  /** 描画 worker が実際に採用した present 方式 (attach 完了後に有効) */
+  presentInfo: GuiPresentInfo | null = null;
   private readonly worker: Worker;
   private readonly canvas: HTMLCanvasElement;
   private readonly onFrame?: (totalFrames: number) => void;
@@ -39,6 +46,7 @@ export class GuiHost {
   private readonly frameWaiters: Array<Waiter<number>> = [];
   private readbackId = 0;
   private readonly readbacks = new Map<number, (r: { width: number; height: number; data: Uint8ClampedArray }) => void>();
+  private readonly statsWaiters = new Map<number, (r: GuiStatsReply) => void>();
   private readonly benches = new Map<number, (r: { convertMs: number; convertPutMs: number }) => void>();
   private logCursor = 0;
   private inSeq = 0;
@@ -61,7 +69,10 @@ export class GuiHost {
     o.canvas.width = o.width; o.canvas.height = o.height;
     const off = o.canvas.transferControlToOffscreen();
     const ready = new Promise<void>((res) => {
-      h.worker.addEventListener("message", (ev: MessageEvent) => { if ((ev.data as { type: string }).type === "ready") res(); }, { once: true });
+      h.worker.addEventListener("message", (ev: MessageEvent) => {
+        const m = ev.data as { type: string; info?: GuiPresentInfo };
+        if (m.type === "ready") { h.presentInfo = m.info ?? null; res(); }
+      }, { once: true });
     });
     h.worker.onmessage = (ev: MessageEvent) => h.onWorker(ev.data as WorkerMsg);
     // magic は wasm の gui_sh() が書くまで未定義 => worker init 前に wasm 側 init を待つ必要がある:
@@ -75,7 +86,7 @@ export class GuiHost {
     Atomics.store(v.i32, W.magic, 0x31495547);
     Atomics.store(v.i32, W.version, 1);
     Atomics.store(v.i32, W.totalSize, OFF.total);
-    h.worker.postMessage({ type: "init", canvas: off, memory: o.memory, base: o.base, width: o.width, height: o.height }, [off]);
+    h.worker.postMessage({ type: "init", canvas: off, memory: o.memory, base: o.base, width: o.width, height: o.height, present: o.present }, [off]);
     await ready;
     h.bindInput();
     Atomics.store(v.i32, W.hostReady, 1);
@@ -109,6 +120,7 @@ export class GuiHost {
         if (cb) { this.readbacks.delete(m.id); cb({ width: m.width, height: m.height, data: new Uint8ClampedArray(m.data) }); }
         break;
       }
+      case "stats": { const cb = this.statsWaiters.get(m.id); if (cb) { this.statsWaiters.delete(m.id); cb({ stats: m.stats, gl: m.gl, frames: m.frames }); } break; }
       case "bench": { const cb = this.benches.get(m.id); if (cb) { this.benches.delete(m.id); cb({ convertMs: m.convertMs, convertPutMs: m.convertPutMs }); } break; }
       default: break;
     }
@@ -133,6 +145,11 @@ export class GuiHost {
   bench(width: number, height: number, iters: number): Promise<{ convertMs: number; convertPutMs: number }> {
     const id = ++this.readbackId;
     return new Promise((res) => { this.benches.set(id, res); this.worker.postMessage({ type: "bench", id, width, height, iters }); });
+  }
+  /** 描画 worker の present 統計 (flush 回数・併合後矩形数・seqlock 持ち越し数など) */
+  stats(): Promise<GuiStatsReply> {
+    const id = ++this.readbackId;
+    return new Promise((res) => { this.statsWaiters.set(id, res); this.worker.postMessage({ type: "stats", id }); });
   }
   /** desktop の RGBA を描画 worker から読み戻す (テスト用) */
   readback(): Promise<{ width: number; height: number; data: Uint8ClampedArray }> {
@@ -206,8 +223,11 @@ export class GuiHost {
   }
 }
 
+export type GuiStatsReply = { stats: GuiRenderStats; gl: { uploads: number; uploadPixels: number; draws: number; directFallbacks: number; contextRestores: number } | null; frames: number };
+
 type WorkerMsg =
-  | { type: "ready" }
+  | { type: "ready"; info?: GuiPresentInfo }
+  | { type: "stats"; id: number; stats: GuiRenderStats; gl: GuiStatsReply["gl"]; frames: number }
   | { type: "log"; line: string }
   | { type: "frame"; seq: number }
   | { type: "title"; surf: number; title: string }

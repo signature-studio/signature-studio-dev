@@ -285,35 +285,6 @@ unsigned long long function_418190(unsigned long long dest, unsigned long long t
     return dest;
 }
 
-/* function_416db0  VA 0x416db0  (System._CopyArray 系: rcx=dst, rdx=src, r8=型情報(kind byte 先頭), r9=要素数; kind で要素 copy を分岐)
- * RetDec は `movzx rcx, byte ptr [rax]` (rax=r8=型情報) の kind 読出しを落とし, kind が常に 0 → 未知 kind の Error (Halt0) に直行した
- * (unit #18: TFormatSettings の string フィールド (kind=18) が 416750 → 416db0 で Halt0). 逆アセンブル 0x416db0-0x416f65 と突合:
- *   10→413540 / 11→4134e0 / 15→41a7b0 (8B 刻み) / 17→418210(…, ti) / 18→_UStrAsg(4133f0)
- *   13→自己再帰 (ti+B(ti+1) の {+6:count, +2:stride, +0xa:elemti**}) / 14,22→416750(dst,src,ti) (stride=D(r14+2)) / 他→Error(2)
- * **kind 12 (0x18 刻み) だけは突合済みでも正しい転記でもない (未対応)**: 機械語は `mov rcx,rbx; mov rdx,rsi; call 0x416720` で dst と src を
- *   渡すが, 下の case 12 は src を渡さず RetDec 版 function_416720(dst) を呼ぶだけ (src が結果に反映されない). さらに 0x416720 自体も
- *   `cmp [0x13A5028],0; je → Error(0x10); call [0x13A5028]` (VA 0x13A5028 の関数ポインタ経由で (rcx,rdx) をそのまま渡す) のうち
- *   RetDec が間接 call (D15) を落としている. kind 12 を実行する unit は未測定 (unit #18 で必要だったのは kind=18). 正しい転記は #490 で追跡 */
-unsigned long long function_416db0(unsigned long long dst, unsigned long long src, unsigned long long ti, unsigned int cnt) {
-    u64 rbx = dst, rsi = src, r13 = (u64)cnt;
-    if (r13 == 0) return 0;
-    u64 rax = 0;
-    u32 kind = B(ti);
-    u64 r14 = ti + (u64)B(ti + 1);
-    switch (kind) {
-    case 10: do { rax = function_413540(rbx, Q(rsi)); rbx += 8; rsi += 8; } while (--r13); break;
-    case 11: do { rax = function_4134e0(rbx, Q(rsi)); rbx += 8; rsi += 8; } while (--r13); break;
-    case 12: do { rax = function_416720(rbx); (void)rsi; rbx += 0x18; rsi += 0x18; } while (--r13); break;   /* 未対応 (src 不使用の近似, #490) */
-    case 13: do { u64 et = Q(Q(r14 + 0xa)); rax = function_416db0(rbx, rsi, et, D(r14 + 6)); u64 st = D(r14 + 2); rbx += st; rsi += st; } while (--r13); break;
-    case 14: case 22: do { rax = function_416750(rbx, rsi, ti); u64 st = D(r14 + 2); rbx += st; rsi += st; } while (--r13); break;
-    case 15: do { rax = function_41a7b0(rbx, Q(rsi)); rbx += 8; rsi += 8; } while (--r13); break;
-    case 17: do { rax = function_418210(rbx, Q(rsi), ti); rbx += 8; rsi += 8; } while (--r13); break;
-    case 18: do { rax = function_4133f0(rbx, Q(rsi)); rbx += 8; rsi += 8; } while (--r13); break;
-    default: function_409730(2); break;
-    }
-    return rax;
-}
-
 /* function_412770  VA 0x412770  (System: InitContext 復元 + longjmp(setjmp 点=entry_point 内) )
  * 実機では戻らない (DllMain の setjmp が eax=1 で再返却 → DllMain は TRUE を返す).
  * lift 版は longjmp を表現できず, 通常 return して Halt0 が ExitProcess まで進んでしまう (実測).
@@ -570,4 +541,73 @@ unsigned long long function_410b10(unsigned long long obj) {
     }
     if (mon != nw) function_407e20(nw);
     return mon;
+}
+
+/* function_40a3b0 (System.Math.GetMXCSR: stmxcsr [rsp]; pop rax; ret): RetDec は pop rax を落とし常に 0 を返す
+ * (__asm_stmxcsr(0); ret 0)。MXCSR マスクビット (0x1f80) が 0 = 全 FP 例外アンマスク扱いとなり,
+ * 40a1c0 (FP 例外送出) → 409730 Error → Halt0 に至る (#417)。wasm に MXCSR は無いので既定値 0x1f80 を返す。 */
+unsigned long long function_40a3b0(void) {
+    return 0x1f80;
+}
+
+/* function_4159e0  VA 0x4159e0  (System.InitializeArray(p, ti, count))  /  function_416db0 (System.CopyArray(dest, src, ti, count))
+ * RetDec は型情報の種別バイト `mov rax,ti; movzx rcx,byte [rax]` の load を落とし kind=0 固定 → default 分岐の Error(reInvalidPtr)
+ * → Halt0 (#417: survey halt0 の 6 unit 直接原因)。逆アセンブル (4159e0..415b05 / 416db0..416f70) から転記。
+ * kind: 10/11/15/17/18 = 単純管理型 (8B), 12 = 24B, 13 = 静的配列 (再帰), 14/22 = record */
+#define TI_REC(ti) ((ti) + B((ti) + 1))
+unsigned long long function_4159e0(unsigned long long p, unsigned long long ti, unsigned int count32) {
+    u64 count = count32;
+    if (!count) return 0;
+    u32 kind = B(ti);
+    switch (kind) {
+    case 10: case 11: case 15: case 17: case 18:
+        if (count == 1) Q(p) = 0; else function_40d210((void*)(uintptr_t)p, count << 3, 0, 0);
+        return 0;
+    case 12:
+        if (count == 1) { Q(p) = 0; Q(p + 8) = 0; Q(p + 16) = 0; }
+        else function_40d210((void*)(uintptr_t)p, count * 24, 0, 0);
+        return 0;
+    case 13: {
+        u64 r = TI_REC(ti);
+        return function_4159e0(p, Q(Q(r + 0xa)), (unsigned)((u64)D(r + 6) * count));
+    }
+    case 14: {
+        u64 r = TI_REC(ti), sz = D(r + 2);
+        do { function_415610(p, ti); p += sz; } while (--count);
+        return 0;
+    }
+    case 22: {
+        u64 dummy[16];
+        return function_4158e0(dummy, p, ti, count);
+    }
+    default:
+        function_409730(2);
+        return 0;
+    }
+}
+
+unsigned long long function_416db0(unsigned long long dest, unsigned long long src, unsigned long long ti, unsigned int count32) {
+    u64 count = count32;
+    if (!count) return 0;
+    u32 kind = B(ti);
+    u64 r = (kind == 13 || kind == 14 || kind == 22) ? TI_REC(ti) : 0;
+    do {
+        u64 step = 8;
+        switch (kind) {
+        case 10: function_413540(dest, Q(src)); break;
+        case 11: function_4134e0(dest, Q(src)); break;
+        case 12: /* 416720: Q(RVA 0xfa5028) が 0 なら Error(0x10), 非 0 なら間接 call (RetDec は落とす, D15 型) */
+            if (Q(R(0xfa5028)) == 0) function_409730(0x10);
+            else m11_icall(Q(R(0xfa5028)), dest, src, 0, 0, 0, 0, 0, 0);
+            step = 0x18; break;
+        case 13: function_416db0(dest, src, Q(Q(r + 0xa)), D(r + 6)); step = D(r + 2); break;
+        case 14: case 22: function_416750(dest, src, ti); step = D(r + 2); break;
+        case 15: function_41a7b0(dest, Q(src)); break;
+        case 17: function_418210(dest, Q(src), ti); break;
+        case 18: function_4133f0(dest, Q(src)); break;
+        default: function_409730(2); return 0;
+        }
+        dest += step; src += step;
+    } while (--count);
+    return 0;
 }

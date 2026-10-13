@@ -114,6 +114,7 @@ typedef struct { uint8_t *row0; int rowstep; int w, h; } Tgt;
 static int dc_tgt(DC *d, Tgt *t) {
   if (d->kind == 1) {
     SurfView v; if (!surf_view(d->surf, &v)) return 0;
+    surf_wseq_begin(d->surf);
     t->row0 = v.px; t->rowstep = v.stride; t->w = v.w; t->h = v.h; return 1;
   }
   Bmp *b = (Bmp *)h_get(d->hbmp, HT_BMP);

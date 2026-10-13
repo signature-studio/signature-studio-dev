@@ -130,7 +130,7 @@ if (runtimeParams.has("runtime")) {
 if (runtimeParams.get("gui") === "selftest") {
   void mountGuiSelfTest(runtimeParams);
 } else if (runtimeParams.get("gui") === "render-selftest") {
-  void mountGuiRenderSelfTest();
+  void mountGuiRenderSelfTest(runtimeParams);
 }
 
 // ---------------------------------------------------------------------------
