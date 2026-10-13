@@ -16,9 +16,9 @@ extern "C" {
 
 void* svgCreate(const uint8_t* data, uint32_t size) {
 	try {
-		auto h = new svg_handle;
+		auto h = std::make_unique<svg_handle>();
 		h->dom = svgdom::load(utki::make_span(data, size));
-		return h;
+		return h.release();
 	} catch (...) {
 		return nullptr;
 	}

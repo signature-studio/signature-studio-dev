@@ -5,7 +5,7 @@
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; ROOT="$HERE/../.."
 W="$ROOT/work/ilsvg_pair"; mkdir -p "$W"; cd "$W"
-source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1
+source "${EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}" >/dev/null 2>&1
 emcc --version | head -1
 
 co() { [ -d "$1" ] || git clone -q --depth 1 --branch "$2" "https://github.com/cppfw/$3.git" "$1"; }
@@ -30,7 +30,7 @@ SRCS="$(find svgdom-0.4.7/src/svgdom -name '*.cpp' | sort) $(find svgren-0.6.4/s
 
 # wasm: svgdom/svgren/agg/mikroxml/utki/papki/cssom を連結
 em++ -O2 -w -std=c++17 -fno-sized-deallocation $INC $SRCS "$HERE/wrap/ilsvg_wrap.cpp" \
-  -sWASM=1 -sMODULARIZE=1 -sEXPORT_NAME=createILSvg -sALLOW_MEMORY_GROWTH=1 \
+  -sWASM=1 -sMODULARIZE=1 -sEXPORT_NAME=createILSvg -sALLOW_MEMORY_GROWTH=1 -sUSE_ZLIB=1 \
   -sEXPORTED_FUNCTIONS=_svgCreate,_svgRender,_svgDestroy,_malloc,_free \
   -sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAPU32 -o ilsvg.js
 echo "[ilsvg] wasm: $(stat -c %s ilsvg.wasm) B"
@@ -38,3 +38,18 @@ echo "[ilsvg] wasm: $(stat -c %s ilsvg.wasm) B"
 # native: 同じソースで一致比較用の基準を作る
 g++ -O2 -w -std=c++17 $INC $SRCS "$HERE/wrap/native_main.cpp" -lz -o nat
 echo "[ilsvg] native: built"
+
+# スモーク比較 (#927): native と wasm を同じ SVG・64x64 で描画し、ARGB32 生データを cmp する。
+SMOKE="$HERE/wrap/smoke.svg"
+cp ilsvg.js ilsvg.cjs
+./nat "$SMOKE" nat.bin > nat.txt
+node "$HERE/wrap/wasm_smoke.cjs" ./ilsvg.cjs "$SMOKE" wasm.bin 64 64 > wasm.txt
+echo "[ilsvg] native: $(cat nat.txt)"
+echo "[ilsvg] wasm:   $(cat wasm.txt)"
+echo "[ilsvg] native bytes: $(stat -c %s nat.bin)  wasm bytes: $(stat -c %s wasm.bin)"
+if cmp nat.bin wasm.bin; then
+  echo "[ilsvg] cmp: IDENTICAL"
+else
+  echo "[ilsvg] cmp: DIFFER"
+  exit 1
+fi
