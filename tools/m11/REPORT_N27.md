@@ -166,16 +166,22 @@ NC1 (capstone 未導入) は `bash tools/m11/m11_gen_ir2.sh` が exit 1 にな�
 - HEAD 再現 (`a4aa766c`・retdec を PATH に入れない・`work/boot5.*` を削除して lift から): rc 0 / 101 秒 / load 0.07 → 0.83 / ok 870 · trap 25 · oom 1 · clobber 0 · miss 46。修正前は同条件で `retdec-decompiler: command not found` により 1 秒で rc 1。
 
 ## 12. #728: `--full` の実走 (head `2e128c5c`) と lift 成果物の PE 紐付け
-実行環境: 本 runner (4 vCPU, 16 GiB)。素材 `fl-win64` (`block00031_PE.bin`, sha256 `b2c64da4…`)・`toolchain-retdec` (`/opt/retdec`)・`toolchain-emsdk`・`work-m11`・`work-liftdiff` を展開。Ghidra 12.1.4 (公式 release, JDK 21) で `functions_dll.csv` を再生成 (59 009 行, sha256 `90d1bbac…`, Ghidra headless 約 10 分)。capstone 5.0.7 / pefile 2024.8.26。
+実行環境: 本 runner (4 vCPU, 16 GiB)。素材 `fl-win64` (`block00031_PE.bin`, sha256 `b2c64da4…`)・`toolchain-retdec` ([RETDEC])・`toolchain-emsdk`・`work-m11`・`work-liftdiff` を展開。Ghidra 12.1.4 (公式 release, JDK 21) で `functions_dll.csv` を再生成 (59 009 行, sha256 `90d1bbac…`, Ghidra headless 約 10 分)。capstone 5.0.7 / pefile 2024.8.26。
+- 測定 head: 下表の F1〜F3 は `2e128c5c` (PR 本文の `2e128c5c` 測定)。現 head `74312499` は `2e128c5c..74312499` のスクリプト差分が空で、コード同一。その後の修正 commit `74b365f6` は `m11_lift.sh` の 1 行 (RETDEC_ROOT 既定値) だけを変える。F3 は PATH で retdec を解決しており、この行は通らない。下の (a)(b)(c) で修正後 head を実測。
 
 | 測定 | コマンド | rc | 所要秒 | 結果 |
 |---|---|---|---|---|
 | F1 | `m11_e2e.sh --full` (head `616d1dd2` 相当・RetDec の PATH 無し) | 1 | 36 | `lift boot4 #1` が `rc=127` (retdec-decompiler 無し)。`m11_lift_all.sh` がこれを無視して DONE を立てていた (fail-open) |
-| F2 | `PATH=/opt/retdec/bin:$PATH m11_e2e.sh --full` (`616d1dd2`) | 0 | 636 | 全段 ok。`reached_stage` 4、trap `memory access out of bounds` @ function_8c6530 |
+| F2 | `PATH=<[RETDEC]>/bin:$PATH m11_e2e.sh --full` (`616d1dd2`) | 0 | 636 | 全段 ok。`reached_stage` 4、trap `memory access out of bounds` @ function_8c6530 |
 | F3 | 同上 (head `2e128c5c`: fail-closed 化 + PE 指紋記録 + RetDec の PATH 解決) | 0 | 633 | 全段 ok。`reached_stage` 4、同じ trap。`ir_sha256` = `fd628f3d…` (F2 は `a5841949…`) |
 
 - F3 の survey: units_run_full 53 / 942、survey_ok 870、trap 25 (oom 1)、clobber 0、miss 46、wasm 6 042 784 B。
+- **解決経路の実測 (修正後 head `74b365f6`)**: `m11_lift.sh` を 3 range (`chunk_0.txt` の先頭 3 range, `work-m11` 由来) で実行。`--full` ではない。
+  - (a) PATH・RETDEC 無し、`RETDEC_ROOT=<[RETDEC]>`: rc 0 / `[lift] RetDec OK: 32 lines` / `[lift] ir5 OK: 27 lines` (解決して進む)。
+  - (b) PATH・RETDEC・RETDEC_ROOT が無効 (`/nonexistent`): rc 1 / `[lift] FAIL: retdec-decompiler 無し (RETDEC_ROOT=/nonexistent; REFERENCES [RETDEC])`。
+  - (c) PATH・RETDEC 無し、RETDEC_ROOT 未設定: 解決先 `<[RETDEC]>/bin/retdec-decompiler`、実行可 (`exec-ok`)。
 - **PE の紐付け**: `work/lift_pe.sha256` に lift 生成時の PE sha256 を記録し、不一致なら lift を作り直す (`m11_e2e.sh`)。ただし作り直し経路の再実行 (指紋一致で skip・不一致で再生成) は**未実測**。
-- **fail-open の修正**: `m11_lift_all.sh` は chunk の rc 非 0 で止まる。`m11_lift.sh` は `retdec-decompiler` を PATH → `$RETDEC_ROOT/bin` の順で解決し、無ければ fail。
+- **fail-open の修正**: `m11_lift_all.sh` は chunk の rc 非 0 で止まる。`m11_lift.sh` は `retdec-decompiler` を PATH → `$RETDEC_ROOT/bin` (未設定時は [RETDEC] の既定位置) の順で解決し、無ければ fail。
+- **指紋の作り直し経路**: `work/lift_pe.sha256` 無し (既存スナップショット) では毎回 full 再生成になる。指紋一致で skip・不一致で再生成の経路は未実測。
 - **未解決**: (a) F2 と F3 で IR の `ir_sha256` が異なる。RetDec・ir5_patch・gen_ir2 の出力が実行ごとに変わる可能性があるが、原因は未切り分け。(b) `reached_stage` 4 の trap (§6 と同類の未解決。lift 成果物が正しいかは未判定)。(c) Ghidra 中間物 `functions_dll.csv` を素材に含めない場合、`--full` は Ghidra 再生成 (WORKFLOW §11 手順) が前提。
 - 起票: (a)(b) は子 issue を #728 の下に起票 (番号はコメント参照)。
