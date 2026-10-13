@@ -206,8 +206,8 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   - `work-m11` → `tools/m11/work/`、`work-liftdiff` → `tools/liftdiff/work/` に展開される
     (gitignore 対象の検証スナップショット。commit しない)。`work-m11` は #516 qstore 以前の生成
     (`qstore_report.json`・`ir_conditions.json` 無し) で現 main の生成手順と一致しない (#680)。survey の基準には使わない。
-    IR の正は `bash tools/m11/m11_e2e.sh --full` (RetDec から再生成) の出力とする。ただし `--full` は **未成功**
-    (head `4e084e1` で実行し `m11_bounds` が `tools/m2/work/ghidra_dll/functions_dll.csv` の欠落で fail-closed。この CSV は素材に無い Ghidra の中間物。`tools/m11/REPORT_N27.md` §10-3・#728)。PE とパスは `FL_WIN64_DIR` 経由・相対パス化済み。
+    IR の正は `bash tools/m11/m11_e2e.sh --full` (RetDec から再生成) の出力とする。`--full` は head `2e128c5c` で rc 0 まで通る (633 秒・素材 + Ghidra 再生成が前提。`tools/m11/REPORT_N27.md` §11・#728)。ただし reached_stage は 4 で trap が残り、IR の sha256 は実行ごとに変わる (未切り分け)。
+    `functions_dll.csv` は素材に無い Ghidra headless の中間物で、Ghidra 12.1.4 (`support/analyzeHeadless`・JDK 21・`tools/m2/ghidra_scripts/DumpFunctions.java`) で作る。lift 成果物は `work/lift_pe.sha256` に生成時の PE 指紋を記録し、PE が変われば作り直す。PE とパスは `FL_WIN64_DIR` 経由・相対パス化済み。
     `work/ir_conditions.json` の `ldfix=applied` と `ir_sha256` (IR の指紋) が一致しない IR は build されない (`m11_build.sh`)。
     **使う側が最初に `bash tools/m11/m11_gen_ir2.sh` を実行して `ir_conditions.json` を作る** (`FL_WIN64_DIR` の PE が要るので `fl-win64` も指定する)。
     Python の `capstone`・`pefile` が要る。無いと ldfix が skipped になり fail-closed で `exit 1` する。agent-setup は現状これらを入れないので、Actions 上で使うには事前に pip で入れるか、agent-setup への追加を別 PR で扱う。
