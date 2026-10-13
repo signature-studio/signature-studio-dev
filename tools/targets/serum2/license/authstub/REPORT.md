@@ -174,23 +174,23 @@ IR 側の「直接 call」「`edx=0x800010`」「入口 edge」の件数は**ス
 
 | 指標 | 機械語 (スクリプト出力) | raw IR (スクリプト出力) | raw IR (手確認・スクリプト外) |
 |---|---|---|---|
-| 直接 `call [reg+0x30]` site (0x1800c2ef4–f05) | `sites` = 1 | — | 0 (再現未確認) |
-| `edx=0x800010` 即値ロード | `edx_const` = 1 | — | 0 (再現未確認) |
-| 0x1800c2ef4 への入口 edge | `into` = 1 (`je` @0x1800c2d69) | — | 0 (再現未確認) |
+| 直接 `call [reg+0x30]` site (0x1800c2ef4–f05) | `sites` = 1 | — | 0 件 (9872–9900 行の `call` は `@function_180034560` の 1 件のみ。`add ..., 48` は 1461・2178・2649 行の 3 件で、いずれも本 site の範囲外) |
+| `edx=0x800010` 即値ロード | `edx_const` = 1 | — | `i32 8388608` / `8388624` の即値は 0x800010 を含む `or` が 9878 行の 1 件のみ (rax≠0 の deferred 側) |
+| 0x1800c2ef4 への入口 edge | `into` = 1 (`je` @0x1800c2d69) | — | `dec_label_pc_1800c2ef4` の参照 0 件 (grep `dec_label_pc_1800c2ef4`) |
 | `insn.addr` が site 範囲を被覆 | — | 0 件 (`covered`) | — |
 | ブロック `dec_label_pc_1800c2ef4` | — | 不在 (`has_block`) | — |
 
-- 手確認の列は「raw `.ll` を読んで数えた値」で、スクリプトでは再計算していない。本 REPORT の作成 run では raw `.ll` が無く再現できていない。再現にはスクリプトの拡張 (子 issue 参照) が必要。
+- 手確認の列は raw `.ll` を grep / sed で読んだ事実のみ。スクリプトの出力には含まれない (census 拡張は子 issue #1029)。
+- 9872 行の `br i1 %110, label %dec_label_pc_1800c2f08, label %dec_label_pc_1800c2d6f` は、null 枝 (`%110` = true) が skip 先 `0x1800c2f08` を指す。`0x1800c2ef4` を指す枝は IR に無い。
 
-### 実測の記録 (e2e・census の再現状況)
+### 実測の記録 (e2e・census)
 
-- 本節の作成 run (2026-10-13 review fix) では以下が**不在**のため、census・e2e を再実行していない:
-  Serum2 PE (`tools/targets/serum2/work/Serum2_win64.vst3`)・raw lift (`work/lift/authstub.drc.ll`)・
-  `plugins-serum2` 素材・toolchain-retdec / toolchain-emsdk。
-- 前 run (PR 本文の申告値・HEAD `3afb7674`) の e2e 値: `bash tools/targets/serum2/license/authstub/e2e.sh` exit 0・23/23 PASS・所要 3.2 s (lift キャッシュ利用)。
-  申告の実行日時・load・exit code の一次ログは残っておらず、本 run では**再現未確認**。
-- 再現手順: `oc_artifacts: plugins-serum2 toolchain-retdec toolchain-emsdk` を PR 本文に指定し、
-  §11 の素材展開手順で PE を配置してから e2e.sh と census を実行する。結果は本節に日時・HEAD SHA・exit code・PASS 件数を追記する。
+- 実行: 2026-10-13 (UTC 17:40)・HEAD `4df84cd4`・load average 0.42 (1 分平均、run 開始時)。
+  PE は `plugins-serum2` の `Install_Xfer_Serum2_2.1.5.exe` から `7z x` で `$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3` を取り出した (19,236,864 B・sha256 `501e7bb3…5283`)。
+- `bash tools/targets/serum2/license/authstub/e2e.sh`: exit 0・**23/23 PASS**・real 34.9 s (lift は本実行で新規生成。`authstub.drc.ll` 710,975 B)。
+- `python3 tools/targets/serum2/license/authstub/l1_census.py <PE> work/lift/authstub.drc.ll`: exit 0・real 0.16 s。
+  `sites=1` / `edx_const=1` / `into=1` / `covered=0` / `has_block=False`。
+- 前 run (HEAD `3afb7674`) の申告値 (3.2 s・23/23) は一次ログ無しのため本節には含めない。本節が一次の実測。
 
 - 事実の範囲: 上記は raw lift 1 本での実測。復元 pass は未実装 (受入条件 2・3 は未達、子 issue に分割)。
 - 未測定 (断定しない): 0x1800c2d59 の `je` は `[rsi+0x22792]` の bit で分岐し、その bit を 1 にする store は 0x1800c2d42 の 1 箇所のみ。N2a でこの store を 0 に置換した後の到達性は、本 census では測っていない。e2e の 23/23 との関係も未確認。
