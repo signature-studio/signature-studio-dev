@@ -124,8 +124,17 @@ python3 tools/gui/analysis/gui_imports.py && python3 tools/gui/gen_api.py   # im
 
 ### 結論
 - **FL 非依存部は実装・検証済み、FL の窓種別に基づく部分は未達 → PR は `Refs #183` (`Closes` なし)**。実装: TOPMOST/NOACTIVATE/`HTTRANSPARENT` を含む popup・tooltip の z 順 (surface 単位)・`WM_NCCALCSIZE`/`WM_NCPAINT`/`WM_NCHITTEST` と `WM_NC*MOUSE*` 配送・`GetWindowDC`/`GetWindowRect`/`AdjustWindowRect[Ex]` の NC 反映・無効領域の複数矩形化 (ウィンドウ/surface dirty とも)・DPI (`SetThreadDpiAwarenessContext` の保持、`GetDpiForWindow`/`GetDpiForSystem`/`IsProcessDPIAware`/`GetDeviceCaps(LOGPIXELS)`/`GetSystemMetrics`/NC 幅の dpr 反映)。
-- **golden 画素一致 (差 0)**: `bash tools/gui/test/nc_golden.sh` (`e2e.sh` 1d/6 に組込み)。popup + TOPMOST tooltip + 枠/caption 付きウィンドウ + 無効 2 矩形だけの再描画の 200×140 シーンを独立 Python オラクル `golden/gen_golden_nc.py` (shim と共有するものなし) と比較: **28,000 px 差 0**。同じバイナリが 23 assertion (client/window rect・HT* 判定・`WindowFromPoint` の HTTRANSPARENT 素通し・`WM_NCLBUTTONDOWN(HTCAPTION)` 配送・`GetUpdateRgn` = COMPLEXREGION・DPI 96↔192 の切替と `AdjustWindowRectEx`) も実行: **23 passed / 0 failed**。
+- **golden 画素一致 (差 0)**: `bash tools/gui/test/nc_golden.sh` (`e2e.sh` 1d/6 に組込み)。popup + TOPMOST tooltip + 枠/caption 付きウィンドウ + 無効 2 矩形だけの再描画の 200×140 シーンを独立 Python オラクル `golden/gen_golden_nc.py` (shim と共有するものなし) と比較: **28,000 px 差 0**。同じバイナリが 26 assertion (client/window rect・HT* 判定・`WindowFromPoint` の HTTRANSPARENT 素通し・`WM_NCLBUTTONDOWN(HTCAPTION)` 配送・`GetUpdateRgn` = COMPLEXREGION・DPI 96↔192 の切替と `AdjustWindowRectEx`・z 順 3 本) も実行: **26 passed / 0 failed**。
 - **ネガコン (3 本; どれかが通ると exit 1)**: 期待値を 1 画素改変 → 拒否 / `NC_FAULT=1` (tooltip を TOPMOST にしない) → **840 px 不一致で拒否** / `NC_FAULT=2` (2 矩形でなく外接矩形を無効化) → **4,270 px 不一致で拒否**。
+
+### 検証 (現 HEAD `7105a2d`、この run の実測)
+| 項目 | 結果 |
+|---|---|
+| `bash tools/gui/e2e.sh` (HEAD `7105a2d`) | **ALL PASS、rc 0、110 s** (終了時 load 1.60)。内訳: selftest 426/0・bpp 16,000 px 差 0・text golden ALL PASS・**nc golden 28,000 px 差 0 (asserts 26/0)**・native lift 0/64,000 px・SIMD 15,679 mismatch 0・Chrome readback / screenshot 0 px・sigprobe mismatch 0 (negctl 177)・present ALL PASS |
+| nc golden ネガコン (`7105a2d`) | 1 px 改変 → 拒否 / `NC_FAULT=1` → MISMATCH 840 px / `NC_FAULT=2` → MISMATCH 4,270 px。判定は「PPM 出力 + MISMATCH 行」に厳格化 (欠落・クラッシュは不合格) |
+| z 順 assert の感度 | 修正前の `gui_core.c` (`51e6170`) に対し新 assert 2 件が FAIL (`non-topmost after TOPMOST stays below it` / `HWND_BOTTOM clears TOPMOST`)、修正後は PASS |
+| 試行 | 1 回目は 5/6 で worktree に `node_modules` が無く `tsc` が ENOENT で停止 (コード起因ではない)。`pnpm install --frozen-lockfile` 後の 2 回目で ALL PASS |
+| 参考: `51e6170` の e2e | PR コメント記載 (3 試行中 2 回失敗、1/6 と 2b/6 の ASan UAF = #489 系、3 試行目 ALL PASS 97 s)。修正前の HEAD 実測として参照のみ |
 
 ### 検証 (`e822e53`、runner 4 CPU、RetDec・emsdk・mingw あり)
 | 層 | 結果 |
