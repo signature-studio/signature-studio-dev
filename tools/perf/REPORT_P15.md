@@ -113,7 +113,8 @@ node tools/perf/p15/chrome_shared.mjs --m 1,4,130 --reps 7 --blk 1000 --runs 3  
 
 - 測定 commit: `2b2faf52` (origin/main の worktree `ws-990`)。`tools/perf/p15` の差分は `862ef65b` 以降 `page.html` の未使用リスナー削除のみ (測定経路外・§0)。
 - 環境: Chrome 154.0.8037.97 (headless), CPU `AMD EPYC 9V45 96-Core Processor` (4 vCPU。§0 の 7763 とは別機), node v22.23.3。
-- 生データ: `tools/perf/p15/results/rerun_20261014_*.jsonl` (`probe_limit` 12 行・`probe_iso` 4 行・`chrome_shared` 19 行)。
+- 生データ: `tools/perf/p15/results/rerun_20261014_*.jsonl` (`probe_limit` 6 行・`probe_iso` 2 行・`chrome_shared` 9 行。いずれも本再測定の行のみで、`2b2faf52` の既存 `results/*.jsonl` と完全一致する行は除外)。
+- `shared_obj` (M=130) の生データは**未保存**: 標準出力のみで、jsonl への保存をしなかった。素材 `work-m6-ott` が本 run に無く再実行もできないため、下表の `shared_obj` 行は再現可能な生データを伴わない参考値として扱う。
 
 | 項目 | 前回 (`862ef65b`, EPYC 7763) | 再測定 (`2b2faf52`, EPYC 9V45) |
 |---|---|---|
