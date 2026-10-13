@@ -90,6 +90,8 @@ FastMM4 の初期化関数群 (InitializeMemoryManager 相当) を単体で検�
 6. 不足引数 0 詰め (sigfix) の意味補完: RetDec が落とした stack 引数を callee 側の逆アセンブルから復元する pass。
 7. Win32 shim の拡充 (tools/shim へ還元するのは shim 担当; ここでは `m11_win.c` に限定)。
 
+RTL の範囲確定と RetDec/x64c 別の liftdiff 採点 (#129): `tools/m11/rtl/REPORT.md`。
+
 ## 6. ブロッカー / ユーザ依頼
 
 * ブロッカー: RetDec 出力の意味保証が無い (上記 §2)。以降の進捗は lift 検証ハーネス or 別 lifter の導入に依存。
