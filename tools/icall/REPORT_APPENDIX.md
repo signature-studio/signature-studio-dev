@@ -130,7 +130,7 @@ python3 tools/icall/diff/rax_callers.py 1801a9a6c 1801c8cb8 1801c8c98
 - `ICALL_CHECK_STK` 付き route build (34.8 s): `ICALL_EMCC_FLAGS=-DICALL_CHECK_STK ICALL_EXTRA_EXPORTS=,_icall_stk_checked,_icall_stk_nonzero,_icall_stk_ptr_bad ANALYSIS_DIR=$HOME/analysis bash tools/icall/ott_route.sh` (`ott_route.sh` の `ICALL_EMCC_FLAGS` / `ICALL_EXTRA_EXPORTS` 経由で `icall_rt.c` の `ICALL_CHECK_STK` 分岐と統計 export を有効化)
 - `stk_check.mjs` (`dispatch=1337 ptr_bad=0 nonzero_stkbuf=0`, rc=0): `node tools/icall/tests/stk_check.mjs tools/icall/work/route/ott_route.cjs` (上の build の出力を引数に渡す。同じ出力先に通常 build が上書きされるため、後で `icall_e2e.sh` を再実行して通常 route を戻す)
 
-注記: 上記 2 つの build コマンドは `ott_route.sh` のソースから導いた手順で、元の実行ログには実際に打ったコマンドが残っていない。この記録の run では素材 (`work/`・retdec・emsdk・OTT DLL) が無く、再実行していない。実測の再確認は未了。
+注記: 上記 2 つの build コマンドは `ott_route.sh` のソースから導いた手順で、本 REPORT に記録されたコマンドではない。この記録の run では素材 (`work/`・retdec・emsdk・OTT DLL) が無く、再実行していない。実測の再確認は未了。
 
 - stack 引数あり site は OTT F の 96 site 中 2 件 (`0x1801a1ce6`・`0x1801aa528`)。いずれも `stk_check` の実行経路で dispatch されない (§9 の `executed 0` と整合)。
 - 値一致の検証には「5 引数以上の間接 call 先が実行される PE」が必要。OTT では成立しない。必要な入力は IPP 結合 or FLEngine (`0xc589b0`・`0x128f9e0` 周辺) で、どちらも素材と runner 上の実行経路が未整備。
