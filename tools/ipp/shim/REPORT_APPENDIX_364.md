@@ -54,6 +54,19 @@ env なし直接起動 (strace なし) の完走結果: `resize_oracle` rc=0・3
 `SUM {"cases":82056,"case_diff":359,"st_mis":0,"byte_diff":55588,"px_diff":55588,"px_tot":5912624}`、`fill3_oracle` rc=0・76 行、`verify_cab262_quirks` rc=0・65 行。
 これらは AVX-512 対応 Runner での実測で、置換前後の mismatch 数の突き合わせ (origin/main 側の再ビルド比較) は本修正では行っていない (置換行以外の変更なし)。
 
+### 検証 (再検証・受入条件 2 の残り、起点 `origin/main` = af8ba9cc)
+
+- 置換前 = `1353c62` (detached worktree)・置換後 = `af8ba9cc` を、同一の gcc フラグ (`-O1 -g -ffp-contract=off -fno-fast-math`) で
+  `resize_oracle` `fill3_oracle` `verify_cab262_quirks` にビルド (`gen_shim.py` は `work/flengine_ipp_names.json` を要するため未実行。gen/ のコミット済み生成物を使用)。
+- 既定値 (env 未設定・引数なし) の `openat` を `strace -f -e trace=openat` で採取: 3 本とも置換前後で **同一パス** (旧 VM 既定値 `[WIN64]` 相当の `extracted/block24356_PE.bin`) を開き、
+  Runner には存在しないため ENOENT (rc=1)。既定値の同一性はこの一致で確認。
+- `FL_WIN64_DIR=$RUNNER_TEMP` (`fl-win64` 展開先 `extracted/`) を与えた実行: 3 本とも rc=132 (SIGILL)、置換前後の stdout は 1 行目 (`--dump` 出力先) を除き `diff` 一致 (`resize_oracle` 26 行・`fill3_oracle` 8 行・`verify_cab262_quirks` 1 行)。
+- 所要: 各実行 0〜1 秒、直列。素材 `fl-win64` の展開 10.5 s (`tar --zstd -xf`)。Runner CPU は AMD EPYC 7763 (avx512 フラグ 0 件)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| AVX-512 非対応 Runner で実 DLL オラクルが SIGILL のため、置換前後の mismatch 数 (`SUM` 行) を比較できない | 既定パス・SIGILL 点までの出力の一致のみ確認 | #294 (AVX-512 対応 Runner) |
+
 ### 検証範囲 / 範囲外 / 未解決
 
 範囲外: `shim_e2e.sh` `fft_e2e.sh` `*_oracle_run.sh` の通し実行 (emcc = `toolchain-emsdk` と `work-liftlib` 等の生成物が要る)、`sigscan.py` の実行 (`work/win_refs.json` が要る。`EXT` 定義行のみ確認)。
