@@ -166,9 +166,13 @@ frontier = 閉包から呼ぶ framework 関数 (P0a の共有 wasm 側)。 vcall
 | 項目 | 実測 |
 |---|---|
 | `reverb_delay_e2e.sh` 全体 (3 回連続、HEAD 8a68603) | **248 s / 241 s / 246 s**、3 回とも exit 0 で `OK` 行 1 回。 開始時 load average (1 分) 1.10 / 1.18 / 1.02。 逐次実行 (並列数 1)。 1 回目は §7 の二分探索 (1 プロセス) と重なった (重なった時間の秒は未計測) |
-| 注記 | 上の 3 回と nega は 8a68603 のもの。 e7aed09 以降 (judge の列名読み・`PLUG_ICALL` 明示・2 鎖表) は下の最終 HEAD 行でのみ確認する | — |
+| 最終 HEAD `reverb_delay_e2e.sh` (prep 込み・fresh 実走、検証起点 **7a92330**) | **rc 0、779 s**。 `OK: 全 gate 通過`。 開始時 load average (1 分) 0.59、終了時 1.02。 judge 9/9・matrix_check 82/82・ids_crosscheck 9/9・xcheck_icall OK (9 行 OK)。 `icall_gate.py` (既定鎖) は rc 1 (F1 missing=3、gate 外。§9)。 9 閉包の lift は PASS、engine 19000 は `emcc -c` rc 1 (E1→E4、§7) で測定のみ |
+| 最終 HEAD `reverb_delay_nega.sh` (検証起点 7a92330) | **rc 0、229 s**、開始時 load average 0.93。 **22/22 DETECTED** (E1 の e2e 実走を含む) |
+| 最終 HEAD の icall 2 鎖 (`icall_summary.py`) | 既定鎖 `PLUG_ICALL=1`: 非 IAT 間接 call 514 site に対し、IR の `__icall_dispatch` 呼出 **514**・non-@name 間接 call 514。 従来鎖 `PLUG_ICALL=0`: 同 514 site に対し、IR の間接 call **0**・dispatch 0。 9 閉包の `defines` は両鎖とも 341 |
+| 最終 HEAD の e2e 実行 `xcheck_icall` | 9 本とも audit = 線形 sweep (差分 3 site は `icall_linear_only.expected` の VA 固定)。 既定鎖の `icall_gate` は Convolver 2 site・Delay Bank 1 site が未被覆 (F1 missing=2 + 1 = 3) |
+| 上の 3 回と nega | 8a68603 の実測 (前行まで)。 judge の列名読みと `PLUG_ICALL` 明示は最終 HEAD の行で確認 | — |
 | 内訳 (9 閉包 lift の `seconds` 合計 / engine 19000 の lift 秒) | 21–25 s / 106–111 s (19165 は 1 s で RetDec 終了)。 plugin 別 (min–max): Convolver 5–5 / Delay 1–2 / Delay 2 2–2 / Delay 3 1–2 / Delay Bank 2–3 / Reeverb 2–3 / Reeverb 2 2–2 / LuxeVerb 3–4 / Multiband Delay 2–3 |
-| 3 回の結果一致 | 判定列 (`status.csv` の秒を除く 9 列)・`facts.json` (バイト一致、sha256 先頭 `b49a112e`)・engine 行 (秒を除く)・`ipp_use.json` の集計値・gate の出力行は 3 回とも同一 |
+| 3 回の結果一致 | 判定列 (`status.csv` の秒を除く 9 列)・`facts.json` (同一 runner 内でバイト一致。sha256 先頭 `b49a112e` は別 runner で `1d8b3090` だったため、ハッシュの値の一致は同一 runner 内に限る)・engine 行 (秒を除く)・`ipp_use.json` の集計値・gate の出力行は 3 回とも同一 |
 | `reverb_delay_nega.sh` (HEAD 8a68603) | exit 0、**158 s**、開始時 load average 0.51。 **22/22 件 DETECTED** (対照は全て rc 0 / 壊した入力は全て rc 1。 内訳は下) |
 | 前提 inventory (初回のみ・`prep.sh`) | 4 分 28 秒 (`win_funcs.py` が大半。 並列 14 プロセス / 4 core)。 `block_manifest.json` が tarball に無く `nsis_names.py` が動かないため `f2/mk_blockmap.py` で blockmap を再構成 |
 | 最終 HEAD (commit 2cc882a: コメントと `engine_ranges.py` の flag 追加のみ変更) | `reverb_delay_e2e.sh --skip-lift` exit 0、**107 s** (judge 9/9・matrix_check 82/82・ids_crosscheck 9/9・xcheck_icall OK)。 lift・engine 段は 8a68603 の 3 回の結果を採用 |
