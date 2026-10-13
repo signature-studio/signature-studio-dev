@@ -162,7 +162,7 @@ reader が読む id の表は上のとおり (`h10_check.py` が dispatch tree �
 
 | 項目 | 実測 (コミット済み HEAD) |
 |---|---|
-| shimx の `CP_ACP` 既定 | **1252** (`tools/shimx/src/str.c` の `g_acp = 1252`)。実 `str.c` を emcc ビルドした probe (`analysis/shimx_acp_probe.c`) の `GetACP()` = 1252。`shimx_set_acp(932)` 後のみ 932 (`GetACP()` = 932)。`shimx_set_acp` の呼出元は repo 内に存在しない (`grep -rn shimx_set_acp` が宣言 `shimx.h` と定義 `str.c` の 2 件のみ) → wasm ランタイムは現状 1252 固定 |
+| shimx の `CP_ACP` 既定 | **1252** (`tools/shimx/src/str.c` の `g_acp = 1252`)。実 `str.c` を emcc ビルドした probe (`analysis/shimx_acp_probe.c`) の `GetACP()` = 1252。`shimx_set_acp(932)` 後のみ 932 (`GetACP()` = 932)。`shimx_set_acp` の**ランタイム呼出元は無い** (shimx 外の ts/mjs/js/c/h に実行時の呼出なし)。clean worktree (`065e825`、本 REPORT 自身を除く) の `git grep -n shimx_set_acp` は **14 件 / 11 ファイル**: shimx 側 9 件 = `shimx.h:1141` (宣言)・`str.c:2,13` (コメントと定義)・`exports.txt:568`・`README.md:35`・`inventory.md:76`・`REPORT_SHX-T8.md:34`・`test/test_shord.inc:140,150`、h10 側 5 件 (本 PR 追加) = `analysis/shimx_acp_probe.c:3,13`・`analysis/neg_nonascii.sh:53`・`src/wrapper_reader.ts:75`・`test/nonascii.test.ts:51`。実際に**呼ぶ**のは `tools/shimx/test/test_shord.inc` のユニットテスト (140: 932、150: 1252) と、計測専用の `analysis/shimx_acp_probe.c:13` (本 PR 追加) だけで、ランタイム経路では呼ばれない → wasm ランタイムは現状 1252 固定 |
 | 対応 codepage | 1252 / 437・850 (近似) / 28591 / 20127 / 65001 / **932** (SHX-T8、`REPORT_SHX-T8.md` §15.3)。936・949・950 等は `ERROR_INVALID_PARAMETER` |
 | shimx 実出力 ↔ reader 模型 | 6 ベクタ (日本語パス・日本語名・カタカナ・半角カナ・`表` の trail byte = 0x5C・`Café`) × ACP 2 通り (1252・932) = **12 件で shimx `MultiByteToWideChar(CP_ACP)` の UTF-16 と `wrapper_reader.ts` の復号が全件一致、不一致 0**。入力バイト列は Python 標準 codec (`cp932`/`cp1252`、shimx の表と独立実装) 由来 |
 | version 8 + CP932 バイト | ACP 932 で原文に復元、**shimx 既定 1252 では復元しない** (例 `93fa967b` → `“ú–{` 相当。ネガコン) |
