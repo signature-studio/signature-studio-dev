@@ -55,7 +55,8 @@ REGLIVE 2,509 (関数入口 live-in 等で脱落でない) / **FRAME_IN_ESCAPED 
 `f4_judge.py` 6 gate (F1 修復対象 / F2 IR 形 / D1 到達 / D2 load だけでは未到達 / P1 起動・survey 不変 / A1 監査分類) 全 PASS。
 ネガコン 4/4 が「期待した FAIL 行」付きで FAIL: N1 pre を post として判定 (D1) / N2 noand を post として判定 (D1) / N3 到達増分 ≥5 を要求 (D1) / N4 survey 1 unit を ok→trap に改竄 (P1)。
 
-実測 (4 vCPU, コミット済み HEAD で `f4_e2e.sh`): 1 回目は監査集約の不具合 (`riperead` キー誤記) で rc=1 (172.8 s、修正前の記録) → 修正後 **172 s, rc 0, 全 PASS / ネガコン 4/4** (開始時 load average 0.87, 終了時 1.19)。**n=1 (再実行による分散は未測定)**。
+実測 (4 vCPU, `f4_e2e.sh`): コミット済み HEAD `7be6bab` で **175 s, rc 0, 6 gate 全 PASS / ネガコン 4/4** (開始時 load average 0.31 は初回。本回は終了時 0.99)。
+同一コード・初回実装時の再実行は 172 s / rc 0 (1 回目は監査集約の `riperead` キー誤記で rc 1・173 s。修正済み)。**n=2 (rc 0 の回)**、分散は未評価。
 
 ## 5. 未解決 / 限界
 
