@@ -1,4 +1,4 @@
-# xcheck_icall.py: 線形 sweep にだけ見える非 IAT 間接 call の VA (1 行 1 VA)。 すべて Delphi try/finally の funclet 本体。
+# xcheck_icall.py: 線形 sweep にだけ見える非 IAT 間接 call の VA (1 行 1 VA)。 すべて (icall §4) D12 の Delphi unwind landing pad と推定 (jmp 直後 + nop nop の後)。
 0x793207   # block 18992 Fruity Convolver  call [rbx-0x20]  (VMT slot -0x20 = Destroy 呼出)
 0x875dd7   # block 18992 Fruity Convolver  call [rax+0x28]
 0x6d938c   # block 19002 Fruity Delay Bank call [rbx-0x20]

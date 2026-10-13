@@ -6,7 +6,7 @@ audit_icall.py の `--sites` 出力 (mn == call かつ kind != iat) の VA 集�
 合格条件 (どれか違えば exit 1):
   (1) audit にあって線形 sweep に無い site が 0   (audit が実在しない site を数えていない)
   (2) 線形 sweep にだけ有る site の VA 集合 == --expected ファイルの集合 (1 行 1 VA, 16 進)
-      既知の 3 site は Delphi `try/finally` の funclet 本体 (直前が `jmp` + nop nop。 CFG の辺から到達せず、recursive descent と RetDec は辿らない)。
+      既知の 3 site は (icall §4) D12 の Delphi unwind landing pad と推定 (直前が `jmp` + nop nop。 CFG の辺から到達せず、recursive descent と RetDec は辿らない)。
       想定外の差 (増えた / 消えた) が出たら不合格にする = 件数ではなく VA で固定した回帰 gate。
 usage: xcheck_icall.py [--dir work/reverb_delay/icall] [--expected reverb_delay/icall_linear_only.expected] <block> ...
 """
