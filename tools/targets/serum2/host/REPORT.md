@@ -63,6 +63,7 @@
 - 0x1800c2b50 の demo bit 書込 + 0x800010 通知ブロックは **`*(int*)(controller_base+0x10c) == 1` をゲートに持つ** (decomp 実測。IEditController this + 0xdc)。
 - 本 host の全構成 (initialize / connect / createView('editor') 取得まで) で +0x10c は **2 のまま不変** (3 秒ポーリングで変化なし, 5 run 実測)。+0x10c の writer は 167 関数 decomp 集合に無い (copy ctor 風 0x18000d1b0 が config+0x30 → obj+0x10c を写すのが近傍)。
 - 推定: +0x10c = DSP↔controller の shared-data リンク ("SerumDSPSharedData" 0x1800b61b0 経由) や editor open 完走など、更に深い初期化完了フラグ (med)。
+- **#1360 追記 (実測)**: 値 2 の書込元は `0x1800b1332` (関数 `0x1800acf70`)。値は `0x180037600` の戻り値で、同関数は context に `IVst3ToAUWrapper` / `IVst3ToAAXWrapper` を QI し両方失敗で 2 を返す。host がこの 2 IID に `kResultOk` を返すと gate は 1 になる (`S2HOST_WRAPPER_QI=1`、§3-7)。既定 host は両 QI が `kNoInterface` のため 2 のまま。詳細は [REPORT_SR1c.md §4-4](REPORT_SR1c.md)。
 - 実測された通知: `restartComponent(flags=0x10 = kParamTitlesChanged)` が 1 run に 3 回 (comp.setState 後 / setComponentState 後 / getState 後)。**0x800010 (= 0x10 kParamTitlesChanged | 0x800000 独自ビット) は未受信** — 発火条件が §3-2/3-3 の未達成部に依存。
 
 ### 3-4. host として観測した demo 関連挙動 (memo)
@@ -145,6 +146,12 @@
   | 2. 強制ゲート下で全 run に `0x1000010` が追加で出る (由来未解析) | gate=1 の副作用の切り分け不足 | #256 (SR-1c) にコメント |
   | 3. 既定 host で +0xdc が 2 のまま (ゲート不通過) | 契約の pv 比較は強制ゲート下でのみ到達を確認 | #256 (SR-1c) |
   | 4. meta 側のみ pv を下げる A/B 未実施 | payload/meta のどちらが比較に使われるかの排他確認は payload 側のみ | 本 issue 範囲外。必要なら新規 SR-1f |
+
+### 3-7. [#1360] 既定 gate==2 の原因と wrapper QI 応答による到達 (実測)
+
+- 結論: 既定 host で `+0xdc` が 2 のままなのは、`0x180037600` が `IVst3ToAUWrapper` / `IVst3ToAAXWrapper` の QI 2 件 (`kNoInterface`) の失敗で 2 を返すため。host が両 IID に応答すると (`S2HOST_WRAPPER_QI=1`) gate は 1 になり、既定ゲートのまま #238 契約の pv 比較と 0x800010 受信に到達する。
+- 数値・run 表は [REPORT_SR1c.md §4-4](REPORT_SR1c.md) が正本。e2e 既定 50/50、wq 追加 6 run を含めて判定 62/62 OK (測定 commit は §4-4 に記載)。
+- 未確定: 実 host (Image-Line/Xfer) が当該 IID に応答するか (未観測)。書込元関数の所属 class (vtable 位置を静的特定できず)。
 
 ## 4. 受け入れ条件との対合 (CAB-68)
 

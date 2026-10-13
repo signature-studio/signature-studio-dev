@@ -5,8 +5,9 @@
 
 ## 1. 結論
 
-- **i128 戻り関数の戻り経路は rax:rdx ではない可能性が高い** (推定)。機械語 (RetDec dsm) の `ret` 直前 3 行を
-  見ると、xmm0 が出現する関数が 24 件あり (戻り値の推定)、rdx で返す判定の関数は 0 件だった。
+- **i128 戻り関数の戻り経路は rax:rdx ではない可能性が高い** (推定)。機械語 (RetDec dsm) で rdx を戻り値として
+  使う判定は、窓幅 3 でも窓幅 8 以上でも 0 件。xmm0 が `ret` 直前に出る関数は、窓幅 3 で 24 件、窓幅 8 以上で 38 件
+  (§3b)。前回の `other` 14 件は窓幅 3 の取りこぼしで、xmm0 の戻り (double) と読むのが妥当 (推定)。
   IR の `i128` 型付けが実際の戻り値と合わない可能性がある (推定。未確定)。
 - したがって受入条件「rdx を取得して `cmp_ret` で比較」は、この 39 関数に対しては**前提が未確定**。
   実装の前に戻り経路の確定が要る (下記 §4)。**コード変更は本 run では行わなかった**。
@@ -54,7 +55,24 @@ cd tools/liftdiff && python3 tests/ld24_sig_breakdown.py > work/ld24_sig_breakdo
 | no_ret | 1 | dsm 内に ret が無い |
 | rax_rdx | 0 | rdx が出現。rax:rdx で返す可能性 (判定規則上 0 件) |
 
-- ヒューリスティック (ret 直前 3 行の文字列) のため、**確定値ではない**。`other` 14 件と `no_ret` 1 件は未確認。
+- ヒューリスティック (ret 直前 3 行の文字列) のため、**確定値ではない**。`no_ret` 1 件は未確認。
+
+### 3b. 窓幅感度 (実測・本 run)
+
+`--window N` (既定 3) で ret 直前 N 行を見る。`cd tools/liftdiff && python3 tests/ld38_ret_convention.py --window N`
+
+| 窓幅 | xmm0 | other | no_ret | rax_rdx | rc |
+|---|---|---|---|---|---|
+| 3 (既定) | 24 | 14 | 1 | 0 | 0 |
+| 8 | 38 | 0 | 1 | 0 | 0 |
+| 16 | 38 | 0 | 1 | 0 | 0 |
+
+- 窓 3 で `other` だった 14 件は、窓 8 以上で全て `xmm0` に入る。例: `function_12657b0` (boot3.drc.dsm L1007869-1007874) は
+  `movq qword ptr [rbp+0x30], xmm0` の後に `movq xmm0, qword ptr [rbp+0x30]` で戻り、`ret` の 5 行前に xmm0 がある。
+- 窓幅を広げても `rax_rdx` は 0 件。「i128 を rax:rdx で返す関数」は本 39 件に 1 件も見つからなかった。
+- 判定器のネガティブコントロール (`--control`) は 3/3 OK のまま。
+- 注意: 窓が広いほど別の呼出し後の xmm0 を拾う可能性がある。本表は方向の確認であり、関数ごとの ABI 確定ではない。
+  確定には呼出し元の戻り値利用を見る必要がある (未実施)。
 - 判定器の検証 (ネガティブコントロール): `python3 tests/ld38_ret_convention.py --control` (実測 rc 0)。
   - `real xmm0 body` (実在 `function_cc32f0` の本体 3 行) → `xmm0` (期待どおり)
   - `xmm0 removed from real body` (同じ本体の xmm0 を rax に置換) → `other` (判定が変わる)

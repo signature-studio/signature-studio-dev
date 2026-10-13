@@ -24,9 +24,54 @@
 
 - `emcc -c` 通過: **4/9** (23914 / 23944 / 24159 / 24298)。不通過 5 本: BooBass_Eng (E3 1 件)、f80 libcall 4 本 (23916 / 24163 / 24167 / 24216)。
 - E1 (`fix_icmp_ptr.py`): `fixcmp_patched` は 9 本とも 0 (`engine_fixcmp.py` の適用なし)。共有鎖で解消済みのため、修復前後の rc は不変。
-- Morphine (23944): `hll_killed_s` 354 — RetDec の HLL 段を kill して `.ll` から再開した経路。通常経路 (HLL 段を含む) の最後までの実測は無い。
+- Morphine (23944): `hll_killed_s` 354 — RetDec の HLL 段を kill して `.ll` から再開した経路 (§A の実測)。通常経路 (HLL 段を含む) の実測は §D。
 - `known.json`: 通過 4 本の `emcc_c_rc` を除去。残りの fails (`declares_unimpl` / `i256_trap` / `missing_define` と不通過 5 本の `emcc_c_rc`) は未解決。
 - judge (C++ 9 本の行のみ、`mk_status.py` 相当の列で作成): KNOWN 9 / NEW-FAIL 0 / FIXED 0 / MISSING 0 / exit 0。`synth_e2e.sh` 全体 (shell 12 本) は未実行。
+
+## D. E3 修復 (#1485; `function_180049450` の i32 仮引数)
+
+修復 pass: `tools/plugins/lift/passes/fix_i32_ptr_arg.py` [P-T2] (opt-in: `PLUG_I32PTR_FUNCS=function_180049450`)。
+pass は次の場合に**出力を書かず非 0 終了**する (`lift_ranges.sh` が `set -e` で止まる): 実引数が定数・`trunc` 定義以外 / 本体で `inttoptr`・`icmp` 以外に使われる / 呼出が解釈できない形。
+`i32` → `i64` の書換えは、`trunc` 定義を変えず `add i64 %W, 0` を挿入して行う (定義元を変えると他の `i32` 使用が壊れるため)。
+
+呼出側の分類 (`function_180049450` の呼出 19 件。`classify_i32_callers.py` で再生成可):
+
+| 種別 | 件数 | 扱い |
+|---|--:|---|
+| `i32 0`〜定数 | 8 | `i64 0` (値は同じ) |
+| `i32 %V`、定義元 `%V = trunc i64 %W to i32` (同一 define 内、距離制限なし) | 10 | `%i3x.N = add i64 %W, 0` を挿入し、それを渡す (上位 32bit を保つ) |
+| `i32 %arg1` (呼出元 `function_180056120` の `i32` 仮引数) | 1 | 対象外 → pass が失敗 |
+
+- 件数の揃え: 「呼出 4 箇所」は `function_180056120` 自体の呼出数 (4 件)。上の 19 件は `function_180049450` の呼出数で、混同していた。
+- 決定の根拠: ネイティブ `0x180049450` は第 2 引数 (rdx) の 64bit 全体を `test rdx, rdx` / `movups [rdx]` でポインタとして使う。
+  `trunc` による上位 32bit の切り捨ては、非 0 の上位を持つポインタで別アドレスを読むため silent に値が変わる。よって `i64` 化して上位を保つ。
+  定数 (0 〜 2^31-1) は `i32`/`i64` で値が同じ。0 拡張・符号拡張は使わない。
+
+回帰テスト: `bash tools/plugins/lift/passes/test_fix_i32_ptr_arg.sh` (5 ケース: 定数 / trunc 定義 (定義と呼出が 30 行以上離れる) → 変換して clang 構文検証 / 仮引数の受け渡し → 失敗 / 本体が i32 を別用途に使う → 失敗 / icmp の被演算子が変数 → 失敗)。
+
+実測 (`bash tools/plugins/synth/cpp_lift.sh 21202 1500`、fl-win64 の 21202 PE・RetDec v5.0・emcc 6.0.12 を使用。測定 HEAD = 05a73875。fc53b943 から 05a73875 までの lift 経路の差分は `lift_ranges.sh` の opt-in 変数 `PLUG_NO_STATIC_DETECT` のみで、未設定時は動作不変):
+
+| 条件 | lift rc | summary.csv | `emcc_c_rc` | 最初のエラー |
+|---|--:|---|--:|---|
+| 修復前 (main f3ffd7ba) | 0 | `21202,1579,0,1393,0,3,3,1,0,1,36,211,25828,67,23,1391,0` | 1 | `e.final.ll:114486:21 '%arg2' defined with type 'i32' but expected 'i64'` |
+| 既定 (opt-in 無効、05a73875) | 0 | `21202,1579,0,1393,0,3,3,1,0,1,42,211,25828,67,23,1391,0` | 1 | 同上 (baseline と同一) |
+| `PLUG_I32PTR_FUNCS=function_180049450` (05a73875) | 1 | `21202,1579,1,-1,-1,-1,-1,-1,0,-1,42,-1,-1,-1,-1,-1,0` (pass 停止のため emcc 列は未生成) | — | `[P-T2] FAIL: 呼出の実引数 %arg1 が trunc 定義でも定数でもない (line 134718)` |
+
+- 測定の鮮度 (fc53b943 → 05a73875): `git diff fc53b943 05a73875 -- tools/plugins/lift tools/plugins/synth` の変更は `lift_ranges.sh` の 2 行 (コメント 1 行と RetDec 呼出行) と REPORT のみ。
+  RetDec 呼出行は `--select-decode-only ${PLUG_NO_STATIC_DETECT:+--disable-static-code-detection} --timeout ...` になった。変数が未設定なら `${…:+…}` は空に展開され、RetDec に渡る argv は変わらない (実測: 未設定時は `--select-decode-only --timeout 5` の 3 語で、旧行と同一)。
+  `git diff fc53b943 05a73875 -- tools/plugins/lift tools/plugins/synth` の lift 側の出力 (抜粋・全文):
+  ```diff
+  -  --select-ranges "$DEC_RANGES" --select-decode-only --timeout "$TMO" > "$OUT/$NAME.retdec.log" 2>&1
+  +  --select-ranges "$DEC_RANGES" --select-decode-only ${PLUG_NO_STATIC_DETECT:+--disable-static-code-detection} --timeout "$TMO" > "$OUT/$NAME.retdec.log" 2>&1
+  ```
+  よって既定経路・opt-in 経路の測定は流用できる (fc53b943 と 05a73875 の summary の差は既定経路の `lift_s` 列のみ 45 → 42。`emcc_c_rc`・欠落数・最初のエラーは同一)。ただし `PLUG_NO_STATIC_DETECT=0` も「設定済み」扱いで `--disable-static-code-detection` が付く (空文字のときだけ付かない)。
+- opt-in 経路は、仕様どおり `function_180056120(i32 %arg1, …)` の呼出で止まる。出力 `.i3.ll` は作られず、`.final.ll` も無い。
+  外側の `i32` 署名を i64 化すると範囲が広がるため、本 pass では扱わない (下記 未解決)。
+- そのため「opt-in の `.ll` が `llvm-as`/clang で構文検証を通る」という受入条件は、実データでは**達成していない**。
+  代わりに検証用の入力 (実データの `e.fh.ll` で `function_180056120` の `i32 %arg1` 1 件だけを定数 0 に置換したコピー。本番の修復ではない) を作り、
+  pass の出力 (const 9 / trunc 10) が `clang -x ir -fsyntax-only` を通ることを確認した。
+- 既定経路の summary は修復前と同一 (`emcc_c_rc`=1、最初のエラーも同一)。`lift_s` のみ測定ごとに変動 (36 → 45 秒)。他 8 本の `emcc_c_rc` は未測定。
+- 注: `e.fh.ll` は llvm-as 18 では 7651 行の `add i64 0, i64 %...` で不正 (RetDec 出力の元からの問題)。clang 18 の `-fsyntax-only` は通る。検証は clang で行う。
 
 ## B. 未解決 (起票先)
 
@@ -35,7 +80,7 @@
 | f80 (x86_fp80) の libcall (`fp_extend` / `fp_round`) | 不通過 4 本 (23916 / 24163 / 24167 / 24216) | #534 (本 issue)。f80→f64 は精度が変わるため既定外。扱いは判断が要る |
 | E3 (i32 仮引数の i64 使用) BooBass_Eng `function_180049450` | 不通過 1 本 | #1301 (PLG-G2-13) |
 | define 欠落 (BooBass_Eng 211 件) | 1 本 (他 8 本は 1〜2 件) | #1301 (PLG-G2-13) |
-| Morphine (23944) の HLL 段を含む通常経路の実測 | 未実測 (再開経路のみ) | #1301 (PLG-G2-13) |
+| Morphine (23944) の HLL 段を含む通常経路の実測 | §D で解消 (kill 無しで最後まで実測。`emcc_c_rc` 0) | #1487 (解消済み) |
 | VEX helper 未実装 (未実装 helper 件数 83〜121) と `PLUG_AVX256` 有効時の再測定 | lift 結果の完全性 | #534 (本 issue) |
 | E2 (SSA 値入り定数式) / E4 (`fix_asm_stores` の def 欠落) | 今回の最初のエラーには出ず未再現。 網羅の確認は未実施 | #534 (本 issue) |
 
@@ -85,3 +130,31 @@
 | 静的検出の既定化 (`PLUG_NO_STATIC_DETECT` を既定 1 にする) と他 batch への影響確認 | 209 件 (BooBass_Eng) | 子 issue (本 run で起票) |
 | 関数名で出る 2 件 (`CreatePlugInstance` / `entry_point`) の `function_<VA>` への正規化 | 2 件 | 子 issue (本 run で起票) |
 | 回復 209 関数の後段 (emcc 型エラー) の確認。 E3 が先に止めるため未確認 | 209 件 | #1301 (PLG-G2-13) |
+
+## D. Morphine (23944) 通常経路の実測 (f3ffd7ba、#1487)
+
+- 測定 commit: **f3ffd7ba**。 その後の `tools/plugins` 差分 (`git diff f3ffd7ba HEAD -- tools/plugins ':!tools/plugins/synth/REPORT_APPENDIX.md'`) は **5 files, +78 / -2** (main 取り込み #1486 由来と #1222 由来):
+  - `lift/lift_ranges.sh` (+1 行 env 分岐): `PLUG_NO_STATIC_DETECT` 未設定時は RetDec 引数が従来と同一 (`${PLUG_NO_STATIC_DETECT:+...}` が空展開)。測定は既定の環境変数で実行したため経路は不変。
+  - `framework/hostshim/hs_disp_emu.py` (+6 / -1): `HS_DISP_RET_ARG=1` のときだけ挙動が変わる。測定では未設定。
+  - `synth/missing_define_classify.py` (新規 30 行) / `reverb_delay/REPORT_APPENDIX.md` (+10) / `framework/hostshim/REPORT_DISPATCHER.md` (+29): 測定経路から呼ばれない (lift 本体ではない)。
+  - 上記により f3ffd7ba 以降のコード経路は変わっていない。測定値はそのまま f3ffd7ba の値として成立する。
+- 測定コマンド: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP HLL_CAP=100000000 bash tools/plugins/synth/cpp_lift.sh 23944 2400`。
+  `HLL_CAP` を 1e8 秒にして HLL 段の kill 判定が発火しないようにした (= kill 無しの通常経路)。`timeout 2280` で包んで実行。
+- 所要時間: 壁時計 14 分 27 秒 (23:03:30 開始 → 23:17:57 終了、`date` 実測)。lift 秒 **854** (summary.csv)。
+- RetDec の段別内訳 (IR 出力 / HLL 段 / finalization の秒数) は **未確認**。測定時の `e.retdec.log` は残っておらず (作業ツリー・`$RUNNER_TEMP`・`$ARTIFACTS_DIR` のいずれにも無い)、段別の秒数は記載しない。
+- load: 実行終了時 `1.07 1.02 0.74`、測定後 `0.71 0.93 0.72`。
+- 結果 (summary.csv): `23944,3050,0,3321,0,52,24,0,0,0,854,1,61,0,271,3320,0`
+
+| 項目 | 通常経路 (f3ffd7ba) | §A 再開経路 (604e900f) |
+|---|--:|--:|
+| lift_rc | 0 | 0 |
+| defines | 3,321 | 3,321 |
+| 未実装 helper | 52 | 121 |
+| i256 trap | 24 | 24 |
+| f80 関数 | 0 | 0 |
+| `emcc_c_rc` | **0** | 0 |
+| lift 秒 | 854 | 407 |
+| `hll_killed_s` | **0** | 354 |
+
+- `emcc -c` は通過 (`emcc.log` 0 バイト、`first_errors.txt` 空)。未実装 helper は §A と不一致 (52 vs 121)。差の原因は `m11_simd2.py` の変更 (711d9ece・f2bbad10、#1163。VEX 3 オペランド形の SSE 委譲、cvt/rep 系の対応追加) で、§A (604e900f) の時点より未実装が減ったことによる。コードの差分からの説明であり、旧 commit での再測定はしていない。それ以外の列 (defines / i256 trap / f80 / emcc_c_rc / lift 秒を除く) は §A の再開経路と一致した。`.ll` 本体の差分比較はしていない。
+- 出力: `tools/plugins/work/synth/cpp23944/` (gitignore)。

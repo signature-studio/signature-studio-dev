@@ -86,6 +86,11 @@ for (let i = 0; i < 942; i++) {
 if (process.env.M11_SURVEY_UNITS) fs.writeFileSync(process.env.M11_SURVEY_UNITS, JSON.stringify(perUnit));
 if (process.env.M11_SURVEY_DETAIL) fs.writeFileSync(process.env.M11_SURVEY_DETAIL, JSON.stringify(detail));
 if (process.env.M11_SURVEY_COST) fs.writeFileSync(process.env.M11_SURVEY_COST, JSON.stringify(perUnitCost));
+if (process.env.M11_DEST_REC_OUT && process.env.M11_INSTR_413060 === '1') {
+  const n = Number(mod._m11_dest_obs_n()), recs = [];
+  for (let k = 0; k < Math.min(n, 512); k++) recs.push({ k, st: mod._m11_dest_rec(k, 0), len: mod._m11_dest_rec(k, 1), rc: mod._m11_dest_rec(k, 2), h: (mod._m11_dest_rec(k, 3) >>> 0).toString(16).padStart(8, '0') + (mod._m11_dest_rec(k, 4) >>> 0).toString(16).padStart(8, '0') });
+  fs.writeFileSync(process.env.M11_DEST_REC_OUT, JSON.stringify(recs));
+}
 const topBy = (k) => perUnitCost.filter((c) => c[k] > 0).sort((a, b) => b[k] - a[k]).slice(0, 8).map((c) => c.va + ':' + c.i + ':' + c[k]);
 const ff = {};
 for (const l of errs) { const m = /unresolved function call: (\S+)/.exec(l); if (m) ff[m[1]] = (ff[m[1]] || 0) + 1; }

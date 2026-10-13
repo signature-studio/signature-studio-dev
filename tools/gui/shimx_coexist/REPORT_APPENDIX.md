@@ -32,3 +32,31 @@
 1. FL の `SHBrowseForFolderA/W` と `IFileDialog` の実呼出を `SHIMX_TRACE` で確認し、結果を本付録に追記する (#1179 で継続)。
 2. 呼出ありと確定した場合: Web の対応 (File System Access directory picker) を実装し、node + mock 検査を `tools/gui/test` に追加する (#1179 で継続)。
 3. 呼出なしと確定した場合: 未対応を fail-fast で明示する (`shimx` の登録と strict abort) し、`IMPORTS.md` を再生成する (#1179 で継続)。
+
+## 5. 再測定 (work-m11 展開・trace variant 再 build、run 2026-10-13)
+
+検証起点: `origin/main` `d040c7f8` (worktree `ws-1179`)。コード差分 0 (`tools/m11` / `tools/shimx` は読取のみ)。生成物は `tools/m11/work/` と `work/` (gitignore 対象)。
+
+| 項目 | 結果 |
+|---|---|
+| 素材 | `work-m11.tar.zst` を worktree ルートへ `tar --zstd -xf` で展開 (2.2 s)。`boot_final3.ll` を含む。 |
+| trace variant 再 build | `bash tools/m11/shimx_link/build.sh --trace --soft` rc=0 / 12.1 s / `signature mismatch=1 undefined symbol=0 duplicate=0`。`FS` を export した `.cjs` を生成。 |
+| 保存済み `.cjs` での ftrace 取得 | rc=1 `Aborted('FS' was not exported)`。保存物は `FS` 未 export の旧版。 |
+| 再 build 版の実 boot (ftrace) | `SHIMX_TRACE_FILE=/tmp/ftrace.jsonl node tools/m11/shimx_link/run_trace.mjs ...` rc=0。`boot_stage=1` `units_run=17` `dllmain_done=false` `threw="memory access out of bounds"` `icall_ok=24` `icall_miss=1`。trace `total_calls=97` `distinct_called=28` `dropped=0`。`m11_sx_trace_soft.ftrace.jsonl` は **0 行**。 |
+| 注意 (手順) | `SHIMX_TRACE_FILE` は MEMFS 上のパスを指定する (例 `/tmp/ftrace.jsonl`)。ホストパス (`$PWD/...`) を渡すと `fopen` が失敗し、0 行のまま `ftrace_error: No such file or directory` になる。 |
+| IR の宣言 (`boot_final3.ll`) | `SHBrowseForFolderA/W` の宣言 **0**。`SHGetPathFromIDList` / `SHGetSpecialFolderPath` / `SHILCreateFromPath` / `SHCreateItemFromParsingName` / `GetOpenFileNameW` も **0**。`CoCreateInstance` は宣言 1 件・呼出 2 件 (`function_4690c0` 経由。呼出元は `function_c53c60` と `m11_tr_function_4690c0`)。 |
+| trace で実際に呼ばれた API (run.json) | 26 種。GetCommandLineW・GetLocaleInfoW・GetProcAddress・LoadStringW・GetModuleFileNameW 等。file API と SHBrowseForFolder / IFileDialog 系は 0。 |
+
+### 5-1. 判定
+
+- **実 boot ではフォルダ選択は呼ばれていない**。ただし、呼ばれていないと言えるのは unit 17 で `memory access out of bounds` により止まるまでの範囲に限る。
+- 止まった位置より後の UI 経路 (設定画面など) で呼ばれるかは、この実行では分からない。`REPORT_N1050.md` §4 のとおり、unit 17〜18 付近の trap (`function_8c5eb0` が D19 と同一関数かは未確認) が先に解消されない限り、そこへ到達しない。
+- IR に `SHBrowseForFolder*` の宣言が無いことは、FL の PE が静的 import しているという §1 の事実と食い違う。`boot_final3.ll` は lift 対象の範囲に限られるため、宣言が無いことを「呼ばれない」の根拠にはしない。
+- 結論: 受入条件 1 (実呼出の確認) は**未達**。方針決定 (受入条件 2) と gui mock 検査 (受入条件 3) は、この結論に依存するため未着手。
+
+### 5-2. 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| boot が unit 17〜18 付近で `memory access out of bounds` により停止する問題の解消 | 停止より後の UI 経路 (フォルダ選択の呼出位置) に到達できず、呼出有無が確定しない | #1050 (既存、`REPORT_N1050.md` §4) |
+| `SHBrowseForFolder*` / `GetOpenFileNameW` 等の IR 宣言が無いことの原因 (lift の import 解決範囲) | IR 上の宣言だけでは呼出を判定できない | #1179 で継続 (lift 側の確認が必要な場合は子 issue) |
