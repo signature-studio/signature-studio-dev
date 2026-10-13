@@ -45,6 +45,9 @@ BYTES = [
     (0x43ba70, 0xd0, bytes.fromhex('83f87b'), 1, 'GetLastError==0x7b (INVALID_NAME) は false を返す'),
     (0x43ba70, 0x30, bytes.fromhex('83f8ff'), 1, 'GetFileAttributesW == INVALID_FILE_ATTRIBUTES (-1) の分岐'),
     (0x758200, 0x50, bytes.fromhex('8b80b8000000a904000000'), 1, '呼出元フレーム [rbp+0xb8] (0x758330 の第 6 引数 flags) の bit2 test (存在確認の省略)'),
+    (0x9de400, 0x1a0, bytes.fromhex('c744242000000000'), 2, 'vtbl+0x30 の第 5 引数 flags = 0 を 2 回 (.moe / .mo)。bit2 (0x4) は立たない (#658)'),
+    (0x75b750, 0x80, bytes.fromhex('8b85b000000089442428'), 1, '第 5 引数 flags ([rbp+0xb0]) を 0x758330 の第 6 引数 ([rsp+0x28]) へ転送 (#658)'),
+    (0x758330, 0x200, bytes.fromhex('4889e9488b95a8000000'), 1, '0x758200 の this = 0x758330 のフレーム (mov rcx, rbp) で [this+0xb8] = flags を読ませる (#658)'),
 ]
 
 # (説明, 書込命令 VA, opcode 長, 読出命令 VA, opcode 長): 0x9db5b0 が 4 番目に作る登録集合の id (mov [rip+x], eax) を、
@@ -147,6 +150,8 @@ def main(argv):
     muts.append(('機械語 (出現回数)', {**spec, 'bytes': [(0x9de400, 0x1a0, bytes.fromhex('ff5330'), 3, 'x')]}))
     muts.append(('グローバル対応', {**spec, 'globals': [('x', 0x9db66a, 2, 0x9dc7b4, 3)]}))
     muts.append(('機械語 (別 level)', {**spec, 'bytes': [(0x9db5b0, 0x80, bytes.fromhex('b203'), 1, 'x')]}))
+    muts.append(('機械語 (bit2 連鎖: flags 0 固定)', {**spec, 'bytes': [(0x9de400, 0x1a0, bytes.fromhex('c744242000000000'), 3, 'x')]}))
+    muts.append(('機械語 (bit2 連鎖: 第 5 引数の転送)', {**spec, 'bytes': [(0x75b750, 0x80, bytes.fromhex('8b85b000000089442429'), 1, 'x')]}))
     missed = 0
     for name, sp in muts:
         _ok, f = run(pe, sp)

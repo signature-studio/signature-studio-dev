@@ -12,5 +12,5 @@
     "outDir": "build/js",
     "sourceMap": false
   },
-  "include": ["../../src/runtime/gui.ts", "../../src/runtime/gui_worker.ts", "../../src/runtime/gui_proto.ts"]
+  "include": ["../../src/runtime/gui.ts", "../../src/runtime/gui_worker.ts", "../../src/runtime/gui_proto.ts", "../../src/runtime/gui_hostcall.ts", "../../src/runtime/gui_fonts.ts"]
 }
