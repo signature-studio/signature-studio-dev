@@ -9,10 +9,10 @@
 
 ## 1. 結論と実測
 
-検証起点: コード commit `6a05082` (本 REPORT の commit は docs と `results/` の再生成のみ)。環境: runner 4 vCPU, node v22.23.3, emcc (`[EMSDK]`)、素材 `work-m11` + `fl-win64`、`python3` の pefile・capstone、`x86_64-w64-mingw32-gcc` (`apt-mingw`)。
+検証起点: コード commit `27a9171` (main `035274b` を merge。main 側の `tools/gui` / `tools/m11` 変更を含む)、`env.sh` の説明コメントのみを足した `498d1d3` で再測定。環境: runner 4 vCPU, node v22.23.3, emcc (`[EMSDK]`)、素材 `work-m11` + `fl-win64`、`python3` の pefile・capstone、`x86_64-w64-mingw32-gcc` (`apt-mingw`)。
 IR は素材 `work-m11` の `boot_final.ll` / `boot_final3.ll` を `tools/gui/work/flengine/tree/` に複製し、複製側で `m11_build.sh` (qstore・alloca・post) を実行してから測った。`m11_gen_ir2.sh` は使っていない (e2e は IR を再生成しない。sha256 は §6)。
 
-| 項目 | 実測 (6a05082, 3 回) | 定義 / 分母 |
+| 項目 | 実測 (498d1d3, 3 回) | 定義 / 分母 |
 |---|---|---|
 | リンク | wasm-ld signature mismatch **0** / undefined **0** / duplicate **0** (ff・soft 両ビルド、3 回とも) | `build.sh` のリンクログ `[gf] OK:` 行 |
 | GUI declare ↔ adapter | IR の GUI declare **177** = adapter **177** (impl 158 / stub 19)、c=0 d=0 | `integ/gen_adapt.py`、`build_ff.log` |
@@ -21,10 +21,10 @@ IR は素材 `work-m11` の `boot_final.ll` / `boot_final3.ll` を `tools/gui/wo
 | fail-fast ビルドの survey | ok 864 / noproc 1 / miss 46 / trap 31。fail-fast で止まった unit は 1 (`LoadImageW`) | `survey_ff.json` |
 | 最初の GUI 呼出 (自然起動) | **`LoadStringW` ×4 → shim (IMPL, P1)**。DllMain attach の 22 unit 内 | `boot.json` の GUI-REACH |
 | survey で shim に到達した API | **23 種** (IMPL 22 / STUB 1)。3 回とも同一集合。§3 | `survey_soft.json` の reach |
-| `LoadStringW` の通算回数 | 8,365,791 回 (survey、run 3 の 1 回のみ記録)。旧 REPORT の 48M 回は clobber 復元前の値 | `survey_soft.json` |
+| `LoadStringW` の通算回数 | 8,365,788 回 (survey、最終 run の `survey_soft.json`)。旧 REPORT の 48M 回は clobber 復元前の値 | `survey_soft.json` |
 | `RegisterClass*` / `CreateWindowEx*` の自然到達 | **0** (起動・survey とも) | judge の INFO 行 |
 | 指向呼出 (§4) | `RegisterClassW` ×2 成功 (atom 0xC001 / 0xC002)、`TApplication` 窓 hwnd `0x210000e` (< 2^31)、WNDPROC 4 引数が `m11_icall` 経由 | `probe.json` |
-| 親の受入条件 2 `bash tools/gui/e2e.sh` | **ALL PASS / rc 0 / 99 秒** (1 回、6a05082)。途中の rc 127 は worktree に `node_modules` が無いため (`pnpm install --frozen-lockfile` で解消) | `tools/gui/e2e.sh` の出力 |
+| 親の受入条件 2 `bash tools/gui/e2e.sh` | **ALL PASS / rc 0 / 202 秒** (1 回、498d1d3 の作業ツリー。`pnpm install --frozen-lockfile` 後)。内訳: bpp / text / native_run / simd / e2e (EXACT 0 px) / present ALL PASS | `tools/gui/e2e.sh` の出力 |
 
 ## 2. 変更と成果物
 
@@ -64,7 +64,7 @@ IR は素材 `work-m11` の `boot_final.ll` / `boot_final3.ll` を `tools/gui/wo
 | 指摘 | 対応 |
 |---|---|
 | S1 FAIL (soft 828 vs baseline 864) | 原因: `run.mjs --survey` が `m11_survey.mjs` の隔離プロトコル (unit ごとの VA 予算 #513・clobber 時の image 復元) を持たず、clobber が起きた後の unit が連鎖して trap していた。プロトコルを移植して一致 (**予算と clobber 復元のどちらが効いたかは未分離**)。judge の S1 に `clobber` も追加 |
-| 検証起点・数値の再測定 | 検証起点を `6a05082` に更新し、全数値を HEAD で 3 回測定 (§6) |
+| 検証起点・数値の再測定 | 検証起点を `6a05082` に更新し、全数値を HEAD で 3 回測定 (§6)。その後 main 取り込み (`27a9171`) で再測定し §1・§6 を更新 |
 | `EnumFontFamiliesExW` の記述 | main の GUI-9 で実装済み。本 REPORT §3 / §7 を実到達結果で書き直し (STUB は `LoadImageW`) |
 | `apt-mingw` が `oc_artifacts` に無い | PR 本文に `apt-mingw` を追加。前提は §6 |
 | m11 `work/` の in-place 書換え | `e2e.sh` step 0 を複製 (`tools/gui/work/flengine/tree/`) 側で実行。本体 `tools/m11` は読取のみ |
@@ -86,7 +86,7 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 - **IMPORTS.md の P 分類への入力** (`IMPORTS.md` §4 に自動出力): `LoadImageW` は stub のまま実到達 → **実装必須へ昇格**。`CreatePalette` / `MessageBoxA` は P2 だが実到達 → P1 以上へ昇格候補。
   P0 の未到達は現 m11 到達段が浅いため (SendMessage / PostMessage / BitBlt / SelectObject ほか) 「不要」の根拠にはならない。
 - `MessageBoxA` は Delphi RTL の `Runtime error 0` ダイアログ (unit の Halt0 経路)。shim は host 無しなら即 IDOK。
-- `LoadStringW` は survey 通算 8,365,791 回。1 unit が資源 ID を回している疑い (shim は資源供給 hook 未接続で常に 0 を返す)。**未調査** (§7)。
+- `LoadStringW` は survey 通算 8,365,788 回。1 unit が資源 ID を回している疑い (shim は資源供給 hook 未接続で常に 0 を返す)。**未調査** (§7)。
 - icall hook 経由の呼出: survey (soft) で 2 回 (`gui_icall_calls`。`EnumDisplayMonitors` の callback と推定)。`m11_icall` miss は soft survey で 48 (baseline 側は未計数)。
 
 ## 4. 指向呼出 (`probe.mjs`; 自然到達ではない)
@@ -118,18 +118,19 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 
 ## 6. 検証
 
-実行: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/gui/flengine/e2e.sh` (HEAD `6a05082`, 4 vCPU, 3 回直列)。
+実行: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/gui/flengine/e2e.sh` (HEAD `498d1d3`, 4 vCPU, 3 回直列)。
 前提: 素材 `work-m11` (`tools/m11/work/` に展開。e2e は読取のみで、複製 `tools/gui/work/flengine/tree/` 側で使う)、`fl-win64` (`$RUNNER_TEMP/fl-win64`)、`x86_64-w64-mingw32-gcc` (`apt-mingw` = `gcc-mingw-w64-x86-64`)、`python3` に pefile・capstone (`python3 -m pip install pefile capstone`。`pip` 単体は別の Python を指すことがあるため `python3 -m pip` を使う)。
 
 | 回 | rc | 所要 (wall) | load 開始 → 終了 | judge | native selftest (`tools/gui/test`) | ネガコン |
 |---|---|---|---|---|---|---|
-| 1 | 0 | 138 s | 0.29 0.42 0.23 → 1.15 0.72 0.37 | 12/12 PASS | 431 passed / 0 failed | 5/5 期待どおり FAIL |
-| 2 | 0 | 129 s | 0.97 0.70 0.36 → 1.17 0.89 0.48 | 12/12 PASS | 431 passed / 0 failed | 5/5 期待どおり FAIL |
-| 3 | 0 | 130 s | 1.17 0.89 0.48 → 1.31 1.04 0.60 | 12/12 PASS | 431 passed / 0 failed | 5/5 期待どおり FAIL |
+| 1 | 0 | 135 s | 2.14 1.53 0.88 → 1.14 1.37 0.92 | 12/12 PASS | 433 passed / 0 failed | 5/5 期待どおり FAIL |
+| 2 | 0 | 134 s | 1.14 1.37 0.92 → 1.09 1.27 0.95 | 12/12 PASS | 433 passed / 0 failed | 5/5 期待どおり FAIL |
+| 3 | 0 | 133 s | 1.09 1.27 0.95 → 1.05 1.20 0.97 | 12/12 PASS | 433 passed / 0 failed | 5/5 期待どおり FAIL |
 
-- min–max: 所要 129–138 s。S1 `864/1/46/31/0` (3/3 一致)。R2 reached 23 (3/3)。B1 units_run 22 (3/3)。`results/*.json` は 3 回で同一の gate 結果、survey の一部数値 (`LoadStringW` の回数など) は run 3 の結果のみ記録。
+- min–max: 所要 133–135 s。S1 `864/1/46/31/0` (3/3 一致)。R2 reached 23 (3/3)。B1 units_run 22 (3/3)。P4 hwnd `0x210000e` (3/3)。`results/*.json` は 3 回で同一の gate 結果 (数値は実行ごとに微変動する)。
+- 旧 HEAD `6a05082` の 3 回 (129–138 s、selftest 431) は `27a9171` で main の GUI 追加テスト (selftest 433) を含むため、直接比較しない。
 - IR provenance (`results/ir_sha256.txt`): 素材 `boot_final.ll` `69c774de…`・`boot_final3.ll` `010451ad…`。m11_build.sh 後 (qstore 段: fixed_stores 279・alloca 段: 拡幅 alloca 2,361 個) `boot_final.ll` `30a4e00d…`・`boot_final3.ll` `4f0a0cc6…` (全文は results/ir_sha256.txt)。
-- 親 `bash tools/gui/e2e.sh` (受入条件 2): ALL PASS / rc 0 / 99 秒 (1 回)。内訳は native lift・bpp・FreeType・SIMD・Chrome E2E・present・sigprobe の各段が PASS。
+- 親 `bash tools/gui/e2e.sh` (受入条件 2): ALL PASS / rc 0 / 202 秒 (1 回、load 2.69 → 2.43)。内訳は native lift・bpp・FreeType・SIMD・Chrome E2E・present・sigprobe の各段が PASS。
 
 ネガティブコントロール (全て「期待した FAIL 行が出る」まで検査。judge のクラッシュを FAIL 確認と誤認しない):
 
@@ -157,4 +158,4 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 | 受入「`__pe_image` を m11_data_gen 方式の data 実体化へ統合」(スコープ 3) | 未着手 (本 PR は m11 の image 敷設をそのまま利用) | PM 起票依頼 (新規子チケット) |
 | 実ブラウザ host 結線 (`GuiHost.attach`・FL ワーカ化・UI スレッドのスタック量 §2-2 #8) | node の headless host のみ。描画 (#32) は別 | #32 / #121 |
 | `tools/m11/m11_e2e.sh` と `m11_gen_ir2.sh` が PE パスを `[ANALYSIS-DIR]` の固定既定値で持つ (`[WIN64]` 経由にしていない) | runner では ldfix が黙ってスキップされ数値が変わる。本 PR の測定は `gen_ir2` を使わず素材 IR で行う | m11 に `FL_WIN64_DIR` 参照を提案 (#132 の未解決と同件。PM 起票依頼) |
-| 前回 run で観測した selftest (ASAN) の `heap-use-after-free` (`gui_headless` の描画スレッドと `surf_free`。前 run で約 2/8 で再現) | 本 HEAD の 3 回では再現せず (431/0 ×3)。フレークは未解消 | PM 起票依頼 (gui_headless の描画と surf_free の排他) |
+| 前回 run で観測した selftest (ASAN) の `heap-use-after-free` (`gui_headless` の描画スレッドと `surf_free`。前 run で約 2/8 で再現) | 本 HEAD の 3 回では再現せず (433/0 ×3)。main 側の #489 系 (headless surface UAF) の merge を含む HEAD での結果。再現率の定量確認は未実施 | PM 起票依頼 (gui_headless の描画と surf_free の排他) |

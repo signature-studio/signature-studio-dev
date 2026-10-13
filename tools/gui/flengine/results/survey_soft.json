@@ -13,8 +13,8 @@
   "trap": 31,
   "clobber": 0,
   "kinds": {
-   "halt0->longjmp": 7,
-   "memory access out of bounds": 23,
+   "halt0->longjmp": 6,
+   "memory access out of bounds": 24,
    "gui_failfast": 1
   },
   "failfast_units": {
@@ -25,7 +25,7 @@
   {
    "order": 1,
    "name": "LoadStringW",
-   "calls": 8365791,
+   "calls": 8365788,
    "kind": "IMPL",
    "prio": "1"
   },
@@ -221,7 +221,7 @@
   "FastMM_GetMem(407a50)": 4184351,
   "FastMM_FreeMem(407e20)": 34,
   "InitUnits": 0,
-  "Halt0": 8
+  "Halt0": 7
  },
  "va_calls": 225,
  "va_bytes": 556138496
