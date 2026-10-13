@@ -98,11 +98,11 @@
 | 確定 closure の lift / build 最初の失敗点 | 受入 2 未達 | #850 |
 | 人手の検収 (lift 結果の bit-exact 化は本 issue の範囲外) | — | — |
 
-## 5. #848 (this 型の 1 段追跡) の試行結果 (HEAD `c36afb68`, 4 vCPU, 各 1 回)
+## 5. #848 (this 型の 1 段追跡) の試行結果 (再測定 HEAD `54fc6273`, 4 vCPU, 各 1 回)
 
-- 計測コードは HEAD `c36afb68`。`scripts/` は `0760e367` と同一で、差分は `vtable_probe_this.py` のみ (`git diff 0760e367 c36afb68 -- scripts` で確認)。
-- 表の値は前回 run の実測。素材 `plugins-kilohearts` を `KH_SRC` で展開 → `extract_installer.sh` (win のみ) → `rtti_walk.py` (6,307 class) → `callgraph.py` (120,856 関数, 4 round) → `vtable_closure.py` の Gain 行 (before 160 / after 555 nogui・1,995 all) を §2 と照合したと報告されている。
-- **本 fix run では `plugins-kilohearts` が `$ARTIFACTS_DIR` に無く、表の再実行は未実施。** 再現は未確認。
+- 測定コード (`vtable_probe_this.py`) は `c36afb68` で追加した。その後 `d8a873a9` は文書のみの変更で、`main` を merge した HEAD (`54fc6273`) では `vtable_closure.py` が `main` 側で更新されている。
+- 表の値は `54fc6273` (merge 後の `scripts/`) で再測定した。素材 `plugins-kilohearts` の `Kilohearts Offline Installer.zip` を `tar --zstd -xf` で展開し、Windows 側のみ `unzip` → `rtti_walk.py` (6,307 class) → `callgraph.py` (120,856 関数, 4 round) → `vtable_closure.py` / `vtable_probe_this.py` の順で実行した。
+- 再測定の結果: Gain before 160 / vtable_closure nogui 555 / all 1,995 / probe narrow 1,994 (vtable sites narrow 83・wide 1,764)。いずれも前回の報告値と一致。
 
 試行は `scripts/vtable_probe_this.py` (1 行 JSON を出力)。規則: 呼び出し元 f の所有 class が ns 内で一意に決まれば、
 vtable call の候補をその class の同 slot に限る (narrow)。一意に決まらなければ従来どおり ns 全 class の同 slot (wide)。
