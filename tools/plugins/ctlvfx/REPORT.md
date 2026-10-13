@@ -8,7 +8,7 @@
   本 dir に複製して独立させた (`env.sh` `mk_blockmap.py` `engine_*` は複製、他は 28 本向けに書き直し)。 #506 の reviewer 指摘 2 件 (判定が不合格でも exit 0 /
   判定自体のネガコン無し) は最初から避けた (§5)
 - 既知類型との関係 (`docs/DEFECTS.md`): 差分試験を未実施のため**確認できていない**。 関係しうるのは D15 (stage-0 のメモリ間接 call 欠落): 本 28 本の
-  間接 call site は vcall 2018 + ptr 299 (§1)。 §7 の 1 件 (rep stosb helper 未実装) は loud な link 時エラーで silent miscompile ではない
+  間接 call site は vcall 2018 + ptr 299 (§1)。 §7 の 1 件 (rep stosb helper 未実装) は `m11_simd2.py` が本体の無いスタブを生成するため、オブジェクト間のシンボルは解決され (wasm の完全 link は未検証)、実行時は何もしない (§7 H1)。 既知類型との対応は未確認
 
 ## 0. 結論 (先出し)
 
@@ -16,7 +16,7 @@
    Eff_Render / 各 override 単位で native と wasm を比べる harness も repo に無い。 GUI 5 本 (HTML NoteBook / NoteBook / NoteBook 2 / Big Clock / Dashboard) は
    GUI shim #10 にも依存する。 → PR は **`Refs #205`** (Closes しない)。
 2. **手順 1 (固有閉包の lift) は 28 本中 27 本が gate を通り、Dashboard 1 本が不合格。** 27 本は RetDec+pass 鎖が完走 (lift_rc 0)、`emcc -c` 通過、`x86_fp80` 関数 0、
-   未実装 helper 宣言 0。 Dashboard は lift_rc 0・`emcc -c` 通過だが **`__asm_rep_stosb_memset(ptr,i8,i64)` が未実装で宣言のみ残る** (定義が供給されなければ link で未解決になる。 §6・§7)。
+   未実装 helper 宣言 0。 Dashboard は lift_rc 0・`emcc -c` 通過だが **`__asm_rep_stosb_memset(ptr,i8,i64)` が未実装** (`lift/passes/m11_simd2.py:285` が `p_simd.c` に本体の無いスタブを生成する。 オブジェクト間のシンボルは解決される (wasm の完全 link は未検証)。 スタブは `m11_simd_unimpl_once` で stderr に 1 行出して return するだけで、memset は実行されない。 §6・§7)。
    `emcc -c` 通過は宣言だけで通るため、`declares_unimpl` を判定に含めない gate ではこの 1 本を見逃す。
    このため `ctlvfx_e2e.sh` は **意図的に exit 1** (28/28 になるまで赤)。 閉包合計 **1822 関数 / 654,352 B** (28 本、`PLUGIN_MATRIX.json` の `lift` 欄と 28 本 × 6 項目すべて一致)。
 3. **規模は 2 極**: Dashboard (417 関数 / 128,061 B) と Fruity Envelope Controller (423 / 133,907 B) の 2 本で 840 関数 / 261,968 B (全体の 関数 46.1% / バイト 40.0%)。 残り 26 本は 7〜94 関数 / 1,863〜43,660 B。
@@ -165,7 +165,7 @@ RetDec が 1 range を複数 define に切ったもので、range 開始 VA の 
 | #506 の指摘 | 本 dir の対応 |
 |---|---|
 | 判定が不合格でも exit 0 (`bad` を表示するだけ、`OK` 行が無条件) | 判定を `judge.py <status.csv>` に切り出し、不合格 1 件で exit 1 (入力不能は exit 2)。 `ctlvfx_e2e.sh` は gate 4 本 (judge / closure_defs / matrix_check / ids_crosscheck) を全部走らせてから、1 本でも不合格なら exit 1 で `[ctlvfx_e2e] FAIL: <gate 名>` を出し、`OK` 行は全合格時のみ |
-| 判定の NC が無い | `ctlvfx_nega.sh`: judge 15 件・e2e の判定部 2 件・matrix_check 4 件・ids_crosscheck 3 件・closure_defs 4 件・lift 本体 4 件 (下表) |
+| 判定の NC が無い | `ctlvfx_nega.sh`: judge 15 件・e2e の判定部 2 件・matrix_check 5 件・ids_crosscheck 3 件・closure_defs 4 件・lift 本体 4 件 (対照を含む。 合計 33。 下表) |
 | `declares_unimpl` が判定外 (「未実装 helper 0」の主張と不一致) | 判定に含めた (`== 0`)。 `-1` (simd.log 無し) も不合格。 実測で Dashboard の 1 件を検出 |
 | (追加) 古い `status.csv` の行で通る | e2e は今回の実行で追記された行だけを `work/ctlvfx/status.csv` にして判定する。 judge は 28 本すべての行を要求し、無い本は不合格 |
 
@@ -215,7 +215,7 @@ block が PLUGIN_MATRIX の win モジュールに在り、Tier が #205 本文�
 |---|---|---|
 | 差分試験 bit-exact (出口条件 3)。 harness が無く P0a/P0b/P0c 未完。 Eff_Render 無しの 19 本はイベント列単位の harness も要る | #205 を閉じられない | #195 / #196 / #197 の完了後に #205 を再開 (Closes はその時)。 harness は #506 で依頼済みの「[PLG-F3a] native ⟷ wasm 差分 harness」にイベント単位の版を含める (PM に起票依頼) |
 | Render test .flp の E2E (出口条件 4) と GUI 5 本 | 同上 | FLEngine 統合・GUI shim #10 待ち。 親 #14 / #205 |
-| **Dashboard の `__asm_rep_stosb_memset` 未実装 (gate 不合格 1 本)**。 engine 2 本にも stosb / stosw / movsb 等 | Dashboard が 28/28 の阻害要因。 link で未解決 | 新規子チケットを PM に起票依頼: 「[PLG-F8a] plugin lift 鎖の rep stos/movs (byte/word/dword) helper 実装」(`m11_simd2.py` 移植か `fw_rep.py` 経由。 §7 H1)。 28/28 後に `ctlvfx_e2e.sh` が exit 0 になる |
+| **Dashboard の `__asm_rep_stosb_memset` 未実装 (gate 不合格 1 本)**。 engine 2 本にも stosb / stosw / movsb 等 | Dashboard が 28/28 の阻害要因。 スタブが生成され (シンボルは解決)、実行時は memset が no-op (stderr のみ) | 新規子チケットを PM に起票依頼: 「[PLG-F8a] plugin lift 鎖の rep stos/movs (byte/word/dword) helper 実装」(`m11_simd2.py` 移植か `fw_rep.py` 経由。 §7 H1)。 28/28 後に `ctlvfx_e2e.sh` が exit 0 になる |
 | `hs_ids.json` に無い Dispatcher ID 25 / 84 / 93 / 102 (Dashboard / VFX Envelope / Envelope Controller / VFX Script、計 7 site) | P0b の応答表が不足 | #196 にコメント (host 呼出か別オブジェクトの slot0 呼出かの判別も) |
 | host slot 0x28 / 0x30 (Voice 系 10 本)・0x98 (9 本)・動的 ID 7 site の意味 | P0b の fail-soft 範囲を超える可能性 | #196 作業 5 (全 case 解析) に追記 |
 | VFX Script の IAT 経由 Win32 呼出 79 site (どの API かは未集計) | Win32 shim の範囲 | #196 にコメント (API 内訳の集計は未実施) |
@@ -228,11 +228,11 @@ block が PLUGIN_MATRIX の win モジュールに在り、Tier が #205 本文�
 | `nsis_names.py` が Actions 上で動かない (`block_manifest.json` 不在) | inventory の再現性 | `mk_blockmap.py` で回避済み。 `docs/WORKFLOW.md` §11 への追記は PM 判断 (#506 と共通) |
 | `docs/DOC_MAP.md` の REPORT 索引に本書が未掲載 | 索引漏れ | PM が追記 |
 
-## 7. DEFECTS.md 行案 (候補・loud な欠陥。 追加の可否は PM 判断)
+## 7. DEFECTS.md 行案 (候補・silent な欠落 (no-op スタブ)。 追加の可否は PM 判断)
 
 | 類型 | 症状 | 観測 | 検出信号 | 修復 |
 |---|---|---|---|---|
-| H1 `rep stos/movs` の byte/word/dword 版 helper が宣言のみ | `declare void @__asm_rep_stosb_memset(ptr,i8,i64)` が final.ll に残り、`emcc -c` は通るが link で未解決 | Dashboard 1 件 (閉包内 `call` 1 site)、engine 2 本にも stosb / stosw / movsb (Tuner は stosd も) | `p.simd.log` の `unimplemented N` > 0 (`declares_unimpl`)。 **`emcc -c` rc=0 では見えない** | `m11_simd2.py` は `rep_stosq_memset` / `rep_movsq_memcpy` のみ実装 (`final.ll` の宣言は残る)。 framework 側の `fw_rep.py` + `fw_rt.c` (`fw_rep_stosb`) が同等を持つ。 plugin 鎖へ移植するか fw_rep を通す。 到達性の探針 (`probe_rep.sh`): Dashboard の final.ll に `fw_rep.py` を当てると `@__asm_rep_` の出現 8 → 0、`@fw_rep_` 0 → 8 (6 call site を正規化、declare 2 追加)、`emcc -c` rc 0。 意味の一致と link は未検証 |
+| H1 `rep stos/movs` の byte/word/dword 版 helper が宣言のみ | `declare void @__asm_rep_stosb_memset(ptr,i8,i64)` が final.ll に残る。 `m11_simd2.py:285` が `p_simd.c` に本体の無いスタブ (`m11_simd_unimpl_once(...)` して return) を生成するため、`emcc -c` は通り、シンボルはオブジェクト間で解決される (`llvm-nm` で `p.o` は `U`、`simd.o` は `T`。 wasm の完全 link と実行は未実施)。 実行時は memset が行われず、出るのは stderr の `[m11][simd-unimpl]` のみ | Dashboard 1 件 (閉包内 `call` 1 site)、engine 2 本にも stosb / stosw / movsb (Tuner は stosd も) | `p.simd.log` の `unimplemented N` > 0 (`declares_unimpl`)、実行時 stderr の `[m11][simd-unimpl]`。 **`emcc -c` rc=0 と link の成否では見えない** | `m11_simd2.py` は `rep_stosq_memset` / `rep_movsq_memcpy` のみ実装 (`final.ll` の宣言は残る)。 framework 側の `fw_rep.py` + `fw_rt.c` (`fw_rep_stosb`) が同等を持つ。 plugin 鎖へ移植するか fw_rep を通す。 到達性の探針 (`probe_rep.sh`): Dashboard の final.ll に `fw_rep.py` を当てると `@__asm_rep_` の出現 8 → 0、`@fw_rep_` 0 → 8 (6 call site を正規化、declare 2 追加)、`emcc -c` rc 0。 意味の一致と link は未検証 |
 | E1 / E2 (#506 §7 と同一類型) | engine で `icmp ptr` に i64 混在 / SSA 値入り `zext` 定数式 | Tuner / VFX Sequencer engine | emcc の型エラー (loud) | E1 は `engine_fixcmp.py`、E2 は未修復 |
 
 ## 8. 成果物
