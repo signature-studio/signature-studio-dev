@@ -1,6 +1,6 @@
 # REPORT — GUI-3 (#174): 実 FLEngine の lift に GUI shim を結合する
 
-**判定: 部分達成 (受入条件 1 は未達。現 HEAD の flengine e2e は `c4e3c064` で 14/14 PASS・rc 0 (§6c-4)。旧 `f1e88c82` の 13/14 (S1 FAIL) は §6c-3 の履歴。PR は `Refs #174`)**。§1〜§5 の数値・記述は旧 HEAD `52e6bd57` 時点のもの (参考)。現 HEAD の実測は §6 を正とする。実 FLEngine (m11 closure, `FLEngine_x64.dll` の 7,421 関数 lift) に `tools/gui` shim を全 TU `-pthread` でリンクし、
+**判定: 部分達成 (受入条件 1 は未達。過去の `c4e3c064` の 14/14 PASS (§6c-4) は当時の値。HEAD `bf9cf547` の flengine e2e は judge 13/14 (S1 FAIL。§6d を正とする)。PR は `Refs #174`)**。§1〜§5 の数値・記述は旧 HEAD `52e6bd57` 時点のもの (参考)。現 HEAD の実測は §6 を正とする。実 FLEngine (m11 closure, `FLEngine_x64.dll` の 7,421 関数 lift) に `tools/gui` shim を全 TU `-pthread` でリンクし、
 **自然起動 (DllMain attach) で最初の GUI API (`LoadStringW`) が shim に到達**した。942 unit の隔離 survey では GUI API **32 種**が shim に到達 (実装済み 31 / fail-fast stub 1 = `LoadImageW`)。
 `CreateWindowExW` は survey で **1 回だけ自然到達**したが、直前の `RegisterClassW` は呼ばれず (`GetClassInfoW` の後に直行)、窓は生成されない (§5-2 の lift 欠陥)。受入条件 1 の意図する「実登録を経た窓生成の自然到達」は未達。
 実 WNDCLASS を JS から指向呼出した場合は `RegisterClassW` ×2 が shim に届き、`TApplication` の窓 (hwnd 31bit) が生成できる。
@@ -323,6 +323,26 @@ main 取込後の木 (`c37522c`) で S1 が FAIL (828/67 vs 864/31) したため
 
 - `tools/gui/flengine/e2e.sh` の前提: `x86_64-w64-mingw32-gcc` は runner 既定に無く `apt-get install gcc-mingw-w64-x86-64` が要る (`oc_artifacts` の `apt-mingw` で入る)。
 - `tools/m11/m11_survey.mjs` 単体の `M11_SURVEY_UNITS` 出力は、`run.mjs` と同じ `[i, label]` 形式ではなく `label` の配列 (`perUnit` は文字列配列)。比較時は index で突き合わせる。
+
+## 6d. 現 HEAD 節 (review #577 対応。HEAD `bf9cf547`)
+
+review `b9f0b32b` の指摘 1 (S1) と 2 (run.mjs のコメント) への対応。
+
+- **S1 の切り分け (実測)**: baseline と soft は **同じ `run.mjs --survey` 経路・同じ VA 予算 256 MiB** で取っており、予算の差ではない (前回の「baseline は m11_survey.mjs 既定 256 MB」は `e2e.sh` の経路変更で成立しなくなっていた)。`baseline_base_survey.json` と `survey_soft_units.json` を unit 別に突き合わせると、差は **unit 304 と 555 の 2 件のみ** (base `ok` / soft `memory access out of bounds` の trap)。ok/trap 以外の差は無い。shim の有無で build が違うため、この 2 件は shim 組込み後の wasm 側の挙動差 (未特定)。
+- 単独 unit の再現 (`m11_base.cjs` / `m11_gui_soft.cjs` を unit 304・555 で単独実行) は、両方とも trap したため切り分けに使えず、原因は未特定。
+- **判定**: S1 は FAIL のまま (870/1/47/24/0 vs 872/1/47/22/0)。判定を PASS に動かす変更は入れていない。judge 13/14。
+- `run.mjs` 4 行目のコメントを実装 (既定 256 MiB) に合わせた。
+
+| 実行 (HEAD `bf9cf547`) | 結果 | 所要 |
+|---|---|---|
+| `bash tools/gui/flengine/e2e.sh` | rc 1。judge **13/14** (S1 のみ FAIL: 870/1/47/24/0 vs base 872/1/47/22/0)。ネガコン N1〜N9 は期待どおり FAIL。native selftest 506 passed / 0 failed | 412 s (測定 load 1.07) |
+
+| 実行 (HEAD `a3f3be1a`。`bf9cf547` は run.mjs のコメント 1 行のみ差) | 結果 | 所要 |
+|---|---|---|
+| `bash tools/m11/ldfix/f4_e2e.sh` | rc 0。6 gate PASS・ネガコン 4/4。RegisterClassW 2→2→3、`function_52a7f0` ret 0x0→0x0→0x110000f。survey pre/noand/post = 870/1/47/24 | 328 s (load 0.18→1.00) |
+| `bash tools/gui/e2e.sh` (`FL_WIN64_DIR` 指定、`pnpm install --frozen-lockfile` 後) | rc 0。ALL PASS (SIMD / text / stress / pe_image / selftest 506/0)。前回 ASan 問題は出ず | 未計測 (rc 0 のみ確認) |
+
+注記: `tools/gui/e2e.sh` の初回は `node_modules` 不在で step 5 (tsc) が rc 127 だった (`pnpm install` で解消。環境要件)。
 
 ## 7. 未解決
 
