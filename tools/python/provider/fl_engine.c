@@ -1,11 +1,13 @@
 /* MCPTools.pyc が静的に参照する flapi 60 関数 (公開 52 + ilmcp 8) のハンドラ + 最小エンジン状態。
- * 意味論は host/fl_mock.mjs と同一 (実エンジンとの差は REPORT 未解決参照)。実 FLEngine 結合時は
- * このファイルのハンドラだけを FLEngine の内部 API 呼出しに置換し、fl_dispatch.c / fl_table.c は流用する。 */
+ * 意味論は host/fl_mock.mjs (公開 52) と host/ilmcp.mjs (ilmcp 8) と同一 (実エンジンとの差は REPORT 未解決参照)。
+ * 実 FLEngine 結合時は このファイルのハンドラだけを FLEngine の内部 API 呼出しに置換し、fl_dispatch.c / fl_table.c は流用する。 */
+#include <ctype.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "fl_api.h"
+#include "gen/ilmcp_data.h"
 
 #define NMIX 127
 #define NSLOT 10
@@ -14,6 +16,7 @@
 #define NSTEP 64
 #define NWIN 64
 #define NAME 96
+#define ROOT_NAME "Plugin database"
 
 typedef struct { char name[NAME], plugin[NAME]; double vol, pan; int mute, solo, sel, fx; int64_t color; uint8_t steps[NSTEP]; } Chan;
 typedef struct { char name[NAME]; double vol, pan; int mute, solo, sel; int64_t color; char slots[NSLOT][NAME]; int act[NMIX]; double lvl[NMIX]; } Mix;
@@ -171,52 +174,91 @@ FL_H(plugins, getParamValue) { PP(0); return fl_ret_d(c, pvals[_q]); }
 FL_H(plugins, getParamValueString) { PP(0); char b[48]; snprintf(b, sizeof b, "%.1f %%", pvals[_q] * 100); return fl_ret_s(c, b); }
 FL_H(plugins, setParamValue) { double v = A_DBL(0, 0); int64_t q = A_INT(1, 0); if (q < 0 || q >= NPARAM) RANGE(); pvals[q] = v; return fl_ret_none(c); }
 
-/* ---- ilmcp (8) ---- */
-/* 出力が収まらない場合は切り詰めずに -1 を返す (呼出し側が fl_err(RANGE) にする)。 */
-static int json_str(char *dst, size_t cap, const char *s) {
-    size_t o = 0;
-    if (cap < 3) return -1;
-    dst[o++] = '"';
-    for (; *s; s++) {
-        unsigned char ch_ = (unsigned char)*s;
-        size_t need = (ch_ == '"' || ch_ == '\\') ? 2 : ch_ < 0x20 ? 6 : 1;
-        if (need > cap - o - 2) return -1; /* 閉じ引用符と NUL の 2B を残す */
-        if (need == 6) { snprintf(dst + o, 7, "\\u%04x", ch_); o += 6; }
-        else if (need == 2) { dst[o++] = '\\'; dst[o++] = (char)ch_; }
-        else dst[o++] = (char)ch_;
+/* ---- ilmcp (8) ---- host/ilmcp.mjs と同じ意味論 (エラー code・木の並び・検証)。
+ * 木・プラグイン名・highlight 名は gen/ilmcp_data.h (analysis/ilmcp の JSON から生成)。 */
+static int plugin_kind_ok(const char *name, const char *kind) {
+    for (int i = 0; i < ilmcp_plugin_n; i++)
+        if (!strcmp(ilmcp_plugins[i].name, name) && !strcmp(ilmcp_plugins[i].kind, kind)) return 1;
+    return 0;
+}
+
+/* JS の Error(msg, code) 相当: "<pre><s>" を code で返す */
+static int fl_err_fmt(fl_call *c, int code, const char *pre, const char *s) {
+    size_t n = strlen(pre) + strlen(s) + 1;
+    char *m = malloc(n);
+    if (!m) return fl_err(c, FL_E_UNSPECIFIED, "Unspecified error");
+    snprintf(m, n, "%s%s", pre, s);
+    int r = fl_err(c, code, m);
+    free(m);
+    return r;
+}
+
+/* JS norm 相当: \ を / とみなし、各区切りを trim して空を除く。先頭は "Plugin database" でなければならない。
+ * 残りを "/" で連結した木のキーを out に書く (out は in と同じ大きさ以下で足りる)。 */
+static int browser_key(const char *in, char *out) {
+    size_t n = strlen(in), o = 0, segs = 0, i = 0;
+    while (i <= n) {
+        size_t e = i;
+        while (e < n && in[e] != '/' && in[e] != '\\') e++;
+        size_t s = i, t = e;
+        while (s < t && isspace((unsigned char)in[s])) s++;
+        while (t > s && isspace((unsigned char)in[t - 1])) t--;
+        if (t > s) {
+            if (segs == 0) {
+                if (t - s != strlen(ROOT_NAME) || memcmp(in + s, ROOT_NAME, t - s)) return 0;
+            } else {
+                if (o) out[o++] = '/';
+                memcpy(out + o, in + s, t - s);
+                o += t - s;
+            }
+            segs++;
+        }
+        i = e + 1;
     }
-    dst[o++] = '"'; dst[o] = 0;
-    return 0;
+    if (!segs) return 0;
+    out[o] = 0;
+    return 1;
 }
-/* b[0..*o) に s を追記する。NUL 込みで残量に収まらなければ (n >= remaining) 何も書かず -1。 */
-static int buf_add(char *b, size_t cap, size_t *o, const char *s) {
-    size_t n = strlen(s), remaining = cap - *o;
-    if (n >= remaining) return -1;
-    memcpy(b + *o, s, n + 1); *o += n;
-    return 0;
+
+static const ilmcp_dir *find_dir(const char *key) {
+    for (int i = 0; i < ilmcp_dir_n; i++)
+        if (!strcmp(ilmcp_dirs[i].key, key)) return &ilmcp_dirs[i];
+    return NULL;
 }
-#define OVERFLOW() return fl_err(c, FL_E_RANGE, "Range error")
+
+/* 文字列の list を JSON 配列で返す (NULL 終端の表。中身は生成時に引用符・\ を含まないと検査済み) */
+static int ret_list(fl_call *c, const char *const *items) {
+    size_t n = 3;
+    for (const char *const *p = items; *p; p++) n += strlen(*p) + 4;
+    char *b = malloc(n);
+    if (!b) return fl_err(c, FL_E_UNSPECIFIED, "Unspecified error");
+    size_t o = 0;
+    b[o++] = '[';
+    for (const char *const *p = items; *p; p++) {
+        if (p != items) b[o++] = ',';
+        o += (size_t)sprintf(b + o, "\"%s\"", *p);
+    }
+    b[o++] = ']';
+    b[o] = 0;
+    int r = fl_ret_json(c, b);
+    free(b);
+    return r;
+}
+
 FL_H(ilmcp, getBrowserNames) {
     NARGS(0, 2);
     const char *nm = (c->n > 0 && c->a[0].tag == 'S') ? A_STR(0) : "";
-    char q[512], b[2048];
-    size_t o = 0;
-    if (json_str(q, sizeof q, nm)) OVERFLOW();
-    static const char *items[] = {"Fruity Slicer", "3x Osc", "Sampler"};
-    if (buf_add(b, sizeof b, &o, "{\"name\":") || buf_add(b, sizeof b, &o, q) || buf_add(b, sizeof b, &o, ",\"items\":[")) OVERFLOW();
-    for (int i = 0; i < 3; i++) {
-        char full[NAME * 3], e[NAME * 6];
-        int n = snprintf(full, sizeof full, "%s/%s", nm, items[i]);
-        if (n < 0 || (size_t)n >= sizeof full) OVERFLOW();
-        if (json_str(e, sizeof e, full)) OVERFLOW();
-        if ((i && buf_add(b, sizeof b, &o, ",")) || buf_add(b, sizeof b, &o, e)) OVERFLOW();
-    }
-    if (buf_add(b, sizeof b, &o, "]}")) OVERFLOW();
-    return fl_ret_json(c, b);
+    int64_t rec = A_INT(1, 0);
+    char *key = malloc(strlen(nm) + 1);
+    if (!key) return fl_err(c, FL_E_UNSPECIFIED, "Unspecified error");
+    const ilmcp_dir *d = browser_key(nm, key) ? find_dir(key) : NULL;
+    free(key);
+    if (!d) return fl_err_fmt(c, FL_E_INVALID_VALUE, "Unknown browser path: ", nm);
+    return ret_list(c, rec ? d->flat1 : d->flat0);
 }
 FL_H(ilmcp, getHighlightNames) {
     NARGS(0, 0);
-    return fl_ret_json(c, "[\"Toolbar: Show Piano roll\",\"Toolbar: Show playlist\",\"Toolbar: Show Mixer\",\"Toolbar: Show Channel Rack\"]");
+    return ret_list(c, ilmcp_highlights);
 }
 FL_H(ilmcp, showHighlight) {
     /* MCPTools 実測: 引数 5 (item,name,caption,whenDone,flag) と、whenDone 内のクリア呼出し 3 (""×3) */
@@ -228,6 +270,7 @@ FL_H(ilmcp, showHighlight) {
 FL_H(ilmcp, addChannel) {
     NARGS(1, 1);
     const char *pn = A_STR(0);
+    if (!plugin_kind_ok(pn, "generator")) return fl_err_fmt(c, FL_E_INVALID_VALUE, "Unknown generator plugin: ", pn);
     if (nch >= NCH_MAX) return fl_err(c, FL_E_UNSPECIFIED, "Unspecified error");
     init_chan(&ch[nch], pn, pn, 0.78125, 0, 0, 0, 0x5A6B7C);
     return fl_ret_i(c, nch++);
@@ -242,7 +285,13 @@ FL_H(ilmcp, addEffect) {
     NARGS(3, 3);
     const char *pn = A_STR(0); int64_t t = A_INT(1, 0), s = A_INT(2, 0);
     if (t < 0 || t >= NMIX || s < 0 || s >= NSLOT) RANGE();
+    if (pn[0] && !plugin_kind_ok(pn, "effect")) return fl_err_fmt(c, FL_E_INVALID_VALUE, "Unknown effect plugin: ", pn);
     set_name(mx[t].slots[s], pn); return fl_ret_b(c, 1);
 }
-FL_H(ilmcp, storePRScript) { NARGS(2, 2); (void)A_STR(0); (void)A_STR(1); n_pr++; return fl_ret_b(c, 1); }
+FL_H(ilmcp, storePRScript) {
+    NARGS(2, 2);
+    const char *nm = A_STR(0); (void)A_STR(1);
+    if (!nm[0] || strpbrk(nm, "\\/:")) return fl_err_fmt(c, FL_E_INVALID_VALUE, "Invalid script name: ", nm);
+    n_pr++; return fl_ret_b(c, 1);
+}
 FL_H(ilmcp, runPRScript) { NARGS(1, 1); (void)A_STR(0); n_run++; return fl_ret_b(c, 1); }

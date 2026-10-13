@@ -187,6 +187,14 @@ def main():
     per_dll = collections.OrderedDict()
     for r in data["imports"]:
         d = per_dll.setdefault(r["dll"], [0, 0]); d[0] += 1; d[1] += r["xref"]
+    # GUI-3 (#174): 実 FLEngine lift で shim に実到達した API (tools/gui/flengine/e2e.sh が results/*.json を更新する)
+    reach = {}
+    for fn, tag in (("boot.json", "起動"), ("survey_soft.json", "survey"), ("probe.json", "probe")):
+        try:
+            for e in json.load(open(os.path.join(HERE, "flengine", "results", fn)))["reach"]:
+                reach.setdefault(e["name"], []).append(tag)
+        except (OSError, KeyError, ValueError):
+            pass
     with open(os.path.join(HERE, "IMPORTS.md"), "w") as f:
         w = f.write
         w("# 自動生成: `python3 tools/gui/analysis/gui_imports.py && python3 tools/gui/gen_api.py`\n\n"
@@ -209,11 +217,22 @@ def main():
           "- **P3** 当面スコープ外 (印刷・メタファイル・wgl・タッチ/ジェスチャ・Dwm/WTS)。stub のまま。\n\n")
         for p in range(4):
             sub = [r for r in rows if r[0] == p]
-            w("## 3.%d P%d (%d 名)\n\n| API | DLL | カテゴリ | xref | 状態 |\n|---|---|---|---|---|\n" % (p, p, len(sub)))
+            w("## 3.%d P%d (%d 名)\n\n| API | DLL | カテゴリ | xref | 状態 | 実到達 (GUI-3 #174) |\n|---|---|---|---|---|---|\n" % (p, p, len(sub)))
             for r in sub:
-                w("| %s | %s | %s | %d | %s |\n" % (r[3], r[2].replace(".dll", ""), r[4], r[6], r[5]))
+                w("| %s | %s | %s | %d | %s | %s |\n" % (r[3], r[2].replace(".dll", ""), r[4], r[6], r[5], "●" + "/".join(reach[r[3]]) if r[3] in reach else ""))
             w("\n")
-        w("## 4. arity 不明 (mingw ヘッダ未収録) で stub 未生成\n\n" + (", ".join(still) if still else "なし") + "\n")
+        if reach:
+            gui_names = {r[3]: r for r in rows}
+            w("## 4. 実到達ベースの優先順位入力 (GUI-3 #174)\n\n"
+              "実 FLEngine の lift (m11 closure) に本 shim を結合して実行し、shim に到達した API (表の「実到達」列: 起動 = DllMain attach / survey = 942 unit 隔離 / probe = 指向呼出)。"
+              "回数・分母・手順は `tools/gui/flengine/REPORT.md`、機械可読は `tools/gui/flengine/results/*.json`。\n\n"
+              "| 区分 | API (P 分類) |\n|---|---|\n")
+            def lab(n): return "%s (P%d)" % (n, gui_names[n][0]) if n in gui_names else n
+            w("| 到達 & 実装済み | %s |\n" % ", ".join(lab(n) for n in sorted(reach) if n in gui_names and gui_names[n][5] == "IMPL"))
+            w("| 到達 & fail-fast stub (**実装必須へ昇格**) | %s |\n" % (", ".join(lab(n) for n in sorted(reach) if n in gui_names and gui_names[n][5] != "IMPL") or "なし"))
+            w("| 到達 & P2/P3 (**P1 以上へ昇格候補**) | %s |\n" % (", ".join(lab(n) for n in sorted(reach) if n in gui_names and gui_names[n][0] >= 2) or "なし"))
+            w("| 未到達の P0 (現 m11 到達段では未実行) | %s |\n\n" % ", ".join(r[3] for r in rows if r[0] == 0 and r[3] not in reach))
+        w(("## %d. arity 不明 (mingw ヘッダ未収録) で stub 未生成\n\n" % (5 if reach else 4)) + (", ".join(still) if still else "なし") + "\n")
     print("gui imports=%d impl=%d stub=%d nohdr=%d (impl total in sources=%d)" % (tot_gui, n_impl, n_stub, len(still), len(impl)))
     prio = collections.Counter(r[0] for r in rows)
     print("priority:", dict(sorted(prio.items())))

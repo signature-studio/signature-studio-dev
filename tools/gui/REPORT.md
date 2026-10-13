@@ -9,6 +9,7 @@
   OffscreenCanvas 読み戻し・画面スクリーンショットとも **golden と 64,000 px 完全一致 (差 0)**。`bash tools/gui/e2e.sh` 1 コマンド (16〜24 s、Chrome 6 連続で安定; クリーン状態からも PASS)。
 - **P1 50 名を実装 (CAB-159)**: DrawEdge/DrawFrameControl/DrawFocusRect・クリップボード 7・フック 3・モニタ/DPI 7・キャレット 4・アイコン/カーソル 5・入力 7・util 8・リージョン 3・DC/ブラシ原点/DDB 3 (+P2 から `CreateCaret` を前倒し)。各 API に unit テスト (selftest **83→314 assertion**、`integ/check_p1_tests.py` が 51 名すべての実装+テスト呼出を機械検査)。
 - **実 FLEngine 結合の準備 (CAB-156)**: 到達 API ログ・m11 IR との署名突合と wasm32 署名 adapter・icall hook・結合手順書/ABI チェックリスト (`INTEGRATION.md`)。m11 IR の GUI declare **177 名**(実装 132→153 / stub 45→24; 後者は CAB-159 後)を突合し、wasm-ld 署名不一致 **177 → 0**(adapter 無しを陰性対照)。`--wndproc` 手指定を廃止(自動検出)。e2e に 6d(到達ログ)/6e(sigprobe)/2b を追加し ALL PASS 維持。
+- **実 FLEngine 結合 (GUI-3 #174)**: m11 closure に本 shim を結線し、自然起動で shim に届く GUI API と未実装 API を実測・集計 (部分達成; `RegisterClass*`/`CreateWindowEx*` の自然到達は未達)。全文は [flengine/REPORT.md](flengine/REPORT.md)。
 - 副産物: RetDec の PE lift 欠陥 4 件と ABI 要件 3 件 (GLOBAL_BASE≥64KiB, 31bit ハンドル, WNDPROC 4 引数 + VA→関数 fnmap) を実測で特定 (§4)。FL 本体 lift にそのまま効く。
 
 ## 1. 成果物
@@ -107,7 +108,7 @@ python3 tools/gui/analysis/gui_imports.py && python3 tools/gui/gen_api.py   # im
 全文は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) に分割移動 (250 行上限; 内容は無変更)。結論: 現行 CPU 経路は 1080p 2.2〜3.8 ms/frame で予算内、WebGL2 present・複数矩形・rAF 同期・seqlock は FL 非依存部を実装・e2e 済み。
 
 ## 10. GUI-5 (#181): 24/8/4/1bpp DIB・mono DDB と wasm SIMD128 行カーネル
-既知類型との関係: lift 欠陥ではなく shim の意味論 (`docs/DEFECTS.md` D1a〜D16 に該当なし)。ただし shim 自身の silent 誤りを 1 件発見 (下記「発見」)。検証起点: 実装 `dd7be3e`、本節の数値は `9cff72c` のクリーン tree での実測 (src/test は最終 HEAD と同一で、以降の commit は REPORT・DOC_MAP のみ; `gui_gdi.c` は `dd7be3e` と同一)。
+既知類型との関係: lift 欠陥ではなく shim の意味論 (`docs/DEFECTS.md` D18 として登録)。ただし shim 自身の silent 誤りを 1 件発見 (下記「発見」)。検証起点: 実装 `dd7be3e`、本節の数値は `9cff72c` のクリーン tree での実測 (src/test は最終 HEAD と同一で、以降の commit は REPORT・DOC_MAP のみ; `gui_gdi.c` は `dd7be3e` と同一)。
 
 ### 結論
 - **機能欠落 (スコープ 1) は FL 非依存の範囲で解消**: `CreateDIBSection` の 1/4/8/24bpp (app から見えるネイティブ形式 `nat` と内部 BGRA shadow を pull/push で同期; 仕様 [PROTOCOL.md §8](PROTOCOL.md))・`CreateBitmap` の mono(1bpp)/24/32bpp・`StretchDIBits`/`SetDIBitsToDevice`/`SetDIBits`/`CreateDIBitmap`/`LoadBitmapW` の 1/4/8/24/32bpp 源・`GetDIBits` の 1/4/8/24/32bpp 出力・`GetDIBColorTable`/`SetDIBColorTable` (IMPORTS: STUB→IMPL, 実装 270→272)・mono↔color 転送の bk/text 色写像・`MERGEPAINT`。未対応は理由付き fail-fast (16bpp DIB / DIB_PAL_COLORS / 圧縮 / `CreateBitmap` 4,8,16bpp の初期 bits)。
@@ -160,16 +161,15 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
 ### 範囲外・未達
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `bash tools/gui/e2e.sh` 全体 ALL PASS の確認 (RetDec 不在で PE lift 層が未実行) | 完了条件 (e2e ALL PASS 維持) 未確認 → `Refs #181` | #181 に `oc_artifacts: toolchain-emsdk toolchain-retdec` で再実行を依頼 (mingw-w64 は apt `gcc-mingw-w64-x86-64` で入った) |
+`bash tools/gui/e2e.sh` 全体 ALL PASS → 付録 §16 で実測。現 HEAD `fcd564bc` で ALL PASS (rc=0, 185 s, 1 回。同 HEAD の 1 回目は 6/6 の依存欠落で rc=2)。1/6 の selftest は `e11701db` で 20 回連続 PASS (ASan 0 件)。修正前 src では 7 回中 2 回発火 | 修正後の e2e 全体の PASS は 1 回のみ。受入扱いは PM 判断 | #489 `[GUI-12]` (既存)・PM |
 | 実 FLEngine が要求する bpp/ROP の確定 (GUI-3 #174 の到達ログ待ち)・16bpp DIB・DIB_PAL_COLORS・`CreateBitmap` 4/8/16bpp の初期 bits・RLE/JPEG/PNG 圧縮 DIB | 実 FL が要求したら fail-fast で止まる (理由付き) | #174 到達後に #181 へ追記 |
-| Chrome 上の SIMD 版 wasm 全体 (lift 済みアプリ込み) の frame time | wasm の API 単位の前後比較が未取得 (kernel 単位のみ) | #181 (RetDec 付き再実行で `gui_wasm.sh` 既定の `-msimd128` ビルドを実測) |
+| Chrome 上の lift 済みアプリ込みの API 単位 frame time → 付録 §16 §2 (wasm shim 全体は取得済み。Chrome 上のアプリ込みは未取得、理由は付録 §16 §2) | — | #181 |
 | mono / パレットの色写像の実 Windows との照合 (近似) | 色が実機と数階調ずれる可能性 | #181 (実機比較はユーザ依頼候補) |
 | native selftest の ASan UAF (20 回中 4 回) | `e2e.sh` 1/6 が約 20% で FAIL | #489 `[GUI-12]` で修正 (本 REPORT §12) |
 | `integ/sigprobe.sh` の `unresolved-imports=0` が `wasm-objdump` 不在で空振り (今回も `command not found`) | 未解決 import なし確認が無効 | #180 (既存コメント) |
 
 ## 11. GUI-9 (#186): GDI テキストの FreeType 描画 (内蔵 8×8 → FreeType 2.7)
-- 結論: `src/gui_ft.c` (FreeType 2.7) が GDI テキストを描き、native 独立オラクル (`golden/ft_oracle.c`) と画素差 0・metrics 差 0 (ネガコン 4/4)、engine の native == wasm32。未登録/解決不能/stock は従来の 8×8。Windows 標準フォントは同梱せず OSS フォント (Open Sans / Barlow) を alias で代替 (#186 PM 判断)。
-- 実測値・実装詳細・レビュー対応の再現・8×8 経路 `DrawText` の挙動差・未解決 (4 件) の全文は **`REPORT_APPENDIX_B.md`** (無変更で分割移動)。未解決 (4) wasm ビルドへの組込みは §13 (#615) で解消。
+- 結論: GDI テキストは FreeType 2.7 で描画し、独立オラクルと画素差 0・metrics 差 0。`e2e.sh` ALL PASS は af8ba9cc・0cbc5651 で各 1 回のみ (flake 残存)。詳細は [REPORT_APPENDIX_B.md](REPORT_APPENDIX_B.md) §11。
 
 ## 12. GUI-12 (#489): headless host の surface 画素 use-after-free (selftest ASan flaky)
 
@@ -188,7 +188,7 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
 | `bpp_golden.sh` / `reach_test.sh` (`31bcd9a`) | ALL PASS / reach 11 + adapt 28 passed (reach_test 内の selftest も 428 passed) |
 
 - **ネガコン**: `-DGUI12_NEGCTL_IMMEDIATE_FREE` (retire を即 free に戻す。`gui12_race.sh` だけが定義) で UAF 30/30。新 stress 節は確率的競合を決定論的に近づけるため、修正前より再現率が高い (修正前 2/30 → ネガコン 30/30)。
-- **範囲外**: `native_e2e.sh` / `e2e.sh` 全体は `/opt/retdec` 不在で未実行 (検証 run の素材は `fl-win64` と apt の mingw のみ)。`emcc -c gui_core.c` は `/opt/emsdk` 不在で `31bcd9a` では未再実行 (`6e6c9b7` 時点では OK)。Chrome E2E (wasm 経路) も未実行 (本変更は native headless の読み出しと shim 側 free 遅延のみ; wasm でも `SurfSnap` は同じコードが走るため要再確認)。
+- **範囲外**: `native_e2e.sh` / `e2e.sh` 全体は `[RETDEC]` 不在で未実行 (検証 run の素材は `fl-win64` と apt の mingw のみ)。`emcc -c gui_core.c` は `[EMSDK]` 不在で `31bcd9a` では未再実行 (`6e6c9b7` 時点では OK)。Chrome E2E (wasm 経路) も未実行 (本変更は native headless の読み出しと shim 側 free 遅延のみ; wasm でも `SurfSnap` は同じコードが走るため要再確認)。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
@@ -208,8 +208,8 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
   | 未解決 | 影響 | 起票先 |
   |---|---|---|
   | (1) `loadFont` の取得元を #22 (VFS) の遅延取得 (Range/OPFS/R2) へ結線 | 本番ブラウザへの配信は未接続 (e2e は同一オリジン `/fonts/*`) | #660 (GUI-14) |
-  | (2) `bash tools/gui/e2e.sh` 全体 (PE lift 層込み) の ALL PASS 確認 | 7ead604 のレビュー実測 (RetDec あり) で 2 回中 1 回 ALL PASS、もう 1 回は `selftest_wrapped` の既知 flake (ASan blit_surf UAF、単独 30 回で 9/30 失敗) で rc=1 (付録 §13 追補) | flake は `gui_headless.c` の起票を PM 依頼 (未起票)。ALL PASS の追加確認は PM 判断 |
-  | (3) 実 FL の face/サイズ確定・alias 実値 | alias は e2e 用 (Segoe UI/Tahoma → Open Sans) のみ | #174 (GUI-3) / #186 の未解決 (2) |
+  | (2) `bash tools/gui/e2e.sh` 全体 (PE lift 層込み) の安定した ALL PASS 確認 | af8ba9cc / 0cbc5651 で 1 回 PASS を確認、flake 残存 (`selftest_wrapped` は単独 30 回で 9/30 失敗・7ead604 実測、付録 §13 追補)。1 回 PASS は flake 解消の根拠にならない | flake の `gui_headless.c` 起票は PM 判断 (未起票) |
+  | (3) 実 FL の face/サイズ確定・alias 実値 | alias は e2e 用 (Segoe UI/Tahoma → Open Sans) のみ | #174 (GUI-3)・付録 B §11 の未解決 (2) |
 
 ## 14. GUI-7 (#183): popup/tooltip・非クライアント領域・無効領域複数矩形・DPI (FL 非依存部)
 既知類型との関係 (DEFECTS.md): 該当なし (shim の意味論)。ただし lift 済み WndProc の `WM_NCCALCSIZE` の `NCCALCSIZE_PARAMS*` lParam が int32 切り詰めで取りこぼされ native で SEGV (§4-6 の既知要件の再発)。修正は shim 側で送信中ポインタを保持。
@@ -218,3 +218,11 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
 - 未解決 (起票先): FL 実窓種別の確定 (#174 / #564 / #565 後に #183 へ追記)・Chrome 上の NC/popup 描画 (#183)・メニュー (#175)。
 ## 15. GUI-8 (#184): e2e の agent-browser 載せ替え・長時間ストレス・Firefox 取込み
 全文と実測 (検証起点 コード HEAD `3bd220d3`): `REPORT_GUI8.md`。結論: e2e は `tools/e2e` ドライバ (agent-browser / puppeteer-core) 経由で `bash tools/gui/e2e.sh` ALL PASS (golden 差 0、203 s)、50,000 フレームのストレスで drop 0・メモリ増加なし・surface gen 不変、ネガコン 3 本は不合格を検出。Firefox は #127 の結果を `PROTOCOL.md §13` に取込み (Safari・Firefox 実描画は未測定)。
+
+## 16. GUI-5 (#181) 続き: e2e.sh 全体 ALL PASS と wasm shim 全体の SIMD/scalar 比較
+
+本文は `REPORT_APPENDIX.md` §16 (250 行上限による分割)。検証起点 HEAD `fcd564bc` (`tools/gui/src`・`include` は `e11701db` と同一)。結論: RetDec 付き `bash tools/gui/e2e.sh` は ALL PASS (rc=0, 185 s, 1 回。同 HEAD の 1 回目は 6/6 の依存欠落で rc=2)。1/6 selftest は `e11701db` で 20 回連続 PASS (ASan 0 件)。修正前 src の有効 7 回中 2 回の UAF (#489) は、修正後の連続試行で発火していない。wbench (`bash tools/gui/test/wbench.sh 5`): rc=0, 19 s, v128 simd=831 / scalar=0 (測定値は付録 §16 §2)。
+
+## 17. GUI-6 (#182): 入力品質 (キー配列 / IME / タッチ・ジェスチャ / Pointer Lock・ClipCursor)
+既知類型との関係: 該当なし (lift 欠陥ではなく shim/host の意味論; `docs/DEFECTS.md` D1a〜D18 に該当なし)。
+- **結論**: 仕様・検証表・ネガコン実測・範囲外と起票先の詳細は付録 [REPORT_APPENDIX.md §14](REPORT_APPENDIX.md)。FL 非依存で CDP 再現できる範囲 (US/DE/FR 配列・IME・タッチ/ZOOM・Pointer Lock/ClipCursor) を実装し、`tools/gui/input/e2e.sh` と selftest・ネガコンで検証。WM_POINTER*・実機確認は未実施のため PR は `Refs #182`。

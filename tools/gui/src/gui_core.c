@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <strings.h>
+#include <math.h>
 #include "gui_internal.h"
 
 #define API int64_t
@@ -71,6 +72,7 @@ struct Wnd {
 static Class *g_classes; static uint32_t g_next_atom = 0xC001;
 static Wnd *g_desktop;
 static Wnd *g_focus, *g_active, *g_capture;
+static void ptrlock_update(void);
 static int g_quit_posted; static int g_quit_code;
 static uint64_t g_gui_tid;
 static uint32_t g_msg_time; static WPOINT g_msg_pt;
@@ -918,7 +920,7 @@ API GetDC(I64 h) {
   gui_sh(); ensure_desktop();
   Wnd *w = h ? wnd_from_h((U64)h) : g_desktop;
   if (!w) return 0;
-  if (w == g_desktop) gui_failfast("GetDC", "screen DC (GetDC(NULL)) not implemented");
+  if (w == g_desktop) return (I64)gdi_get_screen_dc();   /* GetDC(NULL): 画面 DC。描画は捨てる計測・互換 DC 用途 (#174) */
   RL clip = {0}; wnd_clip(w, &clip);
   U64 dc = gdi_get_dc_for_wnd(w, 0, &clip);
   rl_free(&clip);
@@ -969,11 +971,13 @@ API SetCapture(I64 h) {
   Wnd *w = wnd_from_h((U64)h); Wnd *old = g_capture; if (!w) return 0;
   g_capture = w;
   if (old && old != w) send_message(old->h, WM_CAPTURECHANGED, 0, (I64)w->h);
+  ptrlock_update();
   return old ? (I64)old->h : 0;
 }
 API ReleaseCapture(void) {
   Wnd *old = g_capture; g_capture = NULL;
   if (old) send_message(old->h, WM_CAPTURECHANGED, 0, 0);
+  ptrlock_update();
   return 1;
 }
 API GetCapture(void) { return g_capture ? (I64)g_capture->h : 0; }
@@ -1076,6 +1080,10 @@ static int mouse_hook_discard(Wnd *w, uint32_t msg, int x, int y) {
   struct { WPOINT pt; U64 hwnd; uint32_t hit, _pad; U64 extra; } mh = { { x, y }, w->h, 1 /* HTCLIENT */, 0, 0 };
   return hook_run(WH_MOUSE, 0, msg, (I64)(uintptr_t)&mh) != 0;
 }
+static void kbd_set_layout(uint32_t langid);                 /* gui_core_ext.inc */
+static uint32_t kbd_layout_vk(uint32_t sc, int ext);
+static void ime_input(const uint32_t *r);
+static void touch_input(const uint32_t *r);
 static void translate_input(const uint32_t *r) {
   GuiShared *sh = gui_sh();
   uint32_t type = r[0]; int x = (int32_t)r[2], y = (int32_t)r[3]; uint32_t a = r[4], b = r[5], t = r[6];
@@ -1083,6 +1091,7 @@ static void translate_input(const uint32_t *r) {
   switch (type) {
     case GUI_IN_MOUSE_MOVE: case GUI_IN_MOUSE_DOWN: case GUI_IN_MOUSE_UP: case GUI_IN_WHEEL: {
       int lx = 0, ly = 0;
+      if (type == GUI_IN_MOUSE_DOWN || type == GUI_IN_MOUSE_UP) ptrlock_update();
       Wnd *w = g_capture;
       if (w) client_of_screen(w, x, y, &lx, &ly);
       else w = hit_test(x, y, &lx, &ly);
@@ -1121,8 +1130,13 @@ static void translate_input(const uint32_t *r) {
       }
       return;
     }
+    case GUI_IN_LAYOUT: kbd_set_layout(a & 0xFFFF); return;
+    case GUI_IN_IME: ime_input(r); return;
+    case GUI_IN_TOUCH: touch_input(r); return;
+    case GUI_IN_POINTER_LOCK: return;   /* 成立は host 通知。shim 側の状態は持たない (要求は ptrlock_update が出す) */
     case GUI_IN_KEY_DOWN: case GUI_IN_KEY_UP: {
       uint32_t vk = a & 0xFF;
+      { uint32_t lvk = kbd_layout_vk((b >> 8) & 0xFF, (b >> 1) & 1); if (lvk) vk = lvk; }   /* 物理キー (scancode) → 現配列の VK */
       if (type == GUI_IN_KEY_DOWN) g_kb[vk] |= 0x80; else g_kb[vk] &= 0x7f;
       Wnd *w = g_focus ? g_focus : g_active;
       if (!w) return;
@@ -1419,7 +1433,27 @@ API DefWindowProcW(I64 h, I64 msg, I64 wp, I64 lp) { return defproc_impl(h, msg,
 /* ================= カーソル / 入力状態 ================= */
 API GetCursorPos(I64 pt) { GuiShared *sh = gui_sh(); WPOINT *p = (WPOINT *)P_(pt); p->x = (int32_t)__atomic_load_n(&sh->cursor_x, __ATOMIC_RELAXED); p->y = (int32_t)__atomic_load_n(&sh->cursor_y, __ATOMIC_RELAXED); return 1; }
 API GetPhysicalCursorPos(I64 pt) { return GetCursorPos(pt); }
-API SetCursorPos(I64 x, I64 y) { GuiShared *sh = gui_sh(); sh->cursor_x = (int32_t)x; sh->cursor_y = (int32_t)y; return 1; }
+static int g_cursor_cnt;   /* ShowCursor 表示カウンタ (マウス有りの初期値 0 = 表示) */
+static int g_cursor_cnt_get(void) { return g_cursor_cnt; }
+static WRECT g_cclip; static int g_cclip_on;
+API SetCursorPos(I64 x, I64 y) {
+  GuiShared *sh = gui_sh(); int32_t cx = (int32_t)x, cy = (int32_t)y;
+  if (g_cclip_on) { if (cx < g_cclip.left) cx = g_cclip.left; if (cx >= g_cclip.right) cx = g_cclip.right - 1; if (cy < g_cclip.top) cy = g_cclip.top; if (cy >= g_cclip.bottom) cy = g_cclip.bottom - 1; }
+  __atomic_store_n(&sh->cursor_x, cx, __ATOMIC_RELAXED); __atomic_store_n(&sh->cursor_y, cy, __ATOMIC_RELAXED); return 1;
+}
+API ClipCursor(I64 rc) {
+  const WRECT *r = (const WRECT *)P_(rc);
+  if (!r) { g_cclip_on = 0; out_cmd(GUI_CMD_CLIP_RECT, 0, 0, 0, 0, 0, 0); return 1; }
+  if (r->right <= r->left || r->bottom <= r->top) { gui_set_last_error(87); return 0; }
+  g_cclip = *r; g_cclip_on = 1;
+  out_cmd(GUI_CMD_CLIP_RECT, 0, (uint32_t)r->left, (uint32_t)r->top, (uint32_t)r->right, (uint32_t)r->bottom, 0);
+  return 1;
+}
+static int g_ptrlock_req;   /* shim が host へ要求中の Pointer Lock 状態 */
+static void ptrlock_update(void) {
+  int want = g_cursor_cnt_get() < 0 && (g_capture != NULL || (gui_sh()->buttons & 7));
+  if (want != g_ptrlock_req) { g_ptrlock_req = want; out_cmd(GUI_CMD_POINTER_LOCK, 0, (uint32_t)want, 0, 0, 0, 0); }
+}
 API SetPhysicalCursorPos(I64 x, I64 y) { return SetCursorPos(x, y); }
 API LoadCursorA(I64 hi, I64 name) { (void)hi; return name < 0x10000 ? (0x7F000000 + name) : 0x7F000000; }
 API LoadCursorW(I64 hi, I64 name) { return LoadCursorA(hi, name); }
@@ -1433,8 +1467,7 @@ API SetCursor(I64 c) {
   return old;
 }
 API GetCursor(void) { return g_cur; }
-static int g_cursor_cnt;   /* ShowCursor 表示カウンタ (マウス有りの初期値 0 = 表示) */
-API ShowCursor(I64 show) { g_cursor_cnt += show ? 1 : -1; return g_cursor_cnt; }
+API ShowCursor(I64 show) { g_cursor_cnt += show ? 1 : -1; ptrlock_update(); return g_cursor_cnt; }
 API GetCursorInfo(I64 pci) {
   uint32_t *u = (uint32_t *)P_(pci);   /* CURSORINFO (Win64 24B): cbSize, flags, hCursor(8), ptScreenPos(8) */
   if (!u || u[0] != 24) { gui_set_last_error(87); return 0; }
@@ -1502,7 +1535,7 @@ API SystemParametersInfoW(I64 act, I64 p1, I64 p2, I64 fl) {
   GuiShared *sh = gui_sh();
   if (act == 0x30) { WRECT *r = (WRECT *)P_(p2); r->left = r->top = 0; r->right = (int32_t)sh->screen_w; r->bottom = (int32_t)sh->screen_h; return 1; } /* SPI_GETWORKAREA */
   if (act == 0x1004) { *(uint32_t *)P_(p2) = 0; return 1; }  /* SPI_GETMOUSEHOVERTIME 等は 0 */
-  char m[64]; snprintf(m, sizeof m, "SystemParametersInfo action 0x%x", (unsigned)act); gui_failfast("SystemParametersInfoW", m);
+  return 0;  /* 未対応 action は FALSE (Win32 の未対応 action 相当)。値を推定で埋めない */
 }
 API SystemParametersInfoA(I64 a, I64 b, I64 c, I64 d) { return SystemParametersInfoW(a, b, c, d); }
 API GetKeyboardState(I64 buf) { memcpy(P_(buf), g_kb, 256); return 1; }
@@ -1623,20 +1656,14 @@ API SetParent(I64 h, I64 np) {
   invalidate(w, NULL, 1, 1); if (old && old != g_desktop) invalidate(old, NULL, 1, 0);
   return old && old != g_desktop ? (I64)old->h : 0;
 }
-API GetClipCursor(I64 rc) { GuiShared *sh = gui_sh(); WRECT *r = (WRECT *)P_(rc); r->left = r->top = 0; r->right = (int32_t)sh->screen_w; r->bottom = (int32_t)sh->screen_h; return 1; }
-API MapVirtualKeyW(I64 code, I64 type) {
-  if (type == 2) { if (code >= 0x30 && code <= 0x5A) return code; if (code == VK_SPACE) return ' '; return 0; }          /* MAPVK_VK_TO_CHAR */
-  if (type == 0) { static const uint8_t sc[] = { 0 }; (void)sc; return 0; }                                                    /* VK_TO_VSC は未対応 = 0 */
-  return 0;
-}
+API GetClipCursor(I64 rc) { GuiShared *sh = gui_sh(); WRECT *r = (WRECT *)P_(rc); if (g_cclip_on) { *r = g_cclip; return 1; } r->left = r->top = 0; r->right = (int32_t)sh->screen_w; r->bottom = (int32_t)sh->screen_h; return 1; }
 static int vk_to_char(uint32_t vk, const uint8_t *st);   /* gui_core_ext.inc (US 配列) */
+static int layout_to_char(uint32_t vk, uint32_t sc, const uint8_t *st);   /* gui_core_ext.inc */
 API ToAscii(I64 vk, I64 sc, I64 state, I64 buf, I64 flags) {
-  (void)sc; (void)flags; int ch = vk_to_char((uint32_t)vk, (const uint8_t *)P_(state));
-  if (!ch) return 0; *(uint16_t *)P_(buf) = (uint16_t)ch; return 1;
+  (void)flags; const uint8_t *st = (const uint8_t *)P_(state);
+  int ch = layout_to_char((uint32_t)vk, (uint32_t)sc, st); if (ch < 0) ch = vk_to_char((uint32_t)vk, st);
+  if (!ch || ch > 0xFF) return 0; *(uint16_t *)P_(buf) = (uint16_t)ch; return 1;
 }
-API GetKeyboardLayout(I64 tid) { (void)tid; return 0x04090409; }
-API ActivateKeyboardLayout(I64 h, I64 f) { (void)f; return h ? h : 0x04090409; }
-API LoadKeyboardLayoutW(I64 s, I64 f) { (void)s; (void)f; return 0x04090409; }
 API PhysicalToLogicalPoint(I64 h, I64 pt) { (void)h; (void)pt; return 1; }
 API LogicalToPhysicalPoint(I64 h, I64 pt) { (void)h; (void)pt; return 1; }
 API GetMessageExtraInfo(void) { return 0; }

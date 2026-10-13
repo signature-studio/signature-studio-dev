@@ -111,6 +111,12 @@ void gdi_release_dc(U64 h) {
   DC *d = dc_of(h); if (!d) return;
   h_free(h); dc_free(d);
 }
+U64 gdi_get_screen_dc(void) {
+  gui_sh();
+  DC *d = dc_new(2); d->hbmp = g_def_bmp;
+  Bmp *b = (Bmp *)h_get(g_def_bmp, HT_BMP); b->sel++; d->bp = b;
+  return h_alloc(HT_DC, d);
+}
 API DeleteDC(I64 h) { DC *d = dc_of((U64)h); if (!d) return 0; h_free((U64)h); dc_free(d); return 1; }
 API CreateCompatibleDC(I64 hdc) {
   gui_sh(); (void)hdc;

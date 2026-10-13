@@ -35,7 +35,7 @@ done
 
 # ---- 2. clean HEAD スナップショット ----
 rm -rf "$SNAP"; mkdir -p "$SNAP"
-git -C "$T" archive HEAD -- tools/plugins/framework | tar -x -C "$SNAP"
+git -C "$T" archive HEAD -- tools/plugins/framework tools/shared | tar -x -C "$SNAP"
 FW="$SNAP/tools/plugins/framework"
 [ -f "$FW/fw_stage2.sh" ] || { echo "[v269] snapshot 失敗" >&2; exit 1; }
 echo "[v269] snapshot commit: $(git -C "$T" rev-parse --short HEAD)"

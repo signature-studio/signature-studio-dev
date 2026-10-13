@@ -235,7 +235,7 @@ static void check_com_lifecycle(void) {
     CKV("getSamplePosition_stopped", iasio_getSamplePosition(drv, &sp, &ts), ASE_SPNotAdvancing);
     CKV("outputReady_notpresent", iasio_outputReady(drv), ASE_NotPresent);   /* 実測 -1000 */
     CKV("future_invalidparam", iasio_future(drv, 1, NULL), ASE_InvalidParameter);   /* ILWASAPI 既定 -998 */
-    CKV("controlPanel_ok", iasio_controlPanel(drv), ASE_OK);
+    CKV("controlPanel_notpresent", iasio_controlPanel(drv), ASE_NotPresent);   /* UI 未登録 (AU-5 #192 以降の仕様) */
     CKV("start_nobuf", iasio_start(drv), ASE_InvalidMode);
     CKV("stop_idle", iasio_stop(drv), ASE_OK);
     CKV("dispose_nocreate", iasio_disposeBuffers(drv), ASE_InvalidMode);

@@ -1,6 +1,6 @@
-# gui REPORT 付録 — §9 GUI-4 (#180) 全文
+# gui REPORT 付録 — §9 GUI-4 (#180) 全文・§14 GUI-6 (#182) 全文
 
-REPORT.md の 250 行上限のため §9 を無変更で分割移動 (#489 の §12 追加時)。本体: [REPORT.md](REPORT.md)。
+REPORT.md の 250 行上限のため §9 (#180) と §16 (#181 続き) を分割移動。本体: [REPORT.md](REPORT.md)。
 
 ## 9. GUI-4 (#180): WebGL2 present / dirty 複数矩形 / rAF 同期 / seqlock
 既知類型との関係: 該当なし (lift 欠陥ではなく present 経路の設計。`docs/DEFECTS.md` への追加類型なし)。検証起点 commit: コードは `88efd49` (レビュー指摘 A・B・軽微 2 の修正後; present e2e 30 run・seqlock・tearing・golden・auto 降格の数値は全てこの HEAD・クリーン tree での実測)。frame time 表だけは修正前の `09e3db9` での実測 (bench は再測定していない; `88efd49` は seqlock 経路・staged 転送の関数分割 `stage()`/`uploadStaged()`・auto 判定のみを変え、seqlock off の GL 経路の処理は同一)。
@@ -67,3 +67,156 @@ node tools/runtime/gui_e2e.mjs                     # Vite バンドル経由 (�
 bash tools/gui/e2e.sh                              # 全体 (PE lift を含む); 要 RetDec・emsdk・mingw
 ```
 
+
+## 14. GUI-6 (#182): 入力品質 (キー配列 / IME / タッチ・ジェスチャ / Pointer Lock・ClipCursor)
+既知類型との関係: lift 欠陥ではなく shim/host の意味論 (`docs/DEFECTS.md` D1a〜D16 に該当なし)。検証起点: 実装コミットは `8dd9457`、本 run の差分 (B2・推奨修正) は後続コミット (下記の数値はコミット済み tree で実測)。
+
+### 結論
+- **FL 非依存で CDP 再現できる範囲を実装し e2e 済み。受入条件は未達 → PR は `Refs #182`** (理由は「範囲外・未達」: `bash tools/gui/e2e.sh` 全体の ALL PASS は RetDec 不在で PE lift 層が走らず未確認、WM_POINTER*、実機確認)。
+- **キー配列**: 入力 `GUI_IN_KEY_*` の flags に host が set 1 スキャンコード/extended を載せ (`SCAN_BY_CODE`)、shim が現配列で scancode→VK を引く (`kbd_layout_vk`)。`GUI_IN_LAYOUT` で US(0x0409)/DE(0x0407)/FR(0x040C) を切替え、`MapVirtualKeyW` (VK↔VSC/VSC→VK/VK→CHAR)・`ToUnicode`/`ToAscii` (Shift/Caps/AltGr=Ctrl+Alt)・`GetKeyboardLayout`/`GetKeyboardLayoutNameW`/`LoadKeyboardLayoutW` (未対応 KLID は 0 で失敗)/`ActivateKeyboardLayout` が配列に従う。host は Keyboard API の `getLayoutMap` から自動推定 (`layoutFromMap`)。
+- **IME**: 隠し textarea の composition イベント → `GUI_IN_IME` (4 UTF-16/レコードで連結) → `WM_IME_STARTCOMPOSITION`/`WM_IME_COMPOSITION` (GCS_COMPSTR|GCS_CURSORPOS / GCS_RESULTSTR)/`WM_IME_ENDCOMPOSITION`。imm32 は `ImmGetContext`/`ReleaseContext`/`GetCompositionStringW`/`SetCompositionWindow`/`SetCandidateWindow` (位置を host へ `GUI_CMD_IME_POS`)/`Get/SetOpenStatus`/`Get/SetConversionStatus`/`NotifyIME`/`IsIME`/`AssociateContextEx` を実装 (計 12 名)。このうち FL の import 表 (IMPORTS.md) で STUB→IMPL になったのは 7 名 (`ImmAssociateContextEx`・`ImmGetContext`・`ImmGetConversionStatus`・`ImmReleaseContext`・`ImmSetConversionStatus`・`ImmSetOpenStatus`・`ImmIsIME`)。残り 5 名 (`ImmGetCompositionStringW`・`ImmSetCompositionWindow`・`ImmSetCandidateWindow`・`ImmNotifyIME`・`ImmGetOpenStatus`) は FL の import 表に無く、IMPORTS.md 上は変化しない。composition 中の入力から WM_CHAR は合成しない。
+- **タッチ**: `PointerEvent(pointerType=touch)` → `GUI_IN_TOUCH`。`RegisterTouchWindow` 済み窓へ `WM_TOUCH` (`GetTouchInputInfo` = Win64 TOUCHINPUT 48B)、未登録窓は primary 接触をマウスへ昇格。`SetGestureConfig` (MS 仕様の符号化: `{dwID=GID, dwWant=GC_*, dwBlock}`。`{0, GC_ALLGESTURES, 0}` = 全ジェスチャ有効、`{GID_ZOOM=3, GC_ZOOM=1, 0}` = ZOOM のみ) で許可した GID_ZOOM (2 本指距離) を `WM_GESTURE` (`GetGestureInfo` = Win64 GESTUREINFO 56B) で配送。GID_PAN (1 本指移動) も実装しているが、**selftest / e2e に検査が無く未検証**。
+- **Pointer Lock / ClipCursor**: 「カーソル非表示 (`ShowCursor(FALSE)`) かつ capture 中またはボタン押下中」に `GUI_CMD_POINTER_LOCK` で host へ `requestPointerLock` を要求 (要求の発行は selftest で push 数 1/1/0 を検査)。ロック中 host は `movementX/Y` を `cursor_x/y` へ積算 (ClipCursor 矩形へ clamp)。`SetCursorPos` は ClipCursor 矩形へ clamp、`GetClipCursor` は矩形を返す。
+- **ブラウザ既定動作の変更 (PM 承認 2026-10-13)**: host (`src/runtime/gui.ts` の `bindInput`) は GUI canvas の `touch-action` を常に `none` にする。GUI canvas は FL の GUI 面そのもので、ブラウザ既定のパン/ズームは不要なため。タッチを宣言していない GUI でも既定のパン/ズームは無効になる。`RegisterTouchWindow` 済みの窓だけに限定する案は改善として #182 に残す。実測は `tools/gui/input/e2e.sh` の `touch-action` 検査 (`none`)。
+- プロトコル追加は enum 値のみ (`GuiShared` のオフセットは不変・`_Static_assert` 更新なし)。`gui_proto.h` ↔ `gui_proto.ts` を同時更新。
+- FL の GUI import 面: 実装済み 280 → 292 (`IMPORTS.md` は `gen_api.py` が再生成)。IMPORTS.md の STUB→IMPL は 12 行 (imm32 7 + touch/gesture 5)。
+
+### 検証 (4 vCPU runner、検証起点 `8dd9457`、実測時 load 0.8〜1.1)
+
+- **HEAD `0b71ab1` の実測 (B2 修正後)**: `bash tools/gui/e2e.sh` 全体 **ALL PASS** (exit 0, real 1m36.108s; native selftest 493 passed / 0 failed、reach_test 11 / adapt_test 28 passed、6/6・6b/6・6c/6・6d/6・6e/6・6f/6 PASS、6g/6 入力 ALL PASS)。`tools/gui/input/e2e.sh` ALL PASS (in_pushed=41 in_dropped=0 in_consumed=41, real 3.773 s)。`tools/gui/input/negctl.sh` 12 件すべて検出・検出漏れ 0 (real 2 分 34.430 秒)。以下の表は旧検証起点 `8dd9457` のもの。
+| 層 | 結果 |
+|---|---|
+| native `bash tools/gui/test/selftest.sh` (ASan/UBSan, `8dd9457`) | **492 passed / 0 failed** (既存 426 + GUI-6 の 66 assertion; `test/selftest_gui6.inc`)。DE/FR/US 配列・AltGr・IME 分割再構成・タッチ/ジェスチャ・ClipCursor・Pointer Lock 要求の push 数 (1/1/0)・DE/FR の MAPVK 英字大文字化を含む。所要 real 13.06 s |
+| Chrome e2e `bash tools/gui/input/e2e.sh` (CDP `Input.dispatchKeyEvent` / `imeSetComposition` / `insertText` / `dispatchTouchEvent` / `dispatchMouseEvent`, `8dd9457`) | **ALL PASS (21 検査 / 0 FAIL)**。入力リング `in_pushed=41 in_dropped=0 in_consumed=41` (drop 0)。計測: 内部 1.5 s (load 1.12)、real 13.03 s (wasm 再ビルド込み)。ゲストは `input/input_app.c` を emcc で直接 wasm 化 (RetDec 不要) |
+| 既存層 (`8dd9457` で再実測, load 0.8〜0.96) | `reach_test` 11 + `adapt_test` 28 passed (15.4 s)、`bpp_golden` EXACT MATCH 16,000 px・ネガコン 2/2 OK (6.4 s)、`simd_e2e` ALL PASS (14.3 s)、`present/e2e.sh` (`PRESENT_SKIP_BENCH=1`) 7 pass / 0 fail (10.0 s)、`check_p1_tests` 51 APIs / 51 実装・テスト付き (0.14 s) |
+- ネガティブコントロール (下の「ネガコン実測」): `bash tools/gui/input/negctl.sh` (壊したコピーを `build/negctl` に作りリポジトリのソースは変更しない。変異が効かなければ「broken control」として未検出扱い)。
+- 数え方: selftest の passed は `CHK` 成立数 (assertion)。Chrome e2e の検査は `ck()` 行数。
+
+### ネガコン実測 (`bash tools/gui/input/negctl.sh`, 検証起点 `8dd9457`)
+| 変異 (ソース 1 箇所を壊す) | 検出した層 | 結果 (passed / failed、または FAIL 件数) |
+|---|---|---|
+| nc1 物理キー → 現配列 VK 変換 (`kbd_layout_vk`) を無効化 | selftest | 492 passed / **1 failed** → 検出 |
+| nc2 DE の Z/Y の配置を入替 | selftest | 488 passed / **5 failed** → 検出 |
+| nc3 AltGr (Ctrl+Alt) の文字表を無視 | selftest | 490 passed / **3 failed** → 検出 |
+| nc4 WM_IME_COMPOSITION の結果送信フラグを GCS_COMPSTR に変更 | selftest | 490 passed / **3 failed** → 検出 |
+| nc5 ZOOM の接触数補正 (離す接触を数えない) を削除 | selftest | 492 passed / **1 failed** → 検出 |
+| nc6 ClipCursor の clamp を無効化 | selftest | 492 passed / **1 failed** → 検出 |
+| nc7 MAPVK_VK_TO_CHAR の英字大文字化を削除 (本 PR の B4 修正の逆) | selftest | 490 passed / **3 failed** → 検出 |
+| nc8 POINTER_LOCK 要求の push を削除 (本 PR の B5 検査の対象) | selftest | 492 passed / **1 failed** → 検出 |
+| host-1 KEY の scancode を flags から落とす (gui.ts) | Chrome e2e | exit 1 / **6 FAIL** → 検出 |
+| host-2 IME update の送信を落とす (gui.ts) | Chrome e2e | exit 1 / **1 FAIL** → 検出 |
+| host-3 touch 分岐を無効化 (touch→mouse 昇格が効かない) (gui.ts) | Chrome e2e | exit 1 / **6 FAIL** → 検出 |
+| host-4 Pointer Lock 要求の発行を落とす (gui.ts) | Chrome e2e | exit 1 / **1 FAIL** → 検出 |
+
+- 結果: shim 8 件 + host 4 件 = **12 件すべて検出、検出漏れ 0** (`[negctl] 合計 検出漏れ: 0`, exit 0)。所要 real 2 分 34.66 秒 (user 1 分 18.27 秒)。各変異は壊したコピー (`build/negctl`) で実行し、ソースは変更していない。
+
+### 範囲外・未達
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+`bash tools/gui/e2e.sh` 全体は `d1b656dd` で ALL PASS (exit 0, real 2m1.355s; PE lift 層 2/6〜6g/6 を含む; `0b71ab1` では real 1m36.108s)。`input/e2e.sh` は ALL PASS (22 検査, real 4.220s)、`input/negctl.sh` は 12 件検出・検出漏れ 0 (real 2m57.712s)。範囲外の残りは下記の行。
+| WM_POINTER* / RegisterPointerInputTarget 系 (FL の import に無い) と慣性ジェスチャ (GID_PAN の GF_INERTIA)・GID_ROTATE/TWOFINGERTAP/PRESSANDTAP | issue スコープ「タッチ → WM_POINTER*」の一部が未実装 | #182 (実到達ログ: #174 で FL が呼ぶと確定したら) |
+| GID_PAN (1 本指移動の WM_GESTURE) は実装のみで selftest / e2e に検査が無い | パン操作の回帰を検知できない | #182 (テスト追加は次の作業。PM 判断: 今回の PR で足すか) |
+| 配列は US/DE/FR のみ・dead key・IME 配列・実 Windows の KBD テーブルとの照合なし (表は公開仕様から手作成)。Caps の数字行 shift-lock 近似 | 他配列では US 相当に落ちる。表の誤りは実機でしか見つからない | #182 (日本語 JIS/実機確認はユーザ依頼候補; 着手時に具体依頼を起票) |
+| 実機確認 (OS の日本語 IME・実タッチ端末・実 Pointer Lock 成立) は未実施。headless Chrome では Pointer Lock は要求呼出回数と `movementX` 積算のみ検証 (ロック成立は `locked` を直接設定して代用) | 実環境での成立可否・IME 候補ウィンドウ位置が未確認 | #182 (ユーザ依頼: 実機 Chrome での手動確認) |
+| `touch-action: none` を GUI canvas 全体に適用 (上記「ブラウザ既定動作」; PM 承認 2026-10-13) | タッチ非対応の GUI でもブラウザ既定のパン/ズームが無効 | 限定 (RegisterTouchWindow 済み窓のみ) は #182 に改善として残す |
+| `tools/gui/integ/sigprobe.sh` の未解決 import 検査は `wasm-objdump` (wabt) 不在で空振り (`|| true` により `unresolved-imports=0` を無検査で通す。main 既存) | 「未解決 import なし」の確認が無効 (`signature mismatch` の検査は有効) | #741 (GUI-16) |
+| IME 属性/文節 (GCS_COMPATTR/COMPCLAUSE) と変換候補リスト (ImmGetCandidateList) は未提供 | FL が使えば fail-fast ではなく空を返す | #174 到達ログ後に #182 |
+| WM_CHAR 合成は host (gui.ts `key()`) のまま (pump 側 TranslateMessage は未変更) | #103 の補足にある pump 側合成との統合は未決 | #121 (RT-3: 入力 producer 結線) と合わせて決定 |
+| 既存: native selftest の ASan UAF flake | `e2e.sh` 1/6 が時々 FAIL | #489 (既存) |
+
+### 再現
+```
+bash tools/gui/test/selftest.sh        # native 492 assertion
+bash tools/gui/input/e2e.sh            # Chrome + CDP 入力 (tsc → emcc → headless Chrome)
+bash tools/gui/input/negctl.sh         # ネガコン (shim 8 + host 4; 合計 real 2 分 34 秒)
+```
+
+## 16. GUI-5 (#181) 続き: e2e.sh 全体と wasm shim 全体の SIMD/scalar 比較
+
+既知類型との関係: lift 欠陥ではなく shim の意味論 (§10 の同一サーフェス複数クリップ欠陥は `docs/DEFECTS.md` D18 に登録)。
+検証起点: 現 HEAD `fcd564bc` (main `c5df4657` 取り込み後)。`tools/gui/src`・`include` は `e11701db` と同一 (`git diff --quiet e11701db fcd564bc -- tools/gui/src tools/gui/include` で 0 差分)。本節の測定値は全て `fcd564bc` の実測。`e11701db`・`b44ddcd` 等の旧 HEAD の値は直前の試行として試行表に残す。runner 4 CPU、`[EMSDK]`・`[RETDEC]`、mingw-w64 GCC 13 (apt `gcc-mingw-w64-x86-64`)。emcc は `[EMSDK]` の `upstream/emscripten`・`upstream/bin` を PATH に直接指定 (`emsdk_env.sh` が emcc を PATH に出さないため)。6/6 の `tools/e2e` (agent-browser) は `npm ci` (`tools/e2e/package-lock.json`) が前提。`fl-win64` は本 run で不要 (e2e の step 3 は `test/gui_app.c` を使う)。
+
+### 1. `bash tools/gui/e2e.sh` (RetDec 付き・全層)
+
+| HEAD | 試行 | 実行者 | rc | 所要 | load (開始→終了) | 1/6 selftest | ASan UAF |
+|---|---|---|---|---|---|---|---|
+| `fcd564bc` | **現 HEAD (本節)** 1 回目 | 本 run (fix モード) | 2 | 188 s | 0.58 → 2.53 | 428 passed (1/6) | 0 件。6/6 で `tools/e2e` 未導入の spawnSync ENOENT → `npm ci` 後に再実行 |
+| `fcd564bc` | **現 HEAD (本節)** 2 回目 (全体) | 本 run (fix モード) | **0** | **185 s** | 2.13 → 2.84 | 428 passed / 0 failed | 0 件 |
+| `fcd564bc` | wbench (`wbench.sh 5`) | 本 run | 0 | 19 s | 2.49 → 2.24 | — | — |
+| `e11701db` | 直前の試行 (全体) | 本 run (前回) | 0 | 188 s | 0.55 → 2.70 | 428 passed / 0 failed | 0 件 |
+| `e11701db` | selftest 単体 20 回連続 | 本 run (前回) | 0 (20/20) | 256 s (1 回約 13 s) | 1.91 → 1.49 | 428 passed / 0 failed (20 回) | 0 件 (20 回) |
+| `b44ddcd` | 直前の試行 | 本 run (前回) | 0 | 99 s | 0.75 → 1.11 | 428 passed | 0 件 |
+| `b44ddcd` | (修正前 `a440fe9` の 6f/6 が rc=1) | 本 run (前回) | 1 | 27 s / 109 s | — | 1c0/6 通過。6f/6 の `node --test` 集計 grep が 0 行で rc=1 → `b44ddcd` で修正 | — |
+| `1457db3` | T1 | bot (PR コメント) | 1 | 15 s | — | 1/6 で ASan heap-use-after-free | **発火** |
+| `1457db3` | T2 | bot (PR コメント) | 0 | 189 s | — → 2.13 | 426 passed | 0 |
+| `1457db3` | R1 | レビュワー独立 | — | — | — | 426 passed (5/6 は検証用 worktree の `node_modules` 不在で停止。不計上) | 0 |
+| `1457db3` | R2 | レビュワー独立 | 1 | — | — | 1/6 で ASan heap-use-after-free (`gui_headless.c:33 blit_surf` ↔ `gui_core.c:177 surf_free`) | **発火** |
+| `1f20ec7` | run1 | 検証 subagent | 0 | 173 s | 0.11 → 1.71 | 426 passed | 0 |
+| `1f20ec7` | run2 | 検証 subagent | 0 | 102 s | 1.33 → 1.44 | 426 passed | 0 |
+| `ea7a538` | run3 | 検証 subagent | 0 | 104 s | 2.81 → 2.18 | 428 passed | 0 |
+
+- **結論**: 現 HEAD `fcd564bc` で rc=0・ALL PASS (2 回目の全体 run、185 s)。1/6 の selftest は 428 passed / 0 failed、ASan UAF は 0 件。1 回目の全体 run は 6/6 で rc=2 (`tools/e2e` の依存未導入、ENOENT による spawn 失敗。コード起因ではない) のため、`npm ci` 後に全体を再実行した。1 回目の失敗ログは 1/6 〜 6/6 の手前まで全層 PASS。
+- **#489 の扱い (修正後の判定)**: `4f303d4` (#622, #489 修正) を取り込んだ `e11701db` で、selftest 単体を 20 回連続実行して 20/20 PASS・ASan 0 件。修正前 (`1457db3` 系の src、#489 修正なし) では 1/6 に到達した有効 7 回中 2 回 (T1・R2) が ASan UAF で rc=1 だった。修正後は `e11701db` の selftest 20 回連続 + `fcd564bc` の e2e 全体 2 回 (1 回目は 6/6 の依存欠落で rc=2 だが 1/6 までは PASS、2 回目 rc=0) で、いずれも ASan 0 件。20 回の結果は修正前の発火率と比べて有意な差を示すが、1 回ごとの確率事象であるため「解消の証明」ではない。受入判断 (#489 の検収) は PM に任せる。
+- 試行数: 1/6 に到達した有効試行は、修正前 7 回 (T1・T2・R1・R2・run1・run2・run3) で ASan UAF は 2 回 (T1・R2)。修正後 (`e11701db`・`fcd564bc`) は selftest 単体 20 回 + e2e 全体 2 回 (1/6 到達 2 回) で 0 回。
+- 層ごとの結果 (`fcd564bc` 2 回目、`e2e.sh` の標準出力より。全体 rc=0、185 s、load 2.13 → 2.84):
+
+| 層 | 結果 (`fcd564bc`) |
+|---|---|
+| 1/6 selftest (ASan/UBSan) | 428 passed / 0 failed (ASan 0 件) |
+| 1b/6 bpp golden | EXACT MATCH (16,000 px, 0 diff)。negctl 2/2 OK |
+| 1c0/6 FreeType テキスト | text golden ALL PASS (pixels 3826 fg px・0 differing、metrics 30 rows・0 differing)。negctl 4/4 OK。ft-wasm native == wasm32 (TOTAL edd537e3b390f846) |
+| 1d/6 NC golden | asserts 26 passed / 0 failed。EXACT MATCH (28,000 px, 0 diff)。negctl 3/3 OK |
+| 2/6 native lift (PE→RetDec→gcc) | golden EXACT MATCH 0 / 64,000 px |
+| 2b/6 reach / adapt | 11 passed / 28 passed |
+| 1c/6 SIMD == scalar | 15,679 ケース不一致 0。故意欠陥 `GS_FAULT=1〜4` は 1,632 / 271 / 252 / 268 件で FAIL。v128 系命令 simd=1,074 / `-DGUI_NO_SIMD` 0 |
+| 4b/6 GUI-13 ブラウザ text e2e | 8x8 回帰 0 px・metrics 30 行一致、negctl N1〜N5 全て拒否 (1944〜4558 px 差)。PASS |
+| 6/6 Chrome (固定 memory) | OffscreenCanvas readback・screenshot とも EXACT MATCH (0 px) |
+| 6a/6 ネガコン (golden 改竄) | exit 1 で拒否 |
+| 6b/6 Chrome (ALLOW_MEMORY_GROWTH) | 同上 EXACT MATCH (0 px) |
+| 6c/6 fail-fast | OK (EXIT 0xfa11、API 名を console に出力) |
+| 6d/6 reach-log | OK: 36 APIs (reached=36 impl=36 stub=0) |
+| 6e/6 sigprobe | signature mismatch=0 (陰性対照 177)。`unresolved-imports=0` は `wasm-objdump` 不在で空振り (#180) |
+| 6f/6 present e2e | `# pass 7 / # fail 0`、ALL PASS (load 3.21 → 3.76) |
+| 6g/6 ストレス (GUI-8) | 固定 memory: 50,010 frames・inDropped 0・mem 134,217,728 → 134,217,728・surface gen 不変 (`{"0":1}`)。ALLOW_MEMORY_GROWTH: 50,010 frames・inDropped 0・mem 3,801,088 → 4,194,304 (bufChanges 6)。post-stress readback EXACT MATCH (0 px ×2)。ネガコン burst: input ring drop 198,970 件で exit 1、leak: 後半 3,801,088 → 3,932,160 で exit 1 |
+
+### 2. wasm 全体 (shim の API 単位) の SIMD128 / scalar: `bash tools/gui/test/wbench.sh 5`
+
+`fcd564bc` で 1 回 (rc=0, 19 s, load 2.49 → 2.24)。同一 `test/bench.c` を `-msimd128` / `-DGUI_NO_SIMD` で emcc ビルドし交互に 5 回ずつ (n=5, min–max ms/frame, 1920x1080, node v22.23.3)。最終 wasm の v128 系命令は simd=831 / scalar=0 (取り違えは exit 1)。`min 比` = scalar の最小 / simd の最小。
+
+| API | scalar | simd128 | min 比 |
+|---|---|---|---|
+| BitBlt SRCCOPY mem→mem (memmove) | 3.17–3.63 | 3.20–3.53 | 0.99x |
+| BitBlt SRCCOPY mem→window | 0.27–0.33 | 0.27–0.30 | 1.00x |
+| BitBlt SRCINVERT (per-pixel) | 2.93–3.03 | 0.40–0.43 | 7.33x |
+| StretchBlt 2x nearest | 1.57–1.57 | 0.53–0.53 | 2.96x |
+| StretchDIBits 1:1 (per-pixel) | 1.13–1.17 | 0.37–0.47 | 3.05x |
+| AlphaBlend per-pixel α (sca=128) | 14.47–14.63 | 2.07–2.10 | 6.99x |
+| AlphaBlend 定数 α (sca=128) | 14.30–14.67 | 1.50–1.53 | 9.53x |
+| BitBlt SRCPAINT (per-pixel) | 3.27–3.33 | 0.33–0.37 | 9.91x |
+| StretchDIBits 24bpp 1:1 | 2.77–2.80 | 2.00–2.10 | 1.39x |
+| StretchDIBits 8bpp 1:1 | 2.13–2.20 | 1.40–1.47 | 1.52x |
+| BitBlt SRCCOPY from 24bpp DIB section | 2.30–2.60 | 2.23–2.37 | 1.03x |
+| BitBlt SRCCOPY into 24bpp DIB section | 3.97–4.10 | 4.20–4.40 | 0.95x |
+| FillRect solid | 0.40–0.43 | 0.23–0.27 | 1.74x |
+| BitBlt → window + present (headless) | 0.27–0.33 | 0.27–0.33 | 1.00x |
+
+- SRCCOPY・mem→window・present の行は SIMD の対象外か pull/push が支配的で、1.0x 付近 (範囲が重なる誤差内)。24bpp 先 (0.95x) と 24bpp DIB 源 (1.03x) は SIMD の効果がほぼ無い。
+- 1 回の測定のため、min 比の小数第 2 位は揺れる。AlphaBlend の値は実行ごとに変わる (`e11701db` 時の 4.57x〜5.01x・`b44ddcd` 時の 3.87x〜4.01x とは別の測定)。
+- 画素一致は §10 と本付録 §1 の 1c/6 が担い、本 bench は時間のみ。
+- **未取得**: Chrome 上の lift 済みアプリでの API 単位 frame time。`gui_app.c` は 320x200 の静的シーンで、e2e の bench は renderer 側 (変換 + putImageData) のみを測るため shim の時間を分離できない。実 FL (#174) 到達後に取る。
+
+### 3. 未解決 (起票先付き)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 修正後 `e2e.sh` 全体の連続 PASS 試行 (`fcd564bc` で 1 回、`e11701db` で 0 回 = 合計 1 回。`fcd564bc` の 1 回目は 6/6 の依存欠落で rc=2) | 1/6 の ASan UAF が全体 run で再発しないことは 1 回のみ確認 | #489 `[GUI-12]` (既存)・PM |
+| `integ/sigprobe.sh` の `unresolved-imports` が `wasm-objdump` (WABT) 不在で空振り | 「未解決 import なし」の検査が無効 (`mismatch=0` と陰性対照は有効) | #180 (既存コメント) |
+| Chrome 上の lift 済みアプリの API 単位 frame time | 未取得 | #181 → 実 FL (#174) 到達後 |
+
+### 4. 再現
+
+```
+bash tools/gui/e2e.sh             # 全層 (fcd564bc: 185 s)。前提: x86_64-w64-mingw32-gcc、RetDec ([RETDEC])、emsdk ([EMSDK]; emcc を PATH に)、node_modules (pnpm install)、tools/e2e の依存 (npm ci)
+bash tools/gui/test/wbench.sh 5   # wasm SIMD/scalar の API 単位比較 (fcd564bc: 19 s)
+bash tools/gui/test/selftest.sh   # 1/6 単体 (e11701db: 1 回約 13 s、20 回連続 20/20 PASS)
+```

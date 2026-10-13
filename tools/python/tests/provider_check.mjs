@@ -39,30 +39,37 @@ assert.equal(E("general.getVersion").code, 2);                       // 未実�
 assert.equal(E("ilmcp.showHighlight", "a").code, 5);
 assert.equal(E("mixer.getCurrentTempo", 1, 2).code, 5);
 
-// 2b. ilmcp.getBrowserNames の固定バッファ (q[512] / full[288] / e[576] / b[2048]) 境界。
-//   収まらない入力は切り詰めず Range error (code 4)。エスケープ後の名前長を X とすると b の長さ = 59 + 4X、
-//   b は NUL 込みで X <= 497。制御文字 1 個は 6B (\u00XX) に展開される。
-const BN = ["Fruity Slicer", "3x Osc", "Sampler"];
-const browse = (nm) => E("ilmcp.getBrowserNames", nm, 0);
-const okBrowse = (nm) => ({ ok: { name: nm, items: BN.map((n) => `${nm}/${n}`) } });
-const RANGE_ERR = { err: "Range error", code: 4 };
-const fits = ["", "db", 'a"b\\c', "\x01\x1f\n\t", "あ".repeat(90), "a".repeat(273), "\x01".repeat(80) + "a".repeat(17)];
-const overflows = [
-  "a".repeat(274),                      // full[288]: 274 + "/Fruity Slicer" = 288B
-  "\x01".repeat(80) + "a".repeat(18),   // X = 498: q / full / e は収まり b[2048] だけが溢れる
-  "\x01".repeat(85),                    // X = 510: q[512]
-  "\x01".repeat(100),                   // reviewer 再現ケース (b を越えて書いていた)
-  "a".repeat(100000),
-];
-const brief = (r) => JSON.stringify(r).slice(0, 100);
-const bad = [];
-for (const nm of fits) if (JSON.stringify(browse(nm)) !== JSON.stringify(okBrowse(nm))) bad.push(`収まる入力 ${nm.length} 文字: ${brief(browse(nm))}`);
-for (const nm of overflows) {
-  const r = browse(nm);
-  if (JSON.stringify(r) !== JSON.stringify(RANGE_ERR)) bad.push(`溢れる入力 ${nm.length} 文字: ${brief(r)}`);
-  if (JSON.stringify(browse("db")) !== JSON.stringify(okBrowse("db"))) bad.push(`溢れた後に engine が異常 (${nm.length} 文字)`);
+// 2b. ilmcp.getBrowserNames は host/ilmcp.mjs と同じ木を返す (JS 側の期待値を独立に計算して照合)。
+//   不明パス・長大な入力は code 1 (Invalid value) の FL エラーになり、engine は壊れない。
+const ILM = JSON.parse(fs.readFileSync(new URL("analysis/ilmcp/plugin_catalog.json", root))).entries;
+const expectList = (path, rec) => {
+  const parts = path.split("/").map((s) => s.trim()).filter(Boolean);
+  const tree = { dirs: new Map(), items: [] };
+  for (const e of ILM) {
+    let m = tree;
+    for (const d of e.path) { if (!m.dirs.has(d)) m.dirs.set(d, { dirs: new Map(), items: [] }); m = m.dirs.get(d); }
+    m.items.push(e);
+  }
+  let n = tree;
+  for (const d of parts.slice(1)) n = n.dirs.get(d);
+  const out = [];
+  const walk = (node, prefix) => {
+    for (const d of [...node.dirs.keys()].sort((a, b) => a.localeCompare(b))) {
+      out.push(`${prefix}${d}/`);
+      if (rec) walk(node.dirs.get(d), `${prefix}${d}/`);
+    }
+    for (const e of [...node.items].sort((a, b) => a.name.localeCompare(b.name))) out.push(`${prefix}${e.name}`);
+  };
+  walk(n, "");
+  return out;
+};
+for (const [p, r] of [["Plugin database", 0], ["Plugin database", 1], ["Plugin database/Generators/Drum", 0], ["Plugin database/Effects", 1]]) {
+  assert.deepEqual(E("ilmcp.getBrowserNames", p, r).ok, expectList(p, r), `getBrowserNames(${p}, ${r})`);
 }
-assert.deepEqual(bad, [], "ilmcp.getBrowserNames の固定バッファ境界");
+assert.equal(E("ilmcp.getBrowserNames", "Nowhere", 0).code, 1);
+assert.equal(E("ilmcp.getBrowserNames", "Plugin database/Nope", 1).code, 1);
+assert.equal(E("ilmcp.getBrowserNames", "\x01".repeat(100000), 0).code, 1);
+assert.equal(E("general.getVersion").code, 2);                       // 直後も engine は正常
 
 // 3. 戻り型は C 側 (整数値の float でも D): Python 側で type を見る
 const py = await FlPython.create({
@@ -84,7 +91,7 @@ R.append(("cnt", type(channels.channelCount()).__name__))
 R.append(("sel", type(channels.isChannelSelected(0)).__name__))
 R.append(("none", mixer.setTrackName(1, "x")))
 R.append(("kw", channels.getChannelName(value=0, useGlobalIndex=False)))  # kwlist はバイナリ由来 (stubs の index ではなく value)
-R.append(("json", type(ilmcp.getBrowserNames("db", 0)).__name__))
+R.append(("json", type(ilmcp.getBrowserNames("Plugin database", 0)).__name__))
 def exc(f, *a):
     try: f(*a)
     except Exception as e: return (type(e).__name__, str(e)[:40])
@@ -108,8 +115,8 @@ assert.deepEqual(m.cnt, ["int"]);
 assert.deepEqual(m.sel, ["bool"]);
 assert.deepEqual(m.none, [null]);
 assert.deepEqual(m.kw, ["Kick"]);
-assert.deepEqual(m.json, ["dict"]);
+assert.deepEqual(m.json, ["list"]);
 assert.deepEqual(m.range[0], ["IndexError", "Index out of range"]);
 assert.equal(m.type[0][0], "TypeError");
 assert.equal(m.unimpl[0][0], "RuntimeError");
-console.log(JSON.stringify({ functions: ids.length, implemented: impl, unimplemented: unimpl, mcp_static: mcp.size, browser_names_cases: fits.length + overflows.length, PASS: true }));
+console.log(JSON.stringify({ functions: ids.length, implemented: impl, unimplemented: unimpl, mcp_static: mcp.size, PASS: true }));
