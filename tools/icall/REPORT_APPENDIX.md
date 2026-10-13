@@ -191,6 +191,23 @@ awk -F'\t' -v a=401 -v b=404 'NR>1 && $1>=a && $1<=b {s+=$4; l+=$5; n+=$6; u+=$7
 | 落ちた site と stub のブロック単位の 1 対 1 対応 | 受入条件 2 の完全な分類 | #1014 (継続) |
 | 修正して kept を 366 から減らす | 受入条件 3 | #1014 (継続) |
 
+#### 12.4.1 本 run (HEAD `12586095`) の実測と、分類で判明した点
+
+測定経路 (`measure_flengine_split.sh` / `roundtrip.sh` / `audit_icall.py` / `passes_stub_count.py` / `ir_icall_restore.py` / `icall_rewrite.py`) のコード差分は `711b58ca` → `12586095` で 0 行。素材 `fl-win64` / `toolchain-retdec` を `$RUNNER_TEMP` に展開して測定した。
+
+- `measure_flengine_split.sh`: 132.7 s (real, 4 core)。base 366 / c2 366 (基準どおり)。`kept_indirect` 8、dropped 366。
+- `passes_stub_count.py` の段 dump: 709 passes。`Global Value Numbering` 183 / 192 → `Sparse Conditional Constant Propagation` 0 / 9 (§12.1 と一致)。
+- `after.0.restored.ll` の `__icall_dispatch(i64 <site VA>)` は 8 件で、`sites_after.json` の kept 8 と一致。dropped 366 の site VA は restored IR に現れない (stub 呼出しごと消えている)。
+
+**分類を試みて未了の点 (本 run で判明)**:
+
+- 段 dump (`--print-after-all`) の本体には `!N = !{i64 VA}` の META 定義が無い。`insn.addr` を VA に直すには最終 `.ll` の META 表が要るが、段 dump の `!N` 番号と最終 `.ll` の `!N` は一致しない (例: 最終 `.ll` の `!392` は `30189433` (0x1cca779) で、stub 呼出しの VA と対応しない)。
+- `map.json` の `sites[].new` (書換え後 VA) は、最終 `.ll` の `insn.addr` の VA 体系と一致しない (`new` と META 値の共通 0 件)。突合キーの対応は未確定。
+- 結論: site → 段 dump 上のブロックの突合は、現在の成果物 (`map.json` / 最終 `.ll`) だけでは組めない。段 dump ごとの `insn.addr` → VA 対応 (`!N` 定義を段単位で保存する) を取り直す必要がある。
+- 分類スクリプトは本 run では完成していない (PR に含めず、退避)。
+
+**受入条件 2・3 は本 run でも未達。** 次 run の入力: `oc_artifacts: fl-win64 toolchain-retdec` (本 run と同じ) で、段 dump の META を段単位で保存する修正から始める。
+
 ## 14. ICALL-16: stack 引数の動的検証の実測 (#1023, REPORT.md §12 から分割移動)
 
 結論: **OTT では stack 引数の値一致を動的に検証できない** (stack 引数あり site が実行経路に無い)。達成は未了で、残りは #854 / #229 が追跡する。
