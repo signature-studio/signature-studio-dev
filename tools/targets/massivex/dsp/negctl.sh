@@ -6,8 +6,9 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 BASE="$(cd "$HERE/.." && pwd)"; DSP="$BASE/dsp"; W="$DSP/work"
+source "$HERE/../../../shared/env.sh"
 PE="${MX_PE:-$BASE/work/extracted/VST3/Massive X.vst3}"
-X64C="${MX_X64C:-/home/ubuntu/work/webstudio/tools/flelift/x64c.py}"
+X64C="${MX_X64C:-$REPO_ROOT/tools/flelift/x64c.py}"
 
 echo "=== NC1: root を dummy に置換 (surface 567 -> 1) ==="
 python3 - "$W" <<'PY'

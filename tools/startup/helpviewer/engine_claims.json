@@ -1,0 +1,63 @@
+{
+  "dll": {"size": 22227016, "sha256": "b2c64da40921cf262c15c5b25c2b0422e4d1851e953c87e0bc38ed2c19f9496d", "note": "FLEngine_x64.dll 26.1.7.5653 (fl-win64: extracted/block00031_PE.bin)"},
+  "funcs": {
+    "0x10bdaf0": "HelpIsOffline (Help\\index_offline.html の有無 + 強制オフライン設定/オンライン検出)",
+    "0x10bdbe0": "OpenHelpTarget (パス/URL を開く最終段)",
+    "0x10bde00": "HelpRedirectUrl (Help\\Redirects\\<name>.url)",
+    "0x10bdf30": "HelpPathFmt (/html/%s の整形・Help 内探索)",
+    "0x10be5c0": "HelpUrl (トピック → Help\\html\\<topic>、無ければ index_offline.html)",
+    "0x10be860": "HelpPluginOpen (プラグイン別ヘルプ)",
+    "0x10be8c0": "HelpFdDocUrl (/html/FD/web/documents/%s.html)",
+    "0x10bea60": "HelpPluginUrl (/html/plugins/%s.htm)",
+    "0xdb0460": "ブラウザページの初期化 (オフライン時の error ページ = System\\Internet\\error-offline.html)",
+    "0x64ba80": "IsOnline (InternetGetConnectedState != 0)",
+    "0x11a57c0": "LoadSettings ('OfflineHelpBox' を含む)",
+    "0xf1d660": "WhatsNew.htm の表示"
+  },
+  "strings": {
+    "0x10bdaf0": ["index_offline.html"],
+    "0x10be5c0": ["index_offline.html", "/html/%s", "Help"],
+    "0x10be8c0": ["index_offline.html", "/html/FD/web/documents/%s.html"],
+    "0x10bea60": ["index_offline.html", "/html/plugins/%s.htm"],
+    "0x10bde00": ["Redirects\\", ".url"],
+    "0xdb0460": ["file://", "error-offline.html"],
+    "0x11a57c0": ["OfflineHelpBox"]
+  },
+  "calls": [
+    ["0x10bdaf0", "0x64ba80"],
+    ["0x10be5c0", "0x64ba80"], ["0x10be5c0", "0x10bdf30"], ["0x10be5c0", "0x10bdbe0"],
+    ["0x10be8c0", "0x64ba80"], ["0x10be8c0", "0x10bdf30"], ["0x10be8c0", "0x10bdbe0"],
+    ["0x10bea60", "0x64ba80"], ["0x10bea60", "0x10bdf30"],
+    ["0x10be860", "0x10bea60"], ["0x10be860", "0x10bdbe0"],
+    ["0x10bdf30", "0x10bde00"],
+    ["0xdb0460", "0x64ba80"],
+    ["0xf1d660", "0x10bdaf0"],
+    ["0x10be820", "0x10be5c0"], ["0x10be840", "0x10be5c0"],
+    ["0x10d0ff0", "0x10be8c0"]
+  ],
+  "imports": {
+    "0x5928b0": "shell32.dll!ShellExecuteW",
+    "0x592a90": "wininet.dll!InternetGetConnectedState"
+  },
+  "calls_import": [
+    ["0x10bdbe0", "0x5928b0"],
+    ["0x64ba80", "0x592a90"]
+  ],
+  "bytes": [
+    {
+      "func": "0x10bdbe0", "site": "0x10bdd8e", "thunk": "0x5928b0",
+      "hex": "33c933d24989c04d33c948c744242000000000c744242805000000e8",
+      "note": "ShellExecuteW(hwnd=NULL, lpOperation=NULL, lpFile=url, NULL, NULL, SW_SHOW=5) — 動詞は NULL"
+    },
+    {
+      "func": "0x10bdaf0", "site": "0x10bdb0b", "thunk": null,
+      "hex": "488b8030110000" ,
+      "note": "(位置確認用) 設定オブジェクト +0x1130 を読む"
+    },
+    {
+      "func": "0x10bdaf0", "site": "0x10bdb12", "thunk": null,
+      "hex": "83b8c003000002",
+      "note": "cmp dword [設定+0x3c0], 2 — 値 2 = 'Use offline help' (強制オフライン)"
+    }
+  ]
+}

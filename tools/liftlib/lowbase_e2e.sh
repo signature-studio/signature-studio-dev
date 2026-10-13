@@ -16,7 +16,9 @@
 #                 tools/hostbridge/lowbase (audit_va.py / build_x64c.sh / diff/matrix.py), python3 (capstone, pefile)
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; T="$HERE/.."; LB="$T/hostbridge/lowbase"
-DLL=/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll
+source "$T/shared/env.sh"
+DLL="${OTT_DLL:-$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll}"
+[ -f "$DLL" ] || { echo "[lowbase_e2e] $DLL 無し (PLUGINS_DIR / OTT_DLL を確認)" >&2; exit 2; }
 QUICK=""; FULL=0
 for a in "$@"; do case "$a" in --quick) QUICK="--quick";; --full) FULL=1;; esac; done
 export PATH="$PATH:/opt/emsdk/node/24.19.0_64bit/bin"

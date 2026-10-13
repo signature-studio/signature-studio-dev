@@ -51,3 +51,12 @@ fi
 # stock python.js (node/browser 用 CLI) まで通す。共有 ext module (xxlimited 等) は静的化されるので不要。
 emmake make -j"$(nproc)" python.js >make.log 2>&1
 ls -la libpython3.12.a python.js python.wasm python.data
+
+# LGL-3 (#86): 再ビルド記録 (upstream 版・ソース sha256・configure 引数)。build_flpy.sh は CPython ソースにパッチを当てない
+node "$HERE/../legal/notices/record.mjs" --id "cpython-$PYVER" --name CPython --version "$PYVER" --license-spdx PSF-2.0 \
+  --url "https://www.python.org/ftp/python/$PYVER/Python-$PYVER.tgz" --archive "$WORK/Python-$PYVER.tgz" \
+  --src-dir "$SRC" --license-file LICENSE \
+  --script "$HERE/build_cpython_wasm.sh" --toolchain emcc --target wasm32 \
+  --step "configure-native=./configure -C (emsdk を PATH から外した native build python 用)" \
+  --step "configure-wasm=env py_cv_module__sqlite3=n/a py_cv_module_xxlimited=n/a py_cv_module_xxlimited_35=n/a py_cv_module__codecs_cn=n/a py_cv_module__codecs_hk=n/a py_cv_module__codecs_iso2022=n/a py_cv_module__codecs_jp=n/a py_cv_module__codecs_kr=n/a py_cv_module__codecs_tw=n/a py_cv_module__multibytecodec=n/a CONFIG_SITE=Tools/wasm/config.site-wasm32-emscripten emconfigure ./configure -C --host=wasm32-unknown-emscripten --build=<config.guess> --with-emscripten-target=browser --disable-ipv6 OPT=\"-DNDEBUG -fwrapv -O3\" --with-build-python=<native python>" \
+  --step "make=emmake make python.js"

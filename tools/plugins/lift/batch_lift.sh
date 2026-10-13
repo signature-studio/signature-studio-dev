@@ -4,7 +4,10 @@
 #   bash tools/plugins/lift/batch_lift.sh --tier T0                  (PLUGIN_MATRIX.json の Tier 全件)
 # 出力: work/batch/<block>/ (IR, simd C, report) と work/batch/status.csv
 # 注意: ここでは **固有閉包のみ** を lift する (framework frontier は P0 で別途 lift した共有 lib を想定)。
-#       ステータス列: block,name,closure_funcs,closure_bytes,lift_rc,defines,declares_unimpl,f80_funcs,emcc_c_rc,seconds
+#       ステータス列: block,name,closure_funcs,closure_bytes,lift_rc,defines,declares_unimpl,f80_funcs,emcc_c_rc,seconds,icall,dispatch_calls
+# 間接 call 復元 (tools/icall の binary pre-rewrite → RetDec → ir_icall_restore) は既定 ON (PLUG_ICALL=1)。
+#       PLUG_ICALL=0 で従来鎖 (間接 call は RetDec が decoder 段で捨てる = (icall §4) D1)。 dispatch_calls = p.final.ll の `call void @__icall_dispatch(` 行数。
+#       回帰ゲート: python3 tools/plugins/f2/icall_gate.py <block> ... (IR の dispatch site が機械語の間接 call site を全て覆わないと exit 1)
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
@@ -25,8 +28,9 @@ for p in M:
 PY
 )
 fi
+export PLUG_ICALL="${PLUG_ICALL:-1}"
 mkdir -p work/batch
-[ -f work/batch/status.csv ] || echo "block,name,closure_funcs,closure_bytes,lift_rc,defines,declares_unimpl,f80_funcs,emcc_c_rc,seconds" > work/batch/status.csv
+[ -f work/batch/status.csv ] || echo "block,name,closure_funcs,closure_bytes,lift_rc,defines,declares_unimpl,f80_funcs,emcc_c_rc,seconds,icall,dispatch_calls" > work/batch/status.csv
 python3 lift/plugin_closure.py "${BLOCKS[@]}" > /dev/null
 for b in "${BLOCKS[@]}"; do
   PE="$FL_WIN64_DIR/extracted/block$(printf %05d "$b")_PE.bin"
@@ -53,6 +57,7 @@ PY
 )
   # IR が wasm バックエンドを通るか (compile のみ; link/実行は個別検証)
   ( source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1; TMPDIR="$OUT/tmp" emcc -c "$OUT/p.final.ll" -o "$OUT/p.o" -w -O0 -msimd128 > "$OUT/emcc.log" 2>&1 ); erc=$?
-  echo "$b,$NAME,${CF%% *},${CF##* },$rc,$DEF,${UNI:--1},$F80,$erc,$((t1-t0))" >> work/batch/status.csv
-  echo "[batch] $b $NAME rc=$rc defines=$DEF f80=$F80 emcc_c=$erc"
+  DSP=$(grep -c 'call void @__icall_dispatch(' "$OUT/p.final.ll" 2>/dev/null || true)
+  echo "$b,$NAME,${CF%% *},${CF##* },$rc,$DEF,${UNI:--1},$F80,$erc,$((t1-t0)),$PLUG_ICALL,${DSP:-0}" >> work/batch/status.csv
+  echo "[batch] $b $NAME rc=$rc defines=$DEF f80=$F80 emcc_c=$erc icall=$PLUG_ICALL dispatch=${DSP:-0}"
 done

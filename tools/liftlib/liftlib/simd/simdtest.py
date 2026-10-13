@@ -28,7 +28,19 @@ F64_POOL = [0.0, -0.0, 1.0, -1.0, 0.5, 2.0, 3.0, -2.5, 1e-3, 123.456, -7.25, 1e1
             1e-20, float("inf"), float("-inf")]
 
 
+YMM_BASES = ["vmovups", "vmovaps", "vmovupd", "vmovapd", "vmovdqu", "vmovdqa", "vinsertf128", "vextractf128", "vperm2f128",
+             "vaddps", "vsubps", "vmulps", "vdivps", "vminps", "vmaxps", "vaddpd", "vsubpd", "vmulpd", "vdivpd", "vsqrtps", "vsqrtpd",
+             "vandps", "vandpd", "vandnps", "vorps", "vorpd", "vxorps", "vxorpd", "vpand", "vpor", "vpxor", "vpandn",
+             "vpaddd", "vpaddq", "vpsubd", "vpsubq", "vpslld", "vpsrld", "vpsllq", "vpsrlq", "vpsrad", "vpshufd", "vshufps", "vshufpd",
+             "vunpcklps", "vunpckhps", "vunpcklpd", "vunpckhpd", "vcvtdq2ps", "vcvttps2dq", "vmovshdup", "vmovsldup", "vmovddup",
+             "vroundps", "vroundpd", "vhaddps", "vfmadd213ps", "vfmadd231ps", "vfmadd132pd", "vfnmadd213ps", "vfmsub231pd",
+             "vcmpltps", "vcmpneqpd", "vpcmpeqd", "vpcmpgtd", "vpmaxsw", "vpminsw", "vpunpckldq", "vpackssdw"]
+PCMP_BASES = ["pcmpistri", "vpcmpistri"]
+
+
 def domain(base):
+    if base.endswith("pcmpistri"):
+        return "str"
     b = base[1:] if base.startswith("v") and len(base) > 2 else base
     if b in ("cvtps2pd", "cvtps2dq", "cvttps2dq", "cvtss2sd", "cvtss2si", "cvttss2si", "movshdup", "movsldup",
              "rcpps", "rsqrtps", "rcpss", "rsqrtss", "movmskps", "roundss", "roundps"):
@@ -48,6 +60,20 @@ def domain(base):
 
 
 def gen_in16(rng, dom):
+    if dom == "str":     # 文字列比較: 小さな alphabet + NUL を高頻度で (byte / word 両解釈で重複・終端が出る)
+        if rng.random() < 0.5:
+            pool = [0, 1, 2, 3, 0x41, 0x80, 0xff]
+            v = [rng.choice(pool) if rng.random() < 0.8 else 0 for _ in range(16)]
+        else:
+            pool = [0, 1, 0x100, 0x8000, 0xffff, 0x0102]
+            v = []
+            for _ in range(8):
+                w = rng.choice(pool) if rng.random() < 0.85 else 0
+                v += [w & 255, w >> 8]
+        if rng.random() < 0.4:
+            k = rng.randrange(0, 16)
+            v = v[:k] + [0] * (16 - k)
+        return bytes(v)
     if dom == "f32":
         return b"".join(struct.pack("<f", rng.choice(F32_POOL) if rng.random() < 0.6 else rng.uniform(-1000, 1000) * 10 ** rng.uniform(-3, 3)) for _ in range(4))
     if dom == "f64":
@@ -61,7 +87,7 @@ class Form:
         self.cname = "__asm_%s__%s%s" % (base, ret, "".join(args))
 
 
-def enumerate_forms(bases=None, from_decls=None):
+def enumerate_forms(bases=None, from_decls=None, ybases=()):
     """検証対象の (base, ret, args) を列挙。from_decls があればその宣言のみ。"""
     forms, seen = [], set()
     if from_decls is not None:
@@ -71,12 +97,15 @@ def enumerate_forms(bases=None, from_decls=None):
         for b in bases:
             for r, a in gen._REP_SIGS:
                 cand.append((b, r, a))
+        for b in ybases:                       # ymm 専用 (census 外 mnemonic は i256 形のみ列挙)
+            for r, a in gen._YREP_SIGS:
+                cand.append((b, r, a))
     for (b, r, a) in cand:
         key = (b, r, tuple(a))
         if key in seen:
             continue
         seen.add(key)
-        if "y" in a or r == "y" or "?" in a or r == "?":
+        if "?" in a or r == "?":
             continue
         sp = kernels.lookup(b, r, a)
         if sp is None or sp.asm is None:
@@ -86,38 +115,58 @@ def enumerate_forms(bases=None, from_decls=None):
     return forms
 
 
+def arg_offsets(args):
+    off, o = 0, []
+    for t in args:
+        o.append(off)
+        if t == "y":
+            off += 32
+        elif t != "b":
+            off += 16
+    return o
+
+
 def native_src(forms):
     out = ['#include <stdint.h>', '#include <stdio.h>', '#include <stdlib.h>', '#include <string.h>',
            'typedef unsigned char u8; typedef uint32_t u32; typedef uint64_t u64;',
-           'typedef unsigned char v128 __attribute__((vector_size(16)));', '']
+           'typedef unsigned char v128 __attribute__((vector_size(16)));',
+           'typedef unsigned char v256 __attribute__((vector_size(32)));', '']
     for k, f in enumerate(forms):
         sp = f.spec
-        body = ['static void n_%d(const u8* in, u8* out) {' % k, '  v128 r; memset(&r, 0, 16); u32 rr32 = 0; u64 rr64 = 0; (void)r; (void)rr32; (void)rr64;']
+        rty = "v256" if f.ret == "y" else "v128"
+        body = ['static void n_%d(const u8* in, u8* out) {' % k, '  %s r; memset(&r, 0, sizeof r); u32 rr32 = 0; u64 rr64 = 0, fl = 0; (void)r; (void)rr32; (void)rr64; (void)fl;' % rty,
+                '  memset(out, 0, 32);']
+        offs = arg_offsets(f.args)
         for i, t in enumerate(f.args):
             if t == "x":
-                body.append('  v128 p%d; memcpy(&p%d, in + %d, 16);' % (i, i, 16 * i))
+                body.append('  v128 p%d; memcpy(&p%d, in + %d, 16);' % (i, i, offs[i]))
+            elif t == "y":
+                body.append('  v256 p%d; memcpy(&p%d, in + %d, 32);' % (i, i, offs[i]))
             elif t == "d":
-                body.append('  u32 p%d; memcpy(&p%d, in + %d, 4);' % (i, i, 16 * i))
+                body.append('  u32 p%d; memcpy(&p%d, in + %d, 4);' % (i, i, offs[i]))
             elif t == "q":
-                body.append('  u64 p%d; memcpy(&p%d, in + %d, 8);' % (i, i, 16 * i))
+                body.append('  u64 p%d; memcpy(&p%d, in + %d, 8);' % (i, i, offs[i]))
         outs, ins = [], []
         for tok in sp.ops.split():
             nm, c = tok.split(":", 1)
-            var = {"rr": "rr32" if f.ret == "d" else "rr64"}.get(nm, nm)
+            var = {"rr": "rr32" if (f.ret == "d" or sp.result == "pcmp") else "rr64", "fl": "fl"}.get(nm, nm)
             if c[0] in "+=":
-                outs.append('[%s] "%sx"(%s)' % (nm, c[0], var) if c[1:] == "x" else '[%s] "%sr"(%s)' % (nm, c[0], var))
+                lt = c[1:] if c[1:] in ("x", "c") else "r"
+                outs.append('[%s] "%s%s"(%s)' % (nm, c[0], lt, var))
             else:
                 ins.append('[%s] "%s"(%s)' % (nm, c, var))
         asm = sp.asm.replace("$$IMM", "$%d" % (f.imm if f.imm is not None else 0))
         body.append('  __asm__ volatile("%s" : %s : %s);' % (asm, ", ".join(outs), ", ".join(ins)))
         res = sp.result
-        if res in ("rr",):
+        if res == "pcmp":
+            body.append('  { u32 t = (u32)(fl & 0x8c1); memcpy(out, &rr32, 4); memcpy(out + 4, &t, 4); }')
+        elif res in ("rr",):
             if f.ret == "d":
-                body.append('  memset(out, 0, 16); memcpy(out, &rr32, 4);')
+                body.append('  memcpy(out, &rr32, 4);')
             else:
-                body.append('  memset(out, 0, 16); memcpy(out, &rr64, 8);')
+                body.append('  memcpy(out, &rr64, 8);')
         else:
-            body.append('  memcpy(out, &%s, 16);' % res)
+            body.append('  memcpy(out, &%s, sizeof %s);' % (res, res))
         body.append('}')
         out += body
     out.append('typedef void (*fn_t)(const u8*, u8*);')
@@ -127,15 +176,54 @@ def native_src(forms):
   char line[8192];
   while (fgets(line, sizeof line, fi)) {
     int k; char hex[4096]; if (sscanf(line, "%d %4095s", &k, hex) != 2) continue;
-    u8 in[64]; memset(in, 0, sizeof in);
+    u8 in[256]; memset(in, 0, sizeof in);
     for (int i = 0; hex[2*i] && hex[2*i+1]; i++) { unsigned v; sscanf(hex + 2*i, "%2x", &v); in[i] = v; }
-    u8 o[16]; tab[k](in, o);
-    for (int i = 0; i < 16; i++) fprintf(fo, "%02x", o[i]);
+    u8 o[32]; tab[k](in, o);
+    for (int i = 0; i < 32; i++) fprintf(fo, "%02x", o[i]);
     fprintf(fo, "\\n");
   }
   return 0;
 }''')
     return "\n".join(out)
+
+
+def is_y(f):
+    return f.ret == "y" or "y" in f.args
+
+
+_IRT = {"x": "i128", "q": "i64", "d": "i32", "b": "i8", "y": "i256"}
+
+
+def wasm_ir(forms):
+    """i256 形の wrapper を LLVM IR で生成 (C は i256 を書けないため)。helper を **本物の i256 型で call** するので,
+    wasm32 の i256 lowering (引数 = i64×4 分割 / 戻り = sret) と gen.py が出した C の ABI が一致しているかを突合できる。"""
+    L = ['target datalayout = "e-m:e-p:32:32-p10:8:8-p20:8:8-i64:64-i128:128-f128:64-n32:64-S128-ni:1:10:20"',
+         'target triple = "wasm32-unknown-emscripten"']
+    seen = set()
+    for f in forms:
+        if is_y(f) and f.cname not in seen:
+            seen.add(f.cname)
+            L.append("declare %s @%s(%s)" % ({"v": "void"}.get(f.ret) or _IRT[f.ret], f.cname, ", ".join(_IRT[t] for t in f.args)))
+    for k, f in enumerate(forms):
+        if not is_y(f):
+            continue
+        offs = arg_offsets(f.args)
+        L.append("define void @w_%d(ptr %%in, ptr %%out) {" % k)
+        args = []
+        for i, t in enumerate(f.args):
+            if t == "b":
+                args.append("i8 %d" % (f.imm if f.imm is not None else 0))
+                continue
+            L.append("  %%p%d = getelementptr i8, ptr %%in, i32 %d" % (i, offs[i]))
+            L.append("  %%a%d = load %s, ptr %%p%d, align 1" % (i, _IRT[t], i))
+            args.append("%s %%a%d" % (_IRT[t], i))
+        if f.ret == "v":
+            L.append("  call void @%s(%s)" % (f.cname, ", ".join(args)))
+        else:
+            L.append("  %%r = call %s @%s(%s)" % (_IRT[f.ret], f.cname, ", ".join(args)))
+            L.append("  store %s %%r, ptr %%out, align 1" % _IRT[f.ret])
+        L.append("  ret void\n}")
+    return "\n".join(L) + "\n"
 
 
 def wasm_src(forms):
@@ -147,29 +235,39 @@ def wasm_src(forms):
         pass
     ds = []
     for nm, f in decls.items():
-        d = gen.Decl("__asm_%s" % f.base, {"x": "i128", "q": "i64", "d": "i32", "b": "i8", "v": "void"}[f.ret],
-                     [{"x": "i128", "q": "i64", "d": "i32", "b": "i8"}[t] for t in f.args])
+        d = gen.Decl("__asm_%s" % f.base, {"x": "i128", "q": "i64", "d": "i32", "b": "i8", "v": "void", "y": "i256"}[f.ret],
+                     [{"x": "i128", "q": "i64", "d": "i32", "b": "i8", "y": "i256"}[t] for t in f.args])
         ds.append(d)
     c, rep = gen.emit_c(ds, use_names="canon")
     out = [c, '#include <emscripten.h>']
     for k, f in enumerate(forms):
+        if is_y(f):
+            continue                          # i256 形は wasm_ir() の IR wrapper (真の i256 call) で突合
         body = ['EMSCRIPTEN_KEEPALIVE void w_%d(const u8* in, u8* out) {' % k]
         argl = []
+        offs = arg_offsets(f.args)
         for i, t in enumerate(f.args):
             if t == "x":
-                body.append('  u128 a%d; memcpy(&a%d, in + %d, 16);' % (i, i, 16 * i))
+                body.append('  u128 a%d; memcpy(&a%d, in + %d, 16);' % (i, i, offs[i]))
                 argl.append("a%d" % i)
+            elif t == "y":
+                body.append('  u64 a%d[4]; memcpy(a%d, in + %d, 32);' % (i, i, offs[i]))
+                argl += ["a%d[%d]" % (i, j) for j in range(4)]
             elif t == "d":
-                body.append('  u32 a%d; memcpy(&a%d, in + %d, 4);' % (i, i, 16 * i))
+                body.append('  u32 a%d; memcpy(&a%d, in + %d, 4);' % (i, i, offs[i]))
                 argl.append("a%d" % i)
             elif t == "q":
-                body.append('  u64 a%d; memcpy(&a%d, in + %d, 8);' % (i, i, 16 * i))
+                body.append('  u64 a%d; memcpy(&a%d, in + %d, 8);' % (i, i, offs[i]))
                 argl.append("a%d" % i)
             elif t == "b":
                 argl.append(str(f.imm if f.imm is not None else 0))
         call = "%s(%s)" % (f.cname, ", ".join(argl))
-        body.append('  memset(out, 0, 16);')
-        if f.ret == "x":
+        body.append('  memset(out, 0, 32);')
+        if f.ret == "y":
+            body.append('  Y r = %s; memcpy(out, &r, 32);' % call)
+        elif f.ret == "v" and f.spec.result == "pcmp":
+            body.append('  %s; { u32 t = ll_pcmpistr_ecx; memcpy(out, &t, 4); t = ll_pcmpistr_fl & 0x8c1u; memcpy(out + 4, &t, 4); }' % call)
+        elif f.ret == "x":
             body.append('  u128 r = %s; memcpy(out, &r, 16);' % call)
         elif f.ret == "d":
             body.append('  u32 r = %s; memcpy(out, &r, 4);' % call)
@@ -195,7 +293,7 @@ for (const ln of lines) {
   for (let i = 0; i < hex.length / 2; i++) M.HEAPU8[inp + i] = parseInt(hex.substr(2 * i, 2), 16);
   M['_w_' + k](inp, outp);
   let s = '';
-  for (let i = 0; i < 16; i++) s += M.HEAPU8[outp + i].toString(16).padStart(2, '0');
+  for (let i = 0; i < 32; i++) s += M.HEAPU8[outp + i].toString(16).padStart(2, '0');
   res.push(s);
 }
 fs.writeFileSync(process.argv[4], res.join('\n') + '\n');
@@ -215,11 +313,13 @@ def _nan64(b8):
 def compare_form(f, a, b):
     """a=native hex, b=wasm hex -> 'exact' | 'nan-only' | 'approx-ok' | 'mismatch'"""
     A, B = bytes.fromhex(a), bytes.fromhex(b)
+    n = 32 if f.ret == "y" else 16
+    A, B = A[:n], B[:n]
     if A == B:
         return "exact"
     if not f.spec.exact:
         ok = True
-        for i in range(4):
+        for i in range(len(A) // 4):
             x = struct.unpack("<f", A[4 * i:4 * i + 4])[0]
             y = struct.unpack("<f", B[4 * i:4 * i + 4])[0]
             if x != x and y != y:
@@ -235,7 +335,7 @@ def compare_form(f, a, b):
     # NaN のみの差: 4B/8B レーン単位で両方 NaN なら nan-only
     for w, isnan in ((4, _nan32), (8, _nan64)):
         okl = True
-        for i in range(0, 16, w):
+        for i in range(0, len(A), w):
             if A[i:i + w] != B[i:i + w] and not (isnan(A[i:i + w]) and isnan(B[i:i + w])):
                 okl = False
         if okl:
@@ -243,15 +343,17 @@ def compare_form(f, a, b):
     return "mismatch"
 
 
-def run(bases=None, from_decls=None, n=200, out_dir=None, seed=1, verbose=True):
+def run(bases=None, from_decls=None, n=200, out_dir=None, seed=1, verbose=True, ybases=()):
     out_dir = out_dir or os.path.join(os.getcwd(), "work", "simdtest")
     os.makedirs(out_dir, exist_ok=True)
-    forms = enumerate_forms(bases, from_decls)
+    forms = enumerate_forms(bases, from_decls, ybases)
     rng = random.Random(seed)
     with open(os.path.join(out_dir, "n.c"), "w") as fh:
         fh.write(native_src(forms))
     with open(os.path.join(out_dir, "w.c"), "w") as fh:
         fh.write(wasm_src(forms))
+    with open(os.path.join(out_dir, "w_ir.ll"), "w") as fh:
+        fh.write(wasm_ir(forms))
     with open(os.path.join(out_dir, "run.mjs"), "w") as fh:
         fh.write(NODE_RUNNER)
     # vectors
@@ -261,7 +363,9 @@ def run(bases=None, from_decls=None, n=200, out_dir=None, seed=1, verbose=True):
         for _ in range(n):
             blob = b""
             for i, t in enumerate(f.args):
-                if t == "x":
+                if t == "y":
+                    blob += gen_in16(rng, dom) + gen_in16(rng, dom)
+                elif t == "x":
                     blob += gen_in16(rng, dom)
                 elif t == "d":
                     if dom == "f32":
@@ -282,12 +386,12 @@ def run(bases=None, from_decls=None, n=200, out_dir=None, seed=1, verbose=True):
         for k, blob in vec:
             fh.write("%d %s\n" % (k, blob.hex()))
     # build
-    r = subprocess.run(["gcc", "-O1", "-mavx2", "-mfma", "-o", os.path.join(out_dir, "n"), os.path.join(out_dir, "n.c")],
+    r = subprocess.run(["gcc", "-O1", "-mavx2", "-mfma", "-mno-red-zone", "-o", os.path.join(out_dir, "n"), os.path.join(out_dir, "n.c")],
                        capture_output=True, text=True)
     if r.returncode:
         raise RuntimeError("native build failed:\n" + r.stderr[:3000])
     emcc = ["emcc", "-w", "-O1", "-ffp-contract=off", "-frounding-math", "-fno-fast-math", "-I", HERE,
-            os.path.join(out_dir, "w.c"), "-sMODULARIZE=1", "-sENVIRONMENT=node", "-sALLOW_MEMORY_GROWTH=1",
+            os.path.join(out_dir, "w.c"), os.path.join(out_dir, "w_ir.ll"), "-sMODULARIZE=1", "-sENVIRONMENT=node", "-sALLOW_MEMORY_GROWTH=1",
             "-sEXPORTED_RUNTIME_METHODS=HEAPU8", "-sEXPORTED_FUNCTIONS=_malloc,_free," + ",".join("_w_%d" % k for k in range(len(forms))),
             "--no-entry", "-o", os.path.join(out_dir, "w.js")]
     r = env.run(emcc, capture_output=True, text=True)
