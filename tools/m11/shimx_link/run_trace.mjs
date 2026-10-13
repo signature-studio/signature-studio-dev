@@ -21,7 +21,7 @@ mod.HEAPU8.set(fs.readFileSync(M11 + '/work/m11_image.bin'), 0);
 // 実測: Emscripten の ENV を preRun で設定しても shimx の getenv("SHIMX_TRACE") には届かない (environ 初期化が先行) ため export で明示 ON
 if (trace === '1') mod._shimx_set_trace(1);
 const traceFile = process.env.SHIMX_TRACE_FILE;   // MEMFS 上のパス。node の環境変数は guest の getenv に届かないため export で渡す
-if (traceFile && mod._shimx_set_trace_file) mod.ccall('shimx_set_trace_file', 'number', ['string'], [traceFile]);
+if (traceFile && typeof mod._shimx_set_trace_file === 'function') mod.ccall('shimx_set_trace_file', 'number', ['string'], [traceFile]);
 if (process.env.M11_TRACE === '1') mod._m11_set_trace(1);
 if (process.env.SXT_PRINT === '1' && mod._sxt_set_print) mod._sxt_set_print(1);
 
@@ -102,8 +102,10 @@ if (typeof mod._sxt_n === 'function') {
   for (let k = 0; k < Math.min(L, 20000); k++) { const v = mod._sxt_log_at(k); res.trace.events.push([v & 0xffff, names[v >>> 16]]); }
 }
 fs.mkdirSync(outDir, { recursive: true });
-if (traceFile && mod.FS) {   // guest が書いた JSON Lines を MEMFS から回収 (NULL で fclose して flush してから読む)
+if (traceFile) {   // guest が書いた JSON Lines を MEMFS から回収 (NULL で fclose して flush してから読む)。出力が作れなければ必ず ftrace_error を残す
   try {
+    if (typeof mod._shimx_set_trace_file !== 'function') throw new Error('shimx_set_trace_file not exported');
+    if (!mod.FS) throw new Error('FS not available');
     mod.ccall('shimx_set_trace_file', 'number', ['string'], [null]); fs.writeFileSync(path.join(outDir, tag + '.ftrace.jsonl'), mod.FS.readFile(traceFile)); } catch (e) { res.ftrace_error = String(e && e.message || e); }
 }
 fs.writeFileSync(path.join(outDir, tag + '.run.json'), JSON.stringify(res, null, 1));
