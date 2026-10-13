@@ -162,6 +162,7 @@
 | `tools/m11/ldfix/REPORT_510.md` | ~150 | base が引数由来でない load→store (370 site / 169 関数) の判定軸: SSA 対応の静的判定 vs liftdiff 動的差分の実測比較と脱落数 (#510) |
 | `tools/m11/ldfix/REPORT_968.md` | ~50 | D17 修復 pass (rip 相対セルの 2 段 deref 潰れ) の部分達成: 単一 load の 24 関数を修復、残りは子 issue (#968) |
 | `tools/m11/ldfix/REPORT_930.md` | ~100 | 消費者形 pure 残 23 関数 (24 引数) の残件分類 (first-deref-not-entry 18 関数 ほか) とネガコン。survey 到達数は再現未了 (#930) |
+| `tools/m11/ldfix/REPORT_1134.md` | ~50 | 消費者形 pure 残の部分達成 (原因の記録のみ): tracker-no-deref 3 関数 (75a180・db6480・dc27c0) の機構 (引数 slot のループ内書き換え・2 段 deref)、5c44b0 (none) の理由の一部。修正・修復・再測定は未着手で #1324 (LD-45)・#1325 (LD-46) (#1134) |
 | `tools/m11/shimx_link/REPORT.md` | ~165 | M11 × shimx リンク |
 
 ### shim / 起動
