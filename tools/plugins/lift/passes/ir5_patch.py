@@ -100,7 +100,7 @@ def fold_const_ops(text):
                     n += 1
                     done = True
             if not done:
-                pos = j + 1
+                pos = idx + 1  # 外側が畳めなくても入れ子の内側を走査する (zext (.. zext (i32 0 to i64) ..) の取りこぼし)
     for w in ("zext", "trunc", "sext"):
         pos = 0
         while True:
@@ -132,7 +132,7 @@ def fold_const_ops(text):
                 pos = max(idx - 80, 0)
                 n += 1
                 continue
-            pos = j + 1
+            pos = idx + 1
     return text, n
 
 
@@ -487,10 +487,13 @@ def _lift_one_line(line, cnt, suffix=""):
 
     nv = f"%ce{cnt}{suffix}"
     if op in _CAST_OP:
-        m = re.fullmatch(r"(?:ptr|[iif]\d+)\s+([%@][\w.\-]+|[iifp]\d+[^\s]?\s?[^\s]+|[^\s]+)\s+to\s+([ip][\w\d]*)",
+        m = re.fullmatch(r"(ptr|[iif]\d+)\s+([%@][\w.\-]+|[iifp]\d+[^\s]?\s?[^\s]+|[^\s]+)\s+to\s+(double|float|[ip][\w\d]*)",
                          inner.strip())
         if m:
-            val, toty = m.group(1), m.group(2)
+            fromty, val, toty = m.group(1), m.group(2), m.group(3)
+            if op == "bitcast" and toty in ("double", "float") and val.startswith("%"):
+                # bitcast (i64 %local to double): 値だけにすると型が落ちて parse error になる (GMS 以外の engine 23664 で観測)
+                return line[:start] + nv + line[end:], [f"  {nv} = bitcast {fromty} {val} to {toty}"], cnt + 1
             if op == "bitcast":
                 # bitcast (ptr X to ptr) は no-op で除去。iN→ptr は inttoptr 命令化。
                 if toty == "ptr":
@@ -603,7 +606,12 @@ def lift_residual_constexpr(blocks):
             # 反復ごとにも suffix を変える (前回反復で挿入済みの %ce* との衝突防止)
             for ln in lines:
                 newln, ins, cnt = _lift_one_line(ln, cnt, f"{nonce}{it}_{name}")
-                if ins:
+                if not ins and newln != ln:
+                    # `bitcast (ptr X to ptr)` の no-op 除去は命令を挿入せず行だけ書き換える。
+                    # これを捨てると固定点反復が止まり、外側の icmp/zext 定数式が残る (GMS 23677 で観測)
+                    out.append(newln)
+                    changed = True
+                elif ins:
                     out.extend(ins)
                     out.append(newln.rstrip() if newln.strip() != newln else newln)
                     nlines += 1
