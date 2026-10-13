@@ -14,7 +14,7 @@ harness は `liftdiff.py build targets/m11.json` (sig_mismatch 0) → `liftdiff.
 | 0 詰め site 1,049 件 | **一致 170** / **不一致 293** / **未到達 586** (site 単位, `m11_zeropad_liftdiff.py` の集計) |
 | callee の内訳 | 対象 callee 217 件 → 一致 30 / 不一致 69 / 未到達 118 (重複あり) |
 | 再現性 | 同一 HEAD で batch を 2 回実行 (n=2)。batch 集計は 75/173/419 で一致し、site 判定表 (`sigfix_zeropad_liftdiff.tsv`) は **完全一致** (`diff` 0 行) |
-| 所要 | batch 1 回 200 秒 (n=1) / 199 秒 (n=2), 667 関数, 4 shards, load 1.7 |
+| 所要 | batch 1 回 200 秒 (n=1) / 199 秒 (n=2), 667 関数, 4 shards, load 1.7 (記録値。本ファイル §6 参照) |
 | 不一致 site のうち tag が引数 k を指すもの | 25 site (`callsite_arg_drop` 等の evidence が `arg<k>` を含む) |
 
 受入条件「0 詰め site のうち差分ハーネスで実行されるものを優先順に検証し、結果 (一致 / 不一致 / 未到達) を REPORT に実測値で残す」は、
@@ -26,10 +26,11 @@ harness は `liftdiff.py build targets/m11.json` (sig_mismatch 0) → `liftdiff.
 * **一致** = callee の verdict が `match`。
 * **不一致** = callee の verdict が `mismatch`。tag が `arg<k>` を指す場合は `arg` 列に記録 (0 詰めした引数そのものの差分を示すか)。
 * **未到達** = callee の verdict が `unexec` (native が fault / null deref / hang / 未対応シグネチャ), または batch 対象外 (`not_in_batch` は 0 件)。
+* **入力 status** (`sigfix_zeropad_remaining.tsv` の列, `m11_argrecover.py` L205-209 が付与): `matched` = caller 機械語で callee への直接 call が IR の k 番目と対応づいた (1,004 site)。`unmatched` = caller 内の直接 call 数が IR の call 数と一致しない、または k が範囲外で対応が取れない (22 site)。`no_pdata` = caller が .pdata 区間外で機械語を取れない (23 site)。判定表の status 列はこの値をそのまま写す。
 * 優先順: 判定確定 (不一致 → 一致) → 未到達。同順位内は callee の出現数が多い順。
 
 判定表: [results/sigfix_zeropad_liftdiff.tsv](results/sigfix_zeropad_liftdiff.tsv) (1,049 行, 優先順付き)。
-再現: `python3 tools/m11/m11_zeropad_liftdiff.py tools/liftdiff/work/m11/batch_zeropad.jsonl` (batch は `liftdiff.py batch` の `--set file:` 指定)。
+再現: `python3 tools/m11/m11_zeropad_liftdiff.py <batch.jsonl>` (batch は `liftdiff.py batch` の `--set file:` 指定)。入力 batch.jsonl は未 commit (§6)。
 
 ## 3. 内訳
 
@@ -55,3 +56,13 @@ harness は `liftdiff.py build targets/m11.json` (sig_mismatch 0) → `liftdiff.
 | 未到達 586 site (native fault / null deref / hang / unsupported_sig の callee) | 0 詰めの正否が未判定 | #955 (Refs)。native 側の入力生成を拡充する作業は未起票 (PM へ起票を依頼) |
 | 不一致 site のうち 0 詰め起因か callee 本体の欠陥かの切り分け (arg 名指し 25 site 以外) | 不一致 293 site の帰属が未確定 | #955 (Refs)。DEFECTS.md への行案は PM 判断 |
 | 一致 site の意味的な正しさ (callee 単体の一致 ≠ 呼出し元の 0 詰め値の正しさ) | §4 の通り | #955 (Refs)。未検証 |
+
+## 6. 再現性の記録と未達 (fix run, 2026-10-13)
+
+* 判定表 `results/sigfix_zeropad_liftdiff.tsv`: 1,050 行 (ヘッダ 1 + 1,049 site)。sha256 `7ac498d8a3d9c62ed457458d5d10d9965929b3d514861b7de1dcb47f70ab5ad8`。
+* 入力 status 内訳 (`sigfix_zeropad_remaining.tsv`): matched 1,004 / unmatched 22 / no_pdata 23 (合計 1,049)。
+* 所要 / 集計 (75/173/419) の数値は §1 の初回 run の記録値。下記の batch 生データが無いため、この fix run では再実行していない。
+* 起点: 本 commit `e1ac1cfb` の親は origin/main `352f4e96`。harness 実行は `352f4e96` 上で行った (初回 run は `29f63707` (ローカル main) でも行ったが、同一結果を `352f4e96` で得た時点の記録のみ採用)。
+* 生データ batch.jsonl: 未 commit。ローカル・`$HOME/artifacts` のいずれにも存在しない (`tools/liftdiff/work/` も無い)。ハッシュ・行数は未記録。
+* この run の素材: `$HOME/artifacts` には `fl-win64.tar.zst` (2,324,302,252 bytes) のみ。`toolchain-emsdk` / `toolchain-retdec` / `work-m11` / `work-liftdiff` は実在せず、`liftdiff.py build` / `batch` は実行不能。
+* 未達 (次の run で解消する): (a) `oc_artifacts` 指定で素材を揃えて `liftdiff.py batch` を再実行し、batch.jsonl の sha256・行数を記録する。(b) 再生成した判定表 TSV の sha256 が上記と一致することを確認する。
