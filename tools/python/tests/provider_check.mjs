@@ -83,7 +83,7 @@ R.append(("tempo_i", type(mixer.getCurrentTempo(True)).__name__))
 R.append(("cnt", type(channels.channelCount()).__name__))
 R.append(("sel", type(channels.isChannelSelected(0)).__name__))
 R.append(("none", mixer.setTrackName(1, "x")))
-R.append(("kw", channels.getChannelName(index=0, useGlobalIndex=False)))
+R.append(("kw", channels.getChannelName(value=0, useGlobalIndex=False)))  # kwlist はバイナリ由来 (stubs の index ではなく value)
 R.append(("json", type(ilmcp.getBrowserNames("db", 0)).__name__))
 def exc(f, *a):
     try: f(*a)
