@@ -2,7 +2,7 @@
 # negctl_510.sh — audit_lsf_ssa.py のネガティブコントロール (#510)。1 件ずつ壊して/直して判定が期待どおり動くことを数値で示す。
 #   NC0 無改変 boot_final3.ll                                  → 基準
 #   NC1 5c0270 の脱落 store 2 本に load を足す (IR 修復)        → 5c0270 の SUSPECT が 2 減り、alg1 の対象関数が 1 減る
-#   NC2 100be60 (健全: unk/store/OK) の load 由来の store 値を `trunc %arg2` に差し替える (IR 破壊) → unk/store が OK→SUSPECT に 1 動き、alg1 対象関数が 1 増える
+#   NC2 100be60 (alg2 では OK の関数) の load 由来の store 値を `trunc %arg2` に差し替える (IR 破壊) → unk/store が OK→SUSPECT に 1 動き、alg1 対象関数が 1 増える
 #   NC3 image の 5c0270 区間を nop に潰す (機械語側を壊す)       → 5c0270 の site (lsf 2 + frame 1) が列挙から消える
 #   NC4 ablation: --no-alloca-prop                              → reg2mem alloca 経由の由来伝播を切ると偽陽性候補が増える (設計の必要性)
 #   NC5 525600 (CELL_COLLAPSED) の IR を 2 段 load に修復          → 525622 が alg3 OK / CELL_DEEP に動き、CELL_COLLAPSED が 1 減る

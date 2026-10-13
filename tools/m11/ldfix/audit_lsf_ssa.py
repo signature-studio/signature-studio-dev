@@ -3,15 +3,19 @@
 
 audit_lsf.py (#484) は base を argN に解決できる site しか判定できない (脱落形が `store %argN` という IR 署名を持つため)。
 本ツールは base の由来を問わず、**機械語の LSF site 全件** (`mov rD,[rB]` disp 0 → rD を壊さず `mov [m],rD`) を列挙し、
-IR 側を SSA の値の出自 (store される値が `load` 由来か) で判定する。audit_lsf.py の transfer を provenance 付きに差し替えて再利用し、
-arg 解決 site の結果 (lsf 90 site) は audit_lsf.py と一致する (自己検査: --selfcheck)。
+IR 側を SSA の値の出自 (store される値が `load` 由来か・deref 段数) で判定する。audit_lsf.py の transfer を provenance 付きに差し替えて再利用し、
+arg 解決 site (90) / 解決不能 site (370) / 関数 (169) の件数は audit_lsf.py と一致する (audit_lsf_ssa_e2e.sh の 1〜2/6 で突合)。
+site は store 宛 (frame=False) と spill 宛 (frame=True: rbp/rsp 宛) に分ける。spill 宛は IR から消えるのが普通なので alg1〜3 の対象外。
 
-IR 側の判定は互いに独立な 2 本:
-  alg1 (関数単位の個数収支):  IR_ldst[w] = 非 alloca 宛の `store iW %v` で %v が整数 load 由来 (trunc/zext/sext/bitcast/phi/select 経由) の行数
+IR 側の判定:
+  alg1 (関数単位の個数収支):  IR_ldst[w] = 非 alloca 宛の `store iW %v` で %v が load 由来 (trunc/zext/sext/bitcast/phi/select、reg2mem alloca 経由を含む) の行数
                                DEFICIT_w = M_lsf[w] - IR_ldst[w]  (> 0 なら SUSPECT。arg 解決/非解決の LSF site を合算)
   alg2 (site 単位の宛先照合):  機械語 store の (幅 w, disp) と IR の store 宛先 (inttoptr(add %x, C) / gep の C) が一致する store 群を候補とし、
                                候補の値が load 由来なら OK、候補があるのに load 由来が 0 なら SUSPECT、候補 0 件なら NOCAND
-使い方: python3 audit_lsf_ssa.py IR.ll IMAGE.bin 'CONFIG_GLOB' [--json OUT] [--only VA,VA] [--selfcheck]
+  alg3 (deref 段数):          機械語の値の deref 段数 (argN の 1 段 = 1、rip 相対セル経由 = 2 …) <= 候補 store の値の IR load 入れ子段数なら OK、足りなければ SHALLOW
+  cell oracle:                 rip 相対セル経由 (`mov rA,[rip+X]; mov rD,[rA]`) の site を image の実データで判定
+                               (FOLDED_OK / CELL_COLLAPSED / CELL_DEEP。cell_check の docstring 参照)
+使い方: python3 audit_lsf_ssa.py IR.ll IMAGE.bin 'CONFIG_GLOB' [--json OUT] [--only VA,VA] [--no-alloca-prop]
 """
 import argparse
 import collections
