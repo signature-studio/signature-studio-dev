@@ -157,7 +157,7 @@ def classify_set(fn, call_idx, pos, lb):
 
 
 def _set_why(fn, ins):
-    if ins.mnemonic in ('mov', 'movzx', 'movsx', 'movsxd', 'lea') and len(ins.operands) == 2:
+    if ins.mnemonic in ('mov', 'movzx', 'movsx', 'movsxd') and len(ins.operands) == 2:
         src = ins.operands[1]
         if src.type == capstone.CS_OP_MEM:
             return 'load'
