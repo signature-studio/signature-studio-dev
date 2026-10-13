@@ -10,7 +10,7 @@
 - 到達しうる根 = (a) ∪ (b_live) = 314 関数 / 27,031 B。 **total3 = 4,231 関数 / 1,456,503 B** (total2 から **+415 関数 / +65,994 B**、うち根 314 + 根から呼ばれて入った 101 (推定ではなく差分の実測))。 未到達 (非共通 − total3) = 2,238 関数 / 1,134,799 B。
 - **字義どおり根 = (a) ∪ (b) の上界は 7 本とも total3 と同値** (即値の参照が 0 件のため)。
 - **lift**: `judge.py shells` は 7/7 PASS (lift_rc / emcc_c_rc / f80 が全 0) だが、**range 欠落監査 (`indirect_defs.py`) が 5 関数 (4 block) で FAIL**。 `unr_e2e.sh` は exit 1 で `[unr_e2e] OK` は出ない。 欠落 5 件は「畳み込み」ではなく、RetDec が export 名 (`@CreatePlugInstance` 等) で定義したために `function_<VA>` の define が無いもの (下記 §2d-4。 #707 のコメントで訂正)。**5 件とも PE export 関数** (§2d-9)。 修正 (改名) は #720 (未 merge) にある。
-- **AC 達成状況**: AC1 達成 / AC2 **未達** (閉包と検査 U1–U5 は PASS、range 監査が FAIL) / AC3 達成 (d = 1,477 関数 / 738,944 B)。 Closes ではなく Refs・draft PR が妥当 (PM 判断)。
+- **AC 達成状況**: AC1 達成 / AC3 達成 (d = 1,477 関数 / 738,944 B) / AC2 は **#707 (PR #720) へ分割** (PM 判断 2026-10-13、#667 に記録)。 AC2 の閉包と検査 U1–U5 は PASS、judge 7/7 PASS だが、range 監査 (`indirect_defs.py`) は 5 件で FAIL し、この gate は #707 の merge まで不合格のまま。 gate は緩めていない。 Closes なし (Refs #667)。 PR は ready (非 draft)。
 
 **既知類型との関係** (`docs/DEFECTS.md`): **該当なし** (分類と到達性の判定。 lift の変換規則は変更していない)。 range 欠落 5 件は命名の問題で、既知の D1a〜D16 とは対応づけない。 新類型の候補は取り下げ (§7d)。
 
@@ -106,7 +106,9 @@
 | NC6 | 同 + emcc_c_rc=1 の行を追記 | judge FAIL・rc ≠ 0・OK 無し | **rc ≠ 0・judge FAIL・OK 無し** ✓ |
 | NC7 (新規) | 合成 bytes `mov rax, imm64` (= 開始 VA) を `imm_capstone` に入力 | 開始 VA ありで検出 / なしで非検出 | **rc 0** ✓ (即値の検出経路。 BFS 側の辺は NC2 で確認) |
 
-実測: 対照 NC0・NC5 対照・NC1・NC2 (2 件)・NC3・NC4・NC5・NC6 (追記)・NC7 は期待どおり。 **NC6 対照のみ不合格** (AC2 gate 由来。 対照を「無改変で通る」に戻したため、gate 未解決の間は赤)。 `status_run.csv` は各 NC の後に元へ復元 (trap と cp)。
+実測: 対照 NC0・NC5 対照・NC1・NC2 (2 件)・NC3・NC4・NC5・NC6 (追記)・NC7 は期待どおり。 **NC6 対照のみ不合格** (AC2 gate 由来)。 `status_run.csv` は各 NC の後に元へ復元 (trap と cp)。
+
+**PM 判断 (2026-10-13、#667 に記録)**: NC6 対照の期待値は書き換えない。 rc 1 は AC2 の range 欠落 5 件 (PE export 関数、§2d-9) が残るためで、#707 (PR #720) の merge で解消する見込み。 解消までは赤のまま残し、その事実を本節で明示する。 merge 後に `unr_nega.sh` を付け替え後の HEAD で再実行し、本表を差し替える。
 
 ### 2d-8. byte 走査の一致 31 箇所の判定 (`bytescan_hits.py`、capstone の IMM 集合に入らなかったもの)
 
@@ -182,15 +184,15 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| RVA32 根 5 関数 (4 block) が `function_<VA>` の define で出ない (RetDec は export 名で定義。 `indirect_defs` FAIL、`unr_e2e.sh` exit 1) | AC2 未達。 改名の修正は #720 (未 merge)。 改名しないと表経由の呼出しで未定義シンボルになりうる (推定) | #720 の merge 後に再測定。 AC2 の扱いは PM 判断 |
+| RVA32 根 5 関数 (4 block) が `function_<VA>` の define で出ない (RetDec は export 名で定義。 `indirect_defs` FAIL、`unr_e2e.sh` exit 1) | AC2 は #707 へ分割 (PM 判断 2026-10-13)。 改名の修正は #720 (未 merge)。 改名しないと表経由の呼出しで未定義シンボルになりうる (推定) | #707 (PR #720) の merge 後に本 PR を付け替えて再測定 |
 | 即値辺が 7 本とも 0 件 → 実データの sed 変異では NC2 が非識別 | NC2 は合成 fixture (§2d-7) で確認済み。 実データで即値辺が現れた engine では再確認 | #667 にコメント |
 | 字義の根 (a)∪(b) と (b_live) の差が 0 件 | 差が出るのは即値参照が出た時のみ。 現データでは判断に影響しない | #667 にコメント (設計の記録) |
 | 根 314 関数の偶発一致 (数値定数との偶然の一致) は未判別 | RVA32 の判定は「整列 4 バイト値 = RVA」のみ。 表らしさ (連続性) は未検査 | #667 にコメント |
 | (d) 参照なし 1,477 関数 / 738,944 B は dead code 候補にすぎない | 間接経路が他にある可能性。 未使用の確定ではない | #667 にコメント / 次タスク (§8c) |
 | total3 の wasm リンク・実行時の到達性 | 範囲外。 lift 通過 ≠ 正しさ | #667 にコメント |
 | f80 lowering の対象 (lea 段と同じ 3 関数 × 3 block) の bit-exact 未検証 | 差分試験の対象に入るか未定 | #197 にコメント (既存) |
-| **AC2 gate 不合格** (range 欠落 5 件 = PE export 関数 5 件、§2d-9) | 受入 AC2 は未達。 PM 判断: (a) #707 へ移譲して #667 の AC を分割 / (b) gate の定義を変える (変える場合は欠落 5 件を許容する理由と total3・(d) への影響を REPORT に書く)。 本 run では gate を緩めていない | PM (#667・#707) |
-| **基点 #676 (`627-sampler-lea-closure`) が未 merge** (CHANGES_REQUESTED、main とは 384 commit 差)。 main では `rep_stosb_memset` が実装済み (9b5ea38)。 merge 前に main へ付け替えて再測定が必要 | 付け替え後に `unr_e2e.sh`・`unr_nega.sh` を再実行 | PM |
+| **AC2 gate 不合格** (range 欠落 5 件 = PE export 関数 5 件、§2d-9) | PM 判断 (2026-10-13): AC2 は #707 へ移譲し、#667 の AC は AC1・AC3 のみ。 gate は本 PR で緩めていない。 #707 の merge まで `unr_e2e.sh` は rc 1 のまま | #707 (PM 判断で移譲済み) |
+| **基点 #676 (`627-sampler-lea-closure`) が未 merge** (CHANGES_REQUESTED、main とは 384 commit 差)。 main では `rep_stosb_memset` が実装済み (9b5ea38)。 merge 前に main へ付け替えて再測定が必要 | merge 順: #676 → #720 → 本 PR。 付け替え後に `unr_e2e.sh`・`unr_nega.sh` を再実行 | PM (merge 順は PM 判断で確定) |
 
 | byte 一致 31 箇所のうちデータ推定 4 件 (Granulizer・Slicer・Slicex) の中身の確認 | 参照元の判定には影響しない (対象は d)。 未確認 | #667 にコメント |
 | `REPORT_UNREACHED.md` は `docs/DOC_MAP.md` の索引に未掲載 (既存の `REPORT_LEA.md`・`REPORT_INDIRECT.md` も未掲載、grep 確認) | 索引の追記は PM 判断 | PM |
@@ -202,6 +204,6 @@
 
 ## 8c. 次タスク提案
 
-1. 5 関数 (4 block) の定義名を `function_<VA>` へ揃える改名は #720 にある (未 merge)。 #720 を main に入れてから本 PR を付け替え、`unr_e2e.sh` を再実行して AC2 を判定する。
+1. 5 関数 (4 block) の定義名を `function_<VA>` へ揃える改名は #720 (#707 の PR) にある (未 merge)。 AC2 は #707 へ分割済み (PM 判断 2026-10-13)。 #676 → #720 の順に merge した後、本 PR を `--base main` へ付け替え、`unr_e2e.sh` と `unr_nega.sh` を再実行して REPORT の実測を差し替える。
 2. (c) 750 関数 / 406,591 B の呼び元 (outside 同士の呼出鎖) を辿り、どこまでが dead 側かを確定する。
 3. (d) 1,477 関数 / 738,944 B の dead code 候補を、同 DLL 内の他の参照 (未確認の間接経路) で検証する。
