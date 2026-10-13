@@ -65,6 +65,6 @@
 | Serum 2 本体 (lift 後) の FS 呼び出し (Windows パス・ユーザ領域の既定 content dir) と VFS の接続 | データ層が音声経路に載るかは未確認 | #71 (OSS 境界) / SR-4 側 |
 | FLAC wasm は memory→memory 復号 (全体をメモリ展開)。大物の逐次復号 (stream) は未対応 | 最大 FLAC のピークメモリ未実測 | #70 にコメント |
 | libFLAC 版は 1.5.0 を採用。Serum 2 実体が使う版は未確定 (serum2 REPORT §9 既知の未解決) | PCM は全件別実装と一致しており復号結果への影響は無いが版整合は未確認 | #71 |
-| 既存 `tools/assets/e2e.sh` は `/home/ubuntu/...` 前提で runner では実行不可。SlotCache 修正の既存 e2e への影響は未確認 | 既存テストが回帰していない確認が無い (cache.ts の変更は scan の slot 数のみ) | 新規子チケット案 [E2E-n] 「tools/assets/e2e.sh の runner 対応」 |
+| 既存 `tools/assets/e2e.sh` は作者環境の固定絶対パス (repo 外) 前提で runner では実行不可。SlotCache 修正の既存 e2e への影響は未確認 | 既存テストが回帰していない確認が無い (cache.ts の変更は scan の slot 数のみ) | 新規子チケット案 [E2E-n] 「tools/assets/e2e.sh の runner 対応」 |
 
 素材: R2 `plugins-serum2` (2,633,162,886 B) の `Install_Xfer_Serum2_2.1.5.exe` を使用 (FL/プラグイン由来のバイトは commit していない。`tools/assets/serum2/work/` と `$RUNNER_TEMP` のみ)。

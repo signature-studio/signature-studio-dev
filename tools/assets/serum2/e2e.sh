@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Serum 2 コンテンツ配信 (#70) 1 コマンド e2e (pass 1 本 + ネガコン 4 本)。不合格は exit 1。
+# Serum 2 コンテンツ配信 (#70) 1 コマンド e2e (pass 1 本 + ネガコン 3 本)。不合格は exit 1。
 #   SERUM2_INSTALLER=<Install_Xfer_Serum2_2.1.5.exe> EMSDK_ENV=<emsdk_env.sh> bash tools/assets/serum2/e2e.sh
 #   (展開済みなら SERUM2_EXTRACTED=<7z x の出力 dir>)
-# 手順: 7z 展開 -> inventory (期待値と不一致なら exit 2) -> pack -> libFLAC wasm ビルド -> libsndfile 参照 -> e2e (pass/neg x4)
+# 手順: 7z 展開 -> inventory (期待値と不一致なら exit 2) -> pack -> libFLAC wasm ビルド -> libsndfile 参照 -> e2e (pass 1 + neg 3)
 # ネガコン判定: pass は exit 0 かつ failures=0。neg-* は exit 1 かつ failures が下表の値ちょうど (0 件や過大も不合格)。
 set -euo pipefail
 cd "$(dirname "$0")"

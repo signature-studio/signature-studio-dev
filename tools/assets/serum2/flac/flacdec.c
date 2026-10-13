@@ -1,6 +1,6 @@
 /* libFLAC 1.5.0 メモリ→メモリ復号ラッパ (wasm32)。
  *   fd_decode(in, n)  -> 0 = 成功 (MD5 検証込み) / 1 = 復号エラー / 2 = MD5 不一致 / 3 = ストリーム異常
- *   成功後 fd_pcm()/fd_pcm_bytes() で interleaved int32 PCM、fd_rate/fd_channels/fd_bps/fd_total/fd_has_md5/fd_md5 で属性
+ *   成功後 fd_pcm() (int32 先頭ポインタ) / fd_pcm_samples() (要素数) で interleaved int32 PCM、fd_rate/fd_channels/fd_bps/fd_total_lo/fd_total_hi/fd_has_md5/fd_md5 で属性
  */
 #include <stdint.h>
 #include <stdlib.h>
