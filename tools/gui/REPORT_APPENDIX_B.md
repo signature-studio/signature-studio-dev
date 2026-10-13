@@ -34,4 +34,6 @@
 - **現 HEAD `bash tools/gui/e2e.sh` (通常経路) 2 回**: 1 回目 **rc=0 ALL PASS**、3 m 21 s、開始時 load 0.60。2 回目 **rc=1、step 2b の末尾で停止**、2 m 15 s、開始時 load 0.59。2 回目の出力は grep で除外され、原因行は未取得。受入条件 1 は 2 回中 1 回 ALL PASS。
 - **既知 flake (本 PR の変更とは独立)**: `tools/gui/test/reach_test.sh` 末尾の `selftest_wrapped` (ASan) が約 30% の確率で `gui_headless.c:33 blit_surf` の heap-use-after-free (`recompose_all` ← `on_cmd`、thread T1) で落ちる。同バイナリを単独 30 回回した結果は PR HEAD `7ead604` が **9/30 失敗**、origin/main `0fa8283` が **8/30 失敗** (同じ ASan エラー)。PR は `gui_headless.c`・`selftest.c`・`reach_test.sh` に触れていない。
 - **未解決 (起票依頼)**: `gui_headless.c` の blit_surf race の issue 起票 (PM 依頼・未起票)。`toolchain-retdec` を含む素材での通常経路 ALL PASS の追加確認の要否は PM 判断。
+- **§11 追補 (2026-10-13, run 186-e2e-verify): origin/main `84e43186` の通常経路 `bash tools/gui/e2e.sh`**: **rc=0 ALL PASS**、実時間 3 m 31 s、開始時 load 1.11 (1 分値)。素材 fl-win64 / toolchain-retdec / toolchain-emsdk 展開済み。runner に `x86_64-w64-mingw32-gcc` が無く初回は `gen_api.py` で停止 → `apt-get install gcc-mingw-w64-x86-64` (GCC 13) で解消、`pnpm install --frozen-lockfile` を併せて実施。ネガコン 6a・6b・6c・6d・6e・6f・6g・6h (burst / leak) は全て拒否 (exit 1)。
+  - 1 回 PASS のみで、flake の解消は主張しない。`selftest_wrapped` の既知 flake (上記 9/30 失敗) は未解決で、既存の #740 (GUI-15) で追跡する。
 
