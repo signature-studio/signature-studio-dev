@@ -87,7 +87,7 @@
 |---|---|
 | 前提生成 (初回。 inventory 含む、`win_scan` 〜 `closure_lea`) | 549 s (rc 0。 inventory 段の負荷 load average 17 の時間帯あり) |
 | `closure_unreached.py` (7 本) | 26.8 s (rc 0、PASS 5 × 7) |
-| `unr_lift.sh` (7 本、逐次) | 約 138 s (wall、40:15 → 42:33)。 block 別 4 / 13 / 6 / 6 / 8 / 25 / 68 s |
+| `unr_lift.sh` (7 本、逐次) | 138 s (wall、40:15 → 42:33)。 block 別 4 / 13 / 6 / 6 / 8 / 25 / 68 s |
 | `unr_e2e.sh` (前提込み、lift 込み) | **176 s、rc 1** (indirect_defs FAIL)。 load average (1 分) 開始 1.06 → 終了 1.08 |
 | `unr_nega.sh` | 129 s、rc 1 (§2d-7 の NC2 / 対照 NC6 が不一致)。 load average 1.30 → 1.11 |
 
