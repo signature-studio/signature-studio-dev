@@ -156,5 +156,5 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 | `LoadStringW` 8.4M 回の unit 特定と資源供給 hook (`gui_set_resource_provider` ← shimx / PE .rsrc) | LoadStringW が常に空文字 | #174 に所見 / GUI-2 または shimx |
 | 受入「`__pe_image` を m11_data_gen 方式の data 実体化へ統合」(スコープ 3) | 未着手 (本 PR は m11 の image 敷設をそのまま利用) | PM 起票依頼 (新規子チケット) |
 | 実ブラウザ host 結線 (`GuiHost.attach`・FL ワーカ化・UI スレッドのスタック量 §2-2 #8) | node の headless host のみ。描画 (#32) は別 | #32 / #121 |
-| `tools/m11/m11_e2e.sh` と `m11_gen_ir2.sh` が PE パスを `[ANALYSIS-DIR]` 既定 (`/home/ubuntu` 固定) で持つ | runner では ldfix が黙ってスキップされ数値が変わる。本 PR の測定は `gen_ir2` を使わず素材 IR で行う | m11 に `FL_WIN64_DIR` 参照を提案 (#132 の未解決と同件。PM 起票依頼) |
+| `tools/m11/m11_e2e.sh` と `m11_gen_ir2.sh` が PE パスを `[ANALYSIS-DIR]` の固定既定値で持つ (`[WIN64]` 経由にしていない) | runner では ldfix が黙ってスキップされ数値が変わる。本 PR の測定は `gen_ir2` を使わず素材 IR で行う | m11 に `FL_WIN64_DIR` 参照を提案 (#132 の未解決と同件。PM 起票依頼) |
 | 前回 run で観測した selftest (ASAN) の `heap-use-after-free` (`gui_headless` の描画スレッドと `surf_free`。前 run で約 2/8 で再現) | 本 HEAD の 3 回では再現せず (431/0 ×3)。フレークは未解消 | PM 起票依頼 (gui_headless の描画と surf_free の排他) |
