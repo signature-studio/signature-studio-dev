@@ -52,6 +52,23 @@ FL 由来物は `work/` (gitignore) に置き、commit しない。
 - 戻り値を作ると、それは実 FL の値ではない mock になる (issue 本文が禁じる「根拠なし」の戻り値)。
   よって実装は、FL 実機の戻り値を取れる根拠が揃うまで行わない。
 
+### 4.1 import 時の mock 値一覧 (`tests/chord_progression_call_probe.mjs`)
+
+probe が import 時に入れる値。いずれも実 FL の値ではなく **mock (根拠なし)**。実 FL 照合は #81 (PY-9)。
+
+| 対象 (probe の行) | 入れた値 | 種別 | 起票先 |
+|---|---|---|---|
+| `flrack.rack.loop_starter_config` (69 行) | `'{"mock": true, "genres": {}, "loops": []}'` | mock (根拠なし) | #81 |
+| `flpianoroll.score.PPQ` (71 行) | `96` | mock (根拠なし) | #81 |
+| `flrack.rack.flr` / `flrack.flr` (69・70 行) | 空の `types.SimpleNamespace` | mock (根拠なし) | #81 |
+| `flcpt.cpt` (63 行) | 読まれた属性を記録する `Rec('cpt')` | mock (根拠なし) | #81 |
+| `flcpt.chordPool` (66 行) | 読まれた属性を記録する `Rec('chordPool')` | mock (根拠なし) | #81 |
+| `flcpt.ChordMarker` / `ChordAlternative` / `CPT` / `ChordPool` (64・65・67・68 行) | 空の `type(...)` クラス | mock (根拠なし) | #81 |
+| `Rec` の dunder (`__bool__`→False、`__int__`/`__index__`→0、`__float__`→0.0、`__len__`→0、`__iter__`→空、`__lt__`/`__gt__`→False) | 固定値 | mock (根拠なし) | #81 |
+| `flrack` モジュール全体 (61・62 行) | 空の `types.ModuleType` | mock (根拠なし) | #1327 (実装) / #81 (照合) |
+
+結論: 上の値で得た戻り値・例外・「読まれた属性」の表 (§3) は **mock 値に依存する結果**。実 FL の動作の証拠にはならない。`Rec` の固定値に依存する分岐は、実 FL と一致しない可能性がある。
+
 ## 5. 未解決 (起票先)
 
 | 未解決 | 影響 | 起票先 |
