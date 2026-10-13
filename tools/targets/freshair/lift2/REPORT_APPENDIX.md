@@ -191,9 +191,18 @@ bash tools/targets/freshair/lift2/lift2_e2e.sh                                  
 
 - 実測の commit: `c531a0cb`。lift2 コードは `99b87bc2` と同一で、`99b87bc2..c531a0cb` の差分は本ファイル (REPORT_APPENDIX.md) のみ。`RESULT: lift2_e2e ALL PASS`, rc=0, real 1m14.253s, user 1m10.095s, load 0.22 (`uptime`), TMPDIR=`$RUNNER_TEMP`。
 - 基点 `99b87bc2` でも実測: rc=0, real 1m18.548s, load 0.12, ALL PASS。
-- 注: 上記は素材取得時の実測。後続のレビュー run では素材不足で再実行できていない (未再検証)。
+- 注: 上記 c531a0cb の値は現 head の実測ではない (`c531a0cb..8b27e70a` で lift2 コードに差分あり)。現 head の実測は下の 9.1。
 - ただし step 6 (ctrl build) は `failed(funcs with unsupported) 1` (`f_1810577ac: vpcmpeqw ymm1, ymm1, ymmword ptr [r9]`)。build は継続し、ctrl 出力は 15/15 BIT-EXACT (epf 8 + structured 2 + random 5, fma0/1)。
 - ctrl ERR: native/wasm 1/1 (同一 scenario)。comp/filter/fuzz/ABI/ablation 5 種はいずれも実測どおり PASS。
+
+### 9.1 現 head `8b27e70a` の実測: lift2_e2e.sh (FA-11 #692 / PR #1425 受入 4)
+
+- 測定 commit: `8b27e70a` (本 fix の検証 HEAD)。コード差分は `git diff 8b27e70a HEAD -- tools/targets/freshair/lift2 ':!*REPORT*'` の出力で確認する (本節の commit 以降も文書のみ)。
+- 実行: `TMPDIR=$RUNNER_TEMP FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/targets/freshair/lift2/lift2_e2e.sh` (foreground, rc=0)。
+- 実測: `RESULT: lift2_e2e ALL PASS`, rc=0, real 54.981 s, user 50.793 s, load 0.61→0.97 (`uptime`, nproc 4)。
+- 素材: `fl-win64`・`plugins-freshair` (`fetch.sh` で factory `.epf` 8 本を確認)・`toolchain-emsdk`・`toolchain-retdec` を `$ARTIFACTS_DIR` から展開。`SlateCore.core_64` は `work/win/Fresh Air/` にある。
+- 結果: comp 400/400 BIT-EXACT・filter 400/400 BIT-EXACT・fuzz 4 系統 mismatch 0 (各 1200, ERR 0/0)・ABI violations 0・ctrl BIT-EXACT 15/15 (fma0/fma1 とも `ERR native/wasm 1/1 同一 scenario: yes`)・ablation 5 種すべて検出 (comis_noflags 200/200, xmm_args_drop 200/200, xmm_ret_drop 200/200, icall_drop 80/200, cmov_drop 172/200)。
+- mlift: `lifted 1256 funcs / 536369 B / 114503 insns, failed(funcs with unsupported) 0`。
 
 ## 10. FA-10 (#666) rep 経路のネガコン (ctrl) — 実測・受入 4 達成
 
@@ -250,33 +259,34 @@ bash tools/targets/freshair/lift2/lift2_e2e.sh                                  
   - 訂正: §10.1 の「`ctrl_rep.json` の rep は ctrl 閉包が実行する」は、kind ごとには成立しない (`movsb`・`stosw` は未実行)。§10.1 の数値は全 kind 版の値として有効。
 - 未解決 (起票先 #692 (FA-11)・既存のため子 issue は起票せず): `movsb`・`stosw` を実行する入力の設計と ctrl (または新 scenario) への追加、その後の `movsb`・`stosw` 単独ネガコン FAIL 化。
 
-## 12. FA-13 (#905): movsb / stosw を含む関数の呼び出し経路 (静的調査, HEAD `e8109f7a`)
+## 12. FA-13 (#905): movsb / stosw を含む関数の呼び出し経路 (静的調査, 照合 HEAD `8b27e70a`)
 
-- 測定値 (件数・ビルド結果) は §7 が正本。本節は関数の一覧と呼び出し経路だけを書く。
-- 対象: `work/ctrl/ctrl_full.ll` の `define` 単位で rep 行を数えた、rep movsb / rep stosw を含む関数の全件 (§7 と同じ 15 関数)。
+- 件数 (movsb / stosw の行数) と測定値は §7 が正本。本節は関数 VA・case 値・呼び出し元だけを書く。
+- 対象: §7 の 15 関数 (rep movsb / rep stosw を含む関数の全件)。
+- 照合: `8b27e70a` で `build_ctrl.sh` を再実行 (rc 0, `lifted 1256 funcs / failed 0`) して得た `work/ctrl/ctrl_full.ll` で、VA・case 値・呼び出し元を確認した (`work/` gitignore 対象のため commit しない)。
 
-  | 関数 (VA) | movsb | stosw | `fa_icall` の case 値 | direct 呼び出し元 (`ctrl_full.ll`) |
-  |---|---|---|---|---|
-  | `1803e12c0` | 4 | | あり | `1803e2190`, fa_icall |
-  | `1803e2190` | 1 | | あり | `1803e4ee0`, fa_icall |
-  | `1803e2240` | 8 | | あり | `1803e6000`, fa_icall |
-  | `1803e2600` | 8 | | あり | `1803e66f0`, fa_icall |
-  | `1803e2b50` | 1 | | あり | `1803e4d50`, fa_icall |
-  | `1803e4ee0` | 1 | | あり | `1803e95f0`, fa_icall |
-  | `1803e5070` | 1 | | あり | `1803e95f0`, fa_icall |
-  | `1803e8b70` | | 2 | あり | fa_icall のみ |
-  | `1803e95f0` | 7 | | あり | fa_icall のみ |
-  | `1803fb860` | 3 | | あり | `1803e55c0`, fa_icall |
-  | `1803fbb80` | 3 | | あり | `1803e5870`, fa_icall |
-  | `1803fdc70` | 1 | | あり | `18040b950`, fa_icall |
-  | `180401070` | 1 | | あり | `1803fe400`, `181020a74`, fa_icall |
-  | `180402e50` | | 1 | あり | `1803e49e0`, fa_icall |
-  | `180ca4e70` | | 3 | あり | `180f8fd00`, fa_icall |
+  | 関数 (VA) | `fa_icall` の case 値 | direct 呼び出し元 (`ctrl_full.ll`) |
+  |---|---|---|
+  | `1803e12c0` | あり | `1803e2190`, fa_icall |
+  | `1803e2190` | あり | `1803e4ee0`, fa_icall |
+  | `1803e2240` | あり | `1803e6000`, fa_icall |
+  | `1803e2600` | あり | `1803e66f0`, fa_icall |
+  | `1803e2b50` | あり | `1803e4d50`, fa_icall |
+  | `1803e4ee0` | あり | `1803e95f0`, fa_icall |
+  | `1803e5070` | あり | `1803e95f0`, fa_icall |
+  | `1803e8b70` | あり | fa_icall のみ |
+  | `1803e95f0` | あり | fa_icall のみ |
+  | `1803fb860` | あり | `1803e55c0`, fa_icall |
+  | `1803fbb80` | あり | `1803e5870`, fa_icall |
+  | `1803fdc70` | あり | `18040b950`, fa_icall |
+  | `180401070` | あり | `1803fe400`, `181020a74`, fa_icall |
+  | `180402e50` | あり | `1803e49e0`, fa_icall |
+  | `180ca4e70` | あり | `180f8fd00`, fa_icall |
 
-  - 表の行数の合計は §7 の測定と一致する。`rep stosb` / `rep stosq` は本節の対象外。
+  - `rep stosb` / `rep stosq` は本節の対象外。
 - 確認した事実 (実測, `ctrl_full.ll` の静的解析):
   1. 上表の 15 関数はすべて `fa_icall` の switch の case 値として現れる (間接呼び出しの解決先)。`1803e95f0` は `i64 6446552560` (= 0x1803e95f0)。
-  2. `build_ctrl.sh` の `--root` 38 個 (すべて `ctrl_full.ll` に定義あり) から direct の `call` 辺だけで辿ると、15 関数はどれも到達しない。
+  2. `build_ctrl.sh` の `--root` 38 個 (すべて `ctrl_full.ll` に定義あり) から direct の `call` 辺だけで辿ると、15 関数はどれも到達しない (`e8109f7a` で実測。lift2 コードは `e8109f7a` 以降も不変のため本 HEAD にも当てはまるが、本 run では再確認していない)。
 - 未確認 (未解決): vtable の**どの slot から**これらの case が呼ばれるか (`fa_icall` の case 値の参照元)、および、どの scenario の入力でその経路が通るか。上の「direct 呼び出し元」は直前の 1 段のみで、2 段以上の上流は未追跡。
 - 次の作業 (#905 の残件): (a) vtable 参照元の特定と、通る入力 (macro / 子 meter / flag) の決定。(b) その scenario を `gen_ctrl_scen.py` に追加し、`movsb`・`stosw` 単独 trap で `run_ctrl.sh` が FAIL することを実測する。(c) trap を戻し `cmp` で一致を確認する。
 - 起票先: #905 (FA-13, OPEN)。親 #692。
