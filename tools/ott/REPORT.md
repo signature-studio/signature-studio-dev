@@ -240,9 +240,9 @@ OTT_ULP_TOL=2 bash tools/ott/ott_e2e.sh  # 許容 ulp 指定
 | ネガコン (表の 1 entry を 1 bit 破壊) | `[jt] FAIL` (only-in-C 0x10001388 / only-in-PE 0x10001398)、rc 1 |
 | 間接 jmp・call の読み | `LD32((R[0]*4 + 0x100014a4ULL))`・`LD32((R[0] + 0x1cULL))` (PTR=4 B) |
 | `cc -c -O1 -I tools/ott/rt ott_lifted.c` | rc 0 |
-| `emcc -c` | 未実行 (runner に emcc 無し) |
+| `emcc -c -O1 -I tools/ott/rt ott_lifted.c` (toolchain-emsdk 6.0.12) | rc 0 (wasm object 7,512 B) |
 | 回帰: ia32 closure 2 (root 0x10007ca0, 8 関数, 301 insn) の生成 C・lift_meta | origin/main と HEAD で `cmp` 一致 (差 0) |
 | 所要 (lift, 単独実行) | wall 139 ms・load 1 分 0.00 |
 
 - x64 の回帰は**未実測**: fl-win64 素材に x64 の PE が無く、plugins-ott の展開物にも OTT DLL が無い (インストーラのみ)。 変更は ia32 でのみ成立する条件 (`IA32 and ...`) で、x64 の出力は構造上不変と推定。 差分確認は OTT DLL 素材で行うこと。
-- 未解決 (起票先: #1117 の子 / #1099): (1) 0x10001300 の case 内 x87 `fmul` 1 件 (unsup)、(2) `emcc -c` 通過、(3) 受入 1 の「main」は jump table を持たないため、main の受入の意味 (main を対象にするか) を PM が再定義する必要あり。
+- 未解決: (1) 0x10001300 の case 内 x87 `fmul` 1 件 (unsup)。 (2) 受入 1 の「main」(0x10007ca0) は jump table を持たない (`call esi` のみ) ため、main 自体は表の検証対象にならない。 PM が受入の対象関数を再定義する必要あり。 (3) x64 の回帰は OTT DLL 素材が無く未実測。
