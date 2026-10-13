@@ -4,8 +4,9 @@
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 cd "$HERE"
+source "$HERE/../shared/env.sh"
 mkdir -p work
-BIN=/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin
+BIN="$FL_WIN64_DIR/extracted/block00031_PE.bin"
 export TMPDIR="$HERE/work/tmp"
 mkdir -p work/tmp
 
