@@ -4,7 +4,7 @@
 # exit: 0 = 全ケース一致 / 2 = HeartCore 形の不一致が残る (gap) / 1 = ハーネス異常
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
-GUI="$HERE/../../../gui"
+GUI="${KH_GUI_DIR:-$HERE/../../../gui}"   # 既定は repo の tools/gui。修正案の事前検証では修正済みコピーを指定する
 WORK="${KH_UI_WORK:-$HERE/work}"; mkdir -p "$WORK"
 cat > "$WORK/reach_tab_stub.c" <<'EOT'
 #include <stdint.h>
