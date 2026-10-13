@@ -25,10 +25,9 @@ sys.path.insert(0, HERE)
 from gen_sigs import split_args, ptype, ATTRS  # noqa: E402
 
 INT_BITS = {'i1': 1, 'i8': 8, 'i16': 16, 'i32': 32, 'i64': 64}
-FLT = ('float', 'double')
 ZERO = {'ptr': 'null', 'float': '0.000000e+00', 'double': '0.000000e+00'}
 LINK_WORDS = {'dso_local', 'hidden', 'protected', 'default', 'external', 'ccc', 'fastcc', 'local_unnamed_addr', 'unnamed_addr'}
-DECL = re.compile(r'^declare\s+(?P<pre>[^@\n]*?)@(?P<name>[\w.$-]+)\((?P<args>.*)\)(?P<post>[^\n]*)$', re.M)
+DECL = re.compile(r'^declare\s+(?P<pre>[^@\n]*?)@(?P<name>[\w.$-]+)\((?P<args>.*)\)[^\n]*$', re.M)
 DUP = [re.compile(r'^([A-Za-z_]\w*)\.(\d+)$'), re.compile(r'^([A-Za-z_]\w*)_D(\d+)$')]
 
 

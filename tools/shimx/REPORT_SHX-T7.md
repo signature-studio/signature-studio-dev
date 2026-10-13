@@ -5,7 +5,7 @@
 
 ## 16. 署名正規化 IR pass + ゲート (#173, SHX-T7)
 
-既知類型との関係: 該当なし (`docs/DEFECTS.md` D1〜D16 は命令レベルの miscompile。本件は declare 署名の揺れによる wasm-ld mismatch → 実行時 trap で、§4 項 4 の 5 件が実害例)。
+既知類型との関係: 直接の既知類型は無し (`docs/DEFECTS.md` D1a〜D17 は命令・ABI・データ層の miscompile。本件は declare 署名の揺れによる wasm-ld mismatch → 実行時 trap で、§4 項 4 の 5 件が実害例)。ただし下記「未解決」の引数欠落 (M11 `function_593450`) は D5 (ABI 解析による引数喪失) / D7 (呼出規約による引数ずれ) と同族の疑いがあり、同一かは未確定。新規類型の行案は未解決表の直後に置いた。
 
 **結論**: 案A (IR pass) + 案B (ゲート) を実装した。`sig_normalize.py` が lift IR の外部 declare を shimx 定義署名 (`data/sigs.json`) へ正規化し、`sig_gate.sh` が「正規化 → `verify_sig.sh` mismatch 0」を強制する (unresolved が 1 件でもあれば exit 1)。`test.sh` 6b は実 IR をこのゲート経由で検査し、合成 fixture の回帰 `test/sig/sig_test.sh` を追加した。実 IR (M11 / OTT) での実測は下の「レビュー対応後の再検証」。
 
@@ -57,6 +57,22 @@
 | adapter 経由になるため RetDec 側が i64 で渡す HANDLE の上位 32bit は落ちる (trunc) | 実 IR で出た adapter は `SHGetFolderPathW.1` / `_D1` の 1 件ずつのみで、いずれも引数 0 個・戻り値 i64 (sext)。HANDLE 引数の trunc は実 IR では未発火。他プラグインで adapter が出た時は `normalized` / `dup_merged` 一覧で確認 | #173 |
 | lift 側の引数欠落 (M11): `function_593450` は引数 0 個で lift されるが、呼出元 `function_81bca0` は boot_final2 で `function_593450(i32 0)` を渡し、boot_final3 では引数なしで呼ぶ。SHGetFolderPathW の 5 引数 (hwnd・csidl・hToken・flags・path) は IR に残っていない。正規化 adapter と R6 `--normalize-dup` は足りない引数を 0 / null で補完し、shimx は `csidl 0` / `path NULL` で `E_INVALIDARG` を返す。`function_81bca0` は戻り値 ≠ 0 として fallback `function_81bb20` へ分岐する。**silent** (`--emit-stubs` 経路の「名前を出して abort」は loud)。「従来のスタブと同等」は誤り | #173 (lift 欠陥。引数欠落の扱い = unresolved 化 / lift 側修正 / 許容 は PM 判断) |
 | `data/sig_ext.json` の拡張方針は 3 API 分を手で書いた (`GetComputerNameExW` / `GetFileAttributesExW` = 非負 enum・BOOL の zext、`SHGetFolderPathW` ret = HRESULT の sext)。新しい API で adapter が必要になるたび符号の根拠を人が判断して追記する | 既定は unresolved (fail-loud) なので silent miscompile にはならないが、追記は手作業 | #173 |
+
+**新規類型の行案 (DEFECTS.md 形式・PM 判断の入力。DEFECTS.md 本体は未編集)**:
+
+| 項目 | 内容 |
+|---|---|
+| ID | D18 (案。既存 D1a〜D17 と非衝突) |
+| 層 | fe (lift で引数が欠落) + ours (正規化の補完) |
+| 新旧 | 新規 (M11 closure, #173 の実 IR 実測で発見) |
+| 症状 (silent) | 呼出元が渡した引数の一部が declare / call から失われ、足りない引数を `0` / `null` で補うと、呼出先は想定外の入力で動く。M11 `function_593450` は引数 0 個で lift され、`function_81bca0` は boot_final2 で `(i32 0)` を渡す。shimx `SHGetFolderPathW` は csidl 0 / path NULL で `E_INVALIDARG` を返し、gate は mismatch 0 / unresolved 0 で通る |
+| 根本原因 | (未確定) lift 時の呼出規約・引数回収の欠落。`sig_normalize.py` の「余る引数は捨て・足りない引数は 0」と、既存 R6 `ir_undef.py --normalize-dup` の同一方針が silent 化の入口 |
+| 観測 (証拠) | `tools/m11/work/boot_final2.ll` / `boot_final3.ll` の `function_593450` と呼出元 (本節 SHX-T7 実測) |
+| 検出信号 (機械的) | 外部 declare の引数個数が呼出 site の引数個数と一致しない (補完が発生した site) |
+| 修復方針 (案・PM 判断) | (a) 補完を unresolved に変える (現在の fail-loud 既定と整合。実 IR の `test.sh` 6b は exit 1 になる) / (b) lift 側で引数を回復する (別起票) / (c) 許容して理由を残す。推奨は (a) |
+| 既知との関係 | D5・D7 と同族の疑い (未確定)。命令レベルの D1a〜D4 とは別系統 |
+
+`sig_normalize.py` の `DECL` 正規表現の未使用グループ `post`、`FLT` 定数は未使用のため本節の修正では削除していない (挙動に影響しない nit)。
 
 **main 競合解消後の再検証 (2026-10-13, Actions runner, 検証起点 = コミット 3d75d44 (merge 629837b + sigs.json 再生成), n=1, 素材 work-m11 / work-m6-ott 展開済み, emcc 6.0.12 (`/opt/emsdk`))**: main の SHX-T8 (#175) を取り込んだ merge 直後は shimx 関数が増えて `sigs.json` が陳腐化していたため、再生成してから検証した。
 
