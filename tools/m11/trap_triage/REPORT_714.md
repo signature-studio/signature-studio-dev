@@ -92,7 +92,7 @@ python3 trap_triage/check_682.py work/probe714/units_714.json --units 304,555,92
 |---|---|---|---|
 | 304 | 14871 `function_4133f0` (`_UStrAsg`) | `i32.load offset=0` (`[src-8]` の refcount 読出し) | 3147 `function_535ab0` ← 3156 `function_4fad10` ← 1759 `function_4fb910` ← 5235 `function_883140` |
 | 555 | 14871 `function_4133f0` | 同上 | 同鎖の一部 (`function_4fad10` 経由 6211 ほか) |
-| 923 | 14900 (`function_410b10` 系) | `i32.load` | 1759 `function_4fb910` ← 1758 ← 8526 |
+| 923 | 14900 `function_410b10` (OOB 直前 `i64.const 128; i64.sub` = `obj-0x80`) | `i32.load` | 1759 `function_4fb910` (呼出し鎖の上位は未確認) |
 
 - `function_4133f0` の C 転記 (`m11_ov.c`) は `src != nil` のとき `[src-8]` を読む。src がアドレス空間外の値になっているのが起点。
 - **未解決 (次の一手)**: `function_535ab0` が `4133f0` に渡す `src` の出どころ (呼出し元 `function_4fad10` の引数組立て) を、OOB 直前の値で確認する。`function_883140` 側の `i64.const 2074840` (0x1faa18) 付近の定数が、ポインタとして使われていないかも見る。
