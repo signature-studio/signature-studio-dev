@@ -250,16 +250,17 @@ iargs 未対応の 3 site (§17.2 の残 unbound: `1801a3117`・`1801c162b`・`1
 
 ### 17.10 #415 原因切り分け (HEAD 04b4cc5f, コード変更なし): BLK 配置と entry 配線の不整合
 
-素材: `work-icall` / `work-liftlib` / `work-m6-ott` / `analysis-ott-binaries` / `toolchain-retdec` / `toolchain-emsdk` を展開済み (実在確認済み)。`OTT_DLL` は `[ANALYSIS-PLUGINS]` 配下の `ott/binaries/OTT_vst2_win64.dll` (§17.9 と同じ)。capstone・pefile は venv に導入。
+素材: 本 fix run (af5f9644 以降) では `fl-win64` のみ取得されており、`work-*` / `toolchain-*` / `analysis-*` の実在は本 run で未確認。本節は再実行していない。以下は静的照合と §17.9 の記録による。`OTT_DLL` は `[ANALYSIS-PLUGINS]` 配下の `ott/binaries/OTT_vst2_win64.dll` (§17.9 と同じ)。
 
 原因の内容 (BLK 配置と entry 配線) と #883 への分離は §17.9 を参照。本節は §17.9 にない根拠だけを残す。
 
 | 項目 | 根拠 |
 |---|---|
 | BLK の算出式 | `blk = img.base + image_size + 0x4000000` (`img.base > 0x100000000` の枝, `tools/icall/icall_rewrite.py` L653)。`img.base` 0x180000000 のため VA は 4 GiB 超 |
-| 32bit 切り詰め | `ott_getparam_fixed.ll` は `p:32:32` (wasm32)。BLK+8 = `0x184308008` は `0x84308008` に切り詰められ、既定 `MAXIMUM_MEMORY` 64 MiB の外になる |
-| 読み先 | 生成 IR は entry で BLK+8 (`this`) と BLK+0x10 (`idx`) を直接 load する。`iargs` が足した `%arg2` (this) は未使用 |
-| C runtime の既定 BLK | `tools/icall/rt/icall_rt.c` / `icall_ovr.c` は `ICALL_BLK = 0x34308000` で、rewriter の `0x184308000` と不一致。leaf build の stub は `__icall_dispatch` を trap に置換しており runtime は link されない |
-| harness の引数位置 | `spec.py` L182-184 が引数の宣言順を `A <slot>` で出力 (`this`=slot 0, `idx`=slot 1)。`native_runner.c` L128 (`c.gpr[sl]`) と `wasm_runner.mjs` L71 がその slot の位置で渡す。`ms_call.S` L18-19 が gpr[0]→rcx、gpr[1]→rdx に載せる。IR は BLK から読むため、この値は届かない |
+| 32bit 切り詰め | `ott_getparam_fixed.ll` は `p:32:32` (wasm32)。BLK+8 = `0x184308008` は `0x84308008` に切り詰められる。`0x84308008` は 64 MiB (0x4000000) 超。`64 MiB` は lowbase 経路の既定 `max_mib=64` (`tools/liftlib/liftlib/recipes/ott.py` L34・L192)。leafspec の build 経路 (`pipeline.emit`, `tools/liftlib/liftlib/pipeline.py` L211-214) は `MAXIMUM_MEMORY` を渡さないため、leafspec での上限は未確認 (emcc 既定値は本 run で未検証) |
+| 読み先 | `BLK+8` (`this`, 0x184308008) の直接 load は §17.9 L240 の wasm trap 解析 (`LL_VERBOSE=1`) による観測。`BLK+0x10` (`idx`) の直接 load は本 fix run で未確認 (`ott_getparam_fixed.ll` を再生成していないため行番号も示せない)。`iargs` が足した `%arg2` (this) の未使用も同様に未確認 |
+| leaf build の runtime | `targets/ott_getparam.json` に `emcc.sources` が無く、`icall_rt.c` は link されない。`ir_icall_restore.py` L109 が追加する `declare void @__icall_dispatch(i64)` は、`stub_externals: true` のとき `pipeline.emit_stubs` (`pipeline.py` L155-176, 呼出し L193) が `__builtin_trap()` の stub にする。静的追跡のみで、stub の生成は本 run で未実行 |
+| C runtime の既定 BLK | `tools/icall/rt/icall_rt.c` / `icall_ovr.c` は `ICALL_BLK = 0x34308000` で、rewriter の `0x184308000` と不一致 |
+| harness の引数位置 | `spec.py` L182-184 が引数の宣言順を `A <slot>` で出力 (`this`=slot 0, `idx`=slot 1)。`native_runner.c` L128 (`c.gpr[sl]`) と `wasm_runner.mjs` L71 がその slot の位置で渡す。`ms_call.S` L18-19 が gpr[0]→rcx、gpr[1]→rdx に載せる。IR が BLK から読むなら、この値は届かない (前行の未確認事項に依存) |
 
 修正と検証 (ネガコン含む) は 1 run では終えられないため、**#883 (HB-H21) に残す**。
