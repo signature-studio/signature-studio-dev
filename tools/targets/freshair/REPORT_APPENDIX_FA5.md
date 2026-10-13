@@ -46,7 +46,7 @@
 - 方法: `value` 17 関数の rip 参照 (32 B) を 8 B 語で対にし、差分語を分類。`rva_off_*` は「SC 語が指すセクション内 RVA の 16 B」を KH 側と比べる。
 - 前提の訂正: 旧 §A4 の `rva32` (セクション範囲内の整数) は、RVA ポインタなのか定数なのかを区別していなかった。本節の検査では、差分語は RVA として扱えるものだけを対象にした。
 - 測定 commit: `115debea` (最後にコードを変えた commit。RVA 候補を `.rdata` に限定し `sec_hits` を追加)。`ks_identity.sh` と `ks_rdata_value.py` は同じ commit で再実行。コード差分の証跡 `git diff 115debea HEAD -- tools/targets/freshair/*.py tools/targets/freshair/*.sh` は **0 行** (差分は本節の文書のみ)。
-- 実測 (commit `115debea`、2 回実行で byte 一致、EXIT=0。`ks_rdata_value.py` 0.67 s × 2、`ks_identity.sh` 41.0 s、load 0.79 (nproc=4)): 下記の数値が本 PR の正本。
+- 実測 (測定 commit `115debea` のコードを HEAD `0d7ddc37` で再実行。コード差分 0 行。`ks_identity.sh` EXIT=0、34.5 s、load 0.58 (nproc=4)。`ks_rdata_value.py` 2 回実行で byte 一致、EXIT=0、0.57 s / 0.58 s): 下記の数値が本 PR の正本。
   `{"abs_vs_const": 8, "dbl": 13, "fn_value_differs": 17, "int": 23, "rva_off_absent": 72, "text": 23}`
   - `abs_` 接頭辞は、片側以上が ImageBase〜SizeOfImage の 8 B 絶対アドレスである組。`abs_vs_const` 8 語は、片側だけが絶対アドレスで、もう片側が RVA として解決できない定数。
   - `layout` 0 件・`target_eq` 0 件・`abs_layout` 0 件・`abs_target_eq` 0 件 (配置差で説明できる語は無い)。
