@@ -16,6 +16,8 @@
 - FL の GUI import 面: 実装済み 280 → 292 (`IMPORTS.md` は `gen_api.py` が再生成)。IMPORTS.md の STUB→IMPL は 12 行 (imm32 7 + touch/gesture 5)。
 
 ### 検証 (4 vCPU runner、検証起点 `8dd9457`、実測時 load 0.8〜1.1)
+
+- **HEAD `0b71ab1` の実測 (B2 修正後)**: `bash tools/gui/e2e.sh` 全体 **ALL PASS** (exit 0, real 1m36.108s; native selftest 493 passed / 0 failed、reach_test 11 / adapt_test 28 passed、6/6・6b/6・6c/6・6d/6・6e/6・6f/6 PASS、6g/6 入力 ALL PASS)。`tools/gui/input/e2e.sh` ALL PASS (in_pushed=41 in_dropped=0 in_consumed=41, real 3.773 s)。`tools/gui/input/negctl.sh` 12 件すべて検出・検出漏れ 0 (real 2 分 34.430 秒)。以下の表は旧検証起点 `8dd9457` のもの。
 | 層 | 結果 |
 |---|---|
 | native `bash tools/gui/test/selftest.sh` (ASan/UBSan, `8dd9457`) | **492 passed / 0 failed** (既存 426 + GUI-6 の 66 assertion; `test/selftest_gui6.inc`)。DE/FR/US 配列・AltGr・IME 分割再構成・タッチ/ジェスチャ・ClipCursor・Pointer Lock 要求の push 数 (1/1/0)・DE/FR の MAPVK 英字大文字化を含む。所要 real 13.06 s |
@@ -45,7 +47,7 @@
 ### 範囲外・未達
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `bash tools/gui/e2e.sh` 全体 ALL PASS は未確認 (runner に RetDec なし → PE lift 層 2/6・3/6・4/6・6/6〜6d が走らない)。6g/6 (本機能) は追加済み | 完了条件「e2e.sh ALL PASS 維持」未確認 → `Refs #182` | #182: PR 本文の `oc_artifacts` に `toolchain-retdec` を追加済み。次の run で再実行 |
+`bash tools/gui/e2e.sh` 全体は `0b71ab1` で ALL PASS (exit 0, real 1m36.108s; PE lift 層 2/6〜6g/6 を含む)。範囲外の残りは下記の行。
 | WM_POINTER* / RegisterPointerInputTarget 系 (FL の import に無い) と慣性ジェスチャ (GID_PAN の GF_INERTIA)・GID_ROTATE/TWOFINGERTAP/PRESSANDTAP | issue スコープ「タッチ → WM_POINTER*」の一部が未実装 | #182 (実到達ログ: #174 で FL が呼ぶと確定したら) |
 | GID_PAN (1 本指移動の WM_GESTURE) は実装のみで selftest / e2e に検査が無い | パン操作の回帰を検知できない | #182 (テスト追加は次の作業。PM 判断: 今回の PR で足すか) |
 | 配列は US/DE/FR のみ・dead key・IME 配列・実 Windows の KBD テーブルとの照合なし (表は公開仕様から手作成)。Caps の数字行 shift-lock 近似 | 他配列では US 相当に落ちる。表の誤りは実機でしか見つからない | #182 (日本語 JIS/実機確認はユーザ依頼候補; 着手時に具体依頼を起票) |

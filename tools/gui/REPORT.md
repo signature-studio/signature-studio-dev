@@ -246,5 +246,5 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
 
 ## 12. GUI-6 (#182): 入力品質 (キー配列 / IME / タッチ・ジェスチャ / Pointer Lock・ClipCursor)
 既知類型との関係: 該当なし (lift 欠陥ではなく shim/host の意味論; `docs/DEFECTS.md` D1a〜D16 に該当なし)。検証起点: コード `8dd9457` (以降の docs のみの commit は検証対象外)。
-- **結論**: FL 非依存で CDP 再現できる範囲 (US/DE/FR 配列・IME・タッチ/ZOOM・Pointer Lock/ClipCursor) を実装し、`bash tools/gui/input/e2e.sh` ALL PASS (21 検査・drop 0)、selftest 492 passed / 0 failed、ネガコン 12 件すべて検出 (検出漏れ 0)。受入条件 (`bash tools/gui/e2e.sh` 全体の ALL PASS は RetDec 不在で未確認、WM_POINTER*・実機確認は未実施) を満たさないため PR は `Refs #182`。
+- **結論**: FL 非依存で CDP 再現できる範囲 (US/DE/FR 配列・IME・タッチ/ZOOM・Pointer Lock/ClipCursor) を実装し、コード `0b71ab1` で `bash tools/gui/e2e.sh` 全体 ALL PASS (exit 0, real 1m36.108s, RetDec・emsdk・fl-win64 あり)、`tools/gui/input/e2e.sh` ALL PASS (21 検査・drop 0)、selftest 493 passed / 0 failed、ネガコン 12 件すべて検出 (検出漏れ 0)。WM_POINTER*・実機確認は未実施のため PR は `Refs #182`。
 - 仕様・検証表・ネガコン実測・範囲外と起票先の詳細は付録 [REPORT_APPENDIX.md §12](REPORT_APPENDIX.md)。
