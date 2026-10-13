@@ -194,7 +194,7 @@ FA の P1' (comisd×2+jbe/jae+xorps/movaps+jmp, 合流先は reg2mem alloca) が
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | `work-liftlib` / `work-m6-ott` 素材の絶対 symlink (作業 VM の旧 checkout 内ファイルを指す) が runner で dangling。lowbase_e2e [2] が素材展開直後は FAIL | Actions 上で lowbase_e2e を再実行する度に手動張り直しが要る | #448 `[CI-8]` (OPEN) が追跡 (素材の相対 symlink 化 or `recipes/ott.py` の `os.path.lexists` 判定) |
-| (初版の記述: `tools/ott/avx/build_avx.sh`・`tools/ott/crtinit/lift_crt.sh`・`tools/ott/accept/acc_crt_table.py`・`tools/ott/avx/unsup_scan.py`・`tools/m9/m9_tablebind.py`・`tools/shimx/scripts/import_scan.py`・`tools/liftlib/tests/test_unit.py`・`tools/liftlib/xmm0_ret_census.py` にも同一の固定パスが残る。同種の移植性欠陥 (本 issue の範囲外)。新規子チケット案 (CI-4 系列)) | **解消済み**: a4f8a08 (#450 / PR #460) と 2db928d (#427 / PR #438) で main に merge 済み。この HEAD で 8 ファイルとも `/home/ubuntu` の出現数 0 を実測。#450 `[CI-4-ott-liftlib]` は CLOSED | 起票不要 |
+| (初版の記述: `tools/ott/avx/build_avx.sh`・`tools/ott/crtinit/lift_crt.sh`・`tools/ott/accept/acc_crt_table.py`・`tools/ott/avx/unsup_scan.py`・`tools/m9/m9_tablebind.py`・`tools/shimx/scripts/import_scan.py`・`tools/liftlib/tests/test_unit.py`・`tools/liftlib/xmm0_ret_census.py` にも同一の固定パスが残る。同種の移植性欠陥 (本 issue の範囲外)。新規子チケット案 (CI-4 系列)) | **解消済み**: a4f8a08 (#450 / PR #460) と 2db928d (#427 / PR #438) で main に merge 済み。この HEAD で 8 ファイルとも旧ユーザ名付き絶対パスの出現数 0 を実測。#450 `[CI-4-ott-liftlib]` は CLOSED | 起票不要 |
 | `OTT_DLL` が [3] (`build_x64c.sh`) と `--full` に伝わらない。[3] は `libottnative.so` (既定 DLL 由来) と比較するため、別 DLL を指定しても [3] だけ既定 DLL を検証する | 別 DLL を `OTT_DLL` で指定した検証が [1][2] と [3] で別対象になる | 未起票 (新規子チケット案、CI-4 系列・親 #294。PM に起票依頼) |
 | `capstone` / `pefile` の依存がどこにも宣言されていない。素材展開だけでは [1] の最初の python 呼び出しで落ちる | Actions 上で e2e を再実行する度に手動インストールが要る | 未起票 (新規子チケット案、CI 系列。PM に起票依頼) |
 
