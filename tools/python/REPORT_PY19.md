@@ -38,7 +38,7 @@
 |---|---|
 | 素材 | `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`extracted/` 25,166 件)。`toolchain-emsdk` は `/opt/emsdk` |
 | `fetch_inputs.sh` → `build_cpython_wasm.sh` → `build_flpy.sh` | 全て exit 0。`build_cpython_wasm.sh` real 4m07.8s (初回)、`build_flpy.sh` real 7.1s / 再リンク 数秒 |
-| `flpianoroll_dialog_load_e2e.mjs` | 11/11 PASS・exit 0 (wall 0.32 秒、node 内計測) |
+| `flpianoroll_dialog_load_e2e.mjs` | 11/11 PASS・exit 0 (HEAD `61f38893`、node 内計測 0.32 秒) |
 | `pyscript_e2e.mjs` (既存、n=3) | 43/43 PASS・exit 0 ×3。wall 1.00 / 0.997 / 1.007 秒 |
 | 回帰 | `all_tools.mjs` 48/48 ok・host_calls 37,425・exit 0 / `midi_script.mjs` 29 checks OK / `midi_script.mjs --neg` exit 1 (検出) |
 | 再計算 | `flpianoroll_members.py`: 64/64 implemented (exit 0) |
@@ -54,3 +54,4 @@
 | `DialogParams` の戻り値の形 (MOCK) | HUD / 実スクリプトが戻り値を使う場合の互換 | #81 (PY-9)・#10 (HUD) |
 | `loadScoreFromFile` の入力形式 (`.fst`/`.fsc` 独自形式) | 実 FL が書いた score を読めない | 未起票 (本 issue 残件として明記) |
 | `loadScoreFromFile` の失敗種別 (実 FL) | ネガコンは Python 標準例外で代用 | #81 (PY-9) |
+��は Python 標準例外で代用 | #81 (PY-9) |
