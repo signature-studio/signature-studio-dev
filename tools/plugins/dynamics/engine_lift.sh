@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # engine 分離型 2 本 (T2) の C++ engine DLL 全 .pdata 関数を RetDec+pass 鎖で lift → emcc -c (到達性のみ; 正しさは別)
 #   bash tools/plugins/dynamics/engine_lift.sh <block> [timeout_sec]      例: 19252 (Transient Processor engine) / 19048 (Multiband Compressor comp_eng)
-# 出力: work/dynamics/engine<block>/ と 1 行サマリ (block,pdata_funcs,lift_rc,defines,f80_funcs,unimpl_helpers,emcc_c_rc,fixcmp_patched,emcc_c_rc_after_fixcmp,lift_s)
+# 出力: work/dynamics/engine<block>/ と 1 行サマリ (block,pdata_funcs,lift_rc,defines,f80_funcs,unimpl_helpers,emcc_c_rc,fixcmp_patched,emcc_c_rc_after_fixcmp,lift_s,
+#   missing_define,missing_bytes,missing_ref,extra_inside,function_defines  ← engine_defs.py)
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 source "$HERE/env.sh"
@@ -33,4 +34,5 @@ if [ -f "$OUT/e.final.ll" ]; then
   erc2=$(emcc_c "$OUT/e.fixcmp.ll" "$OUT/emcc_fixcmp.log")
   { echo "[final.ll]"; grep -m1 'error' "$OUT/emcc.log" || true; echo "[fixcmp.ll]"; grep -m1 'error' "$OUT/emcc_fixcmp.log" || true; } > "$OUT/first_errors.txt"
 fi
-echo "$B,$(cut -d' ' -f1 "$OUT/ranges.info"),$rc,$DEF,$F80,${UNI:--1},$erc,$NP,$erc2,$((t1-t0))" | tee "$OUT/summary.csv"
+DEFS=$(python3 dynamics/engine_defs.py "$OUT" 2>/dev/null || echo "-1,-1,-1,-1,-1")
+echo "$B,$(cut -d' ' -f1 "$OUT/ranges.info"),$rc,$DEF,$F80,${UNI:--1},$erc,$NP,$erc2,$((t1-t0)),$DEFS" | tee "$OUT/summary.csv"

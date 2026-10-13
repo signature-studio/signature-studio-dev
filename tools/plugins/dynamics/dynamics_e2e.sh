@@ -40,10 +40,11 @@ sys.exit(0 if len(body) == len(want) else 1)
 PY
 
 python3 dynamics/closure_facts.py > work/dynamics/facts.stdout.json 2> work/dynamics/facts.err
+python3 dynamics/matrix_check.py
 
 # engine 分離型 2 本の C++ engine DLL (判定には含めない: 到達性の実測のみ)
 if [ "${1:-}" != "--skip-lift" ]; then
-  echo "block,pdata_funcs,lift_rc,defines,f80_funcs,unimpl_helpers,emcc_c_rc,fixcmp_patched,emcc_c_rc_after_fixcmp,lift_s" > work/dynamics/engines.csv
+  echo "block,pdata_funcs,lift_rc,defines,f80_funcs,unimpl_helpers,emcc_c_rc,fixcmp_patched,emcc_c_rc_after_fixcmp,lift_s,missing_define,missing_bytes,missing_ref,extra_inside,function_defines" > work/dynamics/engines.csv
   for eb in 19252 19048; do bash dynamics/engine_lift.sh "$eb" 1500 | tail -n 1 >> work/dynamics/engines.csv; done
   cat work/dynamics/engines.csv work/dynamics/engine*/first_errors.txt
 fi
