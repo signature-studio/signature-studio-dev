@@ -142,7 +142,7 @@ bash tools/targets/freshair/lift2/lift2_e2e.sh                                  
 
 ## 7. FA-13 (#905): rep movs/stosw の実行到達 (実測, 2026-10-13, 測定 HEAD 863f3d3c)
 
-- HEAD の対応: 測定は `863f3d3c` で行った。以後 `12146acf`・`a01812f9`・`15243d54`・`8048c43a` の差分は本ファイル (文書) のみで、コードは `863f3d3c` から不変。確認: `git diff --stat 863f3d3c 8048c43a` → `REPORT_APPENDIX.md | 15 +++` (1 file changed, 15 insertions)。`git diff 863f3d3c 8048c43a -- tools/targets/freshair/lift2 ':!*REPORT*'` は 0 行。
+- HEAD の対応: 測定は `863f3d3c` で行った。以後 `12146acf`・`a01812f9`・`15243d54`・`8048c43a` の差分は本ファイル (文書) のみで、コードは `863f3d3c` から `8048c43a` まで不変 (その後の lift2 コード変更は下の再測定で扱う)。確認: `git diff --stat 863f3d3c 8048c43a` → `REPORT_APPENDIX.md | 15 +++` (1 file changed, 15 insertions)。`git diff 863f3d3c 8048c43a -- tools/targets/freshair/lift2 ':!*REPORT*'` は 0 行。
 - 検証: worktree `ws-905` (branch `905-lift2-rep-movs-e2e`)。素材 `plugins-freshair` (`Fresh Air.Win.zip` に `SlateCore.core_64` と factory `.epf` 8 本) を `fetch.sh` で展開 (`FA_DL=$RUNNER_TEMP/pf`)。
 - `build_ctrl.sh`: exit 0, real 38.1 s。mlift は `lifted 1256 funcs`, `failed 1` (`f_1810577ac` の `vpcmpeqw ymm`、既知)。
 - 基準 `run_ctrl.sh 2 5` (trap 無し): **15/15 BIT-EXACT**, exit 0, real 4.3 s。
@@ -161,6 +161,7 @@ bash tools/targets/freshair/lift2/lift2_e2e.sh                                  
 - 件数の解消 (本 run): 旧 40 件は漏れ (上記)。正しい値は **45 行 (movsb 39 + stosw 6・15 関数)**。PM 中間コメントの 45 と一致する。
 - 素材 (本 run): `$ARTIFACTS_DIR` に `fl-win64.tar.zst` と `plugins-freshair.tar.zst` の両方が実在。`plugins-freshair` を `tar --zstd -xf` で `$RUNNER_TEMP/plugins-freshair` に展開し、`FA_DL=... fetch.sh` で factory `.epf` 8 本を確認 (`win: 17 files, factory .epf: 8`)。
 - mlift 段の再実行: `build_ctrl.sh` の mlift 部分 (emcc より前) を `c91d292b` の worktree で実行。`lifted 1256 funcs / failed 1` (`f_1810577ac` の `vpcmpeqw ymm`、既知)。`env.sh` は `/opt/emsdk` を source するため、そこだけ外して実行した (mlift は emsdk 不要)。
+- 再測定 (HEAD `e8109f7a`, 本 fix。`863f3d3c..e8109f7a` は mlift の `vpcmpeqw ymm` 等のコード変更を含むが、rep の件数は上の 863f3d3c 測定と一致): `build_ctrl.sh` exit 0, real 41.1 s, `lifted 1256 funcs / failed 0`。`ctrl_full.ll` の rep 行を上の正規表現で数えた結果は **45 行 (movsb 39 / stosw 6)・15 関数**で、上の関数別行数と全件一致。素材は `plugins-freshair` を `$RUNNER_TEMP/pf` に展開し `FA_DL=... fetch.sh` で factory `.epf` 8 本を確認。trap 版は作っていないため `run_ctrl.sh` は未実施。
 - 結論: 受入 1 (実行到達 scenario) は**未達**。rep 経路の到達は本 run で確認していない (trace 未取得)。受入 2 (ネガコン FAIL) は、45 箇所版の trap 件数 (1695) までは確認、wasm 再ビルドと陽性対照は**未実施**のため判定不能。残りは #692 で扱う。
 
 ## 未解決 (起票先 #692)
@@ -249,22 +250,33 @@ bash tools/targets/freshair/lift2/lift2_e2e.sh                                  
   - 訂正: §10.1 の「`ctrl_rep.json` の rep は ctrl 閉包が実行する」は、kind ごとには成立しない (`movsb`・`stosw` は未実行)。§10.1 の数値は全 kind 版の値として有効。
 - 未解決 (起票先 #692 (FA-11)・既存のため子 issue は起票せず): `movsb`・`stosw` を実行する入力の設計と ctrl (または新 scenario) への追加、その後の `movsb`・`stosw` 単独ネガコン FAIL 化。
 
-## 12. FA-13 (#905): movsb / stosw を含む関数の到達経路 (静的調査, HEAD `a67af27b`)
+## 12. FA-13 (#905): movsb / stosw を含む関数の呼び出し経路 (静的調査, HEAD `e8109f7a`)
 
-- 測定 HEAD: `a67af27b` (origin/main)。コード変更なし。素材 (fl-win64 / toolchain-retdec / toolchain-emsdk / plugins-freshair) は `$HOME/artifacts` から展開。`fetch.sh` で factory .epf 8 本 + SlateCore.core_64 を確認。
-- `build_ctrl.sh` (trap 無し, `a67af27b`): exit 0, `lifted 1256 funcs / 536369 B / 114503 insns, failed 0`, 38 秒 (`TMPDIR=$RUNNER_TEMP`)。`ctrl_rep.json` の closure (1256 関数) 内の rep 命令を逆アセンブルで数えた結果:
-  | 命令 | 出現数 | 含む関数 (VA) |
-  |---|---|---|
-  | `rep stosb` | 84 | `1803ba840` ほか |
-  | `rep movsb` | 39 | `1803e12c0`, `1803e2190`, `1803e2240` |
-  | `rep stosw` | 6 | `1803e8b70`, `180402e50`, `180ca4e70` |
-  | `rep stosq` | 1 | `181056140` |
-- 呼び出し鎖 (`ctrl_rep.json` の direct call 辺を遡った結果):
-  - `1803e12c0` (movsb) ← `1803e2190` (movsb) ← `1803e4ee0` ← `1803e95f0` ← (direct の呼び出し元なし)。`1803e95f0` は `fa_icall` の case 値 (`ctrl_full.ll` の `i64 6446552560`) としてのみ現れ、vtable 上の参照元は未特定。
-  - `1803e2240` (movsb) ← `1803e6000` ← `1803e5c30` (direct)。`1803e5c30` の上流は未追跡。
-  - `1803e8b70` (stosw): direct の呼び出し元なし。
-  - `180402e50` (stosw) ← `1803e49e0` (direct の呼び出し元なし)。
-  - `180ca4e70` (stosw) ← `180f8fd00` (direct; 上流未追跡)。
-- 結論: `movsb`・`stosw` は closure に入っているが、ctrl の root (17 slot + 子 wrapper) から direct call だけでは届かない。届くには vtable 経由の間接呼び出し (`fa_icall`) の解決先を辿る必要がある。§11 の「`movsb`・`stosw` 単独 trap は ctrl 15/15 PASS (未到達)」と整合する。
-- 次の作業 (#905 の残件): (a) `1803e95f0` と `1803e5c30` / `180f8fd00` の上流 (vtable 参照元) を特定し、どの scenario の入力 (macro / 子 meter / flag) で通るかを決める。(b) その scenario を `gen_ctrl_scen.py` に追加し、`movsb`・`stosw` 単独 trap で `run_ctrl.sh` が FAIL することを実測する。(c) trap を戻し `cmp` で一致を確認する。
+- 測定値 (件数・ビルド結果) は §7 が正本。本節は関数の一覧と呼び出し経路だけを書く。
+- 対象: `work/ctrl/ctrl_full.ll` の `define` 単位で rep 行を数えた、rep movsb / rep stosw を含む関数の全件 (§7 と同じ 15 関数)。
+
+  | 関数 (VA) | movsb | stosw | `fa_icall` の case 値 | direct 呼び出し元 (`ctrl_full.ll`) |
+  |---|---|---|---|---|
+  | `1803e12c0` | 4 | | あり | `1803e2190`, fa_icall |
+  | `1803e2190` | 1 | | あり | `1803e4ee0`, fa_icall |
+  | `1803e2240` | 8 | | あり | `1803e6000`, fa_icall |
+  | `1803e2600` | 8 | | あり | `1803e66f0`, fa_icall |
+  | `1803e2b50` | 1 | | あり | `1803e4d50`, fa_icall |
+  | `1803e4ee0` | 1 | | あり | `1803e95f0`, fa_icall |
+  | `1803e5070` | 1 | | あり | `1803e95f0`, fa_icall |
+  | `1803e8b70` | | 2 | あり | fa_icall のみ |
+  | `1803e95f0` | 7 | | あり | fa_icall のみ |
+  | `1803fb860` | 3 | | あり | `1803e55c0`, fa_icall |
+  | `1803fbb80` | 3 | | あり | `1803e5870`, fa_icall |
+  | `1803fdc70` | 1 | | あり | `18040b950`, fa_icall |
+  | `180401070` | 1 | | あり | `1803fe400`, `181020a74`, fa_icall |
+  | `180402e50` | | 1 | あり | `1803e49e0`, fa_icall |
+  | `180ca4e70` | | 3 | あり | `180f8fd00`, fa_icall |
+
+  - 表の行数の合計は §7 の測定と一致する。`rep stosb` / `rep stosq` は本節の対象外。
+- 確認した事実 (実測, `ctrl_full.ll` の静的解析):
+  1. 上表の 15 関数はすべて `fa_icall` の switch の case 値として現れる (間接呼び出しの解決先)。`1803e95f0` は `i64 6446552560` (= 0x1803e95f0)。
+  2. `build_ctrl.sh` の `--root` 38 個 (すべて `ctrl_full.ll` に定義あり) から direct の `call` 辺だけで辿ると、15 関数はどれも到達しない。
+- 未確認 (未解決): vtable の**どの slot から**これらの case が呼ばれるか (`fa_icall` の case 値の参照元)、および、どの scenario の入力でその経路が通るか。上の「direct 呼び出し元」は直前の 1 段のみで、2 段以上の上流は未追跡。
+- 次の作業 (#905 の残件): (a) vtable 参照元の特定と、通る入力 (macro / 子 meter / flag) の決定。(b) その scenario を `gen_ctrl_scen.py` に追加し、`movsb`・`stosw` 単独 trap で `run_ctrl.sh` が FAIL することを実測する。(c) trap を戻し `cmp` で一致を確認する。
 - 起票先: #905 (FA-13, OPEN)。親 #692。
