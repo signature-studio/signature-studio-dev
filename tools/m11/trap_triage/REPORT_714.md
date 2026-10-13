@@ -64,7 +64,7 @@ python3 trap_triage/check_682.py work/probe714/units_714.json --units 304,555,92
 |---|---|---|---|
 | 304 | `function_535bf2` (3370 / 0x1a3318) | `i32.load offset=0` | `tbl + cnt*24` の dword (sentinel `-1` 比較)。`tbl` = `*(*(obj+8)+8)`、`cnt` = `[obj+0x10]` を +1 した値 |
 | 555 | `function_535bf2` (3370 / 0x1a3318) | 同上 | 同上 (304 と同一命令・同一 offset) |
-| 923 | `function_410b10` (14898 / 0x354e6f) | `i32.load offset=0` | `*(*(obj+0x20)... ) - 0x80` 系の読み (`[obj-0x80..]` 系、REPORT §4 と一致) |
+| 923 | `function_410b10` (14898 / 0x354e6f) | `i32.load offset=0` | `*(*(obj) - 0x80)` の読み (`obj` = 第 1 引数。`[obj-0x80..]` 系、§4 と一致) |
 
 - 304・555 は同じ OOB 命令 (`535bf2` のテーブル走査) を通る。`535bf2` は `cnt` を加算してから sentinel を探す走査で、sentinel が見つからないか `tbl` が壊れていると線形メモリ外へ出る。
 - 原本では走査の前に `0x535c11` の境界チェック (`jl 0x535bf2`) がある。転記 `M11_FIX_535BF2` の C 版でこの境界条件がどう扱われているかは未確認。
