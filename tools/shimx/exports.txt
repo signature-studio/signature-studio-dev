@@ -635,7 +635,6 @@ shimx_lifttab_name
 shimx_lifttab_proc_resolver
 shimx_lifttab_token
 shimx_lifttab_trampoline
-shimx_midi_dispatch_for_test
 shimx_module_register
 shimx_path_to_posix
 shimx_proc_register
@@ -671,6 +670,7 @@ shimx_set_resource_provider
 shimx_set_shell_execute_hook
 shimx_set_strict
 shimx_set_trace
+shimx_set_trace_file
 shimx_set_trust_ok
 shimx_set_version
 shimx_setenv_utf8

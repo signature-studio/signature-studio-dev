@@ -70,7 +70,6 @@ UINT midiOutOpen(LPHANDLE h, UINT id, ULONG_PTR cb, ULONG_PTR inst, DWORD flags)
 UINT midiOutPrepareHeader(HANDLE h, LPVOID hdr, UINT n);
 UINT midiOutShortMsg(HANDLE h, DWORD msg);
 UINT midiOutUnprepareHeader(HANDLE h, LPVOID hdr, UINT n);
-void shimx_midi_dispatch_for_test(uintptr_t cb, uintptr_t h, uint32_t msg, uintptr_t inst, uintptr_t p1, uintptr_t p2);
 #ifdef __cplusplus
 }
 #endif

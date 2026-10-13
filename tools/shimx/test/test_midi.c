@@ -42,7 +42,8 @@ static uint32_t b_add(uintptr_t h, void *hdr, uint32_t n) {
 }
 static uint32_t b_unprep(uintptr_t h, void *hdr, uint32_t n) { (void)h; (void)hdr; (void)n; g_unprep_calls++; return 0; }
 static uint32_t b_short(uintptr_t h, uint32_t msg) { (void)h; (void)msg; g_short_calls++; return 0; }
-static void b_set_cb(shx_midi_cb_fn fn) { (void)fn; }
+static shx_midi_cb_fn g_invoke_fn;
+static void b_set_cb_keep(shx_midi_cb_fn fn) { g_invoke_fn = fn; }
 
 static const shimx_midi_vtbl g_test_vtbl = {
     .inGetNumDevs = b_inGetNumDevs, .outGetNumDevs = b_outGetNumDevs,
@@ -51,7 +52,7 @@ static const shimx_midi_vtbl g_test_vtbl = {
     .inStart = b_start, .inStop = b_start, .inReset = b_start,
     .inPrepareHeader = b_prep, .inUnprepareHeader = b_unprep, .inAddBuffer = b_add,
     .outPrepareHeader = b_prep, .outUnprepareHeader = b_unprep,
-    .outShortMsg = b_short, .outLongMsg = b_add, .set_cb_invoke = b_set_cb,
+    .outShortMsg = b_short, .outLongMsg = b_add, .set_cb_invoke = b_set_cb_keep,
 };
 
 static void test_midi_default_zero_devices(void) {
@@ -101,7 +102,8 @@ static void test_midi_completion_restores_guest_ptr(void) {
     g_seen_hdr->dwFlags = 2;
     /* cb は C 関数ポインタ (< intptr_limit) として直接呼ばれる: 受けた p1 を記録して guest アドレスに戻っていることを確認 */
     g_cb_p1_seen = 0;
-    shimx_midi_dispatch_for_test((uintptr_t)cb_record, 0x200, 0x3C9u /* MOM_DONE */, 0, (uintptr_t)g_seen_hdr, 0);
+    CHECK(g_invoke_fn != NULL);                                 /* shimx_set_midi_backend が dispatch を登録している */
+    g_invoke_fn((uintptr_t)cb_record, 0x200, 0x3C9u /* MOM_DONE */, 0, (uintptr_t)g_seen_hdr, 0);
     CHECK(g_cb_p1_seen == (uintptr_t)&g);                     /* p1 は guest アドレスへ戻されている */
     CHECK(g.dwBytesRecorded == 7 && (g.dwFlags & 2) != 0);   /* copy-out が guest 側へ反映 */
     CHECK(midiOutUnprepareHeader(0x200, &g, sizeof g) == 0);

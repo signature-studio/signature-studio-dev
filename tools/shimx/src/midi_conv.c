@@ -3,7 +3,7 @@
  * 経路: guest → shimx midi* (本ファイル, weak) → shimx_midi_vtbl (shimx_set_midi_backend で登録) → audio 側 flm_midi*。
  * 未登録時は従来どおり「デバイス 0 台」を返す (shimx 単体ビルドの挙動は不変)。
  *
- * MIDIHDR 変換 (guest → native / 方向は REPORT_SHX-T6 §変換表):
+ * MIDIHDR 変換 (guest → native / 方向は tools/shimx/REPORT.md §19.2):
  *   - guest MIDIHDR = win64 112B (8B ポインタ, pack(1))。native = shx_midihdr_nat 48B (flm_midihdr_t と同一レイアウト)。
  *   - Prepare: native mirror を確保し全フィールドを copy-in。以後 AddBuffer / LongMsg も copy-in → backend → copy-out。
  *   - Unprepare 成功で mirror を解放。mirror は guest ヘッダと 1:1 (guest アドレスで引く)。
@@ -82,9 +82,6 @@ static void midi_dispatch(uintptr_t cb, uintptr_t h, uint32_t msg, uintptr_t ins
 void shimx_set_midi_backend(const shimx_midi_vtbl *t) {
     g_mt = t;
     if (t && t->set_cb_invoke) t->set_cb_invoke(midi_dispatch);
-}
-void shimx_midi_dispatch_for_test(uintptr_t cb, uintptr_t h, uint32_t msg, uintptr_t inst, uintptr_t p1, uintptr_t p2) {
-    midi_dispatch(cb, h, msg, inst, p1, p2);
 }
 
 /* ---- Prepare / Unprepare / AddBuffer / LongMsg (guest 側ヘッダ操作) ---- */
