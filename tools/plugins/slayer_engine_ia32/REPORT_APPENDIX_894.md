@@ -48,8 +48,9 @@
 | wall (`date +%s%N` 差分) | 480 / 492 / 512 ms → min–max 480–512 ms |
 | load average (1 分、各 run 前) | 0.45 / 0.45 / 0.45 |
 | 出力 | 3 回とも `[events-cand] count=5` で同一 (`diff` 0 行) |
-| `git diff ee01b1c2 HEAD -- 'tools/plugins/slayer_engine_ia32/*.py'` の出力 (`6eaff222` 時点) | 0 行 (`*.py` 差分 0。 再測定は不要) |
-| `git diff --stat ee01b1c2 HEAD -- tools/plugins/slayer_engine_ia32` (`6eaff222` 時点・文書のみの差分) | `REPORT.md` 45 行削除・`REPORT_APPENDIX_894.md` 62 行追加 (2 files, +64/-43。 `*.py` は含まない) |
+| `git diff ee01b1c2 HEAD -- 'tools/plugins/slayer_engine_ia32/*.py'` の出力 (`be4137a5` 時点) | 0 行 (`*.py` 差分 0。 再測定は不要) |
+| `git diff ee01b1c2 HEAD -- tools/plugins/slayer_engine_ia32` の行数 (`be4137a5` 時点) | 124 行 (すべて文書の差分) |
+| `git diff --stat ee01b1c2 HEAD -- tools/plugins/slayer_engine_ia32` (`be4137a5` 時点・文書のみの差分) | `REPORT.md` 45 行削除・`REPORT_APPENDIX_894.md` 62 行追加 (2 files, +64/-43。 `*.py` は含まない) |
 
 | VA | 候補の読込み | 直後の添字読み | 判定 |
 |---|---|---|---|
