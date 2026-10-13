@@ -235,3 +235,9 @@ GitHub Actions runner (4 vCPU / RAM 16GB + swap 16GB 追加) で `boot_e2e.sh` �
 ### 10.x 実測の試行
 
 - 結論 (fix run 2026-10-13): 受入条件は未了。詳細と経緯は `REPORT_APPENDIX.md` §C。
+- **実測 (fix run 2026-10-13 16:14–16:23 UTC, head 55acfb6d・素材 fl-win64 / toolchain-emsdk / toolchain-retdec / work-m11 / work-liftdiff 展開済み)**:
+  - 全量 lift (`--closure 2`): `ulimit -v 12GB` で `MemoryError` (16:14:13 開始、約 2 分)。仮想メモリ上限では RSS の値は取れない。
+  - closure 1 (`FLE_LIFT_CLOSURE=1`): `ulimit -v` では capstone の確保で `MemoryError`。RSS 監視 (12288MB 超で子 PID を kill) に切り替え、16:21:35 開始 → 16:23 頃に **ピーク RSS 12563MB で kill (rc=143)**。
+  - 結論: closure 1 でも 12GB 以内に収まらない。clang・boot・ネガコン・survey は未到達。units_run・ipp.called は未測定。
+  - 下界の位置づけ: 「lift が 12GB を超える」ことだけが確定。どの root で止まったかは未特定。`[sys]` mem の値 (MemAvailable) は run ログ `rss.log` にあるが、REPORT には要点のみ転記。
+  - 既定経路: shim は既定で無効 (`55acfb6d`)。`FLE_IPP=1` のときだけ有効。boot 未到達のため、既定経路の数値 (209 据え置き等) が変わるかは未測定。
