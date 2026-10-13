@@ -48,6 +48,13 @@ EMSCRIPTEN_KEEPALIVE int m11_icall_miss_uniq(void) { return (int)g_nmiss_uniq; }
 EMSCRIPTEN_KEEPALIVE int m11_icall_miss_at(int i) { return (i >= 0 && i < (int)g_nmiss_uniq) ? (int)g_miss[i] : 0; }
 EMSCRIPTEN_KEEPALIVE int m11_disp_count(void) { return (int)m11_disp_n; }
 
+/* boot closure 外で C 転記した関数 (m11_disp_tab に無い) を icall から呼べるようにする (#474). 転記本体は下方 */
+extern unsigned long long function_40f960(unsigned long long);
+extern unsigned long long function_41c160(unsigned long long);
+static u64 tr_40f960(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return function_40f960(a0); }
+static u64 tr_41c160(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return function_41c160(a0); }
+static u64 tr_ret0(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return 0; }
+
 static m11_tr_t disp_find(u32 va) {
     int lo = 0, hi = (int)m11_disp_n - 1;
     while (lo <= hi) {
@@ -55,6 +62,11 @@ static m11_tr_t disp_find(u32 va) {
         u32 v = m11_disp_tab[mid].va;
         if (v == va) return (m11_tr_t)m11_disp_tab[mid].fn;
         if (v < va) lo = mid + 1; else hi = mid - 1;
+    }
+    switch (va) {
+    case 0x40f960: return tr_40f960;
+    case 0x41c160: return tr_41c160;
+    case 0x5c04a0: return tr_ret0;   /* `ret` 1 命令 (キャッシュ node 解放フックの既定実体) */
     }
     return 0;
 }
@@ -260,6 +272,139 @@ unsigned long long function_450560(unsigned long long src, unsigned long long de
         if (r == 0) function_44cb40(0, 0);
     }
     return dest;
+}
+
+/* function_40fac0  VA 0x40fac0  (TObject.InitInstance の入れ子手続き: 親チェーンの tkMRecord InitTable を再帰処理)
+ * 逆アセンブル転記. 引数 rcx = 親フレーム (未使用), rdx = クラス, r8 = インスタンス.
+ * クラス → 親クラスへ [vmt-0xb0] (InitTable) を辿り, 種別 0x16 (tkMRecord) の RecOps[0] が奇数なら 417150(inst, typeinfo) を呼ぶ.
+ * 40fb40 と同じく boot closure 外 (IR に関数が無い). */
+static void ov_initinst_nested(u64 cls, u64 inst) {
+    u64 ti, p;
+    for (;;) {
+        ti = Q(cls - 0xb0);
+        p = Q(cls - 0x78);
+        if (p) p = Q(p);
+        if (!p) break;
+        if (!ti || B(ti) != 0x16) { cls = p; continue; }
+        ov_initinst_nested(p, inst);
+        break;
+    }
+    if (ti && B(ti) == 0x16) {
+        u64 n = ti + B(ti + 1);
+        u64 ops = n + 0xa + ((u64)D(n + 6) << 4);
+        if (B(ops) > 0) {
+            u64 op0 = Q(ops + 1);
+            if (op0 & 1) function_417150(inst, ti);
+        }
+    }
+}
+
+/* function_40fb40  VA 0x40fb40  (System.TObject.InitInstance(Self: TClass; Instance: Pointer): TObject)
+ * 410320 (_ClassCreate) が vmtNewInstance 既定実体 40f960 経由で呼ぶ. boot closure 外 (IR に関数が無い) ため C で補う (#474).
+ *   FillChar(Instance^, InstanceSize [self-0x80], 0); PPointer(Instance)^ := Self;
+ *   クラス → 親クラス ([vmt-0x78] を 1 段 deref) を辿り, 各クラスの IntfTable [vmt-0xc0] (EntryCount dword + 40B entry,
+ *   +0x10 VTable / +0x18 IOffset) の VTable != nil を Instance[IOffset] に書く. 途中で InitTable [vmt-0xb0] が tkMRecord (0x16) なら
+ *   最後に入れ子手続き (40fac0) を呼ぶ. 戻りは Instance. */
+u64 function_40fb40(u64 self, u64 inst) {
+    int flag = 0;
+    u64 cls = self;
+    memset((void*)(uintptr_t)inst, 0, (size_t)(long long)(int)D(self - 0x80));
+    Q(inst) = self;
+    do {
+        u64 it = Q(cls - 0xc0);
+        if (it) {
+            int cnt = (int)D(it);
+            for (int i = 0; i < cnt; i++) {
+                u64 ent = it + (u64)(long long)i * 40 + 8;
+                u64 vt = Q(ent + 0x10);
+                if (vt) Q(inst + (u64)(long long)(int)D(ent + 0x18)) = vt;
+            }
+        }
+        u64 ti = Q(cls - 0xb0);
+        if (ti && B(ti) == 0x16) flag = 1;
+        cls = Q(cls - 0x78);
+        if (cls) cls = Q(cls);
+    } while (cls);
+    if (flag) ov_initinst_nested(self, inst);
+    return inst;
+}
+
+/* function_40f960  VA 0x40f960  (System.TObject.NewInstance = vmtNewInstance 既定実体): GetMem(InstanceSize) → InitInstance */
+u64 function_40f960(u64 self) {
+    u64 obj = function_409410((unsigned)(int)D(self - 0x80));
+    return function_40fb40(self, obj);
+}
+
+/* function_41c160  VA 0x41c160  (System.TInterfacedObject.NewInstance): `call 40f960; mov dword [rax+8],1; ret` (FRefCount := 1) */
+u64 function_41c160(u64 self) {
+    u64 obj = function_40f960(self);
+    D(obj + 8) = 1;
+    return obj;
+}
+
+/* function_410320  VA 0x410320  (System._ClassCreate(self: TClass; alloc: ShortInt): TObject)
+ * 逆アセンブル: `test dl,dl; jl skip; mov rcx,rax; call [rax-0x30]` (= VMT vmtNewInstance). RetDec は間接 call を落とし
+ * `ret arg1` にしたため, 494 call site 全てで「生成したオブジェクト」が TClass (VMT, .text 上) 自身になっていた (#418).
+ * vmtNewInstance の実体は m11_icall (disp 表 + C 転記の追加表) 経由で呼ぶ: 既定 40f960 / TInterfacedObject 41c160 は下記 C 転記.
+ * alloc < 0 (継承 ctor 経由) は従来どおり self をそのまま返す. */
+unsigned long long function_410320(unsigned long long self, unsigned int alloc) {
+    if ((signed char)(alloc & 0xff) < 0) return self;
+    return m11_icall(Q(self - 0x30), self, 0, 0, 0, 0, 0, 0, 0);
+}
+
+/* function_5c0270  VA 0x5c0270  (参照カウント付きキャッシュ node の Release: self = キャッシュ, node = function_5c00e0 の戻り)
+ * 逆アセンブル転記 (5c0270..5c0392). node = {+0 next, +8 refcount(dword), +0xc 第 1 qword キー, +0x14 hash(word), +0x18 tid(dword), +0x1c payload}.
+ * RetDec は 3 点を落とした (#474):
+ *   head 一致時  `mov rcx,[node]; mov [self+8],rcx` の [node] (D4: disp=0 の deref 脱落) → head := node 自身
+ *   前任走査後   同じく `mov rcx,[node]; mov [prev],rcx` → prev.next := node 自身 (解放後の node を指したまま = 後で同じ番地が再配分されると循環)
+ *   末尾         `call [ [self] ]` (vmt slot 0, D15: 間接 call 脱落) */
+u64 function_5c0270(u64 self, u64 node) {
+    if (!node) return 0;
+    function_4232e0((void*)(uintptr_t)(self + 0x10));
+    D(node + 8) = D(node + 8) - 1;
+    int zero = D(node + 8) == 0;
+    if (zero) {
+        u64 head = Q(self + 8);
+        if (node == head) {
+            Q(self + 8) = Q(node);
+        } else {
+            u64 prev = head, nx = head ? Q(head) : 0;
+            while (nx && nx != node) { prev = nx; nx = Q(prev); }
+            if (nx) Q(prev) = Q(node);
+        }
+    }
+    function_423980((void*)(uintptr_t)(self + 0x10));
+    if (zero) {
+        u64 key = Q(node + 0xc);
+        if (key) function_424090((void*)(uintptr_t)key);
+        m11_icall(Q(Q(self)), self, node, 0, 0, 0, 0, 0, 0);
+        function_409440(node);
+    }
+    return 0;
+}
+
+/* function_409470  VA 0x409470  (System.ReallocMem(var P: Pointer; NewSize: NativeInt): Pointer)
+ * 逆アセンブル (boot0.drc.dsm 409470..4094e6) から転記. RetDec は `cmp [rbx],0` / `mov rcx,[rbx]` の 1 段 deref (*P) を落とし,
+ * P 自体 (変数のアドレス) を旧ブロックとして扱った (#418). */
+unsigned long long function_409470(void* pv, unsigned long long newsize) {
+    u64 pp = (u64)(uintptr_t)pv;
+    u64 rsi;
+    if (Q(pp) != 0) {
+        if ((long long)newsize > 0) {
+            rsi = function_408040(Q(pp), newsize);
+            if (rsi == 0) function_409730(1);
+        } else {
+            if ((unsigned)function_407e20(Q(pp)) != 0) function_409730(2);
+            rsi = 0;
+        }
+        Q(pp) = rsi;
+    } else {
+        if ((long long)newsize <= 0) return 0;
+        rsi = function_407a50(newsize);
+        if (rsi == 0) function_409730(1);
+        Q(pp) = rsi;
+    }
+    return rsi;
 }
 
 /* function_417b70  VA 0x417b70  (System.DynArraySetLength(var a: Pointer; ti: PDynArrayTypeInfo; dimCnt: NativeInt; lengths: PNativeInt))
