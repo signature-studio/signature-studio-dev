@@ -168,6 +168,8 @@ reach_test 11 / adapt_test 28 passed、sigprobe は adapter 有り mismatch 0 / 
 
 ネガティブコントロール (全て「一致してはならない」を要求。判定が不合格なら非 0): parity N1 補正値 1 bit 破壊 → FAIL / N2 補正ゼロの実装 → FAIL / N3 セクション欠落 → FAIL、pe_image_e2e N1 `--no-pe-reloc` → クラッシュ (rc 139) / N2 再配置表を 1 件ずらす → クラッシュ (rc 139)。
 
+実測 (コード commit `6e5ff48` の clean HEAD, runner 4 vCPU, `git status --porcelain -- tools/gui` 0 行): `bash tools/gui/e2e.sh` rc 0 / ALL PASS **57.3 秒** (load 0.37→1.04; 修正前 a38ba81 は 63.6 秒, 2 回目の同 HEAD 前 56.9 秒)、新設 2a/6 は PASS 4 行。`bash tools/gui/flengine/e2e.sh` rc 0 / judge 12/12 PASS / 既存ネガコン 5/5 FAIL 確認 / 新 parity PASS 8 + pe_image PASS 4 で **129 秒** (load 1.04→1.21; 前 PR の 124〜126 秒)。両 e2e とも前提は `FL_WIN64_DIR`・`RETDEC_DECOMPILER`・mingw・pefile/capstone。
+
 ### 8-4. 未達・未実測
 - 実 FLEngine 全体 (7,421 関数) を RetDec C 経路に通した実測は無い (FLEngine は m11 の LLVM IR 経路。RetDec C に通すのは規模上非現実的) ため、実 PE での検証は「規則の一致 (バイト比較)」までで、RetDec が出す `gN` 分割の実 FLEngine 上の挙動は未検証。
 - runtime 方式の補正対象は「値が SizeOfImage 内を指し、かつ .text 宛でない」DIR64。image 外を指す値は 0 件 (実測)。`.didata` の DIR64 114 件は全て .text 宛で、m11 (.data/.rdata のみ敷設) は補正しない。
