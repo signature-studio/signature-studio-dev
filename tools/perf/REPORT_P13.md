@@ -81,6 +81,7 @@
 | 100 Mbps/接続 | bytes | 1425.1 | 1421.6–1426.8 |
 
 - 結果: **12/12 PASS** (全件 instantiate 成功、exports>0)。
+- `fetchCompile` 経路 (src の本物・受入条件 1): `bun tools/perf/delivery/fetch_compile_chunked_check.ts tools/perf/work/chunked/site big.b92b83ae3549.wasm` → streaming 155.3 ms / bytes 153.2 ms、progress 4 回、PASS (commit `4d3a32f6` 起点の作業ツリー。判定は instantiate 成功 + exports 24)。
 - 100 Mbps/接続 の実測 (1422 ms) は、サイズ比で按分した値 (合成 1458 ms × 26.4/32.6 ≈ 1181 ms) より約 20% 大きい。原因は未切り分け (part 数 3→2、wasm の中身の差などが候補。確定には別測定が要る)。
 - 注記: 帯域制限は接続ごと (§2 と同じ)。
 - 残り (未解決): 本番 runtime の manifest 経路は未接続 → #1166 `[PERF-P18]`。

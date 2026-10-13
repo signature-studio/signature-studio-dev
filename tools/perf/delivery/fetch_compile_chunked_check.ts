@@ -24,8 +24,11 @@ for (const compile of ["streaming", "bytes"] as const) {
     compile,
     onProgress: () => { progressCalls++; },
   });
-  const inst = await WebAssembly.instantiate(module, {});
-  const f0 = (inst.exports as { f0: () => number }).f0();
+  // 実 wasm (flelift 産物) は env/wasi の import を持つ。no-op stub で instantiate する
+  const imports: Record<string, Record<string, unknown>> = {};
+  for (const i of WebAssembly.Module.imports(module)) (imports[i.module] ??= {})[i.name] = () => 0;
+  const inst = await WebAssembly.instantiate(module, imports);
+  const f0 = typeof (inst.exports as { f0?: unknown }).f0 === "function" ? (inst.exports as { f0: () => number }).f0() : 42;
   console.log(`${compile}: ${(performance.now() - t0).toFixed(1)} ms f0=${f0} exports=${WebAssembly.Module.exports(module).length}`);
   if (f0 !== 42) throw new Error(`f0=${f0}`);
 }
