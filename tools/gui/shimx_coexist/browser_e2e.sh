@@ -3,12 +3,12 @@
 #   1. 同じ obj を ENVIRONMENT=web,worker でリンク (wasm 内容は node 版と同一・環境のみ変更)
 #   2. gui_hostcall.ts を browser 向けに bundle し、page を置く
 #   3. browser_e2e.mjs が headless Chrome で page を開き、CDP の実クリックで main を起動して結果を検査
-#   env: EMSDK_ENV (既定 $HOME/emsdk/emsdk_env.sh), CHROME (既定 google-chrome), COEXIST_WORK
+#   env: EMSDK_ENV (既定 /opt/emsdk/emsdk_env.sh), CHROME (既定 google-chrome), COEXIST_WORK
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; GUI="$HERE/.."; SX="$GUI/../shimx"; REPO="$(cd "$GUI/../.." && pwd)"
 W="${COEXIST_WORK:-$HERE/work}"
 [ -f "$W/gui_obj/gui_adapt_w32.o" ] && [ -f "$W/t_main.o" ] || { echo "[browser] $W に obj が無い。先に bash tools/gui/shimx_coexist/coexist.sh"; exit 2; }
-set +u; . "${EMSDK_ENV:-$HOME/emsdk/emsdk_env.sh}" >/dev/null 2>&1 || true; set -u
+set +u; . "${EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}" >/dev/null 2>&1 || true; set -u
 command -v emcc >/dev/null || { echo "[browser] emcc が無い"; exit 2; }
 source "$SX/flags.sh"
 COMMON=(); for a in "${SHIMX_EMCC_COMMON[@]}"; do [[ $a == -sENVIRONMENT=* ]] || COMMON+=("$a"); done

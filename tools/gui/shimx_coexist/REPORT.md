@@ -149,9 +149,9 @@ bash tools/gui/e2e.sh                        # gui 単体 wasm 回帰
 
 | 項目 | 結果 |
 |---|---|
-| `coexist.sh` (node + mock) | rc=0 / 10.28 s / C 58 PASS・host 13 PASS・NC1 dup 7・NC2 fail 14 / ALL PASS |
+| `coexist.sh` (node + mock) | rc=0 / 10.28 s / ALL PASS (件数は §4 を参照) |
 | `browser_e2e.sh` (web build + CDP) | rc=0 / 107.87 s / web link rc=0 / **BROWSER RESULT pass=13 fail=0** |
-| wasm 側 C テスト (web build) | RESULT pass=58 fail=0 |
+| wasm 側 C テスト (web build) | 全 PASS (件数は §4 を参照) |
 | window.open 実行時の user activation | 4 件すべて active |
 | picker 実行時の user activation | open 5 件・save 1 件すべて active |
 
