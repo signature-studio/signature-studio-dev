@@ -52,7 +52,7 @@ require("fs").writeFileSync(out, JSON.stringify({ version: 1, files: [
 echo "big wasm: $BIG ($(stat -c %s "$BIG") B)" | tee -a "$LOG"
 
 step "stage"
-node "$DEPLOY_DIR/scripts/05-stage.mjs" --src "$SRC" --manifest "$W/probe-$SUF/manifest.json" 2>&1 | tee -a "$LOG" | tail -22
+node "$DEPLOY_DIR/scripts/05-stage.mjs" --src "$SRC" --manifest "$W/probe-$SUF/manifest.json" --skip-notices-gate 2>&1 | tee -a "$LOG" | tail -22
 mkdir -p "$W/site/__probe__/ct"; echo '<!doctype html>' > "$W/site/__probe__/ct/a.html"; echo 'export {}' > "$W/site/__probe__/ct/a.js"; echo 'x' > "$W/site/__probe__/ct/a.css"
 # probe only: _headers で Content-Encoding / Content-Type を上書き・付与できるか (edge-facts.sh が採取)
 printf '\n/__probe__/ce/*\n  Content-Encoding: br\n\n/__probe__/ct/a.html\n  Content-Type: text/html; charset=utf-8\n\n/__probe__/ct/a.js\n  Content-Type: text/javascript; charset=utf-8\n\n/__probe__/ct/*.css\n  Content-Type: text/css; charset=utf-8\n' >> "$W/site/_headers"
