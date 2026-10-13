@@ -224,3 +224,27 @@ OTT_ULP_TOL=2 bash tools/ott/ott_e2e.sh  # 許容 ulp 指定
 - 生成 C (`--closure 0`) を `cc -c -O1 -I tools/ott/rt ott_lifted.c` → rc=0。`emcc` は runner に無く `emcc -c` は未実行。
 - `--arch x64` + ia32 PE → `fail-fast` (exit 1)。
 - 未解決 (ia32 の関数境界・x87・jump table 実データ) は #1098 / #1099 / #1117。
+
+## 14. ia32 jump table の実データ検証 (#1117, 測定 commit f1b4ea4c)
+
+- 入力: `block22434_PE.bin` (sha256 84b64c43…de724a9、fl-win64 素材)。 再現: `FL_PE=<同ファイル> python3 tools/ott/lift/verify_ia32_jt.py <ott_lifted.c>` (gate) / 末尾 `neg` (ネガコン)。
+- 受入 1 の対象: issue 本文の export `main` (0x10007ca0, 30 命令) には jump table が無い (`call esi` の間接 call のみ)。 jump table を持つ関数は opcode dispatcher **0x10001300** (`cmp eax,0x18` / `ja 0x1000149c` / `jmp dword ptr [eax*4+0x100014a4]`)。 検証はこちらで行った。
+- 修正 (前は `jmp [idx*4+tbl]` が解決されず実行時 `ott_dispatch` に落ちていた): `x64c.py` の `descend` / `jump_table` が ia32 のメモリ間接 jmp (scale 4・base 0・絶対 disp) を読むようにした。 x64 の経路は分岐条件 (`IA32 and` / `REG` のみ) で不変。
+- 実測 (f1b4ea4c):
+
+| 項目 | 実測 |
+|---|---|
+| lift (`--arch ia32 --closure 0`, root 0x10001300) | functions 1, insns 171, unsup `fmul` 1 (case 内の x87), unlifted callees 1 (0x10009bc4), jt_ranges 1 (0x100014a4 / 104 B) |
+| switch | 21 case (表 25 entry・重複 target あり) + default。 遷移先ラベルは全て case 値の VA に存在 |
+| gate `verify_ia32_jt.py` | `[jt] OK`: case 値集合 == PE 表データ (100 B)、rc 0 |
+| ネガコン (表の 1 entry を 1 bit 破壊) | `[jt] FAIL` (only-in-C 0x10001388 / only-in-PE 0x10001398)、rc 1 |
+| 間接 jmp・call の読み | `LD32((R[0]*4 + 0x100014a4ULL))`・`LD32((R[0] + 0x1cULL))` (PTR=4 B) |
+| `cc -c -O1 -I tools/ott/rt ott_lifted.c` | rc 0 |
+| `emcc -c -O1 -I tools/ott/rt ott_lifted.c` (toolchain-emsdk 6.0.12) | rc 0 (wasm object 7,512 B) |
+| 回帰: ia32 closure 2 (root 0x10007ca0, 8 関数, 301 insn) の生成 C・lift_meta | origin/main と HEAD で `cmp` 一致 (差 0) |
+| 所要 (lift, 単独実行) | wall 139 ms・load 1 分 0.00 |
+
+- x64 の回帰は**未実測**: fl-win64 素材に x64 の PE が無く、plugins-ott の展開物にも OTT DLL が無い (インストーラのみ)。 変更は ia32 でのみ成立する条件 (`IA32 and ...`) で、x64 の出力は構造上不変と推定。 差分確認は OTT DLL 素材で行うこと。
+- 未解決: (1) 0x10001300 の case 内 x87 `fmul` 1 件 (unsup)。 (2) 受入 1 の「main」(0x10007ca0) は jump table を持たない (`call esi` のみ) ため、main 自体は表の検証対象にならない。 PM が受入の対象関数を再定義する必要あり。 (3) x64 の回帰は OTT DLL 素材が無く未実測。
+
+## 15. #1200 — 相対化 (OTT_RELOC=1): 既定 base 同一性のみ (b5d7663c)。N=16・別 base・crtinit chain 未実施 → #1200。詳細 `tools/ott/REPORT_APPENDIX_1200.md`

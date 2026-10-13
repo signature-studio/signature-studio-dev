@@ -59,3 +59,40 @@
 | FW_EXT_FUNCS 対象 x87 関数の一覧と選定根拠 | 未決 | #197 |
 | Phase B `memory access out of bounds` の原因 | 回帰ではない (下記 #884 切り分け)。原因の RTL fold deref は #985 で追跡 | #985 (#884 は切り分け済み) |
 | `tests/test_unit.py` の素材依存 (`m6/work/ott.drc.ll` 等) | 単体テストが素材無しで実行不可 | 別途 (未起票・次 PM 判断) |
+
+## P0c-15 (#1253 / PR #1284): f80_lower --ext の RE_EXT_* をメタデータ付き行へ拡張
+
+- 対象: `tools/plugins/p0c/f80_lower.py` のみ。測定 commit `7d8b7d51` (コードを変えた最後の commit)。
+  f80 経路 (`tools/plugins/p0c/*.py`・`fw_f80.py`・`fw_stage2.sh`・`fw_*.py`) の `7d8b7d51..HEAD` 差分は、再現スクリプト `p0c15_meta_ab.sh` の新規追加 1 本のみ。
+  `git diff 7d8b7d51 HEAD -- tools/plugins/p0c tools/plugins/framework` の差分は、この再現スクリプトと、main 取り込みで入った他 PR 由来の `hostshim/hs_disp_emu.py`・`hs_disp_negctl.py`・`REPORT_DISPATCHER.md` (#986。f80 経路から呼ばれないことを grep で確認済み) と REPORT 追記。
+- 旧版 (`7d8b7d51^` = `fff76e97`) の挙動: `RE_EXT_*` が行末 `\s*$` で止まるため、`, !insn.addr !N` 付き行に一致しない。
+  `function_5dfd30` は `skip:no-ext-values` で ext 化されず、fw_f80.py は ext 指定で fail-fast する。
+- 新版: 各 RE_EXT の行末を `(?:,\s*![\w.]+\s*!\d+)*\s*$` (メタデータ列許容) にし、行末前提だった 4 箇所も同様に直す。
+  書換えが 0 件の関数は `status: skip:no-rewrite` (従来は `ext` で通っていた)。書換え件数は `rewritten` として出す。
+
+### 書換え行のメタデータ (`!insn.addr`) の扱い (指摘 2 への判断)
+
+`plans` は書換え行を組み直すため、書換えた行のメタデータは落ちる。判断は **「落としたままにする (コードは変えない)」**。根拠:
+
+1. 後段で `insn.addr` を読む箇所は無い。`fw_stage2.sh` の f80 後段 (`base.normalize` → `fw_cleanup` → `fw_cefix` → `ir5_patch` 8 way → `fw_sigfix` → `fw_entry_fix` → `fw_cab129` → `ir_flatten` → `fw_canon` → `fw_ovpass` → `fw_table` → emcc) で、`insn` を読む処理は `base.normalize` (保持のみ) と `ir5_patch` の A7 (全 `, !name N` を除去) だけ。
+   `fw_entry_fix.py:18` のコメント「ir5 の A7 が !insn.addr を除去する」と整合する。
+2. 実測 (再現: `bash tools/plugins/p0c/p0c15_meta_ab.sh`): 書換え行にメタデータを付けた入力と付けない入力を `ir5_patch --keep-all` に通すと出力は byte 一致 (`[C] PASS`)。よって書換え行のメタデータは ir5 より後の出力に影響しない。
+3. 落としたままの IR も `llvm-as` を通る (`[D] PASS`)。
+
+書換え行の `!insn.addr` を残す案は、`plans` の全組み直し箇所に `, !insn.addr !N` を再付与する実装が要るが、読み手が無いため採らない。将来 f80 の後段で機械語 VA を読む処理が入る場合は、この節の根拠 1 が崩れるので再判断する。
+
+### 実測 (測定 commit `7d8b7d51`、HEAD と差分 0)
+
+- `p0c15_meta_ab.sh` (素材不要・合成 IR): old=`skip:no-ext-values` / new=`ext` (`rewritten` 3)。書換え無し入力は old==new (`cmp` 一致)。ir5 出力・llvm-as すべて PASS (exit 0)。
+- 素材依存の実測 (作成者 run の記録。**本 fix run では再実行していない**。`$ARTIFACTS_DIR` に fl-win64 しか無く、toolchain-emsdk / work-fw-stage1 が無いため。再測定は #1283):
+  - ext 指定 (`FW_EXT_FUNCS=function_5dfd30,function_5dfdb0,function_5de820,function_5dedf0`): fw_stage2 exit=0、所要 333 s、load avg 0.45 → 2.37。smoke ×3 dispatch=38 units_done=0 va=1 heap=1 ff=0 (3 回同値)。wasm 15,075,739 B。`fw_f80.ll.ext.json` の `rewritten` 26 / 10 / 49 / 71、全 4 関数 `ext`。
+  - 既定 (FW_EXT_FUNCS 未指定): fw_stage2 exit=0、所要 326 s、load avg 2.16 → 2.43。smoke 同値。wasm 15,062,173 B。
+  - `cmp` (ext と既定): DIFF (byte 94 から)。ext 経路が既定と異なる。
+  - 受入条件 2 (書換え 0 件の関数は FAIL): `skip:no-rewrite` になり `fw_f80.py` の `status != 'ext'` 判定で FAIL。
+  - `fw_269_verify.sh` の ALL PASS と `rewritten` 件数は、この fix run では再実行していない。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 受入条件 4: `hs_e2e.sh` の ext 版 E2E | 既定と ext 版の E2E 同等性が未確認 | #1283 (P0c-16, 親 #1253) |
+| 受入条件 5: `skip:no-ext-values` 3 件の原因確定 | ext 化されない関数の原因が未特定 | #1283 |
+| 素材依存の `rewritten` 件数・`fw_269_verify.sh` の再実行 | 本節の再測定が未実施 | #1283 |

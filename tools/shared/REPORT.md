@@ -16,7 +16,7 @@
 | IPP | dsp_ippv2 は win 446 / mac 434 export (ipps 366 / ippi 71)。**全 Delphi/FPC バイナリが同一 unit を静的リンクし、ロード時に 420 distinct 名 (423 は呼出箇所数) を動的解決**する。**使用関数数は本 tool の初版 (win 12 / mac 159) が過少** — 二段間接呼出 (win `mov r,[slot]; call [r]` / mac `lea r,[VAR]; call [r]`) を数え落とした。`tools/ipp` (S, f7152df) の実測が正: **win 229 / mac x86_64 234 / arm64 234、和集合 239、FLEngine(win) 単体 143** (§2 訂正表)。**lift しない・自前 C 実装**。arm64 slice (**408,224B**, 259 export) は **Accelerate/vImage + FL 自前 NEON/C による FL 自作の別実装** (Intel IPP の派生ではない) で、使用 239 のうち 232 を提供 |
 | OSS wasm 再ビルド | **3 本成功** (node 検証): **FreeType 2.7** (native==wasm32==wasm64 40 行完全一致, export 190/190 被覆), **libogg 1.3.2+libvorbis 1.3.5** (エンコード ogg 30,695B **byte-exact**・復号 PCM hash 一致), **Blend2D 0.11.5 (pre-v0.20)** (JIT==no-JIT==wasm の 320×240 **画素完全一致**, 差 0/230,400B = 全 payload; 3 ファイル sha256 一致)。いずれも `bash tools/shared/oss/<lib>/build.sh` で再現 (§3) |
 | 重要知見 | (1) FreeType 2.7 は **`long` 幅依存** (ftgrays.c): wasm32 では FT_LONG64 経路強制 + 2 行 patch、または **wasm64 無改変**で LP64 と bit 一致。 (2) **libm 差** (glibc vs musl の sinf) で入力生成が変わると ogg が 1B ずれる → 検証入力は libm 非依存にする。 (3) Blend2D は JIT 不可の wasm でも no-JIT で画素一致、但し速度は native JIT 0.054 ms/frame に対し native no-JIT 0.12–0.16 (2.2–2.9x)、**wasm 0.21–0.27 (約 4–5x)** (検収再計測 3 回) |
-| プロプラ lift PoC | **libkio** x86_64 slice の純粋関数 15 本を RetDec→IR pass→wasm 化し、**元 mac 機械語を ctypes で直接実行した結果と 760 ケースで差分テスト**: RetDec + 構文正規化のみ (意味修復なし) **228/760 (30%)** → 最小 pass ([C][E][A][B][A'][D]) 適用後 **760/760 (100%)** (head `0fdeded5` 実測、§4)。残欠陥は M7/M8 と同型の類型 (§4) |
+| プロプラ lift PoC | **libkio** x86_64 slice の純粋関数 15 本を RetDec→IR pass→wasm 化し、**元 mac 機械語を ctypes で直接実行した結果と 760 ケースで差分テスト**: RetDec + 構文正規化のみ (意味修復なし) **228/760 (30%)** → 最小 pass ([C][E][A][B][A'][D]) 適用後 **760/760 (100%)** (測定 commit `5c3d745a`、§4)。`xmm_fix` は fp 引数 2 つ以上の関数 1 本 (LimitFloat_RCSfff) でのみ検証 (#938)。残欠陥は M7/M8 と同型の類型 (§4) |
 | 下流チケット | T-SH-01..16 (§5)。最優先 = **T-SH-07 (IPP 自前実装 = CAB-37 に統合; 範囲は tools/ipp の 239 関数)** と **T-SH-02 (Blend2D+Agg2D glue)**。CPython wasm は tools/python (CAB-20) で完了済のため T-SH-05 は実質完了 |
 
 ## 1. 分類表 (根拠は data/classification.json の evidence に regex+hit 記録)
@@ -113,18 +113,35 @@
 ### libkio lift PoC (`bash tools/shared/lift/libkio/lift.sh`)
 - 対象: libkio_x64 の純粋ユーティリティ 15 関数 (`GetFourIntel`/`GetEightIntel`/`GetFloat…`/`GetDouble…`/`SetFour…`/`SetDouble…`/`Limit`/`LimitFloat`/`Fix`/`FixHi`/`CBool`/`unilen`/`wcslen16`/`str2compare`/`str4compare`)。RetDec `--select-ranges` 1.7s → m2 `ir_normalize` → emcc standalone wasm (31.9KB)。`ConvertUTF8/16ToUTF32` は静的バッファ+libc 依存のため除外。
 - **差分テスト**: 元の mac x86_64 機械語を `mmap(RWX)`+ctypes で直接実行 (SysV ABI は Linux と同一; 非循環の参照) と wasm を同一 760 ケース (small=int32 範囲 / wide=64bit 値) で比較し戻り値ビット+書込バッファを照合。
-- **結果 (head `0fdeded5`, 本 run 実測)**: `ANALYSIS_DIR=$HOME/analysis bash lift/libkio/lift.sh` (FIX=1 既定) **TOTAL 760/760**。difftable の全 19 行 (15 関数・wide 群を含む) が 40/40。ネガティブコントロール `FIX=0` (kio_fix 無し) **TOTAL 228/760**: str2compare 21/40・str4compare 24/40・Fix_RCSf 12/40・LimitFloat_RCSfff 0/40。`KIO_ARGREG=0` (#939 の [A'] のみ無効化) **TOTAL 725/760**: str2compare 21/40・str4compare 24/40、他は 40/40。
-- **所要**: FIX=1 3.585 s・FIX=0 3.416 s・KIO_ARGREG=0 3.467 s (`time` 実測、素材 `analysis-mac-shared` `toolchain-retdec` `toolchain-emsdk` を展開済みで実行)。
+- **結果 (測定 commit `5c3d745a`。`git diff eee4b632 5c3d745a -- tools/shared/lift/libkio/` は空、`git diff 5c3d745a HEAD -- tools/shared/lift/libkio/` も空)**: `FL_MAC_DIR` (`[MAC]`) を指定して `bash tools/shared/lift/libkio/lift.sh` (FIX=1 既定) **TOTAL 760/760**。difftable の全 19 行が 40/40。ネガティブコントロール `FIX=0` (kio_fix 無し) **TOTAL 226/760** (LimitFloat_RCSfff 0/40・Fix_RCSf 15/40)。`KIO_ARGREG=0` (汎用 [A'] のみ無効化) **TOTAL 725/760** (str2compare 21/40・str4compare 24/40)。
+  - **`xmm_fix` 単独の寄与** (`kio_fix.py` の `if dsm:` (xmm_fix 呼出) のみ無効化した一時コピー、リポジトリ外で実施): **TOTAL 720/760**。差分は LimitFloat_RCSfff 0/40 ← `xmm_fix` で 40/40。Fix_RCSf は xmm_fix 無しでも 40/40 (単一 fp 引数の [B] が担当)。IR 中の `fcmp` は xmm_fix 有りで 2 件、無しで 0 件。
+  - **DSM 形式の確認 (実測)**: RetDec 出力 `kio.drc.dsm` の命令行は 162 行 (Intel 記法 `0xe5b9:      0f 2e c8 ... \tucomiss xmm1, xmm0`)。`dsm_insns` の正規表現はこの 162 行すべてにマッチ。IR の `!insn.addr` 参照 172 件はすべて META (78 件) に解決。`xmm_fix` が効いている (fcmp が生成される) ことから、DSM 解決は実際に通っている。
+- **汎用化の範囲 (#1129 実測)**: `FLOAT3` (f32×3 の対応表) を廃止し、`kio_fix.py` の `xmm_fix` に置換した。fp 引数 2 つ以上の関数について、(1) DSM の `__asm_*` 命令 (`!insn.addr` で引く) の xmm オペランドから IR の `load i128` を fp 引数 j (SysV で j 番目 = xmm j) の `bitcast` に接続、(2) DSM の jcc 条件 (`ja`/`jae`/`jb`/`jbe`/`je`/`jne`) と分岐の真偽から `ucomiss` の flags を `fcmp <pred> float %argA, %argB` に接続する。関数名・表は持たない。
+  - 素材: `analysis-mac-shared` (`[MAC]`) / `toolchain-retdec` (`[RETDEC]`) / `toolchain-emsdk` (`[EMSDK]`) は `$ARTIFACTS_DIR` から展開済み。emcc は `[EMSDK]` の `emsdk_env.sh` で有効化。
+- **SIG の生成**: `diff_test.py` の SIG は手書きをやめ、`funcs.txt` の戻り値型 (4 列目) と `sig.py` (`c++filt` で demangle した引数型) から生成する。`kio_fix.py` も関数名を見ず、署名と DSM の `idiv` (`sig.idiv_fns`) から規則を選ぶ。
+- **所要** (測定 commit `5c3d745a`。n=3, 実行は直列 1 本・`nproc`=4・計時は `lift.sh` 全体の経過秒・各 run 直前の 1 分 load): FIX=1 **2.83 / 2.83 / 2.83 s** (load 0.49–0.53)。FIX=0 **2.53 / 2.51 / 2.52 s** (load 0.53–0.57)。KIO_ARGREG=0 **2.83 / 2.82 / 2.82 s** (load 0.60–0.64)。各系統の TOTAL は 3 回とも 760/760・226/760・725/760 で一致。
 - **[D] 極性の照合 (実測)**: 機械語 `0xe5b5` (x86_64 スライス, llvm-objdump) は `ucomiss %xmm0,%xmm1` (Intel: `ucomiss xmm1,xmm0`) → `ja 0xe5c7`。`ja` 不成立 (arg2 ≤ arg1) で `minss` 経路 (`0xe5be`)。IR は `%7 = or(%5,%6)` が真で `dec_label_pc_e5be` (minss) に分岐し、`%5`/`%6` = `fcmp ule float %arg2, %arg1` で一致する。
 - **欠陥類型** (RetDec decode-only IR; M7/M8 既知と同型 → 汎用 pass 化が T-SH-16):
-  - [A] **deref 落ち** `mov rax,[rsi]` が rsi そのものに化ける (Get/Set*Intel, unilen/wcslen16/str*compare) — Get/Set 6 関数と、`trunc i64 %argN` 形の汎用 pass (署名の P/PK 位置) で修復。
-  - [A'] **引数レジスタ接続の欠落** — RetDec が k 番目の整数引数を store の無い未初期化 alloca からの k 番目の load として読み、`%argK` を未参照にする (str2compare/str4compare の第 2 引数 `PKc`)。汎用 pass `kio_fix.py` の `int_params` 部: 署名に f/d を含まない関数で、署名の k 番目が P/PK のとき k 番目の load を `ptrtoint ptr %argK` に置換。無効化は `KIO_ARGREG=0`。
+  - [A] **deref 落ち** `mov rax,[rsi]` が rsi そのものに化ける (Get/Set*Intel の `ref64` 引数、unilen/wcslen16/str*compare のポインタ引数) — 署名の `ref64`/`f64ref` 位置は `ptrtoint`→`load`、P/PK 位置の `trunc i64 %argN`+`icmp` は deref load に置換 (汎用)。
+  - [A'] **引数レジスタ接続の欠落** — RetDec が k 番目の整数引数を store の無い未初期化 alloca からの k 番目の load として読み、`%argK` を未参照にする (str2compare/str4compare の第 2 引数 `PKc`)。汎用 pass `kio_fix.py`: 署名に f/d を含まない関数で、署名の k 番目が P/PK のとき k 番目の load を `ptrtoint ptr %argK` に置換。無効化は `KIO_ARGREG=0`。
     - **前提 (未検証の一般化)**: 単一 alloca に全引数が spill されている形を仮定し、その alloca の k 番目の load を整数引数 k とみなす。別の未初期化 alloca からの無関係な load が先に出る関数では番号がずれる。現 19 関数では発生していない (本 PR の 14 関数完全一致と、ネガコン差分 = str2 +19 / str4 +16 のみで確認)。
     - **署名の添字 (既知の制約)**: `int_params` は署名をトークン化して添字で数え、`R`/`K` も独立トークンとして数える (例: `PhRKl` = [Ph,R,K,l] で引数は 2 個)。したがって `R`/`K` の後ろに `P` が来る署名では添字がずれる。現 19 関数では発生しない: Get*Intel `PhRKl` は P が先頭のみ、`PKtPKc`・`PKwPKc` は R/K を含まない、SetFourIntel `PhRKlS1_` は置換対象外 (`S1_` がトークン化できず return None)、SetDoubleIntelDouble `PhRKlRKd` は `d` を含むため対象外。
-  - [B] **float 引数落ち** — 単一 fp 引数の関数は汎用 pass で修復 (`Fix_RCSf` 12→40/40)。fp 引数が複数の `LimitFloat_RCSfff` は xmm 番号が IR から消えるため、関数名直書きの PoC (`FLOAT_XMM`) で修復 (汎用化は #1129)。
-  - [C] **`long`(64bit) を i32 と復元** (Limit/FixHi/CBool) — demangle 署名で拡幅 (`kio_fix.py`)。
-  - [D] `ucomiss` の flags が IR に接続されない (LimitFloat_RCSfff) — `FLOAT_XMM` の `%5`/`%6` で `fcmp ule float %arg2, %arg1` に接続 (極性は上記の実測で確認済み)。
-  - [E] `idiv` が `urem` に化ける符号欠陥 (FixHi) — srem 化。
+  - [B] **float 引数落ち** — 単一 fp 引数の関数は汎用 pass で修復 (`Fix_RCSf` 12→40/40)。fp 引数が複数 (f32,f32,f32 の `LimitFloat_RCSfff`) は xmm 番号が IR から消えるため、DSM の xmm オペランドで接続する (`xmm_fix`・#1129)。
+  - [C] **`long`(64bit) を i32 と復元** (Limit/FixHi/CBool) — 署名に値渡し `long` がある関数で i32→i64 に拡幅 (汎用)。
+  - [D] `ucomiss` の flags が IR に接続されない (LimitFloat_RCSfff) — DSM の jcc (`ja`) と分岐の真偽から `fcmp ule float %arg2, %arg1` を生成し `%5`/`%6` に接続 (`xmm_fix`・#1129。極性は上記の実測で確認済み)。
+  - [E] `idiv` が `urem` に化ける符号欠陥 (FixHi) — DSM に `idiv` がある関数で `urem`→`srem` (汎用; DSM 省略時は適用しない)。
+- **DEFECTS.md 行案** (`docs/DEFECTS.md` への反映は PM 判断・依頼は PR コメント参照):
+  - [C] `long` (値渡し 64bit) を i32 と復元 → 署名に値渡し `long` があれば i32→i64 (汎用)。症状: Limit/FixHi/CBool が 64bit 値で誤り。
+  - [E] `idiv` を `urem` と復元 → DSM に `idiv` がある関数で `urem`→`srem` (汎用; DSM 省略時は不適用)。症状: FixHi が負数で誤り。
+- **未解決 (起票先)**:
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| [B][D] fp 引数 2 つ以上の xmm 番号・flags 接続は `xmm_fix` で汎用化したが、対象は現 19 関数で LimitFloat_RCSfff の 1 関数のみ (他の fp 複数関数での検証なし) | LimitFloat_RCSfff のみ | #938 (OPEN) |
+| [A] 文字列比較の第 2 引数 deref 落ちの汎用化の残 (`KIO_ARGREG` の前提 = 単一 alloca spill) | str2compare / str4compare (`KIO_ARGREG=0` で 725/760) | #1282 [T-SH-27] (#939 は CLOSED のため新規起票) |
+| [C]/[E] の類型行を `docs/DEFECTS.md` へ反映 | 文書のみ | PM 判断 (PR コメントで依頼) |
+| diff_test 入力分布の一部が関数名依存 (`str*compare` の copy_prev、`FixHi` の 0/-1 回避) | 入力生成のみで修復規則には無い | 本 issue 内で残存 |
+
 - 示唆: **RetDec 素の IR の信頼度は低く、全関数に対する差分テスト (native 機械語実行) を標準工程にすべき**。本ハーネスは mac slice 全体に流用可 (`diff_test.py`)。
 
 ## 5. 下流チケット案

@@ -99,10 +99,11 @@ done
 step "6/7 survey 前後 (wasm 再ビルド) と動的到達"
 B="$OUT/build"; mkdir -p "$B/tools"; cp -a "$REPO/tools/shim" "$REPO/tools/shared" "$B/tools/"; cp -a "$REPO/tools/m11" "$B/tools/m11_src"; rm -rf "$B/tools/m11_src/work"; mv "$B/tools/m11_src" "$B/tools/m11"; cp -a "$W" "$B/tools/m11/work"
 mkdir -p "$OUT/basewasm"
+FAIL=0
 ( cd "$B/tools/m11" && rm -f work/boot_final3.ll && bash m11_build.sh > "$OUT/build_base.log" 2>&1 \
-  && cp work/m11_boot.cjs work/m11_boot.cjs.wasm "$OUT/basewasm/" && node trap_triage/survey_units.mjs "$OUT/sv_base.json" | tail -1 )
+  && cp work/m11_boot.cjs work/m11_boot.cjs.wasm "$OUT/basewasm/" && node trap_triage/survey_units.mjs "$OUT/sv_base.json" | tail -1 ) || { echo "[ldfix_509_e2e] 修復前 wasm の build/survey 失敗: $OUT/build_base.log"; FAIL=1; }
 ( cd "$B/tools/m11" && cp "$OUT/bf_f3c.ll" work/boot_final.ll && rm -f work/boot_final3.ll && bash m11_build.sh > "$OUT/build_new.log" 2>&1 \
-  && node trap_triage/survey_units.mjs "$OUT/sv_new.json" | tail -1 )
+  && node trap_triage/survey_units.mjs "$OUT/sv_new.json" | tail -1 ) || { echo "[ldfix_509_e2e] 修復後 wasm の build/survey 失敗: $OUT/build_new.log"; FAIL=1; }
 ( cd "$B/tools/m11" && python3 trap_triage/survey_diff.py "$OUT/sv_base.json" "$OUT/sv_new.json" )
 "$PY" - "$OUT/sv_base.json" "$OUT/sv_new.json" <<'PYEOF'
 import json, re, sys
@@ -118,5 +119,10 @@ PYEOF
 M11_WORK="$B/tools/m11/work" bash "$HERE/reach_509.sh" "$FNS" "$OUT/reach.json"
 
 step "7/7 動的確認 (修復前 wasm / 修復後 wasm を直接呼ぶ)"
-node "$HERE/dyn_509.mjs" "$OUT/basewasm/m11_boot.cjs" "$B/tools/m11/work/m11_boot.cjs" "$IMG"
-echo "[ldfix_509_e2e] 完了 (成果物: $OUT)"
+if [ "$FAIL" = 0 ]; then
+  node "$HERE/dyn_509.mjs" "$OUT/basewasm/m11_boot.cjs" "$B/tools/m11/work/m11_boot.cjs" "$IMG" || FAIL=1
+else
+  echo "[ldfix_509_e2e] 6/7 で修復前 wasm が作れていないため 7/7 は未実行"
+fi
+if [ "$FAIL" = 0 ]; then echo "[ldfix_509_e2e] 完了 (成果物: $OUT)"; else echo "[ldfix_509_e2e] 失敗 (成果物: $OUT)" >&2; fi
+exit "$FAIL"

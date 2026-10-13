@@ -189,6 +189,12 @@ class FnLifter:
 
     def x_set(self, n, v): self.e('store <4 x i32> %s, ptr %%X_%d' % (v, n))
 
+    # ymm の上位 128bit (Y_n)。VEX.128 の xmm 書込と vzeroupper でゼロ化する。関数入口ではゼロ (呼出側の上位は不明)。
+    def y_get(self, n):
+        t = self.t(); self.e('%s = load <4 x i32>, ptr %%Y_%d' % (t, n)); return t
+
+    def y_set(self, n, v): self.e('store <4 x i32> %s, ptr %%Y_%d' % (v, n))
+
     # ---- ベクタ変換ヘルパ
     def v_to(self, v, ty):
         t = self.t(); self.e('%s = bitcast <4 x i32> %s to %s' % (t, v, ty)); return t
@@ -628,6 +634,7 @@ class FnLifter:
             hdr.append('  %%R_%s = alloca i64' % r)
         for k in range(16):
             hdr.append('  %%X_%d = alloca <4 x i32>' % k)
+            hdr.append('  %%Y_%d = alloca <4 x i32>' % k)
         for f in self.FL:
             hdr.append('  %%F_%s = alloca i1' % f)
         for r in G64:
@@ -645,6 +652,7 @@ class FnLifter:
                 hdr.append('  store i64 0, ptr %%R_%s' % r)
         for k in range(16):
             hdr.append('  store <4 x i32> %s, ptr %%X_%d' % ('%%a_x%d' % k if k < 4 else 'zeroinitializer', k))
+            hdr.append('  store <4 x i32> zeroinitializer, ptr %%Y_%d' % k)
         for f in self.FL:
             hdr.append('  store i1 false, ptr %%F_%s' % f)
         hdr.append('  br label %%%s' % self.lbl(self.begin))

@@ -82,3 +82,13 @@ DEFECTS.md 行案 (編集は PM 判断):
 | ID | 層 | 新旧 | 症状 (silent) | 根本原因 | 観測 | 検出信号 | 修復 |
 |---|---|---|---|---|---|---|---|
 | D17 (案) | ours (p1) | 新規 (潜在) | `xor r,r ; … ; setcc r8` の上位 56bit=0 を block 境界越しに推定し, setcc を通らない経路で `zext i1→i64` が不定上位 bit を持つ | 機械語の後方走査が基本ブロックを無視 | 実 leaf では未発現 (tan の xor は同一 block)。合成機械語で再現 (T20-B) | setcc の def 復元で xor が同一 block に無い | 同一 block・32bit 以上の xor に限定 |
+
+### 23.9 tanf 大引数の不一致 (#1087 / LIFTLIB-13) — 原因の切り分け (未修正)
+- **入力**: `work/1087/tanf_wide.json` (gitignore 領域。spec `vars[0].gen` を `unif[-1e12,1e12]` に広げ、`mix` は既定 0.6/0.2/0.2 のまま)。spec 本体 (`specs/ott_leaf_tanf.json`) は無変更。
+- **実測 (コード HEAD `8e077944` = origin/main)**: `leafspec` 40 scenario で **match 33 / mismatch 7 / native_crash 0 / wasm_trap 0**、gate FAIL (rate 0.825)。既定 spec 込みの `targets/ott_leaf.json` 全 6 spec 実行では tanf 40/40・SVF 24/40 (mismatch 9 / crash 7 / trap 2) で、#342 時点の 20/40 から §23.8 の修正後の値と一致 (再現済み)。
+- **不一致の形**: 7 件すべて |x| ≥ 1e11。wasm の戻りは **±150725.0 (0x48133140 系) の定数に張り付き**、native は `tan(x)` と一致する (例: x=1.9119e11 → native −25.9959 / wasm 150725.0)。|x| ≤ 8.4e6 の 33 件は全件一致。
+- **機械語の分岐 (capstone, `OTT_vst2_win64.dll`)**: tanf `0x1801ba860` の閾値は `|x|` ≤ π/4 (fast path), `|x|` < 2^-13 (poly), `|x|` < 2^23 (`cvttpd2dq` による中間還元 `0x1801ba955`〜)。**`|x|` ≥ 2^23 は Payne-Hanek 還元 (`0x1801ba9c8`〜、128bit テーブル積・`bsr`・`shr`・`cmp rcx,0`・`jae`/`jl`/`je`)** に入る。大引数の 7 件はここを通る。
+- **IR の該当箇所 (`function_1801ba860`, `ott_leaf_w_fixed.ll`)**: Payne-Hanek の分岐条件が機械語のフラグに対応していない。`jae 0x1801baa70` (shr 後の CF) は `br i1 true`、その後の `jcc` は `br i1 false` / `br i1 undef` に畳まれ、負号・丸めの側の分岐が脱落する。`bsr` と `cmp rcx,0` の ZF/SF も IR のどの比較にも結線されていない (`bsr`・`shr` のフラグは helper・p1 のどちらにも無い)。
+- **#1087 本文の仮説 (`cvttpd2dq` の INT32_MIN 規約) との関係**: 大引数で通るのは `cvttpd2dq` の分岐ではなく Payne-Hanek 分岐。`x86_cvtt_f2i32` 単体の誤りは支持されない。
+- **SVF への波及 (未確定)**: SVF 残 mismatch 9 の `this[0..3]` は tanf 戻りの直接 store。tanf の大引数不一致が SVF の残差を説明するかは未検証 (SVF 側の引数は別計算のため、tanf の `x` を再計算して突合する必要がある)。
+- **未解決 (起票先)**: flag-folding (`bsr` / `shr` / `cmp` の CF・ZF・SF を分岐に再結線する) の修正と、修正後の tanf wide 40/40 + SVF 再測定 → 子 issue (下記 §23.9 の起票先)。

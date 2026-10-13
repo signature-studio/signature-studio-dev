@@ -92,7 +92,86 @@ def packed_binop(fl, kind, a, b, ty):
     return fl.v_from(t, ty) if ty != '<4 x i32>' else t
 
 
-def emit_insn(fl, i, ):
+def ymm_idx(fl, op):
+    nm = fl.cur.reg_name(op.reg)
+    m = re.match(r'ymm(\d+)$', nm)
+    if not m:
+        raise Unsupported('ymm mix ' + nm)
+    return int(m.group(1))
+
+
+def ymm_src(fl, op):
+    """ymm 256bit オペランド → (lo, hi) の <4 x i32> 対。レジスタは X/Y、メモリは 32B を 2 回 load。"""
+    if op.type == CS_OP_REG:
+        nm = fl.cur.reg_name(op.reg)
+        if nm.startswith('ymm'):
+            n = ymm_idx(fl, op)
+            return fl.x_get(n), fl.y_get(n)
+        raise Unsupported('ymm src ' + nm)
+    p = fl.mem_addr(op)
+    q = fl.t(); fl.e('%s = getelementptr i8, ptr %s, i64 16' % (q, p))
+    lo = fl.t(); fl.e('%s = load <4 x i32>, ptr %s, align 1' % (lo, p))
+    hi = fl.t(); fl.e('%s = load <4 x i32>, ptr %s, align 1' % (hi, q))
+    return lo, hi
+
+
+def ymm_insn(fl, i, m, O):
+    """ymm (VEX.256) の命令。対象外なら None。"""
+    if not any(op.type == CS_OP_REG and fl.cur.reg_name(op.reg).startswith('ymm') for op in O):
+        return None
+    if m == 'vpcmpeqw' and len(O) == 3 and O[0].type == CS_OP_REG:
+        d = ymm_idx(fl, O[0])
+        alo, ahi = ymm_src(fl, O[1]); blo, bhi = ymm_src(fl, O[2])
+        outs = []
+        for a, b in ((alo, blo), (ahi, bhi)):
+            A = fl.v_to(a, '<8 x i16>'); B = fl.v_to(b, '<8 x i16>')
+            c = fl.t(); fl.e('%s = icmp eq <8 x i16> %s, %s' % (c, A, B))
+            r = fl.t(); fl.e('%s = sext <8 x i1> %s to <8 x i16>' % (r, c))
+            outs.append(fl.v_from(r, '<8 x i16>'))
+        fl.x_set(d, outs[0]); fl.y_set(d, outs[1]); return False
+    if m == 'vpxor' and len(O) == 3 and O[0].type == CS_OP_REG:
+        d = ymm_idx(fl, O[0])
+        alo, ahi = ymm_src(fl, O[1]); blo, bhi = ymm_src(fl, O[2])
+        lo = fl.t(); fl.e('%s = xor <4 x i32> %s, %s' % (lo, alo, blo))
+        hi = fl.t(); fl.e('%s = xor <4 x i32> %s, %s' % (hi, ahi, bhi))
+        fl.x_set(d, lo); fl.y_set(d, hi); return False
+    if m == 'vpmovmskb' and len(O) == 2 and O[1].type == CS_OP_REG:
+        lo, hi = ymm_src(fl, O[1])
+        acc = None
+        for k, v in enumerate((lo, hi)):
+            vv = fl.v_to(v, '<16 x i8>')
+            neg = fl.t(); fl.e('%s = icmp slt <16 x i8> %s, zeroinitializer' % (neg, vv))
+            mk = fl.t(); fl.e('%s = bitcast <16 x i1> %s to i16' % (mk, neg))
+            z = fl.t(); fl.e('%s = zext i16 %s to i32' % (z, mk))
+            if k == 1:
+                s = fl.t(); fl.e('%s = shl i32 %s, 16' % (s, z)); z = s
+            if acc is None:
+                acc = z
+            else:
+                o = fl.t(); fl.e('%s = or i32 %s, %s' % (o, acc, z)); acc = o
+        fl.wr(O[0], acc, 32); return False
+    raise Unsupported('ymm ' + m)
+
+
+def emit_insn(fl, i):
+    m = i.mnemonic
+    if m == 'vzeroupper':
+        for k in range(16):
+            fl.y_set(k, 'zeroinitializer')
+        return False
+    r = ymm_insn(fl, i, m, i.operands)
+    if r is not None:
+        return r
+    term = emit_insn_core(fl, i)
+    ops = i.operands
+    # VEX.128 は宛先 xmm の上位 128bit をゼロ化する (flags だけ書く比較系を除く)
+    if (not term and m.startswith('v') and not re.match(r'v(u?comi[sd]|ptest|testp[sd])$', m) and ops
+            and ops[0].type == CS_OP_REG and fl.cur.reg_name(ops[0].reg).startswith('xmm')):
+        fl.y_set(xidx(fl, ops[0]), 'zeroinitializer')
+    return term
+
+
+def emit_insn_core(fl, i, ):
     m = i.mnemonic
     if m.startswith('lock '):
         m = m[5:]
