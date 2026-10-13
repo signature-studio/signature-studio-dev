@@ -1,7 +1,7 @@
 # #856: unit 56 の trap 元 `8c5eb0` の fail-fast 辺の到達可否と機械語対応の確定
 
 **結論**: unit 56 (`0x16fde0`) の `unreachable` は、#699 が入れた `8c5eb0` の件数 0 ガードの fail-fast 辺 (`_t`) で起きる。この辺は unit 56 だけが到達する (survey の trap 25 件中 1 件のみ)。機械語では、この辺に対応する native の経路は `8c608d` の vtable 呼出し (`410360`) であり、fail-fast は native から外れた挙動である。native の呼出先は静的 PE からは確定できなかった (§4)。
-検証 HEAD: `20f6835b` (本 PR の commit)。本 PR の `reach_856.sh` / 本 REPORT のみ。
+検証 HEAD: `9d6e859b` (本 PR の commit)。`reach_856.sh` は `20f6835b` と同一 (以降は REPORT のみの差分)。
 既知類型との関係 (DEFECTS.md): D1b と同型の疑い (#699 §5 の行案が PM 判断待ち)。機構の切り分けは未着手 (#718 / M11-N35)。
 
 ## 1. 機械語 (`8c5eb0`, capstone 5.0.7, `block00031_PE.bin` を VA 直接逆アセンブル)
@@ -18,7 +18,8 @@
 ```
 
 - `410360` (size 77) は `call qword [rbx-0x50]` (rbx = `[rcx]` = vtable) を行い、`[rbp+0x60]` (= 入力 rcx) を返す。
-- guard 適用前の IR (`work/boot_all.ll`) の `function_8c5eb0` (337646–337840 行) は `llvm.trap` 0 件・`unreachable` 0 件。guard 適用後の `work/boot_final.ll` (332700–332910 行) は各 1 件で、`_t` の `llvm.trap` は `m11_guard699.py --mode on` が追加したものである (本 run で grep 確認)。
+- 本 HEAD (`9d6e859b`) で `m11_gen_ir2.sh` → `m11_build.sh` を実行した IR で確認した。guard 適用前の `work/boot_all.ll` の `function_8c5eb0` (337646–337840 行) は `llvm.trap` 0 件・`unreachable` 0 件。guard 適用後の `work/boot_final.ll` は、`function_8c5eb0` 定義が 332700 行、`llvm.trap` が 332741 行 (関数末 332910 行)。`_t` の trap は `m11_guard699.py --mode on` が追加したもの。
+- 注: 配布 `work-m11.tar.zst` 内の `boot_final.ll` は別の IR (guard 前・行番号 196015/196028・`function_8c5eb0` 定義 332632 行) で、本節の行番号とは一致しない。以下の行番号は本 HEAD で生成した IR のもの。
 
 ## 2. 到達可否の実測 (`bash trap_triage/reach_856.sh`)
 
@@ -26,19 +27,19 @@
 
 | 項目 | 結果 |
 |---|---|
-| build | rc 0, 25 秒 |
+| build | rc 0, 25.9 秒 |
 | survey (942 unit) | ok 869 / trap 25 (oom 1) / miss 47 / noproc 1 / clobber 0 |
 | unit 56 の trap | `RuntimeError: unreachable`, 最上位 frame `wasm-function[3471]:0x1aa1df` |
 | trap unit のうち `wasm-function[3471]` を通るもの | **1 / 25** (unit 56 のみ) |
 | 他 24 件の trap 元 | OOB 16 件 (`RuntimeError: memory access out of bounds`)・`Error` 8 件 (全件 `m11_throw_dllmain_done`)。数え方: `work/v856/stack_trapped.txt` の `[survey][stack] unit` 見出し行を `: ` 以降で分類 (計 25 = 16 + 8 + unreachable 1) |
-| 再現 (n=3, 本 HEAD) | 3 回とも unit 56 `unreachable`、ok 869 / trap 25 で同一 |
+| 再現 (n=2, 本 HEAD) | 2 回とも unit 56 `unreachable`、ok 869 / trap 25 で同一 |
 
-- 所要 (`reach_856.sh` 全体, 2 回の survey 込み): 29 秒 (`time` 実測 real 29.07 秒)。開始時 load average 0.64 (4 vCPU)。
+- 所要 (`reach_856.sh` 全体, 2 回の survey 込み): real 29.60 秒・27.41 秒 (`time` 実測)。開始時 load average 0.45・0.73 (4 vCPU)。
 - `wasm-function[3471]` の関数名 (`function_8c5eb0`) は #699 §3-1 の `-g` 付き名前リンクでの測定を引き継いだ。本 run では名前の再検証はしていない。
 
 ## 3. unit 56 のステータス (関数 `function_56fde0` 内の呼出し)
 
-`function_56fde0` (`boot_final.ll` の 196051 行・196064 行。`grep -n "function_8c5eb0(ptr nonnull inttoptr (i64 1469800\|function_8c5eb0(ptr nonnull inttoptr (i64 1470128" work/boot_final.ll` の出力) の `8c5eb0` 呼出し:
+`function_56fde0` (本 HEAD で生成した `boot_final.ll` の 196051 行・196064 行。`grep -n "function_8c5eb0(ptr nonnull inttoptr (i64 1469800\|function_8c5eb0(ptr nonnull inttoptr (i64 1470128" work/boot_final.ll` の出力。guard 適用前後で変わらない) の `8c5eb0` 呼出し:
 
 ```llvm
 196051:  %262 = call i64 @function_8c5eb0(ptr nonnull inttoptr (i64 1469800 to ptr), i64 %ce0n19_function_56fde0, i64 0)
