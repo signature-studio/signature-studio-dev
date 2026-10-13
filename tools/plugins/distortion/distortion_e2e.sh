@@ -37,7 +37,7 @@ python3 lift/plugin_closure.py "${SHELLS[@]}" > /dev/null
 if [ "${1:-}" != "--skip-lift" ]; then
   # 前回までの行を判定に混ぜない: 今回追記された行だけを status.csv にする
   mkdir -p work/batch
-  [ -f work/batch/status.csv ] || echo "block,name,closure_funcs,closure_bytes,lift_rc,defines,declares_unimpl,f80_funcs,emcc_c_rc,seconds" > work/batch/status.csv
+  [ -f work/batch/status.csv ] || echo "block,name,closure_funcs,closure_bytes,lift_rc,defines,declares_unimpl,f80_funcs,emcc_c_rc,seconds,icall,dispatch_calls" > work/batch/status.csv
   n0=$(wc -l < work/batch/status.csv)
   bash lift/batch_lift.sh "${SHELLS[@]}"
   { head -n 1 work/batch/status.csv; tail -n +$((n0 + 1)) work/batch/status.csv; } > "$OUT/status.csv"

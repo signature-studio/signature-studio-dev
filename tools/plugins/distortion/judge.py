@@ -19,7 +19,7 @@ exit: 0 = 全 block 合格, 1 = 不合格あり, 2 = 入力不正 (引数 / フ�
 import argparse, csv, sys
 
 SHELL_COLS = ['block', 'name', 'closure_funcs', 'closure_bytes', 'lift_rc', 'defines', 'declares_unimpl',
-              'f80_funcs', 'emcc_c_rc', 'seconds']
+              'f80_funcs', 'emcc_c_rc', 'seconds', 'icall', 'dispatch_calls']
 AUDIT_COLS = ['block', 'missing_define', 'missing_bytes', 'missing_ref', 'extra_inside', 'function_defines']
 ENGINE_COLS = ['block', 'pdata_funcs', 'lift_rc', 'defines', 'f80_funcs', 'unimpl_helpers', 'emcc_c_rc',
                'f80_funcs_pre', 'emcc_c_rc_pre_f80', 'lift_s', 'missing_define', 'missing_bytes',

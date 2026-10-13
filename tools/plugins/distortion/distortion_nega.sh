@@ -240,7 +240,7 @@ echo "NC-D: $(basename "$ED") missing_define 対照=$m0  実在しない range �
 
 # ---- NC-W: e2e 全体の配線 (--skip-lift 経路で、判定が落ちる status を与えたとき e2e 本体が非 0 で終わり OK 行を出さない) ----
 cp "$OUT/status.csv" "$N/backup_status.csv"; cp "$OUT/shell_audit.csv" "$N/backup_audit.csv"
-cp work/batch/status.csv "$N/poison_batch.csv"; echo "19004,Fruity Fast Dist,12,8381,0,12,0,0,1,2" >> "$N/poison_batch.csv"
+cp work/batch/status.csv "$N/poison_batch.csv"; echo "19004,Fruity Fast Dist,12,8381,0,12,0,0,1,2,1,13" >> "$N/poison_batch.csv"
 o=$(BATCH_STATUS="$N/poison_batch.csv" bash distortion/distortion_e2e.sh --skip-lift 2>&1); rc=$?
 ok=0; echo "$o" | grep -q '^\[distortion_e2e\] OK' && ok=1
 w=0; echo "$o" | grep -q 'FAIL  block 19004.*emcc_c_rc=1' && w=1

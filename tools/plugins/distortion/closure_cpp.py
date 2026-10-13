@@ -57,12 +57,10 @@ def vtables(pe, base, img, ends):
     return out
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument('block', type=int)
-    ap.add_argument('--ranges')
-    ap.add_argument('--json')
-    a = ap.parse_args()
+def compute(block):
+    """→ (out dict, closure {VA: size}, ends, seeds_vt)"""
+    class a: pass
+    a.block = block
     pe, base, img, ends = load(a.block)
     md = Cs(CS_ARCH_X86, CS_MODE_64)
     md.detail = True
@@ -172,11 +170,22 @@ def main():
            'entries': len(entries), 'closure_funcs': len(closure), 'closure_bytes': sum(closure.values()),
            'pdata_funcs': len(ends), 'pdata_bytes': sum(e - s for s, e in ends.items()),
            'indirect_call_sites': ind, 'iat_call_sites': iat}
+    out['ranges'] = ranges
+    return out, closure, ends, seeds_vt
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('block', type=int)
+    ap.add_argument('--ranges')
+    ap.add_argument('--json')
+    a = ap.parse_args()
+    out, closure, ends, seeds_vt = compute(a.block)
     if a.ranges:
-        open(a.ranges, 'w').write(','.join(ranges))
+        open(a.ranges, 'w').write(','.join(out['ranges']))
     if a.json:
-        json.dump(dict(out, ranges=ranges), open(a.json, 'w'))
-    print(json.dumps(out, indent=1))
+        json.dump(out, open(a.json, 'w'))
+    print(json.dumps({k: v for k, v in out.items() if k != 'ranges'}, indent=1))
     # 測定が成立しなかったら非 0 (seed の vtable が 1 本も取れない / 閉包が空 / .pdata より大きい)
     if not seeds_vt or not closure or len(closure) > len(ends):
         print('closure_cpp: FAIL: seed_vtables=%d closure_funcs=%d pdata_funcs=%d' % (len(seeds_vt), len(closure), len(ends)), file=sys.stderr)
