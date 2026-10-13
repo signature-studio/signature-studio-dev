@@ -31,4 +31,8 @@ d_callers = callers(DISPATCH)
 print('dispatch callers (call/jmp):', [hex(c) for c in d_callers])
 for c in d_callers:
     o = owner(c)
-    print('  caller', hex(c), 'owner', hex(o) if o else '-', 'owner callers:', [hex(x) for x in callers(o)] if o else [])
+    cs = callers(o) if o else []
+    print('  caller', hex(c), 'owner', hex(o) if o else '-', 'owner callers:', [hex(x) for x in cs])
+    for x in cs:
+        f = fi(x - IMG)
+        print('    2nd caller', hex(x), 'owner', hex(int(funcs[f][0]) + IMG) if f >= 0 else '-', 'size', int(funcs[f][1] - funcs[f][0]) if f >= 0 else '-')
