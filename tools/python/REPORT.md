@@ -123,19 +123,12 @@ mock との差で見つかったもの: mock は引数の個数/型を検査し�
 
 ### 7b-2. レビュー指摘 (d2706e1) の修正: `ilmcp.getBrowserNames` の固定バッファ
 
-原因: `b[2048]` へ `w += snprintf(w, 残量, ...)` で連結していたため、切り詰められた出力でも snprintf の戻り値 (= 切り詰めなければ書いた長さ) が `w` に加わり、`w` が `b + sizeof b` を越えると次の `(size_t)(b + sizeof b - w)` が巨大な値になって境界なしに書いた。`q[512]` / `full[288]` / `e[576]` と `json_str` も黙って切り詰めていた。修正 (`provider/fl_engine.c`): `json_str` と `buf_add` が残量 (`size_t`) を持ち、`n >= remaining` なら何も書かず失敗 → ハンドラは `Range error` (code 4) を返す。`full` も `snprintf` の戻り値 `>= sizeof full` で失敗にする。
+原因 (`snprintf` 連結の戻り値で境界を越えて書いた) と修正 (`json_str`/`buf_add` の残量判定・code 4)・ASan と NC の全文は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §7b-2。
+現況 (8674fa6): 固定バッファは消滅 (`json_str`/`buf_add` 削除、結果は malloc して `fl_ret_json` でコピー)。このため `provider_check.mjs` 節 2b の溢れ 5 ケースを削除し、長大入力 (`\x01`×100000 → code 1) の検査に置換した。
 
-| 項目 | 実測 (HEAD b2225e1, GitHub Actions runner, node 22.23.3, emsdk 6.0.12, load average 0.53〜1.84) |
-|---|---|
-| 回帰ケース | `tests/provider_check.mjs` 節 2b: 収まる 7 + 溢れる 5 = **12 ケース**。収まる: `""` / `"db"` / 引用符・バックスラッシュ / 制御文字 4 / 日本語 90 字 (270B) / `a`×273 (full 287B ちょうど) / 制御文字×80 + `a`×17 (b[2048] に 2047B ちょうど)。溢れる: `a`×274 (full 288B) / 制御文字×80 + `a`×18 (q・full・e は収まり b だけ溢れる、2051B) / 制御文字×85 (q) / 制御文字×100 (reviewer 再現) / `a`×100000。溢れた後に `getBrowserNames("db")` が正常応答することも各ケースで確認。b の長さ = 59 + 4X (X = エスケープ後の名前長) |
-| 旧コード (d2706e1) × 新テスト | **FAIL**: 溢れる 5 ケース中 5 つ。`a`×274 と `a`×100000 は黙って切り詰めた ok (`…/Fruity Slice`)、他 3 つは不正 JSON (`position 2047` の SyntaxError / `Unexpected end of JSON input`)。収まる 7 ケースは旧コードでも一致 (= 正常系の挙動は不変) |
-| 修正後 × 新テスト | **PASS**: `provider_check` 0.31 / 0.29 / 0.28 秒 (3 回)。節 1〜3 全体 (Python 側の型・例外写像を含む) |
-| メモリ安全 (ASan) | `emcc -fsanitize=address` で旧・新を同テスト (節 1〜2b) 実行: 旧 = **`stack-buffer-overflow` WRITE of size 1**、新 = 検出 0 件で PASS |
-| 回帰なし | `FL_ENGINE=wasm node tests/all_tools.mjs` **48/48 ok**、soft_error 0・raised 0、host_calls 37,424、callback 往復 true、1.59 / 1.61 / 1.61 秒 (3 回)。`tool_coverage.wasm.json` と追跡中の `tool_coverage.json` の tool 別差 **0/48**。`poc_mcp` (mock) POC OK 1.06 秒 |
-| ネガティブコントロール | `full` の判定 `>=` → `>` : 溢れる `a`×274 で FAIL。`buf_add` が溢れても 0 を返す: `98 文字` で FAIL (`",]}"` の不正 JSON)。生き残り 2 件 (等価変異): q の `json_str` 失敗を無視 / `json_str` の残量判定を 2B 緩める — q・e の境界は API 経由では b[2048] (4X) が先に律速して到達できないため (いずれも b が先に失敗するので出力は同じ)。これらの個別境界は `json_str` 単体の C テスト無しでは検出できない |
+### 7b-3. ilmcp 8 ハンドラを `host/ilmcp.mjs` の意味論に合わせる (#74, PR #763 / 8674fa6)
 
-検証範囲: 上記は mac pkg 無しで `fetch_inputs.sh` の win64 DATA block 経路から配置した MCPTools.pyc / midi.py / utils.py で実行した (b76d221 時点の自己申告値 host_calls 37,424・48/48 と同値)。範囲外: `run_all.sh` 全体・headless Chrome (`browser_check`) は未実施。
-
+getBrowserNames (木・不明パス code 1)・getHighlightNames (21 件)・addChannel/addEffect/storePRScript の検証を JS ホストと一致させた。データは `gen_provider.py` が `analysis/ilmcp/*.json` から `provider/gen/ilmcp_data.h` を生成 (dir 28 / plugin 141 / highlight 21)。`tests/ilmcp_diff.mjs` (新規): 呼出し 32 + 状態 9、diffs 0。ネガティブコントロール (addEffect の plugin 名検証を外す) で 2 件差分。実測・検証表は [REPORT_PY74.md](REPORT_PY74.md) §7b-3。
 
 ## 7d. CPython を provider と同一 wasm に静的リンク (PY-2, #83 / #115) — 全文は `REPORT_PY2.md`
 
@@ -174,7 +167,8 @@ T1〜T9 の表は 250 行上限のため [REPORT_APPENDIX.md](REPORT_APPENDIX.md
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | flapi の提供側がモック (`fl_mock.mjs`) のまま。実 FLEngine wasm の `fl_api_call` に差替え未了 | tool の結果はモック値で、実 FL と同一動作の保証なし | #74 (PY-1, PR #459) 以降 / 親 #35 |
-| ilmcp B 群 8 tools は最小の偽実装 | UI から呼べるが FL 本来の挙動ではない | 親 #35 の T3 (ilmcp 実装) |
+| ilmcp B 群 8 tools は JS ホスト・C provider とも状態機械の模擬 (実 FLEngine 未接続) | 戻り値・code の FL 実機一致は未検証。意味論は `host/ilmcp.mjs` と `tests/ilmcp_diff.mjs` で一致 (§7b-3) | #74 (実 FLEngine 上の 38 tool 成功が受入条件) |
+| 非 ASCII 空白の扱い: JS `norm` (trim) と C `browser_key` (isspace) が不一致 | ASCII 入力では差分 0。`\u00a0` 付きパスで JS 成功・C code 1 | #74 の子チケット (REPORT_PY74.md 未解決) |
 | `/?mcp=1` のパネルは最小 UI (整形・履歴・複数行 arguments 編集なし)。`pnpm build` 成果物 (`dist/`) は `/py/` を持たないため dev / preview 専用 | 本番配信での公開は未対応 | 親 #35 に提案 (配信設計は #62 H 系と調整) |
 | (解消) `build_flpy.sh` の `flapi_table.json` 再生成が win PE / stubs 無しで黙って劣化する | #588 (PY-13) で env 化・入力欠落は exit 2 | §PY-13。`fetch_inputs.sh` / `run_all.sh` の `/home/ubuntu` 固定パスは別途 (下の未解決表) |
 

@@ -237,3 +237,4 @@ WINEPREFIX=host/work/wineprefix wine64 host/work/build/vst3host.exe \
 2. GUI (IPlugView open/frame) は未実施 — createView 取得まで。demo dialog は modal の可能性があり headless では opened にしない選択。
 3. 44.1 kHz / 512 frames 等の他サンプルレート未網羅 (48 kHz / 128f 固定)。
 4. 0x800010 受信観測と demo bit = 1 経路は未達 (§3-2/3-3)。CAB-237 wasm ハーネス (23/23) が IR レベルの担保を維持。
+5. [SR-1c #256] API 一覧 (受入 #3) と +0x10c writer 静的走査の実測は [REPORT_SR1c.md](REPORT_SR1c.md) (付録)。+0x10c の実行時 writer は未特定。
