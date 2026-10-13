@@ -79,7 +79,7 @@
 
 | ID | 事実 (実測) | 影響 | 本タスクでの扱い |
 |---|---|---|---|
-| L1 | 0x1800c2b50 の 0x1800c2ef4–f05 (host への**直接** vtable 通知 `call [rax+0x30]`, edx=0x800010) が raw RetDec IR から**脱落** (当該 VA の insn.addr メタが 0 個, 間接 call も 0) | 通知経路の半分が IR に無い (本 stub には有利だが忠実性欠落) | 機械語参照パッチ (mpatch.py) で補完。本 lift 時は再現要確認 |
+| L1 | 0x1800c2b50 の 0x1800c2ef4–f05 (host への**直接** vtable 通知 `call [rax+0x30]`, edx=0x800010) が raw RetDec IR から**脱落** (当該 VA の insn.addr メタが 0 個, 間接 call も 0。機構は §12) | 通知経路の半分が IR に無い (本 stub には有利だが忠実性欠落) | 機械語参照パッチ (mpatch.py) で補完。本 lift 時は再現要確認。原因の説明は §12 に一本化 |
 | L2 | 0x1800c2b50 の tag 文字列 len が callee が書く caller stack なのに undef alloca 読みになり base で 0 fold → tag check が常時偽 | setState が IR 上常に kResultFalse | LF1: len を global 束縛 |
 | L3 | 0x18004fad0 の ucomisd 後の分岐が**直前の整数 compare の stale flag** 再読出しになっている | version 範囲判定が誤分岐 | LF3: fcmp uge に置換 |
 | L4 | 0x18004fad0 の 2 つ目の ucomisd (v ≤ 11.00001) の分岐が脱落 | 範囲外 version も復元経路に進む | LF4: fcmp ugt + br を挿入 (動作実証済み) |
@@ -143,13 +143,33 @@ python3 tools/targets/serum2/license/authstub/authstub_irpass.py \
 - 残: 「変更前 (main 側 authstub 版) の再測定」は未実施。baseline 比較は行わない。
 
 - N4 (process / funclet 無変更) assert OK。変更関数は 18004fad0 / 1800c2b50 / 1800c6090 の 3 件。
-- 本束縛の共通化で達成したのは「既存 e2e の再現」と「束縛プリミティブの共通化」まで。L1 の復元 pass と LF 規則の一般化 (RetDec 出力からの規則導出) は未達。追跡 issue は未起票のため PM に起票を依頼する。
+- 本束縛の共通化で達成したのは「既存 e2e の再現」と「束縛プリミティブの共通化」まで。L1 の復元 pass は #823、LF 規則の一般化 (RetDec 出力からの規則導出) は #824 で追跡する (いずれも起票済み・open)。
 
 ## 12. L1 の再現条件 (実測・追跡 #823)
 
-- 測定 commit: origin/main 36edc993 (ws-250b)。素材: plugins-serum2 → `Install_Xfer_Serum2_2.1.5.exe` の `$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3` (19,236,864 B, sha256 `501e7bb3…5283`)。
+- 測定 commit: origin/main 36edc993。素材: plugins-serum2 → `Install_Xfer_Serum2_2.1.5.exe` の `$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3` (19,236,864 B, sha256 `501e7bb3…5283`)。
 - baseline `bash e2e.sh` (lift キャッシュ利用): 5.7 s, load 0.92 → 0.35, **23/23 PASS**。cold 再生成は未実施。
 - 機械語 (0x1800c2d59–d76): `[rsi+0x90]` が非 0 なら `or dword [rax+8], 0x800010` (deferred 経路)、0 なら `je 0x1800c2ef4` で直接経路 `mov rcx,[rsi+0x10]; mov rax,[rcx]; mov edx,0x800010; call [rax+0x30]` へ分岐する。
 - raw IR では `dec_label_pc_1800c2d5f` の `br i1 (icmp eq %109, 0)` の 0 側が機械語の `je 0x1800c2ef4` ではなく `dec_label_pc_1800c2f08` に付け替えられており、`0x1800c2ef4` 相当のブロックは関数内のどの分岐からも到達しない (`insn.addr` 0 件)。
 - 結論: 脱落は「`0x1800c2ef4` へ向かう辺が lift 時に `0x1800c2f08` へ付け替わる」形で起きている。raw IR の `0x800010` 即値は `or i32 …, 8388624` (L9878, `0x1800c2d6f` 側の deferred 経路) の 1 箇所のみ。
 - 残: 失われた辺を復元する pass の実装と検証は未着手 (#823)。N2b (`0x1800c2d59` → f08 の強制) は deferred 経路除去であり、直接経路の復元とは別問題。
+
+### 12.1 確認手順 (中間物と再生)
+
+- 中間物: `e2e.sh` の step [1] が出力する `tools/targets/serum2/license/authstub/work/lift/authstub.drc.ll` (RetDec raw IR、select-ranges に 0x1800c2b50-0x1800c2f99 を含む)。`work/` は gitignore。
+- 素材: `plugins-serum2` (§11 と同じ PE)。`work/lift/` が無い場合は `bash e2e.sh` の step [1] で生成する (約 30 s)。
+- 再生コマンド (`authstub/` で実行):
+
+```sh
+LIFT=work/lift/authstub.drc.ll
+# (a) 0x1800c2ef4 の insn.addr メタ件数 (期待: 0)
+VA=$(printf '%d' 0x1800c2ef4)
+grep -cE "^![0-9]+ = !\{i64 $VA\}" $LIFT
+# (b) 0x800010 即値 (or i32 ..., 8388624) の出現箇所 (期待: L9878 の 1 箇所)
+grep -nE 'or i32 .*, 8388624' $LIFT
+# (c) 0x1800c2d5f の br i1 (icmp eq %109, 0) の 0 側ターゲット (期待: dec_label_pc_1800c2f08)
+grep -nE 'br i1 \(?icmp eq %109, 0\)?' $LIFT
+```
+
+- 注 (未再現): 上記 (a)〜(c) の期待値は元 PR の記述 (測定 commit 36edc993) で、**この fix run では再実行していない** (`plugins-serum2` 未取得・`work/lift/` 無し)。コマンドの正しさ (IR の表記揺れ等) も未検証。再検証は `oc_artifacts: fl-win64 plugins-serum2` を付けた run で、上記コマンドを実行して結果を本節に書き直すこと。
+- 原因の一本化 (記述上の整理。機構の再確認は上記の再検証待ち): §6 L1 の「insn.addr メタが 0 個」は (a) の結果で、「`0x1800c2ef4` へ向かう辺が lift 時に `0x1800c2f08` へ付け替わる」ことが脱落の機構。
