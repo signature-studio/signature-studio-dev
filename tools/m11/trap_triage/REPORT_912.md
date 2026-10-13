@@ -103,6 +103,11 @@
 - 本 run (fix 対応) の確認: `ls $ARTIFACTS_DIR` は `fl-win64.tar.zst` と `toolchain-retdec.tar.zst` (`[RETDEC]` の `bin/` が存在)。ただし次の 2 点が揃わず、IR 再生成と build を完走できなかった。
   - `m11_bounds.py` の入力 `tools/m2/work/ghidra_dll/functions_dll.csv` (Ghidra 12.1.4 出力) が無い。`fl-win64` の一覧 (25168 entry) に Ghidra 出力は無く、[GHIDRA] も無い。
   - `m11_build.sh` は [EMSDK] の `emsdk_env.sh` を要求するが、`toolchain-emsdk` は未指定で [EMSDK] が無い。
-- よって現 HEAD での既定値の再測定は未実施。必要な素材の追加指定 (`docs/WORKFLOW.md` §11 の許可名) は `toolchain-emsdk` と、`functions_dll.csv` を含む素材 (Ghidra 出力を含む名前。許可名のどれに入るかは未確認)。起票先は #912 (本 issue)。
+- よって現 HEAD での既定値の再測定は未実施。不足の内訳 (この run の確認):
+  - `functions_dll.csv` は素材ではなく、Ghidra 12.1.4 headless (`tools/m2/README.md`・`DumpFunctions.java`) で作る中間物。[GHIDRA] (`/opt/ghidra`) は無く、JDK 21 は `/usr/lib/jvm/temurin-21-jdk-amd64` に有る。GitHub への到達は確認済み (200)。
+  - `toolchain-emsdk` は未取得 ([EMSDK] 無し)。PR 本文の `oc_artifacts:` 行に追加する。
+  - `work/boot*.lift.ll` は RetDec の全 lift (`m11_lift_all.sh`) が無いと生成されない。`docs/WORKFLOW.md` §11 の実測は `--full` が 633 秒 (head `2e128c5c`) で、素材と Ghidra 出力が揃っている前提。
+  - この run は fix モードの上限 40 分で、Ghidra の取得と解析・emsdk の導入・全 lift を連続で行うと上限に収まらないと判断した。途中で打ち切られると push も記録も残らないため、再測定は行わず、この記録と素材の追加指定に留めた。
+  - 次の run の手順: `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk` で起動し、Ghidra 12.1.4 + JDK 21 で `functions_dll.csv` を作る → `m11_gen_ir2.sh` → `m11_build.sh` (既定) と `M11_FIX_912=0` → `survey_units.mjs` → §7 を書き直す。起票先は #912 (本 issue)。
 - 差分の証跡: `git diff a5e9c1ed dc109d61 -- tools/m11/m11_passes.py tools/m11/m11_build.sh` は 2 files, 17 insertions(+), 2 deletions(-) (M2q の pass 追加と `M11_FIX_912` 既定値)。`tools/m11/` 全体の `git diff --stat` には、main 取り込みで入った他 PR の変更 (REPORT_N55・zeropad 等) も含まれる。測定経路の差分は上の 2 files が全て。
 - 現 HEAD (`dc109d61` 以降) での手順: `bash tools/m11/m11_gen_ir2.sh` → `bash tools/m11/m11_build.sh` (環境変数なし) → `survey_units.mjs` を 1 回ずつ。`M11_FIX_912=1` の明示実行は既定変更の検証にならないため含めない。OFF/ON × 修正 0/1 の 4 構成は `M11_FIX_912=0|1` と既定の組で揃える。
