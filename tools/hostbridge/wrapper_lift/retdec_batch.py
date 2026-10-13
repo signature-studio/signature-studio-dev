@@ -1,8 +1,8 @@
 """Fruity Wrapper (block19091/23676) を RetDec で関数単位に lift し、成否を集計する (#828 受入条件 1)。
 
 使い方 (cwd=リポジトリルート):
-  FL_WIN64_DIR=<fl-win64 展開先>/extracted python3 tools/hostbridge/wrapper_lift/retdec_batch.py [block19091_PE.bin ...]
-  FL_WIN64_DIR=<fl-win64 展開先>/extracted python3 tools/hostbridge/wrapper_lift/retdec_batch.py --nc
+  RETDEC=<retdec>/bin/retdec-decompiler FL_WIN64_DIR=<fl-win64 展開先>/extracted python3 tools/hostbridge/wrapper_lift/retdec_batch.py [block19091_PE.bin ...]
+  RETDEC=<retdec>/bin/retdec-decompiler FL_WIN64_DIR=<fl-win64 展開先>/extracted python3 tools/hostbridge/wrapper_lift/retdec_batch.py --nc
 出力: tools/hostbridge/wrapper_lift/work/retdec_<block>.json (gitignore。commit しない)
 方式:
   - 関数範囲 (measure_decode.py と同じ chain 併合の関数集合) を BATCH 個ずつ `--select-ranges` で渡す。
@@ -29,7 +29,7 @@ from liftlib.pe import Image  # noqa: E402
 HERE = os.path.dirname(os.path.abspath(__file__))
 WORK = os.path.join(HERE, "work")
 FL = os.environ["FL_WIN64_DIR"]
-RETDEC = os.environ.get("RETDEC", "/opt/retdec/bin/retdec-decompiler")
+RETDEC = os.environ["RETDEC"]
 BATCH = int(os.environ.get("BATCH", "500"))
 TIMEOUT = int(os.environ.get("TIMEOUT", "300"))
 NC_N = 20
