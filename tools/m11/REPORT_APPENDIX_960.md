@@ -28,10 +28,10 @@
 | 測定 | rc | 所要秒 | ir_sha256 | reached_stage | survey ok / trap / miss |
 |---|---|---|---|---|---|
 | N3 `m11_e2e.sh --full` | 0 | 525 (8 分 45 秒) | `ad73a2cd…` | 4 | 872 / 23 / 46 |
-| N4 同 (生成物削除後に再生成) | 0 | 512 (8 分 33 秒) | `7e66d79d…` | 4 | 872 / 23 / 46 |
+| N4 同 (生成物削除後に再生成) | 0 | 512 (8 分 32 秒) | `7e66d79d…` | 4 | 872 / 23 / 46 |
 
 - **結論**: 同一 HEAD・同一 PE で `ir_sha256` は再び一致しない (N3 ≠ N4)。一方、survey の結果は一致した: `M11_SUMMARY` の survey 系フィールド全て一致、標準出力は時間・負荷の行を除くと差分 0 行。
 - **差の段**: `boot0.drc.ll`・`boot0.lift.ll`・`boot2`/`boot4` の lift/drc は N3 と N4 で一致。`boot1.drc.ll`・`boot3.drc.ll` は `uselistorder` 行の並びに差がある (前回 §14 の `boot0` とは別の段)。`boot1.lift.ll` は空行 1 行だけ差がある。`boot_final.ll` は空行 1 行だけ差 (N3 48683 → N4 48684 個の空行)。空行を除いた sha256 は両者一致。
 - **前回 §14 との関係**: §14 は HEAD `29f63707` で 870/25/46 (N1)、N2 は ok 870 のみ。HEAD が違うため件数は直接比較できない。差の起点が段ごとに変わるため、差は実行ごとに揺れると判断する。
 - **扱いの提案 (受入 3・PM 判断待ち)**: `ir_sha256` は実行ごとの固定指紋として使えない。survey 基準は件数 (ok / trap / miss / reached_stage) で比較する方針を、今回 2 回の一致で支持する。ただし 2 回だけの一致であり、trap / miss の unit 単位の一致は未確認。
-- 再現: §14 と同じ (`FL_WIN64_DIR=<fl-win64>` / `RETDEC_ROOT=/opt/retdec` / `PATH=/opt/retdec/bin:$PATH` で `bash tools/m11/m11_e2e.sh --full` を 2 回)。
+- 再現: §14 と同じ (`FL_WIN64_DIR=<fl-win64>` / `RETDEC_ROOT=<[RETDEC]>/retdec` / `PATH=<[RETDEC]>/bin:$PATH` で `bash tools/m11/m11_e2e.sh --full` を 2 回)。
