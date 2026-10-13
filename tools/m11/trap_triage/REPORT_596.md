@@ -3,7 +3,7 @@
 **判定: 受入条件 1 は部分達成 (全 21 unit を最上位 frame で分類、原因特定は一部のみ)、受入条件 2 は達成 (jsonl 基準で同じ定義の数値突合。TSV 基準 222 との重なりも併記)。Closes しない (Refs #596)。**
 測定基準 = `work-m11` スナップショット (IR 生成条件は未固定、#680)。**検証起点 = `97eaf2a`** (本 run の HEAD。build + survey を再実行、§7)。tools の動作は `f77f050` で最後に変更 (`probe_entry.sh` の不具合修正・`oob_cross307.py` の TSV 基準追記)。`f77f050` 以降の差分は本 REPORT の文言と `probe_entry.py` の docstring のみ。
 変更はすべて `tools/m11/trap_triage/` の診断ツール追加で、`m11_ov.c`・IR・survey の判定は不変。
-既知類型との関係 (`docs/DEFECTS.md`): 4f9f40 系 (5 unit のうち 291・296) は **D4 の新事例** (書込み元 `47b260` の `[rbx]`・`[rsi]` の deref 脱落。#706 (`f39a9e3`) で特定・修復、merge 済み。§3)。304・555・923 は #714。`414ad0` 系 4 unit は `tools/liftdiff/REPORT_APPENDIX.md` §9 (LD-7 / #307) の「入口 rcx の `[rbx]` 1 段 deref 脱落」と**同じ欠陥** (§4 で IR を突合)。
+既知類型との関係 (`docs/DEFECTS.md`): 4f9f40 系 (5 unit のうち 291・296) は **D4 の新事例** (書込み元 `47b260` の `[rbx]`・`[rsi]` の deref 脱落。#706 (`f39a9e3`) で特定・修復、merge 済み。§3。ただし修復 ok は notify 省略版のみ。notify 有効では 291・296 が miss (REPORT_682 §7))。304・555・923 は #714。`414ad0` 系 4 unit は `tools/liftdiff/REPORT_APPENDIX.md` §9 (LD-7 / #307) の「入口 rcx の `[rbx]` 1 段 deref 脱落」と**同じ欠陥** (§4 で IR を突合)。
 
 ## 1. 前提の訂正: OOB は 44 ではなく 21 (snapshot 基準)
 
@@ -21,7 +21,7 @@
 | 最上位 frame (真の trap 関数) | unit | 数 | trap 位置 (wasm offset) | 原因の状態 |
 |---|---|--:|---|---|
 | `417b70` ← `417fc0` ← `8cbb00` ← `8cbcb0` | 56 58 59 60 61 62 63 | 7 | 0x354227 | snapshot では oob。58–63 (6 unit) は `417b70` の `Q(a)` の D17 型 (#664 の解析) で、#552 (merged `191ed7b8`) の head で ok (#664 の記載、本 REPORT では未再測)。56 (1 unit) は別原因 `8c7710` の D4 型 → `8c5eb0` (#662)。旧表の「`417fc0` ×7」は 1 段上 |
-| `4f9f40` ← `4f9ff0` ← `4faae0`/`4fad10` ← `4fb910`/`4fb8a0` | 291 296 304 555 923 | 5 | 0x193d4f / 0x193cc3 | **§3**: レジストリ (`[0x11f26a0]`) の TList の items 配列が破損。書込み元 `47b260` は #706 (`f39a9e3`) で特定・修復、merge 済み |
+| `4f9f40` ← `4f9ff0` ← `4faae0`/`4fad10` ← `4fb910`/`4fb8a0` | 291 296 304 555 923 | 5 | 0x193d4f / 0x193cc3 | **§3**: レジストリ (`[0x11f26a0]`) の TList の items 配列が破損。書込み元 `47b260` は #706 (`f39a9e3`) で特定・修復、merge 済み (修復 ok は notify 省略版のみ。notify 有効では 291・296 が miss、REPORT_682 §7) |
 | `414ad0` ← `414bb0` ← `652500` ← `653660` | 149 158 280 659 | 4 | 0xbc575 | **§4**: `414ad0` 自身の `[arg1]` deref 脱落 (#307 と同一欠陥)。加えて `652500` の入口 arg1 は非ゼロ (§4 の表) |
 | `418190` ← `59f9a0` | 87 | 1 | 0x353397 | 既知 (REPORT_483 §4b: #411 の `418190` 転記との組合せ) |
 | `47ad70` ← `536da0` ← `4fe150` ← `5d2680` | 95 | 1 | 0x18f8d3 | 未特定 (§5) |
@@ -43,7 +43,7 @@
 - `536c20` = TList 系のコンストラクタ (`call 0x410320` ClassCreate → `40f9e0` TObject.Create → `5373f0` で `[self+8]` に items を設定、`410360` で AfterConstruction)。`410360` (AfterConstruction) の IR は `ret arg1` だけの関数で VMT 間接 call が脱落している (#419 / PR #446 REPORT §8.2 の観測。本 run では未再確認)。直前の入口が `410360` であることと、この脱落が items 破損の原因かどうかは別 (**推定**、未検証)。
 - 判定の実測: 単体 `SV_ONLY=291,296,304,555,923` は 5 unit とも **halt0 (oob ではない)**。unit 45 を前置すると 45 だけ oob に変わり、5 unit は halt0 のまま (n=1)。つまり oob になる条件は「前の unit 群が積んだ状態」。本 REPORT の probe (入口単位) では書込み命令までは特定できていない。
 
-書込み元 (#706 `f39a9e3` で merge 済み。本 REPORT では再測していない): `function_47b260` (TList の Add 系, VA 0x47b260)。呼出元 `function_4f9f10` が渡す `T+8` (FItems 欄) に、呼出元 stack 局所の番地を書いていた。機械語の `mov rax,[rbx]` と `mov rcx,[rsi]` (disp=0) の deref 2 点が IR で落ちていた = D4 の新事例。C 転記で修復すると、5 unit 中 291・296 が ok (#706 の実測)。304・555 は closure 外の `function_535c2e` 呼出し (fail-fast abort、#714)、923 は `410b10` の OOB (#714)。
+書込み元 (#706 `f39a9e3` で merge 済み。本 REPORT では再測していない): `function_47b260` (TList の Add 系, VA 0x47b260)。呼出元 `function_4f9f10` が渡す `T+8` (FItems 欄) に、呼出元 stack 局所の番地を書いていた。機械語の `mov rax,[rbx]` と `mov rcx,[rsi]` (disp=0) の deref 2 点が IR で落ちていた = D4 の新事例。C 転記で修復すると (notify 省略版)、5 unit 中 291・296 が ok (#706 の実測)。notify (`call [rbx+0x20]`) を有効化すると 291・296 は miss になる (REPORT_682 §7)。304・555 は closure 外の `function_535c2e` 呼出し (fail-fast abort、#714)、923 は `410b10` の OOB (#714)。
 値 (probe build では `0x10a9f948`、非 probe では `0x10a9f888`) は build 依存。
 
 ## 4. 414ad0 系 (4 unit) と #307 の OOB との突合
@@ -116,7 +116,7 @@ SV_WATCH=11f26a0:8:8 node trap_triage/oob_top.mjs work/trap_triage/watch.json 2>
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | `414ad0` の C 転記 (または ldfix の `[arg1]` deref 復元) で 4 unit (149 158 280 659) が ok になるか。`652500` の入口 arg1 が非ゼロ・arg2〜4 が 0 となる理由 (`653660` の call 引数の突合) を含む | oob 4 unit。#307 の 68 関数も同じ関数 | **#683** (#307 と共通) |
-| 4f9f40 系 5 unit: 書込み元 `47b260` (§3)。291・296 は修復で ok、304・555・923 は別原因 | oob 5 unit | 291・296: **#706** (merge 済み `f39a9e3`)。304・555・923: **#714** |
+| 4f9f40 系 5 unit: 書込み元 `47b260` (§3)。291・296 は notify 省略の修復で ok、304・555・923 は別原因 | oob 5 unit | 291・296: **#706** (merge 済み `f39a9e3`)。ただし notify (D15) 有効化で 291・296 が miss になる未解決が残る (REPORT_682 §7。起票先: 未起票、PM 判断・DEFECTS D15 併記)。304・555・923: **#714** |
 | 95 / 275 / 477 / 895 の個別原因 (各 1 unit) | oob 4 unit | **#684** (本 REPORT §5) |
 | `oob_top.mjs` は `survey_units.mjs` の複製 (frames 処理・SV_WATCH など)。乖離リスクがあるので 1 本に統合する | 2 系統の harness | **未起票** (PM 判断: #683 は統合の受入条件を持たない。新規起票か既存への追記を PM に依頼) |
 | 現 main `8d883c3` と本 REPORT の測定基準の差 (分母 13 と 21) | §1 | #680 (測定基準の固定化) |
