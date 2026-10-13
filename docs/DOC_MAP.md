@@ -144,6 +144,7 @@
 | `tools/m11/trap_triage/REPORT_679.md` | ~110 | icall site 0x41037d の hit 23,053,861 の内訳 (unit 101 = #513 の暴走 loop に 99.999% が集中)・既定 ON の 0x41032e 併記・再現手順と検査スクリプト `icall_41037d_679.py` (#679) |
 | `tools/m11/trap_triage/REPORT_418.md` | ~70 | 409470 転記ハングの原因特定 (#418) |
 | `tools/m11/trap_triage/REPORT_595.md` | ~90 | ClassCreate ON (`M11_OV_CLASSCREATE=1`) の ok 退行の原因切り分けと C 転記 (`41c130` / `413060`)・残る unit 415 の原因・既定 OFF のネガコン (#595) |
+| `tools/m11/trap_triage/REPORT_1157.md` | ~50 | #1157 の二分探索の前提の実測・判定基準の未確定 (基点 `5ff73ff` と現 main の OFF/ON 測定・PM 判断事項) |
 | `tools/m11/trap_triage/REPORT_704.md` | ~60 | unit 415 の `9b4b00` (と `9b5450`) の C 転記 (ON 時のみ) と、現 IR での ON 退行 4 件 (101/190/291/296) の再測定 (#704) |
 | `tools/m11/trap_triage/REPORT_474.md` | ~100 | 410320 補完後の unit 114 ハング = 5c0270 の unlink deref 脱落 (#474)・409470/410320 再採用 |
 | `tools/m11/trap_triage/REPORT_699.md` | ~150 | `8c5eb0` の件数 0 ループ先頭ガードの IR 復元 (unit 56 の trap→ok・ネガコン)・全 IR 関数の jcc↔IR 後続突合の走査 (候補件数は未検証) と、ガード辺の値・未確定事項 (#699)。測定値は本文 §3 |
