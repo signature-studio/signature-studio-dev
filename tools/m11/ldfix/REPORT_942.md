@@ -73,8 +73,10 @@ unit ごとの trap 9 件 (base/fix とも同一 VA)。**旧版の閉包表 (下
 - base = fix で `memory access out of bounds` (units_run 17 / boot_stage 1 / dllmain_done false)。区別はできない。
 - 修復前後で boot の trap 位置・件数は同一。修復 (F3a 2 関数 / F3c 33 関数) は boot の trap を解消も新規発生もさせない。
 - 本 run で trap の呼び出し chain を取得 (`run_stage4.mjs` の stack、base/fix とも同形):
-  `entry_point`(26) → function_41d8f0(14869) → m11_InitLib(14866) → function_4120c0(14865) → m11_icall(14847)
-  → function_44bb70(2765)/function_446400(2711) → function_455790(2835) → … → **function_4133f0(14871) で trap**。
+  trap 点 (内側) から外側へ: **function_4133f0(14871)** ← function_446400(2711) ← function_44bb70(2765)
+  ← function_455790(2835) ← m11_tr_function_455790(9725) ← m11_icall(14847) ← function_4120c0(14865)
+  ← m11_InitLib(14866) ← function_41d8f0(14869) ← entry_point(26) ← m11_boot_enter(14913)。
+  (stack 11 frame 全件取得・base/fix 同一。)
   chain 上の関数 (41d8f0 / 4120c0 / 44bb70 / 446400 / 455790 / 4133f0) は修復対象 (F3a/F3c) に 1 つも含まれない。
 - よって **「ldfix 起因か」: 否** (修復の影響を受けない関数の load で trap。base で既に存在)。
   「既存か」: 既存 (base = 修復前で同じ trap)。修復が trap を新規作成していないことも確定。
