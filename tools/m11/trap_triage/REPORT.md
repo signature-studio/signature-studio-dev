@@ -168,6 +168,8 @@ ok 830 / oob 44 / halt0 20 / abort 1 / miss 46 / noproc 1 (§1 の 829/66 とは
 | `47d460` (←`92d4f0`) | 4 (876 880 891 935) | 未調査 |
 | 各 1 unit | 10: `446400`(17) `5b53f0`(95) `407e20`(138) `8674a0`(275) `8dfd70`(314) `96ef10`(365) `417fc0`(503) `6664c0`(547) `407a50`(745) `40ffe0`(895) | 未調査 |
 
+> **#684 訂正**: `survey_units.mjs` の OOB frame の `slice(1, 30)` は `1eccbfa` (#130) で入っており、本表の基準 `fa918df` の時点で既にあった。したがって本表の最上位 frame も 1 段上の caller を含む可能性があり、同じ不具合の影響を受けた可能性あり・未再測。訂正後の 13 件は `REPORT_684.md` §1。
+
 (名前付き 6 グループ 34 + 各 1 unit 10 = OOB 44 / 最上位 frame 16 種。abort 1 = unit 114 `EnterCriticalSection` shim_unimplemented は OOB ではない。)
 
 ### 8.2 現 HEAD の実測 (`c6b24ec`。コードは merge `51075ef` = PR head + main `0183e74` 取込み)
@@ -204,6 +206,8 @@ work-m11 スナップショットの IR / data は古い生成物で、現 main 
 2. 最多 1 分類の修正で trap 減 + ネガコン: **未達**。ON は trap 67→67 (減少 0)、halt0→ok 0、ok 退行 5。最多分類は現基準で OOB 0 件のため、修正対象が残っていない。ネガコン (OFF = 対照 差 0) は成立。
 3. #307 との関係: 未検証のまま (§8.3)。部分達成。
 
+> **#684 訂正**: 上表の「OOB 最上位 frame」は 1 段上の caller だった (`survey_units.mjs` の `slice(1)` 不具合)。(c) の OOB 13 件の訂正後の最上位と原因は `REPORT_684.md` §1・§3。§8.3 の「`414ad0` は OOB 最上位に現れない」は誤り (4 件が最上位)。
+
 **起票依頼 (PM 判断。本 PR の範囲外)**
 - (a) 410360 ON ブロックの扱い (現基準で trap 増減 0、ok 退行 5。削除候補)。
 - (b) ok 退行 5 件 (15 42 45 138 415) の原因。miss 先 0x1007000 / 0x1c130 / 0x5b4b00。
@@ -219,6 +223,8 @@ M11_OV_CLASSCREATE=1 bash m11_build.sh && node trap_triage/survey_units.mjs out_
 python3 trap_triage/survey_diff.py out_off.json out_on.json
 ```
 `SV_SKIP=<unit,...>`: 列挙した unit を実行せず `kind: "hang"` で記録する。`M11_OV_CLASSCREATE` は env で渡し、`work/ov_classcreate.stamp` で `work/obj/ov.o` を無効化する (値判定、`=0` は OFF)。
+
+**現 main (`8d883c3`) + 本 head での ON・OFF の再測定と ok 退行の原因は [REPORT_595.md](REPORT_595.md)** (既定 OFF は main 対照と差 0。上の §8.2 の表は旧 tree (`0865903`) の値)。
 
 ### 8.3 #307 (liftdiff OOB 222) との関係
 

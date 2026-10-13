@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # PLG-F2 (#199) 手順 1 の 1 コマンド再現: eq-filter 11 本 (12 block) の固有閉包 lift → emcc -c → 閉包統計 → 間接 call 監査
-#   bash tools/plugins/f2/f2_step1.sh            (前提: FL_WIN64_DIR/extracted/block*_PE.bin 全 PE, /opt/retdec, /opt/emsdk,
+#   bash tools/plugins/f2/f2_step1.sh            (前提: FL_WIN64_DIR/extracted/block*_PE.bin 全 PE, [RETDEC], [EMSDK] (docs/REFERENCES.md),
 #                                                 python に pefile+capstone。`source f2/env.sh` が PATH を整える)
 # 出力: work/batch/status.csv, work/f2_stats.json, work/f2/<block>.icall.json, stdout に 3 表
 set -euo pipefail

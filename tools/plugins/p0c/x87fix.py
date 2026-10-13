@@ -3,7 +3,7 @@
 
   python3 x87fix.py IN.ll OUT.ll [--report r.json] [--funcs fn1,fn2,...]
 
-## 背景 (tools/plugins/p0c/REPORT.md §8.0-4, §9)
+## 背景 (tools/plugins/p0c/REPORT_APPENDIX_A.md §8.0-4, §9)
 
 RetDec は x87 スタックを fpr[] 配列 + fpu_stat_TOP 変数で模型化するが, straight-line
 翻訳中の内部 TOP 追跡が破綻し, 特に loop 内で次の欠陥を生成する:

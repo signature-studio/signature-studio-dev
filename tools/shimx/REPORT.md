@@ -2,7 +2,7 @@
 
 > 正本: `tools/shimx/REPORT.md`。
 > **行数**: 250 行以内 (`docs/DOC_MAP.md` §1)。超過分は Git 履歴に残る形で付録へ分割移動 (**内容は削除しない**)。
-> 付録: SHX-T8 (#175) は `REPORT_SHX-T8.md` (§15)、R1〜R8・cbtrans (§9・§10) は `REPORT_R1-R8.md`、CAB-214 (§11・§12) は `REPORT_CAB-214.md` (いずれも分割移動)。
+> 付録: SHX-T8 (#175) は `REPORT_SHX-T8.md` (§15)、SHX-T7 (#173) は `REPORT_SHX-T7.md` (§16)、R1〜R8・cbtrans (§9・§10) は `REPORT_R1-R8.md`、CAB-214 (§11・§12) は `REPORT_CAB-214.md` (いずれも分割移動)。
 
 - 日付: 2026-10-10 (初版) / **2026-10-10 更新: CAB-211 — M11 リンク フィードバック R1〜R8 対応 (§9)** / **2026-10-10 更新: CAB-214 — vreg reg.c 本体取込 + username 統一 (§11)** / **2026-10-10 更新: CAB-214 follow-up — 後始末 3 件 (vreg 薄ラッパ化 / pathreg 予備 profile 退役 / winstubs wrap 5 API 退役, §12)** / 検証環境: emcc 6.0.12, node v24.19.0 (emsdk 同梱), llvm-nm
 - 書込範囲: `tools/shimx/` のみ。`tools/shim` `tools/m2` `tools/m6` `tools/m8` `tools/m11` `tools/plugins` `tools/startup` `tools/targets` は読取のみ (改変 0 行)。
@@ -197,13 +197,17 @@ frame が 1 つも無い場合・捕捉 scope が無い場合・`RtlUnwindEx` �
 
 本文・測定値は付録 **`tools/shimx/REPORT_SHX-T8.md`** (§15.1〜15.5) に分割移動した (行数上限対応、内容は無変更)。以降の § 参照 (§15.x) は同ファイルを指す。
 
-## 16. 不在パスのエラーコード・en-US UI 言語の検証 (#658, ST-T19)
+## 16. 署名正規化 IR pass + ゲート (#173, SHX-T7)
+
+結論: 案A (IR pass `sig_normalize.py`) + 案B (ゲート `sig_gate.sh`) で、lift IR の declare 署名の揺れを shimx 定義署名へ正規化し、mismatch 0 を強制する。方式・検証・実 IR 実測は付録 **`tools/shimx/REPORT_SHX-T7.md`** (§16) に分割移動した (行数上限対応、内容は無変更)。以降の § 参照 (§16) は同ファイルを指す。
+
+## 17. 不在パスのエラーコード・en-US UI 言語の検証 (#658, ST-T19)
 
 - 検証対象: `tools/shimx/test/test_absent.c` (不在パスの `GetFileAttributesW` / `FindFirstFileW` / `FindFirstFileExW` が `INVALID_FILE_ATTRIBUTES` / `INVALID_HANDLE_VALUE` と `GetLastError` 2 (FILE_NOT_FOUND) または 3 (PATH_NOT_FOUND) を返すこと。実在パスは属性・cFileName を返すこと = ネガコン) と `test_sys.c` `test_ui_language` (`GetUserPreferredUILanguages` が en-US)。
 - 写像は `pathreg` (`tools/shimx/pathreg`) 経由。`C:\Users\webstudio\...` → `/c/home/...`、`C:\Program Files\Image-Line\FL Studio 2026\...` → `/fl/...`。
 - 実行環境: `toolchain-emsdk` 6.0.12 (`/opt/emsdk` に展開)・node v22.23.3・Actions runner (4 vCPU)。コミット `b834c83` の HEAD。
 
-### 16.1 実測 (`bash tools/shimx/test.sh`、HEAD `b834c83`)
+### 17.1 実測 (`bash tools/shimx/test.sh`、HEAD `b834c83`)
 
 | run | 所要 (秒) | load1 (開始 → 終了) | MT ALL PASS | ST ALL PASS | absent MT/ST | M4 互換 |
 |---|---|---|---|---|---|---|
@@ -213,7 +217,7 @@ frame が 1 つも無い場合・捕捉 scope が無い場合・`RtlUnwindEx` �
 
 fail-fast 9 種 + ExitProcess(7) = 全 PASS、exit 0 ×3。`test.sh` は実行の副産物として `exports.txt` / `inventory.md` / `BACKLOG.md` / `data/*` を書き換えるが、m8/m11 素材なしでは closure が欠けるため**コミットしていない** (§13 と同方針。`git restore` で HEAD に戻した)。
 
-### 16.2 ネガティブコントロール
+### 17.2 ネガティブコントロール
 
 `test_absent.c` の不在パス 1 件 (`C:\Users\webstudio\Languages\en.moe`) の期待エラーを `ERROR_FILE_NOT_FOUND` → `ERROR_PATH_NOT_FOUND` に書き換えて `test.sh` を実行 → **exit 1**、出力:
 
@@ -224,7 +228,7 @@ fail-fast 9 種 + ExitProcess(7) = 全 PASS、exit 0 ×3。`test.sh` は実行�
 
 書換えを戻した後 `test_absent.c` は HEAD と一致 (`cmp` で確認)。ネガコンが検出できることを確認した。
 
-### 16.3 関連ハーネスの修正 (#658 差し戻し)
+### 17.3 関連ハーネスの修正 (#658 差し戻し)
 
 `test_absent.c` / `pathmap.c` が `pathreg` に依存したため、ワイルドカードで `test/*.c` を取り込んでいた 3 ハーネスが include・link で壊れていた。`-Isrc -Ipathreg/include` と `pathreg/src/pathmap.c` を足して修正:
 
