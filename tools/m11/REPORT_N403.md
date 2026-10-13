@@ -1,7 +1,9 @@
 # M11 LB_BASE=0x10000 の残差調査 (#403, 部分達成)
 
-親: #222 (PR #303)。素材: fl-win64 (`block00031_PE.bin` 22,227,016 B)・work-m11・toolchain-emsdk・toolchain-retdec (2026-10-13 runner, HEAD `64d09590`)。
+親: #222 (PR #303)。素材: fl-win64 (`block00031_PE.bin` 22,227,016 B)・work-m11・toolchain-emsdk・toolchain-retdec (2026-10-13 runner)。
+e2e の測定は HEAD `64d09590` で実施。c8b9ad75 との差は `audit_va.py` のみで e2e 結果に影響しない (§1 の audit 実測は c8b9ad75 で実施)。
 実行は各 1 回ずつ直列 (ただし同一条件の再実行 2 回で結果が一致したものを記す)。
+既知類型との関係: 該当なし (LB 依存差は未切り分けで、`docs/DEFECTS.md` の D1a〜D18 への帰属は未確認。近縁は D11 = PE VA リテラルの切り捨て)。
 
 ## 1. audit_va.py の IAT 判定 (受入 1: 原因特定 — 完了)
 
@@ -39,6 +41,14 @@ LB=0 でも ok 870 / trap 25 で、旧記録 (812 / 83) と別の値になって
 
 - unit 873: 両 LB とも ok・VA 要求 0・GetMem 1 で、REPORT の「LB=0 は 1914MB 要求で OOM」は再現しなかった。
 - 各 unit の VA 表示は LVA 基準 (LB ぶんずれる) のため、表の左右の VA 文字列は 0x10000 ずれている。
+
+### 再現コマンド (リポジトリ root で実行。`FL_WIN64_DIR` は `tools/shared/env.sh` 経由)
+
+- `M11_LB_BASE=0 bash tools/m11/m11_e2e.sh` — 表の LB=0 列 (survey / units_run / 終了理由)
+- `M11_LB_BASE=0x10000 bash tools/m11/m11_e2e.sh` — 表の LB=0x10000 列
+- `python3 tools/hostbridge/lowbase/audit_va.py "$FL_WIN64_DIR/extracted/block00031_PE.bin" 0x10000` — §1 の exit 0 / `iat_slots_holding_image_VA=0`
+
+本 PR の作業 runner では work-m11・toolchain-emsdk・toolchain-retdec が無く、上の e2e 2 本は再実行していない (表の数値は HEAD `64d09590` 測定時の記録)。audit は fl-win64 で実行済み。
 
 ### LB=0x10000 だけの通常起動 Halt0 (新規観測)
 

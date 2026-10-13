@@ -46,7 +46,7 @@ icall (間接 call 復元) は IR 内の関数ポインタ表を `function_<VA>`
 - FLEngine: ImageBase 0x400000 / SizeOfImage 0x18c0000 (24.75 MiB)。m11 は LVA=RVA (base 0) + GLOBAL_BASE 0x10000000 で initial 288 MiB / max 1.8 GiB。
 - DIR64 reloc 278,531 件中 **55,929 件 (20%) の指す先が image 先頭 64 KiB** → LVA=RVA だと値 <0x10000 になり shimx の整数判定 (`MAKEINTRESOURCE`/序数 `GetProcAddress`/`CharUpper(単一文字)`) と衝突しうる。**LVA=RVA+0x10000** (lowbase の `LB_BASE=0x10000`) にすれば全 guest ポインタが ≥0x10000。
 - 影響範囲: `m11_image_gen.py`/`m11_data_gen.py` の `-0x400000` 補正 (→ `-0x400000+LB_BASE`)、IR の VA→LVA 変換 pass、`m11_bounds.py` の境界値。GLOBAL_BASE 0x10000000 は image (0x18c0000+0x10000) の後ろにあるため変更不要。initial は image が支配的 (≥ 25 MiB) なので、削減余地は GLOBAL_BASE 以前の空き領域 (256 MiB → image 直後) 分のみ (推定; m11 未実施)。
-- `audit_va.py` を FLEngine に実行すると IAT 738 スロットが image 範囲値を持つ (Delphi の bound/thunk の可能性)。m11 の import 解決 (`m11_genstubs.py`) がこれを参照するかを要確認。
+- `audit_va.py` を FLEngine に実行すると IAT 738 スロットが image 範囲値に見えた。原因は hint/name RVA の誤判定と確定 (IAT は VA を持たない。`audit_va.py` 修正済み、詳細は `../../m11/REPORT_N403.md` §1)。
 
 ## E. 追加すべき検査 (CI)
 1. `audit_va.py <dll> <LB_BASE>` — DIR64 先 image 外 0 / IAT に VA 0 / base≥64KiB。
