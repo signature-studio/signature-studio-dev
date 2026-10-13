@@ -8,7 +8,7 @@ import path from "node:path";
 import test from "node:test";
 import zlib from "node:zlib";
 import {
-  checkArtifact, checkRegistry, decodeText, generate, INCOMPLETE_MARK, loadFonts, loadRecords, loadRegistry, NOTICES_HTML, NOTICES_TXT, REPO, scanFile, sha256, validateRecord, walk,
+  checkArtifact, checkRegistry, decodeText, generate, INCOMPLETE_MARK, loadFonts, loadRecords, loadRegistry, NOTICES_HTML, NOTICES_TXT, REL_LICENSE_NAME, REPO, scanFile, sha256, validateRecord, walk,
 } from "./lib.mjs";
 
 const tmp = mkdtempSync(path.join(process.env.RUNNER_TEMP ?? tmpdir(), "notices-test-"));
@@ -58,6 +58,11 @@ test("実 registry: tools/shared/oss の build.sh は全て component に紐づ�
   const ft = reg.components.find((c) => c.id === "freetype");
   assert.match(ft.attribution, /The FreeType Project \(www\.freetype\.org\)/);
   assert.equal(reg.flTexts.length, 15);
+});
+
+test("ライセンスファイル名の判定: 実在する名前に一致し、notices の自作ファイルには一致しない", () => {
+  for (const f of ["tools/ipp/shim/fft/pffft/LICENSE.pffft.txt", "x/COPYING", "x/COPYING.LGPLv2.1", "x/LICENSE.md", "x/license.txt", "x/NOTICE", "x/OFL.txt", "x/COPYING3"]) assert.match(f, REL_LICENSE_NAME, f);
+  for (const f of ["tools/legal/notices/notices.test.mjs", "THIRD_PARTY_NOTICES.txt", "docs/LEGAL.md", "x/licenses.json", "x/noticeboard.ts"]) assert.doesNotMatch(f, REL_LICENSE_NAME, f);
 });
 
 test("実 records に GPL 系フラグが無い", () => {

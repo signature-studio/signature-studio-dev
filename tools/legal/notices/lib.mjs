@@ -122,7 +122,8 @@ export function resolveFlTexts(registry, { flDir } = {}) {
   return got;
 }
 
-const REL_LICENSE_NAME = /(^|\/)(LICEN[CS]E|COPYING|NOTICE|OFL)[^/]*$/i;
+// ライセンスファイル名: LICENSE / LICENSE.md / LICENSE.pffft.txt / COPYING.LGPLv2.1 / COPYING3 / NOTICE / OFL.txt (notices.test.mjs や THIRD_PARTY_NOTICES.txt は対象外)
+export const REL_LICENSE_NAME = /(^|\/)(LICEN[CS]E|COPYING|NOTICE|OFL)([._\-0-9][^/]*)?$/i;
 
 export function gitTracked(repoRoot = REPO) {
   try {
