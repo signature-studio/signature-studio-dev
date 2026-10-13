@@ -8,7 +8,7 @@
 #       "[synth_e2e] OK" は全て 0 のときだけ出す。
 # 出力: work/synth/{status.csv,facts.json,...} (work/ は gitignore)
 # 前提素材: fl-win64 / toolchain-retdec / toolchain-emsdk  (docs/WORKFLOW.md §11)
-# 環境変数: JOBS (cpp_lift の並列数; 既定 1) / SYNTH_KNOWN (judge の baseline; 既定 synth/known.json; ネガコン用)
+# 環境変数: JOBS (cpp_lift の並列数; 既定 1) / HLL_CAP (cpp_lift.sh: RetDec の HLL 生成を待つ秒数; 既定 300) / SYNTH_KNOWN (judge の baseline; 既定 synth/known.json; ネガコン用)
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 source "$HERE/env.sh"
@@ -56,6 +56,7 @@ PY
 fi
 
 python3 synth/mk_status.py work/synth/status.csv
+grep -H 'unimplemented:' work/batch/*/p.simd.log work/synth/cpp*/e.simd.log 2>/dev/null | sed 's#work/##' | sort > work/synth/unimpl_names.txt || true
 python3 synth/closure_facts.py > work/synth/facts.stdout.json 2> work/synth/facts.err
 
 rc=0
