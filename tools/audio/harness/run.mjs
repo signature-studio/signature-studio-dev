@@ -48,6 +48,21 @@ for (const buf of [128, 256, 512])
     expect: (r) => [r.verify?.loop && r.verify.loop.best_norm_corr > 0.99 && r.stats.in_overruns === 0 && r.stats.underruns === 0, `lag=${r.verify?.loop?.lag_frames}f (${r.verify?.loop?.lag_ms?.toFixed(2)}ms) corr=${r.verify?.loop?.best_norm_corr?.toFixed(4)} in_overruns=${r.stats.in_overruns} in_underflows=${r.stats.in_underflows}`] });
 scenarios.push({ name: "asio_loop_gum_fake_b256", q: `api=asio&mode=loop&input=gum&buf=256&depth=2&secs=${S(8, 5)}`,
   expect: (r) => [r.verify?.loop && r.verify.loop.input_rms > 1e-4 && r.workletErrors.length === 0, `gum input_rms=${r.verify?.loop?.input_rms?.toExponential(2)} corr=${r.verify?.loop?.best_norm_corr?.toFixed(3)} lag=${r.verify?.loop?.lag_frames}f tracks=${JSON.stringify(r.ctx?.gumTracks?.map((t) => t.label))}`] });
+// AU-5 (#192): 入力デバイス UI。FlAudioInput 経由の入力接続 + controlPanel (ASIO::controlPanel) の UI 代替 + 入力喪失 → kAsioResetRequest
+const loopOk = (r) => r.verify?.loop && r.verify.loop.input_rms > 1e-4 && r.verify.loop.best_norm_corr > 0.99 && r.workletErrors.length === 0;
+scenarios.push({ name: "asio_input_ui_connect_b256", q: `api=asio&mode=loop&input=ui&buf=256&depth=2&secs=${S(8, 5)}`,
+  expect: (r) => [loopOk(r) && r.stats.in_overruns === 0 && r.stats.reset_requests === 0, `FlAudioInput 接続 rms=${r.verify?.loop?.input_rms?.toExponential(2)} corr=${r.verify?.loop?.best_norm_corr?.toFixed(3)} lag=${r.verify?.loop?.lag_frames}f resets=${r.stats.reset_requests}`] });
+scenarios.push({ name: "asio_input_ui_controlpanel_switch", q: `api=asio&mode=loop&input=ui&panel=1&buf=256&depth=2&secs=${S(8, 5)}`,
+  expect: (r) => [loopOk(r) && r.panel_code === 0 && r.ui?.panelOpened === 1 && r.ui.controlPanelCalls === 1 && r.ui.switched && r.ui.switched !== r.ui.labels[0] && r.ui.permission === "granted",
+    `controlPanel code=${r.panel_code}(want 0) opened=${r.ui?.panelOpened} 切替 ${JSON.stringify(r.ui?.labels)} devices=${r.ui?.devices?.length} rms=${r.verify?.loop?.input_rms?.toExponential(2)}`] });
+scenarios.push({ name: "asio_controlpanel_no_ui", q: `api=asio&mode=loop&input=noise&panel=1&panel_ui=0&buf=256&depth=2&secs=${S(6, 4)}`,
+  expect: (r) => [r.panel_code === -1000 && r.workletErrors.length === 0 && !r.aborted, `UI 未登録の controlPanel code=${r.panel_code}(want -1000 ASE_NotPresent)`] });
+scenarios.push({ name: "asio_input_lost_reset", q: `api=asio&mode=loop&input=ui&lose=1&buf=256&depth=2&secs=${S(8, 5)}`,
+  expect: (r) => [r.resets_seen >= 1 && r.stats.reset_requests >= 1 && r.ui?.events?.some((e) => e.type === "lost") && r.stats.underruns === 0 && r.workletErrors.length === 0,
+    `入力喪失 → kAsioResetRequest 受信=${r.resets_seen} (stats ${r.stats.reset_requests}) lost=${JSON.stringify(r.ui?.events?.filter((e) => e.type === "lost"))} underruns=${r.stats.underruns}`] });
+scenarios.push({ name: "asio_input_denied_output_ok", q: `api=asio&mode=loop&input=ui_denied&buf=256&depth=2&secs=${S(6, 4)}`,
+  expect: (r) => [!r.aborted && r.stats.underruns === 0 && r.stats.cb_count > 0 && r.workletErrors.length === 0 && r.ui?.events?.some((e) => e.type === "permission" && e.state === "denied"),
+    `権限拒否でも出力継続: cb=${r.stats.cb_count} underruns=${r.stats.underruns} events=${r.ui?.events?.filter((e) => e.type === "permission" || e.type === "error").map((e) => e.state ?? e.message)}`] });
 scenarios.push({ name: "wasapi_ramp_b512_d2", q: `api=wasapi&mode=ramp&buf=512&depth=2&secs=${S(15, 4)}`, expect: all(underrunFree, rampExact) });
 scenarios.push({ name: "wasapi_sine_b256_d3", q: `api=wasapi&mode=sine&buf=256&depth=3&secs=${S(10, 4)}`, expect: all(underrunFree, sineOk) });
 if (!quick) scenarios.push({ name: "asio_ramp_b256_soak120", q: "api=asio&mode=ramp&buf=256&depth=2&secs=120", expect: all(underrunFree, rampExact) });

@@ -10,6 +10,7 @@
  * 設計: tools/audio/docs/PROTOCOL.md
  */
 import { FLA_CMD, FLA_EV, FLA_LAYOUT, verifyLayout, type FlaField } from "./audio-layout";
+import type { FlAudioInput } from "./audio-input";
 
 /** wasm モジュールへの薄い口 (Emscripten Module / 自前 instance いずれからも作れる) */
 export interface FlAudioWasmApi {
@@ -34,6 +35,10 @@ export interface FlAudioShimOptions {
   captureFactory?: (outCh: number, inCh: number) => FlCaptureSpec | null;
   /** ノード生成直後に呼ばれる (入力ソース接続等のフック) */
   onNode?: (ctx: AudioContext, node: AudioWorkletNode) => void | Promise<void>;
+  /** 入力デバイス管理。in_ch>0 の ATTACH 毎に worklet node へ接続し、入力喪失は kAsioResetRequest として wasm へ通知する */
+  input?: FlAudioInput;
+  /** ASIO::controlPanel (FL の asiopanelbtn) の UI 代替。入力デバイス選択パネルなどを開く。未指定なら controlPanel は NotPresent */
+  controlPanel?: () => void | Promise<void>;
   log?: (msg: string) => void;
   /** getOutputTimestamp の採取ログ (テスト用: 時刻対応の傾き検証) */
   refLog?: { ctxTime: number; epochMs: number }[];
@@ -44,6 +49,9 @@ export interface FlAudioShimOptions {
 type WaitAsyncResult = { async: false; value: "not-equal" | "timed-out" } | { async: true; value: Promise<"ok" | "timed-out"> };
 const waitAsync = (ia: Int32Array, idx: number, val: number): WaitAsyncResult =>
   (Atomics as unknown as { waitAsync(ia: Int32Array, i: number, v: number): WaitAsyncResult }).waitAsync(ia, idx, val);
+
+/** flaudio.h FLA_E_NO_PANEL */
+const FLA_E_NO_PANEL = -3;
 
 const HINTS: (AudioContextLatencyCategory | number)[] = ["interactive", "balanced", "playback", 0];
 
@@ -58,6 +66,8 @@ export class FlAudioShim {
   private moduleLoadedFor: AudioContext | null = null;
   private pendingOpen: { outCh: number; inCh: number } | null = null;
   private ctlPtr = 0;
+  private offInput: (() => void) | null = null;
+  controlPanelCalls = 0;
   lastCapture: FlCaptureSpec | null = null;
   workletErrors: string[] = [];
   commandsHandled = 0;
@@ -81,12 +91,17 @@ export class FlAudioShim {
     this.i32 = new Int32Array(this.api.getBuffer(), this.ctlPtr, 96);
     this.st("ctrl_ready", 1);
     Atomics.notify(this.i32, this.ix("ctrl_ready"));
+    this.offInput = this.opts.input?.on((e) => {
+      if (e.type === "lost") this.postDevEvent(FLA_EV.INPUT_CHANGED);
+    }) ?? null;
     this.log(`attached ctl@${this.ctlPtr} (layout ${n} fields OK)`);
     void this.loop();
   }
 
   dispose(): void {
     this.disposed = true;
+    this.offInput?.();
+    this.opts.input?.disconnect();
     if (this.refTimer) clearInterval(this.refTimer);
     this.node?.disconnect();
     void this.ctx?.close();
@@ -125,6 +140,7 @@ export class FlAudioShim {
       case FLA_CMD.CLOSE: return this.cmdClose();
       case FLA_CMD.RESUME: await this.ctx?.resume(); return 0;
       case FLA_CMD.SET_SR: return this.cmdSetSr(a[0]);
+      case FLA_CMD.CONTROL_PANEL: return this.cmdControlPanel();
       default:
         this.log(`unimplemented command op=${op} (fail-fast)`);
         return -2;
@@ -153,13 +169,18 @@ export class FlAudioShim {
     if (s === "suspended" || s === "interrupted") ev = FLA_EV.SUSPENDED;
     else if (s === "closed") ev = FLA_EV.CLOSED;
     else if (s === "running") ev = FLA_EV.RESUMED;
-    if (ev && this.i32) {
-      Atomics.or(this.i32, this.ix("dev_events"), ev);
-      Atomics.notify(this.i32, this.ix("out_read"));
-    }
+    if (ev) this.postDevEvent(ev);
+  }
+
+  /** dev_events にビットを立て、out_read 待ちの producer を起こす (producer は起床時に exchange で消費して kAsioResetRequest を発行) */
+  private postDevEvent(ev: number): void {
+    if (!this.i32) return;
+    Atomics.or(this.i32, this.ix("dev_events"), ev);
+    Atomics.notify(this.i32, this.ix("out_read"));
   }
 
   private teardownNode(): void {
+    this.opts.input?.disconnect();
     if (this.refTimer) { clearInterval(this.refTimer); this.refTimer = null; }
     if (this.node) { this.node.disconnect(); this.node.port.close(); this.node = null; }
   }
@@ -231,10 +252,21 @@ export class FlAudioShim {
     node.connect(ctx.destination);
     this.node = node;
     await this.opts.onNode?.(ctx, node);
+    if (this.opts.input && inCh > 0) {
+      // 入力の失敗 (権限拒否・デバイス無し) で出力を巻き込まない: 入力は無音のまま継続し、UI へは input.on("error") で伝わる
+      await this.opts.input.connect(ctx, node).catch((e) => this.log(`input connect failed: ${(e as Error).message ?? e}`));
+    }
     await ctx.resume();
     this.updateRef();
     this.refTimer = setInterval(() => this.updateRef(), 250);
     this.log(`ATTACH out=${outCh} in=${inCh} ring=${this.ld("ring_frames")} depth=${this.ld("depth")} outLat=${ctx.outputLatency} state=${ctx.state}`);
+    return 0;
+  }
+
+  private async cmdControlPanel(): Promise<number> {
+    if (!this.opts.controlPanel) return FLA_E_NO_PANEL;
+    this.controlPanelCalls++;
+    await this.opts.controlPanel();
     return 0;
   }
 

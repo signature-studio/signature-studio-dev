@@ -18,7 +18,7 @@ emcc "${FLA_CLANG_FLAGS[@]}" "${FLA_EMCC_FLAGS[@]}" \
 cp "$ROOT/public/worklets/fl-audio-worklet.js" "$OUT/worklets/"
 "$ROOT/node_modules/.bin/tsc" --target es2022 --module es2022 --moduleResolution bundler --skipLibCheck \
   --lib es2022,dom,dom.iterable --outDir "$OUT/js" --rootDir "$ROOT/src/runtime" --noEmit false --isolatedModules \
-  --strict --ignoreConfig "$ROOT/src/runtime/audio-layout.ts" "$ROOT/src/runtime/audio-shim.ts"
+  --strict --ignoreConfig "$ROOT/src/runtime/audio-layout.ts" "$ROOT/src/runtime/audio-shim.ts" "$ROOT/src/runtime/audio-input.ts"
 sed -i 's|from "./audio-layout"|from "./audio-layout.js"|' "$OUT/js/audio-shim.js"
 cp "$HERE/test/index.html" "$HERE/test/page.mjs" "$OUT/"
 echo "[audio] build OK -> $OUT"

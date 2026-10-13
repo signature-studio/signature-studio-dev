@@ -14,7 +14,7 @@
 
 static struct {
     int asio; int apikind; int mode; /* 0 sine 1 ramp 2 loop */
-    uint32_t buf, depth, sr, stress, work_us, hiccup_ms, hiccup_every, timeinfo, sr_after, burst_floor;
+    uint32_t buf, depth, sr, stress, work_us, hiccup_ms, hiccup_every, timeinfo, sr_after, burst_floor, panel;
     double secs;
 } P = { .asio = 1, .mode = 0, .buf = 256, .depth = 2, .sr = 48000, .secs = 10 };
 
@@ -61,6 +61,7 @@ static void bufferSwitch(ASIOLong idx, ASIOBool direct) {
     load_sim();
 }
 static uint32_t g_resets, g_rate_changes;
+static int g_panel_code = 1;   /* flasio_control_panel の戻り値 (1 = 未呼出) */
 static uint64_t g_ti_last; static uint32_t g_ti_bad, g_ti_n;
 static ASIOTime *bufferSwitchTimeInfo(ASIOTime *t, ASIOLong idx, ASIOBool direct) {
     uint64_t pos = ((uint64_t)t->timeInfo.samplePosition.hi << 32) | t->timeInfo.samplePosition.lo;
@@ -125,6 +126,7 @@ static int run_asio(char *j, size_t jn) {
     if (e != ASE_OK) { snprintf(j, jn, "{\"error\":\"createBuffers\",\"code\":%d}", e); return 1; }
     for (int i = 0; i < n; i++)
         for (int b = 0; b < 2; b++) (infos[i].isInput ? g_ibuf : g_obuf)[b][infos[i].channelNum] = infos[i].buffers[b];
+    if (P.panel) g_panel_code = flasio_control_panel();   /* FL の asiopanelbtn 相当 */
     if (P.sr_after) {   /* CreateBuffers 後・Start 前の SetSampleRate → main が AudioContext を再生成 */
         if (flasio_set_sample_rate((double)P.sr_after) != ASE_OK) { snprintf(j, jn, "{\"error\":\"setSampleRate_after\"}"); return 1; }
         P.sr = P.sr_after;
@@ -165,14 +167,14 @@ static int run_asio(char *j, size_t jn) {
         "\"in_overruns\":%u,\"in_underflows\":%u,\"min_fill\":%u,\"avg_fill\":%u,\"wake_count\":%u,\"wait_timeouts\":%u,"
         "\"ring_frames\":%u,\"quanta\":%u,\"reset_requests\":%u,\"wake_hist\":[%u,%u,%u,%u,%u,%u],\"latency_changes\":%u,\"T\":%u,\"burst_obs\":%u,\"timeinfo_cb\":%u},\"timeinfo\":{\"calls\":%u,\"bad\":%u},"
         "\"clock\":{\"samples\":%d,\"fit_ok\":%d,\"rate_hz\":%.3f,\"audible_minus_now_ms\":%.3f,\"monotonic\":%d},"
-        "\"produced_frames\":%llu,\"resets_seen\":%u,\"rate_changes\":%u}",
+        "\"produced_frames\":%llu,\"resets_seen\":%u,\"rate_changes\":%u,\"panel_code\":%d}",
         name, P.buf, st.depth, P.sr, P.mode, elapsed / 1000.0,
         nin, nout, mn, mx, pref, gran, lin, lout, ci.type,
         st.cb_count, st.cb_late, st.cb_max_us, st.cb_avg_us, st.underruns, st.silence_frames,
         st.in_overruns, st.in_underflows, st.min_fill, st.avg_fill, st.wake_count, st.wait_timeouts,
         st.ring_frames, st.quanta, st.reset_requests,
         st.wake_hist[0], st.wake_hist[1], st.wake_hist[2], st.wake_hist[3], st.wake_hist[4], st.wake_hist[5], st.latency_changes, st.T, st.burst_obs, st.timeinfo_cb, g_ti_n, g_ti_bad,
-        ns, fit == 0, rate, offs, mono, (unsigned long long)g_n, g_resets, g_rate_changes);
+        ns, fit == 0, rate, offs, mono, (unsigned long long)g_n, g_resets, g_rate_changes, g_panel_code);
     return 0;
 }
 
@@ -276,6 +278,7 @@ int main(int argc, char **argv) {
         if (!v) continue;
         *v++ = 0;
         if (!strcmp(a, "api")) { P.asio = strcmp(v, "wasapi") != 0; P.apikind = !strcmp(v, "ff_uninit") ? 2 : !strcmp(v, "ff_excl") ? 3 : !strcmp(v, "apicheck") ? 4 : !strcmp(v, "nomem") ? 5 : 0; }
+        else if (!strcmp(a, "panel")) P.panel = (uint32_t)atoi(v);
         else if (!strcmp(a, "burst_floor")) P.burst_floor = (uint32_t)atoi(v);
         else if (!strcmp(a, "mode")) P.mode = !strcmp(v, "ramp") ? 1 : !strcmp(v, "loop") ? 2 : 0;
         else if (!strcmp(a, "buf")) P.buf = (uint32_t)atoi(v);
