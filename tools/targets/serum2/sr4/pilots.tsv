@@ -1,0 +1,10 @@
+name	begin	end	expect	role
+sr4_svf_setup	0x1802f7370	0x1802f74ec	pass	XferFilterSVF vtable slot (.pdata 外 leaf, 係数設定)
+sr4_svf_reset	0x1802f74f0	0x1802f7503	pass	XferFilterSVF vtable slot (.pdata 外 leaf, 状態リセット)
+sr4_ladder_reset	0x1802f5c40	0x1802f5c53	pass	XferFilterLadder vtable slot (.pdata 外 leaf, 状態リセット)
+sr4_osc_setscale	0x1803c87d0	0x1803c888f	fail	WTOsc 系 vtable slot (.pdata 外 leaf, 周波数スケール設定)
+sr4_svf_process	0x1802f7510	0x1802fcc82	fail	XferFilterSVF::process (22,386 B, jump table 35 モード)
+sr4_osc_zero	0x1803d08f0	0x1803d0964	pass	WTOsc 系 vtable slot (.pdata 外 leaf, 256B 状態ゼロ化)
+sr4_ladder_setp	0x18008b2a0	0x18008b2a6	pass	XferFilterLadder vtable slot (movss [this+0xc], xmm1 一命令 setter)
+sr4_osc_get620	0x1803d0970	0x1803d0979	fail	WTOsc 系 vtable slot (movsd xmm0, [this+0x620]; double getter)
+sr4_wt_const	0x180087b10	0x180087b19	fail	WTOsc 系 vtable slot (movsd xmm0, [rip+const]; double 定数戻り)
