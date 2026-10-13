@@ -81,7 +81,7 @@ pass 3 回とも `failures=0`、FLAC 4,747/4,747 PCM 一致、MD5 有り 4,747�
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 実 Chrome (OPFS SyncAccessHandle + SAB + Range) での同等 e2e が無い | ブラウザでの cold/warm・容量・所要は未実測 | #70 に残す (受入に含めるなら別 run で `tools/assets/test/browser-test.ts` 系へ拡張) |
+| 実 Chrome での Serum 2 全件 (7,357 files) 試験は未実施。実施済みは sample 151 files / 29.2 MB (§6) | 容量・全件の OPFS 所要・Firefox/Safari は未測定 | #70 に残す (全件 + 容量の別 run) |
 | **VFS 自体は Range リクエストを発行しない** (chunk object 全体を GET)。Range は raw 格納 chunk へのサーバ側 GET のみ検証 (4/4 で 206 + bytes 一致、br 格納は `Accept-Ranges: none`) | issue 文言「HTTP Range」は chunk 単位取得で満たしている解釈 (推定)。FLAC (raw) をファイル途中から Range で読む経路は未実装 | #70 にコメント (PM 判断: chunk 取得で足りるか) |
 | R2 非公開バケット + Access 配信・実 URL 配信は未実施 (`cf` CLI/認証が runner に無い) | 本番配信経路の実測なし | #63 (配備 manifest)。#18 は CLOSED のため起票先から外した |
 | Serum 2 本体 (lift 後) の FS 呼び出し (Windows パス・ユーザ領域の既定 content dir) と VFS の接続 | データ層が音声経路に載るかは未確認 | #71 (OSS 境界) / SR-4 側 |
@@ -90,3 +90,18 @@ pass 3 回とも `failures=0`、FLAC 4,747/4,747 PCM 一致、MD5 有り 4,747�
 | 既存 `tools/assets/e2e.sh` は作者環境の固定絶対パス (repo 外) 前提で runner では実行不可。SlotCache 修正の既存 e2e への影響は未確認 | 既存テストが回帰していない確認が無い (cache.ts の変更は scan の slot 数のみ) | 新規子チケット案 [E2E-n] 「tools/assets/e2e.sh の runner 対応」 |
 
 素材: R2 `plugins-serum2` (2,633,162,886 B) の `Install_Xfer_Serum2_2.1.5.exe` を使用 (FL/プラグイン由来のバイトは commit していない。`tools/assets/serum2/work/` と `$RUNNER_TEMP` のみ)。
+
+## 6. 実 Chrome e2e (`bash tools/assets/serum2/chrome-e2e.sh`)
+
+Chrome 154.0.8037.97 headless (実ディスクプロファイル) / 同一 inventory・pack (`pack/pack.ts`, quality 9, 7,357 files) / `browser-test.ts --sample 150` (sha256 照合 151 files・29.2 MB)。
+
+HEAD `62ba0b54` (判定を sha 起因に絞った後) で `SERUM2_WORK=<prep> bash tools/assets/serum2/chrome-e2e.sh` を 1 回実行 (prep: `make-inventory.mjs` 7,357 files / 1,392,825,417 B 期待値一致、`pack/pack.ts` 12.9 s)。
+
+| 項目 | 実測 |
+|---|---|
+| pass (cold / warm / xhr-cold) | exit 0, failed=0, 12 s (load 0.93 0.58 0.26) => OK |
+| neg (全 sha を 0 に置換) | exit 1, failed=3, sha_fail=3, 5 s => OK |
+| 各 run の sha256 照合 | pass 151/151 一致 ×3 / neg 151 不一致 ×3 (cold / warm / xhr-cold) |
+| server chunk request (cold / warm / xhr-cold) | 133 / 0 / 133 (pass・neg とも) |
+
+修正前スクリプト (`1f8f477`) の実測 (pass 5 s / neg 6 s) は本表で置き換え。実行は 1 回のみ (n=1)。
