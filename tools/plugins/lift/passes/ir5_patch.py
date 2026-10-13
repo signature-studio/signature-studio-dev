@@ -125,9 +125,13 @@ def fold_const_ops(text):
             inner = text[open_idx + 1:j]
             m = re.fullmatch(r"([iif]\d+)\s+(-?\d+)\s+to\s+([iif]\d+)", inner.strip())
             if m:
+                sw = int(m.group(1)[1:])
                 k = int(m.group(2))
                 tid = int(m.group(3)[1:])
-                v = k & ((1 << tid) - 1)
+                u = k & ((1 << sw) - 1)
+                if w == "sext" and (u >> (sw - 1)) & 1:
+                    u -= 1 << sw
+                v = u & ((1 << tid) - 1)
                 text = text[:idx] + str(v) + text[j + 1:]
                 pos = max(idx - 80, 0)
                 n += 1
