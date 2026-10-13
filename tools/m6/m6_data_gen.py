@@ -7,10 +7,10 @@
 import sys, os, struct
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-WINF = '/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll'
-OUT = os.path.join(BASE, 'work', 'm6_data.c')
+WINF = os.environ.get('M6_PE', '/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll')
+OUT = os.environ.get('M6_DATA_OUT', os.path.join(BASE, 'work', 'm6_data.c'))
 
-IMG_BASE = 0x180000000    # on-disk pointer 値の寄生 base (実測)
+IMG_BASE = int(os.environ.get('M6_IMG_BASE', '0x180000000'), 0)    # on-disk pointer 値の寄生 base (実測)
 VA_BASE = 0x30000000       # IR shift後の DLL 実体配置先 (= ir6_shift.py の NEWBASE)
 
 def main():
@@ -39,7 +39,7 @@ def main():
     for (n, lo, sd) in secs:
         c = 0
         for r in relocs:
-            if lo <= r < lo + min(len(sd), len(sd)) - 8:
+            if lo <= r <= lo + len(sd) - 8:  # #593: セクション末尾の 8B slot も対象 (旧 `<` は off-by-one, m11 #572 と同根)
                 off = r - lo
                 v = struct.unpack_from('<Q', sd, off)[0]
                 nt = v - IMG_BASE + VA_BASE

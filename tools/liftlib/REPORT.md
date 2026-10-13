@@ -197,3 +197,25 @@ FA の P1' (comisd×2+jbe/jae+xorps/movaps+jmp, 合流先は reg2mem alloca) が
 | (初版の記述: `tools/ott/avx/build_avx.sh`・`tools/ott/crtinit/lift_crt.sh`・`tools/ott/accept/acc_crt_table.py`・`tools/ott/avx/unsup_scan.py`・`tools/m9/m9_tablebind.py`・`tools/shimx/scripts/import_scan.py`・`tools/liftlib/tests/test_unit.py`・`tools/liftlib/xmm0_ret_census.py` にも同一の固定パスが残る。同種の移植性欠陥 (本 issue の範囲外)。新規子チケット案 (CI-4 系列)) | **解消済み**: a4f8a08 (#450 / PR #460) と 2db928d (#427 / PR #438) で main に merge 済み。この HEAD で 8 ファイルとも `/home/ubuntu` の出現数 0 を実測。#450 `[CI-4-ott-liftlib]` は CLOSED | 起票不要 |
 | `OTT_DLL` が [3] (`build_x64c.sh`) と `--full` に伝わらない。[3] は `libottnative.so` (既定 DLL 由来) と比較するため、別 DLL を指定しても [3] だけ既定 DLL を検証する | 別 DLL を `OTT_DLL` で指定した検証が [1][2] と [3] で別対象になる | 未起票 (新規子チケット案、CI-4 系列・親 #294。PM に起票依頼) |
 | `capstone` / `pefile` の依存がどこにも宣言されていない。素材展開だけでは [1] の最初の python 呼び出しで落ちる | Actions 上で e2e を再実行する度に手動インストールが要る | 未起票 (新規子チケット案、CI 系列。PM に起票依頼) |
+
+## 21. DIR64 補正境界 (section 末尾 8B slot) の複製の全数列挙と修正 (#593 / M11-N22, 親 #572)
+
+既知類型との関係: 該当なし (DEFECTS.md の D1a〜D16 にも icall §4 にも無い。データ敷設 C 生成器の境界 off-by-one で、m11 #572 と同根)。検証起点 commit: `1a94ac2` (修正コード)。
+
+- 結論: 旧境界 `r < lo + len - 8` は 3 箇所 (`tools/m6/m6_data_gen.py:42` / `tools/liftlib/liftlib/passes/dataimage.py:35` / `tools/liftlib/tests/test_unit.py:116`) に複製されており、全て `<=` に修正。**FL 本体 PE (`block00031_PE.bin`) では `.data` 末尾 slot (RVA `0x11e5000`) が旧条件で補正漏れ、修正後は 0**。OTT 実機 DLL (`OTT_vst2_win64.dll`) での測定は素材 (`analysis-ott-binaries`) が無く**未測**。
+- 再現: `bash tools/liftlib/dir64_boundary_gate.sh` (1 コマンド。PE 省略時 `$FL_WIN64_DIR/extracted/block00031_PE.bin`)。不合格は非 0 で終了する。
+
+| 検査 | 算法 | 結果 |
+|---|---|---|
+| [1] 全数列挙 (`dir64_boundary_enum.py`) | (A) 行 regex と (B) python `ast` の Compare 走査を突合 (`tools/` 配下の `.py/.mjs/.js/.ts/.sh/.c/.h`、`work/` 除外、`reloc`/`DIR64` を含むファイルのみ) | 和集合 8 件 (grep 8 / ast 8, `.py` の不一致 0)。旧境界 0 件。意図的に旧式を残す `m11/m11_reloc_audit.py:83` (旧条件との選択差を測る式 OLD) だけ許可リスト |
+| [2] 実バイト (`dir64_boundary_check.py`) | pefile の `DIRECTORY_ENTRY_BASERELOC` で DIR64 を列挙 (生成器は `.reloc` を手パース = 別算法) し、生成 C の `dlld_*[]` の slot を `v - IMG + VA_BASE` と比較 | m6 / liftlib とも 補正対象の末尾 slot 1 件 / 補正 1 / 補正漏れ 0 / 不正値 0 |
+| [3] ネガコン | 3 箇所の条件を旧 `<` に戻した複製 | 列挙は OLD=3 で FAIL (rc 非 0)。実バイトは m6 / liftlib とも `MISS .data RVA 0x11e5000` 補正漏れ 1 (期待 1 で PASS)。現行コードに期待 1 を与えると FAIL |
+
+- 影響なし (境界が正しい) と判定した箇所: `ott/lift/data_gen.py:28`・`hostbridge/lowbase/x64c/lb_data_gen.py:30` (`< lo + len - 7`、slot が収まる = `<= lo + len - 8` と同値)、`hostbridge/lowbase/audit_va.py` (`range(va, va+vs-7, 8)`)、`m11/m11_image_gen.py`・`plugins/lift/passes/m11_image_gen.py` (`r + 8 <= top`)、`m11/lb_check.py` (`r + 8 <= va + vs`)、`m11/m11_data_gen.py:50` (#572 で修正済)、`flelift/fle_data_gen.py` (生バイトコピーで補正なし)。
+- 実測 (runner 4 vCPU、コミット済み HEAD を `git worktree add --detach` で展開): gate 3 回 全て ALL PASS・37.05 / 37.06 / 37.14 秒 (load average 0.31→0.65→0.81、直列)。
+- 範囲外 / 未測: OTT 実機 DLL の `.rdata` / `.data` 末尾が slot で終わるか。work 素材の既存 `ott_data.c` (`_rdata` 511,510 B・`_data` 56,268 B) は長さが 8 の倍数でなく (剰余 6 / 4)、末尾 8B が slot と整列する RVA かは DLL 無しでは判定できない。`tests/test_unit.py` T7 は OTT DLL 必須のため未実行 (旧条件の境界を使う T7 は同じ条件に修正済み)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| OTT 実機 DLL での末尾 slot 補正漏れの有無が未測 | m6 / liftlib の OTT 生成物に旧条件で落ちた slot があったかが不明 (T7 も未実行) | `oc_artifacts: ... analysis-ott-binaries` 付きで #593 を再起動 (本 PR は Refs) |
+| 実行時の差の顕在化 (LoadStringW 実装後の回帰確認) | m11 同様、潜在バグで顕在化条件は未確認 | #132 にコメントで回帰確認項目を依頼 |

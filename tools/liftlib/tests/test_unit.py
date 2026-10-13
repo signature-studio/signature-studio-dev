@@ -113,7 +113,7 @@ def t7():
     lo, sd = next((lo, d) for n, lo, d in dataimage.sections_raw(img) if n == ".rdata")
     nfix = nlow = 0
     for r in img.relocs_dir64():
-        if lo <= r < lo + len(sd) - 8:
+        if lo <= r <= lo + len(sd) - 8:  # #593: dataimage と同じ境界 (末尾 8B slot を含む)
             off = r - lo
             v = struct.unpack_from("<Q", sd, off)[0]
             if img.base <= v < img.base + img.size:      # image 内ポインタ = 補正対象
