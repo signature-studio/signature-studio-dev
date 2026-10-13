@@ -74,11 +74,11 @@ flapi 呼出し数は `flapiCalls.n` で、`engine.call` ラッパを数えた�
 
 CC 1 件 (flapi 1.000/件) の所要時間を、mock engine ハンドラ内 (`handler_us`) と残り (`rest_us`) に分けて計測。
 
-- 中央値 (5000 件 × 5 試行、load 1.59): total 241.42µs / handler 0.73µs / rest 240.69µs
-- 試行別 total: 220.07 / 237.83 / 241.42 / 243.87 / 264.95µs
-- 同一 session の対照 (`tests/midi_event_bench.mjs 5000 5`、load 2.49): CC 237.91µs (flapi 1) / NoteOn 166.39µs (flapi 0)
-- 読み: flapi ハンドラ自体は 1µs 未満。CC と NoteOn の差 約 72µs が flapi 1 回の経路 (RPC 往復と呼出し側の Python 処理) に当たる。NoteOn 側の約 166µs は flapi を使わない Python 配送の基底。
-- 限界: 差分は NoteOn と配送経路が完全には同一でない前提の推定。素の RPC 往復は本節の計測対象外で、上の「素の SAB 往復」節の値 (中央値 34〜44µs、別 run) を参照する。bimodal は本 run でも再現せず (試行の散らばりは 220〜265µs)。
+- 測定 1 (`tests/midi_path_split.mjs 5000 5`、1 run、JSON の `load` = 終了時 `/proc/loadavg` 2.19): 中央値 total 262.60µs / handler 0.84µs / rest 261.71µs、flapi 1.000/件。試行別 total: 288.78 / 262.60 / 274.19 / 254.59 / 218.78µs
+- 測定 2 (`tests/midi_event_bench.mjs 5000 5`、測定 1 の直後の 1 run、JSON の `load` 1.64): CC 中央値 242.16µs (min 228.34 / max 278.98、flapi 1) / NoteOn 中央値 157.15µs (min 150.79 / max 158.05、flapi 0)
+- 読み: flapi ハンドラ自体は 1µs 未満。測定 2 の CC と NoteOn の差 約 85.0µs が flapi 1 回の経路 (RPC 往復と呼出し側の Python 処理) に当たる。NoteOn 側の約 157µs は flapi を使わない Python 配送の基底。
+- 比較の注意: 測定 1 と測定 2 は別プロセスで load (2.19 / 1.64) が揃っていない。比較できるのは測定 2 の CC と NoteOn の差 (同一 run) だけ。上の既存節の 230.0µs / 149.3µs (差 80.7µs) は load 0.56 の値で、本節とは load が違うため直接比べない。差がほぼ同程度 (80.7µs と 85.0µs) なのは偶然の一致で、1 run ずつのため誤差は未評価。
+- 限界: 差分は NoteOn と配送経路が完全には同一でない前提の推定。素の RPC 往復は本節の計測対象外で、上の「素の SAB 往復」節の値 (中央値 34〜44µs、別 run) を参照する。bimodal は本 run では再現せず (測定 1 の試行の散らばりは 219〜289µs)。
 
 ## 検証範囲 / 範囲外
 
