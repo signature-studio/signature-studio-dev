@@ -24,7 +24,7 @@
  *   - トランスレータは shimx がコールバック引数を取る全 7 API の**登録時に 1 回**走る
  *     (CAB-211 検収コメントのフック契約どおり)。呼出は翻訳結果 (トランポリン) に対して行われる。
  *
- * R3 (同チケット): GetProcAddress で返す IL* (shell32 序数 16..190) / kernel32 UI言語 3 本を
+ * R3 (同チケット) + SHX-T8 (#175): GetProcAddress で返す IL* (shell32 序数 16..190) + shell32 #74 / shlwapi #12・#219 / kernel32 UI言語 3 本を
  * **lift 側関数表から解決可能な実アドレス (トークン)** にする。トークン = SHX_LIFTTAB_TOKEN_BASE+index
  * (wasm メモリ上限外の値なので実ポインタと衝突しない)。shimx_lifttab_proc_resolver() を
  * shimx_set_proc_resolver() に登録すると GetProcAddress がトークンを返す。lift 側 dispatch
@@ -40,7 +40,7 @@
 
 #define SHX_CB_SLOTS 64
 #define SHX_LIFTTAB_TOKEN_BASE 0x7F000000ull
-#define SHX_LIFTTAB_N 13
+#define SHX_LIFTTAB_N 16
 
 typedef unsigned long long u64x;
 
@@ -202,7 +202,7 @@ void shimx_cbtrans_reset(void) {
 }
 
 /* ===============================================================
- * R3: lift ABI トークン表 (shell32 IL* 10 本 + kernel32 UI言語 3 本)
+ * R3: lift ABI トークン表 (shell32 IL* 10 本 + shell32 #74 + shlwapi 2 本 + kernel32 UI言語 3 本)
  * =============================================================== */
 typedef u64x (*shx_lift_thunk_fn)(u64x, u64x, u64x, u64x, u64x, u64x, u64x, u64x);
 
@@ -231,9 +231,12 @@ THUNK(GetThreadPreferredUILanguages,
 THUNK(SetThreadPreferredUILanguages,
     (uint32_t)SetThreadPreferredUILanguages((DWORD)a0, (LPCWSTR)(uintptr_t)a1, (ULONG*)(uintptr_t)a2))
 THUNK(GetThreadUILanguage, (uint32_t)GetThreadUILanguage())
+THUNK(SHCreateStdEnumFmtEtc, (uint32_t)SHCreateStdEnumFmtEtc((UINT)a0, (const void*)(uintptr_t)a1, (LPVOID*)(uintptr_t)a2))
+THUNK(SHCreateMemStream, (uintptr_t)SHCreateMemStream((const BYTE*)(uintptr_t)a0, (UINT)a1))
+THUNK(QISearch, (uint32_t)QISearch((void*)(uintptr_t)a0, (const void*)(uintptr_t)a1, (const GUID*)(uintptr_t)a2, (LPVOID*)(uintptr_t)a3))
 
 typedef struct { const char* name; DWORD ordinal; int dll; shx_lift_thunk_fn th; } LiftEnt;
-/* dll: 0 = shell32.dll (名前+序数), 1 = kernel32.dll (名前) */
+/* dll: 0 = shell32.dll (名前+序数), 1 = kernel32.dll (名前), 2 = shlwapi.dll (名前+序数) */
 static const LiftEnt g_lifttab[SHX_LIFTTAB_N] = {
     { "ILFindLastID", 16, 0, th_ILFindLastID },
     { "ILRemoveLastID", 17, 0, th_ILRemoveLastID },
@@ -248,18 +251,27 @@ static const LiftEnt g_lifttab[SHX_LIFTTAB_N] = {
     { "GetThreadPreferredUILanguages", 0, 1, th_GetThreadPreferredUILanguages },
     { "SetThreadPreferredUILanguages", 0, 1, th_SetThreadPreferredUILanguages },
     { "GetThreadUILanguage", 0, 1, th_GetThreadUILanguage },
+    { "SHCreateStdEnumFmtEtc", 74, 0, th_SHCreateStdEnumFmtEtc },
+    { "SHCreateMemStream", 12, 2, th_SHCreateMemStream },
+    { "QISearch", 219, 2, th_QISearch },
 };
 
 int shimx_lifttab_count(void) { return SHX_LIFTTAB_N; }
 const char* shimx_lifttab_name(int i) { return (i >= 0 && i < SHX_LIFTTAB_N) ? g_lifttab[i].name : NULL; }
 
-unsigned shimx_lifttab_token(const char* name, DWORD ordinal) {
+/* dll=0/2: 序数は shell32 / shlwapi それぞれの名前空間。dll_id: 0=shell32 / 1=kernel32 / 2=shlwapi / -1=DLL 不問 (名前一致のみ) */
+static unsigned lifttab_find(int dll_id, const char* name, DWORD ordinal) {
     if (!name && !ordinal) return 0;
     for (int i = 0; i < SHX_LIFTTAB_N; i++) {
-        if (ordinal) { if (g_lifttab[i].dll == 0 && g_lifttab[i].ordinal == ordinal) return SHX_LIFTTAB_TOKEN_BASE + (unsigned)i; }
+        if (dll_id >= 0 && g_lifttab[i].dll != dll_id) continue;
+        if (ordinal) { if (g_lifttab[i].ordinal == ordinal && g_lifttab[i].dll != 1) return SHX_LIFTTAB_TOKEN_BASE + (unsigned)i; }
         else if (name && !strcmp(g_lifttab[i].name, name)) return SHX_LIFTTAB_TOKEN_BASE + (unsigned)i;
     }
     return 0;
+}
+/* 後方互換: 既存 API は shell32 名前空間 (序数) / 名前一致 (DLL 不問)。shlwapi は shimx_lifttab_proc_resolver 経由 */
+unsigned shimx_lifttab_token(const char* name, DWORD ordinal) {
+    return lifttab_find(ordinal ? 0 : -1, name, ordinal);
 }
 
 shimx_lift_thunk_fn shimx_lifttab_trampoline(unsigned token) {
@@ -274,15 +286,21 @@ static int is_shell32(HMODULE m) {
     const char* n = shx_mod_name(m);
     return n && (!strcmp(n, "shell32.dll") || !strcmp(n, "shell32"));
 }
+static int is_shlwapi(HMODULE m) {
+    const char* n = shx_mod_name(m);
+    return n && (!strcmp(n, "shlwapi.dll") || !strcmp(n, "shlwapi"));
+}
 static int is_kernel32(HMODULE m) {
     const char* n = shx_mod_name(m);
     return n && (!strncmp(n, "kernel32", 8));
 }
 void* shimx_lifttab_proc_resolver(HMODULE m, const char* name, DWORD ordinal) {
     unsigned t = 0;
-    if (ordinal && is_shell32(m)) t = shimx_lifttab_token(NULL, ordinal);
-    else if (name && is_shell32(m)) t = shimx_lifttab_token(name, 0);
-    else if (name && is_kernel32(m)) t = shimx_lifttab_token(name, 0);
+    if (ordinal && is_shell32(m)) t = lifttab_find(0, NULL, ordinal);
+    else if (ordinal && is_shlwapi(m)) t = lifttab_find(2, NULL, ordinal);
+    else if (name && is_shell32(m)) t = lifttab_find(0, name, 0);
+    else if (name && is_shlwapi(m)) t = lifttab_find(2, name, 0);
+    else if (name && is_kernel32(m)) t = lifttab_find(1, name, 0);
     if (!t) return NULL;
     SHX_TRACE("lifttab: %s # orm=%u -> token 0x%x", name ? name : "(null)", (unsigned)ordinal, t);
     return (void*)(uintptr_t)t;
