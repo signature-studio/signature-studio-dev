@@ -34,7 +34,7 @@ for nm, f in F.items():
     print('| %s | %d | %s | %d | %s | %s |' % (nm, h['sites'], ids or '—', h['dyn_id_sites'], oth or '—', h['ids_not_in_hs_ids'] or 'なし'))
 
 print('\n### §3 SIMD kernel 表')
-print('| プラグイン | 閉包内 site | 閉包内で呼ぶ kernel (site) | frontier 内 site | DLL 固有関数走査の site / kernel 種 |')
+print('| プラグイン | 閉包内 site | 閉包内で呼ぶ kernel (site) | frontier 内 site | 全 .pdata 関数の走査の site / kernel 種 (framework 関数を含む) |')
 print('|---|--:|---|--:|---|')
 for nm, f in F.items():
     k = f['kernel']

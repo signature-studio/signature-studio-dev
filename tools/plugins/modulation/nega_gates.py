@@ -76,7 +76,7 @@ for tag, desc, kv, why in [
 ]:
     case(tag, desc, J + [write(tag + '.csv', hdr, mut(B, **kv))] + nob, 1, must=why)
 case('NC3-8', 'その block の行が無い', J + [write('nc3_8.csv', hdr, [r for r in rows if r[0] != B])] + nob, 1, must='行が無い')
-case('NC3-9', '9 列に短縮された行', J + [write('nc3_9.csv', hdr, [r[:9] if r[0] == B else r for r in rows])] + nob, 1, must='列数が 10 でない')
+case('NC3-9', '9 列に短縮された行', J + [write('nc3_9.csv', hdr, [r[:9] if r[0] == B else r for r in rows])] + nob, 1, must='列数が %d でない' % len(hdr))
 case('NC3-10', '良い行の後ろに不合格行を追記 (最終行が採用される)',
      J + [write('nc3_10.csv', hdr, rows + [mut(B, emcc_c_rc=1)[[r[0] for r in rows].index(B)]])] + nob, 1, must='emcc_c_rc=1')
 case('NC3-11', 'ヘッダ列名の改変 (入力不正 = 2)', J + [write('nc3_11.csv', hdr[:4] + ['LIFT_RC'] + hdr[5:], rows)] + nob, 2, must='ヘッダ')
@@ -139,19 +139,49 @@ case('NC6-1', '不合格行 (Fruity Flanger emcc_c_rc=1) を最終行に持つ s
 
 print('--- NC7: icall_check.py (IR の間接 call が静的 site に満たない殻の検出)')
 IK = [sys.executable, os.path.join(HERE, 'icall_check.py')]
-case('NC7-1', '実データ (8 本とも IR の間接 call 0 = 既知の脱落): --gate は非 0 であること', IK + ['--gate'], 1, must='殻 = 8/8 本')
+case('NC7-1', '対照: 実データ (既定鎖 PLUG_ICALL=1 = dispatch 復元済み、 脱落 0): --gate は exit 0', IK + ['--gate'], 0, must='殻 = 0/8 本')
 sf = os.path.join(N, 'facts_flanger.json')
 json.dump({'Fruity Flanger': F['Fruity Flanger']}, open(sf, 'w'))
 j10 = json.load(open(os.path.join(P, 'work', 'modulation', 'icall', '%s.icall.json' % B)))['call_non_iat']
-src = open(os.path.join(BD, B, 'p.final.ll'), errors='replace').read().split('\n')
+DISPATCH = 'call void @__icall_dispatch('
+src = [l for l in open(os.path.join(BD, B, 'p.final.ll'), errors='replace').read().split('\n') if DISPATCH not in l]   # 復元 (dispatch) を除いた = 従来鎖 (PLUG_ICALL=0) 相当の IR
 k0 = next(i for i, l in enumerate(src) if l.startswith('define '))
-for tag, n_inj, want, why in [('NC7-2', j10 - 1, 1, '殻 = 1/1 本'), ('NC7-3', j10, 0, '殻 = 0/1 本'), ('NC7-4', j10 + 1, 0, '殻 = 0/1 本')]:
+for tag, n_inj, want, why in [('NC7-2', j10 - 1, 1, '殻 = 1/1 本'), ('NC7-3', j10, 0, '殻 = 0/1 本'), ('NC7-4', j10 + 1, 0, '殻 = 0/1 本'), ('NC7-5', 0, 1, '殻 = 1/1 本')]:
     bdir = os.path.join(N, 'icall_' + tag)
     os.makedirs(os.path.join(bdir, B))
     inj = ['  %inj.p = inttoptr i64 0 to ptr'] + ['  %%inj.c%d = call i64 %%inj.p()' % i for i in range(n_inj)]
     open(os.path.join(bdir, B, 'p.final.ll'), 'w').write('\n'.join(src[:k0 + 2] + inj + src[k0 + 2:]))
-    case(tag, '%s の IR に間接 call を %d 本注入 (静的 site %d) --gate' % ('Fruity Flanger', n_inj, j10),
+    case(tag, '%s の IR から dispatch を全て除き、 間接 call を %d 本注入 (静的 site %d) --gate' % ('Fruity Flanger', n_inj, j10),
          IK + ['--gate', '--facts', sf, '--batch-dir', bdir, '--out', os.path.join(N, 'icall_out_' + tag)], want, must=why)
+
+print('--- NC8: reach_check.py (閉包から frontier を越えて到達する DLL 固有関数の検出 / 検算の識別力)')
+RK = [sys.executable, os.path.join(HERE, 'reach_check.py'), '--blocks', B, '--out', os.path.join(N, 'refs')]   # 実データは Fruity Flanger 1 本 (全 8 本は e2e)
+case('NC8-1', '実データ (Fruity Flanger): leak ありでも既定は検算 OK で exit 0', RK, 0, must='検算 OK')
+case('NC8-2', '実データ (Fruity Flanger): --gate は leak があれば exit 1', RK + ['--gate'], 1, must='のある殻 = 1/1 本')
+sys.path.insert(0, HERE)
+import reach_check as RC  # noqa: E402
+
+
+def check(tag, desc, ok):
+    print('%-6s %-62s %s' % (tag, desc, 'OK' if ok else 'NG'))
+    if not ok:
+        fails.append(tag)
+
+
+# 合成グラフ: 閉包 {1} → 2 (frontier = framework) → 3 (固有) → 4 (固有)。 5 は閉包から辺が無い固有関数
+g = {1: {2}, 2: {3}, 3: {4}}
+isfw = lambda f: f == 2
+lk, _ = RC.leaks(g, {1}, isfw)
+check('NC8-3', '合成: frontier を越えた先の固有関数 {3, 4} が leak として出る', lk == {3, 4})
+lk, _ = RC.leaks({1: {2}, 3: {4}}, {1}, isfw)
+check('NC8-4', '合成: 辺 2→3 を除くと leak は空 (到達しない関数は leak にならない)', lk == set())
+check('NC8-5', '合成: 5 (辺なし) は leak に入らない', 5 not in RC.leaks({**g, 5: {4}}, {1}, isfw)[0])
+r = RC.crosscheck(g, g, {1}, {4})
+check('NC8-6', '合成: 検算 (A = B\') は不一致なし', r == ([], [], []))
+r = RC.crosscheck(g, {1: {2}, 2: {3}}, {1}, {4})
+check('NC8-7', '合成: B\' から辺 3→4 を落とすと、 A の辺が B\' に無い / A で到達なのに B\' で届かない を検出', r == ([(3, 4)], [4], []))
+r = RC.crosscheck({1: {2}}, g, {1}, {4})
+check('NC8-8', '合成: A が辺 3→4 を取りこぼすと B\' でだけ届く target を報告 (偽陰性側の検出)', r == ([], [], [4]))
 
 print('nega_gates: %s (%d 件不一致)' % ('FAIL' if fails else 'OK', len(fails)))
 sys.exit(1 if fails else 0)

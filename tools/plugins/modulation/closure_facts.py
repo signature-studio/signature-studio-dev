@@ -5,7 +5,7 @@
   2. 閉包 (= plugin 固有関数) が発行する Dispatcher ID / host vtable slot (inventory/host_calls.py の scan を再利用)
   3. 閉包が呼ぶ SIMD kernel 表の変数・実装 (p0c/kernel_matrix.py の scan_dll を再利用; framework 非所属関数のみ走査)
   4. engine 分離型 4 本 (Frequency Shifter / Hyper Chorus / Vintage Chorus / Vintage Phaser) の C++ engine DLL の外形
-出力: work/dynamics/facts.json と stdout の Markdown 表。
+出力: work/modulation/facts.json と stdout の Markdown 表。
 usage: closure_facts.py
 """
 import os, sys, json, collections, struct

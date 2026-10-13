@@ -2,7 +2,7 @@
 # modulation_e2e.sh の各判定の識別力を確認するネガティブコントロール (対象 block 19007 = Fruity Flanger; 8 本中で最小の閉包)。
 #   NC1: final.ll の関数 1 つを壊す (定義の ret を除去) → `emcc -c` が FAIL すること (対照: 無改変は rc=0)
 #   NC2: 閉包 ranges の末尾 1 range を落として再 lift → その関数 (function_<start>) が final.ll から消え、他の関数は残ること
-#   NC3〜NC7: judge.py / matrix_check.py / ids_crosscheck.py / modulation_e2e.sh --judge-only / icall_check.py を合成入力で壊す (nega_gates.py)
+#   NC3〜NC8: judge.py / matrix_check.py / ids_crosscheck.py / modulation_e2e.sh --judge-only / icall_check.py / reach_check.py を合成入力で壊す (nega_gates.py)
 # 事前: modulation_e2e.sh を実行済み (work/batch/19007 と work/modulation/{status8.csv,facts.json} がある)。 exit 0 = 全て期待どおり
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
@@ -39,6 +39,6 @@ echo "NC2: ranges $n_all -> $((n_all - 1)), 落とした関数 function_$LAST:  
 
 ok12=0
 [ "$c0" = 0 ] && [ "$c1" != 0 ] && [ "$h0" = 1 ] && [ "$h1" = 0 ] && [ "$d1" -lt "$d0" ] && [ "$d1" -gt 0 ] && ok12=1
-python3 modulation/nega_gates.py || { echo "[modulation_nega] FAIL: nega_gates (NC3-NC7)" >&2; exit 1; }
+python3 modulation/nega_gates.py || { echo "[modulation_nega] FAIL: nega_gates (NC3-NC8)" >&2; exit 1; }
 [ "$ok12" = 1 ] && { echo "[modulation_nega] OK"; exit 0; }
 echo "[modulation_nega] FAIL: NC1/NC2" >&2; exit 1
