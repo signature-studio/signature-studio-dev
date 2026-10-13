@@ -243,5 +243,6 @@ e2e の exit 0 が意味するのは「殻 8 本の judge / matrix_check / ids_c
 | `closure_facts.py` `matrix_check.py` `ids_crosscheck.py` `icall_check.py` | 閉包 / host ID / kernel / engine 外形 → `work/modulation/facts.json`、matrix 突合、ID 別算法検算、間接 call 脱落の判定 |
 | `reach_check.py` | 閉包の境界の監査 (§3.3): `.pdata` 全関数の辺・バイト走査の検算・閉包からの BFS・leak → `work/modulation/refs/<block>.json` |
 | `report_tables.py` | §1〜§4 の表の生成 |
+| `engine_judge.py` | engine 4 本の到達性 gate (exit 0/1/2)。`--selftest` は NC 6 ケース。付録 `REPORT_APPENDIX_527.md` §I |
 | `engine_lift.sh` `engine_ranges.py` `engine_fixcmp.py` `engine_defs.py` | engine DLL の全 `.pdata` lift・欠落監査・局所修復 (PR #506 の同名スクリプトと同一手法。共通化は §7) |
 | `env.sh` | 環境 (fl-win64 展開・python venv)。 block map は main の `inventory/blockmap_from_matrix.py` を使う |
