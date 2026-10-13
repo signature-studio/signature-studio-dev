@@ -38,5 +38,5 @@
 
 ## 4. 再現
 
-`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 PATH=$HOME/.local/agent-py/bin:$PATH bash tools/m11/trap_triage/repro_1352.sh` (判定 `PASS`)。
+`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 PATH=$AGENT_PY_BIN:$PATH bash tools/m11/trap_triage/repro_1352.sh` (判定 `PASS`)。`AGENT_PY_BIN` は `capstone`・`pefile`・`numpy` を入れた Python venv の bin (agent-setup が作る。`docs/WORKFLOW.md` §11 参照)。
 作業ディレクトリは `tools/m11/`。`work/` は `m11_gen_ir2.sh` で生成する (`work-m11` 展開後に実行)。
