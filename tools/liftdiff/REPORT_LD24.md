@@ -3,13 +3,16 @@
 > 正本: `tools/liftdiff/REPORT.md` §12 から派生。親 issue #235 の残り (#976)。
 > 本節は REPORT (250 行上限) の分割移動として新設。判定は**未実装** (下記 §3 の分割で子 issue に委譲)。
 
-## 1. 未対応の実態 (実測)
+## 1. 未対応の実態 (TSV 件数は実測、署名内訳は IR 未照合)
 
-m11 closure の判定 `unexec / unsupported_sig` は **50 件** (`results/m11_closure_verdicts.tsv`、`unexec_reason` 列)。
+m11 closure の判定 `unexec / unsupported_sig` は **50 件** (`results/m11_closure_verdicts.tsv`、`unexec_reason` 列。本 run で件数を確認)。
 判定元は `ldlib/cases.py` の `supported_sig()` で、`ok = {i1,i8,i16,i32,i64,ptr,float,double}` 以外の
-型 (`i128`・構造体) を含むと弾く。署名は `tools/m11/work/boot_final3.ll` の `define` 行から `ldlib/irtool.parse_sigs` で取得。
+型 (`i128`・構造体) を含むと弾く。署名は `tools/m11/work/boot_final3.ll` の `define` 行から `ldlib/irtool.parse_sigs` で取得する想定。
 
-**表の再生成手順** (入力 IR は `bash tools/m11/m11_e2e.sh --full` で生成。本 run では IR が無く再照合はしていない):
+**本 run の照合状況**: `tools/m11/work/boot_final3.ll` は本 run に存在せず (`fl-win64` 素材のみ)、下表の署名内訳と 10 行の署名形は**未照合**。
+下表は IR を持つ run で再生成して確定させる必要がある。内訳表の行の合計 (39 + 11 = 50) は表内で整合するのみ。
+
+**表の再生成手順** (入力 IR は `bash tools/m11/m11_e2e.sh --full` で生成):
 
 ```
 python3 tools/liftdiff/tests/ld24_sig_breakdown.py tools/m11/work/boot_final3.ll > work/ld24_sig_breakdown.md
