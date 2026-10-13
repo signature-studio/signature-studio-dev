@@ -90,7 +90,7 @@ IR (`boot_final.ll` L225098〜225175、前 run の記録。本 run では未再�
 
 ## 6. 再現
 
-素材 (本 run で展開。所要 10.5 秒、実測。`block00031_PE.bin` sha256 `b2c64da4…9496d`):
+素材 (本 run で全件展開。`/usr/bin/time` 実測 5.51 秒、最大 RSS 7.3MB。`block00031_PE.bin` sha256 `b2c64da4…9496d`):
 
 ```
 mkdir -p "$RUNNER_TEMP/ld19/extracted"
@@ -111,7 +111,7 @@ python3 -c "import sys; sys.path.insert(0,'tools/m11/ldfix'); from ldmach import
 
 機械語の実測 (fl-win64 `block00031_PE.bin`、本 run で再確認): `41a670`〜`41a6d9` と `666aeb`〜`666b1f` は §1・§2 の記述と一致 (`ldmach.Machine.disasm_fn`)。
 
-IR 側の検出試行 (参考値・再現手段なし): 前 run の試作では `41a670` が `load (argN+c)` (c≠0) の store 形として検出されたが、他の複数関数も同形で検出され、誤検出の割合が高かった。本 run では `work-m11` が無く再実行していない。件数・関数名は再現できないため記載しない。
+IR 側の検出試行 (参考値・再現手段なし): 前 run の試作では `41a670` を含む同形の store が検出されたが、誤検出も多く採用しなかった。本 run では `work-m11` が無く再実行していない。件数・関数名は再現できないため記載しない。
 - 原因の推定: `transfer` は機械語側で disp=0 の load 値 (`('ld', n, w)`) しか追跡せず、IR 側の `c` と機械語の disp を照合できない。`(n, w)` だけで突き合わせると無関係な store を拾う。
 - 結論: 検出信号は機械語側の値に disp を持たせる (`('ld', n, w, disp)`) 改修が前提。`transfer` の状態表現を変えるため、全関数の既存判定 (`SUSPECT_VAS` / `SUSPECT_USE_VAS`) への影響を再測定する必要があり、1 run の範囲を超える。
 - 試作コードは取り消し済み (`audit_lsf.py` は未変更)。次 run は disp 追跡版を別 PR で作る (再現スクリプトは同 PR で `tools/m11/ldfix/` に置く)。
