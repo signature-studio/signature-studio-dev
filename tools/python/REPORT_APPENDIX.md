@@ -33,19 +33,19 @@
 | `node tests/browser_check.mjs` (headless Chrome) | BROWSER OK (crossOriginIsolated, 48 tools)、12.5 秒 |
 | ネガティブコントロール `--negative <fn>` (その関数を「何もしない / 空」に差替え) | 8 関数すべて検出: getBrowserNames 5 / addChannel 4 / removeChannel 1 / addEffect 3 / storePRScript 2 / runPRScript 1 / getHighlightNames 4 / showHighlight 3 件 FAIL (`NEGATIVE-CONTROL OK`) |
 
-### 検証 2 (PR #470 HEAD 849222b。runner, node 22.23.3, 4 core。素材 `$RUNNER_TEMP/fl-win64` (`FL_WIN64_DIR`) → `fetch_inputs.sh` → `build_cpython_wasm.sh` (work/ 既存の incremental) → `build_flpy.sh` → `provider/build.sh` = 計 9 秒。測定開始時 load average 0.64。worktree ws-470 は commit 済み・`git status` clean)
+### 検証 2 (PR #470 HEAD e9f46a0 = main ec79ef5 取込後。runner, node 22.23.3, 4 core。素材 `$RUNNER_TEMP/fl-win64` (`FL_WIN64_DIR`) → `fetch_inputs.sh` → `build_cpython_wasm.sh` (work/ 既存の incremental) → `build_flpy.sh` → `provider/build.sh` = 計 9 秒。測定開始時 load average 0.41。worktree ws-470 は commit 済み・`git status` clean)
 | コマンド | 結果 |
 |---|---|
-| `node tests/ilmcp_e2e.mjs` (run_all 9c、n=3) | **25/25 PASS** × 3。wall 0.49 / 0.46 / 0.47 s |
-| `node tests/ilmcp_e2e.mjs --negative <fn>` 8 件 | 5 / 4 / 1 / 3 / 2 / 1 / 4 / 3 件 FAIL (`NEGATIVE-CONTROL OK`)。各 0.42〜0.46 s |
-| `node tests/all_tools.mjs` / `FL_ENGINE=wasm node tests/all_tools.mjs` | どちらも 48/48 ok、**host_calls 37,425**、wall 2.13 / 2.00 s。`analysis/mcp/tool_coverage.json` は再生成結果とコミット済みが一致 (実行後も `git status` clean) |
-| `node tests/poc_mcp.mjs` / `node tests/browser_check.mjs` | POC rc 0 (1.21 s) / BROWSER OK (crossOriginIsolated, 48 tools)、1.37 s |
-| `node tests/provider_check.mjs` (run_all 9b) | PASS (functions 435 / implemented 60 / mcp_static 60)、0.33 s |
-| **`node tools/python/tests/mcp_ui_check.mjs`** (run_all step 11) | **MCP UI OK**、exit 0、1.87 s (UI で tools/list = 48・get_tempo = 130 BPM、devtools で set_tempo(140) → 140)。`--neg` は NEG-CONTROL DETECTED (exit 1 は設計どおり) |
+| `node tests/ilmcp_e2e.mjs` (run_all 9c、n=3) | **25/25 PASS** × 3。wall 0.43 / 0.42 / 0.43 s |
+| `node tests/ilmcp_e2e.mjs --negative <fn>` 8 件 | 5 / 4 / 1 / 3 / 2 / 1 / 4 / 3 件 FAIL (`NEGATIVE-CONTROL OK`)。各 0.42〜0.47 s |
+| `node tests/all_tools.mjs` / `FL_ENGINE=wasm node tests/all_tools.mjs` | どちらも 48/48 ok、**host_calls 37,425**、wall 2.07 / 2.05 s。`analysis/mcp/tool_coverage.json` は再生成結果とコミット済みが一致 (実行後も `git status` clean) |
+| `node tests/poc_mcp.mjs` / `node tests/browser_check.mjs` | POC rc 0 (1.30 s) / BROWSER OK (crossOriginIsolated, 48 tools)、1.36 s |
+| `node tests/provider_check.mjs` (run_all 9b) | PASS (functions 435 / implemented 60 / mcp_static 60)、0.34 s |
+| **`node tools/python/tests/mcp_ui_check.mjs`** (run_all step 11) | **MCP UI OK**、exit 0、1.92 s (UI で tools/list = 48・get_tempo = 130 BPM、devtools で set_tempo(140) → 140)。`--neg` は NEG-CONTROL DETECTED (exit 1 は設計どおり) |
 | 同上、`vite.config.ts` の ilmcp JSON 許可を**外した**状態 (前回 run で実測) | **FAIL** (`Failed to fetch dynamically imported module: …/py/host/fl_mock.mjs`)、exit 2。修正 (`pyAssets` の `allowed` 追加) の検出力を確認 |
-| run_all step 12 | midi_script OK (23 checks、0.87 s、`--neg` exit 1 DETECTED)。`midi_bundled_device.mjs` は NOT VERIFIED (exit 3): fl-win64 素材から同梱 device script を取れない (`fetch_inputs.sh` の win64 経路が配置しない)。本 PR 範囲外 |
-| run_all step 13 | subinterp_probe OK (19 checks、29.7 s、`--neg` exit 1 DETECTED)。`subinterp_negcontrol_old.sh` は本検証では未実行 |
-| run_all step 14 | midi_ui_check OK、1.74 s |
+| run_all step 12 | midi_script OK (23 checks、0.90 s、`--neg` exit 1 DETECTED)。`midi_bundled_device.mjs` は NOT VERIFIED (exit 3): fl-win64 素材から同梱 device script を取れない (`fetch_inputs.sh` の win64 経路が配置しない)。本 PR 範囲外 |
+| run_all step 13 | subinterp_probe OK (19 checks、28.4 s、`--neg` exit 1 DETECTED)。`subinterp_negcontrol_old.sh` は本検証では未実行 |
+| run_all step 14 | midi_ui_check OK、1.72 s |
 
 `run_all.sh` 全体は `/home/ubuntu` 固定 (#630) のため一括実行できず、上記は step ごとの個別実行。
 
