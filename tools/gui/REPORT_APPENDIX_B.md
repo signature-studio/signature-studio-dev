@@ -21,6 +21,8 @@
 - **0cbc5651 (PR HEAD, docs のみ追記; コード差分なし)**: **EXIT=0・ALL PASS**、real 3m03s、終了 load 1.93 (開始 load は未記録)。PR 作成時の run の記録で、後続の再現 run は未実施。native_run EXACT MATCH (0 px)、selftest 433 passed 0 failed、reach 11 + adapt 28 passed、text_golden ALL PASS (ネガコン 4/4)、ft_wasm PASS、bpp_golden・nc_golden・simd_e2e ALL PASS、Chrome E2E 読み戻し・スクリーンショット EXACT MATCH (0 px)、negctl rejected、fail-fast PASS、reach 36 APIs (impl 36, stub 0)、stress 50,000 frames drop 0・memory 有界。grep で出る "fail" 行はすべて "0 failed" か期待どおりの失敗 (ネガコン・fail-fast)。
 - 前提: 0cbc5651 の run でも `x86_64-w64-mingw32-gcc` を `apt-get install gcc-mingw-w64-x86-64` で導入。
 - 1 回 PASS のみで、flake の解消は主張しない (§13 (2) 参照)。
+- **§11 追補 (2026-10-13, run 186-e2e-verify): origin/main `84e43186` の通常経路 `bash tools/gui/e2e.sh`**: **rc=0 ALL PASS**、実時間 3 m 31 s、開始時 load 1.11 (1 分値)。素材 fl-win64 / toolchain-retdec / toolchain-emsdk 展開済み。runner に `x86_64-w64-mingw32-gcc` が無く初回は `gen_api.py` で停止 → `apt-get install gcc-mingw-w64-x86-64` (GCC 13) で解消、`pnpm install --frozen-lockfile` を併せて実施。ネガコンの内訳: 6a は golden 1 画素改竄で拒否 (exit 1)、6h の burst / leak ネガコンも検出を確認、6e (sigprobe) は内部に陰性対照を持つ。6b・6c・6d・6f・6g は正の E2E として PASS (6c は fail-fast の期待失敗を grep で確認)。
+  - 1 回 PASS のみで、flake の解消は主張しない。`selftest_wrapped` の既知 flake (§13 の 9/30 失敗) は未解決で、既存の #740 (GUI-15) で追跡する。
 
 ## 13 追補. c4b293d 再確認 (PR #661 レビュー対応: e2e.sh の FT ビルド保証を step 4 の前へ移動した後)
 

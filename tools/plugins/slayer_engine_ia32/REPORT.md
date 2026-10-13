@@ -176,38 +176,39 @@ ia32 で要注意の mnemonic (件数): cdq 21 / movzx 51 / movsx 54 / lea 590 /
 
 | 項目 | 実測 |
 |---|---|
-| gate (`marshal.py`) | `[marshal] OK`・exit 0。 wall 67–68 ms (n=3)。 実行前 load 1 分 0.22・cpu 4 |
-| nega (`marshal.py --nega`) | `nega: 0/5 miss`・exit 0。 wall 72–73 ms (n=3)。 実行前 load 1 分 0.22・cpu 4 |
+| gate (`marshal.py`) | `[marshal] OK`・exit 0。 wall 83–85 ms (n=3)。 実行前 load 1 分 0.51・cpu 4 |
+| nega (`marshal.py --nega`) | `nega: 0/6 miss`・exit 0。 wall 94–103 ms (n=3)。 実行前 load 1 分 0.51・cpu 4 |
 
-- 所要は HEAD `693c394` で再測定 (`time` 相当の wall を `date +%s%N` で計測・各 n=3 の min–max)。 旧版の単発値 (0.065 s / 0.056 s) は本表で置き換えた。
-- 本節 (§9.2) の表は marshal.py の gate と N1〜N5 の結果。 route 突合 (N4・N5) は §9.3 の注意を参照。
+- 所要は merge 後の HEAD で再測定 (`time` 相当の wall を `date +%s%N` で計測・各 n=3 の min–max)。 旧版の単発値 (0.065 s / 0.056 s) は本表で置き換えた。
+- 本節 (§9.2) の表は marshal.py の gate と N1〜N6 の結果。 route 突合 (N5・N6) は §9.3 の注意を参照。
 
 | NC | 壊した入力・期待 | 実測 FAIL |
 |---|---|---|
 | N1 | magic 即値を 1 bit 壊した複製 (値突合のみ、sha 検査は外す) | `engine magic = 1450406993, want 1450406992` (HIT) |
 | N2 | x32 sizeof 期待を 0xA0 に誤る | `x32 sizeof 0x90 != 0xa0` (HIT) |
 | N3 | 期待 magic を 1 ずらす | `engine magic @0x0 = 1450406992, want 1450406993` (HIT) |
-| N4 | effEditGetRect の子 vtable slot 期待を 5 に誤る | `route erect_child_slot = 4, want 5` (HIT) |
-| N5 | effProcessEvents(25) が switch 内で処理される、と誤った期待 | `route opcode25_default = True, want False` (HIT) |
+| N4 | dispatcher の switch 上限 `cmp eax,0x18` → `0x19` (opcode 25 が範囲内に入る) | `opcode 25 (effProcessEvents) is inside the switch (bound 0x19)` (HIT) |
+| N5 | effEditGetRect の子 vtable slot 期待を 5 に誤る | `route erect_child_slot = 4, want 5` (HIT) |
+| N6 | effProcessEvents(25) が switch 内で処理される、と誤った期待 | `route opcode25_default = True, want False` (HIT) |
 
-### 9.3 読取経路の静的実測 (#894)
+### 9.3 dispatcher の実測 (#894 受入 1・2)
 
-dispatcher `0x10001000` は `[this+0x40]` の vtable slot+0x18 (`0x10001300`) へ全 opcode を渡す。 その switch の結果:
+`marshal.py` の `dispatch_facts` が検証する (RVA は ImageBase 0x10000000 からの相対)。
 
-| 項目 | 実測 | 意味 |
-|---|---|---|
-| switch 上限 (`cmp eax, 0x18`) | 24 | 0..24 のみ jump table |
-| opcode 25 (effProcessEvents) | `ja` の飛び先 `0x1000149c` (逆アセンブル読取) = `mov eax,esi; ret 0x14`・戻り値 0 | switch 内に VstEvents の読取は無い。 「25 が default に落ちる」の判定自体は定数比較 (`PROCESS_EVENTS=25 > bound=0x18`) |
-| opcode 13 (effEditGetRect) | jump table → `0x10001406` (逆アセンブル読取) | `ecx = [ecx+8]` (editor 子) の slot+4 へ転送 |
+| 項目 | 実測 |
+|---|---|
+| dispatcher (vtable[+0x18] の転送先) | RVA 0x1300 の opcode switch。 上限 `cmp eax,0x18` (= 24)、`ja` 先 0x149C |
+| opcode 25 (effProcessEvents) | 範囲外 → 既定分岐 0x149C (`mov eax,esi; ret 0x14`)。 VstEvents は読まれない |
+| opcode 13 (effEditGetRect) | 分岐先 0x1406: `ecx=[ecx+8]` (editor) → `vtable[+4]` へ `ERect**` を渡す |
+| ctor の `this+8` | 0 に初期化 (RVA 0x10E0 の `mov [edx+8],esi`、esi=0) |
 
-- **`ROUTE_EXPECT` の位置づけ**: `bound=0x18`・`opcode25_default=True`・`erect_child_slot=4` は現在の静的構造の**観測値そのもの**であり、 「今の静的構造が変わっていない」ことを守る回帰ガードである。 VstEvents の読取・ERect の書込みを証明するものではない (受入 1〜2 は未達)。
-- `opcode25_default` は `PROCESS_EVENTS > bound` の定数比較で、 その真偽を機械判定しているだけである。 N5 もこの式の真偽だけを見ている。 `ja` の飛び先が default 処理であることは上の表で逆アセンブル結果から読んだ (`default_returns_zero` で検査)。
-- `push 0x19` (= 25) を含む箇所は `0x100025db`・`0x10009bb0` の 2 件。 いずれも dispatcher 経由の opcode 分岐ではない。 `0x10009bb0` は `push 0x19` の後に `0x1000a806` を呼ぶが、 `0x1000a806` の処理内容は未読であり、 VstEvents との関係は未確認。 VstEvents の読取箇所は未特定。
-- effEditGetRect の子 vtable は `[this+8]` に**実行時に**設定されるため、静的な store 列からは ERect 書込み先を特定できない (未解決)。
+- **ERect の実書込みは block22434 の外 (editor クラス)**。 受入 2 は「書込み箇所の特定」まで。 実測の書込み箇所は別 block の探索が要る。
+- **VstEvents の読取箇所は、この dispatcher では見つからない**。 engine の events 読取は別経路 (process 系や別 block) にあると推定 (未確認)。 受入 1 は未達。
+- 殻 (x64) 側の VstEvents / ERect の実物定義は、リポジトリ内 (`vst2_abi.h` を含む) に無い。 受入 3 は未達。
 
-### 9.4 未解決 (起票先: #674 / #894)
+`marshal.py` (gate) は `[marshal] OK`・exit 0。 `marshal.py --nega` は `nega: 0/6 miss`・exit 0 (N1〜N6 すべて期待どおりの理由で FAIL)。 **実測値は下の §9.2 の表 (HEAD で再測定) を正とする**。
 
-- VstEvents の読取箇所: 静的経路に見当たらない (上記)。 #894 の継続。
-- ERect の書込み箇所: 子 vtable が実行時生成のため静的に未特定。 #894 の継続。
-- 殻 (x64) 側の実物構造体の突合: #894 の継続。
-- engine の store 値の実行確認 (静的のみ): #674 (受入 4 と同時)。
+### 9.4 未解決 (起票先: #674)
+
+§6 の未解決と同じ (VstEvents / ERect の engine 側読取、殻側の実物構造体、engine の store 値の実行確認)。 受入 1・2 は「dispatcher 内に読取・書込みが無い」ことまで確定し、実際の箇所は未特定。
+- route 突合 (`ROUTE_EXPECT`: `bound`・`opcode25_default`・`erect_child_slot`) は現在の静的構造の**観測値**を守る回帰ガードである。 VstEvents の読取・ERect の書込みを証明するものではない。 gate の N5・N6 はこの突合の FAIL を検査する。
