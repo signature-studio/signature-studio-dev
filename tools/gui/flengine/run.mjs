@@ -16,14 +16,15 @@ const outFile = opt('--out', null);
 const errs = [];
 const m2 = await import(wasmCjs);
 const mod = await (m2.default ? m2.default({ printErr: (s) => { errs.push(String(s)); } }) : m2());
-mod.HEAPU8.set(fs.readFileSync(M11 + '/work/m11_image.bin'), 0);
+const img = fs.readFileSync(M11 + '/work/m11_image.bin');
+mod.HEAPU8.set(img, 0);
 const num = (f) => { try { return Number(f()); } catch (_) { return null; } };
 const isDone = (e) => e && e.m11_dllmain_done !== undefined;
 const msg1 = (e) => ((e && e.message) || String(e)).split('\n')[0];
 
 let bootThrew = null, bootFailfast = null, dllmainDone = false;
 const sp_boot = mod._emscripten_stack_get_current();
-if (survey) mod._m11_set_survey(1);
+if (survey) { mod._m11_set_survey(1); mod._m11_set_va_unit_budget(Number(process.env.M11_VA_UNIT_BUDGET_MB ?? '256')); }
 try { mod._m11_boot_enter(0n, 1n); } catch (e) {
   if (isDone(e)) { dllmainDone = true; if (survey) mod.__emscripten_stack_restore(sp_boot); }
   else if (e && e.gui_failfast) bootFailfast = e.gui_failfast;
@@ -34,8 +35,14 @@ const res = { ok: 0, noproc: 0, miss: 0, trap: 0 };
 const kinds = {}, ffUnits = {}, perUnit = [];
 if (survey) {
   const sp0 = mod._emscripten_stack_get_current();
+  // unit 隔離: m11_survey.mjs と同じく unit ごとに VA 上限を張り直し、unit が書いた image を実行前の状態へ戻す
+  const unitVa0 = [mod._m11_unit_va(0), mod._m11_unit_va(941)];
+  const tableIntact = () => mod._m11_unit_va(0) === unitVa0[0] && mod._m11_unit_va(941) === unitVa0[1];
+  const snap = new Uint8Array(img.length);
   for (let i = 0; i < 942; i++) {
     errs.push('GF-UNIT-BEGIN ' + i);
+    snap.set(mod.HEAPU8.subarray(0, img.length));
+    mod._m11_va_unit_begin();
     try {
       const r = mod._m11_call_unit(i);
       if (r === 1) res.ok++; else if (r === 0) res.noproc++; else if (r === 2) res.miss++;
@@ -50,6 +57,7 @@ if (survey) {
       perUnit.push([i, 'trap', k]);
       mod.__emscripten_stack_restore(sp0);
     }
+    if (!tableIntact()) { mod.HEAPU8.set(snap, 0); res.clobber++; }
   }
   if (process.env.GF_SURVEY_UNITS) fs.writeFileSync(process.env.GF_SURVEY_UNITS, JSON.stringify(perUnit));
 }
