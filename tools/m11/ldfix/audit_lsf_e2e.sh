@@ -29,8 +29,8 @@ PRE="$OUT/gen/tools/m11/work/boot_final.ll"
 "$PY" - "$W/ldfix_report.json" "$OUT/ldfix_img_report.json" <<'EOF'
 import json, sys
 a, b = json.load(open(sys.argv[1])), json.load(open(sys.argv[2]))
-d = [k for k in a if a[k] != b.get(k)]
-print('[equiv] PE 版 ldfix_report.json vs PE 無し版: キー %d / %d, 不一致 %d %s' % (len(a), len(b), len(d), d))
+d = [k for k in a if a[k] != b.get(k) and not k.startswith('f3c')]
+print('[equiv] PE 版 ldfix_report.json vs PE 無し版: キー %d / %d, 不一致 (f3c* を除く。#509 で F3c を拡張したため f3c* は旧版と異なる) %d %s' % (len(a), len(b), len(d), d))
 EOF
 
 step "2/4 fix_f3c の門 (5c0270 / 41a670; 入力 = 修復前 IR)"

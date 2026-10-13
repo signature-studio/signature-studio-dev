@@ -17,6 +17,9 @@ const cfg = {
   timeinfo: +(q.get("timeinfo") ?? 0),
   sr_after: +(q.get("sr_after") ?? 0),
   burst_floor: +(q.get("burst_floor") ?? 0),
+  ds_fmt: q.get("ds_fmt") ?? "pcm16",   // api=ds*: pcm16 | f32 (FL の primary SetFormat 組立の 2 経路)
+  ds_mode: q.get("ds_mode") ?? "poll",  // poll | notify
+  ds_size: +(q.get("ds_size") ?? 16384),
   input: q.get("input") ?? "none", // noise | gum | ui (FlAudioInput 経由)
   panel: +(q.get("panel") ?? 0),   // 1: ASIO controlPanel を呼ぶ (ui 入力: 別デバイスへ切替える UI 代替を登録)
   panel_ui: q.get("panel_ui") !== "0", // 0: controlPanel 未登録 (NotPresent 経路)
@@ -48,7 +51,7 @@ window.__done = new Promise((resolveAll, rejectAll) => {
     arguments: [
       `api=${cfg.api}`, `mode=${cfg.mode}`, `buf=${cfg.buf}`, `depth=${cfg.depth}`, `secs=${cfg.secs}`, `sr=${cfg.sr}`,
       `stress=${cfg.stress}`, `work_us=${cfg.work_us}`, `hiccup_ms=${cfg.hiccup_ms}`, `hiccup_every=${cfg.hiccup_every}`, `timeinfo=${cfg.timeinfo}`, `sr_after=${cfg.sr_after}`,
-      `burst_floor=${cfg.burst_floor}`, `panel=${cfg.panel}`,
+      `burst_floor=${cfg.burst_floor}`, `panel=${cfg.panel}`, `ds_fmt=${cfg.ds_fmt}`, `ds_mode=${cfg.ds_mode}`, `ds_size=${cfg.ds_size}`,
     ],
     print: (t) => log("[wasm] " + t),
     printErr: (t) => { stderr.push(String(t)); log("[wasm!] " + t); if (String(t).includes("FAIL-FAST")) setTimeout(() => resolveAll({ aborted: true, what: "fail-fast", stderr, cfg }), 500); },
@@ -194,10 +197,19 @@ function verify(capSpec, cfg, result) {
   for (let k = start; k < nq; k++) { const f = fill[k]; fmin = Math.min(fmin, f); fmax = Math.max(fmax, f); fsum += f; cnt++; }
   v.device_fill = { min: fmin, max: fmax, avg: cnt ? fsum / cnt : 0, unit: "frames (リング充填, worklet 消費直前)" };
   const ch0 = out.subarray(0, frames), ch1 = out.subarray(frames, 2 * frames);
-  if (cfg.mode === "ramp") {
+  if (cfg.api === "ds" && cfg.ds_fmt === "pcm16") {
+    // 16bit PCM 経路: クライアントは int16 ランプ (n%30000+1, 右は符号反転) を書く → shim は v/32768 の float32 へ変換 (2 の冪除算なので厳密)
     let ok = 0, firstBad = -1, bad = 0;
     for (let p = 0; p < covered; p++) {
-      const e0 = p + 1;
+      const e0 = Math.fround(((p % 30000) + 1) / 32768);
+      if (ch0[p] === e0 && ch1[p] === -e0) ok++;
+      else { bad++; if (firstBad < 0) firstBad = p; }
+    }
+    v.ramp16 = { frames_checked: covered, bit_exact: ok, mismatches: bad, first_mismatch_frame: firstBad };
+  } else if (cfg.mode === "ramp") {
+    let ok = 0, firstBad = -1, bad = 0;
+    for (let p = 0; p < covered; p++) {
+      const e0 = (p & 0xFFFFFF) + 1; // fla_test.c のランプは 24bit (f32 の厳密整数域) で巻き戻る: 2^24 f = 349.5 s @48k。30 分ソークは巻き戻しを跨ぐ
       if (ch0[p] === e0 && ch1[p] === -e0) ok++;
       else { bad++; if (firstBad < 0) firstBad = p; }
     }
@@ -205,7 +217,7 @@ function verify(capSpec, cfg, result) {
     // underrun 後の連続性: out[p] == ramp[p - S] (S = underrun で挿入された無音フレーム数) が末尾領域で成立するか
     const S = result.stats.silence_frames, lo = Math.max(0, covered - 20000), hi = Math.max(lo, covered - 3000);
     let tail_ok = 0, tail_n = 0;
-    for (let p = lo; p < hi; p++) { tail_n++; if (ch0[p] === p + 1 - S && ch1[p] === -(p + 1 - S)) tail_ok++; }
+    for (let p = lo; p < hi; p++) { tail_n++; const e = ((p - S) & 0xFFFFFF) + 1; if (ch0[p] === e && ch1[p] === -e) tail_ok++; }
     v.ramp.tail_shift_exact = { silence_S: S, checked: tail_n, exact: tail_ok };
   } else if (cfg.mode === "sine") {
     let maxErr = 0, peak = 0, ss = 0, bad = 0;

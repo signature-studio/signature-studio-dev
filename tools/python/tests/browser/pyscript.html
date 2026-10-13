@@ -1,0 +1,24 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>flpy pyscript browser check (PY-11 #466)</title>
+<pre id="result">PENDING</pre>
+<script type="module">
+// 同梱 .pyscript (Piano roll 5 / Remote 5 / Audio 12) を Chrome 上の wasm CPython で実行する。シナリオ本体は node 版と共通 (tests/pyscript_scenarios.mjs)。
+// スクリプト本文は /work/pyscripts.json (FL 由来・gitignore。`node tests/pyscript_e2e.mjs --export-scripts work/pyscripts.json` で生成) を実行時に fetch する。
+import { FlPython } from "/host/flpython.mjs";
+import { createMockEngine } from "/host/fl_mock.mjs";
+import { runScenarios } from "/tests/pyscript_scenarios.mjs";
+const out = { env: navigator.userAgent, crossOriginIsolated };
+try {
+  const j = async (p) => (await fetch(p)).json();
+  const { PR, REMOTE, AUDIO } = await j(new URLSearchParams(location.search).get("scripts") || "/work/pyscripts.json");
+  const ids = await j("/analysis/flapi/flapi_ids.json");
+  const inv = await j("/analysis/scripts_inventory.json");
+  const t0 = performance.now();
+  const { results, outputs } = await runScenarios({ FlPython, createMockEngine, PR, REMOTE, AUDIO, ids, inv, flpyUrl: new URL("/dist/flpy.js", location.href) });
+  const pass = results.filter((r) => r.ok).length;
+  out.summary = { total: results.length, pass, fail: results.length - pass, seconds: Number(((performance.now() - t0) / 1000).toFixed(1)) };
+  out.results = results; out.outputs = outputs;
+} catch (e) { out.error = String(e && e.stack || e); }
+document.getElementById("result").textContent = "RESULT " + JSON.stringify(out);
+</script>

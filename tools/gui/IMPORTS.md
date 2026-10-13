@@ -47,7 +47,7 @@
 | windowscodecs.dll | 1 | 2 |  |
 | comdlg32.dll | 2 | 2 | ● |
 
-GUI 系 DLL (user32.dll, gdi32.dll, comctl32.dll, comdlg32.dll, opengl32.dll, uxtheme.dll, imm32.dll, msimg32.dll, dwmapi.dll, winspool.drv, oleacc.dll, wtsapi32.dll, shcore.dll) の import 合計 **429 名**: 実装済み **292** / fail-fast stub **137** / arity 不明で未生成 **0**。
+GUI 系 DLL (user32.dll, gdi32.dll, comctl32.dll, comdlg32.dll, opengl32.dll, uxtheme.dll, imm32.dll, msimg32.dll, dwmapi.dll, winspool.drv, oleacc.dll, wtsapi32.dll, shcore.dll) の import 合計 **429 名**: 実装済み **293** / fail-fast stub **136** / arity 不明で未生成 **0**。
 
 ## 2. 優先度定義
 
@@ -399,7 +399,7 @@ GUI 系 DLL (user32.dll, gdi32.dll, comctl32.dll, comdlg32.dll, opengl32.dll, ux
 | GetMessageExtraInfo | user32 | hook/sync | 2 | IMPL |
 | GetSysColor | user32 | system | 2 | IMPL |
 | IsClipboardFormatAvailable | user32 | clipboard | 2 | STUB |
-| IsProcessDPIAware | user32 | system | 2 | STUB |
+| IsProcessDPIAware | user32 | system | 2 | IMPL |
 | LoadImageW | user32 | cursor/icon | 2 | STUB |
 | MessageBoxA | user32 | util | 2 | IMPL |
 | MonitorFromPoint | user32 | system | 2 | STUB |

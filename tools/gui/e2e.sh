@@ -22,6 +22,7 @@ if [ "${SKIP_NATIVE:-0}" != "1" ]; then
   bash "$HERE/test/fetch_fonts.sh" | tail -1
   [ -f "$FTLIB" ] || FONT="$HERE/work/OpenSans-Regular.ttf" bash "$HERE/../shared/oss/freetype/build.sh" | tail -3
   bash "$HERE/test/text_golden.sh" | tail -7; bash "$HERE/test/ft_wasm.sh" | tail -2
+  echo "[gui-e2e] 1d/6 GUI-7 popup/tooltip surface・NC 領域・無効領域複数矩形・DPI (独立 Python オラクル golden/gen_golden_nc.py と画素完全一致 + ネガコン 3 本)"; bash "$HERE/test/nc_golden.sh" | tail -6
   echo "[gui-e2e] 2/6 native lift 実行 (PE->RetDec->gcc, headless host, golden)"; bash "$HERE/test/native_e2e.sh" 2>&1 | grep -E "native_run|\[post\]"
   echo "[gui-e2e] 2b/6 結合準備 native (到達 API ログ / wasm32 署名 adapter / ハンドル 31bit / 改名 selftest; CAB-156)"; bash "$HERE/test/reach_test.sh" 2>&1 | grep -E "passed|FAIL"
 fi
