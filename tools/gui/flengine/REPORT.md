@@ -396,6 +396,20 @@ review `b9f0b32b` の指摘 1 (S1) と 2 (run.mjs のコメント) への対応�
 - `f4_e2e.sh` の post IR (`m11_gen_ir2.sh` → `m11_build.sh`、wndseed 無し): **`0x110000f`**
 - `flengine/e2e.sh` の最終 IR (wndseed 込み。`m11_wndseed.sh` を実行): **`0x1100010`** (§6d-2)
 
+## 6g. 現 head の再測定 (review `bde0c341` 差し戻しの必須 2。main 取り込み後)
+
+main `f3ffd7ba` 取り込み後の head `bde0c341` で、§6e の測定 commit `a88aabfa` 以降のコード差分を再測定した。`git diff a88aabfa bde0c341 -- tools/gui tools/m11` のうち `.sh`・`.py`・`.c`・`.h`・`.inc` 等の実行コードは `m11_win.c` (#1096 由来) と `gui/build/*` の main 側差分のみ (main が重複定義を持ち込んだ)。
+
+| 実行 (foreground・1 回・rc は実測) | rc | 所要 | 結果 |
+|---|---|---|---|
+| `bash tools/m11/ldfix/f4_e2e.sh` (head `bde0c341`) | **2** | 86 s (load 0.59→1.03) | **build 段で停止** (gui build 失敗 (pre))。`wasm-ld: duplicate symbol: GetMonitorInfoW` と `EnumDisplayMonitors` (`obj/win.o` と `gui/gui_adapt_w32.o`)。F4 の gate には到達せず |
+| `bash tools/gui/flengine/e2e.sh` (head `bde0c341`) | **1** | 325 s (load 1.12→1.33) | build 段で停止。`wasm-ld: error: duplicate symbol: GetMonitorInfoW` (同上 2 件)。judge は実行されず |
+| `bash tools/gui/e2e.sh` (head `bde0c341`) | **0** | 301 s (load 3.47→0.89) | ALL PASS (simd / 6c/6 fail-fast / present / input / stress (negctl 2/2 exit 1) / selftest 506 passed 0 failed)。ASan の `heap-use-after-free` 等の出力 0 件 |
+
+**判定**: `gui/e2e.sh` は現 head で PASS。`flengine/e2e.sh` と `f4_e2e.sh` は main 由来の重複定義 (#1096 `6f979463` の `tools/m11/m11_win.c` と `tools/gui/build/gui_adapt_w32.c`) で build 段が止まり、S1 の judge と F4 の gate は現 head では未測定。`a88aabfa` の測定値は main 取り込み前のものなので、現 head の値としては使わない。
+
+**GetMonitorInfoW 重複の扱い**: §6f の回避 (`-Wl,--allow-multiple-definition` の scratch 追加) は本 run では入れていない (build 仕様の判断を要するため)。重複の解消は main 側の修正が要る。起票先は子 issue (本 run で起票)。
+
 ## 6f. origin/main の S1 実測 (PR #577 の PM 指示 1。main commit `b4a8422c`)
 
 PM 指示: 「main でも同じ 870 vs 872 なら既存の欠陥、違えば本 PR が原因」。判定式・baseline 値は変えていない。
