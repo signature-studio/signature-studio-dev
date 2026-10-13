@@ -98,6 +98,8 @@ OTT 旧 chain (`build ott_old` + `batch --set closure --shards 4` + `tests/check
 
 ### 7.1 8 関数のパターン別観測 (`work/ott_old/batch.jsonl` の cases から)
 
+注: 下表の元データ (`work/ott_old/batch.jsonl`) は `work/` (gitignore) のため本 PR の差分からは再現できない。**元データの抜粋 TSV は未 commit・未検証** (素材再取得後に commit する)。
+
 | 関数 | 判定 | z | s | p0 | vm0 | u16 | 観測 |
 |---|---|---|---|---|---|---|---|
 | 1801ab1d0 | match | BF(divzero) | NF@1ab1dc | NF@1ab23d | equal | equal | vm0/u16 で初めて両側が正常終了 |
@@ -121,7 +123,7 @@ OTT 旧 chain (`build ott_old` + `batch --set closure --shards 4` + `tests/check
 | 2 (batch のみ・同一 build) | 360 | 230 | 210 |
 | 3 (batch のみ・同一 build) | 360 | 230 | 210 |
 
-- 判定が変わった関数は 0 件 (run1〜3 の verdict を全 800 件で比較)。§4 の 361 / 360 / 361 の揺れは本 HEAD では再現しなかった。
+- 件数は 3 回とも一致 (360 / 230 / 210)。**「判定が変わった関数は 0 件」は未検証**: 関数ごとの verdict を記録した TSV が無く、件数が同じでも内訳の入れ替わりを排除できない。全 800 件の verdict TSV と比較手順は素材の再取得後に commit する (未解決の起票先は下表)。§4 の 361 / 360 / 361 の揺れは本 HEAD では件数の再現に留まる。
 - 結論: 揺れの原因は**特定不能** (再現せず)。§4 の「native timeout・負荷による揺らぎ」は推定のまま。揺れの再現条件 (負荷・shard 配置) は未確認。
 - 測定結果: `results/ld32_m11_sample800_n3_c4e93550.txt` (commit 済み)。
 
