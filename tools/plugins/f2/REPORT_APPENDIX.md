@@ -236,4 +236,4 @@ time python3 tools/plugins/f2/nc_leaf.py                                        
 | C1 | 分類器が slot 位置でなく個数で `xmm_arg_drop` を付ける (Copilot) | `ldlib/pe.py` が `xmm_slots` を出し、`classify.py` は全 slot が IR 署名の同位置で float/double ならタグを付けない |
 | C2 | ネガコンが未検出でも exit 0 (Copilot) | 未検出・unexec があれば exit 1 |
 | C3 | 古い生成物が再実行・集計に混ざる (Copilot) | `leaf_diff.sh` が targets / leaf / leaf_custom の生成物を消してから再生成 |
-| C4 | `/opt/emsdk` の直書き (Copilot) | `[EMSDK]` (docs/REFERENCES.md) 参照に変更 |
+| C4 | emsdk の絶対パス直書き (Copilot) | `[EMSDK]` (docs/REFERENCES.md) 参照に変更 |
