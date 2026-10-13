@@ -105,6 +105,13 @@ expect(TypeError, mx.getTrackVolume, 1, mode=1)
 expect(TypeError, ch.soloChannel, 1, useGlobalIndex=True)
 ch.soloChannel(1, 1, useGlobalIndex=True)
 assert last() == (1, 1, True), last()
+# gap (既定値不明の省略引数) より後ろの未指定引数には stubs 既定値を足さない (足すと位置がずれる)
+ch.getGridBit(index=1)  # position が gap。後続 useGlobalIndex (stubs 既定 False) は省略
+assert last() == (1,), last()
+pl.triggerLiveClip(index=1, blockNum=2)  # flags が gap。後続 velocity (stubs 既定 -1) は省略
+assert last() == (1, 2), last()
+expect(TypeError, ch.getGridBit, index=1, useGlobalIndex=True)  # gap を越えた明示指定は従来どおり TypeError
+expect(TypeError, pl.triggerLiveClip, index=1, blockNum=2, velocity=5)
 # 未知の kwarg は既定値の評価 (stubs 由来の midi.* は eval できない) より先に TypeError
 expect(TypeError, dv.linkToLastTweaked, 1, 2, eventId=3)
 
@@ -162,7 +169,8 @@ for m, fs in t["modules"].items():
                     known.add(f"{m}.{n}")
 print(f"legacy bind が通った kw 呼出し {n_cmp} 件のうち新も同結果 {n_same}、差 {sorted(known)}")
 assert known == {"channels.getStepParam", "channels.soloChannel", "plugins.getColor", "plugins.getParamValueString"}, known
-assert n_cmp - n_same == 5, (n_cmp, n_same)
+# 差 8 件 = 上の 4 関数。うち 3 件 (soloChannel(index=)・getColor(flag=) ×2) は旧が gap 後の既定値で位置ずれさせていたもの (新は省略)
+assert n_cmp - n_same == 8, (n_cmp, n_same)
 
 # (9) kwlist の重複名 (arrangement.selectionSet は ['selStart','selStart','selectNotes',...]; バイナリ由来)
 #     最初の出現だけを kw で束縛し、2 つ目以降は位置専用 (kw では埋まらない)

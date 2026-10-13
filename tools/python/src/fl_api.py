@@ -64,6 +64,8 @@ def _make(mod, name, fid, sig, kwsig=None):
                 if gap is not None:
                     raise TypeError(f"{mod}.{name}() cannot skip optional argument '{names[gap]}' (default unknown)")
                 out.append(kw.pop(n))
+            elif gap is not None:
+                continue  # gap 以降の未指定引数は省略 (既定値を足すと位置がずれる)
             elif n in defaults:
                 out.append(eval(defaults[n], {}))  # stubs 由来の単純リテラル (True/False/0/-1/None)
             elif required is not None and i >= required:

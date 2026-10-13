@@ -3656,19 +3656,19 @@
  },
  "unassigned": [
   {
-   "table_va": "0xc3b140",
+   "table_va": "0x1501e48",
    "names": [
     "write"
    ]
   },
   {
-   "table_va": "0xc3ef30",
+   "table_va": "0x1502df0",
    "names": [
     "clone"
    ]
   },
   {
-   "table_va": "0xc3f0a0",
+   "table_va": "0x1502ea8",
    "names": [
     "getNote",
     "addNote",
@@ -3679,7 +3679,7 @@
    ]
   },
   {
-   "table_va": "0xc3fd70",
+   "table_va": "0x1503400",
    "names": [
     "ProgressMsg",
     "ShowMessage",
@@ -3687,13 +3687,13 @@
    ]
   },
   {
-   "table_va": "0xd2eb50",
+   "table_va": "0x15123d0",
    "names": [
     "getAlternative"
    ]
   },
   {
-   "table_va": "0xd2edd0",
+   "table_va": "0x1513008",
    "names": [
     "addChordMarker",
     "getChordMarker",
@@ -3701,13 +3701,13 @@
    ]
   },
   {
-   "table_va": "0xd338a0",
+   "table_va": "0x1513788",
    "names": [
     "activate_score"
    ]
   },
   {
-   "table_va": "0xd96180",
+   "table_va": "0x1520d60",
    "names": [
     "Execute",
     "execute",

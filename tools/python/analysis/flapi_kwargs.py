@@ -92,7 +92,8 @@ class Image:
             cur.append((o, ok[o]))
         if cur:
             tables.append(cur)
-        return [[e for _, e in t] for t in tables]
+        va0 = self.base + s.VirtualAddress - s.PointerToRawData
+        return [(va0 + t[0][0], [e for _, e in t]) for t in tables]
 
     def wrapper_args(self, fn, flags):
         """ラッパー冒頭 (最初の間接 call まで) の lea [rip+x] を回収し (fmt, kwlist) を返す。"""
@@ -179,7 +180,7 @@ def main():
     table = json.load(open(os.path.join(OUT, "flapi_table.json")))
     mods = {m: set(v) for m, v in table["modules"].items()}
     out = {"source": "${FL_WIN64_DIR}/extracted/block00031_PE.bin", "modules": {}, "unassigned": []}
-    for tbl in img.method_tables():
+    for tbl_va, tbl in img.method_tables():
         names = [e[0] for e in tbl]
         # module 決定: 表中の (name,doc) が table の module と一致する数
         score = {}
@@ -187,7 +188,7 @@ def main():
             score[m] = sum(1 for n, _, _, d in tbl if n in funcs and (not d or funcs[n]["doc"] == d or not funcs[n]["doc"]))
         best = max(score, key=score.get)
         if score[best] == 0:
-            out["unassigned"].append({"table_va": hex(tbl[0][1]), "names": names[:6]})
+            out["unassigned"].append({"table_va": hex(tbl_va), "names": names[:6]})
             continue
         tops = [m for m, s in score.items() if s == score[best]]
         for n, fn, fl, d in tbl:
