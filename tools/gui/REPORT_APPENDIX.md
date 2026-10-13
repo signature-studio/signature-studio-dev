@@ -1,4 +1,4 @@
-# gui REPORT 付録 — §9 GUI-4 (#180) 全文・§13 GUI-6 (#182) 全文
+# gui REPORT 付録 — §9 GUI-4 (#180) 全文・§14 GUI-6 (#182) 全文
 
 REPORT.md の 250 行上限のため §9 を無変更で分割移動 (#489 の §12 追加時)。本体: [REPORT.md](REPORT.md)。
 
@@ -68,6 +68,7 @@ bash tools/gui/e2e.sh                              # 全体 (PE lift を含む);
 ```
 
 
+## 14. GUI-6 (#182): 入力品質 (キー配列 / IME / タッチ・ジェスチャ / Pointer Lock・ClipCursor)
 既知類型との関係: lift 欠陥ではなく shim/host の意味論 (`docs/DEFECTS.md` D1a〜D16 に該当なし)。検証起点: 実装コミットは `8dd9457`、本 run の差分 (B2・推奨修正) は後続コミット (下記の数値はコミット済み tree で実測)。
 
 ### 結論
