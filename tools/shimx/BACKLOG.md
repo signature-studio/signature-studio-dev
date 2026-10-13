@@ -545,12 +545,14 @@
 
 ## SHX-T9 (#177) 実機 DllMain 経路の残 (2026-10-13 再測)
 
-詳細は `tools/shimx/REPORT_SHX-T9.md`。shimx 起因の fail-fast は逐次起動で 0 (停止は lift 側 #232 の `_UStrAsg` OOB)。
+詳細は `tools/shimx/REPORT_SHX-T9.md`。逐次起動 (`trace_soft_fix`) の範囲で shimx 起因の fail-fast は 0 (停止は lift 側 #232 の `_UStrAsg` OOB)。数値の出典は `tools/m11/shimx_link/results/survey.md`。
 
 | 区分 | 残 | 起票先 |
 |---|---|---|
-| GetProcAddress 名前空 miss (kernel32 10 / ole32 6 / shell32 1 / advapi32 1 / ntdll 1) | 19 | P1/P2 追加候補 (未実装 API 名の確定が必要) |
+| GetProcAddress 名前空 miss (kernel32 11 / ole32 6 / ntdll 1 / shell32 1 / advapi32 1) | 20 | P1/P2 追加候補 (未実装 API 名の確定が必要。ログに名前が出ないため要計測) |
+| GetProcAddress GUI 系 miss (dwmapi 23 / user32 8 / comctl32 12 / shcore 1) | 44 | tools/gui |
 | GetProcAddress 序数 miss (kernel32 `#39682`) | 1 | R1 (intptr 閾値 / 敷設) |
 | LoadLibrary 失敗 (Msctf.dll / avrt / PowrProf.dll) | 3 | R4 |
-| survey 範囲外 (unit 160 以降 range 連鎖) | 783 | #773 (harness) |
-| DllMain closure 完走 (stage 5/6) | 未達 | #232 |
+| survey unit 115 の shimx fail-fast (EnterCriticalSection NULL) | 1 | R7 (既定 fail-fast 方針。因果は未確認) |
+| survey unit 160 以降 (range 連鎖の有無は未確認) | 未確認 | #773 |
+| DllMain closure 完走 (stage 5/6) | 未達 | #232 (CLOSED・停止点のみ) |
