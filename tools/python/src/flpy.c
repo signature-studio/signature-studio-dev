@@ -12,8 +12,29 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef FLPY_STATIC
+/* PY-2 (#83): FLEngine 側 provider (fl_api_call) を同一 wasm に静的リンクする。JS import も JSON 往復も無い。
+ * fl_slot と本ファイルの 16B スロットは同一レイアウト (provider/fl_api.h の _Static_assert)。 */
+#include "fl_api.h"
+static unsigned g_trace_on;
+static unsigned long g_host_calls;
+#define TRACE_MAX 65536
+static unsigned short g_trace_fn[TRACE_MAX];
+static unsigned char g_trace_argc[TRACE_MAX];
+static inline int flhost_call(int fn_id, const unsigned char *argv, int argc, unsigned char *ret) {
+    if (g_trace_on && g_host_calls < TRACE_MAX) { g_trace_fn[g_host_calls] = (unsigned short)fn_id; g_trace_argc[g_host_calls] = (unsigned char)argc; }
+    g_host_calls++;
+    return fl_api_call(fn_id, (const fl_slot *)argv, argc, (fl_slot *)ret);
+}
+EMSCRIPTEN_KEEPALIVE void flpy_trace_reset(unsigned on) { g_trace_on = on; g_host_calls = 0; }
+EMSCRIPTEN_KEEPALIVE unsigned long flpy_host_calls(void) { return g_host_calls; }
+EMSCRIPTEN_KEEPALIVE unsigned flpy_trace_len(void) { return g_host_calls < TRACE_MAX ? (unsigned)g_host_calls : TRACE_MAX; }
+EMSCRIPTEN_KEEPALIVE const unsigned short *flpy_trace_fn(void) { return g_trace_fn; }
+EMSCRIPTEN_KEEPALIVE const unsigned char *flpy_trace_argc(void) { return g_trace_argc; }
+#else
 /* flhost_lib.js が提供するホスト import。戻り値 0=ok。ret は 16B スロット。 */
 extern int flhost_call(int fn_id, const unsigned char *argv, int argc, unsigned char *ret);
+#endif
 
 enum { T_NONE = 'N', T_BOOL = 'B', T_INT = 'I', T_DBL = 'D', T_STR = 'S', T_BYTES = 'Y', T_JSON = 'J', T_ERR = 'E', T_CB = 'F' };
 
@@ -306,3 +327,20 @@ EMSCRIPTEN_KEEPALIVE char *flpy_subinterp_run(const char *code, int mode) {
 EMSCRIPTEN_KEEPALIVE const char *flpy_last_error(void) { return g_last_error; }
 EMSCRIPTEN_KEEPALIVE void flpy_free(void *p) { free(p); }
 EMSCRIPTEN_KEEPALIVE int flpy_finalize(void) { return Py_FinalizeEx(); }
+
+#ifdef FLPY_STATIC
+#include <time.h>
+/* 境界単体のコスト: Python を経由せず C から fl_api_call(fn_id, 引数なし) を n 回。戻り S/J/E の本体は free する。返り値 = 合計 ns */
+EMSCRIPTEN_KEEPALIVE double flpy_bench_c(int fn_id, int n) {
+    fl_slot ret;
+    struct timespec a, b;
+    clock_gettime(CLOCK_MONOTONIC, &a);
+    for (int i = 0; i < n; i++) {
+        memset(&ret, 0, sizeof ret);
+        fl_api_call(fn_id, NULL, 0, &ret);
+        if (ret.tag == 'S' || ret.tag == 'J' || ret.tag == 'E') free((void *)(uintptr_t)ret.v.s.ptr);
+    }
+    clock_gettime(CLOCK_MONOTONIC, &b);
+    return (double)(b.tv_sec - a.tv_sec) * 1e9 + (double)(b.tv_nsec - a.tv_nsec);
+}
+#endif
