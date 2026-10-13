@@ -166,14 +166,14 @@ bash tools/gui/e2e.sh                              # 全体 (PE lift を含む);
 ```
 
 ## 10. GUI-5 (#181): 24/8/4/1bpp DIB・mono DDB と wasm SIMD128 行カーネル
-既知類型との関係: lift 欠陥ではなく shim の意味論 (`docs/DEFECTS.md` D1a〜D16 に該当なし)。ただし shim 自身の silent 誤りを 1 件発見 (下記「発見」)。検証起点: 実装 `dd7be3e`、本節の数値は最終 HEAD `9cff72c` のクリーン tree (gui_gdi.c は `dd7be3e` と同一) での実測。
+既知類型との関係: lift 欠陥ではなく shim の意味論 (`docs/DEFECTS.md` D1a〜D16 に該当なし)。ただし shim 自身の silent 誤りを 1 件発見 (下記「発見」)。検証起点: 実装 `dd7be3e`、本節の数値は `9cff72c` のクリーン tree での実測 (src/test は最終 HEAD と同一で、以降の commit は REPORT・DOC_MAP のみ; `gui_gdi.c` は `dd7be3e` と同一)。
 
 ### 結論
 - **機能欠落 (スコープ 1) は FL 非依存の範囲で解消**: `CreateDIBSection` の 1/4/8/24bpp (app から見えるネイティブ形式 `nat` と内部 BGRA shadow を pull/push で同期; 仕様 [PROTOCOL.md §8](PROTOCOL.md))・`CreateBitmap` の mono(1bpp)/24/32bpp・`StretchDIBits`/`SetDIBitsToDevice`/`SetDIBits`/`CreateDIBitmap`/`LoadBitmapW` の 1/4/8/24/32bpp 源・`GetDIBits` の 1/4/8/24/32bpp 出力・`GetDIBColorTable`/`SetDIBColorTable` (IMPORTS: STUB→IMPL, 実装 270→272)・mono↔color 転送の bk/text 色写像・`MERGEPAINT`。未対応は理由付き fail-fast (16bpp DIB / DIB_PAL_COLORS / 圧縮 / `CreateBitmap` 4,8,16bpp の初期 bits)。
 - **SIMD 化 (スコープ 2)**: `src/gui_simd.h` の行カーネル (ROP 15 種・AlphaBlend 定数/per-pixel alpha・不透明化コピー・2x 水平拡大) を wasm SIMD128 と scalar 参照で持ち、`BitBlt`/`StretchBlt`/`StretchDIBits`/`AlphaBlend` が使う。拡縮は x 写像を転送ごとに 1 回計算 (画素ごとの 64bit 除算を排除)。`lift/gui_wasm.sh` は既定 `-msimd128` (`GUI_NO_SIMD=1` で scalar)。
 - **受入条件は未達 → PR は `Refs #181`**: (a) `bash tools/gui/e2e.sh` の ALL PASS は runner に RetDec (`toolchain-retdec`) が無く PE lift 層 (2/6・3/6・4/6・6/6〜6d) を実行できず**未確認**、(b) issue の保留理由 (FLEngine が実際に要求する bpp/ROP を GUI-3 #174 の到達ログで確定) は未充足、(c) Chrome 上で SIMD 版 wasm 全体 (lift 済みアプリ込み) を走らせていない (SIMD は kernel 単位で node 検証)。
 
-### 検証 (全て最終 HEAD `9cff72c` のクリーン tree、runner 4 CPU、`uptime` load 0.5〜1.4)
+### 検証 (全て `9cff72c` のクリーン tree、runner 4 CPU、`uptime` load 0.5〜1.4)
 | 層 | 結果 | 陰性対照 |
 |---|---|---|
 | native `selftest` (ASan/UBSan) | **378 passed / 0 failed** (319 → 378: +59 assertion)。各 bpp の native↔shadow 往復 (24bpp 行 4B 境界・bottom-up/top-down・8bpp 最近傍/重複色 index 保持/SetDIBColorTable・4bpp nibble・1bpp MSB 先頭)・各 bpp 源の StretchDIBits・GetDIBits/SetDIBits・mono 色写像・fail-fast 5 件 | fail-fast 5 件は `SIGABRT` + API 名/理由の文字列を検査 (出力を EOF まで読む) |
