@@ -14,7 +14,8 @@ M = {p['name']: p for p in json.load(open(os.path.join(HERE, '..', 'PLUGIN_MATRI
 n = lambda x: format(x, ',')
 SECS = {}
 for r in csv.DictReader(open(os.path.join(HERE, '..', 'work', 'batch', 'status.csv'))):
-    SECS.setdefault(int(r['block']), []).append(int(r['seconds']))
+    if r['lift_rc'] == '0':   # 失敗 run の秒 (前提欠け等で即落ちた行) を lift 秒に混ぜない
+        SECS.setdefault(int(r['block']), []).append(int(r['seconds']))
 rng = lambda b: ('%d–%d' % (min(SECS[b]), max(SECS[b])) if min(SECS[b]) != max(SECS[b]) else str(SECS[b][0])) + ' (n=%d)' % len(SECS[b])
 SEC = sys.argv[1] if len(sys.argv) > 1 else ''
 import io, contextlib
@@ -34,6 +35,21 @@ for name, blk, _ in targets.SHELLS:
         f['vcall'], f['ptr_or_vt0'], f['iat_calls'], s['defines'], s['f80_funcs'], s['declares_unimpl'],
         ' (%s)' % s['unimpl_names'] if s['unimpl_names'] else '', s['emcc_c_rc'], rng(blk)))
 print('| 計 | | | **%s / %s** | | | | | %s | | | | |' % (n(tot[0]), n(tot[1]), n(tot[2])))
+
+if not SEC or SEC == '2':
+    up = os.path.join(W, 'unreached.json')
+    if not os.path.exists(up):
+        sys.exit('unreached.json が無い: 先に unreached_unique.py を実行する')
+    U = json.load(open(up))
+    print('@@S2')
+    print('| プラグイン | 非共通 関数 / B | 閉包 関数 / B | 閉包外 関数 / B | うちデータ参照あり 関数 / B | データ参照なし 関数 / B | 正の対照 (entry のデータ参照検出) |')
+    print('|---|--:|--:|--:|--:|--:|--:|')
+    for name, _, _ in targets.SHELLS:
+        o = U[name]
+        g = lambda k: '%s / %s' % (n(o[k + '_funcs']), n(o[k + '_bytes']))
+        ok = o['entries_found'] == o['entries'] and o['entries'] > 0
+        print('| %s | %s | %s | %s | %s | %s | %d/%d%s |' % (name, g('nonfw'), g('closure'), g('outside'), g('dataref'), g('nodataref'),
+              o['entries_found'], o['entries'], '' if ok else ' **NG**'))
 
 print('@@S3')
 print('| プラグイン | host call site 計 | slot0 (Dispatcher) 即値 ID (site) | 動的 ID | 他 slot (offset: site) | hs_ids.json に無い ID |')
@@ -65,11 +81,11 @@ for nm, e in engs:
           ', '.join(e['exports']) + (' (計 %d)' % e['n_exports'] if e['n_exports'] > len(e['exports']) else ''), ', '.join('%s (%d)' % kv for kv in e['imports'].items())))
 ep = os.path.join(W, 'engines.csv')
 if os.path.exists(ep):
-    print('\n| block | lift rc | final.ll define | `.pdata` で define 無し (B) | f80 関数 | 未実装 helper | `emcc -c` | fixcmp 後 `emcc -c` | lift 秒 |')
-    print('|--:|--:|--:|--:|--:|--:|--:|--:|--:|')
+    print('\n| block | lift rc | final.ll define | `.pdata` で define 無し (B) | f80 関数 | 未実装 helper | `emcc -c` | fixcmp 後 `emcc -c` | **f80_lower 後 `emcc -c` (最終)** | lift 秒 |')
+    print('|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|')
     for r in csv.DictReader(open(ep)):
-        print('| %s | %s | %s | %s / %s (%s B) | %s | %s | %s | %s | %s |' % (r['block'], r['lift_rc'], r['defines'], r['missing_define'], r['pdata_funcs'], r['missing_bytes'],
-              r['f80_funcs'], r['unimpl_helpers'], r['emcc_c_rc'], r['emcc_c_rc_after_fixcmp'], r['lift_s']))
+        print('| %s | %s | %s | %s / %s (%s B) | %s | %s | %s | %s | **%s** | %s |' % (r['block'], r['lift_rc'], r['defines'], r['missing_define'], r['pdata_funcs'], r['missing_bytes'],
+              r['f80_funcs'], r['unimpl_helpers'], r['emcc_c_rc'], r['emcc_c_rc_after_fixcmp'], r['emcc_c_rc_after_f80'], r['lift_s']))
 
 sys.stdout = _stdout
 out = _buf.getvalue()

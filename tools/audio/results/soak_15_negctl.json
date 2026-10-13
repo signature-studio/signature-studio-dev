@@ -1,0 +1,231 @@
+{
+ "date": "2026-10-13T04:27:22.099Z",
+ "quick": false,
+ "chrome": "headless google-chrome 154",
+ "note": "ran_at は部分再実行時のシナリオ単位時刻",
+ "host": {
+  "load_start": [
+   0.04,
+   0.15,
+   0.09
+  ],
+  "load_end": [
+   0.04,
+   0.14,
+   0.09
+  ],
+  "wall_s": 68.546,
+  "nproc": 4
+ },
+ "results": [
+  {
+   "name": "asio_ramp_b256_soak15_negctl",
+   "query": "api=asio&mode=ramp&buf=256&depth=2&secs=15&hiccup_ms=60&hiccup_every=200",
+   "ok": false,
+   "msg": "underruns=8 silence=5120; ramp mismatches=670464/721408; 実フレーム 721408f ≥ 公称 15s の 99% (712800f); secs_wall=15.009 ≥ 15; workletErrors=0 aborted=false exit=1(1=完了, 2=エラー)",
+   "result": {
+    "api": "asio",
+    "driver": "FL Studio ASIO",
+    "buf": 256,
+    "depth": 14,
+    "sr": 48000,
+    "mode": 1,
+    "secs_wall": 15.009,
+    "reported": {
+     "nin": 2,
+     "nout": 2,
+     "min": 128,
+     "max": 4096,
+     "pref": 512,
+     "gran": 128,
+     "lat_in": 865,
+     "lat_out": 5633,
+     "ch_type": 19
+    },
+    "stats": {
+     "cb_count": 2793,
+     "cb_late": 0,
+     "cb_max_us": 60010,
+     "cb_avg_us": 281,
+     "underruns": 8,
+     "silence_frames": 5120,
+     "in_overruns": 0,
+     "in_underflows": 0,
+     "min_fill": 256,
+     "avg_fill": 2442,
+     "wake_count": 1578,
+     "wait_timeouts": 0,
+     "ring_frames": 16384,
+     "quanta": 5629,
+     "reset_requests": 0,
+     "wake_hist": [
+      1527,
+      50,
+      1,
+      0,
+      0,
+      0
+     ],
+     "latency_changes": 8,
+     "T": 3584,
+     "burst_obs": 512,
+     "timeinfo_cb": 0
+    },
+    "timeinfo": {
+     "calls": 0,
+     "bad": 0
+    },
+    "clock": {
+     "samples": 60,
+     "fit_ok": 1,
+     "rate_hz": 48000.01,
+     "audible_minus_now_ms": 33.644,
+     "monotonic": 1
+    },
+    "produced_frames": 716800,
+    "resets_seen": 0,
+    "rate_changes": 0,
+    "exit": 1,
+    "ctx": {
+     "sampleRate": 48000,
+     "baseLatency": 0.010020833333333333,
+     "outputLatency": 0.03
+    },
+    "snapshot": {
+     "underruns": 8,
+     "silence_frames": 5120,
+     "quanta": 5640,
+     "in_overruns": 0,
+     "wl_state": 0,
+     "out_read": 716288,
+     "out_write": 716800,
+     "in_write": 0,
+     "in_read": 0,
+     "gen": 1,
+     "cb_count": 2794,
+     "cb_late": 0,
+     "cb_max_us": 60010,
+     "wake_count": 1578,
+     "wait_timeouts": 0,
+     "in_underflows": 0,
+     "min_fill": 256,
+     "clock_jumps": 0,
+     "clock_jump_frames": 0,
+     "ring_frames": 16384,
+     "buffer_frames": 256,
+     "depth": 14,
+     "sample_rate": 48000,
+     "out_latency_us": 30000,
+     "base_latency_us": 10021
+    },
+    "workletErrors": [],
+    "cfg": {
+     "api": "asio",
+     "mode": "ramp",
+     "buf": 256,
+     "depth": 2,
+     "secs": 15,
+     "sr": 48000,
+     "stress": 0,
+     "work_us": 0,
+     "hiccup_ms": 60,
+     "hiccup_every": 200,
+     "timeinfo": 0,
+     "sr_after": 0,
+     "burst_floor": 0,
+     "input": "none",
+     "jank": false,
+     "suspend": false
+    },
+    "ref_slope": {
+     "n": 61,
+     "ctx_per_wall": 0.9999998836900985
+    },
+    "verify": {
+     "covered_frames": 721408,
+     "sr": 48000,
+     "gen_inits": 1,
+     "playing_quanta": 5596,
+     "first_underrun_q": 398,
+     "last_underrun_q": 4437,
+     "underrun_events": 8,
+     "audio_thread_gap_ms_hist": {
+      "0": 4078,
+      "1-5": 61,
+      "6-12": 1499,
+      "13-20": 1,
+      "21-40": 0,
+      ">40": 0,
+      "max": 13
+     },
+     "spans": [
+      [
+       0,
+       50975,
+       1
+      ],
+      [
+       52352,
+       51231,
+       1592.03125
+      ],
+      [
+       104832,
+       51231,
+       3192.03125
+      ],
+      [
+       156800,
+       51231,
+       4792.03125
+      ],
+      [
+       208768,
+       51231,
+       6392.03125
+      ],
+      [
+       260224,
+       51231,
+       7992.03125
+      ],
+      [
+       311680,
+       51231,
+       9592.03125
+      ],
+      [
+       363136,
+       204831,
+       11192.03125
+      ],
+      [
+       568064,
+       153344,
+       17592.03125
+      ]
+     ],
+     "device_fill": {
+      "min": 0,
+      "max": 3584,
+      "avg": 2583.8351101634685,
+      "unit": "frames (リング充填, worklet 消費直前)"
+     },
+     "ramp": {
+      "frames_checked": 721408,
+      "bit_exact": 50944,
+      "mismatches": 670464,
+      "first_mismatch_frame": 50944,
+      "tail_shift_exact": {
+       "silence_S": 5120,
+       "checked": 17000,
+       "exact": 17000
+      }
+     }
+    }
+   },
+   "error": null,
+   "ran_at": "2026-10-13T04:27:22.098Z"
+  }
+ ]
+}
