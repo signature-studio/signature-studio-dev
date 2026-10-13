@@ -174,7 +174,7 @@ VA/RVA 変換の ImageBase 化は、`ImageBase` が `0x400000` の PE では出�
 
 ## 8. x64c 側 lift 集合外 359 関数の分類 (#410 受入 1 つ目)
 
-`thunk_classify.py` (PE 静的解析) で分類した。入力は commit 済みの `tools/liftdiff/results/flelift_closure_verdicts.tsv` (RTL 帯 `[0x401000,0x456e98)` の `no_wasm_definition` 359 件を抜き出したもの) と、`fl-win64` の `extracted/block00031_PE.bin`。`work-liftdiff` の batch jsonl は本 run では取得できなかったため使っていない (VA 集合は TSV と同一の 359 件であることを確認)。
+`thunk_classify.py` (PE 静的解析) で分類した。入力は commit 済みの `tools/liftdiff/results/flelift_closure_verdicts.tsv` (RTL 帯 `[0x401000,0x456e98)` の `no_wasm_definition` 359 件を抜き出したもの) と、`fl-win64` の `extracted/block00031_PE.bin`。`work-liftdiff` の batch jsonl は本 run では取得できなかったため使っていない。
 
 | 分類 | 件数 | 根拠 |
 |---|--:|---|
@@ -185,4 +185,4 @@ VA/RVA 変換の ImageBase 化は、`ImageBase` が `0x400000` の PE では出�
 * 同じ 359 件の m11 (RetDec) 側の採点は §2 の注記を正とする (測定値の二重記載を避けるため、ここには数値を書かない)。m11 は thunk を関数として扱える。
 * 推定 (未検証): x64c は thunk を wasm 関数として定義せず、呼出側の `jmp [IAT]` を import 直呼びに置き換える (`x64c.py` の `thunks` 経路)。そのため thunk 自体は「定義なし」になる。**lift 集合に pass を足しても thunk 関数の採点は直ちには成立しない** (thunk 単体を比較するには、import 呼出 1 本の wasm 関数を生成する必要がある)。
 * 結論: 受入条件「lift 集合外 359 の原因分類」は本節で達成。「lift 集合に pass を追加」は本 run では未着手 (tools/flelift の変更とリビルド・batch 再採点が要るため。起票先: #253 に継続 (未起票の新 issue は PM 判断))。
-* 再現: `python3 tools/m11/rtl/thunk_classify.py <block00031_PE.bin> tools/liftdiff/results/flelift_closure_verdicts.tsv` (出力は上記と同一。batch jsonl を入力にしても同じ 359 / 311 になることを、jsonl を TSV から再生成して確認)。
+* 再現: `python3 tools/m11/rtl/thunk_classify.py <block00031_PE.bin> tools/liftdiff/results/flelift_closure_verdicts.tsv` (入力は TSV のみ。batch jsonl を入力にした結果は本 REPORT では主張しない)。
