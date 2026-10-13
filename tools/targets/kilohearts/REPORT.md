@@ -206,3 +206,10 @@ VEX-256 は 344 関数 189,611 B 中 **closure 内は 6 関数のみ** (Convolve
 - Resonator の C 化 (`ghidra_to_c.py resonator`、修復なし) は **ビルド未成功 (emcc 失敗)**。エラー 21 件以上・先頭 10 件の種類: 128bit レーン参照 `_8_8_`/`_4_12_`/`_0_8_` が V128 に無い 3 種、`rcpps` 未実装、`FUN_180fcf904` の引数不一致、`func_0x000180fbdef4` 未定義 stub 等。このため突合・ablation・ネガコンは未実施。
 - 未実施 (理由: 128bit レーン・rcpps/rsqrtps 近似表 (`snapins/scripts/approx_tables.b64`) の C 移植・プロトタイプ整合・stub 追加が未完)。
 - `run_all.sh` (Gain/Haas/Gate) は本 PR では再実行していない。値は §10-3 (c4841f4, n=3) を引用。
+
+#### 10-7b. #556 2 回目 run (Resonator の emcc 再現・callee 追加 decompile)
+- 素材: `plugins-kilohearts` の Windows Installer zip のみ展開 (`extract_installer.sh` は dmg を必須とするため HeartCore 抽出を手で再現)。Ghidra 12.1.4 は GitHub release から再取得 (sha256 一致)。`pefile`・`capstone` は pip 導入。
+- Resonator 7 関数 (修復なし) → `ghidra_to_c.py` → emcc: **失敗を再現** (`resonator.c` 21 件)。内訳: 128bit レーン `_8_8_`/`_4_12_`/`_0_8_` (V128 未定義)、`ushort` 型未定義、`rcpps` 未実装、`func_0x…` 形式の未解決 callee。
+- callee 5 関数 (`0x180fd62dc` `0x180fd6320` `0x180fb6ce0` `0x180fd648c` `0x180fbdef4`) を追加 decompile: 計 12 件 OK。ただし Ghidra 出力の `func_0x…` は未関数化アドレスのため、emcc の未解決は残る。
+- shim に `ushort` を追加 (機械的な型定義のみ)。128bit レーンと `rcpps` は未対応。
+- 突合・ablation・ネガコンは未実施。Stereo / Delay は未着手。
