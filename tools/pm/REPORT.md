@@ -97,3 +97,25 @@ RETRO §3 の良い点の根拠。数値はこちらが正本。
 - 競合 PR の fix を repository_dispatch (watchdog) で起動し、検出から push まで: 約 2.5 分 (#576, #689・PM 記録)。
 - schedule(*/5) の発火: #724 の merge から 80 分時点で 0 件、2 時間時点で 0 件 (PM 記録)。
 - `m11_gen_ir2.sh` の所要: 約 26 秒 (PM 記録)。
+
+## 9. actions/runs の全ページ取得 (#889)
+
+`actions/runs` を `per_page=100` の 1 ページだけ読むと、未完了 run が 100 件を超えたときに古い run が落ちる。
+`pr_gaps.py`・`sync_status.py`・`issue_snapshot.py`・`restart_failed.sh`・`rest_heal.py` を全ページ取得に直した
+(`rest_heal.py` は `gh api --paginate --slurp` で読む `runs()` ヘルパ)。
+
+実測 (取得時刻 UTC・`gh api --paginate` の結果。`total_count` は `per_page=1` の値):
+
+| 条件 | total_count | 全ページ取得件数 | 所要 |
+|---|---:|---:|---:|
+| `status=in_progress` (17:53:43Z) | 48 | 47 | 2.7 s (取得時点の実行中 run が変動) |
+| `status=in_progress` (17:53:45Z 再取得) | 47 | 47 | 同上 |
+| `status=in_progress` `per_page=10` (5 ページ) | - | 45 (`per_page=100` と一致) | - |
+| `status=queued` | 1 | 0 | 0.8 s |
+| `status=pending` | 3 | 3 | - |
+
+- `per_page=10` (5 ページ) と `per_page=100` の比較は、取得時点の変動を含む 1 回の比較である。
+  実行中 run の件数は連続した呼び出しで変動した (in_progress の total_count 43 → 44 → 43、全ページ取得の重複除去後 43 → 44 → 45)。
+  そのため「ページ跨ぎで欠落が無い」とは断定せず、その時点の 1 スナップショットの一致として扱う。
+- `status=completed` は GitHub API の 1000 件上限があるため、本ツールは使わない (対象は実行中の 4 状態のみ)。
+- 件数が 100 件を超える状態の再現は、本 run ではできなかった (実行中 run が 50 件前後)。

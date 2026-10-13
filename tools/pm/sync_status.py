@@ -43,7 +43,7 @@ for p in prs:
 title2num = {i["title"]: n for n, i in issues.items()}
 running = set()
 for s in ("in_progress", "queued"):
-    for r in js("gh", "api", f"repos/{R}/actions/runs?status={s}&per_page=100")["workflow_runs"]:
+    for r in [json.loads(l) for l in sh("gh", "api", "--paginate", f"repos/{R}/actions/runs?status={s}&per_page=100", "--jq", ".workflow_runs[]").splitlines()]:
         if r["event"] == "issue_comment" and r["display_title"] in title2num:
             running.add(title2num[r["display_title"]])
 

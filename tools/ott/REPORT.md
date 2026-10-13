@@ -216,3 +216,11 @@ OTT_ULP_TOL=2 bash tools/ott/ott_e2e.sh  # 許容 ulp 指定
 |---|---|---|
 | `test_unit.py` の `T = ../..` 相対 (FA_PE 等) は `REPO_ROOT` 化していない | 固定パスではなく挙動不変のため据え置き | #294 にコメント |
 | `import_scan.py` / `build_avx.sh` / `lift_crt.sh` の実素材での通し実行 | 本 run は素材 (FLEngine, emcc ビルド) 未実行 | #294 にコメント |
+
+## 13. x64c ia32 front-end (#896 / #1094 fix 再実測, 3d1ff740)
+
+- 入力: `block22434_PE.bin` (fl-win64 素材 `extracted/`)、roots = `0x10007ca0` (`main`)。
+- `--arch ia32 --closure 0` → `functions 1, insns 30, unsup {}, unlifted callees 2`。`--closure 2` → `functions 8, insns 301` (closure 範囲の差)。
+- 生成 C (`--closure 0`) を `cc -c -O1 -I tools/ott/rt ott_lifted.c` → rc=0。`emcc` は runner に無く `emcc -c` は未実行。
+- `--arch x64` + ia32 PE → `fail-fast` (exit 1)。
+- 未解決 (ia32 の関数境界・x87・jump table 実データ) は #1098 / #1099 / #1117。

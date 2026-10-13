@@ -13,7 +13,7 @@
    15 本 → 7 本に縮退する。その結果、乱数列がずれ、ランダムシナリオ先頭 (`S2000`) で native が Abort して MISMATCH になる。
    同一コードで epf を展開すると ctrl は 15/15 bit-exact PASS (A/B, §2.1)。
 2. **rep movsb/stosw の Unsupported は実在する** (baseline build で 17 関数・26 命令)。本 PR で rep movs{b,w,d,q} と
-   rep stosw を実装し、rep 起因の Unsupported を 0 にした。ctrl e2e は rep 経路を**実行する** (`h_rep_str` 先頭の trap で FAIL, §7.1)。
+   rep stosw を実装し、rep 起因の Unsupported を 0 にした。ctrl e2e は rep 経路を**実行する** (`h_rep_str` 先頭の trap で FAIL, §10.1)。
    comp / filter の rep 経路の動的確認は未実施 (§5)。
 3. capstone 5.0.7 は `rep movsb` を単一 mnemonic `rep movsb` で返す (実測)。capstone 4.0.2 は導入できず
    (sdist ビルドが `pkg_resources` を要求)、版差の影響は**未切り分け**。FA-2c (9b420bd) 以降 `mlift/` は無変更
@@ -64,7 +64,7 @@
 
 ### 2.3 rep movs / stosw の実行到達性 (負のコントロール)
 
-rep 経路の trap 版 (`h_rep_str` 先頭への `llvm.trap`) の数値は **§7 が正本** (§7.1 / §7.2)。ctrl は rep 経路を実行し、trap 版で FAIL する。
+rep 経路の trap 版 (`h_rep_str` 先頭への `llvm.trap`) の数値は **§10 が正本** (§10.1 / §10.2)。ctrl は rep 経路を実行し、trap 版で FAIL する。
 comp / filter の trap 版は未実施のため、それらの rep 経路の動的確認は未達 (§5)。
 
 ### 2.4 epf 欠落時のゲート (負のコントロール)
@@ -86,7 +86,7 @@ comp / filter の trap 版は未実施のため、それらの rep 経路の動�
   `mlift_ops.py` の `emit_sse` に追加。`build_ctrl.sh` の FAIL は `pcmpeqw`・`pshuflw` が消え、
   残りは `vpcmpeqw ymm1` (256bit AVX2, mlift は ymm 未対応) の 1 件のみ (`failed(funcs with unsupported) 1`)。
 - 残った `vpcmpeqw ymm` は ctrl closure 内 (f_1810577ac @181057857) で、ymm 対応は未実装。
-- rep 経路のネガコン (trap 版) の数値は §7 が正本 (§2.3 と同じ。旧記録の「15/15 PASS」は誤り・撤回)。
+- rep 経路のネガコン (trap 版) の数値は §10 が正本 (§2.3 と同じ。旧記録の「15/15 PASS」は誤り・撤回)。
   comp 側の trap 版は未実施。
 - 未解決: rep movs/stosw を実行する scenario の追加 (受入 1)、seed 非依存化 (受入 3)、`vpcmpeqw ymm` (受入 2 の残り)。
 
@@ -112,7 +112,7 @@ bash tools/targets/freshair/lift2/lift2_e2e.sh                                  
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| rep movs/stosw の経路は ctrl e2e で実行・検出される (§7.1)。comp/filter の rep 経路は未実行 (trap 版未実施) | comp/filter 側の rep 系 lowering の誤りを e2e が検出するかは未確認 | #692 (FA-11) |
+| rep movs/stosw の経路は ctrl e2e で実行・検出される (§10.1)。comp/filter の rep 経路は未実行 (trap 版未実施) | comp/filter 側の rep 系 lowering の誤りを e2e が検出するかは未確認 | #692 (FA-11) |
 | SSE 整数 `pcmpeqw`/`pshuflw`/`vpcmpeqw` の lowering 未実装 (ctrl closure 2 関数, trap) | 到達すると wasm trap。現シナリオでは未到達 | #692 に併記 |
 | CI の素材配線: plugins-freshair の Win zip → `work/win` の epf 展開が無い (fetch.sh は既存ディレクトリでスキップ) | ctrl 工程は epf 欠落で exit 2 (手動展開が必要) | #693 (FA-12) |
 | 2/5 回帰セットが epf 有無で乱数列が変わる seed 依存 | 別 seed では native OOB の可能性 (既知限界の再発) | #692 に併記 |
@@ -146,17 +146,42 @@ bash tools/targets/freshair/lift2/lift2_e2e.sh                                  
 - `vpcmpeqw` (ymm、`f_1810577ac`) の lowering。
 - epf 展開の素材配線は #693。
 
-## 7. FA-10 (#666) rep 経路のネガコン (ctrl) — 実測・受入 4 達成
+## 7. FA-14 (#907): 回帰セットの seed 依存の実測 (2026-10-13)
+
+- 検証基点: `origin/main` = `99b87bc2`。素材は `plugins-freshair` のみ (`FA_DL` → `fetch.sh`、factory .epf 8 本を補完)。
+- 既定 `run_ctrl.sh 2 5` は seed `0xFA2C0001` 固定 (`run_ctrl.sh` 既定値)。#907 受入 1 の「seed を固定値で明記」の方式を採る (コード変更なし)。
+  epf 欠落時は `run_ctrl.sh` が exit 2 で止まる (本 run で退避実測: `ERROR: factory .epf 8 本が無い ... 生成シナリオ 7 本`, rc=2)。この rc=2 は PASS ではなくゲート停止であり、epf 欠落時の PASS は仕様上対象外。epf 有時は 15/15 PASS (§9)。
+- 別 seed の実測 (structured 2 + random 5、native のみ、`native_ctrl` 単体):
+  - `0x1` / `0x2` / `0x3` はいずれも `native_ctrl` が `Aborted` (rc=134) で途中停止 (出力 8 / 10 / 9 行、15 行に満たない)。
+  - 既知限界 (`run_ctrl.sh` 冒頭: 乱数が意味 field に OOB 書込を起こす) の再発で、seed 非依存ではない。
+- epf 8 本のみ (`gen_ctrl_scen.py <out> 0 0 <seed>`、乱数未使用) の native 出力は seed 0x1/0x2/0x3 で全て rc=0・8/8 行・ERR 0。
+  seed 間の出力差の内訳は本 run では分類していない。判定の根拠は `ctrl_norm.py` の規則 (8 byte 単位で値 ≥ `MASK_MIN` = 0x100000000 の 16 桁を両側同時にマスク) のみで、マスク後に一致することは本 run では未実測 (seed 0x1/0x2/0x3 の wasm 側出力は未取得)。同一 seed の再実行で差が変わるかも未測定 (素材不足で e2e を再実行できない)。
+- 結論: 既定の structured/random を含む回帰は seed 依存 (0x1/0x2/0x3 で native_ctrl が abort、上記実測)。epf 8 本のみの部分は native で seed 0x1/0x2/0x3 とも rc=0 だが、seed 非依存とは未確認 (wasm 比較は未実施)。
+
+## 8. FA-14 (#907) 未達と起票先
+- 受入 2 (`vpcmpeqw ymm`): mlift のレジスタは `XMM = <4 x i32>` 固定で ymm (256bit) の上位を保持できず、構造変更が要る。1 run に収まらないため子 issue に分割する。
+- 受入 3 (`lift2_e2e.sh` ALL PASS): §9 に実測 (実測 commit `c531a0cb`)。
+- 受入 2 の子 issue: [FA-15] lift2 ctrl closure の vpcmpeqw ymm (AVX2 256bit) lowering — #1105 (OPEN、親 #907)。
+
+## 9. FA-14 (#907) 実測: lift2_e2e.sh (`origin/main` = `99b87bc2`)
+
+- 実測の commit: `c531a0cb`。lift2 コードは `99b87bc2` と同一で、`99b87bc2..c531a0cb` の差分は本ファイル (REPORT_APPENDIX.md) のみ。`RESULT: lift2_e2e ALL PASS`, rc=0, real 1m14.253s, user 1m10.095s, load 0.22 (`uptime`), TMPDIR=`$RUNNER_TEMP`。
+- 基点 `99b87bc2` でも実測: rc=0, real 1m18.548s, load 0.12, ALL PASS。
+- 注: 上記は素材取得時の実測。後続のレビュー run では素材不足で再実行できていない (未再検証)。
+- ただし step 6 (ctrl build) は `failed(funcs with unsupported) 1` (`f_1810577ac: vpcmpeqw ymm1, ymm1, ymmword ptr [r9]`)。build は継続し、ctrl 出力は 15/15 BIT-EXACT (epf 8 + structured 2 + random 5, fma0/1)。
+- ctrl ERR: native/wasm 1/1 (同一 scenario)。comp/filter/fuzz/ABI/ablation 5 種はいずれも実測どおり PASS。
+
+## 10. FA-10 (#666) rep 経路のネガコン (ctrl) — 実測・受入 4 達成
 
 本節が rep 経路ネガコンと検証 HEAD の数値の正本 (§2.3・§2.6 は本節を参照)。検証 HEAD は **`3214a40e`** (全節共通)。
 
-### 7.0 前回記録の訂正
+### 10.0 前回記録の訂正
 
-- 旧 §2.3 / §2.6 の「trap 版 15/15 PASS」は**未検証として削除**する。その記録は HEAD (`32f3561b` / `5aec7dda` / `84e43186` の 3 種が混在) と trap の挿入位置を特定できず、同一 HEAD での再実行 (§7.1) とも一致しない。
-- 同一 HEAD `3214a40e` での再実行 (§7.1) は FAIL (exit 1) で、旧「trap 版 exit 1」の記録 (旧 §7.1) と一致した。以後の数値は本節の実測のみを採る。
-- 旧 §7.3 の全体実行値 (real 48.302 s) は旧 run の値。本節の数値は §7.3 の 1 箇所に集約する (他節は参照のみ)。
+- 旧 §2.3 / §2.6 の「trap 版 15/15 PASS」は**未検証として削除**する。その記録は HEAD (`32f3561b` / `5aec7dda` / `84e43186` の 3 種が混在) と trap の挿入位置を特定できず、同一 HEAD での再実行 (§10.1) とも一致しない。
+- 同一 HEAD `3214a40e` での再実行 (§10.1) は FAIL (exit 1) で、旧「trap 版 exit 1」の記録 (旧版の §10.1) と一致した。以後の数値は本節の実測のみを採る。
+- 旧版の §10.3 の全体実行値 (real 48.302 s) は旧 run の値。本節の数値は §10.3 の 1 箇所に集約する (他節は参照のみ)。
 
-### 7.1 rep 経路ネガコン (HEAD `3214a40e`, 実測)
+### 10.1 rep 経路ネガコン (HEAD `3214a40e`, 実測)
 
 - 対象: `h_rep_str` 先頭に `llvm.trap` + `unreachable` を入れた一時版 (`mlift/mlift_ops.py`)。`ctrl_rep.json` に `rep movsb` / `rep stosb` / `rep stosw` / `rep stosq` が入っており、ctrl 閉包はこれを実行する。
 - 検証 HEAD `3214a40e` (`mlift/mlift_ops.py` の blob `f8f57a70`。PR 最新 `b6f3896a` とこのファイルは同一)。
@@ -166,7 +191,7 @@ bash tools/targets/freshair/lift2/lift2_e2e.sh                                  
 - 元に戻した版: `git checkout -- tools/targets/freshair/lift2/mlift/mlift_ops.py` → `git show 3214a40e:…/mlift_ops.py | cmp - …` で **一致 (CMP OK)**。
 - 判定: rep 経路 (`stos*`/`movs*` 共通の `h_rep_str`) の誤りは ctrl e2e で検出される。受入 4 達成。comp / filter の trap 版は未実施 (§5 の未解決)。
 
-### 7.2 再現コマンド
+### 10.2 再現コマンド
 
 1. HEAD `3214a40e` で `mlift/mlift_ops.py` の `h_rep_str` の `bits = ...` 行の直前に `fl.e('call void @llvm.trap()'); fl.e('unreachable'); return True` を入れる。
 2. `bash build_ctrl.sh` → `bash run_ctrl.sh 2 5` (foreground, `TMPDIR=$RUNNER_TEMP`)。exit 1 / `同一 scenario: NO` / `RuntimeError: unreachable` を期待する。
@@ -174,7 +199,7 @@ bash tools/targets/freshair/lift2/lift2_e2e.sh                                  
 
 素材: `work-liftlib-targets` を展開し、`plugins-freshair` は `FA_DL` の `fetch.sh` で epf 8 本を補完 (`work/win` に 8 本を確認)。emsdk / retdec は `/opt` 既存。
 
-### 7.3 lift2_e2e.sh 全体 (元に戻した HEAD `3214a40e`, 実測)
+### 10.3 lift2_e2e.sh 全体 (元に戻した HEAD `3214a40e`, 実測)
 
 - 実測: `RESULT: lift2_e2e ALL PASS`, exit 0, real **60.300 s**, load 0.53→0.89 (nproc 4, TMPDIR=`$RUNNER_TEMP`)。
 - comp 400/400 BIT-EXACT (non-grow 206/206・grow 194/194)・filter BIT-EXACT・fuzz 4 系統 mismatch 0 (各 1200, ERR 0/0)・ABI violations 0・ctrl BIT-EXACT 15/15 (fma0/fma1 とも `ERR native/wasm 1/1 同一 scenario: yes`)・ablation 5 種すべて検出 (comis_noflags 200/200, xmm_args_drop 200/200, xmm_ret_drop 200/200, icall_drop 80/200, cmov_drop 172/200)。

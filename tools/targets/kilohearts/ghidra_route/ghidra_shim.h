@@ -16,6 +16,7 @@ typedef long long longlong;
 typedef unsigned long long ulonglong;
 typedef unsigned int uint;
 typedef unsigned char byte;
+typedef unsigned short ushort;
 
 typedef union {
     uint8_t b[16];

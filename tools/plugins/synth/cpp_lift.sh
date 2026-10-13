@@ -4,7 +4,7 @@
 # RetDec は IR (.ll) を出力した後に C (HLL) 生成へ進むが、後段の pass 鎖は .ll しか使わない。 巨大 DLL (Morphine) では HLL 生成が終わらないため、
 #   e.drc.ll の最終更新から HLL_CAP 秒 (既定 300) 経っても RetDec が生きていれば RetDec だけを kill し、後段 pass 鎖を .ll から再開する
 #   (kill した場合は summary.csv 末尾の hll_killed_s にその時点の経過秒、しなければ 0)。 RESUME=1 なら RetDec を呼ばず既存の e.drc.ll から再開。
-#   再開用スクリプトは lift/lift_ranges.sh から RetDec 呼出の 2 行だけを除いた写しを実行時に作る (本体の更新に追従する)。
+#   再開は lift/lift_ranges.sh を PLUG_REUSE_DRC=1 で直接呼び、既存の e.drc.ll から後段だけを回す (RetDec は飛ばす。本体の更新にそのまま追従する)。
 # 出力: work/synth/cpp<block>/ と summary.csv の 1 行:
 #   block,pdata_funcs,lift_rc,defines,f80_funcs,unimpl_helpers,i256_trap,emcc_c_rc,fixcmp_patched,emcc_c_rc_after_fixcmp,lift_s,missing_define,missing_bytes,missing_ref,extra_inside,function_defines,hll_killed_s
 set -uo pipefail
@@ -16,8 +16,8 @@ B="$1"; TMO="${2:-2400}"
 export PLUG_AVX256="${PLUG_AVX256:-0}"
 OUT="work/synth/cpp$B"
 HLLCAP="${HLL_CAP:-300}"
-resume_script() {
-  sed -e "s#^HERE=.*#HERE=\"$PWD/lift\"#" -e '/^\/opt\/retdec\/bin\/retdec-decompiler/,/retdec\.log/d' lift/lift_ranges.sh > "$OUT/lift_resume.sh"
+resume_lift() {
+  PLUG_REUSE_DRC=1 bash lift/lift_ranges.sh "$PE" "$OUT/ranges.txt" "$OUT" e "$TMO" > "$OUT/lift.log" 2>&1
 }
 if [ "${RESUME:-0}" = 1 ]; then
   [ -f "$OUT/e.drc.ll" ] || { echo "RESUME=1 だが $OUT/e.drc.ll が無い" >&2; exit 2; }
@@ -31,8 +31,7 @@ PE="$FL_WIN64_DIR/extracted/block$(printf %05d "$B")_PE.bin"
 t0=$(date +%s)
 killed=0
 if [ "${RESUME:-0}" = 1 ]; then
-  resume_script
-  bash "$OUT/lift_resume.sh" "$PE" "$OUT/ranges.txt" "$OUT" e "$TMO" > "$OUT/lift.log" 2>&1
+  resume_lift
   rc=$?
 else
   bash lift/lift_ranges.sh "$PE" "$OUT/ranges.txt" "$OUT" e "$TMO" > "$OUT/lift.log" 2>&1 &
@@ -40,15 +39,14 @@ else
   while kill -0 "$lp" 2>/dev/null; do
     if [ -f "$OUT/e.drc.ll" ] && [ $(( $(date +%s) - $(stat -c %Y "$OUT/e.drc.ll") )) -gt "$HLLCAP" ]; then
       killed=$(( $(date +%s) - t0 ))
-      pkill -f "retdec-decompiler $PE" || true
+      for p in $(pgrep -f "retdec-decompiler $PE"); do kill "$p" 2>/dev/null || true; done
       break
     fi
     sleep 3
   done
   wait "$lp"; rc=$?
   if [ "$killed" != 0 ]; then
-    resume_script
-    bash "$OUT/lift_resume.sh" "$PE" "$OUT/ranges.txt" "$OUT" e "$TMO" > "$OUT/lift.log" 2>&1
+    resume_lift
     rc=$?
   fi
 fi
