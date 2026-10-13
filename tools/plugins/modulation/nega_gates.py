@@ -137,5 +137,21 @@ case('NC6-0', '対照: 実 status.csv', E, 0, env={'STATUS_CSV': real}, must='ju
 case('NC6-1', '不合格行 (Fruity Flanger emcc_c_rc=1) を最終行に持つ status.csv', E, 1,
      env={'STATUS_CSV': write('nc6.csv', bh, poison)}, absent='[modulation_e2e] OK', must='judge: FAIL 7/8')
 
+print('--- NC7: icall_check.py (IR の間接 call が静的 site に満たない殻の検出)')
+IK = [sys.executable, os.path.join(HERE, 'icall_check.py')]
+case('NC7-1', '実データ (8 本とも IR の間接 call 0 = 既知の脱落): --gate は非 0 であること', IK + ['--gate'], 1, must='殻 = 8/8 本')
+sf = os.path.join(N, 'facts_flanger.json')
+json.dump({'Fruity Flanger': F['Fruity Flanger']}, open(sf, 'w'))
+j10 = json.load(open(os.path.join(P, 'work', 'modulation', 'icall', '%s.icall.json' % B)))['call_non_iat']
+src = open(os.path.join(BD, B, 'p.final.ll'), errors='replace').read().split('\n')
+k0 = next(i for i, l in enumerate(src) if l.startswith('define '))
+for tag, n_inj, want, why in [('NC7-2', j10 - 1, 1, '殻 = 1/1 本'), ('NC7-3', j10, 0, '殻 = 0/1 本'), ('NC7-4', j10 + 1, 0, '殻 = 0/1 本')]:
+    bdir = os.path.join(N, 'icall_' + tag)
+    os.makedirs(os.path.join(bdir, B))
+    inj = ['  %inj.p = inttoptr i64 0 to ptr'] + ['  %%inj.c%d = call i64 %%inj.p()' % i for i in range(n_inj)]
+    open(os.path.join(bdir, B, 'p.final.ll'), 'w').write('\n'.join(src[:k0 + 2] + inj + src[k0 + 2:]))
+    case(tag, '%s の IR に間接 call を %d 本注入 (静的 site %d) --gate' % ('Fruity Flanger', n_inj, j10),
+         IK + ['--gate', '--facts', sf, '--batch-dir', bdir, '--out', os.path.join(N, 'icall_out_' + tag)], want, must=why)
+
 print('nega_gates: %s (%d 件不一致)' % ('FAIL' if fails else 'OK', len(fails)))
 sys.exit(1 if fails else 0)

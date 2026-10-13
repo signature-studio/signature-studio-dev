@@ -2,9 +2,10 @@
 # PLG-F5 (#202) modulation 8 本の「lift 前提」実測を 1 コマンドで再現する。
 #   bash tools/plugins/modulation/modulation_e2e.sh [--skip-lift | --judge-only]
 # 手順: 前提 inventory (work/ 無ければ生成) → 8 閉包 → batch_lift (RetDec+pass 鎖 → emcc -c) → judge.py (gate)
-#       → closure_facts.py → matrix_check.py → ids_crosscheck.py → engine 4 本 (参考・判定外)
+#       → closure_facts.py → matrix_check.py → ids_crosscheck.py → icall_check.py (測定) → engine 4 本 (参考・判定外)
 # exit 0 は「殻 8 本の judge / matrix_check / ids_crosscheck が全て合格し、engine 4 本の測定行が揃った」ことだけを意味する。
-#   engine の `emcc -c` 結果は判定に含めない (最終行に件数を出す)。 どれかが不合格なら非 0 で終わり、最終の OK 行は出ない。
+#   判定に含めないもの (最終行に件数を出す): engine の `emcc -c` 結果、 icall_check.py の「IR の間接 call 脱落」((icall §4) D1。 既知で未修復 = #514)。
+#   どれかの判定が不合格なら非 0 で終わり、最終の OK 行は出ない。
 #   --skip-lift  : lift を再実行せず、既存の work/batch/status.csv の最終行で判定する (closure_facts 以降は実行する)
 #   --judge-only : --skip-lift の判定だけ実行して終了 (STATUS_CSV=<path> で入力を差し替え可。 ネガティブコントロール用)
 # 出力: work/modulation/{status8.csv,facts.json,engines.csv} (work/ は gitignore)
@@ -26,7 +27,7 @@ mkdir -p work/modulation
 if [ "$MODE" != "--judge-only" ]; then
   if [ ! -d work/winfuncs ] || [ ! -f work/win_abi.json ]; then
     python3 inventory/win_scan.py
-    python3 modulation/mk_blockmap.py
+    python3 inventory/blockmap_from_matrix.py
     python3 inventory/win_funcs.py
     python3 inventory/win_unique.py > /dev/null
     python3 inventory/win_abi.py > /dev/null
@@ -54,6 +55,10 @@ if [ "$MODE" = "--judge-only" ]; then echo "[modulation_e2e] judge-only: PASS"; 
 python3 modulation/closure_facts.py > work/modulation/facts.stdout.json 2> work/modulation/facts.err
 python3 modulation/matrix_check.py || { echo "[modulation_e2e] FAIL: matrix_check" >&2; exit 1; }
 python3 modulation/ids_crosscheck.py || { echo "[modulation_e2e] FAIL: ids_crosscheck" >&2; exit 1; }
+# 間接 call 脱落の測定 (脱落自体は判定外。 audit と別算法の線形 sweep が食い違えば測定不正として FAIL)
+python3 modulation/icall_check.py | tee work/modulation/icall.txt || { echo "[modulation_e2e] FAIL: icall_check (測定の検算不一致)" >&2; exit 1; }
+ICALL_DROP=$(sed -n 's/.*満たない殻 = \([0-9]*\)\/.*/\1/p' work/modulation/icall.txt | tail -n 1)
+[ -n "$ICALL_DROP" ] || { echo "[modulation_e2e] FAIL: icall_check の結果行が読めない" >&2; exit 1; }
 
 # C++ engine 4 本 (判定には含めない: 到達性の実測のみ。 ただし測定行が揃わなければ FAIL)
 if [ "$MODE" != "--skip-lift" ]; then
@@ -64,5 +69,5 @@ fi
 awk -F, -v n="${#ENGINES[@]}" 'NR > 1 { rows++; if (NF != 15) bad++ } END { exit !(rows == n && !bad) }' work/modulation/engines.csv \
   || { echo "[modulation_e2e] FAIL: engines.csv の測定行が ${#ENGINES[@]} 本分揃っていない" >&2; exit 1; }
 ENG_OK=$(awk -F, 'NR > 1 && $7 == 0 { n++ } END { print n + 0 }' work/modulation/engines.csv)
-echo "[modulation_e2e] shells: judge/matrix_check/ids_crosscheck 合格 (8/8 本)。 engines(参考・判定外): emcc -c rc=0 は $ENG_OK/${#ENGINES[@]} 本"
+echo "[modulation_e2e] shells: judge/matrix_check/ids_crosscheck 合格 (8/8 本)。 判定外の測定: IR の間接 call 脱落あり $ICALL_DROP/8 本 (icall §4 D1)、 engines の emcc -c rc=0 は $ENG_OK/${#ENGINES[@]} 本"
 echo "[modulation_e2e] OK: work/modulation/{status8.csv,facts.json,engines.csv} elapsed=${SECONDS}s loadavg=$(cut -d' ' -f1-3 /proc/loadavg)"
