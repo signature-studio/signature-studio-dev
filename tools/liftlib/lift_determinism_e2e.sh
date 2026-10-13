@@ -15,6 +15,7 @@ set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 cd "$HERE"
 N="${DET_RUNS:-2}"
+[ "$N" -ge 2 ] 2>/dev/null || { echo "[lift_determinism_e2e] DET_RUNS は 2 以上の整数 (比較 0 組で PASS させない): $N" >&2; exit 2; }
 ANALYSIS_DIR="${ANALYSIS_DIR:-$HOME/analysis}"
 PE="$ANALYSIS_DIR/plugins/ott/binaries/OTT_vst2_win64.dll"
 RANGES_F="$HERE/../m6/work/ott_ranges.txt"

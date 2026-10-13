@@ -6,9 +6,9 @@
 
 ## 22.1 結論
 
-- 同一 PE・同一 ranges で RetDec を実行すると、**raw `*.drc.ll` は毎回変わる**。差分は `uselistorder` 指示子の行のみ。
-- `uselistorder` 行を除くと、raw も `.drc.c` も全 run で一致する。既存の A7 段 (`run_base` / `ir5_patch`) がこの行を除去するため、**liftlib base 段・m6 chain の出力は決定的**。
-- ASLR (アドレス空間配置のランダム化) を無効にしても決定性は保証されない (値が TMPDIR の絶対パス等の環境で変わる)。`setarch -R` は採らない。
+- 同一 PE・同一 ranges で RetDec を実行すると、**raw `*.drc.ll` は実行ごとに変わり得る**。差分は `uselistorder` 指示 (LLVM の use-list 順の指示) の行で、行の有無と並びが変わる。値の種類数は実行群により異なり、ASLR 有効の実行群 (n=2〜6) で 1〜6 種だった (§22.3 の分布表)。
+- `uselistorder` 行を除くと、raw も `.drc.c` も全 run で一致する (probe の 8 本: ASLR 有効 4 本・無効 4 本で除去後 raw は 1 種、`.drc.c` も 1 種)。既存の A7 段 (`run_base` / `ir5_patch`) がこの行を除去するため、**liftlib base 段・m6 chain の出力は決定的**。
+- ASLR (アドレス空間配置のランダム化) を無効にしても raw が一致しない事例がある (§22.4)。契機は未分離のため、決定性の手段にはしない。`setarch -R` は採らない。
 - 対策は **比較手順の固定** (raw は比較しない・A7 後の成果物で判定) と **回帰 gate** (`lift_determinism_e2e.sh`)。新しい正規化 pass は不要。
 - **未解決**: k80 (block18983_PE.bin, p0c REPORT §15.4) の alloca 並び差は OTT では再現せず、A7 後に残るかは未検証 (fl-win64 が必要)。→ 下記 §22.6 の起票先。
 
@@ -18,8 +18,8 @@
 |---|---|
 | PE | `$ANALYSIS_DIR/plugins/ott/binaries/OTT_vst2_win64.dll` (3146752 B、`analysis-ott-binaries` 展開) |
 | ranges | `tools/m6/work/ott_ranges.txt` (166 関数、`work-m6-ott` 展開) |
-| RetDec | v5.0 (commit `53e55b4b26e9`, `/opt/retdec/bin/retdec-decompiler`)。`--select-ranges` + `--select-decode-only --timeout 2400` |
-| runner | nproc=4、`randomize_va_space=2` (ASLR 有効)、Actions runner (`/home/runner`) |
+| RetDec | v5.0 (commit `53e55b4b26e9`。[RETDEC] `docs/REFERENCES.md`)。`--select-ranges` + `--select-decode-only --timeout 2400` |
+| runner | nproc=4、`randomize_va_space=2` (ASLR 有効)、GitHub Actions runner |
 | 1 run の所要 | 8.2〜9.0 秒 (probe の実測、load 0.6〜1.4) |
 
 ## 22.3 実測 1: raw は実行ごとに変わる (ASLR 有効 / 無効)
@@ -38,22 +38,37 @@ distinct (値の種類数): ASLR 有効 raw = **4/4**、uselistorder 除去後 =
 
 補足の実測 (前段で取得、同じ入力・同じ手順): ASLR 有効 6 本 (a1,a2,b1〜b4) の raw sha256 は全て別値。ASLR 無効 4 本 (n1〜n4) は 4/4 同一 `f2c8f229fd95`。a1 と a2 の raw 差分 26 行は全て `uselistorder` 行で、それを除くと両者は同一。
 
-## 22.4 実測 2: 環境 (出力パス) 依存の確認 (ASLR 無効でも値が変わる)
+実行群ごとの分布 (ASLR 有効の raw。distinct = 値の種類数。全 PR 内実測の集計):
 
-同じ `setarch x86_64 -R` で、出力パスと TMPDIR の絶対パスだけを変えた。
+| 実行群 | 由来 | n | raw distinct |
+|---|---|---|---|
+| probe (`5dc0117`) | 本節の表 | 4 | 4 |
+| 補足 a1,a2,b1〜b4 | 本節の補足 | 6 | 6 |
+| gate N=2 (`5dc0117`) | §22.7 | 2 | 2 |
+| gate N=4 (`5dc0117`) | §22.7 | 4 | 2 (`5bac875d2e33` ×3・`a782ad770357` ×1) |
+| probe (`ae16a2f`、レビュー再実行) | PR review | 4 | 2 (`5bac875d2e33` ×3・`6d79bb6f829a` ×1) |
+| gate N=2 (`ae16a2f`、レビュー再実行) | PR review | 2 | 1 (r1 = r2 = `5bac875d2e33`) |
+| 修正後 HEAD の probe | §22.12 | | |
+
+→ 同じ条件でも一致する回と一致しない回がある。n=2〜6 で distinct は 1〜6 (min–max)。
+
+## 22.4 実測 2: ASLR 無効でも raw が一致しない事例 (契機は未分離)
+
+同じ `setarch x86_64 -R` で、出力パスと TMPDIR のパスを変えた (1 行目と 3 行目)。レビュー再実行では TMPDIR の長さだけを変えた比較も行われた (4 行目)。
 
 | 条件 | raw sha256 |
 |---|---|
 | 前段の n1〜n4 (TMPDIR = `$RUNNER_TEMP/det/n1/tmp`) | f2c8f229fd95 (4/4 同一) |
 | 同じ条件で再実行 (`run1.sh $RUNNER_TEMP/det/n1 setarch x86_64 -R`) | f2c8f229fd95 (再現) |
 | probe (TMPDIR = `tools/liftlib/work/probe/off/r1/tmp`、より長いパス) | 279d6ee60f7d (4/4 同一) |
+| レビュー再実行: TMPDIR の長さだけを変えた 2 本 | 1c5f5c6a47bb (2 本同一) |
 
-→ ASLR 無効でも、環境変数の大きさ (TMPDIR 等の絶対パス) で値が変わる。`setarch -R` は「同じ環境なら毎回同じ」にすぎず、決定性の手段として採らない。
+→ 同じ条件内では再現する (1・2 行目) が、出力パス・TMPDIR が変わると値が変わる事例がある (f2c8f229fd95 と 279d6ee60f7d は別値)。ただし TMPDIR の長さだけを変えた比較では 2 本とも同一 (1c5f5c6a47bb) で、「TMPDIR の絶対パス長で値が変わる」とは言えない。契機は**未分離**。`setarch -R` は決定性の手段として採らない (A7 後の判定で足りる)。
 
 ## 22.5 原因 (推定を含む)
 
-- **実測で言えること**: 差分は LLVM の `uselistorder` (use-list の並び) 指示子のみ。並びはアドレス空間の配置 (ASLR と環境サイズ) に依存して変わる (§22.3・§22.4)。
-- **推定**: RetDec / LLVM 内部で use-list を組むときに、ポインタ値に依存した順序 (ポインタを鍵にした集合・写像の走査) が使われている。RetDec のソースが repo に無く、該当箇所は**未特定**。
+- **実測で言えること**: 差分は LLVM の `uselistorder` 指示の行のみ (行の有無と並びが実行ごとに変わる。例: レビュー再実行の r1 と r4 の比較で `%1930` の追加、`%1795` と `i128 %186` の削除)。ASLR 有効時に値が変わることは §22.3 で実測。ASLR 無効時の変化の契機は未分離 (§22.4)。
+- **推定**: RetDec / LLVM 内部で use-list を組むときに、ポインタ値に依存した順序 (ポインタを鍵にした集合・写像の走査) が使われている可能性がある。RetDec のソースが repo に無く、該当箇所は**未特定**。
 - 除外した仮説: Python の hash seed (`PYTHONHASHSEED=1/2` で liftlib base 出力が同一、§22.7)、`.drc.c` の差 (0 件)、alloca 並びの差 (OTT の 8 本で 0 件: uselistorder 除去後が全て同一のため)。
 
 ## 22.6 対策と比較手順 (決定)
@@ -75,7 +90,7 @@ distinct (値の種類数): ASLR 有効 raw = **4/4**、uselistorder 除去後 =
 
 ## 22.8 回帰 gate と probe (1 コマンド再現)
 
-- `bash tools/liftlib/lift_determinism_e2e.sh` (既定 N=2、`DET_RUNS=N` で変更): RetDec を並列 N 回 → `run_base` → base.ll の sha256 が全て一致で PASS。不一致・ネガコン失敗・RetDec 失敗は全て非 0 で終了。前提欠落 (`ANALYSIS_DIR` 不在) は rc=2。
+- `bash tools/liftlib/lift_determinism_e2e.sh` (既定 N=2、`DET_RUNS=N` で変更。N は 2 以上で、N<2 は比較 0 組で PASS させないため rc=2): RetDec を並列 N 回 → `run_base` → base.ll の sha256 が全て一致で PASS。不一致・ネガコン失敗・RetDec 失敗は全て非 0 で終了。前提欠落 (`ANALYSIS_DIR` 不在) は rc=2。
 - 実測 (HEAD `5dc0117`、load は実行前後):
 
 | 実行 | 結果 | 所要 | load |
@@ -86,9 +101,9 @@ distinct (値の種類数): ASLR 有効 raw = **4/4**、uselistorder 除去後 =
 | 前提欠落 `ANALYSIS_DIR=/nonexistent` | rc=2 | — | — |
 
 - ネガコン 1 (`negctrl`): base.ll に 1 行を足した複製が、同じ比較関数で不一致と判定される (比較器の盲点を検出)。
-- ネガコン 2 は確率的: raw 2 本の sha256 が偶然一致すると PASS する。本 HEAD の実測では raw は 2 本とも不一致 (`5bac875d2e33` / `2d296a991f9b`)、probe では 4 本中 4 種。
+- ネガコン 2 は確率的: raw の全 run が偶然一致すると PASS (exit 0) する。本 HEAD の実測では raw は 2 本とも不一致 (`5bac875d2e33` / `2d296a991f9b`)、probe では 4 本中 4 種。
 
-- `bash tools/liftlib/lift_determinism_probe.sh [N]`: §22.3 の表を出力 (既定 N=4、約 35 秒)。
+- `bash tools/liftlib/lift_determinism_probe.sh [N]`: §22.3 の表を出力 (既定 N=4。所要は §22.12 の実測)。
 
 ## 22.9 受入条件の達成状況 (Issue #668)
 

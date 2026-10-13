@@ -8,9 +8,9 @@
 (raw は uselistorder の順序が実行ごとに変わるため)。
 
 ネガコン 1: r1 の base.ll に 1 行を足した複製が、同じ比較関数で「不一致」と判定されること。
-ネガコン 2: DET_NEGCTRL_NO_BASE=1 で run_base (A7) を外し raw をそのまま比較すると FAIL になること
-(検出力の実測用。この設定では必ず exit 1 になる)。
-PASS かつネガコン 1 検出のときのみ exit 0。それ以外は exit 1。
+ネガコン 2: DET_NEGCTRL_NO_BASE=1 で run_base (A7) を外し raw をそのまま比較する (検出力の実測用)。
+raw の全 run が偶然一致すれば PASS (exit 0)、不一致なら FAIL (exit 1) になる。
+PASS かつネガコン 1 検出のときのみ exit 0。それ以外は exit 1。runs < 2 は比較 0 組のため exit 2。
 """
 import hashlib
 import json
@@ -35,6 +35,9 @@ def same(a, b):
 
 def main():
     out, runs = sys.argv[1], int(sys.argv[2])
+    if runs < 2:
+        print("runs は 2 以上が必要 (比較 0 組で PASS させない): %d" % runs, file=sys.stderr)
+        return 2
     no_base = os.environ.get("DET_NEGCTRL_NO_BASE") == "1"
     rows = []
     for i in range(1, runs + 1):
