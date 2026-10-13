@@ -171,6 +171,26 @@ OVERRIDES = {
   store i64 0, ptr inttoptr (i64 9048192 to ptr), align 8
   ret i64 0
 }''',
+    # 0x52cf40: RTL ハッシュ表検索 (native: CRC32(name) バケット巡回)。呼出元 0x40bce0 経由で
+    # 到達し, 本体が [@24+56] の u16 (name 長) を name ポインタとして 0x52ce00 に渡すため
+    # CRC32 のバイト読取が OOB (hs_dbg 実測: 0x52ecc0 → 0x40bce0 → 0x40b3f0 → 0x40bce0 →
+    # 0x52cf40 → 0x52ce00 で trap)。「見つからない」= 0 を返す fail-soft (REPORT_1229.md §2)。
+    0x52cf40: '''define i64 @function_52cf40() local_unnamed_addr {
+  store i64 0, ptr inttoptr (i64 9048192 to ptr), align 8
+  ret i64 0
+}''',
+    # 0x4e6060: 0x4e5fc0 から呼ばれる自己再帰 (fold で停止条件が崩れ, hs_dbg 実測で同一
+    # 関数に 40 段入って "Maximum call stack size exceeded")。「該当なし」= 0 で fail-soft。
+    0x4e6060: '''define i64 @function_4e6060() local_unnamed_addr {
+  store i64 0, ptr inttoptr (i64 9048192 to ptr), align 8
+  ret i64 0
+}''',
+    # 0x4181e0: 0x4e5f50 が戻り値 ([BLK+0x80]) を +568 で deref する (hs_dbg 実測: 0x4181e0 →
+    # 0x4e5f50 直後に trap)。戻り値が fold 由来のため「該当なし」= 0 で fail-soft。
+    0x4181e0: '''define i64 @function_4181e0() local_unnamed_addr {
+  store i64 0, ptr inttoptr (i64 9048192 to ptr), align 8
+  ret i64 0
+}''',
     # 0x40e720: `ClearWideString(var S)` (native 0x40e720 実測: S[0]!=0 なら refcount--
     # して 0 に達したら FreeMem。rcx は var アドレス)。lift では S が scratch 畳み込みで
     # 内容が非 NULL に見え、`[val-0x10+8]` の refcount 読取 → scratch pool 先頭を
