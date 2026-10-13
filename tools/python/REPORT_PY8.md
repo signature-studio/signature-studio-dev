@@ -36,11 +36,11 @@ flapi 呼出し数は `flapiCalls.n` で、`engine.call` ラッパを数えた�
 
 | 項目 | 値 (µs/イベント) | 条件 |
 |---|---|---|
-| 静的版 MIDI CC 1 件 (device script 1 回実行) | 中央値 23.92 (min 23.82 / max 27.10)、device 呼出し 1.000/件 | 20000 件 × 5 試行、flpy_static.wasm (node メインスレッド)、load 1.14 |
-| 静的版 MIDI NoteOn 1 件 (対照、device 呼出し 0) | 中央値 24.54 (min 24.44 / max 25.37)、0 | 同上 |
+| 静的版 MIDI CC 1 件 (device script 1 回実行) | 中央値 23.92 / 24.99 (2 回の実行、min 23.82〜24.48 / max 26.57〜27.10)、device 呼出し 1.000/件 | 20000 件 × 5 試行、flpy_static.wasm (node メインスレッド)、load 1.14 / 0.71 |
+| 静的版 MIDI NoteOn 1 件 (対照、device 呼出し 0) | 中央値 24.54 / 25.27 (min 24.44〜25.18 / max 25.37〜25.59)、0 | 同上 |
 
-- 静的版 CC 1 件 23.9µs は、Worker+SAB 版 CC 1 件 230.0µs (REPORT §上表、load 0.56) の約 1/10。
-- CC と NoteOn の差 (約 0.6µs) はノイズ範囲内で、device 呼出し 1 回の追加コストは本計測では分離できない。
+- 静的版 CC 1 件 24〜25µs は、Worker+SAB 版 CC 1 件 230.0µs (REPORT 上表、load 0.56) の約 1/9。
+- CC と NoteOn の差 (0.6〜0.3µs) は実行間で符号が変わるノイズ範囲内で、device 呼出し 1 回の追加コストは本計測では分離できない。
 - **計測の限界 (重要)**: 静的版の C 側 (`provider/fl_engine.c`) には `device.*` の handler が無い。そのため本計測は `device.forwardMIDICC` を Python 側の計数スタブに差し替えた。よって (a) C の `fl_api_call` を経由しない、(b) 測っているのは「Python の配送 (`dispatch_script_midi`) + device script 実行」である。「flapi 1 回の C コスト」は `static_bench.mjs` の `c_only_us` (中央値 0.017µs) を参照。
 - 比較時の注意: Worker+SAB 版 230µs は postMessage・Worker 往復を含み、静的版 23.9µs は含まない。両者の差はこの RPC 経路の分であり、flapi 呼出しそのものの差ではない。
 
