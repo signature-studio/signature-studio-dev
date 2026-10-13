@@ -169,8 +169,7 @@ python3 tools/targets/serum2/license/authstub/authstub_irpass.py \
 ## 13. L1 の再現条件 (実測・追跡 #823)
 
 - 測定 commit: origin/main 36edc993。素材: plugins-serum2 → `Install_Xfer_Serum2_2.1.5.exe` の `$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3` (19,236,864 B, sha256 `501e7bb3…5283`)。
-- 再検証 (HEAD `c5f49a76`, runner 4 core, 2026-10-13 UTC, `plugins-serum2` 取得・sha256 一致): `e2e.sh` を 2 回実行し、どちらも lift キャッシュ利用 (step [1] スキップ) で wall 5.58 s / 5.53 s、**23/23 PASS**。実行前後の 1 分 loadavg は 0.17→0.24 / 0.24→0.30。
-- cold lift: step [1] と同一引数の RetDec 単独実行は 33.6 s で `authstub.drc.ll` (710,975 B) を生成。
+- 再検証 (merge commit `7b850441`, runner 4 core, 2026-10-13 UTC, `plugins-serum2` 取得・sha256 `501e7bb3…5283` 一致): `e2e.sh` を cold 1 回 (`work/` 無し) と warm 2 回。cold = wall 35.2 s (step [1] の RetDec lift を含む) / warm = 5.47 s・5.45 s。いずれも **23/23 PASS**。生成物 `patched_base_lf.ll` `c62d9316…8793`、`raw_base_lf.ll` `79ab30ca…0d20` は §12 と一致。
 - 元測定の `load 0.92 → 0.35` は採取方法が本節に無く、この再検証では 0.92 は再現していない。実測値は上記を正とする。
 - 機械語 (0x1800c2d59–d76): `[rsi+0x90]` が非 0 なら `or dword [rax+8], 0x800010` (deferred 経路)、0 なら `je 0x1800c2ef4` で直接経路 `mov rcx,[rsi+0x10]; mov rax,[rcx]; mov edx,0x800010; call [rax+0x30]` へ分岐する。
 - raw IR では `dec_label_pc_1800c2d5f` の `icmp eq i64 %109, 0` の 0 側 (true 側) が機械語の `je 0x1800c2ef4` ではなく `dec_label_pc_1800c2f08` に付け替えられており、`0x1800c2ef4` 相当のブロックは関数内のどの分岐からも到達しない (`insn.addr` 0 件)。
@@ -191,12 +190,13 @@ grep -cE "^![0-9]+ = !\{i64 $VA\}" $LIFT
 # (b) 0x800010 即値 (or i32 ..., 8388624) の出現箇所 (期待: L9878 の 1 箇所)
 grep -nE 'or i32 .*, 8388624' $LIFT
 # (c) 0x1800c2d5f の icmp eq の 0 側 (true 側) ターゲット (期待: dec_label_pc_1800c2f08)
+#     grep 単独は別関数 (L389) も拾うため、判定は L9872 の br 行で行う
 grep -nE 'icmp eq i64 %109, 0' $LIFT
 sed -n 9872p $LIFT   # => br i1 %110, label %dec_label_pc_1800c2f08, label %dec_label_pc_1800c2d6f
 ```
 
-- 再検証結果 (HEAD `c5f49a76`, `work/lift/authstub.drc.ll` = 710,975 B, RetDec v5.0 の cold lift):
+- 再検証結果 (merge commit `7b850441`, `work/lift/authstub.drc.ll` = 710,975 B, RetDec v5.0 の cold lift):
   - (a) `0x1800c2ef4` の insn.addr メタ件数 = **0** (期待どおり)。同じ式で `0x1800c2d5f` と `0x1800c2f08` は各 1 件ヒットし、検索式が機能していることも確認した。
   - (b) `or i32 …, 8388624` = **L9878 の 1 箇所** (`%114 = or i32 %113, 8388624`) (期待どおり)。
-  - (c) 元の検索式 `br i1 (icmp eq %109, 0)` は **0 件** で、表記が違った。実 IR は `%110 = icmp eq i64 %109, 0` (L9870) で、`br i1 %110, label %dec_label_pc_1800c2f08, label %dec_label_pc_1800c2d6f` (L9872)。0 側 (true 側) は `dec_label_pc_1800c2f08` で期待値を満たす。上記の検索式は修正済み。
+  - (c) 元の検索式 `br i1 (icmp eq %109, 0)` は **0 件** で、表記が違った。実 IR は L9870 `%110 = icmp eq i64 %109, 0` と L9872 `br i1 %110, label %dec_label_pc_1800c2f08, label %dec_label_pc_1800c2d6f`。0 側 (true 側) は `dec_label_pc_1800c2f08` で期待値を満たす。上記の検索式は修正済み。
 - 原因の一本化 (記述上の整理。機構は上記 (a)〜(c) で再確認済み): §6 L1 の「insn.addr メタが 0 個」は (a) の結果で、「`0x1800c2ef4` へ向かう辺が lift 時に `0x1800c2f08` へ付け替わる」ことが脱落の機構。
