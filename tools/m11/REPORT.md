@@ -247,4 +247,4 @@ ldfix/qstore の skip を非 0 終了にし、IR 生成条件と IR の指紋を
 
 ## 16. #490 [M11-N15]: main HEAD の 4c3baa4 / faee5b6 状態 (部分達成, 詳細は [REPORT_N15.md](REPORT_N15.md) §16)
 ## 17. #748 [M11-N41]: 652500 の 1 段 deref 復元 (gate 付き, 既定 0, 部分達成)
-unit 149 は OFF/ON とも oob のまま。ON は unit 888 の ok→halt0 退行があり既定にできない。測定値・未解決・起票先は [REPORT_N748.md](REPORT_N748.md)。
+unit 149 は OFF/ON とも oob のまま。ON で kind が変わるのは unit 895 (halt0 → oob) の 1 件のみ (N748 の再測定で訂正)。既定 0 のまま。測定値・未解決・起票先は [REPORT_N748.md](REPORT_N748.md)。
