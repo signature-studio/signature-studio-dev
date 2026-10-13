@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // PERF-P13 (#952) 大物 (>24MiB) wasm の配信計測: 事前非圧縮 part 連結 (deploy/client/chunked.mjs) × compileStreaming × instantiate。
-//   node tools/perf/delivery/chunked_bench.mjs [--mib 32] [--reps 3] [--mbps 0,100] [--out tools/perf/results/chunked.json]
+//   node tools/perf/delivery/chunked_bench.mjs [--mib 32] [--wasm <実 wasm パス>] [--reps 3] [--mbps 0,100] [--out tools/perf/results/chunked.json]
+//   --wasm 指定時は合成 wasm を作らず、その実ファイル (例: tools/flelift/work/lift/flel.wasm) を入力にする。
 // 手順: 合成 wasm 生成 → deploy/scripts/05-stage.mjs で 16MiB part 分割 (--max-file 24MiB) → 静的サーバ (COOP/COEP 付き) →
 // headless Chrome で descriptor を chunkedResponse で連結し compileStreaming → instantiate → f0()==42 を計測。
 // 素材は合成 wasm (関数 ~360B のコード様バイト列。実 FLEngine wasm ではない)。
@@ -59,7 +60,8 @@ function genWasm(targetBytes, bodyBytes = 360) {
   ]);
 }
 
-const raw = genWasm(MIB * 1024 * 1024);
+const WASM_IN = opt("wasm", "");
+const raw = WASM_IN ? readFileSync(path.resolve(WASM_IN)) : genWasm(MIB * 1024 * 1024);
 const sha12 = (await import("node:crypto")).createHash("sha256").update(raw).digest("hex").slice(0, 12);
 const ASSET = `big.${sha12}.wasm`;
 writeFileSync(path.join(SRC, "wasm", ASSET), raw);
@@ -79,9 +81,14 @@ window.runOnce = async (url, mode) => {
   const res = await chunkedResponse(url, { concurrency: 6 });
   const mod = mode === "streaming" ? await WebAssembly.compileStreaming(res) : await WebAssembly.compile(await res.arrayBuffer());
   const tCompiled = performance.now();
-  const inst = await WebAssembly.instantiate(mod, {});
+  const imports = {};
+  for (const i of WebAssembly.Module.imports(mod)) {
+    (imports[i.module] ??= {})[i.name] = i.kind === "function" ? (() => 0) : undefined;
+  }
+  const inst = await WebAssembly.instantiate(mod, imports);
   const tInst = performance.now();
-  return { fetchCompileMs: +(tCompiled - t0).toFixed(1), instantiateMs: +(tInst - tCompiled).toFixed(1), totalMs: +(tInst - t0).toFixed(1), f0: inst.exports.f0(), exports: WebAssembly.Module.exports(mod).length };
+  const f0 = typeof inst.exports.f0 === "function" ? inst.exports.f0() : null;
+  return { fetchCompileMs: +(tCompiled - t0).toFixed(1), instantiateMs: +(tInst - tCompiled).toFixed(1), totalMs: +(tInst - t0).toFixed(1), f0, exports: WebAssembly.Module.exports(mod).length };
 };
 `;
 // 帯域は接続ごとに掛かる (part 並列取得は接続数ぶん合算される)。計測条件ごとに切替える
@@ -148,11 +155,12 @@ try {
   }
   console.log("\n要約 (total = fetch→compile→instantiate, ms 中央値 (min–max)):");
   for (const s of summary) console.log(`  mbps=${String(s.mbps).padStart(3)} ${s.mode.padEnd(9)} ${String(s.medianTotalMs).padStart(8)} (${s.minTotalMs}–${s.maxTotalMs})`);
-  const ok = rows.filter((r) => r.f0 === 42 && r.exports > 0);
+  // 合成 wasm: f0()==42 を判定。実 wasm (--wasm): f0 は無いので instantiate 成功 + export>0 を判定
+  const ok = rows.filter((r) => (WASM_IN ? r.exports > 0 : r.f0 === 42 && r.exports > 0));
   mkdirSync(path.dirname(OUT), { recursive: true });
-  writeFileSync(OUT, JSON.stringify({ chrome: chrome.version, node: process.version, cpus: os.cpus().length, wasmBytes: raw.length, parts: desc.parts.length, partSize: desc.partSize, reps: REPS, rows, summary }, null, 1));
-  if (ok.length !== rows.length) { console.log(`FAIL: ${rows.length - ok.length} 件で f0!=42`); process.exitCode = 1; }
-  else console.log(`\nPASS: ${rows.length}/${rows.length} 件で f0()==42`);
+  writeFileSync(OUT, JSON.stringify({ src: WASM_IN ? path.basename(WASM_IN) : "synthetic", chrome: chrome.version, node: process.version, cpus: os.cpus().length, wasmBytes: raw.length, parts: desc.parts.length, partSize: desc.partSize, reps: REPS, rows, summary }, null, 1));
+  if (ok.length !== rows.length) { console.log(`FAIL: ${rows.length - ok.length} 件で判定不合格`); process.exitCode = 1; }
+  else console.log(`\nPASS: ${rows.length}/${rows.length} 件 (${WASM_IN ? "instantiate 成功" : "f0()==42"})`);
 } finally {
   await chrome.close();
   srv.close();
