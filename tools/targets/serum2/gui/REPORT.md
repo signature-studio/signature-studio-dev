@@ -216,3 +216,35 @@ python3 gui/vstgui_version.py    # 0.70 s (real, 逐次, load 未計測)
 
 - 出力の判定: 13.0 / 13.3 は 0/9、14.0 / 14.3 は 9/9。バイナリ内 9 件 = 1 each。
 - 14.3 → 15.0 の差分リテラル比較 (`git -C work/vstgui4 grep -h -oE '"[^"\\\n]{6,60}"' <tag> -- vstgui/` の集合差) は、一般語が多く判定に使えないため本節の手順には含めない。
+
+## 11. 14.0〜14.3 の差分リテラル法 (2026-10-14 run, #1350)
+
+§10 の残件 (14.0〜14.3) を、版間の製品コード差分にバイナリ出現する文字列リテラルがあるかで試した。入力は §9 の入力 (sha256 とバイト数の正は §9-1 の `sha256sum` 行)。**本 run では素材 `plugins-serum2` が `$ARTIFACTS_DIR` に無く (`fl-win64` のみ)、入力の再照合もバイナリ照合も未実施。** 下表の値は前 run の実測で、本 run では再現していない。
+
+| 段 (製品コード, `tests/` 除外) | 差分の変更行数 | 差分に現れる文字列リテラル | バイナリ内の出現 | 判定 |
+|---|---|---|---|---|
+| 13.3 → 14.0 | 1,075 行 (46 ファイル、insertions 844 + deletions 231) | §10 の 9 配置名 | 各 1 件 | 13.x 除外の根拠 (§10) |
+| 14.0 → 14.1 | 145 行 (7 ファイル) | `CRowColumnResizing` / `Fonts\*` | `CRowColumnResizing` 1 件 (両版の製品コードに存在)。`Fonts\*` は文字列自体が不変 (`*basePath +=` → `basePath +=` のコード変更) | 区別不可 |
+| 14.1 → 14.2 | 43 行 (7 ファイル) | `cairobitmap.h` | 0 件 (`vstgui/lib/platform/linux` 側のヘッダ名) | 区別不可 |
+| 14.2 → 14.3 | 116 行 (13 ファイル) | `hand1` / `fleur` | 0 件 (`vstgui/lib/platform/linux/x11platform.cpp` のカーソル名。Win32 バイナリに入らない) | 区別不可 |
+
+- 14.0 → 14.3 の Win32 / common / uidescription 差分 (9 ファイル) は関数本体の変更が中心 (`d2dfont.cpp` `win32frame.cpp` `genericoptionmenu.cpp` 等)。追加行でリテラルを含むのは 1 件 (`basePath += "Fonts\\*"`、既存の文字列を残したまま `*` の間接参照を外した変更で、文字列自体は不変)。
+- **結論: 14.0〜14.3 の確定は差分リテラル法では不可。** 差分の文字列で版を分ける手は取れない。残る手段は §9 (1) の逆アセンブル突合 (関数本体の差) のみ。確定は #1350 の作業に残す。
+- 対象外: 14.x 内の差は Win32 の描画関数 (`d2dfont` / `win32frame`) に集中するため、逆アセンブル突合を行うなら `d2dfont.cpp` 相当の関数を先に候補にすると効率がよい (推定。未検証)。
+
+### 11-1. 再現手順
+
+```sh
+# tools/targets/serum2/ を cwd・work/vstgui4 は §9-1 の clone
+for p in "vstgui4_14_0 vstgui4_14_1" "vstgui4_14_1 vstgui4_14_2" "vstgui4_14_2 vstgui4_14_3"; do
+  set -- $p; git -C work/vstgui4 diff --stat $1 $2 -- vstgui/ ':!*/tests/*' | tail -1
+  git -C work/vstgui4 diff -U0 $1 $2 -- vstgui/ ':!*/tests/*' | grep -E '^[-+][^-+]' | grep -oE '"[^"]{4,80}"' | sort -u > work/lit_$1_$2.txt
+  while IFS= read -r q; do
+    s=${q:1:-1}
+    echo "$1 -> $2 | $(grep -o -a -F -- "$s" work/Serum2_win64.vst3 | wc -l) | $s"
+  done < work/lit_$1_$2.txt
+done
+```
+
+- 前提: `work/Serum2_win64.vst3` と `work/vstgui4` は §9-1 で用意。照合の出力は「段 | 出現数 | リテラル」で、表の「バイナリ内の出現」列と一致させる (`grep -c` は行数なので使わない)。
+- 本 run の照合: **未実施** (`plugins-serum2` 不在・`work/` 無し)。上表の出現数は前 run の値。所要・load は未計測。

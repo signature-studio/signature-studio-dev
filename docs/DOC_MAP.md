@@ -95,7 +95,7 @@
 | `tools/liftdiff/REPORT_APPENDIX.md` | ~355 | liftdiff REPORT の分割移動節の全文: §5/§5.1/§5.2 (回帰 A/B・Ablation)・§6.1/§6.2 (検収・再現性)・§8/§9 (wasm_trap)・§10 (OTT 旧 chain)・§11 (比較系偽陽性)・§12 (被覆拡大 vm0/u16)。250 行上限のため無変更で分割移動 |
 | `tools/liftdiff/REPORT_APPENDIX_LD16.md` | ~120 | liftdiff REPORT §10 (OTT 旧 chain 前回比) の全文: 集計差分 (38→35 main・HEAD。うち cases.py で 38→40) の原因切り分け・前回比の基準 (同一 HEAD で n=3 採点・PM 判断 #1069)・n=3 非決定性。関数単位の突合は `tools/liftdiff/tests/ott_delta.py` (LD-16 / #825) |
 | `tools/liftdiff/REPORT_APPENDIX_LD25.md` | ~80 | liftdiff REPORT §12 末尾の LD-25 行 (InitUnits の空振り一致・InitTable 充足の boot 状態) の全文: 機械語で確定した原因・units/hybrid の precondition 実測・sample:800 の判定遷移。検査は `tools/liftdiff/tests/check_initunits.py` (LD-25 / #977) |
-| `tools/liftdiff/REPORT_APPENDIX_LD42.md` | ~50 | liftdiff LD-42 (#1248) の実測: units/hybrid の sample:800 判定遷移 (67 関数・突合は `tests/ld42_transition.py`)、TLS precondition、既定 batch を units に据え置く判断 (保留・子 #1464 で判断)。方式決定は DECISIONS D12 |
+| `tools/liftdiff/REPORT_APPENDIX_LD42.md` | ~50 | liftdiff LD-42 (#1248) の実測: units/hybrid の sample:800 判定遷移 (67 関数・突合は `tests/ld42_transition.py`)、TLS precondition、既定 batch を units に据え置く判断 (保留・子 #1464 で判断)。方式決定は DECISIONS D13 |
 | `tools/liftdiff/REPORT_APPENDIX_LD40.md` | ~34 | liftdiff LD-40 (#1199) の既存コード確認 (native `ld_fake_ptr` の thunk・wasm `ott_dispatch` 捕捉・fvm VMT 0 埋め)、未達理由 (1 run の上限内で完結せず)、子 issue #1398 (LD-48) への分割 |
 | `tools/liftdiff/REPORT_APPENDIX_865.md` | ~20 | liftdiff LD-18 (#865) 新規節: trace_head 外 27 件の 414ad0 到達確認 (25/27)・OOB 最上位 frame 集計 (239 件、件数定義と 222 件との差)。`REPORT_APPENDIX.md` は 250 行上限のため増やさず別置き |
 | `tools/liftdiff/REPORT_APPENDIX_LD28.md` | ~26 | liftdiff LD-28 (#1035) の型 C・D 原因候補 (P1〜P3)・0x417b70 の idiv/udiv 仮説の節全文 (REPORT_APPENDIX §9 から分割移動)。測定 commit・鮮度の証跡・数値例 (count = 1 の反例を含む) |
@@ -106,6 +106,7 @@
 | `tools/icall/REPORT.md` | ~245 | 間接 call/jmp 落ち監査 + 復元 pass。§10.1 (#530)・§11 (ICALL-6 #361)・§12 (ICALL-16 #1023) は要約のみで全文は `REPORT_APPENDIX.md` §14 に分割。§13 (#1026 Fresh Air 残落ち 6 件) は結論 1 行のみで全文は `REPORT_APPENDIX_1067.md` §13 |
 | `tools/icall/REPORT_APPENDIX.md` | ~214 | icall REPORT §10.1 (#530 OTT 回帰再実行)・§11 (ICALL-6 #361)・§12 (#229 FLEngine 分割 lift・§12.1 ICALL-9 #847)・§14 (ICALL-16 #1023 stack 引数の実測。REPORT §12 から分割移動)・§15 (#851 の結論 1 行)・§16 (#852 FLEngine jump table) の全文 (250 行上限のため分割移動) |
 | `tools/icall/REPORT_APPENDIX_1067.md` | ~71 | icall REPORT §13 (#1026: Fresh Air 残落ち 6 件) の全文 (`REPORT_APPENDIX.md` §13 から分割移動) と、#1067 (ICALL-20) の段別切り分け。段別の主張は推定・既存記録のみで、dump 再生成は未実施 (素材 `work-icall`・`plugins-freshair` が要る) |
+| `tools/icall/REPORT_APPENDIX_1298.md` | ~56 | icall #1298 (ICALL-24): Fresh Air 残落ち 6 件の RetDec 段欠落の切り分け (素材 dump の再解析・段は推定、pass 未特定。dump 生成 commit は未確定)。REPORT §13 の段別主張の根拠 |
 | `tools/icall/REPORT_APPENDIX_1206.md` | ~23 | icall #1206 (ICALL-21) の全文 (旧 `REPORT_APPENDIX.md` §17 の分割移動・無変更)。jump table の cmp/je 展開の効果の実測。`REPORT_APPENDIX.md` §17 は 1 行要約とリンクのみ |
 | `tools/icall/REPORT_APPENDIX_851.md` | ~40 | icall #851 (`0x128c320` の関数境界誤認 = decode 範囲分割) の全文。`REPORT_APPENDIX.md` §15 の別置き (250 行上限のため)。現 HEAD の A〜D 実測と、前回 `adc7f577` の chunk 実測 (未再現) を含む |
 | `tools/icall/disp_size/REPORT.md` | ~160 | capstone `disp_size` 誤り (D9) の水平展開監査 |
@@ -145,6 +146,7 @@
 | `tools/m11/alloca/REPORT.md` | ~150 | alloca 縮退修正 (CAB-129) |
 | `tools/m11/qstore/REPORT.md` | ~90 | 64bit スタック局所の即値 store が 4B に縮む欠陥 (DEFECTS D17) の検出・修復・idx 87/898/58–63 の帰属・#513 取り込み後の実測 (#516) |
 | `tools/m11/trap_triage/REPORT.md` | ~228 | M11 survey trap の個別原因切り分け (#130)・halt0 20 の原因 (#417)・OOB 分類 (#419、§8.2 = 旧 tree の実測。現 main の ON/OFF 比較は REPORT_595) |
+| `tools/m11/trap_triage/REPORT_1275.md` | ~110 | #1275: `function_535c2e` は `function_535bf0` 内の `ret` (VA 0x535c2e) で、RetDec が call に変えた lift 起因の機械語突合・ClassCreate ON/OFF/転記 ON の 304/555 kind 遷移・再現 `n78_measure.sh` |
 | `tools/m11/trap_triage/REPORT_419.md` | ~58 | #419 の合流前 (fa918df 基準) の OOB 修正試行・旧 ON 構成 (410360 + 8cbda0/8cbce0) の測定 (REPORT §8 から無変更で分割移動) |
 | `tools/m11/trap_triage/REPORT_679.md` | ~110 | icall site 0x41037d の hit 23,053,861 の内訳 (unit 101 = #513 の暴走 loop に 99.999% が集中)・既定 ON の 0x41032e 併記・再現手順と検査スクリプト `icall_41037d_679.py` (#679) |
 | `tools/m11/trap_triage/REPORT_418.md` | ~70 | 409470 転記ハングの原因特定 (#418) |
@@ -175,6 +177,7 @@
 | `tools/m11/ldfix/REPORT_968.md` | ~50 | D17 修復 pass (rip 相対セルの 2 段 deref 潰れ) の部分達成: 単一 load の 24 関数を修復、残りは子 issue (#968) |
 | `tools/m11/ldfix/REPORT_930.md` | ~100 | 消費者形 pure 残 23 関数 (24 引数) の残件分類 (first-deref-not-entry 18 関数 ほか) とネガコン。survey 到達数は再現未了 (#930) |
 | `tools/m11/ldfix/REPORT_1134.md` | ~50 | 消費者形 pure 残の部分達成 (原因の記録のみ): tracker-no-deref 3 関数 (75a180・db6480・dc27c0) の機構 (引数 slot のループ内書き換え・2 段 deref)、5c44b0 (none) の理由の一部。修正・修復・再測定は未着手で #1324 (LD-45)・#1325 (LD-46) (#1134) |
+| `tools/m11/ldfix/REPORT_1290.md` | ~80 | LD-43 (#1290): `ldfix_509_e2e.sh` の修復前 wasm (明示 opt-in `M11_ALLOW_LDFIX_DISABLED=1`) と修復後 wasm (正規 `ldfix.py --pe` + `ldfix=applied` + bind) の作り方。fail-closed gate は弱めず、step 6/7 の完走と dyn 5/5 を実測。決定は DECISIONS D12 |
 | `tools/m11/ldfix/REPORT_1169.md` | ~60 | D17 spill 宛 CELL_COLLAPSED 37 site / 22 関数の消費者追跡の部分達成: 現 HEAD の基準値の実測 (store 宛 86→53、spill 宛は修復前後 37)、目視判定 18 行の分類 (TSV 突き合わせ可能な 6 行は全て TRUE_DROP)。修復 pass 未着手。残件は候補 31 site が #1161 (LD-35)、修復 pass と修復後の残数が本 issue の残件 (#1169) |
 | `tools/m11/shimx_link/REPORT.md` | ~165 | M11 × shimx リンク |
 
