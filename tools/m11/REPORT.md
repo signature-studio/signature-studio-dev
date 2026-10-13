@@ -20,6 +20,8 @@ wasm 上で動作し、**FastMM4 が実際に GetMem → VirtualAlloc でプー�
 | 間接 call 表 | 7,399 トランポリン (`m11_tr_function_X`, VA 二分探索) |
 | 実行時間 | 起動〜停止 約 0.2 秒 (-O0) |
 
+survey の ok / trap 数は `function_417b70` 転記 (#130) 前の値。転記後の件数と trap の個別原因は [trap_triage/REPORT.md](trap_triage/REPORT.md)。
+
 **「FastMM4 heap 初期化完走」は未証明**。到達しているのは「GetMem が medium pool を VirtualAlloc して返す」までで、
 FastMM4 の初期化関数群 (InitializeMemoryManager 相当) を単体で検証してはいない。state は probe 計数 (GetMem/FreeMem/VirtualAlloc 量) のみ。
 

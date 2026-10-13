@@ -9,7 +9,8 @@ mod.HEAPU8.set(fs.readFileSync(M11 + '/work/m11_image.bin'), 0);
 mod._m11_set_survey(1); if (process.env.SV_TRACE) mod._m11_set_trace(1);
 const sp_boot = mod._emscripten_stack_get_current();
 try { mod._m11_boot_enter(0n, 1n); } catch (e) {
-  if (e && e.m11_dllmain_done !== undefined) mod.__emscripten_stack_restore(sp_boot);
+  if (!(e && e.m11_dllmain_done !== undefined)) throw e;
+  mod.__emscripten_stack_restore(sp_boot);
 }
 const sp0 = mod._emscripten_stack_get_current();
 const stubCounts = () => { const o = {}; for (let i = 0; i < mod._m11_stub_uniq(); i++) o[mod.UTF8ToString(mod._m11_stub_name(i))] = mod._m11_stub_count(i); return o; };

@@ -48,12 +48,14 @@ CAB-129 REPORT §5 の「GetLocaleInfoW / LoadStringW 相関」は不採用 (hal
 # 前提: bash tools/m11/m11_e2e.sh 済み (work/m11_boot.cjs, work/m11_image.bin)
 node tools/m11/trap_triage/survey_units.mjs tools/m11/work/trap_triage/after.json    # 942 unit の per-unit JSON (kind / frames / stub / va_mb)
 python3 tools/m11/trap_triage/annotate.py tools/m11/work/trap_triage/after.json [unit...]   # export 名で注釈・halt0 の Error() 呼出元集計
-python3 tools/m11/trap_triage/disasm_fn.py 417b70 ...   # PE (.pdata 区間) の capstone 逆アセンブル (LD_M11_PE で PE 指定)
+python3 tools/m11/trap_triage/disasm_fn.py 417b70 ...   # PE (.pdata 区間) の capstone 逆アセンブル
 ```
 
 環境変数: `SV_ONLY=884` (unit 限定)・`SV_TRACE_AT=884` (その unit だけ trace)・`SV_PROG=1` (進捗を stderr)。
-`capstone` / `pefile` (pip) が要る。この runner では `/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin`
-と `/home/ubuntu/work/webstudio` を symlink / 展開して実行した (PR #301 の方法)。
+`capstone` / `pefile` (pip) が要る。`disasm_fn.py` は `tools/shared/paths.py` の `FL_WIN64_DIR`
+(`docs/REFERENCES.md` `[WIN64]`、Actions での展開は `docs/WORKFLOW.md` §11) 配下の `extracted/block00031_PE.bin` を読む
+(`LD_M11_PE` で PE を直接指定も可)。`m11_e2e.sh` など既存スクリプトは作業 VM の固定パスを前提にするため、
+この runner では `[WIN64]` と repo の checkout をそのパスへ symlink して実行した (PR #301 の方法)。
 
 ## 5. 未解決 (下流)
 
