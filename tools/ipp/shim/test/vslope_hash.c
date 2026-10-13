@@ -1,8 +1,10 @@
-/* IPP-9 (#276): 自前 VectorSlope_64f/_32f 出力の FNV-1a ハッシュ (native と wasm の bit 一致確認用)。
-   vslope_verify.c と同じ乱数列・ケース集合。実 DLL は不要 (wasm で動かすため)。 */
+/* IPP-9 (#276) / IPP-11 (#473): 自前 VectorSlope_64f/_32f 出力の FNV-1a ハッシュ (native と wasm の bit 一致確認用)。
+   vslope_verify.c と同じ乱数列・ケース集合。実 DLL は不要 (wasm で動かすため)。
+   usage: vslope_hash [K]  (K = 64B 境界から出力先をずらす要素数、既定 0。実 DLL は出力先アライメントで出力が変わる) */
 #include "ipp_min.h"
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 IppStatus ippsVectorSlope_64f(double *, int, double, double);
@@ -19,16 +21,19 @@ static double pick(void) {
 static uint64_t h = 1469598103934665603ULL;
 static void fnv(const void *p, size_t n) { const unsigned char *c = p; for (size_t i = 0; i < n; i++) { h ^= c[i]; h *= 1099511628211ULL; } }
 
-int main(void) {
+int main(int argc, char **argv) {
+  int mis = argc > 1 ? atoi(argv[1]) : 0;
   static const int NS[] = {1, 2, 3, 4, 5, 7, 8, 9, 12, 15, 16, 17, 24, 31, 32, 33, 48, 64, 100, 257, 1000, 4097};
-  static double o64[4200];
-  static float o32[4200];
+  static double o64a[4216] __attribute__((aligned(64)));
+  static float o32a[4216] __attribute__((aligned(64)));
+  double *o64 = o64a + mis;
+  float *o32 = o32a + mis;
   for (int t = 0; t < 2400; t++) {
     double o = pick(), s = pick();
     int n = NS[(int)(rnd01() * 22)];
     ippsVectorSlope_64f(o64, n, o, s); fnv(o64, sizeof(double) * (size_t)n);
     ippsVectorSlope_32f(o32, n, (float)o, (float)s); fnv(o32, sizeof(float) * (size_t)n);
   }
-  printf("vslope_hash %016llx\n", (unsigned long long)h);
+  printf("vslope_hash mis=%d %016llx\n", mis, (unsigned long long)h);
   return 0;
 }
