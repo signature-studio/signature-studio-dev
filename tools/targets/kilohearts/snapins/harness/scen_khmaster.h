@@ -60,9 +60,9 @@ u64 __attribute__((ms_abi)) khb_HeapAlloc(u64 h, u32 flags, u64 bytes) {
     u64 cur = *(u64*)0x04000100ULL;
     if (!cur) cur = 0x05000010ULL;
     u64 a = (cur + 15) & ~(u64)15;
+    if (bytes > 0x100000ULL) return 0;
     u64 n = (bytes + 15) & ~(u64)15;
-    if (n > 0xF0000ULL) n = 0xF0000ULL;
-    if (a + n > 0x05100000ULL) a = 0x05000010ULL;
+    if (a + n > 0x05100000ULL) return 0;
     unsigned char* m = (unsigned char*)a;
     for (u64 i = 0; i < n; i++) m[i] = 0;
     *(u64*)0x04000100ULL = a + n;

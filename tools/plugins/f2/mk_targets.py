@@ -5,8 +5,8 @@
 
 出力 (すべて tools/plugins/work/f2/ = gitignore):
   targets/<tag><block>.json   liftdiff の target 記述 (docs/FORMAT.md §1)。IR = work/batch/<block>/p.final.ll (RetDec + pass 鎖の出力そのまま)
-  image/<block>.bin           wasm 線形メモリに載せる PE イメージ (offset 0 = RVA 0)。m11_image_gen.py と同じ規約:
-                              .reloc を除く全 section を RVA に敷き、DIR64 reloc が指す image 内ポインタは VA→RVA (-ImageBase) 補正
+  image/<block>.bin           wasm 線形メモリに載せる PE イメージ。wasm_origin = ImageBase (恒等写像)。
+                              .reloc を除く全 section を RVA に敷く (offset 0 = RVA 0)。IR の絶対 VA 定数をそのまま指せるよう reloc 補正はしない (#871)
   targets/<block>.vas         関数 VA 一覧 (liftdiff batch --set file:)
 """
 import json, os, re, struct, sys
@@ -18,9 +18,11 @@ REPO = os.path.abspath(os.path.join(PLUGINS, '..', '..'))
 sys.path.insert(0, os.path.join(PLUGINS, '..', 'shared'))
 from paths import FL_WIN64_DIR  # noqa: E402
 W = os.path.join(PLUGINS, 'work')
+# 0x5de250 (block 19006) の回帰の機序が未確定のため、この block だけ従来の RVA 配置に戻す (#871 方式 (a'))
+RVA_MODE_BLOCKS = {19006}
 
 
-def build_image(path):
+def build_image(path, to_rva):
     pe = pefile.PE(path, fast_load=True)
     base = pe.OPTIONAL_HEADER.ImageBase
     size = pe.OPTIONAL_HEADER.SizeOfImage
@@ -45,12 +47,13 @@ def build_image(path):
                     relocs.append(page + (e & 0xfff))
             i += blk
     fixed = 0
-    for r in relocs:
-        if r + 8 <= top:
-            v = struct.unpack_from('<Q', img, r)[0]
-            if base < v < base + size:
-                struct.pack_into('<Q', img, r, v - base)
-                fixed += 1
+    if to_rva:
+        for r in relocs:
+            if r + 8 <= top:
+                v = struct.unpack_from('<Q', img, r)[0]
+                if base < v < base + size:
+                    struct.pack_into('<Q', img, r, v - base)
+                    fixed += 1
     return bytes(img), {'base': base, 'size': size, 'top': top, 'reloc_dir64': len(relocs), 'fixed': fixed}
 
 
@@ -108,7 +111,8 @@ def main():
     rel = lambda p: os.path.relpath(p, REPO)
     for b in blocks:
         pe_path = os.path.join(FL_WIN64_DIR, 'extracted', 'block%05d_PE.bin' % b)
-        img, info = build_image(pe_path)
+        rva_mode = b in RVA_MODE_BLOCKS
+        img, info = build_image(pe_path, to_rva=rva_mode)
         ip = os.path.join(W, 'f2', 'image', '%d.bin' % b)
         open(ip, 'wb').write(img)
         bd = os.path.join(W, 'batch', str(b))
@@ -131,7 +135,7 @@ def main():
             'pe': '${FL_WIN64_DIR}/extracted/block%05d_PE.bin' % b,
             'ir': rel(ir_path),
             'image': rel(ip),
-            'wasm_origin': '0x0',
+            'wasm_origin': '0x0' if rva_mode else '0x%x' % pe.OPTIONAL_HEADER.ImageBase,
             'fn_prefix': 'function_',
             'initial_memory': 671088640,   # ld_wasm.c の g_inbuf 192MB + g_heap 96MB + image が収まる最小級 (m11.json と同値)
             'simd': {'gen': 'cat %s' % rel(os.path.join(bd, 'p_simd.c')), 'ir': rel(ir_path),
