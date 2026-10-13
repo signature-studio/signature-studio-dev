@@ -1,15 +1,18 @@
 #!/usr/bin/env bash
 # M11 IR 生成 (再現用): boot0..4.lift.ll → merge → numfix → asmfix → passes → genstubs → dotfix → fnclex0 rename
 #   boot4 = tail-call/間接 call 表 seed の追加分 (m11_tail.py 出力)
+#   boot6 = WNDCLASS 静的実体の WNDPROC (+閉包) の追加分 (m11_wndclass_scan.py --ranges-out → m11_lift.sh ... boot6; #565)
+#           boot5 は #132 の間接 call fallback (m11_extra_ranges5.txt) が使うため、名前を分けている
 set -euo pipefail
 cd "$(dirname "$0")"
-source ../shared/env.sh   # FL_WIN64_DIR (既定は従来どおり /home/ubuntu/work/analysis/win64)
+source ../shared/env.sh   # FL_WIN64_DIR (環境変数で指定)
 PE="${M11_PE:-${PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}}"
 python3 m11_cond.py --reset ldfix=pending qstore=not-applied pe="$PE"   # #680: IR 生成条件を記録 (work/ir_conditions.json)
 CH="work/boot0.lift.ll work/boot1.lift.ll work/boot2.lift.ll work/boot3.lift.ll"
 [ -f work/boot4.lift.ll ] && CH="$CH work/boot4.lift.ll"
 # boot5 = 間接 call 先の fallback 実装 (m11_extra_ranges5.txt; #132 unit #23)
 [ -f work/boot5.lift.ll ] && CH="$CH work/boot5.lift.ll"
+[ -f work/boot6.lift.ll ] && CH="$CH work/boot6.lift.ll"   # boot6 = WNDCLASS 静的実体の WNDPROC 閉包 (m11_wndclass_scan.py, #565)
 python3 m11_merge.py $CH -o work/boot_all.ll
 python3 - <<'PYnum'
 import re

@@ -160,21 +160,21 @@ python3 tools/liftdiff/tests/oob_414ad0.py > tools/liftdiff/results/m11_oob_414a
 
 既知類型との関係 (DEFECTS.md): 新規類型なし (D1〜D6 は OTT 旧 chain の既存分類 = `check_ott.py`)。
 
-### 実測 run (現 head `24848bda`・受入条件 1 の再実行)
+### 実測 run (現 head `dc6e71bc`・受入条件 1 の再実行)
 
-- **Actions run ID**: `38423629378` / URL: https://github.com/signature-studio/signature-studio-dev/actions/runs/38423629378
-- **実行**: `bash tools/liftdiff/liftdiff_e2e.sh` (`--m11-only` なし・既定 `sample:800`)。HEAD `24848bda`。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`・`ANALYSIS_DIR=$HOME/analysis`。
-- **結果**: exit 0 / 所要 155 s (実測) / load (1 分平均) 0.76 (開始時) → 4.68 (終了時)。
+- **Actions run ID**: `38423629378` / URL: https://github.com/signature-studio/signature-studio-dev/actions/runs/38423629378 (`GITHUB_RUN_ID`。この run の中で `liftdiff_e2e.sh` を実行)
+- **実行**: `bash tools/liftdiff/liftdiff_e2e.sh` (`--m11-only` なし・既定 `sample:800`)。検証 HEAD `dc6e71bc` (`main` 取り込み前の PR head)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`・`ANALYSIS_DIR=$HOME/analysis`・`PATH` に emsdk。
+- **結果**: exit 0 / 所要 155 s (実測、開始→終了の wall clock) / load (1 分平均) 2.87 (開始時) → 4.56 (終了時)。
 - **最終行**: `LIFTDIFF_E2E PASS`
 - **[2/4] 集計行**: `OTT_SUMMARY` 212 関数 = 一致 **33** / 不一致 **110** / 実行不能 **69** (D1 4 / D2 6 / D3 13 / D4_D5 19 / D6 26)
 - **ネガコン**: 無加工 exit 0 + NC[D1] / NC[D2] / NC[D3] / NC[D6] が各 exit 1 = 5/5 PASS
-- **他段**: [0/4] 単体 23 件 OK / [3/4] unit #18 3 件 PASS (`UStrAsg` mem diff・`Move(409c80)` spill_slot_deref・`4123c0` 脱落 native 67 > wasm 46) / [4/4] `sample:800` 一致 357 / 不一致 213 / 実行不能 230 (batch 86 s)。boot は unit 22 で native segv (`units_run=22/942`、判定条件外)。
+- **他段**: [0/4] 単体 PASS / [3/4] unit #18 3 件 PASS (`UStrAsg` mem diff・`Move(409c80)` spill_slot_deref・`4123c0` 脱落 native 67 > wasm 46) / [4/4] `sample:800` 一致 357 / 不一致 213 / 実行不能 230 (batch 86 s)。boot は unit 22 で native segv (`units_run=22/942`、判定条件外)。
 - **素材 (`oc_artifacts`)**: `fl-win64 toolchain-retdec toolchain-emsdk work-m11 work-liftdiff work-m6-ott analysis-ott-binaries` (PR 本文と同一)。`$HOME/artifacts` の 7 件の実在を確認して展開:
   - `fl-win64` → `$RUNNER_TEMP/fl-win64` (`FL_WIN64_DIR`)
   - `work-m11` / `work-liftdiff` / `work-m6-ott` → `tools/{m11,liftdiff,m6,ott,m8,m9,m10}/work/` (gitignore・commit なし)
   - `analysis-ott-binaries` → `$HOME/analysis/plugins/ott/binaries/` (`ANALYSIS_DIR=$HOME/analysis`)
-  - `toolchain-retdec` / `toolchain-emsdk` → 既存の `/opt/retdec`・`/opt/emsdk` を使用
-  - python 依存: `pip install --user numpy capstone pefile` (agent-setup 未対応のため手動)
+  - `toolchain-retdec` → `/opt/retdec`・`toolchain-emsdk` → `/opt/emsdk` (展開済み)
+  - python 依存: 実行環境に `numpy capstone pefile` が既に入っていたため追加導入なし (素の runner では要導入)
 - **前回比**: 前回 (`59eea5c`) 38 / 108 / 66 (D3 14・D4_D5 18) → 本 run 33 / 110 / 69 (D3 13・D4_D5 19)。D1・D2・D6 は不変。差分の原因切り分けは #825。
 
 | 未解決 | 影響 | 起票先 |
@@ -183,8 +183,19 @@ python3 tools/liftdiff/tests/oob_414ad0.py > tools/liftdiff/results/m11_oob_414a
 | runner に numpy/capstone/pefile が無く e2e 前に `pip install` が必要 | 素の Actions で e2e が exit 2 | PM に起票依頼 (agent-setup への追加) |
 | `fl-win64` / `analysis-ott-binaries` が agent-setup で自動展開されず手動展開が必要 | 同上 | PM に起票依頼 (agent-setup の別 issue) |
 
-旧記録 (`ebf5114a` 時点・未検証の記述と前回 `59eea5c` run) は分割移動: [`REPORT_APPENDIX_E.md`](REPORT_APPENDIX_E.md) §10。
+### 旧 3 回実測 (`59eea5c`・前回比の基準)
 
+素材 (run 3 で全展開): `fl-win64 toolchain-emsdk work-m11 work-liftdiff work-m6-ott analysis-ott-binaries`。展開先: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`・`ANALYSIS_DIR=$HOME/analysis`・`tools/{m11,liftdiff,m6,ott}/work/` (repo 直下、gitignore)。
+
+- **PE パス解決**: `targets/ott_old.json` の `pe` = `${PLUGINS_DIR}/ott/binaries/OTT_vst2_win64.dll`。`PLUGINS_DIR` 未設定・`ANALYSIS_DIR=/home/runner/analysis` で
+  `ldlib/build_wasm.py` と同じ展開式 (`tools/shared/paths.py` 既定 `$ANALYSIS_DIR/plugins`) が `/home/runner/analysis/plugins/ott/binaries/OTT_vst2_win64.dll` (3,146,752 B, 実在) に解決。
+- **D1〜D6 検出** (`ld_native` + `build ott_old` + `batch --set closure --shards 4` + `tests/check_ott.py`、クリーン worktree で 3 回): 3 回とも exit 0・出力同一。
+  212 関数 = 一致 38 / 不一致 108 / 実行不能 66。D1 icall_drop 4 / D2 short_global 6 / D3 callsite_arg_drop+arg_drop 14 / D4_D5 C 定義 port 18 / D6 body 層 26 (分母 = 212 関数、タグは複数重複あり)。
+  ctor `18011d400` = mismatch (icall_drop, callsite_arg_drop, callee_divergence, import_call_seq, zero_init_drop, fp_flag_unreflected)。
+  §5 の旧実測 (38/108/66) と完全一致。ott_old build は wasm 931,471 B (sig_mismatch 0, undefined 0)。
+- **所要 (実測、4 vCPU runner)**: build+batch+check 20.2 / 22.7 / 21.8 s (load 0.67 / 1.16 / 1.24)。単独 build 6.4 s・batch 15.0 s・nc 0.37 s。
+- **ネガコン** (`tests/nc_check_ott.sh`、新規・`liftdiff_e2e.sh` [2/4] から呼ぶ): batch 複製から D1 / D2 / D3 / D6 のタグを 1 系統ずつ除去 → `check_ott.py` は 4/4 とも exit 1、無加工は exit 0 (計 5/5 PASS)。
+  1 つでも期待外なら nc は exit 1 で e2e が落ちる。
 ## 11. 比較系の偽陽性 2 類型の修正 (LD-11 / #548) — 全文
 
 既知類型との関係: 該当なし (DEFECTS.md の lift 欠陥ではなく比較器側の偽陽性。f2 REPORT §7 起点)。本体 [`REPORT.md`](REPORT.md) §11 の要約から分割移動。
@@ -221,3 +232,27 @@ PR head は 358 / 212 / 230 ×2 と 357 / 213 / 230 ×1 (本 run の 3 回と一
 |---|---|---|
 | 受入条件 1: 0x6cd8a0 の 9 パターン実 PE 実測 (sample:800 に含まれない・f2 系素材が必要) | #548 を Closes できない | f2 系素材の許可名追加 = #293 (PM 判断) |
 | 非決定性: main 同士の case outcome の揺らぎ・0x959a40 の ret/trace 差分の run 依存 | 「+5」ではなく「安定 +4 + 揺らぎ 1 件」として扱う必要 | PM 判断: #548 へのコメントか新規 issue (未起票) |
+
+## 12. 被覆拡大 2 パターン (LD-4 / #235、部分達成) — 全文
+
+`cases.PATTERNS` に 2 pattern を追加 (`ldlib/cases.py`・`ldlib/session.py`)。どちらも既存 9 pattern の case 生成には影響しない。
+
+- `vm0`: this 疑似オブジェクト。arena+0x1000 に VMT (arena+0x2000) への fixup ptr を置き、0 埋めの VMT を指す。
+- `u16`: UTF-16 文字列 blob。arena+0x1000 に Delphi UnicodeString ヘッダ (refcnt=1, len) を置き、本文 UTF-16LE は +8 (arena+0x1008) に置く。引数はヘッダ先頭 (arena+0x1000) を渡す (`PATTERNS` の `('u16', {0}, 'u16', 0, 'small')`・加算 0)。
+
+実測 (m11, sample:800, `--shards 12 --state auto`、base = origin/main 97f28539 / 新 = 本ブランチ):
+
+| 項目 | base (9 pattern) | 新 (11 pattern) |
+|---|---|---|
+| 一致 / 不一致 / 実行不能 | 358 / 212 / 230 | 361 / 229 / 210 |
+| 所要 (batch) | 1m39s (load 0.76) | 1m49s (load 0.31→1.35) |
+
+関数単位の遷移: unexec→match 7 / unexec→mismatch 13 / match→mismatch 4 / match→match 354 / mismatch→mismatch 212 / unexec→unexec 210。
+match→mismatch の 4 件 (0x8445b0・0x6681f0・0xfe8e80・0x528680) は新 pattern (vm0/u16) の case だけが diff/wasm_trap で、既存 9 pattern は変わらない (深部経路の露出)。
+`liftdiff_e2e.sh --m11-only` は exit 0 (単体テスト・unit #18 の 3 検査 PASS・closure 361/229/210)。
+
+**未達 (受入条件)**: 実行不能 2,261 (closure) の内訳の大半 (native fault / null deref) は今回の 2 pattern では解消しない。
+UTF-16 blob は 1 pattern 1 本の固定で、長さや内容の変化を試していない。this/VMT は VMT の slot を埋めないため、仮想 call 先で native が落ちる。
+「native 失敗 RVA からの引数補正」「署名未対応 (vector/struct) の扱い」「状態前提 (InitTable/TLS) の case 生成」は未着手。
+flelift closure (fle_lift.sh 生成物 tools/flelift/work/lift/* が素材に無い) は未実測。
+起票先: 本 issue #235 (部分達成のため Refs)。
