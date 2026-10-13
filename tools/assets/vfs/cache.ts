@@ -65,7 +65,9 @@ export class SlotCache implements ChunkCache {
   }
 
   private scan(): void {
-    const n = Math.min(this.maxSlots, Math.floor(this.file.getSize() / this.slotBytes));
+    // 末尾 slot は chunk が chunkSize 未満だとファイルが slotBytes に満たない。header (HDR) まで在れば slot として数える
+    const size = this.file.getSize();
+    const n = Math.min(this.maxSlots, size >= HDR ? Math.floor((size - HDR) / this.slotBytes) + 1 : 0);
     for (let s = 0; s < n; s++) {
       this.slotId[s] = null;
       this.file.read(this.hdr, s * this.slotBytes);

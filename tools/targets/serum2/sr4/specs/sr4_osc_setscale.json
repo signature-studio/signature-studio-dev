@@ -1,0 +1,197 @@
+{
+ "name": "sr4_osc_setscale",
+ "func": "0x1803c87d0",
+ "wasm_func": "function_1803c87d0",
+ "scenarios": 400,
+ "steps": 1,
+ "seed": 75005,
+ "vars": [
+  {
+   "name": "x0",
+   "gen": {
+    "unif": [
+     -100.0,
+     100.0
+    ]
+   }
+  },
+  {
+   "name": "p",
+   "gen": {
+    "mix": [
+     [
+      0.4,
+      {
+       "choice": [
+        0.25,
+        0.5,
+        1.0,
+        2.0,
+        4.0,
+        440.0
+       ]
+      }
+     ],
+     [
+      0.4,
+      {
+       "unif": [
+        0.01,
+        8.0
+       ]
+      }
+     ],
+     [
+      0.2,
+      {
+       "loguni": [
+        -3,
+        2
+       ]
+      }
+     ]
+    ]
+   }
+  },
+  {
+   "name": "sr",
+   "gen": {
+    "mix": [
+     [
+      0.6,
+      {
+       "choice": [
+        44100,
+        48000,
+        96000,
+        88200,
+        192000
+       ]
+      }
+     ],
+     [
+      0.4,
+      {
+       "int": [
+        1000,
+        400000
+       ]
+      }
+     ]
+    ]
+   }
+  },
+  {
+   "name": "kind",
+   "gen": {
+    "unif": [
+     0,
+     1
+    ]
+   }
+  },
+  {
+   "name": "prev_p",
+   "expr": "f32(p) if kind < .3 else rnd(0.01,8.0)"
+  },
+  {
+   "name": "kind2",
+   "gen": {
+    "unif": [
+     0,
+     1
+    ]
+   }
+  },
+  {
+   "name": "prev_sr",
+   "expr": "sr*1.0 if kind2 < .3 else rint(1000,400000)*1.0"
+  }
+ ],
+ "args": [
+  {
+   "ptr": "this"
+  },
+  {
+   "f32": "x0"
+  },
+  {
+   "f32": "p"
+  }
+ ],
+ "buffers": {
+  "this": {
+   "size": 576,
+   "fields": [
+    {
+     "off": "0x10",
+     "ptr": "owner"
+    },
+    {
+     "off": "0x1e0",
+     "type": "f64",
+     "gen": {
+      "var": "prev_p"
+     }
+    },
+    {
+     "off": "0x1d8",
+     "type": "f64",
+     "gen": {
+      "var": "prev_sr"
+     }
+    },
+    {
+     "off": "0x8",
+     "type": "u32",
+     "gen": {
+      "bits32": 1
+     }
+    },
+    {
+     "off": "0x200",
+     "type": "u32",
+     "gen": {
+      "bits32": 1
+     }
+    },
+    {
+     "off": "0x208",
+     "type": "u64",
+     "gen": {
+      "expr": "rint(0,2**63)"
+     }
+    },
+    {
+     "off": "0x210",
+     "type": "u64",
+     "gen": {
+      "expr": "rint(0,2**63)"
+     }
+    },
+    {
+     "off": "0x22d",
+     "type": "u8",
+     "gen": {
+      "choice": [
+       0,
+       1
+      ]
+     }
+    }
+   ]
+  },
+  "owner": {
+   "size": 256,
+   "fields": [
+    {
+     "off": "0xd0",
+     "type": "i32",
+     "gen": {
+      "var": "sr"
+     }
+    }
+   ]
+  }
+ }
+}

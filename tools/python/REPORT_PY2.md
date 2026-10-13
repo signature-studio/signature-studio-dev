@@ -1,8 +1,8 @@
 # python 付録: PY-2 静的リンク + Py_* 動的束縛の対応表 (#83 / #115)
 
-(REPORT.md の 250 行上限のため分割移動。本体からは §7c として参照。REPORT.md の §11 (MIDI, PY-6) とは別節)
+(REPORT.md の 250 行上限のため分割移動。本体からは §7d として参照。REPORT.md の §7c (ilmcp, PY-3) と §11 (MIDI, PY-6) とは別節)
 
-## 7c. CPython を provider と同一 wasm に静的リンク (PY-2, #83 / #115 の対応表)
+## 7d. CPython を provider と同一 wasm に静的リンク (PY-2, #83 / #115 の対応表)
 
 既知類型との関係: 該当なし (lift / 逆アセの欠陥類型ではない。PE 側は束縛名の機械抽出のみ)。flapi の実体は §7b の provider (最小エンジン状態) で、**実 FLEngine wasm ではない** (範囲外の節参照)。
 
