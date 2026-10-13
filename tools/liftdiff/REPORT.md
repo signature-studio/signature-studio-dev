@@ -238,8 +238,7 @@ OOB `function_414ad0` 系 68 件は `[rbx]` 1 段 deref の IR 脱落 (68 件は
 
 ## 10. OTT 旧 chain (D1〜D6) の Actions 再現 (LD-8 / #406、要約)
 
-Actions で [2/4] を 3 回実測: 3 回とも `check_ott.py` exit 0・212 関数 = 一致 38 / 不一致 108 / 実行不能 66 (D1 4 / D2 6 / D3 14 / D4_D5 18 / D6 26)。`pe` は `ANALYSIS_DIR` 経由で解決。
-ネガコン `tests/nc_check_ott.sh` 5/5 PASS。**`liftdiff_e2e.sh` 全体 exit 0 は `fl-win64`・`work-m11` 未取得のため未確認** (#406 受入条件 1 未達)。全文・未解決表: [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §10。
+`liftdiff_e2e.sh` (--m11-only なし) 全体 exit 0 を実測 (`fl-win64`・`work-m11` 取得済み・176 s・4 vCPU)。[2/4] の OTT 集計は main `6e5c8da` で 212 関数 = 一致 33 / 不一致 110 / 実行不能 69 (D1 4 / D2 6 / D3 13 / D4_D5 19 / D6 26、3 回同一)。前回 #618 (`59eea5c`) の 38/108/66 から変化、原因は未切り分け。ネガコン 5/5 PASS。全文・未解決表: [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §10。
 
 ## 11. 比較系の偽陽性 2 類型の修正 (LD-11 / #548、要約)
 

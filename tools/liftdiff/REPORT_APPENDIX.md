@@ -158,8 +158,19 @@ python3 tools/liftdiff/tests/oob_414ad0.py > tools/liftdiff/results/m11_oob_414a
 
 ## 10. OTT 旧 chain (D1〜D6) の Actions 再現 (LD-8 / #406)
 
-既知類型との関係 (DEFECTS.md): 新規類型なし (D1〜D6 は OTT 旧 chain の既存分類 = `check_ott.py`)。検証起点 commit: `59eea5c` (main `bb76f7c` 上)。
-素材: `plugins-ott analysis-ott-binaries toolchain-retdec toolchain-emsdk work-liftdiff work-m6-ott` (`fl-win64`・`work-m11` は**未取得**)。
+既知類型との関係 (DEFECTS.md): 新規類型なし (D1〜D6 は OTT 旧 chain の既存分類 = `check_ott.py`)。検証起点 commit: `59eea5c` (main `bb76f7c` 上) と、本 run の `6e5c8da` (main 上) の 2 系統。
+素材 (本 run): `fl-win64 plugins-ott analysis-ott-binaries toolchain-retdec toolchain-emsdk work-liftdiff work-m6-ott work-m11` を `$ARTIFACTS_DIR` に確認。`fl-win64` は `tar --zstd -xf` で `$RUNNER_TEMP/fl-win64` に展開 (3.3 GiB) し `FL_WIN64_DIR` に設定。python 依存 (numpy capstone pefile) は `pip install --user` で導入。
+
+### 本 run (LD-8 受入条件 1 の検証・`6e5c8da`)
+
+- **`liftdiff_e2e.sh` (--m11-only なし) 全体 exit 0**: 実測 176 s、load 5.86 / 2.64 / 1.04。[0/4] 単体テスト 23 件 OK、[1/4] build、[2/4] OTT 旧 chain、[3/4] unit #18 の 3 件 PASS、[4/4] M11 closure sample:800 (99 s)。最後に `LIFTDIFF_E2E PASS`。
+- **[2/4] OTT 集計**: 212 関数 = 一致 33 / 不一致 110 / 実行不能 69。D1 icall_drop 4 / D2 short_global 6 / D3 callsite_arg_drop+arg_drop 13 / D4_D5 C 定義 port 19 / D6 body 層 26。`check_ott.py` exit 0 (3 回同一: e2e 内 1 回 + 手動 2 回・batch 15〜16 s)。ネガコン 4/4 PASS (D1/D2/D3/D6 のタグ除去で exit 1)。
+- **前回 (`59eea5c`) との差**: 前回 38/108/66 (D3 14、D4_D5 18)。本 run は 33/110/69 (D3 13、D4_D5 19)。D1・D2・D6 は不変。差分の原因は未切り分け (main の `59eea5c`→`6e5c8da` 間の変更による可能性が高いが、未確認)。検出自体 (D1〜D6 全検出) は維持。
+- **[3/4] unit #18**: `UStrAsg` mem diff / `Move(409c80)` spill_slot_deref / `4123c0` resourcestring 脱落 (native 67 > wasm 46、mem diff 7) の 3 件 PASS。boot は unit 22 で segv (native 側、`units_run=22/942`) したが、判定条件の対象外。
+- **[4/4] M11 closure sample:800**: 一致 357 / 不一致 213 / 実行不能 230。主因の上位は callee_divergence 52・wasm_trap 36・memory_semantics 25・callsite_arg_drop 24。
+- **ネガコン・PE 解決**: `ANALYSIS_DIR=$HOME/analysis` で `pe` が解決し check_ott.py が実行できたことで確認 (受入条件 2)。
+
+### 前回 run (`59eea5c`・fl-win64/work-m11 未取得)
 
 - **PE パス解決**: `targets/ott_old.json` の `pe` = `${PLUGINS_DIR}/ott/binaries/OTT_vst2_win64.dll`。`PLUGINS_DIR` 未設定・`ANALYSIS_DIR=/home/runner/analysis` で
   `ldlib/build_wasm.py` と同じ展開式 (`tools/shared/paths.py` 既定 `$ANALYSIS_DIR/plugins`) が `/home/runner/analysis/plugins/ott/binaries/OTT_vst2_win64.dll` (3,146,752 B, 実在) に解決。
