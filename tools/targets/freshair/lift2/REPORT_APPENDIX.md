@@ -130,29 +130,30 @@ bash tools/targets/freshair/lift2/lift2_e2e.sh                                  
 | 2/5 回帰セットが epf 有無で乱数列が変わる seed 依存 | 別 seed では native OOB の可能性 (既知限界の再発) | #692 に併記 |
 | capstone 4 系の版差 (FA-2c 当時の capstone 版は不明) | 73 s 当時との差の原因は未切り分け | 本 Issue #666 に留保 |
 
-## 6. FA-11 (#692) 途中経過: SSE 整数 pcmpeqw / pshuflw の lowering (部分達成)
+## 6. FA-11 (#692) 途中経過: SSE 整数 pcmpeq{b,d} の lowering (部分達成)
 
-- 検証起点: HEAD `c8ce2a4d` で `lift2_e2e.sh` → `RESULT: lift2_e2e ALL PASS` (exit 0, real 78 s, load 0.11→0.77, nproc 4)。
-- 追加: `mlift/mlift_ops.py` に `pshuflw` と `pcmpeq{b,w,d}` (legacy 2 オペランド) の lowering を追加。
-- ctrl build (`build_ctrl.sh`): `failed(funcs with unsupported)` は 2 → 2 (変化なし)。ただし失敗の内訳は
-  `pcmpeqw` 行が消え、残りは `f_18107d41c: pmovmskb eax, xmm1` と `f_1810577ac: vpcmpeqw ymm1,ymm1,[r9]` (ymm 非対応) と `pmovmskb eax, xmm0` の 3 件。
-- 同 HEAD (変更後) の `lift2_e2e.sh`: `RESULT: lift2_e2e ALL PASS` (exit 0, real 78 s, load 0.11→1.33)。内訳は comp 400/400・filter 400/400・ctrl 15/15・ablation 5 種すべて検出 (変更前と同値)。
-- 新 lowering の実行到達 (review 指摘 2 の (a) 実測): 追加 lowering の先頭に `call void @llvm.trap()` を入れた一時版で `build_ctrl.sh` → `run_ctrl.sh 2 5` を実行。
-  - 対照 (trap 手法が効くことの確認): `pshufd` (ctrl で実行される既存命令) の先頭に trap を入れると `run_ctrl` は **FAIL** (`RESULT: MISMATCH in ctrl scenarios`, exit 1, `S900` で wasm 側のみ `ERR`)。
-  - 新 lowering の trap 版 (`pshuflw` / `pcmpeq{b,w,d}`): `run_ctrl` は **PASS** (`ctrl BIT-EXACT 15/15`, exit 0)。ctrl IR に trap 入り `icmp eq <8 x i16>` は 3 件、`pshuflw` の shufflevector は 1 件が存在する。
-  - S2001 を除いた 14 シナリオ (fma0/1 とも) では、trap 版でも HEAD と同じく全行一致 (mismatch 0)。よって新 lowering は S2001 以外の ctrl シナリオでは実行されない。
-  - S2001 (両側 ERR) は判定に含まれず、新 lowering が S2001 内で発火していないことは**未証明**。根拠: trap 版と HEAD 版の S2001 の wasm スタックは最内フレーム index が 1090 と 1091 で異なる (関数 index の対応付けには wasm の name section が必要だが、ctrl_full.wasm には関数名が無く対応を取れなかった)。ネイティブ側の ERR も両版で同じ戻り先 (`ret=18100cc61`) で、実機で既に落ちるシナリオである。
-  - 結論 (修正): 新 lowering は **S2001 以外の ctrl 14 シナリオでは実行されない**。S2001 内での実行有無は未切り分けのため、「ctrl 経路で実行されない」とは断定しない。受入条件 2 の残りは #692 に残す。
-  - comp / filter: `run_comp.sh` / `run_filter.sh` は実行していない。代わりに、trap 版の `build_comp.sh` / `build_filter.sh` の生成 IR で、新 lowering の出力 (`icmp eq <16 x i8>` / `<8 x i16>` / `<4 x i32>` と `shufflevector <8 x i16>…<8 x i32>`) を grep した: `comp_full.ll` は全て 0 件、`filter.ll` も 0 件 (`sext <N x i1>` 8 件は既存命令)。よって comp / filter の e2e 経路に新 lowering の出力は現れないと判断する (IR 静的確認。動的確認ではない)。
-  - 既存の ctrl ERR (S2001, 両側 ERR) は trap 版・HEAD 版とも同じ `RuntimeError: unreachable` (既存の trap。新 lowering とは無関係)。
-  - 元に戻し: `mlift/mlift_ops.py` を HEAD (`d3e6e968` 以降の内容) と `cmp` で一致確認済み。
-  - 元に戻した HEAD (`6a906bce` の `mlift_ops.py`) で `lift2_e2e.sh` を再実行: `RESULT: lift2_e2e ALL PASS`, exit 0, real 64 s, load 0.27→0.93, nproc 4。comp 400/400・filter 400/400・ctx-fuzz 4 系統 mismatch 0・ctrl 15/15・ablation 5 種すべて検出。
-  - main 取り込み後 HEAD `2e4960f8` で再実行: `RESULT: lift2_e2e ALL PASS`, exit 0, real 62 s, load 0.28→0.93, nproc 4。内訳は上と同値 (comp 400/400・filter 400/400・ctx-fuzz mismatch 0・ctrl 15/15・ablation 5 種)。
-  - 本結論は「追加 lowering は S2001 以外の ctrl シナリオで実行されない」まで。S2001 内の実行有無と、comp / filter の動的確認は未了。lowering 自体の正しさは e2e では検証されていない。受入条件 2 の残りは #692 に残す。
-  - 実行環境: `work-liftlib-targets` / `plugins-freshair` / `fl-win64` を `$ARTIFACTS_DIR` から展開して実施 (epf 8 本は `plugins-freshair` の `Fresh Air.Win.zip` を `tools/targets/freshair/work/win` に展開)。emsdk 6.0.12 は `[EMSDK]` の手順で `$RUNNER_TEMP` に導入し、`env.sh` の前提に合わせて配置。
-- `8c217092` との関係 (重複の解消, commit `1496922d`): main の `8c217092` が `emit_sse` に `pcmpeqw` (`icmp eq <8 x i16>` + `sext`) と `pshuflw` を既に入れている。本 PR 側の `pshuflw` と `pcmpeq[bwd]` の分岐は、先に評価されるため main 側を覆い、main 側の `pcmpeqw` / `pshuflw` は到達しない状態だった。本 PR では `pshuflw` の分岐を削除し、`pcmpeq` の正規表現を `[bd]` に絞った。`pcmpeqw` と `pshuflw` は main 側だけが生きる。本 PR の残りの追加は `pcmpeqb` / `pcmpeqd`。
-- 重複解消後の再検証は未実施: `SlateCore.core_64` (`work-liftlib-targets`) と epf 8 本 (`plugins-freshair`) が `$ARTIFACTS_DIR` に無く、本 run の `oc_artifacts` 指定にも含まれないため、`build_ctrl.sh` / `run_ctrl.sh` / `lift2_e2e.sh` は実行できない (`lift2_e2e.sh` は `ERROR: ... CORE が無い` で exit 2)。このため下記の数値は**重複解消前の head (`90ff81f4`)** のもの。
-  - ctrl build 件数: 上の「2 → 2」は解消前 head の値。重複解消後の正しい件数は未測定 (`8c217092` の「2 → 1」は main 側の記録で、本 PR では再測定していない)。
-  - trap probe (`pcmpeq{b,d}`): 解消前 head の `pcmpeq{b,w,d}` の結果。解消後 head の `pcmpeq{b,d}` は未測定。
-- 未了 (#692 に残す): `pmovmskb` と ymm 形式の `vpcmpeqw` (関数 `f_1810577ac` / `f_18107d41c`)、rep 経路の e2e 到達 (受入条件 1・ネガコン)、回帰セットの seed 非依存化 (受入条件 3)。
-  ctrl closure には `rep stosb` 84・`rep movsb` 39・`rep stosw` 6・`rep stosq` 1 が lift 済みで存在する (`work/ctrl/ctrl_rep.json` の mnemonics 実測)。
+- 検証 HEAD: `db279818` (重複解消 `1496922d` を含む。`mlift_ops.py` の本 PR 差分は `pcmpeq{b,d}` の 8 行のみ)。
+- 追加 (本 PR): `mlift/mlift_ops.py` の `emit_sse` に `pcmpeq{b,d}` (legacy 2 オペランド、`icmp eq` + `sext`)。
+- `8c217092` との関係: main の `8c217092` が `pcmpeqw` / `pshuflw` (と `pmovmskb`) の lowering を既に入れている。本 PR の初版は `pshuflw` と `pcmpeq[bwd]` の分岐を先に評価させ、main 側を覆っていた (dead code)。`1496922d` で `pshuflw` 分岐を削除し、`pcmpeq` の正規表現を `[bd]` に絞った。以後 `pcmpeqw` / `pshuflw` は main 側だけが実行される。
+- ctrl build (`build_ctrl.sh`, `db279818`): `failed(funcs with unsupported)` 1 件 (`f_1810577ac: vpcmpeqw ymm1, ymm1, [r9]`、ymm 非対応)。解消前の `90ff81f4` で失敗していた `pmovmskb` 2 件は main `8c217092` の lowering で解消済み。
+
+### 検証 (`db279818`、`lift2_e2e.sh`)
+- `RESULT: lift2_e2e ALL PASS`, exit 0, real 84 s, load 0.46→0.92, nproc 4 (TMPDIR=`$RUNNER_TEMP`)。
+- comp 400/400 BIT-EXACT (non-grow 206/206・grow 194/194)・filter 400/400 BIT-EXACT・ctx-fuzz 4 系統 mismatch 0・ABI violations 0・ctrl BIT-EXACT 15/15 (S2001 は両側 ERR で同一シナリオ)・ablation 5 種すべて検出。
+- 素材: 本 run の `$ARTIFACTS_DIR` に `fl-win64` / `work-liftlib-targets` / `plugins-freshair` の 3 本の実在を確認。`work-liftlib-targets` を展開し、`plugins-freshair` は `fetch.sh` (`FA_DL`) で factory `.epf` 8 本を補完 (WORKFLOW §11)。emsdk 6.0.12 は `[EMSDK]` の手順で `$RUNNER_TEMP` に導入し、`env.sh` の参照先に配置。
+
+### 新 lowering の実行到達 (`db279818`、ctrl)
+- 対照 (検出手法の検証): `pshufd` (ctrl で実行される既存命令) の先頭に `llvm.trap()` を入れると `run_ctrl.sh 2 5` は FAIL (exit 1, `S900` で wasm 側のみ `ERR`)。
+- `pcmpeq{b,d}` の trap 版: 同じ `run_ctrl.sh 2 5` は 15/15 BIT-EXACT (exit 0)。
+- 静的確認: trap 版の `work/ctrl/ctrl_full.ll` に `icmp eq <16 x i8>` / `icmp eq <4 x i32>` は 0 件 (`icmp eq <8 x i16>` 3 件は main 側の `pcmpeqw`)。`work/ctrl/ctrl_rep.json` の mnemonic に `pcmpeqb` / `pcmpeqd` は 0 件。新分岐は ctrl closure を 1 つも emit しないため、S2001 内での発火も無い。
+- 元に戻した後、`mlift/mlift_ops.py` を HEAD と `cmp` で一致確認済み。
+
+### comp / filter (IR 静的確認のみ、動的確認は未実施)
+- HEAD (`db279818`) の `work/ml/comp_full.ll` と `work/filter/filter.ll` に `icmp eq <16 x i8>` / `icmp eq <4 x i32>` は 0 件 (`icmp eq <8 x i16>` も 0 件)。
+- `run_comp.sh` / `run_filter.sh` の trap 版は未実施。
+
+## 未解決 (起票先 #692)
+- 新 lowering `pcmpeq{b,d}` の comp / filter 経路の動的確認 (trap 版の `run_comp` / `run_filter`)。
+- rep 経路の e2e 到達・ネガコン (受入条件 1)、回帰セットの seed 非依存化 (3)。
+- `vpcmpeqw` (ymm、`f_1810577ac`) の lowering。
+- epf 展開の素材配線は #693。
