@@ -133,7 +133,7 @@ shim 候補 (SR-3/SR-4 入力) は呼出確認 110 件のうち kernel32 (メモ
 
 - 区分 (明示):
   - **実測 (今回の run で取得できたもの)**: なし。`S2HOST_WATCH=1` の console は今回の run で再取得できず、commit されたログも無い (`host/work/` は gitignore)。以下の「IID の内容」は**前 run の出力の転記ではなく、SDK 定義からの計算値**。
-  - **計算 (SDK 由来)**: VST3 SDK `pluginterfaces/vst/ivsthostapplication.h` の `DECLARE_CLASS_IID` (:103 IVst3ToAUWrapper / :122 IVst3ToAAXWrapper) の 4 個の 32bit 値を `base/funknown.h` の `INLINE_UID` (バイト順) で展開した値。取得した SDK は `steinbergmedia/vst3sdk` HEAD `3cdf9ca5` (2026-08-11)。版は固定していない。
+  - **計算 (SDK 由来)**: VST3 SDK `pluginterfaces/vst/ivsthostapplication.h` の `DECLARE_CLASS_IID` (:103 IVst3ToAUWrapper / :122 IVst3ToAAXWrapper) の 4 個の 32bit 値を `base/funknown.h` の `INLINE_UID` (バイト順) で展開した値。参照先は VST3 SDK の `pluginterfaces` submodule commit `4f547e8e102b47de4a8b8aaf343c73b700786372` の `vst/ivsthostapplication.h` (親リポジトリ直下には無い)。版は固定していない。
   - **未実測**: 前 run の `hit#1 … value=2` 直後の IID 読出し、`HostApp::queryInterface` の `kNoInterface` 応答。
 - 計算した IID (`uidHex` と同じ連続 hex。`vst3host.cpp` の watch 出力も同形式):
   - RVA `0x11be750` → `A3B8C6C5C0954688B0916F0BB697AA44` = IVst3ToAUWrapper
