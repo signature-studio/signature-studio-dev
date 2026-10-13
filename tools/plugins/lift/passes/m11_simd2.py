@@ -122,11 +122,32 @@ def gen_body(base, R, A):
         return ['(void)a; (void)b; /* flag は IR 側に未反映 (m6 の ir6 [P1] 相当は未移植; 既知の限界) */']
     if base == 'xgetbv':
         return ['return 0; /* OSXSAVE/AVX を広告しない */']
+    if base in ('prefetcht0', 'prefetcht1', 'prefetcht2', 'prefetchnta', 'prefetchw') and R == 'void':
+        return ['(void)a; /* hint のみ: 状態を変えない */']
+    cm = re.match(r'^cmp(eq|lt|le|unord|neq|nlt|nle|ord)(ps|pd)$', base)
+    if cm and n == 2 and R == 'i128' and A == ['i128', 'i128']:
+        pred, w = cm.groups()
+        T, k, U = ('float', 4, 'u32') if w == 'ps' else ('double', 2, 'u64')
+        cond = {'eq': 'x == y', 'lt': 'x < y', 'le': 'x <= y', 'unord': '(x != x || y != y)',
+                'neq': '!(x == y)', 'nlt': '!(x < y)', 'nle': '!(x <= y)', 'ord': '(x == x && y == y)'}[pred]
+        return ['{ %s xs[%d], ys[%d]; %s rs[%d]; memcpy(xs, &a, 16); memcpy(ys, &b, 16);' % (T, k, k, U, k),
+                '  for (int i = 0; i < %d; i++) { %s x = xs[i], y = ys[i]; rs[i] = (%s) ? (%s)~(%s)0 : 0; }' % (k, T, cond, U, U),
+                '  u128 o; memcpy(&o, rs, 16); return o; }']
+    if base in ('movmskps', 'movmskpd') and n == 1 and A[0] == 'i128':
+        k, b = (4, 31) if base == 'movmskps' else (2, 63)
+        return ['{ u%d xs[%d]; memcpy(xs, &a, 16); u32 m = 0; for (int i = 0; i < %d; i++) m |= (u32)(xs[i] >> %d) << i; return m; }' % (b + 1, k, k, b)]
+    if base == 'rep_movsd_memcpy' and R == 'void' and n == 3:
+        # rep movsd (DF=0): dword を前方へ 1 個ずつ。 dst が src の直後で重なる場合は memmove と結果が違うので前方ループを維持する
+        return ['u8* d = (u8*)a; const u8* s = (const u8*)b;',
+                'if (d <= s || d >= s + (size_t)c * 4u) { memmove(d, s, (size_t)c * 4u); }',
+                'else { for (u64 i = 0; i < c; i++) { u32 t = ((const volatile u32*)s)[i]; ((volatile u32*)d)[i] = t; } }']
+    if base == 'rep_stosb_memset' and R == 'void' and n == 3:
+        return ['memset(a, (int)(u8)b, (size_t)c); /* rep stosb: b = al */']
     if base == 'rep_movsq_memcpy':
         return ['memmove(a, b, (size_t)c * 8u); /* rep movsq: c = qword 数 */']
     if base == 'rep_stosq_memset':
         return ['u64* p = (u64*)a; for (u64 i = 0; i < c; i++) p[i] = b; /* rep stosq */']
-    if base in ('movaps', 'movapd', 'movdqa', 'movdqu', 'movups', 'movupd', 'lddqu') and n == 1:
+    if base in ('movaps', 'movapd', 'movdqa', 'movdqu', 'movups', 'movupd', 'lddqu', 'vmovaps', 'vmovapd', 'vmovdqa', 'vmovdqu', 'vmovups', 'vmovupd') and n == 1:
         return {'i128': ['return a;'], 'i64': ['return (u64)a;'], 'i32': ['return (u32)a;']}.get(R)
     if base in ('movaps', 'movapd', 'movdqa', 'movdqu', 'movups', 'movupd') and R == 'void':
         return ['(void)a; (void)b; /* store: RetDec が dst を引数に持たない no-op */']
@@ -164,8 +185,8 @@ def gen_body(base, R, A):
         return ['%s X = %s, Y = %s; return %s(a, %s);' % (ty, x, y, setf, ex)]
     if base == 'sqrtsd' and n == 1: return ['return lane0d_set(a, sqrt(lane0_d(a)));']
     if base == 'sqrtss' and n == 1: return ['return lane0f_set(a, sqrtf(lane0_f(a)));']
-    pm = re.match(r'^(add|sub|mul|div|min|max)(ps|pd)$', base)
-    if pm and n == 2:
+    pm = re.match(r'^v?(add|sub|mul|div|min|max)(ps|pd)$', base)
+    if pm and n == 2 and A == ['i128', 'i128']:
         op, w = pm.groups()
         T, k = ('float', 4) if w == 'ps' else ('double', 2)
         return ['{ %s xs[%d], ys[%d], rs[%d]; memcpy(xs, &a, 16); memcpy(ys, &b, 16);' % (T, k, k, k),
