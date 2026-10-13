@@ -152,6 +152,6 @@ index 720198eb..7cc41be9 100755
   ```
   差分は e2e.sh の表示文字列 (`n/4`→`n/5`) と REPORT の文言のみ。計算・入出力は不変。実測値 (表 §2) は変えていない。
 - `bash dsp/negctl.sh` (head `0bcdcd15`) → NC1 FAIL<期待> (unsup 67 vs 基準 48,612) / NC2 FAIL<期待> (unsup 746) / NC3 FAIL<期待> (unsup 0)。
-- 検証 HEAD と測定 commit の関係: `0bcdcd15` 以降に追加された `dsp/scripts/mx_pdata_denom.py` は e2e の経路外 (e2e.sh・mx_pdata_quant.py・negctl.sh の差分 0 行)。e2e の測定値は `0bcdcd15` で取得した値のまま有効。
+- 検証 HEAD と測定 commit の関係: 実測は `0bcdcd15` で取得。その後の HEAD (`5c965723` = main 取り込み + `mx_pdata_denom.py` 追加 + 本 REPORT 修正) について `git diff 0bcdcd15 HEAD -- tools/targets/massivex/dsp/e2e.sh tools/targets/massivex/dsp/negctl.sh tools/targets/massivex/dsp/scripts/mx_pdata_quant.py tools/flelift/x64c.py tools/shared/env.sh` は **0 行**。e2e の測定値は `0bcdcd15` のまま有効 (WORKFLOW §6)。
 - 分母の実測: `python3 dsp/scripts/mx_pdata_denom.py <PE>` → valid 186,961 entry の Σ = 58,062,810 B / begin 一意化 186,960 関数の Σ = 58,062,780 B (差 30 B は重複 begin 1 件)。
 - 計測は `.pdata` 解析のみで closure は変えていない。受入 5 の「negctl 3 件 FAIL」は既存の 3 件が満たす (本 run の変更は e2e.sh 末尾の step 5/5 追加のみ)。
