@@ -7,7 +7,7 @@
 素材: $FL_WIN64_DIR/extracted/block22434_PE.bin (既定 $RUNNER_TEMP/fl-win64)。 依存: capstone==5.0.7。
 x64 側の期待値は tools/hostbridge/poc/vst2_abi.h (static_assert と同じ値) から取る。
 """
-import argparse, os, shutil, struct, sys
+import argparse, os, re, shutil, struct, sys
 
 try:
     from capstone import Cs, CS_ARCH_X86, CS_MODE_32
@@ -197,7 +197,76 @@ def zero_fill_bytes(text, va):
     return None
 
 
-def check(path, x32_size=0x90, magic_expect=MAGIC, ptr32=4, pin_sha=True):
+DISPATCH_VA = 0x10001300    # guest switch (vtable slot+0x18)。 dispatcher 0x10001000 は全 opcode をここへ渡す
+PROCESS_EVENTS = 25         # effProcessEvents
+EDIT_GET_RECT = 13          # effEditGetRect
+ROUTE_EXPECT = {'bound': 0x18, 'opcode25_default': True, 'default_returns_zero': True,
+                'erect_child_loaded': True, 'erect_child_slot': 4}
+
+
+def image_base(data):
+    pe = struct.unpack_from('<I', data, 0x3C)[0]
+    return struct.unpack_from('<I', data, pe + 24 + 28)[0]
+
+
+def file_off(data, addr):
+    """VA -> ファイル上の位置。 範囲外は None。"""
+    pe = struct.unpack_from('<I', data, 0x3C)[0]
+    opt = struct.unpack_from('<H', data, pe + 20)[0]
+    nsec = struct.unpack_from('<H', data, pe + 6)[0]
+    rva = addr - image_base(data)
+    for k in range(nsec):
+        o = pe + 24 + opt + 40 * k
+        vs, sva, rs, rp = struct.unpack_from('<IIII', data, o + 8)
+        if sva <= rva < sva + max(vs, rs):
+            return rp + rva - sva
+    return None
+
+
+def route_facts(data, va, text):
+    """effProcessEvents(25) / effEditGetRect(13) が guest 内でどこへ流れるかを静的に読む。 読めない欄は None。"""
+    base = image_base(data) + va
+    md = Cs(CS_ARCH_X86, CS_MODE_32)
+    f = {'bound': None, 'opcode25_default': None, 'default_returns_zero': None,
+         'erect_child_loaded': None, 'erect_child_slot': None}
+    entry = list(md.disasm(text[DISPATCH_VA - base:DISPATCH_VA - base + 0x20], DISPATCH_VA))
+    ci = next((i for i, x in enumerate(entry) if x.mnemonic == 'cmp' and x.op_str.startswith('eax, ')), None)
+    if ci is None or ci + 1 >= len(entry) or entry[ci + 1].mnemonic != 'ja':
+        return f
+    bound = int(entry[ci].op_str.split(', ')[1], 0)
+    default = int(entry[ci + 1].op_str, 0)
+    f['bound'] = bound
+    f['opcode25_default'] = PROCESS_EVENTS > bound
+    dflt = list(md.disasm(text[default - base:default - base + 0x10], default))
+    f['default_returns_zero'] = bool(dflt) and dflt[0].op_str == 'eax, esi' and \
+        any(x.op_str == 'esi, esi' for x in entry)
+    jm = [x for x in entry if x.mnemonic == 'jmp']
+    m = re.search(r'\[eax\*4 \+ (0x[0-9a-f]+)\]', jm[0].op_str) if jm else None
+    if not m:
+        return f
+    e = rdata_entry(data, int(m.group(1), 16) + 4 * EDIT_GET_RECT)
+    if e is None:
+        return f
+    body = list(md.disasm(text[e - base:e - base + 0x30], e))
+    idx = next((i for i, x in enumerate(body) if x.op_str == 'ecx, dword ptr [ecx + 8]'), None)
+    f['erect_child_loaded'] = idx is not None
+    if idx is not None:
+        cm = next((x for x in body[idx:] if x.mnemonic == 'call'), None)
+        sm = re.match(r'dword ptr \[eax \+ (0x[0-9a-f]+|\d+)\]$', cm.op_str) if cm else None
+        f['erect_child_slot'] = int(sm.group(1), 0) if sm else None
+    return f
+
+
+def rdata_entry(data, addr):
+    o = file_off(data, addr)
+    return struct.unpack_from('<I', data, o)[0] if o is not None else None
+
+
+def check_routes(f, expect):
+    return ['route %s = %r, want %r' % (k, f.get(k), v) for k, v in expect.items() if f.get(k) != v]
+
+
+def check(path, x32_size=0x90, magic_expect=MAGIC, ptr32=4, pin_sha=True, route_expect=None):
     """返り値: 失敗項目の list (空なら合格)。 表は stdout に出す。 pin_sha=False は値突合だけを試すネガコン用。"""
     fails = []
     data, va, text = load(path)
@@ -249,6 +318,12 @@ def check(path, x32_size=0x90, magic_expect=MAGIC, ptr32=4, pin_sha=True):
         got = st.get(off)
         if got != exp:
             fails.append('engine %s @%#x = %r, want %r' % (name, off, got, exp))
+    # VstEvents / ERect の読取経路 (dispatcher → guest switch)。 静的に読めない欄は None として FAIL
+    rf = route_facts(data, va, text)
+    print('## effProcessEvents(25) / effEditGetRect(13) の経路 (guest switch %#x)' % DISPATCH_VA)
+    for k, v in rf.items():
+        print('  %-20s = %r' % (k, v))
+    fails += check_routes(rf, route_expect or ROUTE_EXPECT)
     print('## x32 オフセット (ptr=%d): size %#x' % (ptr32, S32))
     print('## x64 オフセット (ptr=8): size %#x' % S64)
     print('')
@@ -299,6 +374,12 @@ def nega(path):
     d4[fo + 2] = 0x19
     open(p4, 'wb').write(bytes(d4))
     cases.append(('N4 switch 上限 0x18 → 0x19 (opcode 25 が範囲内)', p4, {'pin_sha': False}))
+    # N5: effEditGetRect の子 vtable 参照スロットを誤る (期待 slot=5) → route 突合で FAIL
+    cases.append(('N5 effEditGetRect の子 slot 期待を誤る', path,
+                  {'route_expect': dict(ROUTE_EXPECT, erect_child_slot=5)}))
+    # N6: effProcessEvents(25) が switch 内で処理される、と誤った期待 → route 突合で FAIL
+    cases.append(('N6 opcode25 が default に落ちる、を誤った期待', path,
+                  {'route_expect': dict(ROUTE_EXPECT, opcode25_default=False)}))
     miss = 0
     real = sys.stdout
     for label, p, kw in cases:

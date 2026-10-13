@@ -18,17 +18,18 @@ const mcp = new Set(Object.entries(table.modules).flatMap(([m, fs_]) => Object.e
 assert.equal(mcp.size, 60);
 const direct = (name, ...a) => { try { return { ok: engine.call(name, a) }; } catch (e) { return { err: e.message, code: e.flCode }; } };
 const dev = new Set(["device.getPortNumber", "device.isAssigned", "device.setHasMeters", "device.forwardMIDICC", "device.midiOutMsg"]);
-const trn = new Set(["transport.isPlaying"]);
+// 実装 = mock (host/fl_mock.mjs・host/ilmcp.mjs) が持つ MIDI 経路の 5 関数 (PY-20)
+const mig = new Set(["channels.selectedChannel", "channels.fillEachNSteps", "general.getVersion", "transport.isPlaying", "ilmcp.forwardTutorialEvent"]);
 let impl = 0, unimpl = 0;
 for (const id of ids) {
   const r = direct(id, ...Array(40).fill(null).slice(0, 0));
   const notImpl = r.err?.startsWith("Unspecified error (not implemented:");
-  if (mcp.has(id) || dev.has(id) || trn.has(id)) assert.ok(!notImpl, `実装済みのはず: ${id} が未実装`);
+  if (mcp.has(id) || dev.has(id) || mig.has(id)) assert.ok(!notImpl, `実装済みのはず: ${id} が未実装`);
   else assert.ok(notImpl, `${id} は未実装のはず`);
   notImpl ? unimpl++ : impl++;
 }
-// 実装 = MCP 静的 60 + device 5 (MIDI scripting 用、tests/device_diff.mjs が mock と照合) + transport 1 (tests/transport_diff.mjs が mock と照合)
-assert.equal(impl, 66); assert.equal(unimpl, 369);
+// 実装 = MCP 静的 60 + device 5 (MIDI scripting 用、tests/device_diff.mjs が mock と照合) + MIDI 経路 5 (mig)
+assert.equal(impl, 70); assert.equal(unimpl, 365);
 
 // 2. エラー code (C 側): range / wrong param / 型 / unspecified
 const E = (name, ...a) => direct(name, ...a);
@@ -39,7 +40,7 @@ assert.equal(E("channels.getChannelName", 0, false, 7).code, 5);     // 引数�
 assert.equal(E("channels.getChannelName", "0").code, 5);             // 型違い
 assert.equal(E("channels.setChannelName", 0, 5).code, 5);
 assert.equal(E("channels.setChannelVolume", 0, "x").code, 5);
-assert.equal(E("general.getVersion").code, 2);                       // 未実装 → Unspecified error
+assert.equal(E("general.saveUndo").code, 2);                         // 未実装 → Unspecified error
 assert.equal(E("ilmcp.showHighlight", "a").code, 5);
 assert.equal(E("mixer.getCurrentTempo", 1, 2).code, 5);
 
@@ -73,7 +74,7 @@ for (const [p, r] of [["Plugin database", 0], ["Plugin database", 1], ["Plugin d
 assert.equal(E("ilmcp.getBrowserNames", "Nowhere", 0).code, 1);
 assert.equal(E("ilmcp.getBrowserNames", "Plugin database/Nope", 1).code, 1);
 assert.equal(E("ilmcp.getBrowserNames", "\x01".repeat(100000), 0).code, 1);
-assert.equal(E("general.getVersion").code, 2);                       // 直後も engine は正常
+assert.equal(E("general.saveUndo").code, 2);                         // 直後も engine は正常
 
 // 3. 戻り型は C 側 (整数値の float でも D): Python 側で type を見る
 const py = await FlPython.create({
@@ -101,7 +102,7 @@ def exc(f, *a):
     except Exception as e: return (type(e).__name__, str(e)[:40])
 R.append(("range", exc(channels.getChannelName, 999)))
 R.append(("type", exc(channels.getChannelName, "a")))
-R.append(("unimpl", exc(__import__("general").getVersion)))
+R.append(("unimpl", exc(__import__("general").saveUndo)))
 import json
 RESULT = json.dumps(R)
 `);
