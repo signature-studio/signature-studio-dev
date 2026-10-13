@@ -934,9 +934,12 @@ API StretchDIBits(I64 hdc, I64 xd, I64 yd, I64 wd, I64 hd, I64 xs, I64 ys, I64 w
   return dib_to_dc(d, (int)xd, (int)yd, (int)wd, (int)hd, (int)xs, (int)ys, (int)ws, (int)hs, P_(bits), (const WBMIH *)P_(bmi), (uint32_t)rop, (uint32_t)usage, "StretchDIBits") ? (int)(hd < 0 ? -hd : hd) : 0;
 }
 API SetDIBitsToDevice(I64 hdc, I64 xd, I64 yd, I64 w, I64 h, I64 xs, I64 ys, I64 start, I64 lines, I64 bits, I64 bmi, I64 usage) {
-  (void)start; (void)lines;
   DC *d = dc_of((U64)hdc); if (!d) return 0;
-  return dib_to_dc(d, (int)xd, (int)yd, (int)w, (int)h, (int)xs, (int)ys, (int)w, (int)h, P_(bits), (const WBMIH *)P_(bmi), SRCCOPY, (uint32_t)usage, "SetDIBitsToDevice") ? (int)h : 0;
+  /* ySrc は下原点 (MS Learn: lower-left)。top-down DIB の上端からの行 = start + lines - (ys + h) (Wine nulldrv_SetDIBitsToDevice と同式)。
+     bottom-up は dib_to_dc が (bh - ys - hs) で変換するため従来どおり ys をそのまま渡す */
+  const WBMIH *bi = (const WBMIH *)P_(bmi);
+  int ys_eff = bi->biHeight < 0 ? (int)start + (int)lines - ((int)ys + (int)h) : (int)ys;
+  return dib_to_dc(d, (int)xd, (int)yd, (int)w, (int)h, (int)xs, ys_eff, (int)w, (int)h, P_(bits), bi, SRCCOPY, (uint32_t)usage, "SetDIBitsToDevice") ? (int)h : 0;
 }
 /* GetDIBits で bpp<=8 を要求されたときの色テーブル: DIB section は自身のテーブル (同 bpp のとき)、それ以外は決定論的な既定表
  * (1bpp = 黒/白, 4bpp = VGA16, 8bpp = 3-3-2 を 8bit へ拡張) */

@@ -266,6 +266,18 @@ int main(void) {
   StretchDIBits(wdc, 0, 0, 4, 4, 0, 0, 2, 2, (int64_t)(uintptr_t)src, (int64_t)(uintptr_t)&sb, 0, SRCCOPY);
   ReleaseDC(h, wdc); flush_wait();
   CHK(desk(10 + 0, 20 + 0) == rgb(0, 255, 0) && desk(10 + 3, 20 + 3) == rgb(0, 0, 255), "StretchDIBits bottom-up orientation (top row = last data row): %06x %06x", desk(10, 20), desk(13, 23));
+  /* SetDIBitsToDevice top-down partial rect (HeartCore 形: ySrc は下原点, StartScan=0, cLines=H=2): memory row 0 (上) = blue, row 1 (下) = red */
+  { uint32_t tdsrc[4] = { 0xFF0000FF, 0xFF0000FF, 0xFFFF0000, 0xFFFF0000 };
+    WBMIH tb; memset(&tb, 0, sizeof tb); tb.biSize = 40; tb.biWidth = 2; tb.biHeight = -2; tb.biPlanes = 1; tb.biBitCount = 32;
+    WRECT pre = { 30, 30, 32, 32 }; wdc = GetDC(h); gb = CreateSolidBrush(cref(5, 5, 5)); FillRect(wdc, (int64_t)(uintptr_t)&pre, gb); DeleteObject(gb); ReleaseDC(h, wdc); flush_wait();
+    wdc = GetDC(h);
+    SetDIBitsToDevice(wdc, 30, 30, 2, 1, 0, 1, 0, 2, (int64_t)(uintptr_t)tdsrc, (int64_t)(uintptr_t)&tb, DIB_RGB_COLORS);
+    ReleaseDC(h, wdc); flush_wait();
+    CHK(desk(10 + 30, 20 + 30) == rgb(0, 0, 255) && desk(10 + 31, 20 + 30) == rgb(0, 0, 255) && desk(10 + 30, 20 + 31) == rgb(5, 5, 5), "SetDIBitsToDevice top-down partial rect picks top row (ySrc=1 -> memory row 0): %06x %06x %06x", desk(40, 50), desk(41, 50), desk(40, 51));
+    wdc = GetDC(h);
+    SetDIBitsToDevice(wdc, 30, 31, 2, 1, 0, 0, 0, 2, (int64_t)(uintptr_t)tdsrc, (int64_t)(uintptr_t)&tb, DIB_RGB_COLORS);
+    ReleaseDC(h, wdc); flush_wait();
+    CHK(desk(10 + 30, 20 + 31) == rgb(255, 0, 0) && desk(10 + 31, 20 + 31) == rgb(255, 0, 0), "SetDIBitsToDevice top-down partial rect picks bottom row (ySrc=0 -> memory row 1): %06x %06x", desk(40, 51), desk(41, 51)); }
   /* AlphaBlend 50% constant */
   { WBMIH ab; memset(&ab, 0, sizeof ab); ab.biSize = 40; ab.biWidth = 2; ab.biHeight = -2; ab.biPlanes = 1; ab.biBitCount = 32; uint64_t bp2 = 0;
     int64_t d2 = CreateDIBSection(0, (int64_t)(uintptr_t)&ab, 0, (int64_t)(uintptr_t)&bp2, 0, 0); int64_t m2 = CreateCompatibleDC(0); SelectObject(m2, d2);
