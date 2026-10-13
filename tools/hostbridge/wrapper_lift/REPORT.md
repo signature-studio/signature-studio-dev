@@ -3,7 +3,7 @@
 - 親: #94 (HB-H4) / 本 issue: #783 / 担当 dir: `tools/hostbridge/wrapper_lift/`
 - 検証起点: `origin/main` @ 7c5f7a8f (作業ブランチ `783-wrapper-lift-method`)
 - 素材: `fl-win64` (`flstudio_win64_26.1.7.5653.exe` 由来の `extracted/block19091_PE.bin` / `block23676_PE.bin`)
-- 既知類型との関係: 該当なし (decode 計測のみ。lift 出力はまだ無い)
+- 既知類型との関係: 該当なし (decode 計測のみ。silent miscompile の類型には当たらない。lift 出力の類型は §6 末尾)
 - 子 issue: #828 (方式比較) / #829 (CreatePlugInstance 到達) / 兄弟 #784 #787 #788 (#94 分割)
 - 再現: `FL_WIN64_DIR=<fl-win64 展開先>/extracted python3 tools/hostbridge/wrapper_lift/measure_decode.py` (decode 所要は §1 の表。NC は `--nc`)
   - 依存: `pip install capstone pefile` (実行環境: capstone 5.0.7 / pefile 2024.8.26)
@@ -63,7 +63,7 @@
 | 項目 | 状態 |
 |---|---|
 | liftlib (RetDec → 修復 → emcc) の Wrapper 適用 | 未着手 (RetDec 出力が無い) |
-| x64c (`tools/icall/x64c_census.py` 系) の Wrapper 適用 | 未着手 |
+| x64c の block23676 への Wrapper 適用 | 未着手 (block19091 は §6) |
 | 採用方式の wasm build 可否・所要秒 | 未着手 |
 | CreatePlugInstance への到達 | 未着手 |
 
@@ -78,51 +78,29 @@
 | RetDec 既定モード (`--select-decode-only` なし) が reg 243 で落ちる原因 | 既定モードで Wrapper を lift できない理由が未特定 | #828 |
 | RetDec の Wrapper 全体 lift の成否・失敗型分類 (分割 lift の 93 件 / block19091・block23676 は §5 で分類済み。残る未解決は liftlib 経路での失敗型) | liftlib 経路の失敗型が未確定 | #828 (liftlib 経路は #917) |
 
-## 6. 比較表 (#917 受入条件 1〜3。検証 HEAD: 本 PR、2026-10-13 run)
-
-計測環境: `/opt/retdec` (RetDec v5.0)・`/opt/emsdk` (emcc `-c`/`-fsyntax-only`)・capstone 5.0.7 / pefile 2024.8.26 (`$RUNNER_TEMP` の venv)。load average (1 分値) は計測中 0.2〜0.5 (4 CPU)。
-
-| 項目 | RetDec 分割 lift | x64c (`x64c_wrapper.py`) | liftlib (RetDec→修復→emcc) |
-|---|---|---|---|
-| block19091: 関数数 (pdata 併合後) | 19,816 | 19,816 | 19,816 |
-| block19091: lift 成功 (関数単位) | 19,723 (99.53%) | 19,816 (100%・例外で中断せず生成) | 未完 (下記) |
-| block19091: emcc `-c` 通過 (修復なし, 関数単位) | 17,243 / 19,816 (87.02%) | 生成物の `ULLULL` 2 箇所を補正後に全体通過 (補正なしは 18 箇所で失敗) | 未測定 (修復は未実施) |
-| block23676: 関数数 / lift 成功 | 19,826 / 19,733 (99.53%) | 未実施 (本 run の時間内に未着手) | 未測定 |
-| 未対応命令 (unsup 合計・block19091) | — | 3,629 件 / 81 種 (string 命令 2,063・x87 1,256・MMX/SIMD 147・他 163) | 未測定 |
-| wasm link (emcc, 全体) | 未実施 | timeout (400 秒で link 未完) | 未実施 |
-| 所要 (秒) | RetDec `retdec_seconds_all` 305.01 (block19091) / 305.04 (block23676) | x64c 生成 78.9 s (block19091) / emcc `-c` 57.8 s | emcc `-fsyntax-only` 40 batch 3.5 s (wall) |
-
-判定の注意:
-- 「RetDec 分割 lift 99.53%」は RetDec が exit 0 で `function_<VA>` の定義を出したかの数であり、C がコンパイル可能かではない。修復なしの emcc 通過は 87.02%。
-- x64c 欄の 100% は「例外なく生成した」数。`lift_meta.json` の `unsup` (未対応 mnemonic) の関数は、実行時に `ott_unsup` で fail-fast する。関数単位の成否ではない。
-- x64c 生成物は `tools/ott/lift/x64c.py:260` の `hex(MASK[s])` 後の `ULL` 二重付与 (`ULLULL`) で emcc `-c` が 18 箇所で失敗する。本 PR では `sed 's/ULLULL/ULL/'` で補正した複製だけで測った (元 `tools/ott` は変更していない)。
-- wasm link は `emcc -O1 ... -sEXPORTED_FUNCTIONS=_malloc` で 400 秒の timeout (ott runtime `tools/ott/rt` 込み)。完了時間は未測定。
-
-**未解決 (受入条件の残り → 子 issue #1128 `[HB-H26]`)**
-- liftlib (RetDec C → 修復 → emcc) の Wrapper 適用: RetDec 出力は `.ll` ではなく C であり、liftlib の `lift` 入口 (`targets/*.json`・`.ll` 前提) に直接載らない。修復 (`int64_t*` と整数の混在、`__asm_movsd` 等の未宣言 helper) が未実施。
-- block23676 の x64c 実 lift と、両 block の wasm link 完了 (受入条件 1・2 の残り)。
-- 採用方式の判定 (受入条件 4): build 可否が揃うまで決められない。現時点の数字からは RetDec 分割 lift は修復なし 87.02%、x64c は ULL 補正後に C 通過だが wasm link が未完のため、**採用方式は未決定**。
-
 ## 5. 方式比較の実測 (#828、検証 HEAD: 本 PR)
 
-計測: `RETDEC=<retdec>/bin/retdec-decompiler FL_WIN64_DIR=<fl-win64>/extracted python3 tools/hostbridge/wrapper_lift/retdec_batch.py block19091_PE.bin block23676_PE.bin` (RetDec v5.0、batch 500、直列)。x64c は `tools/icall/x64c_census.py` (関数集合は §1 と同じ chain 併合)。
+計測: `RETDEC=<retdec>/bin/retdec-decompiler FL_WIN64_DIR=<fl-win64>/extracted python3 tools/hostbridge/wrapper_lift/retdec_batch.py block19091_PE.bin block23676_PE.bin` (RetDec v5.0、batch 500、直列)。x64c は `tools/icall/x64c_census.py` (関数集合は §1 と同じ chain 併合)。本 PR の数値の正本はこの節。§6 は本節を参照する。
 
 | 項目 | RetDec (分割 lift) | x64c (静的カバレッジ) | liftlib (RetDec→修復→emcc) |
 |---|---|---|---|
 | block19091: 関数数 | 19,816 | 19,816 | 未測定 |
 | block19091: lift 成功 (関数単位) | 19,723 (99.53%) | — | 未測定 |
+| block19091: emcc `-c` 通過 (修復なし, 関数単位) | 17,243 / 19,816 (87.02%) | — | 未測定 |
 | block23676: 関数数 / lift 成功 | 19,826 / 19,733 (99.53%) | — | 未測定 |
 | 未対応命令数 (block19091 / block23676) | — | 3,697 / 3,697 (0.56% / 0.56%) | 未測定 |
 | build 可否 (wasm) | 未実施 | 未実施 | 未実施 |
-| 所要 (RetDec, 全呼び出し秒 `retdec_seconds_all`, block19091 / block23676) | 267.37 / 265.41 | 11.22 s (block19091, 19,816 関数, 単一プロセス) | 未測定 |
+| 所要 (RetDec, 全呼び出し秒 `retdec_seconds_all`, block19091 / block23676) | 267.37 / 265.41 (前回 run) | 11.22 s (block19091, 19,816 関数, 単一プロセス) | 未測定 |
 
 - 計測環境: RetDec v5.0 (`[RETDEC]`、公式 Linux release を RUNNER_TEMP に展開)、capstone 5.0.7 / pefile 2024.8.26。直列 1 プロセス。load average (1 分値) は計測中 0.23–0.33。
+- 所要の注意: 本 HEAD の runner には `[RETDEC]` が無く (`/opt` 配下に無い)、RetDec の所要は本 HEAD で再計測していない。表の 267.37 / 265.41 s は本節の定義による旧計測値。同じ項目の別値 (305.01 s / 305.04 s) が以前の記載にあり、どちらが正かは RetDec を入れた環境での再計測で確定させる (未解決、#828)。
 - 所要の定義: `retdec_seconds_all` = 分割前の親 batch・分割後の子 batch・単独失敗を含む、全 `retdec-decompiler` 呼び出しの wall 時間の和 (呼び出し 40 回、全て exit 0)。`retdec_seconds_ok_calls` (rc == 0 の呼び出しだけの和) は同値 (267.37 / 265.41) で、今回は失敗呼び出しが無いため差は出ない。
-- 定義: RetDec 成功 = 出力 C に `function_<開始 VA>` の定義本体が現れる関数。`exit 0` だが定義が無い関数は失敗 (reason `no_definition`)。
+- 定義: RetDec 成功 = 出力 C に `function_<開始 VA>` の定義本体が現れる関数。`exit 0` だが定義が無い関数は失敗 (reason `no_definition`)。RetDec の出力 C はコンパイル可否を保証しない (emcc 通過は別欄)。
 - 失敗 93 件の内訳 (block19091 / block23676 とも同じ): (a) RetDec が非 0 終了 = 0 件 (全 40 呼び出しが exit 0 で、分割による単独 range の非 0 終了は起きなかった)。(b) exit 0 だが定義なし = 93 件。(a) に該当する代表的なエラー行は無い。(b) の 93 件は線形 decode の不能範囲 (§1: 0x40ce20 / 0x425720 / 0x56f5c0 / 0x572b00 の各範囲) と重ならず (0 件)、原因は未特定。失敗 93 件の全アドレスは `retdec_block*.json` の `failed_funcs` (gitignore)。
 - ネガティブコントロール (`retdec_batch.py --nc`、block19091 の先頭 20 関数を 1 batch で lift): 出力 C から `function_407310` の定義ヘッダ (`int64_t function_407310(void) {`) を 1 行削除すると、defined が 20 → 19 になり、対象関数の判定が `ok` → `no_definition` に変わる。判定が定義行の有無に依存することを確認。
 - 命令数の定義の差: x64c の 659,894 (block19091) は `tools/icall/x64c_census.py` が recursive descent (関数の入口から到達できる命令のみ) で数えた値。§1 の 686,756 は `.pdata` 範囲の線形 decode の総数。同じ 19,816 関数を対象とするが、数え方が異なる (線形 decode は関数内のデータ・到達不能コードも数える)。よって両者は直接比較できない。
-- 再現性: 本 HEAD の再計測 (レビュー対応の run) で block19091 = 19,723 / 93、block23676 = 19,733 / 93。前回の旧版 (`[RETDEC]` 版) と件数が一致。所要は同一条件の再計測ではないため比較しない。
+- x64c の未対応: census 経路の未対応 mnemonic は 66 種 (上位は `movsq` 1,587 / `stosq` 435 / x87 / `rep movsq` 68 / `lock xadd`・`lock cmpxchg`)。Delphi RTL の文字列コピー (rep/movs) と x87 演算が主因。これは静的カバレッジで、x64c の実 lift 成否ではない。
+- wrapper 経路 (`x64c_wrapper.py`、全 pdata 関数を root にした生成) の unsup は 3,629 件 / 81 種 (`lift_meta.json` の `unsup` 合計、本 HEAD で実測)。census 経路の値と集計対象が異なるため直接比較しない。
 - §1 の decode 所要: 本 HEAD の `measure_decode.py` 単発実行では block19091 4.15 s (`decode_seconds`)。表の 2.46–2.49 s は前回 n=3 の値で、環境の load により変動する。
 
 **RetDec の既定モードの失敗 (§2 の追試)**: 1 関数範囲だけでなく block19091・block23676 の全体でも、既定モードは decode 段で
@@ -130,10 +108,33 @@
 `--select-decode-only` を付けると範囲指定の lift が通る。reg 243 の由来は未特定 (capstone 5.0.7 では `X86_REG_BND1` に当たるが、
 両 block の `.text` を線形 decode しても BND レジスタは現れない。RetDec 同梱の capstone の番号体系の差の可能性が残る)。
 
-**x64c の未対応**: 未対応 mnemonic 66 種。上位は `movsq` 1,587 / `stosq` 435 / x87 (`fld`・`fmul`・`fadd`・`fxch`・`fstp` 等) / `rep movsq` 68 / `lock xadd`・`lock cmpxchg`。
-Delphi RTL の文字列コピー (rep/movs) と x87 演算が主因。これは静的カバレッジで、x64c の実 lift 成否ではない。
-
 **未解決 (受入条件の残り)**
 - liftlib (RetDec 出力 → 修復 → emcc) を Wrapper に適用した成否と、wasm build 可否。RetDec の batch 出力 C を結合して emcc する経路は未着手。
-- 採用方式の判定。RetDec は分割 lift で 99.53% が通るが、出力の build と実行 (bit 一致) が未確認のため、単独で採用とは言えない。x64c は命令カバレッジ 99.44% だが実 lift 未実施。
+- 採用方式の判定。RetDec は分割 lift で 99.53% が通るが、修復なしの emcc 通過は 87.02% で、出力の build と実行 (bit 一致) が未確認のため、単独で採用とは言えない。x64c は命令カバレッジ 99.44% だが実 lift 未実施。
 - 上記は子 issue #917 ([HB-H23]) として起票する (§4 の 2 行)。
+
+## 6. 比較表 (#917 受入条件 1〜3。検証 HEAD: 本 PR、2026-10-13 run)
+
+数値の正本は §1・§5。ここは到達状況のみ。計測環境: `/opt` 配下の emcc・RetDec は本 HEAD の runner に無く、emcc 相当の検査は clang `-fsyntax-only` で代用した (下記)。
+
+| 項目 | RetDec 分割 lift | x64c (`x64c_wrapper.py`) | liftlib (RetDec→修復→emcc) |
+|---|---|---|---|
+| block19091: 関数数 | §5 | §5 (全 pdata 関数を生成) | 未測定 |
+| block19091: lift | §5 (成功率) | 例外なく C を生成。未対応 mnemonic の関数は実行時に `ott_unsup` で fail-fast | 未完 (下記) |
+| block19091: C の構文検査 | §5 (修復なしの通過率) | `ULLULL` 18 行を補正すると clang 構文検査を通過 (下記) | 未測定 (修復は未実施) |
+| block23676 | §5 | 未実施 | 未測定 |
+| wasm link (emcc, 全体) | 未実施 | 未完 (旧計測で 400 秒の timeout。完了時間は未測定) | 未実施 |
+
+**x64c 生成物の `ULLULL` (本 HEAD で実測)**
+- 生成 C (`x64c_wrapper.py`、block19091、19,816 関数) の `ULLULL` は **18 行**。全 18 行が `cmpxchg qword ptr` の 64bit 分岐の else 節 (`R[RAX] = (R[RAX] & ~0xffffffffffffffffULLULL) | ...`)。
+- 原因行: `tools/ott/lift/x64c.py` の `i_cmpxchg`。ba13c9dc では 1447 行 `amask = '0xffffffffffffffffULL' if sz == 8 else hex(MASK[sz])` と、1449 行の `'... ~%sULL ...' % (..., amask)`。`sz == 8` の amask は既に `ULL` を含むため、`~%sULL` の `ULL` と二重になる。main では同じ箇所が 1491 / 1493 行 (main の x64c.py は 1605 行、ba13c9dc は 1560 行)。
+- 前回 REPORT が挙げた `x64c.py:260` (`hex(MASK[s])`) は原因ではない。`hex(MASK[s])` は `0xff` 形式で `ULL` を含まず、260 行の `~%sULL` は `ULL` が 1 つだけ付く。
+- 補正の効果: 補正なし `clang -fsyntax-only` は 18 件のエラー (`invalid suffix 'ULLULL' on integer constant`)。`sed 's/ULLULL/ULL/g'` 後は 0 件で通過 (28.7 s)。前回の「2 箇所補正」は誤りで、補正箇所は 18 箇所。
+- emcc は本 HEAD の runner に無く、emcc `-c` の再測定はしていない。clang の結果は C 構文の検査であり、emcc 通過の証拠ではない。
+- 元の `tools/ott` は変更していない。`x64c.py` 本体の修正は #1128 の範囲 (別 PR)。
+- `docs/DEFECTS.md` の該当 ID: なし。構文エラーとして検出されるため、silent miscompile の類型ではない。
+
+**未解決 (受入条件の残り → 子 issue #1128 `[HB-H26]`)**
+- liftlib (RetDec C → 修復 → emcc) の Wrapper 適用: RetDec 出力は `.ll` ではなく C であり、liftlib の `lift` 入口 (`targets/*.json`・`.ll` 前提) に直接載らない。修復 (`int64_t*` と整数の混在、`__asm_movsd` 等の未宣言 helper) が未実施。
+- block23676 の x64c 実 lift と、両 block の wasm link 完了 (受入条件 1・2 の残り)。
+- 採用方式の判定 (受入条件 4): build 可否が揃うまで決められない。**採用方式は未決定**。
