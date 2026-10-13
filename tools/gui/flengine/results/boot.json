@@ -1,17 +1,17 @@
 {
  "mode": "boot",
- "dllmain_done": true,
- "boot_threw": null,
+ "dllmain_done": false,
+ "boot_threw": "memory access out of bounds",
  "boot_failfast": null,
  "units_total": 942,
- "units_run": 22,
- "init_count": 23,
+ "units_run": 52,
+ "init_count": 54,
  "survey": null,
  "reach": [
   {
    "order": 1,
    "name": "LoadStringW",
-   "calls": 4,
+   "calls": 3,
    "kind": "IMPL",
    "prio": "1"
   }
@@ -22,21 +22,20 @@
  "failfast_count": 0,
  "gui_icall_calls": 0,
  "gui_ring_discarded": 0,
- "icall_miss": 0,
- "m11_stub_total": 62,
+ "icall_miss": 5,
+ "m11_stub_total": 61,
  "m11_stubs": [
   "GetLocaleInfoW:59",
-  "EnumCalendarInfoW:2",
-  "FormatMessageW:1"
+  "EnumCalendarInfoW:2"
  ],
  "probes": {
-  "GetMem": 33,
+  "GetMem": 560,
   "FreeMem": 20,
-  "FastMM_GetMem(407a50)": 34,
+  "FastMM_GetMem(407a50)": 568,
   "FastMM_FreeMem(407e20)": 20,
   "InitUnits": 0,
-  "Halt0": 1
+  "Halt0": 0
  },
- "va_calls": 1,
- "va_bytes": 1310720
+ "va_calls": 17,
+ "va_bytes": 12845056
 }
