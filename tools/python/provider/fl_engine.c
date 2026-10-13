@@ -32,6 +32,7 @@ static int playing;
 static int64_t hl_cb;
 static int n_pr, n_run;
 static int dev_port, midi_out_n;
+static int sel_chan;
 static const struct { const char *n; double v; } params[] = {{"Cutoff", 0.5}, {"Resonance", 0.2}, {"Gain", 0.8}};
 static double pvals[3];
 #define NPARAM 3
@@ -61,11 +62,16 @@ void fl_engine_reset(void) {
     win[0] = win[2] = win[4] = 1;
     for (int i = 0; i < NPARAM; i++) pvals[i] = params[i].v;
     tempo = 130; playing = 0; hl_cb = 0; n_pr = n_run = 0;
-    dev_port = 0; midi_out_n = 0;
+    dev_port = 0; midi_out_n = 0; sel_chan = 0;
 }
 int64_t fl_engine_highlight_cb(void) { return hl_cb; }
 int fl_engine_channel_count(void) { return nch; }
 int fl_engine_midi_out_count(void) { return midi_out_n; }
+/* 検査用の読出し口: チャンネル c のステップ p (範囲外は -1)。tests/midi_path_diff.mjs が副作用を比べる */
+int fl_engine_grid_bit(int c, int p) {
+    if (c < 0 || c >= nch || p < 0 || p >= NSTEP) return -1;
+    return ch[c].steps[p];
+}
 
 #define WRONGN() return fl_err(c, FL_E_WRONG_PARAM, "Wrong number of function parameters or wrong parameter type")
 /* 署名なし (np=-1) の関数は dispatch が個数を見ないので handler が検査する */
@@ -98,6 +104,19 @@ FL_H(channels, setGridBit) {
     k->steps[p] = v ? 1 : 0; return fl_ret_none(c);
 }
 FL_H(channels, quickQuantize) { CH(0); (void)k; return fl_ret_none(c); }
+FL_H(channels, selectedChannel) {
+    (void)A_INT(0, 0); int64_t off = A_INT(1, 0); (void)A_INT(2, 0);
+    return fl_ret_i(c, sel_chan + off);
+}
+FL_H(channels, fillEachNSteps) {
+    CH(0); int64_t st = A_INT(1, 1), off = A_INT(2, 0), vel = A_INT(3, 0);
+    (void)vel; (void)A_INT(4, 0);
+    if (st < 1) RANGE();
+    int64_t p = off;
+    if (p < 0) { p %= st; if (p < 0) p += st; }
+    while (p < NSTEP) { k->steps[p] = 1; if (st > NSTEP - p) break; p += st; }
+    return fl_ret_none(c);
+}
 FL_H(channels, showEditor) { CH(0); (void)k; return fl_ret_none(c); }
 
 /* ---- mixer (18) ---- */
@@ -145,6 +164,7 @@ FL_H(mixer, setCurrentTempo) {
 /* ---- transport (2) / playlist (4) / ui (3) ---- */
 FL_H(transport, start) { playing = 1; return fl_ret_none(c); }
 FL_H(transport, stop) { playing = 0; return fl_ret_none(c); }
+FL_H(transport, isPlaying) { return fl_ret_b(c, playing); }
 #define PL(a) int64_t _p = A_INT((a), 0); if (_p < 1 || _p > NPL) RANGE(); Pl *p = &pl[_p - 1]
 FL_H(playlist, trackCount) { return fl_ret_i(c, NPL); }
 FL_H(playlist, getTrackName) {
@@ -157,6 +177,9 @@ FL_H(playlist, setTrackColor) { PL(0); p->color = A_INT(1, 0); return fl_ret_non
 FL_H(ui, getVisible) { WN(0); return fl_ret_b(c, win[_w]); }
 FL_H(ui, showWindow) { WN(0); win[_w] = 1; return fl_ret_none(c); }
 FL_H(ui, hideWindow) { WN(0); win[_w] = 0; return fl_ret_none(c); }
+
+/* ---- general (1) ---- mock と同じ MIDI scripting API バージョン (実機値は未実測) */
+FL_H(general, getVersion) { NARGS(0, 0); return fl_ret_i(c, 1); }
 
 /* ---- device (5, MIDI scripting 用の最小面) ---- mock と同じ: forwardMIDICC / midiOutMsg は呼出しを数える */
 FL_H(device, getPortNumber) { return fl_ret_i(c, dev_port); }
@@ -305,3 +328,5 @@ FL_H(ilmcp, storePRScript) {
     n_pr++; return fl_ret_b(c, 1);
 }
 FL_H(ilmcp, runPRScript) { NARGS(1, 1); (void)A_STR(0); n_run++; return fl_ret_b(c, 1); }
+/* 引数 arity は未確認 (REPORT_PY74 §7c)。mock と同じく個数を見ず、何も返さない */
+FL_H(ilmcp, forwardTutorialEvent) { return fl_ret_none(c); }
