@@ -29,7 +29,7 @@
 ```
 PM (main)                      subagent (実装)                  subagent (検収)
    │                                │                                  │
-   ├ issue 起票 (gh issue create) ──┤                                  │
+   ├ issue 起票 (PM。子 issue は実装も可 §3) ──┤                       │
    ├ worktree 指名 ─────────────────┤                                  │
    │                                ├ gh issue view N                  │
    │                                ├ git worktree add ../ws-N         │
@@ -64,7 +64,7 @@ PM (main)                      subagent (実装)                  subagent (検�
 |---|---|---|---|
 | 実装 subagent | In progress | **In review** (自分を Done にしない) | Done への変更・他チケットの Status 変更 |
 | 検収 subagent | 対象が In review 確認 | 合格 → Done + コメント / 条件付き → **In review 維持** + 所見 | In review でないものを Done にしない |
-| PM (main) | 起票・milestone 確定 | merge・方針変更・是正 | — |
+| PM (main) | 起票 (実装 subagent も下記の条件で可)・milestone 確定 | merge・方針変更・是正 | — |
 
 - **子 issue の起票**: PM のほか、実装 subagent も、**1 run に収まらない作業の残り**と**未解決の起票先**として子 issue を起票してよい
   (2026-10-14 PM 判断。PM の処理待ちで止まるのを避けるため。#833)。条件: ① 題名は `[AREA-n]` 形式。`<AREA>` は
@@ -89,7 +89,7 @@ PM (main)                      subagent (実装)                  subagent (検�
 2. 同一チケット / 同一 dir に In progress または In review があれば**着手せず報告**。
 3. lift / 逆アセ / IR pass / ハーネス系は `docs/DEFECTS.md` を先に読み、REPORT 冒頭に
    「既知類型との関係: 該当 ID / 該当なし」を 1 行書く。
-   **番号体系の注意**: `docs/DEFECTS.md` の D1a〜D19 と `tools/icall/REPORT.md` §4 の D1〜D13 は
+   **番号体系の注意**: `docs/DEFECTS.md` の D1a〜D20 と `tools/icall/REPORT.md` §4 の D1〜D13 は
    **別体系**。参照時は `(DEFECTS.md)` / `(icall §4)` を必ず併記。
 4. **担当 dir 以外の未コミット変更は他担当の WIP**: 触らない・commit に含めない・stash/checkout/clean しない。
 5. ユーザへ追加アーティファクトを依頼する前に必ず検証する (`docs/REFERENCES.md` `[DOWNLOADS]` と
@@ -192,7 +192,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   work-liftlib-targets / work-liftlib / work-icall / work-fw-stage1 / analysis-ott-binaries / analysis-mac-shared / apt-mingw。それ以外は
   run が失敗する)。`oc_artifacts: none` は「追加素材なし」の明示で、単独なら空扱い (既定の fl-win64 になる)。他の名前との混在は失敗する。
   全素材は約 17.7 GiB (2026-10-13 実測) のため必要分だけ指定する。
-  - `toolchain-retdec` → [RETDEC]、`toolchain-emsdk` → [EMSDK] に展開される (環境変数の対応は `docs/REFERENCES.md` §4)。
+  - `toolchain-retdec` → [RETDEC]、`toolchain-emsdk` → [EMSDK] に展開される (環境変数の対応は `docs/REFERENCES.md` §4)。`m11_lift.sh` は PATH に無ければ `$RETDEC_ROOT/bin` → 既定 `/opt/retdec/bin` の順で解決するため、PATH 設定は不要 (#928)。
   - `work-m6-ott` → `tools/m6/work/` + `tools/ott/work/` + `tools/m8/work/` + `tools/m9/work/` + `tools/m10/work/`
     (`tar --zstd -tf` で実測)、`work-liftlib` → `tools/liftlib/work/`、
     `work-icall` → `tools/icall/work/`、`work-liftlib-targets` → `tools/targets/{freshair,kilohearts}/work/`
@@ -211,7 +211,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     `functions_dll.csv` は素材に無い Ghidra headless の中間物で、Ghidra 12.1.4 (`support/analyzeHeadless`・JDK 21・`tools/m2/ghidra_scripts/DumpFunctions.java`) で作る。lift 成果物は `work/lift_pe.sha256` に生成時の PE 指紋を記録し、PE が変われば作り直す。PE とパスは `FL_WIN64_DIR` 経由・相対パス化済み。
     `work/ir_conditions.json` の `ldfix=applied` と `ir_sha256` (IR の指紋) が一致しない IR は build されない (`m11_build.sh`)。
     **使う側が最初に `bash tools/m11/m11_gen_ir2.sh` を実行して `ir_conditions.json` を作る** (`FL_WIN64_DIR` の PE が要るので `fl-win64` も指定する)。
-    Python の `capstone`・`pefile` が要る。無いと ldfix が skipped になり fail-closed で `exit 1` する。agent-setup は現状これらを入れないので、Actions 上で使うには事前に pip で入れるか、agent-setup への追加を別 PR で扱う。
+    Python の `capstone`・`pefile` が要る。無いと ldfix が skipped になり fail-closed で `exit 1` する。agent-setup が `$HOME/.local/agent-py` の venv に `pefile` `capstone` `numpy` を入れ、その bin を PATH 先頭に置く (#893)。venv 無しで動かす場合は同じ venv を手で作る。
     `ir_conditions.json` は生成時の PE の絶対パスを記録し、`m11_build.sh` は現在の PE と一致しないと build を拒否するため、別の環境で作った json を素材に同梱しても使えない。
   - `work-fw-stage1` → `tools/plugins/work/fw/` に framework stage-1 成果物 (fw_icall.dll / fw_map.json /
     fw[0-7].restored.ll / r2.restored.ll / r3.restored.ll の 12 ファイル。#610)。`fw_269_verify.sh` の既定 SRC がそのまま使える。

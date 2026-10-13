@@ -234,4 +234,14 @@ underrun が 3 秒続くと +B を 1 段ずつ戻す (下限は下げない)。`
 最終 HEAD `948e6fb3` (REPORT §10 の件数修正のみ・コード差分なし、`FL_WIN64_DIR` 展開 `fl-win64`): `bash tools/audio/integration/e2e.sh` を 3 回実行 → **13/13 PASS・exit 0 が 3 回** (7.9 s / 7.8 s / 7.7 s、wall 12.0 s / 10.6 s / 10.4 s、load 0.48 / 0.47 / 0.81)。FAIL 0 件。
 
 残り: `public/worklets/dummy-worklet.js` は `deploy/probe/policy-check.mjs`・`tools/e2e/suite/checks.mjs` が参照するため今回は削除せず、追跡 **#839** (E2E-5)。`tools/e2e` スイートの再実行は未実施 (#839 で実施)。
+
 **状態注記 (#839 で更新)**: 上の「削除せず」は当時の記述。#839 で参照を `fl-audio-worklet.js` へ差し替え `dummy-worklet.js` を削除済み。`tools/e2e` の `audioworklet`・`console-clean` は `run.sh` が `stage_app.sh` でテスト音 wasm を配置するようになったため PASS (実測は `tools/e2e/REPORT.md` の「839 E2E-5」節)。
+
+## 19. AU-15 (#863) dev 断続 FAIL の再現 (失敗 1 件を取得)
+
+測定 HEAD は `906f6295` (main `c05efc3d` 取り込み後・PR 差分は本ファイルのみ)。素材 `fl-win64` を `$RUNNER_TEMP/fl-win64` へ展開 (`extracted/` と installer exe)・`FL_WIN64_DIR` 指定。`toolchain-emsdk` を `[EMSDK]` (emsdk 6.0.12) として展開し、`EMSDK_ENV` でそのエントリの `emsdk_env.sh` を指定。`bash tools/audio/integration/e2e.sh` を foreground で実行。
+
+- 本 HEAD `906f6295` の連続 11 run (load 0.22〜2.09): **11/11 exit 0・13/13 PASS** (10〜11 s)。dev:tone `max_err=1.49e-8` zero_runs 0・underrun 0。
+- 旧 HEAD `bb912951` (`d53f449c` からは REPORT のみの差分でコード同一。main 取り込み前): 初回 1 run exit 1・11/13 PASS (8.6 s)。FAIL は dev:tone (`max_err=6.85e-1` `zero_runs=1` `first_err_frame=56576` `first_zero_run_frame=56607`) と dev:underruns (`underruns=1` `first_underrun_frame=56576`)。直後の 10 回は 10/10 exit 0・13/13 PASS。
+- 旧 HEAD `d53f449c` の記録 (失敗ログ未取得) は旧記録として残す。旧記述「21 run 全 PASS」は本実測と合わず撤回。
+- 再現条件 (負荷・タイミング) は未特定。FAIL は旧 HEAD の 11 run 中 1 件のみで、切り分けは `first_underrun_frame=56576` (producer 遅延か consumer rebuffer か) を起点に行う。追跡 **#863** (AU-15)。

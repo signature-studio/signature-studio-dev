@@ -157,3 +157,28 @@ bash tools/targets/freshair/lift2/lift2_e2e.sh                                  
 - rep 経路の e2e 到達・ネガコン (受入条件 1)、回帰セットの seed 非依存化 (3)。
 - `vpcmpeqw` (ymm、`f_1810577ac`) の lowering。
 - epf 展開の素材配線は #693。
+
+## 7. FA-14 (#907): 回帰セットの seed 依存の実測 (2026-10-13)
+
+- 検証基点: `origin/main` = `99b87bc2`。素材は `plugins-freshair` のみ (`FA_DL` → `fetch.sh`、factory .epf 8 本を補完)。
+- 既定 `run_ctrl.sh 2 5` は seed `0xFA2C0001` 固定 (`run_ctrl.sh` 既定値)。#907 受入 1 の「seed を固定値で明記」の方式を採る (コード変更なし)。
+  epf 欠落時は `run_ctrl.sh` が exit 2 で止まる (本 run で退避実測: `ERROR: factory .epf 8 本が無い ... 生成シナリオ 7 本`, rc=2)。この rc=2 は PASS ではなくゲート停止であり、epf 欠落時の PASS は仕様上対象外。epf 有時は 15/15 PASS (§9)。
+- 別 seed の実測 (structured 2 + random 5、native のみ、`native_ctrl` 単体):
+  - `0x1` / `0x2` / `0x3` はいずれも `native_ctrl` が `Aborted` (rc=134) で途中停止 (出力 8 / 10 / 9 行、15 行に満たない)。
+  - 既知限界 (`run_ctrl.sh` 冒頭: 乱数が意味 field に OOB 書込を起こす) の再発で、seed 非依存ではない。
+- epf 8 本のみ (`gen_ctrl_scen.py <out> 0 0 <seed>`、乱数未使用) の native 出力は seed 0x1/0x2/0x3 で全て rc=0・8/8 行・ERR 0。
+  seed 間の出力差の内訳は本 run では分類していない。判定の根拠は `ctrl_norm.py` の規則 (8 byte 単位で値 ≥ `MASK_MIN` = 0x100000000 の 16 桁を両側同時にマスク) のみで、マスク後に一致することは本 run では未実測 (seed 0x1/0x2/0x3 の wasm 側出力は未取得)。同一 seed の再実行で差が変わるかも未測定 (素材不足で e2e を再実行できない)。
+- 結論: 既定の structured/random を含む回帰は seed 依存 (0x1/0x2/0x3 で native_ctrl が abort、上記実測)。epf 8 本のみの部分は native で seed 0x1/0x2/0x3 とも rc=0 だが、seed 非依存とは未確認 (wasm 比較は未実施)。
+
+## 8. FA-14 (#907) 未達と起票先
+- 受入 2 (`vpcmpeqw ymm`): mlift のレジスタは `XMM = <4 x i32>` 固定で ymm (256bit) の上位を保持できず、構造変更が要る。1 run に収まらないため子 issue に分割する。
+- 受入 3 (`lift2_e2e.sh` ALL PASS): §9 に実測 (実測 commit `c531a0cb`)。
+- 受入 2 の子 issue: [FA-15] lift2 ctrl closure の vpcmpeqw ymm (AVX2 256bit) lowering — #1105 (OPEN、親 #907)。
+
+## 9. FA-14 (#907) 実測: lift2_e2e.sh (`origin/main` = `99b87bc2`)
+
+- 実測の commit: `c531a0cb`。lift2 コードは `99b87bc2` と同一で、`99b87bc2..c531a0cb` の差分は本ファイル (REPORT_APPENDIX.md) のみ。`RESULT: lift2_e2e ALL PASS`, rc=0, real 1m14.253s, user 1m10.095s, load 0.22 (`uptime`), TMPDIR=`$RUNNER_TEMP`。
+- 基点 `99b87bc2` でも実測: rc=0, real 1m18.548s, load 0.12, ALL PASS。
+- 注: 上記は素材取得時の実測。後続のレビュー run では素材不足で再実行できていない (未再検証)。
+- ただし step 6 (ctrl build) は `failed(funcs with unsupported) 1` (`f_1810577ac: vpcmpeqw ymm1, ymm1, ymmword ptr [r9]`)。build は継続し、ctrl 出力は 15/15 BIT-EXACT (epf 8 + structured 2 + random 5, fma0/1)。
+- ctrl ERR: native/wasm 1/1 (同一 scenario)。comp/filter/fuzz/ABI/ablation 5 種はいずれも実測どおり PASS。

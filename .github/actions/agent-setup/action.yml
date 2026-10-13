@@ -233,3 +233,15 @@ runs:
           done
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
         fi
+    # p0c e2e 等の Python 依存 (#893)。runner の python3 は EXTERNALLY-MANAGED のため
+    # システムへ pip install できない。専用 venv を作り、GITHUB_PATH で後続 step の
+    # python3 / pip をその venv に向ける。
+    - name: Install Python deps for tools (pefile / capstone / numpy)
+      shell: bash
+      run: |
+        set -euo pipefail
+        venv="$HOME/.local/agent-py"
+        uv venv --clear --python 3.14 "$venv"
+        uv pip install --python "$venv/bin/python" pefile capstone numpy
+        "$venv/bin/python" -c "import pefile, capstone, numpy; print('pefile', pefile.__version__, 'capstone', capstone.__version__, 'numpy', numpy.__version__)"
+        echo "$venv/bin" >> "$GITHUB_PATH"

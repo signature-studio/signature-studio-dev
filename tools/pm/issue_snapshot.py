@@ -60,9 +60,9 @@ def main():
                 pm_art[n] = {"at": c["created_at"], "line": m.group(0)}
     runs = []
     for st in ("in_progress", "queued", "pending", "waiting"):
-        r = api(f"repos/{R}/actions/runs?status={st}&per_page=100", paginate=False)
-        for w in r.get("workflow_runs", []):
-            runs.append({"id": w["id"], "event": w["event"], "title": w["display_title"], "status": st, "created": w["created_at"]})
+        for page in api(f"repos/{R}/actions/runs?status={st}&per_page=100"):
+            for w in page.get("workflow_runs", []):
+                runs.append({"id": w["id"], "event": w["event"], "title": w["display_title"], "status": st, "created": w["created_at"]})
     json.dump({"issues": issues, "prs": prs, "bot_last": bot_last, "pm_art": pm_art, "runs": runs}, open(OUT, "w"), ensure_ascii=False)
     print(f"issues={len(issues)} prs={len(prs)} bot_last={len(bot_last)} runs={len(runs)} -> {OUT}")
 
