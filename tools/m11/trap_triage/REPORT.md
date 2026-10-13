@@ -68,7 +68,8 @@ python3 tools/m11/trap_triage/disasm_fn.py 417b70 ...   # PE (.pdata 区間) の
 
 ## 6. halt0 残 20 unit の原因特定 (#417)
 
-前提: PR #414 (`130-m11-survey-trap`, fa918df) の上。#414 HEAD を build した `survey_units.mjs` の実測は ok 830 / oob 44 / halt0 **20** / abort 1
+前提: #414 マージ後の `main` (`64e617f`) の上 (旧 PR #447 は base `130-m11-survey-trap` が #414 の merge で消え自動 close。同ブランチを main に merge して再測定)。
+base (`main` 64e617f) を build した `survey_units.mjs` の実測は ok 830 / oob 44 / halt0 **20** / abort 1
 (PR #414 本文は「halt0 21」。`m11_e2e.sh` は PE (fl-win64) が runner に無く実行できなかったため、差 1 の原因は未確認)。
 分類は `halt0_classify.py` (Error() 呼出元で集計)、呼出経路は `survey_units.mjs` の wasm frame を `annotate.py` で名前解決して実測した。
 
@@ -100,11 +101,13 @@ DEFECTS.md への採番は PM に委ねる (本 PR は触らない)。
 全件 remap は副作用が大きく、どの定数が VA のままで正しいか (例: Delphi の RTTI/VMT ポインタ) の仕分けが要るため、`M11_M2P=1` の opt-in とし **既定は OFF**。
 本 PR の数値 (§6-3) は M2p OFF のビルド。ハング原因と仕分けは未調査。
 
-### 6-3. 実測 (コミット済み HEAD `0312204`、M2p OFF)
+### 6-3. 実測 (コミット済み HEAD `bb261ba` = main `64e617f` を merge した後、M2p OFF)
 
-`bash tools/m11/m11_build.sh` (約 9 s) 後に `node tools/m11/trap_triage/survey_units.mjs` (約 16 s) と `node tools/m11/m11_survey.mjs` (0.47 s):
+`bash tools/m11/m11_build.sh` (全再生成 base 9.1 s / HEAD 9.4 s) 後に `node tools/m11/trap_triage/survey_units.mjs` (0.54–0.56 s, n=5) と `node tools/m11/m11_survey.mjs` (0.48–0.49 s, n=5)。
+1 並列・4 コア runner・load average 0.4–0.6。`m11_e2e.sh` は PE 無しだと前提チェックで止まり、チェックを外しても `gen_ir2` (ldfix が skip され IR が別物) と
+`m11_data_gen`/`m11_image_gen` (PE 必須) が走るため使えない。e2e 後半と同じ build → `m11_run.mjs` (0.36–0.39 s) → `m11_survey.mjs` → `m11_judge.py` (reached_stage 4/6) を work スナップショットで個別実行した:
 
-| 項目 | base (#414 HEAD) | 本 PR |
+| 項目 | base (main 64e617f) | 本 PR |
 |---|--:|--:|
 | ok | 830 | **841** |
 | trap 計 (oob + halt0 + abort) | 65 | **54** |
