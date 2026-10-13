@@ -80,3 +80,14 @@ OOB 16 件の最上位 frame (現行 build): 144 `407e20` / 149 `412e40` / 275 `
 - `m11_build.sh` (foreground、rc=0、18.8 s): `_m11_icall_cnt_n` 2 件。
 - `survey_units.mjs` (`SV_RAW=1`、foreground、rc=0、9.8 s): `SURVEY_UNITS {"ok":869,"miss":47,"other":1,"halt0":8,"oob":16,"noproc":1}`。
 - `m11_e2e.sh` 全体: 未達 (§1 参照)。
+
+## 7. main `8bc34ed9` での再確認 (再実行)
+
+- 起点: origin/main `8bc34ed9` (PR #1242 取込み後、`7736a5c5` から 473 commit 先)。素材は `work-m11` / `work-liftdiff` / `fl-win64` / `toolchain-*` を展開して使用 (`FL_WIN64_DIR=$HOME/analysis/win64`)。
+- `m11_gen_ir2.sh`: rc=0、46.2 s、`ldfix` F1=902 F2=30 F3c=36 errors=0。
+- `m11_build.sh`: rc=0、27.1 s、`wasm-ld signature mismatch: 0`。
+- `survey_units.mjs` (`SV_RAW=1`): rc=0、20.0 s、`SURVEY_UNITS {"ok":869,"miss":47,"other":1,"halt0":8,"oob":16,"noproc":1}`。`7736a5c5` の集計と完全一致。
+- unit 95 (`0x1d2680`): `kind=ok`、GDI stub 14 件 (`GetDC` 等、0 を返して継続)。OOB は発火しない。
+- unit 895 (`0xeddfe0`): `kind=halt0`、`MessageBoxA` `Runtime error 210 at 0000000010251460`、最上位 `function_412770`。`40ffe0` は `function_40c820` の caller 経由で到達する。
+- 結論: §0 の前提 (対象 OOB が現行 main に無い) は `8bc34ed9` でも成立する。受入条件 1・2 (`47ad70` の index / arg1、`40ffe0` のリスト先頭) は対象の観測が無いため未達のまま。受入条件 3 (DEFECTS 行案) は新規類型が無く、§6 の既出 D11 変種の範囲に留まる。
+- 未解決の起票先は §5 のとおり (895 の halt0 原因は #1080、main 差分の切り分けは #684)。
