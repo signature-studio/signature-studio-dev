@@ -23,7 +23,7 @@ FL_WIN64_DIR=<fl-win64 展開先> python3 tools/shared/scripts/ildsp_survey.py
 | 間接 call 比 | 12.6% |
 | `IPPCODE` 命令数 | 129,188 |
 | `IPPCODE` SIMD 比 | 70.0% |
-| `.text` SIMD 比 | 48.7% (176,373 / 362,280) |
+| `.text` SIMD 比 | 48.7% (176,373 / 362,277) |
 
 ### 未解決: `.text` SIMD 比の定義
 
@@ -55,7 +55,7 @@ closure = export entry の関数 (`.pdata` 境界) から、直接 call と直�
 | WaveformColouring_CreateInstance | 0x1ac470 | 10 | 762 | 27.4% | 17 | 4 | 19.1% |
 
 - 最小: GeneralPitchShifter と PSOLA が同率 238 命令 (8 関数)。両者のバイト列は一致しない (sha1 713ff04f… / 0391d052…)。
-- 規模の大きい 2 つ (LowFreqEnhancer 10,307 / StereoEnhancer 9,925 命令) は 140 / 139 関数。残り 8 件は 8〜44 関数。
+- 規模の大きい 2 つ (LowFreqEnhancer 10,305 / StereoEnhancer 9,925 命令) は 140 / 139 関数。残り 8 件は 8〜44 関数。
 - closure は間接 call を辿らないため、実到達はこの表より大きい可能性がある。
 - 注意: `.pdata` 先頭でない entry は `owner()` で含む関数の先頭に正規化してから辿る。export の 10 件はすべて `.pdata` 先頭に一致した。
 
