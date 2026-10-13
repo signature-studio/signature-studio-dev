@@ -522,7 +522,39 @@ def t17():
           % (st["xret_callees_pending"], st["xret_rets_pending"], st["xret_threaded"], st["xret_rets_after"], ev["detected"], ev["injected"]))
 
 
+def t18():
+    """SR-4 (#75): S1c movl/h(ps|pd) の store 復元 + Image.add_func (.pdata 外 leaf の合成エントリ)。"""
+    blk = {"function_x": "\n".join([
+        "  %a = load i64, ptr %p, align 8, !insn.addr !1",
+        "  call void @__asm_movlps(i64 %a, i128 %v), !insn.addr !2",
+        "  %b = load i64, ptr %q, align 8, !insn.addr !3",
+        "  call void @__asm_movhpd(i64 %b, i128 %w), !insn.addr !4",
+        "  %c = add i64 %b, 1",
+        "  call void @__asm_movlps(i64 %c, i128 %v), !insn.addr !5"])}
+    out, n = base.lower_asm_lane_store(dict(blk))
+    t = out["function_x"]
+    assert n == 2, n
+    assert "store i64 %s1c_0_lo, ptr %p" in t and "%s1c_0_lo = trunc i128 %v to i64" in t, t
+    assert "%s1c_1_sh = lshr i128 %w, 64" in t and "store i64 %s1c_1_lo, ptr %q" in t, t
+    assert "call void @__asm_movlps(i64 %c, i128 %v)" in t     # load 由来でない旧値は触らない (simd 生成側が unsupported 報告)
+    same, n0 = base.lower_asm_lane_store({"f": "  %x = add i64 1, 2"})
+    assert n0 == 0 and same == {"f": "  %x = add i64 1, 2"}
+    img = Image(os.path.join(T, "targets/serum2/work/Serum2_win64.vst3")) if os.path.exists(os.path.join(T, "targets/serum2/work/Serum2_win64.vst3")) else None
+    if img is None:
+        print("T18 ok (S1c 合成 IR; add_func は Serum2 PE 無しで skip)")
+        return
+    assert img.func_at(0x1802f7370) is None
+    img.add_func(0x1802f7370, 0x1802f74ec)
+    assert img.func_at(0x1802f7380) == (0x1802f7370, 0x1802f74ec)
+    try:
+        img.add_func(0x1802f7510, 0x1802f7520)     # .pdata 関数 (0x1802f7510-0x1802fcc82) と重なる
+        raise SystemExit("T18 FAIL: overlap not rejected")
+    except ValueError:
+        pass
+    print("T18 ok (S1c movlps/movhpd store 復元 2 件 + 非 load 旧値は不変 + Image.add_func 登録/重複拒否)")
+
+
 if __name__ == "__main__":
-    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t17):
+    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t17, t18):
         f()
     print("ALL UNIT TESTS PASS")
