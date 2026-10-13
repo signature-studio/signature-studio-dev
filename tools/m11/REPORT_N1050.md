@@ -12,7 +12,7 @@
 
 ## 2. 実測
 
-環境: ランナー (Ubuntu, JDK 21.0.12, Ghidra 12.1.4 build 20260921)。下表の実測は元 run のもの (実行 commit は §2-1 のとおり未特定)。本 fix run で展開した素材は `work-m11` の 4 ファイル (`tools/m11/work/m11_image.bin`・`tools/m11/work/shimx_link/m11_sx_trace_soft.{cjs,cjs.wasm,run.json}`) のみ。`fl-win64` / `toolchain-retdec` / `toolchain-emsdk` は本 fix run では展開していない。
+環境: ランナー (Ubuntu, JDK 21.0.12, Ghidra 12.1.4 build 20260921)。下表の実測は元 run のもの (実行 commit は §2-1 のとおり未特定)。本 fix run で展開した素材は `work-m11` (365 エントリ、`tools/m11/work/` 配下のみ・gitignore 対象)。`fl-win64` / `toolchain-retdec` / `toolchain-emsdk` は本 fix run では展開していない。
 
 | 段階 | コマンド | 結果 |
 |---|---|---|
@@ -81,5 +81,9 @@
   - **ftrace ファイル自体の `wc -l`**: `work-m11.tar.zst` (`$ARTIFACTS_DIR` に存在) には `tools/m11/work/shimx_link/` の `run.json` / `stderr.txt` / `cjs.wasm` 等が入るが、`ftrace` を含むエントリは 0 件 (`tar --zstd -tf | grep -c ftrace` = 0)。よって tarball からは `<tag>.ftrace.jsonl` の行数を再計測できない。
   - **全再生成・trace build の再実行**: Ghidra 600 s + regen 605 s が fix の上限 40 分に収まらないため、この run では再実行しない。実 boot は展開済み `.cjs` で再実行した (§2)。
   - **ftrace 行数の取得**: 上記のとおり `.cjs` が `FS` を export しないため、`SHIMX_TRACE_FILE` 付きの実 boot では ftrace が生成されない。`wc -l` は取得できていない。取り直すには `FS` を export した trace variant (`build.sh --trace --soft`) の再 build が必要で、これは全再生成と同じく本 run の上限を超える。
-- 素材の実在: `$ARTIFACTS_DIR` には `fl-win64` / `toolchain-emsdk` / `toolchain-retdec` / `work-m11` の 4 本が存在する (本 fix run で `ls` 確認)。展開したのは `work-m11` の上記 4 ファイルのみ。
+- 素材の実在: `$ARTIFACTS_DIR` には `fl-win64` / `toolchain-emsdk` / `toolchain-retdec` / `work-m11` の 4 本が存在する (本 fix run で `ls` 確認)。展開したのは `work-m11` (`tools/m11/work/` 配下、365 エントリ) のみ。
+- 追加実測 (差し戻し 2 回目の fix run、`work-m11` 展開物を `tools/m11/work/` 配下で再実行。実行 HEAD `c9cf2304`、コード差分は `git diff 1aa0f211 c9cf2304 -- tools/m11 tools/shimx` が 0 行):
+  - `SHIMX_TRACE_FILE` なし: `node tools/m11/shimx_link/run_trace.mjs m11_sx_trace_soft.cjs` rc=0 / 0.85 s / load average 0.50。`total_calls=94` `distinct_called=26` `dropped=0` `icall_ok=19` `icall_miss=1` `boot_stage=1` `units_run=17` `dllmain_done=false` `threw="memory access out of bounds"`。保存値 (`run.json`) と一致。
+  - `SHIMX_TRACE_FILE` あり: rc=1 `Aborted('FS' was not exported)`。ftrace ファイルは生成されず、`wc -l` は**取得不可** (未生成)。§5 の未実施は継続。
+  - `trace.calls` の内訳 (`run.json`、26 種・合計 94): GetLocaleInfoW 48・GetCurrentThreadId 5・GetModuleHandleW 5・GetProcAddress 5・LoadStringW 3・VirtualAlloc 3・VerSetConditionMask 3・EnumCalendarInfoW 2・GetVersion 2・InitializeCriticalSection 2 ほか 16 種 (各 1)。file API (CreateFileW / CreateFileA / GetFileAttributesW / FindFirstFileW / FindFirstFileExW / FindNextFileW / ReadFile) の積集合は空。
 - 検証 HEAD: 差分範囲は `git diff 8597b970 1aa0f211 --stat` (`tools/m11/REPORT_N1050.md` のみ・コード差分 0)。ネガコン (§3-2) は `1aa0f211` で実行済み。
