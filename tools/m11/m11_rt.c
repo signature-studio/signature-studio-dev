@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <emscripten.h>
+#include <emscripten/stack.h>
 
 #define PAGE daunting_nop = 0  /* (未使用のプレース保留は書かない) */
 
@@ -31,6 +32,9 @@ extern void  free(void* p);
  * 旧版の「64MB arena + 超過時は arena 末尾を返す」は大きな要求 (339MB) で arena 外を返し OOB を起こしていた (修正済).
  */
 int m11_trace_flag = 0;   /* m11_ov.c の m11_set_trace が設定 */
+extern const int m11_trace_isolate;   /* trace が shadow stack を汚さないよう SP 直下を退避/復元する (m11_ov.c M11_TRACE, #495) */
+extern void m11_stk_save(unsigned sp);
+extern void m11_stk_restore(unsigned sp);
 static unsigned long long g_va_used = 0;
 static unsigned long long g_va_calls = 0;
 static unsigned long long g_va_freed_cnt = 0;
@@ -38,7 +42,12 @@ static unsigned long long g_va_freed_cnt = 0;
 EMSCRIPTEN_KEEPALIVE
 void *VirtualAlloc(void* addr, unsigned size, unsigned type, unsigned protect) {
     if (g_va_calls < 8) fprintf(stderr, "[m11][VA] #%llu addr=%p size=%u (0x%x) type=0x%x prot=0x%x\n", g_va_calls, addr, size, size, type, protect);
-    if (m11_trace_flag && g_va_calls < 3) EM_ASM({ console.error('[m11][VA-stack]\n' + new Error().stack.split('\n').slice(2, 12).join('\n')); });
+    if (m11_trace_flag && g_va_calls < 3) {
+        unsigned sp_ = (unsigned)emscripten_stack_get_current();
+        if (m11_trace_isolate) m11_stk_save(sp_);
+        EM_ASM({ console.error('[m11][VA-stack]\n' + new Error().stack.split('\n').slice(2, 12).join('\n')); });
+        if (m11_trace_isolate) m11_stk_restore(sp_);
+    }
     g_va_calls++;
     if (addr) return addr;
     unsigned long long need = ((unsigned long long)size + 0xffffULL) & ~0xffffULL;

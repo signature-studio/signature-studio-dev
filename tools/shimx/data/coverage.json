@@ -18,37 +18,28 @@
  "delay_unimplemented": 0,
  "m4_api": 53,
  "m4_api_inherited": 53,
- "shimx_public_api": 610,
- "shimx_hooks": 58,
- "shimx_stub_api": 166,
- "shimx_functional_api": 444,
+ "shimx_public_api": 618,
+ "shimx_hooks": 59,
+ "shimx_stub_api": 161,
+ "shimx_functional_api": 457,
  "plugins": {
   "OTT_vst2_win64.dll": {
    "total": 375,
    "in_scope": 147,
-   "covered": 146,
-   "missing": [
-    "ord74"
-   ]
+   "covered": 147,
+   "missing": []
   },
   "OTT_vst3_win64.dll": {
    "total": 380,
    "in_scope": 151,
-   "covered": 150,
-   "missing": [
-    "ord74"
-   ]
+   "covered": 151,
+   "missing": []
   },
   "Serum2_win64.vst3": {
    "total": 332,
    "in_scope": 238,
-   "covered": 234,
-   "missing": [
-    "ord12",
-    "ord155",
-    "ord190",
-    "ord219"
-   ]
+   "covered": 238,
+   "missing": []
   },
   "FreshAir.dll": {
    "total": 99,

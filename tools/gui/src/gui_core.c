@@ -25,7 +25,8 @@ static int u16_to_u8(const uint16_t *s, char *out, int cap) {  /* NUL 終端ま�
   if (cap > 0) out[n] = 0;
   return n;
 }
-static int u8_to_u16(const char *s, uint16_t *out, int cap) {
+/* trunc != NULL なら、cap に収まらず変換を打ち切ったとき *trunc = 1 (収まれば 0)。cap < 1 のときは何も書かない */
+static int u8_to_u16x(const char *s, uint16_t *out, int cap, int *trunc) {
   int n = 0;
   while (s && *s && n + 2 < cap) {
     uint32_t c = (uint8_t)*s++;
@@ -35,9 +36,11 @@ static int u8_to_u16(const char *s, uint16_t *out, int cap) {
     if (c >= 0x10000) { c -= 0x10000; out[n++] = (uint16_t)(0xD800 + (c >> 10)); out[n++] = (uint16_t)(0xDC00 + (c & 1023)); }
     else out[n++] = (uint16_t)c;
   }
+  if (trunc) *trunc = (s && *s) ? 1 : 0;
   if (cap > 0) out[n] = 0;
   return n;
 }
+static int u8_to_u16(const char *s, uint16_t *out, int cap) { return u8_to_u16x(s, out, cap, NULL); }
 /* 引数文字列 (A/W/atom) を UTF-8 に */
 static const char *str_in(U64 p, int wide, char *buf, int cap) {
   if (p < 0x10000) return NULL;  /* MAKEINTATOM / NULL */
@@ -1057,11 +1060,13 @@ static int service_sync_requests(void) {
   return did;
 }
 /* 見つかれば out に詰めて 1 */
+static void pump_drops(void);   /* gui_core_ext.inc: host からの drop 要求を GUI スレッド上で配送 (#172) */
 static int try_get(WMSG *out, U64 hwnd, uint32_t mn, uint32_t mx, int remove) {
   GuiShared *sh = gui_sh();
   if (g_any_dirty && gui_now_ms() - g_last_flush >= 16) surf_flush();   /* 描画しっぱなしでも ~60Hz で present */
   service_sync_requests();
   pump_input();
+  pump_drops();
   gui_lock();
   for (uint32_t i = g_qh; i != g_qt; i++) {
     QMsg *q = &g_q[i % QCAP];
@@ -1554,21 +1559,39 @@ API SetWindowPlacement(I64 h, I64 wp) {
   MoveWindow(h, (int32_t)u[7], (int32_t)u[8], (int32_t)u[9] - (int32_t)u[7], (int32_t)u[10] - (int32_t)u[8], 1);
   ShowWindow(h, u[2]); return 1;
 }
-API MsgWaitForMultipleObjects(I64 n, I64 handles, I64 all, I64 ms, I64 mask) {
-  (void)all; (void)mask; GuiShared *sh = gui_sh();
-  if (n != 0 || handles) gui_failfast("MsgWaitForMultipleObjects", "waiting on kernel handles not supported (nCount must be 0)");
+/* MsgWaitForMultipleObjects[Ex] (#172 SHX-T5): shimx の weak 定義を置換する強定義。
+ * kernel object の待機は shimx 担当 (WaitForMultipleObjects を弱参照で借りる)。リンクされていなければ従来どおり nCount==0 のみ。
+ * 起床: GUI のメッセージ到着 = doorbell。kernel object の状態変化は shimx_set_notify_hook(gui_doorbell) (gui_shimx_attach) 経由で
+ * 同じ doorbell を鳴らすため 1 本の futex で両方を待てる。hook 未接続で n>0 のときは 5ms 刻みの poll に縮退 (取りこぼし防止)。
+ * 戻り: WAIT_OBJECT_0+i (i 番目 signaled; 低 index 優先) / WAIT_OBJECT_0+n (メッセージ) / WAIT_TIMEOUT / WAIT_FAILED。
+ * MWMO_WAITALL(1) は「全 object signaled かつ入力あり」で WAIT_OBJECT_0 (入力を先に確認してから object を一括取得 = 取得だけ先走らない)。 */
+extern uint32_t WaitForMultipleObjects(uint32_t n, const uint64_t *hs, int all, uint32_t ms) __attribute__((weak));
+static int g_kernel_notify_attached;
+static uint32_t msgwait_ex(uint32_t n, const uint64_t *hs, uint32_t ms, uint32_t flags) {
+  GuiShared *sh = gui_sh();
+  int all = (flags & 1u) != 0;
+  if (n > 0 && (!hs || n > 63)) { gui_set_last_error(87); return 0xFFFFFFFFu; }
+  if (n > 0 && !WaitForMultipleObjects) gui_failfast("MsgWaitForMultipleObjects", "waiting on kernel handles needs shimx (WaitForMultipleObjects unresolved)");
   uint32_t t0 = gui_now_ms();
   for (;;) {
     uint32_t seen = __atomic_load_n(&sh->doorbell, __ATOMIC_SEQ_CST); WMSG tmp;
-    if (try_get(&tmp, 0, 0, 0, 0)) return 0;   /* WAIT_OBJECT_0 + nCount : メッセージ到着 */
+    int have_msg = try_get(&tmp, 0, 0, 0, 0);
+    if (n > 0 && (!all || have_msg)) {
+      uint32_t r = WaitForMultipleObjects(n, hs, all, 0);
+      if (r != 0x102u) return r;           /* signaled (WAIT_OBJECT_0+i / ABANDONED) または WAIT_FAILED */
+    }
+    if (have_msg && !all) return n;        /* WAIT_OBJECT_0 + nCount : メッセージ到着 */
+    if (have_msg && n == 0) return 0;
     surf_flush();
-    int32_t left = (uint32_t)ms == 0xFFFFFFFFu ? -1 : (int32_t)((uint32_t)ms - (gui_now_ms() - t0));
-    if (left == 0 || (left < 0 && (uint32_t)ms != 0xFFFFFFFFu)) return 0x102;   /* WAIT_TIMEOUT */
+    int32_t left = ms == 0xFFFFFFFFu ? -1 : (int32_t)(ms - (gui_now_ms() - t0));
+    if (ms != 0xFFFFFFFFu && (left <= 0 || (uint32_t)(gui_now_ms() - t0) >= ms)) return 0x102;   /* WAIT_TIMEOUT */
     int32_t tm = next_timer_timeout(); if (left >= 0 && (tm < 0 || left < tm)) tm = left;
+    if (n > 0 && !g_kernel_notify_attached && (tm < 0 || tm > 5)) tm = 5;
     gui_futex_wait(&sh->doorbell, seen, tm);
   }
 }
-API MsgWaitForMultipleObjectsEx(I64 n, I64 handles, I64 ms, I64 mask, I64 flags) { (void)flags; return MsgWaitForMultipleObjects(n, handles, 0, ms, mask); }
+API MsgWaitForMultipleObjects(I64 n, I64 handles, I64 all, I64 ms, I64 mask) { (void)mask; return msgwait_ex((uint32_t)n, (const uint64_t *)P_(handles), (uint32_t)ms, all ? 1u : 0u); }
+API MsgWaitForMultipleObjectsEx(I64 n, I64 handles, I64 ms, I64 mask, I64 flags) { (void)mask; return msgwait_ex((uint32_t)n, (const uint64_t *)P_(handles), (uint32_t)ms, (uint32_t)flags); }
 static API scroll_impl(Wnd *w, int dx, int dy, const WRECT *scroll, const WRECT *clip) {
   extern API BitBlt(I64, I64, I64, I64, I64, I64, I64, I64, I64);
   WRECT r = scroll ? *scroll : (WRECT){ 0, 0, w->w, w->hgt };

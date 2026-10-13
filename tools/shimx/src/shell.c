@@ -294,10 +294,83 @@ ULONG SHChangeNotifyRegister(HWND w, int src, LONG events, UINT msg, int n, cons
 BOOL SHChangeNotifyDeregister(ULONG id) { (void)id; return TRUE; }
 BOOL Shell_NotifyIconW(DWORD msg, void* data) { (void)msg; (void)data; return FALSE; }
 
-void DragAcceptFiles(HWND w, BOOL a) { (void)w; (void)a; }
-void DragFinish(HANDLE d) { (void)d; }
-UINT DragQueryFileW(HANDLE d, UINT i, LPWSTR buf, UINT cch) { (void)d; (void)i; (void)buf; (void)cch; return 0; }
-BOOL DragQueryPoint(HANDLE d, void* pt) { (void)d; (void)pt; return FALSE; }
+/* ---- Drag&Drop (shell32; #172 SHX-T5) ----
+ * DragAcceptFiles は受付ウィンドウ表を持つ (gui が shimx_drag_accepts で引く)。HDROP は DROPFILES ブロック
+ * (pFiles@0 pt@4 fNC@12 fWide@16 + UTF-16 二重 NUL 列) への不透明ハンドルで、gui が shimx_hdrop_create で作り
+ * WM_DROPFILES の wParam に載せる。DragFinish で解放。登録外ハンドルは 0/FALSE を返す (Windows の無効ハンドル相当)。 */
+#define DA_MAX 64
+#define HD_MAX 64
+static HWND g_da[DA_MAX];
+static struct { uint8_t* blk; DWORD nfiles; } g_hd[HD_MAX];
+void DragAcceptFiles(HWND w, BOOL a) {
+    if (!w) return;
+    shx_lock();
+    int slot = -1;
+    for (int i = 0; i < DA_MAX; i++) {
+        if (g_da[i] == w) { slot = i; break; }
+        if (!g_da[i] && slot < 0) slot = i;
+    }
+    if (slot >= 0) g_da[slot] = a ? w : 0;
+    shx_unlock();
+}
+int shimx_drag_accepts(HWND w) {
+    int r = 0;
+    shx_lock();
+    for (int i = 0; i < DA_MAX && !r; i++) r = (g_da[i] == w && w);
+    shx_unlock();
+    return r;
+}
+HANDLE shimx_hdrop_create(const WCHAR* const* wpaths, DWORD n, int x, int y, int nc) {
+    size_t chars = 1;
+    for (DWORD i = 0; i < n; i++) chars += (size_t)shx_wstr_len(wpaths[i]) + 1;
+    uint8_t* b = (uint8_t*)calloc(1, 20 + chars * 2);
+    if (!b) return 0;
+    ((uint32_t*)b)[0] = 20; ((int32_t*)b)[1] = x; ((int32_t*)b)[2] = y; ((uint32_t*)b)[3] = nc ? 1u : 0u; ((uint32_t*)b)[4] = 1u;
+    WCHAR* d = (WCHAR*)(b + 20);
+    for (DWORD i = 0; i < n; i++) { size_t l = (size_t)shx_wstr_len(wpaths[i]) + 1; memcpy(d, wpaths[i], l * 2); d += l; }
+    HANDLE h = 0;
+    shx_lock();
+    for (int i = 0; i < HD_MAX; i++) if (!g_hd[i].blk) { g_hd[i].blk = b; g_hd[i].nfiles = n; h = (HANDLE)(uintptr_t)b; break; }
+    shx_unlock();
+    if (!h) free(b);
+    return h;
+}
+static uint8_t* hdrop_find(HANDLE d, DWORD* n) {
+    uint8_t* r = NULL;
+    shx_lock();
+    for (int i = 0; i < HD_MAX; i++) if (g_hd[i].blk && (uintptr_t)g_hd[i].blk == (uintptr_t)d) { r = g_hd[i].blk; if (n) *n = g_hd[i].nfiles; break; }
+    shx_unlock();
+    return r;
+}
+void DragFinish(HANDLE d) {
+    uint8_t* b = NULL;
+    shx_lock();
+    for (int i = 0; i < HD_MAX; i++) if (g_hd[i].blk && (uintptr_t)g_hd[i].blk == (uintptr_t)d) { b = g_hd[i].blk; g_hd[i].blk = NULL; g_hd[i].nfiles = 0; break; }
+    shx_unlock();
+    free(b);
+}
+UINT DragQueryFileW(HANDLE d, UINT i, LPWSTR buf, UINT cch) {
+    DWORD n = 0;
+    uint8_t* b = hdrop_find(d, &n);
+    if (!b) return 0;
+    if (i == 0xFFFFFFFFu) return n;
+    if (i >= n) return 0;
+    const WCHAR* p = (const WCHAR*)(b + *(uint32_t*)b);
+    for (UINT k = 0; k < i; k++) p += shx_wstr_len(p) + 1;
+    UINT len = (UINT)shx_wstr_len(p);
+    if (!buf) return len;
+    if (!cch) return 0;
+    UINT c = len < cch - 1 ? len : cch - 1;
+    memcpy(buf, p, (size_t)c * 2);
+    buf[c] = 0;
+    return c;
+}
+BOOL DragQueryPoint(HANDLE d, void* pt) {
+    uint8_t* b = hdrop_find(d, NULL);
+    if (!b || !pt) return FALSE;
+    memcpy(pt, b + 4, 8);
+    return !((uint32_t*)b)[3];   /* fNC=0 (クライアント領域) なら TRUE */
+}
 
 /* ---- ShellExecute: ブラウザ起動などは下流フックへ ---- */
 static int (*g_shexec_hook)(const char*, const char*, const char*);
@@ -457,8 +530,9 @@ BOOL GetDefaultPrinterW(LPWSTR buf, LPDWORD n) { (void)buf; (void)n; SetLastErro
 LONG DocumentPropertiesW(HWND w, HANDLE h, LPWSTR dev, LPVOID out, LPVOID in, DWORD mode) { (void)w; (void)h; (void)dev; (void)out; (void)in; (void)mode; return 0; }
 
 LRESULT_T LresultFromObject(const GUID* iid, LRESULT_T wp, LPVOID unk) { (void)iid; (void)wp; (void)unk; return (LRESULT_T)(uint32_t)E_NOTIMPL; }
-BOOL WTSRegisterSessionNotification(HWND w, DWORD flags) { (void)w; (void)flags; return TRUE; }
-BOOL WTSUnRegisterSessionNotification(HWND w) { (void)w; return TRUE; }
+/* weak: tools/gui が強定義で置換する (#172。両方 strong だと IR が宣言したとき wasm-ld の duplicate symbol になっていた) */
+SHIMX_WEAK BOOL WTSRegisterSessionNotification(HWND w, DWORD flags) { (void)w; (void)flags; return TRUE; }
+SHIMX_WEAK BOOL WTSUnRegisterSessionNotification(HWND w) { (void)w; return TRUE; }
 
 const WCHAR* PropVariantToStringWithDefault(const void* pv, const WCHAR* def) {
     uint16_t vt = pv ? *(const uint16_t*)pv : 0;
