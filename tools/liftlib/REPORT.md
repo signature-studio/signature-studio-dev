@@ -202,7 +202,7 @@ FA の P1' (comisd×2+jbe/jae+xorps/movaps+jmp, 合流先は reg2mem alloca) が
 
 既知類型との関係: 該当なし (DEFECTS.md の D1a〜D16 にも icall §4 にも無い。データ敷設 C 生成器の境界 off-by-one で、m11 #572 と同根)。検証起点 commit: `1a94ac2` (修正コード)。
 
-- 結論: 旧境界 `r < lo + len - 8` は 3 箇所 (`tools/m6/m6_data_gen.py:42` / `tools/liftlib/liftlib/passes/dataimage.py:35` / `tools/liftlib/tests/test_unit.py:116`) に複製されており、全て `<=` に修正。**FL 本体 PE (`block00031_PE.bin`) では `.data` 末尾 slot (RVA `0x11e5000`) が旧条件で補正漏れ、修正後は 0**。OTT 実機 DLL (`OTT_vst2_win64.dll`) での測定は素材 (`analysis-ott-binaries`) が無く**未測**。
+- 結論: 旧境界 `r < lo + len - 8` は 3 箇所 (`tools/m6/m6_data_gen.py:42` / `tools/liftlib/liftlib/passes/dataimage.py:35` / `tools/liftlib/tests/test_unit.py:116`) に複製されており、全て `<=` に修正。**FL 本体 PE (`block00031_PE.bin`) では `.data` 末尾 slot (RVA `0x11e5000`) が旧条件で補正漏れ、修正後は 0**。OTT 実機 DLL (`OTT_vst2_win64.dll`) は補正漏れ 0 (末尾 slot 自体が存在せず旧条件でも漏れない = 潜在バグは OTT 生成物には顕在化していなかった。下記「OTT 実機の実測」)。
 - 再現: `bash tools/liftlib/dir64_boundary_gate.sh` (1 コマンド。PE 省略時 `$FL_WIN64_DIR/extracted/block00031_PE.bin`)。不合格は非 0 で終了する。
 
 | 検査 | 算法 | 結果 |
@@ -213,9 +213,21 @@ FA の P1' (comisd×2+jbe/jae+xorps/movaps+jmp, 合流先は reg2mem alloca) が
 
 - 影響なし (境界が正しい) と判定した箇所: `ott/lift/data_gen.py:28`・`hostbridge/lowbase/x64c/lb_data_gen.py:30` (`< lo + len - 7`、slot が収まる = `<= lo + len - 8` と同値)、`hostbridge/lowbase/audit_va.py` (`range(va, va+vs-7, 8)`)、`m11/m11_image_gen.py`・`plugins/lift/passes/m11_image_gen.py` (`r + 8 <= top`)、`m11/lb_check.py` (`r + 8 <= va + vs`)、`m11/m11_data_gen.py:50` (#572 で修正済)、`flelift/fle_data_gen.py` (生バイトコピーで補正なし)。
 - 実測 (runner 4 vCPU、コミット済み HEAD を `git worktree add --detach` で展開): gate 3 回 全て ALL PASS・37.05 / 37.06 / 37.14 秒 (load average 0.31→0.65→0.81、直列)。
-- 範囲外 / 未測: OTT 実機 DLL の `.rdata` / `.data` 末尾が slot で終わるか。work 素材の既存 `ott_data.c` (`_rdata` 511,510 B・`_data` 56,268 B) は長さが 8 の倍数でなく (剰余 6 / 4)、末尾 8B が slot と整列する RVA かは DLL 無しでは判定できない。`tests/test_unit.py` T7 は OTT DLL 必須のため未実行 (旧条件の境界を使う T7 は同じ条件に修正済み)。
+- 範囲外: 実行時の差 (LoadStringW 実装後の回帰確認) は #132 に依頼済み。
+
+### OTT 実機の実測 (`analysis-ott-binaries` の `OTT_vst2_win64.dll`、検証起点 commit `f9adacd` = #636 merge 済み main)
+
+| 検査 | 結果 |
+|---|---|
+| `dir64_boundary_check.py OTT_vst2_win64.dll --gen m6 / --gen liftlib` (`--expect-missed 0`、pefile 独立算法) | 両方 PASS: DIR64 total=13000 / 補正対象=13000 / 補正漏れ=0 / 不正値=0 / 末尾 slot 対象=0 |
+| 旧条件 `<` に戻した複製 (m6 / liftlib) | 同じく補正漏れ=0 (OTT では旧条件でも落ちない) |
+| `tests/test_unit.py` T7 (`t7()` 単独、3 回) | 3 回とも `T7 ok`: 補正 12329 件 (.rdata) = base 非依存、うち nt<0x400000 12329 件。0.611 / 0.596 / 0.600 秒 (load average 0.73→0.75→0.75、直列) |
+| `dir64_boundary_gate.sh` (FL 本体 PE、同 HEAD) | ALL PASS・36.173 秒 (load average 0.69→0.83)。ネガコン (列挙 OLD=3 / 補正漏れ 1 / 期待逆転) 全て期待通り |
+
+- 末尾 slot が無い理由: 補正対象 section は `.rdata` (VS=511510, 最終 DIR64 RVA 0x225618、末尾まで 235518 B) と `.data` (VS=56268, 最終 DIR64 RVA 0x268e70、末尾まで 15708 B) の 2 つで、どちらも最終 reloc から section 末尾まで 8B より十分離れている。他 section (`.text` / `.pdata` / `_RDATA` / `.rsrc` / `.reloc`) に DIR64 は 0 件。よって旧境界 `r < lo + len - 8` は OTT では結果を変えない。
+- 測定条件: runner 4 vCPU、`$HOME/analysis/plugins/ott/binaries/OTT_vst2_win64.dll` (3146752 B)、`FL_WIN64_DIR` は `fl-win64` を展開した dir、`pefile` / `capstone` は uv venv に導入。
+- T7 以外の `test_unit.py` 全体 (`python3 tests/test_unit.py`) は T6 で停止: Fresh Air 素材 (`targets/freshair/work/win/...SlateCore.core_64` = `work-liftlib-targets`) が今回の `oc_artifacts` に無いため。T1〜T5 は PASS (T6 以降未実行)。T7 は上記の通り単独実行で PASS。本 issue の受入条件は T7 のみ。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| OTT 実機 DLL での末尾 slot 補正漏れの有無が未測 | m6 / liftlib の OTT 生成物に旧条件で落ちた slot があったかが不明 (T7 も未実行) | `oc_artifacts: ... analysis-ott-binaries` 付きで #593 を再起動 (本 PR は Refs) |
 | 実行時の差の顕在化 (LoadStringW 実装後の回帰確認) | m11 同様、潜在バグで顕在化条件は未確認 | #132 にコメントで回帰確認項目を依頼 |
