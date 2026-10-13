@@ -2,6 +2,7 @@
 """closure_facts.py (host_calls.py の taint 追跡) の Dispatcher ID を別アルゴリズムで検算する。
 taint を使わず、閉包 ranges を線形逆アセンブルして「`mov r8d, imm` / `xor r8d, r8d` の後 8 命令以内にある
 `call qword ptr [reg]` (disp 0, index 無し, base が rip でない)」を全数拾う。 host 以外の vtable slot0 呼出も拾うため上位集合になる。
+前提: dynamics_e2e.sh 実行済み + `source dynamics/env.sh`。
 合格条件: 各プラグインで taint 版の即値 ID の件数が、本走査の同 ID の件数以下 (取りこぼしなし)。 不合格なら exit 1。
 """
 import os, sys, json, collections
