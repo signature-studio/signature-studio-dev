@@ -100,7 +100,7 @@
 - ネガティブコントロール (`retdec_batch.py --nc`、block19091 の先頭 20 関数を 1 batch で lift): 出力 C から `function_407310` の定義ヘッダ (`int64_t function_407310(void) {`) を 1 行削除すると、defined が 20 → 19 になり、対象関数の判定が `ok` → `no_definition` に変わる。判定が定義行の有無に依存することを確認。
 - 命令数の定義の差: x64c の 659,894 (block19091) は `tools/icall/x64c_census.py` が recursive descent (関数の入口から到達できる命令のみ) で数えた値。§1 の 686,756 は `.pdata` 範囲の線形 decode の総数。同じ 19,816 関数を対象とするが、数え方が異なる (線形 decode は関数内のデータ・到達不能コードも数える)。よって両者は直接比較できない。
 - x64c の未対応: census 経路の未対応 mnemonic は 66 種 (上位は `movsq` 1,587 / `stosq` 435 / x87 / `rep movsq` 68 / `lock xadd`・`lock cmpxchg`)。Delphi RTL の文字列コピー (rep/movs) と x87 演算が主因。これは静的カバレッジで、x64c の実 lift 成否ではない。
-- wrapper 経路 (`x64c_wrapper.py`、全 pdata 関数を root にした生成) の unsup は 3,629 件 / 81 種 (`lift_meta.json` の `unsup` 合計、本 HEAD で実測)。census 経路の値と集計対象が異なるため直接比較しない。
+- wrapper 経路 (`x64c_wrapper.py`、全 pdata 関数を root にした生成) の unsup は 3,629 件 / 81 種 (`lift_meta.json` の `unsup` 合計。`x64c.py` ba13c9dc 版で実測)。census 経路の値と集計対象が異なるため直接比較しない。
 - §1 の decode 所要: 本 HEAD の `measure_decode.py` 単発実行では block19091 4.15 s (`decode_seconds`)。表の 2.46–2.49 s は前回 n=3 の値で、環境の load により変動する。
 
 **RetDec の既定モードの失敗 (§2 の追試)**: 1 関数範囲だけでなく block19091・block23676 の全体でも、既定モードは decode 段で
@@ -126,7 +126,7 @@
 | wasm link (emcc, 全体) | 未実施 | 未完 (旧計測で 400 秒の timeout。完了時間は未測定) | 未実施 |
 
 **x64c 生成物の `ULLULL` (本 HEAD で実測)**
-- 生成 C (`x64c_wrapper.py`、block19091、19,816 関数) の `ULLULL` は **18 行**。全 18 行が `cmpxchg qword ptr` の 64bit 分岐の else 節 (`R[RAX] = (R[RAX] & ~0xffffffffffffffffULLULL) | ...`)。
+- 生成 C (`x64c_wrapper.py`、block19091、19,816 関数、`tools/ott/lift/x64c.py` は ba13c9dc 版で実行) の `ULLULL` は **18 行**。全 18 行が `cmpxchg qword ptr` の 64bit 分岐の else 節 (`R[RAX] = (R[RAX] & ~0xffffffffffffffffULLULL) | ...`)。
 - 原因行: `tools/ott/lift/x64c.py` の `i_cmpxchg`。ba13c9dc では 1447 行 `amask = '0xffffffffffffffffULL' if sz == 8 else hex(MASK[sz])` と、1449 行の `'... ~%sULL ...' % (..., amask)`。`sz == 8` の amask は既に `ULL` を含むため、`~%sULL` の `ULL` と二重になる。main では同じ箇所が 1491 / 1493 行 (main の x64c.py は 1605 行、ba13c9dc は 1560 行)。
 - 前回 REPORT が挙げた `x64c.py:260` (`hex(MASK[s])`) は原因ではない。`hex(MASK[s])` は `0xff` 形式で `ULL` を含まず、260 行の `~%sULL` は `ULL` が 1 つだけ付く。
 - 補正の効果: 補正なし `clang -fsyntax-only` は 18 件のエラー (`invalid suffix 'ULLULL' on integer constant`)。`sed 's/ULLULL/ULL/g'` 後は 0 件で通過 (28.7 s)。前回の「2 箇所補正」は誤りで、補正箇所は 18 箇所。
