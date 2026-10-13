@@ -1,14 +1,31 @@
 """native / wasm の case 結果を比較して差分 (diffs) を作る。ポインタは address ずれ (delta) を許容して正規化する。"""
+import math
 
 M64 = (1 << 64) - 1
 NATIVE_STACK_LO = 0x7000_0000_0000
 SENTINEL = 0xCAFEBABE0BADF00D
+DEFAULT_WASM_TIMEOUT_MS = 1000     # ld_runner.mjs の vm timeout 既定 (target JSON wasm_timeout_ms で上書き)
+DEFAULT_WASM_SLOWDOWN = 20.0       # wasm (-O0 + 計装) が native の何倍まで遅くなり得るかの仮定 (target JSON wasm_slowdown_bound)
+
+
+def wasm_timing_params(t):
+    """target JSON の wasm_timeout_ms (正の整数) / wasm_slowdown_bound (正の数) を検証して (ms, slowdown) を返す。
+    不正値は raise する: ランナ側の既定値 (Number(x) || 1000) と判定閾値が食い違うのを防ぐ。"""
+    ms = t.get('wasm_timeout_ms', DEFAULT_WASM_TIMEOUT_MS)
+    sl = t.get('wasm_slowdown_bound', DEFAULT_WASM_SLOWDOWN)
+    if isinstance(ms, bool) or not isinstance(ms, (int, float)) or not math.isfinite(ms) or ms <= 0 or int(ms) != ms:
+        raise ValueError('wasm_timeout_ms must be a positive integer (got %r)' % (ms,))
+    if isinstance(sl, bool) or not isinstance(sl, (int, float)) or not math.isfinite(sl) or sl <= 0:
+        raise ValueError('wasm_slowdown_bound must be a positive number (got %r)' % (sl,))
+    return int(ms), float(sl)
 
 
 class Ctx:
     """windows = [(lo, hi)] は wasm 側座標。native の同領域は +delta。"""
 
-    def __init__(self, delta, windows, wasm_stack):
+    def __init__(self, delta, windows, wasm_stack, wasm_timeout_ms=DEFAULT_WASM_TIMEOUT_MS, wasm_slowdown=DEFAULT_WASM_SLOWDOWN):
+        self.wasm_timeout_ms = wasm_timeout_ms
+        self.wasm_slowdown = wasm_slowdown
         self.delta = delta
         self.win = windows
         self.wstack = wasm_stack
@@ -43,13 +60,38 @@ def _blocks(mem):
     return d
 
 
+def _bytemask(pre, post):
+    """pre と post で値が変わった byte の mask (8B ワード内)"""
+    m = 0
+    for i in range(8):
+        if ((pre >> (8 * i)) & 0xff) != ((post >> (8 * i)) & 0xff):
+            m |= 0xff << (8 * i)
+    return m
+
+
+def _overlay(base, post, mask):
+    return (base & ~mask & M64) | (post & mask)
+
+
+def eq_block_bytewise(pre_n, post_n, pre_w, post_w, ctx):
+    """部分上書きされた ptr 入りワードの比較 (LD-11 / #548)。各側で pre/post が変化した byte だけを post から取り、
+    変化していない byte は pre (native 側は wasm 座標へ ptr 正規化) を使って合成した語を比較する。
+    ptr 正規化の対象は変化していない byte に限る (変化した byte は生値を比較するので、書込み値の rebase 漏れは隠れない)。"""
+    mn, mw = _bytemask(pre_n, post_n), _bytemask(pre_w, post_w)
+    if not (mn or mw):
+        return ctx.eq(pre_n, pre_w)
+    wn = _overlay(ctx.n2w(pre_n), post_n, mn)
+    ww = _overlay(pre_w, post_w, mw)
+    return wn == ww
+
+
 def cmp_mem(n, w, ctx, limit=8):
     bn, bw = _blocks(n.get('mem', [])), _blocks(w.get('mem', []))
     diffs = []
     for k in sorted(set(bn) | set(bw)):
         if k in bn and k in bw:
             vn, vw = bn[k][1], bw[k][1]
-            if not ctx.eq(vn, vw):
+            if not ctx.eq(vn, vw) and not eq_block_bytewise(bn[k][0], vn, bw[k][0], vw, ctx):
                 diffs.append({'r': k[0], 'o': hex(k[1]), 'native': hex(vn), 'wasm': hex(vw)})
         elif k in bn:
             pre, post = bn[k]
@@ -145,12 +187,20 @@ def cmp_trace(n, w, ctx, sigs, prefix='function_', skip=frozenset()):
 
 
 def compare_case(n, w, ctx, sigs, stub_info, skip=frozenset()):
-    """戻り: dict(outcome, diffs{}) ; outcome ∈ equal / diff / wasm_trap / native_fault / both_fault / hang"""
+    """戻り: dict(outcome, diffs{}) ; outcome ∈ equal / diff / wasm_trap / wasm_timeout_native_long / native_fault / both_fault / hang"""
     sn, sw = n.get('status'), w.get('status')
     if sn in ('hang', 'crash') or sw in ('hang', 'crash'):
         return {'outcome': 'hang', 'native': sn, 'wasm': sw}
     if sw == 'timeout' and sn == 'ok':
-        return {'outcome': 'wasm_trap', 'native': sn, 'wasm': sw, 'wasm_detail': 'timeout: wasm did not finish within 1s (infinite loop?) while native completed'}
+        nms = n.get('ms')
+        # native 自身が wasm_timeout_ms / wasm_slowdown 以上かかった case は、wasm が正常でも打切られ得る (LD-11 / #548)。
+        # 欠陥 (wasm_trap) とは区別し、比較不能 (unexec) として別 outcome にする。native ms 不明 (旧ランナ) は従来どおり wasm_trap。
+        if nms is not None and nms * ctx.wasm_slowdown >= ctx.wasm_timeout_ms:
+            return {'outcome': 'wasm_timeout_native_long', 'native': sn, 'wasm': sw, 'native_ms': nms,
+                    'wasm_timeout_ms': ctx.wasm_timeout_ms, 'wasm_slowdown_bound': ctx.wasm_slowdown}
+        return {'outcome': 'wasm_trap', 'native': sn, 'wasm': sw, 'native_ms': nms,
+                'wasm_detail': 'timeout: wasm did not finish within %dms (infinite loop?) while native completed%s' % (
+                    ctx.wasm_timeout_ms, '' if nms is None else ' in %.3fms' % nms)}
     if sn == 'timeout' or sw == 'timeout':
         return {'outcome': 'hang', 'native': sn, 'wasm': sw}
     n_ok, w_ok = sn == 'ok', sw == 'ok'

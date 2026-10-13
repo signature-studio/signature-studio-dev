@@ -38,6 +38,9 @@ done
 echo "== [4] KH-10/KH-11 (CAB-247): EditorModel 層部分 lift (module E: ctor+poll1+poll2+EventSlot+writer)
     + subscribe 経路 (0x1800526f0 等) の実 IR 化 → native oracle ctx-fuzz + 47 製品「編集可能」デモ"
 python3 lic_build.py --module E | tail -1
+# 47 ctor 呼出元 (work/ctors47.json = em_check.mjs の入力) を clean 環境でも再生成 (xref 全 .text 走査 ≈ 80 s は初回のみ)
+[ -f work/xref_kh11.json ] || python3 scripts/xrefscan.py 180051af0,180d5f190,180d52990,180ef7fc0,180d5e820 --json work/xref_kh11.json > /dev/null
+python3 scripts/kh249_ctor_ids.py --json work/ctor_ids.json | tail -1
 if [ ! -x work/native_ref ]; then
   cc -O1 -Wall -o work/native_ref harness/native_ref.c harness/scenarios.c -Iharness
 fi
@@ -54,6 +57,11 @@ echo "--- emfire (manager slot 起火 E2E / 参考実行・未解決)"
 node harness/compare.mjs work/emfire_200_1.bin work/licE/mod.cjs work/licE/sigs.json --json work/emfire_200_1.json | tail -1 || \
   echo "WARN emfire: wasm 側の未 lift thunk (0x180003360) により bit 不一致 (KH-11 REPORT 未解決・起票先: 親 CAB-13)"
 
+echo "== [4b] KH-11b (#249): snap-in ブラウザ分類 0x180ef7fc0 の lift (module F) → ゲート実行検証 + 式の再実装による期待値確認 + 47 ctor の RTTI 同定"
+python3 lic_build.py --module F | tail -1
+node kh249_check.mjs | tail -1
+python3 scripts/kh249_id_scan.py --json work/id_scan.json | tail -1
+
 echo "== [5] まとめ"
 node -e '
 const fs = require("fs");
@@ -62,6 +70,7 @@ for (const n of ["matrix","gain","haas","clipper","gate","quickeq"]) {
   for (const t of ["base","lic"]) {
     const s = JSON.parse(fs.readFileSync("work/"+n+"/"+t+"/stat.json","utf8"));
     r.push(`${t}: ${s.trials_ok}/${s.trials} trial bit-exact (${s.calls_ok}/${s.calls} call), wasm ${s.wasm_bytes}B, licFn参照 ${s.lic_va_hits_total}`);
+    if (!(s.trials > 0 && s.trials_ok === s.trials)) { console.log("FAIL", n, t, "bit-exact 未達 (比較未実行 = null を含む)"); process.exitCode = 1; }
   }
   console.log(n.padEnd(9), r.join(" | "));
 }'

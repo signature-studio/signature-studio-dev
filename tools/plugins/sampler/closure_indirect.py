@@ -12,7 +12,7 @@
   lea 残    = total の関数が `lea reg,[rip+X]` で開始 VA を取っている非共通関数のうち total に無いもの (関数ポインタをコードで取る経路。 root には加えない。 情報のみ)
 検査 (全て満たさなければ exit 1):
   C1 正の対照: entry だけから BFS した結果が work/closure/block*.json の ranges と完全一致 (BFS 実装が plugin_closure.py と同じ)
-  C2 root 数・バイトが work/sampler/unreached.json の dataref_funcs / dataref_bytes と一致 (unreached_unique.py との独立再現)
+  C2 root 数・バイトが work/sampler/unreached.json の dataref_funcs / dataref_bytes と一致 (unreached_unique.py と同一定義の再計算。 独立検算は C4)
   C3 total ⊆ 非共通関数 (framework を lift 対象に混ぜない) かつ base ⊆ total
   C4 別算法: 関数バイト列の E8/E9 rel32 を全オフセットで拾う過大近似 (命令境界を見ない) で閉包を取り、capstone 版 total ⊆ 過大近似版
 出力: work/sampler/indirect/block<B>.ranges.txt (total の ranges、lift 入力)、work/sampler/indirect.json、stdout の表

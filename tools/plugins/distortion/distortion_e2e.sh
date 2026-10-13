@@ -36,7 +36,7 @@ python3 lift/plugin_closure.py "${SHELLS[@]}" > /dev/null
 if [ "${1:-}" != "--skip-lift" ]; then
   # 前回までの行を判定に混ぜない: 今回追記された行だけを status.csv にする
   mkdir -p work/batch
-  [ -f work/batch/status.csv ] || echo "block,name,closure_funcs,closure_bytes,lift_rc,defines,declares_unimpl,f80_funcs,emcc_c_rc,seconds" > work/batch/status.csv
+  [ -f work/batch/status.csv ] || echo "block,name,closure_funcs,closure_bytes,lift_rc,defines,declares_unimpl,f80_funcs,emcc_c_rc,seconds,icall,dispatch_calls" > work/batch/status.csv
   n0=$(wc -l < work/batch/status.csv)
   bash lift/batch_lift.sh "${SHELLS[@]}"
   { head -n 1 work/batch/status.csv; tail -n +$((n0 + 1)) work/batch/status.csv; } > "$OUT/status.csv"
@@ -55,7 +55,9 @@ fi
 # 閉包 range と final.ll の突合 (全 range の開始 VA に define があるか)
 echo "block,missing_define,missing_bytes,missing_ref,extra_inside,function_defines" > "$OUT/shell_audit.csv"
 for b in "${SHELLS[@]}"; do
-  echo "$b,$(python3 distortion/engine_defs.py --ranges "work/closure/block$(printf %05d "$b").ranges.txt" --ll "work/batch/$b/p.final.ll")" >> "$OUT/shell_audit.csv"
+  # icall 書換え (batch_lift の既定 PLUG_ICALL=1, #514) では RetDec が range 内部に切り出した追加 define の名前が書換え後 PE のアドレスになる (PLG-F6-2 #545 で露見)。 両方の range で数える
+  R2="work/batch/$b/p.icall.map.json.ranges"; ALSO=(); [ -f "$R2" ] && ALSO=(--also-ranges "$R2")
+  echo "$b,$(python3 distortion/engine_defs.py --ranges "work/closure/block$(printf %05d "$b").ranges.txt" --ll "work/batch/$b/p.final.ll" "${ALSO[@]}")" >> "$OUT/shell_audit.csv"
 done
 judge_shells "$OUT/status.csv" "$OUT/shell_audit.csv"
 python3 distortion/unimpl_names.py work/batch --blocks "$SHELLS_CSV"
@@ -65,9 +67,22 @@ python3 distortion/matrix_check.py
 python3 distortion/ids_crosscheck.py
 
 if [ "${1:-}" != "--skip-lift" ]; then
-  echo "block,pdata_funcs,lift_rc,defines,f80_funcs,unimpl_helpers,emcc_c_rc,fixcmp_patched,emcc_c_rc_after_fixcmp,lift_s,missing_define,missing_bytes,missing_ref,extra_inside,function_defines" > "$OUT/engines.csv"
+  echo "block,pdata_funcs,lift_rc,defines,f80_funcs,unimpl_helpers,emcc_c_rc,f80_funcs_pre,emcc_c_rc_pre_f80,lift_s,missing_define,missing_bytes,missing_ref,extra_inside,function_defines" > "$OUT/engines.csv"
   for eb in "${ENGINES[@]}"; do bash distortion/engine_lift.sh "$eb" 1800 | tail -n 1 >> "$OUT/engines.csv"; done
   cat "$OUT/engines.csv" "$OUT"/engine*/first_errors.txt
   python3 distortion/judge.py "$OUT/engines.csv" --engines --blocks "$ENGINES_CSV"
 fi
+# C++ DLL の DSP 閉包 (CreatePlugInstance → vptr → vtable → 直接呼出)。 閉包の全 range が engine の final.ll に define を持つことも確認する
+echo "block,seed_vtables,vtables_in_closure,closure_funcs,closure_bytes,pdata_funcs,indirect_call_sites,iat_call_sites,missing_define,missing_bytes,missing_ref,extra_inside,function_defines" > "$OUT/closure_cpp.csv"
+for eb in "${ENGINES[@]}"; do
+  python3 distortion/closure_cpp.py "$eb" --ranges "$OUT/closure_cpp_$eb.txt" --json "$OUT/closure_cpp_$eb.json" > /dev/null
+  python3 - "$OUT/closure_cpp_$eb.json" "$eb" "$(python3 distortion/engine_defs.py --ranges "$OUT/closure_cpp_$eb.txt" --ll "$OUT/engine$eb/e.final.ll")" >> "$OUT/closure_cpp.csv" <<'PY'
+import json, sys
+j = json.load(open(sys.argv[1]))
+print(','.join(str(x) for x in [sys.argv[2], len(j['seed_vtables']), j['vtables_in_closure'], j['closure_funcs'], j['closure_bytes'], j['pdata_funcs'],
+                                  j['indirect_call_sites'], j['iat_call_sites'], sys.argv[3]]))
+PY
+done
+cat "$OUT/closure_cpp.csv"
+python3 distortion/judge.py "$OUT/closure_cpp.csv" --closure-cpp --blocks "$ENGINES_CSV"
 echo "[distortion_e2e] OK: $OUT/{status.csv,facts.json,engines.csv}"

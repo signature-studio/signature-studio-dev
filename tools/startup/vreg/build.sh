@@ -19,7 +19,7 @@ case "${1:-test}" in
   shimx)
     for mode in st mt; do
       FL=("${SHIMX_EMCC_ST[@]}"); [ $mode = mt ] && FL=("${SHIMX_EMCC_MT[@]}")
-      emcc "${SHIMX_CLANG_FLAGS[@]}" "${FL[@]}" "${INC[@]}" "${SRCS[@]}" "${VSRC[@]}" "$SHIMX"/test/*.c -o "$B/shimx_$mode.js"
+      emcc "${SHIMX_CLANG_FLAGS[@]}" "${FL[@]}" "${INC[@]}" -I"$SHIMX/pathreg/include" "${SRCS[@]}" "${VSRC[@]}" "$SHIMX"/test/*.c "$SHIMX"/pathreg/src/pathmap.c -o "$B/shimx_$mode.js"
       mv "$B/shimx_$mode.js" "$B/shimx_$mode.cjs"
       node "$B/shimx_$mode.cjs" 2> "$B/shimx_$mode.err" | tee "$B/shimx_$mode.out"
     done

@@ -1,0 +1,18 @@
+--- a/src/gui_gdi.c	2026-10-13 04:14:21.294211150 +0000
++++ b/src/gui_gdi.c	2026-10-13 04:14:21.305087548 +0000
+@@ -674,9 +674,13 @@
+   return dib_to_dc(d, (int)xd, (int)yd, (int)wd, (int)hd, (int)xs, (int)ys, (int)ws, (int)hs, P_(bits), (const WBMIH *)P_(bmi), (uint32_t)rop) ? (int)(hd < 0 ? -hd : hd) : 0;
+ }
+ API SetDIBitsToDevice(I64 hdc, I64 xd, I64 yd, I64 w, I64 h, I64 xs, I64 ys, I64 start, I64 lines, I64 bits, I64 bmi, I64 usage) {
+-  (void)start; (void)lines; (void)usage;
++  (void)usage;
+   DC *d = dc_of((U64)hdc); if (!d) return 0;
+-  return dib_to_dc(d, (int)xd, (int)yd, (int)w, (int)h, (int)xs, (int)ys, (int)w, (int)h, P_(bits), (const WBMIH *)P_(bmi), SRCCOPY) ? (int)h : 0;
++  /* ySrc は下原点 (MS Learn: lower-left)。top-down DIB の上端からの行 = startscan + lines - (ySrc + h) (Wine nulldrv_SetDIBitsToDevice と同式)。
++     bottom-up は dib_to_dc が (bh - ys - hs) で変換するため、startscan=0 && lines=高さ のときだけ従来どおり ys をそのまま渡せる */
++  const WBMIH *bi = (const WBMIH *)P_(bmi);
++  int ys_eff = bi->biHeight < 0 ? (int)start + (int)lines - ((int)ys + (int)h) : (int)ys;
++  return dib_to_dc(d, (int)xd, (int)yd, (int)w, (int)h, (int)xs, ys_eff, (int)w, (int)h, P_(bits), bi, SRCCOPY) ? (int)h : 0;
+ }
+ API GetDIBits(I64 hdc, I64 hbm, I64 start, I64 lines, I64 bits, I64 bmi, I64 usage) {
+   (void)hdc; (void)usage;

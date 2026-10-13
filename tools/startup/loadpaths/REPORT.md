@@ -28,7 +28,7 @@
 | `loadpaths.json` | 配置 group の宣言 (glob・phase・推奨 tier・読込単位・読み手関数 VA・`claims` / `calls`) |
 | `check.py` + `mapcheck.mjs` | group を実ファイル一覧に当てて件数・サイズ・Win→VFS 写像 (pathreg JS ミラーを import) を実測 |
 | `crosscheck.py` | 別算法 (RSA の乗算展開 / 64 bit ワード演算の XOR / 標準 `gettext`) による検算 + ネガコン |
-| `svc_check.py` | 検索パス服務 (§8) の vtable スロット・call 辺・import 名・機械語を DLL から機械照合 (43 項目) + `--mutate` ネガコン (#590) |
+| `svc_check.py` | 検索パス服務 (§8) の vtable スロット・call 辺・import 名・機械語を DLL から機械照合 (49 項目) + `--mutate` ネガコン (#590) |
 | `lang_seed_check.mjs` | 非 en seed の seed 層確認 (`Program language` を apply:true・value=ja にした派生をメモリ上で作り、値の出現と外した時の不出現を確認。wasm/素材不要) (#590) |
 | `e2e.sh` | 上記 1 コマンド検証 |
 
@@ -108,7 +108,7 @@ files / bytes は `$INSTDIR` 相対のユニークパス (`inventory_files` 2740
 | texts-dialog | on-demand | T1 | 24 | 110241 | T0p:8 T1:16 | 0x10d5980 (BoxEdition/NotReggedTxt/DemoTxt)、0x1366ae0、0x1369240 (About)、0x11cb000 (`NewVersion.txt` = 更新確認) |
 | empty-project | boot | T0 | 1 | 46361 | T0:1 | 0x11db420 `Data\System\Empty.flp` (無いと 'Could not find default empty project.')。呼出元 0xe1d090 / 0xed5c40 |
 | lang-moe | boot-conditional | T2 | 7 | 6282124 | T1:7 | §2 |
-| lang-svg | unresolved | T1 | 8 | 4025 | T1:8 | 参照元未特定 (.svg 汎用ローダは 0xdceea0) |
+| lang-svg | boot-conditional | T1 | 8 | 4025 | T1:8 | 0xdceea0 = `TToolbarForm.FlagBtnPaint` (言語旗ボタン描画)。#591 で特定: `tools/startup/uilang/REPORT.md` §2 |
 
 - **ヘルプは WebView ではなく URL 組立**: FL は HTML を解釈せず `index_offline.html` と `/html/…` の URL を作って外部ビューアへ渡す (#118 help-viewer の入力)。`Help/` 全体で 55 ファイル、起動で読むのは `.scr` 2 件のみ。
 - 起動で触れる `Artwork/Fonts` は、`Cuprum.ttf` / `FrancoisOne.ttf` が `Shared/Artwork/Fonts/` と**同一内容** (同一 block)。現行推定で T2 になっている 4 件は `OFL.txt` 2 件 + この重複 `.ttf` 2 件 (内容重複排除で実害なし)。
@@ -165,9 +165,9 @@ files / bytes は `$INSTDIR` 相対のユニークパス (`inventory_files` 2740
 | `phase` / tier の動的確定 (boot 中の open() トレース) | §3・§4 の推奨は静的根拠。boot が `CreateFruityInstance` に未到達 (unit 初期化 209 で停止) の間は答え合わせ不可 | #105 (T1・`assettrace` が入力、本 REPORT の group を diff の基準にする) / 依存 [FLE-2] #253 |
 | ~~`0x9de400` の `[self+0xa8]->vtbl+0x30` (検索パス服務) の実体と、ユーザ側ディレクトリ不在時の挙動~~ | 静的に確定 (§8-1・§8-2)。**VFS / shimx 側の実測は未了** (§8-4) | #590 (本 PR)。実測は §8-4 の起票先 |
 | 非 en 言語 (`Program Language`=`ja` を seed + `/fl/System/Languages/ja.moe`) の実読込 e2e と、`en` で .moe を一切開かないことの実測 | §0-1 の動的確認 | 同上 (非 en の seed 先は `tools/startup/vreg/data/seed.json`。生成元 `scripts/build_seed.py` の `OVERRIDES` で `Program language` を `apply:true`・value=`ja` にする) |
-| `GetUserPreferredUILanguages` が en-US を返すことの実測 (非 `zh` を保証。`zh` 返却だと `Program language` が自動書込みされ 0x9deaa0 の分岐が変わる) | 言語の決定性 | shimx 側 (#13 系) / winstubs の子チケットを PM が起票 |
-| `lang-svg` の参照元 (推定: 言語選択 UI) | 8 ファイル 4025 byte の phase が `unresolved` | 同上 (boot 到達後に UI 経路で確定) |
-| Windows 標準フォント名 (`segoeui` `tahoma` `consola` `lucon`) の代替解決 (VFS に無い) | GUI の文字描画 | GUI 側 (#10 の子) へ PM が起票。`fonts` group の `Shared/Artwork/Fonts/*` が代替の候補 |
+| ~~`GetUserPreferredUILanguages` が en-US を返すことの実測~~ | **#591 で実測済み**: 既定 `en-US`、`zh-CN` のときだけ Program language を自動書込み (`tools/startup/uilang/REPORT.md` §1) | — |
+| ~~`lang-svg` の参照元~~ | **#591 で特定**: 0xdceea0 `FlagBtnPaint` (同 §2)。初回描画が起動中かは未確認 | #105 |
+| ~~Windows 標準フォント名の代替解決~~ | **#591 で要求一覧化**: segoeui 等は FL 自身が存在確認して OpenSans に落とす。GDI face 名の代替案は同 §3 | #186 |
 | テーマ選択 UI の列挙経路・`Default.txt` が参照する壁紙画像の必須性 | `theme-others` / `wallpaper-images` は検索パス登録と選択 UI 名のみ確認 | #105 (実トレース後) |
 | `bootset.json` / `classify_bootset.py` への §4 差分 6 点の反映 | 配信 tier の精度 | `tools/assets` の責務。PM 判断で #22 系の子チケット (本 PR では編集しない) |
 | 復号ツールの扱い (`moe.py`) | 本ツールは FL のローカライズ資源の難読化を解くコード。n・鍵・復号結果は保存しない設計だが、EULA の逆アセンブル/複製の制限との関係は未判断 | `docs/LEGAL.md` 側の論点として PM が判断 (LGL 系)。ランタイムには不要なので、問題があれば `moe.py` / `crosscheck.py` の削除で済む |
@@ -210,7 +210,7 @@ DEFECTS.md 追記案: なし (新しい silent miscompile 類型は見つけて�
 
 - 結論: **不在は fail-soft**。`en` の既定でも `en.moe` の探索は走るが、VFS は GetFileAttributesW を `INVALID_FILE_ATTRIBUTES` + `ERROR_FILE_NOT_FOUND`(2) / `ERROR_PATH_NOT_FOUND`(3) で返せば足り、ユーザ側 `Languages\` を空ディレクトリとして作っておく必要はない (§4 の「空ディレクトリ要否」への答え)。
 - 呼出元 0x9de400 は結果を bool (`setne`) としてだけ使う。見つからなければ出力文字列を空にして false を返す。0x9de620 は `xx_YY → xx` の縮約と LC_MESSAGES 系を順に試し、**全滅しても 0x9de810 (フォールバック) → 組込み英語**。
-- 0x758200 には「存在確認の省略」(`[this+0xb8]` の bit2) があるが、0x9de400 の引数との対応は未追跡 (省略されるなら不在でも true になりうる。§8-4)。
+- 0x758200 の「存在確認の省略」(`[this+0xb8]` の bit2) は 0x9de400 経路では無効 (§8-5)。判定は 0x43ba70 / 0x43bb50 の 2 段で、不在なら両方偽。
 
 ### 8-3. 非 en seed (seed 層のみ)
 
@@ -224,8 +224,14 @@ DEFECTS.md 追記案: なし (新しい silent miscompile 類型は見つけて�
 |---|---|---|
 | 受入条件 1: `ja` seed で `/fl/System/Languages/ja.moe` が全量読まれることの e2e | **未達** (boot が `CreateFruityInstance` に未到達) | #590 を開いたまま (依存 #253)。到達後に `assettrace` 系で open() を実測 |
 | 受入条件 3: ネガコン「言語 seed を外すと en 組込みに戻る」の動的確認 | **seed 層のみ** (§8-3)。エンジン側は未達 | 同上 |
-| 0x758200 の bit2 省略が 0x9de400 の呼出で有効か | 未追跡 (有効なら §8-2 の fail-soft 結論が変わりうる) | #590 に残す (boot 到達後の実測で同時に確認) |
-| 受入条件 2 の動的側: shimx/VFS が不在パスで `INVALID_FILE_ATTRIBUTES` + 2/3 を返すことの実測 | 静的な要求仕様のみ確定 (§8-2) | #658 |
+| ~~0x758200 の bit2 省略が 0x9de400 の呼出で有効か~~ | 静的に**無効**と確定 (§8-5)。動的確認は boot 到達後に #590 で同時に行う | #590 |
+| 受入条件 2 の動的側: shimx/VFS が不在パスで `INVALID_FILE_ATTRIBUTES` + 2/3 を返すことの実測 | shimx 側は node e2e で実測済み (`tools/shimx/REPORT.md` §17.1: `test_absent.c` 不在 2/3・実在ネガコン・MT/ST 3 回 PASS)。FL 実行中の実測は未了 | #658 (shimx 側) / #590 (FL 側) |
+
+### 8-5. bit2 の確定 (#658・静的)
+
+`F` = 0x9de400 の vtbl+0x30 の第 5 引数。0x9de48e・0x9de512 が `mov dword [rsp+0x20], 0` で固定 → 0x75b750 が `[rbp+0xb0]` を 0x758330 の第 6 引数へ転送 (0x75b7bd) → 0x758330 の 0x758200 呼出は `this = rbp` (0x7583a1・0x758497) のため `[this+0xb8] = F`。
+
+`test eax,4` (0x75822f) は F=0 で偽 → 省略せず 0x43ba70 (FileExists) → 偽なら 0x43bb50 (ディレクトリとして存在) で判定。**bit2 は 0x9de400 経路では無効**。不在パスは両方偽 (0x43ba70 は GetFileAttributesW=-1 かつ GetLastError∈{2,3,0x7b} で偽)。機械照合は `svc_check.py` 49/49 (機械語 3 件を追加し、ネガコン 2 件を追加して計 8 件検出)。`0x758330` 範囲内の `4889e9488b95a8000000` は 0x758397 の 1 箇所のみ (`0x758490` の `mov rcx,rbp` 後は `[rbp+0xb8]` を `test eax,1` (bit0) で読むため bit2 連鎖ではない。実バイトで確認)。検証: commit `5727ea7` の clean worktree で `e2e.sh` 3 回 = exit 0 ×3 / 所要 **21.59・21.54・21.36 秒** (実行順) / load average (1 分) 開始 0.17・0.56・0.94 → 終了 0.56・0.94・0.96 (同一 runner で shimx 側の作業が並行)。
 
 ## 9. #590 の検証 (実測)
 

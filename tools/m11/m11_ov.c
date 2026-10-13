@@ -98,6 +98,17 @@ static u64 tr_479b10(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64
     return h;
 }
 
+#ifndef M11_OV_CLASSCREATE
+#define M11_OV_CLASSCREATE 0
+#endif
+#if M11_OV_CLASSCREATE
+/* 41c130  `or eax,-1; lock xadd [rcx+8],eax; ret` = TInterfacedObject.AfterConstruction (FRefCount を 1→0 に戻す。NewInstance 41c160 が 1 にしている)。
+ * 410360 ON で [vmt-0x50] 経由の呼出しが現れるが closure 外のため miss (skip) になり FRefCount が 1 のまま残っていた (#595)。戻り値は xadd の旧値 */
+static u64 tr_41c130(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) {
+    u32 old = *(volatile u32*)(uintptr_t)(a0 + 8); *(volatile u32*)(uintptr_t)(a0 + 8) = old - 1; return old;
+}
+#endif
+
 static m11_tr_t disp_find(u32 va) {
     int lo = 0, hi = (int)m11_disp_n - 1;
     while (lo <= hi) {
@@ -116,6 +127,9 @@ static m11_tr_t disp_find(u32 va) {
     case 0x478c70: return tr_478c70;
     case 0x479b00: return tr_479b00;
     case 0x479b10: return tr_479b10;
+#if M11_OV_CLASSCREATE
+    case 0x41c130: return tr_41c130;   /* TInterfacedObject.AfterConstruction (#595) */
+#endif
     }
     return 0;
 }
@@ -480,6 +494,35 @@ unsigned long long function_410320(unsigned long long self, unsigned int alloc) 
     return ICALL_AT(0x41032e, Q(self - 0x30), self, 0, 0, 0, 0, 0, 0, 0);
 }
 
+/* function_47b260  VA 0x47b260  (TList 系 Add: rcx = リスト (rbx), rdx = 追加する値の番地 (rsi); 戻り = 旧 Count)
+ * 逆アセンブル: rdi = [rbx+8] (Count); rax = [rbx] (FItems); cap = [rax-8] (rax≠0); Count = cap なら 47a3e0(rbx, Count+1);
+ *   [rax+rdi*8] = [rsi]; [rbx+8] += 1; [rbx+0x20] ≠ 0 なら call [rbx+0x20](rcx=[rbx+0x18], rdx=rsi, r8b=1).
+ * RetDec は `mov rax,[rbx]` と `mov rcx,[rsi]` の disp=0 deref を 2 点とも落とし, 項目番地を rbx+8*Count (= FItems 欄そのもの)
+ * にして値として rsi (番地) を書いた (DEFECTS D4, #682). 4f9f10 (25 call site の Add 呼出し) から FItems に stack 番地が入る.
+ * notify (`call [rbx+0x20]`, D15) は既定で省略 (M11_NOTIFY_682=1 で有効化。呼出し先 0x535cf0/0x536570 等が closure 外 → miss 化するため。REPORT_682 §7). */
+#ifndef M11_FIX_682
+#define M11_FIX_682 1
+#endif
+#ifndef M11_NOTIFY_682
+#define M11_NOTIFY_682 0
+#endif
+#if M11_FIX_682
+u64 function_47b260(u64 self, void* src, u64 unused) {
+    u64 s = (u64)(uintptr_t)src;
+    u64 cnt = Q(self + 8);
+    u64 items = Q(self);
+    u64 cap = items ? Q(items - 8) : 0;
+    if (cnt == cap) function_47a3e0(self, cnt + 1);
+    items = Q(self);
+    Q(items + cnt * 8) = Q(s);
+    Q(self + 8) = cnt + 1;
+#if M11_NOTIFY_682
+    if (Q(self + 0x20)) ICALL_AT(0x47b2ae, Q(self + 0x20), Q(self + 0x18), s, 1, 0, 0, 0, 0, 0);
+#endif
+    return cnt;
+}
+#endif
+
 /* function_5c0270  VA 0x5c0270  (参照カウント付きキャッシュ node の Release: self = キャッシュ, node = function_5c00e0 の戻り)
  * 逆アセンブル転記 (5c0270..5c0392). node = {+0 next, +8 refcount(dword), +0xc 第 1 qword キー, +0x14 hash(word), +0x18 tid(dword), +0x1c payload}.
  * RetDec は 3 点を落とした (#474):
@@ -571,6 +614,71 @@ unsigned long long function_409470(void* pv, unsigned long long newsize) {
     return rsi;
 }
 
+/* function_414ad0  VA 0x414ad0  (System._LStrSetLength(var s: AnsiString; newLen: Integer))
+ * 逆アセンブル (block00031_PE.bin 0x414ad0..0x414ba9) から転記. rcx = &s (var 引数). 先頭で mov rax,[rbx] の 1 段 deref を要する.
+ * RetDec IR は rcx を文字列ポインタとして扱い, その deref を落とした (DEFECTS.md D4 型). 結果 realloc・長さ書込み・NUL 終端が
+ * スタックアドレスに対して働き, unit #23 (0x467f00) の IntToStr 表構築 (467c40 → 43a7e0 → 43a3f0) で OOB になった. */
+unsigned long long function_414ad0(unsigned long long s, unsigned long long newlen) {
+    int n = (int)(u32)newlen;
+    u64 p, tmp, rdi;
+    if (n <= 0) {
+        function_412d60(s, 0);
+        return 0;
+    }
+    p = Q(s);
+    if (p != 0 && D(p - 8) == 1) {
+        if (D(p - 4) == (u32)n) return 0;
+        tmp = p - 16;
+        u64 sz = (u64)(long long)(n + 1) * 2 + 16;
+        if ((long long)sz <= 0) function_40f560(s, 0);
+        function_409470((void*)(uintptr_t)&tmp, sz);
+        D(tmp + 0xc) = (u32)n;
+        Q(s) = tmp + 0x10;
+        u64 pc = function_414850(Q(s));
+        *(unsigned short*)(uintptr_t)(pc + (u64)(long long)n * 2) = 0;
+        return 0;
+    }
+    rdi = function_412c20((u64)(u32)n);
+    p = Q(s);
+    if (p != 0) {
+        int m = (int)D(p - 4);
+        if (m > n) m = n;
+        u64 pc = function_414850(Q(s));
+        function_409c80(pc, rdi, (u64)(long long)(m * 2));
+        function_412d60(s, 0);
+    }
+    Q(s) = rdi;
+    return 0;
+}
+
+/* function_43a3f0  VA 0x43a3f0  (System: 整数 → 10 進文字列の書込み; 符号 '-' 任意)
+ * 逆アセンブル (0x43a3f0..0x43a4ea) から転記. rcx = &s (var string), edx = 絶対値 (u32), r8b = 負符号フラグ.
+ * 414ad0 で桁数+符号ぶん確保した後, `mov r8,[rbx]` (= *s) の 1 段 deref を RetDec IR が落とし, r8 = &s として '-' と桁を書いた (DEFECTS.md D4 型).
+ * その結果 a[0] 自身 (= 文字列変数) が文字列の中身で上書きされ, 467c40 の IntToStr 表構築で次の反復に OOB となった. */
+unsigned long long function_43a3f0(unsigned long long s, unsigned long long value, unsigned long long sign) {
+    u32 v = (u32)value;
+    u8 sb = (u8)sign;
+    int nd;
+    if (v < 10000u) nd = v < 100u ? 1 + (v >= 10u) : 3 + (v >= 1000u);
+    else if (v < 1000000u) nd = 5 + (v >= 100000u);
+    else if (v < 100000000u) nd = 7 + (v >= 10000000u);
+    else nd = 9 + (v >= 1000000000u);
+    function_414ad0(s, (u64)(u32)(nd + sb));
+    u64 r8 = Q(s);
+    *(unsigned short*)(uintptr_t)r8 = 0x2d;
+    r8 += (u64)(long long)(signed char)sb * 2;
+    while (nd > 1) {
+        u32 q = v / 100u;
+        u32 rem = v - q * 100u;
+        nd -= 2;
+        u32 pair = (u32)('0' + rem / 10u) | ((u32)('0' + rem % 10u) << 16);
+        *(u32*)(uintptr_t)(r8 + (u64)(long long)nd * 2) = pair;
+        v = q;
+    }
+    if (nd != 0) *(unsigned short*)(uintptr_t)r8 = (unsigned short)(v | 0x30u);
+    return s;
+}
+
 /* function_417b70  VA 0x417b70  (System.DynArraySetLength(var a: Pointer; ti: PDynArrayTypeInfo; dimCnt: NativeInt; lengths: PNativeInt))
  * RetDec は `mov rax,[rbp+0xb0]; mov rax,[rax]` (= *a) と `mov rax,[rbp+0xc8]; mov rax,[rax]` (= *lengths) の
  * 1 段 deref を 2 箇所とも落とし, lengths (スタックアドレス) を配列長, a を配列本体として扱った.
@@ -660,6 +768,26 @@ unsigned long long function_410360(unsigned long long inst) {
     m11_vcall(0x41037d, Q(Q(inst) - 0x50), inst);
     return inst;
 }
+
+/* function_413060  VA 0x413060  (System._UStrFromPWCharLen 系: dest: PPointer, src: PWideChar, len: Integer) (#595)
+ * 逆アセンブル: `old := [rbx]` を stack に退避 → len>0 なら [rbx] := 412c20(len), src があれば 409c80(src, new, len*2) / len<=0 なら [rbx] := 0 → 最後に 412d60(&old) で旧文字列を解放。
+ * RetDec は `mov rax,[rbx]` の deref を落とし (D4), stack に dest のアドレス自体を入れた。412d60 がそれを文字列ポインタと見て dest-0x10+8 = dest-8 を refcount として減算するため,
+ * dest = オブジェクト +8 の文字列フィールド (448ee0 → 41c820 → 413060 の経路) では オブジェクト先頭 dword (VMT ポインタの下位) が 1 減り, 410360 が壊れた VMT から [vmt-0x50] を引いた。
+ * 戻り値: 元実装は 412d60 の戻り値 = stack 上の old のアドレス (関数終了後は無効) を返す。C でそれを返すと無効な番地になるため dest を返す。
+ * 呼出し側が戻り値を読むかは未検証 (REPORT_595 §2.2)。 */
+unsigned long long function_413060(unsigned long long dest, void* src, unsigned long long len) {
+    u64 old = Q(dest);
+    int n = (int)len;
+    if (n > 0) {
+        u64 p = function_412c20(len & 0xffffffffull);
+        Q(dest) = p;
+        if (src) function_409c80((u64)(uintptr_t)src, p, (u64)(long long)(int)((unsigned)n * 2u));
+    } else {
+        Q(dest) = 0;
+    }
+    function_412d60((u64)(uintptr_t)&old, 0);
+    return dest;
+}
 #endif /* M11_OV_CLASSCREATE */
 
 /* ---- #483: TDictionary<K,V> (Generics.Collections) の Add/GetItem が全て「重複キー」と誤判定される原因 3 点の C 転記 ----
@@ -738,6 +866,12 @@ u64 function_8cbde0(u64 self, u64 key) {
         return 0;
     }
     return Q(Q(self + 8) + (u64)idx * 24 + 0x10);
+}
+
+/* function_8c7710  VA 0x8c7710  (GetItem の呼出し口: 辞書 = [self+0x410], key = [obj] (obj の VMT = TClass))
+ *   機械語 `mov rax,[rbp+0x30]; mov rax,[rax]; ... call 8cbde0` の 1 段 deref (key = [arg2]) が IR で脱落し arg2 がそのまま渡っていた (D4 型, #662) */
+u64 function_8c7710(u64 self, u64 obj) {
+    return function_8cbde0(Q(self + 0x410), Q(obj));
 }
 
 /* function_478420  VA 0x478420  (IEqualityComparer getter: tkInteger / tkEnumeration; OrdType (byte [info+1+nameLen+1]) で static 実体を選ぶ)
@@ -882,5 +1016,49 @@ unsigned long long function_416db0(unsigned long long dest, unsigned long long s
         }
         dest += step; src += step;
     } while (--count);
+    return 0;
+}
+
+/* function_467c40  VA 0x467c40  (System.SysUtils 系 unit 0x467f00 の初期化: VarBstrFromBool 経由の TrueBoolStrs/FalseBoolStrs 初期化)
+ * RetDec は `mov rax,[rip+0x15e3af0]; call [rax]` (.data の関数ポインタ変数 → .bss 0x15f10e0 の VarBstrFromBool 実体) を 2 箇所とも落とし
+ * (D15 型: 0x467cc9 / 0x467d5d), 戻り値 (HRESULT) の代わりに slot ポインタの下位 32bit を 45a640 に渡して例外 0xEEDFADE → Halt0 に進んでいた.
+ * 0x15f10e0 は 457c70 が GetProcAddress(oleaut32,"VarBstrFromBool") で埋める (wasm では 0 → fallback 0x457860, closure の boot5).
+ * 機械語 0x467c40〜0x467e28 と 1 命令ずつ突合 (stack slot: a[i] = rbp+0x28+8*i (i=0..8, 467e10 で _LStrArrayClr 相当に 9 本まとめて解放), s78 = rbp+0x78). */
+unsigned long long function_467c40(void) {
+    u64 a[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+    u64 s78 = 0;
+    u64 slot = Q(R(0x11e3af0));
+    if (Q(slot) != 0) {
+        function_412e00(&s78);
+        u64 r = ICALL_AT(0x467cc9, Q(Q(R(0x11e3af0))), 0, 0x400, 0, (u64)(uintptr_t)&s78, 0, 0, 0, 0);
+        function_45a640((u32)r, 0xb, 8);
+        function_4149b0((void*)(uintptr_t)R(0x11f1118), s78);
+        function_4149b0(&a[7], s78);                   /* rbp+0x60 */
+        function_439930(&a[8], a[7]);                  /* rbp+0x68 */
+        function_4133f0(R(0x11f1120), a[8]);
+        function_4149b0(&a[5], s78);                   /* rbp+0x50 */
+        function_4398f0(&a[6], a[5]);                  /* rbp+0x58 */
+        function_4133f0(R(0x11f1128), a[6]);
+        function_412e00(&s78);
+        r = ICALL_AT(0x467d5d, Q(Q(R(0x11e3af0))), 0xffffffffull, 0x400, 0, (u64)(uintptr_t)&s78, 0, 0, 0, 0);
+        function_45a640((u32)r, 0xb, 8);
+        function_4149b0((void*)(uintptr_t)R(0x11f1130), s78);
+        function_4149b0(&a[3], s78);                   /* rbp+0x40 */
+        function_439930(&a[4], a[3]);                  /* rbp+0x48 */
+        function_4133f0(R(0x11f1138), a[4]);
+        function_4149b0(&a[1], s78);                   /* rbp+0x30 */
+        function_4398f0(&a[2], a[1]);                  /* rbp+0x38 */
+        function_4133f0(R(0x11f1140), a[2]);
+        u32 ebx = 0xffffff80u;
+        u64 rsi = R(0x11f1148);
+        do {
+            function_43a7e0(&a[0], ebx, 0, 0);
+            function_4133f0(rsi, a[0]);
+            ebx++;
+            rsi += 8;
+        } while (ebx != 0x100u);
+    }
+    function_412e40((u64)(uintptr_t)&a[0], 9);
+    function_412e00(&s78);
     return 0;
 }
