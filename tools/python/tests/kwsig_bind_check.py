@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """kwlist 全 103 関数の kw 束縛の誤束縛 0 検証 (PY-15 #653)。wasm 不要 (偽 _flhost で fl_api.bind を直接検証)。
-  python3 tests/kwsig_bind_check.py [--src DIR]    (DIR 省略時は src/。ネガコン: --src <main の src のコピー>)
+  python3 tests/kwsig_bind_check.py [--src DIR] [--dump FILE]    (DIR 省略時は src/。ネガコン: --src <main の src のコピー>。
+  --dump は全ケースの結果を JSON Lines で書く。旧新比較は tests/kwsig_behavior_diff.py)
 
 各 kwlist 関数について、positional 個数 k (0..max) と kw 名の全部分集合 S を試す。値は識別子付き
 (positional = 100000+i、kw = 200000+(その名前の最初の位置)) なので、受け取った tuple の各位置の値の出所が分かる。
@@ -27,6 +28,7 @@ ROOT = os.path.join(HERE, "..")
 ap = argparse.ArgumentParser()
 ap.add_argument("--src", default=os.path.join(ROOT, "src"))
 ap.add_argument("--table", default=os.path.join(ROOT, "analysis/flapi/flapi_table.json"))
+ap.add_argument("--dump", default=None, help="全ケースの結果を JSON Lines で書く (kwsig_behavior_diff.py の入力)")
 args_ns = ap.parse_args()
 
 calls = []
@@ -118,6 +120,7 @@ def misbound(KL, D, k, av):
 
 stats = dict(functions=0, cases=0, expect_tuple=0, expect_typeerror=0, ok=0, misbind=0, mismatch=0)
 bad = []
+dump = []
 for m, fs in t["modules"].items():
     for n, e in fs.items():
         ks = e.get("kwsig") or {}
@@ -134,6 +137,7 @@ for m, fs in t["modules"].items():
                     K = {s: KW0 + KL.index(s) for s in S}
                     ek, ev = expected(KL, req, D, k, K)
                     ak, av = actual(f, pos, K)
+                    dump.append([m, n, k, list(S), ak, av])
                     stats["cases"] += 1
                     stats["expect_tuple" if ek == "tuple" else "expect_typeerror"] += 1
                     if (ek, ev) == (ak, av):
@@ -147,10 +151,15 @@ for m, fs in t["modules"].items():
                         bad.append((kind, f"{m}.{n}", k, S, ek, ev, ak, av))
             ek, ev = expected(KL, req, D, k, {"__unknown__": KW0})
             ak, av = actual(f, pos, {"__unknown__": KW0})
+            dump.append([m, n, k, ["__unknown__"], ak, av])
             stats["cases"] += 1
             stats["expect_typeerror"] += 1
             stats["ok" if (ek, ev) == (ak, av) else "mismatch"] += 1
 
+if args_ns.dump:
+    with open(args_ns.dump, "w", encoding="utf-8") as fo:
+        for r in dump:
+            fo.write(json.dumps(r, ensure_ascii=False) + "\n")
 print(json.dumps(stats, ensure_ascii=False))
 for b in bad:
     print("FAIL", b)
