@@ -152,6 +152,7 @@ export class GuiHost {
       case "ptrlock": if (m.on) { this.lockRequests++; void Promise.resolve(this.canvas.requestPointerLock?.()).catch(() => {}); } else if (document.pointerLockElement === this.canvas) document.exitPointerLock(); break;
       case "imepos": this.imeAt = [m.x, m.y]; this.ime.style.left = `${m.x}px`; this.ime.style.top = `${m.y}px`; break;
       case "cliprect": this.clip = m.r > m.l && m.b > m.t ? [m.l, m.t, m.r, m.b] : null; break;
+      case "touchwin": this.canvas.style.touchAction = m.n > 0 ? "none" : "auto"; break;
       case "exit": this.exitCode = m.code; this.exitResolve?.(m.code); break;
       case "readback": {
         const cb = this.readbacks.get(m.id);
@@ -234,7 +235,6 @@ export class GuiHost {
   private sendLayout(code: number): void { this.pushIn(IN.LAYOUT, 0, 0, 0, code, 0); }
   private bindInput(): void {
     const c = this.canvas;
-    c.style.touchAction = "none";
     c.addEventListener("pointermove", (e) => {
       if (e.pointerType === "touch") { const [x, y] = this.pos(e); this.pushIn(IN.TOUCH, 0, x, y, (e.pointerId & 0xff) | (1 << 8) | (e.isPrimary ? 1 << 12 : 0), (Math.round(e.width) & 0xffff) | ((Math.round(e.height) & 0xffff) << 16)); return; }
       const [x, y] = this.locked ? this.lockedMove(e) : this.pos(e);
@@ -317,6 +317,7 @@ type WorkerMsg =
   | { type: "ptrlock"; on: boolean }
   | { type: "imepos"; surf: number; x: number; y: number }
   | { type: "cliprect"; l: number; t: number; r: number; b: number }
+  | { type: "touchwin"; n: number }
   | { type: "exit"; code: number }
   | { type: "readback"; id: number; width: number; height: number; data: ArrayBuffer }
   | { type: "bench"; id: number; width: number; height: number; iters: number; convertMs: number; convertPutMs: number };

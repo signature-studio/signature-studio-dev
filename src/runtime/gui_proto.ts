@@ -48,7 +48,7 @@ export const IN = {
 
 export const CMD = {
   SURF_CREATE: 1, SURF_DESTROY: 2, SURF_CHANGE: 3, PRESENT: 4, FRAME_END: 5, SET_TITLE: 6, SET_CURSOR: 7, LOG: 8, EXIT: 9,
-  POINTER_LOCK: 10, IME_POS: 11, CLIP_RECT: 12,
+  POINTER_LOCK: 10, IME_POS: 11, CLIP_RECT: 12, TOUCH_WINDOWS: 13,
 } as const;
 
 export const MOD = { SHIFT: 1, CTRL: 2, ALT: 4, META: 8 } as const;

@@ -40,7 +40,8 @@ try {
   await page.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
   await page.send("Page.bringToFront");
   await page.goto(`http://127.0.0.1:${port}/`);
-  const boot = await page.waitForExpr("window.__ready && window.__ready.then ? (window.__bootDone ||= (window.__ready.then((v)=>{window.__bootVal=v;}), false)) || window.__bootVal : false", 30000).catch(() => null);
+  // 副作用が目的: window.__ready の完了時に __bootVal を仕掛ける (削除すると下の waitForExpr が timeout する)
+  await page.waitForExpr("window.__ready && window.__ready.then ? (window.__bootDone ||= (window.__ready.then((v)=>{window.__bootVal=v;}), false)) || window.__bootVal : false", 30000).catch(() => null);
   const bootVal = await page.waitForExpr("window.__bootVal", 30000);
   ck("crossOriginIsolated + SAB wasm memory", bootVal.crossOriginIsolated === true && bootVal.sab === true);
   const logs = () => page.evaluate("window.__g6.host.logs.filter((l)=>l.startsWith('G6 '))", { awaitPromise: false });
@@ -96,7 +97,7 @@ try {
   ck("IME: compositionstart/update → START + COMPOSITION(GCS_COMPSTR) 'かんじ'", compOk, comp.join(" | "));
   const charsBefore = (await logs()).filter((x) => x.startsWith("G6 CHAR")).length;
   await page.send("Input.insertText", { text: "漢字" });
-  const fin = await waitLog("G6 IME", 2, 4000);
+  const fin = await waitLog("G6 IME", 3, 4000);   // COMP(n=2) + RESULT + END
   ck("IME: commit → COMPOSITION(GCS_RESULTSTR) '漢字' + END", fin.some((x) => x.startsWith("G6 IME RESULT n=2 u=6f225b57")) && fin.includes("G6 IME END"), fin.join(" | "));
   const wmChar = (await logs()).filter((x) => x.startsWith("G6 CHAR")).length - charsBefore;
   ck("IME: no WM_CHAR synthesized for composed text (WM_CHAR delta across the composition)", wmChar === 0, `WM_CHAR delta ${wmChar}`);
@@ -104,7 +105,7 @@ try {
   await waitLog("G6 IME", 2);   // START + COMP
   await page.send("Input.imeSetComposition", { text: "", selectionStart: 0, selectionEnd: 0 });   // 変換中文字列を空にして取消
   await page.evaluate("window.__g6.host.ime.dispatchEvent(new CompositionEvent('compositionend', { data: '' }))", { awaitPromise: false });   // ブラウザが end を出さない実装向けの保険 (二重 END は shim が無視)
-  const canc = await waitLog("G6 IME", 1, 3000);
+  const canc = await waitLog("G6 IME", 2, 3000);   // COMP(n=0) + END
   const allImeAfter = (await logs()).slice(-4);
   ck("IME: cancel → exactly one END and no empty RESULT (duplicate cancel ignored by shim)", canc.filter((x) => x === "G6 IME END").length <= 1 && !allImeAfter.some((x) => x.startsWith("G6 IME RESULT n=0")) && (await logs()).filter((x) => x === "G6 IME END").length === 2, `ENDs total=${(await logs()).filter((x) => x === "G6 IME END").length} tail=${allImeAfter.join(" | ")}`);
 
@@ -143,6 +144,8 @@ try {
 
   // ---- 6) 入力リング drop 0 ----
   const st = await page.evaluate("(() => { const v = window.__g6.host.view; return { pushed: v.u32[33 - 1], dropped: v.u32[33], consumed: v.u32[34] }; })()", { awaitPromise: false });
+  const ta = await page.evaluate("window.__g6.host.canvas.style.touchAction", { awaitPromise: false });
+  ck("touch-action: RegisterTouchWindow 済みのときだけ canvas が none (TOUCH_WINDOWS 経由)", ta === "none", `touchAction=${JSON.stringify(ta)}`);
   ck("input ring: drop 0, all pushed consumed", st.dropped === 0 && st.pushed === st.consumed, `in_pushed=${st.pushed} in_dropped=${st.dropped} in_consumed=${st.consumed}`);
   ck("no page errors", (await page.evaluate("window.__g6.errors.length", { awaitPromise: false })) === 0 && page.exceptions.length === 0, page.exceptions.join("|"));
 } catch (e) {
