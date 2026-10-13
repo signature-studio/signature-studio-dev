@@ -17,6 +17,11 @@ python3 "$HERE/golden/gen_golden.py"
 if [ "${SKIP_NATIVE:-0}" != "1" ]; then
   echo "[gui-e2e] 1/6 native 単体テスト (ASan/UBSan)"; bash "$HERE/test/selftest.sh" | tail -2
   echo "[gui-e2e] 1b/6 GUI-5 各 bpp シーン (独立 Python オラクル golden/gen_golden_bpp.py と画素完全一致 + ネガコン 2 本)"; bash "$HERE/test/bpp_golden.sh" | tail -4
+  echo "[gui-e2e] 1c0/6 GUI-9 FreeType テキスト (native FreeType 直叩きの独立オラクルと画素/metrics 完全一致 + ネガコン 4 本 / engine の native==wasm32)"
+  FTLIB="$HERE/../shared/work/build/freetype/native/src/objs/.libs/libfreetype.a"
+  bash "$HERE/test/fetch_fonts.sh" | tail -1
+  [ -f "$FTLIB" ] || FONT="$HERE/work/OpenSans-Regular.ttf" bash "$HERE/../shared/oss/freetype/build.sh" | tail -3
+  bash "$HERE/test/text_golden.sh" | tail -7; bash "$HERE/test/ft_wasm.sh" | tail -2
   echo "[gui-e2e] 1d/6 GUI-7 popup/tooltip surface・NC 領域・無効領域複数矩形・DPI (独立 Python オラクル golden/gen_golden_nc.py と画素完全一致 + ネガコン 3 本)"; bash "$HERE/test/nc_golden.sh" | tail -6
   echo "[gui-e2e] 2/6 native lift 実行 (PE->RetDec->gcc, headless host, golden)"; bash "$HERE/test/native_e2e.sh" 2>&1 | grep -E "native_run|\[post\]"
   echo "[gui-e2e] 2b/6 結合準備 native (到達 API ログ / wasm32 署名 adapter / ハンドル 31bit / 改名 selftest; CAB-156)"; bash "$HERE/test/reach_test.sh" 2>&1 | grep -E "passed|FAIL"

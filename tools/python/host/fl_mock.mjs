@@ -26,6 +26,7 @@ export function createMockEngine() {
     windows: { 0: true, 1: false, 2: true, 3: false, 4: true, 5: false },
     params: [{ name: "Cutoff", v: 0.5 }, { name: "Resonance", v: 0.2 }, { name: "Gain", v: 0.8 }],
     prScripts: {},
+    midiOut: [],
     log: [],
   };
   const ch = (i) => { if (!st.channels[i]) throw RANGE(); return st.channels[i]; };
@@ -88,6 +89,12 @@ export function createMockEngine() {
     "plugins.getParamValue": (p) => F(st.params[p].v),
     "plugins.getParamValueString": (p) => `${(st.params[p].v * 100).toFixed(1)} %`,
     "plugins.setParamValue": (v, p) => { st.params[p].v = v; },
+    // MIDI scripting (PY-6): device script が使う device.* の最小模擬。forwardMIDICC / midiOutMsg は呼出しを st.midiOut に記録する
+    "device.getPortNumber": () => st.devicePort ?? 0,
+    "device.isAssigned": () => true,
+    "device.setHasMeters": () => { st.hasMeters = true; },
+    "device.forwardMIDICC": (message, mode = 1) => { st.midiOut.push({ api: "forwardMIDICC", message, mode }); },
+    "device.midiOutMsg": (...a) => { st.midiOut.push({ api: "midiOutMsg", args: a }); },
     "ilmcp.getBrowserNames": (name, rec) => ({ name, items: ["Fruity Slicer", "3x Osc", "Sampler"].map((n) => `${name || ""}/${n}`) }),
     "ilmcp.getHighlightNames": () => ["Toolbar: Show Piano roll", "Toolbar: Show playlist", "Toolbar: Show Mixer", "Toolbar: Show Channel Rack"],
     "ilmcp.showHighlight": (item, name, caption, cb) => { st.highlight = { item, name, caption, cb }; return true; },

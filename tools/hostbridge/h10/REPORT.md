@@ -93,7 +93,7 @@ reader が読む id の表は上のとおり (`h10_check.py` が dispatch tree �
 | `nfo/FORMAT.md` §8 | 先頭 u32 8 = **format version** (許容 5–12、Wrapper 自身の writer = 12、DB の FL 11.5.5 writer = 8)。record 1/30/31/32/53/57 の欠落時既定、57 の意味を追記 (本 PR で更新) |
 | `nfo/FORMAT.md` §9・`nfo/REPORT.md` §6-2/3 | 未確認から解消へ (本 PR で更新、本文は複製せず本書へリンク) |
 | `tools/flp` `parseWrapperData` | `kind (8 = VST2, 10 = VST3)` は誤り (VST3 の実機 OTT.fst も 8)。`id 50` を必須とする点も Wrapper と異なる (Wrapper は欠落を class 0 とする)。修正は未実施 (#110 にコメント) |
-| 生成器 (`nfo/src/fst.ts`) | **変更不要**。version 8・ANSI は FL 11.5.5 writer と同一 |
+| 生成器 (`nfo/src/fst.ts`) | ASCII の出力は**変更なし** (version 8・ANSI は FL 11.5.5 writer と同一)。非 ASCII の扱いは #549 で追加 (§9) |
 
 ## 6. 検証
 
@@ -144,7 +144,7 @@ reader が読む id の表は上のとおり (`h10_check.py` が dispatch tree �
 | FL 側 msg 7 handler の特定 (`fle:0x915750` の呼出元 `0x12b9e70` / `0x13173a0`、後者 (71,339 B) は decompile が timeout (120 s)) と、Wrapper 問い合わせ書式 (§4-B) が生成 DB を引けるかの実行検証 | 「起動できる」の最終確認 (段 B) | (a) #267 [HB-H4d] にコメント |
 | `tools/flp` の `kind` 呼称・id 50 必須・id 57/58 の扱い | 実データ解析で誤ラベル | (a) #110 [L-7] にコメント |
 | `block23676` (Wrapper 別ビルド) の Ghidra 解析と差分の意味 | 本解析は PE バイト検査のみ | (a) #94 [HB-H4] にコメント |
-| version 8 は ANSI: 非 ASCII の plugin 名/パスは `CP_ACP` 依存 | wasm 側 shim の codepage 選択 | (b) 新規子チケット #549 [HB-H14] |
+| version 8 は ANSI: 非 ASCII の plugin 名/パスは `CP_ACP` 依存 | **#549 で解決 (§9)**: version 8 は ASCII 限定を生成器で強制、非 ASCII は version 9–12 (UTF-8) を opt-in | 解決済 (残件は §9 末尾) |
 | record 2 の個別 option bit の名前 (binary 由来の特定) | option を生成器から指定したい場合のみ | (c) 親 #99 への提案 (現状は 0x400000 で既定任せ) |
 
 ## 8. 次タスク提案
@@ -153,3 +153,30 @@ reader が読む id の表は上のとおり (`h10_check.py` が dispatch tree �
 |---|---|---|
 | 1 | #267 [HB-H4d] | boot 貫通後、生成 DB を FL 実物 reader と Wrapper の msg 7 経路で引かせる (本書 §4-B の書式を入力に使える) |
 | 2 | [HB-H4] #94 | Wrapper lift 時に factory (`fw:0x87c980`) と export 事前検査の PE スタブ要件を本書 §3-② で確定済みとして扱う |
+
+## 9. 非 ASCII の名前/パス: version 8 (ANSI = CP_ACP) と shimx の整合 (#549 / [HB-H14])
+
+既知類型との関係 (`docs/DEFECTS.md`): 該当なし (文字コード方針の確定。lift・IR pass は使っていない)。
+
+**結論: (a) を既定にする。version 8 の chunk は ASCII のみ (生成器が非 ASCII を例外で拒否)、非 ASCII が要る時だけ version 9–12 (UTF-8) を明示 opt-in (`chunkVersion` / `gen.ts --chunk-version`)。** 理由: version 8 の文字列は Wrapper が `CP_ACP` で読むため、生成時に reader 側の ACP を知る手段が無い (下表: shimx 既定 1252 では CP932 のバイト列が文字化けする)。version 9–12 は `CP_ACP` に依存しない。
+
+| 項目 | 実測 (コミット済み HEAD) |
+|---|---|
+| shimx の `CP_ACP` 既定 | **1252** (`tools/shimx/src/str.c` の `g_acp = 1252`)。実 `str.c` を emcc ビルドした probe (`analysis/shimx_acp_probe.c`) の `GetACP()` = 1252。`shimx_set_acp(932)` 後のみ 932 (`GetACP()` = 932)。`shimx_set_acp` の**ランタイム呼出元は無い** (shimx 外の ts/mjs/js/c/h に実行時の呼出なし)。clean worktree (`065e825`、本 REPORT 自身を除く) の `git grep -n shimx_set_acp` は **14 件 / 11 ファイル**: shimx 側 9 件 = `shimx.h:1141` (宣言)・`str.c:2,13` (コメントと定義)・`exports.txt:568`・`README.md:35`・`inventory.md:76`・`REPORT_SHX-T8.md:34`・`test/test_shord.inc:140,150`、h10 側 5 件 (本 PR 追加) = `analysis/shimx_acp_probe.c:3,13`・`analysis/neg_nonascii.sh:53`・`src/wrapper_reader.ts:75`・`test/nonascii.test.ts:51`。実際に**呼ぶ**のは `tools/shimx/test/test_shord.inc` のユニットテスト (140: 932、150: 1252) と、計測専用の `analysis/shimx_acp_probe.c:13` (本 PR 追加) だけで、ランタイム経路では呼ばれない → wasm ランタイムは現状 1252 固定 |
+| 対応 codepage | 1252 / 437・850 (近似) / 28591 / 20127 / 65001 / **932** (SHX-T8、`REPORT_SHX-T8.md` §15.3)。936・949・950 等は `ERROR_INVALID_PARAMETER` |
+| shimx 実出力 ↔ reader 模型 | 6 ベクタ (日本語パス・日本語名・カタカナ・半角カナ・`表` の trail byte = 0x5C・`Café`) × ACP 2 通り (1252・932) = **12 件で shimx `MultiByteToWideChar(CP_ACP)` の UTF-16 と `wrapper_reader.ts` の復号が全件一致、不一致 0**。入力バイト列は Python 標準 codec (`cp932`/`cp1252`、shimx の表と独立実装) 由来 |
+| version 8 + CP932 バイト | ACP 932 で原文に復元、**shimx 既定 1252 では復元しない** (例 `93fa967b` → `“ú–{` 相当。ネガコン) |
+| version 9–12 + UTF-8 | version 9・10・11・12 の各々で ACP 1252・932 の双方 `name`/`path`/`vendor` が原文一致。同じ UTF-8 バイトを version 8 に書き換えると復元しない (ネガコン) |
+| 生成器 | version 8 (既定) で `record 54/55/56/58` に非 ASCII → `throws` (どの record かを例外文に含む)。`version` は 8–12 のみ (範囲外 `throws`)。ASCII 入力の出力は従来と同一 (既存 test 全 PASS、`nfo_e2e.sh` 回帰なし) |
+
+**定義**: ベクタ = `test/nonascii.test.ts` の `V`。「一致」= probe の UTF-16LE 文字列と模型 `TextDecoder` の復号が `===`。模型の `windows-1252`/`shift_jis` は WHATWG 実装 (shimx の表と独立)。
+
+**検証・ネガコン**: `bash h10_e2e.sh` が probe を emcc でビルドして `test/nonascii.test.ts` (7 件) を走らせ、さらに `analysis/neg_nonascii.sh` が**複製に 1 箇所ずつ変異を入れて FAIL を確認** (対照: 無変異複製が PASS) — 生成器の ASCII ガード除去 / version 範囲の開放 / UTF-8 を latin1 で出力 / reader の v9 UTF-8 判定の無効化 / reader の ACP 無視 / shimx 既定 ACP を 932 に / `shimx_set_acp` を無効化、の **7 / 7 検出**。検出されないと e2e は非 0 で終わる。
+
+**実測 (検証起点 commit `9197a1c`、`$RUNNER_TEMP` の detached clean worktree、4 コア runner、fl-win64 + toolchain-emsdk 展開済み、並列数 1)**: `bash h10_e2e.sh` n = 3 → exit 0 × 3、wall **77.40–77.55 s** (77.40 / 77.55 / 77.54)、load average (1/5/15 分) 開始 0.46 0.34 0.16 → 終了 1.21 0.81 0.40。内訳は各回: PE 検査 62 PASS / 0 FAIL、FLEngine 15 / 0、evidence 19 / 0 (§6 と同値)、reader 模型 + 非 ASCII test **tests 17 / pass 17 / fail 0 / skipped 0** (§6 の 10 件 + 本件 7 件)、`neg_nonascii.sh` 7/7 検出 + 対照 PASS。`nfo` 側: typecheck エラー 0、`node --test test/*.test.ts` tests 40 / pass 36 / fail 0 / skipped 4 (skipped = 実機素材 `HAVE_FL` 無しの既存 4 件)、`SKIP_H4=1 bash nfo_e2e.sh` exit 0 (生成 5 entry・12 files・readerAccepted 5、回帰なし)。範囲外: FL 実機/FLEngine 上での version 9–12 chunk 受理 (上表の未解決 1 行目)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| FL 自身の reader (`fle:0xf46490`) が version 9–12 の chunk を受理するか (Wrapper は 5–12 を受理 [確])。FL は 213 を不透明な塊として Wrapper へ渡すと推定だが**未確認** | version 9–12 の opt-in を実機 FL で使う前に必要。既定 (version 8・ASCII) には影響なし | (a) #267 [HB-H4d] にコメント (boot 貫通後に実行検証) |
+| wasm ランタイムが `shimx_set_acp` を呼ぶ箇所が無い (ACP = 1252 固定)。非 ASCII の `.nfo`/`.Plugins.ini` は UTF-8 BOM (`valuefile.ts`) で別系統 | 非 ASCII の plugin を載せる時は version 9–12 が必須。ユーザ名等が日本語の**実機パス**を DB に入れる要件が出た場合の仮想 FS 側の扱いは別論点 | (c) 親 #99 への提案 (非 ASCII パスは現 spec 範囲外と明記) |
+| Wrapper の他の ANSI 文字列 (plugin 名の UI 表示等、chunk 外) の `CP_ACP` 利用 | 本件は chunk の 4 record のみ | (c) 親 #99 への提案 |

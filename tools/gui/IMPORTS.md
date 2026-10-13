@@ -370,7 +370,7 @@ GUI 系 DLL (user32.dll, gdi32.dll, comctl32.dll, comdlg32.dll, opengl32.dll, ux
 | CreatePatternBrush | gdi32 | dc-state | 2 | STUB |
 | CreatePenIndirect | gdi32 | dc-state | 2 | STUB |
 | CreatePolygonRgn | gdi32 | clip/region | 2 | STUB |
-| EnumFontFamiliesExW | gdi32 | text/font | 2 | STUB |
+| EnumFontFamiliesExW | gdi32 | text/font | 2 | IMPL |
 | EnumFontsW | gdi32 | text/font | 2 | STUB |
 | FrameRgn | gdi32 | clip/region | 2 | STUB |
 | GetCurrentObject | gdi32 | dc-state | 2 | IMPL |

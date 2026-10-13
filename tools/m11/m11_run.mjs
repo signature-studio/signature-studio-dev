@@ -10,6 +10,9 @@ const mod = await (m2.default ? m2.default({ printErr: (s) => { lines.push(Strin
 const img = fs.readFileSync(M11 + '/work/m11_image.bin');
 mod.HEAPU8.set(img, 0);
 if (process.env.M11_TRACE === '1') mod._m11_set_trace(1);
+if (process.env.M11_VFREE_NOOP === '1') mod._m11_set_vfree_noop(1);   // NC (#513): VirtualFree を実解放しない旧挙動
+if (process.env.M11_VA_STACK_AT) mod._m11_set_va_stack_at(Number(process.env.M11_VA_STACK_AT));   // #513: N (>=1; 0 = 無効) 番目 (0 起算) の VirtualAlloc の呼出元スタックを出す
+if (process.env.M11_VA_BIGTRACE === '1') mod._m11_set_va_bigtrace(1);   // #513: 64MB 以上の VirtualAlloc の呼出元 wasm スタックを stderr に出す
 let rc, threw = null, dllmain_done = false;
 try {
   rc = mod._m11_boot_enter(0n, 1n);
@@ -36,6 +39,8 @@ console.log('M11_RESULT ' + JSON.stringify({
   init_count: num(mod._m11_init_count),
   va_used: num(mod._m11_va_used),
   va_calls: num(mod._m11_va_calls),
+  va_live: num(mod._m11_va_live), va_peak: num(mod._m11_va_peak), va_oom: num(mod._m11_va_oom),
+  va_freed: num(mod._m11_va_freed), va_free_unknown: num(mod._m11_va_free_unknown), va_big: num(mod._m11_va_big),
   icall_ok: num(mod._m11_icall_ok),
   icall_miss: num(mod._m11_icall_miss),
   icall_miss_uniq: num(mod._m11_icall_miss_uniq),
