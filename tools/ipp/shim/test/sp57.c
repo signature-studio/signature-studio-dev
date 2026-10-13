@@ -5,6 +5,7 @@
    usage: ./sp57 > sp57.log */
 #define _GNU_SOURCE
 #include "../../ref/pe_load.h"
+#include "fl_dll_path.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -31,7 +32,7 @@ static void run1(F_RSP rsp, int it, double fx, double fy, double sx, double sy, 
 
 int main(void) {
   setvbuf(stdout, NULL, _IONBF, 0);
-  if (pe_load("/home/ubuntu/work/analysis/win64/extracted/block24356_PE.bin", &pe)) return 1;
+  if (pe_load(fl_ipp_dll_path(), &pe)) return 1;
   ((F_SetCpu)ex("ippSetCpuFeatures"))(~0ULL);
   F_RSP rsp = (F_RSP)ex("ippiResizeSqrPixel_8u_C1R");
   memset(src, 0, sizeof src);

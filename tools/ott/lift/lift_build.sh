@@ -3,11 +3,12 @@
 #   env: LIFT_ENTRIES (default work/entries.json), LIFT_OUT (default work/lift), LIFT_CLOSURE (default 0), LIFT_NAME (default ottl)
 set -euo pipefail
 OTT="$(cd -- "$(dirname -- "$0")/.." && pwd)"
-DLL=/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll
+source "$OTT/../shared/env.sh"
+DLL="$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll"
 ENT="${LIFT_ENTRIES:-$OTT/work/entries.json}"
 OUT="${LIFT_OUT:-$OTT/work/lift}"
 NAME="${LIFT_NAME:-ottl}"
-source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1
+source "${EMSDK_DIR:-/opt/emsdk}/emsdk_env.sh" >/dev/null 2>&1
 mkdir -p "$OUT"
 python3 "$OTT/lift/x64c.py" --pe "$DLL" --entries "$ENT" --out "$OUT" --closure "${LIFT_CLOSURE:-2}" \
   --override 1801c8c00=ovr_handle_error_d --override 1801c8cb8=ovr_handle_error_f --override 1801a9a6c=ovr_sqrt_d --override 1801a9b38=ovr_sqrt_f

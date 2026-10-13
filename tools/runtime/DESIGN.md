@@ -55,7 +55,7 @@
 | **OTT lifted DSP (M10 IR, 256 サンプル/ブロック)** | **0.925** (164.8 vs 178.1 µs/block) | 0.83 |
 
 - 外れ値 call_mix は node 側の分解で A(呼出のみ)=2.7×, B(storeのみ)=1.16×, 間接呼出=1.21×, D(元)=0.57× と**方向が反転**する → V8 のインライン/tier-up 判断の揺れで、メモリモデル固有の定数倍ではない。結論: 「一様な X 倍」は無く、実コード (OTT) では差なし (むしろ −7.5%)。
-- **同一 lifted IR を p:64 datalayout に書換えるだけで wasm64 ビルドが通り、出力ハッシュが wasm32 と完全一致** (`824c6c48`)。必要なのは `datalayout` の `f128:64` 付き p:64 と shim の `size_t` 引数幅の整合のみ (`HeapAlloc` 署名不一致 warning 1 件 = i32 vs i64 size)。→ 退避路は実証済み (`bench/build_ott_variants.sh`)。
+- **同一 lifted IR を p:64 datalayout に書換えるだけで wasm64 ビルドが通り、出力ハッシュが wasm32 と完全一致** (`824c6c48`)。必要なのは `datalayout` の `f128:64` 付き p:64 と shim の `size_t` 引数幅の整合のみ (`HeapAlloc` 署名不一致 warning 1 件 = i32 vs i64 size)。→ 退避路は実証済み。常時ビルド検査は `ci/wasm64_check.sh` ([REPORT](REPORT.md) RT-8 実測)。
 
 ### 1.4 Memory 個数上限 (`probe/run_memcount.mjs`) — **新規に判明した制約**
 1 レンダラ内で作れる WebAssembly.Memory は **wasm32: 124–125 個 / wasm64(max 16GiB): 61–62 個** (2 回測定) (max/initial/shared に依存せず一定。約 1TiB の VA 予約上限と整合する値だが、内部上限の正体は**推定**)。
@@ -142,8 +142,20 @@ OPFS は Worker 内 `createSyncAccessHandle` が同期で使える (実測) → 
 
 e2e (`pnpm runtime:e2e`): stage → Vite dev (COOP/COEP) → headless Chrome → 4 wasm を Worker で実行し **元の emcc glue を node で実行した参照値とビット一致を確認** (M10 hash `824c6c48`/`cdd4ee04`, M6 `fb31ca9a`, M1 stdout, M11 `{m11_dllmain_done:1}`/stage=1) + pump 自己検証 (2000 件欠落 0, WM_TIMER ≥3, 実ブロッキング wait 発生)。`--prod` は `vite build` + preview の本番バンドルで、`--cache=cacheapi --compile=bytes` で別経路も検証可。
 
+### 4.1 機能検出フォールバック (RT-9 設計案・**未実装**・Safari 入力待ち)
+入力: Chrome 154 / Firefox 157 は memory64・JSPI・shared memory・Worker 内 Atomics.wait・OffscreenCanvas がすべて可 (実測は REPORT.md)。Safari は未測定のため、以下は検出順序と退避先の設計で、Safari の可否は仮定しない。
+| 機能 | 検出 | 無い場合の退避 |
+|---|---|---|
+| 実行可否 (必須) | `crossOriginIsolated && typeof SharedArrayBuffer` と shared Memory 生成 | pthread/ring 経路が成立しないため起動せず、非対応メッセージを表示 (退避なし) |
+| memory64 | `WebAssembly.validate` (features.json の `memory64`) と `new Memory({address:"i64"})` | §1 の決定どおり wasm32 が既定で、memory64 は退避トリガ時のみ使う。**検出結果で wasm32↔wasm64 を切替える実装は不要** (配信ビルドは wasm32 のみ) |
+| JSPI | `typeof WebAssembly.promising` と `Suspending` | §2 の決定どおり JSPI は副次手段。無ければ ring (`Atomics.wait`) 経路のみ。async→sync 橋渡しが必要な VFS は補助 Worker sync-RPC へ |
+| OffscreenCanvas | Worker 内 `getContext("webgl2")` 成功 | 失敗時はメインスレッド canvas + 描画コマンド転送 (RT-3 で設計)。headless では判定できないので実機判定が必要 |
+| AudioWorklet | `ctx.audioWorklet.addModule` の成否 | 無音で起動せず明示エラー (音声は sample clock マスター: RT-4) |
+| Module 永続化 | IDB 保存は Chrome/Firefox とも不可 | HTTP キャッシュ + hash 名 immutable のみ (§3 の決定どおり) |
+検出は起動時に 1 回、結果を `window.__webstudio` 契約側へ公開する想定 (契約は未実装)。Firefox 固有の注意: 非 shared memory64 の大域 grow が遅い (REPORT.md の RT-9 節) ため、memory64 を使う場合は shared かつ事前確保を優先する。
+
 ## 5. 未解決・要確認
-1. Firefox / Safari の memory64・JSPI・threads・OffscreenCanvas は**未測定** (環境に Chrome のみ)。
+1. **Safari は未測定**。Firefox 157 は headless で実測済み (REPORT.md)。Firefox の AudioWorklet / Worker WebGL2 は headless で判定不能。
 2. 実 FL サイズ (22MiB PE × lift 膨張) の wasm は未生成 — 合成スケール試験 (≤52MiB) からの外挿のみ。
 3. 本番 FL ビルドを pthread 化した boot e2e: shim MT 自己テストでは実証済み (RT-2 #120, 実測は REPORT.md)。実 FLEngine lift での確認は未実施。
 4. ヘッドレス WebGL2 は SwiftShader。実 GPU での OffscreenCanvas 性能は未測定。

@@ -1,4 +1,5 @@
 // Minimal WAV reader + comparison metrics for the render oracle (ORACLE.md section 4). Browser-safe (no Node APIs).
+import { spectralMetrics, LUFS_TOL_LU, TRUE_PEAK_TOL_DB, type SpectralMetrics, type StftBinPos } from './stft.ts';
 export interface Wav {
   sampleRate: number;
   channels: number;
@@ -169,7 +170,7 @@ export function compareWav(a: Wav, b: Wav): Metrics {
     maxUlp,
     rmsDiffDb: db(rmsD),
     snrDb: rmsD === 0 ? Infinity : db(rmsA) - db(rmsD),
-    peakDiffDb: db(pb) - db(pa),
+    peakDiffDb: pa === pb ? 0 : db(pb) - db(pa),
     rmsDiffRefDb: rmsA > 0 ? db(rmsD / rmsA) : -Infinity,
   };
 }
@@ -182,7 +183,31 @@ export interface Verdict {
   why: string;
 }
 
-export function judge(m: Metrics, cls: ToleranceClass): Verdict {
+/** D-spectral gate (ORACLE.md 4.4): STFT bins, LUFS-I and true-peak all within tolerance. */
+export function judgeSpectral(sp: SpectralMetrics): { pass: boolean; why: string } {
+  const s = sp.stft;
+  const fin = (x: number, d = 2) => (Number.isFinite(x) ? x.toFixed(d) : String(x));
+  if (s.refSilent) {
+    const pass = sp.truePeakB === -Infinity;
+    return { pass, why: pass ? 'reference silent and test silent' : `reference silent but test peak=${fin(sp.truePeakB)}dBTP` };
+  }
+  const stftOk = s.binsOverTol === 0;
+  const lufsOk = Math.abs(sp.lufsDiff) <= LUFS_TOL_LU;
+  const tpOk = Math.abs(sp.truePeakDiff) <= TRUE_PEAK_TOL_DB;
+  const where = s.first ? ` first@frame=${s.first.frame} t=${s.first.timeSec.toFixed(4)}s bin=${s.first.bin} (${s.first.freqHz.toFixed(1)}Hz) diff=${fin(s.first.diffDb, 3)}dB` : '';
+  return {
+    pass: stftOk && lufsOk && tpOk,
+    why:
+      `STFT ${s.binsOverTol}/${s.binsCompared} bins >${s.tolDb}dB maxDiff=${fin(s.maxDiffDb, 3)}dB${where}; ` +
+      `LUFS-I ${fin(sp.lufsA)}->${fin(sp.lufsB)} (diff ${fin(sp.lufsDiff, 3)}, <=${LUFS_TOL_LU}); ` +
+      `TP ${fin(sp.truePeakA)}->${fin(sp.truePeakB)}dBTP (diff ${fin(sp.truePeakDiff, 3)}, <=${TRUE_PEAK_TOL_DB})`,
+  };
+}
+
+/**
+ * `sp` is required for D-spectral (fail-closed when absent). Use `judgeWav` to have it computed.
+ */
+export function judge(m: Metrics, cls: ToleranceClass, sp?: SpectralMetrics): Verdict {
   if (m.nanOrInf > 0) return { cls, pass: false, why: `${m.nanOrInf} NaN/Inf samples` };
   if (!m.sameShape) return { cls, pass: false, why: `shape differs (${m.framesA} vs ${m.framesB} frames)` };
   switch (cls) {
@@ -197,8 +222,55 @@ export function judge(m: Metrics, cls: ToleranceClass): Verdict {
       return { cls, pass, why: `rmsDiff/ref=${m.rmsDiffRefDb.toFixed(1)}dB (<=-80) peakDiff=${m.peakDiffDb.toFixed(4)}dB (<=0.01) maxAbs=${m.maxAbs.toExponential(2)} (<=1e-4)` };
     }
     case 'D-spectral': {
-      const pass = m.rmsDiffRefDb <= -60 && Math.abs(m.peakDiffDb) <= 0.1;
-      return { cls, pass, why: `rmsDiff/ref=${m.rmsDiffRefDb.toFixed(1)}dB (<=-60) peakDiff=${m.peakDiffDb.toFixed(3)}dB (<=0.1); spectral STFT stage must also pass (ORACLE.md 4.4)` };
+      const td = Math.abs(m.peakDiffDb) <= 0.1 && m.rmsDiffRefDb <= -60;
+      const base = `rmsDiff/ref=${m.rmsDiffRefDb.toFixed(1)}dB (<=-60) peakDiff=${m.peakDiffDb.toFixed(3)}dB (<=0.1)`;
+      if (!sp) return { cls, pass: false, why: `${base}; STFT/LUFS stage not evaluated (pass SpectralMetrics or use judgeWav)` };
+      const s = judgeSpectral(sp);
+      return { cls, pass: td && s.pass, why: `${base}${td ? '' : ' FAIL'}; ${s.why}` };
     }
+  }
+}
+
+/** compare + judge in one call; computes the STFT/LUFS/true-peak stage for D-spectral */
+export function judgeWav(a: Wav, b: Wav, cls: ToleranceClass): { metrics: Metrics; spectral?: SpectralMetrics; verdict: Verdict } {
+  const metrics = compareWav(a, b);
+  const ok = metrics.nanOrInf === 0 && metrics.sameShape;
+  const spectral = cls === 'D-spectral' && ok ? spectralMetrics(a, b) : undefined;
+  return { metrics, spectral, verdict: judge(metrics, cls, spectral) };
+}
+
+export interface DiffPos {
+  channel: number;
+  frame: number;
+  timeSec: number;
+  a: number;
+  b: number;
+  absDiff: number;
+}
+
+/** first sample (frame-major, then channel) where `exceeds(a, b)` holds; null when none */
+export function firstDiff(a: Wav, b: Wav, exceeds: (x: number, y: number) => boolean = (x, y) => x !== y): DiffPos | null {
+  const frames = Math.min(a.frames, b.frames);
+  const channels = Math.min(a.channels, b.channels);
+  for (let i = 0; i < frames; i++)
+    for (let c = 0; c < channels; c++) {
+      const x = a.ch[c][i];
+      const y = b.ch[c][i];
+      if (!Number.isFinite(x) || !Number.isFinite(y) || exceeds(x, y)) return { channel: c, frame: i, timeSec: i / a.sampleRate, a: x, b: y, absDiff: Math.abs(x - y) };
+    }
+  return null;
+}
+
+/** first position that violates the class's sample-domain limits (D-spectral: the first STFT bin over tolerance, if any) */
+export function firstViolation(a: Wav, b: Wav, cls: ToleranceClass, sp?: SpectralMetrics): DiffPos | StftBinPos | null {
+  switch (cls) {
+    case 'A-exact':
+      return firstDiff(a, b);
+    case 'B-ulp':
+      return firstDiff(a, b, (x, y) => ulpDistF32(x, y) > 4 || Math.abs(x - y) > 1e-6);
+    case 'C-statistical':
+      return firstDiff(a, b, (x, y) => Math.abs(x - y) > 1e-4);
+    case 'D-spectral':
+      return sp?.stft.first ?? null;
   }
 }

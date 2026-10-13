@@ -41,6 +41,9 @@ runs:
         OC_MODEL: ${{ inputs.model }}
         OC_AGENT: ${{ inputs.agent }}
       run: |
+        # GitHub の `shell: bash` は -e 付きで起動される。-e のままだと opencode が非 0 で
+        # 終わった時点で step が即死し、rc の記録・リトライ・stderr の出力が全て走らない。
+        set +e
         set -uo pipefail
         if [ ! -r "$OC_PROMPT_FILE" ]; then
           echo "::error::prompt file is not readable: $OC_PROMPT_FILE"

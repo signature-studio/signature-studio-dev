@@ -3,7 +3,8 @@
 # shim_e2e.sh の S13 から呼ばれる。成果は work/fill7/ (gitignore)。
 set -euo pipefail
 cd "$(dirname "$0")"; HERE=$PWD; IPP=$(cd ../.. && pwd); W=$IPP/work/fill7; mkdir -p "$W" /tmp/opencode
-DLL=/home/ubuntu/work/analysis/win64/extracted/block24356_PE.bin
+source "$IPP/../shared/env.sh"
+DLL="$FL_WIN64_DIR/extracted/block24356_PE.bin"
 CF="-O1 -g -I $IPP/src -ffp-contract=off -fno-fast-math"
 IMPL="$HERE/../impl/ipp_sig_fill3.c"
 gcc $CF -o "$W/fill3_oracle" "$HERE/fill3_oracle.c" "$IPP/ref/pe_load.c" $IMPL -lm

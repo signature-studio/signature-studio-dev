@@ -41,7 +41,8 @@
 | canvas-render | 全画面 canvas の putImageData 結果を getImageData で読み戻し (lit ピクセル > 0, 色数 ≥ 2) + スクリーンショット |
 | audioworklet | クリック → `samplePos` が 128f 単位で増加 (SAB 経由の worklet clock) |
 | console-clean | uncaught エラー 0、想定外 console error/warning 0 (意図的 fail-fast ログと favicon 404 のみ許容) |
-| fl-boot | FL 統合後の契約チェック (下記)。既定 SKIP、`E2E_REQUIRE_FL=1` で必須化 |
+| webstudio-contract | `window.__webstudio` の形状検査 (state ∈ booting/running/error、frames は非負 number、running なら frames>0、error 文字列は state=error 時のみ)。FL 未統合のハーネスは `booting`/`frames:0` で PASS |
+| fl-boot | FL 統合後の契約チェック (下記)。既定 SKIP、`E2E_REQUIRE_FL=1` で必須化。`state==='running' && frames>0` (180s) + canvas 画素検査 (lit>0, colors≥2) |
 
 ターゲット: `preview` (vite preview) / `dev` (vite dev) / `edge-sim` (**deploy の配信ポリシーをローカル再現**: R2 同様 `/` の暗黙 index なし +
 Rules の rewrite/ヘッダ/br) / `url` (`run.sh --url https://…`、Access 時は `E2E_ACCESS_CLIENT_ID/SECRET`)。
@@ -125,9 +126,18 @@ dev は `__e2e__/add.wasm` fixture が配信されないため wasm-load 内の 
 | repo variable `E2E_URL` と secrets `E2E_ACCESS_CLIENT_ID/SECRET` の登録 | 週次 remote ジョブは登録まで skip | 本 issue (#66) へコメント (ユーザ/PM 作業。token secret は `deploy/work/secrets/` にしか無い) |
 | 実 URL に対する週次ジョブの初回実績 | remote の PASS 未確認 | #66 (登録後に `gh workflow run e2e.yaml -f remote=true`) |
 
-## FL 起動契約 (提案: runtime-arch へ)
-FL 統合後に `fl-boot` を有効化するため、ページは `window.__webstudio = { state: 'booting'|'running'|'error', frames: <number>, error?: string }` を公開する。
-`state==='running'` かつ `frames>0` (GUI フレーム転送済み) を `E2E_REQUIRE_FL=1` で必須化。タイムアウト 180s。
+## FL 起動契約 (#65)
+ページは `window.__webstudio = { state: 'booting'|'running'|'error', frames: <number>, error?: string }` を公開する。
+実装は `src/runtime/webstudio_state.ts` (`src/index.ts` が `installWebstudioContract()` を読込時に呼ぶ)。
+- 遷移: `booting` → `running` (GUI フレーム 1 枚以上) / `error` (window `error`・`unhandledrejection`・`fail()`)。`error` は終端で最初のエラーを保持、`frames` は単調増加。
+- frames の供給: `GuiHost.attach({ onFrame })` の累計フレーム数を `controller.setFrames()` に渡す (`src/runtime/gui.ts`)。
+  **実 FL の GuiHost 接続は未実装** (FL 本体がページに統合されていないため。ハーネスのテストフレームは計上しない)。
+- e2e: `webstudio-contract` は常時 (形状)、`fl-boot` は `E2E_REQUIRE_FL=1` で `state==='running' && frames>0` を 180s 待ち、canvas の画素を検査 (#32 の受入に接続)。
+  FL 未統合の現状では `E2E_REQUIRE_FL=1` は FAIL する (意図通り)。
+- 実測 (HEAD 8bf83d9、Chrome 154、node v22.23.3): `--driver both --targets preview,edge-sim,dev` = **PASS 50 / FAIL 0 / SKIP 10** (28.1s、`webstudio-contract` 6/6 PASS = `{"state":"booting","frames":0}`、fl-boot 6 SKIP + edge-policy 4 SKIP)。
+  `E2E_REQUIRE_FL=1 --targets preview` (agent-browser) = PASS 8 / **FAIL 1 (fl-boot: 180146ms 待って `{"state":"booting","frames":0}`)** / SKIP 1、合計 3m2.9s。
+- 単体テスト: `node --test tools/e2e/webstudio_state.test.mjs` (遷移 6 ケース)。
+- 未実施: `agent-browser diff screenshot` による FL 画面のスクリーンショット差分 (基準画像となる FL 起動画面が無いため。#32 後)。
 
 ## ユーザ依頼事項
 1. **公開ホスト名** (例: `studio.<既存ゾーン>`)。案 S の既定は workers.dev (`deploy/README.md` §移行で自前ドメインへ)。
@@ -137,7 +147,7 @@ FL 統合後に `fl-boot` を有効化するため、ページは `window.__webs
 
 ## 下流チケット案
 GitHub issue 起票済 (検収時): T1→実デプロイ (**CAB-35 として完了**・`deploy/REPORT.md`)、
-T2→tools/assets manifest、T3→事前圧縮 + 大容量、T4→`window.__webstudio` 契約実装、
+T2→tools/assets manifest、T3→事前圧縮 + 大容量、T4→`window.__webstudio` 契約実装 (#65、契約本体は実装済・実 FL 接続は #32 側)、
 T5→CI 化 (#66、`.github/workflows/e2e.yaml`)、T6→配信後の自動注入対策、H-1→既定ホスト名構成への適応 (**CAB-61 として完了**)。
 旧 `CAB-xxx` と GitHub issue `#N` の対応は `docs/REFERENCES.md` `[CAB_TO_GH]`。
 

@@ -135,6 +135,13 @@ mark('5/5 trace 監査 (username=webstudio / C:\\Users\\user 残存 0)');
   ok(a.stages === 10, `stages executed == 10 (${a.stages})`);
 }
 
+mark('6/6 crash-restart 単体 (ST-T10: Crash\\ 保存 / ダウンロード提示 / Send 失敗 / restartfl 再ロード)');
+{
+  const out = sh('node', ['test/crash_restart_unit.ts']);
+  const cr = /CRASH-RESTART (?:ALL PASS|FAIL) \(pass=(\d+) fail=(\d+)\)/.exec(out);
+  ok(!!cr && cr[2] === '0', `crash-restart unit: ${cr ? `${cr[1]} checks, ${cr[2]} fail` : 'no result'}`);
+}
+
 mark(`done in ${((Date.now() - t0) / 1000).toFixed(1)}s (load now ${la()})`);
 console.log(failed === 0 ? '[glue-e2e] ALL PASS' : `[glue-e2e] FAIL (${failed})`);
 process.exit(failed === 0 ? 0 : 1);
