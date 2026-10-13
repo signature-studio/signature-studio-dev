@@ -169,6 +169,8 @@ class Session:
             c['wasm_status'] = w.get('status')
             c['_n'] = n; c['_w'] = w
             rec['cases'].append(c)
+        if not any(c['outcome'] in ('equal', 'diff', 'wasm_trap') for c in rec['cases']):
+            rec['cases'] += self._fvm_cases(nat, was, va, sig, rec['cases'])
         if with_refine:
             refined = False
             for c in rec['cases']:
@@ -184,6 +186,39 @@ class Session:
                     elif len(a) == 2 and a[0].get('status') != a[1].get('status'):
                         c['wasm_uninit_dependent'] = True
         return rec
+
+    def _fvm_cases(self, nat, was, va, sig, cases_done):
+        """LD-23 (#975): 全 pattern が未実行 (equal/diff/wasm_trap 無し) の関数で、's' の native fault addr から
+        this 候補の引数を推定し、その引数だけ VMT 付き疑似オブジェクトにした case を実行する。戻りは追加 case 列。"""
+        fault = None
+        for c in cases_done:
+            if c.get('pattern') == 's' and c.get('fault'):
+                fault = c['fault']
+                break
+        cand = cases.fvm_candidates(fault, cases.kinds_of(sig['params']))
+        if not cand:
+            return []
+        lines = [cases.fvm_line(va, self.fn_name(va), i, sig, trace=self.trace) for i in cand]
+        ids = ['%x:fvm%d' % (va, i) for i in cand]
+        rn = nat.run_cases(lines, ids)
+        keep = [i for i, n in enumerate(rn) if n.get('status') not in ('timeout', 'hang', 'crash')]
+        rw = [{'id': ids[i], 'status': 'hang', 'detail': 'skipped (native timeout)', 'calls': [], 'mem': []} for i in range(len(lines))]
+        if keep:
+            for i, w in zip(keep, was.run_cases([lines[i] for i in keep], [ids[i] for i in keep])):
+                rw[i] = w
+        out = []
+        for arg, n, w in zip(cand, rn, rw):
+            try:
+                c = compare.compare_case(n, w, self.ctx, self.sigs, self.stub_info, self.thunks())
+            except Exception as e:
+                c = {'outcome': 'hang', 'native': n.get('status'), 'wasm': w.get('status'), 'compare_error': repr(e)[:120]}
+            c['pattern'] = 'fvm'
+            c['fvm_arg'] = arg
+            c['native_status'] = n.get('status')
+            c['wasm_status'] = w.get('status')
+            c['_n'] = n; c['_w'] = w
+            out.append(c)
+        return out
 
     def static_info(self, va):
         return self.analyzer.analyze(va)
