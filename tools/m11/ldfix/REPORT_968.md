@@ -14,6 +14,9 @@
 
 ## 2. 実測 (`fix_d17_e2e.sh`、PE 無し、work-m11 のみ)
 
+> 下表は旧 HEAD `062ee3f4` の実測値。現 HEAD での e2e は未実施 (work-m11 と emsdk が run に無かった)。
+> 現 HEAD の値で書き直すのは次回の `oc_artifacts: work-m11` 付き run の後。
+
 | 項目 | 修復前 | 修復後 |
 |---|--:|--:|
 | CELL_COLLAPSED store 宛 site | 86 | 53 |
@@ -23,10 +26,23 @@
 | alg3 SHALLOW (unk) | 78 | 49 |
 | alg3 flagged 関数 | 77 | 58 |
 
-- 修復関数数 24 (`fixed_fns=24 fixed_cells=29`)。関数一覧は `fix_d17_report.json` (e2e の work 内)。
-- audit の集計 (`lsf_sites_arg 90 / unresolved 370 / fns_unresolved 169`) は修復前後で不変 (修復は load の形だけを変える)。
+- 修復関数数 24 (`fixed_fns=24 fixed_cells=29`)。関数一覧は e2e の `$OUT/d17_report.json` (`$OUT` = `${RUNNER_TEMP}/fix_d17_e2e`)。
+- audit の集計 (`lsf_sites_arg 90 / unresolved 370 / fns_unresolved 169`) は修復前後で不変。
+  不変なのは件数だけで、下記 2 項目の分類は変わる。
 - emcc 構文検証 (`-O0 -g1 -c`): rc=0。
-- audit_lsf_ssa.py の import 不具合を修正: `machine_sites` が #509 で 5 要素を返すようになり、3 要素の unpack が失敗していた (13 s で再現)。
+
+### 2.1 CELL_COLLAPSED が CELL_DEEP と alg3 に移る理由 (コード読解による推定)
+
+上表の件数はコードの判定条件から次のように説明できる。実測の内訳 (site 単位の追跡) は未取得。
+
+- **CELL_COLLAPSED → CELL_DEEP (store 宛 86 → 53、CELL_DEEP 19 → 52、どちらも 33 件増減)**:
+  `cell_check` (`audit_lsf_ssa.py`) は、セル K を読む IR const load が 64bit 以外なら CELL_COLLAPSED、64bit なら `alg3 == SHALLOW` のときだけ CELL_COLLAPSED と判定する。
+  修復後の K 読みは `load ptr, ptr inttoptr (K)` (64bit) になるため、`alg3` が OK に変わった site は CELL_DEEP に入る。
+  CELL_DEEP は「IR に 2 段の連鎖がある」の意味なので、修復の狙いどおりの分類移動である。
+- **alg3 SHALLOW (unk) 78 → 49、alg3 flagged 77 → 58**:
+  `make_depth` (`audit_lsf_ssa.py`) の深さは、修復後の `load T, ptr %cellp.K` が `1 + depth(%cellp.K) = 2` になり、修復前の 1 から増える。
+  rip セル経由の machine 側 depth は 2 なので、その値を格納する候補 store が `ir depth >= 2` を満たし、`alg3` が SHALLOW から OK に変わる。
+  SHALLOW の減少 (29 site) と CELL_COLLAPSED の減少 (33 site) は一致しない。これは site 単位の対応を取っていないためで、内訳は未確認。
 
 ## 3. 再現
 

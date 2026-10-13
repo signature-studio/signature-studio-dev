@@ -18,6 +18,10 @@ step "2/4 fix_d17.py"
 step "3/4 audit (修復後)"
 "$PY" "$HERE/audit_lsf_ssa.py" "$OUT/boot_d17.ll" "$IMG" "$CFG" --json "$OUT/ssa_fix.json" | head -1
 step "4/4 emcc 構文検証 (修復 IR)"
-source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1
+if ! source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1 || ! command -v emcc > /dev/null 2>&1; then
+  echo "[fix_d17_e2e] FAIL: emsdk が無い (/opt/emsdk/emsdk_env.sh の source か emcc の検出に失敗)" >&2
+  exit 2
+fi
 export TMPDIR="$OUT/tmp"; mkdir -p "$TMPDIR"
-emcc -c "$OUT/boot_d17.ll" -o "$OUT/boot_d17.o" -w -Wno-error=int-conversion -O0 -g1 && echo "[fix_d17_e2e] emcc rc=0"
+emcc -c "$OUT/boot_d17.ll" -o "$OUT/boot_d17.o" -w -Wno-error=int-conversion -O0 -g1 || { echo "[fix_d17_e2e] FAIL: emcc rc!=0" >&2; exit 1; }
+echo "[fix_d17_e2e] emcc rc=0"
