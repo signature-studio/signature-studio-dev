@@ -52,7 +52,7 @@ Runner = Intel Xeon 6973P (当時の記録: `/proc/cpuinfo` の avx512 フラグ
 所要: `sp57` 30.2 s (strace 下)・`resize_oracle` 0.26 s・`fill3_oracle` 0.04 s・`sweep2` 0.23 s・`verify_cab262_quirks` 0.02 s。load average 0.56 (1 分値)、直列。
 env なし直接起動 (strace なし) の完走結果: `resize_oracle` rc=0・39 行・
 `SUM {"cases":82056,"case_diff":359,"st_mis":0,"byte_diff":55588,"px_diff":55588,"px_tot":5912624}`、`fill3_oracle` rc=0・76 行、`verify_cab262_quirks` rc=0・65 行。
-これらは上記 Xeon 6973P 記録 (採取時 CPU 未確認・avx512 あり) の時点での実測で、置換前後の mismatch 数の突き合わせ (origin/main 側の再ビルド比較) は本修正では行っていない (置換行以外の変更なし)。
+これらは前回節の Xeon 6973P 記録 (採取時 CPU 未確認・avx512 あり) の時点での実測。この節では置換前後の mismatch 数の突き合わせは行っておらず (置換行以外の変更なし)、受入条件 2 の結論は次節 (AVX-512 対応 Runner・置換 commit の親子比較) のみを正とする。
 
 ### 検証 (再検証・受入条件 2 の残り、検証対象 = 置換前 `1353c62` / 置換後 `af8ba9cc`)
 
@@ -62,10 +62,6 @@ env なし直接起動 (strace なし) の完走結果: `resize_oracle` rc=0・3
   Runner には存在しないため ENOENT (rc=1)。既定値の同一性はこの一致で確認。
 - `FL_WIN64_DIR=$RUNNER_TEMP` (`fl-win64` 展開先 `extracted/`) を与えた実行: 3 本とも rc=132 (SIGILL)、置換前後の stdout は 1 行目 (`--dump` 出力先) を除き `diff` 一致 (`resize_oracle` 26 行・`fill3_oracle` 8 行・`verify_cab262_quirks` 1 行)。
 - 所要: 各実行 0〜1 秒、直列。素材 `fl-win64` の展開 10.5 s (`tar --zstd -xf`)。Runner CPU は AMD EPYC 7763 (`/proc/cpuinfo` model name = `AMD EPYC 7763 64-Core Processor`、avx512f フラグ 0 件、nproc 4。2026-10-13 採取)。上の Xeon 6973P 記録 (採取時 CPU 未確認) とは同一視しない。
-
-| 未解決 | 影響 | 起票先 |
-|---|---|---|
-| (解決済み: 上の「AVX-512 対応 Runner・置換 commit の親子比較」節で mismatch 数を含め完全一致を確認) | — | — |
 
 ### 検証 (AVX-512 対応 Runner・置換 commit の親子比較 = 受入条件 2 の完了)
 
@@ -86,5 +82,4 @@ env なし直接起動 (strace なし) の完走結果: `resize_oracle` rc=0・3
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 置換前 (`origin/main`) と置換後の mismatch 数 (`SUM` 行) の AVX-512 Runner での突き合わせ | 出力同一性は AVX-512 なし Runner の SIGILL 点までと、置換後単独の完走結果のみ | #294 にコメント |
 | shim_e2e.sh 通し実行を `oc_artifacts: fl-win64 toolchain-emsdk work-liftlib` 付きで未実施 | 置換行以外の挙動は未検証 | 本 PR のレビュー run |
