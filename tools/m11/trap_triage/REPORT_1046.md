@@ -89,7 +89,7 @@ LD_M11_PE=$FL_WIN64_DIR/extracted/block00031_PE.bin python3 tools/m11/trap_triag
   - `dest=0x10a9f910 src=0x0 old=0x100000003` ← **OOB の入力**。`old` は wasm32 の有効ポインタではない (下位 dword 3・上位 dword 1 の packed 値)。
 - `0x10a9f910` は unit 492 内の先行 UStrAsg の dest に現れない。値を書いたのは UStrAsg 以外の store (未特定)。
 - `0x100000003` は IR 定数として `boot_final.ll` に無い (`grep 4294967299` 0 件)。実行時に作られた値。
-- 呼出経路: `4473f0` (IR 147983〜) の `447df0` 出力スロット `stack_var_-48/-56` は `store i64 0` で初期化されている。OOB の dest はこの経路の引数 (`%rdi` = `arg2+256` 系) ではなく、`446400` 側の別 frame の slot。
+- 呼出経路 (IR 確認): `4473f0` の `447df0` 出力スロット `stack_var_-48/-56` は `store i64 0` で初期化され、`4133f0` の `src` 入力はこの値。ただし OOB の `dest` (`0x10a9f910`) の slot の出自 (どの frame の何か) は未確認。`4473f0` 経路との接続は未検証。
 
 ### 受入条件の判定 (#1288)
 
