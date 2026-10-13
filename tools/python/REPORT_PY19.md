@@ -36,10 +36,10 @@
 
 | 項目 | 結果 |
 |---|---|
-| 素材 | `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`extracted/` 25,166 件)。`toolchain-emsdk` は `/opt/emsdk` |
+| 素材 | `fl-win64` を `FL_WIN64_DIR` (`docs/REFERENCES.md` §4) に展開 (`extracted/` 25,166 件)。`toolchain-emsdk` は `[EMSDK]` |
 | `fetch_inputs.sh` → `build_cpython_wasm.sh` → `build_flpy.sh` | 全て exit 0。`build_cpython_wasm.sh` real 4m07.8s (初回)、`build_flpy.sh` real 7.1s / 再リンク 数秒 |
 | `flpianoroll_dialog_load_e2e.mjs` | 11/11 PASS・exit 0 (HEAD `61f38893`、node 内計測 0.32 秒) |
-| `pyscript_e2e.mjs` (既存、n=3) | 43/43 PASS・exit 0 ×3。wall 1.00 / 0.997 / 1.007 秒 |
+| `pyscript_e2e.mjs` (既存、n=3) | 43/43 PASS・exit 0 ×3 (記録値。HEAD `61f38893` で取得、修正 commit 後の再測は未実施)。wall 値は §6 の未解決参照 |
 | 回帰 | `all_tools.mjs` 48/48 ok・host_calls 37,425・exit 0 / `midi_script.mjs` 29 checks OK / `midi_script.mjs --neg` exit 1 (検出) |
 | 再計算 | `flpianoroll_members.py`: 64/64 implemented (exit 0) |
 
@@ -54,4 +54,4 @@
 | `DialogParams` の戻り値の形 (MOCK) | HUD / 実スクリプトが戻り値を使う場合の互換 | #81 (PY-9)・#10 (HUD) |
 | `loadScoreFromFile` の入力形式 (`.fst`/`.fsc` 独自形式) | 実 FL が書いた score を読めない | 未起票 (本 issue 残件として明記) |
 | `loadScoreFromFile` の失敗種別 (実 FL) | ネガコンは Python 標準例外で代用 | #81 (PY-9) |
-��は Python 標準例外で代用 | #81 (PY-9) |
+| `pyscript_e2e.mjs` の wall 値 (§5) | 再測未実施 (`toolchain-emsdk` が runner に無く `dist/` も無い)。§5 の wall 値は PR 本文の値 (1.04 / 1.06 / 1.04 秒) と不一致で、どちらが正かは未確定 | #792 (`oc_artifacts: fl-win64 toolchain-emsdk` の run で再測し §5 を更新) |
