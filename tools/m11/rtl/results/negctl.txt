@@ -1,0 +1,13 @@
+before: match -> after: mismatch
+--- base 計 / 遷移
+| **計** | 1172 | **494/529/149** | **535/123/514** |
+遷移 (m11 → x64c): match→match 211, match→mismatch 5, match→unexec 278, mismatch→match 308, mismatch→mismatch 117, mismatch→unexec 104, unexec→match 16, unexec→mismatch 1, unexec→unexec 132
+--- broken 計 / 遷移
+| **計** | 1172 | **494/529/149** | **534/124/514** |
+遷移 (m11 → x64c): match→match 211, match→mismatch 5, match→unexec 278, mismatch→match 307, mismatch→mismatch 118, mismatch→unexec 104, unexec→match 16, unexec→mismatch 1, unexec→unexec 132
+--- tsv diff (変化行数)
+1
+280c280
+< 0x4133f0	System 以降 [0x401000〜]	mismatch	match
+---
+> 0x4133f0	System 以降 [0x401000〜]	mismatch	mismatch
