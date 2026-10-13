@@ -113,7 +113,7 @@ def t7():
     lo, sd = next((lo, d) for n, lo, d in dataimage.sections_raw(img) if n == ".rdata")
     nfix = nlow = 0
     for r in img.relocs_dir64():
-        if lo <= r < lo + len(sd) - 8:
+        if lo <= r <= lo + len(sd) - 8:  # #593: dataimage と同じ境界 (末尾 8B slot を含む)
             off = r - lo
             v = struct.unpack_from("<Q", sd, off)[0]
             if img.base <= v < img.base + img.size:      # image 内ポインタ = 補正対象
@@ -522,7 +522,46 @@ def t17():
           % (st["xret_callees_pending"], st["xret_rets_pending"], st["xret_threaded"], st["xret_rets_after"], ev["detected"], ev["injected"]))
 
 
+def t18():
+    """[LIFTLIB #478] ott の合否判定 (cli.ott_judge) のネガコン。参照成果物の欠落 (None) を合格にしないこと,
+    junkHi は --auto none の合否に使わないこと, auto 既定は junkHi 閾値で落ちることを固定する。"""
+    from liftlib.cli import ott_judge, OTT_AUTO_JUNKHI_MAX
+    ident = {k: True for k in ("O1", "O2a", "O2b", "O2c", "O3a", "O3b", "O4")}
+    oh = dict(combos=42, equal=True, distinct=40, f0_equal=21, f0_total=21)
+    census = lambda jh: json.dumps({"junkHi": jh})          # noqa: E731
+    good = dict(**{"pass": True}, outhash=oh, census0=census(175))
+    # 正: 全て揃えば junkHi 175 でも PASS (junkHi は --auto none の合否に使わない)
+    ok, why, miss = ott_judge(good, ident, (), None)
+    assert ok and not why and not miss, why
+    # NC1: 7 段 IR 一致の 1 段が None (参照 .ll 欠落) → 不合格 + 欠落扱い
+    ok, why, miss = ott_judge(good, dict(ident, O4=None), (), None)
+    assert not ok and miss and any("O4" in w for w in why), why
+    # NC2: IR 不一致 (False) → 不合格 (欠落ではない)
+    ok, why, miss = ott_judge(good, dict(ident, O2a=False), (), None)
+    assert not ok and not miss and any("O2a" in w for w in why), why
+    # NC3: outhash 未実施 (参照 ott_m10.cjs 欠落) → 不合格 + 欠落扱い
+    ok, why, miss = ott_judge(dict(good, outhash=None), ident, (), None)
+    assert not ok and miss, why
+    # NC4: outhash 不一致 → 不合格
+    bad_oh = dict(oh, equal=False, f0_equal=20)
+    ok, why, miss = ott_judge(dict(good, outhash=bad_oh), ident, (), None)
+    assert not ok and not miss and any("outhash" in w for w in why), why
+    # NC5: outhash 実行失敗 → 不合格
+    ok, why, miss = ott_judge(dict(good, outhash=dict(error="x")), ident, (), None)
+    assert not ok, why
+    # NC6: e2e 不合格 (r[pass]=False) → 不合格
+    ok, why, miss = ott_judge(dict(good, **{"pass": False}), ident, (), None)
+    assert not ok, why
+    # auto 既定: junkHi 閾値ちょうどは PASS / 超過・取得不能は FAIL。IR 一致 None でも auto は影響されない
+    auto = ("f2", "f7", "p1")
+    a_ok = {"pass": True, "outhash": None, "census0": census(OTT_AUTO_JUNKHI_MAX)}
+    assert ott_judge(a_ok, {k: None for k in ident}, auto, None)[0]
+    assert not ott_judge(dict(a_ok, census0=census(OTT_AUTO_JUNKHI_MAX + 1)), ident, auto, None)[0]
+    assert not ott_judge(dict(a_ok, census0=None), ident, auto, None)[0]
+    print("T18 ok (ott_judge: 正 1 / ネガコン NC1 IR None・NC2 IR 不一致・NC3 outhash 未実施・NC4 不一致・NC5 失敗・NC6 e2e 不合格・auto junkHi 閾値)")
+
+
 if __name__ == "__main__":
-    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t17):
+    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t17, t18):
         f()
     print("ALL UNIT TESTS PASS")

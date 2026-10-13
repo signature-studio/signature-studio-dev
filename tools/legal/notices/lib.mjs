@@ -55,6 +55,7 @@ export function loadRecords(dir = RECORDS_DIR) {
 
 const HEX64 = /^[0-9a-f]{64}$/;
 const HEX40 = /^[0-9a-f]{40}$/;
+const KINDS = ["rebuilt", "vendored", "fl-embedded", "font-asset"];
 export const DEFAULT_FORBIDDEN_ARGS = ["--enable-gpl", "--enable-nonfree", "--enable-version3", "--enable-libx264", "--enable-libx265", "--enable-libxvid"];
 
 /** 記録 1 件の検証。問題の文字列配列を返す (空 = OK)。repoRoot を渡すとパッチ/スクリプトの実在と sha256 も検査 */
@@ -95,6 +96,43 @@ export function validateRecord(rec, expectedId, { repoRoot = REPO, forbiddenArgs
       if (!existsSync(f)) at(`パッチが repo に無い: ${pt.path}`);
       else if (sha256(readFileSync(f)) !== pt.sha256) at(`パッチ ${pt.path} が記録時から変わっている (再ビルドして記録を更新)`);
     }
+  }
+  return p;
+}
+
+/**
+ * font-asset (GUI-9 の OSS 代替フォント。リポジトリには入れず fetch スクリプトが取得する) の検証。問題文字列の配列 (空 = OK)。
+ *   - upstream は commit 固定 (url に commit を含む)・版・著作権表示・ライセンス本文 (sha256 一致)・各ファイルの size/sha256 が必須
+ *   - 各ファイルの sha256 が取得スクリプト (coveredBy) の検証値と一致すること (registry だけ更新して取得物が変わる事故の検出)
+ *   - 各ファイルの sha256 が release guard の allow-list にあること (FL 同梱の旧版と窓を共有し、無いと公開物が exit 6 になる: REPORT)
+ */
+export function validateFontAsset(c, { repoRoot = REPO } = {}) {
+  const p = [];
+  const f = c.fontAsset;
+  if (!f) return ["fontAsset が無い"];
+  if (!c.version) p.push("version が無い");
+  for (const k of ["copyright", "repository", "commit"]) if (!f[k]) p.push(`fontAsset.${k} が無い`);
+  if (!HEX40.test(f.commit ?? "")) p.push("fontAsset.commit が 40hex でない (upstream は commit 固定)");
+  if (typeof f.modified !== "boolean") p.push("fontAsset.modified (true/false) が無い");
+  if (typeof f.reservedFontName !== "boolean") p.push("fontAsset.reservedFontName (true/false) が無い");
+  const lic = f.licenseFile ?? {};
+  if (!lic.path || !lic.url || !lic.text) p.push("fontAsset.licenseFile (path / url / text) が無い");
+  else if (sha256(lic.text) !== lic.sha256) p.push("fontAsset.licenseFile の sha256 が本文と一致しない");
+  if (lic.url && !lic.url.includes(f.commit ?? "\0")) p.push("fontAsset.licenseFile.url が commit 固定でない");
+  if (!Array.isArray(f.files) || f.files.length === 0) p.push("fontAsset.files が空");
+  const script = (c.coveredBy ?? []).map((x) => path.join(repoRoot, x)).find((x) => existsSync(x) && statSync(x).isFile());
+  const scriptText = script ? readFileSync(script, "utf8") : null;
+  if (scriptText === null) p.push("coveredBy に取得スクリプト (ファイル) が無い");
+  const allowPath = path.join(repoRoot, "tools/legal/release-guard/allowlist.json");
+  const allow = existsSync(allowPath) ? (JSON.parse(readFileSync(allowPath, "utf8")).entries ?? []) : [];
+  for (const x of f.files ?? []) {
+    if (!x.name || !x.url || !HEX64.test(x.sha256 ?? "") || !Number.isInteger(x.size)) {
+      p.push(`fontAsset.files の項目が不正: ${JSON.stringify(x)}`);
+      continue;
+    }
+    if (!x.url.includes(f.commit ?? "\0")) p.push(`${x.name}: url が commit 固定でない`);
+    if (scriptText !== null && !scriptText.includes(x.sha256)) p.push(`${x.name}: sha256 が取得スクリプトの検証値に無い (registry と取得物が食い違う)`);
+    if (!allow.some((e) => e.sha256 === x.sha256 && e.reason)) p.push(`${x.name}: sha256 が release-guard の allowlist.json に無い (FL 同梱フォントと窓を共有するため公開物が guard で exit 6 になる)`);
   }
   return p;
 }
@@ -162,7 +200,7 @@ export function checkRegistry({ registry, records, fonts, repoRoot = REPO, track
     if (!c.id || ids.has(c.id)) w(`id が空か重複`);
     ids.add(c.id);
     for (const k of ["name", "kind", "license"]) if (!c[k]) w(`${k} が無い`);
-    if (!["rebuilt", "vendored", "fl-embedded"].includes(c.kind)) w(`kind "${c.kind}" が不正 (rebuilt | vendored | fl-embedded)`);
+    if (!KINDS.includes(c.kind)) w(`kind "${c.kind}" が不正 (${KINDS.join(" | ")})`);
     if (typeof c.bundled !== "boolean") w("bundled (true/false) が無い");
     if (c.bundled === false && !c.reason) w("bundled=false には reason が必要 (同梱しない根拠)");
     for (const cp of c.coveredBy ?? []) if (!existsSync(path.join(repoRoot, cp))) w(`coveredBy のパスが repo に無い: ${cp}`);
@@ -187,6 +225,8 @@ export function checkRegistry({ registry, records, fonts, repoRoot = REPO, track
       if (!Array.isArray(v.modifications)) w("vendored.modifications (無改変は [] を明示) が必要");
     } else if (c.kind === "fl-embedded") {
       if (!c.flTexts?.length) w("fl-embedded で bundled=true なのに flTexts (FL 同梱表記) が無い");
+    } else if (c.kind === "font-asset") {
+      for (const m of validateFontAsset(c, { repoRoot })) w(m);
     }
     if (c.copyleft && !["none", "weak", "strong"].includes(c.copyleft)) w(`copyleft "${c.copyleft}" が不正`);
     if (c.copyleft === "strong") w("copyleft=strong (GPL 系) は同梱不可 (docs/LEGAL.md §3.2)");
@@ -274,6 +314,14 @@ function componentLines(c) {
     const v = c.vendored;
     L.push("", `Vendored source: ${v.url} @ ${v.commit}`, `Path in this repository: ${v.path}`);
     L.push(v.modifications.length ? "Modifications:" : "Modifications: none", ...v.modifications.map((m) => `  - ${m}`));
+  }
+  if (c.kind === "font-asset") {
+    const f = c.fontAsset;
+    L.push("", `Copyright: ${f.copyright}`, `Upstream: ${f.repository} @ ${f.commit}`);
+    L.push(`Reserved Font Name: ${f.reservedFontName ? "yes" : "none"}.  Modified: ${f.modified ? "yes" : "no (the font files are distributed byte-for-byte as obtained from upstream)"}.`);
+    L.push("Font files (not part of FL Studio; fetched from the URL below and verified by SHA-256):");
+    for (const x of f.files) L.push(`  - ${x.name}  ${x.size} B  sha256:${x.sha256}`, `    ${x.url}`);
+    L.push("", `License text (${c.license}) from upstream: ${f.licenseFile.path}  (${f.licenseFile.url})`, line(), f.licenseFile.text.replace(/\n$/, ""), line());
   }
   if (c.kind === "fl-embedded") L.push("", "Included inside FL Studio binaries that are translated into the WebAssembly output; the notice text shipped with FL Studio is reproduced in Appendix A.");
   for (const r of c.recs) {
@@ -464,6 +512,22 @@ export function checkArtifact({ entries, registry = loadRegistry(), records = lo
       for (const h of scanFile(e.file, sigs)) {
         if (!detected.has(h.id)) detected.set(h.id, []);
         detected.get(h.id).push({ key: e.key, sig: h.sig, kind: h.kind, reason: h.reason });
+      }
+    }
+  }
+  // font-asset は固有文字列に頼らず、ファイル全体の sha256 (size で絞る) で検出する。改変・subset 版は検出範囲外 (REPORT)
+  const fontAssets = registry.components.flatMap((c) => (c.fontAsset?.files ?? []).map((x) => ({ id: c.id, ...x })));
+  if (fontAssets.length) {
+    for (const e of entries) {
+      if (e.key === NOTICES_TXT || e.key === NOTICES_HTML) continue;
+      const size = statSync(e.file).size;
+      const cands = fontAssets.filter((x) => x.size === size);
+      if (!cands.length) continue;
+      const sum = sha256(readFileSync(e.file));
+      for (const x of cands) {
+        if (x.sha256 !== sum) continue;
+        if (!detected.has(x.id)) detected.set(x.id, []);
+        detected.get(x.id).push({ key: e.key, sig: `sha256:${sum.slice(0, 12)} (${x.name})`, kind: "component" });
       }
     }
   }

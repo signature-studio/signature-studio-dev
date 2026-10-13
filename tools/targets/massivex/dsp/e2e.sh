@@ -7,11 +7,12 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 BASE="$(cd "$HERE/.." && pwd)"     # tools/targets/massivex
 cd "$BASE"
+source "$HERE/../../../shared/env.sh"
 DSP="$BASE/dsp"
 W="$DSP/work"
 PE="${MX_PE:-$BASE/work/extracted/VST3/Massive X.vst3}"
 [ -f "$PE" ] || { echo "FATAL: PE not found: $PE (cwd=$(pwd))" >&2; exit 2; }
-X64C="${MX_X64C:-/home/ubuntu/work/webstudio/tools/flelift/x64c.py}"
+X64C="${MX_X64C:-$REPO_ROOT/tools/flelift/x64c.py}"
 [ -f "$X64C" ] || { echo "FATAL: x64c not found: $X64C" >&2; exit 2; }
 L0="$(cut -d' ' -f1-3 /proc/loadavg)"
 

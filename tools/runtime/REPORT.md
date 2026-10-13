@@ -61,6 +61,8 @@
 - **headless では判定不能**: `AudioContext` 経路 (`resume()` と AudioWorklet) が Firefox headless で 20 s 内に完了せず (step timeout)、Worker 内 WebGL2 は null。runner に音声デバイス・GPU が無い影響の可能性が高く、**Firefox の AudioWorklet / WebGL2 可否は未確定** (実機が必要)。
 - **変更**: `features.js` に各 step 20 s の hang ガードと `window.__partial/__step` を追加 (旧版は 1 step の hang で `__result` が出ず全体が止まる)。Chrome 結果への影響なし (`run_features.mjs` で Chromium 完走を確認)。
 
+**RT-10 実 FLEngine lift の起動時間・tier-up・soak (#128)** — 実 x64c lift (boot 連鎖) の wasm を Chrome Worker で計測 (サイズ・圧縮・起動・帯域・tier-up・boot ループ soak)。**初回フレームと実 FL の soak は未測** (boot が unit 209/942 で停止)。数値・再現: [`rt10/REPORT.md`](rt10/REPORT.md)。
+
 **その他の確定事実**: AudioWorklet 内で `Atomics.wait` は TypeError (消費専用)、Worker 内 OffscreenCanvas(WebGL2/2D/rAF)・OPFS sync handle・nested Worker すべて可、`Memory.toResizableBuffer` あり、JSPI あり、shared wasm32 4GiB / memory64 8GiB grow 可。
 
 ## 設計上の要点 (実装済み)
@@ -72,7 +74,7 @@
 ## 未解決・ブロッカー
 0. **RT-3 (#121)**: (a) 実 FLEngine / `tools/gui/e2e.sh` (emsdk+RetDec 要) 経由の実 shim での入力往復は未実施 (本 run は素材・emsdk 無し)。(b) **入力経路が 2 本** (GuiShared 入力リング `gui.ts` と PumpRing): どちらを正とするかは GUI-3 #174 / GUI-11 #32 で決定 (DESIGN §2.6)。(c) index.html の `#screen` は `setupCanvas` が 2d context 取得済みで `transferControlToOffscreen` 不可 → FL 結合時に寄せる。(d) Firefox/Safari の OffscreenCanvas commit 挙動は未測定 (RT-9)。
 1. **Safari 未測定** (Firefox 157 headless は #127 で測定済み)。Safari 実機で `window.__result` の共有が必要 (起票先: #127)。Firefox の AudioWorklet / Worker WebGL2 も headless では判定不能 (実機が必要)。
-2. **実 FL サイズ wasm が未生成** → 合成 (≤52 MiB) からの外挿 (推定)。実測は FLEngine lift 完成後。
+2. **実 FL サイズ wasm**: x64c boot 連鎖で実測済み (RT-10 #128, 数値は `rt10/REPORT.md`)。残: boot が初回フレームに届いた後の総時間と実 FL の soak (起票先: #541 [RT-12])。
 3. 本番 pthread ビルドの boot e2e は **shim MT 自己テスト main で実証済み (#120)**。残: 実 FLEngine lift を同フラグでビルドした boot (起票先: #227 ICALL-1 / RT-10)。
 3b. この run は `work-m11` 無しで M1/M6/M10/M11 の既存 e2e が skip された。`oc_artifacts: fl-win64 work-m11` で再実行し、本変更後も 4 本が ALL OK のままか確認 (起票先: #120 に再検証コメント / PM 判断)。
 3c. 本番 R2 配信では glue (.mjs) にも COOP/COEP/CORP を付ける必要 (起票先: RT-7)。
@@ -93,7 +95,7 @@
 - **RT-7 (deploy / M12)** R2: COOP/COEP/CORP 注入、wasm は同一オリジン、`Content-Encoding: br`、hash 名 immutable、`manifest.json` は no-cache。
 - **RT-8 (CI)** lift 成果物ごとに wasm32/wasm64 両ビルドを回し 4GiB 超仮定を早期検出。**OTT 分は実装済み** (`ci/wasm64_check.sh`、下記「RT-8 実測」)。未了: (a) M11 boot closure 等 OTT 以外の target (`ci/targets/<name>.sh` を足す方式)、(b) GitHub Actions への常設 (素材が R2 の work-* のため workflow 化には素材取得の設計が要る)。
 - **RT-9 (互換)** Firefox/Safari マトリクス取得と JSPI/memory64 の機能検出フォールバック設計。
-- **RT-10 (soak)** 実 FLEngine lift で download→compile→instantiate→初回フレームの総時間と tier-up 影響を計測。
+- **RT-10 (soak)** 実 FLEngine lift で download→compile→instantiate→boot の総時間と tier-up 影響を計測 (**実施済み・初回フレームは未達**: `rt10/REPORT.md`)。
 
 ## 他担当・既存 e2e との整合 (検収時点)
 - `pnpm typecheck` / `pnpm build` 通過。B (`gui*.ts`) / C (`audio*.ts`) と import・設定の衝突なし。

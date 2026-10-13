@@ -104,6 +104,42 @@ notices ゲートは 05-stage の**全**呼び出しに掛かる。NOTICES を�
 - notices 側に回帰なし (`32d6a18`、fl-win64 展開済): `bash tools/legal/notices/e2e.sh` (`--wasm` なし) は **ALL PASS ×3**・1.14 / 1.58 / 1.60 s (load average 0.68–0.70、PASS 17 項目・FAIL 0)、`notices.test.mjs` は 37/37 ×3 (0.21–0.22 s)。`--wasm` 側 (emsdk が要る 3 件の NEG) は今回再実行していない (build.sh の再実行を伴うため)。PR 本文の `oc_artifacts:` に `toolchain-emsdk` を足したので、再レビューの run で実行できる。
 - ネガティブコントロール: 修正前 `a57aa0a` で #11 が 3/3 失敗 (上表) = 指摘の再現。`notices.test.mjs` 側のゲート検証 (`05-stage に NOTICES の無い dist` で exit 7) は変更なし。
 
+## 代替フォント Open Sans / Barlow の登録 (LGL-8, #616。検証起点: コミット `3ec58b5`・クリーン worktree・fl-win64 展開済)
+
+GUI-9 (#186) は Windows 標準フォントを同梱せず Open Sans / Barlow へ alias する。この 2 つを NOTICES に登録し、release guard (#85) と矛盾しないことを実測した。**事実整理であり法的助言ではない**。
+
+- registry に `kind: "font-asset"` を追加し `open-sans` (3.003) / `barlow` (1.408) を `bundled=true` で登録。NOTICES に版・著作権表示・upstream の repo と **commit (40hex 固定)**・ファイルの URL / size / sha256・OFL 1.1 本文 (upstream の `OFL.txt` を sha256 付きで埋込) を出す。取得元は `tools/gui/test/fetch_fonts.sh` (`coveredBy`)。
+- 取得物はどちらも Reserved Font Name 指定なし (`OFL.txt` に指定行なし)・無改変。FL 同梱の同名フォント (`fonts.json` の origin-unverified) とは**別バイト列** (FL の Barlow-Regular 98,812 B / OpenSans-Regular 217,360 B に対し、代替は 104,068 B / 147,528 B)。
+- `check` は font-asset を検査する: commit/URL の固定・本文 sha256・`fetch_fonts.sh` の検証値との一致 (registry だけ更新して取得物が変わる事故の検出)・release-guard allow-list への登録。成果物走査は**ファイル全体の sha256** (size で絞る) で代替フォントを検出し、`bundled=false` なら失敗する。
+- **release guard との矛盾を実測で発見**: allow-list 無しだと代替フォントは FL 同梱の旧版と窓を共有し **exit 6** (Barlow 48 窓・OpenSans 10 窓)。公開物に載せられないので `release-guard/allowlist.json` に 2 件を `kinds:["window"]` + sha256 で追加した (file / chunk 一致は許容しない)。
+
+### 実測 (`3ec58b5`。n=3)
+
+| 項目 | 実測 |
+|---|---|
+| `FL_WIN64_DIR=<fl-win64> bash tools/legal/notices/e2e.sh` | **ALL PASS ×3**・22.45 / 22.65 / 23.76 s (load average 終了時 0.86–1.17、並列 1)。PASS 27 項目・FAIL 0 (うち NEG 12) |
+| `notices.test.mjs` | 54/54 PASS ×3・0.24–0.25 s (今回 +17 件。font-asset の NEG 10 + registry 経由 1 + allow-list 1 ほか。FL 素材と `fetch_fonts.sh` 取得物が無いと実フォントの 3 件は skip) |
+| `pnpm release-guard:test` | 12/12 PASS ×3 |
+| deny-list 生成 (e2e §7) | 18,350 file sha256 / 1,315,811 windows (抽出物 25,166 files のみ。インストーラ exe は含めない) |
+
+ネガティブコントロール (e2e §7。全て期待どおり):
+
+| 壊し方 | 結果 |
+|---|---|
+| 代替フォント 2 本 + NOTICES を載せた成果物 | notices-check PASS・検出 `barlow,open-sans`・release guard PASS (allow-list 許容 2 files) |
+| allow-list 無しで同じ成果物を走査 | release guard exit 6 (window) = allow-list が効いている証拠 |
+| FL 同梱の `Barlow-Regular.ttf` (block24367) を載せる | exit 6 (file sha256 一致 + window 78 件)。allow-list があっても通らない |
+| 代替 OpenSans を 1 B 付加 | exit 6 (sha256 が変わり allow-list から外れる) |
+| FL の PE (block25164) 先頭 40,000 B | exit 6 (window 38 件) = allow-list 追加後も検出力は落ちていない |
+| registry の open-sans を `bundled=false` にして実フォントを載せる | notices-check exit 1 (`open-sans の痕跡 … bundled=false`) |
+| NOTICES から `[component:open-sans]` を削除 | exit 1 (`同梱 component open-sans が無い`) |
+| 単体: sha256 の食い違い・本文改ざん・commit 非固定・allow-list 欠落・取得スクリプト無しほか 10 件 | 各々 `validateFontAsset` が検出 |
+
+- e2e §7 は `fetch_fonts.sh` (ネットワーク + sha256 検証) が失敗したら **FAIL** にする (黙って skip しない)。
+- 同じ変更で、main 時点で既に `check` が失敗していた件 (`tools/startup/license_obs/license_obs.sh` が未登録のライセンス名ファイルとして検出。`920f837` 由来) を `ignoreLicensePaths` に登録した。本ファイルは OSS のライセンス文ではなくスクリプト (名前が `license_*` に一致するだけ)。登録しないと `notices:check` が通らず本 PR の検証ができなかった。
+
+範囲外 (主張しない): 他のウェイト (Bold / Light 等) は fetch していないため未登録 (alias 表が要求した時点で追加)。実フォントを公開物へ載せる結線 (VFS #22 からの配布) はまだ無く、`bundled=true` は**載せる前提の保守的登録**。改変・subset 化した版は sha256 が変わるため成果物走査では検出されない (その版を載せるなら registry の追加が要る)。upstream (GitHub raw) の可用性に依存する。
+
 ## 範囲 / 範囲外
 
 検証範囲: 既存 05-stage 呼び出し元の回帰 (`pnpm release-guard:test`・`chunked.test.mjs`)・fl-win64 素材 (FL 同梱表記 15 本・ファイル一覧)・emsdk 6.0.12 で実行した上記 7 本の build.sh・`vite build`・`05-stage.mjs`。

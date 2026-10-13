@@ -81,6 +81,20 @@ void gdi_init(void);
 void gdi_fill_rect_dc(U64 hdc, WRECT r, uint32_t colorref);
 int  gdi_dc_is_valid(U64 hdc);
 
+/* ---- テキストエンジン (GUI-9 #186; gui_ft.c が実装)。未登録なら gui_gdi.c は内蔵 8x8 フォントで描く ---- */
+typedef struct { int ascent, descent, height, internal_leading, external_leading, avg_width, max_width, first, last, def_char, brk_char; } GuiTextMetrics;
+typedef struct { int advance, w, h, left, top; uint8_t *cov; } GuiGlyph;   /* cov = w*h の 8bit coverage (malloc; 呼出側が free)。left/top = ペン原点(ベースライン)からの bitmap 左上 (top は上向き正) */
+typedef struct GuiTextEngine {
+  void *(*open)(const uint16_t *face16, int height, int weight, int italic);   /* height: LOGFONT 規約 (<0 = em px, >0 = cell px, 0 = 既定)。NULL = 解決不能 (8x8 へ) */
+  void (*close)(void *f);
+  void (*metrics)(void *f, GuiTextMetrics *m);
+  int (*glyph)(void *f, uint32_t cp, int render, GuiGlyph *g);                 /* 1 = ok。render=0 は advance のみ */
+  int (*resolve)(const uint16_t *face16);                                      /* face 名 -> 登録 index (<0 = 未解決)。alias 含む */
+  int (*nfaces)(void);
+  const char *(*face_name)(int idx);
+} GuiTextEngine;
+void gui_set_text_engine(const GuiTextEngine *e);
+
 /* ---- 小物 ---- */
 #define COLORREF_TO_BGRA(c) (0xFF000000u | (((c) & 0xFFu) << 16) | ((c) & 0xFF00u) | (((c) >> 16) & 0xFFu))
 #define BGRA_TO_COLORREF(p) ((((p) >> 16) & 0xFFu) | ((p) & 0xFF00u) | (((p) & 0xFFu) << 16))

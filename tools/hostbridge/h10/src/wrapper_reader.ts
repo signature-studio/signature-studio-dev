@@ -72,11 +72,15 @@ function fixed(payload: Uint8Array, n: number): Uint8Array {
   return out;
 }
 
-function decode(payload: Uint8Array, enc: 'ansi' | 'utf8'): string {
-  return new TextDecoder(enc === 'utf8' ? 'utf-8' : 'latin1').decode(payload);
+/** CP_ACP models for version <= 8 strings: shimx default (str.c `g_acp = 1252`) and a Japanese Windows host (932, `shimx_set_acp(932)`) */
+export type AnsiCodePage = 'windows-1252' | 'shift_jis';
+
+function decode(payload: Uint8Array, enc: 'ansi' | 'utf8', acp: AnsiCodePage): string {
+  return new TextDecoder(enc === 'utf8' ? 'utf-8' : acp).decode(payload);
 }
 
-export function readWrapperChunk(buf: Uint8Array): WrapperRead {
+/** `acp` only matters for version <= 8 (ANSI); version >= 9 is UTF-8 regardless of CP_ACP. Default 1252 = shimx's default CP_ACP. */
+export function readWrapperChunk(buf: Uint8Array, acp: AnsiCodePage = 'windows-1252'): WrapperRead {
   const fields = emptyFields();
   const out: WrapperRead = { status: 'too-short', version: 0, records: [], fields, consumedAll: false, stringEncoding: 'ansi' };
   if (buf.length < 4) return out;
@@ -116,11 +120,11 @@ export function readWrapperChunk(buf: Uint8Array): WrapperRead {
       case 0x33: fields.magic = new DataView(fixed(payload, 4).buffer).getUint32(0, true); break;
       case 0x34: fields.cid = fixed(payload, 0x10); break;
       case 0x35: fields.state = payload.slice(); break;
-      case 0x36: fields.name = decode(payload, enc); break;
-      case 0x37: fields.path = decode(payload, enc).replace(/\//g, '\\'); break; // fw:0x8760bd StringReplace('/' → '\')
-      case 0x38: fields.vendor = decode(payload, enc); break;
+      case 0x36: fields.name = decode(payload, enc, acp); break;
+      case 0x37: fields.path = decode(payload, enc, acp).replace(/\//g, '\\'); break; // fw:0x8760bd StringReplace('/' → '\')
+      case 0x38: fields.vendor = decode(payload, enc, acp); break;
       case 0x39: fields.vstVersion = new DataView(fixed(payload, 4).buffer).getUint32(0, true); break;
-      case 0x3a: fields.clapId = decode(payload, enc); break;
+      case 0x3a: fields.clapId = decode(payload, enc, acp); break;
       default: break; // unknown id: skipped
     }
     pos = seekTo;
