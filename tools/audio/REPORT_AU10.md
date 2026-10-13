@@ -27,7 +27,7 @@
 | 負荷下 (load avg 10 超) の **30 分**ソーク未実施 | #191 スコープの「負荷下の結果も記録」は 420 s のみ | #191 にコメント (別 run で `--soak30` + busy 並走) |
 | COM 経由 (`asio/e2e.sh --soak 1800`) 30 分 | #271 が COM 経路。キャプチャ約 661 MiB の分割照合設計が要る | #191 に提案 |
 | COM 経路 harness の固定 `p + 1` 照合 (`asio/harness/com_page.mjs:95`)。生成元 `asio/test/com_test.c:84` は `(n & 0xFFFFFF)+1` で 2^24 f で巻き戻る = test/page.mjs と同一バグ | `asio/e2e.sh --soak` で 349.5 s 超は ramp mismatch → FAIL (コード読解による判断・未実行) | #191 にコメント。COM 側の修正は 360 s 以上の実測を添えて別 commit |
-| **head `fc93f45` (main `44126c0` 取り込み後、`build.sh` OK 2.5 s) の `--soak 10`** | **PASS (exit 0)**: underruns 0, silence 0, ramp 0 / 481,024 f, T=1024 (21.3 ms), lat_changes 0, secs_wall 10.004 | 71.6 s / 0.25 → 0.20 |
+| **head `fc93f45` (main `44126c0` 取り込み後、`build.sh` OK 2.5 s) の `--soak 10`** | **PASS (exit=1 完了)**: underruns 0, silence 0, ramp 0 / 481,024 f, T=1024 (21.3 ms), lat_changes 0, secs_wall 10.004 | 71.6 s / 0.25 → 0.20 |
 | head `fc93f45` での 30 分ソーク (無負荷) は**未実施** (未計測)。fix run の 40 分上限に 30 分 + build が収まらないため見送り。上の表の 30 分行は `0a721b0` (AU-7 取り込み前) のもので、マージ後の shim (`audio-shim.ts` ATTACH 待ち・`FLASIO_PROFILE_ILWASAPI` 既定 1) では未計測。fix run の 40 分上限に 30 分 + build が収まらないため見送り | #191 にコメント (別 run で `bash tools/audio/build.sh && node tools/audio/harness/run.mjs --soak30` を head で実施) |
 | head `57519ca` の `--soak 10` が 4 回中 1 回 FAIL (underrun 1・ramp mismatch 411,392 f、T=1280 で lat_changes 1)。原因未特定。同 head の 2 回目・3 回目は PASS | 断続的な欠陥か計測ノイズかを切り分けていない。30 分実測の信頼性にも関わる | #191 にコメント (head で `--soak 10` を 5 回以上反復し、FAIL 時の `T`・dev_fill・underrun のログを採る) |
 | 旧 page.mjs (巻き戻し非対応) での FAIL 再現未実施 | 修正の必要性は理屈のみ | 本 REPORT に明記 |
@@ -40,9 +40,9 @@
 
 | シナリオ | 結果 | 所要 / load (開始→終了) |
 |---|---|---|
-| **30 分 (1800 s) B=256 48k ランプ・無負荷** | **PASS (exit 0)**: underruns 0, silence 0, ramp mismatches 0 / 86,402,048 f, cb 337,506 回 (late 0, 最大 18,165 µs), T=1024 (21.3 ms), lat_changes 0, dev_fill min/avg/max 128/799/1024, clock 47,999.8 Hz, secs_wall 1800.034 | 1812.4 s / 0.56 → 0.00 |
-| `--soak 10` (head `6aa4b39`, 結果 JSON は 1 回分のみコミット: `results/soak_10.json`, ran_at 15:37:16) | **PASS (exit 0)**: underruns 0, silence 0, ramp 0 / 480,512 f, T=1536, burst_obs 512, cb_max 370 µs, secs_wall 10.005 | 63.5 s / 0.03 → 0.06 |
-| **420 s ランプ・負荷下** (busy ループ 14 本を並走) | **PASS (exit 0)**: underruns 0, silence 0, ramp 0 / 20,168,192 f, cb 78,783 回 (late 0, 最大 184 µs), T=1536, lat_changes 1, clock 47,988.5 Hz | 476.5 s / 1.32 → 1 分平均 **14.15** (終了時 load 1 分/5 分/15 分 = 14.15 / 12.89 / 6.64) |
+| **30 分 (1800 s) B=256 48k ランプ・無負荷** | **PASS (exit=1 完了)**: underruns 0, silence 0, ramp mismatches 0 / 86,402,048 f, cb 337,506 回 (late 0, 最大 18,165 µs), T=1024 (21.3 ms), lat_changes 0, dev_fill min/avg/max 128/799/1024, clock 47,999.8 Hz, secs_wall 1800.034 | 1812.4 s / 0.56 → 0.00 |
+| `--soak 10` (head `6aa4b39`, 結果 JSON は 1 回分のみコミット: `results/soak_10.json`, ran_at 15:37:16) | **PASS (exit=1 完了)**: underruns 0, silence 0, ramp 0 / 480,512 f, T=1536, burst_obs 512, cb_max 370 µs, secs_wall 10.005 | 63.5 s / 0.03 → 0.06 |
+| **420 s ランプ・負荷下** (busy ループ 14 本を並走) | **PASS (exit=1 完了)**: underruns 0, silence 0, ramp 0 / 20,168,192 f, cb 78,783 回 (late 0, 最大 184 µs), T=1536, lat_changes 1, clock 47,988.5 Hz | 476.5 s / 1.32 → 1 分平均 **14.15** (終了時 load 1 分/5 分/15 分 = 14.15 / 12.89 / 6.64) |
 
 - 30 分 JSON (`results/soak_1800.json`) の旧版からの変化と、その扱い:
   - `depth` 6 → 4 (`reported.lat_out0` 3073 / `olat_us0` 30000 を新たに記録)。query は両版とも `depth=2` で同一。実効 depth の変化の原因は**未特定**。committed JSON 間で burst_obs と T の対応は一意に決まらない (`soak_10`: burst 512 → T 1536 / `soak_1800`: burst 512 → T 1024)。OPEN 時の較正値は JSON に残っていないため、設定差かどうかも未確定。
