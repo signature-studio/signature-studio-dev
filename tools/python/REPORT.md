@@ -1,6 +1,6 @@
 # G python-mcp — CPython wasm + flapi/MCP 解析 + ブリッジ設計 (2026-10-10)
 
-> 行数上限 (250 行) のため、§7c (#82)・§9 (T1〜T9 表)・§PY-13 (#588)・§12・§13 (#81) の全文は [REPORT_APPENDIX.md](REPORT_APPENDIX.md)、§15 (#654) の全文は [REPORT_PY16.md](REPORT_PY16.md) に分割移動 (本体は要約のみ)。
+> 行数上限 (250 行) のため、§7c (#82)・§9 (T1〜T9 表)・§PY-13 (#588)・§12・§13 (#81) の全文は [REPORT_APPENDIX.md](REPORT_APPENDIX.md)、§15 (#654) の全文は [REPORT_PY16.md](REPORT_PY16.md) に分割移動 (本体は要約のみ)。channels 7 関数の PE 解析 (PY-39, #1527) は [REPORT_PY39.md](REPORT_PY39.md)。
 
 ## 結論 (先出し)
 
