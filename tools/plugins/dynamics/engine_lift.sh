@@ -11,7 +11,7 @@ B="$1"; TMO="${2:-1200}"
 OUT="work/dynamics/engine$B"; mkdir -p "$OUT/tmp"
 python3 dynamics/engine_ranges.py "$B" > "$OUT/ranges.txt" 2> "$OUT/ranges.info"
 t0=$(date +%s)
-bash lift/lift_ranges.sh "$FL_WIN64_DIR/extracted/block$(printf %05d "$B")_PE.bin" "$OUT/ranges.txt" "$OUT" e "$TMO" > "$OUT/lift.log" 2>&1
+PLUG_F80_LOWER=${PLUG_F80_LOWER:-1} bash lift/lift_ranges.sh "$FL_WIN64_DIR/extracted/block$(printf %05d "$B")_PE.bin" "$OUT/ranges.txt" "$OUT" e "$TMO" > "$OUT/lift.log" 2>&1
 rc=$?
 t1=$(date +%s)
 DEF=$(grep -c '^define' "$OUT/e.final.ll" 2>/dev/null || echo 0)

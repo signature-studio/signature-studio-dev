@@ -9,15 +9,24 @@ import re, sys
 src = open(sys.argv[1]).read().split('\n')
 out, n = [], 0
 i64 = set()
+i32 = set()
 uid = 0
 for l in src:
     m = re.match(r'^define .*?@[\w.$]+\((.*)\)', l)
     if m:
         i64 = set(re.findall(r'i64 (%[\w.$]+)', m.group(1)))
+        i32 = set(re.findall(r'i32 (%[\w.$]+)', m.group(1)))
     else:
         d = re.match(r'^\s*(%[\w.$]+) = (?:ptrtoint .* to i64|(?:add|sub|mul|and|or|xor|shl|lshr|ashr|select|load|zext|sext|trunc|call) (?:i1 [^,]+, )?i64\b)', l)
         if d:
             i64.add(d.group(1))
+    for v in sorted(set(re.findall(r'inttoptr i64 (%[\w.$]+) to ptr', l))):
+        if v in i32:
+            uid += 1
+            z = '%s.z%d' % (v, uid)
+            out.append('%s%s = zext i32 %s to i64' % (re.match(r'^(\s*)', l).group(1), z, v))
+            l = l.replace('inttoptr i64 %s to ptr' % v, 'inttoptr i64 %s to ptr' % z)
+            n += 1
     c = re.match(r'^(\s*)(%[\w.$]+) = icmp (\w+) ptr (\S+), (\S+)$', l)
     if c:
         ind, dst, pred, a, b = c.groups()
