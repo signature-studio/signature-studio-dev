@@ -52,7 +52,7 @@ fl-win64 素材 (`block00031_PE.bin`、image base 0x400000) の `.text` を caps
 | 受入条件 | 状態 | 起票先 |
 |---|---|---|
 | case 生成 (`ldlib/cases.py`) で i128 / %tagPOINT を扱う | 未実装 | #1194 (本 issue に残す) |
-| native / wasm 実行器で i128 2 レジスタ投入・tagPOINT 投入 | 未実装 | #1194 |
+| native / wasm 実行器で i128 投入 (渡し方は候補 (a)(b) のどちらか未決)・tagPOINT 投入 | 未実装 | #1194 |
 | ABI を機械語で確認 (i128 の渡し方: 2 レジスタ分解 / ポインタ渡し、tagPOINT) | 部分 (§2)。候補 (a)(b) は未決。呼び先の署名確認と IR/機械語不一致の切り分けが残る | #1194 (本 PR の script を使う) |
 | 対象のうち実行可能になった件数を実測し REPORT_LD*.md に記録 | 未実施 (実行器が無いため 0 件) | #1194 |
 | 既存 pattern の判定を壊していないこと (e2e `liftdiff_e2e.sh --m11-only`) | **未実行**。本 PR は実行器・case を変えていないため、e2e 対象の挙動は変わらない | #1194 |
