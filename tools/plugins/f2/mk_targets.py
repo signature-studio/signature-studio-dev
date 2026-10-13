@@ -45,12 +45,13 @@ def build_image(path, to_rva):
                     relocs.append(page + (e & 0xfff))
             i += blk
     fixed = 0
-    for r in relocs if to_rva else []:
-        if r + 8 <= top:
-            v = struct.unpack_from('<Q', img, r)[0]
-            if base < v < base + size:
-                struct.pack_into('<Q', img, r, v - base)
-                fixed += 1
+    if to_rva:
+        for r in relocs:
+            if r + 8 <= top:
+                v = struct.unpack_from('<Q', img, r)[0]
+                if base < v < base + size:
+                    struct.pack_into('<Q', img, r, v - base)
+                    fixed += 1
     return bytes(img), {'base': base, 'size': size, 'top': top, 'reloc_dir64': len(relocs), 'fixed': fixed}
 
 

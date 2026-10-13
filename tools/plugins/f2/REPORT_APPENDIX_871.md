@@ -106,7 +106,8 @@ leaf_diff は IR leaf かつ機械語に間接 call 無しの 23 関数のみを
 - `/proc/<pid>/maps` (ロード後): image は `00400000-007b2000` (rwx) に mapping。**`0x30D0F4` を含む mapping は無い**。
 - `PEEK 0x30D0F4 16`: fault (ld_native の終了コード 98 = シグナルハンドラの `_exit(98)`)。対照 `PEEK 0x400000 1` は rc 0 で読めた。よって `ld_native` 内で `0x30D0F4` は**未 mapping**。
 - 0x5de250 の native 機械語 (逆アセンブル、capstone): `mov edx,[rcx]; and edx,0x7fffffff; cmp edx,[rip+0x12ecd6]` で、`rip` 相対の読み先は **`0x70CF34`** (image 内、RVA `0x30CF34`)。`PEEK 0x70CF34 4` の値は `0x00008033`。
-- IR (`tools/plugins/work/batch/19006/p.final.ll` 211 行) は `load i32, inttoptr (i64 3198772 = 0x30D0F4)`。native の読み先 `0x70CF34` とは一致しない (差は 0x400E40、ImageBase 補正 0x400000 では説明できない)。
+- IR (`tools/plugins/work/batch/19006/p.final.ll` 211 行) は `load i32, inttoptr (i64 3198772 = 0x30D0F4)`。native の読み先 `0x70CF34` とは一致しない。差は `0x70CF34 − 0x30D0F4 = 0x3FFE40`。IR 定数に ImageBase `0x400000` を足した `0x70D0F4` と native 読み先の差は `0x1C0` (native が 0x1C0 手前)。この `0x1C0` のずれの出どころは未確定。
+- 独立再検証 (`block19006_PE.bin` を展開し capstone で逆アセンブル): `0x5de250: mov edx,[rcx]` / `and edx,0x7fffffff` / `cmp edx,[rip+0x12ecd6]` (`0x5de258`、次命令 `0x5de25e`)。`0x5de25e + 0x12ecd6 = 0x70CF34` で本節の読み先と一致。
 - 修正前に wasm が読んでいた RVA `0x30D0F4` の先頭 16 byte は `01120805126800000d79100000000803`。native が実際に読む `0x30CF34` (`00008033`) とは別の内容。
 
 ### 結論 (部分)
