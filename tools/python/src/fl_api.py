@@ -4,7 +4,10 @@
   各関数 = `_flhost.call(fn_id, args)` を呼ぶ薄いラッパ。fn_id は table の列挙順 (flapi_ids.json と同一)。
 実装本体 (FLEngine 側) は JS ホストが fn_id → 実関数に対応付ける。Python 側に FL ロジックは無い。
 """
+import ast
+import importlib
 import json
+import operator
 import sys
 import types
 
@@ -14,6 +17,29 @@ import _flhost
 # Range error / Index out of range / Wrong number of function parameters or wrong parameter type / ...")
 _ERR = {1: ValueError, 2: RuntimeError, 3: RuntimeError, 4: IndexError, 5: TypeError, 6: RuntimeError,
         7: RuntimeError, 8: RuntimeError}
+
+# stubs 既定値の許可表。midi.* の値は利用者の midi モジュールから実行時に取る (値を repo に複製しない)。
+_DEFAULT_NAMES = frozenset({"midi.PIM_None", "midi.GT_All", "midi.LB_Status_Default", "midi.EKRes", "midi.MaxInt",
+                            "midi.ST_Int", "midi.PME_System", "midi.REC_None", "midi.GC_BackgroundColor",
+                            "midi.FPN_Param"})
+_DEFAULT_UNARY = {ast.UAdd: operator.pos, ast.USub: operator.neg}
+_DEFAULT_BINARY = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul, ast.Div: operator.truediv}
+
+
+def _default_value(expr):
+    # literal_eval は 1 / 24 (BinOp) を扱えないため、四則演算だけ operator で計算する
+    def ev(n):
+        if isinstance(n, ast.Constant) and (n.value is None or isinstance(n.value, (bool, int, float))):
+            return n.value
+        if isinstance(n, ast.UnaryOp) and type(n.op) in _DEFAULT_UNARY:
+            return _DEFAULT_UNARY[type(n.op)](ev(n.operand))
+        if isinstance(n, ast.BinOp) and type(n.op) in _DEFAULT_BINARY:
+            return _DEFAULT_BINARY[type(n.op)](ev(n.left), ev(n.right))
+        if isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name):
+            if f"{n.value.id}.{n.attr}" in _DEFAULT_NAMES:
+                return getattr(importlib.import_module(n.value.id), n.attr)
+        raise ValueError(f"unsupported stub default: {expr!r}")
+    return ev(ast.parse(expr, mode="eval").body)
 
 IDS = []
 
@@ -67,7 +93,7 @@ def _make(mod, name, fid, sig, kwsig=None):
             elif gap is not None:
                 continue  # gap 以降の未指定引数は省略 (既定値を足すと位置がずれる)
             elif n in defaults:
-                out.append(eval(defaults[n], {}))  # stubs 由来の単純リテラル (True/False/0/-1/None)
+                out.append(_default_value(defaults[n]))  # stubs 由来の既定値 (許可した式だけ)
             elif required is not None and i >= required:
                 gap = i if gap is None else gap
             else:
