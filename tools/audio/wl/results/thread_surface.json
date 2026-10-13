@@ -1,5 +1,5 @@
 {
- "pe": "/home/runner/work/_temp/fl-win64/extracted/block00031_PE.bin",
+ "pe": "extracted/block00031_PE.bin",
  "negctl": false,
  "functions": 57816,
  "imports": 795,

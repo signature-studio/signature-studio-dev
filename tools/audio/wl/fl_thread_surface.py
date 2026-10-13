@@ -46,6 +46,9 @@ GATE = [("thread_create", "CreateThread", 1), ("blocking_wait", "WaitForSingleOb
 API2CLASS = {a: c for c, s in CLASSES.items() for a in s}
 
 path = NEG_PE if (NEG and NEG_PE) else MAIN_PE
+# 出力 (stdout / JSON) に絶対パスを残さない: FL_WIN64_DIR 配下なら相対, それ以外は basename
+shown = (os.path.relpath(path, FL_WIN64_DIR) if os.path.abspath(path).startswith(os.path.abspath(FL_WIN64_DIR) + os.sep)
+         else os.path.basename(path))
 if NEG and not NEG_PE:
     # 既定の negctl: 同じスキャナを「実在しない API 名」に向けた gate (期待 FAIL) — 名前照合が空振りしていないことの確認
     GATE = [(c, n + "__negctl_nonexistent", m) for c, n, m in GATE]
@@ -133,7 +136,7 @@ for cls, name, mn in GATE:
     gate_res.append({"class": cls, "api": name, "min_call_sites": mn, "got": got, "ok": got >= mn})
 ok = all(g["ok"] for g in gate_res)
 
-print(f"PE: {path}  (ImageBase {base:#x}, functions(.pdata)={len(funcs)}, imports={len(iat)}, dlls={len(imports_by_dll)})")
+print(f"PE: {shown}  (ImageBase {base:#x}, functions(.pdata)={len(funcs)}, imports={len(iat)}, dlls={len(imports_by_dll)})")
 print(f"{'class':17s} {'api':34s} {'dll':26s} sites funcs")
 for r in rows:
     print(f"{r['class']:17s} {r['api']:34s} {r['dll']:26s} {r['call_sites']:5d} {r['distinct_functions']:5d}")
@@ -144,7 +147,7 @@ print("\n## gate")
 for g in gate_res:
     print(f"  {'PASS' if g['ok'] else 'FAIL'} {g['api']} call_sites={g['got']} (want >= {g['min_call_sites']})")
 if "--json" in sys.argv:
-    json.dump({"pe": path, "negctl": NEG, "functions": len(funcs), "imports": len(iat), "summary": summary, "rows": rows, "gate": gate_res, "ok": ok},
+    json.dump({"pe": shown, "negctl": NEG, "functions": len(funcs), "imports": len(iat), "summary": summary, "rows": rows, "gate": gate_res, "ok": ok},
               open(sys.argv[sys.argv.index("--json") + 1], "w"), indent=1)
 if NEG:
     print(f"\nnegctl: gate {'FAIL (期待どおり)' if not ok else 'PASS (= 検出能力なし)'}")
