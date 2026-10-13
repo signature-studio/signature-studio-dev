@@ -174,7 +174,7 @@
 - IR: `m11_gen_ir2.sh` rc=0 (44.2 s)。`ldfix=applied` (F1=902、errors=0)。`[ir11][M2q] function_980ed0 VA->LVA remap: 1 sites` (M2q 込み)。
 - build (既定、環境変数なし): rc=0 (25.1 s)。`[fix912] mode=off replaced=0` (既定は OFF)。
 - build (`M11_FIX_912=1`): rc=0。`[fix912] mode=on replaced=1`。
-- survey: `trap_triage/survey_units.mjs` (13.1 s / ON 側も同程度、rc=0)。load average 0.49–0.68。
+- survey: `trap_triage/survey_units.mjs` 既定 (OFF) 13.1 s・rc=0、load average 0.49–0.68。ON 側は rc=0 で集計のみ確認 (時間は未計測)。
 
 | 構成 | ok | oob | halt0 | miss | noproc | other | abort |
 |---|--:|--:|--:|--:|--:|--:|--:|
