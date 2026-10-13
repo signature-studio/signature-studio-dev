@@ -8,7 +8,7 @@
 
 | 受入条件 (#656) | 結果 |
 |---|---|
-| 1. 41 callee を列挙し、shim (または lift) を用意 | **部分達成**。41 件を列挙・分類済 (§2)。shim 4 件 (`new`/`delete`/`memcpy`/`getManager`) と lift 2 件 (`1800524e0`/`1800b4b10`) を追加し、未 lift は 40 件 (shim 4 + fail-fast 34 + AVX2 2)。残りは STL/EH/AVX2 で未達 |
+| 1. 未 lift callee を列挙し、shim (または lift) を用意 | **部分達成**。kh_lower の unlifted callees 40 件を列挙・分類済 (§2・元の 41 件は shim/lift 追加前)。shim 4 件 (`new`/`delete`/`memcpy`/`getManager`) と lift 2 件 (`1800524e0`/`1800b4b10`) を追加し、未 lift は 40 件 (shim 4 + fail-fast 34 + AVX2 2)。残りは STL/EH/AVX2 で未達 |
 | 2. function_180ef7fc0 を実行し分類結果・カテゴリを機械照合 (ネガコン付き) | **未達**。入口は依然として最初の未 lift callee `0x180112a30` で fail-fast (§3)。分類結果の lift IR 照合はできていない |
 | 3. REPORT の『lift IR では未検証』を『検証済み』に更新 | **未実施** (検証できていないため、KH249_REPORT §6.2 の記述は変更しない) |
 
@@ -24,7 +24,7 @@
 | `KH656_REPORT.md` | 本報告 |
 | `docs/DOC_MAP.md` | KH249 行に KH656_REPORT を追記 (行数欄は実数) |
 
-## 2. 未 lift callee 41 件の内訳 (実測)
+## 2. 未 lift callee 40 件の内訳 (実測)
 
 計測: `python3 scripts/kh656_census.py` (HEAD の lic_config・`lic_build.py --module F` の stat.json)。
 
