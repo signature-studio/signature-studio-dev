@@ -28,7 +28,7 @@
 
 - 回帰の機序 (確定していない・暫定): 0x5de250 は IR で `load i32 @ inttoptr (3198772 = 0x30D0F4)` を読み、その値で分岐する。0x30D0F4 は ImageBase (0x400000) より下で image 外。修正前は wasm 側がこの値を別の内容として読んでいた。修正後は wasm 側の比較が native と一致しなくなり、`arena+0x1000` への store の有無が分かれる。
 - 最終判定 (HEAD `9d604905`): 一致 **16** / 不一致 **7** / 実行不能 0 (修正前 15 / 8 / 0)。
-- 件数の定義 (本付録・PR 本文で共通): 分母は leaf_diff の対象 23 関数。**残 mismatch 7 = 修正後の不一致全体** (内訳: 修正前からの未解決 6 関数 + 回帰 1 関数 0x5de250)。「残 6」は回帰を除いた数。
+- 件数の定義 (本節の時点のもの。`2b84c6f5` 以前の測定に対応): 分母は leaf_diff の対象 23 関数。**残 mismatch 7 = 修正後の不一致全体** (内訳: 修正前からの未解決 6 関数 + 回帰 1 関数 0x5de250)。「残 6」は回帰を除いた数。`2b84c6f5` 以降の現行定義は §10.12 のとおり (残 mismatch 6 = 修正前からの未解決 6 関数、回帰 0)。
 - 未実施: 残り 7 関数 (非 leaf、30 − 23) を含む 30 関数 (317 箇所) 全体への影響表、修正前からの未解決 6 関数の切り分け (上の件数定義の「残 6」)。本付録の影響表は leaf 23 関数に限る (§10.4・§10.5)。
 
 ## 10.3 (#871 fix モード) 0x5de250 回帰の静的確認と未実施項目
@@ -76,7 +76,7 @@ leaf_diff は IR leaf かつ機械語に間接 call 無しの 23 関数のみを
 ## 10.6 (#871 fix モード 4) 最終 head での再測定 (素材付き run)
 
 - 検証 HEAD: `71d6fd68` (コード差分は `9d604905` 以降なし。`git diff 9d604905 HEAD -- tools/plugins/f2/mk_targets.py tools/liftdiff tools/plugins/f2/leaf_diff.sh` が空)。
-- 素材: `fl-win64`・`toolchain-retdec`・`toolchain-emsdk` を `$ARTIFACTS_DIR` から展開 (fl-win64 13.8 s、PE 実在を確認)。emcc は `tools/m1/flags.sh` の pin `6.0.12` を確認。
+- 素材: `fl-win64` ([WIN64])・`toolchain-retdec` ([RETDEC])・`toolchain-emsdk` ([EMSDK]) を run の素材置き場から展開 (fl-win64 13.8 s、PE 実在を確認)。emcc は `tools/m1/flags.sh` の pin `6.0.12` を確認。
 - `f2_step1.sh`: rc 0、558 s。間接 call 監査の IR leaf 55 / うち機械語でも間接 call 無し 23 (leaf_diff の対象 23 関数と一致)。
 - `leaf_diff.sh` (HEAD `71d6fd68`): rc 0、148 s、load 1.36。**最終判定 一致 16 / 不一致 7 / 実行不能 0** (10.2・10.4 の前 run 測定値と一致)。集合一致 EQ。IR から call 脱落 0。
 - 最終判定 (23 関数、HEAD `71d6fd68`):
@@ -129,7 +129,7 @@ leaf_diff は IR leaf かつ機械語に間接 call 無しの 23 関数のみを
 ## 10.9 (#871 fix モード 6) 最終 head `776e4155` での再測定 (素材付き・範囲限定の判断)
 
 - 検証 HEAD: `776e4155` (コード差分は `e7a82d82` 以降なし。`git diff e7a82d82 HEAD -- tools/plugins/f2` は REPORT_APPENDIX_871.md の docs のみ)。`mk_targets.py` の code 変更は `e7a82d82` 1 件 (`9d604905` と論理的に同一)。
-- 素材: `fl-win64` を `$RUNNER_TEMP` に展開 (`extracted/*_PE.bin`)。`[EMSDK]` (emcc 6.0.12)・`[RETDEC]` (5.0) 実在。
+- 素材: `fl-win64` を run 内の一時領域に展開 (`extracted/*_PE.bin`)。`[EMSDK]` (emcc 6.0.12)・`[RETDEC]` (5.0) 実在。
 - `f2_step1.sh` (HEAD `776e4155`): rc 0、606 s、load 6.52 (並列 lift)。`DIFF count = 0`。IR leaf 55 / うち機械語でも間接 call 無し 23。
 - `leaf_diff.sh` (HEAD `776e4155`): rc 0、143 s、load 0.70。**最終判定 一致 16 / 不一致 7 / 実行不能 0**。集合一致 EQ。
 - `nc_leaf.py` (HEAD `776e4155`): rc 0、197 s、load 0.23。store_drop 5/5、load_drop 10/10、offset_shift 13/13 検出 (未検出 0、unexec 0)。
@@ -143,7 +143,7 @@ leaf_diff は IR leaf かつ機械語に間接 call 無しの 23 関数のみを
 
 ## 10.10 (#871 fix モード 7) HEAD `59b81ec5` での再測定 (素材付き・PR 指摘 4 への対応)
 - 測定 commit: `59b81ec5` (`e7a82d82` 以降のコード差分は 0。`git diff e7a82d82 HEAD -- tools/plugins/f2/mk_targets.py tools/plugins/f2/leaf_diff.sh tools/plugins/f2/f2_step1.sh tools/liftdiff tools/icall` は空)。
-- 素材: `fl-win64` `toolchain-retdec` `toolchain-emsdk` (`$ARTIFACTS_DIR` 実在を確認)。
+- 素材: `fl-win64` ([WIN64])・`toolchain-retdec` ([RETDEC])・`toolchain-emsdk` ([EMSDK]) の実在を確認。
 - `f2_step1.sh`: rc 0、624 s (10 分 24 秒)。開始時 load average 0.17。`DIFF count = 0`。
 - `leaf_diff.sh`: rc 0、149 s (2 分 29 秒)。開始時 load average (1 分 / 5 分) 5.03 / 10.90 (直前の f2_step1 の負荷)、スクリプト自身の記録 load 0.94。最終判定 一致 16 / 不一致 7 / 実行不能 0。集合一致 EQ、IR から call 脱落 0。
 - 0x5de250 (19006): 最終判定 mismatch (`memory_semantics`)。0x6f1650 (19059): match 11/11/11。
@@ -156,7 +156,7 @@ leaf_diff は IR leaf かつ機械語に間接 call 無しの 23 関数のみを
 
 - 測定 commit: `2b84c6f5` (`mk_targets.py` の変更はこの 1 件)。変更は `RVA_MODE_BLOCKS = {19006}` の追加で、block 19006 だけ従来の RVA 配置 (reloc の VA→RVA 補正あり、`wasm_origin` = 0x0) に戻し、他 block は絶対 VA 配置のまま。
 - 機序の切り分け (方式 (b)) は本 run で確定できなかった。確認できたのは算術のみ: IR 定数 `0x30D0F4` + ImageBase `0x400000` = `0x70D0F4` と native の読み先 `0x70CF34` (`00008033`) は `0x1C0` ずれる。wasm 側が 0x5de250 で実際に読んだ値 (trace) と `0x70CF34` の直接比較は**未実施**。このずれの出どころは未確定。
-- 素材: `fl-win64` `toolchain-retdec` `toolchain-emsdk` を `$RUNNER_TEMP` に展開 (`$HOME/artifacts` 実在を確認)。`[EMSDK]` emcc 6.0.12、`[RETDEC]` v5.0 (pin どおり)。
+- 素材: `fl-win64` `toolchain-retdec` `toolchain-emsdk` を run 内の一時領域に展開 (取得元の配置は run 環境の素材置き場で確認)。`[EMSDK]` emcc 6.0.12、`[RETDEC]` v5.0 (pin どおり)。
 - `f2_step1.sh` (HEAD `2b84c6f5` 直前の lift 入力と同一、コード変更なし): rc 0、575 s、load 6.15。`DIFF count = 0`。IR leaf 55 / うち機械語でも間接 call 無し 23。
 - `leaf_diff.sh` (測定 commit `2b84c6f5`): rc 0、135 s、load 0.54。**最終判定 一致 17 / 不一致 6 / 実行不能 0**。集合一致 EQ、IR から call 脱落 0。
 - 判定 (23 関数): 0x5de250 **match** (8/8/11、修正前 match 8/8/11 に戻った)、0x6f1650 **match** (11/11/11)、0x6c8fc0 **match** (8/8/11)。mismatch 6 は 0x6bfec0・0x6c9b60・0x6b0ef0・0x6c8c90・0x6cc2e0・0x6ca5c0 (修正前からの未解決と同じ集合)。
@@ -166,12 +166,12 @@ leaf_diff は IR leaf かつ機械語に間接 call 無しの 23 関数のみを
 ## 10.12 (#871 fix モード 9) HEAD `3b38f81d` での再測定 (素材付き・PR 指摘 1・3 への対応)
 
 - 検証 HEAD: `3b38f81d`。コードは `2b84c6f5` と同一 (`git diff 2b84c6f5 HEAD -- tools/` は本付録 `REPORT_APPENDIX_871.md` の 11 行追記のみ。`mk_targets.py` は変更なし)。
-- 素材: `$HOME/artifacts/` に `fl-win64`・`toolchain-retdec`・`toolchain-emsdk` の 3 点実在を確認。`/opt/emsdk`・`/opt/retdec` 展開済み。`fl-win64` は `f2/env.sh` が `$RUNNER_TEMP/fl-win64` に `extracted/*_PE.bin` (313 本) を展開。
+- 素材: `fl-win64`・`toolchain-retdec`・`toolchain-emsdk` の 3 点実在を確認 ([WIN64]・[RETDEC]・[EMSDK])。emsdk・RetDec は run 内で導入済み。`fl-win64` は `f2/env.sh` が一時領域に `extracted/*_PE.bin` (313 本) を展開。
 - `f2_step1.sh`: rc 0、420 s (開始時 load 0.44)。`DIFF count = 0`。IR leaf 55 / うち機械語でも間接 call 無し 23。
 - `leaf_diff.sh`: rc 0、138 s (開始時 load 6.81、スクリプト記録 load 1.08)。**最終判定 一致 17 / 不一致 6 / 実行不能 0**。集合一致 EQ、IR から call 脱落 0。`2b84c6f5` の §10.11 と一致。
   - 0x5de250 (19006): match 8/8/11。0x6f1650 (19059): match 11/11/11。0x6c8fc0 (18975): match 8/8/11。
   - mismatch 6: 0x6bfec0・0x6c9b60・0x6b0ef0・0x6c8c90・0x6cc2e0・0x6ca5c0 (修正前からの未解決と同じ集合)。
-- `nc_leaf.py` (ネガティブコントロール、HEAD `3b38f81d`): rc 0、203 s (開始時 load 0.71)。実行には `FL_WIN64_DIR` を `$RUNNER_TEMP/fl-win64` に向ける必要があった (既定の `/home/ubuntu/...` では PE が無く失敗)。
+- `nc_leaf.py` (ネガティブコントロール、HEAD `3b38f81d`): rc 0、203 s (開始時 load 0.71)。実行には `FL_WIN64_DIR` を一時領域の展開先に向ける必要があった (既定の参照先では PE が無く失敗)。
   - 結果 (変異後 mismatch 検出 / ベースライン match の変異対象):
 
 | kind | 変異対象 (ベースライン match) | 変異後 mismatch (検出) | match のまま (未検出) | unexec |
