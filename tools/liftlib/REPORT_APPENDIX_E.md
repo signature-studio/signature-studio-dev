@@ -64,7 +64,7 @@ tan / tanf は `expect_match_min: 1.0` で gate 化した。SVF は未達のた�
 - 修正: 読み手ごとに `Binder` を作り直す (`leaf_ext("REINDEX")`、ablation `LL_NO_REINDEX=1`)。
 - 実測 (SVF 180126040, `leafspec --n 40 --only svf`): 修正前 match 20 / mismatch 13 → **修正後 match 24 / mismatch 9** (native_crash 7・wasm_trap 2 不変)。読み手対応は 0x180126092→`%30 = addss`, 0x180126096→`%31 = mulss`, 0x1801260a7→`%38`, 0x1801260b0→`%43` で機械語と一致。
 - 残 mismatch 9: `this[0..3]` (0x180126080 の store = tanf 戻りの直接 store) と `this[16..18]`。**40/40 は未達**。残因は未特定 (tanf 戻りの上位 bit / store 幅の扱いの候補。次の調査対象)。
-- 検証 HEAD `a6d181f4`: `bash tools/liftlib/liftlib_e2e.sh` = **ALL PASS / rc 0 / real 396 s / 終了直後 load 1.05, 0.97, 0.67** (nproc=4、開始時 load は未計測) (`/home/ubuntu/work/{webstudio,analysis}` は run 限りの symlink で解決。永続化しない)。unit ALL PASS・FA 400/400・KH 366/366・OTT checks 8/0・注入 94/94・exp 40 / tan 40 / tanf 40 / log 32+crash 8 / cvt 26+crash 14 不変。
+- 検証: コード HEAD `a6d181f4` / PR head `5a2dcbc2` (`5a2dcbc2` は docs のみで、検証対象のコードは `a6d181f4` と同一)。`bash tools/liftlib/liftlib_e2e.sh` = **ALL PASS / rc 0 / real 396 s / 終了直後 load 1.05, 0.97, 0.67** (nproc=4、開始時 load は未計測)。素材 tarball 内の絶対 symlink は run 限りで張り替えて解決し、永続化しない。unit ALL PASS・FA 400/400・KH 366/366・OTT checks 8/0・注入 94/94・exp 40 / tan 40 / tanf 40 / log 32+crash 8 / cvt 26+crash 14 不変。
 
 ### 23.7 レビュー指摘への対応 (Copilot 2 件 + oc-reviewer)
 | 指摘 | 対応 | 確認 |
