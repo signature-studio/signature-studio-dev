@@ -240,7 +240,7 @@ T1〜T9 の表は 250 行上限のため [REPORT_APPENDIX.md](REPORT_APPENDIX.md
 FLEngine の PyMethodDef 表から 435/435 関数を対応付け、書式 303 関数・kwlist 103 関数を復元 (flags=4 の 125 件は書式無し)。`fl_api.bind` は kwlist 名を stubs 名より優先し、既定値が静的に不明な引数の省略後は後続の既定値を足さない (`getGridBit(index=1)` → `(1,)`)。stubs 名とは 66 一致 / 28 不一致 (バイナリを正とする)。再現: `FL_WIN64_DIR=<fl-win64 展開先> python3 analysis/flapi_kwargs.py` の後 `python3 tests/kwsig_check.py` (0.03〜0.04 秒)。wasm 回帰 (`all_tools.mjs` 48/48 ほか)・stubs 照合の例・`arrangement.selectionSet` の kwlist 重複の CPython 実測: [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §12。
 
 ## 13. 未解決 (#81)
-(a) 実機 FL での `mixer.getCurrentTempo(1)` 確認 (#81 のブロッカー)、`device.flrMidiNote` / `flrMidiCC` の書式未復元は未解決。省略引数の渡し方は §16 (#653)、`midi.*` の NameError は §15 (#654) で解消。詳細: [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §13。
+(a) 実機 FL での `mixer.getCurrentTempo(1)` 確認 (#81 のブロッカー)、`device.flrMidiNote` / `flrMidiCC` の書式未復元は未解決。省略引数の渡し方は #653 (PY-15) で解決 (全文 [REPORT_PY15.md](REPORT_PY15.md))、`midi.*` の NameError は §15 (#654) で解消。詳細: [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §13。
 
 ## 14. Piano roll scripting (`flpianoroll` + `.pyscript` ローダ) — #79 (PY-5)
 
@@ -248,6 +248,3 @@ FLEngine の PyMethodDef 表から 435/435 関数を対応付け、書式 303 �
 
 ## 15. stubs 既定値 `midi.*` の評価 (PY-16, #654)
 結論: `fl_api.bind` の `eval` を、許可した式だけを評価する `_default_value` に置換した。`midi.*` の既定値 **20 関数・21 引数・名前 10 種** は利用者の `midi` から実行時に解決し、repo には値を置かない (`docs/LEGAL.md`)。検証起点 `8d883c3`、修正 commit `4b3cbe2`。`kwsig_check` PASS (wall 43〜45 ms)、旧コード + 新テストは `NameError` で FAIL、実物 midi.py で 21/21 一致。wasm 回帰は all_tools 48/48 (wasm・mock とも)、provider・poc・midi_script・subinterp PASS。追跡の `tool_coverage.json` は旧 NameError で欠けていた 1 tool の出力を新結果に更新。全数列挙・検証の詳細は [REPORT_PY16.md](REPORT_PY16.md)。
-
-## 16. 省略引数の受け渡し方式と誤束縛 0 検証 (PY-15, #653)
-結論: 末尾の省略は C 側既定値に任せ、途中の省略は `TypeError`。全文は [REPORT_PY15.md](REPORT_PY15.md)。
