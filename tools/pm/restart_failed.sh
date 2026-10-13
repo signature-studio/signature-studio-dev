@@ -18,7 +18,7 @@ if [ "$mode" = impl ] || [ "$mode" = both ]; then
   # run の head の issue 番号は、実行時の event payload にしか無いので、タイトルの [..] ではなく
   # run の jobs ではなく issue_comment の comment URL から引けない。代わりに GraphQL の
   # コメント一覧 (bot 以外の /oc コメント) を起点にし、run の成否と突き合わせる。
-  gh api "repos/$R/actions/runs?event=issue_comment&per_page=100" --jq \
+  gh api --paginate "repos/$R/actions/runs?event=issue_comment&per_page=100" --jq \
     '.workflow_runs[]|select(.created_at>"'"$since"'" and (.conclusion=="failure" or .conclusion=="cancelled"))|"\(.id)|\(.created_at)|\(.display_title)"' \
     | sort -t'|' -k2,2 > $PM_TMP/failed_impl.txt
   while IFS='|' read id created title; do
@@ -44,7 +44,7 @@ fi
 
 if [ "$mode" = review ] || [ "$mode" = both ]; then
   bash "$(dirname "$0")/find_unreviewed.sh" | while IFS='|' read pr sha arts; do
-    running="$(gh api "repos/$R/actions/runs?event=pull_request&per_page=100" --jq '[.workflow_runs[]|select(.head_sha[0:7]=="'"$sha"'" and (.status=="in_progress" or .status=="queued"))]|length')"
+    running="$(gh api --paginate "repos/$R/actions/runs?event=pull_request&per_page=100" --jq '.workflow_runs[]|select(.head_sha[0:7]=="'"$sha"'" and (.status=="in_progress" or .status=="queued"))|.id' | wc -l | tr -d ' ')"
     [ "$running" = 0 ] || { echo "skip review #$pr: run in progress"; continue; }
     a="${arts#oc_artifacts: }"; [ "$arts" = NONE ] && a="fl-win64"
     echo "rerun review #$pr with: $a"

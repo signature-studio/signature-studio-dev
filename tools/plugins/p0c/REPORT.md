@@ -113,8 +113,12 @@ f32chain **21** / cmpsel 14 / int32x87 8 / f64mem 6 / int64x87 **2** (0x5de3e0, 
 
 ## 6. 再現手順
 ```sh
-bash tools/plugins/p0c/p0c_e2e.sh      # 約 2 分 (work/ 付き初回は kernel_matrix 走査 + RetDec lift で +10〜20 分)
+bash tools/plugins/p0c/p0c_e2e.sh      # 初回実測 355 秒 (work/ 無し・HEAD 1d63f01f・#893)。work/ 付きは短縮
 ```
+
+### 6.1 CI 準備後の実測 (#893)
+- agent-setup が `$HOME/.local/agent-py` の venv に `pefile` `capstone` `numpy` を入れ、PATH 先頭に置く。runner の `pip install` は不要。
+- HEAD `1d63f01f`・`work/` を削除したクリーン状態で `p0c_e2e.sh`: **rc=0 / 355 秒 / `== e2e OK ==`**。`[2]` は kernel_matrix 走査を実行 (skip なし)。
 [1] kernel_table.py (表復元) → [3] verify_table.py (130 DLL×80 kernel 再検証) → [5] f80_assess.py (分類) → [6] f80_micro (実測)。コミット対象は p0c 直下の script 3 本 + e2e + REPORT (work/ は gitignore)。
 
 ## 7. ユーザ依頼事項 / 次タスク提案

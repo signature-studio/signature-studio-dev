@@ -2,12 +2,13 @@
 
 - 本書は REPORT.md (250 行上限) の付録。 結論は REPORT.md §0-4 と §5 を見る。
 - 再現: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 HLL_CAP=100000 bash tools/plugins/synth/cpp_lift.sh <block>` (出力は `tools/plugins/work/synth/cpp<block>/`)
-- 素材: `fl-win64` (`tar --zstd -xf` で `$RUNNER_TEMP/fl-win64` に展開)。 `toolchain-emsdk` ([EMSDK]) / `toolchain-retdec` ([RETDEC]) が必要 (`docs/REFERENCES.md`・`docs/WORKFLOW.md` §11)。 PR #815 の run では両者が runner に無く、再測定していない
+- 素材: `fl-win64` (`tar --zstd -xf` で `$RUNNER_TEMP/fl-win64` に展開)。 `toolchain-emsdk` ([EMSDK]) / `toolchain-retdec` ([RETDEC]) が必要 (`docs/REFERENCES.md`・`docs/WORKFLOW.md` §11)。 本 runner では両者が無く、再測定していない (462812e4 は HEAD 3418333a の再測定を記録しているが、run ID・`summary.csv` が残っておらず本書では根拠にしない)
 
 ## A. 未測定
 
 - `emcc -c` の現 HEAD での通過本数は**未測定**。 再測定には上記 2 つの toolchain 素材が必要。
 - 旧記録の数値表は出所を確認できないため本書から外し、#534 のコメントへ「出所不明の旧転記・未検証」として移した (分割移動)。
+- Morphine (23944) の `PLUG_REUSE_DRC=1` 再開経路 (`cpp_lift.sh` の `resume_lift`) は**未実測**。 lift 秒の値も未確認。
 
 ## B. E1 修復 (`fix_icmp_ptr.py`)
 
