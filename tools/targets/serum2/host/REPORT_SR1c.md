@@ -101,15 +101,15 @@ shim 候補 (SR-3/SR-4 入力) は呼出確認 110 件のうち kernel32 (メモ
 - 追加: `vst3host.cpp` に `S2HOST_WATCH=1` の opt-in 計測 (既定は無変更)。controller 生成直後に `ctrl iface+0xdc` (= controller base+0x10c) へ x86 デバッグレジスタ DR0 の 4 byte 書込 watch を張り、VEH で書込 RIP と値を記録する。
 - **観測範囲**: DR は**スレッド単位**。`armWatch` は `SetThreadContext(GetCurrentThread())` で**呼出スレッド (main) の DR0 のみ**を張る。他スレッドの書込は**未観測**。Serum2 は `CreateThread` を 25 回呼ぶ (`sr1c_api_surface.tsv`) ため、別スレッドからの書込の有無は本計測では判定できない。
 - 全スレッド対象化の試行 (不採用): 既存スレッドの列挙 (`CreateToolhelp32Snapshot`) と kernel32!CreateThread の IAT 差替え (`CREATE_SUSPENDED` で DR0 を張ってから再開) を試作した。wine 9.0 では Toolhelp の `th32OwnerProcessID` が 0〜1 となり他プロセスのスレッドも混ざる (`own_pid=0`, 全 44 件)。plugin DLL の IAT hook も licensed / 既定 host 双方で 0 回しか呼ばれず (`CreateThread#` 0 件)、新規スレッドへの張りを確認できなかった。試作コードは捨てた (commit しない)。全スレッド化には別手段 (Windows 上の実機、または gdb の thread 全列挙) が要る。
-- 実測 (`S2HOST_WATCH=1`, 既定 host, 4 blocks, HEAD `357379602449afb57b992327ba4562bc44f0cb2f` の `vst3host.cpp` と同一):
+- 実測 (`S2HOST_WATCH=1`, 既定 host, 4 blocks, HEAD `c9fbfc54` (`vst3host.cpp` は `35737960` と同一) で再実行):
   ```
-  [watch] armed DR0=00007f07372962bc (controller iface+0xdc)
+  [watch] armed DR0=00007f87cf47d28c (controller iface+0xdc)
   [watch] hit#1 RIP=00006ffff8af1338 (base=00006ffff8a40000, Serum2_win64.vst3) value=2
   [gate] ctrl iface+0xdc 初期値=2 — 1 への遷移を最大 3 秒ポーリング
   [gate] 最終 +0xdc=2 (観測ヒストグラム 0:0 1:0 2:61 3:0)
   ```
   - 再現コマンド: `cd tools/targets/serum2/host && S2HOST_WATCH=1 wine64 work/build/vst3host.exe 'Z:…\work\Serum2_win64.vst3' - 'Z:…\host\work\out_watch_head' 4 'Z:…\work\exe_extract' > watch.console` (`PATH=/usr/lib/wine:$PATH WINEPREFIX=work/wineprefix WINEDEBUG=-all`、`Z:…` は repo の絶対パスを `\` 区切りにしたもの)。
-  - hit は `[gate]` より前 (比較の根拠: 同一 console の行番号。`hit#1` が 36 行目、`[gate] ctrl iface+0xdc 初期値=2` が 102 行目)。`armed` (32 行) → `hit#1` (36 行) → `controller->initialize` の順。`initialize / setComponentHandler / createView` のどれの内側かは未分離。
+  - hit は `[gate]` より前 (比較の根拠: 同一 console の行番号。`hit#1` が 36 行目、`[gate] ctrl iface+0xdc 初期値=2` が 103 行目)。`armed` (32 行) → `hit#1` (36 行) → `controller->initialize` の順。`initialize / setComponentHandler / createView` のどれの内側かは未分離。
   - 本 run の `hit` は 1 件。上記は同一 run のログ行をそのまま貼った。
 - 書込命令: DLL 内 RVA **`0xb1332` `mov [rcx+0xfc], eax`** (trap 後の RIP は `0xb1338`)。書込値 `eax` は `0x180037600` の戻り値。関数は `0xacf70`〜`0xb142a`。
 - 値 2 の意味 (逆アセンブル、未再現の読み): `0x180037600` は `queryInterface` を 2 回試し、A 成功なら 1、A 失敗かつ B 成功なら 0、両方失敗なら **2** を返す。実測の 2 は「両 QI 失敗」と読む。下記は `capstone` の出力 (`host/work/disasm_sr1c.txt`、commit 外)。分岐 `0x180037656 mov eax,2` が両失敗の経路。
@@ -127,7 +127,7 @@ shim 候補 (SR-3/SR-4 入力) は呼出確認 110 件のうち kernel32 (メモ
 - 結論: `armWatch` を呼んだスレッド上では、+0x10c は **controller 生成〜editor 準備の区間で、QI 結果から値 2 が格納される経路**を通る (main スレッドで 1 回のみ観測。他スレッドの書込は未観測)。REPORT §3-3 の「copy ctor 0x18000d1b0 が候補」との関係は未検証。0x800010 の観測 (= 1 への遷移) は、この QI 結果が変わる条件の解明が前提。
 - 未検証: IID の内容 / 所属 class / `0xacf70` の呼出元 / 0x800010 の既定 host 受信。
 
-- e2e (`S2HOST_WATCH` 未設定, 実行 commit **`35737960`** = `git rev-parse` `357379602449afb57b992327ba4562bc44f0cb2f`、`tools/targets/serum2/host/vst3host.cpp` は HEAD と同一): **50/50 OK, 71.40 s** (`bash tools/targets/serum2/host/e2e.sh`、exit 0)、NC1/NC2 期待どおり (exit=1, NG=1)、load 0.37 → 0.27。前回 run の 75.27 s とは別 run。
+- e2e (`S2HOST_WATCH` 未設定, 実行 commit **`c9fbfc54`** = `git rev-parse` `c9fbfc5473f98cc8902f6ee8daffca3e5446eb1f`、`vst3host.cpp` は `35737960` と同一): **50/50 OK, 67.93 s** (`bash tools/targets/serum2/host/e2e.sh`、exit 0)、NC1/NC2 期待どおり (exit=1, NG=1)、load 0.09 → 0.14。(同 HEAD の直前 run は 71.40 s、`35737960` の run は 71.40 s。)
 
 ## 5. 未解決 (起票先)
 
