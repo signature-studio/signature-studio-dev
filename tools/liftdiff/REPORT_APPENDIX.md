@@ -277,3 +277,9 @@ UTF-16 blob は 1 pattern 1 本の固定で、長さや内容の変化を試し�
 「native 失敗 RVA からの引数補正」「署名未対応 (vector/struct) の扱い」「状態前提 (InitTable/TLS) の case 生成」は未着手。
 flelift closure (fle_lift.sh 生成物 tools/flelift/work/lift/* が素材に無い) は未実測。
 起票先: 本 issue #235 (部分達成のため Refs)。
+
+### LD-24 (#976) 署名未対応 50 関数の内訳 (REPORT §12 から移動)
+
+m11 closure の `unsupported_sig` 50 件の内訳は未実装。分割先 #1193 (ret=`i128` 39 件) と #1194 (params に `i128`・`%tagPOINT` を含む 11 件)。
+件数の再計算と関数ごとの va→署名対応は `tests/ld24_sig_breakdown.py` (入力: `results/m11_closure_verdicts.tsv` と `tools/m11/work/boot_final3.ll`)。
+詳細・受入条件: [`REPORT_LD24.md`](REPORT_LD24.md)。

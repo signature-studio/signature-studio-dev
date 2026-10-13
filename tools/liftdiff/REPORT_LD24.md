@@ -5,9 +5,19 @@
 
 ## 1. 未対応の実態 (実測)
 
-m11 closure の判定 `unexec / unsupported_sig` は **50 件** (`results/m11_closure_verdicts.tsv`)。
+m11 closure の判定 `unexec / unsupported_sig` は **50 件** (`results/m11_closure_verdicts.tsv`、`unexec_reason` 列)。
 判定元は `ldlib/cases.py` の `supported_sig()` で、`ok = {i1,i8,i16,i32,i64,ptr,float,double}` 以外の
-型 (`i128`・構造体) を含むと弾く。署名は `work/m11/boot_final3.ll` の `define` 行から `irtool.parse_sigs` で取得。
+型 (`i128`・構造体) を含むと弾く。署名は `tools/m11/work/boot_final3.ll` の `define` 行から `ldlib/irtool.parse_sigs` で取得。
+
+**表の再生成手順** (入力 IR は `bash tools/m11/m11_e2e.sh --full` で生成。本 run では IR が無く再照合はしていない):
+
+```
+python3 tools/liftdiff/tests/ld24_sig_breakdown.py tools/m11/work/boot_final3.ll > work/ld24_sig_breakdown.md
+```
+
+- 抽出: TSV の `unexec_reason == unsupported_sig` の 50 行 (`va`・`name`) を取り、IR の `function_<VA>` の `define`/`declare` 行から ret/params を引く。
+- 集計: 署名形 (ret, params) ごとの件数。出力の関数別表で `va` → ret/params の対応を確認できる (`work/` は gitignore)。
+- IR に無い関数は末尾に列挙し、終了コード 1 で返す。
 
 | 署名形 (ret / params) | 関数数 |
 |---|---|
@@ -34,6 +44,11 @@ case 生成 (`cases.py`)・native 実行器 (`rt/ld_native.c`・`ld_ms_call.S`)�
 再現・検証する量に収まらないと判断した。
 
 ## 3. 分割 (子 issue)
+
+振り分けの規則 (1 関数を 1 子に限定する): ret=`i128` は戻り値側として #1193 に入れる (params が `i128` でも #1194 には数えない)。
+ret が `i128` 以外で params に `i128` または `%tagPOINT` を含むものを #1194 に入れる。
+これにより #1193 = 39 件、#1194 = 11 件 (内訳: `ret=i64/params=i128` 8 + `ret=i64/params=i64,i64,i128` 1 + `ret=i64/params=i64,i128,i64` 1 + `ret=ptr/params=%tagPOINT` 1)、計 50 件で重なりは無い。
+ret=`i128`・params=`i128` の 1 関数は #1193 のみで扱う (#1194 の件数には含めない)。
 
 | 子 | 対象 | 受入条件 (要点) |
 |---|---|---|

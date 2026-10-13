@@ -247,5 +247,4 @@ Actions run `38430714782` (head `9cadda79`) で `liftdiff_e2e.sh` (--m11-only �
 - **未検証**: 0x6cd8a0 の 9 パターン実 PE 実測 (sample:800 に含まれず f2 系素材が必要)。全文・3 run 表・未解決: [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §11。
 
 ## 12. 被覆拡大 2 パターン (LD-4 / #235、部分達成)
-`vm0` (this/VMT 疑似オブジェクト) と `u16` (UTF-16 文字列 blob) を追加。sample:800 で 一致 358→361 / 不一致 212→229 / 実行不能 230→210 (base 97f28539 比)。未達 (受入条件) は #235 に残す。全文・実測・未達の内訳: [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §12。
-**LD-24 (#976)**: 署名未対応 50 関数の内訳 (i128 戻り値 39・引数 11) は未実装。分割先 #1193・#1194。詳細 [`REPORT_LD24.md`](REPORT_LD24.md)。
+`vm0` (this/VMT 疑似オブジェクト) と `u16` (UTF-16 文字列 blob) を追加。sample:800 で 一致 358→361 / 不一致 212→229 / 実行不能 230→210 (base 97f28539 比)。未達 (受入条件) は #235 に残す。全文・実測・未達の内訳: [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §12。署名未対応 50 関数 (LD-24 / #976) の内訳と分割は [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §12 末尾・[`REPORT_LD24.md`](REPORT_LD24.md)。
