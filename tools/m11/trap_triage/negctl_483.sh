@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # #483 ネガコン + 独立計測: m11_ov.c の転記を 1 つずつ外した構成を work/obj/ov.o に差し替えて link → survey_units.mjs (survey_diff.py で現行 HEAD 版と比較).
 #   usage: negctl_483.sh [構成名 ...]   (省略時は全構成)  各構成の結果を work/negctl_483/<名>.json + 1 行サマリで出す
-#   構成: head(#481 HEAD = BASE_REF の m11_ov.c) full(現行) no479b40 no8cbce0 no8cc190 no8cbde0 nogetters no478420 no478540 no478c70 nocmpmeth
-#         probe_head (#481 HEAD + 8cc190 の観測 [probe] 行: FComparer の中身と重複判定) / raise_head / raise_full (411e80 = RaiseExcept 呼出を数える, 動作は IR と同一; [raise411e80] 行数 = survey 中の raise 回数)
+#   構成: head(BASE_REF の m11_ov.c = main 側のみ) full(現行) no479b40 no8cbce0 no8cc190 no8cbde0 nogetters no478420 no478540 no478c70 nocmpmeth no410b10 exp8cbb00 exp8cbb00_no410b10
+#         probe_head (BASE_REF + 8cc190 の観測 [probe] 行: FComparer の中身と重複判定) / raise_head / raise_full (411e80 = RaiseExcept 呼出を数える, 動作は IR と同一; [raise411e80] 行数 = survey 中の raise 回数)
 #   終了時に work/obj/ov.o を現行 m11_ov.c から再生成する.
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")/.." && pwd)"; cd "$HERE"
 source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1
-BASE_REF="${BASE_REF:-dd9ba2c}"   # head 構成 = #481 HEAD (dd9ba2c) の m11_ov.c
+BASE_REF="${BASE_REF:-20778a7}"   # head 構成 = 本 PR が merge した origin/main (20778a7) の m11_ov.c (= #483 の転記を含まない). merge 前の比較は BASE_REF=dd9ba2c (#481 HEAD)
 CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=${M11_LB_BASE:-0} -I."
 OUT=work/negctl_483; mkdir -p "$OUT"
 [ -f work/obj/boot.o ] || bash m11_build.sh > /dev/null
@@ -30,10 +30,13 @@ gen() { # gen <構成> → work/ov_ablate.c
     no478540) nocase 478540 < m11_ov.c > work/ov_ablate.c ;;
     no478c70) nocase 478c70 < m11_ov.c > work/ov_ablate.c ;;
     nocmpmeth) nocase 479b00 < m11_ov.c | nocase 479b10 > work/ov_ablate.c ;;
+    no410b10) rename_def function_410b10 < m11_ov.c > work/ov_ablate.c ;;   # main (#411) の転記を外す: 本 PR merge 後の ok 退行の主因 (REPORT_483 §4b)
+    exp8cbb00) { cat m11_ov.c; sed -n 's/^+//p' trap_triage/ov_8cbb00_experiment.patch | sed '1d'; } > work/ov_ablate.c ;;   # 未採用実験: 8cbb00 (SetCapacity) を足す
+    exp8cbb00_no410b10) { rename_def function_410b10 < m11_ov.c; sed -n 's/^+//p' trap_triage/ov_8cbb00_experiment.patch | sed '1d'; } > work/ov_ablate.c ;;
     *) echo "unknown config $1" >&2; return 1 ;;
   esac
 }
-CFGS=("$@"); [ ${#CFGS[@]} = 0 ] && CFGS=(head full no479b40 no8cbce0 no8cc190 no8cbde0 nogetters no478420 no478540 no478c70 nocmpmeth raise_head raise_full probe_head)
+CFGS=("$@"); [ ${#CFGS[@]} = 0 ] && CFGS=(head full no479b40 no8cbce0 no8cc190 no8cbde0 nogetters no478420 no478540 no478c70 nocmpmeth no410b10 exp8cbb00 exp8cbb00_no410b10 raise_head raise_full probe_head)
 for c in "${CFGS[@]}"; do
   gen "$c" || continue
   emcc -c work/ov_ablate.c -o work/obj/ov.o $CF || { echo "$c: ov compile FAIL"; continue; }

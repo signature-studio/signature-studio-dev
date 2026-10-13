@@ -1,33 +1,11 @@
+diff --git a/tools/m11/m11_ov.c b/tools/m11/m11_ov.c
+index 9cfb6ca..318ee65 100644
 --- a/tools/m11/m11_ov.c
 +++ b/tools/m11/m11_ov.c
-@@ -622,3 +622,56 @@
-     }
+@@ -834,3 +834,32 @@ unsigned long long function_416db0(unsigned long long dest, unsigned long long s
+     } while (--count);
      return 0;
  }
-+
-+/* function_418190  VA 0x418190  (System._DynArrayClear(var a: Pointer; typeInfo: Pointer): 動的配列変数の解放)
-+ * RetDec は先頭の `mov rsi,[rbx]` (= *a) の deref を落とし (D4), a (変数のアドレス) 自体を配列として扱った:
-+ * `store 0,[a]` で変数の先頭 8B を潰したうえ a-12 の refcount を減らし a-16 を FreeMem → 非 heap 番地の free で OOB (#483: 辞書 Grow → SetCapacity → DynArrayAsg 経由).
-+ * refcount > 0 のとき --refcount (lock xadd); 0 になれば要素型 (typeInfo の ElType) が管理型なら _FinalizeArray(p, ElType^, length) してから FreeMem(p - 0x10). 戻りは a. */
-+unsigned long long function_418190(unsigned long long a, unsigned long long ti, unsigned long long unused) {
-+    u64 p = Q(a);
-+    if (p) {
-+        Q(a) = 0;
-+        int rc = (int)D(p - 0xc);
-+        if (rc > 0) {
-+            D(p - 0xc) = (u32)(rc - 1);
-+            if (rc - 1 == 0) {
-+                u64 elp = Q(ti + B(ti + 1) + 6);
-+                if (elp) {
-+                    u64 len = Q(p - 8);
-+                    if (len) function_416230(p, Q(elp), (unsigned)len);
-+                }
-+                function_409440(p - 0x10);
-+            }
-+        }
-+    }
-+    return a;
-+}
 +
 +/* function_8cbb00  VA 0x8cbb00  (TDictionary.SetCapacity(newcap): 新バケット配列を作って旧配列の有効バケットを再挿入) */
 +unsigned long long function_8cbb00(unsigned long long self, unsigned int newcap32) {
