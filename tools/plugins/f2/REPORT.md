@@ -120,7 +120,7 @@ python3 tools/plugins/f2/xcheck_icall.py 18953 18975 18979 18982 18984 19005 190
 - 範囲: IR 上の site VA の被覆まで。restored IR (全関数 `i64 f(void)`、BLK 経由) の wasm リンク・実行・native 比較は範囲外 (#199 手順 2〜4、#195/#196/#197)。
 
 ### 7.1 結論
-1. eq-filter 11 閉包で、機械語の非 IAT 間接 call **550 site のうち 549 site が IR の `call void @__icall_dispatch(i64 <元 site VA>)` に復元**された (#504 は 0)。残る 1 site (18979 の 0x741035) は到達不能コードで、RetDec が基本ブロックごと除去している (§7.3)。lift_rc 0・`emcc -c` rc 0・matrix 突合 DIFF 0 は 11/11 のまま。
+1. eq-filter 11 閉包で、機械語の非 IAT 間接 call **550 site のうち 549 site が IR の `call void @__icall_dispatch(i64 <元 site VA>)` に復元**された (#504 は 0)。残る 1 site (18979 の 0x741035) は RetDec が基本ブロックごと除去しており、通常制御フローからは到達不能と推定される (§7.3)。lift_rc 0・`emcc -c` rc 0・matrix 突合 DIFF 0 は 11/11 のまま。
 2. 接続は `lift_ranges.sh` の opt-in `PLUG_ICALL=1` (§7.2)。`batch_lift.sh` は既定 ON (`PLUG_ICALL=0` で従来鎖)。`f2_step1.sh` は `PLUG_ICALL=0` を明示し、#504 の数値 (550 → 0、52 秒、DIFF 0) をそのまま再現する。
 3. 接続中に `tools/icall/icall_rewrite.py` の欠陥を 1 件見つけて直した (§7.6 N1): 関数をちょうど連続配置すると RetDec が隣接 range を併合し、後続関数の `define` が落ちる (11 閉包中 4 block で 5 関数)。
 4. 回帰ゲート `icall_gate.py` は、機械語の site VA を IR の dispatch site VA が全て覆わないと exit 1。ネガコン 5 件 (復元を外す・site 1 本削除・site VA 不明・偽 waiver・waiver 無し) が全て FAIL (§7.5)。
@@ -156,14 +156,14 @@ python3 tools/plugins/f2/xcheck_icall.py 18953 18975 18979 18982 18984 19005 190
 | 合計 | | 306 | 306 | **550** | **549** | 1 | | | 63 (復元なし = §2 は 35) |
 
 - IR の native 間接 call (callee が `%reg`) は 11 block とも 0、機械語の `jmp` を stub 化した dispatch (extra) も 0。dispatch は全て `call` 由来。
-- **waived 1 件 = 18979 の `call [rdi+0x1f0]` (0x741035, `Eff_Render` ではなく 0x740e30 の case 分岐)**。RetDec は 0x741007-0x74103b のブロックを除去している (`p.drc.restored.ll` に `insn.addr` が 0x741035 の命令が 0 件)。機械語を手で追うと到達不能: 0x740e6a で `eax=[rbp+0x40]; cmp eax,0xe; jge` により v<14、0x740ee9 `cmp eax,5; jg` で v≥6、0x740f15 `sub eax,6; je` で v≥7、0x740f1c `sub eax,8` で v-14 は -7…-1 (符号なし 6 以上) となり 0x740f22 `jae 0x7411dd` が必ず成立するので 0x740f28 `jmp 0x741007` は実行されない (Delphi の `case` に残った 14〜19 ラベルの死コード; 前提は [rbp+0x40] が 0x740e6a〜0x740ee6 の間で書き換わらないこと)。同関数への他経路は、0x740e30〜0x741200 の分岐先走査で `jmp 0x741007` 1 本のみ。
+- **waived 1 件 = 18979 の `call [rdi+0x1f0]` (0x741035, `Eff_Render` ではなく 0x740e30 の case 分岐)**。RetDec は 0x741007-0x74103b のブロックを除去している (`p.drc.restored.ll` に `insn.addr` が 0x741035 の命令が 0 件)。機械語を手で追うと到達不能と推定 (手作業の追跡で、機械検証ではない): 0x740e6a で `eax=[rbp+0x40]; cmp eax,0xe; jge` により v<14、0x740ee9 `cmp eax,5; jg` で v≥6、0x740f15 `sub eax,6; je` で v≥7、0x740f1c `sub eax,8` で v-14 は -7…-1 (符号なし 6 以上) となり 0x740f22 `jae 0x7411dd` が必ず成立するので 0x740f28 `jmp 0x741007` は実行されない (Delphi の `case` に残った 14〜19 ラベルの死コード; 前提は [rbp+0x40] が 0x740e6a〜0x740ee6 の間で書き換わらないこと)。同関数への他経路は、0x740e30〜0x741200 の分岐先走査で `jmp 0x741007` 1 本のみ。
 - 5 関数の脱落 (§7.6 N1) の修正前の初回実行: 18975 define 37/38・18982 13/14・19013 13/14・19145 26/28 (`closure_stats.py` の assert で検出)。これらの欠落関数は間接 call を持たず、ゲートの site 突合だけでは見えない → define 数突合 (`f2_step2.sh` の `closure_stats.py`) も回帰条件に含めた。
 
 ### 7.4 回帰ゲート `icall_gate.py` と dynamics (#506) への適用
 - 機械語側 (rewriter/`audit_icall.py` と別算法): 閉包 ranges を capstone で線形 sweep し、IAT 以外の間接 `call` の VA 集合。IR 側: `__icall_dispatch(i64 VA)` の VA 集合と、callee が `%reg` の call 数。
 - FAIL (exit 1) 条件: **F1** 機械語 site VA が IR に無い (waiver が無い) / **F2** IR の間接 call 総数 + waived < 機械語 site 数 / **F3** site VA 不明 (`i64 0`) の dispatch / **F4** waiver 無効。waiver は `icall_gate_waivers.json` の (block, site, reason) で、**raw IR (`p.drc.restored.ll`) に当該 VA の `insn.addr` を持つ命令が 1 つも無い**ときだけ有効 (call だけ落ちた場合は BLK store 列が元 VA 付きで残るので waiver は通らない)。
 - 使い方は閉包 ranges と IR の置き場が `batch_lift.sh` と同じなら block 番号だけ: `python3 tools/plugins/f2/icall_gate.py <block>...`。任意の PE/IR は `--pe --ranges --ir [--raw-ir]`。
-- **dynamics 7 block** (19021 18990 19148 19245 18974 19047 19251、#506 の `dynamics_e2e.sh` と同じ一覧) を同じ `batch_lift.sh` で 61 秒 (7 本逐次、開始 load average 0.25) lift: 7/7 が lift_rc 0・`emcc -c` rc 0。ゲート: 機械語 640 site に対し IR dispatch 636、**FAIL 2 block**: Maximus (19148) 230 → 228、Soundgoodizer (19245) 157 → 155。欠けた 4 site は全て `call qword ptr [rbx - 0x20]` (0x780d84・0x78a727・0x77a5d4・0x783f77)、raw IR に命令が無い = **(icall §4) D12 landing pad** (到達不能コードではなく、例外巻き戻し時に実行され得る仮想 dtor 呼出し)。waiver で通さず FAIL のままにした。残る 5 block は PASS。別算法 (rewriter の dispatch 化 site と線形 sweep) は 640 = 640 で集合一致。起票: **#529**。
+- **dynamics 7 block** (19021 18990 19148 19245 18974 19047 19251、#506 の `dynamics_e2e.sh` と同じ一覧) を同じ `batch_lift.sh` で 61 秒 (7 本逐次、開始 load average 0.25) lift: 7/7 が lift_rc 0・`emcc -c` rc 0。ゲート: 機械語 640 site に対し IR dispatch 636、**FAIL 2 block**: Maximus (19148) 230 → 228、Soundgoodizer (19245) 157 → 155。欠けた 4 site は全て `call qword ptr [rbx - 0x20]` (0x780d84・0x78a727・0x77a5d4・0x783f77)、raw IR に命令が無い = **(icall §4) D12 landing pad** (到達不能コードではなく、例外巻き戻し時に実行され得る仮想 dtor 呼出し)。(初回測定 (waiver 無し) の記録。現在の扱いは §7.7 = waiver 方式 (b) で処理し、gate PASS。) 残る 5 block は PASS。別算法 (rewriter の dispatch 化 site と線形 sweep) は 640 = 640 で集合一致。起票: **#529**。
 
 ### 7.5 検証 (HEAD 9204aec、4 core Actions runner、`f2_step2.sh`)
 | 項目 | 実測 |
@@ -206,12 +206,12 @@ python3 tools/plugins/f2/xcheck_icall.py 18953 18975 18979 18982 18984 19005 190
 
 - **実測 (base 97f28539 + waiver 追加)**: `batch_lift.sh` 7 本 68 秒 (load 開始時 0.25 台、7/7 lift_rc 0・`emcc -c` rc 0)。`icall_gate.py` 7 本: **PASS (exit 0)**、waived 4 (19148: 2, 19245: 2)、F1 未被覆 0。
 - **ネガコン**: waiver 無し (`--waivers` で空配列) → **FAIL (exit 1)、F1 missing=2 (19148)・missing=2 (19245)**。`attributed()` は raw IR に実在する VA (0x40ad30) を検出し、waiver の 4 site は raw IR に 0 件 (F4 不発 = waiver 有効)。
-- **残る前提 (未検証)**: 「DSP 経路に例外を投げる箇所が無い」は未検証。waiver は「通常制御フローからは到達不能」までを機械確認した。例外が DSP 内で送出されれば pad が実行される可能性がある。
+- **残る前提 (未検証)**: waiver の reason は「通常制御フローからは到達不能と推定」まで。根拠は scope table の構造と raw IR に命令が無いことで、到達不能の証明ではない。「DSP 経路に例外を投げる箇所が無い」は未検証。例外が DSP 内で送出されれば pad が実行され、間接 call が翻訳されないまま動く (silent miscompile)。Delphi では `_RaiseExcept` 系 RTL helper や、整数除算 0 などのハードウェア例外 (SEH 経由で unwind) が pad を起動し得る。IAT 0 件の確認では不足。追跡 #529。
 
 ### 7.8 未解決
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| waiver 4 site の「DSP 経路に例外を投げる箇所が無い」の確認 (受入条件の併記項目) | 未検証。例外が DSP 内で送出されると pad が実行され、waiver の前提が崩れる | 本 issue #529 の後続 (PR は Refs #529) |
+| waiver 4 site の「DSP 経路に例外を投げる箇所が無い」の確認 (受入条件の併記項目) | 未検証。例外が DSP 内で送出されると pad が実行され、waiver の前提が崩れる。閉包の call graph と `_RaiseExcept` 系 helper・trap 命令の到達性を機械的に確認する必要がある | #529 (PR は Refs #529。Closes は付けない) |
 
 ### 7.9 未解決 (§7.7 から継続)
 | 未解決 | 影響 | 起票先 |
