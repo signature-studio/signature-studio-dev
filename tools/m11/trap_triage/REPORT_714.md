@@ -15,6 +15,8 @@
 - `0x535c2e` は関数の入口ではない。逆アセンブル (capstone, `block00031_PE.bin`):
   - `0x535bf0`: `jmp 0x535c11` (63B の関数)
   - `0x535bf2`: `add [rcx+0x10],1` … `cmp dword [rax+rdx*8],-1` … `jmp 0x535c2e`
+    - 走査式: `mov rdx,[rcx+0x10]` → `lea rdx,[rdx+rdx*2]` (`rdx = cnt*3`) で、`[rax+rdx*8]` = `tbl + cnt*24` (24B stride)。§6 と整合。
+    - 命令列は `block00031_PE.bin` 内で同一並びを確認 (`83 41 10 01 / 48 8b 51 10 / 48 8d 14 52 / 83 3c d0 ff`)。VA と file offset の対応は未確認
   - `0x535c11`: 境界チェック後 `jl 0x535bf2`、否なら `xor eax,eax`
   - **`0x535c2e` = `ret`** (`0x535bf0` 関数の共通の戻り点)
 - IR (`boot_final3.ll` 192008): `function_535bf2` の末尾が `call i64 @function_535c2e()` で、`declare` のみ (定義なし)。RetDec が分岐先の `ret` を独立関数として切り出した誤り。
@@ -56,7 +58,7 @@ python3 trap_triage/check_682.py work/probe714/units_714.json --units 304,555,92
 
 ## 6. OOB 命令の特定 (2026-10-13, 追補 run、n=1)
 
-再現 (HEAD 1d7b619e): gen_ir2 36 秒 rc=0 / build 23.6 秒 rc=0 / survey 11.7 秒 rc=0 (ok 869 / trap 25、§3 と一致) / check_682 2/5 (304=trap 555=trap 923=trap)。
+再現 (計測コード HEAD `1d7b619e`。後続 commit `09b46640`・`37c5fcaa` は本ファイルの追記・表記修正のみでコード変更なし): gen_ir2 36 秒 rc=0 / build 23.6 秒 rc=0 / survey 11.7 秒 rc=0 (ok 869 / trap 25、§3 と一致) / check_682 2/5 (304=trap 555=trap 923=trap)。
 
 `M11_SURVEY_STACK=304,923,555` の wasm スタックを `trap_triage/oob_insn.py` で逆引きした結果:
 
