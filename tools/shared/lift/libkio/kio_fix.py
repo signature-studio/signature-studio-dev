@@ -55,9 +55,34 @@ for fn in sorted(set(re.findall(r"(?m)^define [^\n]*@(__Z\w+)\(", s))):
                 return f"{p} = inttoptr i64 %arg{i} to ptr\n  {v} = load {ty}, ptr {p}, align {BITS[ty]}\n"
             new = re.sub(pat, rep, new)
     if new != body: s = s.replace(body, new); n += 1
-# [B] float 引数落ち: 元の機械語は xmm 引数を直接読むが RetDec IR は未初期化 alloca から読んでいる。
-#     逆アセンブル確認済みの対応 (xmm0=arg1, xmm1=arg2, xmm2=arg3) で alloca load を float 引数の lane0 bit 列に置換する。
+# [B] 浮動小数点引数落ち: 署名に f/d 引数が 1 つだけの関数では、RetDec は xmm0 を初期化されていない alloca から読む
+#     (store が無い)。唯一の fp 引数は SysV で xmm0 に入るので、その alloca の load を %argK のビット列で置換する。
+#     fp 引数が複数の関数は xmm 番号が IR から失われるため対象外 (LimitFloat_RCSfff は別途)。
+def fp_params(fn):
+    m = re.match(r"__Z(\d+)", fn)
+    if not m: return None
+    rest = fn[m.end() + int(m.group(1)):]
+    toks = re.findall(r"RK[a-zA-Z]|R[a-zA-Z]|PK[a-zA-Z]|P[a-zA-Z]|[a-zA-Z]", rest)
+    if "".join(toks) != rest: return None
+    return toks
+for fn in sorted(set(re.findall(r"(?m)^define [^\n]*@(__Z\w+)\(", s))):
+    toks = fp_params(fn)
+    if not toks: continue
+    fl = [i for i, t in enumerate(toks) if t in ("f", "d")]
+    if len(fl) != 1: continue
+    m = re.search(r"(?ms)^define [^\n]*@" + re.escape(fn) + r"\(.*?^}\n", s)
+    body = m.group(0); new = body
+    k = fl[0] + 1; bits, fty = (32, "float") if toks[fl[0]] == "f" else (64, "double")
+    for al in sorted(set(re.findall(r"(%\w+) = alloca i128", new))):
+        if re.search(r"store [^\n]*, ptr " + re.escape(al) + r"[,\s]", new): continue
+        pat = r"(%\w+) = load i128, ptr " + re.escape(al) + r"\n"
+        def rep(mm, k=k, bits=bits, fty=fty):
+            v = mm.group(1)
+            return f"%fpbits{k} = bitcast {fty} %arg{k} to i{bits}\n  {v} = zext i{bits} %fpbits{k} to i128\n"
+        new = re.sub(pat, rep, new)
+    if new != body: s = s.replace(body, new); n += 1
 # [D] ucomiss flags 落ち: `ucomiss xmm1,xmm0; ja` は xmm1 > xmm0 (順序付き・非 NaN) の分岐。flags の load を fcmp ogt に接続する。
+# [B'] 個別規則 (xmm 番号が既知の関数): 逆アセンブル確認済みの対応 (xmm0=arg1, xmm1=arg2, xmm2=arg3)。Fix_RCSf は汎用 [B] で処理済み (no-op)。LimitFloat_RCSfff は fp 引数 3 つのため汎用 [B] の対象外。
 def xmm_of(v, arg): return f"%fbits{v} = bitcast float %arg{arg} to i32\n  %{v} = zext i32 %fbits{v} to i128"
 FLOAT_XMM = {
   "__Z7Fix_RCSf": {"%1 = load i128, ptr %0": xmm_of("1", 1)},
