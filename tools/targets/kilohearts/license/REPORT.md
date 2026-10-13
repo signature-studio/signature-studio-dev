@@ -131,7 +131,7 @@ DSP 固有 closure (42 効果) にはライセンス/ネット系参照が無く
 
 ## 12. #710 named import 節 (HeapAlloc shim / 宣言補完) の検証
 
-- 対象: `lift/gen_stubs_sigs.py` (`HEAP_C` / `IMP_SHIM`)・`lic_build.py` (`decl_named_imports`)。snapins 版 `HEAP_C` の同型問題は未修正 (追跡 issue は PR 本文)。
+- 対象: `lift/gen_stubs_sigs.py` (`HEAP_C` / `IMP_SHIM`)・`lic_build.py` (`decl_named_imports`)。snapins 版 `HEAP_C` の同型問題は未修正 (追跡 #1116)。
 - 変更点: `kh_heap_alloc` は領域を超える要求で **0 を返す** (旧: `n` を 0xF0000 に切り詰め、末尾超過で先頭へ巻き戻し生存ブロックを上書き)。`decl_named_imports` は引数付き・戻り非 i64・fastcc の呼出を `sys.exit` で停止し、`declare void @llvm.trap()` が無いときも停止する。`defined` は属性付き define (`define internal i64 @Foo(...) #0`) に対応。
 - 再現 (emsdk・winpkg 不要、ホスト gcc のみ): `python3 scripts/kh710_check.py` → 終了 0 で全 PASS。
 
