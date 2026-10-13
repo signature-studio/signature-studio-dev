@@ -189,16 +189,9 @@ VA/RVA 変換の ImageBase 化は、`ImageBase` が `0x400000` の PE では出�
 
 ## 9. x64c 不一致の原因別分類 (#410 受入 2 つ目・分類まで; 修復は未着手)
 
-`classify_x64c_mismatch.py` で、`work-liftdiff` に同梱された `flelift/batch_closure_hybrid.jsonl` (既存の batch 出力、RTL 帯 1,172 関数) の tags を集計した。
-出力は `results/x64c_mismatch_classify.txt`。batch は再実行していない (本 run での採点ではない)。
+入力は `work-liftdiff` 同梱の `flelift/batch_closure_hybrid.jsonl` (既存の batch 出力、RTL 帯 1,172 関数)。batch は再実行していない。
+集計は `classify_x64c_mismatch.py`、件数・主因・全タグ・退行 7 件の状態は `results/x64c_mismatch_classify.txt` が正本。
 
-| 項目 | 同梱 jsonl | 参照: §2 / §7-2 の commit 済み値 |
-|---|--:|---|
-| 一致 / 不一致 / 実行不能 | 540 / 116 / 516 | 535 / 125 / 512 (初回) |
-
-* 主因 (tags 先頭) の内訳: callee_divergence 42 / import_call_seq 18 / zero_init_drop 16 / callsite_arg_drop 11 / unlifted_callee 8 / memory_semantics 7 / ret_only 6 / arg_drop 4 / import_arg_diff 3 / xmm_arg_drop 1。
-* 全タグ出現 (複数タグあり): callee_divergence 54 / zero_init_drop 52 / unlifted_callee 47 / import_call_seq 32 / callsite_arg_drop 11 / wasm_trap 11 / memory_semantics 7 / import_arg_diff 6 / ret_only 6 / arg_drop 4 / xmm_arg_drop 1。
-* `zero_init_drop` の wasm 側は未初期化スタック依存 (`wasm_uninit_dependent`) が 52 件 (case 単位)。
-* 一致→不一致の退行 (TSV 由来 7 件) の本 run での状態: 5 件は mismatch のまま (0x4090e0 memory_semantics / 0x41cd70 unlifted_callee+wasm_trap / 0x42d830 callee_divergence / 0x44a590 callee_divergence+unlifted_callee / 0x4511d0 callee_divergence+unlifted_callee)、2 件 (0x412020 / 0x455650) は本 run では unexec。退行の原因特定は未了 (主因は上記 mismatch の先頭タグ)。
-
-**未達 (本 run)**: 「上位の原因から修復」(受入 2 の後半) と「一致数の増加のネガコン付き実測」(受入 3)。修復には tools/flelift の変更とリビルド・batch 再採点が要るため、起票先は #410 に継続 (本 PR は分類まで)。
+* 結論: RTL 帯 1,172 関数 = 一致 540 / 不一致 116 / 実行不能 516 (commit 済み TSV の 535 / 125 / 512 とは別セッションの値。§7-2 の揺れ)。
+* **検証状態: 本 HEAD では入力 jsonl が素材として未取得のため、results txt との diff と上記件数は未再現**。次の run で `oc_artifacts: fl-win64 work-liftdiff` を指定して再実行し、入力の sha256 と行数をここに記録する (未記録の間は本節の数値を検証済みとして扱わない)。
+* 未達: 上位の原因からの修復 (受入 2 後半)・ネガコン付きの一致数増加 (受入 3)・一致→不一致の退行 7 件の原因特定。修復には tools/flelift の変更とリビルド・batch 再採点が要るため、起票先は #410 に継続 (本 PR は分類まで)。
