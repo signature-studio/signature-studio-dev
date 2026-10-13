@@ -49,6 +49,7 @@ PM (main)                      subagent (実装)                  subagent (検�
    └ gh pr merge --merge ──→ branch/worktree 削除
 ```
 
+- 流れ図の「issue 起票」は PM が行う。ただし実装 subagent も、1 run に収まらない作業の残りと未解決の起票先として子 issue を起票してよい (§3 の #835 の規定。milestone・優先度・Status は PM が確定する)。
 - **worktree の場所**: リポジトリの**親ディレクトリの `ws-<N>`**
   (`git worktree add ../ws-<N> -b <N>-<slug> origin/main`)。
   既存 worktree は `git worktree list` で確認。**他人の worktree には触れない** (消さない・checkout しない)。

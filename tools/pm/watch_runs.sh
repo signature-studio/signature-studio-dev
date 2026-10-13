@@ -32,11 +32,11 @@ reset_wait_from_runs() {
 # 1 リクエストだけ読んで待つ。
 IDLE="${IDLE:-60}"
 # completed を含む 1 ページ (50 件) では、新しい完了 run に押し出されて未完了 run を取りこぼすため、
-# 未完了の status ごとに 100 件ずつ問い合わせて、どれかが失敗したら 1 を返す。
+# 未完了の status ごとに全ページを取得する (100 件で打ち切らない。古い run が落ちると監視対象から外れる)。
 list_active() {
   local s out all=""
   for s in queued in_progress waiting pending requested; do
-    out="$(gh api "repos/$REPO/actions/runs?status=$s&per_page=100" --jq '.workflow_runs[].id' 2>"$ERR")" || return 1
+    out="$(gh api --paginate "repos/$REPO/actions/runs?status=$s&per_page=100" --jq '.workflow_runs[].id' 2>"$ERR")" || return 1
     all="$all$out"$'\n'
   done
   printf '%s' "$all" | sed '/^$/d' | sort -n
