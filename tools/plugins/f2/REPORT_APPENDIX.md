@@ -138,3 +138,13 @@ python3 tools/plugins/f2/nc_leaf.py      # ネガティブコントロール (ki
 - 前提 `f2_step1.sh` を `tools/plugins/work/` 無しで実行した初回 = **6 分 55.8 秒** (`time` 実測、`win_funcs.py` が支配的; load average は Pool(14) で最大 16.3)。work/ があれば §1 のとおり 51 秒。
 - `nc_leaf.py`: kind ごとに並列 (3 プロセス) で 55.4 秒 (`store_drop`) / 65.1 秒 (`load_drop`) / 81.3 秒 (`offset_shift`)。
 - `find tools/plugins/f2 -type f -size +20M` = 0 件、`git status --porcelain=v1 -- tools/plugins/f2` はコミット前にクリーン。
+
+### 8.8 HEAD faacabb での再実測 (差し戻し修正後、4 core runner、逐次、同一 run)
+
+| コマンド | rc | 所要 (秒) | load average (1 分) 開始 → 終了 | 結果 |
+|---|--:|--:|---|---|
+| `f2_step1.sh` | 0 | 302 | 0.18 → 8.31 | IR leaf 55 / 機械語でも間接 call 無し 23、dispatch 549 + waived 1 = 550 |
+| `leaf_diff.sh` | 0 | 131 | 7.64 → 1.22 | 最終判定 一致 15 / 不一致 8 / 実行不能 0。主採点 一致 9 / 不一致 9 / 実行不能 5、case 207 (native 完走 93)、補助 66 |
+| `nc_leaf.py` | 0 | 194 | 1.13 → (終了時 未採取) | store_drop 6/6、load_drop 11/11、offset_shift 13/13 検出 |
+
+- `f2_step1.sh` の 302 秒は §8.7 の 51 秒 (work/ あり) と異なる。この worktree では `tools/plugins/work/` を再生成したため (win_funcs が支配的)。
