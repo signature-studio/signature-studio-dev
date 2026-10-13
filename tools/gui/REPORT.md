@@ -214,5 +214,5 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
 ## 14. GUI-7 (#183): popup/tooltip・非クライアント領域・無効領域複数矩形・DPI (FL 非依存部)
 既知類型との関係 (DEFECTS.md): 該当なし (shim の意味論)。ただし lift 済み WndProc の `WM_NCCALCSIZE` の `NCCALCSIZE_PARAMS*` lParam が int32 切り詰めで取りこぼされ native で SEGV (§4-6 の既知要件の再発)。修正は shim 側で送信中ポインタを保持。
 - FL 非依存部は実装・検証済み (golden 28,000 px 差 0、nc_golden asserts 26/0、ネガコン 3 本拒否)。FL の窓種別に基づく部分は未達 → PR は `Refs #183`。
-- 全文・実測 (HEAD `67d5cb7` の e2e ALL PASS 142 s、`87c20fc` の再試行を含む) は `REPORT_APPENDIX_C.md` §13。
+- 全文・実測 (HEAD `63cfe0f` の e2e ALL PASS 191 s、`67d5cb7` / `87c20fc` の記録を含む) は `REPORT_APPENDIX_C.md` §14。
 - 未解決 (起票先): FL 実窓種別の確定 (#174 / #564 / #565 後に #183 へ追記)・Chrome 上の NC/popup 描画 (#183)・メニュー (#175)。

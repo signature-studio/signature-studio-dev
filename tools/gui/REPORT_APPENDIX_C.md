@@ -1,7 +1,7 @@
 
-`REPORT.md` の 250 行上限 (docs/DOC_MAP.md §1) のため、§13 (GUI-7 #183) の全文を無変更で分割移動した (GUI-13 #615 の §13 と衝突したため §14 として再編)。要約は `REPORT.md` §14。
+`REPORT.md` の 250 行上限 (docs/DOC_MAP.md §1) のため、§14 (GUI-7 #183) の全文を無変更で分割移動した (GUI-13 #615 の §13 と衝突したため §14 として再編)。要約は `REPORT.md` §14。
 
-## 13. GUI-7 (#183): popup/tooltip・非クライアント領域・無効領域複数矩形・DPI (FL 非依存部)
+## 14. GUI-7 (#183): popup/tooltip・非クライアント領域・無効領域複数矩形・DPI (FL 非依存部)
 既知類型との関係: lift 欠陥ではなく shim の意味論 (`docs/DEFECTS.md` D1a〜D16 に該当なし)。ただし RetDec lift 済み WndProc の lParam が int32 に切り詰められる既知要件 (§4-6) が新規経路 (`WM_NCCALCSIZE` の `NCCALCSIZE_PARAMS*`) で再発した (下記「発見」)。検証起点: `e822e53` (クリーン tree)。仕様は [PROTOCOL.md §12](PROTOCOL.md)。
 
 ### 結論
@@ -9,9 +9,10 @@
 - **golden 画素一致 (差 0)**: `bash tools/gui/test/nc_golden.sh` (`e2e.sh` 1d/6 に組込み)。popup + TOPMOST tooltip + 枠/caption 付きウィンドウ + 無効 2 矩形だけの再描画の 200×140 シーンを独立 Python オラクル `golden/gen_golden_nc.py` (shim と共有するものなし) と比較: **28,000 px 差 0**。同じバイナリが 26 assertion (client/window rect・HT* 判定・`WindowFromPoint` の HTTRANSPARENT 素通し・`WM_NCLBUTTONDOWN(HTCAPTION)` 配送・`GetUpdateRgn` = COMPLEXREGION・DPI 96↔192 の切替と `AdjustWindowRectEx`・z 順 3 本) も実行: **26 passed / 0 failed**。
 - **ネガコン (3 本; どれかが通ると exit 1)**: 期待値を 1 画素改変 → 拒否 / `NC_FAULT=1` (tooltip を TOPMOST にしない) → **840 px 不一致で拒否** / `NC_FAULT=2` (2 矩形でなく外接矩形を無効化) → **4,270 px 不一致で拒否**。
 
-### 検証 (現 HEAD `67d5cb7`、この run の実測; 以下の `7105a2d` 以前の行は過去 HEAD の記録)
+### 検証 (現 HEAD `63cfe0f`、この run の実測; 以下の `67d5cb7` 以前の行は過去 HEAD の記録)
 | 項目 | 結果 |
 |---|---|
+| `bash tools/gui/e2e.sh` (HEAD `63cfe0f`、origin/main `1358c61` の merge commit、`TMPDIR=$RUNNER_TEMP` の worktree で実行、`pnpm install --frozen-lockfile` 済み) | **ALL PASS、rc 0、191 s** (開始 load 1.22 → 終了 load 2.40)。内訳: selftest 428/0・bpp 16,000 px 差 0 (negctl 2/2)・text golden ALL PASS (negctl 4/4)・**nc golden 28,000 px 差 0 (asserts 26/0、negctl 3/3 拒否)**・native lift 0/64,000 px・SIMD 15,679 mismatch 0 (故意欠陥 4 種 FAIL)・text wasm e2e 4b PASS (negctl N1〜N5 拒否)・Chrome readback / screenshot 0 px (6 / 6b / 6d PASS)・fail-fast 6c PASS・sigprobe mismatch 0 (negctl 177)・present 7 pass / 0 fail |
 | `bash tools/gui/e2e.sh` (HEAD `67d5cb7`、origin/main `8d64067` の merge commit、`$RUNNER_TEMP` で実行) | **ALL PASS、rc 0、142 s** (開始 load 0.72 → 終了 load 3.22)。内訳: selftest 428/0・bpp 16,000 px 差 0 (negctl 2/2)・text golden ALL PASS (negctl 4/4)・**nc golden 28,000 px 差 0 (asserts 26/0)**・native lift 0/64,000 px・SIMD 15,679 mismatch 0 (故意欠陥 4 種 FAIL 確認)・Chrome readback / screenshot 0 px (6 / 6b / 6c / 6d PASS)・sigprobe mismatch 0 (negctl 177)・present 7 pass / 0 fail |
 | nc golden 単体 (`67d5cb7`) | `bash tools/gui/test/nc_golden.sh`: rc 0、asserts 26/0、28,000 px 差 0。ネガコン 3 本 (1 px 改変 / `NC_FAULT=1` 840 px / `NC_FAULT=2` 4,270 px) すべて拒否 |
 | 注記 | レビュー側で出た `node_modules` 不在による tsc (step 5) ENOENT は、`pnpm install --frozen-lockfile` で解消する環境依存でありコード起因ではない。本 run では e2e 開始前 (12:24:25) に `node_modules` が存在していたため、本 run の実測は `pnpm install` 直後の状態に該当する (作成経路は未確認) |
