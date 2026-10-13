@@ -2,7 +2,7 @@
 # libFLAC 1.5.0 (upstream ソース) -> flacdec.wasm (wasm32, memory->memory 復号 + MD5 検証)。
 #   bash tools/assets/serum2/flac/build.sh     出力: tools/assets/serum2/work/flacdec.wasm + flacdec.build.json
 # 前提: emcc (EMSDK 環境済み or $EMSDK_ENV を source)。ソースは tools/shared/oss/flac/build.sh と同じ upstream tarball
-# (sha256 は tools/legal/notices/records/flac-1.5.0.json と一致を検査する)。config.h は native configure 生成物から
+# (sha256 はこのスクリプトに直書きし、upstream tarball と照合する。records/flac-1.5.0.json の値とは手で一致を確認済み)。config.h は native configure 生成物から
 # x86 専用ヘッダの define だけ落とす (tools/shared/oss/flac/build.sh と同手法)。x86 intrin / neon は wasm に無いので除外。
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"

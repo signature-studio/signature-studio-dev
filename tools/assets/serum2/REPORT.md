@@ -1,6 +1,6 @@
 # SR-6 Serum 2 コンテンツ配信 — manifest + LazyVfs + wasm libFLAC (node 層 e2e)
 
-検証起点 commit `953e3fa` (branch `70-serum2-content-delivery`, clean worktree `git worktree add --detach` で再現)。
+検証起点 commit `953e3fa` (branch `70-serum2-content-delivery`)。wasm 経路の再実行 (toolchain-emsdk 付き) は HEAD `24c22fc` の worktree で行い、§2 末尾・§3 に記録。
 既知類型との関係: 該当なし (lift/逆アセ/IR pass 系ではない。§4 の SlotCache 欠陥は lift 欠陥類型 (DEFECTS.md) の外)。
 再現: `SERUM2_INSTALLER=<Install_Xfer_Serum2_2.1.5.exe> EMSDK_ENV=<emsdk_env.sh> bash tools/assets/serum2/e2e.sh`
 (展開済みなら `SERUM2_EXTRACTED=<7z x の出力 dir>`)。pass 1 本 + ネガコン 3 本を走らせ、1 本でも期待と違えば exit 1。
@@ -8,7 +8,7 @@
 ## 1. 結論
 
 - **node 層は達成**: 素材 (R2 `plugins-serum2`) の NSIS を `7z x` で全展開し、content 7 グループを既存 `tools/assets` の pack → manifest → HTTP 配信 → LazyVfs (SAB loader + SlotCache) で読み、**全 7,357 files の sha256 が原本と一致**。
-- **FLAC は upstream libFLAC 1.5.0 を wasm32 に再ビルド** (59,504 B, 17 ソース, emcc 4.0.10) して復号。**全 4,747 FLAC の PCM が libsndfile 1.2.2 (別実装) の PCM と一致**、全件 STREAMINFO MD5 検証込みで rc=0。
+- **FLAC は upstream libFLAC 1.5.0 を wasm32 に再ビルド** (58,008 B, 17 ソース, emcc 6.0.12 = `toolchain-emsdk`) して復号。**全 4,747 FLAC の PCM が libsndfile 1.2.2 (別実装) の PCM と一致**、全件 STREAMINFO MD5 検証込みで rc=0。
 - **未達 (Refs 止まりの理由)**: 実 Chrome 上の OPFS/Range 経路、R2 非公開 + Access 配信、Serum 2 本体 (lift 後) からの FS shim 接続は未実施 (§5)。issue に明示の受入条件が無いため、本 PR の受入条件は §2 の 6 項目とした。
 
 ## 2. 受入条件と実測 (clean HEAD `953e3fa`, `e2e.sh` 1 回)
@@ -32,6 +32,28 @@
 | Tables cold / warm | 1,950 ms / 128 ms (173,372,140 B) |
 | e2e 1 本の所要 | pass 42 s、neg-flac 44 s、neg-ref 43 s、neg-chunk 44 s (load average 0.97–1.80、並列 1) |
 | 準備 (展開済み素材から pack + wasm ビルド + libsndfile 参照) | 21 s (初回の別実行は 29 s) |
+
+### 2-b. wasm 経路の再実行 (HEAD `24c22fc`、`toolchain-emsdk` 付き、n≥3)
+
+素材 `plugins-serum2` と `toolchain-emsdk` を `$ARTIFACTS_DIR` から取得 (`/opt/emsdk` 展開済み、emcc 6.0.12)。
+`SERUM2_INSTALLER=<7z 展開元 exe> EMSDK_ENV=/opt/emsdk/emsdk_env.sh bash tools/assets/serum2/e2e.sh` 1 回目で
+pass + neg 3 件すべて OK (`SERUM2 E2E OK`、全体 4 分 01 秒)。pass は追加で 2 回回した (計 3 回)。
+
+| 項目 (pass 3 回の min–max) | 値 |
+|---|---|
+| pass 所要 (`totalMs`、3 回) | 48,502 / 49,414 / 49,151 ms (min 48.5 s – max 49.4 s)。wall 49.4–49.6 s |
+| 全 files VFS 読み (`vfsReadMs`) | 9.4–10.1 s |
+| 全 FLAC 復号 (`flacDecodeMs`) | 32.6 s (32,583–32,610 ms) |
+| Tables cold / warm | 2,473–2,626 ms / 148–152 ms。chunk request 273 → 0 |
+| load average (pass 開始時) | 0.68–1.82 (1 分値) |
+
+pass 3 回とも `failures=0`、FLAC 4,747/4,747 PCM 一致、MD5 有り 4,747、Range 4/4 + 45/45 一致。
+ネガコン 3 件は 1 回ずつ (期待どおり exit 1 / failures=1): neg-flac 48 s、neg-ref 50 s、neg-chunk 49 s (各 1 回)。
+
+### 2-c. 旧 `cache.ts` でも SlotCache 回帰が落ちることの実測
+
+`slotcache-tail-test.ts` を旧 `cache.ts` (blob `483e058b`、`546c54b` の親) に対して 1 回実行: 通常 rc=1 (4/5 復元)、`--neg` rc=1。
+修正版 (`cache.ts` 現行 HEAD) は通常 rc=0 (5/5)、`--neg` rc=1。`--neg` の切り詰め擬似検査に加え、実旧 blob でも 4/5 で不合格になることを確認した。
 
 数え方: 「files」= `find <root> -type f` から `$COMMONFILES64`/`$PLUGINSDIR` を除いた regular file。「FLAC」= 拡張子 `.flac` (4,747 = Multisamples 3,977 + Samples 661 + Impulses 109)。「PCM 一致」= wasm の int32 PCM を left-justified (bps<32 は (32−bps) bit 左シフト) にした sha256 と、`soundfile.read(dtype='int32')` の sha256 が一致し、かつ ch/rate/frames/bps も一致 (frames は STREAMINFO total_samples とも一致)。
 
@@ -61,7 +83,7 @@
 |---|---|---|
 | 実 Chrome (OPFS SyncAccessHandle + SAB + Range) での同等 e2e が無い | ブラウザでの cold/warm・容量・所要は未実測 | #70 に残す (受入に含めるなら別 run で `tools/assets/test/browser-test.ts` 系へ拡張) |
 | **VFS 自体は Range リクエストを発行しない** (chunk object 全体を GET)。Range は raw 格納 chunk へのサーバ側 GET のみ検証 (4/4 で 206 + bytes 一致、br 格納は `Accept-Ranges: none`) | issue 文言「HTTP Range」は chunk 単位取得で満たしている解釈 (推定)。FLAC (raw) をファイル途中から Range で読む経路は未実装 | #70 にコメント (PM 判断: chunk 取得で足りるか) |
-| R2 非公開バケット + Access 配信・実 URL 配信は未実施 (`cf` CLI/認証が runner に無い) | 本番配信経路の実測なし | #18 (配信運用) / #63 (配備 manifest) |
+| R2 非公開バケット + Access 配信・実 URL 配信は未実施 (`cf` CLI/認証が runner に無い) | 本番配信経路の実測なし | #63 (配備 manifest)。#18 は CLOSED のため起票先から外した |
 | Serum 2 本体 (lift 後) の FS 呼び出し (Windows パス・ユーザ領域の既定 content dir) と VFS の接続 | データ層が音声経路に載るかは未確認 | #71 (OSS 境界) / SR-4 側 |
 | FLAC wasm は memory→memory 復号 (全体をメモリ展開)。大物の逐次復号 (stream) は未対応 | 最大 FLAC のピークメモリ未実測 | #70 にコメント |
 | libFLAC 版は 1.5.0 を採用。Serum 2 実体が使う版は未確定 (serum2 REPORT §9 既知の未解決) | PCM は全件別実装と一致しており復号結果への影響は無いが版整合は未確認 | #71 |
