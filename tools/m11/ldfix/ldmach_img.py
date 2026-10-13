@@ -45,3 +45,20 @@ class ImageMachine(Machine):
         self.cs = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
         self.cs.detail = True
         self._cache = {}
+
+    def cover(self, va, last_label):
+        """RetDec config の endAddr は IR ラベルより短い関数がある (REPORT_484 §4)。最大 IR ラベルから最初の ret/ud2 まで区間を延ばす
+        (PE の .pdata 区間には相当する差が無い。ldfix.main が hasattr で呼ぶ)"""
+        ent = self.fns.get(va)
+        if not ent or last_label < va + ent[1]:
+            return
+        a = last_label
+        while True:
+            got = list(self.cs.disasm(self.read(a - self.base, 16), a, 1))
+            if not got:
+                break
+            a += got[0].size
+            if got[0].mnemonic in ('ret', 'retn', 'ud2', 'int3', 'hlt'):
+                break
+        self.fns[va] = (ent[0], max(ent[1], a - va))
+        self._cache.pop(va, None)

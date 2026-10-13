@@ -1,13 +1,13 @@
 # G python-mcp — CPython wasm + flapi/MCP 解析 + ブリッジ設計 (2026-10-10)
 
-> 行数上限 (250 行) のため、§PY-13 (#588) と §12・§13 (#81) の全文は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) に分割移動 (本体は要約のみ)。
+> 行数上限 (250 行) のため、§7c (#82)・§9 (T1〜T9 表)・§PY-13 (#588)・§12・§13 (#81) の全文は [REPORT_APPENDIX.md](REPORT_APPENDIX.md)、§15 (#654) の全文は [REPORT_PY16.md](REPORT_PY16.md) に分割移動 (本体は要約のみ)。
 
 ## 結論 (先出し)
 
 1. **CPython 3.12.1 (FL 同梱版と完全一致) の emscripten/wasm ビルド成功**。パッチ無し、emsdk 6.0.12 でクリーンビルド 3m19s。node で `print(1+1)`=2、struct/json/zlib/hashlib/decimal/re/datetime/inspect 等が動作。`flpy.wasm` **5.92MB** (gzip 2.07MB) + `flpy.data` (stdlib zip) 3.20MB。
 2. **FL の組込 Python API 面を実測**: 公開 12 module **426 関数** + FL 内部 `ilmcp` 9 = **435 関数** (公開 stubs 旧版 392 に対し +34 が 26.1.7 新規)。他に `flpianoroll`(64 メンバ)/`flcpt`/`flrack`/`fl`、MIDI script callback **27**。
 3. **MCPTools.pyc = 48 tools** (「50」ではない)。逆アセンブルは同一 3.12.1 の marshal/dis。**外部通信は pyc 内に 0 件** (import は stdlib 10 + FL module 12 のみ)。分類 **A local-flapi 38 / B local-ilmcp 8 / U Gopher-UI 付随 2 / X 対象外 0**。LLM ゲートウェイ (Gopher WebView `window.flHelper`) は pyc の外で、対象外。
-4. **PoC 成功**: wasm Python を Web Worker で起動し、SAB 同期 RPC で flapi モック (FLEngine 模擬) に接続、**FL 同梱 `MCPTools.pyc` を FL と同じく `__main__` として実行して 48/48 tools が成功** (例外なし・エラー文言なしの意味。モックの戻り値のため FL 実機と同一動作の保証ではない。37,424 flapi 呼出し)。Python→ホスト callable 呼戻し・MIDI callback 経路・MCP JSON-RPC (tools/list, tools/call) も確認。**headless Chrome (cross-origin isolated, module Worker) でも成功**。
+4. **PoC 成功**: wasm Python を Web Worker で起動し、SAB 同期 RPC で flapi モック (FLEngine 模擬) に接続、**FL 同梱 `MCPTools.pyc` を FL と同じく `__main__` として実行して 48/48 tools が成功** (例外なし・エラー文言なしの意味。モックの戻り値のため FL 実機と同一動作の保証ではない。37,425 flapi 呼出し。HEAD e9f46a0 の実測。内訳は REPORT_APPENDIX §7c 検証 2)。Python→ホスト callable 呼戻し・MIDI callback 経路・MCP JSON-RPC (tools/list, tools/call) も確認。**headless Chrome (cross-origin isolated, module Worker) でも成功**。
 5. 1 コマンド E2E: `bash tools/python/run_all.sh` (incremental 19 秒 / 初回 ~4 分)。
 
 ## 1. CPython 3.12.1 wasm ビルド
@@ -91,7 +91,7 @@ FLEngine rodata の `name\0doc\0…<module>` 並びから機械抽出 (`flapi_ex
 
 ## 7. 未解決・ブロッカー・留意
 
-- **FL 側 Python C API 呼出し面は未抽出**: dlsym 先の関数名が平文で無い。サブインタプリタ運用 (`PyInterpreterConfig` 型の存在から示唆のみ) の実態は不明。wasm で `Py_NewInterpreterFromConfig` が動くかも未検証 (→ §11 で検証: 動く。`_flhost` は PY-12 #587 で対応済み = PY-12 節)。
+- **FL 側 Python C API 呼出し面は抽出済み (§7d で訂正: 名前は UTF-16LE で PE 内にあり 110 件抽出済み)。以前の記述: dlsym 先の関数名が平文で無い。サブインタプリタ運用 (`PyInterpreterConfig` 型の存在から示唆のみ) の実態は不明。wasm で `Py_NewInterpreterFromConfig` が動くかも未検証 (→ §11 で検証: 動く。`_flhost` は PY-12 #587 で対応済み = PY-12 節)。
 - `mixer.getCurrentTempo(1)`/`setCurrentTempo(bpm,1)` の第 2 引数の意味 (MCPTools は素の BPM 扱い、公式 docs は ×1000) は**実機で未確認**。モックは MCPTools 側に合わせた。
 - FLEngine 側 flapi 実装は**モック(27 API を実装、他は None)**。実エンジンとの意味差 (引数省略時の既定値、-1 の意味) は実機/lift 後に検証が必要。
 - **kwargs 署名の静的復元 (PY-9 b, #81) 済み**: rodata の並び順ではなく、FLEngine (win PE) の `.data` 内メソッド表 (name/fn/flags/doc, 32B 刻み) と各ラッパー冒頭の `lea [rip+x]` から `PyArg_ParseTupleAndKeywords` の書式と kwlist を復元 (`analysis/flapi_kwargs.py` → `analysis/flapi/flapi_kwargs.json`、`flapi_table.json` の各関数に `kwsig` を追記)。結果は §12。
@@ -137,29 +137,27 @@ mock との差で見つかったもの: mock は引数の個数/型を検査し�
 検証範囲: 上記は mac pkg 無しで `fetch_inputs.sh` の win64 DATA block 経路から配置した MCPTools.pyc / midi.py / utils.py で実行した (b76d221 時点の自己申告値 host_calls 37,424・48/48 と同値)。範囲外: `run_all.sh` 全体・headless Chrome (`browser_check`) は未実施。
 
 
+## 7d. CPython を provider と同一 wasm に静的リンク (PY-2, #83 / #115) — 全文は `REPORT_PY2.md`
+
+結論: `build_flpy_static.sh` で CPython + flapi provider を 1 つの wasm (`flpy_static.wasm`) にリンクし、`_flhost.call` を同一 wasm 内 C 呼出しにした。48/48 tool が SAB+provider 版・モック版と tool 別差 0/48、Python 込み往復は median 0.34µs (Worker+SAB 版 25〜27µs)。FL の `Py_*` 動的束縛 110 名を PE (`0xc395a0`) から機械抽出し (§7 の「未抽出」を訂正)、109 件が `libpython3.12.a` に存在・1 件は Py_REF_DEBUG 限定。実 FLEngine wasm へのリンクは未実施。1 コマンド: `node tests/static_check.mjs` (前提 `build_flpy_static.sh`)。
+
 ## 8. ユーザ依頼事項
 
 特になし (全て既存素材で完結)。任意: 実機 FL で `mixer.getCurrentTempo(1)` の戻り値 (130 か 130000 か) を確認できれば §7 の 2 点目が解消。
 
+## 7c. ilmcp 9 関数の実装 (PY-3 / #82) — `host/ilmcp.mjs`
+
+**結論**: `ilmcp` 9 関数を JS ホスト (`host/ilmcp.mjs`) に実装し、実 `MCPTools.pyc` 上の class B 8 tool を FLEngine 側状態検査で確認 (`tests/ilmcp_e2e.mjs` 25/25)。**受入条件「実エンジン上で動作」は未達** (PR は `Refs #82`)。引数規約・データ・検証表・仮定・未解決の全文は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) (§7c を 250 行上限のため分割移動)。
+
 ## 9. 下流チケット案
 
-| # | 内容 | 規模 |
-|---|---|---|
-| T1 | **(MCP 60 関数は §7b で完了。残り MIDI 経路 → 426 関数は未着手)** FLEngine wasm に flapi provider (`fl_api_call(fn_id,slots)`) を実装: まず MCP が使う 60 (公開 52 + ilmcp 8) + MIDI 経路 (device/transport/mixer/channels) 優先 → 426 関数。`flapi_table.json` から C 雛形を生成 | L |
-| T2 | CPython を FLEngine wasm へ静的リンク (JS 往復撤廃)。`flpy.c` 再利用、スレッド/GIL 方針確定 | M |
-| T3 | `ilmcp` 9 関数の実装 (PluginDB/Browser 列挙、addChannel/addEffect、PRScript store/run) → MCP B 群 8 tools | L |
-| T4 | MCP JSON-RPC をアプリ内 UI/devtools に公開 (`mcp_rpc.mjs` を FLEngine UI に接続、外部 LLM 無し) | S |
-| T5 | piano roll scripting: `flpianoroll`(Note/Marker/score/ScriptDialog) + `.pyscript` ローダ、同梱 5 本 (Euclidean/Humanize/Arpeggiator…) を回帰試験に。ScriptDialog は HUD フォーム連携 | L |
-| T6 | MIDI scripting ホスト: device script(.py) ローダ、27 callback 配送、Web MIDI 入力→`dispatch_midi`。サブインタプリタ可否の wasm 検証 | M |
-| T7 | Edison `enveditor` / `flcpt` / `flrack` module と Chord progression ツール (pyc 39 + pyscript 2) の動作検証 | M |
-| T8 | 性能: 構造値の binary ABI、バッチ API、MIDI 1 イベント当り呼出し数の計測 | S |
-| T9 | 実機 FL でのモック意味差検証 (ユーザ環境があれば。**kwargs 復元は #81 で完了**、残りは実機確認のみ) | S |
+T1〜T9 の表は 250 行上限のため [REPORT_APPENDIX.md](REPORT_APPENDIX.md) に分割移動した。T3 = PY-3 (本 §7c)・T4 = PY-4 (§10)・T6 = PY-6 (§11) は着手済み。
 
 ## 10. MCP JSON-RPC をアプリ UI / devtools に公開 (PY-4, #77)
 
 既知類型との関係: 該当なし (lift / 逆アセではない。flapi は引き続き `fl_mock.mjs` = FLEngine 模擬)。
 
-- 公開面: `window.flMcp` (`start(files)` `rpc(req)` `list()` `call(name,args)` `stop()`) + `/?mcp=1` の UI パネル。実装 `src/runtime/mcp_panel.ts`、配信 `vite.config.ts` `pyAssets` (`/py/` = host/・dist/flpy.{js,wasm,data}・flapi_ids.json の許可リストのみ)。設計は `BRIDGE.md` §3。
+- 公開面: `window.flMcp` (`start(files)` `rpc(req)` `list()` `call(name,args)` `stop()`) + `/?mcp=1` の UI パネル。実装 `src/runtime/mcp_panel.ts`、配信 `vite.config.ts` `pyAssets` (`/py/` = host/・dist/flpy.{js,wasm,data}・flapi_ids.json・ilmcp の 2 JSON の許可リストのみ)。設計は `BRIDGE.md` §3。
 - `mcp_rpc.mjs` 変更: `tools/call` は `tools/list` に出る name だけ受理 (未知 / 非 tool は isError=true。変更前は `__main__` の任意属性を呼べた)、不正 JSON は -32700。`flpython.mjs` は呼出し側が Worker を渡せる `worker` 引数を追加 (既存呼出しは無変更)。
 - MCPTools.pyc / midi.py / utils.py は**配信しない**: 利用者が UI のファイル選択 (または `flMcp.start({...})`) で供給する。未供給の `start()` は「供給が必要」で reject。
 
@@ -204,6 +202,8 @@ mock との差で見つかったもの: mock は引数の個数/型を検査し�
 
 ネガティブコントロール (終了コード 1 = 検出): `midi_script.mjs --neg` (recorder から OnDirtyChannel を消す → 「27 全配送」だけが FAIL、26/27 と欠落名を表示)・`midi_ui_check.mjs --neg` (構文エラー入り script → 「2 script 読込」だけが FAIL、UI に SyntaxError)・`subinterp_probe.mjs --neg` (拒否 builtin の期待を 1 本欠く → その check だけ FAIL)・`midi_bundled_device.mjs --neg` (midi.py 無し → 読込 check が FAIL)。通常実行の FAIL は exit 2、入力欠落は exit 3 (緑にならない)。
 
+**#601 (load 失敗の巻き戻し)**: `fl_rt.load_device_script` は exec 成功後に `_scripts` へ登録し、例外時は `sys.modules` も戻して再送出する (旧: 登録後に exec → top-level 例外で半端な module が残り midiIn / callback が配送された)。同名の既存 script は先に unload 済みで復元しない。UI (`src/runtime/midi_script.ts`) は読込失敗時に `flMidi.stop()` で巻き戻し (started=false・接続ボタン無効・起動ボタン再有効)。回帰: `midi_script.mjs` §4b (fixture `device_import_fails.py`、29 check)・`midi_ui_check.mjs` 失敗経路 (20 check)。ネガコン (exit 1 = 検出): `midi_script.mjs --neg-legacy` (旧ローダへ差し戻し → 必須 3 check (`LEGACY_KEYS`: listDeviceScripts・sys.modules・midiIn 配送) が FAIL、非 MIDI 配送・同名再読込は FAIL しても可)・`midi_ui_check.mjs --neg-rollback` (UI の stop を無効化 → started・起動ボタン・midiIn の 3 check が FAIL。接続ボタンは catch 節が直接 disabled にするため stop の有無では変わらず検出対象外)。接続ボタン check は起動前に有効化してから失敗させ、失敗後に無効へ戻ることを観測する形に変更 (起動前から disabled だった旧 check は常に PASS で無意味だった)。実測 (HEAD 238353e = main 5d7822a を merge した状態。emsdk 6.0.12 で CPython wasm・flpy をビルド。build_flpy.sh 後の `git status` は空): `midi_script.mjs` exit 0 (29 check 全 PASS)・`--neg-legacy` exit 1 (29 check 中 FAIL 4 件: 必須 3 件 + 非 MIDI 配送 = LEGACY_KEYS 3 本が全て FAIL)・`midi_ui_check.mjs` exit 0 (20 check 全 PASS)・`--neg-rollback` exit 1 (19 check 中 FAIL 3 件: started・起動ボタン・midiIn)。接続ボタンは検出対象外。
+
 ### サブインタプリタ (`flpy_subinterp_run` = 検証用 export)
 
 | 項目 | 実測 |
@@ -239,4 +239,11 @@ mock との差で見つかったもの: mock は引数の個数/型を検査し�
 FLEngine の PyMethodDef 表から 435/435 関数を対応付け、書式 303 関数・kwlist 103 関数を復元 (flags=4 の 125 件は書式無し)。`fl_api.bind` は kwlist 名を stubs 名より優先し、既定値が静的に不明な引数の省略後は後続の既定値を足さない (`getGridBit(index=1)` → `(1,)`)。stubs 名とは 66 一致 / 28 不一致 (バイナリを正とする)。再現: `FL_WIN64_DIR=<fl-win64 展開先> python3 analysis/flapi_kwargs.py` の後 `python3 tests/kwsig_check.py` (0.03〜0.04 秒)。wasm 回帰 (`all_tools.mjs` 48/48 ほか)・stubs 照合の例・`arrangement.selectionSet` の kwlist 重複の CPython 実測: [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §12。
 
 ## 13. 未解決 (#81)
-(a) 実機 FL での `mixer.getCurrentTempo(1)` 確認 (#81 のブロッカー)、`device.flrMidiNote` / `flrMidiCC` の書式未復元、省略引数のホストへの渡し方・stubs 既定値 `midi.*` の `eval` NameError は PM 判断待ち (PR #463 コメントに起票依頼)。詳細: [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §13。
+(a) 実機 FL での `mixer.getCurrentTempo(1)` 確認 (#81 のブロッカー)、`device.flrMidiNote` / `flrMidiCC` の書式未復元、省略引数のホストへの渡し方・stubs 既定値 `midi.*` の NameError は #654 (PY-16) で解消 (§15)。詳細: [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §13。
+
+## 14. Piano roll scripting (`flpianoroll` + `.pyscript` ローダ) — #79 (PY-5)
+
+結論: 同梱 Piano roll scripts 5/5 を wasm 上で回帰テスト化 (`tests/pyscript_e2e.mjs`)。Remote Scripts 5/5・Audio scripts 0/12 (`enveditor` 依存)。flpianoroll は 64 メンバ中 62 実装 (`ScriptDialog.DialogParams` 未実装・`Score.loadScoreFromFile` は stub)。全文・実測・未解決は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §14。Chrome (headless) 上の同梱 Piano roll 5/5 実行と node との出力一致 (#466) は [REPORT_CHROME.md](REPORT_CHROME.md) §14b。
+
+## 15. stubs 既定値 `midi.*` の評価 (PY-16, #654)
+結論: `fl_api.bind` の `eval` を、許可した式だけを評価する `_default_value` に置換した。`midi.*` の既定値 **20 関数・21 引数・名前 10 種** は利用者の `midi` から実行時に解決し、repo には値を置かない (`docs/LEGAL.md`)。検証起点 `8d883c3`、修正 commit `4b3cbe2`。`kwsig_check` PASS (wall 43〜45 ms)、旧コード + 新テストは `NameError` で FAIL、実物 midi.py で 21/21 一致。wasm 回帰は all_tools 48/48 (wasm・mock とも)、provider・poc・midi_script・subinterp PASS。追跡の `tool_coverage.json` は旧 NameError で欠けていた 1 tool の出力を新結果に更新。全数列挙・検証の詳細は [REPORT_PY16.md](REPORT_PY16.md)。

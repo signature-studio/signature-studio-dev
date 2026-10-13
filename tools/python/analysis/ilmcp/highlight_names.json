@@ -1,0 +1,26 @@
+{
+ "source": "FLEngine win64 rodata (block00031_PE.bin), UnicodeString literal run",
+ "names": [
+  "Toolbar: Show Piano Roll",
+  "Toolbar: Show Playlist",
+  "Toolbar: Show Mixer",
+  "Toolbar: Show Channel Rack",
+  "Toolbar: Tempo Selector",
+  "Add channel",
+  "Add steps",
+  "Start playback",
+  "Enable loop starter",
+  "Select loop starter genre",
+  "Channel rack playback",
+  "Loop starter channel dice",
+  "Loop starter dice",
+  "Loop starter send to playlist",
+  "Playlist play",
+  "Toolbar: Playback mode",
+  "StepSeq 808 channels",
+  "StepSeq 808 kick Fill4",
+  "StepSeq 808 snare Fill8",
+  "Pickerpanel pattern 1",
+  "Toolbar: Song mode"
+ ]
+}

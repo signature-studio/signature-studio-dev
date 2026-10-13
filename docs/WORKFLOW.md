@@ -179,7 +179,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
 - **素材**: 既定で取得されるのは `fl-win64` のみ。他は本文に `oc_artifacts: fl-win64 plugins-ott` の
   行を書く (許可名: fl-win64 / plugins-ott / plugins-freshair / plugins-serum2 / plugins-massivex /
   plugins-kilohearts / toolchain-retdec / toolchain-emsdk / work-m11 / work-liftdiff / work-m6-ott /
-  work-liftlib-targets / work-liftlib / work-icall / analysis-ott-binaries / apt-mingw。それ以外は
+  work-liftlib-targets / work-liftlib / work-icall / work-fw-stage1 / analysis-ott-binaries / apt-mingw。それ以外は
   run が失敗する)。全素材は約 17.7 GiB (2026-10-13 実測) のため必要分だけ指定する。
   - `toolchain-retdec` → `/opt/retdec`、`toolchain-emsdk` → `/opt/emsdk` に展開される。
   - `work-m6-ott` → `tools/m6/work/` + `tools/ott/work/` + `tools/m8/work/` + `tools/m9/work/` + `tools/m10/work/`
@@ -191,7 +191,15 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   - `apt-mingw` は R2 の素材ではなく、`gcc-mingw-w64-x86-64` を runner に apt 導入する
     (`x86_64-w64-mingw32-gcc`。PE を作るテスト用で tools/ の 22 ファイルが使う。#646)。
   - `work-m11` → `tools/m11/work/`、`work-liftdiff` → `tools/liftdiff/work/` に展開される
-    (gitignore 対象の検証スナップショット。commit しない)。
+    (gitignore 対象の検証スナップショット。commit しない)。`work-m11` は #516 qstore 以前の生成
+    (`qstore_report.json`・`ir_conditions.json` 無し) で現 main の生成手順と一致しない (#680)。survey の基準には使わない。
+    IR の正は `bash tools/m11/m11_e2e.sh --full` (RetDec から再生成) の出力とする。ただし `--full` は **未成功**
+    (head `4e084e1` で実行し `m11_bounds` が `tools/m2/work/ghidra_dll/functions_dll.csv` の欠落で fail-closed。この CSV は素材に無い Ghidra の中間物。`tools/m11/REPORT_N27.md` §10-3・#728)。PE とパスは `FL_WIN64_DIR` 経由・相対パス化済み。
+    `work/ir_conditions.json` の `ldfix=applied` と `ir_sha256` (IR の指紋) が一致しない IR は build されない (`m11_build.sh`)。
+  - `work-fw-stage1` → `tools/plugins/work/fw/` に framework stage-1 成果物 (fw_icall.dll / fw_map.json /
+    fw[0-7].restored.ll / r2.restored.ll / r3.restored.ll の 12 ファイル。#610)。`fw_269_verify.sh` の既定 SRC がそのまま使える。
+    **R2 実体は未 upload** (upload 完了までこの名前を `oc_artifacts:` に書くと `missing R2 object(s)` で run が失敗する)。
+    作成・検証は `bash tools/plugins/framework/fw_pack_stage1.sh pack` → `artifacts/work-fw-stage1.tar.zst` (`verify` で単独検査も可。R2 への upload は依頼者が行う)。
   - 追加の `work-*` は R2 に置いて、`prepare-event-context.sh` の allowlist に足す (#293)。
 - **fl-win64 の展開と `FL_WIN64_DIR`**: tarball は最上位に `extracted/` と installer exe を持つ
   (`extracted/block00031_PE.bin` 等)。展開先ディレクトリがそのまま `FL_WIN64_DIR` になる。
@@ -259,14 +267,35 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   - **起動主体は完全一致**: fix を起動する reviewer (`oc-reviewer-for-signature-studio[bot]`、`user.type == 'Bot'`) と、
     停止コメント・完了コメントの実装 App (`opencode-for-signature-studio[bot]`) は login の完全一致で見る
     (前方一致だと別名のアカウントでも write 権限の fix が起動し、停止コメントを偽装して数え直しもできてしまう)。
-  - **テスト**: `.github/scripts/tests/test-pr-loop.sh` (fake gh) を `.github/workflows/scripts-test.yaml` が
-    `.github/scripts/**`・`.github/actions/**`・`opencode.yaml` の変更ごとに実行する。
+  - **テスト**: `.github/scripts/tests/test-pr-loop.sh` (fix / verify / reopen) と `test-watchdog.sh` (watchdog の判定と操作)
+    と `test-dispatch-context.sh` (dispatch の入力検証) を、fake gh で `.github/workflows/scripts-test.yaml` が `.github/scripts/**`・`.github/actions/**`・`opencode.yaml` の
+    変更ごとに実行する。
   - **並行制御**: implement job は `opencode-impl-<N>`、review job は `opencode-review-<N>` と group を分ける。
     同じ group だと fix が pending の間に review が入って fix が黙って取り消される (pending は 1 件しか持てない)。
     その代わり fix と review が重なりうるので、reviewer は `gh pr merge --match-head-commit <レビューした head>` で
     未レビューの commit を巻き込まない。
   - PR は **常に ready・base は main** で作る (draft / stacked は REVIEWING でも FIXING でもない状態を作るため禁止)。
     未完でも ready で出して `Refs #N` と未解決を書く。前提 PR が未 merge の作業は着手しない。
+
+  **watchdog** (`.github/scripts/watchdog.sh`、`opencode.yaml` の `watchdog` job): `push` to main と 5 分おきの
+  `schedule` で、REVIEWING でも FIXING でもない PR (IDLE) を機械的に元の 2 状態へ戻す。実行中の run と PR を突き合わせ、
+  push 直後の PR は SETTLE (4 分) の間は触らない。1 回の点検で動かす PR は 12 件までで、REST だけを使う。
+
+  | IDLE の理由 | watchdog がすること |
+  |---|---|
+  | main と競合している | `repository_dispatch` (type `oc-fix`) で fix モードの実装 run を起動する。競合 PR は `pull_request`・`pull_request_review` でワークフローが起動せず、差し戻しでは動かせない (往復回数を消費するだけ)。dispatch は競合に左右されない。同じ head への dispatch は 3 回までで、超えたら `oc:stuck`。fork からの PR (`head.repo` が本リポジトリでない) は dispatch しない (write 権限の run を第三者の入力で動かさないため)。`oc:stuck` も付けず、一覧に出して人が判断する |
+  | draft | ready にする |
+  | 現在の head に verdict が無い | close -> reopen で review を再起動する |
+  | 差し戻し済みだが fix が動いていない | `[watchdog]` の request-changes を出し直す (-> fix) |
+  | approve 済みで未 merge | `gh pr merge --merge --match-head-commit <head>`。失敗したら `[merge-failed]` の request-changes |
+
+  **repository_dispatch (oc-fix)**: 送れるのは `contents: write` を持つトークンだけ。payload は PR 番号 (数字のみ)・理由 (`conflict`)・
+  素材名 (PR 本文の `oc_artifacts:` から allowlist に一致する語だけ) で、自由な文字列は持たない。`prepare-event-context.sh` が
+  値域を検証し、指示文は理由から組み立てる。run は `run-name` が `oc-fix #<PR 番号>` になり、watchdog はこの名前で担当 run を突き合わせる。
+  dispatch の前に `<!-- oc-dispatch:<head12> -->` のマーカー付きコメントを残し、同じ head への回数を数える。
+
+  `oc:stuck` ラベルの PR は触らない (人の判断待ち)。同じ head への watchdog の差し戻しが 6 回、または review の再起動が
+  3 回に達したら `oc:stuck` を付けて止める。`DRY=1` なら計画だけを出す。reviewer は login の完全一致 + `Bot` 型で見る。
 
   PM の運用スクリプト (`pr_gaps.py` で IDLE を計測、`sweep_prs.sh` で復旧) は **バックストップ**であり、
   IDLE が 1 件でも出たらそれ自体を workflow の不具合として扱う (所在は `docs/REFERENCES.md` `[PM-SCRIPTS]`)。
