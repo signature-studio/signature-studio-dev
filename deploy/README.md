@@ -77,6 +77,32 @@ immutable 配下の元ファイル名はハッシュ必須 (stage が検査)。t
 Account: Workers Scripts **Edit**、Access: Apps and Policies **Edit**、Access: Service Tokens **Edit**。現環境の `cf`/`wrangler` は OAuth ログイン済みで
 `workers-scripts.write` `access-app.write` `access-service-token.write` を含む (00-preflight が検査)。zone / R2 / DNS 権限は不要。
 
+## CI / E2E の秘密情報 (`.github/workflows/e2e.yaml`)
+
+> workflow 本体は App に `workflows` 権限が無く push できなかったため `tools/e2e/ci/e2e.yaml.proposed` に置いてある。
+> 有効化: `git mv tools/e2e/ci/e2e.yaml.proposed .github/workflows/e2e.yaml` (`workflows` 権限のあるユーザが実施。詳細 `tools/e2e/REPORT.md` §CI 化)。
+
+| ジョブ | トリガ | 内容 | 必要な設定 |
+|---|---|---|---|
+| `local` | PR / main push (対象 path のみ) / 手動 | `tools/e2e/run.sh --driver both --targets preview,edge-sim` | なし |
+| `remote` | 週次 (月曜 03:17 UTC) / 手動 (`remote=true`) | `tools/e2e/run.sh --url "$E2E_URL" --driver both` | repo variable `E2E_URL`、secrets `E2E_ACCESS_CLIENT_ID` / `E2E_ACCESS_CLIENT_SECRET` |
+
+- `E2E_URL` が空なら remote は skip (notice のみ・失敗にしない)。URL は手動実行の `url` 入力でも上書きできる。
+- 成果物 (`results/*.json`・`shots/*.png`・ログ) は artifact `e2e-{local,remote}-<run_id>` に 14 日保存、表は job summary に出る。
+- **fork PR / 秘密情報**: `local` は secrets を使わない。`remote` は schedule / 手動のみで PR からは起動しない。
+
+**secrets の運用**
+- service token (`signature-studio-e2e`、`40-access.mjs` が作成) の client id/secret を GitHub **repository secrets** に登録する。
+  secret は作成時 1 回しか表示されない (`deploy/work/secrets/<name>.json`、0600・gitignore 済み)。登録後はローカルの控えを削除する。
+- token の有効期間は `ACCESS_SERVICE_TOKEN_DURATION` (既定 8760h = 1 年)。**ローテーションは 11 か月ごと (失効 1 か月前)** に行う。
+  1. `ACCESS_SERVICE_TOKEN_NAME=signature-studio-e2e-<YYYYMM> node deploy/scripts/40-access.mjs --apply` (新 token を作成し Access app のポリシーを新 token に更新。冪等)
+  2. 新 client id/secret を repository secrets に上書き
+  3. `gh workflow run e2e.yaml -f remote=true` で remote ジョブが PASS することを確認
+  4. 旧 token を `cf zero-trust access service-tokens delete` で削除
+- 失効・誤設定時は Access がログインへ 302 するため remote ジョブは FAIL する見込み (推定・実 URL では未検証)。FAIL 時はまず token 期限と secrets を確認する。
+- CI から **デプロイは行わない**。API トークン (Workers Scripts Edit 等、上記「トークン権限」) を GitHub secrets に置く運用は、CI デプロイを導入する時に別 issue で決める
+  (現状 E2E に必要なのは service token のみ。API トークンは不要)。
+
 ## 運用上の注意
 
 - `_headers` の反映には **30–60 秒** (n=3)。90-verify は COEP が付くまでポーリング。再デプロイ直後に古いヘッダを見ても異常ではない。

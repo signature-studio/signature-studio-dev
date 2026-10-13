@@ -209,3 +209,37 @@ PERF_QUICK=1 bash tools/perf/perf.sh     # 代表変種・反復 1 (数分)
 | R2 (`legacy-r2/20-upload.mjs --precompress br`) への実 PUT・ブラウザ透過復号は未実証 (S3 キー無し) | R2 へ戻す場合のみ | `deploy/REPORT.md` §7 の既存起票 (#8) |
 | `chunked.mjs` (大物 part 連結) は `fetchCompile` 未結線 (単一 URL 前提)。part ごとの br 事前圧縮も未設計 (ヘッダ依存の透過復号が使えないため JS 側 decode が要る。Chrome 154 の `DecompressionStream` は gzip/deflate のみ・brotli/zstd 不可を実測) | >24MiB 実 FLEngine wasm の br 配信 | #170 に残置 |
 | 実 FLEngine 規模 (K=10〜100) での streaming 隠蔽効果は合成 17MB のみ。他ブラウザ/実回線は未測 | — | PERF-P9 (§7) |
+
+## 11. AudioWorklet 向け wasm ローダ (PERF-P3 / #162)
+
+既知類型との関係: 該当なし (lift 無し・ローダ + 合成 wasm の計測)。検証起点 commit: `c3cd3e8` (detached worktree で 3 回実行)。
+実装: `src/runtime/worklet_loader.ts` (main 側 API `createWasmWorkletHost` → `host.load(bytes, {prewarmBlocks, keepModule, stubImports})`・`host.firstBlocks()`・`host.probeModulePost()`) と
+`public/worklets/wasm-host-worklet.js` (processor `wasm-host`: bytes 受信 → `WebAssembly.compile` → `instantiate` → `ws_init` → pre-warm → `ws_reset` → `loaded` 通知、`process()` が最初の 16 ブロックの処理時間と先頭 4 ブロックの入出力を報告)。
+wasm ABI `ws_v1`: export `memory` / `ws_buffers()->i32` (in[128] f32 直後に out[128] f32) / `ws_process(i32)`、任意 `ws_init` / `ws_reset`。違反は `loaded` ではなく `error` で reject (e2e で確認)。
+
+e2e: `node tools/perf/loader/loader_e2e.mjs [--reps 5] [--quick]` (Chrome 起動は条件×反復ごとに新規 = NativeModule キャッシュを持ち越さない。`gen_wasm.mjs` が emcc 不要の合成 wasm を生成)。
+対象 wasm: small = 4,778 B (1000 → 64 段 IIR)、big = 33,554,432 B (1000 段 + 各段 nops 200 + 呼ばれない filler 関数 90,000 + padding section; lazy compile 対象は約 1000 関数)。OTT/FLEngine 実 wasm ではない。
+計測は 48 kHz AudioContext・headless Chrome 154 (null sink)・runner 4 コア。worklet 内は `Date.now()` のみ (**1 ms 分解能**)。
+
+検査 (7 項目、3 回とも PASS 7 / FAIL 0。所要 34.7 / 33.9 / 34.5 s、終了時 loadavg 4.5 / 5.7 / 7.7): Module 直 postMessage が messageerror になる・transfer 後に main の buffer が detach・main Module 保持・先頭 4 ブロックの出力が参照モデル (JS, 全段 fround) と bit 一致 (4 ブロック×128 サンプル・非ゼロ 128)・ABI 違反 wasm の reject。
+ネガティブコントロール: 参照への入力を 1 サンプル 0.001 ずらすと 4/4 ブロックが不一致 → FAIL 判定が効く。1000 段の初版 (係数でゲイン > 1 → Infinity) は bit 一致検査が `mism=3` で FAIL し、係数修正で解消した。
+
+| 条件 (n=5 の中央値、3 回実行の範囲) | worklet compile ms | main compile ms | roundtrip (transfer→loaded) ms | block0 ms | 最初の 16 ブロックの最大 ms |
+|---|--:|--:|--:|--:|--:|
+| small / pre-warm 0 / keep 0 | 0〜1 | - | 1.4 前後 | 0〜1 | 0〜1 |
+| big / pre-warm 0 / keep 0 | 21〜23 | - | 21.6〜29.6 | **6〜9** | **6〜11** |
+| big / pre-warm 8 / keep 0 | 20〜22 | - | 32.8〜42.8 | **0〜1** | **1〜2** |
+| big / pre-warm 0 / keep 1 | 21〜23 | 27.9〜33.2 | 21.4〜27.5 | 6〜10 | 6〜10 |
+| big / pre-warm 8 / keep 1 | 20〜21 | 29.0〜31.8 | 32.4〜41.8 | 0〜1 | 1 |
+
+- **pre-warm の効果**: 初回ブロックの処理 6〜11 ms (128f = 2.67 ms の予算の 2〜4 倍 = 初回で underrun) → 0〜2 ms。コストは load の roundtrip +11〜13 ms (pre-warm 8 ブロックの計 11〜12 ms を worklet 内で払う)。small (関数 ~65) では初回も 0〜1 ms で差は 1 ms 分解能以下。
+- **main 側 Module 保持 (`keepModule`) は lazy compile では効果なし**: worklet compile は keep 0/1 とも 21 ms 前後で変わらず、main compile (27.9〜33.2 ms) が startup 〜 first16 に**加算** (66〜75 ms → 90〜118 ms)。§3 の「main で eager compile 済みなら worklet 33 ms」は **eager (`--no-wasm-lazy-compilation`) 時の NativeModule 共有**の話で、既定 lazy では当てはまらない (本実験の Chrome は既定 flag)。→ 既定では `keepModule` は使わず、eager 設定を採るときだけ要再測。
+- load 完了から ctx.resume → 最初の 16 ブロック完了までは 25〜47 ms (small 28〜47 / big 25〜47, null sink の起動待ちが支配; wasm サイズ依存ではない)。startup→first16 (transfer 開始から計): small 32〜50 ms、big 61〜75 ms (keep 0)。
+- 再現: 上のコマンド 1 本。生データ `tools/perf/loader/work/loader_e2e.jsonl` (gitignore)。
+
+| 未解決・限界 | 影響 | 起票先 |
+|---|---|---|
+| 合成 wasm のみ。bit-exact OTT (x64c) / FLEngine 実 closure の worklet 計測は未実施 (REPORT §5.4: FLEngine wasm 未存在) | pre-warm 効果量 (6〜11 ms) は実 closure で変わる | PERF-P9 (#168: bit-exact OTT の Chrome Worker / AudioWorklet 再測) にコメント。FLEngine 実 closure の起動〜初回 audio E2E (旧 P6 案) は issue 未起票 → PM 判断で新規起票 |
+| `Date.now()` 1 ms 分解能・null sink (headless)。実デバイスの underrun 計測なし | 初回ブロック < 1 ms は判別不能・実 underrun 未評価 | PERF-P7 (#165: 実機再測) |
+| eager compile + keepModule の効果 (§3 の 481→33 ms) をローダ経由で未再測 | keepModule の採否判断 | 本 issue のコメントで PM 判断 (必要なら子チケット) |
+| `src/index.ts` / `audio.ts` (dummy-worklet) への組込みはしていない | ローダは未接続の部品 | RT / AU 系 (FLEngine 結線時) |

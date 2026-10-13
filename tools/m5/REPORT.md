@@ -1,6 +1,6 @@
 # tools/m5/REPORT.md — M5 (Delphi lift → wasm E2E + native bit-exact)
 
-> **参照専用 (LIFTLIB-1 / #224)**: 本 dir の lift IR pass・スクリプトは新規実行・改変しない。IR pass の正本は `tools/liftlib` (対応表: `tools/liftlib/README.md`「旧 dir pass → liftlib 対応表」)。既存 e2e 成果物・本 REPORT は歴史として残置し、旧成果物に対する既存 e2e (`tools/m7/m6_e2e.sh`・m8/m9/m10 の `*_e2e.sh`) が引き続き PASS することは `tools/liftlib/REPORT.md` §15 で実測。
+> **参照専用 (LIFTLIB-1 / #224)**: 本 dir の lift IR pass・スクリプトは新規実行・改変しない。IR pass の正本は `tools/liftlib` (対応表: `tools/liftlib/README.md`「旧 dir pass → liftlib 対応表」)。既存 e2e 成果物・本 REPORT は歴史として残置し、旧成果物に対する既存 e2e (`tools/m7/m6_e2e.sh`・m8/m9/m10 の `*_e2e.sh`) が引き続き PASS することは `tools/liftlib/REPORT_APPENDIX_B.md` §15 で実測。
 
 独立検証 (subagent) が全テストを再実行し, ir5_patch の実測バグ 4 件を修正した上で
 生成。メイン成果物は tools/m5/ 配下 (`work/` は実行成果物でコミット対象外)。
