@@ -93,11 +93,32 @@ argfix の `helper_xmm` が 9 → 12 に増え 0x5e09f0 / 0x5e0a70 / 0x5e0b10 �
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 0x5de3e0 の `[rdx]` store 欠落 (lift) | buf_diff 2000 | #331 |
-| 0x5dee90 / 0x5df040 / 0x5e02b0 の残差 | buf_diff 約 2.57M | #331 |
 | 0x5e12b0 の ucomiss 落ち (lift) | abi-mismatch のまま | #331 |
+
+(0x5dee90 / 0x5df040 / 0x5e02b0 は §14.6 で解消。当初の「x87 模型の問題」の推定は外れ、原因は deref の落ち。)
 
 #331 の対象 kernel は 0x5de3e0 / 0x5dee90 / 0x5df040 / 0x5e02b0 / 0x5e12b0 の 5 つ (0x5e0d80 は含まない)。
 | ext 精度が必要な kernel の wasm32 検証・framework 統合 | #269 §12.4 と同じ | #197 (既存提案) |
+
+### 14.6 #983: 残差 3 kernel の原因確定と修復 (検証 HEAD `cb34601`)
+
+原因 (機械語を capstone で読んで確定。lift 前段で RetDec が落としていた):
+
+- **0x5dee90 / 0x5df040** (buf_diff 2,565,360 / 2,565,277): 先頭の `movups xmm7,[r10]` (r10 = r9 = 第 4 引数 arg4) の読み元が、
+  IR で arg4 でなく未初期化 `alloca %r9` になっていた。修復後も `fix_asm_stores` を通さないと 993 cell 残る (下記)。
+- **0x5e02b0** (buf_diff 2,578,706): `mov rdx,[rdx]` (record の第 1 qword を base にする) が落ち、2 本目の出力 base が arg2 自体になっていた。
+
+修復: `k80_deref_fix.py` (新規、関数単位の置換で 1 箇所一致を assert、負論対照 `K80_NO_DEREF_FIX=1` は no-op)。
+`p0c3_e2e.sh` / `p0c4_abi_e2e.py` の chain に組み込み。`p0c3` は lift 後段と揃えるため `fix_asm_stores` を前段に追加した。
+
+| 実測 (HEAD `cb34601`、素材 `fl-win64` のみ、2000 case) | 結果 |
+|---|---|
+| `p0c4_abi_e2e.py 2000` | rc=0、27.0 s (load 0.14〜0.38)、`run=67 ok=67 sig11=0`、3 kernel とも buf_diff=0 |
+| `p0c3_e2e.sh 2000` | rc=0、50.1 s (load 0.41〜0.44)、回帰 11 + 3 kernel とも buf_diff=0 |
+| 修復前 (同じ素材・同じ chain) | 0x5dee90=2,565,360 / 0x5df040=2,565,277 / 0x5e02b0=2,578,706 |
+
+注意: `p0c3` で `fix_asm_stores` を外すと 0x5dee90 / 0x5df040 は buf_diff=993 になる (`p0c4` は 0)。
+pass の順序依存で、lift 後段の順序 (`fix_asm_stores` → f80_lower) に揃えた。
 
 ### 14.5 再現
 

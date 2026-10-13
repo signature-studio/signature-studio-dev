@@ -220,3 +220,23 @@ bash tools/gui/e2e.sh             # 全層 (fcd564bc: 185 s)。前提: x86_64-w6
 bash tools/gui/test/wbench.sh 5   # wasm SIMD/scalar の API 単位比較 (fcd564bc: 19 s)
 bash tools/gui/test/selftest.sh   # 1/6 単体 (e11701db: 1 回約 13 s、20 回連続 20/20 PASS)
 ```
+
+## 9b. GUI-4 (#180) 追補: 前面 surface の z 順再描画 (PR #1022)
+既知類型との関係: 該当なし (present 経路の描画順。lift 欠陥ではない)。検証起点 commit: `b54fb619` (`tools/gui/present/e2e.sh` 前段の PR head)。
+- **変更**: `src/runtime/gui_renderer.ts` の `present()` (2D) と `glDrawRects()` (WebGL2) で、dirty 矩形に重なる前面 surface を z 昇順 (`front.sort`) に並べてから描く。`page.js` の golden に `front-overlap` ステップ (前面 surface 2 枚を全面 dirty の上に重ね、id 順と z 順が逆になる配置) を追加。
+- **実行**: `PRESENT_SKIP_BENCH=1 bash tools/gui/present/e2e.sh` (`b54fb619` を worktree `ws-1022` で実行、rc=0, 17.2 s, load 0.31 → 0.78)。
+  - 35 件 OK・FAIL 0。golden は 4 方式 (cpu-immediate / gl-direct-immediate / gl-staged-raf-seqlock / cpu-raf-seqlock) × 46 step × 230,400 px がすべて差 0 px。
+  - 同じ HEAD を 3 回再実行 (rc=0, 35 OK / 0 FAIL を 3/3)。
+- **陰性対照** (`front.sort` を `//` で無効化した作業ツリーで実行。コミットはしていない。元ファイルは毎回 `b54fb619` へ戻して差分 0 を確認):
+
+| 無効化した箇所 | 実行 | cpu-immediate | gl-direct-immediate | cpu-raf-seqlock | gl-staged-raf-seqlock |
+|---|---|---|---|---|---|
+| 2D (`present()`) のみ | 1 | FAIL 3,512 px | PASS | FAIL 2,862 px | PASS |
+| GL (`glDrawRects()`) のみ | 1 | PASS | FAIL 2,862 px | PASS | PASS |
+| 両方 | 1 | FAIL 3,512 px | FAIL 2,862 px | FAIL 2,862 px | PASS |
+| 両方 | 3 (連続) | FAIL 3/3 (3,512 px) | FAIL 1/3 (2,862 px) | FAIL 2/3 (2,862 px) | PASS 3/3 |
+| 両方 (最初の 1 回を含む全数) | 5 | FAIL 5/5 | FAIL 2/5 | FAIL 3/5 | PASS 5/5 |
+
+  - 検出は run ごとに揺れる。cpu-immediate は毎回検出された。gl-direct-immediate と cpu-raf-seqlock は run によって検出されない場合があった (原因は未特定; 2862 px の同値から、どの step の重なりを拾うかの差と推定するが未確認)。gl-staged-raf-seqlock は今回の 5 + 単独 1 回で一度も検出していない。
+  - 判定: 「ソートを外しても rAF 経路 (gl-staged / cpu-raf) は PASS」は誤り。cpu-raf-seqlock は検出されうる。検出するのは即時経路と cpu-raf-seqlock、検出しないのは gl-staged-raf-seqlock。
+- **範囲外・未解決**: 陰性対照の揺れ原因の特定 (起票先: #180 のまま、必要なら子 issue)。実 GPU・実 FL 負荷での frame time は本節に含まない (本体 §9 の未達を参照)。
