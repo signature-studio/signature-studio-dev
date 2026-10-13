@@ -105,6 +105,17 @@ python3 -c "import sys; sys.path.insert(0,'tools/m11/ldfix'); from ldmach import
 - `disasm_735.py` の出力は `41a69c`〜`41a6a3` の 3 命令 (`mov rax,[rbp+0x50]` / `mov rax,[rax]` / `mov [rip+..],rax`) のみ。41a681〜41a689 と 41a68f〜41a69a は上記の全体出力から取った。
 - IR の確認 (§1・§2 の行番号) は `work-m11.tar.zst` を `tar --zstd -xf` で展開し、`tools/m11/work/` の `grep -n` と `sed -n` で行った (展開は約 2.5 秒、実測)。PR 本文の `oc_artifacts: fl-win64 work-m11` で取得する。
 
+## 6b. 検出信号の試行 (#735 run 3・不採用。コード変更は無し)
+
+目的: 受入 3 (検出信号) として「機械語の zero-disp load 値の store に対し、IR の store 値が `load (argN + c)` (c≠0) か」を `audit_lsf.py` に追加する。
+
+実測 (fl-win64 無し・`work-m11` の `boot_final3.ll` / `m11_image.bin` / `boot*.drc.config.json`、本 run で展開):
+
+- 試作版の出力: 全 7421 関数中 `suspect_off_fns` = 8、`suspect_off_sites` = 19。`41a670` は検出された (`store i64 %2` = `load (%arg1+8)`、機械語 `41a6a3` / `41a6d6` の `[arg1+0]` と不一致)。
+- しかし他 7 関数 (`1064ed0` / `407520` / `442480` / `7e5240` / `821550` / `c3ed10` / `d237e0`) も同形で検出され、誤検出の割合が高い。原因: `transfer` は機械語側で disp=0 の load 値 (`('ld', n, w)`) しか追跡せず、IR 側の `c` と機械語の disp を照合できない。`(n, w)` だけで突き合わせると無関係な store を拾う。
+- 結論: 検出信号は機械語側の値に disp を持たせる (`('ld', n, w, disp)`) 改修が前提。`transfer` の状態表現を変えるため、全関数の既存判定 (`SUSPECT_VAS` / `SUSPECT_USE_VAS`) への影響を再測定する必要があり、1 run の範囲を超える。
+- 試作コードは取り消し済み (`audit_lsf.py` は未変更)。次 run は disp 追跡版を別 PR で作る。
+
 ## 7. 検証 (`docs/WORKFLOW.md` §6)
 
 - 検証 HEAD: PR head の hash は PR 本文と `gh pr view` が正本 (REPORT 内には書かない。自己参照になるため)。
