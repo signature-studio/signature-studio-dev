@@ -123,3 +123,43 @@ REPORT §14 の詳細。pass の仕様・結論は REPORT §14 が正本。
 
 - #1208 の受入条件 3 点は全て達成。範囲外の残り (起票なし・非ブロッカー): (1) `expect_slot` (-72/-80/-152) は照合用の literal のまま。slot 値そのものの導出は未実装。(2) 役割→global 対応 `ROLE_GLOBAL` は手書きの 3 行 (harness C が定義する名前に一致させるため)。
 - 関連: #1213 [SR-11] (slot 照合の追加) は既に MERGED。
+
+## 14c. faithful 経路への L1 適用・icall 界面確認・23/23 再測定 (#1265 / SR-17)
+
+- 測定 commit: `a5ab78f2` (origin/main)。コード変更は無し (本節の追記のみ)。
+- 素材: `plugins-serum2` の `Install_Xfer_Serum2_2.1.5.exe` → `$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3` (19,236,864 B・sha256 `501e7bb3…5283` 一致)。
+- faithful 経路の raw lift: `work/lift/authstub.drc.ll` (710,975 B・sha256 先頭 16 桁 `5ce6d287d370ef96`)。N2b は当てない (`authstub_irpass.py` を通さない)。
+- L1 適用: `liftlib.passes.base.run_base` → `liftlib.passes.l1_restore.restore_l1` (`br_line` 8916、meta `[3049, 3050]`)。復元後 IR (`raw_base_l1.ll`) の sha256 先頭 16 桁 `f019ede0979ae1c7`。`llvm-as-18` で base 後の raw / restored の両方 rc 0。
+
+### census (faithful 経路・前後)
+
+| 指標 | raw (適用前) | restored (適用後) |
+|---|---|---|
+| machine: 直接 `call [reg+0x30]` sites | 1 | 1 |
+| machine: `edx=0x800010` 即値ロード | 1 | 1 |
+| machine: 入口 edge | 1 | 1 |
+| IR: `insn.addr` 被覆 (site 範囲) | 0 | 2 |
+| IR: 直接 call (site 範囲) | 0 | 1 |
+| IR: `edx=0x800010` 即値 (site 範囲) | 0 | 0 |
+| IR: 0x800010 即値 (ファイル全体) | 1 | 1 |
+| IR: br/switch の入口 edge | 0 | 1 |
+| IR: block `dec_label_pc_1800c2ef4` | 不在 | 存在 |
+
+- raw 列は §13b・§14b の値と一致 (再現確認)。
+
+### icall #228 界面の確認 (受入 4): 不一致 (未修正)
+
+- 復元 call は `call void @__icall_dispatch(i64 0x1800c2f05)` のみで、BLK への前段 store を出さない。
+- `tools/icall/rt/icall_rt.c` の `__icall_dispatch` は target を BLK+0x00、rcx を +0x08、rdx を +0x10 から読む。`icall_rewrite.py` の `st(...)` 規則も同じ BLK 配置。現状の復元 call は呼出し先も引数も渡さないため、意味として誤り (#1030 コメントと同じ結論)。
+- 整合には `l1_restore` が BLK store (target=`[[rcx]+0x30]`・rcx=host・rdx=0x800010) を出す設計変更が要る。N2b との適用順 (#1228) と一体のため、本節では実装しない。
+
+### 23/23 再測定 (受入 3)
+
+- `bash tools/targets/serum2/license/authstub/e2e.sh` (`work/` 無し・cold・TMPDIR=`$RUNNER_TEMP`): rc 0・**23/23 PASS**・real **36 s**・load 0.56→0.73。
+- 本 e2e は patched 経路 (N2b あり) で、L1 pass は組込まれていない。よって本値は不変確認であり、L1 適用後の 23/23 ではない。L1 を patched 経路に入れると #1228 の衝突 (`ef4` が到達不能) が起きるため、適用順規約は #1228 で決める。
+
+### 未達 (Refs #1265)
+
+- (a) icall 界面の整合 (BLK 前段 store): 未実装。子 issue #1497 (`[SR-22]`) に起票。
+- (b) N2b との適用順規約の文書化・patched 経路への L1 組込み: #1228 (SR-16) の範囲。
+- (c) 「faithful 経路」の定義と e2e 組込み先: リポジトリに定義が無い。本 run では raw lift + pass の census までを faithful 経路の測定とした。
