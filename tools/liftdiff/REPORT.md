@@ -229,3 +229,12 @@ m11 sample:800 (12 shard) **93〜95 s**、flelift closure (14 shard) **585 s** (
 
 578 関数の種別内訳 (oob 222 / unreachable 218 / hang 39 …)・unreachable は署名不一致 thunk 由来ではない: 全文は
 [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §8、集計は `results/m11_wasm_trap_triage.md` (`tests/triage_wasm_trap.py`)。個別原因は #307 (LD-7)。
+
+## 9. 比較系の偽陽性 2 類型の修正 (LD-11 / #548)
+
+既知類型との関係: 該当なし (DEFECTS.md の lift 欠陥ではなく比較器側の偽陽性。f2 REPORT §7 起点)。
+- `cmp_mem`: 部分上書きされた ptr 入りワードを byte 単位で比較 (変化 byte は生値、未変更 byte のみ ptr 正規化)。`ldlib/compare.py` `eq_block_bytewise`。
+- wasm timeout: target JSON `wasm_timeout_ms` (既定 1000) を `ld_runner.mjs`/`fle_runner.mjs` の `--timeout-ms=` に渡す。native ランナが case 所要 `ms` を出力し、
+  `ms × wasm_slowdown_bound(既定 20) ≥ wasm_timeout_ms` なら `wasm_trap` でなく `wasm_timeout_native_long` (verdict は unexec 側)。
+- 単体テスト (ネガコン 9 件込み) `tests/test_compare_ld11.py` は e2e の [0/4] で実行。
+- **未検証 (素材不足)**: 実 PE を要する m11 sample:800 回帰 (353/217/230) と 0x6cd8a0 9 パターン実測は、この run に `fl-win64` が無く未実施。再実測は fl-win64 を含む run (`oc_artifacts: fl-win64 toolchain-emsdk work-m11 work-liftdiff`) で行う (#548 は未クローズ)。

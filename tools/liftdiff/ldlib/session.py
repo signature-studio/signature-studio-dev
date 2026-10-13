@@ -35,7 +35,10 @@ class Session:
         wins = [(self.origin, self.origin + self.pe.size),
                 (self.lay['arena'], self.lay['arena'] + self.lay['arena_size']),
                 (self.lay['heap'], self.lay['heap'] + self.lay['heap_size'])]
-        self.ctx = compare.Ctx(self.delta, wins, (self.lay['stack_end'], self.lay['stack_base']))
+        self.wasm_timeout_ms = int(self.t.get('wasm_timeout_ms', compare.DEFAULT_WASM_TIMEOUT_MS))
+        self.ctx = compare.Ctx(self.delta, wins, (self.lay['stack_end'], self.lay['stack_base']),
+                               wasm_timeout_ms=self.wasm_timeout_ms,
+                               wasm_slowdown=float(self.t.get('wasm_slowdown_bound', compare.DEFAULT_WASM_SLOWDOWN)))
         self.analyzer = Analyzer(self.pe)
         self.state = None
         if state:
@@ -83,7 +86,9 @@ class Session:
         nat = Runner('native', ['setarch', '-R', os.path.join(ROOT, 'work/ld_native'), self.t['pe']],
                      self.init_lines('native') + ln + [self.tracelines()], timeout=self.timeout)
         was = Runner('wasm', ['node', '--stack-size=4000', os.path.join(ROOT, self.runner_js), self.wasm_js, self.t.get('image') or '-',
-                              '%x' % self.origin, '%x' % self.delta, '--init=' + ','.join(self.t.get('init_exports', []))], self.init_lines('wasm') + lw, timeout=self.timeout)
+                              '%x' % self.origin, '%x' % self.delta, '--init=' + ','.join(self.t.get('init_exports', [])),
+                              '--timeout-ms=%d' % self.wasm_timeout_ms], self.init_lines('wasm') + lw,
+                  timeout=max(self.timeout, self.wasm_timeout_ms / 1000.0 + 5.0))
         return nat, was
 
     def thunks(self):

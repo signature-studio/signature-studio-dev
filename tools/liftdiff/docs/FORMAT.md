@@ -60,6 +60,7 @@ CASE id=.. fn=<va hex> blob=<name|-> args=<k>:<v>,... [trace=1] [xfill=1] [stkfi
  "mem_blocks":N, "mem_trunc":0, "heap_used":N, "rtype":"i64"}
 ```
 
+native の case 結果には呼出し所要 `ms` (ld_ms_call 前後の CLOCK_MONOTONIC、ミリ秒) が入る (wasm 側には無い)。
 `status` — native: `ok|segv|bus|sigill|sigfpe|timeout|abort|bad_fn`(+`fault:{addr,rip}`)、wasm: `ok|trap|timeout|no_export`(+`detail` = trap 種別 + wasm スタック先頭)。
 `mem` は pristine との差分を 8 バイトブロックで列挙 (`b`=呼出し前, `a`=呼出し後, little-endian hex)。
 
@@ -73,7 +74,7 @@ CASE id=.. fn=<va hex> blob=<name|-> args=<k>:<v>,... [trace=1] [xfill=1] [stkfi
  "verdict":"match|mismatch|unexec",
  "unexec_reason":"native_fault_all_patterns|native_null_deref_all_patterns|native_timeout|native_sigill|hang|unsupported_sig|no_wasm_definition",
  "tags":[{"tag":"load_dropped","confidence":"high|medium|low","evidence":"..."}],
- "cases":[{"id":"4133f0:p01","pattern":"p01","outcome":"equal|diff|wasm_trap|native_fault|both_fault|hang",
+ "cases":[{"id":"4133f0:p01","pattern":"p01","outcome":"equal|diff|wasm_trap|wasm_timeout_native_long|native_fault|both_fault|hang",
            "native_status":"ok","wasm_status":"ok",
            "diffs":{"ret":{...},"mem":{"count":1,"first":[{"r":"arena","o":"0x..","native":"0x..","wasm":"0x.."}]},
                     "calls":{"kind":"call_arg|call_name|native_extra_call|wasm_extra_call","index":0,...},
@@ -85,7 +86,8 @@ CASE id=.. fn=<va hex> blob=<name|-> args=<k>:<v>,... [trace=1] [xfill=1] [stkfi
 
 - **verdict**: `match` = native が完走した case が 1 つ以上あり、完走した全 case で一致 (戻り値 / 書換えメモリ / import 呼出し列 / 関数 entry 列)。
   `mismatch` = 完走 case のどれかで差分、または native 完走 / wasm trap。`unexec` = native が完走する case が無い (比較不能)。
-- **outcome**: `native_fault`(native のみ落ちた = wasm は NULL 等で落ちない仕様差、比較不能)、`both_fault`(両方落ちた)。
+- **outcome**: `wasm_timeout_native_long`(wasm が `wasm_timeout_ms` で打切られ、かつ native 自身の実行 `ms` × `wasm_slowdown_bound` ≥ `wasm_timeout_ms`
+  = wasm が正常でも間に合わない長時間 case。欠陥ではなく比較不能: verdict は `unexec` 側、`unexec_reason` = 同名。target JSON の任意キー `wasm_timeout_ms` (既定 1000)・`wasm_slowdown_bound` (既定 20) で調整)、`native_fault`(native のみ落ちた = wasm は NULL 等で落ちない仕様差、比較不能)、`both_fault`(両方落ちた)。
 - **`leaf`**: native/wasm とも callee entry 無し (関数 entry trace が各側 ≤1) の case で true。`liftdiff.py summary` の「自己欠陥確定」
   (callee 不在の差分 = その関数自身の欠陥) 集計に使う。**他担当が同形式を出力する場合はこのキーも必ず出す** (欠けると自己欠陥数が 0 と集計される)。
 - `function.sig.c` = true の関数は C 定義 (extra_sources / hand port) 由来 (check_ott.py の D4/D5 突合で使用)。
