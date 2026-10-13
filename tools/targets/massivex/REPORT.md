@@ -165,7 +165,7 @@ work/ (gitignore): hdr_block1/2.bin, files.json, locations.json, header_parse.js
 
 ### 11.1 検証状況 (実測 HEAD = `858fbfcd`)
 
-- 実測 HEAD は `858fbfcd` (測定時の PR head)。`d0eddb92..858fbfcd` は REPORT のみ、`47fd87cb..d0eddb92` のコード差分は `license/e2e.sh` の `mkdir -p` 重複削除 1 行のみ。以降に `.py` / `.sh` の変更は無い。
+- 測定 HEAD = `858fbfcd`。現 head `a06592e0` との差分は REPORT.md のみ (`git diff 858fbfcd a06592e0 -- ':!tools/targets/massivex/REPORT.md'` が空)。`d0eddb92..858fbfcd` も REPORT のみ。`47fd87cb..d0eddb92` のコード差分は `license/e2e.sh` の `mkdir -p` 重複削除 1 行のみ。
 - 下表は `858fbfcd` の worktree (`git worktree` で detached 展開) で取り直した値。`d0eddb92` の値とも一致する。
 - 測定ログは `work/` 外 (`$RUNNER_TEMP` 配下) に置いた。exit code・PASS 数・所要はそのまま表に記載。
 - 素材: `plugins-massivex` / `toolchain-retdec` / `toolchain-emsdk` を `$ARTIFACTS_DIR` から展開 (`tar --zstd -xf`)。RetDec / emsdk は `[RETDEC]` / `[EMSDK]` (`[OPT-TOOLS]` 配下。環境変数で上書き)。
@@ -197,10 +197,15 @@ work/ (gitignore): hdr_block1/2.bin, files.json, locations.json, header_parse.js
 
 ### 11.2 未解決 (起票先付き)
 
-- **clen 回帰 (未実施)**: 受入条件に記載の「clen」の対象を特定できなかった。
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `MX_OPT=-O0` の初回 exit 1 (`patch site 0x18115dec2` assert)。原因未確定 | e2e の再現性 (計 6 回中 1 回のみ) | #266 (コメントで追跡) |
+| 展開物の installer 内 checksum 0/125 一致 (実機 installer との同一性は未照合) | 「実バイナリに対する回帰」の判定 | #266 |
+
+- **clen 回帰 (未実施)**: clen の対象を特定できなかった。
+  - 出典: review コメント (oc-reviewer, 03d66e83 / aa8002f5 時点) が「#266 の受入条件」として挙げたが、#266 本文に該当記述は無い (`gh issue view 266` で確認)。親 #245 本文にも clen の記述は無い。
   - massivex 配下に clen を検証する script は無い (`clen` は serum2 の `sr3_cut.py` のみ)。
-  - #266 本文・親 #245 本文にも clen の記述は無い。
-  - 対象確定と実施は別 issue に切り出す: 起票先: #880 (対象の確定と実施)。
+  - 対象確定と実施は別 issue に切り出す。起票先: #880 (OPEN)。
 - **MX2-3 (N5 demo UI 抑制 / N6 文言)**: 未実装。起票先: #830。
 - **MX-3b 本体 (U1 process slot 同定 / U2・U5 closure 厳密化 / U3 vectorcall・U4 C++ EH)**: 未着手。起票先: #266。
 
