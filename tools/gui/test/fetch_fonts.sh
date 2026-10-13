@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # fetch_fonts.sh — GUI-9 (#186) のテスト用 OSS フォントを tools/gui/work/ (gitignore) へ取得し sha256 を検証する。リポジトリへは同梱しない。
-#   Open Sans (Apache-2.0 / OFL 1.1: googlefonts/opensans) / Barlow (SIL OFL 1.1: jpt/barlow)。ライセンス本文は tools/legal/notices の NOTICES 運用に合流。
+#   Open Sans (Apache-2.0 / OFL 1.1: googlefonts/opensans) / Barlow (SIL OFL 1.1: google/fonts ofl/barlow)。ライセンス本文は tools/legal/notices の NOTICES 運用に合流。
 set -euo pipefail
 D="$(cd -- "$(dirname -- "$0")/.." && pwd)/work"; mkdir -p "$D"; cd "$D"
 get() { # file url sha256

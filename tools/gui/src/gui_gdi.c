@@ -1052,8 +1052,9 @@ API AlphaBlend(I64 hd, I64 x, I64 y, I64 w, I64 h, I64 hs, I64 sx, I64 sy, I64 s
 }
 
 /* ---------- テキスト (GUI-9 #186: text engine (FreeType) があればそれ、無ければ内蔵 8x8 フォント) ----------
- * 8x8 経路の挙動は従来のまま (e2e golden 維持)。engine 経路: advance = 整数 px、描画 = 8bit coverage の sRGB 値空間での線形合成
- *   out_c = (fg_c*cov + dst_c*(255-cov) + 127) / 255  (独立オラクル golden/gen_golden_text.py が同式を実装) */
+ * 8x8 経路: DrawText のみ挙動が変わった (複数行の DT_CENTER/DT_RIGHT は行ごとに配置 (従来は全行がブロック幅基準の同一 x0)、行末 '\r' は行に含めない)。
+ *   それ以外は従来のまま。tools/gui の既存 golden/selftest/gui_app に DrawText 呼出は無く e2e golden には影響しない。engine 経路: advance = 整数 px、描画 = 8bit coverage の sRGB 値空間での線形合成
+ *   out_c = (fg_c*cov + dst_c*(255-cov) + 127) / 255  (独立オラクル golden/ft_oracle.c が同式を実装) */
 typedef struct { void *e; const GuiTextEngine *te; Font *f; GuiTextMetrics m; } TF;
 static void *font_eng(Font *f) {
   if (!f) return NULL;
