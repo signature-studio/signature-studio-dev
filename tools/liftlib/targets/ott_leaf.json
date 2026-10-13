@@ -1,6 +1,6 @@
 {
  "name": "ott_leaf",
- "image": "/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll",
+ "image": "${OTT_DLL}",
  "raw_ll": "tools/m6/work/ott.drc.ll",
  "funcs": [
   "function_18011ec20",

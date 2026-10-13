@@ -81,7 +81,7 @@ Init・DeleteCriticalSection 65 / GetLastError 61 / GetCurrentThreadId 51 / Vari
 ## 5. 制限・リスク
 
 - **関数ポインタ/COM**: IStream/IMalloc の vtable は Win64 の 8B スロットだが中身は wasm 関数テーブル index。lifted コードからの間接呼出し (署名 i64↔i32) は hostbridge の呼出規約ブリッジが必要。`GetProcAddress` の戻りも同様。
-- **SEH**: RtlUnwind/RaiseException(非継続) は fail-fast。Delphi `raise`/try-finally の実行時巻き戻しは lift 側 (M2: UHANDLER 8,021) の課題。
+- **SEH**: 実巻き戻しランタイムは §14 (#171) で実装済み。ただし lift 側が `ShxSehFrame` を登録しない限り従来どおり fail-fast。lift 側の接続は未了 (§14.3)。
 - **ブロッキング待ち**: 実装は futex。ブラウザのメインスレッドでは Atomics.wait 不可 → エンジンは Worker で動かす前提 (M4 同様)。ST ビルドの INFINITE 待ちは fail-fast。
 - **コードページ**: 既定 ACP=1252。932 等 DBCS は ERROR_INVALID_PARAMETER (日本語 ACP が要るなら表実装が必要)。ロケールデータは en-US 固定。
 - **FileMapping**: マッピング毎の共有バッファ (書戻しは Unmap/Flush/Close)。別プロセスとの共有や巨大ファイルの遅延マップは不可。VirtualAlloc 予約は malloc (上限 512MB/回)。
@@ -99,7 +99,7 @@ Init・DeleteCriticalSection 65 / GetLastError 61 / GetCurrentThreadId 51 / Vari
 | T1 | M11 の shim 差替え | `m11_genstubs.py` の SHIM_BIND を廃し `tools/shimx/src/*.c` をリンク、`ir_undef.py --emit-stubs` で残 (GUI 171 件) の fail-fast スタブを生成。重複定義 (m6_stubs_hand 等) 退役、`verify_sig.sh` を M11 ビルドに組込み | M11 |
 | T2 | hostbridge 接続 | LoadLibrary/GetProcAddress 実体 (wasm モジュール連結) を `shimx_set_load_hook/proc_register/resolver` へ。COM vtable・コールバックの間接呼出し規約ブリッジ (i64↔i32) | hostbridge |
 | T3 | VFS/レジストリ運用 | Win パス写像規約 (`C:`→`/c`) と Emscripten FS マウント構成の確定、`shimx_set_path_mapper` 実装、レジストリの IndexedDB 永続化 (`export_text/import_text`)、tools/startup が列挙したキー集合のシード投入 | runtime / startup |
-| T4 | SEH 実巻き戻し | .pdata/UHANDLER を setjmp 系/例外タグに lift、`shimx_set_raise_hook` に接続。RtlUnwindEx の fail-fast 解除 | lift |
+| T4 | SEH 実巻き戻し | shimx 側ランタイムは §14 で完了 (#171)。残 = lift 側が .pdata/UHANDLER の scope table と try 関数を `ShxSehFrame` 登録形へ出力 (§14.3) | lift |
 | T5 | GUI 側連携 | ShellExecute→`window.open`、GetOpen/SaveFileName→File System Access、Drag&Drop (`shimx_get_drop_target`)、user32 の Char*/MsgWait* は weak なので gui 側の強定義で置換可 | gui |
 | T6 | MIDI/タイマ | winmm `midi*` (weak, 0 台) を Web MIDI で強定義、`timeBeginPeriod` と AudioWorklet クロックの整合 | audio |
 | T7 | 署名正規化 | RetDec の i64/ptr 揺れを吸収する IR パス (declare を shimx 署名へ正規化) または CI で `verify_sig.sh` を常時実行 | lift |
@@ -345,3 +345,44 @@ username 統一により、winstubs (CAB-96) が wrap していた **5 API が s
 
 - `verify_ott` と M11 closure の突合は `work-m11` / `work-m6-ott` 素材が無く SKIP。このため `test.sh` が再生成した inventory.md / BACKLOG.md / coverage.json / inventory.csv は m11 closure が空になるので**コミットしていない** (次回素材付き run で再生成)。`exports.txt` と `proctable.c` は差分 5 行のみ反映。
 - `shimx_wininet_call_count` 以外の公開面変更は `shimx.h` の 4 宣言のみ。
+
+## 14. SEH 実巻き戻しランタイム (#171, SHX-T4)
+
+既知類型との関係 (DEFECTS.md): 該当なし (shim ランタイムの追加。lift/IR には触れない)。検証起点 = `origin/main` 80c7471。
+
+### 14.1 結論
+
+`RaiseException` / `RtlUnwind` / `RtlUnwindEx` の fail-fast を、**lift 側が登録した SEH frame がある場合に限り**実巻き戻しへ置換した (`src/seh.c`, 公開面は `shimx.h` の `ShxSehFrame` と `shimx_seh_*` 7 関数)。
+frame が 1 つも無い場合・捕捉 scope が無い場合・`RtlUnwindEx` の targetFrame に一致する frame が無い場合は従来どおり fail-fast (名前を出して非 0 終了)。
+**受入条件のうち「lift が UHANDLER 8,021 件を frame 登録形へ出力する」は未達** (lift 出力形式は #12 未確定。§14.3)。このため #171 は Closes ではなく Refs。
+
+### 14.2 設計 (tools/icall/landing/REPORT.md §2/§6 の実測仕様に準拠)
+
+- frame 鎖はスレッド毎 (`_Thread_local`)。`ShxSehFrame` = {establisher frame 識別子, scope table (`count + {begin,end,kind,target}` の RVA 4 組), 現在 pc (RVA), `jmp_buf`}。lift 側は try 関数入口で `shimx_seh_enter` + `setjmp(f.jb)`、call 前に `f.pc` を更新、出口で `shimx_seh_leave`。
+- `RaiseException` の順序: raise hook → VEH → **frame 鎖 2 相** → UEF → fail-fast。
+  - 検索相 (内側→外側): kind==2 (catch-all) で pc が範囲内なら捕捉。kind>2 は `shimx_seh_set_typed_matcher` (VMT 照合は lift 側) に委譲。
+  - unwind 相: 捕捉 frame より内側を内側から外し、kind 0/1 scope に pc があれば `pad(&{rec,ctx}, frame)` を実行 (`ExceptionFlags` に EXCEPTION_UNWINDING)。その後 `longjmp(target->jb)`。再開先 RVA は `resume_ip`。pad 実行中は当該 frame を鎖から外すため、pad 内の再送出は外側 frame のみを見る。
+- `RtlUnwind(Ex)`: targetFrame に一致する frame まで同様に巻き戻し、`resume_ip=targetIp` / `resume_ret=retval` で longjmp。targetFrame==NULL は全 frame の pad を実行して復帰 (EXIT_UNWIND)。
+- pad の実体は `shimx_seh_set_pad_resolver` (scope target RVA → 関数) で解決。未設定/未解決は fail-fast。
+
+### 14.3 範囲外・未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| lift が try 関数を `ShxSehFrame` 登録形で出力する側 (.pdata UHANDLER 8,021 → scope table, pc 更新, setjmp) | 実バイナリでの巻き戻しは未到達。単体テスト (合成 scope) のみ | #12 (FLEngine 本番 lifting) の出力形式確定後に子チケット。ICALL-2c (tools/icall/landing §9) と統合 |
+| typed except の VMT 照合 (0x4111d0 相当) | `shimx_seh_set_typed_matcher` は口のみ | 同上 |
+| wasm ABI: `jmp_buf` 越しの longjmp は emscripten の SjLj (`-sSUPPORT_LONGJMP` 既定の emscripten 方式) に依存。wasm EH (exnref) 形は未検討 | lift 側が別方式を選ぶ場合は差替え | #12 / landing REPORT §6 |
+| スレッド跨ぎ・非同期例外 (ハード例外 AV 等) は対象外 | 構造化例外のうち RaiseException 経由のみ | 新規起票なし (下流で必要になった時点) |
+| 実機 FLEngine での通し実行 (RaiseException → pad 進入) | 未検証 | ICALL-2c |
+
+### 14.4 検証 (2026-10-13, Actions runner, 起点 80c7471 + 本変更)
+
+| 検証 | 結果 |
+|---|---|
+| `bash tools/shimx/test.sh --quick` (変更前) | exit 0, 22 s, load 0.45 (1 分値) |
+| 同 (変更後) | exit 0, 22 s, load 0.42。MT 6 グループ (新規 `seh`: catch-all / 入れ子 pad 順序 + frame 引数 + UNWINDING / typed / RtlUnwindEx+RtlUnwind(NULL) / leave 冪等) / ST PASS / M4 互換 PASS / 公開関数 674→680 |
+| fail-fast | 既存 `raise` `rtlunwind` に加え `sehnomatch` (frame あり捕捉 scope なし) `sehbadtarget` (targetFrame 不一致) を追加、いずれも exit=1 + 名前出力 |
+| クリーン HEAD 再現 (4a61103 を detached worktree に展開) | exit 0, 21 s, load 0.76 (1 分値), `seh OK` 出力 1 件 |
+| ネガティブコントロール | unwind 相の `pad()` 呼出を無効化 → `test_seh.c:73: g_pad_n == 2` で FAIL (MT テスト失敗, exit 1)。復元後 PASS |
+
+`--quick` は `verify_ott` を省略 (m11/m8 の work 素材なし、署名突合 6b も素材なしで SKIP)。`inventory.md` / `BACKLOG.md` / `data/*` / `exports.txt` は m11 closure 無しで再生成すると壊れるため**コミットしていない** (§13 と同方針)。`gen_inventory.py` は `RtlUnwind*` を fail-fast 扱いから外したので、次回素材付き run の再生成で BACKLOG の該当行 (P1 `RtlUnwindEx` / `RtlUnwind`) が更新される。

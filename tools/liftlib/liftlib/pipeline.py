@@ -29,6 +29,7 @@ SIMD_DIR = os.path.join(HERE, "simd")
 def rpath(p):
     if p is None:
         return None
+    p = re.sub(r"\$\{(\w+)\}", lambda m: env.PATH_VARS[m.group(1)], p)
     return p if os.path.isabs(p) else os.path.join(ROOT, p)
 
 
