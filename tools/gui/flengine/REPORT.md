@@ -1,6 +1,6 @@
 # REPORT — GUI-3 (#174): 実 FLEngine の lift に GUI shim を結合する
 
-**判定: 部分達成 (受入条件 1 は未達。現 HEAD `f1e88c82` の flengine e2e は 13/14 で FAIL = S1 のみ・§6c-3。PR は `Refs #174`)**。実 FLEngine (m11 closure, `FLEngine_x64.dll` の 7,421 関数 lift) に `tools/gui` shim を全 TU `-pthread` でリンクし、
+**判定: 部分達成 (受入条件 1 は未達。現 HEAD の flengine e2e は `c4e3c064` で 14/14 PASS・rc 0 (§6c-4)。旧 `f1e88c82` の 13/14 (S1 FAIL) は §6c-3 の履歴。PR は `Refs #174`)**。実 FLEngine (m11 closure, `FLEngine_x64.dll` の 7,421 関数 lift) に `tools/gui` shim を全 TU `-pthread` でリンクし、
 **自然起動 (DllMain attach) で最初の GUI API (`LoadStringW`) が shim に到達**した。942 unit の隔離 survey では GUI API **32 種**が shim に到達 (実装済み 31 / fail-fast stub 1 = `LoadImageW`)。
 `CreateWindowExW` は survey で **1 回だけ自然到達**したが、直前の `RegisterClassW` は呼ばれず (`GetClassInfoW` の後に直行)、窓は生成されない (§5-2 の lift 欠陥)。受入条件 1 の意図する「実登録を経た窓生成の自然到達」は未達。
 実 WNDCLASS を JS から指向呼出した場合は `RegisterClassW` ×2 が shim に届き、`TApplication` の窓 (hwnd 31bit) が生成できる。
