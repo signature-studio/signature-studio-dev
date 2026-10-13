@@ -218,12 +218,33 @@ ia32 で要注意の mnemonic (件数): cdq 21 / movzx 51 / movsx 54 / lea 590 /
 
 素材の検索範囲と結果 (`fl-win64` 展開・`extracted/` 配下):
 
-| 対象 | 実測 |
+再現: `python3 tools/plugins/slayer_engine_ia32/sweep_idx_mem.py --ctx 6` (素材は `$RUNNER_TEMP/fl-win64/extracted/block22434_PE.bin`、sha256 と capstone 5.0.7 を固定値で検証)。 スクリプトは decode 失敗時に 1 バイト飛ばし、`.text` 全 73,002 バイトを被覆する (最初の線形掃引は `.text` の約 51% で停止していた。旧記録の「0 件」はこの停止に基づく誤り)。
+
+全域掃引の実測 (本 PR の HEAD で再現、capstone 5.0.7・CS_MODE_32):
+
+| 項目 | 実測 |
 |---|---|
-| `block22434_PE.bin` (engine, sha256 `84b64c43…`) | 線形掃引 (CS_MODE_32, capstone 5.0.7) で `[index*4 + 8]` の memory operand は **0 件** (`events[]` の要素アクセス形の探索) |
-| 同 block の添字付き memory operand 全体 | 上位は x87 の `[base+idx*4+disp]` (配列アクセス) と `[ebx+ecx*4+...]` 形。 VstEvents の形に一致するものは確認できず |
+| 被覆 | 命令 25,349 (72,998 B) + decode 失敗 4 B = **73,002 / 73,002 B** |
+| 添字スケール 4 の memory operand | **304 件** (304 命令)。 うち x87 (`f*`) が 97 件 |
+| 添字 *4 の上位 (base,index) 組 | `[edi+ecx*4]`=33・`[-+eax*4]`=30・`[ecx+eax*4]`=30・`[-+ecx*4]`=30・`[-+edx*4]`=28・`[esi+ecx*4]`=26・`[ebx+edx*4]`=21・`[ebx+eax*4]`=15 (`[-+X*4]` は disp のみの配列・jump table 形) |
+| 変位 8 の添字 *4 | **8 件** (下表) |
 | 素材内の他 block | `block22433_PE.bin` は machine 0x8664 (x64 本体)・ImageBase 0x0 で engine ではない。 ia32 の PE は block22434 のみ |
 | `slayer_x86/` の REPORT | 殻 ↔ engine の ILP32 marshal の必要性のみ記載 (読取箇所の記載なし) |
+
+変位 8 の 8 件 (周辺命令から分類。 いずれも VstEvents 読取とは断定できない):
+
+| VA | 命令 | 周辺から見た分類 |
+|---|---|---|
+| `0x1000a26c` | `mov eax,[esi+ecx*4+8]` | `+4`〜`+0x14` を連続で移す dword コピーループ (`lea eax,[ecx*4]` で ecx は dword 数)。 固定オフセットの一括コピーで、`events[i]` の単独読取ではない可能性が高い |
+| `0x1000a270` | `mov [edi+ecx*4+8],eax` | 同上 (上の store) |
+| `0x1000eb21` | `mov eax,[ebx+esi*4+8]` | `[ebx+esi*4]` の要素を `call` する直前。 関数ポインタ表の要素を読んで呼ぶ形 |
+| `0x1000eb2a` | `call [ebx+esi*4+8]` | 間接 call。 **vtable・関数ポインタ表の呼出し**の可能性が高い (読取ではない) |
+| `0x1000ec00` | `mov eax,[edi+ecx*4+8]` | 直前 `lea ecx,[esi+esi*2]` のため添字は 3·esi、実効 stride **12 B**。 `events[i]` (stride 4) とは一致しない |
+| `0x1000ec0f` | `call [edi+ecx*4+8]` | 同上 (stride 12 の record 内の関数ポインタへの間接 call) |
+| `0x10010e7c` | `mov eax,[esi+ecx*4+8]` | `0x1000a26c` と同一形の dword コピーループ (`0x10010e64`〜) |
+| `0x10010e80` | `mov [edi+ecx*4+8],eax` | 同上 (store) |
+
+結論: `events[i]` (+8 から stride 4 で並ぶ) と**同じ添字形の単独読取は確認できない**。 stride 4 の候補 (`0xa26c` 系・`0xeb21`) は、前者が一括コピー、後者が関数ポインタ呼出しと読め、 VstEvents 読取とは断定できない。 `0xec00` 系は stride 12 で `events[i]` と異なる。 #894 受入 1 は**未達のまま**。
 
 - この探索は「添字 `*4+8` の形」に限定した静的検索であり、**読取の不在を証明しない**。 `numEvents` (+0) は `[reg]`・`events[]` 要素は `[reg+4]` や `[reg+idx*4+4]` (ptr 内の値) で読まれる可能性がある (未確認)。
 - 次の一手 (未着手): effProcessEvents(25) の**呼出し元**を辿る方向 (dispatcher の外から opcode 25 を受ける経路・vtable 初期化) か、`events` を受ける関数の探索を、`[reg+4]` を含む形へ広げて行う。 いずれも #894 の継続。
