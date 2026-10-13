@@ -83,6 +83,6 @@ bash tools/m11/trap_triage/negctl_594.sh   # 前提: work/ に work-m11 (m11_bui
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 58–63 の修復 (qstore) は #552 の merge 待ち | main では 6 unit が oob のまま | #552 (merge) |
-| unit 56: `8c7710` の D4 型 deref 脱落 + その先の `8c5eb0` の OOB | 56 が halt0/oob のまま | 新規子チケット [M11] (本 PR 作成時に起票) |
-| `survey_units.mjs` oob の `.slice(1)` が最上位 frame を捨てる (確定) | `annotate.py` の最上位集計が 1 段ずれる | 新規子チケット [M11] (survey_diff の基準更新込み) |
+| unit 56: `8c7710` の D4 型 deref 脱落 + その先の `8c5eb0` の OOB | 56 が halt0/oob のまま | #662 |
+| `survey_units.mjs` oob の `.slice(1)` が最上位 frame を捨てる (確定) | `annotate.py` の最上位集計が 1 段ずれる | #663 (survey_diff の基準更新込み) |
 | `alloca/REPORT.md` §6 / `m11/REPORT.md` の「上流 8c5cc0 のポインタ破壊」帰属は誤り (本 REPORT §2) | 調査の誤誘導 | 本 PR で REPORT_594 を索引に追加。元 REPORT の訂正は PM 判断 |
