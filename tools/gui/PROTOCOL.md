@@ -187,7 +187,7 @@ host は **レコード書込の前に** 共有 pointer 状態 (cursor/buttons/m
 測定値の正本は `tools/runtime/REPORT.md` (RT-9)。ここは gui host が取る方針のみ。
 | 機能 | Chrome 154 | Firefox 157 | gui host の方針 |
 |---|---|---|---|
-| SAB / `crossOriginIsolated` (COOP+COEP) | 可 | 可 | 必須。`GuiHost.attach` 前に `crossOriginIsolated && memory.buffer instanceof SharedArrayBuffer` を確認し、偽なら起動せず理由を表示 (fail-fast; 代替実装なし) |
+| SAB / `crossOriginIsolated` (COOP+COEP) | 可 | 可 | 必須。確認は `src/index.ts` の開始ボタン無効化 (`crossOriginIsolated` が偽なら無効化し理由を表示; 代替実装なし) で行う。`GuiHost.attach` 内での `crossOriginIsolated` / SAB の fail-fast は**未実装** |
 | `Atomics.waitAsync` (描画 worker の out ring 消費) | 可 | 可 | そのまま使う。無い環境 (Safari 未測定) は `setTimeout` ポーリングへ落とす案 (**未実装**; Safari 測定後に判断) |
 | Worker 内 `Atomics.wait` / メイン `Atomics.wait` 不可 | 同 | 同 | 既存設計どおり: wasm UI スレッドは worker、メインは `waitAsync`/イベントのみ |
 | OffscreenCanvas 2D (`transferControlToOffscreen`) | 可 | 可 | 既定経路 (2D + putImageData) は両者で使える |
