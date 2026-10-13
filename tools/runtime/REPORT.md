@@ -125,27 +125,31 @@ python3 tools/runtime/bench/make_big_wasm.py <in.wasm> <out.wasm> <K> && node to
 - 既存ドライバ `bench/ott_driver.mjs` の `is64` は `memory.type()` (node 24 でも非対応) 依存で常に false → 検査では wasm バイナリの memory section を直接読む。
 
 ## RT-6 実測 (Memory 個数予算 + LRU プール + 100+ ロード負荷試験, #125)
-既知類型との関係 (DEFECTS.md): 該当なし (lift 欠陥ではなくランタイム資源管理)。検証起点 commit `e82e685` (初版 `71b93a0` からの変更は下記「pin 競合の修正」)。
+既知類型との関係 (DEFECTS.md): 該当なし (lift 欠陥ではなくランタイム資源管理)。検証起点 commit `16b9005` (初版 `71b93a0` からの変更は下記「pin 競合の修正」「wasm64 追い出しの枠リーク修正」)。
 - 実装: `src/runtime/memory_budget.ts` (`MemoryBudget` = SharedArrayBuffer 共有可の CAS 個数カウンタ、wasm64 は 1 Memory = 2 slot / `createBudgetedMemory` = 予約→生成、失敗で返却 / `PluginPool` = pin・unpin・LRU 追い出し・同一 id 同時 pin の dedup。ロード完了時に待機中 pin 数をそのまま pins として登録)。既定 capacity 96 (`DEFAULT_PLUGIN_CAPACITY`)。`pnpm typecheck` OK。
 - 再現: `pnpm runtime:memload` = `node tools/runtime/memload/run_memload.mjs [--pos-only|--neg-only]` (1 ケース = 新規 headless Chrome 154.0.8037.97 = 新規レンダラ。判定 NG または **ネガコンが検出されない** と exit 1)。
-- 実測 (GitHub runner 4 vCPU、コミット済み HEAD `e82e685` を `git worktree add --detach` で展開して 3 回、各 total 8.1 / 8.1 / 8.1 s、loadavg 0.87–3.43、exit 0): **ALL PASS 3/3** (PASS 7 + NEG-OK 6)。
+- 実測 (GitHub runner 4 vCPU、コミット済み HEAD `16b9005` を作業ツリー clean の状態で 2 回、total 9.9 / 10.1 s、loadavg 2.01→3.39 / 3.39→3.48、exit 0): **ALL PASS 2/2** (PASS 9 + NEG-OK 7)。直前の `e82e685` の 3 回実測 (8.1 s × 3、PASS 7 + NEG-OK 6) は pin 競合の修正時点の記録として残す。
   | ケース | 実測 (1 回分の代表値) |
   |---|---|
   | naive: 無予算で 300 instance | 125 個目で `RangeError: Out of memory: Cannot allocate Wasm memory` (instance 経由では 125、Memory 直生成は 124。許容 124±4) |
+  | churn_drop: 保持なし 1000 個 → 上限まで保持 → 全解放 → 再び上限まで保持 (明示 GC なし) | churn 1000 個とも例外なし。保持は first 123〜124 / second 123〜124 個で OOM (2 回実測)。全解放後の再作成が効く = 参照を落とした Memory は回収される |
   | pool_churn: 300 種・1500 pin (80% は 60 種に集中)・cap 96 | 例外 0・状態不一致 0・累計ロード 252 (>124)・追い出し 156・peakInUse 96 |
   | pool_concurrent: 120 本 `Promise.all` 同時 pin (cap 120) | 全員の linear memory 内容が一致。121 本目は `MemoryBudgetExceeded` (RangeError でない)・枠リークなし。1 本 unpin 後は LRU 追い出しで 121 本目がロード可。同一 id 10 同時 pin は 1 ロード |
   | pool_race: pin 復帰前の追い出し | (a) cap=1 で pin(A) の k=0〜8 マイクロタスク後に pin(B): 9 通りとも A は破棄されず、B は `MemoryBudgetExceeded`、inUse=size=1。(b) cap 8・24 種・並行 24 本×60 波 = 1440 pin: 受理 890 / 予算拒否 550 / 破棄済みハンドル 0 / 追い出し 423 / peakInUse 8。静止時 生存 value=size=inUse=8、全 unpin 後に追い出し切って 0 |
   | create_fail_releases | 不正 descriptor で RangeError → 予約は返却 (inUse 1→0)、`release()` 二重呼びで負数にならない |
+  | dispose_throw: cap=2 で a (wasm32, unpin 済み) を載せておく → wasm64 `w` のロードが a を追い出す (a の dispose が throw) | 例外は `dispose-boom` のまま伝播。失敗後 inUse=0・size=0 (確保枠を残さない)、後続 `b` の pin は成功 |
   | cross_thread: main 60 + Worker | 共有カウンタ cap 120 で Worker は 60 個目で拒否 (deniedAt=60)、RangeError なし |
   | wasm64: cap 120 | 60 本許可・10 本拒否、実 Memory 生成成功 |
-- **ネガティブコントロール** (全て FAIL を検出して NEG-OK。(6) は pin 競合): (1) `neg=leak` 追い出し後も instance 参照を保持 → 累計 125 ロードで OOM RangeError (pins 469/1500)。(2) pool_churn cap=130 (ネイティブ上限超) → OOM (pins 507/1500)。(3) pool_concurrent cap=130 → 121 本目が拒否されず `no-error`・inUse 121。(4) wasm64 cap=140 → 61 本許可後 RangeError (granted 61)。(5) cross_thread `budget=0` (Worker が予算を無視) → Worker が 65 個目で RangeError。(2) の pins と (4) の granted は実行ごとに揺れる (初版 507 / 61、再実行 483 / 62。いずれも FAIL を検出)。(6) `pool_race?neg=legacy` 修正前の pin (await 後に pins++) に戻す → k=1〜4 で A が破棄済みのまま pin 成功・B のロードも成功、並行 1440 pin 中 900 件が破棄済みハンドル。
+- **ネガティブコントロール** (全て FAIL を検出して NEG-OK。(6) は pin 競合): (1) `neg=leak` 追い出し後も instance 参照を保持 → 累計 125 ロードで OOM RangeError (pins 469/1500)。(2) pool_churn cap=130 (ネイティブ上限超) → OOM (pins 507/1500)。(3) pool_concurrent cap=130 → 121 本目が拒否されず `no-error`・inUse 121。(4) wasm64 cap=140 → 61 本許可後 RangeError (granted 61)。(5) cross_thread `budget=0` (Worker が予算を無視) → Worker が 65 本成功した後の 66 本目で RangeError (main 60 と合算 125 本)。(2) の pins と (4) の granted は実行ごとに揺れる (初版 507 / 61、再実行 483 / 62。いずれも FAIL を検出)。(6) `pool_race?neg=legacy` 修正前の pin (await 後に pins++) に戻す → k=1〜4 で A が破棄済みのまま pin 成功・B のロードも成功、並行 1440 pin 中 900 件が破棄済みハンドル。(7) `churn_drop?neg=keep` churn 中も参照を保持 → 125 本目で OOM (churn ok 124〜125、first / second は 0 本)。
 - **pin 競合の修正** (oc-reviewer 指摘, PR #575): 旧 `pin()` はロード完了の `await` の後で `pins++` していたため、エントリ登録 (pins=0) から復帰までの間に別 id のロードが枠不足で LRU 追い出しに来ると、dispose・枠返却・Map 除去済みの value を pin 済みハンドルとして返した。`loadOne` がエントリ登録時に待機中の pin 数を pins として引き継ぐよう変更 (登録と pin 確保が同期)。旧実装 (`ec2a79b` の `memory_budget.ts`) に戻して `--pos-only` を実行すると `pool_race` だけが FAIL (k=1,2,3,4 で破棄済みハンドル、並行 1440 pin 中 900 件、exit 1)。旧版は `pool_churn` が直列、`pool_concurrent` が cap ちょうどで、この窓を踏まなかった。
-- **実測で確定した事実**: (a) 参照を落とした Memory は回収される。1000 個作成→参照破棄→再作成で 124 個再び作れ、`--expose-gc` の有無で同値 (明示 GC 不要)。churn 1000 個 (保持なし) も例外 0。(b) 上限は main と Worker の合算 (main 60 + Worker 1 本目 64 → 計 124、2 本目 Worker は 0 個)。→ 個数予算は SharedArrayBuffer カウンタでスレッド間共有する必要がある。
+- **wasm64 追い出しの枠リーク修正** (oc-reviewer 軽微指摘): `loadOne` の wasm64 経路で、追加枠の確保中に victim の `dispose` が throw すると、先に確保した base 枠 (wasm32 1 slot) が返らなかった。追い出しを try で囲み、失敗時は base を返して `dispose` を呼ぶよう変更 (`16b9005`)。旧版 (`4633168` の `memory_budget.ts`) に戻して `--pos-only` を実行すると `dispose_throw` だけが FAIL (`inUse=1`、`size=0`、exit 1)。修正版は `inUse=0`、後続 pin 成功。
+- **実測で確定した事実**: (a) 参照を落とした Memory は回収される。`churn_drop`: 保持なしで 1000 個作成 (例外 0) → 上限まで保持 (123〜124 本で OOM) → 全解放後に再び上限まで保持 (123〜124 本)。明示 GC は使っていない (`--expose-gc` 相当の比較は未実施)。(b) 上限は main と Worker の合算で数える (`cross_thread?budget=0`: main 60 + 無予算 Worker 65 本)。→ 個数予算は SharedArrayBuffer カウンタでスレッド間共有する必要がある。
 - 範囲外 / 検証範囲: Chrome 154 のみ (Firefox/Safari の上限は未測定)。Memory は 1 page (max 64MiB) の最小 wasm で、実 lifted DLL (OTT 等) のロードではない。pthread 共有 Memory・AudioWorklet 内の生成は未検証。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `PluginPool` を実プラグイン loader (hostbridge) へ接続し、実 DLL 100+ をロードする負荷試験 | 本試験は最小 wasm の代用。実 DLL 固有の初期化コスト・Memory 以外の資源 (Worker/Table) は未測 | #125 へコメント。親 #25 配下に新規子 issue `[RT-11]` を PM が起票 |
+| `PluginPool` を実プラグイン loader (hostbridge) へ接続し、実 DLL 100+ をロードする負荷試験 | 本試験は最小 wasm の代用。実 DLL 固有の初期化コスト・Memory 以外の資源 (Worker/Table) は未測 | #125 へコメント。親 #25 配下に新規子 issue `[RT-13]` を PM が起票 (`[RT-11]` は #25 が使用中) |
+| `MemoryBudget` の共有カウンタ (SharedArrayBuffer) を `PluginPool` の既定経路 (実 loader・Worker) に配線していない。既定は per-thread カウンタ。受入の「予算で強制 ✅」は pool 単体の結果で、Worker を含む実運用の上限は未検証 (`cross_thread` は共有カウンタを直接渡して検証) | 実 loader 接続時に配線が必要 | #125 へコメント (実 loader 接続と同時に PM 判断) |
 | Kilohearts 47 stub 等の 1 wasm 同居 (prefix + base 割当 + CPU 状態分離。#91 REPORT §7) | pool で追い出せない常駐が 124 を超える場合の最終回避策。未実装 | #96 (HB-H7) に連携コメント |
 | Firefox / Safari の Memory 上限測定 | 予算値 96 は Chrome 実測のみに基づく | RT-9 (#127 系) へコメント |
 | 追い出し時の `dispose` で呼ぶプラグイン終了処理 (FL 側 state 保存) の仕様 | pool は dispose フックだけ提供 | #125 へコメント |
