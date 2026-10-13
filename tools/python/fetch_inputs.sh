@@ -8,7 +8,7 @@ source "$HERE/../shared/env.sh"   # FL_MAC_DIR / FL_WIN64_DIR (docs/REFERENCES.m
 W="$HERE/work"; mkdir -p "$W"
 FL="$FL_MAC_DIR/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL"
 WB="$FL_WIN64_DIR/extracted"
-if [ -d "$FL" ]; then
+if [ -f "$FL/System/Tools/MCP/MCPTools.pyc" ]; then
   cp "$FL/System/Tools/MCP/MCPTools.pyc" "$W/MCPTools.pyc"
   cp "$FL/Shared/Python/Lib/midi.py" "$FL/Shared/Python/Lib/utils.py" "$W/"
   cmp "$W/MCPTools.pyc" "$WB/block25159_DATA.bin" && echo "MCPTools.pyc: mac == win (100674B)"
@@ -16,7 +16,7 @@ if [ -d "$FL" ]; then
   DEV="$FL/System/Hardware specific/Forward CCs to current plugin Port 10/device_Forward CCs to current plugin Port 10.py"
   if [ -f "$DEV" ]; then cp "$DEV" "$W/"; else echo "WARN: device script not found: $DEV" >&2; fi
 else
-  echo "mac pkg なし ($FL_MAC_DIR): win64 の DATA block から取る" >&2
+  echo "mac pkg なし、または MCPTools.pyc 無し ($FL_MAC_DIR): win64 の DATA block から取る" >&2
   head -n1 "$WB/block24429_DATA.bin" | grep -q '^# name=FL Studio (midi) parameters' && head -n1 "$WB/block24430_DATA.bin" | grep -q '^# name=Basic functions' \
     || { echo "block24429/24430 が midi.py/utils.py ではない (FL 版が違う?)" >&2; exit 1; }
   cp "$WB/block25159_DATA.bin" "$W/MCPTools.pyc"

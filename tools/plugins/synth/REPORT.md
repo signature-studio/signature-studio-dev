@@ -19,7 +19,7 @@
    合計 **1,200 関数 / 729,929 B**。 ただし**厳格基準 (未実装 helper 0 かつ i256 trap 0) を満たすのは 9 本**。 Harmless (helper 5 + i256 trap 6)・Kepler Exo (helper 1)・
    Wave Traveller (helper 1) は未実装 helper を宣言した (#207 本文の Harmless の記載 5 件・i256 trap 6 箇所を再現)。 **#535 (§10) で 3 本とも 0 にした: 厳格基準を満たすのは shell 12 本全部**。
    PLUGIN_MATRIX.json の記録とは 91/91 項目一致 (shell 11 本の閉包 6 項目 + batch 4 項目 ×4 本、C++ DLL 9 本の `.pdata` 関数数)。 BooBass の殻は PLUGIN_MATRIX に lift 欄が無く今回初測定。
-4. **C++ x64 DLL 9 本は RetDec まで通るが 9 本とも `emcc -c` は未通過** (§5、#534)。 全 `.pdata` 関数を lift すると define 欠落が 1〜211、未実装 helper が 18〜144 (うち VEX が 10〜94)。
+4. **C++ x64 DLL 9 本は RetDec まで通る。 `emcc -c` は、旧 HEAD (§5 の表) では 9 本とも未通過。 HEAD 3418333a の再測定は未実施** (素材 `toolchain-emsdk` / `toolchain-retdec` が無く再実行できない。 出所を確認できない旧転記は本 PR から外し、#534 のコメントへ移した)。 Morphine は未測定 ([REPORT_APPENDIX.md §A](REPORT_APPENDIX.md)、#534)。 全 `.pdata` 関数を lift すると define 欠落が 1〜211、未実装 helper が 18〜144 (うち VEX が 10〜94)。
    Morphine は RetDec の C 生成 (HLL) 段が終わらず、IR 出力から後段を再開した (§5)。 T2/T3 の見積にはこの未知工数が残る。
 5. **host 呼出面は P0b の応答表で覆える。** shell 12 本の閉包が即値 ID で発行する Dispatcher ID は {2, 3, 14, 20, 21, 36} の 6 種 (taint 版)。 `hs_ids.json` の 35 ID に**不足 0**。
    別算法 (`ids_crosscheck.py`) は 12/12 本で取りこぼしなし (§3)。 動的 ID は Wave Traveller の 2 site のみ。
@@ -141,6 +141,7 @@ Morphine は後段のみの秒 (下記)。
   E4 は 23914 の `function_1800280c7` で追跡した。 `e.rp.ll` には def 2 行があり、`fix_asm_stores.py` (`rp` → `st`) の段で消える (`SX_CALL` は D2 の `movaps` 符号拡張の修復)。
 - engine は KERNEL32 に加え USER32 / GDI32 / OPENGL32 (36 import) / d3d9 / WINMM を import する engine がある (Kepler・Kepler Exo・Transistor Bass: OPENGL32 36・d3d9 1)。 UI 描画を含む DLL を
   全 `.pdata` で lift しており、DSP のみの閉包ではない。 DSP の閉包抽出は未実施 (#534)。
+- 上表は旧 HEAD の値のみ。 HEAD 3418333a の再測定は未実施 (素材不足)。 現 HEAD の `emcc -c` 結果は未確認。 `emcc -c` 列は `cpp_lift.sh` の `emcc_c_rc` (終了コード: 0 = 通過、1 = 不通過。 件数ではない)。
 - 以上は到達性の実測で、正しさは何も示していない。
 
 ## 6. 検証 (HEAD は下表。 4 core / 15 GiB の Actions runner)

@@ -10,7 +10,7 @@ const A: Record<string, string> = {};
 for (let i = 2; i < process.argv.length; i += 2) A[process.argv[i].replace(/^--/, '')] = process.argv[i + 1];
 const root = path.join(path.dirname(new URL(import.meta.url).pathname), '..');
 const PKG = path.resolve(root, A.pkg ?? 'work/pkg-t1');
-const INV = path.resolve(root, 'work/inv_win.jsonl');
+const INV = path.resolve(root, A.inv ?? 'work/inv_win.jsonl');
 const OUT = path.resolve(root, A.out ?? 'work/results-chrome.json');
 const LAT = Number(A.latency ?? 0);
 const MBPS = Number(A.mbps ?? 0);

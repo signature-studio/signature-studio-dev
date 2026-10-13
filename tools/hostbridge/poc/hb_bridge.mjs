@@ -10,7 +10,10 @@
 export const THUNK_BASE = 0x00007ff700000000n; // 合成関数ポインタ VA
 export const THUNK_STRIDE = 0x10n;
 export const HMODULE_BASE = 0x00007ff6a0000000n; // 合成 HMODULE
-const ERROR_MOD_NOT_FOUND = 126, ERROR_PROC_NOT_FOUND = 127;
+const ERROR_MOD_NOT_FOUND = 126, ERROR_PROC_NOT_FOUND = 127, ERROR_NOT_SUPPORTED = 50;
+export const SEM_NOOPENFILEERRORBOX = 0x8000; // Wrapper の SafeLoadLibrary が使うエラーモード (fw:0x449770)
+// bridged 経路の強制無効化: Wrapper の this+0x761 (0=native, 2=32bit bridge, 3=64bit bridge; HOSTBRIDGE §1.6)
+export const forceNative = (desc) => { desc.bridgeRequested = desc.bridge ?? 0; desc.bridge = 0; return desc; };
 
 // ---- AEffect (Win64 配置) ----
 const AE = { magic: 0, dispatcher: 0x08, process: 0x10, setParameter: 0x18, getParameter: 0x20, numPrograms: 0x28,
@@ -68,6 +71,7 @@ export class EmscriptenGuest {
 export class ModuleTable {
   constructor() { this.byId = new Map(); this.alias = new Map(); }
   register(desc) {
+    forceNative(desc);
     this.byId.set(desc.id, desc);
     for (const a of desc.aliases) this.alias.set(a.toLowerCase(), desc);
     this.alias.set(desc.id.toLowerCase(), desc);
@@ -84,9 +88,10 @@ export class ModuleTable {
 }
 
 export class HostBridge {
-  constructor(table) {
+  constructor(table, opts = {}) {
     this.table = table; this.slots = []; this.loaded = new Map(); this.byHandle = new Map();
     this.proxy = new Map(); this.lastError = 0; this.depth = 0;
+    this.errorMode = 0; this.lastLoadMode = 0; this.clock = opts.clock || (() => Date.now()); this.t0 = this.clock();
     this.stats = { icalls: 0, entryCalls: 0, dispatch: 0, process: 0, upcalls: 0, unmarshalled: 0, bytesIn: 0, bytesOut: 0, dispatchByOp: {}, upcallByOp: {} };
     this.host = null; this.hostScratch = null; this.trace = null;
   }
@@ -103,6 +108,10 @@ export class HostBridge {
       LoadLibraryW: (p) => this.LoadLibraryW(p),
       GetProcAddress: (h, n) => this.GetProcAddress(h, n),
       FreeLibrary: (h) => this.FreeLibrary(h),
+      SafeLoadLibrary: (p, mode) => this.SafeLoadLibrary(p, mode),
+      SetErrorMode: (mode) => this.SetErrorMode(mode),
+      timeGetTime: () => this.timeGetTime(),
+      CreateProcessW: () => this.CreateProcessW(),
       icall: (fn, a0, a1, a2, a3, a4, a5) => this.icall(fn, [a0, a1, a2, a3, a4, a5]),
     } };
   }
@@ -119,9 +128,22 @@ export class HostBridge {
   }
 
   // ---- Win32 shim ----
+  SetErrorMode(mode) { const old = this.errorMode; this.errorMode = mode >>> 0; return old; }
+  // fw:0x449770 = SetErrorMode(mode) + LoadLibraryW + SetErrorMode(old). 戻り値前に必ず旧モードへ戻す.
+  SafeLoadLibrary(pPath, mode) {
+    const old = this.SetErrorMode(mode);
+    try { return this.LoadLibraryW(pPath); } finally { this.SetErrorMode(old); }
+  }
+  timeGetTime() { return (this.clock() - this.t0) >>> 0; } // DWORD (ms, 32bit 折返し)
+  // bridged 経路 (ilbridge.exe 起動) は wasm で無効 (HOSTBRIDGE §1.6). 呼ばれたら原因付きで即失敗する.
+  CreateProcessW() {
+    this.lastError = ERROR_NOT_SUPPORTED;
+    throw new Error('hostbridge: CreateProcessW called — bridged plugin (ilbridge.exe) is disabled in the wasm build (HOSTBRIDGE §1.6); plugin must run as native instance');
+  }
   LoadLibraryW(pPath) {
     const path = this.readWStr(pPath);
     const desc = this.table.resolve(path);
+    this.lastLoadMode = this.errorMode;
     if (!desc) { this.lastError = ERROR_MOD_NOT_FOUND; if (this.trace) this.trace(`LoadLibraryW("${path}") -> NULL (126)`); return 0n; }
     let lm = this.loaded.get(desc.id);
     if (lm) lm.refs++;
