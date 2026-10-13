@@ -40,5 +40,6 @@ node tests/midi_bundled_device.mjs                              # 入力が無�
 step "13. サブインタプリタ検証 (flpy.wasm: Py_NewInterpreterFromConfig)"
 node tests/subinterp_probe.mjs | cut -c1-300
 node tests/subinterp_probe.mjs --neg | cut -c1-120 || [ $? -eq 1 ]
+bash tests/subinterp_negcontrol_old.sh | tail -2                     # ネガコン: 修正前 flpy.c (PY-12 #587) で probe が FAIL すること
 step "14. MIDI scripting を アプリ UI / devtools に公開 (Vite + headless Chrome, PY-6 #76)"; (cd "$HERE/../.." && node tools/python/tests/midi_ui_check.mjs 2>&1 | grep -v shim_port | cut -c1-300)
 step "ALL OK"
