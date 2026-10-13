@@ -70,6 +70,9 @@ void gui_pump_idle_flush(void);
 /* ---- window <-> gdi 連携 (gui_core.c が実装) ---- */
 typedef struct Wnd Wnd;
 int  wnd_target(Wnd *w, int *surf, int *ox, int *oy);   /* top-level surf と client 原点 */
+void wnd_clip_window(Wnd *w, RL *out);                   /* window DC (NC を含む) の可視領域 */
+void wnd_window_origin(Wnd *w, int *ox, int *oy);        /* window rect 左上 (surface 座標) */
+int  gui_dpi(void);                                      /* スレッドの DPI 対応状態に応じた論理 DPI (96 / dpr*96) */
 void wnd_clip(Wnd *w, RL *out);                          /* window DC の可視領域 (surface 座標) */
 Wnd *wnd_from_h(U64 h);
 void wnd_client_size(Wnd *w, int *cw, int *ch);

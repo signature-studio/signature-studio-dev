@@ -1,5 +1,6 @@
 # 実装済み API (gen_api.py 生成)
 ActivateKeyboardLayout
+AdjustWindowRect
 AdjustWindowRectEx
 AlphaBlend
 AttachThreadInput
@@ -112,6 +113,8 @@ GetDesktopWindow
 GetDeviceCaps
 GetDlgItem
 GetDoubleClickTime
+GetDpiForSystem
+GetDpiForWindow
 GetFocus
 GetForegroundWindow
 GetGuiResources
@@ -154,6 +157,7 @@ GetTextExtentPointA
 GetTextExtentPointW
 GetTextMetricsA
 GetTextMetricsW
+GetThreadDpiAwarenessContext
 GetTopWindow
 GetUpdateRect
 GetUpdateRgn
@@ -179,6 +183,7 @@ IsChild
 IsDialogMessageA
 IsDialogMessageW
 IsIconic
+IsProcessDPIAware
 IsRectEmpty
 IsWindow
 IsWindowEnabled
