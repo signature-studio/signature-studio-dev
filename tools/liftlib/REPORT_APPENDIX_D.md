@@ -163,7 +163,7 @@ PR #696 の oc-reviewer review (`ae16a2f`、CHANGES_REQUESTED) への対応。�
 ## 23. LIFTLIB-10 (#695): k80 (block18983_PE.bin) の alloca 並び非決定の実測
 
 検証 HEAD: 本 PR 基点 (origin/main `67172db8`) + probe 入力差し替え。素材: `fl-win64` (`block18983_PE.bin` sha256 a399cbe060ec…)・`toolchain-retdec` (RetDec v5.0)・`work-liftlib`。
-入力: `tools/plugins/lift/kernel_ranges_balance.txt` (136 ranges、`PROBE_PE` / `PROBE_RANGES` で指定)。runner は `pefile`・`capstone` が無いため `kernel_table.py` は実行せず、同梱の ranges を使った。
+入力: `tools/plugins/lift/kernel_ranges_balance.txt` (80 ranges、1440 bytes、sha256 `2215d32093306b0c3d55e7552b6e0ff569afc5d8dab366b74b3ef834080dbb10`、`PROBE_PE` / `PROBE_RANGES` で指定)。runner は `pefile`・`capstone` が無いため `kernel_table.py` は実行せず、同梱の ranges を使った。初版の「136 ranges」は誤記で、ファイルは 80 件 (`0x…-0x…` の区間 80 件、カンマ区切り 1 行)。
 実行: `PROBE_PE=… PROBE_RANGES=… PROBE_OUT=… bash tools/liftlib/lift_determinism_probe.sh 4`。RetDec 1 回 2.3 s、probe 全体 10 s、load 0.53 (開始 1 分値)。
 
 ### 23.1 probe 実測 (N=4)

@@ -6,8 +6,9 @@
 #   同一 PE・同一 ranges を RetDec に与え、ASLR 有効 (既定) と無効 (setarch -R) で各 N 回実行する。
 #   各実行について raw .drc.ll の sha256、uselistorder 行を除いた sha256、.drc.c の sha256 を表示し、
 #   モードごとに異なる値の個数 (distinct) を集計する。
-# 入力 (読取のみ): $ANALYSIS_DIR/plugins/ott/binaries/OTT_vst2_win64.dll, tools/m6/work/ott_ranges.txt
-# 出力: tools/liftlib/work/probe/ (gitignore)
+# 入力 (読取のみ): 既定は $ANALYSIS_DIR/plugins/ott/binaries/OTT_vst2_win64.dll と tools/m6/work/ott_ranges.txt。
+#   PROBE_PE / PROBE_RANGES で上書き可能 (例: k80 は PROBE_PE=block18983_PE.bin、PROBE_RANGES=tools/plugins/lift/kernel_ranges_balance.txt)。
+# 出力: tools/liftlib/work/probe/ (gitignore)。PROBE_OUT で上書き可能だが、起動時に rm -rf されるので注意 (空・/・$HOME は拒否)。
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 cd "$HERE"
@@ -17,6 +18,9 @@ ANALYSIS_DIR="${ANALYSIS_DIR:-$HOME/analysis}"
 PE="${PROBE_PE:-$ANALYSIS_DIR/plugins/ott/binaries/OTT_vst2_win64.dll}"
 RANGES_F="${PROBE_RANGES:-$HERE/../m6/work/ott_ranges.txt}"
 OUT="${PROBE_OUT:-$HERE/work/probe}"
+case "$OUT" in
+  ""|/|"$HOME"|"$HOME/") echo "[lift_determinism_probe] PROBE_OUT が不正 (空・/・\$HOME は rm -rf 対象にできない): '$OUT'" >&2; exit 2 ;;
+esac
 
 need() { [ -e "$1" ] || { echo "[lift_determinism_probe] 前提が無い: $1" >&2; exit 2; }; }
 need "$PE" "PE (analysis-ott-binaries または PROBE_PE)"
