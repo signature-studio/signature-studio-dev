@@ -1,7 +1,8 @@
 # tools/plugins/dynamics/REPORT.md — PLG-F3 (#200) dynamics 7 本: lift 前提の実測
 
-- 日付: 2026-10-13 / 担当 dir: `tools/plugins/dynamics/` のみ / 検証起点 commit: **18b1cb3** (`dynamics_e2e.sh`・`dynamics_nega.sh`) と **2ba3978** (= 18b1cb3 + `ids_crosscheck.py` のみ)
-- 再現: `bash tools/plugins/dynamics/dynamics_e2e.sh` (判定 + 実測) / `bash tools/plugins/dynamics/dynamics_nega.sh` (ネガティブコントロール)
+- 日付: 2026-10-13 / 担当 dir: `tools/plugins/dynamics/` のみ / 検証起点 commit: **b2094ba** (判定を gate にした `judge.py` 新設 + `dynamics_e2e.sh`・`dynamics_nega.sh` 修正後。 §5 の実測はすべてこの HEAD の detached worktree)
+- 旧 HEAD (18b1cb3 / 2ba3978) の「exit 0」は、当時の判定が不合格でも exit 0 になる実装だったため合格の根拠から外し、b2094ba の実測に置き換えた (旧値は 16b79f0 の本書)
+- 再現: `bash tools/plugins/dynamics/dynamics_e2e.sh` (判定 + 実測。 不合格・行欠落は exit 1) / `bash tools/plugins/dynamics/dynamics_nega.sh` (ネガティブコントロール NC1〜NC3)
 - 素材: `fl-win64` / `toolchain-retdec` / `toolchain-emsdk` (`docs/WORKFLOW.md` §11)。 環境は `dynamics/env.sh`
 - 既知類型との関係 (`docs/DEFECTS.md`): **該当なし** (§7 の 3 件は emcc が拒否する loud な IR 型エラーで、silent miscompile ではない。
   差分試験を未実施のため D1〜D16 / batch_plan §4 の ARG・IND に該当するかは未確認)
@@ -125,18 +126,33 @@ P0c (`p0c/REPORT.md`) で見た各 kernel の現状 (本 PR では再測定し�
 
 | 項目 | 実測 |
 |---|---|
-| `dynamics_e2e.sh` 全体 (`--skip-lift` 無し、3 回連続、HEAD 18b1cb3) | 130 s / 126 s / 125 s、exit 0。 開始時 load average (1 分) 0.86 / 1.08 / 1.01 (内訳: 7 閉包 + closure_facts + engine 2 本。 いずれも逐次実行で並列数 1) |
-| lift 秒 (`status.csv` の seconds、3 回の min–max) | Limiter 2–3 / Compressor 2 / Maximus 5–6 / Soundgoodizer 4 / Emphasis 3 / Multiband 殻 2 / Transient 殻 2–3 (7 本計 20–23 s)。 engine 19252: 10–12 s、19048: 38–41 s |
-| 3 回の結果一致 | 判定列 (lift_rc / defines / f80 / `emcc -c`)・engine 欠落監査・`facts.json` は 3 回とも同一 (`facts.json` はバイト一致)。 `matrix_check`: 42/42 項目一致を 3 回とも確認 |
-| `dynamics_nega.sh` | exit 0、2.4 s (NC1: rc 0 → 1、NC2: define 27 → 25 かつ対象関数 1 → 0) |
-| `ids_crosscheck.py` (HEAD 2ba3978) | exit 0。 7/7 本で取りこぼしなし (§2) |
-| クリーン worktree での全工程再現 (HEAD 2ba3978、環境変数なしの `env -i`、新規 `RUNNER_TEMP` で fl-win64 展開 + venv 作成から、inventory 生成を含む) | `dynamics_e2e.sh` exit 0、**379 s** (終了時 load average 2.88 / 6.65 / 4.61)。 判定列・`facts.json`・engine 欠落監査は上の 3 回と同一 (`facts.json` はバイト一致)。 続けて `ids_crosscheck.py` 7/7、`dynamics_nega.sh` OK。 worktree は終了後に削除 |
+| `dynamics_e2e.sh` 全体 (`--skip-lift` 無し、inventory 済で 3 回連続、HEAD b2094ba、`env -i`) | 167 s / 168 s / 166 s、いずれも exit 0・`judge: rows=7/7 bad=0`・最終行 `[dynamics_e2e] OK`。 開始時 load average (1 分) 0.98 / 1.05 / 1.03 (内訳: 7 閉包 + 判定 + closure_facts + matrix_check + engine 2 本。 いずれも逐次実行で並列数 1) |
+| 判定の入力 (`status7.csv`、4 回とも) | 7 本とも lift_rc 0 / declares_unimpl 0 / f80_funcs 0 / emcc_c_rc 0。 declares_unimpl は「未計測 -1」ではなく実測の 0 (`batch_lift.sh` は simd ログに `unimplemented N` が無いと -1 を書く。 `judge.py` は -1 を不合格にする) |
+| lift 秒 (`status.csv` の seconds、3 回の min–max) | Limiter 2–3 / Compressor 2 / Maximus 6 / Soundgoodizer 5 / Emphasis 3–4 / Multiband 殻 2–3 / Transient 殻 2–3 (7 本計 25 s / 23 s / 25 s)。 engine 19252: 12–14 s、19048: 47–49 s |
+| 結果一致 (クリーン 1 回 + 上の 3 回 = 4 回) | 判定列 (lift_rc / defines / f80 / `emcc -c`)・engine 欠落監査 (lift 秒を除く全列)・`facts.json` は 4 回とも同一 (`facts.json` は sha256 が 4 本一致、先頭 `1d1d7d5a8d00c7e0`)。 `matrix_check`: 42/42 項目一致を 4 回とも確認 |
+| `dynamics_nega.sh` (HEAD b2094ba、3 回) | 3 回とも exit 0、3 s / 4 s / 4 s (NC1: rc 0 → 1、NC2: define 27 → 25 かつ対象関数 1 → 0、NC3: 下記)。 終了時に `status.csv` / `status7.csv` が元と cmp 一致 |
+| `ids_crosscheck.py` (HEAD b2094ba) | exit 0 (1 秒未満)。 7/7 本で取りこぼしなし (§2)。 本スクリプトは 2ba3978 から挙動不変 (59d0f2e の docstring 1 行のみ) |
+| クリーン worktree での全工程再現 (HEAD b2094ba、環境変数なしの `env -i`、新規 `RUNNER_TEMP` で fl-win64 展開 + venv 作成から、inventory 生成を含む) | `dynamics_e2e.sh` exit 0、**556 s** (開始時 load average 2.43 / 2.63 / 1.18 = 直前に中断した別の inventory 実行の残り。 終了時 1.79 / 7.24 / 5.23)。 判定・`facts.json`・engine 欠落監査は上の 3 回と同一。 続けて `ids_crosscheck.py` 7/7、`dynamics_nega.sh` OK。 上の 3 回連続はこの同じ worktree の inventory を使った。 worktree は終了後に削除 |
 | 前提 inventory (初回のみ) | `inventory/win_funcs.py` 242.12 s (並列 14 プロセス / 4 core)、他 5 s 未満。 `block_manifest.json` が tarball に無く `nsis_names.py` が動かないため、`mk_blockmap.py` が `PLUGIN_MATRIX.json` から代替の blockmap (182 record) を合成 |
 
 ネガティブコントロール (Fruity Limiter 19021):
 - NC1: `final.ll` の関数 1 つの `ret` を除去 → `emcc -c` が **rc 1** (無改変は rc 0)。 `emcc -c` ゲートが壊れた IR を落とすことを確認。
 - NC2: 閉包 ranges の末尾 1 つ (`function_6dd1f0`) を落として再 lift → その define が消え、全体は 27 → 25 (RetDec は 1 range から 2 define を出すことがあり、差は 1 とは限らない)。
   ranges が lift 範囲を実際に決めていることを確認。
+- NC3 (判定 `judge.py` そのもの。 実測の `status7.csv` 7 行を 1 セルずつ壊した合成 CSV を渡す。 rows=採用行/対象 block 数、bad=不合格行数):
+
+  | 入力 | judge.py の rc | rows / bad |
+  |---|--:|---|
+  | 対照 (実測 `status7.csv` そのまま) | 0 | 7/7 / 0 |
+  | Limiter `emcc_c_rc=1` | 1 | 7/7 / 1 |
+  | Limiter `lift_rc=1` + `f80_funcs=3` | 1 | 7/7 / 1 (行単位で数える) |
+  | Maximus `declares_unimpl=5` | 1 | 7/7 / 1 |
+  | Compressor `declares_unimpl=-1` (未計測値) | 1 | 7/7 / 1 |
+  | Transient の行を落とす | 1 | 6/7 / 1 |
+  | e2e 配線: `work/batch/status.csv` に Limiter `emcc_c_rc=1` の行を足し `dynamics_e2e.sh --skip-lift` | exit 1 (`[dynamics_e2e] FAIL`)、`[dynamics_e2e] OK` 行 0 本 | — |
+
+  NC3 自身の識別力: `judge.py` の終了コードを常に 0 に差し替える (= 修正前の挙動相当) と、合成 6 件はすべて rc 0、e2e 配線は exit 0・OK 行 1 本となり
+  `dynamics_nega.sh` は `[dynamics_nega] FAIL` (exit 1)。 差し替えは使い捨ての detached worktree 上で行い、`git show HEAD:` で戻して `git diff` が空であることを確認した。
 
 別系統の突合: Dispatcher ID の独立走査は §2 の通り (`ids_crosscheck.py`、7/7 本で取りこぼしなし)。 閉包の 6 項目 (関数数・バイト・frontier 関数・frontier バイト・vcall・ptr) は、今回の再計算値と `PLUGIN_MATRIX.json` (2026-10-10 生成) が 7 本とも一致。
 `define` 数 = 閉包関数数 も 7 本とも一致 (§1)。
@@ -171,8 +187,9 @@ P0c (`p0c/REPORT.md`) で見た各 kernel の現状 (本 PR では再測定し�
 
 | ファイル | 内容 |
 |---|---|
-| `dynamics_e2e.sh` | 7 閉包 → batch_lift → 判定 (lift_rc / f80 / `emcc -c` が全 0) → `closure_facts.py` → engine 2 本 (参考) |
-| `dynamics_nega.sh` | ネガティブコントロール 2 件 |
+| `dynamics_e2e.sh` | 7 閉包 → batch_lift → 判定 (`judge.py`。 不合格・行欠落は exit 1 で OK 行なし) → `closure_facts.py` → `matrix_check.py` → engine 2 本 (参考) |
+| `judge.py` | `status.csv` の合否判定: `judge.py <status.csv> [block ...] [-o out.csv]`。 lift_rc / declares_unimpl / f80_funcs / emcc_c_rc が全 0 で rc 0、不合格 rc 1、入力不正 rc 2 |
+| `dynamics_nega.sh` | ネガティブコントロール 3 件 (NC1 `emcc -c` / NC2 ranges / NC3 判定) |
 | `closure_facts.py` | 閉包 / host ID / kernel 依存 / engine 外形 → `work/dynamics/facts.json` |
 | `matrix_check.py` `ids_crosscheck.py` | `PLUGIN_MATRIX.json` との 6 項目突合 (e2e に組込み) / Dispatcher ID の別算法検算 (単独実行: `source tools/plugins/dynamics/env.sh && python3 tools/plugins/dynamics/ids_crosscheck.py`) |
 | `engine_lift.sh` `engine_ranges.py` `engine_fixcmp.py` | engine DLL の全 `.pdata` lift と局所修復 |
