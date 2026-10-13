@@ -150,3 +150,50 @@ FA の P1' (comisd×2+jbe/jae+xorps/movaps+jmp, 合流先は reg2mem alloca) が
 全文は **[`REPORT_APPENDIX_C.md`](REPORT_APPENDIX_C.md) §19**。
 - 結論: `python3 -m liftlib build <cfg>` が標準設定 (`-O3 -flto` + gc-sections + 最小 export、正本 `data/std_build.json`) で全変種 (ref/o2/o3/std) をビルドし、署名不一致なら exit 1・成果物なし。`bash tools/liftlib/stdbuild_e2e.sh` (合成入力) で 3/3 PASS・ネガコン FAIL を確認。
 - 未達: 実 OTT / FA / KH を標準設定で通す検証 (素材不足)。未解決は §19 の表。
+
+## 20. lowbase_e2e.sh の DLL パス環境変数化 (#440, 親 #294 / 発見 #427)
+
+既知類型との関係 (DEFECTS.md): 該当なし (lift 欠陥ではなくスクリプトのパス固定の解消)。
+
+- 変更: `tools/liftlib/lowbase_e2e.sh` の DLL 行 (`[ANALYSIS-PLUGINS]` 配下の `OTT_vst2_win64.dll` を絶対パスで直書き) を
+  `source tools/shared/env.sh` + `DLL="${OTT_DLL:-$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll}"` に置換。
+  `PLUGINS_DIR` 未設定時の既定は `[ANALYSIS-PLUGINS]` (= `$ANALYSIS_DIR/plugins`) で従来と同一パス。DLL が無い場合は exit 2。
+- 是正 (review 5499056345 / Copilot 指摘, b0bedb6): `tools/liftlib/liftlib/env.py` の `OTT_DLL` が環境変数 `OTT_DLL` を見ず
+  `PLUGINS_DIR` からのみ導出していたため、[2] (`python3 -m liftlib ott`) は `OTT_DLL` と別の DLL を使い得た。
+  `OTT_DLL = os.environ.get("OTT_DLL") or os.path.join(PLUGINS_DIR, ...)` に変更 (未設定・空文字は従来と同じ導出)。
+- 初回検証 (コミット済み HEAD 100b550、Actions runner 4 vCPU、`ANALYSIS_DIR=$HOME/analysis`、直列 n=1):
+
+| 項目 | 実測 |
+|---|---|
+| 変更後 `bash tools/liftlib/lowbase_e2e.sh` | ALL PASS / rc=0 / 1:19.00 / load average 1.39 (1 分値) |
+| 変更前 (origin/main 版の DLL 行のみ runner の実在パスに差替) | ALL PASS / rc=0 / 1:19.78 |
+| SUMMARY 節 (liftlib ott ×2・x64c 3 構成・合計 150,708 cell) の diff | 差 0 (`SUMMARY_IDENTICAL`) |
+| ネガコン `PLUGINS_DIR=/nonexistent` | `/nonexistent/ott/binaries/OTT_vst2_win64.dll 無し` exit 2 |
+| ネガコン `OTT_DLL=/nonexistent/x.dll` | `/nonexistent/x.dll 無し` exit 2 |
+| 環境変数なし (既定値) | `[ANALYSIS-PLUGINS]/ott/binaries/OTT_vst2_win64.dll` を指す (この runner には無く exit 2) |
+
+- 是正後の検証 (コミット済み HEAD b0bedb6、同 runner・直列 n=1、`ANALYSIS_DIR=$HOME/analysis`、`capstone 5.0.7` / `pefile 2024.8.26` は
+  runner 側 venv で用意):
+
+| 項目 | 実測 |
+|---|---|
+| `bash tools/liftlib/lowbase_e2e.sh` (環境変数なし) | ALL PASS / rc=0 / 81.5 秒 / load average 0.96 (終了直後の 1 分値)。SUMMARY は ott 2 構成 PASS・x64c 3 構成 計 150,708 cell・`max_ulp 0`・`state_diff_qwords 0` |
+| 旧 `env.py` (35d78c9) で `OTT_DLL=<別パスの DLL>` を与えた `env.OTT_DLL` | `PLUGINS_DIR` 由来の既定 DLL を返す (指摘の再現) |
+| 新 `env.py` (b0bedb6) で同条件の `env.OTT_DLL` | 与えた別パスの DLL を返す |
+| `OTT_DLL=<既定 DLL と同一 sha256 のコピー>` + `PLUGINS_DIR=/nonexistent` | [1] PASS・[2] 2 構成 PASS (`PLUGINS_DIR` に依存しない)。[3] は 3 構成とも build FAIL (`build_x64c.sh` が `PLUGINS_DIR` 側の DLL を開き FileNotFoundError)、全体 rc=1 / 146.8 秒 |
+| ネガコン `OTT_DLL=<実在の別 DLL (OTT_vst2_win32.dll, PE32)>` `--quick` | [1] の集計が既定 DLL と異なる (reloc DIR64 0 / IAT 368 slot。既定は 13000 / 375)、[2] は 2 構成とも `checks 8 / broken 3` で FAIL、rc=1 / 39.4 秒。[3] は既定 DLL を使うため PASS |
+| ネガコン `PLUGINS_DIR=/nonexistent`・`OTT_DLL=/nonexistent/x.dll` | いずれも exit 2 (上の初回検証と同一メッセージ) |
+
+- `OTT_DLL` が効く範囲 (上の実測): 存在確認・[1]・[2] (`liftlib/env.py` 経由)。[3] (`hostbridge/lowbase/x64c/build_x64c.sh` は
+  `LB_DLL` か `PLUGINS_DIR` を参照) と `--full` (`hostbridge/lowbase/lowbase_e2e.sh` は `PLUGINS_DIR` のみ参照) には伝わらない。
+- 検証範囲外: `--full` (hostbridge の RetDec chain + Chrome)。`tests/test_unit.py` (FreshAir 素材が要る。plugins-freshair 未取得)。
+- 検証メモ: `work-liftlib` 素材内の `work/ott_*/work/full_t1.drc.{ll,dsm}` は作業 VM の旧 checkout 内ファイルへの絶対 symlink で、
+  runner では dangling となり `recipes/ott.py` が `FileExistsError` で落ちる (初回 run で観測)。gitignore 対象の `work/` 内のため
+  runner 上で検証用 worktree 内の同名ファイルへ張り直して検証した (commit 対象外。是正後の検証 worktree でも 98 本を同様に張り直した)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `work-liftlib` / `work-m6-ott` 素材の絶対 symlink (作業 VM の旧 checkout 内ファイルを指す) が runner で dangling。lowbase_e2e [2] が素材展開直後は FAIL | Actions 上で lowbase_e2e を再実行する度に手動張り直しが要る | #448 `[CI-8]` (OPEN) が追跡 (素材の相対 symlink 化 or `recipes/ott.py` の `os.path.lexists` 判定) |
+| (初版の記述: `tools/ott/avx/build_avx.sh`・`tools/ott/crtinit/lift_crt.sh`・`tools/ott/accept/acc_crt_table.py`・`tools/ott/avx/unsup_scan.py`・`tools/m9/m9_tablebind.py`・`tools/shimx/scripts/import_scan.py`・`tools/liftlib/tests/test_unit.py`・`tools/liftlib/xmm0_ret_census.py` にも同一の固定パスが残る。同種の移植性欠陥 (本 issue の範囲外)。新規子チケット案 (CI-4 系列)) | **解消済み**: a4f8a08 (#450 / PR #460) と 2db928d (#427 / PR #438) で main に merge 済み。この HEAD で 8 ファイルとも `/home/ubuntu` の出現数 0 を実測。#450 `[CI-4-ott-liftlib]` は CLOSED | 起票不要 |
+| `OTT_DLL` が [3] (`build_x64c.sh`) と `--full` に伝わらない。[3] は `libottnative.so` (既定 DLL 由来) と比較するため、別 DLL を指定しても [3] だけ既定 DLL を検証する | 別 DLL を `OTT_DLL` で指定した検証が [1][2] と [3] で別対象になる | 未起票 (新規子チケット案、CI-4 系列・親 #294。PM に起票依頼) |
+| `capstone` / `pefile` の依存がどこにも宣言されていない。素材展開だけでは [1] の最初の python 呼び出しで落ちる | Actions 上で e2e を再実行する度に手動インストールが要る | 未起票 (新規子チケット案、CI 系列。PM に起票依頼) |
