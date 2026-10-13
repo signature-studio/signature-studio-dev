@@ -161,7 +161,9 @@ RetDec は `void(i128,i128,i8)` と lift し ECX/EFLAGS を捨てる → **void 
 | leafspec | RESULT: PASS (exp 40/40, log gate PASS) | — |
 | 同 HEAD の 2 回目 review run: `simd test` / `simd report` / unit T5・T17a / ネガコン NC2 | mismatch 0 / 未被覆 0 / ok / NC2 は BAD で検出し復元後 mismatch 0 | 4.9 秒 (load 0.85 / 0.74 / 0.32) |
 
-`regress` の `ott_auto_none` (旧既定 `--auto none`) は FAIL (census junkHi 175)。reviewer が origin/main `89a1a30` でも census 値まで同一の FAIL を確認しており、**本 PR 起因ではない** (追跡 issue は PM 起票待ち)。
+`regress` の `ott_auto_none` (旧既定 `--auto none`) は当時 FAIL (census junkHi 175 を表示)。reviewer が origin/main `89a1a30` でも census 値まで同一の FAIL を確認しており、**本 PR 起因ではない** (追跡: #478)。
+
+**#478 の調査結果・修正・ネガコン・再計算スクリプトは [`REPORT_APPENDIX_C.md`](REPORT_APPENDIX_C.md) §20 に移した** (本ファイルの 250 行目安のため)。
 
 **(3) 本更新 run の再測定** — HEAD `e86e6e8` (origin/main `91a83a5` を merge 済み)、nproc=4、並列なし。素材は `plugins-ott`・`toolchain-retdec`・`toolchain-emsdk`・`work-liftlib`・`work-liftlib-targets` のみ
 (RetDec の raw `.ll` は `work-liftlib` のキャッシュで `--fresh` ではない):
@@ -213,3 +215,16 @@ liftdiff の 4 スナップショット (`ir_instr.ll`) の declare で C 生成
 |---|---|---|---|---|
 | xmm0 で結果を返す関数が `ret i64 <rax 側ゴミ>` に lift され caller に garbage が流れる | RetDec は戻りレジスタを rax/xmm0 で区別せず `ret i64` に一律化 | OTT exp 1801b4220: 8 ret 中 8 が未搬送 / tan kernel 2/2 | 機械語の全 ret で xmm0 が関数内定義かつ IR の ret が xmm0 由来でない | `f2.run_xmm_ret` → `leafabi.run` |
 | ymm 引数を C helper の `u128` 2 個と誤宣言すると wasm ABI がずれ上位レーンが落ちる | wasm32 は i256 を i64×4 に分割し戻りは sret | 本 run NC2 (レーン順反転で mismatch 29,752) | helper 署名と IR declare の i256 数の不一致 | `gen._params` (u64×4 平坦化 + Y 戻り) |
+
+### 17.8 #415 (RetDec route getParameter jump table 復元): 素材不足で未着手
+
+検証起点: `origin/main` = 8f55002。run (issue #415 コメント) の `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk work-liftlib` では必須入力が揃わず停止した。コード変更なし。
+
+| 必須入力 | 取得状況 (実測) |
+|---|---|
+| `OTT_vst2_win64.dll` (native 参照・`${OTT_DLL}`) | 無し (`$HOME/artifacts` は fl-win64 / toolchain-retdec / toolchain-emsdk / work-liftlib の 4 点のみ。`ANALYSIS_DIR` / `PLUGINS_DIR` 未設定) |
+| `tools/m6/work/ott.drc.ll` (`targets/ott_iargs.json` の `raw_ll`) | 無し (`tools/m6/work/` 自体が存在しない) |
+
+- 再開に必要な `oc_artifacts`: `fl-win64 toolchain-retdec toolchain-emsdk work-liftlib work-m6-ott plugins-ott analysis-ott-binaries` (§17 冒頭の素材と同じ)。
+- 再開手順: ①`liftlib/passes/` に `jmp r8` jump table を `icall_rewrite.py` D10 (`tools/icall/REPORT.md` §4) と同じ target 列挙展開で復元する pass を追加 → ②`leafabi` (`ret_xmm0`) と組合せ → ③`leafspec` で `function_18011e5a0` を idx 0..19 × 200 で native 突合 (現状 0/200, §17.3) → ④ネガコン (pass OFF で FAIL) を数値で記録。
+- 優先度は PM 判断 (#415 コメント: M-Boot blocker #132/#253 解消後に再評価)。

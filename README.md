@@ -20,14 +20,14 @@ docs 索引・各ファイルの責務・行数上限ルールは **[`docs/DOC_M
 
 ## tools 索引
 
-tools 直下は **33 dir** (下表は下位 dir を含め 59 名を列挙)。測定値・実測は各 `REPORT.md` が単一の正本。
+tools 直下は **33 dir** (下表は下位 dir を含め 60 名を列挙)。測定値・実測は各 `REPORT.md` が単一の正本。
 索引は [`docs/DOC_MAP.md`](docs/DOC_MAP.md)。
 
 | 系統 | ディレクトリ | 正本 |
 |---|---|---|
 | 基盤 | `m1`,`m2`,`m3`,`m5`・`flelift`(+`boot`)・`liftlib`・`liftdiff` | `tools/m1/README.md`・各 `REPORT.md` |
 | OTT | `m6`〜`m10`,`ott` | `tools/ott/REPORT.md` |
-| 起動 | `m11`(+`alloca`,`ldfix`,`shimx_link`)・`startup`(+`glue`,`keyfix`,`pump`,`vreg`,`winstubs`) | `tools/m11/REPORT.md`・`tools/startup/STARTUP.md` |
+| 起動 | `m11`(+`alloca`,`ldfix`,`shimx_link`)・`startup`(+`glue`,`keyfix`,`loadpaths`,`pump`,`vreg`,`winstubs`) | `tools/m11/REPORT.md`・`tools/startup/STARTUP.md` |
 | 解析 | `icall` (+`disp_size`,`landing`) | `tools/icall/REPORT.md` |
 | shim | `shim`,`shimx` (+`pathreg`) | `tools/shim/README.md`・`tools/shimx/README.md` |
 | 実行 | `runtime`・`hostbridge`(+`cb`,`h2`,`lowbase`,`nfo`)・`gui`・`audio`(+`asio`)・`assets`(+`wvfs`,`bootset`) | 各 `REPORT.md`・`tools/runtime/DESIGN.md` |

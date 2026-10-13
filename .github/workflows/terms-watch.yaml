@@ -1,0 +1,77 @@
+name: terms-watch
+
+# 各社規約 (Web 4 文書) の週次差分監視 (#507, 親 #88)。FL の規約改定は 30 日で発効するため早期検知が目的。
+# 差分あり (exit 1) / 取得失敗 (exit 3) で job を失敗させ、issue を自動起票 (同題の open issue があればコメント)。
+# 素材 (FL インストーラ等) を要する文書 (fl-eula-html / fl-tou-rtf / xfer-eula) は対象外。
+# それらは FL 新版取り込み手順 (docs/STATUS.md MS11) から `pnpm terms-watch` で手動実行する。
+# 注意: schedule は既定ブランチの workflow だけが走る。リポジトリが 60 日無活動だと GitHub が schedule を自動停止する。
+on:
+  schedule:
+    - cron: '17 3 * * 1' # 毎週月曜 03:17 UTC
+  workflow_dispatch:
+    inputs:
+      negative_control:
+        description: 'ネガコン: 台帳の当該文書のハッシュを 1 文字変えた複製で比較し、job 失敗 + issue 起票を確認する (none = 通常実行)'
+        type: choice
+        default: none
+        options:
+          - none
+          - fl-tou-web
+          - kilohearts-eula
+          - slate-audiotonix-terms
+          - ni-eula
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terms-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write # 失敗時の自動起票・コメント
+    env:
+      NEG: ${{ github.event.inputs.negative_control || 'none' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # Kilohearts の PDF 抽出が `uv run --with pypdf==5.9.0` を使う
+      - uses: astral-sh/setup-uv@v10.3.0
+      - name: Check terms (Web 4 documents)
+        id: check
+        shell: bash
+        run: |
+          node --version
+          if [ "$NEG" = none ]; then
+            bash tools/legal/terms-watch/ci.sh
+          else
+            bash tools/legal/terms-watch/ci.sh --tamper "$NEG"
+          fi
+      # ci.sh より前の step (checkout / uv) の失敗でも通知する (exit_code 無し → 「その他の失敗」)
+      - name: Notify (issue)
+        if: failure()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$NEG" = none ]; then
+            bash tools/legal/terms-watch/notify.sh
+          else
+            bash tools/legal/terms-watch/notify.sh --negative-control
+          fi
+      - name: Upload result
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: terms-watch-result
+          path: |
+            ${{ runner.temp }}/terms-watch/log.txt
+            ${{ runner.temp }}/terms-watch/result.json
+            ${{ runner.temp }}/terms-watch/exit_code
+          if-no-files-found: ignore

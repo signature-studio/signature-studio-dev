@@ -1,0 +1,37 @@
+diff --git a/tools/m11/m11_ov.c b/tools/m11/m11_ov.c
+index 9cfb6ca..318ee65 100644
+--- a/tools/m11/m11_ov.c
++++ b/tools/m11/m11_ov.c
+@@ -834,3 +834,32 @@ unsigned long long function_416db0(unsigned long long dest, unsigned long long s
+     } while (--count);
+     return 0;
+ }
++
++/* function_8cbb00  VA 0x8cbb00  (TDictionary.SetCapacity(newcap): 新バケット配列を作って旧配列の有効バケットを再挿入) */
++unsigned long long function_8cbb00(unsigned long long self, unsigned int newcap32) {
++    long long newcap = (long long)(int)newcap32;
++    u64 loc[2] = { 0, 0 };   /* [rbp+0x30] NewItems, [rbp+0x38] OldItems */
++    u64 ti = Q(R(0x4bec78));
++    u64 cur = Q(self + 8);
++    long long curlen = cur ? (long long)Q(cur - 8) : 0;
++    if (curlen != newcap) {
++        if (newcap < 0) function_448d20();
++        function_418210((u64)(uintptr_t)&loc[1], Q(self + 8), ti);
++        function_417fc0((void*)&loc[0], (void*)(uintptr_t)ti, 1, (unsigned long long)newcap);
++        long long nlen = loc[0] ? (long long)Q(loc[0] - 8) : 0;
++        for (long long i = 0; i < nlen; i++) D(loc[0] + (u64)i * 24) = 0xffffffffu;
++        function_418210(self + 8, loc[0], ti);
++        Q(self + 0x20) = (u64)newcap >> 1;
++        long long olen = loc[1] ? (long long)Q(loc[1] - 8) : 0;
++        for (long long i = 0; i < olen; i++) {
++            u64 b = loc[1] + (u64)i * 24;
++            u32 h = D(b);
++            if (h == 0xffffffffu) continue;
++            long long idx = (long long)~function_8cbce0(self, Q(b + 8), h);
++            u64 dst = Q(self + 8) + (u64)idx * 24;
++            Q(dst) = Q(b); Q(dst + 8) = Q(b + 8); Q(dst + 0x10) = Q(b + 0x10);
++        }
++    }
++    function_416230((u64)(uintptr_t)loc, ti, 2);
++    return 0;
++}

@@ -1,0 +1,3167 @@
+{
+ "vmt_count": 2958,
+ "units": [
+  {
+   "unit": "System",
+   "vmt_lo": "0x401a38",
+   "vmt_hi": "0x404740",
+   "classes": 11
+  },
+  {
+   "unit": "System.Types",
+   "vmt_lo": "0x41fd40",
+   "vmt_hi": "0x41ffd0",
+   "classes": 2
+  },
+  {
+   "unit": "System.SysUtils",
+   "vmt_lo": "0x42db78",
+   "vmt_hi": "0x438108",
+   "classes": 58
+  },
+  {
+   "unit": "System.VarUtils",
+   "vmt_lo": "0x456e98",
+   "vmt_hi": "0x4571f0",
+   "classes": 3
+  },
+  {
+   "unit": "System.Variants",
+   "vmt_lo": "0x458168",
+   "vmt_hi": "0x459d38",
+   "classes": 15
+  },
+  {
+   "unit": "System.TypInfo",
+   "vmt_lo": "0x469550",
+   "vmt_hi": "0x4719b8",
+   "classes": 24
+  },
+  {
+   "unit": "System.Hash",
+   "vmt_lo": "0x4743d8",
+   "vmt_hi": "0x4743d8",
+   "classes": 1
+  },
+  {
+   "unit": "System.Generics.Defaults",
+   "vmt_lo": "0x4778c8",
+   "vmt_hi": "0x5279a0",
+   "classes": 6
+  },
+  {
+   "unit": "System.SyncObjs",
+   "vmt_lo": "0x47fd38",
+   "vmt_hi": "0x4825f8",
+   "classes": 6
+  },
+  {
+   "unit": "System.Rtti",
+   "vmt_lo": "0x482e08",
+   "vmt_hi": "0x4ba120",
+   "classes": 57
+  },
+  {
+   "unit": "System.Generics.Collections",
+   "vmt_lo": "0x48bdf8",
+   "vmt_hi": "0x136e828",
+   "classes": 761
+  },
+  {
+   "unit": "System.Classes",
+   "vmt_lo": "0x4c86b8",
+   "vmt_hi": "0x52ea50",
+   "classes": 73
+  },
+  {
+   "unit": "System.WideStrings",
+   "vmt_lo": "0x53e698",
+   "vmt_hi": "0x53fe90",
+   "classes": 3
+  },
+  {
+   "unit": "System.Contnrs",
+   "vmt_lo": "0x543968",
+   "vmt_hi": "0x544388",
+   "classes": 3
+  },
+  {
+   "unit": "AudioPlayer",
+   "vmt_lo": "0x545a90",
+   "vmt_hi": "0x545a90",
+   "classes": 1
+  },
+  {
+   "unit": "AudioComponents",
+   "vmt_lo": "0x555798",
+   "vmt_hi": "0x5562b0",
+   "classes": 9
+  },
+  {
+   "unit": "ZExpressions",
+   "vmt_lo": "0x5591d0",
+   "vmt_hi": "0x55d698",
+   "classes": 46
+  },
+  {
+   "unit": "Renderer",
+   "vmt_lo": "0x566c08",
+   "vmt_hi": "0x56bc80",
+   "classes": 25
+  },
+  {
+   "unit": "NanoJpeg",
+   "vmt_lo": "0x5704c8",
+   "vmt_hi": "0x5704c8",
+   "classes": 1
+  },
+  {
+   "unit": "BitmapProducers",
+   "vmt_lo": "0x572068",
+   "vmt_hi": "0x5731d8",
+   "classes": 13
+  },
+  {
+   "unit": "ZBitmap",
+   "vmt_lo": "0x577610",
+   "vmt_hi": "0x577610",
+   "classes": 1
+  },
+  {
+   "unit": "Animators",
+   "vmt_lo": "0x578120",
+   "vmt_hi": "0x5788c0",
+   "classes": 6
+  },
+  {
+   "unit": "Meshes",
+   "vmt_lo": "0x5797f0",
+   "vmt_hi": "0x57aec8",
+   "classes": 18
+  },
+  {
+   "unit": "Collision",
+   "vmt_lo": "0x5801b8",
+   "vmt_hi": "0x580438",
+   "classes": 3
+  },
+  {
+   "unit": "Commands",
+   "vmt_lo": "0x580a78",
+   "vmt_hi": "0x5812a8",
+   "classes": 7
+  },
+  {
+   "unit": "CocoSets",
+   "vmt_lo": "0x582500",
+   "vmt_hi": "0x582c60",
+   "classes": 2
+  },
+  {
+   "unit": "CocoAncestor",
+   "vmt_lo": "0x5833b8",
+   "vmt_hi": "0x585258",
+   "classes": 4
+  },
+  {
+   "unit": "Zc",
+   "vmt_lo": "0x587a30",
+   "vmt_hi": "0x587d20",
+   "classes": 2
+  },
+  {
+   "unit": "System.Masks",
+   "vmt_lo": "0x593aa8",
+   "vmt_hi": "0x593db8",
+   "classes": 2
+  },
+  {
+   "unit": "System.DateUtils",
+   "vmt_lo": "0x594bc8",
+   "vmt_hi": "0x5960e0",
+   "classes": 4
+  },
+  {
+   "unit": "System.IniFiles",
+   "vmt_lo": "0x5a1438",
+   "vmt_hi": "0x5a3c80",
+   "classes": 7
+  },
+  {
+   "unit": "System.Win.Registry",
+   "vmt_lo": "0x5abff8",
+   "vmt_hi": "0x5ae1a8",
+   "classes": 4
+  },
+  {
+   "unit": "Vcl.Graphics",
+   "vmt_lo": "0x5b7768",
+   "vmt_hi": "0x5d1e70",
+   "classes": 25
+  },
+  {
+   "unit": "System.Actions",
+   "vmt_lo": "0x5d28a0",
+   "vmt_hi": "0x5d3fb8",
+   "classes": 6
+  },
+  {
+   "unit": "System.ImageList",
+   "vmt_lo": "0x5d91e8",
+   "vmt_hi": "0x5d9558",
+   "classes": 2
+  },
+  {
+   "unit": "Vcl.ActnList",
+   "vmt_lo": "0x5dcca8",
+   "vmt_hi": "0x5ddc28",
+   "classes": 6
+  },
+  {
+   "unit": "System.Win.ComObj",
+   "vmt_lo": "0x5dec38",
+   "vmt_hi": "0x5def80",
+   "classes": 3
+  },
+  {
+   "unit": "System.ZLib",
+   "vmt_lo": "0x5e1588",
+   "vmt_hi": "0x5e2938",
+   "classes": 7
+  },
+  {
+   "unit": "Vcl.Controls",
+   "vmt_lo": "0x5f4728",
+   "vmt_hi": "0x6052c0",
+   "classes": 35
+  },
+  {
+   "unit": "Vcl.StdCtrls",
+   "vmt_lo": "0x623b50",
+   "vmt_hi": "0x62ea78",
+   "classes": 19
+  },
+  {
+   "unit": "System.Zip",
+   "vmt_lo": "0x63c310",
+   "vmt_hi": "0x641c20",
+   "classes": 6
+  },
+  {
+   "unit": "AllUtil",
+   "vmt_lo": "0x647a30",
+   "vmt_hi": "0x647a30",
+   "classes": 1
+  },
+  {
+   "unit": "QuickRegistry",
+   "vmt_lo": "0x6511b8",
+   "vmt_hi": "0x6511b8",
+   "classes": 1
+  },
+  {
+   "unit": "QuickLists",
+   "vmt_lo": "0x663578",
+   "vmt_hi": "0x663908",
+   "classes": 4
+  },
+  {
+   "unit": "QuickLFLists",
+   "vmt_lo": "0x665e28",
+   "vmt_hi": "0x666298",
+   "classes": 5
+  },
+  {
+   "unit": "QuickFont",
+   "vmt_lo": "0x666fa0",
+   "vmt_hi": "0x666fa0",
+   "classes": 1
+  },
+  {
+   "unit": "ILSvg",
+   "vmt_lo": "0x66dbc8",
+   "vmt_hi": "0x66dbc8",
+   "classes": 1
+  },
+  {
+   "unit": "Vcl.Clipbrd",
+   "vmt_lo": "0x66ed98",
+   "vmt_hi": "0x66f468",
+   "classes": 2
+  },
+  {
+   "unit": "WAVFiles",
+   "vmt_lo": "0x670ad0",
+   "vmt_hi": "0x670be0",
+   "classes": 2
+  },
+  {
+   "unit": "ElastiqueAPI",
+   "vmt_lo": "0x677be8",
+   "vmt_hi": "0x677be8",
+   "classes": 1
+  },
+  {
+   "unit": "WAV_Streaming",
+   "vmt_lo": "0x6781b8",
+   "vmt_hi": "0x678308",
+   "classes": 2
+  },
+  {
+   "unit": "DSP_Resample",
+   "vmt_lo": "0x678a30",
+   "vmt_hi": "0x678a30",
+   "classes": 1
+  },
+  {
+   "unit": "DSP_FFT",
+   "vmt_lo": "0x680318",
+   "vmt_hi": "0x680588",
+   "classes": 3
+  },
+  {
+   "unit": "DSP_FFTFilter",
+   "vmt_lo": "0x681ad8",
+   "vmt_hi": "0x681ad8",
+   "classes": 1
+  },
+  {
+   "unit": "il.WaveformCacheProcessor",
+   "vmt_lo": "0x683618",
+   "vmt_hi": "0x683e50",
+   "classes": 7
+  },
+  {
+   "unit": "WAV",
+   "vmt_lo": "0x68fe28",
+   "vmt_hi": "0x68ffc8",
+   "classes": 2
+  },
+  {
+   "unit": "SoundProcs",
+   "vmt_lo": "0x6a00f8",
+   "vmt_hi": "0x6a00f8",
+   "classes": 1
+  },
+  {
+   "unit": "Vcl.Imaging.pngimage",
+   "vmt_lo": "0x6a83a8",
+   "vmt_hi": "0x6ada28",
+   "classes": 33
+  },
+  {
+   "unit": "DIBmp",
+   "vmt_lo": "0x6b7fb0",
+   "vmt_hi": "0x6cbfd0",
+   "classes": 6
+  },
+  {
+   "unit": "Vcl.StdActns",
+   "vmt_lo": "0x6cf668",
+   "vmt_hi": "0x6d08b0",
+   "classes": 7
+  },
+  {
+   "unit": "Vcl.ComCtrls",
+   "vmt_lo": "0x6d1310",
+   "vmt_hi": "0x6d4018",
+   "classes": 5
+  },
+  {
+   "unit": "BmpLists",
+   "vmt_lo": "0x6d7760",
+   "vmt_hi": "0x6d7760",
+   "classes": 1
+  },
+  {
+   "unit": "QuickTimers",
+   "vmt_lo": "0x6d7bd8",
+   "vmt_hi": "0x6d8238",
+   "classes": 4
+  },
+  {
+   "unit": "Slider",
+   "vmt_lo": "0x6d9088",
+   "vmt_hi": "0x6d9398",
+   "classes": 2
+  },
+  {
+   "unit": "il.CustomShortcuts",
+   "vmt_lo": "0x6db580",
+   "vmt_hi": "0x6db6e8",
+   "classes": 2
+  },
+  {
+   "unit": "Vcl.Buttons",
+   "vmt_lo": "0x6e3ec0",
+   "vmt_hi": "0x6e7068",
+   "classes": 5
+  },
+  {
+   "unit": "QuickScroller",
+   "vmt_lo": "0x6eb208",
+   "vmt_hi": "0x6ec360",
+   "classes": 3
+  },
+  {
+   "unit": "Numb",
+   "vmt_lo": "0x6f2ba8",
+   "vmt_hi": "0x6f2ba8",
+   "classes": 1
+  },
+  {
+   "unit": "GlassForm",
+   "vmt_lo": "0x6f3358",
+   "vmt_hi": "0x6f3358",
+   "classes": 1
+  },
+  {
+   "unit": "Vcl.AxCtrls",
+   "vmt_lo": "0x6f39e8",
+   "vmt_hi": "0x6f47e0",
+   "classes": 6
+  },
+  {
+   "unit": "DragDropFormats",
+   "vmt_lo": "0x6f6c90",
+   "vmt_hi": "0x6fa360",
+   "classes": 18
+  },
+  {
+   "unit": "DropTarget",
+   "vmt_lo": "0x6fd1e8",
+   "vmt_hi": "0x7007d8",
+   "classes": 5
+  },
+  {
+   "unit": "DragDrop",
+   "vmt_lo": "0x7025f0",
+   "vmt_hi": "0x704f98",
+   "classes": 10
+  },
+  {
+   "unit": "DropSource",
+   "vmt_lo": "0x708bb8",
+   "vmt_hi": "0x70c318",
+   "classes": 5
+  },
+  {
+   "unit": "DragDropText",
+   "vmt_lo": "0x70d0a8",
+   "vmt_hi": "0x70e588",
+   "classes": 9
+  },
+  {
+   "unit": "DragDropPIDL",
+   "vmt_lo": "0x70fa48",
+   "vmt_hi": "0x711410",
+   "classes": 4
+  },
+  {
+   "unit": "DragDropFile",
+   "vmt_lo": "0x7122e0",
+   "vmt_hi": "0x71b8b0",
+   "classes": 21
+  },
+  {
+   "unit": "ThreadedLayeredControl",
+   "vmt_lo": "0x71d340",
+   "vmt_hi": "0x71d8e0",
+   "classes": 4
+  },
+  {
+   "unit": "LayeredForms",
+   "vmt_lo": "0x71ef08",
+   "vmt_hi": "0x71f3c8",
+   "classes": 2
+  },
+  {
+   "unit": "DragThumb",
+   "vmt_lo": "0x721128",
+   "vmt_hi": "0x721128",
+   "classes": 1
+  },
+  {
+   "unit": "DropSourceEx",
+   "vmt_lo": "0x7229d8",
+   "vmt_hi": "0x722c78",
+   "classes": 2
+  },
+  {
+   "unit": "NewMenu",
+   "vmt_lo": "0x723578",
+   "vmt_hi": "0x723578",
+   "classes": 1
+  },
+  {
+   "unit": "QuickPopup",
+   "vmt_lo": "0x7255a8",
+   "vmt_hi": "0x726990",
+   "classes": 6
+  },
+  {
+   "unit": "MyTransBtn",
+   "vmt_lo": "0x733ed8",
+   "vmt_hi": "0x736e28",
+   "classes": 10
+  },
+  {
+   "unit": "BaseVectorForm",
+   "vmt_lo": "0x741980",
+   "vmt_hi": "0x741980",
+   "classes": 1
+  },
+  {
+   "unit": "LibXmlParserU",
+   "vmt_lo": "0x742380",
+   "vmt_hi": "0x745ce8",
+   "classes": 13
+  },
+  {
+   "unit": "il.XmlReader",
+   "vmt_lo": "0x74abd8",
+   "vmt_hi": "0x74b0e0",
+   "classes": 5
+  },
+  {
+   "unit": "FP_PathManager",
+   "vmt_lo": "0x74ffa8",
+   "vmt_hi": "0x750628",
+   "classes": 6
+  },
+  {
+   "unit": "PathManager",
+   "vmt_lo": "0x750f18",
+   "vmt_hi": "0x7512d8",
+   "classes": 4
+  },
+  {
+   "unit": "QuickTabSelector",
+   "vmt_lo": "0x7603a0",
+   "vmt_hi": "0x761b98",
+   "classes": 5
+  },
+  {
+   "unit": "QuickMemo",
+   "vmt_lo": "0x765678",
+   "vmt_hi": "0x7664d8",
+   "classes": 3
+  },
+  {
+   "unit": "QuickStringGrid",
+   "vmt_lo": "0x76c640",
+   "vmt_hi": "0x76ce30",
+   "classes": 2
+  },
+  {
+   "unit": "WAVScope",
+   "vmt_lo": "0x771048",
+   "vmt_hi": "0x771cb8",
+   "classes": 3
+  },
+  {
+   "unit": "QuickThemeHandler",
+   "vmt_lo": "0x777fd8",
+   "vmt_hi": "0x778258",
+   "classes": 3
+  },
+  {
+   "unit": "ThemeSupport",
+   "vmt_lo": "0x797808",
+   "vmt_hi": "0x797808",
+   "classes": 1
+  },
+  {
+   "unit": "CommonQuickControls2",
+   "vmt_lo": "0x798298",
+   "vmt_hi": "0x79a610",
+   "classes": 5
+  },
+  {
+   "unit": "FavOpenDialog",
+   "vmt_lo": "0x7a1738",
+   "vmt_hi": "0x7a28e8",
+   "classes": 4
+  },
+  {
+   "unit": "PaletteEditor",
+   "vmt_lo": "0x7a8d60",
+   "vmt_hi": "0x7a8d60",
+   "classes": 1
+  },
+  {
+   "unit": "FP_PlugClass",
+   "vmt_lo": "0x7b67d0",
+   "vmt_hi": "0x7b67d0",
+   "classes": 1
+  },
+  {
+   "unit": "NameEdit",
+   "vmt_lo": "0x7b6b18",
+   "vmt_hi": "0x7b6b18",
+   "classes": 1
+  },
+  {
+   "unit": "CommonQuickControls",
+   "vmt_lo": "0x7bddf8",
+   "vmt_hi": "0x7c6e60",
+   "classes": 21
+  },
+  {
+   "unit": "NewCaption",
+   "vmt_lo": "0x7fe500",
+   "vmt_hi": "0x7fe500",
+   "classes": 1
+  },
+  {
+   "unit": "WPControl",
+   "vmt_lo": "0x7ffdb0",
+   "vmt_hi": "0x803b30",
+   "classes": 10
+  },
+  {
+   "unit": "TouchTools",
+   "vmt_lo": "0x80e280",
+   "vmt_hi": "0x80e280",
+   "classes": 1
+  },
+  {
+   "unit": "QuickDispMetrics",
+   "vmt_lo": "0x80fb98",
+   "vmt_hi": "0x80fb98",
+   "classes": 1
+  },
+  {
+   "unit": "GenericAnim",
+   "vmt_lo": "0x8160f8",
+   "vmt_hi": "0x8164a8",
+   "classes": 3
+  },
+  {
+   "unit": "WinTools",
+   "vmt_lo": "0x818298",
+   "vmt_hi": "0x818450",
+   "classes": 2
+  },
+  {
+   "unit": "System.Win.TaskbarCore",
+   "vmt_lo": "0x81e168",
+   "vmt_hi": "0x81e168",
+   "classes": 1
+  },
+  {
+   "unit": "QuickControls",
+   "vmt_lo": "0x81e660",
+   "vmt_hi": "0x81f928",
+   "classes": 6
+  },
+  {
+   "unit": "Vcl.ExtCtrls",
+   "vmt_lo": "0x827858",
+   "vmt_hi": "0x82ac18",
+   "classes": 6
+  },
+  {
+   "unit": "Vcl.ImgList",
+   "vmt_lo": "0x8339b8",
+   "vmt_hi": "0x833d98",
+   "classes": 2
+  },
+  {
+   "unit": "Vcl.Menus",
+   "vmt_lo": "0x8381d8",
+   "vmt_hi": "0x844990",
+   "classes": 13
+  },
+  {
+   "unit": "System.HelpIntfs",
+   "vmt_lo": "0x846478",
+   "vmt_hi": "0x846b00",
+   "classes": 3
+  },
+  {
+   "unit": "Vcl.Forms",
+   "vmt_lo": "0x84c428",
+   "vmt_hi": "0x855940",
+   "classes": 10
+  },
+  {
+   "unit": "Vcl.Printers",
+   "vmt_lo": "0x86d3b8",
+   "vmt_hi": "0x86e1c8",
+   "classes": 4
+  },
+  {
+   "unit": "Vcl.Dialogs",
+   "vmt_lo": "0x86fe88",
+   "vmt_hi": "0x8820b8",
+   "classes": 29
+  },
+  {
+   "unit": "Compiler",
+   "vmt_lo": "0x883340",
+   "vmt_hi": "0x8838f0",
+   "classes": 6
+  },
+  {
+   "unit": "Zc_Ops",
+   "vmt_lo": "0x88c188",
+   "vmt_hi": "0x88eb78",
+   "classes": 17
+  },
+  {
+   "unit": "ZApplication",
+   "vmt_lo": "0x8ac2e8",
+   "vmt_hi": "0x8ac6d8",
+   "classes": 4
+  },
+  {
+   "unit": "ZLog",
+   "vmt_lo": "0x8b4518",
+   "vmt_hi": "0x8b4518",
+   "classes": 1
+  },
+  {
+   "unit": "uSymTab",
+   "vmt_lo": "0x8b4728",
+   "vmt_hi": "0x8b48a8",
+   "classes": 2
+  },
+  {
+   "unit": "ZClasses",
+   "vmt_lo": "0x8bcdc0",
+   "vmt_hi": "0x8c1530",
+   "classes": 23
+  },
+  {
+   "unit": "gnugettext",
+   "vmt_lo": "0x8d8958",
+   "vmt_hi": "0x8d9d80",
+   "classes": 17
+  },
+  {
+   "unit": "AudioPlugIntf",
+   "vmt_lo": "0x8eaab8",
+   "vmt_hi": "0x8eac10",
+   "classes": 2
+  },
+  {
+   "unit": "FP_TempoMap",
+   "vmt_lo": "0x8eae60",
+   "vmt_hi": "0x8eae60",
+   "classes": 1
+  },
+  {
+   "unit": "ApiHook",
+   "vmt_lo": "0x8eafd8",
+   "vmt_hi": "0x8eafd8",
+   "classes": 1
+  },
+  {
+   "unit": "AudioPlug",
+   "vmt_lo": "0x8eb8c8",
+   "vmt_hi": "0x8eca08",
+   "classes": 9
+  },
+  {
+   "unit": "Plugin.Info",
+   "vmt_lo": "0x8f1bd8",
+   "vmt_hi": "0x8f1d68",
+   "classes": 2
+  },
+  {
+   "unit": "Plugin.Formats",
+   "vmt_lo": "0x8fb6a0",
+   "vmt_hi": "0x8fb860",
+   "classes": 2
+  },
+  {
+   "unit": "AbcString",
+   "vmt_lo": "0x904f38",
+   "vmt_hi": "0x9051b0",
+   "classes": 2
+  },
+  {
+   "unit": "AppSettings",
+   "vmt_lo": "0x905c48",
+   "vmt_hi": "0x907250",
+   "classes": 13
+  },
+  {
+   "unit": "Plugin.SearchPaths",
+   "vmt_lo": "0x90b498",
+   "vmt_hi": "0x90d8d8",
+   "classes": 3
+  },
+  {
+   "unit": "Plugin.NFO",
+   "vmt_lo": "0x9104b0",
+   "vmt_hi": "0x9104b0",
+   "classes": 1
+  },
+  {
+   "unit": "Plugin.Locate",
+   "vmt_lo": "0x9149a8",
+   "vmt_hi": "0x9149a8",
+   "classes": 1
+  },
+  {
+   "unit": "DSP_Monitor",
+   "vmt_lo": "0x916e58",
+   "vmt_hi": "0x916e58",
+   "classes": 1
+  },
+  {
+   "unit": "Logging",
+   "vmt_lo": "0x917528",
+   "vmt_hi": "0x917958",
+   "classes": 4
+  },
+  {
+   "unit": "TestUnitIntf",
+   "vmt_lo": "0x9208b0",
+   "vmt_hi": "0x920a10",
+   "classes": 2
+  },
+  {
+   "unit": "il.EventLogger",
+   "vmt_lo": "0x920bd8",
+   "vmt_hi": "0x920ea8",
+   "classes": 3
+  },
+  {
+   "unit": "ILServerComms_Intf",
+   "vmt_lo": "0x927f68",
+   "vmt_hi": "0x928348",
+   "classes": 3
+  },
+  {
+   "unit": "DSP_Delay",
+   "vmt_lo": "0x928678",
+   "vmt_hi": "0x9287a0",
+   "classes": 2
+  },
+  {
+   "unit": "il.ActionList",
+   "vmt_lo": "0x928d18",
+   "vmt_hi": "0x928e98",
+   "classes": 2
+  },
+  {
+   "unit": "MixerInterface",
+   "vmt_lo": "0x92ecd8",
+   "vmt_hi": "0x92ecd8",
+   "classes": 1
+  },
+  {
+   "unit": "il.ThreadTools",
+   "vmt_lo": "0x92ee78",
+   "vmt_hi": "0x92f138",
+   "classes": 3
+  },
+  {
+   "unit": "il.StreamerAPI",
+   "vmt_lo": "0x92fbe8",
+   "vmt_hi": "0x92ff10",
+   "classes": 2
+  },
+  {
+   "unit": "il.DownloadManager",
+   "vmt_lo": "0x934e68",
+   "vmt_hi": "0x937200",
+   "classes": 3
+  },
+  {
+   "unit": "il.ReferencedObject",
+   "vmt_lo": "0x938ff8",
+   "vmt_hi": "0x1162758",
+   "classes": 8
+  },
+  {
+   "unit": "SmartPointers",
+   "vmt_lo": "0x9392a8",
+   "vmt_hi": "0x132e718",
+   "classes": 16
+  },
+  {
+   "unit": "il.BackgroundWorker",
+   "vmt_lo": "0x939688",
+   "vmt_hi": "0x93dbd8",
+   "classes": 6
+  },
+  {
+   "unit": "il.CopyOnWrite",
+   "vmt_lo": "0x9406a8",
+   "vmt_hi": "0x11625e0",
+   "classes": 3
+  },
+  {
+   "unit": "il.Signals",
+   "vmt_lo": "0x9407e8",
+   "vmt_hi": "0x943e30",
+   "classes": 4
+  },
+  {
+   "unit": "il.MsgSignal",
+   "vmt_lo": "0x940918",
+   "vmt_hi": "0x940b68",
+   "classes": 3
+  },
+  {
+   "unit": "CloudUploaderIntf",
+   "vmt_lo": "0x949658",
+   "vmt_hi": "0x9498f0",
+   "classes": 3
+  },
+  {
+   "unit": "il.LicenseIntf",
+   "vmt_lo": "0x94a620",
+   "vmt_hi": "0x94a620",
+   "classes": 1
+  },
+  {
+   "unit": "System.JSON",
+   "vmt_lo": "0x94ae50",
+   "vmt_hi": "0x94fbb0",
+   "classes": 17
+  },
+  {
+   "unit": "il.CloudMastering",
+   "vmt_lo": "0x95cdb8",
+   "vmt_hi": "0x95d368",
+   "classes": 4
+  },
+  {
+   "unit": "gui.RenderIntf",
+   "vmt_lo": "0x9629d8",
+   "vmt_hi": "0x962b60",
+   "classes": 2
+  },
+  {
+   "unit": "il.MsgBoxes",
+   "vmt_lo": "0x962dc0",
+   "vmt_hi": "0x962f08",
+   "classes": 2
+  },
+  {
+   "unit": "il.CloudStorage",
+   "vmt_lo": "0x9679b8",
+   "vmt_hi": "0x9680b0",
+   "classes": 6
+  },
+  {
+   "unit": "TempoMapIntf",
+   "vmt_lo": "0x975508",
+   "vmt_hi": "0x975508",
+   "classes": 1
+  },
+  {
+   "unit": "FL_Project_Intf",
+   "vmt_lo": "0x9756c8",
+   "vmt_hi": "0x9756c8",
+   "classes": 1
+  },
+  {
+   "unit": "FL_Core",
+   "vmt_lo": "0x975958",
+   "vmt_hi": "0x9764d8",
+   "classes": 8
+  },
+  {
+   "unit": "DSP_Declicking",
+   "vmt_lo": "0x9772a8",
+   "vmt_hi": "0x9772a8",
+   "classes": 1
+  },
+  {
+   "unit": "il.DeclickerPool",
+   "vmt_lo": "0x978b48",
+   "vmt_hi": "0x978b48",
+   "classes": 1
+  },
+  {
+   "unit": "LocalRenderer",
+   "vmt_lo": "0x980e68",
+   "vmt_hi": "0x980e68",
+   "classes": 1
+  },
+  {
+   "unit": "mt19937",
+   "vmt_lo": "0x981208",
+   "vmt_hi": "0x981208",
+   "classes": 1
+  },
+  {
+   "unit": "SideRouting",
+   "vmt_lo": "0x982748",
+   "vmt_hi": "0x982748",
+   "classes": 1
+  },
+  {
+   "unit": "DirWatch",
+   "vmt_lo": "0x983028",
+   "vmt_hi": "0x983028",
+   "classes": 1
+  },
+  {
+   "unit": "FL_DLLOpen",
+   "vmt_lo": "0x983b28",
+   "vmt_hi": "0x983cf8",
+   "classes": 2
+  },
+  {
+   "unit": "MIDIFileParser",
+   "vmt_lo": "0x983ee8",
+   "vmt_hi": "0x9851d8",
+   "classes": 16
+  },
+  {
+   "unit": "ZMInflt",
+   "vmt_lo": "0x98bef8",
+   "vmt_hi": "0x98bef8",
+   "classes": 1
+  },
+  {
+   "unit": "ZMXcpt",
+   "vmt_lo": "0x98f5a8",
+   "vmt_hi": "0x98fb58",
+   "classes": 2
+  },
+  {
+   "unit": "ZMDlg",
+   "vmt_lo": "0x990ca8",
+   "vmt_hi": "0x990ca8",
+   "classes": 1
+  },
+  {
+   "unit": "ZMCore",
+   "vmt_lo": "0x992ae0",
+   "vmt_hi": "0x9939d0",
+   "classes": 4
+  },
+  {
+   "unit": "ZMIRec",
+   "vmt_lo": "0x996300",
+   "vmt_hi": "0x996300",
+   "classes": 1
+  },
+  {
+   "unit": "ZMWorkFile",
+   "vmt_lo": "0x997b40",
+   "vmt_hi": "0x997b40",
+   "classes": 1
+  },
+  {
+   "unit": "ZMDrv",
+   "vmt_lo": "0x99aae8",
+   "vmt_hi": "0x99aae8",
+   "classes": 1
+  },
+  {
+   "unit": "ZMWZip",
+   "vmt_lo": "0x99bac0",
+   "vmt_hi": "0x99bac0",
+   "classes": 1
+  },
+  {
+   "unit": "ZMEOC",
+   "vmt_lo": "0x99ffd8",
+   "vmt_hi": "0x99ffd8",
+   "classes": 1
+  },
+  {
+   "unit": "ZMCentral",
+   "vmt_lo": "0x9a2738",
+   "vmt_hi": "0x9a32c8",
+   "classes": 2
+  },
+  {
+   "unit": "ZMHash",
+   "vmt_lo": "0x9a8360",
+   "vmt_hi": "0x9a8360",
+   "classes": 1
+  },
+  {
+   "unit": "ZMZipFile",
+   "vmt_lo": "0x9a8e88",
+   "vmt_hi": "0x9a9dd0",
+   "classes": 3
+  },
+  {
+   "unit": "ZMCenDir",
+   "vmt_lo": "0x9ac1f8",
+   "vmt_hi": "0x9ac490",
+   "classes": 2
+  },
+  {
+   "unit": "ZMLister",
+   "vmt_lo": "0x9adbb8",
+   "vmt_hi": "0x9adbb8",
+   "classes": 1
+  },
+  {
+   "unit": "ZMFileOpr",
+   "vmt_lo": "0x9afb78",
+   "vmt_hi": "0x9b00f0",
+   "classes": 2
+  },
+  {
+   "unit": "ZMModOpr",
+   "vmt_lo": "0x9b3a88",
+   "vmt_hi": "0x9b3a88",
+   "classes": 1
+  },
+  {
+   "unit": "ZMDllLoad",
+   "vmt_lo": "0x9b4488",
+   "vmt_hi": "0x9b4488",
+   "classes": 1
+  },
+  {
+   "unit": "ZMDllOpr",
+   "vmt_lo": "0x9b6278",
+   "vmt_hi": "0x9b6708",
+   "classes": 2
+  },
+  {
+   "unit": "ZipMstr",
+   "vmt_lo": "0x9bc098",
+   "vmt_hi": "0x9c3548",
+   "classes": 11
+  },
+  {
+   "unit": "FoldrDlg",
+   "vmt_lo": "0x9c9910",
+   "vmt_hi": "0x9c9910",
+   "classes": 1
+  },
+  {
+   "unit": "QuickDock",
+   "vmt_lo": "0x9c9d38",
+   "vmt_hi": "0x9cb748",
+   "classes": 5
+  },
+  {
+   "unit": "Instruments",
+   "vmt_lo": "0x9cf0d0",
+   "vmt_hi": "0x9cf0d0",
+   "classes": 1
+  },
+  {
+   "unit": "il.RSSReader",
+   "vmt_lo": "0x9cf4e8",
+   "vmt_hi": "0x9cfb38",
+   "classes": 5
+  },
+  {
+   "unit": "NewsDownloader",
+   "vmt_lo": "0x9d5400",
+   "vmt_hi": "0x9d6308",
+   "classes": 7
+  },
+  {
+   "unit": "FP_DelphiPlug",
+   "vmt_lo": "0x9dada8",
+   "vmt_hi": "0x9dada8",
+   "classes": 1
+  },
+  {
+   "unit": "FLPathManager",
+   "vmt_lo": "0x9db338",
+   "vmt_hi": "0x9db4d8",
+   "classes": 2
+  },
+  {
+   "unit": "Languages",
+   "vmt_lo": "0x9de388",
+   "vmt_hi": "0x9de388",
+   "classes": 1
+  },
+  {
+   "unit": "VTAccessibilityFactory",
+   "vmt_lo": "0x9dfa18",
+   "vmt_hi": "0x9dfa18",
+   "classes": 1
+  },
+  {
+   "unit": "VirtualTrees",
+   "vmt_lo": "0x9dfed8",
+   "vmt_hi": "0xa249b8",
+   "classes": 27
+  },
+  {
+   "unit": "QuickTree",
+   "vmt_lo": "0xa31318",
+   "vmt_hi": "0xa31318",
+   "classes": 1
+  },
+  {
+   "unit": "TagDatabase",
+   "vmt_lo": "0xa32458",
+   "vmt_hi": "0xa326e0",
+   "classes": 3
+  },
+  {
+   "unit": "DataBrowser.Intf",
+   "vmt_lo": "0xa40fc8",
+   "vmt_hi": "0xa42290",
+   "classes": 10
+  },
+  {
+   "unit": "DataBrowser.Controls.Tree",
+   "vmt_lo": "0xa46f98",
+   "vmt_hi": "0xa46f98",
+   "classes": 1
+  },
+  {
+   "unit": "DataBrowser.State",
+   "vmt_lo": "0xa48538",
+   "vmt_hi": "0xa48538",
+   "classes": 1
+  },
+  {
+   "unit": "DataBrowser.NodeState",
+   "vmt_lo": "0xa4c710",
+   "vmt_hi": "0xa4c710",
+   "classes": 1
+  },
+  {
+   "unit": "DataBrowser.Tabs",
+   "vmt_lo": "0xa514b0",
+   "vmt_hi": "0xa514b0",
+   "classes": 1
+  },
+  {
+   "unit": "DataBrowser.Controls.TabSelector",
+   "vmt_lo": "0xa52628",
+   "vmt_hi": "0xa52cf0",
+   "classes": 3
+  },
+  {
+   "unit": "DataBrowser.Controls.TagsGrid",
+   "vmt_lo": "0xa55868",
+   "vmt_hi": "0xa55868",
+   "classes": 1
+  },
+  {
+   "unit": "WavPackDLL",
+   "vmt_lo": "0xa578f8",
+   "vmt_hi": "0xa57b68",
+   "classes": 3
+  },
+  {
+   "unit": "ID3v2_Ext",
+   "vmt_lo": "0xa59b48",
+   "vmt_hi": "0xa59b48",
+   "classes": 1
+  },
+  {
+   "unit": "ID3v1",
+   "vmt_lo": "0xa5cc20",
+   "vmt_hi": "0xa5cc20",
+   "classes": 1
+  },
+  {
+   "unit": "SmpLoader_Ffmpeg",
+   "vmt_lo": "0xa61690",
+   "vmt_hi": "0xa61820",
+   "classes": 2
+  },
+  {
+   "unit": "DataBrowser.SampleLoader",
+   "vmt_lo": "0xa66578",
+   "vmt_hi": "0xa66578",
+   "classes": 1
+  },
+  {
+   "unit": "DataBrowser.Filter",
+   "vmt_lo": "0xa69cf0",
+   "vmt_hi": "0xa69fd8",
+   "classes": 3
+  },
+  {
+   "unit": "DataBrowser.NodeHelper",
+   "vmt_lo": "0xa6b378",
+   "vmt_hi": "0xa6b378",
+   "classes": 1
+  },
+  {
+   "unit": "DataBrowser.View",
+   "vmt_lo": "0xa6bfd8",
+   "vmt_hi": "0xa6c2d8",
+   "classes": 3
+  },
+  {
+   "unit": "DataBrowser",
+   "vmt_lo": "0xa6d638",
+   "vmt_hi": "0xa6d638",
+   "classes": 1
+  },
+  {
+   "unit": "DSP_BeatDetection",
+   "vmt_lo": "0xa95f68",
+   "vmt_hi": "0xa95f68",
+   "classes": 1
+  },
+  {
+   "unit": "DSP_Stretching",
+   "vmt_lo": "0xa97258",
+   "vmt_hi": "0xa97258",
+   "classes": 1
+  },
+  {
+   "unit": "DSP_Reverb",
+   "vmt_lo": "0xa98f78",
+   "vmt_hi": "0xa99098",
+   "classes": 2
+  },
+  {
+   "unit": "il.ChannelSample",
+   "vmt_lo": "0xa99ef8",
+   "vmt_hi": "0xa99ef8",
+   "classes": 1
+  },
+  {
+   "unit": "FileTools",
+   "vmt_lo": "0xa9da68",
+   "vmt_hi": "0xa9de60",
+   "classes": 4
+  },
+  {
+   "unit": "Wrapper.Settings",
+   "vmt_lo": "0xa9ef68",
+   "vmt_hi": "0xa9ef68",
+   "classes": 1
+  },
+  {
+   "unit": "PluginAdapter",
+   "vmt_lo": "0xa9fe18",
+   "vmt_hi": "0xa9ff60",
+   "classes": 2
+  },
+  {
+   "unit": "FlpLoad",
+   "vmt_lo": "0xaa54c8",
+   "vmt_hi": "0xaa54c8",
+   "classes": 1
+  },
+  {
+   "unit": "Vst3Base",
+   "vmt_lo": "0xaadae8",
+   "vmt_hi": "0xab1e48",
+   "classes": 19
+  },
+  {
+   "unit": "Plugin.List",
+   "vmt_lo": "0xab2ca8",
+   "vmt_hi": "0xab2ca8",
+   "classes": 1
+  },
+  {
+   "unit": "Plugin.Formats.FL",
+   "vmt_lo": "0xabe898",
+   "vmt_hi": "0xabe898",
+   "classes": 1
+  },
+  {
+   "unit": "VstPresetFile",
+   "vmt_lo": "0xac0e38",
+   "vmt_hi": "0xac0f88",
+   "classes": 2
+  },
+  {
+   "unit": "VSTPlug",
+   "vmt_lo": "0xac2708",
+   "vmt_hi": "0xac4218",
+   "classes": 5
+  },
+  {
+   "unit": "Plugin.Formats.VST",
+   "vmt_lo": "0xacf418",
+   "vmt_hi": "0xacf418",
+   "classes": 1
+  },
+  {
+   "unit": "VST3_IPSLHostCommands",
+   "vmt_lo": "0xad07e8",
+   "vmt_hi": "0xad0a48",
+   "classes": 2
+  },
+  {
+   "unit": "VST3_IPSLContextInfo",
+   "vmt_lo": "0xad0d78",
+   "vmt_hi": "0xad0fd0",
+   "classes": 2
+  },
+  {
+   "unit": "il.VST3Extensions",
+   "vmt_lo": "0xad1338",
+   "vmt_hi": "0xad1760",
+   "classes": 4
+  },
+  {
+   "unit": "Data.FmtBcd",
+   "vmt_lo": "0xad1d80",
+   "vmt_hi": "0xad4810",
+   "classes": 4
+  },
+  {
+   "unit": "Data.SqlTimSt",
+   "vmt_lo": "0xad5a80",
+   "vmt_hi": "0xad6a88",
+   "classes": 4
+  },
+  {
+   "unit": "System.JSON.Types",
+   "vmt_lo": "0xada4d0",
+   "vmt_hi": "0xadadd8",
+   "classes": 3
+  },
+  {
+   "unit": "System.NetEncoding",
+   "vmt_lo": "0xadf028",
+   "vmt_hi": "0xae0188",
+   "classes": 5
+  },
+  {
+   "unit": "System.JSON.Readers",
+   "vmt_lo": "0xae3358",
+   "vmt_hi": "0xae43d0",
+   "classes": 4
+  },
+  {
+   "unit": "System.JSON.Writers",
+   "vmt_lo": "0xaec678",
+   "vmt_hi": "0xaed8a0",
+   "classes": 2
+  },
+  {
+   "unit": "Data.DBXClassRegistry",
+   "vmt_lo": "0xaef448",
+   "vmt_hi": "0xaef448",
+   "classes": 1
+  },
+  {
+   "unit": "Data.DSUtil",
+   "vmt_lo": "0xaef730",
+   "vmt_hi": "0xaef868",
+   "classes": 2
+  },
+  {
+   "unit": "Data.DBXCommon",
+   "vmt_lo": "0xaf1350",
+   "vmt_hi": "0xb22948",
+   "classes": 66
+  },
+  {
+   "unit": "Data.DBXJSON",
+   "vmt_lo": "0xb42188",
+   "vmt_hi": "0xb42530",
+   "classes": 2
+  },
+  {
+   "unit": "VST3Plug",
+   "vmt_lo": "0xb42ac8",
+   "vmt_hi": "0xb47a38",
+   "classes": 28
+  },
+  {
+   "unit": "Vst3ModuleInfo",
+   "vmt_lo": "0xb5c250",
+   "vmt_hi": "0xb5c538",
+   "classes": 2
+  },
+  {
+   "unit": "Plugin.Formats.VST3",
+   "vmt_lo": "0xb63388",
+   "vmt_hi": "0xb63550",
+   "classes": 2
+  },
+  {
+   "unit": "GenericPlug",
+   "vmt_lo": "0xb655c8",
+   "vmt_hi": "0xb65e50",
+   "classes": 4
+  },
+  {
+   "unit": "Plugin.Formats.Generic",
+   "vmt_lo": "0xb68ea8",
+   "vmt_hi": "0xb68ea8",
+   "classes": 1
+  },
+  {
+   "unit": "CLAPPlug",
+   "vmt_lo": "0xb6a118",
+   "vmt_hi": "0xb6ac08",
+   "classes": 4
+  },
+  {
+   "unit": "Plugin.Formats.CLAP",
+   "vmt_lo": "0xb72360",
+   "vmt_hi": "0xb72360",
+   "classes": 1
+  },
+  {
+   "unit": "Plugin.Scanner",
+   "vmt_lo": "0xb785d8",
+   "vmt_hi": "0xb7a978",
+   "classes": 3
+  },
+  {
+   "unit": "BrowserCache",
+   "vmt_lo": "0xb7f9a8",
+   "vmt_hi": "0xb8a270",
+   "classes": 7
+  },
+  {
+   "unit": "Info",
+   "vmt_lo": "0xb94888",
+   "vmt_hi": "0xb94888",
+   "classes": 1
+  },
+  {
+   "unit": "TS404",
+   "vmt_lo": "0xb95728",
+   "vmt_hi": "0xb95728",
+   "classes": 1
+  },
+  {
+   "unit": "DSP_MEnvelope",
+   "vmt_lo": "0xb97320",
+   "vmt_hi": "0xb979e8",
+   "classes": 5
+  },
+  {
+   "unit": "Miditype",
+   "vmt_lo": "0xba1a58",
+   "vmt_hi": "0xba1a58",
+   "classes": 1
+  },
+  {
+   "unit": "MIDIIn",
+   "vmt_lo": "0xba1d68",
+   "vmt_hi": "0xba1f88",
+   "classes": 2
+  },
+  {
+   "unit": "MidiOut",
+   "vmt_lo": "0xba3340",
+   "vmt_hi": "0xba3680",
+   "classes": 2
+  },
+  {
+   "unit": "oObjects",
+   "vmt_lo": "0xba66f8",
+   "vmt_hi": "0xba6ba8",
+   "classes": 3
+  },
+  {
+   "unit": "ParseClass",
+   "vmt_lo": "0xba74c0",
+   "vmt_hi": "0xba9348",
+   "classes": 15
+  },
+  {
+   "unit": "ParseExpr",
+   "vmt_lo": "0xbaa978",
+   "vmt_hi": "0xbaa978",
+   "classes": 1
+  },
+  {
+   "unit": "SyncThread",
+   "vmt_lo": "0xbb0268",
+   "vmt_hi": "0xbb03a8",
+   "classes": 2
+  },
+  {
+   "unit": "PlugItem",
+   "vmt_lo": "0xbb1698",
+   "vmt_hi": "0xbb1698",
+   "classes": 1
+  },
+  {
+   "unit": "MusicControls",
+   "vmt_lo": "0xbb1c98",
+   "vmt_hi": "0xbb38b8",
+   "classes": 8
+  },
+  {
+   "unit": "QuickEditToolBar",
+   "vmt_lo": "0xbba928",
+   "vmt_hi": "0xbbbcd0",
+   "classes": 6
+  },
+  {
+   "unit": "gui.InfoLabel",
+   "vmt_lo": "0xbcf2b8",
+   "vmt_hi": "0xbcf2b8",
+   "classes": 1
+  },
+  {
+   "unit": "FLHintBar",
+   "vmt_lo": "0xbd0c68",
+   "vmt_hi": "0xbd0c68",
+   "classes": 1
+  },
+  {
+   "unit": "PRQuantize",
+   "vmt_lo": "0xbd2ed8",
+   "vmt_hi": "0xbd2ed8",
+   "classes": 1
+  },
+  {
+   "unit": "ParamCtrl",
+   "vmt_lo": "0xbd5078",
+   "vmt_hi": "0xbd5078",
+   "classes": 1
+  },
+  {
+   "unit": "Vcl.Edge",
+   "vmt_lo": "0xbd9e20",
+   "vmt_hi": "0xbde108",
+   "classes": 9
+  },
+  {
+   "unit": "Vcl.OleCtrls",
+   "vmt_lo": "0xbec908",
+   "vmt_hi": "0xbed888",
+   "classes": 3
+  },
+  {
+   "unit": "System.Win.ObjComAuto",
+   "vmt_lo": "0xbf42c8",
+   "vmt_hi": "0xbf42c8",
+   "classes": 1
+  },
+  {
+   "unit": "QuickWebBrowser",
+   "vmt_lo": "0xbf57b0",
+   "vmt_hi": "0xbf57b0",
+   "classes": 1
+  },
+  {
+   "unit": "FLBrowser",
+   "vmt_lo": "0xbf75c8",
+   "vmt_hi": "0xbf75c8",
+   "classes": 1
+  },
+  {
+   "unit": "ILServerComms_Impl",
+   "vmt_lo": "0xbf8f08",
+   "vmt_hi": "0xbf8f08",
+   "classes": 1
+  },
+  {
+   "unit": "IdException",
+   "vmt_lo": "0xc04bc8",
+   "vmt_hi": "0xc05030",
+   "classes": 4
+  },
+  {
+   "unit": "IdGlobal",
+   "vmt_lo": "0xc055d8",
+   "vmt_hi": "0xc05718",
+   "classes": 2
+  },
+  {
+   "unit": "IdWinsock2",
+   "vmt_lo": "0xc07718",
+   "vmt_hi": "0xc07718",
+   "classes": 1
+  },
+  {
+   "unit": "IdStackBSDBase",
+   "vmt_lo": "0xc15178",
+   "vmt_hi": "0xc16510",
+   "classes": 4
+  },
+  {
+   "unit": "IdStackWindows",
+   "vmt_lo": "0xc17708",
+   "vmt_hi": "0xc17c70",
+   "classes": 2
+  },
+  {
+   "unit": "IdStack",
+   "vmt_lo": "0xc1c970",
+   "vmt_hi": "0xc1e608",
+   "classes": 11
+  },
+  {
+   "unit": "InAppModule",
+   "vmt_lo": "0xc21fa0",
+   "vmt_hi": "0xc21fa0",
+   "classes": 1
+  },
+  {
+   "unit": "gui.MsgBoxes",
+   "vmt_lo": "0xc24418",
+   "vmt_hi": "0xc28cf8",
+   "classes": 3
+  },
+  {
+   "unit": "Notifications",
+   "vmt_lo": "0xc2c658",
+   "vmt_hi": "0xc2c658",
+   "classes": 1
+  },
+  {
+   "unit": "gui.InAppShop",
+   "vmt_lo": "0xc2f8b8",
+   "vmt_hi": "0xc2f8b8",
+   "classes": 1
+  },
+  {
+   "unit": "il.Python",
+   "vmt_lo": "0xc36180",
+   "vmt_hi": "0xc36180",
+   "classes": 1
+  },
+  {
+   "unit": "PRScriptAPI",
+   "vmt_lo": "0xc3e838",
+   "vmt_hi": "0xc3e838",
+   "classes": 1
+  },
+  {
+   "unit": "CloudAccounts",
+   "vmt_lo": "0xc44568",
+   "vmt_hi": "0xc44568",
+   "classes": 1
+  },
+  {
+   "unit": "OAuth2",
+   "vmt_lo": "0xc46798",
+   "vmt_hi": "0xc46ac0",
+   "classes": 3
+  },
+  {
+   "unit": "il.DoubleBufferedList",
+   "vmt_lo": "0xc49d38",
+   "vmt_hi": "0xd111e0",
+   "classes": 6
+  },
+  {
+   "unit": "Mixer.Rendering",
+   "vmt_lo": "0xc4aa28",
+   "vmt_hi": "0xc4ab98",
+   "classes": 2
+  },
+  {
+   "unit": "RenderDWP",
+   "vmt_lo": "0xc4be50",
+   "vmt_hi": "0xc4c9e0",
+   "classes": 2
+  },
+  {
+   "unit": "Asio",
+   "vmt_lo": "0xc53330",
+   "vmt_hi": "0xc53330",
+   "classes": 1
+  },
+  {
+   "unit": "Output_Asio",
+   "vmt_lo": "0xc54d48",
+   "vmt_hi": "0xc54d48",
+   "classes": 1
+  },
+  {
+   "unit": "AutomationDelay",
+   "vmt_lo": "0xc5e568",
+   "vmt_hi": "0xc5e568",
+   "classes": 1
+  },
+  {
+   "unit": "jpeg",
+   "vmt_lo": "0xc63988",
+   "vmt_hi": "0xc63988",
+   "classes": 1
+  },
+  {
+   "unit": "DSP_Lookahead",
+   "vmt_lo": "0xc644e8",
+   "vmt_hi": "0xc64628",
+   "classes": 2
+  },
+  {
+   "unit": "DSP_DrumStretching",
+   "vmt_lo": "0xc64d08",
+   "vmt_hi": "0xc64d08",
+   "classes": 1
+  },
+  {
+   "unit": "DSP_TempoDetection2",
+   "vmt_lo": "0xc676c8",
+   "vmt_hi": "0xc676c8",
+   "classes": 1
+  },
+  {
+   "unit": "DSP_TempoDetection3",
+   "vmt_lo": "0xc68028",
+   "vmt_hi": "0xc68028",
+   "classes": 1
+  },
+  {
+   "unit": "DSP_SpectralPrint",
+   "vmt_lo": "0xc69508",
+   "vmt_hi": "0xc69508",
+   "classes": 1
+  },
+  {
+   "unit": "DSP_PitchDetection",
+   "vmt_lo": "0xc69e78",
+   "vmt_hi": "0xc69e78",
+   "classes": 1
+  },
+  {
+   "unit": "MEBaseModal",
+   "vmt_lo": "0xc6a6b8",
+   "vmt_hi": "0xc6a6b8",
+   "classes": 1
+  },
+  {
+   "unit": "MERes",
+   "vmt_lo": "0xc6afb8",
+   "vmt_hi": "0xc6afb8",
+   "classes": 1
+  },
+  {
+   "unit": "MEWAVProp",
+   "vmt_lo": "0xc6b1c8",
+   "vmt_hi": "0xc6b1c8",
+   "classes": 1
+  },
+  {
+   "unit": "MELoopTool",
+   "vmt_lo": "0xc6d6d8",
+   "vmt_hi": "0xc6d6d8",
+   "classes": 1
+  },
+  {
+   "unit": "MEBlurTool",
+   "vmt_lo": "0xc6f6c8",
+   "vmt_hi": "0xc6f6c8",
+   "classes": 1
+  },
+  {
+   "unit": "MEAmpTool",
+   "vmt_lo": "0xc709d8",
+   "vmt_hi": "0xc709d8",
+   "classes": 1
+  },
+  {
+   "unit": "MEArpTool",
+   "vmt_lo": "0xc71b58",
+   "vmt_hi": "0xc71b58",
+   "classes": 1
+  },
+  {
+   "unit": "MEScaleTool",
+   "vmt_lo": "0xc74948",
+   "vmt_hi": "0xc74948",
+   "classes": 1
+  },
+  {
+   "unit": "MEDecimateTool",
+   "vmt_lo": "0xc75858",
+   "vmt_hi": "0xc75858",
+   "classes": 1
+  },
+  {
+   "unit": "MESmoothTool",
+   "vmt_lo": "0xc76258",
+   "vmt_hi": "0xc76258",
+   "classes": 1
+  },
+  {
+   "unit": "MEEnvFilterTool",
+   "vmt_lo": "0xc77208",
+   "vmt_hi": "0xc77208",
+   "classes": 1
+  },
+  {
+   "unit": "MEStretchTool",
+   "vmt_lo": "0xc78208",
+   "vmt_hi": "0xc78208",
+   "classes": 1
+  },
+  {
+   "unit": "MEClawTool",
+   "vmt_lo": "0xc7aaa8",
+   "vmt_hi": "0xc7aaa8",
+   "classes": 1
+  },
+  {
+   "unit": "MEDrumStretchTool",
+   "vmt_lo": "0xc7c458",
+   "vmt_hi": "0xc7c458",
+   "classes": 1
+  },
+  {
+   "unit": "MEReverbTool",
+   "vmt_lo": "0xc7e638",
+   "vmt_hi": "0xc7e638",
+   "classes": 1
+  },
+  {
+   "unit": "MEEQTool",
+   "vmt_lo": "0xc7f9a8",
+   "vmt_hi": "0xc80108",
+   "classes": 2
+  },
+  {
+   "unit": "IPC.CrossPlatform",
+   "vmt_lo": "0xc83478",
+   "vmt_hi": "0xc835b8",
+   "classes": 2
+  },
+  {
+   "unit": "IPC",
+   "vmt_lo": "0xc83cf8",
+   "vmt_hi": "0xc846e0",
+   "classes": 8
+  },
+  {
+   "unit": "IPC.Bridge",
+   "vmt_lo": "0xc86018",
+   "vmt_hi": "0xc86f18",
+   "classes": 12
+  },
+  {
+   "unit": "Wrapper.Panel",
+   "vmt_lo": "0xc971a0",
+   "vmt_hi": "0xc971a0",
+   "classes": 1
+  },
+  {
+   "unit": "BridgedEditor",
+   "vmt_lo": "0xc97608",
+   "vmt_hi": "0xc97608",
+   "classes": 1
+  },
+  {
+   "unit": "Wrapper.Bridge",
+   "vmt_lo": "0xc97ba8",
+   "vmt_hi": "0xc97fb0",
+   "classes": 4
+  },
+  {
+   "unit": "ILBridgeIntf",
+   "vmt_lo": "0xc9a038",
+   "vmt_hi": "0xc9a038",
+   "classes": 1
+  },
+  {
+   "unit": "BridgedPlug",
+   "vmt_lo": "0xc9d100",
+   "vmt_hi": "0xc9d290",
+   "classes": 2
+  },
+  {
+   "unit": "MEDenoiseTool",
+   "vmt_lo": "0xca1348",
+   "vmt_hi": "0xca1af0",
+   "classes": 3
+  },
+  {
+   "unit": "MEOggOptions",
+   "vmt_lo": "0xcabf68",
+   "vmt_hi": "0xcabf68",
+   "classes": 1
+  },
+  {
+   "unit": "MEMP3Options",
+   "vmt_lo": "0xcacf28",
+   "vmt_hi": "0xcacf28",
+   "classes": 1
+  },
+  {
+   "unit": "MEVocalDenoise",
+   "vmt_lo": "0xcaf758",
+   "vmt_hi": "0xcafe88",
+   "classes": 2
+  },
+  {
+   "unit": "gui.Deverb",
+   "vmt_lo": "0xcb0d98",
+   "vmt_hi": "0xcb0d98",
+   "classes": 1
+  },
+  {
+   "unit": "MEnvEditorFrame",
+   "vmt_lo": "0xcb3718",
+   "vmt_hi": "0xcb7220",
+   "classes": 4
+  },
+  {
+   "unit": "ExceptionAction",
+   "vmt_lo": "0xceab48",
+   "vmt_hi": "0xceab48",
+   "classes": 1
+  },
+  {
+   "unit": "PlugPerfMon",
+   "vmt_lo": "0xceaf48",
+   "vmt_hi": "0xceb1b0",
+   "classes": 3
+  },
+  {
+   "unit": "Mixer.Modules",
+   "vmt_lo": "0xcf2488",
+   "vmt_hi": "0xcf2830",
+   "classes": 4
+  },
+  {
+   "unit": "gui.FadeEditorHelper",
+   "vmt_lo": "0xcf47a8",
+   "vmt_hi": "0xcfe0e8",
+   "classes": 5
+  },
+  {
+   "unit": "RenderWAV",
+   "vmt_lo": "0xd12eb0",
+   "vmt_hi": "0xd147f0",
+   "classes": 2
+  },
+  {
+   "unit": "Mixer.Voices",
+   "vmt_lo": "0xd1fda8",
+   "vmt_hi": "0xd212e8",
+   "classes": 13
+  },
+  {
+   "unit": "ChordProgressionScript",
+   "vmt_lo": "0xd2de28",
+   "vmt_hi": "0xd2e2c8",
+   "classes": 4
+  },
+  {
+   "unit": "SongStarterScript",
+   "vmt_lo": "0xd335d0",
+   "vmt_hi": "0xd335d0",
+   "classes": 1
+  },
+  {
+   "unit": "il.DownloadPaths",
+   "vmt_lo": "0xd367c0",
+   "vmt_hi": "0xd367c0",
+   "classes": 1
+  },
+  {
+   "unit": "job.DownloadFLCSample",
+   "vmt_lo": "0xd3b638",
+   "vmt_hi": "0xd3b638",
+   "classes": 1
+  },
+  {
+   "unit": "DataBrowser.View.Plugin",
+   "vmt_lo": "0xd3d418",
+   "vmt_hi": "0xd3d418",
+   "classes": 1
+  },
+  {
+   "unit": "DataBrowser.View.Lib",
+   "vmt_lo": "0xd3f048",
+   "vmt_hi": "0xd3f048",
+   "classes": 1
+  },
+  {
+   "unit": "DataBrowser.View.Sample",
+   "vmt_lo": "0xd44448",
+   "vmt_hi": "0xd44448",
+   "classes": 1
+  },
+  {
+   "unit": "Browser.View.Downloads",
+   "vmt_lo": "0xd478a8",
+   "vmt_hi": "0xd47c78",
+   "classes": 4
+  },
+  {
+   "unit": "DataBrowser.View.News",
+   "vmt_lo": "0xd4b708",
+   "vmt_hi": "0xd4b708",
+   "classes": 1
+  },
+  {
+   "unit": "DataBrowser.View.Notifications",
+   "vmt_lo": "0xd4d528",
+   "vmt_hi": "0xd4d528",
+   "classes": 1
+  },
+  {
+   "unit": "DataBrowser.View.Help",
+   "vmt_lo": "0xd4f4f8",
+   "vmt_hi": "0xd4f4f8",
+   "classes": 1
+  },
+  {
+   "unit": "MIDIScreenDevice",
+   "vmt_lo": "0xd51fe8",
+   "vmt_hi": "0xd51fe8",
+   "classes": 1
+  },
+  {
+   "unit": "PyForm",
+   "vmt_lo": "0xd53128",
+   "vmt_hi": "0xd53548",
+   "classes": 2
+  },
+  {
+   "unit": "MIDIDevice_ILRemote",
+   "vmt_lo": "0xd70060",
+   "vmt_hi": "0xd70370",
+   "classes": 2
+  },
+  {
+   "unit": "PyModule_Screen",
+   "vmt_lo": "0xd7a8b0",
+   "vmt_hi": "0xd7a8b0",
+   "classes": 1
+  },
+  {
+   "unit": "PyModule_Plugin",
+   "vmt_lo": "0xd7ede8",
+   "vmt_hi": "0xd7ede8",
+   "classes": 1
+  },
+  {
+   "unit": "MIDIDevice_Python",
+   "vmt_lo": "0xd81850",
+   "vmt_hi": "0xd82ba8",
+   "classes": 7
+  },
+  {
+   "unit": "FLScript",
+   "vmt_lo": "0xd87e68",
+   "vmt_hi": "0xd87e68",
+   "classes": 1
+  },
+  {
+   "unit": "Tutorials",
+   "vmt_lo": "0xd87fc8",
+   "vmt_hi": "0xd8a360",
+   "classes": 2
+  },
+  {
+   "unit": "FP_Forwarder",
+   "vmt_lo": "0xd8bf08",
+   "vmt_hi": "0xd8c020",
+   "classes": 2
+  },
+  {
+   "unit": "il.PyDialogPanel",
+   "vmt_lo": "0xd8d3e8",
+   "vmt_hi": "0xd90b50",
+   "classes": 8
+  },
+  {
+   "unit": "PRScript",
+   "vmt_lo": "0xd98ba8",
+   "vmt_hi": "0xd99250",
+   "classes": 2
+  },
+  {
+   "unit": "MCPServer",
+   "vmt_lo": "0xd9bfe8",
+   "vmt_hi": "0xd9c1e8",
+   "classes": 2
+  },
+  {
+   "unit": "DataBrowser.View.Gopher",
+   "vmt_lo": "0xd9d908",
+   "vmt_hi": "0xd9dad8",
+   "classes": 2
+  },
+  {
+   "unit": "BasePluginsMsgDlg",
+   "vmt_lo": "0xd9f5b0",
+   "vmt_hi": "0xd9f5b0",
+   "classes": 1
+  },
+  {
+   "unit": "MissingPluginsDlg",
+   "vmt_lo": "0xda0b48",
+   "vmt_hi": "0xda0b48",
+   "classes": 1
+  },
+  {
+   "unit": "Browser.View.Cloud",
+   "vmt_lo": "0xda56a0",
+   "vmt_hi": "0xda60d8",
+   "classes": 3
+  },
+  {
+   "unit": "job.DownloadLoopStarterSample",
+   "vmt_lo": "0xdb34e8",
+   "vmt_hi": "0xdb34e8",
+   "classes": 1
+  },
+  {
+   "unit": "job.SendLoopStarterCreditReport",
+   "vmt_lo": "0xdb9178",
+   "vmt_hi": "0xdb9178",
+   "classes": 1
+  },
+  {
+   "unit": "SongStarter",
+   "vmt_lo": "0xdb94c0",
+   "vmt_hi": "0xdb9910",
+   "classes": 4
+  },
+  {
+   "unit": "ToolbarModule",
+   "vmt_lo": "0xdc66a8",
+   "vmt_hi": "0xdc66a8",
+   "classes": 1
+  },
+  {
+   "unit": "PRScoreCreator",
+   "vmt_lo": "0xdd00c8",
+   "vmt_hi": "0xdd00c8",
+   "classes": 1
+  },
+  {
+   "unit": "PRBaseTool",
+   "vmt_lo": "0xdd1b38",
+   "vmt_hi": "0xdd1b38",
+   "classes": 1
+  },
+  {
+   "unit": "PRLegato",
+   "vmt_lo": "0xdd2768",
+   "vmt_hi": "0xdd2768",
+   "classes": 1
+  },
+  {
+   "unit": "DeferredLoad",
+   "vmt_lo": "0xdd42d8",
+   "vmt_hi": "0xdd42d8",
+   "classes": 1
+  },
+  {
+   "unit": "PLMEnv",
+   "vmt_lo": "0xdd50c8",
+   "vmt_hi": "0xdd50c8",
+   "classes": 1
+  },
+  {
+   "unit": "gui.EventDraw",
+   "vmt_lo": "0xddb888",
+   "vmt_hi": "0xddbad0",
+   "classes": 2
+  },
+  {
+   "unit": "gui.NoteList",
+   "vmt_lo": "0xde3cb0",
+   "vmt_hi": "0xde3cb0",
+   "classes": 1
+  },
+  {
+   "unit": "PRNoteProp",
+   "vmt_lo": "0xde4998",
+   "vmt_hi": "0xde4998",
+   "classes": 1
+  },
+  {
+   "unit": "MIDIImport",
+   "vmt_lo": "0xde7128",
+   "vmt_hi": "0xde7128",
+   "classes": 1
+  },
+  {
+   "unit": "PRLFO",
+   "vmt_lo": "0xde78c8",
+   "vmt_hi": "0xde78c8",
+   "classes": 1
+  },
+  {
+   "unit": "PRSlicing",
+   "vmt_lo": "0xde9518",
+   "vmt_hi": "0xde9518",
+   "classes": 1
+  },
+  {
+   "unit": "PRFlam",
+   "vmt_lo": "0xdeb338",
+   "vmt_hi": "0xdeb338",
+   "classes": 1
+  },
+  {
+   "unit": "PRKeyLimit",
+   "vmt_lo": "0xdec498",
+   "vmt_hi": "0xdec498",
+   "classes": 1
+  },
+  {
+   "unit": "PRFlip",
+   "vmt_lo": "0xdedf78",
+   "vmt_hi": "0xdedf78",
+   "classes": 1
+  },
+  {
+   "unit": "PRTriplet",
+   "vmt_lo": "0xdeed78",
+   "vmt_hi": "0xdeed78",
+   "classes": 1
+  },
+  {
+   "unit": "PRLevelScale",
+   "vmt_lo": "0xdefe88",
+   "vmt_hi": "0xdefe88",
+   "classes": 1
+  },
+  {
+   "unit": "PRArpeggiator",
+   "vmt_lo": "0xdf1388",
+   "vmt_hi": "0xdf1388",
+   "classes": 1
+  },
+  {
+   "unit": "PRStrum",
+   "vmt_lo": "0xdf3b88",
+   "vmt_hi": "0xdf3b88",
+   "classes": 1
+  },
+  {
+   "unit": "PRRandom",
+   "vmt_lo": "0xdf58b8",
+   "vmt_hi": "0xdf58b8",
+   "classes": 1
+  },
+  {
+   "unit": "PLMergeArrangementForm",
+   "vmt_lo": "0xdfa468",
+   "vmt_hi": "0xdfa468",
+   "classes": 1
+  },
+  {
+   "unit": "MEEventsToAutoTool",
+   "vmt_lo": "0xdfad18",
+   "vmt_hi": "0xdfad18",
+   "classes": 1
+  },
+  {
+   "unit": "ChordProgressionEditor",
+   "vmt_lo": "0xdfba10",
+   "vmt_hi": "0xdfba10",
+   "classes": 1
+  },
+  {
+   "unit": "PRChordTool",
+   "vmt_lo": "0xe0f078",
+   "vmt_hi": "0xe0f468",
+   "classes": 2
+  },
+  {
+   "unit": "gui.EventDrawProxy",
+   "vmt_lo": "0xe20328",
+   "vmt_hi": "0xe20328",
+   "classes": 1
+  },
+  {
+   "unit": "job.ProcessChannelPoolSample",
+   "vmt_lo": "0xe20b88",
+   "vmt_hi": "0xe20b88",
+   "classes": 1
+  },
+  {
+   "unit": "ChannelSamplePool",
+   "vmt_lo": "0xe21ef0",
+   "vmt_hi": "0xe222c0",
+   "classes": 4
+  },
+  {
+   "unit": "PLClipProp",
+   "vmt_lo": "0xe29088",
+   "vmt_hi": "0xe29088",
+   "classes": 1
+  },
+  {
+   "unit": "EventEdit",
+   "vmt_lo": "0xe2de90",
+   "vmt_hi": "0xeb13b8",
+   "classes": 12
+  },
+  {
+   "unit": "PlugList",
+   "vmt_lo": "0xebef58",
+   "vmt_hi": "0xebef58",
+   "classes": 1
+  },
+  {
+   "unit": "gui.NewProject",
+   "vmt_lo": "0xecbf98",
+   "vmt_hi": "0xecbf98",
+   "classes": 1
+  },
+  {
+   "unit": "FL_Project",
+   "vmt_lo": "0xed0c28",
+   "vmt_hi": "0xed0c28",
+   "classes": 1
+  },
+  {
+   "unit": "gui.Render",
+   "vmt_lo": "0xed6a58",
+   "vmt_hi": "0xed7570",
+   "classes": 2
+  },
+  {
+   "unit": "gui.RenderWindow",
+   "vmt_lo": "0xed88e8",
+   "vmt_hi": "0xef1340",
+   "classes": 11
+  },
+  {
+   "unit": "RedeemCodeForm",
+   "vmt_lo": "0xef9c38",
+   "vmt_hi": "0xef9c38",
+   "classes": 1
+  },
+  {
+   "unit": "gui.UnlockWindow",
+   "vmt_lo": "0xefbb78",
+   "vmt_hi": "0xefc920",
+   "classes": 2
+  },
+  {
+   "unit": "il.CloudPlugins",
+   "vmt_lo": "0xf06638",
+   "vmt_hi": "0xf06638",
+   "classes": 1
+  },
+  {
+   "unit": "gui.ShortcutForm",
+   "vmt_lo": "0xf06eb8",
+   "vmt_hi": "0xf06eb8",
+   "classes": 1
+  },
+  {
+   "unit": "TestModeForm",
+   "vmt_lo": "0xf085c8",
+   "vmt_hi": "0xf085c8",
+   "classes": 1
+  },
+  {
+   "unit": "TouchKeyb",
+   "vmt_lo": "0xf0a808",
+   "vmt_hi": "0xf0a808",
+   "classes": 1
+  },
+  {
+   "unit": "TapTempo",
+   "vmt_lo": "0xf116d8",
+   "vmt_hi": "0xf116d8",
+   "classes": 1
+  },
+  {
+   "unit": "gui.ShortcutsModule",
+   "vmt_lo": "0xf13078",
+   "vmt_hi": "0xf13078",
+   "classes": 1
+  },
+  {
+   "unit": "Rtf",
+   "vmt_lo": "0xf36500",
+   "vmt_hi": "0xf36500",
+   "classes": 1
+  },
+  {
+   "unit": "FLPFormat",
+   "vmt_lo": "0xf3b6a0",
+   "vmt_hi": "0xf3b6a0",
+   "classes": 1
+  },
+  {
+   "unit": "PluginFormUnit",
+   "vmt_lo": "0xf55f48",
+   "vmt_hi": "0xf71e88",
+   "classes": 2
+  },
+  {
+   "unit": "MIDI_Generic",
+   "vmt_lo": "0xf72e88",
+   "vmt_hi": "0xf744a0",
+   "classes": 4
+  },
+  {
+   "unit": "MIDIInput",
+   "vmt_lo": "0xf7bba8",
+   "vmt_hi": "0xf7ca88",
+   "classes": 3
+  },
+  {
+   "unit": "MIDIDetect",
+   "vmt_lo": "0xf8f838",
+   "vmt_hi": "0xf8f838",
+   "classes": 1
+  },
+  {
+   "unit": "MIDIDevice_APC",
+   "vmt_lo": "0xf906e8",
+   "vmt_hi": "0xf906e8",
+   "classes": 1
+  },
+  {
+   "unit": "MIDIDevice_Launchpad",
+   "vmt_lo": "0xf92718",
+   "vmt_hi": "0xf929e0",
+   "classes": 2
+  },
+  {
+   "unit": "MIDIDevice_LaunchpadPro",
+   "vmt_lo": "0xf94fd8",
+   "vmt_hi": "0xf94fd8",
+   "classes": 1
+  },
+  {
+   "unit": "MIDIDevice_LaunchpadMK2",
+   "vmt_lo": "0xf98648",
+   "vmt_hi": "0xf98648",
+   "classes": 1
+  },
+  {
+   "unit": "MIDIDevice_LaunchControlXL",
+   "vmt_lo": "0xf9b1f8",
+   "vmt_hi": "0xf9b1f8",
+   "classes": 1
+  },
+  {
+   "unit": "MIDIDevice_LaunchKey_Perf",
+   "vmt_lo": "0xf9d108",
+   "vmt_hi": "0xf9d3e0",
+   "classes": 2
+  },
+  {
+   "unit": "MIDIDevice_StudioMix",
+   "vmt_lo": "0xfa05a8",
+   "vmt_hi": "0xfa0fa8",
+   "classes": 5
+  },
+  {
+   "unit": "MIDIDevice_Block",
+   "vmt_lo": "0xfa2338",
+   "vmt_hi": "0xfa2338",
+   "classes": 1
+  },
+  {
+   "unit": "MIDIDevice_OhmRGB",
+   "vmt_lo": "0xfa35b8",
+   "vmt_hi": "0xfa35b8",
+   "classes": 1
+  },
+  {
+   "unit": "MIDIDevice_Base",
+   "vmt_lo": "0xfa5008",
+   "vmt_hi": "0xfa5008",
+   "classes": 1
+  },
+  {
+   "unit": "MIDIDevice_CNTRLR",
+   "vmt_lo": "0xfa6d78",
+   "vmt_hi": "0xfa6d78",
+   "classes": 1
+  },
+  {
+   "unit": "MIDIDevice_Tweaker",
+   "vmt_lo": "0xfa72c8",
+   "vmt_hi": "0xfa72c8",
+   "classes": 1
+  },
+  {
+   "unit": "MIDIDevice_MidiFighter3D",
+   "vmt_lo": "0xfa8d18",
+   "vmt_hi": "0xfa8d18",
+   "classes": 1
+  },
+  {
+   "unit": "MIDIDevice_CMD_LC1",
+   "vmt_lo": "0xfaa458",
+   "vmt_hi": "0xfaa978",
+   "classes": 3
+  },
+  {
+   "unit": "MIDIDevice_Orbit",
+   "vmt_lo": "0xfac4e8",
+   "vmt_hi": "0xfac4e8",
+   "classes": 1
+  },
+  {
+   "unit": "MIDIDevice_MASCHINE",
+   "vmt_lo": "0xfacfe8",
+   "vmt_hi": "0xfacfe8",
+   "classes": 1
+  },
+  {
+   "unit": "MIDIDevice_KONTROLF1",
+   "vmt_lo": "0xfae858",
+   "vmt_hi": "0xfae858",
+   "classes": 1
+  },
+  {
+   "unit": "MIDIDevice_AlphaTrack",
+   "vmt_lo": "0xfafeb8",
+   "vmt_hi": "0xfafeb8",
+   "classes": 1
+  },
+  {
+   "unit": "MIDIDevice_Tranzport",
+   "vmt_lo": "0xfb29b8",
+   "vmt_hi": "0xfb29b8",
+   "classes": 1
+  },
+  {
+   "unit": "MIDIDevice_nanoKONTROL",
+   "vmt_lo": "0xfb4388",
+   "vmt_hi": "0xfb66f8",
+   "classes": 15
+  },
+  {
+   "unit": "MIDIDevice_padKontrol",
+   "vmt_lo": "0xfb91b8",
+   "vmt_hi": "0xfb91b8",
+   "classes": 1
+  },
+  {
+   "unit": "MIDIDevice_Lemur",
+   "vmt_lo": "0xfbae78",
+   "vmt_hi": "0xfbae78",
+   "classes": 1
+  },
+  {
+   "unit": "MIDIDevice_QuNeo",
+   "vmt_lo": "0xfbc248",
+   "vmt_hi": "0xfbc248",
+   "classes": 1
+  },
+  {
+   "unit": "MIDIDevice_PanoramaP4",
+   "vmt_lo": "0xfbdb60",
+   "vmt_hi": "0xfbde08",
+   "classes": 2
+  },
+  {
+   "unit": "MIDIDevice_MASCHINEJAM",
+   "vmt_lo": "0xfc0e78",
+   "vmt_hi": "0xfc0e78",
+   "classes": 1
+  },
+  {
+   "unit": "MIDIDevice_Fire",
+   "vmt_lo": "0xfc3868",
+   "vmt_hi": "0xfc3b58",
+   "classes": 2
+  },
+  {
+   "unit": "MIDIDevice",
+   "vmt_lo": "0xfd5660",
+   "vmt_hi": "0xfd6080",
+   "classes": 6
+  },
+  {
+   "unit": "EnvMap",
+   "vmt_lo": "0xfdfc30",
+   "vmt_hi": "0xfe0168",
+   "classes": 2
+  },
+  {
+   "unit": "SpeechProperties",
+   "vmt_lo": "0xfe0b08",
+   "vmt_hi": "0xfe0b08",
+   "classes": 1
+  },
+  {
+   "unit": "Channels",
+   "vmt_lo": "0xfe1e60",
+   "vmt_hi": "0xfe3340",
+   "classes": 9
+  },
+  {
+   "unit": "PlaylistTracks",
+   "vmt_lo": "0x10092c0",
+   "vmt_hi": "0x10092c0",
+   "classes": 1
+  },
+  {
+   "unit": "Undo2",
+   "vmt_lo": "0x100d068",
+   "vmt_hi": "0x1014b30",
+   "classes": 52
+  },
+  {
+   "unit": "PRFill",
+   "vmt_lo": "0x102cda8",
+   "vmt_hi": "0x102cda8",
+   "classes": 1
+  },
+  {
+   "unit": "StepSeq",
+   "vmt_lo": "0x10329c8",
+   "vmt_hi": "0x1032cc8",
+   "classes": 2
+  },
+  {
+   "unit": "BSplines",
+   "vmt_lo": "0x1052620",
+   "vmt_hi": "0x1052620",
+   "classes": 1
+  },
+  {
+   "unit": "RecChan.Defines",
+   "vmt_lo": "0x1053958",
+   "vmt_hi": "0x1054128",
+   "classes": 6
+  },
+  {
+   "unit": "BrowserProjectData",
+   "vmt_lo": "0x1069ee8",
+   "vmt_hi": "0x106b9a8",
+   "classes": 16
+  },
+  {
+   "unit": "DataBrowser.Preview",
+   "vmt_lo": "0x1073d28",
+   "vmt_hi": "0x1074018",
+   "classes": 3
+  },
+  {
+   "unit": "DataBrowser.Controls.Preview",
+   "vmt_lo": "0x1074d88",
+   "vmt_hi": "0x10753f8",
+   "classes": 3
+  },
+  {
+   "unit": "DataBrowser.Preview.Sample",
+   "vmt_lo": "0x10773f8",
+   "vmt_hi": "0x10775f0",
+   "classes": 2
+  },
+  {
+   "unit": "Browser",
+   "vmt_lo": "0x107d628",
+   "vmt_hi": "0x107e428",
+   "classes": 2
+  },
+  {
+   "unit": "DataBrowser.Preview.Env",
+   "vmt_lo": "0x1083858",
+   "vmt_hi": "0x1083bb8",
+   "classes": 3
+  },
+  {
+   "unit": "DataBrowser.Preview.Image",
+   "vmt_lo": "0x10850b8",
+   "vmt_hi": "0x10850b8",
+   "classes": 1
+  },
+  {
+   "unit": "DataBrowser.Preview.Text",
+   "vmt_lo": "0x10860f8",
+   "vmt_hi": "0x1086380",
+   "classes": 2
+  },
+  {
+   "unit": "BrowserPreview",
+   "vmt_lo": "0x10890b8",
+   "vmt_hi": "0x10893c8",
+   "classes": 3
+  },
+  {
+   "unit": "BrowserFileData",
+   "vmt_lo": "0x108af48",
+   "vmt_hi": "0x109d088",
+   "classes": 22
+  },
+  {
+   "unit": "job.DownloadWebProjects",
+   "vmt_lo": "0x10a0278",
+   "vmt_hi": "0x10a0278",
+   "classes": 1
+  },
+  {
+   "unit": "job.DownloadCloudBackups",
+   "vmt_lo": "0x10a0808",
+   "vmt_hi": "0x10a0808",
+   "classes": 1
+  },
+  {
+   "unit": "BrowserOnlineData",
+   "vmt_lo": "0x10a10b0",
+   "vmt_hi": "0x10a4e48",
+   "classes": 25
+  },
+  {
+   "unit": "gui.NotificationPanel",
+   "vmt_lo": "0x10bb498",
+   "vmt_hi": "0x10bb498",
+   "classes": 1
+  },
+  {
+   "unit": "job.DownloadLicense",
+   "vmt_lo": "0x10bee40",
+   "vmt_hi": "0x10bee40",
+   "classes": 1
+  },
+  {
+   "unit": "SWReg",
+   "vmt_lo": "0x10c7328",
+   "vmt_hi": "0x10c7328",
+   "classes": 1
+  },
+  {
+   "unit": "Shareware",
+   "vmt_lo": "0x10d54f8",
+   "vmt_hi": "0x10d54f8",
+   "classes": 1
+  },
+  {
+   "unit": "Lilypond",
+   "vmt_lo": "0x10d66d8",
+   "vmt_hi": "0x10d66d8",
+   "classes": 1
+  },
+  {
+   "unit": "ExportScorePDF",
+   "vmt_lo": "0x10d7ae8",
+   "vmt_hi": "0x10d7ae8",
+   "classes": 1
+  },
+  {
+   "unit": "PRTimeSig",
+   "vmt_lo": "0x10d88e8",
+   "vmt_hi": "0x10d88e8",
+   "classes": 1
+  },
+  {
+   "unit": "PluginListWindow",
+   "vmt_lo": "0x10d9008",
+   "vmt_hi": "0x10dc668",
+   "classes": 5
+  },
+  {
+   "unit": "CommandLineParser",
+   "vmt_lo": "0x10e19c8",
+   "vmt_hi": "0x10e19c8",
+   "classes": 1
+  },
+  {
+   "unit": "FLCommandLine",
+   "vmt_lo": "0x10e4f98",
+   "vmt_hi": "0x10e4f98",
+   "classes": 1
+  },
+  {
+   "unit": "TestUnit",
+   "vmt_lo": "0x10e6408",
+   "vmt_hi": "0x10e67d8",
+   "classes": 4
+  },
+  {
+   "unit": "Tests",
+   "vmt_lo": "0x10ef208",
+   "vmt_hi": "0x10efc08",
+   "classes": 8
+  },
+  {
+   "unit": "ScriptAPI",
+   "vmt_lo": "0x10fc128",
+   "vmt_hi": "0x10fc128",
+   "classes": 1
+  },
+  {
+   "unit": "LargePluginDataDlg",
+   "vmt_lo": "0x10fd0b8",
+   "vmt_hi": "0x10fd0b8",
+   "classes": 1
+  },
+  {
+   "unit": "MixerImplementation",
+   "vmt_lo": "0x1100db8",
+   "vmt_hi": "0x1100db8",
+   "classes": 1
+  },
+  {
+   "unit": "il.Updater",
+   "vmt_lo": "0x1101498",
+   "vmt_hi": "0x11015c8",
+   "classes": 2
+  },
+  {
+   "unit": "FL_Settings",
+   "vmt_lo": "0x1104ef8",
+   "vmt_hi": "0x1104ef8",
+   "classes": 1
+  },
+  {
+   "unit": "Tests.UndoRedo",
+   "vmt_lo": "0x1105bc8",
+   "vmt_hi": "0x1105bc8",
+   "classes": 1
+  },
+  {
+   "unit": "Tests.FadeEditorHelper",
+   "vmt_lo": "0x1109860",
+   "vmt_hi": "0x11099d8",
+   "classes": 2
+  },
+  {
+   "unit": "Tests.Playlist",
+   "vmt_lo": "0x1116d50",
+   "vmt_hi": "0x11197f8",
+   "classes": 2
+  },
+  {
+   "unit": "gui.Theme",
+   "vmt_lo": "0x111b510",
+   "vmt_hi": "0x111b510",
+   "classes": 1
+  },
+  {
+   "unit": "ThemeEditor",
+   "vmt_lo": "0x1125f00",
+   "vmt_hi": "0x1126a60",
+   "classes": 2
+  },
+  {
+   "unit": "DemucsForm",
+   "vmt_lo": "0x11339f8",
+   "vmt_hi": "0x1134320",
+   "classes": 2
+  },
+  {
+   "unit": "gui.Welcome.Unlock",
+   "vmt_lo": "0x11373e8",
+   "vmt_hi": "0x11373e8",
+   "classes": 1
+  },
+  {
+   "unit": "gui.Welcome.GDPR",
+   "vmt_lo": "0x11398e8",
+   "vmt_hi": "0x11398e8",
+   "classes": 1
+  },
+  {
+   "unit": "gui.WelcomeWizard",
+   "vmt_lo": "0x113ab90",
+   "vmt_hi": "0x113ecf0",
+   "classes": 17
+  },
+  {
+   "unit": "il.URISchemes",
+   "vmt_lo": "0x11574f0",
+   "vmt_hi": "0x11574f0",
+   "classes": 1
+  },
+  {
+   "unit": "il.SystemInfo",
+   "vmt_lo": "0x1157d00",
+   "vmt_hi": "0x1157d00",
+   "classes": 1
+  },
+  {
+   "unit": "PresetRenderer",
+   "vmt_lo": "0x115ae70",
+   "vmt_hi": "0x115ae70",
+   "classes": 1
+  },
+  {
+   "unit": "AddMarkerSettings",
+   "vmt_lo": "0x115c808",
+   "vmt_hi": "0x115c808",
+   "classes": 1
+  },
+  {
+   "unit": "CrashLogUpload",
+   "vmt_lo": "0x115cfc8",
+   "vmt_hi": "0x115cfc8",
+   "classes": 1
+  },
+  {
+   "unit": "CloudUploader",
+   "vmt_lo": "0x115f4f8",
+   "vmt_hi": "0x1162d18",
+   "classes": 6
+  },
+  {
+   "unit": "TechUnit",
+   "vmt_lo": "0x1167930",
+   "vmt_hi": "0x124e308",
+   "classes": 7
+  },
+  {
+   "unit": "Output_General",
+   "vmt_lo": "0x1251dc0",
+   "vmt_hi": "0x1251dc0",
+   "classes": 1
+  },
+  {
+   "unit": "FL_Instance",
+   "vmt_lo": "0x1253d48",
+   "vmt_hi": "0x1253f08",
+   "classes": 2
+  },
+  {
+   "unit": "ProgramInfo",
+   "vmt_lo": "0x125b058",
+   "vmt_hi": "0x125b1c0",
+   "classes": 2
+  },
+  {
+   "unit": "ParallelFileStream",
+   "vmt_lo": "0x1266b88",
+   "vmt_hi": "0x1266d50",
+   "classes": 2
+  },
+  {
+   "unit": "Mixer.Recording.MIDI",
+   "vmt_lo": "0x1267c30",
+   "vmt_hi": "0x1267c30",
+   "classes": 1
+  },
+  {
+   "unit": "Mixer.Recording",
+   "vmt_lo": "0x1268108",
+   "vmt_hi": "0x1268280",
+   "classes": 2
+  },
+  {
+   "unit": "il.RollingAudioBuffer",
+   "vmt_lo": "0x1275e98",
+   "vmt_hi": "0x1275e98",
+   "classes": 1
+  },
+  {
+   "unit": "Mixer.TrackModule",
+   "vmt_lo": "0x1276828",
+   "vmt_hi": "0x1276828",
+   "classes": 1
+  },
+  {
+   "unit": "FXSettings",
+   "vmt_lo": "0x1277f38",
+   "vmt_hi": "0x1277f38",
+   "classes": 1
+  },
+  {
+   "unit": "Output_DirectSound",
+   "vmt_lo": "0x12aeb48",
+   "vmt_hi": "0x12aec90",
+   "classes": 2
+  },
+  {
+   "unit": "PluginRacks",
+   "vmt_lo": "0x12b0358",
+   "vmt_hi": "0x12b07e0",
+   "classes": 3
+  },
+  {
+   "unit": "Mixer.Defines",
+   "vmt_lo": "0x12c0d00",
+   "vmt_hi": "0x12c1378",
+   "classes": 2
+  },
+  {
+   "unit": "LiveRecDefines",
+   "vmt_lo": "0x12c7988",
+   "vmt_hi": "0x12c7b48",
+   "classes": 2
+  },
+  {
+   "unit": "Patterns",
+   "vmt_lo": "0x12cc3b0",
+   "vmt_hi": "0x12cc8c8",
+   "classes": 2
+  },
+  {
+   "unit": "RecChan",
+   "vmt_lo": "0x12de928",
+   "vmt_hi": "0x12de928",
+   "classes": 1
+  },
+  {
+   "unit": "NewPlayList",
+   "vmt_lo": "0x12e1878",
+   "vmt_hi": "0x12e1878",
+   "classes": 1
+  },
+  {
+   "unit": "GraphEditor",
+   "vmt_lo": "0x13063c8",
+   "vmt_hi": "0x13063c8",
+   "classes": 1
+  },
+  {
+   "unit": "Mixer.Time",
+   "vmt_lo": "0x1310d78",
+   "vmt_hi": "0x1310fc8",
+   "classes": 3
+  },
+  {
+   "unit": "ExternalMediaDlg",
+   "vmt_lo": "0x1313388",
+   "vmt_hi": "0x1313388",
+   "classes": 1
+  },
+  {
+   "unit": "FP_Host",
+   "vmt_lo": "0x1314058",
+   "vmt_hi": "0x132c1d8",
+   "classes": 5
+  },
+  {
+   "unit": "DSP_Plugins",
+   "vmt_lo": "0x132dff8",
+   "vmt_hi": "0x132e578",
+   "classes": 3
+  },
+  {
+   "unit": "System.Win.Sensors",
+   "vmt_lo": "0x1331bd8",
+   "vmt_hi": "0x1333e78",
+   "classes": 14
+  },
+  {
+   "unit": "System.Sensors",
+   "vmt_lo": "0x133d658",
+   "vmt_hi": "0x1341ee0",
+   "classes": 14
+  },
+  {
+   "unit": "gui.ProjectRename",
+   "vmt_lo": "0x134f9e8",
+   "vmt_hi": "0x134f9e8",
+   "classes": 1
+  },
+  {
+   "unit": "SetMidi",
+   "vmt_lo": "0x1350b48",
+   "vmt_hi": "0x1350b48",
+   "classes": 1
+  },
+  {
+   "unit": "Vcl.OleServer",
+   "vmt_lo": "0x136b5d0",
+   "vmt_hi": "0x136b900",
+   "classes": 2
+  },
+  {
+   "unit": "TitleEx",
+   "vmt_lo": "0x136c818",
+   "vmt_hi": "0x136c818",
+   "classes": 1
+  },
+  {
+   "unit": "FL_UserInterface",
+   "vmt_lo": "0x136d8a8",
+   "vmt_hi": "0x1371af0",
+   "classes": 3
+  },
+  {
+   "unit": "LiveRec.MidiLoopRec",
+   "vmt_lo": "0x1374cb0",
+   "vmt_hi": "0x1374cb0",
+   "classes": 1
+  }
+ ]
+}
