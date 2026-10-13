@@ -60,9 +60,11 @@ def prologue_frame(ins_list):
     rsp, rbp = 0, None
     for ins in ins_list:
         mn = ins.mnemonic
-        if mn in ('call', 'ret', 'jmp') or (mn.startswith('j') and mn != 'jmp'):
-            break
         ops = ins.operands
+        if mn.startswith('j') and mn != 'jmp' and ops and ops[0].type == capstone.CS_OP_IMM and ops[0].imm < ins.address:
+            continue   # 後方 jcc = stack probe ループ (`sub rax,0x1000; mov [rsp+rax],al; cmp; ja` 大 frame の prologue)
+        if mn in ('call', 'ret', 'jmp') or mn.startswith('j'):
+            break
         if mn == 'push':
             rsp -= 8
         elif mn == 'pop':
