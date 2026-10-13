@@ -7,7 +7,7 @@
 
 1. **実 FL ミキサでの比較は未達 (#34 待ち)**。本実験の「ミキサ」は FL ではなく、`tools/audio/test/fla_test.c` と同じ**テスト音ミキサ代役** (ramp / 正弦 / 入力素通し)。よって下記は **「ring + producer スレッド」構成と「worklet 内で直接 render」構成の構造的な遅延差** であり、FL 実機の遅延ではない。→ #194 は **Refs** (Closes しない)。
 2. **構造的な差**: 入力→出力の往復遅延 (相互相関, 同一 worklet クロック上) は worklet 直走行が **B フレームちょうど** (128/256/512 → 2.67/5.33/10.67 ms)、ring 方式は **T フレーム** (1408/1536/2048 f = 29.33/32.00/42.67 ms)。差は 26.67/26.67/32.00 ms (各 n=3 全 run 同値)。T は `T ≥ burst×1.25 + B` (`tools/audio/docs/PROTOCOL.md` §4) で決まり、worklet 直走行にはこの項が無い。
-3. **過負荷時の挙動 (実測・持続過負荷)**: render が worklet のオーディオスレッド上で走る。B=256@48k (予算 5333 µs) で模擬負荷 4000 µs は両方式とも健全 (underrun 0 / ramp 不一致 0)。**8000 µs (予算の 1.5 倍) では worklet 直走行の実時間比が 0.635 (音声が実時間の 63.5% しか進まない)、ring は underrun 443 (T が 15872 f まで拡張)**。持続過負荷では両方式とも破綻するため、**直走行固有の代償はこの測定では示せていない**。一過性の単発超過を ring の T が吸収する側との比較は未測定 (§3 項目 4)。直走行は `Atomics.wait` 系のブロッキングが使えない (§3 項目 1)。
+3. **過負荷時の挙動 (実測・持続過負荷)**: render が worklet のオーディオスレッド上で走る。B=256@48k (予算 5333 µs) で模擬負荷 4000 µs は両方式とも健全 (underrun 0 / ramp 不一致 0)。**8000 µs (予算の 1.5 倍) では worklet 直走行の実時間比が 0.605〜0.636 (n=3 の full run の min–max。音声が実時間の 60.5〜63.6% しか進まない)、ring は underrun 443 (T が 15872 f まで拡張, 3 run とも同値)**。持続過負荷では両方式とも破綻するため、**直走行固有の代償はこの測定では示せていない**。一過性の単発超過を ring の T が吸収する側との比較は未測定 (§3 項目 4)。直走行は `Atomics.wait` 系のブロッキングが使えない (§3 項目 1)。
 4. **FL スレッド構造の再設計見積り (静的・FLEngine 全体の数であってミキサ専用ではない)**: §4。結論は「FL 本体は 1 DLL 内で CreateThread 3 箇所 / 待機系 760 箇所 (うち CS Enter 699) / 非ブロッキング同期 971 箇所 (CS Leave・Init・Delete と Event 系) を使い、worklet 直走行にはミキサ呼出グラフの切り出しが前提」。切り出し範囲 (どの関数がミキサ render から到達するか) は未解析。
 
 ## 2. 比較実験 (`run.mjs`, 実測)
@@ -22,12 +22,12 @@
 | 512 | 512, 512, 512 f (10.67 ms) | 2048, 2048, 2048 f (42.67 ms) | 2048 f | 32.00 ms |
 
 - ring の T は OPEN 較正 burst (この runner では 512 f) で決まる。**実機 burst は未計測** (REPORT.md §6 / #187)。実機で burst が 2048〜4096 f なら ring 側の T は 5376 f (56 ms) まで伸びる (AU-11 §10)。直走行側が実機 burst からどう影響を受けるかは**未測定**。
-- 直走行の ramp 出力は B=128/256/512 で全フレーム bit-exact (frames_checked 289,920〜290,688 f = committed `results/results.json` の実測値, 不一致 0, clock_jumps 0)。先頭 B フレームは無音 (head_nonzero 0)。
+- 直走行の ramp 出力は B=128/256/512 で全フレーム bit-exact (frames_checked 289,536〜292,608 f = `results/results.json` (916fa7a の run) の実測値, 不一致 0, clock_jumps 0)。先頭 B フレームは無音 (head_nonzero 0)。
 
 ## 3. 直走行の制約 (実測)
 
 1. **worklet 内 `Atomics.wait` / `memory.atomic.wait32` は戻らず `process()` が停止する** (`probe=2`): 到達マーカ 100 のまま quanta=10 で止まり、3 s 後も増えない (gate `wl_probe_atomic_wait32_traps`)。ring 方式の「FL スレッドが ring へブロッキング write」はそのままでは持ち込めない。
-2. **予算超過は無音ではなく「実時間が進まない」形で現れる**: 8000 µs/ブロックで `rt_ratio` 0.635、`clock_jumps` 0 (shim の `clock_jumps` では検知できない)。検知には wall 時間との比が要る。
+2. **予算超過は無音ではなく「実時間が進まない」形で現れる**: 8000 µs/ブロックで `rt_ratio` が 0.6049 / 0.6351 / 0.6357 (3 本の full run。0.6351 は fea636d 作業ツリー, 0.6357 は PR #599 レビュー側の独立再実行, 0.6049 は 916fa7a クリーン HEAD。各 run 1 回のため n=3 の min–max)、`clock_jumps` 0 (shim の `clock_jumps` では検知できない)。検知には wall 時間との比が要る。
 3. **バースト内の連続 render (推定・未測定)**: ブラウザは quantum を OS バッファ単位で連続呼出する (本 runner の gap ヒストグラムは 0 ms 間隔が多数 + 約 10.7 ms 周期: `results/results.json` の `gap_hist`)。B=256 の render は 2 quantum ごとなので、バースト内で連続して走り得る。4000 µs (予算の 0.75 倍) では健全だった (`load_0.75_wl`)。予算 0.75〜1.0 倍の間でどこから崩れるかは**測っていない**。
 4. **一過性の単発超過 (未測定)**: ring 側は `tools/audio/REPORT.md` §5 の hiccup 試験 (60 ms 停止を 200 cb 毎) で underrun 5 → T 自動拡張 (1536→2816 f)・復帰後データ非破壊を実測済み。直走行に同条件の単発超過を入れた比較は**未実施**のため、一過性の超過に対する直走行の耐性は不明。
 
@@ -58,9 +58,11 @@
 | 比較 e2e (`node tools/audio/wl/run.mjs --reps 3 --secs 6`, 作業ツリー) | **32/32 合格 (negctl 5 件を含む), exit 0, 所要 230.9 s, load average 開始 0.04 / 終了 0.16**, 並列 1 |
 | 静的スレッド面 (`fl_thread_surface.py`) | gate 4/4 PASS (CreateThread≥1, WaitForSingleObject≥1, SetEvent≥1, Sleep≥1), 6.6 s |
 | 静的 negctl (`--negctl`: gate の API 名を実在しない名に差替え) | gate 4/4 FAIL → exit 0 (検出能力あり) |
-| 動的 negctl 5 件 (全て「壊した入力で検査器が FAIL を出す」を確認) | ①負荷 1.5 倍で直走行の健全性 gate が FAIL (rt_ratio 0.635 < 0.99) ②ring の underrun 443 (>0) ③入力を接続しない loop は corr 0 で lag gate が FAIL ④ring の lag 1536 f を直走行用 gate (lag==B) に通すと FAIL ⑤ramp を 1 件壊した結果を gate が FAIL |
+| 動的 negctl 5 件 (全て「壊した入力で検査器が FAIL を出す」を確認) | ①負荷 1.5 倍で直走行の健全性 gate が FAIL (rt_ratio 0.605〜0.636 < 0.99, n=3) ②ring の underrun 443 (>0) ③入力を接続しない loop は corr 0 で lag gate が FAIL ④ring の lag 1536 f を直走行用 gate (lag==B) に通すと FAIL ⑤ramp を 1 件壊した結果を gate が FAIL |
 
 **クリーン HEAD 再検証** (検証起点 commit `fea636d`, `git worktree add --detach` で展開, `bash tools/audio/wl/e2e.sh` = 両ビルド + 静的 gate/negctl + 比較 e2e): **exit 0, 全体 246 s (うち run.mjs 230.6 s), load average 開始 0.03 / 終了 0.17, 並列 1, 32/32 合格 (negctl 5 件を含む), 静的 gate 4/4 PASS・静的 negctl 4/4 FAIL (期待どおり)**。lag は作業ツリー実行と同値 (wl = B f, ring = 1408/1536/2048 f)。`results/results.json` は作業ツリー実行 (230.9 s) の保存物。
+
+**修正後の再検証** (検証起点 commit `916fa7a` = 指摘修正のコード commit。`git worktree add --detach` で展開, 同じ `bash tools/audio/wl/e2e.sh`, `TMPDIR=$RUNNER_TEMP`): **exit 0, 全体 255 s (うち run.mjs 238.9 s), `/proc/loadavg` 1 分値 開始 0.23 / 終了 0.23 (run.mjs 内 開始 0.40 / 終了 0.23), 並列 1, 32/32 合格 (negctl 5 件を含む), 静的 gate 4/4 PASS・静的 negctl 4/4 FAIL (期待どおり)**。lag は全 run 同値 (wl = 128/256/512 f, ring = 1408/1536/2048 f)。`results/thread_surface.json` の再生成は差分が `pe` 1 行のみ (絶対パス → `extracted/block00031_PE.bin`)。`results/results.json` は本 run の保存物 (負荷 1.5 倍の `rt_ratio` 0.6049 は §3 項目 2 の 3 本目)。
 
 検証範囲 / 範囲外: 範囲 = fake シンクの headless Chrome・48 kHz・テスト音ミキサ代役・FLEngine PE の静的 import 解析。**範囲外 = 実 FL ミキサ / 実機 (Windows/mac の実デバイス) の遅延 / Firefox・Safari / 96 kHz / burst が大きい環境での直走行の挙動 / ミキサ到達関数の特定**。
 
