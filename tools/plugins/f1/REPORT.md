@@ -1,7 +1,7 @@
 # tools/plugins/f1 REPORT — [PLG-F1] stereo-util 9 本 lift (#198)
 
 - 担当 dir: `tools/plugins/f1/` (+ `tools/plugins/inventory/blockmap_from_matrix.py`)。 検証起点 commit: 下記 §8 に記載。
-- 既知類型との関係: **D15 (DEFECTS.md)** = メモリ間接 `call [mem]` の silent 脱落。 RetDec 路線では `tools/icall/REPORT.md` §4 の **D1 (icall §4)** と同じ事象 (番号体系は別)。 新規類型なし。
+- 既知類型との関係: **D15 (DEFECTS.md)** (+ Mute 2 fade で **D5 (DEFECTS.md)**) = メモリ間接 `call [mem]` の silent 脱落。 RetDec 路線では `tools/icall/REPORT.md` §4 の **D1 (icall §4)** と同じ事象 (番号体系は別)。 新規類型なし。
 - 数え方・コマンドはすべて本ファイル内に併記。 数値はすべて Actions runner (nproc=4) 上の実測。
 
 ## 0. 結論 (先出し)
@@ -9,8 +9,9 @@
 1. **9 本 (T0 8 + T1 1) の固有閉包 lift は Actions 上で再現した**: 9/9 が RetDec+pass 鎖 完走・`emcc -c` 通過・f80 関数 0・未実装 helper 0。 `defines` は PLUGIN_MATRIX の `closure_funcs` と 9/9 一致 (§2)。
 2. **ただし「`emcc -c` 通過 = 正しい lift」ではない — 9 本全てで、閉包内のメモリ間接 call 185/185 件が IR から無言で脱落している** (§4)。 vtable 経由の GUI/ホスト呼出に加え、**Eff_Render が DSP を呼ぶ関数ポインタ呼出も含まれる**。
 3. **Fruity Phase Inverter の Eff_Render を native 機械語と bit 比較 (492 case × 3 seed)**: in-place 246/246 一致 (符号反転ループの lift は正しい)、**src≠dst の 246 case 中 240 case が不一致** (`dst` が未コピーのまま)。 脱落した `ippsMove_8u` 呼出 1 件だけを手で書き戻した oracle 版は **492/492 一致**、コピー長を 4 byte 短くした陰性対照は 240 fail (§5)。
-4. **Eff_Render 経路の依存を 9 本分実測** (§3): kernel 表 (P0c) の関数ポインタ変数だけでなく、**dsp_ippv2.dll の動的束縛変数 (`ippsCopy_64s` / `ippsMove_8u` / `ippsZero_8u` / `ippsAdd_32f_I` / `ippsSub_32f_I` / `ippsCplxToReal_32fc` / `ippsRealToCplx_32f`) を呼ぶ**。 Phase Inverter / Mute 2 / Center の Eff_Render は DSP 本体が IPP 呼出で、plugin 固有コードは分岐とループのみ。
-5. **#198 の出口条件 (全員で差分試験 bit-exact + Render test .flp) は未達**。 理由は、メモリ間接 call の復元 (#229 ICALL-3) と IPP 関数ポインタの接続 (#38 IPP-10 / `tools/ipp/shim`) が plugin 閉包に未統合であること (§6)。 本 PR は `Refs #198` (Closes しない)。
+4. **Fruity Mute 2 の Eff_Render も同様** (510 case × 3 seed, §5b): 無効/mode3/mode1 の分岐は、脱落した IPP 呼出 2 件 (`ippsCopy_64s`, `ippsZero_8u`) を oracle で戻すと 306/306 一致。 **fade 分岐 (mode0/mode2) は 192/204 不一致のまま** — 呼出先 `function_5df490` が float 引数 (xmm3 + スタック) を正しく受けておらず、D5 (DEFECTS.md) 同型の ARG 欠陥が Eff_Render 層で実害になる。
+5. **Eff_Render 経路の依存を 9 本分実測** (§3): kernel 表 (P0c) の関数ポインタ変数だけでなく、**dsp_ippv2.dll の動的束縛変数 (`ippsCopy_64s` / `ippsMove_8u` / `ippsZero_8u` / `ippsAdd_32f_I` / `ippsSub_32f_I` / `ippsCplxToReal_32fc` / `ippsRealToCplx_32f`) を呼ぶ**。 Phase Inverter / Mute 2 / Center の Eff_Render は DSP 本体が IPP 呼出で、plugin 固有コードは分岐とループのみ。
+6. **#198 の出口条件 (全員で差分試験 bit-exact + Render test .flp) は未達**。 理由は、メモリ間接 call の復元 (#229 ICALL-3) と IPP 関数ポインタの接続 (#38 IPP-10 / `tools/ipp/shim`) が plugin 閉包に未統合であること (§6)。 本 PR は `Refs #198` (Closes しない)。
 
 ## 1. 環境・再現
 
@@ -109,7 +110,26 @@ kernel 表は Balance の初期化関数 (0x5e19f0) と位置非依存ハッシ�
 不一致の形は 1 通り: wasm の `dst` が `0xA5A5A5A5` (試験側のフィル値) のまま = コピーされていない (L 反転は先頭 word が `0x25a5a5a5` = 符号ビットだけ反転した未コピー値)。
 - `pir` は `pi_repair_oracle.py` が `function_6ba930` の先頭に `if (src != dst) f1_ipps_move_8u(src, dst, Length<<3)` を挿入した**試験専用**版 (lift pass ではない)。 目的は「この経路の差分の原因は脱落 call 1 件のみ」の確認 (ablation)。
 - 陰性対照 `pin` (`PI_NEGCTL=1`): コピー長を 4 B 短くすると in-place 以外の n>0 が全て落ちる (240 fail)。 試験は 1 word の欠落を検出できる。
-- 検証範囲: Eff_Render の分岐 (`mode≤0` / `==2` / その他)・in-place 判定・符号ビット反転ループ・コピー呼出の有無。 範囲外: IPP 実装そのもの (stub の意味は memmove と仮定)、ホスト経由の Eff_Render 呼出、他 8 本。
+- 検証範囲 (Phase Inverter): Eff_Render の分岐 (`mode≤0` / `==2` / その他)・in-place 判定・符号ビット反転ループ・コピー呼出の有無。 範囲外: IPP 実装そのもの (stub の意味は memmove と仮定)、ホスト経由の Eff_Render 呼出、他 8 本。
+
+## 5b. Fruity Mute 2 Eff_Render 差分試験 (`mute/mute_e2e.sh`)
+
+`bash tools/plugins/f1/mute/mute_e2e.sh` — 全体 **9.9 秒** (3 seed × 3 版)。 Phase Inverter と同じ構成 (native: `mute/native_mute.c`, wasm: `mu.wasm` 2,877 B)。
+- 対象: Eff_Render `0x6baaf0` (+ framework の fade `0x5df490`, 経路 2 関数 / 376 B)。 `this`: `[+0x128]` = 有効 (byte), `[+0x12c]` = mode (int)。
+- native の IPP 変数: `0x717ec8` = `ippsZero_8u(pDst,len)` (memset 0), `0x717e90` = `ippsCopy_64s(pSrc,pDst,len)` (len 要素 × 8 B の memmove) を同一意味の ms_abi 関数で差し込む。
+- case: n × 17 値 × {無効, 有効 mode0/1/2/3} × {in-place, src≠dst} × 3 rep = **510 case** (src は NaN/inf を含まない乱数: wasm の NaN 伝播は非決定的なため)。
+- 分岐の意味 (機械語): 無効 → src≠dst なら Copy_64s。 mode0 → fade A (`5df490` に定数 2 つ: 0x6bab94/0x6bab98 の float)。 mode1 → Zero_8u(dst, n<<3)。 mode2 → fade B (定数の順を入れ替え)。 mode≥3 → 何もしない。
+
+| 版 | 一致 / 510 (seed 305441741) | seed 1 | seed 2863311530 | 一致の内訳 (seed 305441741) |
+|---|---|---|---|---|
+| lift そのまま (`mu`) | 174 | 175 | 174 | 無効 in-place 51 / 無効 copy 3 / mode3 102 / mode1 6 / fade 計 12 (全て n=0) |
+| IPP 2 件を oracle で書き戻し (`mur`) | **318** | 319 | 318 | 無効 102 / mode1 102 / mode3 102 (= 非 fade 分岐 **306/306**) + fade 12 (n=0) |
+| 陰性対照 (`mun`: Zero の長さ −4 B) | 222 | 223 | 222 | `mur` から mode1 の 96 case が落ちる (他は同じ) |
+
+- **非 fade 分岐**: `mu` では無効 copy (3/51)・mode1 (6/102) が落ちる = 脱落した IPP 呼出の実害。 `mur` で 306/306 一致、`mun` で mode1 が 6/102 に戻る (試験の識別力)。
+- **fade 分岐 (mode0/mode2)**: `mur` でも 4 グループ × 48 = **192 case 不一致** (一致 12 は n=0 のみ。 seed 1 は mode0-copy が 4/51 で +1)。 原因は呼出先 `function_5df490` の IR: 4 番目の整数引数 (`%arg4`) を `movss xmm0` に使い、本来の `xmm3` (開始ゲイン) は零ベクトル (`xor i128 0, 0`) に置換されている。
+  caller 側は `xmm3` の値 (開始ゲイン) を渡さず、スタック引数 (終了ゲイン) だけを第 4 整数引数に載せる。 → **D5 (DEFECTS.md) = float 引数の脱落**と同型で、ramp/fade 系 framework 関数 (Balance・PanOMatic も経由) を呼ぶ Eff_Render は ARG pass なしでは動かない。
+- 検証範囲: 分岐 5 通り・in-place/非 in-place・n=0〜257・IPP 2 関数の呼出有無。 範囲外: fade の数値 (ARG 未修復), 実 IPP。
 
 ## 6. 未解決・ブロッカー (起票依頼)
 
@@ -119,20 +139,21 @@ kernel 表は Balance の初期化関数 (0x5e19f0) と位置非依存ハッシ�
 | Eff_Render の関数ポインタ変数 (kernel 表 + IPP 動的束縛) の接続: wasm 側で変数に table index を書く初期化手順が無い (framework 初期化 0x5e19f0 は CPUID 分岐、IPP は binder 経由) | 復元後も DSP が動かない | 新規 `[PLG-F1b] Eff_Render 用 kernel 表/IPP 関数ポインタ初期化 (wasm table 登録)` を P0a #195 の子として起票依頼 |
 | IPP 7 関数 (`ippsCopy_64s`/`Move_8u`/`Zero_8u`/`Add_32f_I`/`Sub_32f_I`/`CplxToReal_32fc`/`RealToCplx_32f`) の plugin 閉包からの利用経路。 Stereo Shaper の 1 件は名前未特定 (0x732390) | native 参照も dsp_ippv2 無しでは再現不能 (本 PR は memmove stub で代替) | 既存 **#38 [IPP-10]** にコメント (F1 の 7 関数を優先候補に) |
 | Center の採用 kernel 0x5ddf10 は x87 | P0c f80 pass の plugin 閉包への適用 | **#195 (P0a)** / P0c 系の既存 issue にコメント |
-| ARG (float 引数): Balance / PanOMatic の ramp (xmm3 + スタック引数) | Eff_Render 全体の差分には ARG pass 適用が必要 (未検証) | 既存 [PLG-P0c] 系の ARG 項 (p0c REPORT §11) にコメント |
+| ARG (float 引数): **Mute 2 の fade `function_5df490` で実害を実測** (§5b: xmm3 → 零ベクトル, スタック引数 → 第 4 整数引数)。 Balance / PanOMatic の ramp (0x5dfef0 等) も同型の見込み (未検証) | fade/ramp を呼ぶ Eff_Render 全般 | 既存 [PLG-P0c] 系の ARG 項 (p0c REPORT §11) にコメント |
 | Balance 0x6c0000: 機械語 direct call 22 に対し IR 21 (direct 1 件の脱落または noreturn 畳み込みの可能性) | 原因未調査 | 本 issue (#198) 上で継続調査 |
-| 残る 8 本の Eff_Render 差分 (Mute 2 / Center / Send / Stereo Enhancer は §3 の通り IPP + glue で Phase Inverter と同型の試験が可能。 Balance / PanOMatic / Stereo Shaper / Spreader は ARG・f80・大きな経路が絡む) | #198 出口条件の残り | #198 を open のまま継続 (本 PR は `Refs #198`) |
+| 残る 7 本の Eff_Render 差分 (Center / Send / Stereo Enhancer は §3 の通り IPP + kernel の glue で同型の試験が可能。 Balance / PanOMatic / Stereo Shaper / Spreader は ARG・f80・大きな経路が絡む) | #198 出口条件の残り | #198 を open のまま継続 (本 PR は `Refs #198`) |
 | Render test .flp による E2E (PLUGIN_MATRIX の RT 列) | 未実施。 CreatePlugInstance 完全到達 (P0b の未達, `framework/REPORT.md` §6) が前提 | #195 (P0a) / P0b 系 |
 
 ## 7. 成果物
 
 | ファイル | 内容 |
 |---|---|
-| `f1_e2e.sh` | 1 コマンド再現 (素材展開 → inventory → batch lift → plan → audit → Phase Inverter 差分) |
+| `f1_e2e.sh` | 1 コマンド再現 (素材展開 → inventory → batch lift → plan → audit → Phase Inverter / Mute 2 差分) |
 | `env.sh` | `FL_WIN64_DIR` 展開・venv・TMPDIR |
 | `f1_plan.py` | Eff_Render 経路 + kernel 表変数 + IPP 束縛変数の抽出 (`work/f1/<block>/plan.json`, `ranges.txt`) |
 | `f1_call_audit.py` | 脱落 call の静的監査 (`work/f1/call_audit.json`) |
 | `pi/pi_e2e.sh` `pi/native_pi.c` `pi/run_pi.mjs` `pi/pi_repair_oracle.py` | Phase Inverter Eff_Render 差分試験 + oracle ablation + 陰性対照 |
+| `mute/mute_e2e.sh` `mute/native_mute.c` `mute/run_mute.mjs` `mute/mute_repair_oracle.py` | Mute 2 Eff_Render 差分試験 (同構成; fade 分岐は ARG 未修復) |
 | `../inventory/blockmap_from_matrix.py` | installer 無しで `win_funcs.py` を動かす最小 blockmap |
 
 ## 8. 検証 (コミット済み HEAD)
@@ -150,4 +171,4 @@ kernel 表は Balance の初期化関数 (0x5e19f0) と位置非依存ハッシ�
 
 ### DEFECTS.md への行案 (PM 判断)
 
-新規類型なし。 D15 (DEFECTS.md) の観測欄に「plugin 閉包 (Delphi 殻) 9 本でも `call [mem]` 185/185 脱落; Phase Inverter Eff_Render で実害 (src≠dst の 240/246 case で dst 未コピー)」を追記する案。
+新規類型なし。 D5 (DEFECTS.md) の観測欄に「Mute 2 fade (`function_5df490`) で xmm3→零ベクトル、Eff_Render 層で 192/204 case 不一致」、D15 (DEFECTS.md) の観測欄に「plugin 閉包 (Delphi 殻) 9 本でも `call [mem]` 185/185 脱落; Phase Inverter Eff_Render で実害 (src≠dst の 240/246 case で dst 未コピー)」を追記する案。

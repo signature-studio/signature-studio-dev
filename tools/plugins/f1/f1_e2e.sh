@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PLG-F1 (#198) 1 コマンド再現: 素材展開 → inventory (無ければ) → 9 本 batch lift → Eff_Render 経路計画 → 脱落 call 監査 → Phase Inverter 差分試験
+# PLG-F1 (#198) 1 コマンド再現: 素材展開 → inventory (無ければ) → 9 本 batch lift → Eff_Render 経路計画 → 脱落 call 監査 → Phase Inverter / Mute 2 差分試験
 #   bash tools/plugins/f1/f1_e2e.sh          (Actions: oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk)
 # inventory (win_funcs.py) は 4 core で 8 分弱かかる。 work/winfuncs が既にあれば再利用する。
 set -euo pipefail
@@ -20,3 +20,4 @@ echo "[f1] batch lift 9 本: $(( $(date +%s) - t0 )) s, load $(cut -d' ' -f1-3 /
 python3 f1/f1_plan.py $BLOCKS
 python3 f1/f1_call_audit.py $BLOCKS
 bash f1/pi/pi_e2e.sh
+bash f1/mute/mute_e2e.sh
