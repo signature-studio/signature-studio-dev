@@ -297,7 +297,7 @@ for (ret, full, args) in sorted(DECL, key=lambda t: t[1]):
         STATS['impl'] += 1
         continue
     ct = lambda t: CT.get(t, 'u64')
-    params = ', '.join('%s %s' % (ct(t), 'abc'[i]) for i, t in enumerate(A)) or 'void'
+    params = ', '.join('%s %s' % (ct(t), 'abcdefghijklmnop'[i]) for i, t in enumerate(A)) or 'void'
     body = gen_body(base, ret, A)
     if body is None:
         UNIMPL.append('%s %s(%s)' % (ret, full, ','.join(A)))
