@@ -103,7 +103,7 @@ FactoryLibrary: Massive X Factory Content (UPID 0b408693-…)
        → kid 'dfd4a0d7bb4e2f3509e3e1accee33716fb6610684410be0e3b1669ddd87d40f8' がバイナリ内に定数存在 (0x184ff4c2d)
        → RSA 検証は静的 OpenSSL (EVP_PKEY_verify 系)。BCryptVerifySignature import はあるが直接呼出 0
 UI ゲート: 'Please use Native Access to (re-)activate.' 群 / 'Your serial number is incorrect…' (0x181142160, 0x181143c00)
-         / 'Subscription expired.' (0x18010e4e0) / QML demoExpired・subscriptionExpired・MXDemoPopup.qml
+         / 'Subscription expired.' (文字列 0x185013ca8。訂正: 0x18010e4e0 はこの文字列を参照する関数で、文字列 VA ではない・§12.2) / QML demoExpired・subscriptionExpired・MXDemoPopup.qml
 DSP 音声経路 (process) にライセンス参照なしを静的確認 (文字列・xref から UI/起動層に集中) — 実機挙動 (demo 時無音化等) は未検証
 ```
 
@@ -115,7 +115,7 @@ cracked リソースの実体 (ユーザ方針により配置可): `.jwt` 35 個
 |---|---|---|---|
 | N1 | `Product::evaluateRAS2ActivationState` 0x18115de60 / scanActivationInfoRAS3/RAS2 | レジストリ・JWT からアクティベーション状態を評価 | 常時 activated 経路を返す。**推奨の一次点** |
 | N2 | `Engine::productCheckSerialNumber` 0x1805b3510 + 文言 0x181142160 / 0x181143c00 | シリアル不整合で警告 UI | 常時 OK (bool&=true)。文言 UI を出さない |
-| N3 | `Engine::productGetSubscription` 0x1805b3ad0 + CXDB3 検証 0x18116fb20 + 'Subscription expired.' 0x18010e4e0 | サブスク期限で demo/無効化 | 常時「期限なし完全ライセンス」を返す |
+| N3 | `Engine::productGetSubscription` 0x1805b3ad0 + CXDB3 検証 0x18116fb20 + 'Subscription expired.' (文字列 0x185013ca8。訂正: 0x18010e4e0 はこれを参照する関数・§12.2) | サブスク期限で demo/無効化 | 常時「期限なし完全ライセンス」を返す |
 | N4 | RAS3 JWT 検証鎖 (ras3 dir 0x181754f70 / .jwt 列挙 0x180f94350 / KeyStore+CryptoRSA: OpenSSL EVP) | JWT 署名・ハードウェア束縛・exp を検証 | 検証を無条件通過。または **cracked JWT 配置** (方針 §6.0-4・ユーザ承認済み) — vreg へ `Native Access\ras3\*.jwt` を再現 |
 | N5 | QML demo UI (MXDemoPopup.qml / demoExpired / subscriptionExpired) | demo 状態で popup | 非表示固定 (QML 側プロパティ常時 false / popup 生成skip) |
 | N6 | Native Access 誘導文言群 (0x184ffcf87 ほか 6 種) / Registration Tool 文言 | 未アクティベーション時に誘導 | 出現させない |
@@ -219,4 +219,4 @@ work/ (gitignore): hdr_block1/2.bin, files.json, locations.json, header_parse.js
 ## 12. MX2-3 (N5 / N6) 実測 — 2026-10-13 (#830)
 
 - 結論: N5/N6 は現行 IR pass の差し替え点を指定できない (文字列に参照元が無い)。e2e は 3 レベルとも 11/11 PASS (`d7cf3c77`)。
-- 詳細・実測表・§6 の N3 訂正: [REPORT_APPENDIX.md §12](REPORT_APPENDIX.md)。未達の起票先は同節 §12.3。
+- 詳細・実測表・§6 の N3 訂正: [REPORT_APPENDIX.md §12](REPORT_APPENDIX.md)。未達 (N5/N6) の起票先は #1017 [MX-4] (OPEN・同節 §12.3)。
