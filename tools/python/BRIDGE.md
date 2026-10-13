@@ -55,5 +55,5 @@ C. FL 側に固有の Python C API 使用 (`PythonSession`/`TMCPPythonSession`, 
 
 - 戻り値の float/int 区別はモックのみ `F()` が必要。構造値は JSON (getTrackInfo 等)。
 - `Atomics.wait` を使うため COOP/COEP 必須 (本プロジェクト全体の前提と同一)。`Worker` は module worker (Chrome ✔ 実測)。
-- ilmcp 9 関数 (PluginDB/Browser/PRScript/highlight) は FLEngine 内部機能で、mock は最小の偽実装。実装は T3。
+- ilmcp 9 関数 (PluginDB/Browser/PRScript/highlight) は `host/ilmcp.mjs` に JS ホスト実装 (PY-3, REPORT §7c)。実 FLEngine 内部機能への結線と C provider への移植は未了。
 - `mixer.getCurrentTempo(1)` の意味: MCPTools は素の BPM として扱う (clamp 10..522)。公式 docs の asInt=×1000 と食い違う可能性 → 実機未検証 (mock は MCPTools に合わせた)。
