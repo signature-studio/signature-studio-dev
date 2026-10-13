@@ -52,7 +52,7 @@
 | **ソーク 120s** (B=256 48k ランプ) | **underrun 0**, 5,764,608f bit-exact, コールバック 22,516 回, 最大 cb 504 µs, wake 遅延 <1ms 96.2% / 1–2ms 3.7% / 2–8ms 10 回 |
 | `bufferSwitchTimeInfo` (ASIOTime 148B) | 1,883 回, 位置単調・sampleRate 一致 (bad 0), 正弦 PASS。※検収で起動時の samplePosition 巻き戻り (bad=1) が 2/8 回で再現 → `flasio.c` 修正済み (§9) |
 | 過負荷 (busy 6 本 + main 30ms/100ms 停止 + cb 毎 1.5ms 演算) | underrun 0 (別実行では 1〜3 回/256〜1024f: 負荷依存で記録のみ), 復帰後ランプ一致 |
-| 強制 60ms hiccup (200 cb 毎) | underrun 5 (4352f 無音) → T が 1536→2816f へ自動拡張, **復帰後 ramp[p−S] 17000/17000 一致** (データ非破壊) |
+| 強制 60ms hiccup (200 cb 毎) | underrun 5 (4352f 無音) → T が 1536→2816f へ自動拡張, **復帰後 ramp[p−S] 17000/17000 一致** (データ非破壊)。※原実行値 (検収時)。merged HEAD の再生成 run では underrun 6 / 4736f / T=3072 (`results/results.json`、§13 参照) |
 | `SetSampleRate` 48k→44.1k (CreateBuffers 後, Start 前) | `SET_SR` で AudioContext 再生成 → `ctx.sampleRate=44100`, `sampleRateDidChange` 1 回, 正弦誤差 1.49e-8, underrun 0 |
 | `ctx.suspend()` 0.5s → resume | `kAsioResetRequest` 1 回受信, worklet 呼出間隔 max 508 ms を検知 |
 | ループバック (入力→wasm→出力, 合成ノイズ入力) | B=128/256/512 で lag = 1408/1536/2048 f (29.3/32.0/42.7 ms), 相関 1.0000, in_overruns 0, in_underflows 0 (検収再実行: lag は run 変動、B=128 で in_underflows=4 の回あり) |
@@ -129,7 +129,7 @@ e2e 追加 3 本 (`harness/run.mjs`, 計 25 シナリオ): `asio_sine_b512_96k` 
 
 ## 11. AU-7 (#193) ASIO プロファイル確定・systemTime 規約・outputLatency 吸収
 
-既知類型との関係: 該当なし (lift 欠陥ではなく、FLEngine の ASIO 呼出面の静的解析とランタイム shim の規約合わせ)。検証起点 commit `712bcdd` (コード)。再現: 静的 `FL_WIN64_DIR=<fl-win64 展開先> python3 tools/audio/fl_asio_profile.py [--negctl]` (要 capstone/pefile)、動的 `bash tools/audio/build.sh && node tools/audio/harness/run.mjs` (`tools/audio/e2e.sh` 先頭の inventory.sh は `/home/ubuntu` 固定パスのため runner では使えない)。
+既知類型との関係: 該当なし (lift 欠陥ではなく、FLEngine の ASIO 呼出面の静的解析とランタイム shim の規約合わせ)。検証起点 commit `712bcdd` (コード)。再現: 静的 `FL_WIN64_DIR=<fl-win64 展開先> python3 tools/audio/fl_asio_profile.py [--negctl]` (要 capstone/pefile)、動的 `bash tools/audio/build.sh && node tools/audio/harness/run.mjs` (`tools/audio/e2e.sh` 先頭の inventory.sh は固定ホームパス参照のため runner では使えない)。
 
 **結論**: (1) FL は getBufferSize の **min/max/granularity を読まない** → 既定 profile を ILWASAPI 値 (256/4096/512/0) に確定 (報告値は FL の挙動を変えない)。(2) FL の `bufferSwitchTimeInfo` は **samplePosition を読まず systemTime だけ**を使うので、systemTime を基準ドライバ ILWASAPI と同じ「コールバック時刻」に揃えた。(3) 起動直後 outputLatency=0 は ATTACH の待ちで吸収。**実 FLEngine 上の確認 (profile・pbtrackingmode 各モードのカーソル追従) は #34/#98 待ちで未達**。
 
@@ -175,7 +175,7 @@ e2e 追加 3 本 (`harness/run.mjs`, 計 25 シナリオ): `asio_sine_b512_96k` 
 | モード大域 0x15d89d0 と UI の Driver/Hybrid/Mixer の対応 (setter 0x12539b0 は設定構造体の別フィールドと組合せ) 未解読 | どのモードが systemTime を使うか確定していない | #34 にコメント |
 | FL が ts + outLat で可聴時刻を作るか (消費側 0xc56b46〜) 未解析 | systemTime 規約変更の効果を静的に確認できていない | #34 にコメント |
 | 実機で outputLatency が上限 600 ms まで 0 のまま (Firefox/Safari 等) の場合、0 のまま進む | 遅延を過小報告 | #187 (AU-2) にコメント |
-| `tools/audio/e2e.sh` 先頭の `inventory.sh` が `/home/ubuntu` 固定パスと M2 の work 参照 | runner で 1 コマンド e2e が通らない | #66 (E2E) にコメント |
+| `tools/audio/e2e.sh` 先頭の `inventory.sh` が固定ホームパスと M2 の work 参照 | runner で 1 コマンド e2e が通らない | #66 (E2E) にコメント |
 
 ## 12. AU-9 (#185) src/index.ts 組込パッチ設計 (`tools/audio/integration/`)
 
@@ -230,14 +230,14 @@ winmm `midiIn`/`midiOut` 20 関数の Web MIDI 実体を `src/flmidi*.c` / `src/
 | `FlAudioShimOptions.input` | in_ch>0 の ATTACH 毎に接続 (失敗しても出力は継続)。`lost` → `dev_events` に `FLA_EV_INPUT_CHANGED` (=16) → producer が `kAsioResetRequest` を発行 (`ctx.suspend` と同経路) |
 | `FLA_CMD_CONTROL_PANEL` (=8) / `FlAudioShimOptions.controlPanel` | `flasio_control_panel()` が main の UI 代替を呼ぶ。UI 未登録なら `ASE_NotPresent` (FL 側は "Could not open ASIO control panel" 経路) |
 
-検証 (コミット `1809e67`、`inventory.sh` 以外の e2e.sh 手順 = tsc → build.sh → `node harness/run.mjs` フル、headless Chrome 154 の fake device/UI、load average 0.04 開始、所要 485 s): **30/30 PASS** (新規 5 本 + 既存 25 本, `results/results.json`)。`inventory.sh` は `/home/ubuntu` 固定パスを参照するため本 run では未実行。
+検証 (コミット `1809e67`、`inventory.sh` 以外の e2e.sh 手順 = tsc → build.sh → `node harness/run.mjs` フル、headless Chrome 154 の fake device/UI、load average 0.04 開始、所要 485 s): **30/30 PASS** (新規 5 本 + 既存 25 本, `results/results.json`)。`inventory.sh` は固定ホームパス参照のため本 run では未実行。
 
 | 新規シナリオ | 結果 |
 |---|---|
 | `asio_input_ui_connect_b256` | FlAudioInput 経由で RMS 0.141・相関 1.000・lag 1536f (従来の gum 直結と同値)・resets 0 |
 | `asio_input_ui_controlpanel_switch` | `controlPanel` code=0、UI 代替が列挙 3 デバイス (Fake Default / Fake Audio Input 1 / 2) → `Fake Default Audio Input` から `Fake Audio Input 1` へライブ切替、切替後もループバック継続 (RMS 0.141) |
 | `asio_controlpanel_no_ui` | UI 未登録 → `-1000` (ASE_NotPresent)、abort なし |
-| `asio_input_lost_reset` | track ended → `kAsioResetRequest` 1 回受信、underruns 0 |
+| `asio_input_lost_reset` | 合成 `ended` (`track.dispatchEvent(new Event("ended"))`。実デバイスの取り外しではない) → `kAsioResetRequest` 1 回受信、underruns 0 |
 | `asio_input_denied_output_ok` | getUserMedia が NotAllowedError でも `permission: denied` イベント、出力は継続 (underruns 0, cb 1125) |
 
 | 未解決 | 影響 | 起票先 |
