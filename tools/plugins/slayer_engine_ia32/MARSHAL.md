@@ -16,7 +16,7 @@
 - 対象: engine の AEffect 構築関数 (ctor RVA 0x10E0〜0x1196)。 `this+0x20` に AEffect を置く。
 - 検証は**静的** (capstone の逆アセンブル store 列)。 engine を実行していないので、store 値の正しさは実行で未確認。
 - gate (`marshal.py`) が突合するのは、magic・numOutputs・version・ioRatio・uniqueID・numInputs・flags (即値)、object (`edx`)、numPrograms (`ebp`)、numParams (`eax`) の各欄。 引数由来の 2 欄は gate で「即値でなくレジスタ由来」であることを確かめる。
-- 限界: 殻の x64 側の配置は `tools/hostbridge/poc/vst2_abi.h` の `_Static_assert` を期待値として使う (殻側の実物 C 構造体はこの PoC の値)。
+- 限界: 殻の x64 側の配置は `tools/hostbridge/poc/vst2_abi.h` の `_Static_assert` を期待値として使う (殻側の実物 C 構造体はこの PoC の値)。 **`vst2_abi.h` に VstEvents / ERect の定義は無い** (AEffect のみ)。 VstEvents / ERect の x64 側は仕様の計算値で、殻の実物との突合は未実施 (§4)。
 
 ## 3. marshal 表 (AEffect)
 
@@ -58,8 +58,8 @@
 | ERect | top / left / bottom / right (int16) | 0 / 2 / 4 / 6 | 同左 (ポインタ無し) |
 
 - VstEvents の x32 側 `events[]` の要素は **ポインタ** (4 B)。 殻が渡す `VstEvent*` は 8 B 配列なので、要素を 1 件ずつ詰め直す必要がある (deep copy)。
-- **未確認**: engine が `effProcessEvents` (opcode 25) で `numEvents` と `events[]` を読む箇所。 dispatcher は opcode で分岐せず、読取箇所は別の関数にある。 次 run の対象 (§6)。
-- ERect は engine の `effEditGetRect` の書込み先として想定されるが、engine 側の store は未確認。
+- **実測 (dispatcher, RVA 0x1300・`marshal.py` の `dispatch_facts`)**: vtable[+0x18] の opcode switch は `cmp eax,0x18` / `ja` の範囲 (0〜24) のみ。 **opcode 25 (effProcessEvents) は範囲外で既定分岐 (RVA 0x149C) に落ち、何も読まず 0 を返す**。 この dispatcher で `numEvents` / `events[]` は読まれない。
+- ERect の書込み (opcode 13 = effEditGetRect): 分岐先 RVA 0x1406 は `this+8` (editor) を読み、その vtable[+4] へ `ERect**` を渡すだけ。 ctor (RVA 0x10E0) は `this+8` を 0 に初期化するため、editor 未生成時は書込みが起きない。 **ERect の実書込みは editor クラス側 (block22434 の外)** にある。
 
 ## 5. ネガコン
 
