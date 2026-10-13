@@ -31,3 +31,17 @@
 | head `fc93f45` での 30 分ソーク (無負荷) は**未実施** (未計測)。fix run の 40 分上限に 30 分 + build が収まらないため見送り。上の表の 30 分行は `0a721b0` (AU-7 取り込み前) のもので、マージ後の shim (`audio-shim.ts` ATTACH 待ち・`FLASIO_PROFILE_ILWASAPI` 既定 1) では未計測。fix run の 40 分上限に 30 分 + build が収まらないため見送り | #191 にコメント (別 run で `bash tools/audio/build.sh && node tools/audio/harness/run.mjs --soak30` を head で実施) |
 | head `57519ca` の `--soak 10` が 4 回中 1 回 FAIL (underrun 1・ramp mismatch 411,392 f、T=1280 で lat_changes 1)。原因未特定。同 head の 2 回目・3 回目は PASS | 断続的な欠陥か計測ノイズかを切り分けていない。30 分実測の信頼性にも関わる | #191 にコメント (head で `--soak 10` を 5 回以上反復し、FAIL 時の `T`・dev_fill・underrun のログを採る) |
 | 旧 page.mjs (巻き戻し非対応) での FAIL 再現未実施 | 修正の必要性は理屈のみ | 本 REPORT に明記 |
+
+### 16.1 head `6aa4b39` (main `6aa4b39`) での再計測 (2026-10-13, run 191-head)
+
+環境: GitHub runner 4 core / 15 GiB, headless google-chrome, `bash tools/audio/build.sh` 直後。結果は `results/soak_<秒>.json`。
+
+| シナリオ | 結果 | 所要 / load (開始→終了) |
+|---|---|---|
+| **30 分 (1800 s) B=256 48k ランプ・無負荷** | **PASS (exit 0)**: underruns 0, silence 0, ramp mismatches 0 / 86,402,048 f, cb 337,506 回 (late 0, 最大 18,165 µs), T=1024 (21.3 ms), lat_changes 0, dev_fill min/avg/max 128/799/1024, clock 47,999.8 Hz, secs_wall 1800.034 | 1812.4 s / 0.56 → 0.00 |
+| `--soak 10` 反復 (head `6aa4b39`) | **5 / 5 PASS** (ramp 0 / 480,512〜481,024 f, underruns 0, T=1536) | 各 約 60 s 台 (`timeout 150` 内) / 0.06 → 0.08 |
+| **420 s ランプ・負荷下** (busy ループ 14 本を並走) | **PASS (exit 0)**: underruns 0, silence 0, ramp 0 / 20,168,192 f, cb 78,783 回 (late 0, 最大 184 µs), T=1536, lat_changes 1, clock 47,988.5 Hz | 476.5 s / 1.32 → **14.15** (15 分平均 12.89 まで上昇) |
+
+- 10 秒ソークの断続 FAIL (head `57519ca` で 1/3 回発生) は、head `6aa4b39` の 5 回反復では再現せず。原因は依然未特定 (計測ノイズと断定しない)。
+- 本節の 30 分値は head `6aa4b39` (`AU-7` 取り込み後) の実測で、§16 の表の `0a721b0` 版より新しい。
+- 未解決: **負荷下の 30 分ソーク** は未実施 (420 s で代替)。COM 経路 (#271) の 30 分は §16 の未解決表のとおり範囲外。
