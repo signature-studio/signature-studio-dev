@@ -148,6 +148,32 @@ awk -F'\t' -v a=401 -v b=404 'NR>1 && $1>=a && $1<=b {s+=$4; l+=$5; n+=$6; u+=$7
 | `0x128c320` の関数境界誤認 (1 バイト関数化) と NonRecursiveCFGBuilder 警告 | 隣接関数の lift 欠落の疑い | 子 issue (下記) |
 | jump table cmp/je 展開 / Balance・KH・FA wasm 差分 / stack 引数動的検証 / plugin closure バッチ | 本 run 範囲外 | 子 issue (下記) |
 
+### 12.3 ICALL-15 (#1014): SCCP が 0x1dc0080 の load を undef にする条件 (HEAD `a5adb2fc`)
+
+検証 (本 run): `measure_flengine_split.sh` 133 s (load 0.62 → 1.43, 4 core) で base 366 / c2 366 を再現。`sccp_stub_drop.py` 49 s で dump 709 本。全段の IR は `$RUNNER_TEMP` に保存して解析 (commit なし)。RetDec v5.0 (`toolchain-retdec`)。`sites_after.json` の per-site 集計は dropped 366 / kept_indirect 8 で、dropped は関数別に 0xc589b0 = 183 / 0x128f9e0 = 183 (kept 8)。
+
+**結論 (lift した IR 上の機構)**: SCCP の前段 GVN が、分岐の selector になっている global の load を「直前に store された定数」へ畳み込む。その結果 `switch` の `case` 枝が到達不能になり、そこに含まれる 0x1dc0080 の load と stub 呼出しが死コードになる。SCCP は到達不能ブロックの分岐条件を `undef` にして stub を消す。SCCP が load を直接 undef とみなすのではない (`0x1dc0080` の load 自体は undef になっていない)。
+
+| 関数 (lift 名) | selector の global | 直前の store | GVN 前に到達可能なブロック | GVN 後 | SCCP 後 |
+|---|---|---|--:|--:|--:|
+| `function_1cc0000` (0xc589b0 相当) | `0x1504dd4` (`g4`) | `store i32 8` (`dec_label_pc_1cc0823`) | 24 / 303 (stub 含むブロック 114 中 76 が到達可能) | stub を含むブロック 0 / 114 到達 | stub 0・`br i1 undef` 161 |
+| `function_1cc9b70` (0x128f9e0 相当) | `0x15d14e8` | `store i32 7` (`dec_label_pc_1ccaa11`) | 220 / 316 (stub 含むブロック 121 中 83 が到達可能) | 38 / 316、stub ブロック 7 到達 | stub 9・`br i1 undef` 161 |
+
+- 0x1dc0080 の load (`function_1cc0000` で 75 ブロック) は、GVN 前は 50 が到達可能、GVN 後は 0 が到達可能。load 命令数は §12.1 のとおり各関数 99 本 (ここは `function_1cc0000` のブロック数 75 とは別の集計)。
+- 支配関係 (確認済み): `function_1cc0000` の store ブロック `0823` は 08ff への唯一の入口 (`0823` を除くと 08ff に到達しない)。`0823`→`08ff` の間に call は無い。`function_1cc9b70` も同様に、switch ブロック `ccaaed` への全経路が唯一の writer `ccaa11` を通る。したがって GVN の畳み込みは lift した CFG 上では健全。
+- 書込み元 (確認済み): `0x1504dd4` へのアクセスは lift 全体で `function_1cc0000` 内の 5 箇所のみ (`0x15d14e8` 側も同様)。`decompile` の C にも `g4 = 8` (0xc59182、`if (g22 > 1)` の内側) が native の書込みとして存在する。
+- **未確定 (本 issue の残り)**: 畳み込まれた switch の default 枝が native 実行時に常に取られるかは未検証。lift の分岐条件が正しいなら、落ちた site は native でも実行されない死コードの可能性がある。実行で確かめるには、`g22 > 1` の分岐を native で通す入力が必要で、これは素材・実行経路が未整備 (§14 と同じ制約)。
+- 「落ちた 366 site の IR 上の形 (消失 / 別関数への移動)」の分類: 関数単位では 0xc589b0 183 / 0x128f9e0 183 が dropped で、移動先の関数は無い (site の `fn` は元の関数のまま)。stub と site の 1 対 1 対応 (ブロック単位) は未確認 (算術の一致のみ)。
+- 修正 (受入条件 3) は未実施。畳み込みが lift の意図どおりかを決めてから方針を選ぶ必要がある。
+
+### 12.4 #1014 の残 (未達)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 畳み込まれた switch 枝が native で実行されるか (動的検証) | 366 site が真に死コードか、lift 欠陥か | #1014 (継続) |
+| 落ちた site と stub のブロック単位の 1 対 1 対応 | 受入条件 2 の完全な分類 | #1014 (継続) |
+| 修正して kept を 366 から減らす | 受入条件 3 | #1014 (継続) |
+
 ## 14. ICALL-16: stack 引数の動的検証の実測 (#1023, REPORT.md §12 から分割移動)
 
 結論: **OTT では stack 引数の値一致を動的に検証できない** (stack 引数あり site が実行経路に無い)。達成は未了で、残りは #854 / #229 が追跡する。
