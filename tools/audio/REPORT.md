@@ -43,7 +43,7 @@
 | `tools/audio/test/*`, `harness/*` | テスト wasm (正弦/ランプ/ループバック), CDP 駆動 headless Chrome ランナー (COOP/COEP 付き静的サーバ込み) |
 | `tools/audio/{inventory.sh,e2e.sh,build.sh,flags.sh}`, `*.py` | 実測スクリプト群 (capstone/pefile/llvm-nm), emcc フラグは `tools/m1,shim/flags.sh` 流儀 |
 
-## 5. 検証結果 (下表は原実行 (検収時) の値。`results/results.json` は merged HEAD `a6212bc` の 33/33 run。差分は §13。検収の独立再実行は §9)
+## 5. 検証結果 (下表は原実行 (検収時) の値。`results/results.json` は merged HEAD `a6212bc` の 33/33 run。差分は §14 / `REPORT_AU5.md`。検収の独立再実行は §9)
 
 | シナリオ | 結果 |
 |---|---|
@@ -52,7 +52,7 @@
 | **ソーク 120s** (B=256 48k ランプ) | **underrun 0**, 5,764,608f bit-exact, コールバック 22,516 回, 最大 cb 504 µs, wake 遅延 <1ms 96.2% / 1–2ms 3.7% / 2–8ms 10 回 |
 | `bufferSwitchTimeInfo` (ASIOTime 148B) | 1,883 回, 位置単調・sampleRate 一致 (bad 0), 正弦 PASS。※検収で起動時の samplePosition 巻き戻り (bad=1) が 2/8 回で再現 → `flasio.c` 修正済み (§9) |
 | 過負荷 (busy 6 本 + main 30ms/100ms 停止 + cb 毎 1.5ms 演算) | underrun 0 (別実行では 1〜3 回/256〜1024f: 負荷依存で記録のみ), 復帰後ランプ一致 |
-| 強制 60ms hiccup (200 cb 毎) | underrun 5 (4352f 無音) → T が 1536→2816f へ自動拡張, **復帰後 ramp[p−S] 17000/17000 一致** (データ非破壊)。※原実行値 (検収時)。merged HEAD の再生成 run では underrun 6 / 4736f / T=3072 (`results/results.json`、§13 参照) |
+| 強制 60ms hiccup (200 cb 毎) | underrun 5 (4352f 無音) → T が 1536→2816f へ自動拡張, **復帰後 ramp[p−S] 17000/17000 一致** (データ非破壊)。※原実行値 (検収時)。merged HEAD の再生成 run では underrun 6 / 4736f / T=3072 (`results/results.json`、`REPORT_AU5.md` 参照) |
 | `SetSampleRate` 48k→44.1k (CreateBuffers 後, Start 前) | `SET_SR` で AudioContext 再生成 → `ctx.sampleRate=44100`, `sampleRateDidChange` 1 回, 正弦誤差 1.49e-8, underrun 0 |
 | `ctx.suspend()` 0.5s → resume | `kAsioResetRequest` 1 回受信, worklet 呼出間隔 max 508 ms を検知 |
 | ループバック (入力→wasm→出力, 合成ノイズ入力) | B=128/256/512 で lag = 1408/1536/2048 f (29.3/32.0/42.7 ms), 相関 1.0000, in_overruns 0, in_underflows 0 (検収再実行: lag は run 変動、B=128 で in_underflows=4 の回あり) |
@@ -222,35 +222,4 @@ winmm `midiIn`/`midiOut` 20 関数の Web MIDI 実体を `src/flmidi*.c` / `src/
 
 ## 14. AU-5 (#192) 入力デバイス選択・controlPanel・入力喪失リセット (main thread 部品)
 
-既知類型との関係: 該当なし (lift 欠陥ではなくランタイム shim)。
-
-| 追加 | 内容 |
-|---|---|
-| `src/runtime/audio-input.ts` (`FlAudioInput`) | 権限の取得/要求 (`permission()`/`requestPermission()`)、audioinput 列挙、`select(deviceId)` (接続中はライブ切替、選択は storage に永続化)、MediaStreamSource を worklet node へ接続。選択 device が消えたら既定へフォールバック。track ended / device 消失は `lost` イベント |
-| `FlAudioShimOptions.input` | in_ch>0 の ATTACH 毎に接続 (失敗しても出力は継続)。`lost` → `dev_events` に `FLA_EV_INPUT_CHANGED` (=16) → producer が `kAsioResetRequest` を発行 (`ctx.suspend` と同経路) |
-| `FLA_CMD_CONTROL_PANEL` (=8) / `FlAudioShimOptions.controlPanel` | `flasio_control_panel()` が main の UI 代替を呼ぶ。UI 未登録なら `ASE_NotPresent` (FL 側は "Could not open ASIO control panel" 経路) |
-
-検証 (`inventory.sh` 以外の e2e.sh 手順 = tsc → build.sh → `node harness/run.mjs` フル、headless Chrome 154 の fake device/UI、`inventory.sh` は固定ホームパス参照のため未実行):
-
-| 回 | コミット | 結果 | 所要 | 開始時 load |
-|---|---|---|---|---|
-| 1 (pre-merge) | `1809e67` | 30/30 PASS (新規 5 + 既存 25) | 485 s | 0.04 |
-| 2 (merged, 修正前) | `b66c676` | 32/33 PASS。`asio_ramp_b128_d2` のみ FAIL (underrun 1, silence 640) | 518 s | 0.45 |
-| 2' (2 の単独再実行) | `b66c676` | `--only asio_ramp_b128_d2` 1/1 PASS (underrun 0, mismatch 0/961024) | 73 s | 0.13 |
-| 3 (最終) | `a6212bc` | **33/33 PASS** (main 側 3 件を含む全 33 件), exit 0 | 498 s | 0.20 |
-
-回 2 の FAIL は B=128 のランプ試験の揺れ (入力を使わないシナリオ・同一コードで回 2' は PASS)。再現性の確認は回 3 の PASS と回 2' による。`results/results.json` は回 3 の生成物。
-
-| 新規シナリオ | 結果 |
-|---|---|
-| `asio_input_ui_connect_b256` | FlAudioInput 経由で RMS 0.141・相関 1.000・lag 1536f (従来の gum 直結と同値)・resets 0 |
-| `asio_input_ui_controlpanel_switch` | `controlPanel` code=0、UI 代替が列挙 3 デバイス (Fake Default / Fake Audio Input 1 / 2) → `Fake Default Audio Input` から `Fake Audio Input 1` へライブ切替、切替後もループバック継続 (RMS 0.141) |
-| `asio_controlpanel_no_ui` | UI 未登録 → `-1000` (ASE_NotPresent)、abort なし |
-| `asio_input_lost_reset` | 合成 `ended` (`track.dispatchEvent(new Event("ended"))`。実デバイスの取り外しではない) → `kAsioResetRequest` 1 回受信、underruns 0 |
-| `asio_input_denied_output_ok` | getUserMedia が NotAllowedError でも `permission: denied` イベント、出力は継続 (underruns 0, cb 1125) |
-
-| 未解決 | 影響 | 起票先 |
-|---|---|---|
-| FL 本体側の kAsioResetRequest 再初期化確認 | shim は ASIO コールバックまで発行を確認済み。FL がそれで再初期化するかは FL ブートが必要で未検証 | #192 (Refs) |
-| 入力遅延の実機実測 | fake device の lag (1536f) までしか出ない | #187 (AU-2) |
-| 製品 UI (パネル画面・ユーザジェスチャ導線) | 本 PR は部品と UI 代替フックまで | #184 (AU-9) |
+`FlAudioInput` (入力デバイス選択・権限・入力喪失)・`FlAudioShimOptions.input` / `controlPanel`・`FLA_CMD_CONTROL_PANEL` (=8)・`FLA_EV_INPUT_CHANGED` (=16) を実装。e2e 33/33 PASS (merged HEAD `a6212bc`、新規 5 シナリオ含む)。結論: 部品と UI 代替フックまで。FL 本体の kAsioResetRequest 再初期化確認 (#192)・入力遅延の実機実測 (#187)・製品 UI (#184) は未解決。詳細・検証回次・シナリオ表は `REPORT_AU5.md`。
