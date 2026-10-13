@@ -28,6 +28,11 @@ static u64 kh_heap_alloc(u64 bytes) {
 }
 '''
 
+# emscripten libc と名前が重なる named import は abort stub にすると libc を上書きする。到達したら生成段で止める。
+LIBC_NAMES = {'memcpy', 'memmove', 'memset', 'memcmp', 'strlen', 'strcmp', 'strncmp', 'strcpy', 'strncpy', 'strcat',
+              'malloc', 'calloc', 'realloc', 'free', 'abort', 'exit', 'atexit', 'printf', 'sprintf', 'puts', 'qsort',
+              'sqrt', 'floor', 'ceil', 'fabs', 'pow', 'exp', 'log', 'sin', 'cos', 'modf', 'fmod'}
+
 IMP_SHIM = {
     'HeapAlloc': 'rax = kh_heap_alloc(r8);',
     'HeapFree': 'rax = 1;',
@@ -96,6 +101,9 @@ def main():
     body = '\n'.join(x for x in text if not x.startswith('declare '))
     used_names = sorted({n for n in re.findall(r'@([A-Za-z][\w]*)\(', body)
                          if not n.startswith(('function_', 'kh_', 'llvm', 'global_var'))})
+    clash = [n for n in used_names if n in LIBC_NAMES]
+    if clash:
+        sys.exit('gen_stubs_sigs: named import が libc/CRT 名と衝突 (abort stub が libc を上書きする): %s。shim 化か除外が必要' % ', '.join(clash))
     if used_names:
         out.append(HEAP_C)
         out.append('extern u64 rax, rcx, rdx, r8, r9;')

@@ -47,6 +47,18 @@ def decl_cases():
         check('decl:no_trap_rejected', True)
 
 
+def libc_clash_cases():
+    ll = 'define i64 @function_1()\n{\n  %%1 = call i64 @%s()\n  ret i64 %%1\n}\ndeclare void @llvm.trap()\n'
+    gen = os.path.join(LIC, 'lift', 'gen_stubs_sigs.py')
+    with tempfile.TemporaryDirectory() as td:
+        src = os.path.join(td, 'f.ll')
+        for name, want in [('memcpy', 1), ('GetCurrentThreadId', 0)]:
+            open(src, 'w').write(ll % name)
+            r = subprocess.run([sys.executable, gen, src, os.path.join(td, 's.c'), os.path.join(td, 's.json')],
+                               capture_output=True, text=True)
+            check('libc_clash:%s_%s' % (name, 'rejected' if want else 'accepted'), (r.returncode != 0) == bool(want))
+
+
 def heap_cases():
     c = g.HEAP_C
     c = c.replace('#define KH_HEAP 0x05000000ULL', '#define KH_HEAP ((u64)(uintptr_t)HB)')
@@ -87,6 +99,7 @@ int main(void) {
 
 
 decl_cases()
+libc_clash_cases()
 heap_cases()
 print('RESULT %s' % ('PASS' if not fails else 'FAIL ' + ','.join(fails)))
 sys.exit(1 if fails else 0)

@@ -152,3 +152,6 @@ DSP 固有 closure (42 効果) にはライセンス/ネット系参照が無く
 - 上記は HEAD 変更後の `lift/gen_stubs_sigs.py` の `HEAP_C` を、アドレスだけホストバッファへ差し替えて実行したもの (`kh710_check.py`)。
 - **未実施**: emcc rc=0/1、license A/B/E/F の wasm sha256 再計算、`kh249_check.mjs` の ok=17。`fl-win64` 素材に winpkg・emsdk・RetDec が無く再現できないため、旧 HEAD (`9c1f7c0b`) の sha256 表は**この変更で無効**。再計算は winpkg と emsdk のある環境で `lic_build.py --module A|B|E|F` を実行して行う (未実施・起票先は PR 本文)。
 - `product_index.json` (46 plugins) は `work/winpkg/` の生成物 (gitignore)。差分に出ないのは仕様どおり。再生成には `plugins-kilohearts` 素材が要る (`scripts/kh249_product_index.py`)。
+- **libc / CRT 名衝突 (レビュー指摘 3・#710)**: `gen_stubs_sigs.py` は body 中の未知の `@Name(` に `abort()` 付きの定義を生成するため、`memcpy`・`strlen`・`sqrt` 等が named import として出ると libc を上書きする。`LIBC_NAMES` (memcpy/memset/strlen/sqrt/malloc/printf 等 33 名) に当たる名前が `used_names` に出たら生成段で `sys.exit` する (`scripts/kh710_check.py` の `libc_clash:*` で検査: memcpy は停止 / GetCurrentThreadId は通過 = PASS)。
+  - **実 lift 出力での `used_names` 列挙は未実施**。`lic_build.py` は RetDec・winpkg・emsdk を要し、`fl-win64` 素材にはいずれも無い。素材が揃った環境で `final.ll` の `used_names` を出し、`LIBC_NAMES` と突き合わせて空を確認すること (未確認・起票先は PR 本文)。
+- 実行: `python3 scripts/kh710_check.py` → `RESULT PASS` (rc=0・全 15 項目 PASS)。
