@@ -79,7 +79,7 @@ PM (main)                      subagent (実装)                  subagent (検�
 2. 同一チケット / 同一 dir に In progress または In review があれば**着手せず報告**。
 3. lift / 逆アセ / IR pass / ハーネス系は `docs/DEFECTS.md` を先に読み、REPORT 冒頭に
    「既知類型との関係: 該当 ID / 該当なし」を 1 行書く。
-   **番号体系の注意**: `docs/DEFECTS.md` の D1〜D16 と `tools/icall/REPORT.md` §4 の D1〜D13 は
+   **番号体系の注意**: `docs/DEFECTS.md` の D1〜D19 と `tools/icall/REPORT.md` §4 の D1〜D13 は
    **別体系**。参照時は `(DEFECTS.md)` / `(icall §4)` を必ず併記。
 4. **担当 dir 以外の未コミット変更は他担当の WIP**: 触らない・commit に含めない・stash/checkout/clean しない。
 5. ユーザへ追加アーティファクトを依頼する前に必ず検証する (`docs/REFERENCES.md` `[DOWNLOADS]` と
@@ -179,7 +179,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
 - **素材**: 既定で取得されるのは `fl-win64` のみ。他は本文に `oc_artifacts: fl-win64 plugins-ott` の
   行を書く (許可名: fl-win64 / plugins-ott / plugins-freshair / plugins-serum2 / plugins-massivex /
   plugins-kilohearts / toolchain-retdec / toolchain-emsdk / work-m11 / work-liftdiff / work-m6-ott /
-  work-liftlib-targets / work-liftlib / work-icall / work-fw-stage1 / analysis-ott-binaries / apt-mingw。それ以外は
+  work-liftlib-targets / work-liftlib / work-icall / work-fw-stage1 / analysis-ott-binaries / analysis-mac-shared / apt-mingw。それ以外は
   run が失敗する)。全素材は約 17.7 GiB (2026-10-13 実測) のため必要分だけ指定する。
   - `toolchain-retdec` → `/opt/retdec`、`toolchain-emsdk` → `/opt/emsdk` に展開される。
   - `work-m6-ott` → `tools/m6/work/` + `tools/ott/work/` + `tools/m8/work/` + `tools/m9/work/` + `tools/m10/work/`
@@ -188,6 +188,9 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     の HeartCore / SlateCore のみ (liftlib_e2e.sh の `need` 対象) に展開される
   - `analysis-ott-binaries` → `$HOME/analysis/plugins/ott/binaries/` (OTT_vst2_win64.dll ほか実機バイナリ。
     展開後は `ANALYSIS_DIR=$HOME/analysis` が環境に入る。tools/shared/env.sh の既定 /home/ubuntu/work/analysis を上書きする)
+  - `analysis-mac-shared` → `$HOME/analysis/mac/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL/Shared/` に FL の mac 版 dylib (`libkio_x64.dylib` 等 25 本) が展開される
+    (`analysis-*` の規約で `ANALYSIS_DIR=$HOME/analysis` が環境に入り、`FL_MAC_DIR` の既定 `$ANALYSIS_DIR/mac` から見える)。
+    T-SH 系 (shared ライブラリ lift) の native 参照オラクルが `mmap(RWX)` + ctypes で実行する。#761。
   - `apt-mingw` は R2 の素材ではなく、`gcc-mingw-w64-x86-64` を runner に apt 導入する
     (`x86_64-w64-mingw32-gcc`。PE を作るテスト用で tools/ の 22 ファイルが使う。#646)。
   - `work-m11` → `tools/m11/work/`、`work-liftdiff` → `tools/liftdiff/work/` に展開される
