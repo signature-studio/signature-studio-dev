@@ -233,3 +233,13 @@ frontier = 閉包から呼ぶ framework 関数 (P0a の共有 wasm 側)。 vcall
 | `closure_facts.py` `icall_summary.py` `ipp_use.py` | 閉包 / host / kernel / engine 外形、icall 集計表、IPP 実使用 (測定) |
 | `engine_lift.sh` `engine_ranges.py` `engine_defs.py` `engine_fixcmp.py` `engine_bisect.py` `bisect_census.py` | engine の全 `.pdata` lift・欠落監査・局所修復・RetDec 落ち関数の二分探索と命令比較 |
 | `prep.sh` `env.sh` | 前提 inventory (`f2/mk_blockmap.py` で blockmap 再構成) / 環境 |
+
+## 12. #523 (PLG-F4-2) 追補: engine 再測定と E6 修復
+
+- 日付: 2026-10-13 / HEAD: main 97f28539 から `523-plg-f4-2-engine-lift` で作業。 素材 `fl-win64` / `toolchain-*` / `work-*` / `plugins-ott` は `$HOME/artifacts` に実在確認。
+- **E6 修復**: `lift/passes/m11_simd2.py` の仮引数名 `'abc'[i]` を `'abcdefghijklmnop'[i]` に変更 (4 引数以上の `__asm_*` helper で IndexError)。 synthetic IR (3 引数 2 本) で旧版と出力 byte 一致 (`cmp` IDENTICAL)、4 引数 helper が宣言として生成されることを確認。 共有 lift 鎖への影響は 3 引数以下の出力不変 (既存 T0/T1 の `emcc -c` 退行確認は未実施 — 次手で要)。
+- **E1 / E4 は HEAD で再現せず**: Delay 3 engine (19000) を HEAD で再 lift (`engine_lift.sh 19000`、実測 165 s): RetDec rc 0 / define 4,107 / `emcc -c` rc 1。 `emcc` の最初のエラーは E1 でなく x86_fp80 の `do not know how to soften fp_extend` / `no libcall available for frem / fp_round with type f80` (`function_1800bcb00` ほか)。 `fixcmp` 後も同じ。 `PLUG_F80_LOWER=1` を足すと `emcc -c` rc 0 (到達性のみ。 f64 化で精度は落ちる)。 REPORT §7 の E1→E4 記述は現 HEAD では再現しない (要更新)。
+- **19165 (Multiband Delay) の再測定**: 78 関数を mnemonic 基準 (`vpermpd`/`vpermd`/`vpexpandd`/`vshufi32x4`/`valignd`) で `reverb_delay/avx_bad_ranges.py` により列挙 → **78 件** (§7 の 78 と一致)。 `IPPCODE` 除外 + 78 除外で `engine_lift.sh` 実測 (10 分 23 秒、15:37:59–15:48:22 UTC): RetDec rc 0、define 2,608、unimpl helper 241、f80 関数 6、`emcc -c` **rc 139 (segfault)**。 (summary.csv 実測: `19165,2000,0,2608,6,241,139,0,139,606,...`) E5 は回避、E6 は解消。 segfault は新類型で未解析。
+- **未解決 (起票先: #523 継続)**: (a) 19165 `emcc -c` segfault、(b) 19000 の f80 1 関数 (`function_1800bcb00`) (`PLUG_F80_LOWER` 無しでは通らない)、(c) 78 関数の AVX2/AVX-512 命令 (E5) の変換追加、(d) IPPCODE の扱い (#38 [IPP-10] との決定)、(e) 殻との LoadLibrary 結合 (未解析)。
+
+
