@@ -239,7 +239,12 @@ python3 tools/icall/diff/fn3_diff.py 1801a9be0 --n 600 --dump    # native / rout
 **liftlib 統合への影響**: `passes.icall` を持つ liftlib target は `tools/liftlib/targets/ott_route.json` のみ (`grep '"icall"'` で確認)。`liftlib_e2e.sh` / `python3 -m liftlib regress` は fa_gain / kh_gain / OTT (`ott.drc.ll` 系) だけを扱い icall pass を通らないため、#514 の影響は無い。`liftlib_e2e.sh` 自体は `tools/targets/{freshair,kilohearts}/work` (素材 `work-liftlib-targets`) が無く未実行。
 代わりに `pipeline.run_all('targets/ott_route.json', detect_only=True)` を実行: prelift 280 関数・96 site・errors {} → RetDec → restore (dispatch 96 / comis 119)、23.8 秒 (load 0.62)。RetDec 出力の `define` 数 331 (内訳は未分解: range 279 本に対し RetDec が補助関数も定義する。併合有無の判定は未実施)、書換え後 range の連続 0 組。
 
+### 10.2 #600: `liftlib_e2e.sh` の素材付き実走 (base `8f55002`、コード無変更)
+
+素材: `work-liftlib-targets work-liftlib work-m6-ott plugins-ott analysis-ott-binaries toolchain-retdec toolchain-emsdk`。`bash tools/liftlib/liftlib_e2e.sh` = **ALL PASS, exit 0, 387 秒** (load 0.71 開始 → 1.01 終了、直列 1 本): unit ALL PASS / regress fa_gain 400/400・kh_gain 366/366 bit-exact・OTT 2 構成 PASS (census junkHi 104 ≤ 104, 出力 SHA 42/42 一致) / simd 205 mnemonic mismatch 0 / inject 94/94 検出・偽陽性 0 / leafspec gate (exp 40/40, log 32/32) PASS。icall pass は通らない経路 (§10.1) なので #514 の影響なしを実測で確認。leafspec の tan/svf/cvt は gate 無しの情報行 (mismatch 29/30/6、既存)。
+実走の前提 2 点 (実測): ① python に `pefile` `capstone==5.0.7` が必要 (無いと exit 1 で fail-closed、1 回目 359 秒で FAIL)。② `work-liftlib` に `/home/ubuntu/...` を指す dangling symlink 133 本 (`ott_*/work/full_t1.drc.{ll,dsm}`) が含まれ、`recipes/ott.py` の `os.path.exists` が偽→`os.symlink` が FileExistsError で regress が落ちる。削除して再実行 (展開物のみ・commit 対象外)。素材側の修正は別途。
+
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `liftlib_e2e.sh` 全体は `work-liftlib-targets` 無しで未実行 | icall pass 経路外なので影響なしと判断 (上記) だが実走は未確認 | #600 (`oc_artifacts: work-liftlib-targets work-liftlib work-m6-ott plugins-ott analysis-ott-binaries toolchain-retdec toolchain-emsdk`) |
+| `work-liftlib` の dangling symlink 133 本 (runner で regress が FileExistsError) | 素材展開直後は liftlib_e2e.sh が FAIL (削除で回避) | #448 |
 | FMA3 経路 `1801a9be0` が xmm0 42/600 (gate 外の INFO 行) | 本 PR と無関係 (既存の INFO 表示) | #229 (icall 親) |
