@@ -70,4 +70,4 @@ runner (Linux) では Safari を起動できないため、macOS 実機で以下
 3. `work/p7_safari.json` を `tools/perf/p7/results/` に移し、上限・lazy compile・Memory 本数の数値を §0 と同じ表形式で本ファイルに追記する。
 4. 検証: Safari 上で `done` が届かない場合は、Safari の開発メニュー → コンソールのエラーを記録する。
 
-確認済み (runner, 本 PR の HEAD): サーバ起動・`p7.html` 200・`/wasm?c=mid` 200 (941,572 B)・`POST /result` 200・`done` の受信と JSON 書き出し。Safari 本体の挙動は未確認。
+確認済み (runner, 26ce4469): `work/` を削除した状態から `mkdir -p work` → one-liner 起動 → `POST /result?cfg=safari&key=done` 200 → 3.5 秒待機後に `work/p7_safari.json` を読み、`{"safari":{"done":{"ok":true}}}` が含まれることを確認 (rc=0)。`p7.html` 200・`/wasm?c=mid` 200 (941,572 B) も確認済み。Safari 本体の挙動は未確認 (runner では Safari を起動できない)。
