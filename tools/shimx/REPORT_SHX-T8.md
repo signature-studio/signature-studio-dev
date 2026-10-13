@@ -48,7 +48,9 @@ MultiByteToWideChar / WideCharToMultiByte / GetCPInfo(Ex) / IsValidCodePage / Is
 
 範囲外: 実 PE (OTT/Serum2) を実際にリンク・実行しての import 解決は未実施 (`plugins-*` 素材なしで、coverage は `data/imports.json` の既存スナップショット (import_scan.py 出力) と `shimx` 定義の突合)。
 `verify_ott` / M11 closure 突合は `work-m11` / `work-m6-ott` が無く SKIP (§13 と同じ)。このため `test.sh` が再生成した `BACKLOG.md` / `inventory.md` / `data/inventory.csv` は M11・OTT 列が空になり劣化するので **main 版のまま (未更新)** にした。`data/coverage.json` は生成器 (`gen_inventory.py`) の出力のうち `plugins` / `shimx_*` / `ordinal` のみ反映し、`m11_closure` / `ott_api_resolved` は main 版を保持。
-結果として `inventory.md` / `BACKLOG.md` は「ord74 等が未解決」と古いままで `coverage.json` と食い違う → 15.5 の未解決に計上 (素材 `work-m11 work-m6-ott` 付きで `bash tools/shimx/test.sh` を再実行すれば生成器が全て更新する。生成器側は本 PR で修正済み)。
+結果として `inventory.md` / `BACKLOG.md` は「ord74 等が未解決」と古いままで `coverage.json` と食い違う → 15.5 の未解決に計上 (素材 `work-m11 work-m6-ott` 付きで `bash tools/shimx/test.sh` を再実行すれば生成器が全て更新する)。
+
+exports.txt の再生成差分: 並べ替えに加えて **9 本が追加** (削除 0)。`shimx_drag_accepts` `shimx_hdrop_create` `shimx_seh_current_exception` `shimx_seh_depth` `shimx_seh_enter` `shimx_seh_leave` `shimx_seh_set_pad_resolver` `shimx_seh_set_typed_matcher` `shimx_set_notify_hook`。いずれも `src/shell.c` / `src/seh.c` / `src/handles.c` に既に定義があり、main の exports.txt が古かっただけ (生成結果は正しい)。
 
 ### 15.5 序数の裏取り (call site 引数) と残件
 
@@ -61,8 +63,8 @@ MultiByteToWideChar / WideCharToMultiByte / GetCPInfo(Ex) / IsValidCodePage / Is
 | Serum2 shell32 #190 | `0x180267bef` (IAT `0x180fe2f20`) | `rcx`=`wstr` 相当 (`0x180267410` でパス文字列を埋めた後に呼ぶ) | `ILCreateFromPathW(wstr)` 一致 |
 | Serum2 shell32 #155 | `0x180267c55` (IAT `0x180fe2f28`) | `rcx`=直前の PIDL (`test rsi` で非 NULL 時のみ呼ぶ) | `ILFree(ptr)` 一致 |
 | Serum2 shlwapi #219 | `0x18094936d` / `0x1809499c1` → thunk `0x180a1b430` → IAT `0x180fe3068` | `QISearch(this, tab, riid, out)` の 4 引数を `rcx..r9` に配置。`tab`=`0x180f96370` が `QITAB` 2 エントリ (`piid` 有り, offset 0 / 8) | `QISearch(ptr ptr ptr ptr)` 一致 |
-| Serum2 d2d1 #1 | `0x1801668da` (thunk `0x180a1b150`) | `(rcx=1, rdx=riid, r8=0, r9=out)` | `D2D1CreateFactory(long ptr ptr ptr)` 一致 (`d2d1.spec` は名前のみで序数を明示しないため、引数形による裏取り) |
+| Serum2 d2d1 #1 | `0x1801668da` (thunk `0x180a1b150`) | `(rcx=1, rdx=riid, r8=0, r9=out)` | 引数形は `D2D1CreateFactory(long ptr ptr ptr)` と一致。ただし同定は tools/gui 担当で保留 (`d2d1.spec` は名前のみで序数を明示しない) |
 
-以上により、受入条件の「呼出箇所の引数から裏取り」は 6 件すべて完了。`ORD_KNOWN` / `shord.c` の同定に変更は無い。裏取り用の逆アセ (`objdump -d`) は `work/` 配下 (commit しない)。
+以上により、shell32 / shlwapi の 5 件は Wine spec と呼出し箇所の引数形が一致した。d2d1 #1 は引数形が一致するが、同定は tools/gui 担当で保留する (`ORD_KNOWN` には入れない)。`ORD_KNOWN` / `shord.c` の同定に変更は無い。裏取り用の逆アセ (`objdump -d`) は `work/` 配下 (commit しない)。
 
-**残件**: なし (序数の同定根拠は Wine spec + call site 引数の二重化で揃った。`ORD_KNOWN` の d2d1 ord1 は tools/gui 担当帯のままで、分母 238 外)。
+**残件**: d2d1 ord1 (tools/gui 担当, 分母外)。`inventory.md` / `BACKLOG.md` の「名前解決不能」表記は、この保留と一致している。
