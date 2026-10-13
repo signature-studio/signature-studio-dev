@@ -2,7 +2,7 @@
 # H10 (#218) 1 コマンド検証: Fruity Wrapper の wrapper-chunk reader 解析の主張を機械検査する.
 #   ① PE バイト検査 (capstone; fw_a=block19091, fw_b=block23676, FLEngine=block00031)  ② evidence 文面検査  ③ ネガティブコントロール 10 本
 #   ④ typecheck  ⑤ reader 模型 test (生成 DB の .fst 5 件 + 実機 OTT.fst)
-# 前提: fl-win64 素材 ($FL_WIN64_DIR/extracted/block19091_PE.bin, block23676_PE.bin)。Ghidra は不要 (evidence は commit 済み)。
+# 前提: fl-win64 素材 ($FL_WIN64_DIR/extracted/block19091_PE.bin, block23676_PE.bin) + toolchain-emsdk (/opt/emsdk; #549 の shimx CP_ACP probe)。Ghidra は不要 (evidence は commit 済み)。
 # Ghidra で evidence を再生成: bash analysis/reproduce.sh
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -48,9 +48,21 @@ done
 step "typecheck"
 ../../../node_modules/.bin/tsc -p tsconfig.json && echo ok || { echo "FAIL: typecheck"; fail=1; }
 
+step "shimx CP_ACP probe build (#549: 実 src/str.c の MultiByteToWideChar を emcc でビルド; 素材 toolchain-emsdk 必須)"
+set +u; . /opt/emsdk/emsdk_env.sh >/dev/null 2>&1; set -u
+command -v emcc >/dev/null || { echo "FAIL: emcc not found (oc_artifacts: toolchain-emsdk)"; exit 1; }
+# shellcheck disable=SC1091
+source ../../shimx/flags.sh
+rm -f work/shimx_acp_probe.cjs
+emcc "${SHIMX_CLANG_FLAGS[@]}" "${SHIMX_EMCC_ST[@]}" ../../shimx/src/*.c analysis/shimx_acp_probe.c -o work/shimx_acp_probe.js \
+  && mv work/shimx_acp_probe.js work/shimx_acp_probe.cjs && echo "ok: $(node work/shimx_acp_probe.cjs 0 | head -1) (shimx 既定)" || { echo "FAIL: probe build"; fail=1; }
+
 step "reader model tests (node:test)"
 node --test test/*.test.ts 2>&1 | grep -E "^# (tests|pass|fail|skipped)|^not ok" || true
 node --test test/*.test.ts >/dev/null 2>&1 || { echo "FAIL: tests"; fail=1; }
+
+step "negative controls for non-ASCII / CP_ACP tests (#549: 7 mutations, each must be DETECTED)"
+bash analysis/neg_nonascii.sh || { echo "FAIL: neg_nonascii"; fail=1; }
 
 t1=$(date +%s.%N)
 echo; echo "elapsed $(echo "$t1 - $t0" | bc) s | load average start [$la0] end [$(cut -d' ' -f1-3 /proc/loadavg)] | exit $fail"

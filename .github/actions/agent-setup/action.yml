@@ -112,6 +112,8 @@ runs:
         # fl-win64-anything.tar.zst も拾うため、オブジェクトを明示して取得する。
         missing=""
         for name in ${R2_ARTIFACTS:-}; do
+          # apt-* は R2 の素材ではない (後段で apt から入れる)
+          case "$name" in apt-*) continue ;; esac
           key="artifacts/${name}.tar.zst"
           if aws s3 cp "s3://${R2_BUCKET}/$key" "$artifacts_dir" \
             --endpoint-url "$endpoint" --only-show-errors; then
@@ -157,6 +159,30 @@ runs:
             extract_failed="$extract_failed $(basename "$f")"
           fi
         done
+        # work-* の中には /home/ubuntu/work/webstudio/... を指す絶対 symlink が含まれる
+        # (作成元の VM のパス)。runner では dangling になるので、workspace 内を指すよう
+        # 張り直す。対象は work-* を展開した範囲 (tools/*/work 以下) の symlink のみ。
+        if ls "$artifacts_dir"/work-*.tar.zst >/dev/null 2>&1; then
+          relinked=0
+          relink_failed=0
+          while IFS= read -r -d '' link; do
+            target="$(readlink "$link")"
+            case "$target" in
+              /home/ubuntu/work/webstudio/*)
+                if ln -sfn "$GITHUB_WORKSPACE/${target#/home/ubuntu/work/webstudio/}" "$link"; then
+                  relinked=$((relinked + 1))
+                else
+                  echo "::warning::failed to relink $link"
+                  relink_failed=$((relink_failed + 1))
+                fi
+                ;;
+            esac
+          done < <(find "$GITHUB_WORKSPACE/tools" -type l -path "$GITHUB_WORKSPACE/tools/*/work/*" -lname '/home/ubuntu/work/webstudio/*' -print0 2>/dev/null)
+          echo "relinked $relinked absolute work symlinks -> $GITHUB_WORKSPACE (failed: $relink_failed)"
+          if [ "$relink_failed" -gt 0 ]; then
+            extract_failed="$extract_failed work-symlink-relink($relink_failed)"
+          fi
+        fi
         # analysis-* は ANALYSIS_DIR (tools/shared/env.sh の既定の親。#294) へ展開する。
         # tarball の先頭が plugins/... なので $ANALYSIS_DIR/plugins/... になる。
         analysis_dir="$HOME/analysis"
@@ -177,6 +203,19 @@ runs:
           fi
           echo "::warning::continuing without them because artifacts-required=false"
         fi
+
+        # apt-mingw は R2 の素材ではなく apt パッケージ (mingw-w64: PE を作るテスト用)。
+        # R2 から取得する対象 (上の for) には入れず、ここで要求された時だけ入れる。
+        case " ${R2_ARTIFACTS:-} " in
+          *" apt-mingw "*)
+            if sudo apt-get install -y --no-install-recommends gcc-mingw-w64-x86-64 >/dev/null 2>&1; then
+              echo "installed gcc-mingw-w64-x86-64: $(command -v x86_64-w64-mingw32-gcc)"
+            else
+              echo "::error::failed to install gcc-mingw-w64-x86-64"
+              [ "${R2_REQUIRED:-true}" = 'true' ] && exit 1
+            fi
+            ;;
+        esac
 
         du -sh "$artifacts_dir" 2>/dev/null || true
         {

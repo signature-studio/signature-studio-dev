@@ -1,6 +1,6 @@
 /* gui_gdi.c — gdi32/msimg32 相当: ソフトウェアラスタライザ (BGRA32 top-down surface / DIB section)
  * 方針: FL は描画をほぼ自前ビットマップで行い GDI は転送 (BitBlt/StretchDIBits) 経路が主 (IMPORTS.md)。
- * プリミティブ (線/矩形/文字) は最小限、テキストは内蔵 8x8 ビットマップフォント (決定論的)。 */
+ * プリミティブ (線/矩形/文字) は最小限、テキストは text engine (gui_ft.c = FreeType) 未登録なら内蔵 8x8 ビットマップフォント (決定論的)。 */
 #include <stdio.h>
 #include <stdarg.h>
 #include "gui_internal.h"
@@ -16,7 +16,11 @@ typedef struct Bmp { int w, h, stride, topdown, owns, sel, deleted; uint8_t *bit
   int bpp, nstride, isdib, mono, npal; uint8_t *nat; uint32_t *pal; } Bmp;
 typedef struct Brush { int hollow, stock, sysidx; uint32_t color; } Brush;
 typedef struct Pen { int style, width, stock; uint32_t color; } Pen;
-typedef struct Font { int height, stock; } Font;
+/* Font: height = |lfHeight| (GetObject 用), lfh = 符号付き lfHeight。stock フォントと text engine 未登録/face 解決不能は eng=NULL = 内蔵 8x8。
+ * eng は最初のテキスト使用時に遅延 open する (face の遅延取得 = VFS #22 を最初の使用まで遅らせる) */
+typedef struct Font { int height, stock, lfh, weight, italic, tried; uint16_t face[32]; const struct GuiTextEngine *te; void *eng; } Font;
+static const GuiTextEngine *g_te;
+void gui_set_text_engine(const GuiTextEngine *e) { g_te = e; }
 typedef struct Rgn { RL rl; } Rgn;
 typedef struct DCState {
   int dx_wox, wox, woy, vox, voy, bx, by; uint32_t bk, tc; int bkmode, rop2, align, stretch;
@@ -285,13 +289,31 @@ API CreatePen(I64 style, I64 w, I64 c) {
   if (style != PS_SOLID && style != PS_NULL && style != 6) { char m[48]; snprintf(m, sizeof m, "CreatePen style %d", (int)style); gui_failfast("CreatePen", m); }
   return (I64)new_pen((int)style == 6 ? PS_SOLID : (int)style, (int)w, (uint32_t)c & 0xFFFFFF, 0);
 }
-API CreateFontIndirectW(I64 lf) { gui_sh(); Font *f = (Font *)calloc(1, sizeof *f); int32_t h = lf ? *(int32_t *)P_(lf) : 8; f->height = h < 0 ? -h : h; return (I64)h_alloc(HT_FONT, f); }
-API CreateFontIndirectA(I64 lf) { return CreateFontIndirectW(lf); }
-API CreateFontW(I64 h, I64 a, I64 b, I64 c, I64 d, I64 e, I64 f, I64 g, I64 i, I64 j, I64 k, I64 l, I64 m, I64 n) {
-  (void)a; (void)b; (void)c; (void)d; (void)e; (void)f; (void)g; (void)i; (void)j; (void)k; (void)l; (void)m; (void)n;
-  gui_sh(); Font *fo = (Font *)calloc(1, sizeof *fo); fo->height = (int)(h < 0 ? -h : h); return (I64)h_alloc(HT_FONT, fo);
+/* face: wide=1 は UTF-16 (NUL 終端, 最大 31 文字)、wide=0 は ANSI (Latin-1 扱い) */
+static I64 font_new(int32_t h, int weight, int italic, const void *face, int wide) {
+  gui_sh(); Font *f = (Font *)calloc(1, sizeof *f);
+  f->lfh = h; f->height = h < 0 ? -h : h; f->weight = weight ? weight : 400; f->italic = italic != 0;
+  if (face) for (int i = 0; i < 31; i++) { uint16_t c = wide ? ((const uint16_t *)face)[i] : ((const uint8_t *)face)[i]; if (!c) break; f->face[i] = c; }
+  return (I64)h_alloc(HT_FONT, f);
 }
-API CreateFontA(I64 h, I64 a, I64 b, I64 c, I64 d, I64 e, I64 f, I64 g, I64 i, I64 j, I64 k, I64 l, I64 m, I64 n) { return CreateFontW(h, a, b, c, d, e, f, g, i, j, k, l, m, n); }
+API CreateFontIndirectW(I64 lf) {
+  if (!lf) return font_new(8, 400, 0, NULL, 1);
+  const uint8_t *p = (const uint8_t *)P_(lf);   /* LOGFONTW: lfHeight@0 lfWeight@16 lfItalic@20 lfFaceName@28 */
+  return font_new(*(const int32_t *)p, *(const int32_t *)(p + 16), p[20], p + 28, 1);
+}
+API CreateFontIndirectA(I64 lf) {
+  if (!lf) return font_new(8, 400, 0, NULL, 0);
+  const uint8_t *p = (const uint8_t *)P_(lf);
+  return font_new(*(const int32_t *)p, *(const int32_t *)(p + 16), p[20], p + 28, 0);
+}
+API CreateFontW(I64 h, I64 a, I64 b, I64 c, I64 d, I64 e, I64 f, I64 g, I64 i, I64 j, I64 k, I64 l, I64 m, I64 n) {
+  (void)a; (void)b; (void)c; (void)f; (void)g; (void)i; (void)j; (void)k; (void)l; (void)m;
+  return font_new((int32_t)h, (int)d, (int)e & 0xFF, n ? P_(n) : NULL, 1);
+}
+API CreateFontA(I64 h, I64 a, I64 b, I64 c, I64 d, I64 e, I64 f, I64 g, I64 i, I64 j, I64 k, I64 l, I64 m, I64 n) {
+  (void)a; (void)b; (void)c; (void)f; (void)g; (void)i; (void)j; (void)k; (void)l; (void)m;
+  return font_new((int32_t)h, (int)d, (int)e & 0xFF, n ? P_(n) : NULL, 0);
+}
 API CreatePalette(I64 lp) { (void)lp; gui_sh(); return (I64)h_alloc(HT_PAL, calloc(1, 8)); }
 
 static Bmp *bmp_new(int w, int h, int topdown) {
@@ -367,7 +389,7 @@ API DeleteObject(I64 h) {
     case HT_BMP: { Bmp *b = (Bmp *)h_get((U64)h, HT_BMP); h_free((U64)h); b->deleted = 1; if (b->sel == 0) bmp_free(b); return 1; }
     case HT_BRUSH: { Brush *b = (Brush *)h_get((U64)h, HT_BRUSH); if (b->stock) return 1; h_free((U64)h); free(b); return 1; }
     case HT_PEN: { Pen *p = (Pen *)h_get((U64)h, HT_PEN); if (p->stock) return 1; h_free((U64)h); free(p); return 1; }
-    case HT_FONT: { Font *f = (Font *)h_get((U64)h, HT_FONT); if (f->stock) return 1; h_free((U64)h); free(f); return 1; }
+    case HT_FONT: { Font *f = (Font *)h_get((U64)h, HT_FONT); if (f->stock) return 1; h_free((U64)h); if (f->eng) f->te->close(f->eng); free(f); return 1; }
     case HT_RGN: { Rgn *r = (Rgn *)h_get((U64)h, HT_RGN); h_free((U64)h); rl_free(&r->rl); free(r); return 1; }
     case HT_PAL: { if ((U64)h == g_def_pal) return 1; void *p = h_get((U64)h, HT_PAL); h_free((U64)h); free(p); return 1; }
     default: return 0;
@@ -1035,27 +1057,87 @@ API AlphaBlend(I64 hd, I64 x, I64 y, I64 w, I64 h, I64 hs, I64 sx, I64 sy, I64 s
   return 1;
 }
 
-/* ---------- テキスト (内蔵 8x8 フォント) ---------- */
-static int glyph_scale(DC *d) { (void)d; return 1; }
-static int draw_text_run(DC *d, int x, int y, const uint16_t *w16, const char *a8, int n, int opaque_rect_only, int *advance) {
-  int sc = glyph_scale(d), gw = 8 * sc, gh = 8 * sc;
-  *advance = n * gw;
-  int ax = x, ay = y;
-  if ((d->align & 6) == 6) ax -= (n * gw) / 2; else if ((d->align & 6) == 2) ax -= n * gw;   /* TA_CENTER=6, TA_RIGHT=2 */
-  if ((d->align & 24) == 24) ay -= 7 * sc; else if ((d->align & 24) == 8) ay -= gh;           /* TA_BASELINE=24, TA_BOTTOM=8 */
-  if (opaque_rect_only) return 1;
-  uint32_t fg = COLORREF_TO_BGRA(d->tc), bg = COLORREF_TO_BGRA(d->bk);
-  if (d->bkmode == OPAQUE_) fill_dev(d, (WRECT){ ax, ay, ax + n * gw, ay + gh }, bg, 13);
-  for (int i = 0; i < n; i++) {
-    uint32_t c = w16 ? w16[i] : (uint8_t)a8[i];
-    if (c >= 128) c = '?';
-    for (int row = 0; row < 8; row++) {
-      uint8_t bits = gui_font8x8[c][row];
-      for (int col = 0; col < 8; col++) if ((bits >> col) & 1)
-        fill_dev(d, (WRECT){ ax + i * gw + col * sc, ay + row * sc, ax + i * gw + (col + 1) * sc, ay + (row + 1) * sc }, fg, 13);
+/* ---------- テキスト (GUI-9 #186: text engine (FreeType) があればそれ、無ければ内蔵 8x8 フォント) ----------
+ * 8x8 経路: DrawText のみ挙動が変わった (複数行の DT_CENTER/DT_RIGHT は行ごとに配置 (従来は全行がブロック幅基準の同一 x0)、行末 '\r' は行に含めない)。
+ *   それ以外は従来のまま。tools/gui の既存 golden/selftest/gui_app に DrawText 呼出は無く e2e golden には影響しない。engine 経路: advance = 整数 px、描画 = 8bit coverage の sRGB 値空間での線形合成
+ *   out_c = (fg_c*cov + dst_c*(255-cov) + 127) / 255  (独立オラクル golden/ft_oracle.c が同式を実装) */
+typedef struct { void *e; const GuiTextEngine *te; Font *f; GuiTextMetrics m; } TF;
+static void *font_eng(Font *f) {
+  if (!f) return NULL;
+  if (!f->tried) { f->tried = 1; if (g_te && !f->stock) { void *e = g_te->open(f->face, f->lfh, f->weight, f->italic); if (e) { f->eng = e; f->te = g_te; } } }
+  return f->eng;
+}
+static void tf_get(DC *d, TF *t) {
+  t->f = (Font *)h_get(d->hfont, HT_FONT); t->e = font_eng(t->f); t->te = t->e ? t->f->te : NULL;
+  if (t->e) t->te->metrics(t->e, &t->m);
+  else t->m = (GuiTextMetrics){ 7, 1, 8, 0, 0, 8, 8, 32, 126, '?', ' ' };
+}
+static int tf_adv(TF *t, uint32_t cp) {
+  if (!t->e) return 8;
+  GuiGlyph g; if (!t->te->glyph(t->e, cp, 0, &g)) return t->m.avg_width;
+  return g.advance;
+}
+static uint32_t tch(const void *s, int wide, int i) { return wide ? ((const uint16_t *)s)[i] : ((const uint8_t *)s)[i]; }
+static int tf_width(TF *t, const void *s, int wide, int n) { int w = 0; for (int i = 0; i < n; i++) w += tf_adv(t, tch(s, wide, i)); return w; }
+
+static void blend_cov(DC *d, int x0, int y0, const uint8_t *cov, int w, int h, uint32_t fg) {
+  Tgt t; if (!dc_tgt(d, &t)) return;
+  RL *eff = dc_eff(d, &t);
+  WRECT box = { x0, y0, x0 + w, y0 + h };
+  tgt_pull(&t, box);
+  uint32_t fb = fg & 255, fgc = (fg >> 8) & 255, fr = (fg >> 16) & 255;
+  for (int i = 0; i < eff->n; i++) {
+    WRECT c = r_isect(box, eff->r[i]); if (r_empty(c)) continue;
+    for (int y = c.top; y < c.bottom; y++) {
+      uint32_t *p = px_at(&t, c.left, y); const uint8_t *cv = cov + (size_t)(y - y0) * w + (c.left - x0);
+      for (int x = c.left; x < c.right; x++, p++, cv++) {
+        uint32_t a = *cv; if (!a) continue;
+        uint32_t dp = *p, ia = 255 - a;
+        uint32_t b = (fb * a + (dp & 255) * ia + 127) / 255, g = (fgc * a + ((dp >> 8) & 255) * ia + 127) / 255, r = (fr * a + ((dp >> 16) & 255) * ia + 127) / 255;
+        *p = 0xFF000000u | (r << 16) | (g << 8) | b;
+      }
     }
   }
-  dc_dirty(d, (WRECT){ ax, ay, ax + n * gw, ay + gh });
+}
+static int draw_text_run(DC *d, int x, int y, const uint16_t *w16, const char *a8, int n, int opaque_rect_only, int *advance) {
+  TF t; tf_get(d, &t);
+  const void *s = w16 ? (const void *)w16 : (const void *)a8; int wide = w16 != NULL;
+  int total = n > 0 ? tf_width(&t, s, wide, n) : 0, gh = t.m.height;
+  *advance = total;
+  int ax = x, ay = y;
+  if ((d->align & 6) == 6) ax -= total / 2; else if ((d->align & 6) == 2) ax -= total;   /* TA_CENTER=6, TA_RIGHT=2 */
+  if ((d->align & 24) == 24) ay -= t.m.ascent; else if ((d->align & 24) == 8) ay -= gh;   /* TA_BASELINE=24, TA_BOTTOM=8 */
+  if (opaque_rect_only) return 1;
+  uint32_t fg = COLORREF_TO_BGRA(d->tc), bg = COLORREF_TO_BGRA(d->bk);
+  if (d->bkmode == OPAQUE_) fill_dev(d, (WRECT){ ax, ay, ax + total, ay + gh }, bg, 13);
+  WRECT dirty = { ax, ay, ax + total, ay + gh };
+  if (!t.e) {
+    for (int i = 0; i < n; i++) {
+      uint32_t c = tch(s, wide, i);
+      if (c >= 128) c = '?';
+      for (int row = 0; row < 8; row++) {
+        uint8_t bits = gui_font8x8[c][row];
+        for (int col = 0; col < 8; col++) if ((bits >> col) & 1)
+          fill_dev(d, (WRECT){ ax + i * 8 + col, ay + row, ax + i * 8 + col + 1, ay + row + 1 }, fg, 13);
+      }
+    }
+  } else {
+    int pen = ax, base = ay + t.m.ascent;
+    for (int i = 0; i < n; i++) {
+      GuiGlyph g;
+      if (t.te->glyph(t.e, tch(s, wide, i), 1, &g)) {
+        if (g.cov) {
+          int gx = pen + g.left, gy = base - g.top;
+          blend_cov(d, gx, gy, g.cov, g.w, g.h, fg);
+          if (gx < dirty.left) dirty.left = gx; if (gy < dirty.top) dirty.top = gy;
+          if (gx + g.w > dirty.right) dirty.right = gx + g.w; if (gy + g.h > dirty.bottom) dirty.bottom = gy + g.h;
+          free(g.cov);
+        }
+        pen += g.advance;
+      } else pen += t.m.avg_width;
+    }
+  }
+  dc_dirty(d, dirty);
   return 1;
 }
 static int wlen(const uint16_t *s) { int n = 0; while (s[n]) n++; return n; }
@@ -1085,16 +1167,28 @@ static API exttextout_impl(I64 hdc, I64 x, I64 y, I64 opts, I64 rc, I64 str, I64
 }
 API ExtTextOutA(I64 a, I64 b, I64 c, I64 d, I64 e, I64 f, I64 g, I64 h) { return exttextout_impl(a, b, c, d, e, f, g, h, 0); }
 API ExtTextOutW(I64 a, I64 b, I64 c, I64 d, I64 e, I64 f, I64 g, I64 h) { return exttextout_impl(a, b, c, d, e, f, g, h, 1); }
-static API extent_impl(I64 hdc, I64 s, I64 n, I64 sz) { (void)hdc; (void)s; WSIZE *z = (WSIZE *)P_(sz); z->cx = (int)n * 8; z->cy = 8; return 1; }
-API GetTextExtentPoint32A(I64 a, I64 b, I64 c, I64 d) { return extent_impl(a, b, c, d); }
-API GetTextExtentPoint32W(I64 a, I64 b, I64 c, I64 d) { return extent_impl(a, b, c, d); }
-API GetTextExtentPointA(I64 a, I64 b, I64 c, I64 d) { return extent_impl(a, b, c, d); }
-API GetTextExtentPointW(I64 a, I64 b, I64 c, I64 d) { return extent_impl(a, b, c, d); }
-static API metrics_impl(I64 hdc, I64 p, int wide) {
-  (void)hdc; WTEXTMETRIC_HEAD h = { 8, 7, 1, 0, 0, 8, 8, 400, 0, 96, 96 };
+static API extent_impl(I64 hdc, I64 s, I64 n, I64 sz, int wide) {
+  DC *d = dc_of((U64)hdc); WSIZE *z = (WSIZE *)P_(sz);
+  TF t; if (d) tf_get(d, &t); else t.e = NULL, t.m = (GuiTextMetrics){ 7, 1, 8, 0, 0, 8, 8, 32, 126, '?', ' ' };
+  z->cx = n > 0 ? tf_width(&t, P_(s), wide, (int)n) : 0; z->cy = t.m.height; return 1;
+}
+API GetTextExtentPoint32A(I64 a, I64 b, I64 c, I64 d) { return extent_impl(a, b, c, d, 0); }
+API GetTextExtentPoint32W(I64 a, I64 b, I64 c, I64 d) { return extent_impl(a, b, c, d, 1); }
+API GetTextExtentPointA(I64 a, I64 b, I64 c, I64 d) { return extent_impl(a, b, c, d, 0); }
+API GetTextExtentPointW(I64 a, I64 b, I64 c, I64 d) { return extent_impl(a, b, c, d, 1); }
+/* TEXTMETRIC の先頭 11 個の int + chars/flags。W: first@44 last@46 default@48 break@50 italic@52 pitch@55 charset@56 / A: 44..47 + pitch@51 */
+static void fill_tm(TF *t, I64 p, int wide) {
+  WTEXTMETRIC_HEAD h = { t->m.height, t->m.ascent, t->m.descent, t->m.internal_leading, t->m.external_leading, t->m.avg_width, t->m.max_width,
+                         t->f && t->e ? t->f->weight : 400, 0, 96, 96 };
   memset(P_(p), 0, wide ? 60 : 56); memcpy(P_(p), &h, sizeof h);
-  if (wide) { uint16_t *u = (uint16_t *)((uint8_t *)P_(p) + 44); u[0] = 32; u[1] = 126; u[2] = '?'; u[3] = ' '; ((uint8_t *)P_(p))[56] = 1; }
-  else { uint8_t *u = (uint8_t *)P_(p) + 44; u[0] = 32; u[1] = 126; u[2] = '?'; u[3] = ' '; ((uint8_t *)P_(p))[51] = 1; }
+  if (wide) { uint16_t *u = (uint16_t *)((uint8_t *)P_(p) + 44); u[0] = (uint16_t)t->m.first; u[1] = (uint16_t)t->m.last; u[2] = (uint16_t)t->m.def_char; u[3] = (uint16_t)t->m.brk_char; ((uint8_t *)P_(p))[56] = 1; }
+  else { uint8_t *u = (uint8_t *)P_(p) + 44; u[0] = (uint8_t)t->m.first; u[1] = (uint8_t)t->m.last; u[2] = (uint8_t)t->m.def_char; u[3] = (uint8_t)t->m.brk_char; ((uint8_t *)P_(p))[51] = 1; }
+  if (t->e) { ((uint8_t *)P_(p))[wide ? 55 : 51] = 6; /* TMPF_VECTOR|TMPF_TRUETYPE */ if (t->f->italic) ((uint8_t *)P_(p))[wide ? 52 : 48] = 1; }
+}
+static API metrics_impl(I64 hdc, I64 p, int wide) {
+  DC *d = dc_of((U64)hdc); TF t;
+  if (d) tf_get(d, &t); else { t.e = NULL; t.f = NULL; t.m = (GuiTextMetrics){ 7, 1, 8, 0, 0, 8, 8, 32, 126, '?', ' ' }; }
+  fill_tm(&t, p, wide);
   return 1;
 }
 API GetTextMetricsA(I64 hdc, I64 p) { return metrics_impl(hdc, p, 0); }
@@ -1102,29 +1196,62 @@ API GetTextMetricsW(I64 hdc, I64 p) { return metrics_impl(hdc, p, 1); }
 static API drawtext_impl(I64 hdc, I64 str, I64 n, I64 rc, I64 fmt, int wide) {
   DC *d = dc_of((U64)hdc); if (!d) return 0;
   WRECT *r = (WRECT *)P_(rc);
-  int len = (int)n < 0 ? (wide ? wlen((const uint16_t *)P_(str)) : (int)strlen((const char *)P_(str))) : (int)n;
-  /* 行分割 */
-  int nl = 1, maxw = 0, curw = 0;
-  for (int i = 0; i < len; i++) { uint32_t c = wide ? ((const uint16_t *)P_(str))[i] : ((const uint8_t *)P_(str))[i]; if (c == '\n' && !(fmt & DT_SINGLELINE)) { nl++; if (curw > maxw) maxw = curw; curw = 0; } else if (c != '\r') curw++; }
-  if (curw > maxw) maxw = curw;
-  int tw = maxw * 8, th = nl * 8;
-  if (fmt & DT_CALCRECT) { r->right = r->left + tw; r->bottom = r->top + th; return th; }
-  int x0 = r->left, y0 = r->top;
-  if (fmt & DT_CENTER) x0 = r->left + ((r->right - r->left) - tw) / 2; else if (fmt & DT_RIGHT) x0 = r->right - tw;
+  const void *s = P_(str);
+  int len = (int)n < 0 ? (wide ? wlen((const uint16_t *)s) : (int)strlen((const char *)s)) : (int)n;
+  TF t; tf_get(d, &t);
+  /* 行分割: '\n' (DT_SINGLELINE 以外)。行末の '\r' は行に含めない。各行の幅 = advance 合計 */
+  int nl = 1, maxw = 0;
+  for (int i = 0, st = 0; i <= len; i++) {
+    int brk = i == len || (tch(s, wide, i) == '\n' && !(fmt & DT_SINGLELINE));
+    if (!brk) continue;
+    int cnt = i - st; if (cnt > 0 && i < len && tch(s, wide, i - 1) == '\r') cnt--;
+    int w = tf_width(&t, (const uint8_t *)s + (size_t)st * (wide ? 2 : 1), wide, cnt); if (w > maxw) maxw = w;
+    if (i < len) nl++;
+    st = i + 1;
+  }
+  int th = nl * t.m.height;
+  if (fmt & DT_CALCRECT) { r->right = r->left + maxw; r->bottom = r->top + th; return th; }
+  int y0 = r->top;
   if (fmt & DT_VCENTER) y0 = r->top + ((r->bottom - r->top) - th) / 2; else if (fmt & DT_BOTTOM) y0 = r->bottom - th;
   int line = 0, start = 0, adv;
   for (int i = 0; i <= len; i++) {
-    uint32_t c = i < len ? (wide ? ((const uint16_t *)P_(str))[i] : ((const uint8_t *)P_(str))[i]) : '\n';
-    if (c == '\n' && (i == len || !(fmt & DT_SINGLELINE))) {
-      int cnt = i - start;
-      draw_text_run(d, x0 + dev_dx(d), y0 + line * 8 + dev_dy(d), wide ? (const uint16_t *)P_(str) + start : NULL, wide ? NULL : (const char *)P_(str) + start, cnt, 0, &adv);
-      line++; start = i + 1;
-    }
+    int brk = i == len || (tch(s, wide, i) == '\n' && !(fmt & DT_SINGLELINE));
+    if (!brk) continue;
+    int cnt = i - start; if (cnt > 0 && i < len && tch(s, wide, i - 1) == '\r') cnt--;
+    const void *ls = (const uint8_t *)s + (size_t)start * (wide ? 2 : 1);
+    int lw = tf_width(&t, ls, wide, cnt), x0 = r->left;
+    if (fmt & DT_CENTER) x0 = r->left + ((r->right - r->left) - lw) / 2; else if (fmt & DT_RIGHT) x0 = r->right - lw;
+    draw_text_run(d, x0 + dev_dx(d), y0 + line * t.m.height + dev_dy(d), wide ? (const uint16_t *)ls : NULL, wide ? NULL : (const char *)ls, cnt, 0, &adv);
+    line++; start = i + 1;
   }
   return th;
 }
 API DrawTextA(I64 hdc, I64 s, I64 n, I64 rc, I64 fmt) { return drawtext_impl(hdc, s, n, rc, fmt, 0); }
 API DrawTextW(I64 hdc, I64 s, I64 n, I64 rc, I64 fmt) { return drawtext_impl(hdc, s, n, rc, fmt, 1); }
+
+/* EnumFontFamiliesExW(hdc, LOGFONTW *lf, FONTENUMPROCW cb, lParam, flags): 登録 face を列挙する (face 名一致のみ; lfFaceName 空 = 全 face)。
+ * cb(ENUMLOGFONTEXW *, NEWTEXTMETRICEXW *, DWORD fontType = TRUETYPE_FONTTYPE(4), lParam)。cb が 0 を返したら停止。engine 未登録/face 0 件なら 1 を返し cb は呼ばない */
+API EnumFontFamiliesExW(I64 hdc, I64 lf, I64 cb, I64 lparam, I64 flags) {
+  (void)hdc; (void)flags; gui_sh();
+  if (!g_te || !cb) return 1;
+  const uint16_t *want = lf ? (const uint16_t *)((const uint8_t *)P_(lf) + 28) : NULL;
+  int ret = 1;
+  for (int i = 0, nf = g_te->nfaces(); i < nf; i++) {
+    const char *nm = g_te->face_name(i); uint16_t nm16[32] = { 0 };
+    for (int k = 0; k < 31 && nm[k]; k++) nm16[k] = (uint8_t)nm[k];
+    if (want && want[0]) { int k = 0; for (; k < 32; k++) { uint16_t a = want[k], b = nm16[k]; if (a >= 'A' && a <= 'Z') a += 32; if (b >= 'A' && b <= 'Z') b += 32; if (a != b) break; if (!a) break; } if (k < 32 && (want[k] | nm16[k])) continue; }
+    uint8_t elf[348]; uint8_t ntm[100]; memset(elf, 0, sizeof elf); memset(ntm, 0, sizeof ntm);
+    *(int32_t *)(elf + 16) = 400; elf[23] = 1; /* lfWeight, lfCharSet = DEFAULT_CHARSET */
+    memcpy(elf + 28, nm16, sizeof nm16); memcpy(elf + 92, nm16, sizeof nm16);   /* lfFaceName / elfFullName */
+    void *e = g_te->open(nm16, -12, 400, 0); TF t; memset(&t, 0, sizeof t);
+    if (e) { g_te->metrics(e, &t.m); g_te->close(e); } else t.m = (GuiTextMetrics){ 7, 1, 8, 0, 0, 8, 8, 32, 126, '?', ' ' };
+    WTEXTMETRIC_HEAD h = { t.m.height, t.m.ascent, t.m.descent, t.m.internal_leading, t.m.external_leading, t.m.avg_width, t.m.max_width, 400, 0, 96, 96 };
+    memcpy(ntm, &h, sizeof h);
+    ret = (int)gui_call4((U64)cb, (I64)(uintptr_t)elf, (I64)(uintptr_t)ntm, 4, lparam);
+    if (!ret) break;
+  }
+  return ret;
+}
 
 /* ======================================================================================
  * P1 拡張 (CAB-159): 3D 枠/フレームコントロール/フォーカス矩形・リージョン取得・画面 DC・DDB 生成・アイコン描画
