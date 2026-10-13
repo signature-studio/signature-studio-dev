@@ -36,4 +36,6 @@ python3 trap_triage/survey_diff.py "$OUT/pre.json" "$OUT/post.json" > "$OUT/surv
 python3 trap_triage/survey_diff.py "$OUT/pre.json" "$OUT/mut.json" > "$OUT/survey_diff_mut.txt" 2>&1
 grep -E "ok 退行|kind 以外" "$OUT/survey_diff.txt" | sed 's/^/post: /'
 grep -E "ok 退行" "$OUT/survey_diff_mut.txt" | sed 's/^/mut:  /'
+grep -q "^ok 退行 unit: 0 \[\]$" "$OUT/survey_diff.txt" && echo "OK   post: survey_diff ok 退行 0" || { echo "NG   post: survey_diff ok 退行 != 0"; fail=1; }
+grep -q "^ok 退行 unit: 1 \[0\]$" "$OUT/survey_diff_mut.txt" && echo "OK   mut: survey_diff ok 退行 1 [0]" || { echo "NG   mut: survey_diff ok 退行 != [0]"; fail=1; }
 [ "$fail" = 0 ] && echo "NEGCTL_663 ALL EXPECTED" || { echo "NEGCTL_663 UNEXPECTED"; exit 1; }
