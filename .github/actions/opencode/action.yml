@@ -84,21 +84,50 @@ runs:
         echo "opencode exit code: $rc"
         echo "opencode session: ${sid:-none}"
 
-    # 最終回答は opencode api から取得する (JSONL の解析はしない)
-    - name: Write step summary
-      if: ${{ always() && steps.run.outputs.sid != '' }}
+    # 作業の記録は `opencode run --format json` の JSONL をそのまま使う。
+    # 旧実装は「最後の assistant メッセージ」だけを API から取っていたため、最後がツール呼び出し前の
+    # 前置き 1 行だと作業内容が何も残らなかった (run 38331256919 / 38331111477)。
+    # JSONL は run 中の全イベント (text / tool_use / step_finish) を持ち、session が消えても読める。
+    # 生の JSONL は出さない (public repo のログは公開。tool の入出力に認証情報や FL 由来物が
+    # 含まれ得て、secret マスクは登録値との完全一致でしか効かない。レビュー指摘 #477)。
+    # allowlist の投影だけを出す: text は全文、tool_use は tool / status / 所要 ms / 入力の
+    # description・先頭 200 文字 (出力 state.output は出さない)、step_finish は cost / tokens。
+    # 出力は jq の @json で 1 行に収め、`::` 始まりの workflow command として解釈されない。
+    - name: Dump OpenCode events
+      if: ${{ always() }}
       shell: bash
-      env:
-        SID: ${{ steps.run.outputs.sid }}
       run: |
-        # step summary は API/UI からしか読めず `gh run view --log` に出ないため、
-        # 同じ内容をログにも出す (tee)。
+        set +e
+        f="$RUNNER_TEMP/oc-output.jsonl"
+        [ -s "$f" ] || { echo "no opencode output at $f"; exit 0; }
+        echo "::group::opencode events (allowlisted fields only; tool output is not logged)"
+        jq -Rr 'fromjson? | select(.type != null)
+          | if .type == "text" then "text \(.part.text | gsub("\n"; " ") | .[0:2000] | @json)"
+            elif .type == "tool_use" then
+              "tool \(.part.tool) status=\(.part.state.status) ms=\(((.part.state.time.end // 0) - (.part.state.time.start // 0))) input=\(((.part.state.input.description // .part.state.input.command // .part.state.input.filePath // .part.state.input.pattern // "") | tostring | .[0:200]) | @json)"
+            elif .type == "step_finish" then "step_finish cost=\(.part.cost // 0) tokens=\(.part.tokens | tojson)"
+            else empty end' "$f"
+        echo "::endgroup::"
+
+    # step summary には assistant の text ブロックを全て順に出す (最後の 1 件だけにしない)。
+    - name: Write step summary
+      if: ${{ always() }}
+      shell: bash
+      run: |
+        set +e
+        f="$RUNNER_TEMP/oc-output.jsonl"
+        [ -s "$f" ] || exit 0
         {
           echo "## OpenCode result"
           echo
-          opencode api --standalone get "/api/session/$SID/message" \
-            | jq -r '[.data[] | select(.type == "assistant")] | last | .content[]? | select(.type == "text") | .text'
-        } | tee -a "$GITHUB_STEP_SUMMARY" || echo "::warning::could not extract summary for session $SID"
+          # `::` 始まりの行は tee で stdout に流れると workflow command と解釈されるため、
+          # 全行の先頭に空白を足す。
+          jq -Rr 'fromjson? | select(.type == "text") | .part.text // empty | split("\n")[] | " " + .' "$f"
+          echo
+          echo "### usage"
+          jq -Rrs '[split("\n")[] | fromjson? | select(.type == "step_finish") | .part]
+            | "steps=\(length) cost=\((map(.cost // 0) | add // 0) * 1000000 | round / 1000000)"' "$f"
+        } | tee -a "$GITHUB_STEP_SUMMARY"
 
     - name: Fail if OpenCode did not succeed
       if: ${{ steps.run.outputs.rc != '0' }}
