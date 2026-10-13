@@ -91,7 +91,7 @@ mac dylib (`Shared/ILSvg_x64.dylib`) は素材に無いため、受入条件 4 �
 |---|---|
 | export (exports trie) | `_svgCreate` / `_svgRender` / `_svgDestroy` の 3 件。wrapper (`oss/ilsvg/wrap/ilsvg_wrap.cpp`) と同名 |
 | 依存 dylib | `/usr/local/lib/ILSvg_x64.dylib` (自己参照) / `libc++.1.dylib` / `libSystem.B.dylib` の 3 件 |
-| 埋め込みパス | `/Volumes/imageline/flextra/SDKs/ILSvg/{papki,svgdom,svgren,cssom,mikroxml,utki}` |
+| 埋め込みパス | `strings -n 8` で 114 件 (x86_64 スライス)。大半 108 件は小文字 `/Volumes/imageline/flextra/sdks/ILSvg/` 配下 (pixman 6 / cssom 3 / svgdom 1 / agg 1 / mikroxml 1 / utki 1 のソース参照・`xcode/` 配下のビルド中間物 `.o` 95 件を含む)。大文字 `SDKs` は 6 件 (svgdom 3 / papki 1 / svgren 1 / 末尾 `ILSvg/` のみ 1)。含まれるコンポーネントは svgdom / svgren / cssom / papki / mikroxml / utki / pixman / agg |
 | enum 名 | `spread_method_to_string` 等の C++ シンボルが残る。版文字列 (`@PIXMAN_VERSION_*@` は未展開の雛形) からは版番号を特定できず |
 
 実行不可の根拠: この runner は x86_64 Linux。mac バイナリを動かす qemu・Rosetta・box64・wine が無い (`which` で確認)。workflow にも mac runner が無い。よって (1) mac dylib と wasm / native の画素比較 (2) papki `make_unique` / cssom `kilobyte` 置換の挙動一致 は、この環境では成立しない。
