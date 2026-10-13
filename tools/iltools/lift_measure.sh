@@ -6,7 +6,6 @@
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 QFCLIFT="$HERE/../qfclift"
-FLELIFT="$HERE/../flelift"
 : "${FL_WIN64_DIR:?FL_WIN64_DIR を設定}"
 QFC_PY="${QFC_PY:-python3}"
 PE="${ILT_PE:-$FL_WIN64_DIR/extracted/block24347_PE.bin}"
