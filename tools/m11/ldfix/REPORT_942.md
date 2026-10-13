@@ -135,8 +135,8 @@ python3 tools/m11/m11_wasmnames.py tools/m11/ldfix/work/stage4/base/m11_boot.cjs
 
 ## 8. 現 main 生成 IR での再判定 (#1292・受入 1〜4)
 
-測定 commit: `0c308503` の差し戻し対応 HEAD (コード差分 0。`git diff 604e900f HEAD -- tools/` の結果は §8-5)。
-検証起点: origin/main `604e900f` (PR の親)。runner: nproc=4。load average は各回の前後を採取 (§8-1)。
+測定 commit: `604e900f` (origin/main、PR の親。測定に使った `tools/` はこの commit と同一)。
+検証 HEAD: `8702c274` (コード差分 0。`git diff 604e900f HEAD -- tools/ ':!*.md'` は 0 行。§8-5)。runner: nproc=4。load average は各回の前後を採取 (§8-1)。
 素材: fl-win64 / work-m11 / work-liftdiff / toolchain-emsdk (`[EMSDK]`) / toolchain-retdec (`[RETDEC]`) を展開。
 IR は `bash tools/m11/m11_gen_ir2.sh` (現 main の手順) で作り、`ldfix_e2e.sh` の base は `M11_LDFIX=0` の IR から `m11_build.sh` で作った `boot_final3.ll`。
 
@@ -188,7 +188,8 @@ survey (n=3 とも同値。min–max は全 run で同一):
 - 種別が変わった unit は 2 件 (どちらも依然 trap):
   - `0x25c540` (unit 144): base halt0 → fix OOB。fix の最上位 frame 1875 = `function_407e20__lifted`。因果は未確認。
   - `0xeddfe0` (unit 895): base OOB (frame 2001 = `function_40ff70`) → fix halt0。
-- したがって「修復が件数に反映される」は現 main でも**限定的**: 件数の差は ok +2 (unit の変化 2 件) で、帰属が確認できたのは 1 件。snapshot 限定の判定を「解消」とは言わない。
+- unit の変化は 4 件。ok に入ったのが 2 件 (`0x26d1a0`・`0x6d9ba0`)、種別だけ変わったのが 2 件 (`0x25c540`・`0xeddfe0`、いずれも trap のまま)。この 4 件で trap 26 → 24・ok 868 → 870 の差が説明できる。
+- したがって「修復が件数に反映される」は現 main でも**限定的**: 帰属が確認できたのは `0x26d1a0` の 1 件。snapshot 限定の判定を「解消」とは言わない。
 
 ### 8-3. 受入 4: trap 最上位 frame と #942 の結論
 
@@ -203,7 +204,7 @@ survey (n=3 とも同値。min–max は全 run で同一):
 - F3a 3 件 (`ldfix_report.json` `f3a_vas`): `function_4133f0` / `function_413480` / `function_413540`。
 - 旧 snapshot の F3a (413480・413540) との対応: `function_413540` と `function_413480` は新旧で F3a。`function_4133f0` は**現 main で新たに F3a に入った関数**で、旧 snapshot の F3a には無い。
 - F3c 36 (`f3c_vas`) は `ldfix_report.json` を参照。`function_409c80` は F3c に含まれる。
-- F3c 36 と REPORT.md §1 の F3c 26 の差: **原因は未確認**。REPORT.md §1 の 955 (F1 902 + F3c 26 等) は旧 snapshot 時点の測定値で、現 main の IR 生成条件 (stage4 units_run 17 / survey ok 812 等) とは別物。F1 902 は一致する。
+- F3c 36 と REPORT.md §1 の F3c 26 の差: **原因は未確認**。REPORT.md §1 の 955 (F1 902 + F3c 26 等) は旧 snapshot 時点の測定値で、旧 snapshot: units_run 17 / survey ok 812。現 main (§8-1): units_run 52/942、ok 868。F1 902 は一致する。
 
 ### 8-5. 検証範囲と手順
 
