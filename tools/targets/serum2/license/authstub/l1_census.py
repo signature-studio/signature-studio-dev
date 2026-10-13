@@ -1,5 +1,9 @@
 """L1 census: 0x1800c2ef4–f05 の直接 vtable 通知 `call [rax+0x30]` (edx=0x800010) が raw IR に残るかを数える。
 
+機械語側: 直接 `call [reg+0x30]` の site 数 / site 範囲の `edx=0x800010` 即値ロード数 / site への入口 edge (j*) 数。
+raw IR 側: `insn.addr` が site 範囲の命令数 / そのうち直接 call / site 範囲内の 0x800010 (8388624) 即値 /
+ファイル全体の 0x800010 即値 / site ブロックへの br・switch edge 数 / insn.addr の被覆 / site ブロックの有無。
+
 使い方: python3 l1_census.py <PE> <raw.ll>
 """
 import re

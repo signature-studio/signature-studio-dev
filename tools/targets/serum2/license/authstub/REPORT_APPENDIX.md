@@ -37,7 +37,7 @@ raw IR 側は `insn.addr` が site 範囲にある命令数・そのうち直接
 | `insn.addr` が site 範囲を被覆 | — | `insn.addr entries covering site` = 0 | — |
 | ブロック `dec_label_pc_1800c2ef4` | — | `has_block` = False | — |
 
-- 2026-10-13 実測 (#1029): 上記スクリプト出力と手確認列は一致。census 拡張で手確認が不要になった。
+- 2026-10-13 実測 (#1029): 上記スクリプト出力と手確認列は一致。手確認列は突合の記録として残し、census の raw IR 側の列をスクリプト出力で併記した。
 - 9872 行の `br i1 %110, label %dec_label_pc_1800c2f08, label %dec_label_pc_1800c2d6f` は、null 枝 (`%110` = true) が skip 先 `0x1800c2f08` を指す。`0x1800c2ef4` を指す枝は IR に無い。
 
 ### 実測の記録 (e2e・census)
@@ -49,6 +49,13 @@ raw IR 側は `insn.addr` が site 範囲にある命令数・そのうち直接
   `sites=1` / `edx_const=1` / `into=1` / `covered=0` / `has_block=False`。
 - 同一 HEAD `4df84cd4` (main 取り込み前) でも 2026-10-13 17:40 に e2e 23/23 PASS・34.9 s、census は同じ 5 指標を確認。
 - 前 run (HEAD `3afb7674`) の申告値 (3.2 s・23/23) は一次ログ無しのため本節には含めない。本節が一次の実測。
+
+- HEAD `08bb8f19` (#1029 PR 作成時・worktree `ws-1029`・出典: PR #1205 作成時の申告値。レビュー run では再実行していない)。
+  - e2e (`bash tools/targets/serum2/license/authstub/e2e.sh`): exit 0・**23/23 PASS**・real **5.5 s** (lift は main 側で生成したものを再利用)。
+  - e2e cold (main 側・lift 新規生成): real **35.4 s**・23/23 PASS。
+  - census machine 側: `sites=1` / `edx_const=1` / `into=1`。
+  - census IR 側 (`l1_census.py` 拡張後の 6 指標): `insns with insn.addr in site range=0` / `direct call in site range=0` / `edx=0x800010 immediates in site=0` / `edx=0x800010 immediates (whole file)=1` / `edges (br/switch) into site=0` / `covered=0` / `has_block=False`。census real 0.174 s。
+  - 上記 IR 側の行番号 (9872 行の `br`・9878 行の `or ... 8388624`) の実物確認は、レビュー run で PE・raw `.ll` が無く未実施。
 
 - 事実の範囲: 上記は raw lift 1 本での実測。復元 pass は未実装 (受入条件 2・3 は未達、子 issue に分割)。
 - 未測定 (断定しない): 0x1800c2d59 の `je` は `[rsi+0x22792]` の bit で分岐し、その bit を 1 にする store は 0x1800c2d42 の 1 箇所のみ。N2a でこの store を 0 に置換した後の到達性は、本 census では測っていない。e2e の 23/23 との関係も未確認。
