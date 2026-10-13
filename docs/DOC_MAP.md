@@ -182,6 +182,7 @@
 | `tools/targets/kilohearts/license/REPORT.md` | ~125 | HeartCore ライセンス層の呼出点特定 |
 | `tools/targets/kilohearts/license/KH9_REPORT.md`・`KH10_REPORT.md`・`KH11_REPORT.md`・`VERIFY_CAB247.md` | ~125/105/115/185 | KH-9/10/11 実施記録と CAB-247 検証 |
 | `tools/targets/kilohearts/snapins/REPORT.md` | ~200 | KH 共通基盤 lift + SnapinMasterDsp ホストハーネス |
+| `tools/targets/kilohearts/ui_eval/REPORT.md` | ~135 | KH-7 Kilohearts UI (Skia CPU ラスタ) → M7 HUD 接続可否評価 |
 | `tools/targets/freshair/REPORT.md` | ~145 | Fresh Air インストーラ解析 + lift 可否 |
 | `tools/targets/freshair/lift2/REPORT.md` | ~235 | Fresh Air Compressor/Filter/制御層 lift |
 

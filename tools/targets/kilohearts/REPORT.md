@@ -127,7 +127,7 @@ VEX-256 は 344 関数 189,611 B 中 **closure 内は 6 関数のみ** (Convolve
 | KH-4 | **SnapinMasterDsp 基底 closure (188 関数/53KB) + 数学 lib 12 関数 (≈22KB) の lift** → prepare/reset/process/param dirty 通知まで含む snap-in ホストハーネス (wasm) | 大 |
 | KH-5 | Ghidra decompile (C) 経由ルートを RetDec-IR ルートと 3 snap-in で比較 (正確性/ビルド性/工数) | 小〜中 |
 | KH-6 | Tier-M 〜 H: Delay/Reverb/Limiter/Compressor → Ladder/Slice EQ/Filter Table/Carve EQ、最後に Snap Heap/Multipass (間接 call 追跡含む) | 大 |
-| KH-7 | UI: Skia CPU ラスタ → M7 フレーム転送 HUD への接続可否 (Skia は upstream 再ビルド、HeartCore の Editor 層は別途) | 大・低優先 |
+| KH-7 | UI: Skia CPU ラスタ → M7 フレーム転送 HUD への接続可否 (Skia は upstream 再ビルド、HeartCore の Editor 層は別途) | 大・低優先。**評価済み (#59): 接続形は成立・shim/フォント側に未達あり → `ui_eval/REPORT.md`** |
 | KH-8 | ライセンス方針決定後: LicenseManager/PACE 層の置換設計 | 要判断 |
 
 ## 9. 成果物

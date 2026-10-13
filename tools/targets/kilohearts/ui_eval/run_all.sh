@@ -25,5 +25,5 @@ run "5 shim_probe (M7 GUI shim へ実形で投入)" bash "$HERE/shim_probe.sh"
 echo; echo "===== summary (所要 $(( $(date +%s) - t0 )) s, load(end): $(cut -d' ' -f1-3 /proc/loadavg))"
 worst=0
 for i in "${!rc[@]}"; do echo "  exit=${rc[$i]}  ${names[$i]}"; [ "${rc[$i]}" -eq 1 ] && worst=1; [ "$worst" -ne 1 ] && [ "${rc[$i]}" -eq 2 ] && worst=2; [ "${rc[$i]}" -gt 2 ] && worst=1; done
-case $worst in 0) echo "VERDICT: READY";; 2) echo "VERDICT: NOT READY (gap あり。REPORT §5 の未解決を参照)";; *) echo "VERDICT: EVALUATION INVALID (前提違反/ネガコン失敗/異常終了)";; esac
+case $worst in 0) echo "VERDICT: READY";; 2) echo "VERDICT: NOT READY (gap あり。REPORT §6 の未解決を参照)";; *) echo "VERDICT: EVALUATION INVALID (前提違反/ネガコン失敗/異常終了)";; esac
 exit $worst
