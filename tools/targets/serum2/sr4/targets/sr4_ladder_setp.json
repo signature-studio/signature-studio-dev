@@ -1,0 +1,32 @@
+{
+ "name": "sr4_ladder_setp",
+ "image": "tools/targets/serum2/work/Serum2_win64.vst3",
+ "retdec": {
+  "ranges": "0x18008b2a0-0x18008b2a6",
+  "timeout": 600
+ },
+ "funcs": [
+  "function_18008b2a0"
+ ],
+ "passes": {
+  "p1": true,
+  "f7": true,
+  "f2": true,
+  "gdata": "external"
+ },
+ "exports": [
+  "function_18008b2a0"
+ ],
+ "spec": "../targets/serum2/sr4/specs/sr4_ladder_setp.json",
+ "wasm_func": "function_18008b2a0",
+ "func_va": "0x18008b2a0",
+ "regress": {
+  "expect_match": "all"
+ },
+ "extra_funcs": [
+  [
+   "0x18008b2a0",
+   "0x18008b2a6"
+  ]
+ ]
+}

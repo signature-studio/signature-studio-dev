@@ -98,6 +98,17 @@ static u64 tr_479b10(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64
     return h;
 }
 
+#ifndef M11_OV_CLASSCREATE
+#define M11_OV_CLASSCREATE 0
+#endif
+#if M11_OV_CLASSCREATE
+/* 41c130  `or eax,-1; lock xadd [rcx+8],eax; ret` = TInterfacedObject.AfterConstruction (FRefCount を 1→0 に戻す。NewInstance 41c160 が 1 にしている)。
+ * 410360 ON で [vmt-0x50] 経由の呼出しが現れるが closure 外のため miss (skip) になり FRefCount が 1 のまま残っていた (#595)。戻り値は xadd の旧値 */
+static u64 tr_41c130(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) {
+    u32 old = *(volatile u32*)(uintptr_t)(a0 + 8); *(volatile u32*)(uintptr_t)(a0 + 8) = old - 1; return old;
+}
+#endif
+
 static m11_tr_t disp_find(u32 va) {
     int lo = 0, hi = (int)m11_disp_n - 1;
     while (lo <= hi) {
@@ -116,6 +127,9 @@ static m11_tr_t disp_find(u32 va) {
     case 0x478c70: return tr_478c70;
     case 0x479b00: return tr_479b00;
     case 0x479b10: return tr_479b10;
+#if M11_OV_CLASSCREATE
+    case 0x41c130: return tr_41c130;   /* TInterfacedObject.AfterConstruction (#595) */
+#endif
     }
     return 0;
 }
@@ -660,6 +674,26 @@ unsigned long long function_410360(unsigned long long inst) {
     m11_vcall(0x41037d, Q(Q(inst) - 0x50), inst);
     return inst;
 }
+
+/* function_413060  VA 0x413060  (System._UStrFromPWCharLen 系: dest: PPointer, src: PWideChar, len: Integer) (#595)
+ * 逆アセンブル: `old := [rbx]` を stack に退避 → len>0 なら [rbx] := 412c20(len), src があれば 409c80(src, new, len*2) / len<=0 なら [rbx] := 0 → 最後に 412d60(&old) で旧文字列を解放。
+ * RetDec は `mov rax,[rbx]` の deref を落とし (D4), stack に dest のアドレス自体を入れた。412d60 がそれを文字列ポインタと見て dest-0x10+8 = dest-8 を refcount として減算するため,
+ * dest = オブジェクト +8 の文字列フィールド (448ee0 → 41c820 → 413060 の経路) では オブジェクト先頭 dword (VMT ポインタの下位) が 1 減り, 410360 が壊れた VMT から [vmt-0x50] を引いた。
+ * 戻り値: 元実装は 412d60 の戻り値 = stack 上の old のアドレス (関数終了後は無効) を返す。C でそれを返すと無効な番地になるため dest を返す。
+ * 呼出し側が戻り値を読むかは未検証 (REPORT_595 §2.2)。 */
+unsigned long long function_413060(unsigned long long dest, void* src, unsigned long long len) {
+    u64 old = Q(dest);
+    int n = (int)len;
+    if (n > 0) {
+        u64 p = function_412c20(len & 0xffffffffull);
+        Q(dest) = p;
+        if (src) function_409c80((u64)(uintptr_t)src, p, (u64)(long long)(int)((unsigned)n * 2u));
+    } else {
+        Q(dest) = 0;
+    }
+    function_412d60((u64)(uintptr_t)&old, 0);
+    return dest;
+}
 #endif /* M11_OV_CLASSCREATE */
 
 /* ---- #483: TDictionary<K,V> (Generics.Collections) の Add/GetItem が全て「重複キー」と誤判定される原因 3 点の C 転記 ----
@@ -738,6 +772,12 @@ u64 function_8cbde0(u64 self, u64 key) {
         return 0;
     }
     return Q(Q(self + 8) + (u64)idx * 24 + 0x10);
+}
+
+/* function_8c7710  VA 0x8c7710  (GetItem の呼出し口: 辞書 = [self+0x410], key = [obj] (obj の VMT = TClass))
+ *   機械語 `mov rax,[rbp+0x30]; mov rax,[rax]; ... call 8cbde0` の 1 段 deref (key = [arg2]) が IR で脱落し arg2 がそのまま渡っていた (D4 型, #662) */
+u64 function_8c7710(u64 self, u64 obj) {
+    return function_8cbde0(Q(self + 0x410), Q(obj));
 }
 
 /* function_478420  VA 0x478420  (IEqualityComparer getter: tkInteger / tkEnumeration; OrdType (byte [info+1+nameLen+1]) で static 実体を選ぶ)
