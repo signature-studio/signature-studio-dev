@@ -110,3 +110,11 @@
 - **比較した方式**: (a) 同一 Memory への畳み込み (採用)、(b) Worker を分けて Memory 上限を Worker ごとに持つ、(c) 低位 base・小 Memory 化 (#91)。
 - **理由**: (b) は Chrome 154 の上限が renderer プロセス単位で、Worker 分割では合計本数が 124〜253 とばらつき、N=130 を確実に通せない (`tools/perf/REPORT_P15.md` §1)。(c) は #91 の完了が前提で本 issue 単独では成立しない。(a) は Chrome Dedicated Worker で M=130 を Memory 1 本に畳み、instantiate 失敗なし・全 obj の署名が既知値と一致 (同 §3)。定常コストは obj 数に依らず平坦 (M=1 と M=130 で +1.5% 以内)。
 - **影響**: 同一 binary の複数 state に限って検証済み。異なる plugin を同居させる場合の VA 衝突・共有 static の扱いは未検証 (REPORT_P15 §4、子 issue で扱う)。setup は M=130 で約 0.8〜1.0 s かかるため、起動時の一括 pre-warm が前提。
+
+## D11 — release guard の deny-list は CI に置かず、テストは `--skip-release-guard` で fixture を stage する
+
+- **状態**: 採用 (2026-10-14, issue #1151 [PERF-P17])
+- **決定**: `tools/legal/release-guard/work/denylist` (素材由来の指紋) は gitignore で commit しない。CI の既定 job は deny-list を持たず、release guard は fail-closed (exit 4) のまま維持する。`deploy/client/chunked.test.mjs` の fixture stage (`05-stage.mjs`) だけ `--skip-release-guard` を明示する。fixture は `tools/e2e/fixtures/add.wasm` + 合成 padding + `index.html` のみで、FL/プラグイン由来バイトを含まないため、バイパスの前提が成立する。
+- **比較した方式**: (a) CI で R2 素材 (`fl-win64`) から deny-list を毎回生成 (約 34 s + 素材取得が必要で、テスト 1 本のために素材を要求する)、(b) テストで `--skip-release-guard` (採用)、(c) deny-list を commit (素材由来の指紋を repo に置くことになるため不可)。
+- **理由**: (a) は素材取得に依存し、素材の無い run でテストが落ちる。(b) は fixture が素材由来でないことを前提に、テストに限ってゲートを外す。本番 stage (`deploy.sh`・`20-worker --phase release`) は従来どおり `--skip-release-guard` を渡さない。
+- **影響**: 本番 stage でこのフラグを使うと LGL-2 のゲートを通過するため、`deploy.sh` の呼び出し元はフラグを付けない。テストの fixture を素材由来に差し替える場合は、この決定を見直す。

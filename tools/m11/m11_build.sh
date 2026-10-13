@@ -130,8 +130,13 @@ for f in heap failfast file timer sync; do cc ../shim/src/$f.c work/obj/shim_$f.
 S_NEG="$M11_NEG_413060-$M11_DEST_READ-$M11_INSTR_413060"
 if [ "$(cat work/neg_413060.stamp 2>/dev/null || echo none)" != "$S_NEG" ]; then rm -f work/obj/rt.o; fi
 echo "$S_NEG" > work/neg_413060.stamp
+# #1176: work-m11 同梱の rt.o/win.o は古い snapshot のことがある (mtime だけでは判定できない: 同梱 obj が source より新しく見える)。
+#   ソースの sha256 が記録と違えば作り直す (stamp 無し = 初回・snapshot 由来も作り直す)。
+RTWIN_SHA="$(cat m11_rt.c m11_win.c | sha256sum | cut -d' ' -f1)"
+if [ "$(cat work/rtwin.sha256 2>/dev/null || echo none)" != "$RTWIN_SHA" ]; then rm -f work/obj/rt.o work/obj/win.o; fi
 cc m11_rt.c work/obj/rt.o
 cc m11_win.c work/obj/win.o
+echo "$RTWIN_SHA" > work/rtwin.sha256
 llvm-nm --defined-only work/obj/shim_*.o work/obj/rt.o work/obj/win.o 2>/dev/null | awk '$2 ~ /^[TtWwDd]$/ {print $3}' | sort -u > work/defined_c.txt
 if [ ! -f work/m11_winstubs.c ] || [ work/defined_c.txt -nt work/m11_winstubs.c ] || [ m11_genstubs.py -nt work/m11_winstubs.c ] || [ work/boot_final.ll -nt work/m11_winstubs.c ]; then
   M11_EXCLUDE=work/defined_c.txt python3 m11_genstubs.py work/boot_final.ll work > work/genstubs.log
