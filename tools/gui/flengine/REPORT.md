@@ -192,7 +192,7 @@ main 取込後の木 (`c37522c`) で S1 が FAIL (828/67 vs 864/31) したため
 - 差は `run.mjs --survey` だけにあった。`m11_survey.mjs` は unit ごとに `_m11_va_unit_begin()` で VA 上限を張り直し、unit が書いた image を実行前へ戻すが (clobber 対策)、`run.mjs` はこれを省いていたため、前 unit の状態を引きずって 36 unit が Halt0 で落ちていた。
 - 修正: `run.mjs --survey` に `_m11_set_va_unit_budget` / `_m11_va_unit_begin` / unit 単位の image 復元を入れ、`m11_survey.mjs` と同じ手順にそろえた。shim 本体は変更していない。
 
-judge の 14 gate は全て PASS: L1 (ff・soft) / A1 / B1 (units_run 22・init 23) / R1 (`LoadStringW` IMPL ×4) / R2 (到達 23 ≥ floor 19) / S1 (864/31) / S2 / P1〜P4 / P5 (`TLightweightLayeredControl` hwnd `0x110000e`) / W1 (WNDCLASS 11・fn WNDPROC 8・外 0)。
+(`19ebb43` 時点の値。HEAD `b3819e2` 以降の judge は上表のとおり 12/14 で、本段落は現 HEAD の結果ではない) judge の 14 gate は当時全て PASS: L1 (ff・soft) / A1 / B1 (units_run 22・init 23) / R1 (`LoadStringW` IMPL ×4) / R2 (到達 23 ≥ floor 19) / S1 (864/31) / S2 / P1〜P4 / P5 (`TLightweightLayeredControl` hwnd `0x110000e`) / W1 (WNDCLASS 11・fn WNDPROC 8・外 0)。
 - R2 の到達は 23 (floor 19)。`run.mjs` の survey は unit 隔離の修正で到達集合が増えた (floor は未更新。下限として有効)。
 
 ### 発見 (本 PR 外)
