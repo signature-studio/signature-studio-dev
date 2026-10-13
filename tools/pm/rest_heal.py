@@ -48,6 +48,13 @@ def paged(path):
         page += 1
 
 
+def runs(st):
+    p = subprocess.run(["gh", "api", "--paginate", "--slurp", f"repos/{R}/actions/runs?status={st}&per_page=100"], capture_output=True, text=True)
+    if p.returncode != 0:
+        raise RuntimeError(f"actions/runs?status={st}: {p.stderr.strip()[:200]}")
+    return [r for page in json.loads(p.stdout) for r in page.get("workflow_runs", [])]
+
+
 def age_min(ts):
     return int((datetime.now(timezone.utc) - datetime.fromisoformat(ts.replace("Z", "+00:00"))).total_seconds() / 60)
 
@@ -55,7 +62,7 @@ def age_min(ts):
 prs = paged(f"repos/{R}/pulls?state=open")
 active_nums, active_titles = set(), set()
 for st in ("in_progress", "queued", "pending", "waiting"):
-    for run in gh(f"repos/{R}/actions/runs?status={st}&per_page=100")["workflow_runs"]:
+    for run in runs(st):
         for p in run.get("pull_requests") or []:
             active_nums.add(p["number"])
         if run["event"] in ("issue_comment", "workflow_dispatch"):

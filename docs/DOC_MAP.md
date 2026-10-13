@@ -90,9 +90,10 @@
 | `tools/iltools/REPORT.md` | ~36 | T-SH-12 (#154): ILTools_x64.dll の x64c lift 測定 (11,747 関数・unsup 1,236 は全て x87 → 未達)。x87 命令一式が x64c 未対応 |
 | `tools/liftdiff/REPORT.md` | ~250 | flelift (x64c) 全数採点 + native 全起動の参照化 (§5/§6.1/§6.2 は `REPORT_APPENDIX.md` に分割)。§12 (被覆拡大 vm0/u16) は要約のみで全文は `REPORT_APPENDIX.md` §12 |
 | `tools/liftdiff/REPORT_APPENDIX.md` | ~240 | liftdiff REPORT の分割移動節の全文: §5/§5.1/§5.2 (回帰 A/B・Ablation)・§6.1/§6.2 (検収・再現性)・§8/§9 (wasm_trap)・§10 (OTT 旧 chain)・§11 (比較系偽陽性)・§12 (被覆拡大 vm0/u16)。250 行上限のため無変更で分割移動 |
+| `tools/liftdiff/REPORT_APPENDIX_LD16.md` | ~90 | liftdiff REPORT §10 (OTT 旧 chain 前回比) の全文: 集計差分 (33/110/69 → 35/112/65) の原因切り分け (`ldlib/cases.py` pattern 追加)・関数単位の判定変化・n=3 非決定性。関数単位の突合は `tools/liftdiff/tests/ott_delta.py` (LD-16 / #825) |
 | `tools/liftdiff/REPORT_APPENDIX_865.md` | ~20 | liftdiff LD-18 (#865) 新規節: trace_head 外 27 件の 414ad0 到達確認 (25/27)・OOB 最上位 frame 集計 (239 件、件数定義と 222 件との差)。`REPORT_APPENDIX.md` は 250 行上限のため増やさず別置き |
-| `tools/icall/REPORT.md` | ~237 | 間接 call/jmp 落ち監査 + 復元 pass。§10.1 (#530)・§11 (ICALL-6 #361) は要約のみで全文は `REPORT_APPENDIX.md` に分割 |
-| `tools/icall/REPORT_APPENDIX.md` | ~88 | icall REPORT §10.1 (#530 OTT 回帰再実行) と §11 (ICALL-6 #361: FMA3 CRT 経路 600/600・`_handle_errorf` override・rax scratch 根拠) の全文 (250 行上限のため無変更で分割移動) |
+| `tools/icall/REPORT.md` | ~245 | 間接 call/jmp 落ち監査 + 復元 pass。§10.1 (#530)・§11 (ICALL-6 #361)・§12 (ICALL-16 #1023) は要約のみで全文は `REPORT_APPENDIX.md` に分割。§13 (#1026 Fresh Air 残落ち 6 件) は結論 1 行のみで全文は `REPORT_APPENDIX.md` §13 |
+| `tools/icall/REPORT_APPENDIX.md` | ~175 | icall REPORT §10.1 (#530 OTT 回帰再実行)・§11 (ICALL-6 #361: FMA3 CRT 経路 600/600・`_handle_errorf` override・rax scratch 根拠)・§12 (ICALL-16 #1023 stack 引数の実測。REPORT §12 から分割移動。同じ番号 §12 に main 由来の #229 FLEngine 分割 lift 節も併存する) の全文と、§13 (#1026: Fresh Air 残落ち 6 件の分類・未実施の wasm/native 差分と起票先) の全文 (250 行上限のため無変更で分割移動) |
 | `tools/icall/disp_size/REPORT.md` | ~160 | capstone `disp_size` 誤り (D9) の水平展開監査 |
 | `tools/icall/landing/REPORT.md` | ~165 | Delphi unwind landing pad の抽出と lift |
 
@@ -287,7 +288,7 @@
 | `tools/targets/freshair/REPORT.md` | ~145 | Fresh Air インストーラ解析 + lift 可否 |
 | `tools/targets/freshair/REPORT_APPENDIX_FA5.md` | ~42 | freshair REPORT §11 (FA-5 #52) の付録: 最大値の除外基準 (§A1)・`.rdata` 不一致 20 関数の分類詳細 (§A2)・Gain の意味同一性の差分実行 (§A3)。250 行上限のため無変更で分割移動 |
 | `tools/targets/freshair/lift2/REPORT.md` | ~210 | Fresh Air Compressor/Filter/制御層 lift (§12 は `REPORT_APPENDIX_FA4.md` に分割移動) |
-| `tools/targets/freshair/lift2/REPORT_APPENDIX.md` | ~120 | lift2 FA-10 (#666): ctrl 工程 FAILED の epf 素材切り分け (同一コード A/B)・rep movs/stosw の実装と e2e 未実行の実測・未解決 FA-11/FA-12 (REPORT §12 から参照) |
+| `tools/targets/freshair/lift2/REPORT_APPENDIX.md` | ~180 | lift2 FA-10 (#666): ctrl 工程 FAILED の epf 素材切り分け (同一コード A/B)・rep movs/stosw の実装と e2e 未実行の実測・未解決 FA-11/FA-12 (REPORT §12 から参照)。FA-14 (#907): §7 回帰セットの seed 依存実測・§8 受入の未達と起票先 (#1105)・§9 lift2_e2e 実測 (実測 commit `c531a0cb`) |
 | `tools/targets/freshair/lift2/REPORT_APPENDIX_FA4.md` | ~50 | lift2 REPORT §12 全文 (FA-4 #51: チェーン構成 / マクロ→子パラメタ ID 写像)。250 行上限のため無変更で分割移動 |
 | `tools/targets/freshair/lift2/REPORT_FA7.md` | ~70 | FA-7 (#452): macro 子 param ID 0x157/0x158/0x15a の Filter descriptor 同定 (model 層 setter 実測) |
 | `tools/pm/REPORT.md` | ~120 | PM 運用の実測 (PR 件数・PR とチケットの対応・Project Status・Actions run 集計)。RETRO・DIRECTIVES の数値の正本 |
@@ -317,7 +318,7 @@
 | `docs/LEGAL.md` | ライセンス/規約上の運用制約と事実整理 | 技術実装・数値実測 |
 | `docs/LEGAL_TERMS_LEDGER.{json,md}` | 各社規約の取得台帳 (取得日・版表記・正規化テキストの SHA-256)。`.json` が正本、`.md` は自動生成 | 規約本文・手編集 (`pnpm terms-watch` が更新) |
 | `docs/DOC_MAP.md` | 本書。REPORT.md 索引・行数上限ルール・自動生成一覧・本章 | 技術内容・測定値 |
-| `docs/DEFECTS.md` | lift silent miscompile 類型 D1a〜D19 (横断正本) | 個別ケースの詳細 (report 側) |
+| `docs/DEFECTS.md` | lift silent miscompile 類型 D1a〜D20 (横断正本) | 個別ケースの詳細 (report 側) |
 | `docs/HANDOFF/<日付>.md` | 引継ぎ要約 (方針・ブロッカー・次の一手)。最新のみ保持 | 状態の正本 (STATUS.md へ)・数値の羅列 |
 | `tools/<area>/REPORT.md` | **測定値・実測数値・検証結果の単一の正本** (日本語/英文を問わず) | なし (ここが正本) |
 | `tools/<area>/README.md` | **ナビゲーションのみ** (何をする dir か・E2E コマンド・関連ファイル) | 測定値・状態表 |
