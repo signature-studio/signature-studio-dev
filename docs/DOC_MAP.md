@@ -152,6 +152,7 @@
 | `tools/flp/REPORT.md` | ~120 | FLP/FST パーサ・ライタ・往復コーパス |
 | `tools/plugins/REPORT.md` | ~115 | Fruity プラグイン 141 種 wasm 化マップ (カウントの正本) |
 | `tools/plugins/f2/REPORT.md` | ~110 | PLG-F2 eq-filter 11 本: 固有閉包 lift の再現と間接 call 脱落の監査 (#199) |
+| `tools/plugins/hostx/REPORT.md` | ~145 | PLG-X host 統合 / big3p 12 本の方針決定 (lift する 6 / しない 2 / ユーザ判断 4) と閉包 lift の再現・間接 call 脱落の監査 (#210) |
 | `tools/plugins/framework/REPORT.md` | ~520 | TFruityHost shim 実装と検収 |
 | `tools/plugins/p0c/REPORT.md` | ~665 | kernel 表妥当性検証 + f80 assessment |
 | `tools/shared/REPORT.md` | ~295 | FL Shared ライブラリの分類・IPP 実測・OSS wasm 再ビルド・プロプラ lift PoC |
