@@ -5,10 +5,14 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 cd "$HERE"
 command -v node >/dev/null || export PATH="$HOME/.local/share/pnpm/bin:$PATH"
-FL_MAC="/home/ubuntu/work/analysis/mac/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Libs/FLEngine_x64.dylib"
-FL_WIN="/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin"
 # shellcheck disable=SC1091
-source "$HERE/../shared/env.sh"   # FL_WIN64_DIR 等 (環境変数があればそれを優先)
+source "$HERE/../shared/env.sh"   # FL_WIN64_DIR / FL_MAC_DIR 等 (環境変数があればそれを優先)
+FL_MAC="$FL_MAC_DIR/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Libs/FLEngine_x64.dylib"
+FL_WIN="$FL_WIN64_DIR/extracted/block00031_PE.bin"
+# step 3b (scripts_inventory) と step 4 (flapi 抽出) は mac pkg 全体が要る。欠けていれば空出力を作らず先頭で止める (#630)
+for f in "$FL_MAC" "$FL_WIN" "$FL_MAC_DIR/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL/System/Tools/MCP/MCPTools.pyc"; do
+  [ -f "$f" ] || { echo "ERROR: 前提不足で停止: $f が無い (mac は FL_MAC_DIR に pkg_extract が要る。analysis-mac-shared は Shared/ のみ / #630)" >&2; exit 2; }
+done
 step() { printf '\n== %s\n' "$*"; }
 PY312="$HERE/work/build-native/install/bin/python3.12"
 
@@ -54,4 +58,7 @@ node tests/subinterp_probe.mjs | cut -c1-300
 node tests/subinterp_probe.mjs --neg | cut -c1-120 || [ $? -eq 1 ]
 bash tests/subinterp_negcontrol_old.sh | tail -2                     # ネガコン: 修正前 flpy.c (PY-12 #587) で probe が FAIL すること
 step "14. MIDI scripting を アプリ UI / devtools に公開 (Vite + headless Chrome, PY-6 #76)"; (cd "$HERE/../.." && node tools/python/tests/midi_ui_check.mjs 2>&1 | grep -v shim_port | cut -c1-300)
+step "15. Chord progression 41 本 (pyc 39 + pyscript 2) の import / 実行 (PY-7 #78, mock 条件つき)"
+[ -d work/fl_extract ] || python3 analysis/extract_pyc_blocks.py work/fl_extract
+node tests/chord_progression_e2e.mjs | tail -1
 step "ALL OK"

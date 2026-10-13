@@ -49,6 +49,7 @@ PM (main)                      subagent (実装)                  subagent (検�
    └ gh pr merge --merge ──→ branch/worktree 削除
 ```
 
+- 流れ図の「issue 起票」は PM が行う。ただし実装 subagent も、1 run に収まらない作業の残りと未解決の起票先として子 issue を起票してよい (§3 の #835 の規定。milestone・優先度・Status は PM が確定する)。
 - **worktree の場所**: リポジトリの**親ディレクトリの `ws-<N>`**
   (`git worktree add ../ws-<N> -b <N>-<slug> origin/main`)。
   既存 worktree は `git worktree list` で確認。**他人の worktree には触れない** (消さない・checkout しない)。
@@ -65,6 +66,15 @@ PM (main)                      subagent (実装)                  subagent (検�
 | 検収 subagent | 対象が In review 確認 | 合格 → Done + コメント / 条件付き → **In review 維持** + 所見 | In review でないものを Done にしない |
 | PM (main) | 起票・milestone 確定 | merge・方針変更・是正 | — |
 
+- **子 issue の起票**: PM のほか、実装 subagent も、**1 run に収まらない作業の残り**と**未解決の起票先**として子 issue を起票してよい
+  (2026-10-14 PM 判断。PM の処理待ちで止まるのを避けるため。#833)。条件: ① 題名は `[AREA-n]` 形式。`<AREA>` は
+  親 issue の AREA に置き換える (未置換の `<AREA>` のまま実行しない)。既存の最大の n を次のコマンドで調べ、
+  その値 +1 を使う (欠番があっても最大値 +1 とする。`"[AREA-"` のような GitHub 検索は `[` `]` を区切りとして扱うため使わない):
+  `gh issue list --repo <R> --state all --limit 5000 --json title --jq '.[].title' | grep -oE '^\[<AREA>-[0-9]+[a-z]?\]' | grep -oE '[0-9]+' | sort -n | tail -1`
+  起票の直前にもう一度、`gh issue list --repo <R> --state all --limit 5000 --json title --jq '.[].title' | grep -cF '[<AREA>-<n>]'`
+  が 0 になることを確認する (番号の重複を作らない)。② 本文に `親: #N`・受入条件・
+  必要な `oc_artifacts:` 行を書く。③ milestone・優先度・Project の Status は PM が確定する (subagent は触らない)。
+  ④ 起票した番号を、最終回答と issue コメントに書く。
 - **チケット状態の唯一の正は Project V2 の Status フィールド + issue の open/closed**
   (技術進捗の正本は `docs/STATUS.md`)。不変条件: `CLOSED ⇔ Done`、`OPEN ⇔ Backlog|Ready|In progress|In review`。
 - **label `state:*` は使わない** (2026-10-12 実測で全削除済み・0 件)。新規作成・付与しない。
@@ -219,6 +229,15 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
 
   agent-setup での自動展開・`$GITHUB_ENV` への `FL_WIN64_DIR` 設定は未実施 (必要なら別 PR)。
   `PLUGINS_DIR` も同様に `plugins-*` の展開先を指定する。
+- **plugins-freshair の展開 (#693)**: tarball は最上位に `Fresh Air.Win.zip` / `Fresh Air.pkg` を持つ。agent-setup は
+  展開しないので、必要な run が自分で展開して `tools/targets/freshair/fetch.sh` に渡す。`fetch.sh` は zip から
+  `work/win/Fresh Air/.../FACTORY Presets/Factory Bank/*.epf` (8 本) を必ず補完する (`work-liftlib-targets` が先に
+  `work/win/Fresh Air` を作っても欠けない)。mac 側は `xar` と pkg が無ければ skip する。
+
+  ```sh
+  mkdir -p "$RUNNER_TEMP/plugins-freshair" && tar --zstd -xf "$ARTIFACTS_DIR/plugins-freshair.tar.zst" -C "$RUNNER_TEMP/plugins-freshair"
+  FA_DL="$RUNNER_TEMP/plugins-freshair" bash tools/targets/freshair/fetch.sh
+  ```
 - **レビュー run の素材**: review ジョブも PR 本文の `oc_artifacts:` 行を読んで素材を取得する
   (素材を要する e2e をレビュワーが独立再実行するため)。PR 作成者は、素材を要する PR の本文に
   実装時と同じ行を書くこと。

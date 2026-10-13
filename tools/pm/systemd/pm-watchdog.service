@@ -1,0 +1,6 @@
+[Unit]
+Description=PM watchdog ping: dispatch oc-watchdog so the Actions watchdog runs even when the cron does not fire
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /PATH/TO/REPO/tools/pm/pm_watchdog_ping.sh

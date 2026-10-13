@@ -4,7 +4,7 @@
  * 128f ごとに samplePos を進め、コントロール域に書き戻す (メインスレッドは読み取りのみ)。
  * 将来 FLEngine wasm の DSP 出力を Float32 リングバッファ経由でここに接続する。
  *
- * SAB レイアウトは src/runtime/audio.ts と対応 (processorOptions で渡す)。
+ * SAB レイアウトは旧ハーネス (src/runtime/audio.ts, AU-9 #185 で削除済み) と対応していた。本番経路は fl-audio-worklet.js (FlAudioShim)。
  * Int32 コントロール域: [SAMPLE_POS, UNDERRUNS, -, -, RUN_FLAG, ...]
  */
 

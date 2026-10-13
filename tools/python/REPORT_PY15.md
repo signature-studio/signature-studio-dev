@@ -211,3 +211,11 @@ wasm 系 (素材 `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開、`FL_WIN64_DI
 - 実行後の `git status` は空 (`tool_coverage.json` の書き換えなし)。生成物 (`work/`・`dist/`) は gitignore 対象。
 - 差分の手順は `run_all.sh` の step 1・2・5・9b を個別に実行したもの。`run_all.sh` 全体は step 4 の固定パス (#630) のため使えない。
 - 範囲外 (未実行): `mcp_ui_check.mjs` / `midi_ui_check.mjs` (Vite が要る)、`browser_check.mjs`・`midi_script.mjs` 等の §14 記載分は本 head では再計測していない。
+
+### #630 run_all.sh の env.sh 化 (実測)
+
+- 変更: `run_all.sh` の `FL_MAC` / `FL_WIN` を `FL_MAC_DIR` / `FL_WIN64_DIR` (`tools/shared/env.sh`) 経由に。`fetch_inputs.sh` は MCPTools.pyc の実在で mac 分岐を選ぶ (`Resources/FL` の存在だけでは `analysis-mac-shared` の Shared/ のみの素材で落ちるため)。
+- 前提検査: step 1 の前に `FLEngine_x64.dylib` / `block00031_PE.bin` / `MCPTools.pyc` の実在を確認し、欠けていれば `exit 2` で止める。
+- 実測 (素材: `fl-win64` + `analysis-mac-shared` を展開。`FL_MAC_DIR=$HOME/analysis/mac`): `run_all.sh` は 0.008 秒で rc=2、`ERROR: 前提不足で停止: .../Libs/FLEngine_x64.dylib が無い`。空出力・追跡ファイルの変更は無し。
+- 参考 (前検査を入れる前の 1 回目): step 1〜3 は通ったが step 3b が `files: 0` の空 `scripts_inventory.json` を書いた (mac の `Resources/FL` 不在)。このため前検査を追加した。
+- 未解決: mac pkg (`Libs/FLEngine_x64.dylib`・`System/Tools/MCP/`・`Resources/FL/`) を含む素材は `analysis-mac-shared` に無い。`run_all.sh` を Actions で最後まで通すには mac pkg 素材の追加が要る (R2 投入は PM)。受入条件 3 の「完走」は未達。素材追加の起票先: 子 issue #874 (CI-18)。

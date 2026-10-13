@@ -242,7 +242,7 @@ e2e: `node tools/perf/loader/loader_e2e.mjs [--reps 5] [--quick]` (Chrome 起動
 | 合成 wasm のみ。bit-exact OTT (x64c) / FLEngine 実 closure の worklet 計測は未実施 (REPORT §5.4: FLEngine wasm 未存在) | pre-warm 効果量 (6〜11 ms) は実 closure で変わる | PERF-P9 (#168: bit-exact OTT の Chrome Worker / AudioWorklet 再測) にコメント。FLEngine 実 closure の起動〜初回 audio E2E (旧 P6 案) は issue 未起票 → PM 判断で新規起票 |
 | `Date.now()` 1 ms 分解能・null sink (headless)。実デバイスの underrun 計測なし | 初回ブロック < 1 ms は判別不能・実 underrun 未評価 | PERF-P7 (#165: 実機再測) |
 | eager compile + keepModule の効果 (§3 の 481→33 ms) をローダ経由で未再測 | keepModule の採否判断 | 本 issue のコメントで PM 判断 (必要なら子チケット) |
-| `src/index.ts` / `audio.ts` (dummy-worklet) への組込みはしていない | ローダは未接続の部品 | RT / AU 系 (FLEngine 結線時) |
+| 本ローダ (perf 計測対象) は `src/index.ts` に未接続 (オーディオ本番経路は AU-9 #185 の `FlAudioShim`。旧 `audio.ts` は削除済み) | ローダは未接続の部品 | RT / AU 系 (FLEngine 結線時) |
 
 ## 12. bit-exact OTT の RTF 再測 — Chrome Worker / 実 AudioWorklet / 低負荷 / native 比 (PERF-P9 / #168)
 
