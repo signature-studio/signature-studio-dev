@@ -91,7 +91,7 @@ PY
 expect "L1a 対照 final.ll の emcc -c" 0 "$(emcc_rc $OUT/p.final.ll)"
 expect "L1b ret 除去 final.ll の emcc -c" nz "$(emcc_rc $N/broken.ll)"
 R=work/closure/block$(printf %05d $B).ranges.txt
-n_all=$(tr ',' '\n' < "$R" | wc -l)
+n_all=$(tr ',' '\n' < "$R" | grep -c .)   # ranges.txt は末尾改行が無いので wc -l だと 1 少ない
 LAST=$(tr ',' '\n' < "$R" | tail -n 1 | cut -d- -f1 | sed 's/^0x//')
 d0=$(grep -c '^define' "$OUT/p.final.ll"); h0=$(grep -c "^define .*@function_$LAST\\b" "$OUT/p.final.ll")
 tr ',' '\n' < "$R" | head -n $((n_all - 1)) | paste -sd, > "$N/ranges_minus1.txt"
