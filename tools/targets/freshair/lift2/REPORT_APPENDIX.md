@@ -248,3 +248,23 @@ bash tools/targets/freshair/lift2/lift2_e2e.sh                                  
   - **受入 2 (ネガコン FAIL) は `stosb` と全 kind 版で FAIL を実測**。`movsb`・`stosw` 単独版の FAIL は未確認 (未到達のため)。
   - 訂正: §10.1 の「`ctrl_rep.json` の rep は ctrl 閉包が実行する」は、kind ごとには成立しない (`movsb`・`stosw` は未実行)。§10.1 の数値は全 kind 版の値として有効。
 - 未解決 (起票先 #692 (FA-11)・既存のため子 issue は起票せず): `movsb`・`stosw` を実行する入力の設計と ctrl (または新 scenario) への追加、その後の `movsb`・`stosw` 単独ネガコン FAIL 化。
+
+## 12. FA-13 (#905): movsb / stosw を含む関数の到達経路 (静的調査, HEAD `a67af27b`)
+
+- 測定 HEAD: `a67af27b` (origin/main)。コード変更なし。素材 (fl-win64 / toolchain-retdec / toolchain-emsdk / plugins-freshair) は `$HOME/artifacts` から展開。`fetch.sh` で factory .epf 8 本 + SlateCore.core_64 を確認。
+- `build_ctrl.sh` (trap 無し, `a67af27b`): exit 0, `lifted 1256 funcs / 536369 B / 114503 insns, failed 0`, 38 秒 (`TMPDIR=$RUNNER_TEMP`)。`ctrl_rep.json` の closure (1256 関数) 内の rep 命令を逆アセンブルで数えた結果:
+  | 命令 | 出現数 | 含む関数 (VA) |
+  |---|---|---|
+  | `rep stosb` | 84 | `1803ba840` ほか |
+  | `rep movsb` | 39 | `1803e12c0`, `1803e2190`, `1803e2240` |
+  | `rep stosw` | 6 | `1803e8b70`, `180402e50`, `180ca4e70` |
+  | `rep stosq` | 1 | `181056140` |
+- 呼び出し鎖 (`ctrl_rep.json` の direct call 辺を遡った結果):
+  - `1803e12c0` (movsb) ← `1803e2190` (movsb) ← `1803e4ee0` ← `1803e95f0` ← (direct の呼び出し元なし)。`1803e95f0` は `fa_icall` の case 値 (`ctrl_full.ll` の `i64 6446552560`) としてのみ現れ、vtable 上の参照元は未特定。
+  - `1803e2240` (movsb) ← `1803e6000` ← `1803e5c30` (direct)。`1803e5c30` の上流は未追跡。
+  - `1803e8b70` (stosw): direct の呼び出し元なし。
+  - `180402e50` (stosw) ← `1803e49e0` (direct の呼び出し元なし)。
+  - `180ca4e70` (stosw) ← `180f8fd00` (direct; 上流未追跡)。
+- 結論: `movsb`・`stosw` は closure に入っているが、ctrl の root (17 slot + 子 wrapper) から direct call だけでは届かない。届くには vtable 経由の間接呼び出し (`fa_icall`) の解決先を辿る必要がある。§11 の「`movsb`・`stosw` 単独 trap は ctrl 15/15 PASS (未到達)」と整合する。
+- 次の作業 (#905 の残件): (a) `1803e95f0` と `1803e5c30` / `180f8fd00` の上流 (vtable 参照元) を特定し、どの scenario の入力 (macro / 子 meter / flag) で通るかを決める。(b) その scenario を `gen_ctrl_scen.py` に追加し、`movsb`・`stosw` 単独 trap で `run_ctrl.sh` が FAIL することを実測する。(c) trap を戻し `cmp` で一致を確認する。
+- 起票先: #905 (FA-13, OPEN)。親 #692。
