@@ -29,6 +29,39 @@ const loadPlugin = async (id) => {
 };
 const check = (ex, id) => ex.get(0) === hash(id);
 
+// 破棄済み検出用ローダ: dispose されると value.disposed=true。delayOf() 回のマイクロタスクを待ってから返す
+function trackedLoader(delayOf) {
+  const created = [];
+  const load = async (id) => {
+    for (let i = delayOf(); i > 0; i--) await null;
+    const value = { id, disposed: false };
+    created.push(value);
+    return { value, dispose: () => { value.disposed = true; } };
+  };
+  return { created, load };
+}
+
+// ネガコン (neg=legacy): 修正前の pin() = ロード完了の await の後で pins++ する版。エントリ登録 (pins=0) から pins++ までの間に
+// 別 id のロードが追い出しに来ると、破棄済みのエントリを pin 済みとして返す。PluginPool の内部 (entries / loading / loadOne) を直接使う
+class LegacyPinPool extends PluginPool {
+  async pin(id) {
+    let e = this.entries.get(id);
+    if (!e) {
+      let l = this.loading.get(id);
+      if (!l) {
+        l = { waiters: 0 };
+        l.promise = this.loadOne(id, () => 0).finally(() => this.loading.delete(id));
+        this.loading.set(id, l);
+      }
+      e = await l.promise;
+    }
+    e.pins++;
+    e.lastUsed = ++this.tick;
+    let done = false;
+    return { id, value: e.value, unpin: () => { if (done) return; done = true; e.pins--; } };
+  }
+}
+
 function rng(seed) { let s = seed >>> 0; return () => ((s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 4294967296); }
 
 const cases = {
@@ -84,6 +117,54 @@ const cases = {
     await Promise.all(Array.from({ length: 10 }, () => pool2.pin("same")));
     const dedupLoads = loads - before;
     return { cap, pinned: handles.length, ms, stateOk, sizeAfter, inUseAfter, over, afterOverInUse, recovered, evictions: pool.evictions, dedupLoads, err };
+  },
+
+  // pin の競合 (review 指摘): ロード完了 (エントリ登録) から pin が復帰するまでの間に、別 id のロードが枠不足で追い出しに来ても、
+  // 破棄済み (dispose 済み・枠返却済み) のプラグインを pin 済みハンドルとして返さないこと。
+  // (window) cap=1 で pin(A) の k マイクロタスク後に pin(B)。A は pin 済みなので追い出されず、B は MemoryBudgetExceeded になるのが正。
+  // (stress) cap=8・24 種・並行 24 本を 60 波。ロード時間と保持時間はマイクロタスク数でばらつかせる
+  async pool_race() {
+    const Pool = neg === "legacy" ? LegacyPinPool : PluginPool;
+    const window = [];
+    for (let k = 0; k <= 8; k++) {
+      const t = trackedLoader(() => 0);
+      const budget = new MemoryBudget(1);
+      const pool = new Pool(budget, t.load);
+      const pa = pool.pin("A");
+      for (let i = 0; i < k; i++) await null;
+      const pb = pool.pin("B");
+      const [ra, rb] = await Promise.allSettled([pa, pb]);
+      window.push({
+        k, aOk: ra.status === "fulfilled", aDisposed: ra.status === "fulfilled" ? ra.value.value.disposed : null, hasA: pool.has("A"),
+        bOk: rb.status === "fulfilled", bErr: rb.status === "rejected" ? rb.reason?.name : null, inUse: budget.inUse, size: pool.size,
+      });
+    }
+
+    const cap = 8, ids = Array.from({ length: 24 }, (_, i) => `r${i}`);
+    const r = rng(777);
+    const t = trackedLoader(() => Math.floor(r() * 4));
+    const budget = new MemoryBudget(cap);
+    const pool = new Pool(budget, t.load);
+    let handed = 0, stale = 0, exceeded = 0, otherErr = null, peakInUse = 0;
+    const task = async () => {
+      for (let i = Math.floor(r() * 6); i > 0; i--) await null;
+      const id = ids[Math.floor(r() * ids.length)];
+      let h;
+      try { h = await pool.pin(id); } catch (e) { if (e?.name === "MemoryBudgetExceeded") exceeded++; else otherErr ??= errInfo(e); return; }
+      handed++;
+      if (h.value.disposed || h.value.id !== id) stale++;
+      for (let i = Math.floor(r() * 8); i > 0; i--) await null;
+      if (h.value.disposed || !pool.has(id)) stale++;
+      peakInUse = Math.max(peakInUse, budget.inUse);
+      h.unpin();
+    };
+    for (let wave = 0; wave < 60; wave++) await Promise.all(Array.from({ length: 24 }, task));
+    const liveOf = () => t.created.filter((v) => !v.disposed).length;
+    const quiescent = { live: liveOf(), size: pool.size, inUse: budget.inUse };
+    let drained = 0;
+    while (pool.evictOne()) drained++;
+    const afterDrain = { live: liveOf(), size: pool.size, inUse: budget.inUse };
+    return { window, stress: { cap, tasks: 60 * 24, handed, exceeded, stale, otherErr, loads: t.created.length, evictions: pool.evictions, peakInUse, quiescent, drained, afterDrain } };
   },
 
   // Memory 生成の失敗時に枠が戻ること (budget が leak しない)

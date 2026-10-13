@@ -50,6 +50,23 @@ const checks = {
     if (r.dedupLoads !== 1) f.push(`同一 id 同時 pin のロード回数=${r.dedupLoads} != 1`);
     return f;
   },
+  pool_race: (r) => {
+    const f = [];
+    const bad = (pred, msg) => { const ks = r.window.filter(pred).map((a) => a.k); if (ks.length) f.push(`${msg} (k=${ks.join(",")})`); };
+    bad((a) => !a.aOk, "pin(A) が失敗");
+    bad((a) => a.aOk && a.aDisposed, "pin(A) が破棄済みハンドルを返した");
+    bad((a) => !a.hasA, "pin 済みの A がプールに居ない");
+    bad((a) => a.bOk || a.bErr !== "MemoryBudgetExceeded", "A が pin 済みなのに pin(B) が MemoryBudgetExceeded で拒否されない");
+    bad((a) => a.inUse !== 1 || a.size !== 1, "枠と生存エントリが一致しない (期待 inUse=1 size=1)");
+    const s = r.stress;
+    if (s.otherErr) f.push(`想定外の例外 ${JSON.stringify(s.otherErr)}`);
+    if (s.stale !== 0) f.push(`破棄済み/別 id のハンドルを ${s.stale} 件受け取った`);
+    if (s.handed < 100 || s.evictions < 20) f.push(`競合が起きる条件になっていない handed=${s.handed} evictions=${s.evictions}`);
+    if (s.peakInUse > s.cap) f.push(`予算超過 peakInUse=${s.peakInUse} cap=${s.cap}`);
+    if (s.quiescent.live !== s.quiescent.size || s.quiescent.size !== s.quiescent.inUse) f.push(`静止時に 生存 value=${s.quiescent.live} / size=${s.quiescent.size} / inUse=${s.quiescent.inUse} が不一致`);
+    if (s.afterDrain.size !== 0 || s.afterDrain.inUse !== 0 || s.afterDrain.live !== 0) f.push(`全 unpin 後に追い出し切れない (pin 数リーク) ${JSON.stringify(s.afterDrain)}`);
+    return f;
+  },
   create_fail_releases: (r) => {
     const f = [];
     if (r.err?.name !== "RangeError") f.push(`不正 descriptor が RangeError でない: ${JSON.stringify(r.err)}`);
@@ -79,6 +96,7 @@ const POS = [
   ["naive", "", checks.naive, "無予算 300 instance → 実上限で OOM (問題の再現)"],
   ["pool_churn", "", checks.pool_churn, "300 種 × 1500 pin / cap=96"],
   ["pool_concurrent", "", checks.pool_concurrent, "120 同時ロード + 121 本目拒否 + LRU 回復"],
+  ["pool_race", "", checks.pool_race, "pin 復帰前の追い出しで破棄済みハンドルを返さない (cap=1 窓 9 通り + 8 枠・24 種の並行 1440 pin)"],
   ["create_fail_releases", "", checks.create_fail_releases, "Memory 生成失敗で予約が戻る"],
   ["cross_thread", "", checks.cross_thread, "main 60 + Worker 60 (共有カウンタ)"],
   ["wasm64", "", checks.wasm64, "wasm64 = 2 slot (cap=120 → 60 本で拒否)"],
@@ -88,6 +106,7 @@ const NEG = [
   ["pool_churn", "cap=130", checks.pool_churn, "cap をネイティブ上限超 (130) に設定 → OOM で FAIL すること", /例外/],
   ["pool_concurrent", "cap=130", checks.pool_concurrent, "cap=130 / 120 本 → 121 本目が予算拒否でなく OOM / 非拒否になり FAIL すること", /MemoryBudgetExceeded|121 本目/],
   ["wasm64", "cap=140", checks.wasm64, "wasm64 に cap=140 (70 本分 > 実上限 61〜62 本) → RangeError で FAIL すること", /例外/],
+  ["pool_race", "neg=legacy", checks.pool_race, "修正前の pin (await 後に pins++) に戻す → 破棄済みハンドルを返して FAIL すること", /破棄済み/],
   ["cross_thread", "budget=0", checks.cross_thread, "Worker が予算を使わない → 合計が上限を超え Worker が RangeError で FAIL すること", /Worker/],
 ];
 

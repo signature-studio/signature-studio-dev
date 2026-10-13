@@ -125,6 +125,9 @@ type Entry<T> = {
 
 export type PoolHandle<T> = { readonly id: string; readonly value: T; unpin(): void };
 
+/** ロード中の id。`waiters` = この完了を待つ pin() 呼び出し数 (同期で加算され、エントリ登録時に pins として引き継ぐ) */
+type Loading<T> = { promise: Promise<Entry<T>>; waiters: number };
+
 /**
  * 「プラグイン 1 本 = 1 Memory」のプール。`pin` で取得 (未ロードならロード)、`unpin` で使用終了 (ウォーム保持)。
  * 枠が無ければ pin 数 0 のエントリを LRU 順に追い出して再試行。全て pin 中なら MemoryBudgetExceeded。
@@ -132,7 +135,7 @@ export type PoolHandle<T> = { readonly id: string; readonly value: T; unpin(): v
  */
 export class PluginPool<T> {
   private readonly entries = new Map<string, Entry<T>>();
-  private readonly loading = new Map<string, Promise<Entry<T>>>();
+  private readonly loading = new Map<string, Loading<T>>();
   private tick = 0;
   evictions = 0;
   private readonly budget: MemoryBudget;
@@ -153,24 +156,33 @@ export class PluginPool<T> {
 
   async pin(id: string): Promise<PoolHandle<T>> {
     let e = this.entries.get(id);
-    if (!e) {
-      let p = this.loading.get(id);
-      if (!p) {
-        p = this.loadOne(id).finally(() => this.loading.delete(id));
-        this.loading.set(id, p);
+    if (e) {
+      e.pins++;
+    } else {
+      let l = this.loading.get(id);
+      if (!l) {
+        const nl = { waiters: 0 } as Loading<T>;
+        nl.promise = this.loadOne(id, () => nl.waiters).finally(() => {
+          if (this.loading.get(id) === nl) this.loading.delete(id);
+        });
+        this.loading.set(id, nl);
+        l = nl;
       }
-      e = await p;
+      // pin は loadOne がエントリを登録する時点で waiters 分が確保済み (await 後に pins++ すると、その間に
+      // 別 id のロードが pins=0 のこのエントリを追い出し、破棄済みハンドルを返す)
+      l.waiters++;
+      e = await l.promise;
     }
-    e.pins++;
     e.lastUsed = ++this.tick;
+    const entry = e;
     let done = false;
     return {
       id,
-      value: e.value,
+      value: entry.value,
       unpin: () => {
         if (done) return;
         done = true;
-        e.pins--;
+        entry.pins--;
       },
     };
   }
@@ -202,7 +214,7 @@ export class PluginPool<T> {
     }
   }
 
-  private async loadOne(id: string): Promise<Entry<T>> {
+  private async loadOne(id: string, initialPins: () => number): Promise<Entry<T>> {
     // 枠は load() の前に確保できないので (kind が load 結果で決まる)、まず wasm32 1 枠を確保 → 結果の kind で差分調整
     let lease = this.budget.tryAcquire(id, "wasm32");
     while (!lease) {
@@ -241,7 +253,7 @@ export class PluginPool<T> {
         },
       };
     }
-    const e: Entry<T> = { id, value: r.value, lease, dispose: r.dispose, pins: 0, lastUsed: ++this.tick };
+    const e: Entry<T> = { id, value: r.value, lease, dispose: r.dispose, pins: initialPins(), lastUsed: ++this.tick };
     this.entries.set(id, e);
     return e;
   }
