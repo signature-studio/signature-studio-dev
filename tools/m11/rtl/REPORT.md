@@ -216,11 +216,14 @@ jsonl の該当レコードを読んだ結果 (`batch_closure_hybrid.jsonl`、ba
 * 2 件 (`0x412020` / `0x455650`) は unexec のため、batch の差分からは原因を取れない。
 * 次の一手 (本 run では未実施): 退行 5 件を単独で再採点し、trace 差分の入口 (`0x40faa0`) の間接 call 解決を確認する。修復は tools/flelift の変更が要るため #410 に継続。
 
-### 9-2. 退行 7 件の再採点 (未再検証)
+### 9-2. 退行 7 件の再採点 (未実施・生ログ無し)
 
-§9-1 の 5 件 (+ unexec の 2 件) を単独 n=3 と帯 batch 1 回で再採点した値は `results/x64c_regression7_rerun.tsv` が正本 (`tools/m11/rtl/rerun_regression7.py` で再生成)。表は置かない。
+§9-1 の 7 件を単独 n=3 と帯 batch 1 回で再採点する作業は、この節を書いた run では**未実施**。
+生ログ (`rerun5/r{1,2,3}.jsonl`・`band_b1.jsonl`) が `work-liftdiff` 素材に含まれておらず、再採点の出典が無い。
+前 run の単独・帯 batch の数値は出典が確認できないため取り下げた。`results/` に再採点の TSV は置かない。
+`tools/m11/rtl/rerun_regression7.py` は jsonl から 7 件の判定表を作る道具で、生ログを取得した run で実行する (各 jsonl の sha256 と実行コマンドを REPORT に残す)。
 
-* 生ログ (`tools/liftdiff/work/rerun5/r{1,2,3}.jsonl`・`band_b1.jsonl`) は、この節を書いた run の環境に無く、再検証していない。`work-liftdiff` 素材 (`docs/WORKFLOW.md` §11) の取得が要る。入力 jsonl と flelift `ld_wasm.cjs` の sha256 も未確認のため記載しない。再実行時に各 jsonl の sha256 と実行コマンドを残す。
-* 結論 (前 run の自己申告・未再検証): `0x4090e0` / `0x41cd70` / `0x42d830` / `0x44a590` は単独・帯 batch とも mismatch。`0x4511d0` は単独・帯 batch とも match で、コミット済み batch jsonl の mismatch と食い違う。`0x412020` / `0x455650` は判定が揺れる。
-* 含意 (再検証まで暫定): 確実な退行は 4 件。`0x4511d0` は退行かどうか未確定。`0x412020` / `0x455650` は一致→不一致の判定自体が揺れている。
-* 未実施: `0x40faa0` 入口の間接 call 解決の確認 (修復側の作業で、#410 に継続)。
+* 同梱 `batch_closure_hybrid.jsonl` (sha256 `d9995bfa90d96266f56f246f7e398809895c9f003ea225a2ec7d10799f6e0e6b`、7,421 行) の判定は §9-1 の表と一致 (既存 batch 出力の読取りで、再採点ではない)。
+* 結論 (この batch 1 回の範囲のみ): `0x4090e0` / `0x41cd70` / `0x42d830` / `0x44a590` / `0x4511d0` は mismatch、`0x412020` / `0x455650` は unexec。
+* 含意: 一致→不一致の退行 (m11 match → x64c mismatch) は、単独採点で確認するまで確定しない。`0x412020` / `0x455650` は batch 上で実行不能のため、退行とも非退行とも言えない。
+* 未実施: 単独再採点・`0x40faa0` 入口の間接 call 解決の確認 (修復側の作業で、#410 に継続)。
