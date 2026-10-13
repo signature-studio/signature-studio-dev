@@ -1,6 +1,6 @@
 # tools/plugins/p0c REPORT — kernel 表妥当性検証 + f80 assessment (CAB-196)
 
-> **正本**: `tools/plugins/p0c/REPORT.md` (§1〜§7)。§8 以降は付録 `REPORT_APPENDIX_A.md`〜`REPORT_APPENDIX_E.md` に
+> **正本**: `tools/plugins/p0c/REPORT.md` (§1〜§7)。§8 以降は付録 `REPORT_APPENDIX_A.md`〜`REPORT_APPENDIX_F.md` に
 > **無変更で分割移動** (#378, `docs/DOC_MAP.md` §1 の 250 行上限)。付録索引は本ファイル末尾。
 
 作成: 2026-10-10 / HEAD = 1c4b7c7 時点 / 担当 dir: tools/plugins/p0c のみ
@@ -135,4 +135,5 @@ bash tools/plugins/p0c/p0c_e2e.sh      # 約 2 分 (work/ 付き初回は kernel
 | §13 | P0c-7 (#310): 0x5df610 / 0x5e0d80 bit-exact | `REPORT_APPENDIX_D.md` |
 | §14 | P0c-6 (#277): native crash 7 / abi-mismatch 7 kernel の原因 | `REPORT_APPENDIX_E.md` |
 | §15 | 環境パス置換 (#346) | `REPORT_APPENDIX_E.md` |
-| §16 | P0c-8 (#311): ext IR の wasm32 検証 + framework 統合 | `REPORT_APPENDIX_E.md` |
+| §15.4 | #360: 追加素材での full e2e before/after (main で #378 後に追記) | `REPORT_APPENDIX_E.md` |
+| §16 | P0c-8 (#311): ext IR の wasm32 検証 + framework 統合 | `REPORT_APPENDIX_F.md` |

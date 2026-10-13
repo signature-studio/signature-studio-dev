@@ -140,6 +140,51 @@ def parse_auto(s):
     return tuple(x for x in s.split(",") if x)
 
 
+def _junk_hi(r):
+    try:
+        return json.loads(r["census0"]).get("junkHi")
+    except Exception:                          # noqa
+        return None
+
+
+def ott_judge(r, ident, auto, lb_base):
+    """ott の合否判定 (純関数)。戻り値 (ok, 不合格理由 list, 参照欠落 bool)。
+
+    旧既定 (--auto none = m10 chain 再現) の合格条件は 3 つ全て必須で, どれも「判定不能 = 合格」にしない:
+      (1) e2e (checks/broken/band maxdev/nbad/trap) = r["pass"]
+      (2) 7 段 IR 一致 (O1..O4)。参照 .ll が無く None の段は「欠落」として不合格 (lowbase 時は適用外)
+      (3) 出力 SHA 突合 (outhash)。参照 ott_m10.cjs が無い / 実行失敗は「欠落」として不合格
+    auto 既定モードは census junkHi <= OTT_AUTO_JUNKHI_MAX。junkHi が取れない (None) 場合も不合格。
+    census junkHi 自体は --auto none の合否に使わない (表示値)。
+    """
+    reasons, missing = [], False
+    if not r.get("pass"):
+        reasons.append("e2e 不合格 (checks/broken/maxdev/nbad/trap/SHA のいずれか: r[pass]=False)")
+    if auto:
+        jh = _junk_hi(r)
+        if jh is None:
+            reasons.append("census junkHi が取得できない")
+        elif jh > OTT_AUTO_JUNKHI_MAX:
+            reasons.append("census junkHi %d > %d" % (jh, OTT_AUTO_JUNKHI_MAX))
+        return (not reasons), reasons, missing
+    if lb_base in (None, 0x30000000):
+        for k, v in sorted(ident.items()):
+            if v is None:
+                missing = True
+                reasons.append("IR 一致 %s: 参照 .ll が無い (tools/m6/work または tools/m10/work, work-m6-ott 素材)" % k)
+            elif v is not True:
+                reasons.append("IR 一致 %s: 不一致" % k)
+    oh = r.get("outhash")
+    if not oh:
+        missing = True
+        reasons.append("outhash 未実施: 参照 tools/m10/work/ott_m10.cjs が無い")
+    elif "error" in oh:
+        reasons.append("outhash 実行失敗: %s" % oh["error"])
+    elif oh.get("equal") is not True and oh.get("f0_equal") != oh.get("f0_total"):
+        reasons.append("outhash 不一致: equal=%s f0 %s/%s" % (oh.get("equal"), oh.get("f0_equal"), oh.get("f0_total")))
+    return (not reasons), reasons, missing
+
+
 def cmd_ott(a):
     from .recipes import ott
     auto = parse_auto(a.auto)
@@ -163,23 +208,15 @@ def cmd_ott(a):
         # outhash は旧既定 (--auto none = m10 chain 再現) モードで実施する (CAB-238: auto 既定モードは
         # 修復由来の SHA 変化が正のため突合を省略し, 差分は REPORT_APPENDIX_A.md §12 の表を参照)。
         print("[ott] 出力 SHA (param×[0x248]×振幅): liftlib 生成 helper 版 vs 元 m10 成果物 =", json.dumps(r["outhash"]))
-        if not auto:
-            if r["outhash"].get("equal") is False and r["outhash"].get("f0_equal") != r["outhash"].get("f0_total"):
-                r["pass"] = False
+    ok, reasons, missing = ott_judge(r, ident, auto, lb_base)
     if auto and r.get("census0"):
-        # CAB-238 検収②: auto 既定モードは census 改善 (junkHi ≤ 実測値) の維持を合格条件に含める
-        try:
-            jh = json.loads(r["census0"]).get("junkHi")
-        except Exception:                      # noqa
-            jh = None
-        if jh is not None:
-            ok_jh = jh <= OTT_AUTO_JUNKHI_MAX
-            print("[ott] census gate (auto 既定): junkHi %d <= %d -> %s" % (jh, OTT_AUTO_JUNKHI_MAX, "OK" if ok_jh else "NG"))
-            r["pass"] = r["pass"] and ok_jh
-    ok = r["pass"] and (all(v is True for v in ident.values())
-                        if (not auto and lb_base in (None, 0x30000000)) else True)
+        print("[ott] census gate (auto 既定): junkHi %s <= %d" % (_junk_hi(r), OTT_AUTO_JUNKHI_MAX))
+    for x in reasons:
+        print("[ott] NG:", x)
     print("[ott] RESULT:", "PASS" if ok else "FAIL")
-    return 0 if ok else 1
+    if ok:
+        return 0
+    return 2 if missing else 1                  # 2 = 参照成果物の欠落 (不一致の 1 と区別する)
 
 
 def cmd_inject(a):

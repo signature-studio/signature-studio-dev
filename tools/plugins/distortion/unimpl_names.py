@@ -2,7 +2,7 @@
 """未実装 `__asm_*` helper の「名前」を許容リストと突合する (judge.py の declares_unimpl は件数のみのため)。
   unimpl_names.py <batch_dir> --blocks B1,B2,... [--allow BLOCK=__asm_name ...]
   <batch_dir>/<block>/p.simd.log の `[simd2] declares ...` 行と `   unimplemented: <sig>` 行を読む。
-  許容リストに無い名前が 1 つでもある / simd.log か集計行が無い / 集計行の件数と名前の行数が合わない → exit 1。 全 block 許容内 → exit 0。
+  未実装の名前が 1 つでもある (--allow で明示した名前を除く) / simd.log か集計行が無い / 集計行の件数と名前の行数が合わない → exit 1。 全 block 許容内 → exit 0。
 """
 import argparse, os, re, sys
 

@@ -639,6 +639,29 @@ unsigned long long function_417b70(unsigned long long a, unsigned long long ti, 
     return 0;
 }
 
+#ifndef M11_OV_CLASSCREATE
+#define M11_OV_CLASSCREATE 0
+#endif
+#if M11_OV_CLASSCREATE
+/* function_410360  VA 0x410360  (System.TObject: AfterConstruction 呼出し stub) (#419) — 実験: 既定 OFF (-DM11_OV_CLASSCREATE=1 で有効)。
+ * 410320 (ClassCreate) / 40f960 (NewInstance) / 40fb40 (InitInstance) / 40fac0 は main (#474) が既定で転記済みのため本ブロックには持たない。
+ * RetDec は `call [rbx-0x50]` (= AfterConstruction) を落とし `ret arg1` に誤 lift した (DEFECTS D15 型, call site 492)。
+ * VMT slot 呼出し: closure 外の AfterConstruction 既定実装 410070 (= ret) は呼ばず (miss 計上を避ける), #494 の site/target 計測には ok で計上する。
+ * site は元バイナリの `call [rbx-0x50]` の VA 0x41037d (逆アセンブルで確認) */
+static u64 m11_vcall(u32 site, u64 target, u64 self) {
+    if (target == R(0x10070)) {
+        icall_bump(&g_isite, site, 0);
+        icall_bump(&g_itgt, 0x410070u, 0);
+        return self;
+    }
+    return ICALL_AT(site, target, self, 0, 0, 0, 0, 0, 0, 0);
+}
+unsigned long long function_410360(unsigned long long inst) {
+    m11_vcall(0x41037d, Q(Q(inst) - 0x50), inst);
+    return inst;
+}
+#endif /* M11_OV_CLASSCREATE */
+
 /* ---- #483: TDictionary<K,V> (Generics.Collections) の Add/GetItem が全て「重複キー」と誤判定される原因 3 点の C 転記 ----
  * 8cc190 (Add) は FComparer = TEqualityComparer<K>.Default (53df80 → 479b40 _LookupVtableInfo) の GetHashCode/Equals を使う.
  *   479b40  `movzx rcx,byte [rbx]` (TypeInfo.Kind) の deref 脱落 (D4) で Kind=0 固定, `test cl,2; call rax` (getter 呼出し) 脱落 (D15)

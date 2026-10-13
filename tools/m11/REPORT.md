@@ -3,7 +3,7 @@
 **判定: 部分達成** (到達 stage 4/6)。`entry_point`(DllMain attach) → `_StartLib` → `_InitLib` → `InitUnits` が
 wasm 上で動作し、**FastMM4 が実際に GetMem → VirtualAlloc でプールを確保するところまで**は実測で到達。
 ただし 942 unit の初期化は通常起動で **22 本完走後、unit #23 (VA 0x467f00) が Delphi 例外 → Halt0 (§10, #132 で #18 の OOB を解消)**、stage 5 (survey trap 無し完走) は未達。
-(下の §1 表と §2〜§8 は #132 以前 = unit #18 OOB 時点の実測。最新値は §10、survey の最新値 (OOM/clobber 分離後) は §12。)
+(下の §1 表と §2〜§8 は #132 以前 = unit #18 OOB 時点の実測。最新値は §10、survey の最新値 (OOM/clobber 分離後) は §12、#516 qstore 後の最新値は §13。)
 
 再現: `bash tools/m11/m11_e2e.sh` (work/ があれば増分 build: 実測 29.3〜29.6 秒 (§10, 4 vCPU, n=3) / `--full` で RetDec lift から全再生成: 旧記載「約 10 分」で本 PR では未再測定)。常に exit 0。
 gen_ir2 の ldfix は capstone+pefile が無いと黙ってスキップされる (§10 未解決の末尾)。PE は `/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin` 固定 (runner では symlink)。
@@ -152,32 +152,7 @@ reached_stage は全行 4/6 (stage 5 未達)。最終 HEAD は 5 回測定 (gen_
   ok→trap 33 本 / trap→ok 1 本で、ok→trap の 4 本 (unit 235/265/276/313) のスタックは 409410/409470 (GetMem/ReallocMem) → 409730 (Error) → 412a40 → 4128b0 (Halt0) = GetMem 失敗 → Error → Halt0 と整合。
   unit #18 が完走して消費が増えたためと**推定**するが、OOM を除いた意味の退行の有無は**未切り分け** (起票: #132)。
 
-**真因 (実測)**: 44bb70 の record (392B, CAB-129 で拡幅済) の +16 が、直前に呼ぶ `function_44bae0` の呼出し前後で 0 → 0x100000001 に変化
-(`m11_site` を IR に埋めて前後値を実測)。44bae0 の `stack_var_-88` が `alloca i64` (8B) だが、`call 44ba50(ptr)` で escape し
-callee が `[rcx+0x2c..0x3e]` (GetCPInfo の LeadByte 表) に書くため、呼出し元フレーム (= 44bb70 の record) を破壊していた。
-
-修正 (4 点):
-1. `alloca/m11_alloca.py` **R8**: escape する `stack_var_-N` を「次の stack_var までの間隔」に拡幅 (**サイズを供給しない推定型の規則**; 契約・数値・過大拡幅の注意は `alloca/REPORT.md` §2)。
-   gen_ir2 の素の IR に適用して 4,077 サイト → 2,408 alloca / 1,347 関数, +1,153,849 B stack (最終 HEAD で実測)。R8 だけでは OOB 解消のみ (units_run 17 のまま, unit #18 が Halt0 へ)。
-2. `m11_build.sh`: alloca pass を build 時に常設 (idempotent, 内容が同じなら mtime を触らない)。`m11_e2e.sh` の既定経路で pass が掛かる。
-3. `m11_ov.c`: `function_412d60` (`_UStrClr`) / `418190` (`_LStrArrayClr` 系) を C 転記 (RetDec が `mov rax,[rbx]` 型の旧値 load を脱落, D1 系)。
-   `_CopyArray` 416db0 も初版で転記したが (kind の `movzx rcx,[r8]` 脱落が unit #18 の Halt0 原因)、main の #417 (#496) が同関数を kind 12 (416720 の間接 call) 込みで転記したため、
-   merge で本 PR 側を削除し main 版を採用した (kind 12 が src を渡さない Copilot 指摘は main 版で解消)。
-4. `m11_ov.c`: `function_410b10` (TMonitor の GetMonitor 相当) を C 転記 (`a71a404`)。RetDec が `mov rax,[rcx]` (obj → VMT) を落とし `[obj-0x80]` を読む (D4)。
-   旧 main は `_ClassCreate` が TClass 自身を返したため偶然 InstanceSize になっていた。40fb40 で実オブジェクトが作られると `[obj-0x80]` がヒープ上の任意値になり、
-   `410820` (TMonitor.Enter) が LockCount=1 / Recursion=1 / Owner を FastMM の小ブロックプールヘッダ (0x10bd1990: BlockType 0xfa5148 → 0x100000001) に書き、後の `_UStrClr` → FreeMem が OOB (`6ad441d` の停止)。
-   逆アセンブル 0x410b10〜0x410b81 と突合。
-
-ネガティブコントロール (実測): (a) 本 PR 無しの main `c1e4105` = units_run 17 + OOB。(b) 最終 HEAD から 4 の `410b10` だけ外した (NC) = units_run 17 + OOB (停止は 455790 → 44bb70 → 446400 → 447860 → 412d60 → 409440 → 407e20; `6ad441d` で同じ停止を確認)。
-修正 1〜3 を個別に外した切り分けは**現 main 上では未実施** (旧 main 上の実測: 3 点を外すと units_run 17 + OOB)。検証範囲外: 417b70 / 409470 / 410320 / 40fb40 / 416db0 の機械語突合 (main 側の転記; 本 PR の差分ではない)。
-
-**次 blocker (unit #23 = 0x467f00)**: `467f00 → 467c40 → 45a640 → 45a2a0 → 411e80 → 411d20 → 412a60 → Halt0`。467c40 は
-`call [rax]` (IAT 経由の Win32 API, `mov ecx,eax` で戻り値を 45a640 に渡す) の結果で `45a640(ecx, dx=11, r8w=8)` を呼び、ecx が 0 以外・
-`0x7ffdfffb` 系でない値のとき 45a2a0 (例外送出, 0xEEDFADE) に進む。`467c40` の IR には間接 call が **0 件** (機械語 0x467cc9 `call [rax]` / 0x467d5d `call [rax]` が丸ごと脱落 = D15 型, `work/icall_audit.json` の
-`capstone_fns_with_indirect_call` 系と同じ現象)。脱落した戻り値の代わりに `45a640` へ未定義値 (ecx) が渡り例外送出へ進む可能性が高い (推定)。
-`[rip+0x117be27]` の指す IAT スロットの import 名は未特定。
-
-外した内容 (4c3baa4 の 467c40 間接 call 復元・boot5 25 関数 lift・配線 / faee5b6 の 417b70・409470 転記・BSTR スタブ) は #414/#447/#481 と重複するため本 PR に含めない。**#490 ([M11-N15]) で追跡**。
+**真因・修正 4 点・NC・次 blocker (unit #23)・外した内容 (#490 で追跡) の全文は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §10b に分割移動 (250 行上限, 内容は無変更)。** 要点: 44bb70 の record 破壊 (44bae0 の `alloca i64` が callee へ escape) を R8 で拡幅、`412d60`/`418190`/`410b10` を C 転記して通常起動 17 → 22 unit。次 blocker は unit #23 (0x467f00) の Delphi 例外 → Halt0 (#490)。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
@@ -230,11 +205,9 @@ callee が `[rcx+0x2c..0x3e]` (GetCPInfo の LeadByte 表) に書くため、呼
 
 つまり ok→非 ok の退行は **OOM 除外後 2 本 (87, 898)** のみで, 849→816 の 33 本差は大半が OOM の巻き添えだった (旧 `6ad441d→a71a404` の ok→trap 33 本の内訳も同型と推定。未再測)。
 
-### 巨大 VirtualAlloc (355MB×2) の呼出元と必要性
-現 HEAD では通常起動の VirtualAlloc は 1 回 (1.3 MB) で **355MB×2 は再現しない** (`alloca/REPORT.md` 残置 #5 は R8 等で解消済みの可能性。survey の 64MB 以上要求は下の 2 つだけ, `M11_VA_BIGTRACE=1`):
-* unit 368 (0x5810f0=`function_9810f0`) → `980ed0` (ctor; 基底 ctor `6a3be0` は既定 44100 Hz) → `981000` (8 面バッファ確保: size = 8×((8n+31)&~31) ≈ 64n B, n = `*(int32*)(*(u64*)VA 0x15e4080)`) → `409470` → FastMM 大ブロック。**要求 700.7 MB (main) / 190.6 MB (PR)** と build で変わる = 値が不定。n の出所は**未確定** (image 静的値の指す先は 0、実行時の値は未観測。基底 ctor の `call [rbx]` 仮想呼出しの脱落 = D15 の疑いは**推定**)。
-* unit 888 (0xeaea40=`function_12aea40`) → `129f140` → `417fc0` → `417b70` → `409470`: 71.3 MB (両 build 同値, 必要性は未確認)。
-→ 実機の初期化でこの大きさは要らない (推定)。上限 256MB では unit 368 (main) の 700.7MB 要求が oom 扱いになるため, main と比較するときは 1024MB を使う。
+### 巨大 VirtualAlloc の呼出元と必要性 (確定: 全文は `REPORT_APPENDIX.md` §12b) — 現 HEAD では通常起動の VirtualAlloc は 1 回 (1.3 MB) で 355MB×2 は再現しない。survey の 64MB 以上の要求は 2 unit だけで、**どちらも lift 欠陥の産物で不要**:
+* unit 368 (`980ed0` → `981000` → `409470`): 190.6 MB (本 HEAD) / 700.7 MB (main `c1e4105`)。`980ed0` の `inttoptr i64 22954112` が VA→LVA 未 remap (正しくは 18759808) で、n = linear 0 の残骸 (0x2fa020 / 0x10af2ba8) → 式 8×((8n+31)&~31) の 64KB 丸めが両値と一致。1 行直すと要求が消える。
+* unit 888 (`129f140` → `417fc0` → `417b70`): 71.3 MB。`ptrtoint(inttoptr 18683649)` = 変数 [0x11d1700] のアドレス+1 を count に渡す load 脱落 (正しい値 65 → 260 B)。3 行直すと要求が消える。両方直しても survey の unit 別ラベル 942 本は不変。#516/PR #552 (qstore) の検出 420 行に該当関数なし、#418 (409470 ハング) は 410320 脱落で無関係。
 
 ### ネガティブコントロール (実測)
 * 単体 `node m11_vfree_test.mjs` (3 周 × 8MB × 100 = 累計 2.4 GB を確保→解放): 実解放 = **PASS** (OOM 0, 解放 301 回, 周ごと live 0 MB, 二重解放と未知 ptr は 2 回計数)。`M11_VFREE_NOOP=1` (解放しない) = **OOM 116 回・live 1,544.6 MB** (期待どおり NC_OK)。0.51 秒 (load 0.88)。
@@ -248,5 +221,9 @@ callee が `[rcx+0x2c..0x3e]` (GetCPInfo の LeadByte 表) に書くため、呼
 | unit 101 の `4fa210` list 走査が `47a250` (例外生成) を 23M 回繰り返す根因 (list の index/Count の誤 lift か, raise が戻る経路か) | PR HEAD の survey が 1 unit で 256MB (上限なし 1.48GB) 消費 | 新規子チケット案 [M11-N17] (PM 起票), #132 にコメント |
 | unit 144 の image 破壊 (書込み元関数と, 0 埋めの範囲・値) | clobber 1 unit。他 unit の結果に影響し得る | 同上 |
 | #411 の `418190` / `412d60` 転記が unit 87 / 898 で OOB (ok→trap 2 本) | main に入っている実退行 (#411 は merge 済み) | #132 に継続 (#411 は merge 済みで「PR 内で修正」は不可。新規子チケットを PM が起票) |
-| unit 368 の `981000` の n (700.7MB / 190.6MB) の出所, unit 888 の 71.3MB の必要性 | 巨大 alloc が 256MB 上限に依存 | 新規子チケット案 (D15 疑い) |
+| 10 進 `inttoptr` 命令 4,364 件 (942 関数) の VA→LVA 未 remap (368 の n の原因と同類型)。`M11_M2P=1` は survey が 90 秒で完走しない | 巨大 alloc 2 件は上の個別修正で消える。全件 remap は未解決 | #417 |
 | survey の clobber 検出は InitTable のみ | 他の image 破壊は ok に見える | #132 |
+
+## 13. #516 [M11-N18]: 64bit スタック局所の即値 store が 4B に縮む欠陥 (DEFECTS.md D17, idx 87/898)
+
+機械語 `mov qword [rbp+X], imm` (8B) が IR で `store ptr null` / `store i32 imm` (wasm32 で 4B) に縮み、上位 4B 未初期化のまま C 転記 `Q(dest)` が読んで OOB (idx 87 = `418190`, idx 898 = `412d60`, idx 58–63 = `417b70` の `Q(a)`、後者は `function_8cbb00` の 2 site)。`qstore/m11_qstore.py` が 279 site / 158 関数を `store i64` に戻す (`M11_QSTORE=0` で無効)。**#513 取り込み後の HEAD `8e5f760` の実測 (n=3 一致)**: survey NC 856/38/46/1 (clobber 1) → 修復 864/31/46/1 (clobber 0)、ラベル差 9 unit (58–63・87・898 が trap→ok、144 が clobber→trap)。58–63 は `8cbb00` の 2 site だけを除外すると trap に戻り (858/37/46/1) qstore の効果と確定、144 は別 site (未切り分け)。数値・site 一覧・再現・未解決は [qstore/REPORT.md](qstore/REPORT.md)。
