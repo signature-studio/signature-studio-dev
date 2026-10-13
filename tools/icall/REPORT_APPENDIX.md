@@ -148,7 +148,7 @@ awk -F'\t' -v a=401 -v b=404 'NR>1 && $1>=a && $1<=b {s+=$4; l+=$5; n+=$6; u+=$7
 | `0x128c320` の関数境界誤認 (1 バイト関数化) と NonRecursiveCFGBuilder 警告 | 隣接関数の lift 欠落の疑い | 子 issue (下記) |
 | jump table cmp/je 展開 / Balance・KH・FA wasm 差分 / stack 引数動的検証 / plugin closure バッチ | 本 run 範囲外 | 子 issue (下記) |
 
-## 12. ICALL-16: stack 引数の動的検証の実測 (#1023, REPORT.md §12 から分割移動)
+## 14. ICALL-16: stack 引数の動的検証の実測 (#1023, REPORT.md §12 から分割移動)
 
 結論: **OTT では stack 引数の値一致を動的に検証できない** (stack 引数あり site が実行経路に無い)。達成は未了で、残りは #854 / #229 が追跡する。
 
@@ -208,3 +208,20 @@ awk -F'\t' -v a=401 -v b=404 'NR>1 && $1>=a && $1<=b {s+=$4; l+=$5; n+=$6; u+=$7
 |---|---|---|
 | Fresh Air SlateCore closure の wasm 化・native 差分 (受入条件 1) | 監査のみ。出力 bit 一致は未確認 | 子 issue (親 #1026) |
 | 残 6 件 (vtable 直接 call の decode 段落ち) の真因特定と修復 | 2 関数 (`0x180c97aa0` / `0x180da6e60`) の復元不完全 | 子 issue (親 #1026) |
+
+## 16. #852 (ICALL-11): FLEngine jump table の解決器取りこぼし
+
+FLEngine 0x40d253 `jmp [r10+rdx*8+0x40]` (Delphi `sub rdx,8` 形) は、基点 `0x40d298` から `-8..0` の 9 エントリが関数内 target (`0x40d2b6`〜`0x40d2ce`)。
+`resolve_jumptable` は基点から前方しか読まず 1 件しか取れていなかった。後退読みを lea 基点の絶対 8 byte 表に限定して修正 (PR #1204)。
+
+| 項目 | 修正前 | 修正後 | 実測 |
+|---|--:|--:|---|
+| FLEngine 0x40d253 target 数 | 1 | 9 | `resolve_jumptable` 単体 (block00031_PE.bin) |
+| `test_icall.py` | — | RESULT PASS (0 failed) | HEAD `53621af2`, 0.19 s |
+
+- 監査の site 落ち (`dropped`) は修正前後で不変 (`call dropped=3645`, `jt_present=1`)。展開 pass (`jt` tmpl) を通さない限り IR は変わらないため。
+- 展開 pass の効果と Balance・Fresh Air の jt_dropped 切り分けは未実測 → #1206 (ICALL-21)。
+
+## 15. #851: `0x128c320` の関数境界誤認 (1 バイト関数化) の原因
+
+全文は `REPORT_APPENDIX_851.md` (250 行上限のため別置き)。結論: 範囲分割 (decode 単位) が原因。バイナリの境界は正しい。HEAD `a2243d34` で A〜D を再実行し一致 (数値は同ファイル)。chunk0〜3 は未検証。
