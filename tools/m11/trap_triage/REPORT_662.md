@@ -1,6 +1,7 @@
 # #662: unit 56 — 8c7710 の D4 型 deref 脱落の転記と、その先の 8c5eb0 の欠陥 (件数 0 のループ先頭ガード脱落) の特定
 
 **判定: 受入 2 を達成。受入 1 は IR 状態 Q の範囲で達成** (IR 状態 N では未達。§1-2・§3・§5)。
+旧 negctl (`d9bcc52` 時点) のレビュワー run 1 は base→cur で 11 unit の差を出し G1 FAIL だった (未説明・§1-2・§5)。
 `8c7710` を `m11_ov.c` に転記し (commit `ec513e0`)、unit 56 の次の欠陥 `8c5eb0` の原因 (件数 0 ガードの脱落) を IR 状態 Q で実測した。
 unit 56 は Halt0 (`Error`) → OOB (memory access out of bounds) に進むが、`8c5eb0` 本体の修復は本 PR に含めない (後続 issue、§5)。
 他 unit のラベル差は 0 件 (`main` 基準、942 unit 全件比較、IR 状態 Q)。
@@ -12,7 +13,7 @@ unit 56 は Halt0 (`Error`) → OOB (memory access out of bounds) に進むが�
 
 ## 1. 結論と実測
 
-**判定: 受入 2 を達成。受入 1 は IR 状態 Q の範囲で達成** (N では未達。§1-2・§3)。「回帰 0」は、下記 IR 状態 Q で n=3 安定して再現した範囲の主張。
+**判定: 受入 2 を達成。受入 1 は IR 状態 Q の範囲で達成** (N では未達。§1-2・§3)。「回帰 0」は、下記 IR 状態 Q で安定して再現した範囲の主張 (記録済み Q の run: `0775abb` の n=3・`f77c97e` の 1 run・`06eeae3` の 1 run・レビュワーの `5413fe8` の 1 run・レビュワーの `a3f3c8b` の 1 run・HEAD `a3f3c8b` の本 run の計 8 run で、いずれも base→cur 0 件)。旧 negctl の run 1 は base→cur 11 件で、入力 IR 状態は未記録のため説明できていない (§1-2・§5, #680)。
 `bash tools/m11/trap_triage/negctl_662.sh` (base / cur / guard / ng の 4 構成を build + survey)。判定 G1〜G5 は n=3 の全 run と HEAD `06eeae3` の 1 run で PASS, exit 0。
 
 | 構成 | ok / trap / miss / noproc (n=3 min–max) | clobber | trap 内訳 (n=3 同一) | unit 56 | 基準 (base) との unit 差 (n=3) |
@@ -34,6 +35,7 @@ survey の入力 IR (`work/boot_final3.ll`) は qstore (#516) の適用有無で
 |---|---|---|---|---|---|
 | Q: qstore 適用後に再生成 (上表, n=3) | 864/31 | 864/31 | 865/30 | 864/31 | 4 構成とも同一入力 |
 | A: artifact の `boot_final3.ll` (qstore 前, 旧 negctl, n=2) | 859/36 | 859/36 | 860/35 | 859/36 | 4 構成とも同一入力。base→cur 0 件 |
+| 旧 negctl run 1 (`d9bcc52` 時点・レビュワー実測, n=1): 集計は 856/38 (clobber 1)。base→cur **11 件** (G1 FAIL)・G3 FAIL。入力 IR 状態は旧 negctl が固定していなかったため**未記録** (N と集計のみ一致。混在の可能性は未確認) | 856/38 (clobber 1) | — | — | — | 集計値の一致は N と同じだが、unit 単位の一致は未確認。「回帰 0」の対象外として §5 に残す (#680) |
 | 混在: 旧 negctl run 1 (base だけ Q, 他は A, n=1) | 864/31 | 859/36 | 860/35 | 859/36 | base→cur **6 件** (17・53・87・138・898 が ok→trap, 101 が oom→trap) |
 | N: artifact の `boot_final.ll` を展開し直し、PE 無しで `boot_final3.ll` を再生成 (qstore skip, n=1, HEAD `06eeae3` の検査抜きの写し) | 856/38 (clobber 1: unit 144) | 856/38 (clobber 1) | 856/38 (clobber 1) | 856/38 (clobber 1) | 4 構成とも同一入力。**unit 56 は 4 構成すべて trap** (guard でも ok にならない)。Q の base と unit 差 9 件 (58–63・87・898: ok→trap, 144: trap→clobber)。レビュワー実測 (5413fe8 の review) と集計値は一致 |
 
@@ -101,13 +103,16 @@ REPORT_594 §3 の予測 (56 が halt0→oob) と一致。
 - n=3 (逐次実行): wall は run 1 121.6 秒 (前段 build を含む)・run 2 102.2 秒・run 3 102.0 秒。load average (1 分値) の開始→終了は 0.83→0.98・0.98→1.12・1.12→1.02。
 - コミット済み HEAD `f77c97e` での追加 1 run (n=4): rc=0、G1〜G5 PASS、survey は base 864/31/46/1・cur 864/31/46/1・guard 865/30/46/1・ng 864/31/46/1 (clobber 0 は全構成)。wall 101.8 秒、load 0.07→0.83。
 - HEAD `06eeae3` (PE 前提チェック追加) での 1 run: rc=0、G1〜G5 PASS、survey は上と同じ (clobber 0)。wall 133.4 秒、load 0.28→1.06。
+- HEAD `a3f3c8b` (本 PR 現 HEAD) での 1 run (本 runner, node v22.23.3, PE 検査あり・`FL_WIN64_DIR` は fl-win64 を展開した `$RUNNER_TEMP` 配下): rc=0、G1〜G5 PASS、survey は base 864/31/46/1・cur 864/31/46/1・guard 865/30/46/1・ng 864/31/46/1 (clobber 0)、diff base→cur 0 件・base→guard は unit 56 のみ。wall 116.7 秒、load 1.21→1.06。
 - PE 前提チェックのネガコン (`06eeae3`): `FL_WIN64_DIR=/nonexistent/fl-win64` で `FAIL: PE 無し` (rc=1、0.09 秒。ビルドもキャッシュ作成も行わない)。
 - N (PE 無し) の再現: `negctl_662.sh` から PE 検査の 2 行だけを外した写しを `$RUNNER_TEMP` で `FL_WIN64_DIR=/nonexistent/fl-win64` 指定で実行 (測定専用、commit していない)。出力先は `work/v662N`。入力 IR は artifact の `boot_final.ll` を展開し直してから作った (Q の build が `boot_final.ll` に qstore を書き込むため)。prep log に `qstore skip` 1 件、wall 73.1 秒、rc=1 (G3 は想定どおり FAIL)。数値は §1-2 の N 行。
 - node 版: 同じ base build (IR 状態 Q、ネガコン後に残った build) の survey を node v22.23.3 と v24.21.0 で各 n=1 実行し、どちらも 864/31/46/1 (clobber 0)。node 版による差は今回の範囲では出なかった (n=1 のため範囲は限定的)。
 - ネガコン (修正 3): `work/m11_image.bin` を退避して negctl を実行 → `FAIL: survey (base) rc!=0` (`Error: ENOENT`)、exit 1、`units_*.json` は残らない。画像は cmp で復元。
-- e2e (作成者環境の単発記録, コミット `ec513e0`, `bash tools/m11/m11_e2e.sh`, n=1。**本 runner では未再現・未実施**: `m11_e2e.sh` の PE 参照は `[ANALYSIS-DIR]` 配下の固定パスで、14 script が同じ前提を持つ (#680)): `reached_stage 4/6`, `units_run 22`, survey `ok 864 / trap 31 / oom 1 / clobber 0 / miss 46`, `wasm_bytes 6027634`。
+- e2e (作成者環境の単発記録, コミット `ec513e0`, `bash tools/m11/m11_e2e.sh`, n=1): `reached_stage 4/6`, `units_run 22`, survey `ok 864 / trap 31 / oom 1 / clobber 0 / miss 46`, `wasm_bytes 6027634`。
   所要 42.6 秒、load 0.67→0.85 (4 vCPU)。変更前 (`8d883c3`, 同じ work スナップショット) の e2e は 69.2 秒、survey 864/31/1/0/46 で一致。
   wasm の増分 (+62 B) は `function_8c7710` の追加。
+- e2e (本 runner, HEAD `a3f3c8b`, n=1): `m11_e2e.sh` と `m11_gen_ir2.sh` は PE を `[ANALYSIS-DIR]` 配下の固定パスに直書きしているため、PE 行を `M11_PE` 環境変数で上書きできる形に一時的に置換して実行した (commit していない。実行後に元へ戻した)。`M11_PE=$RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin` で実行: rc=0、`reached_stage 4/6`, `units_run 22`, survey `ok 864 / trap 31 / oom 1 / clobber 0 / miss 46`, `wasm_bytes 6027634` (作成者環境と一致)。wall 52.2 秒、load 0.59→0.84。
+- 注意 (レビュワー指摘, 本 PR では未実測): `m11_gen_ir2.sh` は PE 無しのとき ldfix を WARNING だけで skip する (fail-open)。e2e はこの経路で IR を作り直すため、PE 無しの e2e は IR 状態が変わり得る。PE 参照の環境変数化と fail-open の扱いは #680。
 - 範囲: `git diff 8d883c3 ec513e0 --stat` は `tools/m11/m11_ov.c` と `tools/m11/trap_triage/negctl_662.sh` のみ。
 - e2e の HEAD との関係: e2e の数値は `ec513e0` で測定。`ec513e0`→`06eeae3` の差分は `negctl_662.sh` と REPORT・DOC_MAP のみ (`m11_ov.c` は不変)。
 - 範囲外: unit 56 の最終到達 (ok) は本 PR では達成しない (guard は IR 実験のみで commit していない)。`survey_units.mjs` の `.slice(1)` 問題 (REPORT_594 §4) は未修正 (#663)。
@@ -124,8 +129,8 @@ REPORT_594 §3 の予測 (56 が halt0→oob) と一致。
 | `8c6530` (値コピー関数) の他経路の正しさ | 今回の入力は件数 0 由来の不正レコードで、経路自体の検証は未実施 | #699 (`[M11-N31]`) |
 | REPORT_594 (PR #664, 未 merge) との関係 | 本 PR は #664 に依存しない (8c7710 の転記だけを入れた) | #664 (merge 時に REPORT_594 §3 の「採用せず」を更新) |
 | survey の IR 状態依存 (§1-2: qstore 適用の有無で 864/31 ↔ 859/36)。artifact の `boot_final3.ll` は qstore 前 IR のまま | survey の基準 (本 PR は入力を Q に固定して回避) | #680 (コメント追記) |
-| レビュワー実測 run 1 の 856/38 (clobber 1) の IR 状態 | N と集計一致するが、run 1 が N だったかは未確認 (qstore の有無を記録していない) | #680 (コメント追記。PM 依頼) |
-| node v26 (旧版の前提) の未検証 (v22.23.3 と v24.21.0 で同一)・`m11_e2e.sh` の `[ANALYSIS-DIR]` 固定 PE 参照 (runner 上での扱い) | e2e の再現が本 runner で未実施 | #680 |
+| 旧 negctl (`d9bcc52`) のレビュワー run 1 の未説明差: 856/38 (clobber 1)・base→cur **11 件** (G1 FAIL)・G3 FAIL。入力 IR 状態 (Q/A/N) は未記録で、再現も未達 (本 runner の 8 run はすべて base→cur 0 件) | 「回帰 0」は記録済み Q の run の範囲に限る。run 1 の原因は説明できていない | #680 (run 1 の入力状態と 11 件差の原因。PM 依頼) |
+| node v26 (旧版の前提) の未検証 (v22.23.3 と v24.21.0 で同一)・`m11_e2e.sh` の `[ANALYSIS-DIR]` 固定 PE 参照 (runner 上での扱い) | e2e は PE 参照を一時差し替えた本 runner の 1 run (HEAD `a3f3c8b`) で作成者値と一致。固定 PE 参照の恒久対応は未実施 | #680 |
 
 ## 6. DEFECTS.md 行案 (PM 判断。直接編集はしない)
 
