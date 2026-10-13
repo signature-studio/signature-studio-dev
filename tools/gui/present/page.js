@@ -73,6 +73,13 @@ function buildScenario(W, H, steps) {
     const ops = []; let label = "dirty";
     const kind = s % 9;
     if (kind === 3) { const id = 1 + (s % 3); topZ++; surf[id].z = topZ; ops.push({ op: "change", id, patch: { z: topZ } }); label = `z-front s${id}`; }
+    else if (kind === 4) {
+      // 前面 2 枚 (id 大 = s3 が z 小、id 小 = s2 が z 大) を全面 s0 の dirty 矩形に重ねる (id 順だと z 逆転描画になる)
+      topZ += 2; surf[3].visible = 1; surf[3].x = 60; surf[3].y = 260; surf[3].z = topZ - 1; surf[2].z = topZ; surf[2].visible = 1;
+      ops.push({ op: "change", id: 3, patch: { visible: 1, x: 60, y: 260, z: topZ - 1 } }, { op: "change", id: 2, patch: { visible: 1, z: topZ } });
+      ops.push({ op: "paint", id: 0, l: 0, t: 0, r: W, b: H, seed: seed++ }, { op: "present", id: 0, l: 0, t: 0, r: W, b: H });
+      label = "front-overlap s2>s3 over s0";
+    }
     else if (kind === 5) { const id = 3; surf[id].visible = surf[id].visible ? 0 : 1; ops.push({ op: "change", id, patch: { visible: surf[id].visible } }); label = `visible s3=${surf[id].visible}`; }
     else if (kind === 6) { const id = 1; surf[id].x = ri(-30, 300); surf[id].y = ri(-20, 200); ops.push({ op: "change", id, patch: { x: surf[id].x, y: surf[id].y } }); label = "move s1"; }
     else if (kind === 7) {
