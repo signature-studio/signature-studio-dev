@@ -141,7 +141,7 @@ host は **レコード書込の前に** 共有 pointer 状態 (cursor/buttons/m
 
 ## 10. FL lift 接続メモ (RetDec 実測知見, PE 実験 3 本から)
 1. **stack 上の構造体フィールド store が落ちる** (`WNDCLASSA wc; RECT r` 等。API の struct 引数型が付くと 2 番目以降の stack var が消える)。静的大域に置けば全 store が残る。
-2. **大域構造体は 1 フィールド 1 グローバル `gN` に分割される** → `__pe_image` へ `#define gN (*(T*)(__pe_image+off))` で連続化 (`gui_lift_post.py`)。
+2. **大域構造体は 1 フィールド 1 グローバル `gN` に分割される** → `__pe_image` へ `#define gN (*(T*)(__pe_image+off))` で連続化 (`gui_lift_post.py`)。イメージ内ポインタ (.reloc DIR64) は m11_data_gen と同規則の再配置表で起動時に補正 (`lift/pe_image.py`, GUI-12 #566)。
 3. **`GetMessage(...)>0` が壊れる**: 戻りが `bool` 型付けされ `if (!v1 != v1)` (常に真) に化ける → メッセージループが即終了。真偽値判定 `while (GetMessage(..))` なら正しく lift される。
 4. `keybuf[n++]=c` が `g38 = &g39` (定数畳み込み誤り) に化ける例あり (`n=nkeys; ...; nkeys=n+1` に書き直すと正しい)。
 5. WndProc の引数は未使用だと落ちる (`WndProc(a1)` 等) → `--wndproc` で 4 引数正規化。関数ポインタは VA 整数 → fnmap 登録。

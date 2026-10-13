@@ -134,8 +134,53 @@ reach_test 11 / adapt_test 28 passed、sigprobe は adapter 有り mismatch 0 / 
 | WNDCLASS 静的実体の WNDPROC を closure seed に追加する pass (`TLightweightLayeredControl` 0x31dd10 ほか) | その class の窓生成が NULL | m11 / icall 系で PM が起票 (#90 の間接 call 復元と近い) |
 | `EnumFontFamiliesExW` 実装 (コールバック `gui_call4` 経由) | survey の 1 unit が fail-fast | GUI-2 系 (P2 stub 昇格, #174 に所見) |
 | `LoadStringW` 48M 回の unit 特定と資源供給 hook (`gui_set_resource_provider` ← shimx / PE .rsrc) の接続 | LoadStringW が常に空文字 | #174 に所見 / GUI-2 または shimx |
-| 受入「`__pe_image` を m11_data_gen 方式の data 実体化へ統合」(スコープ 3) | 未着手 (本 PR は m11 の image 敷設をそのまま利用) | 新規子チケットを PM が起票 |
+| 受入「`__pe_image` を m11_data_gen 方式の data 実体化へ統合」(スコープ 3) | **#566 (GUI-12) で対応済み → §8**。残り: RetDec C 経路に実 FLEngine 規模の PE を通した実測は無い (§8-4) | #566 |
 | 実ブラウザ host 結線 (`GuiHost.attach`・FL ワーカ化・UI スレッドのスタック量 §2-2 #8) | node の headless host のみ。描画 (#32) は別 | #32 / #121 |
 | `tools/m11/m11_e2e.sh` と `m11_gen_ir2.sh` が PE パスを `/home/ubuntu/...` 固定 | runner では ldfix が黙ってスキップされ数値が変わる (本 PR は sed で回避) | m11 に `FL_WIN64_DIR` 参照を提案 (#132 の未解決と同件) |
+
+## 8. `__pe_image` の m11_data_gen 方式統合 (#566 / GUI-12; #174 スコープ 3)
+
+**結論**: RetDec C 経路 (`tools/gui/lift/gui_lift_post.py`) の `__pe_image` を、m11 と同じ .reloc DIR64 補正規則の共通モジュール `tools/gui/lift/pe_image.py` に統合した。実 FLEngine PE で m11_data_gen.py の出力とバイト一致 (§8-3)。
+
+### 8-1. 設計
+経路が 2 つあり、データの置き方が違う。FLEngine の結線 (本 REPORT §1〜6) は m11 IR 経路で、`__pe_image` は使っておらず、元から m11_data.c / m11_image.bin (LVA 固定敷設) である。`__pe_image` は RetDec C 経路 (テスト PE・プラグイン DLL 向け) だけにある。
+
+| | m11 経路 (FLEngine) | RetDec C 経路 |
+|---|---|---|
+| 敷設先 | linear memory の固定アドレス LVA = RVA + LB | C の静的配列 `__pe_image` (アドレスはリンク時まで不定) |
+| イメージ内ポインタ (.reloc DIR64) | 静的に書換え (`m11_data_gen.py`) | **従来は未補正**で生 VA のまま (§8-2) |
+| 統合後 | 変更なし (m11 は読取専用) | `pe_image.runtime_image` が再配置テーブル (image offset) を出し、`gui_lift_entry()` 先頭の `__pe_image_fixup()` が `delta = &__pe_image[0] - ImageBase` を加算 |
+
+共通にした規則 (`pe_image.py`): DIR64 の走査 (page==0 / 不正 block で打切り)、補正対象 = `base < v < base + span` (厳密不等号)、.text を指す値 (関数 VA) は fnmap の鍵なので補正しない (runtime のみ)。lva モード (`rebase_sections`) は m11 の規則をそのまま持ち、検査用に m11_data_gen と比較する。
+
+### 8-2. 実測した既存欠陥 (統合前)
+- イメージ内ポインタが生 VA (`0x14000xxxx`) のまま: 文字列ポインタ表・配列要素へのポインタ・連結リストを持つテスト PE を lift すると**クラッシュ** (補正を出さない `--no-pe-reloc` で再現, rc 139)。従来の gui_app.c は data にイメージ内ポインタを持たないので e2e では出なかった。
+- 配列 global (`char *g3[4] = {…}; // 0x…`) は `#define` されず、gcc が `gN undeclared` で落ちる。→ 配列 lvalue (`*(T (*)[N])(__pe_image+off)`) のマクロにした。
+
+### 8-3. 検証 (`tools/gui/flengine/pe_image_parity.py`, `tools/gui/test/pe_image_e2e.sh`)
+
+| 検査 | 結果 (実測) |
+|---|---|
+| P1 共通モジュール == m11_data_gen.py 出力 (実 FLEngine PE, LB=0 / 0x10000) | 一致 (.data 2,359,304 B / .rdata 69 B)。DIR64 全 278,531、補正 10,283 (.data) / 0 (.rdata) |
+| P3 既存 `tools/m11/work/m11_data.c` (m11_build.sh が使う実物) とも一致 | 一致 |
+| runtime 方式の内訳 (INFO; .text 外のスロット, 実測) | 補正対象 2,354 (全て .data) / .text 宛で非補正 8,044 (.data 7,930 + .didata 114) / image 外 0。lva 方式の .data 補正 10,283 との突合: 2,354 + 7,930 = 10,284 で **1 件多い** = §8-5 |
+| RetDec C 経路の実行テスト (`pe_image_app.c`: 文字列表 / 配列要素ポインタ / 連結リスト / 関数ポインタ表) | lift の戻り値 = host gcc 直ビルドの戻り値 (34622010)。補正スロット 7 |
+
+ネガティブコントロール (全て「一致してはならない」を要求。判定が不合格なら非 0): parity N1 補正値 1 bit 破壊 → FAIL / N2 補正ゼロの実装 → FAIL / N3 セクション欠落 → FAIL、pe_image_e2e N1 `--no-pe-reloc` → クラッシュ (rc 139) / N2 再配置表を 1 件ずらす → クラッシュ (rc 139)。
+
+### 8-4. 未達・未実測
+- 実 FLEngine 全体 (7,421 関数) を RetDec C 経路に通した実測は無い (FLEngine は m11 の LLVM IR 経路。RetDec C に通すのは規模上非現実的) ため、実 PE での検証は「規則の一致 (バイト比較)」までで、RetDec が出す `gN` 分割の実 FLEngine 上の挙動は未検証。
+- runtime 方式の補正対象は「値が SizeOfImage 内を指し、かつ .text 宛でない」DIR64。image 外を指す値は 0 件 (実測)。`.didata` の DIR64 114 件は全て .text 宛で、m11 (.data/.rdata のみ敷設) は補正しない。
+- `__pe_image` は 1 配列で SizeOfImage 全体 (FLEngine なら 25 MiB 超) を抱えるため、大きな PE には向かない (20 MiB 超 blob を commit しない規約。生成物は work/ 側)。
+
+### 8-5. m11_data_gen.py の境界条件 (m11 は読取専用のため変更せず、起票を依頼)
+`m11_data_gen.py` は `lo <= r < lo + len(sd) - 8` で DIR64 スロットを選ぶ。`<` は厳密不等号なので、**セクション末尾の 8 バイト slot が補正されない** (off-by-one の疑い。`<=` が正しい)。実 FLEngine では `.data` 末尾の RVA `0x11e5000` (値 `0x425f00` = .text 宛の関数ポインタ) が該当し、m11 の `m11_data.c` ではこの 1 slot だけ VA のまま (LVA `0x25f00` に補正されない)。
+`pe_image.py` の lva モードは m11 との**バイト一致検査**のため m11 の条件を意図的にそのまま持つ (`rebase_sections`)。runtime モード (RetDec C 経路) は該当しない (補正漏れなし)。この slot が実行時に参照されるかは未確認。起票: m11 (ldfix/data 系) の子チケットを PM が起票 (本 REPORT §9 の未解決に記載)。
+
+## 9. 未解決 (#566)
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| m11_data_gen.py の末尾 slot 未補正 (§8-5) | `.data` 末尾 1 slot (関数ポインタ) が VA のまま | m11 の子チケット (PM 起票) |
+| RetDec C 経路で実 FLEngine 規模の PE を通した実測なし (§8-4) | `gN` 分割の実機挙動が未検証 | 範囲外 (FLEngine は m11 IR 経路) |
 
 範囲外: 実ブラウザ・Canvas 描画、audio、UI スレッドのスタック量、`gui_reach` の性能影響 (INTEGRATION §4-12 の未計測は継続)。
