@@ -17,7 +17,7 @@
 
 ## 1. 実測 (`h6_e2e.sh`, コミット済み HEAD `f655fff`)
 
-runner 4 vCPU / node v22.23.3 / load average 0.03 (1 分値, 3 回実行直後に \`/proc/loadavg\` で 1 回測定)。
+runner 4 vCPU / node v22.23.3 / load average 0.03 (1 分値, 3 回実行直後に `/proc/loadavg` で 1 回測定)。
 
 | 区分 | 検査 | 結果 |
 |---|---|---|
@@ -49,7 +49,7 @@ runner 4 vCPU / node v22.23.3 / load average 0.03 (1 分値, 3 回実行直後�
 - **HWND**: `effEditOpen` の ptr は不透明値として `surface(hwnd)` ファクトリへ渡す (M7 仮想 window 識別子の結線点)。
 - **UI → plugin**: VST2 の `setParameterAutomated` と同じ (guest `setParameter` + host へ `audioMasterAutomate`)。Wrapper 側の automate 受信 (`fw:0x7abca0` 汎用ハンドラ) との結線は H4。
 - **座標**: manifest の knob/slider 座標は背景 PNG の文字ラベル位置からの目視推定 (実測ではない)。snapshot (`work/editor_snapshot.png`, gitignore) で配置の整合を目視確認した。
-- **資産は非再配布**: 抽出物は `h6/work/` (gitignore)。commit したのは manifest の sha256/寸法 pin のみ (`docs/LEGAL.md` 方針)。
+- **資産は非再配布**: 抽出物は `h6/work/` (gitignore)。commit したのは manifest の sha256/寸法 pin のみ (成果物は再配布しない方針: `docs/LEGAL.md` 冒頭)。
 
 ## 3. 範囲 / 範囲外
 
@@ -62,7 +62,7 @@ runner 4 vCPU / node v22.23.3 / load average 0.03 (1 分値, 3 回実行直後�
 | # | 未解決 | 影響 | 起票先 |
 |---|---|---|---|
 | 1 | **実 lift 済み OTT guest (h2 module) 上での結線検証が未実施**。検証は FakeOtt (20 param・editor 0 返し) + 実 host_vst2.wasm。h2 harness は `work-m6-ott work-liftlib toolchain-retdec fl-win64` 級の素材が必要で、本 run の素材 (plugins-ott / analysis-ott-binaries / toolchain-emsdk) では動かせない | param 名 20 件の実値で manifest が全解決することが未確認 (E4 の名前列は推定) | #100 にコメント (follow-up: `oc_artifacts: plugins-ott analysis-ott-binaries toolchain-emsdk toolchain-retdec work-m6-ott work-liftlib fl-win64` で h2 module に `HostBridgeG1` を適用し N 件 resolve を確認) |
-| 2 | 実ブラウザ (Canvas/FontFace/PointerEvent) 未検証。mock ctx のみ | 描画/入力の実機差 | H8 (\`HOSTBRIDGE.md\` §5, 未起票なら PM 判断) に統合 |
+| 2 | 実ブラウザ (Canvas/FontFace/PointerEvent) 未検証。mock ctx のみ | 描画/入力の実機差 | H8 (`HOSTBRIDGE.md` §5, 未起票なら PM 判断) に統合 |
 | 3 | M7 仮想 window (HWND) と surface の結線は不透明値のまま | FL 側 Wrapper 結線時に確定 | H4 |
 | 4 | 11 param の UI (Bypass/Thresh/Byp 系) | G1 の機能網羅 | #100 follow-up (実 guest の名前確定後) |
 | 5 | `HOSTBRIDGE.md` §5 の H6 行/`DOC_MAP` 反映 | 索引 | 本 PR で DOC_MAP に 1 行追加 (STATUS は PM) |
