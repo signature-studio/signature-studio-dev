@@ -18,7 +18,7 @@
 - 秒の列は PR 本文の値のみ。 旧版の付録は表見出しを「秒 (lift+emcc)」としていたが、本文の lift 時間 (391 s) と wall の内訳は記録になく、wall を正とする。
 
 - **19165 segfault の位置**: `emcc` は `function_1800ceec0` の WebAssembly 命令選択 (DAG combine の `visitSTORE`) で落ちる。 同関数は x86_fp80 を含む (`final.ll` の f80 関数 6 本のうち 1 本)。 `PLUG_F80_LOWER=1` で f80 を外すと segfault は消える。
-- **19165 の次の類型 (f80 lowering 後)**: `e.final.ll:273362: invalid cast opcode for cast from 'double' to 'i80'`。 `p0c/f80_lower.py` は `bitcast x86_fp80 to i80` (f80 のビット列を読む命令) を double に置換するが、`bitcast double to i80` を残す。 f80 のビット操作を扱えないことが原因と推定。 この類型は共有鎖 (`p0c/f80_lower.py`) の修正が必要で、T0/T1 の退行確認 (#523 受入条件 2) を伴うため、本 run では未修正。 **新類型 E7 (f80 ビット操作の lowering 漏れ)** として記録。
+- **19165 の次の類型 (f80 lowering 後)**: `e.final.ll:273362: invalid cast opcode for cast from 'double' to 'i80'`。 `p0c/f80_lower.py` は `bitcast x86_fp80 to i80` (f80 のビット列を読む命令) を double に置換するが、`bitcast double to i80` を残す。 f80 のビット操作を扱えないことが原因と推定。 この類型は共有鎖 (`p0c/f80_lower.py`) の修正が必要で、T0/T1 の退行確認 (#523 受入条件 2) を伴うため、本 run では未修正。 **新類型 E7 (f80 ビット操作の lowering 漏れ)** として記録。 **§14 で改訂 (推定)**: 上流の lift 側の型誤りが本体の可能性が高い。 対処の順序は §14 を参照。
 - **19000 の f80 lowering**: `PLUG_F80_LOWER=1` は f64 化で精度を落とす (53 bit 仮数)。 19000 の f80 関数 (`function_1800bcb00` ほか) の精度影響は未検証。 既定 (`PLUG_F80_LOWER=0`) では `emcc -c` が rc 1 のまま (REPORT §12 の既存結果)。
 - 19165 の segfault の起点 (`function_1800ceec0`) と f80 6 本の内訳は測定時の `work/reverb_delay/engine19165_noipp_nobad/` (gitignore) に残したが、 本 runner の `work/` には存在しない。 再現手順は下記。
 
@@ -43,9 +43,8 @@ PLUG_F80_LOWER=1 bash tools/plugins/reverb_delay/engine_lift.sh 19000 800
 
 ## 14. #523 E7 の切り分け (2026-10-13 · コード変更なし · 未再現)
 
-- **結論**: 19165 の segfault は E7 (f80 ビット列の型誤り) と推定。 測定値は §13 が正本。 本節の内容は未再現の転記で、再測定はしていない (`work/reverb_delay/` と `summary.csv` は本 runner に無く、`e.final.ll` の sha256 も確認できない)。 lift 秒の値は §12・§13 で食い違っており、本節では引用しない。
-- **E7 の IR 位置 (未再現・転記)**: `e.final.ll` の `function_1800ceec0` 内、ブロック `dec_label_pc_1800ceffe` で `bitcast x86_fp80 %12 to i80` → `trunc i80 to i64` → `inttoptr` の列 (行 273381・273392 付近)、`sext i32 to i80` → `bitcast i80 to x86_fp80` の列 (行 273480・273633 付近)。 行番号は f80 lowering 前の `e.final.ll` 基準。 別経路の同型は行 348058 以降。
-- **E7 の IR 抜粋 (未確認)**: `%12` は `load x86_fp80, x86_fp80* %11` で、`%11 = bitcast ptr %rcx to x86_fp80*` と記録されている。 IR 抜粋は添えられていないため、以下は**推定**。
-- **推定原因 (推定)**: RetDec のメモリ型推定が、整数スロットを f80 として扱った lift 側の型誤りではないか。 `p0c/f80_lower.py` は型名を `double` に置換するだけなので、`bitcast double to i80` が残る。 「`bitcast` の lowering 漏れ」より上流の型誤りが本体と推定される。
-- **対処方針 (未実施)**: (a) lift 側の型修復 pass で `%11` の load を `i64` に差し替える。 (b) `f80_lower.py` で i80 ビット列を扱う規則を足す (共有鎖・T0/T1 退行確認が必要)。 (a) を先に試す。
-- **残りの類型 (転記・未再現)**: 同じ IR で `do not know how to soften fp_extend` と `no libcall available for fp_round with type f80` が出る (`f80_lower` 無し時と記録)。 E7 を消しても f80 libcall が残るため、19165 が `emcc -c` rc 0 になるには E7 修正に加えて f80 の扱いを決める必要がある。
+- **位置付け**: §13 の E7 記述を本節で改訂する (診断は下記の推定を採る)。 測定値・rc・再現手順は §13 が正本。 本節は未再現の転記で、再測定はしていない。
+- **IR 位置 (未再現・転記)**: `e.final.ll` の `function_1800ceec0` 内、ブロック `dec_label_pc_1800ceffe` の `bitcast x86_fp80 %12 to i80` → `trunc i80 to i64` → `inttoptr` (行 273381・273392 付近)、`sext i32 to i80` → `bitcast i80 to x86_fp80` (行 273480・273633 付近)。 行番号は f80 lowering 前基準。 別経路の同型は行 348058 以降。 `%12` は `load x86_fp80, x86_fp80* %11`、`%11 = bitcast ptr %rcx to x86_fp80*` と記録されているが、IR 抜粋は未確認。
+- **推定原因 (推定)**: `%11` のポインタ型が f80 と推定されたのは lift 側 (RetDec の型推定) の誤りの可能性が高い。 整数スロットを f80 として読んでいるなら、`bitcast` 以前に型が違う。 `p0c/f80_lower.py` の通常モード (`token_lower`) は `x86_fp80`→`double` の型名置換と f80 定数・intrinsic 名の変換を行うが、`bitcast` 命令を書き換える規則を持たない。 そのため `bitcast x86_fp80 to i80` が `bitcast double to i80` になり、i80 を含む規則が無いまま残る。 これは `f80_lower.py` のコードを読んだうえの推定で、実行による確認はしていない。
+- **対処方針 (未実施)**: (a) lift 側の型修復で `%11` の load を `i64` に差し替える (先に試す)。 (b) `f80_lower.py` に i80 ビット列の規則を足す (共有鎖のため T0/T1 退行確認が必要)。
+- **残りの類型 (転記・未再現)**: 同 IR で `do not know how to soften fp_extend` と `no libcall available for fp_round with type f80` が出る (`f80_lower` 無し時と記録)。 E7 を消しても f80 の libcall が残るため、19165 が `emcc -c` rc 0 になるには E7 の修正に加えて f80 の扱いを決める必要がある。
