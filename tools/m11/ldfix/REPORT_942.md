@@ -89,6 +89,7 @@ unit ごとの trap 9 件 (base/fix とも同一 VA)。**旧版の閉包表 (下
   現 main での効果は判定できていない。REPORT.md の値 (F1 902 / F3c 26) とも比較していない。
 - F3a 2 関数 (413480, 413540) と F3c 33 関数の修復は、stage4 (units_run / probe / icall) と survey (ok / trap / miss) の
   いずれにも**反映されていない** (base = fix)。
+- **注 (現 main の IR での判定は §8-2 を正とする。本節は snapshot 限定の記録)**。
 - 理由 (推定・未確定): 修復関数は trap 閉包 (§2) に含まれるが、trap の最上位 frame の wasm index (14871 / 14873 / 14875 / 5263 /
   1875 / 75 / 725) が修復関数のどれに当たるかは未確認 (§2 の限界)。確認できているのは「修復後も同じ wasm 関数で同じ種類の trap が起きる」まで。
   修復が効く経路が trap より後にあるため先に止まる、という説明は仮説として残す。
@@ -131,3 +132,67 @@ python3 tools/m11/m11_wasmnames.py tools/m11/ldfix/work/stage4/base/m11_boot.cjs
 - 結論 (受入 1・2 の進捗): 「trap の発生 load」は、unit 17 では FastMM の bin 表 (F-8 読み) まで特定。
   bin 表の値がどこから来たか (書き込み元) は未特定。次の入口は、boot 後の bin 表領域への書き込み元と、P/F の値の由来の確認。
 - 未解決 (起票先): bin 表の上書き元の特定 → #942 (次 run)。現 main 生成 IR での再判定 → #1292 (`[CI-25]`)。
+
+## 8. 現 main 生成 IR での再判定 (#1292・受入 1〜4)
+
+測定 commit: `604e900f` (origin/main、worktree `ws-1292` で検証)。素材: fl-win64 / work-m11 / work-liftdiff を展開、toolchain-emsdk・toolchain-retdec は `/opt` の既存を使用。
+IR は `bash tools/m11/m11_gen_ir2.sh` (現 main の手順。`work/ir_conditions.json` を生成) で作り直し、`m11_build.sh` で `boot_final3.ll` を再生成した。
+
+### 8-1. 実測
+
+- IR 生成 (ldfix 適用): `ir_sha256` 2c68ceae…・490693 行・F1=902 / F2=30 / F3a=3 / F3b=5 / F3c=36 (7421 関数中)。
+- IR 生成 (`M11_LDFIX=0`・ldfix 無し): `ir_sha256` 25e931f2…・491108 行。
+- `bash tools/m11/ldfix/ldfix_e2e.sh` (base = ldfix 無し IR / fix = ldfix 適用): 66.0 秒・rc 0・judge PASS (load は未採取)。
+
+| 項目 | base (ldfix 無し) | fix (ldfix 適用) |
+|---|---|---|
+| stage4 units_run / units_total | 52 / 942 | 52 / 942 |
+| stage4 threw | unreachable | unreachable |
+| icall_ok / icall_miss | 234 / 5 | 234 / 5 |
+| survey ok / miss / trap | 868 / 47 / 26 | 870 / 47 / 24 |
+
+- 判定: stage4 PASS (probe・units・icall が base = fix)、survey ok base 868 / fix 870 (OK)。
+- 参考 (手順の訂正): 1 回目の e2e は `boot_final3.ll` が ldfix 適用済みのまま base に使われ、ldfix が 2 回掛かった (F3a=2・survey 870/870・trap 24/24)。before/after になっていないため数値は採用しない。2 回目で base を `M11_LDFIX=0` の IR に差し替えて測り直した。
+- 注: boot の threw は snapshot (§1) の `memory access out of bounds` ではなく、現 main では base/fix とも `unreachable`。
+
+### 8-2. 受入 3: 修復件数の反映 (snapshot 限定の判定を解消)
+
+- 現 main では修復が survey に**反映される**: trap 26 → 24・ok 868 → 870。
+- trap → ok に変わった unit は 2 件: `0x26d1a0` (unit 158、最上位 frame 707 = `function_413540` = F3a 修復対象) と `0x6d9ba0` (unit 493、frame 無しの halt0。修復との対応は未確認)。
+- 種別が変わった unit は 2 件: `0x25c540` (unit 144) は halt0 → OOB、`0xeddfe0` (unit 895) は OOB → halt0。どちらも unit は依然 trap。unit 144 は修復後に `function_407e20__lifted` (FastMM_GetMem 実体) の読みで OOB になった (frame 1875 を fix 側で確認。因果は未確認)。
+- §4 の「反映されない」は snapshot 限定の結論だった。現 main の判定は本節。
+
+### 8-3. 受入 4: trap 最上位 frame と #942 の結論
+
+base の最上位 frame を `m11_wasmnames.py` で IR 関数名に変換した (`trap_units.mjs` は 942 unit を順に走らせる実行順依存の値。§2 の注意参照)。
+
+| unit VA | 種別 (base) | 最上位 frame → IR 関数 | 修復対象 |
+|---|---|---|---|
+| 0x16fde0 | unreachable | 3473 → function_8c5eb0 | 無し |
+| 0x264260 | OOB | 75 → function_412e40 | 無し |
+| 0x26d1a0 | OOB | 707 → function_413540 | **F3a (fix で ok)** |
+| 0x40e170 | OOB | 389 → function_864fe0 | 無し |
+| 0x416010 | OOB | 4476 → function_6cefb0 | 無し |
+| 0x483140 | OOB | 3372 → function_535bf2 | 無し |
+| 0x6bfd60 | OOB | 5371 → function_903d20 | 無し |
+| 0x6d0680 / 0x7654c0 / 0x776bf0 | OOB | 5372 → function_903e00 | 無し |
+| 0x6d5700 | OOB | 14873 → function_4133f0 | **F3a (fix でも trap 残存)** |
+| 0x25c540 (fix) | OOB | 1875 → function_407e20__lifted | 無し |
+| 0x8eaa30 | OOB | 4476 → function_6cefb0 | 無し |
+| 0xabb3b0 | OOB | 1875 → function_407e20__lifted | 無し |
+| 0xcd50d0 | OOB | 711 → function_10c7cd0 | 無し |
+| 0xe63540 | OOB | 1158 → function_125da90 | 無し |
+| 0xf6c660 | OOB | 14900 → function_410b10 | 無し |
+
+- 結論: #942 の「修復対象は function_409c80 の 1 件のみ」は現 main では**一致しない**。`function_409c80` (F2・F3c) は base/fix のどちらの最上位 frame にも現れない。最上位 frame に修復対象として現れるのは `function_413540` (F3a) と `function_4133f0` (F3a) の 2 関数。
+- chain 上の関数の判定 (§3 の「ldfix 起因ではない」) は、この表では確認していない。
+
+### 8-4. 未解決 (起票先)
+
+| 未解決 | 起票先 |
+|---|---|
+| `function_4133f0` (unit 0x6d5700) の F3a 修復後も残る trap の発生 load | #942 (次 run) |
+| unit 144 (0x25c540) が halt0 → OOB に変化した先の bin 表読み (§8-2) | #942 (次 run) |
+| 受入 1 (trap の発生 load の特定) は #942 のまま | #942 |
+
+- `work/ir_conditions.json` は最後の生成 (ldfix 無し) の状態のまま残している (gitignore 対象。commit しない)。
