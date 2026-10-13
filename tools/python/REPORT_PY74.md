@@ -17,7 +17,7 @@
 
 データ: `provider/gen/ilmcp_data.h` は `gen_provider.py` が `analysis/ilmcp/{plugin_catalog,highlight_names}.json` から生成 (dir 28 / plugin 141 / highlight 21)。C から JSON を読めないため事前計算する。木の walk と並びは `host/ilmcp.mjs` と同じ規則。
 
-### 実測 (HEAD 8674fa6、Actions runner 4 core、node 22.23.3、emsdk 6.0.12 = `/opt/emsdk`、直列 1 本)
+### 実測 (HEAD 8674fa6、Actions runner 4 core、node 22.23.3、emsdk 6.0.12 = [EMSDK]、直列 1 本)
 
 入力: `$RUNNER_TEMP/fl-win64` に `fl-win64.tar.zst` を展開 (7.4 秒) → `FL_WIN64_DIR` で `fetch_inputs.sh` → `build_cpython_wasm.sh` (3m39.8s) → `build_flpy.sh` (5.6 秒)。
 
