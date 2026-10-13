@@ -235,11 +235,11 @@ underrun が 3 秒続くと +B を 1 段ずつ戻す (下限は下げない)。`
 
 残り: `public/worklets/dummy-worklet.js` は `deploy/probe/policy-check.mjs`・`tools/e2e/suite/checks.mjs` が参照するため今回は削除せず、追跡 **#839** (E2E-5)。`tools/e2e` スイートの再実行は未実施 (#839 で実施)。
 
-## 19. AU-15 (#863) dev 断続 FAIL の再現試行 (失敗ログ未取得)
+## 19. AU-15 (#863) dev 断続 FAIL の再現 (失敗 1 件を取得)
 
-素材 `fl-win64` を展開 (5.8 s)・`FL_WIN64_DIR` 指定。HEAD `986e7415` の `main` から `863-au15-fl-audio-shim-flake` を切り、`pnpm install --frozen-lockfile` 後に `bash tools/audio/integration/e2e.sh` を実行 (dev:tone・dev:underruns の位置情報つき)。
+検証 HEAD `d53f449c` (PR 差分は本ファイルのみ)。素材 `fl-win64` を `$RUNNER_TEMP/fl-win64` へ展開 (3.3 GiB)・`FL_WIN64_DIR` 指定。`toolchain-emsdk` は未取得のため、pin 版 emsdk 6.0.12 を `$RUNNER_TEMP/emsdk` へ install し `EMSDK_ENV` で指定。`bash tools/audio/integration/e2e.sh` (foreground)。
 
-- 無負荷 10 回: **10/10 PASS** (11〜12 s、load 0.45〜1.28)・dev:tone `max_err=1.49e-8` zero_runs 0・underrun 0。
-- CPU 負荷 (busy loop 6 本) 下 10 回: **10/10 PASS** (21〜23 s、load 3.7〜10.3)。
-- 本節の計 21 run (初回 1 + 無負荷 10 + 負荷下 10) 全 PASS。失敗ログは 0 件のため、producer / consumer の切り分けは未実施。§18 の再現条件 (素材・負荷) は未一致のまま。
-- 次回失敗時は `first_err_frame` / `first_zero_run_frame` / `first_underrun_frame` の値で切り分ける。追跡 **#863** (AU-15)。
+- 初回 1 run: **exit 1・11/13 PASS (8.6 s)**。FAIL は dev:tone (`max_err=6.85e-1` `zero_runs=1` `first_err_frame=56576` `first_zero_run_frame=56607`) と dev:underruns (`underruns=1` `first_underrun_frame=56576`)。preview 側は全 PASS。断続 FAIL の位置情報を初めて取得した。
+- 直後の 10 回 (無負荷・load 0.77〜1.71): **10/10 exit 0・13/13 PASS** (11〜12 s)。dev:tone `max_err=1.49e-8` zero_runs 0・underrun 0。
+- 計 11 run 中 FAIL 1。旧記述「21 run 全 PASS」は本実測と合わず撤回 (旧 21 run の CPU 負荷下 10 回は本節で再実行していない)。
+- 再現条件 (負荷・タイミング) は未特定。切り分けは `first_underrun_frame=56576` (producer 遅延か consumer rebuffer か) を起点に行う。追跡 **#863** (AU-15)。
