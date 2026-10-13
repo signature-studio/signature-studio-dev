@@ -26,25 +26,37 @@ provider 全体: 435 関数 / 実装 70 / 未実装 365 (変化なし。`provide
 - 実機値の確定: FL 26.1.7 の win64 (`$FL_WIN64_DIR`) に対し、各関数を呼んで戻り値を取る実測が必要 (mock 追加より先)。
 - `screen` / `arrangement` / `launchMapPages` は MCPTools.pyc からの参照が 0 (`mcp_tools` が空)。優先度は低い。
 
-## 差分検査 `tests/ui_diff.mjs` (commit 2d39865b)
+## 差分検査 `tests/ui_diff.mjs`
 
 同じ呼出し列を mock (`host/fl_mock.mjs`) と C provider に流し、戻り値と code を比較する。
 
 - in-range 17 呼出し (index 0〜5 の getVisible / showWindow / hideWindow の組合せと `general.getVersion`): **diffs 0**
 - 範囲外 index 3 件 (-1 / 64 / 100): mock は範囲検査をせず、C は code 4 (Index out of range) を返す。**既知の差分**として分けて報告し、差分が消えたら検査が失敗するように書いている。
 
-## 検証 (commit 2d39865b, runner 4 core, node 22.23.3, emsdk 6.0.12, FL_WIN64_DIR は展開先 `$RUNNER_TEMP`)
+## 検証
+
+測定 commit: `832f985d` (main 取り込み後の HEAD)。`832f985d` から HEAD まで `tools/python` のコード差分は 0 (下記)。
+runner 4 core / node 22.23.3 / emsdk 6.0.12 (`$RUNNER_TEMP/emsdk`、`/opt/emsdk` へ symlink) / `FL_WIN64_DIR` は fl-win64 の展開先。
+`tools/python/work/` は `fetch_inputs.sh` で fl-win64 から作成 (gitignore)。負荷: 測定中 load average 0.8〜3.5 (4 core)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `bash provider/build.sh` | exit 0・ハンドラ 70 | — |
-| `build_cpython_wasm.sh` | exit 0 (python.wasm 5.93 MB) | 3 分 19 秒 |
-| `FLPY_SKIP_TABLE=1 build_flpy.sh` | exit 0 (flpy.wasm 5.92 MB) | 4.7 秒 |
-| `node tests/provider_check.mjs` | PASS (435 / 実装 70 / 未実装 365 / MCP 静的 60) | 0.28 秒 |
-| `node tests/ui_diff.mjs` | calls 17、diffs 0、範囲外既知差分 3、PASS | 0.04 秒 |
-| `node tests/device_diff.mjs` | calls 7 + reject 4、diffs 0、PASS | 0.04 秒 |
-| `node tests/transport_diff.mjs` | calls 7、diffs 0、PASS | 0.04 秒 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1.3 秒 |
+| `bash provider/build.sh` | exit 0・ハンドラ 70 | 1 秒 |
+| `build_cpython_wasm.sh` | exit 0 (python.wasm 5.93 MB) | 271 秒 (4 分 31 秒) |
+| `FLPY_SKIP_TABLE=1 build_flpy.sh` | exit 0 (flpy.wasm 5.92 MB) | 6 秒 |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 70 / 未実装 365 / MCP 静的 60) | 0.44 秒 |
+| `node tests/ui_diff.mjs` | calls 17、diffs 0、範囲外既知差分 3、PASS | 0.05 秒 |
+| `node tests/device_diff.mjs` | calls 7、rejects 4、midi_out 4、diffs 0、PASS | 0.05 秒 |
+| `node tests/transport_diff.mjs` | calls 7、diffs 0、PASS | 0.05 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 2.0 秒 |
+
+注: 4 本の node テストは `dist/` 生成後に実行 (並列実行すると `dist/flprov.js` 未生成で失敗する)。
+
+コード差分 (測定 commit から HEAD まで、`tools/python` の `.md` 除く):
+```
+$ git diff 832f985d HEAD -- tools/python ':!*.md'
+(空)
+```
 
 ## 未解決
 
