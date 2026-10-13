@@ -167,7 +167,7 @@
 | `tools/gui/REPORT.md` | ~226 | gui-shim (Win32 user32/gdi32 → OffscreenCanvas)。§9 = GUI-4 (#180) WebGL2 present / 複数矩形 / rAF / seqlock の実測。§10 = GUI-5 (#181) 24/8/4/1bpp DIB・mono DDB と wasm SIMD128 行カーネルの実測 |
 | `tools/gui/shimx_coexist/REPORT.md` | ~110 | shimx weak × gui 強定義の共存リンクと Web 実装接続 (ShellExecute/ファイルダイアログ/D&D) (#172) |
 | `tools/audio/REPORT.md` | ~100 | ASIO/WASAPI/DirectSound → AudioWorklet + SAB リング |
-| `tools/audio/REPORT_MIDI.md` | ~50 | AU-3 (#188) Web MIDI shim の検証全文 (REPORT.md §13 から分割) |
+| `tools/audio/REPORT_MIDI.md` | ~65 | AU-3 (#188) Web MIDI shim の検証全文 (REPORT.md §13 から分割) |
 | `tools/audio/asio/REPORT.md` | ~200 | IASIO COM アダプタ + 120s soak |
 | `tools/assets/REPORT.md` | ~125 | 314MB 級 wasm asset の chunk ローダ + 二段キャッシュ |
 | `tools/assets/wvfs/REPORT.md` | ~145 | 書込可能 OPFS VFS |

@@ -16,9 +16,9 @@
 
 4 本 = `midi_all` (wasm 内 check **54/54** + JS 側の出力内容検算) / ネガコン 2 / Worker 内 Web MIDI 実測。
 
-所要の内訳 (commit 済み `results/midi_results.json` の run 別 `ms`): `midi_all` 1,974 ms / `negctl_drop_one_short_msg` **62,591 ms** / `negctl_flip_sysex_bit` 1,937 ms (レビュワーの再実行では drop500 が 62,476 ms で同じ傾向)。drop500 で待つ箇所のうち説明できるのは wasm 側 `wait_until(&n_data, 1000, 8000)` (`test/flmidi_test.c:155`) の 8 s だけで、残り約 54.6 s の出所は**未特定** (未調査)。3 回の e2e 所要の差 (69.69 / 69.65 / 122.24 s) が同じ待ちに由来するかも未確認。`tools/audio/test/page_midi.mjs` の page 側 deadline は 90 s で、62 s 台の drop500 はこれに達していない (タイムアウトによる打切りではない)。
+所要の内訳 (commit 済み `results/midi_results.json` の run 別 `ms`): `midi_all` 1,974 ms / `negctl_drop_one_short_msg` **62,591 ms** / `negctl_flip_sysex_bit` 1,937 ms 。drop500 で待つ箇所のうち説明できるのは wasm 側 `wait_until(&n_data, 1000, 8000)` (`test/flmidi_test.c:155`) の 8 s だけで、残り約 54.6 s の出所は**未特定** (未調査)。3 回の e2e 所要の差 (69.69 / 69.65 / 122.24 s) が同じ待ちに由来するかも未確認。`tools/audio/test/page_midi.mjs` の page 側 deadline は 90 s で、62 s 台の drop500 はこれに達していない (タイムアウトによる打切りではない)。
 
-4 回目 (本修正の作業ツリー。コード差分 0 を `git diff --stat 1acde4b -- tools/audio/src tools/audio/test tools/audio/harness tools/audio/build.sh src/runtime` の空で確認): `e2e_midi.sh` と同じ 3 手順 (tsc → `build.sh` → `midi_run.mjs`) を実行。出力先は commit 済みの `results/midi_results.json` を避けて `/home/runner/work/_temp/opencode/655_midi_verify.json`。結果 4/4 PASS、全体 70 s (09:17:28 → 09:18:38 UTC、開始時 load 0.51)。`midi_all` 2,003 ms / `negctl_drop_one_short_msg` 62,528 ms / `negctl_flip_sysex_bit` 1,957 ms。drop500 の FAIL 内訳は `short_seq_ok` + `ring_overflow_oldest_kept` (前回と同一)。
+4 回目 (本修正の作業ツリー。コード差分 0 を `git diff --stat 1acde4b -- tools/audio/src tools/audio/test tools/audio/harness tools/audio/build.sh src/runtime` の空で確認): `e2e_midi.sh` と同じ 3 手順 (tsc → `build.sh` → `midi_run.mjs`) を実行。出力先は commit 済みの `results/midi_results.json` を避け、コミットしない一時ファイル (`$RUNNER_TEMP` 配下) に書いた。結果 4/4 PASS、全体 70 s (09:17:28 → 09:18:38 UTC、開始時 load 0.51)。`midi_all` 2,003 ms / `negctl_drop_one_short_msg` 62,528 ms / `negctl_flip_sysex_bit` 1,957 ms。drop500 の FAIL 内訳は `short_seq_ok` + `ring_overflow_oldest_kept` (前回と同一)。
 
 | 検査 (`midi_all` 内, 数え方 = check 1 件 = wasm が自己判定した 1 条件) | 実測 |
 |---|---|
@@ -60,6 +60,6 @@
 |---|---|---|
 | `pnpm typecheck` (`tsc --noEmit`) | EXIT 0 | 1 s 未満 (09:16:34 UTC、同秒で完了) / load 未計測 |
 | `pnpm build` (`tsc --noEmit && vite build`) | EXIT 0。警告 2 件: THIRD_PARTY_NOTICES が不完全 (15 件, `FL_WIN64_DIR` 未指定のため。`NOTICES_STRICT` 未設定), `gui_proto.ts` の INEFFECTIVE_DYNAMIC_IMPORT | 約 1 s (09:16:38 → 09:16:39 UTC) |
-| `pnpm runtime:e2e` (`node tools/runtime/e2e.mjs`) | EXIT 0、`ALL OK` (OK 10 / FAIL 0)。**skip 4 件**: `m1-hello` (`/opt/retdec/bin/retdec-decompiler` 無し = toolchain-retdec 未取得)、`m6-ott` / `m10-ott` / `m11-boot` (work-m6-ott・work-m11 未取得) | 20 s (09:16:45 → 09:17:05 UTC) / 開始時 load 0.07 → 終了時 0.66 |
+| `pnpm runtime:e2e` (`node tools/runtime/e2e.mjs`) | EXIT 0、`ALL OK` (OK 10 / FAIL 0)。**skip 4 件**: `m1-hello` (`[RETDEC]` の `bin/retdec-decompiler` 無し = toolchain-retdec 未取得)、`m6-ott` / `m10-ott` / `m11-boot` (work-m6-ott・work-m11 未取得) | 20 s (09:16:45 → 09:17:05 UTC) / 開始時 load 0.07 → 終了時 0.66 |
 
 runtime e2e の検証範囲は **mt-boot (pthread 4 スレッド × 1M 原子加算 = 4,000,000) と pump (Worker の Atomics.wait・MOUSEMOVE 2,000 件 loss 0・WM_TIMER)** のみ。skip した 4 件は本 PR の検証対象外で、未実行であることを明記する。ログに `shim_port.not_implemented_yet` の console.error が 1 件出るが、判定は PASS (由来は未確認)。

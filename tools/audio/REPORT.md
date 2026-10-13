@@ -218,4 +218,4 @@ e2e 追加 3 本 (`harness/run.mjs`, 計 25 シナリオ): `asio_sine_b512_96k` 
 
 ## 13. AU-3 (#188) Web MIDI shim (全文: `REPORT_MIDI.md`)
 
-winmm `midiIn`/`midiOut` 20 関数の Web MIDI 実体 (SAB MIDI ring + CALLBACK_FUNCTION 専用スレッド + SysEx バッファ + 再スキャン) を `src/flmidi*.c` / `src/runtime/midi-shim.ts` に実装。`bash tools/audio/e2e_midi.sh` が 3 回とも 4/4 PASS (wasm 内 54 check + ネガコン 2 + Worker 実測)。**Chrome 154 の Worker には Web MIDI が無い (実測) ので main thread 中継が必須**。モック `MIDIAccess` での検証のみで、実デバイス (AU-2 #187)・FL 結線/shimx 強定義置換 (#179, #37) は未達。
+winmm `midiIn`/`midiOut` 20 関数の Web MIDI 実体を `src/flmidi*.c` / `src/runtime/midi-shim.ts` に実装。結論: **Chrome 154 の Worker には Web MIDI が無い (実測) ため main thread 中継が必須**。検証の数値・内訳は `REPORT_MIDI.md` §13-1、未解決は §13-3 を参照。モック `MIDIAccess` での検証のみで、実デバイス (AU-2 #187)・FL 結線/shimx 強定義置換 (#179, #37) は未達。
