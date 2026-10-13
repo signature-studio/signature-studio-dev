@@ -35,6 +35,7 @@ host→Python 入口 (flpy.c export): `flpy_init(syspath)` `flpy_run(src,file)` 
 | 経路 | 実装 |
 |---|---|
 | MCP `tools/list` `tools/call` | `host/mcp_rpc.mjs` (JSON-RPC 2.0, 応答は FLEngine の固定テンプレート形) → `py.call("__main__:<tool>")`。MCPTools.pyc は FL と同じく **`__main__` として実行** (`get_mcp_tools_json` が `sys.modules['__main__']` を走査するため) ✔ |
+| アプリ UI / devtools (PY-4 #77) | `src/runtime/mcp_panel.ts` が `window.flMcp` (`start(files)` / `rpc(req)` / `list()` / `call(name,args)` / `stop()`) を常時公開、`/?mcp=1` で UI パネル (MCPTools.pyc・midi.py・utils.py を選択/ドロップ → 起動 → tool 選択 → tools/call)。`tools/python` の host/・dist/flpy.*・flapi_ids.json だけを Vite が `/py/` で配信 (`vite.config.ts` `pyAssets`、許可リスト方式。`work/` = FL 由来ファイルは配信しない)。flapi の提供側は FLEngine 未完成の間 `fl_mock.mjs` (実エンジン結合時は engine を差替)。`tools/call` は `tools/list` に出る name のみ受理 (未知 / 非 tool は isError=true) ✔ |
 | MIDI scripting | Web MIDI → engine → `fl_rt:dispatch_midi`: FL と同順 (OnMidiIn → OnMidiMsg → 未 handled なら OnNoteOn 等)。`flmidimsg` 23 フィールド ✔。他 callback は表 (27 個、`pycb*`) 通り同じ `call_json` で ✔設計 |
 | Piano roll scripting | `.pyscript` の `createDialog()` / `apply(form)` + `flpianoroll` module (Note/Marker/score/Utils/ScriptDialog 64 メンバ)。**未実装** (チケット T5) |
 | stdout/stderr | FL は `fl.FLTextOutput` で Script output へ。本 PoC は Worker→main の `stdout/stderr` メッセージ ✔ |
