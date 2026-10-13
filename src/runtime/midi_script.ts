@@ -170,9 +170,12 @@ export function mountMidiPanel(): void {
       state.textContent = `起動済み: ${Object.keys(await api.scripts()).join(", ")}`;
       connectBtn.disabled = false;
     } catch (e) {
-      state.textContent = `失敗: ${String(e)}`;
+      const reason = String(e);
+      await api.stop().catch((se) => api.output.push(`ERR stop: ${String(se)}`));
+      connectBtn.disabled = true;
+      state.textContent = `失敗: ${reason}`;
     }
-    startBtn.disabled = api.started;
+    startBtn.disabled = api.started || Object.keys(devices).length === 0;
     showOutput();
   });
   connectBtn.addEventListener("click", async () => {
