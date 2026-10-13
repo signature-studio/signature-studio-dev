@@ -1,6 +1,6 @@
 # sampler REPORT 付録: Fruity Slicer 2 殻と engine の結線 (#540 受入条件 4)
 
-本書は `REPORT.md` §5 の付録。 測定は素材 `fl-win64` (block23663 殻 / block23664 engine、`$FL_WIN64_DIR/extracted`) の逆アセンブル (pefile + capstone) による。 実行は行っていない。
+本書は `REPORT.md` §5 の付録。 記録している作業は次のとおり: 素材 `fl-win64` (block23663 殻 / block23664 engine、`$FL_WIN64_DIR/extracted`) の逆アセンブル (pefile + capstone)、素材展開 (§7)、`sampler_engines.sh` の 900 s 打ち切り実行 (exit 124、§7)。 結果の出典と HEAD は §7 に分けて書く。
 
 ## 1. 結論
 
@@ -101,7 +101,7 @@
 
 ## 5. 受入条件 3・5 の測定
 
-### 3. RetDec の C バックエンド省略 (実測)
+### 3. RetDec の C バックエンド省略 (前 run #810 の引用)
 
 | 方式 | 対象 | 結果 (実測) |
 |---|---|---|
@@ -131,7 +131,9 @@
 | VEX helper の SSE 固定の動的確認 (静的には不成立) | #527 にコメント予定 (既存・重複起票せず) |
 | 受入条件 1・2 の再測定 (`sampler_engines.sh`) | 本 HEAD の検証 run は runner に [RETDEC] が無く未再現。 RetDec 環境のある run で再測定 (#540 継続) |
 
-## 7. 本 HEAD (5880a9f6) での再測定
+## 7. 検証 (測定 HEAD 5880a9f6、af86748b と sampler コード同一)
+
+測定 HEAD の扱い: 下表の測定の HEAD は `5880a9f6` (`6769c2c7` の時点で記録された系列) である。 PR の検証 HEAD は `af86748b`。 `5880a9f6` から `af86748b` までに sampler の実行コードは変わっていない (`git diff --stat 5880a9f6 af86748b -- tools/plugins/sampler ':!*.md'` は空)。 そのため表の結果は `af86748b` の sampler コードにも当てはまる。 `af86748b` そのものでの再実行は、この表では行ったと主張しない。
 
 | 項目 | 結果 (実測) |
 |---|---|
