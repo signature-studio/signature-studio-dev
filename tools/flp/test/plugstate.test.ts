@@ -55,6 +55,14 @@ test('unsupported / short payloads are never lossy (ok=false, bytes preserved)',
   assert.equal(t.ok, false);
   assert.deepEqual([...encodePluginState(t)], [...short]);
   assert.equal(decodePluginState('Fruity Limiter', new Uint8Array(2))!.ok, false);
+  for (const plugin of ['Fruity Delay 3', 'Fruity Reeverb 2', 'Fruity Limiter', 'Fruity Parametric EQ 2', 'Maximus']) {
+    for (let n = 0; n < 4; n++) {
+      const raw = Uint8Array.from({ length: n }, (_, i) => i + 1);
+      const h = decodePluginState(plugin, raw)!;
+      assert.equal(h.ok, false, `${plugin} len ${n}`);
+      assert.deepEqual([...encodePluginState(h)], [...raw], `${plugin} len ${n}`);
+    }
+  }
   assert.equal(decodePluginState('3x Osc', new Uint8Array(8)), undefined);
   assert.equal(hasLayout('toString'), false);
 });

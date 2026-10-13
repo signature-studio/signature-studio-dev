@@ -1,6 +1,6 @@
 // Native Fruity plugin state (FLP event 213) decoders — L-3 (#104).
 // Layouts are transcribed from each plugin DLL's SaveRestoreState (vtable slot 3): the order of Stream->Write
-// calls in the Save branch and the `version >= N` gates in the Load branch (see REPORT.md §12).
+// calls in the Save branch and the `version >= N` gates in the Load branch (see REPORT_APPENDIX.md §12).
 // Lossless: encodePluginState(decodePluginState(x)) == x for every input; anything not described by the layout
 // (unknown version, short/long payload) is kept in `tail` and `ok` is false when the layout did not fit exactly.
 // Browser-safe: no node: imports.
@@ -100,7 +100,9 @@ export type FieldValue = number | number[];
 export interface DecodedField { name: string; kind: FieldKind; off: number; size: number; at?: number; value: FieldValue }
 export interface DecodedPluginState {
   plugin: string;
-  /** raw leading u32 as stored */
+  /** payload shorter than 4 bytes: no version word was stored; all bytes are in `tail` and encode writes no header */
+  headerless: boolean;
+  /** raw leading u32 as stored (0 when headerless) */
   versionRaw: number;
   version: number;
   fields: DecodedField[];
@@ -130,7 +132,7 @@ export function decodePluginState(plugin: string, data: Uint8Array): DecodedPlug
   if (!hasLayout(plugin)) return undefined;
   const L = LAYOUTS[plugin];
   const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
-  if (data.length < 4) return { plugin, versionRaw: 0, version: 0, fields: [], tail: data.slice(), ok: false, fieldsBytes: 0 };
+  if (data.length < 4) return { plugin, headerless: true, versionRaw: 0, version: 0, fields: [], tail: data.slice(), ok: false, fieldsBytes: 0 };
   const versionRaw = dv.getUint32(0, true);
   const version = L.version(versionRaw);
   const fields: DecodedField[] = [];
@@ -152,10 +154,11 @@ export function decodePluginState(plugin: string, data: Uint8Array): DecodedPlug
   const tail = data.slice(off);
   // fixed-size plugins must have no tail; Maximus is the only one with a variable sub-stream tail
   if (plugin !== 'Maximus' && tail.length !== 0) fit = false;
-  return { plugin, versionRaw, version, fields, tail, ok: fit, fieldsBytes };
+  return { plugin, headerless: false, versionRaw, version, fields, tail, ok: fit, fieldsBytes };
 }
 
 export function encodePluginState(s: DecodedPluginState): Uint8Array {
+  if (s.headerless) return s.tail.slice();
   const total = 4 + s.fields.reduce((a, f) => a + f.size, 0) + s.tail.length;
   const out = new Uint8Array(total);
   const dv = new DataView(out.buffer);
