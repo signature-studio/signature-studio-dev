@@ -1,13 +1,14 @@
 # REPORT 付録 — [SR-1c #256] controller ゲート (+0x10c / IEditController this+0xdc) の writer 探索と API 一覧化
 
 - 日付: 2026-10-13 / 検証起点: `33fd25a2` (main) / 作業ブランチ: `256-sr1c-ctrl-gate`
-- 検証 HEAD (再測定の基準): **`57f70d4fbb9aaa38901fb48bc7be82ffc500740f`**。**この HEAD での e2e・watch・静的走査は未再測定** (素材 `plugins-serum2` が再実行環境に無いため)。各実測の実行 commit は下の「測定 commit」で個別に示す。
-- 測定 commit (実測の実行 commit。混在しているため節ごとに明記):
-  - §1-1 e2e 50/50・§1-2 relay・§3 静的走査・§2 API 突合: `23337740ca2e1a4ee9c0a4e8e7ab64acd0f1f1d6`
-  - §4-1 watch hit と e2e 50/50 (67.93 s): `c9fbfc5473f98cc8902f6ee8daffca3e5446eb1f` (`vst3host.cpp` = `35737960`、stack 出力なし)
-  - §4-3 の stack 行・IID 値: build commit **未確定** (stack 出力コードは `163461c4` で追加されたが、その build での実行記録は無い。raw 無し)
+- 検証 HEAD (再測定の基準): コード commit **`3ca29c66974d87dcf9c90ffb8f73b8480951b3f4`** (`build.sh` の `-static` 追加)。e2e 50/50・watch・静的走査をこの commit で再測定した (§1-0・§4-1・§4-3)。`3ca29c66` 以降の commit は本付録のみを変更する (コード差分 0、§1-0)。
+- 測定 commit (実測の実行 commit。節ごとに明記):
+  - §1-0 HEAD 再測定 (e2e 50/50・67.31 s、watch・静的走査): `3ca29c66974d87dcf9c90ffb8f73b8480951b3f4`
+  - §1-0 の同一ソース run (`build.sh` 修正前): `37adcb933787c115f16b9fb5a9b178b0120c891f` (50/50・70.73 s)
+  - §1-1 e2e 50/50・§1-2 relay・§3 静的走査・§2 API 突合 (過去の測定): `23337740ca2e1a4ee9c0a4e8e7ab64acd0f1f1d6`
+  - §4-1 旧 watch hit と e2e 50/50 (67.93 s, 過去): `c9fbfc5473f98cc8902f6ee8daffca3e5446eb1f` (`vst3host.cpp` = `35737960`、stack 出力なし)
   - reviewer の再実行 `3552cabc` (記録のみ。e2e・relay・API 突合の判定は一致したとの記載)。
-- 指摘対応の経緯: 本 HEAD で再測定できなかった項目は §5 の未解決に列挙する。
+- 指摘対応の経緯: 再測定で得た値は §1-0・§4-1・§4-3 (同一 console の raw 貼付)。過去の値 (§1-1・§4-1 旧) は経緯として残す。未解決は §5。
 - 既知類型との関係 (`docs/DEFECTS.md`): 該当なし (実 DLL の静的・動的観測。lift 前)
 - 本付録は `REPORT.md` §3-3・§4 #3・§5-2 の追補。本体の結論は変えない。
 
@@ -48,6 +49,21 @@
   NC1 (契約チェックを壊す): summarize exit=1, NG=1 (期待: exit!=0 かつ NG>=1)
   NC2 (gate==2 無影響チェックを壊す): summarize exit=1, NG=1 (期待: exit!=0 かつ NG>=1)
 ```
+
+### 1-0. 再測定 (HEAD, 2026-10-13, 4 core)
+
+- 素材: `plugins-serum2` (`$ARTIFACTS_DIR/plugins-serum2.tar.zst`)。`Install_Xfer_Serum2_2.1.5.exe` を `tar --zstd -xf` で取り出し、`7z x` で展開。`Serum2.vst3/Contents/x86_64-win/Serum2.vst3` = **19,236,864 B**、sha256 `501e7bb3dd9cafe416b3412df3d4e084c01b7468201e5690b9009d7ecd4e5283` (REPORT §0 と一致)。`work/Serum2_win64.vst3` と `work/exe_extract/` に配置。
+- 環境: wine 9.0 (`wine64`)、`x86_64-w64-mingw32-g++` (default は win32 版 GCC 13)。`build.sh` は `-static` で libwinpthread を import しない (§1-0-b)。
+- 測定 commit: **`3ca29c66974d87dcf9c90ffb8f73b8480951b3f4`** (`fix(serum2-host): link host statically so the wine seed run works`)。
+- 結果: `bash tools/targets/serum2/host/e2e.sh` → **50/50 OK, 67.31 s** (exit 0)、NC1/NC2 期待どおり (exit=1, NG=1)、load 0.14 → 0.37。
+- 同一ソースの直前 run: `37adcb93` (`build.sh` 修正前、default の win32 版でビルド) → 50/50 OK, 70.73 s。
+- 鮮度 (WORKFLOW §6): 測定 commit `3ca29c66` は `tools/targets/serum2/host` のコード commit の最終。測定時点の `git diff 3ca29c66 HEAD -- tools/targets/serum2/host` は **0 バイト** (`git diff 3ca29c66 HEAD -- tools/targets/serum2/host | wc -c` = 0)。以後の commit は `REPORT_SR1c.md` (文書) のみで、コードの差分は 0 のまま。
+
+### 1-0-b. seed run の rc=53 (環境側の原因)
+
+- 再現: posix 版 (`x86_64-w64-mingw32-g++-posix`) で `-static` 無しにビルドすると `libwinpthread-1.dll` を import し (`objdump -p`)、wine prefix に当該 DLL が無いため seed run が **rc=53** で終了する。
+- 対処: `build.sh` に `-static` を追加 (`3ca29c66`)。`-static` 付き posix 版は seed run rc=0、import は KERNEL32 / msvcrt のみ。win32 版 (本 runner の default) は `-static` 無しでも import は KERNEL32 / msvcrt のみで、本 run のビルドはいずれも同じ import 構成になる。
+- 注: 本 runner の既定 mingw は win32 版。`-posix` は noble の `g++-mingw-w64-x86-64` が既定にする環境で再現する。
 
 ### 1-2. relay 取得
 
@@ -107,16 +123,24 @@ shim 候補 (SR-3/SR-4 入力) は呼出確認 110 件のうち kernel32 (メモ
 - 追加: `vst3host.cpp` に `S2HOST_WATCH=1` の opt-in 計測 (既定は無変更)。controller 生成直後に `ctrl iface+0xdc` (= controller base+0x10c) へ x86 デバッグレジスタ DR0 の 4 byte 書込 watch を張り、VEH で書込 RIP と値を記録する。
 - **観測範囲**: DR は**スレッド単位**。`armWatch` は `SetThreadContext(GetCurrentThread())` で**呼出スレッド (main) の DR0 のみ**を張る。他スレッドの書込は**未観測**。Serum2 は `CreateThread` を 25 回呼ぶ (`sr1c_api_surface.tsv`) ため、別スレッドからの書込の有無は本計測では判定できない。
 - 全スレッド対象化の試行 (不採用): 既存スレッドの列挙 (`CreateToolhelp32Snapshot`) と kernel32!CreateThread の IAT 差替え (`CREATE_SUSPENDED` で DR0 を張ってから再開) を試作した。wine 9.0 では Toolhelp の `th32OwnerProcessID` が 0〜1 となり他プロセスのスレッドも混ざる (`own_pid=0`, 全 44 件)。plugin DLL の IAT hook も licensed / 既定 host 双方で 0 回しか呼ばれず (`CreateThread#` 0 件)、新規スレッドへの張りを確認できなかった。試作コードは捨てた (commit しない)。全スレッド化には別手段 (Windows 上の実機、または gdb の thread 全列挙) が要る。
-- 実測 (`S2HOST_WATCH=1`, 既定 host, 4 blocks, HEAD `c9fbfc54` (`vst3host.cpp` は `35737960` と同一) で再実行):
+- 実測 (`S2HOST_WATCH=1`, 既定 host, 4 blocks, 測定 commit `3ca29c66`、console は `host/work/watch_3ca.console` (commit 外) の同一 run から抜粋):
   ```
-  [watch] armed DR0=00007f87cf47d28c (controller iface+0xdc)
-  [watch] hit#1 RIP=00006ffff8af1338 (base=00006ffff8a40000, Serum2_win64.vst3) value=2
-  [gate] ctrl iface+0xdc 初期値=2 — 1 への遷移を最大 3 秒ポーリング
-  [gate] 最終 +0xdc=2 (観測ヒストグラム 0:0 1:0 2:61 3:0)
+  L24 [P->H] HostApp::queryInterface unknown iid=C5C6B8A395C08846B0916F0BB697AA44 -> kNoInterface
+  L25 [P->H] HostApp::queryInterface unknown iid=C69D316DC5604262B32C951B93BEF4C6 -> kNoInterface
+  L32 [watch] armed DR0=00007fe73da4106c (controller iface+0xdc)
+  L36 [watch] hit#1 RIP=00006ffff8af1338 (base=00006ffff8a40000, Serum2_win64.vst3) value=2
+  L37 [watch] stack[47]=00006ffff9b74d60 RVA=0x1134d60
+  L38 [watch] stack[61]=00006ffff8ec954d RVA=0x48954d
+  L39 [watch] iid@11BE750 = C5C6B8A395C08846B0916F0BB697AA44
+  L40 [watch] iid@11BE8E8 = C69D316DC5604262B32C951B93BEF4C6
+  L106 [gate] ctrl iface+0xdc 初期値=2 — 1 への遷移を最大 3 秒ポーリング
+  L107 [gate] 最終 +0xdc=2 (観測ヒストグラム 0:0 1:0 2:61 3:0)
   ```
-  - 再現コマンド: `cd tools/targets/serum2/host && S2HOST_WATCH=1 wine64 work/build/vst3host.exe 'Z:…\work\Serum2_win64.vst3' - 'Z:…\host\work\out_watch_head' 4 'Z:…\work\exe_extract' > watch.console` (`PATH=/usr/lib/wine:$PATH WINEPREFIX=work/wineprefix WINEDEBUG=-all`、`Z:…` は repo の絶対パスを `\` 区切りにしたもの)。
-  - hit は `[gate]` より前 (比較の根拠: 同一 console の行番号。`hit#1` が 36 行目、`[gate] ctrl iface+0xdc 初期値=2` が 103 行目)。`armed` (32 行) → `hit#1` (36 行) → `controller->initialize` の順。`initialize / setComponentHandler / createView` のどれの内側かは未分離。
-  - 本 run の `hit` は 1 件。上記は同一 run のログ行をそのまま貼った。
+  - 再現コマンド: `cd tools/targets/serum2/host && S2HOST_WATCH=1 wine64 work/build/vst3host.exe 'Z:…\work\Serum2_win64.vst3' - 'Z:…\host\work\out_watch' 4 'Z:…\work\exe_extract' > watch.console` (`PATH=/usr/lib/wine:$PATH WINEPREFIX=work/wineprefix WINEDEBUG=-all`、`Z:…` は repo の絶対パスを `\` 区切りにしたもの)。
+  - 同一 console 内の順序: `armed` (L32) → `hit#1` (L36) → `[gate]` (L106)。`hit` は `[gate]` より前。`initialize / setComponentHandler / createView` のどれの内側かは未分離。
+  - `L24`・`L25` (QI 2 件、`kNoInterface`) は hit より前。`[watch] iid@…` の IID バイト列は `L24`・`L25` の IID と一致する (同じ 2 つの IID)。
+  - 本 run の `hit` は 1 件。`[gate]` の最終値は 2。
+  - 過去の run (測定 commit `c9fbfc54`、raw 無し) の hit は同じ RIP `0xb1338` で `value=2` (本節の旧記録)。
 - 書込命令: DLL 内 RVA **`0xb1332` `mov [rcx+0xfc], eax`** (trap 後の RIP は `0xb1338`)。書込値 `eax` は `0x180037600` の戻り値。関数は `0xacf70`〜`0xb142a`。
 - 値 2 の意味 (逆アセンブル、未再現の読み): `0x180037600` は `queryInterface` を 2 回試し、A 成功なら 1、A 失敗かつ B 成功なら 0、両方失敗なら **2** を返す。実測の 2 は「両 QI 失敗」と読む。下記は `capstone` の出力 (`host/work/disasm_sr1c.txt`、commit 外)。分岐 `0x180037656 mov eax,2` が両失敗の経路。
   ```
@@ -137,44 +161,50 @@ shim 候補 (SR-3/SR-4 入力) は呼出確認 110 件のうち kernel32 (メモ
 
 ## 4-2. 値 2 の由来 (実行時 IID 読出し)
 
-- IID の値そのもの (実メモリ値・SDK 計算値) は §4-3 に一本化した (数値を二重に書かない)。本節は出所の区分のみ:
-  - **SDK 計算値 (参照用)**: VST3 SDK `pluginterfaces/vst/ivsthostapplication.h` の `DECLARE_CLASS_IID` (IVst3ToAUWrapper / IVst3ToAAXWrapper) を `base/funknown.h` の `INLINE_UID` で展開した値。参照先は `pluginterfaces` submodule commit `4f547e8e102b47de4a8b8aaf343c73b700786372` (親リポジトリ直下には無い。版は固定していない)。
-  - **実測の状態: 未検証 (raw 無し)**。§4-3 の実メモリ値は raw の `[watch] iid@…` 行が commit されておらず照合できないため、SDK 計算値との一致は確認していない。
-  - **未確定**: `RVA` と `lea rdx` の対応 (逆アセンブル読み) は独立に確認していない。`HostApp::queryInterface` の `kNoInterface` 応答は未観測。
-- 逆アセンブル読み (§4-1): 両 QI 失敗の経路で `2`。両 QI 失敗の実行時再現は未確認。
-- 含意 (未検証): 値 2 は、両 IID が host 側で `kNoInterface` になった場合の結果と読める。その場合 `+0x10c` を 1 にするには host が当該 IID に応答する必要がある可能性がある。書込元 `0xb1332` (関数 `0xacf70`) の呼出元は未確定のまま。
-- 次の一手: `S2HOST_WATCH=1` の run を素材 (`plugins-serum2`) 付きで再実行し、`[watch] iid@…` 行と `HostApp::queryInterface unknown iid=…` 行を同形式で突合する。
+- IID の値・実測の突合は §4-3 に一本化した (数値を二重に書かない)。本節は解釈のみ:
+  - 実行時の 2 件の QI (`HostApp::queryInterface`) は両方 `kNoInterface` (§4-3 の console 抜粋 L24・L25)。
+  - `[watch] iid@…` の 2 IID は、これら 2 件の QI と同じ IID だと突合済み (§4-3)。
+- 逆アセンブル読み (§4-1): 両 QI 失敗の経路で `2`。値 `0x180037600` の戻り値そのものは未記録 (未観測)。
+- 含意: 値 2 は両 QI が失敗した結果と読める。`+0x10c` を 1 にするには host が当該 IID に応答する必要がある可能性がある (未検証)。書込元 `0xb1332` (関数 `0xacf70`) の呼出元は §4-3 のとおり。
 
 ## 4-3. 書込元 0xacf70 の呼出元 (静的 + 実行時スタック)
 
-- 検証 HEAD: `57f70d4fbb9aaa38901fb48bc7be82ffc500740f`。**本節の実行時の数値は HEAD で再取得していない**。下記は前 run の転記で、build commit は未確定 (stack 出力コード `163461c4` で追加されたが、その build で実行した記録は無い)。`plugins-serum2` (`sha256 501e7bb3…`・19,236,864 B) が再実行環境に無いため。
-- 静的 (`host/sr1c_callers.py`、再実行は未実施 — 本 run は `host/` の script と文書のみ確認):
-  - `0xacf70` への直接 `call/jmp` は **1 件** (`0x1800b4ea4`)。ただしこれは thunk で、`0x1800b4ea0: add rcx,-0x20` → `0x1800b4ea4: jmp 0x1800acf70` の形 (this を -0x20 して本体へ tail-jump)。
-  - thunk `0xb4ea0` は `.rdata` の vtable 要素 (RVA `0xa2bf70`) に現れる。本体 `0xacf70` は `.rdata` `0xa2bf00`。vtable の所属 class は、RTTI (`.?AV` 名) が DLL 内に無いため**未確定**。
-  - thunk の先頭 `0xb4ea0` は `.pdata` に該当エントリが無い (`host/sr1c_func_head.py` が「pdata に該当なし」を返す)。
-  - vtable 経由の間接 call は候補が多数 (`call [reg+0x70/0x78]` 1126 件) で、静的には一意に決まらない。
-- 実行時 (前 run の転記。raw console は `host/work/` (gitignore) にのみ存在し、commit されていない。**未検証 (raw 無し)**): watch hit (`value=2`) の時点のスタック上の戻り番地候補として、次の 2 件が記録されている。
+- 検証 commit: 測定 commit `3ca29c66` (コード HEAD)。下記の watch console と静的走査は同じ commit の build・同じ DLL (sha256 `501e7bb3…5283`) で取得した。
+- 実行時 (watch console `host/work/watch_3ca.console`、commit 外。以下は同 console からの抜粋そのもの):
   ```
+  [P->H] HostApp::queryInterface unknown iid=C5C6B8A395C08846B0916F0BB697AA44 -> kNoInterface
+  [P->H] HostApp::queryInterface unknown iid=C69D316DC5604262B32C951B93BEF4C6 -> kNoInterface
+  [watch] hit#1 RIP=00006ffff8af1338 (base=00006ffff8a40000, Serum2_win64.vst3) value=2
   [watch] stack[47]=00006ffff9b74d60 RVA=0x1134d60
   [watch] stack[61]=00006ffff8ec954d RVA=0x48954d
+  [watch] iid@11BE750 = C5C6B8A395C08846B0916F0BB697AA44
+  [watch] iid@11BE8E8 = C69D316DC5604262B32C951B93BEF4C6
   ```
-  - `RVA 0x48954d` は関数 `0x4894c0` (size 180) 内の `call 0x1809a8f0c` の直後 (命令境界と一致)。所属 class は未確定。
+  - `RVA 0x48954d` は関数 `0x4894c0` (size 180) 内、`0x489548: call 0x1809a8f0c` の直後 (命令境界。`sr1c_func_head.py` と capstone で確認)。所属 class は未確定。
   - `RVA 0x1134d60` は戻り番地として逆アセンブルで確認していない (未確定)。
-  - 戻り番地の列挙は RSP から 64 語。実際の呼出連鎖 (thunk → 本体) は、スタックの取り方 (frame pointer 省略) のため完全には追えていない。
-- IID の実メモリ値 (前 run の記録。raw の `[watch] iid@…` 行は commit されていないため **未検証 (raw 無し)**。SDK 計算値との一致は確認していない):
-  - RVA `0x11be750` → メモリ `C5C6B8A3 95C08846 B0916F0B B697AA44` (GUID 表記 `A3B8C6C5-C095-4688-B091-6F0BB697AA44` と読める。IVst3ToAUWrapper 候補)。
-  - RVA `0x11be8e8` → メモリ `C69D316D C5604262 B32C951B 93BEF4C6` (GUID 表記 `6D319DC6-60C5-4262-B32C-951B93BEF4C6` と読める。IVst3ToAAXWrapper 候補)。
-- 結論 (未検証を含む):
-  - watch hit の値 2 は、両 QI が失敗した結果と読める (§4-2 の逆アセンブル読みと整合)。ただし戻り値そのものは記録していないため、両失敗の実行時観測は未確認。
-  - 呼出元の所属 class は未確定。0x800010 の受信 (= +0xdc が 1 へ遷移する条件) は本 run では未解明。
+  - 戻り番地の列挙は RSP から 64 語。frame pointer を省略しているため、呼出連鎖 (thunk → 本体) は完全には追えていない。
+- IID の突合 (SDK 計算値との照合):
+  - RVA `0x11be750` の raw `C5C6B8A3 95C08846 B0916F0B B697AA44` は、`DECLARE_CLASS_IID(IVst3ToAUWrapper, 0xA3B8C6C5, 0xC0954688, 0xB0916F0B, 0xB697AA44)` を `INLINE_UID` (little-endian 側) で展開した byte 列と**一致**。
+  - RVA `0x11be8e8` の raw `C69D316D C5604262 B32C951B 93BEF4C6` は、`DECLARE_CLASS_IID(IVst3ToAAXWrapper, 0x6D319DC6, 0x60C56242, 0xB32C951B, 0x93BEF4C6)` と**一致**。
+  - SDK の参照先は `work/vst3sdk` (`3cdf9ca` = tag `v3.8.1_build_84`、`setup_sdk.sh` で取得)。`pluginterfaces/vst/ivsthostapplication.h` の `DECLARE_CLASS_IID` 行は 103 行 (IVst3ToAUWrapper) / 122 行 (IVst3ToAAXWrapper)。
+  - 2 IID は `HostApp::queryInterface unknown iid=…` の 2 件 (console L24・L25) と同一。
+- 静的 (`host/sr1c_callers.py`、本 commit で再実行。`work/Serum2_win64.vst3`):
+  - `sr1c_callers.py … 0xacf70` → `call/jmp 0x1800b4ea4 (.text) RVA 0xb4ea4` が **1 件** (thunk)、`qword@ 0x180a2bf00 (.rdata) RVA 0xa2bf00` が 1 件。
+  - thunk `0xb4ea0` (`add rcx,-0x20` → `jmp 0x1800acf70`) への参照は `call/jmp` 0 件、`qword@ 0x180a2bf70 (.rdata) RVA 0xa2bf70` が 1 件 (vtable 要素)。直接の call 元は thunk の 1 件のみ。
+  - thunk `0xb4ea0` は `.pdata` に該当エントリが無い (`sr1c_func_head.py` が「pdata に該当なし」)。
+  - vtable の所属 class は、RTTI (`.?AV` 名) が DLL 内に無いため**未確定**。
+  - vtable 経由の間接 call は候補が多数 (`call [reg+0x70/0x78]` 1126 件、前 HEAD の計測) で、静的には一意に決まらない。
+- 結論:
+  - watch hit の値 2 と、同 console の `kNoInterface` 2 件 (両 QI 失敗) は時系列で整合する。戻り値 (`0x180037600`) そのものは未記録のため、「両 QI 失敗 → 2」の因果は未確認。
+  - 呼出元の所属 class は未確定。0x800010 の受信 (= +0xdc が 1 へ遷移する条件) は未解明。
 
 ## 5. 未解決 (起票先)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | +0x10c の実行時 writer: 部分達成 (DR0 watch で main スレッドの書込 1 件を観測、RIP RVA `0xb1332`)。全スレッド・全書込の確定と wine watchpoint は未実施 | 既定 host で +0xdc が 2 のまま。0x800010 経路の前提が未解明 | #256 (本 issue、次回 run) |
-| 検証 HEAD `57f70d4f` での e2e 50/50 と watch 再測定が未実施 (`c9fbfc54` は `vst3host.cpp` の stack 出力 (`163461c4`) を含まず、`git diff c9fbfc54 57f70d4f -- tools/targets/serum2/host` は非ゼロ)。`plugins-serum2` が `$ARTIFACTS_DIR` に無い (`oc_artifacts: fl-win64 plugins-serum2` で再起動が必要) | WORKFLOW §6 の鮮度証跡が未達 | #256 |
-| raw の `[watch] iid@…` 行と stack 行の build commit が未確定 (raw console は `host/work/` にのみあり commit されていない)。§4-3 の IID 値は未検証 | IID の一致 (SDK 計算値) を確認できない | #256 |
+| 検証 HEAD での e2e 50/50 と watch 再測定は実施済み (§1-0・§4-1・§4-3、測定 commit `3ca29c66`)。raw console は `host/work/` (gitignore) にあり、commit されていない。REPORT には抜粋を貼った | 鮮度証跡は §1-0 で満たす。raw の全行は再現 run で取得する | #256 |
+| `kNoInterface` 2 件 (IID 一致) と値 2 の因果 (戻り値 `0x180037600` の未記録) | 両 QI 失敗 → 2 は時系列で整合するだけで、戻り値の観測は未実施 | #256 |
 | 0x800010 の既定 host での受信 | 同上 | #256 |
 | 未呼出 217 件の shim 分類 (GUI / ネット経路の到達可否と kernelbase 経由の呼出) | SR-3/SR-4 の入力 | #256 |
 | 静的走査は下限 (間接参照・多段 base を拾えない) | writer の取りこぼし | #256 (watchpoint で補完) |
@@ -182,7 +212,7 @@ shim 候補 (SR-3/SR-4 入力) は呼出確認 110 件のうち kernel32 (メモ
 ## 6. 再現
 
 ```sh
-bash tools/targets/serum2/host/e2e.sh                       # 50/50, 72 s (HEAD 23337740)
+bash tools/targets/serum2/host/e2e.sh                       # 50/50, 67.31 s (測定 commit 3ca29c66、§1-0)
 python3 tools/targets/serum2/host/sr1c_writer_scan.py tools/targets/serum2/work/Serum2_win64.vst3 0x10c out.tsv
 WINEDEBUG=+relay wine64 tools/targets/serum2/host/work/build/vst3host.exe <DLL> <case> <out> 16 <exe_extract> > relay.log 2>&1
 python3 tools/targets/serum2/host/sr1c_api_surface.py tools/targets/serum2/work/Serum2_win64.vst3 relay.log api.tsv
