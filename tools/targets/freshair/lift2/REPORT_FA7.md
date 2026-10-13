@@ -44,8 +44,8 @@ fail-closed: 判定は観測件数に下限を置き (空 PASS 拒否)、不合�
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 実 controller map (`C+0x318`, 木ノード = key u16 id → shared_ptr<param>) を構築して `0x180c9d700` を実行し、ID → 実 param の解決先を実測 | 本 issue の主目的 (未達) | #452 に残す (本 PR は Refs)。続編は新規子チケット FA-8 案 |
-| macro → 0x157.. が preset DUMP の接続表経由で Filter ID 1〜4 に届くか | 最終説明 | FA-8 案 |
-| 型 enum は ctor 既定のみで測定 (`FA_TYPE` で切替可能な実装は入っているが、0x157.. 側の型別実測は未実施) | 弱い一般化 | FA-8 案 |
-| wasm (mlift) 側に setter `0x1803debc0` が無く、setter 後の native/wasm bit-exact は未実施 | 受入条件の bit-exact 部 | FA-8 案 (--root 追加) |
-| Compressor/Gain model の同 ID 意味は未調査 | 範囲外 | FA-8 案 |
+| 実 controller map (`C+0x318`, 木ノード = key u16 id → shared_ptr<param>) を構築して `0x180c9d700` を実行し、ID → 実 param の解決先を実測 | 本 issue の主目的 (未達) | #452 に残す (本 PR は Refs)。続編は新規子チケット #648 (FA-8) |
+| macro → 0x157.. が preset DUMP の接続表経由で Filter ID 1〜4 に届くか | 最終説明 | #648 (FA-8) |
+| 型 enum は ctor 既定のみで測定 (`FA_TYPE` で切替可能な実装は入っているが、0x157.. 側の型別実測は未実施) | 弱い一般化 | #648 (FA-8) |
+| wasm (mlift) 側に setter `0x1803debc0` が無く、setter 後の native/wasm bit-exact は未実施 | 受入条件の bit-exact 部 | #648 (FA-8) (--root 追加) |
+| Compressor/Gain model の同 ID 意味は未調査 | 範囲外 | #648 (FA-8) |
