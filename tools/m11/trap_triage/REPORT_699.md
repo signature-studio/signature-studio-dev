@@ -36,14 +36,22 @@ dec_label_pc_8c5ef5_g699:
 - **件数 > 0 の経路は元 IR と一致する**: 件数 > 0 は `dec_label_pc_8c5f23` への枝を取るため、store は通らない。元 IR との差分は末尾 `br` 1 行の置換 (`diff` で確認: `br label %dec_label_pc_8c5f23` → 上記 6 行)。store は専用ブロック `_g699` にだけ置く (前版は分岐の前に置いていたため件数 > 0 でも rdx を上書きした。レビュー指摘 2 の 2 回目)。
 - 分岐条件: `count <= 0` は機械語の `jg` と件数 ∈ [INT_MIN+1, 0] で一致する。**count = INT_MIN のみ不一致**: 機械語は `sub ebx,1` が wrap して `0x7FFFFFFF` と比較し jg が立たず本体を実行、IR は飛ばす。件数は非負の list 長なので本件では到達しないと見なすが、確認はしていない (厳密化 `sub` + `icmp slt` は未実施)。
 - **ガード辺の値**: ガードで飛ばすと、元 IR で `%rax.0.reg2mem`・`%rdx.1.reg2mem` を store するのは `dec_label_pc_8c6034`・`dec_label_pc_8c603f` だけで、飛び先 `dec_label_pc_8c6066` が両方を load する (phi は無い)。このままでは 0 件経路で未定義値になるため、専用ブロックで明示 store する。
-  - **rax.0 := 0 (機械語で確定)**: `8c5f06: xor eax,eax` の後、`8c5f18: jg` まで rax は書かれない (`8c5f08`〜`8c5f15` は rcx・ebx・[rbp+0x4c]・flags のみ)。0 件経路は rax=0 のまま `8c6066` に入る。ただし `8c6066`〜`8c60df` の間で rax は読まれず `8c60df` で上書きされるため、この値が結果に効く経路は無い。
+  - **rax.0 := 0 (機械語で確定)**: `8c5f06: xor eax,eax` の後、`8c5f18: jg` まで rax は書かれない (`8c5f08`〜`8c5f15` は rcx・ebx・[rbp+0x4c]・flags のみ)。0 件経路は rax=0 のまま `8c6066` に入る。
+    - **訂正 (f3e9950 で確認)**: 前版の「`8c60df` で上書きされるため結果に効く経路は無い」は誤り。IR の `dec_label_pc_8c60df` は `ret rax.2` で、rax.2 は `8c6084` で rax.1 (= ガード辺の 0) を受ける。一方、機械語 `8c60df: mov rax,[rbp+0x80]` は [rbp+0x80] を返す。よって 0 件 ∧ arg2 下位 byte == 0 (`8c608b je 8c60df`) の経路では、IR は 0 を返し、機械語は entry の rcx (= [rbp+0x80], `8c5ebd` で保存、`8c5eee` は arg2 下位 byte ≠ 0 の枝でのみ書く) を返す。**ガード辺の rax.0 := 0 は戻り値に届き、この経路で機械語と食い違う。** この食い違いは `8c60df` の戻り値不一致 (§6) の一部で、ガード無しでも再現する (件数 > 0 の経路も同じ)。ガード辺の rax 値は未確定。
   - **rdx.1 := zext(arg2 下位 byte) (未検証の仮定。approve 判断に影響)**: 機械語では `8c5efd: call 8c67a0` の後の rdx は callee 依存。`8c67a0` は中で `8c7c80` を呼び (`mov rdx, rbx` 後), `8c5eda` の `410320` は `call qword ptr [rax-0x30]` (vtable 間接 call、target は IR から決まらない) を呼ぶ。rdx の出力は IR から確定できない。`8c5ee1: movzx rdx, byte [rbp+0x88]` を経由する値として、既存 IR の `8c6071` (`8ca670` 後の rdx を引数 rdx と同じとする) と同じ pass-through 規約に合わせた。**410320 と 8c67a0 が rdx を変えないことは確認していない**。
   - **機械語での確認 (head b47f7f7, capstone 5.0.7, `block00031_PE.bin` を VA 直接逆アセンブル)**:
     - `8c5efd: call 8c67a0` → `8c67a0` は `call 8c5c90` の後 `call 8c7c80` して `ret` のみ (rdx を書かない)。8c5f02 時点の rdx は `8c7c80` の ret 時の rdx と同じ。
     - `8c7c80` の ret 時の rdx は末尾の経路で決まり、`8c7710` の戻り・`40f9e0` の戻り・vtable 間接 call (`call qword ptr [rbx]`) の戻りのいずれかになる。callee 依存で、逆アセンブルだけでは確定しない。
     - 0 件 ∧ arg3 == 0 ∧ arg2 下位 byte ≠ 0 の経路 (`8c608d: call 410360`): `410360` は rdx を読まず、rcx だけ設定して `call qword ptr [rbx-0x50]` (vtable 先) へ rdx をそのまま渡す。vtable 先が rdx を読むかは未確認。したがってこの経路で rdx は参照されうる。
     - **結論: rdx.1 の正しい値は未確定。0 件経路で結果に影響しないことも未証明。** 仮定 `zext(arg2)` は未証明のまま残す。approve 判断に影響する。
-    - 未実施: `410360` の vtable 先 (`[rbx-0x50]`) の特定と、その rdx 読取りの確認。`8c7c80` の全 ret 経路の rdx 解析。
+    - **rdx の由来 (機械語, head f3e9950 で再確認, capstone 5.0.7, `block00031_PE.bin` を VA 直接逆アセンブル)**:
+      - `8c5ee1` で `movzx rdx, byte [rbp+0x88]` (仮定の元) → `8c5efd: call 8c67a0` がこの rdx を上書きする。
+      - `8c67a0`: `call 8c5c90` の後に `mov rdx, rbx` して `call 8c7c80`、`ret`。`8c67a0` 自身は rdx の出力を決めない。
+      - `8c7c80` の ret 経路 (3 本): (a) rsi≠0 かつ `[rdi+0x4c]==0` (`8c7cc4`→`8c7ce8`): rdx は `call 8c7710` の戻り値のまま。(b) `[rdi+0x4c]≠0` (`8c7cc8`〜`8c7ce6`): `call 8c73b0` の後に `call qword ptr [rbx]` (vtable 先)。(c) rsi=0 (`8c7c9e`〜`8c7cbc`): `call 40f9e0` の後に `call qword ptr [rbx]`。(b)(c) の ret 時の rdx は vtable 先が返す値。
+      - `8c5f02`〜`8c608d` の 0 件経路 (`8c5f18 jg` → `8c6066`): rdx への書き込みは無い。`8c6067` の `je 8c6084` (arg3 == 0) で `8c6071`〜`8c607f` (`mov rdx, [rbp+0x80]` を含む) も飛ばす。よって `8c608d` 時点の rdx = `8c67a0` の戻り時点の rdx = 上記 (a)〜(c) のいずれかの戻り値。
+      - `8c608d: call 410360`: `410360` (`410360`〜`410380`) は rdx を変えず、`call qword ptr [rbx-0x50]` (rbx = `*rcx`) へ渡す。**rdx は vtable 先の第 2 引数として参照される。** vtable 先の実体は未特定。
+      - IR 対応: `dec_label_pc_8c6066` は `%rdx.2 = %rdx.1` を経て、`dec_label_pc_8c608d` の `call function_410360(…, %rdx.2)` へ渡す (`fn8c5eb0` 抜粋)。
+      - **結論 (再確認): 参照の有無 = 有り (`8c608d` → `410360` → `[rbx-0x50]` の第 2 引数)。値の由来 = callee 依存 ((a) `8c7710` の戻り、(b)(c) vtable 先の戻り)。`zext(arg2)` の正しさは未証明のまま。** 未確認: `8c7710` の rdx 出力、`[rbx-0x50]` と `[rbx]` の vtable 先の実体と rdx の扱い。
   - **残る未証明の経路**: 0 件 ∧ arg3 (r8) == 0 ∧ arg2 下位 byte ≠ 0 のとき `8c608d: call 410360` の第 2 引数 (rdx) が、この仮定値と一致するか。同経路は `8c608d` まで到達する (arg2 下位 byte = 0 では到達しない)。上記の確認で、この rdx は callee 依存と分かった。未確定のまま残す (§6)。
   - 上記の未証明により、**「unit 56 ok」は件数 0 経路が正しいことの証拠ではない**。unit 56 は survey のラベル (ok/trap) が変わったことを示すだけで、出力の同一性は比較していない。
 - pass は冪等で、`--mode off` が逆変換する (`on → off` で元の IR にバイト一致, `on → on` で無変更を確認)。
@@ -144,7 +152,7 @@ bash m11_e2e.sh                                        # §3-3
 | e2e (`m11_e2e.sh`) の現 head での完走 | RetDec (`[RETDEC]`) が runner に無く `boot5.lift.ll` を作れない。素材 `toolchain-retdec` の指定が要る | 起票依頼 (PM 採番。依頼側で `oc_artifacts` に `toolchain-retdec` を足す) |
 | `docs/DEFECTS.md` の行案 (D1b との関係の判定を含む) | PM 判断 | PM (§5) |
 | ガード辺の rdx.1 の値 (0 件 ∧ arg3==0 ∧ arg2 下位≠0 の `8c608d` 経路) | 仮定 (zext(arg2)) を置いた。410320 の vtable target と 8c7c80 の rdx 出力を確認するまで正しさは未証明 | #718 (`[M11-N35]`) へ追記 |
-| `8c60df` の戻り値不一致 (別件・ガード無しでも再現) | 機械語は `8c60df: mov rax,[rbp+0x80]` で [rbp+0x80] (arg1 / 8c608d の 410360 結果) を返す。IR は `ret rax.2` (`8c608d` の結果も `rax.2` へ store) で、arg2 下位 byte == 0 経路は arg1 でなく rax.1 を返す。戻り値は呼出側で使われる (例: `56fde0`)。今回の 2 呼出しは arg2 下位 byte = 1 のため `8c60df` 経路に入らない。他の呼出しで同経路に入るかは未確認 | 新規 issue (PM 採番) または #718 |
+| `8c60df` の戻り値不一致 (別件・ガード無しでも再現。ガード辺の rax 値もこの経路で戻り値に届く) | 機械語 `8c60df: mov rax,[rbp+0x80]` は [rbp+0x80] (entry の rcx、または `8c6099` で 410360 結果を格納した値) を返す。IR `dec_label_pc_8c60df` は `ret rax.2`。arg2 下位 byte == 0 (`8c608b`) の経路で、IR は rax.1 (件数 > 0 なら 8ca670 結果、0 件ならガード辺の 0) を返し、機械語は arg1 を返す。戻り値は呼出側で使われる (例: `56fde0`)。今回の 2 呼出しは arg2 下位 byte = 1 のため `8c60df` 経路に入らない。他の呼出しで同経路に入るかは未確認 | #718 (`[M11-N35]`) へ追記依頼 (issue 番号確定) |
 | `count = INT_MIN` の不一致 (§1) | 件数の不正値。到達可否は未確認 | #718 (`[M11-N35]`) |
 
 ## 7. 次タスク提案
