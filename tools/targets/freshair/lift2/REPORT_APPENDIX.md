@@ -230,3 +230,21 @@ bash tools/targets/freshair/lift2/lift2_e2e.sh                                  
 - comp 400/400 BIT-EXACT (non-grow 206/206・grow 194/194)・filter BIT-EXACT・fuzz 4 系統 mismatch 0 (各 1200, ERR 0/0)・ABI violations 0・ctrl BIT-EXACT 15/15 (fma0/fma1 とも `ERR native/wasm 1/1 同一 scenario: yes`)・ablation 5 種すべて検出 (comis_noflags 200/200, xmm_args_drop 200/200, xmm_ret_drop 200/200, icall_drop 80/200, cmov_drop 172/200)。
 - 必要な素材: `oc_artifacts: fl-win64 work-liftlib-targets plugins-freshair toolchain-emsdk toolchain-retdec`。
 - 2026-10-14 の再実行試行 (HEAD `7ec97437`): `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk work-m11` では `SlateCore.core_64` が無く、`lift2_e2e.sh` は exit 2 (`ERROR: … SlateCore.core_64 が無い`)。`fl-win64` / `work-m11` の tar 一覧にも `SlateCore` / `Fresh Air` は無い。このため上記 (`3214a40e`) の値は本 HEAD での再実行値ではない。
+
+## 11. FA-13 (#905): kind 別の rep ネガコンと到達の実測 (HEAD `8bc34ed9`)
+
+- 測定 HEAD: `8bc34ed9` (origin/main)。`git diff 3214a40e 8bc34ed9 -- tools/targets/freshair/lift2/` は REPORT_APPENDIX.md のみ (コード不変)。
+- 素材: `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk plugins-freshair` で展開。`fetch.sh` → factory .epf 8 本、`lift2_e2e.sh` の build・run とも通る。
+- 基準 `lift2_e2e.sh` (trap 無し): `RESULT: lift2_e2e ALL PASS`, exit 0, real **79 s**, load 0.36→0.89 (nproc 4, TMPDIR=`$RUNNER_TEMP`)。comp 400/400・filter 400/400・fuzz 4 系統 mismatch 0・ABI violations 0・ctrl 15/15・ablation 5 種検出。
+- 一時版は `h_rep_str` の先頭に `llvm.trap` + `unreachable` を入れ、`kind` で絞って実施。各版の後に `mlift_ops.py` を元の退避コピーから戻し、`cmp` で一致を確認 (CMP_OK, 3 回とも)。
+  | 一時版 (trap を入れた kind) | `build_ctrl.sh` | `run_ctrl.sh 2 5` | 判定 |
+  |---|---|---|---|
+  | 全 kind (`h_rep_str` 全体) | exit 0 (`lifted 1157 funcs`) | exit 1, `ERR native/wasm 1/0 (同一 scenario: NO)`, wasm 0 行 | FAIL (§10.1 と一致) |
+  | `stosb` のみ | exit 0 | exit 1, `ERR native/wasm 1/0`, wasm 0 行 | FAIL |
+  | `movsb` のみ | exit 0 | exit 0, `15/15`, `ERR 1/1 同一 scenario: yes` | PASS (経路未到達) |
+  | `stosw` のみ | exit 0 | exit 0, `15/15`, `ERR 1/1 同一 scenario: yes` | PASS (経路未到達) |
+- 結論:
+  - **受入 1 (`movsb`・`stosw` の実行到達 scenario) は未達**。既定の ctrl 15 本は `stosb` の経路を実行するが、`movsb`・`stosw` の経路は実行しない。`movsb`・`stosw` の到達を示す trace は未取得。
+  - **受入 2 (ネガコン FAIL) は `stosb` と全 kind 版で FAIL を実測**。`movsb`・`stosw` 単独版の FAIL は未確認 (未到達のため)。
+  - 訂正: §10.1 の「`ctrl_rep.json` の rep は ctrl 閉包が実行する」は、kind ごとには成立しない (`movsb`・`stosw` は未実行)。§10.1 の数値は全 kind 版の値として有効。
+- 未解決 (起票先 #692 (FA-11)・既存のため子 issue は起票せず): `movsb`・`stosw` を実行する入力の設計と ctrl (または新 scenario) への追加、その後の `movsb`・`stosw` 単独ネガコン FAIL 化。
