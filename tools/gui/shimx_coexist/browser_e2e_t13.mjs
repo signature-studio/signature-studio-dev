@@ -1,5 +1,5 @@
-// browser_e2e.mjs — shimx×gui 共存 wasm を headless Chrome で走らせ、browserEnv の window.open / File System Access 経路を検査する (#956 / #1159 SHX-T19)。
-//   usage: node browser_e2e.mjs <webdir>   (browser_e2e.sh が webdir を作る)
+// browser_e2e_t13.mjs — shimx×gui 共存 wasm を headless Chrome で走らせ、browserEnv の window.open / File System Access 経路を検査する (#956 / #1159 SHX-T19)。
+//   usage: node browser_e2e_t13.mjs <webdir>   (browser_e2e_t13.sh が webdir を作る)
 //   user activation が要る host 呼出は、ページの #gate を CDP の Input.dispatchMouseEvent (実マウス) で押させる。
 //   exit 0 = 全 PASS / 1 = 判定 FAIL / 2 = 実行エラー / 3 = watchdog
 import fs from "node:fs";
