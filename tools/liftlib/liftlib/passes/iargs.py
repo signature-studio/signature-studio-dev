@@ -183,7 +183,24 @@ def _conv(v, ty, want, tag, name, ins):
     return name
 
 
-def _resolve(binder, mf, mod, reg, C, tag, nm, ins, depth=0):
+def _entry_off(binder, mf, reg, va, depth=0):
+    """va 直前の reg が入口 rsp からの相対アドレスなら、そのオフセットを返す (入口 rsp = 0)。
+    形: `mov rax,rsp` (入口) → `lea rbp,[rax-K]` → reg。判定できなければ None。"""
+    if depth > 4:
+        return None
+    r = binder.root_def(reg, va)
+    if r == ("entry", "rsp"):
+        return 0
+    if r[0] != "def":
+        return None
+    it = mf.insns.get(r[1])
+    if it is None or it.mnem != "lea" or not it.mem or it.mem["index"] or it.mem["rip"] is not None or it.mem["base"] in (None, "rsp"):
+        return None
+    b = _entry_off(binder, mf, it.mem["base"], r[1], depth + 1)
+    return None if b is None else b + it.mem["disp"]
+
+
+def _resolve(binder, mf, mod, reg, C, tag, nm, ins, depth=0, own_params=None):
     """C 直前の reg の値: (token, type) | None。IR 値が無い lea / add-sub imm は合成する。"""
     v = binder.bind(reg, C)
     if v is not None and not str(v[0]).startswith("@@"):
@@ -199,6 +216,14 @@ def _resolve(binder, mf, mod, reg, C, tag, nm, ins, depth=0):
         return None
     w = it.ops[0].size * 8
     ty = "i64" if w == 64 else "i%d" % w
+    if it.mnem == "mov" and it.mem and it.mem["base"] not in (None, "rsp", "rip") and it.mem["index"] is None and it.mem["read"] and w in (32, 64) and own_params:
+        # 入口 rsp+0x28 以上 = 呼出元自身の 5 番目以降の引数 (%arg{k+1}, k>=4)。MS x64 の積み位置。
+        base_off = _entry_off(binder, mf, it.mem["base"], d)
+        off = None if base_off is None else base_off + it.mem["disp"]
+        if off is not None and off >= 0x28 and (off - 0x28) % 8 == 0 and (off - 0x28) // 8 + 4 < len(own_params):
+            pty, pnm = own_params[(off - 0x28) // 8 + 4]
+            if pnm.startswith("%arg"):
+                return (pnm, pty)
     if it.mnem == "mov" and it.mem and it.mem["rip"] is not None and it.mem["read"] and w in (32, 64):
         ins.append("  %s = load %s, ptr inttoptr (i64 %d to ptr)%s" % (nm + "m", ty, it.mem["rip"], tag))
         return (nm + "m", ty)
@@ -335,7 +360,7 @@ def run(mod, img, log=None, stats=None, repair=True):
                     continue
                 if k < len(cur):
                     continue
-                v = _resolve(binder, mf, mod, reg, C, tag, nm_, ins)
+                v = _resolve(binder, mf, mod, reg, C, tag, nm_, ins, own_params=own_params)
                 if v is None:
                     stats["site_unbound"] = stats.get("site_unbound", 0) + 1
                     log.append("iargs call %s@%x: %s unbound (0 を渡す)" % (g, C, reg))

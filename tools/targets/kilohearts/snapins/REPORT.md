@@ -116,11 +116,14 @@ delay closure 142 関数の近似命令は rcpps 4 箇所のみ (すべて 0x180
 
 ## 12. KH-16 (#779): VEX-256 / FMA 語彙の実測 (語彙追加の前段)
 
-語彙は推定で足さず、難 4 本の snap-in 固有 closure (`closures_sets.pkl` の unique) を capstone で全命令走査して決める。再現: `python3 snapins/scripts/vex256_census.py --json work/vex256_census.json` (前提 = `closures.py` と `callgraph.py` の出力)。
+語彙は推定で足さず、難 4 本の snap-in 固有 closure (`closures_sets.pkl` の unique) を capstone で全命令走査して決める。再現手順 (上流の順序・検証起点 commit `a44f819c`・すべて `tools/targets/kilohearts/` から実行): (1) installer 抽出で `work/winpkg/HeartCore.core_64` を作る (素材 = `plugins-kilohearts` の `Kilohearts Offline Installer.zip`。`scripts/extract_installer.sh` の `KH_SRC` 経由、Windows 側は `payload.dat` → `windows.zip/*` → `winpkg/`) → (2) `python3 scripts/rtti_walk.py work/winpkg/HeartCore.core_64 work/rtti_vtables.json` → (3) `python3 scripts/callgraph.py work/winpkg/HeartCore.core_64 work/rtti_vtables.json work/callgraph.pkl` → (4) `python3 scripts/closures.py work/callgraph.pkl work/rtti_vtables.json work/closures.json` (`work/closures_sets.pkl` を出力) → (5) `python3 snapins/scripts/vex256_census.py --json work/vex256_census.json` → (6) `python3 snapins/scripts/vex256_recount.py` (表の数え直し)。依存 = capstone・pefile・numpy。
 
-- **数え方**: unique closure の各関数の全命令を走査し、(a) オペランドに `ymm` を含む命令、または (b) mnemonic が `vf` で始まる命令を 1 件と数える。同一 VA は 1 回。**測定範囲の限界**: (a) は ymm オペランド形、(b) は `vf*` のみ。xmm 形の `vblend*` / `vperm*` は**未計測** (census の filter 外)。
-- **実測 (2026-10-13, HeartCore.core_64 / callgraph 120,856 関数)**: ymm 命令は Convolver 40・Filter Table 40 (Ladder・Slice EQ は 0)。
-- **再計測の状態**: 本 run では `work/closures_sets.pkl` / `work/callgraph.pkl` が runner に無く census を再実行していない。下表は上記実測の値。再計測 (census の生出力の貼付) は次 run で行う (起票先 = #779)。
+- **数え方 (現行 filter)**: unique closure の各関数の全命令を走査し、(a) オペランドに `ymm` を含む命令、または (b) mnemonic が `v` で始まる VEX 符号化命令 (xmm 形を含む) を 1 件と数える。`vex256_census.py` の `total` は **snap-in ごとの重複を含む合計** (同じ VA が複数 snap-in の closure に入ると、その数だけ数える)。VA 一意数はその下の `vex256_recount.py` が出す (本 run は 673)。ymm 命令数 (`ymm-operand instructions`) は filter によらず `ymm` 判定のみで決まる。
+- **測定 commit の表記**: 本節の生出力は commit `f354504c` の filter で取得した (2026-10-13 18:33 UTC・素材 `plugins-kilohearts` 付き run で再現)。`cf7b36a7`→`e0c79165`→`f354504c` の間で filter 条件 (`is_ymm` / `startswith('v')`) は変わっていない (`git show <commit>:…vex256_census.py` で確認)。census・recount・negcon の全生出力は [REPORT_APPENDIX.md](REPORT_APPENDIX.md)。
+- **検証状況 (再現 HEAD `f354504c`・素材 `plugins-kilohearts`)**: `HeartCore.core_64` = 76,642,304 B (sha256 `d55ce8b4…1441e`) ・`rtti_walk` = typedescriptor 6,923 / vtable 付き class 6,307・`callgraph` = 120,856 関数 (7.1 秒)・`closures` = infra 188。`vex256_census.py` rc 0 (0.36 秒)・`vex256_recount.py` rc 0・`vex256_negcon.py` rc 0。closure の飛ばし件数は census・recount とも **0 件** (`skipped … total 0`)。
+- **実測 (`f354504c` の filter・重複込み)**: mnemonic **54** / 合計 **917** / VA 一意 **673** (snap-in 間で共有 244)。ymm 形は **Convolver 40 / Filter Table 40 / Ladder 0 / Slice EQ 0** (計 80)。**vblend\*/vperm\* は xmm・ymm いずれも 0 件** (census の全 `v*` 走査・recount の `[]` で確認)。
+- **ネガティブコントロール (f354504c で再現・素材不要・`snapins/scripts/vex256_negcon.py`)**: 既知の VEX 符号化 7 命令 (合成バイト列、capstone 5.0.7、全バイト消費を assert) に対し、現行 filter は 7 件検出、旧 filter は 3 件検出。旧 filter で漏れるのは `vblendps` xmm / `vblendvps` xmm / `vpermilps` xmm / `vaddps` xmm の 4 件 (新 filter のみ検出)。`vperm2f128` ymm と `vaddps` ymm は両方で検出。これにより「xmm 形 `vblend*` / `vperm*` は 0 件」の否定結果は、filter が当該命令を検出できることを前提に読む。
+- 下表は `f354504c` の生出力 (`vex256_recount.py`) の転記。ymm 形の値 (旧 filter の表と同じ) であり、xmm 形は含まない。
 
 | mnemonic | Convolver | Filter Table | Ladder | Slice EQ | 合計 |
 |---|--:|--:|--:|--:|--:|
@@ -136,9 +139,10 @@ delay closure 142 関数の近似命令は rcpps 4 箇所のみ (すべて 0x180
 | `vfnmadd231sd` (xmm) | – | – | 1 | 1 | 2 |
 | `vfmadd132sd` (xmm) | – | – | 1 | – | 1 |
 
-- **xmm FMA 計 27 件** (Ladder 11 / Filter Table 6 / Slice EQ 10 = 上表の `vf*` 行の合計)。
-- **未解決 (本 PR では未実施)**: ymm 命令の lift (RetDec が ymm を `i256` の `__asm_v*` として出すか、gen_simd の declare 駆動で扱えるか) は未確認。`gen_simd.py` の VEX 別名表は xmm 形のみで、ymm 形の意味 (`vaddps` 等の 8 lane・upper lane 規則) は未実装。`vfmadd*` の scalar 形は既存 `gen_simd.py` で対応済み。xmm 形の `vblend*` / `vperm*` の有無は未計測 (起票先 = #779、census の filter を広げて次 run で測る)。
-- **受入条件の残り**: 語彙追加・既存 14 snap-in のハッシュ不変・語彙ごとの bit-exact テストとネガコン・run_all.sh 再実行は未実施。
+- **xmm FMA (`vf*`) 計 27 件** (Ladder 11 / Filter Table 6 / Slice EQ 10 = 上表の `vf*` 行の合計)。
+- **語彙の対象 (f354504c の census 結果に基づく・PM 判断 2026-10-13 に従う)**: census で `vblend*` / `vperm*` は 0 件と確定したため、#779 の語彙追加対象から外し、**ymm (`vaddps` / `vmulps` / `vsubps` / `vmovaps`・Convolver と Filter Table のみ) と vfmadd 系 (xmm・scalar) に絞る**。
+- **未解決**: ymm 命令の lift (RetDec が ymm を `i256` の `__asm_v*` として出すか、gen_simd の declare 駆動で扱えるか) は未確認。`gen_simd.py` の VEX 別名表は xmm 形のみで、ymm 形の意味 (`vaddps` 等の 8 lane・upper lane 規則) は未実装。`vfmadd*` の scalar 形は既存 `gen_simd.py` で対応済み。
+- **受入条件の残り**: 語彙追加 (ymm)・既存 14 snap-in のハッシュ不変・語彙ごとの bit-exact テストとネガコン・run_all.sh 再実行は未実施。起票先 = #779 (ymm・bit-exact・ハッシュ不変は #779 に残す。#250 LIFTLIB には振らない)。後続: #709 (KH-14) は #779 完了後に着手 (PM が `blocked_by` 登録済み)。
 
 ## 13. KH-6 第 2 弾 (CAB-258 続, 2026-10-11) — rcpps/rsqrtps 実機近似表で Resonator/Stereo/Delay が bit-exact 化
 

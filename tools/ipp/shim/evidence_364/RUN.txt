@@ -1,0 +1,14 @@
+# 受入条件 2 の実測コマンド (AVX-512 対応 Runner: AMD EPYC 9V45 96-Core, 2026-10-13)
+# 素材: oc_artifacts の fl-win64 を $RUNNER_TEMP/fl に展開 (tar --zstd -xf fl-win64.tar.zst -C $RUNNER_TEMP/fl)
+# 比較対象: pre = 1353c62 (置換前), post = fda39c8 (置換後), 各 detached worktree で同一フラグ
+# ビルド (tools/ipp/shim/build_native.sh の shim_ref 行と同一フラグ):
+#   gcc -std=gnu11 -O2 -ffp-contract=off -fno-fast-math -Wall -Wno-unused-function -Wno-stringop-overflow \
+#       -Wno-array-bounds -Wno-maybe-uninitialized -Wno-misleading-indentation -I<tree>/tools/ipp/src \
+#       -o shim_ref <tree>/tools/ipp/shim/test/shim_ref.c <tree>/tools/ipp/ref/pe_load.c \
+#       <tree>/tools/ipp/shim/src/ipp_shim.c <tree>/tools/ipp/shim/gen/ipp_shim_tab.c \
+#       <tree>/tools/ipp/shim/test/tramp_x86_64.c <tree>/tools/ipp/src/ipp_min.c \
+#       <tree>/tools/ipp/shim/fft/*.c <tree>/tools/ipp/shim/fft/pffft/*.c <tree>/tools/ipp/shim/impl/*.c -lm
+# 実行 (DLL = $RUNNER_TEMP/fl/extracted/block24356_PE.bin):
+#   shim_ref err $DLL                       > err_{pre,post}.json
+#   shim_ref cmp $DLL 0xFFFFFFFFFFFFFFFF    > cmp_{pre,post}.json
+# 結果: err 222 件 mismatch 0 / cmp thunk_vs_direct word_diff=0 status_diff=0。cmp_pre/post と err_pre/post は各々 cmp / 一致。

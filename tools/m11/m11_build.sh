@@ -18,7 +18,8 @@ M11_OV_CLASSCREATE="${M11_OV_CLASSCREATE:-0}"   # #419: 1 = m11_ov.c の実験 o
 M11_OV_414AD0="${M11_OV_414AD0:-0}"   # #683: 1 = m11_ov.c の UStrSetLength 版 function_414ad0 (arg1 deref 復元) に切替; 0 = main の LStrSetLength 版 (#134) を使う (既定; closure 退行 7 件が未解決のため)
 M11_FIX_652500="${M11_FIX_652500:-0}"   # #748: 1 = m11_ov.c の function_652500 (*arg1 の 1 段 deref 復元) を有効化; 0 = lift 版 (既定)
 M11_OV_413060="${M11_OV_413060:-0}"   # #944: 1 = m11_ov.c の function_413060 (dest の旧値 deref 復元, D4) を有効化; 0 = lift 版 (既定)。413060 だけを切り替える独立 gate
-CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=$M11_LB_BASE -DM11_OV_CLASSCREATE=$M11_OV_CLASSCREATE -DM11_OV_414AD0=$M11_OV_414AD0 -DM11_FIX_652500=$M11_FIX_652500 -DM11_OV_413060=$M11_OV_413060"
+M11_FIX_535BF2="${M11_FIX_535BF2:-0}"   # #714: 1 = m11_ov.c の function_535c11/535bf2 転記 (IR 未定義 535c2e・境界 535c11 の再現); 0 = lift 版 (既定)
+CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=$M11_LB_BASE -DM11_OV_CLASSCREATE=$M11_OV_CLASSCREATE -DM11_OV_414AD0=$M11_OV_414AD0 -DM11_FIX_652500=$M11_FIX_652500 -DM11_OV_413060=$M11_OV_413060 -DM11_FIX_535BF2=$M11_FIX_535BF2"
 # image 終端 (SizeOfImage 0x18c0000) + LB_BASE が GLOBAL_BASE (0x10000000) 以内であること
 python3 - <<PYEOF
 import sys
@@ -143,6 +144,9 @@ echo "$M11_FIX_652500" > work/ov_652500.stamp
 # M11_OV_413060 が変わったら ov.o だけ無効化 (#944)
 if [ "$(cat work/ov_413060.stamp 2>/dev/null || echo none)" != "$M11_OV_413060" ]; then rm -f work/obj/ov.o; fi
 echo "$M11_OV_413060" > work/ov_413060.stamp
+# M11_FIX_535BF2 が変わったら ov.o だけ無効化 (#714)
+if [ "$(cat work/ov_535bf2.stamp 2>/dev/null || echo none)" != "$M11_FIX_535BF2" ]; then rm -f work/obj/ov.o; fi
+echo "$M11_FIX_535BF2" > work/ov_535bf2.stamp
 cc m11_ov.c work/obj/ov.o work/boot_final3_sigs.h
 cc work/m11_data.c work/obj/data.o
 

@@ -470,6 +470,9 @@ def t16():
     assert ("function_180127550", 0x180127559, "function_180126920", 1) in pre["sites_entry"], pre["sites_entry"]
     st, lg = {}, []
     iargs.run(mod, img, lg, st)
+    # HB-H25: 5 番目の引数 (入口 rsp+0x28) を読む 2 site (1801c162b / 1801c1752) は bind 済み。残る unbound は 1801a3117 (rdx) のみ
+    assert st.get("site_unbound") == 1, st
+    assert not [l for l in lg if "1801c162b" in l and "unbound" in l or "1801c1752" in l and "unbound" in l], lg
     post = iargs.scan(mod, img)
     assert not post["define_short"] and not post["sites_short"] and not post["sites_entry"], post
     ctor = [l for l in mod.func("function_18011d400").blocks[0].lines if "@function_180127550(" in l]
@@ -705,7 +708,36 @@ def t22():
     print("T22 ok (p1 _setcc_value: " + ", ".join("%s=%s" % (k, "復元" if v else "拒否") for k, v in got.items()) + ")")
 
 
+def t23():
+    """[LIFTLIB-11 / #887] canon_alloca_order: 行順・struct の同先頭トークン (tie)・配列の型名で canon 出力が変わらない。"""
+    def fn(rows):
+        return "\n".join(["define void @function_1000() {", "entry:"] + ["  %%%s = alloca %s" % (n, t) for n, t in rows]
+                         + ["  store i32 0, ptr %3", "  ret void", "}"])
+    base_rows = [("3", "i32"), ("4", "i8"), ("5", "{ i32, i8 }, align 4"), ("6", "{ i64, i64 }, align 8"), ("7", "[8 x i8], align 1")]
+    ref = base.canon_alloca_order(fn(base_rows))
+    for perm in ([4, 3, 2, 1, 0], [2, 0, 4, 1, 3], [1, 0, 2, 3, 4]):
+        got = base.canon_alloca_order(fn([base_rows[i] for i in perm]))
+        assert got == ref, (perm, got, ref)
+    # スロット名は番号の昇順に振り直され、型名順 ([ < i < {) で割り当たる
+    lines = [l for l in ref.split("\n") if "alloca" in l]
+    assert [l.split(" = ")[0].strip() for l in lines] == ["%3", "%4", "%5", "%6", "%7"], lines
+    assert lines[0].endswith("alloca [8 x i8], align 1"), lines
+    # struct 同士の tie (先頭 `{`) が入力順に依存しない
+    s_a = base.canon_alloca_order(fn([("3", "{ i32, i8 }, align 4"), ("4", "{ i64, i64 }, align 8")]))
+    s_b = base.canon_alloca_order(fn([("4", "{ i64, i64 }, align 8"), ("3", "{ i32, i8 }, align 4")]))
+    assert s_a == s_b, (s_a, s_b)
+    # 同型 alloca 2 本の行順入替え (store は %4 を指す): 参照先が入力順に依存しない
+    def fs(rows, store):
+        return "\n".join(["define void @function_1000() {", "entry:"] + ["  %%%s = alloca i32, align 4" % n for n in rows]
+                         + ["  store i32 0, ptr %%%s" % store, "  ret void", "}"])
+    t_a = base.canon_alloca_order(fs(["3", "4"], "4"))
+    t_b = base.canon_alloca_order(fs(["4", "3"], "4"))
+    assert t_a == t_b, (t_a, t_b)
+    assert t_a.endswith("  store i32 0, ptr %4\n  ret void\n}"), t_a
+    print("T23 ok (canon_alloca_order: 行順 3 通り・struct tie・配列型名で canon 出力一致, slot は %3..%7 昇順)")
+
+
 if __name__ == "__main__":
-    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t17, t18, t19, t20, t21, t22):
+    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t17, t18, t19, t20, t21, t22, t23):
         f()
     print("ALL UNIT TESTS PASS")
