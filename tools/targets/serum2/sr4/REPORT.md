@@ -103,5 +103,8 @@ RetDec は `movss [rcx+0xc], xmm1` で xmm1 を undef でなく `sext i64 %arg1 
   | d | 期待 fail の osc_setscale を bit-exact+被覆 1.0 に偽装 | pilot gate exit 1 | exit 1 |
   | e | strict gate | 5/56 で exit 1 | exit 1 |
   - 初版の NC-a は定数を +1 ulp (double) だけ変えたが**最終 float 変換で丸められ bit-exact のまま**で、NC 判定側が『mismatch でない』と報告した (= NC の検出力不足を NC 自身が検出)。2^34 に変更。また NC-a/b の初版は `sr4_pilots.py` の出力 dir 未作成で gate が入力不正 exit 2 を返し『FAIL を検出』と誤認した → 期待 rc を厳密化 (gate 不合格は 1・入力不正は 2)。
-- `find tools/targets/serum2 tools/liftlib -type f -size +20M -not -path '*/work/*'` = 0 件。`tools/liftlib/tests/test_unit.py` は T1〜T17 が `work-m6-ott` 等を要するため未実行、T19・T20 (本 PR 追加; main の T18 = ott_judge と衝突したため改名) のみ単独実行 ok。
+- `find tools/targets/serum2 tools/liftlib -type f -size +20M -not -path '*/work/*'` = 0 件。`tools/liftlib/tests/test_unit.py` の全件実行は下記「main 取り込み後の再検証」を参照 (本 PR 初版では T1〜T17 が素材不足で未実行)。
+- **main 取り込み後の再検証** (merge commit `ebba28f`、競合解消 = `test_unit.py` の t18 改名 T19/T20 のみ。素材 `plugins-serum2` `toolchain-retdec` `toolchain-emsdk` `work-m6-ott` `work-liftlib` `work-liftlib-targets` `analysis-ott-binaries` を展開):
+  - `sr4_run.sh --pilot` (`ebba28f`): **109 秒** (初回のため plugins-serum2 installer の展開を含む。load 1 分値 0.27 → 0.91)、exit 0、`PILOT GATE OK (0 expectation mismatches)`、bit-exact 5/56 (本節 3 回計測と同一の pilot 結果)、ネガコン a〜e 5/5 `NC PASS`、`git status -- tools/targets/serum2/out` 空。
+  - `tools/liftlib/tests/test_unit.py` (`ebba28f`): **318 秒**・rc 0・`ALL UNIT TESTS PASS` (load 0.84 → 1.00)。T1〜T16・T18〜T20 ok、T17a ok、T17b は `LL_XRET_LL`/`LL_XRET_DLL` 未設定のため skip (既存の仕様)。T18 = main の ott_judge (#478)、T19 = S1c、T20 = F2 D5 (改名前の PR 側 T18/T19 = 本節の T19/T20)。
 - 範囲外: 実 Serum 2 の host 駆動 (SR-1) での Voice 実行・音声出力・libm 差の dB 評価 (SR-5)・GUI・FX/mod/arp/spectral (§6.1 の残り 3〜5 人月分)・mac 版。
