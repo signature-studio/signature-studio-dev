@@ -40,8 +40,9 @@ nc nc_cmpnltps   simd.c 's/!(x < y)/(x >= y)/'                      # NaN の扱
 nc nc_movmskps   simd.c 's/>> 31)/>> 30)/'                           # sign bit の位置
 nc nc_stosb_len  simd.c 's/memset(a, (int)(u8)b, (size_t)c)/memset(a, (int)(u8)b, (size_t)(c ? c - 1 : 0))/'
 nc nc_movsd_ovlp simd.c 's/if (d <= s || d >= s + (size_t)c \* 4u)/if (1)/'   # 重なり (dst>src) でも memmove にする
+nc nc_add128    simd.c 's/rs\[i\] = x + y;/rs[i] = x - y;/'
 nc nc_min        ll     's/fcmp olt <8 x float>/fcmp ogt <8 x float>/'
 nc nc_ext1       ll     's/lshr i256 \(%[A-Za-z0-9_]*\), 128/lshr i256 \1, 0/'
 nc nc_store128   ll     's/store i128 %new, ptr %p/store i256 0, ptr %p/'
-if [ "$rc" = 0 ]; then echo "[helper_diff] OK: control 0 mismatch / NC 7 件すべて期待通り FAIL"; exit 0; fi
+if [ "$rc" = 0 ]; then echo "[helper_diff] OK: control 0 mismatch / NC 8 件すべて期待通り FAIL"; exit 0; fi
 echo "[helper_diff] FAIL" >&2; exit 1

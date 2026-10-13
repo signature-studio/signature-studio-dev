@@ -13,6 +13,7 @@ declare i256 @__asm_vminps(i256, i256) local_unnamed_addr
 declare i256 @__asm_vmaxps(i256, i256) local_unnamed_addr
 declare i128 @__asm_vextractf128(i256, i8) local_unnamed_addr
 declare void @__asm_vmovaps__9(i128, i128) local_unnamed_addr
+declare i128 @__asm_vaddps__8(i128, i128) local_unnamed_addr
 declare void @__asm_vmovaps__10(i256, i256) local_unnamed_addr
 
 define i128 @w_cmpnltps(i128 %a, i128 %b) { %r = call i128 @__asm_cmpnltps(i128 %a, i128 %b) ret i128 %r }
@@ -87,5 +88,12 @@ define void @t_vstore128(ptr %p, ptr %a) {
   %new = load i128, ptr %a, align 8
   %old = load i128, ptr %p, align 8
   call void @__asm_vmovaps__9(i128 %old, i128 %new)
+  ret void
+}
+define void @t_vaddps128(ptr %a, ptr %b, ptr %o) {
+  %x = load i128, ptr %a, align 8
+  %y = load i128, ptr %b, align 8
+  %r = call i128 @__asm_vaddps__8(i128 %x, i128 %y)
+  store i128 %r, ptr %o, align 8
   ret void
 }

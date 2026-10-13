@@ -25,6 +25,7 @@ void t_vmulps(void*, void*, void*);
 void t_vdivps(void*, void*, void*);
 void t_vminps(void*, void*, void*);
 void t_vmaxps(void*, void*, void*);
+void t_vaddps128(void*, void*, void*);
 void t_vext0(void*, void*);
 void t_vext1(void*, void*);
 void t_vstore256(void*, void*);
@@ -88,6 +89,8 @@ int main(int argc, char** argv) {
         for (int k = 0; k < 8; k++) CHECK(same_f32(o[k], e[k]), #NAME " lane%d a=%08x b=%08x got=%08x exp=%08x", k, a[k], b[k], o[k], e[k]);
         OPT(vaddps, _mm256_add_ps) OPT(vsubps, _mm256_sub_ps) OPT(vmulps, _mm256_mul_ps)
         OPT(vdivps, _mm256_div_ps) OPT(vminps, _mm256_min_ps) OPT(vmaxps, _mm256_max_ps)
+        { __m128 x4, y4, r4; u32 o4[4], e4[4]; memcpy(&x4, a, 16); memcpy(&y4, b, 16); r4 = _mm_add_ps(x4, y4); memcpy(e4, &r4, 16);
+          t_vaddps128(a, b, o4); for (int k = 0; k < 4; k++) CHECK(same_f32(o4[k], e4[k]), "vaddps128 lane%d", k); }
         u8 mv[32]; memset(mv, 0xcc, 32); t_vmovaps(a, mv); CHECK(!memcmp(mv, a, 32), "vmovaps load form");
         u32 h[4] = {0xcc, 0xcc, 0xcc, 0xcc};
         __m128 lo = _mm256_extractf128_ps(x, 0), hi = _mm256_extractf128_ps(x, 1);
