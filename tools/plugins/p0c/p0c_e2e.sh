@@ -34,9 +34,9 @@ python3 "$HERE/verify_table.py"
 echo "== [4] k80 lift (work/k80.lift.ll が無い場合のみ) =="
 if [ ! -f "$HERE/work/k80.lift.ll" ]; then
   if [ ! -f "$HERE/work/k80_ranges.txt" ]; then
-    python3 - "$HERE/work" <<'PY'
+    python3 - "$HERE/work" "$ROOT/work" <<'PY'
 import json, sys, os
-kt = json.load(open(os.path.join(sys.argv[1], '..', 'work', 'kernel_table.json')))
+kt = json.load(open(os.path.join(sys.argv[2], 'kernel_table.json')))
 ranges = ','.join('0x%x-0x%x' % (int(k['va'], 16), int(k['va'], 16) + k['size'] - 1) for k in kt['kernels'])
 open(os.path.join(sys.argv[1], 'k80_ranges.txt'), 'w').write(ranges + '\n')
 print('ranges written: %d kernels' % len(kt['kernels']))
