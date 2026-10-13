@@ -28,6 +28,26 @@ def make_blob(seed, size=BLOB_SIZE, pfrac=0.30):
 
 BLOBS = {'r1': (101, 0.30), 'r2': (202, 0.30), 'r3': (303, 0.30), 'r4': (404, 0.85)}
 
+
+def make_blob_vm(size=BLOB_SIZE):
+    """this 疑似オブジェクト: arena+0x1000 に VMT (arena+0x2000) への fixup ptr。VMT 本体は 0 埋め (未解決 slot は native で fault し比較外)。"""
+    buf = bytearray(size)
+    buf[0x1000:0x1008] = (0x2000).to_bytes(8, 'little')
+    return bytes(buf), [0x1000]
+
+
+def make_blob_u16(size=BLOB_SIZE):
+    """UTF-16 文字列: arena+0x1000 に Delphi UnicodeString ヘッダ (refcnt=1, length) + UTF-16LE 本文 (本文先頭 = arena+0x1008)。"""
+    import struct
+    buf = bytearray(size)
+    text = 'FL Studio 26.1.7 ABC'.encode('utf-16-le')
+    buf[0x1000:0x1008] = struct.pack('<ii', 1, len(text) // 2)
+    buf[0x1008:0x1008 + len(text)] = text
+    return bytes(buf), []
+
+
+SPECIAL_BLOBS = {'vm': make_blob_vm, 'u16': make_blob_u16}
+
 # (name, ptr 位置集合, blob, ptr オフセット加算)
 PATTERNS = [
     ('z', set(), '-', 0, 'zero'),
@@ -39,6 +59,8 @@ PATTERNS = [
     ('pall2', {0, 1, 2, 3}, 'r3', 0x40, 'small'),
     ('q0', {0}, 'r4', 0x80, 'small'),
     ('qall', {0, 1, 2, 3}, 'r4', 0x100, 'small'),
+    ('vm0', {0}, 'vm', 0, 'small'),
+    ('u16', {0}, 'u16', 0, 'small'),
 ]
 PATTERN_NAMES = [p[0] for p in PATTERNS]
 

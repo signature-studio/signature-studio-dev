@@ -241,6 +241,30 @@ OOB `function_414ad0` 系 68 件は `[rbx]` 1 段 deref の IR 脱落 (68 件は
 Actions で [2/4] を 3 回実測: 3 回とも `check_ott.py` exit 0・212 関数 = 一致 38 / 不一致 108 / 実行不能 66 (D1 4 / D2 6 / D3 14 / D4_D5 18 / D6 26)。`pe` は `ANALYSIS_DIR` 経由で解決。
 ネガコン `tests/nc_check_ott.sh` 5/5 PASS。**`liftdiff_e2e.sh` 全体 exit 0 は `fl-win64`・`work-m11` 未取得のため未確認** (#406 受入条件 1 未達)。全文・未解決表: [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §10。
 
+## 12. 被覆拡大 2 パターン (LD-4 / #235、部分達成)
+
+`cases.PATTERNS` に 2 pattern を追加 (`ldlib/cases.py`・`ldlib/session.py`)。どちらも既存 9 pattern の case 生成には影響しない。
+
+- `vm0`: this 疑似オブジェクト。arena+0x1000 に VMT (arena+0x2000) への fixup ptr を置き、0 埋めの VMT を指す。
+- `u16`: UTF-16 文字列 blob。arena+0x1000 に Delphi UnicodeString ヘッダ (refcnt=1, len) + UTF-16LE 本文を置き、本文先頭を引数で渡す。
+
+実測 (m11, sample:800, `--shards 12 --state auto`、base = origin/main 97f28539 / 新 = 本ブランチ):
+
+| 項目 | base (9 pattern) | 新 (11 pattern) |
+|---|---|---|
+| 一致 / 不一致 / 実行不能 | 358 / 212 / 230 | 361 / 229 / 210 |
+| 所要 (batch) | 1m39s (load 0.76) | 1m49s (load 0.31→1.35) |
+
+関数単位の遷移: unexec→match 7 / unexec→mismatch 13 / match→mismatch 4 / match→match 354 / mismatch→mismatch 212 / unexec→unexec 210。
+match→mismatch の 4 件 (0x8445b0・0x6681f0・0xfe8e80・0x528680) は新 pattern (vm0/u16) の case だけが diff/wasm_trap で、既存 9 pattern は変わらない (深部経路の露出)。
+`liftdiff_e2e.sh --m11-only` は exit 0 (単体テスト・unit #18 の 3 検査 PASS・closure 361/229/210)。
+
+**未達 (受入条件)**: 実行不能 2,261 (closure) の内訳の大半 (native fault / null deref) は今回の 2 pattern では解消しない。
+UTF-16 blob は 1 pattern 1 本の固定で、長さや内容の変化を試していない。this/VMT は VMT の slot を埋めないため、仮想 call 先で native が落ちる。
+「native 失敗 RVA からの引数補正」「署名未対応 (vector/struct) の扱い」「状態前提 (InitTable/TLS) の case 生成」は未着手。
+flelift closure (fle_lift.sh 生成物 tools/flelift/work/lift/* が素材に無い) は未実測。
+起票先: 本 issue #235 (部分達成のため Refs)。
+
 ## 11. 比較系の偽陽性 2 類型の修正 (LD-11 / #548、要約)
 
 既知類型との関係: 該当なし (DEFECTS.md の lift 欠陥ではなく比較器側の偽陽性。f2 REPORT §7 起点)。
