@@ -34,7 +34,7 @@ tools/perf/
   build/ott_build.sh      OTT (M10 最終 IR + helper C) を任意 emcc 構成でビルド (ES6 glue, node/Chrome 共用)
   build/ott_matrix.sh     最適化マトリクス 29 変種 / build/wasmopt_matrix.sh  wasm-opt 10 構成 × 3 入力
   build/m5_build.sh       M5 純 SSE カーネル (waveshaper/distortion) 7 構成 / build/m11_build.sh  M11 closure 任意 -O
-  harness/                bench_core(共通) node_one/node_bench, cdp(依存なし CDP クライアント)/server(COOP/COEP,帯域制限)/chrome_bench, ott_worklet
+  harness/                bench_core(共通) node_one/node_bench, cdp(依存なし CDP クライアント)/server(COOP/COEP,帯域制限)/chrome_bench, ott_worklet; x64c_* (§12: bit-exact OTT を node/Worker/実 AudioWorklet で計測), x64c_suite.sh + native/native_bench.* (§12 の 1 コマンド再現)
   huge/                   wasm_dup.py (実 wasm を K 倍に複製), huge_chrome.mjs (scale/cores/hints/limits/funcs/sync/idb/mem/bw/worklet/ottscale/cache)
   report/                 tables_*.mjs (表生成), compress.mjs, key.mjs, env.sh
   results/                *.jsonl (生データ 1.7MB), TABLES.md, env.json, compress.json, wasmopt_m11.tsv
@@ -122,12 +122,12 @@ M5 純 SSE カーネル (128 sample/call, µs): waveshaper O0 2.11 / O2 0.845 / 
 
 ## 5. 未解決・制約
 
-1. **junk 版の LTO 効果 (17×) は bit-exact 版に移らない** (§2.1 で 1.15×)。M5 カーネル (純 SSE) の SIMD 効果は別 (OTT x64c lift には SIMD 化余地なし)。bit-exact 版の Chrome 実測・M11 級 closure での LTO 効果は未測。
+1. **junk 版の LTO 効果 (17×) は bit-exact 版に移らない** (§2.1 で 1.15×)。M5 カーネル (純 SSE) の SIMD 効果は別 (OTT x64c lift には SIMD 化余地なし)。bit-exact 版の Chrome Worker・実 AudioWorklet 実測は §12 で実施 (LTO 1.2×)。M11 級 closure での LTO 効果は未測 (§12 未解決)。
 2. 共有ホスト (loadavg 5〜25/16C): **単発 max に 5〜6 ms の外れ値** (O3+LTO の 4 µs ブロックでも発生)=スケジューラ起因。実 underrun 評価は低負荷+実オーディオデバイスで要再測 (headless は null sink)。
 3. Chrome 自動 wasm code cache は headless で未観測 (headful 未確認)。compilationHints は「無効果」までで機序未解明 (eager/bg/lazybase ヒントで global eager 時 CPU 9.3→5.7 s、wall 2.3→3.3〜4.1 s)。
 4. FLEngine 実体の wasm は未存在: 規模は M11 closure の K 倍複製+x86 サイズ比の**外挿 (推定)**。`-O1/-O2` の M11 は到達可能関数のみ (619〜810 関数, code 44〜53KB) になり比較に使えない。
 5. Chrome 154 (Linux, Zen5) のみ。Firefox/Safari/モバイル CPU (3〜10× 低速想定) は未測。SIMD は AVX-512 機で有利な可能性。
-6. wasm vs native 比 (M3 は crc で 1.3〜1.4×) は OTT では未測 (lift IR の VA 固定が native 側の障壁)。
+6. wasm vs native 比 (M3 は crc で 1.3〜1.4×): OTT x64c 版は `tools/ott/native` の実機械語参照と同一手順で測定可能になり §12 で測定 (旧 RetDec 版 (junk) は未測)。
 7. 動的リンク (MAIN/SIDE_MODULE, PIC 税) 未測定。
 
 ## 6. ユーザ依頼事項
@@ -139,7 +139,7 @@ M5 純 SSE カーネル (128 sample/call, µs): waveshaper O0 2.11 / O2 0.845 / 
 P1 lift ビルド標準を LTO+O3+最小 export に (署名ガード付き) / P2 `__asm_*` を LLVM vector IR へ lowering (SIMD+LTO 両立) /
 P3 AudioWorklet ローダ (bytes transfer・worklet 内 compile・pre-warm・main 側 Module 保持) / P4 lifted VA の低位再配置 (initial 864MiB→数十MB) /
 P5 perf 回帰ゲート (PERF_QUICK を CI) / P6 FLEngine 実 closure の起動〜初回 audio E2E / P7 headful・Firefox・Safari・Android 再測 /
-P8 プラグイン別 module vs 動的リンクの比較 / P9 OTT 機能修復後の RTF 再測 (**node 版は §2.1 で実施済み**; Chrome・低負荷再測が残)。
+P8 プラグイン別 module vs 動的リンクの比較 / P9 OTT 機能修復後の RTF 再測 (**node 版は §2.1、Chrome Worker・AudioWorklet・低負荷・native 比は §12 で実施済み**; M11 級 closure が残)。
 
 ## 8. 再現
 
@@ -243,3 +243,7 @@ e2e: `node tools/perf/loader/loader_e2e.mjs [--reps 5] [--quick]` (Chrome 起動
 | `Date.now()` 1 ms 分解能・null sink (headless)。実デバイスの underrun 計測なし | 初回ブロック < 1 ms は判別不能・実 underrun 未評価 | PERF-P7 (#165: 実機再測) |
 | eager compile + keepModule の効果 (§3 の 481→33 ms) をローダ経由で未再測 | keepModule の採否判断 | 本 issue のコメントで PM 判断 (必要なら子チケット) |
 | `src/index.ts` / `audio.ts` (dummy-worklet) への組込みはしていない | ローダは未接続の部品 | RT / AU 系 (FLEngine 結線時) |
+
+## 12. bit-exact OTT の RTF 再測 — Chrome Worker / 実 AudioWorklet / 低負荷 / native 比 (PERF-P9 / #168)
+
+全文・表・未解決は `REPORT_APPENDIX.md` §12 (検証起点 `1f98990`、再現 `bash tools/perf/x64c_suite.sh`)。結論: **node = Chrome Worker = 実 AudioWorklet (±4%)**、AudioWorklet で 128f 時間超過 0 / 15,000 block、LTO 1.2×、native 実機械語比 3.6〜4.4×。**M11 級 closure での LTO 効果は未測** (`fl-win64` + FLEngine x64c lift が必要 → 新規 `[PERF-P12]` 起票依頼)。

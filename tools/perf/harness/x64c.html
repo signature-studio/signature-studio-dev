@@ -1,0 +1,59 @@
+<!doctype html><meta charset="utf-8"><title>perf x64c bench</title>
+<script type="module">
+window.runWorker = (opts) => new Promise((resolve, reject) => {
+  const w = new Worker('/h/x64c_worker.mjs', { type: 'module' });
+  window.__w = w;
+  w.onmessage = (e) => { if (e.data.type === 'done') resolve(e.data.result); else if (e.data.type === 'err') reject(new Error(e.data.msg)); };
+  w.onerror = (e) => reject(new Error('worker error ' + e.message));
+  w.postMessage(opts);
+});
+window.killWorker = () => { if (window.__w) window.__w.terminate(); };
+
+// 実 AudioWorklet スレッド: SAB カウンタ時計 (x64c_clock.js) で process() 1 回ごとの所要を計測する。
+//   opts: { variant, sampleRate, blocks, chunkBlocks, chunks }
+window.runWorklet = async (opts) => {
+  const { variant, sampleRate = 48000, blocks = 3000, chunks = 20, chunkBlocks = 500, noclock = false } = opts;
+  const out = { env: 'chrome-audioworklet', variant, crossOriginIsolated, ua: navigator.userAgent };
+  const sab = new SharedArrayBuffer(8);
+  const clock = noclock ? null : new Worker('/h/x64c_clock.js');   // noclock: 時計 worker (1 コア spin) 無しの対照。 bench の Date.now 平均のみ
+  if (clock) await new Promise((res) => { clock.onmessage = (e) => { if (e.data.type === 'started') res(); }; clock.postMessage({ type: 'start', sab }); });
+  const ctx = new AudioContext({ sampleRate, latencyHint: 'interactive' });
+  out.ctxSampleRate = ctx.sampleRate; out.baseLatency = ctx.baseLatency; out.outputLatency = ctx.outputLatency ?? null;
+  await ctx.audioWorklet.addModule('/h/x64c_worklet.js');
+  const node = new AudioWorkletNode(ctx, 'x64c-ott', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2], processorOptions: { sab } });
+  node.connect(ctx.destination);
+  const next = (type) => new Promise((res, rej) => { const f = (e) => { if (e.data.type === type) { node.port.removeEventListener('message', f); res(e.data); } else if (e.data.type === 'err') { node.port.removeEventListener('message', f); rej(new Error(e.data.msg)); } }; node.port.addEventListener('message', f); });
+  node.port.start();
+  const [bytes, names] = await Promise.all([fetch(`/w/ott_x64c/${variant}.wasm`).then((r) => r.arrayBuffer()), fetch(`/w/ott_x64c/${variant}.names.json`).then((r) => r.json())]);
+  out.wasmBytes = bytes.byteLength;
+  const lp = next('loaded'); node.port.postMessage({ type: 'load', bytes, names }, [bytes]);
+  Object.assign(out, await lp);
+  await ctx.resume(); out.ctxState = ctx.state;
+  // (1) worklet スレッド上で連続実行 (process() 外) した 1 chunk の区間平均 — 128f 当たり
+  const bp = next('bench'); node.port.postMessage({ type: 'bench', chunks, per: chunkBlocks });
+  out.bench = await bp;
+  if (noclock) {
+    const b = out.bench; b.meanUsPerBlock = b.chunkMs.reduce((x, y) => x + y, 0) / (b.chunkMs.length * b.per) * 1000; b.rtfMean = b.meanUsPerBlock / (128 / sampleRate * 1e6);
+    await ctx.close(); return out;
+  }
+  // (2) 実時間: AudioContext が process() を 128f 周期で駆動する状態での process() 内 x64c 所要の分布
+  const rp = next('rt'); node.port.postMessage({ type: 'rt', blocks });
+  const rt = await rp;
+  // ticks→µs: rt 区間の (カウンタ総進行 / Date.now 総経過) で較正。 dur = process() 内の o.call() 所要、gap = process() 入口間隔
+  const tpu = rt.totalTicks / (rt.wallMs * 1000);
+  const q = (a, p) => { const b = Float64Array.from(a).sort(); return b[Math.min(b.length - 1, Math.floor(p * b.length))]; };
+  const dur = Array.from(rt.dur, (t) => t / tpu), gap = Array.from(rt.gap.subarray(1), (t) => t / tpu);
+  const budgetUs = 128 / rt.sampleRate * 1e6;
+  out.rt = { n: rt.n, wallMs: rt.wallMs, procCalls: rt.procCalls, ticksPerUs: tpu, clockWorkerTicksPerUs: null, sampleRate: rt.sampleRate, budgetUs,
+    durUs: { min: q(dur, 0), p50: q(dur, .5), p90: q(dur, .9), p99: q(dur, .99), p999: q(dur, .999), max: q(dur, 1) },
+    gapUs: { min: q(gap, 0), p50: q(gap, .5), p99: q(gap, .99), max: q(gap, 1), mean: gap.reduce((x, y) => x + y, 0) / gap.length },
+    zeroDur: dur.filter((x) => x === 0).length, overBudget: dur.filter((x) => x > budgetUs).length, over10pct: dur.filter((x) => x > budgetUs * 0.1).length, over1ms: dur.filter((x) => x > 1000).length, over5ms: dur.filter((x) => x > 5000).length,
+    gapOver2x: gap.filter((x) => x > 2 * budgetUs).length, rtfP50: q(dur, .5) / budgetUs, rtfP99: q(dur, .99) / budgetUs, rtfMax: q(dur, 1) / budgetUs };
+  { const b = out.bench; b.meanUsPerBlock = b.chunkMs.reduce((x, y) => x + y, 0) / (b.chunkMs.length * b.per) * 1000; b.chunkUsPerBlock = b.chunkTicks.map((t) => t / tpu / b.per); b.rtfMean = b.meanUsPerBlock / budgetUs; }
+  const sr = new Promise((res) => { clock.onmessage = (e) => { if (e.data.type === 'stopped') res(e.data); }; }); Atomics.store(new Uint32Array(sab), 1, 1);
+  out.clock = await sr; out.rt.clockWorkerTicksPerUs = out.clock.ticksPerMs / 1000;
+  clock.terminate(); await ctx.close();
+  return out;
+};
+window.__ready = true;
+</script>
