@@ -181,7 +181,7 @@ Chrome 154.0.8037.97 headless, Dedicated Worker, `AMD EPYC 9V45 96-Core Processo
 | 2 | 125 | 同上 | 874.7 |
 | 3 | 124 | 同上 | 868.5 |
 
-合成カーネル (§2.4) の 124〜125 本と同じ上限。実 OTT の initial 864 MiB でも Chrome 154 では 124〜125 本で `instantiate` が失敗する。**plugin 数が 124 を超える構成は、Memory を共有するか、Worker を分けるか、低位 base 化 (#91) が必要**。
+合成カーネル (§2.4) の 124〜125 本と同じ上限。実 OTT の initial 864 MiB でも Chrome 154 では 124〜125 本で `instantiate` が失敗する。**plugin 数が 124 を超える構成の対応は [REPORT_P15](REPORT_P15.md) と DECISIONS D10 (同一 Memory への畳み込み) を正とする**。
 
 ### 8.3 結論の更新 (実 OTT の範囲)
 - plugin 別 instance の**定常**は実 OTT でも node / Chrome Worker で ほぼ平坦 (node +2.8%、Chrome +9%・run 間ばらつき内; §7, §8.1)。
