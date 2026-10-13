@@ -26,6 +26,8 @@ from ..regbind import Binder, FuncIndex
 FN_RE = re.compile(r"function_([0-9a-f]+)$")
 CALL_RE = re.compile(r"\bcall\s+(\S+)\s+@(function_[0-9a-f]+)\((.*)\)\s*$")
 W = {"i1": 1, "i8": 8, "i16": 16, "i32": 32, "i64": 64}
+# 高バイト (bit 8-15) は _canon_reg で族の下位 8 bit と同じ正規化を受けるため、合成すると値を取り違える。
+_HIGH8 = {"ah", "bh", "ch", "dh"}
 
 
 def _va(name):
@@ -228,6 +230,8 @@ def _resolve(binder, mf, mod, reg, C, tag, nm, ins, depth=0, own_params=None):
         ins.append("  %s = load %s, ptr inttoptr (i64 %d to ptr)%s" % (nm + "m", ty, it.mem["rip"], tag))
         return (nm + "m", ty)
     if it.mnem == "movzx" and it.ops[1].type == 1 and w in (32, 64):
+        if it._ci.reg_name(it.ops[1].reg) in _HIGH8:
+            return None
         src = _canon_reg(it._ci, it.ops[1].reg)
         sw = it.ops[1].size * 8
         base = _resolve(binder, mf, mod, src, d, tag, nm + "v", ins, depth + 1)
