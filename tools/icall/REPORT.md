@@ -235,3 +235,11 @@ python3 tools/icall/diff/fn3_diff.py 1801a9be0 --n 600 --dump    # native / rout
 
 FMA3 経路 `1801a9be0` を 42/600 → **600/600** (N3: RetDec の `vmovapd xmm→stack` store 落ち、N4: closure 内 direct call の memory-ABI が戻り xmm1 を通さない)、`_handle_errorf` (1801c8cb8) を closure に入れ override 4/4、`1801a9a6c` の rax は呼出し元が読まないため gate は xmm0 のみ。FMA3 経路は gate に昇格。
 結果表・ネガコン・rax 根拠 (`1801a9be0` の rax 不一致 558/600 も含む)・検証 (HEAD `b23593c`・所要・load)・未解決表の全文は `REPORT_APPENDIX.md` §11。再現: `bash tools/icall/icall_e2e.sh`。
+
+## 12. ICALL-16: stack 引数の動的検証 (#1023)
+
+結論・実測表・未解決は `REPORT_APPENDIX.md` §12 (250 行上限のため分割移動)。結論: OTT では stack 引数の値一致を動的に検証できない。起票先 #854 / #229。
+
+## 13. #1026 (ICALL-18): Fresh Air 残落ち 6 件
+
+Fresh Air SlateCore の復元後の残落ち 6 件 (全て vtable 直接 call `call [rax+disp]`、2 関数) を分類。結論と未解決は REPORT_APPENDIX.md §13 (全文)。wasm 実行と native 差分は未実施 (子 issue へ)。

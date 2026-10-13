@@ -237,6 +237,7 @@ OOB `function_414ad0` 系 68 件は `[rbx]` 1 段 deref の IR 脱落 (68 件は
 ## 10. OTT 旧 chain (D1〜D6) の Actions 再現 (LD-8 / #406、要約)
 
 Actions run `38430714782` (head `9cadda79`) で `liftdiff_e2e.sh` (--m11-only なし) を実測・exit 0・`LIFTDIFF_E2E PASS`・ネガコン 5/5 PASS。ログは `results/liftdiff_e2e_run38430714782_9cadda79.log` (commit 済み)。OTT 集計など詳細・ログ抜粋・未解決表: [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §10。
+- 前回比 (LD-16 / #825): OTT 集計の変化 (33/110/69 ↔ 35/112/65) は `ldlib/cases.py` の pattern 追加 (`79584ef7`・9→11 pattern) が原因と実測で切り分け。詳細: [`REPORT_APPENDIX_LD16.md`](REPORT_APPENDIX_LD16.md)。
 
 ## 11. 比較系の偽陽性 2 類型の修正 (LD-11 / #548、要約)
 

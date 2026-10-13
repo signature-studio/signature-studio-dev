@@ -1353,7 +1353,7 @@ def f3c_ir_stores(lines):
 
 
 def fix_f3c_block(fn, fv, rep, ctr):
-    """F3c-block (従来の block-local 門 G1〜G5。挙動は #509 前と同一): 機械語 `mov rD,[rB]` (zero-disp) の読みが IR で消え、
+    """F3c-block (従来の block-local 門 G1〜G5。#509 前と比べ、#736 で読んだ値 rD が同幅で store されない site を見送る `f3c_no_val_store` を追加): 機械語 `mov rD,[rB]` (zero-disp) の読みが IR で消え、
     ベースレジスタ (argN) の値がそのまま store されている形を復元する (_UStrAsg 409ca4 系 = D7 値↔アドレスの別形)。"""
     lines = fn.body.split('\n')
     blocks = fn.blocks()
@@ -1419,6 +1419,21 @@ def fix_f3c_block(fn, fv, rep, ctr):
                 reg_store = True
         if reg_store:
             rep['f3c_reg_store'] = rep.get('f3c_reg_store', 0) + 1
+            continue
+        # #736: 読んだ値 rD そのものが同幅で memory に store されていなければ見送る。
+        # 戻り値 reg へのコピー (`mov rax,rcx`) や call 先 (`call [rbx+0x18]`) は値の store ではない
+        val_store = False
+        for ins in mins:
+            if ins.mnemonic != 'mov':
+                continue
+            try:
+                o0, o1 = ins.operands
+            except Exception:
+                continue
+            if len(ins.operands) == 2 and o0.type == 3 and o1.type == 1 and fv.cs.reg_name(o1.reg) == rD and o0.size * 8 == bits:
+                val_store = True
+        if not val_store:
+            rep['f3c_no_val_store'] = rep.get('f3c_no_val_store', 0) + 1
             continue
         # store の値が argN (生 / trunc / zext) の行を探す
         stores = []

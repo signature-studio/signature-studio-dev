@@ -65,3 +65,31 @@
 
 **未判明**: 各関数が呼ぶ Blend2D API、引数の型、Agg2D のどのメソッドが FL から実際に呼ばれるか。
 lift か C++ 再実装かの判断には、この依存の確定が要る。`trivial_ret` 54 slot は共通スタブの可能性がある (未検証)。
+
+## 6. vtable 各関数の依存 (呼び出し先の推移閉包)
+
+> 再現: `FL_WIN64_DIR=<fl-win64 展開先> python3 tools/shared/oss/blend2d/agg2d_callees.py`
+> (依存: `pefile`・`capstone`)。出力は `tools/shared/work/agg2d_callees.json` (gitignore)。
+> 各 root から直接 call/jmp で到達する内部関数を再帰で辿り、IAT (`call [rip+disp]`) の import を集計する。
+
+| 項目 | 値 | 根拠 |
+|---|---|---|
+| unique root (vtable 関数) | **79** | §5 と同じ |
+| 内部関数の到達数 (全 root の和集合) | **217** | `agg2d_callees.py` |
+| 2 root 以上から到達する内部関数 | **97** | 同上 |
+| 到達数 (root 別) | 1〜83 (中央値 32) | 同上 |
+| import に到達する root | **42 / 79** | 同上 |
+| 到達する import の種類 | **28** (KERNEL32 の名前付き 27 件 + CFG dispatch スロット 1 件) | 同上 |
+
+- 42 root が共通に到達する import: `EnterCriticalSection`・`LeaveCriticalSection`・`HeapAlloc`・`HeapFree`・`GetLastError`・`SetLastError`・`TlsGetValue`・`TlsSetValue`・`LoadLibraryExW`・`GetProcAddress`・`FreeLibrary` と、CFG dispatch スロット 1 件 (下記)。
+- 16 root が共通に到達する import: `RaiseException`・`RtlCaptureContext`・`RtlLookupFunctionEntry`・`RtlVirtualUnwind`・`UnhandledExceptionFilter`・`SetUnhandledExceptionFilter`・`IsProcessorFeaturePresent`・`GetCurrentProcess`・`TerminateProcess`。例外処理・フェイルファスト系の共通経路と読める (**未検証**)。
+- 「exclusive」 (その root だけが到達する内部関数) は大半が **1 (root 自身)**。Agg2D 固有の実装量は小さく、大部分は共有の Blend2D 内部関数に依存している可能性が高い (**未検証**)。
+
+**判明**: 79 root のうち内部呼び出し先を持たない (`reachable_funcs` = 1) のは **34 / 79**、到達数 5 以下は **37 / 79**。到達数の中央値は 32 で、root により差が大きい。2 root 以上から到達する内部関数は 217 中 **97**。
+**未判明 / 制約**:
+- 間接 call (`call reg`・`jmp reg`) は辿れない。推移閉包は**下限**。
+- `unresolved@1801b7308` の正体を特定 (実測): VA `0x1801b7308` は PE load config の **`GuardCFDispatchFunctionPointer`** (Control Flow Guard の間接 call ディスパッチ用スロット)。中身は `jmp rax` の thunk (VA `0x1801b5b90`)。IAT ではない。`call [rip+disp]` で同スロットを呼ぶ箇所は **42 件** (`ff 15` の全走査で確認)。つまり 42 root が到達するのは「関数ポインタ経由の間接 call」で、その先の実体は本スクリプトでは辿っていない。`agg2d_callees.py` は当該スロットを `CFG!GuardCFDispatch` とラベルし直した (旧 `unresolved@` 表記は廃止)。
+- 本スクリプトは線形スイープを行わず、vtable の root から call/jmp で到達する関数だけを集計する。到達しない `.text` 領域は集計外で、全体の網羅は未実施。
+- 「Blend2D API の名前」は特定できていない (export 無し・シンボル無し)。関数の役割 (描画 / パス / 画素処理) は未判定。
+
+**結論**: vtable の規模は確定 (§5)。依存は「共有ヘルパ + KERNEL32 の少数 import」に寄るが、lift 対象の実質規模 (間接 call 込み、関数の役割) は未確定のため、lift か再実装かの決定は本 run ではしない。

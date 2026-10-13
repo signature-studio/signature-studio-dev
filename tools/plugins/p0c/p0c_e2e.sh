@@ -25,10 +25,15 @@ python3 "$ROOT/inventory/kernel_table.py" "$PE"
 git -C "$REPO" diff --quiet -- tools/plugins/lift/kernel_ranges_balance.txt \
   || { echo "[e2e] WARN: lift/kernel_ranges_balance.txt が再生成で変化した"; git -C "$REPO" diff --stat -- tools/plugins/lift/kernel_ranges_balance.txt | cat; }
 
+# kernel_matrix.py の dll_ids() は tools/plugins/work/nsis_blockmap.json を読む (クリーン checkout には無い)。
+# 無ければ PLUGIN_MATRIX.json の win modules から再構成する (f2/mk_blockmap.py。182 行・PE 一意 DLL 181 件)
+if [ ! -f "$ROOT/work/nsis_blockmap.json" ]; then
+  echo "== [1b] nsis_blockmap.json を PLUGIN_MATRIX.json から生成 (f2/mk_blockmap.py) =="
+  python3 "$ROOT/f2/mk_blockmap.py"
+fi
+
 echo "== [2] kernel_matrix.py (work/kernel_matrix.json が無い場合のみ, 数分) =="
 if [ ! -f "$HERE/work/kernel_matrix.json" ]; then
-  # kernel_matrix.py の dll_ids() は tools/plugins/work/nsis_blockmap.json を読む (クリーン checkout には無い)
-  [ -f "$ROOT/work/nsis_blockmap.json" ] || python3 "$ROOT/inventory/blockmap_from_matrix.py"
   python3 "$HERE/kernel_matrix.py" 12
 else
   echo "skip (work/kernel_matrix.json 存在)"
