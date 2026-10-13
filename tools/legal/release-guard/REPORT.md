@@ -66,6 +66,33 @@ deploy 経路: `bash deploy/scripts/deploy.sh --src <dist>` が 05-stage (入力
 
 初版は窓除外条件なしで、実リポジトリの追跡ファイル 1970 files 中 **20 files が誤検知** (`docs/LEGAL.md`、`tools/ipp/shim/fft/pffft/*` の BSD ライセンス文、`tools/python/analysis/mcp/mcp_tools.json` の API 名)。FL 同梱の OSS ライセンス文・API 名と共有される ASCII テキスト窓が原因。ASCII のみの窓を除外して 0/1970 にした。副作用: テキスト資産の**部分**コピーは検出範囲外 (下表)。
 
+## LGL-7: ilmcp 名称 JSON の走査 (#569)
+
+検証起点: コミット 845a0be4 (fix 前の PR HEAD)。素材 = `fl-win64.tar.zst` 展開 3,419,555,130 B / 25,167 files (`tar --zstd -xf` 7.5 s)。deny-list は `release-guard:build --from <展開先>` で生成 (31.4 s / windows 2,067,704 / file sha256 18,351)。
+
+対象は `tools/python/analysis/ilmcp/plugin_catalog.json` (18,545 B) と `highlight_names.json` (649 B)。
+
+| 項目 | 実測 | 定義 |
+|---|---|---|
+| catalog の行数 | 141 | `entries` の要素数 |
+| catalog の一意な名称 | 131 | `entries[].name` の distinct 数 (同名行 10 件を含む) |
+| highlight の名称 | 21 | `names` の要素数 (一意 21) |
+| 両者の一意な名称 | 152 | catalog と highlight は重複なし |
+| catalog 名称の fl-win64 一致 | UTF-8 で 129 / 131、UTF-16LE で 127 / 131、どちらか 129 / 131 | 25,167 files を全走査、名称 1 件でも一致すれば一致扱い |
+| highlight 名称の fl-win64 一致 | UTF-16LE で 21 / 21、UTF-8 で 4 / 21 | 同上 |
+| 未一致の名称 | `Fresh Air`・`Serum 2 FX` (catalog) | FL 側でも未出現 |
+| release guard (2 JSON) | PASS 2 files 19,194 B、exit 0 | `scan --list` |
+| ネガコン (`block24835_PE.bin` 単体コピー) | exit 6 | file 一致 + window 99 件 |
+
+### 件数の注記
+
+PR 初版の「名称 151 件」「catalog 149/151」は再現しなかった。151 の内訳は確認できていない。本 REPORT では上表の定義だけを採る。`entries` 141 件は同名行を含む数で、一意な名称は 131 件。両 JSON の一意な名称は合計 152 件。
+
+### 未実施
+
+- dist 非収録 (`vite build` の dist に `plugin_catalog`・`highlight_names`・`/py/` の文字列が無い) は PR 初版の検証 (HEAD 9f52e7fc、dist 10 files / 432K) の値であり、本 fix では再実行していない。
+- plugins-* と mac 素材からの deny-list は生成していない (前節の範囲外と同じ)。
+
 ## 範囲 / 範囲外
 
 検証範囲: fl-win64 素材由来の deny-list・上記のネガティブコントロール・deploy の stage/release ゲート。

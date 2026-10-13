@@ -254,7 +254,7 @@ zplane (Auftakt / élastique Pro / Metering / Restore)、Chicken Systems (Sample
 
 運用形態を問わず効く緩和策 (技術側で実装できる線引き):
 1. **再配布物にバイナリを含めない**ことを機械的に担保 (公開前に dist を走査し、FL/プラグイン由来のバイト列・資産ハッシュを拒否する「release guard」)。
-   - 2026-10-13 実測 (LGL-7 #569): `tools/python/analysis/ilmcp/{plugin_catalog,highlight_names}.json` (名称 151 + 21 件) は release guard PASS (fl-win64 deny-list、2 files)・`vite build` の dist に含まれない (`/py/` は dev/preview 配信のみ)。ただし名称は FL 由来文字列 (fl-win64 内で 149/151 + 21/21 一致) で、guard は ASCII のみの窓を仕様上除外するため**検出できないのは検出器の設計による**。配布可否の判断は本 guard の PASS では代替されない (法的助言ではない・判断は未決)。
+   - 2026-10-13 実測: ilmcp の名称 JSON 2 件は release guard PASS・dist 非収録。名称は FL 由来文字列を含むが、guard の PASS は配布可否を代替しない (法的助言ではない・配布可否は未決 LGL-1)。詳細は `tools/legal/release-guard/REPORT.md` の LGL-7 節。
 2. Access の許可リストは **本人 (ライセンス保有者) のみ**。複数人に開く場合は各人の個別保有を前提に文書化。
 3. **利用者の登録キー/アカウント情報はサーバに送らず保存しない** (ローカルのみ)。ライセンス stub 方針は 2026-10-10 ユーザ指示により「登録済みとして振る舞う (無条件アクティベーション)」に確定 (§6.0)。ライセンス状態データはローカルでの配置・合成とし、サーバには保存しない。
 4. OSS は upstream から再ビルド、**FL 由来コードと別モジュール (差し替え可能)**、`--enable-gpl` 等を禁止、NOTICE を自動生成。
