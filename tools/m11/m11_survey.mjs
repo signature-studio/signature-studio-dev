@@ -50,6 +50,7 @@ for (let i = 0; i < 942; i++) {
   perUnitCost.push({ i, va, va_bytes: Number(mod._m11_va_used()) - vaUsed0, getmem: Number(mod._m11_probe_count(0)) - gm0,
     freemem: Number(mod._m11_probe_count(1)) - fm0, oom: Number(mod._m11_va_oom()) - oom0, clobber: clob });
   if (Number(mod._m11_va_big()) > big0) bigUnits.push(va + ':' + (err ? 'trap' : 'ok') + ':' + (Number(mod._m11_va_big()) - big0));
+  if (process.env.M11_SURVEY_STACK && process.env.M11_SURVEY_STACK.split(',').includes(String(i))) console.error('[survey][stack] unit ' + i + ' ' + va + (clob ? ' (clobber)' : '') + ': ' + (err ? ((err && err.stack) || err) : 'returned ' + r));
   if (clob) {
     res.clobber++; clobberUnits.push(va); perUnit.push('clobber');
     if (err) mod.__emscripten_stack_restore(sp0);
@@ -70,7 +71,6 @@ for (let i = 0; i < 942; i++) {
   else k = ((e && e.message) || String(e)).split('\n')[0];
   kinds[k] = (kinds[k] || 0) + 1;
   if (!hadOom) kindsNonOom[k] = (kindsNonOom[k] || 0) + 1;
-  if (process.env.M11_SURVEY_STACK && process.env.M11_SURVEY_STACK.split(',').includes(String(i))) console.error('[survey][stack] unit ' + i + ' ' + va + ': ' + ((e && e.stack) || e));
   const m = e && e.stack && /wasm-function\[(\d+)\]/.exec(e.stack);
   if (m) topFrames[m[1]] = (topFrames[m[1]] || 0) + 1;
   if (first.length < 12) first.push(va);
