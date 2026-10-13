@@ -182,7 +182,7 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
 
 ## 12. GUI-12 (#489): headless host の surface 画素 use-after-free (selftest ASan flaky)
 
-既知類型との関係: lift 欠陥ではなく native headless host と shim の free タイミング競合 (`docs/DEFECTS.md` D1a〜D16 に該当なし。`tools/icall/REPORT.md` §4 とも無関係)。検証起点: 実装 commit `6e6c9b7` (クリーン detached worktree で実行)。
+既知類型との関係: lift 欠陥ではなく native headless host と shim の free タイミング競合 (`docs/DEFECTS.md` D1a〜D17 に該当なし。`tools/icall/REPORT.md` §4 とも無関係)。実装 commit `6e6c9b7`。検証起点: HEAD `31bcd9a` (main 取り込み後の PR HEAD。コード差分は同一で、以後の commit は docs のみ)。
 
 - **原因**: render thread (`gui_headless.c` `blit_surf`) が `gui_surf_ptr(id)` で画素ポインタ、`S->surf[id].w/h` で寸法を別々に読み、その間に shim 側 `surf_free` / `surf_resize` が旧画素を即 `free()` していた (ASan: `blit_surf:33` read / freed by `surf_free`)。wasm 共有メモリ経路では free 済み領域も有効なので crash しない (stale 読みは別問題・未対応)。
 - **修正** (`gui_core.c`): surface ごとに不変 `SurfSnap {px,w,h}` を atomic に公開し host は一組で読む。旧画素と旧 snapshot の free は `retire_locked` で「公開時点の `out_ring.tail` を `out_ring.head` が通過する (= host がその変更レコードを消費し終える)」まで遅延し、`surf_flush` / 次の retire で回収する。host に `gui_lock` を取らせない (out ring 満杯時のデッドロック回避; issue 方針案の前者)。ブラウザ host の挙動・PROTOCOL は不変。
@@ -192,14 +192,14 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
 |---|---|
 | 修正前 selftest (`origin/main` 同一コード) 30 回連続 | exit 1 が 2/30 (同一スタック `blit_surf gui_headless.c:33`) |
 | 修正後 selftest 60 回連続 (作業ツリー, 1 run あたり約 4 秒) | exit 1 が 0/60 (load 1.78) |
-| **`gui12_race.sh 50 30` (`6e6c9b7`, クリーン worktree, 所要 240.3 秒)** | **修正後 exit≠0 が 0/50 (UAF 0)** / ネガコン **30/30 が heap-use-after-free** (load 1.90 / 2.13) → PASS |
-| selftest 件数 | 408 passed, 0 failed (従来 406 + GUI-12 stress 2 件: 150 回の create/MoveWindow×2/destroy 後に保留 free が 0 件に回収) |
-| `bpp_golden.sh` / `reach_test.sh` | ALL PASS / reach 11 + adapt 28 passed |
+| **`gui12_race.sh 50 30` (`31bcd9a`, クリーン worktree, 所要 251 秒)** | **修正後 exit≠0 が 0/50 (UAF 0)** / ネガコン **30/30 が heap-use-after-free** (load 2.15 / 1.79) → PASS |
+| selftest 件数 (`31bcd9a`) | 428 passed, 0 failed (GUI-12 stress 2 件を含む: 150 回の create/MoveWindow×2/destroy 後に保留 free が 0 件に回収) |
+| `bpp_golden.sh` / `reach_test.sh` (`31bcd9a`) | ALL PASS / reach 11 + adapt 28 passed (reach_test 内の selftest も 428 passed) |
 
 - **ネガコン**: `-DGUI12_NEGCTL_IMMEDIATE_FREE` (retire を即 free に戻す。`gui12_race.sh` だけが定義) で UAF 30/30。新 stress 節は確率的競合を決定論的に近づけるため、修正前より再現率が高い (修正前 2/30 → ネガコン 30/30)。
-- **範囲外**: `native_e2e.sh` / `e2e.sh` 全体は `/opt/retdec` 不在 (本 run は `toolchain-emsdk` のみ取得) で未実行。Chrome E2E (wasm 経路) も未実行 (本変更は native headless の読み出しと shim 側 free 遅延のみ; wasm でも `SurfSnap` は同じコードが走るため要再確認)。
+- **範囲外**: `native_e2e.sh` / `e2e.sh` 全体は `/opt/retdec` 不在で未実行 (検証 run の素材は `fl-win64` と apt の mingw のみ)。`emcc -c gui_core.c` は `/opt/emsdk` 不在で `31bcd9a` では未再実行 (`6e6c9b7` 時点では OK)。Chrome E2E (wasm 経路) も未実行 (本変更は native headless の読み出しと shim 側 free 遅延のみ; wasm でも `SurfSnap` は同じコードが走るため要再確認)。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | `e2e.sh` 全体 (native_e2e + wasm Chrome) の再実行 | wasm 側で `SurfSnap` / 遅延 free が回帰を起こさないことが未確認 | #489 にコメント (`oc_artifacts: fl-win64 toolchain-emsdk toolchain-retdec` で再実行依頼) |
-| wasm 経路で host が free 済み旧画素を stale に読む可能性 | 画面の一瞬のずれ (crash なし) | #489 にコメント (別チケット候補; 本修正で保留 free の仕組みは入ったので wasm でも旧画素は `head` 通過まで有効) |
+| wasm 経路で host が free 済み旧画素を stale に読む可能性 | 画面の一瞬のずれ (crash なし) | #489 にコメント (別チケット候補; 本修正で保留 free の仕組みは入ったので、wasm でも旧画素は `head` 通過まで有効と推論 (未実測)) |
