@@ -674,6 +674,25 @@ unsigned long long function_410360(unsigned long long inst) {
     m11_vcall(0x41037d, Q(Q(inst) - 0x50), inst);
     return inst;
 }
+
+/* function_413060  VA 0x413060  (System._UStrFromPWCharLen 系: dest: PPointer, src: PWideChar, len: Integer) (#595)
+ * 逆アセンブル: `old := [rbx]` を stack に退避 → len>0 なら [rbx] := 412c20(len), src があれば 409c80(src, new, len*2) / len<=0 なら [rbx] := 0 → 最後に 412d60(&old) で旧文字列を解放。
+ * RetDec は `mov rax,[rbx]` の deref を落とし (D4), stack に dest のアドレス自体を入れた。412d60 がそれを文字列ポインタと見て dest-0x10+8 = dest-8 を refcount として減算するため,
+ * dest = オブジェクト +8 の文字列フィールド (448ee0 → 41c820 → 413060 の経路) では オブジェクト先頭 dword (VMT ポインタの下位) が 1 減り, 410360 が壊れた VMT から [vmt-0x50] を引いた。
+ * 戻り値は元実装では stack 上の old のアドレス (呼出し側は使わない) のため dest を返す。 */
+unsigned long long function_413060(unsigned long long dest, void* src, unsigned long long len) {
+    u64 old = Q(dest);
+    int n = (int)len;
+    if (n > 0) {
+        u64 p = function_412c20(len & 0xffffffffull);
+        Q(dest) = p;
+        if (src) function_409c80((u64)(uintptr_t)src, p, (u64)(long long)(int)((unsigned)n * 2u));
+    } else {
+        Q(dest) = 0;
+    }
+    function_412d60((u64)(uintptr_t)&old, 0);
+    return dest;
+}
 #endif /* M11_OV_CLASSCREATE */
 
 /* ---- #483: TDictionary<K,V> (Generics.Collections) の Add/GetItem が全て「重複キー」と誤判定される原因 3 点の C 転記 ----
