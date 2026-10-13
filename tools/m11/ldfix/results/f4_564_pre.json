@@ -1,0 +1,29 @@
+{
+ "tag": "pre",
+ "f4_fns": 0,
+ "f4_vas": [],
+ "f4_sites": [],
+ "f4_consumer_and": [],
+ "ir_52a7f0_xor_used": true,
+ "ir_52a7f0_ldf4": false,
+ "reg_calls": 2,
+ "util_ret": "0x0",
+ "util_err": null,
+ "classes": [
+  [
+   "TLightweightLayeredControl",
+   -16383
+  ],
+  [
+   "TApplication",
+   -16382
+  ]
+ ],
+ "units_run": 22,
+ "init_count": 23,
+ "icall_miss": 0,
+ "ok": 816,
+ "noproc": 1,
+ "miss": 46,
+ "trap": 79
+}

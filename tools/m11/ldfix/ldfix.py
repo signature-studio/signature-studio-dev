@@ -1346,6 +1346,9 @@ def f4_candidates(fn, fv, rep):
     return out
 
 
+NO_CONSUMER = [False]
+
+
 def fix_f4(fn, fv, rep, ctr):
     cands = f4_candidates(fn, fv, rep)
     if not cands:
@@ -1387,7 +1390,7 @@ def fix_f4(fn, fv, rep, ctr):
     # consumer 復元: RetDec は undef の自由度で `skip = registered && (v == K)` を `icmp eq i1 (v == K), registered` に畳んでいた
     # (v を正しく load しても未登録+不一致で skip が真になる)。`cmp [frame], K; je T` の直後が je T で、
     # `%C = icmp eq iN v, K` → `%oc = icmp eq i1 %C, %X` → `br i1 %oc, label %T` の形のときだけ `and i1 %C, %X` に戻す。
-    for (xname, nxt, addr) in andfix:
+    for (xname, nxt, addr) in ([] if NO_CONSUMER[0] else andfix):
         if not nxt or nxt[0] != 'je':
             continue
         vn = [r for r in ren if r[1] == xname][0][2]
@@ -1418,9 +1421,11 @@ def main():
     ap.add_argument('--report')
     ap.add_argument('--only', help='カンマ区切りの VA (16進) のみ修復')
     ap.add_argument('--dry-run', action='store_true')
+    ap.add_argument('--f4-no-consumer', action='store_true', help='F4 の consumer 復元 (and i1) だけ外す (ネガコン, #564)')
     ap.add_argument('--no-f4', action='store_true', help='F4 (#564) を無効化 (ネガコン / 旧出力との差分確認)')
     a = ap.parse_args()
     only = set(int(x, 16) for x in a.only.split(',')) if a.only else None
+    NO_CONSUMER[0] = a.f4_no_consumer
     text = open(a.infile, errors='replace').read()
     mach = Machine(a.pe)
     rep = collections.OrderedDict()
