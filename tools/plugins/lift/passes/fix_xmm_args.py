@@ -43,6 +43,17 @@ def split_defs(text):
     return head, chunks
 
 
+def insert_after_entry_label(body, stmts):
+    lines = body.split('\n')
+    for i, ln in enumerate(lines):
+        if re.match(r'^[\w.$-]+:\s*(;.*)?$', ln):
+            if any(s.strip() == lines[k].strip() for s in stmts for k in range(len(lines))):
+                return body
+            lines[i + 1:i + 1] = stmts
+            return '\n'.join(lines)
+    return '\n'.join(stmts) + '\n' + body
+
+
 def params_of(header):
     m = re.search(r'\(([^)]*)\)', header)
     s = m.group(1).strip() if m else ''
@@ -118,15 +129,13 @@ def main():
                                     w = xw.get(nm, 32)
                                     ty = 'double' if w == 64 else 'float'
                                     full.append('%s %%in.%s' % (ty, nm))
-                                    bits = '%%in.%s.bits' % nm
+                                    # k80_argfix の参照名 %in.<xmm>.bits (i64) を入口で float/double から定義する
                                     if w == 64:
-                                        b3 = b3.replace('zext i64 %s to i128' % bits,
-                                                        'zext i64 %%in.%s.i to i128' % nm)
-                                        b3 = re.sub(r'(?m)^(\s*)(%[\w.$-]+ = zext i64 %in\.' + nm + r'\.i to i128)$',
-                                                    r'\1%in.' + nm + r'.i = bitcast double %in.' + nm + r' to i64\n\1\2', b3, count=1)
+                                        d = ['  %%in.%s.bits = bitcast double %%in.%s to i64' % (nm, nm)]
                                     else:
-                                        b3 = b3.replace('trunc i64 %s to i32' % bits,
-                                                        'bitcast float %%in.%s to i32' % nm)
+                                        d = ['  %%in.%s.i32 = bitcast float %%in.%s to i32' % (nm, nm),
+                                             '  %%in.%s.bits = zext i32 %%in.%s.i32 to i64' % (nm, nm)]
+                                    b3 = insert_after_entry_label(b3, d)
                                 header, body = set_params(h3, full), b3
                                 rep['fixed'][fname] = {'params': full, 'callers': callers.get(fname, 0)}
                                 added[fname] = full[len(plist0):]
