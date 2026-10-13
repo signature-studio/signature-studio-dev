@@ -131,7 +131,7 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 ## 6. 検証
 
 実行: `ANALYSIS_DIR=$HOME/analysis FL_WIN64_DIR=$HOME/analysis/win64 bash tools/gui/flengine/e2e.sh` (HEAD = `a927ac87`。main `fe53ba30` (#563 = `d6b2940` 取込済) に #571 の merge `e94d6c8a`、重複 step 除去 `a927ac87`。runner 4 vCPU, 3 回直列)。
-前提: 素材 `fl-win64` (`$HOME/analysis/win64` に展開)、`work-m11` (`tools/m11/work/` に展開。e2e は読取のみで、複製 `tools/gui/work/flengine/snap/` 側で使う)、`toolchain-emsdk` (`/opt/emsdk`)、`toolchain-retdec` (`/opt/retdec`)、`apt-mingw` (`x86_64-w64-mingw32-gcc`)、Python の pefile・capstone (runner の system python は PEP 668 で pip 不可のため venv `$HOME/gfvenv` に導入し PATH の先頭に置いた)。`m11_gen_ir2.sh` を素材の `tools/m11/work/` で 1 回実行して `ir_conditions.json` の `ldfix=applied` を作った。
+前提: 素材 `fl-win64` ([WIN64] = `$ANALYSIS_DIR/win64` に展開)、`work-m11` (`tools/m11/work/` に展開。e2e は読取のみで、複製 `tools/gui/work/flengine/snap/` 側で使う)、`toolchain-emsdk` ([EMSDK])、`toolchain-retdec` ([RETDEC])、`apt-mingw` (`x86_64-w64-mingw32-gcc`)、Python の pefile・capstone (runner の system python は PEP 668 で pip 不可のため venv を作って PATH の先頭に置いた)。`m11_gen_ir2.sh` を素材の `tools/m11/work/` で 1 回実行して `ir_conditions.json` の `ldfix=applied` を作った。
 
 | 回 | rc | 所要 (e2e.sh の done) | load 開始 → 終了 | judge | native selftest (`tools/gui/test`) | pe_image parity / e2e | ネガコン |
 |---|---|---|---|---|---|---|---|
