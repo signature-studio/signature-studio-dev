@@ -25,6 +25,7 @@
 | `src/gui_reach.c` ほか | 到達 API ログ (`GUI-REACH` 行 / `gui_reach_json`)、`gui_set_icall_hook`、`-DGUI_NO_K32` |
 | `tools/gui/e2e/` + `e2e.sh` | CDP ドライバ `e2e.mjs`、ページ、1 コマンド E2E |
 | `tools/gui/golden/` | `gen_golden.py` (独立オラクル) と `final.png` |
+| `tools/gui/shimx_coexist/` + `include/gui_hostcall.h` + `src/runtime/gui_hostcall.ts` | shimx との weak/強定義の境界確定と共存リンク検査・host 呼出路 (ShellExecute/ファイルダイアログ/D&D)。#172。結果は `shimx_coexist/REPORT.md` |
 
 ## 2. 検証結果 (全て実測; `bash tools/gui/e2e.sh`)
 | 層 | 結果 |
