@@ -44,7 +44,7 @@ for (const line of lines) {
     w32(P + 0xa118, 0xffffffff); w32(P + 0xa11c, 0xffffffff);
     w64(P + 0x9f98, RG); w64(P + 0x9fa0, RB);
     w64(RB + 0x10, RB + 0x10); w32(RB + 8, 0x40); w32(RB + 0xc, 0x40); w64(RB + 0x18, RET0); w64(RB + 0x20, RET0);
-    w64(C + 0x2d0, C + 0x2d0); w64(C + 0x328, C + 0x2d0);
+    w64(C + 0x2d0, C + 0x2d0); w64(C + 0x328, process.env.FA_ALT9 ? C + 0x2d8 : C + 0x2d0);   // FA_ALT9: native_ctrl.c と同じネガコン (静的分岐強制)
     w64(C + 0x2e0, C + 0x600); w64(C + 0x600, W);
     w64(C + 0x338, C + 0x610); w64(C + 0x610, W);
     w64(C + 0x318, C + 0x2100);

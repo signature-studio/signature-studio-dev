@@ -92,3 +92,34 @@ REPORT §14 の詳細。pass の仕様・結論は REPORT §14 が正本。
 - 正とする pass の決定 (#1030 / PR #1227, PM 判断事項): 正は `l1_restore.py` (#1226)。PR #1227 の別 pass `serum2_l1.py` と `authstub/l1_restore.py` は撤回。理由: (1) 同じ `br` を書き換えるため両方適用は `二重適用` で失敗する。(2) 0x1800c2f05 の `call [[rcx]+0x30]` は `icall.py` が間接呼出し `call [reg+off]` に適用する規則と同じく `__icall_dispatch(site_va)` へ落とすのが本パイプラインの扱いで、撤回した pass が出す `@__vcall_notify` は定義が無くリンクできない。(3) 撤回した pass の実測 (census) は本 pass の値ではないため REPORT から外した。覆す場合は PM が決め、`__vcall_notify` の定義と #228 の ABI との整合を先に示す。
 - 既存の子 issue への紐付け (2026-10-13 時点の状態): census 拡張 (受入 2 の IR 側指標) は #1029 [SR-13] で、PR #1205 (`Closes #1029`) により完了・closed (merge commit `9d1c632f`、本ブランチは取り込み済み)。復元 pass の前後表・ネガコンの正式化 (受入 2〜3 の残り) は #1030 [SR-14] (open)、LF 規則の導出は #1213 [SR-11] (open、`1007-sr-11-authstub-binding`)、global 名の規則化は #1208 [SR-15] (open)。
 - LF 束縛の詳細 (REPORT §14 旧版の LF5/LF6/LF7 節): `fp_bind.bind_load_slot_at(lines, fn, va, expect_slot, glob, tag)` で束縛。slot は IR 行 (`%stack_var_<slot>`) から読み、`expect_slot` (`'-72'`/`'-80'`/`'-152'`) と不一致なら `SystemExit` で失敗する (照合)。slot 値・global 名は literal のまま (導出は #1208 / #1213)。LF4 の定数は `verify_lf4_const.py` で PE 上の定数と IR の値の一致を確認 (`LF4 const OK`, 11.00001・bits 4622382073171892366)。機械語の slot 参照は IR の slot 名と一致しない (例: 機械語 `[rbp-0x10]` ↔ IR `stack_var_-72`) ため、slot は IR 行を正とした。ネガコン: `negctl_slot.py` (rc 0 = 全条件一致。誤 slot 期待 `-80` → FAIL、誤 VA `0x1800c2c95` → FAIL)。
+
+## 15. LF 束縛先 global の役割導出の詳細 (#1208 / SR-15)
+
+- 方式: `authstub_irpass.derive_role(lines, fn, name, tag)` が、束縛 site の load 結果 (SSA 名) の**全使用行**を分類する。分類は 3 種のみ:
+  - `tag_len`: `icmp eq i64 <v>, <即値>` (tag 文字列の長さ比較)
+  - `dom`: `call i64 @function_…(i64 <v>, ptr getelementptr … @global_var_…)` の第 1 引数 (key 検索) または `inttoptr i64 <v> to ptr` (デリファレンス)
+  - `dbl`: `@__asm_ucomisd…(i128 <v>, …)` の被演算子
+  - `zero`: `@__asm_xorpd(<v>, <v>)` は 0 を作る idiom のため役割に数えない
+  分類外の使用が 1 件でもある、または役割が 2 種以上、または使用 0 件なら `SystemExit` (fail-closed)。同じ LF の複数 site は全て同一役割でなければ失敗する。
+- 役割 → global の対応は `ROLE_GLOBAL` (`dom`→`__authstub_doc_root`、`tag_len`→`__authstub_str_len0`、`dbl`→`__authstub_dbl_ret0`) の 3 行。`liftfix_report.json` の `roles` に導出結果を書き出す。
+- 導出結果 (`work/liftfix_report.json`・HEAD `87cb462b` 実測):
+
+| LF | 機械語 VA (site 数) | 導出した役割 | 束縛先 global | 根拠 (IR の使用) |
+|---|---|---|---|---|
+| LF1 | ctrl 0x1800c2c1f (1) | tag_len | `__authstub_str_len0` | `icmp eq i64 %36, 10` |
+| LF2 | DSP `%3 = xor` (1) | dbl | `__authstub_dbl_ret0` | `__asm_ucomisd(%3, …)` (`xorpd` 1 件は zero として除外) |
+| LF3 | DSP 0x18004fe46 (1) | dbl | `__authstub_dbl_ret0` | 比較前の ucomisd 被演算子 |
+| LF4 | DSP 0x18004fe4c (1) | dbl | `__authstub_dbl_ret0` | `__asm_ucomisd__1(%3, …)` |
+| LF5 | ctrl 0x1800c2c94, 0x1800c2ca4 (2) | dom | `__authstub_doc_root` | 第 1 引数 + `inttoptr` デリファレンス |
+| LF6 | DSP 0x18004fbc6, 0x18004fbd6 (2) | dom | `__authstub_doc_root` | 同上 |
+| LF7 | DSP 0x18004fb74 (1) | tag_len | `__authstub_str_len0` | `icmp eq i64 %28, 9` |
+
+- 機械語 site の総数 9 (LF2 は `xor` 行なので VA ではなくパターン指定)。束縛行の数 (`LIFTFIX` タグ付き行): LF1 1 / LF2 1 / LF3 3 / LF4 6 / LF5 2 / LF6 2 / LF7 1。
+- **出力不変**: 変更前後で `patched_base_lf.ll` / `raw_base_lf.ll` は `cmp` で完全一致 (sha256 `c62d9316…8793` / `79ab30ca…0d20`、REPORT §12-§14 と同じ)。
+- **ネガコン (e2e)**: 役割→global 対応を故意に誤らせ (`tag_len`→`__authstub_doc_root`)、同じ harness をビルドして実行 → **12/23 PASS** (正しい対応は 23/23)。対応の誤りが harness で検出されることを確認。
+- **ネガコン (導出単体)**: `negctl_role.py` — 正例 3 件 (tag_len / dom / dbl) → 一致。負例 3 件 (役割混在 / 未分類 1 件 / 使用 0 件) → 全て SystemExit。rc 0。
+- **実測 (commit `87cb462b`・コード変更の最後の commit)**: `bash e2e.sh` cold (work 削除後) = **36.33 s** (real) → 23/23 PASS、load 0.19→0.55。warm = **5.52 s** → 23/23 PASS、load 0.08→0.15。素材: `plugins-serum2` の `Serum2_win64.vst3` sha256 `501e7bb3…5283` 19,236,864 B (展開後に一致確認)。baseline (変更前 HEAD `f7bebc7b`) は cold 36.27 s / 23/23 PASS / load 0.28→0.63 (同条件)。
+- コード差分: `git diff f7bebc7b 87cb462b -- tools/targets/serum2/license/authstub` → `authstub_irpass.py` +109/-15 行 (役割導出), `negctl_role.py` 新規 64 行。他ファイル無変更。
+
+- #1208 の受入条件 3 点は全て達成。範囲外の残り (起票なし・非ブロッカー): (1) `expect_slot` (-72/-80/-152) は照合用の literal のまま。slot 値そのものの導出は未実装。(2) 役割→global 対応 `ROLE_GLOBAL` は手書きの 3 行 (harness C が定義する名前に一致させるため)。
+- 関連: #1213 [SR-11] (slot 照合の追加) は既に MERGED。

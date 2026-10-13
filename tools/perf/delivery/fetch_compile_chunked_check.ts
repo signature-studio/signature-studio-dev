@@ -24,10 +24,21 @@ for (const compile of ["streaming", "bytes"] as const) {
     compile,
     onProgress: () => { progressCalls++; },
   });
-  const inst = await WebAssembly.instantiate(module, {});
-  const f0 = (inst.exports as { f0: () => number }).f0();
-  console.log(`${compile}: ${(performance.now() - t0).toFixed(1)} ms f0=${f0} exports=${WebAssembly.Module.exports(module).length}`);
-  if (f0 !== 42) throw new Error(`f0=${f0}`);
+  // 実 wasm (flelift 産物) は env/wasi の function import を持つ。no-op stub で instantiate する。
+  // function 以外の import は stub できないので、黙って LinkError にせず明示的に落とす
+  const imports: Record<string, Record<string, unknown>> = {};
+  for (const i of WebAssembly.Module.imports(module)) {
+    if (i.kind !== "function") throw new Error(`unsupported import kind=${i.kind} ${i.module}.${i.name}`);
+    (imports[i.module] ??= {})[i.name] = () => 0;
+  }
+  const inst = await WebAssembly.instantiate(module, imports);
+  const exps = WebAssembly.Module.exports(module).length;
+  // 合成 wasm のみ f0 (() => 42) を持つ。実 wasm は f0 を持たないので null とし、f0 の判定は行わない
+  const hasF0 = typeof (inst.exports as { f0?: unknown }).f0 === "function";
+  const f0 = hasF0 ? (inst.exports as { f0: () => number }).f0() : null;
+  console.log(`${compile}: ${(performance.now() - t0).toFixed(1)} ms f0=${f0 ?? "null"} exports=${exps}`);
+  if (exps <= 0) throw new Error("exports=0");
+  if (hasF0 && f0 !== 42) throw new Error(`f0=${f0}`);
 }
 console.log(`progress callbacks=${progressCalls}`);
 srv.close();

@@ -99,3 +99,34 @@ distinct (rax, path) = 109 / IDs = 256。WATCH 番地の到達 (`hit`) は次の
 | 未収載 ID (25, 54, 64, 88, 96, 101, 128 ほか) の応答確定 | 受入条件 2 | #1222 (PLG-P0b-3) |
 | 未マップ領域の 0 埋め仮定 (§3.3) の実値確定 | 経路判定の信頼度 | #1222 (PLG-P0b-3) |
 | Phase A 回帰の再実行と `hs_e2e.sh` の判定修正 | 受入条件 3 | #196 作業 4 (既存 issue) |
+
+## 6. #1222 (PLG-P0b-3) の実測追記
+
+本節は #1222 の run で追加した事実のみ。受入条件 1・2 の応答値は**未確定**、3 は**未実施**。
+
+### 6.1 callee の機械語解釈 (`hs_callee_disasm.py`・block00031 の VA)
+
+| VA | 機械語から読めた役割 | 戻り値 (rax) |
+|---|---|---|
+| `0x412d60` | `[rcx]` の参照を外し (`lock xadd` で減算)、0 になれば `0x409440` で解放。最後に `rax=rcx` (引数の値) を返す | 引数ポインタ (rcx) |
+| `0x412e40` | `edx` 個の配列要素それぞれに `0x412d60` と同じ参照解放を行う | 未確認 (末尾の rax 設定は本 run で未読) |
+| `0x416230` | `[rdx]` (型タグ byte) を `cmp`/`sub` の連鎖で分岐 (`0x0e`・`0x0a`・`0x0b` 等が判定に現れる) | 未確定 (分岐先ごとに異なる) |
+| `0x86c900` | `[rbx+0x1d0]` (callback) があれば `[rbx+0x1d8]` を渡して呼び、結果が 0 なら `[rbx+0xa4]` があれば `0x617920` の結果で補う | callback 結果、無ければ `0x617920` (`[rbx+0x45c]` を読む。`0x6178e0` は未確認) |
+| `0x409440` | `rcx != 0` なら `[rip+0xf9c844]` の関数を呼び、非 0 なら `0x409730` (解放) | 未確定 |
+
+注意: `0x409440` の `call qword ptr [rip+...]` の先と、`0x416230` の分岐先ごとの戻り値は本 run では未確認。
+
+### 6.2 既存エミュレータの限界 (変更なし)
+
+- 測定 commit: 0eb3c961。`git diff 481eb2d7 HEAD -- tools/plugins/framework/hostshim` は追加 2 ファイル (`REPORT_DISPATCHER.md` +31・`hs_callee_disasm.py` +37 新規)。`git diff 0eb3c961 HEAD -- tools/plugins/framework/hostshim` は `hs_callee_disasm.py` +3 (範囲外 VA の WARN 出力のみ・逆アセンブル結果は不変) と本行の追記のみ。測定対象の `hs_disp_emu.py`・`hostshim.c` は 0 行。
+- 今回の run で `hs_disp_emu.py` を全 256 ID で再実行: exit 0 / 256 件 `stop=ended` / distinct (rax, path) = 109 /
+  unmapped 61 ID・5,340 件 (§3.3 と一致)。wall・load は未計測 (本 run では集計のみ)。
+- 未収載 ID 25/54/64/88/96/101/128 の個別 (rax, leaf) は未取得。callee 戻り値 0 代替のため、
+  §6.1 の解釈を使って応答値へ写す作業が残る。
+
+### 6.3 未実施 (受入条件 3)
+
+- Phase A (`hs_e2e.sh`) は `tools/plugins/work/fw/fw_flat4_canon3.ll` ほか framework stage-2 の生成物を要求する。
+  素材 `work-fw-stage1` は stage-1 (`fw_icall.dll`・`fw_map.json`・`fw[0-7].restored.ll`) のみで、stage-2 は `fw_stage2.sh` での再生成が必要。
+  本 run では時間内に完走できないため未実施。
+- `hostshim.c` の応答表は変更していない。
