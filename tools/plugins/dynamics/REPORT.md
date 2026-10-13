@@ -112,8 +112,17 @@ P0c (`p0c/REPORT.md`) で見た各 kernel の現状 (本 PR では再測定し�
 | 19252 Transient | 0 | 551 | 2 / 522 (165 B) | 0 (既定の `PLUG_F80_LOWER=1` で 1 → 0) | 59 | **0 (成功)** (旧 1 失敗) | — (不要) |
 | 19048 Multiband | 0 | 1,504 | 210 / 1,658 (22,916 B) | 0 | 34 | 1 (失敗) | **0 (成功)** (`engine_fixcmp.py` の i32 修正後) |
 
-- 2026-10-14 実測 (HEAD `29f63707` + 本 PR の差分、`engine_lift.sh` 単独実行、各 17 s / 60 s)。 未実装 helper の列は `e.simd.log` の `unimplemented N` の値。 旧表の 66 (57) / 39 (31) は distinct 宣言数で数え方が違うため直接比べない。
-- 受入条件の判定: `emcc -c` rc 0 は 2 本とも達成。 f80 関数 0 も 2 本とも達成。 未実装 helper 宣言 0 は**未達** (59 / 34)。 VEX helper 未実装の対応は子 issue へ (下記)。
+- 2026-10-14 実測 (測定 commit `711d9ece` = 本 PR の差分、`engine_lift.sh` 単独実行、Transient 14 s / Multiband 50 s)。 未実装 helper の列は `e.simd.log` の `unimplemented N` の値。 旧表の 66 (57) / 39 (31) は distinct 宣言数で数え方が違うため直接比べない。
+- 未実装 helper の内訳 (`m11_simd2.py`、`tools/plugins/lift/passes/`)。 VEX 形 (`v*`) は同名 SSE 形へ委譲 (dst 上位は src1 由来で SSE 形の a 由来と一致する扱い) したうえで、cvt 2 オペランド形・`cvtpd2dq`/`cvttpd2dq`・`pmovsxdq`・`rep_movsb_memcpy`・`rep_stosw_memset`・`int`/`int3` (到達で abort) を追加した。
+
+  | engine | 変更前 (HEAD) | 変更後 (711d9ece) | 残件 |
+  |---|--:|--:|---|
+  | 19252 Transient | 59 | 12 | `movntps` (store, 値のみ渡る) / `vmovsd` store 形 / `vucomisd`・`vcomisd` (flag 未モデル) / スカラー FMA 8 種 |
+  | 19048 Multiband | 34 | 6 | `movntps` / スカラー FMA 5 種 (`vfmadd213sd`・`vfmadd231sd`×2・`vfnmadd132sd`・`vfnmadd231sd`) |
+
+- 生成 helper C (`*_simd.c`) は両 engine とも `msimd11_core.h` と合わせて `emcc -c` rc 0 (`work/dynamics/simdchk/`)。 `e.final.ll` の `emcc -c` だけでは helper 側の型不整合は測れないため、この確認を別に行った。
+- 受入条件の判定: `emcc -c` rc 0 は 2 本とも達成。 f80 関数 0 も 2 本とも達成。 未実装 helper 宣言 0 は**未達** (12 / 6)。 残件は下記の子 issue へ。
+- 既知の限界: `ucomis`/`comis` の SSE 形は従来どおり `(void)a; (void)b;` で flag を反映しない (`m6 ir6 [P1]` 相当は未移植)。 本 PR はこれを変えていない。 `movntps`・`vmovsd` store・FMA の意味は未確定で stub のまま。
 
 - `.pdata` で define 無し = `function_<開始VA>` の define が final.ll に無い range 数 (`engine_defs.py`。 分母は `.pdata` 関数数、括弧は欠けた range の合計長)。 19048 は 210 件のうち 67 件が call 先として `declare` だけ残り、link 時に未解決になる。
   19252 の 2 件は参照なし。 原因 (RetDec の関数境界統合 / 復号失敗) は未調査。 逆に range 内部に別 define が増えた件数は 19252 で 29、19048 で 54。
