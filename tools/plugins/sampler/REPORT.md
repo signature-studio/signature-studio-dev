@@ -69,6 +69,13 @@ framework 共通ハッシュ (13 DLL 以上) でない `.pdata` 関数 (`lift/pl
 - 含意: MATRIX の `lift.closure_*` は「vtable override の直接呼出閉包」であり、Eff_Render / Gen_Render が間接呼出で到達するプラグイン内クラス (Slicex 289 / Soundfont Player 842 関数など) を含まない。 見積の再検討と推移閉包の lift は §7 の新規起票対象。
   dynamics (#506) の 7 本にも同じ制約があるが、そちらは未測定。
 
+## 2b. 推移閉包 (#537): データ参照あり関数を root に足した lift — 全文は `REPORT_INDIRECT.md`
+
+- **結論**: §2 のデータ参照あり関数 (1,437 関数 / 478,062 B) を root に足した推移閉包は **7 本計 3,623 関数 / 1,344,182 B** (§1 の閉包の 3.55 倍 / 2.59 倍。 非共通に占める割合は関数 56.0 % / B 51.9 %)。
+  lift は 7/7 通過 (lift_rc 0 / `emcc -c` rc 0 / f80 0、range 欠落 0)。 `lea [rip+X]` で開始 VA を取る 153 関数 / 38,656 B は root 未収載で、推移閉包もなお下限。
+- 検証 (HEAD 0f50a1b): `indirect_e2e.sh` 3 回 exit 0 (141 / 139 / 138 s)・`indirect_nega.sh` NC0–NC7 全て期待通り (19 s)。 再現: `bash tools/plugins/sampler/indirect_e2e.sh` / `bash tools/plugins/sampler/indirect_nega.sh`。
+- PLUGIN_MATRIX / 見積 (57.5 人日) は書き換えていない (影響の記録は付録。 PM 判断)。
+
 ## 3. host 呼出面 (閉包内の Dispatcher ID / host vtable slot)
 
 `inventory/host_calls.py` の taint 追跡 (`Host=[this+0xbc]` → `vt=[Host]` → `call [vt+disp]`、ID = 直前の `r8` 即値) を閉包 ranges 内の関数に限定して集計 (`closure_facts.py`)。 slot0 = Dispatcher。
@@ -189,7 +196,10 @@ NC4 は #506 の reviewer が再現した「不合格行を追記しても exit 
 |---|---|---|
 | 差分試験 bit-exact (出口条件)。 Eff_Render 単位の native / wasm harness が無く、P0a/b/c が OPEN | #208 を閉じられない | #195 / #196 / #197 の完了後に #208 を再開 (Closes はその時)。 harness は #506 の REPORT §6 が提案した「[PLG-F3a]」と共用 (PM 判断) |
 | Render test .flp の E2E (FL Keys / FPC / Granulizer / Slicer / Slicex / GMS の RT 列 Y) | 同上 | FLEngine 統合待ち。 親 #14 / #208 |
-| 閉包外の固有関数 (§2): 推移閉包を含む lift と見積の再計算 | 見積 57.5 人日の前提・wasm リンク | 新規 #537 [PLG-G3-3] (起票済み)。 dynamics #200 / PR #506 にも同じ制約があるため #200 にコメント |
+| 閉包外の固有関数 (§2): 推移閉包を含む lift と見積の再計算 | 見積 57.5 人日の前提・wasm リンク | **#537 で推移閉包の算出と lift (7/7) は完了 (§2b)**。 見積の書き換えは PM 判断。 dynamics #200 / PR #506 にも同じ制約があるため #200 にコメント |
+| 推移閉包でもなお total 外の非共通関数 2,846 関数 / 1,247,120 B (うち `lea [rip+X]` 参照 153 関数 / 38,656 B) の到達性 | 閉包は下限のまま | #537 (Refs)。 lea 経路を root に足した版は新規子チケット案 (本 PR では未起票: 受入条件外) |
+| 推移閉包 (total) の host 呼出面・kernel 依存 (`closure_facts.py` は base のまま) | §3・§4 が base 限定 | #537 (Refs)・#196 / #197 への入力として total 版が必要 |
+| `closure_indirect.py` の dynamics (#200 / PR #506) 等への適用 (受入条件 4) | 他ファミリの閉包も過小の可能性 | #200 にコメント (未検証)。 `plugin_closure.py` の仕様変更は不要だったため退行確認の対象なし |
 | `rep_stosb_memset` 未実装 stub (Granulizer / Slicer 各 1 call site) | silent な memset 欠落 | 新規 #538 [PLG-G3-4] (起票済み) |
 | C++ engine / 単体 DLL 2 本の `emcc -c` 未通過 (E1・dangling use・`zext 0 to i64`)、未実装 helper 215 / 151、f80 2 / 1、RetDec C バックエンドの規模耐性 | Slicer 2 (T3) の engine、GMS (T3) | 新規 #540 [PLG-G3-2] (起票済み) (同型: #523 [PLG-F4-2]・#527 [PLG-F5-2]) |
 | engine 内の f80 関数 (Slicer 2 engine 2 / GMS 1) | engine の wasm 化 | #197 (`f80_lower.py` の適用) にコメント |
@@ -216,4 +226,5 @@ NC4 は #506 の reviewer が再現した「不合格行を追記しても exit 
 | `sampler_engines.sh` `engine_lift.sh` `engine_ranges.py` `engine_defs.py` `engine_fixcmp.py` `lift_from_ll.sh` | engine / 単体 DLL の全 `.pdata` lift・欠落監査・局所修復・RetDec 後段のみの再開 |
 | `sampler_nega.sh` | ネガティブコントロール NC1–NC7 (§6) |
 | `closure_facts.py` `matrix_check.py` `ids_crosscheck.py` `unreached_unique.py` `report_tables.py` | 閉包 / host / kernel / engine 外形 → `facts.json` / `PLUGIN_MATRIX.json` 突合 / Dispatcher ID の別算法検算 / 閉包外の固有関数 / 表の機械生成 |
+| `closure_indirect.py` `indirect_lift.sh` `indirect_defs.py` `indirect_e2e.sh` `indirect_nega.sh` `REPORT_INDIRECT.md` | #537: 推移閉包の算出 (4 検査) → lift → 判定 (`judge.py shells` + range 欠落監査) → ネガコン NC0–NC7。 不合格で exit 1 |
 | `targets.py` `env.sh` `mk_blockmap.py` | 対象の唯一の定義 / 環境 / `block_manifest.json` 不要の inventory 前提 |
