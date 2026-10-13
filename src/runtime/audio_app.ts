@@ -79,7 +79,7 @@ export async function startFlAudio(o: StartOptions = {}): Promise<FlAudioSession
     log,
   );
   const api: FlAudioWasmApi = {
-    getBuffer: () => mod.wasmMemory.buffer as SharedArrayBuffer,
+    getBuffer: () => mod.wasmMemory.buffer as unknown as SharedArrayBuffer,
     ctlPtr: () => mod._fla_ctl_ptr(),
     layoutCount: () => mod._fla_layout_count(),
     layoutOff: (i) => mod._fla_layout_off(i),
