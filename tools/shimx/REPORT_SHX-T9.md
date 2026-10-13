@@ -68,7 +68,7 @@
 - 修正 (`survey_trace.mjs`): baseline (`m11_survey.mjs`) と同じく InitTable (先頭・末尾の proc VA) の破壊を検出し、その unit を `clobber` と記録して boot をやり直す。image の書き戻し方式は採らない (書き戻すと closure_outside が 796 件に増えた。shimx の import 状態が壊れるため)。
 - 修正後: `SXL_SURVEY` kinds は ok 789 / oob 95 / closure_outside 47 / halt0 9 / clobber 1 / noproc 1 / reboots 1。range は 0。
 - baseline (`m11_boot`) は ok 800 / oob 50 / halt0 44 / closure_outside 46 / abort 1 / noproc 1 (reboots 1)。ログ: `tools/m11/alloca/results/run/m11_boot_surveytrace.out` (`SXL_SURVEY` 行、追跡済み)。
-- 裏付け (0f5d70cc で再測定, `tools/shimx/evidence_773/`): 同一 image (`m11_sx_trace_soft_fix.cjs`, sha256 `b674477d…`, `[EMSDK]` 6.0.12 で build) に対し、修正前 harness (a5adb2fc) は range 783 (ok 137 / oob 6 / closure_outside 14 / halt0 2)、修正後 harness (0f5d70cc) は ok 789 / oob 95 / closure_outside 47 / halt0 9 / clobber 1 / range 0。baseline (`m11_boot.cjs`) は ok 800 / oob 50 / halt0 44 / closure_outside 46 / abort 1。すべて PR の値と一致。`SXL_SURVEY` の全行は `evidence_773/sxl_survey_*.txt`、build ログは `evidence_773/build_log.txt`。
+- 裏付け (HEAD で再測定, `tools/shimx/evidence_773/`): 素材 `work-m11` 同梱の image (sha256 `f100dd66…`) は素材 build 時のもので、link log が空・`.cjs.wasm` 欠落のため測定に使えない。本節の数値は `[EMSDK]` 6.0.12 で `build.sh` を作り直した image (`m11_sx_trace_soft_fix.cjs`, sha256 `b674477d…`) に対するもの。同一 image に対し、修正前 harness (a5adb2fc) は range 783 (ok 137 / oob 6 / closure_outside 14 / halt0 2)、修正後 harness (0f5d70cc) は ok 789 / oob 95 / closure_outside 47 / halt0 9 / clobber 1 / range 0。baseline (`m11_boot.cjs`) は ok 800 / oob 50 / halt0 44 / closure_outside 46 / abort 1。すべて PR の値と一致。`SXL_SURVEY` の全行は `evidence_773/sxl_survey_*.txt`、build ログは `evidence_773/build_log.txt`。
 - 差分の説明 (未完): baseline は unit 115 で `EnterCriticalSection` の fail-fast (abort) に当たって reboot するが、shimx 版では同 unit が halt0 になり fail-fast に当たらない。以後の unit は状態がずれ、oob と halt0/ok が unit 単位で入れ替わる (unit 単位の差分は 81 件)。oob 増 (50→95) の内訳を unit 単位で説明するところまでは未達。起票先: 子 issue #1255 (`[SHX-T9c]`)。
 
 ## 4. 残一覧 (BACKLOG 反映用の要約)
@@ -87,6 +87,6 @@
 
 ## 5. 再現性
 
-- 測定 commit: 0f5d70cc (再測定 run)。素材は `oc_artifacts: fl-win64 work-m11 work-liftdiff` で展開 (`tools/m11/work/`・`tools/liftdiff/work/`)。IR 再生成 (`m11_gen_ir2.sh`) は行わず、素材の `boot_final3.ll` / `m11_image.bin` を使用。
-- image の build には `[EMSDK]` (6.0.12) が必要。runner には無いため `/opt/emsdk` に入れた。`emsdk_env.sh` は PATH の `upstream/bin` を外すため、`build.sh` の `llvm-nm` が見つからず 5 本とも失敗する (失敗しても `e2e.sh` は exit 0 を返す)。runner 側では `/usr/local/bin/llvm-nm` を emsdk の `llvm-nm` へ symlink して解消した。build ログの `[sxlink] OK` で成功を確認すること。
+- 測定 commit: 本節の HEAD (`build.sh` の PATH 修正を含む commit)。素材は `oc_artifacts: fl-win64 work-m11 work-liftdiff` で展開 (`tools/m11/work/`・`tools/liftdiff/work/`)。IR 再生成 (`m11_gen_ir2.sh`) は行わず、素材の `boot_final3.ll` / `m11_image.bin` を使用。image は `e2e.sh` で clean rebuild (obj / gen を削除してから実行)。
+- image の build には `[EMSDK]` (6.0.12) が必要。`emsdk_env.sh` は PATH の `upstream/bin` を外すため、`build.sh` の `llvm-nm` が見つからず 5 本とも失敗する (失敗しても `e2e.sh` は exit 0 を返す)。`build.sh` で `upstream/bin` を PATH に戻して解消 (symlink 不要。HEAD の build.sh で確認済み)。build ログの `[sxlink] OK` で成功を確認すること。
 - `e2e.sh` を再実行すると `tools/m11/shimx_link/results/` の自動生成物が書き換わる (commit 済みと生成元が異なる)。本 PR では results を HEAD に戻し、裏付けは `evidence_773/` に置いた。
