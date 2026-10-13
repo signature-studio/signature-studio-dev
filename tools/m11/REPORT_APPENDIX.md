@@ -146,6 +146,7 @@ GitHub Actions runner (4 core, load 0.6–0.9)。素材は work-m11 スナップ
 | survey (全再生成直後, unit 別 942 本) | **ok 872 / trap 23 / miss 46 / noproc 1** (trap 内訳 OOB 15 / Halt0 7 / unreachable 1) |
 | survey (増分再実行, unit 別 JSON 出力) | 46.94 秒, ok 872 / trap 23 / miss 46 / noproc 1 (全再生成直後と一致) |
 | 0 詰め site / 引数 (`m11_sigfix_stats.sh`, 同 HEAD) | **1,061 site / 2,084 引数** (argrecover 突合 1,016 site, 突合済み引数 **1,983**。未突合 101 = 2,084 − 1,983。内訳は下表) |
+| unit 838 / 882 / 885 | ok / ok / ok (基準の退行チェック対象) |
 
 突合済み引数 1,983 の全カテゴリ (`m11_sigfix_stats.sh` の出力 `work/sigfix_stats/argrecover.txt` の値):
 
@@ -161,7 +162,6 @@ GitHub Actions runner (4 core, load 0.6–0.9)。素材は work-m11 スナップ
 | 既知 4 項目の和 | 1,565 | 1,983 との差 418 は上記 3 項目で埋まる必要がある (未確定) |
 
 **未取得の理由**: 本 run の runner には `work/` の入力 (`boot_final.ll`・`functions_dll.csv`) と RetDec・Ghidra・emcc が無く、`7e149974` の全再生成 (`m11_e2e.sh --full`) と `m11_sigfix_stats.sh` を再実行できなかった。上の 3 項目の値は**このファイルでは確定できない**。出力を取得してから表を埋め、和が 1,983 になることを確認すること (未達のまま本 PR を merge しない)。
-| unit 838 / 882 / 885 | ok / ok / ok (基準の退行チェック対象) |
 
 注記:
 * §9 (3e49295) の記録 (1,049 site / 2,064 引数 / set_const_xmm_callee 48 / survey ok 812) とは HEAD の差で数値が動いている。本表は `7e149974` の値で、比較の基準はこちら。
