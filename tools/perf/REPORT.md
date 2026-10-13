@@ -128,7 +128,7 @@ M5 純 SSE カーネル (128 sample/call, µs): waveshaper O0 2.11 / O2 0.845 / 
 4. FLEngine 実体の wasm は未存在: 規模は M11 closure の K 倍複製+x86 サイズ比の**外挿 (推定)**。`-O1/-O2` の M11 は到達可能関数のみ (619〜810 関数, code 44〜53KB) になり比較に使えない。
 5. Chrome 154 (Linux, Zen5) のみ。Firefox/Safari/モバイル CPU (3〜10× 低速想定) は未測。SIMD は AVX-512 機で有利な可能性。
 6. wasm vs native 比 (M3 は crc で 1.3〜1.4×) は OTT では未測 (lift IR の VA 固定が native 側の障壁)。
-7. 動的リンク (MAIN/SIDE_MODULE, PIC 税) 未測定。
+7. 動的リンク (MAIN/SIDE_MODULE, PIC 税) → **PERF-P8 (#166) で合成カーネルを測定済み: §12 / `REPORT_P8.md`**。実 OTT (x64c) / FLEngine 実体での再測は未実施。
 
 ## 6. ユーザ依頼事項
 
@@ -243,3 +243,8 @@ e2e: `node tools/perf/loader/loader_e2e.mjs [--reps 5] [--quick]` (Chrome 起動
 | `Date.now()` 1 ms 分解能・null sink (headless)。実デバイスの underrun 計測なし | 初回ブロック < 1 ms は判別不能・実 underrun 未評価 | PERF-P7 (#165: 実機再測) |
 | eager compile + keepModule の効果 (§3 の 481→33 ms) をローダ経由で未再測 | keepModule の採否判断 | 本 issue のコメントで PM 判断 (必要なら子チケット) |
 | `src/index.ts` / `audio.ts` (dummy-worklet) への組込みはしていない | ローダは未接続の部品 | RT / AU 系 (FLEngine 結線時) |
+
+## 12. plugin 別 module vs 動的リンク (PERF-P8 / #166)
+
+詳細・全表は `tools/perf/REPORT_P8.md` (付録; 行数上限のため分割)。1 コマンド: `bash tools/perf/p8/p8.sh`。
+結論: 現行 lift (VA 固定) の plugin は plugin 別 module/instance/Memory (定常 CPU 差なし。Chrome 154 は Memory 124〜125 本が上限)。動的リンクは `-fvisibility=hidden` 必須 (既定 visibility は Chrome で ×1.24〜1.25)。合成カーネルでの測定で実 OTT は未再測。

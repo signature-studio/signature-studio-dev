@@ -30,6 +30,7 @@
 |---|---|
 | `tools/perf/results/TABLES.md` | `tools/perf` の計測 driver |
 | `tools/perf/results/compress.md` | 同上 |
+| `tools/perf/p8/results/TABLES.md` | `tools/perf/p8/tables.mjs` (入力 `results/p8.jsonl`) |
 | `tools/icall/disp_size/results/TABLES.md` | disp_size 監査 driver |
 | `tools/icall/disp_size/results/consumers.md` | 同上 |
 | `tools/liftdiff/results/*.md` | `liftdiff` 採点名 driver |
@@ -62,6 +63,7 @@
 | `tools/legal/release-guard/REPORT.md` | ~75 | release guard (LGL-2): 公開前に dist を走査し FL/プラグイン由来バイト列を検出して失敗させる deny-list ゲート |
 | `tools/perf/REPORT.md` | ~150 | wasm 実時間性能・compile 時間・巨大 wasm 実験 |
 | `tools/perf/PERF.md` | ~150 | 性能の設計メモ (bit-exact 版の実測は `tools/perf/REPORT.md` §2.1・完走路の正本は `tools/ott/REPORT.md`) |
+| `tools/perf/REPORT_P8.md` | ~120 | PERF-P8 (#166): plugin 別 module/instance/memory vs MAIN/SIDE_MODULE 動的リンクの合成カーネル比較 (node + Chrome 154 Worker)。`tools/perf/REPORT.md` §12 から参照 |
 
 ### 解析・lift 基盤
 

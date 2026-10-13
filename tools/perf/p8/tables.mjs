@@ -18,7 +18,7 @@ for (const rt of [...new Set(ALL.map((r) => r.runtime))]) {
   const m = grp('steady'); const cfgs = [...new Set([...m.keys()].map((k) => k.split('|')[0]))]; const Ns = [...new Set([...m.keys()].map((k) => +k.split('|')[1]))].sort((a, b) => a - b);
   for (const kind of ['', '_light']) {
     const cs = cfgs.filter((c) => (kind ? c.endsWith('_light') : !c.endsWith('_light'))); if (!cs.length) continue;
-    o.push(`## 定常 µs / 128f ブロック (${kind ? '軽量カーネル NST=1' : '標準カーネル NST=32'}; 各セル = 独立プロセス間の p50 の中央値 (min–max)、比 = 同 N の static_based${kind} 比)`, '');
+    o.push(`## 定常 µs / 128f ブロック (${kind ? '軽量カーネル NST=1' : '標準カーネル NST=32'}; 各セル = 独立プロセス間の p50 の中央値 (min–max)、比 = 同 N の static_based${kind} 比。static が無い N=64 は sep_based${kind} 比 = 自己比 ×1.000)`, '');
     o.push(`| 構成 | ${Ns.map((n) => `N=${n}`).join(' | ')} |`, `|---|${Ns.map(() => '--:').join('|')}|`);
     for (const c of cs) o.push(`| ${c} | ${Ns.map((n) => { const v = m.get(`${c}|${n}`); if (!v) return '-'; const b = m.get(`static_based${kind}|${n}`) ?? m.get(`sep_based${kind}|${n}`); const ratio = b ? ` ×${(med(v.map((x) => x.us_per_block)) / med(b.map((x) => x.us_per_block))).toFixed(3)}` : ''; return `${rng(v, 'us_per_block', kind ? 3 : 2)}${ratio}`; }).join(' | ')} |`);
     o.push('');
