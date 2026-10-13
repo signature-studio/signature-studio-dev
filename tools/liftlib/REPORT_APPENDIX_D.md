@@ -1,0 +1,115 @@
+# liftlib REPORT 付録 D — §22 LIFTLIB-9 (#668): RetDec raw lift 出力の非決定性
+
+> 本体: [`REPORT.md`](REPORT.md) §22 (要約)。本付録は §22 の全文 (250 行上限のため分割移動・内容は削除していない)。
+> 検証起点 commit: `8d883c3` (origin/main)。実装 commit: `5dc0117` (gate + probe)。担当 dir: `tools/liftlib/`。
+> 既知類型との関係: `docs/DEFECTS.md` の D1〜D16 に **該当なし** (非決定性であり miscompile ではない。A7 段で吸収済み)。
+
+## 22.1 結論
+
+- 同一 PE・同一 ranges で RetDec を実行すると、**raw `*.drc.ll` は毎回変わる**。差分は `uselistorder` 指示子の行のみ。
+- `uselistorder` 行を除くと、raw も `.drc.c` も全 run で一致する。既存の A7 段 (`run_base` / `ir5_patch`) がこの行を除去するため、**liftlib base 段・m6 chain の出力は決定的**。
+- ASLR (アドレス空間配置のランダム化) を無効にしても決定性は保証されない (値が TMPDIR の絶対パス等の環境で変わる)。`setarch -R` は採らない。
+- 対策は **比較手順の固定** (raw は比較しない・A7 後の成果物で判定) と **回帰 gate** (`lift_determinism_e2e.sh`)。新しい正規化 pass は不要。
+- **未解決**: k80 (block18983_PE.bin, p0c REPORT §15.4) の alloca 並び差は OTT では再現せず、A7 後に残るかは未検証 (fl-win64 が必要)。→ 下記 §22.6 の起票先。
+
+## 22.2 入力と条件
+
+| 項目 | 値 |
+|---|---|
+| PE | `$ANALYSIS_DIR/plugins/ott/binaries/OTT_vst2_win64.dll` (3146752 B、`analysis-ott-binaries` 展開) |
+| ranges | `tools/m6/work/ott_ranges.txt` (166 関数、`work-m6-ott` 展開) |
+| RetDec | v5.0 (commit `53e55b4b26e9`, `/opt/retdec/bin/retdec-decompiler`)。`--select-ranges` + `--select-decode-only --timeout 2400` |
+| runner | nproc=4、`randomize_va_space=2` (ASLR 有効)、Actions runner (`/home/runner`) |
+| 1 run の所要 | 8.2〜9.0 秒 (probe の実測、load 0.6〜1.4) |
+
+## 22.3 実測 1: raw は実行ごとに変わる (ASLR 有効 / 無効)
+
+`bash tools/liftlib/lift_determinism_probe.sh 4` (HEAD `5dc0117`)。sha256 は先頭 12 桁。
+
+| mode | run | ms | raw sha256 | uselistorder 除去後 | `.drc.c` | uselistorder 行数 |
+|---|---|---|---|---|---|---|
+| on (既定) | r1 | 8879 | 5bac875d2e33 | eb5685d8592b | 1945bf8a4a45 | 2548 |
+| on | r2 | 8879 | 465ac159db7e | eb5685d8592b | 1945bf8a4a45 | 2550 |
+| on | r3 | 8522 | 6d79bb6f829a | eb5685d8592b | 1945bf8a4a45 | 2547 |
+| on | r4 | 8356 | 256e2e70e4f7 | eb5685d8592b | 1945bf8a4a45 | 2547 |
+| off (`setarch x86_64 -R`) | r1〜r4 | 8305〜8744 | 279d6ee60f7d (4/4 同一) | eb5685d8592b | 1945bf8a4a45 | 2546 |
+
+distinct (値の種類数): ASLR 有効 raw = **4/4**、uselistorder 除去後 = **1**、`.drc.c` = **1**。ASLR 無効 raw = 1 (この環境条件内)。
+
+補足の実測 (前段で取得、同じ入力・同じ手順): ASLR 有効 6 本 (a1,a2,b1〜b4) の raw sha256 は全て別値。ASLR 無効 4 本 (n1〜n4) は 4/4 同一 `f2c8f229fd95`。a1 と a2 の raw 差分 26 行は全て `uselistorder` 行で、それを除くと両者は同一。
+
+## 22.4 実測 2: 環境 (出力パス) 依存の確認 (ASLR 無効でも値が変わる)
+
+同じ `setarch x86_64 -R` で、出力パスと TMPDIR の絶対パスだけを変えた。
+
+| 条件 | raw sha256 |
+|---|---|
+| 前段の n1〜n4 (TMPDIR = `$RUNNER_TEMP/det/n1/tmp`) | f2c8f229fd95 (4/4 同一) |
+| 同じ条件で再実行 (`run1.sh $RUNNER_TEMP/det/n1 setarch x86_64 -R`) | f2c8f229fd95 (再現) |
+| probe (TMPDIR = `tools/liftlib/work/probe/off/r1/tmp`、より長いパス) | 279d6ee60f7d (4/4 同一) |
+
+→ ASLR 無効でも、環境変数の大きさ (TMPDIR 等の絶対パス) で値が変わる。`setarch -R` は「同じ環境なら毎回同じ」にすぎず、決定性の手段として採らない。
+
+## 22.5 原因 (推定を含む)
+
+- **実測で言えること**: 差分は LLVM の `uselistorder` (use-list の並び) 指示子のみ。並びはアドレス空間の配置 (ASLR と環境サイズ) に依存して変わる (§22.3・§22.4)。
+- **推定**: RetDec / LLVM 内部で use-list を組むときに、ポインタ値に依存した順序 (ポインタを鍵にした集合・写像の走査) が使われている。RetDec のソースが repo に無く、該当箇所は**未特定**。
+- 除外した仮説: Python の hash seed (`PYTHONHASHSEED=1/2` で liftlib base 出力が同一、§22.7)、`.drc.c` の差 (0 件)、alloca 並びの差 (OTT の 8 本で 0 件: uselistorder 除去後が全て同一のため)。
+
+## 22.6 対策と比較手順 (決定)
+
+1. **比較対象は A7 後の成果物のみ**。raw `*.drc.ll` と中間物 (`*.norm0.ll` 等) は sha256 比較に使わない (`uselistorder` の順序で変わるため)。
+2. 既存の A7 段 (`tools/liftlib/liftlib/passes/base.py:321-335`・`tools/m5/ir5_patch.py:260-271`、`tools/plugins/lift/passes/ir5_patch.py` も同系) が `uselistorder` 行を除去する。新しい正規化 pass は追加しない。
+3. `setarch -R` は採らない (§22.4)。
+4. 回帰 gate: `tools/liftlib/lift_determinism_e2e.sh` (§22.8)。
+
+## 22.7 A7 後の一致 (決定性の実測)
+
+| 対象 | 入力 | 結果 |
+|---|---|---|
+| liftlib `run_base` (A7 含む) | §22.3 の ASLR 有効 + 無効の raw 6 本 (a1,a2,b1,b2,n1,n2) | 6/6 同一 `c8fb37be3a24` |
+| 同上、`PYTHONHASHSEED=1` / `=2` | a1 の raw | 両方 `c8fb37be3a24` (hash seed 非依存) |
+| m6 chain (`m2/ir_normalize.py` → `m5/ir5_patch.py`) | raw a1, b2, n1 | 3/3 同一 `09b1b8128a88` |
+| gate (`lift_determinism_e2e.sh`、N=2) | 新規 2 run | raw `b771dd2dab2c` / `efaddaf414a0` (不一致) → base 2/2 `c8fb37be3a24` PASS |
+| gate N=4 (`DET_RUNS=4`) | 新規 4 run | raw は 2 種 (`5bac875d2e33` ×3、`a782ad770357`) → base 4/4 `c8fb37be3a24` PASS |
+
+## 22.8 回帰 gate と probe (1 コマンド再現)
+
+- `bash tools/liftlib/lift_determinism_e2e.sh` (既定 N=2、`DET_RUNS=N` で変更): RetDec を並列 N 回 → `run_base` → base.ll の sha256 が全て一致で PASS。不一致・ネガコン失敗・RetDec 失敗は全て非 0 で終了。前提欠落 (`ANALYSIS_DIR` 不在) は rc=2。
+- 実測 (HEAD `5dc0117`、load は実行前後):
+
+| 実行 | 結果 | 所要 | load |
+|---|---|---|---|
+| N=2 (既定) | PASS、`negctrl detected`、rc=0 | 総 20 s (RetDec 9 s) | 0.75 → 0.85 |
+| N=4 (`DET_RUNS=4`) | PASS、`negctrl detected`、rc=0 | 総 28 s (RetDec 14 s) | 0.28 → 1.16 |
+| ネガコン 2: `DET_NEGCTRL_NO_BASE=1` (A7 を外し raw を比較) | `determinism FAIL`、rc=1 | RetDec 8 s | 0.80 → 0.99 |
+| 前提欠落 `ANALYSIS_DIR=/nonexistent` | rc=2 | — | — |
+
+- ネガコン 1 (`negctrl`): base.ll に 1 行を足した複製が、同じ比較関数で不一致と判定される (比較器の盲点を検出)。
+- ネガコン 2 は確率的: raw 2 本の sha256 が偶然一致すると PASS する。本 HEAD の実測では raw は 2 本とも不一致 (`5bac875d2e33` / `2d296a991f9b`)、probe では 4 本中 4 種。
+
+- `bash tools/liftlib/lift_determinism_probe.sh [N]`: §22.3 の表を出力 (既定 N=4、約 35 秒)。
+
+## 22.9 受入条件の達成状況 (Issue #668)
+
+| 受入条件 | 状況 |
+|---|---|
+| 非決定の原因を特定し REPORT に実測を残す | **達成 (推定部分あり)**: 差分は uselistorder のみ、ASLR 依存。RetDec 内の箇所は未特定 (§22.5) |
+| lift 成果物を決定的にする手段 / 比較手順を docs に定める | **OTT で達成**: A7 後 + 比較手順 (§22.6)。k80 は未 (下表) |
+| 決定性の回帰検出 (sha256 比較、不一致で非 0) を e2e に入れる | **達成**: `lift_determinism_e2e.sh` (§22.8) |
+
+PR は `Refs #668` (Closes は使わない)。k80 の実測が残るため。
+
+## 22.10 未解決 (起票先付き)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| k80 (block18983_PE.bin) の alloca 並び差 (`%0 = alloca i3` と `i64` の入替) と `k80.lift.ll` の 58 行差 (p0c §15.4)。OTT では再現せず、A7 後に残るかは未検証 | p0c の k80 系 before/after 比較は lift 段を揃えないと成立しない | 新規子 issue `[LIFTLIB-10]` (fl-win64 が必要。`oc_artifacts` に `fl-win64` を追加して再実行を依頼) |
+| RetDec 内部の use-list 順序を決める箇所 (ソース位置) が未特定 | 原因は推定のまま。A7 で運用上は吸収済み | 本件では上流報告しない (箇所未特定)。`[LIFTLIB-10]` の結果を見て判断 |
+| 他 chain (`tools/plugins/lift/` の `lift_ranges.sh` など) の A7 後一致は未測定 | 同じ A7 系コードだが実測していない | 範囲外として明記。必要なら `[LIFTLIB-10]` で併せて測定 |
+| `setarch -R` で決定的にできるか (環境条件を固定すれば足りるか) | 採らない方針 (§22.4) | 不要 (A7 で足りる) |
+
+## 22.11 範囲外
+
+- `tools/liftlib/liftlib_e2e.sh` (FreshAir・KH の素材を要する) は今回の `oc_artifacts` に無いため未実行。本 gate は OTT のみを使う。
+- block18983_PE.bin / k80 は未使用 (fl-win64 不在)。k80 の数値は p0c REPORT §15.4 の既存記録のみ。
