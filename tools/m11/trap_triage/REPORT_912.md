@@ -192,3 +192,26 @@
 ### 旧 IR・旧 commit での測定 (§12-旧 = `ca3001ce`)
 
 main 取り込み前の `ca3001ce` (M2q 込み IR) でも、既定 (OFF) と ON の survey は全 942 unit 一致 (ok 870 / oob 16)。`05e467f1` と同じ結果。旧 IR (`a5e9c1ed`、M2q 無し) では ON で 101 / 291 / 296 が oob→ok に戻った (§7-旧)。現 head (M2q 込み IR) ではその現象は見えない。M2q 由来の変化か、別の要因かは未切り分け (#912)。
+
+## 13. 受入条件の再判定 (#912 run、HEAD `a3af6a7a` 基準)
+
+測定 commit: `a3af6a7a` (origin/main)。作業ブランチ `912-m11-classcreate-oob-close` はこの commit から分岐し、`tools/m11` のコードは変えていない。素材: `fl-win64` / `toolchain-emsdk` / `toolchain-retdec` / `work-m11` (`tools/m11/work/` へ展開)。`m11_gen_ir2.sh` rc=0 (35.7 s)。
+
+構成は 2 つを区別する。issue の退行は `M11_OV_CLASSCREATE=1` (ClassCreate の C 転記) の ON で起きる。`M11_FIX_912` は別の IR 修復 pass。
+
+| 構成 (env) | build | ok | oob | abort | miss | 備考 |
+|---|---|--:|--:|--:|--:|---|
+| OFF (既定) | rc=0 | 870 | 16 | 0 | 47 | `fix912 mode=off replaced=1` (ネガコン) |
+| FIX_912=1 | rc=0 | 870 | 16 | 0 | 47 | `replaced=1`。OFF と kind 差 0 |
+| OV_CLASSCREATE=1 | rc=0 | 869 | 15 | 2 | 47 | ok 退行 1 件 (190) / oob→abort 2 (304・555) |
+| OV_CLASSCREATE=1 + FIX_912=1 | rc=0 | 869 | 15 | 2 | 47 | OV=1 の ON/OFF で kind 差 0 |
+
+- 注: `m11_build.sh` は同じ `work/m11_boot.cjs` を上書きするため、ON/OFF の比較は build の直後に survey を取る順で行った。最初に ON build の後に OFF と誤認して取った survey は捨てた (本節の表は全て各 build 直後の測定)。
+- 測定 (`survey_diff.py`): OV=1 で、101 / 291 / 296 は OFF・OV=1 とも ok。ok 退行は **190 の 1 件のみ** (#1274 で扱う)。OV=1 の ON/OFF 比較 (`M11_FIX_912` 0/1) では ok 退行 0・kind 差 0。
+- 旧 IR の記録 (§7-旧) の「101/291/296 が oob→ok に戻る」は、現 head (M2q 込み IR) では OV=1 の退行としては再現しない。現 head では 101/291/296 は ON・OFF ともに ok。
+
+### 受入条件の判定
+
+- 原因の特定 (101/190/291/296): 101/291/296 は現 head では退行していない。旧 IR での機構 (§5-§6) は仮説のまま。190 は #1274 (子 issue) へ移管。
+- 既存類型への分類: `docs/DEFECTS.md` の D20 は別件 (load offset の取り違え)。旧 IR の `dl` 取り違え (引数の値を IR でスタック番地の下位 byte にする) は、D4 (deref 脱落) とは別で、既存の類型では説明しきれない。D21 として登録する (§6 の仮説は未確定と明記)。
+- ON で ok 退行 0: **未達** (OV=1 で 190 の 1 件)。#1274 で解消する。
