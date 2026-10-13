@@ -230,7 +230,7 @@ def main():
             def lab(n): return "%s (P%d)" % (n, gui_names[n][0]) if n in gui_names else n
             w("| 到達 & 実装済み | %s |\n" % ", ".join(lab(n) for n in sorted(reach) if n in gui_names and gui_names[n][5] == "IMPL"))
             w("| 到達 & fail-fast stub (**実装必須へ昇格**) | %s |\n" % (", ".join(lab(n) for n in sorted(reach) if n in gui_names and gui_names[n][5] != "IMPL") or "なし"))
-            w("| 到達 & P2/P3 (**P1 以上へ昇格候補**) | %s |\n" % (", ".join(lab(n) for n in sorted(reach) if n in gui_names and gui_names[n][0] >= 2) or "なし"))
+            w("| 到達 & P2/P3 (**P1 以上へ昇格候補**) | %s |\n" % (", ".join(lab(n) for n in sorted(reach) if n in gui_names and gui_names[n][0] >= 2 and gui_names[n][5] != "IMPL") or "なし"))
             w("| 未到達の P0 (現 m11 到達段では未実行) | %s |\n\n" % ", ".join(r[3] for r in rows if r[0] == 0 and r[3] not in reach))
         w(("## %d. arity 不明 (mingw ヘッダ未収録) で stub 未生成\n\n" % (5 if reach else 4)) + (", ".join(still) if still else "なし") + "\n")
     print("gui imports=%d impl=%d stub=%d nohdr=%d (impl total in sources=%d)" % (tot_gui, n_impl, n_stub, len(still), len(impl)))
