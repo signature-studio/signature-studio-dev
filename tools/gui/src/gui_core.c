@@ -918,7 +918,7 @@ API GetDC(I64 h) {
   gui_sh(); ensure_desktop();
   Wnd *w = h ? wnd_from_h((U64)h) : g_desktop;
   if (!w) return 0;
-  if (w == g_desktop) gui_failfast("GetDC", "screen DC (GetDC(NULL)) not implemented");
+  if (w == g_desktop) return (I64)gdi_get_screen_dc();   /* GetDC(NULL): 画面 DC。描画は捨てる計測・互換 DC 用途 (#174) */
   RL clip = {0}; wnd_clip(w, &clip);
   U64 dc = gdi_get_dc_for_wnd(w, 0, &clip);
   rl_free(&clip);
@@ -1502,7 +1502,7 @@ API SystemParametersInfoW(I64 act, I64 p1, I64 p2, I64 fl) {
   GuiShared *sh = gui_sh();
   if (act == 0x30) { WRECT *r = (WRECT *)P_(p2); r->left = r->top = 0; r->right = (int32_t)sh->screen_w; r->bottom = (int32_t)sh->screen_h; return 1; } /* SPI_GETWORKAREA */
   if (act == 0x1004) { *(uint32_t *)P_(p2) = 0; return 1; }  /* SPI_GETMOUSEHOVERTIME 等は 0 */
-  char m[64]; snprintf(m, sizeof m, "SystemParametersInfo action 0x%x", (unsigned)act); gui_failfast("SystemParametersInfoW", m);
+  return 0;  /* 未対応 action は FALSE (Win32 の未対応 action 相当)。値を推定で埋めない */
 }
 API SystemParametersInfoA(I64 a, I64 b, I64 c, I64 d) { return SystemParametersInfoW(a, b, c, d); }
 API GetKeyboardState(I64 buf) { memcpy(P_(buf), g_kb, 256); return 1; }
