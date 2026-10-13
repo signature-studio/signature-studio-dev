@@ -88,25 +88,25 @@
 | 前提生成 (初回。 inventory 含む、`win_scan` 〜 `closure_lea`) | 549 s (rc 0。 inventory 段の負荷 load average 17 の時間帯あり) |
 | `closure_unreached.py` (7 本) | 26.8 s (rc 0、PASS 5 × 7) |
 | `unr_lift.sh` (7 本、逐次) | 138 s (wall、40:15 → 42:33)。 block 別 4 / 13 / 6 / 6 / 8 / 25 / 68 s |
-| `unr_e2e.sh` (前提生成込み・work/ 空から、lift・judge・欠落監査まで) | **438 s (11:09:12 → 11:16:30)、rc 1** (judge 7/7 PASS、indirect_defs FAIL 5 件)。 旧版の 176 s は前提生成を含まない区間の値で、「前提込み」の表記は誤り (訂正) |
-| `unr_nega.sh` (改訂版、§2d-7) | rc 0 (期待どおり 9 項目、NC2 は未検証として除外)。 所要は未計測 |
+| `unr_e2e.sh` (前提生成込み・work/ 空から、lift・judge・欠落監査まで、HEAD c2dfeaf) | **11 分 59 秒 (719 s、`real`)、rc 1** (judge 7/7 PASS、indirect_defs FAIL 5 件)。 closure_unreached 25.6 s・lift 段は block 別 5 / 13 / 5 / 6 / 9 / 25 / 66 s (計 129 s 前後) |
+| `unr_nega.sh` (HEAD c2dfeaf、§2d-7) | 1 分 45 秒 (`real` 104.8 s)、rc 1 (NC6 対照のみ不合格。 他は期待どおり) |
 
-### 2d-7. ネガティブコントロール (`unr_nega.sh` 改訂版、HEAD で rc 0)
+### 2d-7. ネガティブコントロール (`unr_nega.sh`、HEAD c2dfeaf で rc 1 = NC6 対照のみ不合格)
 
 | NC | 壊した入力 | 期待 | 実測 |
 |---|---|---|---|
 | 対照 | `closure_unreached.py` (無改変) | rc 0 | **rc 0** ✓ |
 | NC1 | BFS の seed から (a) RVA32 の根を外す | U2 FAIL | **rc 1 (U2)** ✓ |
-| NC2 | BFS の辺から命令内即値を外す (U2 の検証側は残す) | U2 FAIL | **未検証 (受入から除外)**。 即値の辺は 7 本とも 0 件 (§2d-3) のため、外しても結果が変わらない。 識別には即値辺を含む実データか合成 fixture が要る (起票: §7c) |
+| NC2 | 合成 fixture (即値辺あり)。 BFS の辺 (`edge3_of`) から命令内即値を外す | U2 漏れ > 0 | 対照 (無改変) **U2 漏れ 0** ✓ / 即値辺を外す **U2 漏れ 1 → FAIL** ✓。 fixture は `closure_unreached.edge3_of` / `u2_miss` と `closure_indirect.Pe.bfs` の本物を使う。 実データは即値辺 0 件のため sed 変異では識別できない (旧版の「未検証」は撤回) |
 | NC3 | 排他分類の (c) に (a) を二重計上 | U4 FAIL | **rc 1 (U4)** ✓ |
 | NC4 | capstone 側の RVA32 集合に偽の値 0x7fffff01 を注入 | U1 FAIL | **rc 1 (U1)** ✓ |
 | NC5 対照 | `judge.py shells` (無改変 status_run.csv) | rc 0 | **rc 0** ✓ |
 | NC5 | FL Keys の行に emcc_c_rc=1 | judge FAIL | **rc 1** ✓ |
-| NC6 対照 | `unr_e2e.sh --skip-lift` (無改変) | 既知の range 欠落だけで rc 1 (judge PASS・indirect_defs FAIL・OK 無し) | **rc 1 ✓** (judge PASS 7/7、indirect_defs FAIL、OK 無し) |
+| NC6 対照 | `unr_e2e.sh --skip-lift` (無改変、期待値は書き換えず rc 0) | rc 0・OK 行あり | **rc 1 ✗** (AC2 の range 欠落 5 件が残るため。 gate は緩めていない。 PM 判断 (A) まで赤のまま) |
 | NC6 | 同 + emcc_c_rc=1 の行を追記 | judge FAIL・rc ≠ 0・OK 無し | **rc ≠ 0・judge FAIL・OK 無し** ✓ |
-| NC7 (新規) | 合成 bytes `mov rax, imm64` (= 開始 VA) を `imm_capstone` に入力 | 開始 VA ありで検出 / なしで非検出 | **rc 0** ✓ (即値の検出経路の動作確認。 BFS 側の即値辺は NC2 のとおり未検証) |
+| NC7 (新規) | 合成 bytes `mov rax, imm64` (= 開始 VA) を `imm_capstone` に入力 | 開始 VA ありで検出 / なしで非検出 | **rc 0** ✓ (即値の検出経路。 BFS 側の辺は NC2 で確認) |
 
-期待どおり 9 項目 (NC0・NC1・NC3・NC4・NC5 対照/NC5・NC6 対照/NC6・NC7)、未検証 1 項目 (NC2、受入から除外)。 `status_run.csv` は各 NC の後に元へ復元 (trap と cp)。
+実測: 対照 NC0・NC5 対照・NC1・NC2 (2 件)・NC3・NC4・NC5・NC6 (追記)・NC7 は期待どおり。 **NC6 対照のみ不合格** (AC2 gate 由来。 対照を「無改変で通る」に戻したため、gate 未解決の間は赤)。 `status_run.csv` は各 NC の後に元へ復元 (trap と cp)。
 
 ### 2d-8. byte 走査の一致 31 箇所の判定 (`bytescan_hits.py`、capstone の IMM 集合に入らなかったもの)
 
@@ -173,7 +173,7 @@
 
 ## 6c. 検証起点・取りこぼし確認
 
-- 検証起点 commit: **b36fef5** (`feat(plugins): sampler unreached-function classification and total3 closure (Refs #667)`)。 分類・total3・lift・e2e は b36fef5 のスクリプトで実行。 fix 版: `closure_unreached.py` に export 件数と分類集合 (`unr/block*.sets.json`) の出力を追加 (分類・total3・ranges は不変)、 `unr_nega.sh` を改訂 (§2d-7)、 `bytescan_hits.py` を新規追加 (§2d-8)。 `unr_e2e.sh` は fix 版の commit 7d3ac70 で全段を実行 (438 s、rc 1)。 その後 `closure_unreached.py` の export 解析 1 行 (`parse_data_directories`) を直し、同 HEAD で再実行 (PASS 5 × 7、total3 不変)。 `unr_nega.sh` と `bytescan_hits.py` も同 HEAD で実行。
+- 検証起点 commit: **b36fef5** (`feat(plugins): sampler unreached-function classification and total3 closure (Refs #667)`)。 分類・total3・lift・e2e は b36fef5 のスクリプトで実行。 fix 版: `closure_unreached.py` に export 件数と分類集合 (`unr/block*.sets.json`) の出力を追加 (分類・total3・ranges は不変)、 `unr_nega.sh` を改訂 (§2d-7)、 `bytescan_hits.py` を新規追加 (§2d-8)。 `unr_e2e.sh` は fix 版の commit 7d3ac70 で全段を実行 (438 s、rc 1)。 その後 `closure_unreached.py` の export 解析 1 行 (`parse_data_directories`) を直し、同 HEAD で再実行 (PASS 5 × 7、total3 不変)。 `bytescan_hits.py` も同 HEAD で実行。 **最新 HEAD c2dfeaf** (fix 2 版): `closure_unreached.py` に `edge3_of` / `u2_miss` を切り出し (分類・total3 は不変)、`unr_nega.sh` の NC2 を合成 fixture に置換、NC6 対照を「無改変で rc 0」に戻した。 `unr_e2e.sh` は全段を再実行 (11 分 59 秒、rc 1)、`unr_nega.sh` は 1 分 45 秒 (rc 1、NC6 対照のみ不合格 = AC2 gate 由来)。
 - `git status --porcelain=v1 -- tools/plugins/sampler`: 実行後も空 (取りこぼし・混入なし)。 `tools/plugins/work/` (gitignore) の生成物は未 commit。
 - `find tools/plugins/sampler -type f -size +20M` = **0 件**。
 - 検証範囲: 分類・閉包・lift の判定 (lift 通過と range 監査)。 範囲外: 差分試験 (bit-exact)・wasm リンク・実行時の到達性・根 314 関数の偶発一致の判別。 通過 ≠ 正しさ。
@@ -183,7 +183,7 @@
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | RetDec が RVA32 根 5 関数 (4 block) を親関数に畳み込み、独立 define が出ない (`indirect_defs` FAIL、`unr_e2e.sh` exit 1) | AC2 未達。 表経由で呼ばれると未定義シンボルになりうる (推定) | 新規子チケット候補 (lift の関数境界、RetDec `--select-ranges` 周辺)。 PM 判断 |
-| 即値辺が 7 本とも 0 件 → NC2 が非識別 | 即値検査の識別力は本データでは未確認。 即値参照が現れた engine で要再確認 | #667 にコメント |
+| 即値辺が 7 本とも 0 件 → 実データの sed 変異では NC2 が非識別 | NC2 は合成 fixture (§2d-7) で確認済み。 実データで即値辺が現れた engine では再確認 | #667 にコメント |
 | 字義の根 (a)∪(b) と (b_live) の差が 0 件 | 差が出るのは即値参照が出た時のみ。 現データでは判断に影響しない | #667 にコメント (設計の記録) |
 | 根 314 関数の偶発一致 (数値定数との偶然の一致) は未判別 | RVA32 の判定は「整列 4 バイト値 = RVA」のみ。 表らしさ (連続性) は未検査 | #667 にコメント |
 | (d) 参照なし 1,477 関数 / 738,944 B は dead code 候補にすぎない | 間接経路が他にある可能性。 未使用の確定ではない | #667 にコメント / 次タスク (§8c) |
@@ -191,7 +191,7 @@
 | f80 lowering の対象 (lea 段と同じ 3 関数 × 3 block) の bit-exact 未検証 | 差分試験の対象に入るか未定 | #197 にコメント (既存) |
 | **AC2 gate 不合格** (range 欠落 5 件 = PE export 関数 5 件、§2d-9) | 受入 AC2 は未達。 PM 判断: (a) #707 へ移譲して #667 の AC を分割 / (b) gate の定義を変える (変える場合は欠落 5 件を許容する理由と total3・(d) への影響を REPORT に書く)。 本 run では gate を緩めていない | PM (#667・#707) |
 | **基点 #676 (`627-sampler-lea-closure`) が未 merge** (CHANGES_REQUESTED、main とは 384 commit 差)。 main では `rep_stosb_memset` が実装済み (9b5ea38)。 merge 前に main へ付け替えて再測定が必要 | 付け替え後に `unr_e2e.sh`・`unr_nega.sh` を再実行 | PM |
-| 即値辺を含む実データ (または合成 fixture) での NC2 の再確認 | 即値辺は本データで 0 件 | PM (#667 に起票依頼) |
+
 | byte 一致 31 箇所のうちデータ推定 4 件 (Granulizer・Slicer・Slicex) の中身の確認 | 参照元の判定には影響しない (対象は d)。 未確認 | #667 にコメント |
 | `REPORT_UNREACHED.md` は `docs/DOC_MAP.md` の索引に未掲載 (既存の `REPORT_LEA.md`・`REPORT_INDIRECT.md` も未掲載、grep 確認) | 索引の追記は PM 判断 | PM |
 
