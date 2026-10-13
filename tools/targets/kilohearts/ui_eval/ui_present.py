@@ -116,7 +116,7 @@ def main():
         print('  [nc %s] %s -> FAIL したのは %s (期待 %s)' % ('ok' if ok else 'NG', name, sorted(k for k, v in r2.items() if not v), expect))
     nc('biBitCount 32 -> 24 (imm 0x200001 -> 0x180001)', 'mov dword ptr [rbp + 0xc], 0x200001',
        lambda b: b[:-4] + (0x180001).to_bytes(4, 'little'), 'P4')
-    nc('ySrc = H - bottom の sub を add に改変', 'sub esi, r11d', lambda b: bytes([b[0], 0x01]) + b[2:] if b[0] != 0x44 else bytes([b[0], 0x01]) + b[2:], 'P7')
+    nc('ySrc = H - bottom の sub を add に改変', 'sub esi, r11d', lambda b: bytes([b[0], 0x01]) + b[2:], 'P7')
     nc('StartScan 0 -> 1', 'mov dword ptr [rsp + 0x38], 0', lambda b: b[:-4] + (1).to_bytes(4, 'little'), 'P9')
     nc('biSize 40 -> 56', 'mov dword ptr [rbp], 0x28', lambda b: b[:-4] + (56).to_bytes(4, 'little'), 'P1')
     json.dump({'wndproc_va': hex(core.base + fb), 'wndproc_pdata_bytes': fe - fb, 'call_site': hex(core.base + site),

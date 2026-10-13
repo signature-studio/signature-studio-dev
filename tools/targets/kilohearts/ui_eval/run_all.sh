@@ -6,6 +6,9 @@ set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 export KH_UI_WORK="${KH_UI_WORK:-$HERE/work}"; mkdir -p "$KH_UI_WORK"
 SCR="$HERE/../scripts"
+# llvm-objdump: PATH に無ければ /usr/lib/llvm-*/bin の最新版を使う (Ubuntu の llvm は版付きの bin に入り PATH に出ない)
+command -v llvm-objdump >/dev/null || { LLVM_BIN=$(ls -d /usr/lib/llvm-*/bin 2>/dev/null | sort -V | tail -1); [ -n "$LLVM_BIN" ] && PATH="$LLVM_BIN:$PATH"; }
+command -v llvm-objdump >/dev/null || { echo "llvm-objdump が無い: 別算法検算ができない"; exit 1; }
 if python3 -c 'import pefile, capstone, numpy' 2>/dev/null; then PY=(python3)
 else PY=(uv run --no-project --with pefile --with capstone --with numpy python); fi
 t0=$(date +%s); echo "load(start): $(cut -d' ' -f1-3 /proc/loadavg)  nproc=$(nproc)"
@@ -18,7 +21,6 @@ run() { local n="$1"; shift; echo; echo "===== $n"; "$@"; local r=$?; echo "----
 run "1 ui_imports (import 面・GPU 不在・shim 被覆)" "${PY[@]}" "$HERE/ui_imports.py" "$CORE" "$KH_UI_WORK/ui_imports.json"
 run "2 ui_present (画面転送呼び出しの復元)" "${PY[@]}" "$HERE/ui_present.py" "$CORE" "$KH_UI_WORK/ui_present.json"
 run "3 ui_closure (UI/Skia 規模・OS 境界クラス)" "${PY[@]}" "$HERE/ui_closure.py" "$CORE" "$KH_UI_WORK/callgraph.pkl" "$KH_UI_WORK/rtti_vtables.json" "$KH_UI_WORK/ui_closure.json"
-command -v llvm-objdump >/dev/null || { echo "llvm-objdump が無い: 別算法検算ができない"; exit 1; }
 llvm-objdump -d --no-show-raw-insn --section=.text "$CORE" > "$KH_UI_WORK/objdump.txt" || exit 1
 run "4 xcheck_xref (別算法: llvm-objdump 線形逆アセンブルとの突合)" "${PY[@]}" "$HERE/xcheck_xref.py" "$CORE" "$KH_UI_WORK/objdump.txt"
 run "5 shim_probe (M7 GUI shim へ実形で投入)" bash "$HERE/shim_probe.sh"
