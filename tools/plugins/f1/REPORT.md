@@ -1,6 +1,6 @@
 # tools/plugins/f1 REPORT — [PLG-F1] stereo-util 9 本 lift (#198)
 
-- 担当 dir: `tools/plugins/f1/` (+ `tools/plugins/inventory/blockmap_from_matrix.py`)。 検証起点 commit: 下記 §8 に記載。
+- 担当 dir: `tools/plugins/f1/` (+ `tools/plugins/inventory/blockmap_from_matrix.py`)。 検証起点 commit: c64a2b3 (§8)。
 - 既知類型との関係: **D15 (DEFECTS.md)** (+ Mute 2 fade で **D5 (DEFECTS.md)**) = メモリ間接 `call [mem]` の silent 脱落。 RetDec 路線では `tools/icall/REPORT.md` §4 の **D1 (icall §4)** と同じ事象 (番号体系は別)。 新規類型なし。
 - 数え方・コマンドはすべて本ファイル内に併記。 数値はすべて Actions runner (nproc=4) 上の実測。
 
@@ -158,16 +158,17 @@ kernel 表は Balance の初期化関数 (0x5e19f0) と位置非依存ハッシ�
 
 ## 8. 検証 (コミット済み HEAD)
 
-検証起点 commit: **2b7275c** (`git worktree add --detach … 2b7275c` で展開。 inventory 4 ファイル (`win_pe_scan.json` / `nsis_blockmap.json` / `winfuncs/` / `win_abi.json`) だけを手元から複写し、batch lift 以降は全て HEAD のコードで再実行)。
+検証起点 commit: **c64a2b3** (`git worktree add --detach … c64a2b3` で展開。 inventory 4 ファイル (`win_pe_scan.json` / `nsis_blockmap.json` / `winfuncs/` / `win_abi.json`) だけを手元から複写し、batch lift 以降は全て HEAD のコードで再実行)。 先行の検証起点 2b7275c (Phase Inverter まで) でも同値を確認済み (exit 0 / 68.9 秒)。
 
 | 項目 | 結果 (実測) |
 |---|---|
-| `bash tools/plugins/f1/f1_e2e.sh` | **exit 0 / 68.9 秒** (load avg 1 分値 0.08 開始 → 0.78 終了, nproc=4, inventory は再利用) |
+| `bash tools/plugins/f1/f1_e2e.sh` | **exit 0 / 77.8 秒** (load avg 1 分値 0.10 開始 → 0.76 終了, nproc=4, inventory は再利用) |
 | batch lift 9 本 | **26 秒**・9/9 `rc=0 emcc_c=0 f80=0` (§2 と一致; §2 の 3 回計測は 24.74–24.84 秒) |
 | 脱落 call 監査 | 9 block とも §4 の表と同値 (direct 1,047 / `call [mem]` 185 / IR 1,048 / dropped_est 186) |
 | Phase Inverter 差分 | 3 seed × {pi: 252/492, pir: 492/492, pin: 252/492} (§5 と同値) |
+| Mute 2 差分 | seed 305441741 / 1 / 2863311530 × {mu: 174 / 175 / 174, mur: 318 / 319 / 318, mun: 222 / 223 / 222} (/510; §5b と同値) |
 
-衛生確認: `git status --porcelain=v1 -- tools/plugins/f1 tools/plugins/inventory/blockmap_from_matrix.py` = 空 / `git diff --stat origin/main 2b7275c` = 上記 10 ファイルのみ (782 行追加, 他 dir 0) / 20 MiB 超の blob なし。
+衛生確認: `git status --porcelain=v1 -- tools/plugins/f1 tools/plugins/inventory/blockmap_from_matrix.py` = 空 / `git diff --stat origin/main c64a2b3` = `tools/plugins/f1/` と `tools/plugins/inventory/blockmap_from_matrix.py` のみ (他 dir 0) / 20 MiB 超の blob なし。
 
 ### DEFECTS.md への行案 (PM 判断)
 
