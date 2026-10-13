@@ -7,7 +7,7 @@
 
 - **本節の数値は前回 run (PR #1018 の初回検証) の値で、今回の run では再測定していない。** 素材 `work-m11`・`toolchain-emsdk`・`toolchain-retdec` が本 run に無く、`m11_gen_ir2.sh` / `m11_build.sh` / `survey_units.mjs` を実行できなかった (`fl-win64` のみ取得)。
 - per-unit の survey JSON は保存されていなかったため、**再集計は未実施**。
-- base commit: 測定は `origin/main` `6e96689d` 上 (PR HEAD `5c6737c5` の merge-base)。**main 追従後の再測定は未実施** (現 origin/main は `095ca374`)。
+- base commit: 測定 base は `origin/main` `6e96689d` (PR HEAD `5c6737c5` の merge-base)。**main 追従後の再測定は未実施** (2026-10-13 時点の origin/main は `13d51541`)。
 - 測定条件 (前回値の記載どおり): `m11_gen_ir2.sh` で IR 再生成, `ldfix=applied`。`survey_units.mjs` を OFF/ON 各 1 回直列。所要 survey 15.6 s / build 26 s。load は未記録。
 
 ## 2. 集計表 (前回値・未再集計)
@@ -28,7 +28,7 @@
 |---|---|---|
 | 149 | oob → oob | 最上位 frame `412e40 ← 653660 ← 6539e0`。受入条件 1 は未達 |
 | 158 | ok → ok | 変化なし |
-| 280 | 前回値で kind 変化あり (旧 → 新 の詳細は未記録) | 前回 run の記録では oob のまま |
+| 280 | **記録が矛盾**: PR 本文は「oob のまま」、本節は「kind 変化あり」 | 旧 → 新 は未確定 |
 | 659 | oob → halt0 | |
 | 888 | ok → halt0 | **退行**。frames `412770 ← 4128b0 ← ...`。既定 ON にできない |
 | 291 / 296 / 302 / 304 / 368 | 遷移の記録なし | 未確認 |
