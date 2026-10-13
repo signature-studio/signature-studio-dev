@@ -193,20 +193,13 @@ awk -F'\t' -v a=401 -v b=404 'NR>1 && $1>=a && $1<=b {s+=$4; l+=$5; n+=$6; u+=$7
 
 #### 12.4.1 本 run (HEAD `12586095`) の実測と、分類で判明した点
 
-測定経路 (`measure_flengine_split.sh` / `roundtrip.sh` / `audit_icall.py` / `passes_stub_count.py` / `ir_icall_restore.py` / `icall_rewrite.py`) のコード差分は `711b58ca` → `12586095` で 0 行。素材 `fl-win64` / `toolchain-retdec` を `$RUNNER_TEMP` に展開して測定した。
+測定経路のコード差分は `711b58ca` → `12586095` で 0 行。§12.1 / §12.3 の数値は本 run で再確認した。
 
-- `measure_flengine_split.sh`: 132.7 s (real, 4 core)。base 366 / c2 366 (基準どおり)。`kept_indirect` 8、dropped 366。
-- `passes_stub_count.py` の段 dump: 709 passes。`Global Value Numbering` 183 / 192 → `Sparse Conditional Constant Propagation` 0 / 9 (§12.1 と一致)。
-- `after.0.restored.ll` の `__icall_dispatch(i64 <site VA>)` は 8 件で、`sites_after.json` の kept 8 と一致。dropped 366 の site VA は restored IR に現れない (stub 呼出しごと消えている)。
+- `measure_flengine_split.sh`: 132.7 s (real, 4 core) は HEAD `12586095` で新規取得した実測。
+- 段 dump の `!N` 番号は最終 `.ll` の `!N` と一致しない (例: 最終 `.ll` の `!392` は `30189433`)。`map.json` の `sites[].new` と最終 `.ll` の META 値の共通は 0 件。site → 段 dump ブロックの突合は現成果物では組めず、段単位で `!N` を保存する修正が要る。
+- `__icall_dispatch(i64 <site VA>)` は restored IR に 8 件で、`sites_after.json` の kept 8 と一致。dropped 366 の VA は現れない。
 
-**分類を試みて未了の点 (本 run で判明)**:
-
-- 段 dump (`--print-after-all`) の本体には `!N = !{i64 VA}` の META 定義が無い。`insn.addr` を VA に直すには最終 `.ll` の META 表が要るが、段 dump の `!N` 番号と最終 `.ll` の `!N` は一致しない (例: 最終 `.ll` の `!392` は `30189433` (0x1cca779) で、stub 呼出しの VA と対応しない)。
-- `map.json` の `sites[].new` (書換え後 VA) は、最終 `.ll` の `insn.addr` の VA 体系と一致しない (`new` と META 値の共通 0 件)。突合キーの対応は未確定。
-- 結論: site → 段 dump 上のブロックの突合は、現在の成果物 (`map.json` / 最終 `.ll`) だけでは組めない。段 dump ごとの `insn.addr` → VA 対応 (`!N` 定義を段単位で保存する) を取り直す必要がある。
-- 分類スクリプトは本 run では完成していない (PR に含めず、退避)。
-
-**受入条件 2・3 は本 run でも未達。** 次 run の入力: `oc_artifacts: fl-win64 toolchain-retdec` (本 run と同じ) で、段 dump の META を段単位で保存する修正から始める。
+受入条件 2・3 は未達。次 run の入力: `oc_artifacts: fl-win64 toolchain-retdec`。
 
 ## 14. ICALL-16: stack 引数の動的検証の実測 (#1023, REPORT.md §12 から分割移動)
 
