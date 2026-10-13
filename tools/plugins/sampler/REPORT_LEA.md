@@ -124,6 +124,7 @@ lea root を足して `call/jmp rel32` で広げ、新たに入った関数の l
 
 - **最終 HEAD 26dce2e での実測**: `lea_e2e.sh` (lift 込み) exit 0・**3 分 24 秒** (`time` 実測) / `lea_nega.sh` exit 0・**2 分 43 秒**・NC 23 項目全て期待通り。 上表の 11 分は、lift の初回 (キャッシュ無し) を含む c402faf 時点の値。
 - 最終 HEAD の `status_run.csv`: 7 block 全て `lift_rc=0` / `declares_unimpl=0` / `f80=0` / `emcc=0`。 lowering 対象は 3 block (`lowered=1`)。 `work/` の中間生成物は gitignore (`tools/plugins/work/`)。
+- **#1033 (HEAD fe9227a5, `bash tools/plugins/sampler/lea_e2e.sh`)**: exit 0・所要 263 秒 (実測)。 judge shells PASS 7/7 / indirect_defs PASS 7/7 / facts_total PASS 4 checks × 7 plugins / 最終行 OK。 CSV の `f80_raw` は Granulizer・Slicer・Slicer 2 が各 2 (`f80_funcs` lowering 後は全 block 0、`emcc_c_rc_raw` 1 → lowering 後 0)。 実行環境: runner (load 1.0)、素材 fl-win64 / toolchain-retdec / toolchain-emsdk / work-liftlib / work-fw-stage1 / plugins-ott。
 - 旧 f358f17 / ad39596 の検証 (270 / 269 / 268 s、md5 `ceaf59c63860`、`lea_nega` 222 s) は main 基点の値。 main 取り込み後は上の実測に置き換えた。
 - 範囲外: 差分試験 (bit-exact)・wasm リンク・実行時の到達性 (`lea` 先が実際に呼ばれるか)。 通過 ≠ 正しさ (§1 と同じ)。
 
