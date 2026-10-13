@@ -24,7 +24,7 @@
 
 `bash trap_triage/neg_683.sh` (ON/OFF を順に build + `survey_units.mjs` + `survey_diff.py`)。素材 `work-m11` は #516/#680 以前の生成物で `ir_conditions.json` が無く、そのままでは build が fail-closed で止まる。そこで `m11_gen_ir2.sh` で同じ `boot*.lift.ll` から IR を作り直した (ldfix=applied、20 s)。以下はその再生成 IR の実測。
 
-- 実行: HEAD `50fed21d` の worktree で、`m11_gen_ir2.sh` による IR 再生成 (21.1 s、`ldfix=applied`、`qstore=applied`、`ir_sha256` 30a4e00d…) の後に `neg_683.sh` を 3 回実行 (測定 1・2・3)。各回で ON build → survey → OFF build → survey の順。`neg_683.sh` は PE・capstone・pefile の存在を事前確認し、各 build 後に `ir_conditions.json` の `qstore=applied` を確認する (欠けたら exit 1)。qstore 実行の記録は `work/qstore.log` (`functions=7421`、`ir_narrow_imm_stores=140`) と build log の `[m11build] OK` で確認。C 側 (`m11_ov.c`) と build スクリプトは `956d2ed` から変更していない。
+- 実行: HEAD `fe662e88` (コード・スクリプトは `50fed21d` と同一。測定は `50fed21d` で 3 回、`fe662e88` で 1 回実施し、全回で同一結果) の worktree で、`m11_gen_ir2.sh` による IR 再生成 (21.1 s、`ldfix=applied`、`qstore=applied`、`ir_sha256` 30a4e00d…) の後に `neg_683.sh` を 3 回実行 (測定 1・2・3)。各回で ON build → survey → OFF build → survey の順。`neg_683.sh` は PE・capstone・pefile の存在を事前確認し、各 build 後に `ir_conditions.json` の `qstore=applied` を確認する (欠けたら exit 1)。qstore 実行の記録は `work/qstore.log` (`functions=7421`、`ir_narrow_imm_stores=140`) と build log の `[m11build] OK` で確認。C 側 (`m11_ov.c`) と build スクリプトは `956d2ed` から変更していない。
 - 所要 (実測、`neg_683.sh` の各段階。load は各段階終了時の 1 分値): 測定 1 = 全体 76.8 s (ON build 24.5 s / survey 17.2 s (load 1.03) / OFF build 18.4 s / survey 16.5 s (load 1.02))、測定 2 = ON build 18.6 s / survey 16.9 s (load 1.08) / OFF build 18.6 s / survey 16.8 s (load 1.11)、測定 3 = ON build 18.4 s / survey 17.2 s (load 1.06) / OFF build 18.6 s / survey 17.2 s (load 1.03)。
 
 | 構成 | ok | oob | halt0 | miss | noproc | trap | 計 |
@@ -64,7 +64,7 @@ on   units 149/158/280/659: [(149, 'oob'), (158, 'halt0'), (280, 'halt0'), (659,
 
 - **定義** (`tests/oob_414ad0.py` と同じ): batch の関数のうち「最初の `wasm_trap` case の wasm_detail が `memory access out of bounds @ ld_wasm.wasm.function_414ad0` で始まる」関数。基準 jsonl `tools/liftdiff/work/m11/batch_closure.jsonl` (7421 行) で **68**。
 - **A** = IR 無変更の複写 (`m11_414base`)、**B** = `ir414_fix.py` で修復した IR (`m11_414fix`)。68 関数を `--set file:` で指定、`--shards 4 --state auto`。
-- **実行手順**: `liftdiff68_683.sh` を end-to-end で実行 (HEAD `50fed21d`、`FL_WIN64_DIR` = fl-win64 展開先、`PY` = python3 + capstone/pefile/numpy)。3 回実行し、いずれも rc=0 (実測 39.5 s。2・3 回目も同一の要約行)。
+- **実行手順**: `liftdiff68_683.sh` を end-to-end で実行 (HEAD `fe662e88`、`FL_WIN64_DIR` = fl-win64 展開先、`PY` = python3 + capstone/pefile/numpy)。3 回実行し、いずれも rc=0 (実測 39.2 s / 38.6 s / 39.6 s。3 回とも同一の要約行)。
 - 測定 1〜3 の要約 (`cmp68_683.py` 出力): A の oob414 = **59**、B の oob414 = **0**、verdict は A・B とも mismatch 68 / match 0。3 回とも同一。
 
 | 指標 (68 関数、n=3 で同一) | A (IR 無変更) | B (414ad0 修復) |
@@ -111,7 +111,7 @@ FL_WIN64_DIR=... PY=... bash tools/m11/trap_triage/liftdiff68_683.sh
 
 ## 7. 検証範囲 / 範囲外
 
-- 範囲内: m11 survey 942 unit (ON/OFF 各 n=3、HEAD `50fed21d`)、liftdiff 68 関数 (A/B 各 n=3、end-to-end 実行、HEAD `50fed21d`)。以後の REPORT のみの commit では再実行していない。
+- 範囲内: m11 survey 942 unit (ON/OFF 各 n=3、HEAD `50fed21d`。`fe662e88` で追加 1 回)、liftdiff 68 関数 (A/B 各 n=3、end-to-end 実行、HEAD `fe662e88`)。
 - **n の限界**: 上記は n=3 で全件一致 (min = max)。ただし同一素材・同一マシン上の反復であり、別マシン・別負荷での再現は未確認。
 - 範囲外: closure 7421 関数の再測定 (§5 は旧測定値)、`m11_e2e.sh` 全体 (stage4 / bit-exact) への影響 (未実施)、C 版と IR 版の相互検算 (未実施)、副作用の原因 (旧 PR 記述の再現が無いため対象外)。
 - 既存 REPORT の数値 (`818 / 21` 等) は旧生成物 (a) の値で、本 gate の有無とは無関係。他 REPORT の書換えは行わない。
