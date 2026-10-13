@@ -28,7 +28,7 @@
 | `loadpaths.json` | 配置 group の宣言 (glob・phase・推奨 tier・読込単位・読み手関数 VA・`claims` / `calls`) |
 | `check.py` + `mapcheck.mjs` | group を実ファイル一覧に当てて件数・サイズ・Win→VFS 写像 (pathreg JS ミラーを import) を実測 |
 | `crosscheck.py` | 別算法 (RSA の乗算展開 / 64 bit ワード演算の XOR / 標準 `gettext`) による検算 + ネガコン |
-| `svc_check.py` | 検索パス服務 (§8) の vtable スロット・call 辺・import 名・機械語を DLL から機械照合 (43 項目) + `--mutate` ネガコン (#590) |
+| `svc_check.py` | 検索パス服務 (§8) の vtable スロット・call 辺・import 名・機械語を DLL から機械照合 (49 項目) + `--mutate` ネガコン (#590) |
 | `lang_seed_check.mjs` | 非 en seed の seed 層確認 (`Program language` を apply:true・value=ja にした派生をメモリ上で作り、値の出現と外した時の不出現を確認。wasm/素材不要) (#590) |
 | `e2e.sh` | 上記 1 コマンド検証 |
 
@@ -225,7 +225,7 @@ DEFECTS.md 追記案: なし (新しい silent miscompile 類型は見つけて�
 | 受入条件 1: `ja` seed で `/fl/System/Languages/ja.moe` が全量読まれることの e2e | **未達** (boot が `CreateFruityInstance` に未到達) | #590 を開いたまま (依存 #253)。到達後に `assettrace` 系で open() を実測 |
 | 受入条件 3: ネガコン「言語 seed を外すと en 組込みに戻る」の動的確認 | **seed 層のみ** (§8-3)。エンジン側は未達 | 同上 |
 | ~~0x758200 の bit2 省略が 0x9de400 の呼出で有効か~~ | 静的に**無効**と確定 (§8-5)。動的確認は boot 到達後に #590 で同時に行う | #590 |
-| 受入条件 2 の動的側: shimx/VFS が不在パスで `INVALID_FILE_ATTRIBUTES` + 2/3 を返すことの実測 | shimx 側は node e2e で実測済み (`tools/shimx/REPORT.md` §16)。FL 実行中の実測は未了 | #658 (shimx 側) / #590 (FL 側) |
+| 受入条件 2 の動的側: shimx/VFS が不在パスで `INVALID_FILE_ATTRIBUTES` + 2/3 を返すことの実測 | shimx 側は **未実測** (`tools/shimx/test/test_absent.c` は作成済みだが e2e 未実行。`tools/shimx/REPORT.md` に §16 は未作成)。FL 実行中の実測も未了 | #658 (shimx 側) / #590 (FL 側) |
 
 ### 8-5. bit2 の確定 (#658・静的)
 
