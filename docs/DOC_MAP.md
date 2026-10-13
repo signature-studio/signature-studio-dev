@@ -172,7 +172,7 @@
 | `tools/assets/wvfs/REPORT.md` | ~145 | 書込可能 OPFS VFS |
 | `tools/assets/deploy-manifest/REPORT.md` | ~60 | 配備 manifest 生産側 (05-stage 契約) |
 | `tools/python/REPORT.md` | ~250 | CPython wasm + flapi/MCP 解析 + ブリッジ設計。§12 = Piano roll scripting (#79) と Chrome 検証 (#466) の結論 |
-| `tools/python/REPORT_APPENDIX.md` | ~127 | python §7b-2 (getBrowserNames 固定バッファ修正) と §12/§12b (Piano roll scripting #79 / Chrome 検証 #466) の全文 (#619 で無変更分割移動) |
+| `tools/python/REPORT_APPENDIX.md` | ~137 | python §7b-2 (getBrowserNames 固定バッファ修正) と §12/§12b (Piano roll scripting #79 / Chrome 検証 #466) の全文 (#619 で無変更分割移動) |
 | `tools/flp/REPORT.md` | ~120 | FLP/FST パーサ・ライタ・往復コーパス |
 | `tools/plugins/REPORT.md` | ~115 | Fruity プラグイン 141 種 wasm 化マップ (カウントの正本) |
 | `tools/plugins/f2/REPORT.md` | ~200 | PLG-F2 eq-filter 11 本: 固有閉包 lift の再現と間接 call 脱落の監査 (#199)、icall 復元の batch_lift 接続と回帰ゲート (#514) |
