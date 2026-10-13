@@ -178,7 +178,7 @@ P0c (`p0c/REPORT.md`) で見た各 kernel の現状 (本 PR では再測定し�
 | Transient Processor | 26 / 15,853 | 65 / 22,135 | 53.7 / 29.1 |
 | 計 | 312 / 154,522 | **820 / 289,420** | |
 
-- lift (増分閉包を `lift_ranges.sh` = batch_lift と同一鎖で実行): **7/7 lift_rc=0 / declares_unimpl=0 / f80=0 / emcc_c_rc=0** (judge.py 7/7 合格)。 増分閉包の関数数は base の約 2.6〜3.2 倍 (Maximus 245/84、Soundgoodizer 212/65)
+- lift (増分閉包を `lift_ranges.sh` = batch_lift と同一鎖で実行): **7/7 lift_rc=0 / declares_unimpl=0 / f80=0 / emcc_c_rc=0** (judge.py 7/7 合格)。 増分閉包の関数数は base の約 1.8〜3.3 倍 (Emphasis 109/60、Compressor 60/31、Soundgoodizer 212/65)
 - 実測時間 (`indirect_e2e.sh`、コミット前の作業ツリー): **73 s / rc=0**。 `closure_indirect.py` 2.7 s、lift 7 本の合計 71 s (Limiter 7 / Compressor 5 / Maximus 23 / Soundgoodizer 18 / Emphasis 9 / Multiband 4 / Transient 5 s)
 - 判定の負例: 増分 status から 1 行を落とすと judge.py が exit 1 (行欠落の検出)
 - **範囲外 (主張しない)**: 増分閉包の lift が通ったのは emcc の wasm バックエンドを通ったことだけ。 差分試験 (native ⟷ wasm の bit 比較) と wasm リンク・実行は未実施。 増分閉包の内容が正しい機能か (間接呼出の到達先が実際に呼ばれるか) は未検証
