@@ -147,8 +147,8 @@ bash tools/plugins/p0c/p0c_e2e.sh      # 初回実測 355 秒 (work/ 無し・HE
 
 - **方式**: `lift_ranges.sh` に opt-in 段 (`PLUG_CANON_ALLOCA=1`) を追加し、`ir5_patch` (A7 で uselistorder 除去済み) の後に `liftlib.passes.base.canon_alloca_order` を掛ける。正本は liftlib 側 (`passes/canon_alloca.py` は import のラッパ)。既定 0 のため他の lift は不変。p0c_e2e.sh の k80 lift だけ有効化。理由: 比較時だけ正規化すると `k80.lift.ll` 自体が揺れたまま残るため、lift 段で固定した。
 - **測定 commit**: `d5959204`。
-- **素材**: `fl-win64` (`$HOME/analysis/win64/extracted/block18983_PE.bin`)、`toolchain-retdec` (RetDec v5.0 `/opt/retdec`)。`toolchain-emsdk` は `/opt/emsdk` に既存 (clang-24)。
-- **llvm-as**: `toolchain-emsdk` に `llvm-as` が無いため、`/usr/lib/llvm-18/bin` を PATH に追加して `p0c2_e2e.sh` step [4] を通した (スクリプトは無変更)。
+- **素材**: `fl-win64` (`[WIN64]` の `extracted/block18983_PE.bin`)、`toolchain-retdec` (`[RETDEC]`, RetDec v5.0)。`toolchain-emsdk` (`[EMSDK]`, clang-24)。
+- **llvm-as**: `toolchain-emsdk` に `llvm-as` が無いため、システムの LLVM 18 の `llvm-as` を PATH に追加して `p0c2_e2e.sh` step [4] を通した (スクリプトは無変更)。
 
 ### 受入条件の結果
 
@@ -167,10 +167,14 @@ bash tools/plugins/p0c/p0c_e2e.sh      # 初回実測 355 秒 (work/ 無し・HE
 | `p0c2_e2e.sh` | 0 | 50 s | 7.86 → 3.98 |
 
 k80 lift 単体 (`PLUG_CANON_ALLOCA=1`): run1 4 s (load 4.08) / run2 4 s (load 3.83, ASLR 無効)。
+- **測定条件 (未確定)**: RetDec を再実行したか、`PLUG_REUSE_DRC=1` で既存 `k80.drc.ll` から再開したかは、測定時の記録が残っておらず確定できない。`lift_ranges.sh` は `PLUG_REUSE_DRC=1` かつ `drc.ll` 存在時にだけ RetDec を飛ばす。RetDec 実行を含む値としては 4 s は短すぎるため、再開だった可能性がある (推測。根拠なし)。
+- 再確認: 修正時点の runner には `[RETDEC]`・`k80.drc.ll`・k80 の `work/` が無く、再測定できなかった。この 4 s の値は一致判定 (受入条件 2・3) には使っていない。一致判定は sha256 と `p0c2_sweep.csv` の `cmp` で行った。
 
 ### 検証の注記
 - 置換前後の lift 比較は同じ `block18983_PE.bin` / 同じ 80 ranges。`before` は `PLUG_CANON_ALLOCA` 未設定、`after` は設定。p0c2 の before/after は `work/k80.lift.ll` を差し替えて各 1 回ずつ実行 (50 s / 51 s)。
 - `argfix.ll` (中間 IR) のテキストは alloca 番号が変わるため before/after で byte 差が出る。最終判定の `p0c2_sweep.csv` は一致。
 
 ### 差分 (測定 commit 以降のコード差分)
-測定 commit = HEAD = `d5959204`。コード差分 0。
+測定 commit = `d5959204`。p0c 配下のコード差分は 0。main 取り込み (`243f75d9`) で `tools/plugins/lift/lift_ranges.sh` に opt-in 変数 2 つ (`PLUG_NO_STATIC_DETECT`・`PLUG_I32PTR_FUNCS`) が入った。既定 (未設定) では出力は変わらず、p0c の k80 lift は両方とも未設定のまま呼ぶ (`p0c_e2e.sh` L56)。実測は `d5959204` の時点のまま (再測定は未実施。runner に RetDec が無いため)。
+
+`git diff d5959204 HEAD -- tools/plugins/p0c` の範囲は `REPORT.md` の 32 行追加のみ。
