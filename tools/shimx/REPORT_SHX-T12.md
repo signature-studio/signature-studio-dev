@@ -8,7 +8,7 @@
 - `SHIMX_TRACE_FILE=<path>` (または API `shimx_set_trace_file(path)`) で、file API の呼出を **1 行 1 イベントの JSON** として出力する。
 - 対象は CreateFileW / CreateFileA / GetFileAttributesW / FindFirstFileW / FindFirstFileExW / FindNextFileW / ReadFile (open 起点の読み出し)。
 - 既存の `SHIMX_TRACE=1` (stderr の自由文) は**変更なし**。`test.sh` は HEAD と同じく全 PASS (rc=0)。
-- 単体テスト `test/ftrace/ftrace_test.sh` は PASS (実測 3.97 s)。ネガコン (無効時 0 行) を含む。
+- 単体テスト `test/ftrace/ftrace_test.sh` は PASS (実測 5.17 s、§5)。ネガコン (無効時 0 行) を含む。
 
 ## 2. 出力仕様
 
@@ -62,9 +62,14 @@
 | fail_err | {2: 3, 18: 1} (ERROR_FILE_NOT_FOUND ×3 / ERROR_NO_MORE_FILES ×1) |
 | distinct_posix_opened | 2 |
 
-`ftrace_test.sh` の結果 (HEAD = 修正 commit、検証直前の `/proc/loadavg` 開始値 0.84 0.69 0.36): rc=0 / 5.72 s / PASS 6 段 (✓ 完了 5 件 + 完了行)。
+検証 HEAD `69215e5e` の実測 (`/proc/loadavg` 1 分値、実行前→実行後):
 
-`bash tools/shimx/test.sh` (既存の全体テスト): rc=0 / 94 s / 7/7 完了 (開始 load 0.04 0.24 0.18、終了 1.78 0.80 0.38)。実行後に追跡対象の生成物 (`BACKLOG.md` / `exports.txt` / `inventory.md` / `data/coverage.json` / `data/inventory.csv`) は HEAD に戻した。
+| コマンド | rc | 所要 | load |
+|---|---|---|---|
+| `bash tools/shimx/test/ftrace/ftrace_test.sh` | 0 | 5.17 s | 0.56 → 0.60 |
+| `bash tools/shimx/test.sh` | 0 | 47 s | 0.50 → 0.82 |
+
+`test.sh` は 7/7 完了。実行後に追跡対象の生成物 (`BACKLOG.md` / `exports.txt` / `inventory.md` / `data/coverage.json` / `data/inventory.csv`) は HEAD に戻した。
 
 ## 6. ネガティブコントロール
 
@@ -85,7 +90,7 @@
 
 ```
 bash tools/shimx/test/ftrace/ftrace_test.sh   # 単体テスト (約 4 s)
-bash tools/shimx/test.sh                       # 既存の全体テスト (約 37 s)
+bash tools/shimx/test.sh                       # 既存の全体テスト (実測 47 s、§5)
 python3 tools/shimx/scripts/ftrace_summary.py <trace.jsonl>
 ```
 
