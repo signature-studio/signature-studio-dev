@@ -43,13 +43,13 @@ toolchain-retdec はツール台帳 `docs/REFERENCES.md` の `[RETDEC]` を参�
 
 ### 5.1 差分 0 の証跡
 
-検証 HEAD は `f9c54171` (PR head)。測定 commit `916d9932` から HEAD までの `tools/m11` のコード差分は、REPORT 1 ファイルの追加のみ。
+検証 HEAD は `6f0685cf` (PR head)。測定 commit `916d9932` から `6f0685cf` までの `tools/m11` のコード差分は、REPORT 1 ファイルの変更のみ。
 
 ```sh
-git diff --stat 916d9932 HEAD -- tools/m11
-# tools/m11/REPORT_N1004.md | 37 +++++++++++++++++++++++++++++++++++++
-# 1 file changed, 37 insertions(+)
-git diff 916d9932 HEAD -- tools/m11 ':!tools/m11/REPORT_N1004.md' | wc -c
+git diff --stat 916d9932 6f0685cf -- tools/m11
+# tools/m11/REPORT_N1004.md | 93 ++++++++++++++++++++++++++++++++++++++++++++++-
+# 1 file changed, 92 insertions(+), 1 deletion(-)
+git diff 916d9932 6f0685cf -- tools/m11 ':!tools/m11/REPORT_N1004.md' | wc -c
 # 0   (REPORT 以外の差分は 0 バイト)
 ```
 
