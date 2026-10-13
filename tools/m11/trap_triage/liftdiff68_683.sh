@@ -31,7 +31,9 @@ for name in m11_414base m11_414fix; do
   src="$LD/work/m11_414fix/fn68.txt"; dst="$LD/work/$name/fn68.txt"
   [ "$src" = "$dst" ] || cp "$src" "$dst"
 done
-source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1   # [EMSDK] docs/REFERENCES.md
+SS_EMSDK_ENV="${SS_EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}"   # [EMSDK] docs/REFERENCES.md (emsdk_env.sh は EMSDK_ENV を unset するので別名)
+[ -f "$SS_EMSDK_ENV" ] || { echo "[liftdiff68] emsdk_env.sh not found: $SS_EMSDK_ENV (SS_EMSDK_ENV で指定)"; exit 2; }
+source "$SS_EMSDK_ENV" > /dev/null 2>&1
 for name in m11_414base m11_414fix; do
   (cd "$LD" && "$PY" liftdiff.py batch "$HERE/targets_$name.json" --set "file:$LD/work/$name/fn68.txt" --shards 4 --state auto --out "$LD/work/$name/batch_${name#m11_}68.jsonl" > "$LD/work/$name/batch_${name#m11_}68.log" 2>&1)
 done

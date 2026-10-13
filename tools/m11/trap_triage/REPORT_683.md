@@ -34,7 +34,7 @@
 | OFF (既定, gate=0) n=3 | 869 | 17 | 8 | 47 | 1 | 25 | 942 |
 | ON (gate=1) n=3 | 869 | 17 | 8 | 47 | 1 | 25 | 942 |
 
-- **決定的**: 測定 1〜3 は全件一致 (min = max = n=3)。OFF と ON も一致 (差 0)。
+- **本 PR の環境で n=3 の min = max**: 測定 1〜3 は全件一致。本測定では OFF = ON (差 0)。ただし独立測定 (`d8075de` 上) では OFF = ok 828 / oob 13 / halt0 54、ON = ok 828 / oob 10 / halt0 57 で、本測定 (828/11/55 の OFF = ON) と食い違う。原因は未確認 (下記 61 行目)。
 - **`survey_diff.py` の全出力** (測定 3。測定 1〜3 とも同一):
 
 ```
@@ -129,8 +129,8 @@ FL_WIN64_DIR=... PY=... bash tools/m11/trap_triage/liftdiff68_683.sh
 | 158 が ok になった原因 (main 取込による) | 受入条件 1 の 1/4 を満たす理由が未確認 | #683 の継続 |
 | liftdiff 68 の次の trap (`4133f0` / `412e40` 経由の OOB 等) | 68 関数が verdict match に届かない | #307 |
 | closure の match→非 match 7 件 (0x5af280 / 0x50d920 / 0x44b090 / 0x79d920 / 0x663d80 / 0x699ca0 / 0x4447d0) の原因・merged HEAD での再測 | 受入条件 3 (退行 0) が closure 全体で未達 | #307 |
-| 独立測定 (`d8075de`) の OFF 13/10 と本測定の差 | survey 数値の再現性 | PM 判断 (検収 subagent) |
+| 独立測定 (`d8075de`) の OFF 13/10 と本測定の差 | survey 数値の再現性 | #680 (IR 生成条件で OFF が 818/21 ↔ 828/13 と変わる件。既存) |
 | liftdiff batch の再現性 (A 67 と closure 68 の差) | A/B の読み方 | #307 (harness 件) |
-| C 版 (m11_ov.c) と IR 版 (ir414_fix.py) の相互検算 | 転記の正しさ (独立検算) | PM 判断 (検収 subagent) |
-| gate ON が survey で効果を持たない理由 (C 版の 2 版が同じ結果) | 本 gate の存在意義 | PM 判断 |
-| `work-m11` が #516/#680 以前の生成物で `ir_conditions.json` 無し (そのままでは build 不可) | 素材の更新 | PM 判断 (素材の再生成) |
+| C 版 (m11_ov.c) と IR 版 (ir414_fix.py) の相互検算 | 転記の正しさ (独立検算) | #764 (M11-N39。本 PR で起票) |
+| gate ON が survey で効果を持たない理由 (C 版の 2 版が同じ結果) | 本 gate の存在意義 | #683 の継続 |
+| `work-m11` が #516/#680 以前の生成物で `ir_conditions.json` 無し (そのままでは build 不可) | 素材の更新 | #729 (survey 測定基準の残課題。work-m11 の R2 再投入を含む) |
