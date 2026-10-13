@@ -127,7 +127,7 @@ shim 候補 (SR-3/SR-4 入力) は呼出確認 110 件のうち kernel32 (メモ
 - 結論: `armWatch` を呼んだスレッド上では、+0x10c は **controller 生成〜editor 準備の区間で、QI 結果から値 2 が格納される経路**を通る (main スレッドで 1 回のみ観測。他スレッドの書込は未観測)。REPORT §3-3 の「copy ctor 0x18000d1b0 が候補」との関係は未検証。0x800010 の観測 (= 1 への遷移) は、この QI 結果が変わる条件の解明が前提。
 - 未検証: IID の内容 / 所属 class / `0xacf70` の呼出元 / 0x800010 の既定 host 受信。
 
-- e2e (`S2HOST_WATCH` 未設定, 実行 commit **`c9fbfc54`** = `git rev-parse` `c9fbfc5473f98cc8902f6ee8daffca3e5446eb1f`、`vst3host.cpp` は `35737960` と同一): **50/50 OK, 67.93 s** (`bash tools/targets/serum2/host/e2e.sh`、exit 0)、NC1/NC2 期待どおり (exit=1, NG=1)、load 0.09 → 0.14。(同 HEAD の直前 run は 71.40 s、`35737960` の run は 71.40 s。)
+- e2e (`S2HOST_WATCH` 未設定, 実行 commit **`c9fbfc54`** = `git rev-parse` `c9fbfc5473f98cc8902f6ee8daffca3e5446eb1f`、`vst3host.cpp` は `35737960` と同一): **50/50 OK, 67.93 s** (`bash tools/targets/serum2/host/e2e.sh`、exit 0)、NC1/NC2 期待どおり (exit=1, NG=1)、load 0.09 → 0.14。(同コードの `35737960` 時点の run は 71.40 s。)
 
 ## 5. 未解決 (起票先)
 
