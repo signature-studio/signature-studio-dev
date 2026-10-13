@@ -176,7 +176,7 @@ RetDec 出力の欠陥と修復 (対照実験 `lift/gain_ablate.sh` で各々が
 ### 12-0. 結論 (先出し)
 
 - **受入 1 (C+0x2d0/C+0x328 と C+0x318 木の実測): 未達。** harness 構築値のみ実測。C+0x2d0 == C+0x328 (72/72 呼出)、C+0x318 木は空 (map 検索 found=0 が 72/72)、静的分岐 (map 非経由) は 0 回。**実 snapin 構築 (FLE boot 連鎖) からの実値は未取得。**
-- **受入 2 (実経路の実行・ID 解決先・Filter 出力変化): 部分。** 解決先は子リスト index 0 (Filter#1) のみ (120/120 呼出で k=0)、値は 0x157/0x158 = pow(x,0.62)、0x15a = 無変換で epf 8/8 一致 (FA-4 再現)。ただし **0x180da6c00 の呼出は 0 回** のため Filter 出力への到達は未測定。摂動 (Mid Air 0.45→0.9) でも L/R 出力は 40/40 呼出で不変 = 本 harness は 0x157 の効果を観測できない。native/wasm bit-exact は空 map 経路 (setter を含む) で 15/15。
+- **受入 2 (実経路の実行・ID 解決先・Filter 出力変化): 部分。** 解決先は子リスト index 0 (Filter#1) のみ (120/120 呼出で k=0)。値は **1 周目 (各 scenario の先頭 3 呼出) のみ** 0x157/0x158 = pow(x,0.62)、0x15a = 0.0 が epf 8/8 と一致 (FA-4 再現)。**2・3 周目は未検証**: 予測との一致は 0x157 12/16、0x158 14/16、0x15a=0.0 は 8/16 (観測のみ・判定外。予測式は未確定)。0x15a の「無変換」も未確認。**0x180da6c00 の呼出は 0 回** のため Filter 出力への到達は未測定。摂動 (Mid Air 0.45→0.9) でも L/R 出力は 40/40 呼出で不変 = 本 harness は 0x157 の効果を観測できない。native/wasm bit-exact は空 map 経路 (setter を含む) で 15/15。
 - **受入 3 (DUMP 接続表経由で Filter ID 1〜4 に届くか): 未達。** DUMP の Filter は chain idx 0 と 2 の 2 個。宛先は常に idx 0 のため、idx 2 (Filter#2) へはこの経路で届かない。ID 1〜4 との対応は未解決。
 - **受入 4 (Compressor/Gain の同 ID 意味): 未達。** 即値 0x157/0x158/0x15a を持つ pdata 関数は 53 件 (imul と rsp 操作を除外後、偽陽性を含む)。Compressor/Filter/Gain の process 閉包 (78/109/62 関数) との交差は 0、wrapper ctor 閉包 (39/40/39 関数) との交差も 0。同 ID の意味は未解決。
 - 注: 既存の `REPORT_FA7.md` / `REPORT_FA8.md` は repo に存在しない (Issue 本文の参照先)。FA-7/8 の値は再取得せず、本節は FA-4 (`lift2/REPORT.md` §12) の再現から始めた。
@@ -186,11 +186,12 @@ RetDec 出力の欠陥と修復 (対照実験 `lift/gain_ablate.sh` で各々が
 - `0x180ca1480(C, out, key)`: key 無し/keycnt=0 → `{C+0x2b0, C+0x360}`。`C+0x2d0 == C+0x328` → map 検索 (`C+0x318` の木, `+0xa8`)。不一致かつ keycnt=1 かつ key0=0 → 静的返却 `{C+0x308, C+0x470}` (map を引かない)。不一致で keycnt≠1 → ゼロ。不一致で key0≠0 → map 検索。
 - `0x180c9d700(child, id, value, key)`: `out[0]` から `[·+0x10]` の object に対し vtable slot +0x50(id) → +0x18 → +8(value)、続いて `0x180da6c00(out[1], id, idx, 2)`。`0x180da6c00` は r9=2 のとき `0x180f9e540` の結果と `this+0xe8` を比べ、不一致の分岐で id×16 の表 (`this+0x30`) へ (連番, idx) を書き `this+0x48` を増やす (静的読み。一致時は vtable 経路 `[this]+0x50` へ)。
 
-### 12-2. 実測 (n=2 実行, 全て `lift2/` の再現スクリプト)
+### 12-2. 実測 (clean checkout で run_fa9 5 回・run_chainmap 3 回。数値は全実行で同一, 全て `lift2/` の再現スクリプト)
 
 | 項目 | 分母 | 結果 | 再現 |
 |---|---|---|---|
-| FA-4 再現: child 呼出 (child, id, value) と .epf 突合 | epf 8 本 | 8/8 OK, 9 呼出/シナリオ, 宛先 k=0 (Filter#1) | `run_chainmap.sh` |
+| FA-4 再現: child 呼出と .epf 突合 (判定は 1 周目の 3 呼出) | epf 8 本 | 8/8 OK, 9 呼出/シナリオ, 宛先 k=0 (Filter#1) | `run_chainmap.sh` |
+| 2・3 周目の値 (観測のみ・判定外): 0x157=pow(mid,.62) / 0x158=pow(high,.62) / 0x15a=0.0 に一致 | 各 16 呼出 | 12 / 14 / 8 (2 周目と 3 周目で値が変わる。予測式は未確定) | `run_chainmap.sh` (`fa4_chain_map.py` の観測行) |
 | 0x180ca1480 呼出 (setter 内) | 8 シナリオ (S900–S907) | 72 (9/シナリオ) | `run_fa9.sh` |
 | 分岐: C+0x2d0 == C+0x328 (map 経路) | 72 | 72 (静的分岐 0) | 同 |
 | map 検索 found (C+0x318 木, head が自身 = 空) | 72 | 0 | 同 |
@@ -198,14 +199,16 @@ RetDec 出力の欠陥と修復 (対照実験 `lift/gain_ablate.sh` で各々が
 | ERR (base, native) | 8 | 0 | 同 |
 | 宛先 child index (MAPTRACE 全件, S900–S907 + structured) | 120 | 全て 0 | `run_chainmap.sh` |
 | 即値 0x157/0x158/0x15a を持つ pdata 関数 | pdata 25,063 | 53 (≥100KB 38 / <100KB 15) | `fa9_imm_scan.py` |
-| 閉包交差 (process 閉包 78/109/62、ctor 閉包 39/40/39) | 53 | 0 / 0 | `closure.py` |
+| 閉包交差 (process 閉包 78/109/62、ctor 閉包 39/40/39。root は下記注) | 53 | 6 閉包すべて 0 | `fa9_closure_cross.py` |
 | native vs wasm bit-exact (epf 8 + structured 2 + random 5, fma0/1) | 15 | 15/15 (ERR 1 は native/wasm 同一) | `run_ctrl.sh 2 5` |
+
+閉包の再現条件: `closure.py <core> <root>` を **`--stop` 無し**で実行 (`fa9_closure_cross.py` が同条件で計算)。process root = Compressor 0x180775220 (78 関数) / Filter 0x180b6f050 (109) / Gain 0x180afe090 (62)。ctor root = 各 wrapper ctor を単独で指定 (Compressor 0x180774cd0 → 39 / Filter 0x180b6ed50 → 40 / Gain 0x180afde00 → 39)。§3.2 の「Gain process 単体 = 4 関数」は `--stop 0x1803ded20` 付き (同 option で Compressor 51 / Filter 109 / Gain 4)。
 
 ### 12-3. ネガティブコントロール (native のみ, wasm 側は未実施)
 
 | 摂動 | 期待 | 結果 |
 |---|---|---|
-| (b) `FA_ALT9=1`: C+0x328 を C+0x2d0 と不一致にし静的分岐を強制 | 後段が ERR になり、プローブが分岐を検出できる | 8/8 ERR、8/8 path=static。SIGSEGV (`rip=0x180c9d74c addr=0x50`): setter が `[C+0x318]` (controller) の vtable を読み、0 のまま `call [0+0x50]` |
+| (b) `FA_ALT9=1`: C+0x328 を C+0x2d0 と不一致にし静的分岐を強制 | 後段が ERR になり、プローブが分岐を検出できる | 8/8 ERR、8/8 path=static。SIGSEGV (`sig=11 rip=0x180c9d74c addr=0x50`): setter が `[C+0x318]` (controller) の vtable を読み、0 のまま `call [0+0x50]`。詳細は `run_fa9.sh` が `FA_DBG=1` で `work/ctrl/fa9_alt.err` に保存し、ゲート出力に 1 行表示 (FA_DBG 無しでは出ない) |
 | (c) epf の M+0x9dc4 (Mid Air) 0.45→0.9 | 状態ダンプに届く (盲点検査の有効性) | 状態ダンプ差分 400 トークン (子 8 体の P+0x9dc4〜0x9f60 窓、M 窓、ほか 1 窓)。**L/R 出力差分 0/40 呼出** → 0x157 の変化は L/R に届かない (map 空で setter が no-op) |
 
 ### 12-4. 検証範囲 / 範囲外
@@ -218,17 +221,20 @@ RetDec 出力の欠陥と修復 (対照実験 `lift/gain_ablate.sh` で各々が
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 実 snapin 構築 (FLE boot 連鎖) からの C+0x2d0/C+0x328/C+0x318 の実値 (受入 1) | 空 map が実機と同じかが不明 | 既存 #227 (FLE 系 boot 連鎖) |
-| 非空 map の構築 (controller 木 + {ptr, ctrl} 値 + 子 object の vtable slot +0x50/+0x18/+8) で 0x180da6c00 を到達させ、Filter 出力の native/wasm 比較 (受入 2 後半) | 0x157/0x158 の効果が未測定 | #665 続編 |
-| Filter#2 (DUMP idx 2) に macro ID が届く経路と、ID 1〜4 との対応 (受入 3) | Filter#2 のパラメタ連動が不明 | #665 続編 / #51 |
-| 0x157/0x158/0x15a の Compressor/Gain 側の意味 (受入 4)。候補 53 件のうち ≥100KB の 38 件は pdata 境界かテーブルの疑いで未検証 | 子 ID 写像の全体像 | #648 |
+| 実 snapin 構築 (FLE boot 連鎖) からの C+0x2d0/C+0x328/C+0x318 の実値 (受入 1) | 空 map が実機と同じかが不明 | 既存 #227 (FLE 系 boot 連鎖・PM コメント済み) |
+| 非空 map の構築 (controller 木 + {ptr, ctrl} 値 + 子 object の vtable slot +0x50/+0x18/+8) で 0x180da6c00 を到達させ、Filter 出力の native/wasm 比較 (受入 2 後半) | 0x157/0x158 の効果が未測定 | #702 (FA-9b) |
+| Filter#2 (DUMP idx 2) に macro ID が届く経路と、ID 1〜4 との対応 (受入 3) | Filter#2 のパラメタ連動が不明 | #702 / #51 |
+| 0x157/0x158/0x15a の Compressor/Gain 側の意味 (受入 4)。候補 53 件のうち ≥100KB の 38 件は pdata 境界かテーブルの疑いで未検証 | 子 ID 写像の全体像 | #648 (PM コメント済み) |
+| 2・3 周目の 0x157/0x158/0x15a の値の式 (12-2 の観測行) | 1 周目以外の ID 写像が未確定 | #665 (親へ注記。子は PM 起票待ち) |
 | `run_chainmap.sh` の native_ctrl_trace は S2004 以降で abort (`free(): invalid size`、FA-2c の既知限界と同根)。スクリプトは native の終了コードを見ず、判定は epf S900–S907 のみ | 検証範囲の明示 (判定自体は影響なし) | #665 (本 PR で注記) |
 | REPORT_FA7.md / REPORT_FA8.md が repo に無い | 参照先不在 | #648 |
 
 ### 12-6. 再現・環境・実測時間
 
-- 検証起点 commit: `12de6ef` (測定コード `d70e68e`, FA-4 判定の修正 `12de6ef`)。測定は `12de6ef` で再実行して確認。
-- 手順: `bash lift2/build_ctrl.sh` (初回のみ, 約 32 s) → `bash lift2/run_chainmap.sh` (1.5 s) → `bash lift2/run_fa9.sh` (2.7 s, 内部で `run_ctrl.sh 2 5` 約 2 s を含む) → `python3 lift2/fa9_imm_scan.py <core>` (約 26 s, 1 回計測)。
-- 素材: `plugins-freshair` の `Fresh Air.Win.zip` から `FACTORY Presets/Factory Bank/*.epf` (8 本) を `work/win/` へ展開 (gitignore 対象)。Python: capstone 5.0.7 / pefile 2024.8.26 (`pip --user`, repo 外)。
-- 実測時間と load average: `run_fa9.sh` 2.9 s / 2.7 s、`run_chainmap.sh` 1.6 s / 1.5 s、`run_ctrl.sh` 2.7 s (run_fa9 内)。load average は観測時 0.15〜0.53 (`uptime`)。n は各 2 回 (build は 1 回)。
-- 変更点: `native/native_ctrl.c` に `FA_PROBE9` (観測プローブ) と `FA_ALT9` (ネガコン) を追加。どちらも未設定時の経路は変えない (`run_ctrl.sh` 15/15 が同じ native コードで成立することで確認)。
+- 検証起点 commit: `d572059` (スクリプト修正の commit。本節の数値はこの版で実測)。以前の PR 記載の時間 (2.7〜2.9 s / 1.5〜1.6 s) は再現しなかったため差し替えた。
+- 手順 (clean checkout): `git worktree add --detach <dir> d572059` → `work/` が無い状態から、`plugins-freshair` の zip と `work-liftlib-targets` のみ展開 (epf と SlateCore はここから得る) → `pip install --user capstone==5.0.7 pefile==2024.8.26` → `bash lift2/run_fa9.sh` (初回は内部で `build_ctrl.sh` を実行) → `bash lift2/run_chainmap.sh` → `python3 lift2/fa9_closure_cross.py <core>`。
+- 実測 (逐次実行, 所要は `date` 差, load は `/proc/loadavg` の 1 分値を各 run 直前に採取):
+  - `run_fa9.sh`: 初回 (build_ctrl 込み) 36.93 s (n=1)、build 後 **4.79–4.82 s (n=4)**。load 0.74–0.92。全 5 回 GATE PASS。
+  - `run_chainmap.sh`: **2.53–2.54 s (n=3)**。load 1.17–1.18。全 3 回 OK 8/8。
+  - `fa9_closure_cross.py`: 59.1 s (n=1, 参考)。閉包 6 本 + 候補列挙。
+- 変更点 (コード, `f5483d5` → `d572059`): `lift2/env.sh` が `TMPDIR` を作成。`build_ctrl.sh` は clang 失敗で非 0 終了し成果物を確認。`run_fa9.sh`・`run_chainmap.sh` は `native_ctrl`・`ctrl_full.cjs`・`iat_slots.txt` が揃わなければ再 build (従来は `iat_slots.txt` だけで skip)。`run_ctrl.sh` は成果物が無ければ exit 2 (従来は 0 行の MISMATCH)。`run_fa9.sh` の (b) は `FA_DBG=1`。`fa4_chain_map.py` は 2・3 周目の観測行を追加。`fa9_closure_cross.py` を新規追加。`native/native_ctrl.c` の `FA_PROBE9`/`FA_ALT9` は `f5483d5` から変更なし。
