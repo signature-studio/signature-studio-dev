@@ -177,7 +177,7 @@ Fruity Slicer 2 は殻 (block 23663) とは別に C++ engine DLL (block 23664、
 | `passes/test_fold_const_ops.py` / `test_ir5_constexpr.py` | OK / OK (4c3ae00 で実行) |
 | `sampler_nega.sh` / T0 / T1 | **未測定** (本 run の時間上限)。 旧値 (7ffab50 基準) は付録 §C |
 
-- e2e の `batch` 7 本: lift rc 0 / `emcc -c` rc 0 = 7/7、f80 0。 `defines` は FL Keys 29・FPC 141・Granulizer 90・Slicer 121・Slicer 2 51・Slicex 158・Soundfont Player 433。
+- e2e の `batch` 7 本: lift rc 0 / `emcc -c` rc 0 = 7/7、f80 0 (define 29 / 141 / 90 / 121 / 51 / 158 / 433)。
 - 旧 7ffab50 基準の T0/T1 (214 s / 479 s) と batch 注記は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §C。
 
 ### E1 の 2 pass (`fix_ptr_params.py` と `fix_icmp_ptr.py`)
