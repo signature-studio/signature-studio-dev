@@ -39,7 +39,7 @@ MultiByteToWideChar / WideCharToMultiByte / GetCPInfo(Ex) / IsValidCodePage / Is
 
 | 検証 | 結果 |
 |---|---|
-| `bash tools/shimx/test.sh --quick` (クリーン worktree, 検証起点 HEAD `365f7fd`, n=3) | **3/3 exit 0**, 所要 23.6–24.1 s (load average 0.20–0.65 = 実行直前, 並列なし)。MT 5 グループ / ST PASS / fail-fast 8 / M4 互換 MT・ST PASS / 未実装 0 / 公開関数 678 (本 PR 前 674)。`--quick` なしは `verify_ott` が素材なしで SKIP のため同等 (作業ツリー n=1: 24.3 s) |
+| `bash tools/shimx/test.sh --quick` (クリーン worktree, 検証起点 HEAD `365f7fd`, n=3) | **3/3 exit 0**, 所要 23.6–24.1 s (load average 0.20–0.65 = 実行直前, 並列なし)。MT 5 グループ / ST PASS / fail-fast 8 / M4 互換 MT・ST PASS / 未実装 0 / 公開関数 678 (本 PR 前 674)。`--quick` は `verify_ott` を省く (フル実行は §15.6) (作業ツリー n=1: 24.3 s) |
 | CP932 全 DBCS セル | **9,604 セル**: MB→WC 不一致 **0**、WC→MB→WC 往復不一致 **0** (`test_shord.inc`)。オラクル = Python 標準 codec `cp932` (表の出典と独立実装)。生成表 `src/cp932_tab.c` も同 codec と 11,340 セル全件突合し差 **0** |
 | Crypt | RFC 1321 / FIPS 180-4 の公開ベクトル 7 件 + 百万 `a` ×3 アルゴ + 境界長 (55/56/63/64/65 B) ×3 アルゴ全一致。1 バイトずつ流した場合も同値。期待値は Python `hashlib` で再検算 (手書き値との差 0) |
 | 序数 | `GetProcAddress` 序数 (shell32 74 / shlwapi 12・219)・lift トークン往復・IEnumFORMATETC / IStream / QISearch の実呼出を `test_link.c` / `test_cbtrans.c` / `test_shord.inc` で確認 |
@@ -47,8 +47,7 @@ MultiByteToWideChar / WideCharToMultiByte / GetCPInfo(Ex) / IsValidCodePage / Is
 | import カバレッジ (`data/coverage.json`) | OTT vst2 147/147, vst3 151/151, Serum2 238/238, FreshAir 98/98, FL64.exe 111/111 |
 
 範囲外: 実 PE (OTT/Serum2) を実際にリンク・実行しての import 解決は未実施 (`plugins-*` 素材なしで、coverage は `data/imports.json` の既存スナップショット (import_scan.py 出力) と `shimx` 定義の突合)。
-`verify_ott` / M11 closure 突合は `work-m11` / `work-m6-ott` が無く SKIP (§13 と同じ)。このため `test.sh` が再生成した `BACKLOG.md` / `inventory.md` / `data/inventory.csv` は M11・OTT 列が空になり劣化するので **main 版のまま (未更新)** にした。`data/coverage.json` は生成器 (`gen_inventory.py`) の出力のうち `plugins` / `shimx_*` / `ordinal` のみ反映し、`m11_closure` / `ott_api_resolved` は main 版を保持。
-結果として `inventory.md` / `BACKLOG.md` は「ord74 等が未解決」と古いままで `coverage.json` と食い違う → 15.5 の未解決に計上 (素材 `work-m11 work-m6-ott` 付きで `bash tools/shimx/test.sh` を再実行すれば生成器が全て更新する)。
+**フル実行の実測 (本 PR 最終 HEAD, `work-m11` / `work-m6-ott` 展開済み)**: 下表 §15.6 参照。以前の「素材が無く SKIP・main 版のまま」の記述は誤りで、本 run では `verify_ott` は SKIP せず実行され、生成物は生成器の出力どおり更新されている。
 
 exports.txt の再生成差分: 並べ替えに加えて **9 本が追加** (削除 0)。`shimx_drag_accepts` `shimx_hdrop_create` `shimx_seh_current_exception` `shimx_seh_depth` `shimx_seh_enter` `shimx_seh_leave` `shimx_seh_set_pad_resolver` `shimx_seh_set_typed_matcher` `shimx_set_notify_hook`。いずれも `src/shell.c` / `src/seh.c` / `src/handles.c` に既に定義があり、main の exports.txt が古かっただけ (生成結果は正しい)。
 
@@ -68,3 +67,20 @@ exports.txt の再生成差分: 並べ替えに加えて **9 本が追加** (削
 以上により、shell32 / shlwapi の 5 件は Wine spec と呼出し箇所の引数形が一致した。d2d1 #1 は引数形が一致するが、同定は tools/gui 担当で保留する (`ORD_KNOWN` には入れない)。`ORD_KNOWN` / `shord.c` の同定に変更は無い。裏取り用の逆アセ (`objdump -d`) は `work/` 配下 (commit しない)。
 
 **残件**: d2d1 ord1 (tools/gui 担当, 分母外)。`inventory.md` / `BACKLOG.md` の「名前解決不能」表記は、この保留と一致している。
+
+### 15.6 フル `test.sh` の実測 (fix run, 最終 HEAD)
+
+| 項目 | 実測 |
+|---|---|
+| コマンド | `bash tools/shimx/test.sh` (`--quick` なし, 素材 `work-m11` / `work-m6-ott` 展開済み, `plugins-*` は未使用) |
+| 検証 HEAD | `270a32d7` (生成器修正 commit。本 fix の検証は同 HEAD で実施) |
+| 結果 | **exit 0**, real **55.8 s** (user 44.4 s / sys 12.5 s), load average 0.70 (開始直前) |
+| MT / ST / M4 | MT PASS (7 グループ) / ST PASS / M4 テスト MT・ST PASS |
+| 署名 | verify_sig m11 / m11_3 / ott: signature mismatch = 0。sig_test (a)〜(h) ALL PASS |
+| R6 | 構造体展開スタブ + 重複 declare 正規化 OK |
+| verify_ott | baseline 47 → shimx 解決 **24 種** (残 API 0, 新規 undefined 0)。t1 出力 SHA baseline = shimx = `b5a91b9b2ee8da1e` (一致, 512 行) |
+| 完了 | 7/7 完了: shimx 687 公開関数 × MT/ST × M4 互換 × fail-fast 全 PASS |
+| 生成物の差分 (main 比較) | `data/coverage.json`: `shimx_hooks` 59 → 68 (main 版の値が古かった)。`m11_closure` / `ott_api_resolved` (24) は main と同値 |
+| 生成器修正の効果 | 再生成で `inventory.md` / `BACKLOG.md` の見出し注記・正本注記・SHX-T9 節 (`scripts/backlog_tail.md` から連結) は消えない。`exports.txt` も HEAD と一致 |
+
+検証ログ: `work/` 配下 (commit しない)。
