@@ -204,10 +204,10 @@
 | `tools/python/REPORT_PY16.md` | ~100 | PY-16 (#654): stubs 既定値 `midi.*` の評価 (eval 撤去・許可式の評価器・検証・ネガコン) の全文 (REPORT.md §15 の分割移動) |
 | `tools/flp/REPORT.md` | ~120 | FLP/FST パーサ・ライタ・往復コーパス |
 | `tools/plugins/REPORT.md` | ~115 | Fruity プラグイン 141 種 wasm 化マップ (カウントの正本) |
-| `tools/plugins/f2/REPORT.md` | ~239 | PLG-F2 eq-filter 11 本: 固有閉包 lift の再現と間接 call 脱落の監査 (#199)、icall 復元の batch_lift 接続と回帰ゲート (#514, §7)、leaf 23 関数の関数単位差分試験の結論 (#515, §8)。§8 の詳細は `REPORT_APPENDIX.md` |
-| `tools/plugins/f2/REPORT_APPENDIX.md` | ~140 | f2 REPORT §8 全文 (PLG-F2-3 #515: 23 関数表・ARTIFACT 表・NC 詳細・限界・再現・実測時間)。250 行上限のため無変更で分割移動 |
+| `tools/plugins/f2/REPORT.md` | ~210 | PLG-F2 eq-filter 11 本: 固有閉包 lift の再現と間接 call 脱落の監査 (#199)、icall 復元の batch_lift 接続と回帰ゲート (#514, §7)、leaf 23 関数の関数単位差分試験の結論 (#515, §8)、xmm 引数復元 pass の結論 (#547, §9)。§8・§9 の詳細は `REPORT_APPENDIX.md` |
+| `tools/plugins/f2/REPORT_APPENDIX.md` | ~241 | f2 REPORT §8 全文 (PLG-F2-3 #515: 23 関数表・ARTIFACT 表・NC 詳細・限界・再現・実測時間) と §9 全文 (PLG-F2-4 #547: xmm 引数復元 pass の実測と未解決)。250 行上限のため無変更で分割移動 |
+| `tools/plugins/reverb_delay/REPORT.md` | ~235 | PLG-F4 reverb-delay 9 本: 固有閉包 lift・gate 付き e2e・host/kernel/IPP 依存・T3 engine の到達性 (#201) |
 | `tools/plugins/modulation/REPORT.md` | ~249 | PLG-F5 modulation 8 本: 固有閉包 lift の再現・exit code 付き判定・間接 call 脱落の判定・閉包境界 (frontier の先) の監査・C++ engine 4 本の到達性 (#202) |
-| `tools/plugins/reverb_delay/REPORT.md` | ~225 | PLG-F4 reverb-delay 9 本: 固有閉包 lift・gate 付き e2e・host/kernel/IPP 依存・T3 engine の到達性 (#201) |
 | `tools/plugins/hostx/REPORT.md` | ~145 | PLG-X host 統合 / big3p 12 本の方針決定 (lift する 6 / しない 2 / ユーザ判断 4) と閉包 lift の再現・間接 call 脱落の監査 (#210) |
 | `tools/plugins/g1/REPORT.md` | ~250 | PLG-G1 synth-simple + drum-synth 14 本: 閉包 lift・host/kernel/間接 call 監査・C++ DLL 7 本・gate とネガコン (#206) |
 | `tools/plugins/g1/REPORT_APPENDIX.md` | ~30 | g1 REPORT §9 旧版 (検証起点 86ca2d5、#539 取り込み前の 3 run・NC 詳細) の全文 (250 行上限のため分割移動) |
