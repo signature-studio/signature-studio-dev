@@ -62,12 +62,12 @@
 | fail_err | {2: 3, 18: 1} (ERROR_FILE_NOT_FOUND ×3 / ERROR_NO_MORE_FILES ×1) |
 | distinct_posix_opened | 2 |
 
-検証 HEAD `69215e5e` の実測 (`/proc/loadavg` 1 分値、実行前→実行後):
+検証 HEAD `eafbcf4c` (main を merge した後) の実測 (`/proc/loadavg` 1 分値、実行前→実行後):
 
 | コマンド | rc | 所要 | load |
 |---|---|---|---|
-| `bash tools/shimx/test/ftrace/ftrace_test.sh` | 0 | 5.17 s | 0.56 → 0.60 |
-| `bash tools/shimx/test.sh` | 0 | 47 s | 0.50 → 0.82 |
+| `bash tools/shimx/test/ftrace/ftrace_test.sh` | 0 | 5.19 s | 0.25 → 0.31 |
+| `bash tools/shimx/test.sh` | 0 | 46 s | 0.24 → 0.64 |
 
 `test.sh` は 7/7 完了。実行後に追跡対象の生成物 (`BACKLOG.md` / `exports.txt` / `inventory.md` / `data/coverage.json` / `data/inventory.csv`) は HEAD に戻した。
 
