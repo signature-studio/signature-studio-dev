@@ -144,3 +144,38 @@ python3 tools/targets/serum2/license/authstub/authstub_irpass.py \
 
 - N4 (process / funclet 無変更) assert OK。変更関数は 18004fad0 / 1800c2b50 / 1800c6090 の 3 件。
 - 本束縛の共通化で達成したのは「既存 e2e の再現」と「束縛プリミティブの共通化」まで。L1 の復元 pass と LF 規則の一般化 (RetDec 出力からの規則導出) は未達。追跡 issue は未起票のため PM に起票を依頼する。
+
+## 12. L1 脱落条件の特定 (#823, 機械語 ↔ raw IR の突合)
+
+- 対象 PE: `Serum2_win64.vst3` sha256 `501e7bb3…5283` (19,236,864 B)。raw lift: `work/lift/authstub.drc.ll` (e2e.sh [1])。
+- 機械語 (capstone 実測):
+
+  ```
+  0x1800c2d66 test rax, rax            ; rax = [rsi+0x90] (deferred 通知先)
+  0x1800c2d69 je   0x1800c2ef4         ; ★ 唯一の入口 (rax==0 の枝)
+  0x1800c2d6f or   dword ptr [rax+8], 0x800010   ; rax!=0 の枝 (deferred)
+  0x1800c2ef4 mov  rcx, [rsi+0x10]     ; host handler
+  0x1800c2ef8 test rcx, rcx
+  0x1800c2efb je   0x1800c2f08
+  0x1800c2efd mov  rax, [rcx]
+  0x1800c2f00 mov  edx, 0x800010
+  0x1800c2f05 call [rax+0x30]          ; ★ 直接 vtable 通知
+  ```
+
+- 脱落の機構: raw IR で `[rsi+0x90]` の null 判定 (`%110 = icmp eq i64 %109, 0`, `br i1 %110, label %dec_label_pc_1800c2f08, ...`, authstub.drc.ll 行 9870–9872) の**null 枝の飛び先が 0x1800c2f08 (skip) になっている**。機械語の `je` は 0x1800c2ef4 (直接通知) へ飛ぶ。このため 0x1800c2ef4 の基本ブロックは IR に生成されない。
+- 枝の向きは逆: IR の null 枝は「通知しない」、機械語の null 枝は「host へ直接通知する」。
+
+### 数え方 (census)
+
+`python3 tools/targets/serum2/license/authstub/l1_census.py <PE> <raw.ll>` (機械語 site 数 / 入口 edge 数 / IR の insn.addr 被覆 / ブロック有無)。
+
+| 指標 | 機械語 | raw IR |
+|---|---|---|
+| 直接 `call [reg+0x30]` site (0x1800c2ef4–f05) | 1 | 0 |
+| `edx=0x800010` 即値ロード | 1 | 0 |
+| 0x1800c2ef4 への入口 edge | 1 (`je` @0x1800c2d69) | 0 |
+| `insn.addr` が site 範囲を被覆 | — | 0 件 |
+| ブロック `dec_label_pc_1800c2ef4` | — | 不在 |
+
+- 事実の範囲: 上記は raw lift 1 本での実測。復元 pass は未実装 (受入条件 2・3 は未達、子 issue に分割)。
+- 未測定 (断定しない): 0x1800c2d59 の `je` は `[rsi+0x22792]` の bit で分岐し、その bit を 1 にする store は 0x1800c2d42 の 1 箇所のみ。N2a でこの store を 0 に置換した後の到達性は、本 census では測っていない。e2e の 23/23 との関係も未確認。
