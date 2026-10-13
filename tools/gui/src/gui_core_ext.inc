@@ -49,6 +49,29 @@ API CharUpperW(I64 p) {      /* 上位 16bit が 0 なら単一文字 (戻り値
 }
 API CharUpperBuffW(I64 p, I64 n) { uint16_t *s = (uint16_t *)P_(p); uint32_t k = (uint32_t)n; if (!s) return 0; for (uint32_t i = 0; i < k; i++) s[i] = u16_upper(s[i]); return k; }
 API CharLowerBuffW(I64 p, I64 n) { uint16_t *s = (uint16_t *)P_(p); uint32_t k = (uint32_t)n; if (!s) return 0; for (uint32_t i = 0; i < k; i++) s[i] = u16_lower(s[i]); return k; }
+/* wtsapi32: ブラウザにセッション切替通知は無い。shimx の weak 定義 (常に TRUE) と同挙動の強定義 (#172: shimx 側を weak 化して重複を解消) */
+API WTSRegisterSessionNotification(I64 h, I64 flags) { (void)h; (void)flags; return 1; }
+API WTSUnRegisterSessionNotification(I64 h) { (void)h; return 1; }
+/* ---- shimx の user32 weak 9 本の残り (#172): gui 強定義が shimx weak の機能を下回らないよう実装する ---- */
+API CharLowerW(I64 p) {      /* CharUpperW の対: 上位 16bit が 0 なら単一文字、さもなくば NUL 終端文字列を in-place */
+  if ((U64)p < 0x10000) return u16_lower((uint16_t)p);
+  for (uint16_t *s = (uint16_t *)P_(p); *s; s++) *s = u16_lower(*s);
+  return p;
+}
+API CharNextExA(I64 cp, I64 p, I64 flags) { (void)cp; (void)flags; const char *s = (const char *)P_(p); return (s && *s) ? p + 1 : p; }   /* ANSI = 1 byte 単位 (shimx weak と同じ。DBCS は cp932 テーブル (SHX-T8) 側の課題) */
+/* OEM 変換は kernel32 (shimx の WideCharToMultiByte(CP_OEMCP)) の表を弱参照で借りる。単体ビルドでは ASCII のみ ('?' 置換) */
+extern int WideCharToMultiByte(uint32_t cp, uint32_t flags, const uint16_t *w, int nw, char *out, int nout, const char *def, int *used) __attribute__((weak));
+API CharToOemBuffW(I64 src, I64 dst, I64 n) {
+  const uint16_t *w = (const uint16_t *)P_(src); char *d = (char *)P_(dst); uint32_t k = (uint32_t)n;
+  if (!w || !d) return 0;
+  for (uint32_t i = 0; i < k; i++) {
+    if (w[i] < 0x80) { d[i] = (char)w[i]; continue; }
+    char o = '?';
+    if (WideCharToMultiByte) { char b[4] = {0}; int u = 0; if (WideCharToMultiByte(1 /* CP_OEMCP */, 0, &w[i], 1, b, 4, "?", &u) == 1 && !u) o = b[0]; }
+    d[i] = o;
+  }
+  return 1;
+}
 
 /* RT_STRING (6): ブロック = (id>>4)+1、16 本の [WORD len][WCHAR*len] */
 API LoadStringW(I64 hi, I64 id, I64 buf, I64 cch) {
@@ -353,4 +376,207 @@ API ToUnicode(I64 vk, I64 sc, I64 state, I64 buf, I64 cch, I64 flags) {
   if (!ch || !b || (int32_t)cch < 1) return 0;
   b[0] = (uint16_t)ch; if ((int32_t)cch > 1) b[1] = 0;
   return 1;
+}
+
+/* ================= shell / ファイルダイアログ / D&D の Web 実装接続 (#172 SHX-T5) =================
+ * kernel32/shell32 (shimx 担当) とは弱参照だけで結ぶ: shimx 無しの単体ビルドでも本 TU は解決できる。
+ * Web 側 (window.open / File System Access) は main thread 専用なので gui_hostcall (include/gui_hostcall.h) で同期呼出する。
+ * 選択ファイルは host が Emscripten FS の「ステージングディレクトリ」へ書き出し、FL へは Win パスで渡す。 */
+#include "gui_hostcall.h"
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#define GUI_EXPORT EMSCRIPTEN_KEEPALIVE
+#else
+#define GUI_EXPORT
+#endif
+extern int shimx_path_to_posix(const char *win, char *out, size_t cap) __attribute__((weak));
+extern void shimx_set_notify_hook(void (*fn)(void)) __attribute__((weak));
+extern void shimx_set_shell_execute_hook(int (*fn)(const char *, const char *, const char *)) __attribute__((weak));
+extern int shimx_drag_accepts(size_t hwnd) __attribute__((weak));
+extern size_t shimx_hdrop_create(const uint16_t *const *wpaths, uint32_t n, int x, int y, int nc) __attribute__((weak));
+extern void DragFinish(size_t hdrop) __attribute__((weak));
+extern void *shimx_get_drop_target(size_t hwnd) __attribute__((weak));
+
+#define GUI_STAGE_WIN_DIR "C:\\Users\\webstudio\\Documents\\WebImport"
+#define WM_DROPFILES_ 0x233
+#define OFN_ALLOWMULTISELECT_ 0x200
+static uint32_t g_cderr;
+API CommDlgExtendedError(void) { return g_cderr; }
+
+static const char *stage_posix(char *buf, size_t cap) {
+  if (shimx_path_to_posix && shimx_path_to_posix(GUI_STAGE_WIN_DIR, buf, cap) >= 0) return buf;
+  snprintf(buf, cap, "/tmp/webimport"); return buf;
+}
+GUI_EXPORT const char *gui_stage_dir_posix(void) { static char b[512]; return stage_posix(b, sizeof b); }
+GUI_EXPORT const char *gui_stage_dir_win(void) { return GUI_STAGE_WIN_DIR; }
+
+/* ---- ShellExecute → window.open ---- */
+static int url_ok(const char *u) { return u && (!strncasecmp(u, "http://", 7) || !strncasecmp(u, "https://", 8) || !strncasecmp(u, "mailto:", 7)); }
+static int gui_shell_execute(const char *verb, const char *file, const char *params) {
+  if (verb && *verb && strcasecmp(verb, "open")) return 0;
+  const char *u = url_ok(file) ? file : url_ok(params) ? params : NULL;   /* 旧式 ShellExecute("iexplore", url) 形も拾う */
+  if (!u) return 0;
+  size_t n = strlen(u);
+  if (n >= 1900) return 0;
+  return gui_hostcall(GUI_HC_OPEN_URL, 0, u, (uint32_t)n + 1, NULL, 0, NULL, 10000) == 1;
+}
+
+/* ---- GetOpenFileNameW / GetSaveFileNameW → File System Access ----
+ * OPENFILENAMEW (Win64): lpstrFilter@24 nFilterIndex@44 lpstrFile@48 nMaxFile@56 lpstrFileTitle@64 nMaxFileTitle@72 lpstrInitialDir@80
+ *   lpstrTitle@88 Flags@96 nFileOffset@100 nFileExtension@102 lpstrDefExt@104 (NT4 版 136B / 2000 版 152B)
+ * hostcall in : title, initialDir, defExt, 現在のファイル名, ステージング(POSIX), ステージング(Win), Flags(10進), filterIndex の 8 項目 + (説明, パターン)* — NUL 区切り
+ * hostcall out: 選択された base 名の列 (NUL 区切り, 末尾に空文字列)。result: 1 選択 / 0 キャンセル / <0 host エラー */
+static uint64_t rd64(const uint8_t *p) { uint64_t v; memcpy(&v, p, 8); return v; }
+static uint32_t rd32(const uint8_t *p) { uint32_t v; memcpy(&v, p, 4); return v; }
+static int hc_put(char *buf, uint32_t cap, uint32_t *off, const char *s) {
+  size_t l = strlen(s);
+  if (*off + l + 1 > cap) return -1;
+  memcpy(buf + *off, s, l + 1); *off += (uint32_t)l + 1; return 0;
+}
+static int hc_put_w(char *buf, uint32_t cap, uint32_t *off, U64 wp) {   /* UTF-16 引数 (NULL 可) を UTF-8 で積む */
+  char t[512] = ""; if (wp >= 0x10000) u16_to_u8((const uint16_t *)P_(wp), t, sizeof t);
+  return hc_put(buf, cap, off, t);
+}
+#define FD_NAMES_MAX 64
+#define FD_W_CAP (GUI_HC_OUT + 700)   /* dir (<= 600) + host 応答 (< GUI_HC_OUT B; UTF-16 の単位数は UTF-8 のバイト数を超えない) */
+static int fd_put(uint16_t *w, int *wl, const char *s, int sep) {   /* s を w の *wl 以降へ。0 = 全文が収まった / -1 = 収まらない (断片は返さない) */
+  int cap = FD_W_CAP - *wl, tr = 0;
+  if (cap < 1) return -1;
+  int n = u8_to_u16x(s, w + *wl, cap, &tr);
+  if (tr) return -1;
+  *wl += n;
+  if (sep) w[(*wl)++] = 0;   /* u8_to_u16x が書いた終端 (添字 <= cap-1) の位置 */
+  return 0;
+}
+static I64 file_dialog(I64 ofnp, int save) {
+  uint8_t *o = (uint8_t *)P_(ofnp);
+  g_cderr = 0;
+  if (!o || rd32(o) < 136) { g_cderr = 1; gui_set_last_error(87); return 0; }   /* CDERR_STRUCTSIZE */
+  uint16_t *file = (uint16_t *)P_(rd64(o + 48)); uint32_t maxfile = rd32(o + 56), flags = rd32(o + 96);
+  if (!file || maxfile < 2) { g_cderr = 0x3002; gui_set_last_error(87); return 0; }   /* FNERR_INVALIDFILENAME */
+  char in[GUI_HC_IN], sp[512]; uint32_t off = 0; int bad = 0;
+  char cur[260]; u16_to_u8(file, cur, sizeof cur);
+  char fi[16]; snprintf(fi, sizeof fi, "%u", rd32(o + 44));
+  char fl[16]; snprintf(fl, sizeof fl, "%u", flags);
+  bad |= hc_put_w(in, sizeof in, &off, rd64(o + 88));      /* title */
+  bad |= hc_put_w(in, sizeof in, &off, rd64(o + 80));      /* initial dir */
+  bad |= hc_put_w(in, sizeof in, &off, rd32(o) >= 112 ? rd64(o + 104) : 0);   /* defExt */
+  bad |= hc_put(in, sizeof in, &off, cur);
+  bad |= hc_put(in, sizeof in, &off, stage_posix(sp, sizeof sp));
+  bad |= hc_put(in, sizeof in, &off, GUI_STAGE_WIN_DIR);
+  bad |= hc_put(in, sizeof in, &off, fl);
+  bad |= hc_put(in, sizeof in, &off, fi);
+  for (const uint16_t *f = (const uint16_t *)P_(rd64(o + 24)); f && *f && !bad; ) {
+    const uint16_t *d = f; while (*f) f++; f++;
+    const uint16_t *pt = f; if (!*pt) break; while (*f) f++; f++;
+    bad |= hc_put_w(in, sizeof in, &off, (U64)(uintptr_t)d);
+    bad |= hc_put_w(in, sizeof in, &off, (U64)(uintptr_t)pt);
+  }
+  if (bad) { g_cderr = 2; gui_set_last_error(87); return 0; }   /* CDERR_INITIALIZATION (入力が hostcall 領域を超過) */
+  char out[GUI_HC_OUT]; uint32_t on = 0;
+  int rc = gui_hostcall(save ? GUI_HC_SAVE_FILE : GUI_HC_OPEN_FILE, flags, in, off, out, sizeof out - 2, &on, -1);
+  if (rc == 0) return 0;                                        /* キャンセル (CommDlgExtendedError = 0) */
+  if (rc != 1) { g_cderr = 2; gui_set_last_error(rc == -1 ? 1167 /* ERROR_DEVICE_NOT_CONNECTED: host 未接続 */ : 87); return 0; }
+  out[on] = 0; out[on + 1] = 0;
+  const char *names[FD_NAMES_MAX]; int nn = 0; const char *p = out;
+  for (; *p && nn < FD_NAMES_MAX; p += strlen(p) + 1) names[nn++] = p;
+  if (*p) { g_cderr = 2; gui_set_last_error(111); return 0; }   /* 65 件目以降は載らない: 黙って捨てず失敗 (CDERR_INITIALIZATION) */
+  if (nn == 0) return 0;
+  uint16_t w[FD_W_CAP]; int wl = u8_to_u16(GUI_STAGE_WIN_DIR, w, 600);
+  uint32_t nfo; uint32_t total;
+  if (nn == 1 || !(flags & OFN_ALLOWMULTISELECT_)) {            /* 単一: フルパス */
+    w[wl++] = '\\'; nfo = (uint32_t)wl;
+    if (fd_put(w, &wl, names[0], 0)) { g_cderr = 2; gui_set_last_error(111); return 0; }
+    total = (uint32_t)wl + 1;
+  } else {                                                      /* 複数 (OFN_EXPLORER 形式): dir\0name1\0name2\0\0 */
+    w[wl++] = 0; nfo = (uint32_t)wl;
+    for (int i = 0; i < nn; i++) if (fd_put(w, &wl, names[i], 1)) { g_cderr = 2; gui_set_last_error(111); return 0; }
+    total = (uint32_t)wl + 1;
+  }
+  if (total > maxfile) { file[0] = (uint16_t)(total > 0xFFFF ? 0xFFFF : total); g_cderr = 0x3003; gui_set_last_error(111); return 0; }   /* FNERR_BUFFERTOOSMALL: 先頭 WORD に必要文字数 */
+  memcpy(file, w, (size_t)wl * 2); file[wl] = 0;
+  uint16_t *title = (uint16_t *)P_(rd64(o + 64)); uint32_t maxt = rd32(o + 72);
+  if (title && maxt) { uint16_t t[300]; int tl = u8_to_u16(names[0], t, 260); if ((uint32_t)tl + 1 > maxt) tl = (int)maxt - 1; memcpy(title, t, (size_t)tl * 2); title[tl] = 0; }
+  const uint16_t *nm = file + nfo; uint16_t ext = 0;
+  for (uint16_t k = 0; nm[k]; k++) if (nm[k] == '.') ext = (uint16_t)(nfo + k + 1);
+  uint16_t v16 = (uint16_t)nfo; memcpy(o + 100, &v16, 2); memcpy(o + 102, &ext, 2);
+  return 1;
+}
+API GetOpenFileNameW(I64 p) { return file_dialog(p, 0); }
+API GetSaveFileNameW(I64 p) { return file_dialog(p, 1); }
+
+/* ---- Drag&Drop: host が FS へ書き出した名前の列を受け、WM_DROPFILES (DragAcceptFiles 済みの窓) か IDropTarget 経由で渡す ----
+ * gui_drop_files は host (ブラウザ main thread) から呼ばれる。ウィンドウ木は GUI スレッド専有なので、ここでは要求を積んで doorbell を鳴らすだけにし、
+ * 配送 (hit test / HDROP 生成 / 投函 / invoker 呼出) は GUI スレッドの pump_drops (try_get 入口) が行う。
+ * 戻り: 1 = 受理 / -1 = shimx 未リンク / -3 = 要求が大きすぎる・キュー満杯。配送結果は gui_drop_last_result():
+ *   1 = WM_DROPFILES 投函 / 2 = IDropTarget invoker が処理 / 0 = 受け手なし / -2 = HDROP 作成失敗 */
+typedef int (*GuiDropInvoker)(void *target, uint64_t hwnd, size_t hdrop, int x, int y);
+static GuiDropInvoker g_drop_invoker;
+GUI_EXPORT void gui_set_drop_target_invoker(GuiDropInvoker fn) { g_drop_invoker = fn; }
+#define DROP_Q 4
+#define DROP_NAMES 2048
+static struct { int x, y, n; char names[DROP_NAMES]; } g_dq[DROP_Q];
+static uint32_t g_dq_h, g_dq_t;
+static int g_drop_last = -9, g_drop_done;
+GUI_EXPORT int gui_drop_last_result(void) { return __atomic_load_n(&g_drop_last, __ATOMIC_ACQUIRE); }
+GUI_EXPORT int gui_drop_done_count(void) { return __atomic_load_n(&g_drop_done, __ATOMIC_ACQUIRE); }
+GUI_EXPORT int gui_drop_files(int x, int y, int n, const char *names) {
+  if (!shimx_hdrop_create || !shimx_drag_accepts) return -1;
+  size_t len = 0; int k = 0;
+  for (const char *p = names; p && *p && k < n; p += strlen(p) + 1, k++) len += strlen(p) + 1;
+  if (len + 1 > DROP_NAMES) return -3;
+  gui_sh();
+  gui_lock();
+  if (g_dq_t - g_dq_h >= DROP_Q) { gui_unlock(); return -3; }
+  typeof(g_dq[0]) *r = &g_dq[g_dq_t % DROP_Q];
+  r->x = x; r->y = y; r->n = k; if (len) memcpy(r->names, names, len); r->names[len] = 0;
+  g_dq_t++;
+  gui_unlock();
+  gui_doorbell();
+  return 1;
+}
+static int drop_deliver(int x, int y, int n, const char *names) {
+  int lx, ly; Wnd *hit = hit_test(x, y, &lx, &ly);
+  Wnd *acc = NULL; void *tgt = NULL;
+  for (Wnd *w = hit; w && w != g_desktop; w = w->parent) {
+    if (shimx_drag_accepts((size_t)w->h)) { acc = w; break; }
+    if (shimx_get_drop_target && (tgt = shimx_get_drop_target((size_t)w->h)) != NULL) { acc = w; break; }
+  }
+  if (!acc) return 0;
+  static uint16_t wbuf[64][300]; static const uint16_t *wp[64];   /* GUI スレッド専有 (スタックを食わない) */
+  int k = 0; const char *p = names;
+  for (; k < n && k < 64 && *p; k++, p += strlen(p) + 1) {
+    int l = u8_to_u16(GUI_STAGE_WIN_DIR, wbuf[k], 200); wbuf[k][l++] = '\\'; u8_to_u16(p, wbuf[k] + l, 300 - l); wp[k] = wbuf[k];
+  }
+  int cx, cy; client_of_screen(acc, x, y, &cx, &cy);
+  size_t hd = shimx_hdrop_create(wp, (uint32_t)k, cx, cy, 0);
+  if (!hd) return -2;
+  if (shimx_drag_accepts((size_t)acc->h)) {
+    QMsg m = { acc->h, WM_DROPFILES_, (U64)hd, 0, gui_now_ms(), g_msg_pt, NULL };
+    q_push(m);   /* HDROP の解放は受け手の DragFinish */
+    return 1;
+  }
+  int handled = g_drop_invoker ? g_drop_invoker(tgt, acc->h, hd, cx, cy) : 0;
+  if (DragFinish) DragFinish(hd);
+  return handled ? 2 : 0;
+}
+static void pump_drops(void) {
+  for (;;) {
+    gui_lock();
+    if (g_dq_h == g_dq_t) { gui_unlock(); return; }
+    static typeof(g_dq[0]) cur;          /* GUI スレッド専有 (try_get は GUI スレッドのみ) */
+    cur = g_dq[g_dq_h % DROP_Q]; g_dq_h++;
+    gui_unlock();
+    int r = drop_deliver(cur.x, cur.y, cur.n, cur.names);
+    __atomic_store_n(&g_drop_last, r, __ATOMIC_RELEASE);
+    __atomic_add_fetch(&g_drop_done, 1, __ATOMIC_RELEASE);
+  }
+}
+
+/* ---- shimx 結線 (起動時に 1 回): bit0 = kernel object 通知→doorbell, bit1 = ShellExecute hook ---- */
+GUI_EXPORT int gui_shimx_attach(void) {
+  int m = 0;
+  if (shimx_set_notify_hook) { shimx_set_notify_hook(gui_doorbell); g_kernel_notify_attached = 1; m |= 1; }
+  if (shimx_set_shell_execute_hook) { shimx_set_shell_execute_hook(gui_shell_execute); m |= 2; }
+  return m;
 }

@@ -35,8 +35,9 @@ host→Python 入口 (flpy.c export): `flpy_init(syspath)` `flpy_run(src,file)` 
 | 経路 | 実装 |
 |---|---|
 | MCP `tools/list` `tools/call` | `host/mcp_rpc.mjs` (JSON-RPC 2.0, 応答は FLEngine の固定テンプレート形) → `py.call("__main__:<tool>")`。MCPTools.pyc は FL と同じく **`__main__` として実行** (`get_mcp_tools_json` が `sys.modules['__main__']` を走査するため) ✔ |
+| アプリ UI / devtools (PY-4 #77) | `src/runtime/mcp_panel.ts` が `window.flMcp` (`start(files)` / `rpc(req)` / `list()` / `call(name,args)` / `stop()`) を常時公開、`/?mcp=1` で UI パネル (MCPTools.pyc・midi.py・utils.py を選択/ドロップ → 起動 → tool 選択 → tools/call)。`tools/python` の host/・dist/flpy.*・flapi_ids.json だけを Vite が `/py/` で配信 (`vite.config.ts` `pyAssets`、許可リスト方式。`work/` = FL 由来ファイルは配信しない)。flapi の提供側は FLEngine 未完成の間 `fl_mock.mjs` (実エンジン結合時は engine を差替)。`tools/call` は `tools/list` に出る name のみ受理 (未知 / 非 tool は isError=true) ✔ |
 | MIDI scripting | Web MIDI → engine → `fl_rt:dispatch_midi`: FL と同順 (OnMidiIn → OnMidiMsg → 未 handled なら OnNoteOn 等)。`flmidimsg` 23 フィールド ✔。他 callback は表 (27 個、`pycb*`) 通り同じ `call_json` で ✔設計 |
-| Piano roll scripting | `.pyscript` の `createDialog()` / `apply(form)` + `flpianoroll` module (Note/Marker/score/Utils/ScriptDialog)。**実装済 ✔** (`src/flpianoroll.py` + `fl_rt.load_pyscript` / `run_pyscript`、#79。詳細は REPORT §10) |
+| Piano roll scripting | `.pyscript` の `createDialog()` / `apply(form)` + `flpianoroll` module (Note/Marker/score/Utils/ScriptDialog)。**実装済 ✔** (`src/flpianoroll.py` + `fl_rt.load_pyscript` / `run_pyscript`、#79。詳細は REPORT §11) |
 | stdout/stderr | FL は `fl.FLTextOutput` で Script output へ。本 PoC は Worker→main の `stdout/stderr` メッセージ ✔ |
 
 ## 4. スレッド/リアルタイム
@@ -46,7 +47,7 @@ host→Python 入口 (flpy.c export): `flpy_init(syspath)` `flpy_run(src,file)` 
 
 ## 5. FLEngine 側の実装案 (provider)
 
-A. **別 Worker + SAB RPC (現行 PoC)**: provider = `engine.call(name,args)` を FLEngine wasm の C ABI `int fl_api_call(fn_id, const slot* argv, int argc, slot* ret)` に差し替えるだけ。Python 側無変更。クラッシュ/無限ループを Worker 破棄で隔離でき、FLEngine 未完成でも先行開発可 (mock)。
+A. **別 Worker + SAB RPC (現行 PoC)** ✔ C provider 実装済み (`provider/`, REPORT §7b): provider = `engine.call(name,args)` を FLEngine wasm の C ABI `int fl_api_call(fn_id, const slot* argv, int argc, slot* ret)` に差し替えるだけ。Python 側無変更。クラッシュ/無限ループを Worker 破棄で隔離でき、FLEngine 未完成でも先行開発可 (mock)。
 B. **CPython を FLEngine wasm に静的リンク (最終形)**: `_flhost.call` を同一 wasm 内の C 呼出しに (JS 往復・JSON 無し, <1µs)。FL 本来の「同一プロセス・同一スレッドで callback」と一致。`libpython3.12.a`(9.6MB .a / +5.9MB wasm) をリンクし `PyImport_AppendInittab` で `_flhost` を登録する点は flpy.c と同じ (再利用可)。FLEngine lift 後に移行。
 C. FL 側に固有の Python C API 使用 (`PythonSession`/`TMCPPythonSession`, `PyInterpreterConfig`=サブインタプリタ示唆, `pycb*`) は rodata から確認できるが、呼出し関数名は dlopen/dlsym 経由で平文に残らず未抽出 (§REPORT 未解決)。サブインタプリタ分離が要る場合は `Py_NewInterpreterFromConfig` を wasm で要検証 (T6)。
 

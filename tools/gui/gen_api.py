@@ -189,7 +189,10 @@ def main():
         d = per_dll.setdefault(r["dll"], [0, 0]); d[0] += 1; d[1] += r["xref"]
     with open(os.path.join(HERE, "IMPORTS.md"), "w") as f:
         w = f.write
-        w("# FL (win64 FLEngine_x64.dll) GUI 系 import と shim 優先度\n\n")
+        w("# 自動生成: `python3 tools/gui/analysis/gui_imports.py && python3 tools/gui/gen_api.py`\n\n"
+          "> **人手編集禁止** (生成元を直す)。本ファイルは測定・抽出結果の**単一の正本**。\n"
+          "> **行数目安**: 自動生成ファイルのため行数上限はなし (`docs/DOC_MAP.md` §1)。\n\n\n")
+        w("# FL (win64 FLEngine_x64.dll) GUI 系 import と shim 優先度\n")
         w("自動生成: `python3 tools/gui/analysis/gui_imports.py && python3 tools/gui/gen_api.py` "
           "(入力 `tools/m2/work/block00031_PE.bin` = FLEngine_x64.dll 22,227,016 B)。\n\n")
         w("使用頻度 = `.text` の静的 xref 推定 (FF15/FF25/mov [rip+IAT] と、IAT へ jmp する thunk への E8/E9 call の件数; Ghidra 非使用の推定値)。\n\n")

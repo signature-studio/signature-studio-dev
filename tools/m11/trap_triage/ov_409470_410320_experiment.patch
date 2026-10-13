@@ -1,0 +1,52 @@
+diff --git a/tools/m11/m11_ov.c b/tools/m11/m11_ov.c
+index 856cb1f..9473827 100644
+--- a/tools/m11/m11_ov.c
++++ b/tools/m11/m11_ov.c
+@@ -262,6 +262,47 @@ unsigned long long function_450560(unsigned long long src, unsigned long long de
+     return dest;
+ }
+ 
++/* function_410320  VA 0x410320  (System._ClassCreate(self: TClass; alloc: ShortInt): TObject)
++ * 逆アセンブル: `test dl,dl; jl skip; mov rcx,rax; call [rax-0x30]` (= VMT vmtNewInstance). RetDec は間接 call を落とし
++ * `ret arg1` にしたため, 494 call site 全てで「生成したオブジェクト」が TClass (VMT, .text 上) 自身になっていた (#418).
++ * vmtNewInstance の実体 (既定 0x40f960 = TObject.NewInstance: GetMem([self-0x80]) + InitInstance 0x40fb40) は boot closure 外で
++ * disp 表に無いため, 解決できない場合は C で補う (InstanceSize 確保 → 0 埋め → vptr 設定; interface vptr 設定は未実装).
++ * alloc < 0 (継承 ctor 経由) は従来どおり self をそのまま返す. */
++unsigned long long function_410320(unsigned long long self, unsigned int alloc) {
++    if ((signed char)(alloc & 0xff) < 0) return self;
++    u64 slot = Q(self - 0x30);
++    if (disp_find((u32)(slot + (0x400000ull - M11_LB_BASE)))) return m11_icall(slot, self, 0, 0, 0, 0, 0, 0, 0);
++    u64 obj = function_409410((unsigned)(int)D(self - 0x80));
++    if (!obj) return 0;
++    memset((void*)(uintptr_t)obj, 0, (size_t)(int)D(self - 0x80));
++    Q(obj) = self;
++    return obj;
++}
++
++/* function_409470  VA 0x409470  (System.ReallocMem(var P: Pointer; NewSize: NativeInt): Pointer)
++ * 逆アセンブル (boot0.drc.dsm 409470..4094e6) から転記. RetDec は `cmp [rbx],0` / `mov rcx,[rbx]` の 1 段 deref (*P) を落とし,
++ * P 自体 (変数のアドレス) を旧ブロックとして扱った (#418). */
++unsigned long long function_409470(void* pv, unsigned long long newsize) {
++    u64 pp = (u64)(uintptr_t)pv;
++    u64 rsi;
++    if (Q(pp) != 0) {
++        if ((long long)newsize > 0) {
++            rsi = function_408040(Q(pp), newsize);
++            if (rsi == 0) function_409730(1);
++        } else {
++            if ((unsigned)function_407e20(Q(pp)) != 0) function_409730(2);
++            rsi = 0;
++        }
++        Q(pp) = rsi;
++    } else {
++        if ((long long)newsize <= 0) return 0;
++        rsi = function_407a50(newsize);
++        if (rsi == 0) function_409730(1);
++        Q(pp) = rsi;
++    }
++    return rsi;
++}
++
+ /* function_417b70  VA 0x417b70  (System.DynArraySetLength(var a: Pointer; ti: PDynArrayTypeInfo; dimCnt: NativeInt; lengths: PNativeInt))
+  * RetDec は `mov rax,[rbp+0xb0]; mov rax,[rax]` (= *a) と `mov rax,[rbp+0xc8]; mov rax,[rax]` (= *lengths) の
+  * 1 段 deref を 2 箇所とも落とし, lengths (スタックアドレス) を配列長, a を配列本体として扱った.
