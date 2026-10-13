@@ -9,7 +9,7 @@
      (無ければ接尾辞付きブロック) とする。B の後続集合 succ(B) (終端 br/switch のラベル VA) を取る。
   3. T ∉ succ(B) なら「jcc 脱落」候補 (dropped)。
   4. strict (= ループ先頭ガード型): dropped かつ A の直前 2 命令に cmp/test があり、T > A (前方の脱出先)、
-     B の終端が無条件 br で後続 L が B より後方にあり、L が後方ブロック C (C >= L) から back-edge を持つ (ループ先頭)。
+     B の終端が無条件 br で後続 L が B より後方にあり、L の頭ブロックよりテキスト順で後ろのブロック C から back-edge を持つ (ループ先頭)。接尾辞付きの preheader (L と同 VA だがループ外) は前方にあるため候補から外れる (#1190 指摘 1)。
 出力: 関数数 / jcc 数 / dropped 数 / strict 数 と strict 一覧 (JSON)。
 使い方: python3 guard699/scan_guard.py <IR.ll> --pe <PE.bin> --report <out.json>
 判定 (positive control): 8c5eb0 の (A=8c5f18, T=8c6066, L=8c5f23) が guard 脱落 IR で strict に出ること。
@@ -69,6 +69,16 @@ def owners(blocks):
     return own, ambiguous
 
 
+def after_head(blocks, own, L):
+    """ループ先頭 L の頭ブロックより IR テキスト順で後ろにあるブロック名 (back-edge の候補 C)。
+    接尾辞付きの preheader (L と同 VA だがループの外側) は前方にあるため除外される (#1190 指摘 1)。"""
+    head = own.get(L)
+    if head is None:
+        return []
+    names = list(blocks)
+    return names[names.index(head) + 1:]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('ir')
@@ -121,7 +131,7 @@ def main():
             L = next(iter(info['succ'])) if (info['uncond'] and len(info['succ']) == 1) else None
             if not (cmp_before and T > A and L is not None and L > B and L != T):
                 continue
-            back = any(L in b['succ'] for b in blocks.values() if b['va'] >= L)
+            back = any(L in blocks[n]['succ'] for n in after_head(blocks, own, L))
             if back:
                 st['strict'] += 1
                 strict.append({'fn': name, 'jcc': '%x' % A, 'target': '%x' % T, 'loop_head': '%x' % L,
