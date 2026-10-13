@@ -218,6 +218,8 @@ shim 候補 (SR-3/SR-4 入力) は呼出確認 110 件のうち kernel32 (メモ
   | patched + wq + demo_payload | 1 | 無し | 0 | 無し | authstub が中和 |
 
   - 既定 (フラグ無し) の 50 件は変わらず 50/50 OK (`e2e.sh` 再実行)。wq の 6 run を追加し判定 62/62 OK (`summarize.py` に 6 check 追加)。
+  - **測定 commit (コードを変えた最後の commit)**: `d5702b2dbd5f6111953801ebf84cc86db715fc28`。`bash tools/targets/serum2/host/e2e.sh` (`work/out_*`・`cases*` を削除してから実行) → **62/62 OK, 67.53 s** (exit 0)、NC1/NC2 とも期待どおり (exit=1, NG=1)、load 0.07 → 0.10 (1 分値)、並列 1 (逐次)、4 core、wine 9.0。
+  - 鮮度: `git diff d5702b2d HEAD -- tools/targets/serum2/host` は本節の文書以外に差分が無いことを、最終 commit 時点で確認する (下記)。
 - 結論: **既定 host で 0x800010 が出ないのは、gate 値 2 が「wrapper QI 2 件の失敗」で決まるため**。wrapper に応答すれば gate は 1 になり、既定ゲートのまま #238 契約 (pv<2.0.20 → demo bit 1 + 0x800010) が成立する。これは host 側の応答で変わる。ただし「host がこの 2 IID に応答する」ことが実 host の正しい挙動かは未確定 (実 Image-Line/Xfer host の挙動は未観測)。
 
 ## 5. 未解決 (起票先)
