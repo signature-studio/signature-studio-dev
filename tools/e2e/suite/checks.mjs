@@ -40,13 +40,13 @@ export const checks = [
     id: "headers-isolation",
     title: "ドキュメントと worklet が COOP same-origin / COEP require-corp を返す",
     async run(ctx) {
-      for (const p of ["/", "/worklets/dummy-worklet.js"]) {
+      for (const p of ["/", "/worklets/fl-audio-worklet.js"]) {
         const r = await http(ctx, p);
         assertEq(r.status, 200, `${p} status`);
         assertEq(r.headers.get("cross-origin-opener-policy"), "same-origin", `${p} COOP`);
         assertEq(r.headers.get("cross-origin-embedder-policy"), "require-corp", `${p} COEP`);
       }
-      return "COOP=same-origin COEP=require-corp (/, /worklets/dummy-worklet.js)";
+      return "COOP=same-origin COEP=require-corp (/, /worklets/fl-audio-worklet.js)";
     },
   },
   {
@@ -58,7 +58,7 @@ export const checks = [
       const html = await (await http(ctx, "/")).text();
       const jsPath = /src="(\/assets\/[^"]+\.js)"/.exec(html)?.[1];
       assert(jsPath, "index.html から /assets/*.js を取得できない");
-      const probes = ["/", "/index.html", jsPath, "/worklets/dummy-worklet.js", "/__e2e__/add.wasm"];
+      const probes = ["/", "/index.html", jsPath, "/worklets/fl-audio-worklet.js", "/__e2e__/add.wasm"];
       const notes = [];
       for (const p of probes) {
         const r = await http(ctx, p, { headers: { "Accept-Encoding": "br, zstd, gzip" } });

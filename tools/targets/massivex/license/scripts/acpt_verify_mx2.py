@@ -116,7 +116,8 @@ npoints = {
  'N5 QML MXDemoPopup': 0x18415f411,
  'N6 Native Access 文言': 0x184ffcf87,
  'N2 serial-incorrect 文言': 0x181142160,
- 'N3 Subscription expired': 0x18010e4e0,
+ # 関数 VA (文字列 0x185013ca8 を参照する関数)。文字列 VA ではないため、np_res の表示は文字列ではなくコード先頭になる (REPORT §12.2)
+ 'N3 Subscription expired (参照元関数)': 0x18010e4e0,
 }
 def rva2off(rva):
     for s in pe.sections:

@@ -20,7 +20,7 @@
 # bcrypt/ncrypt IAT thunk 群: 0x18396ef10-0x18396f7b0 (jmp [rip+IAT])。呼出クラスタ: 0x18102c9bc-0x18102ca99, 0x18175558f-0x181755a5b, 0x181e98xx-0x181e9bxx (Schannel), 0x181d31xxx-0x181d3fxxx [確]
 # ---- UI / demo ゲート ----
 0x181142160 / 0x181143c00  'Your serial number is incorrect. Please run '           [確]
-0x18010e4e0  'Subscription expired.' / 'Subscription'                              [確]
+0x18010e4e0  [関数] 'Subscription expired.' (文字列 0x185013ca8 を RIP 参照する関数。文字列 VA ではない・REPORT §12.2。N5/N6 の追跡は #1017)  [確]
 0x184ffc425  'Your serial number is incorrect. Please run ' (文言プール)            [確]
 0x184ffcf87 / 0x184ffcfe8 / 0x184ffd03f / 0x184ffd092 / 0x184ffd0d6 / 0x184ffd131  'Please (open|use) Native Access to (re-)activate.' [確]
 0x184ff8e88  'Please run the Registration Tool to enter the correct serial number for {}.' [確]
