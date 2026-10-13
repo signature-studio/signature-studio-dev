@@ -230,15 +230,17 @@ export class PluginPool<T> {
     }
     if (r.kind && r.kind !== "wasm32") {
       // wasm64: 追加の枠を取る (足りなければ追い出し)。取れなければ全て巻き戻す
-      const extra = this.budget.tryAcquire(id, "wasm32");
-      let ex = extra;
-      while (!ex) {
-        if (!this.evictOne()) {
-          lease.release();
-          r.dispose?.();
-          throw new MemoryBudgetExceeded(id, SLOTS_PER_MEMORY[r.kind], this.budget.inUse, this.budget.capacity);
+      let ex = this.budget.tryAcquire(id, "wasm32");
+      try {
+        while (!ex) {
+          if (!this.evictOne()) throw new MemoryBudgetExceeded(id, SLOTS_PER_MEMORY[r.kind], this.budget.inUse, this.budget.capacity);
+          ex = this.budget.tryAcquire(id, "wasm32");
         }
-        ex = this.budget.tryAcquire(id, "wasm32");
+      } catch (err) {
+        // victim の dispose が throw した場合も含め、確保済みの base 枠を返す
+        lease.release();
+        r.dispose?.();
+        throw err;
       }
       const base = lease;
       lease = {

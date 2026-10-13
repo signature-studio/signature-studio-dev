@@ -26,6 +26,23 @@ const checks = {
     if (r.created < NATIVE_LIMIT - 4 || r.created > NATIVE_LIMIT + 4) f.push(`created=${r.created} が実測上限 ${NATIVE_LIMIT}±4 の外`);
     return f;
   },
+  churn_drop: (r) => {
+    const f = [];
+    if (r.churn.err) f.push(`保持なし 1000 個の作成中に例外 ${JSON.stringify(r.churn.err)} (成功 ${r.churn.ok})`);
+    for (const k of ["first", "second"]) {
+      const v = r[k];
+      if (!isOom(v.err)) f.push(`${k}: 上限到達時の例外が OOM でない ${JSON.stringify(v.err)}`);
+      if (v.created < NATIVE_LIMIT - 4 || v.created > NATIVE_LIMIT + 4) f.push(`${k}: created=${v.created} が実測上限 ${NATIVE_LIMIT}±4 の外 (全解放後の再作成が効いていない可能性)`);
+    }
+    return f;
+  },
+  dispose_throw: (r) => {
+    const f = [];
+    if (r.err?.message !== "dispose-boom") f.push(`victim の dispose 例外が伝播しない: ${JSON.stringify(r.err)}`);
+    if (r.afterFail.inUse !== 0 || r.afterFail.size !== 0 || r.afterFail.hasW) f.push(`失敗したロードが枠を残した ${JSON.stringify(r.afterFail)}`);
+    if (r.recovered !== "b") f.push(`後続の pin が成功しない: ${JSON.stringify(r.recovered)}`);
+    return f;
+  },
   pool_churn: (r) => {
     const f = [];
     if (r.err) f.push(`例外 ${JSON.stringify(r.err)}`);
@@ -94,7 +111,9 @@ const checks = {
 // [case, query, check, 説明, 負の場合 (neg) に期待する失敗理由の部分文字列]
 const POS = [
   ["naive", "", checks.naive, "無予算 300 instance → 実上限で OOM (問題の再現)"],
+  ["churn_drop", "", checks.churn_drop, "保持なし 1000 個 → 上限まで保持 → 全解放後に再び上限まで保持 (明示 GC なし)"],
   ["pool_churn", "", checks.pool_churn, "300 種 × 1500 pin / cap=96"],
+  ["dispose_throw", "", checks.dispose_throw, "wasm64 ロード中の追い出しで victim の dispose が throw → 確保枠を残さない"],
   ["pool_concurrent", "", checks.pool_concurrent, "120 同時ロード + 121 本目拒否 + LRU 回復"],
   ["pool_race", "", checks.pool_race, "pin 復帰前の追い出しで破棄済みハンドルを返さない (cap=1 窓 9 通り + 8 枠・24 種の並行 1440 pin)"],
   ["create_fail_releases", "", checks.create_fail_releases, "Memory 生成失敗で予約が戻る"],
@@ -102,6 +121,7 @@ const POS = [
   ["wasm64", "", checks.wasm64, "wasm64 = 2 slot (cap=120 → 60 本で拒否)"],
 ];
 const NEG = [
+  ["churn_drop", "neg=keep", checks.churn_drop, "churn 中も参照を保持 → 上限で OOM して FAIL すること", /例外/],
   ["pool_churn", "neg=leak", checks.pool_churn, "追い出し後も参照を保持 → Memory 回収されず上限 OOM で FAIL すること", /例外|予算超過|累計/],
   ["pool_churn", "cap=130", checks.pool_churn, "cap をネイティブ上限超 (130) に設定 → OOM で FAIL すること", /例外/],
   ["pool_concurrent", "cap=130", checks.pool_concurrent, "cap=130 / 120 本 → 121 本目が予算拒否でなく OOM / 非拒否になり FAIL すること", /MemoryBudgetExceeded|121 本目/],

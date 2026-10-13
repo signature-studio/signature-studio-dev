@@ -72,6 +72,44 @@ const cases = {
     return { created: keep.length, err };
   },
 
+  // 参照を落とした Memory は回収される (明示 GC なし)。保持なしで 1000 個作成 → 上限まで保持 → 全解放後に再び上限まで保持できること。
+  // neg=keep: churn 中も参照を保持 → 上限で OOM (FAIL すること)
+  async churn_drop() {
+    const churn = { ok: 0, err: null }, keepChurn = [];
+    try {
+      for (let i = 0; i < 1000; i++) {
+        const inst = new WebAssembly.Instance(mod, {});
+        inst.exports.put(0, hash(`c${i}`));
+        if (neg === "keep") keepChurn.push(inst);
+        churn.ok++;
+      }
+    } catch (e) { churn.err = errInfo(e); }
+    const fill = () => {
+      const keep = []; let err = null;
+      try { for (let i = 0; i < 300; i++) keep.push(new WebAssembly.Instance(mod, {})); } catch (e) { err = errInfo(e); }
+      return { created: keep.length, err };
+    };
+    const first = fill();
+    const second = fill();
+    return { churn, first, second };
+  },
+
+  // wasm64 ロード中の追い出しで victim の dispose が throw しても、確保済みの枠を残さないこと (loadOne の巻き戻し)
+  async dispose_throw() {
+    const budget = new MemoryBudget(2);
+    const pool = new PluginPool(budget, async (id) => {
+      if (id === "w") return { value: { id }, kind: "wasm64", dispose: () => {} };
+      return { value: { id }, dispose: () => { throw new Error("dispose-boom"); } };
+    });
+    (await pool.pin("a")).unpin();
+    let err = null;
+    try { await pool.pin("w"); } catch (e) { err = errInfo(e); }
+    const afterFail = { inUse: budget.inUse, size: pool.size, hasW: pool.has("w") };
+    let recovered = null;
+    try { recovered = (await pool.pin("b")).id; } catch (e) { recovered = errInfo(e); }
+    return { err, afterFail, recovered };
+  },
+
   // 300 種のプラグインを cap=96 の予算で 1500 回 pin/unpin (Zipf 風 80/20 アクセス)。ネイティブ上限 124 を超えて累計ロードできること
   async pool_churn() {
     const cap = +(q.get("cap") ?? 96);
