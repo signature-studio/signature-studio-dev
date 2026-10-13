@@ -96,6 +96,15 @@ static void build_tree(uint8_t* im, unsigned char** Fp, unsigned char** Mp, unsi
         W64(C + 0x21a8, 8, C + 0x21b8);                             /* map._Myhead = H */
         for (int i = 0; i < 3; i++) W64(C + 0x21b8, i * 8, C + 0x21b8);  /* H.left/parent/right = H */
         C[0x21d0] = 1; C[0x21d1] = 1;                                     /* H._Isnil (H = C+0x21b8, +0x18/+0x19) */
+        /* FA-16: 1 ノードを木に入れる。map 経路の探索 key は keycnt (0x180ca1499 の edx) なので node key = 1。
+         * node: +0 left, +8 parent, +0x10 right, +0x19 isnil, +0x20 key(u16), +0x28 value, +0x30 blk */
+        { unsigned char* N = gr_alloc(0x40); unsigned char* Z = gr_alloc(0x40); unsigned char* NB = gr_alloc(0x30);
+          memset(N, 0, 0x40); memset(Z, 0, 0x40); memset(NB, 0, 0x30);
+          unsigned short k1 = 1; memcpy(N + 0x20, &k1, 2);
+          W64(N, 0x00, C + 0x21b8); W64(N, 0x08, C + 0x21b8); W64(N, 0x10, C + 0x21b8);
+          W64(N, 0x28, Z); W64(N, 0x30, NB);
+          W64(NB, 0, NB + 0x10); W32(NB, 8, 0x40); W32(NB, 0xc, 0x40); W64(NB, 0x18, 0x1803b4070ULL); W64(NB, 0x20, 0x1803b4070ULL);
+          W64(C + 0x21b8, 0x00, N); W64(C + 0x21b8, 0x08, N); W64(C + 0x21b8, 0x10, N); }
         /* param block +0x10 = mgr。mgr は driver 0x180da68c0 が [mgr+0x19a8/0x19b0] (shared_ptr pair) を
          * 読むため、ダミー mgr を渡す (C+0x1900 = 0x1a00B, +0x19a8 = self, +0x19b0 = C+0x1c00 blk refcount=0x40)。 */
         W64(C, 0x370, C + 0x620); W64(C, 0x480, C + 0x620);
