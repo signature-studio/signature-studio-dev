@@ -1,6 +1,6 @@
 # M11 LB_BASE=0x10000 の残差調査 (#403, 部分達成)
 
-親: #222 (PR #303)。素材: fl-win64 (`block00031_PE.bin` 22,227,016 B)・work-m11・toolchain-emsdk・toolchain-retdec (2026-10-13 runner)。
+親: #222 (PR #303)。素材: fl-win64 (`block00031_PE.bin` 22,227,016 B)。work-m11・toolchain-emsdk・toolchain-retdec は本 PR の作業 runner に無い (§2・§4 参照)。
 e2e の測定は HEAD `64d09590` で実施。c8b9ad75 との差は `audit_va.py` のみで e2e 結果に影響しない (§1 の audit 実測は c8b9ad75 で実施)。
 実行は各 1 回ずつ直列 (ただし同一条件の再実行 2 回で結果が一致したものを記す)。
 既知類型との関係: 該当なし (LB 依存差は未切り分けで、`docs/DEFECTS.md` の D1a〜D18 への帰属は未確認。近縁は D11 = PE VA リテラルの切り捨て)。
@@ -48,17 +48,41 @@ LB=0 でも ok 870 / trap 25 で、旧記録 (812 / 83) と別の値になって
 - `M11_LB_BASE=0x10000 bash tools/m11/m11_e2e.sh` — 表の LB=0x10000 列
 - `python3 tools/hostbridge/lowbase/audit_va.py "$FL_WIN64_DIR/extracted/block00031_PE.bin" 0x10000` — §1 の exit 0 / `iat_slots_holding_image_VA=0`
 
-本 PR の作業 runner では work-m11・toolchain-emsdk・toolchain-retdec が無く、上の e2e 2 本は再実行していない (表の数値は HEAD `64d09590` 測定時の記録)。audit は fl-win64 で実行済み。
+本 PR の作業 runner では work-m11・toolchain-emsdk・toolchain-retdec が無く、上の表の e2e 2 本は再実行していない。表の数値は HEAD `64d09590` で測定した**前回記録の引用**である。audit (§1) は fl-win64 で実行済み。
 
 ### LB=0x10000 だけの通常起動 Halt0 (新規観測)
 
 LB=0x10000 では `units_run=37` で Halt0 により早期終了し、`probes.Halt0=1`。LB=0 は 53 unit 実行後 OOB。
 unit 40 の trap (上表) はこの Halt0 と同じ経路。**LB 依存で Halt を呼ぶ分岐が増えている可能性がある。** 未確定。
 
-## 3. 全 IR の remap 件数・実行後の guest ポインタ assert (受入 3: 未着手)
+## 3. 全 IR の remap 件数・実行後の guest ポインタ assert (受入 3: 件数は計測・guest ポインタ assert は未着手)
 
-本 run では着手せず。`lb_check.py` と IR 指紋 (`ir_sha256`) は LB 別に記録済み (LB=0: `9a9e223e…`、LB=0x10000: `451ecd03…`)。
-全 IR の remap 件数は未計測。
+- 計測: `python3 tools/m11/m11_remap_count.py work/boot_final.ll` (未 remap の image VA 即値を数える。`--assert-clean` で残件 0 を要求)。
+  ネガティブコントロール `bash tools/m11/m11_remap_count_negctl.sh` は、既知の未 remap 1 件 (`inttoptr i64 4194304`) で exit 1 かつ `FAIL: unremapped image-VA inttoptr = 1` を出し、未 remap を含まない IR で exit 0 になることを確認する。
+- 件数 (作成者の手元 IR, ir_sha256 `5dfb1473…` = LB=0x10000 記録): `inttoptr i64` 即値 4,470 件 (命令形 4,470 / 式形 0)、
+  うち image VA 範囲 `[0x400000, 0x400000+0x1ac0000)` に残るもの (= 未 remap) **4,368 件**。
+  この件数は本 runner では再計算していない (`work/boot_final.ll` が無い)。
+  `m2_inttoptr_remap = 0`・`m2b_remap = 0` (`ir_report.json`) と合わせ、残件の解消先は未特定 (§未解決 参照)。
+- 指紋の不一致 (未切り分け): 旧記録 (main 版 §3) は LB=0 `9a9e223e…`・LB=0x10000 `451ecd03…`。本 PR の記録は LB=0 `3a9ceb17…`・LB=0x10000 `5dfb1473…`。
+  本 PR は IR 生成・build の経路 (`m11_gen_ir2.sh`・`m11_build.sh`・`m11_lift.sh`) を変更しておらず、本 runner では IR を再生成していない。
+  `REPORT_N27.md` では同一手順の 2 run で `ir_sha256` が異なった記録があり (RetDec・gen_ir2 の出力の非決定性の可能性)、指紋の差はこれと区別できていない。
+  したがって「IR は変更していない」とは言えない。どの IR (指紋) を使った測定かは未確定。
+- 実行後の guest ポインタ assert (実行結果の VA 範囲検査) は未実装。子 issue #1004 (M11-N57) の範囲。
+- `lb_check.py` と IR 指紋 (`ir_sha256`) は LB 別に `m11_cond.py --bind` で記録される。現在の指紋の正本は work-m11 の `ir_conditions.json` (本 runner に無い)。
+
+## 4. 前回記録の引用 (再測定なし)
+
+本 PR の作業 runner (2026-10-13) では work-m11・toolchain-emsdk・toolchain-retdec が無く、e2e は再実行していない。
+以下は HEAD `64d09590` (base main `73853ba2`) で測定し、`REPORT_N715.md` 等に記録された値の引用である。
+
+| 条件 | 所要 (wall) | exit | M11_SUMMARY (要点) |
+|---|---|---|---|
+| `M11_LB_BASE=0` | 150 s | 0 | units_run 53 / survey ok 870 / trap 25 / miss 46 / wasm 6,042,920 |
+| `M11_LB_BASE=0x10000` | 98 s | 0 | units_run 37 / survey ok 868 / trap 27 / miss 46 / wasm 6,043,303 / halt0_early=true |
+
+- 上の値は §2 の表と同じ測定 (同一記録)。二重の独立検証ではない。
+- 本 PR の変更 (`m11_remap_count*`・REPORT) は e2e の経路に入らないため、この値は本 PR の変更では変わらない見込みだが、再測定はしていない。
+- 再測定の手順: `M11_LB_BASE=0 bash tools/m11/m11_e2e.sh` / `M11_LB_BASE=0x10000 bash tools/m11/m11_e2e.sh` (work-m11 と fl-win64 が必要)。
 
 ## 未解決 (起票先)
 
@@ -66,4 +90,6 @@ unit 40 の trap (上表) はこの Halt0 と同じ経路。**LB 依存で Halt 
 |---|---|---|
 | unit 40 / 153 / 158 / 745 の LB 依存差の原因 (特に unit 40 の Halt 経路と通常起動の Halt0 早期終了) | LB=0x10000 の通常起動が 37 unit で止まる。受入 2 未達 | 本 issue (#403) で継続 |
 | REPORT_APPENDIX の旧 HEAD 集計 (812/83) と現 HEAD (870/25) の差 | 既存の数値の根拠が現 HEAD で再現しない | PM が起票 (#222 系) |
-| 全 IR の remap 件数・実行後 guest ポインタ assert | 受入 3 | #403 で継続 |
+| 実行後の guest ポインタ assert (未実装) | 受入 3 の後半 | 子 issue #1004 (M11-N57) |
+| 未 remap の image VA 即値 4,368 件 (件数の解消先) | 受入 3 の件数は計測済み。解消を担当する issue は未特定 (#417 は halt0 21 unit の別件、#1004 は実行後 assert で範囲外) | PM 起票を要求 (担当 issue 未確定) |
+| IR 指紋の不一致 (旧 `9a9e223e…`/`451ecd03…` と本記録 `3a9ceb17…`/`5dfb1473…`) | どの IR で測定したかが未確定 | PM 確認 (work-m11 の `ir_conditions.json` で照合) |
