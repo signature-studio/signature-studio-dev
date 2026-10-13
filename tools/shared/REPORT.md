@@ -114,7 +114,8 @@
 - 対象: libkio_x64 の純粋ユーティリティ 15 関数 (`GetFourIntel`/`GetEightIntel`/`GetFloat…`/`GetDouble…`/`SetFour…`/`SetDouble…`/`Limit`/`LimitFloat`/`Fix`/`FixHi`/`CBool`/`unilen`/`wcslen16`/`str2compare`/`str4compare`)。RetDec `--select-ranges` 1.7s → m2 `ir_normalize` → emcc standalone wasm (31.9KB)。`ConvertUTF8/16ToUTF32` は静的バッファ+libc 依存のため除外。
 - **差分テスト**: 元の mac x86_64 機械語を `mmap(RWX)`+ctypes で直接実行 (SysV ABI は Linux と同一; 非循環の参照) と wasm を同一 760 ケース (small=int32 範囲 / wide=64bit 値) で比較し戻り値ビット+書込バッファを照合。
 - **結果 (本 PR 実測, 検証起点 commit `3e97bb1c`)**: `FL_MAC_DIR=$HOME/analysis/mac bash tools/shared/lift/libkio/lift.sh` (FIX=1 既定) **TOTAL 760/760**。difftable の全 19 行が 40/40。ネガティブコントロール `FIX=0` (kio_fix 無し) **TOTAL 226/760**。`KIO_ARGREG=0` (汎用 [A'] のみ無効化) **TOTAL 725/760** (str2compare / str4compare が 40/40 未満)。
-- **汎用化の範囲 (未達を明記)**: 関数名直書きは無いが、[B][D] の `FLOAT3` (f32×3 の対応表) は `LimitFloat_RCSfff` の 1 関数専用であり、汎用化は未了 (#938)。
+- **汎用化の範囲 (#1129 実測)**: `FLOAT3` (f32×3 の対応表) を廃止し、`kio_fix.py` の `xmm_fix` に置換した。fp 引数 2 つ以上の関数について、(1) DSM の `__asm_*` 命令 (`!insn.addr` で引く) の xmm オペランドから IR の `load i128` を fp 引数 j (SysV で j 番目 = xmm j) の `bitcast` に接続、(2) DSM の jcc 条件 (`ja`/`jae`/`jb`/`jbe`/`je`/`jne`) と分岐の真偽から `ucomiss` の flags を `fcmp <pred> float %argA, %argB` に接続する。関数名・表は持たない。
+  - 実測 (測定 commit は本 PR の HEAD): FIX=1 **TOTAL 760/760** (LimitFloat_RCSfff 40/40・Fix_RCSf 40/40 維持)。ネガティブコントロール FIX=0 **TOTAL 226/760** (LimitFloat_RCSfff 0/40・Fix_RCSf 15/40)。
 - **SIG の生成**: `diff_test.py` の SIG は手書きをやめ、`funcs.txt` の戻り値型 (4 列目) と `sig.py` (`c++filt` で demangle した引数型) から生成する。`kio_fix.py` も関数名を見ず、署名と DSM の `idiv` (`sig.idiv_fns`) から規則を選ぶ。
 - **所要** (n=3, 測定 commit `3e97bb1c`・`git worktree add --detach` の clean worktree・`nproc`=4・実行は直列 1 本・計時は `lift.sh` 全体の経過秒): FIX=1 **2.45 / 2.49 / 2.44 s** (min–max 2.44–2.49 s, 実行直前 load 0.29–0.34)。FIX=0 **2.32 / 2.31 / 2.27 s** (2.27–2.32 s, load 0.37–0.42)。KIO_ARGREG=0 **2.45 / 2.45 / 2.45 s** (2.45–2.45 s, load 0.46–0.51)。3 系統とも各 run の TOTAL は 760/760・226/760・725/760 で一致。素材: analysis-mac-shared のみ展開、retdec は runner 既設 `[RETDEC]`、emcc は emsdk 6.0.12 を `git clone` + `emsdk install` で導入 (`toolchain-emsdk` は未取得のため artifact 由来ではない)。初回 1 回 (キャッシュ未温) の 2.71 s は n=3 から除外。
 - **[D] 極性の照合 (実測)**: 機械語 `0xe5b5` (x86_64 スライス, llvm-objdump) は `ucomiss %xmm0,%xmm1` (Intel: `ucomiss xmm1,xmm0`) → `ja 0xe5c7`。`ja` 不成立 (arg2 ≤ arg1) で `minss` 経路 (`0xe5be`)。IR は `%7 = or(%5,%6)` が真で `dec_label_pc_e5be` (minss) に分岐し、`%5`/`%6` = `fcmp ule float %arg2, %arg1` で一致する。
@@ -123,9 +124,9 @@
   - [A'] **引数レジスタ接続の欠落** — RetDec が k 番目の整数引数を store の無い未初期化 alloca からの k 番目の load として読み、`%argK` を未参照にする (str2compare/str4compare の第 2 引数 `PKc`)。汎用 pass `kio_fix.py`: 署名に f/d を含まない関数で、署名の k 番目が P/PK のとき k 番目の load を `ptrtoint ptr %argK` に置換。無効化は `KIO_ARGREG=0`。
     - **前提 (未検証の一般化)**: 単一 alloca に全引数が spill されている形を仮定し、その alloca の k 番目の load を整数引数 k とみなす。別の未初期化 alloca からの無関係な load が先に出る関数では番号がずれる。現 19 関数では発生していない (本 PR の 14 関数完全一致と、ネガコン差分 = str2 +19 / str4 +16 のみで確認)。
     - **署名の添字 (既知の制約)**: `int_params` は署名をトークン化して添字で数え、`R`/`K` も独立トークンとして数える (例: `PhRKl` = [Ph,R,K,l] で引数は 2 個)。したがって `R`/`K` の後ろに `P` が来る署名では添字がずれる。現 19 関数では発生しない: Get*Intel `PhRKl` は P が先頭のみ、`PKtPKc`・`PKwPKc` は R/K を含まない、SetFourIntel `PhRKlS1_` は置換対象外 (`S1_` がトークン化できず return None)、SetDoubleIntelDouble `PhRKlRKd` は `d` を含むため対象外。
-  - [B] **float 引数落ち** — 単一 fp 引数の関数は汎用 pass で修復 (`Fix_RCSf` 12→40/40)。fp 引数 3 つ (f32,f32,f32) の `LimitFloat_RCSfff` は xmm 番号が IR から消えるため、署名パターン `f32×3` に対応表を当てる (`FLOAT3`)。fp 複数の汎用化は未了 (#1129 は別管理)。
+  - [B] **float 引数落ち** — 単一 fp 引数の関数は汎用 pass で修復 (`Fix_RCSf` 12→40/40)。fp 引数が複数 (f32,f32,f32 の `LimitFloat_RCSfff`) は xmm 番号が IR から消えるため、DSM の xmm オペランドで接続する (`xmm_fix`・#1129)。
   - [C] **`long`(64bit) を i32 と復元** (Limit/FixHi/CBool) — 署名に値渡し `long` がある関数で i32→i64 に拡幅 (汎用)。
-  - [D] `ucomiss` の flags が IR に接続されない (LimitFloat_RCSfff) — `FLOAT3` の `%5`/`%6` で `fcmp ule float %arg2, %arg1` に接続 (極性は上記の実測で確認済み)。
+  - [D] `ucomiss` の flags が IR に接続されない (LimitFloat_RCSfff) — DSM の jcc (`ja`) と分岐の真偽から `fcmp ule float %arg2, %arg1` を生成し `%5`/`%6` に接続 (`xmm_fix`・#1129。極性は上記の実測で確認済み)。
   - [E] `idiv` が `urem` に化ける符号欠陥 (FixHi) — DSM に `idiv` がある関数で `urem`→`srem` (汎用; DSM 省略時は適用しない)。
 - **DEFECTS.md 行案** (`docs/DEFECTS.md` への反映は PM 判断・依頼は PR コメント参照):
   - [C] `long` (値渡し 64bit) を i32 と復元 → 署名に値渡し `long` があれば i32→i64 (汎用)。症状: Limit/FixHi/CBool が 64bit 値で誤り。
@@ -134,7 +135,7 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| [B][D] fp 引数 2 つ以上の xmm 番号復元 (`FLOAT3` は 1 関数専用の対応表で未汎用化) | LimitFloat_RCSfff のみ (現 19 関数で対象は 1) | #938 (OPEN) |
+| [B][D] fp 引数 2 つ以上の xmm 番号・flags 接続は `xmm_fix` で汎用化したが、対象は現 19 関数で LimitFloat_RCSfff の 1 関数のみ (他の fp 複数関数での検証なし) | LimitFloat_RCSfff のみ | #938 (OPEN) |
 | [A] 文字列比較の第 2 引数 deref 落ちの汎用化の残 (`KIO_ARGREG` の前提 = 単一 alloca spill) | str2compare / str4compare (`KIO_ARGREG=0` で 725/760) | #1282 [T-SH-27] (#939 は CLOSED のため新規起票) |
 | [C]/[E] の類型行を `docs/DEFECTS.md` へ反映 | 文書のみ | PM 判断 (PR コメントで依頼) |
 | diff_test 入力分布の一部が関数名依存 (`str*compare` の copy_prev、`FixHi` の 0/-1 回避) | 入力生成のみで修復規則には無い | 本 issue 内で残存 |
