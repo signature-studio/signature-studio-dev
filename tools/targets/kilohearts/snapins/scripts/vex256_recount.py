@@ -22,9 +22,11 @@ md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
 all_cnt = collections.defaultdict(collections.Counter)
 ymm_cnt = collections.defaultdict(collections.Counter)
 va_cnt = collections.Counter()
+skipped = collections.Counter()
 for ns in NS:
     for f in S['sets'][ns]:
         if f not in RES:
+            skipped[ns] += 1
             continue
         for i in md.disasm(rd(BASE + f, RES[f]['size']), BASE + f):
             is_ymm = 'ymm' in i.op_str
@@ -40,6 +42,7 @@ print('mnemonic 数 %d / 重複込み合計 %d / VA 一意数 %d (snap-in 間で
 print('ymm 形 (重複込み) snap-in 別: %s / 合計 %d' % (
     {ns: sum(c[ns] for c in ymm_cnt.values()) for ns in NS}, sum(sum(c.values()) for c in ymm_cnt.values())))
 print('xmm 形を含む全 v* 重複込み合計: %d' % sum(sum(c.values()) for c in all_cnt.values()))
+print('closure functions skipped (not in callgraph RES) per snap-in: %s total %d' % (dict(skipped), sum(skipped.values())))
 print('--- ymm 形 mnemonic 別 (重複込み)')
 for m in sorted(ymm_cnt):
     print('%-12s %s total=%d' % (m, {ns: ymm_cnt[m][ns] for ns in NS if ymm_cnt[m][ns]}, sum(ymm_cnt[m].values())))

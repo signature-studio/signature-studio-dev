@@ -25,9 +25,11 @@ md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
 per = collections.defaultdict(collections.Counter)
 example = {}
 ymm_total = collections.Counter()
+skipped = collections.Counter()
 for ns in NS:
     for f in S['sets'][ns]:
         if f not in RES:
+            skipped[ns] += 1
             continue
         code = rd(BASE + f, RES[f]['size'])
         for i in md.disasm(code, BASE + f):
@@ -42,5 +44,6 @@ out = {m: {'per_snapin': dict(per[m]), 'total': sum(per[m].values()), 'example':
 for m, v in out.items():
     print('%-12s %s total=%d | %s' % (m, v['per_snapin'], v['total'], v['example']))
 print('ymm-operand instructions per snap-in:', dict(ymm_total))
+print('closure functions skipped (not in callgraph RES) per snap-in:', dict(skipped), 'total', sum(skipped.values()))
 if len(sys.argv) > 2 and sys.argv[1] == '--json':
     json.dump(out, open(sys.argv[2], 'w'), indent=1)
