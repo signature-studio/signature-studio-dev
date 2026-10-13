@@ -69,9 +69,9 @@ mirror は guest ヘッダと 1:1 (guest アドレスで引く)。Prepare で確
 
 | 検証 | コマンド | 結果 | 所要 / 備考 |
 |---|---|---|---|
-| shimx 全体 (MT/ST・fail-fast 10 モード・M4 53/53・署名 mismatch 0・midi 単体テスト) | `bash tools/shimx/test.sh` | exit 0 (MT/ST PASS・fail-fast 10・M4 MT/ST PASS・sig_test ALL PASS・mismatch 0) | 32 s (HEAD 5914dc0d・load 0.19→0.76) |
+| shimx 全体 (MT/ST・fail-fast 10 モード・M4 53/53・署名 mismatch 0・midi 単体テスト) | `bash tools/shimx/test.sh` | exit 0 (MT/ST PASS・fail-fast 10・M4 MT/ST PASS・sig_test ALL PASS・mismatch 4 (a) / 0 (b)) | 43 s (HEAD 80bc25d6・load 0.88) |
 | `verify_ott` | 同上 (§7) | **SKIP** (`tools/m8/work/ott_m8.ll` / `tools/m6/work` が無い) | OTT 検証は未実施。素材 (`toolchain-retdec` / `work-m6-ott`) が要る |
-| audio MIDI e2e (audio 単体。shimx 変更はビルド対象外) | `bash tools/audio/e2e_midi.sh` | 4/4 PASS, exit 0 | 69 s (HEAD 5914dc0d・load 0.49) |
+| audio MIDI e2e (audio 単体。shimx 変更はビルド対象外) | `bash tools/audio/e2e_midi.sh` | 4/4 PASS, exit 0 | 69 s (HEAD 80bc25d6・load 0.33) |
 
 注: `test.sh` は実行中に `BACKLOG.md` / `inventory.md` / `data/coverage.json` / `data/inventory.csv` を M11 入力欠落の状態で再生成する。検証後はこれらを main の内容へ戻してある (コミットに含めない)。
 
