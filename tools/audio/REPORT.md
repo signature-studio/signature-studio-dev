@@ -233,3 +233,13 @@ DirectSound shim を実装 (secondary = 循環バイト列, pump が T まで充
 ## 16. AU-10 (#191) 30 分ソーク (`--soak30`)
 
 無負荷 30 分 (1800 s, B=256 48k ランプ) は PASS (underrun 0・ramp mismatch 0)、負荷下は 420 s で PASS。ただし head `fc93f45` (main 取り込み後) 上の 30 分ソークは未実施 (未計測)。head `fc93f45` の 10 秒ソークは PASS (ramp 0 / 481,024 f)。head `57519ca` の 10 秒ソークは 4 回中 1 回 FAIL (ramp mismatch 411,392/480,512、原因未特定) で、他 3 回は PASS。実機・Firefox/Safari は未計測。実測値・再現・未解決は `REPORT_AU10.md` (分割移動先) を参照。
+
+## 17. AU-9 (#185) 組込適用 (`src/index.ts` 反映・旧ハーネス削除)
+
+§12 の提案パッチを `src/index.ts` に適用し、旧 `src/runtime/audio.ts` を削除した (#25 close 済みのため管轄の前提が解消)。`e2e.sh` は `index.ts` が未適用のときだけパッチを当てる (適用済み HEAD を検証可能にするため)。`e2e.sh` の `git archive` 範囲は HEAD 全体へ広げた (`vite.config.ts` が `tools/legal/notices`・`tools/ipp` の LICENSE を読むため部分展開では build が落ちた)。
+
+検証: 素材 `fl-win64` を `$RUNNER_TEMP/fl-win64` へ展開 (7.5 s) し `FL_WIN64_DIR` に指定。HEAD `321c94fa` (適用済み・audio.ts 削除後) で `bash tools/audio/integration/e2e.sh`: **13/13 PASS, exit 0, 67 s** (e2e.sh 全体)。同条件の直前 run (`3c52be7a`) は 13/13 PASS, 63 s / 60.7 s、その前の run は 13/13 PASS, 70 s。tsc --noEmit OK。
+
+dev 側で一度 `dev:tone` / `dev:underruns` が FAIL (underruns=1, zero_runs=1) した (run4 とは別。`e5f043c3` の run3 相当) が、同 HEAD の再実行は全 PASS。再現性は未確定のため、dev 側の初回 underrun は要監視。
+
+残り: `public/worklets/dummy-worklet.js` は `deploy/probe/policy-check.mjs`・`tools/e2e/suite/checks.mjs` が参照するため今回は削除せず (管轄: #62 系 / tools/e2e)。`tools/e2e` スイートの再実行は未実施。
