@@ -127,7 +127,7 @@ IR (boot_final3.ll 行 176793 以降) は `%13 = arg1 + 8*Count` (= `rbx + rdi*8
 | 304・555: `function_535bf2` が **IR 未定義の `function_535c2e`** を呼び fail-fast (`m11_unresolved_function` → abort)。closure 外の関数 | 2 unit が trap | #714 (M11 closure 欠け) |
 | 923: `4fb910`→`410730`→`410b10` (C 転記, モニタスロット解決) の `[obj-0x80..]` 系 OOB。原因未切り分け | 1 unit が trap | #714 (同上) |
 | 47b260 の notify 間接 call (D15) を有効化 (`M11_NOTIFY_682=1`) すると、呼出先 0x535cf0 / 0x536570 / 537220 / 53d290 / 537a40 が closure 外で miss。ok→miss は **45・95・101・291・296・302 の 6 unit** (§4.2)。291・296 の修復 ok はこの省略に依存する | 既定は省略 (`M11_NOTIFY_682=0`)。PM 判断 (DEFECTS D15 行に併記・closure 拡張の要否) |
-| 再生成 IR の ok 件数が前版より 1〜2 ずれる (基準 864→865、修復 868→869、miss 46→47) | 5 unit の判定は一致。絶対値の比較は同一 IR 内で行うこと | 原因未特定 (前版の IR と今回の gen_ir2 出力の差分は未比較)。絶対値の比較は同一 IR 内で行う | PM 判断 (IR 再生成の再現性) |
+| 再生成 IR の ok 件数が前版より 1〜2 ずれる (基準 864→865、修復 868→869、miss 46→47) | 5 unit の判定は一致。絶対値の比較は同一 IR 内で行うこと | 原因未特定 (前版の IR と今回の gen_ir2 出力の差分は未比較) | PM 判断 (IR 再生成の再現性) |
 | DEFECTS.md への D4 再発例の追記 (§6 行案) | 受入条件「D 類型なら追記」 | #716 (DOCS-9)。本 PR では docs/DEFECTS.md を変更しない (WORKFLOW §5) |
 | 計装 build の ok が 870 (通常 868)、oom 内訳が配置依存 | 計装の透過性は ok/trap 単位で 2 unit ぶれる | PM 判断 (計装は診断専用) |
 | 16.23 秒の外れ値 (survey n=3) の原因 | 計測の信頼性 | 未確認 |
@@ -200,7 +200,7 @@ bash trap_triage/store_watch_682.sh fix_w                                # 同 (
 
 - 対象: 本 PR の HEAD (`9952e60` を取り込んだ後の commit)。素材: `work-m11` を `tools/m11/work/` に展開、`fl-win64` は PE 1 本 (`extracted/block00031_PE.bin`, 22 MB) のみ展開。node v22.23.3、capstone・pefile は pip 導入。
 - IR: `m11_gen_ir2.sh` で作り直し (`ir_conditions.json` が snapshot に無く、build が #680 の fail-closed で拒否されたため)。gen_ir2 は 20.9 秒 (`ldfix` F1=902 / F2=30 / F3c=16、errors 0)。
-- 所要: 修復 survey 14.29 秒 (n=1)。`store_watch_682.sh` (修復なし、計装 build + survey 込み) 64.6 秒 (n=1)。load は未計測。
+- 所要: 修復 survey 14.29 秒 (n=1、コミット前)・14.32 秒 (HEAD)。計装込みの所要は下表 (HEAD 再測)。load は未計測。
 - 変更: `m11_ov.c` に `M11_NOTIFY_682` (既定 0) を追加。`store_watch_682.sh` は `M11_FIX_682` / `M11_NOTIFY_682` を受け取り、`ov.o` を明示的に再コンパイルする。`watch_store_682.{py,c}` は store 幅を渡し `[addr, addr+width)` で判定する。`store_watch_682.sh` / `negctl_682.sh` / `chain_682.sh` は Node 失敗で exit する。
 - 検証 (同一 IR):
   - 修復 (既定) survey: ok 869 / miss 47 / trap 25 (oom 1)。`check_682.py` は 2/5、rc=1。
@@ -208,4 +208,18 @@ bash trap_triage/store_watch_682.sh fix_w                                # 同 (
   - ネガコン (`M11_FIX_682=0`): ok 865 / miss 47 / trap 29 (oom 2)。0/5、rc=1。
   - 計装 build (`M11_FIX_682=0`): `unit 45` の `[esc] site=19821 addr=10bb6708 val=10a9f918` / `addr=10bcc0a8 val=10a9f958` を確認 (§2.1 と同じ site。値は build 依存)。`[sw]` 8 hit。
   - 計装 build (既定 `M11_FIX_682=1`): §2.1 の抜粋は出ない (修復で書込みが起きないため)。
+- コミット済み HEAD `2b793ae` での再測 (n=1、各 build は `m11_build.sh` rc=0、signature mismatch 0・undefined 0):
+
+| 構成 (HEAD `2b793ae`) | survey ok/noproc/miss/trap (oom) | 5 unit (291/296/304/555/923) | check_682 rc | 所要 |
+|---|---|---|---:|---:|
+| 修復 (既定: notify 省略) | 869 / 1 / 47 / 25 (1) | ok, ok, trap, trap, trap | 1 (2/5) | 14.32 s |
+| ネガコン (`negctl_682.sh headnc`) | 865 / 1 / 47 / 29 (2) | trap×5 | 1 (0/5) | 47.64 s (build 込み) |
+| 修復 + notify 有効 (`M11_NOTIFY_682=1`) | 863 / 1 / 53 / 25 (1) | miss, miss, trap, trap, trap | 1 (0/5) | — |
+| 計装 修復なし (`store_watch_682.sh head_nc_w`) | 863 / 1 / 47 / 31 (1) | — | — | 63.03 s |
+| 計装 修復あり (`store_watch_682.sh head_fix_w`) | 869 / 1 / 47 / 25 (1) | — | — | 98.32 s |
+
+- HEAD の修復 survey は、コミット前の run と全 942 unit が一致した (差分 0)。
+- 計装 修復なし版の unit 45: `[esc] site=19821` が 2 件 (§2.1 と同一 site)。修復あり版: 0 件。`[sw]` hits は両方 8。
+- 計装 build は配置が変わるため、ok 件数はネガコン本体と一致しない (§2.3 の注記どおり)。
 - 未検証: `chain_682.sh` と `m11_e2e.sh` 全体の再実行 (本 13 節の範囲外)。
+
