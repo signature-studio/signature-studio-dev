@@ -43,9 +43,10 @@
 
 - 仮説「monitor 列挙 stub が 0 を返すことが this 不正の原因」: **§4.1 のネガコンで 275 について反証** (callback を呼んでも 275 は oob のまま)。初版の「支持 (間接)」は、stub が list を埋める前提の推論に過ぎなかったため撤回。
 - 「list が空だと必ず OOB になる」ことは実測 (添字 13 の garbage) で示した。「stub を実装すれば 275 が ok になる」は §4.1 で反証済み。
-### 4.1 ネガコン (#1096、測定 commit 6f979463 = HEAD。基準 c4e93550 との差分は `m11_extra_ranges5.txt` / `m11_win.c` / 本 REPORT のみ)
+### 4.1 ネガコン (#1096、測定 commit 6f979463。以後 `11b51bc9` までの差分は `m11_win.c` の注釈 2 行のみ (実行コード差分 0))
 
 - 測定条件: 変更前 (base1096_before) は `c4e93550` のコード、(a) と (a)+(b) は `6f979463` のコード。
+- e2e (`m11_e2e.sh`、incremental、foreground、n=1、測定 commit `6f979463`): rc=0、47.5 s、load 0.47、reached_stage 4、survey_ok 872。本 HEAD `11b51bc9` では未再測定 (上記理由)。
 - **本 fix run では再測定していない** (未検証): `/opt/emsdk` (EMSDK 6.0.12) と `/opt/retdec` (RetDec v5.0) が runner に無く、全再生成 (RetDec lift) が fix run の上限 (40 分) に収まらないため。下表の数値は #1096 作成時の記録 (n=1) で、本 HEAD での再現は未確認。再測定は子 issue (§5) で行う。
 - 既知の不整合: 同じ base の survey 値が §1 (ok 870) と本表 (ok 871) で 1 ずれている。原因は未切り分け (作成時の別 run の値の可能性)。
 
