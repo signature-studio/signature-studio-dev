@@ -165,7 +165,7 @@ work/ (gitignore): hdr_block1/2.bin, files.json, locations.json, header_parse.js
 
 ### 11.1 検証状況 (実測 HEAD = `858fbfcd`)
 
-- 測定 HEAD = `858fbfcd`。現 head `a06592e0` との差分は REPORT.md のみ (`git diff 858fbfcd a06592e0 -- ':!tools/targets/massivex/REPORT.md'` が空)。`d0eddb92..858fbfcd` も REPORT のみ。`47fd87cb..d0eddb92` のコード差分は `license/e2e.sh` の `mkdir -p` 重複削除 1 行のみ。
+- 測定 HEAD = `858fbfcd`。測定 HEAD から現在の HEAD までのコード差分は無い (検証: `git diff 858fbfcd HEAD -- ':!tools/targets/massivex/REPORT.md'` が空)。`d0eddb92..858fbfcd` も REPORT のみ。`47fd87cb..d0eddb92` のコード差分は `license/e2e.sh` の `mkdir -p` 重複削除 1 行のみ。
 - 下表は `858fbfcd` の worktree (`git worktree` で detached 展開) で取り直した値。`d0eddb92` の値とも一致する。
 - 測定ログは `work/` 外 (`$RUNNER_TEMP` 配下) に置いた。exit code・PASS 数・所要はそのまま表に記載。
 - 素材: `plugins-massivex` / `toolchain-retdec` / `toolchain-emsdk` を `$ARTIFACTS_DIR` から展開 (`tar --zstd -xf`)。RetDec / emsdk は `[RETDEC]` / `[EMSDK]` (`[OPT-TOOLS]` 配下。環境変数で上書き)。
@@ -173,7 +173,7 @@ work/ (gitignore): hdr_block1/2.bin, files.json, locations.json, header_parse.js
 - **入力の同一性 (reviewer 必須 3)**:
   - 本体 `Massive X.vst3` の md5 は `622993e76565f49c094063a2b717d6ca` (`858fbfcd` で再展開して一致確認)。`dsp/REPORT.md` 先頭の記録値と一致する。
   - ただし installer 内の 16B checksum は 125 件中 0 件一致 (`md5-ok 0/125`)。§8.1 の「repack 由来の stale 値」仮説と整合するが、**展開物が実機 installer と同一であることは外部照合できていない**。
-  - よって下表の PASS は「この展開物に対する回帰」の証拠であり、「Massive X 実バイナリに対する回帰」の証拠としては**暫定**。「実バイナリに対する回帰」の判定は保留する (起票先: #266)。
+  - よって下表の PASS は「この展開物に対する回帰」の証拠であり、「Massive X 実バイナリに対する回帰」の証拠としては**暫定**。実バイナリに対する回帰の判定は保留 (#266)。
 - `MX_OPT=-O0` の初回 exit 1 (`patch site 0x18115dec2` assert): **再現せず**。
   - 同一 head で 3 回連続 exit 0 / 11/11 PASS (下表)。
   - 切り詰めコピー (展開物の前半 47.7 MB) を `mx_pefix.py` に通すと、`pefile` は読めて site は `e1 26` のまま、assert は出ない (前回入力とは別の状態)。
@@ -203,7 +203,7 @@ work/ (gitignore): hdr_block1/2.bin, files.json, locations.json, header_parse.js
 | 展開物の installer 内 checksum 0/125 一致 (実機 installer との同一性は未照合) | 「実バイナリに対する回帰」の判定 | #266 |
 
 - **clen 回帰 (未実施)**: clen の対象を特定できなかった。
-  - 出典: review コメント (oc-reviewer, 03d66e83 / aa8002f5 時点) が「#266 の受入条件」として挙げたが、#266 本文に該当記述は無い (`gh issue view 266` で確認)。親 #245 本文にも clen の記述は無い。
+  - #266 本文・親 #245 のいずれにも clen の記述は無く、対象未特定。起票先 #880 (OPEN)。
   - massivex 配下に clen を検証する script は無い (`clen` は serum2 の `sr3_cut.py` のみ)。
   - 対象確定と実施は別 issue に切り出す。起票先: #880 (OPEN)。
 - **MX2-3 (N5 demo UI 抑制 / N6 文言)**: 未実装。起票先: #830。
