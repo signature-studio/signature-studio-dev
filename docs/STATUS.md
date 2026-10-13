@@ -82,6 +82,7 @@
 | `runtime` | 設計・基盤 | `tools/runtime/REPORT.md` |
 | `hostbridge` | 設計+mini VST2 host PoC | `tools/hostbridge/REPORT.md` |
 | `hostbridge/{cb,h2,lowbase,nfo}` | 各実装済 | 各 `REPORT.md` |
+| `hostbridge/h10` | Wrapper chunk reader 静的解析済 (実行検証は #267) | `tools/hostbridge/h10/REPORT.md` |
 | `gui` | 設計+PoC | `tools/gui/REPORT.md` |
 | `audio` | 設計+PoC (e2e で既知 FAIL 1 件あり・詳細は REPORT) | `tools/audio/REPORT.md`・`tools/audio/asio/REPORT.md` |
 | `audio/asio` | COM アダプタ+soak | `tools/audio/asio/REPORT.md` |
