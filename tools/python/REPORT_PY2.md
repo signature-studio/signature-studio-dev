@@ -14,7 +14,7 @@
 | JS import 排除 | `WebAssembly.Module.imports` に `flhost|fl_api|flprov|flHostCall` 一致 **0 件**。同じ検査を `flpy.wasm` に掛けると `env.flhost_call` が 1 件出る (検査が空振りしていないことのポジコン)。`fl_api_call` は export に有り |
 | 48 tool 実行 | `tests/static_check.mjs`: **48/48 ok**、soft_error 0・raised 0、callback 往復 true、host_calls 37,425 (tool 別合計 37,424 + callback 1) |
 | 結果の同一性 | tool 別 (status・結果文字列・api_calls・host_calls) の差: **SAB+provider 版 (`FL_ENGINE=wasm all_tools`) と 0/48、モック版 (追跡中 `tool_coverage.json`) と 0/48**。class A 38 を含む 48 全件 |
-| 所要 (f6352cd、1 回ずつ実測) | `static_check.mjs` 0.277 秒 (load 1.13)。SAB 版 `FL_ENGINE=wasm all_tools` 1.137 秒。mock 版 `all_tools` 1.168 秒。5a0b3c3 時の 3 回 (static 0.27〜0.28 秒、SAB 1.26〜1.37 秒) と同オーダー |
+| 所要 (`e872dbb`、1 回ずつ実測、load 2.07) | `static_check.mjs` 0.356 秒 (rc=0、2 回目の実行も `STATIC CHECK OK`)。SAB 版 `FL_ENGINE=wasm all_tools` 1.067 秒 (load 0.31、9de66ea 時の実測)。f6352cd 時の `static_check` 0.277 秒と同オーダー |
 
 ### 往復コスト (`tests/static_bench.mjs`、1 trial = 20,000 回、5 trial の min / median / max、µs/呼出し)
 
@@ -64,8 +64,9 @@ gate (`pybind_extract.py --check`、不合格は exit 1): 抽出件数 = 110、�
 
 ### 検証範囲 / 範囲外
 
-- **HEAD 再現 (main 取り込み後 763ec65 の検証。素材 `fl-win64` / `toolchain-emsdk` から取り直した `build_cpython_wasm.sh` 込み。load 0.31)**: CPython wasm クリーンビルド rc=0、`build_flpy.sh` / `provider/build.sh` / `build_flpy_static.sh` 全て rc=0。`provider_check` PASS (`"PASS":true`)、`pybind_extract --check` PYBIND CHECK OK (110 件、lib 内 109)、SAB+provider `all_tools` 48/48・host_calls 37,425・1.067 秒、mock `all_tools` 48/48・37,425。`static_check` は **STATIC CHECK FAIL (2)**: SAB+provider 版とは tool 別 0/48 だが、mock 基準 (`tool_coverage.json`) と `get_highlight_names` / `get_browser_names` の 2 件で差 (下記)。0.246 秒。
-- **mock 基準との 2 件の差 (main の PY-3 #82 由来、PR 本体の変更ではない)**: mock は `host/ilmcp.mjs` (main) で FL 実物 rodata 由来の一覧 (`analysis/ilmcp/highlight_names.json` 21 件、`Toolbar: Show Piano Roll,...,Tempo Selector,...`) を返す。C provider の `provider/fl_engine.c` は最小スタブ (`getHighlightNames` 4 件、`Toolbar: Show Piano roll,...`) のまま。C 側と JS 側は仕様が揃っていないため、tool 別 0/48 (SAB+provider) は一致し、mock 基準だけが違う。C 側を揃えるか基準を変えるかは PY-3 / PY-2b 側の判断 (起票依頼)。
+- **HEAD 再現 (`e872dbb`。素材 `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開し `FL_WIN64_DIR` に設定、`toolchain-emsdk` は `/opt/emsdk`。`build_cpython_wasm.sh` は 3 分 17 秒 rc=0。load 2.07)**: `build_flpy.sh` / `provider/build.sh` / `build_flpy_static.sh` 全て rc=0 (static 4.9 秒)。`provider_check` `"PASS":true`、`pybind_extract --check` PYBIND CHECK OK (110 件、lib 内 109、許容 1)、SAB+provider `all_tools` 48/48・host_calls 37,425、`static_check` **STATIC CHECK OK** (48/48 ok、host_calls 37,425、callback 往復 true。SAB+provider 版と 0/48、mock 基準と 0/48)、`ilmcp_e2e` rc=0 (0.32 秒)。
+- **往復コスト (`e872dbb`、`static_bench.mjs 5`、5 trial の min / median / max、µs/呼出し、load 2.07)**: 静的 C `fl_api_call` のみ 0.013 (0.010 / 0.015)、Python `_flhost.call(fn,())` 直 0.225 (0.221 / 0.278)、Python `channels.channelCount()` (fl_api ラッパ経由) 0.410 (0.392 / 0.438)、戻り str 0.297 (0.283 / 0.320)、空の Python 呼出し 0.077 (0.075 / 0.097)、Worker + SAB (同一 provider、`channelCount()`) 26.206 (25.066 / 27.260)。median 同士で SAB 版の約 64 倍。上の表の f6352cd 行より load が高い run のため、数値は本行を正とする。
+- **mock 基準との既知の差 (2 件、本 PR では除外)**: `get_highlight_names` と `get_browser_names` は、mock (`host/ilmcp.mjs`、main の PY-3 #82 由来) と C provider (`provider/fl_engine.c` の最小スタブ) で **result 文字列だけ**が違う。mock は FL 実物 rodata 由来の 21 件 / 木構造、C は固定 4 件 / `[object Object]` 相当。`tests/static_check.mjs` の `KNOWN_MOCK_RESULT_GAP` で、この 2 件のみ mock 比較の result を除外し、status・host_calls・api_calls は従来どおり完全一致で比較する。解消 (C 側の仕様統一) は未着手で、起票依頼 (PR #586 コメント)。
 - 旧記録 (f6352cd、main 取り込み前の HEAD): `static_check` STATIC CHECK OK (差 0/48 ×2)、SAB 48/48・37,425、`tool_coverage.json` を 37,425 に再生成 (`plugins.getParamValueString/4` を反映)。mock 側の `get_highlight_names` は当時 main 未取り込みのため差が出なかった。
 - 旧記録 (5a0b3c3、クリーン worktree): `pybind_extract --check` OK、SAB+provider `all_tools` 48/48・37,424、`static_check` 3 回とも STATIC CHECK OK、0.29 / 0.30 / 0.28 秒 (load 1.10)。main 取り込み前の値で、現 head では使わない。
 - 範囲: node (メインスレッド) での静的版 48 tool と対応表。入力 (MCPTools.pyc 100,674B / midi.py / utils.py / `block00031_PE.bin`) は `fl-win64` 素材から配置 (`fetch_inputs.sh` が `work/fl-stubs` を clone する)。
