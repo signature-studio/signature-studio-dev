@@ -70,7 +70,7 @@
 | 実 FL (Edison) の `EditorSample` 各メンバの戻り値・境界挙動 (`NormalizeFromTo`・`PasteFromTo` の mode 挙動・`Length` setter 等) | mock 値のため実機と異なる可能性 | #81 (PY-9) |
 | `br` `dest` `lim` `rm` `pulse` `saw` は実行完了のみ (数値 oracle 未実装) | 数値の正しさは未検証 | #1310 (PY-28) |
 | ソース先頭 1 バイト反転のネガティブコントロール | 受入条件の文言 (pyc) と不一致 | #1310 (PY-28) |
-| Chrome (headless) 上の Audio 実行 (本検証は node のみ) | ブラウザ実行経路は未検証 #1323 (PY-29) |
+| Chrome (headless) 上の Audio 実行 (本検証は node のみ) | §7 で解決 (#1323 / PY-29) | #1323 (解決済み) |
 
 ## 6. 残り (子 issue)
 
