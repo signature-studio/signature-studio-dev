@@ -31,17 +31,28 @@
 
 **採点の定義**(`leaf_report.py` 冒頭と同文): 関数 verdict は match = native 完走 case ≥1 かつ完走した全 case 一致 / mismatch = 完走 case のどれかに差分、または native 完走 + wasm trap / unexec = native 完走 case 0。最終判定は、補助が mismatch なら mismatch、補助が match で主採点が match/unexec なら match、補助が match で主採点が mismatch の場合のみ `leaf_custom.ARTIFACT` に根拠のある偽陽性 3 関数 (§8.5) を match に上書き。数え方: 関数 = 23 (closure_stats の leaf ∩ audit_icall の静的間接 call 0)、case = 主採点 23×9 = 207 + 補助 66。
 
+### 8.1a ARTIFACT (偽陽性 3 関数) の根拠 (本体 §8.1 から移動)
+
+主採点が mismatch で、補助 case が match の 3 関数。根拠の区別:
+
+| VA | 確認済み (再実行で観測) | 推定 (未検証) |
+|---|---|---|
+| 0x6cd8a0 (EQUO, pall2) | mem 差分は 1 語のみ。native `0x01000000224623b0` / wasm `0x01000000220623b0`、差 0x400000 (= delta) | `cmp_mem` が部分上書きされた ptr 入り語を正規化できない (D17 行案) |
+| 0x73fa20・0x6ec2a0 (pall) | native=ok / wasm=timeout | wasm 1 s 打切りによる偽 `wasm_trap` (D18 行案)。比較器欠陥か否かは未切り分け |
+
+「偽陽性確定」は上表の確認済み範囲に限る。比較器の欠陥は推定 (#548 [LD-11])。
+
 ### 8.2 結果 (`work/f2/leaf_report.md`)
 
 | # | block | plugin | VA | 機械語 B | IR 署名 | 主採点 (9 パターン) | 補助 case | **最終** | タグ |
 |--:|--:|---|---|--:|---|---|---|---|---|
-| 1 | 18953 | EQUO | 0x6cd8a0 | 8 | `i64(i64)` | mismatch 4/6/9 | match 2/2 | **match** (偽陽性、根拠 §8.1 本体) | memory_semantics |
+| 1 | 18953 | EQUO | 0x6cd8a0 | 8 | `i64(i64)` | mismatch 4/6/9 | match 2/2 | **match** (偽陽性、根拠 §8.1a) | memory_semantics |
 | 2 | 18975 | Emphasizer | 0x6bfec0 | 56 | `i64(i64)` | match 6/6/9 | mismatch 1/5 | **mismatch** | fp_flag_unreflected,xmm_arg_drop |
 | 3 | 18975 | Emphasizer | 0x6c8fc0 | 63 | `float(i64)` | mismatch 0/6/9 | - | **mismatch** | xmm_arg_drop |
 | 4 | 18975 | Emphasizer | 0x6c9b60 | 83 | `float(i64,i64)` | match 2/2/9 | mismatch 2/4 | **mismatch** | fp_flag_unreflected,xmm_arg_drop |
 | 5 | 18979 | Frequency Splitter | 0x662fc0 | 15 | `i64(i64)` | match 6/6/9 | - | **match** | - |
 | 6 | 18979 | Frequency Splitter | 0x73e640 | 29 | `i64(i64)` | unexec(native_fault_all_patterns) 0/0/9 | match 7/7 | **match** | - |
-| 7 | 18979 | Frequency Splitter | 0x73fa20 | 65 | `i64(i64,i64,i64)` | mismatch 4/5/9 | match 7/7 | **match** (偽陽性、根拠 §8.1 本体) | wasm_trap |
+| 7 | 18979 | Frequency Splitter | 0x73fa20 | 65 | `i64(i64,i64,i64)` | mismatch 4/5/9 | match 7/7 | **match** (偽陽性、根拠 §8.1a) | wasm_trap |
 | 8 | 18979 | Frequency Splitter | 0x73fa70 | 73 | `i64(i64,i32,i64,i64)` | unexec(hang) 0/0/9 | match 7/7 | **match** | - |
 | 9 | 18982 | Fruity 7 Band EQ | 0x6b0ef0 | 1554 | `i64(i64,i64)` | mismatch 0/6/9 | - | **mismatch** | arg_drop,spill_slot_deref,xmm_arg_drop |
 | 10 | 19005 | Fruity Fast LP | 0x5de300 | 31 | `i64(i64,i64,i64)` | match 1/1/9 | match 4/4 | **match** | - |
@@ -50,7 +61,7 @@
 | 13 | 19006 | Fruity Filter | 0x6cc2e0 | 171 | `i64(i64,i64,i64,i64)` | mismatch 0/3/9 | - | **mismatch** | arg_drop,fp_flag_unreflected,spill_slot_deref,xmm_arg_drop |
 | 14 | 19013 | Fruity Free Filter | 0x6ca5c0 | 1554 | `i64(i64,i64)` | mismatch 0/6/9 | - | **mismatch** | arg_drop,spill_slot_deref,xmm_arg_drop |
 | 15 | 19059 | Fruity Parametric EQ 2 | 0x6e9440 | 29 | `i64(i64)` | unexec(native_fault_all_patterns) 0/0/9 | match 7/7 | **match** | - |
-| 16 | 19059 | Fruity Parametric EQ 2 | 0x6ec2a0 | 65 | `i64(i64,i64,i64)` | mismatch 4/5/9 | match 7/7 | **match** (偽陽性、根拠 §8.1 本体) | wasm_trap |
+| 16 | 19059 | Fruity Parametric EQ 2 | 0x6ec2a0 | 65 | `i64(i64,i64,i64)` | mismatch 4/5/9 | match 7/7 | **match** (偽陽性、根拠 §8.1a) | wasm_trap |
 | 17 | 19059 | Fruity Parametric EQ 2 | 0x6ec2f0 | 73 | `i64(i64,i32,i64,i64)` | unexec(hang) 0/0/9 | match 7/7 | **match** | - |
 | 18 | 19059 | Fruity Parametric EQ 2 | 0x6f1650 | 28 | `float()` | mismatch 0/9/9 | - | **mismatch** | xmm_arg_drop |
 | 19 | 19059 | Fruity Parametric EQ 2 | 0x6f1c40 | 29 | `i64(i64)` | match 6/6/9 | - | **match** | - |

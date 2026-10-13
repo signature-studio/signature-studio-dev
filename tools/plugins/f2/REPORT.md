@@ -203,42 +203,7 @@ python3 tools/plugins/f2/xcheck_icall.py 18953 18975 18979 18982 18984 19005 190
 
 ## 8. PLG-F2-3 (#515): leaf 23 関数の関数単位差分試験 → 付録
 
-- 本節は結論のみ。対象 23 関数の表・ネガコン詳細・限界・再現・実測時間は **`REPORT_APPENDIX.md` (§8 全文を無変更で分割移動)**。
-- 検証起点 commit: **cb70945** (origin/main 6a0a8c8 基点)。main 取り込みの merge (758a06b・87541c3) 後も leaf 系スクリプトは不変で、`f2_step1.sh`・`icall_gate.py`・`matrix_check.py` 等は main 版。
-- 既知類型との関係: 不一致 8 関数は全て **(DEFECTS.md) D5** (xmm 引数脱落)。重なる類型は **(DEFECTS.md) D4** 系・**(DEFECTS.md) D1a**。比較系の偽陽性 2 類型は新規 (§8.5 の DEFECTS.md 行案)。
-- 範囲: native 参照は Linux 上で PE の機械語を ImageBase に mmap して MS x64 ABI で直接実行した値 (`tools/liftdiff/rt/ld_native.c`)。FL Studio 実機・framework・TFruityPlug 実体とのリンク (#195〜#197) は範囲外。
-
-### 8.0 結論
-
-1. 対象 23 関数 (IR leaf 55 のうち機械語にも非 IAT 間接 call が無いもの)。別算法 (`xcheck_leaf.py`) で同じ 23 関数を再導出 (集合一致 EQ)。
-2. **最終判定: 一致 15 / 不一致 8 / 実行不能 0**。主採点だけなら 一致 9 / 不一致 9 / 実行不能 5 で、補助 case を足して確定。主採点の一致 2 関数 (0x6bfec0・0x6c9b60) は補助 case で不一致に覆った。
-3. 不一致 8 関数は全て「機械語が xmm 入力を読むのに IR 署名に float 引数が無い」(D5)。`lift_ranges.sh` 鎖に ARG pass が未接続 → #547。
-4. 一致 15 関数は 9 パターン+補助 case の範囲で戻り値・書換えメモリ・entry 列が bit 一致。**入力空間全体の等価性は主張しない**。
-5. ネガティブコントロール: 変異 30 件 (store_drop 6・load_drop 11・offset_shift 13) を全て検出 (詳細は付録 §8.3)。
-
-### 8.1 ARTIFACT (偽陽性 3 関数) の根拠
-
-主採点が mismatch で、補助 case が match の 3 関数。根拠の区別:
-
-| VA | 確認済み (再実行で観測) | 推定 (未検証) |
-|---|---|---|
-| 0x6cd8a0 (EQUO, pall2) | mem 差分は 1 語のみ。native `0x01000000224623b0` / wasm `0x01000000220623b0`、差 0x400000 (= delta) | `cmp_mem` が部分上書きされた ptr 入り語を正規化できない (D17 行案) |
-| 0x73fa20・0x6ec2a0 (pall) | native=ok / wasm=timeout | wasm 1 s 打切りによる偽 `wasm_trap` (D18 行案)。比較器欠陥か否かは未切り分け |
-
-「偽陽性確定」は上表の確認済み範囲に限る。比較器の欠陥は推定 (#548 [LD-11])。
-
-### 8.2 未解決
-
-| 未解決 | 起票先 |
-|---|---|
-| 不一致 8 関数の xmm 引数脱落 (D5)。ARG pass 未接続 | **#547 [PLG-F2-4]** (親 #199) |
-| liftdiff 比較系の偽陽性 2 類型 | **#548 [LD-11]** (親 #122) |
-| 主採点 9 パターンの検出力不足 | #235 ([LD-4]) にコメント |
-| 手順 2〜4 (framework link・Host shim・Render test .flp E2E) | 既存 #195 / #196 / #197、#199 に残す |
-
-### 8.3 再現
-
-`bash tools/plugins/f2/f2_step1.sh` → `bash tools/plugins/f2/leaf_diff.sh` → `python3 tools/plugins/f2/nc_leaf.py` (手順・ファイル役割・実測時間は付録 §8.6・§8.7)。
+結論: 対象 23 関数で **一致 15 / 不一致 8 / 実行不能 0**。不一致 8 は全て (DEFECTS.md) D5 (xmm 引数脱落、#547 の pass で未解消)。表・ARTIFACT 根拠・ネガコン・限界・再現・実測時間は [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §8。
 
 ## 9. PLG-F2-4 (#547): xmm 引数復元 pass (opt-in `PLUG_XMMARG=1`) → 付録
 
