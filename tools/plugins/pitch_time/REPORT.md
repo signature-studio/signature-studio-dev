@@ -1,6 +1,6 @@
 # tools/plugins/pitch_time/REPORT.md — PLG-F7 (#204) pitch-time 8 本: lift 前提の実測
 
-- 日付: 2026-10-13 / 担当 dir: `tools/plugins/pitch_time/` のみ / 検証起点 commit: **1b35efd** (スクリプト一式。 以降の commit は REPORT.md のみ) (各実測の HEAD は §5)
+- 日付: 2026-10-13 / 担当 dir: `tools/plugins/pitch_time/` のみ / 検証起点 commit: **ed816c2** (スクリプト一式。 以降の commit は REPORT.md のみ。 ed816c2 は 1b35efd に対し `pitch_time_nega.sh` の NC2 修正と `pitch_time_e2e.sh` のコメント 1 行のみ) (各実測の HEAD は §5)
 - 再現: `bash tools/plugins/pitch_time/pitch_time_e2e.sh` (判定 + 実測。 gate が 1 つでも不合格なら非 0 で終わり、最終行は `FAIL`) /
   `bash tools/plugins/pitch_time/pitch_time_nega.sh` (ネガティブコントロール。 期待した終了コードにならなければ非 0)
 - 素材: `fl-win64` / `toolchain-retdec` / `toolchain-emsdk` (`docs/WORKFLOW.md` §11)。 環境は `pitch_time/env.sh`
@@ -122,7 +122,9 @@ RetDec+pass 鎖 → `emcc -c` に通した (#506 の `engine_lift.sh` と同方�
 - `.pdata` で define 無し = `function_<開始VA>` の define が final.ll に無い range 数 (`cpp_defs.py`。 分母は `.pdata` 関数数、括弧は欠けた range の長さ)。 2 module とも 1 件 61 B で、final.ll 内から参照されていない (missing_ref 0)。 原因 (RetDec の関数境界統合 / 復号失敗) は未調査。
   逆に range 内部に RetDec が切り出した別 define は Pitcher 71 / Scratcher engine 18。
 - 未実装 helper の VEX 内訳の再現: `grep -o 'unimplemented: [^ ]* __asm_[a-z0-9_]*' work/pitch_time/cpp19222/c0/e.simd.log | sort -u | grep -c '__asm_v'` → 67 (全体は `sort -u | wc -l` = 94。 19072 は 54 / 62)。
-  VEX 以外の未実装は SSE の packed 比較 (`cmpeqps` ほか) / `blendvps` / `cvtpd2dq` と CRT 由来の `fxsave` / `in` / `int` / `iretd`。 CPUID 分岐で SSE 路に固定できるかは未確認。
+  VEX 以外の未実装は Pitcher 27 種 (94 − 67)・Scratcher engine 8 種 (62 − 54)。 同じコマンドの `grep -v '__asm_v'` で全件が出る。
+  Pitcher の 27 種: `blendvps cmpeqps cmpleps cmpltps cmpnleps cvtpd2dq cvttpd2dq pinsrb pinsrd pmulld pmuludq sqrtpd movmskps pextrd fxsave int3 iretd wait in int movntps pcmpistri prefetchw rep_movsb_memcpy rep_stosb_memset rep_stosd_memset rep_stosw_memset`。
+  Scratcher engine の 8 種: `cvtpd2dq cvttpd2dq int3 int movntps rep_movsb_memcpy rep_stosb_memset rep_stosw_memset`。 CPUID 分岐で SSE 路に固定できるかは未確認。
 - Scratcher engine の f80 1 関数は #197 の `f80_lower.py` の適用対象。 engine は timecode decoder の API で、殻 (`dynload` 2) との結合 (LoadLibrary 経路) は未解析。
 - **Newtone engine は未測定**: `cpp_lift.sh 19216 900` は range 文字列が 255,737 字 (retdec の引数 1 個の上限 131,072 B 超) のため 7 chunk に分けた。 chunk 0 (1,666 range / 874,451 B) で RetDec のログが
   `optimizations` phase (35 s 時点) から進まず、4 分 20 秒を超えても終了せず RSS 6.2 GB に達したため中止した (n=1。 比較: #506 REPORT 記載の Multiband engine 1,658 関数 / 359,159 B は 38–41 s)。
@@ -146,12 +148,13 @@ gate の設計 (#506 のレビュー指摘への対応):
 
 | 項目 | 実測 |
 |---|---|
-| `pitch_time_e2e.sh` 全体 (3 回、HEAD A = 5938ec9、B・C = 1b35efd。 A は Newtone engine の RetDec 1 プロセスが最初の約 50 s 並走) | A 168.8 s / B 169.1 s / C 168.9 s、全て exit 0 (開始時 load average 1 分: 1.05 / 0.64 / 0.99。 逐次実行で並列数 1。 B・C の 2 回は 1b35efd、A との差は未使用だった `--heavy` 分岐の削除のみ) |
+| `pitch_time_e2e.sh` 全体 (3 回、HEAD A = 5938ec9、B・C = 1b35efd。 A は Newtone engine の RetDec 1 プロセスが e2e の開始直後に並走。 並走した秒数は未計測) | A 168.8 s / B 169.1 s / C 168.9 s、全て exit 0 (開始時 load average 1 分: 1.05 / 0.64 / 0.99。 逐次実行で並列数 1。 B・C の 2 回は 1b35efd、A との差は未使用だった `--heavy` 分岐の削除のみ) |
+| `pitch_time_e2e.sh` 再実行 (HEAD ed816c2、修正後の確認、別 runner、work/ 空の初回で inventory 生成込み) | 1198.0 s、exit 0 (開始時 load average 1 分: 12.55。 inventory 生成の並列プロセスが load 約 31 まで上げた)。 殻 7/7 合格、`matrix_check` / `ids_crosscheck` / `judge --engines` 合格、最終行 `[pitch_time_e2e] OK`。 初版の 168.8–169.1 s との差は、この回が inventory 生成を含むこと (下表「前提 inventory」370 s は初版の別測定) と runner が異なることによる (切り分けは未実施) |
 | lift 秒 (`status.csv`、3 回の min–max) | 殻: Scratcher 3 / Vocoder 2–3 / Gross Beat 5 / Newtime 3–4 / Newtone 4 / Pitch Shifter 2–3 / Vocodex 11–12 (s)。 C++: Pitcher 35–36 / Scratcher engine 10–11 (s) |
 | 結果の一致 | A・B・C の正規化ログ (judge の表示、matrix_check・ids_crosscheck の出力、`cpp.csv` の lift_s 以外、clang の最初のエラー文) の `diff` が空 (A と B、B と C) |
 | `matrix_check.py` | 58/58 (閉包 42 + batch 16) |
 | `ids_crosscheck.py` | 7/7、20 site を突合 |
-| `pitch_time_nega.sh` | exit 0、5.3 s (HEAD 1b35efd)。 NC1 / NC2 の数値確認に加え、期待した終了コードの確認 28 件が全て一致 (`<-- FAIL` 0 件) |
+| `pitch_time_nega.sh` | exit 0、7.0 s (HEAD ed816c2)。 初版 (HEAD 1b35efd) は 5.3 s で、NC2 は range 22 → 21 と報告していたが `wc -l` が末尾改行なしの 1 行を数え落とした誤カウントで、実際は 23 → 21 (2 range 落ち)、define 23 → 21 だった (oc-reviewer の指摘、ed816c2 で修正)。 NC1 / NC2 の数値確認に加え、期待した終了コードの確認 28 件が全て一致 (`<-- FAIL` 0 件) |
 | 前提 inventory (初回のみ) | `win_scan` から `kernel_table` まで 370 s (並列 14 プロセス / 4 core、load average 8–17)。 `block_manifest.json` が tarball に無く `nsis_names.py` が動かないため `mk_blockmap.py` が `PLUGIN_MATRIX.json` から代替の blockmap (182 record) を合成 |
 
 ネガティブコントロール (`pitch_time_nega.sh`。 全件が期待した終了コードになることを数値で確認):
@@ -159,7 +162,7 @@ gate の設計 (#506 のレビュー指摘への対応):
 | NC | 壊し方 | 結果 (実測) |
 |---|---|---|
 | NC1 | Vocoder の final.ll の関数 1 つの `ret` を除去 | `emcc -c` rc 0 → 1 |
-| NC2 | Vocoder の閉包 ranges の末尾 1 つを落として再 lift | range 22 → 21、define 23 → 21、`function_6d5790` 1 → 0 (RetDec は 1 range から複数 define を出すため差は 1 と限らない) |
+| NC2 | Vocoder の閉包 ranges の末尾 1 つを落として再 lift (ranges.txt は末尾改行が無いので `grep -c .` で数え、落とした数が 1 であることも判定) | range 23 → 22 (落とした数 1)、define 23 → 22、`function_6d5790` 1 → 0 |
 | NC3 | `judge.py` に不合格を 1 つずつ注入 (Scratcher / Newtime): emcc_c_rc=1 / lift_rc=1 / f80=3 / unimpl=5 / 行欠落 / f80=-1 / define 脱落 / ranges≠closure_funcs | 無改変 rc 0。 8 種とも rc 1 |
 | NC3 | 入力不正: 非数値 / block 指定なし / ファイル無し / 監査引数なし。 古い行のみ (`--since-line`) | rc 2 ×4。 古い行のみ rc 1 |
 | NC4 | `pitch_time_e2e.sh --judge-only` に不合格の status CSV / cpp CSV を渡す | どちらも rc 1、`PASS` 行なし、`FAIL (exit` 行あり。 合格 CSV は rc 0 |
