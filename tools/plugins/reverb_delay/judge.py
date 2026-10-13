@@ -3,11 +3,12 @@
 
 usage: judge.py <status.csv> <block> [<block> ...] [--closure-dir DIR]
 
-status.csv は lift/batch_lift.sh の出力 (列: block,name,closure_funcs,closure_bytes,lift_rc,defines,declares_unimpl,f80_funcs,emcc_c_rc,seconds)。
+status.csv は lift/batch_lift.sh の出力。 列は**名前で読む**: 必須 10 列 (block,name,closure_funcs,closure_bytes,lift_rc,defines,declares_unimpl,f80_funcs,emcc_c_rc,seconds) が
+ヘッダに全部あることを要求し、余分な列 (既定鎖の icall,dispatch_calls など) は許容する。 列の位置には依存しない。
 block ごとの合格条件 (すべて満たすこと):
   lift_rc == 0 / emcc_c_rc == 0 / f80_funcs == 0 / declares_unimpl == 0 / defines == closure_funcs / defines > 0
   (defines == closure_funcs は DEFECT 検出用: 閉包 ranges を RetDec が取りこぼすと define が減る。 DIR/block*.json があればその unique_funcs とも一致を要求)
-行の過不足もすべて不合格: 指定 block の行が無い / 数値でない列 / 列数不足 / 指定外 block の行 (stale) は無視せず報告し、指定 block が欠けたら不合格。
+行の過不足もすべて不合格: 指定 block の行が無い / 数値でない列 / 行の列数がヘッダと違う (不足・過剰) / 必須列の欠落。 指定外 block の行は無視する。
 同一 block が複数行ある場合は最後の行を採用するが、複数行あったこと自体を警告する (batch_lift.sh は追記式)。
 """
 import csv, json, os, sys
@@ -16,15 +17,15 @@ COLS = ['block', 'name', 'closure_funcs', 'closure_bytes', 'lift_rc', 'defines',
 INT_COLS = [c for c in COLS if c != 'name']
 
 
-def judge(rows, want, closure_dir=None):
+def judge(hdr, rows, want, closure_dir=None):
     """returns (fail_messages, per_block_lines)"""
     fails, lines = [], []
     by = {}
     for i, r in enumerate(rows):
-        if len(r) != len(COLS):
-            fails.append('row %d: 列数 %d (期待 %d): %r' % (i + 2, len(r), len(COLS), r))
+        if len(r) != len(hdr):
+            fails.append('row %d: 列数 %d (ヘッダ %d): %r' % (i + 2, len(r), len(hdr), r))
             continue
-        by.setdefault(r[0], []).append(r)
+        by.setdefault(r[hdr.index('block')], []).append(r)
     for b in want:
         rs = by.get(b)
         if not rs:
@@ -33,7 +34,7 @@ def judge(rows, want, closure_dir=None):
             continue
         if len(rs) > 1:
             lines.append('%s warn: %d 行 (最後の行を採用)' % (b, len(rs)))
-        r = dict(zip(COLS, rs[-1]))
+        r = dict(zip(hdr, rs[-1]))
         try:
             v = {c: int(r[c]) for c in INT_COLS}
         except ValueError:
@@ -79,10 +80,10 @@ def main(argv):
     path, want = argv[0], argv[1:]
     with open(path) as f:
         rows = list(csv.reader(f))
-    if not rows or rows[0] != COLS:
-        print('judge: FAIL ヘッダが想定と違う: %r' % (rows[:1],), file=sys.stderr)
+    if not rows or any(c not in rows[0] for c in COLS):
+        print('judge: FAIL ヘッダに必須列が無い (必須: %s): %r' % (','.join(COLS), rows[:1]), file=sys.stderr)
         return 1
-    fails, lines = judge(rows[1:], want, cdir)
+    fails, lines = judge(rows[0], rows[1:], want, cdir)
     print('\n'.join(lines))
     if fails:
         print('judge: FAIL %d 件 / %d block' % (len(fails), len(want)), file=sys.stderr)

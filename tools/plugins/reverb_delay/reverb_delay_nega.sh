@@ -7,12 +7,13 @@
 #   M1-M3  matrix_check.py: facts の closure_funcs +1 / status の emcc_c_rc を matrix と食い違わせる / matrix に無い plugin
 #   I1-I3  ids_crosscheck.py: taint の ID 件数 +1 / hs_ids.json に無い ID を注入 / facts が指す closure json が無い
 #   X1-X3  xcheck_icall.py: audit の site を 1 つ捨てる / audit に存在しない site を足す / expected の VA を 1 つ消す
-#   L1-L2  lift 鎖: final.ll の ret を除去すると emcc -c が非 0 / 閉包 ranges の末尾 1 つを落とした lift の defines を judge に渡すと FAIL
+#   L1-L2  lift 鎖: final.ll の ret を除去すると emcc -c が非 0 / 閉包 ranges の末尾 1 つを落とした従来鎖 (PLUG_ICALL=0) lift の defines を judge に渡すと FAIL
 #   P1     ipp_use.py: 既知の IPP 使用関数を閉包に加えた closure json で users_in_closure が 0 → 1 以上になる (検出器の positive control)
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 source "$HERE/env.sh"
 cd "$HERE/.."
+export PLUG_ICALL=1   # 既定鎖 (J/E/M/I/X/P は既定鎖の成果物を使う)。 L2 だけ PLUG_ICALL=0 を明示
 R=reverb_delay
 O=work/reverb_delay
 N=$O/nega; rm -rf "$N"; mkdir -p "$N/tmp"
@@ -147,7 +148,7 @@ chk L1 $c0 $(emcc_rc $N/broken.ll) "(final.ll の関数 1 つから ret を除�
 RG=work/closure/block$(printf %05d $B).ranges.txt
 n_all=$(tr ',' '\n' < $RG | wc -l)
 tr ',' '\n' < $RG | head -n $((n_all - 1)) | paste -sd, > $N/ranges_minus1.txt
-bash lift/lift_ranges.sh "$FL_WIN64_DIR/extracted/block$(printf %05d $B)_PE.bin" $N/ranges_minus1.txt $N/lift p 600 > $N/lift.log 2>&1
+PLUG_ICALL=0 bash lift/lift_ranges.sh "$FL_WIN64_DIR/extracted/block$(printf %05d $B)_PE.bin" $N/ranges_minus1.txt $N/lift p 600 > $N/lift.log 2>&1
 d1=$(grep -c '^define' $N/lift/p.final.ll)
 python3 - $S $N/status_l2.csv $B $d1 <<'PY'
 import csv, sys
