@@ -3,15 +3,18 @@
 
 機械語 8c5eb0: 8c5f0c で件数 [rcx+0x14] を読み、8c5f15 cmp / 8c5f18 jg 0x8c6066 で件数 <= 0 のとき本体を飛ばす。
 RetDec の IR (dec_label_pc_8c5ef5) ではこの分岐が脱落し、無条件に dec_label_pc_8c5f23 へ進む (#662 REPORT_662 §3)。
---mode on : 末尾の無条件 br を次の形に置換する。
-              %g699 = <cond>
+--mode on : 末尾の無条件 br を次の形に置換する (REPORT_699 §1 が正本)。
+              %g699 = <cond>                        ; 既定 icmp sle i32 %9, 0 (件数 <= 0)
               br i1 %g699, label %dec_label_pc_8c5ef5_g699, label %dec_label_pc_8c5f23
-            dec_label_pc_8c5ef5_g699:   ; ガード辺専用。件数 0 の経路だけで値を store してから飛ばす
-              store i64 0, ptr %rax.0.reg2mem          ; rax.0 := 0 (機械語 8c5f06 xor eax,eax で確定)
-              %g699rdx = and i64 %arg2, 255
-              store i64 %g699rdx, ptr %rdx.1.reg2mem   ; rdx.1 := zext(arg2 下位 byte) (未検証の仮定。REPORT_699 §1)
+            dec_label_pc_8c5ef5_g699:               ; ガード辺専用ブロック
+              %g699a/%g699b/%g699t/%g699c          ; 0 件 ∧ arg3==0 ∧ arg2 下位 byte≠0
+              br i1 %g699c, ..._g699_t, ..._g699_e
+            ..._g699_t:                             ; fail-fast (llvm.trap)
+            ..._g699_e:
+              store i64 0, ptr %rax.0.reg2mem       ; rax.0 := 0 (機械語 8c5f06 xor eax,eax で確定)
+              store i64 0, ptr %rdx.1.reg2mem       ; 読まれない経路の store (rdx の値は未確定)
               br label %dec_label_pc_8c6066
-            件数 > 0 の経路 (dec_label_pc_8c5f23 への枝) は元 IR と一致する。
+            件数 > 0 の経路 (dec_label_pc_8c5f23 への枝) は元 IR と一致する (store は通らない)。
 --mode off: 逆変換 (脱落状態に戻す。ネガコン用)。
 対象ブロックが 1 件でない・想定形でない場合は exit 1 (黙って通さない)。
 """
