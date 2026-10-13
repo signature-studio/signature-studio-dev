@@ -5,9 +5,11 @@
   2. fl_api の bind: kwlist 名での呼出し・VARARGS のみ関数の kwargs 拒否・省略任意引数
   3. stubs の既定値を持つ引数の kw 呼出しが PR 前 (stubs 署名のみ) の bind と同じ結果になる (既知の差だけ許可)
   4. kwlist の重複名 (arrangement.selectionSet) の扱い
+  10. stubs 既定値の評価器 (fl_api._default_value): midi.* 許可表・正の検証・負の対照・eval 不使用の静的ガード
 """
 import json
 import os
+import re
 import sys
 import types
 
@@ -87,18 +89,21 @@ assert last() == (1,), last()
 mx.getTrackName(7)
 assert last() == (7,), last()
 
-# (7) stubs に既定値がある引数: バイナリ側で名前が変わっていても同位置の stubs 既定値を引き継ぐ
-ch.getChannelVolume(1, useGlobalIndex=True)  # stubs の mode=False が kwlist の useDb に引き継がれる
-assert last() == (1, False, True), last()
-ch.getChannelVolume(index=3)
-assert last() == (3, False, False), last()
-mx.getTrackVolume(index=2)  # stubs mode=0 -> kwlist flag
-assert last() == (2, 0), last()
+# (7) 既定値は stubs の同名引数のものだけ。名前が違う同位置 (stubs mode → kwlist useDb/flag) の既定値は引き継がない
+expect(TypeError, ch.getChannelVolume, 1, useGlobalIndex=True)  # useDb は既定値不明 (途中の省略) → 拒否
+ch.getChannelVolume(index=3)  # 末尾の useDb・useGlobalIndex は省略 → C 側の既定値
+assert last() == (3,), last()
+ch.getChannelVolume(1, True, useGlobalIndex=True)
+assert last() == (1, True, True), last()
+mx.getTrackVolume(index=2)  # stubs mode=0 は kwlist flag へ引き継がない → 省略
+assert last() == (2,), last()
 mx.getTrackVolume(2, flag=1)
 assert last() == (2, 1), last()
 gen.saveUndo("u", 1)  # 位置のみ
-gen.saveUndo("u", 1, updateHistory=False)  # stubs update=True -> kwlist updateHistory
+gen.saveUndo("u", 1, updateHistory=False)  # stubs update=True (別名) は引き継がない。明示指定は通る
 assert last() == ("u", 1, False), last()
+gen.saveUndo("u", 1)
+assert last() == ("u", 1), last()
 expect(TypeError, ch.getChannelVolume, 1, mode=1)  # バイナリに無い名前 (stubs の旧名) は拒否
 expect(TypeError, mx.getTrackVolume, 1, mode=1)
 # 位置がずれた引数 (stubs に無い引数がバイナリで挿入されている) は、別の引数の既定値を流用せず拒否
@@ -112,16 +117,18 @@ pl.triggerLiveClip(index=1, blockNum=2)  # flags が gap。後続 velocity (stub
 assert last() == (1, 2), last()
 expect(TypeError, ch.getGridBit, index=1, useGlobalIndex=True)  # gap を越えた明示指定は従来どおり TypeError
 expect(TypeError, pl.triggerLiveClip, index=1, blockNum=2, velocity=5)
-# 未知の kwarg は既定値の評価 (stubs 由来の midi.* は eval できない) より先に TypeError
+# 未知の kwarg は既定値の評価 (stubs 由来の midi.* は利用者の midi から解決) より先に TypeError
 expect(TypeError, dv.linkToLastTweaked, 1, 2, eventId=3)
 
 # (8) PR 前の bind (stubs 署名のみ。fl_api._make の旧実装と同一ロジック) との新旧比較。
 #     stubs 署名と kwlist の両方がある 94 関数の全てで、位置引数 k 個 + kw 1 個 (kwlist の名前) の呼出しを比べる。
-#     旧が通った呼出しは新も同じ結果でなければならない。例外はバイナリと食い違う次の関数だけ (期待を固定):
-#       channels.getStepParam    : stubs は 6 引数、バイナリは 5 引数 (新は 6 つ目を渡さない)
-#       channels.soloChannel     : バイナリは (index, value, useGlobalIndex)。旧は useGlobalIndex を value の位置に束縛していた
-#       plugins.getColor         : バイナリは useGlobalIndex の前に paramIndex がある (同上)
-#       plugins.getParamValueString : バイナリは pickupMode が無く、4 番目が useGlobalIndex
+#     差は次の 3 種だけ (PY-15 #653 で既定値の引き継ぎを同名のみに変えた結果。期待を固定):
+#       a. 名前だけ違う同位置の既定値を引き継がない → 末尾は省略 (C 側の既定値)、途中は TypeError
+#          (channels.getChannelVolume/soloChannel/setChannelPitch, mixer.getTrackVolume/getEventIDName/automateEvent,
+#           general.saveUndo, device.forwardMIDICC)
+#       b. 旧が位置をずらして誤束縛していた (新は束縛しない・TypeError):
+#          plugins.getColor (useGlobalIndex を paramIndex の位置へ) / plugins.getParamValueString (5 引数目を渡す)
+#       c. バイナリは 5 引数なので旧の 6 つ目 (useGlobalIndex の stubs 既定値) を渡さない: channels.getStepParam
 def legacy_bind(sig, args, kw):
     names = [p["name"] for p in sig["params"]]
     defaults = {p["name"]: p["default"] for p in sig["params"] if p["default"] is not None}
@@ -168,9 +175,10 @@ for m, fs in t["modules"].items():
                 else:
                     known.add(f"{m}.{n}")
 print(f"legacy bind が通った kw 呼出し {n_cmp} 件のうち新も同結果 {n_same}、差 {sorted(known)}")
-assert known == {"channels.getStepParam", "channels.soloChannel", "plugins.getColor", "plugins.getParamValueString"}, known
-# 差 8 件 = 上の 4 関数。うち 3 件 (soloChannel(index=)・getColor(flag=) ×2) は旧が gap 後の既定値で位置ずれさせていたもの (新は省略)
-assert n_cmp - n_same == 8, (n_cmp, n_same)
+assert known == {"channels.getChannelVolume", "channels.getStepParam", "channels.setChannelPitch", "channels.soloChannel",
+                 "device.forwardMIDICC", "general.saveUndo", "mixer.automateEvent", "mixer.getEventIDName",
+                 "mixer.getTrackVolume", "plugins.getColor", "plugins.getParamValueString"}, known
+assert (n_cmp, n_same) == (224, 208), (n_cmp, n_same)
 
 # (9) kwlist の重複名 (arrangement.selectionSet は ['selStart','selStart','selectNotes',...]; バイナリ由来)
 #     最初の出現だけを kw で束縛し、2 つ目以降は位置専用 (kw では埋まらない)
@@ -182,4 +190,46 @@ assert last() == (1, 2, 1), last()
 expect(TypeError, arr.selectionSet, selStart=5)  # 2 つ目の selStart が埋まらない (必須)
 expect(TypeError, arr.selectionSet, 1, selStart=5)  # kw は最初の出現にしか束縛されない
 expect(TypeError, arr.selectionSet, 1, 2, selStart=5)
+
+# (10) stubs 既定値の評価器 (_default_value)。eval は使わず許可した式だけを評価する。midi.* の値は利用者の midi から実行時に取る。
+EXPECTED_NAMES = {"midi.PIM_None", "midi.GT_All", "midi.LB_Status_Default", "midi.EKRes", "midi.MaxInt",
+                  "midi.ST_Int", "midi.PME_System", "midi.REC_None", "midi.GC_BackgroundColor", "midi.FPN_Param"}
+# (a) 全数列挙: sig の既定値のうち midi. を含むもの = 20 関数・21 引数・名前 10 種 (固定値)
+midi_args = [(m, n, p["name"], p["default"]) for m, fs in t["modules"].items() for n, e in fs.items() if e.get("sig")
+             for p in e["sig"]["params"] if p["default"] is not None and "midi." in p["default"]]
+assert len(midi_args) == 21 and len({(m, n) for m, n, _, _ in midi_args}) == 20, midi_args
+assert {d for _, _, _, d in midi_args} == EXPECTED_NAMES, {d for _, _, _, d in midi_args}
+# (b) 正の検証: 偽の midi (値は任意) を sys.modules に入れると、既定値がその値で host へ渡る
+FAKE = {nm.split(".")[1]: 9000 + i for i, nm in enumerate(sorted(EXPECTED_NAMES))}
+fake_midi = types.ModuleType("midi")
+fake_midi.__dict__.update(FAKE)
+sys.modules["midi"] = fake_midi
+tr = sys.modules["transport"]
+ch.setChannelPitch(1, value=5, pitchUnit=1, useGlobalIndex=False)  # pickupMode (midi.PIM_None) を省略
+assert last() == (1, 5, 1, FAKE["PIM_None"], False), last()
+tr.rewind(startStop=1)  # flags (midi.GT_All)
+assert last() == (1, FAKE["GT_All"]), last()
+# stubs の既定値は同名のみ引き継ぐ (stubs は pmeflags・kwlist は pmeFlags で名前違い)。よって kw 省略の末尾は C 側既定値に任せ、(1, 2) になる
+tr.globalTransport(index=1, value=2)
+assert last() == (1, 2), last()
+assert fl_api._default_value("midi.PME_System") == FAKE["PME_System"]  # 代わりに midi.PME_System の評価を直接検証
+mx.getEventValue(index=1)  # value (midi.MaxInt)。smoothTarget (stubs 既定 1) も同時に入る
+assert last() == (1, FAKE["MaxInt"], 1), last()
+# (b') midi. 以外の既定値は従来の eval と同じ値・同じ型 (既存挙動を変えない)
+for fs in t["modules"].values():
+    for e in fs.values():
+        for p in e["sig"]["params"] if e.get("sig") else []:
+            if p["default"] is not None and "midi." not in p["default"]:
+                a, b = fl_api._default_value(p["default"]), eval(p["default"], {})
+                assert type(a) is type(b) and a == b, (p["default"], a, b)
+# (c) 参考 (repo のコードは通らない。Python の eval の挙動の確認のみ): midi を渡さない eval は NameError。PR #463 の bind が落ちた原因
+expect(NameError, eval, "midi.PIM_None", {})
+# (d) 評価器の拒否: 許可表の外・許可した形の外は ValueError。1 / 24 は通る
+assert fl_api._DEFAULT_NAMES == EXPECTED_NAMES
+assert fl_api._default_value("1 / 24") == 1 / 24
+for bad in ["__import__('os')", "midi.NoSuch", "open", "'x'"]:
+    expect(ValueError, fl_api._default_value, bad)
+# (e) 静的ガード: 本番コードに eval( の呼出しを残さない
+src = open(os.path.join(ROOT, "src", "fl_api.py"), encoding="utf-8").read()
+assert re.search(r"\beval\s*\(", src) is None, "src/fl_api.py に eval( が残っている"
 print("kwsig_check: OK")

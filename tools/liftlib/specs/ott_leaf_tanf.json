@@ -1,0 +1,17 @@
+{
+ "name": "ott_leaf_tanf",
+ "abi": "ms_pos",
+ "func": "0x1801ba860",
+ "wasm_func": "function_1801ba860",
+ "scenarios": 300,
+ "steps": 1,
+ "seed": 23906,
+ "ret_from_xmm0": true,
+ "expect_match_min": 1.0,
+ "ret_bits": 32,
+ "vars": [
+  {"name": "x", "gen": {"mix": [[0.6, {"unif": [-3.0, 3.0]}], [0.2, {"unif": [-20.0, 20.0]}], [0.2, {"choice": [0.0, 0.7853981, 1.5707963, -1.5707963, 3.1415927]}]]}}
+ ],
+ "args": [{"f32": "x"}],
+ "buffers": {}
+}
