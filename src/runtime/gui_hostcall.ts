@@ -27,7 +27,7 @@ export type PickOptions = { title: string; startDir: string; defExt: string; sug
 
 export interface HostCallEnv {
   /** window.open 相当。ポップアップブロック等で開けなければ false */
-  openWindow(url: string): boolean;
+  openWindow(url: string): boolean | Promise<boolean>;
   /** FL の Help パス (ShellExecuteW の lpFile) を viewer で開く。window.flHelp.shellExecute(null, path) 相当。表示できれば true (#554) */
   openHelp?(path: string): Promise<boolean>;
   /** face 名のフォントを取得・sha256 検証して wasm heap へ置き、その ptr/size を返す (GUI-13 #615; gui_fonts.ts の createFontLoader)。無し・検証失敗は null */
@@ -110,7 +110,7 @@ export class HostCallBridge {
     let result = 0;
     let out: Uint8Array = new Uint8Array(0);
     try {
-      if (op === HC_OP.openUrl) result = this.openUrl(fields[0] ?? "") ? 1 : 0;
+      if (op === HC_OP.openUrl) result = (await this.openUrl(fields[0] ?? "")) ? 1 : 0;
       else if (op === HC_OP.openHelp) result = (await this.openHelp(fields[0] ?? "")) ? 1 : 0;
       else if (op === HC_OP.fetchFont) {
         const f = this.env.loadFont ? await this.env.loadFont(fields[0] ?? "") : null;
@@ -139,11 +139,11 @@ export class HostCallBridge {
     return ok;
   }
 
-  private openUrl(raw: string): boolean {
+  private async openUrl(raw: string): Promise<boolean> {
     let u: URL;
     try { u = new URL(raw); } catch { this.log.push(`openUrl rejected (unparsable): ${raw}`); return false; }
     if (!URL_SCHEMES.has(u.protocol)) { this.log.push(`openUrl rejected (scheme ${u.protocol})`); return false; }
-    const ok = this.env.openWindow(u.href);
+    const ok = await this.env.openWindow(u.href);
     if (!ok) this.log.push(`openUrl blocked: ${u.href}`);
     return ok;
   }
