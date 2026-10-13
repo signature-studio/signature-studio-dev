@@ -207,11 +207,11 @@ NC4 は #506 の reviewer が再現した「不合格行を追記しても exit 
 |---|---|---|
 | 差分試験 bit-exact (出口条件)。 Eff_Render 単位の native / wasm harness が無く、P0a/b/c が OPEN | #208 を閉じられない | #195 / #196 / #197 の完了後に #208 を再開 (Closes はその時)。 harness は #506 の REPORT §6 が提案した「[PLG-F3a]」と共用 (PM 判断) |
 | Render test .flp の E2E (FL Keys / FPC / Granulizer / Slicer / Slicex / GMS の RT 列 Y) | 同上 | FLEngine 統合待ち。 親 #14 / #208 |
-| 閉包外の固有関数 (§2): 推移閉包を含む lift と見積の再計算 | 見積 57.5 人日の前提・wasm リンク | **#537 で推移閉包の算出と lift (7/7) は完了 (§2b)**。 見積の書き換えは PM 判断。 dynamics #200 / PR #506 にも同じ制約があるため #200 にコメント |
-| `rep_stosb_memset` 未実装 stub (Granulizer / Slicer 各 1 call site) | silent な memset 欠落 | #538 [PLG-G3-4] → #629 で解消済み (本 PR の許容を除去し gate で検出) |
+| 閉包外の固有関数 (§2): 推移閉包を含む lift と見積の再計算 | 見積 57.5 人日の前提・wasm リンク | **#537 (PR #624 で main に merge 済み) で推移閉包の算出と lift (7/7) は完了 (§2b)**。 見積の書き換えは PM 判断。 dynamics #200 / PR #506 にも同じ制約があるため #200 にコメント |
 | 推移閉包でもなお total 外の非共通関数 2,846 関数 / 1,247,120 B (うち `lea [rip+X]` 参照 153 関数 / 38,656 B) の到達性 | 閉包は下限のまま | lea 経路は **#627 で root に足した (§2c)**。 total2 外の 2,653 関数 / 1,200,793 B は #667 [PLG-G3-6] |
 | 推移閉包 (total) の host 呼出面・kernel 依存 (`closure_facts.py` は base のまま) | §3・§4 が base 限定 | **#627 で total2 版を再計測し #196 / #197 / #331 にコメント済み (REPORT_LEA.md §3b)** |
 | `closure_indirect.py` の dynamics (#200 / PR #506) 等への適用 (受入条件 4) | 他ファミリの閉包も過小の可能性 | #200 にコメント (未検証)。 `plugin_closure.py` の仕様変更は不要だったため退行確認の対象なし |
+| `rep_stosb_memset` 未実装 stub (Granulizer / Slicer 各 1 call site) | silent な memset 欠落 | #538 [PLG-G3-4] → #629 で解消済み (main 上で `declares_unimpl` 0 × 7 block の実測)。 本 PR で許容を撤去 |
 | C++ engine / 単体 DLL 2 本の `emcc -c` 未通過 (E1・dangling use・`zext 0 to i64`)、未実装 helper 188 / 128、f80 2 / 1、RetDec C バックエンドの規模耐性 | Slicer 2 (T3) の engine、GMS (T3) | 新規 #540 [PLG-G3-2] (起票済み) (同型: #523 [PLG-F4-2]・#527 [PLG-F5-2]) |
 | engine 内の f80 関数 (Slicer 2 engine 2 / GMS 1) | engine の wasm 化 | #197 (`f80_lower.py` の適用) にコメント |
 | host の Dispatcher ID 88 (FPC)・101 (Granulizer) が `hs_ids.json` 未収載、独立走査のみの ID 1 / 63 / 64、slot 0x28 / 0x30 / 0x68 / 0x78 / 0xb8 / 0xf0 / 0xf8 / 0x128 の意味 | P0b の応答表の網羅性 | #196 作業 5 (0x13173a0 全 case 解析) にコメント |
@@ -219,7 +219,9 @@ NC4 は #506 の reviewer が再現した「不合格行を追記しても exit 
 | Balance の 80 実装表に逆引きできない kernel 呼出先 (FPC 3 / Granulizer 4 / Slicer 4 / Slicex 2 site) | P0c の差分試験対象外 | #197 にコメント |
 | Slicex が使う 0x5dee90 / 0x5df040 | P0c の未解決 kernel | #331 にコメント |
 | Slicer 2 殻と engine の結合方式 (LoadLibrary 経路・`DispatchToEngine`) が未解析 | engine を殻に結線できない | 新規 #540 [PLG-G3-2] (起票済み) の受入条件 4 |
-| `docs/DOC_MAP.md` の REPORT 索引に本書が未掲載 | 索引漏れ | PM が追記 |
+| `docs/DOC_MAP.md` の REPORT 索引に本書が未掲載 | 索引漏れ | 本 PR で DOC_MAP §3 に `REPORT.md`・`REPORT_INDIRECT.md` の 2 行を追記して解消 (REPORT 側の PM 追記は不要) |
+| `ALLOW_UNIMPL` (`rep_stosb_memset` 用の許容) の撤去 | 撤去後も既存 CSV に対する judge は PASS 7/7 (`--skip-lift`)。 stub が戻れば FAIL する | 本 PR で撤去 (main 8d883c3 以降の実測で 7 block とも `declares_unimpl` 0) |
+| lowering (f80→f64) の bit-exact 差分 (3 block) | 通過 ≠ 正しさ。 差分試験の対象外 | #197 にコメント済み (REPORT_LEA.md §7b) |
 
 ## 8. DEFECTS.md 行案 (候補・追加の可否は PM 判断)
 

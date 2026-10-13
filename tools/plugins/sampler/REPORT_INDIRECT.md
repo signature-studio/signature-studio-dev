@@ -33,13 +33,13 @@ total = base ∪ root から `call/jmp rel32` で到達する非共通関数 (fr
 |---|--:|--:|--:|--:|--:|--:|--:|--:|
 | FL Keys | 22386 | 83 / 32,838 | 87 | 4 | 0 | 0 | 0 | 4–5 |
 | FPC | 23617 | 323 / 125,155 | 323 | 0 | 0 | 0 | 0 | 12 |
-| Fruity Granulizer | 23658 | 158 / 44,232 | 158 | 0 | 1 (rep_stosb_memset) | 0 | 0 | 5–6 |
-| Fruity Slicer | 23662 | 188 / 56,098 | 190 | 2 | 1 (rep_stosb_memset) | 0 | 0 | 6 |
+| Fruity Granulizer | 23658 | 158 / 44,232 | 158 | 0 | 0 | 0 | 0 | 5–6 |
+| Fruity Slicer | 23662 | 188 / 56,098 | 190 | 2 | 0 | 0 | 0 | 6 |
 | Fruity Slicer 2 (殻) | 23663 | 193 / 67,571 | 193 | 0 | 0 | 0 | 0 | 8 |
 | Slicex | 24172 | 680 / 257,677 | 684 | 4 | 0 | 0 | 0 | 23–24 |
 | Soundfont Player | 24175 | 1,998 / 760,611 | 2,012 | 14 | 0 | 0 | 0 | 65–66 |
 
-- **7/7 通過** (lift_rc 0 / `emcc -c` rc 0 / f80 0 / 未実装 helper は §6 の許容内)。 §1 と同じく通過 ≠ 正しさ。 未実装 helper が増えた block は無い (Granulizer・Slicer の `rep_stosb_memset` 各 1 のまま = #538)。
+- **7/7 通過** (lift_rc 0 / `emcc -c` rc 0 / f80 0 / 未実装 helper 0)。 main 4cc4ae4 (#629 で `rep_stosb_memset` 実装済み) を取り込んだ HEAD で、`targets.py` の `ALLOW_UNIMPL` を空にして実測 (許容 0 の判定で 7/7)。 旧版の「Granulizer・Slicer 各 1 の許容が効いた 7/7」は #629 前の結果で、現在は無効。 許容 0 の block に未実装 1 を与えると rc 1 (NC5)。 §1 と同じく通過 ≠ 正しさ。
 - `indirect_defs.py` (range 単位の監査): 全 7 本で ranges の全関数 (計 3,623) が final.ll に `define @function_<VA>` として存在 (欠落 0)。 judge の `defines>0` は range 欠落を検出できないため、この監査を gate に加えた。
 - Soundfont Player の host call 0 site (§3) は total でも未調査 (`closure_facts.py` の入力は base のまま。 total への拡張は未実施)。
 
@@ -52,8 +52,13 @@ total = base ∪ root から `call/jmp rel32` で到達する非共通関数 (fr
 | `indirect_e2e.sh` 全体 (3 回、inventory 済みから) | exit 0 × 3: **141 s / 139 s / 138 s** (終了時 load average (1 分) 0.99 / 1.00 / 1.01)。 3 回の `[indirect_lift]` 行 (秒を除く) の md5 が一致、算出表も一致 (`diff`) |
 | `indirect_nega.sh` | exit 0、19 s (NC0–NC7 全て期待通り) |
 
-`closure_indirect.py` の 4 検査 (不合格で exit 1): **C1** entry だけから BFS した結果が `plugin_closure.py` の ranges と完全一致 (BFS 実装の同一性) / **C2** root の関数数・バイトが `unreached.json` (§2、別スクリプト) と一致 /
-**C3** total ⊆ 非共通 かつ base ⊆ total (framework を lift 対象に混ぜない) / **C4** 別算法: 命令境界を見ず関数バイト列の `E8`/`E9` rel32 を全オフセットで拾う過大近似の閉包に total が含まれる。
+HEAD を `9f9a9bb` (main 4f33fdd 取り込み後・#551 由来の差分を除去後・許容 0) に進めた。 以下は本 run で HEAD `9f9a9bb` から実測したもの (素材 fl-win64 / toolchain-retdec / toolchain-emsdk を `$ARTIFACTS_DIR` から展開、4 core、`work/` 無し・前提生成込み):
+- `indirect_e2e.sh` (`9f9a9bb`・前提生成込み・許容 0): exit 0、**real 10 分 58.933 秒** (user 35 分 58.210 秒)。 judge 7/7 PASS (lift_rc / emcc_c_rc / f80 全 0・未実装 helper 0)、indirect_defs 7/7 PASS、`[indirect_e2e] OK`。 `closure_indirect.py` 4 検査 × 7 本 PASS。
+- `indirect_nega.sh` (`9f9a9bb`・許容 0): exit 0、**16.324 秒**、NC0–NC7 全て期待通り (NC4: ranges 82 → 81、define 87 → 85)。
+- 前回 (`e0ee8d4`・前提生成込み) の 11 分 20.699 秒・17.5 秒は参考値。 `0f50a1b` (inventory 済み) の 138–141 秒は前提生成なしの別条件で、比較時は条件を揃える。
+
+`closure_indirect.py` の 4 検査 (不合格で exit 1): **C1** entry だけから BFS した結果が `plugin_closure.py` の ranges と完全一致 (BFS 実装の同一性) / **C2** root の関数数・バイトが `unreached.json` (§2、`unreached_unique.py` の出力) と一致 (同一定義 = 8 バイト整列 qword 一致 の再計算。 独立検算ではない。 NC2・NC3 で検出力を確認) /
+**C3** total ⊆ 非共通 かつ base ⊆ total (framework を lift 対象に混ぜない) / **C4** 別算法: 命令境界を見ず関数バイト列の `E8`/`E9` rel32 を全オフセットで拾う過大近似の閉包に total が含まれる (独立検算は C4 のみ)。
 C4 の過大近似は 7 本とも total と同数 (3,623 関数) だった。 capstone 版が取りこぼしていないことは示すが、過大近似側に余分が出なかったので「偽の到達先を拾っていない」ことの強い裏付けではない。
 
 ### ネガティブコントロール (`indirect_nega.sh`、対照 = 無改変で rc 0)

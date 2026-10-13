@@ -48,7 +48,12 @@ PY
   if [ "$F80" -gt 0 ] 2>/dev/null; then
     LOW=1
     python3 p0c/f80_lower.py "$OUT/p.final.ll" "$OUT/p.lower.ll" --report "$OUT/lower.json" > "$OUT/lower.log" 2>&1 || true
-    if [ -f "$OUT/p.lower.ll" ]; then F80=$(grep -c 'x86_fp80' "$OUT/p.lower.ll" || true); else F80=-1; fi
+    if [ -f "$OUT/p.lower.ll" ]; then F80=$(python3 - "$OUT/p.lower.ll" <<'PY'
+import re, sys
+s = open(sys.argv[1]).read()
+print(sum(1 for f in re.split(r'\n(?=define )', s) if f.startswith('define') and 'x86_fp80' in f))
+PY
+); else F80=-1; fi
     erc=-1
     if [ -f "$OUT/p.lower.ll" ]; then
       ( source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1; TMPDIR="$OUT/tmp" emcc -c "$OUT/p.lower.ll" -o "$OUT/p.lower.o" -w -O0 -msimd128 > "$OUT/emcc_lower.log" 2>&1 ); erc=$?

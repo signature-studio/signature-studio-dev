@@ -74,6 +74,10 @@ def judge_shells(a):
         csv.writer(open(a.out, 'w')).writerows([hdr] + kept)
     for b, n, w in fails:
         print('  FAIL block %s (%s): %s' % (b, n, w))
+    if 'lowered' in hdr:
+        low = [r[0] for r in kept if to_int(r, hdr, 'lowered') == 1]
+        print('  lowering 後の値で判定した block: %d/%d (%s) — この block の f80 / emcc -c の判定は lowering 後の値による (raw は f80_raw / emcc_c_rc_raw)'
+              % (len(low), len(want), ','.join(low) or '-'))
     if fails:
         print('judge shells: FAIL %d/%d' % (len(fails), len(want)))
         return 1

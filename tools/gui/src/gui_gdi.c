@@ -87,10 +87,10 @@ static DC *dc_new(int kind) {
   return d;
 }
 U64 gdi_get_dc_for_wnd(Wnd *w, int window_dc, const RL *clip) {
-  (void)window_dc;
   DC *d = dc_new(1);
   int surf, ox, oy;
   if (!wnd_target(w, &surf, &ox, &oy)) gui_failfast("GetDC", "window has no surface");
+  if (window_dc) wnd_window_origin(w, &ox, &oy);   /* GetWindowDC: 原点 = window rect 左上 */
   d->surf = surf; d->ox = ox; d->oy = oy;
   if (clip) { rl_copy(&d->base, clip); d->has_base = 1; }
   return h_alloc(HT_DC, d);
@@ -473,7 +473,7 @@ API GetDeviceCaps(I64 hdc, I64 idx) {
     case HORZRES: return sh->screen_w; case VERTRES: return sh->screen_h;
     case HORZSIZE: return sh->screen_w * 254 / 960; case VERTSIZE: return sh->screen_h * 254 / 960;
     case BITSPIXEL: return 32; case PLANES: return 1; case NUMCOLORS: return -1;
-    case LOGPIXELSX: case LOGPIXELSY: return 96; case SIZEPALETTE: case NUMRESERVED: return 0; case COLORRES: return 24;
+    case LOGPIXELSX: case LOGPIXELSY: return gui_dpi(); case SIZEPALETTE: case NUMRESERVED: return 0; case COLORRES: return 24;
     case RASTERCAPS: return 0x7E99 & ~0x100;  /* RC_PALETTE を立てない */
   }
   return 0;
@@ -489,6 +489,7 @@ API CreateRectRgn(I64 l, I64 t, I64 r, I64 b) {
   if (R < L) { int x = L; L = R; R = x; } if (B < T) { int x = T; T = B; B = x; }
   rl_add(&g->rl, (WRECT){ L, T, R, B }); return (I64)h;
 }
+void gdi_rgn_set_rl(U64 h, const RL *rl) { Rgn *g = (Rgn *)h_get(h, HT_RGN); if (g) rl_copy(&g->rl, rl); }
 API CreateRectRgnIndirect(I64 rc) { const WRECT *r = (const WRECT *)P_(rc); return CreateRectRgn(r->left, r->top, r->right, r->bottom); }
 API SetRectRgn(I64 h, I64 l, I64 t, I64 r, I64 b) { Rgn *g = (Rgn *)h_get((U64)h, HT_RGN); if (!g) return 0; rl_clear(&g->rl); rl_add(&g->rl, (WRECT){ (int)l, (int)t, (int)r, (int)b }); return 1; }
 API CombineRgn(I64 hd, I64 h1, I64 h2, I64 mode) {
