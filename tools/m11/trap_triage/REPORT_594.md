@@ -81,17 +81,18 @@ FL_WIN64_DIR=<fl-win64 の展開先> bash tools/m11/trap_triage/negctl_594.sh   
 旧版 (qstore 無しのみ, 7 構成, G1–G10) の計測は 2 分 44 秒。現版との比較ではない。
 `gate` は FAIL で `exit 1` (終了時に `m11_ov.c` 由来の `ov.o` を再生成)。
 
-### 6-1. 2 回目の実測 (main d7cf3c77 相当, 素材を展開し直し, `m11_gen_ir2.sh` で ir_conditions.json を作成)
+### 6-1. 2 回目の実測 (main `d7cf3c77f94050d705d5718e87431240fce392e7` 上で計測, 素材を展開し直し, `m11_gen_ir2.sh` で ir_conditions.json を作成)
 - 前提 (qstore 検出 pristine) = 279 site、survey 1 回 6.4–7.5 秒、load 0.59–0.94、全体 175 秒、exit 1。
 - SUMMARY: FAIL (G1, G5, G8, G10, G12)。SUMMARY の行まで出力される (fail-closed は機能)。
 - 原因 (実測): main の ldfix 適用済み IR では、qstore 無し (`M11_QSTORE=0`) の base で 58–63 が既に `ok` (base の oob 19 = 87,144,149,158,275,280,304,477,484,492,513,520,555,659,745,830,880,898,923)。
   unit 56 は `other` (`function_8c5eb0` の unreachable)。`8cc190←8c7a10` 系 OOB は base で n=0。
   よって G1/G5/G8/G10 の前提 (base で 58–63 が oob) は main の ldfix 適用後の IR では成立しない。ldfix 版 IR の残す 58–63 修復を外す ldfix=disabled 比較は、build 拒否 (`ldfix=disabled` は fail-closed) のため未測定。
 - G12 は probe 透過で差 2 件 (304, 555 が oob→ok)。probe の追加で trap の出方が変わる = probe は透過でない。
-- ゲートの期待値は緩めていない。ゲート判定の修正は未実施 (前提の作り直しは別 issue)。
+- ゲートの期待値は緩めていない。ゲート判定の修正は未実施 (前提の作り直しは子 issue #1041)。
+- 現状の期待結果は FAIL (exit 1)。`negctl_594.sh` ヘッダにも同じ内容を書いた。
 
 ### 6-2. 既知の制約
-- `m11_e2e.sh` の全再生成経路 (lift_pe.sha256 無し) は `m2/work/ghidra_dll/functions_dll.csv` を要求する。runner に Ghidra が無いため `m11_bounds` が fail-closed で止まる。units_run (`m11_e2e.sh` 全体) はこの経路では未測定。
+- `m11_e2e.sh` の全再生成経路 (lift_pe.sha256 無し) は `m2/work/ghidra_dll/functions_dll.csv` を要求する。runner に Ghidra が無いため `m11_bounds` が fail-closed で止まる。units_run (`m11_e2e.sh` 全体) はこの経路では未測定。子 issue #1042。
 
 ## 6. 検証範囲 / 範囲外 / 未解決
 
@@ -101,6 +102,8 @@ PE (`extracted/block00031_PE.bin`) と capstone/pefile が無い環境では qst
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | (解決) 58–63 の修復 (qstore) は #552 として main に merge 済み | main で 58–63 は ok (G13) | — |
-| unit 56: `8c7710` の D4 型 deref 脱落 + その先の `8c5eb0` の OOB | 56 が halt0/oob のまま | #662 |
-| `survey_units.mjs` oob の `.slice(1)` が最上位 frame を捨てる (確定) | `annotate.py` の最上位集計が 1 段ずれる | #663 (survey_diff の基準更新込み) |
+| negctl 前提の再設計 (ldfix 適用後の IR で 58–63 は base で ok) | gate G1/G5/G8/G10/G12 が FAIL | #1041 (M11-N59) |
+| units_run 測定経路 (`functions_dll.csv` の入手) | `m11_e2e.sh` 全体が未測定 | #1042 (M11-N60) |
+| unit 56: `8c7710` の D4 型 deref 脱落は #662 (closed)。`8c5eb0` の 0 件ガードは #717 (merged) で IR に復元。残る fail-fast の到達可否 | 56 の未解決部分 | #856 (M11-N36, open) |
+| `survey_units.mjs` oob の `.slice(1)` (§4 は c26b41d 時点の記述) | 現 main の `survey_units.mjs:74` は `.slice(0, 30)` で先頭 frame を残す (#663 closed) | #663 (closed) |
 | `alloca/REPORT.md` §6 / `m11/REPORT.md` の「上流 8c5cc0 のポインタ破壊」帰属は誤り (本 REPORT §2) | 調査の誤誘導 | 本 PR で REPORT_594 を索引に追加。元 REPORT の訂正は PM 判断 |

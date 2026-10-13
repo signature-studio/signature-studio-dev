@@ -4,9 +4,9 @@
 #   前提 (fail-closed: 1 つでも欠ければ数値を出さずに exit 1): $FL_WIN64_DIR/extracted/block00031_PE.bin と
 #     python3 での capstone・pefile の import。qstore (m11_build.sh 既定 M11_QSTORE=1) はこの 2 つが揃って初めて効くため,
 #     無い環境では既定構成の数値が変わる (PE 無しで qstore が skip される) → 止める。
-#   IR の出どころ: work/boot_final.pristine.ll (qstore 導入前の IR。初回に work/boot_final.ll から複製し, detect で
-#     qstore 対象 site > 0 を確認する)。m11_build.sh は boot_final.ll を qstore/alloca で書き換えるので, 構成の前に複製から戻す。
-#     m11_gen_ir2.sh での再生成は使わない (ldfix が /home/ubuntu 固定の PE を見るため, 別環境では IR が変わる)。
+#   IR の出どころ: 毎回 m11_gen_ir2.sh で作り直した直後の IR を work/boot_final.pristine.ll に複製する (ldfix=applied・qstore=not-applied・
+#     指紋記録済み)。detect で qstore 対象 site > 0 を確認する。m11_build.sh は boot_final.ll を qstore/alloca で書き換えるので, 構成の前に複製から戻す。
+#     PE は $FL_WIN64_DIR/extracted/block00031_PE.bin を gen_ir2 と ldfix (--pe) が同じ値で読む。/home/ubuntu は env.sh の既定値でしかない。
 #   構成 (m11_ov.c を python で加工して work/obj/ov.o に差し替え → m11_build.sh → survey_units.mjs):
 #     qstore 無し (M11_QSTORE=0 = #552 前の base):
 #     base      現行 m11_ov.c (無加工)                         : 基準. 8cc190 系 OOB の unit 集合を数える
@@ -18,6 +18,7 @@
 #     qstore あり (M11_QSTORE=1 = main の既定):
 #     qbase     現行 m11_ov.c + qstore                         : main の既定. 58-63 は ok (#552). qstore の適用 site 数 = 前提の検出数
 #     qprobe    probe + qstore                                 : probe の透過性 (qbase と kind 完全一致)
+#   現状の期待結果は FAIL (exit 1)、解消は子 issue #1041 (前提再設計) 待ち。期待値は緩めていない (前提が成立しないため G1/G5/G8/G10/G12 が FAIL)。
 #   gate: 条件を満たさなければ exit 1 (FAIL を出して続行しない).  終了時に work/obj/ov.o を現行 m11_ov.c から再生成する.
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")/.." && pwd)"; cd "$HERE"
