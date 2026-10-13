@@ -246,5 +246,5 @@ mock との差で見つかったもの: mock は引数の個数/型を検査し�
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `run_all.sh` が `FL_MAC` / `FL_WIN` を `/home/ubuntu/...` に固定している | Actions で `run_all.sh` 全体を回せない | 新規子チケット (PY-13 の続き) を起票 |
+| `run_all.sh` が `FL_MAC` / `FL_WIN` を `/home/ubuntu/...` に固定している | Actions で `run_all.sh` 全体を回せない | #630 (PY-15) |
 | mac dylib が無い環境では `midi_script_callbacks_in_binary` を既存値から引き継ぐだけで再抽出できない | 26.1.7 以外の版で更新漏れの恐れ (WARN は出る) | #588 コメントに記載 |
