@@ -1,5 +1,7 @@
 # G python-mcp — CPython wasm + flapi/MCP 解析 + ブリッジ設計 (2026-10-10)
 
+> 行数上限 (250 行) のため、§PY-13 (#588) と §12・§13 (#81) の全文は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) に分割移動 (本体は要約のみ)。
+
 ## 結論 (先出し)
 
 1. **CPython 3.12.1 (FL 同梱版と完全一致) の emscripten/wasm ビルド成功**。パッチ無し、emsdk 6.0.12 でクリーンビルド 3m19s。node で `print(1+1)`=2、struct/json/zlib/hashlib/decimal/re/datetime/inspect 等が動作。`flpy.wasm` **5.92MB** (gzip 2.07MB) + `flpy.data` (stdlib zip) 3.20MB。
@@ -92,7 +94,7 @@ FLEngine rodata の `name\0doc\0…<module>` 並びから機械抽出 (`flapi_ex
 - **FL 側 Python C API 呼出し面は未抽出**: dlsym 先の関数名が平文で無い。サブインタプリタ運用 (`PyInterpreterConfig` 型の存在から示唆のみ) の実態は不明。wasm で `Py_NewInterpreterFromConfig` が動くかも未検証 (→ §11 で検証: 動く。`_flhost` は未対応)。
 - `mixer.getCurrentTempo(1)`/`setCurrentTempo(bpm,1)` の第 2 引数の意味 (MCPTools は素の BPM 扱い、公式 docs は ×1000) は**実機で未確認**。モックは MCPTools 側に合わせた。
 - FLEngine 側 flapi 実装は**モック(27 API を実装、他は None)**。実エンジンとの意味差 (引数省略時の既定値、-1 の意味) は実機/lift 後に検証が必要。
-- 引数名 (kwargs) は stubs 由来の署名がある関数のみ。新規 43 関数と ilmcp は位置引数のみ (rodata の書式文字列 `i if sdd…` は順序対応が曖昧で未採用)。
+- **kwargs 署名の静的復元 (PY-9 b, #81) 済み**: rodata の並び順ではなく、FLEngine (win PE) の `.data` 内メソッド表 (name/fn/flags/doc, 32B 刻み) と各ラッパー冒頭の `lea [rip+x]` から `PyArg_ParseTupleAndKeywords` の書式と kwlist を復元 (`analysis/flapi_kwargs.py` → `analysis/flapi/flapi_kwargs.json`、`flapi_table.json` の各関数に `kwsig` を追記)。結果は §12。
 - 旧 stubs (LGPL) は**参照入力のみ**でリポジトリ非同梱 (`fetch_inputs.sh` が clone)。FL 由来 pyc/py も非同梱 — 利用者の FL から実行時供給。EULA 判断は行わない (事実整理のみ)。
 - 呼出しコストは node/Chrome headless の mock 実測。実 FLEngine(wasm) 結合時に再計測要。
 - **MCPTools 内のテンポ規約が不整合に見える**: `get_session_context` は `mixer.getCurrentTempo()` (引数なし) を `/1000` して BPM 化、`get_tempo` は `getCurrentTempo(1)` を素の BPM として表示、`set_tempo` は `setCurrentTempo(bpm, 1)`。モックは後者に合わせたため `get_session_context` が `tempo_bpm: 0.13` を返す (`mcp_classification.json` 側の解析メモ)。どちらが実 FL の挙動かは未確認。
@@ -117,7 +119,7 @@ mock との差で見つかったもの: mock は引数の個数/型を検査し�
 エラー code の割当 (`provider/fl_api.h`): FLEngine PE の文言 9 種 (Invalid value / Unspecified error / Operation unsafe at current time / Range error / Index out of range / Wrong number of function parameters or wrong parameter type / Linked device not assigned / Device not assigned / Plugin not valid) を 1〜8 に割当 (`Range error` と `Index out of range` は 4 に束ねた)。provider が実際に返すのは 2 / 4 / 5 のみで、1 (Invalid value)・3 (unsafe)・6〜8 は定義だけ (実エンジンの発生条件が未解明)。**数値は Python 側 `fl_api._ERR` の写像と整合させた暫定値で、実エンジンの数値は未確認**。
 
 再現: `bash provider/build.sh && node tests/provider_check.mjs && FL_ENGINE=wasm node tests/all_tools.mjs` (前提: `build_flpy.sh` 済み。runner では `EMSDK_ENV=<emsdk>/emsdk_env.sh`、`FL_WIN64_DIR`)。
-入力の用意 (mac pkg 無しの Actions): `oc_artifacts: fl-win64 toolchain-emsdk` + `FL_WIN64_DIR=<fl-win64 展開先> bash fetch_inputs.sh` (パスは `tools/shared/env.sh` 経由。`$FL_MAC_DIR` に mac pkg が無ければ win64 の `block25159_DATA.bin` = MCPTools.pyc、`block24429_DATA.bin` = midi.py (770 行)、`block24430_DATA.bin` = utils.py (213 行) を `work/` に置く)。続けて `build_cpython_wasm.sh` → `build_flpy.sh` (注: `build_flpy.sh` は先頭で `analysis/flapi_table.py` を再実行し、mac dylib / win PE が無い環境では追跡中の `flapi_table.json` / `FLAPI.md` を書き換える。commit しないこと)。
+入力の用意 (mac pkg 無しの Actions): `oc_artifacts: fl-win64 toolchain-emsdk` + `FL_WIN64_DIR=<fl-win64 展開先> bash fetch_inputs.sh` (パスは `tools/shared/env.sh` 経由。`$FL_MAC_DIR` に mac pkg が無ければ win64 の `block25159_DATA.bin` = MCPTools.pyc、`block24429_DATA.bin` = midi.py (770 行)、`block24430_DATA.bin` = utils.py (213 行) を `work/` に置く)。続けて `build_cpython_wasm.sh` → `build_flpy.sh` (`build_flpy.sh` は先頭で `analysis/flapi_table.py` を再実行する。入力は環境変数 `FL_WIN64_DIR`/`FL_WIN_PE`・`FL_STUBS_DIR`・`FL_ENGINE_DYLIB`・`FLAPI_OUT_DIR`・`EMSDK_DIR` で指定でき、win PE / stubs 欠落・PE 照合 0 件は exit 2 + 理由表示で止まる。詳細は §PY-13)。
 
 ### 7b-2. レビュー指摘 (d2706e1) の修正: `ilmcp.getBrowserNames` の固定バッファ
 
@@ -151,7 +153,7 @@ mock との差で見つかったもの: mock は引数の個数/型を検査し�
 | T6 | MIDI scripting ホスト: device script(.py) ローダ、27 callback 配送、Web MIDI 入力→`dispatch_midi`。サブインタプリタ可否の wasm 検証 | M |
 | T7 | Edison `enveditor` / `flcpt` / `flrack` module と Chord progression ツール (pyc 39 + pyscript 2) の動作検証 | M |
 | T8 | 性能: 構造値の binary ABI、バッチ API、MIDI 1 イベント当り呼出し数の計測 | S |
-| T9 | 実機 FL でのモック意味差検証 (ユーザ環境があれば) と kwargs 署名の rodata 書式文字列からの自動復元 | S |
+| T9 | 実機 FL でのモック意味差検証 (ユーザ環境があれば。**kwargs 復元は #81 で完了**、残りは実機確認のみ) | S |
 
 ## 10. MCP JSON-RPC をアプリ UI / devtools に公開 (PY-4, #77)
 
@@ -176,7 +178,7 @@ mock との差で見つかったもの: mock は引数の個数/型を検査し�
 | flapi の提供側がモック (`fl_mock.mjs`) のまま。実 FLEngine wasm の `fl_api_call` に差替え未了 | tool の結果はモック値で、実 FL と同一動作の保証なし | #74 (PY-1, PR #459) 以降 / 親 #35 |
 | ilmcp B 群 8 tools は最小の偽実装 | UI から呼べるが FL 本来の挙動ではない | 親 #35 の T3 (ilmcp 実装) |
 | `/?mcp=1` のパネルは最小 UI (整形・履歴・複数行 arguments 編集なし)。`pnpm build` 成果物 (`dist/`) は `/py/` を持たないため dev / preview 専用 | 本番配信での公開は未対応 | 親 #35 に提案 (配信設計は #62 H 系と調整) |
-| `build_flpy.sh` が `flapi_table.json` / `FLAPI.md` を再生成する。runner には win PE が無く `win_pair_verified` が false になる | 本 PR では当該 2 ファイルをコミットしていない | #74 の PR (provider) と同じ `/home/ubuntu` 固定パス問題。`fetch_inputs.sh` / `run_all.sh` の env 化を別 issue で提案 |
+| (解消) `build_flpy.sh` の `flapi_table.json` 再生成が win PE / stubs 無しで黙って劣化する | #588 (PY-13) で env 化・入力欠落は exit 2 | §PY-13。`fetch_inputs.sh` / `run_all.sh` の `/home/ubuntu` 固定パスは別途 (下の未解決表) |
 
 ## 11. MIDI scripting ホスト (PY-6, #76)
 
@@ -223,5 +225,14 @@ mock との差で見つかったもの: mock は引数の個数/型を検査し�
 | 文書 (公開 stubs) 由来の仕様 (handled 伝播・midiId/midiChan=0・timestamp=0) は 26.1.7 実機で未確認 | 実 script が midiChan 等に依存すると差が出る | 上記 #76 再実行時に同梱 script で確認 / 実機があれば #35 |
 | `_flhost` の per-module state 化 + `Py_mod_multiple_interpreters` 宣言 (サブインタプリタ採用時のみ) | 現状 legacy サブインタプリタで main が壊れる | 新規子チケット提案 `[PY-n]` (採用判断後。PM 起票) |
 | mock の `device.*` は forwardMIDICC / midiOutMsg の記録と 3 関数のみ。実エンジン未接続 | 同梱 script が他の device API を使うと None が返る (`midi_bundled_device.mjs` は未実装 API 呼出しを FAIL にする) | #74 (PY-1) 以降 / 親 #35 |
-| `build_flpy.sh` が `flapi_table.json` / `FLAPI.md` を再生成する (`work/fl-stubs` の clone も要る)。runner には win PE が無い | 本 PR では当該 2 ファイルをコミットしていない | PY-4 §10 と同じ。`fetch_inputs.sh` / `run_all.sh` の env 化を別 issue で提案 |
+| (解消) `build_flpy.sh` の `flapi_table.json` 再生成 | #588 (PY-13) で env 化 | §PY-13 |
 | PY-4 の `poc_mcp.mjs` / `all_tools.mjs` / `mcp_ui_check.mjs` は MCPTools.pyc が無く再実行不可 (本 run で `dispatch_midi` の PoC 区間のみ `midi_script.mjs` に複製して同結果を確認) | `fl_rt.py` / `fl_mock.mjs` の変更の回帰を全体では未確認 | #76 再実行時に `run_all.sh` 相当を実行 |
+
+## PY-13 (#588): `build_flpy.sh` の flapi_table 再生成を環境変数化
+入力 (win PE / stubs / mac dylib / 出力先 / emsdk) を環境変数化し、欠落時は exit 2 (旧: 空入力で緑)。検証 `tests/flapi_table_check.sh` (3 回とも exit 0・2.20 秒・正常系 3/3 一致・ネガコン 6 本 exit 2)。全文・未解決 (#630 PY-15 ほか): [REPORT_APPENDIX.md](REPORT_APPENDIX.md)
+
+## 12. kwargs シグネチャの静的復元 (PY-9 b, #81)
+FLEngine の PyMethodDef 表から 435/435 関数を対応付け、書式 303 関数・kwlist 103 関数を復元 (flags=4 の 125 件は書式無し)。`fl_api.bind` は kwlist 名を stubs 名より優先し、既定値が静的に不明な引数の省略後は後続の既定値を足さない (`getGridBit(index=1)` → `(1,)`)。stubs 名とは 66 一致 / 28 不一致 (バイナリを正とする)。再現: `FL_WIN64_DIR=<fl-win64 展開先> python3 analysis/flapi_kwargs.py` の後 `python3 tests/kwsig_check.py` (0.03〜0.04 秒)。wasm 回帰 (`all_tools.mjs` 48/48 ほか)・stubs 照合の例・`arrangement.selectionSet` の kwlist 重複の CPython 実測: [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §12。
+
+## 13. 未解決 (#81)
+(a) 実機 FL での `mixer.getCurrentTempo(1)` 確認 (#81 のブロッカー)、`device.flrMidiNote` / `flrMidiCC` の書式未復元、省略引数のホストへの渡し方・stubs 既定値 `midi.*` の `eval` NameError は PM 判断待ち (PR #463 コメントに起票依頼)。詳細: [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §13。

@@ -31,6 +31,8 @@ BLK_TARGET, BLK_RCX, BLK_RDX, BLK_R8, BLK_R9 = 0x00, 0x08, 0x10, 0x18, 0x20
 BLK_X0 = 0x28            # xmm0..3 at +0x28,+0x30,+0x38,+0x40
 BLK_RAX, BLK_XMMRET = 0x80, 0x88
 BLK_RAXIN = 0x90
+BLK_XMMRET1 = 0x98       # closure 内 direct call の戻り xmm1 (hi/lo 2 値を返す CRT: 1801c1240・1801c0d00 等)。ICALL_ABI_XMM1=0 で無効 (ネガコン)
+ABI_XMM1 = os.environ.get('ICALL_ABI_XMM1', '1') == '1'
 BLK_STK = 0x48           # 第 5 引数以降 (stack) 配列の先頭アドレス (定数 = blk+BLK_STKBUF; icall_rt.c の __icall_dispatch が設定)
 BLK_STKBUF = 0x100       # stack 引数の連続コピー領域: 呼出し点で [rsp+0x20+8k] (jmp 末尾呼出しは +0x28+8k) を k=0..NSTK-1 だけ明示 load/store
 NSTK = 12                # 16 引数まで (IPP ippiResize*_8u 13 引数 = 9 語)
@@ -321,8 +323,8 @@ LD_INT = [(bytes([0x48, 0x8b, 0x0d]), BLK_RCX), (bytes([0x48, 0x8b, 0x15]), BLK_
 XM = (0x05, 0x0d, 0x15, 0x1d)
 ABI_SPILL_LEN = 4 * 7 + 4 * 8        # 60
 ABI_RELOAD_LEN = 4 * 7 + 4 * 8       # 60
-ABI_RETST_LEN = 7 + 8                # 15
-ABI_RETLD_LEN = 7 + 8                # 15
+ABI_RETST_LEN = 7 + 8 + (8 if ABI_XMM1 else 0)   # 23 (xmm1 戻りあり) / 15
+ABI_RETLD_LEN = 7 + 8 + (8 if ABI_XMM1 else 0)
 
 
 def abi_spill(em, blk):
@@ -342,11 +344,15 @@ def abi_reload(em, blk):
 def abi_ret_store(em, blk):
     em.rip(bytes([0x48, 0x89, 0x05]), blk + BLK_RAX)
     em.rip(bytes([0xf2, 0x0f, 0x11, 0x05]), blk + BLK_XMMRET)
+    if ABI_XMM1:
+        em.rip(bytes([0xf2, 0x0f, 0x11, 0x0d]), blk + BLK_XMMRET1)   # movsd [rip+],xmm1
 
 
 def abi_ret_load(em, blk):
     em.rip(bytes([0x48, 0x8b, 0x05]), blk + BLK_RAX)
     em.rip(bytes([0xf2, 0x0f, 0x10, 0x05]), blk + BLK_XMMRET)
+    if ABI_XMM1:
+        em.rip(bytes([0xf2, 0x0f, 0x10, 0x0d]), blk + BLK_XMMRET1)   # movsd xmm1,[rip+]
 
 
 BLK_CA, BLK_CB, BLK_CFLAGS, BLK_CKIND = 0xA0, 0xA8, 0xB0, 0xB8

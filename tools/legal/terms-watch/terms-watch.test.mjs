@@ -7,7 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { deflateRawSync } from "node:zlib";
-import { ackDocs, exitCodeFor, extractSection, htmlToText, loadLedger, locateFlFile, locateNsisLicense, normalizeText, renderLedgerMd, rtfToText, runCheck, SourceError } from "./lib.mjs";
+import { ackDocs, exitCodeFor, extractSection, fetchBytes, htmlToText, loadLedger, locateFlFile, locateNsisLicense, normalizeText, renderLedgerMd, rtfToText, runCheck, SourceError } from "./lib.mjs";
 import { NsisError, nsisLicenseCandidates, readNsisHeader } from "./nsis.mjs";
 
 const CLI = path.join(import.meta.dirname, "cli.mjs");
@@ -259,5 +259,22 @@ test("runCheck(nsis-license): NEW → UNCHANGED → CHANGED、textEnv の平文�
     assert.equal(r.sha256, r1.sha256, "平文直指定でも NSIS 経由と同一ハッシュ");
   } finally {
     delete process.env.TW_TEST_TEXT;
+  }
+});
+
+test("fetchBytes: ブラウザ相当の UA + Accept を送る (Slate が短い UA の curl に 403 を返す件の回帰)", async () => {
+  const srv = http.createServer((req, res) => {
+    const ua = req.headers["user-agent"] ?? "";
+    const ok = ua.length > 40 && ua.startsWith("Mozilla/5.0 (") && /text\/html/.test(req.headers.accept ?? "");
+    res.writeHead(ok ? 200 : 403, { "content-type": "text/html" });
+    res.end(ok ? "ok" : "forbidden");
+  });
+  await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+  try {
+    const url = `http://127.0.0.1:${srv.address().port}/`;
+    assert.equal((await fetchBytes(url)).bytes.toString(), "ok");
+    await assert.rejects(fetchBytes(url, { fetchImpl: (u, o) => fetch(u, { ...o, headers: { "user-agent": "Mozilla/5.0" } }) }), /HTTP 403/);
+  } finally {
+    srv.close();
   }
 });
