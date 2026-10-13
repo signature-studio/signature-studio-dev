@@ -76,9 +76,10 @@ cd tools/liftlib && python3 -m liftlib leafspec targets/ott_iargs.json --n 200  
 ## 18. LIFTLIB #241 — ymm(i256) helper ABI + pcmpistri + F2 xmm 戻り搬送
 
 - 既知類型との関係: **該当なし** (`docs/DEFECTS.md` D1a〜D16 / `icall §4` とも未登録。新類型行案は §18.7)
-- 検証起点 commit: `main` = `400d546` (着手時)。数値はコミット済み HEAD `8476a82` の clean worktree (`git worktree add --detach`) で再現して取得 (§18.6)。
-- 環境: GitHub Actions runner (nproc=4, emcc 6.0.12, gcc `-mavx2 -mfma`)。**`tools/m6/work` / `targets/*/work` は未展開**のため
-  FA/KH/OTT の回帰 (`liftlib_e2e.sh` の (a)(b)(c)(f)) は**この run では未実施** (§18.6)。
+- 検証起点 commit: `main` = `400d546` (着手時)。初回の数値はコミット済み HEAD `8476a82` の clean worktree (`git worktree add --detach`) で再現して取得。
+  その後 main 取り込みの merge commit が入ったため、`8476a82` の数値が有効かと再測定は §18.6。
+- 環境: GitHub Actions runner (nproc=4, emcc 6.0.12, gcc `-mavx2 -mfma`)。初回 run は **`tools/m6/work` / `targets/*/work` が未展開**で
+  FA/KH/OTT の回帰 (`liftlib_e2e.sh` の (a)(b)(c)(f)) は未実施だった。後続の review run (素材あり) と本更新 run で実施済み (§18.6)。
 
 ### 18.1 結論
 
@@ -136,6 +137,8 @@ RetDec は `void(i128,i128,i8)` と lift し ECX/EFLAGS を捨てる → **void 
 
 ### 18.6 検証 (実測秒・load average・並列数)
 
+**(1) 初回実装 run** — clean HEAD `8476a82`、素材は `fl-win64` のみ:
+
 | 検証 | 結果 | real | load average (nproc=4) |
 |---|---|---|---|
 | `python3 -m liftlib simd test --n 200` (clean HEAD `8476a82`) | 223 mnemonic / 347 form / 182,400 vec: exact 181,895 / approx_ok 505 / **mismatch 0** | 5.8 秒 | 0.33 / 0.37 / 0.24 |
@@ -144,11 +147,52 @@ RetDec は `void(i128,i128,i8)` と lift し ECX/EFLAGS を捨てる → **void 
 | unit T5 / T17a / T17b | 全 ok | — | — |
 | 着手前ベースライン `simd test` (400d546) | 192 mnemonic / 281 form / 95,400 vec / mismatch 0 | 2.8 秒 | — |
 
-**範囲外 (未実施・主張しない)**: `liftlib_e2e.sh` 全体 (FA 400/400・KH 366/366・OTT・leafspec) と unit T1〜T4/T6〜T15 — いずれも
-`tools/m6/work`・`tools/targets/{freshair,kilohearts}/work`・`/home/ubuntu/work/...` の参照データが runner に無く実行できない (必要素材:
-`work-m11` 等では代替不可、`liftlib` 用の work スナップショットが R2 allowlist に無い → §18.7)。`gen.py` の変更は i256/pcmpistri を含む宣言だけに
-効く分岐で、既存形の生成コードは不変 (`simd test` の既存 477 命令インスタンスが全て mismatch 0 で維持) だが、FA/KH/OTT の実 IR での
-回帰は**未確認**。
+**(2) review run の独立再実行 (reviewer 実測)** — HEAD `fb5ef01` (merge commit 2 本の後)、素材あり (`plugins-ott`・`toolchain-*`・`work-*`・`analysis-ott-binaries`):
+
+| 検証 | 結果 | real |
+|---|---|---|
+| `simd test --n 200` | 223 mnemonic / 347 form / 182,400 vec: exact 181,895 / approx_ok 505 / **mismatch 0** | 7.5 秒 (load 0.4) |
+| `simd report` | 4 分類すべて 未被覆 0 | — |
+| unit T1〜T17 (`LL_XRET_*` なし) | **全 PASS** (T17b は skip) | — |
+| T17b + `inject-eval` (`OTT_x64.dll` を `plugins-ott` から 7z 展開 → RetDec `--select-ranges` で `leaf.ll` 再生成) | 検出 3 callee / 11 ret → 搬送 9 → 残 2。注入 **9/9**。`inject-eval` 全体 `injected=103 detected=103 false_positive=0` | — |
+| `liftlib regress` FA Gain | **BIT-EXACT 400/400** | — |
+| `liftlib regress` KH Gain | **BIT-EXACT 366/366** | — |
+| `liftlib regress` OTT (既定 auto f7,p1) | checks 8 / broken 0 / census junkHi 104 ≤ 104 → **PASS** | — |
+| leafspec | RESULT: PASS (exp 40/40, log gate PASS) | — |
+| 同 HEAD の 2 回目 review run: `simd test` / `simd report` / unit T5・T17a / ネガコン NC2 | mismatch 0 / 未被覆 0 / ok / NC2 は BAD で検出し復元後 mismatch 0 | 4.9 秒 (load 0.85 / 0.74 / 0.32) |
+
+`regress` の `ott_auto_none` (旧既定 `--auto none`) は FAIL (census junkHi 175)。reviewer が origin/main `89a1a30` でも census 値まで同一の FAIL を確認しており、**本 PR 起因ではない** (追跡 issue は PM 起票待ち)。
+
+**(3) 本更新 run の再測定** — HEAD `e86e6e8` (origin/main `91a83a5` を merge 済み)、nproc=4、並列なし。素材は `plugins-ott`・`toolchain-retdec`・`toolchain-emsdk`・`work-liftlib`・`work-liftlib-targets` のみ
+(RetDec の raw `.ll` は `work-liftlib` のキャッシュで `--fresh` ではない):
+
+| 検証 | 結果 | real | load average (実行前) |
+|---|---|---|---|
+| `simd test --n 200` | 223 mnemonic / 347 form / 182,400 vec: exact 181,895 / approx_ok 505 / **mismatch 0** / bad_forms 0 | 5.115 秒 | 0.47 / 0.48 / 0.23 |
+| `simd report` | 5 行すべて 未被覆 after = 0 | — | — |
+| `lift targets/fa_gain.json` (FA 実機差分) | scenarios 400 / match 400 / mismatch 0 / crash 0 / trap 0 → **BIT-EXACT 400/400** | 8.695 秒 | 0.11 / 0.36 / 0.20 |
+| `lift targets/kh_gain.json` (KH 実機差分) | scenarios 61 / steps 366 / match 366 / mismatch 0 → **BIT-EXACT 366/366** | 1.393 秒 | 0.25 / 0.38 / 0.21 |
+| `plugins-ott` → 7z 展開 → RetDec `--select-ranges` (§18.5 の手順) | `leaf.ll` 5 define | 43.6 秒 | 0.19 / 0.36 / 0.21 |
+| unit T17a + T17b (`LL_XRET_*` 設定) | 検出 3 callee / 11 ret → 搬送 9 → 残 2、注入 **9/9** 検出 | 0.576 秒 | 0.73 / 0.48 / 0.26 |
+| `inject-eval` (FA / KH / xret。OTT 入力なし) | injected 27 / detected 27 / false_positive 0 (FA 5+1+2, KH 9+1, xret 9) | 1.163 秒 | 0.75 / 0.49 / 0.26 |
+| unit T5 / T6 / T8 | ok | 0.0〜0.1 秒 | — |
+
+**本更新 run で再実施できなかったもの** (reviewer 実測 (2) を根拠にする): `tools/m6/work` (`work-m6-ott`) と `$ANALYSIS_DIR` 配下の `OTT_vst2_win64.dll` (`analysis-ott-binaries`。
+`[ANALYSIS-DIR]`、`docs/REFERENCES.md` §4) が無いため、OTT の regress・leafspec・`liftlib_e2e.sh` 全体 (`need` で exit 2)・unit T1〜T4 / T7 は実行不可。
+T10〜T16 は `skip (OTT raw .ll 無し)` を出して return する実装で、実行されたことにならない (PASS とは数えない)。
+T9 は skip ガードが `m6_rt.c` の有無だけを見るため、`m6/work/m6_stubs_hand.c` が無いと期待値 4 件が成立せず AssertionError になる (素材欠落起因。本 PR は t9 を変更していない)。
+
+**検証起点 `8476a82` は merge commit の後も有効か**:
+- 本 PR の実装 6 ファイル (`simd/gen.py`・`simd/kernels.py`・`simd/liftlib_simd.h`・`simd/simdtest.py`・`passes/f2.py`・`inject.py`) は `8476a82` と `e86e6e8` で**差分なし**
+  (`git diff --quiet 8476a82 HEAD -- <6 ファイル>` が 0)。`cli.py` の差は REPORT の節参照を書いたコメント/docstring のみ。
+  よって `simd test` / `simd report` / F2 xmm 戻りの `8476a82` の数値は有効で、(2)(3) の再測定でも同値だった (mismatch 0、9/9)。
+- merge で main から入った変更は `passes/iargs.py` (新規。`passes.iargs` は既定 off)・`pipeline.py`・`harness/diff.py` (`mask_ranges`)・`recipes/ott.py`・targets/specs/`test_unit.py` (t16)。
+  `pipeline.py` / `harness/diff.py` は FA/KH の lift 経路に載るため、`8476a82` の数値は流用せず、FA/KH は `fb5ef01` (2) と `e86e6e8` (3) で再測定した (400/400・366/366)。
+  `8476a82` の時点では FA/KH/OTT 回帰は未実施だったので、その根拠はこの再測定に置く。
+- `fb5ef01` → `e86e6e8` の liftlib の py 差分は `cli.py`・`recipes/ott.py` のコメント (REPORT §12 → `REPORT_APPENDIX_A.md` §12) のみで、挙動は不変。
+
+`gen.py` の変更は i256/pcmpistri を含む宣言だけに効く分岐で、既存形の生成コードは不変 (`simd test` の既存 477 命令インスタンスが全て mismatch 0 で維持)。
+FA/KH の実 IR への影響は上記の再測定で無し。OTT の実 IR は reviewer 実測 (2) のみ。
 liftdiff の 4 スナップショット (`ir_instr.ll`) の declare で C 生成 → emcc コンパイルを試行: `ott_old` は 156/156 生成・emcc OK、`m11*` 4 本は
 **未知型 (`?` 型: cpuid / rep_movsq 等) の stub が `void` 変数宣言で emcc 失敗** (既存 stub 経路の欠陥、本 #241 の範囲外・§18.7)。
 
@@ -156,7 +200,7 @@ liftdiff の 4 スナップショット (`ir_instr.ll`) の declare で C 生成
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| FA/KH/OTT 回帰 (`liftlib_e2e.sh`) を本変更で再実行できていない | gen.py/kernels.py の変更が既存実 IR に無影響である確証が無い | **新規子チケット (親 #50): liftlib 用 work スナップショットを R2 allowlist (`prepare-event-context.sh`, #293) に追加 → 回帰を再実行** |
+| **解消**: FA/KH/OTT 回帰を本変更で再実行できていない (初回 run 時点) | §18.6 (2)(3) で FA 400/400・KH 366/366・OTT PASS を確認 (OTT は reviewer 実測のみ)。`work-liftlib` / `work-liftlib-targets` は R2 allowlist 済み (`docs/WORKFLOW.md` §11) | 新規子チケットは不要になった (最終判断は PM)。`liftlib_e2e.sh` 全体・OTT・unit T1〜T4 / T7 / T9〜T16 の再現には `oc_artifacts` に `work-m6-ott` + `analysis-ott-binaries` が要る |
 | `pcmpistri` の ECX/フラグを後続命令へ配線 (void 形は shadow global に残すのみ) | KH/OTT の実 IR で pcmpistri 結果を消費する経路は未接続 | 新規子チケット (P1 系 pass の flags 配線) |
 | F2 xmm 戻り 残 2 ret (合流先 ret の多定義 xmm0 phi: 1801b4474 / 1801b4614) | 該当経路で xmm0 を返さない | 既存 #272 系 (領域 phi 合成) へコメント |
 | F2 xmm 戻りのスタック引数・GPR 引数個数不一致 | issue 記載の F2 未対応面のうち本 run は xmm 戻りのみ | 新規子チケット |
