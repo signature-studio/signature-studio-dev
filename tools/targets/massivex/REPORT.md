@@ -160,3 +160,58 @@ tools/targets/massivex/
 └── license/work/                      (gitignore: mx_strings.json 32,677 文字列, mx_cg.pkl, str_xref_summary.json)
 work/ (gitignore): hdr_block1/2.bin, files.json, locations.json, header_parse.json, extracted/ (125 files), mac/ (dmg 展開), innoextract-git (CRC 警告化パッチ済み 1.10-dev), issrc (Inno 6.4.2 検証用 clone)
 ```
+
+## 11. MX-2 検証の再確認 (#266 / MX2-1 mock 欠陥) — 2026-10-13 実測
+
+### 11.1 検証状況 (実測 HEAD = `858fbfcd`)
+
+- 測定 HEAD = `858fbfcd`。測定 HEAD から現在の HEAD までのコード差分は無い (検証: `git diff 858fbfcd HEAD -- ':!tools/targets/massivex/REPORT.md'` が空)。`d0eddb92..858fbfcd` も REPORT のみ。`47fd87cb..d0eddb92` のコード差分は `license/e2e.sh` の `mkdir -p` 重複削除 1 行のみ。
+- 下表は `858fbfcd` の worktree (`git worktree` で detached 展開) で取り直した値。`d0eddb92` の値とも一致する。
+- 測定ログは `work/` 外 (`$RUNNER_TEMP` 配下) に置いた。exit code・PASS 数・所要はそのまま表に記載。
+- 素材: `plugins-massivex` / `toolchain-retdec` / `toolchain-emsdk` を `$ARTIFACTS_DIR` から展開 (`tar --zstd -xf`)。RetDec / emsdk は `[RETDEC]` / `[EMSDK]` (`[OPT-TOOLS]` 配下。環境変数で上書き)。
+- `plugins-massivex` は Inno installer (`Native Instruments Massive X v1.7.1.exe`, 1,870,391,792 B) と dmg のみ。`scripts/parse_setup_headers.py <exe> work` → `scripts/extract_massivex.py <exe> work key` で `work/extracted/VST3/Massive X.vst3` (95,356,824 B, PE32+ DLL) を生成した。`pefile` / `capstone` / `numpy` は pip 導入。
+- **入力の同一性 (reviewer 必須 3)**:
+  - 本体 `Massive X.vst3` の md5 は `622993e76565f49c094063a2b717d6ca` (`858fbfcd` で再展開して一致確認)。`dsp/REPORT.md` 先頭の記録値と一致する。
+  - ただし installer 内の 16B checksum は 125 件中 0 件一致 (`md5-ok 0/125`)。§8.1 の「repack 由来の stale 値」仮説と整合するが、**展開物が実機 installer と同一であることは外部照合できていない**。
+  - よって下表の PASS は「この展開物に対する回帰」の証拠であり、「Massive X 実バイナリに対する回帰」の証拠としては**暫定**。実バイナリに対する回帰の判定は保留 (#266)。
+- `MX_OPT=-O0` の初回 exit 1 (`patch site 0x18115dec2` assert): **再現せず**。
+  - 同一 head で 3 回連続 exit 0 / 11/11 PASS (下表)。
+  - 切り詰めコピー (展開物の前半 47.7 MB) を `mx_pefix.py` に通すと、`pefile` は読めて site は `e1 26` のまま、assert は出ない (前回入力とは別の状態)。
+  - 初回の入力状態・並列実行の有無は記録が無く、原因は**未確定**。
+
+| 項目 (HEAD `858fbfcd`) | 結果 | 所要 |
+|---|---|---|
+| license e2e 既定 (-O1 + zero-init, lift キャッシュ無し) | exit 0 / 11/11 PASS | 62 s |
+| license e2e `MX_OPT=-O0` 1 回目 | exit 0 / 11/11 PASS | 5 s |
+| license e2e `MX_OPT=-O0` 2 回目 | exit 0 / 11/11 PASS | 5 s |
+| license e2e `MX_OPT=-O0` 3 回目 | exit 0 / 11/11 PASS | 5 s |
+| license e2e `MX_OPT=-O2` | exit 0 / 11/11 PASS | 4 s |
+| NC `MX_ZEROINIT=0 MX_OPT=-O1` | exit 1 / 6/11 PASS (T7-T11 TRAP: memory access out of bounds) — 欠陥が再現 | 5 s |
+| dsp/e2e.sh | exit 0 / insns 258,087 / unsup_sites 48,612 / e8e9_targets 594,978 | 36 s |
+| dsp/negctl.sh NC1 / NC2 / NC3 | 3 件 FAIL (期待どおり): 3,118 / 4,575 / 31 insn (script 全体 exit 0) | 9 s |
+
+- `MX_OPT=-O0` の初回 exit 1 は、`858fbfcd` での 3 回連続でも再現せず (上表 3 行とも exit 0)。`d0eddb92` の 3 回と合わせ計 6 回連続 PASS。原因は引き続き未確定 (上記の記録と同じ)。
+
+- dsp の値は `dsp/REPORT.md` と §2/§3 に一致 (258,087 / 48,612)。別の値は残していない。
+- clen は §11.2 のとおり未実施。
+
+### 11.2 未解決 (起票先付き)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `MX_OPT=-O0` の初回 exit 1 (`patch site 0x18115dec2` assert)。原因未確定 | e2e の再現性 (計 6 回中 1 回のみ) | #266 (コメントで追跡) |
+| 展開物の installer 内 checksum 0/125 一致 (実機 installer との同一性は未照合) | 「実バイナリに対する回帰」の判定 | #266 |
+
+- **clen 回帰 (未実施)**: clen の対象を特定できなかった。
+  - #266 本文・親 #245 のいずれにも clen の記述は無く、対象未特定。起票先 #880 (OPEN)。
+  - massivex 配下に clen を検証する script は無い (`clen` は serum2 の `sr3_cut.py` のみ)。
+  - 対象確定と実施は別 issue に切り出す。起票先: #880 (OPEN)。
+- **MX2-3 (N5 demo UI 抑制 / N6 文言)**: 未実装。起票先: #830。
+- **MX-3b 本体 (U1 process slot 同定 / U2・U5 closure 厳密化 / U3 vectorcall・U4 C++ EH)**: 未着手。起票先: #266。
+
+### 11.3 環境
+
+- 既定パスは `tools/shared/env.sh` (REFERENCES `[ANALYSIS-DIR]`)。`REPO_ROOT` は git toplevel から決まるため worktree 内でそのまま動く。
+- `e2e.sh` の retdec / emsdk は `RETDEC` / `EMSDK` 環境変数で上書き可能。既定は REFERENCES `[RETDEC]` / `[EMSDK]` (配下の `[OPT-TOOLS]`)。
+- `pefile` / `capstone` / `numpy` を pip 導入して実行する。
+- fresh checkout で `license/work/` `dsp/work/` が無くても動くよう、両 `e2e.sh` の先頭で `mkdir -p` している。

@@ -224,3 +224,25 @@ FLE 側 case 別応答値の**意味論**は未解析 (FL 本体の case 分岐�
   - bit-exact 比較 (RTL fold deref 解消後) → #195 残部
 
 ---
+
+## 15. #196 run の再現実測 (HEAD `1fec06a1` / 素材 work-fw-stage1・fl-win64・toolchain-emsdk)
+
+- 素材: `work-fw-stage1` を `tools/plugins/work/fw/` に展開 (stage-1 の `.ll` のみで stage-2 中間物は無し)。
+  `fw_stage2.sh` は `fw_icall.dll` (`tools/plugins/work/fw/`) を入力とし、`pefile` / `capstone` 未導入で 1 回目 exit 1 → user-site に導入 → 再実行で exit 0。
+- `fw_stage2.sh`: exit 0 (1 回目 5 分 31 秒で pefile 欠落停止・2 回目は増分 26 秒)。smoke `dispatch=38 units_done=0 va=1 heap=1 ff=0` PASS。
+- `hs_e2e.sh` (HEAD・1 回実測): exit 0 / 1 分 55 秒 / load avg 2.20 1.79 0.87 (開始時)。
+  - Phase A: framework smoke PASS。
+  - Phase B: **`Phase B 例外: memory access out of bounds`**。`status=0xffffffff plug=0x0 rec=7 pluglog=0 slotsCalled=0x0`。
+    記録された Dispatcher ID 序列は 0x47, 0x56, 0x0d, 0x2e, 0x47, 0x1d (GOLDEN 一致)。
+- **判定の注意**: `hs_e2e.mjs` は `plug===0` のとき ctor 連鎖の ID prefix のみで PASS にする (`hs_e2e.mjs` 151-162 行)。
+  Phase B が例外で中断していても `E2E PASS` が出る。`TFruityPlug*` が生成されたことは本判定では保証されない。
+  出口条件 (ctor 完走・42 本) は未達のまま。
+- FLEngine (`block00031_PE.bin`) の `TFruityHost.Dispatcher` (VA `0x13173a0`) は冒頭だけで stack frame 0x1838 の大きな関数。全 case 解析は未着手。
+
+### 未解決 (起票先)
+
+- RTL fold deref の解消 (Phase B の OOB 原因) → #985 `[PLG-P0b-1]` (親 #196)
+- `0x13173a0` の全 case 解析と ID 意味論の確定 → #986 `[PLG-P0b-2]` (親 #196)
+- `hs_e2e.mjs` の判定を「Phase B 例外時は FAIL」に直す → 本 PR の範囲外 (判定ロジック変更は #196 の作業 4 で扱う)
+
+---

@@ -6,6 +6,7 @@ set -e
 cd "$(dirname "$0")"
 source ../../../shared/env.sh
 W=work
+mkdir -p $W/lift $W/tmp
 PE_IN='../work/extracted/VST3/Massive X.vst3'
 PE=$W/mx_fixed.vst3
 
@@ -13,14 +14,13 @@ echo "== [1] PE 修復 (ヘッダ clamp + .text 2B 修復, work copy のみ) =="
 python3 scripts/mx_pefix.py "$PE_IN" "$PE"
 
 echo "== [2] RetDec lift (select-decode-only, TMPDIR=work/tmp) =="
-mkdir -p $W/lift $W/tmp
 if [ ! -f $W/lift/lic.drc.ll ]; then
-  (cd $W/lift && TMPDIR=../tmp /opt/retdec/bin/retdec-decompiler ../mx_fixed.vst3 -o lic.drc.c \
+  (cd $W/lift && TMPDIR=../tmp "${RETDEC:-/opt/retdec}/bin/retdec-decompiler" ../mx_fixed.vst3 -o lic.drc.c \
     --select-ranges "0x18115de60-0x18115ee55" --select-decode-only --timeout 600 > lic.log 2>&1)
   rm -f $W/lift/lic.drc.dsm $W/lift/lic.drc.bc $W/lift/lic.drc.c $W/lift/lic.drc.config.json
 fi
 if [ ! -f $W/lift/eng.drc.ll ]; then
-  (cd $W/lift && TMPDIR=../tmp /opt/retdec/bin/retdec-decompiler ../mx_fixed.vst3 -o eng.drc.c \
+  (cd $W/lift && TMPDIR=../tmp "${RETDEC:-/opt/retdec}/bin/retdec-decompiler" ../mx_fixed.vst3 -o eng.drc.c \
     --select-ranges "0x1805b3510-0x1805b38ae,0x1805b3ad0-0x1805b3ea2" --select-decode-only --timeout 600 > eng.log 2>&1)
   rm -f $W/lift/eng.drc.dsm $W/lift/eng.drc.bc $W/lift/eng.drc.c $W/lift/eng.drc.config.json
 fi
@@ -92,24 +92,37 @@ open(p, 'w').write(t)
 print('18396fb60_5 rename + uselistorder strip done')
 EOF
 
+echo "== [6b] MX2-1 IR zero-init pass (reg2mem alloca の未初期化読み出しを 0 初期化; MX_ZEROINIT=0 で無効化 = NC) =="
+if [ "${MX_ZEROINIT:-1}" = 1 ]; then
+  python3 scripts/mx_ir_zeroinit.py $W/run_all.ll $W/run_all_zi.ll --report $W/zeroinit.json --check
+  RUN_LL=$W/run_all_zi.ll
+else
+  RUN_LL=$W/run_all.ll
+fi
+
 echo "== [7] mock 生成 (declare から wasm シグネチャ一致) + emcc → wasm → node ハーネス =="
-python3 scripts/mx_mocks_gen.py work/run_all.ll work/mocks_gen.c
-export EMSDK=/opt/emsdk
-source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1
-# opt レベルは MX_OPT で切替可。既定は -O0。
-#   背景 (MX-2 検収・実測): -O1/-O2/-Os では T7-T11 (evaluateRAS2) が
+python3 scripts/mx_mocks_gen.py $W/run_all.ll $W/mocks_gen.c
+export EMSDK="${EMSDK:-/opt/emsdk}"
+source "$EMSDK/emsdk_env.sh" >/dev/null 2>&1
+# emsdk の cache が書込不可 (Actions runner) なら work/ へ複製して使う
+EMC="$EMSDK/upstream/emscripten/cache"
+if ! touch $EMC/.w 2>/dev/null; then
+  [ -d $W/emcache ] || { mkdir -p $W/emcache && cp -r $EMC/. $W/emcache/; }
+  export EM_CACHE=$PWD/$W/emcache
+else
+  rm -f $EMC/.w
+fi
+# opt レベルは MX_OPT で切替可。既定は -O1 (MX2-1 の zero-init pass 適用後は -O0/-O1/-O2/-Os で 11/11 PASS)。
+#   背景 (MX-2 検収・実測): pass 無し (MX_ZEROINIT=0) だと -O1/-O2/-Os で T7-T11 (evaluateRAS2) が
 #   "memory access out of bounds" で TRAP し 6/11 PASS。-O0 では 11/11 PASS。
-#   原因: RetDec raw IR は ① reg2mem alloca を store 前に load する
-#   (%stack_var_-824.0.reload 等・未初期化) ② 0x180724c60 への interior call
-#   (DEFECTS.md D11: 0x180724c60 = pdata 関数 0x180724b70 の offset 208 内部) を
-#   string-builder と推定し mock を return 0 だけにして out-param (SSO バッファ) を未初期化。
-#   MSVC の std::string は "add -8; load" (ヒープブロック先頭のサイズ) を読むため、
-#   -O1 以上では LLVM がその load をガード (icmp ult 16) の前に hoist し、
-#   未初期化ポインタを deref して TRAP。-O0 は hoist せず・フレームが 0 初期化のため 11/11 PASS。
-#   TF: MX_OPT=-O1 で 6/11 を再現できる (ネガティブコントロール代わり)。
-EMCC_OPT="${MX_OPT:--O0}"
+#   原因: RetDec raw IR は ① reg2mem alloca を store 前に load する (未初期化)
+#   ② 0x180724c60 への interior call (DEFECTS.md D11: pdata 関数 0x180724b70 の offset 208 内部) を
+#   string-builder と推定し mock が return 0 のみで out-param (SSO バッファ) が未初期化。
+#   MSVC の std::string は "add -8; load" を読むため、-O1 以上では LLVM が load をガード前に hoist して TRAP。
+#   NC: MX_ZEROINIT=0 MX_OPT=-O1 で 6/11 を再現する。
+EMCC_OPT="${MX_OPT:--O1}"
 emcc -w $EMCC_OPT -sENVIRONMENT=node -sMODULARIZE=1 -sALLOW_MEMORY_GROWTH=1 \
   -sERROR_ON_UNDEFINED_SYMBOLS=0 \
   -sEXPORTED_FUNCTIONS=_mx_run_tests,_mx_get_result,_mx_get_detail,_mx_run_one,_mx_get_detail_1,_mx_get_detail_2,_mx_get_detail_3,_mx_get_detail_4,_mx_get_detail_5,_mx_get_detail_6,_mx_get_detail_7,_mx_get_detail_8,_mx_get_detail_9,_mx_get_detail_10,_mx_get_detail_11,_malloc \
-  -o $W/h_all.cjs work/run_all.ll harness/mocks_extra.ll work/mocks_gen.c harness/mx_harness.c
+  -o $W/h_all.cjs $RUN_LL harness/mocks_extra.ll work/mocks_gen.c harness/mx_harness.c
 node harness/run.mjs $W/h_all.cjs --report $W/harness_report.json
