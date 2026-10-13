@@ -111,13 +111,14 @@ IR (boot_final3.ll 行 176793 以降) は `%13 = arg1 + 8*Count` (= `rbx + rdi*8
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 304・555: `function_535bf2` が **IR 未定義の `function_535c2e`** を呼び fail-fast (`m11_unresolved_function` → abort)。closure 外の関数 | 2 unit が trap | 新規 (M11 closure 欠け。PM 起票) |
-| 923: `4fb910`→`410730`→`410b10` (C 転記, モニタスロット解決) の `[obj-0x80..]` 系 OOB。原因未切り分け | 1 unit が trap | 新規 (同上) |
-| 47b260 の notify 間接 call (D15) を入れると 0x535cf0 / 0x536570 が closure 外で miss (試行: unit 45・302 が ok→miss、95・101 が miss) | 転記は notify を省略中 | PM 判断 (DEFECTS D15 行に併記) |
+| 304・555: `function_535bf2` が **IR 未定義の `function_535c2e`** を呼び fail-fast (`m11_unresolved_function` → abort)。closure 外の関数 | 2 unit が trap | #714 (M11 closure 欠け) |
+| 923: `4fb910`→`410730`→`410b10` (C 転記, モニタスロット解決) の `[obj-0x80..]` 系 OOB。原因未切り分け | 1 unit が trap | #714 (同上) |
+| 47b260 の notify 間接 call (D15) を入れると 0x535cf0 / 0x536570 が closure 外で miss (試行: unit 45・302 が ok→miss、95・101 が miss) | 転記は notify を省略中 | PM 判断 (DEFECTS D15 行に併記。#682 にコメント済み、本 PR では省略のまま) |
+| DEFECTS.md への D4 再発例の追記 (§6 行案) | 受入条件「D 類型なら追記」 | #716 (DOCS-9)。本 PR では docs/DEFECTS.md を変更しない (WORKFLOW §5) |
 | 計装 build の ok が 870 (通常 868)、oom 内訳が配置依存 | 計装の透過性は ok/trap 単位で 2 unit ぶれる | PM 判断 (計装は診断専用) |
 | 16.23 秒の外れ値 (survey n=3) の原因 | 計測の信頼性 | 未確認 |
-| 596 の入口 probe 結論 (書込み元の未特定、窓 410360〜536c20) の訂正 | 596 REPORT の §3 は本件で解消 | #596 にコメント (PM) |
-| `m11_e2e.sh` の PE 固定パス (`/home/ubuntu/...`) と合否に使えない exit 0 固定 (§11) | e2e 単体で合否判定できない。本 run は PE 行を差し替えて実行 | 新規 M11 子チケット (PM 起票) |
+| 596 の入口 probe 結論 (書込み元の未特定、窓 410360〜536c20) の訂正 | 596 REPORT の §3 は本件で解消 | #596 にコメント済み (PM) |
+| `m11_e2e.sh` の PE 固定パス (`[WIN64]` の `extracted/block00031_PE.bin` を直書き) と合否に使えない exit 0 固定 (§11) | e2e 単体で合否判定できない。本 run は PE 行を差し替えて実行 | #715 (M11 e2e の exit 仕様・PE 固定) |
 
 ## 8. 検証範囲 / 範囲外
 
@@ -133,13 +134,14 @@ IR (boot_final3.ll 行 176793 以降) は `%13 = arg1 + 8*Count` (= `rbx + rdi*8
 mkdir -p "$RUNNER_TEMP/fl-win64" && tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C "$RUNNER_TEMP/fl-win64"
 export FL_WIN64_DIR="$RUNNER_TEMP/fl-win64"; python3 -m pip install capstone pefile
 cd tools/m11
-for s in ir_lb_base img_lb_base lb_base; do echo 0 > work/$s.stamp; done   # 旧 snapshot に stamp が無い場合のみ
 bash m11_build.sh && M11_SURVEY_UNITS=work/probe682/units_fix.json node m11_survey.mjs
 python3 trap_triage/check_682.py work/probe682/units_fix.json            # rc=1 (2/5)
 bash trap_triage/negctl_682.sh nc && python3 trap_triage/check_682.py work/probe682/units_nc.json   # rc=1 (0/5)
 bash trap_triage/chain_682.sh fix                                        # unit 前の [[g+8]+8] 変化点
 bash trap_triage/store_watch_682.sh w2                                   # 全 store 計装 ([esc]/[sw], sites.json)
 ```
+
+- stamp の補完 (`echo 0 > work/<s>.stamp`) は書かない。`m11_build.sh` は `ir_lb_base`・`img_lb_base` を「存在する時だけ」照合する (L28 `[ -f ... ] &&`)。`lb_base` は build 自身が書く (L22–25)。stamp を補うのは `m11_e2e.sh` の経路 (§11) のみ。
 
 ## 10. 検証起点 commit
 
@@ -154,4 +156,4 @@ bash trap_triage/store_watch_682.sh w2                                   # 全 s
 - `M11_SUMMARY`: reached_stage 4 (DllMain attach 完走・longjmp 経路、stage 5 未達) / units_run_full 22 / survey ok 868・trap 27 (oom 0)・clobber 0・miss 46 / getmem 33・freemem 20 / VA 1.3 MB / wasm 6,027,631 B。
 - survey の ok・trap・clobber・miss は §4.1 の修復行と一致。stage と units_run は §10 の最終 HEAD と一致。
 - 注意: `m11_e2e.sh` は未達・前提欠如でも `exit 0` を返す (スクリプト冒頭の注記どおり)。rc=0 は合否の根拠にしない。合否は `check_682.py` (不合格で rc=1) で判定する。
-- 未解決: `m11_e2e.sh` の PE 固定パス (`/home/ubuntu/...`) と exit 0 固定は、本 PR の範囲外として残す (起票先は §7 の表に追記)。
+- 未解決: `m11_e2e.sh` の PE 固定パス (`[WIN64]` の `extracted/block00031_PE.bin` を直書き) と exit 0 固定は、本 PR の範囲外として残す (起票先 #715、§7 の表)。
