@@ -171,6 +171,20 @@ main 取込後の木 (`c37522c`) で S1 が FAIL (828/67 vs 864/31) したため
 | `bash tools/gui/flengine/e2e.sh` (**HEAD `19ebb43`**) | rc 0。**JUDGE PASS 14/14**。S1 = 864/1/46/31 (base 一致)。ネガコン N1〜N9 は 9/9 が期待どおり FAIL。selftest 0 failed | 2 分 36 秒 (load 0.45 → 0.97) |
 | `bash tools/gui/e2e.sh` (**HEAD `19ebb43`**) | rc 0。ALL PASS (bpp / text / simd / present / Chrome E2E / fail-fast / reach-log / sigprobe)。ASan UAF は本回に出ず | 1 分 33 秒 |
 
+### 6c-2. HEAD `b3819e2` の再測 (review #576 指摘 2 への対応・素材 `work-m11` / `toolchain-*` / `apt-mingw` を展開して実行)
+
+素材: `work-m11` → `tools/m11/work/` (1.6 GiB)、`toolchain-retdec` (RetDec v5.0)、`toolchain-emsdk`、`fl-win64`、`apt-mingw` (`x86_64-w64-mingw32-gcc` は runner 既定で存在)、capstone 5.0.7 / pefile 2024.8.26、`pnpm install --frozen-lockfile`。
+
+| 実行 (HEAD `b3819e2`) | 結果 | 所要 (実測) |
+|---|---|---|
+| `bash tools/m11/m11_wndseed.sh` | **rc 0**。WNDCLASS 11 / fn WNDPROC 8 / 最終 IR 未定義 0 (`WNDCLASS-CHECK PASS`)。boot6 lift 1212 関数 → 8648 defines | 2 分 52 秒 (172 s) |
+| `bash tools/gui/flengine/e2e.sh` | **rc 1**。judge **12/14 FAIL**。FAIL は **B1** (`units_run 52 (base 52)` / `dllmain_done False` / `GetMem 560 FreeMem 20` / `icall_miss 5`) と **S2** (ff 側 fail-fast 集合 `LoadImageW`・`SystemParametersInfoW` ⊄ soft STUB `LoadImageW`)。L1・A1・R1・R2・S1 (865/1/47/29)・P1〜P5・W1 は PASS。ネガコン 9 本は FAIL 期待どおり | 3 分 21 秒 (201 s) |
+| `bash tools/gui/e2e.sh` | **rc 0**。ALL PASS (text / simd / present / Chrome E2E)。**ASan UAF は本回に出ず** | 1 分 45 秒 (105 s) |
+
+- **B1 の FAIL は GUI shim の回帰ではない**: 同じ IR で GUI shim 無しの `baseline_boot.json` 自体が `units_run 52 / dllmain_done false / boot_threw "memory access out of bounds"` になる。REPORT §6c 冒頭の期待値 (units_run 22 / init 23 / dllmain true) とは別物。素材 `work-m11` は #516 以前の生成で、現 main の手順と一致しない (WORKFLOW §11・#680)。`boot0..4` を現 main の `m11_e2e.sh --full` から再生成していないことが原因と**推定** (未確認)。
+- **S2 の FAIL**: `SystemParametersInfoW` が ff survey で fail-fast 到達 (3 unit) だが soft 側は STUB 判定の集合に入らない。§3 の表では `SystemParametersInfoW` は P0 の「実装済み」扱いで、今回の素材 (`work-m11` 由来の IR) では別の経路で fail-fast に落ちている。原因は未調査。
+- 結論: **HEAD `b3819e2` の flengine gate は 14/14 にならなかった** (`19ebb43` の 14/14 は素材の IR が違う時点の値で、現素材では再現しない)。PR は「未達」を明記して出す。
+
 ### S1 の切り分け (結論: shim の回帰ではなく survey ハーネスの隔離不足)
 
 - unit 単位の結果を取得した。baseline (shim 無し, `m11_survey.mjs` の `M11_SURVEY_UNITS`) と GUI 結合 (soft) を突き合わせると、差は **36 unit の ok→trap** のみで、全て `halt0->longjmp` だった。
@@ -194,7 +208,8 @@ judge の 14 gate は全て PASS: L1 (ff・soft) / A1 / B1 (units_run 22・init 
 | `function_52a7f0` の `TempClass.lpfnWndProc` load 脱落 (§5-2) | AllocateHWnd 経路 (TPUtilWindow = Timer / 非同期 window) が全滅 | [M11] / ldfix 子チケットを PM が起票 (本 REPORT の DEFECTS 行案) |
 | ~~WNDCLASS 静的実体の WNDPROC を closure seed に追加する pass~~ | **解消 (#565, §6b)** | — |
 | probe の `m11_icall` miss target `0x6c6f` (3 件) の由来 | 窓生成は成功。WM_NCCREATE の WNDPROC 差替え経路と推定 (未確認) | #565 に所見 (未起票。PM 判断) |
-| `bash tools/gui/e2e.sh` step 1 (ASan) の `heap-use-after-free` (`blit_surf` ↔ `surf_free`)。再現条件: 過去 4 回中 2 回 rc 1 (HEAD `a608f18` で 3 回中 1 回、`96ce3eb` 以前に 1 回)。HEAD `19ebb43` の実行では出ず | gui e2e が非決定的に FAIL する。`blit_surf` と `surf_free` の間の shim 側 race の可能性 | 起票依頼 (PM): GUI-2 系 (issue 番号未割当)。再現時は `tools/gui/build` の ASan ログ (`heap-use-after-free`) を添付 |
+| `bash tools/gui/e2e.sh` step 1 (ASan) の `heap-use-after-free` (`blit_surf` ↔ `surf_free`)。再現条件: 過去 4 回中 2 回 rc 1 (HEAD `a608f18` で 3 回中 1 回、`96ce3eb` 以前に 1 回)。HEAD `19ebb43` と **HEAD `b3819e2` (§6c-2) では出ず** (各 1 回) | gui e2e が非決定的に FAIL する。`blit_surf` と `surf_free` の間の shim 側 race の可能性 | **#740 [GUI-15]** (起票済み)。再現時は `tools/gui/build` の ASan ログ (`heap-use-after-free`) を添付 |
+| flengine judge の B1 (boot parity) / S2 (fail-fast ⊆ soft STUB) が HEAD `b3819e2` で FAIL (§6c-2) | flengine gate 12/14。素材 `work-m11` の IR 由来と推定 | 起票先 未定 (PM 判断。#174 / #132 の IR 再生成と合わせて検討) |
 | ~~flengine S1 の回帰 (GUI 結合 soft で 36 unit が ok→trap)~~ | **解消 (§6c, `19ebb43`)**。原因は `run.mjs --survey` の unit 隔離不足で shim ではない | — |
 | 動的に作られる WNDCLASS (スタック/ヒープ上で組む `RegisterClass`) の WNDPROC | 静的走査では拾えない。`function_52a7f0` 等 5 呼出点のうち静的実体を渡すのは 2 点 | m11 / icall 系で PM が起票 |
 | ~~`EnumFontFamiliesExW` 実装~~ | **解消 (main で IMPL)**。残る STUB は `LoadImageW` (実到達 21 unit) | 起票依頼 (PM): `LoadImageW` の実装 (GUI-2 系, issue 番号未割当) |
