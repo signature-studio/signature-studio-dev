@@ -116,11 +116,12 @@ delay closure 142 関数の近似命令は rcpps 4 箇所のみ (すべて 0x180
 
 ## 12. KH-16 (#779): VEX-256 / FMA 語彙の実測 (語彙追加の前段)
 
-語彙は推定で足さず、難 4 本の snap-in 固有 closure (`closures_sets.pkl` の unique) を capstone で全命令走査して決める。再現: `python3 snapins/scripts/vex256_census.py --json work/vex256_census.json` (前提 = `closures.py` と `callgraph.py` の出力)。
+語彙は推定で足さず、難 4 本の snap-in 固有 closure (`closures_sets.pkl` の unique) を capstone で全命令走査して決める。再現手順 (上流の順序・検証起点 commit `a44f819c`): (1) installer 抽出で `work/winpkg/HeartCore.core_64` を作る (素材 = `plugins-kilohearts`) → (2) `scripts/rtti_walk.py HeartCore.core_64 rtti_vtables.json` → (3) `scripts/callgraph.py HeartCore.core_64 rtti_vtables.json callgraph.pkl` → (4) `scripts/closures.py callgraph.pkl rtti_vtables.json closures.json` (`closures_sets.pkl` を出力) → (5) `python3 snapins/scripts/vex256_census.py --json work/vex256_census.json`。
 
-- **数え方**: unique closure の各関数の全命令を走査し、(a) オペランドに `ymm` を含む命令、または (b) mnemonic が `v` で始まる VEX 符号化命令 (xmm 形を含む) を 1 件と数える。同一 VA は 1 回。
-- **実測 (2026-10-13, HeartCore.core_64 / callgraph 120,856 関数・closures infra 188 / 53,010 B)**: ymm 命令は Convolver 40・Filter Table 40 (Ladder・Slice EQ は 0)。**再計測済み** (PR #827 の値と一致)。VEX 全体は 54 mnemonic / 917 命令。**xmm 形の `vblend*` / `vperm*` は 0 件** (vblend/vperm の mnemonic は出現せず)。
-- 生出力: `python3 snapins/scripts/vex256_census.py --json OUT` の stdout は mnemonic ごとに `per_snapin` / `total` / 先頭例を出す (本文の表はその抜粋)。
+- **数え方 (現行 filter)**: unique closure の各関数の全命令を走査し、(a) オペランドに `ymm` を含む命令、または (b) mnemonic が `v` で始まる VEX 符号化命令 (xmm 形を含む) を 1 件と数える。同一 VA は 1 回。ymm 命令数 (`ymm-operand instructions`) は filter によらず `ymm` 判定のみで決まる。
+- **検証状況 (2026-10-13 の本 run)**: 上流の `HeartCore.core_64` / `closures_sets.pkl` / `callgraph.pkl` は runner に無く (`fl-win64` に HeartCore 無し、`plugins-kilohearts` 未取得)、**census は本 run で再実行していない**。以下の 54 mnemonic / 917 命令・ymm 40/40・xmm 0 件は前 run の報告値で、**現行 filter の生出力による再確認は未了** (起票先 = #779)。PR #827 (`b9a1f35e`) の旧 filter (ymm 含む or `vf*`) による ymm 40/40 とは一致する。
+- **ネガティブコントロール (本 run・素材不要・`snapins/scripts/vex256_negcon.py`)**: 既知の VEX 符号化 7 命令 (合成バイト列、capstone 5.0.7、全バイト消費を assert) に対し、現行 filter は 7 件検出、旧 filter は 3 件検出。旧 filter で漏れるのは `vblendps` xmm / `vblendvps` xmm / `vpermilps` xmm / `vaddps` xmm の 4 件 (新 filter のみ検出)。`vperm2f128` ymm と `vaddps` ymm は両方で検出。これにより「xmm 形 `vblend*` / `vperm*` は 0 件」の否定結果は、filter が当該命令を検出できることを前提に読む。
+- 本文の表は**旧 filter の出力** (PR #827 時点)。`vmovaps` / `vmulps` / `vaddps` / `vsubps` の行は ymm 命令のみを数えた値。現行 filter では同じ mnemonic の xmm 形も `per[mnemonic]` に入るため、現行の生出力で再確認するまで行の値を「ymm のみ」とは断定しない。`vf*` の行は両 filter で同じ集合。
 
 | mnemonic | Convolver | Filter Table | Ladder | Slice EQ | 合計 |
 |---|--:|--:|--:|--:|--:|
