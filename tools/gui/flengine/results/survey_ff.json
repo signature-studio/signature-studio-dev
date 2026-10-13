@@ -9,11 +9,11 @@
  "survey": {
   "ok": 828,
   "noproc": 1,
-  "miss": 46,
-  "trap": 67,
+  "miss": 47,
+  "trap": 66,
   "kinds": {
-   "halt0->longjmp": 54,
-   "memory access out of bounds": 13
+   "memory access out of bounds": 11,
+   "halt0->longjmp": 55
   },
   "failfast_units": {}
  },
@@ -21,7 +21,7 @@
   {
    "order": 1,
    "name": "LoadStringW",
-   "calls": 48069977,
+   "calls": 48069057,
    "kind": "IMPL",
    "prio": "1"
   },
@@ -70,7 +70,7 @@
   {
    "order": 8,
    "name": "MessageBoxA",
-   "calls": 52,
+   "calls": 55,
    "kind": "IMPL",
    "prio": "2"
   },
@@ -158,27 +158,27 @@
  "failfast_count": 0,
  "gui_icall_calls": 1,
  "gui_ring_discarded": 0,
- "icall_miss": 47,
+ "icall_miss": 49,
  "m11_stub_total": 70,
  "m11_stubs": [
   "GetLocaleInfoW:59",
   "EnumCalendarInfoW:2",
-  "FormatMessageW:1",
   "GetTimeZoneInformation:1",
   "MulDiv:1",
   "GlobalAddAtomW:3",
+  "GetFileAttributesW:1",
   "acmMetrics:1",
   "SHGetMalloc:1",
   "GetCurrentThread:1"
  ],
  "probes": {
-  "GetMem": 24035567,
-  "FreeMem": 21,
-  "FastMM_GetMem(407a50)": 24035618,
-  "FastMM_FreeMem(407e20)": 24,
+  "GetMem": 24035505,
+  "FreeMem": 32,
+  "FastMM_GetMem(407a50)": 24035553,
+  "FastMM_FreeMem(407e20)": 33,
   "InitUnits": 0,
-  "Halt0": 55
+  "Halt0": 56
  },
- "va_calls": 1244,
+ "va_calls": 1247,
  "va_bytes": 1552941056
 }

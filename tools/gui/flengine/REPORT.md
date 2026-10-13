@@ -15,8 +15,8 @@
 |---|---|---|
 | リンク | wasm-ld signature mismatch **0** / undefined **0** / duplicate **0** (ff・soft 両ビルド) | `build.sh` のリンクログを grep。wasm 6,167,297 B |
 | GUI declare ↔ adapter | IR の GUI declare **177** = adapter **177** (実装 158 / stub 19)、突合不一致 c=0 d=0 | `integ/gen_adapt.py --ir boot_final.ll` |
-| 起動の回帰 | shim 有り/無し (同一 IR) で **units_run 22 / init_count 23 / dllmain_done true / GetMem 33 / FreeMem 20 / icall_miss 0 が一致** | baseline = `m11_run.mjs` (GUI 3 本は m11_win.c の暫定 stub) |
-| survey の回帰 | soft ビルド (stub は 0 返却) の survey が baseline と **ok 828 / noproc 1 / miss 46 / trap 67 が一致** (soft の trap 内訳 halt0 54 + OOB 13) | 942 unit 隔離 (`m11_survey.mjs` 同手順、VA 上限 0 = `M11_VA_UNIT_BUDGET_MB=0`。既定 256 の m11 survey は ok 864 / trap 31 で、run.mjs は上限を掛けないため baseline 側を 0 に揃えた) |
+| 起動の回帰 | shim 有り/無し (同一 IR) で **units_run 52 / init_count 54 / icall_miss 5 / GetMem 560 / FreeMem 20 が一致**。両者とも `memory access out of bounds` で停止 (dllmain_done false) | baseline = `m11_run.mjs` (GUI 3 本は m11_win.c の暫定 stub)。head `62659d4` の値 (main 取り込み後。取込前は 22 / 23 / 0) |
+| survey の回帰 | soft ビルド (stub は 0 返却) の survey が baseline と **ok 828 / noproc 1 / miss 47 / trap 66 が一致** | 942 unit 隔離 (`m11_survey.mjs` 同手順、VA 上限 0 = `M11_VA_UNIT_BUDGET_MB=0`。既定 256 の m11 survey は run.mjs と食い違うため baseline 側を 0 に揃えた)。取込前は 828 / 46 / 67 |
 | 最初の GUI 呼出 (自然起動) | **`LoadStringW` ×4 → shim (IMPL, P1)**。DllMain attach の 22 unit 内 (`shimx_link/REPORT.md` §4.1 は unit #16 付近) | `GUI-REACH` 行 (`boot.json`) |
 | survey で shim に到達した API | **19 種** (IMPL 19 / STUB 0)。§3 | `survey_soft.json` の reach |
 | fail-fast ビルドの survey | ok 828 / trap 67 (soft と同一)。fail-fast は 0 件 (到達した API は全て実装済み) | `survey_ff.json` |
@@ -121,6 +121,9 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 
 main 取込前 (コード commit `d4665eb` 時点, 当時の値 816/1/46/79), `e2e.sh` 全体を 3 回直列, 4 vCPU): **126 / 125 / 124 秒** (開始時 load average 0.56→1.22→1.24, 終了時 1.22 / 1.24 / 1.03)、毎回 judge **12/12 PASS**・ネガコン 5/5 期待どおり FAIL・native selftest 431 passed / 0 failed・`results/*.json` は 3 回とも同一。
 **修正後 head の実測** (`e2e.sh` 1 回, 4 vCPU): **118 秒, rc 0** (load 1.17 → 0.85 → 0.49)。judge **12/12 PASS** (S1: soft 828/1/46/67 = baseline 828/1/46/67)、ネガコン 5/5 期待どおり FAIL、native selftest **431 passed / 0 failed**。修正前は S1 が soft 828/1/46/67 vs baseline 864/1/46/31 で FAIL だった (baseline 側が既定 VA 上限 256 を掛け、run.mjs は掛けないため)。修正 = baseline を `M11_VA_UNIT_BUDGET_MB=0` で取る (`e2e.sh`)。
+**head `62659d4` (main 取り込み後) の実測**: 修正前の `e2e.sh` は **rc 1** (judge 11/12)。B1 が FAIL: shim 有り boot の `boot_threw` が `memory access out of bounds` で、baseline (shim 無し・同一 IR) も `threw` に同じ例外で止まる (units_run 52 / init 54 / icall_miss 5 は一致)。judge の B1 は「`boot_threw` が None」を要求していたため、baseline と同じ停止位置でも FAIL していた。判定を `boot_threw == base_boot['threw']` (baseline と同じ停止理由) に直した。停止理由 OOB は m11 REPORT §1 の既知の通常起動の停止と同じ (unit #18、`44bb70` の alloca 潰れ)。
+修正後の `e2e.sh` (1 回, 4 vCPU, 開始 load 1.00): **146 秒, rc 0**。judge **12/12 PASS**、ネガコン 5/5 期待どおり FAIL、native selftest **433 passed / 0 failed**。`gui/e2e.sh` の step 5 は `tsc` 導入後に通過 (worktree で `pnpm install --frozen-lockfile`)。
+main 取り込み後で、units_run は 22 → **52**、init_count 23 → **54**、survey soft = baseline = **828 / 1 / 47 / 66** (取込前は 828 / 1 / 46 / 67。miss/trap が 1 件ずつ移動。原因は未分離)。
 個別の単発計測 (開発中, load 0.3〜0.9): `m11_gen_ir2.sh` 20.5 秒 / `m11_build.sh` 12.3 秒 / baseline 起動 0.386 秒 / baseline survey 16.9 秒 / 結合 build 10.6〜17.0 秒 / 結合起動 0.371 秒 / 結合 survey 18.2〜24.1 秒 (ff・soft・EnumFontFamiliesExW 前後で差)。`gen_ir2` は e2e の前提側 (本スクリプトは IR を再生成しない)。
 `results/*.json` と `IMPORTS.md` は本修正で e2e が再生成し、コミットに含めた (baseline_survey.json は上限 0 の値に更新。IMPORTS.md は main 版から `gen_api.py` の出力へ)。
 受入条件 2 (`bash tools/gui/e2e.sh` ALL PASS 維持): 修正後 head で全体を実行 (`FL_WIN64_DIR` 指定) → **rc 1**。step 1 の native selftest (ASan) が `gui_headless.c:33` で heap-use-after-free により abort (headless の render thread が、main thread が `surf_free` した surface を読む競合)。`gui_headless.c` は main と同一で、本 PR では未変更。selftest 単独の再実行 3 回中 1 回が同じ abort。

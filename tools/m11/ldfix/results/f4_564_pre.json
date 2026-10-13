@@ -19,11 +19,11 @@
    -16382
   ]
  ],
- "units_run": 22,
- "init_count": 23,
- "icall_miss": 0,
- "ok": 864,
+ "units_run": 52,
+ "init_count": 54,
+ "icall_miss": 5,
+ "ok": 865,
  "noproc": 1,
- "miss": 46,
- "trap": 31
+ "miss": 47,
+ "trap": 29
 }

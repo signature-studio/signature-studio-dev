@@ -29,7 +29,7 @@ IR に使用ゼロの無名 alloca (B1 の痕跡) が有る / ブロック内 xo
 frame read が恰好 1 本で、prologue を追った `rsp/rbp` モデル (`frame_model`) で escape 済み stack_var の gap 内に解決 / 同番地への機械語 store 無し /
 使用が最初の使用と同一 IR ブロックで、その前に stack_var を渡す call がある。
 さらに consumer: `cmp [frame],K; je T` の形で IR が `icmp eq i1 (v==K), X` に畳まれていれば `and i1 (v==K), X` に戻す (`f4_consumer_and`: 52a7f0 と 71dd80)。
-load だけ直しても到達しない (§4 D2)。`m11_gen_ir2.sh` が `--pe` を `FL_WIN64_DIR` から引くよう変更 (従来は `[WIN64]` の固定パス (`/home/ubuntu/...`) で、runner では ldfix が黙ってスキップされた)。`LDFIX_ARGS` で F4 を外せる (ネガコン用)。
+load だけ直しても到達しない (§4 D2)。`m11_gen_ir2.sh` が `--pe` を `FL_WIN64_DIR` から引くよう変更 (従来は `` `[WIN64]` `` の固定パスで、runner では ldfix が黙ってスキップされた)。`LDFIX_ARGS` で F4 を外せる (ネガコン用)。
 
 ## 3. 全数走査 (`audit_undefload.py`, 別算法)
 
@@ -60,6 +60,11 @@ REGLIVE 2,509 (関数入口 live-in 等で脱落でない) / **FRAME_IN_ESCAPED 
 
 **main 取り込み後の再実測** (merge commit `8637316`、Refs #577。`bash tools/m11/ldfix/f4_e2e.sh`、4 vCPU、開始 load 0.86 / 終了 1.00): **294 s, rc 0**、6 gate 全 PASS、ネガコン 4/4 が期待行付きで FAIL。RegisterClassW 2→3、ret 0x0→0x110000f は上の表と同じ。
 survey は **ok 864 / noproc 1 / miss 46 / trap 31** (pre・post 同一、units_run 22 / init_count 23 / icall_miss 0) で、上の表 (816/1/46/79) と一致しない。差 48 件のうち 36 件は main 取り込みで入った `m11_survey.mjs` の unit 別 VirtualAlloc 上限 (#513、既定 256 MB) の効果: 上限 0 (旧挙動) で再実行すると 828/1/46/67。残る 12 件 (828 vs 816) は未分離 (main 側 `m11_build.sh` 等の寄与の可能性)。`results/f4_564_{pre,noand,post}.json` は 8637316 の実行出力で上書きした。上の表の値は PR 時点 (7be6bab) の実測として残す。
+
+**head `62659d4` の再実測** (`bash tools/m11/ldfix/f4_e2e.sh`、`FL_WIN64_DIR` = `$RUNNER_TEMP/fl-win64`、4 vCPU、開始 load 0.85 / 終了 1.02): **300 s, rc 0**、6 gate 全 PASS、ネガコン 4/4 が期待行付きで FAIL。
+pre / noand / post は **units_run 52 / init_count 54 / icall_miss 5** (main 取り込みで unit 数が 22→52 に増えた)、survey ok / noproc / miss / trap = **865 / 1 / 47 / 29** (3 構成とも同一)。RegisterClassW 2 → 2 → 3、`function_52a7f0` ret 0x0 → 0x0 → 0x110000f。
+`results/f4_564_{pre,noand,post}.json` は本回の出力で上書きした。`ok 864 / miss 46 / trap 31` (8637316 時点) とは別の値になった。差の原因は未分離 (`gen_ir2` / `m11_build.sh` の入力差を未確認)。
+監査 (`audit_undefload.py`): sites 2,846 / FRAME_IN_ESCAPED 56 (本回も同一)。
 
 ## 5. 未解決 / 限界
 
