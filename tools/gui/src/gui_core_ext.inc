@@ -437,6 +437,17 @@ static int hc_put_w(char *buf, uint32_t cap, uint32_t *off, U64 wp) {   /* UTF-1
   char t[512] = ""; if (wp >= 0x10000) u16_to_u8((const uint16_t *)P_(wp), t, sizeof t);
   return hc_put(buf, cap, off, t);
 }
+#define FD_NAMES_MAX 64
+#define FD_W_CAP (GUI_HC_OUT + 700)   /* dir (<= 600) + host 応答 (< GUI_HC_OUT B; UTF-16 の単位数は UTF-8 のバイト数を超えない) */
+static int fd_put(uint16_t *w, int *wl, const char *s, int sep) {   /* s を w の *wl 以降へ。0 = 全文が収まった / -1 = 収まらない (断片は返さない) */
+  int cap = FD_W_CAP - *wl, tr = 0;
+  if (cap < 1) return -1;
+  int n = u8_to_u16x(s, w + *wl, cap, &tr);
+  if (tr) return -1;
+  *wl += n;
+  if (sep) w[(*wl)++] = 0;   /* u8_to_u16x が書いた終端 (添字 <= cap-1) の位置 */
+  return 0;
+}
 static I64 file_dialog(I64 ofnp, int save) {
   uint8_t *o = (uint8_t *)P_(ofnp);
   g_cderr = 0;
@@ -467,18 +478,19 @@ static I64 file_dialog(I64 ofnp, int save) {
   if (rc == 0) return 0;                                        /* キャンセル (CommDlgExtendedError = 0) */
   if (rc != 1) { g_cderr = 2; gui_set_last_error(rc == -1 ? 1167 /* ERROR_DEVICE_NOT_CONNECTED: host 未接続 */ : 87); return 0; }
   out[on] = 0; out[on + 1] = 0;
-  const char *names[64]; int nn = 0;
-  for (const char *p = out; *p && nn < 64; p += strlen(p) + 1) names[nn++] = p;
+  const char *names[FD_NAMES_MAX]; int nn = 0; const char *p = out;
+  for (; *p && nn < FD_NAMES_MAX; p += strlen(p) + 1) names[nn++] = p;
+  if (*p) { g_cderr = 2; gui_set_last_error(111); return 0; }   /* 65 件目以降は載らない: 黙って捨てず失敗 (CDERR_INITIALIZATION) */
   if (nn == 0) return 0;
-  uint16_t w[1024]; int wl = u8_to_u16(GUI_STAGE_WIN_DIR, w, 600);
+  uint16_t w[FD_W_CAP]; int wl = u8_to_u16(GUI_STAGE_WIN_DIR, w, 600);
   uint32_t nfo; uint32_t total;
   if (nn == 1 || !(flags & OFN_ALLOWMULTISELECT_)) {            /* 単一: フルパス */
     w[wl++] = '\\'; nfo = (uint32_t)wl;
-    wl += u8_to_u16(names[0], w + wl, 1020 - wl);
+    if (fd_put(w, &wl, names[0], 0)) { g_cderr = 2; gui_set_last_error(111); return 0; }
     total = (uint32_t)wl + 1;
   } else {                                                      /* 複数 (OFN_EXPLORER 形式): dir\0name1\0name2\0\0 */
     w[wl++] = 0; nfo = (uint32_t)wl;
-    for (int i = 0; i < nn; i++) { wl += u8_to_u16(names[i], w + wl, 1020 - wl); w[wl++] = 0; }
+    for (int i = 0; i < nn; i++) if (fd_put(w, &wl, names[i], 1)) { g_cderr = 2; gui_set_last_error(111); return 0; }
     total = (uint32_t)wl + 1;
   }
   if (total > maxfile) { file[0] = (uint16_t)(total > 0xFFFF ? 0xFFFF : total); g_cderr = 0x3003; gui_set_last_error(111); return 0; }   /* FNERR_BUFFERTOOSMALL: 先頭 WORD に必要文字数 */

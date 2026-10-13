@@ -25,7 +25,8 @@ static int u16_to_u8(const uint16_t *s, char *out, int cap) {  /* NUL 終端ま�
   if (cap > 0) out[n] = 0;
   return n;
 }
-static int u8_to_u16(const char *s, uint16_t *out, int cap) {
+/* trunc != NULL なら、cap に収まらず変換を打ち切ったとき *trunc = 1 (収まれば 0)。cap < 1 のときは何も書かない */
+static int u8_to_u16x(const char *s, uint16_t *out, int cap, int *trunc) {
   int n = 0;
   while (s && *s && n + 2 < cap) {
     uint32_t c = (uint8_t)*s++;
@@ -35,9 +36,11 @@ static int u8_to_u16(const char *s, uint16_t *out, int cap) {
     if (c >= 0x10000) { c -= 0x10000; out[n++] = (uint16_t)(0xD800 + (c >> 10)); out[n++] = (uint16_t)(0xDC00 + (c & 1023)); }
     else out[n++] = (uint16_t)c;
   }
+  if (trunc) *trunc = (s && *s) ? 1 : 0;
   if (cap > 0) out[n] = 0;
   return n;
 }
+static int u8_to_u16(const char *s, uint16_t *out, int cap) { return u8_to_u16x(s, out, cap, NULL); }
 /* 引数文字列 (A/W/atom) を UTF-8 に */
 static const char *str_in(U64 p, int wide, char *buf, int cap) {
   if (p < 0x10000) return NULL;  /* MAKEINTATOM / NULL */
