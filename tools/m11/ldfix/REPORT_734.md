@@ -1,7 +1,7 @@
 # #734 (LD-12): 消費者形 pure 残の F3c 修復 — ptr 型引数の分 (部分達成)
 
 **判定: 部分達成**。ptr 型引数 (`ptr %argN`) の消費者形を修復対象に入れ、消費者形 pure 残を **30 → 23 関数 (33 → 24 引数)**。残りは entry 外の最初の deref (支配関係が要る) が主因で、子 issue に分けた (§4)。
-6/7 (wasm 再ビルド・survey) と 7/7 (動的確認) は未実施 (`/opt/emsdk` が無い。`ir_conditions.json` も無い)。受入条件「SUSPECT を 0」「到達測定」は未達。
+6/7 (wasm 再ビルド・survey) と 7/7 (動的確認) は未実施 (`[EMSDK]` が無い。`ir_conditions.json` も無い)。受入条件「SUSPECT を 0」「到達測定」は未達。
 
 先行: #509 (`REPORT_509.md` §3・§6)。修復は `ldfix.py` `fix_f3c_use` の ptr 分岐 (`ptrarg`)。
 
@@ -30,15 +30,15 @@
 - NC の個別 (5/7、#509 から流用した 2 本): 806740 の store を `%arg3` に戻すと store 形 SUSPECT 1 / 1 (復帰)。1063090 の消費者置換を戻すと消費者形 pure 24 関数、1063090 は pure に入る (復帰)。いずれも #509 時点の NC で、本 PR の ptr 分岐の NC ではない。
 - 残件分類 (`use_residual_509.py`): 修復後 24 引数 / 23 関数。内訳は first-deref-not-entry 13、+ptr-arg 4 (ptr 型だが支配関係も要る)、tracker-no-deref 3、+w32 2、none 1 (5c44b0)、ptr-arg 1。
 - 形の確認 (機械語と突合): 4506e0 は機械語 `mov rcx,[rcx]; test rcx,rcx; ... mov eax,[rcx-4]` (rcx = arg1 の値)。修復後 IR は `*arg1` を load して null 判定と `-4` 読みに使う。44cf40 は `mov rax,[rdx]` の後の store (修復後 IR で整合)。
-- 構文検査: 修復後 IR (`new.ll` と `bf_f3c.ll`) を `llvm-as-18` で検査 (exit 0)。`emcc -c` は使っていない (`/opt/emsdk` が無い)。
+- 構文検査: 修復後 IR (`new.ll` と `bf_f3c.ll`) を `llvm-as-18` で検査 (exit 0)。`emcc -c` は使っていない (`[EMSDK]` が無い)。
 - 検証範囲外: 動的確認 (`dyn_509.mjs`) と survey は未実施 (§3)。SUSPECT 件数だけでは正しさの証明にならない (REPORT_509 §1)。
 
 ## 3. 未実施と理由
 
-素材: `$HOME/artifacts` には `fl-win64.tar.zst` と `work-m11.tar.zst` の両方がある (2026-10-13 確認)。`work-m11` は `tools/m11/work/` へ展開して使った (`boot0-4.lift.ll`・`boot*.drc.config.json`・`m11_image.bin`・`boot_final.ll`・`boot_final3.ll` が揃う)。`ldfix_509_e2e.sh` の 1〜5/7 は work-m11 で exit 0 で完走した (§2)。
+素材: R2 の素材 (`oc_artifacts: fl-win64 work-m11` で指定) を展開して使った。`work-m11` は `tools/m11/work/` へ展開した (`boot0-4.lift.ll`・`boot*.drc.config.json`・`m11_image.bin`・`boot_final.ll`・`boot_final3.ll` が揃う)。`ldfix_509_e2e.sh` の 1〜5/7 は work-m11 で exit 0 で完走した (§2)。
 
 - 再現可能: 1〜5/7 (修復前 IR 再生成・旧版/新版の突合・audit・overlay・NC)。
-- 未達: 6/7 (wasm 再ビルドと survey) と 7/7 (動的確認)。`m11_build.sh` は `work/ir_conditions.json` に `ldfix=applied` が無いと拒否する (#680)。work-m11 の snapshot には `ir_conditions.json` が無いため、6/7 の reach は測れない。`m11_gen_ir2.sh` の再生成には fl-win64 の PE が要るが、この環境には emsdk (`/opt/emsdk`) も無い。記録を手で書いて通すことはしない (指紋が一致しない IR を作るため)。
+- 未達: 6/7 (wasm 再ビルドと survey) と 7/7 (動的確認)。`m11_build.sh` は `work/ir_conditions.json` に `ldfix=applied` が無いと拒否する (#680)。work-m11 の snapshot には `ir_conditions.json` が無いため、6/7 の reach は測れない。`m11_gen_ir2.sh` の再生成には fl-win64 の PE が要るが、この環境には emsdk (`[EMSDK]`) も無い。記録を手で書いて通すことはしない (指紋が一致しない IR を作るため)。
 
 ## 4. 残件 (子 issue に分割)
 
