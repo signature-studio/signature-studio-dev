@@ -101,7 +101,7 @@
 |---|---|---|---|
 | 対照 | `closure_unreached.py` (無改変) | rc 0 | **rc 0** ✓ |
 | NC1 | BFS の seed から (a) RVA32 の根を外す | U2 FAIL | **rc 1 (U2)** ✓ |
-| NC2 | BFS の辺から命令内即値を外す (U2 の検証側は残す) | U2 FAIL | **rc 0 ✗**。 即値の辺は 7 本とも 0 件 (§2d-3) のため、外しても結果が変わらない。 **本データでは識別力が無い** |
+| NC2 | BFS の辺から命令内即値を外す (即値辺を含む閉包 `make_edge3` の即値項を外す) | U6 FAIL | **rc 1 (U6)** ✓。 実データ (即値辺 0 件) では識別できないため、U6 (合成入力) で示す (§2f) |
 | NC3 | 排他分類の (c) に (a) を二重計上 | U4 FAIL | **rc 1 (U4)** ✓ |
 | NC4 | capstone 側の RVA32 集合に偽の値 0x7fffff01 を注入 | U1 FAIL | **rc 1 (U1)** ✓ |
 | NC5 対照 | `judge.py shells` (無改変 status_run.csv) | rc 0 | **rc 0** ✓ |
@@ -109,7 +109,7 @@
 | NC6 対照 | `unr_e2e.sh --skip-lift` (無改変) | rc 0・OK あり | **rc 1 ✗** (range 欠落監査 FAIL のため。 実データの不合格を正しく検出している) |
 | NC6 | 同 + emcc_c_rc=1 の行を追記 | rc ≠ 0・OK 無し | **rc ≠ 0・OK 無し** ✓ |
 
-9 項目中 7 が期待どおり、2 が不一致 (NC2: 非識別、NC6 対照: 実データの FAIL)。 NC 実行後、`status_run.csv` は元の 8 行 (header + 7) に復元した。
+NC 実行後、`status_run.csv` は元の 8 行 (header + 7) に復元した。 (注: この表は #879 の改訂前 (b36fef5 系) の実測。 改訂後の全 NC 結果は §2f を参照)。
 
 ## 2e. #707: export 名による命名と改名 (AC2 の解消)
 
@@ -170,6 +170,34 @@
 
 **既知類型との関係 (`docs/DEFECTS.md`)**: 該当なし。 §7d の「関数の畳み込み」候補は取り下げ (誤り)。 export 名命名は lift の命名規則の問題で、lift の変換規則は変えていない。 DEFECTS.md は編集していない。
 
+## 2f. #879: 即値辺の件数と識別力 (NC2 の解消)
+
+**結論 (先出し)**: 即値辺 (命令内即値による非共通関数への辺) は **7 本とも 0 件** (実測)。 実データでは NC2 が識別できないため、即値辺を含む閉包を合成入力で検査する **U6** を追加した。 U6 により NC2 は FAIL (rc 1) となり、即値検査の識別力を示せた。 実データの即値辺の件数は 0 のまま (即値参照は実データでは閉包に効いていない)。
+
+**即値辺の件数 (7 本別、`work/sampler/unr.json` の `imm_edges`、HEAD の実測)**
+
+| プラグイン | 即値辺 (非共通 → 非共通) |
+|---|--:|
+| FL Keys | 0 |
+| FPC | 0 |
+| Fruity Granulizer | 0 |
+| Fruity Slicer | 0 |
+| Fruity Slicer 2 | 0 |
+| Slicex | 0 |
+| Soundfont Player | 0 |
+
+**U6 (合成入力、`synth_check`)**: 関数 E (`mov eax, imm32 = R の VA`)・R (`mov ecx, imm32 = T の VA`)・T (`ret`) の 3 関数。 total2 = {E}。 即値参照 1 件だけで R が根になり、R の即値辺で T に届く。 期待: 根 = {R}、total3 = {E, R, T}、漏れ 0。 即値辺を閉包から外すと total3 = {E, R} で漏れ 1 となり FAIL する。
+
+**検証 (HEAD、`TMPDIR=$RUNNER_TEMP`、worktree `879-sampler-imm-negctl`)**
+
+| 項目 | 結果 |
+|---|---|
+| `unr_e2e.sh` (前提生成込み) | elapsed 712 s、**rc 0**、`[unr_e2e] OK`。 `judge.py shells` PASS 7/7、`indirect_defs` PASS 7/7 (欠落 0) |
+| `closure_unreached.py` | 24.4 s、**PASS 6 checks** (U1–U5 × 7 本 + U6 合成入力)。 total3 は §2d-3 と同値 |
+| `unr_nega.sh` | elapsed 128 s、**rc 0**、`[unr_nega] OK`。 NC0〜NC8 全て期待どおり (NC2 = U6 FAIL rc 1) |
+
+**検証範囲 / 範囲外**: 範囲内は「即値辺の件数 (7 本別の実測)」と「即値辺の識別力 (合成入力の U6 と NC2)」。 範囲外: 実データに即値参照が現れた場合の閉包の正しさ (現データには無い)、wasm リンク、実行時の到達性、差分試験。 通過 ≠ 正しさ。
+
 ## 6c. 検証起点・取りこぼし確認
 
 - 検証起点 commit: **b36fef5** (`feat(plugins): sampler unreached-function classification and total3 closure (Refs #667)`)。 分類・total3・lift・e2e・ネガコンは全て b36fef5 のスクリプトで実行。 以後の commit はこの REPORT のみ。
@@ -182,7 +210,7 @@
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | (解消・#707) RetDec が RVA32 根 5 関数を export 名で命名 (畳み込みではない、§2e) | 改名で解消 (`indirect_defs` PASS 7/7)。 wasm リンク・実行時の到達性は未検証 | #707 (本 PR) |
-| 即値辺が 7 本とも 0 件 → NC2 が非識別 | 即値検査の識別力は本データでは未確認。 即値参照が現れた engine で要再確認 | #667 にコメント |
+| 即値辺が 7 本とも 0 件 (実データ) | 実データでは即値検査は閉包に効かない。 識別力は合成入力 U6 / NC2 で示した (§2f)。 即値参照が現れた engine では実データでも要再確認 | #667 にコメント |
 | 字義の根 (a)∪(b) と (b_live) の差が 0 件 | 差が出るのは即値参照が出た時のみ。 現データでは判断に影響しない | #667 にコメント (設計の記録) |
 | 根 314 関数の偶発一致 (数値定数との偶然の一致) は未判別 | RVA32 の判定は「整列 4 バイト値 = RVA」のみ。 表らしさ (連続性) は未検査 | #667 にコメント |
 | (d) 参照なし 1,477 関数 / 738,944 B は dead code 候補にすぎない | 間接経路が他にある可能性。 未使用の確定ではない | #667 にコメント / 次タスク (§8c) |
