@@ -78,7 +78,54 @@ static uint32_t g_msg_time; static WPOINT g_msg_pt;
 static WRECT g_dirty[GUI_MAX_SURF]; static uint8_t g_hasdirty[GUI_MAX_SURF]; static volatile int g_any_dirty; static uint32_t g_last_flush;
 static uint32_t g_ztop;
 static uint8_t *g_surf_ptr[GUI_MAX_SURF];   /* native(64bit) 用の実ポインタ。wasm32 では s->pixels と同値 */
-uint8_t *gui_surf_ptr(int id) { return g_surf_ptr[id]; }
+
+/* host (headless render thread) 向けの不変スナップショット (px,w,h)。shim は surface の生成/再確保ごとに新しい SurfSnap を atomic に公開し、
+ * 旧 SurfSnap・旧画素の free は「その変更を伝える out ring レコードを host が消費し終える (out_ring.head が通過)」まで遅延する (GUI-12)。
+ * host は処理中の 1 レコードの間だけ参照し、その間は free されない。gui_lock を host が取る案は out ring 満杯時に shim (lock 保持で push 待ち) と
+ * デッドロックするため採らない。 */
+typedef struct SurfSnap { uint32_t *px; uint32_t w, h; } SurfSnap;
+static SurfSnap *g_surf_snap[GUI_MAX_SURF];
+int gui_surf_snapshot(int id, uint32_t **px, uint32_t *w, uint32_t *h) {
+  SurfSnap *sn = __atomic_load_n(&g_surf_snap[id], __ATOMIC_ACQUIRE);
+  if (!sn) return 0;
+  *px = sn->px; *w = sn->w; *h = sn->h;
+  return 1;
+}
+typedef struct Retired { void *a, *b; uint32_t pos; struct Retired *next; } Retired;
+static Retired *g_retired;
+/* gui_lock 下で、a/b を out ring の現 tail (= 直前に push した変更レコードを含む) を host が消費し終えてから free するよう登録する */
+static void reap_locked(void);
+static void retire_locked(void *a, void *b) {
+#ifdef GUI12_NEGCTL_IMMEDIATE_FREE   /* ネガコン専用: 修正前の挙動 (即 free) に戻す。tools/gui/test/gui12_race.sh だけが定義する */
+  free(a); free(b); return;
+#endif
+  reap_locked();
+  Retired *r = (Retired *)malloc(sizeof *r);
+  if (!r) gui_failfast("surface", "retire alloc failed");
+  r->a = a; r->b = b; r->pos = __atomic_load_n(&gui_sh()->out_ring.tail, __ATOMIC_ACQUIRE);
+  r->next = g_retired; g_retired = r;
+}
+static void reap_locked(void) {
+  uint32_t head = __atomic_load_n(&gui_sh()->out_ring.head, __ATOMIC_ACQUIRE);
+  Retired **pp = &g_retired;
+  while (*pp) {
+    Retired *r = *pp;
+    if ((int32_t)(head - r->pos) >= 0) { *pp = r->next; free(r->a); free(r->b); free(r); }
+    else pp = &r->next;
+  }
+}
+uint32_t gui_surf_retired_count(void) {
+  gui_lock(); reap_locked(); uint32_t n = 0;
+  for (Retired *r = g_retired; r; r = r->next) n++;
+  gui_unlock();
+  return n;
+}
+static SurfSnap *snap_new(uint32_t *px, uint32_t w, uint32_t h) {
+  SurfSnap *sn = (SurfSnap *)malloc(sizeof *sn);
+  if (!sn) gui_failfast("surface", "snapshot alloc failed");
+  sn->px = px; sn->w = w; sn->h = h;
+  return sn;
+}
 
 int surf_view(int id, SurfView *v) {
   GuiShared *sh = gui_sh();
@@ -126,6 +173,7 @@ void surf_flush(void) {
   GuiShared *sh = gui_sh();
   gui_lock();
   g_any_dirty = 0; g_last_flush = gui_now_ms();
+  reap_locked();
   int any = 0;
   uint32_t seq = sh->present_seq + 1;
   for (int i = 0; i < (int)GUI_MAX_SURF; i++) if (sh->surf[i].state) surf_wseq_end(i);   /* PRESENT を見た host が読む前に静止を宣言 */
@@ -158,6 +206,7 @@ static int surf_alloc(int x, int y, int w, int h, const char *title) {
     for (size_t k = 0; k < (size_t)w * h; k++) px[k] = 0xFF000000u;
     s->x = x; s->y = y; s->w = (uint32_t)w; s->h = (uint32_t)h; s->stride = (uint32_t)w * 4;
     s->pixels = (uint32_t)(uintptr_t)px; g_surf_ptr[i] = (uint8_t *)px; s->gen++; s->z = ++g_ztop; s->visible = 0;
+    __atomic_store_n(&g_surf_snap[i], snap_new(px, (uint32_t)w, (uint32_t)h), __ATOMIC_RELEASE);
     snprintf(s->title, sizeof s->title, "%s", title ? title : "");
     __atomic_store_n(&s->state, 1, __ATOMIC_SEQ_CST);
     out_cmd(GUI_CMD_SURF_CREATE, (uint32_t)i, 0, 0, 0, 0, 0);
@@ -174,7 +223,8 @@ static void surf_free(int id) {
   if (s->state) {
     out_cmd(GUI_CMD_SURF_DESTROY, (uint32_t)id, 0, 0, 0, 0, 0);
     __atomic_store_n(&s->state, 0, __ATOMIC_SEQ_CST);
-    free(g_surf_ptr[id]);
+    SurfSnap *osn = __atomic_exchange_n(&g_surf_snap[id], NULL, __ATOMIC_ACQ_REL);
+    retire_locked(g_surf_ptr[id], osn);   /* host が SURF_DESTROY (と先行レコード) を消費するまで free しない */
     g_surf_ptr[id] = NULL; s->pixels = 0; g_hasdirty[id] = 0;
   }
   gui_unlock();
@@ -193,9 +243,10 @@ static void surf_resize(int id, int w, int h) {
   for (int y = 0; y < ch; y++) memcpy(np + (size_t)y * w, op + (size_t)y * s->w, (size_t)cw * 4);
   gui_lock();
   s->w = (uint32_t)w; s->h = (uint32_t)h; s->stride = (uint32_t)w * 4; s->pixels = (uint32_t)(uintptr_t)np; g_surf_ptr[id] = (uint8_t *)np; s->gen++;
+  SurfSnap *osn = __atomic_exchange_n(&g_surf_snap[id], snap_new(np, (uint32_t)w, (uint32_t)h), __ATOMIC_ACQ_REL);
   gui_unlock();
-  free(op);
   out_cmd(GUI_CMD_SURF_CHANGE, (uint32_t)id, 0, 0, 0, 0, 0);
+  gui_lock(); retire_locked(op, osn); gui_unlock();   /* SURF_CHANGE push 後の tail を host が消費し終えるまで旧画素を保持 */
 }
 
 /* ================= 関数ポインタ解決 (lift の VA -> 関数) ================= */

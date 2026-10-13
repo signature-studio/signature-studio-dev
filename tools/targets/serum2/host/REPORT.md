@@ -94,9 +94,57 @@
   | 1. dialog queue probe (+0x139bc8 の xor) は run ごとに値が揺れ (heap 未初期化領域を含む、unpatched+lic_sent と unpatched+demo_payload で setState 前後とも同値) | dialog 発火の判定に使えない。demo 分岐は sentinel 非適用でのみ観測 | #256 (SR-1c) — +0x10c 解明後に観測点を再設計 |
   | 2. controller 側: payload に `kAudioUnitParameterFlag_IsHighResolution=false` を入れても demo bit (this+0x22792) = 0、0x800010 未受信、保存 state にマーカ無し。ゲート +0x10c == 2 のまま (§3-3 と同じ) | controller 側の demo 分岐・0x800010 経路は実 DLL で未観測 | #256 (SR-1c) |
   | 3. ~~writer/reader の lift 範囲未確定~~ → **#340 で判断済み (§5-1)**: nlohmann CBOR 実装は置換除外せず lift 対象に含める | — | 解決 (#340)。IR 化・実行は SR-3/SR-4 側 |
-  | 4. #238 契約突合: 「demoVersion 検出 → 復元打切り」は実 DLL で processor 側のみ確認。「productVersion 2.1.5 ≥ 2.0.20 → store 無し」は §3-4 (meta) のとおり変化なし、payload 側 productVersion を下げる A/B は未実施 | #238 契約の productVersion 側が実 DLL で未突合 | #341 (SR-1e: productVersion 下げ A/B) / 関連 #238 |
+  | 4. ~~#238 契約突合 (payload 側 productVersion 下げ A/B 未実施)~~ — **§3-6 で実施 (#341)** | — | §3-6 |
 
 - e2e: `bash tools/targets/serum2/host/e2e.sh` = **23/23 OK, 39.7 s** (ベースライン 14/14 は 43.0 s)。本ファイル内の e2e 結果・所要はここだけに記載。
+- (#341 での再現: 同一 DLL・同一 e2e で 23/23 OK, 44.1 s, load average 0.66 (開始時 1 分値), wine 9.0, Actions runner。§3-6 の追加前のベースライン)
+
+### 3-6. [SR-1e #341] payload 側 productVersion を下げる A/B と #238 契約の実 DLL 突合 (実測 2026-10-13)
+既知類型との関係 (`docs/DEFECTS.md`): 該当なし (実 DLL の A/B 観測。lift 前)。検証起点: 実装 commit `b251dd9` (ブランチ `341-serum2-payload-productversion`)。
+
+**結論**: (1) 既定の host (controller `+0xdc`==2) では payload `productVersion` を 2.0.19 に下げても **patched/unpatched とも無変化** (4 run, §3-4 の meta 側と同じ)。(2) 契約の比較命令 (0x1800c2d39 の `"2.0.20"` 比較) は `cmp [this+0xdc],1` ゲート (0x1800c2cd7) の内側にあり、ゲートを host から 1 に強制 (`S2HOST_FORCE_GATE=1`) すると **unpatched で #238 契約と一致**: payload pv 2.1.5 → demo bit 0 / 0x800010 無し、pv 2.0.19 → **demo bit 1 / 0x800010 受信**。(3) **不一致 1 件**: patched (mpatch N2a-1) + 強制ゲート + pv 2.1.5 で demo bit = 1 (後述)。
+
+- **case**: `make_cases.py` に `lowver` を追加 = `lic_sent` (sentinel) + payload DOM 最上位 `productVersion` を `2.1.5`→`2.0.19`。**meta の productVersion は 2.1.5 のまま**なので、効果は payload 側だけに帰属する (生成時に seed の pv==2.1.5 を assert)。
+- **A/B 4 run (既定ゲート, 受入条件)**: gate = `*(int*)(ctrl+0xdc)` を setState 直前に記録 (`gate_0xdc_before_ctrl_setstate`)。
+
+  | run | gate | setState 3 系 | sentinel (proc/ctrl) | demo bit | 0x800010 | 保存 pv (proc/ctrl) |
+  |---|---|---|---|---|---|---|
+  | patched + lowver | 2 | 0/0/0 | 適用/適用 | 0 | 無し | 2.1.5/2.1.5 |
+  | unpatched + lowver | 2 | 0/0/0 | 適用/適用 | 0 | 無し | 2.1.5/2.1.5 |
+  | patched + lic_sent (対照, §3-5) | 2 | 0/0/0 | 適用/適用 | 0 | 無し | 2.1.5/2.1.5 |
+  | unpatched + lic_sent (対照, §3-5) | 2 | 0/0/0 | 適用/適用 | 0 | 無し | 2.1.5/2.1.5 |
+
+  - 保存 pv が 2.1.5 に戻るのは、getState が現在の製品版を書き直すためと推定 (未検証。実測事実は「保存 pv が全 run で 2.1.5」まで。processor の復元自体は sentinel 適用で確認済み)。
+- **強制ゲート A/B (追加。契約の比較命令へ到達させる実験)**: `vst3host.cpp` に環境変数 `S2HOST_FORCE_GATE=<n>` を追加 (ctrl `setState` 直前に `+0xdc` へ書込。未設定なら従来どおり無変更)。ゲート内容は 0x1800c2cd7 `cmp dword [rsi+0xdc],1; jne 0x1800c2f08` を逆アセンブルで確認。**host 側の強制であり、実 host で +0xdc が 1 になる条件は未解明** (§3-3, SR-1c #256)。
+
+  | run (gate=1 強制) | demo bit | 0x800010 | 保存 controller state の demo マーカ | #238 契約の予測 | 一致 |
+  |---|---|---|---|---|---|
+  | unpatched + lic_sent (pv 2.1.5) | 0 | 無し | 無し | store 無し (bit 0) | **一致** |
+  | unpatched + lowver (pv 2.0.19) | **1** | **受信** | **有り** (getState が書く) | `<2.0.20` → bit 1 + 0x800010 | **一致** |
+  | unpatched + demo_payload (ctrl マーカ false) | 1 | 受信 | 有り | マーカ経路 → bit 1 + 0x800010 | 一致 (初の実 DLL 0x800010 観測) |
+  | patched + lowver | 0 | 無し | 無し | authstub: 常時 bit 0 / 通知 skip | 一致 |
+  | patched + demo_payload | 0 | 無し | 無し | 同上 | 一致 |
+  | **patched + lic_sent (pv 2.1.5)** | **1** | 無し | 無し | 常時 bit 0 (IR pass 設計) | **不一致 (bit のみ)** |
+
+  - 再現性: 強制ゲート × {patched, unpatched} × {lic_sent, lowver} を各 5 回 (計 20 run, 4 blocks): 各構成で 5/5 同値 (bit と 0x800010 の有無)。
+  - **不一致の原因 (逆アセンブル, high)**: mpatch N2a-1 は `xor al,1` → `xor al,0` (0x1800c2cfc)。bit = lookup 値そのもの (キー `kAudioUnitParameterFlag_IsHighResolution` 不在時の既定値 true=1)。IR pass の「store 常時 0」(`authstub/REPORT.md` N2a) と機械語パッチ (「xor al,0」) は**同値ではない**。影響は限定的: N2b-2 (jmp) が 0x800010 通知を、N3 が getState のマーカ書込を抑止するため、観測できる外部効果は demo bit 内部値のみ。
+  - 同じ強制ゲート下で、全 run (licensed 形の lic_sent 含む) に `restartComponent(0x1000010)` が 2 回追加で出る (+0x1000000 ビットの由来は未解析)。
+- **#238 契約との突合**: 「productVersion 2.1.5 ≥ 2.0.20 → store 無し」= unpatched/gate=1 で **一致** (bit 0)。逆向き (pv <2.0.20 → demo bit 1 + 0x800010) も **一致**。比較に使われる pv は **payload DOM 側** (meta は 2.1.5 固定でも効く)。ただし既定 host ではゲート不通過のため、契約の pv 比較は「到達すれば成立」の条件付き。
+- **判定ゲート**: `summarize.py` は上表の各行を個別に chk (合計 50 チェック)。`e2e.sh` はさらに**ネガティブコントロール**を内蔵 (summary を 1 つ差し替えて summarize が FAIL することを確認し、FAIL しなければ exit 3)。
+  - NC1: unpatched+g1+lowver の summary を lic_sent のもの (bit 0) に差替 → summarize exit=1, NG=1。
+  - NC2: gate==2 の unpatched+lowver の summary を g1+lowver のもの (bit 1) に差替 → exit=1, NG=1。
+  - 「不一致」行は `[KNOWN-DIVERGENCE]` として現状値 (bit==1) を pin。修正されて bit==0 になると NG になり再確認を促す。
+  - 判定が NG のとき e2e.sh は非 0 で終了 (`PIPESTATUS`)。
+- **e2e (コミット済み HEAD `b251dd9` で 3 回)**: **50/50 OK, 66.94 / 66.98 / 66.95 s (min–max 66.94–66.98), load average (1 分値, 開始時) 0.00 / 0.02 / 0.01, 並列 1 (逐次), NC1/NC2 とも期待どおり**。3 回とも各回 `work/out_*` / `cases` を削除してから再実行。追加前は 23/23 OK, 44.1 s。最終 HEAD `99ca79f` (b251dd9 からの差分は summarize.py のコメントと REPORT のみ) でも 1 回再実行: 50/50 OK, 66.94 s, load 0.10, NC1/NC2 期待どおり。
+- **範囲外**: meta のみ pv を下げる A/B (§3-4 で meta は 2.1.5 固定のみ。meta 側を下げた場合は未実施)、controller +0xdc の setter 特定 (SR-1c #256)、wasm/IR 側の再検証 (CAB-237 ハーネスの bit≡0 主張は本 A/B と上記の不一致を踏まえた再確認が必要)。
+- **DEFECTS 行案** (PM 判断で追記): 類型「機械語パッチと IR pass の意図不一致」— 症状: patched+gate=1+pv≥2.0.20 で demo bit=1 / 根拠: N2a-1 が `xor al,0` で lookup 値をそのまま store / 観測: §3-6 表 / 検出信号: 強制ゲート A/B の bit / 修復: N2a-1 を `mov al,0` 相当 (xor→定数) に変えるか、bit を読む箇所を別途中和。
+
+  | 未解決 | 影響 | 起票先 |
+  |---|---|---|
+  | 1. patched DLL (mpatch N2a-1) で gate=1 時 demo bit=1 (IR pass の「常時 0」と不一致) | authstub 機械語版と wasm 版の等価性主張に穴。外部効果は無いが内部 bit が 1 | #623 (SR-2c) / 関連 #238 |
+  | 2. 強制ゲート下で全 run に `0x1000010` が追加で出る (由来未解析) | gate=1 の副作用の切り分け不足 | #256 (SR-1c) にコメント |
+  | 3. 既定 host で +0xdc が 2 のまま (ゲート不通過) | 契約の pv 比較は強制ゲート下でのみ到達を確認 | #256 (SR-1c) |
+  | 4. meta 側のみ pv を下げる A/B 未実施 | payload/meta のどちらが比較に使われるかの排他確認は payload 側のみ | 本 issue 範囲外。必要なら新規 SR-1f |
 
 ## 4. 受け入れ条件との対合 (CAB-68)
 
@@ -109,7 +157,7 @@
 
 ## 5. 引継ぎ (CAB-74 / SR-3 系)
 
-1. ~~payload の解読~~ — **完了 (#255, §3-5): CBOR と判明**。~~writer/reader の lift 要否判断~~ — **完了 (#340, §5-1)**。残: payload 側 productVersion 下げ A/B (#341)。
+1. ~~payload の解読~~ — **完了 (#255, §3-5): CBOR と判明**。~~writer/reader の lift 要否判断~~ — **完了 (#340, §5-1)**。payload 側 productVersion 下げ A/B は **完了 (#341, §3-6)**。
 2. **controller +0x10c の setter 特定** — 0x800010 観測の前提。候補: IConnectionPoint notify ("SerumDSPSharedData") 処理部 / editor open 完走 / FX-class 区別。gdb watchpoint (wine) か lift で特定。
 3. ~~demoVersion 注入後の A/B E2E~~ — **processor 側は完了 (#255, §3-5)**。controller demo bit / 0x800010 は SR-1c。
 4. **WINEDEBUG=+relay による呼出 API 一覧化** — CAB-68 受け入れ #3 の API レベル証跡 (wine 固有の代役を除くリスト化)。
@@ -178,6 +226,7 @@ python3 tools/targets/serum2/host/make_cases.py host/work/state host/work/out_se
 WINEPREFIX=host/work/wineprefix wine64 host/work/build/vst3host.exe \
   'Z:\...\Serum2_win64.authstub.vst3' 'Z:\...\cases\licensed' 'Z:\...\out_x' 64 'Z:\...\exe_extract'
 ```
+- 強制ゲート実験 (#341): `S2HOST_FORCE_GATE=1 wine64 ... vst3host.exe ...` (e2e.sh が自動で実施)。python は `pefile` (mpatch.py) が必要 (`zstandard` は任意。無ければ zstd CLI)。
 - SR-1d (#340) 静的同定: `PY=<python+pefile,capstone,numpy> bash tools/targets/serum2/scripts/sr1d_run.sh` (§5-1)。
 - 前提: `wine64`, `g++-mingw-w64-x86-64`, `xvfb`(任意), CAB-71/237 資産 (`license/authstub/mpatch.py`, `synth_state.py`), 実 DLL `work/Serum2_win64.vst3`。
 - 成果物: `work/out_*/{log.txt, summary.json, saved_*_state.bin, audio_f32_interleaved.raw}` (gitignore)。

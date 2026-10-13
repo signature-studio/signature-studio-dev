@@ -1,0 +1,1089 @@
+{
+ "date": "2026-10-13T07:13:00.074Z",
+ "chrome": "headless google-chrome 154",
+ "runs": [
+  {
+   "name": "midi_all",
+   "query": "",
+   "ok": true,
+   "msg": "checks 54/54 (want 54)  js: synShortOk=true sysexOut=[[3000,true],[40000,true]] drumSent=0 handlerDetachedAfterClose=true",
+   "ms": 1974,
+   "result": {
+    "checks": [
+     {
+      "name": "numdevs",
+      "ok": 1,
+      "detail": "in=2 out=2 (want 2/2)"
+     },
+     {
+      "name": "in_caps_name",
+      "ok": 1,
+      "detail": "r=0 name='Mock Keyboard'"
+     },
+     {
+      "name": "in_caps_longname_trunc31",
+      "ok": 1,
+      "detail": "len=31 (want 31, NUL-terminated)"
+     },
+     {
+      "name": "in_caps_badid",
+      "ok": 1,
+      "detail": "id=2 -> BADDEVICEID"
+     },
+     {
+      "name": "out_caps_mapper",
+      "ok": 1,
+      "detail": "r=0 name='Mock Synth'"
+     },
+     {
+      "name": "errtext",
+      "ok": 1,
+      "detail": "known=0 unknown=9(want 9) text='Still something playing.'"
+     },
+     {
+      "name": "in_open_bad_id",
+      "ok": 1,
+      "detail": "id=7"
+     },
+     {
+      "name": "in_open_cb_null_ptr",
+      "ok": 1,
+      "detail": "CALLBACK_FUNCTION with cb=0"
+     },
+     {
+      "name": "in_open_window_unsupported",
+      "ok": 1,
+      "detail": "CALLBACK_WINDOW"
+     },
+     {
+      "name": "in_open",
+      "ok": 1,
+      "detail": "r=0 MIM_OPEN=1"
+     },
+     {
+      "name": "in_open_twice_allocated",
+      "ok": 1,
+      "detail": "same device"
+     },
+     {
+      "name": "in_addbuffer_unprepared",
+      "ok": 1,
+      "detail": "unprepared hdr"
+     },
+     {
+      "name": "in_addbuffer_badhandle",
+      "ok": 1,
+      "detail": "bad handle"
+     },
+     {
+      "name": "in_addbuffer",
+      "ok": 1,
+      "detail": "r=0,0 flags=6"
+     },
+     {
+      "name": "in_addbuffer_twice",
+      "ok": 1,
+      "detail": "already queued"
+     },
+     {
+      "name": "in_unprepare_inqueue",
+      "ok": 1,
+      "detail": "inqueue"
+     },
+     {
+      "name": "prestart_dropped",
+      "ok": 1,
+      "detail": "callbacks=0 prestart=10 (want 0/10)"
+     },
+     {
+      "name": "in_start",
+      "ok": 1,
+      "detail": "start"
+     },
+     {
+      "name": "short_all_delivered",
+      "ok": 1,
+      "detail": "callbacks=1000 (want 1000)"
+     },
+     {
+      "name": "short_seq_ok",
+      "ok": 1,
+      "detail": "seq_bad=0 callbacks=1000 (want 0/1000)"
+     },
+     {
+      "name": "short_ts_monotonic",
+      "ok": 1,
+      "detail": "ts_bad=0"
+     },
+     {
+      "name": "cb_thread_not_caller",
+      "ok": 1,
+      "detail": "cb thread != midiInOpen caller (yes)"
+     },
+     {
+      "name": "cb_single_thread",
+      "ok": 1,
+      "detail": "all MIM_DATA/LONGDATA on one MIDI thread (other=0)"
+     },
+     {
+      "name": "sysex_content",
+      "ok": 1,
+      "detail": "messages=2 bad=0 (want 2/0), LONGDATA calls=3 (want 3)"
+     },
+     {
+      "name": "sysex_split_across_buffers",
+      "ok": 1,
+      "detail": "LONGDATA=3 (300B:1 + 1000B:2)"
+     },
+     {
+      "name": "sysex_nobuf_counted",
+      "ok": 1,
+      "detail": "sx_nobuf=1 (want 1) delivered=4 (want 4 total)"
+     },
+     {
+      "name": "in_close_with_queued",
+      "ok": 1,
+      "detail": "close with queued buffer"
+     },
+     {
+      "name": "in_stop",
+      "ok": 1,
+      "detail": "stop"
+     },
+     {
+      "name": "stopped_dropped",
+      "ok": 1,
+      "detail": "callbacks +0 (want 0), prestart +5 (want 5)"
+     },
+     {
+      "name": "in_reset",
+      "ok": 1,
+      "detail": "returned unused buffers via LONGDATA(bytes=0): +1 (want 1)"
+     },
+     {
+      "name": "in_unprepare",
+      "ok": 1,
+      "detail": "after reset"
+     },
+     {
+      "name": "in_restart",
+      "ok": 1,
+      "detail": "restart"
+     },
+     {
+      "name": "ring_overflow_counted",
+      "ok": 1,
+      "detail": "accepted=4096 dropped=904 (sum want 5000, accepted want 4096 = ring 65536B / 16B)"
+     },
+     {
+      "name": "ring_overflow_oldest_kept",
+      "ok": 1,
+      "detail": "delivered=4096 (want 4096) seq_bad=0 (first 4096 in order)"
+     },
+     {
+      "name": "in_close",
+      "ok": 1,
+      "detail": "MIM_CLOSE=1"
+     },
+     {
+      "name": "in_close_again_invalhandle",
+      "ok": 1,
+      "detail": "double close"
+     },
+     {
+      "name": "in_start_closed_invalhandle",
+      "ok": 1,
+      "detail": "closed handle"
+     },
+     {
+      "name": "stale_slot_dropped",
+      "ok": 1,
+      "detail": "in_stale=3 (want 3, injected to closed slot) callbacks after close +0 (want 0)"
+     },
+     {
+      "name": "cb_order_inst_handle",
+      "ok": 1,
+      "detail": "inst/handle mismatches=0"
+     },
+     {
+      "name": "out_open_bad_id",
+      "ok": 1,
+      "detail": "id=9"
+     },
+     {
+      "name": "out_open_mapper",
+      "ok": 1,
+      "detail": "r=0 MOM_OPEN=1"
+     },
+     {
+      "name": "out_shortmsg_100",
+      "ok": 1,
+      "detail": "100 messages accepted"
+     },
+     {
+      "name": "out_shortmsg_badhandle",
+      "ok": 1,
+      "detail": "bad handle"
+     },
+     {
+      "name": "out_long_unprepared",
+      "ok": 1,
+      "detail": "unprepared"
+     },
+     {
+      "name": "out_long_3000",
+      "ok": 1,
+      "detail": "r=0 MOM_DONE=1 flags=3"
+     },
+     {
+      "name": "out_unprepare",
+      "ok": 1,
+      "detail": "after done"
+     },
+     {
+      "name": "out_ring_full_notready",
+      "ok": 1,
+      "detail": "first=0 second=67 (want 0/67)"
+     },
+     {
+      "name": "out_close_inflight",
+      "ok": 1,
+      "detail": "close while in flight"
+     },
+     {
+      "name": "out_long_40000_done",
+      "ok": 1,
+      "detail": "MOM_DONE +1"
+     },
+     {
+      "name": "out_close",
+      "ok": 1,
+      "detail": "MOM_CLOSE=1"
+     },
+     {
+      "name": "out_shortmsg_after_close",
+      "ok": 1,
+      "detail": "closed handle"
+     },
+     {
+      "name": "hotplug_statechange",
+      "ok": 1,
+      "detail": "numdevs=3 scan_gen 1->2"
+     },
+     {
+      "name": "hotplug_new_name",
+      "ok": 1,
+      "detail": "name='Hotplugged Pad'"
+     },
+     {
+      "name": "rescan_rpc",
+      "ok": 1,
+      "detail": "numdevs=2 (want 2)"
+     }
+    ],
+    "stats": [
+     5108,
+     5119,
+     904,
+     0,
+     102,
+     0,
+     1,
+     1,
+     3,
+     15,
+     3,
+     2,
+     2,
+     83552,
+     83552
+    ],
+    "js": {
+     "phases": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11
+     ],
+     "handlerAfterClose": true,
+     "noHandlerEmits": 3,
+     "outSent": {
+      "syn": 102,
+      "drum": 0
+     },
+     "synFirst": [
+      [
+       144,
+       0,
+       0
+      ],
+      [
+       145,
+       1,
+       0
+      ],
+      [
+       146,
+       2,
+       0
+      ]
+     ],
+     "synShortOk": true,
+     "synSysex": [
+      {
+       "len": 3000,
+       "ok": true
+      },
+      {
+       "len": 40000,
+       "ok": true
+      }
+     ],
+     "commands": 5,
+     "kbOpened": 1
+    },
+    "snapshot": {
+     "in_dropped": 904
+    }
+   },
+   "error": null
+  },
+  {
+   "name": "negctl_drop_one_short_msg",
+   "query": "corrupt=drop500",
+   "ok": true,
+   "msg": "FAIL した check = [\"short_seq_ok\",\"ring_overflow_oldest_kept\"] (short_seq_ok を含み、巻き込み FAIL が 3 件以内なら検出成功)",
+   "ms": 62591,
+   "result": {
+    "checks": [
+     {
+      "name": "numdevs",
+      "ok": 1,
+      "detail": "in=2 out=2 (want 2/2)"
+     },
+     {
+      "name": "in_caps_name",
+      "ok": 1,
+      "detail": "r=0 name='Mock Keyboard'"
+     },
+     {
+      "name": "in_caps_longname_trunc31",
+      "ok": 1,
+      "detail": "len=31 (want 31, NUL-terminated)"
+     },
+     {
+      "name": "in_caps_badid",
+      "ok": 1,
+      "detail": "id=2 -> BADDEVICEID"
+     },
+     {
+      "name": "out_caps_mapper",
+      "ok": 1,
+      "detail": "r=0 name='Mock Synth'"
+     },
+     {
+      "name": "errtext",
+      "ok": 1,
+      "detail": "known=0 unknown=9(want 9) text='Still something playing.'"
+     },
+     {
+      "name": "in_open_bad_id",
+      "ok": 1,
+      "detail": "id=7"
+     },
+     {
+      "name": "in_open_cb_null_ptr",
+      "ok": 1,
+      "detail": "CALLBACK_FUNCTION with cb=0"
+     },
+     {
+      "name": "in_open_window_unsupported",
+      "ok": 1,
+      "detail": "CALLBACK_WINDOW"
+     },
+     {
+      "name": "in_open",
+      "ok": 1,
+      "detail": "r=0 MIM_OPEN=1"
+     },
+     {
+      "name": "in_open_twice_allocated",
+      "ok": 1,
+      "detail": "same device"
+     },
+     {
+      "name": "in_addbuffer_unprepared",
+      "ok": 1,
+      "detail": "unprepared hdr"
+     },
+     {
+      "name": "in_addbuffer_badhandle",
+      "ok": 1,
+      "detail": "bad handle"
+     },
+     {
+      "name": "in_addbuffer",
+      "ok": 1,
+      "detail": "r=0,0 flags=6"
+     },
+     {
+      "name": "in_addbuffer_twice",
+      "ok": 1,
+      "detail": "already queued"
+     },
+     {
+      "name": "in_unprepare_inqueue",
+      "ok": 1,
+      "detail": "inqueue"
+     },
+     {
+      "name": "prestart_dropped",
+      "ok": 1,
+      "detail": "callbacks=0 prestart=10 (want 0/10)"
+     },
+     {
+      "name": "in_start",
+      "ok": 1,
+      "detail": "start"
+     },
+     {
+      "name": "short_all_delivered",
+      "ok": 1,
+      "detail": "callbacks=999 (want 1000)"
+     },
+     {
+      "name": "short_seq_ok",
+      "ok": 0,
+      "detail": "seq_bad=1 callbacks=999 (want 0/1000)"
+     },
+     {
+      "name": "short_ts_monotonic",
+      "ok": 1,
+      "detail": "ts_bad=0"
+     },
+     {
+      "name": "cb_thread_not_caller",
+      "ok": 1,
+      "detail": "cb thread != midiInOpen caller (yes)"
+     },
+     {
+      "name": "cb_single_thread",
+      "ok": 1,
+      "detail": "all MIM_DATA/LONGDATA on one MIDI thread (other=0)"
+     },
+     {
+      "name": "sysex_content",
+      "ok": 1,
+      "detail": "messages=2 bad=0 (want 2/0), LONGDATA calls=3 (want 3)"
+     },
+     {
+      "name": "sysex_split_across_buffers",
+      "ok": 1,
+      "detail": "LONGDATA=3 (300B:1 + 1000B:2)"
+     },
+     {
+      "name": "sysex_nobuf_counted",
+      "ok": 1,
+      "detail": "sx_nobuf=1 (want 1) delivered=4 (want 4 total)"
+     },
+     {
+      "name": "in_close_with_queued",
+      "ok": 1,
+      "detail": "close with queued buffer"
+     },
+     {
+      "name": "in_stop",
+      "ok": 1,
+      "detail": "stop"
+     },
+     {
+      "name": "stopped_dropped",
+      "ok": 1,
+      "detail": "callbacks +0 (want 0), prestart +5 (want 5)"
+     },
+     {
+      "name": "in_reset",
+      "ok": 1,
+      "detail": "returned unused buffers via LONGDATA(bytes=0): +1 (want 1)"
+     },
+     {
+      "name": "in_unprepare",
+      "ok": 1,
+      "detail": "after reset"
+     },
+     {
+      "name": "in_restart",
+      "ok": 1,
+      "detail": "restart"
+     },
+     {
+      "name": "ring_overflow_counted",
+      "ok": 1,
+      "detail": "accepted=4096 dropped=904 (sum want 5000, accepted want 4096 = ring 65536B / 16B)"
+     },
+     {
+      "name": "ring_overflow_oldest_kept",
+      "ok": 0,
+      "detail": "delivered=4096 (want 4096) seq_bad=1 (first 4096 in order)"
+     },
+     {
+      "name": "in_close",
+      "ok": 1,
+      "detail": "MIM_CLOSE=1"
+     },
+     {
+      "name": "in_close_again_invalhandle",
+      "ok": 1,
+      "detail": "double close"
+     },
+     {
+      "name": "in_start_closed_invalhandle",
+      "ok": 1,
+      "detail": "closed handle"
+     },
+     {
+      "name": "stale_slot_dropped",
+      "ok": 1,
+      "detail": "in_stale=3 (want 3, injected to closed slot) callbacks after close +0 (want 0)"
+     },
+     {
+      "name": "cb_order_inst_handle",
+      "ok": 1,
+      "detail": "inst/handle mismatches=0"
+     },
+     {
+      "name": "out_open_bad_id",
+      "ok": 1,
+      "detail": "id=9"
+     },
+     {
+      "name": "out_open_mapper",
+      "ok": 1,
+      "detail": "r=0 MOM_OPEN=1"
+     },
+     {
+      "name": "out_shortmsg_100",
+      "ok": 1,
+      "detail": "100 messages accepted"
+     },
+     {
+      "name": "out_shortmsg_badhandle",
+      "ok": 1,
+      "detail": "bad handle"
+     },
+     {
+      "name": "out_long_unprepared",
+      "ok": 1,
+      "detail": "unprepared"
+     },
+     {
+      "name": "out_long_3000",
+      "ok": 1,
+      "detail": "r=0 MOM_DONE=1 flags=3"
+     },
+     {
+      "name": "out_unprepare",
+      "ok": 1,
+      "detail": "after done"
+     },
+     {
+      "name": "out_ring_full_notready",
+      "ok": 1,
+      "detail": "first=0 second=67 (want 0/67)"
+     },
+     {
+      "name": "out_close_inflight",
+      "ok": 1,
+      "detail": "close while in flight"
+     },
+     {
+      "name": "out_long_40000_done",
+      "ok": 1,
+      "detail": "MOM_DONE +1"
+     },
+     {
+      "name": "out_close",
+      "ok": 1,
+      "detail": "MOM_CLOSE=1"
+     },
+     {
+      "name": "out_shortmsg_after_close",
+      "ok": 1,
+      "detail": "closed handle"
+     },
+     {
+      "name": "hotplug_statechange",
+      "ok": 1,
+      "detail": "numdevs=3 scan_gen 1->2"
+     },
+     {
+      "name": "hotplug_new_name",
+      "ok": 1,
+      "detail": "name='Hotplugged Pad'"
+     },
+     {
+      "name": "rescan_rpc",
+      "ok": 1,
+      "detail": "numdevs=2 (want 2)"
+     }
+    ],
+    "stats": [
+     5107,
+     5118,
+     904,
+     0,
+     102,
+     0,
+     1,
+     1,
+     3,
+     15,
+     3,
+     2,
+     2,
+     83536,
+     83536
+    ],
+    "js": {
+     "phases": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11
+     ],
+     "handlerAfterClose": true,
+     "noHandlerEmits": 3,
+     "outSent": {
+      "syn": 102,
+      "drum": 0
+     },
+     "synFirst": [
+      [
+       144,
+       0,
+       0
+      ],
+      [
+       145,
+       1,
+       0
+      ],
+      [
+       146,
+       2,
+       0
+      ]
+     ],
+     "synShortOk": true,
+     "synSysex": [
+      {
+       "len": 3000,
+       "ok": true
+      },
+      {
+       "len": 40000,
+       "ok": true
+      }
+     ],
+     "commands": 5,
+     "kbOpened": 1
+    },
+    "snapshot": {
+     "in_dropped": 904
+    }
+   },
+   "error": null
+  },
+  {
+   "name": "negctl_flip_sysex_bit",
+   "query": "corrupt=sysexflip",
+   "ok": true,
+   "msg": "FAIL した check = [\"sysex_content\"] (sysex_content を含み、巻き込み FAIL が 3 件以内なら検出成功)",
+   "ms": 1937,
+   "result": {
+    "checks": [
+     {
+      "name": "numdevs",
+      "ok": 1,
+      "detail": "in=2 out=2 (want 2/2)"
+     },
+     {
+      "name": "in_caps_name",
+      "ok": 1,
+      "detail": "r=0 name='Mock Keyboard'"
+     },
+     {
+      "name": "in_caps_longname_trunc31",
+      "ok": 1,
+      "detail": "len=31 (want 31, NUL-terminated)"
+     },
+     {
+      "name": "in_caps_badid",
+      "ok": 1,
+      "detail": "id=2 -> BADDEVICEID"
+     },
+     {
+      "name": "out_caps_mapper",
+      "ok": 1,
+      "detail": "r=0 name='Mock Synth'"
+     },
+     {
+      "name": "errtext",
+      "ok": 1,
+      "detail": "known=0 unknown=9(want 9) text='Still something playing.'"
+     },
+     {
+      "name": "in_open_bad_id",
+      "ok": 1,
+      "detail": "id=7"
+     },
+     {
+      "name": "in_open_cb_null_ptr",
+      "ok": 1,
+      "detail": "CALLBACK_FUNCTION with cb=0"
+     },
+     {
+      "name": "in_open_window_unsupported",
+      "ok": 1,
+      "detail": "CALLBACK_WINDOW"
+     },
+     {
+      "name": "in_open",
+      "ok": 1,
+      "detail": "r=0 MIM_OPEN=1"
+     },
+     {
+      "name": "in_open_twice_allocated",
+      "ok": 1,
+      "detail": "same device"
+     },
+     {
+      "name": "in_addbuffer_unprepared",
+      "ok": 1,
+      "detail": "unprepared hdr"
+     },
+     {
+      "name": "in_addbuffer_badhandle",
+      "ok": 1,
+      "detail": "bad handle"
+     },
+     {
+      "name": "in_addbuffer",
+      "ok": 1,
+      "detail": "r=0,0 flags=6"
+     },
+     {
+      "name": "in_addbuffer_twice",
+      "ok": 1,
+      "detail": "already queued"
+     },
+     {
+      "name": "in_unprepare_inqueue",
+      "ok": 1,
+      "detail": "inqueue"
+     },
+     {
+      "name": "prestart_dropped",
+      "ok": 1,
+      "detail": "callbacks=0 prestart=10 (want 0/10)"
+     },
+     {
+      "name": "in_start",
+      "ok": 1,
+      "detail": "start"
+     },
+     {
+      "name": "short_all_delivered",
+      "ok": 1,
+      "detail": "callbacks=1000 (want 1000)"
+     },
+     {
+      "name": "short_seq_ok",
+      "ok": 1,
+      "detail": "seq_bad=0 callbacks=1000 (want 0/1000)"
+     },
+     {
+      "name": "short_ts_monotonic",
+      "ok": 1,
+      "detail": "ts_bad=0"
+     },
+     {
+      "name": "cb_thread_not_caller",
+      "ok": 1,
+      "detail": "cb thread != midiInOpen caller (yes)"
+     },
+     {
+      "name": "cb_single_thread",
+      "ok": 1,
+      "detail": "all MIM_DATA/LONGDATA on one MIDI thread (other=0)"
+     },
+     {
+      "name": "sysex_content",
+      "ok": 0,
+      "detail": "messages=2 bad=1 (want 2/0), LONGDATA calls=3 (want 3)"
+     },
+     {
+      "name": "sysex_split_across_buffers",
+      "ok": 1,
+      "detail": "LONGDATA=3 (300B:1 + 1000B:2)"
+     },
+     {
+      "name": "sysex_nobuf_counted",
+      "ok": 1,
+      "detail": "sx_nobuf=1 (want 1) delivered=4 (want 4 total)"
+     },
+     {
+      "name": "in_close_with_queued",
+      "ok": 1,
+      "detail": "close with queued buffer"
+     },
+     {
+      "name": "in_stop",
+      "ok": 1,
+      "detail": "stop"
+     },
+     {
+      "name": "stopped_dropped",
+      "ok": 1,
+      "detail": "callbacks +0 (want 0), prestart +5 (want 5)"
+     },
+     {
+      "name": "in_reset",
+      "ok": 1,
+      "detail": "returned unused buffers via LONGDATA(bytes=0): +1 (want 1)"
+     },
+     {
+      "name": "in_unprepare",
+      "ok": 1,
+      "detail": "after reset"
+     },
+     {
+      "name": "in_restart",
+      "ok": 1,
+      "detail": "restart"
+     },
+     {
+      "name": "ring_overflow_counted",
+      "ok": 1,
+      "detail": "accepted=4096 dropped=904 (sum want 5000, accepted want 4096 = ring 65536B / 16B)"
+     },
+     {
+      "name": "ring_overflow_oldest_kept",
+      "ok": 1,
+      "detail": "delivered=4096 (want 4096) seq_bad=0 (first 4096 in order)"
+     },
+     {
+      "name": "in_close",
+      "ok": 1,
+      "detail": "MIM_CLOSE=1"
+     },
+     {
+      "name": "in_close_again_invalhandle",
+      "ok": 1,
+      "detail": "double close"
+     },
+     {
+      "name": "in_start_closed_invalhandle",
+      "ok": 1,
+      "detail": "closed handle"
+     },
+     {
+      "name": "stale_slot_dropped",
+      "ok": 1,
+      "detail": "in_stale=3 (want 3, injected to closed slot) callbacks after close +0 (want 0)"
+     },
+     {
+      "name": "cb_order_inst_handle",
+      "ok": 1,
+      "detail": "inst/handle mismatches=0"
+     },
+     {
+      "name": "out_open_bad_id",
+      "ok": 1,
+      "detail": "id=9"
+     },
+     {
+      "name": "out_open_mapper",
+      "ok": 1,
+      "detail": "r=0 MOM_OPEN=1"
+     },
+     {
+      "name": "out_shortmsg_100",
+      "ok": 1,
+      "detail": "100 messages accepted"
+     },
+     {
+      "name": "out_shortmsg_badhandle",
+      "ok": 1,
+      "detail": "bad handle"
+     },
+     {
+      "name": "out_long_unprepared",
+      "ok": 1,
+      "detail": "unprepared"
+     },
+     {
+      "name": "out_long_3000",
+      "ok": 1,
+      "detail": "r=0 MOM_DONE=1 flags=3"
+     },
+     {
+      "name": "out_unprepare",
+      "ok": 1,
+      "detail": "after done"
+     },
+     {
+      "name": "out_ring_full_notready",
+      "ok": 1,
+      "detail": "first=0 second=67 (want 0/67)"
+     },
+     {
+      "name": "out_close_inflight",
+      "ok": 1,
+      "detail": "close while in flight"
+     },
+     {
+      "name": "out_long_40000_done",
+      "ok": 1,
+      "detail": "MOM_DONE +1"
+     },
+     {
+      "name": "out_close",
+      "ok": 1,
+      "detail": "MOM_CLOSE=1"
+     },
+     {
+      "name": "out_shortmsg_after_close",
+      "ok": 1,
+      "detail": "closed handle"
+     },
+     {
+      "name": "hotplug_statechange",
+      "ok": 1,
+      "detail": "numdevs=3 scan_gen 1->2"
+     },
+     {
+      "name": "hotplug_new_name",
+      "ok": 1,
+      "detail": "name='Hotplugged Pad'"
+     },
+     {
+      "name": "rescan_rpc",
+      "ok": 1,
+      "detail": "numdevs=2 (want 2)"
+     }
+    ],
+    "stats": [
+     5108,
+     5119,
+     904,
+     0,
+     102,
+     0,
+     1,
+     1,
+     3,
+     15,
+     3,
+     2,
+     2,
+     83552,
+     83552
+    ],
+    "js": {
+     "phases": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11
+     ],
+     "handlerAfterClose": true,
+     "noHandlerEmits": 3,
+     "outSent": {
+      "syn": 102,
+      "drum": 0
+     },
+     "synFirst": [
+      [
+       144,
+       0,
+       0
+      ],
+      [
+       145,
+       1,
+       0
+      ],
+      [
+       146,
+       2,
+       0
+      ]
+     ],
+     "synShortOk": true,
+     "synSysex": [
+      {
+       "len": 3000,
+       "ok": true
+      },
+      {
+       "len": 40000,
+       "ok": true
+      }
+     ],
+     "commands": 5,
+     "kbOpened": 1
+    },
+    "snapshot": {
+     "in_dropped": 904
+    }
+   },
+   "error": null
+  },
+  {
+   "name": "worker_webmidi_probe",
+   "ok": true,
+   "result": {
+    "main": {
+     "hasRequestMIDIAccess": true,
+     "isSecure": true,
+     "access": {
+      "ok": false,
+      "name": "NotAllowedError",
+      "message": "Permission to use Web MIDI API was not granted."
+     }
+    },
+    "worker": {
+     "hasNavigator": true,
+     "hasRequestMIDIAccess": false,
+     "hasMIDIAccessCtor": false,
+     "hasMIDIInputCtor": false,
+     "isSecure": true,
+     "scope": "DedicatedWorkerGlobalScope"
+    }
+   },
+   "error": null
+  }
+ ]
+}

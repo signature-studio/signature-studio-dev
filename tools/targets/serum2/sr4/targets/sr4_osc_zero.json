@@ -1,0 +1,32 @@
+{
+ "name": "sr4_osc_zero",
+ "image": "tools/targets/serum2/work/Serum2_win64.vst3",
+ "retdec": {
+  "ranges": "0x1803d08f0-0x1803d0964",
+  "timeout": 600
+ },
+ "funcs": [
+  "function_1803d08f0"
+ ],
+ "passes": {
+  "p1": true,
+  "f7": true,
+  "f2": true,
+  "gdata": "external"
+ },
+ "exports": [
+  "function_1803d08f0"
+ ],
+ "spec": "../targets/serum2/sr4/specs/sr4_osc_zero.json",
+ "wasm_func": "function_1803d08f0",
+ "func_va": "0x1803d08f0",
+ "regress": {
+  "expect_match": "all"
+ },
+ "extra_funcs": [
+  [
+   "0x1803d08f0",
+   "0x1803d0964"
+  ]
+ ]
+}

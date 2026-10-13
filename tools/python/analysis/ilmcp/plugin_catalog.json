@@ -1,0 +1,1278 @@
+{
+ "entries": [
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Controller"
+   ],
+   "name": "Control Surface"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Controller"
+   ],
+   "name": "Fruity Formula Controller"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Controller"
+   ],
+   "name": "Fruity Peak Controller"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Controller"
+   ],
+   "name": "Fruity X-Y Controller"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Controller"
+   ],
+   "name": "Fruity X-Y-Z Controller"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Delay reverb"
+   ],
+   "name": "Fruity Convolver"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Delay reverb"
+   ],
+   "name": "Fruity Delay 2"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Delay reverb"
+   ],
+   "name": "Fruity Delay 3"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Delay reverb"
+   ],
+   "name": "Fruity Delay Bank"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Delay reverb"
+   ],
+   "name": "Fruity Reeverb 2"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Delay reverb"
+   ],
+   "name": "LuxeVerb"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Delay reverb"
+   ],
+   "name": "Multiband Delay"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Distortion"
+   ],
+   "name": "Distructor"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Distortion"
+   ],
+   "name": "Fruity Blood Overdrive"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Distortion"
+   ],
+   "name": "Fruity Fast Dist"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Distortion"
+   ],
+   "name": "Fruity Soft Clipper"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Distortion"
+   ],
+   "name": "Fruity Squeeze"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Distortion"
+   ],
+   "name": "Fruity WaveShaper"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Distortion"
+   ],
+   "name": "Hardcore"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Dynamics"
+   ],
+   "name": "Emphasis"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Dynamics"
+   ],
+   "name": "Emphasizer"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Dynamics"
+   ],
+   "name": "Fruity Compressor"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Dynamics"
+   ],
+   "name": "Fruity Limiter"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Dynamics"
+   ],
+   "name": "Fruity Multiband Compressor"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Dynamics"
+   ],
+   "name": "Fruity Soft Clipper"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Dynamics"
+   ],
+   "name": "Maximus"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Dynamics"
+   ],
+   "name": "Soundgoodizer"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Dynamics"
+   ],
+   "name": "Transient Processor"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Filter"
+   ],
+   "name": "EQUO"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Filter"
+   ],
+   "name": "Frequency Splitter"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Filter"
+   ],
+   "name": "Fruity Filter"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Filter"
+   ],
+   "name": "Fruity Love Philter"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Filter"
+   ],
+   "name": "Fruity Parametric EQ"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Filter"
+   ],
+   "name": "Fruity Parametric EQ 2"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Flanger"
+   ],
+   "name": "Fruity Chorus"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Flanger"
+   ],
+   "name": "Fruity Flanger"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Flanger"
+   ],
+   "name": "Fruity Flangus"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Flanger"
+   ],
+   "name": "Fruity Phaser"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Flanger"
+   ],
+   "name": "Hyper Chorus"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Flanger"
+   ],
+   "name": "Vintage Chorus"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Flanger"
+   ],
+   "name": "Vintage Phaser"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Gain"
+   ],
+   "name": "Fruity Balance"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Gain"
+   ],
+   "name": "Fruity PanOMatic"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Gain"
+   ],
+   "name": "Fruity Send"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Gain"
+   ],
+   "name": "Fruity Stereo Enhancer"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Gain"
+   ],
+   "name": "Fruity Stereo Shaper"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Gain"
+   ],
+   "name": "Spreader"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Misc"
+   ],
+   "name": "Edison"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Misc"
+   ],
+   "name": "Effector"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Misc"
+   ],
+   "name": "FL Studio Mobile Rack FX"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Misc"
+   ],
+   "name": "Frequency Shifter"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Misc"
+   ],
+   "name": "Fruity Scratcher"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Misc"
+   ],
+   "name": "Fruity Vocoder"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Misc"
+   ],
+   "name": "Gross Beat"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Misc"
+   ],
+   "name": "Low Lifter"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Misc"
+   ],
+   "name": "Newtime"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Misc"
+   ],
+   "name": "Newtone"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Misc"
+   ],
+   "name": "Pitch Shifter"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Misc"
+   ],
+   "name": "Pitcher"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Misc"
+   ],
+   "name": "Transmitter"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Misc"
+   ],
+   "name": "Transporter"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Misc"
+   ],
+   "name": "Vocodex"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Patcher"
+   ],
+   "name": "Patcher"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Patcher"
+   ],
+   "name": "VFX Color Mapper"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Patcher"
+   ],
+   "name": "VFX Envelope"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Patcher"
+   ],
+   "name": "VFX Key Mapper"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Patcher"
+   ],
+   "name": "VFX Keyboard Splitter"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Patcher"
+   ],
+   "name": "VFX Level Scaler"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Patcher"
+   ],
+   "name": "VFX Script"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Patcher"
+   ],
+   "name": "VFX Sequencer"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Visual"
+   ],
+   "name": "Fruity Big Clock"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Visual"
+   ],
+   "name": "Fruity HTML NoteBook"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Visual"
+   ],
+   "name": "Fruity NoteBook"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Visual"
+   ],
+   "name": "Fruity NoteBook 2"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Visual"
+   ],
+   "name": "Fruity Spectroman"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Visual"
+   ],
+   "name": "Fruity dB Meter"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Visual"
+   ],
+   "name": "Tuner"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Visual"
+   ],
+   "name": "Wave Candy"
+  },
+  {
+   "kind": "effect",
+   "source": "native",
+   "path": [
+    "Effects",
+    "Visual"
+   ],
+   "name": "ZGameEditor Visualizer"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Controller"
+   ],
+   "name": "Fruity Envelope Controller"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Controller"
+   ],
+   "name": "Fruity Keyboard Controller"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Drum"
+   ],
+   "name": "BassDrum"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Drum"
+   ],
+   "name": "Drumaxx"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Drum"
+   ],
+   "name": "Drumpad"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Drum"
+   ],
+   "name": "FPC"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Drum"
+   ],
+   "name": "Fruit Kick"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Drum"
+   ],
+   "name": "Fruity DrumSynth Live"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Drum"
+   ],
+   "name": "Fruity Slicer"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Drum"
+   ],
+   "name": "Fruity Slicer 2"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Drum"
+   ],
+   "name": "Ogun"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Drum"
+   ],
+   "name": "Slicex"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "MIDI"
+   ],
+   "name": "MIDI Out"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Misc"
+   ],
+   "name": "Audio Clip"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Misc"
+   ],
+   "name": "Automation Clip"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Misc"
+   ],
+   "name": "BooBass"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Misc"
+   ],
+   "name": "FL Keys"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Misc"
+   ],
+   "name": "FL Studio Mobile"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Misc"
+   ],
+   "name": "FL Studio Mobile Rack"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Misc"
+   ],
+   "name": "Fruity Voltage Controller"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Misc"
+   ],
+   "name": "Layer"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Misc"
+   ],
+   "name": "SoundFont Player"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Patcher"
+   ],
+   "name": "Patcher"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Patcher"
+   ],
+   "name": "VFX Color Mapper"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Patcher"
+   ],
+   "name": "VFX Envelope"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Patcher"
+   ],
+   "name": "VFX Key Mapper"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Patcher"
+   ],
+   "name": "VFX Keyboard Splitter"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Patcher"
+   ],
+   "name": "VFX Level Scaler"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Patcher"
+   ],
+   "name": "VFX Script"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Patcher"
+   ],
+   "name": "VFX Sequencer"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Sampler"
+   ],
+   "name": "DirectWave"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Sampler"
+   ],
+   "name": "Fruity Granulizer"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Sampler"
+   ],
+   "name": "Sampler"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Sampler"
+   ],
+   "name": "Wave Traveller"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Synth classic"
+   ],
+   "name": "3x Osc"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Synth classic"
+   ],
+   "name": "FLEX"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Synth classic"
+   ],
+   "name": "Fruity DX10"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Synth classic"
+   ],
+   "name": "GMS"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Synth classic"
+   ],
+   "name": "Harmless"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Synth classic"
+   ],
+   "name": "Kepler"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Synth classic"
+   ],
+   "name": "Kepler Exo"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Synth classic"
+   ],
+   "name": "MiniSynth"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Synth classic"
+   ],
+   "name": "PoiZone"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Synth classic"
+   ],
+   "name": "Sawer"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Synth classic"
+   ],
+   "name": "SimSynth"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Synth classic"
+   ],
+   "name": "Sytrus"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Synth classic"
+   ],
+   "name": "Toxic Biohazard"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Synth classic"
+   ],
+   "name": "Transistor Bass"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Synth special"
+   ],
+   "name": "Autogun"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Synth special"
+   ],
+   "name": "BeepMap"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Synth special"
+   ],
+   "name": "Harmor"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Synth special"
+   ],
+   "name": "Morphine"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Synth special"
+   ],
+   "name": "Ogun"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Synth special"
+   ],
+   "name": "Plucked!"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Synth special"
+   ],
+   "name": "Sakura"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Visual"
+   ],
+   "name": "Fruity Dance"
+  },
+  {
+   "kind": "generator",
+   "source": "native",
+   "path": [
+    "Generators",
+    "Visual"
+   ],
+   "name": "Fruity Video Player"
+  },
+  {
+   "kind": "effect",
+   "source": "installed",
+   "path": [
+    "Installed",
+    "Effects",
+    "VST"
+   ],
+   "name": "Fresh Air"
+  },
+  {
+   "kind": "effect",
+   "source": "installed",
+   "path": [
+    "Installed",
+    "Effects",
+    "VST"
+   ],
+   "name": "OTT"
+  },
+  {
+   "kind": "effect",
+   "source": "installed",
+   "path": [
+    "Installed",
+    "Effects",
+    "VST3"
+   ],
+   "name": "Serum 2 FX"
+  },
+  {
+   "kind": "generator",
+   "source": "installed",
+   "path": [
+    "Installed",
+    "Generators",
+    "VST3"
+   ],
+   "name": "Massive X"
+  },
+  {
+   "kind": "generator",
+   "source": "installed",
+   "path": [
+    "Installed",
+    "Generators",
+    "VST3"
+   ],
+   "name": "Serum 2"
+  }
+ ]
+}
