@@ -47,6 +47,11 @@ CAB-35 の具体手順・確認項目は `RUNBOOK.md`。
 `05-stage.mjs` (入力) と `20-worker.mjs --phase release` (配備物) は `tools/legal/release-guard` の deny-list と照合し、一致で exit 6 (deny-list 欠落は exit 4・fail-closed)。
 バイパスは `--skip-release-guard` の明示のみ (`deploy.sh` は両方へ伝搬)。deny-list 生成・allow-list・実測は `tools/legal/release-guard/REPORT.md`。
 
+## notices ゲート (LGL-3。stage 前ゲート)
+
+`05-stage.mjs` は入力に `THIRD_PARTY_NOTICES.{txt,html}` が無い/不完全/registry と不一致、または記録なしの同梱 OSS・同梱禁止 (GPL 系) の痕跡を検出したら exit 7。
+NOTICES は `vite build` が出す (FL 素材 `FL_WIN64_DIR` が無いと不完全)。バイパスは `--skip-notices-gate` の明示のみ。仕様・実測は `tools/legal/notices/REPORT.md`。
+
 ## 大物 (>24MiB。tools/perf の 335MB 級 wasm など)
 
 Static Assets は 1 ファイル 25MiB 上限 (26MiB は `Asset too large` で拒否: 実測)、Range 非対応。`05-stage.mjs` が自動で分割する:

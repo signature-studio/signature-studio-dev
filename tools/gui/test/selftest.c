@@ -9,6 +9,7 @@
 #include "gui_api.h"
 #include "gui_internal.h"
 #include "gui_headless.h"
+#include "gui_simd.h"
 
 extern GuiShared *gui_shared_native(void);
 static int g_pass, g_fail;
@@ -86,6 +87,9 @@ static uint32_t rgb(int r, int g, int b) { return (uint32_t)(r << 16 | g << 8 | 
 static uint32_t cref(int r, int g, int b) { return (uint32_t)(r | g << 8 | b << 16); }
 
 #include "selftest_p1.inc"
+#include "selftest_gui5.inc"
+#include "selftest_fd.inc"
+#include "selftest_help.inc"
 
 int main(void) {
   gui_hl_start(640, 480, 1);
@@ -322,6 +326,7 @@ int main(void) {
   gui_set_icall_hook(NULL);
 
   run_p1(h);
+  run_gui5(h);
 
   SECTION("SendMessage / cross-thread");
   CHK(SendMessageA(h, WM_USER + 9, 0, 0) == 4242, "SendMessage direct");
@@ -337,6 +342,25 @@ int main(void) {
     }
     pthread_join(th, &res);
     CHK(got3 && res == (void *)1, "cross-thread PostMessage + sync SendMessage (got3=%d res=%p)", got3, res); }
+
+  run_fd_bounds();
+  run_help_wiring();
+
+  SECTION("GUI-12: surface create/resize/destroy vs render thread blit (ASan UAF regression)");
+  { int ok = 1;
+    for (int it = 0; it < 150; it++) {
+      int64_t sw = CreateWindowExA(0, (int64_t)(uintptr_t)"T1", 0, WS_POPUP | WS_VISIBLE, 0, 0, 600, 400, 0, 0, 0x400000, 0);
+      if (!sw) { ok = 0; break; }
+      MoveWindow(sw, 0, 0, 300 + (it % 5) * 60, 200 + (it % 3) * 50, 1);
+      MoveWindow(sw, 0, 0, 600, 400, 1);
+      GdiFlush();
+      DestroyWindow(sw);
+    }
+    flush_wait();
+    CHK(ok, "stress windows created");
+    /* host が全レコードを消費した後は保留 free (旧画素/snapshot) が全て回収されていること */
+    CHK(gui_surf_retired_count() == 0, "retired surface buffers reaped after host drain (%u left)", gui_surf_retired_count());
+  }
 
   SECTION("quit / destroy messages");
   g_nlog = 0;

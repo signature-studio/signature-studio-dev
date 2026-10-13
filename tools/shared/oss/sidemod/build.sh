@@ -3,21 +3,13 @@
 # SIDE_MODULE (ffmpeg.wasm / lame.wasm) にする。host (MAIN_MODULE) が dlopen でロードする。
 #   usage: bash oss/sidemod/build.sh        (TMPDIR 直下でビルド、成果は work/build/sidemod)
 #   前提: emcc 6.0.12 (SS_EMSDK_ENV に emsdk_env.sh のパス、既定 /opt/emsdk/emsdk_env.sh)
+#   SIDEMOD_GUARD_ONLY=1 なら GPL 検出だけ実行 (emsdk 不要)
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; ROOT="$HERE/../.."
 S="$ROOT/work/src"; B="$ROOT/work/build/sidemod"
-SS_EMSDK_ENV="${SS_EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}"  # emsdk_env.sh は EMSDK_ENV を unset するので別名にする
-[ -f "$SS_EMSDK_ENV" ] || { echo "[sidemod] emsdk_env.sh not found: $SS_EMSDK_ENV (SS_EMSDK_ENV で指定)"; exit 2; }
-source "$SS_EMSDK_ENV" >/dev/null 2>&1
 FFV=4.4.2; LV=3.99.5
 J=$(nproc)
 mkdir -p "$B" "$S"
-dl() { [ -s "$2" ] || curl -fsSL --retry 3 -o "$2" "$1"; }
-( cd "$S"
-  dl https://ffmpeg.org/releases/ffmpeg-$FFV.tar.bz2 ffmpeg-$FFV.tar.bz2
-  dl https://downloads.sourceforge.net/project/lame/lame/3.99/lame-$LV.tar.gz lame-$LV.tar.gz
-  [ -d ffmpeg-$FFV ] || tar xjf ffmpeg-$FFV.tar.bz2
-  [ -d lame-$LV ] || tar xzf lame-$LV.tar.gz )
 
 # FFmpeg の configure 引数 (oss/ffmpeg/build.sh と同一の最小構成 + --enable-pic)。
 # ここに GPL / version3 / nonfree を入れると check_license_flags.py が落とす。
@@ -36,6 +28,19 @@ LAME_ARGS=(--disable-shared --enable-static --disable-nasm --disable-decoder --d
 python3 "$HERE/check_license_flags.py" config "${FF_ARGS[*]}"
 python3 "$HERE/check_license_flags.py" lame "${LAME_ARGS[*]}" -- /dev/null
 echo "${FF_ARGS[*]}" > "$B/ffmpeg.configure"; echo "${LAME_ARGS[*]}" > "$B/lame.configure"
+
+# SIDEMOD_GUARD_ONLY=1: 検出 (上の 2 コマンド) だけ行って終了する。emsdk・ダウンロード不要 (ci_detect.sh が使う)。
+[ "${SIDEMOD_GUARD_ONLY:-}" != 1 ] || { echo "[sidemod] guard only: GPL-GUARD passed"; exit 0; }
+
+SS_EMSDK_ENV="${SS_EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}"  # emsdk_env.sh は EMSDK_ENV を unset するので別名にする
+[ -f "$SS_EMSDK_ENV" ] || { echo "[sidemod] emsdk_env.sh not found: $SS_EMSDK_ENV (SS_EMSDK_ENV で指定)"; exit 2; }
+source "$SS_EMSDK_ENV" >/dev/null 2>&1
+dl() { [ -s "$2" ] || curl -fsSL --retry 3 -o "$2" "$1"; }
+( cd "$S"
+  dl https://ffmpeg.org/releases/ffmpeg-$FFV.tar.bz2 ffmpeg-$FFV.tar.bz2
+  dl https://downloads.sourceforge.net/project/lame/lame/3.99/lame-$LV.tar.gz lame-$LV.tar.gz
+  [ -d ffmpeg-$FFV ] || tar xjf ffmpeg-$FFV.tar.bz2
+  [ -d lame-$LV ] || tar xzf lame-$LV.tar.gz )
 
 # --- 2. FFmpeg 静的 lib (-fPIC) を native / wasm32 で ---
 build_ff() { # name cc-args...
@@ -80,3 +85,18 @@ gcc -O2 -w -fPIC -shared -ffp-contract=off -include "$B/lame-wasm-config.h" $LIN
   -o "$B/lame-native.so" "$HERE/lame_side.c" $LSRC -lm
 gcc -O2 -w -o "$B/host-native" "$HERE/host.c" -ldl
 echo "[sidemod] build done"
+
+# LGL-3 (#86): 再ビルド記録 (配布する side module の FFmpeg / LAME)。configure 引数は上で実際に使った配列そのもの
+REC="$HERE/../../../legal/notices/record.mjs"
+node "$REC" --id "ffmpeg-$FFV" --name FFmpeg --version "n$FFV" --license-spdx "LGPL-2.1-or-later" \
+  --url "https://ffmpeg.org/releases/ffmpeg-$FFV.tar.bz2" --archive "$S/ffmpeg-$FFV.tar.bz2" \
+  --src-dir "$S/ffmpeg-$FFV" --license-file COPYING.LGPLv2.1 --license-file LICENSE.md \
+  --script "$HERE/build.sh" --toolchain emcc --target wasm32 \
+  --step "configure=emconfigure ./configure ${FF_ARGS[*]} --cc=emcc --cxx=em++ --ar=emar --ranlib=emranlib --nm=llvm-nm --strip=llvm-strip" \
+  --step "link=emcc -O2 -fPIC -sSIDE_MODULE=2 -o ffmpeg.wasm ffmpeg_side.c libavformat.a libavcodec.a libavutil.a"
+node "$REC" --id "lame-$LV" --name LAME --version "$LV" --license-spdx "LGPL-2.0-or-later" \
+  --url "https://downloads.sourceforge.net/project/lame/lame/3.99/lame-$LV.tar.gz" --archive "$S/lame-$LV.tar.gz" \
+  --src-dir "$S/lame-$LV" --license-file COPYING \
+  --script "$HERE/build.sh" --toolchain emcc --target wasm32 \
+  --step "configure=./configure ${LAME_ARGS[*]} --build=x86_64-pc-linux-gnu (native で config.h を生成し HAVE_XMMINTRIN_H / MIN_ARCH_SSE を落として wasm 用に使う)" \
+  --step "compile=emcc -O2 -fPIC -ffp-contract=off -include <wasm config.h> -sSIDE_MODULE=2 -o lame.wasm lame_side.c <libmp3lame/*.c (i386 / vector / logo / mpglib を除外)>"
