@@ -65,7 +65,7 @@
 ## 6. 限界と未実装 (正直ベース)
 
 - **fake シンクの数値**: 音声 HW が無いため `outputLatency` 35ms/`baseLatency` 10.7ms は fake 値。実デバイス (Windows WASAPI/mac CoreAudio, Firefox, Safari) での burst・遅延・underrun は**未計測**。往復の総遅延 (入力ブラウザバッファ含む) も未計測。
-- **未実装**: COM vtable アダプタ (win64 ABI/8 バイトポインタの ASIOCallbacks・ASIOBufferInfo・ASIOTime への変換; リフタ呼出規約待ち)、レジストリ `SOFTWARE\ASIO\FL Studio ASIO` と `CoCreateInstance` 配線 (別 shim 行)、~~DirectSound shim~~ (AU-4 で実装, §15)、~~WebMIDI shim~~ (AU-3 で実装, §13。FL 結線は未)、getUserMedia のデバイス選択の**製品 UI** (部品は §14 で実装、画面は AU-9 #184)、WASAPI capture/exclusive/loopback、T の縮小 (拡張のみ)、macOS 固有 (AudioUnit 面) の薄いアダプタ。
+- **未実装**: COM vtable アダプタ (win64 ABI/8 バイトポインタの ASIOCallbacks・ASIOBufferInfo・ASIOTime への変換; リフタ呼出規約待ち)、レジストリ `SOFTWARE\ASIO\FL Studio ASIO` と `CoCreateInstance` 配線 (別 shim 行)、~~DirectSound shim~~ (AU-4 で実装, §15)、~~WebMIDI shim~~ (AU-3 で実装, §13。FL 結線は未)、getUserMedia のデバイス選択の**製品 UI** (部品は §14 で実装、画面は AU-9 #184)、WASAPI capture/exclusive/loopback、安全/低遅延モード UI (§17)、macOS 固有 (AudioUnit 面) の薄いアダプタ。
 - B=128 は ILWASAPI2ASIO の min 256 より小さい (shim 単体の性能であり FL 実運用値ではない)。→ AU-7 で既定 profile を ILWASAPI 値に確定し、FL が min/max/granularity を読まないことを静的に確認 (§11)。
 - 未確認 (推定): `asioMessage` selector 6 → コマンド 0x17 が再起動かどうか、~~FL が granularity=128/min=128 を受理するか~~ (解決: FL は読まない, §11)、~~DS バッファの 16/32bit~~ (§15 で静的確定)、Web MIDI の Firefox/Safari の挙動 (Chrome 154 の DedicatedWorker に Web MIDI が無いことは実測済み, `tools/audio/REPORT_MIDI.md` §13-2)。
 - `ctx.outputLatency` は起動直後 0 → 約 250ms 後に更新される。`getLatencies` は呼出時の値で、FL が起動直後に読むと小さく見える。→ AU-7 で ATTACH 側の待ちを実装 (§11-3)。
@@ -233,3 +233,7 @@ DirectSound shim を実装 (secondary = 循環バイト列, pump が T まで充
 ## 16. AU-10 (#191) 30 分ソーク (`--soak30`)
 
 無負荷 30 分 (1800 s, B=256 48k ランプ) は PASS (underrun 0・ramp mismatch 0)、負荷下は 420 s で PASS。ただし head `fc93f45` (main 取り込み後) 上の 30 分ソークは未実施 (未計測)。head `fc93f45` の 10 秒ソークは PASS (ramp 0 / 481,024 f)。head `57519ca` の 10 秒ソークは 4 回中 1 回 FAIL (ramp mismatch 411,392/480,512、原因未特定) で、他 3 回は PASS。実機・Firefox/Safari は未計測。実測値・再現・未解決は `REPORT_AU10.md` (分割移動先) を参照。
+
+## 17. AU-6 (#190) 遅延ポリシー: T の減衰 (全文: `REPORT_AU6.md`)
+
+underrun が 3 秒続くと +B を 1 段ずつ戻す (下限は下げない)。`kAsioLatenciesChanged` は既定 OFF のまま。quick 全体 44/44 PASS (HEAD `d9c1248a`, 251.9 s)、減衰テスト 2 本 PASS・ネガティブコントロール FAIL で判定の有効性を確認。**未解決**: 閾値 3 秒の実機調整 (#187)、安全/低遅延モード UI (#34 以降)、selector 6 の利用可否 (0x17 未確定)。
