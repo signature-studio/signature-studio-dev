@@ -1,6 +1,6 @@
 # gui REPORT 付録 — §9 GUI-4 (#180) 全文
 
-REPORT.md の 250 行上限のため §9 (#180) と §15 (#181 続き) を分割移動。本体: [REPORT.md](REPORT.md)。
+REPORT.md の 250 行上限のため §9 (#180) と §16 (#181 続き) を分割移動。本体: [REPORT.md](REPORT.md)。
 
 ## 9. GUI-4 (#180): WebGL2 present / dirty 複数矩形 / rAF 同期 / seqlock
 既知類型との関係: 該当なし (lift 欠陥ではなく present 経路の設計。`docs/DEFECTS.md` への追加類型なし)。検証起点 commit: コードは `88efd49` (レビュー指摘 A・B・軽微 2 の修正後; present e2e 30 run・seqlock・tearing・golden・auto 降格の数値は全てこの HEAD・クリーン tree での実測)。frame time 表だけは修正前の `09e3db9` での実測 (bench は再測定していない; `88efd49` は seqlock 経路・staged 転送の関数分割 `stage()`/`uploadStaged()`・auto 判定のみを変え、seqlock off の GL 経路の処理は同一)。
@@ -67,7 +67,7 @@ node tools/runtime/gui_e2e.mjs                     # Vite バンドル経由 (�
 bash tools/gui/e2e.sh                              # 全体 (PE lift を含む); 要 RetDec・emsdk・mingw
 ```
 
-## 15. GUI-5 (#181) 続き: e2e.sh 全体と wasm shim 全体の SIMD/scalar 比較
+## 16. GUI-5 (#181) 続き: e2e.sh 全体と wasm shim 全体の SIMD/scalar 比較
 
 既知類型との関係: lift 欠陥ではなく shim の意味論 (§10 の同一サーフェス複数クリップ欠陥は `docs/DEFECTS.md` D18 に登録)。
 検証起点: 現 HEAD `e11701db` (main `c5df4657` 取り込み後、`tools/gui/src`・`include` は main と同一)。本節の測定値は全て `e11701db` の実測。`b44ddcd`・`ea7a538` 等の旧 HEAD の値は直前の試行として試行表に残す。runner 4 CPU、`[EMSDK]`・`[RETDEC]`、mingw-w64 GCC 13 (apt `gcc-mingw-w64-x86-64`)。emcc は `[EMSDK]` の `upstream/emscripten`・`upstream/bin` と node `24.19.0_64bit` を PATH に直接指定 (`emsdk_env.sh` が emcc を PATH に出さないため)。`fl-win64` は本 run で不要 (e2e の step 3 は `test/gui_app.c` を使う)。

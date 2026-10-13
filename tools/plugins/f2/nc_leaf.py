@@ -13,6 +13,7 @@
   load_drop  : alloca 以外から読む最初の整数/浮動小数 `load` を 0 に置換     (DEFECTS.md D4 = deref 脱落)
   offset_shift: 最初の `add i64 %v, N` (N>0 の整数即値 = フィールド/配列オフセット計算) を N+8 に        (汎用: DEFECTS.md に直接対応する類型は無い)
 出力: work/f2/nc/<kind><block>.{ll,json}, work/f2/nc/<kind>_<block>.jsonl, stdout に kind 別の 検出数/変異数 と未検出関数
+終了コード: 全 kind で全変異が mismatch (検出) のとき 0。match のまま (未検出) / unexec の変異が 1 つでもあれば 1。
 """
 import collections, json, os, re, subprocess, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -135,7 +136,7 @@ def main():
         for b, va, v, d in R:
             if v != 'mismatch':
                 print('  未検出 %s block %s %s: %s' % (kind, b, va, d))
-        if not c['mismatch']:
+        if not c['mismatch'] or c['match'] or c['unexec']:   # 変異を 1 つでも検出できなかった / 実行不能にした kind は FAIL (全変異検出が合格条件)
             rc = 1
     json.dump(res, open(os.path.join(W, 'nc', 'nc_result_%s.json' % '+'.join(kinds)), 'w'), indent=1)
     sys.exit(rc)

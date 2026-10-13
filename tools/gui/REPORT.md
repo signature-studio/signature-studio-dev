@@ -160,7 +160,7 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
 ### 範囲外・未達
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-`bash tools/gui/e2e.sh` 全体 ALL PASS → 付録 §15 で実測。現 HEAD `e11701db` で ALL PASS (rc=0, 188 s, 1 回)。1/6 の selftest は同 HEAD で 20 回連続 PASS (ASan 0 件)。修正前 src では 7 回中 2 回発火 | 修正後の e2e 全体は 1 回のみ。受入扱いは PM 判断 | #489 `[GUI-12]` (既存)・PM |
+`bash tools/gui/e2e.sh` 全体 ALL PASS → 付録 §16 で実測。現 HEAD `e11701db` で ALL PASS (rc=0, 188 s, 1 回)。1/6 の selftest は同 HEAD で 20 回連続 PASS (ASan 0 件)。修正前 src では 7 回中 2 回発火 | 修正後の e2e 全体は 1 回のみ。受入扱いは PM 判断 | #489 `[GUI-12]` (既存)・PM |
 | 実 FLEngine が要求する bpp/ROP の確定 (GUI-3 #174 の到達ログ待ち)・16bpp DIB・DIB_PAL_COLORS・`CreateBitmap` 4/8/16bpp の初期 bits・RLE/JPEG/PNG 圧縮 DIB | 実 FL が要求したら fail-fast で止まる (理由付き) | #174 到達後に #181 へ追記 |
 | Chrome 上の lift 済みアプリ込みの API 単位 frame time → §15 (wasm shim 全体は取得済み。Chrome 上のアプリ込みは未取得、理由は §15) | — | #181 |
 | mono / パレットの色写像の実 Windows との照合 (近似) | 色が実機と数階調ずれる可能性 | #181 (実機比較はユーザ依頼候補) |
@@ -216,7 +216,9 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
 - FL 非依存部は実装・検証済み (golden 28,000 px 差 0、nc_golden asserts 26/0、ネガコン 3 本拒否)。FL の窓種別に基づく部分は未達 → PR は `Refs #183`。
 - 全文・実測 (HEAD `63cfe0f` の e2e ALL PASS 191 s、`67d5cb7` / `87c20fc` の記録を含む) は `REPORT_APPENDIX_C.md` §14。
 - 未解決 (起票先): FL 実窓種別の確定 (#174 / #564 / #565 後に #183 へ追記)・Chrome 上の NC/popup 描画 (#183)・メニュー (#175)。
+## 15. GUI-8 (#184): e2e の agent-browser 載せ替え・長時間ストレス・Firefox 取込み
+全文と実測 (検証起点 コード HEAD `3bd220d3`): `REPORT_GUI8.md`。結論: e2e は `tools/e2e` ドライバ (agent-browser / puppeteer-core) 経由で `bash tools/gui/e2e.sh` ALL PASS (golden 差 0、203 s)、50,000 フレームのストレスで drop 0・メモリ増加なし・surface gen 不変、ネガコン 3 本は不合格を検出。Firefox は #127 の結果を `PROTOCOL.md §13` に取込み (Safari・Firefox 実描画は未測定)。
 
-## 15. GUI-5 (#181) 続き: e2e.sh 全体 ALL PASS と wasm shim 全体の SIMD/scalar 比較
+## 16. GUI-5 (#181) 続き: e2e.sh 全体 ALL PASS と wasm shim 全体の SIMD/scalar 比較
 
-本文は `REPORT_APPENDIX.md` §15 (250 行上限による分割)。結論 (現 HEAD `e11701db`): RetDec 付き `bash tools/gui/e2e.sh` は ALL PASS (rc=0, 188 s, 1 回)。1/6 selftest は 20 回連続 PASS (ASan 0 件)。修正前 src の有効 7 回中 2 回の UAF (#489) は、修正後の連続試行で発火していない。wbench (`bash tools/gui/test/wbench.sh 5`): rc=0, 20 s, v128 simd=831 / scalar=0 (測定値は付録 §15 §2)。
+本文は `REPORT_APPENDIX.md` §16 (250 行上限による分割)。結論 (現 HEAD `e11701db`): RetDec 付き `bash tools/gui/e2e.sh` は ALL PASS (rc=0, 188 s, 1 回)。1/6 selftest は 20 回連続 PASS (ASan 0 件)。修正前 src の有効 7 回中 2 回の UAF (#489) は、修正後の連続試行で発火していない。wbench (`bash tools/gui/test/wbench.sh 5`): rc=0, 20 s, v128 simd=831 / scalar=0 (測定値は付録 §15 §2)。

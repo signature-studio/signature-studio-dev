@@ -80,7 +80,7 @@ native の case 結果には呼出し所要 `ms` (ld_ms_call 前後の CLOCK_MON
                     "calls":{"kind":"call_arg|call_name|native_extra_call|wasm_extra_call","index":0,...},
                     "trace":{"kind":"entry_arg|entry_va|native_extra_entry|wasm_extra_entry","index":1,"va":"0x..","pos":0,"native":"0x..","wasm":"0x.."}},
            "wasm_uninit_dependent":false,"leaf":true,"raw":{...}}],
- "static":{"machine":{"ins":..,"icall":..,"ijmp":..,"fpcmp":..,"arity_gpr":..,"arity_x":..,"stack_args":[..],"repstr":..},
+ "static":{"machine":{"ins":..,"icall":..,"ijmp":..,"fpcmp":..,"arity_gpr":..,"arity_x":..,"xmm_slots":[..],"stack_args":[..],"repstr":..},
            "ir":{"icalls":..,"fcmp":..,"asm_calls":..,"allocas":..,"regslot_deref":..}}}
 ```
 
@@ -104,7 +104,7 @@ native の case 結果には呼出し所要 `ms` (ld_ms_call 前後の CLOCK_MON
 | `spill_slot_deref` | レジスタ退避 alloca 自体を `load` (`[rcx]` が alloca `%rcx` を直接読む) | IR に `bitcast ptr %<reg>` があり mem/ret 差分 |
 | `icall_drop` | 間接 call/jmp が IR から脱落 | 機械語に非 IAT の間接 call/jmp があり IR の間接 call が 0。native trace に wasm に無い callee があれば high |
 | `arg_drop` | 引数(レジスタ/スタック)が IR 署名から脱落 | 機械語の「未定義で読む arg レジスタ/スタック slot」数 > IR 署名の引数数 |
-| `xmm_arg_drop` | xmm 引数が脱落 | 機械語が xmm0..n を入力として読む > IR の fp 引数数 |
+| `xmm_arg_drop` | xmm 引数が脱落 | 機械語が xmm0..n を入力として読む > IR の fp 引数数。ただし読む slot (`xmm_slots`) が全て IR 署名の同じ位置で float/double なら付けない |
 | `unresolved_callee` | wasm が closure 外の関数 (`function_X` 未定義) を呼んだ | wasm の呼出しログに `function_*` |
 | `zero_init_drop` | local のゼロ初期化落ち (未初期化 stack を読む) | wasm の結果が stack fill 0x00 と 0xa5 で変わる |
 | `fp_flag_unreflected` | ucomisd/comisd の flag が分岐に反映されない | 機械語に comis/ucomis があり IR に fcmp が無い (結果差分と併発) |

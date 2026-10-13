@@ -39,6 +39,16 @@ COND_JCC = {"jo", "jno", "jb", "jnae", "jc", "jae", "jnb", "jnc", "je", "jz", "j
 _ZERO_IDIOMS = {"xor", "pxor", "xorps", "xorpd", "vxorps", "vxorpd", "vpxor", "sub", "psubb", "psubw", "psubd",
                 "psubq", "pcmpeqb", "pcmpeqw", "pcmpeqd", "vpcmpeqd", "andnps", "pandn"}
 
+import os
+# LIFTLIB-5: leaf cfg (pipeline が cfg["leaf_ext"] で設定) のときだけ有効にする拡張の総スイッチ。
+# 既定 False = FA/KH/OTT legacy・p1 census (T15) は LIFTLIB-4 と不変。
+LEAF_EXT = False
+
+
+def leaf_ext(name):
+    """拡張 name が有効か。ablation (規則 41): LL_NO_<name>=1 で個別に止められる。"""
+    return LEAF_EXT and not os.environ.get("LL_NO_" + name)
+
 _md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
 _md.detail = True
 
@@ -121,7 +131,7 @@ def _wrap(ci):
 class MFunc:
     """1 関数の機械語。linear sweep (関数境界は pdata または明示範囲)。"""
 
-    def __init__(self, img, start, end):
+    def __init__(self, img, start, end, refine=True):
         self.img, self.start, self.end = img, start, end
         code = img.read(start, end - start)
         self.insns = {}
@@ -134,6 +144,24 @@ class MFunc:
         self._cfg = None
         self._rd = None
         self._ret_reg = None
+        if refine and leaf_ext("CALLEE_PRESERVE"):
+            self._refine_call_writes()
+
+    def _refine_call_writes(self):
+        """LIFTLIB-5: 直接 call の def を「callee が実際に書く volatile reg」に絞る。
+
+        従来 call は VOLATILE 全部の def だったため, callee が書かない r10 等が call を跨ぐと
+        「call が def」と解釈され bind 不能 (tan @1801a9e19 の r10 = 入口 sign) になっていた。
+        callee 機械語の書込集合 (推移閉包) を使い, 解決不能 (間接 call / 範囲外 jmp) は従来どおり。
+        rax / xmm0 (戻り) と flags は常に def のまま。"""
+        for it in self.insns.values():
+            if not it.is_call or it.target is None:
+                continue
+            cw = _callee_writes(self.img, it.target, set())
+            if cw is None:
+                continue
+            keep = (VOLATILE & cw) | {"rax", "xmm0", "flags"}
+            it.writes = (it.writes - VOLATILE) | keep
 
     def __getitem__(self, va):
         return self.insns[va]
@@ -351,6 +379,44 @@ class MFunc:
         """メモリ read を持つ命令: [(va, mem, mnem)]"""
         return [(va, self.insns[va].mem, self.insns[va].mnem) for va in self.order
                 if self.insns[va].mem and self.insns[va].mem["read"]]
+
+
+_CW_CACHE = {}
+
+
+def _callee_writes(img, target, visiting):
+    """callee (直接 call 先) が書き得る volatile reg の集合 (callee が呼ぶ関数の分を含む推移閉包)。
+    解決不能 (範囲不明 / 間接 call / 範囲外 jmp) は None。"""
+    key = (id(img), target)
+    if key in _CW_CACHE:
+        return _CW_CACHE[key]
+    if target in visiting:
+        return set()
+    rng = img.func_at(target)
+    if rng is None:
+        return None
+    visiting = visiting | {target}
+    mf = MFunc(img, *rng, refine=False)
+    w, ok = set(), True
+    for it in mf.insns.values():
+        if it.is_call:
+            if it.target is None:
+                ok = False
+                break
+            sub = _callee_writes(img, it.target, visiting)
+            if sub is None:
+                ok = False
+                break
+            w |= sub | {"rax", "xmm0"}
+            continue
+        if (it.is_jmp or it.is_jcc) and (it.indirect or not (rng[0] <= it.target < rng[1])):
+            ok = False                          # tail jmp / 間接 jmp は追わず保守的に None
+            break
+        w |= it.writes
+    res = (w & VOLATILE) if ok else None
+    if not visiting - {target}:
+        _CW_CACHE[key] = res                    # 循環の途中結果は cache しない
+    return res
 
 
 def tail_ranges(img, start):
