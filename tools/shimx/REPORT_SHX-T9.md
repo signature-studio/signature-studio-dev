@@ -55,8 +55,8 @@
 ### 2.4 fail-fast 到達
 
 - **逐次起動 `trace_soft_fix` (soft モード, 17 unit + #18) では shimx 起因の fail-fast は 0**。停止要因は `_UStrAsg` OOB (lift 側の #232)。
-- **逐次起動 plain (既定 fail-fast) では shimx 起因の fail-fast で停止する**: `m11_sx_plain_failfast` / `m11_sx_trace_failfast_fix` とも `[shim] FAIL-FAST: unimplemented Win32 API: LoadStringW` (top frame `shim_unimplemented`) で Aborted。init_count 16 / units_run 15 で止まる。survey の LoadStringW 初出も unit 16。LoadStringW は GUI 系 API のスタブだが、shimx 側の fail-fast であることに変わりはない (unit 115 と同じ扱い)。
-- **survey の unit 115**: `[shim] FAIL-FAST: unimplemented Win32 API: EnterCriticalSection (NULL/misaligned)` (`results/survey.md` §fail-fast、`results/stub_usage.md`)。shimx `locks.c` の `cs_of()` が出す fail-fast であり、shimx 起因として数える。R7 (`tools/shimx/REPORT_R1-R8.md`) の既定方針 (NULL は fail-fast のまま) に従う。lift 側ポインタ不正が原因かは未確認。起票先: R7 の既存項目 (新規起票なし)。
+- **逐次起動 plain (既定 fail-fast) では shimx 起因の fail-fast で停止する**: `m11_sx_plain_failfast` / `m11_sx_trace_failfast_fix` とも `[shim] FAIL-FAST: unimplemented Win32 API: LoadStringW` (top frame `shim_unimplemented`) で Aborted。init_count 16 / units_run 15 で止まる。survey の LoadStringW 初出も unit 16。LoadStringW は GUI 系 API のスタブだが、shimx 側の fail-fast であることに変わりはない。
+- **survey の unit 115**: shimx 版では fail-fast せず halt0 (§3.1)。baseline の abort (`EnterCriticalSection`、shim 側の未登録 CS) は shim 側の差であり、shimx 起因の fail-fast には数えない。R7 (`tools/shimx/REPORT_R1-R8.md`) の既定方針 (NULL は fail-fast のまま) は、本 survey の他の NULL 到達事例にのみ適用する。
 - **plain 逐次起動の LoadStringW fail-fast**: 上記 (§2 の表) の通り shimx 起因として数える。起票先: tools/gui (GUI stub の実装側)。
 
 ## 3. survey の unit 160 以降 (#773 で切り分け済み)
@@ -81,7 +81,7 @@
 - 差分 81 unit の kind 遷移: ok→oob 31 / halt0→oob 26 / halt0→ok 10 / oob→ok 10 / halt0→closure_outside 1 / abort→halt0 1 / oob→halt0 1 / oob→clobber 1。差分は全 100 unit 区間にわたる (最多 0 区間 13)。
 - 最初の差分は **unit 23** (LVA 0x67f00、baseline halt0 → shimx closure_outside)。unit 115 より前。
 
-**unit 115 の差 (受入条件 1)**: 同じ前処理 (unit 1〜114 を順に実行) で、baseline は `m11_boot.cjs` 単独でも `EnterCriticalSection (未初期化/未登録)` で abort する (`tools/shim/src/sync.c`: CS を表に登録した後の mutex 写影で、表に無い CS を fail-fast)。shimx 版は同じ unit で `EnterCriticalSection` 18 回・`LeaveCriticalSection` 18 回が対で通り、halt0 (正常停止) になる (`tools/shimx/src/locks.c` は ゼロ初期化の CS を未ロック扱いし、NULL/非整列のみ fail-fast)。差は「未登録 CS を abort するか、未ロックとして扱うか」の実装差で、shimx 版の halt0 は fail-fast の欠如による到達。CS ポインタの具体値 (両者の一致) は未比較。
+**unit 115 の差 (受入条件 1)**: 同じ前処理 (unit 1〜114 を順に実行) で、baseline は `m11_boot.cjs` 単独でも `EnterCriticalSection (未初期化/未登録)` で abort する (`tools/shim/src/sync.c`: CS を表に登録した後の mutex 写影で、表に無い CS を fail-fast)。shimx 版は同じ unit で `EnterCriticalSection` 18 回・`LeaveCriticalSection` 18 回が対で通り、halt0 (正常停止) になる (`tools/shimx/src/locks.c` は ゼロ初期化の CS を未ロック扱いし、NULL/非整列のみ fail-fast)。差は「未登録 CS を abort するか、未ロックとして扱うか」の実装差が差の直接の機構と推定する。shimx 版の halt0 は、この実装差により fail-fast に当たらず到達したものと読む。CS ポインタの具体値 (両者の一致) は未比較のため、両者が同一の CS を見ているかは未確認。
 
 **oob 増 (受入条件 2)**: oob 増 57 件 (ok→oob 31 / halt0→oob 26) と減 12 件 (oob→ok 10 / oob→halt0 1 / oob→clobber 1)。増分の内訳の unit 単位説明は未完 (起票先: 子 issue #1465 `[SHX-T9d]`)。`evidence_1255/unit_diff_out.txt` が unit 別の遷移一覧。
 
@@ -100,10 +100,9 @@
 | GetProcAddress GUI 系 miss | 44 | tools/gui |
 | GetProcAddress 序数 miss (kernel32 `#39682`) | 1 | R1 (intptr 閾値 / 敷設) |
 | LoadLibrary 失敗 (Msctf / avrt / PowrProf) | 3 | R4 (`tools/shimx/REPORT_R1-R8.md`) |
-| survey unit 115 の shimx fail-fast (EnterCriticalSection NULL) | 1 | R7 (`tools/shimx/REPORT_R1-R8.md`・既存) |
 | plain 逐次起動の shimx fail-fast (LoadStringW, GUI stub) | 1 | tools/gui |
 | survey unit 160 以降の range 連鎖 | 解消 (harness 修正) | #773 |
-| survey の unit 単位差分: unit 115 の fail-fast 差 | 原因切り分け済み (§3.1)。CS 実装差 | #1255 (`[SHX-T9c]`) |
+| survey の unit 単位差分: unit 115 の fail-fast 差 | 差の機構を推定 (§3.1)。CS ポインタ一致は未比較 | #1255 (`[SHX-T9c]`) |
 | survey の unit 単位差分: unit 23 の分岐・oob 増 57 件の内訳 | 未説明 | #1465 (`[SHX-T9d]`) |
 
 ## 5. 再現性
