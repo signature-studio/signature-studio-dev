@@ -11,7 +11,7 @@
 ### 8.0 結論 (先出し)
 
 1. 対象 23 関数 = §3 の「IR leaf 55」のうち機械語にも非 IAT 間接 call が無いもの。別算法 (`xcheck_leaf.py`) で **同じ 23 関数を再導出** (集合一致 EQ)。23 関数は位置非依存ハッシュで **18 種類のコード**(5 組が別 block と同一コード)。
-2. **最終判定: 一致 15 / 不一致 8 / 実行不能 0**(23 関数)。主採点(9 パターン)だけだと 一致 9 / 不一致 9 / 実行不能 5 で、補助 case(§8.2)を足して 12 関数の判定が確定した。うち主採点の「一致」2 関数 (0x6bfec0・0x6c9b60) は補助 case で不一致に覆った = **9 パターンの一致は検出力が弱い関数がある**。
+2. **最終判定: 一致 15 / 不一致 8 / 実行不能 0**(23 関数、HEAD 2f77ace で 3 回再現)。主採点(9 パターン)だけだと 一致 12 / 不一致 6 / 実行不能 5 (1191aef 時点は 9 / 9 / 5)。補助 case(§8.2)を足して判定が確定する関数がある。うち主採点の「一致」2 関数 (0x6bfec0・0x6c9b60) は補助 case で不一致に覆った = **9 パターンの一致は検出力が弱い関数がある**。
 3. 不一致 8 関数は **全て「機械語が xmm 入力を読むのに IR 署名に float 引数が無い」(D5)**。`batch_lift.sh` → `lift_ranges.sh` の鎖に ARG pass (`lift/passes/ir7_argpass.py` は取り込み済みで未接続) が無いことが共通原因。→ [PLG-F2-4] #547。
 4. 一致 15 関数は 9 パターン+補助 case の範囲で戻り値・書換えメモリ・entry 列が bit 一致。**入力空間全体の等価性は主張しない**(§8.4 の限界)。
 5. ネガティブコントロール (§8.3): 既知の脱落を 1 箇所入れた IR で、一致 15 関数のうち変異できた分の不一致検出を実測。
@@ -29,41 +29,41 @@
 | 補助採点 | 主採点が unexec / 時間切れ / 偽陽性 / 検出力不足の 12 関数に、機械語の意味に合わせた手作り case を追加 (`leaf_custom.py`、66 case)。ptr 鎖・count・float 配列・xmm 入力 (native にだけ `f:<bits>` を渡す) |
 | ABI アダプタ | IR が `i128` を返す 4 関数 (0x6c8fc0・0x6c9b60・0x6f1650・0x6f23b0。機械語は xmm0 に float を返す) は liftdiff の JS ランナが呼べない。元関数を `.i128` に改名し、同名の `trunc i128→i32; bitcast float` だけのラッパを足した (`mk_targets.py`)。機械語の最後の xmm0 書込み命令の型 (`ss`) で float と決定 |
 
-**採点の定義**(`leaf_report.py` 冒頭と同文): 関数 verdict は match = native 完走 case ≥1 かつ完走した全 case 一致 / mismatch = 完走 case のどれかに差分、または native 完走 + wasm trap / unexec = native 完走 case 0。最終判定は、補助が mismatch なら mismatch、補助が match で主採点が match/unexec なら match、補助が match で主採点が mismatch の場合のみ `leaf_custom.ARTIFACT` に根拠のある偽陽性 3 関数 (§8.5) を match に上書き。数え方: 関数 = 23 (closure_stats の leaf ∩ audit_icall の静的間接 call 0)、case = 主採点 23×9 = 207 + 補助 66。
+**採点の定義**(`leaf_report.py` 冒頭と同文): 関数 verdict は match = native 完走 case ≥1 かつ完走した全 case 一致 / mismatch = 完走 case のどれかに差分、または native 完走 + wasm trap / unexec = native 完走 case 0。最終判定は、補助が mismatch なら mismatch、補助が match で主採点が match/unexec なら match、補助が match で主採点が mismatch の場合のみ `leaf_custom.ARTIFACT` に根拠のある偽陽性を match に上書き (2f77ace では該当 0 件、§8.1a)。数え方: 関数 = 23 (closure_stats の leaf ∩ audit_icall の静的間接 call 0)、case = 主採点 23×9 = 207 + 補助 66。
 
 ### 8.1a ARTIFACT (偽陽性 3 関数) の根拠 (本体 §8.1 から移動)
 
-主採点が mismatch で、補助 case が match の 3 関数。根拠の区別:
+1191aef 時点では主採点が mismatch で、補助 case が match の 3 関数だった。**2f77ace (main 取り込み後) では 3 関数とも主採点が match に変わり、`leaf_report.md` の ARTIFACT 上書きは 0 件** (最終判定は主採点のまま match)。根拠の区別:
 
 | VA | 確認済み (再実行で観測) | 推定 (未検証) |
 |---|---|---|
 | 0x6cd8a0 (EQUO, pall2) | mem 差分は 1 語のみ。native `0x01000000224623b0` / wasm `0x01000000220623b0`、差 0x400000 (= delta) | `cmp_mem` が部分上書きされた ptr 入り語を正規化できない (D17 行案) |
 | 0x73fa20・0x6ec2a0 (pall) | native=ok / wasm=timeout | wasm 1 s 打切りによる偽 `wasm_trap` (D18 行案)。比較器欠陥か否かは未切り分け |
 
-「偽陽性確定」は上表の確認済み範囲に限る。比較器の欠陥は推定 (#548 [LD-11])。
+「偽陽性確定」は上表の確認済み範囲に限る。比較器の欠陥は推定 (#548 [LD-11])。主採点が変わった理由 (main 取り込みの `fix_avx256`・`m11_simd2` 由来と推定) は未切り分け。
 
 ### 8.2 結果 (`work/f2/leaf_report.md`)
 
 | # | block | plugin | VA | 機械語 B | IR 署名 | 主採点 (9 パターン) | 補助 case | **最終** | タグ |
 |--:|--:|---|---|--:|---|---|---|---|---|
-| 1 | 18953 | EQUO | 0x6cd8a0 | 8 | `i64(i64)` | mismatch 4/6/9 | match 2/2 | **match** (偽陽性、根拠 §8.1a) | memory_semantics |
+| 1 | 18953 | EQUO | 0x6cd8a0 | 8 | `i64(i64)` | match 6/6/9 | match 2/2 | **match** (1191aef の主採点は mismatch 4/6/9。根拠 §8.1a) | - |
 | 2 | 18975 | Emphasizer | 0x6bfec0 | 56 | `i64(i64)` | match 6/6/9 | mismatch 1/5 | **mismatch** | fp_flag_unreflected,xmm_arg_drop |
 | 3 | 18975 | Emphasizer | 0x6c8fc0 | 63 | `float(i64)` | mismatch 0/6/9 | - | **mismatch** | xmm_arg_drop |
 | 4 | 18975 | Emphasizer | 0x6c9b60 | 83 | `float(i64,i64)` | match 2/2/9 | mismatch 2/4 | **mismatch** | fp_flag_unreflected,xmm_arg_drop |
 | 5 | 18979 | Frequency Splitter | 0x662fc0 | 15 | `i64(i64)` | match 6/6/9 | - | **match** | - |
 | 6 | 18979 | Frequency Splitter | 0x73e640 | 29 | `i64(i64)` | unexec(native_fault_all_patterns) 0/0/9 | match 7/7 | **match** | - |
-| 7 | 18979 | Frequency Splitter | 0x73fa20 | 65 | `i64(i64,i64,i64)` | mismatch 4/5/9 | match 7/7 | **match** (偽陽性、根拠 §8.1a) | wasm_trap |
+| 7 | 18979 | Frequency Splitter | 0x73fa20 | 65 | `i64(i64,i64,i64)` | match 4/5/9 | match 7/7 | **match** (1191aef の主採点は mismatch 4/5/9。根拠 §8.1a) | - |
 | 8 | 18979 | Frequency Splitter | 0x73fa70 | 73 | `i64(i64,i32,i64,i64)` | unexec(hang) 0/0/9 | match 7/7 | **match** | - |
-| 9 | 18982 | Fruity 7 Band EQ | 0x6b0ef0 | 1554 | `i64(i64,i64)` | mismatch 0/6/9 | - | **mismatch** | arg_drop,spill_slot_deref,xmm_arg_drop |
+| 9 | 18982 | Fruity 7 Band EQ | 0x6b0ef0 | 1554 | `i64(i64,i64,double)` | mismatch 0/6/9 | - | **mismatch** | arg_drop,spill_slot_deref,xmm_arg_drop |
 | 10 | 19005 | Fruity Fast LP | 0x5de300 | 31 | `i64(i64,i64,i64)` | match 1/1/9 | match 4/4 | **match** | - |
 | 11 | 19005 | Fruity Fast LP | 0x6c8c90 | 171 | `i64(i64,i64,i64,i64)` | mismatch 0/3/9 | - | **mismatch** | arg_drop,fp_flag_unreflected,spill_slot_deref,xmm_arg_drop |
 | 12 | 19006 | Fruity Filter | 0x5de250 | 23 | `i64(i64)` | match 6/6/9 | - | **match** | - |
 | 13 | 19006 | Fruity Filter | 0x6cc2e0 | 171 | `i64(i64,i64,i64,i64)` | mismatch 0/3/9 | - | **mismatch** | arg_drop,fp_flag_unreflected,spill_slot_deref,xmm_arg_drop |
-| 14 | 19013 | Fruity Free Filter | 0x6ca5c0 | 1554 | `i64(i64,i64)` | mismatch 0/6/9 | - | **mismatch** | arg_drop,spill_slot_deref,xmm_arg_drop |
+| 14 | 19013 | Fruity Free Filter | 0x6ca5c0 | 1554 | `i64(i64,i64,double)` | mismatch 0/6/9 | - | **mismatch** | arg_drop,spill_slot_deref,xmm_arg_drop |
 | 15 | 19059 | Fruity Parametric EQ 2 | 0x6e9440 | 29 | `i64(i64)` | unexec(native_fault_all_patterns) 0/0/9 | match 7/7 | **match** | - |
-| 16 | 19059 | Fruity Parametric EQ 2 | 0x6ec2a0 | 65 | `i64(i64,i64,i64)` | mismatch 4/5/9 | match 7/7 | **match** (偽陽性、根拠 §8.1a) | wasm_trap |
+| 16 | 19059 | Fruity Parametric EQ 2 | 0x6ec2a0 | 65 | `i64(i64,i64,i64)` | match 4/5/9 | match 7/7 | **match** (1191aef の主採点は mismatch 4/5/9。根拠 §8.1a) | - |
 | 17 | 19059 | Fruity Parametric EQ 2 | 0x6ec2f0 | 73 | `i64(i64,i32,i64,i64)` | unexec(hang) 0/0/9 | match 7/7 | **match** | - |
-| 18 | 19059 | Fruity Parametric EQ 2 | 0x6f1650 | 28 | `float()` | mismatch 0/9/9 | - | **mismatch** | xmm_arg_drop |
+| 18 | 19059 | Fruity Parametric EQ 2 | 0x6f1650 | 28 | `float(i64,float)` | mismatch 0/9/9 | - | **mismatch** | ret_only |
 | 19 | 19059 | Fruity Parametric EQ 2 | 0x6f1c40 | 29 | `i64(i64)` | match 6/6/9 | - | **match** | - |
 | 20 | 19059 | Fruity Parametric EQ 2 | 0x6f1c60 | 25 | `i64(i64)` | match 6/6/9 | match 5/5 | **match** | - |
 | 21 | 19059 | Fruity Parametric EQ 2 | 0x6f2320 | 20 | `i64(i64)` | match 5/5/9 | - | **match** | - |
@@ -71,7 +71,7 @@
 | 23 | 19059 | Fruity Parametric EQ 2 | 0x6f23b0 | 17 | `float(i64,i64)` | unexec(native_fault_all_patterns) 0/0/9 | match 4/4 | **match** | - |
 
 最終判定 23 関数: **一致 15 / 不一致 8 / 実行不能 0**
-主採点のみ: 一致 9 / 不一致 9 / 実行不能 5。 case 207: native 完走 93 (equal 56 / diff 35 / wasm_trap 2)、比較不能 114
+主採点のみ: 一致 12 / 不一致 6 / 実行不能 5。 case 207: native 完走 93 (equal 58 / diff 33 / wasm_trap 0)、比較不能 114 (2f77ace。1191aef 時点は 9 / 9 / 5、equal 56 / diff 35 / wasm_trap 2)
 補助採点 12 関数: case 66 (equal 60 / diff 6 / wasm_trap 0 / 比較不能 0)
 最終 mismatch のタグ (該当関数数): xmm_arg_drop 8, fp_flag_unreflected 4, arg_drop 4, spill_slot_deref 4
 最終 mismatch のうち callee 無しで差分 (自己欠陥確定): 8
@@ -155,7 +155,7 @@ python3 tools/plugins/f2/nc_leaf.py      # ネガティブコントロール (ki
 | コマンド | rc | 所要 (秒) | load average (1 分) 開始 → 終了 | 結果 |
 |---|--:|--:|---|---|
 | `f2_step1.sh` | 0 | 302 | 0.18 → 8.31 | IR leaf 55 / 機械語でも間接 call 無し 23、dispatch 549 + waived 1 = 550 |
-| `leaf_diff.sh` | 0 | 131 | 7.64 → 1.22 | 最終判定 一致 15 / 不一致 8 / 実行不能 0。主採点 一致 9 / 不一致 9 / 実行不能 5、case 207 (native 完走 93)、補助 66 |
+| `leaf_diff.sh` | 0 | 131 | 7.64 → 1.22 | 最終判定 一致 15 / 不一致 8 / 実行不能 0。主採点 一致 9 / 不一致 9 / 実行不能 5、case 207 (native 完走 93)、補助 66 (**faacabb 時点の値。2f77ace の値は §9.4**) |
 | `nc_leaf.py` | 0 | 194 | 1.13 → (終了時 未採取) | store_drop 6/6、load_drop 11/11、offset_shift 13/13 検出 |
 
 - `f2_step1.sh` の 302 秒は §8.7 の 51 秒 (work/ あり) と異なる。この worktree では `tools/plugins/work/` を再生成したため (win_funcs が支配的)。
