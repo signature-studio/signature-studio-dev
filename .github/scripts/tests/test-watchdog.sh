@@ -71,8 +71,8 @@ base() { # base <prs json> [active runs json]
 }
 # run <path> <pr番号...>: 実行中 run の JSON (workflow の path と担当 PR)
 run() { local p="$1" nums="" ; shift; for n in "$@"; do nums="$nums{\"number\":$n},"; done; printf '{"event":"pull_request","display_title":"x","path":"%s","pull_requests":[%s]}' "$p" "${nums%,}"; }
-# pr <n> <head> <draft> <updated_at> <labels json>
-pr() { printf '{"number":%s,"title":"PR %s","head":{"sha":"%s"},"draft":%s,"updated_at":"%s","labels":%s,"body":%s}' "$1" "$1" "$2" "$3" "$4" "${5:-[]}" "$(jq -Rn --arg b "${6:-}" '$b')"; }
+# pr <n> <head> <draft> <updated_at> <labels json> [body] [head repo full_name (既定 o/r)]
+pr() { printf '{"number":%s,"title":"PR %s","head":{"sha":"%s","repo":{"full_name":"%s"}},"draft":%s,"updated_at":"%s","labels":%s,"body":%s}' "$1" "$1" "$2" "${7:-o/r}" "$3" "$4" "${5:-[]}" "$(jq -Rn --arg b "${6:-}" '$b')"; }
 # detail <n> <mergeable> <reviews json> <comments json>
 detail() {
   fx "repos/o/r/pulls/$1" "{\"mergeable\":$2}"
@@ -105,6 +105,31 @@ detail 1 false "[]" "[$(for _ in 1 2 3; do printf '{"user":{"login":"%s","type":
 wd
 logged 'pr edit 1 .*--add-label oc:stuck' && not_logged 'repos/o/r/dispatches'
 expect "dispatch limit reached -> oc:stuck, no more dispatch" $?
+
+# 1c2. 差し戻し (watchdog) が 6 回ある競合 PR は oc:stuck にならず、dispatch される (WD_MAX で止めない)
+reset
+base "[$(pr 1 aaa111 false "$OLD")]"
+detail 1 false "[$(for _ in 1 2 3 4 5 6; do printf '%s,' "$(review "$REVIEWER" aaa111 CHANGES_REQUESTED '[watchdog] x (watchdog)')"; done | sed 's/,$//')]"
+wd
+logged 'client_payload\[reason\]=conflict' && not_logged 'add-label oc:stuck' && not_logged 'pr review 1'
+expect "conflict with 6 watchdog re-requests -> still dispatched, not oc:stuck" $?
+
+# 1g. fork からの競合 PR は dispatch しない (write 権限の run を第三者の入力で動かさない)。oc:stuck も付けず、一覧に出して次へ進む
+reset
+base "[$(pr 1 aaa111 false "$OLD" '[]' '' fork-user/signature-studio-dev),$(pr 2 bbb222 true "$OLD")]"
+detail 1 false
+detail 2 true
+wd
+not_logged 'repos/o/r/dispatches' && not_logged 'oc-dispatch' && not_logged 'add-label oc:stuck' && logged 'pr ready 2' && grep -q 'fork からの PR' "$TMP/out"
+expect "fork conflict PR -> no dispatch, no oc:stuck, listed and skipped" $?
+
+# 1h. head.repo が読めない競合 PR も fork とみなして dispatch しない (fail-closed)
+reset
+base "[$(printf '{"number":1,"title":"PR 1","head":{"sha":"aaa111"},"draft":false,"updated_at":"%s","labels":[],"body":""}' "$OLD")]"
+detail 1 false
+wd
+not_logged 'repos/o/r/dispatches' && not_logged 'add-label oc:stuck'
+expect "conflict PR without head.repo -> treated as fork, no dispatch" $?
 
 # 1d. マーカーを偽装した他アカウントのコメントは数えない
 reset

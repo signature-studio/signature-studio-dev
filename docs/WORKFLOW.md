@@ -279,7 +279,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
 
   | IDLE の理由 | watchdog がすること |
   |---|---|
-  | main と競合している | `repository_dispatch` (type `oc-fix`) で fix モードの実装 run を起動する。競合 PR は `pull_request`・`pull_request_review` でワークフローが起動せず、差し戻しでは動かせない (往復回数を消費するだけ)。dispatch は競合に左右されない。同じ head への dispatch は 3 回までで、超えたら `oc:stuck` |
+  | main と競合している | `repository_dispatch` (type `oc-fix`) で fix モードの実装 run を起動する。競合 PR は `pull_request`・`pull_request_review` でワークフローが起動せず、差し戻しでは動かせない (往復回数を消費するだけ)。dispatch は競合に左右されない。同じ head への dispatch は 3 回までで、超えたら `oc:stuck`。fork からの PR (`head.repo` が本リポジトリでない) は dispatch しない (write 権限の run を第三者の入力で動かさないため)。`oc:stuck` も付けず、一覧に出して人が判断する |
   | draft | ready にする |
   | 現在の head に verdict が無い | close -> reopen で review を再起動する |
   | 差し戻し済みだが fix が動いていない | `[watchdog]` の request-changes を出し直す (-> fix) |

@@ -12,7 +12,8 @@
 # イベントが伝播中とみなして次回に回す):
 #   CONFLICT          main と競合。競合 PR は pull_request も pull_request_review も起動しないため、差し戻しでは fix を動かせない
 #                     (往復回数だけ消費して oc:stuck に近づく)。差し戻しは出さず、repository_dispatch (type oc-fix) で fix モードの
-#                     実装 run を起動する (同じ head へは DISPATCH_MAX 回まで。超えたら oc:stuck。#731)
+#                     実装 run を起動する (同じ head へは DISPATCH_MAX 回まで。超えたら oc:stuck。#731)。
+#                     fork からの PR は dispatch しない (write 権限の run を第三者の入力で動かさないため。oc:stuck も付けず一覧に出すだけ)
 #   DRAFT             draft -> ready (ready_for_review で review が起動する)
 #   FIX_IDLE          現在の head に CHANGES_REQUESTED があるのに fix run が無い -> CHANGES_REQUESTED を再提出して fix 経路へ
 #   APPROVED          approve 済みで未 merge -> merge。失敗したら理由付きの CHANGES_REQUESTED
@@ -24,6 +25,7 @@
 # merge は --match-head-commit で、点検した head 以外 (その後に push された未レビューの commit) を巻き込まない。
 # 1 回の点検で行う操作 (oc:stuck の付与を含む) は OC_MAX_ACTIONS 件まで (古い更新の PR から)。残りは次回に回す。
 # 読み取りに失敗した PR・mergeable が未確定の PR は、その回は何も操作せず次回に回す (fail-closed)。
+# fork からの PR (head.repo が本リポジトリでない) は CONFLICT でも dispatch しない (write 権限の run を第三者の入力で動かさない)。一覧に出して人が判断する。
 #
 # 入力 (env): GH_TOKEN (reviewer App。review の提出・merge・ready・close/reopen に使う), OC_REPO,
 #             RUNS_TOKEN (actions:read。省略時は GH_TOKEN), DRY=1 で操作せず計画だけ表示
@@ -176,6 +178,13 @@ for i in $(seq 0 $((total - 1))); do
   line="#$n $reason (updated ${upd_age}m ago)"
   summary="$summary- $line"$'\n'
   echo "$line"
+
+  # fork からの PR は dispatch しない: dispatch の run は write 権限で動き、fork の本文・コメント・ブランチ内容は第三者が書ける。
+  # head.repo が読めない (削除された fork など) 場合も fork とみなす。oc:stuck は付けず、人が判断する。
+  if [ "$reason" = CONFLICT ] && [ "$(jq -r '.head.repo.full_name // ""' <<< "$pr")" != "$R" ]; then
+    echo "  skip: fork からの PR は自動対応しない (人が判断する。oc:stuck は付けない)"
+    continue
+  fi
 
   if [ "$upd_age" -lt "$SETTLE_MIN" ]; then
     echo "  skip: a recent update is still propagating"
