@@ -2,7 +2,7 @@
 # C++ module (MSVC) の全 .pdata 関数を RetDec+pass 鎖で lift → emcc -c (到達性のみ; 正しさは別)
 #   bash tools/plugins/pitch_time/cpp_lift.sh <block> [timeout_sec_per_chunk] [chunk_chars]
 #   例: 19222 (Pitcher 本体) / 19072 (Scratcher engine) / 19216 (Newtone engine)
-# range 文字列が 1 引数の上限 (131072 B) を超える module は chunk_chars (既定 40000 = 約 1500 関数。 RetDec は 1 chunk 4166 関数で RSS 7.4 GB 超・5 分超まで膨らむため小さく切る) 以内の chunk に分けて別々に lift する
+# range 文字列が chunk_chars (既定 40000 字 = 約 1,600 関数。 retdec の引数 1 個は 131072 B が上限) を超える module は chunk に分けて別々に lift する
 # (chunk 間の呼出は declare になる = リンク時に未解決。 chunk 数が 1 なら全関数が同一 module)。
 # 出力: work/pitch_time/cpp<block>/ と stdout 末尾に集計 1 行:
 #   block,pdata_funcs,chunks,lift_rc_max,defines,f80_funcs,unimpl_helpers,emcc_c_fail_chunks,fixcmp_patched,emcc_c_fail_after_fixcmp,lift_s,missing_define,missing_bytes,missing_ref,extra_inside

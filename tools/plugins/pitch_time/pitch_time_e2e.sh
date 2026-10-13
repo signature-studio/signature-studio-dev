@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 # PLG-F7 (#204) pitch-time 8 本の「lift 前提」実測 + 判定を 1 コマンドで再現する。
-#   bash tools/plugins/pitch_time/pitch_time_e2e.sh [--skip-lift | --judge-only] [--heavy]
+#   bash tools/plugins/pitch_time/pitch_time_e2e.sh [--skip-lift | --judge-only]
 # 手順: inventory (work/ 無ければ生成) → 殻 7 本の閉包 → batch_lift → judge.py (gate) → closure_facts → matrix_check → ids_crosscheck
-#       → C++ module 2 本 (Pitcher / Scratcher engine) の全 .pdata lift → judge.py --engines (gate)。 --heavy で Newtone engine (3 chunk、長時間) も加える
+#       → C++ module 2 本 (Pitcher / Scratcher engine) の全 .pdata lift → judge.py --engines (gate)。 Newtone engine は §4 の通り未完のため gate に含めない
 # 終了コード: 全ての gate が合格のときだけ 0。 どれか 1 つでも不合格なら非 0 で、最終行は [pitch_time_e2e] FAIL (OK 行は出ない)。
 #   --skip-lift  : 既存の work/ の結果で判定と突合のみ (lift と C++ module の再測定は省く)。 status は $STATUS_CSV (既定 work/batch/status.csv) の最後の行
-#   --heavy      : Newtone engine (block 19216、.pdata 10,656 関数を 3 chunk に分けて lift) も測定して gate に加える
 #   --judge-only : 殻の judge.py と C++ module の judge.py --engines だけ実行して終わる (最終行は [pitch_time_e2e] JUDGE-ONLY PASS)。
 #                  入力は $STATUS_CSV / $CPP_CSV (既定 work/batch/status.csv / work/pitch_time/cpp.csv)。 判定の配線のネガコン用
 # 出力: work/pitch_time/{status7.csv,facts.json,cpp.csv} (work/ は gitignore)
@@ -15,14 +14,13 @@ trap 'rc=$?; [ "$rc" = 0 ] || echo "[pitch_time_e2e] FAIL (exit $rc, line $LINEN
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 source "$HERE/env.sh"
 cd "$HERE/.."
-MODE=""; HEAVY=0
+MODE=""
 for a in "$@"; do
-  case "$a" in --skip-lift|--judge-only) MODE="$a";; --heavy) HEAVY=1;; *) echo "usage: $0 [--skip-lift|--judge-only] [--heavy]" >&2; exit 2;; esac
+  case "$a" in --skip-lift|--judge-only) MODE="$a";; *) echo "usage: $0 [--skip-lift|--judge-only]" >&2; exit 2;; esac
 done
 # Fruity Scratcher / Fruity Vocoder / Gross Beat / Newtime / Newtone / Pitch Shifter / Vocodex (Delphi 殻)
 SHELLS=(19071 19087 19098 19166 19217 19221 19270)
-CPP=(19222 19072)   # Pitcher 本体 / Scratcher engine
-if [ "$HEAVY" = 1 ]; then CPP+=(19216); fi   # Newtone engine
+CPP=(19222 19072)   # Pitcher 本体 / Scratcher engine (Newtone engine 19216 は REPORT §4: RetDec が 1 chunk で終わらず未完)
 mkdir -p work/pitch_time work/batch
 CLOSURE_DIR="${CLOSURE_DIR:-work/closure}"; LL_DIR="${LL_DIR:-work/batch}"   # judge の欠落監査の入力 (batch_lift.sh / plugin_closure.py の出力先)
 if [ -n "$MODE" ]; then
