@@ -6,7 +6,7 @@
 
 ## 1. 代入元の台帳 (`m11_argrecover.py` の `src:*`)
 
-台帳コードは `621c0d67` で追加済み。本 REPORT の数値は本 commit の HEAD で再生成した。
+台帳コードは `621c0d67` で追加済み。本 REPORT の数値は測定 commit `cb45c284` (検算 `m11_setother_ledger_verify.py` を台帳照合版に直した commit) の HEAD で再生成した。
 
 実行: `python3 m11_post.py work/boot_final.ll work/sigfix_stats/final3_base.ll --pads work/sigfix_stats/pads.json` → `python3 m11_argrecover.py work/sigfix_stats/pads.json --pe <block00031_PE.bin> --out work/sigfix_stats/fixes.json`
 
@@ -93,6 +93,8 @@ EXIT=0
 **独立性の限界**: 検算は代入元の判定を文字列で行うが、(a) 命令列の取得 (`ldmach.disasm_fn`・capstone)、(b) call 位置の対応付け (`k` 番目の call)、(c) 窓の範囲 (分岐・call で打ち切り) は台帳と共通である。したがって検算が確かめるのは「代入元の分類」だけで、窓の取り方や call 対応付けの誤りは検出できない。初版の判定修正は、台帳の値を見た後に行った。修正は規則 (8/16bit 名・`al`/`xmm` を含める) の追加で、台帳の kind を個別に書き換えてはいない。
 
 ## 4. 既定出力の byte 一致 (測定)
+
+測定 commit: `cb45c284`。`git diff cb45c284 HEAD -- tools/m11` の出力は、この REPORT の追記のみ (コードの差分 0)。
 
 `621c0d67` 時点の `m11_post.py` の出力と、現行 HEAD の `m11_post.py` の出力を比較した:
 
