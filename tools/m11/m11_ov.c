@@ -98,6 +98,17 @@ static u64 tr_479b10(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64
     return h;
 }
 
+#ifndef M11_OV_CLASSCREATE
+#define M11_OV_CLASSCREATE 0
+#endif
+#if M11_OV_CLASSCREATE
+/* 41c130  `or eax,-1; lock xadd [rcx+8],eax; ret` = TInterfacedObject.AfterConstruction (FRefCount を 1→0 に戻す。NewInstance 41c160 が 1 にしている)。
+ * 410360 ON で [vmt-0x50] 経由の呼出しが現れるが closure 外のため miss (skip) になり FRefCount が 1 のまま残っていた (#595)。戻り値は xadd の旧値 */
+static u64 tr_41c130(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) {
+    u32 old = *(volatile u32*)(uintptr_t)(a0 + 8); *(volatile u32*)(uintptr_t)(a0 + 8) = old - 1; return old;
+}
+#endif
+
 static m11_tr_t disp_find(u32 va) {
     int lo = 0, hi = (int)m11_disp_n - 1;
     while (lo <= hi) {
@@ -116,6 +127,9 @@ static m11_tr_t disp_find(u32 va) {
     case 0x478c70: return tr_478c70;
     case 0x479b00: return tr_479b00;
     case 0x479b10: return tr_479b10;
+#if M11_OV_CLASSCREATE
+    case 0x41c130: return tr_41c130;   /* TInterfacedObject.AfterConstruction (#595) */
+#endif
     }
     return 0;
 }
