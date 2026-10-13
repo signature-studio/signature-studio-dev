@@ -150,7 +150,7 @@ def gen_body(base, R, A):
     if base == 'rep_movsq_memcpy':
         return ['memmove(a, b, (size_t)c * 8u); /* rep movsq: c = qword 数 */']
     if base == 'int3' and n == 0:
-        return ['abort(); /* int3: 到達すれば意図しない trap */ return 0;']
+        return ['abort(); /* int3: 到達すれば意図しない trap */'] + ([] if R == 'void' else ['return 0;'])
     if base == 'int' and n == 1:
         return ['(void)a; abort(); /* int n: 到達すれば意図しない trap */']
     if base == 'rep_movsb_memcpy' and R == 'void' and n == 3:
