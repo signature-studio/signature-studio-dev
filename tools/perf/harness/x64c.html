@@ -47,7 +47,7 @@ window.runWorklet = async (opts) => {
   out.rt = { n: rt.n, wallMs: rt.wallMs, procCalls: rt.procCalls, ticksPerUs: tpu, clockWorkerTicksPerUs: null, sampleRate: rt.sampleRate, budgetUs,
     durUs: { min: q(dur, 0), p50: q(dur, .5), p90: q(dur, .9), p99: q(dur, .99), p999: q(dur, .999), max: q(dur, 1) },
     gapUs: { min: q(gap, 0), p50: q(gap, .5), p99: q(gap, .99), max: q(gap, 1), mean: gap.reduce((x, y) => x + y, 0) / gap.length },
-    overBudget: dur.filter((x) => x > budgetUs).length, over10pct: dur.filter((x) => x > budgetUs * 0.1).length, over1ms: dur.filter((x) => x > 1000).length, over5ms: dur.filter((x) => x > 5000).length,
+    zeroDur: dur.filter((x) => x === 0).length, overBudget: dur.filter((x) => x > budgetUs).length, over10pct: dur.filter((x) => x > budgetUs * 0.1).length, over1ms: dur.filter((x) => x > 1000).length, over5ms: dur.filter((x) => x > 5000).length,
     gapOver2x: gap.filter((x) => x > 2 * budgetUs).length, rtfP50: q(dur, .5) / budgetUs, rtfP99: q(dur, .99) / budgetUs, rtfMax: q(dur, 1) / budgetUs };
   { const b = out.bench; b.meanUsPerBlock = b.chunkMs.reduce((x, y) => x + y, 0) / (b.chunkMs.length * b.per) * 1000; b.chunkUsPerBlock = b.chunkTicks.map((t) => t / tpu / b.per); b.rtfMean = b.meanUsPerBlock / budgetUs; }
   const sr = new Promise((res) => { clock.onmessage = (e) => { if (e.data.type === 'stopped') res(e.data); }; }); Atomics.store(new Uint32Array(sab), 1, 1);
