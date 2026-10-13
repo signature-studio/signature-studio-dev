@@ -264,7 +264,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     停止コメント・完了コメントの実装 App (`opencode-for-signature-studio[bot]`) は login の完全一致で見る
     (前方一致だと別名のアカウントでも write 権限の fix が起動し、停止コメントを偽装して数え直しもできてしまう)。
   - **テスト**: `.github/scripts/tests/test-pr-loop.sh` (fix / verify / reopen) と `test-watchdog.sh` (watchdog の判定と操作)
-    を、fake gh で `.github/workflows/scripts-test.yaml` が `.github/scripts/**`・`.github/actions/**`・`opencode.yaml` の
+    と `test-dispatch-context.sh` (dispatch の入力検証) を、fake gh で `.github/workflows/scripts-test.yaml` が `.github/scripts/**`・`.github/actions/**`・`opencode.yaml` の
     変更ごとに実行する。
   - **並行制御**: implement job は `opencode-impl-<N>`、review job は `opencode-review-<N>` と group を分ける。
     同じ group だと fix が pending の間に review が入って fix が黙って取り消される (pending は 1 件しか持てない)。
@@ -279,11 +279,16 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
 
   | IDLE の理由 | watchdog がすること |
   |---|---|
-  | main と競合している | reviewer App 名義で `[conflict]` の request-changes を出す (-> fix が main を取り込んで解消) |
+  | main と競合している | `repository_dispatch` (type `oc-fix`) で fix モードの実装 run を起動する。競合 PR は `pull_request`・`pull_request_review` でワークフローが起動せず、差し戻しでは動かせない (往復回数を消費するだけ)。dispatch は競合に左右されない。同じ head への dispatch は 3 回までで、超えたら `oc:stuck`。fork からの PR (`head.repo` が本リポジトリでない) は dispatch しない (write 権限の run を第三者の入力で動かさないため)。`oc:stuck` も付けず、一覧に出して人が判断する |
   | draft | ready にする |
   | 現在の head に verdict が無い | close -> reopen で review を再起動する |
   | 差し戻し済みだが fix が動いていない | `[watchdog]` の request-changes を出し直す (-> fix) |
   | approve 済みで未 merge | `gh pr merge --merge --match-head-commit <head>`。失敗したら `[merge-failed]` の request-changes |
+
+  **repository_dispatch (oc-fix)**: 送れるのは `contents: write` を持つトークンだけ。payload は PR 番号 (数字のみ)・理由 (`conflict`)・
+  素材名 (PR 本文の `oc_artifacts:` から allowlist に一致する語だけ) で、自由な文字列は持たない。`prepare-event-context.sh` が
+  値域を検証し、指示文は理由から組み立てる。run は `run-name` が `oc-fix #<PR 番号>` になり、watchdog はこの名前で担当 run を突き合わせる。
+  dispatch の前に `<!-- oc-dispatch:<head12> -->` のマーカー付きコメントを残し、同じ head への回数を数える。
 
   `oc:stuck` ラベルの PR は触らない (人の判断待ち)。同じ head への watchdog の差し戻しが 6 回、または review の再起動が
   3 回に達したら `oc:stuck` を付けて止める。`DRY=1` なら計画だけを出す。reviewer は login の完全一致 + `Bot` 型で見る。

@@ -27,15 +27,17 @@ if [ "$1" = pr ] || [ "$1" = label ]; then
   exit 0
 fi
 shift
-path="" jq_expr=""
+path="" jq_expr="" method=GET
 while [ $# -gt 0 ]; do
   case "$1" in
     --paginate) ;;
+    -X) method="$2"; shift ;;
     --jq) jq_expr="$2"; shift ;;
     repos/*) path="$1" ;;
   esac
   shift
 done
+[ "$method" = POST ] && exit 0
 if [ -n "${FAKE_FAIL:-}" ] && [[ "$path" == *"$FAKE_FAIL"* ]]; then
   echo "fake gh: injected failure for $path" >&2
   exit 1
@@ -69,8 +71,8 @@ base() { # base <prs json> [active runs json]
 }
 # run <path> <pr番号...>: 実行中 run の JSON (workflow の path と担当 PR)
 run() { local p="$1" nums="" ; shift; for n in "$@"; do nums="$nums{\"number\":$n},"; done; printf '{"event":"pull_request","display_title":"x","path":"%s","pull_requests":[%s]}' "$p" "${nums%,}"; }
-# pr <n> <head> <draft> <updated_at> <labels json>
-pr() { printf '{"number":%s,"title":"PR %s","head":{"sha":"%s"},"draft":%s,"updated_at":"%s","labels":%s}' "$1" "$1" "$2" "$3" "$4" "${5:-[]}"; }
+# pr <n> <head> <draft> <updated_at> <labels json> [body] [head repo full_name (既定 o/r)]
+pr() { printf '{"number":%s,"title":"PR %s","head":{"sha":"%s","repo":{"full_name":"%s"}},"draft":%s,"updated_at":"%s","labels":%s,"body":%s}' "$1" "$1" "$2" "${7:-o/r}" "$3" "$4" "${5:-[]}" "$(jq -Rn --arg b "${6:-}" '$b')"; }
 # detail <n> <mergeable> <reviews json> <comments json>
 detail() {
   fx "repos/o/r/pulls/$1" "{\"mergeable\":$2}"
@@ -80,13 +82,78 @@ detail() {
 review() { printf '{"user":{"login":"%s","type":"%s"},"commit_id":"%s","state":"%s","body":"%s"}' "$1" "${5:-Bot}" "$2" "$3" "${4:-}"; }
 wd() { bash "$SCRIPTS/watchdog.sh" > "$TMP/out" 2>&1; }
 
-# 1. 競合 -> reviewer 名義の [conflict] 差し戻し
+# 1. 競合 PR は pull_request / pull_request_review でワークフローが起動しない。差し戻しでなく repository_dispatch (oc-fix) で起動する (#731)
 reset
-base "[$(pr 1 aaa111 false "$OLD")]"
+base "[$(pr 1 aaa111 false "$OLD" '[]' $'oc_artifacts: toolchain-emsdk (説明文 mingw-w64) bogus-name plugins-ott\n本文')]"
 detail 1 false
 wd
-logged 'pr review 1 .*--request-changes' && logged '\[conflict\]'
-expect "conflict -> request-changes [conflict]" $?
+logged 'api -X POST repos/o/r/dispatches' && logged 'event_type=oc-fix' && logged 'client_payload\[pr\]=1' && logged 'client_payload\[reason\]=conflict' && not_logged 'pr review 1'
+expect "conflict -> repository_dispatch oc-fix (no request-changes)" $?
+
+# 1a. dispatch の素材は PR 本文の oc_artifacts 行から allowlist に一致する語だけ (説明文・未知の語は落とす)
+logged 'client_payload\[artifacts\]=toolchain-emsdk plugins-ott$'
+expect "dispatch artifacts keep only allowlisted names from the PR body" $?
+
+# 1b. dispatch の前に、試行を数えるマーカー付きのコメントを残す
+logged 'pr comment 1 .*oc-dispatch:aaa111'
+expect "a counted marker comment precedes the dispatch" $?
+
+# 1c. 同じ head への dispatch が上限 (3 回) に達したら oc:stuck で止める
+reset
+base "[$(pr 1 aaa111 false "$OLD")]"
+detail 1 false "[]" "[$(for _ in 1 2 3; do printf '{"user":{"login":"%s","type":"Bot"},"body":"x <!-- oc-dispatch:aaa111 -->"},' "$REVIEWER"; done | sed 's/,$//')]"
+wd
+logged 'pr edit 1 .*--add-label oc:stuck' && not_logged 'repos/o/r/dispatches'
+expect "dispatch limit reached -> oc:stuck, no more dispatch" $?
+
+# 1c2. 差し戻し (watchdog) が 6 回ある競合 PR は oc:stuck にならず、dispatch される (WD_MAX で止めない)
+reset
+base "[$(pr 1 aaa111 false "$OLD")]"
+detail 1 false "[$(for _ in 1 2 3 4 5 6; do printf '%s,' "$(review "$REVIEWER" aaa111 CHANGES_REQUESTED '[watchdog] x (watchdog)')"; done | sed 's/,$//')]"
+wd
+logged 'client_payload\[reason\]=conflict' && not_logged 'add-label oc:stuck' && not_logged 'pr review 1'
+expect "conflict with 6 watchdog re-requests -> still dispatched, not oc:stuck" $?
+
+# 1g. fork からの競合 PR は dispatch しない (write 権限の run を第三者の入力で動かさない)。oc:stuck も付けず、一覧に出して次へ進む
+reset
+base "[$(pr 1 aaa111 false "$OLD" '[]' '' fork-user/signature-studio-dev),$(pr 2 bbb222 true "$OLD")]"
+detail 1 false
+detail 2 true
+wd
+not_logged 'repos/o/r/dispatches' && not_logged 'oc-dispatch' && not_logged 'add-label oc:stuck' && logged 'pr ready 2' && grep -q 'fork からの PR' "$TMP/out"
+expect "fork conflict PR -> no dispatch, no oc:stuck, listed and skipped" $?
+
+# 1h. head.repo が読めない競合 PR も fork とみなして dispatch しない (fail-closed)
+reset
+base "[$(printf '{"number":1,"title":"PR 1","head":{"sha":"aaa111"},"draft":false,"updated_at":"%s","labels":[],"body":""}' "$OLD")]"
+detail 1 false
+wd
+not_logged 'repos/o/r/dispatches' && not_logged 'add-label oc:stuck'
+expect "conflict PR without head.repo -> treated as fork, no dispatch" $?
+
+# 1d. マーカーを偽装した他アカウントのコメントは数えない
+reset
+base "[$(pr 1 aaa111 false "$OLD")]"
+detail 1 false "[]" "[$(for _ in 1 2 3; do printf '{"user":{"login":"someone-else","type":"User"},"body":"<!-- oc-dispatch:aaa111 -->"},'; done | sed 's/,$//')]"
+wd
+logged 'repos/o/r/dispatches' && not_logged 'oc:stuck'
+expect "spoofed markers from another account do not count" $?
+
+# 1e. 実行中の oc-fix run (run-name が『oc-fix #N』) があれば担当ありとして何もしない
+reset
+base "[$(pr 1 aaa111 false "$OLD")]" '[{"event":"repository_dispatch","display_title":"oc-fix #1","path":".github/workflows/opencode.yaml","pull_requests":[]}]'
+detail 1 false
+wd
+not_logged 'repos/o/r/dispatches'
+expect "a running oc-fix run covers the conflicting PR" $?
+
+# 1f. 別の PR の oc-fix run は担当にならない
+reset
+base "[$(pr 1 aaa111 false "$OLD")]" '[{"event":"repository_dispatch","display_title":"oc-fix #11","path":".github/workflows/opencode.yaml","pull_requests":[]}]'
+detail 1 false
+wd
+logged 'repos/o/r/dispatches'
+expect "oc-fix #11 does not cover PR #1" $?
 
 # 2. draft -> ready
 reset
