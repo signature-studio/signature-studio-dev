@@ -7,7 +7,7 @@ OUT="$HERE/results/inventory_raw.txt"
 mkdir -p "$HERE/results"
 . "$HERE/../shared/env.sh"
 WIN="$FL_WIN64_DIR/extracted"
-MAC=/home/ubuntu/work/webstudio/tools/m2/work/FLEngine_x86_64.dylib   # M2 が lipo 抽出した x86_64 スライス (読取のみ)
+MAC="${FLENGINE_MAC_SLICE:-$ANALYSIS_DIR/mac/FLEngine_x86_64.dylib}"   # M2 が lipo 抽出した x86_64 スライス (読取のみ; 無ければ [5] を skip)
 {
   echo "### [1] FLEngine_x64.dll: audio/MIDI import 参照元 (fl_audio_xref.py, thunk 経由 e8 解決)"
   python3 "$HERE/fl_audio_xref.py" --json "$HERE/results/xref.json" > /dev/null
@@ -28,6 +28,10 @@ PY
   python3 "$HERE/ilw_vtable.py" $WIN/block00001_PE.bin | head -28
   python3 "$HERE/ilw_consts.py"
   echo; echo "### [5] macOS FLEngine x86_64 slice: CoreAudio/AudioToolbox/CoreMIDI undefined symbols (llvm-nm)"
-  llvm-nm -m -u "$MAC" | grep -E "CoreAudio|AudioToolbox|AudioUnit|CoreMIDI" | sed 's/.*external //' | sort
+  if [ -f "$MAC" ]; then
+    llvm-nm -m -u "$MAC" | grep -E "CoreAudio|AudioToolbox|AudioUnit|CoreMIDI" | sed 's/.*external //' | sort
+  else
+    echo "  (skip: $MAC が無い。FLENGINE_MAC_SLICE で指定可)"
+  fi
 } > "$OUT"
 echo "[audio] inventory -> $OUT ($(wc -l < "$OUT") lines)"
