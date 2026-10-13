@@ -7,6 +7,7 @@ set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 source "$HERE/env.sh"
 cd "$HERE/.."
+export PLUG_ICALL=0   # 従来鎖 (間接 call 復元なし) に固定 (lift_ranges.sh の既定と同じ。 g1_e2e.sh と揃える)
 B="$1"; TMO="${2:-1200}"
 OUT="work/g1/engine$B"; mkdir -p "$OUT/tmp"
 python3 g1/engine_ranges.py "$B" > "$OUT/ranges.txt" 2> "$OUT/ranges.info"

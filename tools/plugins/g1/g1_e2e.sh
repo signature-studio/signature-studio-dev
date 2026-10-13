@@ -5,6 +5,8 @@
 #       → closure_facts.py → [gate 2: matrix_check.py] → [gate 3: ids_crosscheck.py] → [gate 4: icall_check.py] → C++ DLL 7 本の lift (参考; 形式のみ検査)
 # どの gate も不合格なら非 0 で終了し、最終行の `[g1_e2e] OK` は出さない (set -e)。
 # 出力: work/g1/{status12.csv,define_table.md,facts.json,cpp_facts.json,icall/,engines.csv} (work/ は gitignore)
+# 鎖: 本測定は PLUG_ICALL=0 (間接 call 復元前の従来鎖) に固定する。 main の batch_lift.sh は既定 PLUG_ICALL=1 (#539) だが、既定鎖の測定は REPORT §6.1 (別 run)。
+#     PLUG_ICALL=1 の status.csv (icall 列 = 1) は judge.py が不合格にする
 # 環境変数: G1_STATUS_CSV = judge に渡す status.csv を差し替える (ネガティブコントロール用; 既定 work/batch/status.csv)
 # 前提素材: fl-win64 / toolchain-retdec (/opt/retdec) / toolchain-emsdk (/opt/emsdk)  (docs/WORKFLOW.md §11)
 set -euo pipefail
@@ -23,6 +25,7 @@ done
 read -r -a BLOCKS <<< "$(python3 g1/common.py shells)"
 read -r -a CPP <<< "$(python3 g1/common.py engines)"
 mkdir -p work/g1
+export PLUG_ICALL=0
 
 bash g1/prep.sh
 python3 lift/plugin_closure.py "${BLOCKS[@]}" > /dev/null

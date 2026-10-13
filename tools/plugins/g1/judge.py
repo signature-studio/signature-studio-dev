@@ -7,16 +7,19 @@ block ごとの合格条件 (すべて満たす):
   行がちょうど 1 つ / 列が整数 / closure_funcs > 0 / lift_rc == 0 / emcc_c_rc == 0 / f80_funcs == 0 /
   declares_unimpl == 0 (-1 = simd.log に件数行なし = 不明も不合格) / defines >= closure_funcs
   (RetDec は 1 range から複数 define を出すことがあるため等号にしない。 閉包関数 1 つずつに define があるかは define_audit.py が名前で検査する)
+列は 10 列 (#539 以前) または末尾に icall, dispatch_calls を足した 12 列 (#539 以降の batch_lift.sh)。 12 列のときは icall == 0 かつ dispatch_calls == 0 も要求する
+(本測定は PLUG_ICALL=0 の鎖。 g1_e2e.sh が固定する。 既定鎖 PLUG_ICALL=1 の status.csv が混ざったら不合格にする)。
 要求していない block の行が混ざっていても不合格 (status.csv は e2e が作り直した 1 回分であること)。
 終了コード: 全 block 合格のときだけ 0。 1 件でも不合格 / 行不足 / ファイル不在 / 不正な値なら 1 (stderr に理由)。
 """
 import csv, sys
 
 COLS = ['block', 'name', 'closure_funcs', 'closure_bytes', 'lift_rc', 'defines', 'declares_unimpl', 'f80_funcs', 'emcc_c_rc', 'seconds']
+EXTRA = ['icall', 'dispatch_calls']      # #539 以降の batch_lift.sh が付ける 2 列 (icall 復元の有無 / p.final.ll の __icall_dispatch 呼出数)
 INTS = [c for c in COLS if c != 'name']
 
 
-def judge(rows, want):
+def judge(rows, want, has_extra=False):
     """rows: [dict]、want: [int]。 → (不合格理由のリスト, 要求 block 順の行 dict)"""
     fails, by = [], {}
     for r in rows:
@@ -42,6 +45,16 @@ def judge(rows, want):
             fails.append((b, '%d: 整数でない / 欠けた列: %r' % (b, r)))
             continue
         ok_rows[b] = r
+        if has_extra:
+            try:
+                x = {c: int(r[c]) for c in EXTRA}
+            except (KeyError, ValueError, TypeError):
+                fails.append((b, '%d: icall / dispatch_calls が整数でない / 欠けた列: %r' % (b, r)))
+                continue
+            if x['icall'] != 0:
+                fails.append((b, '%d: icall=%d (本測定は PLUG_ICALL=0 = 復元前の鎖。 既定鎖 PLUG_ICALL=1 の測定は REPORT §6.1)' % (b, x['icall'])))
+            if x['dispatch_calls'] != 0:
+                fails.append((b, '%d: dispatch_calls=%d (復元前の鎖では 0 のはず)' % (b, x['dispatch_calls'])))
         if v['closure_funcs'] <= 0:
             fails.append((b, '%d: closure_funcs=%d (> 0 が必要)' % (b, v['closure_funcs'])))
         if v['lift_rc'] != 0:
@@ -60,9 +73,9 @@ def judge(rows, want):
 def load(path):
     with open(path, newline='') as f:
         rd = csv.DictReader(f)
-        if rd.fieldnames != COLS:
-            raise ValueError('ヘッダが想定と違う: %r' % (rd.fieldnames,))
-        return list(rd)
+        if rd.fieldnames not in (COLS, COLS + EXTRA):
+            raise ValueError('ヘッダが想定と違う (10 列 %r、または末尾に %r を足した 12 列): %r' % (COLS, EXTRA, rd.fieldnames))
+        return rd.fieldnames, list(rd)
 
 
 def main(argv):
@@ -76,14 +89,14 @@ def main(argv):
         return 2
     try:
         want = [int(x) for x in argv[1:]]
-        rows = load(argv[0])
+        fieldnames, rows = load(argv[0])
     except Exception as e:  # ファイル不在・ヘッダ不正も不合格
         print('FAIL: status.csv を読めない: %s' % e, file=sys.stderr)
         return 1
-    fails, ok_rows = judge(rows, want)
+    fails, ok_rows = judge(rows, want, fieldnames == COLS + EXTRA)
     if out and not fails:          # 不合格のときは成果物を書かない (前回の合格済み出力を壊さない)
         with open(out, 'w', newline='') as f:
-            w = csv.DictWriter(f, COLS)
+            w = csv.DictWriter(f, fieldnames)
             w.writeheader()
             for b in want:
                 if b in ok_rows:
