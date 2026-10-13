@@ -8,6 +8,7 @@
   [A'] 引数レジスタ接続の欠落: 未初期化 alloca からの k 番目の load を、署名の k 番目がポインタなら %argK に接続。
   [B] 浮動小数点引数落ち: fp 引数が 1 つだけの関数は xmm0 を %argK のビット列で置換。
   [B][D] 例外: fp 引数 3 つ (f32,f32,f32) の関数は IR から xmm 番号が消えるため、手で決めた対応を署名で当てる (FLOAT3)。
+         FLOAT3 は IR の本文文字列を置換する表で、署名 f32×3 に当たるのは現状 LimitFloat_RCSfff の 1 関数のみ (1 関数専用・未汎用化)。
   KIO_ARGREG=0 で [A'] を無効化 (ネガティブコントロール)。"""
 import os, re, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -85,7 +86,7 @@ for fn, kinds in SIGS.items():
             body = re.sub(pat, rep, body)
         return body
     patch(fn, fpfix)
-# [B][D] fp 3 つ (f32,f32,f32): xmm 番号と ucomiss flags の接続 (IR から番号が消えるため手で決めた対応)
+# [B][D] fp 3 つ (f32,f32,f32): xmm 番号と ucomiss flags の接続 (IR から番号が消えるため手で決めた対応・1 関数専用)
 FLOAT3 = {"%2 = load i128, ptr %0": "%fbits2 = bitcast float %arg3 to i32\n  %2 = zext i32 %fbits2 to i128",
           "%3 = load i128, ptr %0": "%fbits3 = bitcast float %arg2 to i32\n  %3 = zext i32 %fbits3 to i128",
           "%4 = load i128, ptr %0": "%fbits4 = bitcast float %arg1 to i32\n  %4 = zext i32 %fbits4 to i128",
