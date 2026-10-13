@@ -178,8 +178,8 @@ python3 tools/targets/serum2/license/authstub/authstub_irpass.py \
   - 正例 (VA `0x1800c2c94`・期待 `-72`) → PASS。
   - 誤 slot (期待 `-80`、IR は `-72`) → `T: slot at 0x1800c2c94 = -72 (expect -80)` で FAIL。
   - 誤 VA (`0x1800c2c95`) → `candidate = 0 (expect 1)` で FAIL。
-- 実測 (HEAD `5e7e26fa`・commit 前の作業ツリーは同一内容・`work/` 無しから cold・load 0.36):
-  - `bash e2e.sh` cold: real **27.28 s** (RetDec lift 含む)・exit 0・**23/23 PASS**。
+- 実測 (HEAD `6d6726bb`・`work/` 無しから cold・load 0.42):
+  - `bash e2e.sh` cold: real **26.57 s** (RetDec lift 含む)・exit 0・**23/23 PASS**。(前 HEAD `5e7e26fa` でも cold 27.28 s・23/23 PASS。)
   - 出力 IR sha256 は §12/§13 の値と一致: `patched_base_lf.ll` `c62d9316…8793`、`raw_base_lf.ll` `79ab30ca…0d20` (全文ハッシュで照合)。
   - `verify_lf4_const.py ../../work/Serum2_win64.vst3 work/patched_base_lf.ll` → `LF4 const OK` (PE 定数 = IR 定数 = 11.00001・bits 4622382073171892366)。
   - 素材: `plugins-serum2` の `Install_Xfer_Serum2_2.1.5.exe` を `7z x` で展開 → `Serum2.vst3` 19,236,864 B・sha256 `501e7bb3…5283` (展開後に一致確認)。
