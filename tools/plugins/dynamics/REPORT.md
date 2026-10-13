@@ -117,7 +117,7 @@ P0c (`p0c/REPORT.md`) で見た各 kernel の現状 (本 PR では再測定し�
 
   | engine | 変更前 (HEAD) | 変更後 (711d9ece) | 残件 |
   |---|--:|--:|---|
-  | 19252 Transient | 59 | 12 | `movntps` (store, 値のみ渡る) / `vmovsd` store 形 / `vucomisd`・`vcomisd` (flag 未モデル) / スカラー FMA 8 種 |
+  | 19252 Transient | 59 | 12 | `movntps` (store, 値のみ渡る) / `vmovsd` store 形 / `vucomisd`・`vcomisd`・`vucomiss` (flag 未モデル。#1408 の範囲) / スカラー FMA 7 宣言 (`vfmadd132sd`・`vfmadd213sd`×2・`vfmadd231sd`×2・`vfmsub213sd`・`vfnmadd231sd`) |
   | 19048 Multiband | 34 | 6 | `movntps` / スカラー FMA 5 種 (`vfmadd213sd`・`vfmadd231sd`×2・`vfnmadd132sd`・`vfnmadd231sd`) |
 
 - 生成 helper C (`*_simd.c`) の `emcc -c`: **未測定**。 前記の「両 engine rc 0」の記録は、生成コマンドが REPORT 以外に無く再現できないため撤回する (`work/dynamics/simdchk/` は本 run に無い)。 再測定は素材 `toolchain-emsdk` と engine の `e.final.ll` が揃った run で行う。
