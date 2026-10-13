@@ -207,13 +207,14 @@ tr.globalTransport(index=1, value=2)  # pmeFlags (midi.PME_System) と flags (mi
 assert last() == (1, 2, FAKE["PME_System"], FAKE["GT_All"]), last()
 mx.getEventValue(index=1)  # value (midi.MaxInt)。smoothTarget (stubs 既定 1) も同時に入る
 assert last() == (1, FAKE["MaxInt"], 1), last()
-# midi. 以外の既定値は従来の eval と同じ値 (既存挙動を変えない)
+# (b') midi. 以外の既定値は従来の eval と同じ値・同じ型 (既存挙動を変えない)
 for fs in t["modules"].values():
     for e in fs.values():
         for p in e["sig"]["params"] if e.get("sig") else []:
             if p["default"] is not None and "midi." not in p["default"]:
-                assert fl_api._default_value(p["default"]) == eval(p["default"], {}), p["default"]
-# (c) 負の対照: 旧方式 (eval に midi を渡さない) は NameError。PR #463 の bind が落ちた原因
+                a, b = fl_api._default_value(p["default"]), eval(p["default"], {})
+                assert type(a) is type(b) and a == b, (p["default"], a, b)
+# (c) 参考 (repo のコードは通らない。Python の eval の挙動の確認のみ): midi を渡さない eval は NameError。PR #463 の bind が落ちた原因
 expect(NameError, eval, "midi.PIM_None", {})
 # (d) 評価器の拒否: 許可表の外・許可した形の外は ValueError。1 / 24 は通る
 assert fl_api._DEFAULT_NAMES == EXPECTED_NAMES
