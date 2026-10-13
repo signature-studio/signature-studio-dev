@@ -89,3 +89,17 @@ e2e 内訳: `midi_all` 54/54 (2,801 ms) / `negctl_drop_one_short_msg` 62,500 ms 
 | `shimx` と audio MIDI を同一 wasm に結合した統合 e2e | 本 run は shimx 単体 (模擬 backend) と audio 単体 (flm_midi 直) を分けて検証 | #37 (AU-14) |
 | 実 Web MIDI・実デバイス | モック検証のみ (REPORT_MIDI §13-3) | #187 (AU-2) |
 | `verify_ott` (OTT 素材での検証) | SKIP のまま | 素材の準備後に実施 (起票先は PM 判断) |
+
+### 19.9 M11 closure への配線 (#179 run #6, `build.sh --midi`)
+
+`tools/m11/shimx_link/build.sh --midi` (opt-in) で audio の `flmidi*.c` を M11 closure に入れ、`sx_midi_boot.c` の constructor で `flmidi_shimx_install()` を呼ぶ。既定 variant は不変。
+
+| 項目 | 実測 (HEAD 上、foreground) |
+|---|---|
+| `build.sh --midi` | rc 0 / 8.2 s / `OK plain_failfast_midi` |
+| `build.sh` (既定) | rc 0 / 5.5 s (比較用の同日実行) |
+| `node midi_e2e.mjs m11_sx_plain_failfast_midi.cjs` | 3/3 PASS / 0.38 s。`sx_midi_probe_numdevs(3)` = 3 (表経由で n_out が返る。未登録の weak は常に 0) |
+| `signature mismatch` | 1 件 (`midiOutShortMsg` i64 vs i32)。既定 variant でも 1 件 = 本変更由来ではない (既知) |
+
+- 残件: この closure は M11 の検査用 wasm で、本番の FL 経路 (`tools/startup`・実 FL・headless Chrome の `midiOutGetNumDevs` 結線) は未配線・未検証。`Closes #179` の条件は未達。起票先 #37 (AU-14)。
+- `midiOutShortMsg` の signature mismatch (i64 呼出 vs i32 定義) は本変更で解消していない。shimx の `outShortMsg` 引数幅の確認が必要 (起票先 #37)。
