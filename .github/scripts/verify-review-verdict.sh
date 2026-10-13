@@ -10,8 +10,8 @@
 #     新しい review run を起動済みなので、古い head の欠落は問わない)
 # COMMENT だけの review は verdict と認めない (Copilot 待ちの保留は廃止した: 直近 15 PR に
 # Copilot の review は 0 件で、保留した PR が動かなくなるため)。
-# それ以外は close -> reopen で review を再起動する。同じ head に OC_REVIEW_MAX_ATTEMPTS 回
-# 再起動しても verdict が出なければ PR に警告を残して失敗する。
+# それ以外は reopen-pr.sh (close -> reopen) で review を再起動する。同じ head に
+# OC_REVIEW_MAX_ATTEMPTS 回再起動しても verdict が出なければ PR に警告を残して失敗する。
 #
 # 入力 (env): GH_TOKEN, OC_REPO, OC_PR_NUMBER
 set -euo pipefail
@@ -39,8 +39,7 @@ fi
 # verdict は APPROVED / CHANGES_REQUESTED だけ。「verdict を持つ最後の review」で判定する
 # (APPROVED の後に COMMENTED が付いても、最後の review の state だけで見ると verdict 無しと誤判定する)。
 rv="$(gh api --paginate "repos/$OC_REPO/pulls/$OC_PR_NUMBER/reviews" \
-  | jq -s --arg h "$head" --arg l "$REVIEWER_LOGIN" \
-    '[.[][] | select(.user.login == $l and .commit_id == $h and (.state == "APPROVED" or .state == "CHANGES_REQUESTED"))] | last // {}')"
+  | jq -s --arg h "$head" '[.[][] | select((.user.login | startswith("oc-reviewer")) and .commit_id == $h and (.state == "APPROVED" or .state == "CHANGES_REQUESTED"))] | last // {}')"
 st="$(jq -r '.state // "NONE"' <<< "$rv")"
 
 case "$st" in
@@ -63,16 +62,5 @@ fi
 
 gh pr comment "$OC_PR_NUMBER" --repo "$OC_REPO" \
   --body "review run が verdict (approve / request-changes) を投稿せずに終了したため、review を再実行します (試行 $((tries + 1))/${MAX_ATTEMPTS}、head ${head:0:7})。<!-- $marker -->"
-gh pr close "$OC_PR_NUMBER" --repo "$OC_REPO"
-sleep 3
-# reopen に失敗すると PR が closed のまま監視から外れるので、再試行し、駄目なら job を失敗させる
-reopened=0
-for _ in 1 2 3 4 5; do
-  if gh pr reopen "$OC_PR_NUMBER" --repo "$OC_REPO"; then reopened=1; break; fi
-  sleep 3
-done
-if [ "$reopened" != 1 ]; then
-  echo "::error::PR #$OC_PR_NUMBER is closed and could not be reopened"
-  exit 1
-fi
+bash "$(dirname "$0")/reopen-pr.sh"
 echo "re-triggered the review for PR #$OC_PR_NUMBER (retry $((tries + 1))/$MAX_ATTEMPTS)"
