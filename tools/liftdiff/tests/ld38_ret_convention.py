@@ -13,13 +13,17 @@
 import argparse, glob, json, re, collections
 
 
-def classify(b):
+WINDOW = 3
+
+
+def classify(b, window=None):
+    w_n = WINDOW if window is None else window
     rets = [k for k, l in enumerate(b) if re.search(r'\tret\b', l)]
     if not rets:
         return 'no_ret'
     kinds = set()
     for k in rets:
-        w = ' '.join(b[max(0, k - 3):k])
+        w = ' '.join(b[max(0, k - w_n):k])
         kinds.add('xmm0' if 'xmm0' in w else 'rax_rdx' if 'rdx' in w else 'other')
     return '/'.join(sorted(kinds))
 
@@ -50,7 +54,9 @@ ap = argparse.ArgumentParser()
 ap.add_argument('--sigs', default='work/m11_ldfix/sigs.json')
 ap.add_argument('--dsm-glob', default='../m11/work/*.dsm')
 ap.add_argument('--control', action='store_true')
+ap.add_argument('--window', type=int, default=3, help='ret 直前何行を見るか (既定 3)')
 a = ap.parse_args()
+WINDOW = a.window
 
 if a.control:
     raise SystemExit(control())
@@ -76,7 +82,7 @@ for f in sorted(glob.glob(a.dsm_glob)):
 cnt = collections.Counter()
 for name in targets:
     b = bodies.get(name)
-    kind = 'not_in_dsm' if b is None else classify(b)
+    kind = 'not_in_dsm' if b is None else classify(b, WINDOW)
     cnt[kind] += 1
     print(name, ','.join(sigs[name]['params']) or '-', kind)
 print('SUMMARY', dict(cnt), 'total', len(targets))

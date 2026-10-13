@@ -51,3 +51,6 @@ for v in six:
     callers=sorted({int(x[0])+IMG for x in refs if x[1]==b and x[2] in (1,2)})
     tgts=sorted({int(x[1])+IMG for x in refs if e is not None and b<=x[0]<e and x[2]==0})
     print(hex(b+IMG),where,'size',e-b if e is not None else '-','callers(call/jmp)',[hex(c) for c in callers][:8],'data/lea targets',[hex(t) for t in tgts][:8])
+    for c in callers[:8]:
+        g=fi(c-IMG)
+        print('  caller',hex(c),'owner',hex(int(funcs[g][0])+IMG) if g>=0 else '-','size',int(funcs[g][1]-funcs[g][0]) if g>=0 else '-')
