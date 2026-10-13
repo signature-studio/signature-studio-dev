@@ -176,8 +176,8 @@ ia32 で要注意の mnemonic (件数): cdq 21 / movzx 51 / movsx 54 / lea 590 /
 
 | 項目 | 実測 |
 |---|---|
-| gate (`marshal.py`) | `[marshal] OK`・exit 0。 wall 83–85 ms (n=3)。 実行前 load 1 分 0.51・cpu 4 |
-| nega (`marshal.py --nega`) | `nega: 0/6 miss`・exit 0。 wall 94–103 ms (n=3)。 実行前 load 1 分 0.51・cpu 4 |
+| gate (`marshal.py`) | `[marshal] OK`・exit 0。 wall 88–110 ms (n=3)。 実行前 load 1 分 0.53・cpu 4 |
+| nega (`marshal.py --nega`) | `nega: 0/6 miss`・exit 0。 wall 98–126 ms (n=3)。 実行前 load 1 分 0.53・cpu 4 |
 
 - 所要は merge 後の HEAD で再測定 (`time` 相当の wall を `date +%s%N` で計測・各 n=3 の min–max)。 旧版の単発値 (0.065 s / 0.056 s) は本表で置き換えた。
 - 本節 (§9.2) の表は marshal.py の gate と N1〜N6 の結果。 route 突合 (N5・N6) は §9.3 の注意を参照。
@@ -212,3 +212,4 @@ ia32 で要注意の mnemonic (件数): cdq 21 / movzx 51 / movsx 54 / lea 590 /
 
 §6 の未解決と同じ (VstEvents / ERect の engine 側読取、殻側の実物構造体、engine の store 値の実行確認)。 受入 1・2 は「dispatcher 内に読取・書込みが無い」ことまで確定し、実際の箇所は未特定。
 - route 突合 (`ROUTE_EXPECT`: `bound`・`opcode25_default`・`erect_child_slot`) は現在の静的構造の**観測値**を守る回帰ガードである。 VstEvents の読取・ERect の書込みを証明するものではない。 gate の N5・N6 はこの突合の FAIL を検査する。
+- `opcode25_default` は `PROCESS_EVENTS > bound` の**定数比較** (`marshal.py` の `route_facts`) であり、実バイナリの読取ではない。 既定分岐 (0x1000149c) の内容は `default_returns_zero` で別途検査する (`mov eax,esi; ret 0x14` を逆アセンブルで読んだ結果)。
