@@ -234,7 +234,7 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
 - 実測値・実装詳細・レビュー対応の再現・8×8 経路 `DrawText` の挙動差・未解決 (4 件) の全文は **`REPORT_APPENDIX.md`** (無変更で分割移動)。未解決 (4) wasm ビルドへの組込みは §12 (#615) で解消。
 
 ## 12. GUI-13 (#615): gui_wasm.sh の wasm ビルドへ gui_ft.c + libfreetype を組込み + ブラウザ上テキスト描画 e2e
-既知類型との関係 (DEFECTS.md): 該当なし (lift 欠陥ではなく shim のリンク構成)。検証起点 commit: 4890d60 (HEAD)。
+既知類型との関係 (DEFECTS.md): 該当なし (lift 欠陥ではなく shim のリンク構成)。検証起点 commit: 4890d60 (HEAD)。c4b293d (e2e.sh の FT 順序修正) の再確認は `REPORT_APPENDIX.md` §12 追補。
 - **組込み**: `lift/gui_wasm.sh` が既定で `src/gui_ft.c` + `src/gui_ft_wasm.c` + wasm32 `-pthread` libfreetype (`lift/ft_wasm_lib.sh` = `shared/oss/freetype/build.sh` 産の patch 済みツリーを再 make; `ft_wasm.sh` と同方式) をリンク。`GUI_NO_FT=1` で従来ビルド。`gui_ft_add_face` / `gui_ft_add_alias` / `_gui_hostcall_ptr` / `_malloc` / `_free` を export。**host (JS) が `gui_ft_add_face` を呼ぶまで engine は未登録 = 8×8 のまま** (既存 e2e の経路は無変更)。
 - **フォントは同梱しない・sha256 検証・遅延取得**: face は `gui_ft_register_lazy` で登録され、最初の `open` で host call `GUI_HC_FETCH_FONT` (=5) を発行 → host (`src/runtime/gui_fonts.ts` `createFontLoader`) が url から取得 → **manifest の sha256 を検証** → wasm heap へ置いて ptr/size を返す。検証失敗・取得失敗は null → shim が LOG に残して 8×8 フォールバック。manifest 台帳は `test/fonts.tsv` (file/url/sha256/face) で、`test/fetch_fonts.sh` (native 用取得) とブラウザ e2e が同じ sha256 を使う。ブラウザ配信は `loadFont` の取得元 (url) を #22 (VFS) の遅延取得に差し替える口 (本 PR では e2e サーバの `/fonts/*` = 未接続, 下記未解決 (1))。
 - **ブラウザ e2e** (`bash tools/gui/test/text_wasm_e2e.sh`; RetDec 不要): RetDec lift の代わりに C ゲスト `test/text_wasm_app.c` (GUI-9 と共有の `test/text_scene.inc` のシーンを WM_PAINT で描き BitBlt、metrics 表を LOG へ) を `gui_wasm.sh` で wasm 化 → headless Chrome (CDP, COOP/COEP, SAB) → フォント遅延取得 → OffscreenCanvas 読み戻しと CDP スクリーンショットを独立オラクルと比較 (`e2e/text_e2e.mjs`, `e2e/cdp_lib.mjs`)。
@@ -246,5 +246,5 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
   | 未解決 | 影響 | 起票先 |
   |---|---|---|
   | (1) `loadFont` の取得元を #22 (VFS) の遅延取得 (Range/OPFS/R2) へ結線 | 本番ブラウザへの配信は未接続 (e2e は同一オリジン `/fonts/*`) | #660 (GUI-14) |
-  | (2) `bash tools/gui/e2e.sh` 全体 (PE lift 層込み) の ALL PASS 確認 | 既存 e2e の維持は 8×8 回帰 (上記) までの確認 | #615 に `oc_artifacts: toolchain-emsdk toolchain-retdec apt-mingw` での再実行を依頼 |
+  | (2) `bash tools/gui/e2e.sh` 全体 (PE lift 層込み) の ALL PASS 確認 | 既存 e2e の維持は 8×8 回帰 (上記) までの確認。c4b293d では RetDec 不在で未達: `e2e.sh` 全体は step 2 rc=1、`SKIP_NATIVE=1` は step 3 rc=127 (付録 §12 追補) | #615 に `oc_artifacts: fl-win64 toolchain-emsdk toolchain-retdec apt-mingw` での再実行を依頼 (PR 本文の行は更新済み) |
   | (3) 実 FL の face/サイズ確定・alias 実値 | alias は e2e 用 (Segoe UI/Tahoma → Open Sans) のみ | #174 (GUI-3) / #186 の未解決 (2) |
