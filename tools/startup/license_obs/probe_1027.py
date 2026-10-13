@@ -7,7 +7,7 @@
 """
 import os, re, struct, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from peidx import Image, rip_target  # noqa: E402
+from peidx import RIP, Image, rip_target  # noqa: E402
 
 img = Image()
 HEX = re.compile(r'0x[0-9a-f]+')
@@ -32,7 +32,10 @@ for name, lo, n, tgt in TABLES:
                 vals.append(rt)
             if any(lo <= v < hi for v in vals):
                 a.append((flo, ins))
-            if any(lo - img.base <= v < hi - img.base for v in vals if v < img.base):
+            if ins.mnemonic.startswith('j') or ins.mnemonic == 'call':
+                continue
+            imm = [int(h, 16) for h in HEX.findall(RIP.sub('', ins.op_str))]
+            if any(lo - img.base <= v < hi - img.base for v in imm):
                 b.append((flo, ins))
     print(f'  a) VA 参照 {len(a)} 件')
     for f, ins in a[:10]:
