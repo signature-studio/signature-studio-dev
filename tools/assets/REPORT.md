@@ -118,3 +118,22 @@ pathreg 既定マウント表の `/c/home`・`/c/tmp` 写像先を実装)。本 
 - **⑤ 停止原因 3 点の修正を確認**: (1) Chrome プロファイルは `work/chrome-profiles/` (実ディスク) — test/asset-e2e.ts:70,71 と test/browser-test.ts:65,66 (2) `GET /__report?wait=<ms>` ロングポール、spawn-server は 1 本待ち受け — server.ts:75-101, spawn-server.ts:34,35 (3) `progress('stage')` 報告 + 全待受 timeout (`withTimeout` 30s/60s, `waitReport(240000)`) + ページ側 90s watchdog — engine-worker.ts:20,74、asset-worker.ts:16-18、main.ts:16-24。
 - **ネガティブコントロール (規則 41)**: 検証 copy の `vfs/asset.ts` から OPFS 読み出しの per-chunk sha128 照合だけを削除すると (検証後に HEAD 内容へ復旧済み)、corrupt-opfs が `CompileError: length overflow` で FAIL (2 シナリオ FAIL)。照合が破損検出の実体であることを確認。追加の検算: 1 バイト破損は sha128 不一致で検出 / 照合を外すと全体 sha256 が不一致のまま通過 / chunk 0 と 1 を入替えると `WebAssembly.compile` が magic word エラーで失敗 (§5 の表と同一条件で `node test/verify-asset-indep.ts` 出力)。
 - **修正した誤記** (この commit): §2 の 227 ファイル→399 ファイル・234 slot→231–232 slot、§4 の pass2 923–1229ms→0.867–1.198s、§5 の 4 シナリオ compile を n=12 の min–max に更新 (当初の n=3 の範囲は狭く、`e2e.sh --full` 内実行の 6.518s を含んでいなかった)、pass2 255–350 MB/s→262–358 MB/s、**imports 3→21**。
+
+## 11. ST-T14 の tier 差分 6 点を bootset 規則に反映 (#592 / 親 #39 / 検証起点 8f55002)
+
+既知類型との関係: 該当なし (lift/逆アセ系ではない)。`tools/startup/loadpaths/REPORT.md` §4 の表を `bootset/classify_bootset.py` の `RULES` に反映し、`bootset.json` / `BOOTSET.md` を**再生成**した (人手編集なし)。tier は引き続き**推定** (実トレースは #105)。
+
+- **変更**: RULES の first-match 順で個別規則を包括規則の前に置いた (#1 `Help/*.scr` T0p / #2 `Artwork/Wallpapers/Default.txt` T0 / #3 `System/Languages/*.moe` T2・残りは T1 / #4 `StartSnd.wv` T0p / #5 Skins/Default の 5 件 T1 / #6 `System/Texts/*.txt` 直下 8 件は T0p 規則を削除して T1)。`BOOTSET.md` の自動生成ヘッダ (「人手編集禁止」) を生成元に取り込んだ (従来は人手追記だった)。
+- **差分検査** `bootset/verify_tier_diff.py <変更前 bootset.json>`: 変更前の rules (8f55002) と新 `work/tiers.json` をファイル単位で比べ、表の 6 点と過不足なく一致することを検査 (不一致は exit 1)。
+  実測: 差分 24 件 = #1 2 件 10949 B / #2 1 件 97 B / #3 7 件 6282124 B / #4 1 件 72076 B / #5 5 件 270952 B / #6 8 件 (1881 B)。表外の差分 0。T0 の byte 増減 -342931 (表の記載 -342931 と一致)。
+  集計 (files / bytes): T0 142→137 / 2212908→1869977、T0p 258→253 / 5595646→5676790、T1 1700→1704 / 76414481→70394241、T2 24990→24996 / 1001026635→1007308662。X-* は無変更。
+- **ネガティブコントロール**: (a) 期待表の #2 の新 tier を壊す → 検査 exit 1 (期待どおり検出)。(b) 規則 `Help/*.scr` を T1 に戻して再生成 → 検査 exit 1 (差分 22 件・期待 24 件) かつ再生成物がコミットと不一致 (`git diff --exit-code` exit 1)。
+- **再現性**: 変更前の規則で再生成した `bootset.json` は旧ファイルとバイト一致 (入力の素材が同一であることの確認)。コミット済み HEAD 4c8f034 で n=3: 再生成 + 検査 + ネガコン + 生成物一致 2.94–2.98 秒 / load average 1.44–1.52 / 並列 1、全回 exit (検査 0・ネガコン 1・生成物差分 0)。
+- **Actions 向け修正**: `inventory/mk_inputs.py` を新設 (素材に無い `block_manifest.json` / `pe_metadata.json` を `extracted/` から再構成。PE 313 件 / x86 55 件)。`inventory.py` / `strings_scan.py` / `e2e.sh` は `FL_WIN64_DIR` を読む。`e2e.sh` に検査・ネガコン・生成物一致を追加 (いずれも不合格なら exit 1)。
+- **既存 e2e の維持 (この run で実行できた範囲)**: `node test/node-test.ts` 15 項目 ALL PASS (1.38 秒) / `node test/browser-test.ts` 17 項目 ALL PASS (3.72 秒、Chrome)。pack は bootset の tier を入力にするため `work/pkg-small` を再生成して実行。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `e2e.sh` の `emscripten-test.ts` を未実行 (`toolchain-emsdk` 未取得) | 受入条件 2 (既存 e2e 維持) の一部が未検証 | #592 (`oc_artifacts: fl-win64 toolchain-emsdk` で再実行) |
+| `e2e.sh` の `asset-e2e.ts` を未実行 (`tools/perf/work/huge/k100.wasm` が許可素材に無い) | 同上 (tier 規則は触らないため影響は小さい。推定) | #592 (素材の置き場の確認は PM) |
+| `tsc -p tsconfig.json --noEmit` が main 時点で exit 1 (`../../shared/paths.mjs` の型宣言なし・esbuild の解決不可) | `e2e.sh` が tsc で止まる (本 PR 由来ではない。origin/main の clean worktree で同じ 4 件を確認) | 新規子チケット (PM) |
