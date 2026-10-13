@@ -7,7 +7,7 @@ xfill 既定 (1) と xfill=0 の両方で、ランナの完全 trace を取り�
 
   python3 tools/liftdiff/tests/trace_fullcompare_typeb.py TARGET.json [batch.jsonl]
 
-TARGET.json は pe を展開済みの block00031_PE.bin に向けた targets/m11.json の複製。
+TARGET.json は targets/m11.json を使う (pe は ${FL_WIN64_DIR}/extracted/block00031_PE.bin を指す)。
 入力 batch 既定 = tools/liftdiff/work/m11/batch_closure.jsonl。ビルド済み work/ を要する (再ビルドはしない)。
 結果は stdout に出す (results/ への書き込みはしない)。
 """
@@ -86,9 +86,11 @@ try:
                 ni = N[i + 1] if i + 1 < len(N) else None
                 wi = W[i + 1] if i + 1 < len(W) else None
                 nxt = (ni, wi)
-            print('fn=0x%x pat=%s xfill=%d L_full=%s next(native,wasm)=%s native=%s wasm=%s' % (
+            typ = ('B' if leaf(Lf) else 'notB') if Lf is not None else '-'
+            print('fn=0x%x pat=%s xfill=%d L_full=%s typeB_full=%s next(native,wasm)=%s native=%s wasm=%s' % (
                 fva, pat, 1 if xf else 0,
                 ('0x%x' % Lf) if Lf is not None else '-',
+                typ,
                 tuple(('0x%x' % v) if v is not None else '-' for v in nxt) if nxt else '-',
                 rn.get('status'), rw.get('status')))
 finally:
