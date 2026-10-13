@@ -140,7 +140,7 @@ define = `p.final.ll` の `^define` 数。f80 = `x86_fp80` を含む define 数�
 
 ## 4. T2/T1: C++ engine DLL 4 本
 
-4 本とも MSVC (VS2019) の C++ DLL で、import は KERNEL32 のみ。殻との結合方式 (LoadLibrary 経路) は未解析。Vintage Chorus / Phaser の engine は `VSTPluginMain` / `main` を export する (VST2 engine。issue 本文の「engine.vst ラップ」に対応)。
+4 本とも MSVC (VS2019) の C++ DLL で、import は KERNEL32 のみ。殻との結合方式 (LoadLibrary 経路) は静的解析で §4.1 に記録 (呼出箇所は未了)。Vintage Chorus / Phaser の engine は `VSTPluginMain` / `main` を export する (VST2 engine。issue 本文の「engine.vst ラップ」に対応)。
 
 | プラグイン | engine block | サイズ B | `.text` B | `.pdata` 関数 / B | export | KERNEL32 import |
 |---|--:|--:|--:|--:|---|--:|
@@ -165,20 +165,17 @@ define = `p.final.ll` の `^define` 数。f80 = `x86_fp80` を含む define 数�
 - f80 関数は Vintage Chorus の `function_18001c320` と Vintage Phaser の `function_1800218a0` の 1 本ずつ (#197 の対象)。以上は到達性の実測で、engine の正しさは何も示していない。
 - **PLG-F5-2 / #527 追補**: `engine_lift.sh` に `p0c/f80_lower.py` の段を追加し、4 本すべて `emcc -c` rc 0 (表の「f80 段後」列)。4 本の順次実行の合計は 65.2 s (35d8f3d5、PR 作成時の実測。修正 run では未再実行)。f80→f64 は bit-exact ではなく (#197 で未検証)、通過は正しさを示さない。詳細は付録 `REPORT_APPENDIX.md`。
 
+### 4.1 殻と engine の結合方式 (受入 5、静的解析)
+
+- 殻 (18978 / 19144 / 19265 / 19267) は 4 本とも KERNEL32 の `LoadLibraryExW` / `GetProcAddress` / `FreeLibrary` を import。engine 名は殻の文字列 (fl-win64 を展開し pefile と UTF-16 / ASCII 走査で確認。`work/` 無し): FS = `Engine_x64.dll` (0x2dda74) + `dispatch` (0x2dda92)、HC = `engine_x64.dll` (0x2e9704) + `DispatchToEngine` (0x2e9722)、VC = `engine_x64.dll` + VST 系名 (0x2d9db0〜0x2daaa0)、VP = `engine_x64.dll` + VST 系名 (0x2db640〜0x2dc330)。
+- VST 系名は `VSTPluginMain` のほか大文字小文字違い 8 種 (計 9 種、`vstpluginmain` は 2 箇所。殻 19265 で確認)。
+- engine の export: 18977 = `dispatch`、19143 = `DispatchToEngine`、19266 / 19268 = `VSTPluginMain` / `main`。19268 の import は KERNEL32 の `LoadLibraryExW` / `GetProcAddress` / `FreeLibrary`。
+- 結論 (推定): 殻が `LoadLibraryExW(engine_x64.dll)` → `GetProcAddress(<export>)` で engine を動的ロードする (§1 の dynload 2 と一致)。
+- 未解析: 殻内の `GetProcAddress` 呼出箇所と引数の実値 (#527 に残す)、engine の `DllMain` の扱い。範囲外: bit-exact・wasm リンク方式 (#202 / #197)。
+
 ## 5. 判定 (gate) の設計と PR #506 の reviewer 指摘への対応
 
-#506 の指摘は (a) 判定が不合格でも exit 0 になる、(b) 判定そのものにネガティブコントロール (NC) が無い、の 2 点。本書では次のように作った。
-
-| 検査 | 実装 | 不合格時 | NC (`modulation_nega.sh`) |
-|---|---|---|---|
-| 殻 8 本の合否 | `judge.py <status.csv> --blocks … --batch-dir work/batch`: lift_rc = 0 / f80 = 0 / `emcc -c` rc = 0 / declares_unimpl = 0 (-1 = 集計行なしも不合格) / define = 閉包関数数 / 全列が整数 / ヘッダ一致 / `p.final.ll` の define 数が行と一致 / `p.o` が非空 | exit 1 (入力不正は 2)。e2e は `||` で受けて `FAIL` を出し exit 1。**`OK` 行は全判定通過後の最終行にだけ出る** | NC3: 15 ケース (§6) |
-| e2e スクリプト自身の終了コード | 判定を `--judge-only` で単独実行でき、 `STATUS_CSV` で入力を差し替えられる | 不合格行入りの CSV で exit 1 かつ出力に `[modulation_e2e] OK` を含まない | NC6 |
-| stale な結果で合格しない | lift 前に `work/batch/<block>` を消す (`lift_ranges.sh` は `drc.ll` の存在だけを見る)。判定対象は今回の実行で `status.csv` に追記された行だけ | — | (設計) |
-| `PLUGIN_MATRIX.json` との突合 | `matrix_check.py`: 閉包 6 項目 + matrix に `batch` 欄のある 5 本は 4 項目を status と比較 (計 68)。プラグイン数 ≠ 8 は exit 2 | exit 1 | NC4 |
-| Dispatcher ID の別算法検算 | `ids_crosscheck.py` | exit 1 | NC5 |
-| `emcc -c` ゲート / ranges が lift 範囲を決めること | — | — | NC1 / NC2 (#506 と同方式) |
-| 間接 call 脱落の検出 | `icall_check.py --gate` (IR 側 = 元の間接 call + 復元 dispatch が静的 site に満たなければ FAIL。audit と別算法の不一致も FAIL) | exit 1 | NC7 |
-| 閉包の境界 (測定) | `reach_check.py` (leak 自体は判定外。A ⊆ B' と前向き ⇒ 逆向きの検算が崩れたら FAIL、`--gate` は leak 1 本で exit 1) | exit 1 | NC8 |
+判定の設計 (検査の一覧表・NC の対応) は付録 `REPORT_APPENDIX.md` §H に分割移動した。
 
 e2e の exit 0 が意味するのは「殻 8 本の judge / matrix_check / ids_crosscheck が全て合格し、`icall_check.py --gate` (脱落 0) と `reach_check.py` の検算が通り、engine 4 本の測定行が揃った」ことだけで、
 **閉包の取りこぼし (leak) と engine の `emcc -c` 結果は判定に含めない**。最終行にこの 2 つの件数を併記する (実行例は §6)。

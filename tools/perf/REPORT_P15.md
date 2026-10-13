@@ -1,0 +1,110 @@
+# tools/perf REPORT_P15 — 実 OTT の Chrome Memory 本数上限 (124〜125) に対する instance 数の設計 (PERF-P15 / #990)
+
+**結論**: 方式 (a) を採る。**1 instance (Memory 1 本) の中に plugin の処理オブジェクトを畳み込む**。
+Chrome 154 の Memory 本数上限は 1 Worker あたり 124〜125 本。Worker を分けると合計が増えることもあるが、割り当ては再現せず不安定なため、(b) Worker 分割では N=130 を確実に通せない。
+Chrome Dedicated Worker で M=130 のオブジェクトを 1 Memory に畳み、instantiate 失敗なし・全 130 obj の署名が既知値 `6b1696f0` と一致した (3 回)。
+
+| 項目 | 結果 |
+|---|---|
+| **採る方式** | (a) 同一 Memory への畳み込み (1 instance 内の複数オブジェクト) |
+| **退けた方式** | (b) Worker 分割: 同一 renderer 内で合計 124〜253 本で頭打ち。(c) 低位 base・小 Memory 化: #91 の完了が前提で本 issue 単独では成立しない |
+| **N=130 の駆動** | Chrome 154 Dedicated Worker, Memory 1 本 (864 MiB), M=130 obj: 3 回とも `sig_ok=true` (130/130 一致)、instantiate 失敗なし |
+| **定常コスト** | M=1: 138.41 / 139.71 / 138.50 µs/block (p50)。M=4: 140.58 / 139.09 / 139.12。M=130: 140.56 / 140.75 / 139.73。obj 当たり横ばい |
+| **setup** | M=130 で 790〜999 ms (obj 当たり約 6〜8 ms)。起動時に一括で行う前提 |
+
+## 0. 検証起点
+
+- 検証起点: `origin/main` = `a5adb2fc` の worktree `ws-990` (branch `990-perf-p15-instance-cap`) で計測。素材 `work-m6-ott` を `tools/ott/work/` に展開 (gitignore)。
+- 環境: Chrome 154.0.8037.97 (headless), CPU `AMD EPYC 7763 64-Core Processor` (4 vCPU), node v22.23.3。load average は計測ごとに記録 (表内 `loadavg` 参照)。
+- 測定コードの最終変更 (実測を取った HEAD 再実行の起点): `862ef65b`。以後の差分 `git diff 862ef65b 638ae3fc -- tools/perf` は以下のとおり。`page.html` の `message` リスナー削除は、測定スクリプト (`probe_limit.mjs` / `probe_iso.mjs` / `chrome_shared.mjs`) が `p.eval` で `probeWorkers` を直接呼ぶため測定経路に入らず、数値に影響しない (再測定不要)。
+  ```diff
+  -// 親ページからの依頼 (iframe 経由 = 別 site = 別 renderer プロセス) に応答する。
+  -window.addEventListener('message', (ev) => {
+  -  if (!ev.data || ev.data.p15 !== 'probe') return;
+  -  window.probeWorkers(ev.data.k, ev.data.max).then((r) => ev.source.postMessage({ p15: 'reply', r }, ev.origin));
+  -});
+  ```
+  (REPORT の変更は §3 の表と生データ件数の記載のみ。)
+
+## 1. 上限の所在 (renderer 単位か Worker 単位か)
+
+`tools/perf/p15/probe_limit.mjs` (Worker を K 個に分け、各 Worker で instance を max=160 まで生成。instance は駆動しない)。
+`tools/perf/p15/results/probe_limit.jsonl` の 6 行:
+
+| K (Worker 数) | run | 各 Worker の成功数 | 合計成功 | 失敗 |
+|---|---|---|---|---|
+| 1 | 0 | 125 | 125 | `Out of memory: Cannot allocate Wasm memory for new instance` |
+| 2 | 0 | 63, 61 | 124 | 同上 |
+| 4 | 0 | 36, 125, 40, 42 | 243 | 同上 |
+| 1 | 1 | 125 | 125 | 同上 |
+| 2 | 1 | 125, 63 | 188 | 同上 |
+| 4 | 1 | 64, 124, 40, 25 | 253 | 同上 |
+
+- K=1 の上限は 125 本 (2 run とも)。K を増やすと合計は増えるが、同条件 (K=2 で 124 と 188、K=4 で 243 と 253) で値が大きくばらつき、各 Worker の本数も偏る (K=4 run 0 は 36・125・40・42)。
+- 結果が再現しない配分では、「N 本の plugin を Worker k に決め打ちで置く」設計を保証できない。よって (b) は採らない。
+- 6 行は n=2 で、ばらつきの原因は未切り分け (推定: Chrome の renderer/GC の配分)。
+
+`tools/perf/p15/probe_iso.mjs` (同一 Chrome で origin を変えた 2 ページ = 別 site = 別 renderer。各 k=1, max=160。`renderers` は実測の renderer プロセス数):
+
+| run | renderers | origin A (localhost) 成功 | origin B (127.0.0.1) 成功 |
+|---|---|---|---|
+| 0 | 7 | 124 | 124 |
+| 1 | 7 | 124 | 125 |
+
+- 別 renderer 側でも各 124〜125 本で止まる。renderer を分けると合計は増えるが、renderer 数は site isolation の挙動に依存して制御できないため、plugin 数の上限を renderer 数で稼ぐ設計は取れない。
+- 補足: iframe 経由の別 origin 版は COEP (`require-corp`) で応答が返らず計測不能だった (試作は削除済み)。
+
+## 2. 畳み込みの検証 (node)
+
+`tools/perf/p15/shared_obj.mjs <ottl.cjs> <M> [BLK]`。1 instance の中に M 個の OTT 処理オブジェクト (`OBJ` を個別の VA に配置。stride 0x40000、入力・出力・buffer も個別) を置き、各 obj を 1000 block 駆動して署名を取る。
+
+| M | load ms | setup ms | µs/block p50 (BLK=50) | 署名 (unique) | 判定 |
+|---|---|---|---|---|---|
+| 1 | 28.51 | 25.16 | 139.01 | `6b1696f0` (1) | OK |
+| 4 | 22.71 | 41.14 | 138.83 | `6b1696f0` (1) | OK |
+| 130 | 23.81 | 795.9 | 141.01 | `6b1696f0` (1) | OK (sig_n=130) |
+
+- M=1 の署名 `6b1696f0` は `tools/perf/p8/real/bench_real.mjs` の既知値と同一。M=130 でも全 obj がこの値になり、obj 間の状態は汚染されない。
+- 注: 定常の比較は §3 の Chrome 表を正とする (本表は署名確認が目的)。
+
+## 3. Chrome 実測 (受入条件: N=130 の駆動)
+
+`tools/perf/p15/chrome_shared.mjs --m 1,4,130 --reps 7 --blk 1000 --runs 3`。1 Worker 内で instance 1 本 (Memory 864 MiB)、M obj を畳み込み。条件×反復ごとに Chrome を新規起動。
+生データ: `tools/perf/p15/results/chrome_shared.jsonl` (10 行。下表の 9 行 + HEAD 再実行 1 行。HEAD 再実行は中央値の計算には含めていない)。
+
+| M | run | µs/block p50 [min–max] | RTF@44.1k / obj | load ms | setup ms | 署名 | renderer RSS 増分 MiB |
+|---|---|---|---|---|---|---|---|
+| 1 | 0 | 138.41 [138.12–156.07] | 0.04769 | 15.59 | 36.87 | `6b1696f0` (1/1) | 63.2 |
+| 1 | 1 | 139.71 [139.04–148.04] | 0.04813 | 7.43 | 23.53 | `6b1696f0` (1/1) | 107.5 |
+| 1 | 2 | 138.50 [138.04–146.33] | 0.04772 | 13.88 | 33.54 | `6b1696f0` (1/1) | -13.2 |
+| 4 | 0 | 140.58 [138.75–179.14] | 0.04843 | 12.97 | 66.66 | `6b1696f0` (4/4) | 336.5 |
+| 4 | 1 | 139.09 [138.59–179.14] | 0.04792 | 13.33 | 65.76 | `6b1696f0` (4/4) | 318.7 |
+| 4 | 2 | 139.12 [138.78–169.39] | 0.04793 | 16.07 | 61.94 | `6b1696f0` (4/4) | 360.3 |
+| 130 | 0 | 140.56 [140.28–141.68] | 0.04843 | 14.24 | 998.8 | `6b1696f0` (130/130) | -150.5 |
+| 130 | 1 | 140.75 [140.47–141.28] | 0.04849 | 18.15 | 807.46 | `6b1696f0` (130/130) | -123.1 |
+| 130 | 2 | 139.73 [138.80–141.15] | 0.04814 | 11.17 | 789.91 | `6b1696f0` (130/130) | 368.5 |
+| 130 | HEAD 再実行 (`862ef65b`) | 139.02 [138.56–139.62] | 0.04790 | 11.13 | 779.63 | `6b1696f0` (130/130) | -152.2 |
+
+- M=130 の µs/block p50 の中央値は 140.56 µs (3 回の中央値)。M=1 の中央値は 138.50 µs。obj 数に依らず定常はほぼ平坦 (+1.5%)。
+- RTF は 1 obj あたり 0.0477〜0.0485 (128 サンプル/44.1 kHz 換算)。
+- renderer RSS の増分は負値を含み、原因は未切り分け。RSS は参考値で、受入判定には使わない。
+
+## 4. 未解決・限界
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 異なる plugin を 1 Memory に畳む際の VA 衝突・共有 static の汚染 (本計測は同一 OTT の M 個 = 同一 binary の別 state) | 異なる plugin を同居させる場合は未検証 | #1259 [PERF-P19] |
+| AudioWorklet での M 個駆動 | 本計測は Dedicated Worker のみ。worklet 側の上限・コストは未測 | #1259 [PERF-P19] |
+| setup 時間 (M=130 で約 0.8〜1.0 s) | 起動時の一括 instantiate/setup の遅延。pre-warm の設計が必要 | REPORT_P8 §11 (pre-warm) と同じ経路 |
+
+## 5. 再現
+
+```sh
+export PERF_TMP=$RUNNER_TEMP/perf
+node tools/perf/p15/probe_limit.mjs --k 1,2,4 --max 160 --runs 2   # §1
+node tools/perf/p15/probe_iso.mjs --k1 1 --k2 1 --max 160 --runs 2  # §1 (別 renderer)
+node tools/perf/p15/shared_obj.mjs tools/ott/work/lift/ottl.cjs 130 50  # §2
+node tools/perf/p15/chrome_shared.mjs --m 1,4,130 --reps 7 --blk 1000 --runs 3  # §3
+```
+
+前提: `oc_artifacts: work-m6-ott` (`tools/ott/work/lift/ottl.wasm`・`ottl.cjs`)。
