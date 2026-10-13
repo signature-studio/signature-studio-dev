@@ -135,16 +135,16 @@ VEX-256 は 344 関数 189,611 B 中 **closure 内は 6 関数のみ** (Convolve
 
 ## 10. KH-5 (#58, 2026-10-13): Ghidra decompile→C→emcc ルート vs RetDec→kh_lower ルート (Gain / Haas / Gate)
 - 再現: `bash tools/targets/kilohearts/ghidra_route/run_all.sh 1000 7` (HeartCore 抽出済み・`/opt/ghidra`=12.1.4・`/opt/retdec`・`/opt/emsdk`・pefile/capstone が前提)。両ルートとも**同一の ctx-fuzz ベクタ** (`snapins/harness`, 1000 trial / seed 7, 実機 x86 機械語を ImageBase 敷設して ms_abi 直接実行) を `compare.mjs` で**全バイト strict 突合**。実測環境: GitHub runner 4 vCPU・RAM 15GB。
-- **結論**: 3 本 (スカラ・単純 leaf) では Ghidra ルートも **1000/1000 bit-exact に到達**するが、**そのまま (機械書換えなしの素の出力) では 0〜41/1000 で FAIL** し、修復は 5 種の書換え規則 + 演算順の手パッチ 4 規則行が要る。RetDec ルートは修復を run 内の pass が自動で行い 3 本とも 1000/1000。**主ルートは RetDec→kh_lower を維持し、Ghidra は第二の oracle (仕様の突合・RetDec が誤る箇所の独立確認) に留める**。理由は下記「規模」。
+- **結論**: 3 本 (スカラ・単純 leaf) では Ghidra ルートも **1000/1000 bit-exact に到達**するが、**修復なし (型 shim + グローバル実データ + callee stub のみ) では 1 / 17 / 0 (Gain/Haas/Gate, /1000) で FAIL** し、修復は機械書換え 4 種 + 手パッチ規則 (`assoc`) 4 行が要る。RetDec ルートは修復を run 内の pass が自動で行い 3 本とも 1000/1000。**主ルートは RetDec→kh_lower を維持し、Ghidra は第二の oracle (仕様の突合・RetDec が誤る箇所の独立確認) に留める**。理由は §10-4 (SIMD/128bit/独自 ABI の関数では C 化の手作業が増える) と §10-2 (silent 類型が Ghidra 固有に 5 種)。
 
 ### 10-1. 3 snap-in の実測 (1000 trial, seed 7)
 | snap-in | Ghidra 素の出力 | Ghidra + 全修復 | wasm | RetDec→kh_lower | wasm |
 |---|---|---|---|---|---|
-| Gain (1 関数) | build 不可 (型エラー) | **1000/1000** (4999/4999 call) | 15,161 B | **1000/1000** (4999/4999) | 23,054 B |
-| Haas (5 関数) | build 不可 | **1000/1000** (5500/5500) | 16,878 B | **1000/1000** (5500/5500) | 35,967 B |
-| Gate (3 関数) | build 不可 | **1000/1000** (4999/4999) | 17,367 B | **1000/1000** (4999/4999) | 45,754 B |
+| Gain (1 関数) | 1/1000 | **1000/1000** (4999/4999 call) | 15,161 B | **1000/1000** (4999/4999) | 23,054 B |
+| Haas (5 関数) | 17/1000 | **1000/1000** (5500/5500) | 16,878 B | **1000/1000** (5500/5500) | 35,967 B |
+| Gate (3 関数) | 0/1000 | **1000/1000** (4999/4999) | 17,367 B | **1000/1000** (4999/4999) | 45,754 B |
 
-- 「素の出力」= Ghidra decompile をそのまま emcc に渡す。Ghidra 型名 (`undefined4`/`longlong`/`CONCAT44` 等) の shim と `_DAT_` の PE 実データ定義と callee stub だけは常時入れた上で、本表の「build 不可」は shim 後も `uint & float` 等の C 型エラーで止まる状態 (emcc の `-Wno-error=int-conversion` 系を足して通した構成が §10-2 の `none` 行)。
+- 「素の出力」= §10-2 の `修復なし` 行 = 常時入れる最小限 (Ghidra 型名 shim・`_DAT_` の PE 実データ定義と C 型推定・callee stub) だけで build し `--fix` 規則は 0 件。build は通るが数値が狂う (silent)。なお型推定を入れる前の最初の試行 (全グローバルを float 扱い) は `uint & float` の型エラーで 3 本とも emcc 失敗した。
 - wasm サイズは非対称な比較: RetDec 側は SIMD helper・globals 窓・stubs・96MB メモリ前提の共通部品を含む。Ghidra 側は C 1 本のみ。
 
 ### 10-2. 修復の要否 (ablation: 全修復 / 1 種外し / なし。数字 = bit-exact trial 数 / 1000)
@@ -163,7 +163,7 @@ VEX-256 は 344 関数 189,611 B 中 **closure 内は 6 関数のみ** (Convolve
   - **concat**: `CONCAT44(hi, fVarN)` の float 引数が数値→uint 変換になる (ビット連結の意図が崩れる)。
   - **assoc**: 浮動小数の積の結合括弧を印字で落とす (`a*(b*c)` が `a * b * c` = C では左結合 `(a*b)*c` → 1 ulp ずれる)。**実機の演算順を逆アセンブルで確認しないと直せない** (Gain 1804b0473..0485 の ramp、Gate 1804c3494..34a7 の smoothstep)。native との差分ハーネスが無いと発見不能。
   - **stackpair**: 連続した 2 スタック変数 (`lStack_e8/e0`) を配列として渡す呼出 (Gate の look-ahead ペア) が `&lStack_e8` 1 個になる。
-- **手作業の実績** (`patches.py` の規則行 = 手作業 1 件): assoc 規則 3 行 (ramp 形 1 本が Gain 1・Haas 2・Gate 1 の計 4 site を覆い、Gate の smoothstep 1 site を別行)。ほか機械規則 5 種 (`ghidra_to_c.py --fix`)。人手の所要時間は計測していない (推定は書かない)。比較用の実測は各段の実測秒 (§10-3)。
+- **手作業の実績** (`patches.py` の規則行 = 手作業 1 件): `assoc` 規則 4 行 (Gain 1・Haas 1・Gate 2。ramp 形の正規表現 1 本が Gain 1・Haas 2・Gate 1 の計 4 site、Gate の smoothstep 1 site を覆う = 計 5 site)。機械書換え 4 種 (bitcast/intload/concat/stackpair, `ghidra_to_c.py --fix`)。人手の所要時間は計測していない (推定は書かない)。比較用の実測は各段の実測秒 (§10-3)。
 - 修復の**発見**には Path B と同じ native 差分ハーネスが不可欠 (Ghidra の出力が正しいかの判定は読むだけでは付かない = RetDec と同じ条件)。
 
 ### 10-3. 実測秒 (run_all.sh を HEAD bc62138 で実行, load average 併記)
@@ -184,6 +184,6 @@ VEX-256 は 344 関数 189,611 B 中 **closure 内は 6 関数のみ** (Convolve
 - [未解決] Resonator / Stereo / Delay の Ghidra 実ビルド・突合は未実施 (`rcpps` 表・128bit・ABI 復元の規則化が前提)。
 
 ### 10-5. 判断への含意
-- **フロント選択**: 主ルート = RetDec→kh_lower (維持)。Ghidra→C は (a) 3 本程度の単純 leaf では全修復後に同等の bit-exact を達成でき、(b) RetDec の P1/F7 を誤らない独立実装として**第二 oracle に有用** (今回 3 本で再確認)。一方、(c) 修復のための silent 類型 5 種 (bitcast/intload/concat/assoc/stackpair) は Ghidra 固有で、(d) SIMD/128bit/独自 ABI の関数では C 化の手作業が要る。
+- **フロント選択**: 主ルート = RetDec→kh_lower (維持)。Ghidra→C は (a) 3 本程度の単純 leaf では全修復後に同等の bit-exact を達成でき、(b) RetDec の P1/F7 を誤らない独立実装として**第二 oracle に有用** (今回 3 本で再確認)。一方、(c) 修復のための silent 類型 5 種 (bitcast/intload/concat/assoc/stackpair。うち手作業が要るのは assoc のみ) は Ghidra 固有で、(d) SIMD/128bit/独自 ABI の関数では C 化の手作業が要る。
 - **KH-3 (検出器) の優先度**: Ghidra を主ルートにしない限り KH-3 の対象は RetDec 側 (D14〜D16 / 既存検出器) のまま。Ghidra を第二 oracle に使う場合は、capstone の演算順/型と C 式の照合 (assoc・bitcast 類型) が要る — ただしこれは oracle 用途なら不要 (native 差分で検出できる)。**優先度の変更は提案しない**。決定は PM。
 - 成果物: `ghidra_route/{ghidra_to_c.py,patches.py,ghidra_shim.h,build_cmp.sh,ablate.sh,census.sh,run_all.sh}`, `scripts/ghidra/DecompEach.java`。`work/` (gitignore): `ghidra/out{,_simd}/`, `gr/<name>/`。
