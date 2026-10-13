@@ -17,7 +17,7 @@ if [ ! -f "$MAP" ]; then echo "[kh_route] $MAP が無い: icall_rewrite.py の�
 BLK="$(python3 -c "import json,sys;print(hex(json.load(open(sys.argv[1]))['blk']))" "$MAP")"
 CFG="$(python3 -c "import json,sys;print(','.join('%x' % v for v in json.load(open(sys.argv[1]))['cfg_thunks']))" "$MAP")"
 source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1
-# 1. 復元後 IR の後処理 (ICALL_FIX_MASK / ICALL_FIX_VSTORE は OTT と同じ既定 1)
+# 1. 復元後 IR の後処理 (fix_mask / fix_vstore を無条件に実行)
 python3 "$HERE/ir_fix_mask.py" "$SRC" "$W/oi.restored.ll" | tee "$W/fix_mask.json"
 python3 "$HERE/ir_fix_vstore.py" "$W/oi.restored.ll" "$W/oi.restored1.ll" | tee "$W/fix_vstore.json"; mv "$W/oi.restored1.ll" "$W/oi.restored.ll"
 # 2. 既存 pass (normalize / ir5_patch) → flatten (global→絶対 addr + shift + dispatch 表)
