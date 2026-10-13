@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # プラグイン 1 PE の選択関数群を lift する汎用ドライバ (tools/m6_lift.sh / m11_lift.sh を一般化)
-#   RetDec --select-ranges --select-decode-only → ir_normalize → ir5_patch → fix_regparam_alloca(新規) → fix_asm_stores(新規) → fix_orcond_xnor(opt-in) → fix_dup_decls(新規) → fix_ptr_params(新規) → fix_icmp_ptr(新規) → m11_asmfix → m11_passes (global→linear VA) → m11_simd2 (__asm_* helper C 生成)
+#   RetDec --select-ranges --select-decode-only → ir_normalize → ir5_patch → fix_regparam_alloca(新規) → fix_asm_stores(新規) → fix_orcond_xnor(opt-in) → fix_dup_decls(新規) → fix_ptr_params(新規) → fix_icmp_ptr(新規) → m11_asmfix → m11_passes (global→linear VA) → fix_avx256(新規; ymm/VEX → IR 命令) → m11_simd2 (__asm_* helper C 生成)
 #
 # 使い方: bash lift_ranges.sh <PE> <ranges(file|"0xA-0xB,...")> <outdir> <name> [timeout_sec]
 #   例: bash lift_ranges.sh /.../block18983_PE.bin ranges.txt work/balance bal
@@ -70,9 +70,11 @@ if [ "${PLUG_F80_LOWER:-0}" = "1" ]; then
   # opt-in: x86_fp80 (x87) → f64 lowering (p0c/f80_lower.py)。 wasm の LLVM backend は fp80 (fpext / frem / 算術) を legalize できず `emcc -c` が落ちる。
   # f64 化は精度を落とす (x87 の 64bit 仮数が 53bit になる) ので既定は off。 呼び出し側が到達性 (emcc -c) だけを測る時に使う。 lowering 前の IR は <name>.pre_f80.ll
   python3 "$P/m11_passes.py" "$OUT/$NAME.asmfix.ll" "$OUT/$NAME.pre_f80.ll" --report "$OUT/$NAME.passes.json"
-  python3 "$HERE/../p0c/f80_lower.py" "$OUT/$NAME.pre_f80.ll" "$OUT/$NAME.final.ll" --report "$OUT/$NAME.f80.json"
+  python3 "$HERE/../p0c/f80_lower.py" "$OUT/$NAME.pre_f80.ll" "$OUT/$NAME.mp.ll" --report "$OUT/$NAME.f80.json"
 else
-  python3 "$P/m11_passes.py" "$OUT/$NAME.asmfix.ll" "$OUT/$NAME.final.ll" --report "$OUT/$NAME.passes.json"
+  python3 "$P/m11_passes.py" "$OUT/$NAME.asmfix.ll" "$OUT/$NAME.mp.ll" --report "$OUT/$NAME.passes.json"
 fi
+# PLUG_AVX256=0 で fix_avx256 を飛ばす (synth/cpp_lift.sh は #534 の C++ DLL 結果を変えないため 0 にする)
+if [ "${PLUG_AVX256:-1}" = 1 ]; then python3 "$P/fix_avx256.py" "$OUT/$NAME.mp.ll" "$OUT/$NAME.final.ll"; else cp "$OUT/$NAME.mp.ll" "$OUT/$NAME.final.ll"; fi
 python3 "$P/m11_simd2.py" "$OUT/$NAME.final.ll" 2> "$OUT/$NAME.simd.log" | sed 's#"\.\./msimd11_core\.h"#"msimd11_core.h"#' > "$OUT/${NAME}_simd.c"
 echo "[lift] OK: $OUT/$NAME.final.ll ($(wc -l < "$OUT/$NAME.final.ll") lines), $(grep -c '^define' "$OUT/$NAME.final.ll") defines, helpers: $(tail -3 "$OUT/$NAME.simd.log" | tr '\n' ' ')"
