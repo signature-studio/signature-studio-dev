@@ -263,7 +263,7 @@ wasm replay: records=297 mismatch=0 -> PASS
 - 独立再計算: `python3 shim/count_fill3.py` (nm で実装シンボルを直接数えて data/ipp_sigs.json の impl 集合と照合、差 0 を assert)
 
 ### 13-5. 未解決 (起票先付き)
-> **更新 (IPP-9 #276)**: 下表の VectorSlope_64f/_32f の bit 不一致は、出力先が揃った場合について解消した (算法・検証・残課題は `shim/REPORT_IPP9.md`)。以下は #263 時点の記録として残す。
+> **更新 (IPP-9 #276)**: 下表の VectorSlope_64f/_32f の bit 不一致は、出力先が揃った場合について解消した (算法・検証・残課題は `shim/REPORT_IPP9.md`)。出力先が揃わない場合も IPP-11 #473 で解消した (`shim/REPORT_IPP11.md`)。以下は #263 時点の記録として残す。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
