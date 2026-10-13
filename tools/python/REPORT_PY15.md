@@ -136,47 +136,78 @@ cases 6122
 
 - 回帰の原因: stubs の `transport.globalTransport` は `pmeflags` (小文字)、kwlist は `pmeFlags`。規則「既定値は同名のみ」により `globalTransport(index=1, value=2)` の既定値 `midi.PME_System` は引き継がれず、旧 `(1, 2, PME_System, GT_All)` → 新 `(1, 2)` (挙動変更 1 件)。大文字小文字は同名とみなさない (規則 (a) と同じ扱い)。
 - 修正: `tests/kwsig_check.py` の期待を `(1, 2)` に直し、`midi.PME_System` の評価は `fl_api._default_value("midi.PME_System")` で直接検証する。
-- 挙動変更 (旧 main `c5df4657` → 新): `transport.globalTransport(index=1, value=2)` の `pmeFlags` 省略。旧の期待値 (`kwsig_check.py:206-207` の `c5df4657` 版) は `(1, 2, PME_System, GT_All)` で、旧は `midi.PME_System` を入れていた。新は C 側既定値に任せる。上の 6122 基準の内訳 (値変更 6・拒否 19) への該当の有無は未確認 (`kwsig_behavior_diff` の再実行が必要)。
+- 挙動変更 (旧 main `c5df4657` → 新): `transport.globalTransport(index=1, value=2)` の `pmeFlags` 省略。旧の期待値 (`kwsig_check.py` の `c5df4657` 版) は `(1, 2, PME_System, GT_All)` で、旧は `midi.PME_System` を入れていた。新は C 側既定値に任せる。
+- 規則 (a) の対象一覧への追加: `transport.globalTransport` (stubs 名 `pmeflags` と kwlist `pmeFlags` の大文字小文字違い。同名規則により `pmeFlags` の既定値を引き継がない)。下の midi あり条件の表 (`globalTransport` の拒否 3・値変更 2) にも含まれる。
 
-| 検査 (HEAD `d84e73b6`) | 結果 | rc |
+**midi あり条件の挙動差**: 実 FL では `midi` があるため、旧 main の `midi.*` 既定値の呼出しは値を返していた。`tests/kwsig_bind_check.py` の harness に `midi` の偽値 (9000+i、名前順) を提供し、旧 main `c5df4657` (`midi.*` を解決する版) と新 `fef025ef` を同条件で比べた (`kwsig_behavior_diff`、6122 ケース):
+
+| 区分 | 件数 | 意味 |
+|---|---|---|
+| 同一 | 6075 | 旧新とも同じ結果 |
+| 拒否 | 29 | 旧は値を返し、新は TypeError (利用者影響) |
+| 値変更 | 18 | 旧新とも値を返すが違う (旧は別の引数の既定値・midi 既定値を入れていた) |
+| 受理 | 0 | 旧 TypeError → 新で値 |
+
+旧 `c5df4657` の誤束縛は 47 件 (`kwsig_bind_check --src c5df4657`: misbind 47・mismatch 0)。新は 0。
+
+関数別 (旧 `c5df4657` 基準・midi あり。拒否 29・値変更 18 の内訳。いずれも旧が `midi.*` 既定値を入れていた呼出しで、新は拒否または値が変わる):
+
+| 関数 | 拒否 | 値変更 |
+|---|---|---|
+| channels.getChannelVolume | 2 | 1 |
+| channels.setChannelPitch | 9 | 2 |
+| mixer.automateEvent | 12 | 3 |
+| transport.globalTransport | 3 | 2 |
+| device.linkToLastTweaked | 3 | 5 |
+| device.forwardMIDICC | — | 1 |
+| general.saveUndo | — | 2 |
+| mixer.getEventIDName / mixer.getTrackVolume | — | 1 / 1 |
+
+参考: 旧 `8d883c3` (harness で `midi` を解決できず `NameError` になる版) を midi 偽値あり条件で比べると、拒否 19・値変更 6・NameError 102 (`8d883c3` の `eval` 版は `midi` 無しでも `NameError` を出すため、この件数は midi 既定値の呼出しを含まない)。
+
+| 検査 (HEAD `fef025ef`) | 結果 | rc |
 |---|---|---|
 | `tests/kwsig_check.py` | OK (224 件中同結果 208、差 16・11 関数) | 0 |
-| `tests/kwsig_bind_check.py` | PASS (103 関数・6122 ケース、misbind 0・mismatch 0) | 0 |
+| `tests/kwsig_bind_check.py` (midi 偽値あり) | PASS (103 関数・6122 ケース、misbind 0・mismatch 0) | 0 |
+| `tests/kwsig_bind_check.py --src <8d883c3 の src>` (ネガコン) | ok 5995 / misbind 25 / mismatch 102 → FAIL | 1 |
+| `tests/kwsig_bind_check.py --src <c5df4657 の src>` (ネガコン) | ok 6075 / misbind 47 / mismatch 0 → FAIL | 1 |
 | `tests/mcp_kwcalls_extract.py` (python3.12・`block25159_DATA.bin`) → `tests/mcp_kwcalls_bind.py src` | 20 箇所・14 パターン → 14/14 PASS | 0 |
 | 同 `--neg` | distinct 15: pass 14, fail 1 → FAIL | 1 |
 
-wasm 系 (素材 `fl-win64` を `$RUNNER_TEMP/fl` に展開、`FL_WIN64_DIR` 設定、直列・前景、4 vCPU):
+wasm 系 (素材 `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開、`FL_WIN64_DIR` 設定、直列・前景、4 vCPU):
 
 | 手順 | 結果 | rc | 所要 |
 |---|---|---|---|
-| `fetch_inputs.sh` → `build_cpython_wasm.sh` | `python.wasm` 生成 | 0 | 4 分 09.8 秒 |
+| `fl-win64` 展開 (`tar --zstd -xf`) | 25,167 件 | 0 | 5.2 秒 |
+| `fetch_inputs.sh` → `build_cpython_wasm.sh` (`bb1b838a`・クリーン) | `python.wasm` 生成 | 0 | 250 秒 (4 分 10 秒) |
 | `build_flpy.sh` | `flpy.wasm` 生成 | 0 | 7.2 秒 |
 | `provider/build.sh` | `flprov.wasm` 生成 | 0 | 1.2 秒 |
-| `tests/all_tools.mjs` (JS mock) | 48/48 ok・host_calls 37,425・callback_roundtrip true | 0 | 2.09 秒 |
-| `FL_ENGINE=wasm tests/all_tools.mjs` | 48/48 ok・host_calls 37,425 | 0 | 2.13 秒 |
-| `tests/provider_check.mjs` | PASS (functions 435・implemented 60・mcp_static 60) | 0 | 0.34 秒 |
+| `tests/provider_check.mjs` | PASS (functions 435・implemented 60・mcp_static 60) | 0 | 0.38 秒 |
+| `tests/all_tools.mjs` (JS mock) | 48/48 ok・host_calls 37,425・callback_roundtrip true | 0 | 1.89 秒 |
+| `FL_ENGINE=wasm tests/all_tools.mjs` | 48/48 ok・host_calls 37,425・callback_roundtrip true | 0 | 2.01 秒 |
 
-- 旧 main の `globalTransport` 実測の再取得は本 run では完了せず (測定スクリプトの import 経路の誤り)。旧 `(1, 2, PME_System, GT_All)` は `kwsig_check.py` の旧期待値 (本 PR 前の `d84e73b6` の親) で確認済み。
-- `tests/kwsig_bind_check.py` と `tests/kwsig_check.py` の 6122 / 224 件基準は本修正で変わらない。
+- 計測の範囲: CPython のクリーン値は `bb1b838a` で取った 250 秒。`fef025ef` は `src/` が同じで harness のみ変わるため、CPython は `work/` の incremental (1 秒) で rc=0 を確認。`fef025ef` の flpy 7 秒・provider 1.2 秒・JS 系の値は同じ構成の実行。
+- `tests/kwsig_check.py` の期待は 224 件基準のまま (本修正で変わらない)。
 
-### 16-b. 本 PR head の wasm 回帰 (検証 HEAD `a92cd53`、node v22.23.3、4 vCPU)
+### 16-b. 本 PR head の wasm 回帰 (検証 HEAD `fef025ef`。旧 `a92cd53` の値は破棄)
 
-§14 の wasm 数値 (`bdd2f7c`) は src が main 取り込みで変わったため、本 head で再計測した。`src/` は `53a013d` 以降不変で、`a70b4c8`→`a92cd53` は docs のみ。
+`src/` は `b9640a6d` 以降不変。`d84e73b6`〜`bb1b838a` は `tests/kwsig_check.py` と REPORT のみ、`fef025ef` は `tests/kwsig_bind_check.py` (midi 偽値) のみ変更。wasm 系の値は下表 (`fef025ef` の実測)。
 
 | 手順 (直列・前景) | 結果 | rc | 所要 |
 |---|---|---|---|
-| `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`FL_WIN64_DIR`) | `extracted/` 展開済み | 0 | 5.401 秒 |
-| `fetch_inputs.sh` | 完了 (mac pkg なしのため win64 DATA から取得) | 0 | 0.282 秒 |
-| `build_cpython_wasm.sh` | `python.wasm` 生成 | 0 | 4 分 03.8 秒 |
-| `build_flpy.sh` | `flpy.wasm` 生成 | 0 | 7.037 秒 |
-| `provider/build.sh` | `flprov.wasm` 生成 | 0 | 1.214 秒 |
-| `tests/provider_check.mjs` | PASS (functions 435・implemented 60) | 0 | 0.924 秒 |
-| `tests/all_tools.mjs` (JS mock) | 48/48 ok・host_calls 37,425・callback_roundtrip true | 0 | 3.194 秒 |
-| `FL_ENGINE=wasm tests/all_tools.mjs` | 48/48 ok・host_calls 37,425・callback_roundtrip true | 0 | 3.277 秒 |
-| `tests/kwsig_bind_check.py` | PASS (103 関数・6122 ケース、misbind 0・mismatch 0) | 0 | 0.238 秒 |
-| `tests/mcp_kwcalls_bind.py` (`src` と `analysis/mcp` の calls.json を引数指定) | 14/14 PASS | 0 | — |
-| 同 `--neg` (不合格 1 件を追加) | distinct 15: pass 14, fail 1 → FAIL | 1 | — |
+| `build_cpython_wasm.sh` (`bb1b838a` でクリーンビルド) | `python.wasm` 生成 | 0 | 250 秒 |
+| `build_cpython_wasm.sh` (`fef025ef`、`work/` incremental) | rc=0 | 0 | 1 秒 |
+| `build_flpy.sh` (`fef025ef`) | `flpy.wasm` 生成 | 0 | 7 秒 |
+| `provider/build.sh` (`fef025ef`) | `flprov.wasm` 生成 | 0 | 1 秒未満 |
+| `tests/provider_check.mjs` | PASS (functions 435・implemented 60・mcp_static 60) | 0 | 0.38 秒 |
+| `tests/all_tools.mjs` (JS mock) | 48/48 ok・host_calls 37,425・callback_roundtrip true | 0 | 1.9 秒 |
+| `FL_ENGINE=wasm tests/all_tools.mjs` | 48/48 ok・host_calls 37,425・callback_roundtrip true | 0 | 2.0 秒 |
+| `tests/kwsig_check.py` | OK (224 件中同結果 208、差 16・11 関数) | 0 | 0.05 秒 |
+| `tests/kwsig_bind_check.py` | PASS (103 関数・6122 ケース、misbind 0・mismatch 0) | 0 | 0.09 秒 |
+| `tests/mcp_kwcalls_extract.py` (python3.12) → `tests/mcp_kwcalls_bind.py` | 20 箇所・14 パターン → 14/14 PASS | 0 | — |
+| 同 `--neg` | distinct 15: pass 14, fail 1 → FAIL | 1 | — |
 
+- CPython の wasm 計測は `bb1b838a` (`src/` 同一・`fef025ef` と wasm 生成物の入力は同じ) のクリーンビルド 250 秒と、`fef025ef` の incremental rc=0 の 2 つ。
 - 実行後の `git status` は空 (`tool_coverage.json` の書き換えなし)。生成物 (`work/`・`dist/`) は gitignore 対象。
 - 差分の手順は `run_all.sh` の step 1・2・5・9b を個別に実行したもの。`run_all.sh` 全体は step 4 の固定パス (#630) のため使えない。
 - 範囲外 (未実行): `mcp_ui_check.mjs` / `midi_ui_check.mjs` (Vite が要る)、`browser_check.mjs`・`midi_script.mjs` 等の §14 記載分は本 head では再計測していない。
