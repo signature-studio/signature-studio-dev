@@ -12,6 +12,6 @@ done
 if [ -z "${JAVA_HOME:-}" ] && [ -d /usr/lib/jvm/temurin-21-jdk-amd64 ]; then export JAVA_HOME=/usr/lib/jvm/temurin-21-jdk-amd64; fi
 [ -n "${JAVA_HOME:-}" ] && export PATH="$JAVA_HOME/bin:$PATH"
 PROG="${GQ_PROGRAM:-fw_a.dll}"; PN="${GQ_PROJECT:-fw}"
-"$GHIDRA_HOME/support/analyzeHeadless" "$H10/work/ghidra" "$PN" -process "$PROG" -noanalysis -readOnly \
-  -scriptPath "$HB/ghidra_scripts" -postScript Query.java "$@" > "$H10/work/ghidra/last_query.log" 2>&1 || {
-  echo "gq.sh: analyzeHeadless failed; tail of log:" >&2; tail -20 "$H10/work/ghidra/last_query.log" >&2; exit 1; }
+"$GHIDRA_HOME/support/analyzeHeadless" "${GQ_PROJDIR:-$H10/work/ghidra}" "$PN" -process "$PROG" -noanalysis -readOnly \
+  -scriptPath "$HB/ghidra_scripts" -postScript Query.java "$@" > "${GQ_PROJDIR:-$H10/work/ghidra}/last_query.log" 2>&1 || {
+  echo "gq.sh: analyzeHeadless failed; tail of log:" >&2; tail -20 "${GQ_PROJDIR:-$H10/work/ghidra}/last_query.log" >&2; exit 1; }

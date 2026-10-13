@@ -38,4 +38,24 @@ Q fw_ctor_callers.txt refsto 7a9db0 87c980 86e1a0 871fe0 875af0
 Q fw_9c4_refs.txt    grepins '\+ 0x9c4\]' 400000 9a0000
 Q fw_89c_8a0_refs.txt grepins '\+ 0x8a0\]|\+ 0x89c\]' 800000 9a0000
 Q fw_xref_strings.txt xrefstr "SaveRestoreState - load" "LoadPlugin_Finish" "Something went wrong loading the"
+# --- FLEngine (block00031_PE.bin) 側: event 212 の flags (0x10 / 0x80) — 解析 10m13s (3 コア) のため REGEN_FLE=1 の時だけ
+if [ "${REGEN_FLE:-0}" = 1 ]; then
+  [ -f "$W/fle.dll" ] || cp "$X/block00031_PE.bin" "$W/fle.dll"
+  mkdir -p "$W/ghidra_fle"
+  if [ ! -d "$W/ghidra_fle/fle.rep" ]; then
+    (cd "$W" && "$GHIDRA_HOME/support/analyzeHeadless" ghidra_fle fle -import fle.dll -scriptPath "$HB/ghidra_scripts" \
+       -postScript DumpFunctions.java ghidra_fle/functions_fle.csv -max-cpu 3 > ghidra_fle/analyze_fle.log 2>&1)
+  fi
+  QF() { GQ_PROJDIR="$W/ghidra_fle" GQ_PROJECT=fle GQ_PROGRAM=fle.dll "$H10/analysis/gq.sh" "$@"; }
+  QF "$E/fle_212_writer_reader.c" decomp aac1e0 aac300 f54900 f3c870
+  QF "$W/f46490.c" decomp f46490
+  python3 - "$W/f46490.c" "$E/fle_212_reader_excerpt.c" <<'PY'
+import sys
+src = open(sys.argv[1]).read().splitlines()
+i = next(k for k, l in enumerate(src) if 'else if (iVar3 == 0xd4) {' in l)
+open(sys.argv[2], 'w').write('=== fle:0xf46490 (.fst/.flp plugin loader) — event 212 (0xd4) case, lines %d..%d of the decompile\n' % (i + 1, i + 261) + '\n'.join(src[i:i + 261]) + '\n')
+PY
+  QF "$W/aba880.asm" disasm aba880
+  grep -B8 -A1 "00ababff" "$W/aba880.asm" > "$E/fle_aba880_call.asm"
+fi
 echo "[h10 reproduce] evidence → $E"
