@@ -235,7 +235,7 @@ FLEngine 0x40d253 `jmp [r10+rdx*8+0x40]` (Delphi `sub rdx,8` 形) は、基点 `
 |---|--:|--:|---|---|---|
 | FLEngine 0x40d253 | 1 | 0 | `jmp [mem]` | 対象外 | before = after |
 | Balance | 0 | — | — | — | 監査のみ |
-| Fresh Air | 2 | 1 or 2 (不一致) | `jmp r9` | 対象 | 未再実行 |
+| Fresh Air | 2 (`sites_after.json`) / 1 (`audit_fa.json`) | 不一致・原因未確定 | `jmp r9` | 対象 | 未再実行 |
 | OTT F | 8 | 8 | `jmp reg` | 対象 | 未再実行 |
 
-未解決: (1) メモリ形 `jmp [r10+rdx*8+d]` への `jt` 展開対応と FLEngine の効果測定 → 子 issue。(2) Fresh Air の jt_dropped を素材付きで再実行し、1 件/2 件の不一致を解消 → 子 issue。
+未解決: (1) メモリ形 `jmp [r10+rdx*8+d]` への `jt` 展開対応と FLEngine の効果測定 → #1402 (ICALL-26)。(2) Fresh Air の jt_dropped を素材付きで再実行し、2 件 (`sites_after.json`) と 1 件 (`audit_fa.json`) の不一致の原因を確定する → #1403 (ICALL-27)。不一致は原因未確定のまま、どちらの件数が正しいかは本 run では判定していない。
