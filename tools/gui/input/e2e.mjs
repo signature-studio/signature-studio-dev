@@ -40,6 +40,7 @@ try {
   await page.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
   await page.send("Page.bringToFront");
   await page.goto(`http://127.0.0.1:${port}/`);
+  const boot = await page.waitForExpr("window.__ready && window.__ready.then ? (window.__bootDone ||= (window.__ready.then((v)=>{window.__bootVal=v;}), false)) || window.__bootVal : false", 30000).catch(() => null);
   const bootVal = await page.waitForExpr("window.__bootVal", 30000);
   ck("crossOriginIsolated + SAB wasm memory", bootVal.crossOriginIsolated === true && bootVal.sab === true);
   const logs = () => page.evaluate("window.__g6.host.logs.filter((l)=>l.startsWith('G6 '))", { awaitPromise: false });
