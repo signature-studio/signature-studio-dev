@@ -1,0 +1,17 @@
+REGION 0x180256000-0x180264000: funcs=248 bytes=56326  (.pdata funcs in range)
+root	closure_funcs	closure_B	in_REGION_funcs	in_REGION_B	in_SR3_cut(other)_funcs	in_SR3_cut(other)_B	remaining_Xfer_funcs	remaining_Xfer_B
+writer 0x1801be2e0	205	142544	6	2645	62	91146	137	48753
+reader 0x1801bf1c0	273	228802	50	43874	36	121849	187	63079
+from_cbor 0x1801bfb00	230	104329	50	43874	0	0	180	60455
+from_ubjson 0x1801bf5f0	230	104327	50	43874	0	0	180	60453
+to_cbor 0x1801bea90	54	12478	6	2645	0	0	48	9833
+
+XferJson container functions (own code, stay in lift):
+  0x1801be2e0	1539 B	in_cut=False
+  0x1801bea90	162 B	in_cut=False
+  0x1801bf1c0	576 B	in_cut=False
+  0x1801bf5f0	1137 B	in_cut=False
+  0x1801bfb00	1139 B	in_cut=False
+
+REGION funcs reachable from 0x180256250/0x180256dc0/0x180263a20 inside REGION: 56 funcs / 46519 B; unreached by direct call: 192 funcs / 9807 B
+REGION funcs already in SR-3 cut table: 2 funcs / 1223 B

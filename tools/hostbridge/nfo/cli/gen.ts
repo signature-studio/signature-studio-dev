@@ -8,7 +8,7 @@ const args = process.argv.slice(2);
 const flag = (n: string): string | undefined => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : undefined; };
 const [specPath, outDir] = args.filter((a, i) => !a.startsWith('--') && !(i > 0 && args[i - 1].startsWith('--') && args[i - 1] !== '--no-verified-ids'));
 if (!specPath || !outDir) {
-  console.error('usage: node cli/gen.ts <specs.json> <outDir> [--kilohearts product_index.json] [--db-path <win path>] [--no-verified-ids]');
+  console.error('usage: node cli/gen.ts <specs.json> <outDir> [--kilohearts product_index.json] [--db-path <win path>] [--no-verified-ids] [--chunk-version 8..12]');
   process.exit(2);
 }
 const specs: PluginSpec[] = JSON.parse(readFileSync(specPath, 'utf8')).plugins;
@@ -23,7 +23,7 @@ if (kh && existsSync(kh)) {
     specs.push({ name: p.fileName, vendor: 'Kilohearts', format: 'vst2', kind: gen ? 'generator' : 'effect', magic: p.id, path: `C:\\Program Files\\Common Files\\VST2\\Kilohearts\\${p.fileName}.dll`, category: gen ? 'Synth' : 'Effect' });
   }
 }
-const res = generateDb(specs, { dbPath: flag('--db-path'), verifiedIds: !args.includes('--no-verified-ids') });
+const res = generateDb(specs, { dbPath: flag('--db-path'), verifiedIds: !args.includes('--no-verified-ids'), chunkVersion: flag('--chunk-version') ? Number(flag('--chunk-version')) : undefined });
 for (const [rel, bytes] of res.files) {
   const p = join(outDir, rel);
   mkdirSync(dirname(p), { recursive: true });
