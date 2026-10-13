@@ -156,6 +156,46 @@ def classify_set(fn, call_idx, pos, lb):
     return 'none', None, 'entry'
 
 
+def src_of(fn, call_idx, pos):
+    """set_other の代入元 (classify_set と同じ窓・同じ命令) を台帳用に分類する.
+    mem_global (rip 相対) / mem_stack (rsp・rbp 相対) / mem_ptr (その他の基底レジスタ) / reg / lea_<base> / imm / other."""
+    ins_list = fn.ins
+    reg = REGS[pos] if pos < 4 else None
+    j = call_idx - 1
+    while j >= 0:
+        ins = ins_list[j]
+        if ins.mnemonic in ('call', 'ret', 'jmp') or ins.mnemonic.startswith('j'):
+            return 'boundary'
+        hit = False
+        if reg:
+            R, W = fn.rw(ins)
+            hit = reg in W
+        else:
+            hit = any(m['write'] and m['base'] == 'rsp' and m['disp'] == 0x20 + 8 * (pos - 4) for m in ldmach.memops_of(fn.cs, ins))
+        if hit:
+            return _src_class(fn, ins)
+        if ins.address in fn.targets:
+            return 'boundary'
+        j -= 1
+    return 'entry'
+
+
+def _src_class(fn, ins):
+    ops = ins.operands
+    src = ops[-1] if len(ops) >= 2 else None
+    if src is None:
+        return 'other'
+    if src.type == capstone.CS_OP_MEM:
+        base = fn.cs.reg_name(src.mem.base)
+        cls = 'global' if base == 'rip' else 'stack' if base in ('rsp', 'rbp') else 'ptr'
+        return ('lea_' if ins.mnemonic == 'lea' else 'mem_') + cls
+    if src.type == capstone.CS_OP_REG:
+        return 'reg'
+    if src.type == capstone.CS_OP_IMM:
+        return 'imm'
+    return 'other'
+
+
 def _set_why(fn, ins):
     if ins.mnemonic in ('mov', 'movzx', 'movsx', 'movsxd') and len(ins.operands) == 2:
         src = ins.operands[1]
@@ -245,6 +285,10 @@ def main():
                             fixes.append({'caller': p['caller'], 'callee': p['callee'], 'k': p['k'], 'pos': pos, 'const': c})
                         else:
                             kind = 'set_other' if pos < 4 else 'stack_set_other'
+                            if kind == 'set_other' or kind == 'stack_set_other':
+                                s_src = src_of(cf, ci, pos)
+                                stats['src:%s:%s' % (kind, s_src)] += 1
+                                rec.setdefault('src', {})[pos] = s_src
                         stats['why:%s:%s' % (kind, why)] += 1
                 rec['args'][pos] = kind
                 stats['arg:' + kind] += 1
