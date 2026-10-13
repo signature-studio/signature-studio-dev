@@ -88,3 +88,41 @@ OOB 16 件の最上位 frame (現行 build): 144 `407e20` / 149 `412e40` / 275 `
 - main 側のどの変更が §2 の遷移を生んだかは未切り分け (§5 の #684 で扱う)。
 - 結論: §6 の元記録の範囲では §0 の前提と整合する。`8bc34ed9` での実測は未実施のため、前提が `8bc34ed9` でも成立するかは未検証。受入条件 1・2 (`47ad70` の index / arg1、`40ffe0` のリスト先頭) は対象の観測が無いため未達のまま。受入条件 3 (DEFECTS 行案) は §6 既出の D11 変種の範囲に留まる。
 - 未解決の起票先は §5 のとおり。
+
+## 8. 現行 main `f7bebc7b` での再測定 (3 回目の run)
+
+測定 commit: `f7bebc7b` (origin/main、PR #1370 取込み後)。前回 §7 の未実施分を、この commit で実測した。
+
+### 8.1 手順と結果 (foreground、すべて rc=0)
+
+- 素材: `fl-win64` → `$RUNNER_TEMP/fl-win64` (`FL_WIN64_DIR`)、`work-m11` / `work-liftdiff` を repo 直下で展開 (`tools/m11/work/`・`tools/liftdiff/work/`)、`toolchain-retdec` / `toolchain-emsdk` を `$RUNNER_TEMP` に展開 ([RETDEC]・[EMSDK] は既存)。
+- `m11_gen_ir2.sh`: rc=0、44.6 s、`ldfix` F1=902 F2=30 F3c=36 errors=0。
+- `m11_build.sh`: rc=0、25.4 s、`wasm-ld signature mismatch: 0`。
+- `survey_units.mjs` (`SV_RAW=1`): rc=0、13.5 s、`ok 870 / halt0 7 / miss 47 / oob 16 / other 1 / noproc 1`。
+- 前回 (§7 の `8bc34ed9`・PR #1261) 記録の `869 / 8` とは 1 件ずれる (ok +1、halt0 -1)。原因は未切り分け。
+- 鮮度の証跡 (`docs/WORKFLOW.md` §6): 測定範囲は `src`・`tools/m11`・`tools/liftdiff` (測定に使うコードと素材の生成元)。`git diff f7bebc7b HEAD -- src tools/m11 tools/liftdiff` の結果は `tools/m11/trap_triage/REPORT_882.md` の 37 行追記のみ (本 PR の文書、測定対象外)。それを除いた差分は 0 byte。よって `f7bebc7b` の実測値は現 HEAD と同じコードに対する値であり、再測定は不要。
+
+### 8.2 対象 unit の状態
+
+| unit | VA | 現行 kind | 観測 |
+|---|---|---|---|
+| 95 | `0x1d2680` | **ok** | GDI stub (`GetDC` 等) を 14 件呼び 0 を返して継続。OOB 不発 |
+| 895 | `0xeddfe0` | **halt0** | `MessageBoxA` `Runtime error 210 at 0000000010251440`。最上位 frame `function_412770`。`40ffe0` は frame 上にあるが `40c820` の caller の一つ |
+
+- 受入条件 1 (unit 95 の `47ad70` index・arg1): OOB が出ないため観測対象が無い。**未達**。
+- 受入条件 2 (unit 895 の `40ffe0` リスト先頭・`p-144`): 静的な機械語は下記で読めた。動的な値 (先頭の出所・構造体の中身) は未取得。**未達**。
+- 受入条件 3 (DEFECTS 行案): 新規類型は確定できず、§6・#1080 §5 の D4 変種のまま。**未達**。
+
+### 8.3 `40ffe0` / `40ff70` の機械語 (`disasm_fn.py`、`f7bebc7b` の PE)
+
+- `40ffe0`: `mov rcx,[rcx]` で 1 段 deref した値を `40ff70` に渡し、戻り値が 0 なら `40c820` を呼ぶ。
+- `40ff70`: `rax = rcx` とし、`[rax-0x90]` (= p-144) を先頭ノードとして辿る。各ノードで `word [rcx]` の要素数を見て `[rcx+r9*2+2]` と `dx` を比較し、一致すれば `[rcx + 8*i + …]` を返す。一致が無ければ `[rax-0x78]` の次ノードへ進む (`[rax]` を読んで反復。再帰ではない)。終端では `xor eax,eax` で 0 を返す。
+- 読み: halt0 の経路は `40ff70` が 0 を返した後の `40c820` 呼び出しに入る形と整合する。ただし「`p-144` が 0 だった」「一致が無かった」のどちらかは、本 run では動的に切り分けていない。
+
+### 8.4 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `40ff70` の `p-144` の実値と走査結果 (0 の経路が null 先頭か不一致か) | 受入条件 2 | #882 の次 run (`SV_TRACE_AT` での値取得が必要) または #684 |
+| 前回 `869 / 8` と本 run `870 / 7` の差 | 比較基準の揺れ | #684 (PM 判断) |
+| `functions_dll.csv` の素材化 (`m11_e2e.sh` 全再生成) | e2e 全体の再現 | PM 判断 (§5 と同じ) |

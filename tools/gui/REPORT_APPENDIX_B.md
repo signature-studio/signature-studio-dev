@@ -56,3 +56,24 @@
 - **受入条件 3 (#740 の修正前 ASan 再現ログ)**: 本 run では取得していない (未達)。
 
 未解決の起票先: #1217 (本 issue を open のまま残す)。
+
+## 11 追補 3. e2e.sh ALL PASS の連続実測 (#186 受入条件 3 点目、run 186-e2e-stability)
+
+測定 commit: origin/main `80c32a06` (コード HEAD。以後コード差分 0)。クリーン worktree `186-e2e-stability`、`build/` 無し。`TMPDIR=$RUNNER_TEMP`、`bash tools/gui/e2e.sh` を foreground で同一 HEAD に 10 回連続実行。素材: fl-win64・toolchain-retdec・toolchain-emsdk を `ls` で実在確認、`/opt/retdec`・`/opt/emsdk` 展開済み。前提: `gcc-mingw-w64-x86-64` 導入済み、`pnpm install --frozen-lockfile` 済み。
+
+| run | rc | 実時間 | 開始時 load (1 分値) | 結果 |
+|---|---|---|---|---|
+| 1 | 0 | 4 m 16 s | 0.89 | ALL PASS |
+| 2 | 0 | 166 s | 2.18 | ALL PASS |
+| 3 | 0 | 165 s | 2.17 | ALL PASS |
+| 4 | 0 | 164 s | 3.07 | ALL PASS |
+| 5 | 0 | 165 s | 1.91 | ALL PASS |
+| 6 | 0 | 165 s | 1.86 | ALL PASS |
+| 7 | 0 | 165 s | 1.96 | ALL PASS |
+| 8 | 0 | 165 s | 2.27 | ALL PASS |
+| 9 | 0 | 165 s | 2.43 | ALL PASS |
+| 10 | 0 | 165 s | 2.02 | ALL PASS |
+
+- **結果**: 10/10 rc=0 / `[gui-e2e] ALL PASS`。各ログに `heap-use-after-free` / UAF の出現 0 件。stress 本体は ALL PASS (drop 0)。ネガコンの `FAIL` 行は期待された拒否 (exit 1 を検出) で、rc には影響しない。
+- **受入条件 3 点目 (`e2e.sh` ALL PASS 維持)**: 本 run で連続 10 回の rc=0 を確認 (#1217 の n≥10 基準を満たす)。
+- **未解決 (移管先は変更なし)**: 修正前 ASan ログの再取得と flake の Closes 判定は #740 / #1217 (GUI-20) で扱う。#186 の判定には含めない。

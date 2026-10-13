@@ -218,3 +218,27 @@ acpt_recount_np = pdata 186,960 / sites 763,898 / targets 594,978 / non-begin 59
 実施記録: `work/lift_one/` (round-1 closure の x64c lift) は 20 分で完了せず中断。完了分
 (seeds 567 関数) を §3 の実測値として採用。Linear: CAB-263 起票→In Review / 子チケット CAB-265。
 
+## 12. U1 進捗 (MX-3b / #266 · pdata 非依存の slot 計測)
+
+**結論 (未確定)**: partial vtable 0x1839761b8 の **slot 9 (0x1800119c0)** が `process` の候補。主 vtable 0x183976038 には process が無い (全 slot が共有スタブか小関数)。IAudioProcessor の 0-based 順 (IUnknown 3 + setBusArrangements / getBusArrangement / canProcessSampleSize / getLatencySamples / setupProcessing / setProcessing / process) では process は slot 9 になる。ただし ProcessData 参照の確証は未取得。
+
+| 項目 | 結果 |
+|---|---|
+| 計測スクリプト | `dsp/scripts/mx_slot_probe.py` (slot → 先頭 VA・先頭命令列)・`dsp/scripts/mx_slot_body.py` (関数本体の `[rdx+disp]` 集計と call 列・pdata 非依存) |
+| 主 vtable slot 0-11 | 0x180017f10 / 0x18000eb30 / 0x18017a630 / 0x18000efe0 / 0x180005680 (×4: slot 4,5,8,9,10 は同一) / 0x18000fad0 / 0x18000fb00 / 0x18000fa90 等。共有スタブ |
+| partial slot 0-10 | slot 9 = 0x1800119c0 (prologue: push rbp/rsi/rdi, sub 0x80) / slot 10 = 0x180011980 (`mov rcx,[rcx+0x28]; call` の薄いラッパ) |
+| slot 9 本体 (max 400 insn 内) | 83 insn・`[rdx+disp]` 参照 0 件 (rdx を退避してから使う可能性あり・未確定)・call 14 件 (先頭 `call 0x1800edeca`、`call [rax+0x18]`、`call [rax+0xa0]` など) |
+| 素材 | plugins-massivex (前回 run の実測: 展開 2.3 s・parse 0.3 s・extract 11.2 s・md5-ok 0/125)。**本 run の素材は fl-win64 のみで再現せず (未検証)**。PE 上の slot/本体数値は再測定待ち |
+
+**反証データ (弱める材料)**: slot 9 本体に `[rdx+disp]` が 0 件。process なら ProcessData (rdx) のフィールドを読むのが普通なので、候補を弱める。rdx を退避してから使う可能性は残るが未確認。
+**前提**: 「IAudioProcessor の 0-based 順で slot 9」は、partial vtable 0x1839761b8 がその interface の vtable であることが前提 (未確認。RTTI 上の所属は未突合)。
+**停止規則 (mx_slot_body.py)**: 最大 400 命令。ただし `ret` を 30 命令超の後に最初に見た地点で止める (ret/int3 の境界は見ない)。
+**ネガティブコントロール**: `mx_slot_body.py --selftest` (PE 不要・既知エンコード)。正例 `mov rax,[rdx+0x18]; mov ecx,[rdx+4]; ret` → rdx 参照 2 件 (offset 4・0x18) を検出、負例 `mov rax,[rcx+0x18]; ret` → 0 件。PE 上の既知 rdx 参照関数での確認は素材 plugins-massivex 未展開のため未実施。
+
+**未解決 (起票先)**: slot 9 が process であることの確証 (rdx の退避先追跡・Ghidra 参照解析) → #266 (MX-3b, OPEN) のコメント https://github.com/signature-studio/signature-studio-dev/issues/266#issuecomment-6156301544 に記載済み。closure 厳密化は #1122 (MX-5, CLOSED・成果は REPORT_MX5.md) のため、残件は #266 へのコメントで示す。vectorcall / C++ EH → #1123 (MX-6, OPEN)。
+
+**検証 commit と差分 (docs/WORKFLOW.md §6)**: PE 実測の測定 commit = **133007f1**。その後 dsp のコードを変えた最後の commit = **59d2f022** (`mx_slot_body.py` を関数化し `--selftest` と停止規則を追加。解析ロジック・集計条件は不変)。
+- `git diff 133007f1 0cf4cb10 -- tools/targets/massivex/dsp` は **148 行** (0cf4cb10 時点の実測。差分 0 ではない。59d2f022 でコードを変えたため。0 行を主張していた旧記載は誤り)。以降の commit で変わるのは REPORT.md のみ。
+- `git diff 59d2f022 HEAD -- tools/targets/massivex/dsp/scripts` は **0 行** (59d2f022 以降にスクリプトの変更なし。以降の差分は本 REPORT.md のみ)。
+- selftest (59d2f022・PE 不要・実測): `selftest PASS: positive rdx refs=2 (offsets [(4, 1), (24, 1)]), negative rdx refs=0`。
+- PE 依存の数値 (slot アドレス・slot 9 本体の 83 insn / call 14 件) は素材未展開のため本 run では再測定していない (前回 run の値・未検証)。

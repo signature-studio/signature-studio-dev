@@ -40,7 +40,7 @@
 
 #define SHX_CB_SLOTS 64
 #define SHX_LIFTTAB_TOKEN_BASE 0x7F000000ull
-#define SHX_LIFTTAB_N 16
+#define SHX_LIFTTAB_N 22
 
 typedef unsigned long long u64x;
 
@@ -234,9 +234,16 @@ THUNK(GetThreadUILanguage, (uint32_t)GetThreadUILanguage())
 THUNK(SHCreateStdEnumFmtEtc, (uint32_t)SHCreateStdEnumFmtEtc((UINT)a0, (const void*)(uintptr_t)a1, (LPVOID*)(uintptr_t)a2))
 THUNK(SHCreateMemStream, (uintptr_t)SHCreateMemStream((const BYTE*)(uintptr_t)a0, (UINT)a1))
 THUNK(QISearch, (uint32_t)QISearch((void*)(uintptr_t)a0, (const void*)(uintptr_t)a1, (const GUID*)(uintptr_t)a2, (LPVOID*)(uintptr_t)a3))
+/* SHX-T23 (#1388): RegisterDragDrop 経路で guest に渡す IDataObject の vtable スロット (ole.c の shimx_ido_*) */
+THUNK(IDO_QueryInterface, (uint32_t)shimx_ido_QueryInterface((void*)(uintptr_t)a0, (const GUID*)(uintptr_t)a1, (void**)(uintptr_t)a2))
+THUNK(IDO_AddRef, (uint32_t)shimx_ido_AddRef((void*)(uintptr_t)a0))
+THUNK(IDO_Release, (uint32_t)shimx_ido_Release((void*)(uintptr_t)a0))
+THUNK(IDO_GetData, (uint32_t)shimx_ido_GetData((void*)(uintptr_t)a0, (const void*)(uintptr_t)a1, (void*)(uintptr_t)a2))
+THUNK(IDO_QueryGetData, (uint32_t)shimx_ido_QueryGetData((void*)(uintptr_t)a0, (const void*)(uintptr_t)a1))
+THUNK(IDO_NotImpl, (uint32_t)shimx_ido_NotImpl())
 
 typedef struct { const char* name; DWORD ordinal; int dll; shx_lift_thunk_fn th; } LiftEnt;
-/* dll: 0 = shell32.dll (名前+序数), 1 = kernel32.dll (名前), 2 = shlwapi.dll (名前+序数) */
+/* dll: 0 = shell32.dll (名前+序数), 1 = kernel32.dll (名前), 2 = shlwapi.dll (名前+序数), 3 = 内部 COM (名前のみ。GetProcAddress からは引けない) */
 static const LiftEnt g_lifttab[SHX_LIFTTAB_N] = {
     { "ILFindLastID", 16, 0, th_ILFindLastID },
     { "ILRemoveLastID", 17, 0, th_ILRemoveLastID },
@@ -254,6 +261,12 @@ static const LiftEnt g_lifttab[SHX_LIFTTAB_N] = {
     { "SHCreateStdEnumFmtEtc", 74, 0, th_SHCreateStdEnumFmtEtc },
     { "SHCreateMemStream", 12, 2, th_SHCreateMemStream },
     { "QISearch", 219, 2, th_QISearch },
+    { "IDataObject.QueryInterface", 0, 3, th_IDO_QueryInterface },
+    { "IDataObject.AddRef", 0, 3, th_IDO_AddRef },
+    { "IDataObject.Release", 0, 3, th_IDO_Release },
+    { "IDataObject.GetData", 0, 3, th_IDO_GetData },
+    { "IDataObject.QueryGetData", 0, 3, th_IDO_QueryGetData },
+    { "IDataObject.NotImpl", 0, 3, th_IDO_NotImpl },
 };
 
 int shimx_lifttab_count(void) { return SHX_LIFTTAB_N; }

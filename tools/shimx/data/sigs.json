@@ -4708,6 +4708,16 @@
 ],
 "ret": "i32"
 },
+"shimx_drop_invoke": {
+"params": [
+"ptr",
+"i64",
+"i32",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
 "shimx_get_callback_translator": {
 "params": [],
 "ret": "ptr"
@@ -4729,6 +4739,13 @@
 ],
 "ret": "void"
 },
+"shimx_hdrop_bytes": {
+"params": [
+"i32",
+"ptr"
+],
+"ret": "ptr"
+},
 "shimx_hdrop_create": {
 "params": [
 "ptr",
@@ -4736,6 +4753,45 @@
 "i32",
 "i32",
 "i32"
+],
+"ret": "i32"
+},
+"shimx_ido_AddRef": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"shimx_ido_GetData": {
+"params": [
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"shimx_ido_NotImpl": {
+"params": [],
+"ret": "i32"
+},
+"shimx_ido_QueryGetData": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"shimx_ido_QueryInterface": {
+"params": [
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"shimx_ido_Release": {
+"params": [
+"ptr"
 ],
 "ret": "i32"
 },

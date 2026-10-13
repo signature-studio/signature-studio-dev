@@ -48,3 +48,9 @@ found 時は `out[0] = node.+0x28`、`out[1] = node.+0x30` (参照カウンタ�
 - (c) の vtable 配置 (`out[0]+0x10` が指す object の vtable 実体、`+0x50` の戻り先) は未読。
 - node を 1 つ構築した際の `0x180ca7db0` の返り値が設計どおりか (found の実測) は未実行。
 - 受入 2 以降 (Filter 出力変化の比較・DUMP idx 2・wasm ネガコン) は未着手。子 issue で扱う。
+
+## 6. FA-17 (#1207): wasm 側ネガティブコントロール (受入 4)
+
+- `native/ctrl_harness.mjs` に `FA_ALT9=1` (C+0x328 を C+0x2d0 と不一致にし静的分岐を強制) を追加。`run_fa9.sh` の判定ゲートに `(b-wasm)` を追加。
+- 実測 (`run_fa9.sh`, 同 commit): (a) base ERR=0・ca1480=72・path=map・found=0・da6c00=0 / (b) native alt ERR=8/8 path=static / (b-wasm) wasm alt ERR=8/8 / GATE: PASS / run_ctrl BIT-EXACT 15/15。
+- 非空 map (受入 1〜3) は未着手。found=0・da6c00=0 のまま (§4)。

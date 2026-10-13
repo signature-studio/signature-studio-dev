@@ -1,0 +1,3 @@
+# label=c59eea5c commit=59eea5c6 n=2
+# wasm = frozen snapshot work/ott_old/ld_wasm.wasm (素材 work-liftdiff 同梱)、ld_native は各 commit の rt/ から再ビルド
+OTT_SUMMARY {"functions": 212, "match": 38, "mismatch": 108, "unexec": 66, "defects": {"D1_indirect_call_drop": 4, "D2_short_global": 6, "D3_callsite_arg_drop": 14, "D4_D5_c_defined_ports": 18, "D6_body_layer": 26}, "ctor_18011d400": {"verdict": "mismatch", "tags": ["icall_drop", "callsite_arg_drop", "callee_divergence", "import_call_seq", "zero_init_drop", "fp_flag_unreflected"]}}
