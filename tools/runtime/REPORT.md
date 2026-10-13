@@ -89,7 +89,7 @@
 - **RT-3 (GUI)** `transferControlToOffscreen` → fl-runtime Worker 内描画、入力イベントを `PumpRing.push` へ (マウス移動 coalesce は producer 側)。`src/index.ts` の `?runtime=` フックと共存。
 - **RT-4 (audio)** worklet は ring 消費専用 (Atomics.wait 不可)。sample clock マスターと underrun 無音ポリシー、ring ABI 共有。
 - **RT-5 (VFS)** OPFS `createSyncAccessHandle` を第一候補、async 必須経路は JSPI または補助 Worker sync-RPC。
-- **RT-6 (plugin loader)** 同時ロード DLL <100 の予算管理 (遅延ロード/アンロード時の参照解放/小プラグイン統合) と 100+ ロードの負荷試験。
+- **RT-6 (plugin loader)** 同時ロード DLL <100 の予算管理 (遅延ロード/アンロード時の参照解放/小プラグイン統合) と 100+ ロードの負荷試験。**予算 + LRU プール + 負荷試験は実装済み** (下記「RT-6 実測」)。未了: 実プラグイン loader への接続・小プラグイン同居 (Refs #125)。
 - **RT-7 (deploy / M12)** R2: COOP/COEP/CORP 注入、wasm は同一オリジン、`Content-Encoding: br`、hash 名 immutable、`manifest.json` は no-cache。
 - **RT-8 (CI)** lift 成果物ごとに wasm32/wasm64 両ビルドを回し 4GiB 超仮定を早期検出。**OTT 分は実装済み** (`ci/wasm64_check.sh`、下記「RT-8 実測」)。未了: (a) M11 boot closure 等 OTT 以外の target (`ci/targets/<name>.sh` を足す方式)、(b) GitHub Actions への常設 (素材が R2 の work-* のため workflow 化には素材取得の設計が要る)。
 - **RT-9 (互換)** Firefox/Safari マトリクス取得と JSPI/memory64 の機能検出フォールバック設計。
@@ -121,3 +121,27 @@ python3 tools/runtime/bench/make_big_wasm.py <in.wasm> <out.wasm> <K> && node to
 - 実測 (GitHub runner 4 vCPU, emcc 6.0.12, load average 0.3–0.7): ビルド 2–3 s (32/64 並列)、`ott32.wasm` 659854 B / `ott64.wasm` 659327 B、全体 2.8 s。**PASS: wasm32/wasm64 とも `824c6c48,cdd4ee04`**。
 - ネガティブコントロール `--neg` (wasm64 側 IR の `fadd float`→`fsub float`): wasm64 が `4d7705c5,4d7705c5` となり不一致を検出 (`NEG-CONTROL OK`)。期待ハッシュを故意に変えると exit 1、未知 target は exit 2。
 - 既存ドライバ `bench/ott_driver.mjs` の `is64` は `memory.type()` (node 24 でも非対応) 依存で常に false → 検査では wasm バイナリの memory section を直接読む。
+
+## RT-6 実測 (Memory 個数予算 + LRU プール + 100+ ロード負荷試験, #125)
+既知類型との関係 (DEFECTS.md): 該当なし (lift 欠陥ではなくランタイム資源管理)。検証起点 commit `71b93a0`。
+- 実装: `src/runtime/memory_budget.ts` (`MemoryBudget` = SharedArrayBuffer 共有可の CAS 個数カウンタ、wasm64 は 1 Memory = 2 slot / `createBudgetedMemory` = 予約→生成、失敗で返却 / `PluginPool` = pin・unpin・LRU 追い出し・同一 id 同時 pin の dedup)。既定 capacity 96 (`DEFAULT_PLUGIN_CAPACITY`)。`pnpm typecheck` OK。
+- 再現: `pnpm runtime:memload` = `node tools/runtime/memload/run_memload.mjs [--pos-only|--neg-only]` (1 ケース = 新規 headless Chrome 154.0.8037.97 = 新規レンダラ。判定 NG または **ネガコンが検出されない** と exit 1)。
+- 実測 (GitHub runner 4 vCPU、コミット済み HEAD を `git worktree add --detach` で展開して 3 回、各 total 7.0 / 7.1 / 7.0 s、loadavg 1.6–3.1): **ALL PASS 3/3** (PASS 6 + NEG-OK 5)。
+  | ケース | 実測 (1 回分の代表値) |
+  |---|---|
+  | naive: 無予算で 300 instance | 125 個目で `RangeError: Out of memory: Cannot allocate Wasm memory` (instance 経由では 125、Memory 直生成は 124。許容 124±4) |
+  | pool_churn: 300 種・1500 pin (80% は 60 種に集中)・cap 96 | 例外 0・状態不一致 0・累計ロード 252 (>124)・追い出し 156・peakInUse 96 |
+  | pool_concurrent: 120 本 `Promise.all` 同時 pin (cap 120) | 全員の linear memory 内容が一致。121 本目は `MemoryBudgetExceeded` (RangeError でない)・枠リークなし。1 本 unpin 後は LRU 追い出しで 121 本目がロード可。同一 id 10 同時 pin は 1 ロード |
+  | create_fail_releases | 不正 descriptor で RangeError → 予約は返却 (inUse 1→0)、`release()` 二重呼びで負数にならない |
+  | cross_thread: main 60 + Worker | 共有カウンタ cap 120 で Worker は 60 個目で拒否 (deniedAt=60)、RangeError なし |
+  | wasm64: cap 120 | 60 本許可・10 本拒否、実 Memory 生成成功 |
+- **ネガティブコントロール** (全て FAIL を検出して NEG-OK): (1) `neg=leak` 追い出し後も instance 参照を保持 → 累計 125 ロードで OOM RangeError (pins 469/1500)。(2) pool_churn cap=130 (ネイティブ上限超) → OOM (pins 507/1500)。(3) pool_concurrent cap=130 → 121 本目が拒否されず `no-error`・inUse 121。(4) wasm64 cap=140 → 61 本許可後 RangeError (granted 61)。(5) cross_thread `budget=0` (Worker が予算を無視) → Worker が 65 個目で RangeError。
+- **実測で確定した事実**: (a) 参照を落とした Memory は回収される。1000 個作成→参照破棄→再作成で 124 個再び作れ、`--expose-gc` の有無で同値 (明示 GC 不要)。churn 1000 個 (保持なし) も例外 0。(b) 上限は main と Worker の合算 (main 60 + Worker 1 本目 64 → 計 124、2 本目 Worker は 0 個)。→ 個数予算は SharedArrayBuffer カウンタでスレッド間共有する必要がある。
+- 範囲外 / 検証範囲: Chrome 154 のみ (Firefox/Safari の上限は未測定)。Memory は 1 page (max 64MiB) の最小 wasm で、実 lifted DLL (OTT 等) のロードではない。pthread 共有 Memory・AudioWorklet 内の生成は未検証。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `PluginPool` を実プラグイン loader (hostbridge) へ接続し、実 DLL 100+ をロードする負荷試験 | 本試験は最小 wasm の代用。実 DLL 固有の初期化コスト・Memory 以外の資源 (Worker/Table) は未測 | #125 へコメント。親 #25 配下に新規子 issue `[RT-11]` を PM が起票 |
+| Kilohearts 47 stub 等の 1 wasm 同居 (prefix + base 割当 + CPU 状態分離。#91 REPORT §7) | pool で追い出せない常駐が 124 を超える場合の最終回避策。未実装 | #96 (HB-H7) に連携コメント |
+| Firefox / Safari の Memory 上限測定 | 予算値 96 は Chrome 実測のみに基づく | RT-9 (#127 系) へコメント |
+| 追い出し時の `dispose` で呼ぶプラグイン終了処理 (FL 側 state 保存) の仕様 | pool は dispose フックだけ提供 | #125 へコメント |
