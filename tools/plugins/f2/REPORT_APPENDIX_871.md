@@ -141,6 +141,13 @@ leaf_diff は IR leaf かつ機械語に間接 call 無しの 23 関数のみを
 - 指摘 3 (未解決 mismatch 6 関数の原因切り分け): 本 run で未着手。受入条件「各関数の未一致原因を 1 行で特定」は**未達**。PR を #871 の完了扱いにしない (部分達成として #871 に残す)。
 - 非ブロッキング (本文の「e2e 再実行」表記): 本 run の数値は 776e4155 で再測定したもの。nc_leaf と修正前後の遷移 (14/6/1/2) の再計算は、修正前の作業ツリー未再生成のため引用 (§10.4)。
 
+## 10.10 (#871 fix モード 7) HEAD `59b81ec5` での再測定 (素材付き・PR 指摘 4 への対応)
+- 測定 commit: `59b81ec5` (`e7a82d82` 以降のコード差分は 0。`git diff e7a82d82 HEAD -- tools/plugins/f2/mk_targets.py tools/plugins/f2/leaf_diff.sh tools/plugins/f2/f2_step1.sh tools/liftdiff tools/icall` は空)。
+- 素材: `fl-win64` `toolchain-retdec` `toolchain-emsdk` (`$ARTIFACTS_DIR` 実在を確認)。
+- `f2_step1.sh`: rc 0、624 s (10 分 24 秒)。開始時 load average 0.17。`DIFF count = 0`。
+- `leaf_diff.sh`: rc 0、149 s (2 分 29 秒)。開始時 load average (1 分 / 5 分) 5.03 / 10.90 (直前の f2_step1 の負荷)、スクリプト自身の記録 load 0.94。最終判定 一致 16 / 不一致 7 / 実行不能 0。集合一致 EQ、IR から call 脱落 0。
+- 0x5de250 (19006): 最終判定 mismatch (`memory_semantics`)。0x6f1650 (19059): match 11/11/11。
+
 ### 集計コマンド
 - 最終判定の抽出: `grep -E '^\| [0-9]+ \| [0-9]+ \|' <leaf_diff の stdout> | grep -c 'match'` 等で数える。関数単位の突き合わせは §10.4 の `python3` 集計 (base/head ログを一時領域で VA ごとに突き合わせ)。
 - 残 mismatch 7 = 不一致全体 (回帰 0x5de250 1 + 未解決 6)。残 6 = 回帰を除く。
