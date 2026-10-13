@@ -152,17 +152,20 @@ bash tools/targets/freshair/lift2/lift2_e2e.sh                                  
 - HEAD (`db279818`) の `work/ml/comp_full.ll` と `work/filter/filter.ll` に `icmp eq <16 x i8>` / `icmp eq <4 x i32>` は 0 件 (`icmp eq <8 x i16>` も 0 件)。
 - `run_comp.sh` / `run_filter.sh` の trap 版は未実施。
 
-## 7. FA-13 (#905): rep movs/stosw の実行到達 (実測, 2026-10-13, 検証 HEAD 863f3d3c)
+## 7. FA-13 (#905): rep movs/stosw の実行到達 (実測, 2026-10-13, 測定 HEAD 863f3d3c)
 
+- HEAD の対応: 測定は `863f3d3c` で行った。以後 `12146acf`・`a01812f9`・`15243d54` の差分は本ファイル (文書) のみで、コードは `863f3d3c` から不変 (`git diff --stat 863f3d3c 15243d54` で確認)。
 - 検証: worktree `ws-905` (branch `905-lift2-rep-movs-e2e`)。素材 `plugins-freshair` (`Fresh Air.Win.zip` に `SlateCore.core_64` と factory `.epf` 8 本) を `fetch.sh` で展開 (`FA_DL=$RUNNER_TEMP/pf`)。
 - `build_ctrl.sh`: exit 0, real 38.1 s。mlift は `lifted 1256 funcs`, `failed 1` (`f_1810577ac` の `vpcmpeqw ymm`、既知)。
 - 基準 `run_ctrl.sh 2 5` (trap 無し): **15/15 BIT-EXACT**, exit 0, real 4.3 s。
-- rep 出現箇所: `ctrl_full.ll` の `rep movs{b,w,d,q}` と `rep stosw` を正規表現で数えると 40 箇所 (`awk` 集計で 12 関数: f_1803e12c0・e2190・e2240・e2600・e2b50・e4ee0・e5070・e8b70・e95f0・fb860・fbb80・fdc70)。
-- ネガコン (40 箇所それぞれの直後に `llvm.trap`、emcc 再ビルド): `run_ctrl.sh 2 5` は **15/15 PASS**, exit 0。既定 seed の 15 シナリオでは rep 経路の 40 箇所は**いずれも実行されない**。
+- rep 出現箇所: `ctrl_full.ll` の `rep movs{b,w,d,q}` と `rep stosw` を数えたとされる結果が 40 箇所 (12 関数: f_1803e12c0・e2190・e2240・e2600・e2b50・e4ee0・e5070・e8b70・e95f0・fb860・fbb80・fdc70)。使ったコマンド・正規表現の全文・命令別内訳は記録されていない (本 run では再計測不可)。
+- 件数の不整合 (未解決): PM 中間コメント (#905, 18:08) は「movsb 39 + stosw 6 = 45 件」。同一集合・同一正規表現なら、movsb 単独 39 件は全体の内数であり、stosw 6 件を足すと合計は 45 件を超えるため、40 件とは両立しない。行数と出現数の違い、対象ファイルの違い、数え方の誤りのいずれかであり、どちらが正しいかは未判定。次回測定で記録すべき項目: 実行コマンド全文、命令別 (movsb / movsw / movsd / movsq / stosw) の出現数、行数と出現数の区別。
+- ネガコン (40 箇所それぞれの直後に `llvm.trap`、emcc 再ビルド): `run_ctrl.sh 2 5` は **15/15 PASS**, exit 0。既定 seed の 15 シナリオでは rep 経路の 40 箇所は**いずれも実行されない**。ただし挿入後の `ctrl_full.ll` の `llvm.trap` 件数は未計数で、期待値との一致は未確認。陽性対照 (既到達関数先頭への trap で FAIL) も未実施。「15/15 PASS = 未到達」は未検証のネガコン結果に基づく推定。
 - 探索 seed (`2 40 0xFA2C0001`, `10 60 0xFA2C0002`) は trap 版でも trap 無し版でも同じ形で **MISMATCH** (wasm 側 0 行)。trap 版と trap 無し版で同一の結果のため、rep 経路の到達判定には使えない (既知限界の乱数 OOB と同根と推定。根拠となる節・issue は未特定)。
 - 元に戻した後、`ctrl_full.ll` の sha256 が挿入前と一致 (`dadbc54b…`)、`.cjs` は `cmp` で一致。`git status` は clean。
 - 未確認 (本 HEAD で再計測できていない): 上記 40 箇所の件数は、#905 の PM 中間コメント (18:08) の「movsb 39 + stosw 6 = 45 件」と食い違う。数え方 (正規表現・命令別内訳) は未記録。陽性対照 (`llvm.trap` 件数 grep・既到達関数先頭への trap で FAIL) も本 run では未実施。素材 `plugins-freshair` が取得できず `ctrl_full.ll` を再生成できなかったため。
-- 結論: 受入 1 (実行到達 scenario) は**未達**。既存入力では rep 経路に届かない可能性が高いが、上記の未確認項目があるため「届かない」とは断定しない。受入 2 (ネガコン FAIL) は届かないため判定不能。残りは #692 で扱う。
+- 結論: 受入 1 (実行到達 scenario) は**未達**。既存入力では rep 経路に届かない可能性が高いが、陽性対照が無いため「届かない」とは断定しない。受入 2 (ネガコン FAIL) は判定不能。残りは #692 で扱う。
+- 再測定に必要な素材: `plugins-freshair` (`oc_artifacts: fl-win64 plugins-freshair` を PR 本文に記載して再起動)。本 run の `$ARTIFACTS_DIR` には `fl-win64.tar.zst` のみ実在し、`fl-win64` 内に freshair 系の entry は 0 件 (`tar --zstd -tf` で確認)。
 
 ## 未解決 (起票先 #692)
 - 新 lowering `pcmpeq{b,d}` の comp / filter 経路の動的確認 (trap 版の `run_comp` / `run_filter`)。
