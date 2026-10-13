@@ -70,7 +70,7 @@ bash tools/gui/e2e.sh                              # 全体 (PE lift を含む);
 ## 14. GUI-5 (#181) 続き: e2e.sh 全体と wasm shim 全体の SIMD/scalar 比較
 
 既知類型との関係: lift 欠陥ではなく shim の意味論 (§10 の同一サーフェス複数クリップ欠陥は `docs/DEFECTS.md` D18 に登録)。
-検証起点: 旧 HEAD `1f20ec7` (main `8d883c3` 取り込み後) の実測に続き、現 main (`origin/main`) を取り込んだ merge commit `ea7a538` で e2e と wbench を取り直した (本節の最終値)。本 PR は main に対して `tools/gui/src`・`include` を変えていない (`git diff origin/main HEAD -- tools/gui/src tools/gui/include` が空)。差分は `wbench.sh` / `wbench_shim.c` の新設・`REPORT.md` の番号整理・`DOC_MAP.md` / `DEFECTS.md` / `AGENTS.md` / `WORKFLOW.md` の D18 表記。runner 4 CPU、`[EMSDK]`・`[RETDEC]`、mingw-w64 GCC 13 (apt `gcc-mingw-w64-x86-64`)、`fl-win64` を `$RUNNER_TEMP/fl-win64/extracted` に展開。
+検証起点: 現 HEAD `b44ddcd` (本 PR の present/e2e.sh 集計 grep 修正を含む) で e2e と wbench を実測した (本節の最終値)。`ea7a538` は main 取り込み前の実測。本 PR は main に対して `tools/gui/src`・`include` を変えていない (`git diff origin/main HEAD -- tools/gui/src tools/gui/include` が空)。差分は `wbench.sh` / `wbench_shim.c` の新設・`REPORT.md` の番号整理・`DOC_MAP.md` / `DEFECTS.md` / `AGENTS.md` / `WORKFLOW.md` の D18 表記。runner 4 CPU、`[EMSDK]`・`[RETDEC]`、mingw-w64 GCC 13 (apt `gcc-mingw-w64-x86-64`)、`fl-win64` を `$RUNNER_TEMP/fl-win64/extracted` に展開。
 
 ### 1. `bash tools/gui/e2e.sh` (RetDec 付き・全層)
 
@@ -85,11 +85,13 @@ bash tools/gui/e2e.sh                              # 全体 (PE lift を含む);
 | `1f20ec7` | run1 | 検証 subagent | 0 | 173 s | 0.11 → 1.71 | 426 passed |
 | `1f20ec7` | run2 | 検証 subagent | 0 | 102 s | 1.33 → 1.44 | 426 passed |
 | `ea7a538` | (環境不備) | 検証 subagent | 127 | 165 s | 0.47 → 2.90 | 5/6 `tools/gui/e2e.sh` が `node_modules/.bin/tsc` 不在で停止 (worktree に依存未導入。`pnpm install --frozen-lockfile` で解消; 不計上) |
-| `ea7a538` | **run3 (最終)** | 検証 subagent | **0** | **104 s** | 2.81 → 2.18 | 428 passed (ALL PASS) |
+| `ea7a538` | run3 | 検証 subagent | 0 | 104 s | 2.81 → 2.18 | 428 passed (ALL PASS) |
+| `b44ddcd` | **現 HEAD (最終)** | 本 run (fix モード) | **0** | **99 s** | 0.75 → 1.11 | 428 passed (ALL PASS)。ASan 0 件 |
+| `b44ddcd` | 直前 (修正前 `a440fe9`) | 本 run | 1 | 27 s / 109 s | — | 1c0/6 は通過。6f/6 の `node --test` 集計 grep が 0 行で rc=1 (`present/e2e.sh` の不具合。`b44ddcd` で修正。`present/e2e.sh` 単体は修正後 rc=0) |
 
-- **結論**: 最終 HEAD `ea7a538` で rc=0・ALL PASS (1 回)。
-- **ただし解消ではない**: 1/6 に到達した有効 7 回中 2 回 (T1・R2) が ASan UAF で rc=1 になった。既存の race (#489 `[GUI-12]`)。`ea7a538` の 1 回は発火していない。`src` は main 取り込み後も本 PR で変えていない。「ALL PASS」を受入とみなすかは PM 判断。
-- **現 HEAD は未実測**: main 取り込み (`2e96a86`) で `tools/gui/src/gui_ft_wasm.c` (+34) と `include/gui_hostcall.h` が入ったため、`ea7a538` の値は現 HEAD の値ではない。現 HEAD の e2e・wbench は本 run では未実施 (試行表には載せない)。理由: 検証 run に emcc・`[EMSDK]`・`[RETDEC]`・mingw が無く、`$ARTIFACTS_DIR` は `fl-win64` のみ。`oc_artifacts: toolchain-emsdk toolchain-retdec` での再実行を PR 本文で依頼する。
+- **結論**: 現 HEAD `b44ddcd` で rc=0・ALL PASS (1 回)。1/6 selftest は 428 passed / 0 failed、ASan UAF は 0 件。
+- **ただし解消ではない**: 1/6 に到達した有効 7 回中 2 回 (T1・R2) が ASan UAF で rc=1 になった。既存の race (#489 `[GUI-12]`)。現 HEAD の 1 回は発火していない。「ALL PASS」を受入とみなすかは PM 判断。
+- 現 HEAD の素材: `toolchain-emsdk` を `/opt/emsdk`、`toolchain-retdec` を `/opt/retdec` に展開。mingw は apt `gcc-mingw-w64-x86-64`。`emsdk_env.sh` は `emcc` を PATH に出さなかったため `PATH=/opt/emsdk/upstream/emscripten:/opt/emsdk/upstream/bin:/opt/emsdk/node/24.19.0_64bit/bin` を直接指定した。`fl-win64.tar.zst` は本 run の `$ARTIFACTS_DIR` に無く未展開 (e2e の step 3 は `test/gui_app.c` を使い fl-win64 を要さないため影響なし)。
 - 層ごとの結果 (run3 `ea7a538`):
 
 | 層 | 結果 (`ea7a538`) |
@@ -105,27 +107,27 @@ bash tools/gui/e2e.sh                              # 全体 (PE lift を含む);
 
 ### 2. wasm 全体 (shim の API 単位) の SIMD128 / scalar: `bash tools/gui/test/wbench.sh 5`
 
-最終 HEAD `ea7a538` で 1 回 (wall 18 s, load 1.91 → 1.65)。同一 `test/bench.c` を `-msimd128` / `-DGUI_NO_SIMD` で emcc ビルドし交互に 5 回ずつ (n=5, min–max ms/frame, 1920x1080, node v22.23.3)。最終 wasm の v128 系命令は simd=708 / scalar=0 (取り違えは exit 1)。`min 比` = scalar の最小 / simd の最小。
+現 HEAD `b44ddcd` で 1 回 (wall 19 s, load 1.02 → 1.02)。同一 `test/bench.c` を `-msimd128` / `-DGUI_NO_SIMD` で emcc ビルドし交互に 5 回ずつ (n=5, min–max ms/frame, 1920x1080, node v24.19.0)。最終 wasm の v128 系命令は simd=708 / scalar=0 (取り違えは exit 1)。`min 比` = scalar の最小 / simd の最小。
 
 | API | scalar | simd128 | min 比 |
 |---|---|---|---|
-| BitBlt SRCCOPY mem→mem (memmove) | 0.40–0.47 | 0.40–0.67 | 1.00x |
-| BitBlt SRCCOPY mem→window | 0.30–0.37 | 0.30–0.37 | 1.00x |
-| BitBlt SRCINVERT (per-pixel) | 3.00–3.33 | 0.47–0.70 | 6.38x |
-| BitBlt SRCPAINT (per-pixel) | 3.27–3.30 | 0.37–0.37 | 8.84x |
-| StretchBlt 2x nearest | 1.57–1.60 | 0.53–0.77 | 2.96x |
-| StretchDIBits 1:1 (32bpp, per-pixel) | 1.07–1.13 | 0.43–0.50 | 2.49x |
-| StretchDIBits 24bpp 1:1 | 2.77–2.83 | 2.03–2.03 | 1.36x |
-| StretchDIBits 8bpp 1:1 | 2.17–2.30 | 1.40–1.43 | 1.55x |
-| AlphaBlend per-pixel α (sca=128) | 14.47–14.87 | 2.03–2.07 | 7.13x |
-| AlphaBlend 定数 α (sca=128) | 14.30–14.47 | 1.50–1.53 | 9.53x |
-| BitBlt SRCCOPY from 24bpp DIB section | 2.33–2.40 | 2.30–2.33 | 1.01x |
-| BitBlt SRCCOPY into 24bpp DIB section | 3.93–4.07 | 4.27–4.47 | 0.92x |
-| FillRect solid | 0.40–0.43 | 0.27–0.27 | 1.48x |
-| BitBlt → window + present (headless) | 0.30–0.33 | 0.27–0.37 | 1.11x |
+| BitBlt SRCCOPY mem→mem (memmove) | 0.33–0.47 | 0.37–0.43 | 0.89x |
+| BitBlt SRCCOPY mem→window | 0.27–0.40 | 0.27–0.37 | 1.00x |
+| BitBlt SRCINVERT (per-pixel) | 3.30–3.63 | 0.53–0.63 | 6.23x |
+| BitBlt SRCPAINT (per-pixel) | 3.93–4.07 | 0.43–0.57 | 9.14x |
+| StretchBlt 2x nearest | 1.57–1.63 | 0.60–0.67 | 2.62x |
+| StretchDIBits 1:1 (32bpp, per-pixel) | 1.03–1.10 | 0.50–0.50 | 2.06x |
+| StretchDIBits 24bpp 1:1 | 2.63–2.70 | 2.30–2.70 | 1.14x |
+| StretchDIBits 8bpp 1:1 | 2.13–2.17 | 1.50–1.57 | 1.42x |
+| AlphaBlend per-pixel α (sca=128) | 14.77–15.07 | 3.23–3.30 | 4.57x |
+| AlphaBlend 定数 α (sca=128) | 14.60–14.70 | 2.93–2.97 | 4.98x |
+| BitBlt SRCCOPY from 24bpp DIB section | 2.17–2.23 | 2.43–2.50 | 0.89x |
+| BitBlt SRCCOPY into 24bpp DIB section | 3.80–3.90 | 4.40–4.47 | 0.86x |
+| FillRect solid | 0.37–0.43 | 0.27–0.30 | 1.37x |
+| BitBlt → window + present (headless) | 0.27–0.37 | 0.27–0.33 | 1.00x |
 
 - SRCCOPY・24bpp 先・DIB 源・present の行は SIMD の対象外か pull/push が支配的で、1.0x 付近 (範囲が重なる誤差内)。
-- 1 回の測定のため、min 比の小数第 2 位は揺れる。`1f20ec7` 時点の別 run では AlphaBlend 7.2〜9.9x・SRCINVERT 6.4x・SRCPAINT 10.0x で同水準。
+- 1 回の測定のため、min 比の小数第 2 位は揺れる。`ea7a538` 時点の値 (AlphaBlend 7.13x・9.53x、SRCINVERT 6.38x、SRCPAINT 8.84x) とも同水準だが、AlphaBlend の値は実行ごとに 4.6x〜9.5x と揺れる。
 - 画素一致は §10 と本付録 §1 の 1c/6 が担い、本 bench は時間のみ。
 - **未取得**: Chrome 上の lift 済みアプリでの API 単位 frame time。`gui_app.c` は 320x200 の静的シーンで、e2e の bench は renderer 側 (変換 + putImageData) のみを測るため shim の時間を分離できない。実 FL (#174) 到達後に取る。
 
@@ -140,6 +142,6 @@ bash tools/gui/e2e.sh                              # 全体 (PE lift を含む);
 ### 4. 再現
 
 ```
-bash tools/gui/e2e.sh             # 全層 (ea7a538: 104 s)。前提: x86_64-w64-mingw32-gcc、RetDec、emsdk、node_modules (pnpm install)、FL_WIN64_DIR
-bash tools/gui/test/wbench.sh 5   # wasm SIMD/scalar の API 単位比較 (ea7a538: 18 s)
+bash tools/gui/e2e.sh             # 全層 (b44ddcd: 99 s)。前提: x86_64-w64-mingw32-gcc、RetDec、emsdk (emcc を PATH に)、node_modules (pnpm install)
+bash tools/gui/test/wbench.sh 5   # wasm SIMD/scalar の API 単位比較 (b44ddcd: 19 s)
 ```
