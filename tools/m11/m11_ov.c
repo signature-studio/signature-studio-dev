@@ -383,6 +383,24 @@ u64 function_5c0270(u64 self, u64 node) {
     return 0;
 }
 
+/* function_5c03d0  VA 0x5c03d0  (参照カウント付きキャッシュ node の差替え: self = キャッシュ, obj = node を +0x18 に持つ所有オブジェクト, key = 検索キー)
+ * 逆アセンブル転記 (5c03d0..5c0463; 5c0470.. は finally 用ハンドラ). 5c0270 / 5c00e0 の呼出し元.
+ *   Lock(self+0x10); old := obj[+0x18]; node := 5c00e0(self, key); obj[+0x18] := node;
+ *   if node <> old then obj.vmt[+0x18](obj)   -- 5c0437 `call [rbx+0x18]` (rcx = obj, rbx = [obj]); node 差替え通知
+ *   5c0270(self, old); Unlock(self+0x10)
+ * RetDec は `cmp rax,[old]; je` ごと `call [rbx+0x18]` を落とした (D15, #482): IR は 5c00e0 → 格納 → 5c0270 を無条件に直列化するだけ.
+ * 通知先は obj の VMT スロット (+0x18) をそのまま m11_icall で解決する (closure 外なら miss = skip, ret 0). */
+u64 function_5c03d0(u64 self, u64 obj, u64 key) {
+    function_4232e0((void*)(uintptr_t)(self + 0x10));
+    u64 old = Q(obj + 0x18);
+    u64 node = function_5c00e0(self, key);
+    Q(obj + 0x18) = node;
+    if (node != old) m11_icall(Q(Q(obj) + 0x18), obj, 0, 0, 0, 0, 0, 0, 0);
+    function_5c0270(self, old);
+    function_423980((void*)(uintptr_t)(self + 0x10));
+    return 0;
+}
+
 /* function_409470  VA 0x409470  (System.ReallocMem(var P: Pointer; NewSize: NativeInt): Pointer)
  * 逆アセンブル (boot0.drc.dsm 409470..4094e6) から転記. RetDec は `cmp [rbx],0` / `mov rcx,[rbx]` の 1 段 deref (*P) を落とし,
  * P 自体 (変数のアドレス) を旧ブロックとして扱った (#418). */
