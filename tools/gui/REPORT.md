@@ -160,7 +160,7 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
 ### 範囲外・未達
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-`bash tools/gui/e2e.sh` 全体 ALL PASS → 付録 §15 で実測。現 HEAD `b44ddcd` で ALL PASS (rc=0, 99 s, 1 回)。ただし 1/6 の ASan UAF が同 src 群の 7 回中 2 回で発火し解消ではない | 受入扱いは PM 判断 | #489 `[GUI-12]` (既存)・PM |
+`bash tools/gui/e2e.sh` 全体 ALL PASS → 付録 §15 で実測。現 HEAD `e11701db` で ALL PASS (rc=0, 188 s, 1 回)。1/6 の selftest は同 HEAD で 20 回連続 PASS (ASan 0 件)。修正前 src では 7 回中 2 回発火 | 修正後の e2e 全体は 1 回のみ。受入扱いは PM 判断 | #489 `[GUI-12]` (既存)・PM |
 | 実 FLEngine が要求する bpp/ROP の確定 (GUI-3 #174 の到達ログ待ち)・16bpp DIB・DIB_PAL_COLORS・`CreateBitmap` 4/8/16bpp の初期 bits・RLE/JPEG/PNG 圧縮 DIB | 実 FL が要求したら fail-fast で止まる (理由付き) | #174 到達後に #181 へ追記 |
 | Chrome 上の lift 済みアプリ込みの API 単位 frame time → §15 (wasm shim 全体は取得済み。Chrome 上のアプリ込みは未取得、理由は §15) | — | #181 |
 | mono / パレットの色写像の実 Windows との照合 (近似) | 色が実機と数階調ずれる可能性 | #181 (実機比較はユーザ依頼候補) |
@@ -188,7 +188,7 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
 | `bpp_golden.sh` / `reach_test.sh` (`31bcd9a`) | ALL PASS / reach 11 + adapt 28 passed (reach_test 内の selftest も 428 passed) |
 
 - **ネガコン**: `-DGUI12_NEGCTL_IMMEDIATE_FREE` (retire を即 free に戻す。`gui12_race.sh` だけが定義) で UAF 30/30。新 stress 節は確率的競合を決定論的に近づけるため、修正前より再現率が高い (修正前 2/30 → ネガコン 30/30)。
-- **範囲外**: `native_e2e.sh` / `e2e.sh` 全体は `/opt/retdec` 不在で未実行 (検証 run の素材は `fl-win64` と apt の mingw のみ)。`emcc -c gui_core.c` は `/opt/emsdk` 不在で `31bcd9a` では未再実行 (`6e6c9b7` 時点では OK)。Chrome E2E (wasm 経路) も未実行 (本変更は native headless の読み出しと shim 側 free 遅延のみ; wasm でも `SurfSnap` は同じコードが走るため要再確認)。
+- **範囲外**: `native_e2e.sh` / `e2e.sh` 全体は `[RETDEC]` 不在で未実行 (検証 run の素材は `fl-win64` と apt の mingw のみ)。`emcc -c gui_core.c` は `[EMSDK]` 不在で `31bcd9a` では未再実行 (`6e6c9b7` 時点では OK)。Chrome E2E (wasm 経路) も未実行 (本変更は native headless の読み出しと shim 側 free 遅延のみ; wasm でも `SurfSnap` は同じコードが走るため要再確認)。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
@@ -219,4 +219,4 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
 
 ## 15. GUI-5 (#181) 続き: e2e.sh 全体 ALL PASS と wasm shim 全体の SIMD/scalar 比較
 
-本文は `REPORT_APPENDIX.md` §15 (250 行上限による分割)。結論 (現 HEAD `b44ddcd`): RetDec 付き `bash tools/gui/e2e.sh` は ALL PASS (rc=0, 99 s, 1 回)。ただし 1/6 の ASan UAF (#489) は有効 7 回中 2 回で発火しており解消ではない。wbench (`bash tools/gui/test/wbench.sh 5`): v128 simd=708 / scalar=0 (測定値は付録 §15 §2)。
+本文は `REPORT_APPENDIX.md` §15 (250 行上限による分割)。結論 (現 HEAD `e11701db`): RetDec 付き `bash tools/gui/e2e.sh` は ALL PASS (rc=0, 188 s, 1 回)。1/6 selftest は 20 回連続 PASS (ASan 0 件)。修正前 src の有効 7 回中 2 回の UAF (#489) は、修正後の連続試行で発火していない。wbench (`bash tools/gui/test/wbench.sh 5`): rc=0, 20 s, v128 simd=831 / scalar=0 (測定値は付録 §15 §2)。
