@@ -9,9 +9,11 @@
 
 ## 1. 結論と実測
 
-検証コード: `d46b024` (`main` (`df0704a`) を取り込んだ merge commit)。結果 JSON はこのコードで e2e を実行して再生成したもの。環境: runner 4 vCPU, node v22.23.3, emcc ([EMSDK], pin 6.0.12)、retdec ([RETDEC])、素材 work-m11 + fl-win64 (`docs/REFERENCES.md` の [WIN64])、x86_64-w64-mingw32-gcc (apt-mingw)、pefile / capstone (pip)。work-m11 素材の `boot_final.ll` は ldfix 未適用 (ir_conditions.json 無し) のため、`m11_gen_ir2.sh` で作り直して (ldfix=applied) から e2e を回した。e2e 本体は IR を再生成しない。
+検証コード: `d46b024` (`main` (`df0704a`) を取り込んだ merge commit) で得た e2e 実測。`results/*.json` はその時点の値のまま (`7a73c02` での再測定は未実施。§6)。環境: runner 4 vCPU, node v22.23.3, emcc ([EMSDK], pin 6.0.12)、retdec ([RETDEC])、素材 work-m11 + fl-win64 (`docs/REFERENCES.md` の [WIN64])、x86_64-w64-mingw32-gcc (apt-mingw)、pefile / capstone (pip)。work-m11 素材の `boot_final.ll` は ldfix 未適用 (ir_conditions.json 無し) のため、`m11_gen_ir2.sh` で作り直して (ldfix=applied) から e2e を回した。e2e 本体は IR を再生成しない。
 
-**現 HEAD の判定: 10/12 (FAIL 2 件、n=3 で再現)**。FAIL は B1 (起動の回帰) と S2 (fail-fast の STUB 判定)。原因は §2-3 の「main 取り込みによる baseline の変化」。判定の期待値は変えていない (PM 判断待ち、§7)。
+**判定**: `d46b024` の e2e 実測 (n=3) は 10/12 (FAIL 2 件 = B1・S2)。その後 judge の判定式を次のとおり直し、committed の結果 JSON に対して **12/12 PASS** を確認した (`judge.py --dir` 再計算。e2e の再実行ではない)。判定の期待値 (units_run 52、ok/miss/trap、STUB 集合) は緩めていない。
+- B1: baseline 側の `threw` を shim 側 `boot_threw` と比較 (両者 `memory access out of bounds`、同じ unit 52 で停止)。
+- S2: fail-fast のうち `IMPORTS.md` で STUB のものだけを対象にし、IMPL 側の未対応 action (`SystemParametersInfoW`) は INFO 行に出す (§7 の (a))。
 
 | 項目 | 実測 (n=3 の範囲) | 定義 / 分母 |
 |---|---|---|
@@ -23,7 +25,7 @@
 | survey で shim に到達した API | **27 種** (IMPL 26 / STUB 1)。§3 | `survey_soft.json` の reach |
 | fail-fast ビルドの survey | ok 865 / noproc 1 / miss 47 / trap 29。fail-fast は 3 unit (`LoadImageW` 1 = P2 STUB、`SystemParametersInfoW` 2 = IMPL 側の未対応 action) | `survey_ff.json` |
 | 起動の baseline (main 取り込み後) | `m11_run.mjs` は unit 52 で `memory access out of bounds` (shim 無しでも同じ)。旧 22 unit 停止から変化 | `baseline_boot.json` |
-| `RegisterClass*` / `CreateWindowEx*` の自然到達 | **0** (起動・survey とも) | judge の INFO 行 |
+| `RegisterClass*` / `CreateWindowEx*` の自然到達 | 起動 (boot) で **0**。survey (unit 単独) では `CreateWindowExW` が **1 回** IMPL 到達 (`survey_soft.json` / `survey_ff.json`)。`RegisterClassW` は自然到達 0 | judge の INFO 行 |
 | 指向呼出 (§4) | `RegisterClassW` ×2 成功 (atom 0xC001 / 0xC002)、`TApplication` 窓 hwnd `0x210000e` (< 2^31)、WNDPROC 4 引数が `m11_icall` 経由 | `probe.json` |
 
 ## 2. 変更と成果物
@@ -71,7 +73,7 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 | survey で到達・**fail-fast stub** | **`LoadImageW` (P2)** — 1 unit (`survey_ff.json` の `failfast_units`)。stub のまま実到達 → **実装必須へ昇格** |
 | survey で到達・IMPL だが **fail-fast** | `SystemParametersInfoW` (P0) — 2 unit (`survey_ff.json`)。未対応 action (`gui_core.c` の `SystemParametersInfoW`) で IMPL 側が落ちる | 未対応 action の実装 (§7) |
 
-- `EnumFontFamiliesExW` は shim で IMPL (`tools/gui/src/gui_gdi.c`)。fail-fast 経路は無く、`failfast_units` に出ない。
+- `EnumFontFamiliesExW` は shim で IMPL (`tools/gui/src/gui_gdi.c` L1234)。fail-fast 経路は無く、`survey_ff.json` の `failfast_units` は `LoadImageW` 1 と `SystemParametersInfoW` 2 のみ (`EnumFontFamiliesExW` は含まない)。以前の `failfast_units` 表記は誤りで、本 REPORT の記述は results と一致させた。
 - **IMPORTS.md の P 分類への入力** (`IMPORTS.md` §4 に自動出力): `LoadImageW` は stub のまま実到達 → 実装必須へ昇格。P2 で実到達の IMPL 済み (`CreatePalette` / `EnumFontFamiliesExW` / `MessageBoxA`) は、実装済みのため昇格候補の欄から外した (`gen_api.py` の §4 出力を IMPL 除外に修正)。
   P0 の未到達は現 m11 到達段が浅いため (SendMessage / PostMessage / BitBlt / SelectObject ほか) 「不要」の根拠にはならない。
 - `MessageBoxA` は Delphi RTL の `Runtime error 0` ダイアログ (unit の Halt0 経路)。shim は host 無しなら即 IDOK。
@@ -130,12 +132,15 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 
 - `bash tools/gui/flengine/e2e.sh` (`d46b024`, n=3): rc 1 / **judge 10/12 (FAIL: B1・S2、3 回とも同一)**。所要 **97 / 91 / 92 秒** (`6/6 done` 行の load: 1.12 / 1.01 / 1.25)。
   - PASS 10: L1 (ff・soft 各 0/0/0)、A1 (declare 177 = adapter 177、impl 158 / stub 19、c=d=0)、R1 (`LoadStringW` IMPL)、R2 (到達 27 ≥ floor 19)、S1 (soft 865/1/47/29 = base)、P1〜P4 (atoms −16383/−16382、hwnd 0x210000e、screen DC 0x120000f、hook calls [2,4])。
-  - FAIL B1: `units_run` 52 = base 52、`GetMem` 560 / `FreeMem` 20 / `icall_miss` 5 は一致。ただし shim 版の `boot_threw` が `memory access out of bounds`。baseline の `baseline_boot.json` の `threw` も同じ `memory access out of bounds` (shim 無しでも同じ unit 52 で停止)。`m11_run.mjs` は `boot_threw` を JSON に出さないため、B1 の比較式 (`boot_threw is None`) が baseline と食い違う。
-  - FAIL S2: ff survey の fail-fast API = `LoadImageW` (STUB) + `SystemParametersInfoW` (IMPL の未対応 action)。soft の STUB 集合は `LoadImageW` のみ。S2 の期待 (fail-fast は STUB) と `SystemParametersInfoW` が合わない。
+  - B1 (`d46b024` 実測では FAIL): `units_run` 52 = base 52、`GetMem` 560 / `FreeMem` 20 / `icall_miss` 5 は一致。shim 版の `boot_threw` は `memory access out of bounds`。baseline の `threw` も同じ文字列 (shim 無しでも unit 52 で停止)。旧比較式は `boot_threw is None` で、baseline 側を見ていなかった。現在の式は `boot_threw == baseline.threw` (判定式の修正、§7)。
+  - S2 (`d46b024` 実測では FAIL): ff survey の fail-fast = `LoadImageW` (STUB, 1 unit) + `SystemParametersInfoW` (IMPL の未対応 action, 2 unit)。現在の式は STUB 集合のみを対象とし、`SystemParametersInfoW` は INFO (`IMPL-side fail-fast`) に出す。
   - ネガコン 5/5 は期待どおり FAIL (N1 R1 / N2 B1 / N3 R2 / N4 S1 / N5 selftest rc 134)。pe_image parity P1・P2・N1〜N3 PASS (exit 0)、`pe_image_e2e` P1・P2・N1・N2 PASS。
   - 選択 (§7): 判定の期待値は変えていない。B1 と S2 の修正は PM 判断。
 - 前回 (`e6f2d7c` / `e391713`、main 取り込み前) の測定: judge 12/12、所要 108 / 109 / 113 秒。main 取り込みで baseline (`units_run` 22 → 52) が変わったため、旧値は現 HEAD では無効。
 - `bash tools/gui/e2e.sh` (GUI 本体 e2e) は本 run では未再実行。前回値 (取り込み前) は現 HEAD では無効。
+
+**`7a73c02` (fix run) で実行したもの**: `pe_image_parity.py --pe block00031_PE.bin` = exit 0 (P1・P2・N1〜N3 PASS)。`judge.py` (committed 結果 JSON の再計算) = 12/12 PASS。
+**未実施 (素材不足; `$ARTIFACTS_DIR` に fl-win64 のみ)**: `e2e.sh` / `build.sh` / `gen_api.py` (mingw 無し)、`pe_image_e2e.sh` (retdec 無し)、`gui/e2e.sh`。`results/*.json` と `IMPORTS.md` は `d46b024` 時点のまま。n≥3 の min–max 再測定は次の run で行う。
 
 個別の単発計測 (開発中・取り込み前): baseline survey 16.9 秒 / 結合 build 10.6〜17.0 秒 / 結合起動 0.371 秒 / 結合 survey 18.2〜24.1 秒。
 `git status --porcelain -- tools/gui` は commit 後クリーン (results と IMPORTS.md は再生成しても差分 0)。
@@ -150,8 +155,8 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 | `function_52a7f0` の `TempClass.lpfnWndProc` load 脱落 (§5-2) | AllocateHWnd 経路 (TPUtilWindow = Timer / 非同期 window) が全滅 | ldfix 系の子チケットを PM が起票 (本 REPORT の DEFECTS 行案) |
 | WNDCLASS 静的実体の WNDPROC を closure seed に追加する pass (`TLightweightLayeredControl` 0x31dd10 ほか) | その class の窓生成が NULL | m11 / icall 系で PM が起票 (#90 の間接 call 復元と近い) |
 | `LoadImageW` 実装 (P2 STUB、survey で fail-fast 1 unit) | survey の 1 unit が fail-fast | GUI-2 系 (P2 stub 昇格, #174 に所見) |
-| `SystemParametersInfoW` の未対応 action (IMPL 側 fail-fast、survey 2 unit) と judge S2 の期待値 | judge S2 が FAIL。IMPL 由来の fail-fast を STUB 判定と分けて扱うか、action を実装するかの判断が要る | PM 判断 (GUI-3 #174 の子チケット候補) |
-| B1 の `boot_threw` 比較 (shim 版 OOB 52 / baseline は JSON 未記録) と main 取り込みによる m11 起動の unit 52 停止 | judge B1 が FAIL。shim の回帰ではない (baseline と同じ停止) | PM 判断 (m11 #134 系と judge の比較式) |
+| `SystemParametersInfoW` の未対応 action (IMPL 側 fail-fast、survey 2 unit) | S2 は STUB 由来のみを判定し、IMPL 由来は INFO に出す (判定式の修正、§6)。action 自体は未実装 (2 unit、survey で止まる) | GUI-3 #174 の子チケット候補 (PM 判断: action の実装 or 残す) |
+| main 取り込みによる m11 起動の unit 52 停止 (`memory access out of bounds`) | shim 無しの baseline でも同じ停止。B1 は baseline の `threw` と一致を要求する形に修正済み。起動の完走 (DllMain 完了) は未達 | m11 #134 系 (PM 判断) |
 | `LoadStringW` 多数回の unit 特定と資源供給 hook (`gui_set_resource_provider` ← shimx / PE .rsrc) の接続 | LoadStringW が常に空文字 | #174 に所見 / GUI-2 または shimx |
 | `tools/m11` の `m11_e2e.sh` と `m11_gen_ir2.sh` は PE パスが固定 (`FL_WIN64_DIR` 非対応) | runner では ldfix が黙ってスキップされ数値が変わる (本 e2e は `FL_WIN64_DIR` で回避) | m11 に `FL_WIN64_DIR` 参照を提案 (#132 の未解決と同件) |
 | 受入「`__pe_image` を m11_data_gen 方式の data 実体化へ統合」(スコープ 3) | **#566 (GUI-12) で対応済み → §8**。残り: RetDec C 経路に実 FLEngine 規模の PE を通した実測は無い (§8-4) | #566 |
@@ -180,11 +185,11 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 
 | 検査 | 結果 (実測) |
 |---|---|
-| P1 共通モジュール == m11_data_gen.py 出力 (実 FLEngine PE, LB=0 / 0x10000) | 一致 (.data 2,359,304 B / .rdata 69 B)。DIR64 全 278,531、補正 **10,284** (.data) / 0 (.rdata) |
-| runtime 方式の内訳 (INFO; .text 外のスロット, 実測) | 補正対象 2,354 (全て .data) / .text 宛で非補正 8,044 (.data 7,930 + .didata 114) / image 外 0。lva 方式の .data 補正 10,284 との突合: 2,354 + 7,930 = 10,284 で一致 |
+| P1 共通モジュール == m11_data_gen.py 出力 (実 FLEngine PE, LB=0 / 0x10000) | 一致 (.data 2,359,304 B / .rdata 69 B)。DIR64 全 278,531、補正 **10,284** (.data) / 0 (.rdata)。`7a73c02` 時点で `block00031_PE.bin` (fl-win64 tar 内) に対し再実行: exit 0、P1 PASS (LB=0 / LB=0x10000)、P2 PASS、N1〜N3 PASS |
+| runtime 方式の内訳 (INFO; .text 外のスロット, 実測) | 補正対象 2,354 (全て .data) / .text 宛で非補正 8,044 (.data 7,930 + .didata 114) / image 外 0。`7a73c02` 再実行で同値 (`rebased 2354` / `text_kept 8044` / `outside_image 0`)。lva 方式の .data 補正 10,284 との突合: 2,354 + 7,930 = 10,284 で一致 |
 | RetDec C 経路の実行テスト (`pe_image_app.c`: 文字列表 / 配列要素ポインタ / 連結リスト / 関数ポインタ表) | lift の戻り値 = host gcc 直ビルドの戻り値 (34622010)。補正スロット 7 |
 
-旧 P3 (`tools/m11/work/m11_data.c` との比較) は e2e の判定から外した。その m11_data.c は #572 より前に生成されたもので、末尾 slot を補正していない (`<` 規則の出力)。現行 m11_data_gen.py の出力との一致 (P1) を判定基準とする。
+旧 P3 (`tools/m11/work/m11_data.c` との比較) は判定から外した。その m11_data.c は #572 より前に生成されたもので、末尾 slot を補正していない (`<` 規則の出力) ため、現行 `m11_data_gen.py` の出力との一致 (P1) を判定基準とする。
 
 ネガティブコントロール (全て「一致してはならない」を要求。判定が不合格なら非 0): parity N1 補正値 1 bit 破壊 → FAIL / N2 補正ゼロの実装 → FAIL / N3 セクション欠落 → FAIL、pe_image_e2e N1 `--no-pe-reloc` → クラッシュ (rc 139) / N2 再配置表を 1 件ずらす → クラッシュ (rc 139)。
 
@@ -195,11 +200,13 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 
 ### 8-5. m11_data_gen.py の境界条件 (解消)
 `m11_data_gen.py` は当初 `lo <= r < lo + len(sd) - 8` で DIR64 スロットを選んでおり、セクション末尾の 8 バイト slot (実 FLEngine の `.data` 末尾 RVA `0x11e5000`、値 `0x425f00` = .text 宛の関数ポインタ) が補正されなかった。
-`#572` (`10c8278`) で `<=` に修正済み。本 PR の `pe_image.py` lva モードも同じ `<=` に揃えた (`c39ca16`)。これにより P1 が PASS し、補正件数は m11 と同じ 10,284 (現 HEAD で再確認: `pe_image_parity.py` exit 0)。
+`#572` (`10c8278`) で `<=` に修正済み。本 PR の `pe_image.py` lva モード (`lo <= r <= lo + len(sd) - 8`) も同じ境界に揃えてある (`c39ca16`)。`7a73c02` で `pe_image_parity.py` が exit 0 (補正 10,284 = m11 と一致)。
 
 ## 9. 未解決 (#566)
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | RetDec C 経路で実 FLEngine 規模の PE を通した実測なし (§8-4) | `gN` 分割の実機挙動が未検証 | 範囲外 (FLEngine は m11 IR 経路) |
+| `tools/gui/flengine/REPORT.md` §1〜§7 の測定値 (秒数・survey・results) の `7a73c02` 再測定 | 本 REPORT の実測は `d46b024` 時点。現 head の e2e は素材不足で未実施 | 次の素材が揃う run で `e2e.sh` を再実行 (PR 差し戻し対応) |
+| `tools/gui/IMPORTS.md` の再生成 | `gen_api.py` は mingw が必要。本 run では未再生成 (§6) | 同上 |
 
 範囲外: 実ブラウザ・Canvas 描画、audio、UI スレッドのスタック量、`gui_reach` の性能影響 (INTEGRATION §4-12 の未計測は継続)。

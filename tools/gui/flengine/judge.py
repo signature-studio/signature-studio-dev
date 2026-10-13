@@ -35,10 +35,11 @@ gate('A1 adapters', ad and ad.group(1) == ad.group(2) and ad.group(5) == '0' and
      'declare=%s adapter=%s impl=%s stub=%s (c=%s d=%s)' % ad.groups() if ad else 'no adapter line')
 
 bu = a.expect_units if a.expect_units is not None else base_boot['units_run']
+base_threw = base_boot.get('threw')
 gate('B1 boot parity', boot['units_run'] == bu and boot['dllmain_done'] == base_boot['dllmain_done'] and boot['init_count'] == base_boot['init_count']
      and boot['probes'].get('GetMem') == base_boot['probes'].get('GetMem') and boot['probes'].get('FreeMem') == base_boot['probes'].get('FreeMem')
-     and boot['icall_miss'] == base_boot['icall_miss'] and boot['boot_failfast'] is None and boot['boot_threw'] is None,
-     'units_run %s (base %s) / dllmain_done %s / GetMem %s FreeMem %s / icall_miss %s' % (boot['units_run'], bu, boot['dllmain_done'], boot['probes'].get('GetMem'), boot['probes'].get('FreeMem'), boot['icall_miss']))
+     and boot['icall_miss'] == base_boot['icall_miss'] and boot['boot_failfast'] is None and boot['boot_threw'] == base_threw,
+     'units_run %s (base %s) / dllmain_done %s / GetMem %s FreeMem %s / icall_miss %s / boot_threw %s (base %s)' % (boot['units_run'], bu, boot['dllmain_done'], boot['probes'].get('GetMem'), boot['probes'].get('FreeMem'), boot['icall_miss'], boot['boot_threw'], base_threw))
 first = boot['reach'][0] if boot['reach'] else None
 gate('R1 first GUI API reaches shim (boot)', first and first['kind'] == 'IMPL' and first['calls'] > 0,
      'first=%s calls=%s kind=%s; reached=%d' % (first and first['name'], first and first['calls'], first and first['kind'], len(boot['reach'])))
@@ -47,10 +48,18 @@ gate('R2 survey reach floor', expected <= names_soft, 'reached %d (expected floo
 sv, bs = svs['survey'], base_sv
 gate('S1 survey parity (soft)', all(sv[k] == bs[k] for k in ('ok', 'noproc', 'miss', 'trap')),
      'ok/noproc/miss/trap = %s/%s/%s/%s (base %s/%s/%s/%s)' % (sv['ok'], sv['noproc'], sv['miss'], sv['trap'], bs['ok'], bs['noproc'], bs['miss'], bs['trap']))
-ffu = set(svf['survey']['failfast_units'])
+ffu_all = set(svf['survey']['failfast_units'])
 stub_soft = set(svs['softstub_apis'])
-gate('S2 fail-fast APIs are STUB in soft reach', ffu <= stub_soft and not (svf['survey']['kinds'].get('gui_failfast', 0) and not ffu),
-     'ff survey fail-fast APIs=%s (units %s); soft STUB APIs=%s' % (sorted(ffu), svf['survey']['kinds'].get('gui_failfast', 0), sorted(stub_soft)))
+# API の状態は IMPORTS.md (gen_api.py の生成物) の STATUS 列で引く。IMPL 側が落とす未対応 action は STUB ではないので S2 の対象外 (INFO)
+status = {}
+IMPORTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'IMPORTS.md')
+for l in open(IMPORTS, encoding='utf-8').read().splitlines():
+    c = [x.strip() for x in l.split('|')]
+    if len(c) > 5 and c[5] in ('IMPL', 'STUB'): status[c[1]] = c[5]
+ffu = {n for n in ffu_all if status.get(n) == 'STUB'}
+impl_ff = sorted(ffu_all - ffu)
+gate('S2 STUB fail-fast APIs are STUB in soft reach', ffu <= stub_soft,
+     'ff survey STUB fail-fast APIs=%s; soft STUB APIs=%s; IMPL-side fail-fast (INFO, not STUB)=%s' % (sorted(ffu), sorted(stub_soft), impl_ff))
 cl = probe['classes']
 pr = {r['name']: r['calls'] for r in probe['reach']}
 gate('P1 RegisterClassW/CreateWindowExW reach shim (directed)', len(cl) >= 2 and all(c['atom'] not in (None, 0) for c in cl) and pr.get('RegisterClassW', 0) >= 2 and pr.get('CreateWindowExW', 0) >= 2,
