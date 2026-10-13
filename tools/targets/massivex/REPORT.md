@@ -163,9 +163,10 @@ work/ (gitignore): hdr_block1/2.bin, files.json, locations.json, header_parse.js
 
 ## 11. MX-2 検証の再確認 (#266 / MX2-1 mock 欠陥) — 2026-10-13 実測
 
-### 11.1 検証状況 (実測 HEAD = `47fd87cb`)
+### 11.1 検証状況 (実測 HEAD = `d0eddb92`)
 
-- 実測 HEAD は `47fd87cb` (現 PR head)。コード差分は `aa8002f5` と同一 (`git diff aa8002f5 47fd87cb -- tools/targets/massivex ':!tools/targets/massivex/REPORT.md'` が空)。`eb1d0d19`・`47fd87cb` は REPORT のみの変更。
+- 実測 HEAD は `d0eddb92` (現 PR head)。`47fd87cb..d0eddb92` のコード差分は `license/e2e.sh` の `mkdir -p` 重複削除 1 行のみ。`aa8002f5..d0eddb92` の `.py` / `.sh` 差分は実質ゼロ (`mkdir` の位置のみ)。
+- 下表は `d0eddb92` で取り直した値 (2 回目の計測。初回計測は `47fd87cb` で、結果は同一)。
 - 素材: `plugins-massivex` / `toolchain-retdec` / `toolchain-emsdk` を `$ARTIFACTS_DIR` から展開 (`tar --zstd -xf`)。RetDec / emsdk は `[RETDEC]` / `[EMSDK]` (`[OPT-TOOLS]` 配下。環境変数で上書き)。
 - `plugins-massivex` は Inno installer (`Native Instruments Massive X v1.7.1.exe`, 1,870,391,792 B) と dmg のみ。`scripts/parse_setup_headers.py <exe> work` → `scripts/extract_massivex.py <exe> work key` で `work/extracted/VST3/Massive X.vst3` (95,356,824 B, PE32+ DLL) を生成した。`pefile` / `capstone` / `numpy` は pip 導入。
 - **入力の同一性 (reviewer 必須 3)**:
@@ -177,16 +178,17 @@ work/ (gitignore): hdr_block1/2.bin, files.json, locations.json, header_parse.js
   - 切り詰めコピー (展開物の前半 47.7 MB) を `mx_pefix.py` に通すと、`pefile` は読めて site は `e1 26` のまま、assert は出ない (前回入力とは別の状態)。
   - 初回の入力状態・並列実行の有無は記録が無く、原因は**未確定**。
 
-| 項目 (HEAD `47fd87cb`) | 結果 | 所要 |
+| 項目 (HEAD `d0eddb92`) | 結果 | 所要 |
 |---|---|---|
-| license e2e 既定 (-O1 + zero-init) | exit 0 / 11/11 PASS | 77 s (lift 無し) |
-| license e2e `MX_OPT=-O0` 1 回目 | exit 0 / 11/11 PASS | 5 s |
-| license e2e `MX_OPT=-O0` 2 回目 | exit 0 / 11/11 PASS | 4 s |
+| license e2e 既定 (-O1 + zero-init) | exit 0 / 11/11 PASS | 5 s (lift キャッシュ有り) |
+| license e2e `MX_OPT=-O0` 1 回目 | exit 0 / 11/11 PASS | 4 s |
+| license e2e `MX_OPT=-O0` 2 回目 | exit 0 / 11/11 PASS | 5 s |
 | license e2e `MX_OPT=-O0` 3 回目 | exit 0 / 11/11 PASS | 5 s |
 | license e2e `MX_OPT=-O2` | exit 0 / 11/11 PASS | 5 s |
 | NC `MX_ZEROINIT=0 MX_OPT=-O1` | exit 1 / 6/11 PASS (T7-T11 TRAP: memory access out of bounds) — 欠陥が再現 | 4 s |
-| dsp/e2e.sh | exit 0 / insns 258,087 / unsup_sites 48,612 / e8e9_targets 594,978 | 40 s |
-| dsp/negctl.sh NC1 / NC2 / NC3 | 3 件 FAIL (期待どおり): 3,118 / 4,575 / 31 insn | 10 s (script 全体 exit 0) |
+| dsp/e2e.sh | exit 0 / insns 258,087 / unsup_sites 48,612 / e8e9_targets 594,978 | 41 s |
+| dsp/negctl.sh NC1 / NC2 / NC3 | 3 件 FAIL (期待どおり): 3,118 / 4,575 / 31 insn (script 全体 exit 0) | 10 s |
+| license e2e 既定 (初回 cold, `47fd87cb`・lift 無し) | exit 0 / 11/11 PASS | 77 s |
 
 - dsp の値は `dsp/REPORT.md` と §2/§3 に一致 (258,087 / 48,612)。別の値は残していない。
 - clen は §11.2 のとおり未実施。
