@@ -106,6 +106,7 @@ GetCursorInfo
 GetCursorPos
 GetDC
 GetDCEx
+GetDIBColorTable
 GetDIBits
 GetDesktopWindow
 GetDeviceCaps
@@ -260,6 +261,7 @@ SetClassLongPtrW
 SetClipboardData
 SetCursor
 SetCursorPos
+SetDIBColorTable
 SetDIBits
 SetDIBitsToDevice
 SetFocus
