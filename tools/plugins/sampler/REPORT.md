@@ -147,7 +147,7 @@ Fruity Slicer 2 は殻 (block 23663) とは別に C++ engine DLL (block 23664、
   | 7 | (#643 review 指摘 1) `zext (i8 -1 to i64)` が 2^64-1 になり、`sext` が元の符号ビットを見ない。 入れ子の cast を走査するようになって露出 | `fold_const_ops` の cast 畳みが宛先幅のマスクだけを使う | 元の型幅でマスクし、sext は符号拡張してから宛先幅に合わせる。 回帰テスト `passes/test_fold_const_ops.py` (旧版で 3 件 FAIL、修正後 4 件 PASS) | 実 block への効きは未計測 (後段の T0/T1 は rc のみ) | 行 2 の統合 (P-F1) で露出した誤りで、PR で追加 |
   - `engine_fixcmp.py` は 5 により不要になった (修復 operand 数 23664: 7 → 0、23677: 11 → 0。 スクリプトは診断用に残す)。
   - 退行確認 (共有鎖を変えたため): Delphi 殻 7 閉包は `sampler_e2e.sh` が exit 0・7/7 `emcc_c=0` (§6)。 T0 バッチは §6。 修正前 pass での 23677 `.lift.ll` は `zext 0 to i64` 2 件・A9L 残存 53 件、修正後は 0 件。
-  - 同型の `v = k & ((1 << tid) - 1)` (元幅を使わない cast 畳み) は PR 外の `tools/m3/ir_patch.py`・`tools/m5/ir5_patch.py`・`tools/targets/kilohearts/snapins/lift/ir5_patch.py`・`tools/targets/kilohearts/poc_gain/ref/ir5_patch.py`・`tools/targets/freshair/ref/ir5_patch.py`・`tools/liftlib/liftlib/passes/base.py` にもある (行 7 と同型)。 本 PR では触らず、起票先は §7。
+  - 同型の `v = k & ((1 << tid) - 1)` (元幅を使わない cast 畳み) は PR 外の `tools/m3/ir_patch.py`・`tools/m5/ir5_patch.py`・`tools/targets/kilohearts/snapins/lift/ir5_patch.py`・`tools/targets/kilohearts/poc_gain/ref/ir5_patch.py`・`tools/targets/freshair/ref/ir5_patch.py`・`tools/liftlib/liftlib/passes/base.py` にもある (行 7 と同型)。 本 PR では触らず、§7 に起票行は未作成 (PM 判断)。
 - `emcc -c` は clang が最初の型エラーで止まるため 1 件ずつ露見する (到達性の下限)。
   - 23664 は `engine_fixcmp.py` 後も行 1 で止まる。 23677 は行 5 (E1) の後に行 2 が残る。
 - **RetDec の C バックエンドが支配的** (経緯の全文は `REPORT_APPENDIX.md` §D): C 出力段が終わらず RetDec を止めた。 `lift_from_ll.sh` で `.ll` 出力後に止めて後段 pass 鎖だけ走らせる方式に変えた (共有鎖は変更していない)。
