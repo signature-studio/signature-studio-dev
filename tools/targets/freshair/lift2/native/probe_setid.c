@@ -18,9 +18,12 @@ static uint64_t measure(int id, unsigned val, unsigned type, int* serr, int* per
     uint64_t* sh = mmap(0, 4096, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
     pid_t pid = fork();
     if (pid == 0) {
-        unsigned char* T = gr_alloc(0xa400); memcpy(T, M0, 0xa400); int s2 = 0; if (g_poff >= 0) memcpy(T + g_poff, &g_pval, 4);
+        /* FA-8 修正: setter 0x1803debc0 は [M+8] の descriptor ポインタ表を引くが、表の中身は ctor を走らせた M0 内への絶対ポインタ。
+         * 旧実装 (FA-7) は M0 を T に複製して process を走らせたため、setter の書込みは M0 側に入り T の出力は構造的に変わらなかった
+         * (ID 2 (周波数) でも outChanged=0 = 空洞な測定)。ここでは fork 子の M0 そのものに setter を適用し、その M0 で process を走らせる。 */
+        unsigned char* T = M0; unsigned char* SNAP = gr_alloc(0xa400); memcpy(SNAP, M0, 0xa400); int s2 = 0; if (g_poff >= 0) memcpy(T + g_poff, &g_pval, 4);
         if (id >= 0) { g_in_guard = 1; s2 = sigsetjmp(g_jb, 1); if (s2 == 0) ((void (__attribute__((ms_abi))*)(void*, int, unsigned))0x1803debc0ULL)(T, id, val); g_in_guard = 0; }
-        int nd = 0; for (int i = 0; i < 0xa400; i++) if (T[i] != M0[i]) { if (nd < 8) ((int*)(sh + 4))[nd] = i; nd++; }
+        int nd = 0; for (int i = 0; i < 0xa400; i++) if (T[i] != SNAP[i]) { if (nd < 8) ((int*)(sh + 4))[nd] = i; nd++; }
         int e; uint64_t h = run_proc(T, type, &e);
         sh[0] = h; ((int*)sh)[2] = s2; ((int*)sh)[3] = e; ((int*)sh)[4 + 16] = nd; _exit(0);
     }

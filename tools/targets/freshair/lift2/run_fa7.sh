@@ -58,6 +58,15 @@ s = open('setid.txt').read()
 ok = all(re.search(r'POKE M\+0x%s=[0-9.]+: diffB=\d+ outChanged=1' % o, s) for o in ('9e0c', '9e54'))
 sys.exit(0 if ok else 1)
 EOF
+python3 - <<'EOF' && ck "陽性対照 (FA-8 追加): setter 経由でも ID 2 (周波数) / ID 3 (Q) は 3 値とも出力が変わる (outChanged=1 が 6/6)。FA-7 の probe は setter が M0 に書き process が複製 T で動く測定バグで 0/6 だった" ok || ck "setter 経由の陽性対照" ng
+import re, sys
+c = t = 0
+for l in open('setid.txt'):
+    m = re.match(r'ID 0x([0-9a-f]+):', l)
+    if m and int(m.group(1), 16) in (2, 3):
+        t += l.count('outChanged='); c += l.count('outChanged=1')
+sys.exit(0 if t == 6 and c == 6 else 1)
+EOF
 python3 - <<'EOF' && ck "ベースライン決定論 (同一入力 2 回で出力ハッシュ一致)" ok || ck "決定論" ng
 import re, sys
 h = open('setid.txt').readline()
