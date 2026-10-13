@@ -62,7 +62,7 @@ HEAD `8cfbb222` での再実行は §7 の通り実施済み (verdict 一致)。
 
 ## 7. 再実行 (HEAD `8cfbb222`、差し戻し対応 run)
 
-- 素材 `fl-win64` / `toolchain-emsdk` / `work-m11` / `work-liftdiff` が `ARTIFACTS_DIR` に実在することを確認して展開した。`FL_WIN64_DIR` は fl-win64 の展開先。`toolchain-emsdk` は runner 上の既存 `/opt/emsdk` (emsdk 6.0.12、`[EMSDK]` と同じ pin) を使い、上書きしていない。numpy 2.5.4・capstone 5.0.7・pefile 2024.8.26 を pip で導入した。
+- 素材 `fl-win64` / `toolchain-emsdk` / `work-m11` / `work-liftdiff` が `ARTIFACTS_DIR` に実在することを確認して展開した。`FL_WIN64_DIR` は fl-win64 の展開先。`toolchain-emsdk` は runner 上の既存配置 (`[EMSDK]`、emsdk 6.0.12) を使い、上書きしていない。numpy 2.5.4・capstone 5.0.7・pefile 2024.8.26 を pip で導入した。
 - `bash tools/m11/ldfix/ls737_liftdiff.sh` を foreground で実行: rc 0、`LS737_LIFTDIFF DONE`、所要 1 分 8 秒。
 - verdict は §3 の表と全 6 batch で一致した (下の出力は script の出力そのまま)。
 
