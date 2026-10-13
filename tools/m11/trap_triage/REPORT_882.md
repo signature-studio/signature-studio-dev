@@ -95,11 +95,12 @@ OOB 16 件の最上位 frame (現行 build): 144 `407e20` / 149 `412e40` / 275 `
 
 ### 8.1 手順と結果 (foreground、すべて rc=0)
 
-- 素材: `fl-win64` → `$RUNNER_TEMP/fl-win64` (`FL_WIN64_DIR`)、`work-m11` / `work-liftdiff` を repo 直下で展開 (`tools/m11/work/`・`tools/liftdiff/work/`)、`toolchain-retdec` / `toolchain-emsdk` を `$RUNNER_TEMP` に展開 (`/opt/retdec`・`/opt/emsdk` は既存)。
+- 素材: `fl-win64` → `$RUNNER_TEMP/fl-win64` (`FL_WIN64_DIR`)、`work-m11` / `work-liftdiff` を repo 直下で展開 (`tools/m11/work/`・`tools/liftdiff/work/`)、`toolchain-retdec` / `toolchain-emsdk` を `$RUNNER_TEMP` に展開 ([RETDEC]・[EMSDK] は既存)。
 - `m11_gen_ir2.sh`: rc=0、44.6 s、`ldfix` F1=902 F2=30 F3c=36 errors=0。
 - `m11_build.sh`: rc=0、25.4 s、`wasm-ld signature mismatch: 0`。
 - `survey_units.mjs` (`SV_RAW=1`): rc=0、13.5 s、`ok 870 / halt0 7 / miss 47 / oob 16 / other 1 / noproc 1`。
 - 前回 (§7 の `8bc34ed9`・PR #1261) 記録の `869 / 8` とは 1 件ずれる (ok +1、halt0 -1)。原因は未切り分け。
+- 鮮度の証跡 (`docs/WORKFLOW.md` §6): 測定範囲は `src`・`tools/m11`・`tools/liftdiff` (測定に使うコードと素材の生成元)。`git diff f7bebc7b HEAD -- src tools/m11 tools/liftdiff` の結果は `tools/m11/trap_triage/REPORT_882.md` の 37 行追記のみ (本 PR の文書、測定対象外)。それを除いた差分は 0 byte。よって `f7bebc7b` の実測値は現 HEAD と同じコードに対する値であり、再測定は不要。
 
 ### 8.2 対象 unit の状態
 
