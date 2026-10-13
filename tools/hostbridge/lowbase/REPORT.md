@@ -123,3 +123,19 @@ LB_BASE=0x10000 bash tools/hostbridge/lowbase/retdec/build_m10_lb.sh
 python3 tools/hostbridge/lowbase/audit_va.py <dll> 0x10000
 ```
 前提: `tools/m10/work/ott_m10.ll`, `tools/hostbridge/work/ott_hb.cjs` (「再配置前」基準; `hostbridge.sh` の産物), `tools/plugins/work/balance/k.final.ll`, `tools/ott/work/libottnative.so`, python (capstone/pefile), emsdk, Chrome。tools/m6〜m10, ott, plugins, shim, hostbridge の既存ファイルは読取のみ (生成物は `lowbase/work`, gitignore 済み)。
+
+## 9. HB-H24 (#974): ブラウザ実機検証の受入条件の対応 (2026-10-13 実測)
+
+前提はすべて当 run で生成・展開した (`fl-win64` → `$HOME/analysis/win64`、`plugins-ott` → `$HOME/analysis/plugins`、`analysis-ott-binaries`・`work-m6-ott`・`work-liftlib` を展開)。`tools/hostbridge/work/ott_hb.cjs` は `bash tools/hostbridge/hostbridge.sh` (ALL PASS)、`tools/plugins/work/balance/k.final.ll` は `t0_e2e.sh` (357/357 × seed 3 本) で生成した。
+
+| # | 受入条件 (#974) | 実測 | 判定 |
+|---|---|---|---|
+| 1 | OTT lowbase を headless Chrome dedicated Worker で同期 `WebAssembly.Instance` 化し C1〜C4 PASS | Chrome/154 Worker: C1 (OTT×4 + Balance が同一 host/bridge に LoadLibrary) OK, C4 (追加 100 instance 生成) OK 771 ms | 達成 |
+| 2 | OTT 出力 sha256 が node と一致 | C2: `4262907b2a26cd5d` = node (500blk×128f) | 達成 |
+| 3 | OTT 出力を SAB ring 経由で AudioWorklet に流し消費量と総和が一致 | 未実施 (AudioWorklet 側の結線は本 run に無い) | 未達 → 子 issue |
+| 4 | Worker を SAB + `Atomics.wait` RPC で呼び出し、`VSTPluginMain` 経由の処理が往復 | 未実施 (`chrome_worker.mjs` は直接呼出のみ) | 未達 → 子 issue |
+| 5 | 128 frame の 1 処理の実時間を実測 | C5: median **0.820 ms** / p99 1.010 ms / min 0.795 ms (n=1000, 50 回ウォームアップ後, OTT 単独 `effs[0]`) / 予算 2.902 ms (128/44100) | 達成 (headless Worker 計測。AudioWorklet 上の値ではない) |
+
+- 検証 e2e: `bash tools/hostbridge/lowbase/lowbase_e2e.sh` = **ALL PASS**、所要 **98 秒** (Chrome 込み・全ビルド込み、worktree `ws-974`, Chrome 154)。
+- 修正: §3 の wasm 名前空間検査が `wasm-objdump` (runner に無い) に依存して 0 件と誤判定していた。node の `WebAssembly.Module.exports` で数えるよう変更 (`ott_function_*` 211 件 / 無接頭 `function_*` 0 件)。
+- 残り (子 issue): 受入 3・4 は AudioWorklet 側の SAB ring 消費と `Atomics.wait` RPC の新規実装が要る。RT-4 (#123) の「AudioWorklet は ring 消費専用 (`Atomics.wait` 不可)」制約を前提に設計する。
