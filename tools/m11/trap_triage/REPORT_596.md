@@ -83,7 +83,7 @@ PROBE_WATCH=11f26a0:8:8 bash trap_triage/probe_entry.sh w2 <fn,fn,...>          
 - probe build の透過性: probe 無し (復元後) の survey JSON が `base.json` と **byte 一致** (`cmp`)。復元は `probe_entry.sh` の `trap restore EXIT`。
 - **限界**: batch の 1 行 (414ad0 の 1 関数) の OOB 文字列を壊した変異では、正規表現版 (238) と raw 走査版 (238 / 414ad0 67) が**両方とも**変化し `--verify` は一致のまま。= `--verify` は「2 つの数え方が同じ入力で一致するか」を見るもので、入力の改変そのものの検出力は無い (改変の検出は上の survey 側ネガコンが担う)。
 - 所要 (実測): `probe_entry.sh` 1 回 20.5 s (11 関数)〜41.2 s (36 関数。build + survey + 元 boot.o の再生成を含む `time`)。load average 0.4〜1.2、1 並列。
-- 未実施: `m11_e2e.sh` 全体 (PE = fl-win64 の展開が必要。本 run は work-m11 のスナップショットで build+survey のみ)、`oob_top.mjs` の n≥3 再現 (1 回のみ)。
+- 未実施: `m11_e2e.sh` 全体 (PE = fl-win64 の展開が必要。本 run は work-m11 のスナップショットで build+survey のみ)、`oob_top.mjs` の n≥3 再現 (HEAD で 1 回再実行: 942 unit の kind 一致・oob 21 unit の frames 名一致。JSON の byte 一致はしない = 末尾 frame の `oob_top.mjs:<行>:19` (ハーネス自身の行番号) が SV_WATCH 追加で動いたため。frame 名・kind は同一)。
 
 ## 8. 未解決
 
