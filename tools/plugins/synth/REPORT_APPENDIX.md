@@ -59,6 +59,11 @@ pass は次の場合に**出力を書かず非 0 終了**する (`lift_ranges.sh
 
 - 測定の鮮度 (fc53b943 → 05a73875): `git diff fc53b943 05a73875 -- tools/plugins/lift tools/plugins/synth` の変更は `lift_ranges.sh` の 2 行 (コメント 1 行と RetDec 呼出行) と REPORT のみ。
   RetDec 呼出行は `--select-decode-only ${PLUG_NO_STATIC_DETECT:+--disable-static-code-detection} --timeout ...` になった。変数が未設定なら `${…:+…}` は空に展開され、RetDec に渡る argv は変わらない (実測: 未設定時は `--select-decode-only --timeout 5` の 3 語で、旧行と同一)。
+  `git diff fc53b943 05a73875 -- tools/plugins/lift tools/plugins/synth` の lift 側の出力 (抜粋・全文):
+  ```diff
+  -  --select-ranges "$DEC_RANGES" --select-decode-only --timeout "$TMO" > "$OUT/$NAME.retdec.log" 2>&1
+  +  --select-ranges "$DEC_RANGES" --select-decode-only ${PLUG_NO_STATIC_DETECT:+--disable-static-code-detection} --timeout "$TMO" > "$OUT/$NAME.retdec.log" 2>&1
+  ```
   よって既定経路・opt-in 経路の測定は流用できる (fc53b943 と 05a73875 の summary の差は既定経路の `lift_s` 列のみ 45 → 42。`emcc_c_rc`・欠落数・最初のエラーは同一)。ただし `PLUG_NO_STATIC_DETECT=0` も「設定済み」扱いで `--disable-static-code-detection` が付く (空文字のときだけ付かない)。
 - opt-in 経路は、仕様どおり `function_180056120(i32 %arg1, …)` の呼出で止まる。出力 `.i3.ll` は作られず、`.final.ll` も無い。
   外側の `i32` 署名を i64 化すると範囲が広がるため、本 pass では扱わない (下記 未解決)。
