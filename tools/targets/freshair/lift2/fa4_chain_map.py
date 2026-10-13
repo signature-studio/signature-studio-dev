@@ -5,7 +5,7 @@
      native_ctrl.c の CHAIN 定数 {1,0,1,0,2,0,2,2} (0=comp 1=filter 2=gain) と一致することを確認する。
   2) native_ctrl (FA_MAP_TRACE=1) が記録した 0x180c9d700(child,id,value) 呼出を、factory .epf 8 本の macro 値から
      期待値を計算して突合する (S900.. = .epf をファイル名ソートした順。各 scenario 1 回目の process = 3 呼出)。
-       id 0x157 <- powf(M[0x9dc4], 0.62)   id 0x158 <- powf(M[0x9e0c], 0.62)   id 0x15a <- M[0x9e60] (そのまま)
+       id 0x157 <- powf(M[0x9dc4], 0.62)   id 0x158 <- powf(M[0x9e0c], 0.62)   id 0x15a <- 0.0 (リテラル照合・M[0x9e60] とは突合しない)
      宛先は全て子リスト entry 0 (= チェーン先頭の Filter)。0.62 は rdata 0x1810cac08 の f32。
   判定は 1 周目 (先頭 3 呼出) のみ。2・3 周目の値は epf 直値から予測できず (0x157 は周回ごとに変化)、観測のみで表示する。
   exit 0 = 全 epf の 1 周目で一致。

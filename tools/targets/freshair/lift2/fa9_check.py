@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """fa9_check.py — FA-9 の実測集計と判定 (run_fa9.sh から呼ぶ)。
-  mkpert <in.txt> <out.txt> : epf シナリオの M+0x9dc4 (Mid Air) を 0.45 → 0.9 に差替えた摂動シナリオを作る
+  mkpert <in.txt> <out.txt> : 各シナリオの初回呼出 (先頭 W ブロック) の M+0x9dc4 (初期 Mid Air) を 0.9 に強制した摂動シナリオを作る
+                              (元値はシナリオごとに異なる。先頭 W ブロックに 1 件だけ在ることを assert)
   check  <base.out> <base.err> <alt.out> <alt.err> <pert_base.out> <pert.out>
          exit 0 = 全ゲート通過 / 1 = 不合格 (ゲートは下記 GATE 行)。
   GATE: (a) base: 8 シナリオ完走・ERR 0・ca1480 呼出 72 (=9/シナリオ)・全呼出が map 経路 (eq=1)・map 検索 found=0・da6c00 呼出 0
@@ -10,16 +11,18 @@
 import re, struct, sys
 
 def mkpert(src, dst):
+    # 行形式: sidx ncalls vcap nW {rg off val}*nW ... (rg=1 は M 領域)。先頭 W ブロック = 初回呼出の入力
     new = '%08x' % struct.unpack('<I', struct.pack('<f', 0.9))[0]
     out = []
     for ln in open(src):
         t = ln.split()
-        for i in range(len(t) - 2):
-            if t[i] == '1' and t[i + 1] == '9dc4':
-                t[i + 2] = new
+        nw = int(t[3])
+        hits = [j for j in range(nw) if t[4 + 3 * j] == '1' and t[5 + 3 * j] == '9dc4']
+        assert len(hits) == 1, ('先頭 W ブロックの M+0x9dc4 が 1 件でない', t[0], hits)
+        t[6 + 3 * hits[0]] = new
         out.append(' '.join(t))
     open(dst, 'w').write('\n'.join(out) + '\n')
-    print('pert: M+0x9dc4 -> 0x%s (0.9f) in %d scenarios' % (new, len(out)))
+    print('pert: 初回呼出の M+0x9dc4 (初期 Mid Air) を 0x%s (0.9f) に強制 (%d scenarios)' % (new, len(out)))
 
 def calls_of(path):
     return [ln for ln in open(path) if ln.startswith('FA9CA')], [ln for ln in open(path) if ln.startswith('FA9DA')]
