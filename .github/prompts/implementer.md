@@ -19,6 +19,10 @@
   (実装なら push / PR コメント / issue コメント)。上限は workflow の step の `timeout-minutes` で決まる:
   新規実装は 58 分、差し戻しの fix モード (`pull_request_review`) は 40 分 (その後の再試行は 15 分)。
   上限で打ち切られると、push もコメントも無いまま終わり、差し戻しのままになる。
+- **広い範囲に効く kill を使ってはならない**: `kill 0`・`kill -- -<PGID>`・`pkill -f <パターン>`・
+  `killall`・`pkill -u`。自分の run のシェルや opencode まで落とし、成果が何も残らないまま終わる
+  (追跡は #744)。プロセスを止めるときは
+  `$!` などで取った **PID を指定して** `kill <PID>` する。時間制限は `timeout <秒> <コマンド>` を使う。
 
 ## 行動規範
 
