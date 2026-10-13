@@ -100,7 +100,7 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 
 ## 6. 検証
 
-実行: `bash tools/gui/flengine/e2e.sh` (前提: tools/m11/work + `m11_gen_ir2.sh` 済み、`FL_WIN64_DIR`、`x86_64-w64-mingw32-gcc` (`gen_api.py` の arity 表)、`pefile`)。
+実行: `SS_EMSDK_ENV=<[EMSDK] の emsdk_env.sh> bash tools/gui/flengine/e2e.sh` (前提: tools/m11/work + `m11_gen_ir2.sh` 済み、`FL_WIN64_DIR`、`x86_64-w64-mingw32-gcc` (`gen_api.py` の arity 表)、`pefile`。`SS_EMSDK_ENV` は必須 (既定値なし))。
 
 | gate | 内容 |
 |---|---|
@@ -130,6 +130,14 @@ main 取り込み後で、units_run は 22 → **52**、init_count 23 → **54**
 `results/*.json` と `IMPORTS.md` は本修正で e2e が再生成し、コミットに含めた (baseline_survey.json は上限 0 の値に更新。IMPORTS.md は main 版から `gen_api.py` の出力へ)。
 受入条件 2 (`bash tools/gui/e2e.sh` ALL PASS 維持): 修正後 head で全体を実行 (`FL_WIN64_DIR` 指定) → **rc 1**。step 1 の native selftest (ASan) が `gui_headless.c:33` で heap-use-after-free により abort (headless の render thread が、main thread が `surf_free` した surface を読む競合)。`gui_headless.c` は main と同一で、本 PR では未変更。selftest 単独の再実行 3 回中 1 回が同じ abort。
 `SKIP_NATIVE=1 bash tools/gui/e2e.sh` (step 1c・3〜6: SIMD 15,679 cases・lift・wasm・tsc・Chrome 3 系統・fail-fast・reach-log・sigprobe・present) は **rc 0 / ALL PASS (42.7 秒)**、Chrome の画素は golden と EXACT MATCH (0 / 64000 px)。競合の修正は本 PR の範囲外 (起票依頼)。
+
+**現 head `c262c44e` の実測** (`SS_EMSDK_ENV=[EMSDK]/emsdk_env.sh FL_WIN64_DIR=<fl-win64 展開先>`、4 vCPU、開始 load 0.79〜1.06):
+- `tools/gui/flengine/e2e.sh`: **135 秒, rc 0** (load 終了 1.19)。judge **12/12 PASS**、ネガコン 5/5 期待どおり FAIL、native selftest **433 passed / 0 failed**。S1: soft 869/1/47/25 = baseline 869/1/47/25。
+- `tools/gui/e2e.sh` (全 step): **114 秒, rc 0, ALL PASS** (load 終了 1.51)。step 1 の native selftest は 433 passed / 0 failed。
+- 同一 head 上で `tools/gui/test/selftest.sh` を 5 回直列: **5/5 とも 433 passed / 0 failed、heap-use-after-free 0**。
+- 比較 (main `c5df4657`、同じ selftest.sh を worktree で 15 回直列): **15/15 とも 428 passed / 0 failed、heap-use-after-free 0**。
+- 前記の「`22a99bf` で selftest 単独 3 回中 1 回 ASan abort」は、この 20 回 (main 15 + head 5) では再現しなかった。原因は未確定。起票先は #740 (GUI-15)。
+- `tools/gui/e2e.sh` の step 5 (tsc) は worktree 内の `node_modules/.bin/tsc` を要する (`pnpm install --frozen-lockfile`)。未導入時は rc 127 で止まる (テスト失敗ではない)。
 
 ## 7. 未解決
 
