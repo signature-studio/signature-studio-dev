@@ -225,7 +225,7 @@ DEFECTS.md 追記案: なし (新しい silent miscompile 類型は見つけて�
 | 受入条件 1: `ja` seed で `/fl/System/Languages/ja.moe` が全量読まれることの e2e | **未達** (boot が `CreateFruityInstance` に未到達) | #590 を開いたまま (依存 #253)。到達後に `assettrace` 系で open() を実測 |
 | 受入条件 3: ネガコン「言語 seed を外すと en 組込みに戻る」の動的確認 | **seed 層のみ** (§8-3)。エンジン側は未達 | 同上 |
 | 0x758200 の bit2 省略が 0x9de400 の呼出で有効か | 未追跡 (有効なら §8-2 の fail-soft 結論が変わりうる) | #590 に残す (boot 到達後の実測で同時に確認) |
-| 受入条件 2 の動的側: shimx/VFS が不在パスで `INVALID_FILE_ATTRIBUTES` + 2/3 を返すことの実測 | 静的な要求仕様のみ確定 (§8-2) | 新規起票 (PR 本文に番号) |
+| 受入条件 2 の動的側: shimx/VFS が不在パスで `INVALID_FILE_ATTRIBUTES` + 2/3 を返すことの実測 | 静的な要求仕様のみ確定 (§8-2) | #658 |
 
 ## 9. #590 の検証 (実測)
 
