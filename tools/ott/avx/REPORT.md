@@ -194,7 +194,7 @@ python3 tools/ott/avx/unsup_scan.py tools/ott/work/avx/entries.json \
 ### 10.1 変更
 
 - `/home/ubuntu` 参照の置換そのものは #450 (`a4f8a08`) で main に入っている (`build_avx.sh` の `DLL`、`unsup_scan.py` の `paths.PLUGINS_DIR` 経由を含む)。
-- 本 PR の差分は `build_avx.sh` の 1 行移動だけ: `source "$OTT/../shared/env.sh"` を `OUT=` の後から `OTT=` の直後へ動かした (競合解消 `6c6645d` で `source` 行を 1 本にまとめた位置)。`env.sh` は `OTT`・`AVX`・`OUT` を設定も参照もしないため挙動は不変。`git diff --stat origin/main...HEAD` = `build_avx.sh` 1 行変更 (1 insertion / 1 deletion) + `REPORT.md` 51 行追加。
+- 本 PR の差分は `build_avx.sh` の 1 行移動だけ: `source "$OTT/../shared/env.sh"` を `OUT=` の後から `OTT=` の直後へ動かした (競合解消 `6c6645d` で `source` 行を 1 本にまとめた位置)。`env.sh` は `OTT`・`AVX`・`OUT` を設定も参照もしないため挙動は不変。`git diff --stat origin/main...HEAD` = `build_avx.sh` 1 行変更 (1 insertion / 1 deletion) + `REPORT.md` 50 行追加。
 - `unsup_scan.py` は本 PR で変更しない。
 - `*.log` 5 本の `/home/ubuntu/work/webstudio/...` は過去実行の出力記録で、受入条件の対象拡張子外のため変更しない。
 
