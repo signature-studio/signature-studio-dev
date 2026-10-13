@@ -166,4 +166,11 @@ node tools/hostbridge/lowbase/multi/multi_load.mjs --ott $PWD/tools/hostbridge/h
 
 | 未達 | 理由 | 起票先 |
 |---|---|---|
-| h2_e2e.sh [4/4] lowbase 既存 e2e・Balance 同時ロード (multi_load) の再現 | `tools/plugins/work/balance/k.final.ll` 生成に `fl-win64` (block18983_PE.bin) が必要で今回の素材に無い。`oc_artifacts: fl-win64` を足した再起動が必要 | #92 コメント |
+**#92 再々実行 (fl-win64 付き, 検証 HEAD 6e5c8dac)**: 未達だった `h2_e2e.sh` [4/4] と Balance 同時ロードを解消。
+
+- 素材: `oc_artifacts: fl-win64 plugins-ott toolchain-retdec toolchain-emsdk work-m6-ott work-liftlib analysis-ott-binaries`。
+  `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` (展開先そのもの)、`ANALYSIS_DIR=$HOME/analysis`、`PLUGINS_DIR=$HOME/analysis/plugins`。
+- 前提の生成 (gitignore): `hostbridge.sh` / `m10_e2e.sh` / `t0_balance/t0_e2e.sh` / `ott/native/build.sh` を順に実行 (全 RC=0)。
+- `bash tools/hostbridge/h2/h2_e2e.sh` = **PASS** (約 39 s, load 0.5〜0.6)。surrogate 15 checks / broken 0、lowbase_e2e ALL PASS。
+- 同時ロード (multi_load): `multi_load lb` **4/4 PASS** (broken 0)、`multi_load 再配置前` 3/3 PASS、E3 PASS。
+- runner 固有: `pefile capstone numpy` を `pip install --user` し、`wasm-objdump` (wabt) を apt 導入 (lowbase_e2e の名前空間チェックに必要)。
