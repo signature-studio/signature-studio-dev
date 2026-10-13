@@ -44,6 +44,7 @@ def main():
     mod.IMG_SIZE = size
     _orig_xreg = mod.FnLift.xreg
 
+    # reg_name が None のレジスタは Unsup にして関数単位で fail-fast させる (生成 C の他の挙動は変えない)。
     def xreg(self, ins, rid):
         if ins.reg_name(rid) is None:
             raise mod.Unsup("xreg None")
