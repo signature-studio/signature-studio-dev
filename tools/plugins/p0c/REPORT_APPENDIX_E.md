@@ -127,10 +127,10 @@ RetDec IR は下位 store (`%arg3`) のみで、`%arg2` の `inttoptr` が未使
   `p0c4_abi_e2e.py` は `K80_NO_FISTP_HI=1` で外せる。`lift_ranges.sh` は `PLUG_FISTP_HI_FUNCS` で指定する。
 - 実測 (`p0c4_abi_e2e.py 2000`、負論対照 `K80_NO_FISTP_HI=1` と同一 HEAD で比較):
 
-| 条件 (検証 HEAD = 本 PR のコミット、同一 HEAD で実行) | rc | 所要 | load (開始時) | 0x5de3e0 buf_diff | ok かつ buf_diff=0 |
-|---|---:|---:|---:|---:|---:|
-| 修復なし (`K80_NO_FISTP_HI=1`) | 0 | 27.1 s | 0.14 | 2000 | 45 |
-| 修復あり | 0 | 27.2 s | 0.14 (同) | **0** | **46** |
+| 条件 | 検証 HEAD | rc | 所要 | load (開始時) | 0x5de3e0 buf_diff | ok かつ buf_diff=0 |
+|---|---|---:|---:|---:|---:|---:|
+| 修復なし (`K80_NO_FISTP_HI=1`) | 作業ツリー (コミット前、内容は `7a8e5b1f` と同一) | 0 | 27.1 s | 0.14 | 2000 | 45 |
+| 修復あり | `7a8e5b1f` (コミット済み) | 0 | 27.2 s | 0.28 | **0** | **46** |
 
 - 差分は 0x5de3e0 の 1 行のみ (他 79 kernel の `run / ok / sig11 / buf_diff` は不変)。`run=67 ok=67 sig11=0`。
 - `lift_ranges.sh` の opt-in 経路: `PLUG_FISTP_HI_FUNCS=function_5de3e0` で `on.final.ll` に `fhi_s` が 2 箇所、未指定で 0 箇所。
