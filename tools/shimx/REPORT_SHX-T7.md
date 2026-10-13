@@ -56,3 +56,15 @@
 | GitHub Actions に `test.sh` を常時回す job が無い (現状の workflow は opencode のみ) | 案B の「CI で常時」は test.sh 経由 (手動 / レビュー run) に留まる | #284 系 `[CI-n]` に提案 (要 素材取得 + emsdk 展開を含む job) |
 | adapter 経由になるため RetDec 側が i64 で渡す HANDLE の上位 32bit は落ちる (trunc) | 実 IR (M11 / OTT) の adapter は 0 件のため該当なし。他プラグインで adapter が出た時に `normalized` 一覧で確認 | #173 |
 | `data/sig_ext.json` の拡張方針は 3 API 分を手で書いた (`GetComputerNameExW` / `GetFileAttributesExW` = 非負 enum・BOOL の zext、`SHGetFolderPathW` ret = HRESULT の sext)。新しい API で adapter が必要になるたび符号の根拠を人が判断して追記する | 既定は unresolved (fail-loud) なので silent miscompile にはならないが、追記は手作業 | #173 |
+
+**main 競合解消後の再検証 (2026-10-13, Actions runner, 検証起点 = コミット 3d75d44 (merge 629837b + sigs.json 再生成), n=1, 素材 work-m11 / work-m6-ott 展開済み, emcc 6.0.12 (`/opt/emsdk`))**: main の SHX-T8 (#175) を取り込んだ merge 直後は shimx 関数が増えて `sigs.json` が陳腐化していたため、再生成してから検証した。
+
+| 検証 | 結果 |
+|---|---|
+| merge 直後 629837b の `test/sig/sig_test.sh` | **exit 1**: `gen_sigs.py --check` が不一致 (sigs.json は 731 関数のまま) → (b) FAIL。main 取込で増えた shim 関数を取りこぼしていた |
+| `gen_sigs.py` 再生成 → 3d75d44 | 731 → **738 関数** (差分 +53 行・削除 0)。増えた 7 関数: `CryptReleaseContext` `QISearch` `SHCreateMemStream` `SHCreateStdEnumFmtEtc` `shimx_drag_accepts` `shimx_hdrop_create` `shimx_set_notify_hook`。`gen_sigs.py --check` exit 0 |
+| `test/sig/sig_test.sh` (3d75d44) | exit 0, **ALL PASS**, 14.35 s, load average (1 分値) 0.58→0.67 |
+| `test.sh --quick` (3d75d44, 実 IR あり) | exit 0, 54.2 s, load average 0.57→0.90。6b 実 IR: m11 / m11_3 / ott いずれも mismatch **0** (正規化前 0 件)。7/7 完了, 公開関数 687 |
+
+- `test.sh --quick` が再生成した inventory.md / BACKLOG.md / coverage.json / inventory.csv / exports.txt は**コミットしていない** (差分 257 行追加・254 行削除)。素材あり run の再生成物だが、コミット可否は別判断 (本 PR の競合解消の範囲外)。
+- `sigs.json` の再生成は `gen_sigs.py --check` (sig_gate.sh が毎回実行) の要件。main 取込のたびに再生成が必要。
