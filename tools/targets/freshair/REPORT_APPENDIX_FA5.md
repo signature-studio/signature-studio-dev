@@ -24,6 +24,22 @@
 - したがって「定数が違う関数がある」は事実だが、「意味が違う」の根拠にはならない。意味同一性は REPORT §11-2 ① の差分実行で判定する (未実施)。
 - 起票先: ① の意味同一性と `value` 17 件の中身 → #52 (本 issue の残件)。
 
+## §A4. `value` 17 件の内訳 (`ks_rdata_detail.py`, #52 残件)
+
+- 再現: `ks_rdata_detail.py <HeartCore> <SlateCore> rdata_class.json share.json` (`ks_identity.sh` の出力を入力にする)。素材は `plugins-freshair` と `work-liftlib-targets` を展開して取得。
+- 実測 (2 回実行で byte 一致、EXIT=0、0.3 s): 内容が違う参照は 42 件 (両側共通)。32 B の参照先を 8 B 語に分けた結果は次のとおり。
+
+| 区分 | SC | KH | 判定の定義 |
+|---|---|---|---|
+| `text_ref` | 2 | 2 | 印字可能 ASCII を含む参照 (文字列断片) |
+| `rva32` | 80 | 81 | 上位 32 bit が 0 で、下位が image 内 RVA の語 |
+| `abs` | 3 | 5 | image 範囲の 8 B 絶対アドレス (`ptr` 判定の対象) |
+| `dbl` | 68 | 68 | それ以外 (倍精度・整数定数など) |
+
+- 読み: `value` の差は 1 種類ではない。`rva32` 語 (約 80 件ずつ) は配置差に依存する値で、定数の中身の差とは限らない。`dbl` 語は定数の差の候補だが、本節では位置ごとの対応を取っていない。文字列断片は少数 (2 件ずつ)。
+- 判定: `value` 17 件を「定数値の差」と断定する根拠は、この集計からは得られない。`rva32` が多いため、分類 `value` は配置差を含んでいる可能性が高い。ただし `ptr` 判定 (8 B 絶対アドレスのみ) では 32 bit RVA を拾えないので、`value` と `ptr` の境界は下限でしか決まらない。
+- 未解決: `dbl` 68 語が同一位置で bit 一致するかの対応付け。`rva32` を RVA 差分で正規化して再分類すること。起票先 → #52 (本 issue の残件)。
+
 ## §A3. Gain の意味同一性 (native ⇄ native 差分, REPORT §11-2 ① の実施)
 
 - 再現: `bash tools/targets/freshair/ks_semantic_gain.sh 200 7` (`SC_CORE`/`KH_CORE` で素材パスを指定可)。ハーネス: `ks_semantic_gain.c` (両側とも実機機械語を ImageBase に敷設し ms_abi で直接実行)、比較: `ks_semantic_gain_cmp.py`。丸め形の単体テスト: `ks_ramp_form.c` (`cc -O1 -ffp-contract=off`)。
