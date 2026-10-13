@@ -83,8 +83,8 @@ Chrome Dedicated Worker で M=130 のオブジェクトを 1 Memory に畳み、
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 実 OTT の複数 plugin を 1 Memory に畳む際の static 衝突 (本計測は同一 OTT を M 個 = 同一 binary の別 state) | 異なる plugin を同居させる場合の VA 衝突・共有 static の汚染は未検証。本計測は同一 plugin の複数 state 限定 | 子 issue 起票先 (下記) |
-| AudioWorklet での M 個駆動 | 本計測は Dedicated Worker のみ。worklet 側の上限・コストは未測 | 子 issue 起票先 (下記) |
+| 異なる plugin を 1 Memory に畳む際の VA 衝突・共有 static の汚染 (本計測は同一 OTT の M 個 = 同一 binary の別 state) | 異なる plugin を同居させる場合は未検証 | #1259 [PERF-P19] |
+| AudioWorklet での M 個駆動 | 本計測は Dedicated Worker のみ。worklet 側の上限・コストは未測 | #1259 [PERF-P19] |
 | setup 時間 (M=130 で約 0.8〜1.0 s) | 起動時の一括 instantiate/setup の遅延。pre-warm の設計が必要 | REPORT_P8 §11 (pre-warm) と同じ経路 |
 
 ## 5. 再現
