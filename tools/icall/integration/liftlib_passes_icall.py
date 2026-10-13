@@ -35,7 +35,7 @@ def prelift(cfg, image, funcs_file, workdir, log):
             args.append(flag)
     log.append("icall.prelift: " + _py("icall_rewrite.py", *args).strip())
     m = json.load(open(mp))
-    ranges = open(mp + ".ranges").read() + ",0x%x-0x%x,0x%x-0x%x" % (m["stub"], m["stub"] + 78, m["comis_stub"], m["comis_stub"] + 29)
+    ranges = open(mp + ".ranges").read() + ",0x%x-0x%x,0x%x-0x%x" % (m["stub"], m["stub"] + m.get("stub_len", 78), m["comis_stub"], m["comis_stub"] + m.get("comis_stub_len", 29))
     return out, ranges, mp
 
 
