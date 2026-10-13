@@ -2,7 +2,7 @@
 # #483 ネガコン + 独立計測: m11_ov.c の転記を 1 つずつ外した構成を work/obj/ov.o に差し替えて link → survey_units.mjs (survey_diff.py で現行 HEAD 版と比較).
 #   usage: negctl_483.sh [構成名 ...]   (省略時は全構成)  各構成の結果を work/negctl_483/<名>.json + 1 行サマリで出す
 #   構成: head(#481 HEAD = BASE_REF の m11_ov.c) full(現行) no479b40 no8cbce0 no8cc190 no8cbde0 nogetters no478420 no478540 no478c70 nocmpmeth
-#         raise_head / raise_full (411e80 = RaiseExcept 呼出を数える, 動作は IR と同一; [raise411e80] 行数 = survey 中の raise 回数)
+#         probe_head (#481 HEAD + 8cc190 の観測 [probe] 行: FComparer の中身と重複判定) / raise_head / raise_full (411e80 = RaiseExcept 呼出を数える, 動作は IR と同一; [raise411e80] 行数 = survey 中の raise 回数)
 #   終了時に work/obj/ov.o を現行 m11_ov.c から再生成する.
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")/.." && pwd)"; cd "$HERE"
@@ -18,6 +18,7 @@ gen() { # gen <構成> → work/ov_ablate.c
   case "$1" in
     full) cp m11_ov.c work/ov_ablate.c ;;
     head) git show "$BASE_REF:tools/m11/m11_ov.c" > work/ov_ablate.c ;;
+    probe_head) { git show "$BASE_REF:tools/m11/m11_ov.c"; cat trap_triage/probe_8cc190.c; } > work/ov_ablate.c ;;
     raise_head) { git show "$BASE_REF:tools/m11/m11_ov.c"; echo "$RAISE"; } > work/ov_ablate.c ;;
     raise_full) { cat m11_ov.c; echo "$RAISE"; } > work/ov_ablate.c ;;
     no479b40) rename_def function_479b40 < m11_ov.c > work/ov_ablate.c ;;
@@ -32,7 +33,7 @@ gen() { # gen <構成> → work/ov_ablate.c
     *) echo "unknown config $1" >&2; return 1 ;;
   esac
 }
-CFGS=("$@"); [ ${#CFGS[@]} = 0 ] && CFGS=(head full no479b40 no8cbce0 no8cc190 no8cbde0 nogetters no478420 no478540 no478c70 nocmpmeth raise_head raise_full)
+CFGS=("$@"); [ ${#CFGS[@]} = 0 ] && CFGS=(head full no479b40 no8cbce0 no8cc190 no8cbde0 nogetters no478420 no478540 no478c70 nocmpmeth raise_head raise_full probe_head)
 for c in "${CFGS[@]}"; do
   gen "$c" || continue
   emcc -c work/ov_ablate.c -o work/obj/ov.o $CF || { echo "$c: ov compile FAIL"; continue; }
