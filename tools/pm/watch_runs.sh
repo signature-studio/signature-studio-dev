@@ -31,8 +31,18 @@ reset_wait_from_runs() {
 # run が 0 本でも終了しない (watcher を 0 本にしない)。新しい run が現れるまで IDLE 秒ごとに
 # 1 リクエストだけ読んで待つ。
 IDLE="${IDLE:-60}"
+# completed を含む 1 ページ (50 件) では、新しい完了 run に押し出されて未完了 run を取りこぼすため、
+# 未完了の status ごとに 100 件ずつ問い合わせて、どれかが失敗したら 1 を返す。
+list_active() {
+  local s out all=""
+  for s in queued in_progress waiting pending requested; do
+    out="$(gh api "repos/$REPO/actions/runs?status=$s&per_page=100" --jq '.workflow_runs[].id' 2>"$ERR")" || return 1
+    all="$all$out"$'\n'
+  done
+  printf '%s' "$all" | sed '/^$/d' | sort -n
+}
 while true; do
-  if ids="$(gh api "repos/$REPO/actions/runs?per_page=50" --jq '[.workflow_runs[]|select(.status!="completed")|.id]|sort|.[]' 2>"$ERR")"; then
+  if ids="$(list_active)"; then
     [ -n "$ids" ] && break
     wait_s "$IDLE"; continue
   fi

@@ -10,7 +10,7 @@ PM が VM 上で実行・常駐させる、PR / Issue / Actions run の運用ツ
   トークンの平文保存や PAT への切替で回避しない。依頼者に解錠を依頼する)。
 - `python3`、`jq`、`curl`、systemd user (`systemctl --user`)。heartbeat は OpenCode CLI を使う。
 - 操作は **REST を基本**にする。GraphQL は 5,000 点/時の枠を使い切った実績がある (RETRO §D)。
-  `gh pr ready` と Project V2 の更新だけが GraphQL。
+  GraphQL を使うのは次だけ: `pr_gaps.py` と `find_unreviewed.sh` (PR 一覧と review の取得)、`sync_status.py` (Project V2 の Status 更新)、`gh pr ready`。
 
 ## 環境変数
 

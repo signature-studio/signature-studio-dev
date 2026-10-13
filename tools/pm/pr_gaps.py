@@ -18,10 +18,19 @@ def run(*a):
     return subprocess.run(a, capture_output=True, text=True, check=True).stdout
 
 
-q = """query($o:String!,$n:String!){repository(owner:$o,name:$n){pullRequests(states:OPEN,first:100){nodes{
+q = """query($o:String!,$n:String!,$c:String){repository(owner:$o,name:$n){pullRequests(states:OPEN,first:100,after:$c){pageInfo{hasNextPage endCursor} nodes{
 number title isDraft mergeable reviewDecision headRefOid baseRefName updatedAt
 reviews(last:30){nodes{author{login} state commit{oid} submittedAt}}}}}}"""
-prs = json.loads(run("gh", "api", "graphql", "-f", f"query={q}", "-F", f"o={O}", "-F", f"n={N}"))["data"]["repository"]["pullRequests"]["nodes"]
+prs, cur = [], None
+while True:
+    args = ["gh", "api", "graphql", "-f", f"query={q}", "-F", f"o={O}", "-F", f"n={N}"]
+    if cur:
+        args += ["-f", f"c={cur}"]
+    page = json.loads(run(*args))["data"]["repository"]["pullRequests"]
+    prs += page["nodes"]
+    if not page["pageInfo"]["hasNextPage"]:
+        break
+    cur = page["pageInfo"]["endCursor"]
 
 active = []
 for s in ("in_progress", "queued", "pending", "waiting"):

@@ -20,24 +20,23 @@ watch_runs.sh の完了通知ごとに、結果処理と合わせて実行する
 - agent は素材が無いと停止報告を出す。停止報告は gh issue view <N> --json comments の最後の bot コメントの先頭行 (## 停止報告) で分かる。
 - 補充前に open issue の bot 停止報告 (素材不足) が無いかを確認し、あれば必要な素材名を指定して再投入する。
 
-## 2026-10-13 指示 121 (最優先・DIRECTIVES.md 指示 121 に逐語)
-- 新規タスクの着手禁止: 新しい issue への /oc 投入 (実装 run) をしない。解除条件 = Project V2 の In review が 0 件。
-- やってよいこと: 既存 PR の解決 (競合解消・修正 run・review 再起動・approve 済みの merge)、起票 (追跡のため)、レトロ。
-- 補充 (15 本維持) のための新規 issue 投入も禁止。稼働本数は『既存 PR の解決 run』で数える。
-- sweep_prs.sh (LOOP=900) は既存 PR の解決なので継続してよい。
+## 2026-10-13 指示 121 (歴史的経緯・現行の launch 規則ではない)
+指示 121 は 2026-10-13 時点の一時的な停止指示だった。現在の launch 規則は指示 130〜132 (`launch_issues.py`) が正本。
+この節の内容 (新規投入の停止・sweep_prs.sh の継続) は、現在の運用としては使わない (`sweep_prs.sh` は廃止、後継は `rest_heal.py`)。
+- 当時の内容: 新規タスクの着手禁止 (解除条件 = Project V2 の In review が 0 件)。既存 PR の解決 (競合解消・修正 run・review 再起動・approve 済みの merge)・起票・レトロは可。補充のための新規 issue 投入も禁止。
 
 ## 2026-10-13 13:10Z 追記 (heartbeat 処理で判明)
 - 差し戻しが 6〜10 回に積み上がる主因は、reviewer が『実装 agent では解消しない』と書いた PM 判断・起票を PM が決めていなかったこと。
-  `python3 $PM_DIR/pm_needs.py` で、最新の差し戻しが PM 判断を求めていて PM の応答が無い PR を洗い出す (REST のみ、約 1〜2 分)。heartbeat のたびに実行して、未回答を 0 にする。
+  `python3 $PM_DIR/pm_needs.py` で、最新の差し戻しが PM 判断を求めていて PM の応答が無い PR を洗い出す (REST のみ。所要は REPORT §8)。heartbeat のたびに実行して、未回答を 0 にする。
 - 積み PR の merge 順はブランチの積み方で決まる (判断前に `git log origin/main..<branch>` / 差分に含まれる他 PR の commit を確認する)。
   例: #551(merged) → #624 → #676 → #708 → #720。誤って逆順を指示したら、すぐ PR と issue に訂正コメントを出す。
 - 実装 agent は issue を起票できない規約 (WORKFLOW §2)。reviewer が『起票先番号』を要求したら PM が起票して番号を PR に伝える。起票前に `gh api "search/issues?q=repo:R+%22CI-13%22+in:title"` で番号の重複を必ず確認 (CI-13 が #725 と重複しかけた)。
 - fix run が exit code 143 (SIGTERM) で cancelled になる場合は、エージェントの `kill 0` / `pkill` が step の bash を落としている疑い (#744, PR #745 で setsid 対応)。annotation に shutdown signal が無いことを確認する。
-- 競合 PR の fix は repository_dispatch (watchdog) で実機動作を確認済み (#576, #689: 検出から push まで約 2.5 分)。schedule(*/5) の発火は #724 の merge から 80 分時点で 0 件。13:20Z で 0 件なら heartbeat から repository_dispatch (oc-watchdog) で起こす経路を PR で追加する。
+- 競合 PR の fix は repository_dispatch (watchdog) で実機動作を確認済み (#576, #689。計測値は REPORT §8)。schedule(*/5) は発火が無く、repository_dispatch (oc-watchdog) で起こす経路を使う。
 
 ## 2026-10-13 13:24Z 追記
 - watchdog を VM から起こす: `pm-watchdog.timer` (systemd user、5 分おき、`pm_watchdog_ping.sh` が repository_dispatch oc-watchdog を送る)。ログ: `$PM_DIR/pm_watchdog_ping.log`。実機で run 名 `watchdog` の起動を確認済み (13:22:51Z)。GitHub の schedule(*/5) は #724 の merge から 2 時間 0 件。止めるとき: `systemctl --user disable --now pm-watchdog.timer`。
 - keyring がロックされると gh が失敗し、ping が FAILED とログに残る (推測・平文保存はしない。依頼者に解錠を依頼)。
 - 新しい shell で `cf` を使うとき: PATH に bun が無いことがある。`mkdir -p "$PM_TMP/shim"; ln -sf "$(command -v bun)" "$PM_TMP/shim/node"; export PATH="$PM_TMP/shim:$PATH"`。
 - R2 投入の一時昇格ポリシー: `$PM_TMP/r2up/pol-rw.json` / `pol-ro.json` (消えたら再作成する: 対象は R2 バケット `signature-studio-artifacts` のリソース、権限は「Workers R2 Storage Bucket Item Read」と「Write」。Cloudflare のアカウント ID は `docs/REFERENCES.md` を参照)。
-- work-m11 は R2 に再投入しても無意味: ir_conditions.json が生成時の PE の絶対パスを持ち m11_build.sh が一致を要求する。使う側が m11_gen_ir2.sh (約 26 秒) を最初に実行する。
+- work-m11 は R2 に再投入しても無意味: ir_conditions.json が生成時の PE の絶対パスを持ち m11_build.sh が一致を要求する。使う側が m11_gen_ir2.sh を最初に実行する (所要は REPORT §8)。

@@ -26,7 +26,7 @@ if [ "$mode" = impl ] || [ "$mode" = both ]; then
     num="$(gh run view "$id" --repo "$R" --log 2>/dev/null | grep -m1 -oE 'OC_ISSUE_NUMBER: [0-9]+' | grep -oE '[0-9]+$')"
     [ -n "$num" ] || { echo "skip run $id: no issue number ($title)"; continue; }
     echo "$num|$id|$created|$title"
-  done < $PM_TMP/failed_impl.txt | sort -t'|' -k1,1n -k3,3 | awk -F'|' '!seen[$1]++ {print}' > $PM_TMP/restart_impl.txt
+  done < $PM_TMP/failed_impl.txt | sort -t'|' -k1,1n -k3,3r | awk -F'|' '!seen[$1]++ {print}' > $PM_TMP/restart_impl.txt
   while IFS='|' read num id created title; do
     state="$(gh issue view "$num" --repo "$R" --json state --jq .state)"
     [ "$state" = OPEN ] || { echo "skip #$num: $state"; continue; }

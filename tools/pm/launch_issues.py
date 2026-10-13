@@ -56,6 +56,20 @@ def load_json(p, default):
         return default
 
 
+_live_cache = {}
+
+
+def live_blockers(n):
+    """issue n を塞いでいる open な blocker (GitHub の dependencies)。取得できなければ止める (着手を誤らないため)。"""
+    if n not in _live_cache:
+        rc, o, e = gh(["api", f"repos/{R}/issues/{n}/dependencies/blocked_by", "--paginate", "--jq",
+                       '.[]|select(.state=="open")|.number'])
+        if rc:
+            raise SystemExit(f"blocked_by fetch failed for #{n}: {e.strip()[:150]}")
+        _live_cache[n] = {int(x) for x in o.split()}
+    return _live_cache[n]
+
+
 def graph(d):
     iss = {i["number"]: i for i in d["issues"]}
     nums = set(iss)
@@ -93,6 +107,10 @@ def graph(d):
         blockers[n] |= ds
     for n, ds in load_json(os.path.join(HERE, "manual_deps.json"), {}).items():
         blockers[int(n)] |= {b for b in ds if b in nums}
+    # GitHub に設定された issue dependencies (blocked_by) の open な blocker も、本文の記述と同じく待ちの根拠にする
+    for n, i in iss.items():
+        if (i.get("deps") or {}).get("total_blocked_by", 0) > 0:
+            blockers[n] |= live_blockers(n) & nums
     for pn, cs in children.items():
         if pn not in has_pr:
             blockers[pn] |= set(cs)
