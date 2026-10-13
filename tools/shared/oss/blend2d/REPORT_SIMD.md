@@ -11,6 +11,7 @@
 - フォント: DejaVuSans (`FL_MAC_DIR` が未展開のため OpenSans が無く fallback)。hash `f701c63bcdbcab67` は DejaVu 版の値 (OpenSans 版 `e467bd5b7dbcd277` とは不一致が正常)。
 - 所要: 一括 109 s (wall, build 含む、`date +%s` 差)。load average (1 分/5 分/15 分): run 開始直前 0.04 0.17 0.09 → bench 直前 2.91 1.19 0.47 → bench 後 2.91 1.19 0.47。
 - 終了コード: `rc=0`。`simd_sse2` の想定ビルド失敗は rc に含めず、比較対象からも外す。
+- 再現 (検証起点 `5a7f765`、同じ runner・クリーン worktree で `bash oss/blend2d/simd_bench.sh` を 1 回): rc=0、wall 89 s (build 含む)、load average 2.66 1.20 0.47 (bench 前後とも)。native no-JIT 0.142–0.145 ms/frame、base 0.448–0.454、simd 0.391–0.460 (n=3 each)。画素 base・simd とも PASS (pixel_hash f701c63bcdbcab67)。negctl FAIL (differing bytes=1/230415)。同じく `simd_sse2` のみ想定どおりビルド失敗。
 
 | 構成 | 画素 (vs native no-JIT) | ms/frame min–max (n=3, 中央値) | native 中央値比 | test.wasm / libblend2d.a |
 |---|---|---|---|---|
