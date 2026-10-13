@@ -12,7 +12,7 @@ rm -rf "$TMP"; mkdir -p "$TMP"
 trap 'rm -rf "$TMP"' EXIT
 
 # 1) 検証対象 = コミット済み HEAD (未コミット WIP に依存しない)
-git -C "$ROOT" archive HEAD src public index.html vite.config.ts tsconfig.json package.json | tar -x -C "$TMP"
+git -C "$ROOT" archive HEAD | tar -x -C "$TMP"
 ln -s "$ROOT/node_modules" "$TMP/node_modules"
 ( cd "$TMP" && patch -p1 --no-backup-if-mismatch < "$ROOT/tools/audio/integration/index.ts.diff" )
 
