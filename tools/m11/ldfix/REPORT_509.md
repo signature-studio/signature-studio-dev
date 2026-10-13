@@ -119,7 +119,7 @@ patterns が零埋めのため脱落が見えなかったと読めるが、liftd
 
 検証起点 commit = `5f28f67` (以降の commit は REPORT と `results/` のみ)。コミット済み HEAD で `bash tools/m11/ldfix/ldfix_509_e2e.sh` (`M11_WORK` = work-m11 展開先、`PY` = capstone + pefile 入り python):
 n=3 の所要 **146 / 147 / 147 s** (並列数 1、4 コア)、終了時 load average (1 分値) 1.14 / 1.20 / 1.39、3 回とも標準出力が byte 一致。内訳: 修復前 IR 再生成 + ldfix 2 版 + 監査 3 本 + ネガコン 3 本 + wasm 2 回ビルド + survey 2 回 + 計装ビルド + 動的確認。
-#484 の `audit_lsf_e2e.sh` も同 HEAD で再実行して完走 (95.2 s、`f3c*` を除く PE 版 report とのキー一致)。
+#484 の `audit_lsf_e2e.sh` も同 HEAD で再実行して完走 (95.2 s)。PE 版 `ldfix_report.json` とのキー不一致は `f3c*` 以外で `f3b_base_unresolved` 57 → 56 の 1 件のみ (§2.1。修復関数リストと出力 IR には影響なし)。
 
 ## 5. 検証範囲 / 範囲外
 - 範囲: `work-m11` 時点 (2026-10-10 生成) の `boot_final.ll` / `boot_final3.ll` 7421 関数。PE 無し shim (`ldmach_img.py` に `cover()` を追加し、RetDec config の区間が IR ラベルより短い関数を最大ラベルから最初の ret まで延長)。
