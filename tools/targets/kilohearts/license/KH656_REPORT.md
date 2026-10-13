@@ -1,0 +1,80 @@
+# KH-13 (#656) — ブラウザ分類 0x180ef7fc0 の lift IR 検証: 未 lift callee の処理 (部分完了)
+
+- 担当 dir: `tools/targets/kilohearts/license/` (前提 PR #329 のブランチ `249-kh11-group-host-license-lift` を取り込み済み、merge `f3b8056`)
+- 既知類型との関係 (DEFECTS.md / icall §4): 該当 ID なし。今回の失敗 2 種は**いずれも loud failure** (例外・ビルドエラー) で silent miscompile ではない。(a) 閉包内の ymm (AVX2) 命令の `gen_simd.py` 未対応 (`KeyError: 'i256'`)、(b) Win32 import `@GetCurrentThreadId` の宣言欠落 (`use of undefined value`)。D15 ([icall]) は既存 pass で本 module でも 3 site 復元済み (変更なし)。
+- 再現コマンド (license/ で実行): `python3 lic_build.py --module F` → `node kh249_check.mjs` → `python3 scripts/kh656_census.py`
+
+## 0. 結論 (先出し)
+
+| 受入条件 (#656) | 結果 |
+|---|---|
+| 1. 41 callee を列挙し、shim (または lift) を用意 | **部分達成**。41 件を列挙・分類済 (§2)。shim 4 件 (`new`/`delete`/`memcpy`/`getManager`) と lift 2 件 (`1800524e0`/`1800b4b10`) を追加し、未 lift は 40 件 (shim 4 + fail-fast 34 + AVX2 2)。残りは STL/EH/AVX2 で未達 |
+| 2. function_180ef7fc0 を実行し分類結果・カテゴリを機械照合 (ネガコン付き) | **未達**。入口は依然として最初の未 lift callee `0x180112a30` で fail-fast (§3)。分類結果の lift IR 照合はできていない |
+| 3. REPORT の『lift IR では未検証』を『検証済み』に更新 | **未実施** (検証できていないため、KH249_REPORT §6.2 の記述は変更しない) |
+
+→ **Refs #656 のみ。Closes は付けない** (受入条件 2・3 が未達)。
+
+## 1. 変更点
+
+| ファイル | 内容 |
+|---|---|
+| `lic_config.json` modules.F | `shims` を追加 (`180f878e0`=new, `180f8791c`=delete, `181384040`=memcpy, `180107430`=getManager。E と同一の C 実装を流用)。`lift` に `1800524e0`・`1800b4b10` を追加 (E で lift 済みの実 IR を流用) |
+| `scripts/kh656_census.py` | 未 lift callee の分類表 (shim / i256-AVX2 / fail-fast) と件数を出力 |
+| `scripts/kh656_closure.py` | 閉包展開ドライバ (未 lift callee を反復的に lift へ追加)。**現状は §4 の 2 件の blocker で停止する** (ビルド失敗時は exit ≠ 0 で終了し、結果を握りつぶさない) |
+| `KH656_REPORT.md` | 本報告 |
+| `docs/DOC_MAP.md` | KH249 行に KH656_REPORT を追記 (行数欄は実数) |
+
+## 2. 未 lift callee 41 件の内訳 (実測)
+
+計測: `python3 scripts/kh656_census.py` (HEAD の lic_config・`lic_build.py --module F` の stat.json)。
+
+| 分類 | 件数 | VA |
+|---|---|---|
+| shim (C 実装で置換、lift しない) | 4 | 0x180107430 (getManager) / 0x180f878e0 (new) / 0x180f8791c (delete) / 0x181384040 (memcpy) |
+| AVX2 (ymm 命令を含む、lift 不可) | 2 | 0x180f89cf0 / 0x180fb6124 (`i256` 検出は閉包展開の試行時の n1.ll で実測、§4) |
+| fail-fast (未 lift、呼ばれると停止) | 34 | 0x180005000 0x180005c30 0x180005c50 0x18000caf0 0x18000f590 0x180021490 0x1800219b0 0x180021d40 0x1800448e0 0x1800541b0 0x18006ac50 0x18006c040 0x18010b6c0 **0x180112a30 (入口経路の先頭)** 0x18012e420 0x18012fba0 0x180130560 0x18013b9e0 0x18013c9c0 0x18024b2e0 0x1803965a0 0x180396b00 0x180396f40 0x18065bbd0 0x180c433b0 0x180c44b50 0x180c44d20 0x180c44d30 0x180c44d50 0x180c47b50 0x180ef8ef0 0x180ef92b0 0x180ef9b70 0x180fb5f5c |
+| **合計 (未 lift 扱い)** | **40** | (元 41 − lift 追加 2 + 新規出現 1 `18000caf0`) |
+
+注: `0x180021490` (key_init) と `0x1800219b0` (apply_key) は module A/E で C stub の seam (`lic_config.json` の stubs) として扱われている。module F では lift も stub もされず fail-fast。F の経路で実際に到達するかは未確認。
+
+## 3. 実測 (コミット HEAD で実行。環境: nproc=4)
+
+| 項目 | 変更前 (PR #329 HEAD `d238c27` 相当) | 変更後 (本 PR) |
+|---|---|---|
+| `lic_build.py --module F` wall time | 24.9 s (retdec stage-0 10.8 s・emcc 11.8 s・user 37.0 s・sys 10.9 s。キャッシュ無し初回) | 同コマンド・キャッシュ有り (emcc 0.5 s。retdec は range key 不変のため再利用) |
+| wasm | 47,604 B | **54,394 B** (sha256 `7ba79e65ec158a711646316579e6f8bc3d8c12f47c61851710a5e2077b8c7707`) |
+| undefined import | 0 | 0 |
+| unlifted callee (kh_lower) | 41 | 40 (shim 4 を含む) |
+| `kh249_check.mjs` | ok=17 ng=0 | **ok=17 ng=0** (入口 fail-fast 先 `0x180112a30` は不変) |
+| 負律対照 (分類式 5 種・命令バイト照合) | 全 FAIL 検出 (KH249 §6.1) | 変化なし (本変更は分類式・thunk に触れない) |
+| load average (終了時) | — | 0.09 / 0.45 / 0.36 (4 CPU) |
+
+- **ネガティブコントロール: 新規 shim/lift については未実施**。追加した shim 4 件と lift 2 件は入口の実行経路で**呼ばれる前に**停止するため、壊して FAIL を確認できない。受入条件 2 のネガコンは入口を越えた後でのみ成立する。
+- 本変更は module F の設定のみ。`run_all.sh` 全体 (module A/B/E・snapin 6 種) は**未実行**。module A/B/E の設定・コードは変更していない。
+
+## 4. 閉包展開の試行と blocker (実測)
+
+`scripts/kh656_closure.py` で未 lift 36 件 (shim・既 lift を除く) を一括追加して再 build した結果:
+
+1. **gen_simd.py が失敗**: `KeyError: 'i256'`。閉包内の `0x180f89cf0` と `0x180fb6124` が ymm 命令 (`load i256` / `__asm_vpcmpeqd` / `__asm_vpmovmskb`) を含む。license 版の `lift/gen_simd.py` の `CT` 表に i256 が無い (snapins 版も同じで、既存 snapin の閉包には現れていない)。→ この 2 件を lift から除外 (`n1.ll` の define 単位で検出)。
+2. **emcc が失敗**: `final.ll:12382:18: error: use of undefined value '@GetCurrentThreadId'`。閉包内の関数が Win32 import を呼ぶが、license 版の lift パイプラインには import の `declare` 生成も named-import shim 節も無い。snapins 版 `lift/gen_stubs_sigs.py` には `IMP_SHIM` (GetCurrentThreadId 含む 20 件) と named-import 節があり、**移植が必要**。
+
+このため `kh656_closure.py` の実行結果は**不合格のまま**で、閉包展開の完了はしていない。`lic_config.json` は (1)(2) の試行で一時的に壊れた状態から、**ビルドが通る状態 (lift 8 件 + shim 4 件) に戻して**コミットする。
+
+## 5. 未解決 (起票先付き)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 入口経路 `0x180112a30` の fail-fast (STL map/shared_ptr 系の lift または shim) | 受入条件 2 (分類結果の lift IR 照合) 未達 | #656 継続 (本 PR は Refs) |
+| 残り fail-fast 34 件 (STL map/string/vector、EH `0x180005c30`/`c50`/`0x180fb5f5c` 等) | 閉包の広がり量は未見積 (試行 1 回目で 36 件を一括追加し失敗) | #656 継続。大きければ子 issue を PM が起票 |
+| ymm (AVX2) 命令の lift 未対応 (`0x180f89cf0` / `0x180fb6124`) | 閉包を広げられない | **未起票** — 親 #656 へのコメントで PM 判断を依頼 |
+| license 版 lift パイプラインの Win32 import 宣言・shim 節の欠落 (snapins 版から移植要) | 閉包を広げると emcc が失敗 | **未起票** — 同上 |
+| 0x180ef7fc0 の native oracle (ctx-fuzz) 未作成 | 出力の bit 照合ができない | #656 継続 |
+| PR #329 未マージ | 本 PR の diff に #329 の commit (merge `f3b8056`) を含む。レビュー対象が二重になる | PM の merge 順序判断 (#329 → #656 を推奨) |
+| shim 4 件 (E と同一実装) の妥当性は F の経路で未検証 | 入口を越えるまで検証不能 | #656 継続 |
+
+## 6. 検証範囲 / 範囲外
+
+- 範囲内: module F の build (lift→stub→emcc)・`kh249_check.mjs` (17 項目)・未 lift callee の census。
+- 範囲外: 閉包展開の完了、分類結果の lift IR 照合、native oracle との突合、module A/B/E/snapin 6 種の再実行 (本変更は F のみ)。
+- 作業ログ: 素材 (`plugins-kilohearts` の Windows installer zip 3.8 GB) は `$RUNNER_TEMP/kh_src` に展開し、`tools/targets/kilohearts/work/winpkg` (gitignore) に Windows 側のみ展開。emsdk/retdec は `/opt/` 既設を使用。Python 依存は `$RUNNER_TEMP/kh_venv` (pefile/capstone/numpy)。
