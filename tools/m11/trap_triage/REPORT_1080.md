@@ -46,7 +46,7 @@ wasm 線形メモリ address 0 から 296 B (= 37 × 8) は `m11_image.bin` で�
 - HEAD vs B: kind 遷移 2 件 (304: oob→ok、555: oob→ok)。895 は halt0 のまま。
 - B で変わったのは `Runtime error` 表示の**番地** (`…1460`→`…1480`) だけ。表示元 (`MessageBoxA` を呼ぶ関数) は本 run では未特定。ただし 0 埋め領域への差し替えで番地が変わったのは、表示文字列の位置が null 読みの値とは別に決まることを示す。
 
-REPORT_882 の値 (869 / 8) との差 (1 件 `halt0` 差) は、同じ手順の再実行での差。本 run の HEAD 値は `870 / 7` で、以後の比較はこの run 内の値で行う。
+REPORT_882 の値 (869 / 8) との差 (ok +1、halt0 -1) の原因は未切り分け。本 run の HEAD 値は `870 / 7` で、以後の比較はこの run 内の値で行う。
 
 ## 4. 判定
 
@@ -77,9 +77,11 @@ REPORT_882 の値 (869 / 8) との差 (1 件 `halt0` 差) は、同じ手順の�
 ## 7. 測定 commit と HEAD までの差分
 
 - 測定 commit: `c4e93550` (実測はこの commit の build・IR 生成で行った)。
-- `git diff c4e93550 HEAD -- tools/m11/` の差分は本 commit で追加した 3 ファイルのみ (コード・IR 生成経路は不変)。
+- `git diff --stat c4e93550 HEAD -- tools/m11/` の出力 (測定 commit からの追加は 3 ファイルのみ、コード・IR 生成経路は不変):
   ```
-  tools/m11/trap_triage/REPORT_1080.md         | 75 +
-  tools/m11/trap_triage/negctl_1080.sh          | 44 +
-  tools/m11/trap_triage/patch_412770_1080.py    | 32 +
+  tools/m11/trap_triage/REPORT_1080.md       | 85 ++++++++++++++++++++++++++++++
+  tools/m11/trap_triage/negctl_1080.sh       | 44 ++++++++++++++++
+  tools/m11/trap_triage/patch_412770_1080.py | 32 +++++++++++
+  3 files changed, 161 insertions(+)
   ```
+- 上記 3 ファイルは `tools/m11/trap_triage/` 内の新規追加のみで、`tools/m11/work/` や IR 生成スクリプトには触れていない。
