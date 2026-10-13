@@ -178,6 +178,9 @@ for r in allrows:
 ST_JA = {'F': '機能実装', 'S': 'スタブ(エラー/無し返却)', 'L': 'libc 解決', 'O': '序数 import (未解決)', 'K': '序数 import (同定・実装済み)', 'U': '**未実装**', 'X:gui': '対象外 (tools/gui)', 'X:audio': '対象外 (tools/audio)'}
 order = {'P0': 0, 'P1': 1, 'P2': 2, 'P3': 3, 'X': 4}
 bl = ['# BACKLOG — shimx 実装バックログ (優先度順, 実測)', '',
+      '> 正本: `tools/shimx/BACKLOG.md` (未解決一覧・解決済みは削除可)。',
+      '> **行数目安**: 本ファイルは未解決一覧の上限 300 行を超過 (`docs/DOC_MAP.md` §1 の上限ルール参照)。',
+      '> 超過分は Git 履歴に残る形での分割移動を推奨 (**内容は削除しない**)。', '',
       '優先度の定義 (必須性→使用頻度): **P0** = M11 init closure が declare する API または OTT undefined 24 種 / **P1** = FLEngine 静的呼出サイト ≥10 または 3 プラグイン以上が使用 / **P2** = FLEngine 静的 import のその他 / **P3** = delay-load・プラグイン専用 / **X** = 他担当 DLL (対象外)。',
       '呼出サイト数 = FLEngine_x64.dll の `jmp [IAT]` thunk への call/jmp/lea 参照数 (静的, `scripts/import_scan.py`)。', '',
       '## 集計', '', '| 優先 | API 数 | 機能実装 | スタブ | libc | 序数(同定・実装済) | 序数(未解決) | 未実装 | 対象外 |', '|---|---|---|---|---|---|---|---|---|']
@@ -202,11 +205,16 @@ bl += ['', '## 下流で実体化が必要な「口」(スタブ→実装の昇�
        '| COM オブジェクトの関数ポインタ | Win64 vtable 8B スロットに wasm 関数ポインタ | lifted コードの間接呼出し規約ブリッジ (i64↔i32 署名) | hostbridge |',
        '| 暗号ハッシュ (advapi32 Crypt*) | 常に失敗 | MD5/SHA を実装 (Serum2 ライセンス系のみ。FL 対象外) | plugins |',
        '| レジストリ永続化 | `shimx_reg_export_text/import_text` | IndexedDB への保存/復元 | runtime |']
-open(W('BACKLOG.md'), 'w').write('\n'.join(bl) + '\n')
+tail = open(os.path.join(HERE, 'backlog_tail.md')).read().rstrip('\n')
+open(W('BACKLOG.md'), 'w').write('\n'.join(bl) + '\n\n' + tail + '\n')
 
 # ---- inventory.md ----
 inv = []
 A = inv.append
+A('# 自動生成: `tools/shimx` の export 走査')
+A('')
+A('> **人手編集禁止** (生成元を直す)。本ファイルは測定・抽出結果の**単一の正本**。')
+A('')
 A('# shimx inventory — 実装済み / 未実装 / 対象外 (実測)')
 A('')
 A('## 結論')
@@ -283,7 +291,8 @@ if ordn:
     if unknown:
         A('序数 import (名前解決不能。実体 API の特定が要る): ' + ', '.join(unknown))
 A('')
-A('プラグイン専用で未提供 (BSD ソケット名は Emscripten libc が解決; 下記は Serum2 のみ): ' + ', '.join(sorted({n for p in plug_rows for n in p[4]})) )
+_plug_missing = ', '.join(sorted({n for p in plug_rows for n in p[4]})) or 'なし'
+A('プラグイン専用で未提供 (BSD ソケット名は Emscripten libc が解決; 下記は Serum2 のみ): ' + _plug_missing)
 A('')
 A('## 表D: 対象外 (他担当 DLL)')
 A('')
