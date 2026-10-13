@@ -3,7 +3,7 @@
 **判定: 受入 1・3・4 と 2 (unit 56 ok・退行 0) を達成。Closes ではなく Refs (未達 1 件 = RetDec の脱落機構の記録は未了、§6)。**
 件数 0 の空リストを `8c6530` へ渡す経路は塞がり、unit 56 は trap から ok になった。
 
-既知類型との関係 (DEFECTS.md): **該当なし (新類型候補)**。`8c5eb0` のループ先頭の件数判定 (`cmp i,count-1; jg exit`) の脱落は既存 D1a〜D17 のいずれにも当たらない。層は未切り分け (§6)。行案は §5。番号は (DEFECTS.md) 体系。
+既知類型との関係 (DEFECTS.md): **D1b と同型の症状・検出信号** (機械語の jcc に対応する IR `br` が無く、飛び先が無条件実行になる)。ただし **根本原因は未切り分け** (D1b は stage-0 のフラグが定数に畳まれる機構。本件は生 lift の段階で既に jcc が無く、同じ機構かは未確認。§2, §6)。新規番号は付けず、行案 (§5) は PM 判断。番号は (DEFECTS.md) 体系。
 
 検証起点: `8d883c3` (main)。作業 branch は `d9bcc52` (親 PR #700 の head) から切った。修正 commit `9dd4d55`。
 e2e 実測は `9dd4d55` の清潔な作業ツリーで実行した (§3-3)。
@@ -24,11 +24,18 @@ IR (`dec_label_pc_8c5ef5`) は `%9 = load i32 [rcx+0x14]` (件数) の後、無�
 修復はこの末尾の `br` を次の形に置換する (`tools/m11/guard699/m11_guard699.py`):
 
 ```llvm
+  store i64 0, ptr %rax.0.reg2mem          ; rax.0 := 0 (機械語で確定, 下記)
+  %g699rdx = and i64 %arg2, 255            ; rdx.1 := zext(arg2 下位 byte) (未検証の仮定, 下記)
+  store i64 %g699rdx, ptr %rdx.1.reg2mem
   %g699 = icmp sle i32 %9, 0
   br i1 %g699, label %dec_label_pc_8c6066, label %dec_label_pc_8c5f23
 ```
 
-- 条件 `count <= 0` と機械語の `jg` (符号付き比較, i=0 > count-1) は等価。
+- 分岐条件: `count <= 0` は機械語の `jg` と件数 ∈ [INT_MIN+1, 0] で一致する。**count = INT_MIN のみ不一致**: 機械語は `sub ebx,1` が wrap して `0x7FFFFFFF` と比較し jg が立たず本体を実行、IR は飛ばす。件数は非負の list 長なので本件では到達しないと見なすが、確認はしていない (厳密化 `sub` + `icmp slt` は未実施)。
+- **ガード辺の値 (レビュー指摘 2)**: ガードで飛ばすと、元 IR で `%rax.0.reg2mem`・`%rdx.1.reg2mem` を store するのは `dec_label_pc_8c6034`・`dec_label_pc_8c603f` だけで、飛び先 `dec_label_pc_8c6066` が両方を load する。このままでは 0 件経路で未定義値になる。次のように明示 store する。
+  - **rax.0 := 0 (機械語で確定)**: `8c5f06: xor eax,eax` の後、`8c5f18: jg` まで rax は書かれない (`8c5f08`〜`8c5f15` は rcx・ebx・[rbp+0x4c]・flags のみ)。0 件経路は rax=0 のまま `8c6066` に入る。
+  - **rdx.1 := zext(arg2 下位 byte) (未検証の仮定)**: 機械語では `8c5efd: call 8c67a0` の後の rdx は callee 依存。`8c67a0` は中で `8c7c80` を呼び (`mov rdx, rbx` 後), `8c5eda` の `410320` は `call qword ptr [rax-0x30]` (vtable 間接 call、target は IR から決まらない) を呼ぶ。rdx の出力は IR から確定できない。`8c5ee1: movzx rdx, byte [rbp+0x88]` を経由する値として、既存 IR の `8c6071` (`8ca670` 後の rdx を引数 rdx と同じとする) と同じ pass-through 規約に合わせた。**410320 と 8c67a0 が rdx を変えないことは確認していない**。
+  - **残る未証明の経路**: 0 件 ∧ arg3 (r8) == 0 ∧ arg2 下位 byte ≠ 0 のとき `8c608d: call 410360` の第 2 引数 (rdx) が、この仮定値と一致するか。同経路は `8c608d` まで到達する (arg2 下位 byte = 0 では到達しない)。機械語の値を確定するには vtable target と `8c7c80` の rdx 出力の確認が要る。未確定のまま残す (§6)。
 - pass は冪等で、`--mode off` が逆変換する (`on → off` で元の IR に一致, `on → on` で無変更を確認)。
 - `m11_build.sh` は alloca 修正の後に pass を適用する (既定 on)。`M11_GUARD699=off` で脱落状態に戻す。`M11_GUARD699_COND` で条件を差し替える (ネガコン用)。
 
@@ -112,13 +119,13 @@ bash m11_e2e.sh                                        # §3-3
 ```
 
 前提: `tools/m11/work/` に work-m11 が展開済み。`FL_WIN64_DIR` に fl-win64 が展開済み (`extracted/block00031_PE.bin`)。`capstone`・`pefile` を import できること (無いと qstore が skip される)。
-runner では `m11_e2e.sh` が `/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin` を固定参照するため、展開先 (`$RUNNER_TEMP/fl-win64`) への symlink を runner 上に作った (repo 外。#680 の範囲)。
+`m11_e2e.sh` は `[WIN64]` (`docs/REFERENCES.md`) の `extracted/block00031_PE.bin` を固定パスで参照する (#680 の範囲)。runner では展開先 (`fl-win64` 展開物の `extracted/`) への symlink を作って合わせた。
 
 ## 5. DEFECTS.md 行案 (PM 判断。直接編集はしない)
 
 | ID | 分類 | 症状 | 根本原因 | 観測 | 検出信号 | 修復 |
 |---|---|---|---|---|---|---|
-| (新規・番号は PM 採番) | fe または opt (未切り分け) | 件数 0 のループで本体が 1 回以上実行される。空リストの `Items[0]` を読み、不正レコードを OOB に渡す | ループ先頭の `cmp; jg exit` が RetDec の生 IR から脱落 (機構は未特定) | `8c5eb0` (unit 56, #662/#699): `8c5f15-8c5f18` ↔ `dec_label_pc_8c5ef5` の無条件 `br`。生 lift `boot2.lift.ll` で既に欠落 | jcc の target が IR 後続に無い (§3-2 の dropped)。strict 規則 (ループ head 型) | `m11_guard699.py` (IR pass, 冪等・双方向) で `icmp sle count,0` 分岐を復元 |
+| (番号は PM 採番。D1b と同型の疑い) | fe または opt (未切り分け) | 件数 0 のループで本体が 1 回以上実行される。空リストの `Items[0]` を読み、不正レコードを OOB に渡す | ループ先頭の `cmp; jg exit` が RetDec の生 IR から脱落 (機構は未特定。D1b の「jcc が IR から消える」と症状・検出信号は一致、根本原因は同一か未確認) | `8c5eb0` (unit 56, #662/#699): `8c5f15-8c5f18` ↔ `dec_label_pc_8c5ef5` の無条件 `br`。生 lift `boot2.lift.ll` で既に欠落 | 機械語 jcc に対応する IR 後続が無い (§3-2 の dropped)。strict 規則 (ループ head 型) | `m11_guard699.py` (IR pass, 冪等・双方向) で `icmp sle count,0` 分岐を復元し、ガード辺の rax/rdx を明示 store (§1) |
 
 ## 6. 未解決
 
@@ -127,9 +134,12 @@ runner では `m11_e2e.sh` が `/home/ubuntu/work/analysis/win64/extracted/block
 | RetDec が先頭 `cmp/jg` を落とす機構 (CFG 復元か命令翻訳か) の切り分け | 同型の再発防止 (修復は IR pass で済んでいるが原因は未特定) | #718 (`[M11-N35]`) |
 | strict 候補 405 件の真偽 (偽陽性率を含む) | 他 unit の miscompile の有無。survey の trap 29 本との関係も未確認 | #718 (`[M11-N35]`) |
 | `dropped_target_not_label` 7058 の内訳 | 走査の見落とし/偽陽性の見積もり | #718 (`[M11-N35]`) |
-| `m11_e2e.sh` の PE 固定パス (`/home/ubuntu/...`) と node v26 前提 | runner では symlink と node v22 で動かしている | #680 |
-| survey の揺らぎ (#662 reviewer 観測: 856/38, 859/36) | 本環境では 3/3 同一。原因未特定 | #680 |
-| `docs/DEFECTS.md` の新類型行 | PM 判断 | PM (§5) |
+| `m11_e2e.sh` の PE 固定パス (`[WIN64]`) と node v26 前提 | runner では symlink と node v22 で動かしている | #680 |
+| survey の揺らぎ (#662 reviewer 観測: 856/38, 859/36) | 再実行で同じ値 (856/38) が出た (§3-1)。原因未特定 | #680 |
+| `docs/DEFECTS.md` の行案 (D1b との関係の判定を含む) | PM 判断 | PM (§5) |
+| ガード辺の rdx.1 の値 (0 件 ∧ arg3==0 ∧ arg2 下位≠0 の `8c608d` 経路) | 仮定 (zext(arg2)) を置いた。410320 の vtable target と 8c7c80 の rdx 出力を確認するまで正しさは未証明 | #718 (`[M11-N35]`) へ追記 |
+| `8c60df` の戻り値不一致 (別件・ガード無しでも再現) | 機械語は `8c60df: mov rax,[rbp+0x80]` で [rbp+0x80] (arg1 / 8c608d の 410360 結果) を返す。IR は `ret rax.2` (`8c608d` の結果も `rax.2` へ store) で、arg2 下位 byte == 0 経路は arg1 でなく rax.1 を返す。戻り値は呼出側で使われる (例: `56fde0`)。今回の 2 呼出しは arg2 下位 byte = 1 のため `8c60df` 経路に入らない。他の呼出しで同経路に入るかは未確認 | 新規 issue (PM 採番) または #718 |
+| `count = INT_MIN` の不一致 (§1) | 件数の不正値。到達可否は未確認 | #718 (`[M11-N35]`) |
 
 ## 7. 次タスク提案
 

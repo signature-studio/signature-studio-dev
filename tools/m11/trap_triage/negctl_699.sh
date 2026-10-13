@@ -5,15 +5,17 @@
 #   fix  = cur + guard 有効 (既定)                                                    期待: base と unit 差は 56 のみ (trap→ok)
 #   ng   = cur + 偽ガード (icmp eq 123456789 = 常に不成立) 期待: cur と unit 差 0 (ネガコン), unit 56 trap
 # 各 survey は rc=0 かつ units JSON 生成を確認してから判定する (前回 JSON の流用で PASS しない)。
-# 判定が 1 つでも外れる・build/survey が失敗したら exit 1。終了時に m11_ov.c を HEAD 版へ戻す。
+# 判定が 1 つでも外れる・build/survey が失敗したら exit 1。終了時に m11_ov.c と work/boot_final.ll を開始時の版へ戻す
+# (ng 構成の IR が残ると次の既定 build の前提が変わるため。boot_final.ll は m11_build.sh が pass を in-place 適用する)。
 set -u
 HERE="$(cd -- "$(dirname -- "$0")/.." && pwd)"
 cd "$HERE"
 OUT=work/v699
 mkdir -p "$OUT"
 cp m11_ov.c "$OUT/ov.cur.c"
+cp work/boot_final.ll "$OUT/boot_final.start.ll" || { echo "FAIL: work/boot_final.ll が無い"; exit 1; }
 git show 8d883c3:tools/m11/m11_ov.c > "$OUT/ov.base.c" || { echo "FAIL: git show 8d883c3"; exit 1; }
-restore() { cp "$OUT/ov.cur.c" m11_ov.c; }
+restore() { cp "$OUT/ov.cur.c" m11_ov.c; cp "$OUT/boot_final.start.ll" work/boot_final.ll; }
 trap restore EXIT
 export TMPDIR="${TMPDIR:-${RUNNER_TEMP:-/tmp}}"
 

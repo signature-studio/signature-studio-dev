@@ -3,7 +3,8 @@
 
 機械語 8c5eb0: 8c5f0c で件数 [rcx+0x14] を読み、8c5f15 cmp / 8c5f18 jg 0x8c6066 で件数 <= 0 のとき本体を飛ばす。
 RetDec の IR (dec_label_pc_8c5ef5) ではこの分岐が脱落し、無条件に dec_label_pc_8c5f23 へ進む (#662 REPORT_662 §3)。
---mode on : 末尾の無条件 br を `%g699 = <cond>` + `br i1 %g699, dec_label_pc_8c6066, dec_label_pc_8c5f23` に置換する。
+--mode on : 末尾の無条件 br を、ガード辺の値の明示 store + `%g699 = <cond>` + `br i1 %g699, dec_label_pc_8c6066, dec_label_pc_8c5f23` に置換する。
+            store は rax.0 := 0 (機械語で確定), rdx.1 := zext(arg2 下位 byte) (機械語では callee 依存。未検証の仮定。REPORT_699 §1)。
 --mode off: 逆変換 (脱落状態に戻す。ネガコン用)。
 対象ブロックが 1 件でない・想定形でない場合は exit 1 (黙って通さない)。
 """
@@ -19,7 +20,10 @@ COUNT = '%9 = load i32, ptr %8, align 4'
 TAG = '%g699'
 DEFAULT_COND = 'icmp sle i32 %9, 0'
 PLAIN = '  br label %' + NEXT + '\n'
-GUARDED = re.compile(r'  ' + re.escape(TAG) + r' = (icmp [^\n]*)\n  br i1 ' + re.escape(TAG)
+STORES = ('  store i64 0, ptr %rax.0.reg2mem\n'
+          '  %g699rdx = and i64 %arg2, 255\n'
+          '  store i64 %g699rdx, ptr %rdx.1.reg2mem\n')
+GUARDED = re.compile(re.escape(STORES) + r'  ' + re.escape(TAG) + r' = (icmp [^\n]*)\n  br i1 ' + re.escape(TAG)
                      + r', label %' + EXIT + r', label %' + NEXT + r'\n')
 
 
@@ -62,7 +66,7 @@ def main():
         fail('ガード挿入位置 (件数 zext 後の store) が想定形でない')
 
     if a.mode == 'on':
-        new_blk = body + '  %s = %s\n  br i1 %s, label %%%s, label %%%s\n' % (TAG, a.cond, TAG, EXIT, NEXT)
+        new_blk = body + STORES + '  %s = %s\n  br i1 %s, label %%%s, label %%%s\n' % (TAG, a.cond, TAG, EXIT, NEXT)
     else:
         new_blk = body + PLAIN
     out = s[:i] + new_blk + s[j:]
