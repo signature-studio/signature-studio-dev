@@ -73,3 +73,32 @@ python3 trap_triage/check_682.py work/probe714/units_714.json --units 304,555,92
 - 次の一手 (未着手): OOB 直前に `tbl` と `cnt` の値 (`obj` の 0x08 / 0x10) を JS 側で読み、(a) `tbl` が指す表の sentinel の有無、(b) `obj` の初期化元 (この走査を持つ構造体を作る関数) を特定する。923 は `410b10` の `obj-0x80` の `obj` 生成元を追う。
 
 本追補の run は上記の逆引きまでで止める (真因は未特定)。
+
+## 7. フラグ配線の修正と再測定 (2026-10-13, 追補 run、n=1)
+
+**§3 の訂正**: `M11_FIX_535BF2` は `m11_ov.c` の既定 0 だけで、`m11_build.sh` の `CF` と stamp に渡っていなかった。そのため §3 の「転記 ON」は実際には ON になっておらず、ON/OFF の差分 0 は転記の無効性を示すものではなかった。`m11_build.sh` に `M11_FIX_535BF2` を `CF` と `ov_535bf2.stamp` で配線した (既定 0 のまま)。
+
+| 構成 | build | survey ok/trap | check_682 (304/555/923/291/296) |
+|---|---|---|---|
+| OFF (既定) | rc=0 / 28.9 秒 | ok 869 / trap 25 | trap, trap, trap, ok, ok (2/5, rc=1) |
+| ON (`M11_FIX_535BF2=1`、`ov.o` に転記が入ることを確認) | rc=0 | ok 869 / trap 25 | trap, trap, trap, ok, ok (2/5, rc=1) |
+
+- gen_ir2 48.8 秒 rc=0 / survey OFF 16.0 秒 rc=0。
+- ON でも 304・555・923 は trap。転記は OOB の起点ではなかった。
+
+**OOB の実測 (ON, `M11_SURVEY_STACK=304,555,923`)**: 前回 §6 の「304 の先頭 = `function_535bf2`」は再現しなかった。
+
+| unit | 先頭 wasm フレーム (関数) | OOB 命令 | 直上の呼出し鎖 |
+|---|---|---|---|
+| 304 | 14871 `function_4133f0` (`_UStrAsg`) | `i32.load offset=0` (`[src-8]` の refcount 読出し) | 3147 `function_535ab0` ← 3156 `function_4fad10` ← 1759 `function_4fb910` ← 5235 `function_883140` |
+| 555 | 14871 `function_4133f0` | 同上 | 同鎖の一部 (`function_4fad10` 経由 6211 ほか) |
+| 923 | 14900 `function_410b10` (OOB 直前 `i64.const 128; i64.sub` = `obj-0x80`) | `i32.load` | 1759 `function_4fb910` (呼出し鎖の上位は未確認) |
+
+- `function_4133f0` の C 転記 (`m11_ov.c`) は `src != nil` のとき `[src-8]` を読む。src がアドレス空間外の値になっているのが起点。
+- **未解決 (次の一手)**: `function_535ab0` が `4133f0` に渡す `src` の出どころ (呼出し元 `function_4fad10` の引数組立て) を、OOB 直前の値で確認する。`function_883140` 側の `i64.const 2074840` (0x1faa18) 付近の定数が、ポインタとして使われていないかも見る。
+
+## 8. 結論 (本 run)
+
+- 受入 1 (304・555 が ok): **未達**。OOB の起点は `_UStrAsg` の src 読出し (§7) で、§6 の `535bf2` 走査仮説は ON/OFF 両方で棄却 (トップフレームに出ない)。
+- 受入 2 (923 の原因): **未達**。鎖は §7 の表。
+- 受入 3 (回帰 0): OFF 既定の survey は HEAD と同じ ok 869 / trap 25。ON も同一。
