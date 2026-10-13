@@ -30,25 +30,24 @@ BLK の算出式・32bit 切り詰め・`ICALL_BLK` 不一致・パイプライ�
 下表の leafspec 数値 (`rc=1`・`match=0 / mismatch=200 / wasm_trap=200`) は §17.9 の記録 (HEAD `83cd9eb4`) の引用であり、本ファイルで独立に再測定したものではない。
 §17.9 の実行 run ID は本ファイル作成時点で特定できていない (`83cd9eb4` に紐づく Actions run のログに該当の leafspec 行を確認できなかった)。
 
-IR の観測 (下表) は `work/ott_getparam/ott_getparam_fixed.ll`・`ott_getparam.drc.restored.ll` を参照しているが、`work/` は gitignore 対象で本 PR からは再生成できず、生成コマンドも未記録。以下の件数は**未検証**として扱い、再現手順が確定するまで根拠にしない:
+IR 上の読み (下記) は `work/ott_getparam/` の生成物を参照したものだが、`work/` は gitignore 対象で本 PR からは再生成できず、生成手順・件数の数え方も未記録。**以下はすべて未検証の仮説**であり、件数は根拠にしない:
 
-| 項目 | 観測 |
-|---|---|
-| entry 引数 | `define i64 @function_18011e5a0(i32 %arg1, i64 %arg2)` (fixed) / `(i32 %arg1)` (restored)。本体は `%arg` を一切読まない |
-| `this` の読み | `%0 = load i64, inttoptr 6512738312` = BLK+0x08 (rcx)。以降 `add i64 %0, 728/732/...` で使用 |
-| `idx` の読み | `%1 = load i64, inttoptr 6512738320` = BLK+0x10 (rdx)。`trunc %1 to i32` / `icmp ult ..., 31` で使用 |
-| 戻り値の store | `store i64 %12, inttoptr 6512738432` = BLK+0x80 (rax) (29 箇所)。`store ..., 6512738440` = BLK+0x88 (xmm0) (23 箇所) |
-| BLK 参照の範囲 | BLK+0x00〜+0x88 の全 inttoptr 定数 (fixed.ll で計 135 箇所)。`@global_var` 参照は 0 |
-| restored の `__icall_dispatch` | 7 箇所 (stub 呼出し → 本 leaf の build では `__builtin_trap()` stub。`stub_externals: true`) |
+- entry 引数は `function_18011e5a0` の `%arg1`・`%arg2` (fixed 版) で、本体は `%arg` を読まないように見える。
+- `this` は BLK+0x08 (rcx)、`idx` は BLK+0x10 (rdx) から load されているように見える。
+- 戻り値の store 先は BLK+0x80 (rax)・BLK+0x88 (xmm0) に見える。
+- 参照範囲は BLK+0x00〜+0x88 の inttoptr 定数に見える。
 
-wasm32 (`p:32:32`) では BLK+0x08 = `0x84308008` / BLK+0x80 = `0x84308080` に切り詰められ、いずれも wasm の線形メモリ外。load・store とも OOB で trap する。
+観測済みの事実は次の 1 点のみ: §17.9 L240 の wasm trap 解析 (`LL_VERBOSE=1`) で BLK+8 (rcx) の load が OOB で trap したこと。
+
+wasm32 (`p:32:32`) では BLK+0x08 = `0x84308008` に切り詰められ、wasm の線形メモリ外になる。
 
 ## 確定した因果
 
-1. **入力の欠落**: entry は `this`/`idx` を BLK から読み、`%arg1`/`%arg2` を読まない。harness は wasm 引数として渡すだけで BLK へは書かない (`wasm_runner.mjs` は BLK を書く処理を持たない)。よって仮に BLK が読めても値は 0 (`this` = 0)。
-2. **BLK の配置**: `icall_rewrite.py` L653 の `0x184308000` は wasm32 の線形メモリ外。load・store の両方が trap する。`blk_va` 指定は RIP 相対 int32 の制約で不可 (§17.10)。
+1. **BLK の配置 (静的に確定)**: `icall_rewrite.py` L653 の `0x184308000` は wasm32 の線形メモリ外。BLK 参照の load・store は OOB で trap する (§17.9 L240 の BLK+8 trap と整合)。`blk_va` 指定は RIP 相対 int32 の制約で不可 (§17.10)。
 
-上の 2 点はどちらも単独で trap の原因になる。1 だけ直しても 2 の store/load で trap し、2 だけ直しても `this` が 0 のまま値が合わない。
+## 仮説 (未検証)
+
+2. **入力の欠落**: entry が `this`/`idx` を BLK から読み、`%arg` を読まないのであれば、harness は BLK へ書かないため (`wasm_runner.mjs` に BLK を書く処理は無い)、仮に BLK が読めても値は 0 になる。この読みは IR 再生成で確認するまで仮説として扱う。
 
 ## 修正方式 (未決定・子 issue で実施)
 
