@@ -128,6 +128,21 @@ FL/Web 系 (a65a73b):
 
 初版の HTML 変換は全タグを空白に置換しており、インラインタグ境界で語が分割された (`<span>Image Line</span>:` → `Image Line :`、`A<span>ny</span>` → `A ny`)。別算法の検算で FL EULA.html が 33332 / 33313 文字で不一致となり発覚。ブロック要素のみ改行・インラインは空白なしに修正し、2/2 一致。また `negative_control.sh` の初版は、EULA.html の改変対象 (`reverse engineer`) が原文では `reverse` と `engineer` の間で改行されており置換が空振りして exit 0 (期待 1) になった。空白改変側も同型の空振りを潜在していたため、改変が空振りしたら異常終了するガードを入れ、対象語を `decompile, disassemble` に変更した。
 
+## 定期実行 (CI-11, #507)
+
+`tools/legal/terms-watch/workflow/terms-watch.yaml` (**未配置**: 実装 run の GitHub App に `workflows` 権限が無く、`.github/workflows/` への push が `refusing to allow a GitHub App to create or update workflow` で拒否された。権限を持つ人が `cp tools/legal/terms-watch/workflow/terms-watch.yaml .github/workflows/terms-watch.yaml` で置く): 毎週月曜 03:17 UTC (`schedule`) + `workflow_dispatch`。素材不要の **Web 4 文書** (`--only fl-tou-web,kilohearts-eula,slate-audiotonix-terms,ni-eula --strict --no-write`) だけを回す。素材を要する `fl-eula-html` / `fl-tou-rtf` / `xfer-eula` は対象外で、FL 新版取り込み手順 (`docs/STATUS.md` MS11) から `pnpm terms-watch` を呼ぶ。
+- `ci.sh`: 比較を実行し、exit 0 でも結果 JSON で **4 件すべてが UNCHANGED** でなければ exit 4 にする (NEW・SKIP の見逃し防止)。0 以外は全て job 失敗。`--tamper <id>` は台帳の SHA-256 先頭 1 文字を変えた複製で比較する (台帳本体は書き換えない)。
+- `notify.sh`: 失敗時 (`if: failure()`) に、同題の open issue があればコメント、無ければ起票する。通知自体が失敗したら job も失敗のまま。
+- `workflow_dispatch` の入力 `negative_control` に id を選ぶと `--tamper` 付きで実行し、job 失敗 + 自動起票 (題は「ネガコン」) を確認できる。
+- Slate の 403: 取得は元からブラウザ相当の UA + Accept (`lib.mjs` `BROWSER_HEADERS`)。単体テスト 12 本目で UA が短いと 403 になる模擬サーバに対し取得成功・短い UA で `HTTP 403` を確認 (UA を `Mozilla/5.0` のみに変える変異で 12 本目だけ FAIL)。
+
+実測 (検証起点 ea92a05、クリーン HEAD の detached worktree、runner、node v22.23.3、load average 0.23 (開始時点)、並列 1): 単体テスト 12/12 PASS、1.20 / 0.82 / 0.80 s (n=3、`pnpm terms-watch:test` の実時間)。`negative_control_ci.sh` 8/8 期待どおり、21.28 s (実 Web 取得 4 件 × 6 回を含む)。`notify_test.sh` 6/6、既存 issue 照合を壊した変異で FAIL (exit 1)。変異: UA を `Mozilla/5.0` のみに変えると単体テスト 12 本目だけ FAIL。未実測: Actions 上の実行 (「未解決」表の先頭行)。
+
+| 再現 | 内容 |
+|---|---|
+| `bash tools/legal/terms-watch/notify_test.sh` | `notify.sh` を偽 `gh` で 6 ケース (既存 issue 無し → create / 同題 open issue 有り → comment / 別題のみ → create / list・create・comment の失敗 → 非 0)。実 issue は作らない |
+| `bash tools/legal/terms-watch/negative_control_ci.sh` | `ci.sh` の 8 ケース: 無改変 → 0 / 台帳ハッシュ 1 文字改変 ×4 → 1 / 接続不能 URL → 3 / 台帳に無い文書 (cli は exit 0) → 4 / 引数不正 → 2 |
+
 ## 範囲 / 範囲外
 
 検証範囲: 上記 7 文書 (Xfer は OTT win インストーラ) の取得・正規化・比較・台帳更新・終了コードと、Xfer の取得機構 (NSIS ヘッダ解析) の合成インストーラでの動作。範囲外 (主張しない): **Serum 2 の Xfer インストーラ・Serum 2 mac pkg からの取得** (`docs/LEGAL.md` §1 は OTT win / Serum 2 win / Serum 2 mac の 3 者が空白正規化後に一致と記載。本 PR で再検証していない)・NSIS の LZMA / bzip2 / ソリッド圧縮ヘッダ・ANSI (非 Unicode) NSIS・規約文に `$` 変数 (NSIS の内部コード化) を含む場合・mac 同梱文書 (`FL_MAC_DIR`。`docs/LEGAL.md` §1 では win と同一と記載、本 run では未検証)・プラグインインストーラ同梱の EULA (Kilohearts `EULA.txt` 等)・Image-Line の他の Specific Terms (Mobile EULA 等)・日本語等の言語別版・変更の法的意味の判定 (1 文字の誤植修正でも CHANGED になる)。
@@ -136,8 +151,9 @@ FL/Web 系 (a65a73b):
 |---|---|---|
 | Xfer 基準線は OTT win インストーラ 1 本から記録した。Serum 2 の Xfer インストーラ (win / mac pkg) では取得を未検証 | Serum 2 側だけ規約が改定されても、この 1 本の基準線では検出できない可能性 | #88 にコメント。`oc_artifacts: plugins-serum2` で `PLUGINS_DIR=<展開先> pnpm terms-watch -- --only xfer-eula --no-write` を実行し、UNCHANGED になるか確認 |
 | NSIS ヘッダの LZMA / bzip2 / ソリッド圧縮・ANSI ビルド・`$` 変数入りの規約文は未対応 | その形式の Xfer インストーラでは ERROR (exit 3、理由付き) | 本 REPORT の限界。実インストーラで ERROR になったら #88 にコメントし対応を追加 |
-| 定期実行・通知が未配線 (FL 追従プロセスの実体も repo に無い) | 30 日ルール (FL) を人が実行しないと検出できない | 新規子チケット `[CI-n]`: 週次 schedule で Web 4 文書 (`--only fl-tou-web,kilohearts-eula,slate-audiotonix-terms,ni-eula`) を回し exit 1/3 で失敗通知。FL 追従手順 (新版取り込み) からの `pnpm terms-watch` 呼出は #88 / MS11 (`docs/STATUS.md`) へコメント |
-| Slate は短い UA (`Mozilla/5.0` のみ) の curl で HTTP 403、ブラウザ相当の UA + Accept で 200 | ボット対策の強化で取得不能 (exit 3) になり得る | 本 REPORT の限界。発生したら #88 にコメント |
+| 週次 workflow が `.github/workflows/` に未配置 (App に `workflows` 権限なし)。配置後も PR の workflow は merge 後に初めて有効 (review ジョブは base の workflow)。`workflow_dispatch` のネガコン (台帳ハッシュ改変 → job 失敗 + issue 起票) は merge 後でないと走らせられない | #507 の受入条件 1・3 が未達 (ローカルでの `ci.sh` / `negative_control_ci.sh` は実測済み。`notify.sh` の実 issue 起票は未実測) | #507 に残す。人が workflow を配置して merge 後に `gh workflow run terms-watch.yaml -f negative_control=ni-eula` → run が failure・issue 起票を確認し、起票された issue を close |
+| FL 新版取り込み手順の実体が repo に無い (STATUS.md MS11 に `pnpm terms-watch` 呼出を明記しただけ) | 素材を要する 3 文書 (fl-eula-html / fl-tou-rtf / xfer-eula) は人が実行しないと検出できない | MS11 の親チケットで手順化 (#88 にコメント) |
+| Slate の 403 は UA 指定で回避済み (`BROWSER_HEADERS`、実測: `Mozilla/5.0` のみ → 403、ブラウザ相当 UA + Accept → 200)。ボット対策がさらに強化されたら取得不能 (exit 3) になり得る | 週次 job が exit 3 で失敗し issue 起票 | 発生したら #88 にコメント |
 | Kilohearts PDF の抽出が `uv` と PyPI の `pypdf==5.9.0` に依存 | `uv` 無し/PyPI 不達の環境では ERROR (exit 3) | 本 REPORT の限界 (pypdf を上げると抽出結果が変わり得るため pin を維持) |
 | 差分の `diff -u` は旧版スナップショットが手元 `work/snapshots/` にある場合のみ | 新規 checkout/CI ではハッシュ差のみ表示 | 規約本文を commit しない方針の帰結。必要なら CI artifact 保存を `[CI-n]` に含める |
 | Web ページ構造変更 (見出し・フッタ) | 切出し失敗 → ERROR、または誤って別範囲を基準線化 | サニティ (`minChars`/`mustContain`) で緩和。`sources.json` の更新で対応 |
