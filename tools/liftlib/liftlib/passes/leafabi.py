@@ -263,6 +263,9 @@ def _rx_thread(mod, fn, img, callee_set, log, stats):
                     break                       # ブロック/呼出境界では追わない (保守的)
                 v = it.next
             for reader in readers:
+                if n and leaf_ext("REINDEX"):
+                    # 前の挿入で行位置がずれるため, 読み手ごとに索引を作り直す (LEAF_EXT のみ)
+                    binder = Binder(mod, fn, mf)
                 n += _rx_one(mod, fn, binder, mf, ln, C, reader, stale, phis, fb_done, stats)
     stats["rx_threaded"] = stats.get("rx_threaded", 0) + n
     if n:
