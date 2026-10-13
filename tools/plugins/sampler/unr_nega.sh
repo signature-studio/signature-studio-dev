@@ -2,7 +2,8 @@
 # unr_e2e.sh (#667) の各検査の識別力を確認するネガティブコントロール。 対照 = 無改変で通ること、壊したものが落ちること。 exit 0 = 全て期待通り
 #   NC0: 対照 closure_unreached.py (無改変) → rc 0
 #   NC1: BFS の seed から (a) RVA32 の根を外す → U2 (根 ⊆ total3) が FAIL
-#   NC2: 即値辺を持つ合成入力 (nc2_imm_synth.py) で、BFS の辺から命令内即値を外すと U2 (固定点) が FAIL (対照は PASS) (#879)
+#   NC2: BFS の辺から命令内即値を外す → U6 (即値辺の識別力・合成入力) が FAIL (実データの即値辺は 0 件のため合成入力で示す)
+#   NC2 (別案): 即値辺を持つ合成入力 (nc2_imm_synth.py) で、BFS の辺から命令内即値を外すと U2 が FAIL (対照は PASS) (#879)
 #   NC3: 排他分類の (c) に (a)(b) の関数を二重計上する → U4 (排他合計) が FAIL
 #   NC4: capstone 側の RVA32 集合に偽の値を注入する → U1 (byte 走査の部分集合) が FAIL
 #   NC5: judge.py shells の入力 CSV の 1 行に emcc_c_rc=1 → judge が FAIL (rc 1)
@@ -33,6 +34,8 @@ cp "$CL" "$T"; expect "NC0 対照 closure_unreached.py (無改変)" "$(rc python
 mutate "$CL" "$T" "s/total3, _ = x.bfs(sorted(total2 | roots), edge3)/total3, _ = x.bfs(sorted(total2 | B_live), edge3)/" NC1
 expect "NC1 根から (a) RVA32 を外す → U2 FAIL" "$(rc python3 "$T" --out-dir "$N/out1")" 1; needfail 'FAIL.*U2' NC1
 
+mutate "$CL" "$T" "s/^        return x.edges(f)\[0\] | x.edges(f)\[1\] | i\[0\] | i\[1\]\$/        return x.edges(f)[0] | x.edges(f)[1]/" NC2
+expect "NC2 BFS の辺から命令内即値を外す → U6 FAIL (合成入力で即値辺の識別力を示す)" "$(rc python3 "$T" --out-dir "$N/out2")" 1; needfail 'FAIL.*U6' NC2
 # NC2: 即値辺を外す検査の識別力は、実データ (即値辺 0 件) では示せないため、即値辺を持つ合成入力で示す (#879)
 expect "NC2a 合成入力・即値辺あり (対照) → U2 PASS" "$(rc python3 sampler/nc2_imm_synth.py)" 0
 expect "NC2b 合成入力・BFS から即値辺を外す → U2 FAIL" "$(rc python3 sampler/nc2_imm_synth.py --drop-imm-bfs)" 1; needfail 'FAIL.*U2' NC2b

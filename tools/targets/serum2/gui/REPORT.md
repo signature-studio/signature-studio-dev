@@ -17,8 +17,8 @@ GUI 戦略 (a) 全 lift / (b) upstream VSTGUI 再構築の比較と判定は **�
 ## 1. 再現手順と入力確認
 
 ```sh
-# 素材: fl-win64 ではなく plugins-serum2 の Install_Xfer_Serum2_2.1.5.exe を使用
-7z x -y -owork/exe_extract "$RUNNER_TEMP/plugins-serum2/Install_Xfer_Serum2_2.1.5.exe"
+# 素材: fl-win64 ではなく plugins-serum2 の Install_Xfer_Serum2_2.1.5.exe を使用 (docs/REFERENCES.md [PLUGINS-SERUM2]。展開は §9-1 の手順で `$EXE` に設定済みとする)
+7z x -y -owork/exe_extract "$EXE"
 cp -f 'work/exe_extract/$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3' work/Serum2_win64.vst3
 python3 gui/extract_uidesc.py work/Serum2_win64.vst3 work/uidesc.json     # uidesc bytes 2093822 (REPORT §2 と一致)
 python3 gui/decode_splice_url.py work/Serum2_win64.vst3                  # 0x180796320 の復号文字列
@@ -126,8 +126,8 @@ python3 gui/decode_splice_url.py work/Serum2_win64.vst3                  # 0x180
 | 観測 | 結果 | 判定 |
 |---|---|---|
 | VSTGUI ソースパス文字列 (`vstgui\lib\cframe.cpp` 等) | 存在。`uidescription/detail/uijsonpersistence.cpp` を含む | VSTGUI 由来の確認 (高) |
-| `VSTGUI` / `vstgui` 文字列 | 計 2,358 件 (大半はパス・ログ用) | 版番号を含まない |
-| `3.7.12` | `VST 3.7.12` (フォント表示付近の文字列, offset 16595120) | **VST3 SDK の版**。VSTGUI の版ではない |
+| `VSTGUI` / `vstgui` 文字列 | §9 の値を正とする (件数・offset は §9 表を参照) | 版番号を含まない |
+| `3.7.12` | `VST 3.7.12` (フォント表示付近の文字列)。offset は §9 を参照 | **VST3 SDK の版**。VSTGUI の版ではない |
 | `3.19.3` / `9.1.5` / `2.0.20` / `2.0.24` | 版番号として単独出現 | VSTGUI と結び付く根拠は無い (未特定) |
 | `kVstVersion*` / `VSTGUI_VERSION` 系 | 0 件 | 版定数は無い |
 
@@ -137,20 +137,57 @@ python3 gui/decode_splice_url.py work/Serum2_win64.vst3                  # 0x180
 
 ### 検証
 
-- 本 run の再測定: **未実施**。`$RUNNER_TEMP/plugins-serum2/` が存在せず (`ARTIFACTS_DIR` は `fl-win64.tar.zst` のみ)、上表の数値は前 run の実測値。本節の sha256 (`501e7bb3dd9cafe4…`) も前 run の記録で、本 run では照合していない。
-- 前 run で使った grep の正確な式はログに残っていない。以下は再測定用に定義したもので、**表の数値との一致は未確認**。
-- 抽出 (`tools/targets/serum2/` を cwd とする):
-  ```sh
-  7z x -y -owork/exe_extract "$RUNNER_TEMP/plugins-serum2/Install_Xfer_Serum2_2.1.5.exe"
-  cp -f 'work/exe_extract/$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3' work/Serum2_win64.vst3
-  sha256sum work/Serum2_win64.vst3   # 完全な値を REPORT に追記する (前 run は先頭 16 桁のみ記録)
-  stat -c %s work/Serum2_win64.vst3  # 19236864 の一致を確認
-  ```
-- 文字列走査 (grep 既定は大小区別あり。`VSTGUI` と `vstgui` は別々に数える):
-  ```sh
-  grep -aoE 'VSTGUI' work/Serum2_win64.vst3 | wc -l          # 大文字
-  grep -aoE 'vstgui' work/Serum2_win64.vst3 | wc -l          # 小文字
-  grep -aob 'VST 3\.7\.12' work/Serum2_win64.vst3            # offset (前 run の 16595120 と照合が必要)
-  grep -aoE 'kVstVersion|VSTGUI_VERSION' work/Serum2_win64.vst3 | wc -l   # 版定数 (表の 0 件)
-  ```
+- 本 run の再測定: **未実施**。素材 `[PLUGINS-SERUM2]` が本 run の `$ARTIFACTS_DIR` に無く (`fl-win64.tar.zst` のみ)、上表の数値は前 run の実測値。本節の sha256 (`501e7bb3dd9cafe4…`) も前 run の記録で、本 run では照合していない。
+- 前 run で使った grep の正確な式はログに残っていない。表の数値の正は §9 (§9-1 の手順で再測定する)。
+- 再測定の手順は §9-1 を参照する。
 - 所要と load: **未計測** (PR 本文と揃える)。
+
+## 9. VSTGUI 版の同定 (2026-10-13 再測定・ソース照合)
+
+§8 の未了分を、VST3 SDK の `vstgui4` submodule との突合で行った。入力は §8 と同一のファイル (sha256 `501e7bb3dd9cafe4…` / 19,236,864 B)。素材の展開と再測定の手順は §9-1。
+
+| 観測 | 結果 | 判定 |
+|---|---|---|
+| バイナリ内の VSTGUI ソースパス (`vstgui4\vstgui\...`) | 34 件抽出。`..` を含む 1 件を除く **33 件** | 比較対象 |
+| 33 件が存在する vstgui4 タグ | `vstgui4_13_0` 〜 `vstgui4_14_3` は **33/33**。`vstgui4_12_3` は 32 (`lib/platform/win32/direct2d/d2dgraphicscontext.cpp` が無い) | **13.0 以降**に絞れる |
+| 12.x 以前 | `vstgui4_10`=30, `vstgui4_11`=32, `vstgui4_12_x`=32 | 除外 (ファイル数で不一致) |
+| 13.x と 14.x の区別 | 33 件のパス集合は同一。13.3 と 14.3 の `UIViewCreator` 系クラス名集合も同一 (4 件) | **パスでは区別できない** |
+| v3.7.12 SDK の vstgui4 pin | submodule commit `02eadc0d` (= `vstgui4_14_0-1`) | SDK 3.7.12 は 14.0 系を同梱 |
+| `VST 3.7.12` の offset | 16595116 | VST3 SDK 版文字列であることは不変 |
+| VSTGUI 文字列計 (大小区別なし) | `VSTGUI` 2,291 + `vstgui` 72 = **2,363** | 参考値。版判定には使わない |
+| 版定数 `kVstVersion` / `VSTGUI_VERSION` | 0 件 | §8 と同じ |
+
+- **結論: VSTGUI は vstgui4 の 13.0 以降 (実質 13.x または 14.x)。13.x と 14.x は今回の手法では区別できない。** 同梱 SDK 3.7.12 の pin (14.0 系) と整合するが、断定はしない。
+- JSON uidescription (`"vstgui-ui-description": {"version": "1"}`) の書式は `uijsonpersistence.cpp` (2020-05 導入, vstgui4_10 系で既に存在) と一致する。書式だけでは版は絞れない。
+- 未確定: 13.x と 14.x の確定。方法は (1) 13.x/14.x 間で差分のある関数本体 (逆アセンブル突合) (2) `UIViewCreator` の RTTI 名 (39 件) を 14.x 側と照合 のいずれか。(2) は本 run で RTTI の mangled 名の抽出に失敗 (0 件) したため未完。
+
+### 9-1. 再現手順 (`tools/targets/serum2/` を cwd・`work/` は gitignore)
+
+素材の所在は `docs/REFERENCES.md` の `[PLUGINS-SERUM2]` (取得指定 `oc_artifacts: plugins-serum2`)。
+
+```sh
+# tools/targets/serum2/ を cwd とする。$ARTIFACTS_DIR は docs/REFERENCES.md [PLUGINS-SERUM2] の配置先
+mkdir -p work/plugins-serum2
+tar --zstd -xf "$ARTIFACTS_DIR/plugins-serum2.tar.zst" -C work/plugins-serum2 --wildcards '*Install_Xfer_Serum2_2.1.5.exe'
+EXE=$(find work/plugins-serum2 -name 'Install_Xfer_Serum2_2.1.5.exe' | head -1)
+7z x -y -owork/exe_extract "$EXE"
+cp -f 'work/exe_extract/$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3' work/Serum2_win64.vst3
+sha256sum work/Serum2_win64.vst3   # 501e7bb3dd9cafe416b3412df3d4e084c01b7468201e5690b9009d7ecd4e5283
+grep -aoE 'vstgui4[\\/][A-Za-z0-9_\\/.-]+\.(cpp|h|mm)' work/Serum2_win64.vst3 | sed -E 's#\\#/#g; s#^vstgui4/vstgui/##' | sort -u > work/vstgui_src_paths.txt
+```
+
+ソース照合の基準:
+
+- 基準 SDK: `https://github.com/steinbergmedia/vst3sdk.git` の tag `v3.7.12_build_20`。`.gitmodules` の `vstgui4` の url は `../vstgui`、pin commit は `02eadc0d2d8295a3b856678fb67901c756580faf` (`git describe` で `vstgui4_14_0-1`)。
+- vstgui 本体: `https://github.com/steinbergmedia/vstgui.git` を `work/vstgui4` に clone し、タグごとに下記を数える。
+  ```sh
+  git clone --filter=blob:none --no-checkout https://github.com/steinbergmedia/vstgui.git work/vstgui4
+  for t in $(git -C work/vstgui4 tag -l 'vstgui4_1[0-4]*'); do
+    n=0; while read p; do git -C work/vstgui4 cat-file -e "$t:vstgui/$p" 2>/dev/null && n=$((n+1)); done < work/vstgui_src_paths.txt
+    echo "$t $n/$(wc -l < work/vstgui_src_paths.txt)"
+  done
+  ```
+  判定に使うのは「vstgui/ 配下のパス存在数」のみ。`d2dgraphicscontext.cpp` の有無は `git -C work/vstgui4 cat-file -e vstgui4_12_3:vstgui/lib/platform/win32/direct2d/d2dgraphicscontext.cpp` で個別に確認できる。
+
+- 所要 (real, 逐次): `extract_uidesc.py` 2.62 s (venv `work/venv`)。ソース照合の所要・load は**未計測**。
+- §8 の表の offset・件数は本節へのリンクに置き換えた (値は本節だけに残す)。

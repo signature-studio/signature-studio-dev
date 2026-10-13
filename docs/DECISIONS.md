@@ -86,3 +86,19 @@
   実測は `tools/shared/REPORT.md` §3.1。
 - **影響**: 退避トリガは RT D1 と同じ (wasm64 へ切替える時は FreeType も無改変の wasm64 ビルドを使う)。
   win freetype.dll は別 version のため、この決定は mac 2.7 の再ビルドにのみ適用する (version は未特定)。
+
+## D9 — 大物 (>24MiB) wasm は事前非圧縮 part + `chunked.mjs` で配信 (br 事前圧縮 part は採らない)
+
+- **状態**: 採用 (2026-10-13, issue #952 [PERF-P13])
+- **決定**: 25MiB を超える wasm は `deploy/scripts/05-stage.mjs` が 16MiB の**事前非圧縮 part** + `index.json` に分割し、
+  クライアントは `deploy/client/chunked.mjs` で連結 ReadableStream にして `WebAssembly.compileStreaming` に渡す。
+  `src/runtime/loader_boot.ts` `fetchCompile` は URL が `*.parts/index.json` のとき、この経路に分岐する。
+- **比較した方式**: (a) part ごとの brotli 事前圧縮 + JS デコード、(b) 事前非圧縮 part (採用)、(c) 単一 URL を Range で取得。
+- **理由**: (a) は Chrome 154 の `DecompressionStream` が brotli/zstd 非対応のため JS brotli デコーダが必要になり、
+  展開が compile 前の律速になる。Static Assets は Range 非対応 (200 全体のみ) のため (c) は使えない。
+  (b) は実エッジで 314MB・19 part の連結 compileStreaming を実証済み (`deploy/REPORT.md`)。
+  part は sha256 検証 + 順序保証 + 背圧を持つ。帯域節約の利得は br の 36% 程度 (`tools/perf/REPORT.md` §10) で、
+  大物を JS 展開する CPU コストと引き替えになるため採らない。
+- **影響**: 大物の wire サイズは非圧縮のまま。帯域が律速の回線では不利になる (実測は `tools/perf/results/chunked.json`)。
+  `cacheapi` モードは単一 URL 前提のため descriptor 経路では使わず、HTTP キャッシュに任せる。
+  R2 再移行時 (D1 の退避路) に part 単位の br を再検討する。
