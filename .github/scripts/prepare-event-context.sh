@@ -85,6 +85,26 @@ pr_body="$(jq -r --argjson max "$MAX_CHARS" '
 printf '%s' "$pr_body" > "$PR_BODY_FILE"
 chmod 600 "$PR_BODY_FILE"
 
+# review は push (pull_request の synchronize) で起動するが、agent は「push → 本文に oc_artifacts を追記」の
+# 順に動くことがあり、payload の本文は起動時点の古い値になる。そのままだと素材が fl-win64 だけになって
+# reviewer が e2e を再実行できない (#820)。トークンがあれば API で現在の本文を取り直す。
+# 取れなければ payload の本文のまま進む (警告のみ)。
+case "$MAX_CHARS" in '' | *[!0-9]*) MAX_CHARS=20000 ;; esac
+case "$EVENT_NAME" in
+  pull_request | pull_request_review)
+    if [ -n "${GH_TOKEN:-}" ]; then
+      pr_num_now="$(jq -r '.pull_request.number // empty' "$GITHUB_EVENT_PATH")"
+      if [ -n "$pr_num_now" ] && fresh_body="$(gh api "repos/${GITHUB_REPOSITORY:-}/pulls/${pr_num_now}" --jq "(.body // \"\") | .[0:${MAX_CHARS}]" 2>/dev/null)"; then
+        pr_body="$fresh_body"
+        printf '%s' "$pr_body" > "$PR_BODY_FILE"
+        log "refreshed the PR body from the API (${#pr_body} chars)"
+      else
+        log "::warning::could not refresh the PR body from the API; using the event payload"
+      fi
+    fi
+    ;;
+esac
+
 # ---------------------------------------------------------------- コマンド判定
 # 行頭 (空白は許容) に /oc または /opencode があり、その後に空白か行末がある行がある
 # ときだけ起動する。`/ocean` や URL 内の `/oc/` では発火しない。
@@ -113,7 +133,7 @@ ARTIFACT_RE='^(fl-win64|plugins-(ott|freshair|serum2|massivex|kilohearts)|toolch
 artifacts=""
 # pull_request_review (reviewer の差し戻し) の本文は reviewer の指摘であり、素材の指定は PR 本文にある。
 ARTIFACTS_SRC="$COMMENT_FILE"
-[ "$EVENT_NAME" = pull_request_review ] && ARTIFACTS_SRC="$PR_BODY_FILE"
+case "$EVENT_NAME" in pull_request | pull_request_review) ARTIFACTS_SRC="$PR_BODY_FILE" ;; esac
 if [ "$EVENT_NAME" = repository_dispatch ]; then
   ARTIFACTS_SRC="$RUNNER_TEMP/opencode-dispatch-artifacts.txt"
   printf 'oc_artifacts: %s\n' "$dispatch_artifacts" > "$ARTIFACTS_SRC"

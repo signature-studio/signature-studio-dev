@@ -160,6 +160,30 @@ P0c (`p0c/REPORT.md`) で見た各 kernel の現状 (本 PR では再測定し�
 検証範囲: 閉包の機械的な到達性 (RetDec+pass 鎖 → `emcc -c`) と、host / kernel 依存の静的な数え上げ。
 範囲外: wasm のリンクと実行、native との出力比較、framework / host shim との結合、Render test .flp。 範囲外の項目について、本書は何も主張しない。
 
+## 5b. 間接呼出到達先を加えた推移閉包 (#537 の closure_indirect 定義を流用)
+
+- 再現: `bash tools/plugins/dynamics/indirect_e2e.sh` (前提の inventory・閉包が無ければ dynamics_e2e.sh --skip-lift で生成)。 定義・検査 C1〜C4 は `dynamics/closure_indirect.py` (`sampler/closure_indirect.py` の `Pe` / `bfs` を import、sampler 側は無変更)
+- 定義: total = 直接 call/jmp 閉包 (base) ∪ 非共通 ∧ 閉包外 ∧ データ参照あり関数 (root) からの BFS。 検査 C2 は sampler の `unreached.json` が無いため、同定義を本 dir 内で再計算して照合
+- 検査: C1 base 再現 / C2 root 再計算一致 / C3 total ⊆ 非共通 / C4 capstone ⊆ byte 走査 → **PASS 4 checks × 7 plugins**
+- 増分 (実測・ `work/dynamics/indirect.json`):
+
+| プラグイン | base 関数 / B | total 関数 / B | 非共通に占める total (関数 % / B %) |
+|---|--:|--:|--:|
+| Fruity Limiter | 27 / 15,869 | 79 / 27,327 | 46.5 / 36.1 |
+| Fruity Compressor | 31 / 11,887 | 60 / 14,971 | 62.5 / 29.3 |
+| Maximus | 84 / 46,094 | 245 / 96,652 | 44.4 / 29.4 |
+| Soundgoodizer | 65 / 29,732 | 212 / 74,909 | 46.0 / 26.7 |
+| Emphasis | 60 / 25,572 | 109 / 39,305 | 56.2 / 43.2 |
+| Fruity Multiband Compressor | 19 / 9,515 | 50 / 14,121 | 47.2 / 44.0 |
+| Transient Processor | 26 / 15,853 | 65 / 22,135 | 53.7 / 29.1 |
+| 計 | 312 / 154,522 | **820 / 289,420** | |
+
+- lift (増分閉包を `lift_ranges.sh` = batch_lift と同一鎖で実行): **7/7 lift_rc=0 / declares_unimpl=0 / f80=0 / emcc_c_rc=0** (judge.py 7/7 合格)。 増分閉包の関数数は base の約 1.8〜3.3 倍 (Emphasis 109/60、Compressor 60/31、Soundgoodizer 212/65)
+- 実測時間 (`indirect_e2e.sh`、コミット前の作業ツリー): **73 s / rc=0**。 `closure_indirect.py` 2.7 s、lift 7 本の合計 71 s (Limiter 7 / Compressor 5 / Maximus 23 / Soundgoodizer 18 / Emphasis 9 / Multiband 4 / Transient 5 s)
+- 判定の負例: 増分 status から 1 行を落とすと judge.py が exit 1 (行欠落の検出)
+- **範囲外 (主張しない)**: 増分閉包の lift が通ったのは emcc の wasm バックエンドを通ったことだけ。 差分試験 (native ⟷ wasm の bit 比較) と wasm リンク・実行は未実施。 増分閉包の内容が正しい機能か (間接呼出の到達先が実際に呼ばれるか) は未検証
+- 注意: 増分後も "非共通 ∧ total 外" の関数は Maximus 307 / 232,504 B、Soundgoodizer 249 / 205,150 B と残る (sampler の #537 と同じく、閉包の取りこぼしは解消していない)。 残差の内訳 (lea 残 関数は Maximus 2 / Soundgoodizer 1 のみ) は本節の対象外
+
 ## 6. 未解決 (起票先付き)
 
 | 未解決 | 影響 | 起票先 |

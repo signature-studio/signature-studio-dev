@@ -207,7 +207,7 @@ python3 tools/icall/diff/fn3_diff.py 1801a9be0 --n 600 --dump    # native / rout
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| FLEngine 巨大 2 関数 (`0xc589b0`, `0x128f9e0`: 各 183 site) の RetDec 範囲分割 lift | 残 366 site | 素材 `fl-win64` が本 run に無く未着手 → #229 に残す (再起動時 `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk`) |
+| FLEngine 巨大 2 関数 (`0xc589b0`, `0x128f9e0`) の RetDec 範囲分割 lift | 残 366 site | 範囲分割では不変 (CHUNKS=2 でも 366)・棄却。実測は REPORT_APPENDIX.md §12 → #229 に残す |
 | `jmp [idx*8+tbl]` / Delphi in-code 表の cmp/je 展開 | RetDec 任せのまま | 同上 (FLEngine/Balance 実バイナリで要検証) → #229 |
 | Fruity Balance / Kilohearts / Fresh Air の wasm 実行 + 差分検証 | 監査のみのまま | 素材 `plugins-freshair plugins-kilohearts fl-win64` が必要 → #229 |
 | plugin closure T0 42 本へ route バッチ適用 | 未着手 | #15 / #50 と連携、素材同上 |

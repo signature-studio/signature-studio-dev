@@ -14,6 +14,7 @@ const cfg = {
   work_us: +(q.get("work_us") ?? 0),
   hiccup_ms: +(q.get("hiccup_ms") ?? 0),
   hiccup_every: +(q.get("hiccup_every") ?? 0),
+  hiccup_stop_ms: +(q.get("hiccup_stop_ms") ?? 0), // >0: この時間以降は hiccup を止める (T 減衰の検証)
   timeinfo: +(q.get("timeinfo") ?? 0),
   sr_after: +(q.get("sr_after") ?? 0),
   burst_floor: +(q.get("burst_floor") ?? 0),
@@ -50,7 +51,7 @@ window.__done = new Promise((resolveAll, rejectAll) => {
     onAbort: (what) => setTimeout(() => resolveAll({ aborted: true, what: String(what), stderr, cfg }), 200),
     arguments: [
       `api=${cfg.api}`, `mode=${cfg.mode}`, `buf=${cfg.buf}`, `depth=${cfg.depth}`, `secs=${cfg.secs}`, `sr=${cfg.sr}`,
-      `stress=${cfg.stress}`, `work_us=${cfg.work_us}`, `hiccup_ms=${cfg.hiccup_ms}`, `hiccup_every=${cfg.hiccup_every}`, `timeinfo=${cfg.timeinfo}`, `sr_after=${cfg.sr_after}`,
+      `stress=${cfg.stress}`, `work_us=${cfg.work_us}`, `hiccup_ms=${cfg.hiccup_ms}`, `hiccup_every=${cfg.hiccup_every}`, `hiccup_stop_ms=${cfg.hiccup_stop_ms}`, `timeinfo=${cfg.timeinfo}`, `sr_after=${cfg.sr_after}`,
       `burst_floor=${cfg.burst_floor}`, `panel=${cfg.panel}`, `ds_fmt=${cfg.ds_fmt}`, `ds_mode=${cfg.ds_mode}`, `ds_size=${cfg.ds_size}`,
     ],
     print: (t) => log("[wasm] " + t),
