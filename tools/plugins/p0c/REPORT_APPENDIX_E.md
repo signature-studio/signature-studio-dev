@@ -146,12 +146,12 @@ RetDec IR は下位 store (`%arg3`) のみで、`%arg2` の `inttoptr` が未使
 - 修復: `tools/plugins/lift/passes/fix_fistp_hi_store.py` [P-S2] (opt-in、関数指定)。下位 dword store の直後に
   `lshr 32` → `trunc` → 未使用 `inttoptr` への store を挿入する。対象形が 1 関数に 1 つだけ成立するときのみ書き換え、曖昧なら何もしない。
   `p0c4_abi_e2e.py` は `K80_NO_FISTP_HI=1` で外せる。`lift_ranges.sh` は `PLUG_FISTP_HI_FUNCS` で指定する。
-- 実測 (`p0c4_abi_e2e.py 2000`、負論対照 `K80_NO_FISTP_HI=1` と同一 HEAD で比較):
+- 実測は §14.7 末尾の最新 HEAD (`84202772`) の表が現行値。以下は pass 初版時の旧測定 (過去の検証 HEAD、記録のみ):
 
 | 条件 | 検証 HEAD | rc | 所要 | load (開始時) | 0x5de3e0 buf_diff | ok かつ buf_diff=0 |
 |---|---|---:|---:|---:|---:|---:|
 | 修復なし (`K80_NO_FISTP_HI=1`) | 作業ツリー (コミット前、内容は `7a8e5b1f` と同一) | 0 | 27.1 s | 0.14 | 2000 | 45 |
-| 修復あり | `7a8e5b1f` (コミット済み) | 0 | 27.2 s | 0.28 | **0** | **46** |
+| 修復あり | `7a8e5b1f` (コミット済み、#983 取り込み前) | 0 | 27.2 s | 0.28 | **0** | **46** |
 
 - 差分は 0x5de3e0 の 1 行のみ (他 79 kernel の `run / ok / sig11 / buf_diff` は不変)。`run=67 ok=67 sig11=0`。
 - `lift_ranges.sh` の opt-in 経路: `PLUG_FISTP_HI_FUNCS=function_5de3e0` で `on.final.ll` に `fhi_s` が 2 箇所、未指定で 0 箇所。
@@ -159,18 +159,23 @@ RetDec IR は下位 store (`%arg3`) のみで、`%arg2` の `inttoptr` が未使
   `Instruction does not dominate all uses!` で落ちるため候補から除外した。`%fhi_s` / `%fhi_v` が既存のときも書き換えない。
   回帰テストは `tools/plugins/lift/passes/test_fix_fistp_hi_store.sh` (`llvm-as` で検査。ok / dom / name / 旧 pass の負論対照)。
   実行結果は `OK` (4 ケースとも期待どおり)。`887d59fb` でも `test_fix_fistp_hi_store.sh` → `OK` (rc=0)。支配チェック後の pass で 0x5de3e0 の候補は落ちず `fixed` になる。
-  `887d59fb` で `p0c4_abi_e2e.py 2000` を実測 (素材 `fl-win64` `toolchain-retdec` `toolchain-emsdk` `work-liftlib` を展開。`k80.lift.ll` は `lift_ranges.sh` で再生成 (80 defines)、`f80_assess.py` → `p0c4` の順)。下表。
+  最新 HEAD `84202772` (main `a0e6ed71` 取り込み後) での実測。素材 `fl-win64` `toolchain-retdec` `toolchain-emsdk` `work-liftlib` を展開。`k80.lift.ll` は `kernel_table.py` → `lift_ranges.sh` (80 defines) → `f80_assess.py` → `p0c4` の順で再生成。クリーン worktree、各 1 回・直列。
 
-  | 条件 | 検証 HEAD | rc | 所要 | load (開始時) | 0x5de3e0 buf_diff | ok かつ buf_diff=0 | run / ok / sig11 |
-  |---|---|---:|---:|---:|---:|---:|---|
-  | 修復なし (`K80_NO_FISTP_HI=1 p0c4_abi_e2e.py 2000`) | `887d59fb` | 0 | 30.5 s | 0.10 | 2000 | 45 | 67 / 67 / 0 |
-  | 修復あり (`p0c4_abi_e2e.py 2000`) | `887d59fb` | 0 | 36.1 s | 0.09 | 0 | 46 | 67 / 67 / 0 |
+  | 条件 | 検証 HEAD | rc | 所要 | load (開始時 1 分) | 0x5de3e0 buf_diff | ok かつ buf_diff=0 | run / ok / sig11 | 0x5dee90 / 0x5df040 / 0x5e02b0 |
+  |---|---|---:|---:|---:|---:|---:|---|---|
+  | 修復なし (`K80_NO_FISTP_HI=1 p0c4_abi_e2e.py 2000`) | `84202772` | 0 | 15.3 s | 0.40 | 2000 | 48 | 67 / 67 / 0 | 0 / 0 / 0 |
+  | 修復あり (`p0c4_abi_e2e.py 2000`) | `84202772` | 0 | 15.6 s | 0.32 | 0 | 49 | 67 / 67 / 0 | 0 / 0 / 0 |
 
-  - 修復なしと修復ありの kernel 行の差分は 0x5de3e0 の 1 行 (buf_diff 2000 → 0) のみ。他 66 kernel は run / ok / buf_diff が同一。
-  - 受入基準 ①〜④ と kernel 表 (45 変数 / 80 実装 / 10,886 B / x87 28) は修復ありで通過。
-  - 残差 0x5dee90 / 0x5df040 / 0x5e02b0 は修復ありでも buf_diff 2,565,360 / 2,565,277 / 2,578,706 のまま。本ブランチ `887d59fb` は origin/main (`b53f24e0`) より 170 コミット古く、main の `k80_deref_fix.py` (#983、`cb346018`) を含まないため。main 取り込み後の再測定は #331 の範囲 (本 PR の範囲外)。
+  - 修復なしと修復ありの kernel 行の差分は 0x5de3e0 の 1 行 (buf_diff 2000 → 0) のみ (`diff` で確認)。
+  - kernel 表 80 implementations / 45 variables / 10,886 B / x87 28 は一致。`test_fix_fistp_hi_store.sh` → OK (rc 0)。
+  - 修復ありの IR: `on.final.ll` に `fhi_s` が 2 箇所 (`PLUG_FISTP_HI_FUNCS=function_5de3e0` 指定時、`[P-S2] function_5de3e0: fixed`)。
+
+  過去の検証 HEAD (記録のみ・現 HEAD の値ではない):
+  - `887d59fb` (main `b53f24e0` 取り込み前): 修復なし 0x5de3e0 buf_diff 2000 / ok かつ buf_diff=0 は 45、修復あり 0 / 46。残差 0x5dee90 / 0x5df040 / 0x5e02b0 は修復ありでも buf_diff 2,565,360 / 2,565,277 / 2,578,706 のまま (main の #983 `k80_deref_fix.py` を含まなかったため)。
+  - `7a8e5b1f`: 修復あり 0x5de3e0 buf_diff 0 / ok かつ buf_diff=0 は 46 (#983 取り込み前、修復なしの測定は作業ツリー)。
+
   - 未検証: `p0c3_e2e.sh` (0x5de3e0 を回帰判定から除外する別経路)、`p0c_e2e.sh` / `p0c2_e2e.sh`。
-- 未検証: 残る 0x5dee90 / 0x5df040 / 0x5e02b0 / 0x5e12b0 (#331) と、`p0c3_e2e.sh` の回帰判定 (0x5de3e0 除外の既存処理) の見直し。
+- 未検証: 0x5e12b0 (#331)。`p0c3_e2e.sh` の回帰判定 (0x5de3e0 除外の既存処理) の見直しは #331。
 
 ## 15. 環境パス置換 (#346, 親 #294・先行 #312): /home/ubuntu 絶対パスを tools/shared へ
 
