@@ -44,13 +44,19 @@ REPORT 本体 §4 から分割移動した経緯と実行条件 (内容は削除
 
 ## G. 殻と engine の結合方式 (受入 5、静的解析)
 
-- 対象: 殻 (Delphi) 18978 / 19144 / 19265 / 19267 と engine 18977 / 19143 / 19266 / 19268。`fl-win64` の block PE を展開し pefile と文字列走査で確認 (定数・ファイル名の実測。`work/` 無し)。
-- 殻の import: 4 本とも `LoadLibraryExW` / `GetProcAddress` / `FreeLibrary` を持つ (KERNEL32)。
-- 殻の文字列 (UTF-16 / ASCII): engine 名は殻に入っている。
-  - Frequency Shifter: 殻 18978 に `Engine_x64.dll` と `dispatch` (0x2dda74 / 0x2dda92)。engine 18977 の export は `dispatch` のみ。
-  - Hyper Chorus: 殻 19144 に `engine_x64.dll` と `DispatchToEngine` (0x2e9704 / 0x2e9722)。engine 19143 の export は `DispatchToEngine` のみ。
-  - Vintage Chorus: 殻 19265 に `engine_x64.dll` と VST 系の名前 `VSTPluginMain` ほか大文字小文字違い 8 種 (計 9 種、0x2d9db0〜0x2daaa0。`vstpluginmain` は 2 箇所)。engine 19266 の export は `VSTPluginMain` / `main`。
-  - Vintage Phaser: 殻 19267 に `engine_x64.dll` と VST 系名 (0x2db640〜0x2dc330)。engine 19268 の export は `VSTPluginMain` / `main` (19266 と同じ VST2 export 構成)、import は `LoadLibraryExW` / `GetProcAddress` / `FreeLibrary` (KERNEL32)。
-- 結論 (推定): 殻が `LoadLibraryExW(engine_x64.dll)` → `GetProcAddress(<export>)` で engine を動的ロードし、Frequency Shifter / Hyper Chorus は `dispatch` / `DispatchToEngine` を、Vintage 系は `VSTPluginMain` (大文字小文字違いの名前で検索) を引く。殻の `dynload 2` (§1) と一致する。
-- 未解析: 殻内の `GetProcAddress` 呼出箇所と引数の実値 (文字列アドレスを参照する命令の特定)、engine の `DllMain` の扱い。bit-exact 検証や wasm 側のリンク方式は範囲外 (#202 / #197)。
-- 再現: `pefile` で殻・engine の export / KERNEL32 import を列挙し、UTF-16 / ASCII 文字列を走査 (本節の値の出典)。
+結論: 殻が `LoadLibraryExW` → `GetProcAddress` で engine を動的ロードする (推定)。測定値 (アドレス・export・件数) の正本は本体 `REPORT.md` §4.1。未解析 (殻内の `GetProcAddress` 呼出箇所) は #527 に残す。
+
+## H. 判定 (gate) の設計と PR #506 の reviewer 指摘への対応 (REPORT.md §5 から分割移動)
+
+#506 の指摘は (a) 判定が不合格でも exit 0 になる、(b) 判定そのものにネガティブコントロール (NC) が無い、の 2 点。本書では次のように作った。
+
+| 検査 | 実装 | 不合格時 | NC (`modulation_nega.sh`) |
+|---|---|---|---|
+| 殻 8 本の合否 | `judge.py <status.csv> --blocks … --batch-dir work/batch`: lift_rc = 0 / f80 = 0 / `emcc -c` rc = 0 / declares_unimpl = 0 (-1 = 集計行なしも不合格) / define = 閉包関数数 / 全列が整数 / ヘッダ一致 / `p.final.ll` の define 数が行と一致 / `p.o` が非空 | exit 1 (入力不正は 2)。e2e は `||` で受けて `FAIL` を出し exit 1。**`OK` 行は全判定通過後の最終行にだけ出る** | NC3: 15 ケース (§6) |
+| e2e スクリプト自身の終了コード | 判定を `--judge-only` で単独実行でき、 `STATUS_CSV` で入力を差し替えられる | 不合格行入りの CSV で exit 1 かつ出力に `[modulation_e2e] OK` を含まない | NC6 |
+| stale な結果で合格しない | lift 前に `work/batch/<block>` を消す (`lift_ranges.sh` は `drc.ll` の存在だけを見る)。判定対象は今回の実行で `status.csv` に追記された行だけ | — | (設計) |
+| `PLUGIN_MATRIX.json` との突合 | `matrix_check.py`: 閉包 6 項目 + matrix に `batch` 欄のある 5 本は 4 項目を status と比較 (計 68)。プラグイン数 ≠ 8 は exit 2 | exit 1 | NC4 |
+| Dispatcher ID の別算法検算 | `ids_crosscheck.py` | exit 1 | NC5 |
+| `emcc -c` ゲート / ranges が lift 範囲を決めること | — | — | NC1 / NC2 (#506 と同方式) |
+| 間接 call 脱落の検出 | `icall_check.py --gate` (IR 側 = 元の間接 call + 復元 dispatch が静的 site に満たなければ FAIL。audit と別算法の不一致も FAIL) | exit 1 | NC7 |
+| 閉包の境界 (測定) | `reach_check.py` (leak 自体は判定外。A ⊆ B' と前向き ⇒ 逆向きの検算が崩れたら FAIL、`--gate` は leak 1 本で exit 1) | exit 1 | NC8 |
