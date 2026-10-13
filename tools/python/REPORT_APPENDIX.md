@@ -187,7 +187,7 @@ stubs (LGPL 参照) 署名との照合 (kwlist のある 103 のうち stubs 署
 | Remote Scripts が `channels` を import 無しで参照 → 実機が同名を注入していると推定 | ローダの注入名 (flapi 12 module) | #79 コメント |
 | `ScriptDialog.Execute()` は headless で常に True | 対話キャンセルの再現不可 | #10 (HUD) |
 | Audio scripts 12 本に `enveditor` 実装が必要 (Edison の波形操作 13 メンバ + Editor 選択) | Audio scripts 0/12 | 新規子チケット案 `[PY-6] enveditor module` (T7 を分割) |
-| flpianoroll は #79 の 64 メンバのうち **62/64 実装**。stub 1 = `Score.loadScoreFromFile` (`NotImplementedError`)、未実装 1 = `ScriptDialog.DialogParams` (`src/flpianoroll.py` に無い) | #79 の受入「64 メンバ」は未充足。`loadScoreFromFile` は .fst/.fsc 読込を使うスクリプトに影響。`DialogParams` は HUD (#10) の実フォーム連携と合わせて実装 | #79 コメント (本 PR の fix で投稿) |
+| flpianoroll の 64 メンバは **PY-19 (#792) で全て実装** (`loadScoreFromFile` は仮想 FS の JSON 読込、`DialogParams` は MOCK)。残り: 実 FL の `.fst`/`.fsc` 形式・`DialogParams` の戻り値形 | 詳細は [REPORT_PY19.md](REPORT_PY19.md) §6 | #81 (PY-9) ほか、REPORT_PY19 §6 参照 |
 | Chrome 上の pyscript 実行未検証 | node のみ | 新規子チケット案 (browser_check に追加) |
 
 ### 14-b. main 競合解消後の再検証 (merge commit `647c9c1`、node v22.23.3、uptime load average 1 分値 2.52 / 2.52 / 2.96)
