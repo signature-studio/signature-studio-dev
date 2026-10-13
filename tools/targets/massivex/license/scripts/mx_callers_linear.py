@@ -21,6 +21,7 @@ def find_callers_linear(code, text_va, targets):
     hits = {t: [] for t in targets}
     buf = bytes(code)
     pos, decoded, undecoded = 0, 0, 0
+    gaps = []
     while pos < len(buf):
         end = 0
         for ins in md.disasm(buf[pos:pos + WINDOW], text_va + pos):
@@ -32,10 +33,14 @@ def find_callers_linear(code, text_va, targets):
                     hits[dst].append((hex(ins.address), ins.mnemonic))
         if end == 0:
             undecoded += 1
+            if gaps and gaps[-1][0] + gaps[-1][1] == text_va + pos:
+                gaps[-1][1] += 1
+            else:
+                gaps.append([text_va + pos, 1])
             pos += 1
         else:
             pos += end
-    return hits, decoded, undecoded
+    return hits, decoded, undecoded, gaps
 
 
 def selftest():
@@ -53,12 +58,12 @@ def selftest():
     code += b"\xe8" + (TARGETS[2] - (text_va + len(code) + 5)).to_bytes(4, "little", signed=True)
     code += b"\xc3"
     want = {TARGETS[0]: 1, TARGETS[1]: 2, TARGETS[2]: 1, TARGETS[3]: 0, TARGETS[4]: 0}
-    hits, decoded, undecoded = find_callers_linear(bytes(code), text_va, TARGETS)
+    hits, decoded, undecoded, gaps = find_callers_linear(bytes(code), text_va, TARGETS)
     got = {t: len(hits[t]) for t in TARGETS}
     for t in TARGETS:
         print(f"selftest fn {t:#x}: 期待 {want[t]} 件 / 検出 {got[t]} 件")
-    print(f"selftest decode: {decoded} B / {len(code)} B, undecoded {undecoded} B")
-    ok = got == want and undecoded > 0
+    print(f"selftest decode: {decoded} B / {len(code)} B, undecoded {undecoded} B, gaps {[(hex(a), n) for a, n in gaps]}")
+    ok = got == want and undecoded == 3
     print("selftest:", "PASS" if ok else "FAIL")
     return 0 if ok else 1
 
@@ -71,8 +76,12 @@ def main():
     ib = pe.OPTIONAL_HEADER.ImageBase
     text = [s for s in pe.sections if s.Name.rstrip(b"\0") == b".text"][0]
     t_off, t_va, t_sz = text.PointerToRawData, ib + text.VirtualAddress, text.SizeOfRawData
-    hits, decoded, undecoded = find_callers_linear(data[t_off:t_off + t_sz], t_va, TARGETS)
+    hits, decoded, undecoded, gaps = find_callers_linear(data[t_off:t_off + t_sz], t_va, TARGETS)
     print(f".text {t_sz} B: decoded {decoded} B ({decoded / t_sz:.2%}), undecoded {undecoded} B")
+    with open("work/mx_linear_gaps.txt", "w") as f:
+        for a, n in gaps:
+            f.write(f"{a:#x} {n}\n")
+    print(f"undecoded gaps: {len(gaps)} 区間 → work/mx_linear_gaps.txt (VA 開始 / バイト数)")
     for t in TARGETS:
         print(f"linear fn {t:#x}: call/jmp {len(hits[t])} 件", hits[t][:10])
 
