@@ -41,8 +41,25 @@
 
 ## 4. 仮説の判定
 
-- 仮説「monitor 列挙 stub が 0 を返すことが this 不正の原因」: **支持 (間接)**。list は `867510` の `EnumDisplayMonitors` callback でしか埋まらず、stub がそれを呼ばないので list が空のまま `80e040` に入る。
+- 仮説「monitor 列挙 stub が 0 を返すことが this 不正の原因」: **§4.1 のネガコンで 275 について反証** (callback を呼んでも 275 は oob のまま)。初版の「支持 (間接)」は、stub が list を埋める前提の推論に過ぎなかったため撤回。
 - 直接の反証 (ネガコン) は未実施 (§5)。「list が空だと必ず OOB になる」ことは実測 (添字 13 の garbage) で示したが、「stub を実装すれば 275 が ok になる」は未検証。
+### 4.1 ネガコン (#1096、本 HEAD c4e93550 基準)
+
+- 変更 (a): callback VA `0x85df70` (56 B) を `m11_extra_ranges5.txt` に追加し boot5 として lift → IR に `function_85df70` (i64 4 引数) が入る。
+- 変更 (b): `m11_win.c` に `EnumDisplayMonitors` (monitor 1 件 `0x10001` を `m11_icall` で callback に 1 回渡す) と `GetMonitorInfoW` (1920×1080, primary) の仮実装を追加。生成 stub (`return 0`) は `M11_EXCLUDE` で除外される。
+- survey (`SV_RAW=1 survey_units.mjs`, 各 13 s, rc 0):
+
+| 条件 | ok | oob | halt0 | miss | noproc | other | unit 275 |
+|---|---|---|---|---|---|---|---|
+| 変更前 (base1096_before) | 871 | 16 | 7 | 46 | 1 | 1 | oob |
+| (a) のみ (IR lift, stub 戻し) | 871 | 16 | 7 | 46 | 1 | 1 | oob |
+| (a)+(b) | 872 | 15 | 7 | 46 | 1 | 1 | oob |
+
+- 遷移: (a) のみ 0 件。(a)+(b) では **unit 144 のみ `oob`→`ok`**、275 以外の他遷移は 0 件。
+- unit 275 は (a)+(b) でも `oob` のまま。ただし callback `0x85df70` は実際に呼ばれる (icall targets に出現、1 回)。`frames` は変わらず `864fe0 ← 80e040`。
+- 判定: **仮説 (list 空が 275 の OOB の原因) は 275 では反証された**。callback が呼ばれても list は埋まらず、275 の `this` は依然不正。`EnumDisplayMonitors` の stub 欠落は 275 の直接原因ではないと判断する (残る候補: `8651a0`/`5dca50` 経路、または list 以外の `50aa70` 入力)。
+- 144 の改善は stub 由来 (IR のみでは変化なし)。144 の `GetFileAttributesW`・`SetDllDirectoryW` stub (0 を返す) とは別経路の可能性があり、要調査。
+
 - 留保: `8651a0` / `5dca50` の `EnumDisplayMonitors` 呼出しが list を埋めるかは未確認。空 list で `50aa70` が `[0+16]=3204488` を件数として読むのは、NULL 相当の `0` 番地の残骸 (REPORT_684 §3 の address 0 書換えと同種) を読んでいる可能性がある。残骸の出所は未特定。
 
 ## 5. 未達と起票先

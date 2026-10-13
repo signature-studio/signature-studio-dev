@@ -125,6 +125,26 @@ unsigned MultiByteToWideChar(unsigned cp, unsigned fl, const char* s, int ns, un
 }
 int IsValidLocale(unsigned lcid, unsigned fl) { (void)lcid; (void)fl; return 1; }
 
+/* EnumDisplayMonitors / GetMonitorInfoW (#1096 仮実装): monitor 1 件 (MON=0x10001, 1920x1080 primary) を
+ * callback (lpfnEnum = IR 上の lift 済 function_85df70) に 1 回渡す。callback が GetMonitorInfoW で情報を取る。 */
+#define M11_MON 0x10001u
+extern uint64_t m11_icall(uint64_t target, uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5, uint64_t a6, uint64_t a7);
+int EnumDisplayMonitors(void* hdc, void* lprc, void* lpfn, int dwData) {
+    (void)lprc;
+    if (!lpfn) return 0;
+    m11_icall((uint64_t)(uintptr_t)lpfn, (uint64_t)M11_MON, (uint64_t)(uintptr_t)hdc, 0, (uint64_t)(uint32_t)dwData, 0, 0, 0, 0);
+    return 1;
+}
+int GetMonitorInfoW(long long hMon, void* lpmi) {
+    if (!lpmi || (unsigned)hMon != M11_MON) return 0;
+    unsigned* p = (unsigned*)lpmi;
+    p[0] = 40;
+    p[1] = 0; p[2] = 0; p[3] = 1920; p[4] = 1080;
+    p[5] = 0; p[6] = 0; p[7] = 1920; p[8] = 1080;
+    p[9] = 1;
+    return 1;
+}
+
 /* LCMapStringW: 大文字/小文字化 (ASCII のみ), それ以外は素通し. 戻り値 = 出力文字数 */
 int LCMapStringW(unsigned lcid, unsigned flags, const unsigned short* src, int nsrc, unsigned short* dst, int ndst) {
     (void)lcid;
