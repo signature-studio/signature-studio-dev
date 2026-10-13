@@ -1,6 +1,6 @@
 # tools/plugins/distortion/REPORT.md — PLG-F6 (#203) distortion + multi-fx 9 本: lift 前提の実測
 
-- 日付: 2026-10-13 / 担当 dir: `tools/plugins/distortion/` (PLG-F6-2 #545 で共有鎖 `tools/plugins/lift/` も変更) / 検証起点 commit: §1〜§3 は **8db8705** / **c0fcf60**、 §4 と §5 の engine 行は PLG-F6-2 (#545) の **66afda1** (e2e) と本書の commit (§5)
+- 日付: 2026-10-13 / 担当 dir: `tools/plugins/distortion/` (PLG-F6-2 #545 で共有鎖 `tools/plugins/lift/` も変更) / 検証起点 commit: §1〜§3 は **8db8705** / **c0fcf60**、 §4 と §5.2 は PLG-F6-2 (#545) の検証 HEAD **946179e** (main 取り込み後の共有鎖で再実行)
 - 再現: `bash tools/plugins/distortion/distortion_e2e.sh` (測定 + 判定。 不合格は非 0) / `bash tools/plugins/distortion/distortion_nega.sh` (ネガティブコントロール) / `python3 tools/plugins/distortion/tables.py` (本書 §1〜§4 の表を出力)
 - 素材: `fl-win64` / `toolchain-retdec` / `toolchain-emsdk` (`docs/WORKFLOW.md` §11)。 環境は `distortion/env.sh`
 - 手法の出典: PR #506 (PLG-F3 dynamics, 未マージ) の e2e / matrix_check / ids_crosscheck / engine_lift を踏襲。 #506 の reviewer 指摘 2 点 (判定が不合格でも exit 0 / 判定そのものの NC が無い) は §5 の通り最初から潰した
@@ -22,7 +22,7 @@
    Love Philter は #331 の対象に列挙された 0x5df040 も 1 site 使う。 Love Philter / `module` / Soft Clipper には Balance の 80 kernel にハッシュ対応付けできない呼出が計 7 種 (`raw:`) ある。
 5. **C++ DLL 2 本 (Effector engine / Hardcore) は PLG-F6-2 (#545) で `emcc -c` rc 0 になった** (§4)。 真因は共有鎖 `lift/passes/ir5_patch.py` の定数式処理 2 件 (E2 / E5) と E1 (`icmp ptr/i64`) で、3 件とも共有鎖 (`lift/`) で直した。
    残る `x86_fp80` 関数 1 本ずつは `p0c/f80_lower.py` (f64 化) で落とす (精度は x87 の 64bit 仮数 → 53bit。 §4)。 **Hardcore の DSP 閉包は 144 関数 / 28,816 B (`.pdata` 1,726 関数 / 349,625 B の 8.3% / 8.2%)** (§4。 Effector engine は 144 関数 / 28,812 B)。
-   未実装 helper は engine 全体で 110 / 102 (VEX 79 / 68) あるが、DSP 閉包が使うのは 11 / 11 (VEX 8 / 8)。 差分試験 (#544) と未実装 helper の実装は未着手。
+   未実装 helper は engine 全体で 92 / 84 あるが、DSP 閉包 (define 開始 VA が閉包 range 内の関数) が呼ぶのは 10 / 10 名 (HEAD 実測。 `__asm_int` `__asm_int3` `__asm_movntps` `__asm_vcomiss` `__asm_vcvtdq2ps` `__asm_vmovd` `__asm_vmovd__N` `__asm_vpand` `__asm_vpsrld` `__asm_vpsubd`)。 差分試験 (#544) と未実装 helper の実装は未着手。
 
 ## 1. 閉包 lift 結果 (Delphi 製 9 DLL)
 
@@ -113,12 +113,14 @@ P0c (`p0c/REPORT.md`) で見た各 kernel の現状 (本 PR では再測定し�
 
 | DLL | RetDec rc | final.ll define | `.pdata` で define 無し (関数 / B) | f80 関数 (lowering 後) | 未実装 helper | `emcc -c` | lowering 前の f80 関数 / `emcc -c` | lift 秒 |
 |---|--:|--:|--:|--:|--:|--:|--:|--:|
-| Effector engine | 0 | 1,362 | 0 / 0 | 0 | 110 (うち VEX 79) | 0 | 1 / 1 | 42 |
-| Hardcore | 0 | 1,780 | 0 / 0 | 0 | 102 (うち VEX 68) | 0 | 1 / 1 | 62 |
+| Effector engine | 0 | 1,362 | 0 / 0 | 0 | 92 (`unimpl_helpers`。 VEX 内訳は下の注) | 0 | 1 / 1 | 47 |
+| Hardcore | 0 | 1,780 | 0 / 0 | 0 | 84 (同) | 0 | 1 / 1 | 66 |
+
+§4 の表は HEAD `946179e` の `work/distortion/engines.csv` (e2e 1 回目の実測)。 #535 (`fix_avx256.py`) の追加で未実装 helper 数が 110 / 102 → 92 / 84 に減った (旧値は 66afda1 の測定)。
 
 `engine_lift.sh <block>` は全 `.pdata` 関数を共有鎖 `lift/lift_ranges.sh` (RetDec+pass 鎖、`PLUG_F80_LOWER=1`) → `emcc -c` に通す。 「`.pdata` で define 無し」= range の開始 VA に define が無い数 (分母は `.pdata` 関数数)。
 **この数は PLG-F6-2 で 1 → 0 になった**: 旧 1 関数 (61 B、MSVC の `_DllMainCRTStartup` 相当 = PE のエントリ) は脱落ではなく、RetDec が `@entry_point` と名付けていただけ (`engine_defs.py` が先頭ラベル `dec_label_pc_<VA>` で数える。 脱落ではないので扱いは不要: DSP ではなく、閉包にも入らない)。
-`final.ll` の lowering 前は `e.pre_f80.ll`。 `lift_s` の 42 / 62 は PLG-F6-2 の実測 (RetDec の再実行を含む 1 回。 §5)。
+`final.ll` の lowering 前は `e.pre_f80.ll`。 `lift_s` の 47 / 66 は HEAD 946179e の実測 (1 回。 §5.2)。
 
 PLG-F6-2 の修復 (起点 = §4 旧版の失敗連鎖 E1 → E2 / E5。 clang は最初の型エラーで止まるので 1 件ずつ露見した):
 
@@ -148,7 +150,7 @@ slot の関数から `call/jmp rel32` で到達する `.pdata` 関数を BFS す
 - **VEX**: 命令に `v` で始まる mnemonic を持つ `.pdata` 関数は Effector engine 13 / Hardcore 12 (`vex_scan.py`)。 うち **AVX 検出フラグ (cpuid + xgetbv の両方を持つ関数が書く .data の dword) を `cmp` で見て分岐するもの 11 / 10**、見ない (無条件に VEX を実行する) ものは各 2 関数 (Hardcore: 0x18005aef0 / 0x18005b0e0) で、**DSP 閉包に入る VEX 関数は各 2、うち無条件のものは 0**。
   閉包の VEX 関数 2 つのうち 1 つ (Hardcore 0x1800594d0) は `cmp [flag],0; jne <VEX 路>` の先に SSE 路 (`movdqa` / `psrld` / `psubd`) を持つ。 もう 1 つ (0x180036130、1,653 B) は `vmovdqu`/`vmovntdq` を使うメモリ操作 (memcpy 相当と推定、未確認) で、フラグを `cmp [..], 3` で見る。
   **決定: AVX 検出フラグを 0 に固定した前提で lift する (= SSE 路を使う)** 方式は成立する見込み。 ただし RetDec は両路を lift するので、VEX 路の `__asm_v*` helper 宣言は未実装のまま残る (リンクが要るなら `unreachable` 化か helper 実装)。 **この lift では固定を実装していない** (フラグの値は未定義のまま)。 実装は別 issue (§6)。
-  未実装 helper 110 / 102 のうち DSP 閉包の関数が呼ぶのは 11 / 11 (VEX 8: `vcomiss vcvtdq2ps vmovaps vmovd vmovd__N vpand vpsrld vpsubd`、非 VEX 3: `int int3 movntps`)。 CPUID 分岐は VEX と SSE 路の両方が閉包にあるので、固定すれば VEX 8 件は不要と推定する (未確認)。
+  未実装 helper 92 / 84 のうち DSP 閉包の関数が呼ぶのは 10 / 10 名 (VEX 7: `vcomiss vcvtdq2ps vmovd vmovd__N vpand vpsrld vpsubd`、非 VEX 3: `int int3 movntps`。 HEAD `946179e` で実測。 旧版の `vmovaps` は HEAD の閉包に現れない。 理由は未確認)。 CPUID 分岐は VEX と SSE 路の両方が閉包にあるので、固定すれば VEX 7 件は不要と推定する (未確認)。
 
 ## 5. 検証 (コミット済み HEAD・4 core / 15 GiB の Actions runner・逐次実行で並列数 1)
 
@@ -159,37 +161,28 @@ slot の関数から `call/jmp rel32` で到達する `.pdata` 関数を BFS す
 | lift 秒 (`status.csv` の seconds、3 回の min–max) | Distructor 2–3 / `module` 5–5 / Effector 3–4 / Blood Overdrive 2–3 / Fast Dist 2–3 / Love Philter 9–10 / Soft Clipper 2–3 / Squeeze 3–3 / WaveShaper 4–4 (9 本計 34–36 s)。 Effector engine 39–40 s、Hardcore 57–58 s |
 | 3 回の結果一致 | 判定列 (`status.csv` の seconds 以外)・`shell_audit.csv`・`facts.json`・`engines.csv` (lift_s 以外) の sha256 先頭 16 桁は 3 回とも同一 (facts `6650e975d4e86b1e` / status `5a51892da5bfae1d` / audit `a5f384f76704ec66` / engines `f8063cfae5009545`) |
 | 判定 (各回) | `judge.py` 9/9 block 合格 → `unimpl_names.py` 9/9 → `matrix_check.py` **72/72** 項目一致 (閉包 6 項目 × 8 plugin + batch 4 項目 × 6 plugin) → `ids_crosscheck.py` 9/9 → `judge.py --engines` 2/2 |
-| `distortion_nega.sh` (HEAD c0fcf60、e2e の直後) | exit 0、**9.08 s**、**37/37** 項目 (下表) |
+| `distortion_nega.sh` (HEAD c0fcf60、e2e の直後) | exit 0、**9.08 s**、**37/37** 項目 (NC 表は `REPORT_APPENDIX.md`。 HEAD 946179e の `distortion_nega.sh` は §5.2 の 44/44) |
 
-ネガティブコントロール (数値は `distortion_nega.sh` の出力。 判定系は「期待した理由の文言で落ちたか」まで照合する):
-
-| NC | 内容 | 結果 |
-|---|---|---|
-| NC-J (18 件) | `distortion_e2e.sh --judge-only` に、実測 status.csv を 1 点だけ壊した入力を与える。 対照 (無改変) は exit 0 + 最終行 OK。 壊し方: `emcc_c_rc`=1 / `lift_rc`=1 (殻と `module`) / `f80_funcs`=3 / `declares_unimpl`=5・許容超過 (Love Philter 2 > 1)・-1 / `defines`=0・9999 / 非整数 / 行の削除・重複・対象外 block の追加 / 欠落監査 csv の `missing_define`=1・`function_defines`+1・`extra_inside`=0 / ヘッダ破損 | 壊した 17 件はすべて exit 1 (ヘッダ破損のみ入力不正の exit 2)、最終行 OK なし、期待した理由の文言が出力に有り |
-| NC-JE (5 件) | engines.csv の判定。 対照 exit 0。 `lift_rc`=1 / `defines`=0 / 集計不能 (-1) / 行削除 | 4 件とも exit 1 |
-| NC-N (5 件) | `unimpl_names.py`。 対照 exit 0。 別名の helper (stosb→stosw) / 未実装 0 の block に名前を追記 / 件数 1 だが名前の行が無い / log 無し | 4 件とも exit 1 |
-| NC-E | Soft Clipper (19078) の `final.ll` の 1 関数の `ret` を除去 | `emcc -c` rc **0 → 1** |
-| NC-R | 19078 の閉包 ranges 14 本の末尾 1 本 (`function_6c11c0`) を落として再 lift | その define 1 → 0、全体 define **15 → 13** (RetDec は 1 range から 2 define を出すことがあり差は 1 と限らない) |
-| NC-I | `ids_crosscheck.py` に Distructor の ID 8 の件数を 1 → 2 にした facts を与える | exit 0 → **1** (9/9 → 8/9) |
-| NC-M | `matrix_check.py`: Distructor の `closure_funcs` +1 / Fast Dist の `emcc_c_rc` を 1 にした status | 72/72 → **71/72** (exit 1)、後者も 71/72 (exit 1) |
-| NC-D | `engine_defs.py` に実在しない range を 1 本足す | `missing_define` **1 → 2** |
-| NC-W | e2e 本体 (`--skip-lift`) に、Fast Dist の最終行が `emcc_c_rc`=1 の lift 結果を与える | e2e 全体が exit 1、最終行 OK なし、`FAIL  block 19004 … emcc_c_rc=1` を表示 (#506 で露見した「判定が落ちても e2e が exit 0」の再発防止) |
+ネガティブコントロール (NC-J / JE / N / E / R / I / M / D / W の計 44 項目。 詳細表は `REPORT_APPENDIX.md`。 判定系は「期待した理由の文言で落ちたか」まで照合する)。
 
 衛生 (HEAD c0fcf60 + 本書): `git status --porcelain=v1 -- tools/plugins/distortion` は本書のみ未追跡、`git diff 042f869 HEAD --stat` の範囲は `tools/plugins/distortion/` のみ、`find tools/plugins/distortion -type f -size +1M` は 0 件。 大物は `tools/plugins/work/` (gitignore)。
 
 検証範囲: 閉包の機械的な到達性 (RetDec+pass 鎖 → `emcc -c`)・閉包 range の脱落監査・host / kernel 依存の静的な数え上げ・C++ DLL の到達性。
 範囲外: wasm のリンクと実行、native との出力比較、framework / host shim との結合、Render test .flp、Hardcore の DSP 閉包の特定。 範囲外の項目について、本書は何も主張しない。
 
-### 5.2 PLG-F6-2 (#545) の検証 (コミット済み HEAD **66afda1**、4 core / 15 GiB の Actions runner、逐次 = 並列数 1)
+### 5.2 PLG-F6-2 (#545) の検証 (コミット済み HEAD **946179e** = origin/main 取り込み後の共有鎖、4 core / 15 GiB の Actions runner、逐次 = 並列数 1)
 
 | 項目 | 実測 |
 |---|---|
-| inventory (初回: fl-win64 展開済み + 生成物なし) | `inventory.sh` **8:51.11** (`/usr/bin/time -v`、exit 0)。 load average (1 分) は実行中の観測で最大 16.40 |
-| `distortion_e2e.sh` (HEAD 66afda1、inventory 済、RetDec 再実行を含む 1 回) | **5:10.69**、exit 0、最終行 `[distortion_e2e] OK`。 開始時 load average (1 分) 0.35。 殻 9 本 `judge.py` **9/9** 合格・`unimpl_names.py` 9/9・`matrix_check.py` / `ids_crosscheck.py` 通過・engine `judge.py --engines` **2/2** 合格・`closure_cpp` 判定 **2/2** 合格 |
-| engine の lift 秒 (`engines.csv`) | Effector engine 42 / Hardcore 62 (各 1 回。 §4 旧版の 39–40 / 57–58 とほぼ同じで、 f80 lowering と icmp pass の追加分は秒単位では見えない) |
-| `distortion_nega.sh` (HEAD 66afda1、e2e の直後) | exit 0、**9.74 s**、**44/44** 項目 (旧 37 + NC-JE の 3 列 + 理由照合 3 + NC-C 1。 下表) |
-| `lift/passes/test_ir5_constexpr.py` | exit 0。 修復後は E5 / E2 とも欠陥 0、修復前 (`BASE=e64ef6f`) は 2 ケースとも欠陥再現。 `BASE=HEAD` (修復済み) では exit 1 |
-| `lift/passes/test_fix_icmp_ptr.sh` | exit 0。 修復前 emcc rc 1 (`'%arg1' defined with type 'i64' but expected 'ptr'`) / 修復後 rc 0 |
+| `distortion_e2e.sh` (HEAD 946179e、inventory 済 (`tools/plugins/work/` の生成物を再利用)、lift 込みの 1 回) | **13:10.16** (`time` real。 user 35:27.11、sys 0:21.77)、exit 0、最終行 `[distortion_e2e] OK`。 開始時 load average (1 分) 1.02 / 終了時 (1 分) 1.10 (5 分 5.16)。 殻 9 本 `judge.py` **9/9** 合格・`unimpl_names.py` 9/9・`matrix_check.py` 72/72・`ids_crosscheck.py` 9/9・engine `judge.py --engines` **2/2** 合格・`closure_cpp` 判定 **2/2** 合格 |
+| engine の lift 秒 (`engines.csv`、HEAD 946179e の 1 回) | Effector engine 47 / Hardcore 66 |
+| DSP 閉包 (`closure_cpp.csv`、同 run) | Effector engine 144 関数 / 28,812 B、Hardcore 144 関数 / 28,816 B (66afda1 と同値) |
+| `distortion_nega.sh` (HEAD 946179e、e2e の直後) | exit 0、**10 s**、**44/44** 項目 |
+| `lift/passes/test_ir5_constexpr.py` (HEAD 946179e) | exit 0、0 s。 修復後 欠陥 0 / 修復前 (`BASE=e64ef6f`) 2 ケースとも欠陥再現 |
+| `lift/passes/test_fix_icmp_ptr.sh` (HEAD 946179e) | exit 0、1 s。 修復前 emcc rc 1 (`'%arg1' defined with type 'i64' but expected 'ptr'`) / 修復後 rc 0 |
+| `vex_scan.py` (HEAD 946179e) | Effector engine: VEX 関数 13、うち閉包 2、無条件 2 (閉包内 0)。 Hardcore: VEX 12、閉包 2、無条件 2 (閉包内 0)。 §4 の値と一致 |
+| 閉包が呼ぶ未実装 helper (HEAD 946179e) | Effector engine 10 名、Hardcore 10 名 (§4) |
+| 共有鎖の波及 (synth の C++ DLL 9 本) | **未測定**。 `synth/cpp_lift.sh` は既定 `HLL_CAP` 300 s の待ちを含み、残り時間の上限内で 9 本を通せなかった。 追跡先は §6 |
 
 追加の NC (`distortion_nega.sh`): NC-JE に 3 列 (engines.csv の `emcc_c_rc`=1 / `missing_define`=1 / `f80_funcs`=1 → いずれも exit 1 かつ出力にその列名の理由) を追加。 **#545 以前は engine の判定が `emcc_c_rc` を合否に使わず常に PASS だった**
 (「判定が不合格でも exit 0 になる gate」の再発防止として、#545 の受入条件 (emcc_c_rc / missing_define / f80_funcs) を合否にし、 `emcc_c_rc`=1 を与えると落ちることを NC で固定した)。
@@ -204,11 +197,12 @@ e2e の殻の監査 (`shell_audit.csv`) は #514 (icall 書換えが batch_lift 
 |---|---|---|
 | 差分試験 bit-exact (出口条件 3)。 Eff_Render 単位の native / wasm harness が無く、P0a/P0b 未完 | #203 を閉じられない | #195 / #196 / #197 の完了後に #203 を再開 (Closes はその時)。 harness は新規 **#544 [PLG-F6-1]** に起票 (#506 §6 が提案する PLG-F3a と共通化できるので統合は PM 判断) |
 | Render test .flp の E2E (出口条件 4) | 同上 | FLEngine 統合待ち。 親 #14 / #203 |
-| ~~Effector engine / Hardcore の `emcc -c` 未通過~~ | — | **#545 で解消** (`emcc -c` rc 0・`missing_define` 0。 §4)。 ただし未実装 helper (VEX 含む 110 / 102) は宣言のみで未実装 → 下の行 |
+| ~~Effector engine / Hardcore の `emcc -c` 未通過~~ | — | **#545 で解消** (`emcc -c` rc 0・`missing_define` 0。 §4)。 ただし未実装 helper (VEX 含む 92 / 84) は宣言のみで未実装 → 下の行 |
 | ~~Hardcore の DSP 閉包が未算出~~ | — | **#545 で算出** (144 関数 / 28,816 B。 §4)。 取りこぼし・過剰の検算 (別アルゴリズム) と、vtable の slot が何の関数か (Eff_Render 相当の特定) は未実施 → **#544 [PLG-F6-1]** にコメント |
-| 未実装 helper の実装 (engine 110 / 102。 DSP 閉包が呼ぶのは VEX 8 + 非 VEX 3 / 同) と AVX 検出フラグの 0 固定 (§4 の決定) | wasm のリンク・実行 | **#197 (PLG-P0c) にコメント** (helper の実装は `msimd` 側の仕事。 共有する `__asm_v*` は #534 / #523 / #527 / #540 と共通) |
+| 未実装 helper の実装 (engine 92 / 84。 DSP 閉包が呼ぶのは VEX 7 + 非 VEX 3 = 10 名) と AVX 検出フラグの 0 固定 (§4 の決定) | wasm のリンク・実行 | **#197 (PLG-P0c) にコメント** (helper の実装は `msimd` 側の仕事。 共有する `__asm_v*` は #534 / #523 / #527 / #540 と共通) |
 | f80 → f64 lowering の精度 (x87 の 64bit 仮数 → 53bit) | f80 関数 (各 1) は DSP 閉包の外なので DSP には及ばないと推定 (未確認) | #544 の差分試験で確認 |
 | 共有鎖の修復 (E1 / E2 / E5) を、#534 (PLG-G2-2) / #523 / #527 / #540 が個別に直していないか | 同じ類型の重複修復 | PM 判断: 本 PR の `lift/passes/ir5_patch.py` / `fix_icmp_ptr.py` を先に merge すると、各 PR は rebase のみ。 #534 の run 2 本が並行しており衝突の可能性あり (本書執筆時点で #534 のブランチ push は無し) |
+| **共有鎖 (`ir5_patch.py` E2/E5・`fix_icmp_ptr.py`・`fix_avx256.py` #535) の synth C++ DLL 9 本への波及 (emcc / defines の再測定)** | 本 PR では未測定。 synth の 9 本は `synth/cpp_lift.sh` で `emcc_c_rc` と define 欠落を測る (`PLUG_AVX256=0` でも ir5 / icmp は効く) | **#534 (PLG-G2-2、OPEN) にコメント**: HEAD 946179e で 9 本を再測定すること |
 | `ir5_patch.py` の定数式 pass の他の読み飛ばし | `pos = j + 1` 型の読み飛ばしが `fold_const_ops` 以外に無いか未監査 | 新規起票しない (次に同類型が出たら #197 に追記) |
 | `batch_lift.sh` (#514) 以降の `distortion_e2e.sh` が main で未実行だった (§5.2) | main の e2e が落ちていた (本 PR で修復) | 本 PR (Refs #545) |
 | Distructor 殻と `module` (18916) の結合方式 | DSP がどちらにあるかの確定 | #544 (差分 harness の設計時に結合方式を解析する) |
