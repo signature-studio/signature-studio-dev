@@ -7,9 +7,9 @@ IR 側 '.'-suffix 名 (e.g. SHGetFolderPathW.1) から JS 変数名にそのま�
 に sanitize し, wasmImports key は quoted にして wasm import 名 (実 IR 名)
 を保つ.
 """
-import re, sys
+import os, re, sys
 
-path = sys.argv[1] if len(sys.argv) > 1 else '/home/ubuntu/work/webstudio/tools/m11/work/m11_boot.cjs'
+path = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), 'work', 'm11_boot.cjs')
 s = open(path).read()
 
 

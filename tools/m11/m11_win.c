@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <emscripten.h>
+extern int m11_trace_flag;
 
 static int g_dummy_heap;
 void* GetProcessHeap(void) { return &g_dummy_heap; }
@@ -13,7 +14,29 @@ void* GetProcessHeap(void) { return &g_dummy_heap; }
 unsigned GetVersion(void) { return 0x4a63000au; /* Win10 19043: major 10 minor 0 build 19043 */ }
 unsigned GetACP(void) { return 1252; }
 int SetThreadLocale(unsigned lcid) { (void)lcid; return 1; }
-void SysFreeString(void* p) { (void)p; }
+void SysFreeString(void* p) { (void)p; }   /* 自前確保でない BSTR (静的/他経路) が来るため free しない (PoC: リーク許容) */
+/* BSTR: [u32 バイト長][UTF-16 文字列][NUL]. SysAllocStringLen(NULL, n) は未初期化 n 文字 (+NUL). 失敗時 NULL */
+void* SysAllocStringLen(const unsigned short* src, unsigned len) {
+    unsigned char* b = (unsigned char*)malloc(4 + (size_t)len * 2 + 2);
+    if (!b) return 0;
+    *(unsigned*)b = len * 2;
+    unsigned short* w = (unsigned short*)(b + 4);
+    if (src) memcpy(w, src, (size_t)len * 2); else memset(w, 0, (size_t)len * 2);
+    w[len] = 0;
+    return w;
+}
+int SysReAllocStringLen(void** pbstr, const unsigned short* src, unsigned len) {
+    void* nb = SysAllocStringLen(src, len);
+    if (!nb) return 0;
+    if (!src && *pbstr) {
+        unsigned old = *(unsigned*)((unsigned char*)*pbstr - 4) / 2;
+        memcpy(nb, *pbstr, (size_t)(old < len ? old : len) * 2);
+    }
+    if (*pbstr) SysFreeString(*pbstr);
+    *pbstr = nb;
+    return 1;
+}
+unsigned SysStringLen(const void* p) { return p ? *(const unsigned*)((const char*)p - 4) / 2 : 0; }
 unsigned long long VerSetConditionMask(unsigned long long m, unsigned type, unsigned char op) {
     return m | ((unsigned long long)op << ((type & 7) * 3)); /* 簡略 (VerifyVersionInfo は常に TRUE) */
 }
@@ -71,7 +94,9 @@ int GetVersionExW(void* p) {
     return 1;
 }
 unsigned LoadStringW(void* h, unsigned id, unsigned short* buf, unsigned n) { (void)h; (void)id; if (buf && n) buf[0] = 0; return 0; }
+EM_JS(void, m11_js_stack, (void), { Error.stackTraceLimit = 60; console.error(new Error().stack.split("\n").slice(2, 60).join("\n")); });
 unsigned MessageBoxA(void* h, const char* text, const char* cap, unsigned type) {
+    if (m11_trace_flag) m11_js_stack();   /* --trace 時: 呼出し元 wasm frame を表示 */
     fprintf(stderr, "[m11][MessageBoxA] caption='%s' text='%s' type=0x%x (自動 IDOK)\n", cap ? cap : "", text ? text : "", type);
     (void)h; return 1;
 }
