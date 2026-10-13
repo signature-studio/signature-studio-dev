@@ -7,6 +7,9 @@
 - OTT 旧 chain の集計差分は **commit 間の `ldlib/cases.py` の pattern 追加** (`79584ef7` feat(liftdiff): add this/VMT and UTF-16 string case patterns (#235)、9→11 pattern) で説明できる。
 - 分類: **main の変更** (採点基準・非決定性ではない)。`cases.py` 単独の差し替えで 33→35 / 110→112 / 69→65 が再現し、他のファイル (`compare.py`・`classify.py`・`pe.py`・`rt/`) は単独では集計を変えない。
 - 非決定性: 旧 `59eea5c` も現 HEAD `986e7415` も OTT 集計は 3 回とも同一 (下表)。
+- **LD-31 (#1069) による訂正**: 上の「旧 `59eea5c` = 33/110/69」は**再現しなかった**。素材から再計算すると `59eea5c` は 3 回とも **38/108/66** (`e48e7c1f` の記録と一致)。33/110/69 は `24848bda` の値。詳細は `results/ott_ld31_repro_summary.txt`。
+  - 38→33 (`59eea5c`→`24848bda`): `rt/ld_native.c` の計時追加 (`ld_native_ms`) が効く (そのファイルだけ `24848bda` 版にすると 33/110/69)。`compare.py` の `wasm_timeout_native_long` 判定 (#548) が `ms` の有無で分岐する。ただし差分 7 件は `match→mismatch` (ret_only) を含み、計時の振り分けだけでは説明しきれない。機序は未特定。
+  - 38→40 (`59eea5c`→`origin/main`): `ldlib/cases.py` の pattern 追加が主因 (cases.py だけ main 版にすると 40/110/62 と一致)。
 - **ログの扱い**: 現 HEAD `986e7415` の 3 回分は `tools/liftdiff/results/liftdiff_e2e_head986e7415_n{1,2,3}.log` として commit 済み。旧 `59eea5c` の 3 回分と §2 の差し替え実行のログは **commit されていない**。再生成には `work-m6-ott` / `work-m11` / `work-liftdiff` / `analysis-ott-binaries` の素材が要り、後続 run の `$HOME/artifacts` には `fl-win64` しか無かったため再実行できていない。よって §1 の旧 `59eea5c` の行と §2 の表の数値は、ログで検証できない報告値として扱う。検証するには素材を揃え、`git worktree add --detach <dir> 59eea5c` で §5 の手順により再実行する必要がある。
 - issue 本文の **38/108/66 は今回の素材・commit では再現しなかった**。main 側 `tools/liftdiff/work/ott_old/` (2026-10-12 18:27) の batch は今回の `59eea5c` 再計算と一致せず、関数単位で 16 件が異なる。その由来は未特定 (PR #802 の run 時点の素材・環境差と推定。未確認)。
 
