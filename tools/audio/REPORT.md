@@ -67,7 +67,7 @@
 - **fake シンクの数値**: 音声 HW が無いため `outputLatency` 35ms/`baseLatency` 10.7ms は fake 値。実デバイス (Windows WASAPI/mac CoreAudio, Firefox, Safari) での burst・遅延・underrun は**未計測**。往復の総遅延 (入力ブラウザバッファ含む) も未計測。
 - **未実装**: COM vtable アダプタ (win64 ABI/8 バイトポインタの ASIOCallbacks・ASIOBufferInfo・ASIOTime への変換; リフタ呼出規約待ち)、レジストリ `SOFTWARE\ASIO\FL Studio ASIO` と `CoCreateInstance` 配線 (別 shim 行)、DirectSound shim、~~WebMIDI shim~~ (AU-3 で実装, §13。FL 結線は未)、getUserMedia のデバイス選択 UI、WASAPI capture/exclusive/loopback、T の縮小 (拡張のみ)、macOS 固有 (AudioUnit 面) の薄いアダプタ。
 - B=128 は ILWASAPI2ASIO の min 256 より小さい (shim 単体の性能であり FL 実運用値ではない)。→ AU-7 で既定 profile を ILWASAPI 値に確定し、FL が min/max/granularity を読まないことを静的に確認 (§11)。
-- 未確認 (推定): `asioMessage` selector 6 → コマンド 0x17 が再起動かどうか、~~FL が granularity=128/min=128 を受理するか~~ (解決: FL は読まない, §11)、DS バッファの 16/32bit、Web MIDI の Worker 内実装状況 (W3C 仕様上は `Exposed=(Window,Worker)`, 実装未確認)。
+- 未確認 (推定): `asioMessage` selector 6 → コマンド 0x17 が再起動かどうか、~~FL が granularity=128/min=128 を受理するか~~ (解決: FL は読まない, §11)、DS バッファの 16/32bit、Web MIDI の Firefox/Safari の挙動 (Chrome 154 の DedicatedWorker に Web MIDI が無いことは実測済み, `tools/audio/REPORT_MIDI.md` §13-2)。
 - `ctx.outputLatency` は起動直後 0 → 約 250ms 後に更新される。`getLatencies` は呼出時の値で、FL が起動直後に読むと小さく見える。→ AU-7 で ATTACH 側の待ちを実装 (§11-3)。
 
 ## 7. ユーザ依頼事項
