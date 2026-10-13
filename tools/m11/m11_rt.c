@@ -42,7 +42,7 @@ static int g_va_bigtrace = 0;
 static unsigned long long g_va_unit_budget = 0;  /* >0: unit 1 本が VirtualAlloc で確保できる累計バイト上限 (survey 用; 超過は NULL = OOM 扱い) */
 static unsigned long long g_va_unit_base = 0;    /* m11_va_unit_begin 時点の g_va_used */
 static unsigned long long g_va_denied = 0;       /* 上限超過で NULL を返した回数 (g_va_oom にも含む) */
-static unsigned long long g_va_stack_at = 0;   /* >0: その番号 (0 起算) の VirtualAlloc 呼出しで呼出元スタックを出す */
+static unsigned long long g_va_stack_at = 0;   /* >=1: 0 起算でその番号の VirtualAlloc 呼出しで呼出元スタックを出す (0 = 無効なので最初の呼出し #0 は指定不可) */
 typedef struct { unsigned char* base; unsigned char* raw; unsigned long long need; } va_ent;
 static va_ent* g_va_tab = 0;
 static unsigned g_va_tab_n = 0, g_va_tab_cap = 0;
