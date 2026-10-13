@@ -3,7 +3,8 @@
 # shim_e2e.sh の S10/S11 から呼ばれる。成果は work/resize/ (gitignore)。
 set -euo pipefail
 cd "$(dirname "$0")"; HERE=$PWD; IPP=$(cd ../.. && pwd); W=$IPP/work/resize; mkdir -p "$W"
-DLL=/home/ubuntu/work/analysis/win64/extracted/block24356_PE.bin
+source "$IPP/../shared/env.sh"
+DLL="$FL_WIN64_DIR/extracted/block24356_PE.bin"
 CF="-O1 -g -I $IPP/src -ffp-contract=off -fno-fast-math"
 IMPL="$HERE/../impl/ipp_resize.c $HERE/../impl/ipp_sig_fill2.c"
 gcc $CF -o "$W/resize_oracle" "$HERE/resize_oracle.c" "$IPP/ref/pe_load.c" $IMPL -lm

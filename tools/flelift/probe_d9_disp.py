@@ -11,7 +11,7 @@ import pefile, capstone, struct, collections, os
 from capstone import Cs, CS_ARCH_X86, CS_MODE_64
 from capstone.x86 import X86_OP_MEM, X86_REG_RIP
 
-PE = os.environ.get('FLE_PE', '/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin')
+PE = os.environ.get('FLE_PE') or os.path.join(os.environ.get('FL_WIN64_DIR', '/home/ubuntu/work/analysis/win64'), 'extracted', 'block00031_PE.bin')
 IMG = 0x400000
 
 pe = pefile.PE(data=open(PE, 'rb').read())

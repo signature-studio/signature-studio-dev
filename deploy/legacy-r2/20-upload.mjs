@@ -15,13 +15,18 @@
 //   cf  (既定) cf r2 objects put。OAuth/APIトークンのみで動く。1 件 300MB 上限、Content-Type のみ設定
 //        (Cache-Control は Transform Rules が付与)
 //   aws S3 互換 API。R2 S3 キー必須 (R2_S3_ACCESS_KEY_ID/SECRET)。multipart で大容量可、
-//        Cache-Control / Content-Encoding もオブジェクトに保存
+//        Cache-Control もオブジェクトに保存
+//        --precompress br: immutable かつ compression 対象拡張子のファイルを brotli で事前圧縮し、
+//          Content-Encoding: br を付けて保存 (圧縮後が元より小さい時だけ。deploy/work/precompressed/ に生成)。
+//          release.json の files[key] に encoding / encodedSize を追記する (元の size は不変 = 進捗バーの分母)。
+//        --no-transform: immutable の Cache-Control に no-transform を追加 (エッジの再圧縮を禁止)
 import { createHash } from "node:crypto";
-import { createReadStream, readdirSync, readFileSync, statSync, writeFileSync, mkdirSync } from "node:fs";
+import { createReadStream, createWriteStream, readdirSync, readFileSync, statSync, writeFileSync, mkdirSync } from "node:fs";
 import { execFile } from "node:child_process";
 import path from "node:path";
 import zlib from "node:zlib";
 import { promisify } from "node:util";
+import { pipeline } from "node:stream/promises";
 import { applyResponseHeaders, contentTypeFor, loadPolicy } from "../lib/policy.mjs";
 import { cf, pool, requireEnv, zoneId } from "../lib/cf.mjs";
 
@@ -39,11 +44,17 @@ const bucket = opt("bucket", process.env.CF_R2_BUCKET);
 const backend = opt("backend", "cf");
 const concurrency = Number(opt("concurrency", "6"));
 const execute = has("execute");
+const precompress = opt("precompress"); // 未指定 | br
+const noTransform = has("no-transform");
 const policy = loadPolicy();
 const CF_PUT_LIMIT = 300 * 1000 * 1000; // cf r2 objects put の上限 (300MB)
 
 if (!src && !manifestPath) throw new Error("--src か --manifest が必要");
 if (!bucket) throw new Error("--bucket (または CF_R2_BUCKET) が必要");
+if (precompress && precompress !== "br") throw new Error(`--precompress は br のみ対応: ${precompress}`);
+if (precompress && backend !== "aws") {
+  throw new Error("--precompress は --backend aws 専用 (cf r2 objects put は Content-Type しか保存できない)");
+}
 
 // ---------- 計画 ----------
 function walk(dir, base = dir, out = []) {
@@ -81,10 +92,25 @@ function sha256(file) {
   });
 }
 
+const compressible = (key) => policy.compression[0].match.ext.includes(path.extname(key).slice(1));
+const PRECOMP_DIR = path.resolve(import.meta.dirname, "../work/precompressed");
+
+// 大きいファイルは q11 が遅いので q9 (--stats と同じ閾値)。lgwin は最大 24 (16MiB 窓)
+async function brotliFile(inFile, outFile, size) {
+  const big = size > 64e6;
+  const params = {
+    [zlib.constants.BROTLI_PARAM_QUALITY]: big ? 9 : 11,
+    [zlib.constants.BROTLI_PARAM_LGWIN]: 24,
+    [zlib.constants.BROTLI_PARAM_SIZE_HINT]: size,
+  };
+  await pipeline(createReadStream(inFile), zlib.createBrotliCompress({ params }), createWriteStream(outFile));
+  return statSync(outFile).size;
+}
+
 const plan = await pool([...entries.values()], 8, async (e) => {
   const size = statSync(e.file).size;
   const key = e.key;
-  return {
+  const p = {
     key,
     file: e.file,
     size,
@@ -93,6 +119,16 @@ const plan = await pool([...entries.values()], 8, async (e) => {
     cacheControl: applyResponseHeaders(policy, { path: `/${key}`, status: 200 }, {})["Cache-Control"],
     cls: isDocument(key) ? "document" : isImmutable(key) ? "immutable" : "mutable",
   };
+  if (noTransform && p.cls === "immutable" && p.cacheControl && !/no-transform/.test(p.cacheControl)) {
+    p.cacheControl += ", no-transform";
+  }
+  if (precompress === "br" && p.cls === "immutable" && compressible(key)) {
+    const outFile = path.join(PRECOMP_DIR, `${key}.br`);
+    mkdirSync(path.dirname(outFile), { recursive: true });
+    const encodedSize = await brotliFile(e.file, outFile, size);
+    if (encodedSize < size) Object.assign(p, { encoding: "br", encodedSize, uploadFile: outFile });
+  }
+  return p;
 });
 
 const errors = [];
@@ -120,7 +156,12 @@ const buildId = createHash("sha256")
 const release = {
   buildId,
   createdAt: new Date().toISOString(),
-  files: Object.fromEntries(plan.map((p) => [p.key, { size: p.size, sha256: p.sha256, contentType: p.contentType }])),
+  files: Object.fromEntries(
+    plan.map((p) => [
+      p.key,
+      { size: p.size, sha256: p.sha256, contentType: p.contentType, ...(p.encoding && { encoding: p.encoding, encodedSize: p.encodedSize }) },
+    ]),
+  ),
 };
 mkdirSync(path.resolve(import.meta.dirname, "../work"), { recursive: true });
 const releaseFile = path.resolve(import.meta.dirname, "../work/release.json");
@@ -145,7 +186,14 @@ for (const cls of ["immutable", "mutable", "document"]) {
   console.log(`  ${cls.padEnd(9)} ${String(xs.length).padStart(4)} files ${fmt(xs.reduce((a, p) => a + p.size, 0))}`);
 }
 for (const p of plan) {
-  console.log(`  ${p.cls.padEnd(9)} ${p.key.padEnd(44)} ${fmt(p.size).padStart(9)}  ${p.contentType}  | ${p.cacheControl}`);
+  const enc = p.encoding ? `  [${p.encoding} ${fmt(p.encodedSize)} ${(p.encodedSize / p.size * 100).toFixed(1)}%]` : "";
+  console.log(`  ${p.cls.padEnd(9)} ${p.key.padEnd(44)} ${fmt(p.size).padStart(9)}  ${p.contentType}${enc}  | ${p.cacheControl}`);
+}
+if (precompress) {
+  const xs = plan.filter((p) => p.encoding);
+  const raw = xs.reduce((a, p) => a + p.size, 0);
+  const enc = xs.reduce((a, p) => a + p.encodedSize, 0);
+  console.log(`precompress=${precompress}: ${xs.length} files raw ${fmt(raw)} -> ${fmt(enc)}`);
 }
 
 if (has("stats")) {
@@ -181,12 +229,13 @@ function putCommand(p, { dry }) {
     return { bin: process.env.CF_BIN ?? "cf", args: a, env: process.env };
   }
   const a = [
-    "s3", "cp", p.file, `s3://${bucket}/${p.key}`,
+    "s3", "cp", p.uploadFile ?? p.file, `s3://${bucket}/${p.key}`,
     "--endpoint-url", s3Endpoint(),
     "--content-type", p.contentType,
     "--cache-control", p.cacheControl ?? "public, max-age=300, must-revalidate",
     "--only-show-errors",
   ];
+  if (p.encoding) a.push("--content-encoding", p.encoding);
   if (dry) a.push("--dryrun");
   return { bin: "aws", args: a, env: s3Env() };
 }
@@ -201,11 +250,12 @@ if (!execute) {
   if (backend === "aws") process.env.R2_S3_ACCESS_KEY_ID ??= "dryrun";
   if (backend === "aws") process.env.R2_S3_SECRET_ACCESS_KEY ??= "dryrun";
   if (backend === "aws") process.env.CLOUDFLARE_ACCOUNT_ID ??= "dryrun-account";
-  for (const p of plan.slice(0, 3)) {
+  const sample = [...new Set([...plan.slice(0, 3), ...plan.filter((p) => p.encoding).slice(0, 1)])];
+  for (const p of sample) {
     const c = putCommand(p, { dry: true });
     try {
       await execFileP(c.bin, c.args, { env: c.env });
-      console.log(`  OK  ${c.bin} ${c.args.slice(0, 5).join(" ")} ...`);
+      console.log(`  OK  ${c.bin} ${c.args.slice(0, 5).join(" ")}${p.encoding ? " " + c.args.slice(c.args.indexOf("--content-type")).join(" ") : ""} ...`);
     } catch (e) {
       console.log(`  NG  ${p.key}: ${String(e.stderr || e.message).split("\n")[0]}`);
     }

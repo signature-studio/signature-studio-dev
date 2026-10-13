@@ -1,13 +1,14 @@
 /* CAB-262 (IPP-7) 検収の独立再計算: quirk を**実装 (impl/ipp_sig_fill3.c) を参照せず**に
    win64 実 DLL だけに対して確認する probe。
    usage: gcc -O1 -I ../../src -I ../../ref -o /tmp/vq test/verify_cab262_quirks.c ../../ref/pe_load.c -lm
-          /tmp/vq [path/to/block24356_PE.bin]
+          /tmp/vq [path/to/block24356_PE.bin]   (省略時 $FL_WIN64_DIR/extracted/block24356_PE.bin)
    出力 (検収実測 2026-10-11, AVX-512 経路 = ippSetCpuFeatures(~0)):
      quirk1 RealToCplx_32f : dst=NULL が最優先 (-8)、len<1 は -6、片方 src NULL は書込のみ
      quirk2 AddProductC_32f : double で 1 回丸め (判別入力 180 組合せのうち DLL と一致は double 側)
      quirk3 Round_32f       : half-away-from-zero (0.5→1, -0.5→-1, 2.5→3)、±0 は符号保存、|x|>=2^31 は不変
      quirk4 WinKaiser_32f_I : I0 級数は 60 項が必要 (24 項は beta=30 で 2.6e-04)、beta>=38 は -39 */
 #include "pe_load.h"
+#include "fl_dll_path.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -24,7 +25,7 @@ static double i0_series(double x, int T) {
 
 int main(int argc, char **argv) {
   PE pe;
-  if (pe_load(argc > 1 ? argv[1] : "/home/ubuntu/work/analysis/win64/extracted/block24356_PE.bin", &pe)) return 1;
+  if (pe_load(argc > 1 ? argv[1] : fl_ipp_dll_path(), &pe)) return 1;
   ((int (MS *)(uint64_t))pe_export(&pe, "ippSetCpuFeatures"))(~0ULL);
 
   /* ============ quirk 1: ippsRealToCplx_32f のエラー優先順 ============ */

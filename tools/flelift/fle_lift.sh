@@ -5,7 +5,9 @@
 #   前提: python3 (capstone, pefile), emsdk 6.0.12
 set -euo pipefail
 FLE="$(cd -- "$(dirname -- "$0")" && pwd)"
-PE="${FLE_PE:-/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin}"
+source "$FLE/../shared/env.sh"
+PE="${FLE_PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}"
+export FLE_PE="$PE"
 ENT="${FLE_ENTRIES:-$FLE/work/fle_entries.json}"
 OUT="${FLE_OUT:-$FLE/work/lift}"
 NAME="${FLE_NAME:-flel}"

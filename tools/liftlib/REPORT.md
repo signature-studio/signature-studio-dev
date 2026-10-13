@@ -592,14 +592,21 @@ T12 は「join split が発動すること」を assert していたが、LIFTLI
 | e2e を素材付きで未実行 | 置換行以外の挙動は未検証 (置換は DLL パス定義のみ) | 本 PR のレビュー run (PR 本文の `oc_artifacts:` 行) |
 | `tools/liftlib/` 直下 5 ファイルに `/home/ubuntu` が残る | runner では symlink 必須 | 未起票 (2026-10-13 時点で `gh issue list --search "CI-4-liftlib"` は #386 のみ)。親 #294 にコメントで起票を提案 |
 
-## 17. LIFTLIB #241 — ymm(i256) helper ABI + pcmpistri + F2 xmm 戻り搬送
+## 17. HB-H3 (#93): 整数引数脱落 (D3) の機械検出・復元 pass `iargs` — 付録へ移動
 
-- 既知類型との関係: **該当なし** (`docs/DEFECTS.md` D1a〜D16 / `icall §4` とも未登録。新類型行案は §17.7)
-- 検証起点 commit: `main` = `400d546` (着手時)。数値はコミット済み HEAD `8476a82` の clean worktree (`git worktree add --detach`) で再現して取得 (§17.6)。
+全文は **[`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §17** (本体の 250 行上限対応で分割移動。内容は削除していない)。
+- 結論: `passes.iargs` (既定 off) が RetDec の整数引数 (rdx/r8/r9) 脱落を機械語基準で検出・復元する。OTT ctor の native 突合は iargs ON 200/200・ネガコン (OFF) 0/200 (§17.2)。
+- 検出 `iargs.scan()` は define 15 / 引数不足 site 15 / 入口素通し位置の誤値 site 17 (`sites_entry`, #427 で実装) を返す (§17.7)。
+- 未達: getParameter の xmm0 戻り (RetDec route; jump table 欠落が先, §17.3)。未解決は §17.5。
+
+## 18. LIFTLIB #241 — ymm(i256) helper ABI + pcmpistri + F2 xmm 戻り搬送
+
+- 既知類型との関係: **該当なし** (`docs/DEFECTS.md` D1a〜D16 / `icall §4` とも未登録。新類型行案は §18.7)
+- 検証起点 commit: `main` = `400d546` (着手時)。数値はコミット済み HEAD `8476a82` の clean worktree (`git worktree add --detach`) で再現して取得 (§18.6)。
 - 環境: GitHub Actions runner (nproc=4, emcc 6.0.12, gcc `-mavx2 -mfma`)。**`tools/m6/work` / `targets/*/work` は未展開**のため
-  FA/KH/OTT の回帰 (`liftlib_e2e.sh` の (a)(b)(c)(f)) は**この run では未実施** (§17.6)。
+  FA/KH/OTT の回帰 (`liftlib_e2e.sh` の (a)(b)(c)(f)) は**この run では未実施** (§18.6)。
 
-### 17.1 結論
+### 18.1 結論
 
 | 項目 | 着手前 | 本 run (実測) |
 |---|---|---|
@@ -609,7 +616,7 @@ T12 は「join split が発動すること」を assert していたが、LIFTLI
 | `pcmpistri` | 未対応 | **imm8 全 128 値 × 2 形 (void / i32) = 256 命令インスタンスを実機突合 mismatch 0** |
 | F2 xmm 戻り搬送 (OTT 実 DLL leaf 3 callee) | 検出器なし | 検出 3 callee / 11 ret → 搬送 9 → 残 2。注入 **9/9 検出** (偽陽性 0) |
 
-### 17.2 ymm(i256) の ABI (wasm32 の実測に基づく)
+### 18.2 ymm(i256) の ABI (wasm32 の実測に基づく)
 
 C は `i256` を表現できないが、LLVM IR の i256 は wasm32 で **引数 = i64 ×4 に分割 / 戻り値 = sret (先頭 i32 引数)** に lower される
 (`clang --target=wasm32-unknown-emscripten -S` の `.functype` で実測: `f (i32, i64×8) -> ()` ← `i256 f(i256, i256)`,
@@ -619,16 +626,16 @@ C は `i256` を表現できないが、LLVM IR の i256 は wasm32 で **引数
 - 128bit レーン独立の packed 命令 (`YMM_LANEWISE` 62 mnemonic) は xmm 版 kernel を下位/上位に適用 (`Spec.lanes`)。レーン横断は個別実装:
   `vinsertf128` / `vextractf128` / `vperm2f128` / `vshufpd` (ymm 版は上位レーンが imm bit[3:2] を使う — 実機突合で判明し個別化)。
 - **突合方法**: C は i256 を書けないので `simdtest.wasm_ir()` が **LLVM IR wrapper** (`load i256` → `call i256 @helper` → `store i256`) を生成し、
-  emcc で C と一緒にリンクする。native 側は gcc inline asm (`v256` / `-mavx2`) の実 ymm 命令。ABI 不一致は mismatch として現れる (§17.4 NC2)。
+  emcc で C と一緒にリンクする。native 側は gcc inline asm (`v256` / `-mavx2`) の実 ymm 命令。ABI 不一致は mismatch として現れる (§18.4 NC2)。
 
-### 17.3 pcmpistri
+### 18.3 pcmpistri
 
 `liftlib_simd.h: ll_pcmpistr()` に SSE4.2 implicit-length 文字列比較の全 imm8 (要素幅 ub/uw/sb/sw × 集約 4 種 × 極性 4 種 × 出力 LSB/MSB) を実装。
 RetDec は `void(i128,i128,i8)` と lift し ECX/EFLAGS を捨てる → **void 形は shadow global (`ll_pcmpistr_ecx` / `ll_pcmpistr_fl`)** に結果を残す
-(フラグ消費は P1 系 pass が担う方針は不変。ECX/フラグを後続が読む配線は未実装 — §17.7)。`d` 形 (ECX を返す) も同一実装。
+(フラグ消費は P1 系 pass が担う方針は不変。ECX/フラグを後続が読む配線は未実装 — §18.7)。`d` 形 (ECX を返す) も同一実装。
 実機突合は ECX + EFLAGS[CF,ZF,SF,OF] (pushfq) を比較、imm8 0..127 全値。
 
-### 17.4 ネガティブコントロール (1 件を壊して FAIL を確認)
+### 18.4 ネガティブコントロール (1 件を壊して FAIL を確認)
 
 | 検査 | 壊し方 | 結果 (`simd test --n 200`) |
 |---|---|---|
@@ -636,13 +643,13 @@ RetDec は `void(i128,i128,i8)` と lift し ECX/EFLAGS を捨てる → **void 
 | NC2 | i256 戻りの hi/lo 反転 (`MKY`) | mismatch **29,752** / bad_forms 56 (ABI・レーン順の破壊を検出) |
 | NC3 | `pcmpistri` の極性 (negative) 処理を無効化 | mismatch **12,800** / bad_forms 2 |
 
-### 17.5 F2 xmm 戻り搬送 (`f2.xmm_ret_scan` / `run_xmm_ret`)
+### 18.5 F2 xmm 戻り搬送 (`f2.xmm_ret_scan` / `run_xmm_ret`)
 
 - 検出: 機械語の**到達可能な全 ret で xmm0 が関数内定義** (`MFunc.ret_in_xmm0`、LIFTLIB-3) なのに、IR の `ret i64/i32` が leafabi の差した
   `%lf_<va>_t*` (xmm0 由来) でない callee。修復は `leafabi.run` (ret → xmm0 bits / call 直後の最初の xmm0 読み → call 戻り) を該当 callee に適用。
 - 入力 (再現): OTT インストーラ (`plugins-ott` 素材) から `OTT_x64.dll` を 7z 展開し、`retdec-decompiler -m bin --select-ranges
   0x1801b4220-0x1801b4615,0x1801a9be0-0x1801aa193,0x1801aa1a0-0x1801aa378 -o leaf OTT_x64.dll` (実測 54 s) → `leaf.ll` (5 define)。
-  `LL_XRET_LL=leaf.ll LL_XRET_DLL=OTT_x64.dll` を設定すると `inject-eval` と unit T16b が走る (未設定なら skip)。
+  `LL_XRET_LL=leaf.ll LL_XRET_DLL=OTT_x64.dll` を設定すると `inject-eval` と unit T17b が走る (未設定なら skip)。
 - 実測 (定義: 1 件 = 1 ret 命令 / 1 callee = 1 define): 検出 **3 callee (exp 1801b4220 8 ret / tan kernel 1801aa1a0 2 ret / 1801b4610 1 ret) = 11 ret**
   → 搬送 **9 ret** (exp 7 + tan kernel 2) → 修復後も未搬送 **2 ret**。
 - 注入評価 (`inject.eval_f2_xret`): 搬送済み 9 ret を `ret i64 0` に 1 件ずつ戻し scan が検出するか → **9/9 検出**。`inject-eval` 全体 RESULT
@@ -653,25 +660,25 @@ RetDec は `void(i128,i128,i8)` と lift し ECX/EFLAGS を捨てる → **void 
   退化させており (機械語は `vpxor xmm0` + 合流先)、xmm0 の元値が IR に無い。どちらも「合流先 ret の多定義 xmm0」で LIFTLIB-4 の領域 phi 合成と同系 (**未解決表へ**)。
 - `tan` 本体 `1801a9be0` は `ret_in_xmm0()` が False (entry/call の phi が ret に混ざる、LIFTLIB-4 §14.7 と同件) のため対象外。
 
-### 17.6 検証 (実測秒・load average・並列数)
+### 18.6 検証 (実測秒・load average・並列数)
 
 | 検証 | 結果 | real | load average (nproc=4) |
 |---|---|---|---|
 | `python3 -m liftlib simd test --n 200` (clean HEAD `8476a82`) | 223 mnemonic / 347 form / 182,400 vec: exact 181,895 / approx_ok 505 / **mismatch 0** | 5.8 秒 | 0.33 / 0.37 / 0.24 |
 | `python3 -m liftlib simd report` | 未被覆 0/0/0/0 | — | — |
 | `python3 -m liftlib inject-eval` (`LL_XRET_*` 設定) | injected 9 / detected 9 / false_positive 0 | — | — |
-| unit T5 / T16a / T16b | 全 ok | — | — |
+| unit T5 / T17a / T17b | 全 ok | — | — |
 | 着手前ベースライン `simd test` (400d546) | 192 mnemonic / 281 form / 95,400 vec / mismatch 0 | 2.8 秒 | — |
 
 **範囲外 (未実施・主張しない)**: `liftlib_e2e.sh` 全体 (FA 400/400・KH 366/366・OTT・leafspec) と unit T1〜T4/T6〜T15 — いずれも
 `tools/m6/work`・`tools/targets/{freshair,kilohearts}/work`・`/home/ubuntu/work/...` の参照データが runner に無く実行できない (必要素材:
-`work-m11` 等では代替不可、`liftlib` 用の work スナップショットが R2 allowlist に無い → §17.7)。`gen.py` の変更は i256/pcmpistri を含む宣言だけに
+`work-m11` 等では代替不可、`liftlib` 用の work スナップショットが R2 allowlist に無い → §18.7)。`gen.py` の変更は i256/pcmpistri を含む宣言だけに
 効く分岐で、既存形の生成コードは不変 (`simd test` の既存 477 命令インスタンスが全て mismatch 0 で維持) だが、FA/KH/OTT の実 IR での
 回帰は**未確認**。
 liftdiff の 4 スナップショット (`ir_instr.ll`) の declare で C 生成 → emcc コンパイルを試行: `ott_old` は 156/156 生成・emcc OK、`m11*` 4 本は
-**未知型 (`?` 型: cpuid / rep_movsq 等) の stub が `void` 変数宣言で emcc 失敗** (既存 stub 経路の欠陥、本 #241 の範囲外・§17.7)。
+**未知型 (`?` 型: cpuid / rep_movsq 等) の stub が `void` 変数宣言で emcc 失敗** (既存 stub 経路の欠陥、本 #241 の範囲外・§18.7)。
 
-### 17.7 未解決 (起票先付き)
+### 18.7 未解決 (起票先付き)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
@@ -682,7 +689,7 @@ liftdiff の 4 スナップショット (`ir_instr.ll`) の declare で C 生成
 | `gen.py` stub が未知型 (`?`) で `void` 変数宣言になり emcc 失敗 (m11 snapshot 4 本で実測) | 未知型を含む IR の helper 生成 | 新規子チケット |
 | ymm 幅変更/レーン横断の命令 (vcvtdq2pd ymm・vpmovmskb ymm・vperm*d・vbroadcast*) は未実装 | Convolver / Filter Table の実 closure で必要になる可能性 | 親 #50 に提案 |
 
-### 17.8 新類型行案 (DEFECTS.md 形式)
+### 18.8 新類型行案 (DEFECTS.md 形式)
 
 | 症状 (silent) | 根本原因 | 観測 (証拠) | 検出信号 | 修復 |
 |---|---|---|---|---|

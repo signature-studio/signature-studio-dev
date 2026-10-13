@@ -1,0 +1,12 @@
+{"op":"open","path":"C:\\Program Files\\Image-Line\\FL Studio 2026\\Artwork\\Skins\\Default\\Title.png","ok":true}
+{"op":"open","path":"c:/program files/image-line/fl studio 2026/artwork/skins/default/title.png","ok":true}
+{"op":"open","path":"\\\\?\\C:\\Program Files\\Image-Line\\FL Studio 2026\\Artwork\\Skins\\Default\\Title.png","ok":true}
+{"op":"open","path":"C:\\Program Files\\Image-Line\\FL Studio 2026\\System\\Config\\Chords.map","ok":true}
+{"op":"enum","path":"C:\\Program Files\\Image-Line\\FL Studio 2026\\System\\Config\\*.txt","ok":true}
+{"op":"open","path":"/fl/System/Config/Thumbnails/a.png","ok":true}
+{"op":"open","path":"C:\\Program Files\\Image-Line\\FL Studio 2026\\Data\\System\\Nope.fst","ok":false}
+{"op":"open","path":"C:\\Program Files\\Image-Line\\FL Studio 2026\\Data\\System\\Generated.bin","ok":true}
+{"op":"open","path":"C:\\Users\\webstudio\\Documents\\Image-Line\\FL Studio\\Settings\\x.xml","ok":true,"w":true}
+{"op":"open","path":"C:\\Users\\webstudio\\AppData\\Roaming\\Image-Line\\y.ini","ok":true}
+{"op":"open","path":"C:\\Users\\webstudio\\AppData\\Local\\Temp\\Image-Line\\1\\z.tmp","ok":true,"w":true}
+{"op":"open","path":"D:\\foo\\bar.dat","ok":false}
