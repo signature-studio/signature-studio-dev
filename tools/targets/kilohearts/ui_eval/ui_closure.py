@@ -163,7 +163,8 @@ def main(core_path, cgp, vtp, outp):
     in_win = sorted(nm for (dll, nm), fs in inv_xr.items() if fs & win_layer)
     out_win = sorted(nm for (dll, nm), fs in inv_xr.items() if fs and not (fs & win_layer))
     gap_names = set(imp['gap'].keys())
-    win = dict(uiwindow_slots=len(uiw[0][1]['slots']) if uiw else 0, uiwindowwin32_slots=len(w32_slots),
+    win = dict(uiwindow_slots=len(uiw[0][1]['slots']) if uiw else 0, uiwindowwin32_vtable_slots=max(len(v['slots']) for _, v in uiw32) if uiw32 else 0,
+               uiwindowwin32_unique_funcs=len(w32_slots),
                uiwindowwin32_slot_bytes=size(w32_slots), wndproc=hex(base + wndproc) if wndproc is not None else None,
                wndproc_bytes=res[wndproc]['size'] if wndproc in res else (int(core.func_of(wnd[0][0])[1] - wndproc) if wnd else 0),
                register_class_funcs=[hex(base + f) for f in regcls], layer_funcs=len(win_layer), layer_bytes=size(win_layer),
@@ -208,8 +209,8 @@ def main(core_path, cgp, vtp, outp):
         len(effects), len(ui_union), size(ui_union), out['ui']['pct_text'], size(ui_union & skia), size(ui_union - skia),
         len(ui_infra), size(ui_infra), size(ui_infra - skia)))
     print('DSP union (same method): %d B' % out['dsp_union_bytes'])
-    print('UIWindow slots=%d UIWindowWin32 slots=%d (%d B) WndProc %s %d B, win layer %d funcs / %d B; coupling %s' % (
-        win['uiwindow_slots'], win['uiwindowwin32_slots'], win['uiwindowwin32_slot_bytes'], win['wndproc'], win['wndproc_bytes'], win['layer_funcs'], win['layer_bytes'], coupling))
+    print('UIWindow vtable slots=%d, UIWindowWin32 vtable slots=%d (unique funcs %d, %d B), WndProc %s %d B, win layer %d funcs / %d B; coupling %s' % (
+        win['uiwindow_slots'], win['uiwindowwin32_vtable_slots'], win['uiwindowwin32_unique_funcs'], win['uiwindowwin32_slot_bytes'], win['wndproc'], win['wndproc_bytes'], win['layer_funcs'], win['layer_bytes'], coupling))
     print('gap in layer: %s ; outside: %s' % (win['gap_in_layer'], win['gap_outside_layer']))
     print('simd:', json.dumps(simd_tab))
     print('UI/DSP ratio %.2f' % out['ui_over_dsp'])
