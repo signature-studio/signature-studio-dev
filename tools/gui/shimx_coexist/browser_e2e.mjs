@@ -78,8 +78,8 @@ try {
   ck("save: FL が書いた内容が選択 handle (createWritable) へ反映される", nf === 1 && JSON.stringify(wr) === "[[70,76,80]]", JSON.stringify({ nf, wr }));
 
   const lg = await ev("window.__log()");
-  // 想定内: activation 無しの window.open (blocked) / javascript: 拒否 (rejected) / activation 無しの picker (user gesture 要求で失敗)
-  const expected = [/^openUrl blocked: https:\/\/example\.com\/no-activation$/, /^openUrl rejected \(scheme javascript:\)$/, /^op [23] failed: .*Must be handling a user gesture/];
+  // 想定内: activation 無しの window.open (blocked) / javascript: 拒否 (rejected) / activation 無しの open・save picker (user gesture 要求で失敗) の計 4 件
+  const expected = [/^openUrl blocked: https:\/\/example\.com\/no-activation$/, /^openUrl rejected \(scheme javascript:\)$/, /^op 2 failed: .*Must be handling a user gesture/, /^op 3 failed: .*Must be handling a user gesture/];
   const unexpected = lg.filter((l) => !expected.some((re) => re.test(l)));
   ck("host log は想定内 (activation 無しの blocked/拒否 3 件) のみ", unexpected.length === 0 && lg.length === expected.length, JSON.stringify({ unexpected, n: lg.length }));
   ck("page 例外なし", logs.length === 0, logs.join(" | "));
