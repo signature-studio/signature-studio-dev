@@ -6,7 +6,7 @@
 
 ## 1. 代入元の台帳 (`m11_argrecover.py` の `src:*`)
 
-台帳コードは `621c0d67` で追加済み。本 REPORT の数値は測定 commit `cb45c284` (検算 `m11_setother_ledger_verify.py` を台帳照合版に直した commit) の HEAD で再生成した。
+測定 commit: `1d1b4f2f` (本 PR の HEAD で再実行。§9 参照)。台帳と検算に使う実行ファイルは `m11_post.py`・`m11_argrecover.py`・`ldfix/ldmach.py`・`m11_setother_ledger_verify.py` の 4 つで、`cb45c284` から `1d1b4f2f` まで `git diff` の出力は 0 行 (`tools/m11` の他の変更は main 取り込み merge `8ddf7b41` 由来で、この 4 つの実行経路に含まれない)。
 
 実行: `python3 m11_post.py work/boot_final.ll work/sigfix_stats/final3_base.ll --pads work/sigfix_stats/pads.json` → `python3 m11_argrecover.py work/sigfix_stats/pads.json --pe <block00031_PE.bin> --out work/sigfix_stats/fixes.json`
 
@@ -104,9 +104,9 @@ EXIT=0
 
 ## 4. 既定出力の byte 一致 (測定)
 
-測定 commit: `cb45c284`。`git diff cb45c284 HEAD -- tools/m11` の出力は、この REPORT の追記のみ (コードの差分 0)。
+測定 commit: `1d1b4f2f` (§1・§9 と同じ)。`m11_post.py` は `cb45c284` から `1d1b4f2f` まで差分 0 行。
 
-`621c0d67` 時点の `m11_post.py` の出力と、現行 HEAD の `m11_post.py` の出力を比較した:
+`621c0d67` 時点の `m11_post.py` の出力と、現行 HEAD の `m11_post.py` の出力を比較した (HEAD `1d1b4f2f` で再実行した sha も同じ):
 
 ```
 $ cmp work/sigfix_stats/old/final3_base.ll work/sigfix_stats/final3_chk.ll && echo CMP_IDENTICAL
@@ -134,7 +134,7 @@ REPORT_N53 の 410 (378 + 32) とは一致する。
 ## 6. survey 退行検査 (受入 2・改訂版)
 
 測定 commit: `dece0171` の worktree (`ws-1441`) で `work-m11` と `fl-win64` を展開し、以下の手順で測定した。
-ローカルでの `git diff` は、本 commit 以降 `tools/m11` のコードを変えていないことを示す (`git diff dece0171 HEAD -- tools/m11 ':(exclude)*.md'` の出力は §9 に記載)。
+`dece0171` から HEAD までの `tools/m11` のコード差分 (`git diff dece0171 HEAD -- tools/m11 ':(exclude)*.md'`) は 0 行 (§9)。
 
 **同じ IR での比較** (IR `c9308c98…`・`ir_conditions`: `ldfix=applied` / `qstore=applied`。`m11_e2e.sh` の既定経路):
 
@@ -166,12 +166,14 @@ REPORT_N53 の 410 (378 + 32) とは一致する。
 
 ## 9. 再測定 (`69c774…` IR・受入 1 と 3 の根拠)
 
-- 入力 IR: 展開直後の `work/boot_final.orig69.ll` (sha256 `69c774ded8aaf717…`・`work-m11` 展開物と同一)。
-- 実行: `m11_post.py` → `m11_argrecover.py` → `m11_setother_ledger_verify.py` (いずれも rc 0)。
+- 測定 commit: `1d1b4f2f` (台帳・検算。§1 と同じ)。survey (§6) の測定 commit は `dece0171` (以下の比較参照)。
+- 入力 IR: 展開直後の `tools/m11/work/boot_final.ll` (sha256 `69c774ded8aaf717…`・`work-m11` 展開物と同一。HEAD で再確認)。
+- 実行 (HEAD `1d1b4f2f`・すべて rc 0): `m11_post.py` (既定出力 sha `ecab191b…`) → `m11_argrecover.py` → `m11_setother_ledger_verify.py`。
 - 台帳: 0 詰め site 1049・引数 1963・set_other 系 410 (set_other 378 + stack_set_other 32)。`resolved_sites` 31・const 復元 fixes 18。
 - 台帳の kind 別件数は §1 と一致 (imm 61 / lea 76 / mem 150 / reg 123)。
 - 検算 (`m11_setother_ledger_verify.py`): `match 410`・`mismatch 0`・exit 0。
-- コード差分: `git diff dece0171 HEAD -- tools/m11 ':(exclude)*.md'` の出力は 0 行 (本 PR の commit は REPORT のみ)。
+- コード差分 (4 ファイル): `git diff cb45c284 1d1b4f2f -- tools/m11/m11_post.py tools/m11/m11_argrecover.py tools/m11/ldfix/ldmach.py tools/m11/m11_setother_ledger_verify.py` は 0 行。
+- survey (§6) の範囲: `git diff dece0171 HEAD -- tools/m11 ':(exclude)*.md'` は 0 行 (`dece0171` 以降、`tools/m11` のコードは未変更)。
 - 注: `work/` は gitignore 対象のため commit しない。`tools/m11/work/` の再生成物 (`boot_final.ll` の `c9308c98…` 版) は素材の既定 IR を上書きしている。
 
 ## 8. 未解決
