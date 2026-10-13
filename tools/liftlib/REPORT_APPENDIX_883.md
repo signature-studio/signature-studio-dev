@@ -41,7 +41,7 @@ IR 上の読み (下記) は `work/ott_getparam/` の生成物を参照したも
 
 ## 確定事項 (アドレス算出)
 
-1. `icall_rewrite.py` L653 の算出で BLK = `0x184308000`。wasm32 (`p:32:32`) では BLK+0x08 が `0x84308008` に切り詰められる。線形メモリ上限との関係は未確認 (§17.10。`blk_va` 指定が RIP 相対 int32 の制約で不可な点も §17.10 参照)。§17.9 の記録 (出所未確認) にある BLK+8 load の trap 解析の記載のみ。
+1. `icall_rewrite.py` L653 の算出で BLK = `0x184308000`。wasm32 (`p:32:32`) では BLK+0x08 が `0x84308008` に切り詰められる。線形メモリ上限との関係は未確認 (§17.10)。`blk_va` 指定の可否は未確認 (試行の記録が無い)。§17.9 の記録 (出所未確認) にある BLK+8 load の trap 解析の記載のみ。
 
 ## 仮説 (未検証)
 
@@ -51,7 +51,7 @@ IR 上の読み (下記) は `work/ott_getparam/` の生成物を参照したも
 
 - (a) entry の BLK 読みを `%arg` 読みへ差し替える (`this` = `%arg1` を i64 化、`idx` = `%arg2`)。戻り値の BLK store は残るため、(c) と組み合わせる必要がある。
 - (b) harness が BLK+0x08/+0x10 へ this/idx を書いてから呼ぶ。BLK の wasm 内配置と同時に必要。
-- (c) BLK を wasm 線形メモリ内の範囲へ移す。RIP 相対 int32 制約のため、単純な `blk_va` 指定では不可。module-local global (`@__icall_blk` 相当) へ inttoptr 定数を張り替える方式が候補。
+- (c) 候補 (未検証): BLK を wasm 線形メモリ内の範囲へ移す。`blk_va` 指定で足りるかは未確認。module-local global (`@__icall_blk` 相当) へ inttoptr 定数を張り替える方式も候補。
 
 (a)(b)(c) のどれを採るかは、呼出し規約 (`spec.py` の `A <slot>`・`native_runner.c` の gpr 配置) と BLK の書込み主体の突合で決める。本 run では方式選択までは行わない。
 
