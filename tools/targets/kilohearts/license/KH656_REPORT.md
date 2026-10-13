@@ -67,8 +67,8 @@
 |---|---|---|
 | 入口経路 `0x180112a30` の fail-fast (STL map/shared_ptr 系の lift または shim) | 受入条件 2 (分類結果の lift IR 照合) 未達 | #656 継続 (本 PR は Refs) |
 | 残り fail-fast 34 件 (STL map/string/vector、EH `0x180005c30`/`c50`/`0x180fb5f5c` 等) | 閉包の広がり量は未見積 (試行 1 回目で 36 件を一括追加し失敗) | #656 継続。大きければ子 issue を PM が起票 |
-| ymm (AVX2) 命令の lift 未対応 (`0x180f89cf0` / `0x180fb6124`) | 閉包を広げられない | **起票依頼中 (PM 採番待ち・番号未採番)**。起票後に番号を追記する |
-| license 版 lift パイプラインの Win32 import 宣言・shim 節の欠落 (snapins 版から移植要) | 閉包を広げると emcc が失敗 | **起票依頼中 (PM 採番待ち・番号未採番)**。起票後に番号を追記する |
+| ymm (AVX2) 命令の lift 未対応 (`0x180f89cf0` / `0x180fb6124`) | 閉包を広げられない | #709 [KH-14] |
+| license 版 lift パイプラインの Win32 import 宣言・shim 節の欠落 (snapins 版から移植要) | 閉包を広げると emcc が失敗 | #710 [KH-15] |
 | 0x180ef7fc0 の native oracle (ctx-fuzz) 未作成 | 出力の bit 照合ができない | #656 継続 |
 | PR #329 未マージ | 本 PR の diff に #329 の commit (merge `f3b8056`) を含む。レビュー対象が二重になる | PM の merge 順序判断 (#329 → #656 を推奨) |
 | shim 4 件 (E と同一実装) の妥当性は F の経路で未検証 | 入口を越えるまで検証不能 | #656 継続 |

@@ -116,7 +116,7 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| ブラウザ本体の STL/shared_ptr 群 (未 lift callee 40 件。shim 追加前は 41 件) 未 lift、native oracle 突合なし | リスト構築〜描画の bit 一致未証明 | #249 (本 issue) 継続 / 親 #15。**子 issue 起票依頼中 (PM 採番待ち・番号未採番)** |
+| ブラウザ本体の STL/shared_ptr 群 (未 lift callee 40 件。shim 追加前は 41 件) 未 lift、native oracle 突合なし | リスト構築〜描画の bit 一致未証明 | #249 (本 issue) 継続 / 親 #15・追跡 #656 [KH-13] |
 | entry+0x22 の意味 (Hosts 判定) 未同定 | `Effects Hosts` が実際にどのエントリかは不明 | #249 継続 |
 | カテゴリ名と無償/有償の対応未確認 | 「無償系」解釈は推定 | #249 継続 |
 | 0x180d52990 の本体 lift 未実施 | Phase Plant 等 3 呼出元の closure は呼出元同定まで | #249 継続 |
