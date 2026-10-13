@@ -50,8 +50,10 @@ const icallDelta = (a, b) => {
 const icall_boot = icallCounts();
 const per = [];
 const only = process.env.SV_ONLY ? process.env.SV_ONLY.split(',').map(Number) : null;
+const skip = process.env.SV_SKIP ? process.env.SV_SKIP.split(',').map(Number) : [];
 for (let i = 0; i < 942; i++) {
   if (only && !only.includes(i)) continue;
+  if (skip.includes(i)) { per.push({ unit: i, va: '0x' + mod._m11_unit_va(i).toString(16), kind: 'hang' }); continue; }
   if (process.env.SV_TRACE_AT && String(i) === process.env.SV_TRACE_AT) mod._m11_set_trace(1);
   if (process.env.SV_STK_FILL) { const sp = mod._emscripten_stack_get_current(); mod.HEAPU8.fill(parseInt(process.env.SV_STK_FILL, 16), sp - 8192, sp); }   // 各 unit の直前に SP 直下 8 KiB を埋める (残骸への感度の検査)
   const before = stubCounts(); const va0 = Number(mod._m11_va_used());
