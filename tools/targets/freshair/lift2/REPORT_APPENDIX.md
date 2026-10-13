@@ -157,3 +157,13 @@ bash tools/targets/freshair/lift2/lift2_e2e.sh                                  
 - rep 経路の e2e 到達・ネガコン (受入条件 1)、回帰セットの seed 非依存化 (3)。
 - `vpcmpeqw` (ymm、`f_1810577ac`) の lowering。
 - epf 展開の素材配線は #693。
+
+## 7. FA-10 (#666) 残件: rep 経路のネガコン (ctrl)
+
+- 検証 HEAD: `84e43186` (origin/main)。変更は `mlift/mlift_ops.py` の一時 trap 1 行のみ (検証後に `cmp` で HEAD と一致を確認して戻した)。
+- 対象: `h_rep_str` の先頭に `llvm.trap` + `unreachable` を入れた一時版。`work/ctrl/ctrl_rep.json` に実在する `rep movsb` / `rep stosb` / `rep stosw` / `rep stosq` の closure がこの経路を通る。
+- 結果 (実測):
+  - trap 版: `build_ctrl.sh` ok → `run_ctrl.sh 2 5` **exit 1** (`MISMATCH in ctrl scenarios`)。`native/wasm` の行数 15/0、ERR は wasm 側 `RuntimeError: unreachable` の 1 件で native 側 ERR 1 件とは同一 scenario ではない (`同一 scenario: NO`)。
+  - 元に戻した版: `build_ctrl.sh` ok → `run_ctrl.sh 2 5` **exit 0** (`ctrl BIT-EXACT 15/15`, real 3 s, load 0.77)。
+- 判定: rep 経路の誤りは ctrl e2e で検出される。これで #666 の受入条件 4 (ネガコン) を満たす。comp / filter の rep 経路 (`ml/comp_full_rep.json` 等) は動的に未確認 (§5 の未解決のまま)。
+- `lift2_e2e.sh` 全体の実測は本節の commit 後に別途記録する (§7.1)。
