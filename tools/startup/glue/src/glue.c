@@ -14,6 +14,7 @@
 #include "vreg.h"
 #include "pump_internal.h"     /* g_pring (リング実体・読取) */
 #include "pump_api.h"          /* pump_get_wait_mode 等の宣言 (読取) */
+#include "shimx.h"             /* ShellExecuteW (G12 検証口) */
 
 #include <stdarg.h>
 #include <stddef.h>
@@ -411,6 +412,16 @@ void glue_trace_dump(void) {
     if (g_trace_dropped) printf("... (%d trace lines dropped)\n", g_trace_dropped);
 }
 int glue_trace_dropped(void) { return g_trace_dropped; }
+
+/* G12 検証口: FL の 0x125d370 と同じく ShellExecuteW を実際に呼ぶ (戻り = HINSTANCE 値)。
+ * hook は winstubs_init() が登録する (ST-T3b #223 で boot glue に結線予定。現状は host から呼ぶ) */
+int glue_probe_shell_execute(const char* verb, const char* file, const char* params) {
+    WCHAR v[64], f[512], p[512];
+    shimx_utf8_to_utf16(verb ? verb : "open", -1, v, 64);
+    shimx_utf8_to_utf16(file ? file : "", -1, f, 512);
+    shimx_utf8_to_utf16(params ? params : "", -1, p, 512);
+    return (int)(uintptr_t)ShellExecuteW(0, v, f, p, 0, 1);
+}
 
 /* 起動時の既定状態 (constructor): host は未構築・trace 空 */
 __attribute__((constructor)) static void glue_init_(void) {

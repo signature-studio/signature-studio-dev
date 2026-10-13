@@ -9,11 +9,13 @@ import json, os, sys, collections
 from multiprocessing import Pool
 HERE = os.path.dirname(os.path.abspath(__file__)); IPP = os.path.dirname(HERE)
 sys.path.insert(0, IPP)
+sys.path.insert(0, os.path.join(IPP, '..', 'shared'))
+from paths import FL_WIN64_DIR
 from scan_x64 import PEImg
 from capstone import Cs, CS_ARCH_X86, CS_MODE_64
 from capstone.x86_const import *
 cs = Cs(CS_ARCH_X86, CS_MODE_64); cs.detail = True
-EXT = '/home/ubuntu/work/analysis/win64/extracted'
+EXT = os.path.join(FL_WIN64_DIR, 'extracted')
 GP = [{X86_REG_RCX, X86_REG_ECX, X86_REG_CX, X86_REG_CL}, {X86_REG_RDX, X86_REG_EDX, X86_REG_DX, X86_REG_DL},
       {X86_REG_R8, X86_REG_R8D, X86_REG_R8W, X86_REG_R8B}, {X86_REG_R9, X86_REG_R9D, X86_REG_R9W, X86_REG_R9B}]
 XM = [{X86_REG_XMM0, X86_REG_YMM0}, {X86_REG_XMM1, X86_REG_YMM1}, {X86_REG_XMM2, X86_REG_YMM2}, {X86_REG_XMM3, X86_REG_YMM3}]

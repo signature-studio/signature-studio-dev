@@ -12,7 +12,8 @@ set -euo pipefail
 OTT="$(cd -- "$(dirname -- "$0")/.." && pwd)"
 CRT="$OTT/crtinit"
 OUT="$OTT/work/crtlift"
-DLL=/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll
+source "$OTT/../shared/env.sh"
+DLL="$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll"
 CLOSURE="${CRT_CLOSURE:-3}"
 mkdir -p "$OUT"
 
@@ -28,7 +29,7 @@ OVR_ARGS=()
 for kv in "${OVR_LIST[@]}"; do OVR_ARGS+=(--override "$kv"); done
 
 echo "[lift_crt] [3/4] lift (x64c) — closure=$CLOSURE, overrides ${#OVR_ARGS[@]}"
-source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1
+source "${EMSDK_DIR:-/opt/emsdk}/emsdk_env.sh" >/dev/null 2>&1
 python3 "$OTT/lift/x64c.py" --pe "$DLL" --entries "$OUT/entries.json" --out "$OUT" --closure "$CLOSURE" \
   "${OVR_ARGS[@]}"
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # One-command verification for tools/hostbridge/nfo (H9 / CAB-98):
 #   typecheck -> browser-safety grep -> unit/corpus tests -> measured metrics -> synthetic DB generation (+ reader-model acceptance).
-# env: FL_ROOT (mac FL Resources/FL; default analysis/mac extract), REGEN_EVIDENCE=1 (re-run Ghidra extraction; ~1 min, needs tools/m2/work/ghidra_dll)
+# env: FL_ROOT (mac FL Resources/FL; default $FL_MAC_DIR/pkg_extract/...; tools/shared/env.sh), REGEN_EVIDENCE=1 (re-run Ghidra extraction; ~1 min, needs tools/m2/work/ghidra_dll)
 set -euo pipefail
 cd "$(dirname "$0")"
 export PATH="$HOME/.local/share/pnpm/bin:$HOME/.bun/bin:$PATH"

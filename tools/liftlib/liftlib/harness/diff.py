@@ -112,6 +112,9 @@ def run_diff(image, func_va, spec, cjs, ll_path, wasm_func, out_dir, n=None, see
             if nm in ign:
                 continue
             hb, tb = b["bufs"].get(nm, ("", "-"))
+            for (o, n_) in spec.get("mask_ranges", {}).get(nm, []):     # 環境依存値 (vtable の絶対 VA 等) を比較から除く
+                hx = hx[:2 * o] + "00" * n_ + hx[2 * (o + n_):]
+                hb = hb[:2 * o] + "00" * n_ + hb[2 * (o + n_):]
             if hx != hb or tok != tb:
                 A = bytes.fromhex(hx)
                 Bv = bytes.fromhex(hb) if hb else b""

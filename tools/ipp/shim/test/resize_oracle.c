@@ -7,6 +7,7 @@
    出力: 系統ごとの統計 + 最終行に SUM JSON (shim_check.py が読む) */
 #define _GNU_SOURCE
 #include "../../ref/pe_load.h"
+#include "fl_dll_path.h"
 #include "../../src/ipp_min.h"
 #include "../../shim/gen/ipp_proto.h"
 #include <stdio.h>
@@ -413,13 +414,14 @@ static void fam_sig(void) {
 
 int main(int argc, char **argv) {
   setvbuf(stdout, NULL, _IONBF, 0);
-  const char *dll = "/home/ubuntu/work/analysis/win64/extracted/block24356_PE.bin";
+  const char *dll = NULL;
   const char *path = NULL;
   for (int i = 1; i < argc; i++) {
     if (!strcmp(argv[i], "--dump") && i + 1 < argc) { path = argv[++i]; }
     else if (!strcmp(argv[i], "--replay") && i + 1 < argc) { path = argv[++i]; }
     else dll = argv[i];
   }
+  if (!dll) dll = fl_ipp_dll_path();
 #ifdef WASM_REPLAY
   g_wasm = 1;
   if (!path) { fprintf(stderr, "usage: resize_oracle.wasm --replay <hashfile>\n"); return 2; }
