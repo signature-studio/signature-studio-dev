@@ -1,8 +1,10 @@
 """MX2-3 (#830 / #1017) N5・N6 文字列の周辺実測。
 
 使い方: python3 license/scripts/mx_n5n6_probe.py <Massive X.vst3>
-文字列の出現 (ASCII / UTF-16LE) と VA (ImageBase 0x180000000) を出し、
-周辺 (前後 160 B) の文脈を表示する。参照元の判定はしない (REPORT_APPENDIX §12.4)。
+N6: バイナリ中の 'Native Access' を含む文字列を ASCII / UTF-16LE で全件列挙する
+    (文言の全文はリポジトリに無いため、推測せず走査で求める。REPORT_APPENDIX §12.2 の 6 件と照合する)。
+N5: 既知の名前を ASCII / UTF-16LE で検索する。
+文字列の VA (ImageBase 0x180000000) と前後 80 B の文脈を出す。参照元の判定はしない (REPORT_APPENDIX §12.4)。
 """
 import re
 import struct
@@ -31,19 +33,33 @@ def off2va(off):
     return None, None
 
 
-TARGETS = {
-    "N6": [b"Please use Native Access to re-activate.", b"Please open Native Access to re-activate."],
-    "N5": [b"MXDemoPopup", b"demoExpired", b"demoExpiredChanged", b"subscriptionExpired"],
-}
+def ctx(off, length):
+    c = data[max(0, off - 80): off + length + 80]
+    return re.sub(rb"[^\x20-\x7e]", b".", c).decode()
 
-for group, needles in TARGETS.items():
-    for s in needles:
-        for label, pat in (("ascii", s), ("utf16", s.decode().encode("utf-16-le"))):
-            hits = [m.start() for m in re.finditer(re.escape(pat), data)]
-            print(f"[{group}] {s.decode()} {label}: {len(hits)} hit(s)")
-            for off in hits[:2]:
-                va, sec = off2va(off)
-                ctx = data[max(0, off - 80): off + len(pat) + 80]
-                txt = re.sub(rb"[^\x20-\x7e]", b".", ctx).decode()
-                print(f"  raw=0x{off:x} VA=0x{va:x} sec={sec}")
-                print(f"    {txt}")
+
+print("[N6] 'Native Access' を含む文字列の全件 (ASCII / UTF-16LE)")
+for label, pat in (
+    ("ascii", rb"[\x20-\x7e]{8,}"),
+    ("utf16", rb"(?:[\x20-\x7e]\x00){8,}"),
+):
+    for m in re.finditer(pat, data):
+        s = m.group(0)
+        txt = s.decode("utf-16-le") if label == "utf16" else s.decode()
+        if "Native Access" not in txt:
+            continue
+        va, sec = off2va(m.start())
+        print(f"  {label} raw=0x{m.start():x} VA=0x{va:x} sec={sec}")
+        print(f"    {txt}")
+        print(f"    ctx: {ctx(m.start(), len(s))}")
+
+TARGETS_N5 = [b"MXDemoPopup", b"demoExpired", b"demoExpiredChanged", b"subscriptionExpired"]
+print("[N5] 既知名の出現")
+for s in TARGETS_N5:
+    for label, pat in (("ascii", s), ("utf16", s.decode().encode("utf-16-le"))):
+        hits = [m.start() for m in re.finditer(re.escape(pat), data)]
+        print(f"  {s.decode()} {label}: {len(hits)} hit(s)")
+        for off in hits[:2]:
+            va, sec = off2va(off)
+            print(f"    raw=0x{off:x} VA=0x{va:x} sec={sec}")
+            print(f"    {ctx(off, len(pat))}")
