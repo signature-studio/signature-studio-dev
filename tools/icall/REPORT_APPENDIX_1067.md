@@ -57,7 +57,7 @@
 - RetDec 再実行: 不可。Fresh Air の入力は `plugins-freshair` と `work-icall` (`rt_freshair-core`) を要する。本 run の素材は `fl-win64` のみ。
 - したがって本節の段別の主張は、素材を揃えた run で dump を生成し直すまで「既存記録・推定」のままとする。
 
-**本 run で再現できた実測**: §13.1 の表と `non-IAT call sites 91 / lost 6` のみ (いずれも PR 初版の記録。本 run は `fa_residual.py` を実行できなかった)。
+**本 run で再現できた実測**: なし。`fa_residual.py` と dump の生成は、素材 `work-icall` が無いため実行していない。下表と §13.1 の数値は PR 初版時の記録 (既存記録)。
 
 | 指標 | 復元前 `audit_before.json` | 復元後 `audit_after.json` | 区分 |
 |---|--:|--:|---|
@@ -66,6 +66,6 @@
 | `call_dropped` | 80 | 5 | 既存記録 |
 | `call_other` (`other_insn`) | 7 | 1 | 既存記録 |
 
-測定 HEAD: `c4e93550` (`tools/icall/*.py` は `origin/main` `ca0f59a1` まで差分 0 (本 PR の `git diff c4e93550 HEAD -- 'tools/icall/*.py'` も 0 行))。
+測定 commit (PR 初版の記載): `c4e93550`。これは主張であり、本 run では `c4e93550` で再測定していない。`tools/icall/*.py` は `c4e93550` から PR HEAD まで差分 0 (`git diff c4e93550 HEAD -- 'tools/icall/*.py'` は 0 行) のため、コード面では記録時点と同等とみなせる。数値そのものは再測定していない。
 
 **未解決** (子 issue): 段別の切り分けの再現 (素材 `work-icall`・`plugins-freshair` を揃えた run で dump を生成し直す) → 子 #1298 の受入条件に含める。
