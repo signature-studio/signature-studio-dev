@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # fl-win64 の展開済み PE (extracted/*_PE.bin) から FreeType 呼出元の候補を洗う (#1144)。
 # usage: bash oss/freetype/callers_scan.sh <extracted_dir>
-#   extracted_dir は `tar --zstd -xf fl-win64.tar.zst 'extracted/*_PE.bin'` の展開先 (repo 外の素材・work/ 配下に置く)
+#   extracted_dir は `tar --zstd -xf fl-win64.tar.zst --wildcards 'extracted/*_PE.bin'` の展開先 (repo 外の素材・work/ 配下に置く)
 set -euo pipefail
 D="${1:?usage: callers_scan.sh <extracted_dir>}"
 cd "$D"

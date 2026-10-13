@@ -12,7 +12,8 @@
 
 ## B. FT_* 呼出面の調査 (#1144, 2026-10-13)
 
-- **素材**: `fl-win64` (`flstudio_win64_26.1.7.5653.exe`) の `extracted/` から PE 313 本 (`*_PE.bin`) を `tar --zstd -xf ... 'extracted/*_PE.bin'` で展開して調査 (`work/ft/extracted/`・gitignore)。再現は `bash oss/freetype/callers_scan.sh <extracted_dir>`。
+- **素材**: `fl-win64` (`flstudio_win64_26.1.7.5653.exe`) の `extracted/` から PE 313 本 (`*_PE.bin`) を `tar --zstd -xf fl-win64.tar.zst --wildcards 'extracted/*_PE.bin'` で展開して調査 (`work/ft/extracted/`・gitignore)。`--wildcards` は必須で、無いと GNU tar が `Not found in archive` で空展開する。再現は `bash oss/freetype/callers_scan.sh <extracted_dir>`。
+- **再現確認 (HEAD 上)**: 上記の `--wildcards` 付き展開で 313 本を取得し、`callers_scan.sh work/ft/extracted` が rc=0 で完了 (FT_names=0 GPA=2、FT_ 名を持つ PE 23 本、`DLL Name: freetype` を import する PE 3 本)。
 - **FL 本体 `block00031_PE.bin`**: `FT_*` の名前が 0 件、`freetype` の文字列も無い。GetProcAddress/LoadLibraryA は import 済み (ただし解決する名前は文字列に現れない)。
 - **`freetype.dll` を import する PE は 0 件**。`freetype.dll` の名前を持つのは installer file table (`block25162_PE.bin`: `Shared\freetype.dll/486712`・`Shared\freetype_x64.dll/607032`) と DLL 自身 (`block24358`/`block24359`) のみ。`Shared\` 配下の FL 製 DLL (ILSvg / Blend2D / ildsp / dsp_ippv2 / QuickFontCache 等) も `freetype` を import していない。
 - **`FT_*` を import する PE**: `block24836`・`block24851`・`block24856` (`libfreetype-6.dll` を import = GTK/pango 系の同梱ライブラリ用。FL 本体ではない)。`block24837` (`libfreetype-6.dll` 本体・227 名)・`block24890` (pango 系の文字列) も FL 本体ではない。`block24435` は libass (字幕) の文字列。
