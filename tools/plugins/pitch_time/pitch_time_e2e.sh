@@ -8,7 +8,7 @@
 #   --judge-only : 殻の judge.py と C++ module の judge.py --engines だけ実行して終わる (最終行は [pitch_time_e2e] JUDGE-ONLY PASS)。
 #                  入力は $STATUS_CSV / $CPP_CSV (既定 work/batch/status.csv / work/pitch_time/cpp.csv)。 判定の配線のネガコン用
 # 出力: work/pitch_time/{status7.csv,facts.json,cpp.csv} (work/ は gitignore)
-# 前提素材: fl-win64 / toolchain-retdec (/opt/retdec) / toolchain-emsdk (/opt/emsdk)  (docs/WORKFLOW.md §11)
+# 前提素材: fl-win64 / toolchain-retdec ([RETDEC]) / toolchain-emsdk ([EMSDK])  (docs/REFERENCES.md, docs/WORKFLOW.md §11)
 set -euo pipefail
 trap 'rc=$?; [ "$rc" = 0 ] || echo "[pitch_time_e2e] FAIL (exit $rc, line $LINENO)" >&2' EXIT
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"

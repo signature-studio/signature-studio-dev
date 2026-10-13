@@ -57,14 +57,15 @@ PY
 c1=$(emcc_rc "$N/broken.ll")
 echo "  NC1: emcc -c control(rc)=$c0 broken(rc)=$c1 (期待: 0 / 非0)"
 R=work/closure/block$(printf %05d $B).ranges.txt
-n_all=$(tr ',' '\n' < "$R" | wc -l)
-LAST=$(tr ',' '\n' < "$R" | tail -n 1 | cut -d- -f1 | sed 's/^0x//')
+n_all=$(tr ',' '\n' < "$R" | grep -c .)   # ranges.txt は末尾改行なし。 wc -l だと 1 少なく数える
+LAST=$(tr ',' '\n' < "$R" | grep . | tail -n 1 | cut -d- -f1 | sed 's/^0x//')
 d0=$(grep -c '^define' "$OUT/p.final.ll"); h0=$(grep -c "^define .*@function_$LAST\\b" "$OUT/p.final.ll")
-tr ',' '\n' < "$R" | head -n $((n_all - 1)) | paste -sd, > "$N/ranges_minus1.txt"
+tr ',' '\n' < "$R" | grep . | head -n $((n_all - 1)) | paste -sd, > "$N/ranges_minus1.txt"
+n1=$(tr ',' '\n' < "$N/ranges_minus1.txt" | grep -c .)
 bash lift/lift_ranges.sh "$FL_WIN64_DIR/extracted/block$(printf %05d $B)_PE.bin" "$N/ranges_minus1.txt" "$N/lift" p 600 > "$N/lift.log" 2>&1
 d1=$(grep -c '^define' "$N/lift/p.final.ll"); h1=$(grep -c "^define .*@function_$LAST\\b" "$N/lift/p.final.ll" || true)
-echo "  NC2: ranges $n_all -> $((n_all - 1)), 落とした関数 function_$LAST: control define=$d0 present=$h0 / minus1 define=$d1 present=$h1 (期待: present 1 -> 0, define 減)"
-{ [ "$c0" = 0 ] && [ "$c1" != 0 ] && [ "$h0" = 1 ] && [ "$h1" = 0 ] && [ "$d1" -lt "$d0" ] && [ "$d1" -gt 0 ]; } || { echo "  NC1/NC2 <-- FAIL"; FAILS=$((FAILS + 1)); }
+echo "  NC2: ranges $n_all -> $n1 (落とした数 $((n_all - n1)), 期待 1), 落とした関数 function_$LAST: control define=$d0 present=$h0 / minus1 define=$d1 present=$h1 (define 減 $((d0 - d1)))"
+{ [ "$c0" = 0 ] && [ "$c1" != 0 ] && [ "$n_all" -gt 1 ] && [ "$n1" = "$((n_all - 1))" ] && [ "$h0" = 1 ] && [ "$h1" = 0 ] && [ "$d1" -lt "$d0" ] && [ "$d1" -gt 0 ]; } || { echo "  NC1/NC2 <-- FAIL"; FAILS=$((FAILS + 1)); }
 
 echo "NC3: judge.py (shell 判定)。 Fruity Scratcher 19071 / Newtime 19166 を壊す"
 JA="--closure-dir work/closure --ll-dir work/batch"
