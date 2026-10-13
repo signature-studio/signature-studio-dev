@@ -1,6 +1,7 @@
 /* selftest_gui5.inc — GUI-5 (#181): 24/8/4/1bpp DIB・mono DDB・GetDIBits/SetDIBits/StretchDIBits の各 bpp、
  * 行カーネル (SIMD 対応) 版 BitBlt/StretchBlt/AlphaBlend と画素単位の参照実装 (gdi_set_ref_blit) の一致、AlphaBlend の独立オラクル、fail-fast 境界。
  * selftest.c から #include (CHK/PTR/cref/rgb を共有)。 */
+#include <errno.h>
 extern void gdi_set_ref_blit(int on);
 static int rop_needs_src_t(uint32_t rop) { return !(rop == PATCOPY || rop == PATINVERT || rop == DSTINVERT || rop == BLACKNESS || rop == WHITENESS); }
 
@@ -30,7 +31,7 @@ static void expect_failfast(void (*fn)(void), const char *what, const char *need
   pid_t pid = fork();
   if (pid == 0) { dup2(pfd[1], 2); close(pfd[0]); fn(); _exit(0); }
   close(pfd[1]);
-  char buf[512] = {0}; size_t got = 0; for (;;) { ssize_t nr = read(pfd[0], buf + got, sizeof buf - 1 - got); if (nr <= 0) break; got += (size_t)nr; } close(pfd[0]);   /* EOF まで読む (途中で閉じると子が SIGPIPE になる) */
+  char buf[512] = {0}; size_t got = 0; for (;;) { char junk[256]; int full = got >= sizeof buf - 1; ssize_t nr = read(pfd[0], full ? junk : buf + got, full ? sizeof junk : sizeof buf - 1 - got); if (nr < 0 && errno == EINTR) continue; if (nr <= 0) break; if (!full) got += (size_t)nr; } close(pfd[0]);   /* EOF まで読む (途中で閉じると子が SIGPIPE になる) */
   int st = 0; waitpid(pid, &st, 0);
   CHK(WIFSIGNALED(st) && WTERMSIG(st) == SIGABRT && strstr(buf, needle) != NULL, "%s: fail-fast (%s) wait-status=0x%x got: %.200s", what, needle, st, buf);
 }
@@ -241,6 +242,7 @@ static void run_gui5(int64_t hwnd) {
       SelectObject(dd, ob); DeleteObject(br); SelectClipRgn(dd, 0);
     }
     int minrop = 1 << 30; for (int i = 0; i < 15; i++) if (per_rop[i] < minrop) minrop = per_rop[i];
+    printf("[selftest] gui5 equivalence: %d cases (%d same-surface), ref mismatches %d, same-surface mismatches %d, negative-control probes detected %d/90\n", cases, same_cases, bad, same_bad, neg_detected);
     CHK(bad == 0, "fast path == reference in %d cases incl. %d same-surface (%d mismatches vs ref; every ROP >= %d cases)", cases, same_cases, bad, minrop);
     CHK(same_cases > 400 && same_bad == 0, "same-surface overlapping blit (1:1 / stretch / flip / multi-rect clip) == blit from a pre-copied surface in %d cases (%d mismatches)", same_cases, same_bad);
     CHK(neg_detected >= 60, "negative control: wrong ROP/offset differs from the reference in %d/90 probes", neg_detected);
