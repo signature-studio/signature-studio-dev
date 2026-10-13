@@ -88,6 +88,35 @@ def build_args(pattern, kinds):
     return toks, blob
 
 
+FVM_OFF = 0x40
+
+
+def fvm_candidates(fault, kinds):
+    """'s' pattern の native fault addr から this 候補の引数 index を返す (LD-23 / #975)。
+    引数 i が整数 SMALL[i] で、fault addr が SMALL[i]+off (off < FVM_OFF) なら、その引数は deref されたポインタ候補。"""
+    if not fault or 'addr' not in fault:
+        return []
+    a = int(fault['addr'], 16)
+    return [i for i in range(min(len(kinds), len(SMALL))) if kinds[i] == 'i' and 0 <= a - SMALL[i] < FVM_OFF]
+
+
+def fvm_line(va, name_prefix, arg, sig, trace=True, xfill=True):
+    """引数 arg だけを this 疑似オブジェクト (vm blob・arena+0x1000) へのポインタにした case。他の引数は small。"""
+    kinds = kinds_of(sig['params'])
+    toks = []
+    for i, k in enumerate(kinds):
+        if k == 'd':
+            toks.append('d:0x%x' % FP_D[i % 4])
+        elif k == 'f':
+            toks.append('f:0x%x' % FP_F[i % 4])
+        elif i == arg:
+            toks.append('i:a:0x%x' % PTR_SLOTS[0])
+        else:
+            toks.append('i:0x%x' % SMALL[i])
+    return 'id=%x:fvm%d fn=%x blob=vm args=%s trace=%d xfill=%d sig=%s rt=%s' % (
+        va, arg, va, ','.join(toks), 1 if trace else 0, 1 if xfill else 0, ','.join(sig['params']), sig['ret'])
+
+
 def supported_sig(sig):
     ok = {'i1', 'i8', 'i16', 'i32', 'i64', 'ptr', 'float', 'double'}
     return all(t in ok for t in sig['params']) and (sig['ret'] in ok or sig['ret'] == 'void')
