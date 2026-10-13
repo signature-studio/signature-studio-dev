@@ -134,6 +134,12 @@ RetDec IR は下位 store (`%arg3`) のみで、`%arg2` の `inttoptr` が未使
 
 - 差分は 0x5de3e0 の 1 行のみ (他 79 kernel の `run / ok / sig11 / buf_diff` は不変)。`run=67 ok=67 sig11=0`。
 - `lift_ranges.sh` の opt-in 経路: `PLUG_FISTP_HI_FUNCS=function_5de3e0` で `on.final.ll` に `fhi_s` が 2 箇所、未指定で 0 箇所。
+- レビュー指摘への対応 (支配チェック): 下位 store より後で定義される `%H` への挿入は、`llvm-as` が
+  `Instruction does not dominate all uses!` で落ちるため候補から除外した。`%fhi_s` / `%fhi_v` が既存のときも書き換えない。
+  回帰テストは `tools/plugins/lift/passes/test_fix_fistp_hi_store.sh` (`llvm-as` で検査。ok / dom / name / 旧 pass の負論対照)。
+  実行結果は `OK` (4 ケースとも期待どおり)。この修正の後に `p0c4_abi_e2e.py` は再実行していない。
+  再実行に必要な `toolchain-retdec` / `toolchain-emsdk` / `work-liftlib` は本 run の素材に無かった (`ls $HOME/artifacts` は `fl-win64` のみ)。
+  支配チェックが 0x5de3e0 の候補を落とさないかは未確認 (IR は `work/` にあり本 run では得られない)。
 - 未検証: 残る 0x5dee90 / 0x5df040 / 0x5e02b0 / 0x5e12b0 (#331) と、`p0c3_e2e.sh` の回帰判定 (0x5de3e0 除外の既存処理) の見直し。
 
 ## 15. 環境パス置換 (#346, 親 #294・先行 #312): /home/ubuntu 絶対パスを tools/shared へ
