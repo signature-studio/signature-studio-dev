@@ -1,8 +1,8 @@
 # #773 裏付けログ (SHX-T9 survey)
-HEAD(測定 commit): 本ファイルを含む commit (build.sh は 05b2c71b と同一・コード差分なし)
+測定 commit: c17ac666 (build.sh は 05b2c71b と同一・コード差分なし)
 image (測定対象): tools/m11/work/shimx_link/m11_sx_trace_soft_fix.cjs sha256 b674477d77504ea4d8368a6b4e72f05989ddcadf1cb8a015de39025fb3466a90
 baseline image: tools/m11/work/m11_boot.cjs sha256 e826e6c0a8e8ff85bff0afacfed7368b23b7da4740ace099a415c4b2fb71f1b2
-EMSDK: 6.0.12 (/opt/emsdk, emsdk install 6.0.12 で導入) / llvm-nm: /opt/emsdk/upstream/bin/llvm-nm (build.sh が PATH に戻す)
+EMSDK: 6.0.12 ([EMSDK] = docs/REFERENCES.md、emsdk install 6.0.12 で導入) / llvm-nm: [EMSDK] の upstream/bin/llvm-nm (build.sh が PATH に戻す)
 build: 5 variant とも clean rebuild (obj / gen / tmp / *.cjs 削除後) で [sxlink] OK (signature mismatch=1 undefined=0 duplicate=0)。ログ: build_logs/
 image sha256 一覧: image_sha256.txt
 
