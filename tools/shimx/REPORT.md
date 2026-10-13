@@ -381,7 +381,7 @@ MultiByteToWideChar / WideCharToMultiByte / GetCPInfo(Ex) / IsValidCodePage / Is
 
 | 検証 | 結果 |
 |---|---|
-| `bash tools/shimx/test.sh` | (§14.7 にコミット済み HEAD での実測を記載) |
+| `bash tools/shimx/test.sh --quick` (クリーン worktree, 検証起点 HEAD `365f7fd`, n=3) | **3/3 exit 0**, 所要 23.6–24.1 s (load average 0.20–0.65 = 実行直前, 並列なし)。MT 5 グループ / ST PASS / fail-fast 8 / M4 互換 MT・ST PASS / 未実装 0 / 公開関数 678 (本 PR 前 674)。`--quick` なしは `verify_ott` が素材なしで SKIP のため同等 (作業ツリー n=1: 24.3 s) |
 | CP932 全 DBCS セル | **9,604 セル**: MB→WC 不一致 **0**、WC→MB→WC 往復不一致 **0** (`test_shord.inc`)。オラクル = Python 標準 codec `cp932` (表の出典と独立実装)。生成表 `src/cp932_tab.c` も同 codec と 11,340 セル全件突合し差 **0** |
 | Crypt | RFC 1321 / FIPS 180-4 の公開ベクトル 7 件 + 百万 `a` ×3 アルゴ + 境界長 (55/56/63/64/65 B) ×3 アルゴ全一致。1 バイトずつ流した場合も同値。期待値は Python `hashlib` で再検算 (手書き値との差 0) |
 | 序数 | `GetProcAddress` 序数 (shell32 74 / shlwapi 12・219)・lift トークン往復・IEnumFORMATETC / IStream / QISearch の実呼出を `test_link.c` / `test_cbtrans.c` / `test_shord.inc` で確認 |
