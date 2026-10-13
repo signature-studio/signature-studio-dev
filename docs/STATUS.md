@@ -79,6 +79,7 @@
 | `shimx/pathreg` | パス写像/レジストリ接続 | `tools/shimx/pathreg/REPORT.md` |
 | `startup` | 起動シーケンス設計+stub 計画 | `tools/startup/REPORT.md` |
 | `startup/{glue,keyfix,pump,vreg,winstubs}` | 各実装済 | 各 `REPORT.md` |
+| `startup/loadpaths` | 言語 .moe/スキン/Help のロード経路を静的解析で確定・VFS 配置 group 定義 (実トレース確定は未了) | `tools/startup/loadpaths/REPORT.md` |
 | `runtime` | 設計・基盤 | `tools/runtime/REPORT.md` |
 | `hostbridge` | 設計+mini VST2 host PoC | `tools/hostbridge/REPORT.md` |
 | `hostbridge/{cb,h2,lowbase,nfo}` | 各実装済 | 各 `REPORT.md` |
