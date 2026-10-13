@@ -21,7 +21,7 @@
 - `com_sine_b256_d2`: PASS (maxErr 1.49e-8, underrun 0)。
 - `com_ramp_b256_d2`: **FAIL**。underrun 1 / silence 640 f。ramp mismatch 195,328/240,384 は underrun 後の出力ずれと思われるが**原因は未調査**。REPORT §12 (#998 [AU-16]) と同じ負荷依存 underrun の同形事象。
 - 同一 run の 30 分ソーク自体は underrun 0 で PASS。短シナリオの FAIL とは別に扱い、再現の有無は次回 e2e で確認する (未確定)。
-- **e2e 全体の終了コード**: 本 run は exit 1 (`com_ramp_b256_d2` の上記 FAIL による)。ソーク単体 (`com_soak1800_b256`) は PASS。#1102 受入条件 1 の文言 (`e2e.sh --soak 1800` が PASS) は**未達**のまま。e2e 全体 exit 0 の記録は、head での再測定を別途行うまで未達のまま残す (本 fix run では実施せず。§6 参照)。
+- **e2e 全体の終了コード**: 本 run は exit 1 (`com_ramp_b256_d2` の上記 FAIL による)。ソーク単体 (`com_soak1800_b256`) は PASS。#1102 受入条件 1 の文言 (`e2e.sh --soak 1800` が PASS) は**未達**のまま。head での再測定 (§7) も exit 1 で、e2e 全体 exit 0 は未達のまま残す。
 
 ## 4. 未達 (子 issue へ分割)
 
@@ -33,7 +33,8 @@
 
 - 測定 commit: `35c6fa15d18c3de624e821503365bf3a4754ea5b` (§3 の e2e 実測の対象コード)。
 - 差分 (コード部分。`*.md` を除く。`git diff 35c6fa15 HEAD -- tools/audio/asio ':!*.md'`): 出力 0 行。
-- 本節を追記した commit (文書のみ) の後、`git diff --stat 35c6fa15 HEAD -- tools/audio/asio` の対象は `*.md` のみ。コード・harness・test への差分 0。
+- コード検証 HEAD `289fb00c` (付録のみの commit): `git diff 35c6fa15 289fb00c -- tools/audio/asio ':!*.md'` = 0 行。`git diff --stat 35c6fa15 289fb00c -- tools/audio/asio` の対象は `REPORT_APPENDIX_1102.md` のみ。
+- `289fb00c` より後の commit は付録 (`*.md`) のみで、その差分も `git diff 35c6fa15 HEAD -- tools/audio/asio ':!*.md'` = 0 行で確認する。
 
 ## 6. head での再実行 (実施済み・§7 参照)
 
