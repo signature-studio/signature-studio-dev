@@ -29,6 +29,7 @@ try {
     ck('C2 Chrome Worker の OTT 出力 (500blk×128f) sha256 = node の sha256 (bit 一致)', r.ott0_sha256 === nodeR.ott_sha256_full, `${r.ott0_sha256?.slice(0, 16)} vs ${nodeR.ott_sha256_full?.slice(0, 16)}`),
     ck('C3 Chrome Worker の Balance kernel 出力 block0 sha256 = node', r.bal_first_block_sha256 === nodeR.bal_first_block_sha256, `${r.bal_first_block_sha256?.slice(0, 16)}`),
     ck(`C4 追加 ${NSPAWN} 個の OTT lowbase instance (各 24MiB initial) を Worker 内で生成`, r.spawn && r.spawn.created === NSPAWN, `created ${r.spawn?.created} in ${r.spawn?.ms.toFixed(0)} ms, linear total ${r.spawn_linear_mib_total} MiB`),
+    ck('C5 OTT 128 frame 1 処理の実時間 (Chrome Worker) が予算 (128/44100 s) の中央値以内', r.frame128 && r.frame128.median_ms <= r.frame128.budget_ms, r.frame128 ? `median ${r.frame128.median_ms.toFixed(3)} ms / p99 ${r.frame128.p99_ms.toFixed(3)} ms / min ${r.frame128.min_ms.toFixed(3)} ms / budget ${r.frame128.budget_ms.toFixed(3)} ms (n=${r.frame128.n})` : 'frame128 未取得'),
   ];
 } finally { await chrome.close(); await srv.close(); }
 if (OUT) fs.writeFileSync(OUT, JSON.stringify(out, null, 1));
