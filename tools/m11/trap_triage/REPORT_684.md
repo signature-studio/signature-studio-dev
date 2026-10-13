@@ -15,7 +15,7 @@
    この 1 箇所だけ LVA (18759304) に直すと unit 477 だけが oob → ok (他 941 unit の遷移 0)。元に戻すと oob に戻る (§4-1)。
    ok になったことは意味の正しさ (G の中身 `0x11F94B0` も VA 形式で、LVA 変換が要る可能性) の証明ではない。
 3. **275 / 95 / 895 は最上位命令まで特定、原因は未特定**。275 は this 引数の不正 (推定: Win32 stub の返り値との関係、未検証)。
-4. D11 変種の DEFECTS 行案は §3。DEFECTS.md 本体は PM 判断 (WORKFLOW §5) のため未編集。
+4. D11 変種の DEFECTS 行案は §6。DEFECTS.md 本体は PM 判断 (WORKFLOW §5) のため未編集。
 
 ## 1. survey の frame 訂正 (`survey_units.mjs`、修正は `be5c84d`)
 
@@ -44,7 +44,7 @@
 
 命令境界の検証: 4 unit の offset はすべて命令境界に一致。境界でないオフセット `0x18f8e0` は `not an instruction boundary` で失敗 (ネガコン)。
 
-- **95** `function_47ad70` @ `0x18f8df` = `i64.load offset=0`。直前は `local.get 5; i64.const 3; 0x86 (i64.shl); local.get 0; 0x7c (i64.add); 0xa7 (i32.wrap_i64)` (`oob_insn.py` の実出力)。`i32.wrap_i64` は `i64.add` の後・`i64.load offset=0` の前にある。
+- **95** `function_47ad70` @ `0x18f8df` = `i64.load offset=0`。直前は `local.get 5; i64.const 3; i64.shl; local.get 0; i64.add; i32.wrap_i64` (`oob_insn.py` の実出力)。`i32.wrap_i64` は `i64.add` の後・`i64.load offset=0` の前にある。
   ループ内で `*(arg0 + (v << 3))` を読む (v = record の `+8` の値)。caller: `536da0` ← `4fe150` ← `5d2680` (unit 本体)。
   この unit の直前に GDI 系 stub (GetDC / GetDeviceCaps / CreatePalette / GetStockObject / LoadIconW / MulDiv) が呼ばれる。
 - **275** `function_864fe0` @ `0x935bf` = `i64.load offset=0` (`this+8` = `GetMonitorInfoW` の hMonitor)。`this` (arg1) が不正。
@@ -94,6 +94,7 @@ IR (`work/boot_final3.ll`): `function_abfd60` 内の `%ce0n11_function_abfd60 = 
 | 95: index と record の出所 | 単発 OOB 1 件 | 同上 (親 #596 にコメント) |
 | 895: リスト先頭の出所 | 単発 OOB 1 件 | 同上 (親 #596 にコメント) |
 | `survey_units.mjs` の旧 frame を前提にした #419 §8.2 / §8.3 の記述 | §8.3 (`414ad0` と #307 の関係) の結論が逆転 | 本 PR で訂正注記 (`REPORT.md` §8.2 直下)。#307 との関係は再検証が必要 (未実施) |
+| work-m11 snapshot の `m11_boot.cjs` は `_m11_icall_cnt_n` を含まず (件数 0)、snapshot 単独の `survey_units.mjs` は `mod._m11_icall_cnt_n is not a function` で失敗する。e2e で再生成した build (件数 2) では動く | survey の再現手順の前提 (§7) | PM 判断 (#494 へのコメント or 新規子チケット) |
 
 ## 6. DEFECTS.md 行案 (PM 判断。本 PR では未編集)
 
@@ -104,6 +105,9 @@ IR (`work/boot_final3.ll`): `function_abfd60` 内の `%ce0n11_function_abfd60 = 
 ## 7. 再現手順
 
 ```sh
+export FL_WIN64_DIR=$RUNNER_TEMP/fl-win64   # 展開先 (未設定なら /home/runner/work/_temp/fl-win64)
+mkdir -p "$FL_WIN64_DIR" && tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C "$FL_WIN64_DIR"
+tar --zstd -xf "$ARTIFACTS_DIR/work-m11.tar.zst" -C "$(git rev-parse --show-toplevel)"   # 内部パスは tools/m11/work/ 始まり (リポジトリ直下に展開)
 export FL_WIN64_DIR=$RUNNER_TEMP/fl-win64          # PE: $FL_WIN64_DIR/extracted/block00031_PE.bin
 cd tools/m11
 mkdir -p work/trap_triage
@@ -115,6 +119,7 @@ node trap_triage/oob684_probe.mjs 477 0 watch                             # addr
 ```
 
 `work-m11` 素材には `work/trap_triage/` が含まれず (`tar --zstd -tf` の grep で 0 件)、`survey_units.mjs` も出力先を作らないため、survey の前に `mkdir -p` が要る。
+survey は e2e で再生成した `work/m11_boot.cjs(.wasm)` に対して実行する。snapshot 単独では不可 (§5)。
 
 ## 8. 検証結果 (実測、HEAD `6c1a34f`)
 
@@ -122,7 +127,31 @@ node trap_triage/oob684_probe.mjs 477 0 watch                             # addr
   §8.2 (c) の e2e 値 (864 / 31 / 46 / 1) と一致。
 - survey `survey_units.mjs` n=3: 12.6 / 12.4 / 12.6 s、load 0.89 / 0.91 / 1.00。3 回とも ok 828 / halt0 54 / miss 46 / oob 13 / noproc 1。
 - 旧 frame との差: 13/13 (§1)。decoder の境界ネガコン (§2)。477 の 1 箇所実験 + ネガコン (§3)。
-- 修正の影響範囲: `survey_units.mjs` の `frames` (OOB と abort のみ影響)。`annotate.py` の最上位 frame 集計は新しい値になる。
+- 修正の影響範囲: 修正箇所 (`survey_units.mjs` の非 halt0 の catch) は trap 全般 (oob / abort / other) に掛かる。本 run の非 halt0 trap は oob 13 件のみで、frames が出たのもその 13 件 (halt0 54 件の frames は別の分岐で作られ、本修正の対象外)。`annotate.py` の最上位 frame 集計は新しい値になる。
+
+### 再検証 (review 2、検証起点 `791cce5` = oob_insn.py 修正の commit A)
+
+- 手順 0 (snapshot 単独、e2e 前): `survey_units.mjs` は `TypeError: mod._m11_icall_cnt_n is not a function` (survey_units.mjs:37) で失敗。`work/m11_boot.cjs` の `_m11_icall_cnt_n` は 0 件。e2e による再生成後は 2 件。
+- snapshot の `m11_boot.cjs.wasm` に対して下記と同じ 4 引数で `oob_insn.py` を実行すると、4 件とも `offset ... is outside function` で失敗 (snapshot の build では REPORT §1 の frame と対応しない)。
+- decoder (snapshot): 全 15701 関数 body が例外なく decode され、各 body が本体の終端ちょうどで止まる。未知命令 0、数値演算子の 16 進名 0。
+- `oob_insn.py` (e2e 再生成 build、import 24 件):
+  - `3067 18f8df` (95): `>> 0x18f8df  i64.load offset=0`、直前 `i32.wrap_i64`
+  - `388 935bf` (275): `>> 0x935bf  i64.load offset=0`、直前 `i32.wrap_i64`
+  - `5373 2775c0` (477): `>> 0x2775c0  i64.load offset=0`、直前 `i32.wrap_i64`
+  - `2001 149cb9` (895): `>> 0x149cb9  i64.load offset=0`、直前 `i32.wrap_i64`
+  - ネガコン `3067 18f8e0`: `offset 0x18f8e0 is not an instruction boundary` (exit 1)
+  - 出力に `0x` 付きの命令名は残らない。
+- import の kind は 24 件すべて 0 (function)。kind 3 (global) の import は 0 件のため、(a) の修正はこの build の解析を変えない。
+- e2e `m11_e2e.sh` n=3 (`791cce5`、3 回とも増分で gen_ir2 なし):
+  - 所要 43.6 / 34.8 / 34.9 s、load 0.34→0.58 / 0.49→0.72 / 0.66→0.81 (run 1 は開始・終了の時刻を別の call で取ったため tool の往復を含む)。
+  - 3 回とも reached_stage 4/6、units 22/942、survey ok 864 / trap 31 (oom 1) / miss 46 / noproc 1 / clobber 0。
+  - commit 前に warm-up 1 回 (作業ツリーは oob_insn.py の未コミット変更のみ。e2e は oob_insn.py を読まない。gen_ir2・data/image 再生成・build を含む。時間は未計測。結果は同じ)。
+  - 前回 (上記 §8 本文): 30.5 / 30.6 / 30.7 s、load 0.45 / 0.67 / 0.80。
+- survey `survey_units.mjs` (`SV_RAW=1`) n=3 (`791cce5`、e2e 後の build):
+  - 所要 16.55 / 16.79 / 16.91 s、load 0.75→1.07 / 0.98→0.99 / 0.91→0.93。
+  - 3 回とも ok 828 / halt0 54 / miss 46 / oob 13 / noproc 1。
+  - 前回 (上記 §8 本文): 12.6 / 12.4 / 12.6 s、load 0.89 / 0.91 / 1.00。
+- OOB 13 件の frames[0] (解決名) と raw 先頭 (wasm index, offset) は §1 の表と 13/13 一致。
 
 ## 9. 変更点と範囲
 
