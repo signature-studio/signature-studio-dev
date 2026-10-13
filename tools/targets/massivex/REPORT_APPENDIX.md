@@ -139,10 +139,10 @@
 | 陽性対照 (probe) | `python3 license/scripts/mx_callers_probe.py --selftest` | 1.1 s (probe 実走査と合計) | 期待 1/2/0/0/0 → 検出 1/2/0/0/0 PASS (rc 0) |
 | 直接走査 (probe) | `python3 license/scripts/mx_callers_probe.py` | 同上 | 5 読み手への E8/E9 = **0 件** (rc 0) |
 | 陽性対照 (linear) | `python3 license/scripts/mx_callers_linear.py --selftest` | 0.1 s | 期待 1/2/1/0/0 → 検出 1/2/1/0/0 PASS・不正バイト 3 B を挟んでも後続 call を検出 (rc 0) |
-| 線形検算 (linear) | `python3 license/scripts/mx_callers_linear.py` | 36.3 s | `.text` 60,224,000 B 中 **デコード 60,189,833 B (99.94%)**・未デコード 34,167 B (17,579 区間)。5 読み手への call/jmp = **0 件** (rc 0) |
+| 線形検算 (linear) | `python3 license/scripts/mx_callers_linear.py` | 36.5 s | `.text` 60,224,000 B 中 **デコード 60,189,833 B (99.94%)**・未デコード 34,167 B (17,579 区間)。5 読み手への call/jmp = **0 件** (rc 0) |
 
 - 欠落区間: 未デコードは 1 B ずつ再同期した区間。全区間の VA 開始・バイト数を `work/mx_linear_gaps.txt` に出力 (`work/` は gitignore・commit しない)。区間バイト数の合計 34,167 B は上の未デコード量と一致。カバー率は 100% ではないが、この欠落区間の中身 (データか未対応命令か) は未分類。読み手への直接 call/jmp の 0 件は、バイト走査 (probe) が欠落区間を含む全 `.text` を走査して同じく 0 件である点で裏付ける。
-- 負荷: 測定時 `uptime` load average 0.58 (開始) → 0.77 (linear 完走時)。4 vCPU。並列 1 プロセス。
+- 負荷: 測定時 `uptime` load average 0.31 (開始) → 0.65 (linear 完走時・HEAD 88fcedc1 再測定)。4 vCPU。並列 1 プロセス。
 - 件数の一致: 読み手 5 関数は probe / linear とも 0 件で一致。0 件の根拠となる陽性対照は selftest (合成 .text) で示した。実 PE 上の陽性対照 (読み手以外の頻出関数の件数比較) は本 HEAD では再測定していない。
 - 判定 (実 PE・現 HEAD): **直接 call/jmp (E8/E9) で N6 読み手 5 関数を呼ぶ箇所は .text 内に 0 件** (バイト走査・線形逆アセンブルの 2 方式で一致)。間接呼び出し (vtable / 関数ポインタ表) と、テーブル基準の参照は本節では判定していない。N5 の読み手は未特定。
 - 残件: 間接呼び出し元の特定 (vtable / 関数ポインタ表の `.rdata` 走査) → #1439 [MX-9]。N5 の読み手の特定 → #1439 [MX-9]。
