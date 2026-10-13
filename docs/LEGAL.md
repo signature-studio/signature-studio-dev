@@ -299,7 +299,7 @@ zplane (Auftakt / élastique Pro / Metering / Restore)、Chicken Systems (Sample
 - **LGL-2**: `release guard` — 公開前に dist/R2 同期対象を走査し、FL/プラグイン由来バイト列・資産ハッシュ (`[ANALYSIS-DIR]`/* から生成した deny-list) を検出したら失敗させる。
 - **LGL-3**: `THIRD_PARTY_NOTICES` 自動生成 (FreeType 謝辞、BSD/MIT 表示、PSF、Apache NOTICE) + upstream バージョン/configure 記録。
 - **LGL-4**: FFmpeg/LAME 等の LGPL 部品を side module (差し替え可能) として upstream から再ビルドする設計 + `--enable-gpl`/`--enable-version3` 検出 CI。
-- **LGL-5**: 規約差分監視 (FL ToU/EULA.html、Xfer、Kilohearts、Slate、NI の最新版取得・ハッシュ比較) を FL 追従プロセスに追加。 → 実装済み (Xfer は取得機構のみ。基準線は実 Xfer インストーラ待ち。`tools/legal/terms-watch/REPORT.md`)。
+- **LGL-5**: 規約差分監視 (FL ToU/EULA.html、Xfer、Kilohearts、Slate、NI の最新版取得・ハッシュ比較) を FL 追従プロセスに追加。 → 実装済み (7 件の基準線を台帳に記録。Xfer は OTT win インストーラの NSIS ヘッダから取得。`tools/legal/terms-watch/REPORT.md`)。
 - **LGL-6**: 一次文書の補完取得 (NI Massive X インストーラ同梱版 EULA ※Web 版は確認済み、Slate Fresh Air 個別条項、Xfer 公式規約、Image-Line の公開 ToU/FAQ)。
 
 ---

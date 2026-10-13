@@ -58,4 +58,23 @@ PY
   printf '%-34s expected=3 actual=%s\n' "接続不能 (ni-eula)" "$code"
   [ "$code" = 3 ] || { fail=1; echo "$out"; }
 fi
+
+# Xfer (実 NSIS インストーラ): PLUGINS_DIR 配下に *.exe があるときだけ。無改変の台帳で exit 0 (UNCHANGED)、台帳ハッシュを 1 文字改変で exit 1、PLUGINS_DIR 無しの --strict で exit 3
+if [ -d "${PLUGINS_DIR:-}" ] && [ -n "$(find "$PLUGINS_DIR" -name '*.exe' -print -quit)" ]; then
+  LEDGER="$REPO_ROOT/docs/LEGAL_TERMS_LEDGER.json"
+  python3 - "$LEDGER" "$T/tampered_xfer.json" <<'PY'
+import json, sys
+l = json.load(open(sys.argv[1])); c = l["docs"]["xfer-eula"]["current"]
+c["sha256"] = ("0" if c["sha256"][0] != "0" else "1") + c["sha256"][1:]
+json.dump(l, open(sys.argv[2], "w"))
+PY
+  xfer() { # xfer <case> <expected-exit> <args...>
+    out="$(node "$CLI" check --only xfer-eula --md "$T/x.md" --no-write --snapshots "$T/snap" "${@:3}" 2>&1)"; code=$?
+    printf '%-34s expected=%s actual=%s\n' "$1" "$2" "$code"
+    [ "$code" = "$2" ] || { fail=1; echo "$out"; }
+  }
+  xfer "xfer 無改変 (実インストーラ)" 0 --ledger "$LEDGER"
+  xfer "xfer 台帳ハッシュ改変" 1 --ledger "$T/tampered_xfer.json"
+  xfer "xfer PLUGINS_DIR 無し --strict" 3 --ledger "$LEDGER" --plugins-dir "$T/nonexistent" --strict
+fi
 exit $fail

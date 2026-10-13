@@ -77,6 +77,19 @@
       "history": [],
       "lastChecked": "2026-10-13",
       "pendingReview": false
+    },
+    "xfer-eula": {
+      "current": {
+        "chars": 1914,
+        "firstSeen": "2026-10-13",
+        "origin": "nsis:Install_Xfer_OTT_137.exe",
+        "sha256": "f9e9af266913c8d4e26acc07c72af2af9ef36785905181fd84133cc0852052d2",
+        "version": null
+      },
+      "firstSeen": "2026-10-13",
+      "history": [],
+      "lastChecked": "2026-10-13",
+      "pendingReview": false
     }
   },
   "schema": 1
