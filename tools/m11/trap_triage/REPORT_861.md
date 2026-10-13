@@ -34,7 +34,7 @@ unit 189 (`CharLowerBuffW` の stub 経由):
 - ネガコン: `kind: halt0`。frames は `function_409470` → `function_409730` (Error)。
   転記が 189 の ok に効いている。
 
-## 3. ネガコン (受入 3)
+## 3. ネガコン (受入 3) — 測定 HEAD: b23ffa2d (main 7736a5c5 取り込み前)
 
 転記を無効化すると unit 189 は `ok → halt0`。per-unit JSON での遷移 (HEAD → ネガコン):
 
@@ -44,7 +44,7 @@ unit 189 (`CharLowerBuffW` の stub 経由):
 
 転記が無いと 24 件の ok が非 ok になる。つまり転記は多くの unit の ok を支えている。
 
-## 4. 回帰 (受入 4) と未解決
+## 4. 回帰 (受入 4) と未解決 — 測定 HEAD: b23ffa2d (main 7736a5c5 取り込み前。a82fa0ff では HEAD のみ再測定)
 
 「修復で他 unit が ok→非 ok にならないか」は、修復なし (ネガコン) を基準にすると **非 ok になるのは unit 368 の 1 件のみ**
 (転記ありで `halt0`、なしで `ok`)。転記あり HEAD を 2 回測って unit 368 の結果は同一 (決定的)。
