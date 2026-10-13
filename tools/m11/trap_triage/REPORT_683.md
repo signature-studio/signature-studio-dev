@@ -24,18 +24,19 @@
 
 `bash trap_triage/neg_683.sh` (ON/OFF を順に build + `survey_units.mjs` + `survey_diff.py`)。素材 `work-m11` は #516/#680 以前の生成物で `ir_conditions.json` が無く、そのままでは build が fail-closed で止まる。そこで `m11_gen_ir2.sh` で同じ `boot*.lift.ll` から IR を作り直した (ldfix=applied、20 s)。以下はその再生成 IR の実測。
 
-- 実行: commit `956d2ed` の worktree (`/home/runner/work/ws-713`) で、`m11_gen_ir2.sh` による IR 再生成後に 3 回実行 (測定 1・2・3)。各回で ON build → survey → OFF build → survey の順。C 側・build スクリプトは `956d2ed` から変更していない (本 fix の commit は REPORT・スクリプトの文言と cp 修正のみ)。
-- 所要 (実測、測定 3): 全体 72 s (ON build 18.4 s / survey 17.5 s (load 0.50) / OFF build 18.4 s / survey 17.0 s (load 0.72))。
+- 実行: HEAD `44bf3e9` の worktree (`/home/runner/work/ws-713`) で、`m11_gen_ir2.sh` による IR 再生成 (21.2 s、`ldfix=applied`、`ir_sha256` 7497b4d8…) の後に 3 回実行 (測定 1・2・3)。各回で ON build → survey → OFF build → survey の順 (`neg_683.sh`)。C 側 (`m11_ov.c`) と build スクリプトは `956d2ed` から変更していない。
+- 所要 (実測、`neg_683.sh` 全体): 測定 1 = 81.96 s (ON build 24.9 s / survey 17.2 s (load 0.93) / OFF build 18.8 s / survey 20.9 s (load 1.10))、測定 2 = 71.84 s、測定 3 = 71.36 s (ON build 19.0 s / survey 17.1 s (load 1.38) / OFF build 18.8 s / survey 16.4 s (load 1.21))。
 
 | 構成 | ok | oob | halt0 | miss | noproc | trap | 計 |
 |---|--:|--:|--:|--:|--:|--:|--:|
 | OFF (既定, gate=0) n=3 | 828 | 11 | 55 | 47 | 1 | 66 | 942 |
 | ON (gate=1) n=3 | 828 | 11 | 55 | 47 | 1 | 66 | 942 |
 
-- **決定的**: 測定 1〜3 は全件一致 (min = max)。OFF と ON も一致 (差 0)。
+- **決定的**: 測定 1〜3 は全件一致 (min = max = n=3)。OFF と ON も一致 (差 0)。
+- **kind 以外の差分 (`survey_diff.py` の全出力、測定 1〜3 とも同一)**: `kind 以外も含めた差分 unit (frames は深さのみ比較): 0 []`。`icall sites / targets の [ok, miss] 差: 0 件`。ok 退行 0。旧 `956d2ed` の確認で出ていた unit 235・888 の差分は、今回の HEAD・IR 再生成後の測定では出ない (0 件)。
 - **遷移 (OFF → ON)**: 942 unit 全件で kind 不変 (ok→ok 828 / oob→oob 11 / halt0→halt0 55 / miss→miss 47 / noproc→noproc 1)。frames の深さの変化も 0。icall sites / targets の [ok, miss] 差も 0。
 - **PR 旧記述 (ON で ok 818→827、ok +9、副作用 58-63・307/311/917・56) は再生成 IR の実測で再現しない**。58-63 / 307 / 311 / 917 は OFF の段階で既に ok、56 は OFF・ON とも oob。
-- **対象 4 unit**: 149 は OFF = ON = oob (最上位 frame `653660 ← 6539e0 ← 664190`)。158/280/659 は OFF = ON = halt0 (`412770 ← 4128b0__lifted ← 4128b0`)。**4 unit とも ok にならない → 受入条件 1 は未達。**
+- **対象 4 unit**: 149 は OFF = ON = oob (最上位 frame `653660 ← 6539e0 ← 664190`)。前版の「ON で最上位が `414c70` に変わる」は、再生成 IR の (c) 測定 (ON/OFF とも) では再現しなかった。`414c70` は stack の最上位に現れない。158/280/659 は OFF = ON = halt0 (`412770 ← 4128b0__lifted ← 4128b0`)。**4 unit とも ok にならない → 受入条件 1 は未達。**
 - **旧 818/21 の出所**: REPORT.md §8.2 の (a)「スナップショット (旧生成物)」。(c)「再生成 IR」を採用基準とする (REPORT.md §8.2 (e))。本 REPORT は (c) を基準とする。
 
 ネガコン: 上記 gate OFF/ON の切替で結果は変わらない。したがって本 gate は survey 上では効果を持たない (C 版 UStr 版と LStr 版が survey で同一の結果)。
@@ -44,20 +45,21 @@
 
 - **定義** (`tests/oob_414ad0.py` と同じ): batch の関数のうち「最初の `wasm_trap` case の wasm_detail が `memory access out of bounds @ ld_wasm.wasm.function_414ad0` で始まる」関数。基準 jsonl `tools/liftdiff/work/m11/batch_closure.jsonl` (7421 行) で **68**。
 - **A** = IR 無変更の複写 (`m11_414base`)、**B** = `ir414_fix.py` で修復した IR (`m11_414fix`)。68 関数を `--set file:` で指定、`--shards 4 --state auto`。
-- **実行手順**: `liftdiff68_683.sh` を end-to-end で実行 (rc=0、41 s、`956d2ed` + 本 commit の cp 修正)。途中で `cp` の同一ファイル問題 (修正済み) と numpy 不足 (`liftdiff.py` の依存) に当たったため、venv に numpy / capstone / pefile を入れて実行。
+- **実行手順**: `liftdiff68_683.sh` を end-to-end で実行 (HEAD `44bf3e9`、`FL_WIN64_DIR` = fl-win64 展開先、`PY` = python3 + capstone/pefile/numpy)。3 回実行し、いずれも rc=0 (実測 40.4 s / 39.6 s / 3 回目は run 1・2 とも同一の要約行)。
+- 測定 1〜3 の要約 (`cmp68_683.py` 出力): A の oob414 = **59**、B の oob414 = **0**、verdict は A・B とも mismatch 68 / match 0。3 回とも同一。
 
-| 指標 (68 関数) | A (IR 無変更) | B (414ad0 修復) |
+| 指標 (68 関数、n=3 で同一) | A (IR 無変更) | B (414ad0 修復) |
 |---|--:|--:|
-| 最初の wasm_trap が 414ad0 の OOB | **67** | **0** |
+| 最初の wasm_trap が 414ad0 の OOB | **59** | **0** |
 | verdict = match | 0 | 0 |
 | verdict = mismatch | 68 | 68 |
 
-- 遷移 (cmp68_683.py): oob414→other・verdict mismatch→mismatch が 67、other→other・verdict mismatch→mismatch が 1。**match → 非 match の退行は 0** (A で match は 0 件のため自明)。
-- B (68 関数) の最初の trap の内訳 (`/tmp/ld68.log` の関数別表の集計、計 68): `4133f0` の OOB 13 件 (経路 `4133f0 < 414c70`)、`412e40` の OOB 9 件 (経路 `412e40 < 652750`)、`4128b0__lifted` の unreachable 3 件、その他の OOB 2 件 (`8e6e30`・`__asm_rep_movsq_memcpy` 各 1)、trap なし 41 件。
-- **414ad0 の修復で消えた OOB は、別の関数の OOB (`412e40` 経由、`4133f0 < 414c70` 等) に置き換わった**。その原因 (deref 脱落の有無) は未確認。68 関数はいずれも verdict が mismatch のまま。
-- **A (今回 67) と既存 closure jsonl の 68 の差**: 1 関数 (最初の trap の関数が変わる)。shard・実行順 (memory 状態の持ち越し) による差と推定 (**未確認**)。このため A/B の比較は同一ハーネス内に限って読む。
+- 遷移 (cmp68_683.py): oob414→other・verdict mismatch→mismatch が **59**、other→other・verdict mismatch→mismatch が **9**。**match → 非 match の退行は 0** (A で match は 0 件のため自明)。
+- B (68 関数) の最初の wasm_trap の内訳 (batch jsonl からの集計): trap なし 38、`4133f0` 18、`412e40` 6、`4128b0__lifted` 2、`__asm_rep_movsq_memcpy` 1、`4144a0` 1、`8e6e30` 1、その他の形式 1 (`dfunction_0` の表示で wasm_detail が JSON 断片)。A の内訳は `414ad0` 59・`408040` 7・`4133f0` 1・trap なし 1。
+- **414ad0 の修復で消えた OOB は、別の関数の OOB (`4133f0 < 414c70`、`412e40 < 652750` 等) に置き換わった**。その原因 (deref 脱落の有無) は未確認。68 関数はいずれも verdict が mismatch のまま。
+- **旧記述の 67 は誤り**: 旧 REPORT の A = 67 は再現しない (3 回とも 59)。`956d2ed` 時点の値が別の実行状態だった可能性は未確認。このため、A/B の比較は同一ハーネス・同一実行内に限って読む。
 
-## 5. closure 全体 (7421 関数) の A/B (14 shard、同一ハーネス)
+## 5. closure 全体 (7421 関数) の A/B (14 shard、同一ハーネス) — **旧測定 (`0113c86`)、本 REPORT の再測定の対象外**
 
 A = IR 無変更 (`m11_414base`、`batch_414base_closure.jsonl`)、B = 修復 IR (`m11_414fix`、`batch_414fix_closure.jsonl`)。両方 `--set closure --shards 14 --state auto`。所要 A 779 s / B 796 s (B は A と非並行、A は m11 survey と並行していた時間を含む)。突合 = `cmp68_683.py` (全 VA)。
 
@@ -76,7 +78,7 @@ A = IR 無変更 (`m11_414base`、`batch_414base_closure.jsonl`)、B = 修復 IR
 
 ## 5.1 kind 以外の差分 unit
 
-survey 942 unit の kind は ON/OFF で全件一致 (§3)。`survey_diff.py` の「kind 以外も含めた差分」も 0 件。
+survey 942 unit の kind は ON/OFF で全件一致 (§3)。`survey_diff.py` の「kind 以外も含めた差分」も 0 件 (測定 1〜3 とも `kind 以外も含めた差分 unit (frames は深さのみ比較): 0 []`)。`956d2ed` の確認で出ていた unit 235・888 の差分は、HEAD `44bf3e9` と IR 再生成 (`ldfix=applied`) の後の測定では再現しない。
 
 ## 6. 再現手順 (1 コマンド)
 
@@ -90,7 +92,8 @@ FL_WIN64_DIR=... PY=... bash tools/m11/trap_triage/liftdiff68_683.sh
 
 ## 7. 検証範囲 / 範囲外
 
-- 範囲内: m11 survey 942 unit (ON/OFF 各 2 回)、liftdiff 68 関数 (A/B 各 1 回、end-to-end 実行)。
+- 範囲内: m11 survey 942 unit (ON/OFF 各 n=3、HEAD `44bf3e9`)、liftdiff 68 関数 (A/B 各 n=3、end-to-end 実行、HEAD `44bf3e9`)。
+- **n の限界**: 上記は n=3 で全件一致 (min = max)。ただし同一素材・同一マシン上の反復であり、別マシン・別負荷での再現は未確認。
 - 範囲外: closure 7421 関数の再測定 (§5 は旧測定値)、`m11_e2e.sh` 全体 (stage4 / bit-exact) への影響 (未実施)、C 版と IR 版の相互検算 (未実施)、副作用の原因 (旧 PR 記述の再現が無いため対象外)。
 - 既存 REPORT の数値 (`818 / 21` 等) は旧生成物 (a) の値で、本 gate の有無とは無関係。他 REPORT の書換えは行わない。
 
