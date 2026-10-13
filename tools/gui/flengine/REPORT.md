@@ -130,19 +130,20 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 
 ## 6. 検証
 
-実行: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/gui/flengine/e2e.sh` (HEAD = `52e6bd57`。4 vCPU, 3 回直列)。
-前提: 素材 `work-m11` (`tools/m11/work/` に展開。e2e は読取のみで、複製 `tools/gui/work/flengine/tree/` 側で使う)、`fl-win64` (`$RUNNER_TEMP/fl-win64`)、`x86_64-w64-mingw32-gcc` (`apt-mingw` = `gcc-mingw-w64-x86-64`)、`python3` に pefile・capstone (`python3 -m pip install pefile capstone`。`pip` 単体は別の Python を指すことがあるため `python3 -m pip` を使う)。
+実行: `ANALYSIS_DIR=$HOME/analysis FL_WIN64_DIR=$HOME/analysis/win64 bash tools/gui/flengine/e2e.sh` (HEAD = `a927ac87`。main `fe53ba30` (#563 = `d6b2940` 取込済) に #571 の merge `e94d6c8a`、重複 step 除去 `a927ac87`。runner 4 vCPU, 3 回直列)。
+前提: 素材 `fl-win64` (`$HOME/analysis/win64` に展開)、`work-m11` (`tools/m11/work/` に展開。e2e は読取のみで、複製 `tools/gui/work/flengine/snap/` 側で使う)、`toolchain-emsdk` (`/opt/emsdk`)、`toolchain-retdec` (`/opt/retdec`)、`apt-mingw` (`x86_64-w64-mingw32-gcc`)、Python の pefile・capstone (runner の system python は PEP 668 で pip 不可のため venv `$HOME/gfvenv` に導入し PATH の先頭に置いた)。`m11_gen_ir2.sh` を素材の `tools/m11/work/` で 1 回実行して `ir_conditions.json` の `ldfix=applied` を作った。
 
-| 回 | rc | 所要 (e2e.sh の done) | load 開始 → 終了 | judge | native selftest (`tools/gui/test`) | ネガコン |
-|---|---|---|---|---|---|---|
-| 1 | 0 | 137 s | 1.14 0.99 0.74 → 1.12 1.03 0.80 | 12/12 PASS | 433 passed / 0 failed | 5/5 期待どおり FAIL |
-| 2 | 0 | 146 s | 1.03 1.02 0.79 → 1.02 1.03 0.84 | 12/12 PASS | 433 passed / 0 failed | 5/5 期待どおり FAIL |
-| 3 | 0 | 143 s | 1.02 1.03 0.84 → 1.26 1.11 0.90 | 12/12 PASS | 433 passed / 0 failed | 5/5 期待どおり FAIL |
+| 回 | rc | 所要 (e2e.sh の done) | load 開始 → 終了 | judge | native selftest (`tools/gui/test`) | pe_image parity / e2e | ネガコン |
+|---|---|---|---|---|---|---|---|
+| 1 | 0 | 211 s | 1.13 1.02 0.60 (終了時) | 12/12 PASS | 433 passed / 0 failed | P1 LB=0・LB=0x10000 PASS、N1〜N3 PASS / pe_image P1・P2・N1・N2 PASS | 5/5 期待どおり FAIL |
+| 2 | 0 | 212 s | 1.06 1.02 0.70 (終了時) | 12/12 PASS | 433 passed / 0 failed | 同上 | 5/5 期待どおり FAIL |
+| 3 | 0 | 212 s | 1.02 1.01 0.77 (終了時) | 12/12 PASS | 433 passed / 0 failed | 同上 | 5/5 期待どおり FAIL |
 
-- 3 回の一致: B1 `units_run 52 (base 52)` / `threw memory access out of bounds (base 同じ)`、L1 undefined/sigmismatch/duplicate `0/0/0`、A1 `177 = 177 (impl 159 / stub 18)`、S1 `871/1/47/23/0 (base 871/1/47/23/0)`、S2 `LoadImageW` のみ fail-fast (ff 1 unit) = soft STUB、R1 first `LoadStringW` ×3、R2 reached 32 (floor 19)、P1 atoms `[-16383, -16382]` / `RegisterClassW=2 CreateWindowExW=3`、P4 hwnd `0x210000e`。
-- 所要は 137–146 s (e2e.sh の done 行。wall は run1 137 s・run2 146 s・run3 143 s)。runner 4 vCPU。
-- IR provenance (`results/ir_sha256.txt`): 素材 `boot_final.ll` `69c774de…`・`boot_final3.ll` `010451ad…`。step 0 で複製側に `m11_gen_ir2.sh` を回して作り直した IR (ldfix=applied) を測定元にした。その後 `m11_build.sh` 後の sha256 は `boot_final.ll` `2be93e55…`・`boot_final3.ll` `ac64ad01…` (全文は results/ir_sha256.txt)。旧 REPORT の `30a4e00d…` / `4f0a0cc6…` は旧版の IR で、現 head の IR とは一致しない。
-- 親 `bash tools/gui/e2e.sh` (受入条件 2): **ALL PASS / rc 0** (本 HEAD `52e6bd57`、1 回・wall 139 s)。事前に `pnpm install --frozen-lockfile` を実行 (rc 0)。
+- 3 回の一致: B1 `units_run 52 (base 52)` / `threw memory access out of bounds (base 同じ)`、L1 undefined/sigmismatch/duplicate `0/0/0`、A1 `177 = 177 (impl 159 / stub 18)`、S1 `871/1/47/23/0 (base 871/1/47/23/0)`、S2 `LoadImageW` のみ fail-fast (ff 1 unit) = soft STUB、R1 first `LoadStringW` (calls=3)、R2 reached 32 (floor 19)、P1 atoms `[-16383, -16382]` / `RegisterClassW=2 CreateWindowExW=3`、P4 hwnd `0x210000e`。
+- parity (`pe_image_parity.py --pe block00031_PE.bin`): `.data` 補正 10,284 件 = m11 `m11_data_gen.py` の 10,284 件 (LB=0 / LB=0x10000 とも一致)。PR 側の旧 off-by-one (`<`) は `c39ca16` で `<=` に直済み (レビュー必須 1)。
+- 所要は 211–212 s (e2e.sh の done 行)。
+- IR provenance (`results/ir_sha256.txt`): 今回は素材の `boot_final.ll` を `m11_gen_ir2.sh` で作り直した (ldfix=applied)。material `boot_final.ll` = `995351f5…` (旧記録 `69c774de…` は素材そのままの IR の指紋)。`boot_final3.ll` は `010451ad…` (不変)。`m11_build.sh` 後は `boot_final.ll` `2be93e55…`・`boot_final3.ll` `ac64ad01…`。
+- `results/*.json` と `IMPORTS.md` は今回の 3 回目の run で再生成。`IMPORTS.md` は `CharLowerW`・`CreatePalette`・`EnumFontFamiliesExW`・`MessageBoxA` が「P2/P3 昇格候補」から外れた (実装済みのため)。
 
 ネガティブコントロール (全て「期待した FAIL 行が出る」まで検査。judge のクラッシュを FAIL 確認と誤認しない。run1 で確認):
 
@@ -216,7 +217,7 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | RetDec C 経路で実 FLEngine 規模の PE を通した実測なし (§8-4) | `gN` 分割の実機挙動が未検証 | 範囲外 (FLEngine は m11 IR 経路) |
-| `tools/gui/flengine/REPORT.md` §1〜§7 の測定値 (秒数・survey・results) の `7a73c02` 再測定 | 本 REPORT の実測は `d46b024` 時点。現 head の e2e は素材不足で未実施 | 次の素材が揃う run で `e2e.sh` を再実行 (PR 差し戻し対応) |
-| `tools/gui/IMPORTS.md` の再生成 | `gen_api.py` は mingw が必要。本 run では未再生成 (§6) | 同上 |
+| 現 HEAD (`a927ac87`) の §1〜§7 測定値は §6 のとおり (素材が揃い 3 回実測済み)。§1〜§5 の旧数値 (秒数・survey 等) は `d46b024` 時点のまま残る | §1〜§5 の本文を §6 の値に合わせ直す | 本 PR 内で後続 commit (差し戻し対応) |
+| `e2e.sh` の pe_image step (4b) は `pe_image_parity.py` と `pe_image_e2e.sh` の全実測を含むが、親 `tools/gui/e2e.sh` (受入条件 2) は未実行 | 親 e2e の結果を §6 に書き足す | 本 PR 内 (未実施の場合は PR 本文で明示) |
 
 範囲外: 実ブラウザ・Canvas 描画、audio、UI スレッドのスタック量、`gui_reach` の性能影響 (INTEGRATION §4-12 の未計測は継続)。
