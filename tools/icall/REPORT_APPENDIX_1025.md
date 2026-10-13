@@ -23,6 +23,20 @@ REPORT.md §15 相当。REPORT.md の 250 行上限のため別置き。親 #853
 
 **wasm のバイト数・sha256 はチェックアウトのパスに依存する**: `-g` のデバッグ情報に絶対パスが埋まるため、worktree が違うと値が変わる。受入値として使うのは「同一 worktree 内で 2 回 build して sha256 が一致すること」のみ。バイト数と build 時間は受入値にしない。
 
+## 鮮度 (測定 commit から現 HEAD まで)
+
+測定 commit `44d70d74` (コード最終変更 `0b761625`) から現 HEAD `292232a0` までのコード差分は 0 行。`44d70d74..292232a0` の変更は本付録 (`REPORT_APPENDIX_1025.md`) のみ。
+
+```
+$ git diff 44d70d74 292232a0 -- tools/icall/kh_route_build.sh tools/icall/ir_*.py tools/icall/rt tools/m*
+(出力 0 行・exit 0)
+$ git diff --stat 44d70d74 292232a0
+ tools/icall/REPORT_APPENDIX_1025.md | 15 +++++++--------
+ 1 file changed, 7 insertions(+), 8 deletions(-)
+```
+
+よって上表の数値は現 HEAD のコードに対しても有効 (再測定は不要, WORKFLOW §6)。
+
 fix の内容: BLK を `map.json` の `blk` から取得 (旧 `0x3a25c000` は出典不明のハードコードだったため削除)、`ir_flatten.py --cfg` に `map.json` の `cfg_thunks` を渡す (OTT `ott_route.sh` と同じ生成式)。
 `cfg_thunks` が空であることは上表の `map.json` の値で確認済み。
 
