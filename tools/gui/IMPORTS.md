@@ -47,7 +47,7 @@
 | windowscodecs.dll | 1 | 2 |  |
 | comdlg32.dll | 2 | 2 | ● |
 
-GUI 系 DLL (user32.dll, gdi32.dll, comctl32.dll, comdlg32.dll, opengl32.dll, uxtheme.dll, imm32.dll, msimg32.dll, dwmapi.dll, winspool.drv, oleacc.dll, wtsapi32.dll, shcore.dll) の import 合計 **429 名**: 実装済み **280** / fail-fast stub **149** / arity 不明で未生成 **0**。
+GUI 系 DLL (user32.dll, gdi32.dll, comctl32.dll, comdlg32.dll, opengl32.dll, uxtheme.dll, imm32.dll, msimg32.dll, dwmapi.dll, winspool.drv, oleacc.dll, wtsapi32.dll, shcore.dll) の import 合計 **429 名**: 実装済み **292** / fail-fast stub **137** / arity 不明で未生成 **0**。
 
 ## 2. 優先度定義
 
@@ -341,7 +341,7 @@ GUI 系 DLL (user32.dll, gdi32.dll, comctl32.dll, comdlg32.dll, opengl32.dll, ux
 | CreateHalftonePalette | gdi32 | palette | 4 | STUB |
 | GetDIBColorTable | gdi32 | palette | 4 | IMPL |
 | SetDIBColorTable | gdi32 | palette | 4 | IMPL |
-| ImmAssociateContextEx | imm32 | IME | 4 | STUB |
+| ImmAssociateContextEx | imm32 | IME | 4 | IMPL |
 | DestroyMenu | user32 | menu | 4 | STUB |
 | EnableMenuItem | user32 | menu | 4 | STUB |
 | GetSystemMenu | user32 | menu | 4 | STUB |
@@ -352,11 +352,11 @@ GUI 系 DLL (user32.dll, gdi32.dll, comctl32.dll, comdlg32.dll, opengl32.dll, ux
 | GetBitmapBits | gdi32 | aux | 3 | STUB |
 | GetEnhMetaFilePaletteEntries | gdi32 | palette | 3 | STUB |
 | MaskBlt | gdi32 | aux | 3 | STUB |
-| ImmGetContext | imm32 | IME | 3 | STUB |
-| ImmGetConversionStatus | imm32 | IME | 3 | STUB |
-| ImmReleaseContext | imm32 | IME | 3 | STUB |
-| ImmSetConversionStatus | imm32 | IME | 3 | STUB |
-| ImmSetOpenStatus | imm32 | IME | 3 | STUB |
+| ImmGetContext | imm32 | IME | 3 | IMPL |
+| ImmGetConversionStatus | imm32 | IME | 3 | IMPL |
+| ImmReleaseContext | imm32 | IME | 3 | IMPL |
+| ImmSetConversionStatus | imm32 | IME | 3 | IMPL |
+| ImmSetOpenStatus | imm32 | IME | 3 | IMPL |
 | CreatePopupMenu | user32 | menu | 3 | STUB |
 | GetMenu | user32 | menu | 3 | STUB |
 | GetMenuItemID | user32 | menu | 3 | STUB |
@@ -414,7 +414,7 @@ GUI 系 DLL (user32.dll, gdi32.dll, comctl32.dll, comdlg32.dll, opengl32.dll, ux
 |---|---|---|---|---|
 | GetEnhMetaFileHeader | gdi32 | metafile | 9 | STUB |
 | GetEnhMetaFileDescriptionW | gdi32 | metafile | 5 | STUB |
-| SetGestureConfig | user32 | touch/gesture | 5 | STUB |
+| SetGestureConfig | user32 | touch/gesture | 5 | IMPL |
 | EnumPrintersW | winspool.drv | printing | 5 | STUB |
 | CopyEnhMetaFileW | gdi32 | metafile | 4 | STUB |
 | DeleteEnhMetaFile | gdi32 | metafile | 4 | STUB |
@@ -424,8 +424,8 @@ GUI 系 DLL (user32.dll, gdi32.dll, comctl32.dll, comdlg32.dll, opengl32.dll, ux
 | PlayEnhMetaFile | gdi32 | metafile | 3 | STUB |
 | SetWinMetaFileBits | gdi32 | metafile | 3 | STUB |
 | StartPage | gdi32 | printing | 3 | STUB |
-| CloseGestureInfoHandle | user32 | touch/gesture | 3 | STUB |
-| RegisterTouchHitTestingWindow | user32 | touch/gesture | 3 | STUB |
+| CloseGestureInfoHandle | user32 | touch/gesture | 3 | IMPL |
+| RegisterTouchHitTestingWindow | user32 | touch/gesture | 3 | IMPL |
 | ClosePrinter | winspool.drv | printing | 3 | STUB |
 | DocumentPropertiesW | winspool.drv | printing | 3 | STUB |
 | FlatSB_GetScrollInfo | comctl32 | scrollbar | 2 | STUB |
@@ -473,7 +473,7 @@ GUI 系 DLL (user32.dll, gdi32.dll, comctl32.dll, comdlg32.dll, opengl32.dll, ux
 | SetPixel | gdi32 | gdi-vector | 2 | IMPL |
 | StartDocW | gdi32 | printing | 2 | STUB |
 | UnrealizeObject | gdi32 | palette | 2 | STUB |
-| ImmIsIME | imm32 | IME | 2 | STUB |
+| ImmIsIME | imm32 | IME | 2 | IMPL |
 | GradientFill | msimg32 | aux | 2 | STUB |
 | LresultFromObject | oleacc | shell-integration | 2 | STUB |
 | wglGetProcAddress | opengl32 | opengl | 2 | STUB |
@@ -481,13 +481,13 @@ GUI 系 DLL (user32.dll, gdi32.dll, comctl32.dll, comdlg32.dll, opengl32.dll, ux
 | CheckMenuItem | user32 | menu | 2 | STUB |
 | CreateMenu | user32 | menu | 2 | STUB |
 | DefFrameProcW | user32 | aux | 2 | IMPL |
-| GetGestureInfo | user32 | touch/gesture | 2 | STUB |
+| GetGestureInfo | user32 | touch/gesture | 2 | IMPL |
 | GetMenuItemInfoW | user32 | menu | 2 | STUB |
 | GetMenuStringW | user32 | menu | 2 | STUB |
 | InsertMenuItemW | user32 | menu | 2 | STUB |
 | IsDialogMessageA | user32 | aux | 2 | IMPL |
 | IsDialogMessageW | user32 | aux | 2 | IMPL |
-| RegisterTouchWindow | user32 | touch/gesture | 2 | STUB |
+| RegisterTouchWindow | user32 | touch/gesture | 2 | IMPL |
 | SetMenuItemInfoW | user32 | menu | 2 | STUB |
 | ShowScrollBar | user32 | scrollbar | 2 | STUB |
 | TranslateMDISysAccel | user32 | aux | 2 | IMPL |

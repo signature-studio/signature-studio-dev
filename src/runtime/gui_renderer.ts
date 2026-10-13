@@ -28,6 +28,9 @@ export type GuiRenderMsg =
   | { type: "frame"; seq: number }
   | { type: "title"; surf: number; title: string }
   | { type: "cursor"; shape: number }
+  | { type: "ptrlock"; on: boolean }
+  | { type: "imepos"; surf: number; x: number; y: number }
+  | { type: "cliprect"; l: number; t: number; r: number; b: number }
   | { type: "exit"; code: number };
 
 export type GuiPresentOptions = {
@@ -492,6 +495,9 @@ export class GuiRenderer {
           break;
         case CMD.SET_TITLE: this.post({ type: "title", surf: r[1], title: this.title(v, r[1]) }); break;
         case CMD.SET_CURSOR: this.post({ type: "cursor", shape: r[2] }); break;
+        case CMD.POINTER_LOCK: this.post({ type: "ptrlock", on: r[2] === 1 }); break;
+        case CMD.IME_POS: this.post({ type: "imepos", surf: r[1], x: r[2] | 0, y: r[3] | 0 }); break;
+        case CMD.CLIP_RECT: this.post({ type: "cliprect", l: r[2] | 0, t: r[3] | 0, r: r[4] | 0, b: r[5] | 0 }); break;
         case CMD.LOG: {
           const n = r[1] & 0xff;
           const bytes = new Uint8Array(v.buffer, v.base + o * 4 + 8, n).slice();

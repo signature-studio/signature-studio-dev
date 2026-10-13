@@ -90,6 +90,7 @@ static uint32_t cref(int r, int g, int b) { return (uint32_t)(r | g << 8 | b << 
 #include "selftest_gui5.inc"
 #include "selftest_fd.inc"
 #include "selftest_help.inc"
+#include "selftest_gui6.inc"
 
 int main(void) {
   gui_hl_start(640, 480, 1);
@@ -345,6 +346,7 @@ int main(void) {
 
   run_fd_bounds();
   run_help_wiring();
+  run_gui6();
 
   SECTION("quit / destroy messages");
   g_nlog = 0;
