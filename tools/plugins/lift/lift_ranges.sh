@@ -62,7 +62,15 @@ python3 "$P/fix_asm_stores.py" "$OUT/$NAME.rp.ll" "$OUT/$NAME.st.ll"
 OC_ARGS=""
 for f in ${PLUG_ORCOND_FUNCS:-}; do OC_ARGS="$OC_ARGS --func $f"; done
 python3 "$P/fix_orcond_xnor.py" "$OUT/$NAME.st.ll" "$OUT/$NAME.oc.ll" $OC_ARGS
-python3 "$P/fix_dup_decls.py" "$OUT/$NAME.oc.ll" "$OUT/$NAME.dd.ll"
+# opt-in: fistp qword の上位 dword store 欠落の復元 (#982; PLUG_FISTP_HI_FUNCS="function_5de3e0 ...")
+FH_ARGS=""
+for f in ${PLUG_FISTP_HI_FUNCS:-}; do FH_ARGS="$FH_ARGS --func $f"; done
+if [ -n "$FH_ARGS" ]; then
+  python3 "$P/fix_fistp_hi_store.py" "$OUT/$NAME.oc.ll" "$OUT/$NAME.fh.ll" $FH_ARGS
+else
+  cp "$OUT/$NAME.oc.ll" "$OUT/$NAME.fh.ll"
+fi
+python3 "$P/fix_dup_decls.py" "$OUT/$NAME.fh.ll" "$OUT/$NAME.dd.ll"
 python3 "$P/fix_ptr_params.py" "$OUT/$NAME.dd.ll" "$OUT/$NAME.pp0.ll"
 python3 "$P/fix_icmp_ptr.py" "$OUT/$NAME.pp0.ll" "$OUT/$NAME.pp.ll"
 # opt-in (PLUG_XMMARG=1): 機械語が xmm0..3 を入力に読むのに IR 署名に無い関数へ float/double 引数を復元 ((DEFECTS.md) D5, PLG-F2-4 #547)

@@ -31,7 +31,13 @@ REPORT 本体 §4 から分割移動した経緯と実行条件 (内容は削除
 
 1. 4 本の `emcc -c` rc 0: 達成 (f80 段を含む)。`judge.py` 相当の exit code 化と NC は未実装。
 2. E1/E2 の共有鎖修復: 対象外 (本 PR は engine 側の段のみ。共有 `lift/passes/` は未変更)。
-3. VEX helper の SSE 固定判定と実装: 未達・未着手。起票先 #527。
+3. VEX helper の SSE 固定判定と実装: 判定は完了 (§F。深さ 3 の直接 call 鎖では guard 無し、間接 call は未追跡)。実装は未達で、起票先は #534 (VEX helper) と #779 (VEX-256 語彙)。受入 3 の範囲変更は PM 判断待ち。
 4. define 無し range (各 2 件) の原因特定: 未達 (未調査)。起票先 #527。
 5. 殻との結合方式 (LoadLibrary 経路・`VSTPluginMain` 呼出) の解析: 未達。起票先 #527。
 6. f80 2 関数の #197 `f80_lower.py` 適用可否: 達成 (適用可、`emcc -c` は通過。bit-exact は未検証 → #197)。
+
+## F. VEX helper の SSE 固定判定 (受入 3)
+
+- 結論: `sampler/vex_guard.py` の深さ 3 の直接 call 鎖 (即値の `call`/`jmp` のみ追跡) では、VEX 関数の caller に cpuid/xgetbv 関数が届かなかった (4 本)。間接 call (`call [rip+...]`・関数ポインタ・vtable) は未追跡で、動的な分岐は未実測。したがって SSE 固定の可否は未確定。
+- 測定値・再現手順: `tools/plugins/modulation/REPORT.md` §4 (VEX 関数数・cpuid/xgetbv 関数数・未実装 helper 数はそこに 1 箇所だけ記載)。
+- 実装は未達。追跡先は #534 (9 本の C++ DLL の VEX helper) と #779 (VEX-256 の lift 語彙拡張)。新規起票はしない (重複回避)。受入 3 の実装をこの 2 件へ移すかは PM 判断待ち。

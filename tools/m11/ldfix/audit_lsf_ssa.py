@@ -340,7 +340,7 @@ def main():
         if ms is None:
             tot['no_machine_range'] += 1
             continue
-        lsf, _ptr, unk, _deref, _raw = ms
+        lsf, _ptr, unk = ms[0], ms[1], ms[2]
         tot['lsf_sites_arg'] += len(lsf)
         tot['lsf_sites_unresolved'] += unk
         tot['fns_unresolved'] += 1 if unk else 0

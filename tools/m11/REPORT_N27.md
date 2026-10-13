@@ -165,6 +165,20 @@ NC1 (capstone 未導入) は `bash tools/m11/m11_gen_ir2.sh` が exit 1 にな�
 - 未実施: 別環境 (別 runner / VM) での n>=2、work-m11 の R2 再投入 (素材権限者)、73532f8 (c) の trap 内訳差の原因調査。
 - HEAD 再現 (`a4aa766c`・retdec を PATH に入れない・`work/boot5.*` を削除して lift から): rc 0 / 101 秒 / load 0.07 → 0.83 / ok 870 · trap 25 · oom 1 · clobber 0 · miss 46。修正前は同条件で `retdec-decompiler: command not found` により 1 秒で rc 1。
 
+### 11-b. #729: 別 runner VM での n=2 (`b4dac086` = origin/main 起点の worktree)
+- 環境: 前節 (§11) と別の runner VM (hostname `runnervmmprz5`・machine-id 先頭 `566c0bdf`)。素材 `fl-win64` (PE 1 member, sha256 `b2c64da4…`)・`toolchain-retdec`・`toolchain-emsdk`・`work-m11`・`work-liftdiff` を展開。
+- 前提の追加: `work-m11` に `lift_pe.sha256` が無く、`m11_e2e.sh` は全再生成に入る。`m11_bounds.py` が `tools/m2/work/ghidra_dll/functions_dll.csv` を要求するため、Ghidra 12.1.4 を GitHub Release (`ghidra_12.1.4_PUBLIC_20260921.zip`) から取得して JDK 21 (Temurin)・`MAXMEM=12G`) で `DumpFunctions.java` を実行した (rc 0 / 609 秒 / 59010 行)。
+- IR 生成: `m11_gen_ir2.sh` rc 0 / 44 秒 / ldfix applied。
+
+| 測定 | rc | 所要秒 | load (開始→終了) | ok | oob | halt0 | trap | miss | clobber | oom | ir_sha256 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| E1 (全再生成: scan→lift 4 chunk→tail→IR→build→survey) | 0 | 599 | 0.57 → 1.22 | 870 | — | — | 25 | 46 | 0 | 1 | `20d68876…` |
+| E2 (増分) | 0 | 45 | 1.04 → 1.08 | 870 | — | — | 25 | 46 | 0 | 1 | `20d68876…` |
+
+- E1 の `reached_stage` 4 / `units_run_full` 53 / `wasm_bytes` 6,042,952。trap の停止点は `unreachable @ function_8c5eb0`。E2 の `ir_sha256` は E1 と一致。
+- 結論: 本 VM で n=2 (E1・E2) の survey 値が一致し、§11 (別 run・別 VM 不明) の 870/25/1/0/46 とも一致した。ただし §11 の VM を確認していないため「環境が違う」とは断定しない。別クラウド・別 OS イメージでの一致は未確認。
+- 注: E1 の全再生成の IR sha256 (`20d68876…`) は §11 の `995351f5…` と異なる。§11 は work-m11 から `m11_gen_ir2.sh` のみで作った IR、E1 は scan→lift→tail を走らせ直した IR で、作り方が違うため差は想定内。survey の値は同一。
+
 ## 12. #728: `--full` の実走 (head `2e128c5c`) と lift 成果物の PE 紐付け
 実行環境: 本 runner (4 vCPU, 16 GiB)。素材 `fl-win64` (`block00031_PE.bin`, sha256 `b2c64da4…`)・`toolchain-retdec` ([RETDEC])・`toolchain-emsdk`・`work-m11`・`work-liftdiff` を展開。Ghidra 12.1.4 (公式 release, JDK 21) で `functions_dll.csv` を再生成 (59 009 行, sha256 `90d1bbac…`, Ghidra headless 約 10 分)。capstone 5.0.7 / pefile 2024.8.26。
 - 測定 head: 下表の F1〜F3 は `2e128c5c` (PR 本文の `2e128c5c` 測定)。現 head `74312499` は `2e128c5c..74312499` のスクリプト差分が空で、コード同一。その後の修正 commit `74b365f6` は `m11_lift.sh` の 1 行 (RETDEC_ROOT 既定値) だけを変える。F3 は PATH で retdec を解決しており、この行は通らない。下の (a)(b)(c) で修正後 head を実測。
@@ -195,3 +209,25 @@ NC1 (capstone 未導入) は `bash tools/m11/m11_gen_ir2.sh` が exit 1 にな�
 - 旧記述: 指紋無し・不一致で再生成する経路は未実測。
 - **未解決**: (a) F2 と F3 で IR の `ir_sha256` が異なる。RetDec・ir5_patch・gen_ir2 の出力が実行ごとに変わる可能性があるが、原因は未切り分け。(b) `reached_stage` 4 の trap (§6 と同類の未解決。lift 成果物が正しいかは未判定)。(c) Ghidra 中間物 `functions_dll.csv` を素材に含めない場合、`--full` は Ghidra 再生成 (WORKFLOW §11 手順) が前提。
 - 起票: (a)(b) は子 issue を #728 の下に起票 (番号はコメント参照)。
+
+## 13. #936: `73532f8` (c) の trap 内訳 (halt0 54 / oob 13) と現 HEAD 実測 (halt0 8 / oob 16) の差の切り分け
+- 受入条件 (#936 の縮小後、PM 判断): (c) 再生成条件 (ldfix・qstore・PE) を明示し、差が条件の違いで説明できるかを実測値付きで記録する。(a) 旧 IR (818/21/56/77) の再測定は別 issue #1165 に分離。
+- 測定 head: `b4dac086` (origin/main)。素材 fl-win64 (PE 1 member, sha256 `b2c64da4…`)・work-m11・work-liftdiff・toolchain-retdec・toolchain-emsdk (展開先は [EMSDK]・[RETDEC])・capstone 5.0.7 / pefile 2024.8.26。`FL_WIN64_DIR` は展開先。
+- 旧 (c) の数値は `trap_triage/survey_units.mjs` (`73532f8` の REPORT.md §8.2) で取った。現 HEAD で同じビルドに `survey_units.mjs` (F0') を当てた実測を、F0 の転記値と照合する (下表)。ok・halt0・miss・trap は転記値と一致する。oob は転記 17 と実測 16 で 1 件違う。この差は oom 1 の分類差によると推定するが、未確認。
+
+| 測定 | IR 条件 (ir_conditions.json) | rc | 所要秒 | load (終了) | ok | oob | halt0 | trap | miss | noproc | clobber |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| F0 | HEAD 既定 (ldfix applied・qstore applied・ir_sha256 `1fc847d4…`)・`m11_e2e.sh` (`m11_survey`) | 0 | 43 | 1.16 | 870 | 17 (§11 転記) | 8 (§11 転記) | 25 (oom 1 含む) | 46 | 1 | 0 |
+| F0' | 同 IR・`survey_units.mjs` | 0 | 10 | – | 870 | 16 | 8 | 25 (oom 1 含む) | 46 | 1 | – |
+| X1 | qstore 無し (ldfix applied, `M11_QSTORE=0 m11_build.sh`) | 0 | 9 | – | 868 | 18 | 8 | 27 (`m11_survey`) | 46 | 1 | 0 |
+| X2 | 実際の条件: ldfix 無し・qstore 無し (`M11_LDFIX=0` で gen)。**注記: 測定時に `work/ir_conditions.json` を applied に書き換えて build を通した。保存された条件ファイルは実際の IR 条件と一致しない。この数値は採用しない (条件の再現・再記録は未実施)** | 0 | 36 | – | 867 | 18 | 9 | 28 (`m11_survey`) | 46 | 1 | 0 |
+
+- F0 の oob 17・halt0 8 は §11 (R1〜R3: 870/17/8/25) の実測値の転記である。本節では F0 の内訳を再測定していない (`m11_survey` の出力は本 run に残っていない)。
+- F0 と F0' の対比は**転記値との照合**であり、再測定の一致ではない。F0' を同一 IR で実測した ok 870・halt0 8・miss 46・trap 25 は、§11 の転記値 (870/8/46/25) と一致する。oob は転記 17 と実測 16 で 1 件違う。F0' の内訳は oob 16 + halt0 8 + oom 1 = 25 で trap と合う。転記 F0 は oob 17 + halt0 8 = 25 で、oom 1 が oob 側に含まれていると読めば合うと推定する。この分類の違いは推定であり、未確認。
+- X1 の差は ok −2・trap +2 にとどまる。(c) の trap 67 (oob 13 / halt0 54) とは一桁以上違う。X2 は採用しない (上表の注記)。
+- 結論: 73532f8 (c) の halt0 54 は、本測定の範囲では再現しない。
+- 再生成条件との関係: qstore の有無では差を説明できない (X1 は halt0 8 のままで、ok −2・trap +2 にとどまる)。ldfix の有無では説明できるかは未確定 (採用できる実測が無い。X2 は採用しない)。
+- halt0 の大半 (54 件) は **IR 生成前段 (RetDec lift・work-m11 の世代) の違い**に由来すると推定されるが、本測定では切り分け未了。
+- 未解決 (起票先): 73532f8 (c) の lift 成果物の再構成 (当時の lift 入力・RetDec 版の特定)、ldfix 無しの IR で build する経路 (現状 `m11_build.sh` は `ldfix=disabled` を拒否)、(a) 818/21 の再測定 (旧 IR snapshot を `work-m11` から直接測る手順が必要) = #1165。
+- 検証範囲: 本 runner の 1 ホスト・PE 1 member・n=1 (F0 のみ 2 ハーネス)。環境間一致は未実測。
+- 再現: `FL_WIN64_DIR=<fl-win64 展開先> bash tools/m11/m11_gen_ir2.sh && bash tools/m11/m11_e2e.sh` (lift 成果物が無ければ `work/lift_pe.sha256` で全再生成に入る。work-m11 は `lift_pe.sha256` を含まないため、本 run は PE の sha256 を手で書いて増分経路で回した。§12 G2)。
