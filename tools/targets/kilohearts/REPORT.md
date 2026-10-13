@@ -134,7 +134,7 @@ VEX-256 は 344 関数 189,611 B 中 **closure 内は 6 関数のみ** (Convolve
 `ghidra_route/` (KH-5, §10), `scripts/{extract_installer.sh,pe_info.py,rtti_walk.py,callgraph.py,closures.py,simd_census.py,make_tables.py,ghidra/DecompAt.java}`, `poc_gain/{native_ref.c,ir_kh_p1.py,ir_kh_f7.py,kh_simd_gain.c,poc_gain.sh,poc_gain_negctl.sh,poc_gain_compare.mjs,ref/}`, `run_all.sh`。`work/` (gitignore): `ranking.md, closures.json, simd_census.json, tables.txt, rtti_vtables.json, ghidra/gain_decomp.txt, blobs/index.json` ほか。
 
 ## 10. KH-5 (#58, 2026-10-13): Ghidra decompile→C→emcc ルート vs RetDec→kh_lower ルート (Gain / Haas / Gate)
-- 再現: `bash tools/targets/kilohearts/ghidra_route/run_all.sh 1000 7` (HeartCore 抽出済み・`/opt/ghidra`=12.1.4・`/opt/retdec`・`/opt/emsdk`・pefile/capstone が前提)。両ルートとも**同一の ctx-fuzz ベクタ** (`snapins/harness`, 1000 trial / seed 7, 実機 x86 機械語を ImageBase 敷設して ms_abi 直接実行) を `compare.mjs` で**全バイト strict 突合**。実測環境: GitHub runner 4 vCPU・RAM 15GB。
+- 再現: `bash tools/targets/kilohearts/ghidra_route/run_all.sh 1000 7` (HeartCore 抽出済み・`[GHIDRA]` (12.1.4)・`[RETDEC]`・`[EMSDK]` (いずれも `docs/REFERENCES.md` のエントリ ID)・pefile/capstone が前提)。両ルートとも**同一の ctx-fuzz ベクタ** (`snapins/harness`, 1000 trial / seed 7, 実機 x86 機械語を ImageBase 敷設して ms_abi 直接実行) を `compare.mjs` で**全バイト strict 突合**。実測環境: GitHub runner 4 vCPU・RAM 15GB。
 - **結論**: 3 本 (スカラ・単純 leaf) では Ghidra ルートも **1000/1000 bit-exact に到達**するが、**修復なし (型 shim + グローバル実データ + callee stub のみ) では 1 / 17 / 0 (Gain/Haas/Gate, /1000) で FAIL** し、修復は機械書換え 4 種 + 手パッチ規則 (`assoc`) 4 行が要る。RetDec ルートは修復を run 内の pass が自動で行い 3 本とも 1000/1000。**主ルートは RetDec→kh_lower を維持し、Ghidra は第二の oracle (仕様の突合・RetDec が誤る箇所の独立確認) に留める**。理由は §10-4 (SIMD/128bit/独自 ABI の関数では C 化の手作業が増える) と §10-2 (silent 類型が Ghidra 固有に 5 種)。
 
 ### 10-1. 3 snap-in の実測 (1000 trial, seed 7)
@@ -164,26 +164,33 @@ VEX-256 は 344 関数 189,611 B 中 **closure 内は 6 関数のみ** (Convolve
   - **assoc**: 浮動小数の積の結合括弧を印字で落とす (`a*(b*c)` が `a * b * c` = C では左結合 `(a*b)*c` → 1 ulp ずれる)。**実機の演算順を逆アセンブルで確認しないと直せない** (Gain 1804b0473..0485 の ramp、Gate 1804c3494..34a7 の smoothstep)。native との差分ハーネスが無いと発見不能。
   - **stackpair**: 連続した 2 スタック変数 (`lStack_e8/e0`) を配列として渡す呼出 (Gate の look-ahead ペア) が `&lStack_e8` 1 個になる。
 - **手作業の実績** (`patches.py` の規則行 = 手作業 1 件): `assoc` 規則 4 行 (Gain 1・Haas 1・Gate 2。ramp 形の正規表現 1 本が Gain 1・Haas 2・Gate 1 の計 4 site、Gate の smoothstep 1 site を覆う = 計 5 site)。機械書換え 4 種 (bitcast/intload/concat/stackpair, `ghidra_to_c.py --fix`)。人手の所要時間は計測していない (推定は書かない)。比較用の実測は各段の実測秒 (§10-3)。
-- 修復の**発見**には Path B と同じ native 差分ハーネスが不可欠 (Ghidra の出力が正しいかの判定は読むだけでは付かない = RetDec と同じ条件)。
+- 修復の**発見**には RetDec stage-0 + kh_lower ルート (比較相手。`snapins/REPORT.md` §0・§2) と同じ native 差分ハーネスが不可欠 (Ghidra の出力が正しいかの判定は読むだけでは付かない = RetDec と同じ条件)。
 
 ### 10-3. 実測秒 (run_all.sh を HEAD bc62138 で実行, load average 併記)
 | 段 | 実測 | load (1/5/15 分) |
 |---|---|---|
-| Ghidra import (76MB PE, `-noanalysis`) + 10 関数 decompile (Gain/Haas/Gate の lift 対象) | 18.8 s | 1.27 0.63 0.39 |
-| 同 (Tier-M 等 10 関数, §10-4) | 20.3 s | 1.32 0.80 0.47 |
+| Ghidra import (76MB PE, `-noanalysis`) + 10 関数 decompile (lift 対象 9 = Gain 1 + Haas 5 + Gate 3、stub 化する callee 1 = `0x18004cf20`) | 18.8 s | 1.27 0.63 0.39 |
+| 同 (census 対象 10 関数 = snap-in process 7 + libm 3, §10-4) | 20.3 s | 1.32 0.80 0.47 |
 | Ghidra 出力 → C 化 → emcc → 突合 (Gain / Haas / Gate) | 0.6 / 0.6 / 0.8 s | 1.27 0.63 0.39 |
 | RetDec stage-0 (冷間) + kh_lower + emcc + 突合 (Gain / Haas / Gate) | 10.1 / 10.3 / 10.6 s (うち RetDec 取得 8.5 / 8.6 / 8.7 s) | 1.41 0.73 0.43 |
 - Ghidra は decompile 本体が関数ごと 0.00〜0.05 s で、時間は import (PE 読込) が支配。RetDec は関数範囲ごとに 8.5 s 前後 (範囲数に依存)。素材取得なしの同一 runner での値。
 
-### 10-4. SIMD / 128bit / ABI の扱い (Tier-M 7 関数 + libm 3 関数 + Channel Mixer の decompile を census, `census.sh`。**C 化・ビルドは未実施 = 構文の有無のみ**)
+### 10-4. SIMD / 128bit / ABI の扱い (census 対象 10 関数 = snap-in process 7 [Resonator / Stereo / Delay / Phaser / Limiter / 3-Band EQ / Channel Mixer] + libm 3 [powf / sincos_a / k_dfdb0] の decompile、`census.sh`。**C 化・ビルドは未実施 = 構文の有無のみ**)
 - Ghidra は 10 関数すべて decompile 完了 (0.01〜0.22 s, 53〜470 行)。ただし C として意味を持たない構文が残る:
-  - **SIMD 疑似関数**: Resonator `rcpps(in_XMM2, …)`・Stereo `rsqrtps(in_XMM3, …)` (各 1)。C に等価物が無く、§13 の実機近似表移植 (bit-exact 化) が別途要る。
+  - **SIMD 疑似関数**: Resonator `rcpps(in_XMM2, …)`・Stereo `rsqrtps(in_XMM3, …)` (各 1)。C に等価物が無く、`snapins/REPORT.md` §13 の実機近似表移植 (bit-exact 化) が別途要る。
   - **128bit 整数演算**: k_dfdb0 (Payne-Hanek) `SUB168(auVar2 * auVar4,8)` 等 3、Phaser 4・Limiter 2・Delay 1。C の `__int128` 化が要る。
   - **レジスタ渡しで引数なしの呼出** (`FUN_xxx()` / `func_0x…()`): Delay 4・Phaser 5・sincos_a 4・powf 1。MS x64 ABI でない独自呼出規約の libm 部品で、**引数・戻りを手で復元**しないと C にならない。sincos_a は `extraout_XMM0_Qa` を 6 個持つ (戻り値以外のレジスタ値の受け渡し)。
-- RetDec→kh_lower はこれらを既に処理済み (§9〜§15 の 14 snap-in bit-exact)。Ghidra ルートで同じ範囲を C 化するには 3 本の実績より桁違いに手作業が増える見込みだが、**実ビルドはしていないので推定**。
-- [未解決] Resonator / Stereo / Delay の Ghidra 実ビルド・突合は未実施 (`rcpps` 表・128bit・ABI 復元の規則化が前提)。
+- RetDec→kh_lower はこれらを既に処理済み (`snapins/REPORT.md` §15: 13 snap-in + khbase (共通基盤) の計 14 本が 1000 trial / seed 7 で全件 bit-exact。上記 census の 10 関数のうち snap-in process 7 本はこの 13 snap-in に含まれ、libm 3 本は 3-Band EQ の lift 対象 = `snapins/snapins.json` の quickeq.lift)。Ghidra ルートで同じ範囲を C 化するには 3 本の実績より桁違いに手作業が増える見込みだが、**実ビルドはしていないので推定**。
+- 未解決 (Resonator / Stereo / Delay の Ghidra 実ビルド・突合 = `rcpps` 表・128bit・ABI 復元の規則化が前提) は §10-6。
 
 ### 10-5. 判断への含意
 - **フロント選択**: 主ルート = RetDec→kh_lower (維持)。Ghidra→C は (a) 3 本程度の単純 leaf では全修復後に同等の bit-exact を達成でき、(b) RetDec の P1/F7 を誤らない独立実装として**第二 oracle に有用** (今回 3 本で再確認)。一方、(c) 修復のための silent 類型 5 種 (bitcast/intload/concat/assoc/stackpair。うち手作業が要るのは assoc のみ) は Ghidra 固有で、(d) SIMD/128bit/独自 ABI の関数では C 化の手作業が要る。
 - **KH-3 (検出器) の優先度**: Ghidra を主ルートにしない限り KH-3 の対象は RetDec 側 (D14〜D16 / 既存検出器) のまま。Ghidra を第二 oracle に使う場合は、capstone の演算順/型と C 式の照合 (assoc・bitcast 類型) が要る — ただしこれは oracle 用途なら不要 (native 差分で検出できる)。**優先度の変更は提案しない**。決定は PM。
 - 成果物: `ghidra_route/{ghidra_to_c.py,patches.py,ghidra_shim.h,build_cmp.sh,ablate.sh,census.sh,run_all.sh}`, `scripts/ghidra/DecompEach.java`。`work/` (gitignore): `ghidra/out{,_simd}/`, `gr/<name>/`。
+
+### 10-6. 未解決
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 人手の所要時間 (Ghidra ルートの修復工数) は未計測。記録したのは手パッチ規則の件数 (§10-2) と各段の実測秒 (§10-3) のみ | #58 受入条件「工数」を人手時間では比較できていない | #58 (open のまま追跡) |
+| Resonator / Stereo / Delay の Ghidra 実ビルド・突合は未実施 (`rcpps` 表・128bit・ABI 復元の規則化が前提) | §10-4 の「手作業が桁違いに増える」は census (構文の有無) に基づく推定のまま | 新規子チケット案 `[KH-5b]` (親 #58。起票は PM。#58 にコメントで提案) |
+| KH-3 優先度とフロント選択の決定 | 材料は §10-5 のみ。決定が無いため PR は `Closes` でなく `Refs #58` | #58 (PM 判断) |
