@@ -1,12 +1,12 @@
 # #942 (CI-22) m11 ldfix stage4 の memory access out of bounds — 切り分け (部分達成)
 
-親 #757。受入条件の進捗: 1 = 部分 / 2 = 部分 / 3 = 達成 (効果なしの判定と理由)。
+親 #757。受入条件の進捗: 1 = 部分 / 2 = 部分 / 3 = 部分 (snapshot 限定の判定。現 main 生成素材での判定は未実施)。
 
 ## 1. 実測 (検証起点 origin/main `b4dac086`・runner 1 台)
 
 `bash tools/m11/ldfix/ldfix_e2e.sh` (FL_WIN64_DIR=$RUNNER_TEMP/fl-win64、TMPDIR=$RUNNER_TEMP)
 - 所要 56.9 秒 (real)・rc 0・開始 2026-10-13 18:32:34 UTC・load average 1.15 / 1.02 / 0.51
-- 素材: fl-win64 / work-m11 / work-liftdiff / toolchain-emsdk (`/opt/emsdk`) を展開 (toolchain-retdec は未使用)
+- 素材: fl-win64 / work-m11 / work-liftdiff / toolchain-emsdk (`[EMSDK]`) を展開 (toolchain-retdec は未使用)
 
 | 項目 | base (修復前) | fix (修復後) |
 |---|---|---|
@@ -39,6 +39,11 @@
 | 0x264260 | OOB | function_664260 | 258 | 409c80, 413480, 413540, 417b70, 44f740 |
 | 0x0 | OOB | (unit VA 0 = 対象外) | — | — |
 
+- survey の trap は 9 件。unit VA を特定できたのは上の 8 件で、残り 1 件 (unit VA 0x0) は帰属不明のため閉包は算出していない。
+  上表は実在 unit 8 件の内訳であり、9 件の完全な内訳ではない。
+- **再現不可 (本 run で確認)**: 上表の閉包サイズ・交差は前 run の `work/trap_units.mjs` / `reach_units.py` の出力であり、
+  両スクリプトはリポジトリにも作業環境にも存在しない (未 commit・消失)。本 run ではこの表を再算出できず、検証済みとは扱わない。
+  表の値は「前 run の出力の転記」として読むこと。
 - unit VA は `m11_unit_va` の RVA。IR 関数名は `+0x400000` (m11_ov.c のアドレス規約) で対応する。全 8 件で定義あり。
 - 閉包は IR の直接 call のみ (間接 call トランポリン経由は含まない)。
 - **未達**: wasm の name section が無い (リンクは `-g1` だが wasm に名前が残っていない) ため、trap の最上位
@@ -53,8 +58,10 @@
 - 「ldfix 起因か既存か」: base (修復前) で既に同じ trap が起きているため、**修復が trap を新規に作っていないこと**は確定。
   trap の原因が修復前の IR のどこにあるか (既存欠陥か、ldfix が見逃した欠陥か) は、§2 の wasm frame → IR 関数対応が要るため未確定。
 
-## 4. 受入 3: ldfix の修復が件数に反映されるか — 達成 (効果なしの判定)
+## 4. 受入 3: ldfix の修復が件数に反映されるか — 部分 (snapshot 限定の判定)
 
+- **判定の範囲**: 本判定は `work-m11` の古い snapshot (§1 注意) の IR でのみ行った。現 main 生成の素材での e2e 再実行は未実施のため、
+  現 main での効果は判定できていない。REPORT.md の値 (F1 902 / F3c 26) とも比較していない。
 - F3a 2 関数 (413480, 413540) と F3c 33 関数の修復は、stage4 (units_run / probe / icall) と survey (ok / trap / miss) の
   いずれにも**反映されていない** (base = fix)。
 - 理由 (推定・未確定): 修復関数は trap 閉包 (§2) に含まれるが、trap の最上位 frame の wasm index (14871 / 14873 / 14875 / 5263 /
@@ -78,4 +85,6 @@ S4_NAME=base S4_IMAGE=tools/m11/work/m11_image.bin node tools/m11/ldfix/work/tra
 python3 tools/m11/ldfix/work/reach_units.py <trap_units の出力>
 ```
 
-`work/` 配下の調査スクリプト (trap_units.mjs / reach_units.py) は gitignore 対象で、commit しない。
+`work/` 配下の調査スクリプト (trap_units.mjs / reach_units.py) は gitignore 対象で、commit されていない。
+本 run ではどちらも存在せず、§2 の閉包表は再実行できない。再現には両スクリプトを `tools/m11/ldfix/` 直下へ復元して
+commit する必要がある (未起票の作業。起票先は #942)。
