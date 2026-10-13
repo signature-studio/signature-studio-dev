@@ -1,8 +1,8 @@
 name: OpenCode
 
 # repository_dispatch (oc-fix) の run は『oc-fix #<PR 番号>』と名づける。watchdog が実行中の run と PR を突き合わせるため。
-# 他のイベントでは空文字になり、既定の名前 (PR タイトル等) のまま。
-run-name: "${{ github.event_name == 'repository_dispatch' && format('oc-fix #{0}', github.event.client_payload.pr) || '' }}"
+# repository_dispatch (oc-watchdog) の run は『watchdog』。他のイベントでは空文字になり、既定の名前 (PR タイトル等) のまま。
+run-name: "${{ github.event_name == 'repository_dispatch' && (github.event.action == 'oc-fix' && format('oc-fix #{0}', github.event.client_payload.pr) || 'watchdog') || '' }}"
 
 on:
   # Issues/PR に `/oc` または `/opencode` コマンドが投稿されたとき。
@@ -24,8 +24,9 @@ on:
   # watchdog が repository_dispatch (type oc-fix) を送って、競合の解消を fix モードの実装 run に載せる (#731)。
   # 送れるのは contents:write を持つトークンだけ。payload は PR 番号・理由・素材名のみで、
   # prepare-event-context.sh が値域を検証する。
+  #   type oc-watchdog は watchdog job を起こす (GitHub の cron は遅延・欠落するため、VM の timer から周期的に送る。#749)。
   repository_dispatch:
-    types: [oc-fix]
+    types: [oc-fix, oc-watchdog]
   workflow_dispatch:
     inputs:
       prompt:
@@ -75,7 +76,7 @@ jobs:
     # 競合と、取りこぼし・失敗した run を点検して戻す。詳細は .github/scripts/watchdog.sh の冒頭。
     # review の提出・merge・ready・close/reopen は reviewer App 名義で行う (同一 App は自分が作った
     # PR に request-changes できない)。
-    if: github.event_name == 'push' || github.event_name == 'schedule'
+    if: github.event_name == 'push' || github.event_name == 'schedule' || (github.event_name == 'repository_dispatch' && github.event.action == 'oc-watchdog')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # GITHUB_TOKEN は実行中の run の一覧 (actions:read) にだけ使う。他の権限は付けない。
