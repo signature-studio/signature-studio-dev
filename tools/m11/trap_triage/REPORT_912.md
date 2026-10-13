@@ -72,7 +72,17 @@
 
 **修復**: `tools/m11/fix912/m11_fix912.py` (IR pass・冪等・双方向。`m11_build.sh` に組み込み、既定 `M11_FIX_912=1`、`0` でネガコン)。SSA 名 (`%37`/`%39`/`%38`) と定数 `994072` を直書きしており、IR 再生成で変わると count != 1 で fail-loud になる (非必須・後続)。`--mode off` は修正済み IR に対しては未検証 (現 IR に対しては実質 no-op)。
 
-## 7. 測定 (前 run・測定 commit `a5e9c1ed`、`m11_gen_ir2.sh` 再生成・同一 IR)
+## 7. 測定 (現 head・測定 commit `c05c11e4`・§10 が正)
+
+| 構成 | ok | oob | halt0 | miss | noproc | other | abort |
+|---|--:|--:|--:|--:|--:|--:|--:|
+| 既定 ON | 870 | 16 | 7 | 47 | 1 | 1 | 0 |
+| OFF (`M11_FIX_912=0`) | 870 | 16 | 7 | 47 | 1 | 1 | 0 |
+
+- **既定 ON と OFF の差し引き: ok 0・unit 単位で全 942 件一致。** 現 head では fix912 の効果は survey に現れない。
+- 以下の旧 §7 の表 (`a5e9c1ed` 時点・M2q 無し IR) は参考として残す。現 head の結論には使わない。
+
+### 7-旧. 前 run の測定 (測定 commit `a5e9c1ed`、M2q 無し IR。現 head で再現せず)
 
 | 構成 | ok | oob | halt0 | miss | noproc | other | abort |
 |---|--:|--:|--:|--:|--:|--:|--:|
@@ -111,3 +121,27 @@
   - 次の run の手順: `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk` で起動し、Ghidra 12.1.4 + JDK 21 で `functions_dll.csv` を作る → `m11_gen_ir2.sh` → `m11_build.sh` (既定) と `M11_FIX_912=0` → `survey_units.mjs` → §7 を書き直す。起票先は #912 (本 issue)。
 - 差分の証跡: `git diff a5e9c1ed dc109d61 -- tools/m11/m11_passes.py tools/m11/m11_build.sh` は 2 files, 17 insertions(+), 2 deletions(-) (M2q の pass 追加と `M11_FIX_912` 既定値)。`tools/m11/` 全体の `git diff --stat` には、main 取り込みで入った他 PR の変更 (REPORT_N55・zeropad 等) も含まれる。測定経路の差分は上の 2 files が全て。
 - 現 HEAD (`dc109d61` 以降) での手順: `bash tools/m11/m11_gen_ir2.sh` → `bash tools/m11/m11_build.sh` (環境変数なし) → `survey_units.mjs` を 1 回ずつ。`M11_FIX_912=1` の明示実行は既定変更の検証にならないため含めない。OFF/ON × 修正 0/1 の 4 構成は `M11_FIX_912=0|1` と既定の組で揃える。
+
+## 10. 現 head の実測 (測定 commit `c05c11e4`・M2q 込み IR)
+
+- 測定 commit (コードを変えた最後): `c05c11e4`。`git diff c05c11e4 HEAD -- tools/m11 ':(exclude)*.md'` は 0 行 (`c05c11e4` 以降の HEAD 差分はすべて md)。したがって本節は現 head の測定として扱う。`2e6fba53` 以降の既定値変更も含む。
+- 素材: `fl-win64` / `toolchain-retdec` / `toolchain-emsdk` / `work-m11` を展開 (`$HOME/artifacts` の実在確認済み)。`/opt/emsdk` は既存。Ghidra は無いが、`m11_gen_ir2.sh` は `functions_dll.csv` を読まずに完走する (§9 の不足の記述は `m11_bounds.py` 等の別経路のもの)。
+- IR: `m11_gen_ir2.sh` rc=0 (43.3 s)。`ir_conditions.json` の `ir_sha256` = `16d1bae6…d869` (fix912 適用前の `boot_final.ll`)。`ldfix=applied`。
+- build: 既定 ON rc=0 (24.5 s、`[fix912] mode=on replaced=1`)。`M11_FIX_912=0` rc=0 (`[fix912] mode=off replaced=1`)。wasm の sha256 は ON `e1d20106…` / OFF `9fe86216…` で異なる (build の切替は効いている)。
+- survey: `survey_units.mjs` 各 rc=0 (約 13 s、load avg 0.41)。
+
+| 構成 | ok | oob | halt0 | miss | noproc | other | abort |
+|---|--:|--:|--:|--:|--:|--:|--:|
+| 既定 ON (環境変数なし) | 870 | 16 | 7 | 47 | 1 | 1 | 0 |
+| OFF (`M11_FIX_912=0`) | 870 | 16 | 7 | 47 | 1 | 1 | 0 |
+| ON 再 build (既定・2 回目) | 870 | 16 | 7 | 47 | 1 | 1 | 0 |
+
+- 942 unit の kind を unit 単位で比較: ON (既定) と OFF は**全 942 unit 一致**。ON と ON 再 build も全 942 unit 一致。
+- 101 / 190 / 291 / 296 は ON・OFF ともに ok。304 / 555 は ON・OFF ともに oob (abort ではない)。
+- **既定 ON の差し引き: ok 0 (OFF と同数)。** §7 の「OFF で 101 / 291 / 296 が oob」は、現 head では再現しない。よって §7 の +3 / -1 は現 head の効果ではない。
+- 現 head で oob の 16 unit: 144 149 275 280 304 477 484 492 513 520 555 659 745 830 880 923。halt0 の 7 unit: 114 245 279 314 509 647 895。
+- 未解明: `m11_passes.py` の M2q (`a5e9c1ed` 後に入った) が、旧測定の IR を変えた可能性。本 run では切り分けていない。`fix912` の対象行 (`i64 %37`→`i64 1`) は ON build の `boot_final3.ll` で置換されている (count 1)。
+
+### 差分 (測定 commit から HEAD まで)
+
+`git diff c05c11e4 HEAD -- tools/m11 ':(exclude)*.md'` の出力: 0 行。
