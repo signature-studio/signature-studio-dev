@@ -157,7 +157,7 @@
 
 | パス | 行数目安 | 何が書かれているか |
 |---|---:|---|
-| `tools/runtime/REPORT.md` | ~90 | ブラウザ実行基盤 |
+| `tools/runtime/REPORT.md` | ~155 | ブラウザ実行基盤 |
 | `tools/runtime/rt10/REPORT.md` | ~190 | 実 FLEngine x64c lift (126MB wasm) の Chrome 起動時間・帯域・tier-up・boot ループ soak (RT-10 #128) |
 | `tools/hostbridge/REPORT.md` | ~95 | Fruity Wrapper の VST2 ロード経路解析 + wasm 同梱プラグイン表 |
 | `tools/hostbridge/cb/REPORT.md` | ~145 | shimx R2 コールバック変換の実体接続 |
@@ -176,7 +176,8 @@
 | `tools/assets/REPORT.md` | ~125 | 314MB 級 wasm asset の chunk ローダ + 二段キャッシュ |
 | `tools/assets/wvfs/REPORT.md` | ~145 | 書込可能 OPFS VFS |
 | `tools/assets/deploy-manifest/REPORT.md` | ~60 | 配備 manifest 生産側 (05-stage 契約) |
-| `tools/python/REPORT.md` | ~240 | CPython wasm + flapi/MCP 解析 + ブリッジ設計。§PY-13 (#588)・§12/§13 (#81 kwargs 署名の静的復元) は要約のみで全文は `REPORT_APPENDIX.md` に分割 |
+| `tools/python/REPORT.md` | ~242 | CPython wasm + flapi/MCP 解析 + ブリッジ設計。§PY-12 (#587) は要約のみで全文は `REPORT_PY12.md`、§PY-13 (#588)・§12/§13 (#81 kwargs 署名の静的復元) は要約のみで全文は `REPORT_APPENDIX.md` に分割 |
+| `tools/python/REPORT_PY12.md` | ~46 | PY-12 (#587): `_flhost` の per-module state 化・サブインタプリタ採用判断の実測 (REPORT.md の PY-12 節の全文。250 行上限のため分離) |
 | `tools/python/REPORT_APPENDIX.md` | ~50 | python REPORT §PY-13 (build_flpy.sh の env 化 #588) と §12/§13 (PY-9 b kwargs 署名復元・wasm 回帰・未解決 #81) の全文 (250 行上限のため無変更で分割移動) |
 | `tools/flp/REPORT.md` | ~120 | FLP/FST パーサ・ライタ・往復コーパス |
 | `tools/plugins/REPORT.md` | ~115 | Fruity プラグイン 141 種 wasm 化マップ (カウントの正本) |
@@ -204,6 +205,7 @@
 | `tools/targets/serum2/host/REPORT.md` | ~110 | Serum 2 最小 VST3 host |
 | `tools/targets/serum2/license/REPORT.md` | ~160 | Serum2 認可機構の呼出点マップ |
 | `tools/targets/serum2/license/authstub/REPORT.md` | ~125 | authorization stub 設計・実装 |
+| `tools/targets/serum2/sr4/REPORT.md` | ~110 | SR-4 (#75) DSP 段階 lift 第 1 段: vtable root 56 関数の対象表 + pilot lift 9 本 (実機 vs wasm 差分) + strict gate + ネガコン |
 | `tools/targets/massivex/REPORT.md` | ~160 | Massive X 事前解析 + ライセンス呼出点マップ |
 | `tools/targets/massivex/dsp/REPORT.md` | ~220 | Massive X DSP closure 特定と lift 計画 |
 | `tools/targets/kilohearts/REPORT.md` | ~200 | Kilohearts インストーラ解析 + snap-in lift 可否 |
@@ -213,6 +215,7 @@
 | `tools/targets/freshair/REPORT.md` | ~145 | Fresh Air インストーラ解析 + lift 可否 |
 | `tools/targets/freshair/lift2/REPORT.md` | ~235 | Fresh Air Compressor/Filter/制御層 lift |
 | `tools/targets/freshair/lift2/REPORT_FA7.md` | ~70 | FA-7 (#452): macro 子 param ID 0x157/0x158/0x15a の Filter descriptor 同定 (model 層 setter 実測) |
+| `tools/pm/REPORT.md` | ~120 | PM 運用の実測 (PR 件数・PR とチケットの対応・Project Status・Actions run 集計)。RETRO・DIRECTIVES の数値の正本 |
 
 ## 4. ドキュメント責務 (単一責任の正本)
 
@@ -230,7 +233,8 @@
 | `docs/WORKFLOW.md` | subagent 運用・PR・レビュー・検収・自己点検・**AREA 一覧** | 技術的な実装手順・測定値 |
 | `docs/REFERENCES.md` | 外部ソース・素材・ツール・**vendored 台帳**。**repo 外絶対パスはここだけ** | repo 内パス・技術内容 |
 | `docs/pm/DIRECTIVES.md` | 依頼者 (user) 指示の**逐語原文**と PM の解釈・反映先 | 原文の改変 (追記のみ)・測定値 |
-| `docs/pm/RETRO_2026-10-13.md` | Actions 移行後 2 日間のショートレトロ (事実・原因・対策。依頼者指示 121) | 個別チケットの測定値 (REPORT が正本)・指示の逐語原文 (`DIRECTIVES.md` が正本)・repo 外絶対パス |
+| `docs/pm/RETRO_2026-10-13.md` | Actions 移行後 2 日間のショートレトロ (事実・原因・対策。依頼者指示 121) | 測定値 (正本は `tools/pm/REPORT.md`。本書は結論と link のみ)・指示の逐語原文 (`DIRECTIVES.md` が正本)・repo 外絶対パス |
+| `tools/pm/REPORT.md` | PM 運用の実測の**正本** (PR 件数・PR とチケットの対応・Project V2 Status・Actions run 集計。基準時刻と取得方法を併記) | 技術実装・指示の逐語原文・チケット状態の判断 (`STATUS.md`・Project V2 が正本) |
 | `docs/pm/README.md` | `docs/pm/` の索引 (3 ファイルの役割のみ) | DIRECTIVES の内容の繰り返し・分析内容 |
 | `docs/pm/PREDECESSOR_ANALYSIS.md` | 解任された前任 PM セッションの分析 (混乱の原因・証拠・再発防止ルールへの反映) | 指示の逐語原文 (`DIRECTIVES.md` が正本)・状態や未解決事項 (`STATUS.md`・`HANDOFF` が正本)・repo 外絶対パス |
 | `docs/LEGAL.md` | ライセンス/規約上の運用制約と事実整理 | 技術実装・数値実測 |
