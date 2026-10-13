@@ -22,8 +22,12 @@ export GF_M11="$TREE/m11"; M="$GF_M11"
 S "0/6 baseline (GUI shim 無し, 同一 IR): m11_build.sh → m11_run.mjs / m11_survey.mjs (複製側)"
 ( cd "$M" && bash m11_build.sh > "$W/res/m11_build.log" 2>&1 ) || { S "m11_build.sh 失敗"; tail -5 "$W/res/m11_build.log"; exit 2; }
 (cd "$M/work" && sha256sum boot_final.ll boot_final3.ll | sed 's/^/after_m11_build  /') >> "$R/ir_sha256.txt"   # m11_build.sh (qstore/alloca/post) 後の IR
-( cd "$M" && node m11_run.mjs 2>/dev/null | sed -n 's/^M11_RESULT //p' > "$W/res/baseline_boot.json" && node m11_survey.mjs 2>/dev/null | sed -n 's/^M11_SURVEY //p' > "$W/res/baseline_survey.json" )
-[ -s "$W/res/baseline_boot.json" ] && [ -s "$W/res/baseline_survey.json" ] || { S "baseline 取得失敗"; exit 2; }
+( cd "$M" && node m11_run.mjs 2>/dev/null | sed -n 's/^M11_RESULT //p' > "$W/res/baseline_boot.json" )
+[ -s "$W/res/baseline_boot.json" ] || { S "baseline 取得失敗"; exit 2; }
+bash "$HERE/build.sh" --base > "$W/res/build_base.log" 2>&1 || { S "build base 失敗"; tail -5 "$W/res/build_base.log"; exit 2; }   # 比較元は GUI と同じ -pthread build (shim 無し)。非 pthread の m11_boot.cjs と比べると 8 unit ぶん順序・ビルド条件差が出る (REPORT §5-6)
+( cd "$HERE" && node run.mjs --survey --wasm "$W/m11_base.cjs" --out "$W/res/baseline_base_survey.json" > /dev/null )
+python3 -c "import json,sys; d=json.load(open(sys.argv[1]))['survey']; json.dump(d, open(sys.argv[2],'w'))" "$W/res/baseline_base_survey.json" "$W/res/baseline_survey.json" 2>/dev/null
+[ -s "$W/res/baseline_survey.json" ] || { S "baseline survey 取得失敗"; exit 2; }
 
 S "1/6 build: ff (fail-fast 例外) / soft (STUB は 0 返却) / plain (到達ログ無し = ネガコン用)"
 bash "$HERE/build.sh"          > "$W/res/build_ff.log"    2>&1 || { S "build ff 失敗"; tail -5 "$W/res/build_ff.log"; exit 1; }

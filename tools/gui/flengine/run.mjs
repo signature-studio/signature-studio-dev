@@ -58,7 +58,7 @@ if (survey) {   // m11_survey.mjs と同じ隔離プロトコル: unit ごとに
   }
 }
 
-mod._gui_reach_dump();
+if (mod._gui_reach_dump) mod._gui_reach_dump();   // --base (shim 無し比較元) には無い
 const reach = [];
 for (const l of errs) {
   const m = /GUI-REACH (\d+) (\w+) (\d+) (IMPL|STUB) P(\S+)$/.exec(l);
