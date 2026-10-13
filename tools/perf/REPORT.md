@@ -7,7 +7,7 @@ emsdk 6.0.12、binaryen 133 (`results/env.json`)。
 > **⚠ 重要な前提 (検収で追記)**: 本 REPORT の OTT RTF 表 (§0/§2) は **M10 の RetDec lift 出力 = junk を生成する wasm** の速度である
 > (tools/ott f4e0514: 間接 call 54 箇所脱落等で実行経路が本来と異なり、処理量が過少)。**bit-exact な正しい lift (tools/ott 自作 x64c lifter) で再測した結果は §2.1**:
 > RTF は O2/O3 で **0.017〜0.019** (junk 版 0.025/0.017 と同程度) だが、**LTO は 1.15× しか効かず (junk 版の 17× は `__asm_*` helper が別 C ファイルだった RetDec chain 固有)**。
-> 「LTO が決定打」「0.0013 / 745 インスタンス/コア」は **bit-exact 版では成立しない**。下流の標準ビルド設定の根拠には §2.1 の数値を使うこと。
+> 「LTO が決定打」「0.0013 / 745 インスタンス/コア」は **bit-exact 版では成立しない**。下流の標準ビルド設定の根拠には §2.1 の数値を使うこと。 (組込済み: `tools/liftlib/data/std_build.json` + 署名ガード = PERF-P1 / #155、実測は `tools/liftlib/REPORT_APPENDIX_C.md` §19)
 
 ## 0. 結論
 
