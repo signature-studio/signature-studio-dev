@@ -290,7 +290,11 @@ flelift closure (fle_lift.sh 生成物 tools/flelift/work/lift/* が素材に無
 | `batch --set closure --shards 4` 前半 (5600 関数) | 1500 s の foreground timeout で打ち切り (rc 124)。JSONL は 400 件ごとに書出済み |
 | 同 後半 (残 1821 関数, `--set file:`) | **653 s** (10 m 53 s)・rc 0 |
 
-全数 (7,421 関数・前後半を結合・重複なし) の verdict:
+> **未検証 (レビュー指摘 1・最重要)**: 前半 JSONL の行数・一意アドレス数は本 run で**確認していない** (打切り後の前半 JSONL が 5,600 件あったことを示す記録が無い)。後半 1,821 件は `--set file:` で別途流した。このため下表の「7,421 関数」は前半の欠損を含む可能性があり、**全数 7,421 の値として扱わない**。前半 JSONL の一意数を確認するか、欠けた関数を再実行して一意数を揃えるまで、下表は参考値。
+>
+> **測定 tree (レビュー指摘 3)**: この値は commit 1795f8ff の tree (base a5adb2fc 系) のもので、main HEAD (598eba1c 以降) の値ではない。main とは `tools/liftlib/liftlib/passes` (l1_restore・iargs・fp_bind) と `tools/liftdiff/ldlib/session.py` が異なる。
+
+参考値 (前後半の合算・未検証・重複確認なし):
 
 | verdict | 件数 |
 |---|---|
@@ -312,3 +316,6 @@ flelift closure (fle_lift.sh 生成物 tools/flelift/work/lift/* が素材に無
 - `FL_WIN64_DIR=... bash tools/liftdiff/liftdiff_e2e.sh` の PASS は **未実行**。既定の [1/4] が `work-m6-ott` (ott.ll) を要するため、
   `--m11-only` の確認も本 run の時間内では行えなかった。起票先: 本 issue #978 (部分達成のため Refs)。
 - 48 分の run 内で全数採点を完了したが、shards 数と再現性の差は上記のとおり未解決。
+- 素材の実在確認 (レビュー非ブロッカー): `ARTIFACTS_DIR` (`/home/runner/artifacts`) には `fl-win64.tar.zst` のみ。`work-m6-ott` は無い。
+  本 run の再実行 (前半 batch・lift 再生成) に必要な `work-m11`・`work-liftdiff` も無く、`tools/liftdiff/work`・`tools/flelift/work` は存在しない。
+  このため前半の再実行・一意数確認は本 run では不可能。
