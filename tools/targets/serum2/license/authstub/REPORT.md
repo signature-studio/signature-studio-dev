@@ -166,6 +166,25 @@ python3 tools/targets/serum2/license/authstub/authstub_irpass.py \
 - 後続 commit で `replace_at` の未使用引数 `tag` を削除した (挙動不変・呼出 1 箇所のみ更新)。素材 `plugins-serum2` が無く e2e の再実行は未実施 (`python3 -m py_compile` のみ確認)。
 - 未達 (#1007 [SR-11] で追跡): 値 (slot オフセット・global 名・LF4 の定数) は依然 literal。RetDec 出力から規則を導出する部分は未実装。
 
+## 14. LF 束縛の値を RetDec 出力から導く (SR-11, Refs #1007)
+
+- 変更: LF5/LF6/LF7 は `fp_bind.bind_load_slot_at(lines, fn, va, expect_slot, glob, tag)` で束縛する。
+  slot は IR 行 (`%stack_var_<slot>`) から読み、`expect_slot` (`'-72'`/`'-80'`/`'-152'`) と不一致なら `SystemExit` で失敗する (照合)。
+- 未達: slot の値は導出していない。`expect_slot` は照合用の期待値として literal のまま残す。global 名 (`__authstub_doc_root` 等) も literal。導出は子 issue #1208 で追跡。
+- LF4 の定数は IR の `ucomisd.1` 引数由来。`verify_lf4_const.py` で PE 上の定数と IR の値の一致を確認する (要素材 `plugins-serum2`・`toolchain-retdec`)。
+- 機械語 VA の site 数: LF5 2 / LF6 2 / LF7 1 (計 5 件)。各 site 数 1 件。
+- 機械語の slot 参照は IR の slot 名と一致しない (例: 機械語 `[rbp-0x10]` ↔ IR `stack_var_-72`)。そのため slot は機械語の rbp 値からは導かず、IR 行を正とした。
+- ネガティブコントロール: `negctl_slot.py` (合成 IR 1 関数・`bind_load_slot_at` 単体。`python3 negctl_slot.py` で再現、rc 0 = 全条件一致)。
+  - 正例 (VA `0x1800c2c94`・期待 `-72`) → PASS。
+  - 誤 slot (期待 `-80`、IR は `-72`) → `T: slot at 0x1800c2c94 = -72 (expect -80)` で FAIL。
+  - 誤 VA (`0x1800c2c95`) → `candidate = 0 (expect 1)` で FAIL。
+- 実測 (HEAD `6d6726bb`・`work/` 無しから cold・load 0.42):
+  - `bash e2e.sh` cold: real **26.57 s** (RetDec lift 含む)・exit 0・**23/23 PASS**。(前 HEAD `5e7e26fa` でも cold 27.28 s・23/23 PASS。)
+  - 出力 IR sha256 は §12/§13 の値と一致: `patched_base_lf.ll` `c62d9316…8793`、`raw_base_lf.ll` `79ab30ca…0d20` (全文ハッシュで照合)。
+  - `verify_lf4_const.py ../../work/Serum2_win64.vst3 work/patched_base_lf.ll` → `LF4 const OK` (PE 定数 = IR 定数 = 11.00001・bits 4622382073171892366)。
+  - 素材: `plugins-serum2` の `Install_Xfer_Serum2_2.1.5.exe` を `7z x` で展開 → `Serum2.vst3` 19,236,864 B・sha256 `501e7bb3…5283` (展開後に一致確認)。
+- 速度比較は記載しない (warm の再測定が無く、変更前後で cache 条件が揃わないため)。
+
 ## 13. L1 の再現条件 (実測・追跡 #823)
 
 - 測定 commit: origin/main 36edc993。素材: plugins-serum2 → `Install_Xfer_Serum2_2.1.5.exe` の `$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3` (19,236,864 B, sha256 `501e7bb3…5283`)。
