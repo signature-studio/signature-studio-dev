@@ -104,69 +104,7 @@ python3 tools/gui/analysis/gui_imports.py && python3 tools/gui/gen_api.py   # im
 前提: x86_64-w64-mingw32-gcc, RetDec (`[RETDEC]`), Emscripten (`[EMSDK]`・同梱 node 24 を PATH に使用), google-chrome, gcc。
 
 ## 9. GUI-4 (#180): WebGL2 present / dirty 複数矩形 / rAF 同期 / seqlock
-既知類型との関係: 該当なし (lift 欠陥ではなく present 経路の設計。`docs/DEFECTS.md` への追加類型なし)。検証起点 commit: コードは `88efd49` (レビュー指摘 A・B・軽微 2 の修正後; present e2e 30 run・seqlock・tearing・golden・auto 降格の数値は全てこの HEAD・クリーン tree での実測)。frame time 表だけは修正前の `09e3db9` での実測 (bench は再測定していない; `88efd49` は seqlock 経路・staged 転送の関数分割 `stage()`/`uploadStaged()`・auto 判定のみを変え、seqlock off の GL 経路の処理は同一)。
-
-### 結論
-- **FL 非依存の範囲を実装し e2e 済み・FL 依存の範囲は未達** (受入条件は満たしていない → PR は `Refs #180`)。実装: `src/runtime/gui_present_gl.ts` (WebGL2: BGRA を `texSubImage2D` + fragment swizzle)・`gui_dirty.ts` (surface 内複数矩形の併合)・`gui_renderer.ts` (`GuiPresentOptions`: `backend` / `sync` / `seqlock`)・shim の seqlock 書込み側 (`GuiSurface.wseq`, `gui_core.c` / `gui_gdi.c`)。既定は従来経路 (2D + 即時) で挙動不変。仕様は [PROTOCOL.md §4](PROTOCOL.md)。
-- **golden 画素一致 (差 0)**: 模擬 guest で GuiShared を駆動 (wasm / lift 不要)。同一の操作列 46 step (生成・z 前面化・表示切替・移動・リサイズ・破棄/再生成・1〜4 個/step の dirty 矩形 (隣接を含む)・alpha 乱数) を 4 方式 (従来 CPU・WebGL2 direct+即時・WebGL2 staged+rAF+seqlock・CPU+rAF+seqlock) へ流し、**毎 step 640×360 px (u32 全件) を独立 oracle** (バイト単位 painter's algorithm) と比較: **4 方式とも 46 step × 230,400 px = 10,598,400 px で差 0**。CDP スクリーンショット (ブラウザ合成後) 4 面 × 230,400 px も差 0。
-- **実 GPU の frame time は未測** (CI の headless Chrome は SwiftShader = ソフトウェア GL)。この環境の比較表を下に示すが、**GPU 化の効果の判断材料にはならない** (下記 解釈)。
-- **seqlock**: 書込み中 surface は読まず直前の整合フレームを保ち、静止後に再試行して新フレームを出す (決定的テスト: 書込み中 4 方式 + 読出し後・検証前に書込みが始まる経路 4 方式)。WebGL2 は staging へ行コピー → `stable()` で検証 → 成功時のみ `texSubImage2D` (検証前にテクスチャへ書かない; seqlock off は従来どおり共有メモリを直接転送)。確率的 tearing 試験 (WebGL2 + rAF, 90 frame, 30 run): off で tear 発生 4〜9 件 / **on で 0 件 (30 run 全て; 強制読出し 0)**。ただし**検出と再試行であり snapshot isolation ではない**。
-
-### 検証 (`bash tools/gui/present/e2e.sh`; `tools/gui/e2e.sh` の 6f/6 にも組込み)
-| 検査 | 結果 (`bash tools/gui/present/e2e.sh` bench 省略を 30 run: **30 PASS / 0 FAIL**) | 陰性対照 |
-|---|---|---|
-| golden 4 方式 × 46 step × 230,400 px | 30 run × 4 方式 = 120 件全て差 0 | present せず 1 px 書換え → 差 **1** px を検出 / fragment swizzle を `.rgb` へ壊す → 差 10,557,172 px (FAIL) |
-| スクリーンショット 4 面 | 差 0 | swizzle 破壊で差 229,492 px (FAIL) |
-| 複数矩形併合 (WebGL2 direct) | 68〜89 PRESENT → 54〜70 矩形 (30 run 全てで矩形数 < PRESENT 数; PRESENT 数は ingest のまとまり方で run ごとに変わる) | `mergeRects` 単体 7 件 (性質テスト: 400 ケースで入力全画素が出力に含まれる = ビットマップ検算) |
-| rAF 同期 (staged+raf) | 30 run 全てで rAF 起動 = flush 数 (29 run は 46、1 run は 47 flush)・即時 0・タイマ救済 0。判定は「rAF 起動 ≥ flush − max(1, 10%)・即時 0」 (レビューで旧 `timer === 0` の厳密一致が 19 run 中 1 run `timer=1` で FAIL したため緩和) | 未実施 (許容内のタイマ救済を再現する手段なし。`rafFlushes > 0` と即時 0 の条件は維持) |
-| seqlock 決定的 (書込み中) | gl/cpu × 即時/rAF 4 方式 × 30 run: 書込み中は旧フレーム維持 (deferred 1〜5)・静止後 10〜23 ms で新フレーム・forced 0。**検証の前から `wseq` が奇数の経路だけ**を通る | seqlock off は書込み中に新フレームを読む (保護なし; 30 run 全て) |
-| seqlock 決定的 (検証中の書込み開始) | 4 方式 × 30 run: surface を読んだ直後・検証の前に guest の書込み開始 (`wseq` 偶→奇) を注入 → 注入 1 回・retries 1・deferred 1〜5・読んだ内容は表示されず旧フレーム維持・静止後 11〜24 ms で新フレーム・forced 0 | 修正前 (`96cf00b` の renderer/GL に同じテストを適用): **gl 即時・gl rAF の 2 方式は新フレームを表示 (= 検証前に `texSubImage2D` していた) で FAIL**、cpu 2 方式は修正前も OK |
-| `backend: auto` の降格 | 正常 → webgl2 / シェーダ不可 → 2d へ降格して readback 可 / プローブ後に描画先だけ失敗 → `[gui] 2D fallback unavailable: ...` の明示エラー (30 run 同一) | 修正前: シェーダ不可で `TypeError: Cannot set properties of null (setting 'fillStyle')` |
-| tearing 確率的 | 下記 (30 run 全て「on の発生 ≤ forced」成立) | seqlock off (WebGL2) で tear 発生 4〜9 件 (30 run; 全 run で off ≥ 4 > on = 0) |
-- **全体 `bash tools/gui/e2e.sh` (`88efd49`, クリーン tree, 4 CPU, RetDec・emsdk・mingw あり): ALL PASS, 55.7 s** (1 run; 6f/6 の present e2e の load は 2.20 → 2.02)。内訳: native `selftest` 319 passed / 0 failed・native lift golden EXACT MATCH・`reach_test` 11 / `adapt_test` 28 passed・wasm の golden EXACT MATCH (固定メモリ・ALLOW_MEMORY_GROWTH)・fail-fast OK・reach log 36 API・sigprobe `signature mismatch=0` (陰性対照 177)・present e2e ALL PASS。他に `tsc --noEmit`・`pnpm build`・`node tools/runtime/gui_e2e.mjs` (ALL OK, 4.2 s) も `88efd49` で確認。
-- **tearing 試験の定義**: guest worker が 1280×720 全面を 1 色/フレームで行ごとに描画 (行あたり 8 µs の busy、書込みは busy だけで 5.76 ms/フレーム以上、周期 16 ms、90 frame、seqlock 書込み側プロトコルに従う)。描画器は rAF 同期。毎 flush 後に左端 1 列を読戻し、行ごとに色が混在すれば tear。「発生件数」= 整合→tear への遷移回数。WebGL2: seqlock off 4〜9 件、on 0 件 (30 run; on の `forced` は 30 run 全て 0、`deferred` 19〜34、`seqRetries` 0〜4)。検査は「on の発生件数 ≤ forced」 (強制読出し = 飢餓回避は整合を諦めるので tear を許容する)。CPU は ingest が FRAME_END 直後に完了するため off でも 0 件 (対照にならない; on の deferred は 2〜94)。on の deferred が多いのは検証用の `readPixels` が worker を GPU 同期で止めて読出しが遅れるため (検証ハーネス由来)。
-- **修正前の欠陥と経路 (レビュー指摘 A)**: 修正前 (`96cf00b`) の WebGL2 は `stable()` の中で `texSubImage2D` していた。**読み始めた後・検証の前に guest が書込みを始める**と (`seqRetries` に計上) 検証は失敗して矩形を持ち越すが、テクスチャには旧フレームと新フレームの行が混在したまま残り、`ingest()` は転送の成否によらず `drawRects` に入れたので次の rAF commit がその混在テクスチャを描画した (4 ms 後の再試行が先に直せば表に出ない = 確率的)。レビュー実測では on でも forced=0 のまま tear 発生 1 件 (19 run 中 1 run)。修正後は staging へコピー → 検証 → 成功時のみ転送とし、持ち越した矩形は `drawRects` に入れず再試行が成功してから描く (その間は直前の整合フレームが見える)。**「seqlock 決定的 (書込み中)」は検証の前から奇数の経路しか通らない**ので、この経路は「検証中の書込み開始」の決定的テストと確率的 tearing 試験で見る。direct 転送 (共有メモリ view を直接 `texSubImage2D`) の利点は seqlock 有効時のみ失われる (staging へのコピーが 1 回入る)。
-- 設計判断: rAF 同期は **ingest (FRAME_END 時点で surface を読む) と commit (rAF で画面反映 + ack) の分離**にした。当初の「FRAME_END を rAF まで遅延して読む」実装は読出しが次フレームの guest 書込みと重なり、CPU 経路 (seqlock off) でも tear 状態の flush が 87 回中 19 回出た。分離後は 86〜87 回中 0 回 (3 run)。
-
-### frame time (headless Chrome 154.0.8037.97, **SwiftShader = 実 GPU ではない**, 4 CPU)
-`ms/frame`: flush(submit) = worker 内 CPU 時間 (`GuiRenderer.stats.flushMs / flushes`: 読出し・変換・転送・描画発行); +GPU sync = flush + 1 px `readPixels` による GPU 完了待ち; wall = guest の PRESENT push → ack。各セル = 60 frame × 3 rep × 3 run の **min–max** (n=9)。load average (1 分) は run 開始→終了で 0.68→1.71 / 1.71→2.60 / 2.40→2.63。
-| size | dirty | 方式 | flush(submit) | +GPU sync | wall | rect/frame |
-|---|---|---|---|---|---|---|
-| 1280×720 | 全面 | CPU putImageData | 2.09–2.13 | — | 2.16–2.21 | 1 |
-| 1280×720 | 全面 | WebGL2 direct | 0.35–0.58 | 5.67–8.21 | 6.99–9.96 | 1 |
-| 1280×720 | 25% | CPU / WebGL2 direct | 0.54–0.56 / 0.07–0.15 | — / 1.74–2.68 | 0.58–0.63 / 1.11–2.54 | 1 |
-| 1280×720 | 8 矩形 (128×72) | CPU / WebGL2 direct | 0.19–0.20 / 0.06–0.07 | — / 0.81–1.59 | 0.22–0.27 / 0.11–0.97 | 8 |
-| 1920×1080 | 全面 | CPU putImageData | 4.72–4.85 | — | 4.90–5.04 | 1 |
-| 1920×1080 | 全面 | WebGL2 direct | 0.75–1.00 | 12.67–13.05 | 17.51–18.25 | 1 |
-| 1920×1080 | 全面 | WebGL2 staged | 1.51–1.70 | 13.29–13.52 | 18.16–18.76 | 1 |
-| 1920×1080 | 25% | CPU / WebGL2 direct | 1.19–1.35 / 0.29–0.64 | — / 3.70–6.71 | 1.26–1.54 / 0.60–7.68 | 1 |
-| 1920×1080 | 64×64 | CPU / WebGL2 direct | 0.01–0.02 / 0.01–0.03 | — / 0.32–0.41 | 0.04–0.06 / 0.05–0.06 | 1 |
-| 1920×1080 | 8 矩形 (128×72) | CPU / WebGL2 direct | 0.19–0.20 / 0.04–0.08 | — / 1.37–1.47 | 0.22–0.26 / 0.10–0.17 | 8 |
-- 全 24 セル (2 サイズ × 4 dirty × 3 方式: CPU / WebGL2 direct / WebGL2 staged) の完全表は `present_e2e.mjs` の出力 (`bash tools/gui/present/e2e.sh`)。
-- **解釈**: GL 経路は worker の CPU 時間 (flush) を CPU 経路の 1/2〜1/6 に減らす (1080p 全面 4.72–4.85→0.75–1.00 ms、1080p 25% 1.19–1.35→0.29–0.64 ms)。一方 SwiftShader では GPU 完了まで 12.7–13.1 ms かかり CPU 経路より遅い (ソフトウェア GL がテクスチャ転送と quad 描画を CPU で行うため)。**実 GPU での完了時間・消費電力・合成コストは未測**で、GUI-4 の「必要性を実測で判断」は実 GPU ブラウザ + 実 FL 負荷が要る。`direct` (共有メモリ view を直接 `texSubImage2D`) は Chrome 154 で許容され、`staged` (行コピー) より全面更新の flush が 0.3〜0.9 ms 小さい。他ブラウザで拒否された場合は `staged` に自動降格 (コード上; 他ブラウザでは未検証)。
-- 従来 CPU 経路の数値 (1080p 全面 4.72–4.85 ms) は §3 の旧実測 (2.2〜3.8 ms) と異なる: §3 は別環境・合成画像の変換ループ計測で、本表は `GuiRenderer` の flush を CI runner (4 CPU, load 0.7〜2.6) で測ったもの。両者は直接比較しない。
-
-### 範囲外・未達
-| 未解決 | 影響 | 起票先 |
-|---|---|---|
-| 実 FLEngine 負荷 (全面再描画 + 多数 BitBlt) での frame time / 入力→表示レイテンシ | #180 完了条件の「実 FLEngine 負荷」「実 GPU の frame time 比較表」が未達 | #180 (Refs のまま open) / GUI-3 (#174) 後 |
-| 実 GPU での比較 (SwiftShader のみ) | GL 化の採否判断ができない | #180 に実 GPU ブラウザでの計測を追記 (headed Chrome か実機; ユーザ依頼候補) |
-| shim の dirty は surface あたり単一外接矩形のまま (host は複数 PRESENT を併合して扱える) | 離れた小領域が多い描画で転送が増える | #180 (shim 側 `g_dirty` を矩形リスト化; 要 selftest 追加) |
-| seqlock は検出と再試行 (back buffer なし) | guest が連続描画だと `staleMs` (100 ms) 後に tear を許容 | #180 (surface の double buffer 化) |
-| 入力→表示レイテンシ・rAF 同期の 30fps 目標 (#10) の実 FL 計測 | 同上 | #180 / #10 |
-| `tools/gui/e2e.sh` 6e/6 sigprobe の `unresolved-imports=0` は **runner に `wasm-objdump` (wabt) が無く `|| true` で常に 0 になる** (本 run の出力に `wasm-objdump: command not found`)。`signature mismatch=0` と陰性対照 `mismatch=177` は有効 | 「未解決 import なし」の確認が空振り (既存の挙動; 本変更とは無関係) | #180 にコメント (runner image へ wabt を足す、または不在時に fail させる) |
-| dirty 内の前面 surface 再描画が surface id 順で z 昇順ではない (`present()` / `glDrawRects()`; レビュー軽微 1) | 前面側が 2 枚以上重なると z の小さい方が上に描かれ得る (golden のシナリオでは顕在化しない; ブラウザ再現は未確認) | #180 にコメント済み (issuecomment-6136756050) |
-| `bash tools/gui/e2e.sh` 0/6 の `gen_api.py` が `tools/gui/IMPORTS.md` の先頭の「自動生成・人手編集禁止」ヘッダを落として書き換える (本 run では diff を commit せず元へ戻した) | e2e を回すたびに作業ツリーが dirty になる (既存の挙動) | #180 にコメント (生成元の `gen_api.py` がヘッダを出すようにする) |
-| **既存の不安定**: native `selftest` (ASan) が `gui_headless.c:blit_surf` で heap-use-after-free することがある (render thread が `surf_free` 済みの画素を読む)。変更前の `origin/main` で 3/20、本変更後 3/14 回が exit 1 (同一スタック) | `tools/gui/e2e.sh` 1/6 が 15〜21% (3/20・3/14) で FAIL しうる (本変更とは無関係) | **#489 `[GUI-12]`** (headless host の render thread と shim の free の競合; 本 run で起票) |
-- 範囲: FL 非依存の模擬 guest・headless Chrome 154 のみ。Firefox / Safari、複数 `canvas`、WebGL コンテキストロスト復帰 (コードあり・未試験) は範囲外。
-
-### 再現
-```
-bash tools/gui/present/e2e.sh                      # tsc → mergeRects 単体 → golden/screenshot/seqlock/tearing/bench (bench 込み 44.4–44.8 s, 3 run, `09e3db9`; PRESENT_SKIP_BENCH=1 で bench 省略 9.6–11.2 s, 30 run, `88efd49`, load 0.34–3.44)
-bash tools/gui/test/selftest.sh                    # native 319 assertion (seqlock wseq の 5 件を追加)
-node tools/runtime/gui_e2e.mjs                     # Vite バンドル経由 (本番 worker) で WebGL2+rAF+seqlock の render-selftest を追加
-bash tools/gui/e2e.sh                              # 全体 (PE lift を含む); 要 RetDec・emsdk・mingw
-```
+全文は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) に分割移動 (250 行上限; 内容は無変更)。結論: 現行 CPU 経路は 1080p 2.2〜3.8 ms/frame で予算内、WebGL2 present・複数矩形・rAF 同期・seqlock は FL 非依存部を実装・e2e 済み。
 
 ## 10. GUI-5 (#181): 24/8/4/1bpp DIB・mono DDB と wasm SIMD128 行カーネル
 既知類型との関係: lift 欠陥ではなく shim の意味論 (`docs/DEFECTS.md` D1a〜D16 に該当なし)。ただし shim 自身の silent 誤りを 1 件発見 (下記「発見」)。検証起点: 実装 `dd7be3e`、本節の数値は `9cff72c` のクリーン tree での実測 (src/test は最終 HEAD と同一で、以降の commit は REPORT・DOC_MAP のみ; `gui_gdi.c` は `dd7be3e` と同一)。
@@ -188,7 +126,7 @@ bash tools/gui/e2e.sh                              # 全体 (PE lift を含む);
 | **未実行** | `bash tools/gui/e2e.sh` の PE lift 層 (RetDec 不在)。`e2e.sh` に 1b/6 (bpp golden)・1c/6 (SIMD) を追加済みだが全体の ALL PASS は未確認 | — |
 - **origin/main (`d1ff878`; #172 shimx・#118 等) との merge 後 `04dd71e`**: `selftest` 406 passed / 0 failed (3 回連続; main 側の `selftest_fd.inc` +28 を含む)・`bpp_golden` EXACT MATCH 16,000 px・`simd_e2e` ALL PASS・`reach_test` 11/28 passed・改名 selftest 406 passed・`tsc` rc 0 を再確認。
 - 再現 1 コマンド: `bash tools/gui/test/selftest.sh` / `bash tools/gui/test/bpp_golden.sh` / `bash tools/gui/test/simd_e2e.sh` (bench は `BENCH=0` で省略。上記 3 本 + reach_test の合計 44.0 s, load 1.05)。
-- **既存の不安定 (本変更と無関係)**: native `selftest` は ASan で `gui_headless.c:blit_surf` の heap-use-after-free で 20 回中 4 回 (20%) exit 1 (全て同一スタック; §9 の #489)。それ以外の失敗は 0。
+- **既存の不安定 (本変更と無関係)**: native `selftest` は ASan で `gui_headless.c:blit_surf` の heap-use-after-free で 20 回中 4 回 (20%) exit 1 (全て同一スタック; #489 → 本 REPORT §12 で修正)。それ以外の失敗は 0。
 
 ### 性能 (1080p, 参考値; 実 FL 負荷・実ブラウザは未測)
 native `-O2` gcc 13 (`bash tools/gui/test/bench.sh 5 [旧 tools/gui のパス]`; 前 = `17b7777` の src に同じ bench.c を適用, 後 = 最終; 各 n=5 の min–max ms/frame, load 0.5〜0.6; native は wasm SIMD が使えないため行ループ化・除算排除の効果のみ):
@@ -226,15 +164,39 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
 | 実 FLEngine が要求する bpp/ROP の確定 (GUI-3 #174 の到達ログ待ち)・16bpp DIB・DIB_PAL_COLORS・`CreateBitmap` 4/8/16bpp の初期 bits・RLE/JPEG/PNG 圧縮 DIB | 実 FL が要求したら fail-fast で止まる (理由付き) | #174 到達後に #181 へ追記 |
 | Chrome 上の SIMD 版 wasm 全体 (lift 済みアプリ込み) の frame time | wasm の API 単位の前後比較が未取得 (kernel 単位のみ) | #181 (RetDec 付き再実行で `gui_wasm.sh` 既定の `-msimd128` ビルドを実測) |
 | mono / パレットの色写像の実 Windows との照合 (近似) | 色が実機と数階調ずれる可能性 | #181 (実機比較はユーザ依頼候補) |
-| native selftest の ASan UAF (20 回中 4 回) | `e2e.sh` 1/6 が約 20% で FAIL | #489 `[GUI-12]` (既存) |
+| native selftest の ASan UAF (20 回中 4 回) | `e2e.sh` 1/6 が約 20% で FAIL | #489 `[GUI-12]` で修正 (本 REPORT §12) |
 | `integ/sigprobe.sh` の `unresolved-imports=0` が `wasm-objdump` 不在で空振り (今回も `command not found`) | 未解決 import なし確認が無効 | #180 (既存コメント) |
 
 ## 11. GUI-9 (#186): GDI テキストの FreeType 描画 (内蔵 8×8 → FreeType 2.7)
 - 結論: `src/gui_ft.c` (FreeType 2.7) が GDI テキストを描き、native 独立オラクル (`golden/ft_oracle.c`) と画素差 0・metrics 差 0 (ネガコン 4/4)、engine の native == wasm32。未登録/解決不能/stock は従来の 8×8。Windows 標準フォントは同梱せず OSS フォント (Open Sans / Barlow) を alias で代替 (#186 PM 判断)。
-- 実測値・実装詳細・レビュー対応の再現・8×8 経路 `DrawText` の挙動差・未解決 (4 件) の全文は **`REPORT_APPENDIX.md`** (無変更で分割移動)。未解決 (4) wasm ビルドへの組込みは §12 (#615) で解消。
+- 実測値・実装詳細・レビュー対応の再現・8×8 経路 `DrawText` の挙動差・未解決 (4 件) の全文は **`REPORT_APPENDIX_B.md`** (無変更で分割移動)。未解決 (4) wasm ビルドへの組込みは §13 (#615) で解消。
 
-## 12. GUI-13 (#615): gui_wasm.sh の wasm ビルドへ gui_ft.c + libfreetype を組込み + ブラウザ上テキスト描画 e2e
-既知類型との関係 (DEFECTS.md): 該当なし (lift 欠陥ではなく shim のリンク構成)。検証起点 commit: 4890d60 (HEAD)。c4b293d (e2e.sh の FT 順序修正) の再確認は `REPORT_APPENDIX.md` §12 追補。
+## 12. GUI-12 (#489): headless host の surface 画素 use-after-free (selftest ASan flaky)
+
+既知類型との関係: lift 欠陥ではなく native headless host と shim の free タイミング競合 (`docs/DEFECTS.md` D1a〜D17 に該当なし。`tools/icall/REPORT.md` §4 とも無関係)。実装 commit `6e6c9b7`。検証起点: HEAD `31bcd9a` (main 取り込み後の PR HEAD。コード差分は同一で、以後の commit は docs のみ)。
+
+- **原因**: render thread (`gui_headless.c` `blit_surf`) が `gui_surf_ptr(id)` で画素ポインタ、`S->surf[id].w/h` で寸法を別々に読み、その間に shim 側 `surf_free` / `surf_resize` が旧画素を即 `free()` していた (ASan: `blit_surf:33` read / freed by `surf_free`)。wasm 共有メモリ経路では free 済み領域も有効なので crash しない (stale 読みは別問題・未対応)。
+- **修正** (`gui_core.c`): surface ごとに不変 `SurfSnap {px,w,h}` を atomic に公開し host は一組で読む。旧画素と旧 snapshot の free は `retire_locked` で「公開時点の `out_ring.tail` を `out_ring.head` が通過する (= host がその変更レコードを消費し終える)」まで遅延し、`surf_flush` / 次の retire で回収する。host に `gui_lock` を取らせない (out ring 満杯時のデッドロック回避; issue 方針案の前者)。ブラウザ host の挙動・PROTOCOL は不変。
+- **再現・検証** `bash tools/gui/test/gui12_race.sh [N=50] [NC_N=30]` (本体 N 回 + ネガコン NC_N 回。いずれか不合格で exit 1):
+
+| 項目 | 実測 (4 vCPU runner, load average は各実行末) |
+|---|---|
+| 修正前 selftest (`origin/main` 同一コード) 30 回連続 | exit 1 が 2/30 (同一スタック `blit_surf gui_headless.c:33`) |
+| 修正後 selftest 60 回連続 (作業ツリー, 1 run あたり約 4 秒) | exit 1 が 0/60 (load 1.78) |
+| **`gui12_race.sh 50 30` (`31bcd9a`, クリーン worktree, 所要 251 秒)** | **修正後 exit≠0 が 0/50 (UAF 0)** / ネガコン **30/30 が heap-use-after-free** (load 2.15 / 1.79) → PASS |
+| selftest 件数 (`31bcd9a`) | 428 passed, 0 failed (GUI-12 stress 2 件を含む: 150 回の create/MoveWindow×2/destroy 後に保留 free が 0 件に回収) |
+| `bpp_golden.sh` / `reach_test.sh` (`31bcd9a`) | ALL PASS / reach 11 + adapt 28 passed (reach_test 内の selftest も 428 passed) |
+
+- **ネガコン**: `-DGUI12_NEGCTL_IMMEDIATE_FREE` (retire を即 free に戻す。`gui12_race.sh` だけが定義) で UAF 30/30。新 stress 節は確率的競合を決定論的に近づけるため、修正前より再現率が高い (修正前 2/30 → ネガコン 30/30)。
+- **範囲外**: `native_e2e.sh` / `e2e.sh` 全体は `/opt/retdec` 不在で未実行 (検証 run の素材は `fl-win64` と apt の mingw のみ)。`emcc -c gui_core.c` は `/opt/emsdk` 不在で `31bcd9a` では未再実行 (`6e6c9b7` 時点では OK)。Chrome E2E (wasm 経路) も未実行 (本変更は native headless の読み出しと shim 側 free 遅延のみ; wasm でも `SurfSnap` は同じコードが走るため要再確認)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `e2e.sh` 全体 (native_e2e + wasm Chrome) の再実行 | wasm 側で `SurfSnap` / 遅延 free が回帰を起こさないことが未確認 | #489 にコメント (`oc_artifacts: fl-win64 toolchain-emsdk toolchain-retdec` で再実行依頼) |
+| wasm 経路で host が free 済み旧画素を stale に読む可能性 | 画面の一瞬のずれ (crash なし) | #489 にコメント (別チケット候補; 本修正で保留 free の仕組みは入ったので、wasm でも旧画素は `head` 通過まで有効と推論 (未実測)) |
+
+## 13. GUI-13 (#615): gui_wasm.sh の wasm ビルドへ gui_ft.c + libfreetype を組込み + ブラウザ上テキスト描画 e2e
+既知類型との関係 (DEFECTS.md): 該当なし (lift 欠陥ではなく shim のリンク構成)。検証起点 commit: 4890d60 (HEAD)。c4b293d (e2e.sh の FT 順序修正) の再確認は `REPORT_APPENDIX_B.md` §13 追補。
 - **組込み**: `lift/gui_wasm.sh` が既定で `src/gui_ft.c` + `src/gui_ft_wasm.c` + wasm32 `-pthread` libfreetype (`lift/ft_wasm_lib.sh` = `shared/oss/freetype/build.sh` 産の patch 済みツリーを再 make; `ft_wasm.sh` と同方式) をリンク。`GUI_NO_FT=1` で従来ビルド。`gui_ft_add_face` / `gui_ft_add_alias` / `_gui_hostcall_ptr` / `_malloc` / `_free` を export。**host (JS) が `gui_ft_add_face` を呼ぶまで engine は未登録 = 8×8 のまま** (既存 e2e の経路は無変更)。
 - **フォントは同梱しない・sha256 検証・遅延取得**: face は `gui_ft_register_lazy` で登録され、最初の `open` で host call `GUI_HC_FETCH_FONT` (=5) を発行 → host (`src/runtime/gui_fonts.ts` `createFontLoader`) が url から取得 → **manifest の sha256 を検証** → wasm heap へ置いて ptr/size を返す。検証失敗・取得失敗は null → shim が LOG に残して 8×8 フォールバック。manifest 台帳は `test/fonts.tsv` (file/url/sha256/face) で、`test/fetch_fonts.sh` (native 用取得) とブラウザ e2e が同じ sha256 を使う。ブラウザ配信は `loadFont` の取得元 (url) を #22 (VFS) の遅延取得に差し替える口 (本 PR では e2e サーバの `/fonts/*` = 未接続, 下記未解決 (1))。
 - **ブラウザ e2e** (`bash tools/gui/test/text_wasm_e2e.sh`; RetDec 不要): RetDec lift の代わりに C ゲスト `test/text_wasm_app.c` (GUI-9 と共有の `test/text_scene.inc` のシーンを WM_PAINT で描き BitBlt、metrics 表を LOG へ) を `gui_wasm.sh` で wasm 化 → headless Chrome (CDP, COOP/COEP, SAB) → フォント遅延取得 → OffscreenCanvas 読み戻しと CDP スクリーンショットを独立オラクルと比較 (`e2e/text_e2e.mjs`, `e2e/cdp_lib.mjs`)。
@@ -246,5 +208,5 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
   | 未解決 | 影響 | 起票先 |
   |---|---|---|
   | (1) `loadFont` の取得元を #22 (VFS) の遅延取得 (Range/OPFS/R2) へ結線 | 本番ブラウザへの配信は未接続 (e2e は同一オリジン `/fonts/*`) | #660 (GUI-14) |
-  | (2) `bash tools/gui/e2e.sh` 全体 (PE lift 層込み) の ALL PASS 確認 | 7ead604 のレビュー実測 (RetDec あり) で 2 回中 1 回 ALL PASS、もう 1 回は `selftest_wrapped` の既知 flake (ASan blit_surf UAF、単独 30 回で 9/30 失敗) で rc=1 (付録 §12 追補) | flake は `gui_headless.c` の起票を PM 依頼 (未起票)。ALL PASS の追加確認は PM 判断 |
+  | (2) `bash tools/gui/e2e.sh` 全体 (PE lift 層込み) の ALL PASS 確認 | 7ead604 のレビュー実測 (RetDec あり) で 2 回中 1 回 ALL PASS、もう 1 回は `selftest_wrapped` の既知 flake (ASan blit_surf UAF、単独 30 回で 9/30 失敗) で rc=1 (付録 §13 追補) | flake は `gui_headless.c` の起票を PM 依頼 (未起票)。ALL PASS の追加確認は PM 判断 |
   | (3) 実 FL の face/サイズ確定・alias 実値 | alias は e2e 用 (Segoe UI/Tahoma → Open Sans) のみ | #174 (GUI-3) / #186 の未解決 (2) |
