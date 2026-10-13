@@ -113,8 +113,8 @@ FL_H(channels, fillEachNSteps) {
     (void)vel; (void)A_INT(4, 0);
     if (st < 1) RANGE();
     int64_t p = off;
-    if (p < 0) { p = off % st; if (p < 0) p += st; }
-    for (; p < NSTEP; p += st) { k->steps[p] = 1; if (st >= NSTEP) break; }
+    if (p < 0) { p %= st; if (p < 0) p += st; }
+    while (p < NSTEP) { k->steps[p] = 1; if (st > NSTEP - p) break; p += st; }
     return fl_ret_none(c);
 }
 FL_H(channels, showEditor) { CH(0); (void)k; return fl_ret_none(c); }
