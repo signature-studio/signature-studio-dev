@@ -5,6 +5,7 @@
  *   `texSubImage2D(RGBA, UNSIGNED_BYTE)` へ渡す (CPU 側の画素ループ無し; R/B 入替は fragment の swizzle `.bgr` で行う, alpha は 1.0 固定)。
  * - 転送方式: "direct" = wasm の共有メモリ view を UNPACK_ROW_LENGTH/SKIP_* 付きで直接渡す (コピー無し)。
  *   ブラウザが共有 ArrayBufferView を拒否する場合 (TypeError) は "staged" (非共有バッファへ行コピー) へ自動降格する。
+ *   seqlock 有効時 (gui_renderer.ts) は検証前にテクスチャへ書かないため direct を使わず、stage() → 検証 → uploadStaged() の順に転送する。
  * - 合成は quad 描画 (`texelFetch` の整数座標, 補間・フィルタ無し) = putImageData 経路と画素一致 (差 0)。
  *   canvas は preserveDrawingBuffer: dirty 領域だけ再描画しても他の領域が残る。
  */
@@ -34,6 +35,21 @@ void main() {
   outColor = vec4(texelFetch(uTex, ivec2(floor(vTexel)), 0).bgr, 1.0);
 }`;
 
+/** シェーダをコンパイル・リンクして program を返す (失敗したら throw)。init() と usable() の共通部 */
+function buildProgram(gl: WebGL2RenderingContext): WebGLProgram {
+  const sh = (type: number, src: string): WebGLShader => {
+    const s = gl.createShader(type)!;
+    gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error("[gui] shader: " + gl.getShaderInfoLog(s));
+    return s;
+  };
+  const p = gl.createProgram()!;
+  gl.attachShader(p, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(p, sh(gl.FRAGMENT_SHADER, FS));
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error("[gui] link: " + gl.getProgramInfoLog(p));
+  return p;
+}
+
 type Tex = { tex: WebGLTexture; w: number; h: number };
 
 export type GlStats = { uploads: number; uploadPixels: number; draws: number; directFallbacks: number; contextRestores: number };
@@ -52,6 +68,20 @@ export class GlPresenter {
   private texs: Array<Tex | null> = [];
   private staging: Uint8Array<ArrayBuffer> = new Uint8Array(0);
   private readonly auto: boolean;
+
+  /**
+   * この環境で WebGL2 とシェーダが使えるかを、描画先とは別の 1x1 OffscreenCanvas で確かめる (描画先 canvas には触れない)。
+   * canvas は一度 WebGL コンテキストを持つと 2D へ降格できないため、backend "auto" は描画先 canvas で getContext する前にこれで判定する。
+   */
+  static usable(): boolean {
+    try {
+      const gl = new OffscreenCanvas(1, 1).getContext("webgl2") as WebGL2RenderingContext | null;
+      if (!gl) return false;
+      try { buildProgram(gl); return true; } finally { gl.getExtension("WEBGL_lose_context")?.loseContext(); }
+    } catch {
+      return false;
+    }
+  }
 
   /** WebGL2 が使えなければ throw */
   constructor(canvas: OffscreenCanvas, readonly width: number, readonly height: number, upload: GlUploadMode | "auto" = "auto") {
@@ -76,16 +106,7 @@ export class GlPresenter {
 
   private init(): void {
     const gl = this.gl;
-    const sh = (type: number, src: string): WebGLShader => {
-      const s = gl.createShader(type)!;
-      gl.shaderSource(s, src); gl.compileShader(s);
-      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error("[gui] shader: " + gl.getShaderInfoLog(s));
-      return s;
-    };
-    const p = gl.createProgram()!;
-    gl.attachShader(p, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(p, sh(gl.FRAGMENT_SHADER, FS));
-    gl.linkProgram(p);
-    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error("[gui] link: " + gl.getProgramInfoLog(p));
+    const p = buildProgram(gl);
     this.uDst = gl.getUniformLocation(p, "uDst")!;
     this.uSrc = gl.getUniformLocation(p, "uSrc")!;
     this.uScreen = gl.getUniformLocation(p, "uScreen")!;
@@ -157,19 +178,36 @@ export class GlPresenter {
         return;
       }
     } else {
-      const need = w * h * 4;
-      if (this.staging.length < need) this.staging = new Uint8Array(need);
-      const rowB = w * 4;
-      if (strideBytes === rowB && l === 0) {
-        this.staging.set(mem.subarray(t * strideBytes, t * strideBytes + need), 0);
-      } else {
-        for (let y = 0; y < h; y++) {
-          const s = (t + y) * strideBytes + l * 4;
-          this.staging.set(mem.subarray(s, s + rowB), y * rowB);
-        }
-      }
-      gl.texSubImage2D(gl.TEXTURE_2D, 0, l, t, w, h, gl.RGBA, gl.UNSIGNED_BYTE, this.staging);
+      this.stage(mem, strideBytes, l, t, w, h);
+      this.uploadStaged(id, l, t, w, h);
+      return;
     }
+    this.stats.uploads++;
+    this.stats.uploadPixels += w * h;
+  }
+
+  /** 共有メモリ上の矩形を非共有の staging へ行コピーする (テクスチャには触れない)。seqlock 検証をコピーの後ろに置くための分離 */
+  stage(mem: Uint8Array, strideBytes: number, l: number, t: number, w: number, h: number): void {
+    const need = w * h * 4;
+    if (this.staging.length < need) this.staging = new Uint8Array(need);
+    const rowB = w * 4;
+    if (strideBytes === rowB && l === 0) {
+      this.staging.set(mem.subarray(t * strideBytes, t * strideBytes + need), 0);
+    } else {
+      for (let y = 0; y < h; y++) {
+        const s = (t + y) * strideBytes + l * 4;
+        this.staging.set(mem.subarray(s, s + rowB), y * rowB);
+      }
+    }
+  }
+
+  /** stage() 済みの w×h をテクスチャの (l,t) へ転送する */
+  uploadStaged(id: number, l: number, t: number, w: number, h: number): void {
+    const gl = this.gl;
+    const tx = this.texs[id];
+    if (!tx) throw new Error(`[gui] upload: no texture for surf ${id}`);
+    gl.bindTexture(gl.TEXTURE_2D, tx.tex);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, l, t, w, h, gl.RGBA, gl.UNSIGNED_BYTE, this.staging);
     this.stats.uploads++;
     this.stats.uploadPixels += w * h;
   }

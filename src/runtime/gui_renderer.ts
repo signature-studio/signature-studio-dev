@@ -16,6 +16,8 @@
  * - dirty 複数矩形: 1 フレーム内の PRESENT を surface ごとに併合 (gui_dirty.ts) して転送。
  * - seqlock: surface の wseq (奇数 = guest が書込み中) を読出し前後で検証。不整合なら矩形を持ち越して 4 ms 後に再試行
  *   (staleMs 以上ずっと読めない場合のみ強制的に読む = 飢餓回避; stats.seqForced)。
+ *   WebGL2 は staging へコピー → 検証 → 成功時のみ texSubImage2D (検証前にテクスチャへ書かない)。持ち越した矩形は
+ *   描画対象 (drawRects) に入れず、再試行で転送できてから描く = その間は直前の整合フレームが見える。
  */
 import { CMD, GUI_MAX_SURF, GUI_OUT_RECS, GuiView, OFF, S, SURF_WORDS, W } from "./gui_proto.js";
 import { type DirtyRect, mergeRects, rectArea } from "./gui_dirty.js";
@@ -120,19 +122,24 @@ export class GuiRenderer {
     this.view = new GuiView(this.memory.buffer, this.base);
     this.view.check();
     const want = p.backend ?? "2d";
-    if (want !== "2d") {
+    let glError: unknown = null;
+    // canvas は一度 WebGL コンテキストを持つと 2D へ降格できないため、auto は描画先で getContext する前に別 canvas で判定する
+    if (want === "webgl2" || (want === "auto" && GlPresenter.usable())) {
       try {
         this.glp = new GlPresenter(o.canvas, o.width, o.height, p.upload ?? "auto");
         this.glp.onRestore = () => { this.needRecompose = true; this.armRetry(0); };
       } catch (e) {
         if (want === "webgl2") throw e;
+        glError = e;
       }
     }
     if (this.glp) {
       this.backend = "webgl2";
     } else {
       this.backend = "2d";
-      this.g2d = o.canvas.getContext("2d", { alpha: false, willReadFrequently: true }) as OffscreenCanvasRenderingContext2D;
+      const g2d = o.canvas.getContext("2d", { alpha: false, willReadFrequently: true }) as OffscreenCanvasRenderingContext2D | null;
+      if (!g2d) throw new Error(`[gui] 2D fallback unavailable: the canvas already holds a WebGL2 context (${String(glError)})`);
+      this.g2d = g2d;
       this.g2d.fillStyle = "#000";
       this.g2d.fillRect(0, 0, this.canvasW, this.canvasH);
     }
@@ -294,9 +301,12 @@ export class GuiRenderer {
     if (!s.state || !s.pixels || !s.w || !s.h) return true;
     if (gl.ensure(s.id, s.w, s.h)) { l = 0; t = 0; r = s.w; b = s.h; }
     const mem = new Uint8Array(v.buffer, s.pixels, s.stride * s.h);
-    const ok = this.stable(v, s.id, () => gl.upload(s.id, mem, s.stride, l, t, r - l, b - t));
-    if (!ok) this.carry.push({ id: s.id, l, t, r, b });
-    return ok;
+    if (!this.seqlock) { gl.upload(s.id, mem, s.stride, l, t, r - l, b - t); return true; }
+    // seqlock: 検証前にテクスチャへ書かない (staging へコピー → 検証 → 成功時のみ転送)。検証に失敗した読出しは捨てる
+    const ok = this.stable(v, s.id, () => gl.stage(mem, s.stride, l, t, r - l, b - t));
+    if (!ok) { this.carry.push({ id: s.id, l, t, r, b }); return false; }
+    gl.uploadStaged(s.id, l, t, r - l, b - t);
+    return true;
   }
 
   private glDraw(s: Surf, l: number, t: number, r: number, b: number): void {
@@ -324,14 +334,19 @@ export class GuiRenderer {
     for (const s of list) this.glDraw(s, 0, 0, s.w, s.h);
   }
 
-  private glUploadRects(rects: DirtyRect[]): void {
+  /** 矩形をテクスチャへ転送し、描画してよい矩形 (転送済み or 転送対象なし) を返す。seqlock で持ち越した矩形は含めない */
+  private glUploadRects(rects: DirtyRect[]): DirtyRect[] {
     const v = this.refresh();
+    const drawable: DirtyRect[] = [];
     for (const q of rects) {
       const s = this.surf(v, q.id);
-      if (!s.state || !s.visible) continue;
-      const c = this.clip(s, q.l, q.t, q.r, q.b);
-      if (c) this.glUpload(v, s, c[0], c[1], c[2], c[3]);
+      if (s.state && s.visible) {
+        const c = this.clip(s, q.l, q.t, q.r, q.b);
+        if (c && !this.glUpload(v, s, c[0], c[1], c[2], c[3])) continue;
+      }
+      drawable.push(q);
     }
+    return drawable;
   }
 
   private glDrawRects(rects: DirtyRect[]): void {
@@ -407,7 +422,7 @@ export class GuiRenderer {
       this.pending.length = 0; this.carry.length = 0;
       const rects = mergeRects(all);
       this.stats.rects += rects.length; this.stats.rectPixels += rectArea(rects);
-      if (this.glp) { this.glUploadRects(rects); if (!this.drawAll) this.drawRects.push(...rects); }
+      if (this.glp) { const drawable = this.glUploadRects(rects); if (!this.drawAll) this.drawRects.push(...drawable); }
       else for (const q of rects) this.present(q.id, q.l, q.t, q.r, q.b);
     }
     this.ingestMs += performance.now() - t0;

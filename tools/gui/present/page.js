@@ -12,7 +12,7 @@ function boot() {
   return { crossOriginIsolated: self.crossOriginIsolated === true, rafType: typeof requestAnimationFrame, ua: navigator.userAgent };
 }
 
-async function makeRenderer(name, present, width, height, surfBytes, pos) {
+async function makeRenderer(name, present, width, height, surfBytes, pos, test = null) {
   const memory = new WebAssembly.Memory({ initial: memPagesFor(surfBytes), maximum: memPagesFor(surfBytes), shared: true });
   const canvas = document.createElement("canvas");
   canvas.width = width; canvas.height = height;
@@ -31,7 +31,7 @@ async function makeRenderer(name, present, width, height, surfBytes, pos) {
     else if (m.id && waiters.has(m.id)) { const w = waiters.get(m.id); waiters.delete(m.id); w(m); }
   };
   worker.onerror = (e) => ready.rej(new Error("worker error: " + e.message));
-  worker.postMessage({ type: "init", canvas: off, memory, base: 0, width, height, present }, [off]);
+  worker.postMessage({ type: "init", canvas: off, memory, base: 0, width, height, present, test }, [off]);
   const info = await readyP;
   const ask = (type, extra = {}) => new Promise((res) => { const id = ++reqId; waiters.set(id, res); worker.postMessage({ type, id, ...extra }); });
   void frameWaiters;
@@ -40,6 +40,7 @@ async function makeRenderer(name, present, width, height, surfBytes, pos) {
     readback: async () => new Uint8Array((await ask("readback")).data),
     stats: () => ask("stats"),
     mode: (mode) => ask("mode", { mode }),
+    inject: (surf) => ask("inject", { surf }),
     reset: () => ask("reset"),
     async waitAck(seq, timeoutMs = 8000) {
       const t0 = performance.now();
@@ -228,6 +229,58 @@ async function runSeqlockDet() {
   return out;
 }
 
+// ---------------- seqlock (決定的; 検証中の書込み開始) ----------------
+// runSeqlockDet は「検証の前から wseq が奇数」の経路しか通らない。ここでは surface を読んだ直後 (検証の前) に guest が書込みを始める経路を模擬する:
+// 読んだ内容は捨てて画面は直前の整合フレームのまま / wseq が偶数に戻ったら新フレームが出る。(旧実装の WebGL2 は検証前に texSubImage2D してこの時点で新フレームを表示した)
+async function runSeqlockMid() {
+  const W = 320, H = 200, out = [];
+  const eq = (a, b) => diffCount(a, b).n === 0;
+  for (const v of [
+    { name: "gl immediate", present: { backend: "webgl2", seqlock: true } },
+    { name: "gl raf", present: { backend: "webgl2", sync: "raf", seqlock: true } },
+    { name: "cpu immediate", present: { backend: "2d", seqlock: true } },
+    { name: "cpu raf", present: { backend: "2d", sync: "raf", seqlock: true } },
+  ]) {
+    container.replaceChildren();
+    const r = await makeRenderer(v.name, v.present, W, H, W * H * 4 + (1 << 20), null, { injectWrite: true });
+    const g = r.guest;
+    g.create(0, 0, 0, W, H, 1); g.paint(0, 0, 0, W, H, 11); g.present(0, 0, 0, W, H); await r.waitAck(g.frameEnd());
+    const frameA = g.oracle();
+    const okA = eq(frameA, await r.readback());
+    g.paint(0, 20, 20, 120, 100, 22); g.present(0, 20, 20, 120, 100);   // 書込みは完了済み。worker が読んだ直後に次の書込みが始まる
+    await r.inject(0);
+    await r.waitAck(g.frameEnd());
+    const frameB = g.oracle();
+    const during = await r.readback();
+    const s1 = await r.stats();
+    g.wseqEnd(0);                                    // 静止 -> 持ち越した矩形が再試行されて表示される
+    let converged = false; const t0 = performance.now();
+    while (performance.now() - t0 < 3000) { if (eq(frameB, await r.readback())) { converged = true; break; } await new Promise((res) => setTimeout(res, 10)); }
+    const s2 = await r.stats();
+    out.push({ name: v.name, initialOk: okA, injected: s1.injected, duringShowsOld: eq(frameA, during), duringShowsNew: eq(frameB, during), retries: s1.stats.seqRetries, deferred: s1.stats.seqDeferred, converged, convergeMs: Math.round(performance.now() - t0), forced: s2.stats.seqForced });
+    r.worker.terminate();
+  }
+  return out;
+}
+
+// ---------------- backend "auto" の降格 ----------------
+// auto は WebGL2 のシェーダがコンパイルできない環境で 2D へ降格する (none = 正常 → webgl2 / all = 降格 → 2d / afterProbe = プローブは通り描画先だけ失敗 → 降格不能なので明示エラー)
+async function runAutoFallback() {
+  const out = [];
+  for (const kind of ["none", "all", "afterProbe"]) {
+    container.replaceChildren();
+    try {
+      const r = await makeRenderer(`auto/${kind}`, { backend: "auto" }, 64, 48, 1 << 20, null, kind === "none" ? null : { breakShader: kind });
+      const rb = await r.readback();
+      out.push({ kind, backend: r.info.backend, error: null, readbackBytes: rb.length });
+      r.worker.terminate();
+    } catch (e) {
+      out.push({ kind, backend: null, error: String(e && e.message || e).split("\n")[0] });
+    }
+  }
+  return out;
+}
+
 // ---------------- bench ----------------
 async function runBench({ sizes = [[1280, 720], [1920, 1080]], frames = 60, warm = 8, reps = 3 } = {}) {
   const out = [];
@@ -279,5 +332,5 @@ async function runBench({ sizes = [[1280, 720], [1920, 1080]], frames = 60, warm
   return { frames, warm, reps, results: out };
 }
 
-window.__present = { boot, runGolden, runTearing, runSeqlockDet, runBench };
+window.__present = { boot, runGolden, runTearing, runSeqlockDet, runSeqlockMid, runAutoFallback, runBench };
 window.__ready = boot();
