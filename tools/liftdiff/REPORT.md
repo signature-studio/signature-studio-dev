@@ -237,7 +237,7 @@ OOB `function_414ad0` 系 68 件は `[rbx]` 1 段 deref の IR 脱落 (68 件は
 ## 10. OTT 旧 chain (D1〜D6) の Actions 再現 (LD-8 / #406、要約)
 
 Actions run `38430714782` (head `9cadda79`) で `liftdiff_e2e.sh` (--m11-only なし) を実測・exit 0・`LIFTDIFF_E2E PASS`・ネガコン 5/5 PASS。ログは `results/liftdiff_e2e_run38430714782_9cadda79.log` (commit 済み)。OTT 集計など詳細・ログ抜粋・未解決表: [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §10。
-- 前回比 (LD-16 / #825・LD-31 / #1069): 基準 `59eea5c` は素材再計算で 38/108/66 (報告値・3 回同一)。`986e7415` は 35/112/65 (commit 済みログで検証)、main は 40/110/62 (報告値)。主因は `ldlib/cases.py` の pattern 追加と推定だが切り分けは未完。詳細: [`REPORT_APPENDIX_LD16.md`](REPORT_APPENDIX_LD16.md)。
+- 前回比 (LD-16 / #825・LD-31 / #1069): n=3 実測 (生ログ commit 済み): 基準 `59eea5c` = 38/108/66、main c4e93550 = 35/112/65、HEAD = 35/112/65。38→40 は `ldlib/cases.py` の pattern 追加で再現 (cases.py 単独で 40/110/62)。main 全体 (35) との差は cases.py 以外の変更によるが未切り分け。詳細: [`REPORT_APPENDIX_LD16.md`](REPORT_APPENDIX_LD16.md)。
 
 ## 11. 比較系の偽陽性 2 類型の修正 (LD-11 / #548、要約)
 
