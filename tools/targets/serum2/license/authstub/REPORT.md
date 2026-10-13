@@ -203,6 +203,26 @@ sed -n 9872p $LIFT   # => br i1 %110, label %dec_label_pc_1800c2f08, label %dec_
   - (c) 元の検索式 `br i1 (icmp eq %109, 0)` は **0 件** で、表記が違った。実 IR は L9870 `%110 = icmp eq i64 %109, 0` と L9872 `br i1 %110, label %dec_label_pc_1800c2f08, label %dec_label_pc_1800c2d6f`。0 側 (true 側) は `dec_label_pc_1800c2f08` で期待値を満たす。上記の検索式は修正済み。
 - 原因の一本化 (記述上の整理。機構は上記 (a)〜(c) で再確認済み): §6 L1 の「insn.addr メタが 0 個」は (a) の結果で、「`0x1800c2ef4` へ向かう辺が lift 時に `0x1800c2f08` へ付け替わる」ことが脱落の機構。
 
+## 14. L1 復元 pass (#1009 / SR-12, 追跡 #823)
+
+- 実装: `tools/liftlib/liftlib/passes/l1_restore.py`。raw IR の `br` (0x1800c2d69 の `je` の null 枝, IR 行 9872) の真の枝を新設ブロック `dec_label_pc_1800c2ef4` へ戻す。ブロックは `host=[rsi+0x10]` の null 判定と `call @__icall_dispatch(i64 0x1800c2f05)` (#228 の `ir_icall_restore.py` と同じ宣言) を持つ。site は機械語 VA で指定し、1 件でなければ失敗する。元行の `!insn.addr !N` は正規表現で捕捉して再利用する (番号の固定値は使わない)。
+- `%arg1` = rsi の根拠: 同関数 0x1800c2b50 の demo bit `[rsi+0x22792]` (機械語 0x1800c2cfe) は IR で `%x = add i64 %arg1, 141202` (141202 = 0x22792) として現れる (`authstub_irpass.py` の demo bit 検出, L233)。よって IR の `%arg1` は関数引数 this = rsi。raw IR 行の直接確認は本 fix の run では未実施 (raw lift 無し)。
+- 対照 (census, `l1_census.py`, PE sha256 `501e7bb3…5283`。機械語側は raw / restored で同値。pass は IR のみを変え機械語は変えないため、効果は IR 側 2 行だけ):
+
+  | 指標 | pass 無し (raw) | pass 有り (restored) |
+  |---|---|---|
+  | 直接 `call [reg+0x30]` site (機械語) | 1 | 1 |
+  | `edx=0x800010` 即値ロード (機械語) | 1 | 1 |
+  | 入口 edge (機械語 `je`) | 1 | 1 |
+  | `insn.addr` が site 範囲を被覆 (IR) | 0 | 2 |
+  | ブロック `dec_label_pc_1800c2ef4` | 不在 | 存在 |
+
+- 到達性 (`authstub_irpass.reachable_set`): restored では `dec_label_pc_1800c2ef4` と `l1_call` が関数入口から到達可能。
+- 構文: `base` 修復 (`liftlib.passes.base.run_base`) 後の raw / restored の両方を `llvm-as-18` で検査し、rc=0 (未修復の RetDec 出力は constexpr の `or` で `llvm-as-18` が落ちるため、検査は base 後で行う)。
+- e2e (commit a5adb2fc = origin/main 取り込み時点, `plugins-serum2` 展開 sha256 一致): cold = **30.15 s**・23/23 PASS (rc 0, load 0.30→0.66)。warm = **3.72 s**・23/23 PASS (rc 0, load 0.15)。cold と warm は実行条件が違い比較できない。pass は e2e チェーンに入っていないため、この 2 行は **e2e チェーン不変の確認であり本変更の検証ではない**。本 fix commit ではこれらを再実行していない。
+- 未達 (受入条件のうち未完): (1) 復元した `call` の引数 (rcx=host, edx=0x800010) の実行時 ABI は #228 (icall の BLK 経由) の界面に従う別工程で、本 pass は site の VA と制御辺のみ復元する。(2) e2e チェーン (`e2e.sh`) への組込みは未実施。
+- 既存の子 issue への紐付け (2026-10-13 時点の状態): census 拡張 (受入 2 の IR 側指標) は #1029 [SR-13] で、PR #1205 (`Closes #1029`) により完了・closed (merge commit `9d1c632f`、本ブランチは取り込み済み)。復元 pass の前後表・ネガコンの正式化 (受入 2〜3 の残り) は #1030 [SR-14] (open)、LF 規則の導出は #1213 [SR-11] (open、`1007-sr-11-authstub-binding`)、global 名の規則化は #1208 [SR-15] (open)。
+
 ## 13b. L1 脱落条件の特定 (#823)
 
 全文は REPORT_APPENDIX.md §13b (機械語 ↔ raw IR の突合・census の数え方・実測の記録)。
