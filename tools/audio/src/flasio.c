@@ -227,7 +227,7 @@ static void *thread_fn(void *arg) {
         }
         int rc = fla_out_wait_fill_le(T - A.B, 50);
         uint32_t ev = __atomic_exchange_n(&c->dev_events, 0, __ATOMIC_SEQ_CST);
-        if (ev & (FLA_EV_CLOSED | FLA_EV_SUSPENDED | FLA_EV_RATE_CHANGED)) {
+        if (ev & (FLA_EV_CLOSED | FLA_EV_SUSPENDED | FLA_EV_RATE_CHANGED | FLA_EV_INPUT_CHANGED)) {
             A.reset_requests++;
             if (A.cb.asioMessage) A.cb.asioMessage(kAsioResetRequest, 0, NULL, NULL);
         }
@@ -293,7 +293,12 @@ ASIOError flasio_get_sample_position(ASIOSamples *sPos, ASIOSamples *tStamp) {
 }
 
 ASIOError flasio_output_ready(void) { need_init("flasio_output_ready"); return ASE_NotPresent; }  /* ILWASAPI 実測: 0xfffffc18 */
-ASIOError flasio_control_panel(void) { need_init("flasio_control_panel"); return ASE_OK; }
+/* FL の asiopanelbtn → controlPanel。ASIO ドライバ同様 UI を開いて即返す。UI 未登録なら ASE_NotPresent
+ * (FL 側は 'Could not open ASIO control panel' を出す経路) */
+ASIOError flasio_control_panel(void) {
+    need_init("flasio_control_panel");
+    return fla_cmd(FLA_CMD_CONTROL_PANEL, 0, 0, 0, 0, NULL, 5000) == 0 ? ASE_OK : ASE_NotPresent;
+}
 ASIOError flasio_future(ASIOLong selector, void *opt) { (void)selector; (void)opt; need_init("flasio_future"); return ASE_InvalidParameter; }
 
 void flasio_get_stats(flasio_stats_t *s) {
