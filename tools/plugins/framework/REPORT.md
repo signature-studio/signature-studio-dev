@@ -1,4 +1,6 @@
 # P0b REPORT — TFruityHost shim (CAB-195)
+> **正本**: `tools/plugins/framework/REPORT.md`。詳細は付録 `tools/plugins/framework/REPORT_P0c9.md` (P0c-9 #610)。
+> 行数超過 (約 520 行・上限 250 行) の分割追跡先: 未起票 (PM に起票を依頼・PR #634 コメント参照)。
 
 - 検収起点 commit: **9b420bd** (`tools/plugins/framework` ツリーは b8e762d と同一: `git diff b8e762d HEAD -- tools/plugins/` = 0 行)
 - 行数目安: 実装部 (§0-§9) 187 行 + 検収記録 (§10-§11) 105 行 + CAB-194 検収 (§12) 78 行 + CAB-269 (§13) 118 行 = 488 行
@@ -518,17 +520,3 @@ canon 段の IR は旧実装と同一 (§13.4) なので、**修正 S1-S4 がサ
 行案 (DEFECTS.md 形式): **D17 手書き pass の採番衝突** — 症状: `multiple definition of local value
 named 'ceclone1'` / 根本原因: pass ごとに `uid` を 0 にリセット / 観測: canon 段の chain clone
 (`function_4076b0` 11224 行) / 検出信号: `llvm-as` を emcc 前に 1 本通す (2.59 s) / 修復: `max(10000, 最大番号)`。
-
-## P0c-9 (#610): stage-1 成果物の素材化 (部分達成・未完)
-
-検証起点 commit: `8f55002` (origin/main)。既知類型との関係: DEFECTS.md の D1〜D16 に該当なし (インフラ変更)。
-
-- 追加: allowlist に `work-fw-stage1` (`.github/scripts/prepare-event-context.sh`)・`fw_pack_stage1.sh` (pack/verify)・WORKFLOW §11 の記載。展開先は `tools/plugins/work/fw/` (= `fw_269_verify.sh` / `hs_e2e.sh` の既定 SRC)。
-- 検証 (合成 12 ファイルで実施。実成果物ではない): pack 正常 rc=0 (12/12)。ネガコン 4 件 (r3 欠落 / 0 byte / 想定外エントリ / fw_map.json 不正 JSON) は全て rc=1。allowlist は `work-fw-stage1` を通し `work-fw-bogus` を rc=1 で拒否。
-- **未達**: 実 stage-1 成果物はこの runner に無く (`tools/plugins/work/fw` 不在・fw-win64 / toolchain のみ取得)、R2 への upload 権限も無いため、素材の実体・`fw_269_verify.sh` / `hs_e2e.sh` の PASS (FW_EXT_FUNCS 未指定/指定) ・ext 対象関数一覧は未作成。
-
-| 未解決 | 影響 | 起票先 |
-|---|---|---|
-| 実 stage-1 の梱包と R2 upload (`fw_pack_stage1.sh pack` → `artifacts/work-fw-stage1.tar.zst`) | 素材が無いと `oc_artifacts: work-fw-stage1` はダウンロード失敗 | #610 (依頼者作業) |
-| fw_269_verify.sh / hs_e2e.sh の FW_EXT_FUNCS 未指定・指定での再検証 | #311 受入条件 3 | #610 (素材 upload 後に再 run: `oc_artifacts: fl-win64 toolchain-emsdk work-fw-stage1`) |
-| FW_EXT_FUNCS 対象 x87 関数の一覧と選定根拠 | 未決 | #197 / #610 |
