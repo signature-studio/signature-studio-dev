@@ -63,7 +63,8 @@
 ## P0c-15 (#1253 / PR #1284): f80_lower --ext の RE_EXT_* をメタデータ付き行へ拡張
 
 - 対象: `tools/plugins/p0c/f80_lower.py` のみ。測定 commit `7d8b7d51` (コードを変えた最後の commit)。
-  `git diff 7d8b7d51 HEAD -- tools/plugins/p0c tools/plugins/framework` の出力は 0 行 (差分 0)。
+  f80 経路 (`tools/plugins/p0c/*.py`・`fw_f80.py`・`fw_stage2.sh`・`fw_*.py`) の `7d8b7d51..HEAD` 差分は、再現スクリプト `p0c15_meta_ab.sh` の新規追加 1 本のみ。
+  `git diff 7d8b7d51 HEAD -- tools/plugins/p0c tools/plugins/framework` の差分は、この再現スクリプトと、main 取り込みで入った他 PR 由来の `hostshim/hs_disp_emu.py`・`hs_disp_negctl.py`・`REPORT_DISPATCHER.md` (#986。f80 経路から呼ばれないことを grep で確認済み) と REPORT 追記。
 - 旧版 (`7d8b7d51^` = `fff76e97`) の挙動: `RE_EXT_*` が行末 `\s*$` で止まるため、`, !insn.addr !N` 付き行に一致しない。
   `function_5dfd30` は `skip:no-ext-values` で ext 化されず、fw_f80.py は ext 指定で fail-fast する。
 - 新版: 各 RE_EXT の行末を `(?:,\s*![\w.]+\s*!\d+)*\s*$` (メタデータ列許容) にし、行末前提だった 4 箇所も同様に直す。
