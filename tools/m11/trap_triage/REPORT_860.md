@@ -10,7 +10,7 @@
 - PE: `fl-win64` 素材 (`block00031_PE.bin`)。capstone 5.0.7 / pefile を venv で導入 (runner の system pip は不可)。
 - build: `m11_build.sh` 24 s、`wasm-ld signature mismatch 0 / undefined symbol 0`。
 - 測定: `node tools/m11/trap_triage/survey_units.mjs <out.json>`、load average 0.58。
-- 基準 HEAD: `origin/main` `986e7415` (worktree `ws-860`、branch `860-m11-m2p-decimal-inttoptr`)。
+- 基準 HEAD: コードは `origin/main` `986e7415` 上で測定 (worktree `ws-860`、branch `860-m11-m2p-decimal-inttoptr`)。`bc342b62` はこの REPORT を追加する commit のみで、`986e7415` との差分は本ファイルだけ (測定対象コードは同一)。
 
 ## 2. 実測 (full sequence)
 
@@ -39,9 +39,9 @@ M2p ON の unit 遷移の表 (受入 3) も、full sequence が 800 s 超のた�
 
 ## 5. 未解決 (起票先)
 
-- M2p ON の survey ハングの原因 (前 unit の状態持ち越し・ループの特定。`SV_PROG` で unit 880 付近まで) → 子 issue (§6)。
-- 10 進 inttoptr 4364 件の仕分け表 (受入 2)・M2p 有無の unit 遷移 (受入 3)・既定 ON の是非 (受入 4) → 同子 issue。
-- halt0 8 (`412770` 系) の個別原因 → 同子 issue。
+- M2p ON の survey ハングの原因 (前 unit の状態持ち越し・ループの特定。`SV_PROG` で unit 880 付近まで) → 子 issue #1076。
+- 10 進 inttoptr 4364 件の仕分け表 (受入 2)・M2p 有無の unit 遷移 (受入 3)・既定 ON の是非 (受入 4) → 子 issue #1076。
+- halt0 8 (`412770` 系) の個別原因 → 子 issue #1076。
 
 ## 6. 再現
 
