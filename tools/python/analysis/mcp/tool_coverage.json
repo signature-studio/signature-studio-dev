@@ -5,7 +5,7 @@
   "soft_error": 0,
   "raised": 0,
   "no_args": 0,
-  "host_calls": 37424,
+  "host_calls": 37425,
   "callback_roundtrip": true
  },
  "tools": [
@@ -538,18 +538,19 @@
   {
    "name": "get_plugin_parameter_value",
    "status": "ok",
-   "result": "Value for 'Cutoff' (Visual Index 1): Normalized Value: 0.5000",
+   "result": "Value for 'Cutoff' (Visual Index 1): Normalized Value: 0.5000, String Value: '50.0 %'",
    "api_calls": [
     "channels.channelCount/1",
     "channels.getChannelName/2",
     "plugins.getParamCount/3",
     "plugins.getParamName/4",
     "plugins.getParamValue/4",
+    "plugins.getParamValueString/4",
     "plugins.getPluginName/4",
     "plugins.isValid/1",
     "plugins.isValid/2"
    ],
-   "host_calls": 15
+   "host_calls": 16
   },
   {
    "name": "set_plugin_parameter_value",

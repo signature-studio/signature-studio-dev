@@ -28,7 +28,7 @@
 | コマンド | 結果 |
 |---|---|
 | `node tests/ilmcp_e2e.mjs` (n=3) | **25/25 PASS** × 3。wall 0.23 / 0.23 / 0.24 s (チェック本体 43 / 44 / 47 ms)、load average 0.14 |
-| `node tests/all_tools.mjs` | 48/48 ok、host_calls 37,424 (変化なし)、callback_roundtrip true、1.05 秒 |
+| `node tests/all_tools.mjs` | 48/48 ok、host_calls 37,424 (828d245 時点の値。main の PY-9b (3d1646f) 取込後の HEAD では 37,425 → 検証 2)、callback_roundtrip true、1.05 秒 |
 | `node tests/poc_mcp.mjs` | POC OK、0.60 秒 |
 | `node tests/browser_check.mjs` (headless Chrome) | BROWSER OK (crossOriginIsolated, 48 tools)、12.5 秒 |
 | ネガティブコントロール `--negative <fn>` (その関数を「何もしない / 空」に差替え) | 8 関数すべて検出: getBrowserNames 5 / addChannel 4 / removeChannel 1 / addEffect 3 / storePRScript 2 / runPRScript 1 / getHighlightNames 4 / showHighlight 3 件 FAIL (`NEGATIVE-CONTROL OK`) |
