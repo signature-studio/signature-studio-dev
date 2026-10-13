@@ -62,3 +62,6 @@ python3 trap_triage/ddmin_units.py 0,1,...,114                             # uni
 - 410320 補完版で 5c00e0 のリストが循環する原因 (`InitInstance 0x40fb40` の実体は closure 外。interface table 初期化 (vptr の追加設定)
   を省いている可能性)。次の手: 0x40fb40 の機械語を逆アセンブルで転記し、unit 114 でハングしない状態で 884 を通す。
 - 受入条件 2 (409470 再適用で回帰 0): 410320 が先決。**本 PR は転記を採用しない** (m11_ov.c 無変更)。実験 patch のみ保存。
+
+> **更新 (#474)**: 上記の未解決は解決済み。unit 114 のハング原因は `InitInstance 0x40fb40` ではなく `function_5c0270` の unlink の deref 脱落で、
+> 409470 + 410320 を再採用して survey 回帰 0 (ok 839 / trap 56)。詳細は `REPORT_474.md`。
