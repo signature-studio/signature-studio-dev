@@ -190,7 +190,7 @@ callee が `[rcx+0x2c..0x3e]` (GetCPInfo の LeadByte 表) に書くため、呼
 ## 11. #513: survey の VirtualFree 実解放・OOM/clobber 分離と「ok 849→816」の切り分け
 
 既知類型との関係: DEFECTS.md に直接の行なし (測定バイアス = 新規類型案を末尾)。unit 87/898 は D1 系 (旧値 load 脱落を C 転記で直した副作用), 巨大 alloc の size は D15 (間接 call 脱落) の疑い (推定)。
-**起点**: 本ブランチ `513-m11-survey-vfree` は PR #411 (`132-m11-stage5`, 未マージ) 上。コード commit `c4a3f72` (= `8059197` + 本 issue の 3 commit; 以降は docs のみ)。比較対象 main = `c1e4105`。runner 4 vCPU, work-m11/work-liftdiff 展開済み, PE は fl-win64 の `block00031_PE.bin`, capstone+pefile 入り venv。
+**起点**: 本ブランチ `513-m11-survey-vfree` は PR #411 (`132-m11-stage5`, 未マージ) 上。コード commit `c4a3f72` (= `8059197` + 本 issue の 3 commit; 以降は docs と診断スクリプト `m11_unit_imgdiff.mjs` の追加のみ)。比較対象 main = `c1e4105`。runner 4 vCPU, work-m11/work-liftdiff 展開済み, PE は fl-win64 の `block00031_PE.bin`, capstone+pefile 入り venv。
 
 **結論**: (1) 見かけの退行の主因は VirtualFree の leak ではない。**survey 中 `VirtualFree` は 0 回** (実解放 0 / 表に無い解放 0 / decommit 0) で、実解放だけでは数値は動かない。(2) 真因は **unit 101 (VA 0x1de960) 1 本が VirtualAlloc 1,477,181,440 B (survey 累計 1,490,026,496 B の 99.14%) を消費**
 (GetMem 23,056,285 回・FreeMem 0 回・1 回あたり 64.07 B) して wasm 上限を使い切り、後続 54 unit が巻き添えで OOM→NULL→Halt0 になっていたこと。(3) unit 単位の上限 + oom/clobber 分類で分離すると **ok 816 → 852** (36 unit は OOM の巻き添えだった)。
