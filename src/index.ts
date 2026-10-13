@@ -7,6 +7,7 @@ import { mountGuiRenderSelfTest, mountGuiSelfTest } from "./runtime/gui_boot";
 import { installWebstudioContract } from "./runtime/webstudio_state";
 import { installFlMcp, mountMcpPanel } from "./runtime/mcp_panel";
 import { installFlMidi, mountMidiPanel } from "./runtime/midi_script";
+import { installFlHelp, mountHelpPanel } from "./runtime/help_panel";
 
 // FL 起動契約 (tools/e2e/REPORT.md §FL 起動契約)。実 FL 統合後は GuiHost の onFrame で setFrames を呼ぶ。
 // このハーネスのテストフレーム (下の blitFrame) は FL の GUI フレームではないので計上しない。
@@ -147,5 +148,12 @@ if (runtimeParams.has("mcp")) mountMcpPanel();
 // ---------------------------------------------------------------------------
 installFlMidi();
 if (runtimeParams.has("midi")) mountMidiPanel();
+
+// ---------------------------------------------------------------------------
+// FL Help ビューア (ST-T8 #118) — devtools: window.flHelp / UI: /?help=1
+// 詳細: tools/startup/helpviewer/REPORT.md。Help の HTML は利用者の FL から実行時供給 (非同梱)・外部通信なし
+// ---------------------------------------------------------------------------
+installFlHelp();
+if (runtimeParams.has("help")) mountHelpPanel();
 
 export {};

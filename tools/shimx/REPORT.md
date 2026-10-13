@@ -100,7 +100,7 @@ Init・DeleteCriticalSection 65 / GetLastError 61 / GetCurrentThreadId 51 / Vari
 | T2 | hostbridge 接続 | LoadLibrary/GetProcAddress 実体 (wasm モジュール連結) を `shimx_set_load_hook/proc_register/resolver` へ。COM vtable・コールバックの間接呼出し規約ブリッジ (i64↔i32) | hostbridge |
 | T3 | VFS/レジストリ運用 | Win パス写像規約 (`C:`→`/c`) と Emscripten FS マウント構成の確定、`shimx_set_path_mapper` 実装、レジストリの IndexedDB 永続化 (`export_text/import_text`)、tools/startup が列挙したキー集合のシード投入 | runtime / startup |
 | T4 | SEH 実巻き戻し | shimx 側ランタイムは §14 で完了 (#171)。残 = lift 側が .pdata/UHANDLER の scope table と try 関数を `ShxSehFrame` 登録形へ出力 (§14.3) | lift |
-| T5 | GUI 側連携 | ShellExecute→`window.open`、GetOpen/SaveFileName→File System Access、Drag&Drop (`shimx_get_drop_target`)、user32 の Char*/MsgWait* は weak なので gui 側の強定義で置換可 | gui |
+| T5 | GUI 側連携 | ShellExecute→`window.open`、GetOpen/SaveFileName→File System Access、Drag&Drop (`shimx_get_drop_target`)、user32 の Char*/MsgWait* は weak なので gui 側の強定義で置換可 (**#172 で実施**: `tools/gui/shimx_coexist/REPORT.md`) | gui |
 | T6 | MIDI/タイマ | winmm `midi*` (weak, 0 台) を Web MIDI で強定義、`timeBeginPeriod` と AudioWorklet クロックの整合 | audio |
 | T7 | 署名正規化 | RetDec の i64/ptr 揺れを吸収する IR パス (declare を shimx 署名へ正規化) または CI で `verify_sig.sh` を常時実行 | lift |
 | T8 | 序数 import と追加 API | shell32 74/155/190・shlwapi 12/219 の同定、Crypt ハッシュ (Serum2)、CP932 テーブル (日本語 ACP) | plugins / shim |

@@ -18,28 +18,9 @@ mkdir -p work/f2
 [ -f work/win_unique.json ] || python3 inventory/win_unique.py > /dev/null
 [ -f work/win_abi.json ] || python3 inventory/win_abi.py > /dev/null
 rm -f work/batch/status.csv
-bash lift/batch_lift.sh $BLOCKS
+PLUG_ICALL=0 bash lift/batch_lift.sh $BLOCKS   # step1 = icall 復元なしの「接続前」計測 (#504 の数値の再現)。復元あり = f2_step2.sh
 echo "== status.csv の突合 (PLUGIN_MATRIX.json の batch 欄と closure_funcs/closure_bytes/lift_rc/emcc_c_rc を比較)"
-python3 - $BLOCKS <<'PY'
-import csv, json, sys
-M = json.load(open('PLUGIN_MATRIX.json'))['plugins']
-by = {m['block']: p for p in M for m in p['win']['modules']}
-rows = {int(r['block']): r for r in csv.DictReader(open('work/batch/status.csv'))}
-bad = 0
-for b in map(int, sys.argv[1:]):
-    r, p = rows[b], by[b]
-    d = p['lift']
-    bt = d.get('batch')   # T3 (Frequency Splitter) は matrix に batch 欄が無い = emcc/lift_rc は比較対象外
-    ok = int(r['closure_funcs']) == d['closure_funcs'] and int(r['closure_bytes']) == d['closure_bytes']
-    if bt:
-        ok = ok and int(r['lift_rc']) == bt['lift_rc'] and int(r['emcc_c_rc']) == bt['emcc_c_rc']
-    bad += not ok
-    print('%d %-24s funcs=%s bytes=%s lift_rc=%s emcc_c_rc=%s -> %s%s' % (
-        b, p['name'], r['closure_funcs'], r['closure_bytes'], r['lift_rc'], r['emcc_c_rc'],
-        'MATCH' if ok else 'DIFF', '' if bt else ' (matrix に batch 欄なし: closure のみ比較)'))
-print('DIFF count =', bad)
-sys.exit(1 if bad else 0)
-PY
+python3 f2/matrix_check.py $BLOCKS
 echo "== 閉包統計"
 python3 f2/closure_stats.py --json work/f2_stats.json $BLOCKS
 echo "== 間接 call 監査 (tools/icall/audit_icall.py)"

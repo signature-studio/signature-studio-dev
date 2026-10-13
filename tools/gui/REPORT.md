@@ -25,6 +25,7 @@
 | `src/gui_reach.c` ほか | 到達 API ログ (`GUI-REACH` 行 / `gui_reach_json`)、`gui_set_icall_hook`、`-DGUI_NO_K32` |
 | `tools/gui/e2e/` + `e2e.sh` | CDP ドライバ `e2e.mjs`、ページ、1 コマンド E2E |
 | `tools/gui/golden/` | `gen_golden.py` (独立オラクル) と `final.png` |
+| `tools/gui/shimx_coexist/` + `include/gui_hostcall.h` + `src/runtime/gui_hostcall.ts` | shimx との weak/強定義の境界確定と共存リンク検査・host 呼出路 (ShellExecute/ファイルダイアログ/D&D)。#172。結果は `shimx_coexist/REPORT.md` |
 
 ## 2. 検証結果 (全て実測; `bash tools/gui/e2e.sh`)
 | 層 | 結果 |
@@ -71,7 +72,7 @@
 - **P1 未実装 0 名** (CAB-159 で全実装。意味論・近似は PROTOCOL.md §11): クリップボードはプロセス内ストア (ブラウザ Clipboard API 橋渡しは設計のみ=ユーザジェスチャ/権限/非同期の制約)、アイコン/カーソルは標準擬似ハンドルのプレースホルダ画像のみ、`LoadStringW`/`LoadBitmapW` はリソース供給 hook (`gui_set_resource_provider`) 待ち、`DrawEdge(BF_DIAGONAL)` は fail-fast、モニタは単一仮想モニタ。
 - **P2 未実装 76 名 (xref 計 281; `CreateCaret` は P1 キャレット成立のため前倒し)**: メニュー 15、ImageList_* 14 (DnD ドラッグ画像)、アイコン/カーソル生成 7、パレット参照 6、IME 6、BufferedPaint/MaskBlt 等 5、スクロールバー API 4、`_TrackMouseEvent` ほか。(ImageList_* 全体 23・メニュー全体 21・IME 全体 7・スクロールバー全体 14 は P2+P3 の合算)
 - **P3 未実装 83 名 (xref 計 190)**: ベクタ GDI (Ellipse/Polygon/Arc/Bezier/Path) 15・メタファイル 11・印刷 10・FlatSB 10・ImageList 9・メニュー 6・タッチ/ジェスチャ 5・Dwm/WTS/oleacc 5・wgl 2・共通ダイアログ 2 など。
-- 機能制約: DIB は 32bpp のみ (1/8/24bpp は fail-fast)、GDI テキストは内蔵 8×8 固定幅 (ASCII)、無効領域は単一外接矩形、非クライアント領域なし、`SetCursorPos` は Pointer Lock 未連携、
+- 機能制約: DIB は 1/4/8/24/32bpp 対応 (GUI-5 #181, §10; 16bpp DIB・DIB_PAL_COLORS・圧縮は fail-fast)、GDI テキストは内蔵 8×8 固定幅 (ASCII)、無効領域は単一外接矩形、非クライアント領域なし、`SetCursorPos` は Pointer Lock 未連携、
   `GetDC(NULL)` (スクリーン DC)・複数モニタ・IME・DPI スケーリング (dpr は header に載るが未適用)・`SetWindowRgn` の形状反映は未対応 (no-op)。
 - 未検証: 実 FLEngine lift との結合 (移植待ち)・長時間ストレス・GPU 合成の実フレームレート・Chrome 以外 (Firefox/Safari)。
 
@@ -85,7 +86,7 @@
 | GUI-1 | CAB-159 | In Review | P1 未実装 50 名 (DrawEdge/Clipboard/フック/モニタ/キャレット/util/入力) → P1 119/119。メニューは GUI-2 へ移動 |
 | GUI-3 | CAB-173 | Backlog (blockedBy CAB-5, CAB-156) | FLEngine 結合: `m11_winstubs.c` (`m11_genstubs.py` 生成物) の GUI 部を本 shim に置換、実到達 API ログで P 分類を更新。blocks CAB-31 |
 | GUI-2 | CAB-175 | Backlog (blockedBy GUI-3) | ImageList_* 23 + メニュー 21 + IME 7 ほか P2 77 名、OLE DnD ↔ HTML5 DnD |
-| GUI-5 | CAB-180 | Backlog (blockedBy GUI-3) | 24/8/1bpp DIB・DDB 対応 (現状 32bpp のみ) + ROP/StretchBlt/AlphaBlend の SIMD128 化 |
+| GUI-5 | CAB-180 / #181 | 部分達成 (§10; FL 非依存部は実装・検証済み、`e2e.sh` ALL PASS と FLEngine 到達 bpp/ROP の確定は未達) | 24/8/4/1bpp DIB・mono DDB 対応 + ROP/StretchBlt/AlphaBlend の SIMD128 化 |
 | GUI-9 | CAB-185 | Backlog (blockedBy GUI-3; フォント方針はユーザ判断) | GDI テキストを内蔵 8×8 → FreeType (CAB-18) 実フォント描画 |
 | GUI-7 | CAB-182 | Backlog (blockedBy GUI-3) | ポップアップ/メニュー/ツールチップ窓、非クライアント領域、DPI、複数 canvas 重畳 |
 | GUI-4 | CAB-179 / #180 | 部分達成 (§9; FL 非依存部は実装・e2e 済み、FL 依存部は GUI-3 待ち) | WebGL2 present・dirty 複数矩形・rAF 同期・seqlock (現行 CPU 経路は 1080p 2.2〜3.8 ms/frame で予算内) |
@@ -164,3 +165,64 @@ bash tools/gui/test/selftest.sh                    # native 319 assertion (seqlo
 node tools/runtime/gui_e2e.mjs                     # Vite バンドル経由 (本番 worker) で WebGL2+rAF+seqlock の render-selftest を追加
 bash tools/gui/e2e.sh                              # 全体 (PE lift を含む); 要 RetDec・emsdk・mingw
 ```
+
+## 10. GUI-5 (#181): 24/8/4/1bpp DIB・mono DDB と wasm SIMD128 行カーネル
+既知類型との関係: lift 欠陥ではなく shim の意味論 (`docs/DEFECTS.md` D1a〜D16 に該当なし)。ただし shim 自身の silent 誤りを 1 件発見 (下記「発見」)。検証起点: 実装 `dd7be3e`、本節の数値は `9cff72c` のクリーン tree での実測 (src/test は最終 HEAD と同一で、以降の commit は REPORT・DOC_MAP のみ; `gui_gdi.c` は `dd7be3e` と同一)。
+
+### 結論
+- **機能欠落 (スコープ 1) は FL 非依存の範囲で解消**: `CreateDIBSection` の 1/4/8/24bpp (app から見えるネイティブ形式 `nat` と内部 BGRA shadow を pull/push で同期; 仕様 [PROTOCOL.md §8](PROTOCOL.md))・`CreateBitmap` の mono(1bpp)/24/32bpp・`StretchDIBits`/`SetDIBitsToDevice`/`SetDIBits`/`CreateDIBitmap`/`LoadBitmapW` の 1/4/8/24/32bpp 源・`GetDIBits` の 1/4/8/24/32bpp 出力・`GetDIBColorTable`/`SetDIBColorTable` (IMPORTS: STUB→IMPL, 実装 270→272)・mono↔color 転送の bk/text 色写像・`MERGEPAINT`。未対応は理由付き fail-fast (16bpp DIB / DIB_PAL_COLORS / 圧縮 / `CreateBitmap` 4,8,16bpp の初期 bits)。
+- **SIMD 化 (スコープ 2)**: `src/gui_simd.h` の行カーネル (ROP 15 種・AlphaBlend 定数/per-pixel alpha・不透明化コピー・2x 水平拡大) を wasm SIMD128 と scalar 参照で持ち、`BitBlt`/`StretchBlt`/`StretchDIBits`/`AlphaBlend` が使う。拡縮は x 写像を転送ごとに 1 回計算 (画素ごとの 64bit 除算を排除)。`lift/gui_wasm.sh` は既定 `-msimd128` (`GUI_NO_SIMD=1` で scalar)。
+- **受入条件は未達 → PR は `Refs #181`**: (a) `bash tools/gui/e2e.sh` の ALL PASS は runner に RetDec (`toolchain-retdec`) が無く PE lift 層 (2/6・3/6・4/6・6/6〜6d) を実行できず**未確認**、(b) issue の保留理由 (FLEngine が実際に要求する bpp/ROP を GUI-3 #174 の到達ログで確定) は未充足、(c) Chrome 上で SIMD 版 wasm 全体 (lift 済みアプリ込み) を走らせていない (SIMD は kernel 単位で node 検証)。
+
+### 検証 (全て `9cff72c` のクリーン tree、runner 4 CPU、`uptime` load 0.5〜1.4)
+| 層 | 結果 | 陰性対照 |
+|---|---|---|
+| native `selftest` (ASan/UBSan) | **378 passed / 0 failed** (319 → 378: +59 assertion)。各 bpp の native↔shadow 往復 (24bpp 行 4B 境界・bottom-up/top-down・8bpp 最近傍/重複色 index 保持/SetDIBColorTable・4bpp nibble・1bpp MSB 先頭)・各 bpp 源の StretchDIBits・GetDIBits/SetDIBits・mono 色写像・fail-fast 5 件 | fail-fast 5 件は `SIGABRT` + API 名/理由の文字列を検査 (出力を EOF まで読む) |
+| 行カーネル版 == 画素単位参照 (`gdi_set_ref_blit`) | ROP 15 種 × 幾何 (1:1・2x・任意比・水平/垂直反転) × クリップ (なし/矩形/穴/複数穴) × 同一サーフェス重複: **4,500 ケース (うち同一サーフェス 642) で不一致 0**。各 ROP 300 ケース。同一サーフェスは「転送元を事前コピーした別サーフェスから転送した結果」とも一致 | 別 ROP・別オフセットで実行した結果は参照と不一致 (90 プローブ中 76 で検出) |
+| AlphaBlend 独立オラクル (テスト内に直書き `(x+127)/255` 丸め) | 60 ランダムケース (定数 α/per-pixel α・1:1/拡縮・端のはみ出し) で不一致 0。`gs_div255(x)==(x+127)/255` を x∈[0,65025] 全件確認 | sca=101 の結果を sca=100 のオラクルと比較 → 不一致を検出 (+ 同条件 sca=100 は一致の陽性対照) |
+| **golden** (`bash tools/gui/test/bpp_golden.sh`): 24/8/4/1bpp StretchDIBits + 24/8bpp DIB section (native 直書き + GDI FillRect/LineTo → BitBlt) + mono + SRCINVERT 2x + AlphaBlend の 160×100 シーンを独立 Python オラクル `golden/gen_golden_bpp.py` (shim と共有するのはパターン式のみ) と比較 | **16,000 px 差 0 (EXACT MATCH)** | 期待値を 1 画素壊す → 不一致で拒否 / shim 側に故意の欠陥 (パレット index 2 の色差し替え) → **40 px 不一致で拒否** (どちらかが通ると script が exit 1) |
+| wasm SIMD128 (`bash tools/gui/test/simd_e2e.sh`, emcc 6.0.12 + node v22.23.3) | SIMD == scalar: ROP 15 種 × 長さ 0..70 × アライメント 0..3、α 全 256 値 × 2 方式、不透明化コピー・2x 拡大の端数、1080p 1 行 (1920 px): **15,679 ケース不一致 0**。`gui_gdi.c` を `-msimd128` で wasm 化すると v128 系命令 1,020 / `-DGUI_NO_SIMD` で 0 (SIMD 経路が実際に入る) | SIMD 無効ビルドの simd_test は exit 2 で拒否 (scalar 同士の比較で PASS しない) / 故意の欠陥 4 種 (`-DGS_FAULT=1..4`: div255 丸め・SRCINVERT→OR・shuffle 誤り・OR 落ち) は全て FAIL (不一致 1,632 / 271 / 252 / 268) |
+| 既存層 | `reach_test` 11 passed・`adapt_test` 28 passed・改名 selftest 378 passed (`test/reach_test.sh`)、`tsc -p tools/gui/tsconfig.json` rc 0、`sigprobe` signature mismatch=0 (陰性対照 177)、present e2e (`PRESENT_SKIP_BENCH=1`) 7 pass / 0 fail ALL PASS (18.8 s) | — |
+| **未実行** | `bash tools/gui/e2e.sh` の PE lift 層 (RetDec 不在)。`e2e.sh` に 1b/6 (bpp golden)・1c/6 (SIMD) を追加済みだが全体の ALL PASS は未確認 | — |
+- **origin/main (`d1ff878`; #172 shimx・#118 等) との merge 後 `04dd71e`**: `selftest` 406 passed / 0 failed (3 回連続; main 側の `selftest_fd.inc` +28 を含む)・`bpp_golden` EXACT MATCH 16,000 px・`simd_e2e` ALL PASS・`reach_test` 11/28 passed・改名 selftest 406 passed・`tsc` rc 0 を再確認。
+- 再現 1 コマンド: `bash tools/gui/test/selftest.sh` / `bash tools/gui/test/bpp_golden.sh` / `bash tools/gui/test/simd_e2e.sh` (bench は `BENCH=0` で省略。上記 3 本 + reach_test の合計 44.0 s, load 1.05)。
+- **既存の不安定 (本変更と無関係)**: native `selftest` は ASan で `gui_headless.c:blit_surf` の heap-use-after-free で 20 回中 4 回 (20%) exit 1 (全て同一スタック; §9 の #489)。それ以外の失敗は 0。
+
+### 性能 (1080p, 参考値; 実 FL 負荷・実ブラウザは未測)
+native `-O2` gcc 13 (`bash tools/gui/test/bench.sh 5 [旧 tools/gui のパス]`; 前 = `17b7777` の src に同じ bench.c を適用, 後 = 最終; 各 n=5 の min–max ms/frame, load 0.5〜0.6; native は wasm SIMD が使えないため行ループ化・除算排除の効果のみ):
+| API | 前 | 後 | min 比 |
+|---|---|---|---|
+| BitBlt SRCINVERT | 7.17–7.30 | 2.60–2.67 | 2.76x |
+| BitBlt SRCPAINT | 7.17–7.30 | 2.63–2.87 | 2.73x |
+| StretchBlt 2x nearest | 7.20–7.83 | 1.90–1.97 | 3.79x |
+| StretchDIBits 32bpp 1:1 | 7.20–7.63 | 0.70–0.73 | 10.29x |
+| AlphaBlend per-pixel α | 18.97–19.13 | 14.73–15.17 | 1.29x |
+| AlphaBlend 定数 α | 18.13–18.80 | 15.77–16.07 | 1.15x |
+| StretchDIBits 24bpp 1:1 / 8bpp 1:1 | fail-fast | 2.10–2.13 / 1.40–1.43 | — |
+| BitBlt SRCCOPY 24bpp DIB section → 32bpp / 逆向き | fail-fast | 1.90–2.20 / 3.57–4.37 | — |
+
+wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128` なしの同一ソース):
+| カーネル | scalar | SIMD128 | min 比 |
+|---|---|---|---|
+| ROP SRCINVERT | 2.122–2.466 | 0.751–0.892 | 2.83x |
+| ROP PATPAINT | 2.149–2.193 | 0.772–1.078 | 2.78x |
+| AlphaBlend 定数 α | 12.745–12.838 | 2.942–3.309 | 4.33x |
+| AlphaBlend per-pixel α | 18.476–18.745 | 4.260–4.321 | 4.34x |
+| StretchDIBits 1:1 (不透明化コピー) | 1.550–1.754 | 0.627–0.661 | 2.47x |
+| StretchBlt 2x の水平拡大行 | 1.301–1.430 | 0.566–0.583 | 2.30x |
+- 数え方: 行カーネルだけの時間 (clip・xmap・pull/push・dirty は含まない; 全 API の wasm 計測は Chrome 上の lift 済みアプリが要るため未実施)。AlphaBlend の native 改善が小さい (1.15〜1.29x) のは native に SIMD 経路が無く整数演算が支配的なため。
+- 24bpp 以下の DIB section は GDI 操作ごとに pull/push (矩形限定) が入る分、32bpp より遅い (BitBlt 先が 24bpp で 3.57–4.37 ms)。
+
+### 発見・限界
+- **発見 (shim の silent 誤り・本 PR で修正)**: 同一サーフェス BitBlt でクリップが複数矩形のとき、旧実装は先行矩形の書込みを後続矩形が転送元として読む (穴あきクリップで画素が源と異なる; 旧画素単位実装で 642 ケース中 32 件を再現)。本 PR は転送元矩形の事前コピーで修正。`docs/DEFECTS.md` 形式の行案: 症状 = スクロール/コピーで穴の周りの画素が壊れる / 根本原因 = クリップ矩形ごとに全行を処理し先行矩形の結果を源として読む / 検出信号 = 事前コピー転送との画素比較 / 修復 = 源矩形のスナップショット (DEFECTS.md の直接編集は PM 判断)。
+- 近似: mono への color 書込み (輝度 ≥128 を白)、`GetDIBits` の ≤8bpp 既定色表 (決定論的な 1bpp 黒白/4bpp VGA16/8bpp 3-3-2; 実 Windows の DDB パレットとは異なる)、≤8bpp への書込みは最近傍 (距離関数は RGB 二乗距離で、実 Windows との照合は未実施)。
+
+### 範囲外・未達
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `bash tools/gui/e2e.sh` 全体 ALL PASS の確認 (RetDec 不在で PE lift 層が未実行) | 完了条件 (e2e ALL PASS 維持) 未確認 → `Refs #181` | #181 に `oc_artifacts: toolchain-emsdk toolchain-retdec` で再実行を依頼 (mingw-w64 は apt `gcc-mingw-w64-x86-64` で入った) |
+| 実 FLEngine が要求する bpp/ROP の確定 (GUI-3 #174 の到達ログ待ち)・16bpp DIB・DIB_PAL_COLORS・`CreateBitmap` 4/8/16bpp の初期 bits・RLE/JPEG/PNG 圧縮 DIB | 実 FL が要求したら fail-fast で止まる (理由付き) | #174 到達後に #181 へ追記 |
+| Chrome 上の SIMD 版 wasm 全体 (lift 済みアプリ込み) の frame time | wasm の API 単位の前後比較が未取得 (kernel 単位のみ) | #181 (RetDec 付き再実行で `gui_wasm.sh` 既定の `-msimd128` ビルドを実測) |
+| mono / パレットの色写像の実 Windows との照合 (近似) | 色が実機と数階調ずれる可能性 | #181 (実機比較はユーザ依頼候補) |
+| native selftest の ASan UAF (20 回中 4 回) | `e2e.sh` 1/6 が約 20% で FAIL | #489 `[GUI-12]` (既存) |
+| `integ/sigprobe.sh` の `unresolved-imports=0` が `wasm-objdump` 不在で空振り (今回も `command not found`) | 未解決 import なし確認が無効 | #180 (既存コメント) |

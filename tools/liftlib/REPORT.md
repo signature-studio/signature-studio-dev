@@ -2,7 +2,7 @@
 
 > 正本: `tools/liftlib/REPORT.md` (§0〜§9 + 要約)。
 > **付録 (分割移動・内容は削除していない)**: [`REPORT_APPENDIX_A.md`](REPORT_APPENDIX_A.md) (§10〜§12)・
-> [`REPORT_APPENDIX_B.md`](REPORT_APPENDIX_B.md) (§13〜§16)・[`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) (§17)。
+> [`REPORT_APPENDIX_B.md`](REPORT_APPENDIX_B.md) (§13〜§16)・[`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) (§17・§18)・[`REPORT_APPENDIX_C.md`](REPORT_APPENDIX_C.md) (§19)。
 > 節番号は全ファイルで通し番号 (本体の §N 参照は付録の同番号節を指す)。
 
 - 日付: 2026-10-11 / 担当 dir: `tools/liftlib/` (他 dir は読取のみ) / 再現: `bash tools/liftlib/liftlib_e2e.sh` (キャッシュ時 約 25 秒 + leaf spec 約 4 分, `--fresh` で FA/KH を RetDec lift から約 1 分)
@@ -144,3 +144,9 @@ FA の P1' (comisd×2+jbe/jae+xorps/movaps+jmp, 合流先は reg2mem alloca) が
 
 全文は **[`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §18** (本体の 250 行上限対応で分割移動。内容は削除していない)。
 - 結論: ymm(i256) helper の ABI と `pcmpistri` を実装して SIMD helper 自動生成の未被覆を解消し、F2 に xmm 戻り搬送 (`xmm_ret_scan` / `run_xmm_ret`) を追加した。実測値・未解決は付録 §18.1・§18.6・§18.7。
+
+## 19. PERF-P1 (#155): lift ビルド標準設定 + 出力署名ガード — 付録へ配置
+
+全文は **[`REPORT_APPENDIX_C.md`](REPORT_APPENDIX_C.md) §19**。
+- 結論: `python3 -m liftlib build <cfg>` が標準設定 (`-O3 -flto` + gc-sections + 最小 export、正本 `data/std_build.json`) で全変種 (ref/o2/o3/std) をビルドし、署名不一致なら exit 1・成果物なし。`bash tools/liftlib/stdbuild_e2e.sh` (合成入力) で 3/3 PASS・ネガコン FAIL を確認。
+- 未達: 実 OTT / FA / KH を標準設定で通す検証 (素材不足)。未解決は §19 の表。

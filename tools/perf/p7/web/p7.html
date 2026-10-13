@@ -1,0 +1,114 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>p7 browser matrix</title>
+<script type="module">
+// 1 ページ = 1 ブラウザ構成。round 0 で全実験、round 1..R-1 は同一 URL の再ロード (wasm code cache 観測)。
+// 結果は POST /result?cfg=<cfg>&key=<key> でサーバへ送る (ブラウザ非依存・driver 不要)。
+const q = new URLSearchParams(location.search);
+const cfg = q.get('cfg'), round = +(q.get('round') || 0), rounds = +(q.get('rounds') || 3);
+const FULL = q.get('full') === '1';
+const post = (key, obj) => fetch(`/result?cfg=${cfg}&key=${key}`, { method: 'POST', body: JSON.stringify(obj) }).then((r) => r.text());
+const log = (m) => post('log', { m: String(m) });
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const ms = () => performance.now();
+const safe = async (key, fn) => { try { await post(key, await fn()); } catch (e) { await post(key, { error: String(e && e.stack || e).slice(0, 500) }); } };
+
+async function cacheRound() {
+  const out = { round };
+  const t0 = ms(); const mod = await WebAssembly.compileStreaming(fetch('/wasm?c=mid&salt=0&cc=immutable'));
+  out.compileStreamingMs = ms() - t0;
+  const t1 = ms(); const inst = await WebAssembly.instantiate(mod, {}); out.instantiateMs = ms() - t1;
+  const { ws_process, ws_buffers } = inst.exports; ws_buffers();
+  const t2 = ms(); ws_process(128); out.firstCallMs = ms() - t2;
+  const t3 = ms(); ws_process(128); out.secondCallMs = ms() - t3;
+  await sleep(2500);
+  return out;
+}
+
+if (round > 0) {
+  await safe(`cache_round${round}`, cacheRound);
+  if (round + 1 < rounds) location.href = `/p7.html?cfg=${cfg}&round=${round + 1}&rounds=${rounds}`;
+  else await post('done', { ok: true });
+} else {
+  await safe('env', async () => ({ ua: navigator.userAgent, crossOriginIsolated, hardwareConcurrency: navigator.hardwareConcurrency, deviceMemory: navigator.deviceMemory ?? null,
+    simd: WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,1,5,1,96,0,1,123,3,2,1,0,10,10,1,8,0,65,0,253,15,253,98,11])), sab: typeof SharedArrayBuffer !== 'undefined',
+    audioContext: typeof AudioContext !== 'undefined', audioWorklet: typeof AudioWorkletNode !== 'undefined' }));
+
+  // --- Worker: compile 規模依存 / first call / steady / bit-exact (3 サイズ × 3 反復; 反復ごとに別 salt = engine 内キャッシュを避ける) ---
+  const runWorker = (params) => new Promise((res, rej) => {
+    const w = new Worker('/worker.js'); w.onmessage = (e) => { w.terminate(); res(e.data); }; w.onerror = (e) => { w.terminate(); rej(new Error('worker error ' + e.message)); };
+    w.postMessage(params);
+  });
+  for (const c of ['small', 'mid', 'large']) {
+    for (let rep = 0; rep < 3; rep++) await safe(`worker_${c}_${rep}`, () => runWorker({ c, salt: 100 + rep, blocks: c === 'small' ? 3000 : 400 }));
+  }
+  // --- メインスレッド compile / compileStreaming (別 salt) ---
+  for (const c of ['mid', 'large']) await safe(`main_${c}`, async () => {
+    const out = {};
+    let t = ms(); const m1 = await WebAssembly.compileStreaming(fetch(`/wasm?c=${c}&salt=200`)); out.streamMs = ms() - t;
+    const buf = await (await fetch(`/wasm?c=${c}&salt=201`)).arrayBuffer(); out.bytes = buf.byteLength;
+    t = ms(); const m2 = await WebAssembly.compile(buf); out.compileBytesMs = ms() - t;
+    out.exports = WebAssembly.Module.exports(m1).length + WebAssembly.Module.exports(m2).length;
+    try { const b2 = await (await fetch(`/wasm?c=${c}&salt=202`)).arrayBuffer(); t = ms(); new WebAssembly.Module(b2); out.syncMainMs = ms() - t; out.syncMainOk = true; }
+    catch (e) { out.syncMainOk = false; out.syncMainErr = String(e).slice(0, 160); }
+    return out;
+  });
+
+  // --- Module の postMessage / IndexedDB ---
+  await safe('module_transfer', async () => {
+    const mod = await WebAssembly.compile(new Uint8Array([0, 0x61, 0x73, 0x6d, 1, 0, 0, 0]));
+    const out = {};
+    try { structuredClone(mod); out.structuredClone = true; } catch (e) { out.structuredClone = false; }
+    try { const db = await new Promise((res, rej) => { const r = indexedDB.open('p7', 1); r.onupgradeneeded = () => r.result.createObjectStore('m'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+      await new Promise((res, rej) => { const tx = db.transaction('m', 'readwrite'); tx.objectStore('m').put(mod, 'k'); tx.oncomplete = res; tx.onerror = () => rej(tx.error); tx.onabort = () => rej(tx.error); }); out.idb = true; }
+    catch (e) { out.idb = false; out.idbErr = String(e).slice(0, 120); }
+    return out;
+  });
+
+  // --- AudioWorklet (実 AudioContext; 実デバイスが無い runner では null sink / 不可) ---
+  await safe('worklet', async () => {
+    if (typeof AudioContext === 'undefined' || typeof AudioWorkletNode === 'undefined') return { available: false, reason: 'no AudioContext/AudioWorklet' };
+    const out = { available: true };
+    const SR = 48000;
+    const ctx = new AudioContext({ latencyHint: 'interactive', sampleRate: SR });
+    out.sampleRate = ctx.sampleRate; out.baseLatency = ctx.baseLatency; out.initialState = ctx.state;
+    await ctx.audioWorklet.addModule('/worklet.js');
+    const bytes = await (await fetch('/wasm?c=small&salt=300')).arrayBuffer();
+    const node = new AudioWorkletNode(ctx, 'p7-proc', { numberOfInputs: 0, outputChannelCount: [1] });
+    const msg = new Promise((res) => { node.port.onmessage = (e) => { if (e.data.type === 'result') res(e.data); else if (e.data.type === 'loaded') out.loaded = e.data; }; });
+    const mod = await WebAssembly.compile(bytes.slice(0));
+    try { node.port.postMessage({ type: 'mod', mod }); out.moduleDirectPostThrew = false; } catch (e) { out.moduleDirectPostThrew = String(e).slice(0, 100); }
+    node.connect(ctx.destination);
+    node.port.postMessage({ type: 'load', bytes, sr: SR, durMs: 2000, hashBlocks: 1000 }, [bytes]);
+    const rp = ctx.resume().catch((e) => { out.resumeErr = String(e).slice(0, 100); });
+    await Promise.race([rp, sleep(3000)]);
+    out.stateAfterResume = ctx.state;
+    const r = await Promise.race([msg, sleep(15000).then(() => null)]);
+    out.result = r;
+    out.outputLatency = ctx.outputLatency ?? null;
+    await ctx.close().catch(() => {});
+    return out;
+  });
+
+  // --- 上限: 関数数 / Memory 個数 ---
+  for (const n of [1000000, 1000001]) await safe(`limit_funcs_${n}`, async () => {
+    const t = ms();
+    try { const b = await (await fetch(`/wasm?c=funcs&n=${n}`)).arrayBuffer(); const t1 = ms(); await WebAssembly.compile(b); return { n, ok: true, bytes: b.byteLength, compileMs: ms() - t1, totalMs: ms() - t }; }
+    catch (e) { return { n, ok: false, err: String(e).slice(0, 200), totalMs: ms() - t }; }
+  });
+  for (const pages of [256, 12288]) await safe(`limit_memories_${pages}`, async () => {
+    const mems = []; let err = null; const CAP = 400;
+    try { for (let i = 0; i < CAP; i++) mems.push(new WebAssembly.Memory({ initial: pages, maximum: pages })); } catch (e) { err = String(e).slice(0, 160); }
+    return { pages, mib: pages / 16, allocated: mems.length, cap: CAP, hitCap: mems.length === CAP, err };
+  });
+  if (FULL) for (const d of [0, 1]) await safe(`limit_bytes_${d}`, async () => {
+    const t = ms();
+    try { const b = await (await fetch(`/wasm?c=bytes&d=${d}`)).arrayBuffer(); await WebAssembly.compile(b); return { d, bytes: b.byteLength, ok: true, ms: ms() - t }; }
+    catch (e) { return { d, ok: false, err: String(e).slice(0, 200), ms: ms() - t }; }
+  });
+
+  // --- code cache 観測用: round 1..R-1 は同一 URL (Cache-Control: immutable) を再ロード ---
+  await safe('cache_round0', cacheRound);
+  location.href = `/p7.html?cfg=${cfg}&round=1&rounds=${rounds}`;
+}
+</script>
