@@ -1,0 +1,32 @@
+{
+ "name": "sr4_svf_reset",
+ "image": "tools/targets/serum2/work/Serum2_win64.vst3",
+ "retdec": {
+  "ranges": "0x1802f74f0-0x1802f7503",
+  "timeout": 600
+ },
+ "funcs": [
+  "function_1802f74f0"
+ ],
+ "passes": {
+  "p1": true,
+  "f7": true,
+  "f2": true,
+  "gdata": "external"
+ },
+ "exports": [
+  "function_1802f74f0"
+ ],
+ "spec": "../targets/serum2/sr4/specs/sr4_svf_reset.json",
+ "wasm_func": "function_1802f74f0",
+ "func_va": "0x1802f74f0",
+ "regress": {
+  "expect_match": "all"
+ },
+ "extra_funcs": [
+  [
+   "0x1802f74f0",
+   "0x1802f7503"
+  ]
+ ]
+}

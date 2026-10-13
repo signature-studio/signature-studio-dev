@@ -1,0 +1,37 @@
+{
+ "name": "sr4_wt_const",
+ "image": "tools/targets/serum2/work/Serum2_win64.vst3",
+ "retdec": {
+  "ranges": "0x180087b10-0x180087b19",
+  "timeout": 600
+ },
+ "funcs": [
+  "function_180087b10"
+ ],
+ "passes": {
+  "p1": true,
+  "f7": true,
+  "f2": true,
+  "gdata": "external",
+  "leafabi": {
+   "ret_xmm0": [
+    "function_180087b10"
+   ]
+  }
+ },
+ "exports": [
+  "function_180087b10"
+ ],
+ "spec": "../targets/serum2/sr4/specs/sr4_wt_const.json",
+ "wasm_func": "function_180087b10",
+ "func_va": "0x180087b10",
+ "regress": {
+  "expect_match": "all"
+ },
+ "extra_funcs": [
+  [
+   "0x180087b10",
+   "0x180087b19"
+  ]
+ ]
+}
