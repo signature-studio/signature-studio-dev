@@ -78,3 +78,15 @@ python3 gui/cursor_switch_bound.py 172800 1729b5   # 関数範囲の switch 範�
 
 - 実行時の system load: `uptime` の 1 分平均 0.00 (23:19 時点)。計測は単発 (逐次 1 回)。
 - 出力先は gitignore の `work/` (`scan_out.txt` / `bound_out.txt`)。
+- **注: §5 の数値は 388bf469 のスクリプトで取った前 run の値。** 後続 commit (`4a834e8c`) で `cursor_switch_scan.py` の数値抽出を正規表現に変えたため、§5 の再測定は未実施 (素材無し)。
+
+## 6. 検証起点と証跡 (レビュー指摘 5・6・7 への対応)
+
+- 測定起点 commit: `388bf469` (§5 の数値の取得元)。
+- 後続の修正: `4a834e8c` (DOC_MAP 索引・本付録の記述訂正・スクリプトの operand 解析修正・括弧追加)。
+- `git diff 388bf469 HEAD -- tools/targets/serum2` (実測の入力側に当たるのは `cursor_switch_scan.py` のみ):
+  `REPORT_APPENDIX_1350.md` 8 行、`cursor_switch_bound.py` 1 行、`cursor_switch_scan.py` 12 行の変更 (コード変更は `4a834e8c` の 1 commit)。
+- `git status --porcelain` (PR ブランチの worktree): 変更なし (commit 後)。
+- `find tools/targets/serum2 -size +20M`: 0 件。
+- **素材不在の確認**: `$ARTIFACTS_DIR` は `fl-win64.tar.zst` のみ。`plugins-serum2` 無し・`Serum2_win64.vst3` は `find /` でも無し。よって sha256 照合・§2-2 の両関数の再実行・§5 の n=3 再測定は **本 run では未実施**。PR 本文に `oc_artifacts: plugins-serum2` を入れて次回 run で行う。
+- 新しい operand 解析は合成入力で確認: Capstone が出す `eax, dword ptr [rax + 0x7f00]` に対し、旧コード (`split` + `int(tok,16)`) は `ValueError: invalid literal for int() with base 16: '0x7f00]'` で落ち、新コードは `0x7f00` を抽出する。
