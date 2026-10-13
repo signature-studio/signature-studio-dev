@@ -211,3 +211,23 @@ GitHub Actions runner (4 vCPU / RAM 16GB + swap 16GB 追加) で `boot_e2e.sh` �
 | `f_43c5e0` → `f_414ec0` (UStr copy) が out=0 を返す理由 (付録 §B 3-5) | unit 進行 209 で停止、`0x15F34A0` 未登録 | 本 issue (#253) に継続 |
 | survey 非 ok 3 (unit 280/659 `0x6a7b70`、895 `0x976da0`) | survey 完全 ok 未達 | 本 issue (#253) に継続 |
 | lifted C コンパイルが 14.8GB 使う | CI (RAM 16GB) では swap なしで不可 | CI 整備 issue (#284) へ提案 |
+
+## 10. FLE-6: dsp_ippv2 shim と 0x6a7b70 root (#672, PR #681)
+
+- **真因 (#672 の 08:07 UTC 実測コメントが出典)**: `0x15F34A0` = `ippsZero_8u`。`LoadLibraryW("dsp_ippv2_x64.dll")` の失敗 → `f_653f40` の early return → 登録されず 0。`f_414ec0` (UStrCopy) の out=0 は VCL リーダの誤りではなく、この連鎖の結果。**FLE-5 の「VCL リーダ起因」は誤認**。lift 欠陥ではなく host shim の欠落。
+- **shim** (`fle_boot.c`): `shimx_set_load_hook` で dsp_ippv2 を擬似 HMODULE 登録、`imp_GetProcAddress` が名前ごとのトークンを返す。`ippsZero_8u` のみ実装、他は `R[0]=0` の fail-soft + 呼出計数。`LoadLibrary` hook は `#if !FLEBOOT_NOSX` 内のため **nosx variant では dsp_ippv2 は解決されない (意図どおり)**。
+- **DEFECTS.md 照合**: 該当なし。D15 (メモリ間接 call の空ブロック) とは別事象。lift 欠陥ではないことを #672 で実測済み。
+- **fail-soft の silent miscompile 面**: `ipp_call` は `ippsZero_8u` 以外の全 IPP で何もせず `R[0]=0` を返す。IppStatus 系は ippStsNoErr のまま出力を埋めず、`ippMalloc` (0x15F33C0) は NULL 相当。units_run の前進がこの stub 由来の可能性がある。**呼ばれた IPP 名と回数の全一覧は実測未了 (起票依頼 ①)**。
+- **0x6a7b70 root**: `boot_roots.json` からは**除外したまま** (blocklist と REPORT §0/§5/§7 の不変条件を維持)。`fle6_measure.sh` だけが `FLE_EXTRA_ROOTS=0x6a7b70` で一時的に root 化する。survey 非破裂は未確認 (起票依頼 ②)。
+- **summary への証跡** (`fle_boot.mjs`): `ipp.ptr_15F34A0` / `ipp.ptr_15F40E8` / `ipp.total` / `ipp.called` を JSON と `FLEBOOT_RESULT` に出す。`FLEBOOT_IPP_CHECK` 行で判定 (shim 有: 0x15F34A0 ≠ 0 / `FLE_IPP=0`: = 0)、NG は exit 3。`fle6_measure.sh` は `|| true` を撤去し、判定行・JSON が無ければ exit 4 で止まる。
+- `dbg_probe.mjs` は未参照のため削除 (同じ観測は `fle_boot.mjs` の summary に統合)。
+
+| 項目 | 状態 |
+|---|---|
+| shim 有 / ネガコン (`0x15F34A0` 判定) の再採取 | **未実施** (本 run は emsdk / retdec / m11 素材が無く lift・clang 不可)。起票依頼 ③ |
+| units_run の前進・次の停止点 | **未実施**。前 run の値 (209 据え置き) は #672 08:07 コメントに残る |
+| survey 再実測 (0x6a7b70 root の非破裂確認) | **未実施**。起票依頼 ② |
+| 呼出 IPP 名の全一覧 | **未実施**。起票依頼 ① |
+
+起票依頼: ① IPP fail-soft の呼出名一覧と silent miscompile 検査 ② survey 再実測と 0x6a7b70 root 化の可否判断 (PM 判断) ③ `bash tools/flelift/boot/fle6_measure.sh` を emsdk 込みの runner で再採取 (素材: `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk work-m11 work-liftdiff`)。
+`boot_e2e.sh` / `build.sh` / `iterate_roots.sh` の `/opt/emsdk` 直書きは既存の書式で、本 PR の範囲外 (起票依頼 ④)。

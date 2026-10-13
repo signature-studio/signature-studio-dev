@@ -7,9 +7,11 @@
 # 工程: gen_boot (phase A) → x64c lift (closure 2) → fle_data_gen → gen_boot (phase B: imp bridge)
 #       → build.sh plain (lifted C の clang -O0 1 本) → boot 実行 (--boot-only)
 #       → ネガコン FLE_IPP=0 (dsp_ippv2 shim 無効) で同じ boot を再実行。
-# 前提: FL_WIN64_DIR (fl-win64 展開先) / python3 (capstone, pefile) / /opt/emsdk (emcc 6.0.12) / node。
+# 0x6a7b70 は boot_roots.json には入れず、本スクリプトだけが FLE_EXTRA_ROOTS で一時的に root 化する
+# (iterate_roots.sh の blocklist 不変条件を崩さないため)。
+# 前提: FL_WIN64_DIR (fl-win64 展開先) / python3 (capstone, pefile) / SS_EMSDK_ENV (emsdk_env.sh, 既定 /opt/emsdk) / node。
 # 出力: results/boot_summary_fle6.json (shim 有), results/boot_summary_fle6_negctl.json (shim 無)。
-# 生成物は work/boot/ (gitignore)。
+# 生成物は work/boot/ (gitignore)。判定に失敗したら非 0 で終了する。
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 FLE="$(cd "$HERE/.." && pwd)"
@@ -17,9 +19,12 @@ source "$HERE/../../shared/env.sh"
 W="$FLE/work/boot"
 LIFT="$W/lift"
 PE="${FLE_PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}"
+SS_EMSDK_ENV="${SS_EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}"  # emsdk_env.sh は EMSDK_ENV を unset するので別名にする
+[ -f "$SS_EMSDK_ENV" ] || { echo "[fle6] emsdk_env.sh not found: $SS_EMSDK_ENV (SS_EMSDK_ENV で指定)"; exit 2; }
+export FLE_EXTRA_ROOTS="${FLE_EXTRA_ROOTS:-0x6a7b70}"
 export TMPDIR="$W/tmp"
 mkdir -p "$W/tmp" "$W/obj" "$HERE/results"
-set +u; source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1; set -u
+set +u; source "$SS_EMSDK_ENV" > /dev/null 2>&1; set -u
 NODE="$(command -v node)"
 
 stage() { echo "[fle6] $1 start $(date -u +%H:%M:%S) load=$(cut -d' ' -f1-3 /proc/loadavg)"; }
@@ -42,13 +47,21 @@ T=$(date +%s); stage "clang-plain"
 bash "$HERE/build.sh" plain
 elapsed "clang-plain" "$T"
 
+# 判定は exit code で行う (|| true で握り潰さない)。結果 JSON・判定行が無い、または判定 NG なら即失敗する。
+# $1=label  $2=out.json  $3=FLE_IPP (1: shim 有 / 0: ネガコン)
+run_boot() {
+  local log="$W/run_fle6_$1.log"
+  FLE_IPP="$3" FLE_BOOT_VARIANT=plain "$NODE" "$HERE/fle_boot.mjs" "$W/fleboot_plain.cjs" "$2" --boot-only > "$log" 2>&1
+  grep 'FLEBOOT_RESULT' "$log"
+  grep 'FLEBOOT_IPP_CHECK' "$log" || { echo "[fle6] $1: FLEBOOT_IPP_CHECK 行が無い ($log)"; exit 4; }
+  [ -s "$2" ] || { echo "[fle6] $1: 結果 JSON が無い ($2)"; exit 4; }
+}
+
 T=$(date +%s); stage "boot"
-FLE_BOOT_VARIANT=plain "$NODE" "$HERE/fle_boot.mjs" "$W/fleboot_plain.cjs" "$HERE/results/boot_summary_fle6.json" --boot-only > "$W/run_fle6.log" 2>&1 || true
-grep 'FLEBOOT_RESULT' "$W/run_fle6.log" || true
+run_boot shim "$HERE/results/boot_summary_fle6.json" 1
 elapsed "boot" "$T"
 
 T=$(date +%s); stage "negctl (FLE_IPP=0)"
-FLE_IPP=0 FLE_BOOT_VARIANT=plain "$NODE" "$HERE/fle_boot.mjs" "$W/fleboot_plain.cjs" "$HERE/results/boot_summary_fle6_negctl.json" --boot-only > "$W/run_fle6_negctl.log" 2>&1 || true
-grep 'FLEBOOT_RESULT' "$W/run_fle6_negctl.log" || true
+run_boot negctl "$HERE/results/boot_summary_fle6_negctl.json" 0
 elapsed "negctl" "$T"
 echo "[fle6] end $(date -u +%H:%M:%S)"
