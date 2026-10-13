@@ -928,6 +928,63 @@ def lift_fixups(text):
     return "\n".join(keep), n_fix[0], d
 
 
+_ALLOCA_LINE = re.compile(r"^(\s*)%(\d+) = alloca (\S+)(.*)$")
+_LOCAL_REF = re.compile(r"%(\d+)(?![\w.])")
+
+
+def canon_alloca_order(text):
+    """関数ごとの連続した alloca 行を型名順に並べ直し、%N 参照を付け替える (LIFTLIB-11 / #887)。
+
+    RetDec は同一入力でも alloca 行の並びを ASLR 等に依存して入れ替えることがある (k80 で実測)。
+    同じ関数内で型が重複する alloca は無いことを前提に、型名 (文字列順) で並べ替え、
+    alloca の名前 (%N) を新しい位置に合わせて振り直す。意味は変わらない (スロットの番号付けのみ)。
+    """
+    lines = text.split("\n")
+    n = len(lines)
+    i = 0
+    while i < n:
+        if lines[i].startswith("define "):
+            j = i + 1
+            while j < n and not lines[j].startswith("}"):
+                j += 1
+            _canon_alloca_body(lines, i, j)
+            i = j + 1
+        else:
+            i += 1
+    return "\n".join(lines)
+
+
+def _canon_alloca_body(lines, s, e):
+    rename = {}
+    fixed = set()
+    k = s + 1
+    while k < e:
+        if not _ALLOCA_LINE.match(lines[k]):
+            k += 1
+            continue
+        run = []
+        while k < e and _ALLOCA_LINE.match(lines[k]):
+            run.append(k)
+            k += 1
+        if len(run) < 2:
+            continue
+        ms = [_ALLOCA_LINE.match(lines[x]) for x in run]
+        names = [m.group(2) for m in ms]
+        types = [m.group(3) for m in ms]
+        order = sorted(range(len(run)), key=lambda q: types[q])
+        for p, q in enumerate(order):
+            if p != q:
+                rename[names[q]] = names[p]
+        for p, q in enumerate(order):
+            m = ms[q]
+            lines[run[p]] = f"{m.group(1)}%{names[p]} = alloca {m.group(3)}{m.group(4)}"
+            fixed.add(run[p])
+    if rename:
+        for x in range(s + 1, e):
+            if x not in fixed:
+                lines[x] = _LOCAL_REF.sub(lambda mo: "%" + rename.get(mo.group(1), mo.group(1)), lines[x])
+
+
 def make_args(**kw):
     import types
     d = dict(infile="", outfile="", select="", keep_all=False, redirect="", xmm_arg_map="", c11_fix="",
