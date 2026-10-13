@@ -4,8 +4,15 @@
 usage: rtl_compare.py <rtl_units.json(rtl_range.py --json)> <m11_batch.jsonl> <flelift_batch.jsonl> [--tsv out.tsv] [--md out.md]
 batch.jsonl は liftdiff batch の出力 (1 行 1 関数, function.va / verdict)。verdict は liftdiff の
 一致(match)/不一致(mismatch)/実行不能(unexec) に正規化して使う。
+両 route の VA 積集合のうち RTL 帯 RTL_LO <= VA < RTL_HI だけを採点する (帯外は stderr に件数を出して除外)。
+--md の先頭 1 行は `自動生成: <cmd>` (docs/DOC_MAP.md §4)。
 """
 import collections, json, sys
+
+RTL_LO, RTL_HI = 0x401000, 0x456e98  # 採点する RTL 帯 (System/System.Types/System.SysUtils; REPORT §2)
+
+MD_HEADER = ('自動生成: python3 tools/m11/rtl/rtl_compare.py <rtl_units.json> <m11_batch.jsonl> <flelift_batch.jsonl> '
+             '--md <out.md> --tsv <out.tsv> (引数の実値は tools/m11/rtl/REPORT.md §6)')
 
 OV = {  # m11_ov.c の手転記 (RTL 関連)
     0x4120c0: 'InitUnits', 0x41d8f0: '_StartLib', 0x412160: '_InitLib', 0x412510: '再配置表適用',
@@ -36,11 +43,15 @@ def norm(v):
 def main():
     units = json.load(open(sys.argv[1]))['units']
     m, x = load(sys.argv[2]), load(sys.argv[3])
-    common = sorted(set(m) & set(x))
+    both = set(m) & set(x)
+    common = sorted(va for va in both if RTL_LO <= va < RTL_HI)
+    if len(common) != len(both):
+        print('RTL 帯 %#x..%#x の外の %d 関数を除外 (両 route 採点あり %d → %d)' % (
+            RTL_LO, RTL_HI, len(both) - len(common), len(both), len(common)), file=sys.stderr)
     # unit 帯: VMT lo を昇順に並べ、次 unit の VMT lo までをその unit の帯とする近似 (code は unit ごと連続)
     bands = sorted((int(u['vmt_lo'], 16), u['unit']) for u in units if int(u['vmt_lo'], 16) < 0x545000)
     # .text 先頭の System unit は VMT より前から始まる
-    bands[0] = (0x401000, bands[0][1])
+    bands[0] = (RTL_LO, bands[0][1])
 
     def unit_of(va):
         name = None
@@ -78,7 +89,7 @@ def main():
     out = '\n'.join(lines)
     print(out)
     if '--md' in sys.argv:
-        open(sys.argv[sys.argv.index('--md') + 1], 'w').write(out + '\n')
+        open(sys.argv[sys.argv.index('--md') + 1], 'w').write(MD_HEADER + '\n' + out + '\n')
     if '--tsv' in sys.argv:
         with open(sys.argv[sys.argv.index('--tsv') + 1], 'w') as fo:
             fo.write('#va\tunit\tm11\tx64c\n')

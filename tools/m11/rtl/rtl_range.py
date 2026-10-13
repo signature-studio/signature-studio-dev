@@ -11,12 +11,12 @@ usage: rtl_range.py <PE> [--json out.json]
 import json, re, struct, sys
 import pefile
 
-B = 0x400000
 VMT_TYPEINFO = 0xa8   # 本バイナリ実測: VMT-0xa8 に typeinfo ptr (2,958/2,958 クラスで ClassType と相互参照一致)
 
 
 def main():
     pe = pefile.PE(sys.argv[1], fast_load=True)
+    B = pe.OPTIONAL_HEADER.ImageBase
     img = pe.get_memory_mapped_image()
     t = [s for s in pe.sections if s.Name.startswith(b'.text')][0]
     lo, hi = t.VirtualAddress, t.VirtualAddress + t.Misc_VirtualSize
