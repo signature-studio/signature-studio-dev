@@ -166,17 +166,20 @@ VEX-256 は 344 関数 189,611 B 中 **closure 内は 6 関数のみ** (Convolve
 - **手作業の実績** (`patches.py` の規則行 = 手作業 1 件): `assoc` 規則 4 行 (Gain 1・Haas 1・Gate 2。ramp 形の正規表現 1 本が Gain 1・Haas 2・Gate 1 の計 4 site、Gate の smoothstep 1 site を覆う = 計 5 site)。機械書換え 4 種 (bitcast/intload/concat/stackpair, `ghidra_to_c.py --fix`)。人手の所要時間は計測していない (推定は書かない)。比較用の実測は各段の実測秒 (§10-3)。
 - 修復の**発見**には RetDec stage-0 + kh_lower ルート (比較相手。`snapins/REPORT.md` §0・§2) と同じ native 差分ハーネスが不可欠 (Ghidra の出力が正しいかの判定は読むだけでは付かない = RetDec と同じ条件)。
 
-### 10-3. 実測秒 (run_all.sh を HEAD bc62138 で実行, load average 併記)
-| 段 | 実測 | load (1/5/15 分) |
+### 10-3. 実測秒 (コミット済み HEAD c4841f4 で `run_all.sh 1000 7` を連続 n=3 回, min–max。runner 4 vCPU・run_all.sh は逐次実行。c4841f4 以降の差分は REPORT.md のみ)
+| 段 | 実測 wall (min–max) | load (1/5/15 分) の min–max |
 |---|---|---|
-| Ghidra import (76MB PE, `-noanalysis`) + 10 関数 decompile (lift 対象 9 = Gain 1 + Haas 5 + Gate 3、stub 化する callee 1 = `0x18004cf20`) | 18.8 s | 1.27 0.63 0.39 |
-| 同 (census 対象 10 関数 = snap-in process 7 + libm 3, §10-4) | 20.3 s | 1.32 0.80 0.47 |
-| Ghidra 出力 → C 化 → emcc → 突合 (Gain / Haas / Gate) | 0.6 / 0.6 / 0.8 s | 1.27 0.63 0.39 |
-| RetDec stage-0 (冷間) + kh_lower + emcc + 突合 (Gain / Haas / Gate) | 10.1 / 10.3 / 10.6 s (うち RetDec 取得 8.5 / 8.6 / 8.7 s) | 1.41 0.73 0.43 |
-- Ghidra は decompile 本体が関数ごと 0.00〜0.05 s で、時間は import (PE 読込) が支配。RetDec は関数範囲ごとに 8.5 s 前後 (範囲数に依存)。素材取得なしの同一 runner での値。
+| Ghidra import (76MB PE, `-noanalysis`) + 10 関数 decompile (lift 対象 9 = Gain 1 + Haas 5 + Gate 3、stub 化する callee 1 = `0x18004cf20`) | 23.2–38.2 s | 1.14–1.50 / 0.64–1.07 / 0.31–0.56 |
+| 同 (census 対象 10 関数 = snap-in process 7 + libm 3, §10-4) | 24.1–24.9 s | 1.31–1.51 / 0.83–1.19 / 0.41–0.66 |
+| Ghidra 出力 → C 化 → emcc → 突合: Gain / Haas / Gate | 0.7–1.3 / 0.8–1.1 / 1.0–1.4 s | 1.13–1.50 / 0.64–1.07 / 0.31–0.56 |
+| RetDec stage-0 (冷間) + kh_lower + emcc + 突合: Gain / Haas / Gate | 13.6–13.9 / 13.8–14.0 / 14.2–14.4 s (うち RetDec 取得 11.5–11.6 s) | 1.11–1.59 / 0.71–1.15 / 0.35–0.63 |
+- 3 回とも exit 0。判定は 3 回とも同一: Ghidra 全修復 1000/1000 ×3 (wasm 15,161 / 16,878 / 17,367 B)・RetDec 1000/1000 ×3 (23,054 / 35,967 / 45,754 B)・§10-2 の ablation 21 構成は全値一致。
+- 変動が大きい: Ghidra import の最大値 38.2 s は 1 回目 (23.7 s / 23.2 s が 2・3 回目。原因は未検証)。前版の n=1 値 (Ghidra 18.8 s・RetDec 10.1〜10.6 s, HEAD bc62138) は本表で置換した。別 runner での検収 run (PR #475 の review, HEAD 63b145d) の値は Ghidra 25.0 / 25.8 s・RetDec 13.3 / 13.5 / 13.9 s で、前版より長い。
+- `[wall … | load …]` 行の取得場所: [4] の RetDec 側と [3] の C 化は console に出る。[2] と [5] (Ghidra 2 段) は `run_all.sh` が `> run.log 2>&1` で束ねるため console に出ず、`work/ghidra/run.log` (lift 対象 decompile)・`work/ghidra/run2.log` (census) の末尾に入る。
+- Ghidra は時間が import (PE 読込) に支配される。decompile 本体は関数ごとの `decomp_sec` の合計が lift 対象 0.26 s・census 0.92 s (3 回目の `work/ghidra/out/summary.tsv`・`out_simd/summary.tsv`, n=1)。RetDec 取得は Gain (1 範囲)・Haas (5 範囲)・Gate (3 範囲) で 11.5–11.6 s と差が見えない。素材取得なしの同一 runner での値。
 
 ### 10-4. SIMD / 128bit / ABI の扱い (census 対象 10 関数 = snap-in process 7 [Resonator / Stereo / Delay / Phaser / Limiter / 3-Band EQ / Channel Mixer] + libm 3 [powf / sincos_a / k_dfdb0] の decompile、`census.sh`。**C 化・ビルドは未実施 = 構文の有無のみ**)
-- Ghidra は 10 関数すべて decompile 完了 (0.01〜0.22 s, 53〜470 行)。ただし C として意味を持たない構文が残る:
+- Ghidra は 10 関数すべて decompile 完了 (関数ごとの decompile 0.01〜0.24 s は 3 回目の `out_simd/summary.tsv` の値で n=1、53〜470 行は `census.sh` の `wc -l`)。ただし C として意味を持たない構文が残る:
   - **SIMD 疑似関数**: Resonator `rcpps(in_XMM2, …)`・Stereo `rsqrtps(in_XMM3, …)` (各 1)。C に等価物が無く、`snapins/REPORT.md` §13 の実機近似表移植 (bit-exact 化) が別途要る。
   - **128bit 整数演算**: k_dfdb0 (Payne-Hanek) `SUB168(auVar2 * auVar4,8)` 等 3、Phaser 4・Limiter 2・Delay 1。C の `__int128` 化が要る。
   - **レジスタ渡しで引数なしの呼出** (`FUN_xxx()` / `func_0x…()`): Delay 4・Phaser 5・sincos_a 4・powf 1。MS x64 ABI でない独自呼出規約の libm 部品で、**引数・戻りを手で復元**しないと C にならない。sincos_a は `extraout_XMM0_Qa` を 6 個持つ (戻り値以外のレジスタ値の受け渡し)。
