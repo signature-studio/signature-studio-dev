@@ -26,3 +26,7 @@ fix_asm_stores.py       [P-S1c/S1d] 64bit 部分 store / i64 経由 sext の 128
 fix_orcond_xnor.py      [P-C1]  RetDec の `or.cond = icmp eq i1` (XNOR 誤畳み込み) → and (opt-in, 関数指定)
 fix_dup_decls.py        [P-D1]  同一 declare 重複除去
 fix_ptr_params.py       [P-T1]  定義済み関数の `ptr %argN` 仮引数を i64 に統一 (call site は ptrtoint, 本体の ptr 文脈は inttoptr)
+fix_icmp_ptr.py         [P-E1]  `icmp P ptr %a, %b` の i64 被演算子 → inttoptr (PLG-F6-2 #545。 旧 distortion/engine_fixcmp.py)
+#
+# 変更したコピー (PLG-F6-2 #545)
+ir5_patch.py: [P-F1] fold_const_ops が畳めない外側の式の内側を読み飛ばす欠陥 (E5) / [P-F2] lift_residual_constexpr が bitcast 除去だけの行変更を捨てる欠陥 (E2)。 回帰テスト test_ir5_constexpr.py (修復前 e64ef6f を NC に使う)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """ir5_patch.py の定数式処理 (PLG-F6-2 #545 の E2 / E5 修復) の回帰テスト + ネガティブコントロール。
   python3 test_ir5_constexpr.py            → 修復後 (作業ツリーの ir5_patch.py) が全ケース合格、かつ修復前 (git の BASE) が同じケースで不合格になること
-  BASE=<rev> で修復前の版を選ぶ (既定 origin/main)。 BASE が取れない / 修復前の版が合格してしまう (= テストが欠陥を検出できない) 場合は exit 1。
+  BASE=<rev> で修復前の版を選ぶ (既定 e64ef6f = 本修復の直前の main。 merge 後も NC が成立するよう commit 固定)。 BASE が取れない / 修復前の版が合格してしまう (= テストが欠陥を検出できない) 場合は exit 1。
 ケースは Hardcore (block 19101) / Effector engine (block 18973) の実 IR から抜いた最小形:
   E5: `xor (i32 ptrtoint @g, i32 ptrtoint @g)` → 0 に畳まれた後の外側 `zext (i32 0 to i64)` が、内側を読み飛ばす旧実装では畳まれず、
       A9L が `%x = zext 0 to i64` (型の無い zext) を出す → emcc "expected type"
@@ -76,7 +76,7 @@ def main():
     after = load(os.path.join(HERE, 'ir5_patch.py'), 'ir5_after')
     print('[修復後 (作業ツリー)]')
     bad_after = check(after, 'after')
-    base = os.environ.get('BASE', 'origin/main')
+    base = os.environ.get('BASE', 'e64ef6f')
     r = subprocess.run(['git', '-C', HERE, 'show', '%s:%s' % (base, TARGET)], capture_output=True, text=True)
     if r.returncode != 0:
         print('FAIL: 修復前の版 %s:%s が取れない (ネガティブコントロール不成立): %s' % (base, TARGET, r.stderr.strip()), file=sys.stderr)
