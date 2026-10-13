@@ -18,6 +18,7 @@ bash tools/liftlib/lowbase_e2e.sh            # lowbase 検証 (CAB-220): audit_v
 |---|---|
 | `build <cfg> [--profile std] [--variants ref,o2,o3,std] [--expect SIG]` | **標準ビルド入口 (PERF-P1)**: RetDec → 修復 → helper → 標準設定 (`-O3 -flto` + gc-sections + 最小 export; 正本 `data/std_build.json` / `liftlib/stdbuild.py`) で全変種ビルド → 同一シナリオの wasm 出力署名が全一致のときだけ `<name>.cjs` を確定 (不一致 exit 1)。shell は `python3 liftlib/stdbuild.py flags std` / `guard` |
 | `lift targets/fa_gain.json` | RetDec → base 正規化 → P1/F7/F2 修復 → helper 自動生成 → emcc → **差分ハーネス** (実機 vs wasm) |
+| `python3 tools/liftlib/ott_census.py <ott.cjs> [--f248 0\|1] [--expect-junkhi N] [--max-junkhi N]` | OTT 出力の junk census (junkHi 等) の再計算と期待値突合 (#478。定義は REPORT_APPENDIX_C.md §20) |
 | `detect <cfg>` | 修復せず検出だけ (所見 JSON) |
 | `diagnose <cfg>` | pass ごとに無効化して再評価 (どの修復が必須か) + 未修復所見 |
 | `simd gen x.ll -o out.c [--canon y.ll]` | `__asm_*` 宣言から C helper 生成 (正規名化も) |

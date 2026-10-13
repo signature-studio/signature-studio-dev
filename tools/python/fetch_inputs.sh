@@ -12,6 +12,9 @@ if [ -d "$FL" ]; then
   cp "$FL/System/Tools/MCP/MCPTools.pyc" "$W/MCPTools.pyc"
   cp "$FL/Shared/Python/Lib/midi.py" "$FL/Shared/Python/Lib/utils.py" "$W/"
   cmp "$W/MCPTools.pyc" "$WB/block25159_DATA.bin" && echo "MCPTools.pyc: mac == win (100674B)"
+  # PY-6 (#76): 同梱 device script (MIDI scripting)。tests/midi_bundled_device.mjs の入力。パスは scripts_inventory.json のキー (FL/ からの相対) 由来
+  DEV="$FL/System/Hardware specific/Forward CCs to current plugin Port 10/device_Forward CCs to current plugin Port 10.py"
+  if [ -f "$DEV" ]; then cp "$DEV" "$W/"; else echo "WARN: device script not found: $DEV" >&2; fi
 else
   echo "mac pkg なし ($FL_MAC_DIR): win64 の DATA block から取る" >&2
   head -n1 "$WB/block24429_DATA.bin" | grep -q '^# name=FL Studio (midi) parameters' && head -n1 "$WB/block24430_DATA.bin" | grep -q '^# name=Basic functions' \

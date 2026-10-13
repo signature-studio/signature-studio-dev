@@ -1,8 +1,8 @@
-# tools/gui REPORT 付録 (本体 REPORT.md は 250 行上限のため §11 を分割)
+# tools/gui REPORT 付録 (本体 REPORT.md は 250 行上限のため §12 を分割)
 
-## 11. GUI-5 (#181) 続き: RetDec 付き e2e.sh 全体 ALL PASS と wasm 全体の SIMD/scalar 比較
+## 12. GUI-5 (#181) 続き: RetDec 付き e2e.sh 全体 ALL PASS と wasm 全体の SIMD/scalar 比較
 
-既知類型との関係: lift 欠陥ではなく shim の意味論 (§10 の同一サーフェス複数クリップ欠陥は `docs/DEFECTS.md` D17 に登録)。検証起点: main `021fd75` + 本ブランチ (`tools/gui` の src は無変更。追加は `test/wbench.sh`・`test/wbench_shim.c` のみ)。runner 4 CPU、node v22.23.3、emcc 6.0.12、mingw-w64 は apt `gcc-mingw-w64-x86-64`、RetDec は `toolchain-retdec`。
+既知類型との関係: lift 欠陥ではなく shim の意味論 (§10 の同一サーフェス複数クリップ欠陥は `docs/DEFECTS.md` D18 に登録)。検証起点: main `021fd75` + 本ブランチ (`tools/gui` の src は無変更。追加は `test/wbench.sh`・`test/wbench_shim.c` のみ)。runner 4 CPU、node v22.23.3、emcc 6.0.12、mingw-w64 は apt `gcc-mingw-w64-x86-64`、RetDec は `toolchain-retdec`。
 
 ### 1. `bash tools/gui/e2e.sh` (RetDec 付き・全層) → **ALL PASS (rc=0, 所要 88.6 s, load 0.95〜1.14)**
 | 層 | 実測 |
@@ -31,5 +31,5 @@ FAIL した層は無し。native selftest の ASan UAF (#489) は今回の 1 回
 | BitBlt SRCCOPY (memmove 系 3 行) | 0.23–0.43 | 同左 | 1.00x |
 | BitBlt SRCCOPY 24bpp DIB 源 / 先 | 1.87–1.90 / 3.20–3.27 | 1.77–1.80 / 3.37–3.47 | 1.06x / 0.95x |
 - SRCCOPY は memmove で SIMD の対象外 (1.00x が正)。24bpp 先は pull/push が支配的で SIMD 差が出ない (0.95x = 誤差内)。
-- 画素一致は SIMD == scalar を §10・§11-1 (1c/6) が担い、本 bench は時間のみ。lift 済みアプリ (scalar ビルド `GUI_NO_SIMD=1 gui_wasm.sh`、v128 命令 0 / SIMD 版 223) も Chrome e2e で golden EXACT (0/64,000 px)。
+- 画素一致は SIMD == scalar を §10・§12-1 (1c/6) が担い、本 bench は時間のみ。lift 済みアプリ (scalar ビルド `GUI_NO_SIMD=1 gui_wasm.sh`、v128 命令 0 / SIMD 版 223) も Chrome e2e で golden EXACT (0/64,000 px)。
 - **未取得**: Chrome 上の lift 済みアプリでの API 単位 frame time。gui_app.c は 320x200 の静的シーンで、e2e の bench は renderer 側 (変換 + putImageData) のみを測るため shim の時間を分離できない。実 FL (#174) 到達後に取る。

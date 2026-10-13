@@ -29,7 +29,7 @@ emcc <lift IR / runtime> tools/shimx/src/*.c ... -sGLOBAL_BASE=<64KB 以上>    
 | 領域 | API |
 |---|---|
 | VFS | `shimx_set_path_mapper` (Win→FS パス写像) / `shimx_path_to_posix` |
-| コールバック変換 (R2/R3 実体) | `shimx_cbtrans_set_invoke` (lift 側 VA→関数解決を登録) / `shimx_cbtrans_install` / `shimx_cb_translator` / `shimx_lifttab_proc_resolver` / `shimx_lifttab_trampoline` (詳細は REPORT §10 と src/cbtrans.c 冒頭) |
+| コールバック変換 (R2/R3 実体) | `shimx_cbtrans_set_invoke` (lift 側 VA→関数解決を登録) / `shimx_cbtrans_install` / `shimx_cb_translator` / `shimx_lifttab_proc_resolver` / `shimx_lifttab_trampoline` (詳細は REPORT_R1-R8.md §10 と src/cbtrans.c 冒頭) |
 | モジュール | `shimx_module_register` / `shimx_proc_register` / `shimx_set_proc_resolver` / `shimx_set_load_hook` / `shimx_set_resource_provider` / `shimx_set_exe_path` / `shimx_set_strict` |
 | レジストリ | `shimx_reg_set[_sz/_dword]` / `shimx_reg_import_text` / `shimx_reg_export_text` / `shimx_reg_reset` |
 | プロセス | `shimx_set_command_line` / `shimx_setenv_utf8` / `shimx_set_version` / `shimx_set_exit_hook` / `shimx_set_acp` / `shimx_set_locale` |
@@ -46,7 +46,7 @@ emcc <lift IR / runtime> tools/shimx/src/*.c ... -sGLOBAL_BASE=<64KB 以上>    
 | `src/teb.c` | LastError/TID/擬似 TEB(`__readgs*`)/TLS(1088)/FLS |
 | `src/file.c` `ini.c` | パス写像, CreateFile 系, Find*, FileMapping, 属性/一時/ドライブ, INI, コンソール |
 | `src/timer.c` `heap.c` `str.c` `locale.c` | 時刻, heap/Global/Virtual, MultiByte/WideChar・比較・LCMap, ロケール/FormatMessage |
-| `src/reg.c` `env.c` `module.c` `seh.c` | レジストリ(メモリ内, vreg 拡張取込: 世代/通知・import 強化・追加 6 API — REPORT §11)+Crypt スタブ, 環境/システム情報/バージョン/アトム, モジュール表/GetProcAddress/リソース/IMAGEHLP, SEH 第一手+CRT ロック |
+| `src/reg.c` `env.c` `module.c` `seh.c` | レジストリ(メモリ内, vreg 拡張取込: 世代/通知・import 強化・追加 6 API — REPORT_CAB-214.md §11)+Crypt スタブ, 環境/システム情報/バージョン/アトム, モジュール表/GetProcAddress/リソース/IMAGEHLP, SEH 第一手+CRT ロック |
 | `src/ole.c` `shell.c` `net.c` | BSTR/VARIANT/SAFEARRAY/IStream/IMalloc, shell32/version/各種スタブ, ネットワーク・認証・MIDI の常時エラー |
 | `src/proctable.c` `shimx_stubs.h` `exports.txt` | 自動生成 (test.sh)。GetProcAddress の組込み表 / 未宣言 API の prototype / 公開関数一覧 |
 | `scripts/` | import_scan(PE 走査) / build_objs / gen_proctable / gen_stub_protos / gen_inventory / ir_undef / verify_sig / verify_ott |

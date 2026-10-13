@@ -1,0 +1,19 @@
+{
+ "detect_only": true,
+ "fixed_stores": 279,
+ "fn_no_pdata": 452,
+ "functions": 7421,
+ "ir_narrow_fix": 276,
+ "ir_narrow_fix_slot": 3,
+ "ir_narrow_imm_stores": 419,
+ "ir_narrow_imm_stores_no_pdata": 0,
+ "ir_narrow_machine_narrow": 140,
+ "machine_qword_imm_stack_stores": 3528,
+ "machine_qword_imm_stack_stores_zero": 3428,
+ "machine_qword_imm_unmatched": 1053,
+ "machine_qword_imm_unmatched_alloca_other_form": 27,
+ "machine_qword_imm_unmatched_interior_of_wider_alloca": 2,
+ "machine_qword_imm_unmatched_no_alloca_neg_slot": 1021,
+ "machine_qword_imm_unmatched_no_alloca_nonneg_slot": 3,
+ "machine_qword_matched_ir_i64": 2197
+}

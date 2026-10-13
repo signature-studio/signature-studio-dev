@@ -25,9 +25,21 @@ export interface WrapperFstSpec {
   has64?: boolean;
   /** chunk record 53 — plugin state blob, omitted when empty */
   state?: Uint8Array;
+  /**
+   * chunk format version (first u32). Default 8 = FL 11.5.5's DB writer: strings are ANSI (CP_ACP), so only ASCII is
+   * accepted (a non-ASCII string throws instead of silently depending on the reader's code page).
+   * 9..12 = the Wrapper's UTF-8 string mode (fw:0x875d1f `cmp ecx,9`); independent of CP_ACP. The FL-side reader's
+   * acceptance of 9..12 is unverified (tools/hostbridge/h10/REPORT.md §9).
+   */
+  version?: number;
 }
 
 const te = new TextEncoder();
+
+export const DEFAULT_CHUNK_VERSION = 8;
+/** Wrapper accepts 5..12 (fw:0x870f6d); the generator emits 8 (FL 11.5.5 writer) or 9..12 (UTF-8 strings) */
+export const MIN_GEN_VERSION = 8;
+export const MAX_GEN_VERSION = 12;
 
 class Buf {
   parts: Uint8Array[] = [];
@@ -65,8 +77,15 @@ function utf16z(s: string): Uint8Array {
   return b;
 }
 
-/** ANSI/UTF-8 bytes for wrapper-chunk strings (FL writes the ANSI code page; identical to UTF-8 for ASCII names) */
-function ansi(s: string): Uint8Array {
+/**
+ * Bytes for a wrapper-chunk string. version >= 9: UTF-8. version 8 (ANSI, decoded by the Wrapper with CP_ACP): ASCII only —
+ * the generator has no code-page encoder and the reader's CP_ACP (shimx default 1252, JP Windows 932) is not known at
+ * generation time, so a non-ASCII string would be decoded differently per host. Fail fast instead.
+ */
+function chunkString(s: string, version: number, what: string): Uint8Array {
+  if (version < 9 && /[^\x00-\x7f]/.test(s)) {
+    throw new Error(`wrapper chunk version ${version} stores ${what} as ANSI (CP_ACP); non-ASCII ${JSON.stringify(s)} needs version 9..12 (UTF-8)`);
+  }
   return te.encode(s);
 }
 
@@ -76,10 +95,15 @@ function baseNameNoExt(p: string): string {
   return d > 0 ? b.slice(0, d) : b;
 }
 
-/** the 213 payload: u32 8, then { u32 id, u64 size, payload }* (fle:0xa9eff0; records 2, 50, 51|52|58|51+52, 54, 55, 56, 53) */
+/** the 213 payload: u32 version (8 = FL 11.5.5 writer, ANSI/ASCII; 9..12 = UTF-8 strings), then { u32 id, u64 size, payload }* (fle:0xa9eff0; records 2, 50, 51|52|58|51+52, 54, 55, 56, 53) */
 export function buildWrapperChunk(s: WrapperFstSpec): Uint8Array {
+  const version = s.version ?? DEFAULT_CHUNK_VERSION;
+  if (!Number.isInteger(version) || version < MIN_GEN_VERSION || version > MAX_GEN_VERSION) {
+    throw new Error(`wrapper chunk version ${version}: generator supports ${MIN_GEN_VERSION}..${MAX_GEN_VERSION}`);
+  }
+  const str = (v: string, what: string): Uint8Array => chunkString(v, version, what);
   const b = new Buf();
-  b.u32(8);
+  b.u32(version);
   const rec = (id: number, payload: Uint8Array): void => {
     b.u32(id);
     b.u64(BigInt(payload.length));
@@ -107,14 +131,14 @@ export function buildWrapperChunk(s: WrapperFstSpec): Uint8Array {
   const c = s.plugclass;
   if (c === 0 || c === 4) rec(51, magic4());
   else if (c === 7 || c === 8) rec(52, guid16());
-  else if (c === 11 || c === 12) rec(58, ansi(s.idstring ?? ''));
+  else if (c === 11 || c === 12) rec(58, str(s.idstring ?? '', 'record 58 (CLAP id)'));
   else { rec(51, magic4()); rec(52, guid16()); }
 
   const clap = c === 11 || c === 12;
   const nameRec = s.nameRecord ?? (clap || !s.filename ? s.displayName : baseNameNoExt(s.filename));
-  if (nameRec) rec(54, ansi(nameRec));
-  if (s.filename) rec(55, ansi(s.filename));
-  if (s.vendor) rec(56, ansi(s.vendor));
+  if (nameRec) rec(54, str(nameRec, 'record 54 (name)'));
+  if (s.filename) rec(55, str(s.filename, 'record 55 (path)'));
+  if (s.vendor) rec(56, str(s.vendor, 'record 56 (vendor)'));
   if (s.state && s.state.length > 0) rec(53, s.state);
   return b.bytes();
 }

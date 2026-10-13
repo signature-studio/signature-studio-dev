@@ -1,0 +1,20 @@
+format	tag	file_off	rva	section	ref_funcs
+cbor	get_cbor_string	0xfb82cd	0x180fb98cd	.rdata	0x18025bbd0
+cbor	get_cbor_binary	0xfb8327	0x180fb9927	.rdata	0x18025b510
+msgpack	get_msgpack_string	0xfb8387	0x180fb9987	.rdata	0x18025d200
+common	sax_parse_internal_invalid_byte	0xfb846c	0x180fb9a6c	.rdata	0x1802571e0,0x1802580d0,0x18025e340,0x180260ab0
+common	unexpect_eof	0xfb8bcb	0x180fba1cb	.rdata	0x180259490,0x1802596f0,0x18025a830,0x18025ab20,0x18025c6c0
+common	after_parse_expected_eoi	0xfb8187	0x180fb9787	.rdata	0x180256dc0
+ubjson	get_ubjson_size_type	0xfb83cb	0x180fb99cb	.rdata	0x180261c90
+ubjson	get_ubjson_size_value	0xfb8240	0x180fb9840	.rdata	0x18025fbb0
+ubjson	get_ubjson_type	0xfb81ac	0x180fb97ac	.rdata	0x180263d10
+bjdata	get_ubjson_size_value_bjdata	0xfb8282	0x180fb9882	.rdata	0x18025fbb0
+bjdata	get_ubjson_size_type_bjdata	0xfb8417	0x180fb9a17	.rdata	0x180261c90
+bjdata	bjdata_ndarray	0xfba24a	0x180fbb84a	.rdata	0x180261410
+bson	bson_record	0xfb8167	0x180fb9767	.rdata	0x1802598d0
+msgpack	name_msgpack	0xfc8da2	0x180fca3a2	.rdata	0x180258e50
+cbor	name_cbor	-	-	-	(0 hits)
+ubjson	name_ubjson	0xfd1207	0x180fd2807	.rdata	0x180258e50
+bson	name_bson	-	-	-	(0 hits)
+bjdata	name_bjdata	0xfd0416	0x180fd1a16	.rdata	0x180258e50
+text	lexer_parse_error	0xfda0c4	0x180fdb6c4	.rdata	0x180248400,0x180253e60,0x180258e50,0x18055e800,0x1805e5780

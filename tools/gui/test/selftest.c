@@ -89,6 +89,7 @@ static uint32_t cref(int r, int g, int b) { return (uint32_t)(r | g << 8 | b << 
 #include "selftest_p1.inc"
 #include "selftest_gui5.inc"
 #include "selftest_fd.inc"
+#include "selftest_help.inc"
 
 int main(void) {
   gui_hl_start(640, 480, 1);
@@ -343,6 +344,7 @@ int main(void) {
     CHK(got3 && res == (void *)1, "cross-thread PostMessage + sync SendMessage (got3=%d res=%p)", got3, res); }
 
   run_fd_bounds();
+  run_help_wiring();
 
   SECTION("quit / destroy messages");
   g_nlog = 0;

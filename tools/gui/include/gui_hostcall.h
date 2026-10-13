@@ -14,7 +14,7 @@
 #define GUI_HC_IN      2048
 #define GUI_HC_OUT     4096
 
-enum { GUI_HC_OPEN_URL = 1, GUI_HC_OPEN_FILE = 2, GUI_HC_SAVE_FILE = 3 };
+enum { GUI_HC_OPEN_URL = 1, GUI_HC_OPEN_FILE = 2, GUI_HC_SAVE_FILE = 3, GUI_HC_OPEN_HELP = 4 /* in = FL の Help パス (UTF-8, NUL 終端) → host の flHelp.shellExecute (#554) */ };
 
 /* result: >0 成功 / 0 キャンセル・拒否 / <=-16 host 側エラー (gui_hostcall.ts HC_ERR)。ライブラリ側の失敗は gui_hostcall() の戻りで -1 (未接続) / -2 (timeout) / -3 (溢れ) */
 typedef struct {
