@@ -96,8 +96,11 @@
 - **数え方の定義**: `checks` = 実装側の試験 S1〜S8 に含まれる check 行 (`OK`/`FAIL` の行、`S[0-9]+[a-z]? ` 形式) の件数。`ネガコン` = 実装を外した mutant 6 種 (SafeLoadLibrary のモード非復元 / GetProcAddress の大小無視 / FreeLibrary の refcount 無視 / timeGetTime 定数 / CreateProcessW 黙って成功 / bridged 強制の素通し) のうち、対応 check が 1 件以上 FAIL した数。期待値は 6/6。
 - **再計算**: `bash tools/hostbridge/poc/recount_shim.sh` (`test_shim.mjs` を実行し OK/FAIL 件数と negative controls caught を出力)。
 - **実測** (`recount_shim.sh`, HEAD = 784 ブランチ): real checks OK=18 FAIL=0; negative controls caught=6/6; `[shim] ALL PASS`。
-- **未検証**: OTT 経路 (`run_poc.mjs`) は `tools/m10/work/ott_m10.ll` が必要で、その生成 (`m6_lift.sh`) は OTT 実機バイナリ (`[ANALYSIS-PLUGINS]` 配下の `ott/binaries/OTT_vst2_win64.dll`) と `work/ott_ranges.txt` を要する。本 run では `analysis-ott-binaries` / `work-m6-ott` の素材が取得されておらず (`$ARTIFACTS_DIR` は `fl-win64` のみ)、`run_poc.mjs` は実行できない。issue 受入 1 (既存 OTT 経路の不変確認) は未達のまま。PM へ: 素材 `oc_artifacts: fl-win64 toolchain-emsdk toolchain-retdec analysis-ott-binaries work-m6-ott` での再起動を要請。
-  - 再確認 (HEAD 93ef594c, fix run): `$ARTIFACTS_DIR` は `fl-win64.tar.zst` のみ。`bash tools/hostbridge/hostbridge.sh` → [1] E1〜E20 OK → [2] build で `tools/m10/work/ott_m10.ll` 無しにより exit=1 で停止。[3a]〜[4] (`run_poc.mjs`) 未実行。shim 追加前後の `run_poc.mjs` 比較は未取得。
+- **OTT e2e (受入 1) 実測** (HEAD b7d7c018, 素材 `oc_artifacts: fl-win64 toolchain-emsdk toolchain-retdec analysis-ott-binaries work-m6-ott` を取得して展開。`ANALYSIS_DIR=$HOME/analysis`):
+  - `bash tools/hostbridge/hostbridge.sh` (foreground): exit=0, 所要 4 秒 (build 済み `HB_SKIP_BUILD=1` での再実行。初回は [2] build を含めて実行)。[1] E1〜E20 OK / [3b] `checks 13 / broken 0` / [3c] `[shim] ALL PASS`・ネガコン 6/6 / [4] `[run_poc] checks 28 / broken 0` → `[hostbridge] ALL PASS`。
+  - 比較対象 `d78208de^` (shim 追加前, 同じ素材・同じ build 手順で `[2]`→`[4]`): exit=0, `[run_poc] checks 28 / broken 0`。
+  - 前後比較: `run_poc.mjs` の出力を時間・RSS・ビルド時刻・アドレス以外で diff → 差分なし (`bridge stats`・`T5c`〜`T8b` の結果行・`checks 28` が一致)。OTT 経路は shim 追加で不変。
+  - 前提の補足: `analysis/check_pe_stub.py` は `pefile` を要する。runner に未導入だと [3a] で `ModuleNotFoundError` により停止する (`pip install --user pefile` で解消)。`hostbridge.sh` 自体は依存を入れない。
 - **注意**: bridged 強制は `ModuleTable.register` 経由の全 descriptor に効くが、現行 descriptor に `bridge` 欄は無く実効値は常に 0。Wrapper 側 `this+0x761` の本物の制御 (Wrapper を lift した後) は H4 本体の範囲。
 
 ## 6'. 規約遵守メモ
