@@ -17,7 +17,7 @@
 | IPP | dsp_ippv2 は win 446 / mac 434 export (ipps 366 / ippi 71)。**全 Delphi/FPC バイナリが同一 unit を静的リンクし、ロード時に 420 distinct 名 (423 は呼出箇所数) を動的解決**する。**使用関数数は本 tool の初版 (win 12 / mac 159) が過少** — 二段間接呼出 (win `mov r,[slot]; call [r]` / mac `lea r,[VAR]; call [r]`) を数え落とした。`tools/ipp` (S, f7152df) の実測が正: **win 229 / mac x86_64 234 / arm64 234、和集合 239、FLEngine(win) 単体 143** (§2 訂正表)。**lift しない・自前 C 実装**。arm64 slice (**408,224B**, 259 export) は **Accelerate/vImage + FL 自前 NEON/C による FL 自作の別実装** (Intel IPP の派生ではない) で、使用 239 のうち 232 を提供 |
 | OSS wasm 再ビルド | **3 本成功** (node 検証): **FreeType 2.7** (native==wasm32==wasm64 40 行完全一致, export 190/190 被覆), **libogg 1.3.2+libvorbis 1.3.5** (エンコード ogg 30,695B **byte-exact**・復号 PCM hash 一致), **Blend2D 0.11.5 (pre-v0.20)** (JIT==no-JIT==wasm の 320×240 **画素完全一致**, 差 0/230,400B = 全 payload; 3 ファイル sha256 一致)。いずれも `bash tools/shared/oss/<lib>/build.sh` で再現 (§3) |
 | 重要知見 | (1) FreeType 2.7 は **`long` 幅依存** (ftgrays.c): wasm32 では FT_LONG64 経路強制 + 2 行 patch、または **wasm64 無改変**で LP64 と bit 一致。 (2) **libm 差** (glibc vs musl の sinf) で入力生成が変わると ogg が 1B ずれる → 検証入力は libm 非依存にする。 (3) Blend2D は JIT 不可の wasm でも no-JIT で画素一致、但し速度は native JIT 0.054 ms/frame に対し native no-JIT 0.12–0.16 (2.2–2.9x)、**wasm 0.21–0.27 (約 4–5x)** (検収再計測 3 回) |
-| プロプラ lift PoC | **libkio** x86_64 slice の純粋関数 15 本を RetDec→IR pass→wasm 化し、**元 mac 機械語を ctypes で直接実行した結果と 760 ケースで差分テスト**: RetDec + 構文正規化のみ (意味修復なし) **228/760 (30%)** → 最小 pass ([C][E][A][B]) 適用後 **685/760 (90%)**、12 関数が完全一致。残欠陥は M7/M8 と同型の類型 (§4) |
+| プロプラ lift PoC | **libkio** x86_64 slice の純粋関数 15 本を RetDec→IR pass→wasm 化し、**元 mac 機械語を ctypes で直接実行した結果と 760 ケースで差分テスト**: RetDec + 構文正規化のみ (意味修復なし) **228/760 (30%)** → 最小 pass ([C][E][A][B][A']) 適用後 **720/760 (95%)**、14 関数が完全一致。残欠陥は M7/M8 と同型の類型 (§4) |
 | 下流チケット | T-SH-01..16 (§5)。最優先 = **T-SH-07 (IPP 自前実装 = CAB-37 に統合; 範囲は tools/ipp の 239 関数)** と **T-SH-02 (Blend2D+Agg2D glue)**。CPython wasm は tools/python (CAB-20) で完了済のため T-SH-05 は実質完了 |
 
 ## 1. 分類表 (根拠は data/classification.json の evidence に regex+hit 記録)
@@ -115,9 +115,11 @@
 ### libkio lift PoC (`bash tools/shared/lift/libkio/lift.sh`)
 - 対象: libkio_x64 の純粋ユーティリティ 15 関数 (`GetFourIntel`/`GetEightIntel`/`GetFloat…`/`GetDouble…`/`SetFour…`/`SetDouble…`/`Limit`/`LimitFloat`/`Fix`/`FixHi`/`CBool`/`unilen`/`wcslen16`/`str2compare`/`str4compare`)。RetDec `--select-ranges` 1.7s → m2 `ir_normalize` → emcc standalone wasm (31.9KB)。`ConvertUTF8/16ToUTF32` は静的バッファ+libc 依存のため除外。
 - **差分テスト**: 元の mac x86_64 機械語を `mmap(RWX)`+ctypes で直接実行 (SysV ABI は Linux と同一; 非循環の参照) と wasm を同一 760 ケース (small=int32 範囲 / wide=64bit 値) で比較し戻り値ビット+書込バッファを照合。
-- **結果**: RetDec + `ir_normalize` (構文正規化のみ; `kio_fix` 無し) **228/760 (30.0%)** → pass 後 **685/760 (90.1%)** (#144 で [B] fp 単一引数 pass 追加, 前版 657/760)。完全一致 (出現する全群 40/40): GetFour/Eight/Float/Double, SetFour/Double, Limit, FixHi, CBool, Fix_RCSf, unilen, wcslen16 の **12 関数**。残る 3 関数 (str2compare 21/40, str4compare 24/40, LimitFloat 0/40) は未修復 (下記の欠陥類型 [A]・[B]+[D])。
+- **結果**: RetDec + `ir_normalize` (構文正規化のみ; `kio_fix` 無し) **228/760 (30.0%)** → pass 後 **720/760 (94.7%)** (#144 で [B] fp 単一引数 pass 追加, 前版 657/760; #939 で [A'] 引数レジスタ接続 pass 追加, 前版 685/760)。完全一致 (出現する全群 40/40): GetFour/Eight/Float/Double, SetFour/Double, Limit, FixHi, CBool, Fix_RCSf, unilen, wcslen16, **str2compare, str4compare** の **14 関数**。残る 1 関数 (LimitFloat 0/40) は未修復 (下記の欠陥類型 [D])。
+- **#939 実測** (commit は本 PR。`KIO_ARGREG=0` でネガティブコントロール): pass 有り str2compare **40/40**・str4compare **40/40**・合計 720/760 / pass 無し (`KIO_ARGREG=0`) str2compare 21/40・str4compare 24/40・合計 685/760。素材 `analysis-mac-shared` `toolchain-retdec` `toolchain-emsdk`、`lift.sh` 実行 3.6s。
 - **欠陥類型** (RetDec decode-only IR; M7/M8 既知と同型 → 汎用 pass 化が T-SH-16):
-  - [A] **deref 落ち** `mov rax,[rsi]` が rsi そのものに化ける (Get/Set*Intel, unilen/wcslen16/str*compare) — Get/Set 6 関数のみ修復。
+  - [A] **deref 落ち** `mov rax,[rsi]` が rsi そのものに化ける (Get/Set*Intel, unilen/wcslen16/str*compare) — Get/Set 6 関数と、`trunc i64 %argN` 形の汎用 pass (署名の P/PK 位置) で修復。
+  - [A'] **引数レジスタ接続の欠落** — RetDec が k 番目の整数引数を store の無い未初期化 alloca からの k 番目の load として読み、`%argK` を未参照にする (str2compare/str4compare の第 2 引数 `PKc`)。汎用 pass `kio_fix.py` の `int_params` 部: 署名に f/d を含まない関数で、署名の k 番目が P/PK のとき k 番目の load を `ptrtoint ptr %argK` に置換。無効化は `KIO_ARGREG=0`。
   - [B] **float 引数落ち** — 単一 fp 引数の関数は `kio_fix.py` で修復 (`Fix_RCSf` 12→40/40)。fp 引数が複数の `LimitFloat` は xmm 番号が IR から消えるため未修復。
   - [C] **`long`(64bit) を i32 と復元** (Limit/FixHi/CBool) — demangle 署名で拡幅 (`kio_fix.py`)。
   - [D] `ucomiss` の flags が IR に接続されない (LimitFloat) — 未修復。
