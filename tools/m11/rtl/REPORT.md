@@ -171,3 +171,18 @@ m11 側の集計 (494/529/149) は不変。書換え 1 件が集計に 1 件ぶ�
 | `negctl.sh` (復元 jsonl): `_UStrAsg 0x4133f0` の x64c を mismatch に書換え | x64c 535/125/512 → 534/126/512、TSV 差分 1 行 (PASS) |
 
 VA/RVA 変換の ImageBase 化は、`ImageBase` が `0x400000` の PE では出力が変わらないことの確認までで、別 ImageBase の PE での動作は確認していない (該当 PE が無い)。
+
+## 8. x64c 側 lift 集合外 359 関数の分類 (#410 受入 1 つ目)
+
+`thunk_classify.py` (PE 静的解析) で分類した。入力は素材の `work-liftdiff` 内 `flelift/batch_closure.jsonl` (RTL 帯 `[0x401000,0x456e98)` の `no_wasm_definition` 359 件) と `fl-win64` の `block00031_PE.bin`。
+
+| 分類 | 件数 | 根拠 |
+|---|--:|---|
+| import thunk (先頭 `FF 25` = `jmp [rip+IAT]`、1 命令) | **359** | 全件。命令数 1・call 無し・IR 無し (batch 静的情報) |
+| その他 | 0 | - |
+
+* 飛び先 IAT は **311 スロット** (kernel32 165 / user32 120 / gdi32 53 / advapi32 13 ほか)。上位は `kernel32!FreeLibrary` ×4 など。
+* 同じ 359 件の m11 (RetDec) 側は **330 一致 / 28 不一致 / 1 hang** (m11 は thunk を関数として扱える)。
+* 推定 (未検証): x64c は thunk を wasm 関数として定義せず、呼出側の `jmp [IAT]` を import 直呼びに置き換える (`x64c.py` の `thunks` 経路)。そのため thunk 自体は「定義なし」になる。**lift 集合に pass を足しても thunk 関数の採点は直ちには成立しない** (thunk 単体を比較するには、import 呼出 1 本の wasm 関数を生成する必要がある)。
+* 結論: 受入条件「lift 集合外 359 の原因分類」は本節で達成。「lift 集合に pass を追加」は本 run では未着手 (tools/flelift の変更とリビルド・batch 再採点が要るため。起票先: #253 に継続 (未起票の新 issue は PM 判断))。
+* 再現: `python3 tools/m11/rtl/thunk_classify.py <block00031_PE.bin> <flelift batch.jsonl>` (出力は上記と同一)。
