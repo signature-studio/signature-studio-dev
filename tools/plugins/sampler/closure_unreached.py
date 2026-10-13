@@ -77,6 +77,25 @@ def imm_capstone(x, f, starts):
     return va, rv
 
 
+def edge3_of(x, IMM):
+    """total3 の BFS の辺 = call/jmp rel32 ∪ lea [rip+X] ∪ 命令内即値 (IMM = {f: imm_capstone(x, f, nonfw)})"""
+    def edge3(f):
+        i = IMM.get(f, (set(), set()))
+        return x.edges(f)[0] | x.edges(f)[1] | i[0] | i[1]
+    return edge3
+
+
+def u2_miss(x, total3, IMM, nonfw):
+    """U2 (固定点) の漏れ数: total3 の関数の call/jmp・lea・即値の先が非共通なのに total3 に無い数"""
+    miss = 0
+    for f in total3:
+        i = IMM.get(f, (set(), set()))
+        for t in x.edges(f)[0] | x.edges(f)[1] | i[0] | i[1]:
+            if t in nonfw and t not in total3:
+                miss += 1
+    return miss
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--out-dir', default=os.path.join(WORK, 'sampler'))
@@ -142,18 +161,10 @@ def main():
         ed = getattr(x.pe, 'DIRECTORY_ENTRY_EXPORT', None)
         exp = {s.address for s in ed.symbols if s.address} if ed else set()
 
-        def edge3(f):
-            i = IMM.get(f, (set(), set()))
-            return x.edges(f)[0] | x.edges(f)[1] | i[0] | i[1]
-
+        edge3 = edge3_of(x, IMM)
         total3, _ = x.bfs(sorted(total2 | roots), edge3)
         literal, _ = x.bfs(sorted(total2 | A | B_all), edge3)
-        miss = 0
-        for f in total3:
-            i = IMM.get(f, (set(), set()))
-            for t in x.edges(f)[0] | x.edges(f)[1] | i[0] | i[1]:
-                if t in nonfw and t not in total3:
-                    miss += 1
+        miss = u2_miss(x, total3, IMM, nonfw)
         root_miss = len(roots - total3)
         c2 = miss == 0 and root_miss == 0
         c3 = total2 <= total3 <= nonfw and (len(total2), x.size(total2)) == (lea[name]['total2_funcs'], lea[name]['total2_bytes'])

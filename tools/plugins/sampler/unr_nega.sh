@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# unr_e2e.sh (#667) の各検査の識別力を確認するネガティブコントロール。 対照 = 無改変で期待どおり、壊したものが期待どおり落ちること。 exit 0 = 全て期待通り
+# unr_e2e.sh (#667) の各検査の識別力を確認するネガティブコントロール。 対照 = 無改変で通ること、壊したものが落ちること。 exit 0 = 全て期待通り
 #   NC0: 対照 closure_unreached.py (無改変) → rc 0
 #   NC1: BFS の seed から (a) RVA32 の根を外す → U2 (根 ⊆ total3) が FAIL
-#   NC2: 未検証 (受入から除外)。 BFS の辺から命令内即値を外す → U2 FAIL を期待するが、即値辺は実データで 0 件のため識別できない (REPORT_UNREACHED §2d-7)。 即値の検出経路は NC7 で確認
+#   NC2: 合成 fixture (即値辺を含む) で、BFS の辺から命令内即値を外すと U2 (固定点) が FAIL。 対照は即値辺ありで漏れ 0 (実データは即値辺 0 件のため sed 変異では識別できない)
 #   NC3: 排他分類の (c) に (a)(b) の関数を二重計上する → U4 (排他合計) が FAIL
 #   NC4: capstone 側の RVA32 集合に偽の値を注入する → U1 (byte 走査の部分集合) が FAIL
 #   NC5: judge.py shells の入力 CSV の 1 行に emcc_c_rc=1 → judge が FAIL (rc 1)
-#   NC6: 対照 = 無改変の unr_e2e.sh --skip-lift は、既知の range 欠落 (AC2 未達) だけで rc 1 (judge は PASS・indirect_defs は FAIL・OK 無し)。 同 + emcc_c_rc=1 の行を追記 → judge が FAIL に変わり rc ≠ 0・OK 無し
+#   NC6: 対照 = 無改変の unr_e2e.sh --skip-lift が rc 0 で OK を出す (期待値は書き換えない)。 同 + emcc_c_rc=1 の行を追記 → judge が FAIL に変わり rc ≠ 0・OK 無し。 AC2 の range 欠落 (#667) が残る間は対照が rc 1 になり、本スクリプトは FAIL する (gate を緩めない方針の結果。 扱いは PM 判断)
 #   NC7: 合成 bytes (mov rax, imm64 = 開始 VA) を imm_capstone が検出する。 開始 VA が無ければ検出しない (即値の検出経路の動作確認)
 # 事前: unr_e2e.sh 実行済み (work/sampler/unrlift/status_run.csv と work/sampler/unr/ がある)
 set -euo pipefail
@@ -18,7 +18,6 @@ FAIL=0
 expect() { if [ "$2" = "$3" ]; then echo "  ok  $1: $2"; else echo "  !! $1: 実測 $2 / 期待 $3" >&2; FAIL=1; fi; }
 rc() { set +e; "$@" > "$N/last.out" 2>&1; local r=$?; set -e; echo $r; }
 needfail() { grep -q "$1" "$N/last.out" || { echo "  !! $2: '$1' の FAIL 行が無い" >&2; FAIL=1; }; }
-echo "  -- NC2 未検証: 即値辺は実データで 0 件のため、外しても結果は変わらない (受入から除外。 即値の検出経路は NC7)"
 
 CL=sampler/closure_unreached.py
 T=sampler/_nc_closure_unreached.py
@@ -33,6 +32,29 @@ cp "$CL" "$T"; expect "NC0 対照 closure_unreached.py (無改変)" "$(rc python
 
 mutate "$CL" "$T" "s/total3, _ = x.bfs(sorted(total2 | roots), edge3)/total3, _ = x.bfs(sorted(total2 | B_live), edge3)/" NC1
 expect "NC1 根から (a) RVA32 を外す → U2 FAIL" "$(rc python3 "$T" --out-dir "$N/out1")" 1; needfail 'FAIL.*U2' NC1
+
+# NC2: 合成 fixture。 A (total2) の即値が非共通 B の開始 VA を指す。 本物の edge3_of / u2_miss / Pe.bfs を使う。
+#   対照 (無改変の edge3_of): BFS が B に届き U2 漏れ 0。 BFS の辺から即値だけを外すと B に届かず U2 漏れ 1 (FAIL)
+cat > "$N/nc2.py" <<'PY'
+import importlib.util, sys
+sys.path.insert(0, 'sampler')
+import closure_indirect as CI
+spec = importlib.util.spec_from_file_location('cu_mod', sys.argv[1]); CU = importlib.util.module_from_spec(spec); spec.loader.exec_module(CU)
+class X:
+    base = 0
+    ends = {'A': 1, 'B': 1}
+    def fw(self, f): return False
+    def edges(self, f): return (set(), set())
+x = X()
+IMM = {'A': ({'B'}, set()), 'B': (set(), set())}
+total3, _ = CI.Pe.bfs(x, ['A'], CU.edge3_of(x, IMM))
+miss = CU.u2_miss(x, total3, IMM, {'A', 'B'})
+print('U2 漏れ %d (total3=%s)' % (miss, sorted(total3)))
+sys.exit(1 if miss else 0)
+PY
+expect "NC2 対照 (即値辺あり・無改変の edge3_of): U2 漏れ 0" "$(rc python3 "$N/nc2.py" "$CL")" 0
+mutate "$CL" "$T" "s/^        return x.edges(f)\[0\] | x.edges(f)\[1\] | i\[0\] | i\[1\]\$/        return x.edges(f)[0] | x.edges(f)[1]/" NC2
+expect "NC2 BFS の辺から命令内即値を外す → U2 漏れ > 0 (FAIL)" "$(rc python3 "$N/nc2.py" "$T")" 1; needfail 'U2 漏れ 1' NC2
 
 mutate "$CL" "$T" "s/        ex_c = C - A - B_all\$/        ex_c = C - B_all/" NC3
 expect "NC3 (c) に (a) を二重計上 → U4 FAIL" "$(rc python3 "$T" --out-dir "$N/out3")" 1; needfail 'FAIL.*U4' NC3
@@ -57,12 +79,10 @@ csv.writer(open(sys.argv[2], 'w')).writerows(rows)
 PY
 expect "NC5 emcc_c_rc=1 の 1 行 → judge FAIL" "$(J "$N/mut.csv")" 1
 
-# NC6: e2e 本体 (--skip-lift). 対照は既知の不合格 (range 欠落) だけで rc 1 になることを確認する
+# NC6: e2e 本体 (--skip-lift). 対照 (無改変) は rc 0 で OK を出す。 AC2 gate が未解決の間は rc 1 で FAIL する (期待値は書き換えない)
 cp "$SRC" "$N/status_run.orig.csv"
-r6a=$(rc bash sampler/unr_e2e.sh --skip-lift); expect "NC6 対照 (無改変 --skip-lift): 既知の range 欠落のみで rc 1" "$r6a" 1
-grep -q 'judge shells: PASS 7/7' "$N/last.out" || { echo "  !! NC6 対照: judge が PASS していない" >&2; FAIL=1; }
-grep -q 'indirect_defs: FAIL' "$N/last.out" || { echo "  !! NC6 対照: indirect_defs の FAIL が無い (既知の欠落が出ていない)" >&2; FAIL=1; }
-if grep -q '\[unr_e2e\] OK' "$N/last.out"; then echo "  !! NC6 対照: 既知の不合格なのに OK 行が出た" >&2; FAIL=1; fi
+r6a=$(rc bash sampler/unr_e2e.sh --skip-lift); expect "NC6 対照 (--skip-lift 無改変)" "$r6a" 0
+grep -q '\[unr_e2e\] OK' "$N/last.out" || { echo "  !! NC6: 対照に OK 行が無い" >&2; FAIL=1; }
 python3 - "$SRC" <<'PY'
 import csv, sys
 p = sys.argv[1]
