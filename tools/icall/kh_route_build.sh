@@ -14,7 +14,7 @@ M11="$(cd -- "$T/m11" && pwd)"
 if [ ! -f "$SRC" ]; then echo "[kh_route] $SRC が無い: 素材 work-icall を展開し、rewrite+RetDec を先に実行" >&2; exit 2; fi
 MAP="$HERE/work/rt_kilohearts-gain/map.json"
 if [ ! -f "$MAP" ]; then echo "[kh_route] $MAP が無い: icall_rewrite.py の出力 (blk / cfg_thunks) が必要" >&2; exit 2; fi
-BLK="$(python3 -c "import json,sys;print(hex(json.load(open(sys.argv[1]))['blk']))" "$MAP")"
+BLK="$(python3 -c "import json,sys;print(hex(json.load(open(sys.argv[1]))['blk'] - 0x150000000))" "$MAP")"
 CFG="$(python3 -c "import json,sys;print(','.join('%x' % v for v in json.load(open(sys.argv[1]))['cfg_thunks']))" "$MAP")"
 source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1
 # 1. 復元後 IR の後処理 (fix_mask / fix_vstore を無条件に実行)
@@ -24,16 +24,18 @@ python3 "$HERE/ir_fix_vstore.py" "$W/oi.restored.ll" "$W/oi.restored1.ll" | tee 
 python3 "$T/m2/ir_normalize.py" "$W/oi.restored.ll" "$W/oi.norm0.ll" >/dev/null
 python3 "$T/m5/ir5_patch.py" "$W/oi.norm0.ll" "$W/oi.lift.ll" --report "$W/ir5.json" >/dev/null 2>&1
 cp "$W/oi.lift.ll" "$W/oi.p1.ll"
-python3 "$HERE/ir_flatten.py" "$W/oi.p1.ll" "$W/oi.flat.ll" --table "$W/oi.table.c" --cfg "$CFG"
+python3 "$HERE/ir_flatten.py" "$W/oi.p1.ll" "$W/oi.flat.ll" --limit 0x0c000000 --table "$W/oi.table.c" --cfg "$CFG"
 # 3. SIMD / VEX helper (silent 0 返却を残さない)
 python3 "$T/m11/m11_simd2.py" "$W/oi.flat.ll" 2> "$W/simd.log" > "$W/oi.simd0.c"
 sed -i "s#\"../msimd11_core.h\"#\"$M11/msimd11_core.h\"#; s#\"../m11/msimd11_core.h\"#\"$M11/msimd11_core.h\"#" "$W/oi.simd0.c"
 python3 "$HERE/vex_gen.py" "$W/oi.flat.ll" "$W/oi.vex.c" | tee "$W/vex_gen.json"
 python3 "$HERE/simd_merge.py" "$W/oi.simd0.c" "$W/oi.simd.c" "$HERE/rt/icall_simd_extra.c" "$W/oi.vex.c" --report "$W/simd_merge.json"
-# 4. PE data 敷設の代わりの空定義 (未了。wasm の data は未配置)
-printf 'void ott_data_install(void) {}\n' > "$W/kh_nodata.c"
+# 4. PE data 敷設 (.rdata/.data/_RDATA を 0x30000000+RVA へ。data_gen.py は OTT と同じ規約)
+PE="$HERE/work/kh_pe/HeartCore.core_64"
+if [ ! -f "$PE" ]; then echo "[kh_route] $PE が無い: plugins-kilohearts の windows.zip から HeartCore.core_64 を展開" >&2; exit 2; fi
+python3 "$T/ott/lift/data_gen.py" "$PE" "$W/kh_data.c"
 # 5. build (BLK は map.json の blk、メモリ量は 0x3c000000 固定)
-emcc "$W/oi.flat.ll" "$W/oi.simd.c" "$W/oi.vex.c" "$W/oi.table.c" "$HERE/rt/icall_rt.c" "$HERE/rt/icall_ovr.c" "$HERE/rt/icall_simd_extra.c" "$W/kh_nodata.c" \
+emcc "$W/oi.flat.ll" "$W/oi.simd.c" "$W/oi.vex.c" "$W/oi.table.c" "$HERE/rt/icall_rt.c" "$HERE/rt/icall_ovr.c" "$HERE/rt/icall_simd_extra.c" "$W/kh_data.c" \
   -DICALL_BLK=$BLK -w -O0 -g -ffp-contract=off -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=2MB -sGLOBAL_BASE=268435456 \
   -sENVIRONMENT=node -sMODULARIZE=1 -sEXPORT_NAME=createModule -sEXIT_RUNTIME=1 -sERROR_ON_UNDEFINED_SYMBOLS=0 \
   -sEXPORTED_FUNCTIONS=_ott_run,_ott_xmm0,_ott_data_install,_malloc -sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAPU32,HEAPF32,HEAPF64 \
