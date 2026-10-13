@@ -25,9 +25,11 @@
 ## 2. 数学名表 (名前ポインタ表)
 
 - 旧 run の記述: `.rdata` 0x180fae600 付近に `(ID, 名前ポインタ)` の 16 バイト組の表がある。
-- 数学名表の走査と、表を指す lea/mov 参照元の列挙は `scripts/sr3c_muparser_attr.py` に入れた (`name table:` と `lea/mov refs into name table:` の行)。本 run では `work/` が無く未実行のため、出力は未取得。
-- 旧 run の「lea 参照元 5 関数」「12 参照」等の個数は、committed スクリプトの出力では再現できないため本 REPORT から外した。再取得後に出力を貼る。
-- 6 関数のアドレスを 8 バイト絶対ポインタとして `.rdata` で探したが 0 件。
+- 本 run (2026-10-13, `plugins-serum2` 展開, `sr3_run.sh` 後) の `scripts/sr3c_muparser_attr.py` 出力: name table `rva 0x180fae640` 24 件 (`exp` `pow` `log` `log10` `sinh` `cosh` `tanh` `asin` `acos` `atan` `atan2` `sqrt` `sin` `cos` `tan` `ceil` `floor` `fabs` `modf` `ldexp` `_cabs` `_hypot` `fmod` `frexp`)。
+- 表を指す RIP lea は **1 件** (`0x180a0ea64`、所属 `0x180a0ea50` 345 B)。この関数は表を線形探索する dispatch (ID 一致で `call 0x180a0a6a0` / `call 0x180a03b50`) である。旧 run の「lea 参照元 5 関数・12 参照」は本 run の出力では再現しなかったため撤回する。
+- 窓外 6 関数の int32 RVA 出現 (`scripts/sr3c_chain.py`): 各関数の VA は `.rdata` の 3 つ組 `(begin, end, unwind)` 表 (0x18111df10/0x18111e35c/0x18111e534/0x18111f634 ほか、各 2 回) と `.pdata` にだけ現れる。`.rdata` の 3 つ組は `.pdata` の複製で、dispatch 表ではない。
+- 6 関数の 8 バイト絶対ポインタは 0 件 (旧 run と同じ)。
+- 呼び出し経路 (`scripts/sr3c_chain.py`): dispatch `0x180a0ea50` の直接 call/jmp 呼出元は **2 件** (`0x180a0e406` 所属 `0x180a0e2f0` 378 B、`0x180a0e5a4` 所属 `0x180a0e470` 421 B)。さらに呼出元は `0x1809e9844` (所属 `0x1809e9790` 451 B)、`0x1809ea5f5`・`0x1809ea7b2`・`0x1809ea80d` (muParser 窓外側の別関数)。ここで直接 call/jmp の経路が止まる。窓外 6 関数はこの経路上に現れない。
 
 ## 3. 結論
 
@@ -37,7 +39,8 @@
 
 ## 4. 実測
 
-- 本 run の検証 (コミット済みデータのみ): `out/sr3_verify.txt`・`out/sr4_funcs.tsv`・`out/sr3_gap_blocks.tsv` で §1 の所在を確認。`scripts/sr3c_muparser_attr.py` は `py_compile` 成功のみ (実行は未実施)。
-- 素材: `plugins-serum2` (`Install_Xfer_Serum2_2.1.5.exe`) は本 run の `$ARTIFACTS_DIR` に無く、`work/` も無いため、`sr3_run.sh` の再実行と `sr3c_muparser_attr.py` の実行はできていない。
-- 前回 run の記録 (再現未確認): `sr3_run.sh` 43.8 秒 (4 core, user 26.0 s)。cut 1,510 関数 / 1,464,181 B (§11.6 の基準 `699addb` と一致)。入力 sha256 `501e7bb3…5283` (§11 と同一)。
-- 未了: `plugins-serum2` を `oc_artifacts` で取得し、`sr3_run.sh` → `sr3c_muparser_attr.py` を実行して §1 の「未再確認」列と §2 の出力を埋める。
+- 素材: `plugins-serum2` を `tar --zstd -xf $HOME/artifacts/plugins-serum2.tar.zst --wildcards '*Install_Xfer_Serum2_2.1.5.exe'` で `$RUNNER_TEMP/serum2` に展開 (1.7 s)。入力 sha256 `501e7bb3…5283` (§11 と一致)。
+- `sr3_run.sh` 実測 (本 run): 42.7 s (real) / user 24.6 s・4 core。cut 1,510 関数 / 1,464,181 B、lift 33,791 → 32,281 関数。§11.6 の基準と一致。
+- `sr3c_muparser_attr.py` 実測: 2.0 s。`sr3c_chain.py` 実測: 10.0 s (初回実行は `lea` の VA/RVA 取り違えで 0 件となったため修正し、修正後の出力を §2・§3 に載せた)。
+- 本 run の変更: `scripts/sr3c_chain.py` を追加 (§2・§3 の出力を再現する)。`out/` の生成物は変更なし。
+- 未了: 窓外 6 関数の帰属は、dispatch の呼出元を 2 段 (dispatch → 呼出元 → その呼出元) まで確認したが、6 関数には届かなかった。3 段目以降は未走査。静的な直接 call/jmp・RIP lea・絶対ポインタ・RVA 表では特定不可。間接呼出 (`call qword ptr`・vtable・関数ポインタ登録) の追跡は静的では不完全なため、動的トレース (数学名表 dispatch の実行中に呼ばれる関数の記録) が必要。#71 継続。
