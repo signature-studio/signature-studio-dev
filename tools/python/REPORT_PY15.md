@@ -165,7 +165,7 @@ cases 6122
 
 参考: 旧 `8d883c3` (harness で `midi` を解決できず `NameError` になる版) を midi 偽値あり条件で比べると、拒否 19・値変更 6・NameError 102 (`8d883c3` の `eval` 版は `midi` 無しでも `NameError` を出すため、この件数は midi 既定値の呼出しを含まない)。
 
-| 検査 (HEAD `fef025ef`) | 結果 | rc |
+| 検査 (HEAD `fef025ef` の midi 偽値条件。`6e6d81a8` は REPORT のみで同じ検査) | 結果 | rc |
 |---|---|---|
 | `tests/kwsig_check.py` | OK (224 件中同結果 208、差 16・11 関数) | 0 |
 | `tests/kwsig_bind_check.py` (midi 偽値あり) | PASS (103 関数・6122 ケース、misbind 0・mismatch 0) | 0 |
@@ -189,25 +189,25 @@ wasm 系 (素材 `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開、`FL_WIN64_DI
 - 計測の範囲: CPython のクリーン値は `bb1b838a` で取った 250 秒。`fef025ef` は `src/` が同じで harness のみ変わるため、CPython は `work/` の incremental (1 秒) で rc=0 を確認。`fef025ef` の flpy 7 秒・provider 1.2 秒・JS 系の値は同じ構成の実行。
 - `tests/kwsig_check.py` の期待は 224 件基準のまま (本修正で変わらない)。
 
-### 16-b. 本 PR head の wasm 回帰 (検証 HEAD `fef025ef`。旧 `a92cd53` の値は破棄)
+### 16-b. 本 PR head の wasm 回帰 (検証 HEAD `6e6d81a8`。旧 `a92cd53` の値は破棄)
 
-`src/` は `b9640a6d` 以降不変。`d84e73b6`〜`bb1b838a` は `tests/kwsig_check.py` と REPORT のみ、`fef025ef` は `tests/kwsig_bind_check.py` (midi 偽値) のみ変更。wasm 系の値は下表 (`fef025ef` の実測)。
+`src/` は `b9640a6d` 以降不変。`d84e73b6`〜`bb1b838a` は `tests/kwsig_check.py` と REPORT のみ、`fef025ef` は `tests/kwsig_bind_check.py` (midi 偽値) のみ、`6e6d81a8` は本 REPORT のみ変更。下表は `6e6d81a8` の実測 (クリーン `work/` から、直列・前景、node 22.23.3、素材 `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開、`FL_WIN64_DIR` 設定)。
 
 | 手順 (直列・前景) | 結果 | rc | 所要 |
 |---|---|---|---|
-| `build_cpython_wasm.sh` (`bb1b838a` でクリーンビルド) | `python.wasm` 生成 | 0 | 250 秒 |
-| `build_cpython_wasm.sh` (`fef025ef`、`work/` incremental) | rc=0 | 0 | 1 秒 |
-| `build_flpy.sh` (`fef025ef`) | `flpy.wasm` 生成 | 0 | 7 秒 |
-| `provider/build.sh` (`fef025ef`) | `flprov.wasm` 生成 | 0 | 1 秒未満 |
-| `tests/provider_check.mjs` | PASS (functions 435・implemented 60・mcp_static 60) | 0 | 0.38 秒 |
-| `tests/all_tools.mjs` (JS mock) | 48/48 ok・host_calls 37,425・callback_roundtrip true | 0 | 1.9 秒 |
-| `FL_ENGINE=wasm tests/all_tools.mjs` | 48/48 ok・host_calls 37,425・callback_roundtrip true | 0 | 2.0 秒 |
-| `tests/kwsig_check.py` | OK (224 件中同結果 208、差 16・11 関数) | 0 | 0.05 秒 |
-| `tests/kwsig_bind_check.py` | PASS (103 関数・6122 ケース、misbind 0・mismatch 0) | 0 | 0.09 秒 |
-| `tests/mcp_kwcalls_extract.py` (python3.12) → `tests/mcp_kwcalls_bind.py` | 20 箇所・14 パターン → 14/14 PASS | 0 | — |
+| `fl-win64` 展開 (`tar --zstd -xf`) | 25,166 件・`block00031_PE.bin` あり | 0 | 7.9 秒 |
+| `fetch_inputs.sh` | 完了 | 0 | 1.4 秒 |
+| `build_cpython_wasm.sh` (クリーン) | `python.wasm` 生成 | 0 | 3 分 29.0 秒 |
+| `build_flpy.sh` | `flpy.wasm` 生成 | 0 | 5.7 秒 |
+| `provider/build.sh` | `flprov.wasm` 生成 | 0 | 1.0 秒 |
+| `tests/provider_check.mjs` | PASS (functions 435・implemented 60・mcp_static 60) | 0 | 0.32 秒 |
+| `tests/all_tools.mjs` (JS mock) | 48/48 ok・host_calls 37,425・callback_roundtrip true | 0 | 1.31 秒 |
+| `FL_ENGINE=wasm tests/all_tools.mjs` | 48/48 ok・host_calls 37,425・callback_roundtrip true | 0 | 1.29 秒 |
+| `tests/kwsig_check.py` | OK (224 件中同結果 208、差 16・11 関数) | 0 | 実行ログ未計測 |
+| `tests/kwsig_bind_check.py` | PASS (103 関数・6122 ケース、misbind 0・mismatch 0) | 0 | 実行ログ未計測 |
+| `tests/mcp_kwcalls_extract.py` (python3.12, `block25159_DATA.bin` 100,674 B) → `tests/mcp_kwcalls_bind.py src` | 20 箇所・14 パターン → 14/14 PASS | 0 | 実行ログ未計測 |
 | 同 `--neg` | distinct 15: pass 14, fail 1 → FAIL | 1 | — |
 
-- CPython の wasm 計測は `bb1b838a` (`src/` 同一・`fef025ef` と wasm 生成物の入力は同じ) のクリーンビルド 250 秒と、`fef025ef` の incremental rc=0 の 2 つ。
 - 実行後の `git status` は空 (`tool_coverage.json` の書き換えなし)。生成物 (`work/`・`dist/`) は gitignore 対象。
 - 差分の手順は `run_all.sh` の step 1・2・5・9b を個別に実行したもの。`run_all.sh` 全体は step 4 の固定パス (#630) のため使えない。
 - 範囲外 (未実行): `mcp_ui_check.mjs` / `midi_ui_check.mjs` (Vite が要る)、`browser_check.mjs`・`midi_script.mjs` 等の §14 記載分は本 head では再計測していない。
