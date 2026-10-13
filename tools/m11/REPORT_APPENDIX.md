@@ -165,7 +165,7 @@ GitHub Actions runner (4 core, load 0.6–0.9)。素材は work-m11 スナップ
 
 注記:
 * §9 (3e49295) の記録 (1,049 site / 2,064 引数 / set_const_xmm_callee 48 / survey ok 812) とは HEAD の差で数値が動いている。本表は `7e149974` の値で、比較の基準はこちら。
-* **差の説明 (inherit 1,172 → 1,185、set_const_xmm_callee 48 → 49)**: `git diff 3e49295 7e149974 -- tools/m11/m11_argrecover.py` の分類ロジックは不変 (`classify_set` の戻り値に `why` を足し、`none` の判定条件は同一)。よって数値差は分類器ではなく**入力側**から来る (`work/boot_final.ll` を作る `m11_passes.py` / `m11_gen_ir2.sh` / `m11_post.py` の変更、または `m11_post.py --pads` の site 列挙の変化)。どの commit が 1,172→1,185 を生んだかは、3e49295 と 7e149974 で `m11_sigfix_stats.sh` を実行して site 単位に突き合わせるまで**未特定** (本 run では入力が無く未実施)。
+* **差の説明 (inherit 1,172 → 1,185、set_const_xmm_callee 48 → 49)**: `git diff 3e49295 7e149974 -- tools/m11/m11_argrecover.py` の分類ロジックは不変 (`classify_set` の戻り値に `why` を足し、`none` の判定条件は同一)。分類器は原因ではない。入力側 (`work/boot_final.ll` を作る `m11_passes.py` / `m11_gen_ir2.sh` / `m11_post.py` の変更、または `m11_post.py --pads` の site 列挙の変化) が候補だが、**原因未特定**。どの commit で動いたかは 3e49295 と 7e149974 で `m11_sigfix_stats.sh` を実行して site 単位に突き合わせるまで分からない (本 run では入力が無く未実施)。この突合は #1479 の前提に追加した。
 * 統計スクリプトで `tools/m11/results/sigfix_zeropad_remaining.tsv` が 1,050 → 1,062 行に再生成された (未コミット。再生成物のため本 PR に含めない)。
 * 再測定 (after) と `fix_xmm_args.py` の接続は本 run では時間が足りず未実施 (下記の子 issue)。
 
