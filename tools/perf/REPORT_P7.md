@@ -54,3 +54,18 @@
 | Firefox の worklet 内 `postMessage(Module)` 挙動 | ハーネスが worklet 側の受信を確認していない | 実機採取時に worklet 側 `messageerror` を記録するよう拡張 |
 | Firefox 上限: Memory 400 本超 | CAP を 400 にしたため上限未到達 | 実機でも必要なら CAP を上げる (RSS 0 の仮想予約のみ) |
 | compilationHints の機序・低負荷専用機での再測 | 本 run は共有 VM | 既存 REPORT §5.3 に残置 |
+
+## 5. Safari (macOS 実機) の手動採取手順 ([PERF-P7c] #949)
+
+runner (Linux) では Safari を起動できないため、macOS 実機で以下を行う。`p7.mjs` の自動起動は使わない。
+
+1. macOS の端末で repo を checkout し、リポジトリ直下で次を実行する (Node 必要。サーバは 127.0.0.1 のみで待つ)。
+   ```sh
+   node --input-type=module -e "import fs from 'node:fs'; import {startServer} from './tools/perf/p7/server.mjs'; const s = await startServer(); console.log(s.url + '/p7.html?cfg=safari&rounds=3'); setInterval(() => fs.writeFileSync('work/p7_safari.json', JSON.stringify(s.results, null, 1)), 3000);"
+   ```
+   表示された URL (`http://127.0.0.1:<port>/p7.html?cfg=safari&rounds=3`) を **Safari で開く**。
+2. ページは round 0 の全実験を行った後、同一 URL を 2 回再ロードする (wasm code cache の観測)。`work/p7_safari.json` の `done` キーが出るまで待つ (目安は端末依存。`done` が出なければ失敗)。
+3. `work/p7_safari.json` を `tools/perf/p7/results/` に移し、上限・lazy compile・Memory 本数の数値を §0 と同じ表形式で本ファイルに追記する。
+4. 検証: Safari 上で `done` が届かない場合は、Safari の開発メニュー → コンソールのエラーを記録する。
+
+確認済み (runner, 本 PR の HEAD): サーバ起動・`p7.html` 200・`/wasm?c=mid` 200 (941,572 B)・`POST /result` 200・`done` の受信と JSON 書き出し。Safari 本体の挙動は未確認。
