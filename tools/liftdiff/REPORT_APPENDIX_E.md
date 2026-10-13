@@ -2,7 +2,7 @@
 
 ## 10. 旧記録: OTT 旧 chain (D1〜D6) の Actions 再現 (LD-8 / #406) — 未検証時点の記述
 
-本文は `REPORT_APPENDIX.md` §10 に置き換えた。以下は `ebf5114a` 時点の記述を無変更で移動したもの (250 行上限のため分割移動)。
+本文は `REPORT_APPENDIX.md` §10 に置き換えた。以下は `ebf5114a` 時点の記述を移動したもの (250 行上限のため分割移動)。repo 外絶対パスは `$HOME/analysis` に正規化した (AGENTS.md §4.1)。本節の数値は**未検証・申告値 (`ebf5114a` 時点)** であり、実測の正本は `REPORT_APPENDIX.md` §10。
 
 
 既知類型との関係 (DEFECTS.md): 新規類型なし (D1〜D6 は OTT 旧 chain の既存分類 = `check_ott.py`)。検証起点 commit: `59eea5c` (main `bb76f7c` 上) と、本 run の `6e5c8da` (main 上) の 2 系統。
@@ -24,8 +24,8 @@
 
 ### 前回 run (`59eea5c`・fl-win64/work-m11 未取得)
 
-- **PE パス解決**: `targets/ott_old.json` の `pe` = `${PLUGINS_DIR}/ott/binaries/OTT_vst2_win64.dll`。`PLUGINS_DIR` 未設定・`ANALYSIS_DIR=/home/runner/analysis` で
-  `ldlib/build_wasm.py` と同じ展開式 (`tools/shared/paths.py` 既定 `$ANALYSIS_DIR/plugins`) が `/home/runner/analysis/plugins/ott/binaries/OTT_vst2_win64.dll` (3,146,752 B, 実在) に解決。
+- **PE パス解決**: `targets/ott_old.json` の `pe` = `${PLUGINS_DIR}/ott/binaries/OTT_vst2_win64.dll`。`PLUGINS_DIR` 未設定・`ANALYSIS_DIR=$HOME/analysis` で
+  `ldlib/build_wasm.py` と同じ展開式 (`tools/shared/paths.py` 既定 `$ANALYSIS_DIR/plugins`) が `$HOME/analysis/plugins/ott/binaries/OTT_vst2_win64.dll` (3,146,752 B, 実在) に解決。
 - **D1〜D6 検出** (`ld_native` + `build ott_old` + `batch --set closure --shards 4` + `tests/check_ott.py`、クリーン worktree で 3 回): 3 回とも exit 0・出力同一。
   212 関数 = 一致 38 / 不一致 108 / 実行不能 66。D1 icall_drop 4 / D2 short_global 6 / D3 callsite_arg_drop+arg_drop 14 / D4_D5 C 定義 port 18 / D6 body 層 26 (分母 = 212 関数、タグは複数重複あり)。
   ctor `18011d400` = mismatch (icall_drop, callsite_arg_drop, callee_divergence, import_call_seq, zero_init_drop, fp_flag_unreflected)。

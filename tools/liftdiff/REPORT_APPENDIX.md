@@ -162,17 +162,16 @@ python3 tools/liftdiff/tests/oob_414ad0.py > tools/liftdiff/results/m11_oob_414a
 
 ### 実測 run (受入条件 1 の再実行)
 
-- **Actions run ID**: `38427784456` / URL: https://github.com/signature-studio/signature-studio-dev/actions/runs/38427784456 (`GITHUB_RUN_ID`。本節の実測 run)
-- **検証 HEAD**: `d7cb6a5b` (PR の最終 head)
-- **実行**: `bash tools/liftdiff/liftdiff_e2e.sh` (`--m11-only` なし・既定 `sample:800`)。`ANALYSIS_DIR=$HOME/analysis`・`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`・`TMPDIR=$RUNNER_TEMP`。素材は `oc_artifacts` の 6 件を `$HOME/artifacts` で実在確認してから展開。
-- **ログ**: `tools/liftdiff/work/e2e_d7cb6a5b.log` (`work/` は gitignore・commit なし。抜粋は下記)
+- **Actions run ID**: `38430714782` (`GITHUB_RUN_ID`。本節の実測 run)。ログは commit 済みの [`results/liftdiff_e2e_run38430714782_9cadda79.log`](results/liftdiff_e2e_run38430714782_9cadda79.log) (`results/` は gitignore 対象外)。Actions 上の run ログには `liftdiff_e2e.sh` の stdout を残していないため、この commit 済みログが根拠。
+- **検証 HEAD**: `9cadda79` (PR の最終 head。`main` `909cf37b` を merge した後の commit。merge 後も e2e を再実行)
+- **実行**: `bash tools/liftdiff/liftdiff_e2e.sh` (`--m11-only` なし・既定 `sample:800`)。`ANALYSIS_DIR=$HOME/analysis`・`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`・`PLUGINS_DIR=$HOME/analysis/plugins`・`TMPDIR=$RUNNER_TEMP`。素材は `oc_artifacts` の 6 件を `$HOME/artifacts` で実在確認してから展開。
 
-| 検証 HEAD | 結果 | 所要 (wall clock) | load (1 分平均 開始→終了) | [2/4] 212 関数 (一致 / 不一致 / 実行不能) | D1 / D2 / D3 / D4_D5 / D6 |
+| 検証 HEAD | 結果 | 所要 (wall clock) | load (1 分平均) | [2/4] 212 関数 (一致 / 不一致 / 実行不能) | D1 / D2 / D3 / D4_D5 / D6 |
 |---|---|---|---|---|---|
-| `d7cb6a5b` (本節・最終 head) | exit 0・`LIFTDIFF_E2E PASS` | 174 s | 1.15 → 5.84 | **35 / 112 / 65** | 4 / 6 / 14 / 20 / 26 |
+| `9cadda79` (本節・最終 head) | exit 0・`LIFTDIFF_E2E PASS` | 179 s | 終了時 6.05 (開始時は未取得) | **35 / 112 / 65** | 4 / 6 / 14 / 20 / 26 |
 
 - **ネガコン**: 無加工 exit 0 + NC[D1] / NC[D2] / NC[D3] / NC[D6] が各 exit 1 = 5/5 PASS
-- **ログ抜粋** (`e2e_d7cb6a5b.log` の該当行をそのまま):
+- **ログ抜粋** (commit 済みログの該当行をそのまま):
   ```
   OTT_SUMMARY {"functions": 212, "match": 35, "mismatch": 112, "unexec": 65, "defects": {"D1_indirect_call_drop": 4, "D2_short_global": 6, "D3_callsite_arg_drop": 14, "D4_D5_c_defined_ports": 20, "D6_body_layer": 26}, ...}
   PASS positive: 無加工 batch → exit 0
@@ -187,7 +186,7 @@ python3 tools/liftdiff/tests/oob_414ad0.py > tools/liftdiff/results/m11_oob_414a
   LIFTDIFF_E2E PASS
   ```
 - **注意**: 以前の記録 (run `38423629378` の 33/110/69 と 35/112/65 など) は、ログが残っておらず run との対応を確認できないため、受入の根拠にしない。前回比の差分の原因切り分けは #825。
-- **他段 (本 run)**: [0/4] 単体 23 tests OK / [1/4] build ・ネガコン 5/5 / [3/4] unit #18 3 件 PASS (`UStrAsg` mem diff・`Move(409c80)` spill_slot_deref・`4123c0` 脱落 native 67 > wasm 46) / [4/4] `sample:800` 一致 361 / 不一致 229 / 実行不能 210 (batch 99 s)。boot は unit 22 で native segv (`units_run=22/942`、判定条件外)。
+- **他段 (本 run)**: [0/4] 単体 23 tests OK (`Ran 23 tests`・`OK`) / [1/4] build ・ネガコン 5/5 / [3/4] unit #18 3 件 PASS (`UStrAsg` mem diff・`Move(409c80)` spill_slot_deref・`4123c0` 脱落 native 67 > wasm 46) / [4/4] `sample:800` 一致 361 / 不一致 229 / 実行不能 210 (batch 105 s)。boot は unit 22 で native segv (`units_run=22/942`、判定条件外)。
 - **素材 (`oc_artifacts`)**: `fl-win64 toolchain-retdec toolchain-emsdk work-m11 work-liftdiff work-m6-ott analysis-ott-binaries` (PR 本文と同一)。`$HOME/artifacts` の 7 件の実在を確認して展開:
   - `fl-win64` → `$RUNNER_TEMP/fl-win64` (`FL_WIN64_DIR`)
   - `work-m11` / `work-liftdiff` / `work-m6-ott` → repo 直下の `tools/{m11,liftdiff,m6}/work/` 他 (gitignore・commit なし)
