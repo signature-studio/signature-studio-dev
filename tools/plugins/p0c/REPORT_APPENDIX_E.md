@@ -212,7 +212,7 @@ before は 515.7 s で `p0c/work/kernel_table.json` の置き場所違いによ�
 
 | 項目 | before (8af7eb0) | after (856be6b) | HEAD (b1e5f88a) |
 |---|---|---|---|
-| `p0c_e2e.sh` 初回 (kernel_matrix 込み) | rc=0、354.4 s (全体 5 分 54 秒、load 5.58→0.55) | rc=0、350.9 s (全体 5 分 50 秒、load 8.56→3.57) | rc=0、6.7 s (kernel_matrix・lift skip) |
+| `p0c_e2e.sh` 初回 (kernel_matrix 込み) | rc=0、354.4 s (開始時 uptime load 1 分値 0.55) | rc=0、350.9 s (開始時 uptime load 1 分値 3.57) | rc=0、6.7 s (kernel_matrix・lift skip、load 未記録) |
 | `p0c2_e2e.sh 200` | rc=0、9.4 s (load 未記録) | rc=0、14.7 s (load 未記録) | rc=0、7.5 s |
 
 判定: `p0c_e2e.sh` と `p0c2_e2e.sh` の stdout (パス正規化後) は before/after で一致 (`p0c_e2e.sh` 132 行、`p0c2_e2e.sh` 75 行系)。`cmp` 一致: `k80.final.ll` `table_verify.json` `kernel_matrix.json` `f80_classes.json` `f80_kernels.json` `p0c2_sweep.csv` `k80abi.json` `diff/k80.argfix.ll` `diff/k80.argfix.wasm.o`。
