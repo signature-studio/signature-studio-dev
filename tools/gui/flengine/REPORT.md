@@ -149,6 +149,12 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 - IR provenance (`results/ir_sha256.txt`): 素材 `boot_final.ll` `69c774de…`・`boot_final3.ll` `010451ad…`。step 0 で複製側に `m11_gen_ir2.sh` を回して作り直した IR (ldfix=applied) を測定元にした。その後 `m11_build.sh` 後の sha256 は `boot_final.ll` `2be93e55…`・`boot_final3.ll` `ac64ad01…` (全文は results/ir_sha256.txt)。旧 REPORT の `30a4e00d…` / `4f0a0cc6…` は旧版の IR で、現 head の IR とは一致しない。
 - 親 `bash tools/gui/e2e.sh` (受入条件 2): **ALL PASS / rc 0** (本 HEAD `40e4e4b0`、1 回・wall 3 分 18 秒 (198.8 s)、present-e2e 段の load 1.16 → 1.55)。事前に `pnpm install --frozen-lockfile` と `tools/e2e` の `npm ci` を実行 (step 6 の agent-browser 依存のため。いずれも rc 0)。同 HEAD の 1 回目 (`pnpm install` 前) は `tsc` 不在で rc 127、2 回目 (`tools/e2e` の `npm ci` 前) は step 6 の `agent-browser` 不在で rc 2。いずれも依存未導入で、ASan 由来ではない。
 
+### results 再生成 (commit `c994306b`、main 取込後・実測は未実施)
+- `results/probe.json`: `util_window` (`function_52a7f0`) の ret = `0x1100010` (旧 `0x110000f`)。`TApplication` の hwnd は `0x110000f` のまま (ret 値と取り違えないこと)。
+- `results/baseline_boot.json`: `wasm_size` = 6912872、`init_count` 54、`units_run` 52、`disp_entries` 8621。
+- `results/ir_sha256.txt`: `material` の `boot_final.ll` = `69c774de…`・`boot_final3.ll` = `010451ad…`。`after_m11_build` の `boot_final.ll` = `cc4d1057…`・`boot_final3.ll` = `ab88f081…`。下の HEAD 表の `2be93e55…`・`ac64ad01…` は旧版で、現 results とは一致しない。
+- 上の値は再生成物の記録であり、e2e 実測ではない。実測は PR #577 の検証節を参照。
+
 ### 現 HEAD `3885765a` の実測 (本節を正とする)
 
 | 対象 | rc | 所要 | 結果 |

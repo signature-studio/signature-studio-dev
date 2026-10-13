@@ -1,7 +1,7 @@
 # REPORT_564 — function_52a7f0 (AllocateHWnd) の `cmp [TempClass.lpfnWndProc]` 脱落 (#564 / M11-N19)
 
 **判定: 部分達成 (Refs #564, Closes しない)**。欠陥の型を特定し、ldfix に **F4** を追加して 10 関数を機械語突合で修復した。
-修復後、指向呼出 (JS から `function_52a7f0` を直接呼ぶ) で `RegisterClassW` に到達する (ret hwnd 0 → 0x110000f)。自然起動での到達ではない
+修復後、指向呼出 (JS から `function_52a7f0` を直接呼ぶ) で `RegisterClassW` に到達する (ret hwnd 0 → 0x1100010。`results/probe.json` c994306b 再生成の値)。自然起動での到達ではない
 (自然起動は unit #23 で Halt0 のため #134/#490 の先)。全数走査は実施したが検出器に偽陰性があり (§3)、F4 が直した 10 関数のうち
 動的に効果を確認したのは 52a7f0 だけ (§5)。依存: PR #563 (`tools/gui/flengine` の probe を使う。#563 未 merge のため同ブランチを取り込み済み)。
 
@@ -48,7 +48,7 @@ REGLIVE 2,509 (関数入口 live-in 等で脱落でない) / **FRAME_IN_ESCAPED 
 |---|---|---|---|
 | F4 修復関数 | 0 | 10 | 10 |
 | `RegisterClassW` 到達 (probe 通算) | 2 | 2 | **3** |
-| `function_52a7f0` の戻り | 0x0 (CreateWindowExW NULL) | 0x0 | **0x110000f** |
+| `function_52a7f0` の戻り | 0x0 (CreateWindowExW NULL) | 0x0 | **0x1100010** (probe.json c994306b。旧 `40e4e4b0` の実測は 0x110000f) |
 | 通常起動 units_run / init_count | 52 / 54 | 同 | 同 |
 | survey ok / noproc / miss / trap | 869 / 1 / 47 / 25 | 同 | 同 |
 
