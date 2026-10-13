@@ -94,6 +94,11 @@ if [ "$CHROME" = 1 ]; then
   step "[4] headless Chrome (dedicated Worker): 同 module を Web 環境でロード → node と bit 一致 + Memory 個数"
   S="$W/chrome_stage"; rm -rf "$S"; mkdir -p "$S"; cp "$HB/poc/hb_bridge.mjs" "$LB/multi/chrome_worker.mjs" "$W/host_vst2.wasm" "$W/m10_0x10000/ott_hb.cjs" "$W/m10_0x10000/ott_hb.wasm" "$W/bal_lb/bal_hb.cjs" "$W/bal_lb/bal_hb.wasm" "$S/"
   node "$LB/multi/run_chrome.mjs" --stage "$S" --node-json "$W/ml_lb.json" --nmod 4 --nspawn 100 --out "$W/chrome_result.json" 2>&1 | tee -a "$W/e2e.log"; chk ${PIPESTATUS[0]} "Chrome Worker"
+
+  step "[5] (#1174) SAB ring → AudioWorklet の消費量・総和と、Worker の SAB + Atomics.wait RPC による VSTPluginMain 往復を node 参照と照合"
+  RS="$W/ring/stage"; rm -rf "$RS"; mkdir -p "$RS"; cp "$HB/poc/hb_bridge.mjs" "$LB/multi/ring_common.mjs" "$LB/multi/ring_rpc_worker.mjs" "$LB/multi/ring_worklet.js" "$W/hb_0x10000/host_vst2.wasm" "$W/hb_0x10000/ott_hb.cjs" "$W/hb_0x10000/ott_hb.wasm" "$RS/"
+  node "$LB/multi/ring_node_ref.mjs" --ott "$W/hb_0x10000/ott_hb.cjs" --host "$W/hb_0x10000/host_vst2.wasm" --out "$W/ring/ring_ref.json" > "$W/ring/ref.log" 2>&1; chk $? "node 参照 (ring/RPC): $(cat "$W/ring/ref.log")"
+  node "$LB/multi/ring_rpc_run.mjs" --stage "$RS" --ref "$W/ring/ring_ref.json" --out "$W/ring/ring_result.json" 2>&1 | tee -a "$W/e2e.log"; chk ${PIPESTATUS[0]} "Chrome: RPC 往復 (Atomics.wait) + AudioWorklet ring 消費 = node 参照"
 fi
 echo; echo "================ SUMMARY"; cat "$SUM"
 [ $FAIL = 0 ] && echo "[lowbase_e2e] ALL PASS" || echo "[lowbase_e2e] FAIL (上の FAIL 行を参照)"
