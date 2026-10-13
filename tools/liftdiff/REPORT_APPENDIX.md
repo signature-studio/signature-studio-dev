@@ -277,7 +277,7 @@ match→mismatch の 4 件 (0x8445b0・0x6681f0・0xfe8e80・0x528680) は新 pa
 ### 12.1 fault 由来 this 疑似 pattern `fvm` (LD-23 / #975、部分達成)
 
 - 実装: `cases.fvm_candidates` が `'s'` の native fault addr から this 候補の引数 index を推定 (`SMALL[i] ≤ addr-SMALL[i] < 0x40`)。
-  `session._fvm_cases` は **全 pattern が未実行 (equal/diff/wasm_trap 無し) の関数に限り**、候補引数だけを `vm` blob の疑似オブジェクトにした case `fvm<arg>` を追加する。既存 pattern の case 生成と結果は変えない。
+  `session._fvm_cases` は **全 pattern が未実行 (equal/diff/wasm_trap 無し) の関数に限り**、候補引数だけを `vm` blob の疑似オブジェクトにした case `fvm<arg>` を追加する。既存 pattern の case 生成は変えない (fvm は追加のみ)。既存 pattern の関数単位 verdict は全関数で不変だが、**case 単位の outcome は 7 関数で変化している** (下記・未検証)。
 - 集計: `tests/fvm_transitions.py BASE.jsonl NEW.jsonl` が verdict 遷移と「既存 pattern が変わった関数」を出す。
 - 実測 (m11 sample:800・`--shards 12 --state auto`・同一 worktree で base / 新を連続実行):
   - base (fvm 追加直前の親 `2f235a0a` の tree): match 360 / mismatch 230 / unexec 210 (1m42s, load 0.46→5.70)
@@ -285,8 +285,9 @@ match→mismatch の 4 件 (0x8445b0・0x6681f0・0xfe8e80・0x528680) は新 pa
   - 関数単位の遷移: match→match 360・mismatch→mismatch 230・unexec→unexec 210 (**遷移 0 件**)。
   - `fvm` case は 437 件走り、native_fault 193 / both_fault 243 / hang 1。**1 件も equal/diff/wasm_trap にならなかった**。
   - **測定 commit の注意**: §12 の vm0/u16 の「新 361」は `ecb45fee` 時点の測定で、本節の base (`2f235a0a`) とは commit が異なる。`2f235a0a` は `ecb45fee` 以降の main 取り込みを含む。361 と 360 の 1 件差は**未切り分け** (§6.2 で記録した 0x959a40 の run 依存が候補だが、本 PR では確認していない)。
-  - **case 単位の outcome 変化 7 関数は未検証**: 対象 VA・base/new の outcome・native 実行時間の raw jsonl を保存していないため、根拠を記録できない。「timeout の揺らぎ」は仮説であり、断定しない。検証として再実行 (`tests/fvm_transitions.py BASE.jsonl NEW.jsonl` で VA を出力) を子 issue に残す。
-    受入条件の「既存 pattern の一致 (verdict) は変えない」は、上の関数単位 verdict 遷移 (match→match 360 等) で成立する。case の outcome 変化とは区別する。
+  - **case 単位の outcome 変化 7 関数は未検証**: `tests/fvm_transitions.py` の `EXISTING_PATTERN_CHANGED` が 7 関数を出力したが、対象 VA・base/new の outcome・native 実行時間の raw jsonl を保存していないため、根拠を記録できない。「timeout の揺らぎ」は仮説であり、断定しない。検証として再実行 (`tests/fvm_transitions.py BASE.jsonl NEW.jsonl` で VA を出力) を子 issue に残す。
+    本 PR で主張できるのは**関数単位 verdict の不変** (match→match 360 / mismatch→mismatch 230 / unexec→unexec 210) だけ。case 単位の outcome 不変は主張しない。
+  - **base と新の測定 commit**: §12 の vm0/u16 の「新 361」(`ecb45fee`) を fvm の base として引用しない。fvm の比較は同一 worktree で連続実行した base (`2f235a0a`) と新 (`0596772f`) のみを使う。
 - **原因 (未達の根拠)**: fvm の fault 位置 (rip 0x41a7xx・0xd2b1 等、または addr 0xb) は、this の VMT slot が 0 埋めのため仮想 call 先で落ちる。
   引数 this を正しく指しても、VMT の slot を解決しない限り native は仮想 call を完走できない。受入条件 (2) の「一致/不一致への遷移」は現設計では 0 件。
 - **残り (子 issue へ)**: VMT slot に ret stub (または wasm 側で解決可能な関数) を置く設計。これは wasm 側の仮想 call 解決と整合させる必要がある。
