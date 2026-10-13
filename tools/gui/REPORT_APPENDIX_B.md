@@ -47,9 +47,10 @@
 
 ## GUI-20 (#1217): e2e.sh 連続実行と 6h CDP タイムアウトの再現確認
 
-検証 commit `f7bebc7b` (origin/main、コード変更なし。本節は docs のみ追記)。`TMPDIR=$RUNNER_TEMP` 相当 (`/home/runner/work/_temp`)、`bash tools/gui/e2e.sh` を foreground で実行。素材: fl-win64 は既定取得、toolchain-emsdk / toolchain-retdec 展開済み。`x86_64-w64-mingw32-gcc` は runner 既設。
+検証 commit `f7bebc7b` (origin/main、コード変更なし。本節は docs のみ追記)。`TMPDIR=$RUNNER_TEMP`、`bash tools/gui/e2e.sh` を foreground で実行。素材: fl-win64 は既定取得、toolchain-emsdk / toolchain-retdec 展開済み。`x86_64-w64-mingw32-gcc` は runner 既設。
 
 - **初回 (run1)**: rc=127。worktree に `node_modules` が無く step 5 の `tsc` が見つからなかったための環境起因の失敗 (e2e の判定ではない)。`pnpm install --frozen-lockfile --ignore-scripts` (worktree 内、0 秒) 後は解消。
+- **注記**: run2〜run11 は `pnpm install` を挟んだ後の環境であり、「同一環境での連続 10 回」ではない (run1 の除外は環境起因と判断)。
 - **連続実行 (run2〜run11、10 回)**: rc 0 / `ALL PASS` が **10/10**。1 回あたり 211〜214 s。開始 load 1 分値は 0.70〜3.23 (run2〜11 の範囲)。
 - **6h ストレス (step 6h, 各 run 2 本の本番 + 2 本のネガコン)**: 本番 2 本は全 run で PASS (50,010 frames, inDropped 0, outFullWaits 0, gens {"0":1})。`CDP command timed out` は **0 件 / 10 run**。ネガコン burst・leak は全 run で exit 1 を検出。
 - **判定**: 受入条件 2 (n≥10 連続 rc 0 と所要・load の記録) は **達成**。受入条件 1 (6h の CDP タイムアウト原因の特定) は **未達**: 本 run で再現しなかったため原因を実測で特定できていない。以前の 1 回の失敗の再現条件 (並行負荷の有無・agent-browser の eval 待ち時間) は未確定。
