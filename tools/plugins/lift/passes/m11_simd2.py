@@ -141,12 +141,12 @@ def gen_body(base, R, A):
         return ['u8* d = (u8*)a; const u8* s = (const u8*)b;',
                 'if (d <= s || d >= s + (size_t)c * 4u) { memmove(d, s, (size_t)c * 4u); }',
                 'else { for (u64 i = 0; i < c; i++) { u32 t = ((const volatile u32*)s)[i]; ((volatile u32*)d)[i] = t; } }']
-    if base == 'rep_stosb_memset' and R == 'void' and n == 3:
-        return ['memset(a, (int)(u8)b, (size_t)c); /* rep stosb: b = al */']
     if base == 'rep_movsq_memcpy':
         return ['memmove(a, b, (size_t)c * 8u); /* rep movsq: c = qword 数 */']
     if base == 'rep_stosq_memset':
         return ['u64* p = (u64*)a; for (u64 i = 0; i < c; i++) p[i] = b; /* rep stosq */']
+    if base == 'rep_stosb_memset' and n == 3 and A == ['ptr', 'i8', 'i64']:
+        return ['memset(a, (int)(b & 0xffu), (size_t)c); /* rep stosb: b = AL, c = byte 数 */']
     if base in ('movaps', 'movapd', 'movdqa', 'movdqu', 'movups', 'movupd', 'lddqu', 'vmovaps', 'vmovapd', 'vmovdqa', 'vmovdqu', 'vmovups', 'vmovupd') and n == 1:
         return {'i128': ['return a;'], 'i64': ['return (u64)a;'], 'i32': ['return (u32)a;']}.get(R)
     if base in ('movaps', 'movapd', 'movdqa', 'movdqu', 'movups', 'movupd') and R == 'void':
