@@ -1,6 +1,6 @@
 # #942 (CI-22) m11 ldfix stage4 の memory access out of bounds — 切り分け (部分達成)
 
-親 #757。受入条件の進捗: 1 = 部分 / 2 = 部分 / 3 = 部分 (snapshot 限定の判定。現 main 生成素材での判定は未実施)。
+親 #757。受入条件の進捗 (本 run 時点): 1 = 部分 (frame → IR 対応で trap の関数 7 種まで特定。発生 load は未特定) / 2 = 部分 (trap chain に修復関数無し = ldfix 起因ではないと確定。trap の load 特定は未了) / 3 = 部分 (snapshot 限定の判定。現 main 生成素材は #1292)。
 
 ## 1. 実測 (検証起点 origin/main `b4dac086`・runner 1 台)
 
@@ -63,6 +63,7 @@ unit ごとの trap 9 件 (base/fix とも同一 VA)。**旧版の閉包表 (下
 
 - 結論: 9 件の最上位 frame の関数は 7 種。修復対象は `function_409c80` (unit 0x0 の frame) の 1 件のみ。
   残りの trap は修復前から、修復と無関係な関数の load で起きている。
+  受入 1 は「関数の特定まで」で部分達成 (trap の発生 load の特定は未了 = §5)。
 - base/fix の frame 比較 (survey): 9 件の最上位 frame の関数 index は base/fix で同一 (前 run と同じ)。
   wasm offset のみ fix 側で増える。修復は trap の発生関数を変えていない。
   trap の発生 load (address 値) までは未特定。
@@ -98,6 +99,7 @@ unit ごとの trap 9 件 (base/fix とも同一 VA)。**旧版の閉包表 (下
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 「memory access out of bounds」の発生 load の特定 (function_4133f0 / 418190 / 8c6530 等の address 値) | trap の根本原因の特定 | #942 (次 run) |
+| 現 main 生成 IR での ldfix 効果の再判定 (受入 3 の snapshot 限定を解消) | 修復件数の反映を現 main で未確認 | #1292 (`[CI-25]`・子) |
 | 閉包表 (§2 旧版の unit 閉包サイズ・交差) の再算出 | 本 run では再算出していない (前 run の転記) | 不要 (frame 対応で代替。閉包表は参考値) |
 | work-m11 の IR が現 main 生成と不一致 (ir_conditions.json 無し) | 修復件数が REPORT.md と一致しない | 既存 #680 |
 
