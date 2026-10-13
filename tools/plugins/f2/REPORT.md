@@ -208,10 +208,28 @@ python3 tools/plugins/f2/xcheck_icall.py 18953 18975 18979 18982 18984 19005 190
 - **ネガコン**: waiver 無し (`--waivers` で空配列) → **FAIL (exit 1)、F1 missing=2 (19148)・missing=2 (19245)**。`attributed()` は raw IR に実在する VA (0x40ad30) を検出し、waiver の 4 site は raw IR に 0 件 (F4 不発 = waiver 有効)。
 - **残る前提 (未検証)**: waiver の reason は「通常制御フローからは到達不能と推定」まで。根拠は scope table の構造と raw IR に命令が無いことで、到達不能の証明ではない。「DSP 経路に例外を投げる箇所が無い」は未検証。例外が DSP 内で送出されれば pad が実行され、間接 call が翻訳されないまま動く (silent miscompile)。Delphi では `_RaiseExcept` 系 RTL helper や、整数除算 0 などのハードウェア例外 (SEH 経由で unwind) が pad を起動し得る。IAT 0 件の確認では不足。追跡 #529。
 
+### 7.7b #529 追補: 例外経路の一次スキャン (`raise_scan.py`・`raise_reach.py`)
+
+- **目的**: waiver の前提「DSP 経路に例外を投げる箇所が無い」を機械的に確認する。pad は waiver 関数 W の unwind 時に走るので、W から閉包内の直接 call で到達する関数に trap 命令・例外 API があるかを見る。
+- **実測 (HEAD 986e7415 の上に作業・`batch_lift.sh` 7 本 64 秒・7/7 lift_rc 0・`emcc -c` rc 0、`icall_gate.py` exit 0・機械語 640 / IR 636 / waived 4 / F1 0 (8.3 秒))**:
+
+| block | 閉包関数 | trap 命令 (div/idiv/int) | 例外 API (IAT 名) | W から閉包内直接 call で到達する関数 | trap 関数のうち到達するもの |
+|---|--:|--:|--:|--:|--:|
+| 19148 | 84 | 6 (idiv 6 件・4 関数) | 0 | 0 | 0 |
+| 19245 | 65 | 0 | 0 | 0 | 0 |
+
+  - 19148 の idiv は 0x83f010・0x841340・0x843c90・0x851c30 の 4 関数。waiver 関数 0x780d00・0x78a660 からの直接 call では到達しない。
+  - 閉包の `call qword ptr [rip+…]` 2 件 (0x83b39f・0x83b434) は import 表に無い slot (0x8d0018・0x8d0020) への間接 call で、IAT 名では判定できない。
+- **判定 (部分)**: 直接 call の範囲では、W の unwind 元になる trap は閉包内に見つからない。ただし次が未確認で、「無い」の証明にはなっていない。
+  1. W の間接 call (vtable / 関数ポインタ、閉包内 128 件) の先。
+  2. 閉包外 (framework frontier) への直接 call の先 (`raise_scan` の `direct_out_of_closure`・19148 は 118 件) に `_RaiseExcept` 系 helper が無いか。
+  3. 閉包外からの AV・SEH (`RtlRaiseException` 経由でない hardware 例外) の扱い。
+- 再現: `python3 tools/plugins/f2/raise_scan.py <block>` → `raise_reach.py <block>` (前提: `work/closure/`・`FL_WIN64_DIR`)。結果は `work/f2/raise_scan_<block>.json`・`raise_reach_<block>.json` (gitignore)。
+
 ### 7.8 未解決
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| waiver 4 site の「DSP 経路に例外を投げる箇所が無い」の確認 (受入条件の併記項目) | 未検証。例外が DSP 内で送出されると pad が実行され、waiver の前提が崩れる。閉包の call graph と `_RaiseExcept` 系 helper・trap 命令の到達性を機械的に確認する必要がある | #529 (PR は Refs #529。Closes は付けない) |
+| waiver 4 site の「DSP 経路に例外を投げる箇所が無い」の確認 (7.7b の 1〜3) | 未検証。W の間接 call と frontier 先の trap/raise が残る。例外が DSP 内で送出されると pad が実行され、waiver の前提が崩れる | #529 (PR は Refs #529。Closes は付けない) | (受入条件の併記項目) | 未検証。例外が DSP 内で送出されると pad が実行され、waiver の前提が崩れる。閉包の call graph と `_RaiseExcept` 系 helper・trap 命令の到達性を機械的に確認する必要がある | #529 (PR は Refs #529。Closes は付けない) |
 
 ### 7.9 未解決 (§7.7 から継続)
 | 未解決 | 影響 | 起票先 |
