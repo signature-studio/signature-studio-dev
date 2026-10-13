@@ -32,7 +32,13 @@ enum {
   GUI_IN_CHAR       = 7, /* a=UTF-16 code unit */
   GUI_IN_FOCUS      = 8, /* a=1 gained / 0 lost */
   GUI_IN_SCREEN     = 9, /* x=w, y=h : desktop リサイズ */
-  GUI_IN_CLOSE      = 10 /* w1=surf : ユーザがウィンドウを閉じた (WM_CLOSE) */
+  GUI_IN_CLOSE      = 10, /* w1=surf : ユーザがウィンドウを閉じた (WM_CLOSE) */
+  /* ---- GUI-6 (#182) 入力品質 ---- */
+  GUI_IN_LAYOUT     = 11, /* a=KLID (下位 16bit = LANGID; 例 0x0409 US / 0x0407 DE / 0x040C FR)。以後 MapVirtualKey/ToUnicode/GetKeyboardLayout がこの配列で答える */
+  GUI_IN_IME        = 12, /* a = phase(bit0-3) | nunits(bit8-10, 0..4) | first(bit12) | last(bit13); x = u0|u1<<16, y = u2|u3<<16 (UTF-16); b = カーソル位置 (last のみ有効)。
+                           * phase: 1 START / 2 COMPOSITION 更新 / 3 COMMIT (結果文字列) / 4 CANCEL。文字列は first..last の連続レコードで運ぶ */
+  GUI_IN_TOUCH      = 13, /* x,y = 座標(i32); a = pointerId | phase<<8 (0 down / 1 move / 2 up / 3 cancel) | primary<<12; b = 接触径 (w|h<<16, px) */
+  GUI_IN_POINTER_LOCK = 14 /* a=1 ロック成立 / 0 解除 (host 通知: shim は GetCursorPos の意味を「仮想カーソル」へ切替えない = host が相対量を積算して cursor_x/y へ書く) */
 };
 enum { GUI_MOD_SHIFT = 1, GUI_MOD_CTRL = 2, GUI_MOD_ALT = 4, GUI_MOD_META = 8 };
 
@@ -47,7 +53,10 @@ enum {
   GUI_CMD_SET_TITLE    = 6, /* title は surf 表の title[64] (UTF-8) */
   GUI_CMD_SET_CURSOR   = 7, /* w2 = cursor shape (IDC_* の数値) */
   GUI_CMD_LOG          = 8, /* w1 = byte len(0..24), w2..w7 = payload, w1 の bit8 = 行末 */
-  GUI_CMD_EXIT         = 9  /* w1 = exit code */
+  GUI_CMD_EXIT         = 9, /* w1 = exit code */
+  GUI_CMD_POINTER_LOCK = 10, /* w2 = 1 要求 / 0 解除。host は requestPointerLock / exitPointerLock (成立は GUI_IN_POINTER_LOCK で返す) */
+  GUI_CMD_IME_POS      = 11, /* w1 = surf, w2 = x, w3 = y (surface client 座標; ImmSetCompositionWindow/CandidateWindow)。host は IME ポップアップ位置の textarea を移動 */
+  GUI_CMD_CLIP_RECT    = 12  /* w2..w5 = l,t,r,b (ClipCursor; 全 0 = 解除)。host はロック中の仮想カーソルをこの矩形へ clamp */
 };
 
 /* ---- surface 表エントリ (128 B) -------------------------------------------- */

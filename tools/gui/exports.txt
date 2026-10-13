@@ -18,7 +18,10 @@ CharToOemBuffW
 CharUpperBuffW
 CharUpperW
 ClientToScreen
+ClipCursor
 CloseClipboard
+CloseGestureInfoHandle
+CloseTouchInputHandle
 CombineRgn
 CommDlgExtendedError
 CopyRect
@@ -118,6 +121,7 @@ GetDpiForSystem
 GetDpiForWindow
 GetFocus
 GetForegroundWindow
+GetGestureInfo
 GetGuiResources
 GetIconInfo
 GetKeyNameTextW
@@ -160,6 +164,7 @@ GetTextMetricsA
 GetTextMetricsW
 GetThreadDpiAwarenessContext
 GetTopWindow
+GetTouchInputInfo
 GetUpdateRect
 GetUpdateRgn
 GetWindow
@@ -175,6 +180,18 @@ GetWindowTextA
 GetWindowTextW
 GetWindowThreadProcessId
 HideCaret
+ImmAssociateContextEx
+ImmGetCompositionStringW
+ImmGetContext
+ImmGetConversionStatus
+ImmGetOpenStatus
+ImmIsIME
+ImmNotifyIME
+ImmReleaseContext
+ImmSetCandidateWindow
+ImmSetCompositionWindow
+ImmSetConversionStatus
+ImmSetOpenStatus
 InflateRect
 IntersectClipRect
 IntersectRect
@@ -240,6 +257,8 @@ RegisterClassExA
 RegisterClassExW
 RegisterClassW
 RegisterClipboardFormatW
+RegisterTouchHitTestingWindow
+RegisterTouchWindow
 RegisterWindowMessageA
 RegisterWindowMessageW
 ReleaseCapture
@@ -272,6 +291,7 @@ SetDIBits
 SetDIBitsToDevice
 SetFocus
 SetForegroundWindow
+SetGestureConfig
 SetKeyboardState
 SetMapMode
 SetParent

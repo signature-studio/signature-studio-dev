@@ -223,3 +223,7 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
 ## 16. GUI-5 (#181) 続き: e2e.sh 全体 ALL PASS と wasm shim 全体の SIMD/scalar 比較
 
 本文は `REPORT_APPENDIX.md` §16 (250 行上限による分割)。検証起点 HEAD `fcd564bc` (`tools/gui/src`・`include` は `e11701db` と同一)。結論: RetDec 付き `bash tools/gui/e2e.sh` は ALL PASS (rc=0, 185 s, 1 回。同 HEAD の 1 回目は 6/6 の依存欠落で rc=2)。1/6 selftest は `e11701db` で 20 回連続 PASS (ASan 0 件)。修正前 src の有効 7 回中 2 回の UAF (#489) は、修正後の連続試行で発火していない。wbench (`bash tools/gui/test/wbench.sh 5`): rc=0, 19 s, v128 simd=831 / scalar=0 (測定値は付録 §16 §2)。
+
+## 17. GUI-6 (#182): 入力品質 (キー配列 / IME / タッチ・ジェスチャ / Pointer Lock・ClipCursor)
+既知類型との関係: 該当なし (lift 欠陥ではなく shim/host の意味論; `docs/DEFECTS.md` D1a〜D18 に該当なし)。
+- **結論**: 仕様・検証表・ネガコン実測・範囲外と起票先の詳細は付録 [REPORT_APPENDIX.md §14](REPORT_APPENDIX.md)。FL 非依存で CDP 再現できる範囲 (US/DE/FR 配列・IME・タッチ/ZOOM・Pointer Lock/ClipCursor) を実装し、`tools/gui/input/e2e.sh` と selftest・ネガコンで検証。WM_POINTER*・実機確認は未実施のため PR は `Refs #182`。
