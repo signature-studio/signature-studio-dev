@@ -202,6 +202,8 @@ mock との差で見つかったもの: mock は引数の個数/型を検査し�
 
 ネガティブコントロール (終了コード 1 = 検出): `midi_script.mjs --neg` (recorder から OnDirtyChannel を消す → 「27 全配送」だけが FAIL、26/27 と欠落名を表示)・`midi_ui_check.mjs --neg` (構文エラー入り script → 「2 script 読込」だけが FAIL、UI に SyntaxError)・`subinterp_probe.mjs --neg` (拒否 builtin の期待を 1 本欠く → その check だけ FAIL)・`midi_bundled_device.mjs --neg` (midi.py 無し → 読込 check が FAIL)。通常実行の FAIL は exit 2、入力欠落は exit 3 (緑にならない)。
 
+**#601 (load 失敗の巻き戻し)**: `fl_rt.load_device_script` は exec 成功後に `_scripts` へ登録し、例外時は `sys.modules` も戻して再送出する (旧: 登録後に exec → top-level 例外で半端な module が残り midiIn / callback が配送された)。同名の既存 script は先に unload 済みで復元しない。UI (`src/runtime/midi_script.ts`) は読込失敗時に `flMidi.stop()` で巻き戻し (started=false・接続ボタン無効・起動ボタン再有効)。回帰: `midi_script.mjs` §4b (fixture `device_import_fails.py`、29 check)・`midi_ui_check.mjs` 失敗経路 (20 check)。ネガコン (exit 1 = 検出): `midi_script.mjs --neg-legacy` (旧ローダへ差し戻し → 読込失敗系 4 check だけ FAIL)・`midi_ui_check.mjs --neg-rollback` (UI の stop を無効化 → 巻き戻し系 3 check だけ FAIL)。
+
 ### サブインタプリタ (`flpy_subinterp_run` = 検証用 export)
 
 | 項目 | 実測 |

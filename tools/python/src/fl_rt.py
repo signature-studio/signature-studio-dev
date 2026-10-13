@@ -193,7 +193,8 @@ def parse_meta(source):
 
 def load_device_script(name, source=None, path=None, port=None):
     """device script (.py) を読み込む。source (文字列) か path (wasm FS 上) のどちらか。OnInit は呼ばない (init_scripts)。
-    port: この script が受ける MIDI 入力ポート番号 (None=全ポート)。同名の再読込は module を作り直す。"""
+    port: この script が受ける MIDI 入力ポート番号 (None=全ポート)。同名の再読込は module を作り直す。
+    exec が例外で失敗したら登録しない (sys.modules も戻す)。同名の既存 script は先に unload 済みで復元しない。"""
     if source is None:
         with open(path, "rb") as fh:
             source = fh.read().decode("utf-8")
@@ -205,8 +206,12 @@ def load_device_script(name, source=None, path=None, port=None):
     mod.__file__ = path or f"<device:{name}>"
     code = compile(source, mod.__file__, "exec")
     sys.modules[key] = mod
+    try:
+        exec(code, mod.__dict__)
+    except BaseException:
+        sys.modules.pop(key, None)
+        raise
     _scripts[name] = {"module": mod, "port": port, "meta": meta, "path": path, "key": key}
-    exec(code, mod.__dict__)
     return json.dumps({"name": name, "module": key, "meta": meta, "port": port,
                        "callbacks": sorted(cb for cb in CALLBACKS if callable(getattr(mod, cb, None)))})
 
