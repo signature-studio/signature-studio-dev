@@ -1,6 +1,6 @@
 # #930 (LD-20): 消費者形 pure 残 23 関数 (24 引数) の残件測定 — 部分達成
 
-**判定: 部分達成**。修復の追加はせず、残件の実測 (再生成 IR での到達・不能理由・ネガコン) を取った。支配関係つきの修復 (entry 外 deref の 13 + 4 + 2 関数) は未着手で、子 issue に分けた (§4)。
+**判定: 部分達成**。修復の追加はせず、残件の分類 (§3) とネガコン (§4) を取った。支配関係つきの修復 (entry 外 deref の 18 関数 = 素 13・ptr 4・w32 1) は未着手で、子 issue #1134 に分けた (§5)。§2 の到達数は再現未了 (§2.1)。
 
 先行: #734 (`REPORT_734.md`)。
 
@@ -8,10 +8,10 @@
 
 | 受入条件 | 結果 |
 |---|---|
-| 残 23 関数 (24 引数) のうち entry 外 deref の 13 関数 (+ptr 4 / +w32 2 を含む) を支配関係つきで修復、または不能理由を関数ごとに記録 | **一部**。関数ごとの最初の deref 位置を §3 に記録。支配関係つきの修復は未着手 (§4 の子 issue) |
-| tracker-no-deref (3 関数) と none (5c44b0) の理由を記録 | **記録**。理由は §3 (tracker-no-deref は到達 0 で、修復の効果を測れない。5c44b0 は理由未特定) |
-| `ir_conditions.json` を作り直した IR で `reach_509.sh` を実行し、survey 到達を記録 | **達成**。§2 (ir_conditions `ldfix=applied`・ir_sha256 `f5b27a23…`) |
-| ネガコン (修復を外すと SUSPECT_USE が復帰) | **達成**。§2 (ptr 分岐の直前版 30 関数 / 33 引数 → 現行 23 / 24) |
+| 残 23 関数 (24 引数) のうち entry 外 deref の 18 関数 (19 引数。素 13・ptr 4・w32 1) を支配関係つきで修復、または不能理由を関数ごとに記録 | **一部**。関数ごとの最初の deref 位置を §3 に記録。支配関係つきの修復は未着手 (§5 の子 issue #1134) |
+| tracker-no-deref (3 関数) と none (5c44b0) の理由を記録 | **一部**。tracker-no-deref (3 関数) は「記号実行が deref を見ない」という現象のみを記録 (理由は未特定)。5c44b0 は理由未特定。理由の特定は #1134 |
+| `ir_conditions.json` を作り直した IR で `reach_509.sh` を実行し、survey 到達を記録 | **未検証**。§2 の到達数は、この PR の run の VA 列・出力 JSON が無く再現できない (§2.1)。再測定は #1134 |
+| ネガコン (修復を外すと SUSPECT_USE が復帰) | **達成**。§4 (ptr 分岐の直前版 30 関数 / 33 引数 → 現行 23 / 24) |
 
 ## 2. 測定 (実測)
 
@@ -23,21 +23,23 @@
 | `m11_build.sh` (wasm 再ビルド) | rc 0、`OK: work/m11_boot.cjs(+.wasm)` | 20.9 s |
 | `audit_lsf.py` (現行 IR) | suspect_use 23 関数 / 24 引数、suspect_mixed 119 関数 | 11.3 s |
 | `use_residual_509.py` | 合計 24 (関数, 引数) / 23 関数。内訳は §3 | 1.4 s |
-| `reach_509.sh` (23 関数を計装、survey 942 unit) | rc 0。§2.1 | 17.3 s |
+| `reach_509.sh` (23 関数を計装、survey 942 unit) | 未検証 (VA 列・出力 JSON を保存せず、§2.1 の値は再現できない) | — |
 | ネガコン (`7db8953b^` の ldfix.py を修復前 IR に流す) | suspect_use 30 関数 / 33 引数 (現行は 23 / 24) | — |
 
 実行時の load average は 0.35〜0.5 (4 vCPU)。
 
-### 2.1 到達 (survey 942 unit、関数入口の計装)
+### 2.1 到達 (survey 942 unit、関数入口の計装) — 未検証
 
-| 関数 | 実行 unit 数 | 入口通過 総回数 |
-|---|--:|--:|
-| 40fe90 | 2 | 6 |
-| 44f040 | 3 | 3 |
-| 47ad70 | 7 | 15 |
-| 上記以外の 20 関数 (41b8d0, 41b970, 449550, 44fb40, 5c44b0, 6905f0, 75a180, 784ed0, 786d50, 787380, c40420, db6480, dc27c0, ddd4d0, f552a0, 101d180, 1050f90, 10626e0, 10628d0, 12f9730) | 0 | 0 |
+**この表は現時点で再現できない。撤回扱いとし、再測定は #1134 で行う。**
 
-survey で実行されたのは 3 関数のみ。残り 20 関数は、942 unit のどれでも入口を通らなかった。
+- 計装に渡した VA 列 (順番) と出力 JSON を、本 PR の run では保存していなかった。index と関数の対応は確定できない。
+- 同じ `reach_509.sh` 系の既存 `results/reach_509.json` (942 unit、#509 の run) の内訳は次の通り (`kind` = `reach_survey.mjs` の unit 判定)。
+  - kind 別: ok 852 / oob 26 / halt0 17 / miss 46 / noproc 1 (計 942)
+  - hit のある unit: index 1 = 17 unit、index 7 = 44 unit、index 14 = 1 unit、index 15 = 1 unit
+  - kind=ok で hit のある unit: index 7 の 26 unit のみ
+- 「到達」の定義: 本 REPORT では「kind=ok の unit で、その関数の入口計装が 1 回以上 hit した」を指す。halt0・oob・miss で hit した unit は到達数に含めない。
+
+本 PR の表 (40fe90 2 unit / 44f040 3 unit / 47ad70 7 unit) は、既存 JSON の内訳とも対応しない。対応する VA 列の記録が見つからないため、この数値は根拠なし。
 
 ## 3. 関数ごとの残件 (use_residual_509.py の門 + 最初の deref 位置)
 
@@ -70,10 +72,12 @@ survey で実行されたのは 3 関数のみ。残り 20 関数は、942 unit 
 | ddd4d0 | arg2 | ptr-arg | ddd4e9 | ptr | 0 |
 | f552a0 | arg1 | first-deref-not-entry | f552b6 | i64 | 0 |
 
-- **first-deref-not-entry 13 関数 (+ptr 4 / +w32 2 を含む)**: 最初の deref が entry ブロック外。修復には IR のブロック支配関係が要る。survey で到達するのは 40fe90・44f040・47ad70 の 3 関数のみ。
-- **tracker-no-deref 3 関数 (75a180・db6480・dc27c0)**: audit は機械語の deref を見るが、ldfix の記号実行は見ない。3 関数とも survey 到達 0 で、修復の効果は測れない。
+- **first-deref-not-entry 18 関数 (素 13・ptr 4・w32 1)**: 最初の deref が entry ブロック外。修復には IR のブロック支配関係が要る。ptr 付きは 10626e0・784ed0・786d50・787380 (4 関数)、w32 付きは 1050f90 (1 関数、2 引数)。survey 到達の欄は §2.1 の通り未検証。
+- **tracker-no-deref 3 関数 (75a180・db6480・dc27c0)**: audit は機械語の deref を見るが、ldfix の記号実行は deref を見ない (現象。理由は未特定)。survey 到達の欄は未検証のため、修復の効果も未測定。
 - **none (5c44b0)**: どの門にも掛からないが、`fix_f3c_use` の置換対象になっていない理由は未特定。最初の deref (5c44bf) は entry ブロック内。
-- **ptr-arg 1 (ddd4d0)**: ptr 型引数だが、最初の deref は entry 内。REPORT_734 の PR 版 SUSPECT_USE に残る既知の関数。survey 到達 0。
+- **ptr-arg 1 (ddd4d0)**: ptr 型引数だが、最初の deref は entry 内。REPORT_734 の PR 版 SUSPECT_USE に残る既知の関数。
+
+分類語の定義 (`use_residual_509.py` の門): `first-deref-not-entry` = 最初の deref のブロックが entry 外 / `ptr-arg` = 引数の IR 型が ptr / `w32` = 32bit deref を含む / `tracker-no-deref` = 機械語には deref があるが記号実行の tracker が見つけない / `none` = どの門にも掛からない。
 
 ## 4. ネガコン (修復の有無で SUSPECT_USE が変わること)
 
@@ -90,9 +94,9 @@ ptr 分岐を外すと SUSPECT_USE が 7 関数 / 9 引数だけ戻る。REPORT_
 
 | 残件 | 件数 | 起票先 |
 |---|--:|---|
-| entry 外 deref の支配関係つき修復 (first-deref-not-entry 13 関数、+ptr 4・+w32 2 を含む) | 13 関数 | 子 issue #1134 (LD-34) |
+| entry 外 deref の支配関係つき修復 (first-deref-not-entry 18 関数 = 素 13・ptr 4・w32 1) | 18 関数 (19 引数) | 子 issue #1134 (LD-34) |
 | tracker-no-deref (75a180・db6480・dc27c0) の記号実行の修正 | 3 関数 | 子 issue #1134 (LD-34) |
 | 5c44b0 (none) の理由特定 | 1 関数 | 子 issue #1134 (LD-34) |
 | 7/7 動的確認 (修復の wasm 比較) | — | 子 issue #1134 (LD-34) |
 
-survey で到達したのは 3 関数のみのため、survey の ok 退行は今回の範囲では測っていない。SUSPECT 件数だけでは修復の正しさは示せない (REPORT_509 §1)。
+survey の ok 退行は、到達数が再現できていないため今回の範囲では測っていない。SUSPECT 件数だけでは修復の正しさは示せない (REPORT_509 §1)。
