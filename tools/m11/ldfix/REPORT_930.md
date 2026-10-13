@@ -19,7 +19,7 @@
 - 手順: `m11_gen_ir2.sh` (rc 0・ldfix=applied) → `m11_build.sh` (rc 0・wasm-ld signature mismatch 0 / undefined symbol 0) → `ldfix/reach_509.sh` (23 関数を計装)。
 - 出力 JSON: `results/reach_930.json` (942 unit)。
 - 所要 (実測): gen_ir2 44.6 s / build 25.5 s / reach 22.3 s。load average 1.2 前後。
-- 素材: `fl-win64` → `$RUNNER_TEMP/fl-win64`、`work-m11` → `tools/m11/work/`、`toolchain-emsdk` → `/opt/emsdk` (emcc 6.0.12)。
+- 素材: `fl-win64` → `$RUNNER_TEMP/fl-win64`、`work-m11` → `tools/m11/work/`、`toolchain-emsdk` → `[EMSDK]` (emcc 6.0.12)。
 
 ### 2.1 kind 別の集計
 
