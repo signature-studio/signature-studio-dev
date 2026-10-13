@@ -11,6 +11,16 @@ ROOT_REPO="$(cd "$HERE/../.." && pwd)"
 set +u; . "${EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}" >/dev/null 2>&1 || true; set -u
 command -v node >/dev/null || { echo "node not found (emsdk env)" >&2; exit 2; }
 command -v google-chrome >/dev/null || [ -n "${CHROME:-}" ] || { echo "google-chrome not found" >&2; exit 2; }
+E2E_TOOLS="${E2E_TOOLS_DIR:-$HERE/../e2e}"
+case "${E2E_DRIVER:-agent-browser}" in
+  agent-browser) E2E_DEP="$E2E_TOOLS/node_modules/.bin/agent-browser" ;;
+  puppeteer) E2E_DEP="$E2E_TOOLS/node_modules/puppeteer-core/package.json" ;;
+  *) echo "[gui-e2e] E2E_DRIVER=${E2E_DRIVER} は未対応 (agent-browser|puppeteer)" >&2; exit 2 ;;
+esac
+if [ ! -e "$E2E_DEP" ] && [ "${E2E_NO_AUTOINSTALL:-0}" != "1" ]; then
+  (cd "$E2E_TOOLS" && npm ci --no-audit --no-fund --ignore-scripts) >&2 || true
+fi
+[ -e "$E2E_DEP" ] || { echo "[gui-e2e] 前提不足: $E2E_DEP が無い (step 6 のドライバが ENOENT で落ちる)。対処: (cd tools/e2e && npm ci --no-audit --no-fund --ignore-scripts) を実行する" >&2; exit 2; }
 echo "[gui-e2e] 0/6 import 解析 + API 面生成"
 [ -f "$HERE/analysis/imports_all.json" ] || python3 "$HERE/analysis/gui_imports.py" >/dev/null
 python3 "$HERE/gen_api.py"
