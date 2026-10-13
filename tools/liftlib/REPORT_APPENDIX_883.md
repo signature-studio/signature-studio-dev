@@ -55,6 +55,13 @@ IR 上の読み (下記) は `work/ott_getparam/` の生成物を参照したも
 
 (a)(b)(c) のどれを採るかは、呼出し規約 (`spec.py` の `A <slot>`・`native_runner.c` の gpr 配置) と BLK の書込み主体の突合で決める。本 run では方式選択までは行わない。
 
+## 配置の算術と既存機構の確認 (run 3, コード変更なし)
+
+- `icall_rewrite.py` L653 の既定 BLK = `img.base + image_size + 0x4000000` = `0x184308000` (`blk_va` 未指定時)。wasm32 では `0x84308000` に切り詰められる。
+- section VA は `0x180308000`。RIP 相対 int32 (±2 GiB) で届く最小番地は `0x100308000` で、4 GiB 未満の wasm 線形メモリ内には届く番地がある。ただし画像は `0x180000000` 系 VA のまま wasm に載るため、BLK を低位へ移すには画像ごと shift する必要がある。
+- leaf パイプライン (`targets/ott_getparam.json`) は `passes.shift` を持たず、`pipeline.py` L137 の `remap.shift_va` は実行されない。`recipes/ott.py` (OTT 既存 recipe) は `LB_BASE` (0x30000000 系) へ shift して wasm に載せている。
+- したがって #1269 の方式は「leaf 側へ `shift` (newbase) を導入する」が最小候補。その場合 native 側 (`native_runner.c` の VA 敷設) と harness の突合 (#1270) も同時に揃える必要がある。本 run ではコードを変えず、この前提のみを確定した。
+
 ## 次の作業
 
 修正・ネガコン・regress 登録は子 issue で行う (本 issue #883 は受入条件 4 件のうち達成 0 件 (4 件とも未達) → 検証未了のため open のまま)。

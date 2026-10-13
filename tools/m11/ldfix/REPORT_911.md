@@ -195,6 +195,19 @@ python3 tools/m11/ldfix/retdec_negctl_1091.py <DIR>/dump.err 41a670 41a670 41a6f
 - 所要 (秒、`retdec_stage_1091.py 41a670 41a670 41a6f4 41a6a0`、n=3・逐次): 8.43 / 8.47 / 8.45 (min 8.43 – max 8.47)
 - load average (`uptime`): 実行前 1.14 / 実行後 1.09 (レビュー側の実測とは別の run)
 
+### 6d. #1091 (LD-33): 段 16 の変換規則の特定 (RetDec ソース照合)
+
+RetDec のソースは公開リポジトリ (avast/retdec) から取得して照合した。素材の toolchain-retdec は版日付 `2019-03-08` (`share/retdec/support/version.txt`) のため、履歴で版を揃えて確認した。
+
+- 段 16 の `Constants optimization` は `src/bin2llvmir/optimizations/constants/constants.cpp` の `ConstantsAnalysis` (登録名 `retdec-constants`、L37〜42)。
+- 規則の該当箇所: `checkForGlobalInInstruction` の末尾 (L164〜171)。`isa<LoadInst>(inst) && gv && root.ops.size() <= 1` のとき、load の pointer operand を `gv` (裸の GlobalVariable) に置き換える。`root` は `SymbolicTree::PrecomputedRda` で作った pointer operand の記号木 (`simplifyNode` 済み)。
+- 版の確認: 同じ分岐は 2019-03-09 時点の版 (`6edcaaea`、L164〜171 相当) にもある。最後の変更 `24b50de5` (2019-05-27) は別の条件 (`getActiveBits() <= 64`) の追加のみで、この分岐は触っていない。
+- 観測との対応: `41a6a0` の `load *rax` が `load @rcx` になるのは、記号木が `inttoptr(load @rax)` の pointer を gv `@rcx` まで簡約し、この分岐で deref の 1 段を落として gv を直接 load する形と整合する (§6c の段 1→16 の IR と一致)。
+
+**未確認 (ここで止める)**: 分岐が実際に 41a6a0 で発火することの実行による確認 (RetDec をビルドしてログを出す作業は本 run に収まらない)。上記は「ソース上の唯一の該当分岐」であり、発火の証明ではない。
+
+判定: 受入 1 後半 (変換規則の特定) は **ソース上の該当分岐までで達成**。発火の実行確認は子 issue に残す。
+
 ## 7. 検証 (`docs/WORKFLOW.md` §6)
 
 - 検証 HEAD: PR head の hash は PR 本文と `gh pr view` が正本 (REPORT 内には書かない。自己参照になるため)。
