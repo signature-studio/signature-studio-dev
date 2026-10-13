@@ -29,6 +29,17 @@ for st in ir_lb_base img_lb_base; do
 done
 
 if [ ! -f work/boot_final.ll ]; then echo "[m11build] work/boot_final.ll 無し: m11_gen_ir2.sh を先に" >&2; exit 2; fi
+# qstore (#516): 機械語 `mov qword [rbp+X],imm` が IR で `store ptr null`/`store i32 imm` (4B) に縮む site を `store i64` に戻す
+#   (capstone 突合で確定した site のみ; idempotent)。M11_QSTORE=0 で無効化 (ネガコン; 無効化は m11_gen_ir2.sh で IR を作り直してから)。
+if [ "${M11_QSTORE:-1}" = 1 ]; then
+  PE_QS="${PE:-${FL_WIN64_DIR:-/home/ubuntu/work/analysis/win64}/extracted/block00031_PE.bin}"
+  if [ -f "$PE_QS" ] && python3 -c 'import capstone, pefile' 2>/dev/null; then
+    python3 qstore/m11_qstore.py work/boot_final.ll work/boot_final.qstore.tmp.ll --pe "$PE_QS" --report work/qstore_report.json > work/qstore.log
+    if ! cmp -s work/boot_final.ll work/boot_final.qstore.tmp.ll; then mv work/boot_final.qstore.tmp.ll work/boot_final.ll; else rm -f work/boot_final.qstore.tmp.ll; fi
+  else
+    echo "[m11build] WARNING: qstore skip (PE または capstone/pefile 無し)" >&2
+  fi
+fi
 # alloca 縮退修正 (CAB-129 + #132 R8): RetDec が `alloca i64` (8B) に潰したローカルを拡幅 (idempotent)。
 #   unit #18 OOB の真因 = 44bae0 の stack_var が callee 44ba50 に書かれ 44bb70 の record を破壊 (R8)。
 #   内容が変わった時だけ boot_final.ll を差し替える (mtime を更新して毎回 post/cc を走らせない)。
