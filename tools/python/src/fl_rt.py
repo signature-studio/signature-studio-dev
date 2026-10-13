@@ -107,6 +107,34 @@ def run_pyscript(name, score=None, values=None):
             "utils": list(flpianoroll.Utils.messages), "warnings": list(flpianoroll.warnings)}
 
 
+def run_audio(name, sample=None, selection=None, values=None):
+    """Audio scripts (Edison) の 1 回分の実行: sample({"ch","rate","regions"}) と選択 (start,end) を注入 →
+    createDialog() → 値注入 → apply(form) → 結果 dict。Play To End のようにトップレベルで完結する本も処理は走る。
+    戻り値: {"dialog", "sample" (enveditor.dump), "warnings"}。"""
+    import enveditor
+    mod = _PYSCRIPTS[name]
+    enveditor.reset(sample, selection)
+    form = None
+    dialog = None
+    if callable(getattr(mod, "createDialog", None)):
+        form = mod.createDialog()
+        form.set_values(values or {})
+        dialog = form.describe()
+    if callable(getattr(mod, "apply", None)):
+        mod.apply(form)
+    import flpianoroll
+    return {"dialog": dialog, "sample": enveditor.dump(), "warnings": list(flpianoroll.warnings)}
+
+
+def load_audio(path, name, sample=None, selection=None):
+    """Audio script を読む前に enveditor を注入する (トップレベルで処理する本: Region 変換・Play To End 用)。"""
+    import enveditor
+    enveditor.reset(sample, selection)
+    r = load_pyscript(path, name)
+    r["sample"] = enveditor.dump()
+    return r
+
+
 class flmidimsg:
     """FL の flmidimsg (FlMidiMsg) 相当。23 フィールドは FLEngine rodata (handled timestamp status data1 data2 port ...)。
     note/velocity/pressure/progNum/controlNum/controlVal は data1/data2 の別名 (公開 stubs 文書: 「Modifications to this will affect

@@ -237,7 +237,7 @@ OOB `function_414ad0` 系 68 件は `[rbx]` 1 段 deref の IR 脱落 (68 件は
 ## 10. OTT 旧 chain (D1〜D6) の Actions 再現 (LD-8 / #406、要約)
 
 Actions run `38430714782` (head `9cadda79`) で `liftdiff_e2e.sh` (--m11-only なし) を実測・exit 0・`LIFTDIFF_E2E PASS`・ネガコン 5/5 PASS。ログは `results/liftdiff_e2e_run38430714782_9cadda79.log` (commit 済み)。OTT 集計など詳細・ログ抜粋・未解決表: [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §10。
-- 前回比 (LD-16 / #825): OTT 集計の変化 (33/110/69 ↔ 35/112/65) は `ldlib/cases.py` の pattern 追加 (`79584ef7`・9→11 pattern) が原因と実測で切り分け。詳細: [`REPORT_APPENDIX_LD16.md`](REPORT_APPENDIX_LD16.md)。
+- 前回比 (LD-16 / #825・LD-31 / #1069): n=3 実測 (生ログ commit 済み): 旧基準 `59eea5c` = 38/108/66、main c4e93550 = 35/112/65、HEAD = 35/112/65。38→40 は `ldlib/cases.py` の pattern 追加で再現 (cases.py 単独で 40/110/62)。main 全体 (35) との差は cases.py 以外の変更によるが未切り分け。詳細: [`REPORT_APPENDIX_LD16.md`](REPORT_APPENDIX_LD16.md)。
 
 ## 11. 比較系の偽陽性 2 類型の修正 (LD-11 / #548、要約)
 
@@ -247,4 +247,4 @@ Actions run `38430714782` (head `9cadda79`) で `liftdiff_e2e.sh` (--m11-only �
 - **未検証**: 0x6cd8a0 の 9 パターン実 PE 実測 (sample:800 に含まれず f2 系素材が必要)。全文・3 run 表・未解決: [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §11。
 
 ## 12. 被覆拡大 2 パターン (LD-4 / #235、部分達成) と fault 由来 fvm (LD-23 / #975)
-`vm0`・`u16` を追加 (sample:800 で 一致 358→361 / 不一致 212→229 / 実行不能 230→210)。fault 由来 `fvm` は遷移 0 件 (360/230/210 不変・VMT slot 未解決)。全文・実測・未達: [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §12・§12.1。署名未対応 50 関数 (LD-24 / #976) の内訳と分割は [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §12 末尾・[`REPORT_LD24.md`](REPORT_LD24.md)。
+`vm0`・`u16` を追加 (sample:800 で 一致 358→361 / 不一致 212→229 / 実行不能 230→210)。fault 由来 `fvm` は遷移 0 件 (360/230/210 不変・VMT slot 未解決)。全文・実測・未達: [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §12・§12.1。署名未対応 50 関数 (LD-24 / #976) の内訳と分割は [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §12 末尾・[`REPORT_LD24.md`](REPORT_LD24.md)。状態前提 (InitTable / TLS index) の case 生成 (LD-25 / #977、部分達成: units の InitUnits 空振り一致 11/11 の検出と hybrid 状態の遷移表) は [`REPORT_APPENDIX_LD25.md`](REPORT_APPENDIX_LD25.md)。

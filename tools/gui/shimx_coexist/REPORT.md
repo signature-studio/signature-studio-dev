@@ -118,12 +118,12 @@ shimx の生成物 (`BACKLOG.md` / `inventory.md` / `data/*` / `exports.txt`) �
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 実ブラウザ (Chrome) での `showOpenFilePicker` / `showSaveFilePicker` / `window.open` e2e が未実施。これらは transient user activation (約 5 秒) を要し、FL の操作が入力イベントから遅れると picker が SecurityError → FALSE (`CDERR_INITIALIZATION`) になり得る | 受入条件「Web 実装経由で動く」の実機確認 | 新規子チケット [GUI-9] (`tools/gui/e2e` の CDP ドライバでユーザ操作付き e2e) — 親 #13 / M-Integration |
-| `RegisterDragDrop` 経路: `gui_set_drop_target_invoker` の口のみ。guest の `IDropTarget` vtable 呼出 (m11_icall / `shimx_cbtrans_set_invoke` 経由) と CF_HDROP を返す `IDataObject` が未実装 | FL が OLE D&D のみ使う場合ファイルドロップ不可 | #1178 [SHX-T21] |
+| `RegisterDragDrop` 経路: guest の `IDropTarget` 呼出し橋と CF_HDROP の `IDataObject` は #1388 [SHX-T23] で実装 (node + mock まで。実 FL guest は未検証、詳細 `REPORT_SHX-T23.md`) | FL が OLE D&D のみ使う場合の実機可否は未確認 | #1178 [SHX-T21] / #177 [SHX-T9] |
 | save の反映契機: `flushSaves()` は手動呼出。FL の `CloseHandle` 等への自動結線が無い | 保存したファイルが実ファイルへ出ない | 新規子チケット [SHX-T13] (pathreg の flush 契機 #169 と整合) |
 | `gui_shimx_attach()` と `HostCallBridge.start()` を呼ぶ起動 glue が未結線 (`tools/m11/shimx_link` / 起動 glue 側) | 実 FL 結線ビルドで MsgWait の handle 待ちが 5 ms poll 縮退、ダイアログが host 未接続で FALSE | #177 [SHX-T9] (実機検証) にコメント |
 | 実 FL guest との結合は未実施。MsgWait の `HANDLE` 配列の要素幅は、shimx が `HANDLE = size_t` (wasm32 で 4 B)、lift 側が 8 B 要素で組む可能性があり**整合は未検証** | handle 配列の読み違い (未確認) | #177 [SHX-T9] にコメント (実 guest でのみ検証可能) |
 | OFN の `lpfnHook` / `lpTemplateName` (`OFN_ENABLEHOOK` / `OFN_ENABLETEMPLATE` / `OFN_ENABLETEMPLATEHANDLE`) は **fail-fast で明示** (`file_dialog()` 入口。`selftest_fd.inc` で検査、§8) | hook 付き呼出しは abort する (黙って無視しない) | 対応は必要時に別 issue |
-| フォルダ選択 (`SHBrowseForFolder` / `IFileDialog`) は shimx・gui とも実体無し (IMPORTS.md で未登録) | 該当 FL 機能 (呼出の有無は未確認) | #1179 [SHX-T22] |
+| フォルダ選択 (`SHBrowseForFolder` / `IFileDialog`) は shimx・gui とも実体無し (IMPORTS.md で未登録)。FL 本体は `SHBrowseForFolderA` を静的 import (呼出の有無は未確認) | 該当 FL 機能 (呼出の有無は未確認) | #1179 [SHX-T22] (調査: `REPORT_APPENDIX.md`) |
 | 複数選択は最大 64 件 (`FD_NAMES_MAX`): 65 件以上は FALSE + `CDERR_INITIALIZATION`。名前の列を `names[]` 配列に載せず 2 パスで走査すれば撤廃できる (host 応答は 4,094 B 以内なので 1 文字名で最大 2,047 件) | FL で 65 件超を一括選択する操作 (有無は未調査) | 新規子チケット (PM 起票依頼; FL の実操作で要否を判断) |
 | `selftest.sh` の既存 flake: `gui_headless.c:33 blit_surf` が解放済み面を読む ASan heap-use-after-free (base・HEAD とも 100 回中 10 / 9 回、§4.2) | `selftest.sh` と、それを `pipefail` 下で呼ぶ `e2e.sh` step 1 が同率で落ちる (本 PR の変更とは無関係) | 新規子チケット [GUI-*] (PM 起票依頼。headless host の render thread と `surf_free` の同期) |
 | shimx の生成物 (BACKLOG / inventory / data / exports) が未再生成 (§5) | 新設 3 関数が一覧に無い | 次回のフル `bash tools/shimx/test.sh` (OTT 素材付き) |
@@ -190,3 +190,46 @@ bash tools/gui/e2e.sh                        # gui 単体 wasm 回帰
 - ネガコントロール: activation を常時付与 (`withoutActivation` を gesture 付きに置換) すると **4 FAIL / 10 PASS** (14 検査中 4 FAIL、exit 1、所要 11.175 s、HEAD `cfd3f7b2`・`browser_e2e.mjs` は `7f5807c7` と同一)。activation 無しの検査と想定内 log の件数検査が、activation の有無を実際に区別していることを確認した。
 
 未解決 (起票先): 実 native picker の操作 (headless 不可。手動採取または GUI-9 の入力注入で扱う)・実 FL guest 結合での `window.open` / picker 呼出 (#177 SHX-T9)。
+
+## 10. 実ブラウザ e2e (SHX-T13 #956 の別実装: `browser_e2e_t13.sh`)
+
+`bash tools/gui/shimx_coexist/browser_e2e_t13.sh` (前提: 先に `coexist.sh` で `work/` の obj を作る)。同じ obj を `ENVIRONMENT=web,worker` でリンクし、`src/runtime/gui_hostcall.ts` を bun で browser 向けに bundle、headless Chrome で走らせる。
+
+- 注: main の #1159 版 (`browser_e2e.sh`、§9) と並存する本 PR の版。同名ファイルの競合を避けるため `_t13` 名に退避した。
+- **確認方式**: user activation が要る host 呼出 (`window.open` / picker) の直前に、ページの `#gate` ボタンを CDP `Input.dispatchMouseEvent` の実マウスで押させる (10 回 = window.open 4 + open 5 + save 1)。`navigator.userActivation.isActive` を各呼出で記録し、全件 true を検査。
+- **picker**: headless で native ダイアログは操作できないため、`showOpenFilePicker` / `showSaveFilePicker` だけ差し替え。`browserEnv()` の本体経路 (types 変換・Abort→null・File 読込・createWritable) は通る。
+- **window.open**: 実 API を呼ぶが遷移先は `about:blank` (外部通信なし)。URL に `blocked` を含む場合のみ null を返してポップアップブロックを模擬。
+- 変更: `HostCallEnv.openWindow` を `boolean | Promise<boolean>` にし、`openUrl` を async 化 (ブラウザ側の戻り値を await する)。node 側の挙動は不変。
+
+### 実測 (code HEAD `862b4967` = main `c4e93550` 取り込み後の merge commit。測定 HEAD `862b4967`。runner、Chrome 154.0.8037.97、直列・前景実行、開始時 load average 1 分値)
+
+測定順: `coexist.sh` → `browser_e2e_t13.sh` → `browser_e2e.sh` (main 版、確認用)。各 run は単独 (並行なし)。
+
+| 項目 | 結果 |
+|---|---|
+| `coexist.sh` (node + mock) | rc=0 / 10.528 s / 開始時 load 0.46 / link duplicate 0・warning 0・undefined 0 / ALL PASS (件数は §4 を参照。host 13 PASS 0 FAIL) |
+| `browser_e2e_t13.sh` (本 PR の版、web build + CDP) | rc=0 / 108.567 s / 開始時 load 0.53 / web link rc=0 / **BROWSER RESULT pass=13 fail=0** / Chrome 154.0.8037.97 |
+| `browser_e2e.sh` (main #1159 版、確認用) | rc=0 / 11.341 s / 開始時 load 0.11 / **BROWSER RESULT pass=14 fail=0** / Chrome 154.0.8037.97 |
+| wasm 側 C テスト (web build、`browser_e2e_t13.sh` 内) | RESULT pass=58 fail=0 |
+| window.open 実行時の user activation | 4 件すべて active |
+| picker 実行時の user activation | open 5 件・save 1 件すべて active |
+
+- 測定環境の補足: runner に mingw (`gcc-mingw-w64-x86-64`) と `wabt` が無かったため apt で導入。worktree で `pnpm install --frozen-lockfile` を実行 (main 版 `browser_e2e.sh` が `node_modules/.bin/tsc` を使うため)。
+- 本 PR の code 変更: `src/runtime/gui_hostcall.ts` ほか `tools/gui/shimx_coexist/browser_e2e_t13.{sh,mjs}`・`browser_page.js`・`browser_index.html` (`origin/main` 比の差分)。
+
+### 旧 commit の参考値 (code commit `fdc95bf2`、測定 HEAD `fe406aa5`。現 HEAD の実測ではない)
+
+`browser_e2e_t13.sh` 導入前の版で測ったもの。`browser_e2e.sh` の旧版 (main 取り込み前) の値で、現在の `browser_e2e.sh` (main 版) とは別物。
+
+| 項目 | 結果 |
+|---|---|
+| `coexist.sh` | rc=0 / 14.72 s / ALL PASS |
+| `browser_e2e.sh` (旧版) | rc=0 / 108.25 s / web link rc=0 / BROWSER RESULT pass=13 fail=0 |
+
+判定項目: window.open の URL 一致 (C 側で拒否した 4 件は host に来ない)、picker types・multi フラグ、buffer 反映 (kick.wav / a.wav / b.wav / c.mid の内容)、save の実 handle 反映 (`flushSaves` = 1)、host log の想定外エラー無し、ページの未捕捉例外無し。
+
+### 未解決
+
+- 実 FL guest との結合は未実施 (§6 の既存項目)。
+- browser_e2e.mjs には negative control を入れていない (node 版の NC1/NC2 相当は未実装)。
+- 実 FL の `ShellExecute` / `GetOpenFileName` 呼出の順序・タイミングは未検証 (§6 の SHX-T9 / SHX-T12 側)。

@@ -78,3 +78,22 @@ mac dylib (`Shared/ILSvg_x64.dylib`) は素材に無いため、受入条件 4 �
 |---|---|
 | mac dylib (`Shared/ILSvg_x64.dylib`) との出力比較。基準の定義と素材 (mac slice) の供給 | #1148 `[T-SH-26]` (親 #927) |
 | papki 1.0.101 の `make_unique` 置換・cssom の `kilobyte` 置換が FL バイナリの版と一致するか (推定) | #1148 (同上) |
+
+## mac dylib との比較の試行 (#1148 / 親 #927)
+
+結論 1 行: mac 版 `ILSvg_x64.dylib` は素材 (`analysis-mac-shared`) から取得できたが、x86_64 Mach-O のため Linux runner では実行できず、出力比較 (受入条件 1・2) は未実施。実行比較は #1348 `[T-SH-28]` へ分割。
+
+抽出: `analysis-mac-shared.tar.zst` の `FL Studio 2026.app/Contents/Resources/FL/Shared/ILSvg_x64.dylib` (universal, 3297952 B)。x86_64 スライス (offset 16384, 1641088 B) を `tools/shared/work/mac_ilsvg/x86/` に切り出し (gitignore)。sha256 先頭 16 桁 `c2a14c1b94323cd0`。
+
+静的確認 (`llvm-objdump --macho`):
+
+| 項目 | 実測 |
+|---|---|
+| export (exports trie) | `_svgCreate` / `_svgRender` / `_svgDestroy` の 3 件。wrapper (`oss/ilsvg/wrap/ilsvg_wrap.cpp`) と同名 |
+| 依存 dylib | `/usr/local/lib/ILSvg_x64.dylib` (自己参照) / `libc++.1.dylib` / `libSystem.B.dylib` の 3 件 |
+| 埋め込みパス | `strings -n 8` で 114 件 (x86_64 スライス)。大半 108 件は小文字 `/Volumes/imageline/flextra/sdks/ILSvg/` 配下 (pixman 6 / cssom 3 / svgdom 1 / agg 1 / mikroxml 1 / utki 1 のソース参照・`xcode/` 配下のビルド中間物 `.o` 95 件を含む)。大文字 `SDKs` は 6 件 (svgdom 3 / papki 1 / svgren 1 / 末尾 `ILSvg/` のみ 1)。含まれるコンポーネントは svgdom / svgren / cssom / papki / mikroxml / utki / pixman / agg |
+| enum 名 | `spread_method_to_string` 等の C++ シンボルが残る。版文字列 (`@PIXMAN_VERSION_*@` は未展開の雛形) からは版番号を特定できず |
+
+実行不可の根拠: この runner は x86_64 Linux。mac バイナリを動かす qemu・Rosetta・box64・wine が無い (`which` で確認)。workflow にも mac runner が無い。よって (1) mac dylib と wasm / native の画素比較 (2) papki `make_unique` / cssom `kilobyte` 置換の挙動一致 は、この環境では成立しない。
+
+未解決 (起票先): 実行比較の基準定義・実行環境の確定・比較本体 → #1348 `[T-SH-28]` (親 #1148)。

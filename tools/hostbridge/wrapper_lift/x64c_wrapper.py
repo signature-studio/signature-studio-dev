@@ -57,6 +57,13 @@ def main():
         json.dump({"roots": rngs, "calltgt": []}, fh)
     sys.argv = ["x64c.py", "--pe", path, "--entries", entries, "--out", out_dir, "--closure", "0"]
     mod.main()
+    # x64c.py の i_cmpxchg (main 1491/1493 行) は amask に既に ULL を含むため、生成 C に ULLULL が出る。
+    # x64c.py 本体は変更しない (範囲外) ので、Wrapper 側の後処理で吸収する (REPORT §6)。
+    c_path = os.path.join(out_dir, "ott_lifted.c")
+    with open(c_path, encoding="utf-8", errors="replace") as fh:
+        text = fh.read()
+    with open(c_path, "w", encoding="utf-8") as fh:
+        fh.write(text.replace("ULLULL", "ULL"))
 
 
 if __name__ == "__main__":

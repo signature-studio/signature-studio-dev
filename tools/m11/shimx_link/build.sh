@@ -27,6 +27,7 @@ TAG="${VARIANT}_${GUIV}${SUF}${WSUF}${MSUF}"
 GEN="$W/gen${SUF}${WSUF}"; mkdir -p "$GEN"
 WSD="$(cd "$M11/../startup/winstubs" && pwd)"
 set +u; source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1; set -u
+export PATH="/opt/emsdk/upstream/bin:$PATH"   # emsdk_env.sh は upstream/bin を PATH から外すため llvm-nm が見つからない (#773)
 export TMPDIR="$W/tmp"; mkdir -p "$W/obj" "$W/tmp"
 CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=${M11_LB_BASE:-0}"
 SXF="-O1 -w -Wno-error=int-conversion -Wno-implicit-function-declaration -fno-strict-aliasing"   # shimx 自身のフラグ (scripts/build_objs.sh と同じ, ST)

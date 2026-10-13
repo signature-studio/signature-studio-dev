@@ -18,13 +18,13 @@ mkdir -p "$W"
 L0="$(cut -d' ' -f1-3 /proc/loadavg)"
 
 T0=$(date +%s)
-echo "== 1/4 RTTI + vtable 抽出"
+echo "== 1/5 RTTI + vtable 抽出"
 python3 "$DSP/scripts/mx_rtti.py" "$PE" "$W/rtti_vtables.json" 2>&1 | sed 's/^/   /'
 
-echo "== 2/4 VST3 入口面 (exports + MassiveX*/Steinberg::Vst vtable slot)"
+echo "== 2/5 VST3 入口面 (exports + MassiveX*/Steinberg::Vst vtable slot)"
 python3 "$DSP/scripts/mx_entry_surface.py" "$PE" "$W/rtti_vtables.json" "$W/surface" | sed 's/^/   /'
 
-echo "== 3/4 x64c probe (未対応命令センサス, tools/flelift/x64c.py を読取実行)"
+echo "== 3/5 x64c probe (未対応命令センサス, tools/flelift/x64c.py を読取実行)"
 python3 - "$W" <<'PY'
 import json, sys
 W = sys.argv[1]
@@ -60,8 +60,11 @@ for k, v in g.most_common():
     print("   group %-14s %d sites" % (k, v))
 PY
 
-echo "== 4/4 独立再計算 (線形 E8/E9 バイトスキャン・別アルゴリズム)"
+echo "== 4/5 独立再計算 (線形 E8/E9 バイトスキャン・別アルゴリズム)"
 python3 "$DSP/scripts/mx_recount.py" "$PE" "$W/rtti_vtables.json" "$W/recount.json" | sed 's/^/   /'
+
+echo "== 5/5 .pdata chained 分割 + leaf 近似の定量化 (MX-5 受入 2・3)"
+python3 "$DSP/scripts/mx_pdata_quant.py" "$PE" "$W/pdata_quant.json" | sed 's/^/   /'
 
 T1=$(date +%s)
 echo "OK  elapsed=$((T1-T0))s  load start=[$L0] end=[$(cut -d' ' -f1-3 /proc/loadavg)]"

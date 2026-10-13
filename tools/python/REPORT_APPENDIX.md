@@ -131,7 +131,7 @@ stubs (LGPL 参照) 署名との照合 (kwlist のある 103 のうち stubs 署
 
 既知類型との関係 (DEFECTS.md): 該当なし (lift ではなく純 Python 実装)。検証起点 commit: `57326b1` (クリーン worktree で再現)。
 
-**結論**: 同梱 Piano roll scripts **5/5** が wasm CPython 上で実行でき、**43 検査 (うちネガティブコントロール 3) 全 PASS** で回帰テスト化。Remote Scripts 5 本は flapi のみで動作 (5/5)。Audio scripts 12 本は `enveditor` 依存のため flapi のみでは **0/12** (Edison 用 `enveditor` 実装が別途必要)。
+**結論**: 同梱 Piano roll scripts **5/5** が wasm CPython 上で実行でき、**43 検査 (うちネガティブコントロール 3) 全 PASS** で回帰テスト化。Remote Scripts 5 本は flapi のみで動作 (5/5)。Audio scripts 12 本は `enveditor` 実装後に **12/12 import・実行** (PY-23 #1054、[REPORT_PY23.md](REPORT_PY23.md))。
 
 | 項目 | 実装 |
 |---|---|
@@ -170,7 +170,7 @@ stubs (LGPL 参照) 署名との照合 (kwlist のある 103 のうち stubs 署
 |---|---|---|---|
 | Piano roll scripts | 5 | **5/5** | 上記回帰 |
 | Remote Scripts | 5 | **5/5** | `filleach` `rerollLSloop/Sample/Steps` `flrInit` (channels API のみ、モックで列照合) |
-| Audio scripts | 12 | **0/12** | 全て `from enveditor import *` (`EditorSample` / `Editor` / `Utils` を使用)。`enveditor` は flapi 435 関数に含まれない別 module。静的に使用メンバを集計: `EditorSample` 系 (`SetSampleAt` `GetSampleAt` `SineFromTo` `AmpFromTo` `SilenceFromTo` `PasteFromTo` `GetRegion` `RegionCount` `Length` `SampleRate` `NumChans` `MSToSamples` `NormalizeFormat`) と `Editor.SelectionStartS/EndS` |
+| Audio scripts | 12 | **12/12 import・実行** (PY-23 #1054) | 全て `from enveditor import *`。`enveditor` は flapi 435 関数に含まれない別 module で、Edison Script Reference (block24447) から実装。詳細は [REPORT_PY23.md](REPORT_PY23.md) |
 
 ### 検証範囲 / 範囲外
 
@@ -186,7 +186,7 @@ stubs (LGPL 参照) 署名との照合 (kwlist のある 103 のうち stubs 署
 | ScriptDialog の範囲外値を clamp しない (警告のみ)。実機の clamp 有無は未確認 | 範囲外入力時の結果 | #79 コメント |
 | Remote Scripts が `channels` を import 無しで参照 → 実機が同名を注入していると推定 | ローダの注入名 (flapi 12 module) | #79 コメント |
 | `ScriptDialog.Execute()` は headless で常に True | 対話キャンセルの再現不可 | #10 (HUD) |
-| Audio scripts 12 本に `enveditor` 実装が必要 (Edison の波形操作 13 メンバ + Editor 選択) | Audio scripts 0/12 | 新規子チケット案 `[PY-6] enveditor module` (T7 を分割) |
+| Audio scripts 12 本の数値 oracle (6 本) と先頭バイト反転ネガコン | 残り 6 本は実行完了のみ | [REPORT_PY23.md](REPORT_PY23.md) §6 |
 | flpianoroll の 64 メンバは **PY-19 (#792) で全て実装** (`loadScoreFromFile` は仮想 FS の JSON 読込、`DialogParams` は MOCK)。残り: 実 FL の `.fst`/`.fsc` 形式・`DialogParams` の戻り値形 | 詳細は [REPORT_PY19.md](REPORT_PY19.md) §6 | #81 (PY-9) ほか、REPORT_PY19 §6 参照 |
 | Chrome 上の pyscript 実行未検証 | node のみ | 新規子チケット案 (browser_check に追加) |
 

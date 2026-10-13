@@ -19,7 +19,8 @@ clang -O1 -ffp-contract=off -frounding-math -w -o native_probe9 "$HERE/native/na
 FA_PROBE9=1 FA_HEAP_ZERO=1 ./native_probe9 "$CORE" fa9_epf.txt 0 > fa9_base.out 2> fa9_base.err
 FA_DBG=1 FA_ALT9=1 FA_PROBE9=1 FA_HEAP_ZERO=1 ./native_probe9 "$CORE" fa9_epf.txt 0 > fa9_alt.out 2> fa9_alt.err
 FA_HEAP_ZERO=1 ./native_probe9 "$CORE" fa9_pert.txt 0 > fa9_pert.out 2>/dev/null
-python3 "$HERE/fa9_check.py" check fa9_base.out fa9_base.err fa9_alt.out fa9_alt.err fa9_base.out fa9_pert.out
+FA_DBG=1 FA_ALT9=1 FA_HEAP_ZERO=1 node "$HERE/native/ctrl_harness.mjs" ./ctrl_full.cjs fa9_epf.txt 0 > fa9_wasm_alt.out 2> fa9_wasm_alt.err
+python3 "$HERE/fa9_check.py" check fa9_base.out fa9_base.err fa9_alt.out fa9_alt.err fa9_base.out fa9_pert.out fa9_wasm_alt.out
 rc=$?
 echo "(b) detail (FA_DBG=1, 全 ERR 行は $W/fa9_alt.err): $(grep -m1 '^ERR' fa9_alt.err)"
 echo "--- run_ctrl (native vs wasm, HEAD) ---"

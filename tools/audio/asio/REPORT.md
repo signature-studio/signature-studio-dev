@@ -8,6 +8,8 @@
 
 **CAB-270 (COM 経由 120s soak)**: `com_soak120_b256` を追加。既定 120 秒で **underrun 0 / silence 0 / ramp 0 mismatch / bufferSwitchTimeInfo bad 0 / COM 面 (sellog・参照カウント) 一致**を 9 回連続で実測 (§3-2)。`--quick` では soak を実行しない (親 e2e 規約)、`--soak N` で秒数変更可。
 
+> AU-17 (#1102) の COM 経由 30 分ソーク・p+1 照合の 24bit 修正の実測は `REPORT_APPENDIX_1102.md` に分割移動 (250 行上限)。
+
 ## 1. 前回中断 (insufficient_credits) の残骸精査 → **引継ぎ採用**
 
 `tools/audio/asio/` に未追跡 11 ファイル (計 1,565 行 / work/ は空ディレクトリのみ = **ビルド未通過の中断点**)。精査の結果、設計・実装・テスト・ハーネスはほぼ完成形だったため**クリーン再実行ではなく引継ぎ**を選択した。未追跡ファイル一覧: `iasio.h/.c`, `iasio_vreg.c`, `iasio_shimx.c`, `test/com_test.c`, `harness/{index_com.html,com_page.mjs,run_com.mjs}`, `build.sh`, `e2e.sh`, `.gitignore`。コミットは 0 (HEAD = 1c4b7c7 時点で全て未追跡)。
@@ -242,3 +244,5 @@ bash tools/audio/e2e.sh --out tools/audio/work/results_parent.json   # 親 e2e 2
 | 実行 A の underrun の原因 (負荷・ring 深さ・worklet スケジューリング) が未特定。本 5 回と §11 B〜E では再現せず | ゲート (underrun 0) が通算 1/10 回揺らぐ。merge 判定で再実行が必要になり得る | #998 |
 | 負荷を掛けた状態 (並行 e2e) での再現試験が未実施 | 原因の切り分けができない | #998 |
 | 実行 A は HEAD `fef39e5` (別コミット)。同一 HEAD での再現ではない | 同一 HEAD の再現条件が未確定 | #998 |
+
+負荷下の再現試験 (L1〜L3) は [REPORT_APPENDIX_998.md](REPORT_APPENDIX_998.md) を参照。負荷下で完全実行 2 回中 1 回 underrun (`com_ramp_b256_d2`)。

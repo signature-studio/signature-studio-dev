@@ -140,7 +140,7 @@ define = `p.final.ll` の `^define` 数。f80 = `x86_fp80` を含む define 数�
 
 ## 4. T2/T1: C++ engine DLL 4 本
 
-4 本とも MSVC (VS2019) の C++ DLL で、import は KERNEL32 のみ。殻との結合方式 (LoadLibrary 経路) は未解析。Vintage Chorus / Phaser の engine は `VSTPluginMain` / `main` を export する (VST2 engine。issue 本文の「engine.vst ラップ」に対応)。
+4 本とも MSVC (VS2019) の C++ DLL で、import は KERNEL32 のみ。殻との結合方式 (LoadLibrary 経路) は静的解析で §4.1 に記録 (呼出箇所は未了)。Vintage Chorus / Phaser の engine は `VSTPluginMain` / `main` を export する (VST2 engine。issue 本文の「engine.vst ラップ」に対応)。
 
 | プラグイン | engine block | サイズ B | `.text` B | `.pdata` 関数 / B | export | KERNEL32 import |
 |---|--:|--:|--:|--:|---|--:|
@@ -159,26 +159,23 @@ define = `p.final.ll` の `^define` 数。f80 = `x86_fp80` を含む define 数�
 | 19268 (Vintage Phaser) | 0 | 657 | 2 / 626 (420) | 31 | 1 | 92 (71) | 1 (失敗) | 1 (失敗、適用 0 件) | 0 (f80 段後、f80 1 → 0) | 17–22 |
 
 - `emcc -c` の列は b9fe1d8 の実測 (`engines.csv`)、「f80 段後」列は 35d8f3d5 の実測 (`summary.csv` erc3)。8603db1・648383c の 0/4 本から変わった。旧記述 (4 本とも E1 → E2) は P-E1 取り込み後は成り立たず、`engine_fixcmp.py` は 0 件 (E2 は b9fe1d8 で未確認)。lift 秒の出典は raw の `summary.csv`・`engines.csv` が無く (`work/` は gitignore)、run 番号も未記録のため commit 履歴の記載に基づく: (a) 4d57b9ef・8603db17 (8603db1 時点) と 4282160f (648383c 時点) の本体表 = 18977 16–17 / 19143 15–16 / 19266 18 / 19268 22 (58297bfe で 21–22、4282160f で 20–22)、(b) 9f661ead が統合した 35d8f3d5 の PR 作成時の追補 = 18977 13–14 / 19143 13 / 19266 15 / 19268 17–18。表は (a) と (b) の union。19268 の 20・21 は (a) の記載にのみ現れ、元の記録が無いため出典不明。
-- `.pdata` で define 無し = `function_<開始VA>` の define が final.ll に無い range 数 (`engine_defs.py`。分母は `.pdata` 関数数、括弧は欠けた range の合計 B)。**名前の不一致の疑い** (#527 追補、4 本の実機照合は未再現): 前 run の記録では欠けた 2 件は RetDec が export 名・既知名で define した関数 (18977 `dispatch` + `entry_point` / 19143 `DispatchToEngine` + `entry_point` / 19266・19268 `VSTPluginMain` + `entry_point`) とされるが、`work/`・lift 出力が無く本 run では照合できていない。`engine_name_gap.py` は合成入力でのみ確認し、真の欠落 0 は未確定。
+- `.pdata` で define 無し = `function_<開始VA>` の define が final.ll に無い range 数 (`engine_defs.py`。分母は `.pdata` 関数数、括弧は欠けた range の合計 B)。**名前の不一致 (#527 追補)**: 欠けた range は RetDec が export 名・既知名 (dispatch / entry_point 等) で define された関数と判定された前 run の記録がある。名前照合の再現は未取得 (付録 `REPORT_APPENDIX_527.md` §I.2・§I.2.1)。
 - 失敗した 2 本 (19266・19268): 最初のエラーは `e.final.ll` の `emcc -c` (`first_errors.txt`) で、E1 (icmp ptr/i64) でも E2 (zext 定数式) でもない。エラーは 4 件 (`4 errors generated.`): `do not know how to soften fp_extend` ×2、`no libcall available for frem with type f80` ×1、`no libcall available for fp_round with type f80` ×1。どちらも `e.final.ll` に x86_fp80 を含む define が 8 個ある (`grep -c x86_fp80`) うちの、どの関数で出たかは未特定。f80 型の演算の legalize 失敗で、#197 の `f80_lower.py` (f80 → f64) の対象と見られる (未検証)。
 - VEX (AVX/FMA) の未実装 helper は distinct で 50〜71 (648383c・b9fe1d8 とも同値)。CPUID 分岐で SSE 路に固定できるかの静的な下調べ (`sampler/vex_guard.py`、HEAD 70385178 で 4 本を 2026-10-13 に再実行): VEX 関数 8/8/9/13 (VEX 命令 635/658/588/916)、cpuid 関数 2/2/2/3、xgetbv 関数 2/2/2/2、VEX 関数の直接 call 鎖 (即値 call/jmp のみ、深さ 3) に cpuid/xgetbv 関数が届いたものは 0/0/0/0。間接 call (`call [rip+...]`・関数ポインタ・vtable) は未追跡のため、「SSE 固定は静的に不成立」とは言えない。動的な分岐の実測は未実施。T1 の AVX 2 種の SSE 路固定は `plugins/REPORT.md` §4.3 に記録あり。
 - f80 関数は Vintage Chorus の `function_18001c320` と Vintage Phaser の `function_1800218a0` の 1 本ずつ (#197 の対象)。以上は到達性の実測で、engine の正しさは何も示していない。
-- **PLG-F5-2 / #527 追補**: `engine_lift.sh` に `p0c/f80_lower.py` の段を追加し、4 本すべて `emcc -c` rc 0 (表の「f80 段後」列)。4 本の順次実行の合計は 65.2 s (35d8f3d5、PR 作成時の実測。修正 run では未再実行)。f80→f64 は bit-exact ではなく (#197 で未検証)、通過は正しさを示さない。詳細は付録 `REPORT_APPENDIX.md`。
+- **PLG-F5-2 / #527 追補**: `engine_lift.sh` に `p0c/f80_lower.py` の段を追加し、4 本すべて `emcc -c` rc 0 (表の「f80 段後」列)。これは前 run の記録で、本 PR の修正 run では再現していない (付録 §I.2.1)。4 本の順次実行の合計は 65.2 s (35d8f3d5、PR 作成時の実測。修正 run では未再実行)。f80→f64 は bit-exact ではなく (#197 で未検証)、通過は正しさを示さない。詳細は付録 `REPORT_APPENDIX.md`。gate (`engine_judge.py`) の判定と名前照合の付録は `REPORT_APPENDIX_527.md` (§I・§I.2)。
+
+### 4.1 殻と engine の結合方式 (受入 5、静的解析)
+
+- 殻 (18978 / 19144 / 19265 / 19267) は 4 本とも KERNEL32 の `LoadLibraryExW` / `GetProcAddress` / `FreeLibrary` を import。engine 名は殻の文字列 (fl-win64 を展開し pefile と UTF-16 / ASCII 走査で確認。`work/` 無し): FS = `Engine_x64.dll` (0x2dda74) + `dispatch` (0x2dda92)、HC = `engine_x64.dll` (0x2e9704) + `DispatchToEngine` (0x2e9722)、VC = `engine_x64.dll` + VST 系名 (0x2d9db0〜0x2daaa0)、VP = `engine_x64.dll` + VST 系名 (0x2db640〜0x2dc330)。
+- VST 系名は `VSTPluginMain` のほか大文字小文字違い 8 種 (計 9 種、`vstpluginmain` は 2 箇所。殻 19265 で確認)。
+- engine の export: 18977 = `dispatch`、19143 = `DispatchToEngine`、19266 / 19268 = `VSTPluginMain` / `main`。19268 の import は KERNEL32 の `LoadLibraryExW` / `GetProcAddress` / `FreeLibrary`。
+- 結論 (推定): 殻が `LoadLibraryExW(engine_x64.dll)` → `GetProcAddress(<export>)` で engine を動的ロードする (§1 の dynload 2 と一致)。
+- 未解析: 殻内の `GetProcAddress` 呼出箇所と引数の実値 (#527 に残す)、engine の `DllMain` の扱い。範囲外: bit-exact・wasm リンク方式 (#202 / #197)。
 
 ## 5. 判定 (gate) の設計と PR #506 の reviewer 指摘への対応
 
-#506 の指摘は (a) 判定が不合格でも exit 0 になる、(b) 判定そのものにネガティブコントロール (NC) が無い、の 2 点。本書では次のように作った。
-
-| 検査 | 実装 | 不合格時 | NC (`modulation_nega.sh`) |
-|---|---|---|---|
-| 殻 8 本の合否 | `judge.py <status.csv> --blocks … --batch-dir work/batch`: lift_rc = 0 / f80 = 0 / `emcc -c` rc = 0 / declares_unimpl = 0 (-1 = 集計行なしも不合格) / define = 閉包関数数 / 全列が整数 / ヘッダ一致 / `p.final.ll` の define 数が行と一致 / `p.o` が非空 | exit 1 (入力不正は 2)。e2e は `||` で受けて `FAIL` を出し exit 1。**`OK` 行は全判定通過後の最終行にだけ出る** | NC3: 15 ケース (§6) |
-| e2e スクリプト自身の終了コード | 判定を `--judge-only` で単独実行でき、 `STATUS_CSV` で入力を差し替えられる | 不合格行入りの CSV で exit 1 かつ出力に `[modulation_e2e] OK` を含まない | NC6 |
-| stale な結果で合格しない | lift 前に `work/batch/<block>` を消す (`lift_ranges.sh` は `drc.ll` の存在だけを見る)。判定対象は今回の実行で `status.csv` に追記された行だけ | — | (設計) |
-| `PLUGIN_MATRIX.json` との突合 | `matrix_check.py`: 閉包 6 項目 + matrix に `batch` 欄のある 5 本は 4 項目を status と比較 (計 68)。プラグイン数 ≠ 8 は exit 2 | exit 1 | NC4 |
-| Dispatcher ID の別算法検算 | `ids_crosscheck.py` | exit 1 | NC5 |
-| `emcc -c` ゲート / ranges が lift 範囲を決めること | — | — | NC1 / NC2 (#506 と同方式) |
-| 間接 call 脱落の検出 | `icall_check.py --gate` (IR 側 = 元の間接 call + 復元 dispatch が静的 site に満たなければ FAIL。audit と別算法の不一致も FAIL) | exit 1 | NC7 |
-| 閉包の境界 (測定) | `reach_check.py` (leak 自体は判定外。A ⊆ B' と前向き ⇒ 逆向きの検算が崩れたら FAIL、`--gate` は leak 1 本で exit 1) | exit 1 | NC8 |
+判定の設計 (検査の一覧表・NC の対応) は付録 `REPORT_APPENDIX.md` §H に分割移動した。
 
 e2e の exit 0 が意味するのは「殻 8 本の judge / matrix_check / ids_crosscheck が全て合格し、`icall_check.py --gate` (脱落 0) と `reach_check.py` の検算が通り、engine 4 本の測定行が揃った」ことだけで、
 **閉包の取りこぼし (leak) と engine の `emcc -c` 結果は判定に含めない**。最終行にこの 2 つの件数を併記する (実行例は §6)。
@@ -246,5 +243,6 @@ e2e の exit 0 が意味するのは「殻 8 本の judge / matrix_check / ids_c
 | `closure_facts.py` `matrix_check.py` `ids_crosscheck.py` `icall_check.py` | 閉包 / host ID / kernel / engine 外形 → `work/modulation/facts.json`、matrix 突合、ID 別算法検算、間接 call 脱落の判定 |
 | `reach_check.py` | 閉包の境界の監査 (§3.3): `.pdata` 全関数の辺・バイト走査の検算・閉包からの BFS・leak → `work/modulation/refs/<block>.json` |
 | `report_tables.py` | §1〜§4 の表の生成 |
+| `engine_judge.py` | engine 4 本の到達性 gate (exit 0/1/2)。`--selftest` は合成入力 8 ケース (good 1 + NC 7)。付録 `REPORT_APPENDIX_527.md` §I |
 | `engine_lift.sh` `engine_ranges.py` `engine_fixcmp.py` `engine_defs.py` | engine DLL の全 `.pdata` lift・欠落監査・局所修復 (PR #506 の同名スクリプトと同一手法。共通化は §7) |
 | `env.sh` | 環境 (fl-win64 展開・python venv)。 block map は main の `inventory/blockmap_from_matrix.py` を使う |

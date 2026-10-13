@@ -265,51 +265,130 @@ def run_check(lines, report):
 # ハーネス用 liftfix (本体 diff とは分離。RetDec が callee の caller-stack 書込み / FP 戻り値を
 # 未定義 alloca 読みに落とした箇所を実行可能にする束縛 — lift fidelity gap L2/L3 の回避)。
 # 適用対象は base 修復後の IR。各ルール: (fn, パターン) → 置換。
+#
+# 束縛先 global は「値の使われ方 (役割)」から導く (#1208)。役割 → global の対応は ROLE_GLOBAL のみ。
+#   dom     : 値が key 検索 call (第 1 引数, 第 2 引数が文字列 global) に渡される → DOM root
+#   tag_len : 値が整数即値と icmp eq で比較される → tag 文字列 len
+#   dbl     : 値が __asm_ucomisd の xmm 被演算子 → FP 戻り値
+# 役割が 1 つに定まらない (0 件・2 種以上・未分類の使用あり) 場合は失敗する。
+ROLE_GLOBAL = {
+    'dom': '__authstub_doc_root',
+    'tag_len': '__authstub_str_len0',
+    'dbl': '__authstub_dbl_ret0',
+}
 LIFTFIX_DECL = [
-    "@__authstub_dbl_ret0 = external global i128 ; LF2: DSP setState の version double 戻り (harness C で定義)",
+    f"@{ROLE_GLOBAL['dbl']} = external global i128 ; LF2: DSP setState の version double 戻り (harness C で定義)",
 ]
+
+
+def _use_role(line, name):
+    """1 件の使用行 (name を含む) の役割。分類できなければ None。"""
+    if re.search(r'icmp eq i64 ' + name + r', \d+', line):
+        return 'tag_len'
+    if re.search(r'call i64 @function_[0-9a-f]+\(i64 ' + name + r', ptr getelementptr inbounds \(\[\d+ x i8\], ptr @global_var_', line):
+        return 'dom'
+    if re.search(r'inttoptr i64 ' + name + r' to ptr', line):
+        return 'dom'
+    if '@__asm_ucomisd' in line and re.search(r'i128 ' + name + r'[,)]', line):
+        return 'dbl'
+    if '@__asm_xorpd' in line:
+        return 'zero'
+    return None
+
+
+def derive_role(lines, fnva, name, tag):
+    """fn 内で SSA 名 name を使う行の役割を求める。役割が 1 種に定まらなければ失敗。"""
+    s, e = fn_span(lines, fnva)
+    en = re.escape(name)
+    uses = [(i, lines[i]) for i in range(s + 1, e)
+            if re.search(en + r'(?![\w.])', lines[i]) and not re.match(r'\s*' + en + r' = ', lines[i])]
+    roles = {}
+    unknown = []
+    for i, l in uses:
+        r = _use_role(l, en)
+        if r is None:
+            unknown.append((i + 1, l.strip()))
+        elif r != 'zero':
+            roles.setdefault(r, []).append(i + 1)
+    if unknown or len(roles) != 1:
+        raise SystemExit(f'{tag}: role of {name} undecided: roles={sorted(roles)} unknown={unknown}')
+    (role,) = roles
+    return role
+
+
+def _load_role(lines, fnva, va, slot, tag):
+    """機械語 VA の `load i64, ptr %stack_var_<slot>` の結果値の役割。"""
+    i = site_at(lines, fnva, va, r'\s*%\S+ = load i64, ptr %stack_var_' + re.escape(slot) + r'\b')
+    return derive_role(lines, fnva, re.match(r'\s*(%\S+) = ', lines[i]).group(1), tag)
+
 
 def apply_liftfix(lines, report):
     """base 後 IR に対する束縛。全ルール exactly-1 でなければ失敗。"""
     applied = []
+    roles = {}
     C = 0x1800c2b50  # controller setState
     D = 0x18004fad0  # DSP setState
+
+    # 役割は束縛前の IR から導く (束縛で行が変わる前に求める)。
+    # 同じ LF の複数 site は全て同一役割でなければ失敗する。
+    def agree(tag, rs):
+        if len(set(rs)) != 1:
+            raise SystemExit(f'{tag}: site roles disagree: {rs}')
+        return rs[0]
+
+    i1 = site_at(lines, C, 0x1800c2c1f, r'\s*%\S+ = trunc i128 %\S+ to i64, ')
+    n1 = re.match(r'\s*(%\S+) = ', lines[i1]).group(1)
+    roles['LF1'] = agree('LF1', [derive_role(lines, C, n1, 'LF1')])
+    roles['LF5'] = agree('LF5', [_load_role(lines, C, 0x1800c2c94, '-72', 'LF5'),
+                                 _load_role(lines, C, 0x1800c2ca4, '-72', 'LF5')])
+    roles['LF6'] = agree('LF6', [_load_role(lines, D, 0x18004fbc6, '-80', 'LF6'),
+                                 _load_role(lines, D, 0x18004fbd6, '-80', 'LF6')])
+    roles['LF7'] = agree('LF7', [_load_role(lines, D, 0x18004fb74, '-152', 'LF7')])
+    roles['LF2'] = agree('LF2', [derive_role(lines, D, '%3', 'LF2')])
+    i3 = site_at(lines, D, 0x18004fe46, r'\s*%\S+ = or i1 %cf\.0\.reload, %zf\.0\.reload')
+    j3 = max(k for k in range(fn_span(lines, D)[0], i3) if '@__asm_ucomisd(' in lines[k])
+    op3 = re.search(r'@__asm_ucomisd\(i128 \S+?, i128 (%\S+?)\)', lines[j3]).group(1)
+    roles['LF3'] = agree('LF3', [derive_role(lines, D, op3, 'LF3')])
+    i4 = site_at(lines, D, 0x18004fe4c, r'\s*call void @__asm_ucomisd__1\(')
+    op4 = re.search(r'@__asm_ucomisd__1\(i128 (%\S+?),', lines[i4]).group(1)
+    roles['LF4'] = agree('LF4', [derive_role(lines, D, op4, 'LF4')])
+    report['roles'] = roles
+    G = {k: ROLE_GLOBAL[v] for k, v in roles.items()}
 
     # LF1: tag 文字列 len (base が undef alloca 読みを xor 0 に fold。
     # machine は call 後に [rbp-0x28] を読む → 呼出後に mock が書く global から読む)
     replace_at(lines, C, 0x1800c2c1f, r'\s*%\S+ = trunc i128 %\S+ to i64, ',
-               ['  %36 = load i64, ptr @__authstub_str_len0, !insn.addr !2583 '
+               [f'  {n1} = load i64, ptr @{G["LF1"]}, !insn.addr !2583 '
                 '; LIFTFIX LF1 (旧: trunc of undef-fold)'])
     applied.append('LF1')
 
     # LF5/LF6: DOM root ポインタ (alloca 配置が machine と異なるため global に束縛)
     # LF5/LF6/LF7 の slot は IR 行から読んだ値と照合する (expect_slot 不一致で失敗)。
-    # 照合用の期待値 (-72/-80/-152) と global 名は literal のまま残す (値の導出は未達 #1208)。
-    bind_load_slot_at(lines, C, 0x1800c2c94, '-72', '__authstub_doc_root', 'LF5')
-    bind_load_slot_at(lines, C, 0x1800c2ca4, '-72', '__authstub_doc_root', 'LF5')
+    # 照合用の期待値 (-72/-80/-152) は literal のまま残す (slot 値の導出は本 issue の範囲外)。
+    bind_load_slot_at(lines, C, 0x1800c2c94, '-72', G['LF5'], 'LF5')
+    bind_load_slot_at(lines, C, 0x1800c2ca4, '-72', G['LF5'], 'LF5')
     applied.append('LF5')
-    bind_load_slot_at(lines, D, 0x18004fbc6, '-80', '__authstub_doc_root', 'LF6')
-    bind_load_slot_at(lines, D, 0x18004fbd6, '-80', '__authstub_doc_root', 'LF6')
+    bind_load_slot_at(lines, D, 0x18004fbc6, '-80', G['LF6'], 'LF6')
+    bind_load_slot_at(lines, D, 0x18004fbd6, '-80', G['LF6'], 'LF6')
     applied.append('LF6')
 
     # LF7: tag 文字列 len (ctrl LF1 の DSP 版: alloca 配置差を global 束縛で吸収)
-    bind_load_slot_at(lines, D, 0x18004fb74, '-152', '__authstub_str_len0', 'LF7')
+    bind_load_slot_at(lines, D, 0x18004fb74, '-152', G['LF7'], 'LF7')
     applied.append('LF7')
 
     # LF2: `%3 = xor i128 0, 0` (base が入口 undef 読みを fold したもの。
     # ucomisd の version double 値) → global から読む (mock が callee 戻りを書込)
     replace_lines(lines, D, r'\s*%3 = xor i128 0, 0',
-                  lambda m, l: ['  %3 = load i128, ptr @__authstub_dbl_ret0, !insn.addr !0 '
+                  lambda m, l: [f'  %3 = load i128, ptr @{G["LF2"]}, !insn.addr !0 '
                                 '; LIFTFIX LF2 (旧: xor i128 0,0)'], 1, 'LF2')
     applied.append('LF2')
 
     # LF3: ucomisd(0, v) 後の stale flag 再読出し (or cf,zf) を実 fcmp に置換
     # (machine: ucomisd xmm1=0, xmm0=v; ja → out。IR は entry 時の整数 flag を再利用するため誤分岐)
     # version 値は mock が呼出中に書く global から「比较時に」読む (entry hoist を避ける)
-    i3 = site_at(lines, D, 0x18004fe46, r'\s*%\S+ = or i1 %cf\.0\.reload, %zf\.0\.reload')
     var = re.match(r'\s*(%\S+) = or i1', lines[i3]).group(1)
     lines[i3:i3 + 1] = [
-        '  %lf3t = load i64, ptr @__authstub_dbl_ret0 ; LIFTFIX LF3 (stale flag → 実比較, 呼出後の値)',
+        f'  %lf3t = load i64, ptr @{G["LF3"]} ; LIFTFIX LF3 (stale flag → 実比較, 呼出後の値)',
         '  %lf3d = bitcast i64 %lf3t to double ; LIFTFIX LF3',
         f'  {var} = fcmp uge double %lf3d, 0.0 ; LIFTFIX LF3',
     ]
@@ -317,10 +396,10 @@ def apply_liftfix(lines, report):
 
     # LF4: 2 つ目の ucomisd (v <= 11.00001) の分岐が脱落しているため挿入
     # (machine: ucomisd xmm0, [11.00001]; ja 0x18004ff26)
-    i = site_at(lines, D, 0x18004fe4c, r'\s*call void @__asm_ucomisd__1\(')
-    cst = re.search(r'i128 %3, (i64 )?(\d+)\)', lines[i]).group(2)
-    insert_after(lines, i, [
-        '  %lf4t = load i64, ptr @__authstub_dbl_ret0 ; LIFTFIX LF4 (脱落分岐の復元, 呼出後の値)',
+    i4 = site_at(lines, D, 0x18004fe4c, r'\s*call void @__asm_ucomisd__1\(')
+    cst = re.search(r'i128 %3, (i64 )?(\d+)\)', lines[i4]).group(2)
+    insert_after(lines, i4, [
+        f'  %lf4t = load i64, ptr @{G["LF4"]} ; LIFTFIX LF4 (脱落分岐の復元, 呼出後の値)',
         '  %lf4d = bitcast i64 %lf4t to double ; LIFTFIX LF4',
         f'  %lf4c = bitcast i64 {cst} to double ; LIFTFIX LF4',
         '  %lf4 = fcmp ugt double %lf4d, %lf4c ; LIFTFIX LF4',

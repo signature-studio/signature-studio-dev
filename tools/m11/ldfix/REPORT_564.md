@@ -19,7 +19,7 @@ IR (最終 `boot_final.ll`): `%1 = xor i64 0, 0` / `%8 = icmp eq i64 %1, 4344096
 連鎖 (stage ごとの実測): `boot0.drc.ll` (RetDec 直後) で既に `%0 = alloca i64` + `%1 = load i64, ptr %0` (store の無い alloca の load = **undef**)。
 `[rbp+0x70]` は callee が書く escape 済み `%stack_var_-96` の内部 (+8) だが、RetDec はそれを別 alloca の load にした。
 undef の自由度で LLVM が分岐条件を `icmp eq i1 (v==K), registered` に畳み (`skip = registered && v==K` の意味が壊れる)、m5 `ir5_patch` B1 が undef を 0 に固定して最終 IR の `xor i64 0, 0` になる。
-**RetDec frontend (層 fe) + 我々の B1 (ours) の複合**。DEFECTS.md の既存類型では D4 (deref 脱落) / D1b (定数に畳まれた分岐) の近縁だが、原因 (callee が書く frame 内部 read の undef 化) が違うため **D21 として新規行を追加**した (D18 は main の #562 GUI-5、D19・D20 は main の #662・#735 が使用中のため。当初 D19 で起票したが main 取り込み時に番号を衝突回避のため改めた)。
+**RetDec frontend (層 fe) + 我々の B1 (ours) の複合**。DEFECTS.md の既存類型では D4 (deref 脱落) / D1b (定数に畳まれた分岐) の近縁だが、原因 (callee が書く frame 内部 read の undef 化) が違うため **D22 として新規行を追加**した (D18 は main の #562 GUI-5、D19・D20 は main の #662・#735 が使用中のため。当初 D19 で起票したが main 取り込み時に番号を衝突回避のため改めた)。
 F3 系の門 (G1〜G5) が対象外の理由: F3c は `mov rD,[argN-base]` (引数ポインタ経由) の load→store 形を見る。本件は rbp 相対 (frame) の read で base が引数でない (G1/G2 で落ちる)。
 
 ## 2. 修復 (ldfix F4, `ldfix.py` / `ldframe.py`)

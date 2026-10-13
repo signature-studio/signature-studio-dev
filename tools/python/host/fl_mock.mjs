@@ -31,7 +31,11 @@ export function createMockEngine() {
     midiOut: [],
     log: [],
   };
-  const ch = (i) => { if (!st.channels[i]) throw RANGE(); return st.channels[i]; };
+  // channels / playlist の index は整数のみ (C provider の A_INT と同じ: 文字列・None・非整数は code 5)、範囲外は code 4
+  const ix = (i) => { if (i === undefined) return 0; if (typeof i === "boolean") return +i; if (!Number.isInteger(i)) throw WRONG(); return i; };
+  const str = (s) => { if (typeof s !== "string") throw WRONG(); return s; };
+  const ch = (i) => { i = ix(i); if (!st.channels[i]) throw RANGE(); return st.channels[i]; };
+  const pl = (i) => { i = ix(i); if (i < 1 || i > st.playlist.length) throw RANGE(); return st.playlist[i - 1]; };
   const tr = (i) => { if (!st.mixer[i]) throw RANGE(); return st.mixer[i]; };
   const tog = (cur, v) => (v === undefined || v === -1 ? !cur : !!v);
   // fl_provider の引数検査 (fl_dispatch.c type_ok / fl_a_int) と同じ: None は既定値、bool と整数のみ可、他は code 5
@@ -65,7 +69,7 @@ export function createMockEngine() {
       for (; p < 64; p += stride) ch(ci).steps[p] = 1;
     },
     "channels.getChannelName": (i) => ch(i).name,
-    "channels.setChannelName": (i, n) => { ch(i).name = n; },
+    "channels.setChannelName": (i, n) => { ch(i).name = str(n); },
     "channels.isChannelSelected": (i) => ch(i).sel,
     "channels.selectChannel": (i, v) => { ch(i).sel = tog(ch(i).sel, v); },
     "channels.deselectAll": () => { st.channels.forEach((c) => (c.sel = false)); },
@@ -78,7 +82,12 @@ export function createMockEngine() {
     "channels.setChannelColor": (i, c) => { ch(i).color = c; },
     "channels.getTargetFxTrack": (i) => ch(i).fx,
     "channels.setTargetFxTrack": (i, t) => { ch(i).fx = t; },
-    "channels.setGridBit": (i, pos, v) => { ch(i).steps[pos] = v ? 1 : 0; },
+    "channels.setGridBit": (i, pos, v) => {
+      const k = ch(i);
+      pos = ix(pos);
+      if (pos < 0 || pos >= 64) throw RANGE();
+      k.steps[pos] = v ? 1 : 0;
+    },
     "channels.quickQuantize": (i) => { ch(i); },
     "channels.showEditor": (i) => { ch(i); },
     "mixer.trackCount": () => st.mixer.length,
@@ -105,9 +114,9 @@ export function createMockEngine() {
     "transport.stop": () => { st.playing = false; },
     "transport.isPlaying": (...a) => { arity(a, 0, 0); return st.playing; },
     "playlist.trackCount": () => st.playlist.length,
-    "playlist.getTrackName": (i) => st.playlist[i - 1]?.name ?? "",
-    "playlist.setTrackName": (i, n) => { st.playlist[i - 1].name = n; },
-    "playlist.setTrackColor": (i, c) => { st.playlist[i - 1].color = c; },
+    "playlist.getTrackName": (i) => { i = ix(i); return st.playlist[i - 1]?.name ?? ""; }, // 範囲外は空文字 (C と同じ)
+    "playlist.setTrackName": (i, n) => { pl(i).name = str(n); },
+    "playlist.setTrackColor": (i, c) => { pl(i).color = c; },
     "ui.getVisible": (w) => !!st.windows[w],
     "ui.showWindow": (w) => { st.windows[w] = true; },
     "ui.hideWindow": (w) => { st.windows[w] = false; },

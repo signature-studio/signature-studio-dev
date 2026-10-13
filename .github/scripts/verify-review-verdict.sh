@@ -16,7 +16,12 @@
 # 入力 (env): GH_TOKEN, OC_REPO, OC_PR_NUMBER
 set -euo pipefail
 
-: "${OC_REPO:?}" "${OC_PR_NUMBER:?}"
+# 前提 (OC_REPO / OC_PR_NUMBER) が無い = 「Prepare PR context」が失敗して review 自体が走らなかった。
+# 検証する対象が無いので、ここで失敗を重ねず何もせず終わる (失敗の原因は prepare 側の step に出ている)。
+if [ -z "${OC_REPO:-}" ] || [ -z "${OC_PR_NUMBER:-}" ]; then
+  echo "OC_REPO / OC_PR_NUMBER is unset: no review run to verify"
+  exit 0
+fi
 MAX_ATTEMPTS="${OC_REVIEW_MAX_ATTEMPTS:-3}"
 REVIEWER_LOGIN="${OC_REVIEWER_LOGIN:-oc-reviewer-for-signature-studio[bot]}"
 
