@@ -723,6 +723,14 @@ def t23():
     s_a = base.canon_alloca_order(fn([("3", "{ i32, i8 }, align 4"), ("4", "{ i64, i64 }, align 8")]))
     s_b = base.canon_alloca_order(fn([("4", "{ i64, i64 }, align 8"), ("3", "{ i32, i8 }, align 4")]))
     assert s_a == s_b, (s_a, s_b)
+    # 同型 alloca 2 本の行順入替え (store は %4 を指す): 参照先が入力順に依存しない
+    def fs(rows, store):
+        return "\n".join(["define void @function_1000() {", "entry:"] + ["  %%%s = alloca i32, align 4" % n for n in rows]
+                         + ["  store i32 0, ptr %%%s" % store, "  ret void", "}"])
+    t_a = base.canon_alloca_order(fs(["3", "4"], "4"))
+    t_b = base.canon_alloca_order(fs(["4", "3"], "4"))
+    assert t_a == t_b, (t_a, t_b)
+    assert t_a.endswith("  store i32 0, ptr %4\n  ret void\n}"), t_a
     print("T23 ok (canon_alloca_order: 行順 3 通り・struct tie・配列型名で canon 出力一致, slot は %3..%7 昇順)")
 
 

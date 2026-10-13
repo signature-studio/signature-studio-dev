@@ -936,7 +936,7 @@ def canon_alloca_order(text):
     """関数ごとの連続した alloca 行を型名順に並べ直し、%N 参照を付け替える (LIFTLIB-11 / #887)。
 
     RetDec は同一入力でも alloca 行の並びを ASLR 等に依存して入れ替えることがある (k80 で実測)。
-    型キーは型全体 (align を除く) の文字列順で並べ替え、スロット名 (%N) は番号の昇順に振り直す。
+    型キーは型全体 (align を除く) の文字列順で並べ替え、同型は番号の昇順、スロット名 (%N) は番号の昇順に振り直す。
     入力の行順・同先頭トークンの型 (struct 同士) に依存しない。意味は変わらない (スロットの番号付けのみ)。
     """
     lines = text.split("\n")
@@ -971,7 +971,7 @@ def _canon_alloca_body(lines, s, e):
         ms = [_ALLOCA_LINE.match(lines[x]) for x in run]
         names = [m.group(2) for m in ms]
         bodies = [m.group(3) + m.group(4) for m in ms]
-        keys = [(re.sub(r",\s*align\s+\d+", "", b), b) for b in bodies]
+        keys = [(re.sub(r",\s*align\s+\d+", "", b), int(names[q])) for q, b in enumerate(bodies)]
         slots = sorted(names, key=int)
         order = sorted(range(len(run)), key=lambda q: keys[q])
         for p, q in enumerate(order):
