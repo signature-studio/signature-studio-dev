@@ -79,7 +79,7 @@
 3. **[audio-midi]** WebMIDI shim (SAB MIDI ring, `midiIn/Out` 20 関数, CALLBACK_FUNCTION スレッド, SysEx バッファ, 再スキャン) と Worker 直受信の実機検証。
 4. ~~**[audio-directsound]**~~ 実装済み (AU-4 #189, §15)。
 5. **[audio-input-ui]** (#192, 部品は §14 で実装済み。FL 本体側の再初期化確認と入力遅延実測は未達) getUserMedia デバイス選択 + `controlPanel` UI + `kAsioResetRequest` 連携、入力遅延実測。
-6. **[audio-latency-policy]** T の縮小 (安定時に B 刻みで減衰)、安全モード/低遅延モードの UI、FL の selector 6 (0x17) 挙動確認後に `kAsioLatenciesChanged` を使うか決定。
+6. ~~**[audio-latency-policy]**~~ T の縮小 (安定時に B 刻みで減衰) は実装済み (AU-6 #190, §17)。残るのは安全モード/低遅延モードの UI と、FL の selector 6 (0x17) 挙動確認後に `kAsioLatenciesChanged` を使うか決定すること。
 7. **[audio-fl-profile]** (AU-7 #193) 静的に確定できた部分は §11。実 FLEngine 起動後の profile / `pbtrackingmode` 各モード (Driver/Hybrid/Mixer) でのカーソル追従確認は #34 待ち。
 8. **[audio-worklet-wasm]** (任意) FL ミキサを Wasm Audio Worklet 内で直接走らせる案との遅延比較 (ブロッキング不可のため FL スレッド構造の再設計が前提)。
 9. **[audio-ui-integration]** `src/index.ts` への組込 (ユーザジェスチャで `FlAudioShim.attach`, 既存 `audio.ts` ハーネスとの統合/置換)。
@@ -236,4 +236,4 @@ DirectSound shim を実装 (secondary = 循環バイト列, pump が T まで充
 
 ## 17. AU-6 (#190) 遅延ポリシー: T の減衰 (全文: `REPORT_AU6.md`)
 
-underrun が 3 秒続くと +B を 1 段ずつ戻す (下限は下げない)。`kAsioLatenciesChanged` は既定 OFF のまま。quick 全体 44/44 PASS (HEAD `d9c1248a`, 251.9 s)、減衰テスト 2 本 PASS・ネガティブコントロール FAIL で判定の有効性を確認。**未解決**: 閾値 3 秒の実機調整 (#187)、安全/低遅延モード UI (#34 以降)、selector 6 の利用可否 (0x17 未確定)。
+underrun が 3 秒続くと +B を 1 段ずつ戻す (下限は下げない)。`kAsioLatenciesChanged` は既定 OFF のまま。減衰テストと検証結果の正本は `REPORT_AU6.md` §2。**未解決**: 閾値 3 秒の実機調整 (#187)、安全/低遅延モード UI (#34 以降)、selector 6 の利用可否 (0x17 未確定)。
