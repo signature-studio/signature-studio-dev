@@ -192,18 +192,17 @@ VEX-256 は 344 関数 189,611 B 中 **closure 内は 6 関数のみ** (Convolve
 - 成果物: `ghidra_route/{ghidra_to_c.py,patches.py,ghidra_shim.h,build_cmp.sh,ablate.sh,census.sh,run_all.sh}`, `scripts/ghidra/DecompEach.java`。`work/` (gitignore): `ghidra/out{,_simd}/`, `gr/<name>/`。
 
 ### 10-6. 未解決
-### 10-7. KH-12 (#556) 途中経過: Resonator / Stereo / Delay の Ghidra 実ビルド (部分)
-- 環境: Ghidra 12.1.4 = GitHub release `Ghidra_12.1.4_build` の `ghidra_12.1.4_PUBLIC_20260921.zip` (570 MB, sha256 `ddac49f9…d2db`)、JDK 21、`GHIDRA_HOME` で指定。素材 `plugins-kilohearts` は Installer (zip/dmg) で、`scripts/extract_installer.sh` が HeartCore を抽出 (3m34s)。
-- 関数集合 (`snapins.json` の `lift` 値 + `extra` の和): Resonator 7 / Stereo 8 / Delay 141。`DecompEach.java` で 156 関数を decompile し **156 件 OK** (summary.tsv の status 集計 = OK 156・失敗 0)、Resonator の process 0x180743390 は 0.23 s・361 行。
-- 3 snap-in 合計の decompile は headless import 込みで 31.3 s (1 回・n=1)。
-- Resonator の C 化 (`ghidra_to_c.py resonator`、修復なし) は **emcc 失敗** (エラー 21 件以上・先頭 10 件の種類: 128bit レーン参照 `_8_8_`/`_4_12_`/`_0_8_` が V128 に無い 3 種、`rcpps` 未実装、`FUN_180fcf904` の引数不一致、`func_0x000180fbdef4` 未定義 stub 等)。**ビルド未成功のため突合・ablation・ネガコンは未実施**。
-- 未実施の理由: 本 run の時間上限内に、128bit レーン・rcpps/rsqrtps 実機近似表 (`snapins/scripts/approx_tables.b64`) の C への移植・プロトタイプ整合・stub 追加を終えられなかった。
-- 同 run で `run_all.sh 1000 7` (Gain/Haas/Gate) を再実行: 全修復 1000/1000 ×3・ablation 21 構成が §10-1/§10-2 と全値一致 (再現性の確認)、RetDec 側 wasm 23,054 / 35,967 / 45,754 B 一致。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | Resonator の emcc 失敗 (128bit レーン・rcpps 近似表・プロトタイプ・stub) | 受入条件 1〜4 (実ビルド・突合・ネガコン・結論) が全て未達 | #556 (本 PR は `Refs #556`) |
-| Stereo / Delay の Ghidra 実ビルド未着手 (rsqrtps・sincos_a の引数なし呼出・k_dfdb0 の 128bit 演算) | 受入条件 1〜4 未達 | #556 |
+| Stereo / Delay の Ghidra 実ビルド・突合は未実施 (rsqrtps・sincos_a の引数なし呼出・k_dfdb0 の 128bit 演算。`rcpps` 表・128bit・ABI 復元の規則化が前提)。§10-4 の「手作業が桁違いに増える」は census (構文の有無) に基づく推定のまま | 受入条件 1〜4 未達 | #556。子チケット案 `[KH-5b]` (親 #58。起票は PM) |
 | 人手の所要時間 (Ghidra ルートの修復工数) は未計測。記録したのは手パッチ規則の件数 (§10-2) と各段の実測秒 (§10-3) のみ | #58 受入条件「工数」を人手時間では比較できていない | #58 (open のまま追跡) |
-| Resonator / Stereo / Delay の Ghidra 実ビルド・突合は未実施 (`rcpps` 表・128bit・ABI 復元の規則化が前提) | §10-4 の「手作業が桁違いに増える」は census (構文の有無) に基づく推定のまま | 新規子チケット案 `[KH-5b]` (親 #58。起票は PM。#58 にコメントで提案) |
 | KH-3 優先度とフロント選択の決定 | 材料は §10-5 のみ。決定が無いため PR は `Closes` でなく `Refs #58` | #58 (PM 判断) |
+
+### 10-7. KH-12 (#556) 途中経過: Resonator / Stereo / Delay の Ghidra 実ビルド (部分)
+- 環境: Ghidra 12.1.4 = GitHub release `Ghidra_12.1.4_build` の `ghidra_12.1.4_PUBLIC_20260921.zip` (570 MB, sha256 `ddac49f9…d2db`)、JDK 21、`GHIDRA_HOME` で指定。素材 `plugins-kilohearts` は Installer (zip/dmg) で、`scripts/extract_installer.sh` が HeartCore を抽出 (3m34s)。
+- 関数集合 (`snapins.json` の `lift` 値 + `extra` の和): Resonator 7 / Stereo 8 / Delay 141。`DecompEach.java` で 156 関数を decompile し **156 件 OK** (summary.tsv の status 集計 = OK 156・失敗 0)。3 snap-in 合計の decompile は headless import 込みで 31.3 s (n=1)。
+- Resonator の C 化 (`ghidra_to_c.py resonator`、修復なし) は **ビルド未成功 (emcc 失敗)**。エラー 21 件以上・先頭 10 件の種類: 128bit レーン参照 `_8_8_`/`_4_12_`/`_0_8_` が V128 に無い 3 種、`rcpps` 未実装、`FUN_180fcf904` の引数不一致、`func_0x000180fbdef4` 未定義 stub 等。このため突合・ablation・ネガコンは未実施。
+- 未実施 (理由: 128bit レーン・rcpps/rsqrtps 近似表 (`snapins/scripts/approx_tables.b64`) の C 移植・プロトタイプ整合・stub 追加が未完)。
+- `run_all.sh 1000 7` (Gain/Haas/Gate) の再実行結果は §10-3 の再実行で再確認 (変更なし)。
