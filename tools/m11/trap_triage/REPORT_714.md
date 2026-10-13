@@ -102,3 +102,31 @@ python3 trap_triage/check_682.py work/probe714/units_714.json --units 304,555,92
 - 受入 1 (304・555 が ok): **未達**。OOB の起点は `_UStrAsg` の src 読出し (§7) で、§6 の `535bf2` 走査仮説は ON/OFF 両方で棄却 (トップフレームに出ない)。
 - 受入 2 (923 の原因): **未達**。鎖は §7 の表。
 - 受入 3 (回帰 0): OFF 既定の survey は HEAD と同じ ok 869 / trap 25。ON も同一。
+
+## 9. OOB 呼出し鎖の再測定と呼出し元 (2026-10-13, 追補 run 3、n=1)
+
+再現 (`M11_FIX_535BF2` 既定 0 = OFF、コード HEAD `92cfb784` の main 作業ツリーで実施。コード変更は本 PR に無い): gen_ir2 rc=0 / build rc=0 / survey rc=0 / check_682 2/5 (304=trap 555=trap 923=trap 291=ok 296=ok) rc=1。
+survey の集計は ok 870 / trap 24 / noproc 1 / miss 47 で、§7 (ok 869 / trap 25) と一致しない。原因は未調査。判定への影響は無い (check_682 は同じ)。
+
+**先頭 wasm フレーム (OFF, `M11_SURVEY_STACK=304,923`、`trap_triage/oob_insn.py` で逆引き)**
+
+| unit | 先頭フレーム | OOB 命令 | 直上の呼出し鎖 (wasm index) |
+|---|---|---|---|
+| 304 | 3372 `function_535bf2` (0x1a336f) | `i32.load` = `tbl + cnt*24` の sentinel 比較 (`tbl`=`*(*(obj+8)+8)`、`cnt`=`[obj+0x10]`+1) | 3147 `function_535ab0` ← 3157 `function_4fad10` ← 1759 `function_4fb910` ← 5237 ← 12403 ← 14849 ← 14865 |
+| 923 | 14900 `function_410b10` (0x354f17) | `i32.load` = `*(*(obj)-0x80)` | 2017 ← 1759 `function_4fb910` ← 1758 ← 8528 ← 14849 ← 14865 |
+
+- §6 (OFF) の「304 の先頭 = `function_535bf2`」と一致する。§7 (ON) では先頭が `function_4133f0` に変わる。先頭フレームは `M11_FIX_535BF2` の値で変わるため、§7 の「535bf2 仮説は棄却」は OFF 側では成立しない。ON 側の結論と OFF 側の結論を分けて扱う。
+
+**IR 上の呼出し元 (`work/boot_final.ll`)**
+
+- `function_535bf2` (189324): `obj+0x10` を +1 して `tbl + cnt*24` を読み、`-1` なら `function_535c11(@m11num_1)` を呼ぶ。`function_535c11` (189355) は `[obj+8]+8` と `[items-8]` で境界を見る。
+- `function_535c11` の呼出し元: `function_4fa3d0` (178270 から始まる関数内 178436 / 178462 / 178501 / 178527)、`function_4fad10` (178917 から始まる関数内 179009 / 179035)。両方とも引数は `function_535240(obj_field, flag)` の戻り値で、`function_535240` は `function_535b30(const 1003752, flag, obj)` を呼ぶ。
+- `function_4fad10` は `function_535ab0` を 179017 で呼ぶ (`stack_var_-80` を渡す)。`function_535ab0` は `function_4133f0(arg, src)` を先に呼ぶ。
+- `function_4fb910` (179735) は `function_4fad10(load [18818720], arg1, arg2)` を呼ぶ。`function_4fb910` の呼出し元のうち 102123 (`function_136c660`) は `arg2 = 2074840` (0x1faa18) で呼ぶ。0x1faa18 は survey の image 範囲 (0x400000〜0x1ec0000) の外にある定数で、ポインタとして使われているかは未確認。
+- `function_4fb910` の 206344 / 206345 / 211067〜211069 でも同じ定数 (2074840) を arg2 にして呼ばれている。
+
+**次の一手 (未着手, 優先順)**
+
+1. `function_4fad10` の 179017 付近で `tbl` と `cnt` を作る `obj` (`function_535240` の第 1 引数) の由来を確認する。OOB 直前の `obj+8` / `obj+0x10` の値を JS 側で読むのが最短。
+2. `function_4fb910` の arg2 = 0x1faa18 が `function_4fad10` 内でどう使われるか (アドレスとして読まれるか) を確認する。
+3. 923: `function_410b10` の `obj` を渡す `function_4fb910` 側 (1759) の arg1 (= 16169216 系の定数) から辿る。
