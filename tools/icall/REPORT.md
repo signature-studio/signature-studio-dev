@@ -248,3 +248,4 @@ Fresh Air SlateCore の復元後の残落ち 6 件 (全て vtable 直接 call `c
 ## 14. #852 (ICALL-11): FLEngine jump table の取りこぼし修正
 
 FLEngine の Delphi 表 (`sub rdx,8` 形) で 1 件しか解決していなかった欠陥を修正 (9 件に)。cmp/je 展開の効果は未実測 → REPORT_APPENDIX.md §16・#1206。
+## 15. #1025 (ICALL-17): Kilohearts Gain icall 経路 wasm 化は build まで (部分達成・実行/native 差分は未達)。`bash tools/icall/kh_route_build.sh`。全文 `REPORT_APPENDIX_1025.md`
