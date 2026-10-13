@@ -3,7 +3,7 @@
 # 各回の所要時間・load・集計 (ok/noproc/miss/trap/clobber)・function_413060 の到達計数 (unit 数・呼出し数) を出す。
 # 加えて感度確認 (受入条件 3・#1149): dest 値の指紋 (dest_obs_hash) で OFF の決定性 (OFF 再実行で一致) とネガコン
 # (M11_NEG_413060=1: dest に p+0x40 を書く既知変更) が OFF と差を作ることを示す。ON と OFF の dest 指紋差も出す。
-# 先頭で既定 build (M11_INSTR_413060 未設定・計測なし) の survey も測る (基準 869/25・REPORT_944 §0)。
+# 先頭で既定 build (M11_INSTR_413060 未設定・計測なし) の survey も測る (基準 870/24 @ a3641979 以降・REPORT_944 §0)。
 # 判定: build / survey の rc≠0、既定 survey が 869/25 から外れる、unit ラベルの OFF/ON 差分あり、計数の不一致、OFF 再実行で指紋不一致、ネガコンの指紋が OFF と同一 のいずれかで FAIL (exit 1)。
 # 前提: work/ が m11_e2e.sh 相当で生成済み (work/boot_final.ll・work/ir_conditions.json)、FL_WIN64_DIR 設定済み。
 # 計測 build (M11_INSTR_413060=1) の値は同一 build 内の比較専用。既定 build (計測なし) の基準は REPORT_944 §0 (main と同一の 869/25)。
@@ -51,8 +51,8 @@ line = next((l for l in open(sys.argv[1]) if l.startswith('M11_SURVEY ')), None)
 if line is None:
     print('[repro_705] default: M11_SURVEY 行が無い'); sys.exit(1)
 d = json.loads(line[len('M11_SURVEY '):])
-ok = d.get('ok') == 869 and d.get('trap') == 25 and d.get('clobber') == 0
-print(f"[repro_705] 既定 build 基準 (869/25/0): {'一致' if ok else '不一致'} (ok={d.get('ok')} trap={d.get('trap')} clobber={d.get('clobber')})")
+ok = d.get('ok') == 870 and d.get('trap') == 24 and d.get('clobber') == 0
+print(f"[repro_705] 既定 build 基準 (870/24/0): {'一致' if ok else '不一致'} (ok={d.get('ok')} trap={d.get('trap')} clobber={d.get('clobber')})")
 sys.exit(0 if ok else 1)
 PYD
 }

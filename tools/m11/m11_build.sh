@@ -44,8 +44,12 @@ done
 if [ ! -f work/boot_final.ll ]; then echo "[m11build] work/boot_final.ll 無し: m11_gen_ir2.sh を先に" >&2; exit 2; fi
 PE_QS="${PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}"
 # #680: ldfix 適用の記録が無い IR (旧スナップショット等) は build しない (m11_gen_ir2.sh で作り直す)
-if [ "$(python3 m11_cond.py --get ldfix)" != applied ]; then
-  echo "[m11build] ERROR: work/ir_conditions.json に ldfix=applied の記録無し (現在: '$(python3 m11_cond.py --get ldfix)')。m11_gen_ir2.sh で IR を作り直すこと" >&2; exit 2
+if [ "$(python3 m11_cond.py --get ldfix)" = disabled ] && [ "${M11_ALLOW_LDFIX_DISABLED:-0}" = 1 ]; then
+  # #1165: ldfix 無し IR (M11_LDFIX=0 で生成したもの) の build は明示 opt-in のときだけ許す。既定は拒否のまま。
+  #   指紋 (--check) と PE の一致は下で従来どおり検査する。測定時は ldfix=disabled を REPORT に明記すること。
+  echo "[m11build] WARNING: M11_ALLOW_LDFIX_DISABLED=1: ldfix 無しの IR で build する (ir_conditions.json ldfix=disabled)" >&2
+elif [ "$(python3 m11_cond.py --get ldfix)" != applied ]; then
+  echo "[m11build] ERROR: work/ir_conditions.json に ldfix=applied の記録無し (現在: '$(python3 m11_cond.py --get ldfix)')。m11_gen_ir2.sh で IR を作り直すこと (ldfix 無しで測るなら M11_ALLOW_LDFIX_DISABLED=1)" >&2; exit 2
 fi
 # #680 (review): 記録の無い差替え (正規 pass を経ない IR の書換え) を拒否する。正規 pass は直後に --bind で指紋を更新する
 if ! python3 m11_cond.py --check work/boot_final.ll; then
@@ -130,8 +134,13 @@ for f in heap failfast file timer sync; do cc ../shim/src/$f.c work/obj/shim_$f.
 S_NEG="$M11_NEG_413060-$M11_DEST_READ-$M11_INSTR_413060"
 if [ "$(cat work/neg_413060.stamp 2>/dev/null || echo none)" != "$S_NEG" ]; then rm -f work/obj/rt.o; fi
 echo "$S_NEG" > work/neg_413060.stamp
+# #1176: work-m11 同梱の rt.o/win.o は古い snapshot のことがある (mtime だけでは判定できない: 同梱 obj が source より新しく見える)。
+#   ソースの sha256 が記録と違えば作り直す (stamp 無し = 初回・snapshot 由来も作り直す)。
+RTWIN_SHA="$(cat m11_rt.c m11_win.c | sha256sum | cut -d' ' -f1)"
+if [ "$(cat work/rtwin.sha256 2>/dev/null || echo none)" != "$RTWIN_SHA" ]; then rm -f work/obj/rt.o work/obj/win.o; fi
 cc m11_rt.c work/obj/rt.o
 cc m11_win.c work/obj/win.o
+echo "$RTWIN_SHA" > work/rtwin.sha256
 llvm-nm --defined-only work/obj/shim_*.o work/obj/rt.o work/obj/win.o 2>/dev/null | awk '$2 ~ /^[TtWwDd]$/ {print $3}' | sort -u > work/defined_c.txt
 if [ ! -f work/m11_winstubs.c ] || [ work/defined_c.txt -nt work/m11_winstubs.c ] || [ m11_genstubs.py -nt work/m11_winstubs.c ] || [ work/boot_final.ll -nt work/m11_winstubs.c ]; then
   M11_EXCLUDE=work/defined_c.txt python3 m11_genstubs.py work/boot_final.ll work > work/genstubs.log

@@ -56,6 +56,11 @@ CCMAP = {'e': 'E', 'z': 'E', 'ne': 'NE', 'nz': 'NE', 'b': 'B', 'c': 'B', 'nae': 
          'o': 'O', 'no': 'NO', 'l': 'L', 'nge': 'L', 'ge': 'GE', 'nl': 'GE', 'le': 'LE', 'ng': 'LE', 'g': 'G', 'nle': 'G'}
 
 
+RELOC = os.environ.get('OTT_RELOC') == '1'   # 相対化モード: 画像 VA 定数を (ott_gbase + RVA) で書く (既定 off = 出力不変)
+if RELOC and VEXCOV:   # OTT_VEXCOV_HIT の引数は既定 base の shifted VA 固定 (相対化未対応)
+    raise SystemExit('[x64c] fail-fast: OTT_RELOC=1 と OTT_VEXCOV=1 は同時に使えない')
+
+
 def sh(c):
     c &= 0xffffffffffffffff
     return c - SHIFT if IMG <= c < IMG + IMG_SIZE else c
@@ -63,6 +68,14 @@ def sh(c):
 
 def hx(c):
     return '0x%xULL' % (c & 0xffffffffffffffff)
+
+
+def gv(c):
+    """画像 VA 定数の C 式。既定 = hx(sh(c)) (出力不変)、相対化 = (ott_gbase + RVA)。"""
+    c &= 0xffffffffffffffff
+    if RELOC and IMG <= c < IMG + IMG_SIZE:
+        return '(ott_gbase + %s)' % hx(c - IMG)
+    return hx(sh(c))
 
 
 class Unsup(Exception):
@@ -246,7 +259,7 @@ class FnLift:
             tgt = ins.address + ins.size + m.disp
             if 0x180001000 <= tgt < 0x1801e2000 and ins.mnemonic != 'lea':
                 self.textrefs.add(tgt)
-            e = hx(sh(tgt))
+            e = gv(tgt)
         else:
             terms = []
             if m.base != 0:
@@ -257,7 +270,7 @@ class FnLift:
                 terms.append('R[%d]*%d' % (i, m.scale) if m.scale != 1 else 'R[%d]' % i)
             disp = m.disp
             if m.base == 0 and m.index == 0:
-                e = hx(sh(disp & 0xffffffffffffffff if disp < 0 else disp))
+                e = gv(disp)
             else:
                 if disp:
                     terms.append(hx(disp & 0xffffffffffffffff))
@@ -278,7 +291,7 @@ class FnLift:
             v = op.imm & MASK[8]
             if sz < 8:
                 v &= MASK[sz]
-            return hx(sh(v)) if sz == 8 else hex(v) + 'U'
+            return gv(v) if sz == 8 else hex(v) + 'U'
         if op.type == X86_OP_MEM:
             return 'LD%d(%s)' % (sz * 8, self.ea(ins, op))
         raise Unsup('rd')
@@ -321,17 +334,17 @@ class FnLift:
         return 'L_%x' % va
 
     def call_stmt(self, ins, tgt):
-        ret = sh(ins.address + ins.size)
+        ret = gv(ins.address + ins.size)
         if IA32:
-            return 'R[RSP] -= 4; ST32(R[RSP], %s); ' % hx(ret) + tgt
-        return 'R[RSP] -= 8; ST64(R[RSP], %s); ' % hx(ret) + tgt
+            return 'R[RSP] -= 4; ST32(R[RSP], %s); ' % ret + tgt
+        return 'R[RSP] -= 8; ST64(R[RSP], %s); ' % ret + tgt
 
     def emit_call_direct(self, ins, t):
         if t in self.thunks:
             return self.call_stmt(ins, 'imp_%s();' % self.thunks[t])
         if t in self.known:
             return self.call_stmt(ins, 'f_%x();' % t)
-        return self.call_stmt(ins, 'ott_unlifted(%s);' % hx(sh(t)))
+        return self.call_stmt(ins, 'ott_unlifted(%s);' % gv(t))
 
     def lift(self):
         self.descend()
@@ -424,7 +437,7 @@ class FnLift:
         seg = ins.reg_name(m.segment) if m.segment else ''
         if seg == 'gs' and m.base == 0 and m.index == 0 and ops[1].size == 8:
             if m.disp == 0x58:
-                return self.L(self.wr(ins, ops[0], hx(sh(TLSA_VA)), 8))
+                return self.L(self.wr(ins, ops[0], gv(TLSA_VA), 8))
             if m.disp == 0x10:
                 return self.L(self.wr(ins, ops[0], '(R[RSP] + 0x1000)', 8))
         raise Unsup('segment ' + seg)
@@ -646,8 +659,13 @@ class FnLift:
                 return self.L('f_%x(); return;' % t)
             return self.L('goto %s;' % self.label(t))
         if ins.address in self.jtabs:
-            sw = ' '.join('case %s: goto %s;' % (hx(sh(t)), self.label(t)) for t in sorted(set(self.jtabs[ins.address])))
-            return self.L('switch (%s) { %s default: ott_badjump(%s, %s); }' % (self.rd(ins, op, PTR), sw, hx(ins.address), self.rd(ins, op, PTR)))
+            if RELOC:   # case 値は RVA、selector は base を引いて比べる
+                sw = ' '.join('case %s: goto %s;' % (hx(t - IMG), self.label(t)) for t in sorted(set(self.jtabs[ins.address])))
+                sel = '(%s) - ott_gbase' % self.rd(ins, op, PTR)
+            else:
+                sw = ' '.join('case %s: goto %s;' % (hx(sh(t)), self.label(t)) for t in sorted(set(self.jtabs[ins.address])))
+                sel = self.rd(ins, op, PTR)
+            return self.L('switch (%s) { %s default: ott_badjump(%s, %s); }' % (sel, sw, hx(ins.address), self.rd(ins, op, PTR)))
         slot = iat_slot(ins, op)
         if slot is not None and slot in self.pe.iat:
             return self.L('imp_%s(); return;' % self.pe.iat[slot])
@@ -1582,6 +1600,8 @@ def main():
     used_imps = sorted(used_imps)
     with open(os.path.join(out, 'ott_lifted.c'), 'w') as fh:
         fh.write('#include "ott_cpu.h"\n')
+        if RELOC:
+            fh.write('extern uint64_t ott_gbase;\n')
         for nm in used_imps:
             fh.write('void imp_%s(void);\n' % nm)
         for c in sorted(set(overrides.values())):
@@ -1590,9 +1610,9 @@ def main():
             fh.write('void f_%x(void);\n' % e)
         for e in sorted(final):
             fh.write(final[e].csrc + '\n')
-        fh.write('void ott_dispatch(uint64_t t) {\n  switch (t) {\n')
+        fh.write('void ott_dispatch(uint64_t t) {\n  switch (%s) {\n' % ('t - ott_gbase' if RELOC else 't'))
         for e in sorted(final):
-            fh.write('  case %s: f_%x(); return;\n' % (hx(sh(e)), e))
+            fh.write('  case %s: f_%x(); return;\n' % (hx(e - IMG) if RELOC else hx(sh(e)), e))
         fh.write('  default: ott_unlifted(t);\n  }\n}\n')
         for nm in used_imps:
             fh.write('__attribute__((weak)) void imp_%s(void) { extern void ott_missing_import(const char*); ott_missing_import("%s"); }\n' % (nm, nm))
