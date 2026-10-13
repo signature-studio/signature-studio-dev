@@ -109,13 +109,19 @@ export class FlAudioInput {
     return devices;
   }
 
-  /** デバイスを選ぶ (null = 既定)。接続中ならライブで切り替える (チャンネル数差は node の speakers 変換が吸収) */
+  /**
+   * デバイスを選ぶ (null = 既定)。接続中ならライブで切り替える (チャンネル数差は node の speakers 変換が吸収)。
+   * 切替に失敗したら旧デバイスは稼働したまま選択と保存値を元に戻し、error を emit して reject する (selected は emit しない)。
+   */
   async select(deviceId: string | null): Promise<void> {
+    const prev = this.selected;
     this.selected = deviceId || null;
+    if (this.target) {
+      try { await this.open(); } catch (e) { this.selected = prev; throw e; }
+    }
     try {
       if (this.selected) this.storage?.setItem(this.key, this.selected); else this.storage?.removeItem(this.key);
     } catch { /* storage 不可 */ }
-    if (this.target) await this.open();
     this.emit({ type: "selected", deviceId: this.selected, label: this.activeTrack?.label ?? "" });
   }
 

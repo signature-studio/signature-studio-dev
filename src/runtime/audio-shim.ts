@@ -37,7 +37,10 @@ export interface FlAudioShimOptions {
   onNode?: (ctx: AudioContext, node: AudioWorkletNode) => void | Promise<void>;
   /** 入力デバイス管理。in_ch>0 の ATTACH 毎に worklet node へ接続し、入力喪失は kAsioResetRequest として wasm へ通知する */
   input?: FlAudioInput;
-  /** ASIO::controlPanel (FL の asiopanelbtn) の UI 代替。入力デバイス選択パネルなどを開く。未指定なら controlPanel は NotPresent */
+  /**
+   * ASIO::controlPanel (FL の asiopanelbtn) の UI 代替。入力デバイス選択パネルなどを開く。未指定なら controlPanel は NotPresent。
+   * 契約: UI を開いて即返すこと。shim のコマンドループは await 中ブロックされ、C 側の待ちを超えると ASE_NotPresent になる。
+   */
   controlPanel?: () => void | Promise<void>;
   log?: (msg: string) => void;
   /** getOutputTimestamp の採取ログ (テスト用: 時刻対応の傾き検証) */
