@@ -5,6 +5,7 @@
 # (M11_NEG_413060=1: dest に p+0x40 を書く既知変更) が OFF と差を作ることを示す。ON と OFF の dest 指紋差も出す。
 # 判定: build / survey の rc≠0、unit ラベルの OFF/ON 差分あり、計数の不一致、OFF 再実行で指紋不一致、ネガコンの指紋が OFF と同一 のいずれかで FAIL (exit 1)。
 # 前提: work/ が m11_e2e.sh 相当で生成済み (work/boot_final.ll・work/ir_conditions.json)、FL_WIN64_DIR 設定済み。
+# 計測 build (M11_INSTR_413060=1) の値は同一 build 内の比較専用。既定 build (計測なし) の基準は REPORT_944 §0 (main と同一の 869/25)。
 # 使い方: bash tools/m11/trap_triage/repro_705.sh
 set -u
 cd "$(dirname "$0")/.."   # tools/m11 へ
@@ -13,11 +14,11 @@ OUT=work/repro_705; mkdir -p "$OUT"
 FAIL=0
 run_one() {  # run_one <label> <M11_OV_413060 値> <M11_NEG_413060 値>
   local label="$1" gate="$2" neg="$3" t0 t1 rc
-  if ! M11_OV_413060="$gate" M11_NEG_413060="$neg" timeout 300 bash m11_build.sh > "$OUT/build_$label.log" 2>&1; then
+  if ! M11_INSTR_413060=1 M11_OV_413060="$gate" M11_NEG_413060="$neg" timeout 300 bash m11_build.sh > "$OUT/build_$label.log" 2>&1; then
     echo "[repro_705] build $label FAILED"; FAIL=1; return 1
   fi
   t0=$(date +%s%N)
-  M11_SURVEY_UNITS="$OUT/units_$label.json" timeout 300 node m11_survey.mjs > "$OUT/survey_$label.out" 2>/dev/null; rc=$?
+  M11_INSTR_413060=1 M11_SURVEY_UNITS="$OUT/units_$label.json" timeout 300 node m11_survey.mjs > "$OUT/survey_$label.out" 2>/dev/null; rc=$?
   t1=$(date +%s%N)
   echo "[repro_705] $label: rc=$rc elapsed=$(awk -v a="$t0" -v b="$t1" 'BEGIN{printf "%.3f", (b-a)/1e9}') s load=$(cut -d' ' -f1 /proc/loadavg)"
   if [ "$rc" -ne 0 ]; then echo "[repro_705] survey $label FAILED (rc=$rc)"; FAIL=1; fi

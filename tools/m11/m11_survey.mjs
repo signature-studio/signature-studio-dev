@@ -43,7 +43,7 @@ for (let i = 0; i < 942; i++) {
   mod._m11_va_unit_begin();
   const oom0 = Number(mod._m11_va_oom()), big0 = Number(mod._m11_va_big());
   const vaUsed0 = Number(mod._m11_va_used()), gm0 = Number(mod._m11_probe_count(0)), fm0 = Number(mod._m11_probe_count(1));
-  const lf0 = Number(mod._m11_probe_count(6)), lr0 = Number(mod._m11_probe_count(7)), p413_0 = Number(mod._m11_probe_count(8));
+  const lf0 = Number(mod._m11_probe_count(6)), lr0 = Number(mod._m11_probe_count(7)), p413_0 = process.env.M11_INSTR_413060 === '1' ? Number(mod._m11_probe_count(8)) : 0;
   let r, err = null;
   try { r = mod._m11_call_unit(i); } catch (e) { err = e; }
   const clob = !tableIntact();
@@ -51,7 +51,7 @@ for (let i = 0; i < 942; i++) {
   const hadOom = Number(mod._m11_va_oom()) > oom0;
   perUnitCost.push({ i, va, va_bytes: Number(mod._m11_va_used()) - vaUsed0, getmem: Number(mod._m11_probe_count(0)) - gm0,
     freemem: Number(mod._m11_probe_count(1)) - fm0, oom: Number(mod._m11_va_oom()) - oom0, clobber: clob,
-    listfind: Number(mod._m11_probe_count(6)) - lf0, listraise: Number(mod._m11_probe_count(7)) - lr0, f413060: Number(mod._m11_probe_count(8)) - p413_0 });
+    listfind: Number(mod._m11_probe_count(6)) - lf0, listraise: Number(mod._m11_probe_count(7)) - lr0, ...(p413_0 || process.env.M11_INSTR_413060 === '1' ? { f413060: Number(mod._m11_probe_count(8)) - p413_0 } : {}) });
   if (Number(mod._m11_va_big()) > big0) bigUnits.push(va + ':' + (err ? 'trap' : 'ok') + ':' + (Number(mod._m11_va_big()) - big0));
   if (process.env.M11_SURVEY_STACK && process.env.M11_SURVEY_STACK.split(',').includes(String(i))) console.error('[survey][stack] unit ' + i + ' ' + va + (clob ? ' (clobber)' : '') + ': ' + (err ? ((err && err.stack) || err) : 'returned ' + r));
   if (clob) {
@@ -95,8 +95,10 @@ console.log('M11_SURVEY ' + JSON.stringify({
   trap_kinds: kinds, trap_kinds_nonoom: kindsNonOom, top_frame_idx: topFrames,
   failfast_functions: ff, halted_units: halted.slice(0, 20), first_trap_units: first,
   getmem: Number(mod._m11_probe_count(0)), freemem: Number(mod._m11_probe_count(1)),
-  dest_obs_n: Number(mod._m11_dest_obs_n()), dest_obs_hash: Number(mod._m11_dest_obs_hhi()).toString(16).padStart(8, '0') + Number(mod._m11_dest_obs_hlo()).toString(16).padStart(8, '0'),
-  f413060_calls: Number(mod._m11_probe_count(8)), f413060_units: perUnitCost.filter((c) => c.f413060 > 0).map((c) => c.i + ':' + c.va + ':' + c.f413060),
+  ...(process.env.M11_INSTR_413060 === '1' ? {
+    dest_obs_n: Number(mod._m11_dest_obs_n()), dest_obs_hash: Number(mod._m11_dest_obs_hhi()).toString(16).padStart(8, '0') + Number(mod._m11_dest_obs_hlo()).toString(16).padStart(8, '0'),
+    f413060_calls: Number(mod._m11_probe_count(8)), f413060_units: perUnitCost.filter((c) => c.f413060 > 0).map((c) => c.i + ':' + c.va + ':' + c.f413060),
+  } : {}),
   fastmm_getmem_impl: Number(mod._m11_probe_count(2)), fastmm_freemem_impl: Number(mod._m11_probe_count(3)),
   va_calls: Number(mod._m11_va_calls()), va_bytes: Number(mod._m11_va_used()),
   va_live: Number(mod._m11_va_live()), va_peak: Number(mod._m11_va_peak()), va_oom: Number(mod._m11_va_oom()), va_denied: Number(mod._m11_va_denied()),

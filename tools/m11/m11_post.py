@@ -8,7 +8,7 @@
      Delphi の unit init ループ / VMT / TLS hook は C override 側で m11_icall(va,...) 経由で呼ぶ)
  使い方: python3 m11_post.py IN.ll OUT.ll [--report REPORT.json]
 """
-import re, sys, json
+import os, re, sys, json
 
 src, dst = sys.argv[1], sys.argv[2]
 rep = {}
@@ -219,8 +219,9 @@ def sigfix(text, report, pads=None, fixes=None):
 # 呼出し計数 probe (FastMM4 の入口): 計数 wrapper を weak で被せ, 本体は __lifted に改名
 PROBES = {0x409410: 'GetMem', 0x409440: 'FreeMem', 0x407a50: 'FastMM_GetMem(407a50)', 0x407e20: 'FastMM_FreeMem(407e20)',
           0x4120c0: 'InitUnits', 0x4128b0: 'Halt0',
-          0x4fa210: 'ListFind(4fa210)', 0x47a250: 'ListRaise(47a250)',   # M11-N40: 末尾追加 (既存 index 0-5 不変; OFF の survey 結果の不変は作業者報告・未検証, REPORT_739 §2)
-          0x413060: 'function_413060'}   # #944: 末尾追加 (index 8; 既存 index 不変)。OFF/ON 両方で呼出し数を計数する
+          0x4fa210: 'ListFind(4fa210)', 0x47a250: 'ListRaise(47a250)'}   # M11-N40: 末尾追加 (既存 index 0-5 不変; OFF の survey 結果の不変は作業者報告・未検証, REPORT_739 §2)
+if os.environ.get('M11_INSTR_413060') == '1':   # #944: 計測専用。既定 0 では入れず、既定 build の post 出力を main と同一に保つ
+    PROBES[0x413060] = 'function_413060'   # index 8 (末尾追加; 既存 index 不変)
 probe_wrappers = []
 
 
@@ -336,7 +337,8 @@ for (nm, ret, args) in fns:
     hdr.append('extern %s %s(%s);' % (rt, nm, ats))
 open(dst.replace('.ll', '_sigs.h'), 'w').write('\n'.join(hdr) + '\n')
 ent = ', '.join('{ i32, ptr } { i32 %d, ptr @m11_tr_%s }' % (va, nm) for va, nm in tab)
-tail = ['', 'declare void @m11_probe(i32)', 'declare void @m11_dest_obs(i64)'] + probe_wrappers + ['', '; ---- m11_post.py: 間接 call トランポリン + VA 表 ----']
+# 計測時 (M11_INSTR_413060=1) のみ PROBES に 0x413060 が入り、dest 観測の宣言が出る
+tail = ['', 'declare void @m11_probe(i32)'] + (['declare void @m11_dest_obs(i64)'] if 0x413060 in PROBES else []) + probe_wrappers + ['', '; ---- m11_post.py: 間接 call トランポリン + VA 表 ----']
 tail.extend(tr)
 tail.append('@m11_disp_n = constant i32 %d' % len(tab))
 tail.append('@m11_disp_tab = constant [%d x { i32, ptr }] [%s]' % (len(tab), ent))

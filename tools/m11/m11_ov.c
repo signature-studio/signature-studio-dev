@@ -912,10 +912,17 @@ static u64 tr_9b4b00(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64
  * dest = オブジェクト +8 の文字列フィールド (448ee0 → 41c820 → 413060 の経路) では オブジェクト先頭 dword (VMT ポインタの下位) が 1 減り, 410360 が壊れた VMT から [vmt-0x50] を引いた。
  * 戻り値: 元実装は 412d60 の戻り値 = stack 上の old のアドレス (関数終了後は無効) を返す。C でそれを返すと無効な番地になるため dest を返す。
  * 呼出し側が戻り値を読むかは未検証 (REPORT_595 §2.2)。 */
+#ifndef M11_INSTR_413060
+#define M11_INSTR_413060 0
+#endif
+#if M11_INSTR_413060
 void m11_probe(int i);
 void m11_dest_obs(unsigned long long dest);
+#endif
 unsigned long long function_413060(unsigned long long dest, void* src, unsigned long long len) {
+#if M11_INSTR_413060
     m11_probe(8);
+#endif
     u64 old = Q(dest);
     int n = (int)len;
     if (n > 0) {
@@ -926,7 +933,9 @@ unsigned long long function_413060(unsigned long long dest, void* src, unsigned 
         Q(dest) = 0;
     }
     function_412d60((u64)(uintptr_t)&old, 0);
+#if M11_INSTR_413060
     m11_dest_obs(dest);
+#endif
     return dest;
 }
 #endif /* M11_OV_413060 */
