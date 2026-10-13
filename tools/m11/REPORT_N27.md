@@ -163,3 +163,4 @@ NC1 (capstone 未導入) は `bash tools/m11/m11_gen_ir2.sh` が exit 1 にな�
 - `reached_stage` 4 / `units_run_full` 53 / `wasm_bytes` 6,042,784 (R1)。
 - 注: 本節の ok 870 は §10-1 (head `4e084e1` で ok 866 / oob 21 / halt0 8 / trap 29) と**一致しない**。差の出所は未切り分け (work-m11 は R2 に投入済みの snapshot 由来の IR を使い、ir_sha256 を記録した)。§3 の旧値 (864/23/31) とも異なる。
 - 未実施: 別環境 (別 runner / VM) での n>=2、work-m11 の R2 再投入 (素材権限者)、73532f8 (c) の trap 内訳差の原因調査。
+- HEAD 再現 (`a4aa766c`・retdec を PATH に入れない・`work/boot5.*` を削除して lift から): rc 0 / 101 秒 / load 0.07 → 0.83 / ok 870 · trap 25 · oom 1 · clobber 0 · miss 46。修正前は同条件で `retdec-decompiler: command not found` により 1 秒で rc 1。
