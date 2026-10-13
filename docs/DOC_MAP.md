@@ -176,7 +176,12 @@
 | `tools/plugins/REPORT.md` | ~115 | Fruity プラグイン 141 種 wasm 化マップ (カウントの正本) |
 | `tools/plugins/f2/REPORT.md` | ~200 | PLG-F2 eq-filter 11 本: 固有閉包 lift の再現と間接 call 脱落の監査 (#199)、icall 復元の batch_lift 接続と回帰ゲート (#514) |
 | `tools/plugins/framework/REPORT.md` | ~520 | TFruityHost shim 実装と検収 |
-| `tools/plugins/p0c/REPORT.md` | ~665 | kernel 表妥当性検証 + f80 assessment |
+| `tools/plugins/p0c/REPORT.md` | ~138 | kernel 表妥当性検証 + f80 assessment (§1〜§7)。§8〜§16 は `REPORT_APPENDIX_A.md`〜`E.md` に分割し、本体末尾に付録索引 (#378) |
+| `tools/plugins/p0c/REPORT_APPENDIX_A.md` | ~164 | p0c §8 (P0c-2 CAB-241 f80→f64 lowering)・§9 (P0c-3 CAB-251 x87 スタック模型修復) 全文 (#378 で無変更分割移動) |
+| `tools/plugins/p0c/REPORT_APPENDIX_B.md` | ~189 | p0c §10 (P0c-4 CAB-196 ext-emulation mode) 全文 (同上) |
+| `tools/plugins/p0c/REPORT_APPENDIX_C.md` | ~203 | p0c §11 (P0c-4 CAB-253 ARG pass ABI 推定強化) 全文 (同上) |
+| `tools/plugins/p0c/REPORT_APPENDIX_D.md` | ~159 | p0c §12 (P0c-5 #269)・§13 (P0c-7 #310) 全文 (同上) |
+| `tools/plugins/p0c/REPORT_APPENDIX_E.md` | ~225 | p0c §14 (P0c-6 #277)・§15 (環境パス置換 #346)・§16 (P0c-8 #311) 全文 (同上) |
 | `tools/shared/REPORT.md` | ~295 | FL Shared ライブラリの分類・IPP 実測・OSS wasm 再ビルド・プロプラ lift PoC |
 | `tools/shared/oss/sidemod/REPORT.md` | ~60 | FFmpeg/LAME を差し替え可能な side module として再ビルド + GPL 混入検出 (LGL-4) |
 
