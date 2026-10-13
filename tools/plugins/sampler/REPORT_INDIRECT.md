@@ -33,13 +33,13 @@ total = base ∪ root から `call/jmp rel32` で到達する非共通関数 (fr
 |---|--:|--:|--:|--:|--:|--:|--:|--:|
 | FL Keys | 22386 | 83 / 32,838 | 87 | 4 | 0 | 0 | 0 | 4–5 |
 | FPC | 23617 | 323 / 125,155 | 323 | 0 | 0 | 0 | 0 | 12 |
-| Fruity Granulizer | 23658 | 158 / 44,232 | 158 | 0 | 1 (rep_stosb_memset) | 0 | 0 | 5–6 |
-| Fruity Slicer | 23662 | 188 / 56,098 | 190 | 2 | 1 (rep_stosb_memset) | 0 | 0 | 6 |
+| Fruity Granulizer | 23658 | 158 / 44,232 | 158 | 0 | 0 | 0 | 0 | 5–6 |
+| Fruity Slicer | 23662 | 188 / 56,098 | 190 | 2 | 0 | 0 | 0 | 6 |
 | Fruity Slicer 2 (殻) | 23663 | 193 / 67,571 | 193 | 0 | 0 | 0 | 0 | 8 |
 | Slicex | 24172 | 680 / 257,677 | 684 | 4 | 0 | 0 | 0 | 23–24 |
 | Soundfont Player | 24175 | 1,998 / 760,611 | 2,012 | 14 | 0 | 0 | 0 | 65–66 |
 
-- **7/7 通過** (lift_rc 0 / `emcc -c` rc 0 / f80 0 / 未実装 helper は §6 の許容内)。 **この 7/7 は `targets.py` の `ALLOW_UNIMPL` (Granulizer・Slicer の `rep_stosb_memset` 各 1 = 空 stub) の許容が効いた結果**。 許容 0 の block に未実装 1 を与えると rc 1 (NC5)。 §1 と同じく通過 ≠ 正しさ。 未実装 helper が増えた block は無い (Granulizer・Slicer の `rep_stosb_memset` 各 1 のまま = #538)。
+- **7/7 通過** (lift_rc 0 / `emcc -c` rc 0 / f80 0 / 未実装 helper 0)。 main 4cc4ae4 (#629 で `rep_stosb_memset` 実装済み) を取り込んだ HEAD で、`targets.py` の `ALLOW_UNIMPL` を空にして実測 (許容 0 の判定で 7/7)。 旧版の「Granulizer・Slicer 各 1 の許容が効いた 7/7」は #629 前の結果で、現在は無効。 許容 0 の block に未実装 1 を与えると rc 1 (NC5)。 §1 と同じく通過 ≠ 正しさ。
 - `indirect_defs.py` (range 単位の監査): 全 7 本で ranges の全関数 (計 3,623) が final.ll に `define @function_<VA>` として存在 (欠落 0)。 judge の `defines>0` は range 欠落を検出できないため、この監査を gate に加えた。
 - Soundfont Player の host call 0 site (§3) は total でも未調査 (`closure_facts.py` の入力は base のまま。 total への拡張は未実施)。
 

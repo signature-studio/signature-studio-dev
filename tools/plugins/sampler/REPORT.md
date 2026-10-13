@@ -5,7 +5,7 @@
   `bash tools/plugins/sampler/sampler_nega.sh` (ネガティブコントロール)。 対象の定義は `targets.py` だけ
 - 素材: `fl-win64` / `toolchain-retdec` / `toolchain-emsdk` (`docs/WORKFLOW.md` §11)。 環境は `sampler/env.sh`
 - 既知類型との関係 (`docs/DEFECTS.md`): **該当なし** (silent miscompile は差分試験を未実施のため確認していない)。
-  §5 の `rep_stosb_memset` 未実装 helper は stub 化で実行時に値が変わるため、D 類型の候補として §8 に行案を置く
+  §5 の `rep_stosb_memset` 未実装 helper は stub 化で実行時に値が変わるため、D 類型の候補として §8 に行案を置いた (#629 で解消。 §0 の 6)
 - 先行 PR #506 (dynamics) の reviewer 指摘 (判定が不合格でも exit 0 / 判定のネガコン欠如) への対応は §6
 
 ## 0. 結論 (先出し)
@@ -23,7 +23,7 @@
    別算法の独立走査はさらに ID 1 / 63 / 64 (Granulizer・Slicer・Slicex) を検出した (§3)。 hostshim は未収載 ID に 0 を返す fail-soft で落ちないが、応答の意味は未解析。
 5. **SIMD kernel 依存は 5 本**: FL Keys 1 / FPC 4 / Granulizer 11 / Slicer 11 / Slicex 11 site (Slicer 2 殻・Soundfont Player は 0)。 うち FPC 3 / Granulizer 4 / Slicer 4 / Slicex 2 site は
    Balance の 80 実装表に逆引きできない呼出先 (§4)。 Slicex は P0c の #331 未解決 kernel (0x5dee90 / 0x5df040) を使う。
-6. **Granulizer・Slicer の未実装 helper `rep_stosb_memset` は各 1 call site**。 `m11_simd2.py` は `rep_stosq_memset` しか実装せず、`stosb` は `m11_simd_unimpl_once("__asm_rep_stosb_memset")` を呼ぶだけの空 stub になる (初回だけ stderr に出し、memset されない)。 `emcc -c` は通るので judge の `declares_unimpl` 許容 (上限 1 + 名前の許可リスト) でのみ検出できる (§5)。
+6. **Granulizer・Slicer の未実装 helper `rep_stosb_memset` は各 1 call site だった (#629 前 base 042f869 の測定、§5)**。 `m11_simd2.py` は `rep_stosq_memset` しか実装せず、`stosb` は空 stub になっていた (memset されない)。 `emcc -c` は通るため judge の `declares_unimpl` 許容でのみ検出できた。 **#629 (main 790d2f5 系) で `rep_stosb_memset` を実装済み。 main 4cc4ae4 を取り込んだ HEAD で `ALLOW_UNIMPL` を空にして 7/7・未実装 0 を実測** (REPORT_INDIRECT §1)。 許容は 0 で運用する。
 7. **C++ engine / 単体 DLL**: Fruity Slicer 2 の engine (5,160 関数) と GMS (2,355 関数) は RetDec の `.ll` 出力 + pass 鎖が完走 (lift_rc 0、define 5,993 / 2,525) するが `emcc -c` は未通過 (dangling use・`zext 0 to i64`)。 RetDec の C バックエンドが 10 分超・8 GiB 超かかるため `.ll` 出力後に止める方式にした (§5)。
 8. **GMS (MSVC C++ 単体) は Delphi 殻の閉包方式が使えない**: vtable 規約が違い `plugin_closure.py` の対象外 (framework 一致 0)。 全 `.pdata` lift を行った (§5)。 直接 Win32 API は registry 6 / dynload 3 / file_io 17 / gdi_direct 6 / clipboard_dnd 3 / threads 1 (`PLUGIN_MATRIX.json` `win_direct_api`)。
 
@@ -167,7 +167,7 @@ Fruity Slicer 2 は殻 (block 23663) とは別に C++ engine DLL (block 23664、
 ### gate の設計 (#506 の reviewer 指摘への対応)
 
 - 判定は `judge.py` に切り出し、不合格が 1 件でもあれば **exit 1** (入力不正は exit 2)。 `sampler_e2e.sh` は `set -e` で判定の直後に中断し、`[sampler_e2e] OK` は全工程を通った時だけ出る。
-- `declares_unimpl` も判定に含める。 許容は `targets.py` の `ALLOW_UNIMPL` (Granulizer・Slicer の各 1) と名前の許可リスト (`rep_stosb_memset`) だけ。 それ以外の block が 1 件でも未実装 helper を持てば不合格。 -1 (計測不能)・非整数・行欠落・header のみ・空は全て不合格。
+- `declares_unimpl` も判定に含める。 許容は `targets.py` の `ALLOW_UNIMPL` だけ (#537 の時点では Granulizer・Slicer の各 1 + 名前の許可リスト。 #629 で stub 解消後は空)。 それ以外の block が 1 件でも未実装 helper を持てば不合格。 -1 (計測不能)・非整数・行欠落・header のみ・空は全て不合格。
 - lift 実行時は、その run が `work/batch/status.csv` に追記した行だけを判定する (過去 run の合格行で通さない)。
 - 突合 (`matrix_check.py` / `ids_crosscheck.py` / `unreached_unique.py`) は期待件数と照合した件数が一致しなければ不合格 (facts が空・欠落でも vacuous に通さない)。 `unreached_unique.py` は正の対照が落ちると exit 1。
 - engine の判定は「計測が成立したか」(lift_rc 0・define>0・pdata>0・行が揃う) に限り、`emcc -c` の成否は不合格にしない (到達性の実測値であり §7 で起票)。 この区別をスクリプト冒頭と REPORT に明記した。
@@ -200,7 +200,7 @@ NC4 は #506 の reviewer が再現した「不合格行を追記しても exit 
 | 推移閉包でもなお total 外の非共通関数 2,846 関数 / 1,247,120 B (うち `lea [rip+X]` 参照 153 関数 / 38,656 B) の到達性 | 閉包は下限のまま | #537 (Refs)。 lea 経路を root に足した版は新規子チケット案 (本 PR では未起票: 受入条件外) |
 | 推移閉包 (total) の host 呼出面・kernel 依存 (`closure_facts.py` は base のまま) | §3・§4 が base 限定 | #537 (Refs)・#196 / #197 への入力として total 版が必要 |
 | `closure_indirect.py` の dynamics (#200 / PR #506) 等への適用 (受入条件 4) | 他ファミリの閉包も過小の可能性 | #200 にコメント (未検証)。 `plugin_closure.py` の仕様変更は不要だったため退行確認の対象なし |
-| `rep_stosb_memset` 未実装 stub (Granulizer / Slicer 各 1 call site) | silent な memset 欠落 | 新規 #538 [PLG-G3-4] (起票済み) |
+| `rep_stosb_memset` 未実装 stub (Granulizer / Slicer 各 1 call site) | silent な memset 欠落 | #538 [PLG-G3-4]。 #629 で実装・main merge 済み (本 HEAD で未実装 0 を実測)。 #538 の close は PM 判断 |
 | C++ engine / 単体 DLL 2 本の `emcc -c` 未通過 (E1・dangling use・`zext 0 to i64`)、未実装 helper 215 / 151、f80 2 / 1、RetDec C バックエンドの規模耐性 | Slicer 2 (T3) の engine、GMS (T3) | 新規 #540 [PLG-G3-2] (起票済み) (同型: #523 [PLG-F4-2]・#527 [PLG-F5-2]) |
 | engine 内の f80 関数 (Slicer 2 engine 2 / GMS 1) | engine の wasm 化 | #197 (`f80_lower.py` の適用) にコメント |
 | host の Dispatcher ID 88 (FPC)・101 (Granulizer) が `hs_ids.json` 未収載、独立走査のみの ID 1 / 63 / 64、slot 0x28 / 0x30 / 0x68 / 0x78 / 0xb8 / 0xf0 / 0xf8 / 0x128 の意味 | P0b の応答表の網羅性 | #196 作業 5 (0x13173a0 全 case 解析) にコメント |
@@ -214,7 +214,7 @@ NC4 は #506 の reviewer が再現した「不合格行を追記しても exit 
 
 | 類型 | 症状 | 観測 | 検出信号 | 修復 |
 |---|---|---|---|---|
-| H1 stos 系 helper 未実装 stub | `__asm_rep_stosb_memset(ptr, i8, i64)` が `m11_simd2.py` で未実装 → `p_simd.c` では `m11_simd_unimpl_once()` を呼ぶだけの空 stub になり memset されない | Fruity Granulizer / Slicer 各 1 call site (`rep_stosq_memset` は実装済み) | `p.simd.log` の `unimplemented: ... rep_stosb_memset`。 `emcc -c` は通る (silent) | `m11_simd2.py` に `rep_stosb_memset` を足す (memset へ写像)。 `judge.py` は許容リストで名指しして検出 |
+| H1 stos 系 helper 未実装 stub | `__asm_rep_stosb_memset(ptr, i8, i64)` が `m11_simd2.py` で未実装 → `p_simd.c` では `m11_simd_unimpl_once()` を呼ぶだけの空 stub になり memset されない | Fruity Granulizer / Slicer 各 1 call site (`rep_stosq_memset` は実装済み) | `p.simd.log` の `unimplemented: ... rep_stosb_memset`。 `emcc -c` は通る (silent) | `m11_simd2.py` に `rep_stosb_memset` を足す (memset へ写像)。 **#629 で実装済み** (未実装 0 を実測)。 `judge.py` は許容 0 で運用 |
 | H2 閉包の過小計上 | vtable override の直接呼出閉包が非共通コードの 8–35 % (バイト) しか含まず、間接呼出の到達先が lift から漏れる | §2 (7 本計 閉包外・データ参照あり 1,437 関数 / 478,062 B) | リンク時の未解決シンボル / 実行時 `call` 先の欠落。 差分試験の不一致 | データ参照ありの関数を root に足した推移閉包で lift |
 
 ## 9. 成果物
