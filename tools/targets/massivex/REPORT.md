@@ -163,14 +163,15 @@ work/ (gitignore): hdr_block1/2.bin, files.json, locations.json, header_parse.js
 
 ## 11. MX-2 検証の再確認 (#266 / MX2-1 mock 欠陥) — 2026-10-13 実測
 
-### 11.1 検証状況 (実測 HEAD = `d0eddb92`)
+### 11.1 検証状況 (実測 HEAD = `858fbfcd`)
 
-- 実測 HEAD は `d0eddb92` (現 PR head)。`47fd87cb..d0eddb92` のコード差分は `license/e2e.sh` の `mkdir -p` 重複削除 1 行のみ。`aa8002f5..d0eddb92` の `.py` / `.sh` 差分は実質ゼロ (`mkdir` の位置のみ)。
-- 下表は `d0eddb92` で取り直した値 (2 回目の計測。初回計測は `47fd87cb` で、結果は同一)。
+- 実測 HEAD は `858fbfcd` (測定時の PR head)。`d0eddb92..858fbfcd` は REPORT のみ、`47fd87cb..d0eddb92` のコード差分は `license/e2e.sh` の `mkdir -p` 重複削除 1 行のみ。以降に `.py` / `.sh` の変更は無い。
+- 下表は `858fbfcd` の worktree (`git worktree` で detached 展開) で取り直した値。`d0eddb92` の値とも一致する。
+- 測定ログは `work/` 外 (`$RUNNER_TEMP` 配下) に置いた。exit code・PASS 数・所要はそのまま表に記載。
 - 素材: `plugins-massivex` / `toolchain-retdec` / `toolchain-emsdk` を `$ARTIFACTS_DIR` から展開 (`tar --zstd -xf`)。RetDec / emsdk は `[RETDEC]` / `[EMSDK]` (`[OPT-TOOLS]` 配下。環境変数で上書き)。
 - `plugins-massivex` は Inno installer (`Native Instruments Massive X v1.7.1.exe`, 1,870,391,792 B) と dmg のみ。`scripts/parse_setup_headers.py <exe> work` → `scripts/extract_massivex.py <exe> work key` で `work/extracted/VST3/Massive X.vst3` (95,356,824 B, PE32+ DLL) を生成した。`pefile` / `capstone` / `numpy` は pip 導入。
 - **入力の同一性 (reviewer 必須 3)**:
-  - 本体 `Massive X.vst3` の md5 は `622993e76565f49c094063a2b717d6ca`。`dsp/REPORT.md` 先頭の記録値と一致し、同じ手順で再現できることは確認した。
+  - 本体 `Massive X.vst3` の md5 は `622993e76565f49c094063a2b717d6ca` (`858fbfcd` で再展開して一致確認)。`dsp/REPORT.md` 先頭の記録値と一致する。
   - ただし installer 内の 16B checksum は 125 件中 0 件一致 (`md5-ok 0/125`)。§8.1 の「repack 由来の stale 値」仮説と整合するが、**展開物が実機 installer と同一であることは外部照合できていない**。
   - よって下表の PASS は「この展開物に対する回帰」の証拠であり、「Massive X 実バイナリに対する回帰」の証拠としては**暫定**。受入「回帰」の達成判定は保留する (起票先: #266)。
 - `MX_OPT=-O0` の初回 exit 1 (`patch site 0x18115dec2` assert): **再現せず**。
@@ -178,17 +179,18 @@ work/ (gitignore): hdr_block1/2.bin, files.json, locations.json, header_parse.js
   - 切り詰めコピー (展開物の前半 47.7 MB) を `mx_pefix.py` に通すと、`pefile` は読めて site は `e1 26` のまま、assert は出ない (前回入力とは別の状態)。
   - 初回の入力状態・並列実行の有無は記録が無く、原因は**未確定**。
 
-| 項目 (HEAD `d0eddb92`) | 結果 | 所要 |
+| 項目 (HEAD `858fbfcd`) | 結果 | 所要 |
 |---|---|---|
-| license e2e 既定 (-O1 + zero-init) | exit 0 / 11/11 PASS | 5 s (lift キャッシュ有り) |
-| license e2e `MX_OPT=-O0` 1 回目 | exit 0 / 11/11 PASS | 4 s |
+| license e2e 既定 (-O1 + zero-init, lift キャッシュ無し) | exit 0 / 11/11 PASS | 62 s |
+| license e2e `MX_OPT=-O0` 1 回目 | exit 0 / 11/11 PASS | 5 s |
 | license e2e `MX_OPT=-O0` 2 回目 | exit 0 / 11/11 PASS | 5 s |
 | license e2e `MX_OPT=-O0` 3 回目 | exit 0 / 11/11 PASS | 5 s |
-| license e2e `MX_OPT=-O2` | exit 0 / 11/11 PASS | 5 s |
-| NC `MX_ZEROINIT=0 MX_OPT=-O1` | exit 1 / 6/11 PASS (T7-T11 TRAP: memory access out of bounds) — 欠陥が再現 | 4 s |
-| dsp/e2e.sh | exit 0 / insns 258,087 / unsup_sites 48,612 / e8e9_targets 594,978 | 41 s |
-| dsp/negctl.sh NC1 / NC2 / NC3 | 3 件 FAIL (期待どおり): 3,118 / 4,575 / 31 insn (script 全体 exit 0) | 10 s |
-| license e2e 既定 (初回 cold, `47fd87cb`・lift 無し) | exit 0 / 11/11 PASS | 77 s |
+| license e2e `MX_OPT=-O2` | exit 0 / 11/11 PASS | 4 s |
+| NC `MX_ZEROINIT=0 MX_OPT=-O1` | exit 1 / 6/11 PASS (T7-T11 TRAP: memory access out of bounds) — 欠陥が再現 | 5 s |
+| dsp/e2e.sh | exit 0 / insns 258,087 / unsup_sites 48,612 / e8e9_targets 594,978 | 36 s |
+| dsp/negctl.sh NC1 / NC2 / NC3 | 3 件 FAIL (期待どおり): 3,118 / 4,575 / 31 insn (script 全体 exit 0) | 9 s |
+
+- `MX_OPT=-O0` の初回 exit 1 は、`858fbfcd` での 3 回連続でも再現せず (上表 3 行とも exit 0)。`d0eddb92` の 3 回と合わせ計 6 回連続 PASS。原因は引き続き未確定 (上記の記録と同じ)。
 
 - dsp の値は `dsp/REPORT.md` と §2/§3 に一致 (258,087 / 48,612)。別の値は残していない。
 - clen は §11.2 のとおり未実施。
