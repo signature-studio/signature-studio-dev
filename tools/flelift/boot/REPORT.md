@@ -224,18 +224,14 @@ GitHub Actions runner (4 vCPU / RAM 16GB + swap 16GB 追加) で `boot_e2e.sh` �
 
 | 項目 | 状態 |
 |---|---|
-| shim 有 / ネガコン (`0x15F34A0` 判定) の再採取 | **未実施**。ab373f1 の再検証 run (2026-10-13) でも `$ARTIFACTS_DIR` は `fl-win64.tar.zst` のみ・`/opt/emsdk` 無しのため lift・clang 不可。PR 本文の `oc_artifacts:` を `fl-win64 toolchain-retdec toolchain-emsdk work-m11 work-liftdiff` に変更して再採取する。起票依頼 ③ |
+| shim 有 / ネガコン (`0x15F34A0` 判定) の再採取 | **未実施**。ab373f1 の再検証 run (2026-10-13) でも `$ARTIFACTS_DIR` は `fl-win64.tar.zst` のみ・`[EMSDK]` 無しのため lift・clang 不可。PR 本文の `oc_artifacts:` を `fl-win64 toolchain-retdec toolchain-emsdk work-m11 work-liftdiff` に変更して再採取する。起票依頼 ③ |
 | units_run の前進・次の停止点 | **未実施**。前 run の値 (209 据え置き) は #672 08:07 コメントに残る |
 | survey 再実測 (0x6a7b70 root の非破裂確認) | **未実施**。起票依頼 ② |
 | 呼出 IPP 名の全一覧 | **未実施**。起票依頼 ① |
 
 起票依頼: ① IPP fail-soft の呼出名一覧と silent miscompile 検査 ② survey 再実測と 0x6a7b70 root 化の可否判断 (PM 判断) ③ `bash tools/flelift/boot/fle6_measure.sh` を emsdk 込みの runner で再採取 (素材: `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk work-m11 work-liftdiff`)。
-`boot_e2e.sh` / `build.sh` / `iterate_roots.sh` の `/opt/emsdk` 直書きは既存の書式で、本 PR の範囲外 (起票依頼 ④)。
+`boot_e2e.sh` / `build.sh` / `iterate_roots.sh` の `[EMSDK]` 直書きは既存の書式で、本 PR の範囲外 (起票依頼 ④)。
 
-### 10.x 実測の試行 (fix run 2026-10-13, Refs #672)
+### 10.x 実測の試行
 
-- 素材: `fl-win64` → `$HOME/analysis/win64` (展開 7.8 s)、`work-m11` → `tools/m11/work` (233 件)、`work-liftdiff` → `tools/liftdiff/work` (11 件)、`/opt/emsdk` (emcc 6.0.12)・`/opt/retdec` 有。`capstone` / `pefile` は `$RUNNER_TEMP/venv-fle` (リポジトリ外) に導入。
-- 資源 (14:43 UTC): MemAvailable 14334 MiB / 空き 69G / nproc 4 / load 1.07。
-- `fle6_measure.sh` (foreground, `timeout 1500`, rc=124): gen-A 7 s 完了。`lift` (x64c, closure 2) は 25 分経っても完了せず打ち切り。`work/boot` 配下の生成物は無し。
-- 未取得: shim 有/無の `units_run`・`stopped_at`・`ipp.called` 全件・`FLEBOOT_IPP_CHECK`・0x6a7b70 root 化後の前進・survey 非破裂。**取れなかった理由: lift 段の時間切れ (25 分で打ち切り)**。
-- 判定: 受入条件は未了のまま。Closes は付けず `Refs #672`。次の run で lift 単体の所要時間を先に採ってから boot に進む。
+- 結論 (fix run 2026-10-13): 受入条件は未了。詳細と経緯は `REPORT_APPENDIX.md` §C。

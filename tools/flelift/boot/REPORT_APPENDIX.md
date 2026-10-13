@@ -182,3 +182,11 @@ FLE-5 は `boot/dbg_lift.py` (任意 guest VA を lift 生成 C の行に埋め�
 なお (3) の「image 全体に store 0 件」は **rip-rel disp32 バイト走査**の結果で、
 `f_653dd0` は `mov rcx,[rbp+0x28]; mov [rcx],rax` という**動的ストア**なので
 即値検索では決して出てこない (`boot/dbg_lift.py` の `--at` で解決)。
+
+## C. §10.x から移動: FLE-6 実測の試行 (fix run 2026-10-13, Refs #672)
+
+- 素材: `fl-win64` → `[WIN64]` (展開 7.8 s)、`work-m11` → `tools/m11/work` (233 件)、`work-liftdiff` → `tools/liftdiff/work` (11 件)、`[EMSDK]` (emcc 6.0.12)・`[RETDEC]` 有。`capstone` / `pefile` は リポジトリ外の venv に導入。
+- 資源 (14:43 UTC): MemAvailable 14334 MiB / 空き 69G / nproc 4 / load 1.07。
+- `fle6_measure.sh` (foreground, `timeout 1500`, rc=124): gen-A 7 s 完了。`lift` (x64c, closure 2) は 25 分経っても完了せず打ち切り。`work/boot` 配下の生成物は無し。
+- 未取得: shim 有/無の `units_run`・`stopped_at`・`ipp.called` 全件・`FLEBOOT_IPP_CHECK`・0x6a7b70 root 化後の前進・survey 非破裂。**取れなかった理由: lift 段の時間切れ (25 分で打ち切り)**。
+- 判定: 受入条件は未了のまま。Closes は付けず `Refs #672`。次の run で lift 単体の所要時間を先に採ってから boot に進む。
