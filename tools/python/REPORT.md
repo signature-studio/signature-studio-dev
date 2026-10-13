@@ -139,10 +139,10 @@ FLEngine rodata の `name\0doc\0…<module>` 並びから機械抽出 (`flapi_ex
 データ: `analysis/ilmcp/plugin_catalog.json` = native 136 (fst_manifest の `Data/Patches/Plugin database`: Generators 57 / Effects 79) + installed 5 (`hostbridge/nfo/specs/wasm_plugins.json`)。`analysis/ilmcp/highlight_names.json` = rodata の UnicodeString リテラル 21 件。生成 = `FL_WIN64_DIR=… python3 analysis/ilmcp_catalog.py`。
 カタログは**名前とカテゴリのみ** (FL 由来のバイト列は含まない)。FL 同梱プラグイン名・UI 文字列 21 件をリポジトリに置くことの可否は `docs/LEGAL.md` に照らして未確認 → PM 判断事項 (下記未解決)。
 
-### 検証 (runner, node 22.23.3, 4 core)
+### 検証 (runner, node 22.23.3, 4 core。検証起点 = クリーン worktree の commit 828d245。環境: `work/` に MCPTools.pyc・midi.py・utils.py・fl-stubs、`dist/` に `build_flpy.sh` 産の flpy.*)
 | コマンド | 結果 |
 |---|---|
-| `node tests/ilmcp_e2e.mjs` | **25/25 PASS**、41–45 ms (n=9 の min–max は下のネガティブ実行内) |
+| `node tests/ilmcp_e2e.mjs` (n=3) | **25/25 PASS** × 3。wall 0.23 / 0.23 / 0.24 s (チェック本体 43 / 44 / 47 ms)、load average 0.14 |
 | `node tests/all_tools.mjs` | 48/48 ok、host_calls 37,424 (変化なし)、callback_roundtrip true、1.05 秒 |
 | `node tests/poc_mcp.mjs` | POC OK、0.60 秒 |
 | `node tests/browser_check.mjs` (headless Chrome) | BROWSER OK (crossOriginIsolated, 48 tools)、12.5 秒 |
