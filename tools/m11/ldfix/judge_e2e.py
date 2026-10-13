@@ -59,6 +59,13 @@ ok = True
 lines = []
 lines.append('stage4 到達: base=%d/6 fix=%d/6 %s' % (sb, sf, 'OK' if sf >= sb else 'REGRESS'))
 ok &= sf >= sb
+# 前提: stage4 に到達していない (units_run 0 等) 比較は効果検証にならないため FAIL にする (#757)
+for name, S in (('base', base), ('fix', fix)):
+    reached = sb if name == 'base' else sf
+    lines.append('前提 %s: stage4 到達 %s' % (name, 'OK' if reached >= 4 else 'NOT REACHED (FAIL)'))
+    ok &= reached >= 4
+    lines.append('前提 %s: survey ok %s' % (name, 'OK' if (S['survey'].get('ok') or 0) >= 1 else 'ZERO (FAIL)'))
+    ok &= (S['survey'].get('ok') or 0) >= 1
 for k in ('GetMem', 'FreeMem', 'FastMM_GetMem(407a50)'):
     lines.append('probe %-22s base=%-5s fix=%-5s %s' % (k, prb.get(k), prf.get(k),
                  'OK' if (prf.get(k) or 0) >= (prb.get(k) or 0) else 'REGRESS'))

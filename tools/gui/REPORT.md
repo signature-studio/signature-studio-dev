@@ -169,8 +169,7 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
 | `integ/sigprobe.sh` の `unresolved-imports=0` が `wasm-objdump` 不在で空振り (今回も `command not found`) | 未解決 import なし確認が無効 | #180 (既存コメント) |
 
 ## 11. GUI-9 (#186): GDI テキストの FreeType 描画 (内蔵 8×8 → FreeType 2.7)
-- 結論: `src/gui_ft.c` (FreeType 2.7) が GDI テキストを描き、native 独立オラクル (`golden/ft_oracle.c`) と画素差 0・metrics 差 0 (ネガコン 4/4)、engine の native == wasm32。未登録/解決不能/stock は従来の 8×8。Windows 標準フォントは同梱せず OSS フォント (Open Sans / Barlow) を alias で代替 (#186 PM 判断)。
-- 実測値・実装詳細・レビュー対応の再現・8×8 経路 `DrawText` の挙動差・未解決 (4 件) の全文は **`REPORT_APPENDIX_B.md`** (無変更で分割移動)。未解決 (4) wasm ビルドへの組込みは §13 (#615) で解消。
+- 結論: GDI テキストは FreeType 2.7 で描画し、独立オラクルと画素差 0・metrics 差 0。`e2e.sh` ALL PASS は af8ba9cc・0cbc5651 で各 1 回のみ (flake 残存)。詳細は [REPORT_APPENDIX_B.md](REPORT_APPENDIX_B.md) §11。
 
 ## 12. GUI-12 (#489): headless host の surface 画素 use-after-free (selftest ASan flaky)
 
@@ -209,8 +208,8 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
   | 未解決 | 影響 | 起票先 |
   |---|---|---|
   | (1) `loadFont` の取得元を #22 (VFS) の遅延取得 (Range/OPFS/R2) へ結線 | 本番ブラウザへの配信は未接続 (e2e は同一オリジン `/fonts/*`) | #660 (GUI-14) |
-  | (2) `bash tools/gui/e2e.sh` 全体 (PE lift 層込み) の ALL PASS 確認 | 7ead604 のレビュー実測 (RetDec あり) で 2 回中 1 回 ALL PASS、もう 1 回は `selftest_wrapped` の既知 flake (ASan blit_surf UAF、単独 30 回で 9/30 失敗) で rc=1 (付録 §13 追補) | flake は `gui_headless.c` の起票を PM 依頼 (未起票)。ALL PASS の追加確認は PM 判断 |
-  | (3) 実 FL の face/サイズ確定・alias 実値 | alias は e2e 用 (Segoe UI/Tahoma → Open Sans) のみ | #174 (GUI-3) / #186 の未解決 (2) |
+  | (2) `bash tools/gui/e2e.sh` 全体 (PE lift 層込み) の安定した ALL PASS 確認 | af8ba9cc / 0cbc5651 で 1 回 PASS を確認、flake 残存 (`selftest_wrapped` は単独 30 回で 9/30 失敗・7ead604 実測、付録 §13 追補)。1 回 PASS は flake 解消の根拠にならない | flake の `gui_headless.c` 起票は PM 判断 (未起票) |
+  | (3) 実 FL の face/サイズ確定・alias 実値 | alias は e2e 用 (Segoe UI/Tahoma → Open Sans) のみ | #174 (GUI-3)・付録 B §11 の未解決 (2) |
 
 ## 14. GUI-7 (#183): popup/tooltip・非クライアント領域・無効領域複数矩形・DPI (FL 非依存部)
 既知類型との関係 (DEFECTS.md): 該当なし (shim の意味論)。ただし lift 済み WndProc の `WM_NCCALCSIZE` の `NCCALCSIZE_PARAMS*` lParam が int32 切り詰めで取りこぼされ native で SEGV (§4-6 の既知要件の再発)。修正は shim 側で送信中ポインタを保持。
