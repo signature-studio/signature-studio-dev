@@ -156,6 +156,7 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 |---|---|---|---|---|
 | 0 | 457 s | 14/14 PASS | 504 passed / 0 failed | 9/9 期待どおり FAIL (NC N1〜N9) |
 
+- 親 `bash tools/gui/e2e.sh` (HEAD `0246df1f`・1 回): **rc 0 / ALL PASS**、wall 209 s (シェルで開始・終了時刻を取った実測)。前提欠如は 2 回: `tsc` 不在 (rc 127、`pnpm install --frozen-lockfile` で解消) と `agent-browser` 不在 (rc 2、`tools/e2e` の `npm ci` で解消)。どちらも ASan 由来ではない。
 - `results/` は e2e が再生成した。`wasm_size` 6912872 → **6913035**、`ir_sha256.txt` の `material` / `after_m11_build` は変化 (`boot_final.ll` `e9aa138e…`・`boot_final3.ll` `5586d206…`)。`c994306b` の値とは一致しない。
 - `results/probe.json` は本 e2e で変化なし (git 上で差分無し)。`util_window.ret` = `0x1100010` の値は c994306b の再生成物のまま。本 e2e のログに `util_window.ret` は出ない (P4 の `TApplication` hwnd = `0x110000f` のみ確認)。`REPORT_564.md` §4 の 0x110000f (f4_e2e の post 実測) との差は未解決。
 - 旧 `40e4e4b0` の値 (selftest 500/0・judge 12/12) は本 HEAD で 504/0・14/14 に変わった。増分の原因は未確認。
