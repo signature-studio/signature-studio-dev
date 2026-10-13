@@ -107,6 +107,35 @@ python3 tools/icall/diff/rax_callers.py 1801a9a6c 1801c8cb8 1801c8c98
 - 範囲分割で落ちは減らない (CHUNKS=2 で 366 のまま)。仮説 A (RetDec の打ち切り回避) は**棄却**。
 - 補足 (DEFECTS 候補): RetDec は `0x128c320` 直前の関数を `data inside code section 0x128c281--0x128c320` と誤認し、`0x128c320` を 1 バイト関数にする。`NonRecursiveCFGBuilder` が `function_128c320` への edge を毎回捨てる警告 (5 件) が出る。本件の 366 落ちとの因果は未検証。
 
+### 12.1 #851: `0x128c320` の関数境界誤認 (1 バイト関数化) の原因
+
+結論: **誤認の原因は範囲分割 (decode 単位)**。バイナリの境界は正しい。`0x128c320` の本体が同じ decode モジュールに無いと、RetDec は 1 バイトの stub として作る。`.pdata` (unwind 表) と一致する。
+
+素材 `fl-win64` (`block00031_PE.bin`)、検証起点 HEAD = #851 ブランチ (main `7c9ea884` 基点)、再現 `FL_WIN64_DIR=<展開先> bash tools/icall/fn_boundary_repro.sh <outdir>` (load 1.01・所要 279 s)。
+
+| decode 範囲 | `function_128c320` のラベル | 備考 |
+|---|---|---|
+| A: `0x128c280-0x128c2e1` + `0x128c320-0x128dc44` | `0x128c320--0x128dc44` (正) | 本体あり |
+| B: A + `0x128c2f0-0x128c313` | `0x128c320--0x128dc44` (正) | 本体あり |
+| 2 関数のみ (`0xc589b0-0xc5d667`, `0x128f9e0-0x1294ab8`) | `0x128c320--0x128c321` (**1 B**) | 呼出元 `128f9e0` と同 module。NonRecursive 警告 5 件 |
+| 2 関数 + `0x128c320-0x128dc44` | `0x128c320--0x128dc44` (正) | 警告 `function_128c320()` は残る (5 件) |
+| rt_flengine chunk0 (呼出元 `128f9e0` を含む) | `0x128c320--0x128c321` (**1 B**) | 警告 5 件 |
+| rt_flengine chunk1 | (本体も stub も無し) | |
+| rt_flengine chunk2 | `0x128c320--0x128c321` (**1 B**) | 本体を含まない |
+| rt_flengine chunk3 (本体を含む) | `0x128c320--0x128dc44` (正) | |
+
+- `.pdata` (RVA → VA) の関数開始: `0x128c280--0x128c2e1` / `0x128c2f0--0x128c314` / `0x128c320--0x128dc44`。`0x128c2f0` は 3 点目の実関数。
+- DSM の `; data inside code section at 0x128b811 -- 0x128c320` は、**選択外の関数本体を RetDec が data 扱いする**ことから来る。`0x128c2f0` は F (FLEngine 7,421 関数の選択) に含まれず、`data inside code section at 0x128c2e1 -- 0x128c2f0` と `0x128c313 -- 0x128c320` の間の data として出る。
+- 呼出元の `function_128f9e0` (chunk0) から `function_128c320(v47)` へは直接 call 1 箇所。`0x128c320` の rel32 call 元は 4 箇所 (`0x1286317`・`0x1290312`・`0x12a28d3`・`0x12a35da`)。`0x128c2f0` の rel32 call 元は 0 件 (間接参照の可能性は未確認)。同じ chunk0 では `0x128c280` も `--0x128c281` の 1 B 関数になる。
+- 5 件の `NonRecursiveCFGBuilder` 警告は chunk0 (呼出元 `128f9e0` を含む側) にのみ出る。本体を足すと `function_128c320` の名前の警告は消えず、全体の警告は 5 → 15 に増える (追加の 10 件は `rax_1_reload` 等の無関係 edge。要調査)。
+- 既知類型か: `docs/DEFECTS.md` の D1a〜D18 の文言とは一致しない (1 バイト stub は decode 範囲由来で、命令の誤復号ではない)。**行案は未確定**。確定には 366 落ちとの突合が要る。
+
+#### 未確定 (本 run で未達)
+
+- 隣接関数の lift 欠落の before / after 監査 (`audit_icall.py` の数字) は**未実施**。上の表はラベル (境界) の before / after のみ。
+- 追加の警告 10 件 (`rax_1_reload` 等) の出所は未確認。
+- 366 落ちとの因果は未検証 (本体を足しても警告 5 件が残る)。
+
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 366 site 落ちの真因 (decode 後・最適化中に stub 呼出しが減る段の特定と、関数単位の before/after 突合) | 2 関数の wasm 化不可 | #229 (続き) |
