@@ -214,6 +214,7 @@ class Analyzer:
         arity_gpr = (max(used_args) + 1) if used_args else 0
         return dict(ins=n, icall=icall, ijmp=ijmp, fpcmp=fpcmp, simdint=simdint, calls=sorted(set(calls)), repstr=repstr,
                     arity_gpr=arity_gpr, arity_x=(max(used_x) + 1) if used_x else 0,
+                    xmm_slots=sorted(used_x),
                     stack_args=sorted(stack_args), truncated=bool(work))
 
 
