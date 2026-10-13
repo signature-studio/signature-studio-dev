@@ -82,7 +82,7 @@ IR (`work/boot_final3.ll`): `function_abfd60` 内の `%ce0n11_function_abfd60 = 
 - 275: this 不正の出所は未特定。`80e040` の項目取得 (`function_8657b0`) が返す値を実測していない。
   stub (GetMonitorInfoW / EnumDisplayMonitors が 0 を返す) が項目の作り方に影響する**推定** (未検証)。
   次の一手: 80e040 直前の項目列の実測、または monitor enumeration の stub を仮に実装して差を測る (ネガコン付き)。
-- 95: `47ad70` の index `v` の出所 (record `+8`) と `arg0` の由来は未確認。caller の GDI stub 系との関係は**推定**。
+- 95: `47ad70` の index `v` の出所 (record `+8`) と `arg1` の由来は未確認。caller の GDI stub 系との関係は**推定**。
 - 895: リスト先頭 (`40ffe0` の引数) の出所は未確認。`p-144` が指す構造体の定義は未特定。
 
 ## 5. 未解決 (起票先)
@@ -121,6 +121,14 @@ node trap_triage/oob684_probe.mjs 477 0 watch                             # addr
 survey は e2e で再生成した `work/m11_boot.cjs(.wasm)` に対して実行する。snapshot 単独では不可 (§5)。
 
 ## 8. 検証結果 (実測。HEAD ごとに記載、最新は下記の `718849f` 節)
+
+### 最新 (HEAD `17ac1fe`、コード HEAD `791cce5` と同一の code。以降は docs のみ)
+
+- e2e `m11_e2e.sh` (foreground、rc=0、35.7 s、load 0.52→0.76): reached_stage 4/6、units 22/942、ok 864 / trap 31 (oom 1) / miss 46 / noproc 1 / clobber 0。
+- survey `SV_RAW=1 survey_units.mjs` (rc=0): 単独実行 17.5 s (load 1.02 → 1.02。計 3 回のうち並列の 2 回は 17.4 / 17.6 s で、時間は干渉を含む)。3 回とも ok 828 / halt0 54 / miss 46 / oob 13 / noproc 1。単独実行の JSON は `718849f` 時の JSON と byte 一致 (`cmp`)。
+- 手順は §7 どおり (`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`、`work-m11` を展開した clean な worktree `ws-703`)。
+- OOB 13 件の frame (解決名) と raw 先頭: §1 の表と 13/13 一致。halt0 54 件はすべて frames を持つ (集計は JSON の kind で確認)。
+- `oob_insn.py` 4 件: 全て命令境界で `i64.load offset=0`、直前の `i32.wrap_i64` 有無は §2 のとおり。ネガコン `18f8e0` は境界エラー。
 
 ### 初回 (HEAD `6c1a34f`)
 
