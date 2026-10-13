@@ -1,0 +1,4 @@
+#va	verdict_r1	verdict_r2	verdict_r3	case_outcome_changed_patterns
+0x5c5500	unexec	unexec	unexec	fvm=hang|both_fault|both_fault p01=both_fault|hang|both_fault p1=both_fault|both_fault|hang qall=both_fault|hang|both_fault u16=both_fault|both_fault|hang
+0x67e2b0	mismatch	mismatch	mismatch	s=both_fault|hang|hang
+0x903d50	match	match	match	s=hang|native_fault|native_fault
