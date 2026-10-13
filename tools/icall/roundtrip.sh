@@ -53,7 +53,7 @@ python3 - "$OUT" <<'PY'
 import json, sys
 o = sys.argv[1]
 m = json.load(open(o + '/map.json'))
-open(o + '/after.ranges', 'w').write(open(o + '/map.json.ranges').read() + ',0x%x-0x%x,0x%x-0x%x' % (m['stub'], m['stub'] + 78, m['comis_stub'], m['comis_stub'] + 29))
+open(o + '/after.ranges', 'w').write(open(o + '/map.json.ranges').read() + ',0x%x-0x%x,0x%x-0x%x' % (m['stub'], m['stub'] + m.get('stub_len', 78), m['comis_stub'], m['comis_stub'] + m.get('comis_stub_len', 29)))
 PY
 retdec_chunks "$OUT/rw.dll" "$OUT/after.ranges" "$OUT/after"
 IRS=""

@@ -123,6 +123,76 @@ def find_undef_for(mod, fn, ix, readers):
     return best[1], best[2], best[3]
 
 
+SEXT_ARG_RE = re.compile(r"^\s*(%[\w$.\-]+) = sext i64 %arg\d+ to i128\s*$")
+
+
+def find_sext_arg_for(mod, fn, readers):
+    """SR-4 (#75): RetDec が xmm 引数 (例: `movss [rcx+0xc], xmm1`) を undef ではなく `sext i64 %argN to i128`
+    (= 整数引数 reg の値) に束ねる形 (DEFECTS.md D5)。その sext 値の使用が全て xmm reader の機械語アドレス上なら
+    xmm 値の定義とみなす: (bi, li, name)。使用が 1 件も無い/reader 外に使われる sext は対象外。"""
+    rs = set(readers)
+    for bi, b in enumerate(fn.blocks):
+        for li, ln in enumerate(b.lines):
+            m = SEXT_ARG_RE.match(IR.strip_tokens(ln))
+            if not m:
+                continue
+            name = m.group(1)
+            pat = re.compile(r"(?<![\w$.%\-])" + re.escape(name) + r"(?![\w$.\-])")
+            uses = [mod.addr_of(l2) for b2 in fn.blocks for l2 in b2.lines if l2 is not ln and pat.search(IR.strip_tokens(l2))]
+            if uses and all(a in rs for a in uses):
+                return bi, li, name
+    return None
+
+
+# ---------------------------------------------------------------------------------
+# xmm 戻り値の搬送 (LIFTLIB #241) — OTT [F1] accessor 型
+# ---------------------------------------------------------------------------------
+# RetDec は xmm0 に結果を返す関数 (double/float accessor・exp/log/tan 等) を `ret i64 <rax 側の値>` と lift し,
+# 真の戻り (xmm0) を落とす (callee 側) / call 後の xmm0 読みが呼出前の古い SSA を流す (caller 側 = RX)。
+# 検出: 機械語の全 (到達可能) ret で xmm0 が関数内定義 (MFunc.ret_in_xmm0) なのに, IR の `ret i64/i32` が
+#       xmm0 由来 (`%lf_<va>_t*` = leafabi が差した trunc) でない。
+# 修復: leafabi (ret → xmm0 bits / call 直後の最初の xmm0 読み → call 戻り) を全 module に適用。
+XRET_OK_RE = re.compile(r"^\s*ret i(?:64|32) %lf_[0-9a-f]+_t\d*\b")
+XRET_RE = re.compile(r"^\s*ret i(?:64|32) ")
+
+
+def xmm_ret_scan(mod, img, names=None):
+    """{関数名: (総 ret 数, 未搬送 ret 数)} — 機械語が xmm0 で返すのに IR の ret が xmm0 由来でない関数のみ。"""
+    out = {}
+    for fn in mod.funcs():
+        if not re.match(r"function_[0-9a-f]+$", fn.name) or (names and fn.name not in names):
+            continue
+        rng = img.func_at(int(fn.name.split("_")[1], 16))
+        if rng is None or not MFunc(img, *rng).ret_in_xmm0():
+            continue
+        rets = [IR.strip_tokens(l) for b in fn.blocks for l in b.lines if XRET_RE.match(IR.strip_tokens(l))]
+        bad = [l for l in rets if not XRET_OK_RE.match(l)]
+        if bad:
+            out[fn.name] = (len(rets), len(bad))
+    return out
+
+
+def run_xmm_ret(mod, img, log=None, stats=None, repair=True, only=None):
+    """xmm 戻り搬送の検出 (+ repair=True なら修復)。stats: xret_callees_pending / xret_rets_pending (修復前) /
+    xret_rets_after (修復後の残)。"""
+    stats = stats if stats is not None else {}
+    log = log if log is not None else []
+    before = xmm_ret_scan(mod, img, only)
+    stats["xret_callees_pending"] = len(before)
+    stats["xret_rets_pending"] = sum(b for _, b in before.values())
+    log.append("F2 xmm-ret pending: " + ", ".join("%s:%d/%d" % (n, b, t) for n, (t, b) in sorted(before.items())))
+    if not repair or not before:
+        return stats
+    from . import leafabi
+    st = {}
+    leafabi.run(mod, img, tuple(before), log, st, repair=True)
+    stats["xret_threaded"] = st.get("ret_threaded", 0)
+    stats["xret_rx_threaded"] = st.get("rx_threaded", 0)
+    after = xmm_ret_scan(mod, img, only)
+    stats["xret_rets_after"] = sum(b for _, b in after.values())
+    return stats
+
+
 def run(mod, img, log=None, stats=None, repair=True, only=None, phase="both", ix_map=None):
     """phase: "callee" (define/declare への %xmmK_bits 追加) / "callsite" (call site 引数接続)
     / "both" (従来通り)。LIFTLIB-2 では pipeline が callee 相を p1 より前に流す
@@ -203,6 +273,11 @@ def run(mod, img, log=None, stats=None, repair=True, only=None, phase="both", ix
             for k in ks:
                 kind, readers = i["params"][k]
                 hit = find_undef_for(mod, fn, ix, readers)
+                if hit is None:
+                    hit = find_sext_arg_for(mod, fn, readers)
+                    if hit is not None:
+                        stats["sext_arg_rebound"] = stats.get("sext_arg_rebound", 0) + 1
+                        log.append("F2 %s: xmm%d は `sext i64 %%argN` に束ねられていた (D5 型) → %%xmm%d_bits に差替" % (nm, k, k))
                 if hit is None:
                     log.append("F2 %s: xmm%d の undef 値が見つからない (引数のみ追加)" % (nm, k))
                     stats["undef_missing"] = stats.get("undef_missing", 0) + 1

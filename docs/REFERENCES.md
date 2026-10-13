@@ -28,6 +28,7 @@
 | `[LINEAR-AUDIT]` | `../analysis/LINEAR_AUDIT_LOG.md` | 旧 Linear 運用の定期監査ログ (歴史資料) |
 | `[PREFLIGHT]` | `../analysis/preflight.sh` | 環境検査・`--env` / `--lock` ヘルパ (歴史的。repo 内手順は `docs/WORKFLOW.md`) |
 | `[MODEL-POLICY]` | `../analysis/MODEL_POLICY.md` | モデル指定・ゾンビ監視の方針 (PM 管理) |
+| `[PM-SCRIPTS]` | `../analysis/sweep_prs.sh` ほか | PM が VM 上で常駐・実行する PR/run 運用スクリプト (repo 外・repo に未取込)。`sweep_prs.sh` (open PR の状態判定と次の run の自動依頼、`docs/WORKFLOW.md` §11)・`find_silent_runs.sh` (着手報告だけで終わった run の検出)・`restart_failed.sh` (失敗 run の再投入)・`watch_runs.sh` (+ `watch_runs.sh.notes`)。所在が記録されているのは `sweep_prs.sh` のみ。他は `[ANALYSIS-DIR]` 配下かどうか未確認 (#582 のコメントで PM に確認依頼済み。#582 は確認が済むまで open) |
 
 `../analysis/` は **作業用 VM 上のリポジトリ外ディレクトリ**。リポジトリには含めない (`.gitignore` 対象外・クローン先に無い)。
 CI や他人の環境では存在しないため、再現手順は本ファイルの所在情報を前提としない。
@@ -66,6 +67,7 @@ CI や他人の環境では存在しないため、再現手順は本ファイ�
 | `[V-PFFFT-UP]` | `tools/ipp/shim/fft/work/pffft_up/` | 同上 `[V-PFFFT]` の比較用 upstream 複製 | — | なし | BSD 系 | 差分確認用 |
 | `[V-MASSIVEX]` | `tools/targets/massivex/work/{innoextract,issrc}/` | Inno Setup 抽出ツール類 | — | なし | 各種 | gitignore 対象 |
 | `[V-ICALL]` | `tools/icall/disp_size/work/capnext/` | capstone next | — | なし | BSD | gitignore 対象 |
+| `[V-CP932-BESTFIT]` | `tools/shimx/src/cp932_tab.c` (生成物 192 KB) | https://unicode.org/Public/MAPPINGS/VENDORS/MICSFT/WindowsBestFit/bestfit932.txt (Microsoft / Unicode Consortium) | 取得時点 (入力は `tools/shimx/work/` に取得、非 commit) | `tools/shimx/scripts/gen_cp932.py` による C 配列への機械変換のみ (手編集禁止) | Unicode Terms of Use | `tools/shimx/REPORT_SHX-T8.md` §15.3 |
 | `[V-FLP]` | `tools/flp/work/venv/...` | Python venv (`nothing` 等) | — | なし | — | gitignore 対象 |
 
 **vendored の共通ルール**:
@@ -87,3 +89,41 @@ repo 内ドキュメントでの書き方:
 ```
 
 悪い例 (禁止): `/home/ubuntu/work/analysis/win64/REPORT.md` と repo 内 .md に直接書く。
+
+---
+
+## 4. 外部資産の環境変数 (`tools/shared/env.sh` / `paths.py` / `paths.mjs`)
+
+tools/ のスクリプトが repo 外の資産を参照するときの共通定義 (#312、親 #294)。3 つは同じ変数名・同じ既定値を持ち、
+**環境変数が設定済みならそれを優先、未設定時のみ既定値**を使う。`tools/shared/test_paths.sh` で一致を検査する。
+
+| 変数 | エントリ ID | 既定値 |
+|---|---|---|
+| `REPO_ROOT` | (repo 自身) | `git rev-parse --show-toplevel` (git 外では `tools/shared/` の 2 つ上) |
+| `ANALYSIS_DIR` | `[ANALYSIS-DIR]` | `/home/ubuntu/work/analysis` |
+| `FL_WIN64_DIR` | `[WIN64]` | `$ANALYSIS_DIR/win64` |
+| `FL_MAC_DIR` | `[MAC]` | `$ANALYSIS_DIR/mac` |
+| `PLUGINS_DIR` | `[ANALYSIS-PLUGINS]` | `$ANALYSIS_DIR/plugins` |
+
+使い方 (既存スクリプトの置換は area ごとの子 issue で行う):
+
+```sh
+# bash: スクリプト冒頭で
+source "$(git rev-parse --show-toplevel)/tools/shared/env.sh"
+PE="$FL_WIN64_DIR/extracted/block00031_PE.bin"
+```
+
+```python
+# python
+import sys; sys.path.insert(0, f"{REPO}/tools/shared")   # REPO は __file__ から求める
+from paths import FL_WIN64_DIR
+PE = f"{FL_WIN64_DIR}/extracted/block00031_PE.bin"
+```
+
+```js
+// node
+import { FL_WIN64_DIR } from '../shared/paths.mjs';   // 呼び出し元からの相対
+const PE = `${FL_WIN64_DIR}/extracted/block00031_PE.bin`;
+```
+
+Actions では `FL_WIN64_DIR` に fl-win64 の展開先を指定する (`docs/WORKFLOW.md` §11)。

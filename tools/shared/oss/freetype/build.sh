@@ -10,6 +10,7 @@
 #   - wasm64 (-sMEMORY64=1, long=64bit): 無改変で一致
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; ROOT="$HERE/../.."
+source "$ROOT/env.sh"
 SRC="$ROOT/work/src/freetype-2.7"; B="$ROOT/work/build/freetype"
 [ -d "$SRC" ] || bash "$ROOT/oss/fetch_sources.sh"
 source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1
@@ -43,14 +44,26 @@ emcc -O2 -sMEMORY64=1 -I"$INC" "$HERE/test_ft.c" "$B/wasm64/src/objs/.libs/libfr
   -sENVIRONMENT=node -sNODERAWFS=1 -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1
 echo "[ft] sizes: libfreetype.a native=$(stat -c %s "$B/native/src/objs/.libs/libfreetype.a") wasm32=$(stat -c %s "$B/wasm32/src/objs/.libs/libfreetype.a")  test wasm32=$(stat -c %s "$B/test_wasm32.wasm") wasm64=$(stat -c %s "$B/test_wasm64.wasm")"
 
-FONT="${FONT:-/home/ubuntu/work/analysis/mac/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL/Shared/Artwork/Fonts/OpenSans-Regular.ttf}"
+FONT="${FONT:-$FL_MAC_DIR/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL/Shared/Artwork/Fonts/OpenSans-Regular.ttf}"
 "$B/test_native" "$FONT" > "$B/out_native.txt"
 node "$B/test_wasm32.cjs" "$FONT" > "$B/out_wasm32.txt"
-node --experimental-wasm-memory64 "$B/test_wasm64.cjs" "$FONT" > "$B/out_wasm64.txt" 2>"$B/out_wasm64.err" || node "$B/test_wasm64.cjs" "$FONT" > "$B/out_wasm64.txt"
+node64="${EMSDK_NODE:-node}"   # wasm64 (table64) は node >= 24 が必要。システム node v22 では CompileError (emsdk 同梱 node を使う)
+"$node64" "$B/test_wasm64.cjs" "$FONT" > "$B/out_wasm64.txt" 2>"$B/out_wasm64.err"
 rc=0
 for v in wasm32 wasm64; do
   if diff -q "$B/out_native.txt" "$B/out_$v.txt" >/dev/null; then
     echo "[ft] PASS $v: native == wasm ($(wc -l < "$B/out_$v.txt") lines, $(tail -1 "$B/out_$v.txt"))"
   else diff "$B/out_native.txt" "$B/out_$v.txt" | head -6; echo "[ft] FAIL $v"; rc=1; fi
 done
+
+# LGL-3 (#86): 再ビルド記録 (upstream 版・ソース sha256・configure 引数・パッチ) を NOTICES 用に書く
+if [ "$rc" = 0 ]; then
+  node "$ROOT/../legal/notices/record.mjs" --id freetype-2.7 --name FreeType --version 2.7 --license-spdx FTL \
+    --url https://download.savannah.gnu.org/releases/freetype/freetype-2.7.tar.gz --archive "$ROOT/work/src/freetype-2.7.tar.gz" \
+    --src-dir "$SRC" --license-file docs/FTL.TXT --license-file docs/LICENSE.TXT \
+    --script "$HERE/build.sh" --toolchain emcc --target wasm32 --target wasm64 \
+    --step "configure=./configure $CFG --build=x86_64-pc-linux-gnu --host=i686-pc-linux-gnu (emconfigure, CFLAGS=-O2; wasm64 は CFLAGS=-O2 -sMEMORY64=1)" \
+    --step "config-edit=wasm32 のみ include/freetype/config/ftoption.h の FT_CONFIG_OPTION_FORCE_INT64 を #define" \
+    --patch "tools/shared/oss/freetype/ftgrays_lp64.patch:ftgrays.c の FT_UDIV を long long 化 (wasm32 のみ)"
+fi
 exit $rc

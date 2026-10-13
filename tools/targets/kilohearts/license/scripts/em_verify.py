@@ -25,9 +25,12 @@ pefile / capstone / RetDec 出力 / 実装側スクリプトは一切使わな�
 
 usage: python3 scripts/em_verify.py [--json OUT]
 """
+import os as _os, sys as _sys
+_sys.path.append(_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', '..', '..', '..', 'shared'))
+from paths import REPO_ROOT
 import sys, json, struct, collections
 
-CORE = '/home/ubuntu/work/webstudio/tools/targets/kilohearts/work/winpkg/HeartCore.core_64'
+CORE = _os.path.join(REPO_ROOT, 'tools/targets/kilohearts/work/winpkg/HeartCore.core_64')
 IMG = 0x180000000
 OFF = 0x1088
 PAT = struct.pack('<i', OFF)          # 88 10 00 00

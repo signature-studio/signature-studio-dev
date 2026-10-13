@@ -41,19 +41,50 @@ runs:
         OC_MODEL: ${{ inputs.model }}
         OC_AGENT: ${{ inputs.agent }}
       run: |
+        # GitHub の `shell: bash` は -e 付きで起動される。-e のままだと opencode が非 0 で
+        # 終わった時点で step が即死し、rc の記録・リトライ・stderr の出力が全て走らない。
+        set +e
         set -uo pipefail
         if [ ! -r "$OC_PROMPT_FILE" ]; then
           echo "::error::prompt file is not readable: $OC_PROMPT_FILE"
           exit 1
         fi
-        prompt="$(cat "$OC_PROMPT_FILE")"
+        # runner の状態を 60 秒おきに step のログへ出す (#765)。fix run が実装 step の途中で
+        # 'The runner has received a shutdown signal' (exit 143) で打ち切られることがあり、そのときは
+        # 後続の always() step も走らず、打ち切り直前の状態が残らない。標準出力へ直接出せば、
+        # step が落ちてもログに残る。プロセスは comm (コマンド名のみ) を出し、引数は出さない。
+        sys_sampler() {
+          while :; do
+            echo "[sys] $(date -u +%H:%M:%S) mem=$(free -m | awk '/^Mem:/{printf "%d/%dMB", $3, $2}') swap=$(free -m | awk '/^Swap:/{printf "%dMB", $3}') disk=$(df --output=pcent / | tail -1 | tr -d ' ') load=$(cut -d' ' -f1-3 /proc/loadavg)"
+            ps -eo rss=,etimes=,comm= --sort=-rss | head -3 | awk '{printf "[sys]   rss=%dMB up=%ds %s\n", $1 / 1024, $2, $3}'
+            timeout "${OC_SAMPLE_SECS:-60}" tail -f /dev/null
+          done
+        }
+        stop_sampler() {
+          [ -n "${sampler_pid:-}" ] || return 0
+          pkill -P "$sampler_pid" 2>/dev/null
+          kill "$sampler_pid" 2>/dev/null
+          wait "$sampler_pid" 2>/dev/null
+          sampler_pid=
+        }
+        sys_sampler &
+        sampler_pid=$!
+        trap stop_sampler EXIT
+
         rc=1
         attempt=1
         wait_s=15
         while [ "$attempt" -le 2 ]; do
-          opencode run --standalone --auto \
+          # プロンプトは引数でなく標準入力で渡す。Linux は 1 引数を 128KB (131072 バイト) に制限し、
+          # 日本語の diff を含む review のプロンプトはそれを超える ("Argument list too long"、終了コード 126)。
+          # 再試行のたびにファイルを開き直す。
+          # setsid -w: opencode を別セッションで起動する。エージェントが後始末で `kill 0` や
+          # `kill -- -PGID` を実行しても、この step の bash に SIGTERM が届かない (届くと exit 143 で
+          # step が落ち、rc の記録・リトライ・後続の診断 step が全て走らない。#744)。
+          setsid -w opencode run --standalone --auto \
             --model "$OC_MODEL" --agent "$OC_AGENT" \
-            --format json --print-logs "$prompt" \
+            --format json --print-logs \
+            < "$OC_PROMPT_FILE" \
             > "$RUNNER_TEMP/oc-output.jsonl" 2> "$RUNNER_TEMP/oc-stderr.log"
           rc=$?
           if [ "$rc" = 0 ]; then break; fi
@@ -65,6 +96,7 @@ runs:
           fi
           attempt=$((attempt + 1))
         done
+        stop_sampler
 
         # sid 抽出: 旧実装は `jq ... | head -1` で、head が先に閉じると jq が
         # SIGPIPE で死に、step の shell は -o pipefail なので step 全体が落ちていた。
@@ -81,21 +113,50 @@ runs:
         echo "opencode exit code: $rc"
         echo "opencode session: ${sid:-none}"
 
-    # 最終回答は opencode api から取得する (JSONL の解析はしない)
-    - name: Write step summary
-      if: ${{ always() && steps.run.outputs.sid != '' }}
+    # 作業の記録は `opencode run --format json` の JSONL をそのまま使う。
+    # 旧実装は「最後の assistant メッセージ」だけを API から取っていたため、最後がツール呼び出し前の
+    # 前置き 1 行だと作業内容が何も残らなかった (run 38331256919 / 38331111477)。
+    # JSONL は run 中の全イベント (text / tool_use / step_finish) を持ち、session が消えても読める。
+    # 生の JSONL は出さない (public repo のログは公開。tool の入出力に認証情報や FL 由来物が
+    # 含まれ得て、secret マスクは登録値との完全一致でしか効かない。レビュー指摘 #477)。
+    # allowlist の投影だけを出す: text は全文、tool_use は tool / status / 所要 ms / 入力の
+    # description・先頭 200 文字 (出力 state.output は出さない)、step_finish は cost / tokens。
+    # 出力は jq の @json で 1 行に収め、`::` 始まりの workflow command として解釈されない。
+    - name: Dump OpenCode events
+      if: ${{ always() }}
       shell: bash
-      env:
-        SID: ${{ steps.run.outputs.sid }}
       run: |
-        # step summary は API/UI からしか読めず `gh run view --log` に出ないため、
-        # 同じ内容をログにも出す (tee)。
+        set +e
+        f="$RUNNER_TEMP/oc-output.jsonl"
+        [ -s "$f" ] || { echo "no opencode output at $f"; exit 0; }
+        echo "::group::opencode events (allowlisted fields only; tool output is not logged)"
+        jq -Rr 'fromjson? | select(.type != null)
+          | if .type == "text" then "text \(.part.text | gsub("\n"; " ") | .[0:2000] | @json)"
+            elif .type == "tool_use" then
+              "tool \(.part.tool) status=\(.part.state.status) ms=\(((.part.state.time.end // 0) - (.part.state.time.start // 0))) input=\(((.part.state.input.description // .part.state.input.command // .part.state.input.filePath // .part.state.input.pattern // "") | tostring | .[0:200]) | @json)"
+            elif .type == "step_finish" then "step_finish cost=\(.part.cost // 0) tokens=\(.part.tokens | tojson)"
+            else empty end' "$f"
+        echo "::endgroup::"
+
+    # step summary には assistant の text ブロックを全て順に出す (最後の 1 件だけにしない)。
+    - name: Write step summary
+      if: ${{ always() }}
+      shell: bash
+      run: |
+        set +e
+        f="$RUNNER_TEMP/oc-output.jsonl"
+        [ -s "$f" ] || exit 0
         {
           echo "## OpenCode result"
           echo
-          opencode api --standalone get "/api/session/$SID/message" \
-            | jq -r '[.data[] | select(.type == "assistant")] | last | .content[]? | select(.type == "text") | .text'
-        } | tee -a "$GITHUB_STEP_SUMMARY" || echo "::warning::could not extract summary for session $SID"
+          # `::` 始まりの行は tee で stdout に流れると workflow command と解釈されるため、
+          # 全行の先頭に空白を足す。
+          jq -Rr 'fromjson? | select(.type == "text") | .part.text // empty | split("\n")[] | " " + .' "$f"
+          echo
+          echo "### usage"
+          jq -Rrs '[split("\n")[] | fromjson? | select(.type == "step_finish") | .part]
+            | "steps=\(length) cost=\((map(.cost // 0) | add // 0) * 1000000 | round / 1000000)"' "$f"
+        } | tee -a "$GITHUB_STEP_SUMMARY"
 
     - name: Fail if OpenCode did not succeed
       if: ${{ steps.run.outputs.rc != '0' }}

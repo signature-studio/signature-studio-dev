@@ -33,8 +33,13 @@ if [ ! -f "$M11/work/boot_final.prealloca.ll" ]; then
   cp "$M11/work/boot_final.ll" "$M11/work/boot_final.prealloca.ll"
   step "素 IR を退避: work/boot_final.prealloca.ll"
 fi
+# #680 (review): 正規の ldfix 適用済み IR (指紋一致) だけに pass を当てる。差替え済みの IR に bind して洗い流さない
+if [ "$(python3 "$M11/m11_cond.py" --get ldfix)" != applied ] || ! python3 "$M11/m11_cond.py" --check "$M11/work/boot_final.ll"; then
+  step "FAILED: work/boot_final.ll は ldfix 適用済み・指紋一致の正規 IR ではない (m11_gen_ir2.sh で作り直す)"; exit 1
+fi
 step "m11_alloca.py 適用 (in-place)"
 python3 m11_alloca.py "$M11/work/boot_final.ll" "$M11/work/boot_final.ll" --report work/alloca_report.json || exit 1
+python3 "$M11/m11_cond.py" --bind "$M11/work/boot_final.ll" || exit 1   # #680: 正規の pass なので指紋を更新 (m11_build.sh の検査用)
 
 # 2. mainline build + 実行 --------------------------------------------------------
 step "m11_build.sh (増分)"

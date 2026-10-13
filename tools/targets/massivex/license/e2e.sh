@@ -4,7 +4,7 @@
 # (lift キャッシュ work/lift/*.ll あり時 約 20 秒 / 無し時 +約 60 秒)
 set -e
 cd "$(dirname "$0")"
-export LIFTLIB_DIR="${LIFTLIB_DIR:-$(cd ../../../liftlib && pwd)}"
+source ../../../shared/env.sh
 W=work
 PE_IN='../work/extracted/VST3/Massive X.vst3'
 PE=$W/mx_fixed.vst3
@@ -31,10 +31,9 @@ python3 scripts/mx_lic_stub.py $W/lift/lic.drc.ll $W/lic_patched.ll --report $W/
 python3 scripts/mx_lic_stub.py $W/lift/eng.drc.ll $W/eng_patched.ll --report $W/irpatch_eng.json --check
 
 echo "== [4] base 修復 (liftlib ライブラリ利用, 無改変) — patched / raw の両方 =="
-python3 - <<'EOF'
+python3 - "$REPO_ROOT" <<'EOF'
 import sys
-import os
-sys.path.insert(0, os.environ['LIFTLIB_DIR'])
+sys.path.insert(0, sys.argv[1] + '/tools/liftlib')
 from liftlib.passes import base as B
 for src, dst in (('work/lic_patched.ll', 'work/lic_patched_base.ll'),
                  ('work/lift/lic.drc.ll', 'work/lic_raw_base.ll'),

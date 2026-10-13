@@ -26,7 +26,6 @@ HttpQueryInfoW HttpQueryInfoA InternetOpenA InternetOpenUrlA InternetSetStatusCa
 WSAStartup WSACleanup WSAGetLastError WSASetLastError closesocket ioctlsocket WSAPoll WSASocketW
 WNetOpenEnumW WNetEnumResourceW WNetCloseEnum WNetGetUniversalNameW WinVerifyTrust CertCloseStore CertFindCertificateInStore
 CertFreeCertificateContext CertGetNameStringW CertGetNameStringA CryptMsgClose CryptMsgGetParam CryptQueryObject CryptDecodeObject
-CryptAcquireContextA CryptCreateHash CryptHashData CryptGetHashParam CryptDestroyHash
 midiInGetNumDevs midiOutGetNumDevs midiInGetDevCapsW midiOutGetDevCapsW midiInOpen midiOutOpen midiInClose midiOutClose midiInStart
 midiInStop midiInReset midiInAddBuffer midiInPrepareHeader midiInUnprepareHeader midiOutPrepareHeader midiOutUnprepareHeader
 midiOutShortMsg midiOutLongMsg midiInGetErrorTextW midiOutGetErrorTextW timeBeginPeriod timeEndPeriod timeGetDevCaps
@@ -47,11 +46,11 @@ GetConsoleMode ReadConsoleW SetErrorMode SetThreadErrorMode IsDebuggerPresent Lo
 SetVolumeLabelW OutputDebugStringW OutputDebugStringA IsWow64Process
 RtlUnwind RtlUnwindEx
 '''.split())
-FAILFAST_BY_DESIGN = {'RtlUnwind', 'RtlUnwindEx'}   # 呼ばれたら fail-fast (巻き戻し未対応) — 実装済みだが「実質未対応」として注記
+FAILFAST_BY_DESIGN = set()   # #171: RtlUnwind/RtlUnwindEx は SEH frame (setjmp 系) 経由で実巻き戻し。frame 未登録時のみ fail-fast
 
 NOTE = {
-    'RaiseException': 'VEH→UEF→fail-fast (継続可能例外のみ復帰)', 'RtlUnwind': 'fail-fast (SEH 巻き戻しは lift 側課題)',
-    'RtlUnwindEx': 'fail-fast', 'GetProcAddress': '組込み表 (proctable) + 外部フック。未知名は NULL', 'LoadLibraryW': 'モジュール表+load フック。実体ロードは hostbridge',
+    'RaiseException': 'VEH→SEH frame 鎖 (longjmp 捕捉)→UEF→fail-fast (継続可能例外のみ復帰)', 'RtlUnwind': 'SEH frame 巻き戻し (frame 未登録は fail-fast)',
+    'RtlUnwindEx': 'SEH frame 巻き戻し (frame 未登録は fail-fast)', 'GetProcAddress': '組込み表 (proctable) + 外部フック。未知名は NULL', 'LoadLibraryW': 'モジュール表+load フック。実体ロードは hostbridge',
     'CreateProcessW': '常に ERROR_FILE_NOT_FOUND', 'ShellExecuteW': 'shimx_set_shell_execute_hook 経由', 'GetOpenFileNameW': 'キャンセル扱い (Web ファイル選択は下流)',
     'WSAStartup': 'WSASYSNOTREADY (ネットワーク無し)', 'InternetGetConnectedState': 'FALSE', 'timeGetTime': 'M4 継承 (emscripten_get_now)',
     'CreateThread': 'CREATE_SUSPENDED 対応/threadId 修正 (M4 差分)', 'SuspendThread': 'カウントのみ (実停止不可)', 'TerminateThread': '状態のみ完了扱い',
@@ -83,15 +82,16 @@ public_api = sorted(n for n in defined if not n.startswith('shimx_') and not n.s
 hooks = sorted(n for n in defined if n.startswith('shimx_') or n.startswith('vreg_'))
 
 LIBC_OK = {'memset', 'socket', 'bind', 'listen', 'accept', 'recv', 'send', 'getsockname', 'ntohs'}   # Emscripten libc が解決 (ソケットは実行時エラー)
-# R3 で序数 → API を同定し GetProcAddress 序数表 (src/module.c shx_ordtable) に登録済みのもの
-ORD_KNOWN = {'shell32.dll': {155: 'ILFree', 190: 'ILCreateFromPathW'}}
+# 序数 → API を同定し GetProcAddress 序数表 (src/module.c shx_ordtable) に登録済みのもの (R3 + SHX-T8 #175)
+ORD_KNOWN = {'shell32.dll': {74: 'SHCreateStdEnumFmtEtc', 155: 'ILFree', 190: 'ILCreateFromPathW'},
+             'shlwapi.dll': {12: 'SHCreateMemStream', 219: 'QISearch'}}
 def status(name, dll):
     if name in defined:
         return 'S' if name in STUBS else 'F'
     if name in LIBC_OK:
         return 'L'
     if name.startswith('ord') and name[3:].isdigit():
-        return 'O'
+        return 'K' if int(name[3:]) in ORD_KNOWN.get(dll, {}) else 'O'     # K = 序数同定済み + 実装済み (カバー扱い)
     if dll in OTHER_OWNER:
         return 'X:' + OTHER_OWNER[dll]
     return 'U'
@@ -139,8 +139,8 @@ for pn, v in imp['plugins'].items():
         names[e['name']] = e['dll']
     tot = len(names)
     ins = [(n, d) for n, d in names.items() if d not in OTHER_OWNER]
-    ok = [n for n, d in ins if status(n, d) in ('F', 'S', 'L')]
-    plug_rows.append((pn, tot, len(ins), len(ok), sorted(n for n, d in ins if status(n, d) not in ('F', 'S', 'L'))))
+    ok = [n for n, d in ins if status(n, d) in ('F', 'S', 'L', 'K')]
+    plug_rows.append((pn, tot, len(ins), len(ok), sorted(n for n, d in ins if status(n, d) not in ('F', 'S', 'L', 'K'))))
 cov['plugins'] = {p[0]: dict(total=p[1], in_scope=p[2], covered=p[3], missing=p[4]) for p in plug_rows}
 cov['m11_closure'] = {k: len(v) for k, v in m11.items()}
 cov['ott_api_resolved'] = len(ott_undef24)
@@ -175,16 +175,16 @@ for n, ps in plug_dem.items():
 allrows = rows + extra
 for r in allrows:
     r['tier'] = tier(r)
-ST_JA = {'F': '機能実装', 'S': 'スタブ(エラー/無し返却)', 'L': 'libc 解決', 'O': '序数 import (未解決)', 'U': '**未実装**', 'X:gui': '対象外 (tools/gui)', 'X:audio': '対象外 (tools/audio)'}
+ST_JA = {'F': '機能実装', 'S': 'スタブ(エラー/無し返却)', 'L': 'libc 解決', 'O': '序数 import (未解決)', 'K': '序数 import (同定・実装済み)', 'U': '**未実装**', 'X:gui': '対象外 (tools/gui)', 'X:audio': '対象外 (tools/audio)'}
 order = {'P0': 0, 'P1': 1, 'P2': 2, 'P3': 3, 'X': 4}
 bl = ['# BACKLOG — shimx 実装バックログ (優先度順, 実測)', '',
       '優先度の定義 (必須性→使用頻度): **P0** = M11 init closure が declare する API または OTT undefined 24 種 / **P1** = FLEngine 静的呼出サイト ≥10 または 3 プラグイン以上が使用 / **P2** = FLEngine 静的 import のその他 / **P3** = delay-load・プラグイン専用 / **X** = 他担当 DLL (対象外)。',
       '呼出サイト数 = FLEngine_x64.dll の `jmp [IAT]` thunk への call/jmp/lea 参照数 (静的, `scripts/import_scan.py`)。', '',
-      '## 集計', '', '| 優先 | API 数 | 機能実装 | スタブ | libc | 序数 | 未実装 | 対象外 |', '|---|---|---|---|---|---|---|---|']
+      '## 集計', '', '| 優先 | API 数 | 機能実装 | スタブ | libc | 序数(同定・実装済) | 序数(未解決) | 未実装 | 対象外 |', '|---|---|---|---|---|---|---|---|---|']
 for t in ('P0', 'P1', 'P2', 'P3', 'X'):
     rs = [r for r in allrows if r['tier'] == t]
     c = Counter(r['status'].split(':')[0] for r in rs)
-    bl.append('| %s | %d | %d | %d | %d | %d | %d | %d |' % (t, len(rs), c['F'], c['S'], c['L'], c['O'], c['U'], c['X']))
+    bl.append('| %s | %d | %d | %d | %d | %d | %d | %d | %d |' % (t, len(rs), c['F'], c['S'], c['L'], c['K'], c['O'], c['U'], c['X']))
 bl += ['', '## 一覧 (P0〜P3。X は件数のみ — 全件は data/inventory.csv)', '',
        '| 優先 | API | DLL | 呼出サイト | M11 | OTT | プラグイン | 状態 | 実装 | 備考 |', '|---|---|---|---|---|---|---|---|---|---|']
 for r in sorted([r for r in allrows if r['tier'] != 'X'], key=lambda r: (order[r['tier']], -r['calls'], r['name'])):
@@ -228,7 +228,7 @@ if os.path.exists(W('work', 'ott', 'result.json')):
     A('- **OTT undefined 47 種 (M8)**: shimx リンクで **%d → %d 種**。Win/CRT API 24 種は **全て解決** (残 %d は `function_18*` = lift 欠落で shim の対象外)。t1 出力 SHA は baseline と一致。' % (
         o['baseline_undefined'], o['shimx_undefined'], o['shimx_fn18']))
 A('')
-A('状態記号: **F** 機能実装 / **S** スタブ (無い・失敗・キャンセルを返す) / **L** libc 解決 / **O** 序数 import / **U** 未実装 / **X** 他担当。')
+A('状態記号: **F** 機能実装 / **S** スタブ (無い・失敗・キャンセルを返す) / **L** libc 解決 / **K** 序数 import (同定・実装済み) / **O** 序数 import (未解決) / **U** 未実装 / **X** 他担当。')
 A('全 import の行別データ: `data/inventory.csv`、優先度付き一覧: `BACKLOG.md`、機械可読な集計: `data/coverage.json`。')
 A('')
 A('## 表A: DLL 別カバレッジ (FLEngine 静的 import %d)' % n738)
@@ -265,7 +265,7 @@ A('')
 A('## 表C: 未実装 (担当範囲内)')
 A('')
 un = [r for r in allrows if r['status'] == 'U']
-ordn = [r for r in allrows if r['status'] == 'O']
+ordn = [r for r in allrows if r['status'] in ('O', 'K')]
 if un:
     A('| API | DLL | 区分 | 呼出サイト |')
     A('|---|---|---|---|')
@@ -275,7 +275,7 @@ else:
     A('FLEngine 静的/delay import には担当範囲内の未実装 API は **ありません**。')
 A('')
 if ordn:
-    known = ['%s!%s=%s (R3 同定, GetProcAddress 序数表で解決)' % (r['dll'].replace('.dll', ''), r['name'], ORD_KNOWN.get(r['dll'], {}).get(int(r['name'][3:]), '?'))
+    known = ['%s!%s=%s (同定済み・実装済み, GetProcAddress 序数表で解決)' % (r['dll'].replace('.dll', ''), r['name'], ORD_KNOWN.get(r['dll'], {}).get(int(r['name'][3:]), '?'))
              for r in ordn if int(r['name'][3:]) in ORD_KNOWN.get(r['dll'], {})]
     unknown = ['%s!%s' % (r['dll'].replace('.dll', ''), r['name']) for r in ordn if int(r['name'][3:]) not in ORD_KNOWN.get(r['dll'], {})]
     if known:

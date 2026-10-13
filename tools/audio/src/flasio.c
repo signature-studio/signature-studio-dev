@@ -49,6 +49,16 @@ ASIOLong flasio_get_driver_version(void) { return 1; }
 
 static void need_init(const char *api) { if (!A.inited) fla_failfast(api, "driver not initialised (call flasio_init)"); }
 
+/* ASIOTime.systemTime / getSamplePosition の timeStamp (ns)。ILWASAPI2ASIO (0x1800039b0) と同じく timeGetTime() ms × 1e6。 */
+static uint64_t systime_ns(const fla_clock_t *k) {
+#if FLASIO_SYSTIME_AUDIBLE
+    return k->audible_ns;
+#else
+    (void)k;
+    return (uint64_t)(uint32_t)(uint64_t)emscripten_get_now() * 1000000ULL;
+#endif
+}
+
 ASIOError flasio_get_channels(ASIOLong *numIn, ASIOLong *numOut) {
     need_init("flasio_get_channels");
     *numIn = FLASIO_NUM_IN; *numOut = FLASIO_NUM_OUT;
@@ -173,9 +183,10 @@ static void do_buffer(int idx) {
         /* play_start は worklet が新 gen を認識した時に更新される (wl_state != IDLE でそれが確定)。それ以前は原点 0 に固定し、起動直後の位置巻き戻りを防ぐ */
         uint64_t pos = (LD(c->wl_state) != FLA_WL_IDLE && k.pos_frames > k.play_start) ? k.pos_frames - k.play_start : 0;
         t.timeInfo.samplePosition.hi = (uint32_t)(pos >> 32); t.timeInfo.samplePosition.lo = (uint32_t)pos;
-        t.timeInfo.systemTime.hi = (uint32_t)(k.audible_ns >> 32); t.timeInfo.systemTime.lo = (uint32_t)k.audible_ns;
+        uint64_t st = systime_ns(&k);
+        t.timeInfo.systemTime.hi = (uint32_t)(st >> 32); t.timeInfo.systemTime.lo = (uint32_t)st;
         t.timeInfo.sampleRate = A.sr; t.timeInfo.speed = 1.0;
-        t.timeInfo.flags = kSampleRateValid | kSamplePositionValid | (k.audible_ns ? kSystemTimeValid : 0);
+        t.timeInfo.flags = kSampleRateValid | kSamplePositionValid | (st ? kSystemTimeValid : 0);
         A.timeinfo_cb++;
         A.cb.bufferSwitchTimeInfo(&t, idx, 1);
     } else {
@@ -216,7 +227,7 @@ static void *thread_fn(void *arg) {
         }
         int rc = fla_out_wait_fill_le(T - A.B, 50);
         uint32_t ev = __atomic_exchange_n(&c->dev_events, 0, __ATOMIC_SEQ_CST);
-        if (ev & (FLA_EV_CLOSED | FLA_EV_SUSPENDED | FLA_EV_RATE_CHANGED)) {
+        if (ev & (FLA_EV_CLOSED | FLA_EV_SUSPENDED | FLA_EV_RATE_CHANGED | FLA_EV_INPUT_CHANGED)) {
             A.reset_requests++;
             if (A.cb.asioMessage) A.cb.asioMessage(kAsioResetRequest, 0, NULL, NULL);
         }
@@ -276,12 +287,18 @@ ASIOError flasio_get_sample_position(ASIOSamples *sPos, ASIOSamples *tStamp) {
     fla_clock_read(&k);
     uint64_t pos = k.pos_frames > k.play_start ? k.pos_frames - k.play_start : 0;
     sPos->hi = (uint32_t)(pos >> 32); sPos->lo = (uint32_t)pos;
-    tStamp->hi = (uint32_t)(k.audible_ns >> 32); tStamp->lo = (uint32_t)k.audible_ns;
+    uint64_t st = systime_ns(&k);
+    tStamp->hi = (uint32_t)(st >> 32); tStamp->lo = (uint32_t)st;
     return ASE_OK;
 }
 
 ASIOError flasio_output_ready(void) { need_init("flasio_output_ready"); return ASE_NotPresent; }  /* ILWASAPI 実測: 0xfffffc18 */
-ASIOError flasio_control_panel(void) { need_init("flasio_control_panel"); return ASE_OK; }
+/* FL の asiopanelbtn → controlPanel。ASIO ドライバ同様 UI を開いて即返す。UI 未登録なら ASE_NotPresent
+ * (FL 側は 'Could not open ASIO control panel' を出す経路) */
+ASIOError flasio_control_panel(void) {
+    need_init("flasio_control_panel");
+    return fla_cmd(FLA_CMD_CONTROL_PANEL, 0, 0, 0, 0, NULL, 5000) == 0 ? ASE_OK : ASE_NotPresent;
+}
 ASIOError flasio_future(ASIOLong selector, void *opt) { (void)selector; (void)opt; need_init("flasio_future"); return ASE_InvalidParameter; }
 
 void flasio_get_stats(flasio_stats_t *s) {

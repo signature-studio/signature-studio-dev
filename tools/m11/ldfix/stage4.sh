@@ -14,7 +14,7 @@ mkdir -p "$W/obj" "$W/tmp" "$S4"
 export PATH="$HOME/.local/share/pnpm/bin:$PATH"
 source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1
 export TMPDIR="$W/tmp"
-CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1"
+CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=${M11_LB_BASE:-0}"
 
 # 署名 header (m11_post.py と同一規約: IR の define 署名から C prototype を生成)
 python3 - "$IR" "$W/boot_final3_sigs.h" <<'PYEOF'
@@ -61,6 +61,7 @@ cc "$IR" "$W/obj/boot.o"
 if [ ! -f "$W/m11_simd.c" ] || [ "$IR" -nt "$W/m11_simd.c" ]; then
   (cd "$M11" && python3 m11_simd2.py "$IR" > "$W/m11_simd.c" 2> "$W/simd2.log") || { echo simd2 failed; tail -5 "$W/simd2.log"; exit 1; }
 fi
+cp "$M11/msimd11_core.h" "$S4/msimd11_core.h"
 cc "$W/m11_simd.c" "$W/obj/simd.o" "$M11/msimd11_core.h"
 cc "$W/m11_winstubs.c" "$W/obj/winstubs.o"
 cc "$W/m11_fnstubs.c" "$W/obj/fnstubs.o"

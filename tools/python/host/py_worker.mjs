@@ -7,7 +7,7 @@ let port;
 if (isBrowserWorker) {
   port = { on: (cb) => { globalThis.onmessage = (e) => cb(e.data); }, post: (m) => globalThis.postMessage(m) };
 } else {
-  const wt = await import("node:worker_threads");
+  const wt = await import(/* @vite-ignore */ "node:worker_threads");
   port = { on: (cb) => wt.parentPort.on("message", cb), post: (m) => wt.parentPort.postMessage(m) };
 }
 
@@ -27,7 +27,7 @@ function withStrs(strs, fn) {
 
 async function init({ sab, flpyUrl, files = {}, syspath = "" }) {
   client = new RpcClient(sab);
-  const create = (await import(flpyUrl)).default;
+  const create = (await import(/* @vite-ignore */ flpyUrl)).default;
   const locateFile = isBrowserWorker
     ? (p) => new URL(p, flpyUrl).href
     : (p) => new URL(p, flpyUrl).pathname;

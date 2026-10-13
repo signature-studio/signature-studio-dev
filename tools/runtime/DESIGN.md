@@ -55,7 +55,7 @@
 | **OTT lifted DSP (M10 IR, 256 サンプル/ブロック)** | **0.925** (164.8 vs 178.1 µs/block) | 0.83 |
 
 - 外れ値 call_mix は node 側の分解で A(呼出のみ)=2.7×, B(storeのみ)=1.16×, 間接呼出=1.21×, D(元)=0.57× と**方向が反転**する → V8 のインライン/tier-up 判断の揺れで、メモリモデル固有の定数倍ではない。結論: 「一様な X 倍」は無く、実コード (OTT) では差なし (むしろ −7.5%)。
-- **同一 lifted IR を p:64 datalayout に書換えるだけで wasm64 ビルドが通り、出力ハッシュが wasm32 と完全一致** (`824c6c48`)。必要なのは `datalayout` の `f128:64` 付き p:64 と shim の `size_t` 引数幅の整合のみ (`HeapAlloc` 署名不一致 warning 1 件 = i32 vs i64 size)。→ 退避路は実証済み (`bench/build_ott_variants.sh`)。
+- **同一 lifted IR を p:64 datalayout に書換えるだけで wasm64 ビルドが通り、出力ハッシュが wasm32 と完全一致** (`824c6c48`)。必要なのは `datalayout` の `f128:64` 付き p:64 と shim の `size_t` 引数幅の整合のみ (`HeapAlloc` 署名不一致 warning 1 件 = i32 vs i64 size)。→ 退避路は実証済み。常時ビルド検査は `ci/wasm64_check.sh` ([REPORT](REPORT.md) RT-8 実測)。
 
 ### 1.4 Memory 個数上限 (`probe/run_memcount.mjs`) — **新規に判明した制約**
 1 レンダラ内で作れる WebAssembly.Memory は **wasm32: 124–125 個 / wasm64(max 16GiB): 61–62 個** (2 回測定) (max/initial/shared に依存せず一定。約 1TiB の VA 予約上限と整合する値だが、内部上限の正体は**推定**)。
@@ -106,9 +106,19 @@ Worker "fl-runtime" ── wasm インスタンス = Win32 UI スレッド ─�
 
 ### 2.4 pthread (`spike/pthread_test.c`, `run_pthread_test.mjs`)
 `-pthread -sPROXY_TO_PTHREAD -sPTHREAD_POOL_SIZE=6 -sEXIT_RUNTIME -sMODULARIZE -sEXPORT_ES6` がヘッドレス Chrome で完走: 4 スレッド×1M `atomic_fetch_add` = **4,000,000 (一致)**、4 スレッド spawn+join 31.8ms (プール事前確保)、`pthread_cond` ping-pong RTT **19.0µs**、`emscripten_num_logical_cores`=16。`Module.instantiateWasm` で自前 compileStreaming した Module を注入し、worker 側にも共有された (`injectedModule: true`)。→ 本番 FL ビルド (`tools/shim` MT 経路) はこの glue を採用し、boot.ts の compile 経路を `instantiateWasm` から差し込む。
+**RT-2 (#120) で確定**: フラグは `tools/runtime/prod/flags.sh` (`-sGROWABLE_ARRAYBUFFERS=2` を含む)、注入は `loader_boot.ts` `createEmscriptenPthreadModule`、配信は hash 名 + brotli 事前圧縮 (`stage_wasm.mjs`)。glue (.mjs) は pthread Worker スクリプトでもあるため hash 名へ書換え、COEP/CORP を付けて配信する。実測は REPORT.md。
 
 ### 2.5 同期/非同期の橋渡し方針 (下流)
 OPFS は Worker 内 `createSyncAccessHandle` が同期で使える (実測) → VFS は OPFS 同期ハンドルを第一候補。ネットワーク/IDB を要する場合のみ JSPI または補助 Worker + `Atomics.wait` の sync-RPC。
+
+### 2.6 GUI 結線 (RT-3 #121): OffscreenCanvas と入力イベント
+- **入力 (producer)**: `gui_input.ts` `PumpInput` が canvas/window の DOM イベントを Win32 メッセージ (WM_MOUSEMOVE/L,M,R BUTTON/MOUSEWHEEL/KEYDOWN,UP/SYSKEY*/CHAR/SETFOCUS,KILLFOCUS) に変換し `PumpRing.push`。純関数 (`mouseMoveMsg` 等) は DOM 非依存。
+  **マウス移動の coalesce は producer 側**: pointermove は最新 1 件だけを保持し rAF で push、他種イベント (down/up/key/wheel/focus) の直前に保留 move を吐いて順序を保つ。
+- **描画 (OffscreenCanvas)**: `canvas.transferControlToOffscreen()` で渡した先で 2D 描画する。主は **yield 方式** (非ブロッキングで ring を掃く → `Atomics.waitAsync` でイベントループへ戻る → タスク終了で commit)。
+  **blocking 方式** (`getMessage` = `Atomics.wait` に居座ったまま描く = 実 FL の UI スレッドの形) は、Worker のタスクが終わるまで OffscreenCanvas が画面へ commit されない (Chrome 154 は `OffscreenCanvas.commit()` 無し、e2e で実測)。
+  → **GetMessage でブロックする wasm UI スレッドと描画スレッドは分離する**: 描画は GuiShared の out ring を `waitAsync` で消費する専用描画 Worker (`gui_worker.ts` = `gui_renderer.ts`) が担う (tools/gui PROTOCOL §1 の構成)。fl-runtime Worker が OffscreenCanvas を直接持つのは (A) ブロックしない駆動 (yield) か (B) 描画だけをブロックしない別タスクへ逃がす場合に限る。
+- **2 つの入力経路の関係** (統合は未決): tools/gui の GuiShared 入力リング (`gui.ts`, shim が `translate_input` で消費) と、本節の PumpRing (`worker_pump.ts` ABI, startup/pump の C ポンプが消費)。GUI shim とポンプ shim は同時リンク不可 (duplicate strong symbol: tools/startup/pump REPORT §8)。どちらを正にするかは GUI-3 (#174) / GUI-11 (#32) で決める。
+- **`?runtime=` 共存**: `/?gui=selftest[&present=yield|blocking]` と `/?gui=render-selftest` は `?runtime=` と独立に併用可 (index.ts でそれぞれ別に mount)。
 
 ## 3. ブート手順とキャッシュ (`bench/run_compile_bench.mjs`)
 フロー: `main: loadManifest(/wasm/manifest.json)` → `spawnRuntimeWorker` → Worker: `fetch(hash名.wasm)` → `compileStreaming` (進捗は `Response.clone()` の並行消費、compileStreaming には**元の Response**を渡す = コードキャッシュ連携を壊さない) → `buildImports` (Module.imports() を introspection、未解決は fail-fast フォワーダ) → instantiate → `emscripten_stack_init` / `__wasm_call_ctors` → driver。
@@ -141,10 +151,22 @@ OPFS は Worker 内 `createSyncAccessHandle` が同期で使える (実測) → 
 
 e2e (`pnpm runtime:e2e`): stage → Vite dev (COOP/COEP) → headless Chrome → 4 wasm を Worker で実行し **元の emcc glue を node で実行した参照値とビット一致を確認** (M10 hash `824c6c48`/`cdd4ee04`, M6 `fb31ca9a`, M1 stdout, M11 `{m11_dllmain_done:1}`/stage=1) + pump 自己検証 (2000 件欠落 0, WM_TIMER ≥3, 実ブロッキング wait 発生)。`--prod` は `vite build` + preview の本番バンドルで、`--cache=cacheapi --compile=bytes` で別経路も検証可。
 
+### 4.1 機能検出フォールバック (RT-9 設計案・**未実装**・Safari 入力待ち)
+入力: Chrome 154 / Firefox 157 は memory64・JSPI・shared memory・Worker 内 Atomics.wait・OffscreenCanvas がすべて可 (実測は REPORT.md)。Safari は未測定のため、以下は検出順序と退避先の設計で、Safari の可否は仮定しない。
+| 機能 | 検出 | 無い場合の退避 |
+|---|---|---|
+| 実行可否 (必須) | `crossOriginIsolated && typeof SharedArrayBuffer` と shared Memory 生成 | pthread/ring 経路が成立しないため起動せず、非対応メッセージを表示 (退避なし) |
+| memory64 | `WebAssembly.validate` (features.json の `memory64`) と `new Memory({address:"i64"})` | §1 の決定どおり wasm32 が既定で、memory64 は退避トリガ時のみ使う。**検出結果で wasm32↔wasm64 を切替える実装は不要** (配信ビルドは wasm32 のみ) |
+| JSPI | `typeof WebAssembly.promising` と `Suspending` | §2 の決定どおり JSPI は副次手段。無ければ ring (`Atomics.wait`) 経路のみ。async→sync 橋渡しが必要な VFS は補助 Worker sync-RPC へ |
+| OffscreenCanvas | Worker 内 `getContext("webgl2")` 成功 | 失敗時はメインスレッド canvas + 描画コマンド転送 (RT-3 で設計)。headless では判定できないので実機判定が必要 |
+| AudioWorklet | `ctx.audioWorklet.addModule` の成否 | 無音で起動せず明示エラー (音声は sample clock マスター: RT-4) |
+| Module 永続化 | IDB 保存は Chrome/Firefox とも不可 | HTTP キャッシュ + hash 名 immutable のみ (§3 の決定どおり) |
+検出は起動時に 1 回、結果を `window.__webstudio` 契約側へ公開する想定 (契約は未実装)。Firefox 固有の注意: 非 shared memory64 の大域 grow が遅い (REPORT.md の RT-9 節) ため、memory64 を使う場合は shared かつ事前確保を優先する。
+
 ## 5. 未解決・要確認
-1. Firefox / Safari の memory64・JSPI・threads・OffscreenCanvas は**未測定** (環境に Chrome のみ)。
-2. 実 FL サイズ (22MiB PE × lift 膨張) の wasm は未生成 — 合成スケール試験 (≤52MiB) からの外挿のみ。
-3. 本番 FL ビルドを pthread 化した状態での boot e2e (shim MT + glue + 本ローダ) は未実施。
+1. **Safari は未測定**。Firefox 157 は headless で実測済み (REPORT.md)。Firefox の AudioWorklet / Worker WebGL2 は headless で判定不能。
+2. 実 FL サイズ (22MiB PE × lift 膨張) の wasm は RT-10 (#128) で実測済み (x64c boot 連鎖。数値は [`rt10/REPORT.md`](rt10/REPORT.md))。合成からの外挿との差もそちら。
+3. 本番 FL ビルドを pthread 化した boot e2e: shim MT 自己テストでは実証済み (RT-2 #120, 実測は REPORT.md)。実 FLEngine lift での確認は未実施。
 4. ヘッドレス WebGL2 は SwiftShader。実 GPU での OffscreenCanvas 性能は未測定。
 5. Memory 個数上限 (~125) と「プラグイン=1 Memory」方針の整合 (§1.4)。
 6. 性能ベンチは共有 VM 上 (load 9–20)。メモリ64 の定量は静かな機で再測が必要。

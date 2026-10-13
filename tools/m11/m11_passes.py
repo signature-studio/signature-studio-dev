@@ -13,7 +13,9 @@
 import sys, re, json, argparse, os, itertools
 from collections import Counter
 
-BASE_VA = 0x400000
+from lb_base import LB as LB_BASE   # M11_LB_BASE (既定 0): LVA = VA - 0x400000 + LB_BASE
+
+BASE_VA = 0x400000 - LB_BASE
 IMG_LO = 0x400000
 IMG_HI = 0x1abf400   # 全 image 末尾 (.rsrc 終端 VA)
 
@@ -256,6 +258,25 @@ def pass_m2(text, report):
     text = re.sub(r'(inttoptr i64 )(0x[0-9a-f]+)( to ptr\b)', rep, text)
     stage('M2', 'inttoptr constant VA remap: %d' % n[0])
     report['m2_inttoptr_remap'] = n[0]
+    return text
+
+
+def pass_m2p_dec_inttoptr(text, report):
+    """[M2p] 命令形式の 10 進 `%x = inttoptr i64 <VA> to ptr` の VA→LVA remap (#417).
+    RetDec は絶対アドレスを 10 進で出すが pass_m2 は 16 進しか見ない。pass_m1 が作る定数式形式
+    `inttoptr (i64 N to ptr)` は既に LVA なので触らず、行頭が `%name = inttoptr i64 N to ptr` の形だけを対象にする。"""
+    n = [0]
+
+    def rep(m):
+        nv = shiftva(int(m.group(2)))
+        if nv is None:
+            return m.group(0)
+        n[0] += 1
+        return m.group(1) + str(nv) + m.group(3)
+
+    text = re.sub(r'(?m)^(\s*%[\w.$-]+\s*=\s*inttoptr i64 )(\d+)( to ptr\b)', rep, text)
+    stage('M2p', 'decimal inttoptr instr VA remap: %d' % n[0])
+    report['m2p_dec_inttoptr_remap'] = n[0]
     return text
 
 
@@ -758,6 +779,8 @@ def main():
     text = pass_m2l_numballs(text, report)
     text = pass_m1(text, report)
     text = pass_m2(text, report)
+    if os.environ.get('M11_M2P') == '1':   # #417: 既定 OFF (有効化すると unit 503 で survey がハング, REPORT 参照)
+        text = pass_m2p_dec_inttoptr(text, report)
     text = pass_m2c(text, report)
     text = pass_m2g_irfix(text, report)
     text = pass_m2h_select(text, report)

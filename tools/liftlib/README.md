@@ -6,21 +6,24 @@ OTT (`tools/m5〜m10`)・Fresh Air (`targets/freshair/{ref,lift}`)・Kilohearts 
 pass と helper を 1 本に統合した (元 dir は無改変)。
 
 ```
-bash tools/liftlib/liftlib_e2e.sh            # 回帰 (OTT = auto f7,p1 既定 (checks 8/0 = param 0.0/0.1/0.9/1.0 sweep 付き) + 旧既定 --auto none + leaf spec。所要は REPORT.md §12 参照): ユニット + FA 400/400 + KH 366/366 + OTT + SIMD 281 form + 注入 94/94 + OTT leaf native spec
+bash tools/liftlib/liftlib_e2e.sh            # 回帰 (OTT = auto f7,p1 既定 (checks 8/0 = param 0.0/0.1/0.9/1.0 sweep 付き) + 旧既定 --auto none + leaf spec。所要は REPORT_APPENDIX_A.md §12 参照): ユニット + FA 400/400 + KH 366/366 + OTT + SIMD 281 form + 注入 94/94 + OTT leaf native spec
 bash tools/liftlib/liftlib_e2e.sh --quick    # 回帰のみ (FA/KH/OTT)
 bash tools/liftlib/liftlib_e2e.sh --fresh    # FA/KH を RetDec の lift から再生成 (全体で約 1 分)
+bash tools/liftlib/stdbuild_e2e.sh           # 標準ビルド設定 + 署名ガード (PERF-P1 / #155): 合成入力で全変種署名一致 + ネガコン (plugin バイナリ・RetDec 不要。数秒)
 bash tools/liftlib/lowbase_e2e.sh            # lowbase 検証 (CAB-220): audit_va + OTT を低位 base で最初から生成 (2 base) + x64c native bit 一致 3 構成 150,708 cell (--full で CAB-90 e2e 全体も)
 ```
 
 ## CLI (`python3 -m liftlib …`, cwd=tools/liftlib)
 | コマンド | 内容 |
 |---|---|
+| `build <cfg> [--profile std] [--variants ref,o2,o3,std] [--expect SIG]` | **標準ビルド入口 (PERF-P1)**: RetDec → 修復 → helper → 標準設定 (`-O3 -flto` + gc-sections + 最小 export; 正本 `data/std_build.json` / `liftlib/stdbuild.py`) で全変種ビルド → 同一シナリオの wasm 出力署名が全一致のときだけ `<name>.cjs` を確定 (不一致 exit 1)。shell は `python3 liftlib/stdbuild.py flags std` / `guard` |
 | `lift targets/fa_gain.json` | RetDec → base 正規化 → P1/F7/F2 修復 → helper 自動生成 → emcc → **差分ハーネス** (実機 vs wasm) |
+| `python3 tools/liftlib/ott_census.py <ott.cjs> [--f248 0\|1] [--expect-junkhi N] [--max-junkhi N]` | OTT 出力の junk census (junkHi 等) の再計算と期待値突合 (#478。定義は REPORT_APPENDIX_C.md §20) |
 | `detect <cfg>` | 修復せず検出だけ (所見 JSON) |
 | `diagnose <cfg>` | pass ごとに無効化して再評価 (どの修復が必須か) + 未修復所見 |
 | `simd gen x.ll -o out.c [--canon y.ll]` | `__asm_*` 宣言から C helper 生成 (正規名化も) |
 | `simd test` / `simd report` | 生成 helper を実機 inline asm と bit 突合 / KH census の被覆 before→after |
-| `ott [--auto none\|f7\|p1\|f7,p1] [--lb-base N]` | OTT を liftlib 側だけで再現 (m10_e2e 相当)。**`--auto` 既定 = `f7,p1` (CAB-238)**: 汎用 F7 (ir9_outcopy 包含) + 語彙拡張 P1 を適用し, checks 7/0 + census 改善 (junkHi ≤104) をゲートにする。出力 SHA は修復由来で m10 参照と分離 (差分理由は REPORT.md §12)。`--auto none` = 旧既定 (修復無し m10 chain 再現, 各段 IR 一致 + SHA 42/42 ゲート)。`--lb-base` で V-shift 先 newbase (=LB_BASE) を指定して低位 base・小 memory で最初から生成 (CAB-220, 例 `0x10000` = initial 24MiB / `0x1230000`。未指定は元 m10 chain と同一の 0x30000000) |
+| `ott [--auto none\|f7\|p1\|f7,p1] [--lb-base N]` | OTT を liftlib 側だけで再現 (m10_e2e 相当)。**`--auto` 既定 = `f7,p1` (CAB-238)**: 汎用 F7 (ir9_outcopy 包含) + 語彙拡張 P1 を適用し, checks 7/0 + census 改善 (junkHi ≤104) をゲートにする。出力 SHA は修復由来で m10 参照と分離 (差分理由は REPORT_APPENDIX_A.md §12)。`--auto none` = 旧既定 (修復無し m10 chain 再現, 各段 IR 一致 + SHA 42/42 ゲート)。`--lb-base` で V-shift 先 newbase (=LB_BASE) を指定して低位 base・小 memory で最初から生成 (CAB-220, 例 `0x10000` = initial 24MiB / `0x1230000`。未指定は元 m10 chain と同一の 0x30000000) |
 | `leafspec targets/ott_leaf.json` | OTT leaf closure を base→f2→P1→leafabi→emcc で構築し, 実機機械語と乱数 scenario で bit 突合 (CAB-239。xmm0 戻りは IR ret 差替で搬送) |
 | `inject-eval` | パターン注入による検出器の検出力・偽陽性評価 |
 | `specgen <image> <va>` | 機械語から harness spec の雛形を生成 |
@@ -55,6 +58,23 @@ targets/*.json specs/*.json  data/kh_mnemonics.json  tests/test_unit.py
 - **F2** xmm 引数落ち: callee の入口 live-in xmm0..3 を到達定義から算出 (f32/f64/v128 は読取 mnemonic で判定) → define 引数追加 + undef 置換 + 全 call site で bind。
 - **SIMD helper**: `(base mnemonic, 戻り型, 引数型)` だけで C を生成 (RetDec の引数規約=capstone の read operand 順)。IR は `__asm_<base>__<ret><args>` に正規名化。
 - **差分ハーネス**: spec(JSON) の乱数 context を native(VA 敷設) と wasm の両方に与え, 全バッファ (+ guard 64B, ポインタ欄は buf+off トークン) を bit 比較。ステップ列 (状態持越し) 対応。
+
+## 旧 dir (tools/m2〜m10) pass → liftlib 対応表 (LIFTLIB-1 / #224 検収条件 3)
+旧 dir は**参照専用** (既存 e2e 成果物・REPORT は残置、新規 lift/修復は liftlib 経由)。昇格元ごとの置換先と一致検証:
+
+| 昇格元 | pass | liftlib の置換先 | 一致の担保 |
+|---|---|---|---|
+| m2 `ir_normalize.py` | A0 (opaque ptr / datalayout) | `passes/base.py` `m2_normalize` | unit T1 (base == m2+m5, IR テキスト完全一致) |
+| m3 `ir_patch.py` / m5 `ir5_patch.py` | A1–A8, A9L/A9L2, B1, S1a/S1b, C1/C9/C11–C13 | `passes/base.py` (`normalize`/`lift_residual_constexpr`/`lower_asm_store`/`closure_select`/`redirect_calls`, `run_base`) | unit T1 + `ott` O1 (ott_lift.ll と一致) |
+| m6 `ir6_pass.py` | [P1] (SSA 名パターン) | `passes/p1_legacy.py` (参照実装, IR 完全一致) / `passes/p1.py` (insn.addr 駆動の正本) | unit T2 (ir7e_p1.ll と一致) / `ott` O2a |
+| m6 `ir6_shift.py` | VA remap | `passes/remap.py` `shift_va` | unit T2 (ir7e_p2.ll) / O2b |
+| m6 `ir6_gdata.py` + `m6_data_gen.py` | データ実体化 | `passes/remap.py` `gdata`/`gdata_legacy` + `passes/dataimage.py` | unit T2 (ir7e_p3.ll) / O2c |
+| m6 `gen_msimd6.py` + `m6_simd_check.py` | SIMD helper 生成 | `simd/gen.py` + `simd/kernels.py` | `simd test` (192 mnemonic / 281 form / 95,400 vector) |
+| m9 `ir9_outcopy.py` / targets ir_kh_f7 / FA F7' | F7 (load 脱落) | `passes/f7.py` | `inject-eval` / FA 400/400 / KH 366/366 |
+| m7 `ir7_argpass` / m8 `ir7_argpass_fixed`・`ir8_valueflow` の引数接続 | F2 (xmm 引数落ち) | `passes/f2.py` (本体再生は固有) | FA 400/400 / `ott` 7 段 |
+| m6 `m6_memfix.py`・`m6_full_extract.py` / m8 `ir7_argpass_fixed.py`・`ir8_valueflow.py` / m9 `ir9_bootstraps.py`・`ir9_outcopy.py` / m9 `m9_tablebind` / m10 `m10_boot` | OTT 固有 (固定名・dsm・VA) | `recipes/ott` (vendored 無改変, `runtime_lb.py` が C ランタイムをマクロ化) | `ott --auto none` の 7 段 IR 一致 + 出力 SHA 42/42 |
+
+範囲外 (別起票): vendored 固有部 (#12–16, 18) の insn.addr 駆動汎用化。
 
 ## 新ターゲットの追加
 1. `targets/<name>.json` (`image`, `retdec.ranges`, `funcs`, `exports`, `spec`, `func_va`, `wasm_func`) を書く

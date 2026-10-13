@@ -107,7 +107,16 @@ def _zero(ty):
     return '0'
 
 
-def sigfix(text, report):
+def _const(ty, cv):
+    v = cv['val']
+    if cv['kind'] == 'ptr':
+        return 'inttoptr (i64 %d to ptr)' % v if ty == 'ptr' else str(v & ((1 << int(ty[1:])) - 1))
+    if ty == 'ptr':
+        return 'inttoptr (i64 %d to ptr)' % v
+    return str(v & ((1 << int(ty[1:])) - 1)) if ty.startswith('i') else _zero(ty)
+
+
+def sigfix(text, report, pads=None, fixes=None):
     sigs = {}
     for m in re.finditer(r'^(?:define|declare)(?: weak)? (\S+) @(function_[0-9a-f]+)\(([^)]*)\)', text, re.M):
         ret, nm, args = m.groups()
@@ -120,7 +129,24 @@ def sigfix(text, report):
         ctr[0] += 1
         return '%%m11sf%d' % ctr[0]
     fixed = skipped = 0
+    applied = [0]
+    cur = None
+    ordn = {}
+    ncall = {}
+    _c = None
     for line in text.split('\n'):
+        if line.startswith('define '):
+            dm = re.search(r'@([\w.$]+)\(', line)
+            _c = dm.group(1) if dm else None
+        elif ' call ' in line and _c:
+            cm = re.search(r'call \S+ @(function_[0-9a-f]+)\(', line)
+            if cm:
+                ncall[(_c, cm.group(1))] = ncall.get((_c, cm.group(1)), 0) + 1
+    for line in text.split('\n'):
+        if line.startswith('define '):
+            dm = re.search(r'@([\w.$]+)\(', line)
+            cur = dm.group(1) if dm else None
+            ordn = {}
         m = callre.match(line) if ' call ' in line else None
         if not m:
             out.append(line)
@@ -130,6 +156,7 @@ def sigfix(text, report):
         if not sig:
             out.append(line); continue
         tret, tparams = sig
+        k = ordn[nm] = ordn.get(nm, -1) + 1
         args = []
         for a in _split_top(argstr):
             ty = a.split()[0]
@@ -141,6 +168,8 @@ def sigfix(text, report):
             skipped += 1
             out.append(line); continue
         pre, newargs, bad = [], [], False
+        if pads is not None and len(args) < len(tparams):
+            pads.append({'caller': cur, 'callee': nm, 'k': k, 'n': ncall.get((cur, nm), 0), 'have': len(args), 'want': len(tparams)})
         for i, pt in enumerate(tparams):
             if i < len(args):
                 ty, val = args[i]
@@ -150,7 +179,12 @@ def sigfix(text, report):
                 pre += ls
                 newargs.append('%s %s' % (pt, nv))
             else:
-                newargs.append('%s %s' % (pt, _zero(pt)))
+                cv = fixes.get((cur, nm, k, i)) if fixes else None
+                if cv is None:
+                    newargs.append('%s %s' % (pt, _zero(pt)))
+                else:
+                    newargs.append('%s %s' % (pt, _const(pt, cv)))
+                    applied[0] += 1
         if bad:
             skipped += 1
             out.append(line); continue
@@ -175,6 +209,7 @@ def sigfix(text, report):
         out.extend(pre); out.append('  %s = %s' % (r, call.strip())); out.extend(ls)
         out.append('  %s = %s' % (dst, ('add %s %s, 0' % (sret, nv)) if sret != 'ptr' else ('getelementptr i8, ptr %s, i32 0' % nv)))
         fixed += 1
+    report['sigfix_const_recovered'] = applied[0]
     report['sigfix_rewritten'] = fixed
     report['sigfix_skipped'] = skipped
     print('[m11_post][sigfix] call site 署名書換え: %d (型未対応で skip: %d)' % (fixed, skipped))
@@ -210,7 +245,16 @@ def weaken(m):
         return 'define %s @%s__lifted(%s)%s' % (ret, nm, args, m.group('rest'))
     return 'define weak %s @%s(%s)%s' % (ret, nm, args, m.group('rest'))
 
-text = sigfix(text, rep)
+pads = []
+fixes = None
+if '--fixes' in sys.argv:
+    fixes = {(f['caller'], f['callee'], f['k'], f['pos']): f['const'] for f in json.load(open(sys.argv[sys.argv.index('--fixes') + 1]))['fixes']}
+text = sigfix(text, rep, pads, fixes)
+rep['sigfix_zeropad_sites'] = len(pads)
+rep['sigfix_zeropad_args'] = sum(p['want'] - p['have'] for p in pads)
+print('[m11_post][sigfix] 0 詰め call site: %d (0 詰め引数 %d)' % (rep['sigfix_zeropad_sites'], rep['sigfix_zeropad_args']))
+if '--pads' in sys.argv:
+    json.dump(pads, open(sys.argv[sys.argv.index('--pads') + 1], 'w'))
 text = def_re.sub(weaken, text)
 
 NMAX = 8

@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "id": "blend2d-fc827d56fb52",
+  "name": "Blend2D",
+  "version": "pre-v0.20 (fc827d56fb529cb6977d923733dcb411c172cd03)",
+  "provenance": "build-script",
+  "upstream": {
+    "url": "https://github.com/blend2d/blend2d",
+    "commit": "fc827d56fb529cb6977d923733dcb411c172cd03"
+  },
+  "license": {
+    "spdx": "Zlib",
+    "files": [
+      {
+        "path": "LICENSE.md",
+        "sha256": "5dd4008d009c12097b67b72052cebfec97ceda866123455ba860079b58e0ae40",
+        "text": "Copyright (c) 2017-2024 The Blend2D Authors\n\nThis software is provided 'as-is', without any express or implied\nwarranty. In no event will the authors be held liable for any damages\narising from the use of this software.\n\nPermission is granted to anyone to use this software for any purpose,\nincluding commercial applications, and to alter it and redistribute it\nfreely, subject to the following restrictions:\n\n1. The origin of this software must not be misrepresented; you must not\n   claim that you wrote the original software. If you use this software\n   in a product, an acknowledgment in the product documentation would be\n   appreciated but is not required.\n2. Altered source versions must be plainly marked as such, and must not be\n   misrepresented as being the original software.\n3. This notice may not be removed or altered from any source distribution.\n"
+      }
+    ]
+  },
+  "build": {
+    "script": "tools/shared/oss/blend2d/build.sh",
+    "toolchain": "emcc 6.0.12",
+    "targets": [
+      "wasm32"
+    ],
+    "args": [
+      {
+        "step": "cmake",
+        "args": "emcmake cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DBLEND2D_STATIC=ON -DASMJIT_DIR=<asmjit-src> -DBLEND2D_NO_INSTALL=ON -DBLEND2D_NO_JIT=ON -DBLEND2D_NO_TLS=ON -DBLEND2D_NO_FUTEX=ON"
+      }
+    ],
+    "patches": []
+  }
+}

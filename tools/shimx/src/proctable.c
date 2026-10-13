@@ -8,6 +8,7 @@ const ShxProcEnt shx_proctable[] = {
     { "advapi32.dll", "CryptDestroyHash", (void*)CryptDestroyHash },
     { "advapi32.dll", "CryptGetHashParam", (void*)CryptGetHashParam },
     { "advapi32.dll", "CryptHashData", (void*)CryptHashData },
+    { "advapi32.dll", "CryptReleaseContext", (void*)CryptReleaseContext },
     { "advapi32.dll", "GetTokenInformation", (void*)GetTokenInformation },
     { "advapi32.dll", "OpenProcessToken", (void*)OpenProcessToken },
     { "advapi32.dll", "RegCloseKey", (void*)RegCloseKey },
@@ -492,6 +493,7 @@ const ShxProcEnt shx_proctable[] = {
     { "shell32.dll", "SHChangeNotifyRegister", (void*)SHChangeNotifyRegister },
     { "shell32.dll", "SHCreateDirectoryExW", (void*)SHCreateDirectoryExW },
     { "shell32.dll", "SHCreateItemFromParsingName", (void*)SHCreateItemFromParsingName },
+    { "shell32.dll", "SHCreateStdEnumFmtEtc", (void*)SHCreateStdEnumFmtEtc },
     { "shell32.dll", "SHFileOperationW", (void*)SHFileOperationW },
     { "shell32.dll", "SHGetDesktopFolder", (void*)SHGetDesktopFolder },
     { "shell32.dll", "SHGetFileInfoW", (void*)SHGetFileInfoW },
@@ -508,6 +510,8 @@ const ShxProcEnt shx_proctable[] = {
     { "shell32.dll", "Shell_NotifyIconW", (void*)Shell_NotifyIconW },
     { "shfolder.dll", "SHGetFolderPathW", (void*)SHGetFolderPathW },
     { "shlwapi.dll", "PathUnExpandEnvStringsW", (void*)PathUnExpandEnvStringsW },
+    { "shlwapi.dll", "QISearch", (void*)QISearch },
+    { "shlwapi.dll", "SHCreateMemStream", (void*)SHCreateMemStream },
     { "shlwapi.dll", "SHCreateStreamOnFileEx", (void*)SHCreateStreamOnFileEx },
     { "user32.dll", "CharLowerBuffW", (void*)CharLowerBuffW },
     { "user32.dll", "CharLowerW", (void*)CharLowerW },
@@ -526,7 +530,11 @@ const ShxProcEnt shx_proctable[] = {
     { "wininet.dll", "HttpOpenRequestW", (void*)HttpOpenRequestW },
     { "wininet.dll", "HttpQueryInfoA", (void*)HttpQueryInfoA },
     { "wininet.dll", "HttpQueryInfoW", (void*)HttpQueryInfoW },
+    { "wininet.dll", "HttpSendRequestA", (void*)HttpSendRequestA },
     { "wininet.dll", "HttpSendRequestExW", (void*)HttpSendRequestExW },
+    { "wininet.dll", "HttpSendRequestW", (void*)HttpSendRequestW },
+    { "wininet.dll", "InternetCheckConnectionA", (void*)InternetCheckConnectionA },
+    { "wininet.dll", "InternetCheckConnectionW", (void*)InternetCheckConnectionW },
     { "wininet.dll", "InternetCloseHandle", (void*)InternetCloseHandle },
     { "wininet.dll", "InternetConnectW", (void*)InternetConnectW },
     { "wininet.dll", "InternetGetConnectedState", (void*)InternetGetConnectedState },
@@ -542,4 +550,4 @@ const ShxProcEnt shx_proctable[] = {
     { "winmm.dll", "timeGetTime", (void*)timeGetTime },
     { "wintrust.dll", "WinVerifyTrust", (void*)WinVerifyTrust },
 };
-const int shx_proctable_n = 538;
+const int shx_proctable_n = 546;

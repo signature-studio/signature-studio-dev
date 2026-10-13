@@ -80,8 +80,22 @@ class Image:
         self._pdata = ents
         self._pd_begin = [e[0] for e in ents]
 
+    def add_func(self, begin, end):
+        """.pdata 外の leaf 関数 (unwind 情報なし) を合成エントリとして登録 (SR-4: Serum 2 のフィルタ vtable 実体など)。
+        既存 pdata 範囲と重なる登録は ValueError。"""
+        self._load_pdata()
+        for (b, e, _u) in self._pdata:
+            if b < end and begin < e:
+                raise ValueError("add_func %#x-%#x overlaps pdata %#x-%#x" % (begin, end, b, e))
+        self._pdata = sorted(self._pdata + [(begin, end, -1)])
+        self._pd_begin = [e[0] for e in self._pdata]
+        if hasattr(self, "_mg"):
+            del self._mg
+
     def _chain_parent(self, u):
         """UNWIND_INFO (RVA u) が CHAININFO なら親 RUNTIME_FUNCTION (begin,end) を返す。"""
+        if u < 0:
+            return None
         try:
             d = self.read(self.base + u, 4)
             flags = d[0] >> 3

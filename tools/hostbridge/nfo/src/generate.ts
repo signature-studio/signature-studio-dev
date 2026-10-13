@@ -43,6 +43,11 @@ export interface GenOptions {
   verifiedIds?: boolean;
   /** write Installed/.Plugins.ini — the TMemIniFile cache FL rebuilds itself when missing (default true) */
   pluginsIni?: boolean;
+  /**
+   * wrapper chunk (.fst event 213) format version. Default 8 (FL 11.5.5 writer; ANSI strings → ASCII-only names/paths/vendor,
+   * generateDb throws on non-ASCII). 9..12 writes UTF-8 strings (needed for non-ASCII; see h10/REPORT.md §9).
+   */
+  chunkVersion?: number;
 }
 
 export const DEFAULT_DB_PATH = 'C:\\Users\\Public\\Documents\\Image-Line\\FL Studio\\Presets\\Plugin database';
@@ -146,6 +151,7 @@ export function generateDb(specs: PluginSpec[], opts: GenOptions = {}): GenResul
       idstring: pf[0].idstring,
       has32,
       has64,
+      version: opts.chunkVersion,
     });
     const vf = writeEntry(entry, { dbPath, flPath: opts.flPath });
     files.set(fstRel, fst);

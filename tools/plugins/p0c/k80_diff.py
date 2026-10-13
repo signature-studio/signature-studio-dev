@@ -23,10 +23,13 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-LIFTP = '/home/ubuntu/work/webstudio/tools/plugins/lift/passes'
-PE = '/home/ubuntu/work/analysis/win64/extracted/block18983_PE.bin'
+sys.path.insert(0, os.path.join(HERE, '..', '..', 'shared'))
+from paths import FL_WIN64_DIR, REPO_ROOT  # noqa: E402
+LIFTP = os.path.join(REPO_ROOT, 'tools', 'plugins', 'lift', 'passes')
+PE = os.path.join(FL_WIN64_DIR, 'extracted', 'block18983_PE.bin')
 
 HELPER_CIMPL = {
     'function_409d00': 'u64 function_409d00(u128 a) { return (u64)(i64)llrint(lane0_d(a)); }   /* cvtsd2si RC=nearest */',
@@ -175,6 +178,20 @@ def build_argmodel(func, abi):
             irmap.append(('slot', j))
             named.add(j)
         else:
+            # RetDec の %argN は win64 gpr 序数 (rcx,rdx,r8,r9) そのもの。機械語が rcx を読まない
+            # kernel (0x5e1280: rdx,r8 のみ) でも arg1=rcx のため、使用 slot を詰めて割り当てると
+            # 1 つずれて IR 側が NULL へ store する (#277)
+            # 末尾の未使用 gpr (0x5de710 の r9) は RetDec が詰めるため序数固定しない:
+            # その slot か、より後ろの gpr slot を機械語が使う (= 手前に穴がある) ときだけ固定する
+            ma = re.match(r'%arg(\d+)$', pn)
+            if (ma and 1 <= int(ma.group(1)) <= 4 and pt not in ('float', 'double')
+                    and os.environ.get('K80_NO_ARGORD') != '1'):
+                n = int(ma.group(1)) - 1
+                if any(g in gused for g in GORD[n:]):
+                    j = next(k for k, s in enumerate(mslots) if s[0] == 'gpr' and s[1] == GORD[n])
+                    irmap.append(('slot', j))
+                    named.add(j)
+                    continue
             irmap.append(('pos', pt))
     pool_gpr = [k for k, (kind, d, u, dr) in enumerate(mslots) if kind == 'gpr' and u and k not in named]
     pool_xmm = [k for k, (kind, d, u, dr) in enumerate(mslots) if kind == 'xmm' and k not in named]
@@ -459,10 +476,14 @@ def gen_driver(kernels, funcs, cases, proto=None):
                 # clip_index kernel (添字アクセス) は fp scalar を有限・非負に制限する
                 # (負または inf/NaN の gain → trunc が 0x8000.. → 負添字 → OOB read → SIGSEGV)
                 gate = '' if (clip and os.environ.get('K80_NO_NNEGF') != '1') else 'if ((rnd() >> 40) > 5) '
+                # clip_index kernel: gain が大きいと cvttsd2si が 0x80000000 を返し、neg でも INT_MIN の
+                # まま clamp を素通りして負添字 OOB (0x5e0c00; 2000 case 中に発生。仮説は
+                # K80_NO_CLIPRANGE=1 で sig11 再現を確認)。gain 指数を 2^-9..2^-1 に絞る (#277)
+                nexp = 9 if (clip and os.environ.get('K80_NO_CLIPRANGE') != '1') else 25
                 gen = ('{ double v = (double)(int64_t)(rnd() %% 4000001) / 1000.0; vA[%d].f = vI[%d].f = v; }'
                        % (pid, pid)) if w == 64 else (
-                    '{ uint32_t rr = (uint32_t)rnd(); %srr = (rr & 0x807fffffu) | ((((rnd() >> 40) & 0xffu) %% 25u + 118u) << 23); vA[%d].f = vI[%d].f = %s; }'
-                    % (gate, pid, pid, ('nnegf((double)bits2f(rr))'
+                    '{ uint32_t rr = (uint32_t)rnd(); %srr = (rr & 0x807fffffu) | ((((rnd() >> 40) & 0xffu) %% %du + 118u) << 23); vA[%d].f = vI[%d].f = %s; }'
+                    % (gate, nexp, pid, pid, ('nnegf((double)bits2f(rr))'
                                        if (clip and os.environ.get('K80_NO_NNEGF') != '1')
                                        else '(double)bits2f(rr)')))
                 out.append('    ' + gen)

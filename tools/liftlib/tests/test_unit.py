@@ -5,7 +5,7 @@
   T2 p1_legacy / shift / gdata_legacy が OTT 元チェーンの中間成果物と一致
   T3 SIMD 生成が RetDec の接尾番号 (`__N`) に依存しない (接尾を付け替えても生成 C が同一)
   T4 同じ名前でも署名が違えば別 helper になる (FA の mulss(i128,i32) と OTT の mulss(i128,i128))
-  T5 mnemonic 被覆: KH census 205 種のうち未被覆は pcmpistri / vinsertf128 のみ
+  T5 mnemonic 被覆: KH census 205 種のうち未被覆 0 (pcmpistri / vinsertf128 は LIFTLIB #241 で被覆)
   T6 機械語解析: FA gain の live-in / 到達定義
 """
 import json
@@ -26,7 +26,7 @@ from liftlib.pe import Image                       # noqa: E402
 from liftlib.mc import MFunc                       # noqa: E402
 
 FA_PE = os.path.join(T, "targets/freshair/work/win/Fresh Air/C__ProgramData_Slate Digital/Fresh Air/SlateCore.core_64")
-OTT_DLL = "/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll"
+from liftlib.env import OTT_DLL                    # noqa: E402
 DUP = ("declare i64 @function_1803ded20", "declare i64 @function_18004cf20")
 
 
@@ -74,7 +74,10 @@ def t3():
 
 
 def t4():
-    fa = gen.scan_decls(open(os.path.join(T, "targets/freshair/work/lift_gain/gain_lift.ll")).read())
+    fa_src = os.path.join(T, "targets/freshair/work/lift_gain/gain_lift.ll")
+    if not os.path.exists(fa_src):    # 旧 FA 中間成果物が無い環境 (Actions) は liftlib 自前の RetDec 生出力 (同じ __asm_mulss 宣言) を使う
+        fa_src = os.path.join(T, "liftlib/work/fa_gain/fa_gain.drc.ll")
+    fa = gen.scan_decls(open(fa_src).read())
     ott = gen.scan_decls(open(os.path.join(T, "m6/work/ott_shift3b.ll")).read())
     fm = {d.name: d.sig for d in fa if d.base == "mulss"}
     om = {d.name: d.sig for d in ott if d.base == "mulss"}
@@ -87,7 +90,7 @@ def t5():
     d = json.load(open(os.path.join(HERE, "..", "data/kh_mnemonics.json")))
     allm = sorted(set(d["effects"]) | set(d["infra"]) | set(d["hosts"]))
     cov, unc = gen.coverage(allm)
-    assert unc == ["pcmpistri", "vinsertf128"], unc
+    assert unc == [], unc
     print("T5 ok (mnemonic %d 種中 未被覆 %s)" % (len(allm), unc))
 
 
@@ -110,7 +113,7 @@ def t7():
     lo, sd = next((lo, d) for n, lo, d in dataimage.sections_raw(img) if n == ".rdata")
     nfix = nlow = 0
     for r in img.relocs_dir64():
-        if lo <= r < lo + len(sd) - 8:
+        if lo <= r <= lo + len(sd) - 8:  # #593: dataimage と同じ境界 (末尾 8B slot を含む)
             off = r - lo
             v = struct.unpack_from("<Q", sd, off)[0]
             if img.base <= v < img.base + img.size:      # image 内ポインタ = 補正対象
@@ -443,7 +446,266 @@ def t15():
           % (st1["unsupported"], st2["unsupported"], st3["unsupported"]))
 
 
+def t16():
+    """[HB-H3 / #93] iargs: 整数引数 (rdx/r8/r9) 脱落の機械検出と復元 (OTT, RetDec raw .ll)。
+
+    - 検出: AudioEffect ctor の委譲 (function_180127550 は rcx のみ, 機械語は r8/r9 まで素通し) を含む
+      define 15 / call site 15 を検出する (実測値)。
+    - 復元: 復元後は再走査で 0 / 0。ctor の呼出しが (this, audioMaster, 1, 20) になる。
+    - 冪等: 2 回流しても変化なし。
+    """
+    raw = os.path.join(T, "m6/work/ott.drc.ll")
+    if not os.path.exists(raw):
+        print("T16 skip (OTT raw .ll 無し)")
+        return
+    from liftlib.passes import iargs
+    img = Image(OTT_DLL)
+    text, _ = base.run_base(open(raw).read(), base.make_args())
+    mod = IR.Module.parse(text)
+    pre = iargs.scan(mod, img)
+    assert len(pre["define_short"]) == 15 and len(pre["sites_short"]) == 15, (len(pre["define_short"]), len(pre["sites_short"]))
+    assert ("function_180127550", 1, 4) in pre["define_short"], pre["define_short"]
+    # sites_entry: 引数の個数は足りているが入口値素通し位置に別値 (undef 等) を渡している site (実測 17)
+    assert len(pre["sites_entry"]) == 17, len(pre["sites_entry"])
+    assert ("function_180127550", 0x180127559, "function_180126920", 1) in pre["sites_entry"], pre["sites_entry"]
+    st, lg = {}, []
+    iargs.run(mod, img, lg, st)
+    post = iargs.scan(mod, img)
+    assert not post["define_short"] and not post["sites_short"] and not post["sites_entry"], post
+    ctor = [l for l in mod.func("function_18011d400").blocks[0].lines if "@function_180127550(" in l]
+    assert len(ctor) == 1 and "(i64 %arg1, i64 %arg2, i64 1, i64 20)" in ctor[0], ctor
+    # 復元済みの site の rcx (入口素通し) を undef に戻すと detect-only が検出する (逆方向の被覆)
+    fn = mod.func("function_18011d400")
+    li = next(i for i, l in enumerate(fn.blocks[0].lines) if "@function_180127550(" in l)
+    good = fn.blocks[0].lines[li]
+    fn.blocks[0].lines[li] = good.replace("(i64 %arg1, ", "(i64 undef, ", 1)
+    assert fn.blocks[0].lines[li] != good
+    bad = iargs.scan(mod, img)
+    assert [s for s in bad["sites_entry"] if s[0] == "function_18011d400" and s[2] == "function_180127550" and s[3] == 0], bad["sites_entry"]
+    fn.blocks[0].lines[li] = good
+    assert not iargs.scan(mod, img)["sites_entry"]
+    st2, lg2 = {}, []
+    iargs.run(mod, img, lg2, st2)
+    assert not st2.get("define_fixed") and not st2.get("sites_fixed"), st2
+    print("T16 ok (iargs: define %d / site %d / entry %d 検出 → 復元 define_fixed=%d sites_fixed=%d site_unbound=%d, 再走査 0/0/0, 冪等)"
+          % (len(pre["define_short"]), len(pre["sites_short"]), len(pre["sites_entry"]), st["define_fixed"], st["sites_fixed"], st.get("site_unbound", 0)))
+
+
+def t17():
+    """[LIFTLIB #241] i256 ABI + pcmpistri + F2 xmm 戻り搬送。
+    (a) gen.py が i256 形を u64×4 平坦化 / Y 戻りで生成し, 実体 (kernels) を持つ (stub でない)
+    (b) pcmpistri (void / i32 形) が生成される
+    (c) F2 xmm 戻り: LL_XRET_LL (RetDec raw .ll) と LL_XRET_DLL (OTT_x64.dll) があれば検出→修復→再検出 + 注入評価を固定"""
+    ll = ("declare i256 @__asm_vinsertf128(i256, i128, i8)\ndeclare void @__asm_vmovaps__3(i256, i256)\n"
+          "declare void @__asm_vpcmpistri(i128, i128, i8)\ndeclare i32 @__asm_pcmpistri__2(i128, i128, i8)\n")
+    c, rep = gen.emit_c(gen.scan_decls(ll), use_names="canon")
+    assert not rep["unsupported"], rep["unsupported"]
+    assert "Y __asm_vinsertf128__yyxb(u64 p0_0, u64 p0_1, u64 p0_2, u64 p0_3, u128 p1, u8 p2)" in c, c
+    assert "__builtin_trap" not in c and "ll_pcmpistr_ecx" in c
+    print("T17a ok (i256 ABI: u64x4 平坦化 + Y 戻り / pcmpistri void,i32 形とも生成)")
+    xl, xd = os.environ.get("LL_XRET_LL"), os.environ.get("LL_XRET_DLL")
+    if not (xl and xd and os.path.exists(xl) and os.path.exists(xd)):
+        print("T17b skip (LL_XRET_LL / LL_XRET_DLL 未設定)")
+        return
+    from liftlib import inject
+    from liftlib.passes import f2
+    img = Image(xd)
+    text, _ = base.run_base(open(xl).read(), base.make_args())
+    mod = IR.Module.parse(text)
+    st = {}
+    f2.run_xmm_ret(mod, img, [], st, repair=True)
+    assert st["xret_callees_pending"] == 3 and st["xret_rets_pending"] == 11, st
+    assert st["xret_threaded"] == 9 and st["xret_rets_after"] == 2, st
+    ev = inject.eval_f2_xret(mod, img)
+    assert ev["injected"] == 9 and ev["detected"] == 9, ev
+    print("T17b ok (F2 xmm 戻り: 検出 %d callee/%d ret → 搬送 %d → 残 %d, 注入 %d/%d 検出)"
+          % (st["xret_callees_pending"], st["xret_rets_pending"], st["xret_threaded"], st["xret_rets_after"], ev["detected"], ev["injected"]))
+
+
+def t18():
+    """[LIFTLIB #478] ott の合否判定 (cli.ott_judge) のネガコン。参照成果物の欠落 (None) を合格にしないこと,
+    junkHi は --auto none の合否に使わないこと, auto 既定は junkHi 閾値で落ちることを固定する。"""
+    from liftlib.cli import ott_judge, OTT_AUTO_JUNKHI_MAX
+    ident = {k: True for k in ("O1", "O2a", "O2b", "O2c", "O3a", "O3b", "O4")}
+    oh = dict(combos=42, equal=True, distinct=40, f0_equal=21, f0_total=21)
+    census = lambda jh: json.dumps({"junkHi": jh})          # noqa: E731
+    good = dict(**{"pass": True}, outhash=oh, census0=census(175))
+    # 正: 全て揃えば junkHi 175 でも PASS (junkHi は --auto none の合否に使わない)
+    ok, why, miss = ott_judge(good, ident, (), None)
+    assert ok and not why and not miss, why
+    # NC1: 7 段 IR 一致の 1 段が None (参照 .ll 欠落) → 不合格 + 欠落扱い
+    ok, why, miss = ott_judge(good, dict(ident, O4=None), (), None)
+    assert not ok and miss and any("O4" in w for w in why), why
+    # NC2: IR 不一致 (False) → 不合格 (欠落ではない)
+    ok, why, miss = ott_judge(good, dict(ident, O2a=False), (), None)
+    assert not ok and not miss and any("O2a" in w for w in why), why
+    # NC3: outhash 未実施 (参照 ott_m10.cjs 欠落) → 不合格 + 欠落扱い
+    ok, why, miss = ott_judge(dict(good, outhash=None), ident, (), None)
+    assert not ok and miss, why
+    # NC4: outhash 不一致 → 不合格
+    bad_oh = dict(oh, equal=False, f0_equal=20)
+    ok, why, miss = ott_judge(dict(good, outhash=bad_oh), ident, (), None)
+    assert not ok and not miss and any("outhash" in w for w in why), why
+    # NC5: outhash 実行失敗 → 不合格
+    ok, why, miss = ott_judge(dict(good, outhash=dict(error="x")), ident, (), None)
+    assert not ok, why
+    # NC6: e2e 不合格 (r[pass]=False) → 不合格
+    ok, why, miss = ott_judge(dict(good, **{"pass": False}), ident, (), None)
+    assert not ok, why
+    # auto 既定: junkHi 閾値ちょうどは PASS / 超過・取得不能は FAIL。IR 一致 None でも auto は影響されない
+    auto = ("f2", "f7", "p1")
+    a_ok = {"pass": True, "outhash": None, "census0": census(OTT_AUTO_JUNKHI_MAX)}
+    assert ott_judge(a_ok, {k: None for k in ident}, auto, None)[0]
+    assert not ott_judge(dict(a_ok, census0=census(OTT_AUTO_JUNKHI_MAX + 1)), ident, auto, None)[0]
+    assert not ott_judge(dict(a_ok, census0=None), ident, auto, None)[0]
+    print("T18 ok (ott_judge: 正 1 / ネガコン NC1 IR None・NC2 IR 不一致・NC3 outhash 未実施・NC4 不一致・NC5 失敗・NC6 e2e 不合格・auto junkHi 閾値)")
+
+
+def t19():
+    """SR-4 (#75): S1c movl/h(ps|pd) の store 復元 + Image.add_func (.pdata 外 leaf の合成エントリ)。"""
+    blk = {"function_x": "\n".join([
+        "  %a = load i64, ptr %p, align 8, !insn.addr !1",
+        "  call void @__asm_movlps(i64 %a, i128 %v), !insn.addr !2",
+        "  %b = load i64, ptr %q, align 8, !insn.addr !3",
+        "  call void @__asm_movhpd(i64 %b, i128 %w), !insn.addr !4",
+        "  %c = add i64 %b, 1",
+        "  call void @__asm_movlps(i64 %c, i128 %v), !insn.addr !5"])}
+    out, n = base.lower_asm_lane_store(dict(blk))
+    t = out["function_x"]
+    assert n == 2, n
+    assert "store i64 %s1c_0_lo, ptr %p" in t and "%s1c_0_lo = trunc i128 %v to i64" in t, t
+    assert "%s1c_1_sh = lshr i128 %w, 64" in t and "store i64 %s1c_1_lo, ptr %q" in t, t
+    assert "call void @__asm_movlps(i64 %c, i128 %v)" in t     # load 由来でない旧値は触らない (simd 生成側が unsupported 報告)
+    same, n0 = base.lower_asm_lane_store({"f": "  %x = add i64 1, 2"})
+    assert n0 == 0 and same == {"f": "  %x = add i64 1, 2"}
+    img = Image(os.path.join(T, "targets/serum2/work/Serum2_win64.vst3")) if os.path.exists(os.path.join(T, "targets/serum2/work/Serum2_win64.vst3")) else None
+    if img is None:
+        print("T19 ok (S1c 合成 IR; add_func は Serum2 PE 無しで skip)")
+        return
+    assert img.func_at(0x1802f7370) is None
+    img.add_func(0x1802f7370, 0x1802f74ec)
+    assert img.func_at(0x1802f7380) == (0x1802f7370, 0x1802f74ec)
+    try:
+        img.add_func(0x1802f7510, 0x1802f7520)     # .pdata 関数 (0x1802f7510-0x1802fcc82) と重なる
+        raise SystemExit("T19 FAIL: overlap not rejected")
+    except ValueError:
+        pass
+    print("T19 ok (S1c movlps/movhpd store 復元 2 件 + 非 load 旧値は不変 + Image.add_func 登録/重複拒否)")
+
+
+def t20():
+    """SR-4 (#75): F2 の D5 型 (xmm 引数が `sext i64 %argN` に束ねられた形) 検出。"""
+    from liftlib.passes import f2
+    ll = "\n".join([
+        "define i64 @function_18008b2a0(i64 %arg1) local_unnamed_addr {",
+        "dec_label_pc_18008b2a0:",
+        "  %2 = sext i64 %arg1 to i128, !insn.addr !0",
+        "  %3 = call i64 @__asm_movss__qx(i128 %2), !insn.addr !0",
+        "  %4 = sext i64 %arg1 to i128, !insn.addr !1",
+        "  %5 = call i64 @__asm_movss__qx(i128 %4), !insn.addr !2",
+        "  ret i64 0, !insn.addr !2",
+        "}",
+        "declare i64 @__asm_movss__qx(i128) local_unnamed_addr",
+        "!0 = !{i64 6443020960}", "!1 = !{i64 6443020965}", "!2 = !{i64 6443020970}", ""])
+    mod = IR.Module.parse(ll)
+    fn = mod.funcs()[0]
+    hit = f2.find_sext_arg_for(mod, fn, [6443020960])
+    assert hit is not None and hit[2] == "%2", hit                 # reader アドレス上でのみ使われる sext
+    assert f2.find_sext_arg_for(mod, fn, [6443020999]) is None     # reader 外 -> 対象外
+    assert f2.find_sext_arg_for(mod, fn, [6443020960, 6443020970]) is not None
+    print("T20 ok (F2 D5 型: reader 上の sext i64 %arg を xmm 値定義として検出 / reader 外は不検出)")
+
+
+
+def t21():
+    """[LIFTLIB-5 / #342] leafabi: `_ret_thread` の名前割当 `fresh` はループ前に束縛される。
+
+    ret が全て reg2mem phi 分岐に入る構成 (最初に処理する ret が phi) で UnboundLocalError にならず,
+    同一 ret VA の複製 ret にも衝突しない名前が付く。`_rx_one` の phi load 名は block を跨いで衝突しない。
+    """
+    from types import SimpleNamespace as NS
+    from liftlib import mc
+    from liftlib.passes import leafabi
+
+    class _Mod:
+        def addr_of(self, ln):
+            return 0x1000
+        def tag(self, va):
+            return ""
+
+    class _Ix:
+        defs = {}
+        def dominators(self):
+            return {0: {0}, 1: {0, 1}}
+
+    class _Binder:
+        ix = _Ix()
+        def bind(self, reg, va):
+            return None
+
+    prev, prev_phi = mc.LEAF_EXT, leafabi._call_phi
+    mc.LEAF_EXT = True
+    leafabi._call_phi = lambda mod, fn, binder, va, used: "%phia"
+    try:
+        fn = NS(name="function_1000", blocks=[NS(lines=["  %a = add i64 0, 0", "  ret i64 %a"]),
+                                              NS(lines=["  ret i64 0"])])
+        st = {}
+        leafabi._ret_thread(_Mod(), fn, None, _Binder(), [], st)
+    finally:
+        mc.LEAF_EXT, leafabi._call_phi = prev, prev_phi
+    assert st["ret_phi"] == 2 and st.get("ret_unbound", 0) == 0, st
+    names = [l.split(" = ")[0].strip() for b in fn.blocks for l in b.lines if " = " in l]
+    assert len(names) == len(set(names)), names
+    for b in fn.blocks:
+        assert b.lines[-1].startswith("  ret i64 %lf_1000_t"), b.lines
+        assert any("load i128, ptr %phia" in l for l in b.lines), b.lines
+    print("T21 ok (leafabi _ret_thread: phi 分岐が先頭 ret でも fresh 束縛済み, 複製 ret の名前は %d 個すべて一意)" % len(names))
+
+
+def t22():
+    """[LIFTLIB-5 / #342] p1 `_setcc_value`: `xor r,r` のゼロ化は setcc と同一の機械語 block 内, かつ 32bit 以上に限る。
+
+    (A) 同一 block の xor r10d,r10d → 復元する (tan @1801a9cd9 の形)
+    (B) xor が別 block (jz で setcc 側へ迂回できる) → 復元しない (別 pred の xor を信用すると上位 56bit が不定)
+    (C) xor r10b,r10b (8bit) → 復元しない (上位 bit を消さない)
+    GPR spill slot: reload は領域内の全 pred 経路で store 済みの slot に限る (st["__gw"] の交わり)。
+    """
+    from types import SimpleNamespace as NS
+    from liftlib import mc
+    from liftlib.passes import p1
+
+    class _Img:
+        def __init__(self, code):
+            self.code = code
+        def read(self, va, n):
+            return self.code[va - 0x1000:va - 0x1000 + n]
+
+    cmp_set_ret = bytes.fromhex("39d1" "410f95c2" "c3")                  # cmp ecx,edx ; setne r10b ; ret
+    cases = {
+        "A_same_block": (bytes.fromhex("4531d2") + cmp_set_ret, True),   # xor r10d,r10d
+        "B_other_block": (bytes.fromhex("85c0" "7403" "4531d2") + cmp_set_ret, False),   # test; jz +3; xor r10d,r10d | setcc
+        "C_xor8": (bytes.fromhex("4530d2") + cmp_set_ret, False),        # xor r10b,r10b
+    }
+    prev = mc.LEAF_EXT
+    mc.LEAF_EXT = True
+    try:
+        got = {}
+        for name, (code, want) in cases.items():
+            mf = MFunc(_Img(code), 0x1000, 0x1000 + len(code))
+            d = next(v for v in mf.order if mf.insns[v].mnem.startswith("set"))
+            stub = NS(mf=mf, mod=NS(tag=lambda va: ""), b=NS(_is_region_dst=lambda n: False),
+                      ix=NS(instrs_at=lambda a: [(0, 0, "  %c = icmp ne i32 %a, %b")]),
+                      _value_ok=lambda n, u: True, nm=lambda va, t: "%sz", used=lambda k: None)
+            out = []
+            v = p1.Region._setcc_value(stub, "r10", d, d, out)
+            got[name] = v is not None
+            assert (v is not None) == want, (name, v, out)
+    finally:
+        mc.LEAF_EXT = prev
+    print("T22 ok (p1 _setcc_value: " + ", ".join("%s=%s" % (k, "復元" if v else "拒否") for k, v in got.items()) + ")")
+
+
 if __name__ == "__main__":
-    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15):
+    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t17, t18, t19, t20, t21, t22):
         f()
     print("ALL UNIT TESTS PASS")

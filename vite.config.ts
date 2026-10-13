@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
+import { thirdPartyNotices } from "./tools/legal/notices/vite-plugin.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -37,11 +38,27 @@ function wasmAssets(): Plugin {
       res.end("not found");
       return;
     }
-    const st = statSync(file);
     const isWasm = file.endsWith(".wasm");
-    res.setHeader("Content-Type", isWasm ? "application/wasm" : "application/json");
+    const isGlue = file.endsWith(".mjs");
+    // glue (.mjs) は pthread Worker のスクリプトとしても読まれる。COEP: require-corp 下の Worker script は
+    // 応答自身に COEP が無いとロードに失敗する (preview ではこのミドルウェアが preview.headers より先に走るため明示する)
+    res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+    res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
+    res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
+    res.setHeader("Content-Type", isWasm ? "application/wasm" : isGlue ? "text/javascript" : "application/json");
+    res.setHeader("Cache-Control", isWasm || isGlue ? "public, max-age=31536000, immutable" : "no-cache");
+    // 事前圧縮 (`<file>.br`, stage_wasm.mjs が生成) があり Accept-Encoding: br なら Content-Encoding: br で返す (本番 R2 配信と同形)
+    const br = `${file}.br`;
+    if ((isWasm || isGlue) && existsSync(br) && /\bbr\b/.test(String(req.headers["accept-encoding"] ?? ""))) {
+      const bst = statSync(br);
+      res.setHeader("Content-Encoding", "br");
+      res.setHeader("Vary", "Accept-Encoding");
+      res.setHeader("Content-Length", bst.size);
+      createReadStream(br).pipe(res);
+      return;
+    }
+    const st = statSync(file);
     res.setHeader("Accept-Ranges", "bytes");
-    res.setHeader("Cache-Control", isWasm ? "public, max-age=31536000, immutable" : "no-cache");
     const m = /bytes=(\d+)-(\d*)/.exec(String(req.headers.range ?? ""));
     if (m) {
       const s = Number(m[1]);
@@ -66,8 +83,47 @@ function wasmAssets(): Plugin {
   };
 }
 
+/**
+ * `/py/*` を tools/python から配信する (dev / preview 共通。PY-4 #77)。
+ * 許可リスト方式: host/ (ES module)・dist/ (flpy.js/wasm/data, build_flpy.sh 生成)・analysis/flapi/flapi_ids.json のみ。
+ * work/ (利用者の FL 由来 MCPTools.pyc / midi.py / utils.py) は配信しない — 利用者が UI から供給する。
+ * COEP: require-corp 下の module Worker script は応答側にも COEP/CORP が要る。
+ */
+function pyAssets(): Plugin {
+  const dir = path.join(here, "tools/python");
+  const allowed = /^(host\/[\w.-]+\.mjs|dist\/flpy\.(js|wasm|data)|analysis\/flapi\/flapi_ids\.json|analysis\/ilmcp\/(plugin_catalog|highlight_names)\.json)$/;
+  const types: Record<string, string> = { ".mjs": "text/javascript", ".js": "text/javascript", ".wasm": "application/wasm", ".data": "application/octet-stream", ".json": "application/json" };
+  const mw = (req: IncomingMessage, res: ServerResponse, next: () => void): void => {
+    const url = new URL(req.url ?? "/", "http://x");
+    if (!url.pathname.startsWith("/py/")) return next();
+    const rel = decodeURIComponent(url.pathname.slice("/py/".length));
+    const file = path.join(dir, rel);
+    if (!allowed.test(rel) || !existsSync(file) || !statSync(file).isFile()) {
+      res.statusCode = 404;
+      res.end("not found");
+      return;
+    }
+    res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+    res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
+    res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
+    res.setHeader("Content-Type", types[path.extname(file)] ?? "application/octet-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Content-Length", statSync(file).size);
+    createReadStream(file).pipe(res);
+  };
+  return {
+    name: "py-assets",
+    configureServer(server) {
+      server.middlewares.use(mw);
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use(mw);
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [crossOriginIsolation(), wasmAssets()],
+  plugins: [crossOriginIsolation(), wasmAssets(), pyAssets(), thirdPartyNotices()],
   server: {
     // tools/ 配下は巨大な work/ を多数抱える (inotify watch 枯渇 ENOSPC の原因)。HMR 対象外にする
     watch: { ignored: ["**/tools/**", "**/deploy/**", "**/dist/**", "**/node_modules/**"] },

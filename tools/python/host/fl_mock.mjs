@@ -1,6 +1,7 @@
 // FLEngine 模擬ホスト (PoC)。実装版では FLEngine wasm の export に置換される同一インタフェース:
 //   engine.call("mixer.getTrackName", [index, ...]) -> any
 // 返す number は整数なら int、実数なら float になる。整数値の float は F(x) で明示。
+import { createIlmcp } from "./ilmcp.mjs";
 const F = (v) => ({ t: "D", v });
 
 class FlError extends Error {
@@ -26,6 +27,7 @@ export function createMockEngine() {
     windows: { 0: true, 1: false, 2: true, 3: false, 4: true, 5: false },
     params: [{ name: "Cutoff", v: 0.5 }, { name: "Resonance", v: 0.2 }, { name: "Gain", v: 0.8 }],
     prScripts: {},
+    midiOut: [],
     log: [],
   };
   const ch = (i) => { if (!st.channels[i]) throw RANGE(); return st.channels[i]; };
@@ -34,6 +36,9 @@ export function createMockEngine() {
 
   const impl = {
     "channels.channelCount": () => st.channels.length,
+    "channels.selectedChannel": (canBeNone = false, offset = 0) => st.selectedChannel + offset,
+    // 5 番目引数 useGlobalIndex は未モデル化 (index 0 のみを使う検査では差が出ない)
+    "channels.fillEachNSteps": (i, stride, offset, vel) => { ch(i); for (let p = offset; p < 64; p += stride) ch(i).steps[p] = 1; },
     "channels.getChannelName": (i) => ch(i).name,
     "channels.setChannelName": (i, n) => { ch(i).name = n; },
     "channels.isChannelSelected": (i) => ch(i).sel,
@@ -88,14 +93,20 @@ export function createMockEngine() {
     "plugins.getParamValue": (p) => F(st.params[p].v),
     "plugins.getParamValueString": (p) => `${(st.params[p].v * 100).toFixed(1)} %`,
     "plugins.setParamValue": (v, p) => { st.params[p].v = v; },
-    "ilmcp.getBrowserNames": (name, rec) => ({ name, items: ["Fruity Slicer", "3x Osc", "Sampler"].map((n) => `${name || ""}/${n}`) }),
-    "ilmcp.getHighlightNames": () => ["Toolbar: Show Piano roll", "Toolbar: Show playlist", "Toolbar: Show Mixer", "Toolbar: Show Channel Rack"],
-    "ilmcp.showHighlight": (item, name, caption, cb) => { st.highlight = { item, name, caption, cb }; return true; },
-    "ilmcp.addChannel": (plugin) => { st.channels.push({ name: plugin, plugin, vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: false, fx: 0, steps: new Array(64).fill(0) }); return st.channels.length - 1; },
-    "ilmcp.removeChannel": (i) => { st.channels.splice(i, 1); },
-    "ilmcp.addEffect": (plugin, track, slot) => { tr(track).slots[slot] = plugin; return true; },
-    "ilmcp.storePRScript": (name, src) => { st.prScripts[name] = src; return true; },
-    "ilmcp.runPRScript": (src) => { st.log.push(["runPRScript", src.length]); return true; },
+    // MIDI scripting (PY-6): device script が使う device.* の最小模擬。forwardMIDICC / midiOutMsg は呼出しを st.midiOut に記録する
+    // general.getVersion = MIDI scripting API バージョン (int)。実機値は未実測のため固定のモック値 (同梱 script は print するだけ)
+    "general.getVersion": () => st.scriptingVersion ?? 1,
+    "device.getPortNumber": () => st.devicePort ?? 0,
+    "device.isAssigned": () => true,
+    "device.setHasMeters": () => { st.hasMeters = true; },
+    "device.forwardMIDICC": (message, mode = 1) => { st.midiOut.push({ api: "forwardMIDICC", message, mode }); },
+    "device.midiOutMsg": (...a) => { st.midiOut.push({ api: "midiOutMsg", args: a }); },
+    ...createIlmcp(st, {
+      RANGE,
+      INVALID: (m) => new FlError(m, 1),
+      makeChannel: (plugin) => ({ name: plugin, plugin, vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: false, fx: 0, steps: new Array(64).fill(0) }),
+      nMixer: st.mixer.length,
+    }),
   };
 
   const record = [];

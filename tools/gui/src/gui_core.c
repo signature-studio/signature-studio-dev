@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <strings.h>
+#include <math.h>
 #include "gui_internal.h"
 
 #define API int64_t
@@ -25,7 +26,8 @@ static int u16_to_u8(const uint16_t *s, char *out, int cap) {  /* NUL 終端ま�
   if (cap > 0) out[n] = 0;
   return n;
 }
-static int u8_to_u16(const char *s, uint16_t *out, int cap) {
+/* trunc != NULL なら、cap に収まらず変換を打ち切ったとき *trunc = 1 (収まれば 0)。cap < 1 のときは何も書かない */
+static int u8_to_u16x(const char *s, uint16_t *out, int cap, int *trunc) {
   int n = 0;
   while (s && *s && n + 2 < cap) {
     uint32_t c = (uint8_t)*s++;
@@ -35,9 +37,11 @@ static int u8_to_u16(const char *s, uint16_t *out, int cap) {
     if (c >= 0x10000) { c -= 0x10000; out[n++] = (uint16_t)(0xD800 + (c >> 10)); out[n++] = (uint16_t)(0xDC00 + (c & 1023)); }
     else out[n++] = (uint16_t)c;
   }
+  if (trunc) *trunc = (s && *s) ? 1 : 0;
   if (cap > 0) out[n] = 0;
   return n;
 }
+static int u8_to_u16(const char *s, uint16_t *out, int cap) { return u8_to_u16x(s, out, cap, NULL); }
 /* 引数文字列 (A/W/atom) を UTF-8 に */
 static const char *str_in(U64 p, int wide, char *buf, int cap) {
   if (p < 0x10000) return NULL;  /* MAKEINTATOM / NULL */
@@ -57,7 +61,8 @@ struct Wnd {
   U64 wndproc, userdata, id, hinst;
   int wide, destroying;
   char title[128];
-  int has_inv; WRECT inv; int erase;
+  int has_inv; WRECT inv; RL invl; int erase;   /* invl = 無効領域 (client 座標の非重複矩形リスト), inv = その外接矩形 */
+  int nl, nt, nr, nb; int nc_dirty;              /* 非クライアント領域の幅 (window rect と client rect の差) */
   int surf;                 /* top-level のみ */
   uint64_t tid; uint8_t *extra; int cbextra;
   int in_paint;
@@ -67,15 +72,63 @@ struct Wnd {
 static Class *g_classes; static uint32_t g_next_atom = 0xC001;
 static Wnd *g_desktop;
 static Wnd *g_focus, *g_active, *g_capture;
+static void ptrlock_update(void);
 static int g_quit_posted; static int g_quit_code;
 static uint64_t g_gui_tid;
 static uint32_t g_msg_time; static WPOINT g_msg_pt;
 
 /* ================= surface / present ================= */
-static WRECT g_dirty[GUI_MAX_SURF]; static uint8_t g_hasdirty[GUI_MAX_SURF]; static volatile int g_any_dirty; static uint32_t g_last_flush;
-static uint32_t g_ztop;
+static RL g_dirty[GUI_MAX_SURF]; static uint8_t g_hasdirty[GUI_MAX_SURF];   /* dirty は非重複矩形リスト (8 超は外接矩形へ縮退) */ static volatile int g_any_dirty; static uint32_t g_last_flush;
+static uint32_t g_ztop, g_ztop_tm = 0x40000000u;   /* TOPMOST は常に非 TOPMOST より前面 (z >= 0x40000000) */
 static uint8_t *g_surf_ptr[GUI_MAX_SURF];   /* native(64bit) 用の実ポインタ。wasm32 では s->pixels と同値 */
-uint8_t *gui_surf_ptr(int id) { return g_surf_ptr[id]; }
+
+/* host (headless render thread) 向けの不変スナップショット (px,w,h)。shim は surface の生成/再確保ごとに新しい SurfSnap を atomic に公開し、
+ * 旧 SurfSnap・旧画素の free は「その変更を伝える out ring レコードを host が消費し終える (out_ring.head が通過)」まで遅延する (GUI-12)。
+ * host は処理中の 1 レコードの間だけ参照し、その間は free されない。gui_lock を host が取る案は out ring 満杯時に shim (lock 保持で push 待ち) と
+ * デッドロックするため採らない。 */
+typedef struct SurfSnap { uint32_t *px; uint32_t w, h; } SurfSnap;
+static SurfSnap *g_surf_snap[GUI_MAX_SURF];
+int gui_surf_snapshot(int id, uint32_t **px, uint32_t *w, uint32_t *h) {
+  SurfSnap *sn = __atomic_load_n(&g_surf_snap[id], __ATOMIC_ACQUIRE);
+  if (!sn) return 0;
+  *px = sn->px; *w = sn->w; *h = sn->h;
+  return 1;
+}
+typedef struct Retired { void *a, *b; uint32_t pos; struct Retired *next; } Retired;
+static Retired *g_retired;
+/* gui_lock 下で、a/b を out ring の現 tail (= 直前に push した変更レコードを含む) を host が消費し終えてから free するよう登録する */
+static void reap_locked(void);
+static void retire_locked(void *a, void *b) {
+#ifdef GUI12_NEGCTL_IMMEDIATE_FREE   /* ネガコン専用: 修正前の挙動 (即 free) に戻す。tools/gui/test/gui12_race.sh だけが定義する */
+  free(a); free(b); return;
+#endif
+  reap_locked();
+  Retired *r = (Retired *)malloc(sizeof *r);
+  if (!r) gui_failfast("surface", "retire alloc failed");
+  r->a = a; r->b = b; r->pos = __atomic_load_n(&gui_sh()->out_ring.tail, __ATOMIC_ACQUIRE);
+  r->next = g_retired; g_retired = r;
+}
+static void reap_locked(void) {
+  uint32_t head = __atomic_load_n(&gui_sh()->out_ring.head, __ATOMIC_ACQUIRE);
+  Retired **pp = &g_retired;
+  while (*pp) {
+    Retired *r = *pp;
+    if ((int32_t)(head - r->pos) >= 0) { *pp = r->next; free(r->a); free(r->b); free(r); }
+    else pp = &r->next;
+  }
+}
+uint32_t gui_surf_retired_count(void) {
+  gui_lock(); reap_locked(); uint32_t n = 0;
+  for (Retired *r = g_retired; r; r = r->next) n++;
+  gui_unlock();
+  return n;
+}
+static SurfSnap *snap_new(uint32_t *px, uint32_t w, uint32_t h) {
+  SurfSnap *sn = (SurfSnap *)malloc(sizeof *sn);
+  if (!sn) gui_failfast("surface", "snapshot alloc failed");
+  sn->px = px; sn->w = w; sn->h = h;
+  return sn;
+}
 
 int surf_view(int id, SurfView *v) {
   GuiShared *sh = gui_sh();
@@ -83,6 +136,19 @@ int surf_view(int id, SurfView *v) {
   GuiSurface *s = &sh->surf[id];
   v->px = g_surf_ptr[id]; v->stride = (int)s->stride; v->w = (int)s->w; v->h = (int)s->h; v->gen = s->gen;
   return 1;
+}
+/* seqlock (GUI-4): host が surface 画素を読むときの tearing 検出用。奇数 = flush 後に shim が画素へ書込み中/書込み済み (未 flush)、
+ * 偶数 = 静止。書込み前に begin (偶数→奇数)、PRESENT を push する前に end (奇数→偶数)。host は読出し前後で同じ偶数値を確認する。 */
+void surf_wseq_begin(int id) {
+  if (id < 0 || id >= (int)GUI_MAX_SURF) return;
+  uint32_t *w = &gui_sh()->surf[id].wseq;
+  uint32_t cur = __atomic_load_n(w, __ATOMIC_RELAXED);
+  while (!(cur & 1)) if (__atomic_compare_exchange_n(w, &cur, cur + 1, 0, __ATOMIC_SEQ_CST, __ATOMIC_RELAXED)) break;
+}
+static void surf_wseq_end(int id) {
+  uint32_t *w = &gui_sh()->surf[id].wseq;
+  uint32_t cur = __atomic_load_n(w, __ATOMIC_RELAXED);
+  while (cur & 1) if (__atomic_compare_exchange_n(w, &cur, cur + 1, 0, __ATOMIC_SEQ_CST, __ATOMIC_RELAXED)) break;
 }
 static void out_cmd(uint32_t cmd, uint32_t surf, uint32_t a, uint32_t b, uint32_t c, uint32_t d, uint32_t e) {
   uint32_t rec[8] = { cmd, surf, a, b, c, d, e, 0 };
@@ -95,14 +161,10 @@ void surf_dirty(int id, WRECT r) {
   r = r_isect(r, (WRECT){ 0, 0, (int32_t)s->w, (int32_t)s->h });
   if (!r_empty(r)) {
     g_any_dirty = 1;
-    if (!g_hasdirty[id]) { g_dirty[id] = r; g_hasdirty[id] = 1; }
-    else {
-      WRECT *d = &g_dirty[id];
-      if (r.left < d->left) d->left = r.left;
-      if (r.top < d->top) d->top = r.top;
-      if (r.right > d->right) d->right = r.right;
-      if (r.bottom > d->bottom) d->bottom = r.bottom;
-    }
+    RL t = {0}; rl_add(&t, r);
+    if (!g_hasdirty[id]) { rl_clear(&g_dirty[id]); g_hasdirty[id] = 1; }
+    rl_union(&g_dirty[id], &t); rl_free(&t);
+    if (g_dirty[id].n > 8) { WRECT b; rl_bbox(&g_dirty[id], &b); rl_clear(&g_dirty[id]); rl_add(&g_dirty[id], b); }
   }
   gui_unlock();
 }
@@ -110,15 +172,19 @@ void surf_flush(void) {
   GuiShared *sh = gui_sh();
   gui_lock();
   g_any_dirty = 0; g_last_flush = gui_now_ms();
+  reap_locked();
   int any = 0;
   uint32_t seq = sh->present_seq + 1;
+  for (int i = 0; i < (int)GUI_MAX_SURF; i++) if (sh->surf[i].state) surf_wseq_end(i);   /* PRESENT を見た host が読む前に静止を宣言 */
   for (int i = 0; i < (int)GUI_MAX_SURF; i++) {
     if (!g_hasdirty[i]) continue;
     g_hasdirty[i] = 0;
     if (!sh->surf[i].state) continue;
-    WRECT r = g_dirty[i];
-    out_cmd(GUI_CMD_PRESENT, (uint32_t)i, (uint32_t)r.left, (uint32_t)r.top, (uint32_t)r.right, (uint32_t)r.bottom, seq);
-    any = 1;
+    for (int k = 0; k < g_dirty[i].n; k++) {
+      WRECT r = g_dirty[i].r[k];
+      out_cmd(GUI_CMD_PRESENT, (uint32_t)i, (uint32_t)r.left, (uint32_t)r.top, (uint32_t)r.right, (uint32_t)r.bottom, seq);
+      any = 1;
+    }
   }
   if (any) {
     out_cmd(GUI_CMD_FRAME_END, seq, 0, 0, 0, 0, 0);
@@ -141,6 +207,7 @@ static int surf_alloc(int x, int y, int w, int h, const char *title) {
     for (size_t k = 0; k < (size_t)w * h; k++) px[k] = 0xFF000000u;
     s->x = x; s->y = y; s->w = (uint32_t)w; s->h = (uint32_t)h; s->stride = (uint32_t)w * 4;
     s->pixels = (uint32_t)(uintptr_t)px; g_surf_ptr[i] = (uint8_t *)px; s->gen++; s->z = ++g_ztop; s->visible = 0;
+    __atomic_store_n(&g_surf_snap[i], snap_new(px, (uint32_t)w, (uint32_t)h), __ATOMIC_RELEASE);
     snprintf(s->title, sizeof s->title, "%s", title ? title : "");
     __atomic_store_n(&s->state, 1, __ATOMIC_SEQ_CST);
     out_cmd(GUI_CMD_SURF_CREATE, (uint32_t)i, 0, 0, 0, 0, 0);
@@ -157,8 +224,9 @@ static void surf_free(int id) {
   if (s->state) {
     out_cmd(GUI_CMD_SURF_DESTROY, (uint32_t)id, 0, 0, 0, 0, 0);
     __atomic_store_n(&s->state, 0, __ATOMIC_SEQ_CST);
-    free(g_surf_ptr[id]);
-    g_surf_ptr[id] = NULL; s->pixels = 0; g_hasdirty[id] = 0;
+    SurfSnap *osn = __atomic_exchange_n(&g_surf_snap[id], NULL, __ATOMIC_ACQ_REL);
+    retire_locked(g_surf_ptr[id], osn);   /* host が SURF_DESTROY (と先行レコード) を消費するまで free しない */
+    g_surf_ptr[id] = NULL; s->pixels = 0; g_hasdirty[id] = 0; rl_free(&g_dirty[id]);
   }
   gui_unlock();
 }
@@ -170,14 +238,16 @@ static void surf_resize(int id, int w, int h) {
   if ((uint32_t)w == s->w && (uint32_t)h == s->h) return;
   uint32_t *np = (uint32_t *)malloc((size_t)w * h * 4);
   for (size_t k = 0; k < (size_t)w * h; k++) np[k] = 0xFF000000u;
+  surf_wseq_begin(id);
   uint32_t *op = (uint32_t *)g_surf_ptr[id];
   int cw = (int)(s->w < (uint32_t)w ? s->w : (uint32_t)w), ch = (int)(s->h < (uint32_t)h ? s->h : (uint32_t)h);
   for (int y = 0; y < ch; y++) memcpy(np + (size_t)y * w, op + (size_t)y * s->w, (size_t)cw * 4);
   gui_lock();
   s->w = (uint32_t)w; s->h = (uint32_t)h; s->stride = (uint32_t)w * 4; s->pixels = (uint32_t)(uintptr_t)np; g_surf_ptr[id] = (uint8_t *)np; s->gen++;
+  SurfSnap *osn = __atomic_exchange_n(&g_surf_snap[id], snap_new(np, (uint32_t)w, (uint32_t)h), __ATOMIC_ACQ_REL);
   gui_unlock();
-  free(op);
   out_cmd(GUI_CMD_SURF_CHANGE, (uint32_t)id, 0, 0, 0, 0, 0);
+  gui_lock(); retire_locked(op, osn); gui_unlock();   /* SURF_CHANGE push 後の tail を host が消費し終えるまで旧画素を保持 */
 }
 
 /* ================= 関数ポインタ解決 (lift の VA -> 関数) ================= */
@@ -232,29 +302,31 @@ static int is_visible(Wnd *w) {
   for (; w && w != g_desktop; w = w->parent) if (!(w->style & WS_VISIBLE)) return 0;
   return 1;
 }
-int wnd_target(Wnd *w, int *surf, int *ox, int *oy) {
+static int ww(Wnd *w) { return w->nl + w->w + w->nr; }
+static int wh(Wnd *w) { return w->nt + w->hgt + w->nb; }
+int wnd_target(Wnd *w, int *surf, int *ox, int *oy) {   /* top-level surface と w の client 原点 (surface 座標) */
   int x = 0, y = 0;
-  while (w && w->parent != g_desktop) { x += w->x; y += w->y; w = w->parent; }
+  while (w && w->parent != g_desktop) { x += w->x + w->nl; y += w->y + w->nt; w = w->parent; }
   if (!w) return 0;
-  *surf = w->surf; *ox = x; *oy = y;
+  *surf = w->surf; *ox = x + w->nl; *oy = y + w->nt;
   return 1;
 }
 void wnd_client_size(Wnd *w, int *cw, int *ch) { *cw = w->w; *ch = w->hgt; }
 static void to_screen_origin(Wnd *w, int *sx, int *sy) {
   int x = 0, y = 0;
-  while (w && w != g_desktop) { x += w->x; y += w->y; w = w->parent; }
+  while (w && w != g_desktop) { x += w->x + w->nl; y += w->y + w->nt; w = w->parent; }
   *sx = x; *sy = y;
 }
-void wnd_clip(Wnd *w, RL *out) {
+static void wnd_clip_impl(Wnd *w, RL *out, int win) {   /* win=1: window DC (NC を含む window rect) */
   rl_clear(out);
   if (!is_visible(w)) return;
   int surf, ox, oy;
   if (!wnd_target(w, &surf, &ox, &oy)) return;
-  WRECT r = { ox, oy, ox + w->w, oy + w->hgt };
+  WRECT r = win ? (WRECT){ ox - w->nl, oy - w->nt, ox - w->nl + ww(w), oy - w->nt + wh(w) } : (WRECT){ ox, oy, ox + w->w, oy + w->hgt };
   /* 祖先 client に収める */
   int ax = ox, ay = oy;
   for (Wnd *a = w; a->parent != g_desktop; a = a->parent) {
-    ax -= a->x; ay -= a->y;  /* a->parent の client 原点 (surface 座標) */
+    ax -= a->x + a->nl; ay -= a->y + a->nt;  /* a->parent の client 原点 (surface 座標) */
     Wnd *p = a->parent;
     if (p->parent == g_desktop || 1) {
       WRECT pc = { ax, ay, ax + p->w, ay + p->hgt };
@@ -263,13 +335,68 @@ void wnd_clip(Wnd *w, RL *out) {
   }
   rl_add(out, r);
   if ((w->style & WS_CLIPSIBLINGS) && w->parent != g_desktop) {
-    int px = ox - w->x, py = oy - w->y;
+    int px = ox - w->x - w->nl, py = oy - w->y - w->nt;
     for (Wnd *s = w->next; s; s = s->next)
-      if (s->style & WS_VISIBLE) rl_subtract_rect(out, (WRECT){ px + s->x, py + s->y, px + s->x + s->w, py + s->y + s->hgt });
+      if (s->style & WS_VISIBLE) rl_subtract_rect(out, (WRECT){ px + s->x, py + s->y, px + s->x + ww(s), py + s->y + wh(s) });
   }
   if (w->style & WS_CLIPCHILDREN)
     for (Wnd *c = w->first; c; c = c->next)
-      if (c->style & WS_VISIBLE) rl_subtract_rect(out, (WRECT){ ox + c->x, oy + c->y, ox + c->x + c->w, oy + c->y + c->hgt });
+      if (c->style & WS_VISIBLE) rl_subtract_rect(out, (WRECT){ ox + c->x, oy + c->y, ox + c->x + ww(c), oy + c->y + wh(c) });
+}
+void wnd_clip(Wnd *w, RL *out) { wnd_clip_impl(w, out, 0); }
+void wnd_clip_window(Wnd *w, RL *out) { wnd_clip_impl(w, out, 1); }
+void wnd_window_origin(Wnd *w, int *ox, int *oy) { int s; wnd_target(w, &s, ox, oy); *ox -= w->nl; *oy -= w->nt; }
+
+/* ================= z-order / 非クライアント領域 ================= */
+enum { WS_BORDER_ = 0x00800000, WS_DLGFRAME_ = 0x00400000, WS_THICKFRAME_ = 0x00040000, WS_EX_TOPMOST_ = 8, WS_EX_TRANSPARENT_ = 0x20,
+       WS_EX_CLIENTEDGE_ = 0x200, WS_EX_NOACTIVATE_ = 0x08000000, HT_NOWHERE = 0, HT_CLIENT = 1, HT_CAPTION = 2, HT_BORDER = 18, HT_TRANSPARENT = -1 };
+static uint32_t next_z(Wnd *w) { return (w->exstyle & WS_EX_TOPMOST_) ? ++g_ztop_tm : ++g_ztop; }
+static void link_top(Wnd *w) {   /* desktop の子リスト (= z 順) の最前面へ。ただし非 TOPMOST は TOPMOST の下 */
+  unlink_child(w);
+  Wnd *p = g_desktop; w->parent = p;
+  Wnd *at = p->last;
+  if (!(w->exstyle & WS_EX_TOPMOST_)) while (at && (at->exstyle & WS_EX_TOPMOST_)) at = at->prev;
+  w->prev = at; w->next = at ? at->next : p->first;
+  if (at) at->next = w; else p->first = w;
+  if (w->next) w->next->prev = w; else p->last = w;
+}
+/* DPI 方針 (PROTOCOL.md §12): canvas 内部解像度 = 物理 px。DPI 非対応 (既定) の context には 96 を見せ画素は 1:1、
+ * 対応 (SYSTEM/PER_MONITOR 系) の context には dpr*96 を見せ、shim が決める寸法 (NC 幅・システムメトリクス) をその DPI に比例させる。
+ * context はプロセス共通の 1 値 (SetThreadDpiAwarenessContext も同じ変数を書く。スレッド別には保持しない)。 */
+static I64 g_dpi_ctx = -1;   /* DPI_AWARENESS_CONTEXT_UNAWARE */
+int gui_dpi(void) { if (g_dpi_ctx == -1 || g_dpi_ctx == -5) return 96; uint32_t d = gui_sh()->dpr_x100; return (int)((96u * (d ? d : 100) + 50) / 100); }
+static int dscale(int v) { return (v * gui_dpi() + 48) / 96; }
+static I64 send_message(U64 h, uint32_t msg, U64 wp, I64 lp);
+/* 非クライアント幅 (決定的な shim 規約: 実 Windows の DWM 枠とは一致しない。PROTOCOL.md §12) */
+static void nc_metrics(uint32_t style, uint32_t ex, int *l, int *t, int *r, int *b) {
+  int bw = 0;
+  if (style & WS_THICKFRAME_) bw = dscale(5);                                   /* SM_CXFRAME 4 + SM_CXBORDER 1 */
+  else if (style & WS_DLGFRAME_) bw = dscale(3);                                /* SM_CXDLGFRAME */
+  else if (style & WS_BORDER_) bw = dscale(1);
+  if (ex & WS_EX_CLIENTEDGE_) bw += dscale(2);
+  int cap = ((style & WS_CAPTION) == WS_CAPTION) ? dscale(23) : 0;
+  *l = *r = *b = bw; *t = bw + cap;
+}
+static WRECT *g_nc_cur;   /* 送信中の NCCALCSIZE_PARAMS.rgrc: lift 済み WndProc は lParam を int32 に切り詰める (REPORT §4-6) ため native (64bit) では下位 32bit 一致で復元 */
+/* ウィンドウ矩形 (親 client 座標) を与え WM_NCCALCSIZE で client 寸法と NC 幅を確定 */
+static void calc_nc(Wnd *w, int ww_, int wh_) {
+  struct { WRECT r[3]; U64 pwp; } p;
+  struct { U64 hwnd, after; int32_t x, y, cx, cy; uint32_t flags, _p; } wp = { w->h, 0, w->x, w->y, ww_, wh_, 0, 0 };
+  WRECT win = { w->x, w->y, w->x + ww_, w->y + wh_ };
+  p.r[0] = p.r[1] = p.r[2] = win; p.pwp = H_(&wp);
+  WRECT *saved = g_nc_cur; g_nc_cur = p.r;
+  send_message(w->h, WM_NCCALCSIZE, 1, H_(&p));
+  g_nc_cur = saved;
+  WRECT c = p.r[0];
+  if (c.left < win.left) c.left = win.left;
+  if (c.top < win.top) c.top = win.top;
+  if (c.right > win.right) c.right = win.right;
+  if (c.bottom > win.bottom) c.bottom = win.bottom;
+  if (c.right < c.left) c.right = c.left;
+  if (c.bottom < c.top) c.bottom = c.top;
+  w->nl = c.left - win.left; w->nt = c.top - win.top; w->nr = win.right - c.right; w->nb = win.bottom - c.bottom;
+  w->w = c.right - c.left; w->hgt = c.bottom - c.top;
+  w->nc_dirty = (w->nl | w->nt | w->nr | w->nb) != 0;
 }
 
 /* ================= 呼出し ================= */
@@ -428,29 +555,30 @@ static API create_window_impl(uint32_t exstyle, I64 cls, I64 name, uint32_t styl
   if (y == (int32_t)0x80000000) y = 0;
   if (cx == (int32_t)0x80000000) cx = 640;
   if (cy == (int32_t)0x80000000) cy = 480;
-  w->x = x; w->y = y; w->w = cx < 0 ? 0 : cx; w->hgt = cy < 0 ? 0 : cy;
+  w->x = x; w->y = y; w->w = cx < 0 ? 0 : cx; w->hgt = cy < 0 ? 0 : cy;   /* NC 確定 (WM_NCCALCSIZE) まで window rect = client */
   w->id = (style & WS_CHILD) ? (U64)menu : 0;
   w->cbextra = k->cbwnd; if (w->cbextra > 0) w->extra = (uint8_t *)calloc(1, (size_t)w->cbextra);
   w->h = h_alloc(HT_WND, w);
-  link_child(par ? par : g_desktop, w);
-  if (!par) w->surf = surf_alloc(x, y, w->w, w->hgt, w->title);
+  if (par) link_child(par, w); else link_top(w);
+  if (!par) { w->surf = surf_alloc(x, y, w->w, w->hgt, w->title); if (exstyle & WS_EX_TOPMOST_) gui_sh()->surf[w->surf].z = ++g_ztop_tm; }
   /* CREATESTRUCT (Win64 layout, 88B) */
   struct { U64 lpCreateParams, hInstance, hMenu, hwndParent; int32_t cy, cx, y, x; uint32_t style, _p; U64 lpszName, lpszClass;
            uint32_t dwExStyle, _p2; } cs = { (U64)param, (U64)hinst, (U64)menu, (U64)parent, cy, cx, y, x, style, 0,
                                            (U64)name, (U64)cls, exstyle, 0 };
   I64 r = send_message(w->h, WM_NCCREATE, 0, H_(&cs));
-  if (!r) { Wnd *dead = w; send_message(dead->h, WM_NCDESTROY, 0, 0); unlink_child(dead); if (dead->surf >= 0) surf_free(dead->surf); h_free(dead->h); free(dead->extra); free(dead); return 0; }
+  if (!r) { Wnd *dead = w; send_message(dead->h, WM_NCDESTROY, 0, 0); unlink_child(dead); if (dead->surf >= 0) surf_free(dead->surf); h_free(dead->h); rl_free(&dead->invl); free(dead->extra); free(dead); return 0; }
+  calc_nc(w, w->w, w->hgt);
   r = send_message(w->h, WM_CREATE, 0, H_(&cs));
   if ((int32_t)r == -1) {
     send_message(w->h, WM_DESTROY, 0, 0); send_message(w->h, WM_NCDESTROY, 0, 0);
-    unlink_child(w); if (w->surf >= 0) surf_free(w->surf); h_free(w->h); free(w->extra); free(w);
+    unlink_child(w); if (w->surf >= 0) surf_free(w->surf); h_free(w->h); rl_free(&w->invl); free(w->extra); free(w);
     return 0;
   }
   if (style & WS_VISIBLE) {
     w->style |= WS_VISIBLE;
     send_message(w->h, WM_SHOWWINDOW, 1, 0);
     post_size_move(w);
-    if (!par) { GuiShared *sh = gui_sh(); sh->surf[w->surf].visible = 1; out_cmd(GUI_CMD_SURF_CHANGE, (uint32_t)w->surf, 0, 0, 0, 0, 0); activate(w); }
+    if (!par) { GuiShared *sh = gui_sh(); sh->surf[w->surf].visible = 1; out_cmd(GUI_CMD_SURF_CHANGE, (uint32_t)w->surf, 0, 0, 0, 0, 0); if (!(exstyle & WS_EX_NOACTIVATE_)) activate(w); }
     invalidate(w, NULL, 1, 1);
   } else post_size_move(w);
   return (I64)w->h;
@@ -476,7 +604,7 @@ static void destroy_tree(Wnd *w) {
   if (w->surf >= 0) surf_free(w->surf);
   h_free(w->h);
   while (w->props) { struct Prop *p = w->props; w->props = p->next; free(p); }
-  free(w->extra); free(w);
+  rl_free(&w->invl); free(w->extra); free(w);
 }
 API DestroyWindow(I64 h) {
   Wnd *w = wnd_from_h((U64)h);
@@ -530,8 +658,8 @@ API GetClientRect(I64 h, I64 rc) {
 }
 API GetWindowRect(I64 h, I64 rc) {
   Wnd *w = wnd_from_h((U64)h); if (!w) return 0;
-  int sx, sy; to_screen_origin(w, &sx, &sy);
-  WRECT *r = (WRECT *)P_(rc); r->left = sx; r->top = sy; r->right = sx + w->w; r->bottom = sy + w->hgt; return 1;
+  int sx, sy; to_screen_origin(w, &sx, &sy); sx -= w->nl; sy -= w->nt;
+  WRECT *r = (WRECT *)P_(rc); r->left = sx; r->top = sy; r->right = sx + ww(w); r->bottom = sy + wh(w); return 1;
 }
 API ClientToScreen(I64 h, I64 pt) {
   Wnd *w = wnd_from_h((U64)h); if (!w) return 0;
@@ -553,7 +681,7 @@ API MapWindowPoints(I64 hf, I64 ht, I64 pts, I64 n) {
   return ((I64)(uint16_t)(fy - ty) << 16) | (uint16_t)(fx - tx);
 }
 
-static void apply_geometry(Wnd *w, int x, int y, int cw, int ch, int moved, int sized) {
+static void apply_geometry(Wnd *w, int x, int y, int cw, int ch, int moved, int sized) {   /* cw, ch = window rect の寸法 */
   w->x = x; w->y = y;
   if (is_toplevel(w) && w->surf >= 0) {
     GuiSurface *s = &gui_sh()->surf[w->surf];
@@ -561,9 +689,9 @@ static void apply_geometry(Wnd *w, int x, int y, int cw, int ch, int moved, int 
     if (sized) surf_resize(w->surf, cw, ch);
     out_cmd(GUI_CMD_SURF_CHANGE, (uint32_t)w->surf, 0, 0, 0, 0, 0);
   }
-  w->w = cw; w->hgt = ch;
+  if (sized) calc_nc(w, cw, ch); else { w->w = cw - w->nl - w->nr; w->hgt = ch - w->nt - w->nb; }
   if (sized) {
-    send_message(w->h, WM_SIZE, 0, ((I64)(ch & 0xFFFF) << 16) | (cw & 0xFFFF));
+    send_message(w->h, WM_SIZE, 0, ((I64)(w->hgt & 0xFFFF) << 16) | (w->w & 0xFFFF));
     invalidate(w, NULL, 1, 1);
   }
   if (moved) send_message(w->h, WM_MOVE, 0, ((I64)(y & 0xFFFF) << 16) | (x & 0xFFFF));
@@ -572,32 +700,43 @@ static void apply_geometry(Wnd *w, int x, int y, int cw, int ch, int moved, int 
 API MoveWindow(I64 h, I64 x, I64 y, I64 cw, I64 ch, I64 repaint) {
   (void)repaint;
   Wnd *w = wnd_from_h((U64)h); if (!w) return 0;
-  apply_geometry(w, (int)x, (int)y, (int)cw, (int)ch, w->x != (int)x || w->y != (int)y, w->w != (int)cw || w->hgt != (int)ch);
+  apply_geometry(w, (int)x, (int)y, (int)cw, (int)ch, w->x != (int)x || w->y != (int)y, ww(w) != (int)cw || wh(w) != (int)ch);
   return 1;
 }
 static void show_internal(Wnd *w, int show);
+static int g_noact;   /* SW_SHOWNA / SWP_NOACTIVATE 中は show で activate しない */
 API SetWindowPos(I64 h, I64 after, I64 x, I64 y, I64 cx, I64 cy, I64 flags) {
   Wnd *w = wnd_from_h((U64)h); if (!w) return 0;
   int nx = (flags & SWP_NOMOVE) ? w->x : (int)x, ny = (flags & SWP_NOMOVE) ? w->y : (int)y;
-  int nw = (flags & SWP_NOSIZE) ? w->w : (int)cx, nh = (flags & SWP_NOSIZE) ? w->hgt : (int)cy;
+  int nw = (flags & SWP_NOSIZE) ? ww(w) : (int)cx, nh = (flags & SWP_NOSIZE) ? wh(w) : (int)cy;
   if (!(flags & SWP_NOZORDER) && w->parent) {
     Wnd *p = w->parent;
     if (after == HWND_BOTTOM_ || after == HWND_TOP_ || after == -1 || after == -2) {
+      if (after == -1 && is_toplevel(w)) w->exstyle |= WS_EX_TOPMOST_;   /* HWND_TOPMOST / HWND_NOTOPMOST */
+      if ((after == -2 || after == HWND_BOTTOM_) && is_toplevel(w)) w->exstyle &= ~(uint32_t)WS_EX_TOPMOST_;   /* NOTOPMOST / BOTTOM は topmost を外す (MSDN) */
       unlink_child(w);
       if (after == HWND_BOTTOM_) { w->parent = p; w->next = p->first; w->prev = NULL; if (p->first) p->first->prev = w; else p->last = w; p->first = w; }
+      else if (is_toplevel(w)) link_top(w);
       else link_child(p, w);
-      if (is_toplevel(w) && w->surf >= 0) { gui_sh()->surf[w->surf].z = (after == HWND_BOTTOM_) ? 0 : ++g_ztop; out_cmd(GUI_CMD_SURF_CHANGE, (uint32_t)w->surf, 0, 0, 0, 0, 0); }
+      if (is_toplevel(w) && w->surf >= 0) { gui_sh()->surf[w->surf].z = (after == HWND_BOTTOM_) ? 0 : next_z(w); out_cmd(GUI_CMD_SURF_CHANGE, (uint32_t)w->surf, 0, 0, 0, 0, 0); }
     } else if (wnd_from_h((U64)after)) {
       Wnd *a = wnd_from_h((U64)after);
-      unlink_child(w);
-      w->parent = p; w->prev = a; w->next = a->next;
-      if (a->next) a->next->prev = w; else p->last = w;
-      a->next = w;
-      if (is_toplevel(w) && w->surf >= 0) { gui_sh()->surf[w->surf].z = gui_sh()->surf[a->surf].z; out_cmd(GUI_CMD_SURF_CHANGE, (uint32_t)w->surf, 0, 0, 0, 0, 0); }
+      if (is_toplevel(w) && ((w->exstyle ^ a->exstyle) & WS_EX_TOPMOST_)) {   /* TOPMOST 群と非 TOPMOST 群は跨がない: 各群の先頭 (link_top) へ */
+        link_top(w);
+        if (w->surf >= 0) { gui_sh()->surf[w->surf].z = next_z(w); out_cmd(GUI_CMD_SURF_CHANGE, (uint32_t)w->surf, 0, 0, 0, 0, 0); }
+      } else {
+        unlink_child(w);
+        w->parent = p; w->prev = a; w->next = a->next;
+        if (a->next) a->next->prev = w; else p->last = w;
+        a->next = w;
+        if (is_toplevel(w) && w->surf >= 0) { gui_sh()->surf[w->surf].z = gui_sh()->surf[a->surf].z; out_cmd(GUI_CMD_SURF_CHANGE, (uint32_t)w->surf, 0, 0, 0, 0, 0); }
+      }
     }
   }
-  apply_geometry(w, nx, ny, nw, nh, w->x != nx || w->y != ny, w->w != nw || w->hgt != nh);
+  apply_geometry(w, nx, ny, nw, nh, w->x != nx || w->y != ny, ww(w) != nw || wh(w) != nh);
+  g_noact = (flags & SWP_NOACTIVATE) != 0;
   if (flags & SWP_SHOWWINDOW) show_internal(w, 1);
+  g_noact = 0;
   if (flags & SWP_HIDEWINDOW) show_internal(w, 0);
   return 1;
 }
@@ -610,7 +749,7 @@ static void show_internal(Wnd *w, int show) {
   if (is_toplevel(w) && w->surf >= 0) {
     gui_sh()->surf[w->surf].visible = show ? 1 : 0;
     out_cmd(GUI_CMD_SURF_CHANGE, (uint32_t)w->surf, 0, 0, 0, 0, 0);
-    if (show) activate(w);
+    if (show) { if (!(w->exstyle & WS_EX_NOACTIVATE_) && !g_noact) activate(w); }
     else if (g_active == w) { g_active = NULL; for (Wnd *t = g_desktop->last; t; t = t->prev) if ((t->style & WS_VISIBLE) && t != w) { activate(t); break; } }
   }
   if (show) invalidate(w, NULL, 1, 1);
@@ -619,7 +758,9 @@ static void show_internal(Wnd *w, int show) {
 API ShowWindow(I64 h, I64 cmd) {
   Wnd *w = wnd_from_h((U64)h); if (!w) return 0;
   int was = !!(w->style & WS_VISIBLE);
+  g_noact = (cmd == SW_SHOWNA || cmd == 4 /* SW_SHOWNOACTIVATE */);
   show_internal(w, cmd != SW_HIDE);
+  g_noact = 0;
   return was;
 }
 
@@ -681,20 +822,21 @@ API GetWindowThreadProcessId(I64 h, I64 pid) {
   if (pid) *(uint32_t *)P_(pid) = 1;
   return (I64)(w->tid & 0x7fffffff);
 }
-API AdjustWindowRectEx(I64 rc, I64 style, I64 menu, I64 ex) { (void)rc; (void)style; (void)menu; (void)ex; return 1; }
+API AdjustWindowRectEx(I64 rc, I64 style, I64 menu, I64 ex) {
+  (void)menu; WRECT *r = (WRECT *)P_(rc); int l, t, rr, b; nc_metrics((uint32_t)style, (uint32_t)ex, &l, &t, &rr, &b);
+  r->left -= l; r->top -= t; r->right += rr; r->bottom += b; return 1;
+}
+API AdjustWindowRect(I64 rc, I64 style, I64 menu) { return AdjustWindowRectEx(rc, style, menu, 0); }
 
 /* ================= 無効領域 / WM_PAINT ================= */
 static void invalidate(Wnd *w, const WRECT *r, int erase, int children) {
   WRECT full = { 0, 0, w->w, w->hgt };
   WRECT x = r ? r_isect(*r, full) : full;
   if (!r_empty(x)) {
-    if (!w->has_inv) { w->inv = x; w->has_inv = 1; }
-    else {
-      if (x.left < w->inv.left) w->inv.left = x.left;
-      if (x.top < w->inv.top) w->inv.top = x.top;
-      if (x.right > w->inv.right) w->inv.right = x.right;
-      if (x.bottom > w->inv.bottom) w->inv.bottom = x.bottom;
-    }
+    if (!w->has_inv) rl_clear(&w->invl);
+    RL t = {0}; rl_add(&t, x); rl_union(&w->invl, &t); rl_free(&t);   /* 複数矩形の無効領域 (非重複) */
+    if (w->invl.n > 16) { WRECT b; rl_bbox(&w->invl, &b); rl_clear(&w->invl); rl_add(&w->invl, b); }
+    rl_bbox(&w->invl, &w->inv); w->has_inv = 1;
     if (erase) w->erase = 1;
   }
   if (children) for (Wnd *c = w->first; c; c = c->next) invalidate(c, NULL, erase, 1);
@@ -711,7 +853,10 @@ API ValidateRect(I64 h, I64 rc) {
   Wnd *w = wnd_from_h((U64)h); if (!w) return 1;
   if (!rc) { w->has_inv = 0; w->erase = 0; return 1; }
   const WRECT *r = (const WRECT *)P_(rc);
-  if (w->has_inv && r->left <= w->inv.left && r->top <= w->inv.top && r->right >= w->inv.right && r->bottom >= w->inv.bottom) { w->has_inv = 0; w->erase = 0; }
+  if (w->has_inv) {
+    rl_subtract_rect(&w->invl, *r);
+    if (rl_empty(&w->invl)) { w->has_inv = 0; w->erase = 0; } else rl_bbox(&w->invl, &w->inv);
+  }
   return 1;
 }
 API GetUpdateRect(I64 h, I64 rc, I64 erase) {
@@ -733,7 +878,10 @@ static void erase_background(Wnd *w, U64 hdc) {
   I64 handled = send_message(w->h, WM_ERASEBKGND, hdc, 0);
   (void)handled;
 }
-static void do_paint_msg(Wnd *w) { send_message(w->h, WM_PAINT, 0, 0); }
+static void nc_paint_if_needed(Wnd *w) {   /* 枠の再描画は WM_PAINT の前に WM_NCPAINT (wParam=1: 全域) */
+  if (w->nc_dirty && is_visible(w)) { w->nc_dirty = 0; send_message(w->h, WM_NCPAINT, 1, 0); surf_flush(); }
+}
+static void do_paint_msg(Wnd *w) { nc_paint_if_needed(w); send_message(w->h, WM_PAINT, 0, 0); }
 API UpdateWindow(I64 h) {
   Wnd *w = wnd_from_h((U64)h); if (!w) return 0;
   if (w->has_inv && is_visible(w)) do_paint_msg(w);
@@ -746,7 +894,11 @@ API BeginPaint(I64 h, I64 ps) {
   WRECT rc = w->has_inv ? w->inv : (WRECT){ 0, 0, w->w, w->hgt };
   RL clip = {0}; wnd_clip(w, &clip);
   int surf, ox, oy; wnd_target(w, &surf, &ox, &oy);
-  rl_intersect_rect(&clip, (WRECT){ ox + rc.left, oy + rc.top, ox + rc.right, oy + rc.bottom });
+  if (w->has_inv) {   /* 無効領域 (複数矩形) だけを描画可能にする */
+    RL inv = {0}; rl_copy(&inv, &w->invl);
+    for (int i = 0; i < inv.n; i++) { inv.r[i].left += ox; inv.r[i].right += ox; inv.r[i].top += oy; inv.r[i].bottom += oy; }
+    rl_intersect(&clip, &inv); rl_free(&inv);
+  } else rl_intersect_rect(&clip, (WRECT){ ox + rc.left, oy + rc.top, ox + rc.right, oy + rc.bottom });
   U64 dc = gdi_get_dc_for_wnd(w, 0, &clip);
   rl_free(&clip);
   p->hdc = dc; p->rcPaint = rc;
@@ -768,14 +920,21 @@ API GetDC(I64 h) {
   gui_sh(); ensure_desktop();
   Wnd *w = h ? wnd_from_h((U64)h) : g_desktop;
   if (!w) return 0;
-  if (w == g_desktop) gui_failfast("GetDC", "screen DC (GetDC(NULL)) not implemented");
+  if (w == g_desktop) return (I64)gdi_get_screen_dc();   /* GetDC(NULL): 画面 DC。描画は捨てる計測・互換 DC 用途 (#174) */
   RL clip = {0}; wnd_clip(w, &clip);
   U64 dc = gdi_get_dc_for_wnd(w, 0, &clip);
   rl_free(&clip);
   return (I64)dc;
 }
 API GetDCEx(I64 h, I64 rgn, I64 flags) { (void)rgn; (void)flags; return GetDC(h); }
-API GetWindowDC(I64 h) { return GetDC(h); }
+API GetWindowDC(I64 h) {   /* 原点 = window rect 左上・可視領域は NC を含む */
+  gui_sh(); ensure_desktop();
+  Wnd *w = h ? wnd_from_h((U64)h) : g_desktop; if (!w) return 0;
+  if (w == g_desktop) gui_failfast("GetWindowDC", "screen DC (GetWindowDC(NULL)) not implemented");
+  RL clip = {0}; wnd_clip_window(w, &clip);
+  U64 dc = gdi_get_dc_for_wnd(w, 1, &clip); rl_free(&clip);
+  return (I64)dc;
+}
 API ReleaseDC(I64 h, I64 dc) { (void)h; gdi_release_dc((U64)dc); surf_flush(); return 1; }
 
 /* ================= フォーカス / キャプチャ / アクティブ ================= */
@@ -784,8 +943,8 @@ static void activate(Wnd *top) {
   Wnd *old = g_active; g_active = top;
   if (old) send_message(old->h, WM_ACTIVATE, 0, (I64)top->h);
   if (is_toplevel(top) && top->surf >= 0) {
-    if (top->parent->last != top) { unlink_child(top); link_child(g_desktop, top); }
-    gui_sh()->surf[top->surf].z = ++g_ztop; out_cmd(GUI_CMD_SURF_CHANGE, (uint32_t)top->surf, 0, 0, 0, 0, 0);
+    link_top(top);
+    gui_sh()->surf[top->surf].z = next_z(top); out_cmd(GUI_CMD_SURF_CHANGE, (uint32_t)top->surf, 0, 0, 0, 0, 0);
   }
   send_message(top->h, WM_ACTIVATE, 1, 0);
   if (!g_focus || toplevel_of(g_focus) != top) set_focus_internal(top);
@@ -812,11 +971,13 @@ API SetCapture(I64 h) {
   Wnd *w = wnd_from_h((U64)h); Wnd *old = g_capture; if (!w) return 0;
   g_capture = w;
   if (old && old != w) send_message(old->h, WM_CAPTURECHANGED, 0, (I64)w->h);
+  ptrlock_update();
   return old ? (I64)old->h : 0;
 }
 API ReleaseCapture(void) {
   Wnd *old = g_capture; g_capture = NULL;
   if (old) send_message(old->h, WM_CAPTURECHANGED, 0, 0);
+  ptrlock_update();
   return 1;
 }
 API GetCapture(void) { return g_capture ? (I64)g_capture->h : 0; }
@@ -860,21 +1021,28 @@ static int wnd_in_filter(U64 hwnd, U64 filt) {
   for (; w; w = w->parent) if (w == f) return 1;
   return 0;
 }
+static int g_hit_code = HT_CLIENT;   /* 直近 hit_test の WM_NCHITTEST 結果 */
 static Wnd *hit_test(int x, int y, int *lx, int *ly) {
   ensure_desktop();
+  g_hit_code = HT_CLIENT;
   for (Wnd *t = g_desktop->last; t; t = t->prev) {
     if (!(t->style & WS_VISIBLE)) continue;
-    /* surface z-order : 同 z は後勝ち; ここでは sibling 順 = z 順 */
-    if (x < t->x || y < t->y || x >= t->x + t->w || y >= t->y + t->hgt) continue;
-    Wnd *cur = t; int cx = x - t->x, cy = y - t->y;
+    /* surface z-order : 同 z は後勝ち; ここでは sibling 順 = z 順 (TOPMOST は link_top で常に末尾側) */
+    if (x < t->x || y < t->y || x >= t->x + ww(t) || y >= t->y + wh(t)) continue;
+    int cx = x - t->x - t->nl, cy = y - t->y - t->nt;
+    int inclient = cx >= 0 && cy >= 0 && cx < t->w && cy < t->hgt;
+    I64 code = send_message(t->h, WM_NCHITTEST, 0, ((I64)(uint16_t)(int16_t)y << 16) | (uint16_t)(int16_t)x);
+    if ((int32_t)code == HT_TRANSPARENT) continue;   /* ツールチップ等: 下の窓へ素通し */
+    if (!inclient || (int32_t)code != HT_CLIENT) { g_hit_code = (int32_t)code == HT_CLIENT ? HT_BORDER : (int32_t)code; *lx = cx; *ly = cy; return t; }
+    Wnd *cur = t;
     for (;;) {
       Wnd *hit = NULL;
       for (Wnd *c = cur->last; c; c = c->prev) {
         if (!(c->style & WS_VISIBLE)) continue;
-        if (cx >= c->x && cy >= c->y && cx < c->x + c->w && cy < c->y + c->hgt) { hit = c; break; }
+        if (cx >= c->x && cy >= c->y && cx < c->x + ww(c) && cy < c->y + wh(c)) { hit = c; break; }
       }
       if (!hit) break;
-      cur = hit; cx -= hit->x; cy -= hit->y;
+      cur = hit; cx -= hit->x + hit->nl; cy -= hit->y + hit->nt;
     }
     *lx = cx; *ly = cy;
     return cur;
@@ -912,6 +1080,10 @@ static int mouse_hook_discard(Wnd *w, uint32_t msg, int x, int y) {
   struct { WPOINT pt; U64 hwnd; uint32_t hit, _pad; U64 extra; } mh = { { x, y }, w->h, 1 /* HTCLIENT */, 0, 0 };
   return hook_run(WH_MOUSE, 0, msg, (I64)(uintptr_t)&mh) != 0;
 }
+static void kbd_set_layout(uint32_t langid);                 /* gui_core_ext.inc */
+static uint32_t kbd_layout_vk(uint32_t sc, int ext);
+static void ime_input(const uint32_t *r);
+static void touch_input(const uint32_t *r);
 static void translate_input(const uint32_t *r) {
   GuiShared *sh = gui_sh();
   uint32_t type = r[0]; int x = (int32_t)r[2], y = (int32_t)r[3]; uint32_t a = r[4], b = r[5], t = r[6];
@@ -919,10 +1091,17 @@ static void translate_input(const uint32_t *r) {
   switch (type) {
     case GUI_IN_MOUSE_MOVE: case GUI_IN_MOUSE_DOWN: case GUI_IN_MOUSE_UP: case GUI_IN_WHEEL: {
       int lx = 0, ly = 0;
+      if (type == GUI_IN_MOUSE_DOWN || type == GUI_IN_MOUSE_UP) ptrlock_update();
       Wnd *w = g_capture;
       if (w) client_of_screen(w, x, y, &lx, &ly);
       else w = hit_test(x, y, &lx, &ly);
       if (!w) return;
+      if (!g_capture && g_hit_code != HT_CLIENT && type != GUI_IN_WHEEL) {   /* 非クライアント: WM_NCMOUSEMOVE / WM_NCLBUTTONDOWN|UP (wParam = HT*, lParam = screen) */
+        uint32_t nm = type == GUI_IN_MOUSE_MOVE ? 0xA0u : (a == 0 ? 0xA1u : a == 1 ? 0xA7u : 0xA4u) + (type == GUI_IN_MOUSE_UP ? 1 : 0);
+        if (type == GUI_IN_MOUSE_DOWN) { Wnd *tp = toplevel_of(w); if (tp != g_active && !(tp->exstyle & WS_EX_NOACTIVATE_)) activate(tp); }
+        QMsg m = { w->h, nm, (U64)(int64_t)g_hit_code, mk_lparam(x, y), t, { x, y }, NULL };
+        q_push(m); return;
+      }
       if (type == GUI_IN_MOUSE_MOVE) {
         if (!g_capture) send_message(w->h, WM_SETCURSOR, w->h, (I64)(1 | (WM_MOUSEMOVE << 16)));
         if (mouse_hook_discard(w, WM_MOUSEMOVE, x, y)) return;
@@ -939,7 +1118,7 @@ static void translate_input(const uint32_t *r) {
         uint32_t base = btn == 0 ? WM_LBUTTONDOWN : btn == 1 ? WM_MBUTTONDOWN : WM_RBUTTONDOWN;
         uint32_t msg = base + (type == GUI_IN_MOUSE_UP ? 1 : 0);
         if (type == GUI_IN_MOUSE_DOWN) {
-          if (!g_capture) { Wnd *tp = toplevel_of(w); if (tp != g_active) activate(tp); }
+          if (!g_capture) { Wnd *tp = toplevel_of(w); if (tp != g_active && !(tp->exstyle & WS_EX_NOACTIVATE_)) activate(tp); }
           int dbl = w->cls && (w->cls->style & CS_DBLCLKS) && g_last_click_btn == btn && (t - g_last_click_t) <= 500 &&
                     abs(x - g_last_click_x) <= 4 && abs(y - g_last_click_y) <= 4;
           if (dbl) { msg = base + 2; g_last_click_btn = -1; }
@@ -951,8 +1130,13 @@ static void translate_input(const uint32_t *r) {
       }
       return;
     }
+    case GUI_IN_LAYOUT: kbd_set_layout(a & 0xFFFF); return;
+    case GUI_IN_IME: ime_input(r); return;
+    case GUI_IN_TOUCH: touch_input(r); return;
+    case GUI_IN_POINTER_LOCK: return;   /* 成立は host 通知。shim 側の状態は持たない (要求は ptrlock_update が出す) */
     case GUI_IN_KEY_DOWN: case GUI_IN_KEY_UP: {
       uint32_t vk = a & 0xFF;
+      { uint32_t lvk = kbd_layout_vk((b >> 8) & 0xFF, (b >> 1) & 1); if (lvk) vk = lvk; }   /* 物理キー (scancode) → 現配列の VK */
       if (type == GUI_IN_KEY_DOWN) g_kb[vk] |= 0x80; else g_kb[vk] &= 0x7f;
       Wnd *w = g_focus ? g_focus : g_active;
       if (!w) return;
@@ -1042,11 +1226,13 @@ static int service_sync_requests(void) {
   return did;
 }
 /* 見つかれば out に詰めて 1 */
+static void pump_drops(void);   /* gui_core_ext.inc: host からの drop 要求を GUI スレッド上で配送 (#172) */
 static int try_get(WMSG *out, U64 hwnd, uint32_t mn, uint32_t mx, int remove) {
   GuiShared *sh = gui_sh();
   if (g_any_dirty && gui_now_ms() - g_last_flush >= 16) surf_flush();   /* 描画しっぱなしでも ~60Hz で present */
   service_sync_requests();
   pump_input();
+  pump_drops();
   gui_lock();
   for (uint32_t i = g_qh; i != g_qt; i++) {
     QMsg *q = &g_q[i % QCAP];
@@ -1152,6 +1338,7 @@ static API dispatch_impl(I64 lpmsg) {
   Wnd *w = wnd_from_h(m->hwnd);
   if (!w) return 0;
   if (m->message == WM_PAINT && !w->has_inv) return 0;
+  if (m->message == WM_PAINT) nc_paint_if_needed(w);
   I64 r = call_proc(w, m->message, m->wParam, m->lParam);
   if (m->message == WM_PAINT) surf_flush();
   return r;
@@ -1204,13 +1391,34 @@ static API defproc_impl(I64 h, I64 msg, I64 wp, I64 lp, int wide) {
       gdi_fill_rect_dc(dc, r, col);
       return 1;
     }
-    case WM_NCHITTEST: return 1;  /* HTCLIENT */
+    case WM_NCCALCSIZE: {   /* wParam=1: NCCALCSIZE_PARAMS (rgrc[0] = 新 window rect -> client rect)、0: RECT */
+      WRECT *r = (g_nc_cur && (uint32_t)lp == (uint32_t)(uintptr_t)g_nc_cur) ? g_nc_cur : (WRECT *)P_(lp); int l, t, rr, b; nc_metrics(w->style, w->exstyle, &l, &t, &rr, &b);
+      r->left += l; r->top += t; r->right -= rr; r->bottom -= b; return 0;
+    }
+    case WM_NCPAINT: {   /* window DC に枠 (4 辺) とキャプション帯を描く。client は塗らない */
+      extern API GetWindowDC(I64); extern API ReleaseDC(I64, I64);
+      I64 dc = GetWindowDC(h); if (!dc) return 0;
+      int W_ = ww(w), HH = wh(w), bw = w->nl, cap = w->nt - bw; if (cap < 0) cap = 0;
+      if (bw) {
+        gdi_fill_rect_dc((U64)dc, (WRECT){ 0, 0, W_, bw }, 0x646464); gdi_fill_rect_dc((U64)dc, (WRECT){ 0, HH - w->nb, W_, HH }, 0x646464);
+        gdi_fill_rect_dc((U64)dc, (WRECT){ 0, bw, w->nl, HH - w->nb }, 0x646464); gdi_fill_rect_dc((U64)dc, (WRECT){ W_ - w->nr, bw, W_, HH - w->nb }, 0x646464);
+      }
+      if (cap) gdi_fill_rect_dc((U64)dc, (WRECT){ w->nl, bw, W_ - w->nr, bw + cap }, 0xD1B499);
+      ReleaseDC(h, dc); return 0;
+    }
+    case WM_NCHITTEST: {   /* lParam = screen 座標 */
+      int px = (int16_t)(lp & 0xFFFF), py = (int16_t)((lp >> 16) & 0xFFFF), sx, sy; to_screen_origin(w, &sx, &sy);
+      int cx = px - sx, cy = py - sy;
+      if (cx >= 0 && cy >= 0 && cx < w->w && cy < w->hgt) return HT_CLIENT;
+      if (cx < -w->nl || cy < -w->nt || cx >= w->w + w->nr || cy >= w->hgt + w->nb) return HT_NOWHERE;
+      int bw = w->nl; return (w->nt > bw && cy < 0 && cy >= -(w->nt - bw)) ? HT_CAPTION : HT_BORDER;
+    }
     case WM_SETCURSOR: {
       extern API SetCursor(I64);
       if (w->cls && w->cls->hcursor) SetCursor((I64)w->cls->hcursor);
       return 1;
     }
-    case WM_MOUSEACTIVATE: return 1;
+    case WM_MOUSEACTIVATE: return (w->exstyle & WS_EX_NOACTIVATE_) ? 3 /* MA_NOACTIVATE */ : 1;
     case WM_SHOWWINDOW: case WM_SIZE: case WM_MOVE: case WM_ACTIVATE: case WM_SETFOCUS: case WM_KILLFOCUS:
     case WM_DESTROY: case WM_NCDESTROY: case WM_CREATE: return 0;
     case WM_GETTEXTLENGTH: return (I64)strlen(w->title);
@@ -1225,7 +1433,27 @@ API DefWindowProcW(I64 h, I64 msg, I64 wp, I64 lp) { return defproc_impl(h, msg,
 /* ================= カーソル / 入力状態 ================= */
 API GetCursorPos(I64 pt) { GuiShared *sh = gui_sh(); WPOINT *p = (WPOINT *)P_(pt); p->x = (int32_t)__atomic_load_n(&sh->cursor_x, __ATOMIC_RELAXED); p->y = (int32_t)__atomic_load_n(&sh->cursor_y, __ATOMIC_RELAXED); return 1; }
 API GetPhysicalCursorPos(I64 pt) { return GetCursorPos(pt); }
-API SetCursorPos(I64 x, I64 y) { GuiShared *sh = gui_sh(); sh->cursor_x = (int32_t)x; sh->cursor_y = (int32_t)y; return 1; }
+static int g_cursor_cnt;   /* ShowCursor 表示カウンタ (マウス有りの初期値 0 = 表示) */
+static int g_cursor_cnt_get(void) { return g_cursor_cnt; }
+static WRECT g_cclip; static int g_cclip_on;
+API SetCursorPos(I64 x, I64 y) {
+  GuiShared *sh = gui_sh(); int32_t cx = (int32_t)x, cy = (int32_t)y;
+  if (g_cclip_on) { if (cx < g_cclip.left) cx = g_cclip.left; if (cx >= g_cclip.right) cx = g_cclip.right - 1; if (cy < g_cclip.top) cy = g_cclip.top; if (cy >= g_cclip.bottom) cy = g_cclip.bottom - 1; }
+  __atomic_store_n(&sh->cursor_x, cx, __ATOMIC_RELAXED); __atomic_store_n(&sh->cursor_y, cy, __ATOMIC_RELAXED); return 1;
+}
+API ClipCursor(I64 rc) {
+  const WRECT *r = (const WRECT *)P_(rc);
+  if (!r) { g_cclip_on = 0; out_cmd(GUI_CMD_CLIP_RECT, 0, 0, 0, 0, 0, 0); return 1; }
+  if (r->right <= r->left || r->bottom <= r->top) { gui_set_last_error(87); return 0; }
+  g_cclip = *r; g_cclip_on = 1;
+  out_cmd(GUI_CMD_CLIP_RECT, 0, (uint32_t)r->left, (uint32_t)r->top, (uint32_t)r->right, (uint32_t)r->bottom, 0);
+  return 1;
+}
+static int g_ptrlock_req;   /* shim が host へ要求中の Pointer Lock 状態 */
+static void ptrlock_update(void) {
+  int want = g_cursor_cnt_get() < 0 && (g_capture != NULL || (gui_sh()->buttons & 7));
+  if (want != g_ptrlock_req) { g_ptrlock_req = want; out_cmd(GUI_CMD_POINTER_LOCK, 0, (uint32_t)want, 0, 0, 0, 0); }
+}
 API SetPhysicalCursorPos(I64 x, I64 y) { return SetCursorPos(x, y); }
 API LoadCursorA(I64 hi, I64 name) { (void)hi; return name < 0x10000 ? (0x7F000000 + name) : 0x7F000000; }
 API LoadCursorW(I64 hi, I64 name) { return LoadCursorA(hi, name); }
@@ -1239,8 +1467,7 @@ API SetCursor(I64 c) {
   return old;
 }
 API GetCursor(void) { return g_cur; }
-static int g_cursor_cnt;   /* ShowCursor 表示カウンタ (マウス有りの初期値 0 = 表示) */
-API ShowCursor(I64 show) { g_cursor_cnt += show ? 1 : -1; return g_cursor_cnt; }
+API ShowCursor(I64 show) { g_cursor_cnt += show ? 1 : -1; ptrlock_update(); return g_cursor_cnt; }
 API GetCursorInfo(I64 pci) {
   uint32_t *u = (uint32_t *)P_(pci);   /* CURSORINFO (Win64 24B): cbSize, flags, hCursor(8), ptScreenPos(8) */
   if (!u || u[0] != 24) { gui_set_last_error(87); return 0; }
@@ -1280,13 +1507,13 @@ API GetSystemMetrics(I64 i) {
     case SM_CXSCREEN: case SM_CXVIRTUALSCREEN: case SM_CXFULLSCREEN: case SM_CXMAXIMIZED: return sh->screen_w;
     case SM_CYSCREEN: case SM_CYVIRTUALSCREEN: case SM_CYFULLSCREEN: case SM_CYMAXIMIZED: return sh->screen_h;
     case SM_XVIRTUALSCREEN: case SM_YVIRTUALSCREEN: return 0;
-    case SM_CXVSCROLL: case SM_CYHSCROLL: return 17;
-    case SM_CYCAPTION: return 23;
-    case SM_CXBORDER: case SM_CYBORDER: return 1;
+    case SM_CXVSCROLL: case SM_CYHSCROLL: return dscale(17);
+    case SM_CYCAPTION: return dscale(23);
+    case SM_CXBORDER: case SM_CYBORDER: return dscale(1);
     case SM_CXDOUBLECLK: case SM_CYDOUBLECLK: return 4;
     case SM_CXICON: case SM_CYICON: return 32;
     case SM_CXSMICON: case SM_CYSMICON: return 16;
-    case SM_CXFRAME: case SM_CYFRAME: return 4;
+    case SM_CXFRAME: case SM_CYFRAME: return dscale(4);
     case SM_CXDRAG: case SM_CYDRAG: return 4;
     case SM_CMONITORS: return 1;
     case SM_MOUSEPRESENT: return 1;
@@ -1308,7 +1535,7 @@ API SystemParametersInfoW(I64 act, I64 p1, I64 p2, I64 fl) {
   GuiShared *sh = gui_sh();
   if (act == 0x30) { WRECT *r = (WRECT *)P_(p2); r->left = r->top = 0; r->right = (int32_t)sh->screen_w; r->bottom = (int32_t)sh->screen_h; return 1; } /* SPI_GETWORKAREA */
   if (act == 0x1004) { *(uint32_t *)P_(p2) = 0; return 1; }  /* SPI_GETMOUSEHOVERTIME 等は 0 */
-  char m[64]; snprintf(m, sizeof m, "SystemParametersInfo action 0x%x", (unsigned)act); gui_failfast("SystemParametersInfoW", m);
+  return 0;  /* 未対応 action は FALSE (Win32 の未対応 action 相当)。値を推定で埋めない */
 }
 API SystemParametersInfoA(I64 a, I64 b, I64 c, I64 d) { return SystemParametersInfoW(a, b, c, d); }
 API GetKeyboardState(I64 buf) { memcpy(P_(buf), g_kb, 256); return 1; }
@@ -1355,7 +1582,14 @@ API SendInput(I64 n, I64 pin, I64 cb) {
 API MessageBoxA(I64 h, I64 t, I64 c, I64 f) { (void)h; (void)f; gui_logf("MessageBox[%s]: %s", c ? (const char *)P_(c) : "", t ? (const char *)P_(t) : ""); return 1; }
 API MessageBoxW(I64 h, I64 t, I64 c, I64 f) { char a[200], b[100]; u16_to_u8((const uint16_t *)P_(t), a, sizeof a); u16_to_u8((const uint16_t *)P_(c), b, sizeof b); return MessageBoxA(h, H_(a), H_(b), f); }
 API NotifyWinEvent(I64 a, I64 b, I64 c, I64 d) { (void)a; (void)b; (void)c; (void)d; return 0; }
-API SetThreadDpiAwarenessContext(I64 c) { return c; }
+API SetThreadDpiAwarenessContext(I64 c) {   /* 戻り値 = 旧 context。不正値は 0 */
+  if (!((c >= -5 && c <= -1))) { gui_set_last_error(87); return 0; }
+  I64 old = g_dpi_ctx; g_dpi_ctx = c; return old;
+}
+API GetThreadDpiAwarenessContext(void) { return g_dpi_ctx; }
+API GetDpiForSystem(void) { gui_sh(); return (g_dpi_ctx == -1 || g_dpi_ctx == -5) ? 96 : (I64)((96u * (gui_sh()->dpr_x100 ? gui_sh()->dpr_x100 : 100) + 50) / 100); }
+API GetDpiForWindow(I64 h) { if (!wnd_from_h((U64)h)) return 0; return gui_dpi(); }
+API IsProcessDPIAware(void) { return g_dpi_ctx != -1 && g_dpi_ctx != -5; }
 API IsIconic(I64 h) { (void)h; return 0; }
 API IsZoomed(I64 h) { (void)h; return 0; }
 
@@ -1422,20 +1656,14 @@ API SetParent(I64 h, I64 np) {
   invalidate(w, NULL, 1, 1); if (old && old != g_desktop) invalidate(old, NULL, 1, 0);
   return old && old != g_desktop ? (I64)old->h : 0;
 }
-API GetClipCursor(I64 rc) { GuiShared *sh = gui_sh(); WRECT *r = (WRECT *)P_(rc); r->left = r->top = 0; r->right = (int32_t)sh->screen_w; r->bottom = (int32_t)sh->screen_h; return 1; }
-API MapVirtualKeyW(I64 code, I64 type) {
-  if (type == 2) { if (code >= 0x30 && code <= 0x5A) return code; if (code == VK_SPACE) return ' '; return 0; }          /* MAPVK_VK_TO_CHAR */
-  if (type == 0) { static const uint8_t sc[] = { 0 }; (void)sc; return 0; }                                                    /* VK_TO_VSC は未対応 = 0 */
-  return 0;
-}
+API GetClipCursor(I64 rc) { GuiShared *sh = gui_sh(); WRECT *r = (WRECT *)P_(rc); if (g_cclip_on) { *r = g_cclip; return 1; } r->left = r->top = 0; r->right = (int32_t)sh->screen_w; r->bottom = (int32_t)sh->screen_h; return 1; }
 static int vk_to_char(uint32_t vk, const uint8_t *st);   /* gui_core_ext.inc (US 配列) */
+static int layout_to_char(uint32_t vk, uint32_t sc, const uint8_t *st);   /* gui_core_ext.inc */
 API ToAscii(I64 vk, I64 sc, I64 state, I64 buf, I64 flags) {
-  (void)sc; (void)flags; int ch = vk_to_char((uint32_t)vk, (const uint8_t *)P_(state));
-  if (!ch) return 0; *(uint16_t *)P_(buf) = (uint16_t)ch; return 1;
+  (void)flags; const uint8_t *st = (const uint8_t *)P_(state);
+  int ch = layout_to_char((uint32_t)vk, (uint32_t)sc, st); if (ch < 0) ch = vk_to_char((uint32_t)vk, st);
+  if (!ch || ch > 0xFF) return 0; *(uint16_t *)P_(buf) = (uint16_t)ch; return 1;
 }
-API GetKeyboardLayout(I64 tid) { (void)tid; return 0x04090409; }
-API ActivateKeyboardLayout(I64 h, I64 f) { (void)f; return h ? h : 0x04090409; }
-API LoadKeyboardLayoutW(I64 s, I64 f) { (void)s; (void)f; return 0x04090409; }
 API PhysicalToLogicalPoint(I64 h, I64 pt) { (void)h; (void)pt; return 1; }
 API LogicalToPhysicalPoint(I64 h, I64 pt) { (void)h; (void)pt; return 1; }
 API GetMessageExtraInfo(void) { return 0; }
@@ -1455,7 +1683,8 @@ API GetUpdateRgn(I64 h, I64 rgn, I64 erase) {
   extern API SetRectRgn(I64, I64, I64, I64, I64);
   (void)erase; Wnd *w = wnd_from_h((U64)h); if (!w) return 0;
   if (!w->has_inv) { SetRectRgn(rgn, 0, 0, 0, 0); return 1; }
-  SetRectRgn(rgn, w->inv.left, w->inv.top, w->inv.right, w->inv.bottom); return 2;
+  extern void gdi_rgn_set_rl(U64, const RL *);
+  gdi_rgn_set_rl((U64)rgn, &w->invl); return w->invl.n > 1 ? 3 : 2;
 }
 API ValidateRgn(I64 h, I64 rgn) { (void)rgn; return ValidateRect(h, 0); }
 API BeginDeferWindowPos(I64 n) { (void)n; return 0x7DEF0000; }
@@ -1539,21 +1768,39 @@ API SetWindowPlacement(I64 h, I64 wp) {
   MoveWindow(h, (int32_t)u[7], (int32_t)u[8], (int32_t)u[9] - (int32_t)u[7], (int32_t)u[10] - (int32_t)u[8], 1);
   ShowWindow(h, u[2]); return 1;
 }
-API MsgWaitForMultipleObjects(I64 n, I64 handles, I64 all, I64 ms, I64 mask) {
-  (void)all; (void)mask; GuiShared *sh = gui_sh();
-  if (n != 0 || handles) gui_failfast("MsgWaitForMultipleObjects", "waiting on kernel handles not supported (nCount must be 0)");
+/* MsgWaitForMultipleObjects[Ex] (#172 SHX-T5): shimx の weak 定義を置換する強定義。
+ * kernel object の待機は shimx 担当 (WaitForMultipleObjects を弱参照で借りる)。リンクされていなければ従来どおり nCount==0 のみ。
+ * 起床: GUI のメッセージ到着 = doorbell。kernel object の状態変化は shimx_set_notify_hook(gui_doorbell) (gui_shimx_attach) 経由で
+ * 同じ doorbell を鳴らすため 1 本の futex で両方を待てる。hook 未接続で n>0 のときは 5ms 刻みの poll に縮退 (取りこぼし防止)。
+ * 戻り: WAIT_OBJECT_0+i (i 番目 signaled; 低 index 優先) / WAIT_OBJECT_0+n (メッセージ) / WAIT_TIMEOUT / WAIT_FAILED。
+ * MWMO_WAITALL(1) は「全 object signaled かつ入力あり」で WAIT_OBJECT_0 (入力を先に確認してから object を一括取得 = 取得だけ先走らない)。 */
+extern uint32_t WaitForMultipleObjects(uint32_t n, const uint64_t *hs, int all, uint32_t ms) __attribute__((weak));
+static int g_kernel_notify_attached;
+static uint32_t msgwait_ex(uint32_t n, const uint64_t *hs, uint32_t ms, uint32_t flags) {
+  GuiShared *sh = gui_sh();
+  int all = (flags & 1u) != 0;
+  if (n > 0 && (!hs || n > 63)) { gui_set_last_error(87); return 0xFFFFFFFFu; }
+  if (n > 0 && !WaitForMultipleObjects) gui_failfast("MsgWaitForMultipleObjects", "waiting on kernel handles needs shimx (WaitForMultipleObjects unresolved)");
   uint32_t t0 = gui_now_ms();
   for (;;) {
     uint32_t seen = __atomic_load_n(&sh->doorbell, __ATOMIC_SEQ_CST); WMSG tmp;
-    if (try_get(&tmp, 0, 0, 0, 0)) return 0;   /* WAIT_OBJECT_0 + nCount : メッセージ到着 */
+    int have_msg = try_get(&tmp, 0, 0, 0, 0);
+    if (n > 0 && (!all || have_msg)) {
+      uint32_t r = WaitForMultipleObjects(n, hs, all, 0);
+      if (r != 0x102u) return r;           /* signaled (WAIT_OBJECT_0+i / ABANDONED) または WAIT_FAILED */
+    }
+    if (have_msg && !all) return n;        /* WAIT_OBJECT_0 + nCount : メッセージ到着 */
+    if (have_msg && n == 0) return 0;
     surf_flush();
-    int32_t left = (uint32_t)ms == 0xFFFFFFFFu ? -1 : (int32_t)((uint32_t)ms - (gui_now_ms() - t0));
-    if (left == 0 || (left < 0 && (uint32_t)ms != 0xFFFFFFFFu)) return 0x102;   /* WAIT_TIMEOUT */
+    int32_t left = ms == 0xFFFFFFFFu ? -1 : (int32_t)(ms - (gui_now_ms() - t0));
+    if (ms != 0xFFFFFFFFu && (left <= 0 || (uint32_t)(gui_now_ms() - t0) >= ms)) return 0x102;   /* WAIT_TIMEOUT */
     int32_t tm = next_timer_timeout(); if (left >= 0 && (tm < 0 || left < tm)) tm = left;
+    if (n > 0 && !g_kernel_notify_attached && (tm < 0 || tm > 5)) tm = 5;
     gui_futex_wait(&sh->doorbell, seen, tm);
   }
 }
-API MsgWaitForMultipleObjectsEx(I64 n, I64 handles, I64 ms, I64 mask, I64 flags) { (void)flags; return MsgWaitForMultipleObjects(n, handles, 0, ms, mask); }
+API MsgWaitForMultipleObjects(I64 n, I64 handles, I64 all, I64 ms, I64 mask) { (void)mask; return msgwait_ex((uint32_t)n, (const uint64_t *)P_(handles), (uint32_t)ms, all ? 1u : 0u); }
+API MsgWaitForMultipleObjectsEx(I64 n, I64 handles, I64 ms, I64 mask, I64 flags) { (void)mask; return msgwait_ex((uint32_t)n, (const uint64_t *)P_(handles), (uint32_t)ms, (uint32_t)flags); }
 static API scroll_impl(Wnd *w, int dx, int dy, const WRECT *scroll, const WRECT *clip) {
   extern API BitBlt(I64, I64, I64, I64, I64, I64, I64, I64, I64);
   WRECT r = scroll ? *scroll : (WRECT){ 0, 0, w->w, w->hgt };

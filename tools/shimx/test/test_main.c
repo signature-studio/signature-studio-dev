@@ -2,7 +2,9 @@
  *   node x.cjs            : 全グループ (MT ビルドならスレッド系も)
  *   node x.cjs unimpl     : shim_unimplemented → 関数名を出して abort
  *   node x.cjs raise      : 未処理 RaiseException → fail-fast
- *   node x.cjs rtlunwind  : RtlUnwind → fail-fast
+ *   node x.cjs rtlunwind  : RtlUnwind (frame 未登録) → fail-fast
+ *   node x.cjs sehnomatch : SEH frame はあるが捕捉 scope 無し → fail-fast (#171)
+ *   node x.cjs sehbadtarget : RtlUnwindEx の targetFrame に一致 frame 無し → fail-fast (#171)
  *   node x.cjs strict     : strict モードで未知 GetProcAddress → fail-fast
  *   node x.cjs bstrfree   : strict モードで SysFreeString(管理外ポインタ) → fail-fast (R5)
  *   node x.cjs csnull     : 既定モードで EnterCriticalSection(NULL) → fail-fast (R7)
@@ -18,6 +20,8 @@ int main(int argc, char** argv) {
     if (!strcmp(mode, "unimpl")) { shim_unimplemented("DestroyWindow_NonImplemented_Example"); return 0; }
     if (!strcmp(mode, "raise")) { uint64_t a[1] = { 0x1234 }; RaiseException(0xE06D7363u, EXCEPTION_NONCONTINUABLE, 1, a); return 0; }
     if (!strcmp(mode, "rtlunwind")) { RtlUnwind(NULL, NULL, NULL, NULL); return 0; }
+    if (!strcmp(mode, "sehnomatch")) { seh_failfast_nomatch(); return 0; }
+    if (!strcmp(mode, "sehbadtarget")) { seh_failfast_badtarget(); return 0; }
     if (!strcmp(mode, "strict")) {
         shimx_set_strict(1);
         GetProcAddress(GetModuleHandleW(W("kernel32.dll")), "NoSuchKernelApi");
@@ -51,6 +55,8 @@ int main(int argc, char** argv) {
     run_ole_shell_tests();       fprintf(stderr, "[shimx-test] ole/shell OK\n");
     run_link_tests(mt);          fprintf(stderr, "[shimx-test] link OK\n");
     run_cbtrans_tests(mt);       fprintf(stderr, "[shimx-test] cbtrans OK\n");
+    run_seh_tests();             fprintf(stderr, "[shimx-test] seh OK\n");
+    run_absent_path_tests();     fprintf(stderr, "[shimx-test] absent-path OK\n");
     printf("[shimx-test] ALL PASS (build=%s)\n", build);
     return 0;
 }

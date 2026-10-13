@@ -20,6 +20,10 @@ if grep -rn "from 'node:" web/; then echo "FAIL: node import in web/"; fail=1; e
 step "unit + corpus tests"; node --test test/ 2>&1 | grep -E "^ℹ (tests|pass|fail)"
 step "round trip (level 0 container, level 1 typed)"; node cli/roundtrip.ts corpus/roundtrip.json | head -12
 step "manifest / census / plugins"; node cli/corpus.ts 2>/dev/null
+if [ -n "${E2E_FLP_WIN_DIR:-}" ]; then
+  step "plugin state (event 213) decoders: layout fit / byte-exact round trip / predicted length (L-3, #104)"
+  node cli/plugstate.ts "$E2E_FLP_WIN_DIR" work/plugstate.json || fail=1
+fi
 step "win installer vs mac corpus"; node cli/winmac.ts corpus/winmac.json
 if [ "${SETUP_PYFLP:-0}" = 1 ] && [ ! -x work/venv310/bin/python ]; then
   command -v uv >/dev/null && uv venv --python 3.10 work/venv310 && uv pip install --python work/venv310/bin/python pyflp

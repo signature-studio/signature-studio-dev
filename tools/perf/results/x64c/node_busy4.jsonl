@@ -1,0 +1,6 @@
+{"env":"node","node":"v22.23.3","v":"o2","sig":"6b1696f0","nonzeroOut":256,"p50us":92.05,"p99us":3101.07,"maxus":7110.45,"batch64p50us":95.14,"rtf44":0.03171,"load":3.2}
+{"env":"node","node":"v22.23.3","v":"o3lto","sig":"6b1696f0","nonzeroOut":256,"p50us":75.28,"p99us":89.03,"maxus":3181.34,"batch64p50us":76.38,"rtf44":0.02594,"load":3.2}
+{"env":"node","node":"v22.23.3","v":"o2","sig":"6b1696f0","nonzeroOut":256,"p50us":91.35,"p99us":3100.09,"maxus":8104.9,"batch64p50us":92.33,"rtf44":0.03147,"load":3.5}
+{"env":"node","node":"v22.23.3","v":"o3lto","sig":"6b1696f0","nonzeroOut":256,"p50us":73.7,"p99us":131.37,"maxus":6645.02,"batch64p50us":74.88,"rtf44":0.02539,"load":3.78}
+{"env":"node","node":"v22.23.3","v":"o2","sig":"6b1696f0","nonzeroOut":256,"p50us":91.5,"p99us":108.22,"maxus":4370.36,"batch64p50us":93.51,"rtf44":0.03152,"load":3.78}
+{"env":"node","node":"v22.23.3","v":"o3lto","sig":"6b1696f0","nonzeroOut":256,"p50us":73.83,"p99us":89.07,"maxus":4874.22,"batch64p50us":74.82,"rtf44":0.02544,"load":4.04}

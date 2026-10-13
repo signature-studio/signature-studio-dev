@@ -88,6 +88,7 @@ CryptHashData
 CryptMsgClose
 CryptMsgGetParam
 CryptQueryObject
+CryptReleaseContext
 DecodePointer
 DeleteAtom
 DeleteCriticalSection
@@ -260,7 +261,9 @@ HttpEndRequestW
 HttpOpenRequestW
 HttpQueryInfoA
 HttpQueryInfoW
+HttpSendRequestA
 HttpSendRequestExW
+HttpSendRequestW
 ILClone
 ILCloneFirst
 ILCombine
@@ -301,6 +304,8 @@ InterlockedOr
 InterlockedPopEntrySList
 InterlockedPushEntrySList
 InterlockedXor
+InternetCheckConnectionA
+InternetCheckConnectionW
 InternetCloseHandle
 InternetConnectW
 InternetGetConnectedState
@@ -414,6 +419,7 @@ PropVariantToFileTime
 PropVariantToStringWithDefault
 PropVariantToVariant
 PulseEvent
+QISearch
 QueryDepthSList
 QueryDosDeviceW
 QueryPerformanceCounter
@@ -512,6 +518,8 @@ SHChangeNotifyDeregister
 SHChangeNotifyRegister
 SHCreateDirectoryExW
 SHCreateItemFromParsingName
+SHCreateMemStream
+SHCreateStdEnumFmtEtc
 SHCreateStreamOnFileEx
 ShellExecuteA
 ShellExecuteExA
@@ -581,6 +589,7 @@ shimx_towlower
 shimx_towupper
 shimx_utf16_to_utf8
 shimx_utf8_to_utf16
+shimx_wininet_call_count
 SHOpenFolderAndSelectItems
 SignalObjectAndWait
 SizeofResource

@@ -12,7 +12,8 @@ HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 REPO="$(cd -- "$HERE/../../.." && pwd)"
 cd "$REPO"
 export PATH="$HOME/.local/share/pnpm/bin:$PATH"
-PE=/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin
+source "$REPO/tools/shared/env.sh"
+PE="$FL_WIN64_DIR/extracted/block00031_PE.bin"
 BATCH=0
 for a in "$@"; do case "$a" in --batch) BATCH=1 ;; esac; done
 
@@ -22,6 +23,7 @@ fail() { echo "[ldfix_e2e] FAILED: $*"; exit 1; }
 [ -f tools/m11/work/boot_final3.ll ] || fail "tools/m11/work/boot_final3.ll 無し (bash tools/m11/m11_e2e.sh を先に)"
 [ -f "$PE" ] || fail "PE 無し"
 
+mkdir -p "$HERE/work/stage4"
 step "1/5 修復 pass 適用: boot_final3.ll -> work/ldfix_fixed.ll"
 python3 "$HERE/ldfix.py" tools/m11/work/boot_final3.ll "$HERE/work/ldfix_fixed.ll" \
   --pe "$PE" --report "$HERE/work/ldfix_report.json" || fail "ldfix.py"
@@ -58,7 +60,7 @@ if [ "$BATCH" = 1 ]; then
   step "liftdiff closure 全数 batch (base / fix 各約 10 分)"
   python3 tools/liftdiff/liftdiff.py batch tools/liftdiff/targets/m11.json --set closure --shards 12 --state auto \
     --out "$HERE/work/batch_base.jsonl" > "$HERE/work/batch_base.log" 2>&1
-  python3 tools/liftdiff/liftdiff.py batch "$HERE/targets/m11_ldfix.json" --set closure --shards 12 --state auto \
+  python3 tools/liftdiff/liftdiff.py batch "$(python3 "$HERE/render_target.py" "$HERE/targets/m11_ldfix.json")" --set closure --shards 12 --state auto \
     --out "$HERE/work/batch_ldfix.jsonl" > "$HERE/work/batch_ldfix.log" 2>&1
   python3 tools/liftdiff/liftdiff.py summary "$HERE/work/batch_base.jsonl" | head -8
   python3 tools/liftdiff/liftdiff.py summary "$HERE/work/batch_ldfix.jsonl" | head -8

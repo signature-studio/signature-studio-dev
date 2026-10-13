@@ -12,7 +12,8 @@
 # 触らず独立再現するときは `FW_W=<空dir> bash fw_stage2.sh` (dir に stage-1 成果物を置く)。
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
-T=/home/ubuntu/work/webstudio
+source "$HERE/../../shared/env.sh"
+T="$REPO_ROOT"
 W="${FW_W:-$HERE/../work/fw}"
 PE="$W/fw_icall.dll"
 FRESH=0
@@ -61,13 +62,19 @@ if [ $FRESH = 1 ] || [ ! -f fw_all.restored.ll ]; then
 fi
 
 # ---- 3. f80 → f64 ----
-[ -f fw_f80.ll ] || python3 "$HERE/fw_f80.py" fw_all.restored.ll fw_f80.ll --report fw_f80.json
+# FW_EXT_FUNCS (P0c-8 / #311): 指定すると fw_f80.py --ext-funcs で ext (dd) emulation を適用する。
+# 未指定なら従来どおり (fw_f80.ll は byte 一致)。FW_CHOP_FUNCS / FW_CHOP_RANGES は fldcw chop 区間。
+EXT_ARGS=()
+if [ -n "${FW_EXT_FUNCS:-}" ]; then
+  EXT_ARGS=(--ext-funcs "$FW_EXT_FUNCS" --chop-funcs "${FW_CHOP_FUNCS:-}" --chop-ranges "${FW_CHOP_RANGES:-}")
+fi
+[ -f fw_f80.ll ] || python3 "$HERE/fw_f80.py" fw_all.restored.ll fw_f80.ll --report fw_f80.json "${EXT_ARGS[@]}"
 
 # ---- 4. liftlib base normalize ----
 if [ ! -f fw_norm.ll ]; then
   python3 - <<'PY'
-import sys
-sys.path.insert(0, '/home/ubuntu/work/webstudio/tools/liftlib')
+import os, sys
+sys.path.insert(0, os.environ['REPO_ROOT'] + '/tools/liftlib')
 from liftlib.passes import base
 text = open('fw_f80.ll', errors='replace').read()
 open('fw_norm.ll', 'w').write(base.normalize(text))
@@ -140,8 +147,8 @@ fi
 if [ ! -f fw_simd.c ]; then
   # liftlib simd gen (TAG 拡張)
   python3 - <<'PY'
-import sys, re
-sys.path.insert(0, '/home/ubuntu/work/webstudio/tools/liftlib')
+import os, sys, re
+sys.path.insert(0, os.environ['REPO_ROOT'] + '/tools/liftlib')
 from liftlib.simd import gen as G
 class DynTag(dict):
     def get(self, k, d=None):

@@ -91,6 +91,29 @@ fence="$(awk -v n="$longest_fence" 'BEGIN { s = ""; while (length(s) < n) s = s 
         printf '2. 読み取り専用なので、調査結果をコメントするのみ。\n'
       fi
       ;;
+    pull_request_review)
+      # reviewer (oc-reviewer) の差し戻し (changes_requested)。上の「依頼内容」は reviewer の review 本文
+      # (reviewer が PR の内容を引用しているため、指示としては扱わず指摘の入口として読む)。
+      printf '**これは reviewer の差し戻しに対する fix モードである。PM の指示を待たずに、あなた自身が修正を完了させる。**\n\n'
+      printf '1. 指摘の全体を確認する: `gh pr view %s --comments`、`gh api repos/%s/pulls/%s/reviews`、\n' "$PR_NUMBER" "$REPO" "$PR_NUMBER"
+      printf '   `gh api repos/%s/pulls/%s/comments` (inline)。oc-reviewer の最新の review と、copilot-pull-request-reviewer の指摘の両方を読む。\n' "$REPO" "$PR_NUMBER"
+      printf '2. `gh pr checkout %s` した PR ブランチ上で、妥当な指摘を全て修正する。force push はしない。\n' "$PR_NUMBER"
+      printf '   main と競合している場合は main を merge して解消する (rebase はしない)。\n'
+      printf '3. 修正を同じブランチへ push する (push が review を自動で再起動する)。PR 本文の検証 HEAD・実測値は最新の HEAD に更新する。\n'
+      printf '4. 妥当でないと判断した指摘は、PR コメントに根拠 (実測) を書く。\n'
+      printf '5. **何も push せず、PR コメントも書かずに終了してはならない。** 終了前に、指摘ごとの対応 (修正 commit / 対応しない理由) を PR コメントで報告する。\n'
+      printf '6. draft にしない。新しい PR を作らない (この PR を直す)。\n'
+      ;;
+    repository_dispatch)
+      # watchdog が送った fix 依頼 (競合の解消。#731)。競合 PR は review イベントでは起動しないため、この経路で起動する。
+      printf '**これは watchdog が送った競合解消の依頼である。PM の指示を待たずに、あなた自身が完了させる。**\n\n'
+      printf '1. `gh pr checkout %s` した PR ブランチ上で `git fetch origin main && git merge origin/main` を実行し、競合を解消する。\n' "$PR_NUMBER"
+      printf '   rebase はしない。force push はしない。main 側の変更を消さない。競合解消以外の変更はしない。\n'
+      printf '2. 解消後、PR が触る領域の検証 (該当 e2e またはテスト) を再実行し、結果を PR コメントに実測で書く。\n'
+      printf '3. 同じブランチへ push する (push が review を自動で再起動する)。PR 本文の検証 HEAD・実測値は最新の HEAD に更新する。\n'
+      printf '4. 競合した箇所と解消方針を PR コメントで報告する。**何も push せず、PR コメントも書かずに終了してはならない。**\n'
+      printf '5. draft にしない。新しい PR を作らない (この PR を直す)。\n'
+      ;;
     pull_request)
       printf '1. PR の差分を読み、依頼された追加作業を実施する。\n'
       if [ "$PERMISSION" = write ]; then

@@ -1,0 +1,37 @@
+
+`REPORT.md` の 250 行上限 (docs/DOC_MAP.md §1) のため、§11 の全文を無変更で分割移動した (GUI-13 #615 で §13 を追加した際)。要約は `REPORT.md` §11。
+
+## 11. GUI-9 (#186): GDI テキストの FreeType 描画 (内蔵 8×8 → FreeType 2.7)
+- **実装**: `src/gui_ft.c` (`GuiTextEngine` = FreeType 2.7、hinting は FT 既定) を `gui_set_text_engine(gui_ft_engine())` で有効化。未登録/face 解決不能/stock フォントは従来の 8×8 (既存 golden 維持)。`CreateFont{A,W}`/`CreateFontIndirect{A,W}` は face・height・weight・italic を保持 (`GetObject` の lfHeight は従来通り)、`GetTextMetrics`/`GetTextExtentPoint*`/`TextOut`/`ExtTextOut`/`DrawText` を engine 経由に、`EnumFontFamiliesExW` を STUB→IMPL (登録 face を列挙、`gui_call4` で cb 呼出、fontType=TRUETYPE)。
+- **方針 (#186 PM 判断)**: Windows 標準フォントは同梱しない。`gui_ft_alias("Segoe UI", "Open Sans")` 型の face→OSS フォント代替表、未解決名は最初に登録した face。`gui_ft_register_lazy` で最初の `open` 時に load (VFS #22 取得口; 実 VFS 結線は未)。テスト用フォントは Open Sans (`googlefonts/opensans`) と Barlow (`google/fonts` ofl/barlow) を `test/fetch_fonts.sh` が `work/` (gitignore) へ sha256 検証付きで取得し、リポジトリには入れない。
+- **独立オラクル**: `golden/ft_oracle.c` は shim のコードを一切使わず native FreeType 2.7 (`tools/shared/oss/freetype/build.sh` 産 `libfreetype.a`) を直接叩いて同一シーンの PPM と metrics 表を作る。共有するのは仕様 (ppem 規約・advance=四捨五入した hinted advance・合成式 `(fg*cov+dst*(255-cov)+127)/255`・TA_*/DT_* 配置) のみ。`golden/cmp_text.py` が画素と metrics 表 (2 face × 15 高さ = 30 行 × 9 列) を全一致判定。**実 Windows フォントとの一致は主張しない**。
+- **実測 (HEAD 再現前の作業ツリー; 4 vCPU, gcc ASan/UBSan, emcc 6.0.12, node 24)**:
+  - `bash tools/gui/test/text_golden.sh`: 前景 3826 画素・差 **0**、metrics 30 行・差 **0**、`EnumFontFamiliesExW` (全 2 face / 名指定 1 件=Barlow) OK、ネガコン 4/4 検出 (期待 1 画素+metrics 1 セル破壊 / フォント高さ +1 欠陥 = 1063 画素差 / engine 未登録 (8×8) / オラクルのフォントファイル差替え)。実時間 6.4 s。
+  - `bash tools/gui/test/ft_wasm.sh`: engine (gui_ft.c) の metrics/advance/glyph coverage ダンプ 11 行が native と wasm32 (`-pthread` で再ビルドした FreeType 2.7, FORCE_INT64+patch) で一致 (TOTAL edd537e3b390f846)、ダンプ破壊のネガコン検出。実時間 6.7 s。
+  - 回帰 (変更後): `selftest.sh` 406 passed/0 failed、`bpp_golden.sh` ALL PASS (ネガコン込み)、`simd_e2e.sh` ALL PASS、`reach_test.sh` 11+28 passed。
+- **レビュー対応の再現 (コミット済み HEAD 5813bea; work/・build/・libfreetype 無しのクリーン状態, 4 vCPU)**: `e2e.sh` 1c0 ブロックを原文のまま抽出して実行 (前段に `gen_api.py`; `fetch_fonts.sh` → `FONT=work/OpenSans-Regular.ttf build.sh` → `text_golden.sh` → `ft_wasm.sh`)。rc=0、実時間 1m34.678s (n=1、終了時 load average 2.29)。`build.sh` 自己テスト PASS wasm32/wasm64 (40 行, TOTAL a4eff06d516ef88f)、`text_golden.sh` ALL PASS (前景 3826 画素・差 0 / metrics 30 行・差 0)、`ft_wasm.sh` PASS (11 行, TOTAL edd537e3b390f846)。修正前は `FONT` 既定値 (FL mac 展開物) が無く `build.sh` が exit 1 → `e2e.sh` が 1c0 で abort していた。
+- **ネガコンの厳格化**: `text_golden.sh` は `cmp_text.py` が exit 1 (不一致) で拒否した場合だけ検出扱い (exit 0 受理・exit 2 入力不正はともに FAIL)。オラクル側 PPM を不正入力 (exit 2) にした変異版で `NEGCTL FAIL (rc=2)` と script exit 1 を確認 (従来の「非 0 なら検出」では通っていた)。
+- **8×8 経路の `DrawText` 挙動差 (実測; 旧 = main 59c1169、新 = HEAD 5813bea の engine 未登録、100×40・stock フォント・FNV 画素ハッシュ)**: DT_LEFT 複数行・CRLF DT_LEFT・単一行 DT_CENTER の画素と戻り値は 3 件とも一致。複数行 `ab\ncdef` の DT_CENTER は 1 行目の最小 x が 34→42、DT_RIGHT は 68→84 (旧は全行がブロック幅基準の同一 x0、新は行ごとに配置 = Windows の挙動)。`tools/gui` の既存 golden/selftest/gui_app に `DrawText` 呼出は無い (grep)。`e2e.sh` 全体での確認は未 (下記未解決 (1))。
+- **既知の限界**: カーニング・ClearType・合成 bold/italic・lpDx・DT_WORDBREAK/DT_END_ELLIPSIS/`&` プレフィックス・GetTextExtentExPoint/GetTextFace は未実装 (8×8 時代から DT 簡略のまま)。advance は整数 px (サブピクセル位置決めなし)。`GetTextMetrics` の `tmAveCharWidth` は OS/2 `xAvgCharWidth` (Windows の算出と異なりうる)。
+- **未解決** (本 PR は `Refs #186`): (1) `bash tools/gui/e2e.sh` 全体 ALL PASS は af8ba9cc / 0cbc5651 で各 1 回確認。安定性 (flake) は未確認 (付録 §11 追補・§13 (2))。(2) 実 FL が要求する face/サイズの確定 (blockedBy GUI-3 #174) と alias 表の実値。(3) VFS (#22) からの実フォント遅延取得の結線 (口 `gui_ft_register_lazy` のみ)・ブラウザ (wasm 全体) 上のテキスト描画 e2e。(THIRD_PARTY_NOTICES (#86) への Open Sans/Barlow の license 登録は #616 で対応: `tools/legal/notices/REPORT.md`。)(4) `wasm32` の `gui_wasm.sh` ビルドへ `gui_ft.c` + libfreetype の組込み (本 PR は既定 e2e のビルドへ未リンク = 既存 wasm 経路は 8×8 のまま)。
+
+## 11 追補. e2e.sh ALL PASS の実測 (#186 再実行 run; REPORT §11 から分割移動)
+
+- **af8ba9cc (検証起点 = origin/main, docs 追記前)**: 素材 `fl-win64` / `toolchain-retdec` / `toolchain-emsdk` 展開済み。runner に `x86_64-w64-mingw32-gcc` が無く `gen_api.py` が 0/6 で落ちたため `apt-get install gcc-mingw-w64-x86-64` (GCC 13) を導入して再実行。結果: **EXIT=0・`[gui-e2e] ALL PASS`**、real 5m02s、開始 load 0.54。native_run EXACT MATCH (0 px)、selftest 433 passed, 0 failed、Chrome E2E EXACT MATCH (読み戻し・スクリーンショットとも 0 px)、negctl (6a) rejected、fail-fast PASS、reach 36 APIs (impl 36 / stub 0)、stress 50,000 frames drop 0 (negctl burst / leak も exit 1 で検出)。ログ全文は run の一時ファイル (非コミット)。
+- **0cbc5651 (PR HEAD, docs のみ追記; コード差分なし)**: **EXIT=0・ALL PASS**、real 3m03s、終了 load 1.93 (開始 load は未記録)。PR 作成時の run の記録で、後続の再現 run は未実施。native_run EXACT MATCH (0 px)、selftest 433 passed 0 failed、reach 11 + adapt 28 passed、text_golden ALL PASS (ネガコン 4/4)、ft_wasm PASS、bpp_golden・nc_golden・simd_e2e ALL PASS、Chrome E2E 読み戻し・スクリーンショット EXACT MATCH (0 px)、negctl rejected、fail-fast PASS、reach 36 APIs (impl 36, stub 0)、stress 50,000 frames drop 0・memory 有界。grep で出る "fail" 行はすべて "0 failed" か期待どおりの失敗 (ネガコン・fail-fast)。
+- 前提: 0cbc5651 の run でも `x86_64-w64-mingw32-gcc` を `apt-get install gcc-mingw-w64-x86-64` で導入。
+- 1 回 PASS のみで、flake の解消は主張しない (§13 (2) 参照)。
+
+## 13 追補. c4b293d 再確認 (PR #661 レビュー対応: e2e.sh の FT ビルド保証を step 4 の前へ移動した後)
+
+環境: 4 vCPU・RAM 15 GiB、RetDec v5.0 ([RETDEC])、emcc 6.0.12、Chrome headless、clean worktree。以下の数値は PR #661 レビュー (oc-reviewer, HEAD `7ead604`) の実測で、rc・所要・開始時 load (1 分値)・回数を記す。
+
+- **負の対照 (旧順序の再現)**: libfreetype wasm32 が無い状態で `lift/gui_wasm.sh` を呼ぶと `run tools/shared/oss/freetype/build.sh first` で **rc=2** (1.1 s)。旧順序の e2e.sh step 4 は同じ経路で落ちる。
+- **新順序の FT ガード** (`test/fetch_fonts.sh` → `FONT=… shared/oss/freetype/build.sh`): **rc=0**、実時間 1 m 31 s。native / wasm32 / wasm64 の自己テストは PASS (TOTAL a4eff06d516ef88f)、フォント 2 本取得・sha256 OK。続けて `lift/ft_wasm_lib.sh` **rc=0** (5.9 s、`build/ft_mt` へ -pthread 再ビルド)。`gui_wasm.sh` は FT 段を通過し、`/nonexistent/lifted.c` の emcc 入力エラー (rc=1) で止まる。失敗位置が FT 検査から lifted.c 入力へ移ったことを確認 (lifted.c の生成は RetDec が必要で本 run では未実施)。
+- **`text_wasm_e2e.sh` (RetDec 不要)**: **3/3 rc=0 PASS**。実時間 18.27 s (初回) / 8.59 s / 8.63 s (FT ビルド 1 m 31 s は含まない)、開始時 load 1.84 / 1.76 / 3.01。読み戻し 0 px・スクリーンショット 0 px (38400 px 中、前景 3826 px)、metrics 30 行差 0、8×8 回帰 0 px (前景 2179 px)、ネガコン N1〜N5 全て拒否。
+- **旧 `e2e.sh` (f3ba8e1) の `SKIP_NATIVE=1`・libfreetype 未ビルド (ネガコン)**: **rc=2 で step 4** (`run tools/shared/oss/freetype/build.sh first`)、11.2 s。
+- **現 HEAD `SKIP_NATIVE=1 bash tools/gui/e2e.sh`・libfreetype 未ビルド**: **rc=0 ALL PASS**、2 m 24 s、開始時 load 1.28。step 33 のガードで FT native/wasm32/wasm64 を構築し、wasm32・wasm64 とも `[ft] PASS`。
+- **現 HEAD `bash tools/gui/e2e.sh` (通常経路) 2 回**: 1 回目 **rc=0 ALL PASS**、3 m 21 s、開始時 load 0.60。2 回目 **rc=1、step 2b の末尾で停止**、2 m 15 s、開始時 load 0.59。2 回目の出力は grep で除外され、原因行は未取得。受入条件 1 は 2 回中 1 回 ALL PASS。
+- **既知 flake (本 PR の変更とは独立)**: `tools/gui/test/reach_test.sh` 末尾の `selftest_wrapped` (ASan) が約 30% の確率で `gui_headless.c:33 blit_surf` の heap-use-after-free (`recompose_all` ← `on_cmd`、thread T1) で落ちる。同バイナリを単独 30 回回した結果は PR HEAD `7ead604` が **9/30 失敗**、origin/main `0fa8283` が **8/30 失敗** (同じ ASan エラー)。PR は `gui_headless.c`・`selftest.c`・`reach_test.sh` に触れていない。
+- **未解決 (起票依頼)**: `gui_headless.c` の blit_surf race の issue 起票 (PM 依頼・未起票)。`toolchain-retdec` を含む素材での通常経路 ALL PASS の追加確認の要否は PM 判断。
+

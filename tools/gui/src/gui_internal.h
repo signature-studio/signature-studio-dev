@@ -63,12 +63,17 @@ static inline WRECT r_isect(WRECT a, WRECT b) {
 typedef struct { uint8_t *px; int stride, w, h; uint32_t gen; } SurfView;
 int  surf_view(int id, SurfView *v);
 void surf_dirty(int id, WRECT r);
+uint32_t gui_surf_retired_count(void);   /* GUI-12: host 消費待ちで保留中の旧 surface バッファ数 (テスト用) */
+void surf_wseq_begin(int id);            /* window surface へ画素を書く前に呼ぶ (seqlock; 偶数→奇数) */
 void surf_flush(void);                    /* 溜まった dirty を PRESENT + FRAME_END として push */
 void gui_pump_idle_flush(void);
 
 /* ---- window <-> gdi 連携 (gui_core.c が実装) ---- */
 typedef struct Wnd Wnd;
 int  wnd_target(Wnd *w, int *surf, int *ox, int *oy);   /* top-level surf と client 原点 */
+void wnd_clip_window(Wnd *w, RL *out);                   /* window DC (NC を含む) の可視領域 */
+void wnd_window_origin(Wnd *w, int *ox, int *oy);        /* window rect 左上 (surface 座標) */
+int  gui_dpi(void);                                      /* スレッドの DPI 対応状態に応じた論理 DPI (96 / dpr*96) */
 void wnd_clip(Wnd *w, RL *out);                          /* window DC の可視領域 (surface 座標) */
 Wnd *wnd_from_h(U64 h);
 void wnd_client_size(Wnd *w, int *cw, int *ch);
@@ -76,9 +81,24 @@ void wnd_client_size(Wnd *w, int *cw, int *ch);
 /* ---- gdi (gui_gdi.c) ---- */
 U64 gdi_get_dc_for_wnd(Wnd *w, int window_dc, const RL *clip_override);
 void gdi_release_dc(U64 hdc);
+U64 gdi_get_screen_dc(void);   /* GetDC(NULL)/GetWindowDC(NULL): 既定 1x1 ビットマップ選択済みのメモリ DC (ReleaseDC/DeleteDC で解放) */
 void gdi_init(void);
 void gdi_fill_rect_dc(U64 hdc, WRECT r, uint32_t colorref);
 int  gdi_dc_is_valid(U64 hdc);
+
+/* ---- テキストエンジン (GUI-9 #186; gui_ft.c が実装)。未登録なら gui_gdi.c は内蔵 8x8 フォントで描く ---- */
+typedef struct { int ascent, descent, height, internal_leading, external_leading, avg_width, max_width, first, last, def_char, brk_char; } GuiTextMetrics;
+typedef struct { int advance, w, h, left, top; uint8_t *cov; } GuiGlyph;   /* cov = w*h の 8bit coverage (malloc; 呼出側が free)。left/top = ペン原点(ベースライン)からの bitmap 左上 (top は上向き正) */
+typedef struct GuiTextEngine {
+  void *(*open)(const uint16_t *face16, int height, int weight, int italic);   /* height: LOGFONT 規約 (<0 = em px, >0 = cell px, 0 = 既定)。NULL = 解決不能 (8x8 へ) */
+  void (*close)(void *f);
+  void (*metrics)(void *f, GuiTextMetrics *m);
+  int (*glyph)(void *f, uint32_t cp, int render, GuiGlyph *g);                 /* 1 = ok。render=0 は advance のみ */
+  int (*resolve)(const uint16_t *face16);                                      /* face 名 -> 登録 index (<0 = 未解決)。alias 含む */
+  int (*nfaces)(void);
+  const char *(*face_name)(int idx);
+} GuiTextEngine;
+void gui_set_text_engine(const GuiTextEngine *e);
 
 /* ---- 小物 ---- */
 #define COLORREF_TO_BGRA(c) (0xFF000000u | (((c) & 0xFFu) << 16) | ((c) & 0xFF00u) | (((c) >> 16) & 0xFFu))

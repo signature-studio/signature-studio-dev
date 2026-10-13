@@ -23,7 +23,7 @@
     IR の xor i64 0,0 が 1 本・機械語に自己 xor 無し・load 先ベースが argN と解決」の
     厳密条件が揃ったときだけ復元する。
 
-使い方: python3 ldfix.py IN.ll OUT.ll --pe PE.bin [--report OUT.json] [--only 4133f0,...] [--dry-run]
+使い方: python3 ldfix.py IN.ll OUT.ll --pe PE.bin [--report OUT.json] [--only 4133f0,...] [--passes f3c] [--dry-run]
 """
 import argparse
 import bisect
@@ -36,9 +36,12 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ldmach import Machine, FnMach  # noqa: E402
 
-BASE = 0x400000
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from lb_base import LB, IMG_BASE  # noqa: E402
+
+BASE = IMG_BASE - LB   # IR の LVA 定数 c0 → rip_rva(VA) は c0 + BASE (M11_LB_BASE 補正込み)
 DEF_RE = re.compile(r'^define (?P<ret>[^@]*?)@(?P<name>function_[0-9a-f]+)\((?P<args>[^)]*)\)(?P<rest>[^{]*)\{', re.M)
-BLK_RE = re.compile(r'^dec_label_pc_(?P<va>[0-9a-f]+):', re.M)
+BLK_RE = re.compile(r'^dec_label_pc_(?P<va>[0-9a-f]+)(?:\.[\w.$-]+)?:', re.M)   # .thread / .dec_label_pc_*_crit_edge 接尾ラベルも VA 付きブロック
 XOR0_RE = re.compile(r'^(\s*)(%[\w.$-]+) = xor i64 0, 0\s*$', re.M)
 CE_PT_RE = re.compile(r'^\s*(%[\w.$-]+) = ptrtoint ptr inttoptr \(i64 (\d+) to ptr\) to i64\s*$')
 CE_TRUNC_RE = re.compile(r'^\s*(%[\w.$-]+) = trunc i64 (%[\w.$-]+) to i32\s*$')
@@ -115,7 +118,7 @@ class Fn:
                     out.append((cur_va, cur))
                 cur_va = int(m.group('va'), 16)
                 cur = [l]
-            elif re.match(r'^[\w.$-]+:\s*$', l):
+            elif re.match(r'^[\w.$-]+:\s*(;.*)?$', l):   # `; preds = ...` 付きラベルも新ブロック
                 if cur:
                     out.append((cur_va, cur))
                 cur_va = None
@@ -1086,9 +1089,265 @@ def find_loop_slot(fn, lines, blk_meta, blk_va, rD):
 # F3c: zero-disp load 落ち → ベースレジスタ値の store 化 (`mov r8,[rcx]` → `store %arg1`)
 # ---------------------------------------------------------------------------
 
-def fix_f3c(fn, fv, rep, ctr):
-    """機械語 `mov rD,[rB]` (zero-disp) の読みが IR で消え、ベースレジスタ (argN) の値が
-    そのまま store されている形を復元する (_UStrAsg 409ca4 系 = D7 値↔アドレスの別形)。"""
+F3C_STORE_RE = re.compile(r'^(\s*)store (i\d+|ptr) (%[\w.$-]+), ptr ([^,\n]+)((?:, align \d+)?)\s*$')
+F3C_END = ('ret', 'retn', 'ud2', 'int3', 'hlt')
+F3C_VOLATILE = ('rax', 'rcx', 'rdx', 'r8', 'r9', 'r10', 'r11')
+F3C_SAVED = ('rbx', 'rsi', 'rdi', 'r12', 'r13', 'r14', 'r15')
+F3C_ARITY = {}      # 関数 VA → IR の define の引数個数 (main が埋める)。直接 call の引数 reg を何本読むかに使う
+
+
+def _f3c_is_branch(i):
+    return i.mnemonic.startswith('j') or i.mnemonic.startswith('loop') or i.mnemonic in F3C_END
+
+
+def _f3c_leaders(ins):
+    """機械語の基本ブロック先頭 (分岐先 / 分岐・ret の直後)。IR ラベルには依存しない"""
+    addrs = {i.address for i in ins}
+    lead = {ins[0].address}
+    for k, i in enumerate(ins):
+        if not _f3c_is_branch(i):
+            continue
+        if k + 1 < len(ins):
+            lead.add(ins[k + 1].address)
+        if i.operands and i.operands[0].type == 2 and i.operands[0].imm in addrs:
+            lead.add(i.operands[0].imm)
+    return lead
+
+
+def _f3c_note_uses(cs, i, st, uses):
+    """argN を持つ reg の「使用」を記録する: ('deref', addr, n, 幅) = zero-disp 64/32bit load の base / ('raw', addr, n) = それ以外の読み。
+    reg→reg の 64bit コピーと frame への spill は使用に数えない (call の引数 reg・ret の rax は数える)"""
+    mn, ops = i.mnemonic, i.operands
+    if mn == 'mov' and len(ops) == 2:
+        o0, o1 = ops
+        if o0.type == 1 and o1.type == 1 and o0.size == 8 and o1.size == 8:
+            return
+        if o0.type == 1 and o1.type == 3:
+            mb = gprnorm(cs, o1.mem.base) if o1.mem.base else None
+            if not o1.mem.index and mb in ('rbp', 'rsp'):
+                return
+            if not o1.mem.index and not o1.mem.disp and mb and o1.size in (4, 8):
+                sv = st.get(mb)
+                if sv and sv[0] == 'arg':
+                    uses.append(('deref', i.address, sv[1], o1.size * 8))
+                    return
+        if o0.type == 3 and o1.type == 1:
+            mb = gprnorm(cs, o0.mem.base) if o0.mem.base else None
+            if mb in ('rbp', 'rsp') and not o0.mem.index and o0.size == 8:
+                return
+    regs = set()
+    try:
+        for rid in i.regs_access()[0]:
+            r = gprnorm(cs, rid)
+            if r:
+                regs.add(r)
+    except Exception:
+        pass
+    if mn == 'call':
+        tgt = ops[0].imm if ops and ops[0].type == 2 else None
+        regs.update(list(ARGREG_ARG)[:F3C_ARITY.get(tgt, 4)])
+    if mn in ('ret', 'retn'):
+        regs.add('rax')
+    for r in sorted(regs):
+        sv = st.get(r)
+        if sv and sv[0] == 'arg':
+            uses.append(('raw', i.address, sv[1]))
+
+
+def _f3c_step(cs, i, st, lsf, ptr, uses=None):
+    """命令 1 個の記号実行。値 = ('arg', n) | ('ld', n, 幅) (argN を base にした zero-disp load の値)。
+    lsf: load した値を同幅でそのまま store する site → (addr, n, 幅)。ptr: argN 自身の非 frame 宛 store → Counter[(n, 幅)]"""
+    mn, ops = i.mnemonic, i.operands
+    if uses is not None:
+        _f3c_note_uses(cs, i, st, uses)
+    dest = newv = None
+    if mn == 'mov' and len(ops) == 2:
+        o0, o1 = ops
+        if o0.type == 1 and o1.type == 1:
+            dest = gprnorm(cs, o0.reg)
+            if o0.size == 8 and o1.size == 8:
+                newv = st.get(gprnorm(cs, o1.reg))
+        elif o0.type == 1 and o1.type == 3:
+            dest = gprnorm(cs, o0.reg)
+            mb = gprnorm(cs, o1.mem.base) if o1.mem.base else None
+            if not o1.mem.index and mb in ('rbp', 'rsp'):
+                if o1.size == 8:
+                    newv = st.get(('m', mb, o1.mem.disp))
+            elif not o1.mem.index and not o1.mem.disp and mb and o1.size in (4, 8):
+                sv = st.get(mb)
+                if sv and sv[0] == 'arg':
+                    newv = ('ld', sv[1], o1.size * 8)
+        elif o0.type == 3 and o1.type == 1:
+            sv = st.get(gprnorm(cs, o1.reg))
+            mb = gprnorm(cs, o0.mem.base) if o0.mem.base else None
+            w = o0.size * 8
+            frame = mb in ('rbp', 'rsp') and not o0.mem.index
+            if frame:
+                if sv and w == 64:
+                    st[('m', mb, o0.mem.disp)] = sv
+                else:
+                    st.pop(('m', mb, o0.mem.disp), None)
+            if lsf is not None and sv:
+                if sv[0] == 'ld' and sv[2] == w:
+                    lsf.append((i.address, sv[1], w))
+                elif sv[0] == 'arg' and not frame:
+                    ptr[(sv[1], w)] += 1
+    if mn == 'call':
+        for r in F3C_VOLATILE:
+            st.pop(r, None)
+    else:
+        try:
+            wr = i.regs_access()[1]
+        except Exception:
+            wr = ()
+        for rid in wr:
+            r = gprnorm(cs, rid)
+            if r:
+                st.pop(r, None)
+    if dest and newv:
+        st[dest] = newv
+
+
+def _f3c_static_state(cs, ins):
+    """entry の直線部分 (最初の分岐/ret まで) で argN から 1 回だけ代入される callee-saved reg と、1 回だけ書かれる frame slot
+    (`mov [rbp+d], rcx` の home)。→ (regdef: {reg: (n, def の addr)}, slotdef: {(base, disp): n})。
+    ブロック単位の記号実行へ持ち込む (base を reg コピー・frame slot 経由まで追跡する G2 の拡張)"""
+    st = {r: ('arg', n) for r, n in ARGREG_ARG.items()}
+    regdef, slotdef = {}, {}
+    for i in ins:
+        if _f3c_is_branch(i):
+            break
+        before = dict(st)
+        _f3c_step(cs, i, st, None, None)
+        for k, v in st.items():
+            if v[0] != 'arg' or before.get(k) == v:
+                continue
+            if isinstance(k, tuple):
+                slotdef.setdefault(k[1:], []).append(v[1])
+            elif k in F3C_SAVED:
+                regdef.setdefault(k, []).append((v[1], i.address))
+    nslot, leas = collections.Counter(), []
+    for i in ins:
+        ops = i.operands
+        if i.mnemonic == 'lea' and len(ops) == 2 and ops[1].type == 3 and ops[1].mem.base:
+            b = gprnorm(cs, ops[1].mem.base)
+            if b in ('rbp', 'rsp'):
+                leas.append((b, ops[1].mem.disp))
+        if ops and ops[0].type == 3 and i.mnemonic not in ('cmp', 'test', 'push'):
+            b = gprnorm(cs, ops[0].mem.base) if ops[0].mem.base else None
+            if b in ('rbp', 'rsp'):
+                nslot[(b, ops[0].mem.disp)] += 1
+    sreg = {r: v[0] for r, v in regdef.items() if len(v) == 1}
+    sslot = {k: v[0] for k, v in slotdef.items()
+             if len(v) == 1 and nslot[k] == 1 and not any(k[0] == b and k[1] <= d < k[1] + 8 for (b, d) in leas)}
+    return sreg, sslot
+
+
+def _f3c_regs_by_block(cs, blocks, sreg):
+    """各ブロック先頭で argN をそのまま持っている reg: 引数 reg (rcx/rdx/r8/r9) と、entry で 1 回代入された callee-saved reg (sreg)。
+    reg を書く命令 (def 自身を除く。call は volatile 全部を書く) があるブロックの後続へ到達閉包を取り、その外側だけを残す"""
+    bidx = {b[0].address: k for k, b in enumerate(blocks)}
+    succ = []
+    for k, b in enumerate(blocks):
+        last = b[-1]
+        mn = last.mnemonic
+        tgt = last.operands[0].imm if last.operands and last.operands[0].type == 2 else None
+        nxt = [k + 1] if k + 1 < len(blocks) else []
+        if mn == 'jmp':
+            succ.append([bidx[tgt]] if tgt in bidx else [])
+        elif mn.startswith('j') or mn.startswith('loop'):
+            succ.append(([bidx[tgt]] if tgt in bidx else []) + nxt)
+        elif mn in F3C_END:
+            succ.append([])
+        else:
+            succ.append(nxt)
+    track = {r: (ARGREG_ARG[r], None) for r in ARGREG_ARG}
+    track.update({r: (n, a) for r, (n, a) in sreg.items()})
+    writers = {r: set() for r in track}
+    for k, b in enumerate(blocks):
+        for i in b:
+            if i.mnemonic == 'call':
+                for r in F3C_VOLATILE:
+                    if r in writers:
+                        writers[r].add(k)
+                continue
+            try:
+                wr = i.regs_access()[1]
+            except Exception:
+                wr = ()
+            for rid in wr:
+                r = gprnorm(cs, rid)
+                if r in writers and track[r][1] != i.address:
+                    writers[r].add(k)
+    keep = [set(track) for _ in blocks]
+    for r, ws in writers.items():
+        seen, todo = set(), [x for w in ws for x in succ[w]]
+        while todo:
+            x = todo.pop()
+            if x in seen:
+                continue
+            seen.add(x)
+            todo.extend(succ[x])
+        for x in seen:
+            keep[x].discard(r)
+    keep[0] = set(ARGREG_ARG)
+    return keep, {r: v[0] for r, v in track.items()}
+
+
+def f3c_track(fv):
+    """F3c 機械語側。→ (lsf: [(addr, n, 幅)], ptr: Counter[(n, 幅)], uses, entry ブロックの命令 addr 集合)。ブロック間の join は使わず、各ブロックを
+    「到達するどの経路でも書き換えられていない引数 reg / entry で 1 回代入された callee-saved reg / 1 回だけ書かれる frame home」から
+    記号実行する (関数単位の個数収支で IR と突合するため IR ブロックとの対応は不要)"""
+    ins = fv.ins
+    if not ins:
+        return None
+    lead = _f3c_leaders(ins)
+    sreg, sslot = _f3c_static_state(fv.cs, ins)
+    blocks, cur = [], []
+    for i in ins:
+        if i.address in lead and cur:
+            blocks.append(cur)
+            cur = []
+        cur.append(i)
+    blocks.append(cur)
+    keep, argof = _f3c_regs_by_block(fv.cs, blocks, sreg)
+    lsf, ptr, uses = [], collections.Counter(), []
+    for k, b in enumerate(blocks):
+        st = {r: ('arg', argof[r]) for r in keep[k]}
+        for (bs, d), n in sslot.items():
+            st[('m', bs, d)] = ('arg', n)
+        for i in b:
+            _f3c_step(fv.cs, i, st, lsf, ptr, uses)
+    return lsf, ptr, uses, {i.address for i in blocks[0]}
+
+
+def f3c_ir_stores(lines):
+    """IR 側: `store iW %argN` (trunc/zext 経由含む、alloca 宛を除く) の行 → {(n, 幅): [行 index]}"""
+    allocas, alias = set(), {}
+    for l in lines:
+        m = re.match(r'^\s*(%[\w.$-]+) = alloca ', l)
+        if m:
+            allocas.add(m.group(1))
+        m = re.match(r'^\s*(%[\w.$-]+) = (?:trunc|zext) i64 %arg(\d+) to i(\d+)\s*$', l)
+        if m:
+            alias[m.group(1)] = (int(m.group(2)), int(m.group(3)))
+    out = collections.defaultdict(list)
+    for k, l in enumerate(lines):
+        m = F3C_STORE_RE.match(l)
+        if not m or m.group(4).strip() in allocas:
+            continue
+        w = 64 if m.group(2) == 'ptr' else int(m.group(2)[1:])
+        ma = re.fullmatch(r'%arg(\d+)', m.group(3))
+        if ma:
+            out[(int(ma.group(1)), w)].append(k)
+        elif m.group(3) in alias and alias[m.group(3)][1] == w:
+            out[(alias[m.group(3)][0], w)].append(k)
+    return out
+
+
+def fix_f3c_block(fn, fv, rep, ctr):
+    """F3c-block (従来の block-local 門 G1〜G5。挙動は #509 前と同一): 機械語 `mov rD,[rB]` (zero-disp) の読みが IR で消え、
+    ベースレジスタ (argN) の値がそのまま store されている形を復元する (_UStrAsg 409ca4 系 = D7 値↔アドレスの別形)。"""
     lines = fn.body.split('\n')
     blocks = fn.blocks()
     cum = 0
@@ -1170,6 +1429,9 @@ def fix_f3c(fn, fv, rep, ctr):
                         stores.append((k, ms2, tline))
         if not stores:
             rep['f3c_no_store'] = rep.get('f3c_no_store', 0) + 1
+            rep.setdefault('f3c_no_store_vas', [])
+            if '%x' % fn.va not in rep['f3c_no_store_vas']:
+                rep['f3c_no_store_vas'].append('%x' % fn.va)
             continue
         # argN の ptr 式
         t = pty.get(argn, 'i64')
@@ -1214,6 +1476,150 @@ def fix_f3c(fn, fv, rep, ctr):
     return fixed
 
 
+
+
+def fix_f3c_fn(fn, fv, rep, ctr):
+    """機械語 `mov rD,[rB]` (zero-disp, rB は argN に解決) の値がそのまま `mov [m],rD` される site の IR が、load を落として
+    `store %argN` (ポインタ自身) を書いている形を復元する (_UStrAsg 409ca4 系 = D7 値↔アドレスの別形 / D4 の store 形)。
+    #509 で門を拡張: G2 = rB を load 直前まで (自己上書き `mov rcx,[rcx]` を許す) かつ reg コピー・frame slot 経由まで追跡 /
+    G4 = 「rB の store が機械語にある」でなく argN 自身の非 frame 宛 store (正当なポインタ store) の関数内個数で判定 /
+    G5 = 同一 IR ブロックの store でなく、関数単位の `store %argN` 収支で対応 (IR のブロック複製 `.thread` と無関係)"""
+    tr = f3c_track(fv)
+    if tr is None:
+        return 0
+    lsf, ptr = tr[0], tr[1]
+    if not lsf:
+        return 0
+    lines = fn.body.split('\n')
+    cand = f3c_ir_stores(lines)
+    hd = re.match(r'^define [^@]*@function_[0-9a-f]+\(([^)]*)\)', fn.body)
+    pty = {}
+    if hd:
+        for idx, p in enumerate([p.strip() for p in hd.group(1).split(',') if p.strip()]):
+            pty[idx + 1] = p.split()[0] if p.split() else 'i64'
+    edits = {}
+    fixed = 0
+    for key in sorted({(n, w) for (_a, n, w) in lsf}):
+        n, w = key
+        if ptr[key]:
+            rep['f3c_fn_ptr_store'] = rep.get('f3c_fn_ptr_store', 0) + 1
+            continue
+        if not cand.get(key):
+            rep['f3c_fn_no_store'] = rep.get('f3c_fn_no_store', 0) + 1
+            continue
+        t = pty.get(n, 'i64')
+        for k in cand[key]:
+            m = F3C_STORE_RE.match(lines[k])
+            ctr[0] += 1
+            nm = 'ldfxn%d' % ctr[0]
+            pre = []
+            aptr = '%%arg%d' % n
+            if t != 'ptr':
+                pre = ['  %%%s_p = inttoptr %s %%arg%d to ptr' % (nm, t, n)]
+                aptr = '%%%s_p' % nm
+            ty = m.group(2)
+            ld = '  %%%s = load %s, ptr %s, align %d' % (nm, ty, aptr, max(w // 8, 1))
+            st = '%sstore %s %%%s, ptr %s%s' % (m.group(1), ty, nm, m.group(4), m.group(5))
+            edits[k] = pre + [ld, st]
+            fixed += 1
+    if not fixed:
+        return 0
+    out = []
+    for i2, l in enumerate(lines):
+        out.extend(edits[i2]) if i2 in edits else out.append(l)
+    fn.body = '\n'.join(out)
+    rep['f3c_fn_stores'] = rep.get('f3c_fn_stores', 0) + fixed
+    return 1
+
+
+ctr_f3cu = [0]             # fix_f3c_use 専用 counter
+
+
+def fix_f3c_use(fn, fv, rep, ctr):
+    """F3c-use (#509): 消費者が store でない D4 (load した値が address base や演算の operand に流れる形)。
+    条件 (全部): (a) 機械語の argN を base にした zero-disp load が全て 64bit で、最初の 1 本が entry ブロックにある /
+    (b) argN の生の使用 (call 引数・ptr store など) が全て最初の load より前にある / (c) IR に argN からの zero-offset load が 1 本も無い (= load は全滅) /
+    (d) argN は i64 引数。→ IR の %argN の使用のうち、(b) の生の使用の数だけ先頭側を残し、残りを `load i64, [%argN]` の値に置換する
+    (load は置換する最初の行の直前。生の使用が無ければ entry ブロックの alloca 群の直後)。417b70 (arg4 = count の pointer) / 666a60 (r14 = *arg1) 型"""
+    tr = f3c_track(fv)
+    if tr is None:
+        return 0
+    _lsf, _ptr, uses, blk0 = tr
+    lines = fn.body.split('\n')
+    hd = re.match(r'^define [^@]*@function_[0-9a-f]+\(([^)]*)\)', fn.body)
+    pty = {}
+    if hd:
+        for idx, p in enumerate([p.strip() for p in hd.group(1).split(',') if p.strip()]):
+            pty[idx + 1] = p.split()[0] if p.split() else 'i64'
+    edits = {}
+    done = 0
+    for n in sorted({u[2] for u in uses if u[0] == 'deref'}):
+        derefs = [u for u in uses if u[0] == 'deref' and u[2] == n]
+        first = min(u[1] for u in derefs)
+        raws = [u for u in uses if u[0] == 'raw' and u[2] == n]
+        if first not in blk0 or not all(u[3] == 64 for u in derefs) or any(u[1] > first for u in raws):
+            continue
+        if pty.get(n, 'i64') != 'i64':
+            rep['f3c_use_ptrarg'] = rep.get('f3c_use_ptrarg', 0) + 1
+            continue
+        argre = re.compile(r'(?<![\w.$-])%arg' + str(n) + r'(?![\w.$-])')
+        ptr_alias = set()
+        for l in lines[1:]:
+            m = re.match(r'^\s*(%[\w.$-]+) = inttoptr i64 %arg' + str(n) + r' to ptr\s*$', l)
+            if m:
+                ptr_alias.add(m.group(1))
+        loaded = False
+        for l in lines[1:]:
+            m = re.match(r'^\s*%[\w.$-]+ = load [^,]+, ptr ([^,\s]+)', l)
+            if m and (m.group(1) == '%%arg%d' % n or m.group(1) in ptr_alias):
+                loaded = True
+                break
+        if loaded:
+            continue
+        idx = [k for k in range(1, len(lines)) if argre.search(lines[k])]
+        keep = len(raws)
+        rep_idx = idx[keep:]
+        if not rep_idx:
+            continue
+        entry_end = next((k for k in range(2, len(lines)) if re.match(r'^[\w.$-]+:', lines[k])), len(lines))
+        if rep_idx[0] >= entry_end:
+            rep['f3c_use_not_entry'] = rep.get('f3c_use_not_entry', 0) + 1
+            continue
+        if keep == 0:
+            at = 2
+            while at < len(lines) and re.match(r'^\s*%[\w.$-]+ = alloca ', lines[at]):
+                at += 1
+        else:
+            at = rep_idx[0]
+        ctr[0] += 1
+        nm = 'ldfxu%d' % ctr[0]
+        for k in rep_idx:
+            lines[k] = argre.sub('%' + nm, lines[k])
+        edits.setdefault(at, []).extend(['  %%%s_p = inttoptr i64 %%arg%d to ptr' % (nm, n),
+                                          '  %%%s = load i64, ptr %%%s_p, align 8' % (nm, nm)])
+        rep['f3c_use_replaced'] = rep.get('f3c_use_replaced', 0) + len(rep_idx)
+        done += 1
+    if not done:
+        return 0
+    out = []
+    for i2, l in enumerate(lines):
+        out.extend(edits.get(i2, []))
+        out.append(l)
+    fn.body = '\n'.join(out)
+    return 1
+
+
+ctr_f3cn = [0]             # fix_f3c_fn 専用 counter (F1〜F3 の SSA 名採番を不変に保つ)
+
+
+def fix_f3c(fn, fv, rep, ctr):
+    """F3c = 従来の block-local 門 (fix_f3c_block) → 関数単位の個数収支門 (fix_f3c_fn, #509)。後者は前者が直した行を見ない"""
+    a = fix_f3c_block(fn, fv, rep, ctr)
+    u = fix_f3c_use(fn, fv, rep, ctr_f3cu)
+    b = fix_f3c_fn(fn, fv, rep, ctr_f3cn)
+    return a or u or b
+
+
 # ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
@@ -1226,10 +1632,14 @@ def main():
     ap.add_argument('--report')
     ap.add_argument('--only', help='カンマ区切りの VA (16進) のみ修復')
     ap.add_argument('--dry-run', action='store_true')
+    ap.add_argument('--passes', help='カンマ区切りで pass を限定 (f1,f1v,f2,f3a,f3b,f3c)。既に ldfix 済みの IR へ F3c だけを重ねる用 (#509)')
     a = ap.parse_args()
+    passes = set(a.passes.split(',')) if a.passes else None
     only = set(int(x, 16) for x in a.only.split(',')) if a.only else None
     text = open(a.infile, errors='replace').read()
     mach = Machine(a.pe)
+    for m in DEF_RE.finditer(text):
+        F3C_ARITY[int(m.group('name')[len('function_'):], 16)] = len([x for x in m.group('args').split(',') if x.strip()])
     rep = collections.OrderedDict()
     ctr = [0]
     counts = collections.OrderedDict((k, 0) for k in ('f1', 'f1v', 'f2', 'f3a', 'f3b', 'f3c'))
@@ -1247,9 +1657,13 @@ def main():
         fn = Fn(m.group('name'), va, text[m.start():end])
         nfn += 1
         blk_vas = [bva for (bva, _ls) in fn.blocks() if bva is not None]
+        if blk_vas and hasattr(mach, 'cover'):
+            mach.cover(va, max(blk_vas))
         fv = FnMach(mach, va, blk_vas)
         try:
             for tag, func in (('f1', fix_f1), ('f1v', fix_f1v), ('f2', fix_f2), ('f3a', fix_f3a), ('f3b', fix_f3b), ('f3c', fix_f3c)):
+                if passes is not None and tag not in passes:
+                    continue
                 c = ctr_f1v if tag == 'f1v' else ctr
                 if func(fn, fv, rep, c):
                     counts[tag] += 1

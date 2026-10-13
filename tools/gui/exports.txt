@@ -1,5 +1,6 @@
 # 実装済み API (gen_api.py 生成)
 ActivateKeyboardLayout
+AdjustWindowRect
 AdjustWindowRectEx
 AlphaBlend
 AttachThreadInput
@@ -10,12 +11,19 @@ CallNextHookEx
 CallWindowProcA
 CallWindowProcW
 CharLowerBuffW
+CharLowerW
+CharNextExA
 CharNextW
+CharToOemBuffW
 CharUpperBuffW
 CharUpperW
 ClientToScreen
+ClipCursor
 CloseClipboard
+CloseGestureInfoHandle
+CloseTouchInputHandle
 CombineRgn
+CommDlgExtendedError
 CopyRect
 CreateBitmap
 CreateCaret
@@ -62,6 +70,7 @@ EnumChildWindows
 EnumClipboardFormats
 EnumDisplayMonitors
 EnumDisplaySettingsW
+EnumFontFamiliesExW
 EnumThreadWindows
 EnumWindows
 EqualRect
@@ -102,13 +111,17 @@ GetCursorInfo
 GetCursorPos
 GetDC
 GetDCEx
+GetDIBColorTable
 GetDIBits
 GetDesktopWindow
 GetDeviceCaps
 GetDlgItem
 GetDoubleClickTime
+GetDpiForSystem
+GetDpiForWindow
 GetFocus
 GetForegroundWindow
+GetGestureInfo
 GetGuiResources
 GetIconInfo
 GetKeyNameTextW
@@ -128,6 +141,7 @@ GetModuleHandleW
 GetMonitorInfoW
 GetObjectA
 GetObjectW
+GetOpenFileNameW
 GetParent
 GetPhysicalCursorPos
 GetPixel
@@ -135,6 +149,7 @@ GetPropW
 GetRandomRgn
 GetRegionData
 GetRgnBox
+GetSaveFileNameW
 GetStockObject
 GetStretchBltMode
 GetSysColor
@@ -147,7 +162,9 @@ GetTextExtentPointA
 GetTextExtentPointW
 GetTextMetricsA
 GetTextMetricsW
+GetThreadDpiAwarenessContext
 GetTopWindow
+GetTouchInputInfo
 GetUpdateRect
 GetUpdateRgn
 GetWindow
@@ -163,6 +180,18 @@ GetWindowTextA
 GetWindowTextW
 GetWindowThreadProcessId
 HideCaret
+ImmAssociateContextEx
+ImmGetCompositionStringW
+ImmGetContext
+ImmGetConversionStatus
+ImmGetOpenStatus
+ImmIsIME
+ImmNotifyIME
+ImmReleaseContext
+ImmSetCandidateWindow
+ImmSetCompositionWindow
+ImmSetConversionStatus
+ImmSetOpenStatus
 InflateRect
 IntersectClipRect
 IntersectRect
@@ -172,6 +201,7 @@ IsChild
 IsDialogMessageA
 IsDialogMessageW
 IsIconic
+IsProcessDPIAware
 IsRectEmpty
 IsWindow
 IsWindowEnabled
@@ -227,6 +257,8 @@ RegisterClassExA
 RegisterClassExW
 RegisterClassW
 RegisterClipboardFormatW
+RegisterTouchHitTestingWindow
+RegisterTouchWindow
 RegisterWindowMessageA
 RegisterWindowMessageW
 ReleaseCapture
@@ -254,10 +286,12 @@ SetClassLongPtrW
 SetClipboardData
 SetCursor
 SetCursorPos
+SetDIBColorTable
 SetDIBits
 SetDIBitsToDevice
 SetFocus
 SetForegroundWindow
+SetGestureConfig
 SetKeyboardState
 SetMapMode
 SetParent
@@ -309,5 +343,7 @@ UnregisterClassW
 UpdateWindow
 ValidateRect
 ValidateRgn
+WTSRegisterSessionNotification
+WTSUnRegisterSessionNotification
 WaitMessage
 WindowFromPoint

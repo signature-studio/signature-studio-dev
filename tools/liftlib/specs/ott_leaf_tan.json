@@ -1,11 +1,13 @@
 {
  "name": "ott_leaf_tan",
+ "abi": "ms_pos",
  "func": "0x1801a9be0",
  "wasm_func": "function_1801a9be0",
  "scenarios": 300,
  "steps": 1,
  "seed": 23903,
  "ret_from_xmm0": true,
+ "expect_match_min": 1.0,
  "vars": [
   {"name": "x", "gen": {"mix": [[0.6, {"unif": [-3.14159, 3.14159]}], [0.2, {"unif": [-20.0, 20.0]}], [0.1, {"choice": [0.0, 0.7853981633974483, 1.5707963, -1.5707963, 3.14159265]}], [0.1, {"sample": 1}]]}}
  ],

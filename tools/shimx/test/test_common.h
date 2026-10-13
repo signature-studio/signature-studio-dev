@@ -39,4 +39,8 @@ void run_sys_tests(void);
 void run_ole_shell_tests(void);
 void run_link_tests(int multithread);
 void run_cbtrans_tests(int multithread);
+void run_seh_tests(void);
+void run_absent_path_tests(void);
+void seh_failfast_nomatch(void);
+void seh_failfast_badtarget(void);
 #endif

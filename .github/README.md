@@ -15,13 +15,14 @@ OWNER に限定している。アクセス制御はそのうえで、コメン�
 
 | ファイル | 役割 |
 |---|---|
-| `workflows/opencode.yaml` | 起動トリガ (issue_comment `/oc`・pull_request・workflow_dispatch) と 2 ジョブ (implement / review) |
+| `workflows/opencode.yaml` | 起動トリガ (issue_comment `/oc`・pull_request・pull_request_review・workflow_dispatch) と 2 ジョブ (implement / review) |
 | `actions/agent-setup/action.yml` | ツールチェイン (uv/pnpm/node26/bun/opencode) と R2 からの素材ダウンロード |
-| `actions/opencode/action.yml` | `opencode auth import` → `opencode run --format json` → sessionID から `opencode api` で最後の assistant text を `$GITHUB_STEP_SUMMARY` へ |
+| `actions/opencode/action.yml` | `opencode auth import` → `opencode run --format json` (JSONL をファイルへ) → `Dump OpenCode events` が allowlist の投影 (text 全文・tool 名/状態/所要 ms/入力の先頭 200 文字・cost/tokens。tool の出力と生 JSONL はログに出さない) を job ログへ → `Write step summary` が text ブロックを全て順に + steps/cost を `$GITHUB_STEP_SUMMARY` とログへ |
 | `scripts/install-opencode.sh` | opencode CLI のインストール (pin・指数バックオフ・フォールバック) |
 | `scripts/prepare-event-context.sh` | untrusted なイベント値をファイルに隔離し、制御変数を `$GITHUB_ENV` へ 1 行ずつ書く |
 | `scripts/assemble-prompt.sh` | イベント文脈を実装エージェント用プロンプトに流し込む |
 | `scripts/assemble-reviewer-prompt.sh` | 同じ方式でレビュワー用プロンプトを組み立てる |
+| `scripts/fix-progress.sh` / `verify-review-verdict.sh` / `reopen-pr.sh` | 差し戻し後の fix の進捗判定・往復の上限、verdict の検証、close -> reopen による review の再起動 (reopen は 3 回まで再試行) |
 | `prompts/implementer.md` | 実装エージェントの行動規範 (スコープ・commit 規約・実測必須・マージ方法・規約への導線) |
 | `prompts/reviewer.md` | レビュワーエージェントの役割 (approve/request-changes・マージ) |
 

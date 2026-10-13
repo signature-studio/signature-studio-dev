@@ -34,8 +34,10 @@ from capstone import Cs, CS_ARCH_X86, CS_MODE_64
 from capstone.x86 import X86_OP_MEM, X86_OP_REG
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, '..', '..', 'shared'))
+from paths import FL_WIN64_DIR  # noqa: E402
 GORD = ['rcx', 'rdx', 'r8', 'r9']   # win64 整数引数 slot 順
-PE = '/home/ubuntu/work/analysis/win64/extracted/block18983_PE.bin'
+PE = os.path.join(FL_WIN64_DIR, 'extracted', 'block18983_PE.bin')
 
 GPR = {}
 for name, canon in [('RCX', 'rcx'), ('ECX', 'rcx'), ('CX', 'rcx'), ('CL', 'rcx'),
@@ -81,10 +83,12 @@ def scan_function(MD, td, tva, va, fend):
     gpr_arg, xmm_arg = [], []
     gpr_deref = set()
     gpr_base = set()
+    gpr_derived = set()
     gpr_idx = set()
     gpr_w, xmm_w = set(), set()
     xmm_width = {}                                         # xmmN -> 32/64 (初回 read 命令から)
     stack_reads = []                                       # (entry_rsp 相対 offset, insn)
+    stack_written = set()
     xmm_insns = []                                         # (mnemonic, [(op idx, reg name)])
     scaled_index = False
     clip_index = False                                     # movsx/movzx [base+idx*scale>=2] (負添字 OOB 対策)
@@ -139,15 +143,22 @@ def scan_function(MD, td, tva, va, fend):
                     scaled_index = True
                 if o.mem.base in COPYREG:
                     gpr_deref.add(COPYREG[o.mem.base])
-                    gpr_base.add(COPYREG[o.mem.base])
+                    # 既に write 済みの引数 reg (0x5e0630: `mov r8, rdx` 後の [r8]) は入力値の deref
+                    # ではない。コピー逆伝播の種 (gpr_derived) にのみ入れ、引数 base には数えない (#277)
+                    if COPYREG[o.mem.base] in gpr_w and os.environ.get('K80_NO_WRITTEN_BASE') != '1':
+                        gpr_derived.add(COPYREG[o.mem.base])
+                    else:
+                        gpr_base.add(COPYREG[o.mem.base])
                 if o.mem.index in COPYREG:
                     gpr_deref.add(COPYREG[o.mem.index])
                     if o.mem.base in COPYREG:
                         gpr_idx.add(COPYREG[o.mem.index])
                 if (o.mem.base == x86.X86_REG_RBP and rbp_established) or o.mem.base == x86.X86_REG_RSP:
-                    if o.access & 1:                       # mem が読み替数のときだけ arg 候補
-                        rel = (o.mem.disp - frame_fixed) if o.mem.base == x86.X86_REG_RBP \
-                            else (o.mem.disp - 8 * push_n - sub_rsp)
+                    rel = (o.mem.disp - frame_fixed) if o.mem.base == x86.X86_REG_RBP \
+                        else (o.mem.disp - 8 * push_n - sub_rsp)
+                    if (o.access & 2) and not (o.access & 1) and os.environ.get('K80_NO_STACKW') != '1':
+                        stack_written.add(rel)              # 先に書いた home slot の読み戻しは引数ではない
+                    if o.access & 1 and rel not in stack_written:   # mem が読み替数のときだけ arg 候補
                         stack_reads.append((rel, i))
         # ゼロ化イディオム (xorps r,r / pxor r,r / xor r,r / subsd r,r): 同一レジスタの
         # read は引数ではない (0 にする write)。read set から除外する (CAB-253)。
@@ -170,6 +181,12 @@ def scan_function(MD, td, tva, va, fend):
         for r in writes:
             if r in GPR:
                 gpr_w.add(GPR[r])
+        # movlps/movlpd/movhps/movhpd xmm, mem は片側 64bit のみ load する。capstone は dest を
+        # read|write と付けるが、残り半分は引数値ではない (0x5dee90 の xmm0/xmm2 が偽の引数になる, #277)
+        if m in ('movlps', 'movlpd', 'movhps', 'movhpd') and len(i.operands) == 2 \
+                and i.operands[0].type == X86_OP_REG and i.operands[1].type == X86_OP_MEM \
+                and os.environ.get('K80_NO_PARTIAL_LOAD') != '1':
+            reads = [r for r in reads if r != i.operands[0].reg]
         for r in reads:
             if r in XMM:
                 xn = XMM[r]
@@ -189,10 +206,11 @@ def scan_function(MD, td, tva, va, fend):
             copies.append((COPYREG[i.operands[0].reg], COPYREG[i.operands[1].reg]))
     # copy 逆向き伝播 (mov dst, src で dst が base なら src の値も base として
     # 使われ得る — 顺方向は shr 等の変換を挟むため伝播しない)
+    direct_base = set(gpr_base)
     for _ in range(8):
         ch = False
         for dst, src in copies:
-            if dst in gpr_base and src not in gpr_base:
+            if (dst in gpr_base or dst in gpr_derived) and src not in gpr_base:
                 gpr_base.add(src)
                 ch = True
             if dst in gpr_idx and src not in gpr_idx:
@@ -200,6 +218,12 @@ def scan_function(MD, td, tva, va, fend):
                 ch = True
         if not ch:
             break
+    # index として使われる reg (0x5e02b0 の r8: `lea [rcx+r8*4]`) がコピー伝播だけで base 扱いに
+    # なったものは個数/添字引数であってポインタではない (#277)
+    # 全 kernel に適用すると index と pointer を兼ねる reg (0x5de390 の rcx 等) を落として crash が増える
+    # ため、ptr_struct を持つ kernel (record{ptr,ptr} 経由で書く) に限定する。
+    if ptr_struct and os.environ.get('K80_NO_IDX_NOT_BASE') != '1':
+        gpr_base -= {r for r in gpr_idx if r in GORD and r not in direct_base and r not in ptr_struct}
     # stack args: entry_rsp 相対 offset ≥ 8 (retaddr の上) を read-before-write で
     seen = {}
     for off, ins in stack_reads:
@@ -215,6 +239,12 @@ def scan_function(MD, td, tva, va, fend):
             op = ins.operands[0] if ins.operands else None
             if op is not None and getattr(op, 'size', 0) in (4, 8) and not mn.startswith('fld'):
                 w = op.size * 8
+            # cvtss2sd xmm, dword [m] / cvtsd2ss xmm, qword [m]: 幅はニーモニック末尾ではなく
+            # メモリオペランドの大きさ (0x5e09f0 の stack 引数は 32bit float, #277)
+            if os.environ.get('K80_NO_MEMW') != '1' and not mn.startswith('fld'):
+                mo = [o for o in ins.operands if o.type == X86_OP_MEM and getattr(o, 'size', 0) in (4, 8)]
+                if mo:
+                    w = mo[0].size * 8
         if off not in seen:
             seen[off] = (isfp, w, ins.mnemonic, ins.op_str)
     # movsq (16B struct コピー) からの二重 deref: 直前 4 命令の `mov rX, <gpr slot>`

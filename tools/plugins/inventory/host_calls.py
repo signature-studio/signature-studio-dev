@@ -16,7 +16,9 @@ from capstone.x86 import X86_OP_MEM, X86_OP_REG, X86_OP_IMM
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 WORK = os.path.join(HERE, '..', 'work')
-EXT = '/home/ubuntu/work/analysis/win64/extracted'
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'shared'))
+from paths import FL_WIN64_DIR  # noqa: E402
+EXT = os.path.join(FL_WIN64_DIR, 'extracted')
 HOSTOFF = 0xbc
 
 

@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "id": "wavpack-4.80.0",
+  "name": "WavPack",
+  "version": "4.80.0",
+  "provenance": "build-script",
+  "upstream": {
+    "url": "https://github.com/dbry/WavPack/archive/refs/tags/4.80.0.tar.gz",
+    "archive": "wavpack-4.80.0.tar.gz",
+    "sha256": "c72cb0bbe6490b84881d61f326611487eedb570d8d2e74f073359578b08322e2"
+  },
+  "license": {
+    "spdx": "BSD-3-Clause",
+    "files": [
+      {
+        "path": "COPYING",
+        "sha256": "32dd0db6f16b9f6ea462e880248590ad8222f8fe1ab329b8042e3fe390e3372e",
+        "text": "                  Copyright (c) 1998 - 2015 David Bryant\n                          All rights reserved.\n\nRedistribution and use in source and binary forms, with or without\nmodification, are permitted provided that the following conditions are met:\n\n    * Redistributions of source code must retain the above copyright notice,\n      this list of conditions and the following disclaimer.\n    * Redistributions in binary form must reproduce the above copyright notice,\n      this list of conditions and the following disclaimer in the\n      documentation and/or other materials provided with the distribution.\n    * Neither the name of Conifer Software nor the names of its contributors\n      may be used to endorse or promote products derived from this software\n      without specific prior written permission.\n\nTHIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS \"AS IS\"\nAND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE\nIMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE\nARE DISCLAIMED. IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE FOR\nANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL\nDAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR\nSERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER\nCAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,\nOR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE\nOF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\n"
+      }
+    ]
+  },
+  "build": {
+    "script": "tools/shared/oss/wavpack/build.sh",
+    "toolchain": "emcc 6.0.12",
+    "targets": [
+      "wasm32",
+      "wasm64"
+    ],
+    "args": [
+      {
+        "step": "compile",
+        "args": "emcc -O2 -ffp-contract=off -w -I<src>/include -DPACKAGE_VERSION=\\\"4.80.0\\\" <src>/src/*.c (autotools 不使用)"
+      }
+    ],
+    "patches": []
+  }
+}

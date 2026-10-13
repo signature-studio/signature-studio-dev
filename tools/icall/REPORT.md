@@ -71,9 +71,7 @@
 | 最終 heap/obj state 差 (qword) | 260,657 | **0** | 0 |
 | t1 std 512 cell | 全 0 (旧 chain は 0x326 で早期 return) | **512/512 bit-exact, junk 0** | 512/512 |
 - 使う既存 pass: ir_normalize, ir5_patch (m2/m5)、SIMD helper は m11_simd2.py (署名駆動) + 補完 5 種 (`cmplesd cmpnltsd cvttpd2dq cvtpd2dq sqrtpd`)。**M8/M9/M10 の OTT 専用 hand port (ir7_argpass, ir8_valueflow, ir9_bootstraps, gate box C port 等) は不要**。
-- CRT 数学 (exp/log/tan/pow) は libm 置換でなく DLL 自身の機械語を lift (D4 解消)。関数単位の native 差分 (`diff/fn_diff.py`, 乱数入力 120 点) は 8 関数中 4 が全 bit 一致、tan 本体 `1801a9be0` は 111/120 (残り 9 は 1 ulp 差: 大引数 ≈1e4 の reduction 経路)、
-  2 本は誤差報告経路で fail-fast、`1801c1240` は 0/120 (xmm0 以外の戻り経路, 未調査)。leaf kernel (`1801aa1a0`) は隠れ入力 (xmm4/5 等) があり単独呼出しでは native 側も不定のため比較不能。**matrix 89 scenario は全 bit 一致**だが、
-  OTT が踏まない CRT 経路 (大引数 tan 等) に 1 ulp 級の残差が有り得る — 子チケットで扱う。
+- CRT 数学 (exp/log/tan/pow) は libm 置換でなく DLL 自身の機械語を lift (D4 解消)。関数単位の native 差分は **§8 (ICALL-5)** に移した (旧記述 = tan 111/120・`1801c1240` 0/120 は §8 で原因特定・修復済み)。**matrix 89 scenario は全 bit 一致**。
 - 反復の過程 (全て修復済み): rewriter の capstone `disp_size` 誤り (66-prefix SSE の rip-rel 103/916 命令が定数誤参照) → tan が桁違い、jump table 未展開で setParameter 不動作、
   `mov r11,rax` を call 後に置いて rax 喪失、chained 断片 (`0x1801207f1`) の単独関数化、closure の条件 jmp 追従漏れ。各段で `ott/diff/cmp.py` の stage 差分が原因特定に効いた
   (例: ctor 直後 obj 差 2 qword → 0, setp 段の +0x248 差 → jump table)。
@@ -111,7 +109,7 @@
 - FLEngine は監査と書換え/復元の構造検証まで。wasm ビルドと実行 (M11 boot) は未。残 382 site (巨大 2 関数 366) と gap 879 site は未復元。
 - 5 引数目以降 (stack 渡し) は BLK 未対応 (`_InitLib` 8 引数など)。`jmp [idx*8+tbl]` 形 jump table、x87/MMX/AVX、`rep` 系は RetDec 任せ。
 - OTT の F 集合は native coverage 由来 (x64c と同条件)。coverage 外の vtable target は `__icall_dispatch` が fail-fast する (未登録 target を site VA 付きで表示)。
-- route build は -O0 (性能は評価していない)。CRT エラー経路 override 4 件 (R の `ott_ovr.c`) は未移植 (matrix 89 scenario は通る)。
+- route build は -O0 (性能は評価していない)。CRT エラー経路 override は 4 件中 3 件を移植済み (§8)。残り `_handle_errorf` (1801c8cb8) は route の closure に無く lift 対象外。
 - Fruity/KH/FA の wasm 実行検証は未 (監査のみ)。comis/derefix は OTT で bit-exact を確認したが他 PE では静的件数のみ。
 - 作業中に `pkill -f retdec-decompiler` を実行してしまい、同時刻に他 subagent が走らせていた RetDec が落ちた可能性がある (原因は本担当の誤操作)。
 
@@ -125,3 +123,115 @@ bash tools/icall/x64c_fle_probe.sh   # x64c を FLEngine に当てた対応度 (
 python3 tools/icall/tests/test_icall.py
 ```
 前提: python3 (capstone, pefile), emsdk 6.0.12 (`[EMSDK]`), RetDec (`[RETDEC]`), node, setarch。keystone は raw 試験 (`work/probe`) のみ。
+
+## 8. ICALL-5: CRT 経路の関数単位差分 (#231)
+
+既知類型との関係 (`docs/DEFECTS.md` D1〜D16 / 本書 §4 D1〜D13 とは別体系): **新規 2 件 (下記 N1・N2)**。DEFECTS.md の D7 (silent miscompile 系) とは別。
+検証起点 commit: `b82052e` (main) → 実装 `fd86159`。DLL = plugins-ott 内 NSIS インストーラの `OTT_x64.dll` (sha256 `ecd51e056860a37dbff4223c4dcab1a12f91e3f280161bec249fe8d97ab2378e`)。
+
+### 8.1 結果 (route = RetDec + icall pass, native = 実機械語, 600 点/関数, seed 3, xmm0 raw 64bit の bit 比較)
+| 関数 | 修復前 | 修復後 | 原因 |
+|---|--:|--:|---|
+| `1801a9be0` tan 本体 | 556/600 (max 1ulp, 差の x は 0.9 以上から) | **600/600** | N1 |
+| `1801aa1a0` leaf kernel (r8=1 経路) | 555/600 | **600/600** | N1 |
+| `1801c1240` (AVX/FMA 版 reduction) | 0/600 | **600/600** | N2 |
+| `1801a9a6c` `1801b4154` `1801c12f4` | 600/600 | 600/600 | — |
+| `1801a9b38` `1801c1398` (誤差報告経路) | wasm fail-fast, native も SIGSEGV | `1801a9b38` は override で動作 (§8.3) | CRT 未初期化 |
+
+- **N1 (新規): RetDec が `and r64, 0xffffffff00000000` (Dekker 風の上位 32bit 切出し) を `select (x <u 0xFFFFFFFF00000001), x, x + 0xFFFFFFFF` に誤 lower する。** 症状: tan/atan 系の hi 部が 1ulp ずれる。
+  発見の手がかり: issue 本文は「大引数 ≈1e4」としていたが、実測の差分入力は x = 0.908… から出ていた (reduction 経路ではない)。`oi.drc.ll` (RetDec 直後) に既に誤り。
+  検出信号: `icmp ult i64 X, -4294967295` + `add i64 X, 4294967295` + `select`。修復: `ir_fix_mask.py` で `and i64 X, -4294967296` に戻す (OTT で 2 箇所)。
+- **N2 (新規): `m11_simd2.py` の未実装 VEX helper は stderr を出して 0 を返す (silent)。** AVX/FMA 版 CRT (`1801c1240`) が xmm0=0 を返していた。修復: `vex_gen.py` が IR の宣言署名から VEX.128 helper 66 種を生成
+  (FMA3 は `fma()` 単一丸め)、`vcomisd/vucomisd` は comis の flag 経路 (`icall_rewrite.py` の COMIS_KIND) に追加、残る未実装 stub は `simd_merge.py` で abort に変更 (残 6 種: int / int3 / movntps / pcmpistri / rep movsb / rep stosb)。
+
+### 8.2 ネガティブコントロール
+- `ICALL_FIX_MASK=0 bash tools/icall/ott_route.sh` (N1 補正を外す): gate が `1801a9be0` 556/600・`1801aa1a0` 555/600 で FAIL。
+- `vex_gen.py` の FMA132 の被乗数を 1 箇所取り違え: `1801c1240` が 0/600 で FAIL (他は 600/600 のまま)。
+
+### 8.3 CRT エラー経路 override (R の `ott_ovr.c` 移植)
+`rt/icall_ovr.c` + `ir_override.py` で `1801c8c00` (_handle_error) / `1801a9a6c` (sqrt) / `1801a9b38` (sqrtf) を C 実装に置換。
+native は CRT 未初期化で SIGSEGV するため突合不能 (UCRT の観測可能な意味から導出; 根拠は `tools/ott/rt/ott_ovr.c`)。
+実行確認 (wasm): sqrt(-1) = `0xfff8000000000000`・sqrt(4) = 2.0・sqrt(-0.0) = -0.0・sqrtf(inf) = inf。置換前は未登録の間接 call target で fail-fast。
+`1801a9a6c` の関数単位比較は xmm0 のみ 600/600 (rax は 0/600 一致: 原因は未調査。BLK 経由の rax と native の rax で意味が違う可能性があり、本 gate は xmm0 のみを判定に使う)。
+
+### 8.4 検証 (clean HEAD `fd86159` の worktree, load average は開始→終了)
+| コマンド | 結果 | 所要 | load |
+|---|---|--:|---|
+| `OTT_SKIP_INFO=1 bash tools/ott/ott_e2e.sh` | PASS: 89 scenario / 50,236 cell 全一致, max_ulp 0, state diff 0 | 20.9 s | 0.42→1.23 |
+| `bash tools/icall/icall_e2e.sh` | PASS: 89 scenario / 50,236 cell 全一致, state diff 0, 監査 落ち 70→0, CRT gate PASS | 86.5 s | 1.13→1.62 |
+| `bash tools/icall/diff/crt_fn_gate.sh` | PASS (6 関数 × 600 点) | 2.6 s | — |
+| `python3 tools/icall/tests/test_icall.py` | PASS (0 failed; ICALL-5 追加 4 件を含む) | — | — |
+(修復前の同 e2e: 80.9 s・PASS。cell 数は変わらず、差は関数単位 gate のみに現れる。)
+
+### 8.5 範囲外・未解決
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| **FMA3 経路 (`__use_fma3=1`) の `1801a9be0` が 42/600** (他 4 関数は 600/600)。RetDec が `vmovapd [rsp+0x40], xmm0` を void helper にして store を落とすため `[rsp+0x40]` の再読込 (`1801aa0d6`) が未初期化になる疑い (未確認) | OTT 既定 (`__use_fma3=0`) は無影響。AVX2 CPU で DllMain を通す経路のみ | 親 #90 に子チケット提案 (RetDec の VEX 256bit/stack store 落ち, D7 (本書 §4) 類似) |
+| `1801a9b38` (sqrtf)・`1801c1398` 本体は native 突合不能 (CRT 未初期化) | override は UCRT 仕様由来で native bit 突合は無し | 親 #90 にコメント (x64c 側 `tools/ott/crtinit/REPORT.md` §7 が同じ限界を記載) |
+| `_handle_errorf` (1801c8cb8) は route の closure F に無く未 lift | float 版エラー経路に到達すると fail-fast | #231 続報 (到達 scenario が構築できた時点で) |
+| 関数単位 gate は SSE2 経路の 6 関数のみ。他の CRT 関数 (exp/log/pow の 1801b4220 等) は DSP matrix の bit 一致のみ | OTT が踏まない入力域の 1ulp は残り得る | #231 続報 (候補選別 `fn_diff.py` は rip/rsp 相対 leaf の 8 関数に限定) |
+| #9 (OTT bit-exact 512/512) への反映: route でも 512/512 (t1 std 512 cell: zero 5 / normal 507 / junkHi 0 / junkTiny 0, |max| 0.2516) | — | #9 にコメントで報告 |
+| `/home/ubuntu/work/analysis/...` ハードコード | runner で動かない | #294 (issue #231 コメントに列挙) |
+
+### 8.6 再現
+```sh
+bash tools/ott/ott_e2e.sh && bash tools/icall/icall_e2e.sh      # 前提 + 全体 (関数単位 gate を含む)
+bash tools/icall/diff/crt_fn_gate.sh                             # gate のみ (2.6 秒)
+python3 tools/icall/diff/fn3_diff.py 1801a9be0 --n 600 --dump    # native / route / x64c の 3 者比較 (--kernel / --fma 0|1 / --wide)
+```
+
+## 9. #229 (ICALL-3) 統合適用 + stack 引数 BLK 拡張
+既知類型との関係: 該当なし (新規: RetDec が rsp を stack_var 別 alloca に分割 → rsp 相対アドレスを BLK に渡せない)。検証起点 commit: `60a68c2` (branch `229-icall-liftlib-stack-blk`, base `400d546`)。
+
+| 項目 | 結果 | 実測 |
+|---|---|---|
+| liftlib 統合 patch 適用 | **済** (`patch -p1 --dry-run` OK / pipeline.py hunk #2 は offset 23 行で成功) | `liftlib.passes.icall` import OK。`liftlib.pipeline.run_all('targets/ott_route.json', detect_only=True)` = prelift (280 関数・96 site・errors {}) → RetDec 17.5 s → restore (dispatch 96 / comis 100) → repair_ll、全体 29.9 s (load 0.74) |
+| stack 引数 BLK (+0x48 / STKBUF 12 語) | **済 (静的 + OTT 回帰のみ)** | OTT F: site 96 中 stack 引数あり 2 (`0x1801a1ce6`・`0x1801aa528`, 各 1 語), 94 は 0 語。`function_1801aa4dc` の IR に STKBUF store を確認 |
+| 回帰 `icall_e2e.sh` (HEAD `60a68c2`) | **PASS** 82.6 s (load 0.94, 4 core) | unit PASS 0 failed (新規 stk 6 件含む) / OTT F 落ち 70→0 / tail-jmp 11→0 / matrix 89 scenario・50,236 cell 全 bit 一致・max_ulp 0・state_diff 0 qword |
+| 前提再現 (`ott_e2e.sh`) | PASS 23.4 s | OTT_x64.dll = `Install_Xfer_OTT_137.exe` の `$_13_/OTT_x64.dll` を `[ANALYSIS-DIR]`/plugins/ott/binaries/OTT_vst2_win64.dll に配置 (m6_scan.py で `tools/m6/work/ott_ranges.txt` 生成) |
+
+- **設計の経緯 (実測)**: ① 当初案「BLK+0x48 = rsp+0x20 のアドレス」は、`ICALL_CHECK_STK` 計測で 1,337 dispatch 中 1 件が非整列値 (0x102cbecf, site 0x1801a03d3) になり不採用 (RetDec が rsp を連続領域として持たない)。
+  ② 全 site 無条件に 12 語コピーすると leaf の `i64 f(void)` 一様 ABI が崩れ ctor entry が表から消えた (`ott_run: unknown entry 0x3011d400`) → 実際に store された語数だけコピー。
+  ③ 初版の検出は `movaps [rsp+0x20], xmm6` (callee-saved xmm 退避) を引数と誤認し 6 site (うち 4 が実行され dispatch 252 回) → xmm/非整数サイズ store を除外して 2 site に。
+- **ネガティブコントロール**: 上記 ③ の誤検出入力 (`movaps [rsp+0x20], xmm6`) が unit `stk: movaps ... 引数でない` で 0 語になること / 直前 call より前の store が無視されること。
+- **検証範囲外 (正直な限界)**: OTT で stack 引数あり 2 site は matrix で**実行されない** (executed 0 / dispatch 1,337 中) ため、**stack 引数が実際に被呼側へ届くことの動的検証は未実施** (`tests/stk_check.mjs` は dispatch 総数 1,337・STKBUF 非 0 = 0 件を確認するのみ)。
+  動的検証には 5 引数以上を取る間接 call 先を持つ PE (IPP 結合 or FLEngine) が必要。`ICALL_IPP_SHIM` フック (`__icall_dispatch` 先頭) は `-DICALL_IPP_SHIM` でのみ有効、shim とのリンクは未検証。
+- **レビュー対応 (PR #326 Copilot 指摘 7 件, HEAD `4d30c1f` で実測, 4 core)**:
+  ① `stk_slots_stored` は operand access に write を要求 (cmp/test の読み取りを除外)。unit 新規 3 件 (cmp/test は 0 語・cmp の後の mov は 1 語): 修正前 FAIL 2 (cmp/test) → 修正後 `RESULT PASS (0 failed)`。
+  ② `ICALL_CHECK_STK` の dispatch ごとに BLK+0x48 の「期待値一致 / 8 byte 整列 / STKBUF 12 語が線形メモリ内」を runtime 検査 (`icall_stk_ptr_bad`)。`stk_check.mjs` は `dispatch>0 && ptr_bad==0` を終了コードで assert (nonzero_stkbuf は診断のみ)。
+  実測: 正常 build `dispatch=1337 ptr_bad=0` rc=0 / ネガティブコントロール (pointer を +1 で非整列化) `dispatch=1337 ptr_bad=1337` rc=1。
+  ③ `ott_route.json` の image を `${PLUGINS_DIR}/...` に (`pipeline.rpath()` が tools/shared/paths.py の変数を展開)。`run_all('targets/ott_route.json', detect_only=True)` 32.5 s 完走。
+  ⑤⑥⑦ docs: integration/README.md は「再適用不可の履歴スナップショット」と明記し patch 適用コマンドを削除、実測値は本節へのリンクのみ。`passes/icall.py` の docstring は funcs ファイル必須に修正。
+  回帰 `icall_e2e.sh`: PASS 91.5 s (load 1.28)、unit 0 failed / OTT F 落ち 70→0・tail-jmp 11→0 / matrix 89 scenario・50,236 cell 全 bit 一致 (max_ulp 0, state_diff 0 qword) / crt_fn_gate PASS。
+- 追加 build オプション: `ICALL_EMCC_FLAGS` / `ICALL_EXTRA_EXPORTS` (`ott_route.sh`)、`stub_len` / `comis_stub_len` を map.json に出力 (stub 長が 78 固定でなくなったため ranges 計算 4 箇所を map 由来に変更)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| FLEngine 巨大 2 関数 (`0xc589b0`, `0x128f9e0`: 各 183 site) の RetDec 範囲分割 lift | 残 366 site | 素材 `fl-win64` が本 run に無く未着手 → #229 に残す (再起動時 `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk`) |
+| `jmp [idx*8+tbl]` / Delphi in-code 表の cmp/je 展開 | RetDec 任せのまま | 同上 (FLEngine/Balance 実バイナリで要検証) → #229 |
+| Fruity Balance / Kilohearts / Fresh Air の wasm 実行 + 差分検証 | 監査のみのまま | 素材 `plugins-freshair plugins-kilohearts fl-win64` が必要 → #229 |
+| plugin closure T0 42 本へ route バッチ適用 | 未着手 | #15 / #50 と連携、素材同上 |
+| stack 引数の動的検証 (5 引数以上の間接 call を実行) | 本回は静的のみ | IPP 結合 (#246 系) で実行 → #229 |
+
+## 10. #514: icall_rewrite.py の関数配置修正 (連続配置の回避)
+
+既知類型との関係 (`docs/DEFECTS.md` / 本書 §4 とは別体系): **新規 1 件**。plugin 閉包 (eq-filter 11 block) を `tools/plugins/lift/lift_ranges.sh` の `PLUG_ICALL=1` で通したところ、書換え後の関数が 16 byte 整列でちょうど連続配置になる箇所 (関数終端が 16 の倍数) で、RetDec の `--select-ranges` が隣接 range `[a,b)+[b,c)` を 1 関数に併合し、後続関数の `define` が落ちた (4 block で 5 関数。dispatch 数は変わらないので site 突合では見えず、`define` 数 ≠ 閉包関数数で検出)。
+修正: `icall_rewrite.py` の `next_slot()` で、直前の関数/stub と連続になる場合だけ 16 byte 空ける (連続しない配置はバイト一致)。stub・comis stub にも同じ処理。詳細な実測は `tools/plugins/f2/REPORT.md` §7。
+### 10.1 #530: OTT 回帰の再実行 (素材付き)
+
+`icall_e2e.sh` PASS (89 scenario / 50,236 cell 全一致, state_diff 0)・`test_icall.py` PASS。**e2e は #514 の連続配置を検出しない** (修正を外しても PASS) ため `tests/test_icall.py` に連続配置チェックを追加。全文・実測表は `REPORT_APPENDIX.md` §10.1。
+
+### 10.2 #600: `liftlib_e2e.sh` の素材付き実走 (base `8f55002`、コード無変更)
+
+素材: `work-liftlib-targets work-liftlib work-m6-ott plugins-ott analysis-ott-binaries toolchain-retdec toolchain-emsdk`。`bash tools/liftlib/liftlib_e2e.sh` = **ALL PASS, exit 0, 387 秒** (load 0.71 開始 → 1.01 終了、直列 1 本): unit ALL PASS / regress fa_gain 400/400・kh_gain 366/366 bit-exact・OTT 2 構成 PASS (census junkHi 104 ≤ 104, 出力 SHA 42/42 一致) / simd 205 mnemonic mismatch 0 / inject 94/94 検出・偽陽性 0 / leafspec gate (exp 40/40, log 32/32) PASS。icall pass は通らない経路 (§10.1) なので #514 の影響なしを実測で確認。leafspec の tan/svf/cvt は gate 無しの情報行 (mismatch 29/30/6、既存)。
+実走の前提 2 点 (実測): ① python に `pefile` `capstone==5.0.7` が必要 (無いと exit 1 で fail-closed、1 回目 359 秒で FAIL)。② `work-liftlib` に `/home/ubuntu/...` を指す dangling symlink 133 本 (`ott_*/work/full_t1.drc.{ll,dsm}`) が含まれ、`recipes/ott.py` の `os.path.exists` が偽→`os.symlink` が FileExistsError で regress が落ちる。削除して再実行 (展開物のみ・commit 対象外)。素材側の修正は別途。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `work-liftlib` の dangling symlink 133 本 (runner で regress が FileExistsError) | 素材展開直後は liftlib_e2e.sh が FAIL (削除で回避) | #448 |
+| FMA3 経路 `1801a9be0` が xmm0 42/600 (gate 外の INFO 行) | 本 PR と無関係 (既存の INFO 表示) → **#361 / PR #617 で解消 (§11)** | #229 (icall 親) |
+
+## 11. ICALL-6: CRT 経路の残 (#361)
+
+FMA3 経路 `1801a9be0` を 42/600 → **600/600** (N3: RetDec の `vmovapd xmm→stack` store 落ち、N4: closure 内 direct call の memory-ABI が戻り xmm1 を通さない)、`_handle_errorf` (1801c8cb8) を closure に入れ override 4/4、`1801a9a6c` の rax は呼出し元が読まないため gate は xmm0 のみ。FMA3 経路は gate に昇格。
+結果表・ネガコン・rax 根拠 (`1801a9be0` の rax 不一致 558/600 も含む)・検証 (HEAD `b23593c`・所要・load)・未解決表の全文は `REPORT_APPENDIX.md` §11。再現: `bash tools/icall/icall_e2e.sh`。

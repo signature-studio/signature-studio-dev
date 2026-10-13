@@ -29,7 +29,9 @@ CFG = json.load(open(os.path.join(ROOT, 'lic_config.json')))
 
 def sh(cmd, log=None, check=True):
     t = time.time()
-    cmd = 'source %s >/dev/null 2>&1; ' % EMSDK + cmd
+    # KH_EM_CACHE: 読取専用な emscripten cache の差替え用 ([EMSDK] の cache が読めない Actions runner 向け)。
+    # emsdk_env.sh が EM_CACHE を消すため source 後に再設定する。値は shell に埋め込まず環境変数として展開させる
+    cmd = 'source %s >/dev/null 2>&1; ' % EMSDK + ('export EM_CACHE="$KH_EM_CACHE"; ' if os.environ.get('KH_EM_CACHE') else '') + cmd
     r = subprocess.run(cmd, shell=True, capture_output=True, text=True, executable='/bin/bash')
     if log:
         open(log, 'w').write(r.stdout + r.stderr)
@@ -142,7 +144,7 @@ def build(vas, tag_dir, tag, apply_stub, module=None, abi=None, jt=None, shims=N
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--module', choices=['A', 'B', 'E'])
+    ap.add_argument('--module', choices=['A', 'B', 'E', 'F'])
     ap.add_argument('--dsp', default=None, help='snapin name (matrix/gain/haas/clipper/gate/quickeq)')
     ap.add_argument('--tag', default='lic')
     ap.add_argument('--no-stub', action='store_true')

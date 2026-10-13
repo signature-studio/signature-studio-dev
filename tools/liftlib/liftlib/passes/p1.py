@@ -15,7 +15,7 @@ import os
 import re
 
 from .. import ir as IR
-from ..mc import MFunc, _canon_reg
+from ..mc import MFunc, _canon_reg, leaf_ext
 from ..regbind import Binder, FuncIndex, TYPE_BITS, result_type
 
 # jcc の condition code -> (fcmp predicate, 反転か)
@@ -659,6 +659,46 @@ class Region:
         finally:
             self._resolving.discard(key)
 
+    def _setcc_value(self, reg, d, va, out):
+        """`xor r,r ; ... ; setcc r8` (RetDec は結果を i1 で持つ) の r 全体値 = zext i1 → i64 (LIFTLIB-5)。
+
+        GPR bind は i1 を弾くため多定義 bind が復元不能になっていた (tan @1801a9cd9 の r10 =
+        入口 sign)。d と同一 block の直前 8 命令以内に同 reg の 32bit 以上のゼロ化 (xor r,r) がある時だけ上位 56bit = 0 と言える。"""
+        if not leaf_ext("SETCC_I1"):
+            return None
+        it = self.mf.insns.get(d)
+        if it is None or not it.mnem.startswith("set") or len(it.ops) != 1 or it.ops[0].type != 1:
+            return None
+        if _canon_reg(it._ci, it.ops[0].reg) != reg:
+            return None
+        # d と同一の機械語 block 内に限る: block 境界を跨ぐと別 pred の xor を「ゼロ化済み」と誤認し,
+        # setcc を通らない経路の上位 56bit が 0 と保証できない (silent miscompile)
+        vas = self.mf.cfg()[self.mf.block_of(d)]["vas"]
+        k = vas.index(d)
+        zeroed = False
+        for pv in reversed(vas[max(0, k - 8):k]):
+            p = self.mf.insns[pv]
+            if p.mnem == "xor" and len(p.ops) == 2 and p.ops[0].type == 1 and p.ops[1].type == 1 \
+                    and p.ops[0].reg == p.ops[1].reg and _canon_reg(p._ci, p.ops[0].reg) == reg \
+                    and p._ci.operands[0].size >= 4:       # 8/16bit xor は上位 bit を消さない
+                zeroed = True
+                break
+            if reg in p.writes:
+                break
+        if not zeroed:
+            return None
+        for (bi, li, ln) in self.ix.instrs_at(d):
+            dst = IR.instr_dst(ln)
+            if not dst or result_type(ln) != "i1" or self.b._is_region_dst(dst):
+                continue
+            if not self._value_ok(dst, va):
+                continue
+            n = self.nm(va, "sz")
+            out.append("  %s = zext i1 %s to i64%s" % (n, dst, self.mod.tag(va)))
+            self.used("setcc_i1")
+            return (n, "i64")
+        return None
+
     def _def_site_lift(self, reg, d, va, out):
         """落とされた経路上の def 命令 1 個をその場で lift して値を復元する
         (SSE 算術 / GPR mov・即値 / rip 基準 load など, 値を生む単一命令)。"""
@@ -700,6 +740,15 @@ class Region:
         不一致の場合はここでは合成しない (誤った値の選択より unsupported を優先)。
         領域内合流による多定義は collect/merge_in の reg2mem 合成が正しい値を選ぶ。"""
         vals = []
+        if leaf_ext("REGION_DEFS"):
+            # LIFTLIB-5: 領域は D からしか入らない。生存側 S (領域外) の命令だけが書く def は
+            # この経路に流れないので除外する (def が領域内 block か, 分岐点 J に到達する def のみ残す)。
+            at_j = self.mf.defs_before(self.J, reg)
+            keep = {d for d in defs
+                    if d in at_j or (d and self.mf.block_of(d) in self.internal)}
+            if keep and keep != set(defs):
+                self.used("multi_region_defs")
+                defs = keep
         for d in sorted(defs):
             if d == 0:
                 v = self._entry_value(reg)
@@ -711,6 +760,8 @@ class Region:
                     v = None
                 if v is None:
                     v = self.b.synthetic_def(reg, d)
+                if v is None:
+                    v = self._setcc_value(reg, d, va, out)
                 if v is None:
                     it = self.mf.insns.get(d)
                     if it is not None and it.mnem.startswith("cmov") and len(it.ops) == 2:
@@ -857,6 +908,34 @@ class Region:
             self.used("rsp_restore_bind")
             return True
         raise Unsupported("rsp load %s size %d" % (base, m["size"]))
+
+    def _rsp_gpr(self, it, st, out, va, tag, write):
+        """64bit GPR の rsp slot spill/reload (LIFTLIB-5)。xmm slot と同じ head alloca (i64) 経由。
+        slot が領域内で書かれていない reload は Unsupported (入口/他経路の値を推測しない)。"""
+        m = it.mem
+        if m["index"] or m["seg"]:
+            raise Unsupported("rsp slot form %s" % it.op_str)
+        off = m["disp"]
+        ap = self.rsp_allocas.get(off)
+        if write:
+            if ap is None:
+                ap = "%%p1r_%x_rsp%x" % (self.D, off & 0xFFFFFFFF)
+                self.rsp_allocas[off] = ap
+                self.rsp_alloca_lines.append("  %s = alloca i64" % ap)
+            x = self._gpr_val(st, _canon_reg(it._ci, it.ops[1].reg), va, out)
+            out.append("  store i64 %s, ptr %s, align 4%s" % (x, ap, tag))
+            st.setdefault("__gw", set()).add(off)
+            self.used("rsp_gpr_store")
+            return True
+        if ap is None or off not in st.get("__gw", ()):
+            raise Unsupported("rsp gpr reload @%x: slot %#x が領域内の全経路で store 済みでない" % (va, off))
+        dst = _canon_reg(it._ci, it.ops[0].reg)
+        n = self.nm(va, "gl")
+        out.append("  %s = load i64, ptr %s, align 4%s" % (n, ap, tag))
+        st[dst] = (n, "i64")
+        st["__w"].add(dst)
+        self.used("rsp_gpr_load")
+        return True
 
     def _lift_call(self, it, st, out, va, tag):
         """断片内 call。declare (RetDec) の引数型列を (rcx,rdx,r8,r9) に対応付け,
@@ -1207,6 +1286,10 @@ class Region:
             xr1 = len(it.ops) > 1 and it.ops[1].type == 1 and _canon_reg(it._ci, it.ops[1].reg).startswith("xmm")
             if (xr0 or xr1) and m.lstrip("v") in ("movsd", "movss", "movaps", "movapd", "movups", "movupd", "movdqa", "movdqu"):
                 return self._rsp(it, st, out, va, tag, write=mem["write"])
+            # LIFTLIB-5: 64bit GPR の spill/reload (mov [rsp+k], r64 / mov r64, [rsp+k])
+            if m == "mov" and leaf_ext("GPR_SPILL") and mem["size"] == 8 and len(it.ops) == 2 \
+                    and (it.ops[1].type == 1 if mem["write"] else it.ops[0].type == 1):
+                return self._rsp_gpr(it, st, out, va, tag, write=mem["write"])
         # 断片内 call
         if it.is_call and it.target is not None and not mem:
             return self._lift_call(it, st, out, va, tag)
@@ -1661,7 +1744,7 @@ class Region:
         for va in self.topo:
             self.cur_va = va          # LIFTLIB-4: merge_in が合成する値の def block 基準
             if va == D:
-                st = {k: (set(v) if k == "__w" else (dict(v) if k == "rsp" else v)) for k, v in st0.items()}
+                st = {k: (set(v) if k in ("__w", "__gw") else (dict(v) if k == "rsp" else v)) for k, v in st0.items()}
                 pre = []
             else:
                 st, pre = self.merge_in(va)
@@ -1683,9 +1766,11 @@ class Region:
         cfg = self.mf.cfg()
         preds = [p for p in cfg[va]["pred"] if p in self.internal]
         pst = [self.out_states[p] for p in preds]
-        st = {"__w": set(), "fl": None, "rsp": {}}
+        st = {"__w": set(), "fl": None, "rsp": {}, "__gw": set()}
         if pst:
             st["__w"] = set().union(*[s["__w"] for s in pst])
+            # GPR spill slot は全 pred 経路で store 済みの slot だけ reload 可 (片経路だけの store は未初期化 alloca を読む)
+            st["__gw"] = set.intersection(*[set(s.get("__gw", ())) for s in pst])
             fls = [s.get("fl") for s in pst]
             st["fl"] = fls[0] if all(f == fls[0] for f in fls) else None
             rsps = [s.get("rsp", {}) for s in pst]
@@ -1701,9 +1786,21 @@ class Region:
         for r in cands:
             if not all(r in s for s in pst):
                 # 持っていない pred の終端で到達値を束縛してから合成する
+                dead_skip = False
                 for s, p in zip(pst, preds):
                     if r not in s:
-                        self.read_reg(s, r, cfg[p]["vas"][-1], self.preterm_lines(p), use_va=p)
+                        try:
+                            self.read_reg(s, r, cfg[p]["vas"][-1], self.preterm_lines(p), use_va=p)
+                        except Unsupported:
+                            # LIFTLIB-5: 入口値 (f2 引数なし) など束縛不能でも, 合流点で
+                            # live でない reg (直後に上書きされる) なら合成不要 → 捨てる
+                            if not leaf_ext("DEAD_JOIN") or r in self.block_live_in().get(va, set()):
+                                raise
+                            dead_skip = True
+                            break
+                if dead_skip:
+                    self.used("join_dead_skip")
+                    continue
             vals = [s[r] for s in pst]
             vals = [self._checked(v, p, "merge %s" % r, self.preterm_lines(p))
                     for p, v in zip(preds, vals)]

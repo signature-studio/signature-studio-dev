@@ -164,6 +164,7 @@ F3a/F3b/F3c と同根。icall では PE 書換え (`lea B,[B+8]; op [B-8]` 補�
 | `embed_e2e.sh` / `embed_sx_ab.sh` / `sx_halt0_ab.sh` | 常設化 A/B 検収 (stage4 + survey・`--batch` で liftdiff 全数 / alloca 足場 mainline+shimx 純リンク A/B / halt0 足場 survey A/B) |
 | `halt0_map.py` | survey JSON → halt0 発生点 × unit 対応表抽出 |
 | `targets/m11_ldfix.json`・`targets/m11_ldfix_embedded{,_post}.json` | liftdiff 用 target (修復 IR / 常設化 IR / post 後・F1v 分離用) |
+| `render_target.py` | targets/*.json の `${FL_WIN64_DIR}` 等を `tools/shared/paths.py` の値で展開し `work/targets/` に出力 (liftdiff は env を展開しないため e2e が経由する) |
 | `results/halt0_map_*.json` | halt0 対応表実測 (CAB-129 受入時 / 今日 base / 今日 fix) |
 | `work/` | 生成物 (gitignore): ldfix_fixed.ll, ldfix_report.json, batch_base*.jsonl, batch_ldfix*.jsonl, stage4/{base,fix}/ |
 
@@ -183,3 +184,31 @@ F3a/F3b/F3c と同根。icall では PE 書換え (`lea B,[B+8]; op [B-8]` 補�
 4. ~~**m11 への常設組み込み**: §6-4 の 1 行追加~~ → **CAB-131 で実施済み** (詳細は付録 `REPORT_APPENDIX_AB.md`)。
 5. bitcast 残存による静的タグの残存: F2 修復後に使われなくなった bitcast 行の DCE (分類器の
    `regslot_deref` が静的カウントのため付き続ける。意味上の問題なし)。
+
+## 9. 絶対パス除去 (#351、親 #294)
+
+`/home/ubuntu` 直書き 6 箇所 (`ldfix_e2e.sh`・`embed_e2e.sh`・`halt0_map.py`・`targets/*.json` x3) を
+`tools/shared` の `FL_WIN64_DIR` に置換 (既定値は従来と同一)。sh は `source tools/shared/env.sh`、py は `paths.py`。
+JSON は `${FL_WIN64_DIR}` プレースホルダとし、e2e が `render_target.py` で展開した `work/targets/*.json` を liftdiff に渡す
+(liftdiff `build_wasm.load_target` は area 外で env を展開しないため)。
+
+既知類型との関係: 該当なし (lift 出力に触れない)。検証起点: `origin/main` 2c3e526。
+
+| 検査 | コマンド | 実測 |
+|---|---|---|
+| 残存 | `grep -rn '/home/ubuntu' tools/m11/ldfix --include=*.sh --include=*.py --include=*.json --include=*.ts --include=*.mjs` (work/ 除く) | 0 件 (置換前 6 件) |
+| 構文 | `bash -n *.sh` / `py_compile halt0_map.py render_target.py` | 5 sh・2 py すべて OK |
+| 既定値で同一 | env 未設定で `render_target.py` → `git show HEAD:<json>` と `cmp` | 3/3 byte 同一 |
+| 上書き | `FL_WIN64_DIR=/x/y` で render / `halt0_map.py` の `FL_WIN64_DIR` | `pe` が `/x/y/extracted/...` / `/x` |
+
+置換前後の e2e 出力同一性 (#351 受入 2) の実測 (2026-10-13, runner, 素材 fl-win64 / work-m11 / work-liftdiff / toolchain-emsdk 展開, capstone+pefile は venv):
+
+| 比較 | 方法 | 結果 |
+|---|---|---|
+| 工程 1 (`ldfix.py`) | 置換後 HEAD を、PE パスだけ旧 `/home/ubuntu/work/analysis/win64` に揃えて実行 | `ldfix_fixed.ll` (21,771,834 B) と `ldfix_report.json` が**バイト一致** (F3c=26) |
+| render 済み target | 旧 JSON (`5984f7e^`) と `render_target.py` 既定展開 | 3/3 byte 同一 |
+| `ldfix_e2e.sh` 全工程 | 置換前 (`33fd25a2` のうち置換対象 6 ファイルだけを `5984f7e^` に戻した tree) と置換後 (`33fd25a2`) のログ | パス正規化後に**完全一致** (30 行。置換前 50 秒 / 置換後 61 秒) |
+
+注意 (置換とは無関係): 比較基点を `5984f7e^` 全体にすると、その間の他 PR の `ldfix.py` 変更で F3c が 0 → 26 と変わる。比較は置換対象以外が同一の tree で行うこと。
+
+既存欠陥 (#757 で修正・2026-10-13 実測): 修正前は stage4 が到達せず (`m11_simd.c: '../msimd11_core.h' file not found`・boot `missing function: __asm_movapd__112`)、base / fix とも survey ok 0・units_run 0 でも `judge_e2e.py` が PASS と判定していた。原因は `stage4.sh` が header を `work/stage4/` に置かず、simd.o が link されていなかったこと。`stage4.sh` で header を配置し、`judge_e2e.py` に「stage4 到達 (>=4) と survey ok >=1」の前提を入れた。修正後 HEAD `b4af8272`: `ldfix_e2e.sh` 全工程 PASS (50.8 秒・rc 0)。`missing function: __asm_movapd__112` の消失と link の `undefined symbol` / `signature mismatch` 0 件は、この run のログから grep 件数を記録していないため未測定 (受入条件として未達扱い)。base / fix とも stage 4/6・units_run 17/942・survey ok 136・trap 9 で、ldfix の差は出ていない (F3c=26 は適用されるが survey 件数は不変)。

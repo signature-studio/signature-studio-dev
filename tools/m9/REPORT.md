@@ -1,5 +1,7 @@
 # M9 REPORT — SVF 路線 bootstraps + 出力 copy L/R + OOB table remap
 
+> **参照専用 (LIFTLIB-1 / #224)**: 本 dir の lift IR pass・スクリプトは新規実行・改変しない。IR pass の正本は `tools/liftlib` (対応表: `tools/liftlib/README.md`「旧 dir pass → liftlib 対応表」)。既存 e2e 成果物・本 REPORT は歴史として残置し、旧成果物に対する既存 e2e (`tools/m7/m6_e2e.sh`・m8/m9/m10 の `*_e2e.sh`) が引き続き PASS することは `tools/liftlib/REPORT_APPENDIX_B.md` §15 で実測。
+
 ## 0. 結論 (先出し)
 
 - **E2E 全項目 PASS**: `bash tools/m9/m9_e2e.sh` = checks 6 / broken 0 + [F9] OOB 不発 → exit 0。

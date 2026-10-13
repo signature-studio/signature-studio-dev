@@ -8,11 +8,15 @@
  *
  * (shim 実装統合の規約: tools/shim/src/heap.c の HeapAlloc/HeapFree 等を静的リンクで併用)
  */
+#ifndef M11_LB_BASE
+#define M11_LB_BASE 0   /* #222: LVA = RVA + M11_LB_BASE (m11_build.sh が -D で渡す) */
+#endif
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <emscripten.h>
+#include <emscripten/stack.h>
 
 #define PAGE daunting_nop = 0  /* (未使用のプレース保留は書かない) */
 
@@ -24,36 +28,108 @@ extern void  free(void* p);
 /* ---- Virtual memory shim ----
  * VirtualAlloc: 要求ごとに calloc(size + 64KB) で確保し 64KB 境界へ揃える (wasm には ページ予約/保護が無い).
  *   addr 指定 (commit 追加) は既に確保済領域内とみなし addr をそのまま返す.
- *   VirtualFree/Protect は no-op (PoC; 計測のため leak を許容).
+ *   確保ごとに (返した基底, calloc の生ポインタ, 長さ) を表に記録する (#513).
+ * VirtualFree: MEM_RELEASE (0x8000) で基底ポインタが表にあれば free して表から消す (実解放).
+ *   MEM_DECOMMIT (0x4000) は no-op (回数だけ数える). 表に無い解放要求は 1 を返し g_va_free_unknown に数える.
+ *   M11 の survey は 942 unit を 1 プロセスで通算実行する. 旧版 (VirtualFree no-op) は累計が wasm 上限に達すると
+ *   OOM → NULL → GetMem 失敗 → Halt0 となり, 意味の trap と区別できなかった (#513).
+ *   m11_set_vfree_noop(1) で旧挙動 (解放しない) に戻せる = ネガティブコントロール.
  * 旧版の「64MB arena + 超過時は arena 末尾を返す」は大きな要求 (339MB) で arena 外を返し OOB を起こしていた (修正済).
  */
 int m11_trace_flag = 0;   /* m11_ov.c の m11_set_trace が設定 */
-static unsigned long long g_va_used = 0;
+#define M11_VA_BIG (64ULL << 20)   /* この大きさ以上の要求は stderr に記録し, m11_set_va_bigtrace(1) なら呼出元スタックも出す */
+static int g_va_bigtrace = 0;
+static unsigned long long g_va_unit_budget = 0;  /* >0: unit 1 本が VirtualAlloc で確保できる累計バイト上限 (survey 用; 超過は NULL = OOM 扱い) */
+static unsigned long long g_va_unit_base = 0;    /* m11_va_unit_begin 時点の g_va_used */
+static unsigned long long g_va_denied = 0;       /* 上限超過で NULL を返した回数 (g_va_oom にも含む) */
+static unsigned long long g_va_stack_at = 0;   /* >=1: 0 起算でその番号の VirtualAlloc 呼出しで呼出元スタックを出す (0 = 無効なので最初の呼出し #0 は指定不可) */
+typedef struct { unsigned char* base; unsigned char* raw; unsigned long long need; } va_ent;
+static va_ent* g_va_tab = 0;
+static unsigned g_va_tab_n = 0, g_va_tab_cap = 0;
+static int g_vfree_noop = 0;
+static unsigned long long g_va_used = 0;       /* 累計確保バイト (従来値と同義) */
+static unsigned long long g_va_live = 0;       /* 現在確保中バイト */
+static unsigned long long g_va_peak = 0;       /* g_va_live の最大 */
+extern const int m11_trace_isolate;   /* trace が shadow stack を汚さないよう SP 直下を退避/復元する (m11_ov.c M11_TRACE, #495) */
+extern void m11_stk_save(unsigned sp);
+extern void m11_stk_restore(unsigned sp);
 static unsigned long long g_va_calls = 0;
-static unsigned long long g_va_freed_cnt = 0;
+static unsigned long long g_va_oom = 0;        /* calloc 失敗 (NULL を返した) 回数 */
+static unsigned long long g_va_freed_cnt = 0;  /* MEM_RELEASE で実解放した回数 */
+static unsigned long long g_va_freed_bytes = 0;
+static unsigned long long g_va_free_unknown = 0;
+static unsigned long long g_va_free_skipped = 0;  /* NC (m11_set_vfree_noop) で解放を見送った回数 */
+static unsigned long long g_va_decommit = 0;
+static unsigned long long g_va_big_cnt = 0;
+
+EM_JS(void, m11_va_big_stack, (unsigned size), {
+    var l = Error.stackTraceLimit; Error.stackTraceLimit = 48;
+    var st = new Error().stack; Error.stackTraceLimit = l;
+    console.error('[m11][VA-big] size=' + size + ' (' + (size / 1048576).toFixed(1) + ' MB)\n' + st.split('\n').slice(2, 48).join('\n'));
+});
 
 EMSCRIPTEN_KEEPALIVE
 void *VirtualAlloc(void* addr, unsigned size, unsigned type, unsigned protect) {
     if (g_va_calls < 8) fprintf(stderr, "[m11][VA] #%llu addr=%p size=%u (0x%x) type=0x%x prot=0x%x\n", g_va_calls, addr, size, size, type, protect);
-    if (m11_trace_flag && g_va_calls < 3) EM_ASM({ console.error('[m11][VA-stack]\n' + new Error().stack.split('\n').slice(2, 12).join('\n')); });
+    if (m11_trace_flag && g_va_calls < 3) {
+        unsigned sp_ = (unsigned)emscripten_stack_get_current();
+        if (m11_trace_isolate) m11_stk_save(sp_);
+        EM_ASM({ console.error('[m11][VA-stack]\n' + new Error().stack.split('\n').slice(2, 12).join('\n')); });
+        if (m11_trace_isolate) m11_stk_restore(sp_);
+    }
+    if (g_va_stack_at && g_va_calls == g_va_stack_at) m11_va_big_stack(size);
     g_va_calls++;
     if (addr) return addr;
+    if (size >= M11_VA_BIG) {
+        g_va_big_cnt++;
+        fprintf(stderr, "[m11][VA-big] #%llu size=%u (%.1f MB) live=%.1fMB\n", g_va_calls - 1, size, size / 1048576.0, g_va_live / 1e6);
+        if (g_va_bigtrace && g_va_big_cnt <= 8) m11_va_big_stack(size);
+    }
     unsigned long long need = ((unsigned long long)size + 0xffffULL) & ~0xffffULL;
+    if (g_va_unit_budget && g_va_used - g_va_unit_base + need > g_va_unit_budget) {
+        g_va_oom++; g_va_denied++;
+        if (g_va_denied <= 8) fprintf(stderr, "[m11][VA] unit budget 超過 want=%.1fMB unit_used=%.1fMB budget=%.1fMB (NULL を返す)\n", need / 1e6, (g_va_used - g_va_unit_base) / 1e6, g_va_unit_budget / 1e6);
+        return 0;
+    }
     unsigned char* raw = (unsigned char*)calloc(1, (size_t)(need + 0x10000ULL));
     if (!raw) {
-        fprintf(stderr, "[m11][VA] OOM want=%.1fMB used=%.1fMB (NULL を返す)\n", need / 1e6, g_va_used / 1e6);
+        g_va_oom++;
+        fprintf(stderr, "[m11][VA] OOM want=%.1fMB used=%.1fMB live=%.1fMB (NULL を返す)\n", need / 1e6, g_va_used / 1e6, g_va_live / 1e6);
         return 0;
     }
     unsigned long long p = (unsigned long long)raw;
     unsigned long long off = (0x10000ULL - (p & 0xffffULL)) & 0xffffULL;
+    if (g_va_tab_n == g_va_tab_cap) {
+        unsigned nc = g_va_tab_cap ? g_va_tab_cap * 2 : 256;
+        va_ent* nt = (va_ent*)realloc(g_va_tab, nc * sizeof(va_ent));
+        if (!nt) { free(raw); g_va_oom++; fprintf(stderr, "[m11][VA] OOM (管理表)\n"); return 0; }
+        g_va_tab = nt; g_va_tab_cap = nc;
+    }
+    g_va_tab[g_va_tab_n].base = raw + off; g_va_tab[g_va_tab_n].raw = raw; g_va_tab[g_va_tab_n].need = need; g_va_tab_n++;
     g_va_used += need;
+    g_va_live += need;
+    if (g_va_live > g_va_peak) g_va_peak = g_va_live;
     return raw + off;
 }
 
+EMSCRIPTEN_KEEPALIVE
 int VirtualFree(void* p, unsigned size, unsigned type) {
-    (void)p; (void)size; (void)type;
-    g_va_freed_cnt++;
-    return 1; /* FastMM arena 解放は省略 (boot 終了後まとめて drop) */
+    (void)size;
+    if (type & 0x4000) { g_va_decommit++; return 1; }          /* MEM_DECOMMIT: 領域は保持 */
+    if (!(type & 0x8000)) return 1;                              /* MEM_RELEASE 以外は従来どおり成功扱い */
+    for (unsigned i = g_va_tab_n; i-- > 0; ) {                   /* 直近の確保から探す */
+        if (g_va_tab[i].base == (unsigned char*)p) {
+            if (g_vfree_noop) { g_va_free_skipped++; return 1; }  /* NC: 旧挙動 (解放しない, 表にも残す) */
+            g_va_live -= g_va_tab[i].need;
+            g_va_freed_bytes += g_va_tab[i].need;
+            g_va_freed_cnt++;
+            free(g_va_tab[i].raw);
+            g_va_tab[i] = g_va_tab[--g_va_tab_n];
+            return 1;
+        }
+    }
+    g_va_free_unknown++;
+    return 1;
 }
 
 int VirtualProtect(void* p, unsigned size, unsigned prot_new, unsigned* prot_old) {
@@ -97,8 +173,9 @@ int64_t m11_boot_enter(int64_t hinst, int64_t reason) {
     if (!data_installed) {
         m11_data_install();
         data_installed = 1;
-        fprintf(stderr, "[m11] PE image .data/.rdata installed (LVA base 0)\n");
+        fprintf(stderr, "[m11] PE image .data/.rdata installed (LVA = RVA + 0x%x)\n", (unsigned)M11_LB_BASE);
     }
+    hinst += (int64_t)M11_LB_BASE;   /* hinst = LVA 上の image 先頭 (ホストは従来どおり 0 を渡す; LVA=RVA では 0) */
     g_m11_boot_stage = 1;
     fflush(stdout);
     fprintf(stderr, "[m11][args] entry_point(0x%llx, 0x%llx, 0x%llx)\n",
@@ -116,11 +193,26 @@ void m11_unresolved_function(const char* name) {
     abort();  /* exit code 101 相当 (wasm EXITRUNTIME が abort を伝える; exit_runtime=1) */
 }
 
-/* state 値: VirtualAlloc arena 実測値 */
+/* state 値: VirtualAlloc 実測値 (m11_va_used = 累計確保バイト; live/peak/oom/freed は #513) */
 EMSCRIPTEN_KEEPALIVE
 int64_t m11_va_used(void) { return (int64_t)g_va_used; }
 EMSCRIPTEN_KEEPALIVE
 int64_t m11_va_calls(void) { return (int64_t)g_va_calls; }
+EMSCRIPTEN_KEEPALIVE int64_t m11_va_live(void) { return (int64_t)g_va_live; }
+EMSCRIPTEN_KEEPALIVE int64_t m11_va_peak(void) { return (int64_t)g_va_peak; }
+EMSCRIPTEN_KEEPALIVE int64_t m11_va_oom(void) { return (int64_t)g_va_oom; }
+EMSCRIPTEN_KEEPALIVE int64_t m11_va_freed(void) { return (int64_t)g_va_freed_cnt; }
+EMSCRIPTEN_KEEPALIVE int64_t m11_va_freed_bytes(void) { return (int64_t)g_va_freed_bytes; }
+EMSCRIPTEN_KEEPALIVE int64_t m11_va_free_unknown(void) { return (int64_t)g_va_free_unknown; }
+EMSCRIPTEN_KEEPALIVE int64_t m11_va_free_skipped(void) { return (int64_t)g_va_free_skipped; }
+EMSCRIPTEN_KEEPALIVE int64_t m11_va_decommit(void) { return (int64_t)g_va_decommit; }
+EMSCRIPTEN_KEEPALIVE int64_t m11_va_big(void) { return (int64_t)g_va_big_cnt; }
+EMSCRIPTEN_KEEPALIVE void m11_set_vfree_noop(int v) { g_vfree_noop = v; }
+EMSCRIPTEN_KEEPALIVE void m11_set_va_bigtrace(int v) { g_va_bigtrace = v; }
+EMSCRIPTEN_KEEPALIVE void m11_set_va_unit_budget(int mb) { g_va_unit_budget = (unsigned long long)(mb > 0 ? mb : 0) << 20; }
+EMSCRIPTEN_KEEPALIVE void m11_va_unit_begin(void) { g_va_unit_base = g_va_used; }
+EMSCRIPTEN_KEEPALIVE int64_t m11_va_denied(void) { return (int64_t)g_va_denied; }
+EMSCRIPTEN_KEEPALIVE void m11_set_va_stack_at(int v) { g_va_stack_at = (unsigned long long)v; }
 
 /* __asm_fnclex0 等の SIMD/FPU helper は m11_simd2.py が IR 署名から生成 (work/m11_simd.c) */
 

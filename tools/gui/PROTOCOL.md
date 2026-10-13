@@ -41,7 +41,7 @@
 | 0x8940 | out_recs[2048][8×u32] (64 KiB) | shim |
 | 0x18940 | 終端 (= 100,672 B) | |
 
-surface エントリ (128 B): `state, visible, x, y, w, h, stride, pixels(wasm addr), z, gen, _rsv[6], title[64]`。
+surface エントリ (128 B): `state, visible, x, y, w, h, stride, pixels(wasm addr), z, gen, wseq, _rsv[5], title[64]`。`wseq` は seqlock (§4 の 6)。
 `pixels` は **BGRA32 top-down** (Windows DIB と同じ B,G,R,A バイト順)。リサイズ/再確保で `gen++` かつ `SURF_CHANGE`。
 JS ミラー: `src/runtime/gui_proto.ts` (`OFF`, `W`, `S`)。C 側 `_Static_assert` で全オフセット固定、wasm と JS の total_size 不一致は worker 起動時に throw。
 メモリ成長対策: worker は処理毎に `memory.buffer` を取り直す (`WebAssembly.Memory` を init で受領)。静的領域とリングは成長で動かない。
@@ -82,9 +82,15 @@ host は **レコード書込の前に** 共有 pointer 状態 (cursor/buttons/m
 1. 描画先がウィンドウ DC (surface) のとき、プリミティブごとに `surf_dirty(surf, rect)` が surface 単位の dirty 外接矩形に合流。
 2. **flush 契機**: EndPaint / ReleaseDC / GdiFlush / `WM_PAINT` dispatch 後 / `GetMessage` ブロック直前 / PeekMessage 空 / 前回 flush から 16 ms 超 (try_get 入口)。
 3. flush は dirty のある surface ごとに `PRESENT`、最後に `FRAME_END(seq)` を 1 個 (`present_seq++`)。
-4. worker は PRESENT を受けるたび即描画 (BGRA→RGBA, alpha=255 固定, `putImageData`) し、重なる **より前面の surface** の交差領域を再描画して前後関係を維持。
-5. ack: `present_done_seq == present_seq` が「全フレーム描画済み」。tearing 防止の seqlock は未実装 (GDI のフロントバッファ描画と同等)。
-- 想定ホットパス: FL の `BitBlt/StretchDIBits(window DC)` → 1 フレーム 1 PRESENT (外接矩形)。dirty 複数矩形化・WebGL2 テクスチャ転送は将来 (REPORT 下流チケット)。
+4. worker (`gui_renderer.ts`) の既定は従来経路: PRESENT を受けるたび即描画 (BGRA→RGBA, alpha=255 固定, `putImageData`) し、重なる **より前面の surface** の交差領域を再描画して前後関係を維持。
+5. ack: `present_done_seq == present_seq` が「全フレーム描画済み」。
+6. **GUI-4 (#180) の present 拡張** (`GuiPresentOptions`; 既定は 4. の従来経路で挙動不変。`GuiHost.attach({present})` / `/?gui=render-selftest&backend=webgl2&sync=raf&seqlock=1` で選択):
+   - `backend: "webgl2"`: surface ごとの RGBA8 テクスチャへ dirty 矩形を `texSubImage2D` (共有メモリ view を UNPACK_ROW_LENGTH/SKIP_* 付きで直接。拒否するブラウザは非共有バッファへ行コピーに自動降格)、fragment の swizzle `.bgr` で BGRA→RGB、alpha=1.0。合成は整数 `texelFetch` の quad 描画 (補間なし)。`"auto"` は WebGL2 不可なら 2D。
+   - **dirty 複数矩形**: 1 フレーム (PRESENT 群 + FRAME_END) の矩形を surface ごとに `mergeRects` (`gui_dirty.ts`) で併合 (重なり/接触は必ず、離れたものは面積増 ≤ 25% のとき、surface あたり最大 8 個)。shim が PRESENT を複数発行すればそのまま複数矩形で転送される (shim 側の dirty は現状 surface あたり単一外接矩形のまま = 未達)。
+   - `sync: "raf"`: **ingest** (FRAME_END 時点で surface 画素を読む = GL はテクスチャ転送) と **commit** (画面反映 + ack) を分離し、commit のみ `requestAnimationFrame` に同期 (複数 FRAME_END は 1 回の commit に集約し最新 seq を ack)。rAF が来ない場合は `rafTimeoutMs` (既定 100 ms) のタイマで commit。
+   - **seqlock** (`seqlock: true`): `GuiSurface.wseq` は奇数 = guest が flush 後に画素を書込み中/書込み済み、偶数 = 静止。shim は window surface へ描く直前 (`dc_tgt`) に偶数→奇数、`surf_flush` が PRESENT を push する前に全 live surface を奇数→偶数にする。host は `wseq` を読出しの前後で比較し、奇数または不一致なら読出しを破棄して矩形を持ち越し、4 ms 後に再試行する。`staleMs` (既定 100 ms) を超えて連続で読めない場合のみ強制的に読む (飢餓回避; `stats.seqForced`)。
+     **限界**: これは tear の「検出と再試行」で、guest が書込みを止めない限り読めない (back buffer による snapshot isolation ではない)。JS の `Atomics.load` と非 atomic な画素読出しの順序保証はエンジン実装 (SC atomic の full fence) 依存。
+- 想定ホットパス: FL の `BitBlt/StretchDIBits(window DC)` → 1 フレーム 1 PRESENT (外接矩形)。
 
 ## 5. lift ABI (RetDec 産コード ↔ shim)
 - **全 API は `int64_t NAME(int64_t a0, ...)`**。lifter 出力が `int32_t`/ポインタ/`int64_t` を混ぜて呼ぶため、戻り値・引数とも 64bit 整数に統一
@@ -117,20 +123,30 @@ host は **レコード書込の前に** 共有 pointer 状態 (cursor/buttons/m
 - 他スレッドからの `SendMessage` は要求キューに積み GUI スレッドの pump 完了を futex 待ち (native selftest で検証)。`PostMessage` は任意スレッドから可。
 
 ## 8. GDI モデル (`src/gui_gdi.c`)
-- 描画先は常に BGRA32: window DC → top-level surface、memory DC → 選択ビットマップ。`CreateDIBSection` は **32bpp BI_RGB/BITFIELDS のみ** (biHeight<0=top-down / >0=bottom-up を保持。`ppvBits` は wasm 内実アドレス)。
-  `CreateCompatibleBitmap`/`CreateBitmap(32bpp)` は top-down。それ以外の bpp/圧縮/file mapping は fail-fast。
-- 転送: `BitBlt`/`StretchBlt`/`PatBlt`/`StretchDIBits`/`SetDIBitsToDevice`/`AlphaBlend`/`GetDIBits`/`SetDIBits`。
-  ROP: SRCCOPY(等倍は行 memmove・alpha ごと転送), SRCPAINT, SRCAND, SRCINVERT, SRCERASE, NOTSRCCOPY, NOTSRCERASE, MERGECOPY, PATCOPY, PATINVERT, PATPAINT, DSTINVERT, BLACKNESS, WHITENESS。他は fail-fast。
-  拡縮は **nearest (`src = floor(i*sw/dw)`)**、dest の負幅/負高は反転、source の負 extent は fail-fast。同一バッファ重複は行/列順を反転して memmove 相当。
+- 描画先は常に BGRA32 (「shadow」): window DC → top-level surface、memory DC → 選択ビットマップ。`CreateDIBSection` は **1/4/8/24/32bpp** (BI_RGB; 32bpp のみ BI_BITFIELDS 可。biHeight<0=top-down / >0=bottom-up を保持)。
+  **32bpp**: `ppvBits` = shadow そのもの (従来どおり)。**1/4/8/24bpp**: `ppvBits` = app から見えるネイティブ形式の `nat` (行 4B 境界・色テーブルは bmiColors の RGBQUAD, DIB_RGB_COLORS のみ) で、GDI は shadow に描き、
+  操作前に **pull** (nat → shadow, 操作矩形のみ) / 操作後に **push** (shadow → nat, dirty 矩形) する (app が nat を直接書いた内容は次の GDI 操作で反映され、GDI の描画は呼出し直後に nat から読める)。
+  ≤8bpp への push は色テーブルの **RGB 二乗距離の最近傍** (完全一致は最初の index)。push は「現 index の色が shadow と同じなら index を変えない」ので重複色パレットでもクリップ外 pixel の index は不変。範囲外 index は黒。
+  `GetDIBColorTable`/`SetDIBColorTable` (hdc に選択済みの ≤8bpp DIB section; Set は shadow 全面再 pull)。`GetObject` は bmBitsPixel=実 bpp・bmBits=nat。
+  DDB: `CreateCompatibleBitmap`/`CreateBitmap(24|32bpp)` は top-down BGRA、**`CreateBitmap(1bpp)` は mono DDB** (bit 1 = 白; 初期 bits は WORD 行・MSB 先頭。mono DC に互換なビットマップも mono)。
+  mono 転送の色写像: mono→color は 1(白)=転送先 DC の bk 色 / 0(黒)=text 色、color→mono は **転送元 DC の bk 色と一致する画素=白**、その他の mono 書込みは輝度 (30R+59G+11B)/100 ≥ 128 を白。
+  `CreateBitmap` の 4/8/16bpp は bits なしのみ (bits ありは論理パレットが要るため fail-fast)。16bpp DIB・DIB_PAL_COLORS・圧縮 DIB・file mapping は fail-fast (理由付き)。
+- 転送: `BitBlt`/`StretchBlt`/`PatBlt`/`StretchDIBits`/`SetDIBitsToDevice`/`AlphaBlend`/`GetDIBits`/`SetDIBits`。`StretchDIBits`/`SetDIBits`/`CreateDIBitmap`/`LoadBitmapW` の源は 1/4/8/24/32bpp (≤8bpp は bmiColors)、
+  `GetDIBits` の要求形式は 1/4/8/24/32bpp (≤8bpp は DIB section 自身の表、無ければ決定論的既定表: 1bpp=黒/白・4bpp=VGA16・8bpp=3-3-2; biBitCount=0 の問合せは DIB section なら自身の bpp)。
+  ROP: SRCCOPY(等倍は行 memmove・alpha ごと転送), SRCPAINT, SRCAND, SRCINVERT, SRCERASE, NOTSRCCOPY, NOTSRCERASE, MERGECOPY, MERGEPAINT, PATCOPY, PATINVERT, PATPAINT, DSTINVERT, BLACKNESS, WHITENESS。他は fail-fast。
+  拡縮は **nearest (`src = floor(i*sw/dw)`)**、dest の負幅/負高は反転、source の負 extent は fail-fast。
+  **同一サーフェス重複**: 1:1 かつ単一クリップ矩形は行順 (下→上/行内スナップショット) で memmove 同等、拡縮/反転/複数クリップ矩形は転送元矩形を先にコピー (スナップショット意味論; 旧実装は複数クリップ矩形で先行矩形の書込みを後続が読む)。
   プリミティブ/ROP 経路の alpha は 0xFF 固定 (SRCCOPY のみ alpha 保存)。`AlphaBlend` は 255 除算の丸め付き (premultiplied `AC_SRC_ALPHA` / 定数 alpha)。
+  **行カーネル (`src/gui_simd.h`)**: ROP / AlphaBlend / 不透明化コピー / 2x 水平拡大は行単位のカーネルで、wasm SIMD128 (`-msimd128`; `GUI_NO_SIMD` で無効) と scalar 参照を持ち画素完全一致 (`test/simd_e2e.sh`)。
+  拡縮の x 写像は転送ごとに 1 回計算 (画素ごとの 64bit 除算なし)。参照実装 (`blit_core_ref`: 画素単位) は `gdi_set_ref_blit(1)` で切替え可 (selftest が 15 ROP × 幾何 × クリップ × 重複で一致検査)。
 - プリミティブ: `FillRect`/`FrameRect`/`Rectangle`/`MoveToEx`+`LineTo` (Bresenham・終点除外・太線は正方スタンプ)/`SetPixel(V)`/`GetPixel`。ペンは SOLID/NULL のみ (他は fail-fast)。ブラシは solid/hollow。
 - テキスト: **内蔵 8×8 ビットマップフォント** (font8x8, Public Domain, ASCII のみ。ET/DT/ExtTextOut/DrawText/GetTextExtent/GetTextMetrics は一貫した固定幅 8px)。FL は自前 FreeType 描画が主なので GDI テキストは保険。
 - クリップ: `RL` (矩形リスト) 実装の region (`CreateRectRgn/CombineRgn(AND/OR/DIFF/XOR/COPY)/OffsetRgn`)、`SelectClipRgn/ExtSelectClipRgn/IntersectClipRect/ExcludeClipRect/GetClipBox`、`SaveDC/RestoreDC`、`SetWindowOrgEx/SetViewportOrgEx` (MM_TEXT のみ)。
 - ROP2: COPYPEN, XORPEN, NOT, BLACK, WHITE, NOP, MASKPEN, MERGEPEN, NOTCOPYPEN。
 
 ## 9. 制限・既知の逸脱 (fail-fast ではなく近似で通すもの)
-`SetWindowRgn`/`NotifyWinEvent`/`LockWindowUpdate`/`ShowOwnedPopups`/`AttachThreadInput`/`IsDialogMessage`/`SetThreadDpiAwarenessContext` は no-op、`SelectPalette`/`RealizePalette` は常に 32bpp 真色扱い、
-`SetCursorPos` は共有 cursor 値のみ更新 (Pointer Lock 連携は未実装)、`GetDeviceCaps(RASTERCAPS)` は RC_PALETTE なし、`MsgWaitForMultipleObjects` は `nCount==0` のみ、`GetDC(NULL)`(スクリーン DC) は fail-fast。
+`SetWindowRgn`/`NotifyWinEvent`/`LockWindowUpdate`/`ShowOwnedPopups`/`AttachThreadInput`/`IsDialogMessage`/`SetThreadDpiAwarenessContext` は no-op、`SelectPalette`/`RealizePalette` は常に真色扱い (≤8bpp DIB の色は DIB 自身の色テーブル)、
+`SetCursorPos` は共有 cursor 値のみ更新 (Pointer Lock 連携は未実装)、`GetDeviceCaps(RASTERCAPS)` は RC_PALETTE なし、`MsgWaitForMultipleObjects[Ex]` は shimx リンク時のみ kernel handle 待ちに対応 (未リンクなら `nCount==0` のみ; #172)、`GetDC(NULL)`(スクリーン DC) は fail-fast。
 フック (`SetWindowsHookEx` 系) は §11 の範囲で配送 (CAB-159)。ImageList_*/FlatSB_*/uxtheme BufferedPaint/IME/印刷/メタファイル/wgl は stub (IMPORTS.md)。
 
 ## 10. FL lift 接続メモ (RetDec 実測知見, PE 実験 3 本から)
@@ -155,7 +171,27 @@ host は **レコード書込の前に** 共有 pointer 状態 (cursor/buttons/m
 - **モニタ/DPI (7)**: 単一仮想モニタ (HMONITOR=0x7B000001, 矩形 = canvas 寸法)。`EnumDisplaySettingsW` は 1 モード (32bpp/60Hz)。DPI は `SetThreadDpiHostingBehavior` の値保持のみ (描画スケールは GUI-7)。`GetGuiResources` はハンドル表の種別別カウンタ (GDI はストック除く、PEAK は実ピーク)。
 - **キャレット (4 + 前倒し `CreateCaret`)**: システムで 1 個。表示 = client DC への `DSTINVERT` (点滅なし)。所有ウィンドウ破棄でキャレット破棄。WM_PAINT で上書きされた場合は次の Show/Hide/移動まで反転状態が不整合になり得る (近似)。
 - **入力 (7)**: `SendInput` は host リングを介さず `translate_input` へ直接注入 (キー/Unicode/スキャンコード/マウス相対・絶対 (0..65535→画面)・ボタン・ホイール)。`buttons/mods/cursor` は host 所有の領域を shim も更新し、次の実入力で host 値に上書きされる。`ToUnicode`/`ToAscii` は US 配列 (デッドキー・AltGr なし)。キー名/スキャンコード表は set 1 US。HKL は 1 個 (0x04090409)。
-- **リソース**: `LoadStringW` (RT_STRING) / `LoadBitmapW` (RT_BITMAP, 24/32bpp のみ) は `gui_set_resource_provider()` で結合側が供給する (shimx の FindResource/LoadResource 相当を CAB-173 で接続)。未設定/未発見は 0 + `ERROR_RESOURCE_NAME_NOT_FOUND`(1814)/`ERROR_RESOURCE_TYPE_NOT_FOUND`(1813)。
+- **リソース**: `LoadStringW` (RT_STRING) / `LoadBitmapW` (RT_BITMAP, 1/4/8/24/32bpp; 1bpp は mono DDB) は `gui_set_resource_provider()` で結合側が供給する (shimx の FindResource/LoadResource 相当を CAB-173 で接続)。未設定/未発見は 0 + `ERROR_RESOURCE_NAME_NOT_FOUND`(1814)/`ERROR_RESOURCE_TYPE_NOT_FOUND`(1813)。
 - **GDI**: `DrawEdge` は矩形のみ (`BF_DIAGONAL` は fail-fast; SOFT は近似)。`DrawFrameControl` は形状簡略 (ボタン/チェック/ラジオ/スクロール矢印/キャプション/メニュー記号)。`DrawFocusRect` は (x+y)偶数画素の XOR (2 回で復帰)。
   `CreateDCW("DISPLAY")` は画面寸法を返す互換 DC (描画は破棄; 画面直描きは不可)。`GetClipRgn` は論理座標、`GetRandomRgn` は SYSRGN=画面座標 / CLIPRGN=DC 原点基準。`GetRegionData` は RDH_RECTANGLES を (top,left) 順で返す。
   アイコン/カーソルは標準 (擬似ハンドル) のみ: 32x32 のプレースホルダ画像を生成して `GetIconInfo`/`DrawIcon[Ex]` が使う (実画像資源・`CreateIconIndirect`・`LoadImage` は GUI-2)。
+
+## 12. マルチ top-level・非クライアント領域・DPI (GUI-7 #183; FL 非依存部)
+- **surface 方針**: 全 top-level (WS_POPUP / メニュー / ツールチップ / ドロップダウン) は別 surface (最大 16)。合成は host 側で z 順に重畳 (単一 canvas 内合成; 複数 canvas / DOM 重畳は未実装)。`WS_EX_TOPMOST` の surface は `z >= 0x40000000` で常に非 TOPMOST の前面 (`link_top` が desktop 子リスト順も同じに保つ)。`SetWindowPos(HWND_TOPMOST/NOTOPMOST)` で切替。`WS_EX_NOACTIVATE` / `SW_SHOWNA` / `SWP_NOACTIVATE` は activate しない (z も上げない)。
+- **ヒットテスト**: top-level は `WM_NCHITTEST` (lParam = screen 座標) を送って判定。`HTTRANSPARENT(-1)` は素通し (ツールチップ)、`HTCLIENT` 以外は `WM_NC{MOUSEMOVE,LBUTTONDOWN,LBUTTONUP,...}` (wParam = HT*) として投函し client 入力にしない。`DefWindowProc` の判定は HTCLIENT / HTCAPTION / HTBORDER / HTNOWHERE のみ (リサイズ角 HT* は未実装)。
+- **非クライアント領域**: window rect = client + NC。作成/サイズ変更時に `WM_NCCALCSIZE` (wParam=1, `NCCALCSIZE_PARAMS`) を送り client 寸法と NC 幅を確定。`DefWindowProc` の既定幅は `WS_THICKFRAME` 5 / `WS_DLGFRAME` 3 / `WS_BORDER` 1 (+`WS_EX_CLIENTEDGE` 2) + caption 23 (`WS_CAPTION`)。**実 Windows (DWM) の枠とは一致しない決定的な shim 規約** (golden 用)。`WM_PAINT` の前に `WM_NCPAINT` (枠 4 辺と caption 帯を単色で描画)。`GetWindowDC` は原点 = window rect 左上・可視領域に NC を含む。`GetWindowRect` / `AdjustWindowRect[Ex]` は NC を反映。surface サイズ = window rect。
+- **無効領域**: surface あたり/ウィンドウあたり非重複矩形リスト (ウィンドウは 16 超で外接矩形へ縮退、surface の dirty は 8 超)。`BeginPaint` の DC クリップは無効領域そのもの (外接矩形ではない)。`ValidateRect` は部分的に差し引く。`GetUpdateRgn` は複数矩形の region を返す (2 矩形以上 = `COMPLEXREGION`)。surf の dirty は矩形ごとに `PRESENT` を出す (host は従来どおり併合して扱える)。
+- **DPI**: canvas 内部解像度 = 物理 px (画素は 1:1; ビットマップ拡縮はしない)。DPI context (`SetThreadDpiAwarenessContext` で設定。shim では全スレッド共通の 1 値) が UNAWARE (既定 -1 / -5) なら `GetDpiForWindow` / `GetDeviceCaps(LOGPIXELS*)` は 96、それ以外 (-2 SYSTEM / -3 / -4 PER_MONITOR[_V2]) は `dpr_x100 * 96 / 100`。shim が決める寸法 (NC 幅・`GetSystemMetrics` の SM_CYCAPTION/SM_CXVSCROLL/SM_CXFRAME/SM_CXBORDER・`AdjustWindowRect`) はその DPI に比例。アプリ自身の座標は拡縮しない (DPI 対応アプリは `GetDpiForWindow` で自分で拡縮する前提)。`WM_DPICHANGED`・複数モニタ別 DPI は未実装 (単一仮想モニタ)。
+- **未実装 (FL の窓種別が確定してから)**: `SetWindowRgn` の形状クリップ、リサイズ角の HT*、NC のテーマ描画、複数 canvas / DOM 重畳、メニュー (#175)。
+## 13. ブラウザ互換 fallback 方針 (GUI-8 #184; 入力 = #127 RT-9 の Firefox 157 headless 実測。Safari は未測定)
+測定値の正本は `tools/runtime/REPORT.md` (RT-9)。ここは gui host が取る方針のみ。
+| 機能 | Chrome 154 | Firefox 157 | gui host の方針 |
+|---|---|---|---|
+| SAB / `crossOriginIsolated` (COOP+COEP) | 可 | 可 | 必須。確認は `src/index.ts` の開始ボタン無効化 (`crossOriginIsolated` が偽なら無効化し理由を表示; 代替実装なし) で行う。`GuiHost.attach` 内での `crossOriginIsolated` / SAB の fail-fast は**未実装** |
+| `Atomics.waitAsync` (描画 worker の out ring 消費) | 可 | 可 | そのまま使う。無い環境 (Safari 未測定) は `setTimeout` ポーリングへ落とす案 (**未実装**; Safari 測定後に判断) |
+| Worker 内 `Atomics.wait` / メイン `Atomics.wait` 不可 | 同 | 同 | 既存設計どおり: wasm UI スレッドは worker、メインは `waitAsync`/イベントのみ |
+| OffscreenCanvas 2D (`transferControlToOffscreen`) | 可 | 可 | 既定経路 (2D + putImageData) は両者で使える |
+| Worker 内 WebGL2 (GUI-4 の WebGL2 present) | 可 (SwiftShader) | 判定不能 (headless で null) | `present.backend` は worker が実際に採用した方式を `presentInfo` で返す。WebGL2 を取れなければ 2D へ落ちる既存フォールバックを正とする。Firefox 実機で未確認 |
+| rAF (worker) | 可 | 可 | `present.sync="raf"` 可。無ければ `rafTimeoutMs` の timer flush |
+- **メモリ**: 非 shared memory64 の 8 GiB grow が Firefox で 35〜37 s (Chromium 0.5 ms)。gui の共有領域は wasm32 の shared memory 上なので該当しないが、memory64 版 FLEngine を同一 Memory で動かす場合は初期確保を前倒しする (Firefox での grow 戦略は #127 / RT 系で決定)。
+- **未確認 (起票先 #127)**: Safari 全般、Firefox の実描画 (gui e2e の Firefox 実行)。これらが取れるまで、サポート対象は Chrome のみとし、Firefox は「機能検出は通るが e2e 未実施」と扱う。

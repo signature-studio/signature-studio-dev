@@ -1,0 +1,37 @@
+{
+ "name": "sr4_osc_get620",
+ "image": "tools/targets/serum2/work/Serum2_win64.vst3",
+ "retdec": {
+  "ranges": "0x1803d0970-0x1803d0979",
+  "timeout": 600
+ },
+ "funcs": [
+  "function_1803d0970"
+ ],
+ "passes": {
+  "p1": true,
+  "f7": true,
+  "f2": true,
+  "gdata": "external",
+  "leafabi": {
+   "ret_xmm0": [
+    "function_1803d0970"
+   ]
+  }
+ },
+ "exports": [
+  "function_1803d0970"
+ ],
+ "spec": "../targets/serum2/sr4/specs/sr4_osc_get620.json",
+ "wasm_func": "function_1803d0970",
+ "func_va": "0x1803d0970",
+ "regress": {
+  "expect_match": "all"
+ },
+ "extra_funcs": [
+  [
+   "0x1803d0970",
+   "0x1803d0979"
+  ]
+ ]
+}

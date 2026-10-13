@@ -162,7 +162,7 @@ Compressor/Filter (FA-2/2b) はコミット済みで検収可能。制御層は 
 |---|---|---|---|
 | E-1 | `__chkstk` の gs read (`mov r11, gs:[0x10]`) が Linux で SIGSEGV (gs_base=0) | native が ctor 入口で停止 | `xor r11,r11` + nop に差替え (StackLimit=0 → probe skip)。wasm の @fa_teb=0 と同値 |
 | E-2 | FreshAirDspModel ctor (0x1803ba840) の arg2 (rdx) は**非 NULL 必須** (`[arg2+4]` を M+0xa088 に写す) | native が ctor 途中で停止 | 両側で同一の 0 初期化 32B ダミーを渡す |
-| E-3 | `h_rep_stos` が**初期 rcx を毎回読み直さない** | model ctor 内 `rep stosb` が無限ループ → wasm OOB | ループ頭で `%R_rcx` をロード (ループ持ち回し変数化) |
+| E-3 | `h_rep_stos` が**初期 rcx を毎回読み直さない** | model ctor 内 `rep stosb` が無限ループ → wasm OOB | ループ頭で `%R_rcx` をロード (ループ持ち回し変数化)。※ 後に FA-10 (#666) で `h_rep_stos` は `h_rep_str` (movs/stos 共通) へ改名 (`mlift/mlift_ops.py`) |
 | E-4 | `fa_icall` switch が icall_targets のみ解決 | vtable slot / 引数受け回しの関数ポインタが host trap | **lift 済み全関数**に拡大 + CFG stub (`jmp rax`) の rax0 再ディスパッチ。未 seed は `icall_extra.py` が自動列挙 |
 | E-5 | 共有マシンスタック @fa_stack 1MB 不足 (深い入れ子 + 0x5cc0 フレーム) | guard violation 25,344 (stack 溢出) | 8MB (host stack と同値) に |
 
@@ -200,3 +200,12 @@ Compressor/Filter (FA-2/2b) はコミット済みで検収可能。制御層は 
    (`VSTPluginMain_FrAr` → 0x180c7d400 → 0x180c7c030) は locale/TLS 依存が深く native oracle
    未成立 — host 呼出 (audioMaster) の差替えが次タスク (`entry_probe.c` を観測点として残置)。
 3. GUI/エディタ層は対象外 (CAB-52 と同方針)。Determinism は暗黙確認のみ (§8-4)。
+
+## 12. FA-4 追記: チェーン構成 / マクロ→子パラメタ ID 写像 (#51, commit dd9bc5e)
+
+全文は `REPORT_APPENDIX_FA4.md` に分割移動した (250 行上限・内容無変更)。要点:
+
+- チェーン: 子 8 個 (Filter×2 / Compressor×3 / Gain×3)。`native_ctrl.c` の `CHAIN` と一致。
+- マクロ (Mid Air → 0x157, High Air → 0x158 は `powf(x,0.62)`、Trim → 0x15a は無変換) の宛先は子リスト index 0 (Filter) 固定。
+- 限界 (FA-7 で部分回答 → `REPORT_FA7.md`): 0x157/0x158/0x15a が Filter のどの内部パラメタか (名前・値域) は未解決 (FA-7 の詳細は REPORT_FA7.md)。
+- FA-10 (#666, 2026-10-13): 工程 6 (ctrl) FAILED の原因は epf 素材の展開漏れ。同一コードで epf を展開すると ctrl 15/15 PASS。詳細・未解決は `REPORT_APPENDIX.md`。

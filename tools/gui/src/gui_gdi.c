@@ -1,17 +1,26 @@
 /* gui_gdi.c — gdi32/msimg32 相当: ソフトウェアラスタライザ (BGRA32 top-down surface / DIB section)
  * 方針: FL は描画をほぼ自前ビットマップで行い GDI は転送 (BitBlt/StretchDIBits) 経路が主 (IMPORTS.md)。
- * プリミティブ (線/矩形/文字) は最小限、テキストは内蔵 8x8 ビットマップフォント (決定論的)。 */
+ * プリミティブ (線/矩形/文字) は最小限、テキストは text engine (gui_ft.c = FreeType) 未登録なら内蔵 8x8 ビットマップフォント (決定論的)。 */
 #include <stdio.h>
 #include <stdarg.h>
 #include "gui_internal.h"
 #include "gui_font8x8.h"
+#include "gui_simd.h"
 
 #define API int64_t
 
-typedef struct Bmp { int w, h, stride, topdown, owns, sel, deleted; uint8_t *bits; } Bmp;
+/* Bmp: bits = 内部 BGRA32 surface (GDI の描画対象; 「shadow」)。bpp != 32 の DIB section は app から見えるネイティブ形式の nat (行 4B 境界) を別に持ち、
+ * GDI 操作の前後で pull (nat -> shadow) / push (shadow -> nat) を行う (DDB は shadow のみ; mono = 1bpp DDB: 白 0xFFFFFFFF/黒 0xFF000000 を保持し、
+ * 転送時に転送先 DC の bk/tc 色へ写像する)。pal は bpp<=8 の色テーブル (256 要素; 範囲外 index は黒)。 */
+typedef struct Bmp { int w, h, stride, topdown, owns, sel, deleted; uint8_t *bits;
+  int bpp, nstride, isdib, mono, npal; uint8_t *nat; uint32_t *pal; } Bmp;
 typedef struct Brush { int hollow, stock, sysidx; uint32_t color; } Brush;
 typedef struct Pen { int style, width, stock; uint32_t color; } Pen;
-typedef struct Font { int height, stock; } Font;
+/* Font: height = |lfHeight| (GetObject 用), lfh = 符号付き lfHeight。stock フォントと text engine 未登録/face 解決不能は eng=NULL = 内蔵 8x8。
+ * eng は最初のテキスト使用時に遅延 open する (face の遅延取得 = VFS #22 を最初の使用まで遅らせる) */
+typedef struct Font { int height, stock, lfh, weight, italic, tried; uint16_t face[32]; const struct GuiTextEngine *te; void *eng; } Font;
+static const GuiTextEngine *g_te;
+void gui_set_text_engine(const GuiTextEngine *e) { g_te = e; }
 typedef struct Rgn { RL rl; } Rgn;
 typedef struct DCState {
   int dx_wox, wox, woy, vox, voy, bx, by; uint32_t bk, tc; int bkmode, rop2, align, stretch;
@@ -78,18 +87,19 @@ static DC *dc_new(int kind) {
   return d;
 }
 U64 gdi_get_dc_for_wnd(Wnd *w, int window_dc, const RL *clip) {
-  (void)window_dc;
   DC *d = dc_new(1);
   int surf, ox, oy;
   if (!wnd_target(w, &surf, &ox, &oy)) gui_failfast("GetDC", "window has no surface");
+  if (window_dc) wnd_window_origin(w, &ox, &oy);   /* GetWindowDC: 原点 = window rect 左上 */
   d->surf = surf; d->ox = ox; d->oy = oy;
   if (clip) { rl_copy(&d->base, clip); d->has_base = 1; }
   return h_alloc(HT_DC, d);
 }
+static void bmp_free(Bmp *b) { if (b->owns) free(b->bits); free(b->nat); free(b->pal); free(b); }
 static void bmp_unref(Bmp *b) {
   if (!b) return;
   if (b->sel > 0) b->sel--;
-  if (b->deleted && b->sel == 0) { if (b->owns) free(b->bits); free(b); }
+  if (b->deleted && b->sel == 0) bmp_free(b);
 }
 static void dc_free(DC *d) {
   if (d->kind == 2) bmp_unref(d->bp ? d->bp : (Bmp *)h_get(d->hbmp, HT_BMP));
@@ -101,6 +111,12 @@ void gdi_release_dc(U64 h) {
   DC *d = dc_of(h); if (!d) return;
   h_free(h); dc_free(d);
 }
+U64 gdi_get_screen_dc(void) {
+  gui_sh();
+  DC *d = dc_new(2); d->hbmp = g_def_bmp;
+  Bmp *b = (Bmp *)h_get(g_def_bmp, HT_BMP); b->sel++; d->bp = b;
+  return h_alloc(HT_DC, d);
+}
 API DeleteDC(I64 h) { DC *d = dc_of((U64)h); if (!d) return 0; h_free((U64)h); dc_free(d); return 1; }
 API CreateCompatibleDC(I64 hdc) {
   gui_sh(); (void)hdc;
@@ -110,17 +126,18 @@ API CreateCompatibleDC(I64 hdc) {
 }
 
 /* 描画先ビュー: row0 は論理 top 行, rowstep は符号付きバイト */
-typedef struct { uint8_t *row0; int rowstep; int w, h; } Tgt;
+typedef struct { uint8_t *row0; int rowstep; int w, h; Bmp *bmp; int mono; } Tgt;
 static int dc_tgt(DC *d, Tgt *t) {
   if (d->kind == 1) {
     SurfView v; if (!surf_view(d->surf, &v)) return 0;
-    t->row0 = v.px; t->rowstep = v.stride; t->w = v.w; t->h = v.h; return 1;
+    surf_wseq_begin(d->surf);
+    t->row0 = v.px; t->rowstep = v.stride; t->w = v.w; t->h = v.h; t->bmp = NULL; t->mono = 0; return 1;
   }
   Bmp *b = (Bmp *)h_get(d->hbmp, HT_BMP);
   if (!b) b = &g_dummy_bmp;
   if (b->topdown) { t->row0 = b->bits; t->rowstep = b->stride; }
   else { t->row0 = b->bits + (size_t)(b->h - 1) * b->stride; t->rowstep = -b->stride; }
-  t->w = b->w; t->h = b->h; return 1;
+  t->w = b->w; t->h = b->h; t->bmp = b == &g_dummy_bmp ? NULL : b; t->mono = b->mono; return 1;
 }
 static inline uint32_t *px_at(const Tgt *t, int x, int y) { return (uint32_t *)(t->row0 + (ptrdiff_t)y * t->rowstep) + x; }
 static int dev_dx(DC *d) { return (d->kind == 1 ? d->ox : 0) - d->wox + d->vox; }
@@ -135,7 +152,94 @@ static RL *dc_eff(DC *d, const Tgt *t) {
   }
   return &d->eff;
 }
-static void dc_dirty(DC *d, WRECT dev) { if (d->kind == 1) surf_dirty(d->surf, dev); }
+/* ---------- ネイティブ形式 DIB (24/8/4/1bpp) <-> BGRA shadow ---------- */
+static inline int dib_stride(int bpp, int w) { return (int)((((int64_t)w * bpp + 31) / 32) * 4); }
+static int dib_bpp_ok(int bpp) { return bpp == 1 || bpp == 4 || bpp == 8 || bpp == 24 || bpp == 32; }
+/* 1 行デコード: ネイティブ行 (bpp 1/4/8/24/32) -> BGRA32 (alpha 0xFF; 32bpp のみ alpha を保持せず 0xFF 化)。pal は bpp<=8 で 2^bpp 要素以上 */
+static void row_decode(int bpp, const uint8_t *in, int w, const uint32_t *pal, uint32_t *out) {
+  switch (bpp) {
+    case 32: for (int x = 0; x < w; x++) { uint32_t v; memcpy(&v, in + (size_t)x * 4, 4); out[x] = v | 0xFF000000u; } break;
+    case 24: for (int x = 0; x < w; x++) { const uint8_t *p = in + (size_t)x * 3; out[x] = 0xFF000000u | ((uint32_t)p[2] << 16) | ((uint32_t)p[1] << 8) | p[0]; } break;
+    case 8: for (int x = 0; x < w; x++) out[x] = pal[in[x]]; break;
+    case 4: for (int x = 0; x < w; x++) out[x] = pal[(x & 1) ? (in[x >> 1] & 15) : (in[x >> 1] >> 4)]; break;
+    case 1: for (int x = 0; x < w; x++) out[x] = pal[(in[x >> 3] >> (7 - (x & 7))) & 1]; break;
+    default: { char m[40]; snprintf(m, sizeof m, "DIB bpp=%d", bpp); gui_failfast("gdi.dib", m); }
+  }
+}
+/* パレット最近傍 (RGB 二乗距離; 完全一致は最初の index)。 */
+static int pal_nearest(const uint32_t *pal, int n, uint32_t px) {
+  int best = 0; int64_t bd = -1;
+  for (int i = 0; i < n; i++) {
+    int dr = (int)((px >> 16) & 255) - (int)((pal[i] >> 16) & 255), dg = (int)((px >> 8) & 255) - (int)((pal[i] >> 8) & 255), db = (int)(px & 255) - (int)(pal[i] & 255);
+    int64_t d = (int64_t)dr * dr + (int64_t)dg * dg + (int64_t)db * db;
+    if (bd < 0 || d < bd) { bd = d; best = i; if (!d) break; }
+  }
+  return best;
+}
+/* 1 行エンコード: BGRA32 -> ネイティブ行 (bpp 24/32 は無損失、<=8 はパレット最近傍)。out は呼出側がゼロ初期化済みであること (4/1bpp は OR で詰める) */
+static void row_encode(int bpp, uint8_t *out, const uint32_t *in, int w, const uint32_t *pal, int npal) {
+  uint32_t lastp = 0xFFFFFFFFu; int lasti = 0;
+  switch (bpp) {
+    case 32: memcpy(out, in, (size_t)w * 4); break;
+    case 24: for (int x = 0; x < w; x++) { out[3 * x] = (uint8_t)in[x]; out[3 * x + 1] = (uint8_t)(in[x] >> 8); out[3 * x + 2] = (uint8_t)(in[x] >> 16); } break;
+    default:
+      for (int x = 0; x < w; x++) {
+        uint32_t p = in[x] & 0xFFFFFF; if (p != lastp) { lasti = pal_nearest(pal, npal, p); lastp = p; }
+        if (bpp == 8) out[x] = (uint8_t)lasti;
+        else if (bpp == 4) out[x >> 1] |= (uint8_t)((x & 1) ? lasti : lasti << 4);
+        else out[x >> 3] |= (uint8_t)(lasti << (7 - (x & 7)));
+      }
+  }
+}
+static uint32_t pal_at(const Bmp *b, int idx) { return b->pal[idx]; }
+/* nat -> shadow (論理 top 基準の矩形)。nat を持たない Bmp では何もしない */
+static void bmp_pull(Bmp *b, WRECT r) {
+  if (!b || !b->nat) return;
+  r = r_isect(r, (WRECT){ 0, 0, b->w, b->h }); if (r_empty(r)) return;
+  uint32_t *tmp = (uint32_t *)malloc((size_t)b->w * 4);
+  for (int y = r.top; y < r.bottom; y++) {
+    int m = b->topdown ? y : b->h - 1 - y;
+    row_decode(b->bpp, b->nat + (size_t)m * b->nstride, b->w, b->pal, tmp);
+    memcpy((uint32_t *)(b->bits + (size_t)m * b->stride) + r.left, tmp + r.left, (size_t)(r.right - r.left) * 4);
+  }
+  free(tmp);
+}
+/* shadow -> nat。パレット DIB は「現在の index の色が shadow と同じなら index を変えない」(重複色パレットで app の index を壊さない) */
+static void bmp_push(Bmp *b, WRECT r) {
+  if (!b || !b->nat) return;
+  r = r_isect(r, (WRECT){ 0, 0, b->w, b->h }); if (r_empty(r)) return;
+  for (int y = r.top; y < r.bottom; y++) {
+    int m = b->topdown ? y : b->h - 1 - y;
+    const uint32_t *sp = (const uint32_t *)(b->bits + (size_t)m * b->stride);
+    uint8_t *np = b->nat + (size_t)m * b->nstride;
+    if (b->bpp == 24) { for (int x = r.left; x < r.right; x++) { np[3 * x] = (uint8_t)sp[x]; np[3 * x + 1] = (uint8_t)(sp[x] >> 8); np[3 * x + 2] = (uint8_t)(sp[x] >> 16); } continue; }
+    uint32_t lastp = 0xFFFFFFFFu; int lasti = 0;
+    for (int x = r.left; x < r.right; x++) {
+      int cur = b->bpp == 8 ? np[x] : b->bpp == 4 ? ((x & 1) ? (np[x >> 1] & 15) : (np[x >> 1] >> 4)) : ((np[x >> 3] >> (7 - (x & 7))) & 1);
+      uint32_t p = sp[x] & 0xFFFFFF;
+      if (((pal_at(b, cur) ^ p) & 0xFFFFFF) == 0) continue;
+      if (p != lastp) { lasti = pal_nearest(b->pal, b->npal, p); lastp = p; }
+      if (b->bpp == 8) np[x] = (uint8_t)lasti;
+      else if (b->bpp == 4) np[x >> 1] = (uint8_t)((x & 1) ? ((np[x >> 1] & 0xF0) | lasti) : ((np[x >> 1] & 0x0F) | (lasti << 4)));
+      else np[x >> 3] = (uint8_t)((np[x >> 3] & ~(1 << (7 - (x & 7)))) | (lasti << (7 - (x & 7))));
+    }
+  }
+}
+static inline void tgt_pull(const Tgt *t, WRECT r) { if (t->bmp && t->bmp->nat) bmp_pull(t->bmp, r); }
+/* mono DDB への書込みを白/黒へ正規化 (輝度 (30R+59G+11B)/100 >= 128 が白) */
+static void mono_norm(Bmp *b, WRECT r) {
+  r = r_isect(r, (WRECT){ 0, 0, b->w, b->h }); if (r_empty(r)) return;
+  for (int y = r.top; y < r.bottom; y++) {
+    int m = b->topdown ? y : b->h - 1 - y; uint32_t *p = (uint32_t *)(b->bits + (size_t)m * b->stride);
+    for (int x = r.left; x < r.right; x++) { uint32_t c = p[x]; uint32_t l = (((c >> 16) & 255) * 30 + ((c >> 8) & 255) * 59 + (c & 255) * 11) / 100; p[x] = l >= 128 ? 0xFFFFFFFFu : 0xFF000000u; }
+  }
+}
+static void dc_dirty(DC *d, WRECT dev) {
+  if (d->kind == 1) { surf_dirty(d->surf, dev); return; }
+  Bmp *b = (Bmp *)h_get(d->hbmp, HT_BMP); if (!b) return;
+  if (b->nat) bmp_push(b, dev);
+  else if (b->mono) mono_norm(b, dev);
+}
 
 /* ---------- ROP2 / ピクセル ---------- */
 static uint32_t apply_rop2(uint32_t dst, uint32_t src, int rop2) {
@@ -155,6 +259,7 @@ static uint32_t apply_rop2(uint32_t dst, uint32_t src, int rop2) {
 static void fill_dev(DC *d, WRECT r, uint32_t bgra, int rop2) {
   Tgt t; if (!dc_tgt(d, &t)) return;
   RL *eff = dc_eff(d, &t);
+  tgt_pull(&t, r);
   for (int i = 0; i < eff->n; i++) {
     WRECT c = r_isect(r, eff->r[i]);
     for (int y = c.top; y < c.bottom; y++) {
@@ -184,48 +289,107 @@ API CreatePen(I64 style, I64 w, I64 c) {
   if (style != PS_SOLID && style != PS_NULL && style != 6) { char m[48]; snprintf(m, sizeof m, "CreatePen style %d", (int)style); gui_failfast("CreatePen", m); }
   return (I64)new_pen((int)style == 6 ? PS_SOLID : (int)style, (int)w, (uint32_t)c & 0xFFFFFF, 0);
 }
-API CreateFontIndirectW(I64 lf) { gui_sh(); Font *f = (Font *)calloc(1, sizeof *f); int32_t h = lf ? *(int32_t *)P_(lf) : 8; f->height = h < 0 ? -h : h; return (I64)h_alloc(HT_FONT, f); }
-API CreateFontIndirectA(I64 lf) { return CreateFontIndirectW(lf); }
-API CreateFontW(I64 h, I64 a, I64 b, I64 c, I64 d, I64 e, I64 f, I64 g, I64 i, I64 j, I64 k, I64 l, I64 m, I64 n) {
-  (void)a; (void)b; (void)c; (void)d; (void)e; (void)f; (void)g; (void)i; (void)j; (void)k; (void)l; (void)m; (void)n;
-  gui_sh(); Font *fo = (Font *)calloc(1, sizeof *fo); fo->height = (int)(h < 0 ? -h : h); return (I64)h_alloc(HT_FONT, fo);
+/* face: wide=1 は UTF-16 (NUL 終端, 最大 31 文字)、wide=0 は ANSI (Latin-1 扱い) */
+static I64 font_new(int32_t h, int weight, int italic, const void *face, int wide) {
+  gui_sh(); Font *f = (Font *)calloc(1, sizeof *f);
+  f->lfh = h; f->height = h < 0 ? -h : h; f->weight = weight ? weight : 400; f->italic = italic != 0;
+  if (face) for (int i = 0; i < 31; i++) { uint16_t c = wide ? ((const uint16_t *)face)[i] : ((const uint8_t *)face)[i]; if (!c) break; f->face[i] = c; }
+  return (I64)h_alloc(HT_FONT, f);
 }
-API CreateFontA(I64 h, I64 a, I64 b, I64 c, I64 d, I64 e, I64 f, I64 g, I64 i, I64 j, I64 k, I64 l, I64 m, I64 n) { return CreateFontW(h, a, b, c, d, e, f, g, i, j, k, l, m, n); }
+API CreateFontIndirectW(I64 lf) {
+  if (!lf) return font_new(8, 400, 0, NULL, 1);
+  const uint8_t *p = (const uint8_t *)P_(lf);   /* LOGFONTW: lfHeight@0 lfWeight@16 lfItalic@20 lfFaceName@28 */
+  return font_new(*(const int32_t *)p, *(const int32_t *)(p + 16), p[20], p + 28, 1);
+}
+API CreateFontIndirectA(I64 lf) {
+  if (!lf) return font_new(8, 400, 0, NULL, 0);
+  const uint8_t *p = (const uint8_t *)P_(lf);
+  return font_new(*(const int32_t *)p, *(const int32_t *)(p + 16), p[20], p + 28, 0);
+}
+API CreateFontW(I64 h, I64 a, I64 b, I64 c, I64 d, I64 e, I64 f, I64 g, I64 i, I64 j, I64 k, I64 l, I64 m, I64 n) {
+  (void)a; (void)b; (void)c; (void)f; (void)g; (void)i; (void)j; (void)k; (void)l; (void)m;
+  return font_new((int32_t)h, (int)d, (int)e & 0xFF, n ? P_(n) : NULL, 1);
+}
+API CreateFontA(I64 h, I64 a, I64 b, I64 c, I64 d, I64 e, I64 f, I64 g, I64 i, I64 j, I64 k, I64 l, I64 m, I64 n) {
+  (void)a; (void)b; (void)c; (void)f; (void)g; (void)i; (void)j; (void)k; (void)l; (void)m;
+  return font_new((int32_t)h, (int)d, (int)e & 0xFF, n ? P_(n) : NULL, 0);
+}
 API CreatePalette(I64 lp) { (void)lp; gui_sh(); return (I64)h_alloc(HT_PAL, calloc(1, 8)); }
 
 static Bmp *bmp_new(int w, int h, int topdown) {
   Bmp *b = (Bmp *)calloc(1, sizeof *b);
   if (w < 0) w = -w; if (h < 0) h = -h;
-  b->w = w; b->h = h; b->stride = w * 4; b->topdown = topdown; b->owns = 1;
+  b->w = w; b->h = h; b->stride = w * 4; b->topdown = topdown; b->owns = 1; b->bpp = 32;
   b->bits = (uint8_t *)calloc((size_t)(w ? w : 1) * (h ? h : 1), 4);
   return b;
 }
-API CreateCompatibleBitmap(I64 hdc, I64 w, I64 h) { (void)hdc; gui_sh(); if (w <= 0 || h <= 0) return 0; return (I64)h_alloc(HT_BMP, bmp_new((int)w, (int)h, 1)); }
-API CreateBitmap(I64 w, I64 h, I64 planes, I64 bpp, I64 bits) {
-  (void)planes; gui_sh();
-  if (bpp != 32 && !(bpp == 1 && !bits)) { char m[64]; snprintf(m, sizeof m, "CreateBitmap bpp=%d (only 32bpp / empty 1bpp)", (int)bpp); gui_failfast("CreateBitmap", m); }
+/* BITMAPINFO の色テーブル (RGBQUAD, ヘッダ直後) -> BGRA 256 要素 (未指定/範囲外は黒)。返値 = 有効エントリ数 */
+static int bmi_palette(const WBMIH *bi, uint32_t pal[256]) {
+  int bpp = bi->biBitCount, full = 1 << bpp, n = bi->biClrUsed ? (int)bi->biClrUsed : full;
+  if (n > full) n = full;
+  for (int i = 0; i < 256; i++) pal[i] = 0xFF000000u;
+  const uint8_t *q = (const uint8_t *)bi + bi->biSize;
+  for (int i = 0; i < n; i++) { uint32_t v; memcpy(&v, q + (size_t)i * 4, 4); pal[i] = v | 0xFF000000u; }
+  return n;
+}
+API CreateCompatibleBitmap(I64 hdc, I64 w, I64 h) {
+  gui_sh(); if (w <= 0 || h <= 0) return 0;
   Bmp *b = bmp_new((int)w, (int)h, 1);
-  if (bits && bpp == 32) memcpy(b->bits, P_(bits), (size_t)w * h * 4);
+  DC *d = dc_of((U64)hdc);
+  if (d && d->kind == 2) { Bmp *cur = d->bp; if (cur && cur->mono) { b->mono = 1; b->bpp = 1; for (size_t i = 0; i < (size_t)b->w * b->h; i++) ((uint32_t *)b->bits)[i] = 0xFF000000u; } }   /* mono DC 互換 = mono DDB */
+  return (I64)h_alloc(HT_BMP, b);
+}
+/* CreateBitmap: bpp=1 は mono DDB (bit 1 = 白)。bits の行は WORD (2B) 境界・top-down。24/32bpp は直接色。
+ * 4/8/16bpp の初期 bits は論理パレット (DDB のシステムパレット) が必要なので fail-fast (bits なしの生成と、DIB section/SetDIBits 経由は可) */
+API CreateBitmap(I64 w, I64 h, I64 planes, I64 bpp, I64 bits) {
+  gui_sh();
+  if (w <= 0 || h <= 0) return 0;
+  if (planes != 1) { char m[64]; snprintf(m, sizeof m, "CreateBitmap planes=%d (only 1)", (int)planes); gui_failfast("CreateBitmap", m); }
+  if (!(bpp == 1 || bpp == 4 || bpp == 8 || bpp == 16 || bpp == 24 || bpp == 32)) { char m[64]; snprintf(m, sizeof m, "CreateBitmap bpp=%d (1/4/8/16/24/32)", (int)bpp); gui_failfast("CreateBitmap", m); }
+  if (bits && (bpp == 4 || bpp == 8 || bpp == 16)) { char m[96]; snprintf(m, sizeof m, "CreateBitmap bpp=%d with initial bits (needs a logical palette / 16bpp layout; use CreateDIBSection or SetDIBits)", (int)bpp); gui_failfast("CreateBitmap", m); }
+  Bmp *b = bmp_new((int)w, (int)h, 1);
+  if (bpp == 1) {
+    b->mono = 1; b->bpp = 1;
+    int ws = (int)((((int64_t)w + 15) / 16) * 2);
+    for (int y = 0; y < b->h; y++) for (int x = 0; x < b->w; x++) {
+      int bit = bits ? ((((const uint8_t *)P_(bits))[(size_t)y * ws + (x >> 3)] >> (7 - (x & 7))) & 1) : 0;
+      ((uint32_t *)b->bits)[(size_t)y * b->w + x] = bit ? 0xFFFFFFFFu : 0xFF000000u;
+    }
+  } else if (bits && bpp == 24) {
+    int ws = (int)((((int64_t)w * 24 + 15) / 16) * 2);
+    for (int y = 0; y < b->h; y++) row_decode(24, (const uint8_t *)P_(bits) + (size_t)y * ws, b->w, NULL, (uint32_t *)b->bits + (size_t)y * b->w);
+  } else if (bits && bpp == 32) memcpy(b->bits, P_(bits), (size_t)w * h * 4);
+  b->bpp = (int)bpp;
   return (I64)h_alloc(HT_BMP, b);
 }
 API CreateDIBSection(I64 hdc, I64 bmi, I64 usage, I64 ppv, I64 hsec, I64 off) {
-  (void)hdc; (void)usage; (void)off; gui_sh();
+  (void)hdc; (void)off; gui_sh();
   const WBMIH *bi = (const WBMIH *)P_(bmi);
   if (hsec) gui_failfast("CreateDIBSection", "file-mapping backed DIB section not supported");
-  if (bi->biBitCount != 32 || (bi->biCompression != BI_RGB && bi->biCompression != BI_BITFIELDS)) {
-    char m[64]; snprintf(m, sizeof m, "DIB bpp=%d comp=%u (only 32bpp BI_RGB/BITFIELDS)", bi->biBitCount, bi->biCompression); gui_failfast("CreateDIBSection", m);
+  int bpp = bi->biBitCount;
+  if (!dib_bpp_ok(bpp) || !(bi->biCompression == BI_RGB || (bi->biCompression == BI_BITFIELDS && bpp == 32))) {
+    char m[64]; snprintf(m, sizeof m, "DIB bpp=%d comp=%u (1/4/8/24 BI_RGB, 32 BI_RGB/BITFIELDS)", bpp, bi->biCompression); gui_failfast("CreateDIBSection", m);
   }
+  if (bpp <= 8 && usage != DIB_RGB_COLORS) gui_failfast("CreateDIBSection", "DIB_PAL_COLORS (logical-palette indices) not supported");
+  if (bi->biSize < 40) gui_failfast("CreateDIBSection", "BITMAPCOREHEADER not supported");
   Bmp *b = bmp_new(bi->biWidth, bi->biHeight, bi->biHeight < 0);
-  if (ppv) *(U64 *)P_(ppv) = (U64)(uintptr_t)b->bits;
+  b->isdib = 1; b->bpp = bpp;
+  if (bpp != 32) {
+    b->nstride = dib_stride(bpp, b->w);
+    b->nat = (uint8_t *)calloc((size_t)b->nstride * (b->h ? b->h : 1), 1);
+    if (bpp <= 8) { b->pal = (uint32_t *)malloc(256 * 4); b->npal = bmi_palette(bi, b->pal); }
+    bmp_pull(b, (WRECT){ 0, 0, b->w, b->h });   /* shadow 初期化 (ゼロ index -> pal[0] / 24bpp -> 黒) */
+  }
+  if (ppv) *(U64 *)P_(ppv) = (U64)(uintptr_t)(b->nat ? b->nat : b->bits);
   return (I64)h_alloc(HT_BMP, b);
 }
 API DeleteObject(I64 h) {
   HType t = h_type((U64)h);
   switch (t) {
-    case HT_BMP: { Bmp *b = (Bmp *)h_get((U64)h, HT_BMP); h_free((U64)h); b->deleted = 1; if (b->sel == 0) { if (b->owns) free(b->bits); free(b); } return 1; }
+    case HT_BMP: { Bmp *b = (Bmp *)h_get((U64)h, HT_BMP); h_free((U64)h); b->deleted = 1; if (b->sel == 0) bmp_free(b); return 1; }
     case HT_BRUSH: { Brush *b = (Brush *)h_get((U64)h, HT_BRUSH); if (b->stock) return 1; h_free((U64)h); free(b); return 1; }
     case HT_PEN: { Pen *p = (Pen *)h_get((U64)h, HT_PEN); if (p->stock) return 1; h_free((U64)h); free(p); return 1; }
-    case HT_FONT: { Font *f = (Font *)h_get((U64)h, HT_FONT); if (f->stock) return 1; h_free((U64)h); free(f); return 1; }
+    case HT_FONT: { Font *f = (Font *)h_get((U64)h, HT_FONT); if (f->stock) return 1; h_free((U64)h); if (f->eng) f->te->close(f->eng); free(f); return 1; }
     case HT_RGN: { Rgn *r = (Rgn *)h_get((U64)h, HT_RGN); h_free((U64)h); rl_free(&r->rl); free(r); return 1; }
     case HT_PAL: { if ((U64)h == g_def_pal) return 1; void *p = h_get((U64)h, HT_PAL); h_free((U64)h); free(p); return 1; }
     default: return 0;
@@ -264,10 +428,10 @@ static int get_object_impl(I64 h, I64 n, I64 buf) {
       Bmp *b = (Bmp *)h_get((U64)h, HT_BMP);
       if (!buf) return 104;
       if (n < 32) return 0;
-      WBITMAP bm = { 0, b->w, b->h, b->stride, 1, 32, (U64)(uintptr_t)b->bits };
+      WBITMAP bm = { 0, b->w, b->h, b->nat ? b->nstride : b->stride, 1, (uint16_t)b->bpp, (U64)(uintptr_t)(b->nat ? b->nat : b->bits) };
       memset(P_(buf), 0, (size_t)(n < 104 ? n : 104));
       memcpy(P_(buf), &bm, 32);
-      if (n >= 72) { WBMIH bi = { 40, b->w, b->topdown ? -b->h : b->h, 1, 32, 0, (uint32_t)(b->stride * b->h), 0, 0, 0, 0 }; memcpy((uint8_t *)P_(buf) + 32, &bi, 40); return n >= 104 ? 104 : 32; }
+      if (n >= 72) { WBMIH bi = { 40, b->w, b->topdown ? -b->h : b->h, 1, (uint16_t)b->bpp, 0, (uint32_t)((b->nat ? b->nstride : b->stride) * b->h), 0, 0, b->pal ? (uint32_t)b->npal : 0, 0 }; memcpy((uint8_t *)P_(buf) + 32, &bi, 40); return n >= 104 ? 104 : 32; }
       return 32;
     }
     case HT_BRUSH: { Brush *b = (Brush *)h_get((U64)h, HT_BRUSH); if (!buf) return 16; WLOGBRUSH lb = { b->hollow ? 1 : 0, b->color, 0 }; memcpy(P_(buf), &lb, 16); return 16; }
@@ -315,7 +479,7 @@ API GetDeviceCaps(I64 hdc, I64 idx) {
     case HORZRES: return sh->screen_w; case VERTRES: return sh->screen_h;
     case HORZSIZE: return sh->screen_w * 254 / 960; case VERTSIZE: return sh->screen_h * 254 / 960;
     case BITSPIXEL: return 32; case PLANES: return 1; case NUMCOLORS: return -1;
-    case LOGPIXELSX: case LOGPIXELSY: return 96; case SIZEPALETTE: case NUMRESERVED: return 0; case COLORRES: return 24;
+    case LOGPIXELSX: case LOGPIXELSY: return gui_dpi(); case SIZEPALETTE: case NUMRESERVED: return 0; case COLORRES: return 24;
     case RASTERCAPS: return 0x7E99 & ~0x100;  /* RC_PALETTE を立てない */
   }
   return 0;
@@ -331,6 +495,7 @@ API CreateRectRgn(I64 l, I64 t, I64 r, I64 b) {
   if (R < L) { int x = L; L = R; R = x; } if (B < T) { int x = T; T = B; B = x; }
   rl_add(&g->rl, (WRECT){ L, T, R, B }); return (I64)h;
 }
+void gdi_rgn_set_rl(U64 h, const RL *rl) { Rgn *g = (Rgn *)h_get(h, HT_RGN); if (g) rl_copy(&g->rl, rl); }
 API CreateRectRgnIndirect(I64 rc) { const WRECT *r = (const WRECT *)P_(rc); return CreateRectRgn(r->left, r->top, r->right, r->bottom); }
 API SetRectRgn(I64 h, I64 l, I64 t, I64 r, I64 b) { Rgn *g = (Rgn *)h_get((U64)h, HT_RGN); if (!g) return 0; rl_clear(&g->rl); rl_add(&g->rl, (WRECT){ (int)l, (int)t, (int)r, (int)b }); return 1; }
 API CombineRgn(I64 hd, I64 h1, I64 h2, I64 mode) {
@@ -536,35 +701,29 @@ API GetPixel(I64 hdc, I64 x, I64 y) {
   int px = (int)x + dev_dx(d), py = (int)y + dev_dy(d);
   if (px < 0 || py < 0 || px >= t.w || py >= t.h) return 0xFFFFFFFF;
   RL *e = dc_eff(d, &t); if (!rl_contains(e, px, py)) return 0xFFFFFFFF;
+  tgt_pull(&t, (WRECT){ px, py, px + 1, py + 1 });
   return BGRA_TO_COLORREF(*px_at(&t, px, py));
 }
 
 /* ---------- BitBlt / StretchBlt ---------- */
 static uint32_t rop_pix(uint32_t rop, uint32_t s, uint32_t dst, uint32_t pat) {
-  switch (rop) {
-    case SRCCOPY: return s;
-    case SRCPAINT: return s | dst;
-    case SRCAND: return s & dst;
-    case SRCINVERT: return s ^ dst;
-    case SRCERASE: return s & ~dst;
-    case NOTSRCCOPY: return ~s;
-    case NOTSRCERASE: return ~(s | dst);
-    case MERGECOPY: return s & pat;
-    case PATCOPY: return pat;
-    case PATINVERT: return pat ^ dst;
-    case PATPAINT: return dst | pat | ~s;
-    case DSTINVERT: return ~dst;
-    case BLACKNESS: return 0;
-    case WHITENESS: return 0xFFFFFFFFu;
-  }
-  char m[48]; snprintf(m, sizeof m, "BitBlt rop 0x%08x", (unsigned)rop); gui_failfast("BitBlt", m);
+  if (!gs_rop_supported(rop)) { char m[48]; snprintf(m, sizeof m, "BitBlt rop 0x%08x", (unsigned)rop); gui_failfast("BitBlt", m); }
+  return gs_rop_px(rop, s, dst, pat);
 }
-/* 汎用転送: 論理座標 -> デバイス座標; sw/sh と dw/dh が異なれば nearest 拡縮 (src = rx*sw/adw), dw/dh 負は反転。
+static int rop_needs_src(uint32_t rop) { return !(rop == PATCOPY || rop == PATINVERT || rop == DSTINVERT || rop == BLACKNESS || rop == WHITENESS); }
+static int rop_reads_dst(uint32_t rop) {   /* dst を読まない ROP は SRCCOPY / NOTSRCCOPY / MERGECOPY / PATCOPY / BLACKNESS / WHITENESS */
+  return !(rop == SRCCOPY || rop == NOTSRCCOPY || rop == MERGECOPY || rop == PATCOPY || rop == BLACKNESS || rop == WHITENESS);
+}
+/* 試験用: 1 なら BitBlt/StretchBlt を行カーネルを使わない画素単位の参照実装 (blit_core_ref) へ振り分ける。selftest が高速経路との一致検査に使う */
+static int g_ref_blit;
+void gdi_set_ref_blit(int on) { g_ref_blit = on; }
+
+/* 参照実装 (画素単位・旧 blit_core そのまま + mono DDB の色写像): 論理座標 -> デバイス座標; sw/sh と dw/dh が異なれば nearest 拡縮 (src = rx*sw/adw), dw/dh 負は反転。
  * src 矩形の負幅/負高は未対応 (fail-fast)。同一バッファ重複は行/列方向を逆順にして memmove 同等。 */
-static int blit_core(DC *dd, int dx0, int dy0, int dw, int dh, DC *sd, int sx0, int sy0, int sw, int sh, uint32_t rop) {
+static int blit_core_ref(DC *dd, int dx0, int dy0, int dw, int dh, DC *sd, int sx0, int sy0, int sw, int sh, uint32_t rop) {
   Tgt dt, st = {0};
   if (!dc_tgt(dd, &dt)) return 0;
-  int need_src = !(rop == PATCOPY || rop == PATINVERT || rop == DSTINVERT || rop == BLACKNESS || rop == WHITENESS);
+  int need_src = rop_needs_src(rop);
   if (need_src) { if (!sd || !dc_tgt(sd, &st)) return 0; if (sw < 0 || sh < 0) gui_failfast("StretchBlt", "negative source extent"); }
   int hol = 0; uint32_t pat = 0;
   if (rop == PATCOPY || rop == PATINVERT || rop == MERGECOPY || rop == PATPAINT) pat = brush_bgra(dd->hbrush, &hol);
@@ -575,9 +734,12 @@ static int blit_core(DC *dd, int dx0, int dy0, int dw, int dh, DC *sd, int sx0, 
   int dl = dw < 0 ? dx0 + dw : dx0, dtp = dh < 0 ? dy0 + dh : dy0;
   RL *eff = dc_eff(dd, &dt);
   WRECT full = { dl, dtp, dl + adw, dtp + adh };
+  if (need_src) tgt_pull(&st, (WRECT){ sx0, sy0, sx0 + sw, sy0 + sh });
+  tgt_pull(&dt, full);
   int same = need_src && dt.row0 == st.row0;
   int rev_y = same && dy0 > sy0, rev_x = same && dy0 == sy0 && dx0 > sx0;
-  if (rop == SRCCOPY && dw > 0 && dh > 0 && sw == dw && sh == dh) {   /* 等倍コピー高速経路: 行 memmove, alpha もそのまま転送 */
+  uint32_t bkc = COLORREF_TO_BGRA(dd->bk), tcc = COLORREF_TO_BGRA(dd->tc), srcbk = need_src && sd ? (COLORREF_TO_BGRA(sd->bk) & 0xFFFFFF) : 0;
+  if (rop == SRCCOPY && dw > 0 && dh > 0 && sw == dw && sh == dh && !st.mono && !dt.mono) {   /* 等倍コピー高速経路: 行 memmove, alpha もそのまま転送 */
     for (int i = 0; i < eff->n; i++) {
       WRECT c = r_isect(full, eff->r[i]);
       c = r_isect(c, (WRECT){ dl - sx0, dtp - sy0, dl - sx0 + st.w, dtp - sy0 + st.h });  /* 源の範囲内に限定 */
@@ -607,6 +769,8 @@ static int blit_core(DC *dd, int dx0, int dy0, int dw, int dh, DC *sd, int sx0, 
           int sx = sx0 + (sw == adw ? rx : (int)(((int64_t)rx * sw) / adw));
           if (sx < 0 || sx >= st.w) continue;
           s = *px_at(&st, sx, sy);
+          if (st.mono && !dt.mono) s = (s & 0xFFFFFF) ? bkc : tcc;                          /* mono -> color: 1(白) = 転送先 DC の bk 色, 0(黒) = text 色 */
+          else if (!st.mono && dt.mono) s = ((s & 0xFFFFFF) == srcbk) ? 0xFFFFFFFFu : 0xFF000000u;   /* color -> mono: 転送元 DC の bk 色と一致 = 白 */
         }
         if ((rop == PATCOPY || rop == PATINVERT) && hol) continue;
         uint32_t *q = px_at(&dt, x, y);
@@ -614,6 +778,89 @@ static int blit_core(DC *dd, int dx0, int dy0, int dw, int dh, DC *sd, int sx0, 
       }
     }
   }
+  dc_dirty(dd, full);
+  return 1;
+}
+/* 転送先 x(論理 idx = 0..adw-1) -> 転送元 x の表。xm[idx] = -1 は範囲外。nearest 拡縮は単調なので有効範囲は連続区間 [*vlo,*vhi) */
+static void build_xmap(int32_t *xm, int adw, int flip, int sx0, int sw, int src_w, int *vlo, int *vhi) {
+  *vlo = adw; *vhi = 0;
+  for (int idx = 0; idx < adw; idx++) {
+    int rx = flip ? adw - 1 - idx : idx;
+    int sx = sx0 + (sw == adw ? rx : (int)(((int64_t)rx * sw) / adw));
+    if (sx < 0 || sx >= src_w) { xm[idx] = -1; continue; }
+    xm[idx] = sx; if (idx < *vlo) *vlo = idx; *vhi = idx + 1;
+  }
+}
+/* 行カーネル版 (BitBlt / StretchBlt の本体): xmap で除算を行ごと/画素ごとに排除し、ROP は gs_rop_row (wasm SIMD128)、
+ * 等倍は連続行、整数 2x 拡大 (sw*2==adw, 反転なし) は gs_dup2 + 直前行の複製で処理する。mono DDB が絡む転送は参照実装へ。 */
+static int blit_core(DC *dd, int dx0, int dy0, int dw, int dh, DC *sd, int sx0, int sy0, int sw, int sh, uint32_t rop) {
+  if (g_ref_blit) return blit_core_ref(dd, dx0, dy0, dw, dh, sd, sx0, sy0, sw, sh, rop);
+  Tgt dt, st = {0};
+  if (!dc_tgt(dd, &dt)) return 0;
+  int need_src = rop_needs_src(rop);
+  if (need_src) { if (!sd || !dc_tgt(sd, &st)) return 0; if (sw < 0 || sh < 0) gui_failfast("StretchBlt", "negative source extent"); }
+  if (dt.mono || st.mono) return blit_core_ref(dd, dx0, dy0, dw, dh, sd, sx0, sy0, sw, sh, rop);
+  if (!gs_rop_supported(rop)) rop_pix(rop, 0, 0, 0);   /* 未対応 ROP は従来どおり fail-fast (API 名 BitBlt) */
+  int hol = 0; uint32_t pat = 0;
+  if (rop == PATCOPY || rop == PATINVERT || rop == MERGECOPY || rop == PATPAINT) pat = brush_bgra(dd->hbrush, &hol);
+  dx0 += dev_dx(dd); dy0 += dev_dy(dd);
+  if (need_src) { sx0 += dev_dx(sd); sy0 += dev_dy(sd); }
+  int adw = dw < 0 ? -dw : dw, adh = dh < 0 ? -dh : dh;
+  if (adw == 0 || adh == 0) return 1;
+  int dl = dw < 0 ? dx0 + dw : dx0, dtp = dh < 0 ? dy0 + dh : dy0;
+  RL *eff = dc_eff(dd, &dt);
+  WRECT full = { dl, dtp, dl + adw, dtp + adh };
+  if (need_src) tgt_pull(&st, (WRECT){ sx0, sy0, sx0 + sw, sy0 + sh });
+  tgt_pull(&dt, full);
+  int same = need_src && dt.row0 == st.row0;
+  int rev_y = same && dy0 > sy0;
+  uint32_t *snap = NULL;   /* 同一サーフェス: 1:1 かつ単一クリップ矩形は行順 (rev_y) + 行スナップショットで memmove 同等。それ以外 (拡縮/反転/複数クリップ矩形) は転送元矩形を先にコピーする */
+  if (same && (eff->n > 1 || !(dw > 0 && dh > 0 && sw == dw && sh == dh))) {
+    WRECT sr = r_isect((WRECT){ sx0, sy0, sx0 + sw, sy0 + sh }, (WRECT){ 0, 0, st.w, st.h });
+    if (r_empty(sr)) { dc_dirty(dd, full); return 1; }
+    int cw = sr.right - sr.left, ch = sr.bottom - sr.top;
+    snap = (uint32_t *)malloc((size_t)cw * ch * 4);
+    for (int yy = 0; yy < ch; yy++) memcpy(snap + (size_t)yy * cw, px_at(&st, sr.left, sr.top + yy), (size_t)cw * 4);
+    st.row0 = (uint8_t *)snap; st.rowstep = cw * 4; st.w = cw; st.h = ch; sx0 -= sr.left; sy0 -= sr.top; same = 0; rev_y = 0;
+  }
+  int copy_ident = rop == SRCCOPY && dw > 0 && dh > 0 && sw == dw && sh == dh;   /* alpha もそのまま転送 (旧高速経路と同一) */
+  int ident_x = dw > 0 && sw == adw, dup2_x = dw > 0 && sw * 2 == adw && !ident_x;
+  int32_t *xm = NULL; uint32_t *tmp = NULL; int vlo = 0, vhi = adw;
+  if (need_src) {
+    xm = (int32_t *)malloc((size_t)adw * 4); build_xmap(xm, adw, dw < 0, sx0, sw, st.w, &vlo, &vhi);
+    tmp = (uint32_t *)malloc((size_t)adw * 4);
+  }
+  if (!((rop == PATCOPY || rop == PATINVERT) && hol)) {
+    for (int i = 0; i < eff->n; i++) {
+      WRECT c = r_isect(full, eff->r[i]);
+      if (r_empty(c)) continue;
+      int xa = c.left, xb = c.right;
+      if (need_src) { if (xa < dl + vlo) xa = dl + vlo; if (xb > dl + vhi) xb = dl + vhi; }
+      if (xb <= xa) continue;
+      int n = xb - xa;
+      for (int yy = 0; yy < c.bottom - c.top; yy++) {
+        int y = rev_y ? c.bottom - 1 - yy : c.top + yy;
+        uint32_t *dst = px_at(&dt, xa, y);
+        if (!need_src) { gs_rop_row(rop, dst, dst, (size_t)n, pat); continue; }
+        int ry = y - dtp; if (dh < 0) ry = adh - 1 - ry;
+        int sy = sy0 + (sh == adh ? ry : (int)(((int64_t)ry * sh) / adh));
+        if (sy < 0 || sy >= st.h) continue;
+        const uint32_t *srow = px_at(&st, 0, sy), *src;
+        if (ident_x) {
+          src = srow + xm[xa - dl];
+          if (copy_ident) { memmove(dst, src, (size_t)n * 4); continue; }
+          if (same) { memcpy(tmp, src, (size_t)n * 4); src = tmp; }
+        } else {
+          int o = xa - dl;
+          if (dup2_x && !same && (o & 1) == 0) { gs_dup2(tmp, srow + xm[o], (size_t)n); }
+          else for (int k = 0; k < n; k++) tmp[k] = srow[xm[o + k]];
+          src = tmp;
+        }
+        if (rop == SRCCOPY) gs_opaque_copy(dst, src, (size_t)n); else gs_rop_row(rop, dst, src, (size_t)n, pat);
+      }
+    }
+  }
+  free(xm); free(tmp); free(snap);
   dc_dirty(dd, full);
   return 1;
 }
@@ -630,132 +877,268 @@ API StretchBlt(I64 hd, I64 x, I64 y, I64 w, I64 h, I64 hs, I64 sx, I64 sy, I64 s
   return blit_core(dd, (int)x, (int)y, (int)w, (int)h, sd, (int)sx, (int)sy, (int)sw, (int)sh, (uint32_t)rop);
 }
 
-/* DIB 入力 (BITMAPINFO + bits) -> 一時 Bmp 風ビューとして描画先へ nearest 転送 */
-static uint32_t dib_px(const WBMIH *bi, const uint8_t *bits, int x, int y /* top-based */) {
-  int w = bi->biWidth, h = bi->biHeight < 0 ? -bi->biHeight : bi->biHeight;
-  int row = bi->biHeight < 0 ? y : (h - 1 - y);
-  if (bi->biBitCount == 32) return *(const uint32_t *)(bits + (size_t)row * w * 4 + (size_t)x * 4) | 0xFF000000u;
-  if (bi->biBitCount == 24) { size_t stride = (((size_t)w * 24 + 31) / 32) * 4; const uint8_t *p = bits + row * stride + (size_t)x * 3; return 0xFF000000u | (p[2] << 16) | (p[1] << 8) | p[0]; }
-  char m[48]; snprintf(m, sizeof m, "DIB source bpp=%d", bi->biBitCount); gui_failfast("StretchDIBits", m);
-}
-static int dib_to_dc(DC *d, int xd, int yd, int wd, int hd, int xs, int ys, int ws, int hs, const void *bits, const WBMIH *bi, uint32_t rop) {
-  if (rop != SRCCOPY) gui_failfast("StretchDIBits", "rop other than SRCCOPY");
-  if (bi->biCompression != BI_RGB && bi->biCompression != BI_BITFIELDS) gui_failfast("StretchDIBits", "compressed DIB");
+/* DIB 入力 (BITMAPINFO + bits; 1/4/8/24/32bpp) -> 描画先へ nearest 転送 (SRCCOPY のみ)。<=8bpp は bmiColors (DIB_RGB_COLORS) の色テーブル */
+static int dib_to_dc(DC *d, int xd, int yd, int wd, int hd, int xs, int ys, int ws, int hs, const void *bits, const WBMIH *bi, uint32_t rop, uint32_t usage, const char *api) {
+  if (rop != SRCCOPY) gui_failfast(api, "rop other than SRCCOPY");
+  if (bi->biCompression != BI_RGB && bi->biCompression != BI_BITFIELDS) gui_failfast(api, "compressed DIB");
+  int bpp = bi->biBitCount;
+  if (!dib_bpp_ok(bpp)) { char m[48]; snprintf(m, sizeof m, "DIB source bpp=%d", bpp); gui_failfast(api, m); }
+  if (bpp <= 8 && usage != DIB_RGB_COLORS) gui_failfast(api, "DIB_PAL_COLORS (logical-palette indices) not supported");
+  uint32_t pal[256]; if (bpp <= 8) bmi_palette(bi, pal);
   Tgt t; if (!dc_tgt(d, &t)) return 0;
   RL *eff = dc_eff(d, &t);
   int dx = dev_dx(d), dy = dev_dy(d);
   int adw = wd < 0 ? -wd : wd, adh = hd < 0 ? -hd : hd;
+  if (adw == 0 || adh == 0) return 1;
   int dl = (wd < 0 ? xd + wd : xd) + dx, dtp = (hd < 0 ? yd + hd : yd) + dy;
   int bw = bi->biWidth, bh = bi->biHeight < 0 ? -bi->biHeight : bi->biHeight;
-  /* 源矩形 (DIB 座標: StretchDIBits の ySrc は下原点) */
-  int sy_top = (bi->biHeight < 0) ? ys : (bh - ys - hs);
+  if (bw <= 0 || bh == 0) return 1;
+  int sy_top = (bi->biHeight < 0) ? ys : (bh - ys - hs);   /* 源矩形 (DIB 座標: StretchDIBits の ySrc は下原点) */
   WRECT full = { dl, dtp, dl + adw, dtp + adh };
+  tgt_pull(&t, full);
+  size_t bstride = (size_t)dib_stride(bpp, bw);
+  int32_t *xm = (int32_t *)malloc((size_t)adw * 4); int vlo, vhi;
+  build_xmap(xm, adw, wd < 0, xs, ws, bw, &vlo, &vhi);
+  uint32_t *tmp = (uint32_t *)malloc((size_t)adw * 4), *rowbuf = bpp == 32 ? NULL : (uint32_t *)malloc((size_t)bw * 4);
+  int cached_sy = -1; const uint32_t *srow = NULL;
+  int ident_x = wd > 0 && ws == adw;
   for (int i = 0; i < eff->n; i++) {
     WRECT c = r_isect(full, eff->r[i]);
+    if (r_empty(c)) continue;
+    int xa = c.left, xb = c.right; if (xa < dl + vlo) xa = dl + vlo; if (xb > dl + vhi) xb = dl + vhi;
+    if (xb <= xa) continue;
+    int n = xb - xa;
     for (int y = c.top; y < c.bottom; y++) {
       int ry = y - dtp; if (hd < 0) ry = adh - 1 - ry;
       int sy = sy_top + (hs == adh ? ry : (int)(((int64_t)ry * hs) / adh));
       if (sy < 0 || sy >= bh) continue;
-      for (int x = c.left; x < c.right; x++) {
-        int rx = x - dl; if (wd < 0) rx = adw - 1 - rx;
-        int sx = xs + (ws == adw ? rx : (int)(((int64_t)rx * ws) / adw));
-        if (sx < 0 || sx >= bw) continue;
-        *px_at(&t, x, y) = dib_px(bi, (const uint8_t *)bits, sx, sy);
+      if (sy != cached_sy) {
+        int row = bi->biHeight < 0 ? sy : (bh - 1 - sy);
+        const uint8_t *rp = (const uint8_t *)bits + (size_t)row * bstride;
+        if (bpp == 32) srow = (const uint32_t *)rp;   /* 32bpp は変換不要: 行を直接参照し kernel が alpha を 0xFF 化 */
+        else { row_decode(bpp, rp, bw, pal, rowbuf); srow = rowbuf; }
+        cached_sy = sy;
       }
+      uint32_t *dst = px_at(&t, xa, y); const uint32_t *src;
+      if (ident_x) src = srow + xm[xa - dl];
+      else { for (int k = 0; k < n; k++) tmp[k] = srow[xm[xa - dl + k]]; src = tmp; }
+      gs_opaque_copy(dst, src, (size_t)n);
     }
   }
+  free(xm); free(tmp); free(rowbuf);
   dc_dirty(d, full);
   return 1;
 }
 API StretchDIBits(I64 hdc, I64 xd, I64 yd, I64 wd, I64 hd, I64 xs, I64 ys, I64 ws, I64 hs, I64 bits, I64 bmi, I64 usage, I64 rop) {
-  (void)usage;
   DC *d = dc_of((U64)hdc); if (!d) return 0;
-  return dib_to_dc(d, (int)xd, (int)yd, (int)wd, (int)hd, (int)xs, (int)ys, (int)ws, (int)hs, P_(bits), (const WBMIH *)P_(bmi), (uint32_t)rop) ? (int)(hd < 0 ? -hd : hd) : 0;
+  return dib_to_dc(d, (int)xd, (int)yd, (int)wd, (int)hd, (int)xs, (int)ys, (int)ws, (int)hs, P_(bits), (const WBMIH *)P_(bmi), (uint32_t)rop, (uint32_t)usage, "StretchDIBits") ? (int)(hd < 0 ? -hd : hd) : 0;
 }
 API SetDIBitsToDevice(I64 hdc, I64 xd, I64 yd, I64 w, I64 h, I64 xs, I64 ys, I64 start, I64 lines, I64 bits, I64 bmi, I64 usage) {
-  (void)start; (void)lines; (void)usage;
+  (void)start; (void)lines;
   DC *d = dc_of((U64)hdc); if (!d) return 0;
-  return dib_to_dc(d, (int)xd, (int)yd, (int)w, (int)h, (int)xs, (int)ys, (int)w, (int)h, P_(bits), (const WBMIH *)P_(bmi), SRCCOPY) ? (int)h : 0;
+  return dib_to_dc(d, (int)xd, (int)yd, (int)w, (int)h, (int)xs, (int)ys, (int)w, (int)h, P_(bits), (const WBMIH *)P_(bmi), SRCCOPY, (uint32_t)usage, "SetDIBitsToDevice") ? (int)h : 0;
+}
+/* GetDIBits で bpp<=8 を要求されたときの色テーブル: DIB section は自身のテーブル (同 bpp のとき)、それ以外は決定論的な既定表
+ * (1bpp = 黒/白, 4bpp = VGA16, 8bpp = 3-3-2 を 8bit へ拡張) */
+static int default_palette(int bpp, uint32_t pal[256]) {
+  static const uint32_t vga[16] = { 0x000000, 0x800000, 0x008000, 0x808000, 0x000080, 0x800080, 0x008080, 0xC0C0C0, 0x808080, 0xFF0000, 0x00FF00, 0xFFFF00, 0x0000FF, 0xFF00FF, 0x00FFFF, 0xFFFFFF };
+  for (int i = 0; i < 256; i++) pal[i] = 0xFF000000u;
+  if (bpp == 1) { pal[0] = 0xFF000000u; pal[1] = 0xFFFFFFFFu; return 2; }
+  if (bpp == 4) { for (int i = 0; i < 16; i++) pal[i] = 0xFF000000u | vga[i]; return 16; }
+  for (int i = 0; i < 256; i++) { uint32_t r = (uint32_t)((i >> 5) & 7) * 255 / 7, g = (uint32_t)((i >> 2) & 7) * 255 / 7, b = (uint32_t)(i & 3) * 255 / 3; pal[i] = 0xFF000000u | (r << 16) | (g << 8) | b; }
+  return 256;
 }
 API GetDIBits(I64 hdc, I64 hbm, I64 start, I64 lines, I64 bits, I64 bmi, I64 usage) {
-  (void)hdc; (void)usage;
+  (void)hdc;
   Bmp *b = (Bmp *)h_get((U64)hbm, HT_BMP); if (!b) return 0;
   WBMIH *bi = (WBMIH *)P_(bmi);
-  if (!bits) { bi->biSize = 40; bi->biWidth = b->w; bi->biHeight = b->h; bi->biPlanes = 1; bi->biBitCount = 32; bi->biCompression = BI_RGB; bi->biSizeImage = (uint32_t)(b->stride * b->h); return b->h; }
-  if (bi->biBitCount != 32) gui_failfast("GetDIBits", "requested bpp != 32");
+  int req = bi->biBitCount;
+  if (!bits) {   /* ヘッダ問合せ: biBitCount == 0 なら DIB section は自身の bpp、それ以外は 32 */
+    int bpp = req ? req : (b->isdib ? b->bpp : 32);
+    if (!dib_bpp_ok(bpp)) gui_failfast("GetDIBits", "requested bpp not in 1/4/8/24/32");
+    bi->biSize = 40; bi->biWidth = b->w; bi->biHeight = b->h; bi->biPlanes = 1; bi->biBitCount = (uint16_t)bpp; bi->biCompression = BI_RGB;
+    bi->biSizeImage = (uint32_t)(dib_stride(bpp, b->w) * b->h); return b->h;
+  }
+  if (!dib_bpp_ok(req)) { char m[48]; snprintf(m, sizeof m, "requested bpp=%d (1/4/8/24/32)", req); gui_failfast("GetDIBits", m); }
+  if (req <= 8 && usage != DIB_RGB_COLORS) gui_failfast("GetDIBits", "DIB_PAL_COLORS not supported");
+  uint32_t pal[256]; int npal = 0;
+  if (req <= 8) {
+    if (b->pal && b->bpp == req) { memcpy(pal, b->pal, 256 * 4); npal = b->npal; } else npal = default_palette(req, pal);
+    uint8_t *q = (uint8_t *)bi + (bi->biSize ? bi->biSize : 40);
+    for (int i = 0; i < npal; i++) { uint32_t v = pal[i] & 0xFFFFFF; memcpy(q + (size_t)i * 4, &v, 4); }   /* RGBQUAD: rgbReserved = 0 */
+    bi->biClrUsed = (uint32_t)npal; bi->biCompression = BI_RGB;
+  }
+  bmp_pull(b, (WRECT){ 0, 0, b->w, b->h });
+  size_t ostride = (size_t)dib_stride(req, b->w);
+  bi->biWidth = b->w; bi->biPlanes = 1; bi->biSizeImage = (uint32_t)(ostride * b->h);
   int n = 0;
   for (int i = 0; i < (int)lines && start + i < b->h; i++) {
     int y = (int)start + i;                      /* DIB 行 (bottom-up 想定 : biHeight>0) */
     int top = bi->biHeight < 0 ? y : b->h - 1 - y;
     int mrow = b->topdown ? top : b->h - 1 - top;
-    memcpy((uint8_t *)P_(bits) + (size_t)i * b->w * 4, b->bits + (size_t)mrow * b->stride, (size_t)b->w * 4); n++;
+    uint8_t *out = (uint8_t *)P_(bits) + (size_t)i * ostride;
+    if (req != 32) memset(out, 0, ostride);
+    row_encode(req, out, (const uint32_t *)(b->bits + (size_t)mrow * b->stride), b->w, pal, npal);
+    n++;
   }
   return n;
 }
 API SetDIBits(I64 hdc, I64 hbm, I64 start, I64 lines, I64 bits, I64 bmi, I64 usage) {
-  (void)hdc; (void)usage;
+  (void)hdc;
   Bmp *b = (Bmp *)h_get((U64)hbm, HT_BMP); if (!b) return 0;
   const WBMIH *bi = (const WBMIH *)P_(bmi);
-  if (bi->biBitCount != 32) gui_failfast("SetDIBits", "source bpp != 32");
+  int bpp = bi->biBitCount;
+  if (!dib_bpp_ok(bpp)) { char m[48]; snprintf(m, sizeof m, "source bpp=%d (1/4/8/24/32)", bpp); gui_failfast("SetDIBits", m); }
+  if (bpp <= 8 && usage != DIB_RGB_COLORS) gui_failfast("SetDIBits", "DIB_PAL_COLORS not supported");
+  uint32_t pal[256]; if (bpp <= 8) bmi_palette(bi, pal);
+  size_t istride = (size_t)dib_stride(bpp, b->w);
+  uint32_t *tmp = (uint32_t *)malloc((size_t)b->w * 4);
   int n = 0;
   for (int i = 0; i < (int)lines && start + i < b->h; i++) {
     int y = (int)start + i; int top = bi->biHeight < 0 ? y : b->h - 1 - y; int mrow = b->topdown ? top : b->h - 1 - top;
-    memcpy(b->bits + (size_t)mrow * b->stride, (const uint8_t *)P_(bits) + (size_t)i * b->w * 4, (size_t)b->w * 4); n++;
+    if (bpp == 32) memcpy(b->bits + (size_t)mrow * b->stride, (const uint8_t *)P_(bits) + (size_t)i * istride, (size_t)b->w * 4);   /* 旧挙動: alpha も保持 */
+    else { row_decode(bpp, (const uint8_t *)P_(bits) + (size_t)i * istride, b->w, pal, tmp); memcpy(b->bits + (size_t)mrow * b->stride, tmp, (size_t)b->w * 4); }
+    n++;
   }
+  free(tmp);
+  if (b->nat) bmp_push(b, (WRECT){ 0, 0, b->w, b->h });
+  else if (b->mono) mono_norm(b, (WRECT){ 0, 0, b->w, b->h });
   return n;
 }
-static uint32_t div255(uint32_t x) { x += 128; return (x + (x >> 8)) >> 8; }
+/* hdc に選択された DIB section (bpp<=8) の色テーブル。Set は shadow を作り直す */
+static Bmp *dc_dib_pal(I64 hdc) { DC *d = dc_of((U64)hdc); if (!d || d->kind != 2) return NULL; Bmp *b = (Bmp *)h_get(d->hbmp, HT_BMP); return b && b->pal ? b : NULL; }
+API GetDIBColorTable(I64 hdc, I64 start, I64 n, I64 out) {
+  Bmp *b = dc_dib_pal(hdc); if (!b || start < 0 || start >= (1 << b->bpp) || !out) return 0;
+  int cnt = (int)n; if (start + cnt > (1 << b->bpp)) cnt = (1 << b->bpp) - (int)start;
+  for (int i = 0; i < cnt; i++) { uint32_t v = b->pal[start + i] & 0xFFFFFF; memcpy((uint8_t *)P_(out) + (size_t)i * 4, &v, 4); }
+  return cnt;
+}
+API SetDIBColorTable(I64 hdc, I64 start, I64 n, I64 in) {
+  Bmp *b = dc_dib_pal(hdc); if (!b || start < 0 || start >= (1 << b->bpp) || !in) return 0;
+  int cnt = (int)n; if (start + cnt > (1 << b->bpp)) cnt = (1 << b->bpp) - (int)start;
+  for (int i = 0; i < cnt; i++) { uint32_t v; memcpy(&v, (const uint8_t *)P_(in) + (size_t)i * 4, 4); b->pal[start + i] = v | 0xFF000000u; }
+  if (start + cnt > b->npal) b->npal = (int)start + cnt;
+  bmp_pull(b, (WRECT){ 0, 0, b->w, b->h });
+  return cnt;
+}
 API AlphaBlend(I64 hd, I64 x, I64 y, I64 w, I64 h, I64 hs, I64 sx, I64 sy, I64 sw, I64 sh, I64 blend) {
   DC *dd = dc_of((U64)hd), *sd = dc_of((U64)hs); if (!dd || !sd) return 0;
+  if (w <= 0 || h <= 0 || sw <= 0 || sh <= 0) return 0;
   uint32_t bf = (uint32_t)blend; uint32_t sca = (bf >> 16) & 0xFF, afmt = (bf >> 24) & 0xFF;
   Tgt dt, st; if (!dc_tgt(dd, &dt) || !dc_tgt(sd, &st)) return 0;
   RL *eff = dc_eff(dd, &dt);
-  int dx = x + dev_dx(dd), dy = y + dev_dy(dd), ssx = (int)sx + dev_dx(sd), ssy = (int)sy + dev_dy(sd);
-  WRECT full = { dx, dy, dx + (int)w, dy + (int)h };
+  int dx = (int)x + dev_dx(dd), dy = (int)y + dev_dy(dd), ssx = (int)sx + dev_dx(sd), ssy = (int)sy + dev_dy(sd);
+  int adw = (int)w;
+  WRECT full = { dx, dy, dx + adw, dy + (int)h };
+  tgt_pull(&st, (WRECT){ ssx, ssy, ssx + (int)sw, ssy + (int)sh });
+  tgt_pull(&dt, full);
+  int same = dt.row0 == st.row0;
+  int32_t *xm = (int32_t *)malloc((size_t)adw * 4); int vlo, vhi;
+  build_xmap(xm, adw, 0, ssx, (int)sw, st.w, &vlo, &vhi);
+  uint32_t *tmp = (uint32_t *)malloc((size_t)adw * 4);
+  int ident_x = (int)sw == adw;
+  int rev_y = same && dy > ssy;
   for (int i = 0; i < eff->n; i++) {
     WRECT c = r_isect(full, eff->r[i]);
-    for (int yy = c.top; yy < c.bottom; yy++) {
-      int sy2 = ssy + (int)(((int64_t)(yy - dy) * sh) / h); if (sy2 < 0 || sy2 >= st.h) continue;
-      for (int xx = c.left; xx < c.right; xx++) {
-        int sx2 = ssx + (int)(((int64_t)(xx - dx) * sw) / w); if (sx2 < 0 || sx2 >= st.w) continue;
-        uint32_t s = *px_at(&st, sx2, sy2), *q = px_at(&dt, xx, yy), dv = *q, o = 0xFF000000u;
-        uint32_t sa = afmt ? (s >> 24) : 255;
-        for (int sh2 = 0; sh2 < 24; sh2 += 8) {
-          uint32_t sc = (s >> sh2) & 0xFF, dc = (dv >> sh2) & 0xFF, r;
-          if (afmt) { uint32_t scs = div255(sc * sca); uint32_t a = div255(sa * sca); r = scs + div255(dc * (255 - a)); }
-          else r = div255(sc * sca) + div255(dc * (255 - sca));
-          if (r > 255) r = 255;
-          o |= r << sh2;
-        }
-        *q = o;
-      }
+    if (r_empty(c)) continue;
+    int xa = c.left, xb = c.right; if (xa < dx + vlo) xa = dx + vlo; if (xb > dx + vhi) xb = dx + vhi;
+    if (xb <= xa) continue;
+    int n = xb - xa;
+    for (int yy = 0; yy < c.bottom - c.top; yy++) {
+      int yv = rev_y ? c.bottom - 1 - yy : c.top + yy;
+      int sy2 = ssy + (int)(((int64_t)(yv - dy) * sh) / h); if (sy2 < 0 || sy2 >= st.h) continue;
+      const uint32_t *srow = px_at(&st, 0, sy2), *src;
+      if (ident_x && !same) src = srow + xm[xa - dx];
+      else { for (int k = 0; k < n; k++) tmp[k] = srow[xm[xa - dx + k]]; src = tmp; }
+      gs_alpha_row(px_at(&dt, xa, yv), src, (size_t)n, sca, afmt);
     }
   }
+  free(xm); free(tmp);
   dc_dirty(dd, full);
   return 1;
 }
 
-/* ---------- テキスト (内蔵 8x8 フォント) ---------- */
-static int glyph_scale(DC *d) { (void)d; return 1; }
-static int draw_text_run(DC *d, int x, int y, const uint16_t *w16, const char *a8, int n, int opaque_rect_only, int *advance) {
-  int sc = glyph_scale(d), gw = 8 * sc, gh = 8 * sc;
-  *advance = n * gw;
-  int ax = x, ay = y;
-  if ((d->align & 6) == 6) ax -= (n * gw) / 2; else if ((d->align & 6) == 2) ax -= n * gw;   /* TA_CENTER=6, TA_RIGHT=2 */
-  if ((d->align & 24) == 24) ay -= 7 * sc; else if ((d->align & 24) == 8) ay -= gh;           /* TA_BASELINE=24, TA_BOTTOM=8 */
-  if (opaque_rect_only) return 1;
-  uint32_t fg = COLORREF_TO_BGRA(d->tc), bg = COLORREF_TO_BGRA(d->bk);
-  if (d->bkmode == OPAQUE_) fill_dev(d, (WRECT){ ax, ay, ax + n * gw, ay + gh }, bg, 13);
-  for (int i = 0; i < n; i++) {
-    uint32_t c = w16 ? w16[i] : (uint8_t)a8[i];
-    if (c >= 128) c = '?';
-    for (int row = 0; row < 8; row++) {
-      uint8_t bits = gui_font8x8[c][row];
-      for (int col = 0; col < 8; col++) if ((bits >> col) & 1)
-        fill_dev(d, (WRECT){ ax + i * gw + col * sc, ay + row * sc, ax + i * gw + (col + 1) * sc, ay + (row + 1) * sc }, fg, 13);
+/* ---------- テキスト (GUI-9 #186: text engine (FreeType) があればそれ、無ければ内蔵 8x8 フォント) ----------
+ * 8x8 経路: DrawText のみ挙動が変わった (複数行の DT_CENTER/DT_RIGHT は行ごとに配置 (従来は全行がブロック幅基準の同一 x0)、行末 '\r' は行に含めない)。
+ *   それ以外は従来のまま。tools/gui の既存 golden/selftest/gui_app に DrawText 呼出は無く e2e golden には影響しない。engine 経路: advance = 整数 px、描画 = 8bit coverage の sRGB 値空間での線形合成
+ *   out_c = (fg_c*cov + dst_c*(255-cov) + 127) / 255  (独立オラクル golden/ft_oracle.c が同式を実装) */
+typedef struct { void *e; const GuiTextEngine *te; Font *f; GuiTextMetrics m; } TF;
+static void *font_eng(Font *f) {
+  if (!f) return NULL;
+  if (!f->tried) { f->tried = 1; if (g_te && !f->stock) { void *e = g_te->open(f->face, f->lfh, f->weight, f->italic); if (e) { f->eng = e; f->te = g_te; } } }
+  return f->eng;
+}
+static void tf_get(DC *d, TF *t) {
+  t->f = (Font *)h_get(d->hfont, HT_FONT); t->e = font_eng(t->f); t->te = t->e ? t->f->te : NULL;
+  if (t->e) t->te->metrics(t->e, &t->m);
+  else t->m = (GuiTextMetrics){ 7, 1, 8, 0, 0, 8, 8, 32, 126, '?', ' ' };
+}
+static int tf_adv(TF *t, uint32_t cp) {
+  if (!t->e) return 8;
+  GuiGlyph g; if (!t->te->glyph(t->e, cp, 0, &g)) return t->m.avg_width;
+  return g.advance;
+}
+static uint32_t tch(const void *s, int wide, int i) { return wide ? ((const uint16_t *)s)[i] : ((const uint8_t *)s)[i]; }
+static int tf_width(TF *t, const void *s, int wide, int n) { int w = 0; for (int i = 0; i < n; i++) w += tf_adv(t, tch(s, wide, i)); return w; }
+
+static void blend_cov(DC *d, int x0, int y0, const uint8_t *cov, int w, int h, uint32_t fg) {
+  Tgt t; if (!dc_tgt(d, &t)) return;
+  RL *eff = dc_eff(d, &t);
+  WRECT box = { x0, y0, x0 + w, y0 + h };
+  tgt_pull(&t, box);
+  uint32_t fb = fg & 255, fgc = (fg >> 8) & 255, fr = (fg >> 16) & 255;
+  for (int i = 0; i < eff->n; i++) {
+    WRECT c = r_isect(box, eff->r[i]); if (r_empty(c)) continue;
+    for (int y = c.top; y < c.bottom; y++) {
+      uint32_t *p = px_at(&t, c.left, y); const uint8_t *cv = cov + (size_t)(y - y0) * w + (c.left - x0);
+      for (int x = c.left; x < c.right; x++, p++, cv++) {
+        uint32_t a = *cv; if (!a) continue;
+        uint32_t dp = *p, ia = 255 - a;
+        uint32_t b = (fb * a + (dp & 255) * ia + 127) / 255, g = (fgc * a + ((dp >> 8) & 255) * ia + 127) / 255, r = (fr * a + ((dp >> 16) & 255) * ia + 127) / 255;
+        *p = 0xFF000000u | (r << 16) | (g << 8) | b;
+      }
     }
   }
-  dc_dirty(d, (WRECT){ ax, ay, ax + n * gw, ay + gh });
+}
+static int draw_text_run(DC *d, int x, int y, const uint16_t *w16, const char *a8, int n, int opaque_rect_only, int *advance) {
+  TF t; tf_get(d, &t);
+  const void *s = w16 ? (const void *)w16 : (const void *)a8; int wide = w16 != NULL;
+  int total = n > 0 ? tf_width(&t, s, wide, n) : 0, gh = t.m.height;
+  *advance = total;
+  int ax = x, ay = y;
+  if ((d->align & 6) == 6) ax -= total / 2; else if ((d->align & 6) == 2) ax -= total;   /* TA_CENTER=6, TA_RIGHT=2 */
+  if ((d->align & 24) == 24) ay -= t.m.ascent; else if ((d->align & 24) == 8) ay -= gh;   /* TA_BASELINE=24, TA_BOTTOM=8 */
+  if (opaque_rect_only) return 1;
+  uint32_t fg = COLORREF_TO_BGRA(d->tc), bg = COLORREF_TO_BGRA(d->bk);
+  if (d->bkmode == OPAQUE_) fill_dev(d, (WRECT){ ax, ay, ax + total, ay + gh }, bg, 13);
+  WRECT dirty = { ax, ay, ax + total, ay + gh };
+  if (!t.e) {
+    for (int i = 0; i < n; i++) {
+      uint32_t c = tch(s, wide, i);
+      if (c >= 128) c = '?';
+      for (int row = 0; row < 8; row++) {
+        uint8_t bits = gui_font8x8[c][row];
+        for (int col = 0; col < 8; col++) if ((bits >> col) & 1)
+          fill_dev(d, (WRECT){ ax + i * 8 + col, ay + row, ax + i * 8 + col + 1, ay + row + 1 }, fg, 13);
+      }
+    }
+  } else {
+    int pen = ax, base = ay + t.m.ascent;
+    for (int i = 0; i < n; i++) {
+      GuiGlyph g;
+      if (t.te->glyph(t.e, tch(s, wide, i), 1, &g)) {
+        if (g.cov) {
+          int gx = pen + g.left, gy = base - g.top;
+          blend_cov(d, gx, gy, g.cov, g.w, g.h, fg);
+          if (gx < dirty.left) dirty.left = gx; if (gy < dirty.top) dirty.top = gy;
+          if (gx + g.w > dirty.right) dirty.right = gx + g.w; if (gy + g.h > dirty.bottom) dirty.bottom = gy + g.h;
+          free(g.cov);
+        }
+        pen += g.advance;
+      } else pen += t.m.avg_width;
+    }
+  }
+  dc_dirty(d, dirty);
   return 1;
 }
 static int wlen(const uint16_t *s) { int n = 0; while (s[n]) n++; return n; }
@@ -785,16 +1168,28 @@ static API exttextout_impl(I64 hdc, I64 x, I64 y, I64 opts, I64 rc, I64 str, I64
 }
 API ExtTextOutA(I64 a, I64 b, I64 c, I64 d, I64 e, I64 f, I64 g, I64 h) { return exttextout_impl(a, b, c, d, e, f, g, h, 0); }
 API ExtTextOutW(I64 a, I64 b, I64 c, I64 d, I64 e, I64 f, I64 g, I64 h) { return exttextout_impl(a, b, c, d, e, f, g, h, 1); }
-static API extent_impl(I64 hdc, I64 s, I64 n, I64 sz) { (void)hdc; (void)s; WSIZE *z = (WSIZE *)P_(sz); z->cx = (int)n * 8; z->cy = 8; return 1; }
-API GetTextExtentPoint32A(I64 a, I64 b, I64 c, I64 d) { return extent_impl(a, b, c, d); }
-API GetTextExtentPoint32W(I64 a, I64 b, I64 c, I64 d) { return extent_impl(a, b, c, d); }
-API GetTextExtentPointA(I64 a, I64 b, I64 c, I64 d) { return extent_impl(a, b, c, d); }
-API GetTextExtentPointW(I64 a, I64 b, I64 c, I64 d) { return extent_impl(a, b, c, d); }
-static API metrics_impl(I64 hdc, I64 p, int wide) {
-  (void)hdc; WTEXTMETRIC_HEAD h = { 8, 7, 1, 0, 0, 8, 8, 400, 0, 96, 96 };
+static API extent_impl(I64 hdc, I64 s, I64 n, I64 sz, int wide) {
+  DC *d = dc_of((U64)hdc); WSIZE *z = (WSIZE *)P_(sz);
+  TF t; if (d) tf_get(d, &t); else t.e = NULL, t.m = (GuiTextMetrics){ 7, 1, 8, 0, 0, 8, 8, 32, 126, '?', ' ' };
+  z->cx = n > 0 ? tf_width(&t, P_(s), wide, (int)n) : 0; z->cy = t.m.height; return 1;
+}
+API GetTextExtentPoint32A(I64 a, I64 b, I64 c, I64 d) { return extent_impl(a, b, c, d, 0); }
+API GetTextExtentPoint32W(I64 a, I64 b, I64 c, I64 d) { return extent_impl(a, b, c, d, 1); }
+API GetTextExtentPointA(I64 a, I64 b, I64 c, I64 d) { return extent_impl(a, b, c, d, 0); }
+API GetTextExtentPointW(I64 a, I64 b, I64 c, I64 d) { return extent_impl(a, b, c, d, 1); }
+/* TEXTMETRIC の先頭 11 個の int + chars/flags。W: first@44 last@46 default@48 break@50 italic@52 pitch@55 charset@56 / A: 44..47 + pitch@51 */
+static void fill_tm(TF *t, I64 p, int wide) {
+  WTEXTMETRIC_HEAD h = { t->m.height, t->m.ascent, t->m.descent, t->m.internal_leading, t->m.external_leading, t->m.avg_width, t->m.max_width,
+                         t->f && t->e ? t->f->weight : 400, 0, 96, 96 };
   memset(P_(p), 0, wide ? 60 : 56); memcpy(P_(p), &h, sizeof h);
-  if (wide) { uint16_t *u = (uint16_t *)((uint8_t *)P_(p) + 44); u[0] = 32; u[1] = 126; u[2] = '?'; u[3] = ' '; ((uint8_t *)P_(p))[56] = 1; }
-  else { uint8_t *u = (uint8_t *)P_(p) + 44; u[0] = 32; u[1] = 126; u[2] = '?'; u[3] = ' '; ((uint8_t *)P_(p))[51] = 1; }
+  if (wide) { uint16_t *u = (uint16_t *)((uint8_t *)P_(p) + 44); u[0] = (uint16_t)t->m.first; u[1] = (uint16_t)t->m.last; u[2] = (uint16_t)t->m.def_char; u[3] = (uint16_t)t->m.brk_char; ((uint8_t *)P_(p))[56] = 1; }
+  else { uint8_t *u = (uint8_t *)P_(p) + 44; u[0] = (uint8_t)t->m.first; u[1] = (uint8_t)t->m.last; u[2] = (uint8_t)t->m.def_char; u[3] = (uint8_t)t->m.brk_char; ((uint8_t *)P_(p))[51] = 1; }
+  if (t->e) { ((uint8_t *)P_(p))[wide ? 55 : 51] = 6; /* TMPF_VECTOR|TMPF_TRUETYPE */ if (t->f->italic) ((uint8_t *)P_(p))[wide ? 52 : 48] = 1; }
+}
+static API metrics_impl(I64 hdc, I64 p, int wide) {
+  DC *d = dc_of((U64)hdc); TF t;
+  if (d) tf_get(d, &t); else { t.e = NULL; t.f = NULL; t.m = (GuiTextMetrics){ 7, 1, 8, 0, 0, 8, 8, 32, 126, '?', ' ' }; }
+  fill_tm(&t, p, wide);
   return 1;
 }
 API GetTextMetricsA(I64 hdc, I64 p) { return metrics_impl(hdc, p, 0); }
@@ -802,29 +1197,62 @@ API GetTextMetricsW(I64 hdc, I64 p) { return metrics_impl(hdc, p, 1); }
 static API drawtext_impl(I64 hdc, I64 str, I64 n, I64 rc, I64 fmt, int wide) {
   DC *d = dc_of((U64)hdc); if (!d) return 0;
   WRECT *r = (WRECT *)P_(rc);
-  int len = (int)n < 0 ? (wide ? wlen((const uint16_t *)P_(str)) : (int)strlen((const char *)P_(str))) : (int)n;
-  /* 行分割 */
-  int nl = 1, maxw = 0, curw = 0;
-  for (int i = 0; i < len; i++) { uint32_t c = wide ? ((const uint16_t *)P_(str))[i] : ((const uint8_t *)P_(str))[i]; if (c == '\n' && !(fmt & DT_SINGLELINE)) { nl++; if (curw > maxw) maxw = curw; curw = 0; } else if (c != '\r') curw++; }
-  if (curw > maxw) maxw = curw;
-  int tw = maxw * 8, th = nl * 8;
-  if (fmt & DT_CALCRECT) { r->right = r->left + tw; r->bottom = r->top + th; return th; }
-  int x0 = r->left, y0 = r->top;
-  if (fmt & DT_CENTER) x0 = r->left + ((r->right - r->left) - tw) / 2; else if (fmt & DT_RIGHT) x0 = r->right - tw;
+  const void *s = P_(str);
+  int len = (int)n < 0 ? (wide ? wlen((const uint16_t *)s) : (int)strlen((const char *)s)) : (int)n;
+  TF t; tf_get(d, &t);
+  /* 行分割: '\n' (DT_SINGLELINE 以外)。行末の '\r' は行に含めない。各行の幅 = advance 合計 */
+  int nl = 1, maxw = 0;
+  for (int i = 0, st = 0; i <= len; i++) {
+    int brk = i == len || (tch(s, wide, i) == '\n' && !(fmt & DT_SINGLELINE));
+    if (!brk) continue;
+    int cnt = i - st; if (cnt > 0 && i < len && tch(s, wide, i - 1) == '\r') cnt--;
+    int w = tf_width(&t, (const uint8_t *)s + (size_t)st * (wide ? 2 : 1), wide, cnt); if (w > maxw) maxw = w;
+    if (i < len) nl++;
+    st = i + 1;
+  }
+  int th = nl * t.m.height;
+  if (fmt & DT_CALCRECT) { r->right = r->left + maxw; r->bottom = r->top + th; return th; }
+  int y0 = r->top;
   if (fmt & DT_VCENTER) y0 = r->top + ((r->bottom - r->top) - th) / 2; else if (fmt & DT_BOTTOM) y0 = r->bottom - th;
   int line = 0, start = 0, adv;
   for (int i = 0; i <= len; i++) {
-    uint32_t c = i < len ? (wide ? ((const uint16_t *)P_(str))[i] : ((const uint8_t *)P_(str))[i]) : '\n';
-    if (c == '\n' && (i == len || !(fmt & DT_SINGLELINE))) {
-      int cnt = i - start;
-      draw_text_run(d, x0 + dev_dx(d), y0 + line * 8 + dev_dy(d), wide ? (const uint16_t *)P_(str) + start : NULL, wide ? NULL : (const char *)P_(str) + start, cnt, 0, &adv);
-      line++; start = i + 1;
-    }
+    int brk = i == len || (tch(s, wide, i) == '\n' && !(fmt & DT_SINGLELINE));
+    if (!brk) continue;
+    int cnt = i - start; if (cnt > 0 && i < len && tch(s, wide, i - 1) == '\r') cnt--;
+    const void *ls = (const uint8_t *)s + (size_t)start * (wide ? 2 : 1);
+    int lw = tf_width(&t, ls, wide, cnt), x0 = r->left;
+    if (fmt & DT_CENTER) x0 = r->left + ((r->right - r->left) - lw) / 2; else if (fmt & DT_RIGHT) x0 = r->right - lw;
+    draw_text_run(d, x0 + dev_dx(d), y0 + line * t.m.height + dev_dy(d), wide ? (const uint16_t *)ls : NULL, wide ? NULL : (const char *)ls, cnt, 0, &adv);
+    line++; start = i + 1;
   }
   return th;
 }
 API DrawTextA(I64 hdc, I64 s, I64 n, I64 rc, I64 fmt) { return drawtext_impl(hdc, s, n, rc, fmt, 0); }
 API DrawTextW(I64 hdc, I64 s, I64 n, I64 rc, I64 fmt) { return drawtext_impl(hdc, s, n, rc, fmt, 1); }
+
+/* EnumFontFamiliesExW(hdc, LOGFONTW *lf, FONTENUMPROCW cb, lParam, flags): 登録 face を列挙する (face 名一致のみ; lfFaceName 空 = 全 face)。
+ * cb(ENUMLOGFONTEXW *, NEWTEXTMETRICEXW *, DWORD fontType = TRUETYPE_FONTTYPE(4), lParam)。cb が 0 を返したら停止。engine 未登録/face 0 件なら 1 を返し cb は呼ばない */
+API EnumFontFamiliesExW(I64 hdc, I64 lf, I64 cb, I64 lparam, I64 flags) {
+  (void)hdc; (void)flags; gui_sh();
+  if (!g_te || !cb) return 1;
+  const uint16_t *want = lf ? (const uint16_t *)((const uint8_t *)P_(lf) + 28) : NULL;
+  int ret = 1;
+  for (int i = 0, nf = g_te->nfaces(); i < nf; i++) {
+    const char *nm = g_te->face_name(i); uint16_t nm16[32] = { 0 };
+    for (int k = 0; k < 31 && nm[k]; k++) nm16[k] = (uint8_t)nm[k];
+    if (want && want[0]) { int k = 0; for (; k < 32; k++) { uint16_t a = want[k], b = nm16[k]; if (a >= 'A' && a <= 'Z') a += 32; if (b >= 'A' && b <= 'Z') b += 32; if (a != b) break; if (!a) break; } if (k < 32 && (want[k] | nm16[k])) continue; }
+    uint8_t elf[348]; uint8_t ntm[100]; memset(elf, 0, sizeof elf); memset(ntm, 0, sizeof ntm);
+    *(int32_t *)(elf + 16) = 400; elf[23] = 1; /* lfWeight, lfCharSet = DEFAULT_CHARSET */
+    memcpy(elf + 28, nm16, sizeof nm16); memcpy(elf + 92, nm16, sizeof nm16);   /* lfFaceName / elfFullName */
+    void *e = g_te->open(nm16, -12, 400, 0); TF t; memset(&t, 0, sizeof t);
+    if (e) { g_te->metrics(e, &t.m); g_te->close(e); } else t.m = (GuiTextMetrics){ 7, 1, 8, 0, 0, 8, 8, 32, 126, '?', ' ' };
+    WTEXTMETRIC_HEAD h = { t.m.height, t.m.ascent, t.m.descent, t.m.internal_leading, t.m.external_leading, t.m.avg_width, t.m.max_width, 400, 0, 96, 96 };
+    memcpy(ntm, &h, sizeof h);
+    ret = (int)gui_call4((U64)cb, (I64)(uintptr_t)elf, (I64)(uintptr_t)ntm, 4, lparam);
+    if (!ret) break;
+  }
+  return ret;
+}
 
 /* ======================================================================================
  * P1 拡張 (CAB-159): 3D 枠/フレームコントロール/フォーカス矩形・リージョン取得・画面 DC・DDB 生成・アイコン描画
@@ -1013,9 +1441,19 @@ static int dib_bits_offset(const WBMIH *bi) {   /* ヘッダ + (BITFIELDS マス
   return (int)bi->biSize + (bi->biCompression == BI_BITFIELDS && bi->biSize == 40 ? 12 : 0) + colors * 4;
 }
 static void dib_fill_bmp(Bmp *b, const WBMIH *bi, const uint8_t *bits, const char *api) {
-  if (bi->biBitCount != 24 && bi->biBitCount != 32) { char m[48]; snprintf(m, sizeof m, "DIB source bpp=%d (only 24/32bpp)", bi->biBitCount); gui_failfast(api, m); }
+  int bpp = bi->biBitCount;
+  if (!dib_bpp_ok(bpp)) { char m[48]; snprintf(m, sizeof m, "DIB source bpp=%d (1/4/8/24/32)", bpp); gui_failfast(api, m); }
   if (bi->biCompression != BI_RGB && bi->biCompression != BI_BITFIELDS) gui_failfast(api, "compressed DIB");
-  for (int y = 0; y < b->h; y++) for (int x = 0; x < b->w; x++) ((uint32_t *)(b->bits + (size_t)y * b->stride))[x] = dib_px(bi, bits, x, y);
+  uint32_t pal[256]; if (bpp <= 8) bmi_palette(bi, pal);
+  int sh = bi->biHeight < 0 ? -bi->biHeight : bi->biHeight, w = b->w < bi->biWidth ? b->w : bi->biWidth;
+  size_t stride = (size_t)dib_stride(bpp, bi->biWidth);
+  uint32_t *tmp = (uint32_t *)malloc((size_t)(bi->biWidth > 0 ? bi->biWidth : 1) * 4);
+  for (int y = 0; y < b->h && y < sh; y++) {
+    int row = bi->biHeight < 0 ? y : (sh - 1 - y);
+    row_decode(bpp, bits + (size_t)row * stride, bi->biWidth, pal, tmp);
+    memcpy(b->bits + (size_t)y * b->stride, tmp, (size_t)w * 4);
+  }
+  free(tmp);
 }
 #define CBM_INIT_ 4
 API CreateDIBitmap(I64 hdc, I64 pbih, I64 init, I64 pbits, I64 pbmi, I64 usage) {
@@ -1024,7 +1462,7 @@ API CreateDIBitmap(I64 hdc, I64 pbih, I64 init, I64 pbits, I64 pbmi, I64 usage) 
   Bmp *b = bmp_new(bih->biWidth, bih->biHeight, 1);
   if ((init & CBM_INIT_) && pbits && pbmi) {
     const WBMIH *bi = (const WBMIH *)P_(pbmi);
-    if (bi->biWidth != b->w) { free(b->bits); free(b); gui_failfast("CreateDIBitmap", "lpbmi width != lpbmih width"); }
+    if (bi->biWidth != b->w) { bmp_free(b); gui_failfast("CreateDIBitmap", "lpbmi width != lpbmih width"); }
     Bmp tmp = *b; tmp.h = bi->biHeight < 0 ? -bi->biHeight : bi->biHeight; if (tmp.h > b->h) tmp.h = b->h;
     dib_fill_bmp(&tmp, bi, (const uint8_t *)P_(pbits), "CreateDIBitmap");
   }
@@ -1040,6 +1478,7 @@ API LoadBitmapW(I64 hinst, I64 name) {
   if (!g_gdi_res || !g_gdi_res((U64)hinst, 2 /* RT_BITMAP */, (uint32_t)name, &data, &sz)) { gui_set_last_error(1813); return 0; }   /* ERROR_RESOURCE_TYPE_NOT_FOUND */
   const WBMIH *bi = (const WBMIH *)data; Bmp *b = bmp_new(bi->biWidth, bi->biHeight, 1);
   dib_fill_bmp(b, bi, (const uint8_t *)data + dib_bits_offset(bi), "LoadBitmapW");
+  if (bi->biBitCount == 1) { b->mono = 1; b->bpp = 1; mono_norm(b, (WRECT){ 0, 0, b->w, b->h }); }   /* 1bpp 資源 = mono DDB */
   return (I64)h_alloc(HT_BMP, b);
 }
 

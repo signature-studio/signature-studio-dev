@@ -1,0 +1,296 @@
+{
+ "_total": {
+  "cut_bytes": 1464181,
+  "cut_funcs": 1510,
+  "lift_bytes_after": 8665863,
+  "lift_bytes_before": 10130044,
+  "lift_funcs_after": 32281,
+  "lift_funcs_before": 33791
+ },
+ "flac": {
+  "by_tag": {
+   "anchor": 1,
+   "window": 2
+  },
+  "clusters": [
+   {
+    "addr_taken_entries": 0,
+    "entry_funcs": 1,
+    "exit_callees": 65,
+    "seed_funcs": 1,
+    "window": [
+     "0x1805cacc0",
+     "0x1805cc576"
+    ],
+    "window_bytes": 6326,
+    "window_funcs": 3
+   }
+  ],
+  "cut_bytes": 6310,
+  "cut_funcs": 3,
+  "seeds": 1,
+  "window_bytes": 6326,
+  "window_funcs": 3
+ },
+ "libsfz": {
+  "by_tag": {
+   "anchor": 2,
+   "vtable": 1,
+   "window": 50
+  },
+  "clusters": [
+   {
+    "addr_taken_entries": 0,
+    "entry_funcs": 0,
+    "exit_callees": 1,
+    "seed_funcs": 1,
+    "window": [
+     "0x1802e8c70",
+     "0x1802e8c9b"
+    ],
+    "window_bytes": 43,
+    "window_funcs": 1
+   },
+   {
+    "addr_taken_entries": 0,
+    "entry_funcs": 5,
+    "exit_callees": 49,
+    "seed_funcs": 2,
+    "window": [
+     "0x180436cc0",
+     "0x18043f84c"
+    ],
+    "window_bytes": 35724,
+    "window_funcs": 52
+   }
+  ],
+  "cut_bytes": 33950,
+  "cut_funcs": 53,
+  "seeds": 3,
+  "window_bytes": 35767,
+  "window_funcs": 53
+ },
+ "libsndfile": {
+  "by_tag": {
+   "anchor": 2,
+   "window": 4
+  },
+  "clusters": [
+   {
+    "addr_taken_entries": 0,
+    "entry_funcs": 2,
+    "exit_callees": 10,
+    "seed_funcs": 1,
+    "window": [
+     "0x1805cc740",
+     "0x1805ce168"
+    ],
+    "window_bytes": 6696,
+    "window_funcs": 5
+   },
+   {
+    "addr_taken_entries": 0,
+    "entry_funcs": 1,
+    "exit_callees": 11,
+    "seed_funcs": 1,
+    "window": [
+     "0x1805dc170",
+     "0x1805dc59b"
+    ],
+    "window_bytes": 1067,
+    "window_funcs": 1
+   }
+  ],
+  "cut_bytes": 7751,
+  "cut_funcs": 6,
+  "seeds": 2,
+  "window_bytes": 7763,
+  "window_funcs": 6
+ },
+ "muparser": {
+  "by_tag": {
+   "anchor": 1,
+   "vtable": 8,
+   "window": 195
+  },
+  "clusters": [
+   {
+    "addr_taken_entries": 0,
+    "entry_funcs": 15,
+    "exit_callees": 75,
+    "seed_funcs": 8,
+    "window": [
+     "0x18091ace0",
+     "0x18092741d"
+    ],
+    "window_bytes": 51005,
+    "window_funcs": 203
+   },
+   {
+    "addr_taken_entries": 0,
+    "entry_funcs": 1,
+    "exit_callees": 2,
+    "seed_funcs": 1,
+    "window": [
+     "0x18099a6d0",
+     "0x18099b7c6"
+    ],
+    "window_bytes": 4342,
+    "window_funcs": 1
+   }
+  ],
+  "cut_bytes": 53591,
+  "cut_funcs": 204,
+  "seeds": 9,
+  "window_bytes": 55347,
+  "window_funcs": 204
+ },
+ "nlohmann_json": {
+  "by_tag": {
+   "anchor": 32,
+   "vtable": 4
+  },
+  "cut_bytes": 46279,
+  "cut_funcs": 36,
+  "note": "header-only templates, scattered; seeds only",
+  "seeds": 36,
+  "window": null
+ },
+ "sha512": {
+  "by_tag": {
+   "anchor": 1,
+   "window": 4
+  },
+  "clusters": [
+   {
+    "addr_taken_entries": 0,
+    "entry_funcs": 2,
+    "exit_callees": 2,
+    "seed_funcs": 1,
+    "window": [
+     "0x180432300",
+     "0x18043307c"
+    ],
+    "window_bytes": 3452,
+    "window_funcs": 5
+   }
+  ],
+  "cut_bytes": 3412,
+  "cut_funcs": 5,
+  "seeds": 1,
+  "window_bytes": 3452,
+  "window_funcs": 5
+ },
+ "sqlite": {
+  "by_tag": {
+   "anchor": 19,
+   "window": 921
+  },
+  "clusters": [
+   {
+    "addr_taken_entries": 0,
+    "entry_funcs": 16,
+    "exit_callees": 9,
+    "seed_funcs": 19,
+    "window": [
+     "0x1807b4e40",
+     "0x180870ac7"
+    ],
+    "window_bytes": 769159,
+    "window_funcs": 940
+   }
+  ],
+  "cut_bytes": 752440,
+  "cut_funcs": 940,
+  "seeds": 19,
+  "window_bytes": 769159,
+  "window_funcs": 940
+ },
+ "zl_convolver": {
+  "by_tag": {
+   "vtable": 13,
+   "window": 27
+  },
+  "clusters": [
+   {
+    "addr_taken_entries": 0,
+    "entry_funcs": 3,
+    "exit_callees": 14,
+    "seed_funcs": 13,
+    "window": [
+     "0x1805ea750",
+     "0x1805ecb22"
+    ],
+    "window_bytes": 9170,
+    "window_funcs": 40
+   }
+  ],
+  "cut_bytes": 8325,
+  "cut_funcs": 40,
+  "seeds": 13,
+  "window_bytes": 9170,
+  "window_funcs": 40
+ },
+ "zlib": {
+  "by_tag": {
+   "anchor": 4,
+   "window": 10
+  },
+  "clusters": [
+   {
+    "addr_taken_entries": 0,
+    "entry_funcs": 7,
+    "exit_callees": 3,
+    "seed_funcs": 3,
+    "window": [
+     "0x18056f220",
+     "0x1805739b8"
+    ],
+    "window_bytes": 18328,
+    "window_funcs": 12
+   },
+   {
+    "addr_taken_entries": 0,
+    "entry_funcs": 1,
+    "exit_callees": 3,
+    "seed_funcs": 1,
+    "window": [
+     "0x1805ac590",
+     "0x1805ae963"
+    ],
+    "window_bytes": 9171,
+    "window_funcs": 2
+   }
+  ],
+  "cut_bytes": 26986,
+  "cut_funcs": 14,
+  "seeds": 4,
+  "window_bytes": 27499,
+  "window_funcs": 14
+ },
+ "zstd": {
+  "by_tag": {
+   "anchor": 7,
+   "window": 202
+  },
+  "clusters": [
+   {
+    "addr_taken_entries": 0,
+    "entry_funcs": 3,
+    "exit_callees": 2,
+    "seed_funcs": 7,
+    "window": [
+     "0x1801c08b0",
+     "0x18024152c"
+    ],
+    "window_bytes": 527484,
+    "window_funcs": 209
+   }
+  ],
+  "cut_bytes": 525137,
+  "cut_funcs": 209,
+  "seeds": 7,
+  "window_bytes": 527484,
+  "window_funcs": 209
+ }
+}
