@@ -215,3 +215,21 @@ jsonl の該当レコードを読んだ結果 (`batch_closure_hybrid.jsonl`、ba
 * 観測: `0x44a590` と `0x4511d0` は、wasm の入口がどちらも `0x40faa0` に収束している。`work-liftdiff` 同梱 `tools/liftdiff/work/flelift/fle_lifted_tr.c` (生成行 69926 付近) で `0x40faa0` は `0x44a505` から直接 call されており (`call 0x40faa0`)、native 側の呼出先 (`0x415c30` / `0x4103c0`) と一致しない。仮説: x64c の間接 call 解決が、同じ呼出し点でも対象を取り違えている。未検証。
 * 2 件 (`0x412020` / `0x455650`) は unexec のため、batch の差分からは原因を取れない。
 * 次の一手 (本 run では未実施): 退行 5 件を単独で再採点し、trace 差分の入口 (`0x40faa0`) の間接 call 解決を確認する。修復は tools/flelift の変更が要るため #410 に継続。
+
+### 9-2. 退行 5 件の単独再採点 (batch 外・n=3)
+
+`liftdiff.py batch targets/flelift.json --set file:<5 VA> --shards 5 --nobuild --state auto` を 3 回実行した (既存の `work/flelift` の wasm・obj を使用、batch 全数の再実行は無し、1 回あたり 9 秒)。
+
+| va | batch (9-1 の jsonl) | 単独 r1 | 単独 r2 | 単独 r3 |
+|---|---|---|---|---|
+| `0x4090e0` | mismatch | mismatch | mismatch | mismatch |
+| `0x41cd70` | mismatch | mismatch | mismatch | mismatch |
+| `0x42d830` | mismatch | mismatch | mismatch | mismatch |
+| `0x44a590` | mismatch | mismatch | mismatch | mismatch |
+| `0x4511d0` | mismatch | **match** | **match** | **match** |
+
+* 結論: 退行 5 件のうち 4 件は単独でも mismatch で安定し、退行の実在は裏づいた。`0x4511d0` は単独では 3 回とも match で、batch の mismatch と食い違う。§7-2 の「セッション間で verdict が動く」現象の一例と見られる (未特定)。
+* 含意: 一致→不一致 7 件の「退行」のうち少なくとも 1 件は、batch 文脈依存の可能性がある。退行の判定には単独 n>=3 の確認を前提にすること。
+* `0x4511d0` 単独 (1 関数のみ) は `--shards 1` でも `--shards 5` でも match。shard 配置の差では説明できない。
+* 未検証: `0x4511d0` が単独で match になる理由 (同居関数・state の影響)。`0x40faa0` の間接 call 解決の確認は未実施。
+* 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開して `FL_WIN64_DIR` を設定。`tools/flelift/work/lift` は無いが、既存の `work/flelift` (ld_wasm.wasm・obj) で動いた。
