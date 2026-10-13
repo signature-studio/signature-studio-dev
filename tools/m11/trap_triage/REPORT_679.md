@@ -7,9 +7,9 @@
 ## 0. 結論 (先出し)
 
 1. **23,053,861 hit の 99.999% は unit idx 101 (VA 0x1de960, halt0) 1 本**: 23,053,622 hit。残り 70 unit の合計は **239 hit** (最大は unit 54 の 41 hit)。
-2. **unit 101 は #513 の暴走 unit と同一**: VA 0x1de960 / halt0 / VirtualAlloc 1477.2 MB が #513 の 1,477,181,440 B (GetMem 23,056,285 回) と一致。
-3. **判定: 正常な頻度ではなく暴走 (loop)**。根拠は §3 (生存スタックが 1 段ずつ = ループ、object 生成が 1:1、OOM で停止、残り unit は 239 hit)。
-4. **既定ビルドでも同じ hit が出る**: `M11_OV_CLASSCREATE=0` (既定) では site 0x41037d は 0 hit だが、既定 ON の 410320 (ClassCreate) の site **0x41032e が 23,053,917 hit** (unit 101 は 23,053,623)。issue の数値は ON 構成でのみ現れる。
+2. **unit 101 は #513 の暴走 unit と同一**: VA 0x1de960 / halt0 / VirtualAlloc 1477.2 MB が #513 の 1,477,181,440 B (GetMem 23,056,285 回) と一致。(#513 のコメントは VA を 0x5de960 と書くが、0x5de960 − 0x400000 = 0x1de960 で同じ VA の表記違い。本 REPORT は image base 0x400000 を引いた値 0x1de960 で統一する。)
+3. **判定: 正常な頻度ではなく暴走と判断**。根拠は §3 (halt 時の生存スタックが 1 段ずつ、object 生成が 1:1、OOM で停止、残り unit は 239 hit)。loop は 1 スナップショットからの推定。
+4. **既定ビルドでは 0x41032e (410320) 経由で同じ暴走が出る**: `M11_OV_CLASSCREATE=0` (既定) では site 0x41037d は 0 hit だが、410320 (ClassCreate) が vmtNewInstance を呼ぶ site **0x41032e が 23,053,917 hit** (unit 101 は 23,053,623)。410320 は `M11_OV_CLASSCREATE` では制御されず、#474 以降常時転記されている (`m11_ov.c` L646-647)。issue の 0x41037d の数値だけが ON 構成でのみ現れる。
 
 受入条件: 1 (内訳) 達成 (§2)・2 (#513 との関係) 達成 = 同一 unit の確認 (同一根因かは未確定、§5)・3 (判断と根拠) 達成 (§3)。
 
@@ -20,13 +20,13 @@
   work-m11 スナップショット (基準 (a)) の IR は古いため、再現数値は基準 (c) で取った。
 - 基準 (a) (スナップショット IR のまま) の ON は 0x41037d の ok 23,054,371 (miss 8) で、基準 (c) と 510 hit 違う (§8.2 (e) の基準固定の問題と同じ)。
 
-再現 (1 コマンドずつ。`m11_gen_ir2.sh` は PE を `/home/ubuntu/...` に固定するため、cd 行と PE 行を差し替えた一時コピーを `work/` に作って実行した。コミットはしない):
+再現 (1 コマンドずつ。PE の素材は `[WIN64]` (`docs/REFERENCES.md`) の fl-win64 を使う。`m11_gen_ir2.sh` は PE 行を固定値で持つため、PE 行を差し替えた一時コピーを `work/` に作って実行した。コミットはしない):
 
 ```sh
 cd tools/m11
 export FL_WIN64_DIR=<fl-win64 の展開先>          # 例: $RUNNER_TEMP/fl-win64 (tar --zstd -xf fl-win64.tar.zst)
 PE=$FL_WIN64_DIR/extracted/block00031_PE.bin
-sed -e "s#^cd \"\$(dirname \"\$0\")\"#cd $PWD#" -e "s#^PE=/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin#PE=$PE#" m11_gen_ir2.sh > work/gen_ir2_pe.sh
+sed -e "s#^cd \"\$(dirname \"\$0\")\"#cd $PWD#" -e "s#^PE=.*#PE=$PE#" m11_gen_ir2.sh > work/gen_ir2_pe.sh
 uv run --with capstone --with pefile python3 m11_image_gen.py "$PE" && uv run --with capstone --with pefile python3 m11_data_gen.py "$PE"
 uv run --with capstone --with pefile bash work/gen_ir2_pe.sh          # boot_final.ll (ldfix 込み)
 M11_OV_CLASSCREATE=1 uv run --with capstone --with pefile bash m11_build.sh   # ON (qstore は capstone が要る)
@@ -70,36 +70,39 @@ LB_BASE は 0 (既定)。IR の lift 段 (`boot0..4.lift.ll`) は work-m11 ス�
 | (a) スナップショット | OFF | 818 / 21 / 56 / 46 / 1 | 0 (0) | 23,054,426 |
 
 - (c) ON / OFF の survey は REPORT §8.2 (c) の値、(a) は §8.2 (a) の値と一致 (既存の数値の再現)。
-- 所要 (実測、4 コア runner、1 本ずつ直列、load average 0.44–0.70): IR 再生成 (`gen_ir2`、ldfix 込み) を含む 21.8 s (wall、初回に失敗した image/data 2 件を含む)、image + data の本実行 1.0 s、ON build 25.2 s (wall)、ON survey 18.4 s (wall。2 回目・3 回目は時間未計測)。
+- 所要 (n=1 の参考値、4 コア runner、1 本ずつ直列、load average 0.44–0.70。範囲は測っていない): IR 再生成 (`gen_ir2`、ldfix 込み) を含む 21.8 s (wall、初回に失敗した image/data 2 件を含む)、image + data の本実行 1.0 s、ON build 25.2 s (wall)、ON survey 18.4 s (wall)。
 
-## 3. 判定: 暴走 loop であって正常な頻度ではない (根拠)
+## 3. 判定: 正常な頻度ではなく暴走と判断 (根拠)
 
 1. **集中**: 上表のとおり 99.999% が 1 unit。他 70 unit は合計 239 hit (1 unit あたり最大 41) で、同じ site がこの桁に留まることを示す。
-2. **ループ (再帰ではない)**: unit 101 が halt0 (OOM) で止まった時点の生存スタック (innermost → outermost) は
+2. **ループの可能性が高い (再帰ではないと見える)**: unit 101 が halt0 (OOM) で止まった時点の生存スタック (innermost → outermost) は
    `409730` (Error) ← `409410` (GetMem) ← `40f960` (NewInstance) ← `m11_icall` ← `410320` (ClassCreate) ← `448d40` (Exception.Create) ← `47a250` ← `4fa210` ← `4fa8f0` ← `4fb980` ← `5de960` (unit 初期化) ← `m11_call_unit`。
-   各 frame は 1 回ずつで、深さは増えていない。`4fa210` の 1 段が繰り返し呼ばれ、その都度 例外 object を作る形。
-   (注: halt 時点のスナップショットであり、周回数そのものは未計測。)
-3. **object 生成が 1:1**: 0x41032e (ClassCreate) 23,053,623 ≒ 0x41037d (AfterConstruction) 23,053,622 ≒ NewInstance (target 0x40f960) 23,053,623。
-   1 object 生成 = 1 NewInstance (GetMem) = 1 AfterConstruction。#513 の「1 回あたり 64.07 B」で割ると確保量 1477.2 MB と整合 (推定)。
+   halt 時点の 1 スナップショットでは各 frame が 1 段ずつで、深さは増えていない。`4fa210` の 1 段が繰り返し呼ばれ、その都度 例外 object を作る形に見える。
+   (注: 1 スナップショットからの推定であり、周回数そのものは未計測。)
+3. **object 生成が 1:1 (0x41032e と 0x41037d の対応)**: 0x41032e (ClassCreate の vmtNewInstance call site) 23,053,623 と 0x41037d (AfterConstruction) 23,053,622 はほぼ一致する。
+   1 object 生成 = 1 GetMem (`409410`) = 1 AfterConstruction とみなせる。#513 の「1 回あたり 64.07 B」で割ると確保量 1477.2 MB と整合 (推定)。
+   (注: NewInstance 側の target hit は本 REPORT の表に実測値として載せていないため、根拠に使わない。)
 4. **終了せず OOM で停止**: halt0 の経路は GetMem 失敗 (`409410` → `409730`)、wasm の `growMemory` が上限で失敗 (`err` に記録)。正常終了ではない。
    確保した object は解放されない (#513 の実測で FreeMem 0 回) → 1.48 GB がそのまま残る。
 
 ## 4. 検査スクリプトの負のコントロール (`trap_triage/icall_41037d_679.py`)
 
-| 条件 | 期待 | 実測 |
-|---|---|---|
-| 正しい期待値 (`--expect-ok 23053861 --expect-miss 9`) + `--off` (OFF の 0x41037d = 0) | PASS | `RESULT PASS`、exit 0 (ON 3 回とも同じ値) |
-| 期待値を 1 だけ外す (`--expect-ok 23053860`) | FAIL | exit 1 (RESULT 行は出力を捨てたため未表示) |
-| OFF の survey を ON として読む (0x41037d が 0 hit で `(3)` 不成立) | FAIL | exit 1 (同上) |
+検査スクリプトの負のコントロールは、合成 fixture (`tools/m11/work/trap_triage/`、gitignore、コミットなし) で本 PR の HEAD 上で実測した。
 
-`icall_hits.py` も同様に検査が効くことを確認 (0x41032e の期待を 0 にした OFF の survey で `FAIL`、exit 1)。
+| 条件 (fixture) | 期待 | 実測 |
+|---|---|---|
+| 正しい期待値 (ok 1005 / miss 2) + `--off` (OFF の 0x41037d = 0) | PASS | `RESULT PASS`、exit 0 |
+| 期待値を 1 だけ外す (`--expect-ok 1004`) | FAIL | `FAIL (5) ok 1005 != 期待 1004`、`RESULT FAIL`、exit 1 |
+| ON の survey を `--off` に渡す (0x41037d が 1007 hit) | FAIL | `FAIL (4) OFF なのに 0x41037d が 1007 hit`、`RESULT FAIL`、exit 1 |
+
+実データ (942 unit の survey) での PASS (`--expect-ok 23053861 --expect-miss 9`) は、本 REPORT の初版で取得したもの。survey の JSON は `work/` にあり本 PR では再実行していない。
 
 ## 5. 未解決 (起票先付き)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| unit 101 の loop の終了条件 (`4fa210` の走査が止まらない理由)・例外 object が解放されない (FreeMem 0) 理由 | 1 unit が 1.48 GB を確保して OOM で halt0 (#513 の残件そのもの)。根本原因 (lift 欠陥か本来の挙動か) は未特定 | 既存 #513 にコメント (本 PR 後に投稿) |
-| #513 の GetMem 23,056,285 と本測定の AfterConstruction 23,053,622 (unit 101) の差 2,663 | 未切り分け (測定基準の差か、410320 を経由しない GetMem か) | #513 |
+| unit 101 の loop の終了条件 (`4fa210` の走査が止まらない理由)・例外 object が解放されない (FreeMem 0) 理由 | 1 unit が 1.48 GB を確保して OOM で halt0 (#513 の残件そのもの)。根本原因 (lift 欠陥か本来の挙動か) は未特定 | **起票依頼中** (#513 は CLOSED。PM 判断で新規起票または #513 の再 open。番号は PM から受けて追記する) |
+| #513 の GetMem 23,056,285 と本測定の AfterConstruction 23,053,622 (unit 101) の差 2,663 | 未切り分け (測定基準の差か、410320 を経由しない GetMem か) | 上の起票依頼と同じ (番号決定後に追記) |
 | 基準 (a) (スナップショット IR) と (c) で 0x41037d が 510 hit ずれる | 測定基準の固定 (§8.2 (e) と同じ) | 既存 #419 の (e) 判断 (PM) |
 | 既定ビルドでも同じ hit が site 0x41032e に出る | 「ClassCreate override の計測」を読むとき、既定 ON の site を併記しないと誤読する | 本 REPORT で説明 (追加の起票なし) |
 
