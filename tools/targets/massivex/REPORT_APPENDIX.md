@@ -81,7 +81,7 @@
 | N5 demo UI 抑制 (QML 側の demoExpired / subscriptionExpired / MXDemoPopup 表示経路の特定と差し替え)。N5 の 4 範囲は RIP 相対の参照元 0 件 | 受入条件 1 未達 | #1017 [MX-4] (OPEN) |
 | N6 Native Access 誘導文言 6 種の抑制 (N6-1 の読み手 0x180f95e20 の呼び出し元の特定。N6-2〜6 の読み手関数 0x181142370 / 0x181144570 / 0x181142640 / 0x1811453f0 の役割と呼び出し元の特定 → 差し替え点の決定) | 受入条件 2 未達 | #1017 [MX-4] (OPEN) |
 | `acpt_verify_mx2.py` の N5/N6 検査は文字列実在のみ | 「抑制済み」の機械検証が無い | #1017 [MX-4] (OPEN) |
-| e2e の再測定 (`toolchain-retdec` 素材が必要) | 本節の e2e 数値は作成者の記録のまま | #1280 (素材付き再測定・`[MX-7]`) |
+| e2e の再測定 (`toolchain-retdec` 素材が必要) | 素材付きの再測定は §12.6 で実施済み (`-O0`/`-O1`/`-O2` とも 11/11 PASS) | #1280 (`[MX-7]`・受入条件 達成) |
 
 ### 12.4 #1017 の再確認 (main 側の素材付き実測。本 PR の HEAD `b83223e6` でも同一スクリプトで再実行済み)
 
@@ -111,3 +111,19 @@
   - RVA32 (LE 4B) 一致: 2 件 (raw `0x54a23f8` / `0x57e9d24`)。pefile で所属を確認すると `.pdata` (RVA `0x5fc0ff8`) と `.xdata` (RVA `0x630d324`) で、いずれも unwind/範囲表の内部。コード側の呼び出し元ではないと判定 [推]。
 - 判定: N6 読み手の呼び出し元は直接参照では見つからない。間接呼び出し (関数ポインタ表・vtable 経由) か、テーブル基準の相対参照の可能性が残る。N5 の読み手は本節でも未特定。
 - 結論: 差し替え点は依然として未特定。`mx_lic_stub.py` の N5/N6 ルールは追加しない (根拠なしに br_force/store を入れると silent miscompile になるため)。#1017 で間接参照の総当たりを行う。
+
+### 12.6 license e2e の素材付き再測定 (`[MX-7]`・#1280・2026-10-13)
+
+- 測定 commit = `604e900f` (origin/main。測定時点で `tools/targets/massivex/` のコードは無変更)。
+- 素材: `plugins-massivex` と `toolchain-retdec` / `toolchain-emsdk` を `$ARTIFACTS_DIR` から `tar --zstd -xf` で展開。`Massive X.vst3` は `parse_setup_headers.py` → `extract_massivex.py <exe> work key` で生成し、md5 `622993e76565f49c094063a2b717d6ca` (95,356,824 B) が §11.1 と一致。RetDec は `$RUNNER_TEMP/rd/retdec`、emsdk は `$RUNNER_TEMP/em/emsdk` を `RETDEC` / `EMSDK` で指定。
+- 実行: `license/work` を削除してから `MX_OPT=<level> bash e2e.sh` (lift キャッシュ無し = 冷間)。各レベルとも exit 0。
+
+| MX_OPT | 所要 (wall) | load (開始→終了) | harness | 結果 |
+|---|--:|---|--:|---|
+| `-O0` | 55.7 s | 0.90 → 1.13 | 11/11 | PASS (exit 0) |
+| `-O1` (既定) | 52.4 s | 0.88 → 1.19 | 11/11 | PASS (exit 0) |
+| `-O2` | 47.6 s | 1.01 → 1.00 | 11/11 | PASS (exit 0) |
+
+- 全レベルで T1〜T11 が PASS。`-O1`/`-O2` で T7〜T11 が TRAP しないこと (MX2-1 zero-init pass の効果) も確認。
+- コード差分: 測定 commit `604e900f` から HEAD までの `tools/targets/massivex/` のうち `.md` 以外は 0 行 (`git diff 604e900f HEAD -- tools/targets/massivex ':!*.md'` が空)。
+- 生ログ: `$RUNNER_TEMP/e2e_O{0,1,2}.log` (`work/` 外・commit しない)。
