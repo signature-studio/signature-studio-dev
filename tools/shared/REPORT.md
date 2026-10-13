@@ -117,9 +117,13 @@
 - **差分テスト**: 元の mac x86_64 機械語を `mmap(RWX)`+ctypes で直接実行 (SysV ABI は Linux と同一; 非循環の参照) と wasm を同一 760 ケース (small=int32 範囲 / wide=64bit 値) で比較し戻り値ビット+書込バッファを照合。
 - **結果**: RetDec + `ir_normalize` (構文正規化のみ; `kio_fix` 無し) **228/760 (30.0%)** → pass 後 **720/760 (94.7%)** (#144 で [B] fp 単一引数 pass 追加, 前版 657/760; #939 で [A'] 引数レジスタ接続 pass 追加, 前版 685/760)。完全一致 (出現する全群 40/40): GetFour/Eight/Float/Double, SetFour/Double, Limit, FixHi, CBool, Fix_RCSf, unilen, wcslen16, **str2compare, str4compare** の **14 関数**。残る 1 関数 (LimitFloat 0/40) は未修復 (下記の欠陥類型 [D])。
 - **#939 実測** (commit は本 PR。`KIO_ARGREG=0` でネガティブコントロール): pass 有り str2compare **40/40**・str4compare **40/40**・合計 720/760 / pass 無し (`KIO_ARGREG=0`) str2compare 21/40・str4compare 24/40・合計 685/760。素材 `analysis-mac-shared` `toolchain-retdec` `toolchain-emsdk`、`lift.sh` 実行 3.6s。
+- **difftable の変化の内訳**: main の `libkio_lift_difftable.json` (合計 621/760) は #144 以前の古い値が残っていた。本 PR での合計 +99 は、pass 由来の str2compare +19 / str4compare +16 (計 +35) と、main の陳腐化の再生成による `unilen` 5→40・`wcslen16` 39→40・`Fix_RCSf` 12→40 (計 +64) に分かれる。後者は本 PR の pass 由来ではない。
+- **後者 3 関数が pass の影響を受けないことの根拠 (推論)**: pass 有り 720/760 とネガコン `KIO_ARGREG=0` 685/760 の差は 35 で、これは str2compare (40→21 = 19) と str4compare (40→24 = 16) の和に一致する。pass は値を上げる方向にしか作用しないため、差が 35 に収まる以上、`unilen`/`wcslen16`/`Fix_RCSf` は両条件で同値 (40/40) である。ネガコンの関数別値は未記録のため、これは合計からの推論であり、再実行による実測ではない。
 - **欠陥類型** (RetDec decode-only IR; M7/M8 既知と同型 → 汎用 pass 化が T-SH-16):
   - [A] **deref 落ち** `mov rax,[rsi]` が rsi そのものに化ける (Get/Set*Intel, unilen/wcslen16/str*compare) — Get/Set 6 関数と、`trunc i64 %argN` 形の汎用 pass (署名の P/PK 位置) で修復。
   - [A'] **引数レジスタ接続の欠落** — RetDec が k 番目の整数引数を store の無い未初期化 alloca からの k 番目の load として読み、`%argK` を未参照にする (str2compare/str4compare の第 2 引数 `PKc`)。汎用 pass `kio_fix.py` の `int_params` 部: 署名に f/d を含まない関数で、署名の k 番目が P/PK のとき k 番目の load を `ptrtoint ptr %argK` に置換。無効化は `KIO_ARGREG=0`。
+    - **前提 (未検証の一般化)**: 単一 alloca に全引数が spill されている形を仮定し、その alloca の k 番目の load を整数引数 k とみなす。別の未初期化 alloca からの無関係な load が先に出る関数では番号がずれる。現 19 関数では発生していない (本 PR の 14 関数完全一致と、ネガコン差分 = str2 +19 / str4 +16 のみで確認)。
+    - **署名の添字**: `int_params` は署名をトークン化して添字で数えるため、`R`/`K` を別トークンとして数える (例: `PhRKl` = [Ph,R,K,l])。現 19 関数では `P` で始まるトークンは先頭引数のみ (Get*Intel の `PhRKl`) なので、置換は先頭引数の位置にしか作用しない。
   - [B] **float 引数落ち** — 単一 fp 引数の関数は `kio_fix.py` で修復 (`Fix_RCSf` 12→40/40)。fp 引数が複数の `LimitFloat` は xmm 番号が IR から消えるため未修復。
   - [C] **`long`(64bit) を i32 と復元** (Limit/FixHi/CBool) — demangle 署名で拡幅 (`kio_fix.py`)。
   - [D] `ucomiss` の flags が IR に接続されない (LimitFloat) — 未修復。

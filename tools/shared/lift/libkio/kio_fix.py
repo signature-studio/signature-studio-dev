@@ -84,7 +84,9 @@ for fn in sorted(set(re.findall(r"(?m)^define [^\n]*@(__Z\w+)\(", s))):
 # [A'] 引数レジスタ接続の欠落 (汎用): RetDec は整数引数 k 番目を、store の無い未初期化 alloca からの k 番目の load
 #     として読むことがある (str2compare: %1=rdi, %2=rsi が同じ %0 を読み %arg2 が未参照)。SysV では k 番目の
 #     整数クラス引数は k 番目の整数レジスタ = 署名の k 番目の引数。署名の k 番目が P/PK のときだけ
-#     `ptrtoint ptr %argK` に置換する。f/d/R を含む署名は対象外。KIO_ARGREG=0 で無効化 (ネガティブコントロール)。
+#     `ptrtoint ptr %argK` に置換する。f/d を含む署名は対象外 (R は対象に含む: 参照引数は ABI 上ポインタなので
+#     ptrtoint 対象で正しい)。前提: 単一 alloca に全引数が spill され、その k 番目の load が整数引数 k。
+#     KIO_ARGREG=0 で無効化 (ネガティブコントロール)。
 def int_params(fn):
     m = re.match(r"__Z(\d+)", fn)
     if not m: return None
