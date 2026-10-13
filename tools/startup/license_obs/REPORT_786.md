@@ -121,7 +121,7 @@
 | g2 | 0x10d3a43 `cmp byte [rax],0` | 0x15e3d80 | 0x16b6e58 | `0x00` |
 | g3 | 0x10d3a5f `mov [rcx],eax` (`0x10c7850` の戻り値の格納先) | 0x15e14a8 (g1 と同一) | 0x14f852c | 同上 (g1 と同じ dword) |
 | g4 | 0x10d3a68 `cmp dword [rax],0` | 0x15e14a8 (g1 と同一) | 0x14f852c | 同上 |
-| g5 | 0x10d3a72 `[[g5]]→+0xd0` gradeChar 書込み | 0x15e4790 | 0x141d6b8 | LE qword `0x30220230` (オブジェクトのヒープ位置。gradeChar 格納先はその +0xd0) |
+| g5 | 0x10d3a72 `[[g5]]→+0xd0` gradeChar 書込み | 0x15e4790 | 0x141d6b8 | LE qword `0x30022230` (オブジェクトのヒープ位置。gradeChar 格納先はその +0xd0) |
 
 - g1・g3・g4 は同じ dword (0x14f852c) を指す。
 - g6〜g8 のうち g6・g7・g8 は 0x10d3a30 の外 (呼出し元 0x10cf498・0x11fd457・0x11fe627 の条件) のため本付録では扱わない。
