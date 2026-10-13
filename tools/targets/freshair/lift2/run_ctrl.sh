@@ -10,7 +10,8 @@
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; FA="$(dirname "$HERE")"
 CORE="$FA/work/win/Fresh Air/C__ProgramData_Slate Digital/Fresh Air/SlateCore.core_64"
-W="$HERE/work/ctrl"; cd "$W"; source "$HERE/env.sh"
+W="$HERE/work/ctrl"; [ -x "$W/native_ctrl" ] && [ -f "$W/ctrl_full.cjs" ] || { echo "ERROR: $W に native_ctrl / ctrl_full.cjs が無い (build_ctrl.sh を先に実行)" >&2; exit 2; }
+cd "$W"; source "$HERE/env.sh"
 NS="${1:-2}"; NR="${2:-5}"; SEED="${3:-0xFA2C0001}"
 EXPECT=$((NS + NR + 8))
 python3 "$HERE/gen_ctrl_scen.py" ctrl_scen.txt "$NS" "$NR" "$SEED" | tail -1

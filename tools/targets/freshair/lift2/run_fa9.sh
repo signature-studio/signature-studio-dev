@@ -10,17 +10,18 @@ set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; FA="$(dirname "$HERE")"
 CORE="$FA/work/win/Fresh Air/C__ProgramData_Slate Digital/Fresh Air/SlateCore.core_64"
 [ -f "$CORE" ] || { echo "ERROR: $CORE が無い (素材 plugins-freshair を展開)"; exit 2; }
-W="$HERE/work/ctrl"; [ -f "$W/iat_slots.txt" ] || bash "$HERE/build_ctrl.sh" >/dev/null || exit 2
+W="$HERE/work/ctrl"; { [ -x "$W/native_ctrl" ] && [ -f "$W/ctrl_full.cjs" ] && [ -f "$W/iat_slots.txt" ]; } || bash "$HERE/build_ctrl.sh" >/dev/null || exit 2
 cd "$W"; source "$HERE/env.sh"
 python3 "$HERE/gen_ctrl_scen.py" ctrl_scen.txt 2 5 0xFA2C0001 >/dev/null || exit 2
 head -8 ctrl_scen.txt > fa9_epf.txt
 python3 "$HERE/fa9_check.py" mkpert fa9_epf.txt fa9_pert.txt || exit 2
 clang -O1 -ffp-contract=off -frounding-math -w -o native_probe9 "$HERE/native/native_ctrl.c" || exit 2
 FA_PROBE9=1 FA_HEAP_ZERO=1 ./native_probe9 "$CORE" fa9_epf.txt 0 > fa9_base.out 2> fa9_base.err
-FA_ALT9=1 FA_PROBE9=1 FA_HEAP_ZERO=1 ./native_probe9 "$CORE" fa9_epf.txt 0 > fa9_alt.out 2> fa9_alt.err
+FA_DBG=1 FA_ALT9=1 FA_PROBE9=1 FA_HEAP_ZERO=1 ./native_probe9 "$CORE" fa9_epf.txt 0 > fa9_alt.out 2> fa9_alt.err
 FA_HEAP_ZERO=1 ./native_probe9 "$CORE" fa9_pert.txt 0 > fa9_pert.out 2>/dev/null
 python3 "$HERE/fa9_check.py" check fa9_base.out fa9_base.err fa9_alt.out fa9_alt.err fa9_base.out fa9_pert.out
 rc=$?
+echo "(b) detail (FA_DBG=1, 全 ERR 行は $W/fa9_alt.err): $(grep -m1 '^ERR' fa9_alt.err)"
 echo "--- run_ctrl (native vs wasm, HEAD) ---"
 t0=$(date +%s); bash "$HERE/run_ctrl.sh" 2 5 | tail -1; ctrl_rc=${PIPESTATUS[0]}; t1=$(date +%s)
 echo "run_ctrl rc=$ctrl_rc wall=$((t1 - t0))s"
