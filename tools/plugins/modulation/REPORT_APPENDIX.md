@@ -23,8 +23,8 @@ REPORT 本体 §4 から分割移動した経緯と実行条件 (内容は削除
 
 ## D. 実行条件 (35d8f3d5 の f80 段)
 
-- 実行: `bash tools/plugins/modulation/engine_lift.sh <block> 300` を 4 本 (18977・19143・19266・19268) 順次実行。4 本合計 65.2 s (PR #804 本文の記載。本修正 run では再実行していない)。
-- 上記は emsdk 入りの環境で行われた。修正 run の runner には `emcc` と `/opt/emsdk` が無い。
+- 実行: `bash tools/plugins/modulation/engine_lift.sh <block> 300` を 4 本 (18977・19143・19266・19268) 順次実行。実測値は本体 §4 の表と直下の段落に記録した。
+- 上記は emsdk 入りの環境で行われた。修正 run の runner には `emcc` と `/opt/emsdk` が無いため、再実行していない。
 
 ## E. 受入条件の状態 (PR #804 本文より)
 

@@ -163,7 +163,7 @@ define = `p.final.ll` の `^define` 数。f80 = `x86_fp80` を含む define 数�
 - 失敗した 2 本 (19266・19268): 最初のエラーは `e.final.ll` の `emcc -c` (`first_errors.txt`) で、E1 (icmp ptr/i64) でも E2 (zext 定数式) でもない。エラーは 4 件 (`4 errors generated.`): `do not know how to soften fp_extend` ×2、`no libcall available for frem with type f80` ×1、`no libcall available for fp_round with type f80` ×1。どちらも `e.final.ll` に x86_fp80 を含む define が 8 個ある (`grep -c x86_fp80`) うちの、どの関数で出たかは未特定。f80 型の演算の legalize 失敗で、#197 の `f80_lower.py` (f80 → f64) の対象と見られる (未検証)。
 - VEX (AVX/FMA) の未実装 helper は distinct で 50〜71 (648383c・b9fe1d8 とも同値)。CPUID 分岐で SSE 路に固定できるかは未確認 (T1 の AVX 2 種は CPUID 分岐で SSE 路固定と `plugins/REPORT.md` §4.3 に記録あり)。
 - f80 関数は Vintage Chorus の `function_18001c320` と Vintage Phaser の `function_1800218a0` の 1 本ずつ (#197 の対象)。以上は到達性の実測で、engine の正しさは何も示していない。
-- **PLG-F5-2 / #527 追補**: `engine_lift.sh` に `p0c/f80_lower.py` の段を追加し、4 本すべて `emcc -c` rc 0 (表の「f80 段後」列)。4 本合計 65.2 s (35d8f3d5、PR 本文の記載・未再実行)。f80→f64 は bit-exact ではなく (#197 で未検証)、通過は正しさを示さない。詳細は付録 `REPORT_APPENDIX.md`。
+- **PLG-F5-2 / #527 追補**: `engine_lift.sh` に `p0c/f80_lower.py` の段を追加し、4 本すべて `emcc -c` rc 0 (表の「f80 段後」列)。4 本の順次実行の合計は 65.2 s (35d8f3d5、PR 作成時の実測。修正 run では未再実行)。f80→f64 は bit-exact ではなく (#197 で未検証)、通過は正しさを示さない。詳細は付録 `REPORT_APPENDIX.md`。
 
 ## 5. 判定 (gate) の設計と PR #506 の reviewer 指摘への対応
 
