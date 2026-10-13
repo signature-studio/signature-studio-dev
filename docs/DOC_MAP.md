@@ -171,7 +171,8 @@
 | `tools/assets/REPORT.md` | ~125 | 314MB 級 wasm asset の chunk ローダ + 二段キャッシュ |
 | `tools/assets/wvfs/REPORT.md` | ~145 | 書込可能 OPFS VFS |
 | `tools/assets/deploy-manifest/REPORT.md` | ~60 | 配備 manifest 生産側 (05-stage 契約) |
-| `tools/python/REPORT.md` | ~120 | CPython wasm + flapi/MCP 解析 + ブリッジ設計 |
+| `tools/python/REPORT.md` | ~244 | CPython wasm + flapi/MCP 解析 + ブリッジ設計。§7c (ilmcp, PY-3) の全文と §9 (下流チケット案) の表は `REPORT_APPENDIX.md` に分割 |
+| `tools/python/REPORT_APPENDIX.md` | ~64 | python REPORT §7c 全文 (ilmcp 9 関数 PY-3 #82: 引数規約・検証・仮定・未解決) と §9 下流チケット案 T1〜T9 |
 | `tools/flp/REPORT.md` | ~120 | FLP/FST パーサ・ライタ・往復コーパス |
 | `tools/plugins/REPORT.md` | ~115 | Fruity プラグイン 141 種 wasm 化マップ (カウントの正本) |
 | `tools/plugins/f2/REPORT.md` | ~200 | PLG-F2 eq-filter 11 本: 固有閉包 lift の再現と間接 call 脱落の監査 (#199)、icall 復元の batch_lift 接続と回帰ゲート (#514) |
