@@ -217,6 +217,8 @@
 | `tools/plugins/p0c/REPORT_APPENDIX_D.md` | ~159 | p0c §12 (P0c-5 #269)・§13 (P0c-7 #310) 全文 (同上) |
 | `tools/plugins/p0c/REPORT_APPENDIX_E.md` | ~207 | p0c §14 (P0c-6 #277)・§15 (環境パス置換 #346)・§15.4 (#360 full e2e before/after) 全文 (同上・§15.4 は main 追記分) |
 | `tools/plugins/p0c/REPORT_APPENDIX_F.md` | ~62 | p0c §16 (P0c-8 #311 ext IR の wasm32 検証 + framework 統合) 全文 (同上・E の 250 行上限のため分割) |
+| `tools/plugins/sampler/REPORT.md` | ~230 | PLG-G3 (#208) sampler 8 本: lift 前提の実測 (#537 の推移閉包 §2b は REPORT_INDIRECT.md) |
+| `tools/plugins/sampler/REPORT_INDIRECT.md` | ~80 | sampler REPORT §2b の付録: #537 推移閉包 (間接呼出の到達先) の算出・lift・ネガコン |
 | `tools/plugins/slayer_x86/REPORT.md` | ~132 | FL Slayer x86 engine (Slayer_Engine.dll) の結合方式 (ilbridge.exe 経由) と lift 方針 (#536) |
 | `tools/plugins/slayer_engine_ia32/REPORT.md` | ~130 | FL Slayer x86 engine (block22434 = Slayer_Engine.dll) の ia32 decode 基準値 (#674 中間): 線形掃引の実測・gate C1〜C4・ネガコン N1〜N3・objdump 検算 |
 | `tools/shared/REPORT.md` | ~295 | FL Shared ライブラリの分類・IPP 実測・OSS wasm 再ビルド・プロプラ lift PoC |
