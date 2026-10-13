@@ -14,7 +14,7 @@ export const HC = {
 export const HC_MAGIC = 0x43484749;
 export const HC_IN = 2048;
 export const HC_OUT = 4096;
-export const HC_OP = { openUrl: 1, openFile: 2, saveFile: 3 } as const;
+export const HC_OP = { openUrl: 1, openFile: 2, saveFile: 3, openHelp: 4 } as const;
 /** host 側エラーの result 値 (wasm 側の -1/-2/-3 と衝突しない) */
 export const HC_ERR = -16;
 
@@ -28,6 +28,8 @@ export type PickOptions = { title: string; startDir: string; defExt: string; sug
 export interface HostCallEnv {
   /** window.open 相当。ポップアップブロック等で開けなければ false */
   openWindow(url: string): boolean;
+  /** FL の Help パス (ShellExecuteW の lpFile) を viewer で開く。window.flHelp.shellExecute(null, path) 相当。表示できれば true (#554) */
+  openHelp?(path: string): Promise<boolean>;
   /** showOpenFilePicker 相当。キャンセルは null */
   pickOpen(o: PickOptions): Promise<PickedFile[] | null>;
   /** showSaveFilePicker 相当。キャンセルは null */
@@ -107,6 +109,7 @@ export class HostCallBridge {
     let out: Uint8Array = new Uint8Array(0);
     try {
       if (op === HC_OP.openUrl) result = this.openUrl(fields[0] ?? "") ? 1 : 0;
+      else if (op === HC_OP.openHelp) result = (await this.openHelp(fields[0] ?? "")) ? 1 : 0;
       else if (op === HC_OP.openFile || op === HC_OP.saveFile) {
         const r = await this.dialog(op === HC_OP.saveFile, flags, fields);
         result = r.result; out = r.out;
@@ -120,6 +123,13 @@ export class HostCallBridge {
     Atomics.store(i, HC.result >> 2, result);
     Atomics.store(i, HC.respSeq >> 2, seq);   // 最後: wasm はこれで完了を知る
     Atomics.notify(i, HC.respSeq >> 2);
+  }
+
+  private async openHelp(path: string): Promise<boolean> {
+    if (!this.env.openHelp) { this.log.push("openHelp: no viewer"); return false; }
+    const ok = await this.env.openHelp(path);
+    if (!ok) this.log.push(`openHelp rejected: ${path}`);
+    return ok;
   }
 
   private openUrl(raw: string): boolean {

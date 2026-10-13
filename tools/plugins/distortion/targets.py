@@ -24,8 +24,7 @@ ENGINES = [
     ('Effector engine', 18973, 'Effector', 'MSVC C++'),
     ('Hardcore', 19101, 'Hardcore', 'MSVC C++ 単体'),
 ]
-# 既知の未実装 helper の許容数 (PLUGIN_MATRIX.json の batch.unimpl_helpers 由来; 超過 or 集計不能は不合格)
-ALLOW_UNIMPL = {19024: 1}
+# 未実装 helper の許容は無い (#535 で Love Philter の rep_stosb_memset も実装済み。 許容を残すと再び未実装になっても検出できない)
 
 if __name__ == '__main__':
     if sys.argv[1:] == ['shells']:

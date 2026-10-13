@@ -1,4 +1,19 @@
 {
   "_doc": "許容する成果物 (自作コード・shim・OSS 再ビルド物) の allow-list。entries[] = { path: glob (任意), sha256: hex (任意), kinds: [file|chunk|window] (既定: 全部), reason: 必須 }。path と sha256 は両方指定すると AND。運用形態 (LGL-1) の確定に従い追加する。",
-  "entries": []
+  "entries": [
+    {
+      "sha256": "c53aceea2dcf5b4098099c0c4d0a061d17e178a049317b42a422b1a9f7f8eb59",
+      "kinds": [
+        "window"
+      ],
+      "reason": "OSS 代替フォント Open Sans 3.003 (OpenSans-Regular.ttf, OFL 1.1, tools/legal/notices/registry.json の open-sans)。FL 同梱の旧版フォントと内容窓を共有するため window 一致する。file/chunk 一致は許容しない (kinds=window のみ)"
+    },
+    {
+      "sha256": "95aa02c7c43096e0dd44d787ba6216864a67157e402adab59b35572e0c1577ea",
+      "kinds": [
+        "window"
+      ],
+      "reason": "OSS 代替フォント Barlow 1.408 (Barlow-Regular.ttf, OFL 1.1, tools/legal/notices/registry.json の barlow)。FL 同梱の旧版フォントと内容窓を共有するため window 一致する。file/chunk 一致は許容しない (kinds=window のみ)"
+    }
+  ]
 }

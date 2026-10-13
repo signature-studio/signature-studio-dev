@@ -119,8 +119,13 @@ static void test_r3_proctable(void) {
     CHECK(GetProcAddress(sh, (LPCSTR)(uintptr_t)153) == (void*)ILGetNext);
     CHECK(GetProcAddress(sh, (LPCSTR)(uintptr_t)155) == (void*)ILFree);
     CHECK(GetProcAddress(sh, (LPCSTR)(uintptr_t)190) == (void*)ILCreateFromPathW);
-    CHECK(GetProcAddress(sh, (LPCSTR)(uintptr_t)74) == NULL);             /* SHCreateStdEnumFmtEtc は未実装のまま */
+    CHECK(GetProcAddress(sh, (LPCSTR)(uintptr_t)74) == (void*)SHCreateStdEnumFmtEtc);   /* SHX-T8 */
+    CHECK(GetProcAddress(sh, (LPCSTR)(uintptr_t)75) == NULL);             /* 未割当序数は miss */
     CHECK(GetLastError() == ERROR_PROC_NOT_FOUND);
+    HMODULE shl = GetModuleHandleW(W("shlwapi.dll"));
+    CHECK(GetProcAddress(shl, (LPCSTR)(uintptr_t)12) == (void*)SHCreateMemStream);
+    CHECK(GetProcAddress(shl, (LPCSTR)(uintptr_t)219) == (void*)QISearch);
+    CHECK(GetProcAddress(shl, (LPCSTR)(uintptr_t)16) == NULL);            /* shell32 #16 とは別名前空間 */
 
     /* IL* 実働 (shimx 自前 PIDL 形式) */
     LPVOID pidl = ILCreateFromPathW(W("C:\\Program Files\\FL"));
