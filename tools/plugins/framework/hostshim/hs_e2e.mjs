@@ -99,10 +99,12 @@ async function phaseB() {
 
   const fails = [];
   let st = -1;
+  let exc = null;
   try {
     st = Number(mod._hs_e2e_run());
   } catch (e) {
-    console.error('[hs] Phase B 例外: %s', (e.message || '').split('\n')[0]);
+    exc = (e.message || '').split('\n')[0];
+    console.error('[hs] Phase B 例外: %s', exc);
     st = -1;
   }
   const dv = dvOf(mod);
@@ -147,6 +149,9 @@ async function phaseB() {
   if (OBSERVE) { console.error('[hs] observe mode — 判定なし'); return fails; }
 
   // ---- 判定 ----
+  // Phase B 例外 (OOB 等) は連鎖が完走していないので FAIL (#985 受入 2)。
+  if (exc !== null) fails.push('Phase B 例外: ' + exc);
+
   // P0b の出口条件 = 「CreatePlugInstance → TTestPlug.Create → TDelphiFruityPlug ctor へ
   // host shim 連鎖が到達し, native と同じ ID 序列 (prefix) が記録される」こと。
   // 完全な TFruityPlug* 生成 (plug != 0 / instance field / vtable 照合) は P0b の

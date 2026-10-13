@@ -231,3 +231,8 @@ NC1 (capstone 未導入) は `bash tools/m11/m11_gen_ir2.sh` が exit 1 にな�
 - 未解決 (起票先): 73532f8 (c) の lift 成果物の再構成 (当時の lift 入力・RetDec 版の特定)、ldfix 無しの IR で build する経路 (現状 `m11_build.sh` は `ldfix=disabled` を拒否)、(a) 818/21 の再測定 (旧 IR snapshot を `work-m11` から直接測る手順が必要) = #1165。
 - 検証範囲: 本 runner の 1 ホスト・PE 1 member・n=1 (F0 のみ 2 ハーネス)。環境間一致は未実測。
 - 再現: `FL_WIN64_DIR=<fl-win64 展開先> bash tools/m11/m11_gen_ir2.sh && bash tools/m11/m11_e2e.sh` (lift 成果物が無ければ `work/lift_pe.sha256` で全再生成に入る。work-m11 は `lift_pe.sha256` を含まないため、本 run は PE の sha256 を手で書いて増分経路で回した。§12 G2)。
+
+## 14. #960: `--full` を同一 HEAD・同一 PE で 2 回実行し、IR の差の段を切り分け
+
+- 結論: 同一 HEAD・同一 PE でも `ir_sha256` は実行ごとに一致しない。最初に変わる段は RetDec の出力順 (`boot0.drc.ll`)。受入 3 は PM 判断待ち。
+- 測定値・段の詳細・未解決と再現手順は [REPORT_APPENDIX_960.md](REPORT_APPENDIX_960.md) を参照 (全文)。
