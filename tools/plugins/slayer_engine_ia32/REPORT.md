@@ -1,7 +1,7 @@
 # tools/plugins/slayer_engine_ia32/REPORT.md — FL Slayer x86 engine (Slayer_Engine.dll) の ia32 decode 基準値 (#674 中間)
 
 - 日付: 2026-10-13 / 担当 dir: `tools/plugins/slayer_engine_ia32/` のみ / 親 #536 (結合方式は決定済み・PR #677 は未マージ。本件はその成果に依存しない独立計測) / 本 issue #674 の**中間成果** (受入条件 5 項目は 0/5 達成)
-- 対象: block22434 (`extracted/block22434_PE.bin`, 179,512 B, sha256 `84b64c43…de724a9`) = FL Slayer の x86 engine
+- 対象: block22434 (`extracted/block22434_PE.bin`, 179,512 B, sha256 `84b64c43…de724a9`) = FL Slayer の x86 engine と推定。 根拠は AEffect 構築 store (§9.1、magic 即値) と opcode 25 の dispatch 構造 (§9)。 他の ia32 PE (§9.5) は engine か未確認
 - 検証起点 commit: `5574803` (修正版。 検証記録は §6)。 初版は `bd8690c`。
 - 再現: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 $PY tools/plugins/slayer_engine_ia32/measure.py --dump` (gate) と `… measure.py --nega` (ネガコン)。 `$PY` は `uv venv $RUNNER_TEMP/venv_ia32 && uv pip install --python $RUNNER_TEMP/venv_ia32/bin/python capstone==5.0.7`。 capstone の版が 5.0.7 以外、または入力の SHA-256 (`84b64c43cc6528401e1c4e84074785e100e8453c4db4c8322a5d5f608de724a9`) が一致しない場合は gate の前に exit 1 (`[pin]` / `[input] FAIL`)。
 - 既知類型との関係 (`docs/DEFECTS.md`): **該当なし**。 本件は decode の静的計測で lift 出力は作っていない (silent miscompile の観測対象外)。 新類型の候補は §7 の行案のみ (DEFECTS.md は未編集)
@@ -228,7 +228,7 @@ ia32 で要注意の mnemonic (件数): cdq 21 / movzx 51 / movsx 54 / lea 590 /
 | 添字スケール 4 の memory operand | **304 件** (304 命令)。 うち x87 (`f*`) が 97 件 |
 | 添字 *4 の上位 (base,index) 組 | `[edi+ecx*4]`=33・`[-+eax*4]`=30・`[ecx+eax*4]`=30・`[-+ecx*4]`=30・`[-+edx*4]`=28・`[esi+ecx*4]`=26・`[ebx+edx*4]`=21・`[ebx+eax*4]`=15 (`[-+X*4]` は disp のみの配列・jump table 形) |
 | 変位 8 の添字 *4 | **8 件** (下表) |
-| 素材内の他 block | `block22433_PE.bin` は machine 0x8664 (x64 本体)・ImageBase 0x0 で engine ではない。 ia32 の PE は block22434 のみ |
+| 素材内の他 PE | fl-win64 の PE は machine 0x14c (ia32) 55 件・0x8664 (x64) 258 件。 ia32 PE は block22434 以外にも多数 (例 block00000・00004・24830〜24863 など)。 `block22433` は machine 0x8664・ImageBase 0x400000 の x64 本体で、machine の値だけでは engine か断定できないため engine 候補から外すことはしない (x64 本体と推定するのみ)。 他の ia32 PE が engine か否かは未確認 |
 | `slayer_x86/` の REPORT | 殻 ↔ engine の ILP32 marshal の必要性のみ記載 (読取箇所の記載なし) |
 
 変位 8 の 8 件 (周辺命令から分類。 いずれも VstEvents 読取とは断定できない):
@@ -241,7 +241,7 @@ ia32 で要注意の mnemonic (件数): cdq 21 / movzx 51 / movsx 54 / lea 590 /
 | `0x1000eb2a` | `call [ebx+esi*4+8]` | 間接 call。 **vtable・関数ポインタ表の呼出し**の可能性が高い (読取ではない) |
 | `0x1000ec00` | `mov eax,[edi+ecx*4+8]` | 直前 `lea ecx,[esi+esi*2]` のため添字は 3·esi、実効 stride **12 B**。 `events[i]` (stride 4) とは一致しない |
 | `0x1000ec0f` | `call [edi+ecx*4+8]` | 同上 (stride 12 の record 内の関数ポインタへの間接 call) |
-| `0x10010e7c` | `mov eax,[esi+ecx*4+8]` | `0x1000a26c` と同一形の dword コピーループ (`0x10010e64`〜) |
+| `0x10010e7c` | `mov eax,[esi+ecx*4+8]` | `0x1000a26c` と同一形の dword コピーループ (開始位置は未実測) |
 | `0x10010e80` | `mov [edi+ecx*4+8],eax` | 同上 (store) |
 
 結論: `events[i]` (+8 から stride 4 で並ぶ) と**同じ添字形の単独読取は確認できない**。 stride 4 の候補 (`0xa26c` 系・`0xeb21`) は、前者が一括コピー、後者が関数ポインタ呼出しと読め、 VstEvents 読取とは断定できない。 `0xec00` 系は stride 12 で `events[i]` と異なる。 #894 受入 1 は**未達のまま**。
