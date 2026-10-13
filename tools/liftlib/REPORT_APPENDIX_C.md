@@ -46,3 +46,48 @@ fail-open の封じ込め (PR #497 レビュー指摘、修正コミット `8406
 | register file 局所化 (alloca → mem2reg) pass 自体は未実装 (#54 申し送り、REPORT は推定のみ・実測無し)。署名ガードの変種として載せる枠 (`variant_extra`) だけ用意 | Path B の wasm サイズ縮小は未着手 | 新規子チケット (`[PERF-n]`、親 #17。番号は PM 採番) を PM が起票 |
 | `tools/ott/{avx,entry,crtinit}` の `-O1` 固定 emcc 行は未変更 | 当該 e2e は std 未適用 | #155 (lift_build.sh の std 検証後に同じ `stdbuild.py flags` へ) |
 | `lift_build.sh` の dev は旧スクリプト (-O1) に `-Wl,--no-gc-sections` が増える (旧は -O1 既定の gc) | LIFT_PROFILE=dev の wasm サイズのみ | 影響軽微・対応なし |
+
+## §20 LIFTLIB-7 (#478) ott_auto_none: FAIL 原因の実測・fail-closed 化・ネガコン・census 再計算
+
+検証環境: nproc=4、並列なし、素材は PR 本文の `oc_artifacts` 7 本 (`work-m6-ott` が `tools/{m6,m8,m9,m10,ott}/work`、`analysis-ott-binaries` が `OTT_vst2_win64.dll` を供給)。pefile/capstone/numpy は `$RUNNER_TEMP` の uv venv、node は `/opt/emsdk/node/24.19.0_64bit/bin`。
+旧コードの測定起点 HEAD `25330e7`、修正後は commit 済み HEAD `96a3887` (cli.py `ott_judge` / test_unit T18 / `ott_census.py`)。
+
+**1. FAIL の原因 (実測)**: `--auto none` の合否に census 閾値は無く、junkHi 175 は表示値 (`cmd_ott`)。FAIL 条件は e2e (checks/maxdev/nbad/trap)・7 段 IR 一致・出力 SHA 突合の 3 つ。素材が揃えば PASS、**参照成果物が欠けると FAIL** になる (log の census 行は junkHi 175 を表示するので、FAIL と census 値が同居して見える)。
+
+| 条件 (旧コード HEAD `25330e7`、`ott --auto none`) | 結果 | real (load 実行前) |
+|---|---|---|
+| 全素材あり | RESULT PASS rc 0。IR 一致 7 段 true、checks 8 / broken 0、maxdev 0.0 / nbad 0、trap 0、junkHi 175、outhash 42/42 (f0 21/21) | 11.741 秒 (load 0.31) |
+| `tools/m10/work/ott_m10.ll` を欠落 | **RESULT FAIL rc 1**。`O4_m10_ll_identical: null` (`same()` が None)。他の IR 6 段 true、checks 8 / broken 0、junkHi 175 | 11.059 秒 (load 0.30) |
+| `ott_m10.cjs(.wasm)` を欠落 (`ott_m10.ll` あり) | **RESULT PASS rc 0** (outhash は `None` のまま素通り) | 10.121 秒 |
+| (依存未導入) | `liftlib/pe.py:10 import pefile` で `ModuleNotFoundError` | — |
+
+- 元の FAIL 報告 (Actions run、census junkHi 175 を伴う) の素材構成は本 run から見えない。**元の run が `ott_m10.ll` 欠落だったことは未確認 (推定: 当時は `work-m6-ott` を渡せず `tools/m10/work` が無かった。#478 の素材行に `work-m6-ott` が無いことと、上の欠落再現が一致するため)**。
+- **旧コードの穴 (実測)**: 参照 `ott_m10.cjs` が無いと outhash が実施されず、`--auto none` は SHA 突合なしで PASS・rc 0 になる (上表 3 行目)。IR 一致の `None` は FAIL でも、outhash の欠落は PASS だった。一貫していなかった。
+
+**2. 修正 (期待値ではなく判定の側)**: 期待値 (junkHi 閾値) は `--auto none` に無く、古くもない。直したのは判定の fail-closed 化 (`cli.py` `ott_judge`)。`--auto none` は IR 一致 7 段 (None = 参照欠落は不合格)・outhash 実施かつ一致 (未実施・実行失敗・不一致は不合格)・e2e 合格の全てを必須とする。参照欠落は rc 2、不一致は rc 1 で区別する。`auto` 既定の junkHi ≤ 104 は junkHi が取れない場合も不合格にした。
+
+**3. ネガコン (実測、HEAD `96a3887`)**:
+
+| 操作 | 結果 |
+|---|---|
+| `ott_m10.cjs(.wasm)` 欠落 (旧コードは PASS rc 0) | `[ott] NG: outhash 未実施`、**RESULT FAIL rc 2**。10.172 秒 |
+| `ott_m10.ll` 欠落 (cjs あり) | `NG: IR 一致 O4_m10_ll_identical: 参照 .ll が無い`、**RESULT FAIL rc 2** |
+| 全素材あり | RESULT PASS rc 0。IR 一致 7 段 true、checks 8 / broken 0、junkHi 175、outhash 42/42。11.245 秒 (load 0.63) |
+| `ott_judge` の None 分岐を `continue` に変異 | T18 が `AssertionError` で落ちる (検出力あり。元に戻して再 PASS) |
+| `tests/test_unit.py` T18 (正 1 + NC1〜NC6 + auto 閾値 3) | 全 PASS。`python3 tests/test_unit.py` は ALL UNIT TESTS PASS、real 5 分 13.634 秒 (load 0.34) |
+| `python3 -m liftlib regress` | `{"fa_gain":"PASS","kh_gain":"PASS","ott":"PASS","ott_auto_none":"PASS"}`、rc 0。39.490 秒 (load 0.92) |
+
+**4. 数え方の定義と再計算スクリプト**: junkHi は `recipes/ott/e2e_check.mjs` E6 の出力分類で、param 0.5・N=256×2ch・float32 出力 512 値を `[0x248]=0/1` で 1 回ずつ処理し、`v==0`→zero、NaN→nan、`|v|>=4`→**junkHi**、`|v|<=1e-18`→junkTiny、他→normal と数える。再計算は `python3 tools/liftlib/ott_census.py <cjs> [--f248 0|1] [--expect-junkhi N] [--max-junkhi N]` (取得不能 rc 2、期待値違反 rc 1)。実測 (HEAD `96a3887`):
+
+| 対象 | 実行 | 結果 |
+|---|---|---|
+| `work/ott/ott_gen.cjs` (`--auto none`) | `--expect-junkhi 175` | junkHi 175 / zero 132 / normal 69 / junkTiny 136 → PASS rc 0 (0.827 秒) |
+| 同 | `--expect-junkhi 104` (ネガコン) | FAIL rc 1 |
+| 同 | `--f248 1` | junkHi 252 / zero 4 / normal 254 / junkTiny 2 (表示のみ) |
+| `work/ott_auto_f2_f7_p1/ott_gen.cjs` (auto 既定) | `--max-junkhi 104` | junkHi 104 / normal 140 → PASS rc 0 (1.401 秒) |
+| 同 | `--max-junkhi 103` (ネガコン) | FAIL rc 1 |
+| 存在しない cjs | `--expect-junkhi 175` | 取得不能 rc 2 |
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 元の FAIL の run が `ott_m10.ll` 欠落だったかの裏取り (推定のまま) | 原因は「参照欠落で FAIL する」ことまでは実測。元 run の素材は未確認 | #478 (PM が元 run の素材一覧を確認できれば確定) |

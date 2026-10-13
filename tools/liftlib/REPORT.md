@@ -151,12 +151,93 @@ FA の P1' (comisd×2+jbe/jae+xorps/movaps+jmp, 合流先は reg2mem alloca) が
 - 結論: `python3 -m liftlib build <cfg>` が標準設定 (`-O3 -flto` + gc-sections + 最小 export、正本 `data/std_build.json`) で全変種 (ref/o2/o3/std) をビルドし、署名不一致なら exit 1・成果物なし。`bash tools/liftlib/stdbuild_e2e.sh` (合成入力) で 3/3 PASS・ネガコン FAIL を確認。
 - 未達: 実 OTT / FA / KH を標準設定で通す検証 (素材不足)。未解決は §19 の表。
 
-## 20. LIFTLIB-5 (#342) — tan / tanf bit-exact・SVF 20/40 (未達)
+## 20. lowbase_e2e.sh の DLL パス環境変数化 (#440, 親 #294 / 発見 #427)
 
-- 既知類型との関係: 該当なし (DEFECTS.md D1a〜D16 未登録。新類型行案は §20.7)
+既知類型との関係 (DEFECTS.md): 該当なし (lift 欠陥ではなくスクリプトのパス固定の解消)。
+
+- 変更: `tools/liftlib/lowbase_e2e.sh` の DLL 行 (`[ANALYSIS-PLUGINS]` 配下の `OTT_vst2_win64.dll` を絶対パスで直書き) を
+  `source tools/shared/env.sh` + `DLL="${OTT_DLL:-$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll}"` に置換。
+  `PLUGINS_DIR` 未設定時の既定は `[ANALYSIS-PLUGINS]` (= `$ANALYSIS_DIR/plugins`) で従来と同一パス。DLL が無い場合は exit 2。
+- 是正 (review 5499056345 / Copilot 指摘, b0bedb6): `tools/liftlib/liftlib/env.py` の `OTT_DLL` が環境変数 `OTT_DLL` を見ず
+  `PLUGINS_DIR` からのみ導出していたため、[2] (`python3 -m liftlib ott`) は `OTT_DLL` と別の DLL を使い得た。
+  `OTT_DLL = os.environ.get("OTT_DLL") or os.path.join(PLUGINS_DIR, ...)` に変更 (未設定・空文字は従来と同じ導出)。
+- 初回検証 (コミット済み HEAD 100b550、Actions runner 4 vCPU、`ANALYSIS_DIR=$HOME/analysis`、直列 n=1):
+
+| 項目 | 実測 |
+|---|---|
+| 変更後 `bash tools/liftlib/lowbase_e2e.sh` | ALL PASS / rc=0 / 1:19.00 / load average 1.39 (1 分値) |
+| 変更前 (origin/main 版の DLL 行のみ runner の実在パスに差替) | ALL PASS / rc=0 / 1:19.78 |
+| SUMMARY 節 (liftlib ott ×2・x64c 3 構成・合計 150,708 cell) の diff | 差 0 (`SUMMARY_IDENTICAL`) |
+| ネガコン `PLUGINS_DIR=/nonexistent` | `/nonexistent/ott/binaries/OTT_vst2_win64.dll 無し` exit 2 |
+| ネガコン `OTT_DLL=/nonexistent/x.dll` | `/nonexistent/x.dll 無し` exit 2 |
+| 環境変数なし (既定値) | `[ANALYSIS-PLUGINS]/ott/binaries/OTT_vst2_win64.dll` を指す (この runner には無く exit 2) |
+
+- 是正後の検証 (コミット済み HEAD b0bedb6、同 runner・直列 n=1、`ANALYSIS_DIR=$HOME/analysis`、`capstone 5.0.7` / `pefile 2024.8.26` は
+  runner 側 venv で用意):
+
+| 項目 | 実測 |
+|---|---|
+| `bash tools/liftlib/lowbase_e2e.sh` (環境変数なし) | ALL PASS / rc=0 / 81.5 秒 / load average 0.96 (終了直後の 1 分値)。SUMMARY は ott 2 構成 PASS・x64c 3 構成 計 150,708 cell・`max_ulp 0`・`state_diff_qwords 0` |
+| 旧 `env.py` (35d78c9) で `OTT_DLL=<別パスの DLL>` を与えた `env.OTT_DLL` | `PLUGINS_DIR` 由来の既定 DLL を返す (指摘の再現) |
+| 新 `env.py` (b0bedb6) で同条件の `env.OTT_DLL` | 与えた別パスの DLL を返す |
+| `OTT_DLL=<既定 DLL と同一 sha256 のコピー>` + `PLUGINS_DIR=/nonexistent` | [1] PASS・[2] 2 構成 PASS (`PLUGINS_DIR` に依存しない)。[3] は 3 構成とも build FAIL (`build_x64c.sh` が `PLUGINS_DIR` 側の DLL を開き FileNotFoundError)、全体 rc=1 / 146.8 秒 |
+| ネガコン `OTT_DLL=<実在の別 DLL (OTT_vst2_win32.dll, PE32)>` `--quick` | [1] の集計が既定 DLL と異なる (reloc DIR64 0 / IAT 368 slot。既定は 13000 / 375)、[2] は 2 構成とも `checks 8 / broken 3` で FAIL、rc=1 / 39.4 秒。[3] は既定 DLL を使うため PASS |
+| ネガコン `PLUGINS_DIR=/nonexistent`・`OTT_DLL=/nonexistent/x.dll` | いずれも exit 2 (上の初回検証と同一メッセージ) |
+
+- `OTT_DLL` が効く範囲 (上の実測): 存在確認・[1]・[2] (`liftlib/env.py` 経由)。[3] (`hostbridge/lowbase/x64c/build_x64c.sh` は
+  `LB_DLL` か `PLUGINS_DIR` を参照) と `--full` (`hostbridge/lowbase/lowbase_e2e.sh` は `PLUGINS_DIR` のみ参照) には伝わらない。
+- 検証範囲外: `--full` (hostbridge の RetDec chain + Chrome)。`tests/test_unit.py` (FreshAir 素材が要る。plugins-freshair 未取得)。
+- 検証メモ: `work-liftlib` 素材内の `work/ott_*/work/full_t1.drc.{ll,dsm}` は作業 VM の旧 checkout 内ファイルへの絶対 symlink で、
+  runner では dangling となり `recipes/ott.py` が `FileExistsError` で落ちる (初回 run で観測)。gitignore 対象の `work/` 内のため
+  runner 上で検証用 worktree 内の同名ファイルへ張り直して検証した (commit 対象外。是正後の検証 worktree でも 98 本を同様に張り直した)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `work-liftlib` / `work-m6-ott` 素材の絶対 symlink (作業 VM の旧 checkout 内ファイルを指す) が runner で dangling。lowbase_e2e [2] が素材展開直後は FAIL | Actions 上で lowbase_e2e を再実行する度に手動張り直しが要る | #448 `[CI-8]` (OPEN) が追跡 (素材の相対 symlink 化 or `recipes/ott.py` の `os.path.lexists` 判定) |
+| (初版の記述: `tools/ott/avx/build_avx.sh`・`tools/ott/crtinit/lift_crt.sh`・`tools/ott/accept/acc_crt_table.py`・`tools/ott/avx/unsup_scan.py`・`tools/m9/m9_tablebind.py`・`tools/shimx/scripts/import_scan.py`・`tools/liftlib/tests/test_unit.py`・`tools/liftlib/xmm0_ret_census.py` にも同一の固定パスが残る。同種の移植性欠陥 (本 issue の範囲外)。新規子チケット案 (CI-4 系列)) | **解消済み**: a4f8a08 (#450 / PR #460) と 2db928d (#427 / PR #438) で main に merge 済み。この HEAD で 8 ファイルとも `/home/ubuntu` の出現数 0 を実測。#450 `[CI-4-ott-liftlib]` は CLOSED | 起票不要 |
+| `OTT_DLL` が [3] (`build_x64c.sh`) と `--full` に伝わらない。[3] は `libottnative.so` (既定 DLL 由来) と比較するため、別 DLL を指定しても [3] だけ既定 DLL を検証する | 別 DLL を `OTT_DLL` で指定した検証が [1][2] と [3] で別対象になる | 未起票 (新規子チケット案、CI-4 系列・親 #294。PM に起票依頼) |
+| `capstone` / `pefile` の依存がどこにも宣言されていない。素材展開だけでは [1] の最初の python 呼び出しで落ちる | Actions 上で e2e を再実行する度に手動インストールが要る | 未起票 (新規子チケット案、CI 系列。PM に起票依頼) |
+
+## 21. DIR64 補正境界 (section 末尾 8B slot) の複製の全数列挙と修正 (#593 / M11-N22, 親 #572)
+
+既知類型との関係: 該当なし (DEFECTS.md の D1a〜D16 にも icall §4 にも無い。データ敷設 C 生成器の境界 off-by-one で、m11 #572 と同根)。検証起点 commit: `1a94ac2` (修正コード)。
+
+- 結論: 旧境界 `r < lo + len - 8` は 3 箇所 (`tools/m6/m6_data_gen.py:42` / `tools/liftlib/liftlib/passes/dataimage.py:35` / `tools/liftlib/tests/test_unit.py:116`) に複製されており、全て `<=` に修正。**FL 本体 PE (`block00031_PE.bin`) では `.data` 末尾 slot (RVA `0x11e5000`) が旧条件で補正漏れ、修正後は 0**。OTT 実機 DLL (`OTT_vst2_win64.dll`) は補正漏れ 0 (末尾 slot 自体が存在せず旧条件でも漏れない = 潜在バグは OTT 生成物には顕在化していなかった。下記「OTT 実機の実測」)。
+- 再現: `bash tools/liftlib/dir64_boundary_gate.sh` (1 コマンド。PE 省略時 `$FL_WIN64_DIR/extracted/block00031_PE.bin`)。不合格は非 0 で終了する。
+
+| 検査 | 算法 | 結果 |
+|---|---|---|
+| [1] 全数列挙 (`dir64_boundary_enum.py`) | (A) 行 regex と (B) python `ast` の Compare 走査を突合 (`tools/` 配下の `.py/.mjs/.js/.ts/.sh/.c/.h`、`work/` 除外、`reloc`/`DIR64` を含むファイルのみ) | 和集合 8 件 (grep 8 / ast 8, `.py` の不一致 0)。旧境界 0 件。意図的に旧式を残す `m11/m11_reloc_audit.py:83` (旧条件との選択差を測る式 OLD) だけ許可リスト |
+| [2] 実バイト (`dir64_boundary_check.py`) | pefile の `DIRECTORY_ENTRY_BASERELOC` で DIR64 を列挙 (生成器は `.reloc` を手パース = 別算法) し、生成 C の `dlld_*[]` の slot を `v - IMG + VA_BASE` と比較 | m6 / liftlib とも 補正対象の末尾 slot 1 件 / 補正 1 / 補正漏れ 0 / 不正値 0 |
+| [3] ネガコン | 3 箇所の条件を旧 `<` に戻した複製 | 列挙は OLD=3 で FAIL (rc 非 0)。実バイトは m6 / liftlib とも `MISS .data RVA 0x11e5000` 補正漏れ 1 (期待 1 で PASS)。現行コードに期待 1 を与えると FAIL |
+
+- 影響なし (境界が正しい) と判定した箇所: `ott/lift/data_gen.py:28`・`hostbridge/lowbase/x64c/lb_data_gen.py:30` (`< lo + len - 7`、slot が収まる = `<= lo + len - 8` と同値)、`hostbridge/lowbase/audit_va.py` (`range(va, va+vs-7, 8)`)、`m11/m11_image_gen.py`・`plugins/lift/passes/m11_image_gen.py` (`r + 8 <= top`)、`m11/lb_check.py` (`r + 8 <= va + vs`)、`m11/m11_data_gen.py:50` (#572 で修正済)、`flelift/fle_data_gen.py` (生バイトコピーで補正なし)。
+- 実測 (runner 4 vCPU、コミット済み HEAD を `git worktree add --detach` で展開): gate 3 回 全て ALL PASS・37.05 / 37.06 / 37.14 秒 (load average 0.31→0.65→0.81、直列)。
+- 範囲外: 実行時の差 (LoadStringW 実装後の回帰確認) は #132 に依頼済み。
+
+### OTT 実機の実測 (`analysis-ott-binaries` の `OTT_vst2_win64.dll`、検証起点 commit `f9adacd` = #636 merge 済み main)
+
+| 検査 | 結果 |
+|---|---|
+| `dir64_boundary_check.py OTT_vst2_win64.dll --gen m6 / --gen liftlib` (`--expect-missed 0`、pefile 独立算法) | 両方 PASS: DIR64 total=13000 / 補正対象=13000 / 補正漏れ=0 / 不正値=0 / 末尾 slot 対象=0 |
+| 旧条件 `<` に戻した複製 (m6 / liftlib) | 同じく補正漏れ=0 (OTT では旧条件でも落ちない) |
+| `tests/test_unit.py` T7 (`t7()` 単独、3 回) | 3 回とも `T7 ok`: 補正 12329 件 (.rdata) = base 非依存、うち nt<0x400000 12329 件。0.611 / 0.596 / 0.600 秒 (load average 0.73→0.75→0.75、直列) |
+| `dir64_boundary_gate.sh` (FL 本体 PE、同 HEAD) | ALL PASS・36.173 秒 (load average 0.69→0.83)。ネガコン (列挙 OLD=3 / 補正漏れ 1 / 期待逆転) 全て期待通り |
+
+- 末尾 slot が無い理由: 補正対象 section は `.rdata` (VS=511510, 最終 DIR64 RVA 0x225618、末尾まで 235518 B) と `.data` (VS=56268, 最終 DIR64 RVA 0x268e70、末尾まで 15708 B) の 2 つで、どちらも最終 reloc から section 末尾まで 8B より十分離れている。他 section (`.text` / `.pdata` / `_RDATA` / `.rsrc` / `.reloc`) に DIR64 は 0 件。よって旧境界 `r < lo + len - 8` は OTT では結果を変えない。
+- 測定条件: runner 4 vCPU、`$HOME/analysis/plugins/ott/binaries/OTT_vst2_win64.dll` (3146752 B)、`FL_WIN64_DIR` は `fl-win64` を展開した dir、`pefile` / `capstone` は uv venv に導入。
+- T7 以外の `test_unit.py` 全体 (`python3 tests/test_unit.py`) は T6 で停止: Fresh Air 素材 (`targets/freshair/work/win/...SlateCore.core_64` = `work-liftlib-targets`) が今回の `oc_artifacts` に無いため。T1〜T5 は PASS (T6 以降未実行)。T7 は上記の通り単独実行で PASS。本 issue の受入条件は T7 のみ。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 実行時の差の顕在化 (LoadStringW 実装後の回帰確認) | m11 同様、潜在バグで顕在化条件は未確認 | #132 にコメントで回帰確認項目を依頼 |
+
+## 22. LIFTLIB-5 (#342) — tan / tanf bit-exact・SVF 20/40 (未達)
+
+- 既知類型との関係: 該当なし (DEFECTS.md D1a〜D16 未登録。新類型行案は §22.7)
 - 検証起点 commit: `14d5bc8` (コミット済み HEAD を ws-342 worktree で実行。以降の commit は REPORT のみ)
 
-### 20.1 結論
+### 22.1 結論
 | leaf (leafspec 40 scenario) | LIFTLIB-4 | LIFTLIB-5 |
 |---|---|---|
 | tan 1801a9be0 | 11/40 | **40/40** (mismatch 0 / crash 0) |
@@ -167,19 +248,19 @@ FA の P1' (comisd×2+jbe/jae+xorps/movaps+jmp, 合流先は reg2mem alloca) が
 
 tan / tanf は `expect_match_min: 1.0` で gate 化した。SVF は未達のため gate 無し。
 
-### 20.2 原因と修復 (tan)
+### 22.2 原因と修復 (tan)
 1. **call の def 範囲** (`mc.py`): call は VOLATILE 全部を def にしていたため、callee が書かない `r10` (入口 sign) が call を跨ぐと bind 不能。callee 機械語の書込集合 (推移閉包) に絞る (`LL_NO_CALLEE_PRESERVE`)。
 2. **領域の多定義 bind** (`p1.py`): 領域は D からしか入らないが、生存側 S だけが書く def も候補に入れて復元不能になっていた。領域に流れる def に限定 (`LL_NO_REGION_DEFS`)。
-3. **setcc の i1** (`p1.py`): `xor r,r ; setcc r8` の結果が i1 で GPR bind に使えなかった。setcc と**同一の機械語 block** の直前 8 命令内に同 reg の 32bit 以上のゼロ化 (`xor r,r`) がある時のみ `zext i1 → i64` で復元 (`LL_NO_SETCC_I1`)。block を跨ぐ・8/16bit の xor は信用しない (§20.7)。
+3. **setcc の i1** (`p1.py`): `xor r,r ; setcc r8` の結果が i1 で GPR bind に使えなかった。setcc と**同一の機械語 block** の直前 8 命令内に同 reg の 32bit 以上のゼロ化 (`xor r,r`) がある時のみ `zext i1 → i64` で復元 (`LL_NO_SETCC_I1`)。block を跨ぐ・8/16bit の xor は信用しない (§22.7)。
 4. **合流点 dead reg** (`p1.py`): 合流で live でない reg が束縛不能でも領域全体を捨てていた。dead なら合成せず捨てる (`LL_NO_DEAD_JOIN`)。
-5. **GPR rsp spill/reload** (`p1.py`): `mov [rsp+k], r64` / 逆を領域内で扱う (`LL_NO_GPR_SPILL`)。reload は領域内の**全 pred 経路**で store 済みの slot に限る (§20.7)。現行の ott_leaf closure では一度も使われない (§20.4)。
+5. **GPR rsp spill/reload** (`p1.py`): `mov [rsp+k], r64` / 逆を領域内で扱う (`LL_NO_GPR_SPILL`)。reload は領域内の**全 pred 経路**で store 済みの slot に限る (§22.7)。現行の ott_leaf closure では一度も使われない (§22.4)。
 6. **ret / RX の複製 call** (`leafabi.py`): p1 が call を複製すると単一 SSA が ret を支配しない。全複製の戻りを alloca (i128) に store し ret/RX 前で load (`LL_NO_RET_PHI`)。RX は call 後の xmm0 読み手を全て差し替える (`LL_NO_RX_ALL`)。
-7. すべて `mc.LEAF_EXT` (leaf cfg のみ ON) の内側。FA/KH/OTT 既定は不変 (§20.4)。
+7. すべて `mc.LEAF_EXT` (leaf cfg のみ ON) の内側。FA/KH/OTT 既定は不変 (§22.4)。
 
-### 20.3 ハーネス修正 (SVF/cvt の測定が変わった理由)
+### 22.3 ハーネス修正 (SVF/cvt の測定が変わった理由)
 `native_runner.c` / `wasm_runner.mjs` は MS x64 ABI の引数レジスタを「gpr/xmm 独立カウント (SysV 的)」で割り当てていた。MS x64 は**位置**で決まる (第 N 引数 = rcx/rdx/r8/r9 か xmm0..3 の N 番目)。`(this, float, float)` の 2 つ目の float が xmm0 に入り xmm2 が 0 になっていたので、位置対応に直した。これで SVF 2/40 → 20/40、cvt 11/40 → 26/40 (trap 6 → 0)。`diff.py` に `ret_bits` を追加 (f32 戻りは下位 32bit のみ比較)。
 
-### 20.4 ネガティブコントロール (tan leafspec 一致数, 各 switch を 1 つだけ止めた実測)
+### 22.4 ネガティブコントロール (tan leafspec 一致数, 各 switch を 1 つだけ止めた実測)
 | switch | tan | 判定 |
 |---|---|---|
 | (全 ON) | 40/40 | — |
@@ -191,26 +272,26 @@ tan / tanf は `expect_match_min: 1.0` で gate 化した。SVF は未達のた�
 | `LL_NO_GPR_SPILL=1` | 40/40 | tan 不要。**SVF も 20/40 + mismatch 13 + trap 2 + crash 7 で不変**、全 leaf の一致数も不変。出力 `ott_leaf_fixed.ll` が全 ON と byte 一致 (md5 `8e5f6a76…`) = 現行 closure では語彙が一度も使われない |
 | `LL_NO_RX_ALL=1` | 40/40 | tan 不要。**SVF は 20/40 + mismatch 13 + trap 2 + crash 7 で不変**、全 leaf の一致数も不変。IR は 1 site 差 (`rx_threaded` 32→31 / `rx_nodomin` 2→1) |
 
-### 20.5 検証 (実測)
-`bash tools/liftlib/liftlib_e2e.sh` (コミット済み HEAD `14d5bc8`、nproc=4、2026-10-13): **ALL PASS / real 352.690 s / 終了時 load average 1.04, 0.97, 0.67**。unit T1〜T19 PASS (T17b は `LL_XRET_*` 未設定で skip)・FA 400/400・KH 366/366・OTT checks 8/0・`--auto none` SHA 42/42・SIMD 205 mnemonic mismatch 0・注入 94/94 (偽陽性 0)・T15 (残留 6) 不変。leafspec は §20.1 の表と同一 (tan 40 / tanf 40 / exp 40 / log 32+crash 8 / SVF 20+mismatch 13+trap 2+crash 7 / cvt 26+crash 14)。
-- 旧実測 (`7e00ff2`、real 2m21.641s) より長い。`7e00ff2`→`14d5bc8` は main の merge (iargs T16 ほか) と §20.7 の修正を含む。T16 単体は `REPORT_APPENDIX.md` §17 に 123.4 s と記録済み (推定: 差分の主因)。
+### 22.5 検証 (実測)
+`bash tools/liftlib/liftlib_e2e.sh` (コミット済み HEAD `14d5bc8`、nproc=4、2026-10-13): **ALL PASS / real 352.690 s / 終了時 load average 1.04, 0.97, 0.67**。unit T1〜T20 PASS (T17b は `LL_XRET_*` 未設定で skip)・FA 400/400・KH 366/366・OTT checks 8/0・`--auto none` SHA 42/42・SIMD 205 mnemonic mismatch 0・注入 94/94 (偽陽性 0)・T15 (残留 6) 不変。leafspec は §22.1 の表と同一 (tan 40 / tanf 40 / exp 40 / log 32+crash 8 / SVF 20+mismatch 13+trap 2+crash 7 / cvt 26+crash 14)。
+- 旧実測 (`7e00ff2`、real 2m21.641s) より長い。`7e00ff2`→`14d5bc8` は main の merge (iargs T16 ほか) と §22.7 の修正を含む。T16 単体は `REPORT_APPENDIX.md` §17 に 123.4 s と記録済み (推定: 差分の主因)。
 - 前提: `work-liftlib` の tarball 内 symlink が `/home/ubuntu/work/webstudio/...` の絶対パス。`/home/ubuntu/work/webstudio → ws-342` の symlink が無いと `regress` の OTT が `FileExistsError` (`os.path.exists` は dangling symlink で False)。`REPORT_APPENDIX_B.md` §15.3 と同件。
 - 経過: LEAF_EXT 導入前は OTT 既定で emcc 失敗 + T15 が 15→14 でずれたため、拡張を leaf cfg に限定した。
 
-### 20.6 未解決 (起票先)
+### 22.6 未解決 (起票先)
 | 未解決 | 起票先 |
 |---|---|
 | SVF 20/40: mismatch 13 + trap 2 + crash 7。`this+0x10/0x14/0x18` (tanf 結果 `%18` を読む addss/mulss) の xmm0 差し替えが RetDec の insn.addr ずれで一部効かない | #342 (Refs で継続) |
 | cvt: 26/40 + crash 14 (CRT 経路 `jmp *rax`) | #256 系 (leaf native CRT 経路) |
 
-### 20.7 レビュー指摘への対応 (Copilot 2 件 + oc-reviewer)
+### 22.7 レビュー指摘への対応 (Copilot 2 件 + oc-reviewer)
 | 指摘 | 対応 | 確認 |
 |---|---|---|
-| `leafabi._ret_thread`: `fresh` を phi 分岐が定義前に呼ぶ | `fresh(va, base)` をループ前に束縛。`_rx_one` の phi load 名 (L313 同型) は衝突検査を block 内 → 関数全体へ | T18。修正前コード (`3dd3438`) では `UnboundLocalError` を再現、修正後は PASS |
-| `p1._setcc_value`: 後方走査が block 境界を跨ぐ | setcc と同一の機械語 block 内に限定。あわせて 8/16bit の `xor` は上位 bit を消さないので除外 | T19 (合成機械語 3 形: 同一 block=復元 / 別 block=拒否 / 8bit xor=拒否)。修正前は別 block も復元 |
-| `p1._rsp_gpr` reload (L927 同型): 領域全体の「store 済み」集合で判定 = 片経路の store を全経路と誤認 | `st["__gw"]` に載せ、合流で全 pred の交わりを取る | 現行 closure では未使用 (§20.4)。出力 IR は修正前後で byte 一致 |
-| 検証が head と不一致 / 相互参照 §15→§20 | §20.5 を最終 head で再実測。PR 本文の参照を §20.4 / §20.6 に修正 | §20.5 |
-| 未測定の switch | SVF で on/off を実測 | §20.4 |
+| `leafabi._ret_thread`: `fresh` を phi 分岐が定義前に呼ぶ | `fresh(va, base)` をループ前に束縛。`_rx_one` の phi load 名 (L313 同型) は衝突検査を block 内 → 関数全体へ | T19。修正前コード (`3dd3438`) では `UnboundLocalError` を再現、修正後は PASS |
+| `p1._setcc_value`: 後方走査が block 境界を跨ぐ | setcc と同一の機械語 block 内に限定。あわせて 8/16bit の `xor` は上位 bit を消さないので除外 | T20 (合成機械語 3 形: 同一 block=復元 / 別 block=拒否 / 8bit xor=拒否)。修正前は別 block も復元 |
+| `p1._rsp_gpr` reload (L927 同型): 領域全体の「store 済み」集合で判定 = 片経路の store を全経路と誤認 | `st["__gw"]` に載せ、合流で全 pred の交わりを取る | 現行 closure では未使用 (§22.4)。出力 IR は修正前後で byte 一致 |
+| 検証が head と不一致 / 相互参照 §15→§22 | §22.5 を最終 head で再実測。PR 本文の参照を §22.4 / §22.6 に修正 | §22.5 |
+| 未測定の switch | SVF で on/off を実測 | §22.4 |
 
 修正前後で `work/ott_leaf/ott_leaf_fixed.ll` の md5 は同一 (`8e5f6a76…`)、leafspec 一致数も同一 (tan 40 / tanf 40 / exp 40 / log 32+crash 8 / SVF 20 / cvt 26)。上記 3 件は**現行 closure の出力を変えない潜在バグの封じ込め**。
 
@@ -218,4 +299,4 @@ DEFECTS.md 行案 (編集は PM 判断):
 
 | ID | 層 | 新旧 | 症状 (silent) | 根本原因 | 観測 | 検出信号 | 修復 |
 |---|---|---|---|---|---|---|---|
-| D17 (案) | ours (p1) | 新規 (潜在) | `xor r,r ; … ; setcc r8` の上位 56bit=0 を block 境界越しに推定し, setcc を通らない経路で `zext i1→i64` が不定上位 bit を持つ | 機械語の後方走査が基本ブロックを無視 | 実 leaf では未発現 (tan の xor は同一 block)。合成機械語で再現 (T19-B) | setcc の def 復元で xor が同一 block に無い | 同一 block・32bit 以上の xor に限定 |
+| D17 (案) | ours (p1) | 新規 (潜在) | `xor r,r ; … ; setcc r8` の上位 56bit=0 を block 境界越しに推定し, setcc を通らない経路で `zext i1→i64` が不定上位 bit を持つ | 機械語の後方走査が基本ブロックを無視 | 実 leaf では未発現 (tan の xor は同一 block)。合成機械語で再現 (T20-B) | setcc の def 復元で xor が同一 block に無い | 同一 block・32bit 以上の xor に限定 |

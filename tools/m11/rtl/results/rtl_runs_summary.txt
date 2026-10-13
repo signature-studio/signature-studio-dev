@@ -1,0 +1,16 @@
+m11 n=3 一致/不一致/実行不能: 494 / 529 / 149  各 run: 494/529/149, 494/529/149, 494/529/149
+  run 間で verdict が動いた関数: 0 / 1172 (VA 共通)
+  unexec_reason hang                   13
+  unexec_reason native_fault_all_patterns 81
+  unexec_reason native_null_deref_all_patterns 44
+  unexec_reason unsupported_sig        11
+x64c n=3 一致/不一致/実行不能: 535 / 123 / 514  各 run: 535/123/514, 535/123/514, 535/123/514
+  run 間で verdict が動いた関数: 0 / 1172 (VA 共通)
+  unexec_reason hang                   13
+  unexec_reason native_fault_all_patterns 73
+  unexec_reason native_null_deref_all_patterns 58
+  unexec_reason no_wasm_definition     359
+  unexec_reason unsupported_sig        11
+run1 両 route 採点可 641: m11 不一致 425 → x64c 不一致 122, 不一致→一致 308 / 一致→不一致 5
+run2 両 route 採点可 641: m11 不一致 425 → x64c 不一致 122, 不一致→一致 308 / 一致→不一致 5
+run3 両 route 採点可 641: m11 不一致 425 → x64c 不一致 122, 不一致→一致 308 / 一致→不一致 5
