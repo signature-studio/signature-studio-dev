@@ -145,3 +145,12 @@
 - 出力: `tools/m2/work/ghidra_dll/functions_dll.csv` (2.0 MB)。gitignore 対象のため commit しない。
 - `m11_gen_ir2.sh` と `m11_build.sh` は `functions_dll.csv` を読まずに完走した (§10)。`functions_dll.csv` は `m11_bounds.py` 等の別経路の入力。
 - 注意: `FL_WIN64_DIR` を export せずに Ghidra を起動すると、空のパス `/extracted/block00031_PE.bin` で即失敗する。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` を明示する。
+
+## 11. 既定 OFF の build と main の cmp (本 head `e8dde459`)
+
+- 測定 commit (コードを変えた最後): `e8dde459` (`M11_FIX_912` 既定 0)。`git diff origin/main e8dde459 -- tools/m11/m11_build.sh` は fix912 の 3 行 (呼出し・既定 0・コメント) のみ。main (`90a6e664`) との差はこの 3 行だけ。
+- IR: `m11_gen_ir2.sh` rc=0 (43.7 s)。`boot_final.ll` sha256 = `16d1bae6…d869` (fix912 適用前、§10 と同一)。main 側 (`origin/main` = `90a6e664` の detached worktree) でも同じ IR・同じ sha256 `16d1bae6…`。
+- build (既定、環境変数なし): `m11_build.sh` rc=0 (25.1 s)。`[fix912] mode=off replaced=0` (no-op)。`boot_final3.ll` sha256 = `12a49c09…b99`。
+- main 側の既定 build: rc=0 (22.7 s)。`boot_final3.ll` sha256 = `12a49c09…b99`。
+- **`cmp work/boot_final3.ll` (ws-1276 の既定 build と main の build): 一致 (CMP_IDENTICAL)。**
+- 結論: 既定 build の挙動は main と同一。fix912 は既定 OFF で no-op。ON 時 (`M11_FIX_912=1`) の効果は §10 の現 head 測定 (ON/OFF 差 0) を参照。
