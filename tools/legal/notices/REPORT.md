@@ -90,9 +90,23 @@ build.sh 実行の所要 (逐次、emsdk 6.0.12 を `$RUNNER_TEMP` に導入):
 
 クリーン HEAD 検証で**実際に 1 件バグを検出**した: ライセンスファイル名の正規表現が `notices.test.mjs` に一致し `check` が自滅 (最初の worktree 検証 `7a36c8d` で FAIL → `a505069` で修正し、単体テストを追加)。
 
+### 既存の 05-stage 呼び出し元への影響 (レビュー指摘対応・検証起点 `32d6a18`・クリーン worktree)
+
+notices ゲートは 05-stage の**全**呼び出しに掛かる。NOTICES を作らない検証用の呼び出しは `--skip-notices-gate` を明示する (リリース物ではない)。呼び出し元の洗い出し: `grep -rn "05-stage"` (*.mjs / *.sh / *.yaml / *.json / *.ts、`node_modules`・`work/` 除く) のうち 05-stage を実際に起動する箇所は 6 か所: `tools/assets/deploy-manifest/e2e.sh:35` (初版で対応済) / `tools/legal/notices/e2e.sh:64-67` (本 PR のゲート検証。フラグの有無を意図して使い分け) / `guard.test.mjs` の `s()` / `chunked.test.mjs:39` / `probe.sh:55` / `deploy/scripts/deploy.sh:23` (リリース経路。`"$@"` を渡すだけで、ゲートは効かせたまま)。`deploy.sh` を呼ぶ repo 内スクリプトは無い (`grep -rn "deploy\.sh"`)。
+
+| 呼び出し元 | 対応 | 実測 (`a57aa0a` = 修正前 → `32d6a18` = 修正後) |
+|---|---|---|
+| `guard.test.mjs` の `s()` (#11 が 4 回起動) | `s()` の引数に `--skip-notices-gate` | `pnpm release-guard:test`: 修正前 **n=3 全て 11/12** (#11 が `7 !== 0`) → 修正後 **n=13 のうち 11 回が 12/12**、残り 2 回は #6 のみ失敗 (#11 は 13/13 PASS)。所要 0.81–1.02 s (最初の n=3、load average 0.82–0.83、並列 1) |
+| `chunked.test.mjs:39` | 引数に `--skip-notices-gate` | 合成 deny-list (`RELEASE_GUARD_DENYLIST`) を与えた環境で 修正前 0/8 PASS (`THIRD_PARTY_NOTICES.txt が成果物に無い`) → 修正後 **7/7 PASS ×3** (0.36–0.43 s)。deny-list が無い環境 (この runner) は修正前後とも exit 4 で 0/8 PASS (n=3、本変更と無関係) |
+| `probe.sh:55` | 引数に `--skip-notices-gate` | 実行不可 (Cloudflare 認証が要る)。差分 1 引数のみ |
+
+- #6 (`壊れた .br は raw のみ走査して note を残す`) は本変更と無関係の既存の不安定なテスト: `randomBytes(2000)` を「壊れた brotli」に使っているが、乱数 2000 B が brotli として復号成功したのは 791/20000 標本 (`zlib.brotliDecompressSync` の成否)。復号成功すると `notes.length` が 0 になり `0 !== 1`。修正は本 PR の範囲外 → 未解決 8。
+- notices 側に回帰なし (`32d6a18`、fl-win64 展開済): `bash tools/legal/notices/e2e.sh` (`--wasm` なし) は **ALL PASS ×3**・1.14 / 1.58 / 1.60 s (load average 0.68–0.70、PASS 17 項目・FAIL 0)、`notices.test.mjs` は 37/37 ×3 (0.21–0.22 s)。`--wasm` 側 (emsdk が要る 3 件の NEG) は今回再実行していない (build.sh の再実行を伴うため)。PR 本文の `oc_artifacts:` に `toolchain-emsdk` を足したので、再レビューの run で実行できる。
+- ネガティブコントロール: 修正前 `a57aa0a` で #11 が 3/3 失敗 (上表) = 指摘の再現。`notices.test.mjs` 側のゲート検証 (`05-stage に NOTICES の無い dist` で exit 7) は変更なし。
+
 ## 範囲 / 範囲外
 
-検証範囲: fl-win64 素材 (FL 同梱表記 15 本・ファイル一覧)・emsdk 6.0.12 で実行した上記 7 本の build.sh・`vite build`・`05-stage.mjs`。
+検証範囲: 既存 05-stage 呼び出し元の回帰 (`pnpm release-guard:test`・`chunked.test.mjs`)・fl-win64 素材 (FL 同梱表記 15 本・ファイル一覧)・emsdk 6.0.12 で実行した上記 7 本の build.sh・`vite build`・`05-stage.mjs`。
 範囲外 (主張しない): GitHub Actions 上での job 実行 (未有効化)・`20-worker.mjs` ゲート・mac 素材・plugins-* 素材由来の同梱 OSS・非 OSS の第三者技術の謝辞 (`docs/LEGAL.md` §3.3)・LGPL §6 の充足判断 (法的判断)・wasm 変換された FL 由来バイト列中の OSS (lift で命令列が変わるため signature は主に export 名/文字列定数頼り)。
 
 ## 未解決
@@ -106,3 +120,4 @@ build.sh 実行の所要 (逐次、emsdk 6.0.12 を `$RUNNER_TEMP` に導入):
 | 5. Blend2D / AsmJit / libogg / pffft は固有の文字列が無く、バイト走査では検出できない (build.sh・vendored 台帳の網羅検査のみ) | 当該部品を記録なしで同梱しても走査では検出できない | #86 のフォローアップ (本番モジュールの export 名で signature を検証) |
 | 6. `oss/ffmpeg`・`oss/lame` (PoC ハーネス) と `oss/ilsvg` は record を書かない (配布用の `sidemod` が書く。ilsvg は `bundled=false`) | ilsvg を同梱化するとき記録が必要 | [T-SH-18] #19 にコメント |
 | 7. LGPL §6(b) の「適切な共有ライブラリ機構」に side module が当たるかは未確定 | NOTICES の案内文は事実記述のみ | LGL-4 #87 (既出) |
+| 8. `guard.test.mjs` #6 が `randomBytes` 依存で不安定 (上記 791/20000)。本 PR は未修正 | `pnpm release-guard:test` が偶発的に 11/12 になる | 新規 `[LGL-n]` (LGL-2 の test fix: 固定バイト列にする)。PM が起票 |
