@@ -1,7 +1,8 @@
 # tools/plugins/reverb_delay/REPORT.md — PLG-F4 (#201) reverb-delay 9 本: lift 前提の実測
 
-- 日付: 2026-10-13 / 担当 dir: `tools/plugins/reverb_delay/` のみ (生成物は `tools/plugins/work/` = gitignore) / 検証起点 commit: **8a68603** (e2e 3 回・nega 1 回。 以降の commit は本書・`bisect_census.py` の追加、`engine_ranges.py` の `--exclude-ranges` 追加 (既定動作は不変)、コメント 2 行の修正のみ。 範囲は `git diff 8a68603 HEAD -- tools/plugins/reverb_delay` で確認)
-- 手法: 先行 PR #506 (`tools/plugins/dynamics/`、未 merge) の e2e・matrix 突合・ID 検算を移植し、#506 の reviewer 指摘 (判定が不合格でも exit 0 / 判定そのものの NC 欠如) を**最初から**避けた (§2)。#506 のファイルには依存しない
+- 日付: 2026-10-13 / 担当 dir: `tools/plugins/reverb_delay/` のみ (生成物は `tools/plugins/work/` = gitignore) / 検証起点 commit: **8a68603** (e2e 3 回・nega 1 回。 §8 の表は 8a68603 の実測。 以降の commit で判定・鎖の設定を変えており、最終 HEAD の再実測は §8 の別行)
+- 手法: 先行 PR #506 (`tools/plugins/dynamics/`、b1480188 で merge 済み) の e2e・matrix 突合・ID 検算を移植し、#506 の reviewer 指摘 (判定が不合格でも exit 0 / 判定そのものの NC 欠如) を**最初から**避けた (§2)。#506 のファイルには依存しない
+- icall 鎖 (2 つ): 既定の `batch_lift.sh` は `PLUG_ICALL=1` (icall 復元あり)、`lift_ranges.sh` (engine / nega の L2) は既定 `PLUG_ICALL=0` (従来鎖)。 本書の e2e・nega は `PLUG_ICALL` を明示する。 §0・§5 の「IR の間接 call」は**従来鎖 (`PLUG_ICALL=0`) の結果**であり、既定鎖では `__icall_dispatch` 呼出として現れる (§5)
 - 再現: `bash tools/plugins/reverb_delay/reverb_delay_e2e.sh` (gate 付き。不合格なら exit 1) / `bash tools/plugins/reverb_delay/reverb_delay_nega.sh` (NC 22 件)
 - 素材: `fl-win64` / `toolchain-retdec` / `toolchain-emsdk` (`docs/WORKFLOW.md` §11)。環境は `reverb_delay/env.sh`
 - 既知類型との関係: (icall §4) **D1 (間接 call 脱落)** が 9 閉包すべてで再現 (§5)。(icall §4) **D12 (Delphi unwind landing pad が CFG 非到達)** を 3 site で再現 (§5)。
@@ -13,8 +14,8 @@
    Eff_Render 単位で native (DLL を VA 敷設して ms_abi 実行) と wasm を比べる harness も repo に無い。 → PR は **`Refs #201`** (Closes しない)。
 2. **手順 1 (固有閉包の lift) は Delphi 殻 9/9 本で通った**: `lift_rc` 0・`emcc -c` rc 0・`x86_fp80` 関数 0・未実装 `__asm_*` helper 宣言 0・`define` 数 = 閉包関数数。
    合計 **341 関数 / 188,119 B**。 T3 の殻 2 本 (Delay 3 / Multiband Delay) は `PLUGIN_MATRIX.json` に batch 欄が無く**今回が初測定**。 閉包 6 項目 + batch 4 項目の matrix 突合は **82/82 一致** (§1)。
-3. **ただし通過 ≠ 正しさ**: 9 閉包の機械語には非 IAT の間接 call が計 **514 site** あるが、lift 後 IR (`p.final.ll`) の間接 call は **0**。 入口スロット (`Eff_Render` 等) を含む。
-   (icall §4) D1 の再現で、`batch_lift.sh` に icall 復元が接続されていない限り**差分試験は必ず不一致**になる (§5)。 → #514 ([PLG-F2-2]) に件数を追記。
+3. **ただし通過 ≠ 正しさ**: 9 閉包の機械語には非 IAT の間接 call が計 **514 site** あるが、従来鎖 (`PLUG_ICALL=0`) の lift 後 IR (`p.final.ll`) では間接 call は **0**。 入口スロット (`Eff_Render` 等) を含む。
+   (icall §4) D1 は従来鎖の結果である。 既定鎖 (`PLUG_ICALL=1`) では 514 site が `__icall_dispatch` 呼出として IR に残る (§5)。 既定鎖でも回帰ゲート `f2/icall_gate.py` は 9 閉包のうち Convolver 2 site・Delay Bank 1 site (計 3 site、D12 と推定) で F1 (missing) になる (§9)。 差分試験の前提はこの 3 site の扱いの決定。 → #514 ([PLG-F2-2]) に従来鎖の件数を追記 (既定鎖の訂正も必要。§9)。
 4. **host 呼出面は P0b の応答表で覆える**: 閉包の即値 Dispatcher ID は {2, 14, 36, 50, 67} の 5 種 (計 14 site)、すべて `hs_ids.json` の 35 ID に含まれる。 別算法の独立走査も 9/9 本で取りこぼしなし (§3)。 動的 ID は Convolver の 2 site。
 5. **SIMD kernel 依存は 5 本、うち 4 本 (Convolver / Delay 2 / Delay Bank / Reeverb 2) の閉包が #331 ([P0c-7]) 未解決の 0x5dee90 / 0x5df040 を呼ぶ** (§4)。 Delay 3 / Reeverb / LuxeVerb / Multiband Delay の殻は閉包内 kernel 呼出 0 site。
 6. **Convolver の FFT は IPP 経由ではない (静的調査)**: IPP 関数ポインタ 420 変数のうち DLL 全体で参照する関数は Convolver 5 / LuxeVerb 4 / 他 7 本 0 で、名前は Move / Zero / Add / MulC のみ。 FFT 系 (`fft`/`dft`/`conv`/`corr`) の参照は 0。 → #38 ([IPP-10]) 側の FFT 代替は Convolver に不要と推定 (§6、範囲は§6 の但し書き)。
@@ -98,6 +99,7 @@ frontier = 閉包から呼ぶ framework 関数 (P0a の共有 wasm 側)。 vcall
 ## 5. 間接 call 監査 ((icall §4) D1 / D12)
 
 `tools/icall/audit_icall.py --funcs <閉包関数 VA> --ir work/batch/<block>/p.final.ll`。 「静的 site」= 閉包 ranges の非 IAT 間接 call、「IR」= `p.final.ll` で callee が `@name` でない call。 関数単位の件数比較 (`insn.addr` が無い IR のため)。
+**この表は従来鎖 (`PLUG_ICALL=0`) の結果。** 既定鎖 (`PLUG_ICALL=1`) では `callee が @name でない call` が 0 のまま変わらず、間接 call は `call void @__icall_dispatch(` として現れるため、この列は既定鎖の脱落量を表さない。 既定鎖の件数は `icall_summary.py` の 2 鎖表で併記する (§8 の最終 HEAD 行)。
 
 | プラグイン | 静的 site | call あり関数 | IR の間接 call | 入口スロットの静的間接 call (slot=n) | 入口の IR 間接 call |
 |---|--:|--:|--:|---|--:|
@@ -163,7 +165,8 @@ frontier = 閉包から呼ぶ framework 関数 (P0a の共有 wasm 側)。 vcall
 
 | 項目 | 実測 |
 |---|---|
-| `reverb_delay_e2e.sh` 全体 (3 回連続、HEAD 8a68603) | **248 s / 241 s / 246 s**、3 回とも exit 0 で `OK` 行 1 回。 開始時 load average (1 分) 1.10 / 1.18 / 1.02。 逐次実行 (並列数 1)。 1 回目の冒頭 約 1 分は §7 の二分探索 (1 プロセス) と重なった |
+| `reverb_delay_e2e.sh` 全体 (3 回連続、HEAD 8a68603) | **248 s / 241 s / 246 s**、3 回とも exit 0 で `OK` 行 1 回。 開始時 load average (1 分) 1.10 / 1.18 / 1.02。 逐次実行 (並列数 1)。 1 回目は §7 の二分探索 (1 プロセス) と重なった (重なった時間の秒は未計測) |
+| 注記 | 上の 3 回と nega は 8a68603 のもの。 e7aed09 以降 (judge の列名読み・`PLUG_ICALL` 明示・2 鎖表) は下の最終 HEAD 行でのみ確認する | — |
 | 内訳 (9 閉包 lift の `seconds` 合計 / engine 19000 の lift 秒) | 21–25 s / 106–111 s (19165 は 1 s で RetDec 終了)。 plugin 別 (min–max): Convolver 5–5 / Delay 1–2 / Delay 2 2–2 / Delay 3 1–2 / Delay Bank 2–3 / Reeverb 2–3 / Reeverb 2 2–2 / LuxeVerb 3–4 / Multiband Delay 2–3 |
 | 3 回の結果一致 | 判定列 (`status.csv` の秒を除く 9 列)・`facts.json` (バイト一致、sha256 先頭 `b49a112e`)・engine 行 (秒を除く)・`ipp_use.json` の集計値・gate の出力行は 3 回とも同一 |
 | `reverb_delay_nega.sh` (HEAD 8a68603) | exit 0、**158 s**、開始時 load average 0.51。 **22/22 件 DETECTED** (対照は全て rc 0 / 壊した入力は全て rc 1。 内訳は下) |
@@ -196,7 +199,8 @@ frontier = 閉包から呼ぶ framework 関数 (P0a の共有 wasm 側)。 vcall
 |---|---|---|
 | 差分試験 bit-exact (出口条件 3)。 Eff_Render 単位の native / wasm harness が無く、P0a/P0b/P0c 未完 | #201 を閉じられない | #195 / #196 / #197 の完了後に #201 を再開 (Closes はその時)。 harness は #506 REPORT §6 が提案した [PLG-F3a] と共通 (PM 未起票。重複起票しない) |
 | Render test .flp の E2E (出口条件 4)。 RT 列が付くのは Convolver / Delay 2 / Delay Bank / Reeverb / Reeverb 2 の 5 本 | 同上 | FLEngine 統合待ち。 親 #14 / #201 |
-| 非 IAT 間接 call 514 site の脱落 (D1) と、audit が辿れない 3 site (D12) | 9 本すべて。 接続しない限り差分試験は必ず不一致 | #514 ([PLG-F2-2]) に追記済み |
+| 非 IAT 間接 call 514 site の脱落 (D1、従来鎖の結果) と、audit が辿れない 3 site (D12) | 9 本すべて。 従来鎖では差分試験は必ず不一致 | #514 ([PLG-F2-2]) に従来鎖の件数を追記。 既定鎖での訂正は本 PR のコメントで扱う (#514 への訂正コメントは PM が起票先を判断) |
+| 既定鎖 (`PLUG_ICALL=1`) の `icall_gate.py` F1 missing=3 (0x793207 / 0x875dd7 / 0x6d938c、D12 と推定) | `reverb_delay_e2e.sh` は `icall_gate.py` を gate 外 (`set +e`) で実行するため e2e は `OK` を出す。 waive は `f2/icall_gate_waivers.json` (18979 の 1 件のみ) に無い | 起票先 (PM 判断): #514 の子 issue として D12 の landing pad を追跡するか、既存 #514 に追記するか。 `icall_linear_only.expected` と `icall_gate_waivers.json` のどちらを正本にするかも同時に決める |
 | C++ engine 2 本 (Delay 3 / Multiband Delay): E1・E4・E5・E6、19165 の `IPPCODE` (静的リンク IPP) | T3 の 2 本 | **#523 ([PLG-F4-2])** を起票 |
 | #331 の 0x5dee90 / 0x5df040 に依存する閉包 4 本 | kernel の保証 | #331 に追記済み |
 | 動的 ID 2 site (Convolver)・slot 0x120 ×1 (LuxeVerb)・ID 14 / 67 の応答 | host 呼出面の意味 | #196 に追記済み |
