@@ -154,7 +154,7 @@ bash tools/targets/freshair/lift2/lift2_e2e.sh                                  
 
 ## 7. FA-13 (#905): rep movs/stosw の実行到達 (実測, 2026-10-13, 測定 HEAD 863f3d3c)
 
-- HEAD の対応: 測定は `863f3d3c` で行った。以後 `12146acf`・`a01812f9`・`15243d54` の差分は本ファイル (文書) のみで、コードは `863f3d3c` から不変 (`git diff --stat 863f3d3c 15243d54` で確認)。
+- HEAD の対応: 測定は `863f3d3c` で行った。以後 `12146acf`・`a01812f9`・`15243d54`・`8048c43a` の差分は本ファイル (文書) のみで、コードは `863f3d3c` から不変。確認: `git diff --stat 863f3d3c 8048c43a` → `REPORT_APPENDIX.md | 15 +++` (1 file changed, 15 insertions)。`git diff 863f3d3c 8048c43a -- tools/targets/freshair/lift2 ':!*REPORT*'` は 0 行。
 - 検証: worktree `ws-905` (branch `905-lift2-rep-movs-e2e`)。素材 `plugins-freshair` (`Fresh Air.Win.zip` に `SlateCore.core_64` と factory `.epf` 8 本) を `fetch.sh` で展開 (`FA_DL=$RUNNER_TEMP/pf`)。
 - `build_ctrl.sh`: exit 0, real 38.1 s。mlift は `lifted 1256 funcs`, `failed 1` (`f_1810577ac` の `vpcmpeqw ymm`、既知)。
 - 基準 `run_ctrl.sh 2 5` (trap 無し): **15/15 BIT-EXACT**, exit 0, real 4.3 s。
