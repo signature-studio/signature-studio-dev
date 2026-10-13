@@ -19,7 +19,7 @@
  "m4_api": 53,
  "m4_api_inherited": 53,
  "shimx_public_api": 618,
- "shimx_hooks": 59,
+ "shimx_hooks": 70,
  "shimx_stub_api": 161,
  "shimx_functional_api": 457,
  "plugins": {
@@ -54,11 +54,6 @@
    "missing": []
   }
  },
- "m11_closure": {
-  "win_other": 171,
-  "shimx": 182,
-  "lifter": 203,
-  "shimx_dup": 1
- },
- "ott_api_resolved": 24
+ "m11_closure": {},
+ "ott_api_resolved": 0
 }

@@ -237,3 +237,68 @@ fail-fast 9 種 + ExitProcess(7) = 全 PASS、exit 0 ×3。`test.sh` は実行�
 - `tools/startup/winstubs/winstubs.sh` (8/8 完了): rc=0 (実測 10 秒)。`--wrap` 下の shimx 回帰で ST/MT とも ALL PASS
 
 `quick_test.sh` は `test.sh --quick` でも ST/MT の absent-path OK を確認。
+
+## 18. SHX-T6 (#179): winmm midi* の強定義置換 (win64 ABI 変換層 + backend 表)
+
+既知類型との関係: 該当なし (ランタイム shim の接続。lift 欠陥ではない)。依頼: PM 設計決定 1〜4 (#179 コメント)。
+
+### 18.1 構成
+
+| ファイル | 役割 |
+|---|---|
+| `src/midi_backend.h` | 関数表 `shimx_midi_vtbl` と native 幅 `shx_midihdr_nat` (48B)。emscripten 非依存 |
+| `src/midi_conv.c` | weak な `midi*` 20 関数。guest win64 ABI を変換し表へ委譲。未登録時は従来どおり 0 台 |
+| `src/net.c` | `midiIn/OutGetErrorTextW` のみ残置。midi 本体の weak スタブは削除 |
+| `src/shimx.h` | `shimx_set_midi_backend` 宣言 (struct タグ前方宣言) |
+| `tools/audio/src/flmidi_shimx.c` | audio 側の強い登録口。`flm_midi*` を表へ束ね `shimx_set_midi_backend` を呼ぶ |
+
+shimx は `emscripten.h` に依存しない。`flmidi*.c` は `tools/audio/src` に置いたまま (ビルド依存を shimx へ波及させない)。
+
+### 18.2 win64 ABI 変換 (方向と対象)
+
+guest 側の MIDIHDR は win64 レイアウト (8B ポインタ・`pack(1)`・112B)。`flm_midihdr_t` (wasm ネイティブ・48B) へ変換する。
+寸法は mingw-w64 の `mmsystem.h` で確認 (`_Static_assert`: `sizeof(MIDIHDR)==112`, `lpNext` offset 28)。
+
+| 構造体 | guest (win64) | native (wasm) | 方向 |
+|---|---|---|---|
+| MIDIHDR 全体 | 112B | 48B | copy-in (Prepare/AddBuffer/LongMsg 前) → backend → copy-out |
+| `lpData` | 8B ポインタ | 4B | 下位 32bit を copy-in (wasm 線形メモリは共有) |
+| `dwBufferLength` / `dwOffset` | 4B | 4B | copy-in のみ |
+| `dwBytesRecorded` | 4B | 4B | copy-in → backend が書込み → copy-out |
+| `dwFlags` | 4B | 4B | copy-in → backend が DONE/INQUEUE を立てる → copy-out |
+| `dwUser` | 8B | 4B | 下位 32bit を copy-in |
+| `lpNext` / `reserved` / `dwReserved` | 8B | 4B | copy-in しない (shimx は未使用) |
+| 完了通知 p1 (MIM_LONGDATA / MOM_DONE) | native hdr | — | copy-out 後、p1 を guest アドレスへ戻して callback へ渡す |
+| MIDIINCAPSW / MIDIOUTCAPSW | 76B / 84B | 同一 | **素通し** (ポインタを含まず、レイアウト一致を確認) |
+
+mirror は guest ヘッダと 1:1 (guest アドレスで引く)。Prepare で確保、Unprepare 成功で解放。
+未 Prepare のヘッダへの AddBuffer/LongMsg は `MIDIERR_UNPREPARED (64)`。
+
+### 18.3 コールバック invoke
+
+完了通知の `shimx_midi_dispatch` は `cb` が実 C 関数ポインタ (< intptr_limit) なら直接呼び、guest VA なら `shimx_cbtrans_get_invoke()` (SHX-T2 #178 と同じ invoke 契約) へ落とす。`cb==0` (CALLBACK_NULL) は通知しない。audio 側は `flmidi_set_invoke` にこの dispatch を登録する。
+
+### 18.4 timeBeginPeriod (方針 3 行)
+
+- 解像度の要求は **無視する (no-op のまま)**。`timer.c` の weak 既定 (0 を返す) を変更しない。
+- 理由: Web 側のタイマー (AudioWorklet サンプルクロック / `performance.now`) は固定で、winmm の周期要求に応じて変えられない。
+- 要求を受けても Web の精度は変わらないため、偽の成功を返すより現状の no-op を明示する。
+
+### 18.5 検証 (2026-10-13, ws-179 `179-shimx-webmidi-strong`, コミット済み HEAD で実行)
+
+| 検証 | コマンド | 結果 | 所要 / 備考 |
+|---|---|---|---|
+| shimx 全体 (MT/ST・fail-fast 10 モード・M4 53/53・署名 mismatch 0・midi 新規テスト) | `bash tools/shimx/test.sh` | exit 0 | 実測 (本 run) |
+| audio MIDI e2e (本番 54/54 + ネガコン 2 + Worker 実測) | `bash tools/audio/e2e_midi.sh` | 4/4 PASS, exit 0 | 71 s (16:04:55 開始, load 0.26) |
+| audio 側 `flmidi_shimx.c` 単体コンパイル | `emcc -c` | exit 0 | — |
+
+e2e の内訳: `midi_all` 54/54 (2,491 ms) / `negctl_drop_one_short_msg` 62,517 ms / `negctl_flip_sysex_bit` 1,919 ms / `worker_webmidi_probe` 582 ms。
+drop500 の 62 s 台は既存 REPORT_MIDI §13-3 で未特定と記録済みの経路で、本変更の影響ではない。
+
+### 18.6 範囲外・未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 実 FL (`fl-win64`) での winmm MIDI 結線 (`midiInOpen` の呼出元 → 本実装) の実機確認 | 結線は ABI 変換まで。FL 実 e2e 未実施 | #37 (AU-14) にコメント |
+| `shimx` と audio MIDI を同一 wasm に結合した統合 e2e | 本 run は shimx 単体 (模擬 backend) と audio 単体 (flm_midi 直) を分けて検証 | #37 (AU-14) |
+| 実 Web MIDI・実デバイス | モック検証のみ (REPORT_MIDI §13-3) | #187 (AU-2) |
