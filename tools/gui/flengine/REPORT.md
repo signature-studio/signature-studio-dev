@@ -408,7 +408,16 @@ main `f3ffd7ba` 取り込み後の head `bde0c341` で、§6e の測定 commit `
 
 **判定**: `gui/e2e.sh` は現 head で PASS。`flengine/e2e.sh` と `f4_e2e.sh` は main 由来の重複定義 (#1096 `6f979463` の `tools/m11/m11_win.c` と `tools/gui/build/gui_adapt_w32.c`) で build 段が止まり、S1 の judge と F4 の gate は現 head では未測定。`a88aabfa` の測定値は main 取り込み前のものなので、現 head の値としては使わない。
 
-**GetMonitorInfoW 重複の扱い**: §6f の回避 (`-Wl,--allow-multiple-definition` の scratch 追加) は本 run では入れていない (build 仕様の判断を要するため)。重複の解消は main 側の修正が要る。起票先は子 issue (本 run で起票)。
+**GetMonitorInfoW 重複の扱い**: 重複の解消 (どちらの定義を正とするか) は build 仕様の判断を要するため、本 run では commit しない。起票先は子 issue **#1559** (`[M11-N102]`)。
+
+**回避版の実測 (参考・commit していない)**: `tools/gui/flengine/build.sh` のリンク行に `-Wl,--allow-multiple-definition` を一時的に足して測定し、測定後に元へ戻した (`git status` は測定後クリーン)。
+
+| 実行 (回避版・foreground・1 回) | rc | 所要 | 結果 |
+|---|---|---|---|
+| `bash tools/gui/flengine/e2e.sh` (head `bde0c341` + 回避) | **1** | 467 s (load 1.13→1.07) | judge **12/14**。**R2 FAIL** `reached 31 (expected floor 19); missing=['EnumDisplayMonitors', 'GetMonitorInfoW']`。**S1 FAIL** `870/1/47/24/0` (base `872/1/47/22/0`、main と同値)。他 PASS: L1×2・A1 (193/193/173/20)・B1 52・R1・S2・P1 (RegisterClassW=3)・P2〜P5・W1。ネガコン N1〜N9 期待どおり FAIL |
+| `bash tools/m11/ldfix/f4_e2e.sh` (head `bde0c341` + 回避) | **0** | 387 s (load 1.06) | 6 gate PASS (F1/F2/D1/D2/P1/A1)。ネガコン 4/4 期待どおり FAIL。`RegisterClassW` pre 2 / noand 2 / post 3。`function_52a7f0` ret pre `0x0` → noand `0x0` → post **`0x110000f`** (本 IR (wndseed 無し) の値)。survey pre/noand/post = `870/1/47/24` |
+
+結論: 回避版では S1 の値は main と同じ (`870/1/47/24/0`)。R2 は重複の片方が消えたことで 2 件欠落する (§6f の回避の副作用と同じ形)。したがって flengine の判定 (12/14) は、重複の解消方法を決めるまで確定しない。判定式・baseline は変えていない。
 
 ## 6f. origin/main の S1 実測 (PR #577 の PM 指示 1。main commit `b4a8422c`)
 
