@@ -124,7 +124,7 @@ RetDec 出力の欠陥と修復 (対照実験 `lift/gain_ablate.sh` で各々が
 2. **FA-2 Compressor/Gain/Filter snapin の DSP クロージャ lift**: `lift/gain_e2e.sh` を雛形に Compressor `process` (0x180775220, 1,664 B, 間接 call 1) → Filter → FreshAirDsp 制御層へ拡大。native 参照ハーネス (`native_gain.c`) をクラス単位に一般化。
 3. **FA-3 共通 pass 昇格**: ①comis `no_branch` 分岐再構成 (CFG は機械語から) ②脱落 load/branch の機械検出器 ③xmm 引数 signature 復元 ④`gen_msimd` を base 名+型キー化。OTT (M6-M11) と共有。
 4. **FA-4 FreshAirDsp 駆動ハーネス**: `FRAR/DUMP` のチェーン (Filter×2/Compressor×3/Gain×3) と param id (0x157..) 対応表を復元し、マクロ → 子パラメタの写像を確認、factory `.epf` 8 本 (1,244 B) で試験。
-5. **FA-5 Kilohearts target との統合**: SlateCore 内の `ks*` 37 ID は Kilohearts snapin と同系統の可能性が高い (推定)。Kilohearts 解析担当と DSP closure/pass を共有 (同一実装なら 1 回の lift で両対象)。
+5. **FA-5 Kilohearts target との統合** (#52): 機械語比較を実施済み → **§11**。snapin の process 実装は同一ビルドではなく、共有できるのは共通基盤 (数学 lib / CRT / allocator) のみ。
 6. **FA-6 UI** (#53): `.rsrc` 内 `FRAR/*` PNG 95・vec を使う WebGL/Canvas UI は非同梱運用 (素材はユーザ手元で抽出) — M7 HUD 方針に合流。**方針は `docs/DECISIONS.md` D7 で決定済み**。素材抽出・描画の実装は HUD 側 (#10) で行い、Fresh Air 固有の UI 実装チケットは起票しない。
 
 ## 8. 成果物
@@ -143,3 +143,28 @@ RetDec 出力の欠陥と修復 (対照実験 `lift/gain_ablate.sh` で各々が
 - `analyze.sh` / `gain_e2e.sh` / `gain_ablate.sh`: work/ キャッシュ再利用・別 dir へ clean 再生成 (zip/pkg から, 29 s) のいずれも 400/400 bit-exact、ablation は P1 87/400・F7 trap(1/400 実行)・F2 400/400 不一致で一致。
 - 独立再計算で一致: 2 ファイル sha256 同一 / 全サイズ / core pdata 25,063 エントリ / .text 17,575,936 / Gain process 0x180afe090 = 446 B / Compressor process 0x180775220 = 1,664 B / license getter 呼出元 38 (DSP closure 内 0) / 独立 BFS closure は 237 を包含 (--stop 0x1803ded20 配下 2 関数/246 B 差のみ)。
 - 本節で §0・§1・§4.1 の PACE 記述 (AAX 署名ブロックの `Eden wrapper` 属性)・pdata 数の表記・closure の 16 B 仮定を訂正。
+
+## 11. FA-5: SlateCore ⇄ HeartCore の snapin 実装同一性 (#52, 機械語比較)
+
+- 再現: `bash tools/targets/freshair/ks_identity.sh [outdir]` (素材 = `work-liftlib-targets` の SlateCore / HeartCore。下の 3 スクリプトを直列実行)。比較は **正規化後の完全一致** のみ (類似度は参考)。
+- 正規化 (`ks_identity.py` の `Pe.norm`): **E** = call/jmp 先・`[rip+disp]`・イメージ内絶対アドレス即値だけを抽象化 (構造体 offset・即値・レジスタは残す) / **R** = E から数値をすべて落とす (レジスタ名は残す) / **M** = mnemonic 列のみ。類似度 = difflib ratio。関数境界は .pdata (CHAININFO 連続チャンク併合)。
+
+### 11-1. 結果 (実測)
+
+| 比較 | 結果 |
+|---|---|
+| 共通 `*Dsp` クラス (RTTI) | **37** (SlateCore 38 = 37 + `FreshAirDsp`)。vtable は 35 クラスが KH 20 slot / SC 17 slot、2 クラスが 21/18・21/17 |
+| process 相当 slot (KH slot 14 を SC 全 slot と総当たり) の完全一致 | E **0/37**・R **0/37**・M **1/37** (TapeStop = 9 B の stub で自明)。M 類似度の中央値 0.243、最大は Compressor 0.436・Gain 0.475 (実体のある関数のみ) |
+| Gain process (KH 0x1804b0380 609 B/137 命令 ⇄ SC 0x180afe090 446 B/86 命令) | E 類似度 0.036 / M 類似度 0.475。this の state offset が別 (KH `+0x64..0x78`、SC `+0x9c..0xd0`)、param 取得経路も別 (`ctx+0x3188` ⇄ `this+0x90`→`+0x9dc4`)。構造体配置が違う (同一ソースかどうかは機械語からは判定できない) |
+| 全 .pdata 関数 (≥12 命令) の E ハッシュ照合 | KH 87,227 関数 / SC 18,027 関数 → 共通ハッシュ **829**・SC 側 **1,679 関数 / 218,520 B** (SC の ≥12 命令関数合計 17,203,480 B の 1.3%) |
+| Fresh Air DSP closure (FreshAirDsp + Gain + Filter + Compressor 全 slot からの direct call 到達, 177 関数 / 68,389 B) のうち KH と E 一致 | **63 関数 / 21,740 B (31.8%)**。一致する側は powf `0x18103fd60`⇄KH `0x180fc3640` (3,782 B)・pow `0x181046890`⇄`0x180fc4590` (5,777 B)・FMA 数学 lib・allocator/CRT 等の **共通基盤**。process 本体は 0 本 |
+| 上記 63 関数のうち KH 側 VA が `snapins.json` の lift VA に出現 | 49 本 (VA の 9 桁 hex 文字列一致の粗い判定。複数 KH 関数が同一ハッシュになる SC 関数が 7 本ある) |
+| 上記 63 関数の `.rdata` 定数 (rip 参照先先頭 16 B) | 参照なし 35 / 一致 8 / **不一致 20**。コードが一致しても参照先定数が違う関数がある |
+
+実測: `ks_identity.sh` 全体 55.5 s (n=1・nproc=4・load average 0.59 → 0.84)、個別は identity 5.0 s / census 31.8 s / closure_share 18.2 s。コミット済み HEAD (`1465257`) で再実行し 3 本の JSON が直前の実行と byte 一致 (決定的)。
+
+### 11-2. 結論と制約
+
+- **1 回の lift で両対象に効く範囲 = 共通基盤のみ** (SC DSP closure の 31.8% / 21,740 B)。snapin ごとの process は SlateCore と HeartCore で別ビルドの機械語で、既存 KH lift (`tools/targets/kilohearts/snapins/`) の IR/wasm を SlateCore に流用することはできない (Gain は SC 側も別途 lift 済み = §5)。
+- ID の一致 (§1) は **製品 ID・クラス名・17/20 slot の vtable 形が同系統** であることまで。実装同一性は本節で「機械語レベルでは同一でない」と確定。
+- **未検証**: ① 機械語が違っても **意味が同一か** (state 配置を揃えた差分実行 = 同じ入力で SC/KH の native 出力が bit 一致するか) は未実施。Gain は ramp + 2 乗平均メータの同型 (§5 / kilohearts REPORT §6) で、意味同一の蓋然性は高いが測っていない。② `.rdata` 不一致 20 本が定数差か参照先の配置差かは未分類。③ 直接 call のみ追跡 (間接 call は辿らない = closure は下限)。
