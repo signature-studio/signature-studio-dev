@@ -51,8 +51,10 @@ EMSCRIPTEN_KEEPALIVE int m11_disp_count(void) { return (int)m11_disp_n; }
 /* boot closure 外で C 転記した関数 (m11_disp_tab に無い) を icall から呼べるようにする (#474). 転記本体は下方 */
 extern unsigned long long function_40f960(unsigned long long);
 extern unsigned long long function_41c160(unsigned long long);
+extern unsigned long long function_5c0e70(unsigned long long);
 static u64 tr_40f960(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return function_40f960(a0); }
 static u64 tr_41c160(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return function_41c160(a0); }
+static u64 tr_5c0e70(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return function_5c0e70(a0); }
 static u64 tr_ret0(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return 0; }
 
 static m11_tr_t disp_find(u32 va) {
@@ -66,6 +68,7 @@ static m11_tr_t disp_find(u32 va) {
     switch (va) {
     case 0x40f960: return tr_40f960;
     case 0x41c160: return tr_41c160;
+    case 0x5c0e70: return tr_5c0e70;   /* 5c03d0 の node 差替え通知の実体 (#482) */
     case 0x5c04a0: return tr_ret0;   /* `ret` 1 命令 (キャッシュ node 解放フックの既定実体) */
     }
     return 0;
@@ -398,6 +401,24 @@ u64 function_5c03d0(u64 self, u64 obj, u64 key) {
     if (node != old) m11_icall(Q(Q(obj) + 0x18), obj, 0, 0, 0, 0, 0, 0, 0);
     function_5c0270(self, old);
     function_423980((void*)(uintptr_t)(self + 0x10));
+    return 0;
+}
+
+/* function_5c0810  VA 0x5c0810  (DoChange: `if FOnChange.Code <> nil then FOnChange(Self)`; self = +8 Code / +0x10 Data の通知イベントを持つオブジェクト)
+ * 逆アセンブル転記 (5c0810..5c082e): `cmp [rbx+8],0; je; mov rcx,[rbx+0x10]; mov rdx,rbx; call [rbx+8]`. boot closure 外 (IR に関数が無い). */
+u64 function_5c0810(u64 self) {
+    u64 code = Q(self + 8);
+    if (code) m11_icall(code, Q(self + 0x10), self, 0, 0, 0, 0, 0, 0);
+    return 0;
+}
+
+/* function_5c0e70  VA 0x5c0e70  (5c03d0 の通知先 = obj の VMT スロット +0x18 の実体 (Changed): DoChange → 所有者があればその Changed)
+ * 逆アセンブル転記 (5c0e70..5c0e99): `call 5c0810; cmp [rbx+0x30],0; je; mov rax,[rbx+0x30]; mov rcx,rax; mov rbx,[rax]; call [rbx+0x18]`.
+ * boot closure 外 (vtable 経由でしか到達しない). 所有者の Changed は m11_icall で解決する (closure 外なら miss = skip, #482). */
+u64 function_5c0e70(u64 self) {
+    function_5c0810(self);
+    u64 owner = Q(self + 0x30);
+    if (owner) m11_icall(Q(Q(owner) + 0x18), owner, 0, 0, 0, 0, 0, 0, 0);
     return 0;
 }
 
