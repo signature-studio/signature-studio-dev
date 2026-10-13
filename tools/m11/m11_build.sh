@@ -47,6 +47,10 @@ fi
 #   内容が変わった時だけ boot_final.ll を差し替える (mtime を更新して毎回 post/cc を走らせない)。
 python3 alloca/m11_alloca.py work/boot_final.ll work/boot_final.alloca.tmp.ll --report work/alloca_report.json > work/alloca.log
 if ! cmp -s work/boot_final.ll work/boot_final.alloca.tmp.ll; then mv work/boot_final.alloca.tmp.ll work/boot_final.ll; else rm -f work/boot_final.alloca.tmp.ll; fi
+# #699: 8c5eb0 の件数 0 ループ先頭ガード (RetDec が落とした cmp/jg) を IR に復元 (冪等)。
+#   M11_GUARD699=off で脱落状態に戻す (ネガコン)。M11_GUARD699_COND で条件を差し替え (ネガコン: 常に不成立)。
+python3 guard699/m11_guard699.py work/boot_final.ll work/boot_final.guard699.tmp.ll --mode "${M11_GUARD699:-on}" --cond "${M11_GUARD699_COND:-icmp sle i32 %9, 0}" --report work/guard699_report.json
+if ! cmp -s work/boot_final.ll work/boot_final.guard699.tmp.ll; then mv work/boot_final.guard699.tmp.ll work/boot_final.ll; else rm -f work/boot_final.guard699.tmp.ll; fi
 # #131: sigfix 復元モードが変わったら post 結果を無効化 (stamp)
 if [ "$(cat work/sigfix_recover.stamp 2>/dev/null || echo 0)" != "${M11_SIGFIX_RECOVER:-0}" ]; then rm -f work/boot_final3.ll; fi
 echo "${M11_SIGFIX_RECOVER:-0}" > work/sigfix_recover.stamp
