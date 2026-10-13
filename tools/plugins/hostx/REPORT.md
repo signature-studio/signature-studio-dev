@@ -1,6 +1,6 @@
 # tools/plugins/hostx REPORT — PLG-X host 統合 / big3p 12 本の方針決定と lift 前提の実測 (#210)
 
-- 検証起点 commit: **1ab852f** (`210-big3p-policy` に origin/main ec79ef5 を取り込んだ merge。#514 の icall 復元 237010e を含む)。§2〜§5 の数値は `bash tools/plugins/hostx/hostx_e2e.sh` をこの HEAD で 1 回実行 (exit 0) して取得。後続の commit は `hostx_nega.sh` と本 REPORT のみを変える (lift・閉包の コードは不変)。
+- 検証起点 commit: **0e7f717** (`210-big3p-policy` の head。origin/main ec79ef5 を取り込んだ 1ab852f の上に、REPORT と `hostx_nega.sh` の期待値を載せた commit)。§2〜§5 の数値は `bash tools/plugins/hostx/hostx_e2e.sh` を 0e7f717 で 1 回実行 (exit 0、1,092 秒) して取得し、`hostx_nega.sh` (`[hostx_nega] OK`) と公式 gate `f2/icall_gate.py` も同じ 0e7f717 で実行。1ab852f の実測 (1,099 秒) は §5 に併記。後続の commit は本 REPORT のみを変える (lift・閉包のコードは不変)。
 - 日付: 2026-10-13 / 担当 dir: `tools/plugins/hostx/` のみ (生成物は `tools/plugins/work/` = gitignore)
 - 既知類型との関係: **(icall §4) D1 = 間接 call/jmp 脱落**。#514 の復元で IR 側の間接 call は 2,178 site まで回復したが、公式ゲート `f2/icall_gate.py` で 8 閉包中 6 本が未被覆 (§3)。f80 (x87) は `tools/plugins/REPORT.md` §4.3 の既知事象。新規類型なし。
 - 範囲: issue #210 の「方針決定」(§1) と、手順 1 (固有閉包 lift → `emcc -c`) の再現 (§2)、間接 call の gate (§3)、C++ engine の窓 lift の到達性 (§4)。**差分試験 (bit-exact) と Render test .flp は未達** (§6)。PR は `Refs #210`、`Closes` は付けない。
@@ -102,7 +102,7 @@
 
 ## 5. 検算とネガティブコントロール (`bash tools/plugins/hostx/hostx_nega.sh`)
 
-| 検査 | 壊し方 | 結果 (HEAD 1ab852f + 本 commit) |
+| 検査 | 壊し方 | 結果 (HEAD 0e7f717) |
 |---|---|---|
 | NC1 `emcc -c` rc | MIDI Out の `p.final.ll` の 1 関数から `ret` を除去 | 無改変 rc 0 → 壊した IR rc 1 |
 | NC2 閉包 → define 数 | 閉包 29 range の末尾 1 本を落として再 lift | defines 30 → 28、落とした `function_701d90` は 1 → 0 |
@@ -115,10 +115,11 @@
 - `[hostx_nega] OK` で exit 0。
 - 環境: GitHub Actions runner (`nproc`=4)。
 
-### 所要時間 (`hostx_e2e.sh`、HEAD 1ab852f)
+### 所要時間 (`hostx_e2e.sh`、HEAD 0e7f717、n=1)
 
-- **wall 1,099 秒 (18 分 19 秒) を n=1 で実測**。内訳には fl-win64 の展開 (`$RUNNER_TEMP/fl-win64` が無かった) と venv 作成 (`ssvenv`) を含む。並列 1。
-- load average: 開始直前 0.51 / 0.29 / 0.12 (uptime)、終了直後 1.00 / 2.88 / 4.33。
+- **wall 1,092 秒 (18 分 12 秒) を n=1 で実測** (exit 0)。並列 1。fl-win64 展開済みの `$RUNNER_TEMP/fl-win64` を使用 (展開・venv は既存)。
+- load average: e2e 開始直前の `uptime` は 0.78 / 0.43 / 0.17、終了直後の `/proc/loadavg` は 1.00 / 2.82 / 4.26 (実行中の推移は未サンプル)。
+- 先行 HEAD 1ab852f での実測: wall 1,099 秒 (18 分 19 秒, n=1、fl-win64 展開と venv 作成を含む)。lift 経路は両 HEAD で同一 (差分は REPORT と `hostx_nega.sh` のみ)。
 - n≥3 のレンジは取っていない (1 回 18 分のため、本 run の上限 58 分に 3 回は収まらない)。単発値であることを明記する。旧 REPORT の「7 分 29.6 秒」は本 HEAD で測っていないため削除した。
 
 ## 6. 範囲外・未解決
