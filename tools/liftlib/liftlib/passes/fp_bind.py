@@ -43,6 +43,45 @@ def insert_after(lines, i, new):
     lines[i + 1:i + 1] = new
 
 
+def meta_va_map(lines):
+    """`!N = !{i64 VA}` → {N: VA} (insn.addr メタの機械語 VA 解決用)。"""
+    out = {}
+    for l in lines:
+        m = re.match(r'^!(\d+)\s*=\s*!\{i64 (\d+)\}', l.strip())
+        if m:
+            out[m.group(1)] = int(m.group(2))
+    return out
+
+
+def site_at(lines, fnva, va, pat):
+    """fn 内で insn.addr の機械語 VA == va かつ pat に一致する行の index。1 件でなければ失敗。
+    機械語 VA を鍵にするので、IR 行番号・alloca 名の変化に依らず同じ site を指す。"""
+    s, e = fn_span(lines, fnva)
+    mv = meta_va_map(lines)
+    hits = []
+    for i in range(s + 1, e):
+        mm = re.search(r'!insn\.addr !(\d+)', lines[i])
+        if mm and mv.get(mm.group(1)) == va and re.match(pat, lines[i]):
+            hits.append(i)
+    if len(hits) != 1:
+        raise SystemExit(f'site {va:#x} in {fnva:#x}: candidate = {len(hits)} (expect 1)')
+    return hits[0]
+
+
+def replace_at(lines, fnva, va, pat, new, tag):
+    """機械語 VA va の行 (pat 一致) を new の行列で置換する。"""
+    i = site_at(lines, fnva, va, pat)
+    lines[i:i + 1] = new
+    return i
+
+
+def bind_load_at(lines, fnva, va, slot, glob, tag):
+    """機械語 VA va の `load i64, ptr %stack_var_<slot>` を `load i64, ptr @<glob>` に差し替える (1 site)。"""
+    load = r'load i64, ptr %stack_var_' + re.escape(slot) + r'\b'
+    i = site_at(lines, fnva, va, r'\s*%\S+ = ' + load)
+    lines[i] = re.sub(load, 'load i64, ptr @' + glob, lines[i]) + ' ; LIFTFIX ' + tag
+
+
 def bind_slot_loads(lines, fnva, slot, glob, expect, tag):
     """fn 内の `load i64, ptr %stack_var_<slot>` (行頭が代入) を `load i64, ptr @<glob>` に差し替える。"""
     load = r'load i64, ptr %stack_var_' + re.escape(slot) + r'\b'
