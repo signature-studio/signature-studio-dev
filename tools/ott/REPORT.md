@@ -247,19 +247,4 @@ OTT_ULP_TOL=2 bash tools/ott/ott_e2e.sh  # 許容 ulp 指定
 - x64 の回帰は**未実測**: fl-win64 素材に x64 の PE が無く、plugins-ott の展開物にも OTT DLL が無い (インストーラのみ)。 変更は ia32 でのみ成立する条件 (`IA32 and ...`) で、x64 の出力は構造上不変と推定。 差分確認は OTT DLL 素材で行うこと。
 - 未解決: (1) 0x10001300 の case 内 x87 `fmul` 1 件 (unsup)。 (2) 受入 1 の「main」(0x10007ca0) は jump table を持たない (`call esi` のみ) ため、main 自体は表の検証対象にならない。 PM が受入の対象関数を再定義する必要あり。 (3) x64 の回帰は OTT DLL 素材が無く未実測。
 
-## 15. #1200 — 画像 base の相対化 (OTT_RELOC=1, 親 #989 / 子 #1201)
-
-- 結論: **既定 base (0x30000000) での同一性のみ確認**。相対化の実証 (別 base・複数インスタンス N=16) は未実施 → #1200 に残す。
-- 実装: `lift/x64c.py` の `OTT_RELOC=1` で画像 VA 定数を `(ott_gbase + RVA)` で出力。`OTT_RELOC=1` と `OTT_VEXCOV=1` は fail-fast (VEXCOV の shifted VA 定数は相対化未対応)。
-  `rt/ott_glue.c` に `ott_gbase` (既定 0x30000000) と `ott_set_gbase`。`crtinit/ott_crt.c` は cookie・api-set 表・encoded slot・`__FlsIndex`・trampoline 番地を RVA + `ott_gbase` で持つ。
-- 既定 lift (`OTT_RELOC` 未設定): 生成 `ott_lifted.c` / `ott_data.c` が main 版 (558b47b0) と byte 一致 (`cmp`)。
-- 測定 commit: **110d65e7** (素材 `analysis-ott-binaries` + `toolchain-emsdk` 展開、node 22.23.3 / emsdk node 24.19.0 は SIG_ONLY の実行)。
-  - 既定 lift: real 6.3 s、`functions 75, insns 5790, unsup {}`。
-  - 相対化 lift (`OTT_RELOC=1`): real 3 m 36 s、`functions 75, insns 5790, unsup {}`、`ott_lifted.c` の `ott_gbase` 参照 807 箇所。
-  - main 558b47b0 の既定 lift: real 6.1 s、`ott_lifted.c` / `ott_data.c` とも既定 lift と `cmp` 一致。
-  - 署名 (SIG_ONLY, N=1, gbase 既定値): 既定 `6b1696f0` / 相対化 `6b1696f0` / main `6b1696f0`。nonzeroOut 256。
-  - 負荷: load average 1.08 (1 分値)、直列実行。
-- 前版 (80cd4a2a): 既定 6.8 s、相対化の `ott_gbase` 参照 776 箇所、署名は同じ `6b1696f0`。110d65e7 で `x64c.py` / `ott_crt.c` / `ott_cpu.c` が変わったため、以後はこちらを正とする。
-- 110d65e7 の指摘対応 (VEXCOV+RELOC の fail-fast、`ott_crt.c` の絶対番地の gbase 相対化、`ott_cpu.c` の unlifted 診断) は上記測定に含まれる。
-  ただし crtinit の chain (cookie・trampoline) の e2e 実行は未実施 (lift・署名の範囲のみ)。
-- 未達: N=16 / 別 base での `ott_set_gbase` 経路 → #1200 に残す。相対化の CPU コスト・SIDE_MODULE PIC 税 → #1201。
+## 15. #1200 — 相対化 (OTT_RELOC=1): 既定 base 同一性のみ (b5d7663c)。N=16・別 base・crtinit chain 未実施 → #1200。詳細 `tools/ott/REPORT_APPENDIX_1200.md`
