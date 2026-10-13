@@ -3,8 +3,8 @@
 **判定: 受入条件達成 (測定は完了し n=3 で記録)。ただし結論は 1 関数のみ判定可能で、806740 と 666a60 は両側で比較不能 (unexec)。**
 親: #509 (LD-9) / REPORT_509.md §6 の起票依頼 5。前任の動的確認 (REPORT_509.md §4.4) は wasm 直接呼びで、liftdiff (native PE 比較) は未実施だった。
 
-実測の起点: `061eadd6` (`ls737_liftdiff.sh` を追加した commit。§3 の実測はこの版で取得)。以降 `fb9c6f48` は本 REPORT のみを追加し、`tools/` のコードは `061eadd6` と同一。再現: `FL_WIN64_DIR=<fl-win64 展開先> bash tools/m11/ldfix/ls737_liftdiff.sh`。
-HEAD 上での再実行 (verdict 行の貼り付け) は、素材 (`toolchain-emsdk` / `work-m11` / `work-liftdiff`) が揃う run で行うまで未実施。本 run では `fl-win64` のみ存在した (§7)。
+実測の起点: `061eadd6` (`ls737_liftdiff.sh` を追加した commit。§3 の初回実測はこの版で取得)。以降 `8cfbb222` までで、本測定の経路 (`tools/liftdiff/` と `ls737_liftdiff.sh` の実行部) は変わらない。`8cfbb222` で `ls737_liftdiff.sh` のコメント行のみ変更 (repo 外パスの除去)。`tools/m11/` の他スクリプトの差 (main 取り込み由来) は本スクリプトから呼ばれない。再現: `FL_WIN64_DIR=<fl-win64 展開先> bash tools/m11/ldfix/ls737_liftdiff.sh`。
+HEAD `8cfbb222` での再実行は §7 の通り実施済み (verdict 一致)。
 
 ## 1. 結論 (受入条件別)
 
@@ -21,10 +21,11 @@ HEAD 上での再実行 (verdict 行の貼り付け) は、素材 (`toolchain-em
 - **native**: `block00031_PE.bin` (fl-win64 の FLEngine_x64.dll)。
 - **状態**: `work/m11/boot_state.json` (work-liftdiff 同梱) を両側に与える。boot state を与えない単独実行では 806740 と 666a60 が両側で fault したため、状態ありで揃えた。
 - **パターン**: liftdiff 既定の 11 パターン (`cases.PATTERNS`)。関数ごとに 11 case。
+- **IR の出所**: `work-m11` の `boot_final2.ll` / `boot_final3.ll` (snapshot の `.ll`) を直接使用。`m11_build.sh` の `ir_conditions` ゲートは通していない。`work-m11` は `docs/WORKFLOW.md` §11 で #516 以前の生成とされ survey の基準には使わない。本測定は修復前後の比較専用で、絶対的な基準にはしない。
 
 ## 3. 実測 (n=3)
 
-所要 (1 batch、3 関数): post 7.755〜7.783 s、pre 6.781〜7.095 s。`load1` 0.55〜1.14。
+所要 (1 batch、3 関数) は run ごとに異なる。`061eadd6` 当時の初回 run: post 7.755〜7.783 s、pre 6.781〜7.095 s (`load1` 0.55〜1.14)。`8cfbb222` の再実行 run (§7): post 8.734〜8.786 s、pre 7.631〜7.996 s (`load1` 0.70〜1.21)。両 run の値は別 runner の計測で、比較には使わない。
 
 | 関数 | 修復前 (3 回とも同一) | 修復後 (3 回とも同一) |
 |---|---|---|
@@ -59,8 +60,39 @@ HEAD 上での再実行 (verdict 行の貼り付け) は、素材 (`toolchain-em
 
 生成物 (`tools/liftdiff/work/`) は gitignore 対象で commit しない。
 
-## 7. 再実行の状況 (fix run)
+## 7. 再実行 (HEAD `8cfbb222`、差し戻し対応 run)
 
-- 本 run (差し戻し対応) の `ARTIFACTS_DIR` には `fl-win64.tar.zst` のみ。`toolchain-emsdk`・`work-m11`・`work-liftdiff` は無く、`ls737_liftdiff.sh` は `test -f` で停止する。
-- そのため本 run では §3 を再実行していない。§3 の数値は PR 作成時の run の記録 (本 fix run では未検証。ログは gitignore 対象の work/ 配下で commit されていない)。
-- 次の再実行は、PR 本文の単独行 `oc_artifacts: fl-win64 toolchain-emsdk work-m11 work-liftdiff` で素材を揃えた run で行い、verdict 行をここに貼る。
+- 素材 `fl-win64` / `toolchain-emsdk` / `work-m11` / `work-liftdiff` が `ARTIFACTS_DIR` に実在することを確認して展開した。`FL_WIN64_DIR` は fl-win64 の展開先。`toolchain-emsdk` は runner 上の既存 `/opt/emsdk` (emsdk 6.0.12、`[EMSDK]` と同じ pin) を使い、上書きしていない。numpy 2.5.4・capstone 5.0.7・pefile 2024.8.26 を pip で導入した。
+- `bash tools/m11/ldfix/ls737_liftdiff.sh` を foreground で実行: rc 0、`LS737_LIFTDIFF DONE`、所要 1 分 8 秒。
+- verdict は §3 の表と全 6 batch で一致した (下の出力は script の出力そのまま)。
+
+```
+[ls737] post r1 8768 ms  load1=0.70
+[ls737] pre r1 7889 ms  load1=1.18
+[ls737] post r2 8786 ms  load1=1.08
+[ls737] pre r2 7996 ms  load1=0.99
+[ls737] post r3 8734 ms  load1=1.21
+[ls737] pre r3 7631 ms  load1=1.11
+[ls737] pre r1 function_66e080 verdict=mismatch reason=None cases={'both_fault': 3, 'wasm_trap': 8} tags=['xmm_arg_drop', 'fp_flag_unreflected', 'wasm_trap']
+[ls737] pre r1 function_806740 verdict=unexec reason=native_null_deref_all_patterns cases={'both_fault': 11} tags=[]
+[ls737] pre r1 function_666a60 verdict=unexec reason=native_fault_all_patterns cases={'both_fault': 11} tags=[]
+[ls737] pre r2 function_66e080 verdict=mismatch reason=None cases={'both_fault': 3, 'wasm_trap': 8} tags=['xmm_arg_drop', 'fp_flag_unreflected', 'wasm_trap']
+[ls737] pre r2 function_806740 verdict=unexec reason=native_null_deref_all_patterns cases={'both_fault': 11} tags=[]
+[ls737] pre r2 function_666a60 verdict=unexec reason=native_fault_all_patterns cases={'both_fault': 11} tags=[]
+[ls737] pre r3 function_66e080 verdict=mismatch reason=None cases={'both_fault': 3, 'wasm_trap': 8} tags=['xmm_arg_drop', 'fp_flag_unreflected', 'wasm_trap']
+[ls737] pre r3 function_806740 verdict=unexec reason=native_null_deref_all_patterns cases={'both_fault': 11} tags=[]
+[ls737] pre r3 function_666a60 verdict=unexec reason=native_fault_all_patterns cases={'both_fault': 11} tags=[]
+[ls737] post r1 function_66e080 verdict=mismatch reason=None cases={'native_fault': 3, 'diff': 8} tags=['xmm_arg_drop', 'zero_init_drop', 'fp_flag_unreflected']
+[ls737] post r1 function_806740 verdict=unexec reason=native_null_deref_all_patterns cases={'both_fault': 11} tags=[]
+[ls737] post r1 function_666a60 verdict=unexec reason=hang cases={'both_fault': 8, 'hang': 3} tags=[]
+[ls737] post r2 function_66e080 verdict=mismatch reason=None cases={'native_fault': 3, 'diff': 8} tags=['xmm_arg_drop', 'zero_init_drop', 'fp_flag_unreflected']
+[ls737] post r2 function_806740 verdict=unexec reason=native_null_deref_all_patterns cases={'both_fault': 11} tags=[]
+[ls737] post r2 function_666a60 verdict=unexec reason=hang cases={'both_fault': 8, 'hang': 3} tags=[]
+[ls737] post r3 function_66e080 verdict=mismatch reason=None cases={'native_fault': 3, 'diff': 8} tags=['xmm_arg_drop', 'zero_init_drop', 'fp_flag_unreflected']
+[ls737] post r3 function_806740 verdict=unexec reason=native_null_deref_all_patterns cases={'both_fault': 11} tags=[]
+[ls737] post r3 function_666a60 verdict=unexec reason=hang cases={'both_fault': 8, 'hang': 3} tags=[]
+LS737_LIFTDIFF DONE
+```
+
+- 所要 (本 run の batch): post 8.734〜8.786 s、pre 7.631〜7.996 s (§3 の初回 run とは別 runner の値)。
+- 初回 run のログは gitignore 対象の work/ 配下のため commit しない。本 run のログは上記の貼り付けが正。
