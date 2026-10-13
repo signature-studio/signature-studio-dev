@@ -249,16 +249,33 @@ IppStatus ippsConvert_16s32f(const Ipp16s *pSrc, Ipp32f *pDst, int len) {
 }
 
 /* ============ 7. VectorSlope ============ */
-/* 実測 (probe_d/vs4): offset + i*slope の直接積。
-   **残差 (未解決・起票先: 本チケット REPORT)**: 実 DLL の 64f 版は SIMD ブロック累積経路で
-   値を生成しており、80 要素中 24 要素 (30%) が自前実装と **±1 ULP** 異なる (絶対値は
-   相対 1e-16 帯)。VectorSlope_32f も同種のブロック累積で bit 再現未解決 (REPORT §4) であり、
-   64f は double 精度のため相対誤差は 32f より小さい。bit-exact は次のチケットで
-   win カーネル逆アセ (CPU dispatch 込み) により解明する。 */
+/* IPP-9 (#276) / IPP-11 (#473): 実 DLL (dsp_ippv2_x64.dll の SSE2 カーネルを逆アセ。全 ISA 経路で同一出力) の算法。
+   - head: 出力先が 16B 境界に揃うまで 1 要素ずつ peel。p 番目 (p=0,1,..) の値 = p*s + o (積→加算)。
+     64f の peel は 0 か 1 要素 (出力先が 8B 境界のとき)。peel 数 p はポインタ値 & 15 で決まる。
+   - body: peel 後の {p*s, (p+1)*s} から 2 レーン × 4 ベクトル = 8 要素ブロック。
+     ベクトル m の値 = (初期 + m 回の 2s 累積) + o。以降のブロックは各レーンに step=8*s を加算 (rem/8 ブロック)。
+   - tail (rem%8): 先頭要素 = 次ブロックのレーン0 累積値、以降は直前要素 + s の直列加算。
+   乗算と加算は融合しない (-ffp-contract=off 必須)。 */
 IppStatus ippsVectorSlope_64f(Ipp64f *pDst, int len, Ipp64f offset, Ipp64f slope) {
   if (!pDst) return ippStsNullPtrErr;
   if (len < 1) return ippStsSizeErr;
-  for (int i = 0; i < len; i++) pDst[i] = offset + (double)i * slope;
+  const double s = slope, s2 = 2.0 * s, step = 8.0 * s;
+  int i = 0;
+  while (((uintptr_t)(pDst + i) & 15) != 0) {
+    pDst[i] = (double)i * s + offset;
+    if (++i >= len) return ippStsNoErr;
+  }
+  double x[2] = {(double)i * s, ((double)i + 1.0) * s}, lane[8];
+  for (int m = 0; m < 4; m++)
+    for (int c = 0; c < 2; c++) { lane[2 * m + c] = x[c] + offset; x[c] += s2; }
+  const int rem = len - i;
+  int b = 0;
+  for (; b + 8 <= rem; b += 8)
+    for (int k = 0; k < 8; k++) { pDst[i + b + k] = lane[k]; lane[k] += step; }
+  if (b < rem) {
+    pDst[i + b] = lane[0];
+    for (b++; b < rem; b++) pDst[i + b] = pDst[i + b - 1] + s;
+  }
   return ippStsNoErr;
 }
 
