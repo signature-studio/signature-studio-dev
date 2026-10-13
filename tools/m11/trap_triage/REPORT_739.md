@@ -52,3 +52,45 @@ python3 trap_triage/icall_41037d_679.py work/trap_triage/on_c.json --expect-ok 2
 ```
 
 `n40_cost.json` の `listfind` / `listraise` / `getmem` を unit ごとに見る (`work/trap_triage/n40_cost.json`)。
+
+## 5. 実測 (2026-10-13 run, origin/main a7033aaf, 生出力付き)
+
+§2 の「未検証」を解消するため、§4 の手順を本 run で実行した。PE は fl-win64 (`block00031_PE.bin`)、IR は `m11_gen_ir2.sh` 相当で再生成 (`ldfix` 込み、490,693 行)。
+
+**OFF (`M11_OV_CLASSCREATE=0`, probe 有)** — `work/n40_survey.out` 先頭行より:
+
+```
+M11_SURVEY {"dllmain_done":true,"boot_threw":null,"units":942,"ok":869,"noproc":1,"miss":47,"trap":25,"clobber":0,"trap_oom":1,"trap_other":24,...
+"0x1de960:101:131399680"   (unit 101 = 0x1de960: ok, va_bytes 131,399,680)
+```
+
+`n40_cost.json` の unit 101 は `getmem=1, freemem=0, oom=0, listfind=2, listraise=0`。unit 304 (0x483140) は `getmem=4`、`listfind=0`。
+全 942 unit の listfind 合計 = 2、listraise 合計 = 0、getmem 合計 = 2,004。
+
+**ON (`M11_OV_CLASSCREATE=1`)** — `work/trap_triage/on_c.json` (`survey_units.mjs`):
+
+```
+SURVEY_UNITS {"ok":867,"miss":47,"other":1,"oob":18,"halt0":8,"noproc":1}
+unit 101: kind=oob, msg="memory access out of bounds", frames=[function_410360, function_4fa070, function_4fb090, function_4fb8a0, function_5de960, ...]
+unit 898: kind=ok, icall 0x41037d ok=504
+```
+
+`icall_41037d_679.py` (ON): 0x41037d の unit 合計 ok=1049 miss=2 (当たった unit 108 本)。最上位は unit 898 (504 hit, 48.0%)。unit 101 は 1 hit のみ。
+
+**判定**
+
+- OFF では unit 101 は暴走せず ok (131 MB・GetMem 1 回)。`4fa210` (ListFind) の入口は 2 回。PR #993 の「unit 101 は 0 回・unit 304 に 2 回」とは一致しない (今回の実測を採る)。
+- ON では unit 101 は halt0 ではなく **oob**。frames の先頭は `function_410360` → `function_4fa070` → … → `function_5de960` (oob の正確な発生命令は未測定)。halt0 8 件の内訳に unit 101 は含まれない。
+- 0x41037d の hit が unit 898 に集中する件は、ON のみで観測。REPORT_679 の「unit 101 が 99.999%」は、基準 (c) の旧構成 (`M11_OV_CLASSCREATE=1` の期待値 23,053,861) と現 IR が一致しないことを示す。期待値は現構成では不成立。
+- よって REPORT_679 の「暴走 unit 101 の halt0」は、現 main (a7033aaf) の OFF / ON いずれでも再現していない。
+
+**受入条件の状態**
+
+- 1 根本原因: 未達 (暴走が再現しないため、根因の特定対象がない)。
+- 2 GetMem 差 2,663: 未達 (比較対象の暴走が無い)。
+- 3 周回数 probe: 未達 (入口回数 2 回のみ。1 周回あたり object 数は未計測)。
+
+**未解決 (起票先 #739)**
+
+- ON の unit 101 の oob (`function_4fa070` 近傍の境界外アクセス) の原因。これは暴走 (halt0) とは別の失敗の可能性が高い。
+- REPORT_679 の期待値 (23,053,861) を現構成でどう扱うかの判断 (PM)。
