@@ -81,7 +81,7 @@ def rebase_sections(pe, names=(".rdata", ".data"), lb=0, span=IMG_SPAN_M11):
         sd = bytearray(data)
         fixed = 0
         for r in relocs:
-            if lo <= r < lo + len(sd) - 8:
+            if lo <= r <= lo + len(sd) - 8:   # m11_data_gen.py #572: セクション末尾の 8B slot も対象
                 off = r - lo
                 v = struct.unpack_from("<Q", sd, off)[0]
                 if pe.base < v < pe.base + span:

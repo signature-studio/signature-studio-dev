@@ -12,6 +12,10 @@ t0=$(date +%s); S "start load=$(cut -d' ' -f1-3 /proc/loadavg) nproc=$(nproc)"
 for f in boot_final.ll boot_final3.ll m11_image.bin; do [ -f "$M/work/$f" ] || { S "前提欠如: tools/m11/work/$f (work-m11 素材 + m11_gen_ir2.sh)"; exit 2; }; done
 [ -f "${FL_WIN64_DIR:-/nonexistent}/extracted/block00031_PE.bin" ] || { S "前提欠如: FL_WIN64_DIR/extracted/block00031_PE.bin (import thunk 表)"; exit 2; }
 command -v x86_64-w64-mingw32-gcc >/dev/null || { S "前提欠如: x86_64-w64-mingw32-gcc (gen_api.py の arity 表)"; exit 2; }
+# tools/m11 は読取のみ (AGENTS §4-4): m11_build.sh は work/ を書き換えるため、work 込みで複製した検証スナップショットで以降を回す
+SNAP="$W/snap"; rm -rf "$SNAP"; mkdir -p "$SNAP"
+cp -a "$GF_M11" "$SNAP/m11" && cp -a "$GF_M11/../shared" "$SNAP/shared" && cp -a "$GF_M11/../shim" "$SNAP/shim" || { S "検証スナップショットの複製に失敗"; exit 2; }
+export GF_M11="$SNAP/m11"; M="$GF_M11"; S "検証スナップショット: $M (元の tools/m11 は読取のみ)"
 
 S "0/6 baseline (GUI shim 無し, 同一 IR): m11_build.sh → m11_run.mjs / m11_survey.mjs"
 ( cd "$M" && bash m11_build.sh > "$W/res/m11_build.log" 2>&1 ) || { S "m11_build.sh 失敗"; tail -5 "$W/res/m11_build.log"; exit 2; }
@@ -43,7 +47,7 @@ S "4/6 native selftest (tools/gui/test/selftest.sh)"
 bash "$GF_GUI/test/selftest.sh" 2>&1 | tail -1 | tee "$W/res/selftest.txt"; grep -q ", 0 failed" "$W/res/selftest.txt" || rc=1
 
 S "4b/6 __pe_image の data 実体化 (GUI-12 #566): 共通規則 vs m11_data_gen.py (実 FLEngine PE, LB=0/0x10000) + ネガコン"
-python3 "$HERE/pe_image_parity.py" --pe "$FL_WIN64_DIR/extracted/block00031_PE.bin" --m11-data "$M/work/m11_data.c" > "$W/res/pe_image_parity.txt" 2>&1; pr=$?
+python3 "$HERE/pe_image_parity.py" --pe "$FL_WIN64_DIR/extracted/block00031_PE.bin" > "$W/res/pe_image_parity.txt" 2>&1; pr=$?
 grep -E "PASS|FAIL|done" "$W/res/pe_image_parity.txt"; [ $pr = 0 ] || rc=1
 bash "$GF_GUI/test/pe_image_e2e.sh" > "$W/res/pe_image_e2e.txt" 2>&1; pr=$?
 grep -E "PASS|FAIL|done" "$W/res/pe_image_e2e.txt"; [ $pr = 0 ] || rc=1

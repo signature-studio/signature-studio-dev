@@ -6,7 +6,7 @@
 import fs from 'fs';
 import path from 'path';
 const HERE = path.dirname(new URL(import.meta.url).pathname);
-const M11 = path.resolve(HERE, '../../m11');
+const M11 = process.env.GF_M11 || path.resolve(HERE, '../../m11');
 const args = process.argv.slice(2);
 const survey = args.includes('--survey');
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
