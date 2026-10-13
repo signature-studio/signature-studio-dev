@@ -3,9 +3,9 @@
 
 capstone を使わず、closure の各関数の .pdata 区間を **バイト列パターン**だけで走査する:
   REX.W C7 /0 imm32 で ModRM が [rbp+disp8] (48 C7 45 d8 imm32) / [rbp+disp32] (48 C7 85 d32 imm32) /
-  [rsp+disp8] (48 C7 44 24 d8 imm32) / [rsp+disp32] (48 C7 84 24 d32 imm32)
-命令境界を見ないので偽陽性 (命令の途中の一致) がありうる = **上限**。capstone 版 (m11_qstore.py の
-machine_qword_imm_stack_stores) との差分が偽陽性 + prologue 未解決 (rbp 基準で frame 追跡できない関数) で説明できることを確認する。
+  [rsp] (48 C7 04 24 imm32) / [rsp+disp8] (48 C7 44 24 d8 imm32) / [rsp+disp32] (48 C7 84 24 d32 imm32)
+命令境界を見ないので偽陽性 (命令の途中の一致) がありうる。capstone 版 (m11_qstore.py の
+machine_qword_imm_stack_stores, 全 closure 関数の rbp/rsp 基準 qword imm store) との総数一致を確認する。
 使い方: crosscheck_bytes.py <boot_final.ll> --pe PE.bin
 """
 import argparse
@@ -20,8 +20,9 @@ from ldmach import Machine  # noqa: E402
 PATS = {
     'rbp+d8': re.compile(rb'\x48\xc7\x45.....', re.S),
     'rbp+d32': re.compile(rb'\x48\xc7\x85........', re.S),
-    'rsp+d8': re.compile(rb'\x48\xc7\x44\x24......', re.S),
-    'rsp+d32': re.compile(rb'\x48\xc7\x84\x24.........', re.S),
+    'rsp+0': re.compile(rb'\x48\xc7\x04\x24....', re.S),
+    'rsp+d8': re.compile(rb'\x48\xc7\x44\x24.....', re.S),
+    'rsp+d32': re.compile(rb'\x48\xc7\x84\x24........', re.S),
 }
 
 

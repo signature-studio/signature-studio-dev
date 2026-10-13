@@ -235,3 +235,11 @@ callee が `[rcx+0x2c..0x3e]` (GetCPInfo の LeadByte 表) に書くため、呼
 | 巨大 VirtualAlloc 要求 (355MB×2, unit #18 のサイズ算出の未初期化値) | 通常起動で 711.7MB 確保 (`alloca/REPORT.md` 残置 #5) | #132 に継続 |
 | `m11_site` 型の診断 (IR へ guest VA を埋める) が m11 に無い | 反復が手作業 | boot/dbg_lift.py (flelift/boot) の m11 版を要検討 |
 | 素材 tarball に `ir_lb_base.stamp` が無く初回 e2e は必ず gen_ir2 が走る。gen_ir2 は capstone/pefile が無いと ldfix を黙ってスキップする (WARNING のみ) | 素材展開直後の数値が ldfix 有無で変わる (`6ad441d` で無し: survey 839/56/46/1、有り: 841/54/46/1) | #132 に継続 (e2e の前提チェック追加を提案) |
+
+## 11. 64bit スタック局所の即値 store が 4B に縮む欠陥 (#516, DEFECTS.md D17)
+
+PR #411 の reviewer 検算で見つかった実退行 idx 87 (0x59f9a0) / idx 898 (0x1306110) の原因。機械語 `mov qword [rbp+X], imm` (8B) が IR で `store ptr null` / `store i32 imm` (wasm32 で 4B) に縮み、
+上位 4B が未初期化のまま、C 転記 `function_418190` / `function_412d60` の `Q(dest)` (8B) が非 0 のゴミを旧値として読んでいた (idx 87 = 418190、idx 898 = 412d60 を転記のみ無効化して帰属を確定)。
+- 修復: `qstore/m11_qstore.py` (capstone 突合で確定した 279 site / 158 関数を `store i64` に戻す。`m11_build.sh` に常設、`M11_QSTORE=0` で無効)。survey 816/79 → **817/78** (変化は idx 87 のみ)、通常起動は 22 unit のまま。NC (`M11_QSTORE=0`) は 816/79。
+- 無 skip の survey では idx 898 は OOM (暴走 unit idx 101, #513) で trap のまま。skip 101/144 の probe では idx 87 / 898 とも ok。
+- 数値・site 一覧・選択理由・未解決: [qstore/REPORT.md](qstore/REPORT.md)。再現: `bash tools/m11/qstore/qstore_e2e.sh`。
