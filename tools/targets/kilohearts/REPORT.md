@@ -224,7 +224,7 @@ VEX-256 は 344 関数 189,611 B 中 **closure 内は 6 関数のみ** (Convolve
 - 突合・ablation・ネガコンは本 run でも未実施。Stereo / Delay は未着手。
 
 #### 10-7d. #1215 (KH-23) 1 単位: V128 の 128bit レーン型を shim で解消
-- 環境: Ghidra 12.1.4 = GitHub release `Ghidra_12.1.4_build` の zip (sha256 `ddac49f9…d2db` 一致)、JDK 21。素材は `plugins-kilohearts` の Installer zip → payload.dat → windows.zip → HeartCore.core_64。emsdk は `/opt/emsdk` (6.0.12)。
+- 環境: Ghidra 12.1.4 = GitHub release `Ghidra_12.1.4_build` の zip (sha256 `ddac49f9…d2db` 一致)、JDK 21。素材は `plugins-kilohearts` の Installer zip → payload.dat → windows.zip → HeartCore.core_64。emsdk は `[EMSDK]` (6.0.12)。
 - 変更: `ghidra_shim.h` の `V128` に `_0_8_`・`_8_8_` (uint64) と `_4_12_` (12 byte) のレーンを追加 (commit は本 PR)。
 - emcc (resonator, 修復なし, `-ferror-limit=0`, 同一条件): 旧 shim 22 行 (`_8_8_`/`_4_12_`/`_0_8_` 由来 8 件) → 新 shim 18 行 (そのレーン由来 0 件)。
 - 残件 (emcc): (a) テーブル `UNK_182280000`・`UNK_182280020` が未定義 (`pe_bytes` は 1 グローバル 16 byte しか読まない)、(b) 未関数化 callee `func_0x000180fd648c`・`func_0x000180fd6498`・`func_0x000180fd662c`・`func_0x000180fbdfcc`・`func_0x000180fbdef4`・`FUN_180fe5f40`・`FUN_180fd3144`、(c) `rcpps` の 2 引数形 (`rcpps(in_XMM2, auVar26)`)、(d) 引数なし呼出の `param_1` 不足 2 件。
