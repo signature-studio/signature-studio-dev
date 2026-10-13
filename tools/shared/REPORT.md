@@ -105,7 +105,7 @@
 | DirectWaveCtEngine | C++ | 1.71M | 2.6% | 23% | 難 | FS shim 後 |
 | dsp_ippv2 | C++/asm | 11.7M | 43% | 3% | (lift しない) | §2 |
 
-(補足: libreverb `BaseReverb::Process_Fruity_32FM_32FS` (0x25c0-0x2f87, 外部 call 無し) は RetDec 0.3s で lift 可、IR 73KB に `__asm_{movss,mulss,addss,subss,xorps,movaps,cmpneqss,andps,andnps,orps}` 計 185 call — M6-M11 の helper 生成で実行可能になる見込み (**実行検証は未実施**)。
+(補足: libreverb `BaseReverb::Process_Fruity_32FM_32FS` (0x25c0-0x2f87, 外部 call 無し) は RetDec 0.3s で lift 可、IR 73KB に `__asm_{movss,mulss,addss,subss,xorps,movaps,cmpneqss,andps,andnps,orps}` 計 185 call — M6-M11 の helper 生成で実行可能になる見込み (mac slice の実行検証は未実施)。**win 版 `Reverb.dll` の Process_Fruity/UF は lift + native 実機械語との差分テスト 240/240 一致・ネガコン 4 件 FAIL を確認済 (T-SH-15 #161 部分達成、詳細は [lift/libreverb/REPORT.md](lift/libreverb/REPORT.md); win は範囲が別: Fruity 0x1240–0x1b7f / UF 0x1ba0–0x278b)**。ildsp の lift は未着手。
 (命令数/SIMD/間接 call 率 = indirect/全 call は `llvm-objdump -d` 全逆アセンブル実測。C++/Pascal の vtable 比率の目安)
 
 ### libkio lift PoC (`bash tools/shared/lift/libkio/lift.sh`)

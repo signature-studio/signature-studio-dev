@@ -5,11 +5,14 @@
 2. 文字列アンカー (ASIO/DirectSound エラーメッセージ) を参照する関数を解決
 3. 各関数内の `call qword ptr [reg+disp]` (COM/ASIO vtable 呼出) の disp 集計
 出力: JSON (--json path) と stdout。"""
-import sys, re, struct, json, bisect, collections
+import sys, os, re, struct, json, bisect, collections
 import pefile
 from capstone import Cs, CS_ARCH_X86, CS_MODE_64
 
-PATH = "/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin"
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "shared"))
+from paths import FL_WIN64_DIR
+
+PATH = os.path.join(FL_WIN64_DIR, "extracted", "block00031_PE.bin")
 pe = pefile.PE(PATH)
 img = pe.get_memory_mapped_image()
 base = pe.OPTIONAL_HEADER.ImageBase

@@ -3,7 +3,8 @@
   - 名前非依存: `__asm_<base>[__N|.N]` の接尾番号は無視し, (base mnemonic, 戻り型, 引数型) だけで意味を決める
   - 正規名: `__asm_<base>__<ret><args>` (例 __asm_mulss__xxd) へ IR をリネームすれば, 複数バイナリの
     helper を 1 本の C に統合できる (`canonicalize`)
-  - 未被覆の mnemonic (テーブルに無い / i256 (ymm) 形) は一覧化し, 任意で fail-fast stub を出す
+  - 未被覆の mnemonic (テーブルに無い形) は一覧化し, 任意で fail-fast stub を出す
+  - i256 (ymm): wasm32 ABI = 引数 u64×4 に平坦化 / 戻り値 sret (C の struct Y 返し) (LIFTLIB #241)
 """
 import re
 import sys
@@ -12,7 +13,7 @@ from collections import OrderedDict
 from . import kernels
 
 TAG = {"i128": "x", "i64": "q", "i32": "d", "i16": "w", "i8": "b", "i256": "y", "void": "v"}
-CT = {"x": "u128", "q": "u64", "d": "u32", "w": "u16", "b": "u8", "v": "void"}
+CT = {"x": "u128", "q": "u64", "d": "u32", "w": "u16", "b": "u8", "v": "void", "y": "Y"}
 
 DECL_RE = re.compile(r"(?m)^declare[ \t]+(\S+)[ \t]+@(__asm_[\w.\-]+)\(([^)\n]*)\)(?:[ \t]+\S+)*[ \t]*$")
 SUFFIX_RE = re.compile(r"(?:__\d+|\.\d+)$")
@@ -84,16 +85,17 @@ def emit_c(decls, use_names="orig", stub_unsupported=True, extra_header=""):
              '#include "liftlib_simd.h"', extra_header, ""]
     rep = dict(generated=[], unsupported=[], approx=[], dup=[])
     seen = set()
+    uses_pcmp = False
     for d in decls:
         nm = d.name if use_names == "orig" else d.canon
         if nm in seen:
             rep["dup"].append(nm)
             continue
         seen.add(nm)
-        if "?" in d.ret or "?" in "".join(d.args) or d.ret == "y" or "y" in d.args:
-            rep["unsupported"].append((d.name, d.sig, "i256/ymm (VEX-256) は C で ABI 表現不能"))
+        if "?" in d.ret or "?" in "".join(d.args):
+            rep["unsupported"].append((d.name, d.sig, "未知の型タグ (i16 等) は ABI 未定義"))
             if stub_unsupported:
-                lines.append(_stub(nm, d, "256-bit"))
+                lines.append(_stub(nm, d, "unknown type"))
             continue
         sp = kernels.lookup(d.base, d.ret, d.args)
         if sp is None:
@@ -101,20 +103,44 @@ def emit_c(decls, use_names="orig", stub_unsupported=True, extra_header=""):
             if stub_unsupported:
                 lines.append(_stub(nm, d, "unimplemented"))
             continue
-        params = ", ".join("%s p%d" % (CT[t], i) for i, t in enumerate(d.args)) or "void"
+        params, pro = _params(d)
         rt = CT[d.ret]
         lines.append("/* %s%s */" % (d.base, (" — " + sp.note) if sp.note else ""))
-        lines.append("LL_EXPORT %s %s(%s) { %s }" % (rt, nm, params, sp.body))
+        body = sp.body
+        if sp.lanes is not None:
+            inner, iargs = sp.lanes
+            ip = ", ".join("%s p%d" % (CT[t], i) for i, t in enumerate(iargs))
+            lines.append("static inline u128 %s__l(%s) { %s }" % (nm, ip, inner.body))
+            lo = ", ".join(("YLO(p%d)" if t == "y" else "p%d") % i for i, t in enumerate(d.args))
+            hi = ", ".join(("YHI(p%d)" if t == "y" else "p%d") % i for i, t in enumerate(d.args))
+            body = "return MKY(%s__l(%s), %s__l(%s));" % (nm, lo, nm, hi)
+        lines.append("LL_EXPORT %s %s(%s) { %s%s }" % (rt, nm, params, pro, body))
         rep["generated"].append((nm, d.sig))
+        if d.base.endswith("pcmpistri") and d.ret == "v":
+            uses_pcmp = True
         if not sp.exact:
             rep["approx"].append(nm)
+    if uses_pcmp:
+        lines.append("LL_EXPORT u32 ll_pcmpistr_ecx; LL_EXPORT u32 ll_pcmpistr_fl;")
     return "\n".join(lines) + "\n", rep
 
 
+def _params(d):
+    """(C 引数リスト, 関数先頭 prologue)。i256 (y) は wasm32 ABI に合わせ u64×4 に平坦化し prologue で Y に束ねる。"""
+    ps, pro = [], ""
+    for i, t in enumerate(d.args):
+        if t == "y":
+            ps += ["u64 p%d_%d" % (i, k) for k in range(4)]
+            pro += "Y p%d = {{p%d_0, p%d_1, p%d_2, p%d_3}}; " % ((i,) * 5)
+        else:
+            ps.append("%s p%d" % (CT[t], i))
+    return ", ".join(ps) or "void", pro
+
+
 def _stub(nm, d, why):
-    params = ", ".join("%s p%d" % (CT.get(t, "u128"), i) for i, t in enumerate(d.args)) or "void"
+    params, _ = _params(d) if "?" not in "".join(d.args) else (", ".join("u128 p%d" % i for i in range(len(d.args))) or "void", "")
     rt = CT.get(d.ret, "u128")
-    ret = "" if rt == "void" else "return 0;"
+    ret = "" if rt == "void" else ("Y z = {{0, 0, 0, 0}}; return z;" if rt == "Y" else "return 0;")
     return ("LL_EXPORT %s %s(%s) { __builtin_trap(); %s } /* %s */"
             % (rt, nm, params, ret, why))
 
@@ -125,11 +151,15 @@ def _stub(nm, d, why):
 _REP_SIGS = [("x", ["x"]), ("x", ["x", "x"]), ("x", ["x", "d"]), ("x", ["x", "q"]), ("x", ["d"]), ("x", ["q"]),
              ("x", ["x", "b"]), ("x", ["x", "x", "b"]), ("x", ["x", "x", "x"]), ("x", ["x", "x", "d"]),
              ("x", ["x", "x", "q"]), ("d", ["x"]), ("q", ["x"]), ("d", ["d"]), ("d", ["q"]), ("v", ["x", "x"]),
-             ("v", ["x", "q"]), ("v", ["x", "d"]), ("x", []), ("q", []), ("v", ["b"])]
+             ("v", ["x", "q"]), ("v", ["x", "d"]), ("x", []), ("q", []), ("v", ["b"]),
+             ("v", ["x", "x", "b"]), ("d", ["x", "x", "b"])]
+# ymm (i256) 形の代表署名 (LIFTLIB #241)。VEX-256 mnemonic のみ試す
+_YREP_SIGS = [("y", ["y"]), ("y", ["y", "y"]), ("y", ["y", "b"]), ("y", ["y", "y", "b"]), ("y", ["y", "y", "y"]),
+              ("y", ["y", "x", "b"]), ("x", ["y", "b"]), ("v", ["y", "y"])]
 
 
 def mnemonic_covered(base):
-    for r, a in _REP_SIGS:
+    for r, a in _REP_SIGS + _YREP_SIGS:
         if kernels.lookup(base, r, a) is not None:
             return True
     return False

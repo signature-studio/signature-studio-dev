@@ -31,6 +31,48 @@ BLK_TARGET, BLK_RCX, BLK_RDX, BLK_R8, BLK_R9 = 0x00, 0x08, 0x10, 0x18, 0x20
 BLK_X0 = 0x28            # xmm0..3 at +0x28,+0x30,+0x38,+0x40
 BLK_RAX, BLK_XMMRET = 0x80, 0x88
 BLK_RAXIN = 0x90
+BLK_XMMRET1 = 0x98       # closure 内 direct call の戻り xmm1 (hi/lo 2 値を返す CRT: 1801c1240・1801c0d00 等)。ICALL_ABI_XMM1=0 で無効 (ネガコン)
+ABI_XMM1 = os.environ.get('ICALL_ABI_XMM1', '1') == '1'
+BLK_STK = 0x48           # 第 5 引数以降 (stack) 配列の先頭アドレス (定数 = blk+BLK_STKBUF; icall_rt.c の __icall_dispatch が設定)
+BLK_STKBUF = 0x100       # stack 引数の連続コピー領域: 呼出し点で [rsp+0x20+8k] (jmp 末尾呼出しは +0x28+8k) を k=0..NSTK-1 だけ明示 load/store
+NSTK = 12                # 16 引数まで (IPP ippiResize*_8u 13 引数 = 9 語)
+STK_COPY_ONE = 8 + 7     # mov r11,[rsp+disp32] (8B) ; mov [rip+d],r11 (7B)
+STK_WINDOW = 48          # nstk 推定: site 直前の同一基本ブロック風の命令列 (直前の call/ret/jmp まで, 最大この命令数) を遡る
+SITE_TAIL_BASE = 7 * 6 + 8 * 4 + 5 + 7 + 8
+
+
+def site_tail_len(nstk):
+    return SITE_TAIL_BASE + nstk * STK_COPY_ONE
+
+
+def stk_slots_stored(items, idx):
+    """items[idx] (間接 call site) の直前で [rsp+0x20+8k] (k<NSTK) へ store された最大 k+1 (無ければ 0)。
+    全 site で無条件に rsp+0x20.. を読むと、RetDec が leaf 関数の stack 引数と誤認して関数 signature を変える (i64 f(void) 崩れ) ため、
+    実際に書かれているスロットだけを BLK へコピーする。"""
+    n = 0
+    seen = 0
+    j = idx - 1
+    while j >= 0 and seen < STK_WINDOW:
+        it = items[j]
+        j -= 1
+        if it.kind != 'ins':
+            continue
+        seen += 1
+        ins = it.ins
+        mn = ins.mnemonic
+        if mn in ('call', 'ret', 'retf', 'jmp'):
+            break
+        if not ins.operands or ins.operands[0].type != x86.X86_OP_MEM or not (ins.operands[0].access & capstone.CS_AC_WRITE):
+            continue   # cmp/test [rsp+..] 等の読み取りは store ではない
+        m = ins.operands[0].mem
+        if ins.reg_name(m.base) == 'rsp' and not m.index and not m.segment:
+            sz = ins.operands[0].size
+            if mn.startswith(('movaps', 'movups', 'movdqa', 'movdqu', 'movapd', 'movupd', 'vmov')) or sz not in (1, 2, 4, 8):
+                continue   # xmm 退避 (callee-saved の spill 領域) は引数ではない
+            d = m.disp - 0x20
+            if d >= 0 and d % 8 == 0 and d // 8 < NSTK:
+                n = max(n, d // 8 + 1)
+    return n
 
 
 
@@ -161,12 +203,12 @@ def split_prefix(raw):
     return pref, rex, i
 
 
-def expansion_template(it, tail, abi=True, cfg=False):
+def expansion_template(it, tail, abi=True, cfg=False, nstk=0):
     """site 展開の (長さ, builder(pos, blk, stub, newtarget_of_rip) ) を返す. 長さは位置非依存."""
     ins = it.ins
     if cfg:   # MSVC CFG thunk (`jmp rax`) 経由: 実 target は rax → mov r11, rax
         head = bytes([0x4c, 0x8b, 0xd8])
-        return len(head) + 7 * 6 + 8 * 4 + 5 + 7 + 8 + (1 if tail else 0), (head, b'', False, tail, b'', b'')
+        return len(head) + site_tail_len(nstk) + (1 if tail else 0), (head, b'', False, tail, b'', b'', nstk)
     raw = bytes(ins.bytes)
     pref, rex, i = split_prefix(raw)
     assert raw[i] == 0xff, 'unexpected opcode for indirect call/jmp: %s' % raw.hex()
@@ -193,15 +235,15 @@ def expansion_template(it, tail, abi=True, cfg=False):
         rest = bytes(sibpart) + bytes([0xf8])
         head = head2
         pre = lea_disp8(dfx, 8); post = lea_disp8(dfx, -8)
-        return (len(pre) + len(head) + len(rest) + len(post) + 7 * 6 + 8 * 4 + 5 + 7 + 8 + (1 if tail else 0)), (head, rest, riprel, tail, pre, post)
+        return (len(pre) + len(head) + len(rest) + len(post) + site_tail_len(nstk) + (1 if tail else 0)), (head, rest, riprel, tail, pre, post, nstk)
     lenA = len(head) + len(rest)
     # 残り: store 5 reg + 4 xmm + r11 / call / loads / (ret)
-    lenB = 7 * 6 + 8 * 4 + 5 + 7 + 8 + (1 if tail else 0)
-    return lenA + lenB, (head, rest, riprel, tail, b'', b'')
+    lenB = site_tail_len(nstk) + (1 if tail else 0)
+    return lenA + lenB, (head, rest, riprel, tail, b'', b'', nstk)
 
 
 def build_site(it, pos, blk, stub, tpl):
-    head, rest, riprel, tail, pre, post = tpl
+    head, rest, riprel, tail, pre, post, nstk = tpl
     out = bytearray()
     # [A] mov r11, <operand>
     out += pre
@@ -222,6 +264,11 @@ def build_site(it, pos, blk, stub, tpl):
         out.extend(opbytes + p32(d)); cur += ln
 
     st(bytes([0x4c, 0x89, 0x1d]), BLK_TARGET)      # mov [rip+], r11
+    # stack 引数: RetDec は rsp を連続領域でなく stack_var 別 alloca に分割するため、rsp+0x20 のアドレスは渡せない。
+    # 値を連続 BLK 領域へ明示コピーして SSA 配線を保つ (target は退避済みで r11 は空き)
+    for k in range(nstk):
+        out.extend(bytes([0x4c, 0x8b, 0x9c, 0x24]) + p32(0x20 + 8 * k)); cur += 8   # mov r11,[rsp+disp32]
+        st(bytes([0x4c, 0x89, 0x1d]), BLK_STKBUF + 8 * k)
     st(bytes([0x48, 0x89, 0x05]), BLK_RAXIN)       # rax-in (MSVC CFG thunk: 実 target は rax)
     st(bytes([0x48, 0x89, 0x0d]), BLK_RCX)         # rcx
     st(bytes([0x48, 0x89, 0x15]), BLK_RDX)         # rdx
@@ -247,7 +294,7 @@ def stub_code(pos, blk):
         ln = len(b) + 4
         out.extend(b + p32(blk + off - (cur + ln))); cur += ln
     op(bytes([0x48, 0x8b, 0x05]), BLK_TARGET)                   # mov rax,[tgt]
-    for off in (BLK_RCX, BLK_RDX, BLK_R8, BLK_R9, BLK_X0, BLK_X0 + 8, BLK_X0 + 16, BLK_X0 + 24):
+    for off in (BLK_RCX, BLK_RDX, BLK_R8, BLK_R9, BLK_X0, BLK_X0 + 8, BLK_X0 + 16, BLK_X0 + 24) + tuple(BLK_STKBUF + 8 * k for k in range(NSTK)):
         op(bytes([0x48, 0x03, 0x05]), off)                      # add rax,[..]
     op(bytes([0x48, 0x89, 0x05]), BLK_RAX)                      # mov [rax_res],rax
     op(bytes([0x48, 0x89, 0x05]), BLK_XMMRET)                   # mov [xmm_res],rax
@@ -276,8 +323,8 @@ LD_INT = [(bytes([0x48, 0x8b, 0x0d]), BLK_RCX), (bytes([0x48, 0x8b, 0x15]), BLK_
 XM = (0x05, 0x0d, 0x15, 0x1d)
 ABI_SPILL_LEN = 4 * 7 + 4 * 8        # 60
 ABI_RELOAD_LEN = 4 * 7 + 4 * 8       # 60
-ABI_RETST_LEN = 7 + 8                # 15
-ABI_RETLD_LEN = 7 + 8                # 15
+ABI_RETST_LEN = 7 + 8 + (8 if ABI_XMM1 else 0)   # 23 (xmm1 戻りあり) / 15
+ABI_RETLD_LEN = 7 + 8 + (8 if ABI_XMM1 else 0)
 
 
 def abi_spill(em, blk):
@@ -297,11 +344,15 @@ def abi_reload(em, blk):
 def abi_ret_store(em, blk):
     em.rip(bytes([0x48, 0x89, 0x05]), blk + BLK_RAX)
     em.rip(bytes([0xf2, 0x0f, 0x11, 0x05]), blk + BLK_XMMRET)
+    if ABI_XMM1:
+        em.rip(bytes([0xf2, 0x0f, 0x11, 0x0d]), blk + BLK_XMMRET1)   # movsd [rip+],xmm1
 
 
 def abi_ret_load(em, blk):
     em.rip(bytes([0x48, 0x8b, 0x05]), blk + BLK_RAX)
     em.rip(bytes([0xf2, 0x0f, 0x10, 0x05]), blk + BLK_XMMRET)
+    if ABI_XMM1:
+        em.rip(bytes([0xf2, 0x0f, 0x10, 0x0d]), blk + BLK_XMMRET1)   # movsd xmm1,[rip+]
 
 
 BLK_CA, BLK_CB, BLK_CFLAGS, BLK_CKIND = 0xA0, 0xA8, 0xB0, 0xB8
@@ -408,7 +459,7 @@ def comis_stub_code(pos, blk):
 COMIS_STUB_LEN = 7 * 4 + 1
 
 
-STUB_LEN = 7 * 11 + 1
+STUB_LEN = 7 * (11 + NSTK) + 1
 
 
 def main():
@@ -513,11 +564,12 @@ def main():
     fset = set(funcs)
     cfg_thunks = {f for f in funcs if img.read(f, 2) == b'\xff\xe0'}      # MSVC CFG dispatch thunk (jmp rax)
     ncfg = 0
+    nstk_hist = collections.Counter()
     for f, (fs, fe, items) in funcs.items():
         if a.abi:
             pro = Item('pro', fs); pro.newlen = ABI_RELOAD_LEN
             items.insert(0, pro)
-        for it in items:
+        for ii, it in enumerate(items):
             if it.kind == 'data':
                 it.newlen = len(it.raw); continue
             if it.kind == 'pro':
@@ -540,7 +592,9 @@ def main():
                     cfg = True
             if expand:
                 tail = (st.mn == 'jmp')
-                it.newlen, it.tmpl = expansion_template(it, tail, a.abi, cfg)
+                nk = 0 if tail else stk_slots_stored(items, ii)
+                nstk_hist[nk] += 1
+                it.newlen, it.tmpl = expansion_template(it, tail, a.abi, cfg, nk)
                 nsites += 1
                 ncfg += cfg
                 continue
@@ -550,7 +604,8 @@ def main():
             if ins.operands and ins.operands[0].type == x86.X86_OP_IMM and (x86.X86_GRP_JUMP in grp or x86.X86_GRP_CALL in grp or mn == 'call'):
                 tgt = ins.operands[0].imm
                 if mn == 'call' and tgt in cfg_thunks:
-                    it.newlen, it.tmpl = expansion_template(it, False, a.abi, True); nsites += 1; ncfg += 1
+                    nk = stk_slots_stored(items, ii); nstk_hist[nk] += 1
+                    it.newlen, it.tmpl = expansion_template(it, False, a.abi, True, nk); nsites += 1; ncfg += 1
                     it.site = it.site or _FakeSite(it)
                     continue
                 if raw[0] in (0xe0, 0xe1, 0xe2, 0xe3):
@@ -578,15 +633,21 @@ def main():
     sect_va = img.base + ((image_size + 0xfff) & ~0xfff)
     cur = sect_va
     new_start = {}
-    for f, (fs, fe, items) in funcs.items():
-        cur = (cur + 15) & ~15
+
+    def next_slot(c):
+        # 16 byte 整列。 直前の関数/stub の終端とちょうど連続する (終端が既に 16 の倍数) と、RetDec の --select-ranges が
+        # [a,b)+[b,c) を 1 関数に併合して後続関数の define が落ちる (#514: eq-filter 4 block で 5 関数) ので 1 paragraph 空ける
+        a = (c + 15) & ~15
+        return a + 16 if a == c else a
+    for k, (f, (fs, fe, items)) in enumerate(funcs.items()):
+        cur = next_slot(cur) if k else sect_va
         new_start[f] = cur
         for it in items:
             it.newva = cur; cur += it.newlen
-    cur = (cur + 15) & ~15
+    cur = next_slot(cur)
     stub_va = cur
     cur += STUB_LEN
-    cstub_va = (cur + 15) & ~15
+    cstub_va = next_slot(cur)
     cur = cstub_va + COMIS_STUB_LEN
     sect_end = cur
     blk = a.blk_va if a.blk_va else (img.base + image_size + 0x4000000 if img.base > 0x100000000 else img.base + image_size + 0x100000)
@@ -769,12 +830,12 @@ def main():
     new_size = ((sect_va - img.base + len(buf)) + pe.OPTIONAL_HEADER.SectionAlignment - 1) // pe.OPTIONAL_HEADER.SectionAlignment * pe.OPTIONAL_HEADER.SectionAlignment
     struct.pack_into('<I', data, soi, new_size)
     open(a.out, 'wb').write(data)
-    m = {'pe': a.pe, 'image_base': img.base, 'section_va': sect_va, 'section_size': len(buf), 'blk': blk, 'stub': stub_va, 'comis_stub': cstub_va, 'ncomis': ncomis,
+    m = {'pe': a.pe, 'image_base': img.base, 'section_va': sect_va, 'section_size': len(buf), 'blk': blk, 'blk_stk': BLK_STK, 'blk_stkbuf': BLK_STKBUF, 'nstk_max': NSTK, 'nstk_hist': dict(nstk_hist), 'stub': stub_va, 'stub_len': STUB_LEN, 'comis_stub': cstub_va, 'comis_stub_len': COMIS_STUB_LEN, 'ncomis': ncomis,
          'nsites': nsites, 'nfrag_inlined': nfrag, 'njt': njt, 'ncfg': ncfg, 'cfg_thunks': sorted(cfg_thunks), 'nderef': nderef, 'abi': dict(nabi), 'nfuncs': len(funcs), 'errors': dict(errs),
          'func_map': {hex(f): hex(new_start[f]) for f in funcs},
          'func_range_new': {hex(f): [hex(new_start[f]), hex(new_start[f] + sum(it.newlen for it in funcs[f][2]))] for f in funcs},
          'insn_ranges': [[n, l, o] for n, l, o in insn_map],
-         'sites': [{'va': it.va, 'new': it.newva, 'kind': it.site.kind, 'mn': it.site.mn, 'text': it.site.text, 'fn': f}
+         'sites': [{'va': it.va, 'new': it.newva, 'kind': it.site.kind, 'mn': it.site.mn, 'text': it.site.text, 'fn': f, 'nstk': (it.tmpl[6] if len(it.tmpl) > 6 else 0)}
                    for f, (fs, fe, items) in funcs.items() for it in items if it.kind == 'ins' and it.tmpl is not None and isinstance(it.tmpl[0], bytes)],
          }
     json.dump(m, open(a.map, 'w'))

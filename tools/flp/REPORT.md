@@ -103,7 +103,7 @@
 
 ## 7. 未解決 / ブロッカー / ユーザ依頼
 
-- 未解決: ① ~~低信頼 47 ID~~ → L-6 で解消 (§10; med 25 件の役割確定は §10.4), ② native plugin state (event 213) は blob のまま (plugin 毎デコーダ未実装), ③ ~~版境界 stride~~ → §10 で規則を engine から確定 (build 4702–4719 の実標本のみ無し), ④ ~~ORACLE の STFT 判定 (D クラス) 未実装~~ → L-5 で実装 (§11) / C・D 閾値は暫定。
+- 未解決: ① ~~低信頼 47 ID~~ → L-6 で解消 (§10; med 25 件の役割確定は §10.4), ② native plugin state (event 213): 上位 5 plugin は L-3 でデコーダ実装 (§12)、他 plugin は blob のまま, ③ ~~版境界 stride~~ → §10 で規則を engine から確定 (build 4702–4719 の実標本のみ無し), ④ ~~ORACLE の STFT 判定 (D クラス) 未実装~~ → L-5 で実装 (§11) / C・D 閾値は暫定。
 - ブロッカー: なし (ネイティブ FL 不在は設計で回避)。
 - **ユーザ依頼**: (1) 可能ならネイティブ FL 26.1.7 で **Render tests 82 本 + Demo 3 本を 48kHz/32bit float/dither off で WAV 書出し** (ORACLE.md §7) — T5 の golden。(2) Serum 2 / OTT / Fresh Air / Kilohearts を実際に使った `.flp` (第三者 VST の 213 解析と tools/plugins の実使用検証用)。
 - 法務は事実整理のみ: Demo/Template/preset は Image-Line 同梱素材。リポジトリには複製せず派生メタデータのみコミット。PyFLP は GPL-3.0 で **参照のみ** (コード非流用; `id_sets.ts` は ID 番号のみ, 名前とレイアウトは本実装で独立に記述)。
@@ -114,7 +114,7 @@
 |---|---|---|
 | L-1 | wasm FLEngine の FLP load→save ハーネス (T1) | 26.1 保存ファイルで `flpdiff` identical, 書込 ID ⊆ `ENGINE_WRITTEN_IDS` |
 | L-2 | headless offline render 入口 + 決定論ランナー (T2): Render tests 82 本 × 3 回 SHA 一致 | ORACLE §2 |
-| L-3 | 上位 plugin の state (213) デコーダ + 単体 DSP 3 者比較 (T3): Fruity Parametric EQ 2 / Limiter / Reeverb 2 / Maximus / Delay 3 から | クラス A/B 判定表 |
+| L-3 | 上位 plugin の state (213) デコーダ + 単体 DSP 3 者比較 (T3): Fruity Parametric EQ 2 / Limiter / Reeverb 2 / Maximus / Delay 3 から | クラス A/B 判定表 (**デコーダ済 §12 / 3 者比較は未実施**) |
 | L-4 | ネイティブ golden 取込 (T5) と C/D 閾値再校正 | §7 依頼 (1) |
 | L-5 | STFT/LUFS 判定 (`src/wav.ts` D クラス) と最初の差分位置レポート | ORACLE §4.4 (**済 §11, #108**) |
 | L-6 | エンジン読込 switch (`0xa9e7a0` 以降の FlpLoad) 逆アセンブルで低信頼 47 ID を確定 | `unknown_events.json` の undocumented → 0 (**済 §10, #109**) |
@@ -210,3 +210,7 @@
 | true-peak の補間 FIR は BS.1770 Annex 2 の係数表ではなく Kaiser sinc 近似 (fs/4 付近までの正弦で ≤0.001 dB) | ±0.1 dB 判定には十分。規格準拠の係数表が必要なら差替 | #108 コメント |
 | 実機 golden が無いため STFT フロア −60 dB・0.1 dB 等の閾値は暫定のまま | 実 render での偽陽性/偽陰性率は未測定 | L-4 (T5, §8) |
 | 乱数変調 plugin 等 (非相関ノイズ) は STFT 振幅が bin 単位で揺れるため本判定では FAIL する (テストで固定) | 該当 plugin の D 判定には統計的スペクトル (帯域平均) 版が別途必要 | #108 コメント (PM 判断で子チケット化) |
+
+## 12. L-3 (#104): 上位 5 plugin の state (event 213) デコーダ + DSP クラス静的所見
+
+- 詳細・実測・未解決 (起票先付き) は **`REPORT_APPENDIX.md` §12**。Fruity Parametric EQ 2 / Limiter / Reeverb 2 / Maximus / Delay 3 の state(213) デコーダ (`src/plugstate.ts`) を実装し、コーパス 2,090 件の往復が byte-exact。**受入条件 (クラス A/B 判定表) は未達** (X/L/W 3 者比較は未実施。静的走査による推定のみ)。

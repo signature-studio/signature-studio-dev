@@ -60,7 +60,8 @@ typedef struct GuiSurface {
   uint32_t pixels;  /* wasm アドレス : BGRA32 top-down */
   uint32_t z;       /* 大きいほど前面 */
   uint32_t gen;     /* pixels/サイズ再確保ごとに +1 */
-  uint32_t _rsv[6];
+  uint32_t wseq;    /* seqlock (GUI-4): 奇数 = shim が画素を書き換え中/未 flush、偶数 = flush 済みで静止。host は読出し前後で同値かつ偶数を確認 */
+  uint32_t _rsv[5];
   char     title[64];
 } GuiSurface;
 

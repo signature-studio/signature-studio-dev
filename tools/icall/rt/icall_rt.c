@@ -1,5 +1,5 @@
 /* icall_rt.c — icall_rewrite/ir_icall_restore 経路の runtime (memory-ABI + 間接 call dispatch + OTT 用 import 最小実装)
- * BLK レイアウト = icall_rewrite.py と一致: +0 target / +8 rcx / +0x10 rdx / +0x18 r8 / +0x20 r9 / +0x28..0x40 xmm0-3(low64) / +0x80 rax / +0x88 xmm0
+ * BLK レイアウト = icall_rewrite.py と一致: +0 target / +8 rcx / +0x10 rdx / +0x18 r8 / +0x20 r9 / +0x28..0x40 xmm0-3(low64) / +0x48 stk (= ICALL_BLK+0x100: 第 5 引数以降 12 語の連続コピー。呼出し点で [rsp+0x20+8k] を store) / +0x80 rax / +0x88 xmm0
  * 全 lifted 関数は `i64 f(void)` (引数/戻り値は BLK 経由) なので dispatch は VA→表引きして f() を呼ぶだけ。
  * 未登録 target / 未実装 import は呼び出し位置 (site VA) を表示して abort (fail-fast)。 */
 #include <stdint.h>
@@ -33,7 +33,30 @@ static long long (*lookup(uint32_t va))(void) {
     return 0;
 }
 
+#define BLK_STK_OFF 0x48
+#define BLK_STKBUF_OFF 0x100
+#ifdef ICALL_IPP_SHIM   /* IPP shim 結合 (tools/ipp/shim): target が shim の cookie なら実行して戻る (それ以外は 0 で素通り) */
+extern int ipp_shim_dispatch(void* blk);
+#endif
+#ifdef ICALL_CHECK_STK
+static unsigned long long g_stk_n, g_stk_bad, g_stk_ptr_bad;
+unsigned long long icall_stk_checked(void) { return g_stk_n; }
+unsigned long long icall_stk_nonzero(void) { return g_stk_bad; }
+unsigned long long icall_stk_ptr_bad(void) { return g_stk_ptr_bad; }
+#endif
+
 void __icall_dispatch(uint64_t site) {
+    BLKQ(BLK_STK_OFF) = ICALL_BLK + BLK_STKBUF_OFF;
+#ifdef ICALL_IPP_SHIM
+    if (ipp_shim_dispatch((void*)(uintptr_t)ICALL_BLK)) return;
+#endif
+#ifdef ICALL_CHECK_STK   /* BLK+0x48 の pointer が ICALL_BLK+0x100 と一致 / 8 byte 整列 / STKBUF 全体 (12 語) が線形メモリ内か。外れは g_stk_ptr_bad */
+    { uint64_t p = BLKQ(BLK_STK_OFF);
+      if (p != ICALL_BLK + BLK_STKBUF_OFF || (p & 7) || p + 8 * 12 > (uint64_t)__builtin_wasm_memory_size(0) * 65536) g_stk_ptr_bad++; }
+#endif
+#ifdef ICALL_CHECK_STK   /* 統計: 呼出し点ごとの stack コピー 12 語のうち非 0 の語数 (全 0 の site は stack 引数なし or 未配線) */
+    { g_stk_n++; for (int k = 0; k < 12; k++) if (BLKQ(BLK_STKBUF_OFF + 8 * k)) { g_stk_bad++; break; } }
+#endif
     uint64_t t = BLKQ(0);
     for (unsigned k = 0; k < icall_cfg_n; k++)   /* MSVC CFG thunk (jmp rax) 経由 → 実 target は rax-in */
         if ((uint32_t)t == icall_cfg_va[k]) { t = BLKQ(0x90); break; }

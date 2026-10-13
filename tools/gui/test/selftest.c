@@ -9,6 +9,7 @@
 #include "gui_api.h"
 #include "gui_internal.h"
 #include "gui_headless.h"
+#include "gui_simd.h"
 
 extern GuiShared *gui_shared_native(void);
 static int g_pass, g_fail;
@@ -86,6 +87,9 @@ static uint32_t rgb(int r, int g, int b) { return (uint32_t)(r << 16 | g << 8 | 
 static uint32_t cref(int r, int g, int b) { return (uint32_t)(r | g << 8 | b << 16); }
 
 #include "selftest_p1.inc"
+#include "selftest_gui5.inc"
+#include "selftest_fd.inc"
+#include "selftest_help.inc"
 
 int main(void) {
   gui_hl_start(640, 480, 1);
@@ -122,6 +126,21 @@ int main(void) {
   CHK(desk(10 + 24, 20 + 24) == rgb(255, 0, 0) && desk(10 + 25, 20 + 25) != rgb(255, 0, 0), "FillRect right/bottom exclusive");
   CHK(desk(10 + 50, 20 + 50) == rgb(255, 255, 255), "WM_ERASEBKGND via DefWindowProc class brush (COLOR_WINDOW): %06x", desk(60, 70));
   CHK(!PeekMessageA((int64_t)(uintptr_t)&m, 0, 0, 0, PM_REMOVE), "queue empty after paint validated");
+
+  SECTION("seqlock wseq (GUI-4): 描画で奇数, flush で偶数");
+  {
+    CHK((S->surf[0].wseq & 1) == 0, "wseq even after flush: %u", S->surf[0].wseq);
+    uint32_t w0 = S->surf[0].wseq;
+    int64_t sdc = GetDC(h); WRECT sr = { 60, 60, 70, 70 };
+    int64_t sbr = CreateSolidBrush(0x00FF00); FillRect(sdc, (int64_t)(uintptr_t)&sr, sbr); DeleteObject(sbr);
+    CHK(S->surf[0].wseq == w0 + 1 && (S->surf[0].wseq & 1), "wseq odd after window DC draw (before flush): %u -> %u", w0, S->surf[0].wseq);
+    GdiFlush();
+    CHK(S->surf[0].wseq == w0 + 2 && !(S->surf[0].wseq & 1), "wseq even again after flush (+2 per frame): %u", S->surf[0].wseq);
+    ReleaseDC(h, sdc);
+    flush_wait();
+    CHK(S->surf[0].wseq == w0 + 2, "no spurious bump without drawing: %u", S->surf[0].wseq);
+    CHK(desk(10 + 65, 20 + 65) == rgb(0, 255, 0), "seqlock does not alter pixels: %06x", desk(75, 85));
+  }
 
   SECTION("timers");
   g_nlog = 0;
@@ -307,6 +326,7 @@ int main(void) {
   gui_set_icall_hook(NULL);
 
   run_p1(h);
+  run_gui5(h);
 
   SECTION("SendMessage / cross-thread");
   CHK(SendMessageA(h, WM_USER + 9, 0, 0) == 4242, "SendMessage direct");
@@ -322,6 +342,9 @@ int main(void) {
     }
     pthread_join(th, &res);
     CHK(got3 && res == (void *)1, "cross-thread PostMessage + sync SendMessage (got3=%d res=%p)", got3, res); }
+
+  run_fd_bounds();
+  run_help_wiring();
 
   SECTION("quit / destroy messages");
   g_nlog = 0;

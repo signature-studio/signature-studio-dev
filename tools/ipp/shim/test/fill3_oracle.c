@@ -577,7 +577,8 @@ int main(int argc, char **argv) {
   if (!dll) dll = fl_ipp_dll_path();
 #ifndef WASM_REPLAY
   if (pe_load(dll, &pe)) return 1;
-  ((int (MS *)(uint64_t))ex("ippSetCpuFeatures"))(~0ULL);
+  { const char *cm = getenv("IPP_CPU_MASK");  /* 既定 ~0 (全 ISA)。AVX-512 の無い host では 0x3f 等で上書き */
+    ((int (MS *)(uint64_t))ex("ippSetCpuFeatures"))(cm ? strtoull(cm, 0, 0) : ~0ULL); }
 #endif
   if (path) {
 #ifdef WASM_REPLAY
