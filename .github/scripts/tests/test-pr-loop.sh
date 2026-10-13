@@ -190,6 +190,11 @@ verify "$TMP/event.json"; rc=$?
 { [ $rc = 0 ] && ! logged 'pr close'; }; expect "run 中に head が進んだ -> 検証を免除 (新 head の run が担当)" $?
 
 vsetup NONE
+fx repos/o/r/pulls/7/reviews '[{"user":{"login":"oc-reviewer-for-signature-studio[bot]"},"state":"APPROVED","commit_id":"hhh"},{"user":{"login":"oc-reviewer-for-signature-studio[bot]"},"state":"COMMENTED","commit_id":"hhh"}]'
+verify; rc=$?
+{ [ $rc = 0 ] && ! logged 'pr close'; }; expect "APPROVED の後に COMMENT が付いても verdict は APPROVED のまま (再起動しない)" $?
+
+vsetup NONE
 fx repos/o/r/pulls/7 '{"state":"closed","head":{"sha":"hhh"}}'
 verify; rc=$?
 { [ $rc = 0 ] && ! logged 'pr close'; }; expect "PR が closed/merged -> 何もしない" $?

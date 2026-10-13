@@ -36,7 +36,7 @@ if [ -n "$run_head" ] && [ "$run_head" != "$head" ]; then
 fi
 
 rv="$(gh api --paginate "repos/$OC_REPO/pulls/$OC_PR_NUMBER/reviews" \
-  | jq -s --arg h "$head" '[.[][] | select((.user.login | startswith("oc-reviewer")) and .commit_id == $h)] | last // {}')"
+  | jq -s --arg h "$head" '[.[][] | select((.user.login | startswith("oc-reviewer")) and .commit_id == $h and (.state == "APPROVED" or .state == "CHANGES_REQUESTED"))] | last // {}')"
 st="$(jq -r '.state // "NONE"' <<< "$rv")"
 
 case "$st" in
