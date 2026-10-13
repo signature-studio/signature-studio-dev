@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
-# ldfix_509_e2e.sh — #509 (LD-9) 1 コマンド再現。PE (fl-win64) 無しで、work-m11 の
-#   work/{boot*.lift.ll, boot*.drc.config.json, m11_image.bin, boot_final.ll, boot_final3.ll} と [EMSDK], node だけで走る。
+# ldfix_509_e2e.sh — #509 (LD-9) 1 コマンド再現。work-m11 の
+#   work/{boot*.lift.ll, boot*.drc.config.json, m11_image.bin, boot_final.ll, boot_final3.ll} と [EMSDK], node に加え、
+#   6/7 の修復後 IR 生成 (ldfix.py --pe) のために fl-win64 の PE (FL_WIN64_DIR) が要る (#1290)。
 #   1/7 修復前 IR を再生成 (audit_lsf_e2e.sh と同じ)
 #   2/7 ldfix 旧版 ($PREV_REF) / 新版 (HEAD) を同じ修復前 IR に適用 → 出力が異なる関数の一覧 (他の関数は byte 一致)
 #   3/7 audit_lsf.py (store 形 + 消費者形) を 修復前 / 旧版 / 新版 に実行
 #   4/7 既に ldfix 済みの work/boot_final.ll へ F3c だけを重ねた IR (--passes f3c) と新版出力の突合
 #   5/7 ネガティブコントロール (旧版 = 修復を外す / 新版の store 1 本・消費者 1 関数を戻す)
 #   6/7 修復前後の wasm を作り survey 942 unit を unit ごとに突合 + 修復した関数の動的到達 (reach_509.sh)
+#        修復前 wasm: step 1 の ldfix=disabled 記録 + M11_ALLOW_LDFIX_DISABLED=1 (明示 opt-in)。
+#        修復後 wasm: 修復前 IR を ldfix.py --pe で正規適用 → ldfix=applied → --bind → 既定 gate で build (#1290)。
 #   7/7 修復前後の wasm で 5 関数を直接呼んで期待値と突き合わせ (dyn_509.mjs)
 # 使い方: EMSDK_ENV=<[EMSDK] の emsdk_env.sh> bash tools/m11/ldfix/ldfix_509_e2e.sh      環境変数: EMSDK_ENV (必須、[EMSDK] の emsdk_env.sh) / M11_WORK (既定 tools/m11/work) / PY (capstone+pefile 入り python) / PREV_REF (既定 009e823)
 set -uo pipefail
@@ -21,6 +24,7 @@ if [ -z "${PY:-}" ]; then
   else uv venv "$OUT/venv" -q && uv pip install -q --python "$OUT/venv/bin/python" capstone pefile && PY="$OUT/venv/bin/python"; fi
 fi
 CFG="$W/boot*.drc.config.json"; IMG="$W/m11_image.bin"
+PE_QS="${PE:-${FL_WIN64_DIR:?FL_WIN64_DIR (fl-win64 の展開先) を指定してください}/extracted/block00031_PE.bin}"
 step() { echo "[ldfix_509_e2e] $*"; }
 FNS="5c0270,41a670,66e080,7e5240,806740,c62780,417b70,409c80,666a60,1062c50,1063090,12cb4f0,12f9730,4087a0,40ffe0,447ee0,44f110,44f1d0,44f2c0,44f740,6074b0,7763d0,8239d0,86a7c0,8c7710,f3dd20"
 
@@ -100,9 +104,12 @@ step "6/7 survey 前後 (wasm 再ビルド) と動的到達"
 B="$OUT/build"; mkdir -p "$B/tools"; cp -a "$REPO/tools/shim" "$REPO/tools/shared" "$B/tools/"; cp -a "$REPO/tools/m11" "$B/tools/m11_src"; rm -rf "$B/tools/m11_src/work"; mv "$B/tools/m11_src" "$B/tools/m11"; cp -a "$W" "$B/tools/m11/work"
 mkdir -p "$OUT/basewasm"
 FAIL=0
-( cd "$B/tools/m11" && rm -f work/boot_final3.ll && bash m11_build.sh > "$OUT/build_base.log" 2>&1 \
+( cd "$B/tools/m11" && cp "$OUT/gen/tools/m11/work/ir_conditions.json" work/ && cp "$PRE" work/boot_final.ll && rm -f work/boot_final3.ll \
+  && M11_ALLOW_LDFIX_DISABLED=1 bash m11_build.sh > "$OUT/build_base.log" 2>&1 \
   && cp work/m11_boot.cjs work/m11_boot.cjs.wasm "$OUT/basewasm/" && node trap_triage/survey_units.mjs "$OUT/sv_base.json" | tail -1 ) || { echo "[ldfix_509_e2e] 修復前 wasm の build/survey 失敗: $OUT/build_base.log"; FAIL=1; }
-( cd "$B/tools/m11" && cp "$OUT/bf_f3c.ll" work/boot_final.ll && rm -f work/boot_final3.ll && bash m11_build.sh > "$OUT/build_new.log" 2>&1 \
+( cd "$B/tools/m11" && cp "$PRE" work/boot_final.ll && "$PY" ldfix/ldfix.py work/boot_final.ll work/boot_final.ldfix.ll --pe "$PE_QS" --report work/ldfix_report.json > "$OUT/ldfix_new.log" 2>&1 \
+  && mv work/boot_final.ldfix.ll work/boot_final.ll && python3 m11_cond.py ldfix=applied && python3 m11_cond.py --bind work/boot_final.ll \
+  && rm -f work/boot_final3.ll && bash m11_build.sh > "$OUT/build_new.log" 2>&1 \
   && node trap_triage/survey_units.mjs "$OUT/sv_new.json" | tail -1 ) || { echo "[ldfix_509_e2e] 修復後 wasm の build/survey 失敗: $OUT/build_new.log"; FAIL=1; }
 ( cd "$B/tools/m11" && python3 trap_triage/survey_diff.py "$OUT/sv_base.json" "$OUT/sv_new.json" )
 "$PY" - "$OUT/sv_base.json" "$OUT/sv_new.json" <<'PYEOF'
