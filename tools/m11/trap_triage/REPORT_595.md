@@ -10,7 +10,7 @@ Issue 記載の unit 85/719 の退行・unit 114 のハングは、**現 main (#
 素材: work-m11 スナップショット + [EMSDK] (`docs/REFERENCES.md`)。PE 無し (fl-win64 未取得)。main `8d883c3` の `m11_build.sh` の qstore pass は PE が無いため 3 構成すべて skip (build log の WARNING で確認)。
 手順: `bash m11_build.sh` / `M11_OV_CLASSCREATE=1 bash m11_build.sh` →
 `node trap_triage/survey_units.mjs out.json` → `python3 trap_triage/survey_diff.py a.json b.json`。942 unit。
-ベース = 本 PR の merge commit `8445b39` (main `8d883c3` を取り込み済み。#446 は `8d883c3` でマージ済み)。コードはこの commit と同一 (以降の変更は docs のみ)。旧ベース (`5ff73ff`・`0865903`) の値は §1 の旧ベース表だけに残す。逆アセンブルは `disasm_img.py` (capstone は venv に導入)。
+ベース = 本 PR の merge commit `8445b39` (main `8d883c3` を取り込み済み。#446 は `8d883c3` でマージ済み)。実行されるコードは `8445b39` と同一 (以降の変更は docs・`m11_ov.c` の注釈・`negctl_595.sh` の追加のみ)。旧ベース (`5ff73ff`・`0865903`) の値は §1 の旧ベース表だけに残す。逆アセンブルは `disasm_img.py` (capstone は venv に導入)。
 
 ## 1. 測定 (本ベース。build と survey は各構成 1 回ずつの単発。load average (1 分値) 0.54〜0.89 を計測中の `uptime` で記録)
 
@@ -23,6 +23,8 @@ build 5.3〜10.1 s、survey 12.4〜12.8 s (いずれも wall の単発。既定 
 | ON | `8445b39` | 817 | 21 | 56 | 47 | 1 | 1: 415 |
 
 分母は 942 unit = ok + oob + halt0 + miss + noproc (全行で一致)。`noproc` は `_m11_call_unit` が 0 を返した unit で、3 構成とも unit 941 (VA 0x0) の 1 件。
+
+再実行 (同じ手順・単発・並列数 1。上表と同じ kind の結果を再現): OFF build 8.0 s / survey 8.8 s、ON build 3.9 s / survey 9.0 s、load average (uptime 1 分値) 0.38〜0.84。OFF 818 / 21 / 56 / 46 / 1、ON 817 / 21 / 56 / 47 / 1、ok 退行 415。
 
 OFF → ON の遷移は ok→miss 1 (415) のみ。他は kind 不変 (oob→oob 21, halt0→halt0 56, noproc→noproc 1)。trap (oob+halt0) は OFF 77 / ON 77 で不変 (ON は halt0→ok を一つも作らない = 本ベースでも ON の利得が無い)。
 
@@ -41,6 +43,8 @@ OFF → ON の遷移は ok→miss 1 (415) のみ。他は kind 不変 (oob→oob
 
 ## 2. 原因 (unit 単位の実測。段階の切り分けは旧ベースの表で行った)
 
+icall 表のキー = 生の値 + 0x400000 (VA)。本文の slot `0x1007000` は生の値で、表のキーは `0x1407000`。本文の他の番地 (`0x9b4b00`・`0x41c130`・`0x525720`) は VA 表記。
+
 ### 2.1 unit 42・45・138: `41c130` (TInterfacedObject.AfterConstruction) が closure 外 → miss
 410360 を ON にすると `[vmt-0x50]` 経由の AfterConstruction 呼出しが現れる。既定実体 `410070` (= `ret`) は `m11_vcall` が直接処理するが、
 TInterfacedObject 派生は `41c130` (`or eax,-1; lock xadd [rcx+8],eax; ret` = FRefCount を 1→0 に戻す) を引く。これは boot closure 外で miss になり、
@@ -54,13 +58,22 @@ unit 15 の 2 件の AfterConstruction 呼出しは slot = `0x1007000` (コー�
 RetDec は `mov rax,[rbx]` の deref を落とし (DEFECTS D4)、stack に dest **のアドレス自体** を入れた。`412d60` はそれを文字列ポインタと解釈し
 `dest - 0x10 + 8 = inst + 0` の dword を refcount として 1 減らす。VMT ポインタ下位が 1 減り、`[vmt-0x50]` が壊れた値 (`0x1007000`) になる。
 OFF でも `410320` は既定 ON (#474) で実オブジェクトを返すため同じ書込みは起きていると推定するが、OFF の `Q(inst)` は未測定。OFF の `410360` は `ret arg1` で `[inst]` を読まないため顕在化しない (未検証の推定)。
+上記の `Q(inst)`・`[inst]`・slot の数値は `448ee0` を C に置いて測った計測 (未コミット・再現なし)。
+
+再現 (commit 済み HEAD): `bash trap_triage/negctl_595.sh` (`413060` の `u64 old = Q(dest);` だけを D4 の欠陥形 `(u64)(uintptr_t)dest` に戻して ON で survey。単発、総計 35 s 実測)。
+- 転記どおり (on): ok 817 / oob 21 / halt0 56 / miss 47 / noproc 1
+- 欠陥形 (d4): ok 816 / oob 21 / halt0 56 / miss 48 / noproc 1。ok→miss は unit 15 の 1 件のみ。unit 15 の icall `0x1407000` が miss 2 (on は 0)
+→ 413060 の D4 が unit 15 の ok 退行の原因 (ネガコン)。
+
+呼出し側 (IR `work/boot_final3.ll`): `413060` の呼出し 28 箇所のうち戻り値を読むのは 7 箇所 (5 は上位関数の `ret` へ素通し、2 は rax 変数へ格納)。計測 (未コミット・再現なし)。戻り値を `dest` とする転記が呼出し側に影響するかは未検証。
+
 修正: `function_413060` を逆アセンブルから C 転記 (ON 時のみ)。unit 15 は ok に戻った (`bf5d84f`)。
 
 ### 2.3 unit 415: ON で呼ばれる closure 外関数が miss (§4)
 `410360` の呼出し先が `0x9b4b00` (AfterConstruction 相当のスロット実体。`410070` → `481790` → `9b5450` → `4133f0`/`412d60` を呼ぶ 144 byte)。
 boot closure 外 (`boot_fns.json` に無い) ため `m11_icall` が miss → unit 415 の kind が ok → miss。**機能退行ではなく、OFF では AfterConstruction 呼出し自体が
 脱落していた (D15) ため miss が見えなかった**と読める (「ok」だった OFF は呼ばずに終わっていた)。`9b4b00` は `9b5450` (`boot_final3_sigs.h` に無い) も呼び、転記範囲が広いため本 PR では未転記。
-unit 745 (`0x125720` を miss するが kind は halt0 のまま) と 304 (oob の frame が変わるが oob のまま) も差分 unit だが kind は不変 (本ベースでも同じ)。
+unit 745 (icall 表のキー `0x525720` = survey JSON の `miss_new` の生の値 `0x125720` + 0x400000 を miss するが kind は halt0 のまま) と 304 (oob の frame が変わるが oob のまま) も差分 unit だが kind は不変 (本ベースでも同じ)。
 
 ## 3. Issue 記載の unit 85 / 719 / 114 は現 main では再現しない
 Issue (#595) の退行 5 件 (85 719 42 45 415) とハング (114) は #446 の古い tree (#474/#503 前) での値。現 main (`8d883c3`) + 本 PR の OFF/ON では (§1 と同じ survey の unit 単位、単発):

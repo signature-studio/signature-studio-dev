@@ -679,7 +679,8 @@ unsigned long long function_410360(unsigned long long inst) {
  * 逆アセンブル: `old := [rbx]` を stack に退避 → len>0 なら [rbx] := 412c20(len), src があれば 409c80(src, new, len*2) / len<=0 なら [rbx] := 0 → 最後に 412d60(&old) で旧文字列を解放。
  * RetDec は `mov rax,[rbx]` の deref を落とし (D4), stack に dest のアドレス自体を入れた。412d60 がそれを文字列ポインタと見て dest-0x10+8 = dest-8 を refcount として減算するため,
  * dest = オブジェクト +8 の文字列フィールド (448ee0 → 41c820 → 413060 の経路) では オブジェクト先頭 dword (VMT ポインタの下位) が 1 減り, 410360 が壊れた VMT から [vmt-0x50] を引いた。
- * 戻り値は元実装では stack 上の old のアドレス (呼出し側は使わない) のため dest を返す。 */
+ * 戻り値: 元実装は 412d60 の戻り値 = stack 上の old のアドレス (関数終了後は無効) を返す。C でそれを返すと無効な番地になるため dest を返す。
+ * 呼出し側が戻り値を読むかは未検証 (REPORT_595 §2.2)。 */
 unsigned long long function_413060(unsigned long long dest, void* src, unsigned long long len) {
     u64 old = Q(dest);
     int n = (int)len;
