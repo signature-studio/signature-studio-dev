@@ -211,5 +211,5 @@ dest 読出しを止めても 871/23 のまま。よって dest 読出しが原�
 - 差分: `getmem` 2012→2013・`freemem` 162→164 (ON で +1 / +2)。OFF 再測定は 2012/162 で決定的。差の原因は未切り分け (ON の C 転記版が呼ぶ alloc 回数の差の可能性はあるが未検証)。判定 (unit ラベル・trap・icall) には出ない。
 - 感度: icall は差が出ない項目なので、本節の一致は「差なし」の確認であり感度の証明ではない。感度は §2・§6 のネガコン (呼出し数 227→180) が担う。
 - 所要 (survey 単発): OFF 16.323 s / ON 16.072 s。elapsed の run 間揺れ (§1) があるため判定には使わない。
-- 再現 (受入条件 4・HEAD `99c787fa`・直列・単発): `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/m11/trap_triage/repro_705.sh` 全体 183 s (load 開始 0.54)・判定 `PASS`。計数は OFF/ON/OFF 再実行/ネガコンで 870/24・870/24・870/24・867/27。dest 指紋は OFF `acb2345ddb678281` (再実行で一致)・ON `ac2d2efb758d4bb1`・ネガコン `18e582921189ec13` で §6 の測定 (`2f83abc0`) と一致。unit ラベル差分 0。
+- 再現 (受入条件 4・HEAD `c55e6d25`・直列・単発・`m11_gen_ir2.sh` を HEAD で再実行してから実行): `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/m11/trap_triage/repro_705.sh` 全体 154.7 s (`time` の real、load 開始 1.20)・判定 `PASS`。計数は OFF/ON/OFF 再実行/ネガコンで 870/24・870/24・870/24・867/27。dest 指紋は OFF `acb2345ddb678281` (再実行で一致)・ON `ac2d2efb758d4bb1`・ネガコン `18e582921189ec13`。unit ラベル差分 0。
 - 注: `repro_705.sh` の既定 build の `boot_final3.ll` md5 は `7304232a4b2a28e1456cb3e7527b653d` (§0 の `4fd74f…` と異なる)。計数 870/24 は §0・§6 の基準と一致。md5 の差の原因は未切り分け (`m11_gen_ir2.sh` を HEAD で再実行した IR から作ったため)。
