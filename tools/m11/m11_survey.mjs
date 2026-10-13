@@ -4,6 +4,7 @@
 // 環境変数: M11_SURVEY_UNITS=<path> (unit 別ラベル JSON) / M11_SURVEY_COST=<path> (unit 別 VA・GetMem 消費 JSON) / M11_SURVEY_STACK=<i,..> (その unit の trap スタック)
 //           M11_VFREE_NOOP=1 (VirtualFree を実解放しない = NC) / M11_VA_UNIT_BUDGET_MB=0 (上限なし = 旧挙動) / M11_VA_BIGTRACE=1 / M11_VA_STACK_AT=<n>
 import fs from 'fs';
+import { ptrPre, ptrCheck } from './m11_ptrcheck.mjs';
 const M11 = new URL('./', import.meta.url).pathname.replace(/\/$/, '');
 const m2 = await import(M11 + '/work/m11_boot.cjs');
 const errs = [];
@@ -11,6 +12,7 @@ if (process.env.M11_SURVEY_STACK || process.env.M11_VA_STACK_AT) Error.stackTrac
 const mod = await m2.default({ printErr: (s) => { errs.push(String(s)); } });
 const img = fs.readFileSync(M11 + '/work/m11_image.bin');
 mod.HEAPU8.set(img, 0);
+const ptrPreSet = ptrPre(mod, img.length);
 mod._m11_set_survey(1);
 if (process.env.M11_VFREE_NOOP === '1') mod._m11_set_vfree_noop(1);
 if (process.env.M11_VA_STACK_AT) mod._m11_set_va_stack_at(Number(process.env.M11_VA_STACK_AT));
@@ -89,7 +91,9 @@ const ff = {};
 for (const l of errs) { const m = /unresolved function call: (\S+)/.exec(l); if (m) ff[m[1]] = (ff[m[1]] || 0) + 1; }
 const stubs = [];
 for (let i = 0; i < (mod._m11_stub_uniq() || 0); i++) stubs.push(mod.UTF8ToString(mod._m11_stub_name(i)) + ':' + mod._m11_stub_count(i));
+const ptrcheck = ptrCheck(mod, ptrPreSet);
 console.log('M11_SURVEY ' + JSON.stringify({
+  ptrcheck,
   dllmain_done: done, boot_threw: bootThrew, units: 942, ...res, trap_oom: trapOom, trap_other: res.trap - trapOom, ok_with_oom: okWithOom,
   oom_units: oomUnits.slice(0, 60), clobber_units: clobberUnits, big_units: bigUnits.slice(0, 40), top_va_units: topBy('va_bytes'), top_getmem_units: topBy('getmem'),
   trap_kinds: kinds, trap_kinds_nonoom: kindsNonOom, top_frame_idx: topFrames,

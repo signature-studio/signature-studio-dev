@@ -17,7 +17,7 @@ async function boot(extraFiles = {}) {
   for (const [k, v] of Object.entries(REMOTE)) files[`/fl/Scripts/${k}.pyscript`] = enc(v[1]);
   for (const [f, s] of AUDIO) files[`/fl/Scripts/audio_${f}.pyscript`] = enc(s);
   const py = await FlPython.create({ flpyUrl, engine, ids, files, onStdout: () => {}, onStderr: () => {} });
-  await py.run("import fl_rt, flpianoroll; flpianoroll.install(); fl_rt.install_flapi()");
+  await py.run("import fl_rt, flpianoroll, enveditor; flpianoroll.install(); enveditor.install(); fl_rt.install_flapi()");
   return { py, engine };
 }
 const load = async (py, name) => py.call("fl_rt:load_pyscript", { path: `/fl/Scripts/${name}.pyscript`, name });
@@ -192,9 +192,78 @@ for (const n of Object.keys(PR)) {
   check("Audio scripts 12 本 (inventory と件数一致)", AUDIO.length === 12 && invAudio.length === 12, `${AUDIO.length}/${invAudio.length}`);
   check("Audio 12 本の FL module 依存は enveditor のみ (inventory と別算法で一致)",
     AUDIO.every(([, s]) => imports(s).every((x) => x === "enveditor" || x === "math")) && invAudio.every((f) => JSON.stringify(f.imports_fl) === '["enveditor"]'));
-  let nf = 0;
-  for (const [f] of AUDIO) { const r = await py.call("fl_rt:load_pyscript", { path: `/fl/Scripts/audio_${f}.pyscript`, name: `audio_${f}` }); if (r.err && /ModuleNotFoundError.*enveditor/.test(r.err)) nf++; }
-  check("Audio 12 本: flapi のみでは 0/12 (全て ModuleNotFoundError: enveditor)", nf === 12, `${nf}/12`);
+  // PY-23 (#1054): enveditor 実装後の実行検証。各本を Title / 先頭のシグネチャで特定 (ブロック名は持たない)
+  const by = (re) => { const h = AUDIO.filter(([, s]) => re.test(s)); if (h.length !== 1) throw new Error(`audio ${re}: ${h.length}`); return h[0][0]; };
+  const A = {
+    amp: by(/ScriptDialog\('Amp'/), br: by(/ScriptDialog\('Bit reduction'/), dest: by(/ScriptDialog\('Destructoid'/),
+    lim: by(/ScriptDialog\('Limiter'/), old: by(/ScriptDialog\('Old school'/), rm: by(/ScriptDialog\('Ring modulation'/),
+    pulse: by(/ScriptDialog\('Pulse generator'/), saw: by(/ScriptDialog\('Saw generator'/), sil: by(/ScriptDialog\('Silence generator'/),
+    sine: by(/ScriptDialog\('Sine generator'/), region: by(/^for i in range\(EditorSample\.RegionCount\)/m), ptE: by(/ScriptDialog\('Play To End'/),
+  };
+  const ld = (f, sample, sel) => py.call("fl_rt:load_audio", { path: `/fl/Scripts/audio_${f}.pyscript`, name: `audio_${f}`, sample, selection: sel });
+  const ra = (f, sample, sel, values) => py.call("fl_rt:run_audio", { name: `audio_${f}`, sample, selection: sel, values });
+  const mono = (n, fn = (i) => 0) => ({ ch: [Array.from({ length: n }, (_, i) => fn(i))], rate: 44100 });
+  const loaded = [];
+  for (const [f] of AUDIO) { const r = await ld(f, mono(4), [0, 0]); loaded.push(r.ok ? "ok" : r.err); }
+  check("Audio 12 本: enveditor を import して load が通る", loaded.filter((x) => x === "ok").length === 12, loaded.filter((x) => x !== "ok").join(" | "));
+  const ex = [];
+  const exOk = async (name, fn) => { try { const r = await fn(); if (r.err) throw new Error(r.err); ex.push(name); return r.ok; } catch (e) { return { err: String(e) }; } };
+  // Amp: 選択範囲 [2,5] だけ Volume 倍
+  {
+    const x = [1, -1, 0.5, 0.25, 0.75, -0.5, 0.1, 0.2];
+    const r = await exOk("amp", () => ra(A.amp, mono(8, (i) => x[i]), [2, 5], { Volume: 0.5 }));
+    const exp = x.map((v, i) => (i >= 2 && i <= 5 ? v * 0.5 : v));
+    const got = r.sample ? r.sample.ch[0] : [];
+    check("Audio Amp: 選択 [2,5] のみ Volume 0.5 倍 (独立 oracle)", got.length === 8 && got.every((v, i) => near(v, exp[i])), JSON.stringify(got));
+  }
+  // Old school: SampleRate 11000、全体を 8bit 量子化 (round(s*128)/128。0.5 境界を避けた入力)
+  {
+    const x = [0.3, -0.7, 0.1234, 0.9, -0.333, 0.6];
+    const r = await exOk("old", () => ra(A.old, mono(6, (i) => x[i]), [0, 0], {}));
+    const exp = x.map((v) => Math.round(v * 128) / 128);
+    check("Audio Old school: SampleRate=11000 かつ 8bit 量子化 (独立 oracle)", r.sample && r.sample.rate === 11000 && r.sample.ch[0].every((v, i) => near(v, exp[i])), JSON.stringify(r.sample && r.sample.ch[0]));
+  }
+  // Silence generator: Length 0 → 指定長の無音 (選択範囲 [0,99])
+  {
+    const r = await exOk("sil", () => ra(A.sil, { ch: [[]], rate: 44100 }, [0, 99], { "Length (samples)": 100 }));
+    check("Audio Silence generator: Length 100 の無音 (独立 oracle)", r.sample && r.sample.ch[0].length === 100 && r.sample.ch[0].every((v) => v === 0));
+  }
+  // Sine generator: Length 0 → 1000ms=44100 samples、選択 [0,999] に 1000Hz 正弦 (位相 0 基準は ASSUMPTION)
+  {
+    const r = await exOk("sine", () => ra(A.sine, { ch: [[]], rate: 44100 }, [0, 999], { "Freq (Hz)": 1000, Phase: 0, Volume: 1 }));
+    const g = r.sample ? r.sample.ch[0] : [];
+    const exp = Array.from({ length: 1000 }, (_, n) => Math.sin((2 * Math.PI * 1000 * n) / 44100));
+    check("Audio Sine generator: 44100 samples・選択内が 1000Hz 正弦 (独立 oracle)", g.length === 44100 && exp.every((v, n) => near(g[n], v)) && g.slice(1000).every((v) => v === 0), `len=${g.length}`);
+  }
+  // Region: 各 region の SampleEnd = 次 region の SampleStart、最後は Length-1 (トップレベルで実行)
+  {
+    const r = await py.call("fl_rt:load_audio", { path: `/fl/Scripts/audio_${A.region}.pyscript`, name: `audio_${A.region}`, sample: { ch: [Array.from({ length: 100 }, () => 0)], rate: 44100, regions: [{ name: "a", start: 10, end: 20 }, { name: "b", start: 40, end: 60 }, { name: "c", start: 70, end: 90 }] }, selection: [0, 0] });
+    const ends = r.ok ? r.ok.sample.regions.map((x) => x.end) : [];
+    check("Audio Region 変換: SampleEnd = 次 Start / 末尾は Length-1 (独立 oracle)", JSON.stringify(ends) === "[40,70,99]", JSON.stringify(ends));
+    if (!r.err) ex.push("region");
+  }
+  // Play To End: Reset/Selection 既定 (No) → 全 region の SampleEnd = Length-1
+  {
+    const r = await py.call("fl_rt:load_audio", { path: `/fl/Scripts/audio_${A.ptE}.pyscript`, name: `audio_${A.ptE}`, sample: { ch: [Array.from({ length: 100 }, () => 0)], rate: 44100, regions: [{ name: "a", start: 10, end: 20 }, { name: "b", start: 40, end: 60 }] }, selection: [0, 0] });
+    const ends = r.ok ? r.ok.sample.regions.map((x) => x.end) : [];
+    check("Audio Play To End: 既定 (No/No) で全 region の SampleEnd = Length-1 (独立 oracle)", JSON.stringify(ends) === "[99,99]", JSON.stringify(ends));
+    if (!r.err) ex.push("playtoend");
+  }
+  // 残りは実行が例外なく完了することを確認 (数値 oracle は未実装。ring mod は clipboard mock が空のため変化なしが期待)
+  for (const k of ["br", "dest", "lim", "rm", "pulse", "saw"]) {
+    const r = await exOk(k, () => ra(A[k], mono(64, (i) => Math.sin(i / 5) * 0.5), [0, 63], {}));
+    check(`Audio ${k}: 実行が例外なく完了`, !r.err, r.err || "");
+  }
+  info("Audio 実行 OK 本数", `${ex.length}`);
+  // NEG-d: Amp の適用量を 1 箇所改変 (value → value*2) → 独立 oracle と不一致になる (FAIL を検出)
+  const ampSrc = AUDIO.find(([f]) => f === A.amp)[1];
+  const ampMut = ampSrc.replace("EditorSample.AmpFromTo(x1,x2,value)", "EditorSample.AmpFromTo(x1,x2,value*2)");
+  const { py: p3 } = await boot({ AmpMut: ampMut });
+  await p3.call("fl_rt:load_pyscript", { path: "/fl/Scripts/AmpMut.pyscript", name: "AmpMut" });
+  const mr = await p3.call("fl_rt:run_audio", { name: "AmpMut", sample: mono(8, (i) => [1, -1, 0.5, 0.25, 0.75, -0.5, 0.1, 0.2][i]), selection: [2, 5], values: { Volume: 0.5 } });
+  const mg = mr.ok ? mr.ok.sample.ch[0] : [];
+  check("NEG-d: Amp の適用量を改変 → oracle 不一致 (FAIL を検出)", mr.ok && !near(mg[2], 0.5 * 0.5), `mg[2]=${mg[2]} (正常 0.25)`);
+  await p3.terminate();
 }
 
 await py.terminate();

@@ -119,6 +119,13 @@ case 単位分類 (完全再現) を基準にすること。「実行不能 2,49
   410320 の call 脱落からその経路に入るまでの因果は trace_head (最大 12 件) に収まらず**直接確認していない** (推定)。
 - **分岐の型 (LD-17 / #864)**: 残りを排他的に型 B (L が ret まで call 無し・tail jump 無し) / C (L の直接 call 先で分岐) / D (直接 call 先に無い) に分類した。件数は `results/m11_unreachable_diverge.md` §2 が正本。
   型 B は「L の内部では食い違わず、L の戻り後の呼出元で次 entry が現れる」と読める (推定)。根拠は B に入る L の機械語を ret まで読んで jmp 先 (tail jump) が無いことを確認した点のみ (`tail_jmps`)。戻り後の実際の呼出元は未確認。個別原因は未特定 → 子 issue #1034 (型 B)・#1035 (型 C・D)。
+- **型 B の再検証 (LD-27 / #1034・未実測)**: `tests/trace_fullcompare_typeb.py` は、型 B 候補の case を完全 trace (xfill 既定 1 と 0) で取り直し、full-trace の L を型 B 判定 (`typeB_full`) し直す。
+  - **未実測**: 本ブランチは手元の run で再実行していない。`work-m11` (batch jsonl) と `work-liftdiff` が素材に無く、m11 の IR は RetDec 生成物で、`fl-win64` だけでは build できないため。以下の件数・値は再実測するまで確定値ではない。
+  - 件数の定義・表 (xfill 別の分岐残存数 / full-trace L と trace_head L の一致数 / L が変わった件数 / 0x40a380 の件数 / rax 値) は、再実測後に本節へ追記する。それまで受入条件は未チェック。
+  - **trace_head 基準の型 B 候補 34 件** は、`batch` の trace_head (最大 12 件) で求めた L が leaf のもの。full-trace で L が変わる件は、型 B の定義 (L が ret まで call 無し) を満たすか full-trace 側で再判定が要る。満たさない件は型 B から外す。
+  - **xfill 仮説 (推定)**: 型 B の root entry で x0 が食い違うのは、xfill=1 が署名外 xmm に 1.25+i を入れるためと `rt/ld_native.c` の読みから推定している。xfill=0 の x0 値で裏を取るまで、実測で確かめた内容ではない。
+  - **再現手順 (`TARGET.json`)**: `tools/liftdiff/targets/m11.json` は既に `"pe": "${FL_WIN64_DIR}/extracted/block00031_PE.bin"` を指すので、複製は不要。`FL_WIN64_DIR` を `fl-win64` の展開先に設定し、`python3 tools/liftdiff/tests/trace_fullcompare_typeb.py tools/liftdiff/targets/m11.json <batch.jsonl>` を実行する。事前に `bash tools/m11/m11_gen_ir2.sh` で `ir_conditions.json` を作り、`work-m11` 相当の IR と image を用意する。
+  - 個別原因・類型 (D15 / ldfix / その他) の分類は未完 → #1034 は Refs。
 - **OOB function_414ad0 系 (68 件)**: 機械語は入口 rcx (var 文字列のアドレス) の 1 段 deref `mov r,[rbx]` が 4 箇所 (0x414af3/0x414b49/0x414b64/0x414b78)。
   lift 後 IR には `%arg1` を ptr とする load が 0 件で、`%arg1` を値のまま `icmp`/`add` に使っている (ldfix F3a/F3b 型の値↔アドレス取り違え)。
   68 件は全て最上位 trap frame が `function_414ad0` (= wasm は 414ad0 に到達している)。wasm trace_head に 414ad0 が現れるのは 41 件で、
@@ -158,6 +165,14 @@ python3 tools/liftdiff/tests/oob_414ad0.py > tools/liftdiff/results/m11_oob_414a
 ```
 LD-17 (#864) の型分類は `results/m11_unreachable_diverge.md` §2 (同じスクリプトの出力)。PE 展開は `block00031_PE.bin` 1 ファイルで足りる (実測 22227016 bytes)。スクリプトの入力は `work-liftdiff` (batch_closure.jsonl) と `work-m11` (boot_final3.ll) を要するため、これら素材が無い環境では再生成できない。
 単体実行 (手動実測) は `[WIN64]` の PE を指す `pe` に書き換えた `targets/m11.json` の複製で `python3 liftdiff.py run <target.json> --fn 0x414ad0 --state auto --nobuild -v` (`targets/m11.json` 自体の固定パスは #294)。
+
+#### 型 C・D の原因候補 (LD-28 / #1035)
+集計 = `tests/trace_diverge_cd.py` → `results/m11_unreachable_cd.md` (件数の正本)。型 A・B (#864 の D15 候補・leaf) を除いた型 C・D の食い違いを対象にする。
+- 結論: 型 C・D の食い違いは原因候補 (P1・P2・P3) に分類した。P2 は L が F の直接 call 先であることを条件に含む。内訳は results 参照。
+- P2 の代表例 0x418be0 (呼出元 0x41c820) は P2 候補に分類した。IR 側 (`call 0x407030` の欠落) は再確認していない。call site と IR block の対応づけは未実施。
+- P2 の全 20 件で F→L の直接 call 辺 (`L ∈ direct_calls(F)`) が成立することを PE 実測で確認した。
+- `results/m11_unreachable_cd.md` は F→L 条件を入れた後の出力と一致することを HEAD で確認済み (生成元を再実行して diff 0 行)。
+- 候補判定は call 先の集合差分のみ。P1・P2 は候補であり確定ではない。
 
 ## 10. OTT 旧 chain (D1〜D6) の Actions 再現 (LD-8 / #406)
 
@@ -272,8 +287,74 @@ PR head は 358 / 212 / 230 ×2 と 357 / 213 / 230 ×1 (本 run の 3 回と一
 match→mismatch の 4 件 (0x8445b0・0x6681f0・0xfe8e80・0x528680) は新 pattern (vm0/u16) の case だけが diff/wasm_trap で、既存 9 pattern は変わらない (深部経路の露出)。
 `liftdiff_e2e.sh --m11-only` は exit 0 (単体テスト・unit #18 の 3 検査 PASS・closure 361/229/210)。
 
+(本体 REPORT §12 の要約元: `vm0`・`u16` 追加は sample:800 で 一致 358→361 / 不一致 212→229 / 実行不能 230→210 (base 97f28539 比)。)
+
+### 12.1 fault 由来 this 疑似 pattern `fvm` (LD-23 / #975、部分達成)
+
+- 実装: `cases.fvm_candidates` が `'s'` の native fault addr から this 候補の引数 index を推定 (`SMALL[i] ≤ addr-SMALL[i] < 0x40`)。
+  `session._fvm_cases` は **全 pattern が未実行 (equal/diff/wasm_trap 無し) の関数に限り**、候補引数だけを `vm` blob の疑似オブジェクトにした case `fvm<arg>` を追加する。既存 pattern の case 生成は変えない (fvm は追加のみ)。既存 pattern の関数単位 verdict は全関数で不変だが、**case 単位の outcome は 7 関数で変化している** (下記・未検証)。
+- 集計: `tests/fvm_transitions.py BASE.jsonl NEW.jsonl` が verdict 遷移と「既存 pattern が変わった関数」を出す。
+- 実測 (m11 sample:800・`--shards 12 --state auto`・同一 worktree で base / 新を連続実行):
+  - base (fvm 追加直前の親 `2f235a0a` の tree): match 360 / mismatch 230 / unexec 210 (1m42s, load 0.46→5.70)
+  - 新 (`0596772f`): match 360 / mismatch 230 / unexec 210 (1m41s, load 1.27→ ※終了時 load は未採取)
+  - 関数単位の遷移: match→match 360・mismatch→mismatch 230・unexec→unexec 210 (**遷移 0 件**)。
+  - `fvm` case は 437 件走り、native_fault 193 / both_fault 243 / hang 1。**1 件も equal/diff/wasm_trap にならなかった**。
+  - **測定 commit の注意**: §12 の vm0/u16 の「新 361」は `ecb45fee` 時点の測定で、本節の base (`2f235a0a`) とは commit が異なる。`2f235a0a` は `ecb45fee` 以降の main 取り込みを含む。361 と 360 の 1 件差は**未切り分け** (§6.2 で記録した 0x959a40 の run 依存が候補だが、本 PR では確認していない)。
+  - **case 単位の outcome 変化 7 関数は未検証**: `tests/fvm_transitions.py` の `EXISTING_PATTERN_CHANGED` が 7 関数を出力したが、対象 VA・base/new の outcome・native 実行時間の raw jsonl を保存していないため、根拠を記録できない。「timeout の揺らぎ」は仮説であり、断定しない。検証として再実行 (`tests/fvm_transitions.py BASE.jsonl NEW.jsonl` で VA を出力) を子 issue に残す。
+    本 PR で主張できるのは**関数単位 verdict の不変** (match→match 360 / mismatch→mismatch 230 / unexec→unexec 210) だけ。case 単位の outcome 不変は主張しない。
+  - **base と新の測定 commit**: §12 の vm0/u16 の「新 361」(`ecb45fee`) を fvm の base として引用しない。fvm の比較は同一 worktree で連続実行した base (`2f235a0a`) と新 (`0596772f`) のみを使う。
+- **原因 (未達の根拠)**: fvm の fault 位置 (rip 0x41a7xx・0xd2b1 等、または addr 0xb) は、this の VMT slot が 0 埋めのため仮想 call 先で落ちる。
+  引数 this を正しく指しても、VMT の slot を解決しない限り native は仮想 call を完走できない。受入条件 (2) の「一致/不一致への遷移」は現設計では 0 件。
+- **残り (子 issue へ)**: VMT slot に ret stub (または wasm 側で解決可能な関数) を置く設計。これは wasm 側の仮想 call 解決と整合させる必要がある。
+
 **未達 (受入条件)**: 実行不能 2,261 (closure) の内訳の大半 (native fault / null deref) は今回の 2 pattern では解消しない。
 UTF-16 blob は 1 pattern 1 本の固定で、長さや内容の変化を試していない。this/VMT は VMT の slot を埋めないため、仮想 call 先で native が落ちる。
 「native 失敗 RVA からの引数補正」「署名未対応 (vector/struct) の扱い」「状態前提 (InitTable/TLS) の case 生成」は未着手。
 flelift closure (fle_lift.sh 生成物 tools/flelift/work/lift/* が素材に無い) は未実測。
 起票先: 本 issue #235 (部分達成のため Refs)。
+
+### LD-24 (#976) 署名未対応 50 関数の内訳 (REPORT §12 から移動)
+
+m11 closure の `unsupported_sig` 50 件は未実装。分割先は #1193 と #1194。詳細・件数の注記・受入条件: [`REPORT_LD24.md`](REPORT_LD24.md)。
+
+## 13. flelift closure の再採点 (LD-26 / #978、部分達成) — 参考値 (未確定)
+
+素材 (fl-win64・work-m11・work-liftdiff) から `tools/flelift/fle_lift.sh` で lift 生成物 (`tools/flelift/work/lift/*`) を作り直し、`targets/flelift.json` で全数採点した。方式は「fl-win64 からの再生成」(allowlist 追加なし)。issue は方式を PM 判断としているため、この選択は PM の確認対象。
+
+| 工程 | 実測 (本 run・4 core・load 約 0.8) |
+|---|---|
+| `fle_lift.sh` (x64c lift → emcc) | 合計 **67.2 s** (lift 36 s・emcc 31 s)。functions 7018 / insns 340,761 / unsup {} / imports 354 |
+| `liftdiff.py build targets/flelift.json` | **29.0 s**。`sig_mismatch` 0・`undefined` 0 |
+| `bootstate --mode hybrid` | **10.9 s**。units_run **928/942** (InitCount 246 で segv・first_fail 830) |
+| `batch --set closure --shards 4` 前半 (5600 関数) | 1500 s の foreground timeout で打ち切り (rc 124)。JSONL は 400 件ごとに書出済み |
+| 同 後半 (残 1821 関数, `--set file:`) | **653 s** (10 m 53 s)・rc 0 |
+
+> **未検証 (レビュー指摘 1・最重要)**: 前半 JSONL の行数・一意アドレス数は本 run で**確認していない** (打切り後の前半 JSONL が 5,600 件あったことを示す記録が無い)。後半 1,821 件は `--set file:` で別途流した。このため下表の「7,421 関数」は前半の欠損を含む可能性があり、**全数 7,421 の値として扱わない**。前半 JSONL の一意数を確認するか、欠けた関数を再実行して一意数を揃えるまで、下表は参考値。
+>
+> **測定 tree (レビュー指摘 1・3)**: この値は commit 1795f8ff の tree (base a5adb2fc 系) のもので、現 HEAD (7242709f = main 取り込み merge) の値ではない。`git diff 1795f8ff 7242709f --stat -- tools/liftlib/liftlib tools/liftdiff/ldlib` は 5 files, +174 / -1 (`passes/l1_restore.py` +79・`passes/iargs.py` +19/-1・`passes/fp_bind.py` +13・`ldlib/session.py` +35・`ldlib/cases.py` +29)。この差分の上に載せた値は**未検証**。再測定 (fle_lift.sh / liftdiff build / bootstate / batch) は素材不足で本 run では不可。
+
+参考値 (未確定・前後半の合算・前半 JSONL の一意数未確認・重複確認なし。全数 7,421 として扱わない):
+
+| verdict | 件数 |
+|---|---|
+| match (一致) | 4,280 |
+| mismatch (不一致) | 805 |
+| unexec (実行不能) | 2,336 |
+
+実行不能の内訳: native_fault 1,183 / native_null_deref 460 / no_wasm_definition 402 / hang 241 / unsupported_sig 50。
+
+§12 までの値 (17 unit の旧 boot、CAB-232 相当) との遷移: unexec→match 240 / match→mismatch 220 / unexec→mismatch 167 / mismatch→match 142 / mismatch→unexec 73 / match→unexec 25。
+(比較元 `results/flelift_closure_verdicts.tsv` は旧 boot 4,143 / 633 / 2,645。)
+
+**REPORT §1 (928 unit 到達状態の値 4,182 / 741 / 2,498) との不一致**: 本 run は 4,280 / 805 / 2,336 で、
+差は +98 / +64 / −162。§6.2 が示す負荷依存の揺らぎ (native badjson 等) の範囲を超える。原因は未切り分けで、
+候補は shards 4 (REPORT は 14)・前後半の 2 プロセス分割・native 側の状態 (`--state auto`)。
+「本 run の値が正」とは扱わず、再現性の確認を未解決として残す。
+
+未達 (受入条件):
+- `FL_WIN64_DIR=... bash tools/liftdiff/liftdiff_e2e.sh` の PASS は **未実行**。既定の [1/4] が `work-m6-ott` (ott.ll) を要するため、
+  `--m11-only` の確認も本 run の時間内では行えなかった。起票先: 本 issue #978 (部分達成のため Refs)。
+- 48 分の run 内で全数採点を完了したが、shards 数と再現性の差は上記のとおり未解決。
+- 素材の実在確認 (レビュー非ブロッカー): `ARTIFACTS_DIR` (`/home/runner/artifacts`) には `fl-win64.tar.zst` のみ。`work-m6-ott` は無い。
+  本 run の再実行 (前半 batch・lift 再生成) に必要な `work-m11`・`work-liftdiff` も無く、`tools/liftdiff/work`・`tools/flelift/work` は存在しない。
+  このため前半の再実行・一意数確認は本 run では不可能。

@@ -37,3 +37,10 @@
 - **既知 flake (本 PR の変更とは独立)**: `tools/gui/test/reach_test.sh` 末尾の `selftest_wrapped` (ASan) が約 30% の確率で `gui_headless.c:33 blit_surf` の heap-use-after-free (`recompose_all` ← `on_cmd`、thread T1) で落ちる。同バイナリを単独 30 回回した結果は PR HEAD `7ead604` が **9/30 失敗**、origin/main `0fa8283` が **8/30 失敗** (同じ ASan エラー)。PR は `gui_headless.c`・`selftest.c`・`reach_test.sh` に触れていない。
 - **未解決 (起票依頼)**: `gui_headless.c` の blit_surf race の issue 起票 (PM 依頼・未起票)。`toolchain-retdec` を含む素材での通常経路 ALL PASS の追加確認の要否は PM 判断。
 
+
+## 11 追補 2. e2e.sh ALL PASS の再実測 (#186 再々実行 run)
+
+検証起点 HEAD `9d1c632f` (origin/main、クリーン worktree `186-e2e-recheck`、`build/` 無し)。`TMPDIR=$RUNNER_TEMP`、`bash tools/gui/e2e.sh` 1 回、foreground。素材: fl-win64・toolchain-retdec・toolchain-emsdk 実在確認。前提: `apt-get install gcc-mingw-w64-x86-64` (GCC 13)、`pnpm install --frozen-lockfile`。
+
+- **結果**: rc=0 / `[gui-e2e] ALL PASS` / 実時間 211 s / 開始時 load 0.37 (1 分値)。stress の negctl 4 本は FAIL を検出して拒否 (stress 本体は ALL PASS)。
+- **安定性**: 本 run は 1 回のみ。受入条件「維持」の判定 (n 連続) は #1217 で扱う。flake (`blit_surf` の heap-use-after-free) の追跡は #740 (GUI-15)。

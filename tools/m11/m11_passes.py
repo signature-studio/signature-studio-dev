@@ -280,6 +280,19 @@ def pass_m2p_dec_inttoptr(text, report):
     return text
 
 
+def pass_m2q_fn980ed0(text, report):
+    """[M2q] function_980ed0 の定数 VA 0x15e4080 (10 進 22954112) を LVA に remap (#861 → #1043).
+    RetDec が 10 進で出したこの 1 件だけが VA→LVA 漏れ。残ると n が linear 0 の残骸を読み、unit 368 で 832MB の VirtualAlloc
+    (2 GiB 上限超過で halt0) になる。全件 remap (M2P) は unit 503 でハングするため、この 1 件に限定する。"""
+    old = '%ce0n11_function_980ed0 = inttoptr i64 22954112 to ptr'
+    n = text.count(old)
+    new = '%ce0n11_function_980ed0 = inttoptr i64 ' + str(shiftva(22954112)) + ' to ptr'
+    text = text.replace(old, new)
+    stage('M2q', 'function_980ed0 VA->LVA remap: %d sites' % n)
+    report['m2q_fn980ed0_remap'] = n
+    return text
+
+
 def pass_m2b(text, report):
     n = [0]
 
@@ -779,6 +792,7 @@ def main():
     text = pass_m2l_numballs(text, report)
     text = pass_m1(text, report)
     text = pass_m2(text, report)
+    text = pass_m2q_fn980ed0(text, report)
     if os.environ.get('M11_M2P') == '1':   # #417: 既定 OFF (有効化すると unit 503 で survey がハング, REPORT 参照)
         text = pass_m2p_dec_inttoptr(text, report)
     text = pass_m2c(text, report)

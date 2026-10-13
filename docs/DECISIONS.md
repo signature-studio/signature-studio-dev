@@ -102,3 +102,11 @@
 - **影響**: 大物の wire サイズは非圧縮のまま。帯域が律速の回線では不利になる (実測は `tools/perf/results/chunked.json`)。
   `cacheapi` モードは単一 URL 前提のため descriptor 経路では使わず、HTTP キャッシュに任せる。
   R2 再移行時 (D1 の退避路) に part 単位の br を再検討する。
+
+## D10 — 実 OTT の Chrome Memory 本数上限 (124〜125) への対応: 同一 Memory への処理オブジェクト畳み込み
+
+- **状態**: 採用 (2026-10-13, issue #990 [PERF-P15])
+- **決定**: plugin 数が 124 を超える構成は、plugin ごとに Memory を 1 本ずつ持つ方式 (PERF-P8 の plugin 別 instance) を拡張せず、**1 instance (Memory 1 本) の中に処理オブジェクトを畳み込む**。`OBJ`・入出力・buffer を obj ごとに別 VA に置く。
+- **比較した方式**: (a) 同一 Memory への畳み込み (採用)、(b) Worker を分けて Memory 上限を Worker ごとに持つ、(c) 低位 base・小 Memory 化 (#91)。
+- **理由**: (b) は Chrome 154 の上限が renderer プロセス単位で、Worker 分割では合計本数が 124〜253 とばらつき、N=130 を確実に通せない (`tools/perf/REPORT_P15.md` §1)。(c) は #91 の完了が前提で本 issue 単独では成立しない。(a) は Chrome Dedicated Worker で M=130 を Memory 1 本に畳み、instantiate 失敗なし・全 obj の署名が既知値と一致 (同 §3)。定常コストは obj 数に依らず平坦 (M=1 と M=130 で +1.5% 以内)。
+- **影響**: 同一 binary の複数 state に限って検証済み。異なる plugin を同居させる場合の VA 衝突・共有 static の扱いは未検証 (REPORT_P15 §4、子 issue で扱う)。setup は M=130 で約 0.8〜1.0 s かかるため、起動時の一括 pre-warm が前提。

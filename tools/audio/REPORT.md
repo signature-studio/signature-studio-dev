@@ -245,3 +245,6 @@ underrun が 3 秒続くと +B を 1 段ずつ戻す (下限は下げない)。`
 - 旧 HEAD `bb912951` (`d53f449c` からは REPORT のみの差分でコード同一。main 取り込み前): 初回 1 run exit 1・11/13 PASS (8.6 s)。FAIL は dev:tone (`max_err=6.85e-1` `zero_runs=1` `first_err_frame=56576` `first_zero_run_frame=56607`) と dev:underruns (`underruns=1` `first_underrun_frame=56576`)。直後の 10 回は 10/10 exit 0・13/13 PASS。
 - 旧 HEAD `d53f449c` の記録 (失敗ログ未取得) は旧記録として残す。旧記述「21 run 全 PASS」は本実測と合わず撤回。
 - 再現条件 (負荷・タイミング) は未特定。FAIL は旧 HEAD の 11 run 中 1 件のみで、切り分けは `first_underrun_frame=56576` (producer 遅延か consumer rebuffer か) を起点に行う。追跡 **#863** (AU-15)。
+
+## 20. AU-15 (#863) 現 HEAD での再試行 (失敗 0 件)
+結論: `origin/main` `2f235a0a` で 15 run 全 PASS (無負荷 9 + 負荷下 6)。全文は [REPORT_APPENDIX_863.md](REPORT_APPENDIX_863.md) §20。

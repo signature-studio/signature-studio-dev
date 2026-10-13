@@ -215,3 +215,7 @@ jsonl の該当レコードを読んだ結果 (`batch_closure_hybrid.jsonl`、ba
 * 観測: `0x44a590` と `0x4511d0` は、wasm の入口がどちらも `0x40faa0` に収束している。`work-liftdiff` 同梱 `tools/liftdiff/work/flelift/fle_lifted_tr.c` (生成行 69926 付近) で `0x40faa0` は `0x44a505` から直接 call されており (`call 0x40faa0`)、native 側の呼出先 (`0x415c30` / `0x4103c0`) と一致しない。仮説: x64c の間接 call 解決が、同じ呼出し点でも対象を取り違えている。未検証。
 * 2 件 (`0x412020` / `0x455650`) は unexec のため、batch の差分からは原因を取れない。
 * 次の一手 (本 run では未実施): 退行 5 件を単独で再採点し、trace 差分の入口 (`0x40faa0`) の間接 call 解決を確認する。修復は tools/flelift の変更が要るため #410 に継続。
+
+### 9-2. 退行 5 件の単独再採点 — 未実施
+
+退行 5 件 (§9-1) は単独 (batch 外) での再採点を行っておらず、実測値は存在しない。本節は単独での判定を記録しない。再採点は #410 で、素材 `fl-win64` (`docs/WORKFLOW.md` §11) と `tools/flelift/work`・`tools/liftdiff/work` が揃う環境で行う。
