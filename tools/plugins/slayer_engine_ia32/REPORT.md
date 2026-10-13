@@ -176,16 +176,33 @@ ia32 で要注意の mnemonic (件数): cdq 21 / movzx 51 / movsx 54 / lea 590 /
 
 | 項目 | 実測 |
 |---|---|
-| gate (`marshal.py`) | `[marshal] OK`・exit 0。 wall 0.065 s (single run) |
-| nega (`marshal.py --nega`) | `nega: 0/3 miss`・exit 0。 wall 0.056 s |
-| 負荷 | 実行前 load 1 分 0.23・cpu 4 |
+| gate (`marshal.py`) | `[marshal] OK`・exit 0 |
+| nega (`marshal.py --nega`) | `nega: 0/5 miss`・exit 0 |
 
 | NC | 壊した入力・期待 | 実測 FAIL |
 |---|---|---|
 | N1 | magic 即値を 1 bit 壊した複製 (値突合のみ、sha 検査は外す) | `engine magic = 1450406993, want 1450406992` (HIT) |
 | N2 | x32 sizeof 期待を 0xA0 に誤る | `x32 sizeof 0x90 != 0xa0` (HIT) |
 | N3 | 期待 magic を 1 ずらす | `engine magic @0x0 = 1450406992, want 1450406993` (HIT) |
+| N4 | effEditGetRect の子 vtable slot 期待を 5 に誤る | `route erect_child_slot = 4, want 5` (HIT) |
+| N5 | effProcessEvents(25) が switch 内で処理される、と誤った期待 | `route opcode25_default = True, want False` (HIT) |
 
-### 9.3 未解決 (起票先: #674)
+### 9.3 読取経路の静的実測 (#894)
 
-§6 の未解決と同じ (VstEvents / ERect の engine 側読取、殻側の実物構造体、engine の store 値の実行確認)。
+dispatcher `0x10001000` は `[this+0x40]` の vtable slot+0x18 (`0x10001300`) へ全 opcode を渡す。 その switch の結果:
+
+| 項目 | 実測 | 意味 |
+|---|---|---|
+| switch 上限 (`cmp eax, 0x18`) | 24 | 0..24 のみ jump table |
+| opcode 25 (effProcessEvents) | **default (`0x1000149c`)・戻り値 0** | switch 内に VstEvents の読取は無い |
+| opcode 13 (effEditGetRect) | jump table → `0x10001406` | `ecx = [ecx+8]` (editor 子) の slot+4 へ転送 |
+
+- `push 0x19` (= 25) を含む箇所は `0x100025db`・`0x10009bb0` の 2 件。 いずれも dispatcher 経由の opcode 分岐ではなく、 `0x10009bb0` は `0x1000a806` (audio master 系) を呼ぶ。 VstEvents の読取箇所は未特定。
+- effEditGetRect の子 vtable は `[this+8]` に**実行時に**設定されるため、静的な store 列からは ERect 書込み先を特定できない (未解決)。
+
+### 9.4 未解決 (起票先: #674 / #894)
+
+- VstEvents の読取箇所: 静的経路に見当たらない (上記)。 #894 の継続。
+- ERect の書込み箇所: 子 vtable が実行時生成のため静的に未特定。 #894 の継続。
+- 殻 (x64) 側の実物構造体の突合: #894 の継続。
+- engine の store 値の実行確認 (静的のみ): #674 (受入 4 と同時)。
