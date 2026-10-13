@@ -78,6 +78,31 @@
 | RetDec 既定モード (`--select-decode-only` なし) が reg 243 で落ちる原因 | 既定モードで Wrapper を lift できない理由が未特定 | #828 |
 | RetDec の Wrapper 全体 lift の成否・失敗型分類 (分割 lift の 93 件 / block19091・block23676 は §5 で分類済み。残る未解決は liftlib 経路での失敗型) | liftlib 経路の失敗型が未確定 | #828 (liftlib 経路は #917) |
 
+## 6. 比較表 (#917 受入条件 1〜3。検証 HEAD: 本 PR、2026-10-13 run)
+
+計測環境: `/opt/retdec` (RetDec v5.0)・`/opt/emsdk` (emcc `-c`/`-fsyntax-only`)・capstone 5.0.7 / pefile 2024.8.26 (`$RUNNER_TEMP` の venv)。load average (1 分値) は計測中 0.2〜0.5 (4 CPU)。
+
+| 項目 | RetDec 分割 lift | x64c (`x64c_wrapper.py`) | liftlib (RetDec→修復→emcc) |
+|---|---|---|---|
+| block19091: 関数数 (pdata 併合後) | 19,816 | 19,816 | 19,816 |
+| block19091: lift 成功 (関数単位) | 19,723 (99.53%) | 19,816 (100%・例外で中断せず生成) | 未完 (下記) |
+| block19091: emcc `-c` 通過 (修復なし, 関数単位) | 17,243 / 19,816 (87.02%) | 生成物の `ULLULL` 2 箇所を補正後に全体通過 (補正なしは 18 箇所で失敗) | 未測定 (修復は未実施) |
+| block23676: 関数数 / lift 成功 | 19,826 / 19,733 (99.53%) | 未実施 (本 run の時間内に未着手) | 未測定 |
+| 未対応命令 (unsup 合計・block19091) | — | 3,629 件 / 81 種 (string 命令 2,063・x87 1,256・MMX/SIMD 147・他 163) | 未測定 |
+| wasm link (emcc, 全体) | 未実施 | timeout (400 秒で link 未完) | 未実施 |
+| 所要 (秒) | RetDec `retdec_seconds_all` 305.01 (block19091) / 305.04 (block23676) | x64c 生成 78.9 s (block19091) / emcc `-c` 57.8 s | emcc `-fsyntax-only` 40 batch 3.5 s (wall) |
+
+判定の注意:
+- 「RetDec 分割 lift 99.53%」は RetDec が exit 0 で `function_<VA>` の定義を出したかの数であり、C がコンパイル可能かではない。修復なしの emcc 通過は 87.02%。
+- x64c 欄の 100% は「例外なく生成した」数。`lift_meta.json` の `unsup` (未対応 mnemonic) の関数は、実行時に `ott_unsup` で fail-fast する。関数単位の成否ではない。
+- x64c 生成物は `tools/ott/lift/x64c.py:260` の `hex(MASK[s])` 後の `ULL` 二重付与 (`ULLULL`) で emcc `-c` が 18 箇所で失敗する。本 PR では `sed 's/ULLULL/ULL/'` で補正した複製だけで測った (元 `tools/ott` は変更していない)。
+- wasm link は `emcc -O1 ... -sEXPORTED_FUNCTIONS=_malloc` で 400 秒の timeout (ott runtime `tools/ott/rt` 込み)。完了時間は未測定。
+
+**未解決 (受入条件の残り → 子 issue #1128 `[HB-H26]`)**
+- liftlib (RetDec C → 修復 → emcc) の Wrapper 適用: RetDec 出力は `.ll` ではなく C であり、liftlib の `lift` 入口 (`targets/*.json`・`.ll` 前提) に直接載らない。修復 (`int64_t*` と整数の混在、`__asm_movsd` 等の未宣言 helper) が未実施。
+- block23676 の x64c 実 lift と、両 block の wasm link 完了 (受入条件 1・2 の残り)。
+- 採用方式の判定 (受入条件 4): build 可否が揃うまで決められない。現時点の数字からは RetDec 分割 lift は修復なし 87.02%、x64c は ULL 補正後に C 通過だが wasm link が未完のため、**採用方式は未決定**。
+
 ## 5. 方式比較の実測 (#828、検証 HEAD: 本 PR)
 
 計測: `RETDEC=<retdec>/bin/retdec-decompiler FL_WIN64_DIR=<fl-win64>/extracted python3 tools/hostbridge/wrapper_lift/retdec_batch.py block19091_PE.bin block23676_PE.bin` (RetDec v5.0、batch 500、直列)。x64c は `tools/icall/x64c_census.py` (関数集合は §1 と同じ chain 併合)。
