@@ -139,3 +139,9 @@ FA の P1' (comisd×2+jbe/jae+xorps/movaps+jmp, 合流先は reg2mem alloca) が
 - 結論: `passes.iargs` (既定 off) が RetDec の整数引数 (rdx/r8/r9) 脱落を機械語基準で検出・復元する。OTT ctor の native 突合は iargs ON 200/200・ネガコン (OFF) 0/200 (§17.2)。
 - 検出 `iargs.scan()` は define 15 / 引数不足 site 15 / 入口素通し位置の誤値 site 17 (`sites_entry`, #427 で実装) を返す (§17.7)。
 - 未達: getParameter の xmm0 戻り (RetDec route; jump table 欠落が先, §17.3)。未解決は §17.5。
+
+## 18. PERF-P1 (#155): lift ビルド標準設定 + 出力署名ガード — 付録へ配置
+
+全文は **[`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §18**。
+- 結論: `python3 -m liftlib build <cfg>` が標準設定 (`-O3 -flto` + gc-sections + 最小 export、正本 `data/std_build.json`) で全変種 (ref/o2/o3/std) をビルドし、署名不一致なら exit 1・成果物なし。`bash tools/liftlib/stdbuild_e2e.sh` (合成入力) で 3/3 PASS・ネガコン FAIL を確認。
+- 未達: 実 OTT / FA / KH を標準設定で通す検証 (素材不足)。未解決は §18 の表。

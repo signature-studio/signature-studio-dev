@@ -243,3 +243,6 @@ e2e: `node tools/perf/loader/loader_e2e.mjs [--reps 5] [--quick]` (Chrome 起動
 | `Date.now()` 1 ms 分解能・null sink (headless)。実デバイスの underrun 計測なし | 初回ブロック < 1 ms は判別不能・実 underrun 未評価 | PERF-P7 (#165: 実機再測) |
 | eager compile + keepModule の効果 (§3 の 481→33 ms) をローダ経由で未再測 | keepModule の採否判断 | 本 issue のコメントで PM 判断 (必要なら子チケット) |
 | `src/index.ts` / `audio.ts` (dummy-worklet) への組込みはしていない | ローダは未接続の部品 | RT / AU 系 (FLEngine 結線時) |
+
+## 12. 標準ビルド設定の liftlib 組込 (PERF-P1 / #155)
+§2.1 の結論 (O2 以上必須・LTO 無害・SIMD/wasm-opt 追加は入れない) を `tools/liftlib/data/std_build.json` に固定し、署名ガード付きビルド入口 `python3 -m liftlib build` へ組込んだ。実測・未解決は `tools/liftlib/REPORT_APPENDIX.md` §18。
