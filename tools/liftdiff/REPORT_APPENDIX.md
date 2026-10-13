@@ -161,10 +161,9 @@ LD-17 (#864) の型分類は `results/m11_unreachable_diverge.md` §2 (同じス
 
 #### 型 C・D の原因候補 (LD-28 / #1035)
 集計 = `tests/trace_diverge_cd.py` → `results/m11_unreachable_cd.md` (件数の正本)。型 A・B (#864 の D15 候補・leaf) を除いた型 C・D の食い違いを対象にする。
-- P2 (呼出元の直接 call 脱落): 0x41c820 が 20 件。0x418be0 (20 件) の食い違いは、呼出元 0x41c820 の機械語 `call 0x418be0` → `call 0x407030` (`LoadStringW` ラッパ) → `call 0x413060` のうち、IR では `call 0x407030` が無く `call 0x413060` に直結している (`boot_final3.ll` の `function_41c820` を確認)。
-- P1 (L 内の直接 call 脱落): 9 件。0x41c8c0 ほか。
-- P3 (未特定): 63 件。0x417b70 (32 件) を含む。0x417b70 は IR に機械語の全直接 call 先があり、食い違いは L 内の分岐条件の差と読める (推定・未確認)。
-- 候補判定は call 先の集合差分のみで、call site と IR block の対応づけはしていない。P1・P2 は候補であり確定ではない。
+- 結論: 型 C・D の食い違いは原因候補 (P1・P2・P3) に分類した。P2 は L が F の直接 call 先であることを条件に含む。内訳は results 参照。
+- P2 の代表例 0x418be0 (呼出元 0x41c820) は候補 (`call 0x407030` が IR の対応関数に無い) で、call site と IR block の対応づけは未実施。
+- 候補判定は call 先の集合差分のみ。P1・P2 は候補であり確定ではない。
 
 ## 10. OTT 旧 chain (D1〜D6) の Actions 再現 (LD-8 / #406)
 

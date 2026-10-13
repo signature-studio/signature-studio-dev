@@ -5,7 +5,7 @@ trace_diverge_unreachable.py と同じ食い違い (最後の共通 entry L・na
 原因候補を次の順で割り当てる。call site と IR block は対応づけない (候補であり確定ではない)。
 
   P1 L 内の直接 call 脱落: L の機械語の直接 call 先のうち IR の L に無いものが、次 entry に一致
-  P2 呼出元の直接 call 脱落: L の一つ前の entry F の直接 call 先のうち IR の F に無いものが、次 entry に一致
+  P2 呼出元の直接 call 脱落: L の一つ前の entry F が L を直接 call し (L ∈ direct_calls(F))、F の直接 call 先のうち IR の F に無いものが、次 entry に一致
   P3 未特定: 上記いずれでもない
 
   python3 tools/liftdiff/tests/trace_diverge_cd.py > tools/liftdiff/results/m11_unreachable_cd.md
@@ -131,7 +131,7 @@ def main():
         F = N[i - 2] if i >= 2 else None
         if nn in (missing(L) or set()):
             cause, site = 'P1 L 内の直接 call 脱落 (native の次 entry が IR に無い)', L
-        elif F is not None and nn in (missing(F) or set()):
+        elif F is not None and L in direct_calls(F) and nn in (missing(F) or set()):
             cause, site = 'P2 呼出元の直接 call 脱落 (native の次 entry が IR の呼出元に無い)', F
         else:
             cause, site = 'P3 未特定 (両側の次 entry とも IR に call あり)', L
