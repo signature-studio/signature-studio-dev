@@ -204,3 +204,4 @@ bash tools/targets/freshair/lift2/lift2_e2e.sh                                  
 - 実測: `RESULT: lift2_e2e ALL PASS`, exit 0, real **60.300 s**, load 0.53→0.89 (nproc 4, TMPDIR=`$RUNNER_TEMP`)。
 - comp 400/400 BIT-EXACT (non-grow 206/206・grow 194/194)・filter BIT-EXACT・fuzz 4 系統 mismatch 0 (各 1200, ERR 0/0)・ABI violations 0・ctrl BIT-EXACT 15/15 (fma0/fma1 とも `ERR native/wasm 1/1 同一 scenario: yes`)・ablation 5 種すべて検出 (comis_noflags 200/200, xmm_args_drop 200/200, xmm_ret_drop 200/200, icall_drop 80/200, cmov_drop 172/200)。
 - 必要な素材: `oc_artifacts: fl-win64 work-liftlib-targets plugins-freshair toolchain-emsdk toolchain-retdec`。
+- 2026-10-14 の再実行試行 (HEAD `7ec97437`): `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk work-m11` では `SlateCore.core_64` が無く、`lift2_e2e.sh` は exit 2 (`ERROR: … SlateCore.core_64 が無い`)。`fl-win64` / `work-m11` の tar 一覧にも `SlateCore` / `Fresh Air` は無い。このため上記 (`3214a40e`) の値は本 HEAD での再実行値ではない。
