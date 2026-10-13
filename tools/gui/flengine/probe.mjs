@@ -35,10 +35,11 @@ for (const c of CLASSES) {
   const r = catchRun(() => mod._function_425260(c.wc));   // = RegisterClassW の lift 済みラッパ (ptr 引数のみ)
   out.classes.push({ site: c.site, wndclass_va: '0x' + c.wc.toString(16), name, lpfnWndProc: '0x' + wndproc.toString(16), atom: r.ok ? Number(r.v) : null, err: r.err || null });
   const miss0 = mod._m11_icall_miss(), icall0 = mod._gf_icall_count();
+  const icallOk0 = mod._m11_icall_ok();
   const w = catchRun(() => mod._CreateWindowExW(0, nameP, 0, 0x80000000 | 0, 0, 0, 64, 48, 0, 0, inst, 0));
   const h = w.ok ? Number(w.v) >>> 0 : null;
   out.windows.push({ name, hwnd: h === null ? null : '0x' + h.toString(16), hwnd_below_2_31: h !== null && h !== 0 ? h < 0x80000000 : null, err: w.err || null,
-    wndproc_icall_calls: mod._gf_icall_count() - icall0, thunk_calls: mod._gf_thunk_count(), m11_icall_miss_delta: mod._m11_icall_miss() - miss0 });
+    wndproc_icall_calls: mod._gf_icall_count() - icall0, m11_icall_ok_delta: mod._m11_icall_ok() - icallOk0, wndproc: '0x' + wndproc.toString(16), thunk_calls: mod._gf_thunk_count(), m11_icall_miss_delta: mod._m11_icall_miss() - miss0 });
 }
 // AllocateHWnd 相当 (function_52a7f0): GetClassInfoW → RegisterClassW → CreateWindowExW → SetWindowLongPtrW(GWLP_WNDPROC)
 const calls0 = {};
@@ -53,6 +54,7 @@ mod._gui_reach_dump();
 out.reach = [];
 for (const l of errs) { const m = /GUI-REACH (\d+) (\w+) (\d+) (IMPL|STUB) P(\S+)$/.exec(l); if (m) out.reach.push({ order: +m[1], name: m[2], calls: +m[3], kind: m[4], prio: m[5] }); }
 out.icall_miss = mod._m11_icall_miss();
+out.icall_miss_targets = Array.from({ length: mod._m11_icall_miss_uniq() }, (_, i) => '0x' + (mod._m11_icall_miss_at(i) >>> 0).toString(16));
 const json = JSON.stringify(out);
 const of = opt('--out', null);
 if (of) fs.writeFileSync(of, JSON.stringify(out, null, 1));

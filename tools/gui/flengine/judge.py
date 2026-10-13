@@ -11,6 +11,7 @@ ap.add_argument('--boot', default='boot_ff.json')
 ap.add_argument('--survey-ff', default='survey_ff.json')
 ap.add_argument('--survey-soft', default='survey_soft.json')
 ap.add_argument('--probe', default='probe.json')
+ap.add_argument('--wndscan', default='wndclass.json', help='m11_wndclass_scan.py --json-out の出力 (e2e.sh が DIR に置く)')
 ap.add_argument('--expected', default=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'results', 'reach_expected.json'))
 ap.add_argument('--expect-units', type=int, default=None, help='baseline の units_run を上書き (ネガコン用)')
 ap.add_argument('--quiet', action='store_true')
@@ -64,6 +65,13 @@ tapp = [w for w in probe['windows'] if w['name'] == 'TApplication']
 h = int(tapp[0]['hwnd'], 16) if tapp and tapp[0]['hwnd'] else 0
 gate('P4 TApplication window (WNDPROC = DefWindowProcW import thunk) created', h > 0 and h < 0x80000000 and tapp[0]['wndproc_icall_calls'] > 0,
      'hwnd=%s icall=%s' % (tapp[0]['hwnd'] if tapp else None, tapp[0]['wndproc_icall_calls'] if tapp else None))
+ws = J(a.wndscan)['summary']
+gate('W1 WNDCLASS scan: every fn WNDPROC is defined in the final IR', ws['wndclass_instances'] >= 11 and ws['wndproc_fn_instances'] >= 8 and ws['wndproc_outside_final_ir'] == 0,
+     'WNDCLASS %d (fn WNDPROC %d, import thunk %d) / outside final IR %d / outside base closure %d (floor: 11 / 8)' % (ws['wndclass_instances'], ws['wndproc_fn_instances'], ws['wndproc_import_thunk_instances'], ws['wndproc_outside_final_ir'], ws['wndproc_outside_closure']))
+tl = [w for w in probe['windows'] if w['name'] == 'TLightweightLayeredControl']
+hl = int(tl[0]['hwnd'], 16) if tl and tl[0]['hwnd'] else 0
+gate('P5 TLightweightLayeredControl (WNDPROC 0x31dd10, formerly outside closure) window created', 0 < hl < 0x80000000 and tl[0]['m11_icall_ok_delta'] > 0,
+     'hwnd=%s m11_icall ok=%s miss=%s' % (tl[0]['hwnd'] if tl else None, tl[0]['m11_icall_ok_delta'] if tl else None, tl[0]['m11_icall_miss_delta'] if tl else None))
 ok_all = all(r[1] for r in res)
 if not a.quiet:
     for n, ok, d in res: print('%-52s %s  %s' % (n, 'PASS' if ok else 'FAIL', d))
@@ -71,7 +79,8 @@ if not a.quiet:
     print('INFO natural (boot+survey) RegisterClass*/CreateWindowEx* reach: %s' % (sorted(set(nat)) or 'NOT REACHED (acceptance criterion 1 unmet by natural flow; see REPORT)'))
     for w in probe['windows']:
         if not w['hwnd'] or w['hwnd'] == '0x0':
-            print('OPEN directed CreateWindowExW(%s) returned NULL: WNDPROC 4-arg call reached m11_icall x%d, miss +%d (target outside the lift closure or an import thunk) -> WM_NCCREATE=0' % (w['name'], w['wndproc_icall_calls'], w['m11_icall_miss_delta']))
+            print('OPEN directed CreateWindowExW(%s) returned NULL: WNDPROC 4-arg call reached m11_icall x%d, miss +%d' % (w['name'], w['wndproc_icall_calls'], w['m11_icall_miss_delta']))
+    print('INFO m11_icall miss targets after probe: %s (0x6c6f = WNDPROC swapped in by WM_NCCREATE (SetWindowLongPtr), not yet attributed; see REPORT)' % probe.get('icall_miss_targets'))
     uw = probe.get('util_window') or {}
     if uw.get('ret') in (None, '0x0'):
         print('OPEN directed function_52a7f0 (AllocateHWnd) returned NULL: RegisterClassW skipped by a lift defect (cmp [TempClass.lpfnWndProc] folded to constant 0)')

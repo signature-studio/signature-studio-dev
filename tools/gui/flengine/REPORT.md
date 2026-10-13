@@ -125,13 +125,40 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 受入条件 2 (`bash tools/gui/e2e.sh` ALL PASS 維持): 本 PR の shim 変更 (`GetDC(NULL)`) 後に実行し **rc 0 / ALL PASS (64 秒, load average 0.75→1.03, 1 回)**。native selftest 324 passed / 0 failed、native lift と Chrome の画素が golden と **EXACT MATCH (0 / 64000 px)**、
 reach_test 11 / adapt_test 28 passed、sigprobe は adapter 有り mismatch 0 / 無し (陰性対照) 177、present e2e 7 pass / 0 fail。`wasm-objdump: command not found` が出るが既存 (sigprobe の補助表示のみ)。
 
+## 6b. WNDCLASS 静的実体の WNDPROC を closure に加える (#565 / M11-N20)
+
+**判定: 受入条件 3 つとも達成**。PE の `.data` から WNDCLASS 静的実体を走査し (`tools/m11/m11_wndclass_scan.py`)、closure 外の WNDPROC を seed に RetDec で lift (boot5) して IR に結合する流れを 1 コマンド化した (`bash tools/m11/m11_wndseed.sh`)。
+新規 lift 欠陥は無し (DEFECTS.md 該当なし)。issue 記載の `0x31dd10` は **RVA**で、VA は `0x71dd10` (m11 の LVA は RVA 座標)。
+
+| 項目 | 実測 | 定義 / 分母 |
+|---|---|---|
+| WNDCLASS 静的実体 | **11 件** (全て `.data`) | `.reloc` DIR64 の +8 が `.pdata` 関数先頭/import thunk、+64 が識別子風文字列、+16/+20/+24..+56 が妥当な全条件 AND。棄却 = 関数でない 132,128 / フィールド不整合 120,306 / 名前不正 41 (`results/wndclass_scan.json`) |
+| WNDPROC の内訳 | 関数 **8** 本 (全て distinct) + `DefWindowProcW` import thunk (`0x424920`) **3** 件 (TPUtilWindow / TApplication / VTPanningWindow) | thunk は closure 外だが `gen_thunks.py` が shim へ解決済み (§2-1 #5) |
+| closure 内 / 外 (seed 導入前 = boot0..4, 7,421 関数) | **内 0 / 外 8** | 0x6d8330 TTimerWindow, 0x71dd10 TLightweightLayeredControl, 0xc3e940 flpianoroll.Marker, 0xc3f060 flpianoroll.Pattern, 0xd2e620 flcpt.ChordAlternative, 0xd339b0 flrack.Channels, 0xd70600 TILRemoteWindow, 0xd82150 flmidimsg |
+| seed の閉包 | 8 WNDPROC → call/jmp 即値を辿り **1,212 関数 / 398,396 B** を追加 (うち import thunk 6B 関数を含む) | 既存 lift 済みに当たったら止める。境界は `.pdata` + import thunk |
+| lift / IR | RetDec boot5 **2 分 0.5 秒** (1,212 range)。`m11_gen_ir2.sh` 30.0 秒。IR 定義関数 **7,421 → 8,647** (+1,226 = 閉包 1,212 + RetDec の内部入口別関数化 14)。未定義 `function_*` は **8 → 8 (同一集合)** | 初回 (thunk 抜き 1,179 range) は未定義が 33 に増えたため、import thunk と遅延 import スロットの 6B 関数を閉包に含めた (2 回目 1,210 → 3 回目 1,212 で収束) |
+| wasm | 6,021,637 → **6,905,826 B**、`wasm-ld` signature mismatch 0 / undefined 0 / duplicate 0 (m11 と GUI 結合の ff・soft) | `disp_entries` 7,399 → 8,621 |
+| 起動・survey の回帰 | units_run **22** / init_count **23** / dllmain_done true / GetMem 33 / FreeMem 20 / icall_miss 0 は不変。survey ok 816 / noproc 1 / miss 46 / trap 79 も不変 | baseline (m11 単体) と GUI 結合の双方を新 IR で再測 |
+| 指向 probe | `TLightweightLayeredControl` の `CreateWindowExW` が **NULL → hwnd 0x110000e** (WNDPROC `0x31dd10` = closure 内の `function_71dd10` へ `m11_icall` ok)。`RegisterClassW` ×2 / `TApplication` hwnd 0x110000f も維持 | gate **P5** (旧 REPORT §4 の OPEN の解消)。hwnd 値は GUI 関数が増えて採番が変わった (旧 0x210000e) |
+
+残る観測: probe の `m11_icall` miss は 3 件 (target `0x6c6f` 1 種)。`function_71dd10` が WM_NCCREATE で `[lpCreateParams+0x78]` を `SetWindowLongPtrW(GWL_WNDPROC)` に渡す経路で、probe の `lpParam=NULL` だと低位メモリの値が WNDPROC になるためと**推定** (偽オブジェクトに `0x24920` を置いた追試でも 0x6c6f のままだったため、この仮説は**未確認**。再現・原因は未調査)。窓生成自体は成功する。
+`function_52a7f0` (AllocateHWnd) の `RegisterClassW` 脱落 (§5-2) は本 issue の範囲外で未解決のまま (judge の OPEN 行)。
+
+### 6b-1. 検証 (W1 / P5 / ネガコン N6〜N9。実測値は §6b-2)
+
+- **W1** (走査 gate): 検出 WNDCLASS ≥ 11 かつ fn WNDPROC ≥ 8 かつ最終 IR に未定義の WNDPROC = 0。**P5**: `TLightweightLayeredControl` の hwnd が 31bit 内かつ `m11_icall` ok > 0。
+- ネガコン (期待した FAIL 行まで検査): **N6** seed 導入前 IR (boot0 のみ) で `--check` → `WNDCLASS-CHECK FAIL` / **N7** その走査 JSON を judge → W1 FAIL / **N8** 検出 floor を実測+1 → floor FAIL (空振り PASS 防止) / **N9** hwnd=NULL の probe → P5 FAIL。
+- `m11_wndclass_scan.py --check` は 走査 0 件・未定義 WNDPROC のどちらでも exit 1 (終了コードをそのまま gate に使う)。
+
 ## 7. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | `RegisterClass*` / `CreateWindowEx*` の自然到達 (#134 / #490 の先) | 受入条件 1 | #134 / #490 に依存。到達後に `bash tools/gui/flengine/e2e.sh` の INFO 行が変わる (R2 floor を更新) |
 | `function_52a7f0` の `TempClass.lpfnWndProc` load 脱落 (§5-2) | AllocateHWnd 経路 (TPUtilWindow = Timer / 非同期 window) が全滅 | [M11] / ldfix 子チケットを PM が起票 (本 REPORT の DEFECTS 行案) |
-| WNDCLASS 静的実体の WNDPROC を closure seed に追加する pass (`TLightweightLayeredControl` 0x31dd10 ほか) | その class の窓生成が NULL | m11 / icall 系で PM が起票 (#90 の間接 call 復元と近い) |
+| ~~WNDCLASS 静的実体の WNDPROC を closure seed に追加する pass~~ | **解消 (#565, §6b)** | — |
+| probe の `m11_icall` miss target `0x6c6f` (3 件) の由来 | 窓生成は成功。WM_NCCREATE の WNDPROC 差替え経路と推定 (未確認) | #565 に所見 (未起票。PM 判断) |
+| 動的に作られる WNDCLASS (スタック/ヒープ上で組む `RegisterClass`) の WNDPROC | 静的走査では拾えない。`function_52a7f0` 等 5 呼出点のうち静的実体を渡すのは 2 点 | m11 / icall 系で PM が起票 |
 | `EnumFontFamiliesExW` 実装 (コールバック `gui_call4` 経由) | survey の 1 unit が fail-fast | GUI-2 系 (P2 stub 昇格, #174 に所見) |
 | `LoadStringW` 48M 回の unit 特定と資源供給 hook (`gui_set_resource_provider` ← shimx / PE .rsrc) の接続 | LoadStringW が常に空文字 | #174 に所見 / GUI-2 または shimx |
 | 受入「`__pe_image` を m11_data_gen 方式の data 実体化へ統合」(スコープ 3) | 未着手 (本 PR は m11 の image 敷設をそのまま利用) | 新規子チケットを PM が起票 |

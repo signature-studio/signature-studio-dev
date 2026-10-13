@@ -3,7 +3,7 @@
 #   bash tools/gui/flengine/e2e.sh
 # 終了コード: 0 = 全 gate PASS かつ全ネガティブコントロールが期待どおり FAIL / 1 = gate FAIL またはネガコンが FAIL しなかった / 2 = 前提欠如。
 # 前提: tools/m11/work/ (work-m11 素材 + gen_ir2 済み IR)・emsdk・node・python3 (+ x86_64-w64-mingw32-gcc: tools/gui/gen_api.py の arity 表)。
-#   FL_WIN64_DIR は gen_ir2 の ldfix にだけ必要 (本スクリプトは IR を再生成しない)。PATH は env.sh の GF_EXTRA_PATH で足せる。
+#   FL_WIN64_DIR は gen_ir2 の ldfix と WNDCLASS 走査 (m11_wndclass_scan.py: capstone+pefile) に必要 (本スクリプトは IR を再生成しない。IR は m11_wndseed.sh 取込済みであること)。PATH は env.sh の GF_EXTRA_PATH で足せる。
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; source "$HERE/env.sh"
 W="$GF_W"; M="$GF_M11"; R="$HERE/results"; mkdir -p "$W/res" "$R"
@@ -33,9 +33,12 @@ node probe.mjs                                                --out "$W/res/prob
 node run.mjs --wasm "$W/m11_gui_plain.cjs"                    --out "$W/res/boot_plain.json"  > /dev/null
 for f in boot_ff survey_ff survey_soft probe boot_plain baseline_boot baseline_survey; do [ -s "$W/res/$f.json" ] || { S "結果 JSON が空: $f"; exit 1; }; done
 
+S "2b/6 WNDCLASS scan (m11_wndclass_scan.py --check: fn WNDPROC は最終 IR に定義されていること)"
+python3 "$M/m11_wndclass_scan.py" --pe "$FL_WIN64_DIR/extracted/block00031_PE.bin" --ir "$M/work/boot_final.ll" --json-out "$W/res/wndclass.json" --check --min-instances 11 -q > "$W/res/wndclass.out" 2>&1; tail -1 "$W/res/wndclass.out"
+[ -s "$W/res/wndclass.json" ] || { S "wndclass.json が空"; exit 1; }
 S "3/6 judge"
 python3 judge.py --dir "$W/res"; rc=$?
-cp "$W/res/boot_ff.json" "$R/boot.json"; cp "$W/res/survey_soft.json" "$R/survey_soft.json"; cp "$W/res/survey_ff.json" "$R/survey_ff.json"; cp "$W/res/probe.json" "$R/probe.json"
+cp "$W/res/wndclass.json" "$R/wndclass.json"; cp "$W/res/boot_ff.json" "$R/boot.json"; cp "$W/res/survey_soft.json" "$R/survey_soft.json"; cp "$W/res/survey_ff.json" "$R/survey_ff.json"; cp "$W/res/probe.json" "$R/probe.json"
 cp "$W/res/baseline_boot.json" "$R/baseline_boot.json"; cp "$W/res/baseline_survey.json" "$R/baseline_survey.json"
 python3 "$GF_GUI/gen_api.py" > /dev/null    # IMPORTS.md の「実到達」列・§4 を今回の results で再生成
 
@@ -68,6 +71,23 @@ nc_selftest() { ( set -e; gcc -O1 -g -w -fsanitize=address,undefined -fno-saniti
     "$GF_GUI"/src/gui_platform.c "$GF_GUI"/src/gui_reach.c "$GF_GUI"/build/gui_reach_tab.c "$W/nc/gui_core.c" "$GF_GUI"/src/gui_gdi.c "$GF_GUI"/src/gui_headless.c "$GF_GUI"/build/gui_stubs.c \
     "$GF_GUI/test/selftest.c" -o "$W/nc/selftest_old" -lm; "$W/nc/selftest_old" 2>&1 | tail -3; ); }
 nc "N5 GetDC(NULL) を fail-fast に戻した shim で selftest" "FAIL-FAST: unimplemented Win32 API: GetDC" nc_selftest
+
+# N6: seed 導入前の IR (boot0 chunk 単体を最終 IR とみなす) で走査 → W1 FAIL (走査 --check も非 0)
+nc "N6 WNDPROC が IR に無い状態の走査 (--check)" "WNDCLASS-CHECK FAIL" python3 "$M/m11_wndclass_scan.py" --pe "$FL_WIN64_DIR/extracted/block00031_PE.bin" --ir "$M/work/boot0.lift.ll" --check --min-instances 11 -q
+python3 "$M/m11_wndclass_scan.py" --pe "$FL_WIN64_DIR/extracted/block00031_PE.bin" --ir "$M/work/boot0.lift.ll" --json-out "$W/nc/wndclass_noseed.json" -q
+nc "N7 同 JSON を judge (W1)" "W1 WNDCLASS scan.*FAIL" python3 judge.py --dir "$W/res" --wndscan "$W/nc/wndclass_noseed.json"
+# N8: 走査の空振り (検出 floor 12 > 実 11) を --check が拒否する
+nc "N8 検出件数 floor を実測 +1 に" "WNDCLASS-CHECK FAIL.*floor" python3 "$M/m11_wndclass_scan.py" --pe "$FL_WIN64_DIR/extracted/block00031_PE.bin" --ir "$M/work/boot_final.ll" --check --min-instances 12 -q
+# N9: P5 (TLightweightLayeredControl の窓) が NULL に戻った probe を judge
+python3 - "$W/res" "$W/nc" <<'PY'
+import json, sys
+d, o = sys.argv[1:3]
+p = json.load(open(d + '/probe.json'))
+for w in p['windows']:
+    if w['name'] == 'TLightweightLayeredControl': w['hwnd'] = '0x0'
+json.dump(p, open(o + '/probe_null_window.json', 'w'))
+PY
+nc "N9 TLightweightLayeredControl の hwnd が NULL (seed 無し相当)" "P5 TLightweightLayeredControl.*FAIL" python3 judge.py --dir "$W/res" --probe "$W/nc/probe_null_window.json"
 
 S "6/6 done: $(( $(date +%s) - t0 )) s, load=$(cut -d' ' -f1-3 /proc/loadavg)  → exit $rc"
 exit $rc

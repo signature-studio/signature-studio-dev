@@ -27,27 +27,31 @@
  "windows": [
   {
    "name": "TLightweightLayeredControl",
-   "hwnd": "0x0",
-   "hwnd_below_2_31": null,
-   "err": null,
-   "wndproc_icall_calls": 2,
-   "thunk_calls": 0,
-   "m11_icall_miss_delta": 2
-  },
-  {
-   "name": "TApplication",
-   "hwnd": "0x210000e",
+   "hwnd": "0x110000e",
    "hwnd_below_2_31": true,
    "err": null,
    "wndproc_icall_calls": 4,
+   "m11_icall_ok_delta": 1,
+   "wndproc": "0x31dd10",
+   "thunk_calls": 0,
+   "m11_icall_miss_delta": 3
+  },
+  {
+   "name": "TApplication",
+   "hwnd": "0x110000f",
+   "hwnd_below_2_31": true,
+   "err": null,
+   "wndproc_icall_calls": 4,
+   "m11_icall_ok_delta": 0,
+   "wndproc": "0x24920",
    "thunk_calls": 4,
    "m11_icall_miss_delta": 0
   }
  ],
  "abi": {
-  "gui_shared_ptr": 271610880,
+  "gui_shared_ptr": 271620928,
   "gui_shared_ptr_ge_0x10000": true,
-  "screen_dc": "0x120000f",
+  "screen_dc": "0x1200010",
   "screen_dc_in_31bit": true
  },
  "reach": [
@@ -74,14 +78,14 @@
   },
   {
    "order": 4,
-   "name": "GetClassInfoW",
-   "calls": 1,
+   "name": "SetWindowLongPtrW",
+   "calls": 2,
    "kind": "IMPL",
    "prio": "0"
   },
   {
    "order": 5,
-   "name": "SetWindowLongPtrW",
+   "name": "GetClassInfoW",
    "calls": 1,
    "kind": "IMPL",
    "prio": "0"
@@ -101,5 +105,8 @@
    "prio": "0"
   }
  ],
- "icall_miss": 2
+ "icall_miss": 3,
+ "icall_miss_targets": [
+  "0x6c6f"
+ ]
 }

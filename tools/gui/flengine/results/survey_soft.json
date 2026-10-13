@@ -21,7 +21,7 @@
   {
    "order": 1,
    "name": "LoadStringW",
-   "calls": 48116199,
+   "calls": 48116197,
    "kind": "IMPL",
    "prio": "1"
   },

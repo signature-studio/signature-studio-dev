@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # M11 IR 生成 (再現用): boot0..4.lift.ll → merge → numfix → asmfix → passes → genstubs → dotfix → fnclex0 rename
 #   boot4 = tail-call/間接 call 表 seed の追加分 (m11_tail.py 出力)
+#   boot5 = WNDCLASS 静的実体の WNDPROC (+閉包) の追加分 (m11_wndclass_scan.py --ranges-out → m11_lift.sh ... boot5; #565)
 set -euo pipefail
 cd "$(dirname "$0")"
 CH="work/boot0.lift.ll work/boot1.lift.ll work/boot2.lift.ll work/boot3.lift.ll"
 [ -f work/boot4.lift.ll ] && CH="$CH work/boot4.lift.ll"
+[ -f work/boot5.lift.ll ] && CH="$CH work/boot5.lift.ll"   # boot5 = WNDCLASS 静的実体の WNDPROC 閉包 (m11_wndclass_scan.py, #565)
 python3 m11_merge.py $CH -o work/boot_all.ll
 python3 - <<'PYnum'
 import re
