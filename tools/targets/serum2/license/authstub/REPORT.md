@@ -174,12 +174,16 @@ python3 tools/targets/serum2/license/authstub/authstub_irpass.py \
 - LF4 の定数は IR の `ucomisd.1` 引数由来。`verify_lf4_const.py` で PE 上の定数と IR の値の一致を確認する (要素材 `plugins-serum2`・`toolchain-retdec`)。
 - 機械語 VA の site 数: LF5 2 / LF6 2 / LF7 1 (計 5 件)。各 site 数 1 件。
 - 機械語の slot 参照は IR の slot 名と一致しない (例: 機械語 `[rbp-0x10]` ↔ IR `stack_var_-72`)。そのため slot は機械語の rbp 値からは導かず、IR 行を正とした。
-- ネガティブコントロール (合成 IR 1 関数・`bind_load_slot_at` 単体、HEAD で実測):
+- ネガティブコントロール: `negctl_slot.py` (合成 IR 1 関数・`bind_load_slot_at` 単体。`python3 negctl_slot.py` で再現、rc 0 = 全条件一致)。
   - 正例 (VA `0x1800c2c94`・期待 `-72`) → PASS。
   - 誤 slot (期待 `-80`、IR は `-72`) → `T: slot at 0x1800c2c94 = -72 (expect -80)` で FAIL。
   - 誤 VA (`0x1800c2c95`) → `candidate = 0 (expect 1)` で FAIL。
-- 出力 IR の sha256 (`patched_base_lf.ll` `c62d9316…8793` / `raw_base_lf.ll` `79ab30ca…0d20`) は本節の HEAD では**未実測** (素材 `plugins-serum2`・lift 出力が無く e2e を再実行できなかった)。
-- 速度比較は記載しない (変更前後で cache 条件が異なり、同条件の実測が無いため)。
+- 実測 (HEAD `5e7e26fa`・commit 前の作業ツリーは同一内容・`work/` 無しから cold・load 0.36):
+  - `bash e2e.sh` cold: real **27.28 s** (RetDec lift 含む)・exit 0・**23/23 PASS**。
+  - 出力 IR sha256 は §12/§13 の値と一致: `patched_base_lf.ll` `c62d9316…8793`、`raw_base_lf.ll` `79ab30ca…0d20` (全文ハッシュで照合)。
+  - `verify_lf4_const.py ../../work/Serum2_win64.vst3 work/patched_base_lf.ll` → `LF4 const OK` (PE 定数 = IR 定数 = 11.00001・bits 4622382073171892366)。
+  - 素材: `plugins-serum2` の `Install_Xfer_Serum2_2.1.5.exe` を `7z x` で展開 → `Serum2.vst3` 19,236,864 B・sha256 `501e7bb3…5283` (展開後に一致確認)。
+- 速度比較は記載しない (warm の再測定が無く、変更前後で cache 条件が揃わないため)。
 
 ## 13. L1 の再現条件 (実測・追跡 #823)
 
