@@ -61,7 +61,7 @@ if F:
     pr = F.get('probes') or {}
     if (F.get('va_calls') or 0) >= 1 and (pr.get('GetMem') or 0) >= 1:
         reached = max(reached, 4) if reached >= 3 else reached
-    if S and S.get('ok') == 942 - (S.get('noproc') or 0) and not S.get('trap') and not S.get('miss'):
+    if S and S.get('ok') == 942 - (S.get('noproc') or 0) and not S.get('trap') and not S.get('miss') and not S.get('clobber'):
         reached = 5
     if F.get('dllmain_done') and (F.get('units_run') or 0) >= (F.get('units_total') or 1):
         reached = 6
@@ -112,8 +112,15 @@ print('image: %s bytes, wasm: %s bytes' % (F.get('image_bytes'), F.get('wasm_siz
 if S:
     print('-' * 72)
     print('unit survey (InitUnits 抑止 → 942 unit を 1 本ずつ try/catch 隔離; DllMain done=%s):' % S.get('dllmain_done'))
-    print('  ok=%s noproc=%s miss(closure外)=%s trap=%s  (合計 %s)' % (S.get('ok'), S.get('noproc'), S.get('miss'), S.get('trap'), S.get('units')))
+    print('  ok=%s noproc=%s miss(closure外)=%s trap=%s clobber=%s  (合計 %s)' % (S.get('ok'), S.get('noproc'), S.get('miss'), S.get('trap'), S.get('clobber', 0), S.get('units')))
     print('  trap kinds: %s' % json.dumps(S.get('trap_kinds'), ensure_ascii=False))
+    if S.get('trap_oom') is not None:   # #513: OOM (VirtualAlloc が NULL を返した unit) 起因の trap を分離
+        print('  oom 分離: trap=%s = oom %s (unit 実行中に VirtualAlloc が NULL) + その他 %s / ok のうち OOM を踏んだ unit %s / 非 OOM trap kinds: %s' % (
+            S.get('trap'), S.get('trap_oom'), S.get('trap_other'), S.get('ok_with_oom'), json.dumps(S.get('trap_kinds_nonoom'), ensure_ascii=False)))
+        print('  clobber (unit が image の InitTable を壊した → 実行前の image を戻した): %s' % (S.get('clobber_units') or []))
+        print('  VirtualAlloc (survey): live=%.1f MB peak=%.1f MB oom=%s 実解放 %s 回 (%.1f MB) 表に無い解放 %s 見送り(NC) %s decommit %s 64MB 以上の要求 %s 回%s' % (
+            (S.get('va_live') or 0) / 1e6, (S.get('va_peak') or 0) / 1e6, S.get('va_oom'), S.get('va_freed'), (S.get('va_freed_bytes') or 0) / 1e6,
+            S.get('va_free_unknown'), S.get('va_free_skipped'), S.get('va_decommit'), S.get('va_big'), '  [NC: VirtualFree 無効]' if S.get('vfree_noop') else ''))
     tf = S.get('top_frame_idx') or {}
     top = sorted(tf.items(), key=lambda kv: -kv[1])[:8]
     print('  top trap frames: %s' % ', '.join('%s x%d' % (N.get(int(k), 'fn#' + k), v) for k, v in top))
@@ -128,7 +135,7 @@ print('-' * 72)
 print('M11_SUMMARY ' + json.dumps({
     'reached_stage': reached, 'stop_reason': stop,
     'units_run_full': F.get('units_run'), 'units_total': F.get('units_total'),
-    'survey_ok': S.get('ok') if S else None, 'survey_trap': S.get('trap') if S else None, 'survey_miss': S.get('miss') if S else None,
+    'survey_ok': S.get('ok') if S else None, 'survey_trap': S.get('trap') if S else None, 'survey_trap_oom': S.get('trap_oom') if S else None, 'survey_clobber': S.get('clobber') if S else None, 'survey_miss': S.get('miss') if S else None,
     'getmem': pr.get('GetMem'), 'freemem': pr.get('FreeMem'), 'va_calls': F.get('va_calls'), 'va_mb': round((F.get('va_used') or 0) / 1e6, 1),
     'wasm_bytes': F.get('wasm_size'), 'trampolines': F.get('disp_entries'),
 }, ensure_ascii=False))

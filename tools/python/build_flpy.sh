@@ -20,7 +20,7 @@ emcc -O2 -g0 "$WORK/flpy.o" "$B/libpython3.12.a" \
   -sUSE_ZLIB -sUSE_BZIP2 -ldl -lm \
   --no-entry -sALLOW_MEMORY_GROWTH -sINITIAL_MEMORY=33554432 -sSTACK_SIZE=5242880 \
   -sFORCE_FILESYSTEM -sMODULARIZE -sEXPORT_ES6 -sEXPORT_NAME=createFlPython -sENVIRONMENT=web,worker,node \
-  -sEXPORTED_FUNCTIONS=_flpy_init,_flpy_run,_flpy_call_json,_flpy_last_error,_flpy_free,_flpy_finalize,_malloc,_free \
+  -sEXPORTED_FUNCTIONS=_flpy_init,_flpy_run,_flpy_call_json,_flpy_subinterp_run,_flpy_last_error,_flpy_free,_flpy_finalize,_malloc,_free \
   -sEXPORTED_RUNTIME_METHODS=FS,UTF8ToString,stringToUTF8,lengthBytesUTF8,HEAPU8,ccall,cwrap \
   --js-library "$HERE/src/flhost_lib.js" --preload-file "$ST@/" \
   -o "$D/flpy.js"
