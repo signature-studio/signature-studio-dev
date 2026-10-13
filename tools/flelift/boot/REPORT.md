@@ -224,7 +224,7 @@ GitHub Actions runner (4 vCPU / RAM 16GB + swap 16GB 追加) で `boot_e2e.sh` �
 
 | 項目 | 状態 |
 |---|---|
-| shim 有 / ネガコン (`0x15F34A0` 判定) の再採取 | **未実施** (本 run は emsdk / retdec / m11 素材が無く lift・clang 不可)。起票依頼 ③ |
+| shim 有 / ネガコン (`0x15F34A0` 判定) の再採取 | **未実施**。ab373f1 の再検証 run (2026-10-13) でも `$ARTIFACTS_DIR` は `fl-win64.tar.zst` のみ・`/opt/emsdk` 無しのため lift・clang 不可。PR 本文の `oc_artifacts:` を `fl-win64 toolchain-retdec toolchain-emsdk work-m11 work-liftdiff` に変更して再採取する。起票依頼 ③ |
 | units_run の前進・次の停止点 | **未実施**。前 run の値 (209 据え置き) は #672 08:07 コメントに残る |
 | survey 再実測 (0x6a7b70 root の非破裂確認) | **未実施**。起票依頼 ② |
 | 呼出 IPP 名の全一覧 | **未実施**。起票依頼 ① |
