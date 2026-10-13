@@ -183,10 +183,10 @@ bash tools/gui/e2e.sh                        # gui 単体 wasm 回帰
 | save: FL が書いた内容 `[70,76,80]` が選択 handle の `createWritable` へ反映 | PASS |
 | host log は想定内 4 件 (activation 無し blocked 1 / javascript 拒否 1 / picker 失敗 2) のみ・page 例外 0 | PASS |
 
-- 実測: `browser_e2e.sh` HEAD `7f5807c7` で **14 PASS / 0 FAIL** × 2 回 (所要 **11.751 s / 11.806 s**、単独実行)。
-- 回帰 `coexist.sh` HEAD `7f5807c7`: ALL PASS、所要 **14.430 s / 14.557 s**。C 側 58 / 0、host 側 13 / 0、link duplicate 0 / warning 0 / undefined 0、NC1 duplicate 7、NC2 C 側 fail 14。
+- 実測: `browser_e2e.sh` HEAD `7f5807c7` で **14 PASS / 0 FAIL** × 2 回 (所要 **11.751 s / 11.806 s**、単独実行)。HEAD `cfd3f7b2` (コード同一) で再実行 **14 PASS / 0 FAIL** (所要 **19.538 s**、coexist 直後の単独実行)。
+- 回帰 `coexist.sh` HEAD `7f5807c7`: ALL PASS、所要 **14.430 s / 14.557 s**。HEAD `cfd3f7b2`: ALL PASS、所要 **17 s** (1 回)。C 側 58 / 0、host 側 13 / 0、link duplicate 0 / warning 0 / undefined 0、NC1 duplicate 7、NC2 C 側 fail 14。
 - 同時実行は不可: browser と coexist は `work/` を共有するため、並行すると browser が rc=1 で落ちる (単独再実行で PASS を確認)。
 - 環境: emsdk 6.0.12 (PATH 経由。`EMSDK_ENV` 未指定時は PATH の emcc を使う)、`llvm-nm` (llvm-18)、gcc-mingw-w64-x86-64、wabt。
-- ネガコントロール: activation を常時付与 (`withoutActivation` を gesture 付きに置換) すると **4 FAIL / 8 PASS** (exit 1、所要 1.593 s)。activation 無しの 3 検査と想定内 log の件数検査が、activation の有無を実際に区別していることを確認した。
+- ネガコントロール: activation を常時付与 (`withoutActivation` を gesture 付きに置換) すると **4 FAIL / 10 PASS** (14 検査中 4 FAIL、exit 1、所要 11.175 s、HEAD `cfd3f7b2`・`browser_e2e.mjs` は `7f5807c7` と同一)。activation 無しの検査と想定内 log の件数検査が、activation の有無を実際に区別していることを確認した。
 
 未解決 (起票先): 実 native picker の操作 (headless 不可。手動採取または GUI-9 の入力注入で扱う)・実 FL guest 結合での `window.open` / picker 呼出 (#177 SHX-T9)。
