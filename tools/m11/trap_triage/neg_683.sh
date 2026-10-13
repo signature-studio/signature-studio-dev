@@ -5,12 +5,18 @@
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 cd "$HERE/.."
+source ../shared/env.sh   # FL_WIN64_DIR
+PE_QS="${PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}"
+# qstore (m11_build.sh) は PE と capstone・pefile が揃わないと skip → build が失敗する。事前に落として原因を明示する
+[ -f "$PE_QS" ] || { echo "[neg_683] ERROR: PE 無し: $PE_QS" >&2; exit 1; }
+python3 -c 'import capstone, pefile' || { echo "[neg_683] ERROR: capstone / pefile 無し (qstore が走らない)" >&2; exit 1; }
 mkdir -p work/trap_triage
 for v in 1 0; do
   name=$([ "$v" = 1 ] && echo on || echo off)
   s=$(date +%s.%N)
   M11_OV_414AD0=$v bash m11_build.sh > "work/trap_triage/build_$name.log" 2>&1
   b=$(date +%s.%N)
+  [ "$(python3 m11_cond.py --get qstore)" = applied ] || { echo "[neg_683] ERROR: qstore=applied の記録無し (build_$name.log を確認)" >&2; exit 1; }
   node trap_triage/survey_units.mjs "work/trap_triage/$name.json" > "work/trap_triage/survey_$name.log" 2>&1
   e=$(date +%s.%N)
   echo "[neg_683] M11_OV_414AD0=$v build $(awk "BEGIN{print $b - $s}") s / survey $(awk "BEGIN{print $e - $b}") s / loadavg(1,5,15m)=$(cut -d' ' -f1-3 /proc/loadavg)"

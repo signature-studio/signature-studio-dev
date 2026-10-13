@@ -31,7 +31,7 @@ for name in m11_414base m11_414fix; do
   src="$LD/work/m11_414fix/fn68.txt"; dst="$LD/work/$name/fn68.txt"
   [ "$src" = "$dst" ] || cp "$src" "$dst"
 done
-source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1
+source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1   # [EMSDK] docs/REFERENCES.md
 for name in m11_414base m11_414fix; do
   (cd "$LD" && "$PY" liftdiff.py batch "$HERE/targets_$name.json" --set "file:$LD/work/$name/fn68.txt" --shards 4 --state auto --out "$LD/work/$name/batch_${name#m11_}68.jsonl" > "$LD/work/$name/batch_${name#m11_}68.log" 2>&1)
 done
