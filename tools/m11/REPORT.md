@@ -242,9 +242,9 @@ judge: stage 6 は Halt0/longjmp 無し・全 942 unit 実行・skip 0・DllMain
 | unit 30/39/40 の Init 値 0xfa9390 (.text の関数途中・closure 外・skip 3)。skip は ret 0 のため当該 3 unit の init は未実行 | stage 6 の `skip 0` 未達。出所未確認 | 上と同じ (起票依頼 PM 判断) |
 | D4 同型 (`mov r64,[reg]` の 1 段 deref 脱落) の他サイトの全数 | 他 unit の silent 誤動作の恐れ | DEFECTS.md 行案 (PM 判断) |
 
-## 15. #680: survey 測定基準の固定化 (ldfix/qstore の fail-closed・PE パス env 化)
-ldfix/qstore の skip を非 0 終了にし、IR 生成条件と IR の指紋を `work/ir_conditions.json` に記録する fail-closed 化。qstore on / off の差は本 runner の n=2 で再現した。測定値・未解決・環境間一致 (未実測) は [REPORT_N27.md](REPORT_N27.md)。
+## 15. #680: survey 測定基準の固定化 (ldfix/qstore の fail-closed・PE パス env 化) → 本文は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §15
 
 ## 16. #490 [M11-N15]: main HEAD の 4c3baa4 / faee5b6 状態 (部分達成, 詳細は [REPORT_N15.md](REPORT_N15.md) §16)
+
 ## 17. #748 [M11-N41]: 652500 の 1 段 deref 復元 (gate 付き, 既定 0, 部分達成)
 unit 149 は OFF/ON とも oob のまま。ON で kind が変わるのは unit 895 (halt0 → oob) の 1 件のみ (N748 の再測定で訂正)。既定 0 のまま。測定値・未解決・起票先は [REPORT_N748.md](REPORT_N748.md)。
