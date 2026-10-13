@@ -171,7 +171,7 @@ bash tools/audio/e2e.sh --out tools/audio/work/results_parent.json   # 親 e2e 2
 | `asio_sine_b256_96k` の `fla_open: effective depth > 16` abort (今回 10/10 再現) | 親 e2e が 22 シナリオ系で 21/22 | **CAB-210** (AU-11・起票済み)。本チケット起因でないことを §4-1 で実測 |
 | asioMessage selector 6 の内部コマンド 0x17 の正体 | soak 中の `cmd17=0` 実測。解釈は推定のまま | **CAB-97** にコメント済 |
 | shimx 側 `CoCreateInstance` の REGDB_E_CLASSNOTREG スタブからのフォワード 1 行 | 実 FLEngine 結線前に必要 | **CAB-33** に引継ぎ (§9) |
-| 短シナリオ `com_ramp_b256_d2` の underrun (§11: HEAD fef39e5 の初回 e2e で 1/2 回発生) | 短シナリオの負荷依存。120s soak は同条件で 0 | 新規子 issue を PM に依頼 (未起票)。暫定の紐付け先: **#190** (AU-6 ring 充填 T) |
+| 短シナリオ `com_ramp_b256_d2` の underrun (§11 実行 A: 3 回中 1 回) | 短シナリオの負荷依存。120s soak は 3 回とも 0 | **#98** にコメント (残件として記録)。新規子 issue の要否は PM 判断 |
 
 ## 11. 修正 PR #771 (#98 差し戻し対応) の実測
 
