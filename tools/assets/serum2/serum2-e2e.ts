@@ -28,12 +28,16 @@ const TMP = process.env.TMPDIR ?? os.tmpdir();
 const WORK = fs.mkdtempSync(path.join(TMP, 'serum2-e2e-'));
 
 let failures = 0;
-const fail = (msg: string) => {
+const failedPaths: string[] = [];
+// path 付きはファイル単位の不合格 (1 ファイル = 1 件)。集計行は、ファイル単位で説明済みなら件数に足さない (二重計上の回避)
+const fail = (msg: string, p?: string) => {
   failures++;
+  if (p) failedPaths.push(p);
   console.log('  FAIL', msg);
 };
-const check = (cond: boolean, msg: string) => {
+const check = (cond: boolean, msg: string, explainedByFiles = false) => {
   if (cond) console.log('  ok  ', msg);
+  else if (explainedByFiles) console.log('  FAIL', msg, '(ファイル単位の不合格で計上済み)');
   else fail(msg);
 };
 const sha = (b: Uint8Array) => crypto.createHash('sha256').update(b).digest('hex');
@@ -139,7 +143,7 @@ console.log('[1] manifest tree vs src');
     if (s && s.type === 'file' && s.size === e.size) {
       ok++;
       bytes += s.size;
-    } else fail('stat mismatch ' + e.p);
+    } else fail('stat mismatch ' + e.p, e.p);
   }
   check(ok === truth.length && bytes === truth.reduce((a, e) => a + e.size, 0), `stat size match ${ok}/${truth.length} files, ${bytes} B`);
   result.files = truth.length;
@@ -161,7 +165,10 @@ console.log('[2] Tables (wavetable) + warm restart');
   for (const e of tables) {
     const got = vfs.readFileSync(e.p);
     bytes += got.length;
-    if (sha(got) !== e.sha) bad++;
+    if (sha(got) !== e.sha) {
+      bad++;
+      failedPaths.push(e.p);
+    }
   }
   lap('tablesColdMs', t);
   const cold = await srv.stats();
@@ -225,23 +232,26 @@ const negRef = MODE === 'neg-ref' ? truth.filter((e) => e.p.endsWith('.flac'))[7
   let readMs = 0;
   let decMs = 0;
   const t = performance.now();
+  const failedBefore = new Set(failedPaths);
   for (const e of truth) {
+    const isFlac = e.p.endsWith('.flac');
+    if (isFlac) nFlac++;
     let got: Uint8Array;
     const r0 = performance.now();
     try {
       got = vfs.readFileSync(e.p);
     } catch (err) {
       readErr++;
-      fail(`read error ${e.p}: ${(err as Error).message}`);
+      fail(`read error ${e.p}: ${(err as Error).message}`, e.p);
       continue;
     }
     readMs += performance.now() - r0;
     if (got.length !== e.size || sha(got) !== e.sha) {
       shaBad++;
-      fail('sha256 mismatch ' + e.p);
+      fail('sha256 mismatch ' + e.p, e.p);
+      continue;
     }
-    if (!e.p.endsWith('.flac')) continue;
-    nFlac++;
+    if (!isFlac) continue;
     let input = got;
     if (e.p === negFlac) {
       input = Uint8Array.from(got);
@@ -252,7 +262,7 @@ const negRef = MODE === 'neg-ref' ? truth.filter((e) => e.p.endsWith('.flac'))[7
     decMs += performance.now() - d0;
     rcCount[d.rc] = (rcCount[d.rc] ?? 0) + 1;
     if (d.rc !== 0) {
-      fail(`flac decode rc=${d.rc} ${e.p}`);
+      fail(`flac decode rc=${d.rc} ${e.p}`, e.p);
       continue;
     }
     bpsCount[d.bps] = (bpsCount[d.bps] ?? 0) + 1;
@@ -261,15 +271,16 @@ const negRef = MODE === 'neg-ref' ? truth.filter((e) => e.p.endsWith('.flac'))[7
     const ref = refFlac[e.p];
     const refSha = e.p === negRef ? ref.sha.replace(/^./, (c) => (c === '0' ? '1' : '0')) : ref.sha;
     if (d.sha === refSha && d.ch === ref.ch && d.rate === ref.rate && d.frames === ref.frames && d.bps === ref.bps && d.frames === d.total) flacOk++;
-    else fail(`flac PCM != libsndfile 参照 ${e.p} (ch ${d.ch}/${ref.ch} rate ${d.rate}/${ref.rate} frames ${d.frames}/${ref.frames} sha ${d.sha === refSha})`);
+    else fail(`flac PCM != libsndfile 参照 ${e.p} (ch ${d.ch}/${ref.ch} rate ${d.rate}/${ref.rate} frames ${d.frames}/${ref.frames} sha ${d.sha === refSha})`, e.p);
   }
+  const perFile = failedPaths.filter((p) => !failedBefore.has(p)).length;
   lap('fullReadDecodeMs', t);
   result.vfsReadMs = Math.round(readMs);
   result.flacDecodeMs = Math.round(decMs);
   const net = await srv.stats();
-  check(shaBad === 0 && readErr === 0, `VFS read sha256 match ${truth.length - shaBad - readErr}/${truth.length} files (read errors ${readErr})`);
+  check(shaBad === 0 && readErr === 0, `VFS read sha256 match ${truth.length - shaBad - readErr}/${truth.length} files (read errors ${readErr})`, perFile > 0);
   check(nFlac === Object.keys(refFlac).length, `FLAC files ${nFlac} == 参照数 ${Object.keys(refFlac).length}`);
-  check(flacOk === nFlac, `wasm libFLAC PCM == libsndfile PCM ${flacOk}/${nFlac} (rc 分布 ${JSON.stringify(rcCount)}, bps 分布 ${JSON.stringify(bpsCount)}, STREAMINFO MD5 有り ${md5Files})`);
+  check(flacOk === nFlac, `wasm libFLAC PCM == libsndfile PCM ${flacOk}/${nFlac} (rc 分布 ${JSON.stringify(rcCount)}, bps 分布 ${JSON.stringify(bpsCount)}, STREAMINFO MD5 有り ${md5Files})`, perFile > 0);
   result.flac = { files: nFlac, ok: flacOk, md5Files, rcCount, bpsCount, pcmBytes };
   result.net = net;
   result.cache = (cache as any).stats;
@@ -284,7 +295,8 @@ console.log('[5] HTTP Range + VFS random range');
   const rawB = manifest.chunks.c.reduce((a, c, i) => a + (k[i] === 0 ? c : 0), 0);
   result.chunkCodec = { total: manifest.chunks.n, raw: nRaw, br: k.filter((x) => x === 1).length, zst: k.filter((x) => x === 2).length, rawStoredBytes: rawB };
   // raw 格納の FLAC 専用 chunk に Range GET
-  const big = truth.filter((e) => e.p.endsWith('.flac') && leaf(e.p)?.[2] === -1 && k[leaf(e.p)![1]!] === 0).sort((a, b) => b.size - a.size)[0];
+  const negFile = (result.negChunk as { file: string } | undefined)?.file;
+  const big = truth.filter((e) => e.p.endsWith('.flac') && e.p !== negFile && leaf(e.p)?.[2] === -1 && k[leaf(e.p)![1]!] === 0).sort((a, b) => b.size - a.size)[0];
   const first = leaf(big.p)![1]!;
   const id = manifest.chunks.id.substr(first * 32, 32);
   const url = `${srv.url}/c/${id.slice(0, 2)}/${id}.raw`;
@@ -321,9 +333,13 @@ console.log('[5] HTTP Range + VFS random range');
   for (let i = 0; i < 40; i++) rc.push([Math.floor(rng() * big.size), Math.floor(rng() * 200000) + 1]);
   for (const [pos, len] of rc) {
     const b = new Uint8Array(len);
-    const n = vfs.readSync(fd, b, 0, len, pos);
-    const exp = Math.max(0, Math.min(len, big.size - pos));
-    if (n !== exp || sha(b.subarray(0, n)) !== sha(src.subarray(pos, pos + n))) rb++;
+    try {
+      const n = vfs.readSync(fd, b, 0, len, pos);
+      const exp = Math.max(0, Math.min(len, big.size - pos));
+      if (n !== exp || sha(b.subarray(0, n)) !== sha(src.subarray(pos, pos + n))) rb++;
+    } catch {
+      rb++;
+    }
   }
   check(rb === 0, `VFS range reads ${rc.length - rb}/${rc.length} 一致 (${big.p}, ${big.size} B)`);
   vfs.close();
