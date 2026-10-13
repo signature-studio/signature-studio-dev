@@ -109,6 +109,32 @@ python3 tools/icall/diff/rax_callers.py 1801a9a6c 1801c8cb8 1801c8c98
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 366 site 落ちの真因 (decode 後・最適化中に stub 呼出しが減る段の特定と、関数単位の before/after 突合) | 2 関数の wasm 化不可 | #229 (続き) |
+### 12.1 ICALL-9 (#847): stub 呼出しが減る段の特定 (HEAD `f452bb79`)
+
+実測 (`measure_flengine_split.sh`, 117.6 s, load 1.12 開始, 4 core): base 366 / c2 366 (§12 と一致)。
+`--print-after-all` 全段 dump (119 MB, `$RUNNER_TEMP` 内の生成物で commit しない) から段ごとの stub 数を再集計した。
+
+| 段 | 関数数 | stub 呼出し (関数合計) |
+|---|--:|--:|
+| decode (`Input binary to LLVM IR decoding`) | 61 | 377 |
+| `Selected functions optimization` 以降 (2 関数 + stub 2) | 4 | 377 |
+| `Sparse Conditional Constant Propagation` 直前 (`function_1cc0000` 183 / `function_1cc9b70` 192 / 残り 2 関数 2) | 4 | 377 |
+| `Sparse Conditional Constant Propagation` 直後 (`function_1cc0000` 0 / `function_1cc9b70` 9 / 他 2) | 4 | 11 |
+| `Strip Unused Function Prototypes` 以降 | 4 | 11 |
+
+- **減る段は SCCP (`Sparse Conditional Constant Propagation`) の 1 段だけ** (`passes_stub.txt` の 377 → 11 の遷移)。377 − 11 = 366 で、落ちた site 数と一致する (site 1 本 = stub 1 呼出しとみなせる場合の整合。site 単位の対応は未確認)。
+- SCCP の前後で `function_1cc0000` の IR は 7,943 行 → 1,884 行。stub を含む 114 基本ブロックが消える。
+- 消える分岐の条件は、直前の段で `load i64, i64* inttoptr (i64 31195264)` (= 0x1dc0080, BLK 領域内) から読んだ値の比較。SCCP 後はこの分岐が `br i1 undef` になり (両関数で計 161 本)、後続ブロックごと到達不能扱いになる。
+- 0x1dc0080 への store は関数内に 1 本 (`stack_var_-649.0` の phi、基本ブロック `dec_label_pc_1cc9898`)。読み出し 100 箇所の全てがこの store に支配されるかは未確認。
+- **未確定**: なぜ SCCP がこの load を `undef` と判定するか (load は通常 overdefined)。BLK 上の値が未初期化扱いになる経路か、RetDec の memory 扱いか。
+- 仮説 A (範囲分割で回避) は §12 のとおり棄却済み。本件の段特定で、落ちは「RetDec が SCCP で分岐を undef にする」ことに起因すると分かった。修正は未実施 (根本の判定条件が未確定のため)。
+
+### 12.2 残 (ICALL-9 の受入条件のうち未達)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 0x1dc0080 の load が SCCP で `undef` になる条件の特定 | 366 site 落ちの真因の本体 | #847 に残す (本 run では未完) |
+| 落ちた 366 site の IR 上の形 (消失 / 別関数への移動) の関数単位 before/after 分類 | 受入条件 2 未達 | #847 に残す |
+| 修正して 0xc589b0 / 0x128f9e0 の kept を 366 から減らす | 受入条件 3 未達 | #847 に残す |
 | `0x128c320` の関数境界誤認 (1 バイト関数化) と NonRecursiveCFGBuilder 警告 | 隣接関数の lift 欠落の疑い | 子 issue (下記) |
 | jump table cmp/je 展開 / Balance・KH・FA wasm 差分 / stack 引数動的検証 / plugin closure バッチ | 本 run 範囲外 | 子 issue (下記) |
