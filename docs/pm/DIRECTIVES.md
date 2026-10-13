@@ -851,6 +851,12 @@ PM を含む全てのセッションは ephemeral で中断・削除される可
 
 > 指示に従わずに作業を中断することを禁止します。
 
+### 指示 121（2026-10-13、ショートレトロ・既存 PR の解決を最優先・新規着手の禁止）
+
+> - ショートレトロを実施してください。GitHub Actions移行後から今までの開発の流れを集計し、問題点を列挙してください。
+> - 今から既存PRの解決を第一に作業してください。新規タスクは着手しないようにしてください。
+>   - In Reviewが0件になるまでこの制約は解除されません。
+
 ---
 
 ## 2. PM による解釈・運用への反映
@@ -877,6 +883,7 @@ PM を含む全てのセッションは ephemeral で中断・削除される可
 | 指示 118: OC_MODEL_ID の変更 | モデル枠の管理は依頼者。PM は variable を変更しない。失敗が続く時は variable と失敗ログ (`rate_limit_error` 等) を確認して依頼者に共有 | `restart_failed.sh` (失敗 run の再投入) |
 | 指示 119・120: 古い PR がマージされない理由の質問、実装が始まったチケットは merge までノンストップ、作業の中断禁止 | 原因 (2026-10-13 時点の open PR の分類。件数は測定値のため本ファイルに書かない): 競合 (CONFLICT) の PR は review run が立たないのに review を再起動し続けた、reviewer の request-changes 後に修正依頼を出していなかった、Copilot の review 待ちで保留された PR があった。いずれも PR 単位の「次の一手」を PM が手で追えなくなったことが原因。**運用**: PR ごとに状態 (CONFLICT / FIX / NOREVIEW / DRAFT / COPILOT / APPROVED) を機械的に判定し、止まっている PR を必ず次の run に載せる。`sweep_prs.sh` を常駐させ (15 分間隔)、競合は main を merge する run、request-changes は修正 run、review 未投稿・draft は review 再起動、Copilot 待ちは reopen を自動で依頼する。approve 済み未 merge の PR は PM が merge 順を判断して merge する。着手報告だけで終わった run は `find_silent_runs.sh` で検出して再投入する。6 時間を超えた PR は確認の最初に見る | `docs/REFERENCES.md` `[PM-SCRIPTS]` (`sweep_prs.sh`・`watch_runs.sh.notes`)・`docs/WORKFLOW.md` §11 |
 | 指示 112: 全作業は GitHub Actions へ移行済みで、ローカルでの作業は基本的に行われない | 作業の実行主体は Actions 上の OpenCode (issue に `/oc oc_actions_allow_write` をコメントして起動)。ローカル subagent を「稼働本数 15」の数え方の前提にしない。PM のローカル作業は「Actions 起動・監視・検収・統合」に限る | `.github/workflows/opencode.yaml` (implement / review job)・`.github/README.md`・`docs/WORKFLOW.md` (Actions 運用の追記が必要) |
+| 指示 121: ショートレトロ、既存 PR の解決を最優先、新規タスクの着手禁止 (In review が 0 件になるまで解除されない) | **新規着手の禁止**: 新しい issue への `/oc` 投入・新規子チケットの実装 run を止める。起票は『未解決の追跡』のために行ってよいが、実装 run は投入しない。進行中の run (着手済み issue の続き・PR への修正依頼) は新規ではないので継続する。**解除条件**: Project V2 の Status が In review の件数 0 件 (実質は open PR の解消を含めて 0 に近づける)。**運用**: `sweep_prs.sh` の巡回を既存 PR の解決に集中させる (競合解消・修正・review 再起動・approve 済みの merge 判断)。レトロは `docs/pm/RETRO_2026-10-13.md` に記録し、問題点と対策を列挙する | `docs/pm/RETRO_2026-10-13.md`・`/home/ubuntu/work/analysis/watch_runs.sh.notes` |
 
 ---
 
