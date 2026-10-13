@@ -36,6 +36,18 @@ ALLOCA_RE = re.compile(r'^(\s*)(%stack_var_(-?\d+)) = alloca (?P<ty>[^,]+?)(?P<r
 BITCAST_RE = re.compile(r'^\s*(%[\w.$-]+) = bitcast ptr (%stack_var_-?\d+) to ptr\s*$')
 STORE_RE = re.compile(r'^(?P<ind>\s*)store (?P<ty>i32|i64|ptr) (?P<val>-?\d+|null), ptr (?P<dst>%[\w.$-]+)(?P<al>, align \d+)?\s*$')
 SZ32 = {'i1': 1, 'i8': 1, 'i16': 2, 'i32': 4, 'ptr': 4, 'float': 4}   # datalayout p:32 (boot_final.ll 先頭)
+SZ32_ALL = dict(SZ32, i64=8, double=8, i128=16)
+
+
+def tsize32(ty):
+    """alloca 型の wasm32 実体積 (不明は None)"""
+    ty = ty.strip()
+    if ty in SZ32_ALL:
+        return SZ32_ALL[ty]
+    m = re.match(r'^\[(\d+) x (\w+)\]$', ty)
+    if m and m.group(2) in SZ32_ALL:
+        return int(m.group(1)) * SZ32_ALL[m.group(2)]
+    return None
 
 
 def slot_of(name):
@@ -146,9 +158,7 @@ def process(lines, mach, detect_only):
                 if ty == 'ptr' and val != 'null':
                     continue
                 narrow[(slot, v)].append(i)
-        ms = None
-        if narrow or True:
-            ms = machine_stores(mach, va)
+        ms = machine_stores(mach, va)
         stats['functions'] += 1
         if ms is None:
             stats['fn_no_pdata'] += 1
@@ -169,6 +179,21 @@ def process(lines, mach, detect_only):
                 mq[(slot, imm)] += len(addrs)
             else:
                 mn_[(slot, imm)] += len(addrs)
+        ext = {}
+        for nm, ai in allocas.items():
+            am = ALLOCA_RE.match(lines[ai])
+            ext[slot_of(nm)] = tsize32(am.group('ty')) or 0
+        for (slot, v), cnt in mq.items():
+            un = cnt - min(cnt, wide_ir.get((slot, v), 0) + len(narrow.get((slot, v), [])))
+            if un <= 0:
+                continue
+            stats['machine_qword_imm_unmatched'] += un
+            if slot in ext:
+                stats['machine_qword_imm_unmatched_alloca_other_form'] += un
+            elif any(t < slot < t + sz for t, sz in ext.items()):
+                stats['machine_qword_imm_unmatched_interior_of_wider_alloca'] += un
+            else:
+                stats['machine_qword_imm_unmatched_no_alloca_' + ('neg_slot' if slot < 0 else 'nonneg_slot')] += un
         stats['machine_qword_imm_stack_stores'] += sum(mq.values())
         stats['machine_qword_imm_stack_stores_zero'] += sum(c for (sl, v), c in mq.items() if v == 0)
         for key, cnt in mq.items():
@@ -195,7 +220,7 @@ def process(lines, mach, detect_only):
                 continue
             for i in idxs:
                 m = STORE_RE.match(lines[i])
-                new_lines[i] = '%sstore i64 %d, ptr %s%s' % (m.group('ind'), v, m.group('dst'), m.group('al') or '')
+                new_lines[i] = '%sstore i64 %d, ptr %s, align 8' % (m.group('ind'), v, m.group('dst'))   # alloca は align 8 以上で base への store
             name = '%%stack_var_%d' % slot
             ai = allocas[name]
             am = ALLOCA_RE.match(new_lines[ai])
