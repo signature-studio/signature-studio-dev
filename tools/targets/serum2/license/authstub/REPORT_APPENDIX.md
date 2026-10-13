@@ -1,4 +1,4 @@
-> **正本**: `tools/targets/serum2/license/authstub/REPORT.md` §13。本書は REPORT の 250 行上限のため、旧 §13 の全文を無変更で分割移動した付録。
+> **正本**: `tools/targets/serum2/license/authstub/REPORT.md` §13 (§13b)・§14 (付録 §14b)。本書は REPORT の 250 行上限のため、旧 §13 の全文と旧 §14 の詳細を分割移動した付録。
 
 ## 13b. L1 脱落条件の特定 (#823, 機械語 ↔ raw IR の突合)
 
@@ -63,3 +63,32 @@ raw IR 側は `insn.addr` が site 範囲にある命令数・そのうち直接
 
 - 事実の範囲: 上記は raw lift 1 本での実測。復元 pass は未実装 (受入条件 2・3 は未達、子 issue に分割)。
 - 未測定 (断定しない): 0x1800c2d59 の `je` は `[rsi+0x22792]` の bit で分岐し、その bit を 1 にする store は 0x1800c2d42 の 1 箇所のみ。N2a でこの store を 0 に置換した後の到達性は、本 census では測っていない。e2e の 23/23 との関係も未確認。
+
+## 14b. L1 復元 pass の詳細 (#1009 / SR-12, 追跡 #823)
+
+REPORT §14 の詳細。pass の仕様・結論は REPORT §14 が正本。
+
+- 実装: `tools/liftlib/liftlib/passes/l1_restore.py`。raw IR の `br` (0x1800c2d69 の `je` の null 枝, IR 行 9872) の真の枝を新設ブロック `dec_label_pc_1800c2ef4` へ戻す。ブロックは `host=[rsi+0x10]` の null 判定と `call @__icall_dispatch(i64 0x1800c2f05)` (#228 の `ir_icall_restore.py` と同じ宣言) を持つ。site は機械語 VA で指定し、1 件でなければ失敗する。元行の `!insn.addr !N` は正規表現で捕捉して再利用する (番号の固定値は使わない)。
+- `%arg1` = rsi の根拠: 同関数 0x1800c2b50 の demo bit `[rsi+0x22792]` (機械語 0x1800c2cfe) は IR で `%x = add i64 %arg1, 141202` (141202 = 0x22792) として現れる (`authstub_irpass.py` の demo bit 検出, L233)。よって IR の `%arg1` は関数引数 this = rsi。raw IR 行の直接確認は本 fix の run では未実施 (raw lift 無し)。
+- census (`l1_census.py`, PE sha256 `501e7bb3…5283`)。pass 前 (raw) の値は §13b の表が正本 (機械語 `sites=1`/`edx_const=1`/`into=1`、IR 側 `covered=0`/`has_block=False` 等)。pass は IR のみを変え機械語は変えないため、pass 後に変わるのは IR 側だけ:
+
+  | 指標 (IR 側・pass 後) | 値 (raw → restored) |
+  |---|---|
+  | `insn.addr` が site 範囲を被覆 | 0 → 2 |
+  | 直接 `call` が site 範囲 | 0 → 1 |
+  | 入口 edge (`br`/`switch`) into site block | 0 → 1 |
+  | `edx=0x800010` 即値の site 範囲 | 0 → 0 (ファイル全体は 1 → 1) |
+  | ブロック `dec_label_pc_1800c2ef4` | 不在 → 存在 |
+
+- 到達性 (`authstub_irpass.reachable_set`): restored では `dec_label_pc_1800c2ef4` と `l1_call` が関数入口から到達可能。
+- 実測 (測定 commit `27e2c48d` = origin/main。PR #1353 の作者が取得した値。fix run では再実行していない。素材 `plugins-serum2` は `$ARTIFACTS_DIR` に実在することを確認済み。RetDec v5.0 cold lift は 30.20 s・lift 出力 710,975 B。lift は pass に依存しない):
+  - `bash e2e.sh` (`27e2c48d`): rc 0・**23/23 PASS**・warm **4.78 s** (lift キャッシュ利用)。cold の 30.20 s は lift 含む。pass は e2e チェーンに入っていないため、この e2e は不変確認であり pass の検証ではない。
+  - ネガコン: pass を外した raw IR が脱落状態 (上表の左列) そのもの。二重適用は `l1_restore` が exit 1 で拒否 (`二重適用`)。
+  - 構文: `base` 修復 (`liftlib.passes.base.run_base`) 後の raw / restored を `llvm-as-18` で検査、いずれも rc 0 (未修復の RetDec 出力は constexpr の `or` で `llvm-as-18` が落ちるため、検査は base 後で行う)。
+- 旧実測 (いずれも e2e チェーン不変の確認であり本変更の検証ではない。cold と warm は実行条件が違い比較できない):
+  - HEAD `a5adb2fc` (origin/main 取り込み時点, `plugins-serum2` 展開 sha256 一致): cold = **30.15 s**・23/23 PASS (rc 0, load 0.30→0.66)。warm = **3.72 s**・23/23 PASS (rc 0, load 0.15)。
+  - HEAD `6d6726bb` (`work/` 無しから cold・load 0.42): cold = **26.57 s** (RetDec lift 含む)・exit 0・23/23 PASS。出力 IR sha256 は §12/§13 と一致 (`patched_base_lf.ll` `c62d9316…8793`、`raw_base_lf.ll` `79ab30ca…0d20`)。前 HEAD `5e7e26fa` でも cold 27.28 s・23/23 PASS。
+- 未達 (受入条件のうち未完): (1) 復元した `call` の引数 (rcx=host, edx=0x800010) の実行時 ABI は #228 (icall の BLK 経由) の界面に従う別工程で、本 pass は site の VA と制御辺のみ復元する。(2) e2e チェーン (`e2e.sh`) への組込みは未実施。
+- 正とする pass の決定 (#1030 / PR #1227, PM 判断事項): 正は `l1_restore.py` (#1226)。PR #1227 の別 pass `serum2_l1.py` と `authstub/l1_restore.py` は撤回。理由: (1) 同じ `br` を書き換えるため両方適用は `二重適用` で失敗する。(2) 0x1800c2f05 の `call [[rcx]+0x30]` は `icall.py` が間接呼出し `call [reg+off]` に適用する規則と同じく `__icall_dispatch(site_va)` へ落とすのが本パイプラインの扱いで、撤回した pass が出す `@__vcall_notify` は定義が無くリンクできない。(3) 撤回した pass の実測 (census) は本 pass の値ではないため REPORT から外した。覆す場合は PM が決め、`__vcall_notify` の定義と #228 の ABI との整合を先に示す。
+- 既存の子 issue への紐付け (2026-10-13 時点の状態): census 拡張 (受入 2 の IR 側指標) は #1029 [SR-13] で、PR #1205 (`Closes #1029`) により完了・closed (merge commit `9d1c632f`、本ブランチは取り込み済み)。復元 pass の前後表・ネガコンの正式化 (受入 2〜3 の残り) は #1030 [SR-14] (open)、LF 規則の導出は #1213 [SR-11] (open、`1007-sr-11-authstub-binding`)、global 名の規則化は #1208 [SR-15] (open)。
+- LF 束縛の詳細 (REPORT §14 旧版の LF5/LF6/LF7 節): `fp_bind.bind_load_slot_at(lines, fn, va, expect_slot, glob, tag)` で束縛。slot は IR 行 (`%stack_var_<slot>`) から読み、`expect_slot` (`'-72'`/`'-80'`/`'-152'`) と不一致なら `SystemExit` で失敗する (照合)。slot 値・global 名は literal のまま (導出は #1208 / #1213)。LF4 の定数は `verify_lf4_const.py` で PE 上の定数と IR の値の一致を確認 (`LF4 const OK`, 11.00001・bits 4622382073171892366)。機械語の slot 参照は IR の slot 名と一致しない (例: 機械語 `[rbp-0x10]` ↔ IR `stack_var_-72`) ため、slot は IR 行を正とした。ネガコン: `negctl_slot.py` (rc 0 = 全条件一致。誤 slot 期待 `-80` → FAIL、誤 VA `0x1800c2c95` → FAIL)。
