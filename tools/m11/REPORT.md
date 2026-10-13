@@ -235,3 +235,7 @@ callee が `[rcx+0x2c..0x3e]` (GetCPInfo の LeadByte 表) に書くため、呼
 | 巨大 VirtualAlloc 要求 (355MB×2, unit #18 のサイズ算出の未初期化値) | 通常起動で 711.7MB 確保 (`alloca/REPORT.md` 残置 #5) | #132 に継続 |
 | `m11_site` 型の診断 (IR へ guest VA を埋める) が m11 に無い | 反復が手作業 | boot/dbg_lift.py (flelift/boot) の m11 版を要検討 |
 | 素材 tarball に `ir_lb_base.stamp` が無く初回 e2e は必ず gen_ir2 が走る。gen_ir2 は capstone/pefile が無いと ldfix を黙ってスキップする (WARNING のみ) | 素材展開直後の数値が ldfix 有無で変わる (`6ad441d` で無し: survey 839/56/46/1、有り: 841/54/46/1) | #132 に継続 (e2e の前提チェック追加を提案) |
+
+## 11. #572 [M11-N21]: m11_data_gen.py の DIR64 補正境界 = off-by-one (確定・修正済み)
+
+`lo <= r < lo+len-8` は `<=` が正しい。DIR64 278,531 件のうち落ちるのは `.data` 末尾 RVA `0x11e5000` (値 `0x425f00`, 実行時に unit #12 が表経由で読む `TResStringRec` 風データへのポインタ) の 1 件のみ。`<=` に修正し、`m11_reloc_gate.sh` (ネガコン付き, 不合格で非 0) で補正漏れ 0 を確認。e2e の `M11_SUMMARY` は修正前後で完全一致 (units_run 22 / survey ok 816 trap 79 miss 46)。実行時の最終結果は `LoadStringW` stub (常に 0) のため同じで、潜在バグ。全文・実測・未解決 (m6 / liftlib に同条件が複製) は **`REPORT_N21.md`**。
