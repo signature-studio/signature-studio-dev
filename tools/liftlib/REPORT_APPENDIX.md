@@ -161,7 +161,22 @@ RetDec は `void(i128,i128,i8)` と lift し ECX/EFLAGS を捨てる → **void 
 | leafspec | RESULT: PASS (exp 40/40, log gate PASS) | — |
 | 同 HEAD の 2 回目 review run: `simd test` / `simd report` / unit T5・T17a / ネガコン NC2 | mismatch 0 / 未被覆 0 / ok / NC2 は BAD で検出し復元後 mismatch 0 | 4.9 秒 (load 0.85 / 0.74 / 0.32) |
 
-`regress` の `ott_auto_none` (旧既定 `--auto none`) は FAIL (census junkHi 175)。reviewer が origin/main `89a1a30` でも census 値まで同一の FAIL を確認しており、**本 PR 起因ではない** (追跡 issue は PM 起票待ち)。
+`regress` の `ott_auto_none` (旧既定 `--auto none`) は FAIL (census junkHi 175)。reviewer が origin/main `89a1a30` でも census 値まで同一の FAIL を確認しており、**本 PR 起因ではない** (追跡: #478)。
+
+**#478 の途中調査 (未解決・素材不足で停止。以下の仮説は推定で、未実測)**:
+
+| 項目 | 内容 |
+|---|---|
+| 実測 (本 run, 検証起点 `d5e6f98`) | 既存スナップショット `tools/liftlib/work/ott/ott_gen.cjs` に `e2e_check.mjs` / `m10_coefdump.mjs`+`m10_coefref.py` / `e2e_trap10.mjs` を直接実行: checks 8 / broken 0, maxdev 0.0 / nbad 0, trap_rc 0, census[0x248]=0 junkHi 175 (m10 旧 chain 参照値と同値)。real 1.027 秒 (e2e_check のみ, load 0.37) |
+| コード読み (`cli.py` `cmd_ott`) | `--auto none` の合否に census 閾値は無い。`r["pass"]` (checks/maxdev/nbad/trap) と `all(v is True for v in ident.values())` (7 段 IR 一致) と outhash 突合のみ。junkHi 175 は表示値で FAIL 条件ではない |
+| 推定 (原因) | `ident` の参照は `tools/m6/work/{ott_lift,ir7e_p1..p3,ott_memfix0,1}.ll` と `tools/m10/work/ott_m10.ll`。ファイルが無いと `same()` は `None` を返し `is True` 判定が False になるため FAIL する。`tools/m10/work` はどの `oc_artifacts` 名にも含まれない (`docs/WORKFLOW.md` §11)。Actions 上では常に FAIL になる可能性 |
+| 未実施 | 上記の確認 (`ident` の実値出力) と修正・ネガコン。`tools/m6/work` が無く `python3 -m liftlib ott --auto none` が ott.drc.ll の読込で止まる |
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `ott_auto_none` の FAIL 原因の実測特定 | #478 の受入条件 1〜3 が未達 | #478 (要 `oc_artifacts: work-m6-ott analysis-ott-binaries` を追加して再起動) |
+| `tools/m10/work` を供給する素材名が無い | `--auto none` の IR 一致・outhash 突合が Actions で成立しない可能性 | #478 にコメント (allowlist 追加は PM 判断, #293 系) |
+
 
 **(3) 本更新 run の再測定** — HEAD `e86e6e8` (origin/main `91a83a5` を merge 済み)、nproc=4、並列なし。素材は `plugins-ott`・`toolchain-retdec`・`toolchain-emsdk`・`work-liftlib`・`work-liftlib-targets` のみ
 (RetDec の raw `.ll` は `work-liftlib` のキャッシュで `--fresh` ではない):
