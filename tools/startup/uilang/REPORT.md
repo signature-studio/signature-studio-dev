@@ -126,7 +126,16 @@ lang = 0x9dece0(…, 1)                              ← 'Program Language' (既
 
 ### 4.1 クリーン HEAD での再現
 
-(下記「検証結果」に実測を追記する。)
+コミット `487d205` を `git worktree add --detach` で展開して `bash tools/startup/uilang/e2e.sh` を 3 回 (並列 1、node v22.23.3 / python3.14 / emcc 6.0.12、4 コア):
+
+| 実行 | exit | 所要 (秒) | load average (1 分) 開始 → 終了 |
+|---|---|---|---|
+| 1 | 0 | 15.75 | 0.02 → 0.24 |
+| 2 | 0 | 16.26 | 0.24 → 0.41 |
+| 3 | 0 | 16.50 | 0.41 → 0.58 |
+
+範囲 15.75–16.50 秒。いずれも `verify_uilang.py` 49 件 fail 0 / ネガコン 5/5 検出 / probe 10 件一致 / NC 1/1。同じ HEAD で `tools/startup/loadpaths/e2e.sh` PASS (8.68 秒・readers 34・fail 0)、`tools/shimx/test.sh --quick` 全 PASS。
+再現: `source tools/shared/env.sh` (または `FL_WIN64_DIR` 指定) → `bash tools/startup/uilang/e2e.sh`。fl-win64 展開は `docs/WORKFLOW.md` §11。
 
 ## 5. 検証範囲 / 範囲外 / 未解決
 
