@@ -56,14 +56,14 @@
 | N6 Native Access 誘導文言 6 種の抑制 (参照元の特定が先) | 受入条件 2 未達 | #1017 [MX-4] (OPEN) |
 | `acpt_verify_mx2.py` の N5/N6 検査は文字列実在のみ | 「抑制済み」の機械検証が無い | #1017 [MX-4] (OPEN) |
 
-### 12.4 #1017 の再確認 (HEAD = `7a39dea0` の素材付き実測)
+### 12.4 #1017 の再確認 (HEAD = `c2d47fda` の素材付き実測。スクリプト差分なし・同一測定)
 
 - **素材**: `plugins-massivex` (`$ARTIFACTS_DIR/plugins-massivex.tar.zst`) を `$RUNNER_TEMP/mx` に展開 → `scripts/parse_setup_headers.py` → `scripts/extract_massivex.py <exe> work key` で `work/extracted/VST3/Massive X.vst3` (95,356,824 B) を生成。md5 `622993e76565f49c094063a2b717d6ca` は REPORT.md §11.1 (2026-10-13 の記録) の値と一致。
   - 注: extract の 16B checksum は 125/125 不一致 (REPORT.md §1・§8 と同じ既知事象)。展開物の同一性は md5 の一致で確認した。
 - **実行** (いずれも exit 0):
   - `python3 license/scripts/mx_n5n6_probe.py "work/extracted/VST3/Massive X.vst3"` (4.7 s)
   - `python3 license/scripts/mx_n5n6_refscan.py "work/extracted/VST3/Massive X.vst3"` (1.4 s)
-- **probe の抜粋**: `Native Access` を含む ASCII 文字列は 8 件 (N6 の表 6 件 + 表外の `0x184ffc452` "Native Access to enter the correct serial number." と `0x184ffdb55` "Native Access can't be found. ...")。UTF-16LE は 1 件 (`0x18500c4d2`、プリセット パス内の製品名で誘導文言ではない)。`.rdata` 範囲 (raw 0x4ffaa52〜0x4ffdb55 付近)。
+- **probe の抜粋**: `Native Access` を含む ASCII 文字列は 8 件 (N6 の表 6 件 + 表外の `0x184ffc452` "Native Access to enter the correct serial number." と `0x184ffdb55` "Native Access can't be found. ...")。UTF-16LE は 1 件 (`0x18500c4d2`、プリセット パス内の製品名で誘導文言ではない)。いずれも `.rdata` 内 (raw 0x4ffaa52 = VA 0x184ffc452 〜 raw 0x4ffc155 = VA 0x184ffdb55)。
 - **refscan の抜粋**:
   - `N6 0x184ffd03f: abs64=0 rva32=1` / `rva32 raw=0x3c8af47` (`.rdata` 内)。他の 9 VA は abs64 0 / rva32 0。
   - この 1 件は `0x04ffd03f` を含む 5 バイト周期の 4B 値列 (`0x04ffd04f` 等が連続) の一部。ポインタ表か別構造かは未特定のため、「参照」とは判定しない。
