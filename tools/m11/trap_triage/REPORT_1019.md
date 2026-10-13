@@ -7,7 +7,7 @@
 ## 0. 検証環境
 
 - HEAD = `origin/main` `a5adb2fc` から切った `1019-m11-unit149-oob-412e40`。
-- 素材: `fl-win64` (`$RUNNER_TEMP/fl/extracted`)、`toolchain-emsdk` (`/opt/emsdk`)、`toolchain-retdec` (`/opt/retdec`)、`work-m11`、`work-liftdiff` を `tar --zstd -xf` で展開 (計 16 秒)。
+- 素材: `fl-win64` (展開先は `FL_WIN64_DIR` 配下)、`toolchain-emsdk` (`[EMSDK]`)、`toolchain-retdec` (`[RETDEC]`)、`work-m11`、`work-liftdiff` を `tar --zstd -xf` で展開 (計 16 秒)。
 - `FL_WIN64_DIR=$RUNNER_TEMP/fl` (展開先の直下。`.../extracted/extracted` にすると ldfix が skip して fail-closed する)。
 - `m11_gen_ir2.sh`: rc=0, 43.95 s, `ldfix=applied`, `ir_sha256=f5b27a23…`, `boot_final.ll` 490693 行。
 
