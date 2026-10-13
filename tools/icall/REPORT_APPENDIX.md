@@ -205,40 +205,6 @@ awk -F'\t' -v a=401 -v b=404 'NR>1 && $1>=a && $1<=b {s+=$4; l+=$5; n+=$6; u+=$7
 |---|---|---|
 | stack 引数 5 個以上の間接 call の値一致の動的検証 (実行される PE が必要) | 受入条件 (1)(2)(3) 未達 | #854 (ICALL-13) / #229 (icall 親) |
 
-## 13. #1026 (ICALL-18): Fresh Air SlateCore の復元後残落ち 6 件の分類
-
-既知類型との関係: 該当なし (新規類型は未確定。残 6 件は RetDec の vtable 呼出し落ちで、icall §4 D1 の残存形)。
-数値の出所: 既存 `work-icall` 監査 JSON (`rt_freshair-core/`) の再集計。その監査を生成した HEAD はリポジトリに記録が無いため、本節では特定しない。本 run では `work-icall` が無く再実行していない (未検証)。素材 `plugins-freshair` (`Fresh Air.Win.zip` → `SlateCore.core_64`, 36,285,952 B) からの機械語確認は、本 run では再実行していない (初回 PR の記載のみ)。
-
-### 13.1 残 6 件 (復元後 IR に call が無い非 IAT 間接 call)
-
-再現: `python3 tools/icall/diff/fa_residual.py tools/icall/work/rt_freshair-core` (`sites_after.json` を読むだけ, 即時)。
-出力 (実測): `non-IAT call sites 91 / lost 6 (audit call_lost_non_iat=6)`、`by IR status: {'other_insn:br': 1, 'dropped': 5}`。
-
-| 関数 | 落ち site (VA) | 命令 | IR 状態 |
-|---|---|---|---|
-| `0x180c97aa0` (参照解放 + 2 段 vtable) | `0x180c97e17` | `call [rax+0x10]` | other_insn:br (call 以外の br のみ残る) |
-| 同 | `0x180c97e38` | `call [rax+0x20]` | dropped |
-| 同 | `0x180c97e56` | `call [rax+0x8]` | dropped |
-| 同 | `0x180c97e71` | `call [rax+0x20]` | dropped |
-| `0x180da6e60` (本体 ~1.4k 行) | `0x180da7261` | `call [rax+0x30]` | dropped |
-| 同 | `0x180da72fc` | `call [rax+0x30]` | dropped |
-
-- 残 6 件は全て `kind=vtable` (`call qword ptr [rax+disp]`)。reg / rip_data / IAT は復元後 0 落ち。
-- `0x180c97aa0` は `lock xadd` で参照を落とした後 `mov rax,[rcx]` → `call [rax+0x10]` (`0x180c97e14`〜`0x180c97e17`) の形。
-- `0x180c97aa0` の IR は before 118 行・call 0 件、after 139 行・call 5 件。
-- 原因 (推定, 未検証): 復元 pass の対象外の vtable 直接 call 形 (`call [rax+disp]`、rax は直前の `mov rax,[rcx]`)。decode 段で捨てられる経路 (icall §3.1-1) と同じと見られるが、IR 上の捨て位置は未確定。
-- `0x180c97e17` は call の後に br だけが残り、call のみが消えた形。
-
-### 13.2 未実施 (受入条件 1)
-
-- Fresh Air SlateCore closure の wasm 実行と native 差分: **未実施**。`tools/ott/native/ottnat.py` と `diff/matrix.py` は OTT 専用 (`OTT_vst2_win64.dll` 固定) で、Fresh Air 用の native 実行ハーネスと入力 matrix が無い。
-
-| 未解決 | 影響 | 起票先 |
-|---|---|---|
-| Fresh Air SlateCore closure の wasm 化・native 差分 (受入条件 1) | 監査のみ。出力 bit 一致は未確認 | 子 issue (親 #1026) |
-| 残 6 件 (vtable 直接 call の decode 段落ち) の真因特定と修復 | 2 関数 (`0x180c97aa0` / `0x180da6e60`) の復元不完全 | 子 issue (親 #1026) |
-
 ## 16. #852 (ICALL-11): FLEngine jump table の解決器取りこぼし
 
 FLEngine 0x40d253 `jmp [r10+rdx*8+0x40]` (Delphi `sub rdx,8` 形) は、基点 `0x40d298` から `-8..0` の 9 エントリが関数内 target (`0x40d2b6`〜`0x40d2ce`)。
