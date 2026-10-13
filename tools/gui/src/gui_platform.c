@@ -6,6 +6,7 @@
 #include <math.h>
 #include <time.h>
 #include "gui_internal.h"
+#include "gui_hostcall.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -82,6 +83,48 @@ void gui_unlock(void) {
 void gui_doorbell(void) {
   __atomic_fetch_add(&g_sh.doorbell, 1, __ATOMIC_SEQ_CST);
   gui_futex_wake(&g_sh.doorbell);
+}
+
+/* ---- host call (gui_hostcall.h): main thread 専用 API (window.open / File System Access) への同期呼出 ---- */
+static GuiHostCall g_hc __attribute__((aligned(64)));
+GuiHostCall *gui_hostcall_native(void) { return &g_hc; }
+#ifdef __EMSCRIPTEN__
+EMSCRIPTEN_KEEPALIVE uint32_t gui_hostcall_ptr(void) { return (uint32_t)(uintptr_t)&g_hc; }
+#endif
+int gui_hostcall(uint32_t op, uint32_t flags, const void *in, uint32_t in_len, void *out, uint32_t out_cap, uint32_t *out_len, int timeout_ms) {
+  if (in_len > GUI_HC_IN) return -3;
+  g_hc.magic = GUI_HC_MAGIC; g_hc.version = GUI_HC_VERSION;
+  if (!__atomic_load_n(&g_hc.host_ready, __ATOMIC_ACQUIRE)) return -1;
+  for (;;) {   /* 同時に 1 呼出のみ (in/out 領域が 1 組なので直列化) */
+    uint32_t z = 0;
+    if (__atomic_compare_exchange_n(&g_hc.lock, &z, 1, 0, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)) break;
+    gui_futex_wait(&g_hc.lock, 1, 50);
+  }
+  int rc;
+  g_hc.op = op; g_hc.flags = flags; g_hc.in_len = in_len; g_hc.out_len = 0; g_hc.result = 0;
+  if (in_len) memcpy(g_hc.in, in, in_len);
+  uint32_t seq = __atomic_add_fetch(&g_hc.req_seq, 1, __ATOMIC_SEQ_CST);
+  gui_futex_wake(&g_hc.req_seq);
+  uint32_t t0 = gui_now_ms();
+  for (;;) {
+    uint32_t r = __atomic_load_n(&g_hc.resp_seq, __ATOMIC_ACQUIRE);
+    if (r == seq) break;
+    int wait = 100;
+    if (timeout_ms >= 0) {
+      int32_t left = timeout_ms - (int32_t)(gui_now_ms() - t0);
+      if (left <= 0) { rc = -2; goto done; }
+      if (left < wait) wait = left;
+    }
+    gui_futex_wait(&g_hc.resp_seq, r, wait);
+  }
+  rc = g_hc.result;
+  { uint32_t n = g_hc.out_len; if (n > GUI_HC_OUT) n = GUI_HC_OUT; if (n > out_cap) n = out_cap;
+    if (out && n) memcpy(out, g_hc.out, n);
+    if (out_len) *out_len = n; }
+done:
+  __atomic_store_n(&g_hc.lock, 0, __ATOMIC_RELEASE);
+  gui_futex_wake(&g_hc.lock);
+  return rc;
 }
 
 /* ---- out ring (MPSC: 内部 spinlock, 消費者は host 1 本) ---- */
