@@ -55,10 +55,29 @@ LB=0 でも ok 870 / trap 25 で、旧記録 (812 / 83) と別の値になって
 LB=0x10000 では `units_run=37` で Halt0 により早期終了し、`probes.Halt0=1`。LB=0 は 53 unit 実行後 OOB。
 unit 40 の trap (上表) はこの Halt0 と同じ経路。**LB 依存で Halt を呼ぶ分岐が増えている可能性がある。** 未確定。
 
-## 3. 全 IR の remap 件数・実行後の guest ポインタ assert (受入 3: 未着手)
+## 3. 全 IR の remap 件数・実行後の guest ポインタ assert (受入 3: 件数は計測・guest ポインタ assert は未着手)
 
-本 run では着手せず。`lb_check.py` と IR 指紋 (`ir_sha256`) は LB 別に記録済み (LB=0: `9a9e223e…`、LB=0x10000: `451ecd03…`)。
-全 IR の remap 件数は未計測。
+- 計測: `python3 tools/m11/m11_remap_count.py work/boot_final.ll` (未 remap の image VA 即値を数える)。
+  ネガティブコントロール `bash tools/m11/m11_remap_count_negctl.sh` で、既知の未 remap 1 件を検出して非 0 になることを確認 (NEGCTL OK)。
+- 実測 (LB=0x10000 で生成した `work/boot_final.ll`, ir_sha256 `5dfb1473…`): `inttoptr i64` 即値 4,470 件 (命令形 4,470 / 式形 0)、
+  うち image VA 範囲 `[0x400000, 0x400000+0x1ac0000)` に残るもの (= 未 remap) **4,368 件**。
+  `m2_inttoptr_remap = 0`・`m2b_remap = 0` (`ir_report.json`) と合わせ、#417 (10 進 inttoptr 命令の全件 remap 未解決) と同じ類型。
+- 実行後の guest ポインタ assert (実行結果の VA 範囲検査) は未実装。残件は子 issue へ (下記)。
+- `lb_check.py` と IR 指紋 (`ir_sha256`) は LB 別に記録済み (LB=0: `3a9ceb17…`、LB=0x10000: `5dfb1473…`。本 run の実測)。
+
+## 4. 今回 run の再測定 (2026-10-13 runner, base main `73853ba2`, 各 1 回直列)
+
+素材: fl-win64 (`$RUNNER_TEMP/fl-win64`)・work-m11 (`tools/m11/work`)・toolchain-emsdk・toolchain-retdec を展開。
+`pip install capstone pefile` を runner に追加 (`m11_e2e.sh` の前提)。
+
+| 条件 | 所要 (wall) | exit | M11_SUMMARY (要点) |
+|---|---|---|---|
+| `M11_LB_BASE=0` | 150 s | 0 | units_run 53 / survey ok 870 / trap 25 / miss 46 / wasm 6,042,920 |
+| `M11_LB_BASE=0x10000` | 98 s | 0 | units_run 37 / survey ok 868 / trap 27 / miss 46 / wasm 6,043,303 / halt0_early=true |
+
+- §2 の旧表 (HEAD `64d09590`) と同値。LB=0 / LB=0x10000 の差は再現。
+- `m11_e2e.sh` 自体は exit 0 (未達は現在地を再現して報告する設計)。判定は各 SUMMARY の値で行う。
+- 本 run の再測定は、既存 work-m11 の IR (LB=0x10000 で生成) と `m11_build.sh` 増分で行った。`--full` は未実行。
 
 ## 未解決 (起票先)
 
@@ -66,4 +85,5 @@ unit 40 の trap (上表) はこの Halt0 と同じ経路。**LB 依存で Halt 
 |---|---|---|
 | unit 40 / 153 / 158 / 745 の LB 依存差の原因 (特に unit 40 の Halt 経路と通常起動の Halt0 早期終了) | LB=0x10000 の通常起動が 37 unit で止まる。受入 2 未達 | 本 issue (#403) で継続 |
 | REPORT_APPENDIX の旧 HEAD 集計 (812/83) と現 HEAD (870/25) の差 | 既存の数値の根拠が現 HEAD で再現しない | PM が起票 (#222 系) |
-| 全 IR の remap 件数・実行後 guest ポインタ assert | 受入 3 | #403 で継続 |
+| 実行後の guest ポインタ assert (未実装) | 受入 3 の後半 | 子 issue #1004 (M11-N57) |
+| 未 remap の image VA 即値 4,368 件 (#417 と同類型) | 受入 3 の件数は計測済み。解消は #417 側 | #417 (既存) |
