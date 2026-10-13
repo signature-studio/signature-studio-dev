@@ -186,3 +186,21 @@ DSP 固有 closure (42 効果) にはライセンス/ネット系参照が無く
 - 検査: `kh710_check.py` に `placement:*` を追加 (TLS 返却値が arena・cave・heap 域外 / カーソルが static / TLS shim が `KH_TLS` を使う) → 全 PASS。
 - 影響: 上記 12.1 のとおり、4 module の wasm は変わらない (sha 一致)。
 - **define 名の stub 化 (review 指摘 2)**: `used_names` は `define` 行の名前も拾い、同一モジュール内で定義された非 `function_` 関数 (`define internal i64 @LocalHelper(...)` を `function_1` が呼ぶ形) に `abort()` stub を生成していた。修正: `local` (`^define ... @Name(`) を `used_names` から除外。再現 (修正前): `gen_stubs_sigs.py` で `LocalHelper(void)` の stub 出力。修正後: 出力 0 件。検査 `define_not_stubbed` を `kh710_check.py` に追加 (PASS)。
+
+### 12.4 本 run の実測 (HEAD `8e56adc8`・素材 4 種展開・旧 HEAD `9c1f7c0b` 比較)
+
+- 素材: `plugins-kilohearts` は installer zip (取得 60 s) → `payload.dat` (取得 74 s) → `windows.zip` → `work/winpkg/HeartCore.core_64` のみ展開。`toolchain-emsdk` (`/opt/emsdk`)・`toolchain-retdec` (`/opt/retdec`) は既存。`KH_EM_CACHE=$RUNNER_TEMP/emcache`。
+- 手順 (順序固定・1 つ終わるごとに本節へ追記):
+
+| 順 | 測定 | 結果 | 時間 |
+|---|---|---|---|
+| 1 | 旧 HEAD `9c1f7c0b` の module A 再ビルド (比較基準) | sha `411007b8…b6fc`・26,705 B・undefined `[]` | 29.5 s |
+| 2 | 現 HEAD `8e56adc8` の `used_names` 突合 (module A/B/E/F、現 HEAD の `LIBC_NAMES` 32 名) | 4 module とも `used_names = []`・衝突 0 | 数秒 |
+| 3 | 現 HEAD `lic_build.py --module A` | sha `411007b8…b6fc`・26,705 B (旧と一致) | 11.3 s |
+| 4 | 現 HEAD `--module B` | rc=0・sha `62182947…cf04`・25,249 B (旧と一致) | 12 s |
+| 5 | 現 HEAD `--module E` | rc=0・sha `0cf066d1…6fed8`・364,770 B (旧と一致) | 13 s |
+| 6 | 現 HEAD `--module F` | rc=0・sha `7ba79e65…8c7707`・54,394 B (旧と一致) | 11 s |
+| 7 | 現 HEAD `kh249_check.mjs` | rc=0・`kh249_check ok=17 ng=0` | 数秒 |
+
+- emcc rc: A/B/E/F 全て 0。`undefined_imports` は A で `[]`。
+- 注: 旧 HEAD `9c1f7c0b` には `LIBC_NAMES` が無い (`b08b431a` で追加) ため、`used_names` 突合は現 HEAD の定義を使った。
