@@ -219,7 +219,8 @@ def sigfix(text, report, pads=None, fixes=None):
 # 呼出し計数 probe (FastMM4 の入口): 計数 wrapper を weak で被せ, 本体は __lifted に改名
 PROBES = {0x409410: 'GetMem', 0x409440: 'FreeMem', 0x407a50: 'FastMM_GetMem(407a50)', 0x407e20: 'FastMM_FreeMem(407e20)',
           0x4120c0: 'InitUnits', 0x4128b0: 'Halt0',
-          0x4fa210: 'ListFind(4fa210)', 0x47a250: 'ListRaise(47a250)'}   # M11-N40: 末尾追加 (既存 index 0-5 不変; OFF の survey 結果の不変は作業者報告・未検証, REPORT_739 §2)
+          0x4fa210: 'ListFind(4fa210)', 0x47a250: 'ListRaise(47a250)',   # M11-N40: 末尾追加 (既存 index 0-5 不変; OFF の survey 結果の不変は作業者報告・未検証, REPORT_739 §2)
+          0x413060: 'function_413060'}   # #944: 末尾追加 (index 8; 既存 index 不変)。OFF/ON 両方で呼出し数を計数する
 probe_wrappers = []
 
 
