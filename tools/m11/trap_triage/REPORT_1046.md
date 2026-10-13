@@ -65,3 +65,9 @@ LD_M11_PE=$FL_WIN64_DIR/extracted/block00031_PE.bin python3 tools/m11/trap_triag
 ```
 
 注: `disasm_fn.py` は `LD_M11_PE` で PE を指定する (`$FL_WIN64_DIR/extracted/block00031_PE.bin` と同一。`[WIN64]`)。
+
+## 8. 測定 commit からの差分 (差分 0 の証跡)
+
+- 測定 commit: `9aad4595` (§1・§2 の測定)。検証 HEAD: `b55c9f7c` (main `d7d91d26` を取り込み)。
+- `git diff --stat 9aad4595 b55c9f7c -- tools/m11/m11_gen_ir2.sh tools/m11/m11_build.sh tools/m11/trap_triage/ tools/shim tools/m11/*.py tools/m11/*.sh`: 出力は `tools/m11/trap_triage/REPORT_1046.md` (+67) と `REPORT_714.md` (+42) のみ。コード差分 0。
+- 同範囲外の差分 (`tools/shared/lift/libkio/*`・`tools/m11/ldfix/ldfix_509_e2e.sh`) は m11 の IR 生成・build・survey から参照されない (`grep` で 0 件)。
