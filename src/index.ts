@@ -3,6 +3,7 @@ import { setupCanvas, blitFrame, type FrameTarget } from "./runtime/canvas";
 import { createImportForwarder } from "./runtime/imports";
 import { instantiateWasm } from "./runtime/loader";
 import { mountRuntimePanel } from "./runtime/boot_ui";
+import { mountGuiRenderSelfTest, mountGuiSelfTest } from "./runtime/gui_boot";
 import { installWebstudioContract } from "./runtime/webstudio_state";
 import { installFlMcp, mountMcpPanel } from "./runtime/mcp_panel";
 
@@ -124,6 +125,12 @@ startBtn.addEventListener("click", async () => {
 const runtimeParams = new URLSearchParams(location.search);
 if (runtimeParams.has("runtime")) {
   void mountRuntimePanel(runtimeParams);
+}
+// GUI 結線 (RT-3) — /?gui=selftest[&present=yield|blocking]。?runtime= とは独立に併用可
+if (runtimeParams.get("gui") === "selftest") {
+  void mountGuiSelfTest(runtimeParams);
+} else if (runtimeParams.get("gui") === "render-selftest") {
+  void mountGuiRenderSelfTest();
 }
 
 // ---------------------------------------------------------------------------
