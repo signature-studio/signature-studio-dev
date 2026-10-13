@@ -10,7 +10,10 @@
 #                      PM の /oc コメント起動は run のタイトルが PR タイトルと一致する)
 # カバーされていなければ IDLE であり、理由ごとに戻す (updated_at が SETTLE 分以内なら、直前の操作の
 # イベントが伝播中とみなして次回に回す):
-#   CONFLICT          main と競合 (競合 PR は pull_request run が起動しない) -> reviewer App 名義の CHANGES_REQUESTED で fix 経路へ
+#   CONFLICT          main と競合。競合 PR は pull_request も pull_request_review も起動しないため、差し戻しでは fix を動かせない
+#                     (往復回数だけ消費して oc:stuck に近づく)。差し戻しは出さず、repository_dispatch (type oc-fix) で fix モードの
+#                     実装 run を起動する (同じ head へは DISPATCH_MAX 回まで。超えたら oc:stuck。#731)。
+#                     fork からの PR は dispatch しない (write 権限の run を第三者の入力で動かさないため。oc:stuck も付けず一覧に出すだけ)
 #   DRAFT             draft -> ready (ready_for_review で review が起動する)
 #   FIX_IDLE          現在の head に CHANGES_REQUESTED があるのに fix run が無い -> CHANGES_REQUESTED を再提出して fix 経路へ
 #   APPROVED          approve 済みで未 merge -> merge。失敗したら理由付きの CHANGES_REQUESTED
@@ -22,6 +25,7 @@
 # merge は --match-head-commit で、点検した head 以外 (その後に push された未レビューの commit) を巻き込まない。
 # 1 回の点検で行う操作 (oc:stuck の付与を含む) は OC_MAX_ACTIONS 件まで (古い更新の PR から)。残りは次回に回す。
 # 読み取りに失敗した PR・mergeable が未確定の PR は、その回は何も操作せず次回に回す (fail-closed)。
+# fork からの PR (head.repo が本リポジトリでない) は CONFLICT でも dispatch しない (write 権限の run を第三者の入力で動かさない)。一覧に出して人が判断する。
 #
 # 入力 (env): GH_TOKEN (reviewer App。review の提出・merge・ready・close/reopen に使う), OC_REPO,
 #             RUNS_TOKEN (actions:read。省略時は GH_TOKEN), DRY=1 で操作せず計画だけ表示
@@ -34,6 +38,9 @@ REVIEWER_LOGIN="${OC_REVIEWER_LOGIN:-oc-reviewer-for-signature-studio[bot]}"
 SETTLE_MIN="${OC_SETTLE_MINUTES:-4}"
 MAX_ACTIONS="${OC_MAX_ACTIONS:-12}"
 WD_MAX="${OC_WATCHDOG_MAX:-6}"
+# 同じ head に対する競合解消の dispatch の上限 (超えたら oc:stuck)
+DISPATCH_MAX="${OC_DISPATCH_MAX:-3}"
+ARTIFACT_RE='^(fl-win64|plugins-(ott|freshair|serum2|massivex|kilohearts)|toolchain-(retdec|emsdk)|work-(m11|liftdiff|m6-ott|liftlib-targets|liftlib|icall)|analysis-ott-binaries|apt-mingw)$'
 RUNS_TOKEN="${RUNS_TOKEN:-${GH_TOKEN:-}}"
 now="$(date -u +%s)"
 age_min() { echo $(((now - $(date -u -d "$1" +%s)) / 60)); }
@@ -54,6 +61,21 @@ reopen() { # reopen <PR> <head>: 試行を数えるマーカー付きのコメ�
   gh pr comment "$1" --repo "$R" \
     --body "[watchdog] 現在の head (${2:0:7}) に verdict が無いため、review を再起動します。<!-- $marker -->" || true
   OC_REPO="$R" OC_PR_NUMBER="$1" bash "$(dirname "$0")/reopen-pr.sh"
+}
+dispatch_fix() { # dispatch_fix <PR> <head> <reason> <artifacts>: 試行を数えるマーカー付きのコメント -> repository_dispatch (oc-fix)
+  local marker="oc-dispatch:${2:0:12}"
+  gh pr comment "$1" --repo "$R" \
+    --body "[watchdog] この PR は main と競合しています。競合 PR は review イベントでワークフローが起動しないため、repository_dispatch で競合解消の実装 run を起動します (head ${2:0:7})。<!-- $marker -->" || true
+  gh api -X POST "repos/$R/dispatches" -f event_type=oc-fix \
+    -F "client_payload[pr]=$1" -f "client_payload[reason]=$3" -f "client_payload[artifacts]=$4"
+}
+pr_artifacts() { # pr_artifacts <PR JSON>: PR 本文の oc_artifacts 行から、allowlist に一致する語だけを取り出す
+  local line name out=""
+  line="$(jq -r '.body // ""' <<< "$1" | grep -m1 -E '^[[:space:]]*oc_artifacts:' || true)"
+  for name in $(printf '%s' "${line#*oc_artifacts:}" | tr -cd 'a-z0-9 -'); do
+    printf '%s' "$name" | grep -qE "$ARTIFACT_RE" && out="${out:+$out }$name"
+  done
+  printf '%s' "$out"
 }
 mark_stuck() { # mark_stuck <PR>
   gh label create oc:stuck --repo "$R" --color B60205 --description "automatic review/fix recovery exhausted; needs a human decision" --force > /dev/null 2>&1 || true
@@ -93,7 +115,7 @@ for i in $(seq 0 $((total - 1))); do
   upd_age="$(age_min "$(jq -r .updated_at <<< "$pr")")"
 
   if jq -e --argjson n "$n" --arg t "$title" \
-    'any(.[]; .path == ".github/workflows/opencode.yaml" and (((.prs | index($n)) != null) or ((.event == "issue_comment" or .event == "workflow_dispatch") and .title == $t)))' \
+    'any(.[]; .path == ".github/workflows/opencode.yaml" and (((.prs | index($n)) != null) or ((.event == "issue_comment" or .event == "workflow_dispatch") and .title == $t) or (.event == "repository_dispatch" and .title == ("oc-fix #" + ($n | tostring)))))' \
     <<< "$active" > /dev/null; then
     covered_n=$((covered_n + 1))
     continue
@@ -137,6 +159,9 @@ for i in $(seq 0 $((total - 1))); do
   retry_n="$(jq -s --arg m "review-retry:${head:0:12}" --arg who "$REVIEWER_LOGIN" \
     '[.[][] | select(.user.login == $who and .user.type == "Bot" and (.body | contains($m)))] | length' <<< "$cm_raw")"
 
+  disp_n="$(jq -s --arg m "oc-dispatch:${head:0:12}" --arg who "$REVIEWER_LOGIN" \
+    '[.[][] | select(.user.login == $who and .user.type == "Bot" and (.body | contains($m)))] | length' <<< "$cm_raw")"
+
   reason=""
   if [ "$mergeable" = false ]; then
     reason=CONFLICT
@@ -154,6 +179,13 @@ for i in $(seq 0 $((total - 1))); do
   summary="$summary- $line"$'\n'
   echo "$line"
 
+  # fork からの PR は dispatch しない: dispatch の run は write 権限で動き、fork の本文・コメント・ブランチ内容は第三者が書ける。
+  # head.repo が読めない (削除された fork など) 場合も fork とみなす。oc:stuck は付けず、人が判断する。
+  if [ "$reason" = CONFLICT ] && [ "$(jq -r '.head.repo.full_name // ""' <<< "$pr")" != "$R" ]; then
+    echo "  skip: fork からの PR は自動対応しない (人が判断する。oc:stuck は付けない)"
+    continue
+  fi
+
   if [ "$upd_age" -lt "$SETTLE_MIN" ]; then
     echo "  skip: a recent update is still propagating"
     continue
@@ -167,16 +199,17 @@ for i in $(seq 0 $((total - 1))); do
 
   # 復旧に失敗し続ける PR を延々と叩かない。同じ head への watchdog の差し戻しが WD_MAX 回、または
   # review の自動再実行が尽きた (review-retry が 3 回) PR は oc:stuck を付けて止める (人の判断が要る)。
-  if { [ "$reason" != NOREVIEW ] && [ "$wd_n" -ge "$WD_MAX" ]; } || { [ "$reason" = NOREVIEW ] && [ "$retry_n" -ge 3 ]; }; then
-    echo "  STUCK: automatic recovery exhausted on ${head:0:7} (watchdog=$wd_n review-retry=$retry_n): labelled oc:stuck, no further action"
+  if { [ "$reason" != NOREVIEW ] && [ "$reason" != CONFLICT ] && [ "$wd_n" -ge "$WD_MAX" ]; } || { [ "$reason" = NOREVIEW ] && [ "$retry_n" -ge 3 ]; } || { [ "$reason" = CONFLICT ] && [ "$disp_n" -ge "$DISPATCH_MAX" ]; }; then
+    echo "  STUCK: automatic recovery exhausted on ${head:0:7} (watchdog=$wd_n review-retry=$retry_n dispatch=$disp_n): labelled oc:stuck, no further action"
     do_it "oc:stuck on #$n" mark_stuck "$n"
     continue
   fi
 
   case "$reason" in
     CONFLICT)
-      do_it "request-changes (conflict) on #$n" request_changes "$n" \
-        "[conflict] main と競合しています (mergeable=false)。競合 PR は review が起動しないため、この差し戻しで修正 run を起動します。origin/main を merge して競合を解消し、push してください (競合解消以外の変更はしない。main 側の変更を消さない)。競合した箇所と解消方針を PR にコメントで報告してください。(watchdog)"
+      # 競合 PR は pull_request / pull_request_review のどちらでも起動しないので、差し戻しでは fix を動かせない (#731)。
+      # repository_dispatch は競合に左右されない。
+      do_it "dispatch oc-fix (conflict) for #$n" dispatch_fix "$n" "$head" conflict "$(pr_artifacts "$pr")"
       ;;
     DRAFT)
       do_it "ready #$n" gh pr ready "$n" --repo "$R"
