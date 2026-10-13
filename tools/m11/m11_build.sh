@@ -29,6 +29,11 @@ for st in ir_lb_base img_lb_base; do
 done
 
 if [ ! -f work/boot_final.ll ]; then echo "[m11build] work/boot_final.ll 無し: m11_gen_ir2.sh を先に" >&2; exit 2; fi
+# alloca 縮退修正 (CAB-129 + #132 R8): RetDec が `alloca i64` (8B) に潰したローカルを拡幅 (idempotent)。
+#   unit #18 OOB の真因 = 44bae0 の stack_var が callee 44ba50 に書かれ 44bb70 の record を破壊 (R8)。
+#   内容が変わった時だけ boot_final.ll を差し替える (mtime を更新して毎回 post/cc を走らせない)。
+python3 alloca/m11_alloca.py work/boot_final.ll work/boot_final.alloca.tmp.ll --report work/alloca_report.json > work/alloca.log
+if ! cmp -s work/boot_final.ll work/boot_final.alloca.tmp.ll; then mv work/boot_final.alloca.tmp.ll work/boot_final.ll; else rm -f work/boot_final.alloca.tmp.ll; fi
 # #131: sigfix 復元モードが変わったら post 結果を無効化 (stamp)
 if [ "$(cat work/sigfix_recover.stamp 2>/dev/null || echo 0)" != "${M11_SIGFIX_RECOVER:-0}" ]; then rm -f work/boot_final3.ll; fi
 echo "${M11_SIGFIX_RECOVER:-0}" > work/sigfix_recover.stamp
