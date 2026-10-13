@@ -33,7 +33,7 @@ REPORT 本体 §4 から分割移動した経緯と実行条件 (内容は削除
 2. E1/E2 の共有鎖修復: 対象外 (本 PR は engine 側の段のみ。共有 `lift/passes/` は未変更)。
 3. VEX helper の SSE 固定判定と実装: 判定は完了 (§F。深さ 3 の直接 call 鎖では guard 無し、間接 call は未追跡)。実装は未達で、起票先は #534 (VEX helper) と #779 (VEX-256 語彙)。受入 3 の範囲変更は PM 判断待ち。
 4. define 無し range (各 2 件) の原因特定: 未達 (未調査)。起票先 #527。
-5. 殻との結合方式 (LoadLibrary 経路・`VSTPluginMain` 呼出) の解析: 未達。起票先 #527。
+5. 殻との結合方式 (LoadLibrary 経路・`VSTPluginMain` 呼出) の解析: 静的解析で §G に記録 (呼出箇所の特定は未了)。
 6. f80 2 関数の #197 `f80_lower.py` 適用可否: 達成 (適用可、`emcc -c` は通過。bit-exact は未検証 → #197)。
 
 ## F. VEX helper の SSE 固定判定 (受入 3)
@@ -41,3 +41,16 @@ REPORT 本体 §4 から分割移動した経緯と実行条件 (内容は削除
 - 結論: `sampler/vex_guard.py` の深さ 3 の直接 call 鎖 (即値の `call`/`jmp` のみ追跡) では、VEX 関数の caller に cpuid/xgetbv 関数が届かなかった (4 本)。間接 call (`call [rip+...]`・関数ポインタ・vtable) は未追跡で、動的な分岐は未実測。したがって SSE 固定の可否は未確定。
 - 測定値・再現手順: `tools/plugins/modulation/REPORT.md` §4 (VEX 関数数・cpuid/xgetbv 関数数・未実装 helper 数はそこに 1 箇所だけ記載)。
 - 実装は未達。追跡先は #534 (9 本の C++ DLL の VEX helper) と #779 (VEX-256 の lift 語彙拡張)。新規起票はしない (重複回避)。受入 3 の実装をこの 2 件へ移すかは PM 判断待ち。
+
+## G. 殻と engine の結合方式 (受入 5、静的解析)
+
+- 対象: 殻 (Delphi) 18978 / 19144 / 19265 / 19267 と engine 18977 / 19143 / 19266 (19268 は engine 側未解析)。`fl-win64` の block PE を展開し pefile と文字列走査で確認 (定数・ファイル名の実測。`work/` 無し)。
+- 殻の import: 4 本とも `LoadLibraryExW` / `GetProcAddress` / `FreeLibrary` を持つ (KERNEL32)。
+- 殻の文字列 (UTF-16 / ASCII): engine 名は殻に入っている。
+  - Frequency Shifter: 殻 18978 に `Engine_x64.dll` と `dispatch` (0x2dda74 / 0x2dda92)。engine 18977 の export は `dispatch` のみ。
+  - Hyper Chorus: 殻 19144 に `engine_x64.dll` と `DispatchToEngine` (0x2e9704 / 0x2e9722)。engine 19143 の export は `DispatchToEngine` のみ。
+  - Vintage Chorus: 殻 19265 に `engine_x64.dll` と VST 系の名前 `VSTPluginMain` ほか大文字小文字違い 9 種 (0x2d9db0〜0x2daaa0)。engine 19266 の export は `VSTPluginMain` / `main`。
+  - Vintage Phaser: 殻 19267 に `engine_x64.dll` と VST 系名 (0x2db640〜0x2dc330)。engine 19268 は未解析 (19266 と同じ VST2 export と推定)。
+- 結論 (推定): 殻が `LoadLibraryExW(engine_x64.dll)` → `GetProcAddress(<export>)` で engine を動的ロードし、Frequency Shifter / Hyper Chorus は `dispatch` / `DispatchToEngine` を、Vintage 系は `VSTPluginMain` (大文字小文字違いの名前で検索) を引く。殻の `dynload 2` (§3) と一致する。
+- 未解析: 殻内の `GetProcAddress` 呼出箇所と引数の実値 (文字列アドレスを参照する命令の特定)、engine の `DllMain` の扱い。bit-exact 検証や wasm 側のリンク方式は範囲外 (#202 / #197)。
+- 再現: `pefile` で殻・engine の export / KERNEL32 import を列挙し、UTF-16 / ASCII 文字列を走査 (本節の値の出典)。
