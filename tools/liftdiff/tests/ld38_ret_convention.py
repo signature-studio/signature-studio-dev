@@ -1,6 +1,7 @@
 """LD-38 (#1193): ret=i128 の 39 関数について、機械語の戻り経路を RetDec の逆アセンブル (dsm) から判定する。
 
 使い方: python3 tests/ld38_ret_convention.py [--sigs work/m11_ldfix/sigs.json] [--dsm-glob '../m11/work/*.dsm']
+        python3 tests/ld38_ret_convention.py --control   (分類器のネガティブコントロール。実データ不要)
 出力: 関数ごとの戻り経路 (xmm0 / rax_rdx / other / no_ret) と集計。
 
 判定 (ret 命令直前 3 行の文字列):
@@ -11,10 +12,48 @@
 """
 import argparse, glob, json, re, collections
 
+
+def classify(b):
+    rets = [k for k, l in enumerate(b) if re.search(r'\tret\b', l)]
+    if not rets:
+        return 'no_ret'
+    kinds = set()
+    for k in rets:
+        w = ' '.join(b[max(0, k - 3):k])
+        kinds.add('xmm0' if 'xmm0' in w else 'rax_rdx' if 'rdx' in w else 'other')
+    return '/'.join(sorted(kinds))
+
+
+# 実在の xmm0 関数 function_cc32f0 (tools/m11/work/boot2.drc.dsm) の本体をそのまま使う。
+REAL_XMM0 = [
+    '0xcc32f0:    66 0f 28 c1                        \tmovapd xmm0, xmm1',
+    '0xcc32f4:    f2 0f 59 81 90 10 00 00            \tmulsd xmm0, qword ptr [rcx + 0x1090]',
+    '0xcc32fc:    c3                                 \tret ',
+]
+
+
+def control():
+    cases = [
+        ('real xmm0 body', REAL_XMM0, 'xmm0'),
+        ('xmm0 removed from real body', [l.replace('xmm0', 'rax') for l in REAL_XMM0], 'other'),
+        ('ret line deleted', REAL_XMM0[:2], 'no_ret'),
+    ]
+    ok = True
+    for name, body, want in cases:
+        got = classify(body)
+        ok &= got == want
+        print('CONTROL', name, 'got', got, 'want', want, 'OK' if got == want else 'FAIL')
+    return 0 if ok else 1
+
+
 ap = argparse.ArgumentParser()
 ap.add_argument('--sigs', default='work/m11_ldfix/sigs.json')
 ap.add_argument('--dsm-glob', default='../m11/work/*.dsm')
+ap.add_argument('--control', action='store_true')
 a = ap.parse_args()
+
+if a.control:
+    raise SystemExit(control())
 
 sigs = json.load(open(a.sigs))
 targets = sorted(k for k, v in sigs.items() if v['ret'] == 'i128')
@@ -37,18 +76,7 @@ for f in sorted(glob.glob(a.dsm_glob)):
 cnt = collections.Counter()
 for name in targets:
     b = bodies.get(name)
-    if b is None:
-        kind = 'not_in_dsm'
-    else:
-        rets = [k for k, l in enumerate(b) if re.search(r'\tret\b', l)]
-        if not rets:
-            kind = 'no_ret'
-        else:
-            kinds = set()
-            for k in rets:
-                w = ' '.join(b[max(0, k - 3):k])
-                kinds.add('xmm0' if 'xmm0' in w else 'rax_rdx' if 'rdx' in w else 'other')
-            kind = '/'.join(sorted(kinds))
+    kind = 'not_in_dsm' if b is None else classify(b)
     cnt[kind] += 1
     print(name, ','.join(sigs[name]['params']) or '-', kind)
 print('SUMMARY', dict(cnt), 'total', len(targets))
