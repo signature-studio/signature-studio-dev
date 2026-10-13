@@ -18,7 +18,7 @@ mkdir -p "$HERE/work"
 
 # 前提素材の事前チェック (欠けていれば素材名を示して非 0 で止まる)
 [ -f "$PE" ] || { echo "[e2e] FATAL: $PE が無い。oc_artifacts に fl-win64 が必要 (FL_WIN64_DIR=$FL_WIN64_DIR)" >&2; exit 1; }
-python3 -c "import pefile, capstone" 2>/dev/null || { echo "[e2e] FATAL: python3 の pefile / capstone が無い (pip install pefile capstone)" >&2; exit 1; }
+python3 -c "import pefile, capstone, numpy" 2>/dev/null || { echo "[e2e] FATAL: python3 の pefile / capstone / numpy が無い (pip install pefile capstone numpy)" >&2; exit 1; }
 
 echo "== [1] kernel_table.py =="
 python3 "$ROOT/inventory/kernel_table.py" "$PE"
