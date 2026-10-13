@@ -7,7 +7,7 @@
 gate (exit 1): 独立算法の線形 sweep (capstone で閉包 ranges を逆アセンブル、オペランドが即値でない call のうち IAT 呼出を除く) の数が、
   audit_icall の `call_non_iat` (recursive descent で到達した site) + `gap_sites` (到達しないが decode できた gap の間接 call/jmp) と一致しない block が 1 つでもある / 入力 JSON 不在。
   (gap を足すのは、audit が到達不能と判定した機械語内の call も sweep は数えるため。 f2 の 11 block では gap 0 で単純な一致だった)
-測定のみ (gate ではない): IR の間接 call 数。 静的 site > 0 かつ IR 0 の block は「脱落」と表示する (lift 鎖に icall 復元が無いことの観測)。
+測定のみ (gate ではない): IR の間接 call 数。 静的 site > 0 かつ IR 0 の block は「脱落」と表示する (g1_e2e.sh は PLUG_ICALL=0 = 復元なしの鎖を測るので、その観測。 PLUG_ICALL=1 の IR は `@__icall_dispatch` 呼出が callee `@name` なので「IR の間接 call」に数えられず、復元済みでも「脱落」と出る: 既定鎖は REPORT §6.1)。
 """
 import json, os, subprocess, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
