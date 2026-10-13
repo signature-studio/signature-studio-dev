@@ -163,7 +163,7 @@ work/ (gitignore): hdr_block1/2.bin, files.json, locations.json, header_parse.js
 
 ## 11. MX-2 検証の再確認 (#266 / MX2-1 mock 欠陥) — 2026-10-13 実測
 
-### 11.1 検証状況 (HEAD aa8002f5・現 head で実測済み)
+### 11.1 検証状況 (HEAD bacb7be4・現 head で実測済み。コード差分は aa8002f5 から無し)
 
 - 素材: `plugins-massivex` / `toolchain-retdec` / `toolchain-emsdk` を `$ARTIFACTS_DIR` から展開。
   RetDec / emsdk は runner 既存の `[RETDEC]` / `[EMSDK]` (`RETDEC` / `EMSDK` 環境変数で指定)。
