@@ -34,3 +34,26 @@
 - ネガコン (修復を外すと store 宛 CELL_COLLAPSED が戻る) を追加。
 - 検証: `audit_lsf_ssa.py` の store 宛 CELL_COLLAPSED の減少、`emcc -c` の構文検証。
 - 受入条件 2 (CELL_COLLAPSED 0) は、上記の対応付けがすべて結べた場合にだけ達成可能。結べない site が残れば、その時点で数を報告する。
+
+## 4. LD-47 (#1375) 実測: 現 HEAD での基準値と訂正 (2026-10-14)
+
+測定 commit: `12586095` (run 開始時の origin/main。`tools/m11` の検証はこの HEAD のコードで行った)。
+素材: `work-m11` を `$HOME/artifacts` から `tar --zstd -xf ... -C <repo>` で展開 (展開先は `tools/m11/work/`)、`toolchain-emsdk` は `/opt/emsdk` (emcc 6.0.12)。
+
+- 訂正: §3 の「修復前 53 site」は誤り。`REPORT_968.md` §2 の表では 53 は**修復後**の値。現 HEAD の修復前は store 宛 CELL_COLLAPSED **86 site / 49 関数**。
+- 訂正: §1 の鮮度記述「`916d9932` 以降はドキュメントのみ」は誤り。`git diff --name-only 916d9932 HEAD -- tools/m11` に非 md の変更が 51 件・非 md diff 988 行ある。上記の再現は現 HEAD で行った。
+
+e2e (`bash tools/m11/ldfix/fix_d17_e2e.sh`、現 HEAD、foreground、31 秒、emcc rc=0):
+
+| 項目 | 修復前 | 修復後 (fix_d17.py) |
+|---|--:|--:|
+| store 宛 CELL_COLLAPSED site | 86 | 53 |
+| store 宛 CELL_COLLAPSED 関数 | 49 | 28 |
+| store 宛 CELL_DEEP site | 19 | 52 |
+| spill 宛 CELL_COLLAPSED site | 37 | 37 |
+| alg3 flagged 関数 | 77 | 58 |
+| 修復した関数 / cell | — | 24 / 29 |
+
+- 再現: K を読む IR load が複数本の K 組は 28 関数・32 K 組 (issue の 28 関数 / 32 組と一致)。この 28 関数に含まれる store 宛 CELL_COLLAPSED は修復前で 56 site。
+- 1:1 規則は未実装。ネガコンも未実装 (対象の修復関数が無いため)。受入条件 1・3 は未達。受入条件 4 (emcc 構文検証) は `fix_d17.py` の修復 IR (単一 load 規則のみ) に対して通過を確認した。
+- 残作業: 機械語 site ごとの rip セル → レジスタ → load の連鎖追跡 (未着手)。issue #1375 のまま継続する。
