@@ -217,7 +217,6 @@ NC4 は #506 の reviewer が再現した「不合格行を追記しても exit 
 | Slicer 2 殻と engine の結合方式 (LoadLibrary 経路・`DispatchToEngine`) が未解析 | engine を殻に結線できない | 新規 #540 [PLG-G3-2] (起票済み) の受入条件 4 |
 | `docs/DOC_MAP.md` の REPORT 索引に本書が未掲載 | 索引漏れ | PM が追記 |
 | 本 PR HEAD の基点は main 042f869 (main は 8d883c3 まで 384 commit 先)。 `rep_stosb_memset` の許容 (`targets.py` の `ALLOW_UNIMPL`) と lowering の要否を main 上で再測定する | 本 PR HEAD では撤去すると FAIL する (未実装のまま)。 main 上の値は未測定 | 先行 #551 → #624 の merge と base の main 付け替え後に再測定 (PM 判断: merge 順) |
-| 本 PR HEAD の基点は main 042f869 (main は 8d883c3 まで 384 commit 先)。 `rep_stosb_memset` の許容 (`targets.py` の `ALLOW_UNIMPL`) と lowering の要否を main 上で再測定する | 本 PR HEAD では撤去すると FAIL する (未実装のまま)。 main 上の値は未測定 | 先行 #551 → #624 の merge と base の main 付け替え後に再測定 (PM 判断: merge 順) |
 
 ## 8. DEFECTS.md 行案 (候補・追加の可否は PM 判断)
 
