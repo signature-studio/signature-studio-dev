@@ -333,11 +333,11 @@ review `b9f0b32b` の指摘 1 (S1) と 2 (run.mjs のコメント) への対応�
 - **判定**: S1 は FAIL のまま (870/1/47/24/0 vs 872/1/47/22/0)。判定を PASS に動かす変更は入れていない。judge 13/14。
 - `run.mjs` 4 行目のコメントを実装 (既定 256 MiB) に合わせた。
 
-本節の実測は **HEAD `125fefd2`** (コード差分なし。`bf9cf547` の測定値を含む) で取り直した値。実行環境: runner 4 vCPU、`apt-mingw` (`x86_64-w64-mingw32-gcc`) を apt 導入、`[EMSDK]` = `/opt/emsdk/emsdk_env.sh`、`fl-win64` / `work-m11` を展開。
+本節の実測は **HEAD `125fefd2`** (コード差分なし。`bf9cf547` の測定値を含む) で取り直した値。実行環境: runner 4 vCPU、`apt-mingw` (`x86_64-w64-mingw32-gcc`) を apt 導入、`[EMSDK]` (`EMSDK_ENV` で指定)、`fl-win64` / `work-m11` を展開。
 
 | 実行 (HEAD `125fefd2`・foreground・1 回) | rc | 所要 | 結果 |
 |---|---|---|---|
-| `EMSDK_ENV=… FL_WIN64_DIR=… ANALYSIS_DIR=… RETDEC=/opt/retdec/bin/retdec-decompiler bash tools/gui/flengine/e2e.sh` | **1** | 466 s (load 0.68→1.09) | judge **13/14**。S1 のみ FAIL: `870/1/47/24/0` vs base `872/1/47/22/0`。他 13 gate PASS (L1×2・A1 declare=193 adapter=193 impl=173 stub=20・B1 units 52・R1 LoadStringW・R2 reach 33≥19・S2・P1〜P5・W1)。ネガコン N1〜N9 期待どおり FAIL。selftest 506 passed / 0 failed |
+| `EMSDK_ENV=<[EMSDK] の emsdk_env.sh> FL_WIN64_DIR=<[WIN64]> ANALYSIS_DIR=… RETDEC=<[RETDEC] の retdec-decompiler> bash tools/gui/flengine/e2e.sh` | **1** | 466 s (load 0.68→1.09) | judge **13/14**。S1 のみ FAIL: `870/1/47/24/0` vs base `872/1/47/22/0`。他 13 gate PASS (L1×2・A1 declare=193 adapter=193 impl=173 stub=20・B1 units 52・R1 LoadStringW・R2 reach 33≥19・S2・P1〜P5・W1)。ネガコン N1〜N9 期待どおり FAIL。selftest 506 passed / 0 failed |
 | `EMSDK_ENV=… FL_WIN64_DIR=… bash tools/m11/ldfix/f4_e2e.sh` | **0** | 385 s (load 1.00) | 6 gate PASS (F1/F2/D1/D2/P1/A1)。ネガコン 4/4 期待行付き FAIL。RegisterClassW 2→2→3。`function_52a7f0` ret pre `0x0` → noand `0x0` → post **`0x110000f`**。survey pre/noand/post = `870/1/47/24`。`ir_sha256.txt` の `after_m11_build` 行は再生成で変化 (下記 §6d-2) |
 | `EMSDK_ENV=… FL_WIN64_DIR=… bash tools/gui/e2e.sh` | **0** | 302 s (load 2.28) | ALL PASS (SIMD / present / input / stress (negctl 2/2 exit 1) / pe_image / selftest 506/0) |
 
@@ -403,7 +403,7 @@ PM 指示: 「main でも同じ 870 vs 872 なら既存の欠陥、違えば本 
 | 項目 | 値 |
 |---|---|
 | 測定対象 | `origin/main` = `b4a8422c` (Merge #1443)。検証用 worktree (detached・本 PR の branch ではない)。素材 `work-m11` / `work-liftdiff` / `fl-win64` は同じ展開物 |
-| 手順 | `EMSDK_ENV=/opt/emsdk/emsdk_env.sh RETDEC=/opt/retdec/bin/retdec-decompiler FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 ANALYSIS_DIR=… bash tools/gui/flengine/e2e.sh` (foreground・1 回) |
+| 手順 | `EMSDK_ENV=<[EMSDK] の emsdk_env.sh> RETDEC=<[RETDEC] の retdec-decompiler> FL_WIN64_DIR=<[WIN64]> ANALYSIS_DIR=… bash tools/gui/flengine/e2e.sh` (foreground・1 回) |
 | rc / 所要 / load | **1** / 445 s / 0.62→1.65 (nproc 4) |
 | S1 survey parity (soft) | **FAIL `870/1/47/24/0` (base `872/1/47/22/0`)** |
 | 判定 | 12/14 (S1 FAIL、**R2 FAIL**)。他 L1×2・A1・B1・R1・S2・P1〜P5・W1 は PASS |
