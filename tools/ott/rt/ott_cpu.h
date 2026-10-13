@@ -51,6 +51,7 @@ static inline X128 xz(void) { X128 x; memset(&x, 0, sizeof x); return x; }
  * gs:[0x10] = TEB.StackLimit (スタック余裕判定) のみ → 全 0 の静的ブロックを指せば
  * 「スタック溢れなし」の意味になり native と揃う (guest stack は emcc 2MB)。 */
 extern uint64_t ott_gsbase, ott_fsbase;
+extern uint64_t ott_gbase;   /* 相対化モード: guest image の wasm 上の base (ott_glue.c) */
 
 /* CAB-135: 256bit (ymm) レジスタ i のメモリ load/store (X+XH の組) と VEX.128 dest の上位ゼロ化 */
 static inline void LDY(int i, uint64_t a) { memcpy(&X[i], (const void*)A_(a), 16); memcpy(&XH[i], (const void*)A_(a + 16), 16); }
