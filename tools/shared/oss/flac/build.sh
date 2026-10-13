@@ -92,4 +92,16 @@ for V in 1.5.0 1.3.1; do
   done
   echo "[flac $V] native output:"; sed 's/^/    /' "$B/$V-native/out.txt"
 done
+
+# LGL-3 (#86): 再ビルド記録 (libFLAC 1.5.0 / 1.3.1)
+if [ "$RC" = 0 ]; then
+  for V in 1.5.0 1.3.1; do
+    node "$ROOT/../legal/notices/record.mjs" --id "flac-$V" --name libFLAC --version "$V" --license-spdx BSD-3-Clause \
+      --url "https://downloads.xiph.org/releases/flac/flac-$V.tar.xz" --archive "$S/flac-$V.tar.xz" \
+      --src-dir "$S/flac-$V" --license-file COPYING.Xiph \
+      --script "$HERE/build.sh" --toolchain emcc --target wasm32 --target wasm64 \
+      --step "config.h=./configure --disable-ogg --disable-asm-optimizations --disable-doxygen-docs --disable-examples --disable-xmms-plugin --disable-cpplibs --disable-shared --enable-static --build=x86_64-pc-linux-gnu (native で config.h を生成し、HAVE_CPUID_H / HAVE_SYS_AUXV_H / FLAC__HAS_X86INTRIN を落として wasm 用に使う)" \
+      --step "compile=emcc $CF -I<wasm config.h dir> -I<src>/include -I<src> -I<src>/src/libFLAC/include -DHAVE_CONFIG_H <src>/src/libFLAC/*.c (ia32 / _intrin_ / deduplication / lpc_intrin_neon / ogg_ を除外)"
+  done
+fi
 exit $RC

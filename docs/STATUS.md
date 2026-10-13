@@ -107,6 +107,7 @@
 | `targets/freshair/lift2` | lift2 実装 | `tools/targets/freshair/lift2/REPORT.md` |
 | `e2e` | ハーネス+PASS 実績 | `tools/e2e/REPORT.md` |
 | `hosting` | 配信構成 (案 S) | `tools/hosting/REPORT.md` |
+| `legal/notices` | THIRD_PARTY_NOTICES 自動生成+記録なし OSS の検出 (LGL-3) | `tools/legal/notices/REPORT.md` |
 | `deploy` | デプロイ構成・実績 | `deploy/README.md`・`deploy/REPORT.md` |
 | `perf` | 性能計測 | `tools/perf/REPORT.md`・`tools/perf/PERF.md` |
 
