@@ -65,7 +65,19 @@ env なし直接起動 (strace なし) の完走結果: `resize_oracle` rc=0・3
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| AVX-512 非対応 Runner で実 DLL オラクルが SIGILL のため、置換前後の mismatch 数 (`SUM` 行) を比較できない | 既定パス・SIGILL 点までの出力の一致のみ確認 | #294 (AVX-512 対応 Runner) |
+| (解決済み: 上の「AVX-512 対応 Runner・置換 commit の親子比較」節で mismatch 数を含め完全一致を確認) | — | — |
+
+### 検証 (AVX-512 対応 Runner・置換 commit の親子比較 = 受入条件 2 の完了)
+
+- Runner: AMD EPYC 9V45 96-Core (`/proc/cpuinfo` の model name・avx512f あり、nproc 4、2026-10-13 採取)。前回節の EPYC 7763 (avx512 0 件) とは別 CPU。SIGILL は発生せず、実 DLL の初期化と `err`・`cmp` が完走した。
+- 比較対象: 置換 commit `fda39c8` の親 `1353c62` (置換前) と `fda39c8` (置換後)。`tools/ipp/shim/src`・`impl`・`fft`・`test/shim_ref.c`・`tools/ipp/src` は置換 commit で変更なし。各 tree で `build_native.sh` 相当の gcc (`-std=gnu11 -O2 -ffp-contract=off -fno-fast-math`) により `shim_ref` をビルド。`gen_shim.py` は `work/flengine_ipp_names.json` (mac 素材由来) を要するため未実行。`gen/` のコミット済み生成物を使用。
+- 対象 DLL: `$RUNNER_TEMP/fl/extracted/block24356_PE.bin` (`fl-win64` を `tar --zstd -xf` で展開、10.5 s〜15.8 s)。
+- 実測 (置換前 / 置換後):
+  - `shim_ref err`: `{"err_grid_total":222,"err_grid_mismatch":0,"err_grid_mismatch_thunk":0}` (両側同一)
+  - `shim_ref cmp` (ALL): `thunk_vs_direct: word_diff=0 status_diff=0` (両側)
+  - `cmp.json` / `err.json`: **sha256 / `cmp` で完全一致** (置換前後の mismatch 数・全関数の差分が同一)
+- 所要: ビルド 1 本 各 1 秒未満、`err` 0.01 s、`cmp` 0.26〜0.29 s。直列。load average 0.87 (開始時 1 分値)。
+- 参考: 現行 HEAD (`a6521599` 相当) と `1353c62` の `cmp.json` は一致しない。差分は `ippsVectorSlope_32f` の 1 関数のみ (1353c62: differ 15641 / 現行: differ 0)。原因は置換ではなく IPP-11 (#473, commit `ef15fa8b` 以降) の VectorSlope 修正。置換 commit の前後比較には影響しない。
 
 ### 検証範囲 / 範囲外 / 未解決
 
