@@ -3,7 +3,7 @@
 入力の license 群は vreg の seed (tools/startup/vreg/data/seed.json) の apply=true エントリをそのまま使う。
 再現: python3 tools/startup/license_obs/run_cases.py   (要 FL_WIN64_DIR, uv pip install pefile capstone unicorn)
 """
-import json, os, struct, sys, time
+import json, os, struct, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from emu_reg import Emu, Reg, FLAG, ENTRY  # noqa: E402
 
@@ -32,7 +32,6 @@ def observe(name, reg, cl=0, comp='PC1', appdata='C:\\Users\\u\\AppData\\Roaming
     e.setup_globals()
     for va, b in patches:
         e.uc.mem_write(va, b)
-    t = time.time()
     st = e.run(cl=cl)
     reads = []
     for ev in reg.log:
@@ -45,7 +44,7 @@ def observe(name, reg, cl=0, comp='PC1', appdata='C:\\Users\\u\\AppData\\Roaming
         'button_id': struct.unpack('<I', e.rd(struct.unpack('<Q', e.rd(BTN, 8))[0], 4))[0],
         'unknown_apis': sorted(getattr(e, 'unknown', set())),
         'api_calls': len(e.api_log), 'registry_values_read': sorted(set(reads)),
-        'registry_keys_opened': opens, 'elapsed_s': round(time.time() - t, 2),
+        'registry_keys_opened': opens,
     }
 
 
@@ -73,12 +72,12 @@ def main():
     json.dump(out, open(os.path.join(HERE, 'results', 'cases.json'), 'w'), indent=1, ensure_ascii=False)
     md = ['<!-- 自動生成: python3 tools/startup/license_obs/run_cases.py (人手編集禁止) -->', '',
           '# 0x10c7cd0 の実機械語実行結果 (unicorn)', '',
-          '| case | 終了 | flag byte[0x14f84a8] | gradeChar | button ID | 未実装 API | 値読取 (distinct) | 所要 s |', '|---|---|---|---|---|---|---|---|']
+          '| case | 終了 | flag byte[0x14f84a8] | gradeChar | button ID | 未実装 API | 値読取 (distinct) |', '|---|---|---|---|---|---|---|']
     for o in out:
         okc = o['status'] == 'ok'
         fl, gr, bt = (f"0x{o['flag_hex']}", f"0x{o['gradeChar_hex']}", o['button_id']) if okc else ('—', '—', '—')
         md.append(f"| {o['case']} | {o['status'][:48]} | {fl} | {gr} | {bt} | "
-                  f"{','.join(o['unknown_apis']) or '-'} | {len(o['registry_values_read'])} | {o['elapsed_s']} |")
+                  f"{','.join(o['unknown_apis']) or '-'} | {len(o['registry_values_read'])} |")
     md += ['', '## 値読取の内訳 (case A1 / A4 / B1)', '']
     for o in out:
         if o['case'][:2] in ('A1', 'A4', 'B1'):

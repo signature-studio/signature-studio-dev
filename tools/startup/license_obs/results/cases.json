@@ -20,8 +20,7 @@
    "HKCU\\Software\\Image-Line\\Registrations\\FL Studio 26.1",
    "HKLM\\SOFTWARE\\Microsoft\\Cryptography",
    "HKLM\\Software\\Image-Line\\Registrations\\FL Studio 26.1"
-  ],
-  "elapsed_s": 0.03
+  ]
  },
  {
   "case": "A2 ILRegKey 無し (cl=1 Fire check)",
@@ -44,8 +43,7 @@
    "HKCU\\Software\\Image-Line\\Registrations\\FL Studio 26.1",
    "HKLM\\SOFTWARE\\Microsoft\\Cryptography",
    "HKLM\\Software\\Image-Line\\Registrations\\FL Studio 26.1"
-  ],
-  "elapsed_s": 0.03
+  ]
  },
  {
   "case": "A3 ILRegKey 無し + 別 MachineGuid / ComputerName / AppData",
@@ -68,8 +66,7 @@
    "HKCU\\Software\\Image-Line\\Registrations\\FL Studio 26.1",
    "HKLM\\SOFTWARE\\Microsoft\\Cryptography",
    "HKLM\\Software\\Image-Line\\Registrations\\FL Studio 26.1"
-  ],
-  "elapsed_s": 0.03
+  ]
  },
  {
   "case": "A4 ILRegKey 無し + MachineGuid 取得失敗",
@@ -91,8 +88,7 @@
    "HKCU\\Software\\Image-Line\\Registrations\\FL Studio 26.1",
    "HKLM\\SOFTWARE\\Microsoft\\Cryptography",
    "HKLM\\Software\\Image-Line\\Registrations\\FL Studio 26.1"
-  ],
-  "elapsed_s": 0.03
+  ]
  },
  {
   "case": "D2 空文字列の ILRegKey",
@@ -115,8 +111,7 @@
    "HKCU\\Software\\Image-Line\\Registrations",
    "HKCU\\Software\\Image-Line\\Registrations\\FL Studio 26.1",
    "HKLM\\SOFTWARE\\Microsoft\\Cryptography"
-  ],
-  "elapsed_s": 0.03
+  ]
  },
  {
   "case": "B1 vreg seed のプレースホルダ (cl=0)",
@@ -139,8 +134,7 @@
    "HKCU\\Software\\Image-Line\\Registrations",
    "HKCU\\Software\\Image-Line\\Registrations\\FL Studio 26.1",
    "HKLM\\SOFTWARE\\Microsoft\\Cryptography"
-  ],
-  "elapsed_s": 0.02
+  ]
  },
  {
   "case": "B2 vreg seed のプレースホルダ (cl=1)",
@@ -163,8 +157,7 @@
    "HKCU\\Software\\Image-Line\\Registrations",
    "HKCU\\Software\\Image-Line\\Registrations\\FL Studio 26.1",
    "HKLM\\SOFTWARE\\Microsoft\\Cryptography"
-  ],
-  "elapsed_s": 0.02
+  ]
  },
  {
   "case": "D1 16 進 128 文字の非正規 ILRegKey",
@@ -187,8 +180,7 @@
    "HKCU\\Software\\Image-Line\\Registrations",
    "HKCU\\Software\\Image-Line\\Registrations\\FL Studio 26.1",
    "HKLM\\SOFTWARE\\Microsoft\\Cryptography"
-  ],
-  "elapsed_s": 0.03
+  ]
  },
  {
   "case": "N1 gradeChar 初期値 imm 0x40→0x42 に改変 (0x10ca56f)",
@@ -211,8 +203,7 @@
    "HKCU\\Software\\Image-Line\\Registrations\\FL Studio 26.1",
    "HKLM\\SOFTWARE\\Microsoft\\Cryptography",
    "HKLM\\Software\\Image-Line\\Registrations\\FL Studio 26.1"
-  ],
-  "elapsed_s": 0.03
+  ]
  },
  {
   "case": "N2 bit0 を立てる or の直前の jle を nop 化 (0x10cf4e4)",
@@ -235,8 +226,7 @@
    "HKCU\\Software\\Image-Line\\Registrations\\FL Studio 26.1",
    "HKLM\\SOFTWARE\\Microsoft\\Cryptography",
    "HKLM\\Software\\Image-Line\\Registrations\\FL Studio 26.1"
-  ],
-  "elapsed_s": 0.03
+  ]
  },
  {
   "case": "N3 FLAG の初期化値 imm 改変: store 元 0x10d08d8 を 0x04 に (.data)",
@@ -259,7 +249,6 @@
    "HKCU\\Software\\Image-Line\\Registrations\\FL Studio 26.1",
    "HKLM\\SOFTWARE\\Microsoft\\Cryptography",
    "HKLM\\Software\\Image-Line\\Registrations\\FL Studio 26.1"
-  ],
-  "elapsed_s": 0.03
+  ]
  }
 ]
