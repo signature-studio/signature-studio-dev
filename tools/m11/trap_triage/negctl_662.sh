@@ -15,6 +15,9 @@ cd "$HERE"
 OUT=work/v662
 mkdir -p "$OUT"
 python3 -c 'import capstone, pefile' 2>/dev/null || { echo "FAIL: capstone/pefile 無し (qstore が skip され IR 状態が変わる)"; exit 1; }
+source "$HERE/../shared/env.sh"
+PE_CHK="${PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}"
+[ -f "$PE_CHK" ] || { echo "FAIL: PE 無し ($PE_CHK) (qstore が skip され IR 状態が変わる。FL_WIN64_DIR を fl-win64 の展開先にする)"; exit 1; }
 if [ ! -f "$OUT/boot_final3.orig.ll" ]; then
   rm -f work/boot_final3.ll
   bash m11_build.sh > "$OUT/build_prep.log" 2>&1 || { echo "FAIL: 前段 build ($OUT/build_prep.log)"; exit 1; }
