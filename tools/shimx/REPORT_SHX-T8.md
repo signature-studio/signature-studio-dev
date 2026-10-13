@@ -73,14 +73,14 @@ exports.txt の再生成差分: 並べ替えに加えて **9 本が追加** (削
 | 項目 | 実測 |
 |---|---|
 | コマンド | `bash tools/shimx/test.sh` (`--quick` なし, 素材 `work-m11` / `work-m6-ott` 展開済み, `plugins-*` は未使用) |
-| 検証 HEAD | `7d2e1e3f` (生成器修正 `270a32d7` / 生成物修正 `14e4eb35` / REPORT 修正 `7d2e1e3f`) |
-| 結果 | **exit 0**, real **53.8 s** (user 42.0 s / sys 12.0 s)。同系列の直前 HEAD `14e4eb35` では exit 0, 52.9 s |
-| 再生成後の差分 | `git status` 空 (再生成物は commit 済みの内容と一致) |
+| 検証 HEAD | `ef7b40ee` (生成器修正 `270a32d7` / 生成物修正 `14e4eb35` / REPORT 修正 `7d2e1e3f` / 検証 HEAD 記録 `ef7b40ee`)。実行前に `work-m11` / `work-m6-ott` を展開 (`tools/m11/work/` `tools/m6/work/` `tools/m8/work/` `tools/m9/work/` `tools/m10/work/` `tools/ott/work/`) |
+| 結果 | **exit 0**, real **1m29.2s** (user 1m14.7s / sys 16.4s), load average 0.18 (実行直前)。SKIP なし、FAIL 0 |
+| 再生成後の差分 | `git status` 空 (再生成物は commit 済みの内容と一致)。素材が無い状態で走らせると `m11_closure` / `ott_api_resolved` が空・0 に化けるため、素材の展開は必須 |
 | MT / ST / M4 | MT PASS (7 グループ) / ST PASS / M4 テスト MT・ST PASS |
 | 署名 | verify_sig m11 / m11_3 / ott: signature mismatch = 0。sig_test (a)〜(h) ALL PASS |
 | R6 | 構造体展開スタブ + 重複 declare 正規化 OK |
 | verify_ott | baseline 47 → shimx 解決 **24 種** (残 API 0, 新規 undefined 0)。t1 出力 SHA baseline = shimx = `b5a91b9b2ee8da1e` (一致, 512 行) |
-| 完了 | 7/7 完了: shimx 687 公開関数 × MT/ST × M4 互換 × fail-fast 全 PASS |
+| 完了 | 7/7 完了: shimx 687 公開関数 × MT/ST × M4 互換 × fail-fast 全 PASS。内訳: `exports.txt` 687 行 = shimx_* 63 + vreg_* 5 (運用フック計 68) + その他 619。`data/coverage.json` の `shimx_public_api` 618 は `gen_inventory.py` の `defined` 基準で、差 1 件は `shim_unimplemented` (`exports.txt` は T/W を全て書き出し、生成器は除外する)。両方とも生成器の仕様どおりで、件数の誤りではない |
 | 生成物の差分 (main 比較) | `data/coverage.json`: `shimx_hooks` 59 → 68 (main 版の値が古かった)。`m11_closure` / `ott_api_resolved` (24) は main と同値 |
 | 生成器修正の効果 | 再生成で `inventory.md` / `BACKLOG.md` の見出し注記・正本注記・SHX-T9 節 (`scripts/backlog_tail.md` から連結) は消えない。`exports.txt` も HEAD と一致 |
 
