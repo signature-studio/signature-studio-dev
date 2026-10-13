@@ -34,7 +34,7 @@
 
 ### 16.1 `6aa4b39` head での再計測 (2026-10-13, run 191-head)
 
-計測対象は `6aa4b39` head。現 main (`b069ecb9`) での再計測は未実施 (`6aa4b39` 以降に `tools/audio` の 11 ファイル・103 行追加・13 行削除が main に入っている)。
+計測対象は `6aa4b39` head。計測時点 (main `b069ecb9`) での再計測は未実施 (`6aa4b39` 以降に `tools/audio` の 11 ファイル・103 行追加・13 行削除が main に入っている)。
 
 環境: GitHub runner 4 core / 15 GiB, headless google-chrome, `bash tools/audio/build.sh` 直後。結果は `results/soak_<秒>.json`。
 
@@ -44,9 +44,8 @@
 | `--soak 10` (head `6aa4b39`, 結果 JSON は 1 回分のみコミット: `results/soak_10.json`, ran_at 15:37:16) | **PASS (exit 0)**: underruns 0, silence 0, ramp 0 / 480,512 f, T=1536, burst_obs 512, cb_max 370 µs, secs_wall 10.005 | 63.5 s / 0.03 → 0.06 |
 | **420 s ランプ・負荷下** (busy ループ 14 本を並走) | **PASS (exit 0)**: underruns 0, silence 0, ramp 0 / 20,168,192 f, cb 78,783 回 (late 0, 最大 184 µs), T=1536, lat_changes 1, clock 47,988.5 Hz | 476.5 s / 1.32 → 1 分平均 **14.15** (終了時 load 1 分/5 分/15 分 = 14.15 / 12.89 / 6.64) |
 
-- `--soak 10` は同 head で反復実行したが、結果 JSON をコミットしていないため本表は 1 回分の値だけを採る。反復の値 (ramp 0・underruns 0 の PASS) は JSON 追加後に別途書く。
 - 30 分 JSON (`results/soak_1800.json`) の旧版からの変化と、その扱い:
-  - `depth` 6 → 4 (`reported.lat_out0` 3073 / `olat_us0` 30000 を新たに記録)。query は両版とも `depth=2`。`depth` は query 値ではなく `fla_open` が OPEN 時の較正 burst から決める実効値で、式 `T = ceil((1.25·burst+B)/B)·B` を当てはめると、旧版 burst_obs 896 → T=1536 (depth 6)、今版 burst_obs 512 → T=1024 (depth 4) と整合する。つまり較正 burst の変動によるもので、設定差ではない。同一 query の反復での burst 分布は未測定。
+  - `depth` 6 → 4 (`reported.lat_out0` 3073 / `olat_us0` 30000 を新たに記録)。query は両版とも `depth=2` で同一。実効 depth の変化の原因は**未特定**。committed JSON 間で burst_obs と T の対応は一意に決まらない (`soak_10`: burst 512 → T 1536 / `soak_1800`: burst 512 → T 1024)。OPEN 時の較正値は JSON に残っていないため、設定差かどうかも未確定。
   - `clock_jumps` 10 (snapshot, `clock_jump_frames` 0)。比較元となる旧版の記録は §16 の表に無く、原因は**未調査**。ramp 照合は 86,402,048 f 全て一致 (mismatch 0)。
   - `cb_max_us` 18,165 µs (旧版 199 µs)。原因は**未調査**。late 0 (コールバック遅延の検出なし) の値。
 - 本節の 30 分値は head `6aa4b39` (`AU-7` 取り込み後) の実測で、§16 の表の `0a721b0` 版より新しい。
