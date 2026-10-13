@@ -97,7 +97,7 @@ e2e 内訳: `midi_all` 54/54 (2,801 ms) / `negctl_drop_one_short_msg` 62,500 ms 
 | 項目 | 実測 (HEAD 上、foreground) |
 |---|---|
 | `build.sh --midi` | rc 0 / 8.2 s / `OK plain_failfast_midi` |
-| `build.sh` (既定) | rc 0 / 5.5 s (比較用の同日実行) |
+| `build.sh` (既定) | rc 0 / `OK plain_failfast` (同 HEAD で再実行。時間は未計測) |
 | `node midi_e2e.mjs m11_sx_plain_failfast_midi.cjs` | 3/3 PASS / 0.38 s。`sx_midi_probe_numdevs(3)` = 3 (表経由で n_out が返る。未登録の weak は常に 0) |
 | `signature mismatch` | 1 件 (`midiOutShortMsg` i64 vs i32)。既定 variant でも 1 件 = 本変更由来ではない (既知) |
 
