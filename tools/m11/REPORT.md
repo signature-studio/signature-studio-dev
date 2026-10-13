@@ -3,7 +3,7 @@
 **判定: 部分達成** (到達 stage 4/6)。`entry_point`(DllMain attach) → `_StartLib` → `_InitLib` → `InitUnits` が
 wasm 上で動作し、**FastMM4 が実際に GetMem → VirtualAlloc でプールを確保するところまで**は実測で到達。
 ただし 942 unit の初期化は通常起動で **22 本完走後、unit #23 (VA 0x467f00) が Delphi 例外 → Halt0 (§10, #132 で #18 の OOB を解消)**、stage 5 (survey trap 無し完走) は未達。
-(下の §1 表と §2〜§8 は #132 以前 = unit #18 OOB 時点の実測。最新値は §10。)
+(下の §1 表と §2〜§8 は #132 以前 = unit #18 OOB 時点の実測。最新値は §10、survey の最新値 (OOM/clobber 分離後) は §11。)
 
 再現: `bash tools/m11/m11_e2e.sh` (work/ があれば増分 build: 実測 29.3〜29.6 秒 (§10, 4 vCPU, n=3) / `--full` で RetDec lift から全再生成: 旧記載「約 10 分」で本 PR では未再測定)。常に exit 0。
 gen_ir2 の ldfix は capstone+pefile が無いと黙ってスキップされる (§10 未解決の末尾)。PE は `/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin` 固定 (runner では symlink)。
@@ -121,57 +121,8 @@ FastMM4 の初期化関数群 (InitializeMemoryManager 相当) を単体で検�
 
 ## 9. sigfix 0 詰めの計測・機械語分類・定数復元 (#131, 部分達成)
 
-既知類型との関係: 該当 (icall §4 の `callsite_arg_drop` = liftdiff 分類、`ldfix/REPORT_APPENDIX_AB.md` 優先 1)。`docs/DEFECTS.md` D1〜D16 に直接の行は無く、D7 (stack 引数のずれ) は別件 (新規行案は下記)。
-
-### 計測 (コミット済み HEAD `3e49295`, `bash tools/m11/m11_sigfix_stats.sh`, 3.50 / 3.49 / 3.48 秒, load 0.52, n=3 直列)
-単位: **0 詰め site** = `m11_post.py` sigfix が「call site の実引数数 < callee 定義の引数数」で書換えた call (分母: sigfix 書換え 6,675 site)。**0 詰め引数** = 補われた引数の総数。集計は `m11_post.py --pads`。
-
-| 項目 | 実測 |
-|---|---|
-| 0 詰め site / 0 詰め引数 | **1,049 site / 2,064 引数** (217 callee / 475 caller。位置 0..3 = 1,892、位置 4 以降 (stack) = 172) |
-| 既定出力 | 従来の `work/boot_final3.ll` と `cmp` byte 一致 (計測追加で出力不変) |
-| 機械語と突合できた site | 1,004 / 1,049 (`no_pdata` 23 = caller が .pdata 区間外、`unmatched` 22 = IR の callee 呼出し数と機械語の直接 call 数が不一致で k 番目の対応が取れない) |
-
-突合済み 1,004 site の 0 詰め引数 1,963 の分類 (`m11_argrecover.py`, capstone の線型 disasm。Win64: rcx/rdx/r8/r9 → `[rsp+0x20+8(i-4)]`):
-
-| 分類 | 引数数 | 意味 |
-|---|---:|---|
-| callee_unused | 313 | callee 入口の直線部で読む前に全幅書込み (stack 引数は callee 全体に読出し無し)。**0 詰めは無害** |
-| set_const | 18 | caller の直前窓 (同一基本ブロック) で定数代入。**復元済み** (`M11_SIGFIX_RECOVER=1`) |
-| set_const_xmm_callee | 48 | 定数代入だが callee が xmm0..3 を引数に読む。復元しない (下記退行) |
-| set_other | 378 / stack_set_other 32 | 窓内で非定数 (reg/メモリ由来) を代入。SSA 値との対応づけが必要で**未復元** |
-| inherit | 1,172 | 窓内で未代入 (caller 引数の素通し/遠方 def)。**未復元** |
-| callee_nopdata | 2 | callee が .pdata 外 |
-
-**削減**: 0 詰め引数 2,064 のうち 18 (0.87%) を実値に置換、313 (15.2%) は無害と判定。残り (set_other 378 + stack_set_other 32 + inherit 1,172 + xmm 48 + nopdata 2 + 未突合 101) は意味未保証のまま。残りの site 別一覧: `results/sigfix_zeropad_remaining.tsv` (1,049 行, 引数ごとの分類付き)。1 site が全引数 callee_unused or set_const で**完全解決**するのは 31 site。
-
-### 検証 (実測)
-| 項目 | 結果 |
-|---|---|
-| 別アルゴリズム検算 `m11_argrecover_verify.py` (capstone の regs_access を使わず op_str の文字列で後ろ向き走査) | 復元 18 件が 18/18 一致 (初版 63 件では xor r9,r9 の 64bit 形を検算側が拾えず 10 件不一致 → 検算側の誤りと機械語で確認して修正し 63/63) |
-| ネガティブコントロール (値を 3 件 +1) | 15/18 一致・不一致 3 で exit 1 |
-| `m11_e2e.sh` (HEAD `3e49295`, `M11_SIGFIX_RECOVER=1`, 31.3 秒 (増分), load 0.88) | stage 4/6, 通常起動 17/942, survey **ok 812 / trap 83 / miss 46 / noproc 1** = 復元なし (60.6 秒, 全 obj 再生成) と同一。trap 内訳 OOB 34 / Halt0 48 / abort 1 も同一。unit 別 (942 本) 比較で差 0 |
-| 初版 (定数 63 件復元) | survey **ok 809 / trap 86** に**退行** (unit 838, 882, 885: ok → OOB)。二分探索で `function_c349a0` → `function_6a3d50` の 1 site (rcx=`lea` の ptr 定数) に特定。callee は xmm1..3 を引数に読むが IR に xmm 引数が無く 0 になる (推定: 実在オブジェクトへ xmm=0 で書込みが進み OOB)。xmm 引数を読む callee は部分復元しない規則を追加し、同等に戻った |
-
-つまり**定数復元は survey の数値を改善しなかった** (18 件は ok/trap どの unit にも影響しない)。意味補完の本体 (set_other / inherit の 1,550 引数) は未達。
-
-### 使い方・成果物
-* `m11_post.py --pads P.json` (0 詰め site 一覧出力) / `--fixes F.json` (復元適用)。`m11_argrecover.py` (分類+fix 生成)、`m11_argrecover_verify.py` (検算)、`m11_sigfix_stats.sh` (1 コマンド再現)。
-* `M11_SIGFIX_RECOVER=1 bash m11_e2e.sh` で復元を有効化 (既定 0 = 従来と byte 一致)。`M11_SURVEY_UNITS=<path>` で survey が unit 別結果 JSON を出す。
-* runner では `m11_e2e.sh` の PE パスが `/home/ubuntu/work/analysis/win64/extracted` ハードコードのため symlink で回避 (`m11_build.sh` は `FL_WIN64_DIR` 参照)。
-
-### 新規類型の行案 (DEFECTS.md 形式; 直接編集は PM 判断)
-| 症状 | 根本原因 | 観測 | 検出信号 | 修復 |
-|---|---|---|---|---|
-| 0 詰め引数を一部だけ実値化すると退行 | callee が xmm 引数 (IR に現れない) を読むのに整数引数だけ実値化し、callee が実オブジェクトを触って OOB | unit 838/882/885 ok→OOB (survey) | survey の unit 別差分 + 二分探索 | xmm 引数を読む callee は復元対象外 (本 PR) |
-
-### 未解決
-| 未解決 | 影響 | 起票先 |
-|---|---|---|
-| set_other 410 / inherit 1,172 引数の復元 (機械語 reg → IR SSA 値対応のデータフロー; #90 の間接 call 復元と共通基盤) | 0 詰めの大半が意味未保証のまま | #131 に残 (Refs)。新規子チケットは PM 起票 |
-| xmm 引数 (xmm_arg_drop) の復元 (IR に xmm 引数が無い) | xmm を読む callee では整数引数だけ復元できない (48 引数) | #131 コメントで PM に提案 |
-| `unmatched` 22 / `no_pdata` 23 site | 突合不能 | 同上 |
-| #122 差分ハーネスで 0 詰め箇所を優先検証 | 未実施 (本 PR は survey の unit 比較まで) | #131 コメント |
+0 詰め 1,049 site / 2,064 引数 (単位: sigfix が callee 定義より実引数の少ない call を書換えた site / 補った引数数)。うち 18 引数を機械語突合で実値に復元 (`M11_SIGFIX_RECOVER=1`)、survey の数値は不変。
+**全文 (計測表・分類・検算・退行の二分探索・新規類型の行案・未解決) は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) に分割移動 (250 行上限, 内容は無変更)。**
 
 ## 10. #132: unit #18 OOB の真因解消 (通常起動 17 → 22 unit)
 
@@ -235,3 +186,64 @@ callee が `[rcx+0x2c..0x3e]` (GetCPInfo の LeadByte 表) に書くため、呼
 | 巨大 VirtualAlloc 要求 (355MB×2, unit #18 のサイズ算出の未初期化値) | 通常起動で 711.7MB 確保 (`alloca/REPORT.md` 残置 #5) | #132 に継続 |
 | `m11_site` 型の診断 (IR へ guest VA を埋める) が m11 に無い | 反復が手作業 | boot/dbg_lift.py (flelift/boot) の m11 版を要検討 |
 | 素材 tarball に `ir_lb_base.stamp` が無く初回 e2e は必ず gen_ir2 が走る。gen_ir2 は capstone/pefile が無いと ldfix を黙ってスキップする (WARNING のみ) | 素材展開直後の数値が ldfix 有無で変わる (`6ad441d` で無し: survey 839/56/46/1、有り: 841/54/46/1) | #132 に継続 (e2e の前提チェック追加を提案) |
+
+## 11. #513: survey の VirtualFree 実解放・OOM/clobber 分離と「ok 849→816」の切り分け
+
+既知類型との関係: DEFECTS.md に直接の行なし (測定バイアス = 新規類型案を末尾)。unit 87/898 は D1 系 (旧値 load 脱落を C 転記で直した副作用), 巨大 alloc の size は D15 (間接 call 脱落) の疑い (推定)。
+**起点**: 本ブランチ `513-m11-survey-vfree` は PR #411 (`132-m11-stage5`, 未マージ) 上。コード commit `c4a3f72` (= `8059197` + 本 issue の 3 commit; 以降は docs のみ)。比較対象 main = `c1e4105`。runner 4 vCPU, work-m11/work-liftdiff 展開済み, PE は fl-win64 の `block00031_PE.bin`, capstone+pefile 入り venv。
+
+**結論**: (1) 見かけの退行の主因は VirtualFree の leak ではない。**survey 中 `VirtualFree` は 0 回** (実解放 0 / 表に無い解放 0 / decommit 0) で、実解放だけでは数値は動かない。(2) 真因は **unit 101 (VA 0x1de960) 1 本が VirtualAlloc 1,477,181,440 B (survey 累計 1,490,026,496 B の 99.14%) を消費**
+(GetMem 23,056,285 回・FreeMem 0 回・1 回あたり 64.07 B) して wasm 上限を使い切り、後続 54 unit が巻き添えで OOM→NULL→Halt0 になっていたこと。(3) unit 単位の上限 + oom/clobber 分類で分離すると **ok 816 → 852** (36 unit は OOM の巻き添えだった)。
+
+実装 (`m11_rt.c` / `m11_survey.mjs` / `m11_judge.py`): ① `VirtualAlloc` が (基底, calloc 生ポインタ, 長さ) を表に持ち, `VirtualFree(MEM_RELEASE)` で実際に free (DECOMMIT は no-op, 表に無い解放は 1 を返して計数)。② unit ごとの VA 累計上限 `M11_VA_UNIT_BUDGET_MB` (既定 256, 0 = 旧挙動)。超過は NULL (OOM) で, unit 実行中に NULL が出た trap を `oom` に分類 (`trap_oom` / `trap_other` / `oom_units`)。
+③ unit 実行後に InitTable (先頭・末尾 proc VA) が壊れていたら実行前の image を書き戻し `clobber` に分類 (検出は InitTable のみ)。④ 診断: `M11_SURVEY_COST` (unit 別 VA/GetMem), `M11_SURVEY_STACK`, `M11_VA_BIGTRACE`, `m11_unit_imgdiff.mjs` (unit 前後の image 差分), `m11_wasmnames.py` (wabt 無しの関数名注釈)。
+
+### 実測 (survey 単体 `node m11_survey.mjs`。PR HEAD 既定 7.27〜7.36 秒 (n=5, load 0.59→0.93) / 上限 0・1024MB 19.7〜19.9 秒 (n=5) / main 1024MB 7.00〜7.11 秒 (n=3))
+| 構成 | ok | trap = oom + 他 | clobber | miss | noproc | VA 累計 / peak | OOM |
+|---|---:|---|---:|---:|---:|---|---:|
+| PR HEAD・上限なし (= 旧測定 NC) | 816 | 79 = 55 + 24 | 0 | 46 | 1 | 1,490.0 MB | 55 |
+| PR HEAD・既定 256MB (n=3 完全一致) | **852** | 42 = 1 + 41 | 1 | 46 | 1 | 556.2 MB | 1 |
+| PR HEAD・1024MB | 852 | 42 = 1 + 41 | 1 | 46 | 1 | 1,362.3 MB | 1 |
+| PR HEAD・既定 + `M11_VFREE_NOOP=1` (NC) | 852 | 42 = 1 + 41 | 1 | 46 | 1 | 556.2 MB (実解放 0 = 差なし) | 1 |
+| main `c1e4105`・上限なし / 1024MB | 849 | 43 = 0 + 43 | 0 | 49 | 1 | 822.4 MB | 0 |
+| main・既定 256MB | 848 | 44 = 1 + 43 | 0 | 49 | 1 | 87.7 MB | 1 (unit 368 の 700.7MB 要求が上限超過) |
+
+`m11_e2e.sh` (増分 build): コード HEAD `c4a3f72` で 25.54 秒 (load 0.38→0.59, n=1)、直前 `08cc36c` (差は survey の stack 出力のみ) で 25.55 / 25.52 / 25.44 秒 (load 0.24→0.91, n=3)。いずれも stage 4/6・通常起動 22 unit・survey 852/42(oom 1)/clobber 1/46/1。通常起動の VirtualAlloc は 1 回 (1.3 MB)。
+検算 (別算法): unit 別 VA の総和 = 全体 1,490,026,496 B (差 0), `oom>0` の unit 55 = 'oom' ラベル 55 = `va_oom` 55, 次に大きい unit は 11,534,336 B (0x145d10)。
+
+### unit 単位の比較 (main と PR HEAD, どちらも上限 1024MB = OOM 無し側に揃える。942 本中 933 本同一)
+| unit (idx / RVA) | main → PR | 内容 |
+|---|---|---|
+| 17 / 0x55790 | trap → ok | #411 の本題 (unit #18 OOB 解消) |
+| 138 / 0x243270 | trap → ok | 原因未確認 (main→PR で ok 化) |
+| 86 / 0x19b100, 357 / 0x55b400, 496 / 0x6de4d0 | miss → ok | closure 外 call が出なくなった。原因未確認 |
+| **87 / 0x19f9a0** | **ok → trap** | OOB @ `function_418190` (#411 の C 転記) — OOM 無関係の**実退行** |
+| **898 / 0xf06110** | **ok → trap** | OOB @ `function_412d60` (#411 の C 転記, 呼出元 12f98f0←1305fd0) — **実退行** |
+| 101 / 0x1de960 | trap → oom | main は OOB @ 4fa210。PR は進んで 4fa210 (list 走査 loop) → 47a250 (例外生成: `TList.Error` 相当) → 448d40 (`Exception.Create`→`_ClassCreate`→GetMem) の連鎖で GetMem 23M 回 (loop が毎周回 例外 object を作る**推定**; 機械語は逆アセンブルで確認, 周回は未観測) → OOM で Halt0 |
+| 144 / 0x25c540 | trap → clobber | main は OOB @ 414ad0。PR は進んで **image の InitTable (ptr/count/units) を 0 に**し (`m11_unit_imgdiff.mjs 144`: image 14,873,449 B / 1,638,708 range が変化, 範囲 0x8〜0x1579044。対照 unit 143 は 5 B / 2 range), 最後は FastMM で OOB。**旧測定では OOM で Halt0 になり隠れていた** |
+
+つまり ok→非 ok の退行は **OOM 除外後 2 本 (87, 898)** のみで, 849→816 の 33 本差は大半が OOM の巻き添えだった (旧 `6ad441d→a71a404` の ok→trap 33 本の内訳も同型と推定。未再測)。
+
+### 巨大 VirtualAlloc (355MB×2) の呼出元と必要性
+現 HEAD では通常起動の VirtualAlloc は 1 回 (1.3 MB) で **355MB×2 は再現しない** (`alloca/REPORT.md` 残置 #5 は R8 等で解消済みの可能性。survey の 64MB 以上要求は下の 2 つだけ, `M11_VA_BIGTRACE=1`):
+* unit 368 (0x5810f0=`function_9810f0`) → `980ed0` (ctor; 基底 ctor `6a3be0` は既定 44100 Hz) → `981000` (8 面バッファ確保: size = 8×((8n+31)&~31) ≈ 64n B, n = `*(int32*)(*(u64*)VA 0x15e4080)`) → `409470` → FastMM 大ブロック。**要求 700.7 MB (main) / 190.6 MB (PR)** と build で変わる = 値が不定。n の出所は**未確定** (image 静的値の指す先は 0、実行時の値は未観測。基底 ctor の `call [rbx]` 仮想呼出しの脱落 = D15 の疑いは**推定**)。
+* unit 888 (0xeaea40=`function_12aea40`) → `129f140` → `417fc0` → `417b70` → `409470`: 71.3 MB (両 build 同値, 必要性は未確認)。
+→ 実機の初期化でこの大きさは要らない (推定)。上限 256MB では unit 368 (main) の 700.7MB 要求が oom 扱いになるため, main と比較するときは 1024MB を使う。
+
+### ネガティブコントロール (実測)
+* 単体 `node m11_vfree_test.mjs` (3 周 × 8MB × 100 = 累計 2.4 GB を確保→解放): 実解放 = **PASS** (OOM 0, 解放 301 回, 周ごと live 0 MB, 二重解放と未知 ptr は 2 回計数)。`M11_VFREE_NOOP=1` (解放しない) = **OOM 116 回・live 1,544.6 MB** (期待どおり NC_OK)。0.51 秒 (load 0.88)。
+* survey: 上限を外す (`M11_VA_UNIT_BUDGET_MB=0`) と OOM 55 / ok 816 / VA 1,490.0 MB に戻る (NC)。`M11_VFREE_NOOP=1` は survey では**差が出ない** (VirtualFree が呼ばれないため。受入条件「解放を無効化すると OOM が戻る」は survey では成り立たず, 単体テストで成立)。
+* 検証範囲外: FastMM が大ブロック/プール解放で VirtualFree を呼ぶ経路の実行 (survey では FreeMem 37 回中 0 回), 全 unit を通した clobber 検出 (InitTable 以外の破壊は未検出)。
+
+### 新規類型の行案 (DEFECTS.md 形式; 直接編集は PM 判断)
+| 症状 | 根本原因 | 観測 | 検出信号 | 修復 |
+|---|---|---|---|---|
+| 1 プロセス通算 survey で後続 unit が OOM→Halt0 / 破壊 unit が OOM で隠れる | hog unit 1 本 (無限 alloc ループ) が wasm 上限を使い切る測定バイアス | unit 101 が VA の 99.14%・巻き添え 54 unit; unit 144 の image 破壊が旧測定で不可視 | unit 別 VA/GetMem (`M11_SURVEY_COST`)・oom/clobber 分類 | unit 別上限 + InitTable 検査 + image 巻戻し (本 PR) |
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| unit 101 の `4fa210` list 走査が `47a250` (例外生成) を 23M 回繰り返す根因 (list の index/Count の誤 lift か, raise が戻る経路か) | PR HEAD の survey が 1 unit で 256MB (上限なし 1.48GB) 消費 | 新規子チケット案 [M11-N17] (PM 起票), #132 にコメント |
+| unit 144 の image 破壊 (書込み元関数と, 0 埋めの範囲・値) | clobber 1 unit。他 unit の結果に影響し得る | 同上 |
+| #411 の `418190` / `412d60` 転記が unit 87 / 898 で OOB (ok→trap 2 本) | PR の実退行 | #132 (PR #411 内で修正) |
+| unit 368 の `981000` の n (700.7MB / 190.6MB) の出所, unit 888 の 71.3MB の必要性 | 巨大 alloc が 256MB 上限に依存 | 新規子チケット案 (D15 疑い) |
+| survey の clobber 検出は InitTable のみ | 他の image 破壊は ok に見える | #132 |
