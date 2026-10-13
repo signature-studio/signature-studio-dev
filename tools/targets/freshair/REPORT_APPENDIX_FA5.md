@@ -45,11 +45,12 @@
 - 再現: `ks_rdata_class.py` の出力 `rdata_class.json` を入力に `python3 ks_rdata_value.py <HeartCore.core_64> <SlateCore.core_64> rdata_class.json share.json out.json` (uv で pefile/numpy/capstone)。素材は `work-liftlib-targets`。
 - 方法: `value` 17 関数の rip 参照 (32 B) を 8 B 語で対にし、差分語を分類。`rva_off_*` は「SC 語が指すセクション内 RVA の 16 B」を KH 側と比べる。
 - 前提の訂正: 旧 §A4 の `rva32` (セクション範囲内の整数) は、RVA ポインタなのか定数なのかを区別していなかった。本節の検査では、差分語は RVA として扱えるものだけを対象にした。
-- 測定 commit: `1b3a1b33` (最後にコードを変えた commit)。`ks_identity.sh` と `ks_rdata_value.py` を `d67052f9` でも再実行し、同じ数値 (以後 docs のみの commit で HEAD は進むが、コード差分は 0 のまま)。コード差分の証跡 `git diff 1b3a1b33 HEAD -- tools/targets/freshair/*.py tools/targets/freshair/*.sh` は **0 行** (差分は本節の文書のみ)。
-- 実測 (2 回実行で byte 一致、EXIT=0。`ks_rdata_value.py` 0.73〜0.75 s、`ks_identity.sh` 51.9 s、load 0.36〜0.74 (nproc=4)): 下記の数値が本 PR の正本。
+- 測定 commit: `115debea` (最後にコードを変えた commit。RVA 候補を `.rdata` に限定し `sec_hits` を追加)。`ks_identity.sh` と `ks_rdata_value.py` は同じ commit で再実行。コード差分の証跡 `git diff 115debea HEAD -- tools/targets/freshair/*.py tools/targets/freshair/*.sh` は **0 行** (差分は本節の文書のみ)。
+- 実測 (commit `115debea`、2 回実行で byte 一致、EXIT=0。`ks_rdata_value.py` 0.67 s × 2、`ks_identity.sh` 41.0 s、load 0.79 (nproc=4)): 下記の数値が本 PR の正本。
   `{"abs_vs_const": 8, "dbl": 13, "fn_value_differs": 17, "int": 23, "rva_off_absent": 72, "text": 23}`
   - `abs_` 接頭辞は、片側以上が ImageBase〜SizeOfImage の 8 B 絶対アドレスである組。`abs_vs_const` 8 語は、片側だけが絶対アドレスで、もう片側が RVA として解決できない定数。
   - `layout` 0 件・`target_eq` 0 件・`abs_layout` 0 件・`abs_target_eq` 0 件 (配置差で説明できる語は無い)。
+  - RVA 候補は `.rdata` を指すものに限定 (コードで保証)。`sec_hits` (語の解決先セクション件数): SC `.rdata` rva 74 / abs 2、SC `.text` rva 1 / abs 1、KH `.rdata` rva 74 / abs 5。`.text` を指す RVA 候補 1 語は `rva_off_*` に入らない (差分語の分類は `.rdata` 対のみ)。
   - RVA 候補 72 語 (すべて `.rdata` を指す) は、SC が指す 16 B が KH の `.rdata` の全バイト位置のどこにも無い (`rva_off_absent` 72 / 72、`rva_off_found` 0)。
   - `int` 23 / `dbl` 13 / `text` 23 は、差分語のうち RVA 候補・絶対アドレスでないもの (整数・倍精度・文字列断片)。
 - 読み: `value` 17 件は「配置がずれただけ」とは言えず、RVA 候補の指す先の 16 B が KH 側に無い。参照先がさらにポインタを含む場合は未追跡 (下限)。`dbl` 13 / `int` 23 が同一位置の定数差か、そもそも対応しない語の組み合わせかは未確定。
