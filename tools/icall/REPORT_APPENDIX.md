@@ -103,38 +103,43 @@ python3 tools/icall/diff/rax_callers.py 1801a9a6c 1801c8cb8 1801c8c98
 - 関数範囲: `0xc589b0-0xc5d667` (19,639 B) / `0x128f9e0-0x1294ab8` (20,696 B)。site は各 183 / 191 (うち 8 が書換え後も IR に残る)。
 - RetDec は正常終了 (タイムアウト無し、約 10 s で `Running phase: cleanup`)。落ちは時間切れではない。
 - decode 段 (`--print-after-all` の `Input binary to LLVM IR decoding`) では stub 呼出し **377** 本。`Selected functions optimization` 段で 61 関数 → 4 関数 (2 関数 + stub 2)。
-  以後は関数ごとに 1 モジュールへ分けて最適化され、stub 呼出しは `Simple constant propagation` 付近で 377 → 11 へ減る (`passes_stub.txt`)。
+  以後は関数ごとに 1 モジュールへ分けて最適化され、stub 呼出しは `Sparse Conditional Constant Propagation` (SCCP) の 1 段で 377 → 11 へ減る (§12.1)。
 - 範囲分割で落ちは減らない (CHUNKS=2 で 366 のまま)。仮説 A (RetDec の打ち切り回避) は**棄却**。
 - 補足 (DEFECTS 候補): RetDec は `0x128c320` 直前の関数を `data inside code section 0x128c281--0x128c320` と誤認し、`0x128c320` を 1 バイト関数にする。`NonRecursiveCFGBuilder` が `function_128c320` への edge を毎回捨てる警告 (5 件) が出る。本件の 366 落ちとの因果は未検証。
 
-| 未解決 | 影響 | 起票先 |
-|---|---|---|
 ### 12.1 ICALL-9 (#847): stub 呼出しが減る段の特定 (HEAD `f452bb79`)
 
-実測 (`measure_flengine_split.sh`, 117.6 s, load 1.12 開始, 4 core): base 366 / c2 366 (§12 と一致)。
-`--print-after-all` 全段 dump (119 MB, `$RUNNER_TEMP` 内の生成物で commit しない) から段ごとの stub 数を再集計した。
+実測 (HEAD `5c7ed042` ではなく測定時 HEAD `f452bb79` の `measure_flengine_split.sh` を再実行, 117.96 s, load 0.63 開始 → 1.64 終了, 4 core): base 366 / c2 366 (§12 と一致)。
+再現手順 (検証 HEAD はコミット後に更新):
+```sh
+FL_WIN64_DIR=<fl-win64 展開先>/extracted bash tools/icall/measure_flengine_split.sh $OUT   # base/rw.dll・base/after.ranges を作る
+RETDEC_BIN=<RetDec>/bin/retdec-decompiler python3 tools/icall/sccp_stub_drop.py $OUT/base/rw.dll $OUT/base/after.ranges tools/icall/work/sccp_stub_drop
+```
+`sccp_stub_drop.py` は `--print-after-all` の全 dump (709 本) を読み、関数ごとに stub 数・IR 行数・基本ブロック (ラベル数)・`br i1 undef`・0x1dc0080 の load/store を `dumps.tsv` に出し、stub 数が変わった関数の直前・直後を `sccp_pairs.tsv` に書く。`passes_stub_count.py` は段の変化点しか出さず、本節の行数・基本ブロック・`br i1 undef` は出さない。`tools/icall/work/` は gitignore。
 
-| 段 | 関数数 | stub 呼出し (関数合計) |
-|---|--:|--:|
-| decode (`Input binary to LLVM IR decoding`) | 61 | 377 |
-| `Selected functions optimization` 以降 (2 関数 + stub 2) | 4 | 377 |
-| `Sparse Conditional Constant Propagation` 直前 (`function_1cc0000` 183 / `function_1cc9b70` 192 / 残り 2 関数 2) | 4 | 377 |
-| `Sparse Conditional Constant Propagation` 直後 (`function_1cc0000` 0 / `function_1cc9b70` 9 / 他 2) | 4 | 11 |
-| `Strip Unused Function Prototypes` 以降 | 4 | 11 |
+段ごとの実測 (`sccp_stub_drop.py` の `dumps.tsv` = dump 1 本ごとの生データから集計。関数 `function_1cc0000` / `function_1cc9b70` / `function_1cd3f30` / `function_1cd3fe0` の 4 関数が段ごとに 1 組ずつ出る):
 
-- **減る段は SCCP (`Sparse Conditional Constant Propagation`) の 1 段だけ** (`passes_stub.txt` の 377 → 11 の遷移)。377 − 11 = 366 で、落ちた site 数と一致する (site 1 本 = stub 1 呼出しとみなせる場合の整合。site 単位の対応は未確認)。
-- SCCP の前後で `function_1cc0000` の IR は 7,943 行 → 1,884 行。stub を含む 114 基本ブロックが消える。
-- 消える分岐の条件は、直前の段で `load i64, i64* inttoptr (i64 31195264)` (= 0x1dc0080, BLK 領域内) から読んだ値の比較。SCCP 後はこの分岐が `br i1 undef` になり (両関数で計 161 本)、後続ブロックごと到達不能扱いになる。
-- 0x1dc0080 への store は関数内に 1 本 (`stack_var_-649.0` の phi、基本ブロック `dec_label_pc_1cc9898`)。読み出し 100 箇所の全てがこの store に支配されるかは未確認。
-- **未確定**: なぜ SCCP がこの load を `undef` と判定するか (load は通常 overdefined)。BLK 上の値が未初期化扱いになる経路か、RetDec の memory 扱いか。
-- 仮説 A (範囲分割で回避) は §12 のとおり棄却済み。本件の段特定で、落ちは「RetDec が SCCP で分岐を undef にする」ことに起因すると分かった。修正は未実施 (根本の判定条件が未確定のため)。
+| 段 (dump 名) | stub 呼出し (関数合計) | 関数 IR 行数 (4 関数) | 基本ブロック | `br i1 undef` |
+|---|--:|--:|--:|--:|
+| `Global Value Numbering` (SCCP の直前, dump idx 401–404) | 377 (183 + 192 + 1 + 1) | 16,380 | 621 | 0 |
+| `Sparse Conditional Constant Propagation` (idx 405–408) | **11** (0 + 9 + 1 + 1) | 4,256 | 621 | **322** |
+| `Strip Unused Function Prototypes` 以降 (dump idx 625–632 の組) | 11 | 1,828 | 60 | 0 |
+
+- **減る段は SCCP の 1 段** (SCCP の前後の段で stub 数が 377 → 11 に変わるのは SCCP のみ)。377 − 11 = 366 は落ちた site 数と一致する。ただし site と stub の対応は未確認 (算術の一致のみ)。
+- 関数単位 (`sccp_pairs.tsv`): `function_1cc0000` は stub 183 → 0・IR 7,943 → 1,884 行・基本ブロック 303 → 303 (ラベル数は不変)・`br i1 undef` 0 → 161。`function_1cc9b70` は stub 192 → 9・IR 8,380 → 2,315 行・`br i1 undef` 0 → 161。
+- stub を含む基本ブロックは `function_1cc0000` で 114。SCCP 後は stub を含むブロックが 0 になる (ブロック総数は不変)。
+- SCCP の直前段 (`Global Value Numbering`) で、両関数とも `load i64, i64* inttoptr (i64 31195264 to i64*)` (= 0x1dc0080) が 99 本ずつ。SCCP 後は 0 本になり、`store` は両関数とも 1 本 (`stack_var_-649.0` の phi) が残る。
+- 0x1dc0080 の読み出しは両関数合計 198 本 (各 99)。なお旧記述の「100 箇所」は、ここでは 1 関数あたりの値として誤りだった (読み出し 99 + store 1 = 100 の数え間違い)。
+- 分岐の条件は、直前段で 0x1dc0080 から読んだ値の比較と推定される。SCCP 後にこの分岐が `br i1 undef` になる (両関数で各 161 本)。条件の直接の対応 (どの load がどの分岐の条件か) は未確認。
+- **観測と未確定を分ける**: SCCP で分岐が `undef` になることは観測された。なぜ SCCP がこの load を `undef` と判定するか (load は通常 overdefined) は未確定 (#1014)。BLK 上の値が未初期化扱いになる経路か、RetDec の memory 扱いかは未確認。
+- 仮説 A (範囲分割で回避) は §12 のとおり棄却済み。落ちの直接の段は SCCP で、その判定条件は未確定。修正は未実施。
 
 ### 12.2 残 (ICALL-9 の受入条件のうち未達)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 0x1dc0080 の load が SCCP で `undef` になる条件の特定 | 366 site 落ちの真因の本体 | #847 に残す (本 run では未完) |
-| 落ちた 366 site の IR 上の形 (消失 / 別関数への移動) の関数単位 before/after 分類 | 受入条件 2 未達 | #847 に残す |
-| 修正して 0xc589b0 / 0x128f9e0 の kept を 366 から減らす | 受入条件 3 未達 | #847 に残す |
+| 0x1dc0080 の load が SCCP で `undef` になる条件の特定 | 366 site 落ちの真因の本体 | #1014 (ICALL-15) |
+| 落ちた 366 site の IR 上の形 (消失 / 別関数への移動) の関数単位 before/after 分類 | 受入条件 2 未達 | #1014 |
+| 修正して 0xc589b0 / 0x128f9e0 の kept を 366 から減らす | 受入条件 3 未達 | #1014 |
 | `0x128c320` の関数境界誤認 (1 バイト関数化) と NonRecursiveCFGBuilder 警告 | 隣接関数の lift 欠落の疑い | 子 issue (下記) |
 | jump table cmp/je 展開 / Balance・KH・FA wasm 差分 / stack 引数動的検証 / plugin closure バッチ | 本 run 範囲外 | 子 issue (下記) |
