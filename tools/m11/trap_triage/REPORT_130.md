@@ -1,8 +1,8 @@
 # #130 survey trap 再測定と残 trap の切り分け (2026-10-13)
 
-**判定: 部分達成 (trap 25、完了条件 < 20 は未達)**。本 run はコード変更なし。main `c10e8716` を再ビルドして実測し、残 trap の原因候補を切り分けた。
+**判定: 部分達成 (trap 25、完了条件 < 20 は未達)**。本 run はコード変更なし。main `97f28539` (merge `a6b58d7e`) を再ビルドして実測し、残 trap の原因候補を切り分けた。
 
-## 1. 実測 (main `c10e8716`、コード変更なし)
+## 1. 実測 (main `97f28539` (merge `a6b58d7e`)、コード変更なし)
 
 素材: `fl-win64` (block00031_PE.bin のみ展開), `work-m11` / `work-liftdiff` (`tools/m11/work/`, `tools/liftdiff/work/` へ展開), `toolchain-emsdk` ([EMSDK])。`capstone` / `pefile` は `$RUNNER_TEMP/pyenv130` (pip) で導入。
 
