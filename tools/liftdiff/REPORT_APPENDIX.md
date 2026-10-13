@@ -317,7 +317,7 @@ flelift closure (fle_lift.sh 生成物 tools/flelift/work/lift/* が素材に無
 
 m11 closure の `unsupported_sig` 50 件は未実装。分割先は #1193 と #1194。詳細・件数の注記・受入条件: [`REPORT_LD24.md`](REPORT_LD24.md)。
 
-## 13. flelift closure の再採点 (LD-26 / #978、部分達成) — lift 生成物の再生成
+## 13. flelift closure の再採点 (LD-26 / #978、部分達成) — 参考値 (未確定)
 
 素材 (fl-win64・work-m11・work-liftdiff) から `tools/flelift/fle_lift.sh` で lift 生成物 (`tools/flelift/work/lift/*`) を作り直し、`targets/flelift.json` で全数採点した。方式は「fl-win64 からの再生成」(allowlist 追加なし)。issue は方式を PM 判断としているため、この選択は PM の確認対象。
 
@@ -331,9 +331,9 @@ m11 closure の `unsupported_sig` 50 件は未実装。分割先は #1193 と #1
 
 > **未検証 (レビュー指摘 1・最重要)**: 前半 JSONL の行数・一意アドレス数は本 run で**確認していない** (打切り後の前半 JSONL が 5,600 件あったことを示す記録が無い)。後半 1,821 件は `--set file:` で別途流した。このため下表の「7,421 関数」は前半の欠損を含む可能性があり、**全数 7,421 の値として扱わない**。前半 JSONL の一意数を確認するか、欠けた関数を再実行して一意数を揃えるまで、下表は参考値。
 >
-> **測定 tree (レビュー指摘 3)**: この値は commit 1795f8ff の tree (base a5adb2fc 系) のもので、main HEAD (598eba1c 以降) の値ではない。main とは `tools/liftlib/liftlib/passes` (l1_restore・iargs・fp_bind) と `tools/liftdiff/ldlib/session.py` が異なる。
+> **測定 tree (レビュー指摘 1・3)**: この値は commit 1795f8ff の tree (base a5adb2fc 系) のもので、現 HEAD (7242709f = main 取り込み merge) の値ではない。`git diff 1795f8ff 7242709f --stat -- tools/liftlib/liftlib tools/liftdiff/ldlib` は 5 files, +174 / -1 (`passes/l1_restore.py` +79・`passes/iargs.py` +19/-1・`passes/fp_bind.py` +13・`ldlib/session.py` +35・`ldlib/cases.py` +29)。この差分の上に載せた値は**未検証**。再測定 (fle_lift.sh / liftdiff build / bootstate / batch) は素材不足で本 run では不可。
 
-参考値 (前後半の合算・未検証・重複確認なし):
+参考値 (未確定・前後半の合算・前半 JSONL の一意数未確認・重複確認なし。全数 7,421 として扱わない):
 
 | verdict | 件数 |
 |---|---|
