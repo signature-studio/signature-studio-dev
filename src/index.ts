@@ -4,6 +4,7 @@ import { createImportForwarder } from "./runtime/imports";
 import { instantiateWasm } from "./runtime/loader";
 import { mountRuntimePanel } from "./runtime/boot_ui";
 import { installWebstudioContract } from "./runtime/webstudio_state";
+import { installFlMcp, mountMcpPanel } from "./runtime/mcp_panel";
 
 // FL 起動契約 (tools/e2e/REPORT.md §FL 起動契約)。実 FL 統合後は GuiHost の onFrame で setFrames を呼ぶ。
 // このハーネスのテストフレーム (下の blitFrame) は FL の GUI フレームではないので計上しない。
@@ -124,5 +125,12 @@ const runtimeParams = new URLSearchParams(location.search);
 if (runtimeParams.has("runtime")) {
   void mountRuntimePanel(runtimeParams);
 }
+
+// ---------------------------------------------------------------------------
+// MCP JSON-RPC (PY-4 #77) — devtools: window.flMcp / UI: /?mcp=1
+// 詳細: tools/python/BRIDGE.md。MCPTools.pyc は利用者の FL から実行時供給 (非同梱)
+// ---------------------------------------------------------------------------
+installFlMcp();
+if (runtimeParams.has("mcp")) mountMcpPanel();
 
 export {};
