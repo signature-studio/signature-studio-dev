@@ -6,6 +6,7 @@ set -e
 cd "$(dirname "$0")"
 source ../../../shared/env.sh
 W=work
+mkdir -p $W/lift $W/tmp
 PE_IN='../work/extracted/VST3/Massive X.vst3'
 PE=$W/mx_fixed.vst3
 
