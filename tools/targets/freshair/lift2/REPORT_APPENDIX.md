@@ -51,8 +51,10 @@
 | 1 | 0 | 1m19.336s | 1m12.087s / 5.636s | 0.19 (up 4 min) | `RESULT: lift2_e2e ALL PASS` |
 | 2 | 0 | 1m15.112s | — | 0.88 | `RESULT: lift2_e2e ALL PASS` |
 | 3 | 0 | 1m14.871s | — | 0.89 | `RESULT: lift2_e2e ALL PASS` |
+| 4 (HEAD `0e8ff06`, docs のみ追加) | 0 | 1m15.232s | 1m10.948s / 5.560s | 0.12 | `RESULT: lift2_e2e ALL PASS` |
+| 5 (HEAD `fa219ea`, origin/main 取り込み後) | 0 | 1m14.509s | 1m10.444s / 5.349s | 0.53 | `RESULT: lift2_e2e ALL PASS` |
 
-- min–max: real 1m14.871s–1m19.336s (n=3)。nproc 4。
+- 現 HEAD `fa219ea` (最終) の min–max: real 1m14.509s–1m15.232s (n=2, 回 4・5)。全 5 回の min–max: 1m14.509s–1m19.336s。nproc 4。
 - 工程別 (1 回目の実測): comp fma0 200 / fma1 200 (計 400, mismatch 0, 両側 ERR 0) / filter 400 (mismatch 0) /
   fuzz comp・filter × fma0・fma1 の各 1200 mismatch 0 / ABI violations 0 / ctrl 15/15 (fma0+fma1, 両側 ERR 1/1 同一 scenario) /
   ablation 注入 5 種すべて検出 (comis_noflags 200/200, xmm_args_drop 200/200, xmm_ret_drop 200/200,
