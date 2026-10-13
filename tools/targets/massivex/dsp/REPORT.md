@@ -239,6 +239,6 @@ acpt_recount_np = pdata 186,960 / sites 763,898 / targets 594,978 / non-begin 59
 
 **検証 commit と差分 (docs/WORKFLOW.md §6)**: PE 実測の測定 commit = **133007f1**。その後 dsp のコードを変えた最後の commit = **59d2f022** (`mx_slot_body.py` を関数化し `--selftest` と停止規則を追加。解析ロジック・集計条件は不変)。
 - `git diff 133007f1 HEAD -- tools/targets/massivex/dsp` は **142 行** (差分 0 ではない。59d2f022 でコードを変えたため。0 行を主張していた旧記載は誤り)。
-- `git diff 59d2f022 HEAD -- tools/targets/massivex/dsp` は **0 行** (検証 HEAD = 59d2f022 以降に dsp のコード変更なし)。
+- `git diff 59d2f022 HEAD -- tools/targets/massivex/dsp/scripts` は **0 行** (59d2f022 以降にスクリプトの変更なし。以降の差分は本 REPORT.md のみ)。
 - selftest (59d2f022・PE 不要・実測): `selftest PASS: positive rdx refs=2 (offsets [(4, 1), (24, 1)]), negative rdx refs=0`。
 - PE 依存の数値 (slot アドレス・slot 9 本体の 83 insn / call 14 件) は素材未展開のため本 run では再測定していない (前回 run の値・未検証)。
