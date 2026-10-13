@@ -3,7 +3,8 @@
 **判定: 受入条件達成 (測定は完了し n=3 で記録)。ただし結論は 1 関数のみ判定可能で、806740 と 666a60 は両側で比較不能 (unexec)。**
 親: #509 (LD-9) / REPORT_509.md §6 の起票依頼 5。前任の動的確認 (REPORT_509.md §4.4) は wasm 直接呼びで、liftdiff (native PE 比較) は未実施だった。
 
-検証起点: `061eadd6` (本 PR の HEAD)。再現: `FL_WIN64_DIR=<fl-win64 展開先> bash tools/m11/ldfix/ls737_liftdiff.sh`。
+実測の起点: `061eadd6` (`ls737_liftdiff.sh` を追加した commit。§3 の実測はこの版で取得)。以降 `fb9c6f48` は本 REPORT のみを追加し、`tools/` のコードは `061eadd6` と同一。再現: `FL_WIN64_DIR=<fl-win64 展開先> bash tools/m11/ldfix/ls737_liftdiff.sh`。
+HEAD 上での再実行 (verdict 行の貼り付け) は、素材 (`toolchain-emsdk` / `work-m11` / `work-liftdiff`) が揃う run で行うまで未実施。本 run では `fl-win64` のみ存在した (§7)。
 
 ## 1. 結論 (受入条件別)
 
@@ -57,3 +58,9 @@
 | `tools/m11/ldfix/REPORT_737.md` | 本書 |
 
 生成物 (`tools/liftdiff/work/`) は gitignore 対象で commit しない。
+
+## 7. 再実行の状況 (fix run)
+
+- 本 run (差し戻し対応) の `ARTIFACTS_DIR` には `fl-win64.tar.zst` のみ。`toolchain-emsdk`・`work-m11`・`work-liftdiff` は無く、`ls737_liftdiff.sh` は `test -f` で停止する。
+- そのため本 run では §3 を再実行していない。§3 の数値は PR 作成時の run の記録 (本 fix run では未検証。ログは gitignore 対象の work/ 配下で commit されていない)。
+- 次の再実行は、PR 本文の単独行 `oc_artifacts: fl-win64 toolchain-emsdk work-m11 work-liftdiff` で素材を揃えた run で行い、verdict 行をここに貼る。

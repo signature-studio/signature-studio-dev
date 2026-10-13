@@ -4,7 +4,7 @@
 #   修復前 IR = work-m11 の boot_final2.ll (ldfx 名 0 件) の上に、修復後 IR (boot_final3.ll) の
 #   3 関数だけを boot_final2 の本体で差し替えたもの。他の関数は修復後と同一。
 # 素材: oc_artifacts: fl-win64 toolchain-emsdk work-m11 work-liftdiff + python (numpy capstone pefile)
-#   FL_WIN64_DIR = fl-win64 の展開先 (中に extracted/block00031_PE.bin)。EMSDK は /opt/emsdk。
+#   FL_WIN64_DIR = fl-win64 の展開先 (中に extracted/block00031_PE.bin)。EMSDK は docs/REFERENCES.md の [EMSDK]。
 # 使い方: FL_WIN64_DIR=<展開先> bash tools/m11/ldfix/ls737_liftdiff.sh
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
