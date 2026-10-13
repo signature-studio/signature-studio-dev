@@ -7,5 +7,5 @@ set +u; . "${EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}" >/dev/null 2>&1 || true; set -
 command -v node >/dev/null || { echo "node not found" >&2; exit 2; }
 command -v google-chrome >/dev/null || [ -n "${CHROME_BIN:-}" ] || { echo "google-chrome not found" >&2; exit 2; }
 (cd "$GUI" && "$ROOT/node_modules/.bin/tsc" -p tsconfig.json)
-node --test "$HERE/dirty.test.mjs" 2>&1 | grep -E "^# (tests|pass|fail)"
+node --test "$HERE/dirty.test.mjs" 2>&1 | grep -E "^(# |ℹ )(tests|pass|fail)"
 node "$HERE/present_e2e.mjs"
