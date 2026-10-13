@@ -1,12 +1,12 @@
-# tools/plugins/synth/REPORT_APPENDIX.md — #534: C++ x64 DLL 9 本の `emcc -c` (現 HEAD 実測)
+# tools/plugins/synth/REPORT_APPENDIX.md — #534: C++ x64 DLL 9 本の `emcc -c` (cf9bf765 の run の転記)
 
 - 本書は REPORT.md (250 行上限) の付録。 結論は REPORT.md §0-4 と §5 を見る。
 - 再現: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/plugins/synth/cpp_lift.sh <block>` (出力は `tools/plugins/work/synth/cpp<block>/`。 `HLL_CAP` の既定 300 s)
-- 素材: `fl-win64` / `toolchain-emsdk` / `toolchain-retdec` (`docs/WORKFLOW.md` §11)。 本測定の run で 3 つとも `$HOME/artifacts` に実在し、`tar --zstd -xf` で展開して使用した。
+- 素材: `fl-win64` / `toolchain-emsdk` / `toolchain-retdec` (`docs/WORKFLOW.md` §11)。 数値は cf9bf765 の run で取得した実測の転記。 その run の素材は fl-win64 / toolchain-emsdk / toolchain-retdec。 run ID は本 runner に記録が無く不明。 測定ログは本 runner に残っておらず、再測定は未実施 (fix run の runner には emcc / `/opt/emsdk` / `/opt/retdec` も無い)。
 
-## A. 現 HEAD の実測 (`cpp_lift.sh`、既定 `PLUG_AVX256=0`)
+## A. cf9bf765 の run の実測 (`cpp_lift.sh`、既定 `PLUG_AVX256=0`)
 
-測定: 上 8 本 (Morphine 以外) は変更前の script で 3 本並列 (`xargs -P 3`)、総経過 409 s。 Morphine (23944) は変更後の再開経路 (§B) で別測定し、lift 秒 89 (表の値と §B の値は同じ)。
+測定: 上 8 本 (Morphine 以外) は変更前の script で 3 本並列 (`xargs -P 3`)、総経過 409 s。 Morphine (23944) は変更後の再開経路 (§B) で別測定。 Morphine の lift 秒 89 は cf9bf765 の表 (78 s) と本文 (90 s) が食い違っていたため 00cb8af8 で 89 s に統一した値で、元のログは残っておらず出典は照合できない (未確認値)。
 
 | DLL | block | `.pdata` 関数 | define | 欠落 define | 未実装 helper | i256 trap | f80 関数 | `emcc -c` rc | lift 秒 | 最初のエラー |
 |---|--:|--:|--:|--:|--:|--:|--:|--:|--:|---|
@@ -29,7 +29,7 @@
 
 - `cpp_lift.sh` の旧再開経路は `sed` で `lift_ranges.sh` から RetDec 行だけを削っていたが、削除範囲が `if/else/fi` を壊し、`lift_resume.sh: line 49: syntax error` で落ちていた (旧 Morphine 23944 は lift_rc 2)。
 - 修正: `sed` を止め、`PLUG_REUSE_DRC=1` で既存 `e.drc.ll` から `lift_ranges.sh` を再開する (RetDec を飛ばす既存の仕組み)。 kill は `pkill -f` を止め、`pgrep -f` で得た PID を個別に `kill` する。
-- 検証: `RESUME=1 bash synth/cpp_lift.sh 23944 2400` → lift_rc 0 / emcc_c_rc 0 / lift 秒 89 (表 A と同値)。 通常経路 (HLL 段を最後まで回す) の実測は未実施。
+- 検証 (cf9bf765 の run の転記): `RESUME=1 bash synth/cpp_lift.sh 23944 2400` → lift_rc 0 / emcc_c_rc 0 / lift 秒 89 (表 A と同値。 cf9bf765 の本文は 90 s、表は 78 s だった。 出典は未確認)。 通常経路 (HLL 段を最後まで回す) の実測は未実施。
 
 ## C. 未解決 (起票先)
 
