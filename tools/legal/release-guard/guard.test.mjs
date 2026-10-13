@@ -121,7 +121,7 @@ test("CLI: 違反=exit 6 / クリーン=exit 0 / deny-list 無し=exit 4 / 対�
 test("deploy 05-stage: 違反 dist は exit 6 で stage せず / --skip-release-guard でのみ通過 / deny-list 無しは exit 4", () => {
   const stage = path.resolve(import.meta.dirname, "../../../deploy/scripts/05-stage.mjs");
   const env = { RELEASE_GUARD_DENYLIST: dlDir, RELEASE_GUARD_ALLOWLIST: path.join(tmp, "none.json") };
-  const s = (src, out, extra = [], e = env) => spawnSync("node", [stage, "--src", src, "--out", out, ...extra], { encoding: "utf8", env: { ...process.env, ...e } });
+  const s = (src, out, extra = [], e = env) => spawnSync("node", [stage, "--src", src, "--out", out, "--skip-notices-gate", ...extra], { encoding: "utf8", env: { ...process.env, ...e } });
   put("d7/index.html", "<html></html>");
   put("d7/blob.dat", FL2);
   const bad = s(path.join(tmp, "d7"), path.join(tmp, "out-bad"));

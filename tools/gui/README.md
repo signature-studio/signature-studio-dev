@@ -17,3 +17,4 @@ FL の GUI (Win32 user32/gdi32 経由のウィンドウ・メッセージルー�
 P1 50 名 (CAB-159) の意味論: [PROTOCOL.md §11](PROTOCOL.md)。unit テスト `test/selftest_p1.inc` (selftest 314 assertion) と `python3 tools/gui/integ/check_p1_tests.py` (実装+テスト呼出の機械検査)。
 
 shimx 共存 (#172 SHX-T5): `bash tools/gui/shimx_coexist/coexist.sh` (weak/強定義の共存リンク + ShellExecute→`window.open` / GetOpen・SaveFileName→File System Access / Drag&Drop の host 呼出路。結果は [shimx_coexist/REPORT.md](shimx_coexist/REPORT.md))。
+GUI-4 (#180) present (WebGL2 / dirty 複数矩形 / rAF 同期 / seqlock): `bash tools/gui/present/e2e.sh` (FL・lift・wasm 不要の模擬 guest で golden 画素一致・tearing・bench; 結果は REPORT §9)。方式は `GuiPresentOptions` (`src/runtime/gui_renderer.ts`)、仕様は [PROTOCOL.md §4](PROTOCOL.md)。

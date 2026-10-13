@@ -87,6 +87,19 @@ int surf_view(int id, SurfView *v) {
   v->px = g_surf_ptr[id]; v->stride = (int)s->stride; v->w = (int)s->w; v->h = (int)s->h; v->gen = s->gen;
   return 1;
 }
+/* seqlock (GUI-4): host が surface 画素を読むときの tearing 検出用。奇数 = flush 後に shim が画素へ書込み中/書込み済み (未 flush)、
+ * 偶数 = 静止。書込み前に begin (偶数→奇数)、PRESENT を push する前に end (奇数→偶数)。host は読出し前後で同じ偶数値を確認する。 */
+void surf_wseq_begin(int id) {
+  if (id < 0 || id >= (int)GUI_MAX_SURF) return;
+  uint32_t *w = &gui_sh()->surf[id].wseq;
+  uint32_t cur = __atomic_load_n(w, __ATOMIC_RELAXED);
+  while (!(cur & 1)) if (__atomic_compare_exchange_n(w, &cur, cur + 1, 0, __ATOMIC_SEQ_CST, __ATOMIC_RELAXED)) break;
+}
+static void surf_wseq_end(int id) {
+  uint32_t *w = &gui_sh()->surf[id].wseq;
+  uint32_t cur = __atomic_load_n(w, __ATOMIC_RELAXED);
+  while (cur & 1) if (__atomic_compare_exchange_n(w, &cur, cur + 1, 0, __ATOMIC_SEQ_CST, __ATOMIC_RELAXED)) break;
+}
 static void out_cmd(uint32_t cmd, uint32_t surf, uint32_t a, uint32_t b, uint32_t c, uint32_t d, uint32_t e) {
   uint32_t rec[8] = { cmd, surf, a, b, c, d, e, 0 };
   gui_out_push(rec);
@@ -115,6 +128,7 @@ void surf_flush(void) {
   g_any_dirty = 0; g_last_flush = gui_now_ms();
   int any = 0;
   uint32_t seq = sh->present_seq + 1;
+  for (int i = 0; i < (int)GUI_MAX_SURF; i++) if (sh->surf[i].state) surf_wseq_end(i);   /* PRESENT を見た host が読む前に静止を宣言 */
   for (int i = 0; i < (int)GUI_MAX_SURF; i++) {
     if (!g_hasdirty[i]) continue;
     g_hasdirty[i] = 0;
@@ -173,6 +187,7 @@ static void surf_resize(int id, int w, int h) {
   if ((uint32_t)w == s->w && (uint32_t)h == s->h) return;
   uint32_t *np = (uint32_t *)malloc((size_t)w * h * 4);
   for (size_t k = 0; k < (size_t)w * h; k++) np[k] = 0xFF000000u;
+  surf_wseq_begin(id);
   uint32_t *op = (uint32_t *)g_surf_ptr[id];
   int cw = (int)(s->w < (uint32_t)w ? s->w : (uint32_t)w), ch = (int)(s->h < (uint32_t)h ? s->h : (uint32_t)h);
   for (int y = 0; y < ch; y++) memcpy(np + (size_t)y * w, op + (size_t)y * s->w, (size_t)cw * 4);

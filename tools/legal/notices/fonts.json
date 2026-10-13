@@ -1,0 +1,656 @@
+{
+ "schema": 1,
+ "source": "FL Studio win64 file list (extracted/block25163_DATA.bin)",
+ "excluded": [
+  "System/Tools/LilyPond/** (GPL ツール。同梱しない: docs/LEGAL.md §3.2)"
+ ],
+ "files": [
+  {
+   "path": "Artwork/Fonts/Cuprum/Cuprum.ttf",
+   "size": 195052,
+   "status": "license-text",
+   "licenseFile": "OFL.txt"
+  },
+  {
+   "path": "Artwork/Fonts/Francois One/FrancoisOne.ttf",
+   "size": 113128,
+   "status": "license-text",
+   "licenseFile": "OFL.txt"
+  },
+  {
+   "path": "Artwork/Fonts/Fruity microfont.ttf",
+   "size": 20072,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Help/fonts/ILGlyphsEx.eot",
+   "size": 95750,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Help/fonts/ILGlyphsEx.otf",
+   "size": 95508,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Help/fonts/ILGlyphsEx.ttf",
+   "size": 95544,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Help/fonts/ILGlyphsEx.woff",
+   "size": 53628,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/_default.ttf",
+   "size": 217276,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/04b03_COMP_MAT-Regular.ttf",
+   "size": 29064,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Abeganshi-Shadow.zfo",
+   "size": 17140,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Abeganshi.zfo",
+   "size": 23856,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Acens.ttf",
+   "size": 29060,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/American-Captain.ttf",
+   "size": 79484,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Antaris.ttf",
+   "size": 169660,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/AnthoniSignature-Bold.zfo",
+   "size": 124748,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Audiowide-Regular.zfo",
+   "size": 47616,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/BAD GRUNGE.zfo",
+   "size": 109864,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/BadScript-Regular.zfo",
+   "size": 50768,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Bangers-Regular.zfo",
+   "size": 95664,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Barlow-Medium.ttf",
+   "size": 89352,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Barriecito-Regular.zfo",
+   "size": 271812,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Behofeel Script.zfo",
+   "size": 239324,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Bevan-Regular.ttf",
+   "size": 90500,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Bright Script Base.zfo",
+   "size": 93260,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/BrightScript.zfo",
+   "size": 603804,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/BungeeInline-Regular.zfo",
+   "size": 174356,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/CevicheOne-Regular.zfo",
+   "size": 35576,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Chosence-Bold.ttf",
+   "size": 23704,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Chosence-Regular.ttf",
+   "size": 23528,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Cold Climate.zfo",
+   "size": 154880,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Coming Soon.ttf",
+   "size": 59136,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/CoveredByYourGrace-Regular.zfo",
+   "size": 49828,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Cuprum.ttf",
+   "size": 195052,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Dosis-Bold.ttf",
+   "size": 136412,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Dosis-ExtraBold.ttf",
+   "size": 137200,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Dosis-ExtraLight.ttf",
+   "size": 135140,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Dosis-Light.ttf",
+   "size": 136376,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Dosis-Medium.ttf",
+   "size": 136444,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Dosis-Regular.ttf",
+   "size": 136940,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Dosis-SemiBold.ttf",
+   "size": 135520,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Dot Com.ttf",
+   "size": 52372,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/EastSeaDokdo-Regular.zfo",
+   "size": 3177240,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/FasterOne-Regular.zfo",
+   "size": 43340,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/FrancoisOne.ttf",
+   "size": 113128,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/FugazOne-Regular.zfo",
+   "size": 25976,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Histeria Slant.zfo",
+   "size": 111384,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Holland.zfo",
+   "size": 110304,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Italianno-Regular.ttf",
+   "size": 137364,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/JosefinSans-SemiBold.ttf",
+   "size": 33004,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Kalam-Regular.zfo",
+   "size": 427336,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Khand-Bold.zfo",
+   "size": 336420,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Khand-Light.ttf",
+   "size": 302284,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Khand-Medium.zfo",
+   "size": 307552,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Khand-Regular.zfo",
+   "size": 297792,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Khand-SemiBold.zfo",
+   "size": 331012,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Lobster-Regular.ttf",
+   "size": 406076,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Milkstore02-Clean.zfo",
+   "size": 22520,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Milkstore03-Textured.zfo",
+   "size": 156716,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Monoton-Regular.zfo",
+   "size": 49904,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/NothingYouCouldDo-Regular.zfo",
+   "size": 31964,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/NovaFlat-Regular.zfo",
+   "size": 92036,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/NovaMono.ttf",
+   "size": 302380,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Orbitron-Black.ttf",
+   "size": 37460,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Orbitron-Bold.ttf",
+   "size": 38424,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Orbitron-Bold.zfo",
+   "size": 44380,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Orbitron-Medium.ttf",
+   "size": 39596,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Orbitron-Regular.ttf",
+   "size": 39308,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/ornamentsFont.ttf",
+   "size": 51996,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Oswald-Light.ttf",
+   "size": 44740,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/PeaxDrawnIcons.ttf",
+   "size": 134704,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/PermanentMarker-Regular.zfo",
+   "size": 73620,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/PT_Sans-Narrow-Web-Regular.ttf",
+   "size": 396212,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/PT_Sans-Web-Regular.ttf",
+   "size": 442960,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/RacingSansOne-Regular.zfo",
+   "size": 130080,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Raleway-Black.ttf",
+   "size": 180592,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Raleway-Bold.ttf",
+   "size": 179244,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Raleway-Regular.ttf",
+   "size": 178520,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Raleway-Thin.ttf",
+   "size": 177572,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Revalia-Regular.ttf",
+   "size": 63056,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Roboto-Thin.ttf",
+   "size": 130044,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/RockSalt-Regular.zfo",
+   "size": 119304,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Share-Regular.ttf",
+   "size": 91940,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/SigmarOne-Regular.zfo",
+   "size": 166448,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Signatrue alt.zfo",
+   "size": 35064,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Signatrue.zfo",
+   "size": 35352,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/sosa.ttf",
+   "size": 40292,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/timeburnerbold.ttf",
+   "size": 62080,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/timeburnernormal.ttf",
+   "size": 62784,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/Ubuntu-R.ttf",
+   "size": 353824,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/UbuntuCondensed-Regular.ttf",
+   "size": 350420,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/UnicaOne-Regular.zfo",
+   "size": 37104,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/UnifrakturMaguntia-Regular.zfo",
+   "size": 82536,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/VampiroOne-Regular.zfo",
+   "size": 27324,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Effects/ZGameEditor Visualizer/Effects/HUD/fonts/WesttgoniaBarneh.zfo",
+   "size": 63520,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Plugins/Fruity/Generators/FL Studio Mobile/Installed/Fonts/OpenSans_SemiCondensed-SemiBold.ttf",
+   "size": 130856,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Shared/Artwork/Fonts/04b03_COMP_MAT-Regular.ttf",
+   "size": 29064,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Shared/Artwork/Fonts/American-Captain.ttf",
+   "size": 79484,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Shared/Artwork/Fonts/Antaris.ttf",
+   "size": 169660,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Shared/Artwork/Fonts/Barlow-Bold.ttf",
+   "size": 102940,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Shared/Artwork/Fonts/Barlow-ExtraLight.ttf",
+   "size": 97076,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Shared/Artwork/Fonts/Barlow-Medium.ttf",
+   "size": 89352,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Shared/Artwork/Fonts/Barlow-Regular.ttf",
+   "size": 98812,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Shared/Artwork/Fonts/Barlow-SemiBold.ttf",
+   "size": 103016,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Shared/Artwork/Fonts/Barlow-Thin.ttf",
+   "size": 96292,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Shared/Artwork/Fonts/Chosence-Bold.ttf",
+   "size": 23704,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Shared/Artwork/Fonts/Chosence-Regular.ttf",
+   "size": 23528,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Shared/Artwork/Fonts/Cuprum.ttf",
+   "size": 195052,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Shared/Artwork/Fonts/FrancoisOne.ttf",
+   "size": 113128,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Shared/Artwork/Fonts/Italianno-Regular.ttf",
+   "size": 137364,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Shared/Artwork/Fonts/JosefinSans-SemiBold.ttf",
+   "size": 33004,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Shared/Artwork/Fonts/Khand-Light.ttf",
+   "size": 302284,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Shared/Artwork/Fonts/OpenSans-CondBold.ttf",
+   "size": 264372,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Shared/Artwork/Fonts/OpenSans-CondLight.ttf",
+   "size": 221108,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Shared/Artwork/Fonts/OpenSans-Light.ttf",
+   "size": 222412,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Shared/Artwork/Fonts/OpenSans-Regular.ttf",
+   "size": 217360,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Shared/Artwork/Fonts/OpenSans-Semibold.ttf",
+   "size": 221328,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Shared/Artwork/Fonts/Orbitron-SemiBold.ttf",
+   "size": 24400,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Shared/Artwork/Fonts/ornamentsFont.ttf",
+   "size": 51996,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Shared/Artwork/Fonts/Oswald-Light.ttf",
+   "size": 44740,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Shared/Artwork/Fonts/PT_Sans-Narrow-Web-Regular.ttf",
+   "size": 396212,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Shared/Artwork/Fonts/PT_Sans-Web-Regular.ttf",
+   "size": 442960,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Shared/Artwork/Fonts/Revalia-Regular.ttf",
+   "size": 63056,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Shared/Artwork/Fonts/RobotoCondensed-Light.ttf",
+   "size": 160800,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Shared/Artwork/Fonts/RobotoCondensed-Regular.ttf",
+   "size": 159868,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Shared/Artwork/Fonts/Share-Regular.ttf",
+   "size": 91940,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Shared/Artwork/Fonts/Ubuntu-R.ttf",
+   "size": 353824,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Shared/Artwork/Fonts/UbuntuCondensed-Regular.ttf",
+   "size": 350420,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "Shared/Artwork/Fonts/WebSymbols-Regular.otf",
+   "size": 28824,
+   "status": "origin-unverified"
+  },
+  {
+   "path": "System/Tools/BeatSlicer/HOOG0555.TTF",
+   "size": 47508,
+   "status": "origin-unverified"
+  }
+ ]
+}
