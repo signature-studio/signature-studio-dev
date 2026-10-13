@@ -147,6 +147,7 @@ RetDec 出力の欠陥と修復 (対照実験 `lift/gain_ablate.sh` で各々が
 ## 11. FA-5: SlateCore ⇄ HeartCore の snapin 実装同一性 (#52, 機械語比較)
 
 - 再現: `bash tools/targets/freshair/ks_identity.sh [outdir]` (素材 = `work-liftlib-targets` の SlateCore / HeartCore。下の 3 スクリプトを直列実行)。比較は **正規化後の完全一致** のみ (類似度は参考)。
+- 最大値の基準: 11-1 の「最大 Compressor 0.436・Gain 0.475」は、process 候補 37 件のうち **TapeStop (M 1.000・9 B の stub) と HostProxy (M 0.750・41 B)** を除いた中での最大。両者は実体の小さい関数で、類似度が高くても process 比較の代表にならないため除外した。全 37 件の最大は TapeStop 1.000 → HostProxy 0.750 → Gain 0.475 の順 (`ident.json` の `process_pair.ratio_M`)。
 - 正規化 (`ks_identity.py` の `Pe.norm`): **E** = call/jmp 先・`[rip+disp]`・イメージ内絶対アドレス即値だけを抽象化 (構造体 offset・即値・レジスタは残す) / **R** = E から数値をすべて落とす (レジスタ名は残す) / **M** = mnemonic 列のみ。類似度 = difflib ratio。関数境界は .pdata (CHAININFO 連続チャンク併合)。
 
 ### 11-1. 結果 (実測)
@@ -159,7 +160,7 @@ RetDec 出力の欠陥と修復 (対照実験 `lift/gain_ablate.sh` で各々が
 | 全 .pdata 関数 (≥12 命令) の E ハッシュ照合 | KH 87,227 関数 / SC 18,027 関数 → 共通ハッシュ **829**・SC 側 **1,679 関数 / 218,520 B** (SC の ≥12 命令関数合計 17,203,480 B の 1.3%) |
 | Fresh Air DSP closure (FreshAirDsp + Gain + Filter + Compressor 全 slot からの direct call 到達, 177 関数 / 68,389 B) のうち KH と E 一致 | **63 関数 / 21,740 B (31.8%)**。一致する側は powf `0x18103fd60`⇄KH `0x180fc3640` (3,782 B)・pow `0x181046890`⇄`0x180fc4590` (5,777 B)・FMA 数学 lib・allocator/CRT 等の **共通基盤**。process 本体は 0 本 |
 | 上記 63 関数のうち KH 側 VA が `snapins.json` の lift VA に出現 | 49 本 (VA の 9 桁 hex 文字列一致の粗い判定。複数 KH 関数が同一ハッシュになる SC 関数が 7 本ある) |
-| 上記 63 関数の `.rdata` 定数 (rip 参照先先頭 16 B) | 参照なし 35 / 一致 8 / **不一致 20**。コードが一致しても参照先定数が違う関数がある |
+| 上記 63 関数の `.rdata` 定数 (rip 参照先先頭 16 B) | 参照なし 35 / 一致 8 / **不一致 20**。コードが一致しても参照先定数が違う関数がある (内訳は下の 11-3) |
 
 実測: `ks_identity.sh` 全体 55.5 s (n=1・nproc=4・load average 0.59 → 0.84)、個別は identity 5.0 s / census 31.8 s / closure_share 18.2 s。コミット済み HEAD (`1465257`) で再実行し 3 本の JSON が直前の実行と byte 一致 (決定的)。
 
@@ -167,7 +168,23 @@ RetDec 出力の欠陥と修復 (対照実験 `lift/gain_ablate.sh` で各々が
 
 - **1 回の lift で両対象に効く範囲 = 共通基盤のみ** (SC DSP closure の 31.8% / 21,740 B)。snapin ごとの process は SlateCore と HeartCore で別ビルドの機械語で、既存 KH lift (`tools/targets/kilohearts/snapins/`) の IR/wasm を SlateCore に流用することはできない (Gain は SC 側も別途 lift 済み = §5)。
 - ID の一致 (§1) は **製品 ID・クラス名・17/20 slot の vtable 形が同系統** であることまで。実装同一性は本節で「機械語レベルでは同一でない」と確定。
-- **未検証**: ① 機械語が違っても **意味が同一か** (state 配置を揃えた差分実行 = 同じ入力で SC/KH の native 出力が bit 一致するか) は未実施。Gain は ramp + 2 乗平均メータの同型 (§5 / kilohearts REPORT §6) で、意味同一の蓋然性は高いが測っていない。② `.rdata` 不一致 20 本が定数差か参照先の配置差かは未分類。③ 直接 call のみ追跡 (間接 call は辿らない = closure は下限)。
+- **未検証**: ① 機械語が違っても **意味が同一か** (state 配置を揃えた差分実行 = 同じ入力で SC/KH の native 出力が bit 一致するか) は未実施。Gain は ramp + 2 乗平均メータの同型 (§5 / kilohearts REPORT §6) で、意味同一の蓋然性は高いが測っていない。② `.rdata` 不一致 20 本の分類は 11-3 (一部は未確定)。③ 直接 call のみ追跡 (間接 call は辿らない = closure は下限)。
+
+### 11-3. `.rdata` 不一致 20 関数の分類 (`ks_rdata_class.py`)
+
+`ks_closure_share.py` の `differ_vas` (20 関数) について、rip 相対で参照する `.rdata` 先頭 16 B の参照列を SC/KH で対にして分類した (再現: `ks_rdata_class.py <KH> <SC> <share.json> <out.json>`)。
+
+| 分類 | 件数 | 判定の定義 |
+|---|---|---|
+| `value` | 17 | 参照数は同じで、内容の違う参照のうち **image 範囲の絶対アドレスを含まない** もの |
+| `ptr` | 3 | 内容の違う参照に image 範囲 (`base`〜`img_hi`) 内の 8 B 値を含むもの |
+| `count` / `order` | 0 / 0 | — |
+
+- **未確定**: `value` 17 件は「定数値の差」とは断定できない。差分語 (計 70 語、`value` 側も含む) を抽出すると、ASCII 文字列 (`0x7420726f74636576` = "vector t" 等 = 文字列リテラルの断片) や、上位 32 bit が 0 の値 (例 `0x3b3f5000000000`・`0xf880d000000000`) が混じる。`value` の 17 件は「文字列リテラル (型名・メッセージ) の断片」か「定数テーブルの別要素」の可能性がある。どちらかの切り分けは未実施。
+- 注: `ptr` 判定 (`has_abs_ptr`) は 8 B 整列の値だけを見るため、差分が 4 B 境界にずれた場合は取りこぼす。分類は下限。
+- `ptr` 3 件 (`0x180cb5ef0`・`0x18100ca5c`・`0x181066558`) は、参照先が配置差に依存する絶対アドレスを含むため、定数差ではなく配置差由来と読むのが妥当 (これも未検証)。
+- したがって「定数が違う関数がある」は事実だが、「意味が違う」の根拠にはならない。意味同一性は ① の差分実行で判定する (未実施)。
+- 起票先: ① の意味同一性と `value` 17 件の中身 → #52 (本 issue の残件)。
 
 ## 12. FA-9: 制御層 setter 経路 (0x180c9d700 → 0x180ca1480 → 0x180da6c00) の実経路測定 (#665, Refs #648 #452)
 
