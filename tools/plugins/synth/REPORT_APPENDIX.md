@@ -44,7 +44,8 @@
 - 測定 commit: **f3ffd7ba** (= origin/main 取り込み後の HEAD)。`git diff f3ffd7ba HEAD -- tools/plugins ':!tools/plugins/synth/REPORT_APPENDIX.md'` は 0 行 (REPORT_APPENDIX.md を除くコード範囲の差分 0)。
 - 測定コマンド: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP HLL_CAP=100000000 bash tools/plugins/synth/cpp_lift.sh 23944 2400`。
   `HLL_CAP` を 1e8 秒にして HLL 段の kill 判定が発火しないようにした (= kill 無しの通常経路)。`timeout 2280` で包んで実行。
-- 所要時間: 壁時計 14 分 27 秒 (23:03:30 開始 → 23:17:57 終了、`date` 実測)。lift 秒 **854** (summary.csv)。RetDec 内訳は `e.retdec.log`: IR 出力 (`e.drc.ll` 最終更新 23:04:24 = 開始から約 54 s)、C 生成 (HLL) 段 685 s、finalization 762 s。
+- 所要時間: 壁時計 14 分 27 秒 (23:03:30 開始 → 23:17:57 終了、`date` 実測)。lift 秒 **854** (summary.csv)。
+- RetDec の段別内訳 (IR 出力 / HLL 段 / finalization の秒数) は **未確認**。測定時の `e.retdec.log` は残っておらず (作業ツリー・`$RUNNER_TEMP`・`$ARTIFACTS_DIR` のいずれにも無い)、段別の秒数は記載しない。
 - load: 実行終了時 `1.07 1.02 0.74`、測定後 `0.71 0.93 0.72`。
 - 結果 (summary.csv): `23944,3050,0,3321,0,52,24,0,0,0,854,1,61,0,271,3320,0`
 
