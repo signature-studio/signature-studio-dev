@@ -69,7 +69,7 @@
 
 ## 6. 検証 (規則 36〜41・45)
 
-実行はコミット済み HEAD (`ff9827a`) で行い §6.3 に記録する (作業ツリー変更なし)。
+実行はコミット済み HEAD (`d238c27`) で行い §6.3 に記録する (作業ツリー変更なし)。
 
 ### 6.1 負律対照 (規則 41・実測)
 | # | 操作 | 結果 |
@@ -85,18 +85,18 @@
 - 製品 id ↔ ctor の 1:1 対応は「id を持つ関数の最近傍」ヒューリスティクス (§2)。RTTI クラス名の 47/47 同定とは独立で、製品名の対応は一部 (`Matrix`=kscm 等) クラス名からの読み替え。
 - native oracle (ctx-fuzz) との bit 突合は未実施。
 
-### 6.3 実測 (コミット済み HEAD `ff9827a` で `bash run_all.sh` を単発実行)
+### 6.3 実測 (コミット済み HEAD `d238c27` で `bash run_all.sh` を単発実行。以降の差分は本節の docs のみ)
 | 項目 | 結果 |
 |---|---|
-| 所要時間 | **49 s** (xref 走査キャッシュ・RetDec stage-0 キャッシュ有り。実行環境 nproc=4) |
-| load average (1/5/15 分) | 開始 0.17 / 0.44 / 0.33 → 終了 0.64 / 0.52 / 0.36 |
+| 所要時間 | **49 s** (同 run の直前に実行した初回 (キャッシュ無し・HEAD `9b6e379` + 未コミット差分) は **5 分 06 s** (07:10:12〜07:15:19、xref 全走査含む)。本実測は xref・RetDec stage-0 キャッシュ有り。nproc=4) |
+| load average (1/5/15 分) | 開始 0.12 / 0.60 / 0.43 → 終了 0.69 / 0.68 / 0.47 |
 | exit | **0** |
 | lic_check (module A/B) | ok=70 |
 | snapin 6 種 base/lic | **200/200 × 12 系** bit-exact (matrix 1149 / gain 999 / haas 1100 / clipper 1100 / gate 999 / quickeq 999 call。全 call 一致) |
 | em / empoll (module E) | 200/200 (700/700 call) / 1000/1000 (10,000/10,000 call) bit-exact |
 | em_check | ok=52 ng=0 |
 | emfire (情報提供・既知未解決) | 0/200 (ctor/register 400/600 call 一致、fire 0/200)。KH11_REPORT §2 と同じ。run_all.sh の exit には影響しない |
-| module F (本チケット) | 6 関数 lift・wasm 47,604 B・undefined import 0・`kh249_check` ok=11 ng=0 |
+| module F (本チケット) | 6 関数 lift・wasm 47,604 B・undefined import 0・`kh249_check` ok=17 ng=0 |
 | ctor 同定 | callers=47 rtti_resolved=47 |
 
 初回実行 (HEAD `da081d5`) は `run_all.sh` が exit=0 だったが matrix/clipper が `null/null` だった (§8)。上表は修正後 HEAD の再実行値。
