@@ -21,7 +21,7 @@
  ],
  "util_window": {
   "fn": "function_52a7f0",
-  "ret": "0x0",
+  "ret": "0x1100010",
   "err": null
  },
  "windows": [
@@ -51,7 +51,7 @@
  "abi": {
   "gui_shared_ptr": 271677568,
   "gui_shared_ptr_ge_0x10000": true,
-  "screen_dc": "0x1200010",
+  "screen_dc": "0x1200011",
   "screen_dc_in_31bit": true
  },
  "reach": [
@@ -65,7 +65,7 @@
   {
    "order": 2,
    "name": "RegisterClassW",
-   "calls": 2,
+   "calls": 3,
    "kind": "IMPL",
    "prio": "0"
   },
