@@ -171,11 +171,18 @@ LD-17 (#864) の型分類は `results/m11_unreachable_diverge.md` §2 (同じス
 - 結論: 型 C・D の食い違いは原因候補 (P1・P2・P3) に分類した。P2 は L が F の直接 call 先であることを条件に含む。内訳は results 参照。
 - P2 の代表例 0x418be0 (呼出元 0x41c820) は P2 候補に分類した。IR 側 (`call 0x407030` の欠落) は再確認していない。call site と IR block の対応づけは未実施。
 - P2 の全 20 件で F→L の直接 call 辺 (`L ∈ direct_calls(F)`) が成立することを PE 実測で確認した。
-- `results/m11_unreachable_cd.md` は現コードの出力と一致 (入力 work-m11 / work-liftdiff で再生成して確認。コード HEAD 516a2b07 で exit 0・16.56 s・diff 0 行)。
+- **測定 commit = `516a2b07`** (本節の数値はこの commit での実測)。`results/m11_unreachable_cd.md` はその commit の出力と一致 (入力 work-m11 / work-liftdiff で再生成し exit 0・16.56 s・diff 0 行)。この測定は前回 run の記録で、本 fix run では素材が無く再実行していない。コードを変えた最後の commit は `8119565c` (P2 の F→L 辺の要求)。
+- **鮮度 (#1268・`docs/WORKFLOW.md` §6)**: 測定 commit からの、測定に使う 3 ファイルの差分。
+  ```
+  $ git diff 516a2b07 HEAD -- tools/liftdiff/ldlib/pe.py tools/liftdiff/tests/trace_diverge_cd.py tools/liftdiff/results/m11_unreachable_cd.md
+  (出力 0 行)
+  ```
+  同じ 3 ファイルは `8119565c` から `516a2b07` の間も差分 0 行。以後の commit は REPORT・PR 本文のみ。
 - P2 の全 20 件で `L ∈ direct_calls(F)` が成立 (同一 PE・同一入力で 20/20 を確認)。
 - 候補判定は call 先の集合差分のみ。P1・P2 は候補であり確定ではない。
 - **0x417b70 (LD-28 受入条件 1・静的確認のみ、動的未確認)**: 食い違い 32 件の次 entry は native 側 0x409470 (18)・0x409410 (11)・0x418190 (3)、wasm 側 0x409730 (17)・0x409410 (15)。
-  L の機械語は `417c56: idiv qword ptr [rbp+0x60]` (符号付き除算) だが、IR は `%29 = udiv i64 %28, %arg4` (符号なし)。
+  L の機械語は `417c56: idiv qword ptr [rbp+0x60]` (符号付き除算、直前の `cqo` で符号拡張)。機械語は `block00031_PE.bin` (RVA `0x17c56`, ImageBase `0x400000`) で確認。
+  IR は `%29 = udiv i64 %28, %arg4` (符号なし) と前回 run で記録したが、**`boot_final3.ll` の行番号は未確認** (素材 `work-m11` が無く、本 fix run では再照合していない)。
   その直後の `icmp eq %29, %27` が偽のとき `call 0x409730; unreachable` へ進む。stride×count が負で count > 0 なら、符号付き除算は stride を返すが符号なし除算は一致しない。
   手計算の数値例 (積の符号のみ): −16×2 (count 2)、−32×4、−8×3 で udiv は stride を返さず、idiv は返す。
   仮説: 32 件の一部は、この udiv が trap 経路 (0x409730) を誤って取ることで生じる。**未確認**: 32 件の stride 符号・経路の実測、および sdiv への修正後に食い違いが消えるかの再実行。
