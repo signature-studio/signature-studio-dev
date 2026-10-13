@@ -50,15 +50,19 @@ RetDec の CFG 復元 (jcc の終端化) と命令翻訳 (フラグ) のどち�
 
 4 構成の build + survey を各 1 回、計 3 回実行。構成: base = `8d883c3` の `m11_ov.c` + guard 無効 / cur = 現 `m11_ov.c` (8c7710 転記) + guard 無効 / fix = cur + guard 有効 (既定) / ng = cur + 偽ガード (`icmp eq i32 %9, 123456789`)。
 
-| 構成 | ok | trap (oom 以外) | oom | miss | noproc | 計 | unit 56 | 3 回の一致 |
+| 構成 | ok | trap (oom 以外) | oom | miss | noproc | 計 | unit 56 | 実施回数 |
 |---|---|---|---|---|---|---|---|---|
-| base | 864 | 30 | 1 | 46 | 1 | 942 | trap | 3/3 同一 |
-| cur | 864 | 30 | 1 | 46 | 1 | 942 | trap | 3/3 同一 |
-| fix | **865** | 29 | 1 | 46 | 1 | 942 | **ok** | 3/3 同一 |
-| ng | 864 | 30 | 1 | 46 | 1 | 942 | trap | 3/3 同一 |
+| base | 864 | 30 | 1 | 46 | 1 | 942 | trap | 1 (r2) |
+| cur | 864 | 30 | 1 | 46 | 1 | 942 | trap | 1 (r2) |
+| fix | **865** | 29 | 1 | 46 | 1 | 942 | **ok** | 1 (r2) |
+| ng | 864 | 30 | 1 | 46 | 1 | 942 | trap | 1 (r2) |
+
+- **実施回数は 1 回 (r2) のみ**。3 回の再実行は時間制限のため未実施 (§6)。
+- r1 (最初の実行) は無効。`FL_WIN64_DIR` 未設定で PE (`/home/ubuntu/...`) を読めず、`m11_build.sh` が qstore (D17) を skip した。その結果 base/cur/fix/ng が全て 856/38 となり、fix でも unit 56 が trap のままだった。r2 は `FL_WIN64_DIR` を設定して qstore を有効にした値。
+- 旧版 (REPORT 初版) の数値は 3 回の実測で得たもの。本版の r2 は同一値を再現した。
 
 - 集計の定義: `units_<cfg>.json` の値を数えた (942 unit, trap と oom は排他)。survey 行の `trap` は oom を含む合計 (base 31 / fix 30)。e2e のサマリも同じ定義 (§3-3)。
-- 判定 G1〜G5 は 3 回とも PASS (exit 0)。
+- 判定 G1〜G5 は r2 で PASS (exit 0)。
   - G1 cur vs base: unit 差 0 (回帰 0)。
   - G2 cur: unit 56 は trap。
   - G3 fix vs base: 差は unit 56 の trap→ok のみ。
@@ -84,15 +88,14 @@ RetDec の CFG 復元 (jcc の終端化) と命令翻訳 (フラグ) のどち�
 - **走査の範囲**: 全 IR 関数 (= 全 unit の閉包を含む上位集合)。unit への帰属は行っていない。
 - **限界 (重要)**: strict の 405 件は**未検証の候補**。規則は heuristic で、偽陽性の率は未測定。405 件のうち miscompile である件数は本件では言えない。`dropped_target_not_label` の 7058 は内訳 (関数外への tail jump か否か) 未調査。
 
-### 3-3. e2e (`bash tools/m11/m11_e2e.sh`, コミット済み HEAD `9dd4d55`, 3 回)
+### 3-3. e2e (`bash tools/m11/m11_e2e.sh`, 修正版 (コミット 9dbdd1e 以降の作業ツリー), 1 回)
 
-| 回 | 所要 (秒) | load (開始→終了) | rc | 備考 |
-|---|---|---|---|---|
-| 1 | 55.5 | 0.92→0.97 | 0 | `gen_ir2` で IR を再生成 (stamp 無し) を含む |
-| 2 | 32.0 | 0.97→0.98 | 0 | 増分 |
-| 3 | 32.2 | 0.98→0.99 | 0 | 増分 |
+| 回 | 所要 (秒) | rc | 備考 |
+|---|---|---|---|
+| r1 | 66.3 (`time` の real) | 0 | `FL_WIN64_DIR` 設定・PE (`[WIN64]`) 参照で qstore 有効 |
 
-- 3 回とも同一のサマリ: `reached_stage 4/6` (FastMM4 が VirtualAlloc でプールを確保)、`stop_reason` = DllMain attach 完走、`units_run_full 22 / 942`、survey `ok 865 / trap 30 (うち oom 1) / clobber 0 / miss 46`、`wasm_bytes 6027656`。
+- サマリ: `reached_stage 4`、`stop_reason` = DllMain attach 完走、`units_run_full 22 / 942`、survey `ok 865 / trap 30 (うち oom 1) / clobber 0 / miss 46`、`wasm_bytes 6027674`。
+- **実施は 1 回のみ** (3 回は時間制限のため未実施 (§6))。load・3 回の再現性は未測定。
 - 変更前 (`8d883c3`) は #662 の REPORT で 69.2 秒・survey 864/31 (oom を含む)。本 e2e は unit 56 が ok になった分だけ survey が変わる (865/30)。到達 stage は変わらない (4/6)。unit 56 の後段の停止点は本件の範囲外。
 - 所要の数え方: `date +%s.%N` の差 (`m11_e2e.sh` の開始から終了まで)。4 vCPU。
 - 検証範囲: e2e の survey は `unit 56 = ok` を含めて 942 unit 全件。e2e 末尾の `m11_icall_audit.py` の出力 (`脱落率 100.0%`) は本件と無関係の既存監査で、本件では判定していない。
