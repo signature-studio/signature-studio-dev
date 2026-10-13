@@ -4,7 +4,7 @@
 # RetDec は IR (.ll) を出力した後に C (HLL) 生成へ進むが、後段の pass 鎖は .ll しか使わない。 巨大 DLL (Morphine) では HLL 生成が終わらないため、
 #   e.drc.ll の最終更新から HLL_CAP 秒 (既定 300) 経っても RetDec が生きていれば RetDec だけを kill し、後段 pass 鎖を .ll から再開する
 #   (kill した場合は summary.csv 末尾の hll_killed_s にその時点の経過秒、しなければ 0)。 RESUME=1 なら RetDec を呼ばず既存の e.drc.ll から再開。
-#   再開用スクリプトは lift/lift_ranges.sh から RetDec 呼出の 2 行だけを除いた写しを実行時に作る (本体の更新に追従する)。
+#   再開は lift/lift_ranges.sh を PLUG_REUSE_DRC=1 で直接呼び、既存の e.drc.ll から後段だけを回す (RetDec は飛ばす。本体の更新にそのまま追従する)。
 # 出力: work/synth/cpp<block>/ と summary.csv の 1 行:
 #   block,pdata_funcs,lift_rc,defines,f80_funcs,unimpl_helpers,i256_trap,emcc_c_rc,fixcmp_patched,emcc_c_rc_after_fixcmp,lift_s,missing_define,missing_bytes,missing_ref,extra_inside,function_defines,hll_killed_s
 set -uo pipefail

@@ -6,7 +6,7 @@
 
 ## A. 現 HEAD の実測 (`cpp_lift.sh`、既定 `PLUG_AVX256=0`)
 
-測定: 3 本並列 (`xargs -P 3`)、8 本の総経過 409 s。 Morphine は下記の再開経路で別測定 (90 s)。
+測定: 上 8 本 (Morphine 以外) は変更前の script で 3 本並列 (`xargs -P 3`)、総経過 409 s。 Morphine (23944) は変更後の再開経路 (§B) で別測定し、lift 秒 89 (表の値と §B の値は同じ)。
 
 | DLL | block | `.pdata` 関数 | define | 欠落 define | 未実装 helper | i256 trap | f80 関数 | `emcc -c` rc | lift 秒 | 最初のエラー |
 |---|--:|--:|--:|--:|--:|--:|--:|--:|--:|---|
@@ -18,9 +18,9 @@
 | Sawer engine | 24167 | 1,676 | 1,833 | 1 | 83 | 3 | 1 | **1** | 78 | `do not know how to soften fp_extend` |
 | Toxic Biohazard | 24216 | 1,841 | 1,927 | 1 | 94 | 3 | 1 | **1** | 99 | `do not know how to soften fp_extend` |
 | Transistor Bass engine | 24298 | 3,257 | 3,741 | 2 | 87 | 3 | 0 | **0** | 147 | — |
-| Morphine | 23944 | 3,050 | 3,321 | 1 | 121 | 24 | 0 | **0** | 78 (再開経路) | — |
+| Morphine | 23944 | 3,050 | 3,321 | 1 | 121 | 24 | 0 | **0** | 89 (再開経路) | — |
 
-- `emcc -c` 通過は **4 / 9** (23914 / 24159 / 24298 / 23944)。 E2 (SSA 値入り定数式) と E4 (def 消失) は、この HEAD の 4 本では再現しなかった。
+- `emcc -c` 通過は **4 / 9**。 内訳: 変更前 script の 8 本で **3 / 8** (23914 / 24159 / 24298)、変更後の再開経路の Morphine 23944 で **1 / 1**。 E2 (SSA 値入り定数式) と E4 (def 消失) は、この HEAD の 4 本では再現しなかった。
 - E1 (icmp ptr/i64) は共有鎖 `tools/plugins/lift/passes/fix_icmp_ptr.py` で解消済み。
 - 残る不通過 5 本の類型: E3 (21202) 1 本、f80 libcall (23916 / 24163 / 24167 / 24216) 4 本。
 - `known.json` の 23914 / 23944 / 24159 / 24298 から `emcc_c_rc` を外した (baseline 更新。 外さないと judge が FIXED で落ちる)。 9 本を judge にかけ、KNOWN 9 / NEW-FAIL 0 / FIXED 0 / exit 0 を確認。
@@ -29,7 +29,7 @@
 
 - `cpp_lift.sh` の旧再開経路は `sed` で `lift_ranges.sh` から RetDec 行だけを削っていたが、削除範囲が `if/else/fi` を壊し、`lift_resume.sh: line 49: syntax error` で落ちていた (旧 Morphine 23944 は lift_rc 2)。
 - 修正: `sed` を止め、`PLUG_REUSE_DRC=1` で既存 `e.drc.ll` から `lift_ranges.sh` を再開する (RetDec を飛ばす既存の仕組み)。 kill は `pkill -f` を止め、`pgrep -f` で得た PID を個別に `kill` する。
-- 検証: `RESUME=1 bash synth/cpp_lift.sh 23944 2400` → lift_rc 0 / emcc_c_rc 0 / 90 s。 通常経路 (HLL 段を最後まで回す) の実測は未実施。
+- 検証: `RESUME=1 bash synth/cpp_lift.sh 23944 2400` → lift_rc 0 / emcc_c_rc 0 / lift 秒 89 (表 A と同値)。 通常経路 (HLL 段を最後まで回す) の実測は未実施。
 
 ## C. 未解決 (起票先)
 
