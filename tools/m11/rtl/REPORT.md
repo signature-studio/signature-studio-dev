@@ -189,10 +189,11 @@ VA/RVA 変換の ImageBase 化は、`ImageBase` が `0x400000` の PE では出�
 
 ## 9. x64c 不一致の原因別分類 (#410 受入 2 つ目・分類まで; 修復は未着手)
 
-入力は `work-liftdiff` 同梱の `flelift/batch_closure_hybrid.jsonl` (既存の batch 出力。batch は再実行していない)。その 7,421 行の jsonl から RTL 帯 1,172 関数を抽出する。
-集計は `classify_x64c_mismatch.py`、件数・主因・全タグ・退行候補 7 件の状態は `results/x64c_mismatch_classify.txt` が正本。
+入力は `work-liftdiff` 同梱の `flelift/batch_closure_hybrid.jsonl` (既存の batch 出力。batch は再実行していない) と、commit 済みの `results/rtl_verdicts.tsv` (§7-2 の x64c 列)。その 7,421 行の jsonl から RTL 帯 1,172 関数を抽出する。
+集計は `classify_x64c_mismatch.py <batch.jsonl> <rtl_verdicts.tsv>`、件数・主因・全タグ・TSV とのクロス表・退行候補 7 件の状態は `results/x64c_mismatch_classify.txt` が正本。
 
-* 結論: RTL 帯 1,172 関数 = 一致 540 / 不一致 116 / 実行不能 516 (commit 済み TSV の 535 / 125 / 512 とは別セッションの値。§7-2 の揺れ)。
-* 検証状態: `work-liftdiff` 同梱 jsonl で再実行し results txt と diff 0 行 (run: 本 fix run、HEAD は本 commit)。入力 jsonl: sha256 = `d9995bfa90d96266f56f246f7e398809895c9f003ea225a2ec7d10799f6e0e6b`、7,421 行。
-* 退行候補 7 件の見出しは TSV 由来。status は batch 側の値で、`0x412020` / `0x455650` は batch では `unexec` (不一致ではない)。残り 5 件が batch 側でも一致→不一致。
+* 結論: RTL 帯 1,172 関数の batch 判定 = 一致 540 / 不一致 116 / 実行不能 516。
+* 件数の出所 (混同を避けるため): 「一致 535 / 不一致 125 / 実行不能 512」は `results/rtl_verdicts.tsv` の x64c 列 (§2 の表と同じ)。batch 判定はこれと一致しない (TSV と batch の差は results txt のクロス表)。`results/flelift_closure_verdicts.tsv` を同じ帯で数えると 563 / 79 / 530 で、これは本節では使わない。
+* 退行候補 (一致→不一致) 7 件の定義: `rtl_verdicts.tsv` で m11 = match かつ x64c = mismatch (`rtl_compare.py` の遷移と同じ)。batch 側の status は mismatch 5 (`0x4090e0` / `0x41cd70` / `0x42d830` / `0x44a590` / `0x4511d0`) と unexec 2 (`0x412020` / `0x455650`)。batch で不一致になったのは 5 件のみ。
+* 検証状態: `work-liftdiff` 同梱 jsonl で再実行し、results txt と diff 0 行 (再実行 run: 38429463570)。入力 jsonl: sha256 = `d9995bfa90d96266f56f246f7e398809895c9f003ea225a2ec7d10799f6e0e6b`、7,421 行。
 * 未達: 上位の原因からの修復 (受入 2 後半)・ネガコン付きの一致数増加 (受入 3)・一致→不一致の退行 7 件の原因特定。修復には tools/flelift の変更とリビルド・batch 再採点が要るため、起票先は #410 に継続 (本 PR は分類まで)。

@@ -26,7 +26,17 @@ ret_only	6
 arg_drop	4
 xmm_arg_drop	1
 
-## 一致→退行候補 (TSV 由来 VA 一覧。status は batch 側の値)
+## rtl_verdicts.tsv の x64c 列 (帯内 1172 件)
+match/mismatch/unexec = 535/125/512
+
+## TSV x64c 列 (行) × batch 判定 (列)
+TSV\batch	match	mismatch	unexec
+match	534	1	0
+mismatch	5	114	6
+unexec	1	1	510
+
+## 一致→不一致の退行候補 (7 件; 定義: rtl_verdicts.tsv で m11=match かつ x64c=mismatch。status は batch 側)
+va	batch_verdict	batch_tags
 0x4090e0	mismatch	memory_semantics
 0x412020	unexec	(none)
 0x41cd70	mismatch	unlifted_callee,wasm_trap
