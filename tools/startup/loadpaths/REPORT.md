@@ -106,7 +106,7 @@ files / bytes は `$INSTDIR` 相対のユニークパス (`inventory_files` 2740
 | texts-dialog | on-demand | T1 | 24 | 110241 | T0p:8 T1:16 | 0x10d5980 (BoxEdition/NotReggedTxt/DemoTxt)、0x1366ae0、0x1369240 (About)、0x11cb000 (`NewVersion.txt` = 更新確認) |
 | empty-project | boot | T0 | 1 | 46361 | T0:1 | 0x11db420 `Data\System\Empty.flp` (無いと 'Could not find default empty project.')。呼出元 0xe1d090 / 0xed5c40 |
 | lang-moe | boot-conditional | T2 | 7 | 6282124 | T1:7 | §2 |
-| lang-svg | unresolved | T1 | 8 | 4025 | T1:8 | 参照元未特定 (.svg 汎用ローダは 0xdceea0) |
+| lang-svg | boot-conditional | T1 | 8 | 4025 | T1:8 | 0xdceea0 = `TToolbarForm.FlagBtnPaint` (言語旗ボタン描画)。#591 で特定: `tools/startup/uilang/REPORT.md` §2 |
 
 - **ヘルプは WebView ではなく URL 組立**: FL は HTML を解釈せず `index_offline.html` と `/html/…` の URL を作って外部ビューアへ渡す (#118 help-viewer の入力)。`Help/` 全体で 55 ファイル、起動で読むのは `.scr` 2 件のみ。
 - 起動で触れる `Artwork/Fonts` は、`Cuprum.ttf` / `FrancoisOne.ttf` が `Shared/Artwork/Fonts/` と**同一内容** (同一 block)。現行推定で T2 になっている 4 件は `OFL.txt` 2 件 + この重複 `.ttf` 2 件 (内容重複排除で実害なし)。
@@ -163,9 +163,9 @@ files / bytes は `$INSTDIR` 相対のユニークパス (`inventory_files` 2740
 | `phase` / tier の動的確定 (boot 中の open() トレース) | §3・§4 の推奨は静的根拠。boot が `CreateFruityInstance` に未到達 (unit 初期化 209 で停止) の間は答え合わせ不可 | #105 (T1・`assettrace` が入力、本 REPORT の group を diff の基準にする) / 依存 [FLE-2] #253 |
 | `0x9de400` の `[self+0xa8]->vtbl+0x30` (検索パス服務) の実体と、ユーザ側ディレクトリ不在時の挙動 | `Languages\` 等の level 0 を VFS でどう見せるか (空ディレクトリ要否) | 新規子チケットを PM が起票 (親 #39。boot 到達後に実測) |
 | 非 en 言語 (`Program Language`=`ja` を seed + `/fl/System/Languages/ja.moe`) の実読込 e2e と、`en` で .moe を一切開かないことの実測 | §0-1 の動的確認 | 同上 (非 en の seed 先は `tools/startup/vreg/data/seed.json`。生成元 `scripts/build_seed.py` の `OVERRIDES` で `Program language` を `apply:true`・value=`ja` にする) |
-| `GetUserPreferredUILanguages` が en-US を返すことの実測 (非 `zh` を保証。`zh` 返却だと `Program language` が自動書込みされ 0x9deaa0 の分岐が変わる) | 言語の決定性 | shimx 側 (#13 系) / winstubs の子チケットを PM が起票 |
-| `lang-svg` の参照元 (推定: 言語選択 UI) | 8 ファイル 4025 byte の phase が `unresolved` | 同上 (boot 到達後に UI 経路で確定) |
-| Windows 標準フォント名 (`segoeui` `tahoma` `consola` `lucon`) の代替解決 (VFS に無い) | GUI の文字描画 | GUI 側 (#10 の子) へ PM が起票。`fonts` group の `Shared/Artwork/Fonts/*` が代替の候補 |
+| ~~`GetUserPreferredUILanguages` が en-US を返すことの実測~~ | **#591 で実測済み**: 既定 `en-US`、`zh-CN` のときだけ Program language を自動書込み (`tools/startup/uilang/REPORT.md` §1) | — |
+| ~~`lang-svg` の参照元~~ | **#591 で特定**: 0xdceea0 `FlagBtnPaint` (同 §2)。初回描画が起動中かは未確認 | #105 |
+| ~~Windows 標準フォント名の代替解決~~ | **#591 で要求一覧化**: segoeui 等は FL 自身が存在確認して OpenSans に落とす。GDI face 名の代替案は同 §3 | #186 |
 | テーマ選択 UI の列挙経路・`Default.txt` が参照する壁紙画像の必須性 | `theme-others` / `wallpaper-images` は検索パス登録と選択 UI 名のみ確認 | #105 (実トレース後) |
 | `bootset.json` / `classify_bootset.py` への §4 差分 6 点の反映 | 配信 tier の精度 | `tools/assets` の責務。PM 判断で #22 系の子チケット (本 PR では編集しない) |
 | 復号ツールの扱い (`moe.py`) | 本ツールは FL のローカライズ資源の難読化を解くコード。n・鍵・復号結果は保存しない設計だが、EULA の逆アセンブル/複製の制限との関係は未判断 | `docs/LEGAL.md` 側の論点として PM が判断 (LGL 系)。ランタイムには不要なので、問題があれば `moe.py` / `crosscheck.py` の削除で済む |

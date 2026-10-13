@@ -50,12 +50,17 @@
       "globs": [
         "System/Languages/*.svg"
       ],
-      "phase": "unresolved",
+      "phase": "boot-conditional",
       "tier": "T1",
       "fetch": "whole",
       "vfs": "/fl/System/Languages/<lang>.svg (RO)",
-      "readers": [],
-      "note": "言語選択 UI の国旗アイコンと推定 (参照元は特定できていない。.svg の汎用ローダは 0xdceea0)"
+      "readers": [
+        {
+          "va": "0xdceea0",
+          "role": "TToolbarForm.FlagBtnPaint の本体 (0xdcf270 経由)。<lang>.svg を検索区分 0x40f で探し、在れば SVG 描画・無ければ文字列表示。<lang> = [0x15e43a8] の文字列、空なら Program Language (#591 / tools/startup/uilang)"
+        }
+      ],
+      "note": "メインツールバーの言語旗ボタン (FlagBtn) の描画で選択中 1 言語の .svg だけを読む (既定 en.svg)。描画はメッセージループ経由で、初回描画が起動中かは未確認のため boot-conditional。確定は tools/startup/uilang/REPORT.md §2"
     },
     {
       "id": "skin-splash",
