@@ -3,7 +3,7 @@
 日付: 2026-10-13 / 書込範囲: `tools/startup/license_obs/`・`tools/startup/GATES.md` (G04)・`docs/DOC_MAP.md` (索引 2 行) /
 再現: `bash tools/startup/license_obs/license_obs.sh` (要 `FL_WIN64_DIR` = 素材 fl-win64 の展開先。venv は `uv` で自動作成)
 既知類型との関係 (DEFECTS.md / icall §4): 該当なし (lift の silent miscompile は扱わない。静的読解と実機械語の観測)。
-検証起点: コミット済み HEAD `56e0379` (§4)。
+検証起点: コミット済み HEAD `0a0b631` (§4)。
 
 ## 0. 結論 (数値は全て実測。推定は「推定」と明記)
 
@@ -12,6 +12,7 @@
    unicorn で直接実行**して観測した (§3.3)。→ 本 PR は `Refs #107` (Closes しない)。
 2. **Trial 判定の本体は `byte[0x14f84a8]` ではなく gradeChar** (`[[[0x15e4790]]+0xd0]` の 1 byte; `0x40`='@'=未登録・`0x41`–`0x43`='A'–'C'=登録 tier・`0x3f`='?'=期限切れ)。
    「Trial mode」文言を出す箇所 (FL Cloud バックアップ警告・`(disabled in Trial mode)` 等) は **gradeChar ≤ 0x40** で分岐する (§3.2)。
+   gradeChar の列挙は `[[var]]+0xd0` を連続形で辿る **196 ロード/89 関数 (下限)** であり網羅ではない (次項)。
    **旧記述 (GATES G04・startup REPORT §4-1) の「bit0 = Trial 解釈」は反証**: bit0 は登録リマインダ系 UI の分岐であり、しかも bit0 を立てる経路は実行されない (§3.1・§3.3 N2)。
 3. **フラグ byte**: 全バイナリで `0x14f84a8` を参照する命令は **直接参照 0 件・ポインタ `0x15e0698` 経由 44 ロード (read 38 / write 6)**。write は全て `0x10c7cd0` 内。
    静的初期値 `0x00`。read は bit2 (0x04) 20 ロード/18 関数・bit0 (0x01) 12/12・bit1 (0x02) 5/5・その他 1 (§3.1)。
@@ -21,6 +22,9 @@
    ilreg の静的予測「プレースホルダは全ティア grade 0 → gradeChar 0x40・flag 0」は**動的には未確認** (§5・§6)。
 6. **プロジェクト方針 (常に登録済み) との関係**: 「登録済み」の状態は gradeChar > 0x40 であって、flag byte の bit ではない (推定: 有効な primary tier 鍵は flag を 0 のまま gradeChar だけを `A`–`C` にする。§3.2)。
    vreg のプレースホルダ単体で gradeChar > 0x40 になる根拠は静的にも動的にも無い。→ 対策案は §6 (別 issue)。
+7. **gradeChar の列挙は下限**: 連続形 196 ロード/89 関数に加え、レジスタ追跡 (§3.2) で `lea reg,[obj+0xd0]` (バイトのポインタフィールドのアドレスを取る形) 69 ロードと
+   フィールドへのポインタ書込 1 ロードが見つかった (追跡形 266 ロード/102 関数。連続形の 89 関数に無い関数が 13)。アドレスを退避した後の間接アクセスは追っていない。
+   よって `== 0x40` 判定を持つ関数は 89 より多い可能性が高く (§3.2 の 13 関数の比較命令は推定)、Trial 制限範囲 (§5)・`?` 書換え経路の列挙 (§3.2 write 3 関数) も下限である。
 
 ## 1. 範囲と素材
 
@@ -37,10 +41,10 @@
 |---|---|
 | `license_obs.sh` / `env.sh` | 1 コマンド e2e (scan → run_cases → verify) |
 | `peidx.py` | `.pdata` の関数境界ごとの capstone 逆アセンブル共通部品 |
-| `scan_consumers.py` | フラグ byte と gradeChar の全 read/write サイト列挙 → `results/flag_sites.json`・`results/FLAG_SITES.md` (自動生成) |
+| `scan_consumers.py` | フラグ byte の全 read/write サイト列挙 + gradeChar の連続形 (下限)・レジスタ追跡形の列挙 → `results/flag_sites.json`・`results/FLAG_SITES.md` (自動生成)。`--no-track` / `--no-redef-stop` はネガコン用 (ファイルを書かず件数だけ出す) |
 | `emu_reg.py` | unicorn による `0x10c7cd0` 実行環境 (後述 §3.3) |
 | `run_cases.py` | 入力ケース実行 → `results/cases.json`・`results/CASES.md` (自動生成) |
-| `verify.py` | 検算 (capstone 非依存の生バイト走査・不変条件・ケース期待値) |
+| `verify.py` | 検算 (capstone 非依存の生バイト走査・gradeChar 追跡の別算法・不変条件・ケース期待値・ネガコン) |
 
 ## 3. 結果
 
@@ -64,18 +68,29 @@ bit ごとの利用箇所 (文字列は各分岐の線形 45 命令以内に現�
 | bit1 | `0x1375990`: 立つ→"Fire edition"。`0x11c2d80`: 立つ→"Upgrade to Producer edition for more features..."。`0x10d1340`: 立たない→"Your license has expired" | Fire edition |
 | bit2 | `0xc225d0`: 立つ→"Upgrade Fire to Producer Edition"。`0xc33690`/`0xc33c10`: 立つ→"…is in trial mode. You can save this project but you must connect your Fire controller…"。**`0xecec70`/`0x1363af0`/`0xf1f1f0`: 立たない→"Project backups to FL Cloud are not available in Trial mode."、`0xecf240`/`0x135b3a0`: 立たない→"(disabled in Trial mode)"** | Fire 系鍵 (second tier, `or 4`) を持つときの免除ビット。立たない側の "Trial mode" 文言は §3.2 のとおり **gradeChar ≤ 0x40 も要求** |
 
-### 3.2 gradeChar `[[[0x15e4790]]+0xd0]` の全サイト (同スクリプト; 一覧は `results/FLAG_SITES.md` 後半)
+### 3.2 gradeChar `[[[0x15e4790]]+0xd0]` のサイト (同スクリプト; 一覧は `results/FLAG_SITES.md` 後半。**連続形は下限**)
 
-`0x15e4790` → 変数 → オブジェクト → `+0xd0` の byte ポインタ、という経路のロードが **196** (read 189 / write 7)、**89 関数**。
+**連続形** = `mov r1,[0x15e4790]` → `mov r2,[r1]` → `mov r3,[r2+0xd0]` を 3 命令連続で辿る形 (`grade_site`)。`0x15e4790` → 変数 → オブジェクト → `+0xd0` の byte ポインタ、
+という経路のロードが **196** (read 189 / write 7)、**89 関数 (下限)**。`0x15e4790` を読む `mov r64,[rip+..]` の生ロードは 2,422 (分母)。
 
 | 分類 | ロード数 / 関数数 | 備考 |
 |---|---|---|
-| write | 7 / 3 関数 | `0x10c7cd0` ×5 (`0x40` 初期化 `0x10ca56d`・tier 確定 `0x10cbb12`/`0x10cd0db` (値=ループ添字 `0x41`–`0x43`)・期限切れ `0x3f` `0x10cf4c6`・`0x40` `0x10cf621`) / `0x10d3a30` (`0x3f`) / `0x11cb000` (`0x3f`) |
+| write (連続形のみ = 下限) | 7 / 3 関数 | `0x10c7cd0` ×5 (`0x40` 初期化 `0x10ca56d`・tier 確定 `0x10cbb12`/`0x10cd0db` (値=ループ添字 `0x41`–`0x43`)・期限切れ `0x3f` `0x10cf4c6`・`0x40` `0x10cf621`) / `0x10d3a30` (`0x3f`) / `0x11cb000` (`0x3f`) |
 | read `== 0x40` | 62 / 34 | 同型の inline コード (24 関数 family を含むと推定) |
 | read `== 0x3f` | 27 / 26 | この 26 関数は全て `== 0x40` も比較。ilreg/GATES の「24 関数」との差 2 は未照合 → §6 |
 | read `> 0x40` | 50 / 41 | 登録済みのとき通る側 (下記 Trial 文言サイトを含む) |
 | read `>= 0x41`〜`0x44` (4) / `== 0x42` (3) | 7 | tier 別分岐 (A/B/C) |
 | read 条件未復元 (`setcc` 等) | 43 | 一覧に生の命令を記載 |
+
+**レジスタ追跡形** (`track_grade`): ロード直後が `mov r2,[r1]` のとき r2 を 13 命令追い (`ret`/`jmp` または r2 の書換えで打切り)、`[r2+0xd0]` を使う最初の命令を拾う。
+追跡形は **266 ロード/102 関数** = 連続形 196 (89 関数) + 追加 70。追加の内訳は `lea reg,[obj+0xd0]` 69 ロード/20 関数 (バイトのポインタフィールドの**アドレス**を取る形)・
+`mov qword ptr [rcx+0xd0],rax` 1 ロード (`0x10d52ed`, 関数 `0x10d50d0` = フィールドへのポインタ書込)。追加 70 は 21 関数に分布し、**13 関数が連続形の 89 関数の外**:
+`0xe7a470` `0xf51fd0` `0xfeffe0` `0xffbff0` `0x103ca70` `0x1183130` `0x11d9340` `0x11fc770` `0x1231170` `0x12875a0` `0x13582c0` `0x1358870` `0x1366190`
+(一覧は `results/FLAG_SITES.md` 末尾)。この 266 / 13 関数はレビュワーの独立実測 (HEAD `43aa592` に対する指摘) と一致する。
+この 13 関数はいずれも関数内に `cmp ?, 0x40` / `cmp ?, 0x3f` を 1–9 命令 (計 59 命令; 例 `cmp dword ptr [rbp+0x394], 0x40`) 持つ。gradeChar をスタックに写して比較する形の**推定**で、命令数の集計のみ (関数ごとのデータフローは未確認)。
+`lea` で得たアドレスは別の場所 (例 `0xe7a470`: `[rbp+0x3a8]`) に退避され、その先で `movzx` による読出し・`GetMem` 相当での 1 byte 再確保・`FreeMem` 相当での旧領域解放・`[obj+0xd0] := 新` が行われる。
+この「確保・コピー・解放・スロット := 新」の簡易パターン一致 71 箇所/20 関数はレビュワー実測で、**本 PR では再現していない**。メモリ管理関数の同定とアンチタンパ目的という解釈も**推定**。
+**追跡形も下限**: 退避先経由の間接アクセス、`0x15e4790` 経路以外 (引数で渡されたオブジェクト等) から来る `+0xd0` は追っていない。
 
 **Trial 文言サイトの共通点**: `gradeChar > 0x40` の偽側 (= `@`/`?`) が "Trial" 文言。13 ロードで確認 — `0xecec70`・`0xf1f1f0`・`0x1363af0` ("Project backups to FL Cloud are not available in Trial mode.")、
 `0xecf240`・`0x135b3a0` ("(disabled in Trial mode)")、`0x1105e40` ("Undo tests are disabled in Trial mode")、`0x11d8f30` ("(Trial)")、`0x1146190`・`0x1146850` (" trial")、`0x10a9170` (`welcome_window_trial`)、`0x10a7270`/`0x10aaae0` (`free` / "Free for customers")。
@@ -105,18 +120,22 @@ bit ごとの利用箇所 (文字列は各分岐の線形 45 命令以内に現�
 **MachineGuid・ComputerName・AppData は ILRegKey の有無に関わらず先に取得される** (A1 の API 呼出順: `LoadLibraryW(SHFolder)` → `GetComputerNameExW` → `RegOpenKeyExA(HKLM Cryptography)`)。ただし ILRegKey 無しでは結果に影響しない (A1=A3=A4)。
 B/D1 の停止点: ILRegKey を読んだ後の復号 (`0x8d0380` 系, ilreg FORMAT §5) で、`0x8c5c90` が返す singleton の byte 添字表 (`[obj+8+idx*8]`, `0x8c7820`) が null。表は unit の初期化節で作られるため、`InitUnits` を実行しない本環境では空。
 
-## 4. 検証 (コミット済み HEAD `56e0379` をクリーン worktree に展開して実行)
+## 4. 検証 (コミット済み HEAD `0a0b631` をクリーン worktree に展開して実行)
 
 | 項目 | 実測 |
 |---|---|
-| `bash license_obs.sh` (venv 作成済み) | 68.78 / 68.94 / 69.06 秒 (n=3 直列, 4 コア runner, load average 1 分値 0.89 / 0.97 / 0.99)。内訳: scan 5.8 秒・run_cases 62.5 秒 (11 ケース × PE 敷設)・verify 0.36 秒 |
-| 結果 | 3/3 回 `ALL OK` (verify 16 項目 PASS)。再生成した `results/*` はコミット内容と `cmp` 一致 (決定的) |
-| 別アルゴリズム検算 | capstone 非依存の生バイト走査 (`REX.W 8B /r` + `rip` 相対 rel32 から実効アドレスを逆算) が、スロット `0x15e0698` のロード 44 件を capstone 結果と **集合として完全一致** (差 0)。`0x15e4790` 経路 196 は生走査 2,422 ロードの部分集合 |
-| ネガティブコントロール | N1 (gradeChar 初期値改変) → 0x42 / N2 (jle 無効化) → flag 0x01 / N3 (初期化元値改変) → flag 0x04。いずれも **実行された機械語の書込が観測値に反映される**ことを示す |
+| `bash license_obs.sh` (venv 作成済み) | 55.42 / 55.64 / 55.86 秒 (n=3 直列, 4 コア runner, 開始時の load average 1 分値 0.81 / 0.92 / 0.97)。内訳 (n=1, 開始時 load average 0.75): scan_consumers 2.97 秒・run_cases 47.06 秒 (11 ケース × PE 敷設)・verify 6.05 秒 |
+| 結果 | 3/3 回 `ALL OK` (verify 22 項目 PASS)。再生成した `results/*` はコミット内容と差分なし (`git status --porcelain` 空, 3/3 回)。`run_cases` の出力に含まれていた実行時間 (0.01 秒単位で 0.01–0.03 に揺れ、`7350c28` の検証では 3/3 回差分が出た) を `0a0b631` で除いて決定的にした |
+| 別アルゴリズム検算 1 (フラグ) | capstone 非依存の生バイト走査 (`REX.W 8B /r` + `rip` 相対 rel32 から実効アドレスを逆算) が、スロット `0x15e0698` のロード 44 件を capstone 結果と **集合として完全一致** (差 0) |
+| 別アルゴリズム検算 2 (gradeChar) | `verify.py` V1d/V1e: 生バイト走査の `0x15e4790` ロード 2,422 件を起点に、`.pdata` の関数境界を使わず capstone の detail モード (オペランド構造 base/index/disp・`regs_access` の書込レジスタ・call の volatile 破壊) で窓を直接デコードして追跡。追跡形 **266 ロード/102 関数** を scan と **集合として完全一致** (差 0, 使用命令 VA も 266 件一致, `lea` 69)、連続形 196 ⊆ 追跡形、連続形の外 13 関数。V1b (連続形 196 ⊆ 生ロード 2,422) は部分集合検査で**取りこぼしを検出しない** |
+| ネガティブコントロール (ケース) | N1 (gradeChar 初期値改変) → 0x42 / N2 (jle 無効化) → flag 0x01 / N3 (初期化元値改変) → flag 0x04。いずれも **実行された機械語の書込が観測値に反映される**ことを示す |
+| ネガティブコントロール (追跡) | V5a: 追跡を無効にすると **196 に戻る** (`scan_consumers.py --no-track`: 追跡形 196 ロード/89 関数 = 連続形, 追加 0)。V5b: r2 書換えでの打切りを外すと **279** (≠266; 13 ロード多い。r2 が別の値に書き換わった後の `[r2+0xd0]` を拾う誤検出で、例は vtable 呼出 `call [rax+0xd0]` と次のロードの使用の二重計上) |
 | 規約チェック | `git status --porcelain -- tools/startup/license_obs` 空・`find tools/startup/license_obs -type f -size +20M` 空 |
 
-検証範囲: ILRegKey 無し/空での 0x10c7cd0 の終状態 (flag・gradeChar)、フラグ/gradeChar の静的サイト一覧。
-範囲外: ILRegKey 非空 (有効書式を含む) の判定結果、unit 初期化後の状態、実エンジンの boot 経由の呼出、bit の意味ラベルの確定 (文字列からの**推定**)。
+検証範囲: ILRegKey 無し/空での 0x10c7cd0 の終状態 (flag・gradeChar)、フラグ byte `0x14f84a8` の全サイト (直接参照 0・ポインタ `0x15e0698` 経由 44 ロード; 生バイト走査で検算済み)、
+gradeChar の連続形 196 ロード/89 関数 (**下限**) とレジスタ追跡形 266 ロード/102 関数 (**下限**; 13 関数は連続形の外)。
+範囲外: ILRegKey 非空 (有効書式を含む) の判定結果、unit 初期化後の状態、実エンジンの boot 経由の呼出、bit の意味ラベルの確定 (文字列からの**推定**)、
+**gradeChar の網羅**: 退避アドレス (`lea reg,[obj+0xd0]`) 経由の間接アクセスとポインタ張り替え (レビュワー実測: `+0xd0` 使用 266 件、うち 13 関数は 89 関数の外。本 PR のレジスタ追跡で 266/13 を再現したが、退避先経由のアクセスは追っていない)。
 
 ## 5. 問い (issue 範囲) への回答
 
@@ -124,7 +143,7 @@ B/D1 の停止点: ILRegKey を読んだ後の復号 (`0x8d0380` 系, ilreg FORM
 |---|---|---|
 | bit0/bit1 の実測 | bit0・bit1 とも ILRegKey 無し/空では 0 (実機械語)。bit0 を立てる経路は実行されない。bit0=Trial は **反証** (§3.1) | 実測 (A1–A4, D2) / 意味ラベルは推定 |
 | ILRegKey 無しの挙動 | 例外なく終了。flag 0x00・gradeChar 0x40 → Trial 文言サイトの偽側 (§3.2) に入る。起動は継続 | 実測 (flag/gradeChar) / UI 帰結は静的 |
-| Trial 制限範囲 | gradeChar を参照する 89 関数 (条件を復元できた read 146 ロード) のうち、"Trial" 文言を持つ 13 ロードを列挙 (§3.2)。FL Cloud バックアップ、Undo テスト、ようこそ画面ほか。制限の**機能的全容**は文字列で見える範囲のみ | 静的 (線形パスの文字列; 目安) |
+| Trial 制限範囲 | gradeChar を `[[var]]+0xd0` の連続形で辿る 196 ロード/89 関数 (**下限**; 条件を復元できた read 146 ロード) のうち、"Trial" 文言を持つ 13 ロードを列挙 (§3.2)。連続形の外に 13 関数あり (追跡形 102 関数)。FL Cloud バックアップ、Undo テスト、ようこそ画面ほか。制限の**機能的全容**は文字列で見える範囲のみ | 静的 (線形パスの文字列; 目安) |
 | MachineGuid 依存 | ILRegKey の有無に関わらず MachineGuid/ComputerName/AppData を取得するが、ILRegKey 無しの結果には影響しない (A1=A3=A4)。非空 ILRegKey での依存は ilreg の静的結論 (SHA-256 マシン束縛) のまま | 実測 (無鍵) / 静的 (有鍵) |
 | GATES.md G04 の確定 | 反映済み (同 PR)。確定できない部分は「未確定」と明記 | — |
 
@@ -135,6 +154,7 @@ B/D1 の停止点: ILRegKey を読んだ後の復号 (`0x8d0380` 系, ilreg FORM
 | lift 経路 (flelift/boot) で `0x10c7cd0` が実行されたときの観測 (本題 #107) | boot が unit 209/942 で停止中のため不可 | #107 に残 (boot 突破後に `license_obs/emu_reg.py` の期待値と突合) |
 | ILRegKey 非空の判定結果の動的確認 | プレースホルダが gradeChar 0x40 のままか未確認 (静的予測のみ) | **#525** `[ST-T15]` (unit 初期化節の実行 = VM ハンドラ表の構築を `emu_reg.py` に追加) |
 | 「常に登録済み」を満たす手段の設計: gradeChar を `A` 以上に確定させる (有効書式の ILRegKey は #116 のユーザ .reg / ホスト側後処理 / vreg での合成) と、期限切れ `?` への書換え 2 経路 (`0x10d3a30`・`0x11cb000`) の抑止 | 現 seed のままでは Trial 扱い (推定) | **#526** `[ST-T16]` (+ #116 へコメント) |
+| gradeChar の参照サイトの網羅: 退避アドレス (`lea reg,[obj+0xd0]`) 経由の間接アクセスとポインタ張り替え (追跡形 266 ロード/102 関数、うち 13 関数は連続形の 89 関数の外)。`== 0x40` 判定を持つ関数は 89 より多い可能性が高く、`?` 書込み経路の列挙 (3 関数) も下限 | Trial 制限範囲 (§5) と #526 の範囲 2・選択肢 (b) が下限の上に立つ | **#526** (2026-10-13 コメントで追記済み: ポインタ張り替え 71 箇所/20 関数 (レビュワー実測)・`?` 書込み経路は 3 関数分のみ)。退避アドレスのデータフロー追跡による網羅は #107 に残 |
 | `== 0x3f` を比較する inline 関数が 26 (本調査) と 24 (GATES/ilreg) で不一致 | G04 補足の「24 関数」の根拠再確認 | #107 コメント |
 | bit の意味ラベル (bit1=Fire、bit2=Fire 鍵免除) と tier キー 31000/31005/31010/31020 の製品対応 | G04 の記述は「推定」止まり | #107 コメント (#213 は closed。後継の ST-T14 番号は #39 に使用済みのため新規番号は PM 確定) |
 | 経路ごとの機能的な Trial 制限の全容 (文字列を持たない分岐 43 ロード等) | Trial 制限範囲は「見える範囲」 | #525 + FLEngine boot 後の動的観測 (#107 に残) |
