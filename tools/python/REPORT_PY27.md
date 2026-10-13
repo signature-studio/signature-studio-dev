@@ -52,10 +52,10 @@ runner 4 core / node 22.23.3 / emsdk 6.0.12 (`$RUNNER_TEMP/emsdk`、`/opt/emsdk`
 
 注: 4 本の node テストは `dist/` 生成後に実行 (並列実行すると `dist/flprov.js` 未生成で失敗する)。
 
-コード差分 (測定 commit から HEAD まで、`tools/python` の `.md` 除く):
+コード差分 (測定 commit から HEAD まで、`tools/python` 全体):
 ```
-$ git diff 832f985d HEAD -- tools/python ':!*.md'
-(空)
+$ git diff 832f985d HEAD -- tools/python
+(空。REPORT 更新 commit のみの差分は REPORT_PY27.md 自身であり、コードは変わらない)
 ```
 
 ## 未解決
