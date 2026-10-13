@@ -212,3 +212,26 @@ python3 tools/icall/diff/fn3_diff.py 1801a9be0 --n 600 --dump    # native / rout
 | Fruity Balance / Kilohearts / Fresh Air の wasm 実行 + 差分検証 | 監査のみのまま | 素材 `plugins-freshair plugins-kilohearts fl-win64` が必要 → #229 |
 | plugin closure T0 42 本へ route バッチ適用 | 未着手 | #15 / #50 と連携、素材同上 |
 | stack 引数の動的検証 (5 引数以上の間接 call を実行) | 本回は静的のみ | IPP 結合 (#246 系) で実行 → #229 |
+
+## 10. #514: icall_rewrite.py の関数配置修正 (連続配置の回避)
+
+既知類型との関係 (`docs/DEFECTS.md` / 本書 §4 とは別体系): **新規 1 件**。plugin 閉包 (eq-filter 11 block) を `tools/plugins/lift/lift_ranges.sh` の `PLUG_ICALL=1` で通したところ、書換え後の関数が 16 byte 整列でちょうど連続配置になる箇所 (関数終端が 16 の倍数) で、RetDec の `--select-ranges` が隣接 range `[a,b)+[b,c)` を 1 関数に併合し、後続関数の `define` が落ちた (4 block で 5 関数。dispatch 数は変わらないので site 突合では見えず、`define` 数 ≠ 閉包関数数で検出)。
+修正: `icall_rewrite.py` の `next_slot()` で、直前の関数/stub と連続になる場合だけ 16 byte 空ける (連続しない配置はバイト一致)。stub・comis stub にも同じ処理。詳細な実測は `tools/plugins/f2/REPORT.md` §7。
+### 10.1 #530: OTT 回帰の再実行 (素材付き)
+
+`icall_e2e.sh` PASS (89 scenario / 50,236 cell 全一致, state_diff 0)・`test_icall.py` PASS。**e2e は #514 の連続配置を検出しない** (修正を外しても PASS) ため `tests/test_icall.py` に連続配置チェックを追加。全文・実測表は `REPORT_APPENDIX.md` §10.1。
+
+### 10.2 #600: `liftlib_e2e.sh` の素材付き実走 (base `8f55002`、コード無変更)
+
+素材: `work-liftlib-targets work-liftlib work-m6-ott plugins-ott analysis-ott-binaries toolchain-retdec toolchain-emsdk`。`bash tools/liftlib/liftlib_e2e.sh` = **ALL PASS, exit 0, 387 秒** (load 0.71 開始 → 1.01 終了、直列 1 本): unit ALL PASS / regress fa_gain 400/400・kh_gain 366/366 bit-exact・OTT 2 構成 PASS (census junkHi 104 ≤ 104, 出力 SHA 42/42 一致) / simd 205 mnemonic mismatch 0 / inject 94/94 検出・偽陽性 0 / leafspec gate (exp 40/40, log 32/32) PASS。icall pass は通らない経路 (§10.1) なので #514 の影響なしを実測で確認。leafspec の tan/svf/cvt は gate 無しの情報行 (mismatch 29/30/6、既存)。
+実走の前提 2 点 (実測): ① python に `pefile` `capstone==5.0.7` が必要 (無いと exit 1 で fail-closed、1 回目 359 秒で FAIL)。② `work-liftlib` に `/home/ubuntu/...` を指す dangling symlink 133 本 (`ott_*/work/full_t1.drc.{ll,dsm}`) が含まれ、`recipes/ott.py` の `os.path.exists` が偽→`os.symlink` が FileExistsError で regress が落ちる。削除して再実行 (展開物のみ・commit 対象外)。素材側の修正は別途。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `work-liftlib` の dangling symlink 133 本 (runner で regress が FileExistsError) | 素材展開直後は liftlib_e2e.sh が FAIL (削除で回避) | #448 |
+| FMA3 経路 `1801a9be0` が xmm0 42/600 (gate 外の INFO 行) | 本 PR と無関係 (既存の INFO 表示) → **#361 / PR #617 で解消 (§11)** | #229 (icall 親) |
+
+## 11. ICALL-6: CRT 経路の残 (#361)
+
+FMA3 経路 `1801a9be0` を 42/600 → **600/600** (N3: RetDec の `vmovapd xmm→stack` store 落ち、N4: closure 内 direct call の memory-ABI が戻り xmm1 を通さない)、`_handle_errorf` (1801c8cb8) を closure に入れ override 4/4、`1801a9a6c` の rax は呼出し元が読まないため gate は xmm0 のみ。FMA3 経路は gate に昇格。
+結果表・ネガコン・rax 根拠 (`1801a9be0` の rax 不一致 558/600 も含む)・検証 (HEAD `b23593c`・所要・load)・未解決表の全文は `REPORT_APPENDIX.md` §11。再現: `bash tools/icall/icall_e2e.sh`。

@@ -123,20 +123,30 @@ host は **レコード書込の前に** 共有 pointer 状態 (cursor/buttons/m
 - 他スレッドからの `SendMessage` は要求キューに積み GUI スレッドの pump 完了を futex 待ち (native selftest で検証)。`PostMessage` は任意スレッドから可。
 
 ## 8. GDI モデル (`src/gui_gdi.c`)
-- 描画先は常に BGRA32: window DC → top-level surface、memory DC → 選択ビットマップ。`CreateDIBSection` は **32bpp BI_RGB/BITFIELDS のみ** (biHeight<0=top-down / >0=bottom-up を保持。`ppvBits` は wasm 内実アドレス)。
-  `CreateCompatibleBitmap`/`CreateBitmap(32bpp)` は top-down。それ以外の bpp/圧縮/file mapping は fail-fast。
-- 転送: `BitBlt`/`StretchBlt`/`PatBlt`/`StretchDIBits`/`SetDIBitsToDevice`/`AlphaBlend`/`GetDIBits`/`SetDIBits`。
-  ROP: SRCCOPY(等倍は行 memmove・alpha ごと転送), SRCPAINT, SRCAND, SRCINVERT, SRCERASE, NOTSRCCOPY, NOTSRCERASE, MERGECOPY, PATCOPY, PATINVERT, PATPAINT, DSTINVERT, BLACKNESS, WHITENESS。他は fail-fast。
-  拡縮は **nearest (`src = floor(i*sw/dw)`)**、dest の負幅/負高は反転、source の負 extent は fail-fast。同一バッファ重複は行/列順を反転して memmove 相当。
+- 描画先は常に BGRA32 (「shadow」): window DC → top-level surface、memory DC → 選択ビットマップ。`CreateDIBSection` は **1/4/8/24/32bpp** (BI_RGB; 32bpp のみ BI_BITFIELDS 可。biHeight<0=top-down / >0=bottom-up を保持)。
+  **32bpp**: `ppvBits` = shadow そのもの (従来どおり)。**1/4/8/24bpp**: `ppvBits` = app から見えるネイティブ形式の `nat` (行 4B 境界・色テーブルは bmiColors の RGBQUAD, DIB_RGB_COLORS のみ) で、GDI は shadow に描き、
+  操作前に **pull** (nat → shadow, 操作矩形のみ) / 操作後に **push** (shadow → nat, dirty 矩形) する (app が nat を直接書いた内容は次の GDI 操作で反映され、GDI の描画は呼出し直後に nat から読める)。
+  ≤8bpp への push は色テーブルの **RGB 二乗距離の最近傍** (完全一致は最初の index)。push は「現 index の色が shadow と同じなら index を変えない」ので重複色パレットでもクリップ外 pixel の index は不変。範囲外 index は黒。
+  `GetDIBColorTable`/`SetDIBColorTable` (hdc に選択済みの ≤8bpp DIB section; Set は shadow 全面再 pull)。`GetObject` は bmBitsPixel=実 bpp・bmBits=nat。
+  DDB: `CreateCompatibleBitmap`/`CreateBitmap(24|32bpp)` は top-down BGRA、**`CreateBitmap(1bpp)` は mono DDB** (bit 1 = 白; 初期 bits は WORD 行・MSB 先頭。mono DC に互換なビットマップも mono)。
+  mono 転送の色写像: mono→color は 1(白)=転送先 DC の bk 色 / 0(黒)=text 色、color→mono は **転送元 DC の bk 色と一致する画素=白**、その他の mono 書込みは輝度 (30R+59G+11B)/100 ≥ 128 を白。
+  `CreateBitmap` の 4/8/16bpp は bits なしのみ (bits ありは論理パレットが要るため fail-fast)。16bpp DIB・DIB_PAL_COLORS・圧縮 DIB・file mapping は fail-fast (理由付き)。
+- 転送: `BitBlt`/`StretchBlt`/`PatBlt`/`StretchDIBits`/`SetDIBitsToDevice`/`AlphaBlend`/`GetDIBits`/`SetDIBits`。`StretchDIBits`/`SetDIBits`/`CreateDIBitmap`/`LoadBitmapW` の源は 1/4/8/24/32bpp (≤8bpp は bmiColors)、
+  `GetDIBits` の要求形式は 1/4/8/24/32bpp (≤8bpp は DIB section 自身の表、無ければ決定論的既定表: 1bpp=黒/白・4bpp=VGA16・8bpp=3-3-2; biBitCount=0 の問合せは DIB section なら自身の bpp)。
+  ROP: SRCCOPY(等倍は行 memmove・alpha ごと転送), SRCPAINT, SRCAND, SRCINVERT, SRCERASE, NOTSRCCOPY, NOTSRCERASE, MERGECOPY, MERGEPAINT, PATCOPY, PATINVERT, PATPAINT, DSTINVERT, BLACKNESS, WHITENESS。他は fail-fast。
+  拡縮は **nearest (`src = floor(i*sw/dw)`)**、dest の負幅/負高は反転、source の負 extent は fail-fast。
+  **同一サーフェス重複**: 1:1 かつ単一クリップ矩形は行順 (下→上/行内スナップショット) で memmove 同等、拡縮/反転/複数クリップ矩形は転送元矩形を先にコピー (スナップショット意味論; 旧実装は複数クリップ矩形で先行矩形の書込みを後続が読む)。
   プリミティブ/ROP 経路の alpha は 0xFF 固定 (SRCCOPY のみ alpha 保存)。`AlphaBlend` は 255 除算の丸め付き (premultiplied `AC_SRC_ALPHA` / 定数 alpha)。
+  **行カーネル (`src/gui_simd.h`)**: ROP / AlphaBlend / 不透明化コピー / 2x 水平拡大は行単位のカーネルで、wasm SIMD128 (`-msimd128`; `GUI_NO_SIMD` で無効) と scalar 参照を持ち画素完全一致 (`test/simd_e2e.sh`)。
+  拡縮の x 写像は転送ごとに 1 回計算 (画素ごとの 64bit 除算なし)。参照実装 (`blit_core_ref`: 画素単位) は `gdi_set_ref_blit(1)` で切替え可 (selftest が 15 ROP × 幾何 × クリップ × 重複で一致検査)。
 - プリミティブ: `FillRect`/`FrameRect`/`Rectangle`/`MoveToEx`+`LineTo` (Bresenham・終点除外・太線は正方スタンプ)/`SetPixel(V)`/`GetPixel`。ペンは SOLID/NULL のみ (他は fail-fast)。ブラシは solid/hollow。
 - テキスト: **内蔵 8×8 ビットマップフォント** (font8x8, Public Domain, ASCII のみ。ET/DT/ExtTextOut/DrawText/GetTextExtent/GetTextMetrics は一貫した固定幅 8px)。FL は自前 FreeType 描画が主なので GDI テキストは保険。
 - クリップ: `RL` (矩形リスト) 実装の region (`CreateRectRgn/CombineRgn(AND/OR/DIFF/XOR/COPY)/OffsetRgn`)、`SelectClipRgn/ExtSelectClipRgn/IntersectClipRect/ExcludeClipRect/GetClipBox`、`SaveDC/RestoreDC`、`SetWindowOrgEx/SetViewportOrgEx` (MM_TEXT のみ)。
 - ROP2: COPYPEN, XORPEN, NOT, BLACK, WHITE, NOP, MASKPEN, MERGEPEN, NOTCOPYPEN。
 
 ## 9. 制限・既知の逸脱 (fail-fast ではなく近似で通すもの)
-`SetWindowRgn`/`NotifyWinEvent`/`LockWindowUpdate`/`ShowOwnedPopups`/`AttachThreadInput`/`IsDialogMessage`/`SetThreadDpiAwarenessContext` は no-op、`SelectPalette`/`RealizePalette` は常に 32bpp 真色扱い、
-`SetCursorPos` は共有 cursor 値のみ更新 (Pointer Lock 連携は未実装)、`GetDeviceCaps(RASTERCAPS)` は RC_PALETTE なし、`MsgWaitForMultipleObjects` は `nCount==0` のみ、`GetDC(NULL)`(スクリーン DC) は fail-fast。
+`SetWindowRgn`/`NotifyWinEvent`/`LockWindowUpdate`/`ShowOwnedPopups`/`AttachThreadInput`/`IsDialogMessage`/`SetThreadDpiAwarenessContext` は no-op、`SelectPalette`/`RealizePalette` は常に真色扱い (≤8bpp DIB の色は DIB 自身の色テーブル)、
+`SetCursorPos` は共有 cursor 値のみ更新 (Pointer Lock 連携は未実装)、`GetDeviceCaps(RASTERCAPS)` は RC_PALETTE なし、`MsgWaitForMultipleObjects[Ex]` は shimx リンク時のみ kernel handle 待ちに対応 (未リンクなら `nCount==0` のみ; #172)、`GetDC(NULL)`(スクリーン DC) は fail-fast。
 フック (`SetWindowsHookEx` 系) は §11 の範囲で配送 (CAB-159)。ImageList_*/FlatSB_*/uxtheme BufferedPaint/IME/印刷/メタファイル/wgl は stub (IMPORTS.md)。
 
 ## 10. FL lift 接続メモ (RetDec 実測知見, PE 実験 3 本から)
@@ -161,7 +171,7 @@ host は **レコード書込の前に** 共有 pointer 状態 (cursor/buttons/m
 - **モニタ/DPI (7)**: 単一仮想モニタ (HMONITOR=0x7B000001, 矩形 = canvas 寸法)。`EnumDisplaySettingsW` は 1 モード (32bpp/60Hz)。DPI は `SetThreadDpiHostingBehavior` の値保持のみ (描画スケールは GUI-7)。`GetGuiResources` はハンドル表の種別別カウンタ (GDI はストック除く、PEAK は実ピーク)。
 - **キャレット (4 + 前倒し `CreateCaret`)**: システムで 1 個。表示 = client DC への `DSTINVERT` (点滅なし)。所有ウィンドウ破棄でキャレット破棄。WM_PAINT で上書きされた場合は次の Show/Hide/移動まで反転状態が不整合になり得る (近似)。
 - **入力 (7)**: `SendInput` は host リングを介さず `translate_input` へ直接注入 (キー/Unicode/スキャンコード/マウス相対・絶対 (0..65535→画面)・ボタン・ホイール)。`buttons/mods/cursor` は host 所有の領域を shim も更新し、次の実入力で host 値に上書きされる。`ToUnicode`/`ToAscii` は US 配列 (デッドキー・AltGr なし)。キー名/スキャンコード表は set 1 US。HKL は 1 個 (0x04090409)。
-- **リソース**: `LoadStringW` (RT_STRING) / `LoadBitmapW` (RT_BITMAP, 24/32bpp のみ) は `gui_set_resource_provider()` で結合側が供給する (shimx の FindResource/LoadResource 相当を CAB-173 で接続)。未設定/未発見は 0 + `ERROR_RESOURCE_NAME_NOT_FOUND`(1814)/`ERROR_RESOURCE_TYPE_NOT_FOUND`(1813)。
+- **リソース**: `LoadStringW` (RT_STRING) / `LoadBitmapW` (RT_BITMAP, 1/4/8/24/32bpp; 1bpp は mono DDB) は `gui_set_resource_provider()` で結合側が供給する (shimx の FindResource/LoadResource 相当を CAB-173 で接続)。未設定/未発見は 0 + `ERROR_RESOURCE_NAME_NOT_FOUND`(1814)/`ERROR_RESOURCE_TYPE_NOT_FOUND`(1813)。
 - **GDI**: `DrawEdge` は矩形のみ (`BF_DIAGONAL` は fail-fast; SOFT は近似)。`DrawFrameControl` は形状簡略 (ボタン/チェック/ラジオ/スクロール矢印/キャプション/メニュー記号)。`DrawFocusRect` は (x+y)偶数画素の XOR (2 回で復帰)。
   `CreateDCW("DISPLAY")` は画面寸法を返す互換 DC (描画は破棄; 画面直描きは不可)。`GetClipRgn` は論理座標、`GetRandomRgn` は SYSRGN=画面座標 / CLIPRGN=DC 原点基準。`GetRegionData` は RDH_RECTANGLES を (top,left) 順で返す。
   アイコン/カーソルは標準 (擬似ハンドル) のみ: 32x32 のプレースホルダ画像を生成して `GetIconInfo`/`DrawIcon[Ex]` が使う (実画像資源・`CreateIconIndirect`・`LoadImage` は GUI-2)。

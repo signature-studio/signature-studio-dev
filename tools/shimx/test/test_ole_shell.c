@@ -92,6 +92,7 @@ static void test_variant_safearray(void) {
     VariantClear(&w); VariantClear(&va);
 }
 
+#include "test_shord.inc"
 static void test_stream_malloc(void) {
     LPVOID stm = NULL;
     CHECK(CreateStreamOnHGlobal(0, TRUE, &stm) == S_OK && stm);
@@ -196,5 +197,8 @@ void run_ole_shell_tests(void) {
     test_guid_bstr();
     test_variant_safearray();
     test_stream_malloc();
+    test_shord();
+    test_cp932();
+    test_crypt();
     test_shell_version();
 }

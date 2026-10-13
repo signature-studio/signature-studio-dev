@@ -47,7 +47,7 @@
 | windowscodecs.dll | 1 | 2 |  |
 | comdlg32.dll | 2 | 2 | ● |
 
-GUI 系 DLL (user32.dll, gdi32.dll, comctl32.dll, comdlg32.dll, opengl32.dll, uxtheme.dll, imm32.dll, msimg32.dll, dwmapi.dll, winspool.drv, oleacc.dll, wtsapi32.dll, shcore.dll) の import 合計 **429 名**: 実装済み **270** / fail-fast stub **159** / arity 不明で未生成 **0**。
+GUI 系 DLL (user32.dll, gdi32.dll, comctl32.dll, comdlg32.dll, opengl32.dll, uxtheme.dll, imm32.dll, msimg32.dll, dwmapi.dll, winspool.drv, oleacc.dll, wtsapi32.dll, shcore.dll) の import 合計 **429 名**: 実装済み **280** / fail-fast stub **149** / arity 不明で未生成 **0**。
 
 ## 2. 優先度定義
 
@@ -339,8 +339,8 @@ GUI 系 DLL (user32.dll, gdi32.dll, comctl32.dll, comdlg32.dll, opengl32.dll, ux
 | ImageList_GetDragImage | comctl32 | imagelist | 4 | STUB |  |
 | ImageList_GetImageCount | comctl32 | imagelist | 4 | STUB |  |
 | CreateHalftonePalette | gdi32 | palette | 4 | STUB |  |
-| GetDIBColorTable | gdi32 | palette | 4 | STUB |  |
-| SetDIBColorTable | gdi32 | palette | 4 | STUB |  |
+| GetDIBColorTable | gdi32 | palette | 4 | IMPL |  |
+| SetDIBColorTable | gdi32 | palette | 4 | IMPL |  |
 | ImmAssociateContextEx | imm32 | IME | 4 | STUB |  |
 | DestroyMenu | user32 | menu | 4 | STUB |  |
 | EnableMenuItem | user32 | menu | 4 | STUB |  |
@@ -370,7 +370,7 @@ GUI 系 DLL (user32.dll, gdi32.dll, comctl32.dll, comdlg32.dll, opengl32.dll, ux
 | CreatePatternBrush | gdi32 | dc-state | 2 | STUB |  |
 | CreatePenIndirect | gdi32 | dc-state | 2 | STUB |  |
 | CreatePolygonRgn | gdi32 | clip/region | 2 | STUB |  |
-| EnumFontFamiliesExW | gdi32 | text/font | 2 | STUB | ●survey |
+| EnumFontFamiliesExW | gdi32 | text/font | 2 | IMPL | ●survey |
 | EnumFontsW | gdi32 | text/font | 2 | STUB |  |
 | FrameRgn | gdi32 | clip/region | 2 | STUB |  |
 | GetCurrentObject | gdi32 | dc-state | 2 | IMPL |  |
@@ -381,9 +381,9 @@ GUI 系 DLL (user32.dll, gdi32.dll, comctl32.dll, comdlg32.dll, opengl32.dll, ux
 | TextOutW | gdi32 | text/font | 2 | IMPL |  |
 | GetDpiForMonitor | shcore | system | 2 | STUB |  |
 | GetProcessDpiAwareness | shcore | system | 2 | STUB |  |
-| CharLowerW | user32 | util | 2 | STUB |  |
-| CharNextExA | user32 | util | 2 | STUB |  |
-| CharToOemBuffW | user32 | util | 2 | STUB |  |
+| CharLowerW | user32 | util | 2 | IMPL |  |
+| CharNextExA | user32 | util | 2 | IMPL |  |
+| CharToOemBuffW | user32 | util | 2 | IMPL |  |
 | CopyImage | user32 | cursor/icon | 2 | STUB |  |
 | CountClipboardFormats | user32 | clipboard | 2 | STUB |  |
 | CreateCaret | user32 | cursor/icon | 2 | IMPL |  |
@@ -495,10 +495,10 @@ GUI 系 DLL (user32.dll, gdi32.dll, comctl32.dll, comdlg32.dll, opengl32.dll, ux
 | BufferedPaintUnInit | uxtheme | aux | 2 | STUB |  |
 | GetDefaultPrinterW | winspool.drv | printing | 2 | STUB |  |
 | OpenPrinterW | winspool.drv | printing | 2 | STUB |  |
-| WTSRegisterSessionNotification | wtsapi32 | shell-integration | 2 | STUB |  |
-| WTSUnRegisterSessionNotification | wtsapi32 | shell-integration | 2 | STUB |  |
-| GetOpenFileNameW | comdlg32 | dialog | 1 | STUB |  |
-| GetSaveFileNameW | comdlg32 | dialog | 1 | STUB |  |
+| WTSRegisterSessionNotification | wtsapi32 | shell-integration | 2 | IMPL |  |
+| WTSUnRegisterSessionNotification | wtsapi32 | shell-integration | 2 | IMPL |  |
+| GetOpenFileNameW | comdlg32 | dialog | 1 | IMPL |  |
+| GetSaveFileNameW | comdlg32 | dialog | 1 | IMPL |  |
 | DefMDIChildProcW | user32 | aux | 1 | IMPL |  |
 | EnableScrollBar | user32 | scrollbar | 1 | STUB |  |
 | GetScrollRange | user32 | scrollbar | 1 | STUB |  |
@@ -511,8 +511,8 @@ GUI 系 DLL (user32.dll, gdi32.dll, comctl32.dll, comdlg32.dll, opengl32.dll, ux
 
 | 区分 | API (P 分類) |
 |---|---|
-| 到達 & 実装済み | CharLowerBuffW (P1), CreatePalette (P2), CreateWindowExW (P0), EnumDisplayMonitors (P1), EnumDisplaySettingsW (P1), FindWindowW (P1), GetClassInfoW (P0), GetClipCursor (P0), GetDC (P0), GetDeviceCaps (P0), GetMonitorInfoW (P1), GetStockObject (P1), GetSystemMetrics (P0), LoadIconW (P1), LoadStringW (P1), MessageBoxA (P2), RegisterClassW (P0), RegisterClipboardFormatW (P0), RegisterWindowMessageW (P0), ReleaseDC (P0), SetWindowLongPtrW (P0), SystemParametersInfoW (P0) |
-| 到達 & fail-fast stub (**実装必須へ昇格**) | EnumFontFamiliesExW (P2) |
+| 到達 & 実装済み | CharLowerBuffW (P1), CreatePalette (P2), CreateWindowExW (P0), EnumDisplayMonitors (P1), EnumDisplaySettingsW (P1), EnumFontFamiliesExW (P2), FindWindowW (P1), GetClassInfoW (P0), GetClipCursor (P0), GetDC (P0), GetDeviceCaps (P0), GetMonitorInfoW (P1), GetStockObject (P1), GetSystemMetrics (P0), LoadIconW (P1), LoadStringW (P1), MessageBoxA (P2), RegisterClassW (P0), RegisterClipboardFormatW (P0), RegisterWindowMessageW (P0), ReleaseDC (P0), SetWindowLongPtrW (P0), SystemParametersInfoW (P0) |
+| 到達 & fail-fast stub (**実装必須へ昇格**) | なし |
 | 到達 & P2/P3 (**P1 以上へ昇格候補**) | CreatePalette (P2), EnumFontFamiliesExW (P2), MessageBoxA (P2) |
 | 未到達の P0 (現 m11 到達段では未実行) | SendMessageW, PostMessageW, DeleteObject, SelectObject, GetCursorPos, GetWindowLongPtrW, GetCapture, DeleteDC, SetWindowPos, BitBlt, SetBkColor, SetCursor, IntersectRect, IsWindowVisible, SetFocus, CreateCompatibleDC, GetWindowRect, ReleaseCapture, OffsetRect, ShowWindow, GetObjectW, SetTextColor, DrawTextW, MapWindowPoints, DefWindowProcW, SetWindowOrgEx, GetKeyState, PeekMessageW, CombineRgn, RestoreDC, FillRect, GetParent, InvalidateRect, RedrawWindow, SetActiveWindow, EndPaint, DispatchMessageW, StretchBlt, GetFocus, GetWindowThreadProcessId, SetTimer, CallWindowProcW, GetAsyncKeyState, GetWindow, IsWindowEnabled, SetStretchBltMode, BeginPaint, SetCursorPos, SetPhysicalCursorPos, GetClientRect, UnregisterClassW, GetDIBits, GetActiveWindow, CreateBitmap, CreateCompatibleBitmap, DestroyWindow, IsIconic, LockWindowUpdate, SetCapture, GdiFlush, PatBlt, ClientToScreen, GetWindowDC, IsWindow, MapVirtualKeyW, PhysicalToLogicalPoint, TranslateMessage, CreateDIBSection, GetDCEx, GetDesktopWindow, GetKeyboardState, PostQuitMessage, SetWindowTextW, AlphaBlend, GetForegroundWindow, ActivateKeyboardLayout, GetPhysicalCursorPos, IsChild, KillTimer, SetForegroundWindow, ValidateRect, WindowFromPoint, StretchDIBits, EnableWindow, GetAncestor, GetKeyboardLayout, LogicalToPhysicalPoint, ScreenToClient, SetDIBits, AdjustWindowRectEx, GetMessagePos, GetUpdateRect, IsZoomed, LoadKeyboardLayoutW, SetParent, ToAscii, UpdateWindow, WaitMessage, GetStretchBltMode, SetDIBitsToDevice, DispatchMessageA, GetMessageTime, GetMessageW, GetWindowTextW, InvalidateRgn, PostThreadMessageW, SendMessageA, SetWindowTextA |
 
