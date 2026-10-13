@@ -95,11 +95,13 @@ pass 3 回とも `failures=0`、FLAC 4,747/4,747 PCM 一致、MD5 有り 4,747�
 
 Chrome 154.0.8037.97 headless (実ディスクプロファイル) / 同一 inventory・pack (`pack/pack.ts`, quality 9, 7,357 files) / `browser-test.ts --sample 150` (sha256 照合 151 files・29.2 MB)。
 
+HEAD `62ba0b54` (判定を sha 起因に絞った後) で `SERUM2_WORK=<prep> bash tools/assets/serum2/chrome-e2e.sh` を 1 回実行 (prep: `make-inventory.mjs` 7,357 files / 1,392,825,417 B 期待値一致、`pack/pack.ts` 12.9 s)。
+
 | 項目 | 実測 |
 |---|---|
-| pass (cold / warm / xhr-cold) | exit 0, failed=0, 5 s (load 0.61 0.48 0.23) |
-| neg (全 sha を 0 に置換) | exit 1, failed=3, 6 s |
-| 各 run の sha256 照合 | 151/151 一致 (cold / warm / xhr-cold すべて) |
-| server chunk request (cold / warm / xhr-cold) | 133 / 0 / 133 |
+| pass (cold / warm / xhr-cold) | exit 0, failed=0, 12 s (load 0.93 0.58 0.26) => OK |
+| neg (全 sha を 0 に置換) | exit 1, failed=3, sha_fail=3, 5 s => OK |
+| 各 run の sha256 照合 | pass 151/151 一致 ×3 / neg 151 不一致 ×3 (cold / warm / xhr-cold) |
+| server chunk request (cold / warm / xhr-cold) | 133 / 0 / 133 (pass・neg とも) |
 
-注: 上表は判定を sha 起因に絞る前のスクリプトでの実測。修正後の `chrome-e2e.sh` (neg は `failed=3` かつ sha256 FAIL 行 3 件) は素材 `plugins-serum2` と prep が runner に無く未実行 (PR 本文の `oc_artifacts: plugins-serum2` で再実行予定)。
+修正前スクリプト (`1f8f477`) の実測 (pass 5 s / neg 6 s) は本表で置き換え。実行は 1 回のみ (n=1)。
