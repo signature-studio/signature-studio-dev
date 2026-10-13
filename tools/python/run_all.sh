@@ -29,6 +29,7 @@ step "7. builtin 一覧 / FL 同梱 Python 差分"; node tests/dump_builtins.mjs
 step "8. PoC: MCPTools.pyc on wasm Python + flapi mock (Worker/SAB RPC)"; node tests/poc_mcp.mjs | grep -E '"(tools|init_ms|host_calls|roundtrip_us_per_flapi_call)"|POC'
 step "9. 48 tools 全実行"; node tests/all_tools.mjs
 step "9b. C provider (fl_api_call) 版 flprov.wasm + 48 tools"; bash provider/build.sh | tail -2; node tests/provider_check.mjs; FL_ENGINE=wasm node tests/all_tools.mjs
+step "9c. ilmcp 9 関数 e2e (状態検査 + ネガティブ)"; node tests/ilmcp_e2e.mjs
 python3 analysis/mcp_classify.py
 step "9c. .pyscript ローダ + flpianoroll 回帰 (同梱 Piano roll 5 / Remote 5 / Audio 12 調査)"; node tests/pyscript_e2e.mjs | grep -E '^\{"total"'
 step "9d. 同梱 Piano roll 5 本を Chrome (agent-browser) 上の wasm CPython で実行 + node 出力との一致 (PY-11 #466)"
@@ -46,5 +47,6 @@ node tests/midi_bundled_device.mjs                              # 入力が無�
 step "13. サブインタプリタ検証 (flpy.wasm: Py_NewInterpreterFromConfig)"
 node tests/subinterp_probe.mjs | cut -c1-300
 node tests/subinterp_probe.mjs --neg | cut -c1-120 || [ $? -eq 1 ]
+bash tests/subinterp_negcontrol_old.sh | tail -2                     # ネガコン: 修正前 flpy.c (PY-12 #587) で probe が FAIL すること
 step "14. MIDI scripting を アプリ UI / devtools に公開 (Vite + headless Chrome, PY-6 #76)"; (cd "$HERE/../.." && node tools/python/tests/midi_ui_check.mjs 2>&1 | grep -v shim_port | cut -c1-300)
 step "ALL OK"

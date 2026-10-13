@@ -10,6 +10,7 @@
 #include <sys/mman.h>
 #include <sys/syscall.h>
 #include <sys/time.h>
+#include <time.h>
 #include <unistd.h>
 
 #pragma pack(push,1)
@@ -200,9 +201,14 @@ static void run_case(char* line) {
   scrub_stack(ld_case.stkfill);
   if (ld_case.trace) tr_arm();
   struct itimerval it = { {0, 0}, {1, 500000} };
+  struct timespec t0, t1;
+  ld_native_ms = -1.0;
   if (sigsetjmp(g_jb, 1) == 0) {
     g_in_call = 1; setitimer(ITIMER_REAL, &it, NULL);
+    clock_gettime(CLOCK_MONOTONIC, &t0);
     ld_ms_call(fn, gpr, xmm, stk, nstk, out, ld_case.rax);
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    ld_native_ms = (double)(t1.tv_sec - t0.tv_sec) * 1e3 + (double)(t1.tv_nsec - t0.tv_nsec) / 1e6;
     struct itimerval z = {{0,0},{0,0}}; setitimer(ITIMER_REAL, &z, NULL);
     g_in_call = 0;
     if (ld_case.trace) tr_disarm();

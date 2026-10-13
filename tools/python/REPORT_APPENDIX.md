@@ -1,23 +1,86 @@
-# tools/python REPORT 付録 (REPORT.md から分割移動)
+# tools/python REPORT 付録
 
-> **正本**: `tools/python/REPORT.md`。本書は行数上限 (250 行、`docs/DOC_MAP.md` §1) 超過分の**分割移動**で、内容は削除していない。
+> 正本: `tools/python/REPORT.md`。行数上限 (250 行, `docs/DOC_MAP.md` §1) のため、§7c (ilmcp, PY-3 #82)・§9 (下流チケット T1〜T9 表)・§PY-13 (#588)・§12・§13 (#81 PY-9 b) の全文をここに分割移動した。内容は削除していない (Git 履歴に残る)。
 
-## A. §7b-2 (PY-1 レビュー指摘の修正: `ilmcp.getBrowserNames` の固定バッファ) — 全文
+## 7c. ilmcp 9 関数の実装 (PY-3 / #82) — `host/ilmcp.mjs`
 
-### 7b-2. レビュー指摘 (d2706e1) の修正: `ilmcp.getBrowserNames` の固定バッファ
+既知類型との関係: 該当なし (lift ではなく JS ホスト実装。DEFECTS.md の対象外)。検証起点 commit は PR 本文参照。
 
-原因: `b[2048]` へ `w += snprintf(w, 残量, ...)` で連結していたため、切り詰められた出力でも snprintf の戻り値 (= 切り詰めなければ書いた長さ) が `w` に加わり、`w` が `b + sizeof b` を越えると次の `(size_t)(b + sizeof b - w)` が巨大な値になって境界なしに書いた。`q[512]` / `full[288]` / `e[576]` と `json_str` も黙って切り詰めていた。修正 (`provider/fl_engine.c`): `json_str` と `buf_add` が残量 (`size_t`) を持ち、`n >= remaining` なら何も書かず失敗 → ハンドラは `Range error` (code 4) を返す。`full` も `snprintf` の戻り値 `>= sizeof full` で失敗にする。
+**結論**: `ilmcp` 9 関数を `host/ilmcp.mjs` に実装し `fl_mock.mjs` から差し替えた (旧: 戻り値固定の偽実装)。class B 8 tool + U 2 tool を wasm CPython 上の実 `MCPTools.pyc` で実行し、**FLEngine 側状態** (チャンネル・ミキサースロット・PRScript・highlight) を検査する e2e `tests/ilmcp_e2e.mjs` が 25/25 PASS。
+**ただし受入条件「実エンジン上で動作」は未達**: FLEngine は未完成 (`tools/flelift/boot` は InitUnits まで)。本実装は JS ホストの状態機械で、実 FL との戻り値・例外の一致は未検証。
 
-| 項目 | 実測 (HEAD b2225e1, GitHub Actions runner, node 22.23.3, emsdk 6.0.12, load average 0.53〜1.84) |
+| 関数 | 引数規約 (MCPTools 逆アセンブル実測) | 実装 |
+|---|---|---|
+| getBrowserNames(name, recursive) | name = `Plugin database[/…]`、recursive = int(0/1) | カタログ木の直下 / 全子孫を `["Effects/", …, "Drum/Kick"]` の list で返す。不明パスは ValueError |
+| addChannel(plugin) | 拡張子・パスは MCPTools 側で除去済み | generator のみ受理。戻り = 0 起点 index。effect 名・未知名は ValueError |
+| removeChannel(idx) | 0 起点。MCPTools が降順に呼ぶ | 範囲外は IndexError (code 4) |
+| addEffect(plugin, track, slot) | slot は 0 起点 (visual−1)。**plugin="" = スロット消去** (remove_effect / reset_mixer_tracks が使う) | effect のみ受理。track 0..126・slot 0..9 |
+| storePRScript(name, source) | name は拡張子なし | `/ \ :` を含む名前は拒否 (保存先は FL の Piano roll scripts dir 想定) |
+| runPRScript(source) | `ui.showWindow(piano roll)` の後に呼ばれる | ソースを保持し `st.prRunner` があれば委譲。**実行本体は PY-5 (#79) の flpianoroll 待ち** |
+| getHighlightNames() / showHighlight(item,name,caption,whenDone,flag) | whenDone は Python callable (`{__cb:id}`) | 名前は FLEngine win64 rodata 実測 21 件 (旧モックは 4 件・大文字小文字も違った: `Piano roll` ≠ 実機 `Piano Roll`) |
+| forwardTutorialEvent | MCPTools 未使用・arity 不明 | 呼出を記録して None |
+
+データ: `analysis/ilmcp/plugin_catalog.json` = native 136 (fst_manifest の `Data/Patches/Plugin database`: Generators 57 / Effects 79) + installed 5 (`hostbridge/nfo/specs/wasm_plugins.json`)。`analysis/ilmcp/highlight_names.json` = rodata の UnicodeString リテラル 21 件。生成 = `FL_WIN64_DIR=… python3 analysis/ilmcp_catalog.py`。
+`/py/` の配信許可 (`vite.config.ts` `pyAssets`) は ilmcp.mjs が import する 2 JSON を個別に列挙している。import 一覧からの自動生成は、許可リストを意図的に固定する設計 (PY-4) を崩すため不採用。取りこぼしは `mcp_ui_check.mjs` (run_all step 11) が検出する。
+カタログは**名前とカテゴリのみ** (FL 由来のバイト列は含まない)。FL 同梱プラグイン名・UI 文字列 21 件をリポジトリに置くことの可否は `docs/LEGAL.md` に照らして未確認 → PM 判断事項 (下記未解決)。
+
+### 検証 (runner, node 22.23.3, 4 core。検証起点 = クリーン worktree の commit 828d245。環境: `work/` に MCPTools.pyc・midi.py・utils.py・fl-stubs、`dist/` に `build_flpy.sh` 産の flpy.*)
+| コマンド | 結果 |
 |---|---|
-| 回帰ケース | `tests/provider_check.mjs` 節 2b: 収まる 7 + 溢れる 5 = **12 ケース**。収まる: `""` / `"db"` / 引用符・バックスラッシュ / 制御文字 4 / 日本語 90 字 (270B) / `a`×273 (full 287B ちょうど) / 制御文字×80 + `a`×17 (b[2048] に 2047B ちょうど)。溢れる: `a`×274 (full 288B) / 制御文字×80 + `a`×18 (q・full・e は収まり b だけ溢れる、2051B) / 制御文字×85 (q) / 制御文字×100 (reviewer 再現) / `a`×100000。溢れた後に `getBrowserNames("db")` が正常応答することも各ケースで確認。b の長さ = 59 + 4X (X = エスケープ後の名前長) |
-| 旧コード (d2706e1) × 新テスト | **FAIL**: 溢れる 5 ケース中 5 つ。`a`×274 と `a`×100000 は黙って切り詰めた ok (`…/Fruity Slice`)、他 3 つは不正 JSON (`position 2047` の SyntaxError / `Unexpected end of JSON input`)。収まる 7 ケースは旧コードでも一致 (= 正常系の挙動は不変) |
-| 修正後 × 新テスト | **PASS**: `provider_check` 0.31 / 0.29 / 0.28 秒 (3 回)。節 1〜3 全体 (Python 側の型・例外写像を含む) |
-| メモリ安全 (ASan) | `emcc -fsanitize=address` で旧・新を同テスト (節 1〜2b) 実行: 旧 = **`stack-buffer-overflow` WRITE of size 1**、新 = 検出 0 件で PASS |
-| 回帰なし | `FL_ENGINE=wasm node tests/all_tools.mjs` **48/48 ok**、soft_error 0・raised 0、host_calls 37,424、callback 往復 true、1.59 / 1.61 / 1.61 秒 (3 回)。`tool_coverage.wasm.json` と追跡中の `tool_coverage.json` の tool 別差 **0/48**。`poc_mcp` (mock) POC OK 1.06 秒 |
-| ネガティブコントロール | `full` の判定 `>=` → `>` : 溢れる `a`×274 で FAIL。`buf_add` が溢れても 0 を返す: `98 文字` で FAIL (`",]}"` の不正 JSON)。生き残り 2 件 (等価変異): q の `json_str` 失敗を無視 / `json_str` の残量判定を 2B 緩める — q・e の境界は API 経由では b[2048] (4X) が先に律速して到達できないため (いずれも b が先に失敗するので出力は同じ)。これらの個別境界は `json_str` 単体の C テスト無しでは検出できない |
+| `node tests/ilmcp_e2e.mjs` (n=3) | **25/25 PASS** × 3。wall 0.23 / 0.23 / 0.24 s (チェック本体 43 / 44 / 47 ms)、load average 0.14 |
+| `node tests/all_tools.mjs` | 48/48 ok、host_calls 37,424 (828d245 時点の値。main の PY-9b (3d1646f) 取込後の HEAD では 37,425 → 検証 2)、callback_roundtrip true、1.05 秒 |
+| `node tests/poc_mcp.mjs` | POC OK、0.60 秒 |
+| `node tests/browser_check.mjs` (headless Chrome) | BROWSER OK (crossOriginIsolated, 48 tools)、12.5 秒 |
+| ネガティブコントロール `--negative <fn>` (その関数を「何もしない / 空」に差替え) | 8 関数すべて検出: getBrowserNames 5 / addChannel 4 / removeChannel 1 / addEffect 3 / storePRScript 2 / runPRScript 1 / getHighlightNames 4 / showHighlight 3 件 FAIL (`NEGATIVE-CONTROL OK`) |
 
-検証範囲: 上記は mac pkg 無しで `fetch_inputs.sh` の win64 DATA block 経路から配置した MCPTools.pyc / midi.py / utils.py で実行した (b76d221 時点の自己申告値 host_calls 37,424・48/48 と同値)。範囲外: `run_all.sh` 全体・headless Chrome (`browser_check`) は未実施。
+### 検証 2 (PR #470 HEAD e9f46a0 = main ec79ef5 取込後。runner, node 22.23.3, 4 core。素材 `$RUNNER_TEMP/fl-win64` (`FL_WIN64_DIR`) → `fetch_inputs.sh` → `build_cpython_wasm.sh` (work/ 既存の incremental) → `build_flpy.sh` → `provider/build.sh` = 計 9 秒。測定開始時 load average 0.41。worktree ws-470 は commit 済み・`git status` clean)
+| コマンド | 結果 |
+|---|---|
+| `node tests/ilmcp_e2e.mjs` (run_all 9c、n=3) | **25/25 PASS** × 3。wall 0.43 / 0.42 / 0.43 s |
+| `node tests/ilmcp_e2e.mjs --negative <fn>` 8 件 | 5 / 4 / 1 / 3 / 2 / 1 / 4 / 3 件 FAIL (`NEGATIVE-CONTROL OK`)。各 0.42〜0.47 s |
+| `node tests/all_tools.mjs` / `FL_ENGINE=wasm node tests/all_tools.mjs` | どちらも 48/48 ok、**host_calls 37,425**、wall 2.07 / 2.05 s。`analysis/mcp/tool_coverage.json` は再生成結果とコミット済みが一致 (実行後も `git status` clean) |
+| `node tests/poc_mcp.mjs` / `node tests/browser_check.mjs` | POC rc 0 (1.30 s) / BROWSER OK (crossOriginIsolated, 48 tools)、1.36 s |
+| `node tests/provider_check.mjs` (run_all 9b) | PASS (functions 435 / implemented 60 / mcp_static 60)、0.34 s |
+| **`node tools/python/tests/mcp_ui_check.mjs`** (run_all step 11) | **MCP UI OK**、exit 0、1.92 s (UI で tools/list = 48・get_tempo = 130 BPM、devtools で set_tempo(140) → 140)。`--neg` は NEG-CONTROL DETECTED (exit 1 は設計どおり) |
+| 同上、`vite.config.ts` の ilmcp JSON 許可を**外した**状態 (前回 run で実測) | **FAIL** (`Failed to fetch dynamically imported module: …/py/host/fl_mock.mjs`)、exit 2。修正 (`pyAssets` の `allowed` 追加) の検出力を確認 |
+| run_all step 12 | midi_script OK (23 checks、0.90 s、`--neg` exit 1 DETECTED)。`midi_bundled_device.mjs` は NOT VERIFIED (exit 3): fl-win64 素材から同梱 device script を取れない (`fetch_inputs.sh` の win64 経路が配置しない)。本 PR 範囲外 |
+| run_all step 13 | subinterp_probe OK (19 checks、28.4 s、`--neg` exit 1 DETECTED)。`subinterp_negcontrol_old.sh` は本検証では未実行 |
+| run_all step 14 | midi_ui_check OK、1.72 s |
+
+`run_all.sh` 全体は `/home/ubuntu` 固定 (#630) のため一括実行できず、上記は step ごとの個別実行。
+
+host_calls の差 (旧記載 37,424 = 828d245 の値との差 +1): PY-9b (3d1646f) で kwargs 束縛が直り、旧 NameError (§12 参照: `plugins.getParamValueString(slotIndex=, useGlobalIndex=)`) で飛んでいた `plugins.getParamValueString/4` が 1 回通るようになった。`get_plugin_parameter_value` の result に `String Value: '50.0 %'` が増え、api_calls に 1 件追加 (`tool_coverage.json` の差分)。本 PR の差分 (ilmcp・vite 設定) はこの tool の呼出し経路に触れない。レビュー run (HEAD 2e1dc34) の 37,425 とも一致。
+
+`all_tools.mjs` の 48/48 は「エラー文言が無い」判定なので、旧モックでも通っていた (get_browser_names の戻りが `[object Object]` だった点は `tool_coverage.json` の差分に現れる)。状態検査は `ilmcp_e2e.mjs` が担う。
+
+### 仮定 (実機未確認)
+- getBrowserNames の戻り形: 旧モックは `{name, items}` dict、本実装は文字列 list。MCPTools は `data` をそのまま返すだけで形を検査しないため静的解析では確定できない。実機の形は PY-9 (#81) で確認。
+- フォルダ末尾 `/` の表記・`recursive` の深さ・エラー時が例外か空 list か。
+- addEffect の既知プラグイン検査: 実機が未知名に例外を返すか黙って無視するかは未確認 (MCPTools は例外を捕捉して "Failed to add effect" を返す実装なので、どちらでも tool 側は破綻しない)。
+
+### 未解決
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 実 FLEngine 上での動作 (受入条件 1) | PY-3 を Closes にできない | #74 (PY-1) の実エンジン結線後に再検証 |
+| C provider (`fl_api_call`, PR #459) の ilmcp ハンドラは旧モック意味論のまま | provider 経由 (`FL_ENGINE=wasm`) では本実装と挙動が乖離 | #459 (MERGED) にコメント済み。`fl_engine.c` を本実装と同じ意味論に更新するチケットは PM 起票待ち |
+| runPRScript の実行 (flpianoroll) | run_piano_roll_script はソース受領までで、スクリプトは走らない | #79 (PY-5) |
+| 実機の戻り形・例外の確認 | 上記「仮定」 | #81 (PY-9) |
+| `run_all.sh` が `/home/ubuntu` 固定のまま | CI で一括実行できない (本 run は手動で work/ 配置) | #630 (PY-15) にコメント済み (親 #294) |
+| カタログ (プラグイン名 141 件) と highlight 名 21 件の commit 可否 | FL 由来の名称文字列をリポジトリに含める | #569 (LGL-7)。`docs/LEGAL.md` 照合は未実施。不可なら実行時に利用者の FL から生成する形へ変更 |
+
+## 9. 下流チケット案
+
+| # | 内容 | 規模 |
+|---|---|---|
+| T1 | **(MCP 60 関数は §7b で完了。残り MIDI 経路 → 426 関数は未着手)** FLEngine wasm に flapi provider (`fl_api_call(fn_id,slots)`) を実装: まず MCP が使う 60 (公開 52 + ilmcp 8) + MIDI 経路 (device/transport/mixer/channels) 優先 → 426 関数。`flapi_table.json` から C 雛形を生成 | L |
+| T2 | CPython を FLEngine wasm へ静的リンク (JS 往復撤廃)。`flpy.c` 再利用、スレッド/GIL 方針確定 | M |
+| T3 | `ilmcp` 9 関数の実装 (PluginDB/Browser 列挙、addChannel/addEffect、PRScript store/run) → MCP B 群 8 tools | L |
+| T4 | MCP JSON-RPC をアプリ内 UI/devtools に公開 (`mcp_rpc.mjs` を FLEngine UI に接続、外部 LLM 無し) | S |
+| T5 | piano roll scripting: `flpianoroll`(Note/Marker/score/ScriptDialog) + `.pyscript` ローダ、同梱 5 本 (Euclidean/Humanize/Arpeggiator…) を回帰試験に。ScriptDialog は HUD フォーム連携 | L |
+| T6 | MIDI scripting ホスト: device script(.py) ローダ、27 callback 配送、Web MIDI 入力→`dispatch_midi`。サブインタプリタ可否の wasm 検証 | M |
+| T7 | Edison `enveditor` / `flcpt` / `flrack` module と Chord progression ツール (pyc 39 + pyscript 2) の動作検証 | M |
+| T8 | 性能: 構造値の binary ABI、バッチ API、MIDI 1 イベント当り呼出し数の計測 | S |
+| T9 | 実機 FL でのモック意味差検証 (ユーザ環境があれば。**kwargs 復元は #81 で完了**、残りは実機確認のみ) | S |
 
 ## PY-13 (#588): `build_flpy.sh` の flapi_table 再生成を環境変数化
 
@@ -64,8 +127,6 @@ stubs (LGPL 参照) 署名との照合 (kwlist のある 103 のうち stubs 署
 - stubs 既定値が C 側で不明な引数を飛ばす呼出し (`channels.soloChannel(1, useGlobalIndex=True)` 等 3 関数) は `TypeError`。実 FL は C 側の既定値で通すため意味差。ホストへの「省略」の渡し方 (provider は `None`=handler 既定値、JS mock の `tog` は `undefined` のみ省略扱い) が未統一で、PM 判断待ち (PR #463 コメントに起票依頼)。
 - stubs 既定値 `midi.*` 10 種 (21 引数: `PIM_None` 7、`GT_All` 5 ほか) は `eval(…, {})` で `NameError` (main 既存の問題)。PM が別 issue で追跡 (PR #463 コメントに起票依頼)。
 
-## B. §14 / §14b (Piano roll scripting #79 / Chrome 検証 #466) — 全文
-
 ## 14. Piano roll scripting (`flpianoroll` + `.pyscript` ローダ) — #79 (PY-5)
 
 既知類型との関係 (DEFECTS.md): 該当なし (lift ではなく純 Python 実装)。検証起点 commit: `57326b1` (クリーン worktree で再現)。
@@ -101,7 +162,7 @@ stubs (LGPL 参照) 署名との照合 (kwlist のある 103 のうち stubs 署
 | `build_flpy.sh` 再リンク | 6.4 秒 (1 回) |
 | 回帰 (既存 PoC) | `smoke_direct` OK / `poc_mcp` POC OK / `all_tools` 48/48 ok・37,424 呼出し (§5 と同値) |
 
-ネガティブコントロール (数値): (a) Euclidean の `int(i*slope)` を `int(i*slope+0.5)` に改変 → oracle 不一致を検出 (改変版のノート集合が oracle と異なる)。(b) `Score.getNote` を clone 返却に差替え → Humanize の offset が反映されず検出。(c) 存在しないコントロール名 → `KeyError` で検出。3/3 が期待通り FAIL 側に倒れた。
+ネガティブコントロール (数値、テストが `INFO` 行で常時出力): (a) Euclidean の `int(i*slope)` を `int(i*slope+0.5)` に改変 → 改変版 **41 ノート** / oracle **39 ノート** で集合不一致を検出。(b) `Score.getNote` を clone 返却に差替え → Humanize (Start Time Offset 0.5・Ref 1/64 = 6 ticks・Seed 2) の time 値列が元値 **[200,248,296,344]** のまま。同パラメータの正常系の期待値は **[203,251,299,347]** (12 ノート正常系の先頭 4 値を実測)。(c) 存在しないコントロール名 → `KeyError` で検出。3/3 とも期待どおり検出側に倒れた。
 
 ### Remote Scripts 5 本 / Audio scripts 12 本 の調査結果
 
@@ -114,7 +175,7 @@ stubs (LGPL 参照) 署名との照合 (kwlist のある 103 のうち stubs 署
 ### 検証範囲 / 範囲外
 
 - 範囲: 同梱 5+5 本の wasm 上の動作・上記 oracle との一致。モック engine (実 FLEngine ではない)。
-- 範囲外: **実機 FL の出力との一致** (未確認。下記 ASSUMPTION)、HUD の実フォーム UI (#10)、`loadScoreFromFile`、`flcpt`/`flrack`/`enveditor` (T7)。
+- 範囲外: **実機 FL の出力との一致** (未確認。下記 ASSUMPTION)、HUD の実フォーム UI (#10)、Chrome 上での pyscript 実行 (node のみ)、`loadScoreFromFile`、`flcpt`/`flrack`/`enveditor` (T7)。
 
 ### 未解決
 
@@ -126,57 +187,30 @@ stubs (LGPL 参照) 署名との照合 (kwlist のある 103 のうち stubs 署
 | Remote Scripts が `channels` を import 無しで参照 → 実機が同名を注入していると推定 | ローダの注入名 (flapi 12 module) | #79 コメント |
 | `ScriptDialog.Execute()` は headless で常に True | 対話キャンセルの再現不可 | #10 (HUD) |
 | Audio scripts 12 本に `enveditor` 実装が必要 (Edison の波形操作 13 メンバ + Editor 選択) | Audio scripts 0/12 | 新規子チケット案 `[PY-6] enveditor module` (T7 を分割) |
-| `loadScoreFromFile` 未実装 | .fst/.fsc 読込を使うスクリプト | #79 コメント |
-| ~~Chrome 上の pyscript 実行未検証~~ | 下記 §14b で解消 (#466) | — |
+| flpianoroll は #79 の 64 メンバのうち **62/64 実装**。stub 1 = `Score.loadScoreFromFile` (`NotImplementedError`)、未実装 1 = `ScriptDialog.DialogParams` (`src/flpianoroll.py` に無い) | #79 の受入「64 メンバ」は未充足。`loadScoreFromFile` は .fst/.fsc 読込を使うスクリプトに影響。`DialogParams` は HUD (#10) の実フォーム連携と合わせて実装 | #79 コメント (本 PR の fix で投稿) |
+| Chrome 上の pyscript 実行未検証 | node のみ | 新規子チケット案 (browser_check に追加) |
 
-### 14b. Chrome (agent-browser) 上の pyscript 実行検証 — #466 (PY-11)
+### 14-b. main 競合解消後の再検証 (merge commit `647c9c1`、node v22.23.3、uptime load average 1 分値 2.52 / 2.52 / 2.96)
 
-既知類型との関係 (DEFECTS.md / icall §4): 該当なし (lift ではなく wasm CPython のホスト検証)。
-
-結論: **同梱 Piano roll scripts 5/5 は Chrome 154 (headless, agent-browser 0.39.0) 上の wasm CPython で実行でき、node (v22.23.3) と出力が全件一致した**。不一致 0 件のため原因調査対象なし。
-
-| 項目 | 内容 |
+| 項目 | 結果 |
 |---|---|
-| 方式 | シナリオ本体を `tests/pyscript_scenarios.mjs` に分離 (node 版 `pyscript_e2e.mjs` と Chrome 版 `browser/pyscript.html` が**同一コード**を実行 = harness の差を排除)。Chrome は `tests/pyscript_browser.mjs` が `tools/e2e` の agent-browser ドライバで起動・結果回収 (module Worker + SAB RPC、`crossOriginIsolated=true` を判定に含む) |
-| スクリプト供給 | `node tests/pyscript_e2e.mjs --export-scripts work/pyscripts.json` で FL 同梱本文を `work/` (gitignore) に出力し、ページが実行時 fetch。FL 由来物は commit しない |
-| 判定 | (1) 43 check が両環境で名前・ok とも一致し全 PASS、(2) `run_pyscript` 出力 19 件 (`{name, values, score, result}`) がキー順非依存の正規化 JSON で全件 bit 一致、(3) Chrome の Euclidean 2 出力を **python (`tests/pyscript_compare.py`、JS oracle とは別実装の整数算術)** で再計算し一致、(4) 実行された Piano roll script が 5 本であること |
-| 再現 | `FL_WIN64_DIR=<fl-win64> bash tools/python/run_all.sh` の step 9d、または上記 3 コマンド: `node tests/pyscript_e2e.mjs --dump work/pyscript_node.json --export-scripts work/pyscripts.json` → `node tests/pyscript_browser.mjs --dump work/pyscript_chrome.json` → `python3 tests/pyscript_compare.py work/pyscript_node.json work/pyscript_chrome.json` |
+| `tests/pyscript_e2e.mjs` (n=3) | 43/43 PASS・exit 0。wall 1.64 / 0.80 / 0.78 秒 (1 回目は初回読込) |
+| `build_cpython_wasm.sh` | exit 0、real 3m33.880s (native + wasm、本 run の初回ビルド) |
+| `build_flpy.sh` | exit 0、real 5.680s |
+| 回帰 (同 HEAD) | `smoke_direct` exit 0 / `midi_script.mjs` 23 checks OK・`--neg` exit 1 (検出) / `all_tools` 48/48 ok (host_calls 37,425) / `poc_mcp` POC OK |
+| 比較 (同手順で再実行、一時展開) | 旧 head `57326b1`: host_calls 37,424 / `origin/main` `b6311f3`: 37,425 (`get_plugin_parameter_value` に `plugins.getParamValueString` 呼出しが 1 件増)。merge 後 HEAD は main と同値。差は main 側に既存。保存スナップショット `analysis/mcp/tool_coverage.json` (37,424) は現行コードより古い (自動生成物のため本 PR では更新しない) |
+| 素材 | `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`FL_WIN64_DIR`)、`toolchain-emsdk` は [EMSDK] (`docs/REFERENCES.md`) の位置に展開。mac dylib なし (flapi_table は既存表 27 件を引継ぎ) |
+| 範囲 | node + mock engine。Chrome 上の pyscript 実行は未検証 (従来どおり) |
 
-実測 (コミット c61317a の内容、Actions runner 4 core、Chrome 154.0.0.0 headless、node v22.23.3、`dist/flpy.*` は本 run でクリーンビルド、n=3、直列):
+### 14-c. 差し戻し対応後の再検証 (検証 HEAD `cd9e81e`、node v22.23.3、4 core)
 
-| 回 | load average (1 分, 開始時) | node 43 check | Chrome 43 check (スクリプト内 / wall) | compare |
-|---|---|---|---|---|
-| 1 | 1.96 | 43 PASS / 0 FAIL, 1 s | 43 PASS / 0 FAIL, 1.1 s / 2.0 s | outputs 19 件中不一致 0 |
-| 2 | 2.04 | 43 PASS / 0 FAIL, 1 s | 43 PASS / 0 FAIL, 1.1 s / 2.0 s | 同上 |
-| 3 | 2.04 | 43 PASS / 0 FAIL, 1 s | 43 PASS / 0 FAIL, 1.1 s / 2.0 s | 同上 |
+検証 HEAD は差し戻し対応の code/test commit `cd9e81e`。以降の commit は docs のみ (実行結果に影響しない)。ビルドは merge `36af1c4` の worktree で実施 (`cd9e81e` までに `src/` は未変更)。
 
-マージ後 HEAD (`cf0547f` = origin/main `e64ef6f` 取り込み後、`build_flpy.sh` 再リンク済み) でも step 9d を n=3 再実行: 3/3 とも node 43/43・Chrome 43/43・compare 不一致 0 (load average 1.04 / 1.44 / 1.44)。
-
-再検証 (#619 レビュー対応): origin/main `f9adacd` 取り込み後の HEAD `3522e52` (コード差分なし = 競合解消 + REPORT 分割) をクリーンな worktree でビルドし直して実行 (Actions runner 4 core、node v22.23.3、Chrome 154.0.0.0 headless、agent-browser 0.39.0)。`build_cpython_wasm.sh` 202 s、`build_flpy.sh` 6 s。step 9d の 3 コマンドを n=3 直列:
-
-| 回 | load average (1 分, 開始時) | node | Chrome (スクリプト内) | compare | 3 コマンド合計 wall |
-|---|---|---|---|---|---|
-| 1 | 2.79 | 43/43 PASS, exit 0 | 43/43 PASS, 0.9 s, exit 0 | outputs 19 件中不一致 0, exit 0 | 15.7 s (初回: agent-browser 初回起動を含む) |
-| 2 | 2.78 | 同上 | 同上 | 同上 | 2.7 s |
-| 3 | 2.80 | 同上 | 同上 | 同上 | 2.7 s |
-
-`pyscript_compare.py --neg` は `outputs 不一致 1/19` + `Euclidean 再計算不一致` を検出して exit 1。検証コミットは `3522e52` のみ (上の c61317a / cf0547f は各時点の記録)。
-
-(別途の先行 3 回: Chrome スクリプト内 1.1〜1.2 s / wall 1.9〜2.1 s。node のスクリプト内秒は整数丸め (`toFixed(1)` の 0.9〜1.0)。)
-node 版は分離リファクタ後も 43/43 PASS (リファクタ前 #79 の check 数と同数)。
-
-ネガティブコントロール (全て実測):
-
-| NEG | 操作 | 結果 |
-|---|---|---|
-| 比較側 | Chrome 出力 1 ノートの `time` を +1 して `pyscript_compare.py --neg` | `outputs 不一致 1/19` + `Euclidean 再計算不一致` を検出し exit 1 (run_all.sh は exit 0 を異常扱い) |
-| Chrome 実行側 | `work/pyscripts_mut.json` で Euclidean 本文を 1 箇所改変 (`current := int(i * slope + 0.5)`) して `pyscript_browser.mjs --scripts` | Chrome 上で `Euclidean default 41 vs 39`・`custom 46 vs 45` の 2 check が FAIL、total 43 / pass 41 / fail 2、exit 1 |
-| 既存 | シナリオ内 NEG-a/b/c (Euclidean 改変・getNote clone・typo 値 KeyError) | Chrome でも 3/3 検出 (43 check に含む) |
-
-検証範囲: 同梱 Piano roll 5 本 + Remote 5 本の flapi 列 + Audio 12 本の調査を、モック engine で Chrome headless 1 環境・agent-browser 経由で実行。範囲外: 実機 FL との一致、Firefox/Safari、headful Chrome、実 FLEngine(wasm) 結合 (本検証は mock engine)、`run_all.sh` 全体の再実行 (step 9d のみ実行)。
-注意: `build_flpy.sh` は mac dylib / win PE の無い runner で追跡中の `analysis/flapi/{FLAPI.md,flapi_table.json}` を書き換える (既知)。本 PR には含めていない。
-
-| 未解決 | 影響 | 起票先 |
-|---|---|---|
-| Firefox / Safari での pyscript 実行 | Chrome 以外は未検証 | #165 (PERF-P7 ブラウザ行列) にコメント |
-| mock engine ではなく実 FLEngine(wasm) 結合時の再検証 | 出力一致は mock 上の結論 | #112 / T3 以降 |
+| 項目 | 結果 |
+|---|---|
+| 素材 | `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`FL_WIN64_DIR`、`extracted/` 25,166 件)。`toolchain-emsdk` は [EMSDK] の位置 (存在確認済み) |
+| `fetch_inputs.sh` → `build_cpython_wasm.sh` → `build_flpy.sh` | 全て exit 0。直列 real 3m28.731s (wasm 初回ビルド込み。`build_flpy.sh` 単体は 14-b の 5.680s) |
+| `tests/pyscript_e2e.mjs` (n=3) | 43/43 PASS・exit 0 ×3。wall 0.89 / 0.80 / 0.80 秒。uptime 1 分値 1.11 → 1.26 |
+| 回帰 | `smoke_direct` exit 0 / `poc_mcp` POC OK / `all_tools` 48/48 ok・host_calls 37,425 / `midi_script` 23 checks OK・`--neg` exit 1 |
+| NC 実測 | (a) 改変版 41 ノート vs oracle 39 ノート / (b) time 値列 [200,248,296,344] vs 期待 [203,251,299,347] (詳細は §14 の NC 段落) |
+| 副作用 | `all_tools` は tracked の `analysis/mcp/tool_coverage.json` を書き換える (実測 37,425 vs 保存値 37,424)。検証後に元の内容へ戻し、commit には含めない |

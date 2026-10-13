@@ -1,14 +1,13 @@
 # G python-mcp — CPython wasm + flapi/MCP 解析 + ブリッジ設計 (2026-10-10)
-> **正本**: `tools/python/REPORT.md`。詳細は §7b-2 / §14 / 付録 `tools/python/REPORT_APPENDIX.md`。
 
-> 行数上限 (250 行) のため、§PY-13 (#588) と §12・§13 (#81) の全文は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) に分割移動 (本体は要約のみ)。
+> 行数上限 (250 行) のため、§7c (#82)・§9 (T1〜T9 表)・§PY-13 (#588) と §12・§13 (#81) の全文は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) に分割移動 (本体は要約のみ)。
 
 ## 結論 (先出し)
 
 1. **CPython 3.12.1 (FL 同梱版と完全一致) の emscripten/wasm ビルド成功**。パッチ無し、emsdk 6.0.12 でクリーンビルド 3m19s。node で `print(1+1)`=2、struct/json/zlib/hashlib/decimal/re/datetime/inspect 等が動作。`flpy.wasm` **5.92MB** (gzip 2.07MB) + `flpy.data` (stdlib zip) 3.20MB。
 2. **FL の組込 Python API 面を実測**: 公開 12 module **426 関数** + FL 内部 `ilmcp` 9 = **435 関数** (公開 stubs 旧版 392 に対し +34 が 26.1.7 新規)。他に `flpianoroll`(64 メンバ)/`flcpt`/`flrack`/`fl`、MIDI script callback **27**。
 3. **MCPTools.pyc = 48 tools** (「50」ではない)。逆アセンブルは同一 3.12.1 の marshal/dis。**外部通信は pyc 内に 0 件** (import は stdlib 10 + FL module 12 のみ)。分類 **A local-flapi 38 / B local-ilmcp 8 / U Gopher-UI 付随 2 / X 対象外 0**。LLM ゲートウェイ (Gopher WebView `window.flHelper`) は pyc の外で、対象外。
-4. **PoC 成功**: wasm Python を Web Worker で起動し、SAB 同期 RPC で flapi モック (FLEngine 模擬) に接続、**FL 同梱 `MCPTools.pyc` を FL と同じく `__main__` として実行して 48/48 tools が成功** (例外なし・エラー文言なしの意味。モックの戻り値のため FL 実機と同一動作の保証ではない。37,424 flapi 呼出し)。Python→ホスト callable 呼戻し・MIDI callback 経路・MCP JSON-RPC (tools/list, tools/call) も確認。**headless Chrome (cross-origin isolated, module Worker) でも成功**。
+4. **PoC 成功**: wasm Python を Web Worker で起動し、SAB 同期 RPC で flapi モック (FLEngine 模擬) に接続、**FL 同梱 `MCPTools.pyc` を FL と同じく `__main__` として実行して 48/48 tools が成功** (例外なし・エラー文言なしの意味。モックの戻り値のため FL 実機と同一動作の保証ではない。37,425 flapi 呼出し。HEAD e9f46a0 の実測。内訳は REPORT_APPENDIX §7c 検証 2)。Python→ホスト callable 呼戻し・MIDI callback 経路・MCP JSON-RPC (tools/list, tools/call) も確認。**headless Chrome (cross-origin isolated, module Worker) でも成功**。
 5. 1 コマンド E2E: `bash tools/python/run_all.sh` (incremental 19 秒 / 初回 ~4 分)。
 
 ## 1. CPython 3.12.1 wasm ビルド
@@ -92,7 +91,7 @@ FLEngine rodata の `name\0doc\0…<module>` 並びから機械抽出 (`flapi_ex
 
 ## 7. 未解決・ブロッカー・留意
 
-- **FL 側 Python C API 呼出し面は未抽出**: dlsym 先の関数名が平文で無い。サブインタプリタ運用 (`PyInterpreterConfig` 型の存在から示唆のみ) の実態は不明。wasm で `Py_NewInterpreterFromConfig` が動くかも未検証 (→ §11 で検証: 動く。`_flhost` は未対応)。
+- **FL 側 Python C API 呼出し面は未抽出**: dlsym 先の関数名が平文で無い。サブインタプリタ運用 (`PyInterpreterConfig` 型の存在から示唆のみ) の実態は不明。wasm で `Py_NewInterpreterFromConfig` が動くかも未検証 (→ §11 で検証: 動く。`_flhost` は PY-12 #587 で対応済み = PY-12 節)。
 - `mixer.getCurrentTempo(1)`/`setCurrentTempo(bpm,1)` の第 2 引数の意味 (MCPTools は素の BPM 扱い、公式 docs は ×1000) は**実機で未確認**。モックは MCPTools 側に合わせた。
 - FLEngine 側 flapi 実装は**モック(27 API を実装、他は None)**。実エンジンとの意味差 (引数省略時の既定値、-1 の意味) は実機/lift 後に検証が必要。
 - **kwargs 署名の静的復元 (PY-9 b, #81) 済み**: rodata の並び順ではなく、FLEngine (win PE) の `.data` 内メソッド表 (name/fn/flags/doc, 32B 刻み) と各ラッパー冒頭の `lea [rip+x]` から `PyArg_ParseTupleAndKeywords` の書式と kwlist を復元 (`analysis/flapi_kwargs.py` → `analysis/flapi/flapi_kwargs.json`、`flapi_table.json` の各関数に `kwsig` を追記)。結果は §12。
@@ -123,31 +122,38 @@ mock との差で見つかったもの: mock は引数の個数/型を検査し�
 入力の用意 (mac pkg 無しの Actions): `oc_artifacts: fl-win64 toolchain-emsdk` + `FL_WIN64_DIR=<fl-win64 展開先> bash fetch_inputs.sh` (パスは `tools/shared/env.sh` 経由。`$FL_MAC_DIR` に mac pkg が無ければ win64 の `block25159_DATA.bin` = MCPTools.pyc、`block24429_DATA.bin` = midi.py (770 行)、`block24430_DATA.bin` = utils.py (213 行) を `work/` に置く)。続けて `build_cpython_wasm.sh` → `build_flpy.sh` (`build_flpy.sh` は先頭で `analysis/flapi_table.py` を再実行する。入力は環境変数 `FL_WIN64_DIR`/`FL_WIN_PE`・`FL_STUBS_DIR`・`FL_ENGINE_DYLIB`・`FLAPI_OUT_DIR`・`EMSDK_DIR` で指定でき、win PE / stubs 欠落・PE 照合 0 件は exit 2 + 理由表示で止まる。詳細は §PY-13)。
 
 ### 7b-2. レビュー指摘 (d2706e1) の修正: `ilmcp.getBrowserNames` の固定バッファ
-`snprintf` 戻り値を `w` に加算していたため切り詰め時に境界なし書込みが起きていた → `json_str`/`buf_add` が残量を持ち、溢れたら `Range error` (code 4) で失敗に修正 (`provider/fl_engine.c`)。回帰 12 ケース (収まる 7 + 溢れる 5)・旧コード FAIL 5/5・ASan で旧 stack-buffer-overflow → 新 0 件・`all_tools` 48/48。**原因・ケース表・実測の全文は `REPORT_APPENDIX.md` §A**。
+
+原因: `b[2048]` へ `w += snprintf(w, 残量, ...)` で連結していたため、切り詰められた出力でも snprintf の戻り値 (= 切り詰めなければ書いた長さ) が `w` に加わり、`w` が `b + sizeof b` を越えると次の `(size_t)(b + sizeof b - w)` が巨大な値になって境界なしに書いた。`q[512]` / `full[288]` / `e[576]` と `json_str` も黙って切り詰めていた。修正 (`provider/fl_engine.c`): `json_str` と `buf_add` が残量 (`size_t`) を持ち、`n >= remaining` なら何も書かず失敗 → ハンドラは `Range error` (code 4) を返す。`full` も `snprintf` の戻り値 `>= sizeof full` で失敗にする。
+
+| 項目 | 実測 (HEAD b2225e1, GitHub Actions runner, node 22.23.3, emsdk 6.0.12, load average 0.53〜1.84) |
+|---|---|
+| 回帰ケース | `tests/provider_check.mjs` 節 2b: 収まる 7 + 溢れる 5 = **12 ケース**。収まる: `""` / `"db"` / 引用符・バックスラッシュ / 制御文字 4 / 日本語 90 字 (270B) / `a`×273 (full 287B ちょうど) / 制御文字×80 + `a`×17 (b[2048] に 2047B ちょうど)。溢れる: `a`×274 (full 288B) / 制御文字×80 + `a`×18 (q・full・e は収まり b だけ溢れる、2051B) / 制御文字×85 (q) / 制御文字×100 (reviewer 再現) / `a`×100000。溢れた後に `getBrowserNames("db")` が正常応答することも各ケースで確認。b の長さ = 59 + 4X (X = エスケープ後の名前長) |
+| 旧コード (d2706e1) × 新テスト | **FAIL**: 溢れる 5 ケース中 5 つ。`a`×274 と `a`×100000 は黙って切り詰めた ok (`…/Fruity Slice`)、他 3 つは不正 JSON (`position 2047` の SyntaxError / `Unexpected end of JSON input`)。収まる 7 ケースは旧コードでも一致 (= 正常系の挙動は不変) |
+| 修正後 × 新テスト | **PASS**: `provider_check` 0.31 / 0.29 / 0.28 秒 (3 回)。節 1〜3 全体 (Python 側の型・例外写像を含む) |
+| メモリ安全 (ASan) | `emcc -fsanitize=address` で旧・新を同テスト (節 1〜2b) 実行: 旧 = **`stack-buffer-overflow` WRITE of size 1**、新 = 検出 0 件で PASS |
+| 回帰なし | `FL_ENGINE=wasm node tests/all_tools.mjs` **48/48 ok**、soft_error 0・raised 0、host_calls 37,424、callback 往復 true、1.59 / 1.61 / 1.61 秒 (3 回)。`tool_coverage.wasm.json` と追跡中の `tool_coverage.json` の tool 別差 **0/48**。`poc_mcp` (mock) POC OK 1.06 秒 |
+| ネガティブコントロール | `full` の判定 `>=` → `>` : 溢れる `a`×274 で FAIL。`buf_add` が溢れても 0 を返す: `98 文字` で FAIL (`",]}"` の不正 JSON)。生き残り 2 件 (等価変異): q の `json_str` 失敗を無視 / `json_str` の残量判定を 2B 緩める — q・e の境界は API 経由では b[2048] (4X) が先に律速して到達できないため (いずれも b が先に失敗するので出力は同じ)。これらの個別境界は `json_str` 単体の C テスト無しでは検出できない |
+
+検証範囲: 上記は mac pkg 無しで `fetch_inputs.sh` の win64 DATA block 経路から配置した MCPTools.pyc / midi.py / utils.py で実行した (b76d221 時点の自己申告値 host_calls 37,424・48/48 と同値)。範囲外: `run_all.sh` 全体・headless Chrome (`browser_check`) は未実施。
+
 
 ## 8. ユーザ依頼事項
 
 特になし (全て既存素材で完結)。任意: 実機 FL で `mixer.getCurrentTempo(1)` の戻り値 (130 か 130000 か) を確認できれば §7 の 2 点目が解消。
 
+## 7c. ilmcp 9 関数の実装 (PY-3 / #82) — `host/ilmcp.mjs`
+
+**結論**: `ilmcp` 9 関数を JS ホスト (`host/ilmcp.mjs`) に実装し、実 `MCPTools.pyc` 上の class B 8 tool を FLEngine 側状態検査で確認 (`tests/ilmcp_e2e.mjs` 25/25)。**受入条件「実エンジン上で動作」は未達** (PR は `Refs #82`)。引数規約・データ・検証表・仮定・未解決の全文は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) (§7c を 250 行上限のため分割移動)。
+
 ## 9. 下流チケット案
 
-| # | 内容 | 規模 |
-|---|---|---|
-| T1 | **(MCP 60 関数は §7b で完了。残り MIDI 経路 → 426 関数は未着手)** FLEngine wasm に flapi provider (`fl_api_call(fn_id,slots)`) を実装: まず MCP が使う 60 (公開 52 + ilmcp 8) + MIDI 経路 (device/transport/mixer/channels) 優先 → 426 関数。`flapi_table.json` から C 雛形を生成 | L |
-| T2 | CPython を FLEngine wasm へ静的リンク (JS 往復撤廃)。`flpy.c` 再利用、スレッド/GIL 方針確定 | M |
-| T3 | `ilmcp` 9 関数の実装 (PluginDB/Browser 列挙、addChannel/addEffect、PRScript store/run) → MCP B 群 8 tools | L |
-| T4 | MCP JSON-RPC をアプリ内 UI/devtools に公開 (`mcp_rpc.mjs` を FLEngine UI に接続、外部 LLM 無し) | S |
-| T5 | piano roll scripting: `flpianoroll`(Note/Marker/score/ScriptDialog) + `.pyscript` ローダ、同梱 5 本 (Euclidean/Humanize/Arpeggiator…) を回帰試験に。ScriptDialog は HUD フォーム連携 | L |
-| T6 | MIDI scripting ホスト: device script(.py) ローダ、27 callback 配送、Web MIDI 入力→`dispatch_midi`。サブインタプリタ可否の wasm 検証 | M |
-| T7 | Edison `enveditor` / `flcpt` / `flrack` module と Chord progression ツール (pyc 39 + pyscript 2) の動作検証 | M |
-| T8 | 性能: 構造値の binary ABI、バッチ API、MIDI 1 イベント当り呼出し数の計測 | S |
-| T9 | 実機 FL でのモック意味差検証 (ユーザ環境があれば。**kwargs 復元は #81 で完了**、残りは実機確認のみ) | S |
+T1〜T9 の表は 250 行上限のため [REPORT_APPENDIX.md](REPORT_APPENDIX.md) に分割移動した。T3 = PY-3 (本 §7c)・T4 = PY-4 (§10)・T6 = PY-6 (§11) は着手済み。
 
 ## 10. MCP JSON-RPC をアプリ UI / devtools に公開 (PY-4, #77)
 
 既知類型との関係: 該当なし (lift / 逆アセではない。flapi は引き続き `fl_mock.mjs` = FLEngine 模擬)。
 
-- 公開面: `window.flMcp` (`start(files)` `rpc(req)` `list()` `call(name,args)` `stop()`) + `/?mcp=1` の UI パネル。実装 `src/runtime/mcp_panel.ts`、配信 `vite.config.ts` `pyAssets` (`/py/` = host/・dist/flpy.{js,wasm,data}・flapi_ids.json の許可リストのみ)。設計は `BRIDGE.md` §3。
+- 公開面: `window.flMcp` (`start(files)` `rpc(req)` `list()` `call(name,args)` `stop()`) + `/?mcp=1` の UI パネル。実装 `src/runtime/mcp_panel.ts`、配信 `vite.config.ts` `pyAssets` (`/py/` = host/・dist/flpy.{js,wasm,data}・flapi_ids.json・ilmcp の 2 JSON の許可リストのみ)。設計は `BRIDGE.md` §3。
 - `mcp_rpc.mjs` 変更: `tools/call` は `tools/list` に出る name だけ受理 (未知 / 非 tool は isError=true。変更前は `__main__` の任意属性を呼べた)、不正 JSON は -32700。`flpython.mjs` は呼出し側が Worker を渡せる `worker` 引数を追加 (既存呼出しは無変更)。
 - MCPTools.pyc / midi.py / utils.py は**配信しない**: 利用者が UI のファイル選択 (または `flMcp.start({...})`) で供給する。未供給の `start()` は「供給が必要」で reject。
 
@@ -186,11 +192,13 @@ mock との差で見つかったもの: mock は引数の個数/型を検査し�
 | handled / port / 例外 | 達成 | handled で停止 (OnMidiIn・OnMidiMsg 各)・0xF8 は型別なし・port 不一致は非配送・例外の隔離と stderr traceback・未知 callback / 個数不一致 / 不正バイトは reject |
 | Web MIDI → dispatch 結線 | **偽 MIDIAccess で達成**・実デバイス未検証 | node 偽 access: 200 件連投が到着順、portMap・後から接続した入力・detach。Chrome (`node tests/midi_ui_check.mjs`, ルートから): UI でファイル供給→起動→OnInit→60 件連投・port 別配送・devtools から注入、14 check PASS。**実 Chrome の `requestMIDIAccess` はこの runner で `InvalidStateError: Platform dependent initialization failed`** (MIDI backend なし) |
 | 同梱 device script の動作 | **未検証** | `node tests/midi_bundled_device.mjs` → exit 3 (入力 `work/device_Forward CCs…py`・`midi.py`・`utils.py` 無し)。ハーネス自体は合成の代替ファイルで dry-run し exit 0 / `--neg` で exit 1 を確認 (同梱 script ではない) |
-| サブインタプリタ | 下記 | `node tests/subinterp_probe.mjs`: 12 check PASS |
+| サブインタプリタ | 下記・PY-12 節 | `node tests/subinterp_probe.mjs`: 12 check PASS (PY-6 時点。現行 19 check は PY-12 節) |
 
 実測 (n=3): `midi_script.mjs` wall 0.59〜0.60 秒。MIDI 1 件のフル配送 (Worker + SAB RPC、OnMidiIn+OnMidiMsg+OnNoteOn の 3 callback) は逐次 137〜143 µs・パイプライン 129〜137 µs (1000 件当り)。`midi_ui_check.mjs` スクリプト内 1.292 / 1.322 / 1.541 秒。`subinterp_probe.mjs` wall 5.09〜5.10 秒。`pnpm typecheck` / `pnpm build` 成功。`flpy.wasm` 5,923,783B / `flpy.data` 3,214,338B / `flpy.js` 120,351B (本 run のリンク。§1 の 5,920,419B との差は同表記の再ビルド変動の範囲で、因果は未切り分け)。CPython クリーンビルド (tgz 取得+native+wasm+記録) 210 秒 (4 core, ログの開始/終了時刻差)。
 
 ネガティブコントロール (終了コード 1 = 検出): `midi_script.mjs --neg` (recorder から OnDirtyChannel を消す → 「27 全配送」だけが FAIL、26/27 と欠落名を表示)・`midi_ui_check.mjs --neg` (構文エラー入り script → 「2 script 読込」だけが FAIL、UI に SyntaxError)・`subinterp_probe.mjs --neg` (拒否 builtin の期待を 1 本欠く → その check だけ FAIL)・`midi_bundled_device.mjs --neg` (midi.py 無し → 読込 check が FAIL)。通常実行の FAIL は exit 2、入力欠落は exit 3 (緑にならない)。
+
+**#601 (load 失敗の巻き戻し)**: `fl_rt.load_device_script` は exec 成功後に `_scripts` へ登録し、例外時は `sys.modules` も戻して再送出する (旧: 登録後に exec → top-level 例外で半端な module が残り midiIn / callback が配送された)。同名の既存 script は先に unload 済みで復元しない。UI (`src/runtime/midi_script.ts`) は読込失敗時に `flMidi.stop()` で巻き戻し (started=false・接続ボタン無効・起動ボタン再有効)。回帰: `midi_script.mjs` §4b (fixture `device_import_fails.py`、29 check)・`midi_ui_check.mjs` 失敗経路 (20 check)。ネガコン (exit 1 = 検出): `midi_script.mjs --neg-legacy` (旧ローダへ差し戻し → 必須 3 check (`LEGACY_KEYS`: listDeviceScripts・sys.modules・midiIn 配送) が FAIL、非 MIDI 配送・同名再読込は FAIL しても可)・`midi_ui_check.mjs --neg-rollback` (UI の stop を無効化 → started・起動ボタン・midiIn の 3 check が FAIL。接続ボタンは catch 節が直接 disabled にするため stop の有無では変わらず検出対象外)。接続ボタン check は起動前に有効化してから失敗させ、失敗後に無効へ戻ることを観測する形に変更 (起動前から disabled だった旧 check は常に PASS で無意味だった)。実測 (HEAD 238353e = main 5d7822a を merge した状態。emsdk 6.0.12 で CPython wasm・flpy をビルド。build_flpy.sh 後の `git status` は空): `midi_script.mjs` exit 0 (29 check 全 PASS)・`--neg-legacy` exit 1 (29 check 中 FAIL 4 件: 必須 3 件 + 非 MIDI 配送 = LEGACY_KEYS 3 本が全て FAIL)・`midi_ui_check.mjs` exit 0 (20 check 全 PASS)・`--neg-rollback` exit 1 (19 check 中 FAIL 3 件: started・起動ボタン・midiIn)。接続ボタンは検出対象外。
 
 ### サブインタプリタ (`flpy_subinterp_run` = 検証用 export)
 
@@ -201,7 +209,7 @@ mock との差で見つかったもの: mock は引数の個数/型を検査し�
 | builtin 66 本 | isolated で拒否 5 本 (`_elementtree _flhost _lsprof faulthandler pyexpat`、"does not support loading in subinterpreters")。legacy は 0 本 |
 | 隔離 | isolated は main の `__main__` 変数・`sys.modules` を共有しない |
 | コスト | 作成+`import json, re`+実行+破棄 = 26.74〜28.21 ms/個 (50 個ずつの平均を 1 run 3 batch、3 run)。150 回後も線形メモリ 33,554,432B のまま (増加なし) |
-| **`_flhost`** | isolated では import 不可 (`Py_mod_multiple_interpreters` 未宣言。3.12.1 の既定は非対応)。**legacy では import できるが、`flhost_exec` が static 変数 (`json_loads`/`HostError`/`g_cbs`) を上書きし、サブインタプリタ破棄後に main の `_flhost.call` が壊れる** (trap `memory access out of bounds` / `NameError: isinstance` 等、症状は不定) |
+| **`_flhost`** (PY-6 時点・PY-12 #587 で解消 → PY-12 節) | isolated では import 不可 (`Py_mod_multiple_interpreters` 未宣言。3.12.1 の既定は非対応)。**legacy では import できるが、`flhost_exec` が static 変数 (`json_loads`/`HostError`/`g_cbs`) を上書きし、サブインタプリタ破棄後に main の `_flhost.call` が壊れる** (trap `memory access out of bounds` / `NameError: isinstance` 等、症状は不定) |
 
 判断 (推定を含む): device script の配送は script ごとの module namespace で足りるため、サブインタプリタは**採用しない**。違いは `sys.modules` を共有する点 (script 間で `utils` 等が共有される)。FL が script ごとにインタプリタを分けているかは `PyInterpreterConfig` 型名の存在以外に証拠が無く未確認。将来必要になれば `_flhost` を module state 化 + `Py_mod_multiple_interpreters` 宣言する改修が前提 (下表)。
 
@@ -211,10 +219,14 @@ mock との差で見つかったもの: mock は引数の個数/型を検査し�
 | 実ブラウザ / 実 MIDI デバイスでの Web MIDI 受信が未検証 | 結線は偽 MIDIAccess のみ | #37 (AU-14) にコメント。手元ブラウザでの `flMidi.connectWebMidi()` 実行を依頼 |
 | host 通知 13 個と OnMidiOutMsg の**発火元** (OnIdle の 20ms 周期・OnRefresh フラグ・OnUpdateMeters の `device.setHasMeters` ゲート等) は FLEngine 側の責務で、本実装は配送面のみ。OnInitAll の意味 (全 script の OnInit 後に 1 回) は名前からの推定 | エンジン結合時に発火条件を別途実装・実機確認 | 親 #35 に提案 (FLEngine 結線チケット) |
 | 文書 (公開 stubs) 由来の仕様 (handled 伝播・midiId/midiChan=0・timestamp=0) は 26.1.7 実機で未確認 | 実 script が midiChan 等に依存すると差が出る | 上記 #76 再実行時に同梱 script で確認 / 実機があれば #35 |
-| `_flhost` の per-module state 化 + `Py_mod_multiple_interpreters` 宣言 (サブインタプリタ採用時のみ) | 現状 legacy サブインタプリタで main が壊れる | 新規子チケット提案 `[PY-n]` (採用判断後。PM 起票) |
+| `_flhost` の per-module state 化 + `Py_mod_multiple_interpreters` 宣言 | 解消 | #587 (PY-12) で実装 → PY-12 節 |
 | mock の `device.*` は forwardMIDICC / midiOutMsg の記録と 3 関数のみ。実エンジン未接続 | 同梱 script が他の device API を使うと None が返る (`midi_bundled_device.mjs` は未実装 API 呼出しを FAIL にする) | #74 (PY-1) 以降 / 親 #35 |
-| (解消) `build_flpy.sh` の `flapi_table.json` 再生成 | #588 (PY-13) で env 化 | §PY-13 |
+| (解消) `build_flpy.sh` の `flapi_table.json` 再生成 | #588 (PY-13) で env 化 | §PY-13 (`REPORT_APPENDIX.md`) |
 | PY-4 の `poc_mcp.mjs` / `all_tools.mjs` / `mcp_ui_check.mjs` は MCPTools.pyc が無く再実行不可 (本 run で `dispatch_midi` の PoC 区間のみ `midi_script.mjs` に複製して同結果を確認) | `fl_rt.py` / `fl_mock.mjs` の変更の回帰を全体では未確認 | #76 再実行時に `run_all.sh` 相当を実行 |
+
+## PY-12 (#587): `_flhost` の per-module state 化 — 実測・全文は `REPORT_PY12.md`
+
+**結論**: 受入条件 3 件とも達成 (`_flhost` を module state 化し `Py_mod_multiple_interpreters` 宣言、isolated で import 可・破棄後も main 無傷、採用判断材料あり)。**採用判断: 採用しない** (隔離の代償が module namespace 分離の数百倍)。
 
 ## PY-13 (#588): `build_flpy.sh` の flapi_table 再生成を環境変数化
 入力 (win PE / stubs / mac dylib / 出力先 / emsdk) を環境変数化し、欠落時は exit 2 (旧: 空入力で緑)。検証 `tests/flapi_table_check.sh` (3 回とも exit 0・2.20 秒・正常系 3/3 一致・ネガコン 6 本 exit 2)。全文・未解決 (#630 PY-15 ほか): [REPORT_APPENDIX.md](REPORT_APPENDIX.md)
@@ -225,14 +237,6 @@ FLEngine の PyMethodDef 表から 435/435 関数を対応付け、書式 303 �
 ## 13. 未解決 (#81)
 (a) 実機 FL での `mixer.getCurrentTempo(1)` 確認 (#81 のブロッカー)、`device.flrMidiNote` / `flrMidiCC` の書式未復元、省略引数のホストへの渡し方・stubs 既定値 `midi.*` の `eval` NameError は PM 判断待ち (PR #463 コメントに起票依頼)。詳細: [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §13。
 
-## 14. Piano roll scripting (`flpianoroll` + `.pyscript` ローダ) — #79 (PY-5) / Chrome 検証 #466 (PY-11)
+## 14. Piano roll scripting (`flpianoroll` + `.pyscript` ローダ) — #79 (PY-5)
 
-- 既知類型との関係 (DEFECTS.md): 該当なし (lift ではなく純 Python 実装 / wasm CPython のホスト検証)。 **結論**: 同梱 Piano roll scripts **5/5** が wasm CPython 上で実行でき、**43 検査 (うちネガティブコントロール 3) 全 PASS** で回帰テスト化 (`tests/pyscript_e2e.mjs`、node v22.23.3 で 43/43)。Remote Scripts 5 本は flapi のみで動作 (5/5)。Audio scripts 12 本は `enveditor` 依存のため **0/12**。
-- **#466 (Chrome)**: 同梱 Piano roll 5/5 を Chrome 154 (headless, agent-browser 0.39.0) 上で実行し、node と 43 check 全 PASS・`run_pyscript` 出力 19 件が全件一致 (不一致 0)。独立再計算 (`tests/pyscript_compare.py`) とネガコン 3 種 (compare 側・Chrome 実行側・シナリオ内 NEG-a/b/c) は全て FAIL 側に倒れた。実測 (n=3、load average、wall) は付録 §B。
-- 再現: `FL_WIN64_DIR=<fl-win64> bash tools/python/run_all.sh` の step 9d、または `node tests/pyscript_e2e.mjs --dump work/pyscript_node.json --export-scripts work/pyscripts.json` → `node tests/pyscript_browser.mjs --dump work/pyscript_chrome.json` → `python3 tests/pyscript_compare.py work/pyscript_node.json work/pyscript_chrome.json`。 **詳細 (実装表・oracle 表・実測表・Remote/Audio 調査・範囲外・未解決表の全文) は `tools/python/REPORT_APPENDIX.md` §B**。範囲外: 実機 FL との一致、Firefox/Safari、headful Chrome、実 FLEngine(wasm) 結合 (mock engine)、`run_all.sh` 全体の再実行。
-
-| 未解決 | 影響 | 起票先 |
-|---|---|---|
-| Firefox / Safari での pyscript 実行 | Chrome 以外は未検証 | #165 (PERF-P7) にコメント |
-| 実 FLEngine(wasm) 結合時の再検証 | 出力一致は mock 上の結論 | #112 / T3 以降 |
-| #79 由来の未解決 (Note 既定値・clearNotes・clamp・enveditor 等) | 付録 §B「未解決」表 | 付録 §B 記載の起票先 |
+結論: 同梱 Piano roll scripts 5/5 を wasm 上で回帰テスト化 (`tests/pyscript_e2e.mjs`)。Remote Scripts 5/5・Audio scripts 0/12 (`enveditor` 依存)。flpianoroll は 64 メンバ中 62 実装 (`ScriptDialog.DialogParams` 未実装・`Score.loadScoreFromFile` は stub)。全文・実測・未解決は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §14。Chrome (headless) 上の同梱 Piano roll 5/5 実行と node との出力一致 (#466) は [REPORT_CHROME.md](REPORT_CHROME.md) §14b。

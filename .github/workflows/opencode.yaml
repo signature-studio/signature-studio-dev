@@ -8,7 +8,14 @@ on:
     types: [created]
   # PR が Open / 更新 / 再オープンされたとき → レビュワーエージェントが起動
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, ready_for_review]
+  # review の提出で fix モードが動く (指示 122/123: open PR は「レビュー中」か「レビューを受けて修正中」
+  # のどちらかであり、人手 (PM) を介さずに遷移する)。
+  #   oc-reviewer が changes_requested  -> implement job が fix モードで同じ PR ブランチを修正して push
+  #                                        (push が synchronize を起こし、review job が再起動する)
+  # Copilot の review 提出では何も起動しない (Copilot 待ちの保留は廃止した)。
+  pull_request_review:
+    types: [submitted]
   workflow_dispatch:
     inputs:
       prompt:
@@ -30,6 +37,13 @@ on:
         description: 'auto | releases | npm'
         required: false
         default: ''
+  # main が進むと、既に open の PR が競合になる。競合 PR には pull_request の event が起きず、review も
+  # 修正も始まらないので、main への push のたびに全 open PR を点検する (watchdog job)。
+  push:
+    branches: [main]
+  # event の取りこぼしや run の失敗で「レビューも修正もされていない」PR が残らないよう、定期的に点検する。
+  schedule:
+    - cron: '*/5 * * * *'
 
 # すべての GitHub API 認証は
 # actions/create-github-app-token が発行する App installation token が担う。
@@ -44,6 +58,44 @@ permissions: {}
 # 実行中のエージェントを push で中断すると作業内容が失われる。
 
 jobs:
+  watchdog:
+    # open PR を「レビュー中」か「レビューを受けて修正中」のどちらかに保つ (#719、指示 122/123)。
+    # 主経路はイベント駆動 (差し戻し -> fix、push -> review)。これはバックストップで、イベントが起きない
+    # 競合と、取りこぼし・失敗した run を点検して戻す。詳細は .github/scripts/watchdog.sh の冒頭。
+    # review の提出・merge・ready・close/reopen は reviewer App 名義で行う (同一 App は自分が作った
+    # PR に request-changes できない)。
+    if: github.event_name == 'push' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # GITHUB_TOKEN は実行中の run の一覧 (actions:read) にだけ使う。他の権限は付けない。
+    permissions:
+      actions: read
+    concurrency:
+      group: opencode-watchdog
+      cancel-in-progress: false
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/create-github-app-token@v3
+        id: reviewer-token
+        with:
+          client-id: ${{ vars.OC_REVIEW_APP_CLIENT_ID }}
+          private-key: ${{ secrets.OC_REVIEW_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-issues: write
+
+      - name: Keep every open PR either under review or being fixed
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.reviewer-token.outputs.token }}
+          RUNS_TOKEN: ${{ github.token }}
+          OC_REPO: ${{ github.repository }}
+        run: bash .github/scripts/watchdog.sh
+
   implement:
     # 実装エージェント: issue_comment (/oc) または workflow_dispatch で起動。
     # PR 上の /oc コメントは conflict 解消などの追加作業。
@@ -62,20 +114,27 @@ jobs:
       (github.event.comment.author_association == 'COLLABORATOR' ||
       github.event.comment.author_association == 'MEMBER' ||
       github.event.comment.author_association == 'OWNER') &&
-      (contains(github.event.comment.body, '/oc') || contains(github.event.comment.body, '/opencode')))
+      (contains(github.event.comment.body, '/oc') || contains(github.event.comment.body, '/opencode'))) ||
+      (github.event_name == 'pull_request_review' &&
+      github.event.review.state == 'changes_requested' &&
+      github.event.review.user.type == 'Bot' &&
+      github.event.review.user.login == 'oc-reviewer-for-signature-studio[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     concurrency:
-      group: opencode-${{ github.event.pull_request.number || github.event.issue.number || github.ref }}
+      group: opencode-impl-${{ github.event.pull_request.number || github.event.issue.number || github.ref }}
       cancel-in-progress: false
     # opencode が暴走しても runner を既定の 6 時間は占有しない
     timeout-minutes: 60
     env:
       # workflow_dispatch は write 権限を持つ人手による起動なので書き込み可。
       # issue_comment は本文に oc_actions_allow_write を含む場合だけ書き込み可。
+      # pull_request_review (oc-reviewer の差し戻し。上の if で投稿者を限定済み) は fix のため write。
       # 式評価であり untrusted 文字列を shell に展開していないので injection はない。
       # 値域の検証は prepare-event-context.sh が行う。
       OC_PERMISSION: >-
         ${{ (github.event_name == 'workflow_dispatch'
+        || github.event_name == 'pull_request_review'
         || contains(github.event.comment.body, 'oc_actions_allow_write'))
         && 'write' || 'read' }}
     steps:
@@ -85,10 +144,14 @@ jobs:
       #    これにより準備ステップが .github/scripts/ 以下のファイルにアクセス可能。
       #    should_run 依存ではなく無条件で実行する。
       # ---------------------------------------------------------------------
+      # pull_request_review の GITHUB_SHA は refs/pull/N/merge なので、ref 未指定だと PR 側の
+      # .github/actions と .github/scripts が secrets 付きで実行される。fix モードでは base
+      # (main の正本) を checkout し、agent が `gh pr checkout` で PR ブランチへ移る。
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          ref: ${{ github.event_name == 'pull_request_review' && github.event.pull_request.base.ref || '' }}
           persist-credentials: false
 
       # ---------------------------------------------------------------------
@@ -163,9 +226,21 @@ jobs:
         shell: bash
         run: bash .github/scripts/assemble-prompt.sh
 
+      # fix モード (reviewer の差し戻し) の進捗検証用に、起動時点の PR head を記録する。
+      - name: Record the PR head (fix mode)
+        id: fixrec
+        if: steps.context.outputs.should_run == 'true' && github.event_name == 'pull_request_review'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: bash .github/scripts/fix-progress.sh record
+
+      # fix モードは step に上限を置く: job の 60 分を使い切ると、下の検証・再試行 step が走る前に
+      # job ごと打ち切られ、無音終了になるため。
       - name: Run OpenCode (implementer)
         id: oc
-        if: steps.context.outputs.should_run == 'true'
+        if: steps.context.outputs.should_run == 'true' && steps.fixrec.outputs.stop != 'true'
+        timeout-minutes: ${{ github.event_name == 'pull_request_review' && 40 || 58 }}
         uses: ./.github/actions/opencode
         with:
           model: ${{ vars.OC_MODEL_ID }}
@@ -175,8 +250,70 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
 
+      # ---------------------------------------------------------------------
+      # fix モードの「無音終了」対策。差し戻された PR は、agent が push も PR コメントもせずに
+      # 終わると「修正もレビューもされていない」状態に戻ってしまう。
+      #   pushed   -> synchronize が review を起動する
+      #   answered -> push せず根拠をコメントした。review を起動し直す (下の reopen)
+      #   none     -> 何もしていない。1 回だけ再試行し、なお none なら job を失敗させる
+      # ---------------------------------------------------------------------
+      # `always()` ではなく `!cancelled()`: always() は run の cancel 後も走るため、PM が fix run を cancel しても
+      # retry (write、15 分) が起動して push しうる。!cancelled() は失敗・step の timeout の後には走り、cancel の後には走らない。
+      - name: Check the fix progress
+        id: progress
+        if: ${{ !cancelled() && steps.context.outputs.should_run == 'true' && github.event_name == 'pull_request_review' && steps.fixrec.outputs.stop != 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: bash .github/scripts/fix-progress.sh check
+
+      - name: Prepare the retry prompt
+        id: retry-prompt
+        if: ${{ !cancelled() && steps.progress.outputs.result == 'none' }}
+        shell: bash
+        env:
+          OC_PROMPT_SRC: ${{ steps.prompt.outputs.prompt_file }}
+        run: bash .github/scripts/fix-progress.sh retry-prompt
+
+      - name: Run OpenCode (implementer, retry)
+        id: oc-retry
+        if: ${{ !cancelled() && steps.progress.outputs.result == 'none' }}
+        timeout-minutes: 15
+        uses: ./.github/actions/opencode
+        with:
+          model: ${{ vars.OC_MODEL_ID }}
+          agent: build
+          auth-export: ${{ secrets.OC_AUTH_EXPORT }}
+          prompt-file: ${{ steps.retry-prompt.outputs.prompt_file }}
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+
+      - name: Check the fix progress (retry)
+        id: progress-retry
+        if: ${{ !cancelled() && steps.progress.outputs.result == 'none' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: bash .github/scripts/fix-progress.sh check
+
+      # push せず根拠だけをコメントして終えた場合、コメントは review を起動しないので
+      # close -> reopen で pull_request:reopened を起こし、reviewer に再判断させる。
+      - name: Re-trigger the review after an answer without a push
+        if: ${{ !cancelled() && (steps.progress.outputs.result == 'answered' || steps.progress-retry.outputs.result == 'answered') }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: bash .github/scripts/fix-progress.sh reopen
+
+      - name: Fail when the fix run made no progress
+        if: ${{ !cancelled() && steps.progress-retry.outputs.result == 'none' }}
+        shell: bash
+        run: |
+          echo "::error::the fix run neither pushed a commit nor commented on the PR, even after one retry"
+          exit 1
+
   review:
-    # レビュワーエージェント: PR opened / synchronize / reopened で起動し、
+    # レビュワーエージェント: PR opened / synchronize / reopened / ready_for_review で起動し、
     # approve/request-changes を出したうえで必要ならマージまで行う。
     #
     # fork PR ガード: pull_request イベントでは fork 由来の PR に secrets が渡らない
@@ -189,7 +326,7 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     concurrency:
-      group: opencode-${{ github.event.pull_request.number || github.event.issue.number || github.ref }}
+      group: opencode-review-${{ github.event.pull_request.number || github.event.issue.number || github.ref }}
       cancel-in-progress: false
     timeout-minutes: 60
     steps:
@@ -301,7 +438,10 @@ jobs:
           OC_HAS_REVIEWER_TOKEN: ${{ steps.reviewer-token.outputs.token != '' }}
         run: bash .github/scripts/assemble-reviewer-prompt.sh
 
+      # step に上限を置く: job の 60 分を使い切ると、下の verdict 検証 step が走る前に job ごと
+      # 打ち切られうる。検証 (verdict が無ければ review を再起動) の時間を残す。
       - name: Run OpenCode (reviewer)
+        timeout-minutes: 50
         uses: ./.github/actions/opencode
         with:
           model: ${{ vars.OC_MODEL_ID }}
@@ -310,3 +450,14 @@ jobs:
           prompt-file: ${{ steps.prompt.outputs.prompt_file }}
         env:
           GH_TOKEN: ${{ steps.reviewer-token.outputs.token || steps.app-token.outputs.token }}
+
+      # reviewer が success で終わっても verdict を投稿しないことがある (PR #462)。そのままだと
+      # 「レビューもされず修正もされない」PR になるので、verdict を検証し、無ければ review を再実行する。
+      # !cancelled(): reviewer の step が失敗・タイムアウトした場合も再実行へ回す (cancel された run は再実行しない:
+      # PM の停止手段を効かせる)。
+      - name: Verify that a review verdict was posted
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.reviewer-token.outputs.token || steps.app-token.outputs.token }}
+        run: bash .github/scripts/verify-review-verdict.sh

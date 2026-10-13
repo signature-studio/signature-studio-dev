@@ -7,6 +7,7 @@ const enc = (s) => new TextEncoder().encode(s);
 const results = [];
 const outputs = [];
 const check = (name, ok, detail = "") => { results.push({ name, ok: !!ok, detail }); if (!ok) console.log("FAIL", name, detail); };
+const info = (name, detail) => console.log("INFO", name, detail);
 // ---- wasm Python 起動 ----
 async function boot(extraFiles = {}) {
   const engine = createMockEngine();
@@ -128,6 +129,7 @@ for (const n of Object.keys(PR)) {
   const off = await run(py, "Humanize", { PPQ: 96, notes: src }, { ...idv, "Start Time Offset": 0.5, "Duration Offset": 0.5, "Velocity Offset": 0.25, "Start Time Ref": 1 });
   check("Humanize offset (ref 1/64 → 6 ticks): time+3 / length*1.5 / velocity*1.25(≤1)",
     off.score.notes.every((n, i) => n.time === src[i].time + 3 && n.length === Math.trunc(src[i].length * 1.5) && near(n.velocity, Math.min(src[i].velocity * 1.25, 1))));
+  info("Humanize offset 正常系 time 値列 (src+3 が期待値)", JSON.stringify(off.score.notes.map((n) => n.time)));
   const rv = { "Start Time Range": 0.5, "Duration Range": 0.3, "Velocity Range": 0.4, Seed: 2, "Start Time Ref": 0 };
   const a = await run(py, "Humanize", { PPQ: 96, notes: src }, rv);
   const b = await run(py, "Humanize", { PPQ: 96, notes: src }, rv);
@@ -208,12 +210,14 @@ await py.terminate();
   const oracle = (p, o, num) => Array.from({ length: p }, (_, i) => (i === 0 || Math.floor((i * o) / p) !== Math.floor(((i - 1) * o) / p) ? N({ time: i * 24, number: num }) : null)).filter(Boolean);
   const exp = [...oracle(32, 8, 36), ...oracle(32, 13, 37), ...oracle(32, 18, 42)];
   check("NEG-a: Euclidean を 1 箇所改変 → oracle 不一致 (FAIL を検出)", !sameSet(a.score.notes, exp), `改変版 ${a.score.notes.length} ノート vs oracle ${exp.length}`);
+  info("NEG-a 改変版ノート数 / oracle ノート数", `${a.score.notes.length} / ${exp.length}`);
   // (b) Score.getNote が live 参照でなくコピーを返す → Humanize の in-place 更新が失われ offset テストが FAIL するはず
   await p2.run("import flpianoroll; flpianoroll.Score.getNote = lambda s, i: s._notes[i].clone()");
   await load(p2, "Humanize");
   const src = Array.from({ length: 4 }, (_, i) => N({ number: 50 + i, time: 200 + i * 48, length: 40, selected: true }));
   const h = await run(p2, "Humanize", { PPQ: 96, notes: src }, { "Start Time Range": 0, "Duration Range": 0, "Velocity Range": 0, "Start Time Offset": 0.5, "Start Time Ref": 1, Seed: 2 });
   check("NEG-b: getNote が clone を返す → Humanize offset が反映されない (FAIL を検出)", h.score.notes.every((n, i) => n.time === src[i].time), JSON.stringify(h.score.notes.map((n) => n.time)));
+  info("NEG-b 改変版 time 値列 (元 time 200,248,296,344 のまま)", JSON.stringify(h.score.notes.map((n) => n.time)));
   // (c) typo したフォーム値は黙って無視されず KeyError
   await load(p2, "Euclidean");
   const bad = await p2.call("fl_rt:run_pyscript", { name: "Euclidean", score: { PPQ: 96, notes: [] }, values: { "CH9: Onsets": 3 } });

@@ -12,7 +12,7 @@ import sys, os, struct
 BASE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE)
 from lb_base import LB, IMG_BASE   # LB: M11_LB_BASE (既定 0 = LVA=RVA; 0x10000 で LVA=RVA+0x10000, #222)
-WINF = sys.argv[1] if len(sys.argv) > 1 else os.environ.get('M11_PE', '/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin')
+WINF = sys.argv[1] if len(sys.argv) > 1 else os.environ.get('M11_PE') or os.path.join(os.environ.get('FL_WIN64_DIR') or '/home/ubuntu/work/analysis/win64', 'extracted', 'block00031_PE.bin')
 OUT = os.environ.get('M11_DATA_OUT', os.path.join(BASE, 'work', 'm11_data.c'))
 
 LVA_SH = IMG_BASE          # VA 範囲判定の起点 (preferred image base)
