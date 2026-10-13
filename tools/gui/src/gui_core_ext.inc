@@ -347,12 +347,78 @@ API GetKeyNameTextW(I64 lparam, I64 buf, I64 cch) {   /* lParam: bit16-23 = scan
   int n = 0; for (; e->name[n] && n < (int32_t)cch - 1; n++) b[n] = (uint16_t)(uint8_t)e->name[n];
   b[n] = 0; return n;
 }
+/* ---- 配列 (GUI-6 #182): US 配列を基準に、DE (0x0407) / FR (0x040C) の差分キーだけを表で持つ。dead key / IME 配列は未対応 (0 = 文字なし)。
+ * 表は XKB・KBDGR/KBDFR の公開仕様を元に手作成 (実 Windows との照合は未実施 → REPORT 範囲外)。n/s/g = 無修飾 / Shift / AltGr(Ctrl+Alt) の文字 (0 = なし)。 */
+typedef struct { uint8_t sc, vk; uint16_t n, s, g; } LkEnt;
+#define LL(sc, vk, c) { sc, vk, (uint16_t)(c), (uint16_t)((c) - 32), 0 }   /* 英小文字 (Shift = 大文字) */
+static const LkEnt k_de[] = {
+  { 0x02, '1', '1', '!', 0 }, { 0x03, '2', '2', '"', 0xB2 }, { 0x04, '3', '3', 0xA7, 0xB3 }, { 0x05, '4', '4', '$', 0 }, { 0x06, '5', '5', '%', 0 },
+  { 0x07, '6', '6', '&', 0 }, { 0x08, '7', '7', '/', '{' }, { 0x09, '8', '8', '(', '[' }, { 0x0A, '9', '9', ')', ']' }, { 0x0B, '0', '0', '=', '}' },
+  { 0x0C, 0xDB, 0xDF, '?', '\\' }, { 0x0D, 0xDD, 0xB4, '`', 0 },
+  { 0x10, 'Q', 'q', 'Q', '@' }, { 0x12, 'E', 'e', 'E', 0x20AC }, LL(0x15, 'Z', 'z'), { 0x1A, 0xBA, 0xFC, 0xDC, 0 }, { 0x1B, 0xBB, '+', '*', '~' },
+  { 0x27, 0xC0, 0xF6, 0xD6, 0 }, { 0x28, 0xDE, 0xE4, 0xC4, 0 }, { 0x29, 0xDC, '^', 0xB0, 0 }, { 0x2B, 0xBF, '#', '\'', 0 },
+  LL(0x2C, 'Y', 'y'), { 0x32, 'M', 'm', 'M', 0xB5 }, { 0x33, 0xBC, ',', ';', 0 }, { 0x34, 0xBE, '.', ':', 0 }, { 0x35, 0xBD, '-', '_', 0 },
+  { 0x56, 0xE2, '<', '>', '|' },
+};
+static const LkEnt k_fr[] = {
+  { 0x02, '1', '&', '1', 0 }, { 0x03, '2', 0xE9, '2', '~' }, { 0x04, '3', '"', '3', '#' }, { 0x05, '4', '\'', '4', '{' }, { 0x06, '5', '(', '5', '[' },
+  { 0x07, '6', '-', '6', '|' }, { 0x08, '7', 0xE8, '7', '`' }, { 0x09, '8', '_', '8', '\\' }, { 0x0A, '9', 0xE7, '9', '^' }, { 0x0B, '0', 0xE0, '0', '@' },
+  { 0x0C, 0xDB, ')', 0xB0, ']' }, { 0x0D, 0xBB, '=', '+', '}' },
+  LL(0x10, 'A', 'a'), LL(0x11, 'Z', 'z'), { 0x1A, 0xDD, 0, 0, 0 }, { 0x1B, 0xBA, '$', 0xA3, 0xA4 },
+  LL(0x1E, 'Q', 'q'), { 0x27, 'M', 'm', 'M', 0 }, { 0x28, 0xC0, 0xF9, '%', 0 }, { 0x29, 0xDE, 0xB2, 0, 0 }, { 0x2B, 0xDC, '*', 0xB5, 0 },
+  LL(0x2C, 'W', 'w'), { 0x32, 0xBC, ',', '?', 0 }, { 0x33, 0xBE, ';', '.', 0 }, { 0x34, 0xBF, ':', '/', 0 }, { 0x35, 0xDF, '!', 0xA7, 0 },
+  { 0x56, 0xE2, '<', '>', 0 },
+};
+typedef struct { uint16_t langid; const LkEnt *t; int n; const char *name; } LkDef;
+static const LkDef k_defs[] = { { 0x0409, NULL, 0, "US" }, { 0x0407, k_de, (int)(sizeof k_de / sizeof k_de[0]), "DE" }, { 0x040C, k_fr, (int)(sizeof k_fr / sizeof k_fr[0]), "FR" } };
+static int g_kl = 0;   /* k_defs の index (0 = US) */
+static void kbd_set_layout(uint32_t langid) { for (int i = 0; i < 3; i++) if (k_defs[i].langid == (langid & 0xFFFF)) { g_kl = i; return; } }
+static const LkEnt *lk_by_sc(uint32_t sc) { const LkDef *d = &k_defs[g_kl]; for (int i = 0; i < d->n; i++) if (d->t[i].sc == sc) return &d->t[i]; return NULL; }
+static const LkEnt *lk_by_vk(uint32_t vk) { const LkDef *d = &k_defs[g_kl]; for (int i = 0; i < d->n; i++) if (d->t[i].vk == vk) return &d->t[i]; return NULL; }
+static uint32_t kbd_layout_vk(uint32_t sc, int ext) {   /* scancode -> VK (現配列)。0 = 不明 (呼出側は元の VK を使う) */
+  if (ext) return 0;
+  const LkEnt *e = lk_by_sc(sc); if (e) return e->vk;
+  if (g_kl == 0) return 0;
+  return vk_from_scan(sc, 0);
+}
+/* 配列込み: 状態配列 (GetKeyboardState 形式) + vk/sc から 1 文字。0 = 文字なし */
+static int layout_to_char(uint32_t vk, uint32_t sc, const uint8_t *st) {
+  if (g_kl == 0) return -1;   /* -1 = US 経路 (vk_to_char) へ */
+  int shift = st && ((st[VK_SHIFT] | st[0xA0] | st[0xA1]) & 0x80), caps = st && (st[0x14] & 1);
+  int ctrl = st && ((st[VK_CONTROL] | st[0xA2] | st[0xA3]) & 0x80), alt = st && ((st[VK_MENU] | st[0xA4] | st[0xA5]) & 0x80);
+  const LkEnt *e = sc ? lk_by_sc(sc & 0xFF) : NULL; if (!e) e = lk_by_vk(vk);
+  if (!e) return -1;
+  if (ctrl && alt) return e->g;                                   /* AltGr = Ctrl+Alt */
+  if (ctrl) return (e->n >= 'a' && e->n <= 'z') ? e->n - 'a' + 1 : 0;
+  int up = shift; if (caps && e->s == e->n - 32) up = !shift;   /* Caps は「Shift 文字 = 無修飾文字の大文字」のキー (英字・DE の umlaut) だけ反転。FR の数字行 (é → 2) は近似で反転しない */
+  return up ? e->s : e->n;
+}
+API GetKeyboardLayout(I64 tid) { (void)tid; uint32_t l = k_defs[g_kl].langid; return (I64)(((uint32_t)l << 16) | l); }
+API ActivateKeyboardLayout(I64 h, I64 f) { (void)f; I64 old = GetKeyboardLayout(0); if (h > 1) kbd_set_layout((uint32_t)h & 0xFFFF); return old; }
+API LoadKeyboardLayoutW(I64 s, I64 f) {   /* "0000040C" 形式の KLID */
+  (void)f; const uint16_t *k = (const uint16_t *)P_(s); uint32_t v = 0;
+  for (int i = 0; k && k[i] && i < 8; i++) { uint32_t c = k[i]; v = (v << 4) | (c <= '9' ? c - '0' : (c | 32) - 'a' + 10); }
+  uint32_t l = v & 0xFFFF; for (int i = 0; i < 3; i++) if (k_defs[i].langid == l) return (I64)((l << 16) | l);
+  gui_set_last_error(87); return 0;
+}
 API GetKeyboardLayoutList(I64 n, I64 list) {
   if (n < 0) { gui_set_last_error(87); return 0; }
   if (n == 0) return 1;
-  *(U64 *)P_(list) = 0x04090409; return 1;   /* HKL は Win64 で 8B */
+  *(U64 *)P_(list) = (U64)GetKeyboardLayout(0); return 1;   /* HKL は Win64 で 8B */
 }
-API GetKeyboardLayoutNameW(I64 buf) { static const char k[] = "00000409"; uint16_t *b = (uint16_t *)P_(buf); for (int i = 0; i < 9; i++) b[i] = (uint16_t)k[i]; return 1; }   /* KL_NAMELENGTH 9 */
+API GetKeyboardLayoutNameW(I64 buf) { char k[16]; snprintf(k, sizeof k, "%08X", k_defs[g_kl].langid); uint16_t *b = (uint16_t *)P_(buf); for (int i = 0; i < 9; i++) b[i] = (uint16_t)(uint8_t)k[i]; return 1; }   /* KL_NAMELENGTH 9 */
+API MapVirtualKeyW(I64 code, I64 type) {
+  uint32_t c = (uint32_t)code;
+  switch ((int)type) {
+    case 0: { const LkEnt *e = lk_by_vk(c); if (e) return e->sc;                                                  /* MAPVK_VK_TO_VSC */
+              for (size_t i = 0; i < sizeof g_sc / sizeof g_sc[0]; i++) if (g_sc[i].ext == 0 && g_sc[i].vk == c) { if (g_kl && lk_by_sc(g_sc[i].sc)) continue; return g_sc[i].sc; } return 0; }
+    case 1: case 3: { uint32_t v = kbd_layout_vk(c & 0xFF, (c >> 8) == 0xE0); if (v) return v; return vk_from_scan(c & 0xFF, (c >> 8) == 0xE0); }   /* MAPVK_VSC_TO_VK(_EX) */
+    case 2: { uint8_t st[256] = { 0 }; int ch = layout_to_char(c, 0, st); if (ch < 0) ch = vk_to_char(c, st);
+              if (c >= 'A' && c <= 'Z' && ch >= 'a' && ch <= 'z') ch -= 32;   /* MAPVK_VK_TO_CHAR: 英字は大文字 (US/DE/FR 共通) */
+              return ch > 0 ? ch & 0x7FFFFFFF : 0; }
+  }
+  return 0;
+}
 /* US 配列: 状態配列 (GetKeyboardState 形式) から 1 文字へ。0 = 文字なし */
 static int vk_to_char(uint32_t vk, const uint8_t *st) {
   int shift = st && ((st[VK_SHIFT] | st[0xA0] | st[0xA1]) & 0x80), ctrl = st && ((st[VK_CONTROL] | st[0xA2] | st[0xA3]) & 0x80), caps = st && (st[0x14] & 1);
@@ -371,12 +437,193 @@ static int vk_to_char(uint32_t vk, const uint8_t *st) {
   return 0;
 }
 API ToUnicode(I64 vk, I64 sc, I64 state, I64 buf, I64 cch, I64 flags) {
-  (void)sc; (void)flags; int ch = vk_to_char((uint32_t)vk, (const uint8_t *)P_(state));
+  (void)flags; const uint8_t *st = (const uint8_t *)P_(state);
+  int ch = layout_to_char((uint32_t)vk, (uint32_t)sc, st); if (ch < 0) ch = vk_to_char((uint32_t)vk, st);
   uint16_t *b = (uint16_t *)P_(buf);
   if (!ch || !b || (int32_t)cch < 1) return 0;
   b[0] = (uint16_t)ch; if ((int32_t)cch > 1) b[1] = 0;
   return 1;
 }
+
+/* ================= IME (GUI-6 #182): host の DOM composition → WM_IME_* + imm32 ================= *
+ * host (gui.ts) が compositionstart/update/end を GUI_IN_IME (最大 4 UTF-16/レコードの連結) で送る。translate_input 内 (GUI スレッド) で
+ * 即時 SendMessage するので、ハンドラが ImmGetCompositionStringW を呼ぶ時点の文字列は当該メッセージのもの。
+ * 範囲: 変換候補ウィンドウ (CANDIDATEFORM) は位置を host へ通知するだけ。属性 (GCS_COMPATTR/COMPCLAUSE) は未提供 (長さ 0)。 */
+#define WM_IME_STARTCOMPOSITION_ 0x10D
+#define WM_IME_ENDCOMPOSITION_ 0x10E
+#define WM_IME_COMPOSITION_ 0x10F
+#define WM_IME_NOTIFY_ 0x282
+#define GCS_COMPSTR_ 0x8
+#define GCS_CURSORPOS_ 0x80
+#define GCS_RESULTSTR_ 0x800
+static uint16_t g_ime_comp[512], g_ime_res[512], g_ime_acc[512];
+static int g_ime_ncomp, g_ime_nres, g_ime_nacc, g_ime_cursor, g_ime_composing, g_ime_open = 1;
+static uint32_t g_ime_conv = 1 /* IME_CMODE_NATIVE */, g_ime_sent;
+static void ime_input(const uint32_t *r) {
+  uint32_t a = r[4], phase = a & 15, nu = (a >> 8) & 7, first = (a >> 12) & 1, last = (a >> 13) & 1;
+  if (first) g_ime_nacc = 0;
+  uint32_t u[4] = { r[2] & 0xFFFF, r[2] >> 16, r[3] & 0xFFFF, r[3] >> 16 };
+  for (uint32_t i = 0; i < nu && i < 4 && g_ime_nacc < 511; i++) g_ime_acc[g_ime_nacc++] = (uint16_t)u[i];
+  if (!last) return;
+  Wnd *w = g_focus ? g_focus : g_active; if (!w) return;
+  int cur = (int)r[5];
+  g_ime_sent++;
+  switch (phase) {
+    case 1: g_ime_composing = 1; g_ime_ncomp = 0; send_message(w->h, WM_IME_STARTCOMPOSITION_, 0, 0); break;
+    case 2:
+      if (!g_ime_composing) { g_ime_composing = 1; send_message(w->h, WM_IME_STARTCOMPOSITION_, 0, 0); }
+      memcpy(g_ime_comp, g_ime_acc, (size_t)g_ime_nacc * 2); g_ime_ncomp = g_ime_nacc; g_ime_cursor = cur > g_ime_ncomp ? g_ime_ncomp : cur;
+      send_message(w->h, WM_IME_COMPOSITION_, 0, GCS_COMPSTR_ | GCS_CURSORPOS_); break;
+    case 3:
+      if (!g_ime_composing) { g_ime_composing = 1; send_message(w->h, WM_IME_STARTCOMPOSITION_, 0, 0); }
+      memcpy(g_ime_res, g_ime_acc, (size_t)g_ime_nacc * 2); g_ime_nres = g_ime_nacc; g_ime_ncomp = 0; g_ime_cursor = 0;
+      send_message(w->h, WM_IME_COMPOSITION_, 0, GCS_RESULTSTR_);
+      g_ime_composing = 0; send_message(w->h, WM_IME_ENDCOMPOSITION_, 0, 0); break;
+    case 4:
+      if (!g_ime_composing) break;   /* composition 中でない cancel は無視 (START 無しの END を送らない) */
+      g_ime_ncomp = 0; g_ime_cursor = 0;
+      send_message(w->h, WM_IME_COMPOSITION_, 0, 0); g_ime_composing = 0; send_message(w->h, WM_IME_ENDCOMPOSITION_, 0, 0); break;
+  }
+}
+uint32_t gui_ime_sent(void) { return g_ime_sent; }
+#define HIMC_ 0x7D000001
+API ImmGetContext(I64 h) { return wnd_from_h((U64)h) ? HIMC_ : 0; }
+API ImmReleaseContext(I64 h, I64 himc) { (void)himc; return wnd_from_h((U64)h) != NULL; }
+API ImmIsIME(I64 hkl) { (void)hkl; return 1; }
+API ImmGetConversionStatus(I64 himc, I64 pconv, I64 psent) {
+  if (himc != HIMC_) return 0;
+  if (pconv) *(uint32_t *)P_(pconv) = g_ime_open ? g_ime_conv : 0; if (psent) *(uint32_t *)P_(psent) = 0; return 1;
+}
+API ImmSetConversionStatus(I64 himc, I64 conv, I64 sent) { (void)sent; if (himc != HIMC_) return 0; g_ime_conv = (uint32_t)conv; return 1; }
+API ImmSetOpenStatus(I64 himc, I64 open) {
+  if (himc != HIMC_) return 0;
+  g_ime_open = open != 0;   /* host の OS IME は DOM から切替不可: 状態を保持するだけ (WM_IME_NOTIFY IMN_SETOPENSTATUS=8 を通知) */
+  Wnd *w = g_focus ? g_focus : g_active; if (w) send_message(w->h, WM_IME_NOTIFY_, 8, 0);
+  return 1;
+}
+API ImmAssociateContextEx(I64 h, I64 himc, I64 flags) { (void)himc; (void)flags; return wnd_from_h((U64)h) != NULL; }
+/* ImmGetCompositionStringW(himc, GCS_*, buf, len): 返値 = バイト数。buf==NULL/len==0 は必要サイズのみ */
+API ImmGetCompositionStringW(I64 himc, I64 idx, I64 buf, I64 len) {
+  if (himc != HIMC_) return -1;
+  const uint16_t *src = NULL; int n = 0;
+  if (idx == GCS_COMPSTR_) { src = g_ime_comp; n = g_ime_ncomp; }
+  else if (idx == GCS_RESULTSTR_) { src = g_ime_res; n = g_ime_nres; }
+  else if (idx == GCS_CURSORPOS_) return g_ime_cursor;
+  else return 0;
+  int bytes = n * 2;
+  if (buf && (int32_t)len > 0) { int c = bytes < (int32_t)len ? bytes : (int32_t)len; memcpy(P_(buf), src, (size_t)c); return c; }
+  return bytes;
+}
+API ImmSetCompositionWindow(I64 himc, I64 cf) {   /* COMPOSITIONFORM: dwStyle(4) ptCurrentPos(8) rcArea(16) */
+  if (himc != HIMC_ || !cf) return 0;
+  const int32_t *p = (const int32_t *)P_(cf); Wnd *w = g_focus ? g_focus : g_active; int sx = 0, sy = 0; if (w) to_screen_origin(w, &sx, &sy);
+  out_cmd(GUI_CMD_IME_POS, w && w->surf >= 0 ? (uint32_t)w->surf : 0, (uint32_t)(sx + p[1]), (uint32_t)(sy + p[2]), 0, 0, 0); return 1;
+}
+API ImmSetCandidateWindow(I64 himc, I64 cf) {   /* CANDIDATEFORM: dwIndex(4) dwStyle(4) ptCurrentPos(8) */
+  if (himc != HIMC_ || !cf) return 0;
+  const int32_t *p = (const int32_t *)P_(cf); Wnd *w = g_focus ? g_focus : g_active; int sx = 0, sy = 0; if (w) to_screen_origin(w, &sx, &sy);
+  out_cmd(GUI_CMD_IME_POS, w && w->surf >= 0 ? (uint32_t)w->surf : 0, (uint32_t)(sx + p[2]), (uint32_t)(sy + p[3]), 0, 0, 0); return 1;
+}
+API ImmNotifyIME(I64 himc, I64 action, I64 index, I64 value) {   /* NI_COMPOSITIONSTR=0x15 のみ対応。index (CPS_CANCEL=4 / CPS_COMPLETE=1) は区別せず、常に表示中の composition をクリアする (DOM 側の確定・取消は host から行えないため表示状態の消去のみ) */
+  (void)index; (void)value; if (himc != HIMC_) return 0;
+  if (action == 0x15) { g_ime_ncomp = 0; g_ime_cursor = 0; return 1; }
+  return 0;
+}
+API ImmGetOpenStatus(I64 himc) { return himc == HIMC_ && g_ime_open; }
+
+/* ================= タッチ / ジェスチャ (GUI-6 #182) ================= *
+ * host の PointerEvent (pointerType=touch) → GUI_IN_TOUCH。RegisterTouchWindow 済みの窓へは WM_TOUCH (GetTouchInputInfo)、
+ * 未登録の窓へは primary 接触をマウス (WM_MOUSEMOVE/LBUTTON*) へ昇格 (Windows の既定動作)。2 本指の距離変化 → WM_GESTURE GID_ZOOM、
+ * 1 本指移動 (SetGestureConfig で GID_PAN 許可の窓) → GID_PAN。WM_POINTER* は FL が import する API が無いため範囲外。 */
+#define WM_TOUCH_ 0x240
+#define WM_GESTURE_ 0x119
+enum { GID_BEGIN_ = 1, GID_END_ = 2, GID_ZOOM_ = 3, GID_PAN_ = 4 };
+enum { GF_BEGIN_ = 1, GF_INERTIA_ = 2, GF_END_ = 4 };
+#define MAXTOUCH 10
+typedef struct { int used; uint32_t id; int32_t x, y; } TPt;
+static TPt g_tp[MAXTOUCH]; static U64 g_touch_wnd[32]; static int g_ntouch_wnd; static int g_primary_id = -1;
+static U64 g_gest_wnd[32]; static uint32_t g_gest_want[32]; static int g_ngest;
+static int g_zoom_on, g_zoom_dist, g_pan_on, g_pan_x, g_pan_y; static uint32_t g_gest_seq;
+typedef struct { int32_t x, y; U64 src; uint32_t id, flags, mask, time; U64 extra; uint32_t cx, cy; } TouchIn;   /* TOUCHINPUT Win64 48B (x,y は 1/100 px) */
+typedef struct { uint32_t cbSize, dwFlags, dwID; uint32_t _p; U64 hwnd; int16_t px, py; uint32_t inst, seq; U64 args; uint32_t cbExtra, _q; } GestInfo;   /* GESTUREINFO Win64 56B */
+_Static_assert(sizeof(GestInfo) == 56 && sizeof(TouchIn) == 48, "win64 TOUCHINPUT/GESTUREINFO layout");
+static TouchIn g_tin[MAXTOUCH]; static int g_ntin; static GestInfo g_gi;
+static int touch_registered(U64 h) { for (int i = 0; i < g_ntouch_wnd; i++) if (g_touch_wnd[i] == h) return 1; return 0; }
+API RegisterTouchWindow(I64 h, I64 flags) {
+  (void)flags; if (!wnd_from_h((U64)h)) { gui_set_last_error(1400); return 0; }
+  if (!touch_registered((U64)h) && g_ntouch_wnd < 32) g_touch_wnd[g_ntouch_wnd++] = (U64)h; return 1;
+}
+API SetGestureConfig(I64 h, I64 res, I64 c, I64 pcfg, I64 cb) {   /* GESTURECONFIG {dwID, dwWant, dwBlock} 12B */
+  (void)res; if (!wnd_from_h((U64)h) || cb != 12) { gui_set_last_error(87); return 0; }
+  const uint32_t *g = (const uint32_t *)P_(pcfg); uint32_t want = 0;
+  for (int i = 0; i < (int)c; i++) { if (g[i * 3] == 0) { if (g[i * 3 + 1] & 1u) want = 0xFFFFFFFFu; } else if (g[i * 3] < 32) { if (g[i * 3 + 1] & 1u) want |= 1u << g[i * 3]; } }
+  int k = -1; for (int i = 0; i < g_ngest; i++) if (g_gest_wnd[i] == (U64)h) k = i;
+  if (k < 0 && g_ngest < 32) { k = g_ngest++; g_gest_wnd[k] = (U64)h; }
+  if (k >= 0) g_gest_want[k] = want; return 1;
+}
+static uint32_t gest_want(U64 h) { for (int i = 0; i < g_ngest; i++) if (g_gest_wnd[i] == h) return g_gest_want[i]; return 0xFFFFFFFFu; }
+API GetGestureInfo(I64 hgi, I64 pgi) {
+  if (hgi != 0x7C000001 || !pgi) { gui_set_last_error(6); return 0; }
+  GestInfo *o = (GestInfo *)P_(pgi); if (o->cbSize != sizeof(GestInfo)) { gui_set_last_error(87); return 0; }
+  *o = g_gi; return 1;
+}
+API CloseGestureInfoHandle(I64 hgi) { return hgi == 0x7C000001; }
+API RegisterTouchHitTestingWindow(I64 h, I64 v) { (void)v; return wnd_from_h((U64)h) != NULL; }
+API GetTouchInputInfo(I64 h, I64 c, I64 pti, I64 cb) {
+  if (h != 0x7B000001 || cb != (I64)sizeof(TouchIn) || !pti) { gui_set_last_error(87); return 0; }
+  int n = (int)c < g_ntin ? (int)c : g_ntin; memcpy(P_(pti), g_tin, (size_t)n * sizeof(TouchIn)); return 1;
+}
+API CloseTouchInputHandle(I64 h) { return h == 0x7B000001; }
+static TPt *tp_find(uint32_t id) { for (int i = 0; i < MAXTOUCH; i++) if (g_tp[i].used && g_tp[i].id == id) return &g_tp[i]; return NULL; }
+static int tp_count(void) { int n = 0; for (int i = 0; i < MAXTOUCH; i++) n += g_tp[i].used; return n; }
+static void send_gesture(Wnd *w, uint32_t id, uint32_t flags, int px, int py, U64 args) {
+  memset(&g_gi, 0, sizeof g_gi); g_gi.cbSize = sizeof(GestInfo); g_gi.dwFlags = flags; g_gi.dwID = id; g_gi.hwnd = w->h;
+  g_gi.px = (int16_t)px; g_gi.py = (int16_t)py; g_gi.seq = ++g_gest_seq; g_gi.args = args;
+  I64 r = send_message(w->h, WM_GESTURE_, 0, 0x7C000001);
+  if (!r) { /* 未処理 → 既定 (DefWindowProc は CloseGestureInfoHandle のみ) */ }
+}
+static void touch_input(const uint32_t *r) {
+  GuiShared *sh = gui_sh();
+  int x = (int32_t)r[2], y = (int32_t)r[3]; uint32_t a = r[4], id = a & 0xFF, phase = (a >> 8) & 15; int primary = (a >> 12) & 1; uint32_t t = r[6];
+  int lx = 0, ly = 0; Wnd *w = g_capture; if (w) client_of_screen(w, x, y, &lx, &ly); else w = hit_test(x, y, &lx, &ly);
+  TPt *p = tp_find(id);
+  if (phase == 0) { if (!p) for (int i = 0; i < MAXTOUCH; i++) if (!g_tp[i].used) { p = &g_tp[i]; break; } if (p) { p->used = 1; p->id = id; } if (primary || g_primary_id < 0) g_primary_id = (int)id; }
+  if (!p) return;
+  int dx = x - p->x, dy = y - p->y; p->x = x; p->y = y;
+  int wasprimary = (int)id == g_primary_id;
+  if (!w) { if (phase >= 2) { p->used = 0; if (wasprimary) g_primary_id = -1; } return; }
+  if (touch_registered(w->h)) {
+    memset(g_tin, 0, sizeof g_tin); g_ntin = 0;
+    for (int i = 0; i < MAXTOUCH; i++) if (g_tp[i].used) {
+      TouchIn *o = &g_tin[g_ntin++]; o->x = g_tp[i].x * 100; o->y = g_tp[i].y * 100; o->id = g_tp[i].id; o->time = t; o->cx = o->cy = 0; o->mask = 0;
+      o->flags = (g_tp[i].id == id ? (phase == 0 ? 0x2 /* DOWN */ : phase == 1 ? 0x1 /* MOVE */ : 0x4 /* UP */) : 0x1) | ((int)g_tp[i].id == g_primary_id ? 0x10 /* PRIMARY */ : 0);
+    }
+    send_message(w->h, WM_TOUCH_, (U64)g_ntin, 0x7B000001);
+  } else if (wasprimary) {   /* マウス昇格 (primary 接触のみ) */
+    uint32_t rec[8] = { phase == 0 ? GUI_IN_MOUSE_DOWN : phase == 1 ? GUI_IN_MOUSE_MOVE : GUI_IN_MOUSE_UP, 0, (uint32_t)x, (uint32_t)y, 0, 0, t, 0 };
+    __atomic_store_n(&sh->cursor_x, x, __ATOMIC_RELAXED); __atomic_store_n(&sh->cursor_y, y, __ATOMIC_RELAXED);
+    if (phase == 0) { if (phase == 0) { uint32_t mv[8] = { GUI_IN_MOUSE_MOVE, 0, (uint32_t)x, (uint32_t)y, 0, 0, t, 0 }; translate_input(mv); } sh->buttons |= 1; }
+    else if (phase >= 2) { sh->buttons &= ~1u; rec[0] = GUI_IN_MOUSE_UP; }
+    translate_input(rec);
+  }
+  /* ジェスチャ */
+  int n = tp_count() - (phase >= 2 ? 1 : 0); uint32_t want = gest_want(w->h);   /* 離す接触は数えない (2 本指ズーム → 1 本になった時点で END) */
+  if (n == 2 && (want & (1u << GID_ZOOM_))) {
+    TPt *q[2]; int k = 0; for (int i = 0; i < MAXTOUCH && k < 2; i++) if (g_tp[i].used) q[k++] = &g_tp[i];
+    int ddx = q[0]->x - q[1]->x, ddy = q[0]->y - q[1]->y, d = (int)(sqrt((double)ddx * ddx + (double)ddy * ddy) + 0.5), mx = (q[0]->x + q[1]->x) / 2, my = (q[0]->y + q[1]->y) / 2;
+    if (!g_zoom_on) { g_zoom_on = 1; g_zoom_dist = d; send_gesture(w, GID_ZOOM_, GF_BEGIN_, mx, my, (U64)d); }
+    else if (d != g_zoom_dist) { g_zoom_dist = d; send_gesture(w, GID_ZOOM_, 0, mx, my, (U64)d); }
+  } else if (g_zoom_on) { g_zoom_on = 0; send_gesture(w, GID_ZOOM_, GF_END_, x, y, (U64)g_zoom_dist); }
+  if (n == 1 && (want & (1u << GID_PAN_)) && phase == 1) {
+    if (!g_pan_on) { g_pan_on = 1; send_gesture(w, GID_PAN_, GF_BEGIN_, x, y, 0); }
+    else if (dx || dy) { (void)dx; (void)dy; send_gesture(w, GID_PAN_, 0, x, y, 0); }
+  }
+  if (phase >= 2) {
+    if (g_pan_on && n <= 1) { g_pan_on = 0; send_gesture(w, GID_PAN_, GF_END_, x, y, 0); }
+    p->used = 0; if (wasprimary) g_primary_id = -1;
+  }
+}
+int gui_touch_count(void) { return tp_count(); }
 
 /* ================= shell / ファイルダイアログ / D&D の Web 実装接続 (#172 SHX-T5) =================
  * kernel32/shell32 (shimx 担当) とは弱参照だけで結ぶ: shimx 無しの単体ビルドでも本 TU は解決できる。
