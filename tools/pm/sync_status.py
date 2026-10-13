@@ -93,8 +93,3 @@ for i in range(0, len(changes), 10):
         print("mutation failed:", out.stderr[:300])
         sys.exit(1)
 print("applied", len(changes))
-final = Counter()
-for it in items:
-    c = it.get("content") or {}
-    if c.get("type") == "Issue":
-        final[it.get("status", "none")] += 0

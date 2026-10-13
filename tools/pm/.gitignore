@@ -7,4 +7,6 @@ stop_deps_candidates.json
 wave2_cat.json
 pm_launch.log
 pm_watchdog_ping.log
+pm_watchdog_ping.log.err
+pm_watchdog_ping.log.tmp
 __pycache__/

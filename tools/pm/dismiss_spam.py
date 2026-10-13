@@ -7,7 +7,6 @@ DRY = os.environ.get("DRY") == "1"
 ONLY = set(map(int, os.environ["ONLY"].split(","))) if os.environ.get("ONLY") else None
 def api(*a):
     return subprocess.check_output(["gh", "api", *a], text=True)
-prs = json.loads(api("--paginate", f"repos/{R}/pulls?state=open&per_page=100")) if False else None
 raw = api("--paginate", f"repos/{R}/pulls?state=open&per_page=100")
 nums = []
 dec = json.JSONDecoder(); i = 0

@@ -2,7 +2,11 @@
 # heartbeat.sh — 30 分ごとに PM セッションへプロンプトを送り、応答の停止で作業が止まらないようにする (指示 102・116・120)。
 # 起動: systemctl --user enable --now pm-heartbeat.service (再起動後も自動復帰)。
 # 送るのは固定文だけ。セッション ID が無効になった場合は送信に失敗するだけで、ループは続く。
-SID="${PM_SESSION_ID:-ses_ee0c66629ffeZ92Uddt9mOoVur}"
+SID="${PM_SESSION_ID:-}"
+if [ -z "$SID" ]; then
+  echo "heartbeat.sh: PM_SESSION_ID is required" >&2
+  exit 1
+fi
 INTERVAL="${PM_HEARTBEAT_SECONDS:-1800}"
 MSG='[heartbeat 30分ごと / 自動送信] 作業を止めずに続行してください。
 1. watch_runs.sh が動いていなければ background で再起動する (bash __PM_DIR__/watch_runs.sh)。

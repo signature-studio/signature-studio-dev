@@ -16,6 +16,7 @@ PM が VM 上で実行・常駐させる、PR / Issue / Actions run の運用ツ
 
 | 変数 | 既定 | 用途 |
 |---|---|---|
+| `PM_SESSION_ID` | **必須** (無ければ heartbeat.sh は起動せず終了) | heartbeat が送信する PM セッション ID。環境ごとに設定する |
 | `PM_DIR` | このディレクトリ | 状態ファイルとログの置き場 (heartbeat の文面にも使う) |
 | `PM_TMP` | `${TMPDIR:-/tmp}/pm` | 一時ファイル |
 | `OPENCODE_BIN` | `opencode` | heartbeat が使う OpenCode CLI |
@@ -53,7 +54,7 @@ PM が VM 上で実行・常駐させる、PR / Issue / Actions run の運用ツ
 - **Cloudflare のリソース (worker・token) は新規に作らない**。R2 への投入は既存 token の一時昇格だけで行い、
   終わったら必ず Read のみへ戻す (手順は `watch_runs.notes.md`)。
 - `git add -A` / `git add .`、破壊的な git 操作、`pkill -f` (自分のシェルを殺す) は使わない。
-- `sleep` は使わず、待機は `timeout N tail -f /dev/null`。
+- 10 秒以上の待機は使わず、`timeout N tail -f /dev/null` で行う。10 秒未満の再試行間隔 (2〜4 秒・0.4〜1.5 秒) の `time.sleep` だけは許容する。
 - 新規着手は、Opened PR が 10 件を下回れば開始、80 件を超えれば Review-Only (指示 130)。
 - 判断の根拠は issue / PR のコメントに残す (PM が決めたことを agent に伝える唯一の経路)。
 

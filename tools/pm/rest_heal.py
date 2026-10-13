@@ -32,7 +32,7 @@ def gh(*args, data=None):
             return json.loads(p.stdout) if p.stdout.strip() else None
         if "rate limit" in p.stderr.lower():
             print("rate limited:", p.stderr.strip()[:120], file=sys.stderr)
-            time.sleep(30)
+            subprocess.run(["timeout", "30", "tail", "-f", "/dev/null"])
             continue
         time.sleep(2)
     raise RuntimeError(f"{' '.join(args)}: {p.stderr.strip()[:200]}")

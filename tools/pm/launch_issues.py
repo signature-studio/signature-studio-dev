@@ -43,7 +43,7 @@ def age_h(ts):
 
 
 def snapshot():
-    rc, o, e = subprocess.run([sys.executable, os.path.join(HERE, "issue_snapshot.py")], capture_output=True, text=True).returncode, "", ""
+    rc = subprocess.run([sys.executable, os.path.join(HERE, "issue_snapshot.py")], capture_output=True, text=True).returncode
     if rc:
         raise SystemExit("snapshot failed")
     return json.load(open(STATE))
