@@ -49,6 +49,7 @@ PM (main)                      subagent (実装)                  subagent (検�
    └ gh pr merge --merge ──→ branch/worktree 削除
 ```
 
+- 流れ図の「issue 起票」は PM が行う。ただし実装 subagent も、1 run に収まらない作業の残りと未解決の起票先として子 issue を起票してよい (§3 の #835 の規定。milestone・優先度・Status は PM が確定する)。
 - **worktree の場所**: リポジトリの**親ディレクトリの `ws-<N>`**
   (`git worktree add ../ws-<N> -b <N>-<slug> origin/main`)。
   既存 worktree は `git worktree list` で確認。**他人の worktree には触れない** (消さない・checkout しない)。
@@ -228,6 +229,15 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
 
   agent-setup での自動展開・`$GITHUB_ENV` への `FL_WIN64_DIR` 設定は未実施 (必要なら別 PR)。
   `PLUGINS_DIR` も同様に `plugins-*` の展開先を指定する。
+- **plugins-freshair の展開 (#693)**: tarball は最上位に `Fresh Air.Win.zip` / `Fresh Air.pkg` を持つ。agent-setup は
+  展開しないので、必要な run が自分で展開して `tools/targets/freshair/fetch.sh` に渡す。`fetch.sh` は zip から
+  `work/win/Fresh Air/.../FACTORY Presets/Factory Bank/*.epf` (8 本) を必ず補完する (`work-liftlib-targets` が先に
+  `work/win/Fresh Air` を作っても欠けない)。mac 側は `xar` と pkg が無ければ skip する。
+
+  ```sh
+  mkdir -p "$RUNNER_TEMP/plugins-freshair" && tar --zstd -xf "$ARTIFACTS_DIR/plugins-freshair.tar.zst" -C "$RUNNER_TEMP/plugins-freshair"
+  FA_DL="$RUNNER_TEMP/plugins-freshair" bash tools/targets/freshair/fetch.sh
+  ```
 - **レビュー run の素材**: review ジョブも PR 本文の `oc_artifacts:` 行を読んで素材を取得する
   (素材を要する e2e をレビュワーが独立再実行するため)。PR 作成者は、素材を要する PR の本文に
   実装時と同じ行を書くこと。

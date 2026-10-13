@@ -4,6 +4,7 @@ import fs from "node:fs";
 import assert from "node:assert/strict";
 import { FlPython } from "../host/flpython.mjs";
 import { createWasmEngine } from "../host/fl_provider.mjs";
+import { createMockEngine } from "../host/fl_mock.mjs";
 
 const root = new URL("../", import.meta.url);
 const ids = JSON.parse(fs.readFileSync(new URL("analysis/flapi/flapi_ids.json", root)));
@@ -119,4 +120,9 @@ assert.deepEqual(m.json, ["list"]);
 assert.deepEqual(m.range[0], ["IndexError", "Index out of range"]);
 assert.equal(m.type[0][0], "TypeError");
 assert.equal(m.unimpl[0][0], "RuntimeError");
+// 6. 省略表現: 引数の None は省略 (既定値) と同じ。JS mock (fl_mock.mjs) と C provider で結果が一致する
+const mock = createMockEngine();
+for (const a of [[0], [0, null], [0, -1]]) {
+  assert.equal(engine.call("plugins.getPluginName", a), mock.call("plugins.getPluginName", a), `getPluginName(${a})`);
+}
 console.log(JSON.stringify({ functions: ids.length, implemented: impl, unimplemented: unimpl, mcp_static: mcp.size, PASS: true }));
