@@ -3,7 +3,7 @@
 **判定: 部分達成 (trap 83 → 66、目標 < 20 は未達)**。halt0 48 unit の発生源を wasm スタックで全数特定し、
 最大の原因 `function_417b70` (System.DynArraySetLength) の 1 段 deref 脱落を C 転記 (`m11_ov.c`) で修正した。
 
-## 1. 実測 (HEAD `1eccbfa`、`bash tools/m11/m11_e2e.sh`、16.1 s、load average 0.45)
+## 1. 実測 (HEAD `36494d0`、`bash tools/m11/m11_e2e.sh`、16.2 s、load average 0.38)
 
 | 項目 | 修正前 | 修正後 |
 |---|--:|--:|
@@ -12,6 +12,8 @@
 | └ oob / halt0 / abort | 34 / 48 / 1 | 44 / 21 / 1 |
 | reached_stage / units_run (通常起動) | 4/6 / 17 | 4/6 / 17 (不変) |
 | wasm-ld signature mismatch / undefined | 0 / 0 | 0 / 0 |
+
+`node tools/m11/trap_triage/survey_units.mjs <out.json>` (同 HEAD、0.51 s): `SURVEY_UNITS {"ok":829,"oob":44,"halt0":21,"miss":46,"abort":1,"noproc":1}`。
 
 unit 遷移 (per-unit JSON 比較): halt0→ok 16 / **halt0→oob 11** / oob→ok 1。halt0→oob の 11 件は、
 修正で Halt0 を抜けて先へ進み、次の欠陥 (下記 §3-2) に当たったもの。trap 総数の減少は 17 (= 83−66)。
