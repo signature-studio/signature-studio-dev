@@ -10,6 +10,8 @@ import vm from 'vm';
 const [, , wasmJs, imageBin, originHex, deltaHex, ...rest] = process.argv;
 const initExports = (rest.find((x) => x.startsWith('--init=')) || '--init=').slice(7).split(',').filter(Boolean);
 const layoutOnly = rest.includes('--layout');
+// wasm 1 case の打切り ms (target JSON wasm_timeout_ms)。既定 1000
+const wasmTimeoutMs = Number((rest.find((x) => x.startsWith('--timeout-ms=')) || '--timeout-ms=1000').slice(13)) || 1000;
 const mod = await (await import(path.resolve(wasmJs))).default({ printErr: () => {}, print: () => {} });
 const exp = mod.wasmExports || mod.asm || {};
 const origin = BigInt('0x' + originHex), delta = BigInt('0x' + deltaHex);
@@ -58,7 +60,7 @@ function runCase(line) {
   let status = 'ok', detail = '', rax = 0n, x0 = 0n, hasRet = 1;
   try {
     globalThis.__ld_call = () => mod._fle_ld_run();
-    const r = vm.runInThisContext('__ld_call()', { timeout: 1000 });
+    const r = vm.runInThisContext('__ld_call()', { timeout: wasmTimeoutMs });
     if (rt === 'void') hasRet = 0;
     else if (rt === 'double' || rt === 'float') x0 = BigInt.asUintN(64, mod._fle_ld_xmm0());   // 生 bits (cmp_ret が幅で処理)
     else if (typeof r === 'bigint') rax = BigInt.asUintN(64, r);
