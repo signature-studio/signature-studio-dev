@@ -175,7 +175,7 @@
 | `tools/assets/wvfs/REPORT.md` | ~145 | 書込可能 OPFS VFS |
 | `tools/assets/deploy-manifest/REPORT.md` | ~60 | 配備 manifest 生産側 (05-stage 契約) |
 | `tools/python/REPORT.md` | ~240 | CPython wasm + flapi/MCP 解析 + ブリッジ設計。§PY-13 (#588)・§12/§13 (#81 kwargs 署名の静的復元) は要約のみで全文は `REPORT_APPENDIX.md` に分割 |
-| `tools/python/REPORT_APPENDIX.md` | ~50 | python REPORT §PY-13 (build_flpy.sh の env 化 #588) と §12/§13 (PY-9 b kwargs 署名復元・wasm 回帰・未解決 #81) の全文 (250 行上限のため無変更で分割移動) |
+| `tools/python/REPORT_APPENDIX.md` | ~176 | python REPORT §PY-13 (build_flpy.sh の env 化 #588)・§12/§13 (PY-9 b kwargs 署名復元・wasm 回帰・未解決 #81)・§14 (PY-15 省略引数の受け渡し・誤束縛 0 検証・挙動変更の内訳・ネガコン・wasm 回帰 #653) の全文 (250 行上限のため無変更で分割移動) |
 | `tools/flp/REPORT.md` | ~120 | FLP/FST パーサ・ライタ・往復コーパス |
 | `tools/plugins/REPORT.md` | ~115 | Fruity プラグイン 141 種 wasm 化マップ (カウントの正本) |
 | `tools/plugins/f2/REPORT.md` | ~200 | PLG-F2 eq-filter 11 本: 固有閉包 lift の再現と間接 call 脱落の監査 (#199)、icall 復元の batch_lift 接続と回帰ゲート (#514) |
