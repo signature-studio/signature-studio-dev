@@ -109,7 +109,15 @@
 | `--backend-no-opts` (前 run #810 の実測、本 HEAD では未再測定) | 23664 | **exit 0、441 s、Maximum RSS 3.52 GB**。 `.ll` 75 MB・`.c` 39.6 MB 出力まで完走。 run id 未確認 |
 
 - 結論: `--backend-no-opts` で RSS は 8.15 GiB → 3.52 GB に下がり、C 出力まで完走する。 ただし 441 s は `lift_from_ll.sh` (.ll 出力後に停止、既定経路) より長い。 共有 `lift_ranges.sh` は変更せず、既定経路は `lift_from_ll.sh` のまま (判断: 変更しない)。
-- 理由: `lift_from_ll.sh` は C 出力を使わず `.ll` の後段だけ使うため、`--backend-no-opts` を入れても時間の利点が無い。 `--no-memory-limit` は本 HEAD では未測定 (RSS は 3.5 GB で上限に届かなかった)。
+- 理由: `lift_from_ll.sh` は C 出力を使わず `.ll` の後段だけ使うため、`--backend-no-opts` を入れても時間の利点が無い。
+- 本 HEAD (main dc7c11df・fl-win64 展開 `$RUNNER_TEMP/fl-win64`、23664 の ranges 5,160 関数) での実測:
+
+| 方式 | 結果 (実測) |
+|---|---|
+| `--no-memory-limit` (既定 `--backend-*` のまま) | **exit 137・`--timeout 1100` で打ち切り (経過 18:20.34)、Maximum RSS 11.19 GB**。 "out of memory" 0 件。 `.ll` 75 MB は約 2 分で出力 (`e.drc.ll`、RetDec 内の phase)。 "emission of the target code [c]" に 922.76 s で入り、C 出力の途中で 1100 s に達して打ち切り。 C 出力は未完 |
+| `--backend-no-opts` | **exit 0、8:18.90 (499 s)、Maximum RSS 3.52 GB**。 `.ll` 75 MB・`.c` 39.6 MB 出力まで完走。 前 run #810 の 441 s / 3.52 GB と同じ RSS |
+
+- 結論 (受入条件 3): `--no-memory-limit` は RSS 上限を外すだけで、C 出力段の時間とメモリを抑えられない (11.19 GB まで伸び、1100 s でも C 出力が終わらない)。 メモリを抑えるのは `--backend-no-opts` で、こちらは 499 s かかる。 いずれも `lift_from_ll.sh` (`.ll` 出力 + 後段のみ、約 2 分 + 後段) より遅い・重いため、共有 `lift_ranges.sh` には入れない (判断: 変更しない)。 RetDec の既定経路は本 HEAD でも `lift_from_ll.sh` を使う。
 
 ### 5. VEX helper の CPUID 分岐 (前 run の引用、main f0d65f32。本 HEAD では未再測定)
 
@@ -127,7 +135,7 @@
 | 未解決 | 起票先 |
 |---|---|
 | 殻の selector 9 件の `r8`/`r9` 引数の完全な意味・戻り値の型 (engine 側 case ごとの読解) | 本 #540 (継続) |
-| `--no-memory-limit` の実測 (今回 RSS 3.5 GB で未到達) | 本 #540 (継続) |
+| `--no-memory-limit` は 1100 s の timeout で C 出力未完・RSS 11.19 GB (§5 受入条件 3 の実測済み)。 `lift_from_ll.sh` 既定経路で足りるため追加の方式評価は不要 | 本 #540 (継続、受入条件 3 は判断まで完了) |
 | VEX helper の SSE 固定の動的確認 (直接 call 鎖では guard 無し。間接 call は未追跡) | #527 にコメント予定 (既存・重複起票せず) |
 | 受入条件 1・2 の再測定 (`sampler_engines.sh`) | 本 HEAD の検証 run は runner に [RETDEC] が無く未再現。 RetDec 環境のある run で再測定 (#540 継続) |
 
