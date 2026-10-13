@@ -6,9 +6,9 @@ REPORT.md §15 相当。REPORT.md の 250 行上限のため別置き。親 #853
 
 **未達 (部分達成)**。icall 経路の復元後 IR から wasm ビルドまで成立したが、wasm 実行は未達 (前回 run で 61/61 シナリオが trap)。native 差分は未取得。
 
-## 実測 (HEAD `44d70d74`・`ws-1025` worktree・2026-10-13 20:43 UTC)
+## 実測 (HEAD `a42f84e1`・`ws-1025` worktree・2026-10-13 21:36 UTC)
 
-測定 run: PR #1247 の fix モード (レビュー指摘への対応)。HEAD `44d70d74` を `ws-1025` worktree で checkout して実行。
+測定 run: PR #1247 の fix モード (レビュー指摘への対応)。HEAD `a42f84e1` を `ws-1025` worktree で実行。2 回 build して sha256 一致。
 
 素材: `work-icall` を `tools/icall/work/` に展開 (`tar --zstd -xf`)。`plugins-kilohearts` / `toolchain-*` は `$ARTIFACTS_DIR` に実在を確認したが、本 build 経路では展開していない (emsdk は [EMSDK] を使用)。
 
@@ -25,17 +25,18 @@ REPORT.md §15 相当。REPORT.md の 250 行上限のため別置き。親 #853
 
 ## 鮮度 (測定 commit から現 HEAD まで)
 
-検証 HEAD `c666521f` (本節を書いた時点) まで、測定 commit `44d70d74` からのコード差分は 0 行。`44d70d74..c666521f` の変更は本付録 (`REPORT_APPENDIX_1025.md`) のみ。
+測定 commit `a42f84e1` (コードを変えた最後の commit。`kh_route_build.sh` のコメント修正と REPORT.md の空行削除)。上表は `a42f84e1` の worktree で実測した。`a42f84e1` から現 HEAD までのコード差分は 0 行。
 
 ```
-$ git diff 44d70d74 c666521f -- tools/icall/kh_route_build.sh tools/icall/ir_*.py tools/icall/rt tools/m*
+$ git diff 44d70d74 a42f84e1 -- tools/icall/kh_route_build.sh tools/icall/ir_*.py tools/icall/rt tools/m2 tools/m5 tools/m11
+diff --git a/tools/icall/kh_route_build.sh b/tools/icall/kh_route_build.sh
+-# 1. 復元後 IR の後処理 (ICALL_FIX_MASK / ICALL_FIX_VSTORE は OTT と同じ既定 1)
++# 1. 復元後 IR の後処理 (fix_mask / fix_vstore を無条件に実行)
+$ git diff a42f84e1 HEAD -- tools/icall/kh_route_build.sh tools/icall/ir_*.py tools/icall/rt tools/m*
 (出力 0 行・exit 0)
-$ git diff --stat 44d70d74 c666521f
- tools/icall/REPORT_APPENDIX_1025.md | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
 ```
 
-よって上表の数値は現 HEAD のコードに対しても有効 (再測定は不要, WORKFLOW §6)。
+`44d70d74..a42f84e1` の差分はコメント 1 行のみ (実行される行は不変)。`a42f84e1..HEAD` は 0 行。よって上表の数値は現 HEAD のコードに対しても有効 (再測定は不要, WORKFLOW §6)。
 
 fix の内容: BLK を `map.json` の `blk` から取得 (旧 `0x3a25c000` は出典不明のハードコードだったため削除)、`ir_flatten.py --cfg` に `map.json` の `cfg_thunks` を渡す (OTT `ott_route.sh` と同じ生成式)。
 `cfg_thunks` が空であることは上表の `map.json` の値で確認済み。
