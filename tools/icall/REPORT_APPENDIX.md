@@ -86,3 +86,29 @@ python3 tools/icall/diff/rax_callers.py 1801a9a6c 1801c8cb8 1801c8c98
 | `1801c8cb8` override の動的突合なし | float 版エラー経路の戻りは UCRT 仕様由来 | #90 にコメント (§8.5 と同じ限界) |
 | `1801bdcba` が `1801c8c98` 直後に eax を読む (errorf 経路の rax 戻りの意味が未確認) | float エラー経路到達時のみ | #361 (本 issue に残し、到達 scenario 構築時に確認) |
 | `/home/ubuntu/work/analysis` ハードコード (`ott_route.sh`) | runner では symlink 回避 | #294 |
+
+## 12. #229: FLEngine 巨大 2 関数の範囲分割 lift (before / after)
+
+既知類型との関係 (`docs/DEFECTS.md` / icall §4 とは別体系): **該当なし** (新規類型の確定は未)。
+
+検証起点 HEAD `183158f7` (main)、素材 `fl-win64` (`block00031_PE.bin`)、4 core。
+再現: `FL_WIN64_DIR=<展開先>/extracted bash tools/icall/measure_flengine_split.sh <outdir>`。
+
+| 条件 | RetDec 所要 | 書換え後の落ち (非 IAT 374 site 中) | 備考 |
+|---|--:|--:|---|
+| CHUNKS=1 (2 関数を 1 回) | 42.97 s (roundtrip 全体, 単独実行) | **366** (kept_indirect 8) | before は 373 落ち (RetDec 素通し) |
+| CHUNKS=2 (`--select-ranges` を 2 分割) | 42.24 s (roundtrip 全体, 単独実行) | **366** (kept_indirect 8) | 分割しても差なし |
+| 検証スクリプト一括 (`measure_flengine_split.sh`, HEAD 再現) | 134.0 s (load 0.14 → 1.38) | base 366 / c2 366 | 段特定 (`passes_stub_count.py`) を含む |
+
+- 関数範囲: `0xc589b0-0xc5d667` (19,639 B) / `0x128f9e0-0x1294ab8` (20,696 B)。site は各 183 / 191 (うち 8 が書換え後も IR に残る)。
+- RetDec は正常終了 (タイムアウト無し、約 10 s で `Running phase: cleanup`)。落ちは時間切れではない。
+- decode 段 (`--print-after-all` の `Input binary to LLVM IR decoding`) では stub 呼出し **377** 本。`Selected functions optimization` 段で 61 関数 → 4 関数 (2 関数 + stub 2)。
+  以後は関数ごとに 1 モジュールへ分けて最適化され、stub 呼出しは `Simple constant propagation` 付近で 377 → 11 へ減る (`passes_stub.txt`)。
+- 範囲分割で落ちは減らない (CHUNKS=2 で 366 のまま)。仮説 A (RetDec の打ち切り回避) は**棄却**。
+- 補足 (DEFECTS 候補): RetDec は `0x128c320` 直前の関数を `data inside code section 0x128c281--0x128c320` と誤認し、`0x128c320` を 1 バイト関数にする。`NonRecursiveCFGBuilder` が `function_128c320` への edge を毎回捨てる警告 (5 件) が出る。本件の 366 落ちとの因果は未検証。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 366 site 落ちの真因 (decode 後・最適化中に stub 呼出しが減る段の特定と、関数単位の before/after 突合) | 2 関数の wasm 化不可 | #229 (続き) |
+| `0x128c320` の関数境界誤認 (1 バイト関数化) と NonRecursiveCFGBuilder 警告 | 隣接関数の lift 欠落の疑い | 子 issue (下記) |
+| jump table cmp/je 展開 / Balance・KH・FA wasm 差分 / stack 引数動的検証 / plugin closure バッチ | 本 run 範囲外 | 子 issue (下記) |

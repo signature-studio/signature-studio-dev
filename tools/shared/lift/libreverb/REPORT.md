@@ -50,8 +50,7 @@ win 版 `Reverb.dll` の `Process_Fruity_32FM_32FS` / `Process_UF_32FM_32FS` を
 3 回とも本検査 240/240・ネガコン 4 件期待通り FAIL。
 
 ## 6. ildsp (`block24360_PE.bin`) 調査のみ (lift 未実施)
-`.text` 362,280 命令 (うち SIMD 111,346 = 30.7%) + `IPPCODE` 129,192 命令 (SIMD 69.4%)。`.text` の call は直接 5,898 / 間接 848 (間接率 12.6%)。`.pdata` 2,622 関数、export 10 (`*_CreateInstance`)、import は KERNEL32 のみ。mac 版の測定 (146K 命令) とは別個体であり比較しない。
-(集計: capstone, `ildsp_survey` 相当の使い捨てスクリプト。分母 = 逆アセンブルできた命令。再現スクリプトは未整備 → 未解決 1)
+ildsp の規模測定 (命令数・call 数・export closure 表) と未解決は [lift/ildsp/REPORT.md](ildsp/REPORT.md) が正本。
 
 ## 検証範囲 / 範囲外
 - 範囲: win 版 Process_Fruity/UF の**合成状態** (乱数 + 境界値) に対する wasm と native 機械語のビット一致。
@@ -60,8 +59,6 @@ win 版 `Reverb.dll` の `Process_Fruity_32FM_32FS` / `Process_UF_32FM_32FS` を
 ## 未解決
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| **ildsp (146K〜362K 命令) の lift 本体** | #161 後半が未達 (Closes 不可) | #161 継続。ildsp は Limiter/PSOLA 等 10 CreateInstance 単位で子チケットに分割を提案 (PM) |
-| ildsp サイズ調査の再現スクリプト無し | §6 の数値が 1 コマンド再現不可 | #161 の継続作業で `tools/shared/scripts/` に追加 |
 | 実インスタンス (CreateReverbInstance → Process) の駆動検証 | 状態レイアウトの意味づけ (14 delay line の長さ制約) は乱数/境界値で代替 | #161 継続 or 別チケット (PM 判断) |
 | D1a 変種「分岐条件が直前の無関係な add の parity/zero flag」の DEFECTS.md 反映 | カタログ未反映 | 行案は §3。DEFECTS.md の編集は PM 判断 |
 | ir_normalize / fix pass が `libkio` 配下の流用 (汎用化されていない) | 他 lib 転用時にコピーが増える | #(T-SH-16 汎用 pass 化) にコメント |

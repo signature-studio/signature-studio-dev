@@ -19,7 +19,7 @@
 | # | 呼出点 (実測座標) | 処置 | 実装 | 検証 |
 |---|---|---|---|---|
 | N1 | 0x18004fad0 (DSP setState) 内 `demoVersion` キー検出分岐 **0x18004fbdd** (`je 0x18004fe1c`) | 検出時も無視して復元続行 (防御案を採用) | IR: br_force !37 / 機械語: `0f 84…`→`e9…90` (6B) | wasm: dialog 非実行 + 復元実行 (3 ケース) |
-| N2a | 0x1800c2b50 内 demo bit store **0x1800c2cfe** (`mov [rsi+0x22792],al`) と **0x1800c2d42** (`mov …,1`) | 常時 0 を store | IR: store_const !2624/!2630 / 機械語: imm 2B (`34 01`→`34 00`, `01`→`00`) | wasm: bit≡0 (marker 0/1 両方) |
+| N2a | 0x1800c2b50 内 demo bit store **0x1800c2cfe** (`mov [rsi+0x22792],al`) と **0x1800c2d42** (`mov …,1`) | 常時 0 を store | IR: store_const !2624/!2630 / 機械語: N2a-1 は `34 01` (xor al,1)→`b0 00` (mov al,0) 2B に変更 (#623。旧 `34 00` は lookup 値を残すため定数 0 にならなかった), N2a-2 は `01`→`00` | wasm: bit≡0 (marker 0/1 両方) |
 | N2b | 0x1800c2b50 内 0x800010 通知分岐 **0x1800c2d04** (jne→d5f) と **0x1800c2d59** (je→f08) | licensed 側に固定 (通知ブロック到達不能化) | IR: br_force !2625/!2633 / 機械語: `75 59`→`90 90`, `0f 84…`→`e9…90` | wasm: deferred flags 0x0 (pre は 0x800010 発火を実測) |
 | N3 | 0x1800c6090 (getState) の demo マーカ書込分岐 **0x1800c687b** (`jne +0x3d`) | 書込 skip 常時化 | IR: br_force !3004 / 機械語: `75`→`eb` (1B) | IR: マーカ書込 block 到達不能 |
 | N4 | 0x180056670 (`SerumDSP::process`) | **無変更** (CAB-71 実測どおり音声経路に demo 参照無し) | pass は対象外 | IR diff 0 行 + 前方呼出閉包 842 関数が patch 対象と非交差 |

@@ -72,7 +72,48 @@ python3 gui/decode_splice_url.py work/Serum2_win64.vst3                  # 0x180
 | 残り 2 点の動的確認 (実 host で Splice 表示が出ないこと) | 静的確認のみ。実 VSTGUI 実行が必要 | #623 (SR-2c) / GUI lift 時 |
 | GUI 戦略 (a) 全 lift / (b) upstream VSTGUI 再構築の比較 | 本 run 未実施。§9 T7 (2〜3 週調査) の本体 | 本 issue #68 の残作業 (Refs) |
 
-## 5. 検証 (実測)
+## 5. GUI 戦略 (a) 全 lift / (b) upstream VSTGUI 再構築 の比較 (§9 T7)
+
+### 5-1. 実測 (`gui/strategy_count.py` → `out/gui_strategy_count.txt`)
+
+| 項目 | 実測 |
+|---|---|
+| 入力 | `work/uidesc.json` (2,093,822 B, §1 と同一)。templates 123 / bitmaps 344 |
+| View クラス参照 | 817 件 / **103 種** (全 103 種がバイナリ RTTI に名前一致) |
+| うち VSTGUI 標準名とみなした分 (`C` 接頭辞, ヒューリスティック) | 16 種 / **260 件** (`CViewContainer` 165 が大半) |
+| うち Xfer 独自とみなした分 (その他, ヒューリスティック) | 87 種 / **557 件** (`HoverView` `XferAdvancedOptionMenu` `VectorKnob` `XferOnOffButton` ほか) |
+| sub-controller | 159 件 / 61 種。RTTI 名一致 58 種。不一致 3 種 (`OscController2` `RoutingSlotController2` `RoutingSlotController6`) |
+| VSTGUI `UIViewCreator` 系 RTTI | 39 件 (`VSTGUI::UIViewCreator::*Creator`) |
+| GUI 関数 (closure, `out/closure_summary.json`, 静的・過大近似) | GUI root 836 / GUI closure 7,138 関数 (4.21 MB) / GUI のみ 3,217 関数 (1.92 MB) / DSP と共有 3,921 関数 (2.29 MB) |
+
+注: 「C 接頭辞 = VSTGUI」「その他 = Xfer」は名前からの**推定**であり、個々の class の実体 (どの RTTI がどの .text に対応するか) は未確認。RTTI 照合は部分文字列ではなく単語境界の一致のみ。
+
+### 5-2. 比較
+
+| 観点 | (a) 全 lift | (b) upstream VSTGUI 再構築 + Xfer 固有ビューのみ lift/置換 |
+|---|---|---|
+| 対象量 | GUI closure 7,138 関数 / 4.21 MB (過大近似)。実数は動的トレース後 | VSTGUI 基盤 (推定 約 3,360 関数 / 692 KB, 本体 REPORT §3) は upstream ソースで置換。lift 対象は Xfer 固有 87 種 (557 参照) |
+| 依存 | Win32 / D2D / DirectComposition を含む platform 層を lift するか、canvas へ差し替えるかが不明のまま | canvas platform を新規実装する前提。upstream VSTGUI の版は未確定 (SR-3 の cut 表に VSTGUI は未掲載) |
+| 量の根拠 | 関数数・バイトは実測。ただし closure は間接呼出の取りこぼしを含み、真値は未確定 | 置換側の工数は未実測 (推定のみ) |
+| 検証の取り方 | バイナリ同士の挙動比較が可能 | 参照 (実機) 表示との突合が必要。§4 の動的確認と同じ経路 |
+| 既存資産 | host (§host/REPORT) で editor 生成まで到達。描画は未実施 | uidesc 展開 (§1) と PNG/TTF は既に取得可能 |
+
+### 5-3. 判定 (推奨・確度付き)
+
+- **推奨: (b)。** 根拠は実測の 2 点 (a) GUI closure 4.21 MB は DSP と 3,921 関数を共有し、lift 単独では DSP 側の切り分けも要る。(b) は uidesc の View 種が 103 と有限で、Xfer 固有は 87 種に限られる。
+- **確度: 中。** (b) の工数・canvas platform の工数は**未実測**。VSTGUI 版の同定も未了のため、(b) を採るなら版確定を先にする。
+- **残留 (1) Splice 実体化分岐** は (a)(b) どちらでも同じ未解決 (§2-3)。SpliceController は Xfer 固有ビューなので (b) では置換側で扱う。
+- **PoC 境界 (次段)**: 最小 1 view (例 `CTextLabel` 系 + `XferOnOffButton`) を upstream VSTGUI で canvas 描画し、uidesc から 1 template を実体化する。ここまでを GUI 戦略の PoC とし、全 Xfer ビューの置換はこの後に起票する。
+
+本 run では (a)(b) の工数見積もりを実測していないため、**判定は推奨止まり**。最終決定はユーザ判断。
+
+## 6. 検証 (実測)
+
+- `gui/strategy_count.py work/uidesc.json out/rtti_classes.txt` を 1 回実行 (0.09 s)。出力は `out/gui_strategy_count.txt` (691 B)。
+- 入力の sha256 `501e7bb3dd9cafe4…` / 19,236,864 B は REPORT §11 と一致 (本 run で `plugins-serum2` の exe から再抽出)。
+- uidesc 抽出 2,093,822 B (`extract_uidesc.py`, 3.55 s, 逐次)。
+
+## 7. 検証 (前 run, 残留 2 点)
 
 - 抽出 → 復号 → uidesc 解析を 1 コマンド系列で 1 回実行 (§1)。出力は §2-1 / §3 の数値と一致。
 - ネガティブコントロール: テンプレート参照カウントは own def を差し引いて 0 (= 自己参照を数えていない)。定義件数 3 は `SpliceExpired`/`SpliceMaxLimit`/`SpliceRTO` の 3 名を列挙して確認。
