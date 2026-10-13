@@ -107,6 +107,8 @@ python3 tools/gui/analysis/gui_imports.py && python3 tools/gui/gen_api.py   # im
 ## 9. GUI-4 (#180): WebGL2 present / dirty 複数矩形 / rAF 同期 / seqlock
 全文は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) に分割移動 (250 行上限; 内容は無変更)。結論: 現行 CPU 経路は 1080p 2.2〜3.8 ms/frame で予算内、WebGL2 present・複数矩形・rAF 同期・seqlock は FL 非依存部を実装・e2e 済み。
 
+- **前面 surface の z 順再描画** (#180 / PR #1022, 検証起点 `b54fb619`): `present()` / `glDrawRects()` で dirty 矩形内の前面 surface を z 昇順に描く。`e2e.sh` ALL PASS (35 件 OK、golden 4 方式 × 46 step × 230,400 px 差 0)。ソート除去の陰性対照は cpu-immediate (差 3,512 px) が 5/5 回 FAIL、gl-direct-immediate・cpu-raf-seqlock (差 2,862 px) が 5 回中 2〜3 回 FAIL、gl-staged-raf-seqlock は 5/5 回 PASS (検出しない)。全文は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §9b。
+
 ## 10. GUI-5 (#181): 24/8/4/1bpp DIB・mono DDB と wasm SIMD128 行カーネル
 既知類型との関係: lift 欠陥ではなく shim の意味論 (`docs/DEFECTS.md` D18 として登録)。ただし shim 自身の silent 誤りを 1 件発見 (下記「発見」)。検証起点: 実装 `dd7be3e`、本節の数値は `9cff72c` のクリーン tree での実測 (src/test は最終 HEAD と同一で、以降の commit は REPORT・DOC_MAP のみ; `gui_gdi.c` は `dd7be3e` と同一)。
 
