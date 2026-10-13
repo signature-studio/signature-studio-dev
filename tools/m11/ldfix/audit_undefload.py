@@ -49,7 +49,7 @@ def scan_text(text, meta):
             for l in lines:
                 if a not in l or re.match(r'^  %s = alloca ' % ea, l):
                     continue
-                if re.match(r'^  %[\w.$-]+ = load \w+, (?:ptr|\w+\*) %s(?![\w.$-])' % ea.lstrip('%') if False else r'^  %[\w.$-]+ = load [^,]+, [^%]*' + ea + r'(?![\w.$-])', l):
+                if re.match(r'^  %[\w.$-]+ = load [^,]+, [^%]*' + ea + r'(?![\w.$-])', l):
                     continue
                 if re.search(ea + r'(?![\w.$-])', l):
                     bad.add(a)
