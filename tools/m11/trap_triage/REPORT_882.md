@@ -40,6 +40,7 @@
 | OOB → OOB でない | 56 | OOB (`8c6530`) | OOB でない (本 run の survey 出力は 16 件の OOB 一覧のみで、現 ok/halt0/miss の区分は未取得) |
 | OOB → OOB でない | 291 / 296 | OOB (`4f9f40`) | OOB でない (同上) |
 | halt0 → OOB | 280 / 659 | halt0 (`412770`) | OOB (`6cefb0`) |
+| halt0 → OOB でない | 158 | halt0 (`414ad0`) | OOB でない (本 build の OOB 16 件に含まれない)。ok / halt0 / miss の区分は未取得 (本 run の survey 出力に unit 単位の halt0 一覧なし) |
 | 新たに OOB | 144 / 745 (`407e20`)、484 / 513 / 520 (`903e00`)、492 (`4133f0`)、830 (`10c7cd0`)、880 (`125da90`) | OOB でない (分類は未取得) | OOB |
 | OOB のまま (top frame 変化) | 304 / 555 (`4f9f40` → `535bf2`)、923 (`4f9f40` → `410b10`) | OOB | OOB |
 | OOB のまま (top frame 同じ) | 149 (`412e40`)、275 (`864fe0`)、477 (`903d20`) | OOB | OOB |
