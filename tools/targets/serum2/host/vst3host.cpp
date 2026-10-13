@@ -79,6 +79,12 @@ static LONG CALLBACK watchVeh(PEXCEPTION_POINTERS ep) {
     if (m) GetModuleFileNameA(m, mod, MAX_PATH);
     L("[watch] hit#%d RIP=%p (base=%p, %s) value=%d", gWatchHits, (void*)c->Rip, (void*)m,
       strrchr(mod, '\\') ? strrchr(mod, '\\') + 1 : mod, *gWatchAddr);
+    // スタック上の戻り番地候補 (関数 0xacf70 の呼出元を実行時に確定するため、RSP 以上の qword を 8 個出す)
+    for (int k = 0; k < 64 && m; k++) {
+      const DWORD64 ret = *(const DWORD64*)(c->Rsp + 8 * k);
+      if (ret > (DWORD64)m && ret < (DWORD64)m + 0x2000000)
+        L("[watch] stack[%d]=%p RVA=0x%llx", k, (void*)ret, (unsigned long long)(ret - (DWORD64)m));
+    }
     if (m) {  // QI の IID 候補 (lea rdx の解決先 RVA 0x11be750 / 0x11be8e8, 実行時に .data へ格納される)
       const DWORD rvas[2] = {0x11be750, 0x11be8e8};
       for (int i = 0; i < 2; i++) {
