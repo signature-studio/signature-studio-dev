@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """FL Slayer x86 engine (block22434 = Slayer_Engine.dll) の ia32 decode 基準値 (#674 / 親 #536)。
 
-  measure.py         実測 + 期待値 gate (C1〜C3)。 gate 不合格で exit 1。
+  measure.py         実測 + 期待値 gate (C1〜C4)。 gate 不合格で exit 1。
   measure.py --nega  ネガティブコントロール (壊した入力は必ず FAIL)。 miss > 0 で exit 1。
+  --seed / --bytes   --nega の N2 (乱数破壊) の seed と先頭バイト数 (既定 674 / 300)。
   --dump             全命令の逆アセンブルを work/ に書く (gitignore 対象)。
 
-素材: $FL_WIN64_DIR/extracted/block22434_PE.bin (既定 $RUNNER_TEMP/fl-win64)。 依存: capstone。
+素材: $FL_WIN64_DIR/extracted/block22434_PE.bin (既定 $RUNNER_TEMP/fl-win64)。
+入力の SHA-256 と capstone の版は固定値で検証し、不一致は gate より前に exit 1。 依存: capstone==5.0.7。
 """
 import argparse, collections, hashlib, os, random, re, struct, sys, time
 
@@ -23,6 +25,8 @@ EXPECT_MACHINE = 0x14C          # IMAGE_FILE_MACHINE_I386 (#536 C1)
 EXPECT_TEXT_VSIZE = 73002       # .text VirtualSize (#536 C7 の 73,002 B)
 UNDEC_MAX = 0.001               # gate C3: 線形掃引のデコード不能バイト率の上限 (粗い gate)
 EXPECT_PRIV_MAX = 15            # gate C4: 特権命令 (ring0 専用) の件数の上限 = 実測 baseline
+EXPECT_CAPSTONE = '5.0.7'       # 件数は capstone の版に依存するため版を固定する
+EXPECT_SHA256 = '84b64c43cc6528401e1c4e84074785e100e8453c4db4c8322a5d5f608de724a9'  # block22434_PE.bin (179,512 B)
 PRIV_MNEM = frozenset(['in', 'ins', 'insb', 'insw', 'insd', 'out', 'outs', 'outsb', 'outsw', 'outsd',
                        'hlt', 'cli', 'sti', 'iret', 'iretd', 'iretw', 'lgdt', 'lidt', 'lldt', 'ltr', 'lmsw',
                        'sgdt', 'sidt', 'sldt', 'clts', 'invd', 'wbinvd', 'invlpg', 'rdmsr', 'wrmsr', 'rsm',
@@ -280,16 +284,31 @@ def report(res, sha, path, names):
 CAP_VER = None
 
 
-def measure(args, log):
+def load_input(args, log):
     global CAP_VER
     import capstone
     CAP_VER = capstone.__version__
+    if CAP_VER != EXPECT_CAPSTONE:
+        log('[pin] FAIL capstone=%s (期待 %s)' % (CAP_VER, EXPECT_CAPSTONE))
+        return None
     path = args.dll or os.path.join(fl_dir(), 'extracted', 'block22434_PE.bin')
     if not os.path.isfile(path) or os.path.getsize(path) == 0:
-        log('[measure] FAIL 素材が無い/空: %s' % path)
-        return 1
+        log('[input] FAIL 素材が無い/空: %s' % path)
+        return None
     data = open(path, 'rb').read()
     sha = hashlib.sha256(data).hexdigest()
+    if sha != EXPECT_SHA256:
+        log('[input] FAIL sha256=%s (期待 %s)' % (sha, EXPECT_SHA256))
+        return None
+    return path, data, sha
+
+
+def measure(args, log):
+    loaded = load_input(args, log)
+    if loaded is None:
+        log('[measure] FAIL 入力検証不合格 (gate は実行しない)')
+        return 1
+    path, data, sha = loaded
     dump_path = None
     if args.dump:
         os.makedirs(WORK, exist_ok=True)
@@ -329,18 +348,19 @@ def mut_text_vsize(d, pe):
 
 NEGA = [
     ('N1', 'machine 0x14c -> 0x8664 (x86-64 のつもり)', mut_machine, {'C1'}),
-    ('N2', '.text 先頭 %d B を乱数化' % NEGA_CORRUPT_BYTES, mut_text_random, {'C4'}),
+    ('N2', '.text 先頭を乱数化 (seed / bytes は [nega params] 行)', mut_text_random, {'C4'}),
     ('N3', '.text VirtualSize 73002 -> 73003', mut_text_vsize, {'C2'}),
 ]
 
 
 def nega(args, log):
-    global CAP_VER
-    import capstone
-    CAP_VER = capstone.__version__
-    path = args.dll or os.path.join(fl_dir(), 'extracted', 'block22434_PE.bin')
-    data = open(path, 'rb').read()
+    loaded = load_input(args, log)
+    if loaded is None:
+        log('nega: FAIL 入力検証不合格 (ネガコンは実行しない)')
+        return 1
+    _, data, _ = loaded
     pe = parse_pe(data)
+    log('[nega params] N2 seed=%d corrupt_bytes=%d' % (NEGA_SEED, NEGA_CORRUPT_BYTES))
     os.makedirs(os.path.join(WORK, 'nega'), exist_ok=True)
     miss = 0
     for nid, desc, mut, expect in NEGA:
@@ -361,11 +381,16 @@ def nega(args, log):
 
 
 def main():
+    global NEGA_SEED, NEGA_CORRUPT_BYTES
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--dll', help='対象 PE (既定: $FL_WIN64_DIR/extracted/block22434_PE.bin)')
     ap.add_argument('--nega', action='store_true', help='ネガティブコントロールを実行')
+    ap.add_argument('--seed', type=int, default=NEGA_SEED, help='--nega の N2 の乱数 seed (既定 %d)' % NEGA_SEED)
+    ap.add_argument('--bytes', type=int, default=NEGA_CORRUPT_BYTES,
+                    help='--nega の N2 で乱数化する先頭バイト数 (既定 %d)' % NEGA_CORRUPT_BYTES)
     ap.add_argument('--dump', action='store_true', help='全命令の逆アセンブルを work/ に書く')
     args = ap.parse_args()
+    NEGA_SEED, NEGA_CORRUPT_BYTES = args.seed, args.bytes
     log = lambda s: print(s, flush=True)
     rc = nega(args, log) if args.nega else measure(args, log)
     sys.exit(rc)
