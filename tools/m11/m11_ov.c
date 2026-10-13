@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <emscripten.h>
+#include <emscripten/stack.h>
 
 typedef unsigned long long u64;
 typedef unsigned int u32;
@@ -33,6 +34,32 @@ typedef struct { u32 va; void* fn; } m11_disp_ent;
 extern const m11_disp_ent m11_disp_tab[];
 extern const u32 m11_disp_n;
 typedef u64 (*m11_tr_t)(u64, u64, u64, u64, u64, u64, u64, u64);
+
+/* trace 出力 (fprintf) は wasm shadow stack の SP より下を汚す. その残骸は後続 unit の frame で「未初期化 alloca の読み」として読まれ,
+ * survey の結果が trace の有無で変わる (#495: unit 134 の function_413870 は rcx/rdx/r8 を未初期化 alloca から読む).
+ * 出力の前後で SP 直下 M11_TRACE_SPAN バイトを JS 側 (shadow stack を使わない) で退避/復元し, trace を透過にする.
+ * M11_TRACE_ISOLATE=0 で従来 (素の fprintf) に戻る (ネガコン用: trap_triage/negctl_495.sh). */
+#ifndef M11_TRACE_ISOLATE
+#define M11_TRACE_ISOLATE 1
+#endif
+#define M11_TRACE_SPAN 8192   /* 下の EM_JS の 8192 と同じ値 */
+const int m11_trace_isolate = M11_TRACE_ISOLATE;
+EM_JS(void, m11_stk_save, (unsigned sp), {
+    Module.m11_stk_saved = HEAPU8.slice(Math.max(0, sp - 8192), sp);
+});
+EM_JS(void, m11_stk_restore, (unsigned sp), {
+    const s = Module.m11_stk_saved, base = sp - s.length;
+    if (Module.m11_trace_probe) {   /* 汚れた最深バイトの SP からの距離 (最大値) を記録: M11_TRACE_SPAN が足りているかの実測 */
+        let d = 0; for (let i = 0; i < s.length; i++) if (HEAPU8[base + i] !== s[i]) { d = s.length - i; break; }
+        if (d > (Module.m11_maxdirty | 0)) Module.m11_maxdirty = d;
+    }
+    HEAPU8.set(s, base);
+});
+#if M11_TRACE_ISOLATE
+#define M11_TRACE(...) do { unsigned sp_ = (unsigned)emscripten_stack_get_current(); m11_stk_save(sp_); fprintf(stderr, __VA_ARGS__); m11_stk_restore(sp_); } while (0)
+#else
+#define M11_TRACE(...) fprintf(stderr, __VA_ARGS__)
+#endif
 
 static int g_trace = 0;
 static u64 g_icall_ok = 0, g_icall_miss = 0, g_icall_viaVA = 0;
@@ -86,11 +113,11 @@ u64 m11_icall(u64 target, u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6
         int seen = 0;
         for (u32 i = 0; i < g_nmiss_uniq; i++) if (g_miss[i] == (u32)target) { seen = 1; break; }
         if (!seen && g_nmiss_uniq < MISS_MAX) g_miss[g_nmiss_uniq++] = (u32)target;
-        if (g_trace) fprintf(stderr, "[m11][icall-miss] target=0x%llx (closure 外; skip, ret 0)\n", target);
+        if (g_trace) M11_TRACE("[m11][icall-miss] target=0x%llx (closure 外; skip, ret 0)\n", target);
         return 0;
     }
     g_icall_ok++;
-    if (g_trace) fprintf(stderr, "[m11][icall] 0x%llx\n", target);
+    if (g_trace) M11_TRACE("[m11][icall] 0x%llx\n", target);
     return f(a0, a1, a2, a3, a4, a5, a6, a7);
 }
 
@@ -128,7 +155,7 @@ EMSCRIPTEN_KEEPALIVE unsigned m11_unit_va(int i) {
 u64 function_4120c0(void) {
     u64 tbl = Q(R(0x11eac90));
     if (g_survey) { g_units_total = tbl ? D(tbl) : 0; return 0; }
-    if (g_trace) fprintf(stderr, "[m11][InitUnits] InitTable=0x%llx\n", tbl);
+    if (g_trace) M11_TRACE("[m11][InitUnits] InitTable=0x%llx\n", tbl);
     if (!tbl) return 0;
     int count = (int)D(tbl);
     u64 units = Q(tbl + 8);
@@ -140,7 +167,7 @@ u64 function_4120c0(void) {
         D(R(0x11eac98)) = (u32)i;
         if (!proc) continue;
         u32 miss0 = (u32)g_icall_miss;
-        if (g_trace) fprintf(stderr, "[m11][unit %d/%d] init=0x%llx\n", i, count, proc);
+        if (g_trace) M11_TRACE("[m11][unit %d/%d] init=0x%llx\n", i, count, proc);
         m11_icall(proc, 0, 0, 0, 0, 0, 0, 0, 0);
         if ((u32)g_icall_miss != miss0) g_units_skipped++;
         else g_units_run++;
@@ -152,7 +179,7 @@ u64 function_4120c0(void) {
  *   args: rcx=Context rdx=a1 r8=a2 r9=InitTable(hook 表: [reason] を call) [stk5]=DllProc [stk6]=hInst [stk7]=Reason [stk8]=Reserved */
 u64 m11_InitLib(u64 ctx, u64 a1, u64 a2, u64 tbl, u64 dllproc, u64 hinst, u64 reason64, u64 reserved) {
     u32 reason = (u32)reason64;
-    if (g_trace) fprintf(stderr, "[m11][InitLib] ctx=0x%llx a1=0x%llx a2=0x%llx tbl=0x%llx dllproc=0x%llx hinst=0x%llx reason=%u reserved=0x%llx\n", ctx, a1, a2, tbl, dllproc, hinst, reason, reserved);
+    if (g_trace) M11_TRACE("[m11][InitLib] ctx=0x%llx a1=0x%llx a2=0x%llx tbl=0x%llx dllproc=0x%llx hinst=0x%llx reason=%u reserved=0x%llx\n", ctx, a1, a2, tbl, dllproc, hinst, reason, reserved);
     u64 r13 = R(reason < 2 ? 0x11eac80 : 0x11eada8);
     u64 tmp[30];
     memcpy(tmp, (void*)(uintptr_t)(ctx + 0x38), 240);
@@ -222,7 +249,7 @@ unsigned long long function_412510(void* tbl) {
  *   old=*dest; *dest=src; old!=nil && refcnt(old-8)>0 → --refcnt==0 なら 0x409440(old-0x10) (FreeMem) */
 unsigned long long function_4133f0(unsigned long long dest, unsigned long long src) {
     u64 s = src;
-    if (g_trace) fprintf(stderr, "[m11][UStrAsg] dest=0x%llx src=0x%llx\n", dest, src);
+    if (g_trace) M11_TRACE("[m11][UStrAsg] dest=0x%llx src=0x%llx\n", dest, src);
     if (s) {
         if ((int)D(s - 8) < 0) {
             u32 len = D(s - 4);
@@ -254,7 +281,7 @@ static int g_longjmp_hit = 0;
 EMSCRIPTEN_KEEPALIVE int m11_longjmp_hit(void) { return g_longjmp_hit; }
 unsigned long long function_412770(void* ctx) {
     g_longjmp_hit++;
-    if (g_trace) fprintf(stderr, "[m11][longjmp] Halt0 -> RestoreContext(ctx=%p): DllMain attach 完走として JS 例外で巻き戻す\n", ctx);
+    if (g_trace) M11_TRACE("[m11][longjmp] Halt0 -> RestoreContext(ctx=%p): DllMain attach 完走として JS 例外で巻き戻す\n", ctx);
     m11_throw_dllmain_done(1);
     return 0;
 }
