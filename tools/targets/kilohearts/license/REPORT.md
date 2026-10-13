@@ -150,9 +150,39 @@ DSP 固有 closure (42 効果) にはライセンス/ネット系参照が無く
 | heap: 先に確保したブロックの内容 (0xAB 100B) が後続確保後も保持 | 保持 | PASS |
 
 - 上記は HEAD 変更後の `lift/gen_stubs_sigs.py` の `HEAP_C` を、アドレスだけホストバッファへ差し替えて実行したもの (`kh710_check.py`)。
-- **未実施**: emcc rc=0/1、license A/B/E/F の wasm sha256 再計算、`kh249_check.mjs` の ok=17。`fl-win64` 素材に winpkg・emsdk・RetDec が無く再現できないため、旧 HEAD (`9c1f7c0b`) の sha256 表は**この変更で無効**。再計算は winpkg と emsdk のある環境で `lic_build.py --module A|B|E|F` を実行して行う (未実施・起票先は PR 本文)。
+- 回帰確認 (emcc rc・sha256・`kh249_check.mjs` ok=17): **実施済み** (12.1 参照。旧 HEAD を同条件で再ビルドして一致)。
 - `product_index.json` (46 plugins) は `work/winpkg/` の生成物 (gitignore)。差分に出ないのは仕様どおり。再生成には `plugins-kilohearts` 素材が要る (`scripts/kh249_product_index.py`)。
 - **libc / CRT 名衝突 (レビュー指摘 3・#710)**: `gen_stubs_sigs.py` は body 中の未知の `@Name(` に `abort()` 付きの定義を生成するため、`memcpy`・`strlen`・`sqrt` 等が named import として出ると libc を上書きする。`LIBC_NAMES` (memcpy/memset/strlen/sqrt/malloc/printf 等 33 名) に当たる名前が `used_names` に出たら生成段で `sys.exit` する (`scripts/kh710_check.py` の `libc_clash:*` で検査: memcpy は停止 / GetCurrentThreadId は通過 = PASS)。
-  - **実 lift 出力での `used_names` 列挙は未実施**。`lic_build.py` は RetDec・winpkg・emsdk を要し、`fl-win64` 素材にはいずれも無い。素材が揃った環境で `final.ll` の `used_names` を出し、`LIBC_NAMES` と突き合わせて空を確認すること (未確認・起票先は PR 本文)。
+  - 実 lift 出力での `used_names` 列挙: **実施済み** (12.2 参照。4 module とも空で、`LIBC_NAMES` との衝突なし)。
 - 実行 (HEAD `e49f9640`): `python3 scripts/kh710_check.py` → `RESULT PASS` (rc=0・PASS 15 / FAIL 0)。
+
+### 12.1 回帰確認 (実測・旧 HEAD `9c1f7c0b` を同条件で再ビルドして比較)
+
+- 素材: `fl-win64` / `plugins-kilohearts` (installer zip → `work/winpkg/HeartCore.core_64`) / `toolchain-emsdk` (`/opt/emsdk`, node 24.19.0) / `toolchain-retdec` (`/opt/retdec`)。
+- 旧 HEAD は `git worktree` (detached `9c1f7c0b`) で `winpkg` を複製し、`lic_build.py --module A|B|E|F` を実行。現 HEAD は同じ `lic_build.py` を実行。
+
+| module | 旧 `9c1f7c0b` sha256 | 現 HEAD sha256 | wasm bytes | 判定 |
+|---|---|---|---|---|
+| A | `411007b8…b6fc` | `411007b8…b6fc` | 26705 | 一致 |
+| B | `62182947…cf04` | `62182947…cf04` | 25249 | 一致 |
+| E | `0cf066d1…6fed8` | `0cf066d1…6fed8` | 364770 | 一致 |
+| F | `7ba79e65…7707` | `7ba79e65…7707` | 54394 | 一致 |
+
+- 各 module の `lic_build.py` rc は 0。`undefined_imports` は全て `[]`。emcc は全 module で成功 (rc=0)。
+- `kh249_check.mjs` (module F): 旧・現とも `kh249_check ok=17 ng=0`、rc=0。
+- 全 module の `stubs.c` に `kh_heap_alloc` / `kh_cursor` は出力されず (`grep -c` = 0)、HeapAlloc shim は本 4 module では使われない。したがって `kh_heap_alloc` の失敗値変更は 4 module の wasm には影響しない (sha 一致の理由)。
+- sha 表の数値は同じ `lic_build.py` を同条件で 2 HEAD から実行した結果 (旧 HEAD 側は `ws-1084-base` worktree)。
+
+### 12.2 実 lift 出力の `used_names` と `LIBC_NAMES` の突合 (実測)
+
+- 対象: `work/licA|B|E|F/final.ll` (RetDec stage-0 → lower → normalize → stub pass の出力) に対し、`gen_stubs_sigs.py` と同じ式で `used_names` を計算 (define/declare 名と `function_`・`kh_`・`llvm`・`global_var` を除外)。
+- 結果: 4 module とも `used_names = []`。`LIBC_NAMES` (memcpy・strlen・sqrt 等) との交差は空。libc / CRT 名の衝突は実 lift 出力では発生しない。
+- 注記: 現在の 4 module は named import (HeapAlloc 等) を呼ばない。`used_names` が非空になる入力での経路は `kh710_check.py` の `libc_clash:*` で検査する。
+
+### 12.3 HeapAlloc カーソルの配置修正 (review 指摘 1)
+
+- 指摘: `kh_heap_alloc` のカーソルが `0x04000100` (arena の `operator new` 確保域 = newheap の先頭) に置かれ、`TlsGetValue`/`FlsGetValue` の返却値 `0x04000200` も同域内だった。
+- 修正: カーソルを `static u64 kh_cursor` に移す。TLS/FLS の返却値を `KH_TLS` (`0x05200000`、`KH_HEAP_END` 直後の未使用域) にする。
+- 検査: `kh710_check.py` に `placement:*` を追加 (TLS 返却値が arena・cave・heap 域外 / カーソルが static / TLS shim が `KH_TLS` を使う) → 全 PASS。
+- 影響: 上記 12.1 のとおり、4 module の wasm は変わらない (sha 一致)。
 - **define 名の stub 化 (review 指摘 2)**: `used_names` は `define` 行の名前も拾い、同一モジュール内で定義された非 `function_` 関数 (`define internal i64 @LocalHelper(...)` を `function_1` が呼ぶ形) に `abort()` stub を生成していた。修正: `local` (`^define ... @Name(`) を `used_names` から除外。再現 (修正前): `gen_stubs_sigs.py` で `LocalHelper(void)` の stub 出力。修正後: 出力 0 件。検査 `define_not_stubbed` を `kh710_check.py` に追加 (PASS)。

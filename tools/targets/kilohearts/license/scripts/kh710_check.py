@@ -105,8 +105,23 @@ int main(void) {
     check('heap:live_block_intact', kv['p1_intact'] == '1')
 
 
+def placement_cases():
+    """HeapAlloc のカーソル (static) と TLS 返却値が、arena (0x04000000..0x04800000) の
+    operator new 域・sys・cave (0x05000000 4KB) と重ならないことを生成コードの定数で確認する (#710 review)。"""
+    arena = (0x04000000, 0x04800000)
+    cave = (0x05000000, 0x05001000)
+    heap = (0x05000000, 0x05100000)
+    tls = int(re.search(r'#define KH_TLS (0x[0-9A-Fa-f]+)ULL', g.HEAP_C).group(1), 16)
+    check('placement:tls_outside_arena', not (arena[0] <= tls < arena[1]) and not (cave[0] <= tls < cave[1]), hex(tls))
+    check('placement:tls_outside_heap', not (heap[0] <= tls < heap[1]), hex(tls))
+    check('placement:cursor_is_static', 'static u64 kh_cursor' in g.HEAP_C and '0x04000100' not in g.HEAP_C)
+    shim_tls = [g.IMP_SHIM[k] for k in ('TlsGetValue', 'FlsGetValue')]
+    check('placement:tls_shim_uses_KH_TLS', all('KH_TLS' in s and '0x04000200' not in s for s in shim_tls))
+
+
 decl_cases()
 libc_clash_cases()
 heap_cases()
+placement_cases()
 print('RESULT %s' % ('PASS' if not fails else 'FAIL ' + ','.join(fails)))
 sys.exit(1 if fails else 0)

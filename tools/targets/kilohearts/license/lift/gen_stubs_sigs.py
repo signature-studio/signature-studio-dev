@@ -10,12 +10,16 @@ CT = {'i128': 'u128', 'i64': 'u64', 'i32': 'u32', 'i16': 'unsigned short', 'i8':
 
 # ---- Win32 named import shim (snapins/lift/gen_stubs_sigs.py から移植・#710)。レジスタグローバル ABI: 引数 rcx/rdx/r8..., 戻り rax。
 # 割当アドレス KH_HEAP (0x05000000, 1MB) は arena(0x04000000..0x04800000) の直後で wasm リニアメモリ内。
+# カーソルは static 変数に持つ (arena の operator new 域 0x04000100.. と重ならない・#710 review)。
+# TlsGetValue / FlsGetValue の返却値 KH_TLS は KH_HEAP_END 直後の未使用域 (arena・heap・cave と非重複)。
 HEAP_C = r'''
 #include <stdlib.h>
 #define KH_HEAP 0x05000000ULL
 #define KH_HEAP_END (0x05000000ULL + 0x100000ULL)
+#define KH_TLS 0x05200000ULL
+static u64 kh_cursor = 0;
 static u64 kh_heap_alloc(u64 bytes) {
-  u64 cur = *(u64*)(unsigned int)0x04000100ULL;
+  u64 cur = kh_cursor;
   if (cur == 0) cur = KH_HEAP + 16;
   u64 a = (cur + 15) & ~(u64)15;
   if (bytes > KH_HEAP_END - KH_HEAP) return 0;
@@ -23,7 +27,7 @@ static u64 kh_heap_alloc(u64 bytes) {
   if (a + n > KH_HEAP_END) return 0;
   unsigned char* m = (unsigned char*)(unsigned int)a;
   for (u64 i = 0; i < n; i++) m[i] = 0;
-  *(u64*)(unsigned int)0x04000100ULL = a + n;
+  kh_cursor = a + n;
   return a;
 }
 '''
@@ -50,8 +54,8 @@ IMP_SHIM = {
     'GetCurrentProcess': 'rax = 0xffffffffffffffffULL;',
     'GetCurrentProcessId': 'rax = 1234;',
     'GetCurrentThreadId': 'rax = 1;',
-    'TlsGetValue': 'rax = 0x04000200ULL;',
-    'FlsGetValue': 'rax = 0x04000200ULL;',
+    'TlsGetValue': 'rax = KH_TLS;',
+    'FlsGetValue': 'rax = KH_TLS;',
     'FlsSetValue': 'rax = 1;',
     'RaiseException': 'rax = 1;',
 }
