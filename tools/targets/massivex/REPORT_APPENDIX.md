@@ -111,3 +111,11 @@
   - RVA32 (LE 4B) 一致: 2 件 (raw `0x54a23f8` / `0x57e9d24`)。pefile で所属を確認すると `.pdata` (RVA `0x5fc0ff8`) と `.xdata` (RVA `0x630d324`) で、いずれも unwind/範囲表の内部。コード側の呼び出し元ではないと判定 [推]。
 - 判定: N6 読み手の呼び出し元は直接参照では見つからない。間接呼び出し (関数ポインタ表・vtable 経由) か、テーブル基準の相対参照の可能性が残る。N5 の読み手は本節でも未特定。
 - 結論: 差し替え点は依然として未特定。`mx_lic_stub.py` の N5/N6 ルールは追加しない (根拠なしに br_force/store を入れると silent miscompile になるため)。#1017 で間接参照の総当たりを行う。
+
+### 12.6 N6 読み手の直接呼び出し元 (#1017 run・再実測)
+- 素材: `plugins-massivex` を `tools/targets/massivex/license/work/` に展開 → `scripts/parse_setup_headers.py <exe> work` → `scripts/extract_massivex.py <exe> work key` (`work/` は tools 直下)。`Massive X.vst3` md5 `622993e76565f49c094063a2b717d6ca` (95,356,824 B) で §11.1 と一致。抽出時の 16B checksum 125/125 不一致は §1・§8 の既知事象。
+- 測定 HEAD: `a893d1f2` (origin/main) + 本 commit の `license/scripts/mx_callers_probe.py` (lift コードは未変更)。
+- `scripts/mx_xref_fn.py --all` (1 分 52 秒・exit 0): N6-1 4 件 / N6-2 1 件 / N6-3 1 件 / N6-4 5 件 / N6-5 1 件 / N6-6 1 件 (§12.2a と一致)。N5 の 4 範囲は 0 件 (一致)。
+- `scripts/mx_callers_probe.py` (0.7 秒・exit 0): 読み手 5 関数 (0x180f95e20 / 0x181142370 / 0x181144570 / 0x181142640 / 0x1811453f0) への E8 call / E9 jmp は **いずれも 0 件**。
+- 判定: 読み手の呼び出し元は直接 call/jmp・RIP 参照・絶対 8B では見つからない。間接呼び出し (vtable / 関数ポインタ表) か、文字列 index 経由のテーブル参照の可能性が残る。N5 の読み手は未特定。
+- 次の一手 (子 issue で扱う): vtable / 関数ポインタ表の走査 (`.rdata` 内の 8B 値 = 読み手 VA) と、N5 の QML プロパティ名テーブルの走査。
