@@ -4,7 +4,7 @@
 # 終了コード: 0 = 全 gate PASS かつ全ネガティブコントロールが期待どおり FAIL / 1 = gate FAIL またはネガコンが FAIL しなかった / 2 = 前提欠如。
 # 前提: tools/m11/work/ (work-m11 素材 + gen_ir2 済み IR)・emsdk・node・python3 (+ x86_64-w64-mingw32-gcc: tools/gui/gen_api.py の arity 表)。
 #   FL_WIN64_DIR は gen_ir2 の ldfix と m11_build.sh の qstore 段 (PE 突合) に必要。PATH は env.sh の GF_EXTRA_PATH で足せる。
-#   tools/m11 は読取専用: m11_build.sh は work/ を in-place 更新するため、素材を $GF_W/tree へ複製し複製側で baseline / build を回す。
+#   tools/m11 は読取専用: m11_build.sh は work/ を in-place 更新するため、素材を $GF_W/tree へ複製し複製側で m11_gen_ir2.sh → baseline / build を回す。
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; source "$HERE/env.sh"
 W="$GF_W"; SRC="$GF_M11"; TREE="$W/tree"; R="$HERE/results"; mkdir -p "$W/res" "$R"
@@ -17,6 +17,7 @@ command -v x86_64-w64-mingw32-gcc >/dev/null || { S "前提欠如: x86_64-w64-mi
 S "0/6 複製: tools/m11 + tools/shim + tools/shared → $TREE (m11_build.sh の相対参照を保つ)"
 rm -rf "$TREE"; mkdir -p "$TREE"; cp -a "$SRC" "$GF_GUI/../shim" "$GF_GUI/../shared" "$TREE/"
 export GF_M11="$TREE/m11"; M="$GF_M11"
+( cd "$M" && bash m11_gen_ir2.sh > "$W/res/m11_gen_ir2.log" 2>&1 ) || { S "m11_gen_ir2.sh 失敗 (複製側で IR 再生成。#680 の ldfix=applied 記録が必要)"; tail -5 "$W/res/m11_gen_ir2.log"; exit 2; }   # main #680: m11_build.sh は ir_conditions.json の ldfix=applied を要求する。素材の旧 IR は使えない
 (cd "$SRC/work" && sha256sum boot_final.ll boot_final3.ll | sed 's/^/material  /') > "$R/ir_sha256.txt"   # 素材そのままの IR (provenance)
 S "0/6 baseline (GUI shim 無し, 同一 IR): m11_build.sh → m11_run.mjs / m11_survey.mjs (複製側)"
 ( cd "$M" && bash m11_build.sh > "$W/res/m11_build.log" 2>&1 ) || { S "m11_build.sh 失敗"; tail -5 "$W/res/m11_build.log"; exit 2; }
