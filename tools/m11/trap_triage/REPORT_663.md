@@ -1,6 +1,6 @@
 # #663 [M11-N27]: `survey_units.mjs` の oob frames が最上位 frame を捨てる (`.slice(1)`) を直し、annotate の最上位集計を実測で更新
 
-**判定: 受入条件 2 件は commit `18dbb43` で実測して達成 (§2〜§4)。コード HEAD `523f55a` (filter アンカー化を含む) でも survey を再測定し、同じ結果を確認 (§8)。** 最終 HEAD `e4f79f9` (main 取り込み後) は未測定 (§8 の末尾)。残る未解決は、最終 HEAD `2786d5a5` での再測定と基準 (c) の再測定 (§5・§8-2)。
+**判定: 受入条件 2 件は commit `18dbb43` で実測して達成 (§2〜§4)。コード HEAD `523f55a` (filter アンカー化を含む) でも survey を再測定し、同じ結果を確認 (§8)。** 最終 HEAD `be3f1819` は §8-3 で実測 (unit 単位 kind 差 0・ok 退行 0・ネガコン期待どおり)。残る未解決は `m11_e2e.sh --full` 経由の基準 (c) の再測定 (§5)。
 修正は `survey_units.mjs` の非 halt0 分岐 (`slice(1, 30)` → `slice(0, 30)`、後段で filter を `/^\s*at /` にアンカー。PR #703 と同一行)。kind は 942 unit 全てで不変 (ok 退行 0・icall 差 0)、
 oob 21 unit の frames だけが最上位 frame を含む 1 段増えた。`annotate.py` は**コード変更なし** (入力の frames が正しくなったので集計が正しくなる)。
 修正前の起点 = `8d883c3` (`origin/main`)。実測の commit = `18dbb43` (修正本体 = `442c46e`)。本 PR の最終 HEAD は PR コメントに記載。
@@ -156,3 +156,34 @@ python3 trap_triage/survey_diff.py work/negctl_663/pre.json work/negctl_663/post
 よって `2786d5a5` の kind 件数・`frames_check`・ネガコン・`survey_diff` の ok 退行は**未測定**。推定値では埋めない。
 本件の受入条件「unit 単位で kind 差 0 を実測」は、`523f55a` の実測 (§8) で成立しているが、最終 HEAD での再確認は未達のまま。
 再測定の条件: `fl-win64` + `toolchain-emsdk` + `work-m11` を指定して `m11_gen_ir2.sh` → `m11_build.sh` → `negctl_663.sh` を foreground で実行し、その head SHA を §8 に追記する。
+
+## 8-3. 最終 HEAD `be3f1819` での実測 (IR 再生成 + PE あり、Closes #663 の判定根拠)
+
+素材 (`$ARTIFACTS_DIR` の実在を確認してから展開): `fl-win64` (`$RUNNER_TEMP/fl-win64`、`block00031_PE.bin` 22,227,016 B)・`toolchain-emsdk` (`/opt/emsdk`)・`toolchain-retdec` (`/opt/retdec`)・`work-m11` (`tools/m11/work/`)・`work-liftdiff` (`tools/liftdiff/work/`)。
+実行は HEAD で foreground、順に 3 本。
+
+| 手順 | 結果 (rc / wall) |
+|---|---|
+| `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/m11/m11_gen_ir2.sh` | rc 0 / 17.5 s。`ldfix=applied`、`boot_final.ll` 490,653 行 |
+| `bash tools/m11/m11_build.sh` | rc 0 / 21.2 s。`signature mismatch: 0, undefined symbol: 0` |
+| `bash tools/m11/trap_triage/negctl_663.sh` | rc 0 / 26.2 s (pre 13.12 s、post 12.95 s)。`NEGCTL_663 ALL EXPECTED` |
+
+- 初回の `m11_gen_ir2.sh` は rc 1 で停止 (`ldfix skip`)。runner の既定 Python に `capstone` / `pefile` が無かったため。`uv venv` で `capstone 5.0.7`・`pefile 2024.8.26` を入れ、その venv の bin を PATH 先頭に置いて再実行した (PE 自体は存在していた)。
+- 開始時 load average (1 分) 1.10、CPU 4。
+
+| 項目 | 結果 (`be3f1819`) |
+|---|---|
+| kind 件数 pre / post (ok / halt0 / miss / oob / noproc) | 828 / 55 / 47 / 11 / 1 (同一) |
+| **unit 単位の kind 差 (942 unit)** | **0** (`survey_diff.py`: 遷移は全て同 kind) |
+| ok 退行 unit (post) | 0 `[]` |
+| icall sites / targets の総数差 | 0 件 / 0 件 |
+| `frames_check.py` (post vs pre) | PASS (exit 0)。oob 11 / frames が変わった unit 11 / 違反 0 |
+| ネガコン: pre vs pre | FAIL (exit 1) = 期待どおり |
+| ネガコン: unit 0 の kind を ok → oob に書換え | FAIL (exit 1)・`ok 退行 unit: 1 [0]` = 期待どおり |
+| kind 以外も含む frames 差 (深さのみ比較) | oob 11 unit `[56, 95, 149, 275, 291, 296, 304, 477, 555, 895, 923]` |
+
+**件数の注意**: kind 件数は §2 (work-m11 の snapshot IR) の 818 / 56 / 46 / 21 / 1 と一致しない。本節は IR を再生成した結果で、差の原因 (snapshot IR と再生成 IR の違い) は本 run では切り分けていない。件数を §2 と比べてはならない。判定は同一 HEAD 内の pre / post の unit 単位比較で行う。
+
+**基準 (c) の範囲**: IR 再生成 (`m11_gen_ir2.sh`、PE あり) と build・survey は REPORT.md §8.2 の (c) の IR 部に当たる。`m11_e2e.sh --full` は未実行 (WORKFLOW §11 のとおり `m11_bounds` が `functions_dll.csv` 欠落で fail-closed するため)。(c) の完全な再現は未解決 (§5)。
+
+**判定**: unit 単位の kind 差 0 が HEAD で実測された。受入条件 2 件を満たすため `Closes #663` を維持する。
