@@ -116,11 +116,12 @@ IR 側の検出試行 (参考値・再現手段なし): 前 run の試作では 
 - 結論: 検出信号は機械語側の値に disp を持たせる (`('ld', n, w, disp)`) 改修が前提。`transfer` の状態表現を変えるため、全関数の既存判定 (`SUSPECT_VAS` / `SUSPECT_USE_VAS`) への影響を再測定する必要があり、1 run の範囲を超える。
 - 試作コードは取り消し済み (`audit_lsf.py` は未変更)。次 run は disp 追跡版を別 PR で作る (再現スクリプトは同 PR で `tools/m11/ldfix/` に置く)。
 
-## 6c. #1091 (LD-33): RetDec のどの段で値が化けるか (確定・段の特定まで)
+## 6c. #1091 (LD-33): RetDec のどの段で値が化けるか (段の特定まで。規則・固有性は未確認)
 
 既知類型との関係 (DEFECTS.md): D20 (既登録・機構未確定) の 41a670 / 666a60 の同型。新規類型として報告する場合の候補は本節。
 
-素材 (本 run で展開。`tar --zstd -xf`): `fl-win64` の `block00031_PE.bin`、`toolchain-retdec` の `bin/retdec-decompiler`、`work-m11` の `tools/m11/work/`。RetDec の**ソースは素材に無い** (展開物は bin・lib・share のみ)。
+素材 (前 run で展開した記録。`tar --zstd -xf`): `fl-win64` の `block00031_PE.bin`、`toolchain-retdec` の `bin/retdec-decompiler`、`work-m11` の `tools/m11/work/`。RetDec の**ソースは素材に無い** (展開物は bin・lib・share のみ)。
+**本 fix run (PR head 86be7c84 への差し戻し対応) では `toolchain-retdec` と `work-m11` が `$ARTIFACTS_DIR` に無く、段ダンプを再実行していない。以下の表と数値は前 run の記録で、再現は未確認。**
 
 **結論**: 41a670 の `41a6a0` (`mov rax,[rax]` = `[arg1+0]`) は、RetDec の LLVM パス **`Constants optimization` (段 16)** で `load @rcx` (= `[arg1+8]` の値) に置き換わる。
 後段 (段 18 `LLVM instruction optimization using RDA`) で `41a6a3` の store 値もこの値に固定される。`boot0.drc.ll` (RetDec 直後) で既に誤りで、`norm0` / `ir5_patch` は値を変えない (型表記の置換のみ、diff で確認)。
@@ -133,9 +134,9 @@ IR 側の検出試行 (参考値・再現手段なし): 前 run の試作では 
 | 41a6a3 `mov [rip+..],rax` | 1 → 16 → 18 | Constants / RDA | 16 で `%rax` 由来 → 18 で `@rcx` 由来を保持 |
 | 666b10 `mov r8,[r8]` (666a60) | 15 → 17 | Constants optimization | `inttoptr(*(rbp+0x28)→r8)` の load → **`load @rcx`** (誤。`rcx` = slot 先頭) |
 
-段 15 (Stack optimization) まで `41a6a0` は正しく `*(arg1)` の deref になっている。段 16 の差分 (`diff` の全文) では、同じ段で `inttoptr` 経由の load 群が `@rcx` の直接 load に畳まれている。
+段 15 (Stack optimization) まで `41a6a0` は正しく `*(arg1)` の deref になっている、という前 run の記録。段 16 の差分の全文は記録していない (出力が残っておらず、再現手順にも含めていない)。したがって「段 16 で `inttoptr` 経由の load 群が `@rcx` の直接 load に畳まれた」は、差分の根拠を示せない状態にある。
 
-**負の対照 (注意)**: 41a67c (`mov [rbp+0x50],rcx`) も段 15 と 18 で表現が変わるため、「段 1 以降は必ず 1 行出る」。したがって本スクリプトの出力で「変化した段」だけを見ること。段 16 が `41a6a0` 固有の変化であることは、段 16 で 41a67c が変化しないことで示す (本 run では未実施。次の作業で確認する)。
+**負の対照 (未実施・固有性は未確認)**: 41a67c (`mov [rbp+0x50],rcx`) も段 15 と 18 で表現が変わるため、「段 1 以降は必ず 1 行出る」。段 16 が `41a6a0` 固有の変化かを示すには、41a670 関数内の全 load/store について段 15→16 と 16→17 の変化件数を出し、41a6a0 が特異かを見る必要がある。これは未実施。本スクリプトは現状 1 命令ずつしか出さないため、件数集計は未対応。
 
 **未確定 (受入 1 の後半・受入 2 の確定)**:
 - 段 16 の「どの変換規則が `load @rax` を `load @rcx` に畳んだか」は、RetDec のソースが無いため未特定 (素材に無い)。`Constants optimization` の名前からの推定に留まる。
