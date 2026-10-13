@@ -4,7 +4,7 @@
 
 ## 15.6 #346 受入 2: 現 HEAD での置換前後 e2e 一致 (検証 HEAD 4b3616e5 / before = 置換のみ戻した main)
 
-素材: `fl-win64` `toolchain-retdec` `toolchain-emsdk` (`oc_artifacts`)。before = `4b3616e5` の `tools/plugins/p0c/*.py` を `856be6b` の置換差分で逆適用し、`p0c_e2e.sh` / `p0c2_e2e.sh` の 3 行 (`source env.sh`・`PE=`) を `/home/ubuntu/work/analysis/win64` に戻したもの。after = `4b3616e5` そのまま。`/home/ubuntu/work/analysis/win64` と `/home/ubuntu/work/webstudio` は before 用に symlink。`PATH` に `/usr/lib/llvm-18/bin` を追加。各 n=1・直列。
+素材: `fl-win64` `toolchain-retdec` `toolchain-emsdk` (`oc_artifacts`)。before = `4b3616e5` の `tools/plugins/p0c/*.py` を `856be6b` の置換差分で逆適用し、`p0c_e2e.sh` / `p0c2_e2e.sh` の 3 行 (`source env.sh`・`PE=`) を置換前の絶対パス既定値 (856be6b の差分の逆) に戻したもの。after = `4b3616e5` そのまま。before 用に、[WIN64] の解析 dir と、リポジトリ相対の作業 dir (webstudio) を symlink で用意。LLVM 18 の bin を PATH に追加。各 n=1・直列。
 
 | 項目 | before | after |
 |---|---|---|
@@ -26,9 +26,11 @@
 | `diff/k80.argfix.ll` | daa2d6b87a52 | daa2d6b87a52 | 一致 (同上) |
 | `kernel_table.json` (`tools/plugins/work/`) | (cmp) | (cmp) | 一致 |
 
-**RetDec 非決定の切り分け**: 初回の before 側 `k80.lift.ll` (f826f7ef815a) だけが after (d38a7c667c46) と違った。差は 40 行で、全て `alloca` 行の順序入れ替え (非 alloca 行の差 0)。同じ before コードで lift を 2 回取り直すと 2 回とも同一 (after とも 0 行差) だったため、置換由来ではなく初回生成時の RetDec の揺れ (#668)。揃え直した lift から下流 (`k80.final.ll`・`k80.argfix.ll`・`wasm.o`・`p0c2_sweep.csv`) を再生成すると全て一致した。
+**RetDec 非決定の切り分け**: 初回の before 側 `k80.lift.ll` (f826f7ef815a) だけが after (d38a7c667c46) と違った。差は 40 行で、全て `alloca` 行の順序入れ替え (非 alloca 行の差 0)。同じ before コードで lift を 2 回取り直すと 2 回とも同一 (after とも 0 行差) だったため、置換由来ではなく初回生成時の RetDec の揺れ。揃え直した lift から下流 (`k80.final.ll`・`k80.argfix.ll`・`wasm.o`・`p0c2_sweep.csv`) を再生成すると全て一致した。
 
-**結論**: 受入 2 (現 HEAD で置換前後の出力が同一) を満たす。ただし `k80.lift.ll` の alloca 順は RetDec 側で揺れるため、比較は揃えた lift を使う (#668)。
+**結論**: 受入 2 (現 HEAD で置換前後の出力が同一) を満たす。ただし `k80.lift.ll` の alloca 順は RetDec 側で揺れるため、比較は揃えた lift を使う。
+
+**未解決**: RetDec の alloca 順の非決定性。関連の #668 は CLOSED で、この件に対応する open issue は無い。起票先: 未起票 (新規 issue 番号は未発行。PM の起票待ち)。
 
 ## 16. P0c-8 (#311, 親 #197・先行 #269): ext IR の wasm32 検証 + framework 統合 (fw_f80.py → f80_lower --ext)
 
