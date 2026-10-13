@@ -80,6 +80,24 @@ CC 1 件 (flapi 1.000/件) の所要時間を、mock engine ハンドラ内 (`ha
 - 比較の注意: 測定 1 と測定 2 は別プロセスで load (2.19 / 1.64) が揃っていない。比較できるのは測定 2 の CC と NoteOn の差 (同一 run) だけ。上の既存節の 230.0µs / 149.3µs (差 80.7µs) は load 0.56 の値で、本節とは load が違うため直接比べない。差がほぼ同程度 (80.7µs と 85.0µs) なのは偶然の一致で、1 run ずつのため誤差は未評価。
 - 限界: 差分は NoteOn と配送経路が完全には同一でない前提の推定。素の RPC 往復は本節の計測対象外で、上の「素の SAB 往復」節の値 (中央値 34〜44µs、別 run) を参照する。bimodal は本 run では再現せず (測定 1 の試行の散らばりは 219〜289µs)。
 
+## CC 1 件の RPC 往復 / flapi / Python の分離 (run 6 追記、`tests/midi_rpc_split.mjs`)
+
+計測 HEAD: ebb1110b (計測スクリプト追加のみ。前後で `host/`・`src/` は変更なし)。
+分け方: `rpc_rt` = 同一 Python プロセス内で `channels.channelCount()` loop と `_noop()` loop の 1 呼出し当り差分 (RPC 往復 1 回分)。`python` = CC total − flapi handler − rpc_rt (Python 配送 + device script 実行)。
+
+| 項目 | 中央値 (µs) | 試行 (5 回) | 条件 |
+|---|---|---|---|
+| RPC 往復 1 回 (`rpc_rt`) | 29.58 | 29.32〜31.98 | 20000 呼出し × 5 試行 |
+| CC 1 件 total (flapi 1.000/件) | 174.93 | 155.86〜197.76 | 5000 件 × 5 試行 |
+| CC 1 件の flapi handler (mock engine) | 0.66 | — | `counted.call` 区間 |
+| CC 1 件の Python 残り (`python`) | 143.79 | — | total − handler − rpc_rt |
+| NoteOn 1 件 total (flapi 0、対照) | 106.31 | 104.35〜116.18 | 同上 |
+
+- load: 終了時 `/proc/loadavg` 1.20 (計測前の run は 1.47)。
+- commit 前の作業ツリー (同一コード) で先に 1 回計測 (load 1.47): rpc_rt 30.23 / CC total 178.39 / handler 0.59 / python 147.56 / NoteOn 118.59。傾向は HEAD と同じ。
+- 読み: CC 1 件 (175µs) のうち RPC 往復は 1 回で約 30µs (約 17%)、flapi handler は 1µs 未満 (約 0.4%)。CC − NoteOn 差 約 69µs = RPC 往復 約 30µs + CC 固有の Python 処理 約 39µs (device script の CC 分岐と `device.forwardMIDICC` 前後の Python 処理)。
+- 限界: (1) `rpc_rt` は `channelCount()` の関数本体 (channels モジュール内の Python 処理) を含む差分で、純粋な SAB 往復ではない。素の SAB 往復は上の「SAB 素往復」節 (34〜44µs / 17〜21µs、別 run) を参照。(2) bimodal (100µs 台の遅い峰) は本 run でも再現せず、単峰。(3) 実 FLEngine の flapi 処理時間は含まない。
+
 ## 検証範囲 / 範囲外
 
 - 範囲内: Actions runner (4 core、node 22.23.3)、素材 `fl-win64` (MCPTools.pyc / midi.py / utils.py / device script は `fetch_inputs.sh` で配置)、CPython 3.12.1 wasm・flpy・provider・静的版をクリーンにビルド (`build_cpython_wasm.sh` 4 分 46 秒 (d36dbefe 時点の run)・4 分 03 秒 (HEAD 08c569ba の静的版検証 run)、`build_flpy.sh` rc=0、`build_flpy_static.sh` rc=0)。
@@ -90,6 +108,6 @@ CC 1 件 (flapi 1.000/件) の所要時間を、mock engine ハンドラ内 (`ha
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | MIDI 1 件の静的版 (PY-2 リンク後) の所要時間は未計測 | 「1 µs 未満」は往復コストからの推定。配送経路の実測が必要 | #35 (親)。静的版の MIDI 配送計測は別 issue 候補 |
-| bimodal (100〜130µs) の原因 | 負荷下の Python 込み往復は 52〜113µs まで伸びるが、15µs 台の速い峰は出ず bimodal は未再現。原因の切り分け (Python / flapi / Worker スケジューリング) は未了 | #80 の後続 (Python 込み経路の負荷下での分解計測) |
+| bimodal (100〜130µs) の原因 | 負荷下の Python 込み往復は 52〜113µs まで伸びるが、15µs 台の速い峰は出ず bimodal は未再現。RPC 往復 (約 30µs)・flapi handler (1µs 未満)・Python 残り (約 144µs) の分離は run 6 で実施 (上の節)。bimodal の再現条件は未了 | #80 の後続 (bimodal の再現条件の追試) |
 | 実 FLEngine wasm への結線 | 実エンジンの flapi 処理時間は含まれない | #35 (親)。FLEngine 起動 (MS5) 完了後 |
 | SAB 素往復の中央値が runner・load で 2 倍ほど違う (元計測 34〜44µs / 追試 17〜21µs) | 絶対値は runner 依存。単峰の結論は両方で成立 | #80 の追試 (負荷を揃えた複数 runner 計測) |
