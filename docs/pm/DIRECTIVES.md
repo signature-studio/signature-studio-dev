@@ -895,7 +895,7 @@ PM を含む全てのセッションは ephemeral で中断・削除される可
 > 設定画面上では上限が60に引き上げられていました。
 > このことが既知の情報であればご放念ください。
 
-※ スクリーンショット 1 枚添付: 設定画面 Runners / GitHub-hosted runners の『All jobs usage 22/60』(Linux 22・Windows 0・macOS 0)。
+※ スクリーンショット 1 枚添付 (設定画面 Runners / GitHub-hosted runners の同時実行数の表示)。
 
 ### 指示 128（2026-10-13、通知: LLM の Quota・マシンの再起動）
 
