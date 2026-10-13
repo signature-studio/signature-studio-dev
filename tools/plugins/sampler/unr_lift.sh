@@ -26,6 +26,11 @@ print(v['total3']['funcs'], v['total3']['bytes'])")"
   t0=$(date +%s)
   bash sampler/lift_from_ll.sh "$PE" "$R" "$OUT" p 2400 > "$OUT/lift.log" 2>&1
   rc=$?
+  # RetDec は export 表の関数を export 名で出す (例: @CreatePlugInstance)。 関数本体は揃っているので、 範囲 VA に対応する define だけ function_<VA> に改名する (#707)。 改名前は p.prerename.ll に残す (ネガコン NC7 用)
+  if [ -f "$OUT/p.final.ll" ]; then
+    cp "$OUT/p.final.ll" "$OUT/p.prerename.ll"
+    python3 sampler/export_rename.py "$OUT/p.final.ll" "$PE" "$R" --report "$OUT/export_rename.json" >> "$OUT/lift.log" 2>&1
+  fi
   t1=$(date +%s)
   DEF=$(grep -c '^define' "$OUT/p.final.ll" 2>/dev/null || echo 0)
   UNI=$(grep -o 'unimplemented [0-9]*' "$OUT/p.simd.log" 2>/dev/null | awk '{print $2}' | head -1)

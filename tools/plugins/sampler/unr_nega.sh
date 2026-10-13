@@ -7,6 +7,7 @@
 #   NC4: capstone 側の RVA32 集合に偽の値を注入する → U1 (byte 走査の部分集合) が FAIL
 #   NC5: judge.py shells の入力 CSV の 1 行に emcc_c_rc=1 → judge が FAIL (rc 1)
 #   NC6: unr_e2e.sh --skip-lift に emcc_c_rc=1 の行を追記 → 非 0 かつ `[unr_e2e] OK` が出ない
+#   NC7: export 名の改名 (export_rename.py) を外した lift 出力 → indirect_defs (range 欠落監査) が FAIL
 # 事前: unr_e2e.sh 実行済み (work/sampler/unrlift/status_run.csv と work/sampler/unr/ がある)
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
@@ -72,5 +73,12 @@ PY
 r6b=$(rc bash sampler/unr_e2e.sh --skip-lift); expect "NC6 emcc_c_rc=1 の行を追記 → 非 0" "$([ "$r6b" != 0 ] && echo nonzero)" nonzero
 if grep -q '\[unr_e2e\] OK' "$N/last.out"; then echo "  !! NC6: 不合格なのに OK 行が出た" >&2; FAIL=1; fi
 cp "$N/status_run.orig.csv" "$SRC"
+
+# NC7: export 名の改名 (export_rename.py) を外した出力 (p.prerename.ll) → range 欠落監査が FAIL する
+rm -rf "$N/nc7"; mkdir -p "$N/nc7"
+for d in work/sampler/unrlift/*/; do
+  b="$(basename "$d")"; mkdir -p "$N/nc7/$b"; cp "$d/p.prerename.ll" "$N/nc7/$b/p.final.ll"
+done
+expect "NC7 改名前 (export 名のまま) → indirect_defs FAIL" "$(rc python3 sampler/indirect_defs.py --lift-dir "$N/nc7" --ranges-dir work/sampler/unr)" 1; needfail 'FAIL' NC7
 
 [ "$FAIL" = 0 ] && echo "[unr_nega] OK: 全ネガコンが期待通り" || { echo "[unr_nega] FAIL" >&2; exit 1; }
