@@ -129,6 +129,8 @@ int IsValidLocale(unsigned lcid, unsigned fl) { (void)lcid; (void)fl; return 1; 
  * callback (lpfnEnum = IR 上の lift 済 function_85df70) に 1 回渡す。callback が GetMonitorInfoW で情報を取る。 */
 #define M11_MON 0x10001u
 extern uint64_t m11_icall(uint64_t target, uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5, uint64_t a6, uint64_t a7);
+/* 注意: dwData は本来 LPARAM (64bit) だが int で受けて (uint32_t) で 0 拡張している。上位 32bit は失われる。
+ * 上位 32bit に値が来る呼出しで callback が参照するなら誤る (未検証)。直すと測定が変わるため、直す場合は再測定が要る。 */
 int EnumDisplayMonitors(void* hdc, void* lprc, void* lpfn, int dwData) {
     (void)lprc;
     if (!lpfn) return 0;
