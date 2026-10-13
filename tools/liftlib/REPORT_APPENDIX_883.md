@@ -91,7 +91,7 @@ IR 上の読み (下記) は `work/ott_getparam/` の生成物を参照したも
 ### 残作業 (#1269 の受入条件のうち未達)
 
 1. (a) の実装と `leafspec` の wasm_trap 0 の確認 (match の判定は #1270 の受入条件)。
-2. `icall_e2e.sh` の前後測定。`ANALYSIS_DIR` は既定 `/home/ubuntu/work/analysis` のため、環境変数で `$HOME/analysis` を指定する必要がある。また `tools/ott/work/` (`ott_e2e.sh` の成果物) が前提で、本 run では未展開。
+2. `icall_e2e.sh` の前後測定。`ANALYSIS_DIR` は既定値が環境依存のため、環境変数で指定する (本 run では `$HOME/analysis` を指定)。また `tools/ott/work/` (`ott_e2e.sh` の成果物) が前提で、本 run では未展開。
 3. ネガコン (修正を外すと wasm_trap 200 に戻る) の実測。
 
 ## 再現
