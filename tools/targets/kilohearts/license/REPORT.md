@@ -204,3 +204,10 @@ DSP 固有 closure (42 効果) にはライセンス/ネット系参照が無く
 
 - emcc rc: A/B/E/F 全て 0。`undefined_imports` は A で `[]`。
 - 注: 旧 HEAD `9c1f7c0b` には `LIBC_NAMES` が無い (`b08b431a` で追加) ため、`used_names` 突合は現 HEAD の定義を使った。
+
+### 12.5 ネガコン (宣言補完を無効化) の実測 — 不成立
+
+- 操作: `lic_build.py` の `txt = decl_named_imports(txt)` (137 行) を一時的に無効化し、`--module F` を 1 回ビルド。作業ツリーは測定後に復元 (commit なし)。
+- 結果: **rc=0**・`undefined_imports: []`。宣言補完を外しても module F は失敗しなかった。
+- 解釈: module F は `used_names` が空 (§12.2) で、そもそも named import を呼ばない。よって本 4 module は宣言補完のネガコンに不適。#710 の本来の失敗 (閉包展開での `@GetCurrentThreadId` 宣言欠落) は、その名前を呼ぶ閉包を含む入力でしか再現しない。
+- 未実施・起票先: 閉包展開で named import を呼ぶ入力でのネガコン (#656)。本 run では測定できていないため、受入条件のこの項目は未達のまま。
