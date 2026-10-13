@@ -29,7 +29,7 @@
 ```
 PM (main)                      subagent (実装)                  subagent (検収)
    │                                │                                  │
-   ├ issue 起票 (gh issue create) ──┤                                  │
+   ├ issue 起票 (PM。子 issue は実装も可 §3) ──┤                       │
    ├ worktree 指名 ─────────────────┤                                  │
    │                                ├ gh issue view N                  │
    │                                ├ git worktree add ../ws-N         │
@@ -64,7 +64,7 @@ PM (main)                      subagent (実装)                  subagent (検�
 |---|---|---|---|
 | 実装 subagent | In progress | **In review** (自分を Done にしない) | Done への変更・他チケットの Status 変更 |
 | 検収 subagent | 対象が In review 確認 | 合格 → Done + コメント / 条件付き → **In review 維持** + 所見 | In review でないものを Done にしない |
-| PM (main) | 起票・milestone 確定 | merge・方針変更・是正 | — |
+| PM (main) | 起票 (実装 subagent も下記の条件で可)・milestone 確定 | merge・方針変更・是正 | — |
 
 - **子 issue の起票**: PM のほか、実装 subagent も、**1 run に収まらない作業の残り**と**未解決の起票先**として子 issue を起票してよい
   (2026-10-14 PM 判断。PM の処理待ちで止まるのを避けるため。#833)。条件: ① 題名は `[AREA-n]` 形式。`<AREA>` は
