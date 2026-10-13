@@ -36,6 +36,7 @@ python3 liftdiff.py build targets/ott_old.json >/dev/null
 echo "== [2/4] OTT 旧 chain: 欠陥 D1〜D6 の検出"
 python3 liftdiff.py batch targets/ott_old.json --set closure --shards 4 --nobuild --out work/ott_old/batch.jsonl | tail -22
 python3 tests/check_ott.py | tee work/ott_old/check.txt
+bash tests/nc_check_ott.sh   # ネガコン: D1/D2/D3/D6 のタグを 1 系統ずつ除くと check_ott.py が exit 1 になること
 else
 echo "== [2/4] OTT 旧 chain: skipped (--m11-only)"
 fi
