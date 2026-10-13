@@ -145,8 +145,8 @@ node tools/perf/p8/check.mjs --negative   # ネガティブコントロール (�
 コミット済み HEAD での再実行 (`72e1ae3e`): N=1 110.43 / N=16 113.57 µs/block、署名は全 N で `6b1696f0` (表と同じ傾向)。
 
 **読み取り**:
-- 実 OTT でも **定常コストは instance 数に依らず平坦** (N=1→16 で +2.5%、先の合成カーネルの「plugin 別 Memory は静的リンクと同等」と整合)。各 instance は 1 block あたり約 111〜114 µs で、44.1 kHz では約 3.9% の RTF。
-- **1 instance の追加コスト**: load 約 4.4 ms + setup 約 6.6 ms + RSS 約 6.5〜7 MiB (N=16 の値)。N=16 で合計 RSS 288 MiB。
+- 実 OTT でも **定常コストは instance 数に依らず平坦** (N=1→16 で +2.5%、先の合成カーネルの「plugin 別 Memory は静的リンクと同等」と整合)。各 instance は 1 block あたり約 110〜114 µs で、44.1 kHz では RTF 約 0.038〜0.039 (1 instance の計算量の 3.8〜3.9%)。
+- **1 instance の追加コスト** (N=16 の平均): load 約 5.5 ms (88.4/16) + setup 約 7.4 ms (118.4/16) + RSS 約 7.2 MiB (114.6/16)。N=16 で合計 RSS 288 MiB。
 - 合成カーネルと違い、実 OTT は **絶対 VA (0x30000000 台) 固定** のため、動的リンク / 静的同居の比較は本 lift のままでは組めない (guest VA の相対化 pass が前提; 下記未解決)。したがって実 OTT で測れたのは「plugin 別 instance」の構成のみ。
 - 合成カーネルの PIC 税 (SIDE_MODULE) は実 OTT では測れていない (未達のまま)。
 
