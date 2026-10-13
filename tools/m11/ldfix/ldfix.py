@@ -1566,9 +1566,7 @@ def fix_f3c_use(fn, fv, rep, ctr):
         raws = [u for u in uses if u[0] == 'raw' and u[2] == n]
         if first not in blk0 or not all(u[3] == 64 for u in derefs) or any(u[1] > first for u in raws):
             continue
-        if pty.get(n, 'i64') != 'i64':
-            rep['f3c_use_ptrarg'] = rep.get('f3c_use_ptrarg', 0) + 1
-            continue
+        ptrarg = pty.get(n, 'i64') != 'i64'
         argre = re.compile(r'(?<![\w.$-])%arg' + str(n) + r'(?![\w.$-])')
         ptr_alias = set()
         for l in lines[1:]:
@@ -1602,8 +1600,14 @@ def fix_f3c_use(fn, fv, rep, ctr):
         nm = 'ldfxu%d' % ctr[0]
         for k in rep_idx:
             lines[k] = argre.sub('%' + nm, lines[k])
-        edits.setdefault(at, []).extend(['  %%%s_p = inttoptr i64 %%arg%d to ptr' % (nm, n),
-                                          '  %%%s = load i64, ptr %%%s_p, align 8' % (nm, nm)])
+        if ptrarg:
+            # ptr 型引数: %argN は既にアドレス。機械語の [rB] は %argN への直接の load、値は ptr 消費者へ inttoptr で渡す (#734)
+            edits.setdefault(at, []).extend(['  %%%s_l = load i64, ptr %%arg%d, align 8' % (nm, n),
+                                              '  %%%s = inttoptr i64 %%%s_l to ptr' % (nm, nm)])
+            rep['f3c_use_ptrarg'] = rep.get('f3c_use_ptrarg', 0) + 1
+        else:
+            edits.setdefault(at, []).extend(['  %%%s_p = inttoptr i64 %%arg%d to ptr' % (nm, n),
+                                              '  %%%s = load i64, ptr %%%s_p, align 8' % (nm, nm)])
         rep['f3c_use_replaced'] = rep.get('f3c_use_replaced', 0) + len(rep_idx)
         done += 1
     if not done:

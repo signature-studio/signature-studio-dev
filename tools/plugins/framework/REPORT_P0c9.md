@@ -26,11 +26,29 @@
 - 想定外エントリ検査は `verify` に検査対象 tarball を渡した場合の結果。`pack` は `$FILES` のみを tar に入れるため pack 経路では発生しない。
 - pack 既定 OUT (`artifacts/work-fw-stage1.tar.zst`) で生成 → `verify` rc=0 を確認済み (合成入力)。
 - allowlist: `work-fw-stage1` を通し、`work-fw-bogus` と `work-fw-stage1x` を rc=1 で拒否。
-- e2e (`fw_269_verify.sh` / `hs_e2e.sh`): 未実行。`$HOME/artifacts` には `fl-win64.tar.zst` と `toolchain-emsdk.tar.zst` のみで、`work-fw-stage1` は無い。
-- **未達**: 実 stage-1 成果物はこの runner に無く (`tools/plugins/work/fw` 不在)、R2 への upload 権限も無いため、素材の実体・`fw_269_verify.sh` / `hs_e2e.sh` の PASS (FW_EXT_FUNCS 未指定/指定)・ext 対象関数一覧は未作成。
+- e2e (2026-10-13, runner): `$ARTIFACTS_DIR` に `work-fw-stage1.tar.zst` (23,640,747 B) が実在。`fw_pack_stage1.sh verify` 12/12 OK → `tools/plugins/work/fw/` に展開。
+- 初回 `fw_269_verify.sh` は三段で落ちた (いずれも既存コードの不備。修正して後段へ進んだ):
+  1. snapshot が `tools/shared/env.sh` を含まず `fw_stage2.sh` が 0 s で exit 1 → `git archive` に `tools/shared` を追加。
+  2. `liftlib/simd/gen.py` の `_params` が `CT[t]` で落ちる (`KeyError: 'g224'`)。`fw_stage2.sh` の DynTag が `iN` を `gN` に変換し `CT` に無いキーを渡す (b8e6855f #241 で `_stub` が `_params` 経由になった回帰)。→ `CT.get(t, "u128")` の寛容化。
+  3. `pefile` / `capstone` 未導入 (WORKFLOW §11 の注記どおり) → system python3 では `pip install --user` 後も import できなかったため `tools/plugins/framework/work/venv` に導入して PATH 先頭に置いた。`llvm-as` が emsdk 同梱に無く `/usr/lib/llvm-18/bin` を PATH に追加 (IR 検証用。emcc は emsdk の clang 24 のまま)。
+- **実測 (検証 HEAD = 739a4fe1。3bdb1d74 に origin/main 570bcb73 を merge し REPORT を更新した commit。空の W から stage-2 全再構築、素材 fl-win64 + toolchain-emsdk + work-fw-stage1、2026-10-13 runner)**:
+  - `fw_269_verify.sh`: rc=0, `fw_stage2.sh` 253 s (load 0.42 0.77 0.60 → 2.62 1.78 1.04), smoke ×3 PASS (81/81/81 ms, dispatch=38 units_done=0 va=1 heap=1 ff=0)、smoke 同値 差分行=0/0、wasm 15,062,169 B (`--size` 未指定のため照合は警告止まり)。
+  - `hs_e2e.sh --fresh`: rc=0, 88 s (load 0.64 1.30 0.94 → 1.34 1.32 0.98), `E2E PASS`。Phase B は `Phase B 例外: memory access out of bounds` を出し、emcc 側の実行ログにも `Aborted(Runtime error: The application has corrupted its heap memory area (address zero)!)` が出る。判定 (hs.mjs §判定) は `plug===0` 時の ID prefix 照合のみで、GOLDEN 6 ID すべて一致 → `E2E PASS`。`plug != 0` の完全生成は REPORT §7.1 の次段扱い。
+  - Phase B 例外の切り分け (レビュー指摘 2): origin/main の `gen.py` では `fw_stage2.sh` が `KeyError: 'g224'` で停止し `fw_image.bin` を生成できない。したがって origin/main では Phase B に到達せず、同素材の baseline は取得不可。本 PR の `_params` 修正 (`CT.get(t, "u128")`) で到達可能になった経路が例外の原因である可能性を否定できない。**既存仕様とは断定しない**。切り分けと判定は #884 (`[P0c-11]`) で行う。
+  - `_stub` (指摘 1 対応): `d0e15d52` の `_stub` 書き換えを元に戻した。未知タグ `?` を含む形と既知型形を含む 8 形で 56aa8795 と出力一致 (diff 0)。`['g224']` / `['x','g224']` の `_params` 経路は `u128` にフォールバックして正常生成 (旧版は KeyError)。`gen.py` の PR 差分は `_params` の 1 行のみ。
+- 副作用の確認: `liftlib/simd/gen.py` の既知型 (x/d/q/b/y 等) の `_stub` 出力は origin/main と一致 (5 形で diff 0)。`tests/test_unit.py` は `m6/work` 等の素材が無く実行不可 (既存の前提)。
+- **#610 再検証 (HEAD = b37d20ac、素材 fl-win64 + toolchain-emsdk + work-fw-stage1、runner 2026-10-13)**:
+  - 既定経路 (FW_EXT_FUNCS 未指定): `fw_269_verify.sh` ALL PASS (空の W から, `fw_stage2.sh` 318 s, load 0.44 0.68 0.58 → 2.57 1.81 1.07, smoke ×3 PASS, 差分行 0/0, wasm 15,062,169 B)。`hs_e2e.sh --fresh` E2E PASS (97.9 s)。Phase B `memory access out of bounds` は本節 1 段上と同一。
+  - ext 指定 (`FW_EXT_FUNCS=function_5dfd30,function_5dfdb0,function_5de820,function_5dedf0`): `fw_269_verify.sh` ALL PASS (`fw_stage2.sh` 319 s, load 0.81 1.16 1.02 → 2.63 1.98 1.36, smoke ×3 PASS, 差分行 0/0)。`fw_f80.ll.ext.json` で `ext_functions: 4`・skip 0 を確認。ただし wasm サイズは既定と同一 15,062,169 B で、ext 化が最終 wasm に反映されたかは未確認。
+  - ext 指定 (`function_5dfbe0,5dfc90,5dfd30,5dfdb0,5de820,5dedf0,5dfb60` の 7 関数): **fail**。`function_5dfb60` / `5dfbe0` / `5dfc90` が `skip:no-ext-values` で ext 化されず、`fw_f80.py` が exit 1 (fail-fast 設計どおり)。
+  - `hs_e2e.sh` の ext 指定版: `FW_EXT_FUNCS=...` 付きで E2E PASS (97.9 → 99.2 s)。ただし hs は既定経路で生成済みの `fw_flat4_canon3.ll` を読むため、ext 版の中間生成物を経由していない。
+  - 修正: `fw_269_verify.sh` の snapshot に `tools/plugins/p0c` を追加 (ext 指定時の `f80_lower.py` 不在を解消)。
+  - 環境: `pefile` が runner の python3 に無く、venv (`uv pip install pefile capstone numpy`) を PATH 先頭に置いて実行。
+- **未達 (受入 3 の FW_EXT_FUNCS 指定経路)**: 7 関数指定は 3 関数が ext 化不可。`fw_flat4_canon3.ll` を ext 版で再生成した e2e は未実施。ext 対象の選定根拠 (x87 関数の一覧) は未作成。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 実 stage-1 の梱包と R2 upload (`fw_pack_stage1.sh pack` → `artifacts/work-fw-stage1.tar.zst`) | 素材が無いと `oc_artifacts: work-fw-stage1` は `missing R2 object(s)` で失敗 | #610 (依頼者作業) |
-| fw_269_verify.sh / hs_e2e.sh の FW_EXT_FUNCS 未指定・指定での再検証 | #311 受入条件 3 | #610 (素材 upload 後に再 run: `oc_artifacts: fl-win64 toolchain-emsdk work-fw-stage1`) |
-| FW_EXT_FUNCS 対象 x87 関数の一覧と選定根拠 | 未決 | #197 / #610 |
+| FW_EXT_FUNCS 指定 (ext 対象関数あり) 時の fw_269_verify.sh / hs_e2e.sh 再検証 | #311 受入条件 3 の残り | #197 (選定後に再 run) |
+| FW_EXT_FUNCS 対象 x87 関数の一覧と選定根拠 | 未決 | #197 |
+| Phase B `memory access out of bounds` の原因切り分け (origin/main に baseline 無し) | `_params` の CT.get 経路で到達可能になった可能性。既存仕様か回帰かは未確定 | #884 |
+| `tests/test_unit.py` の素材依存 (`m6/work/ott.drc.ll` 等) | 単体テストが素材無しで実行不可 | 別途 (未起票・次 PM 判断) |

@@ -91,6 +91,17 @@
   ERR を含む scenario は bit-exact 比較の対象外 (出力は ERR 行のみ) で、残り 14 件が実際の出力比較。
 - `run_ctrl.sh` 冒頭コメントの旧記述 (「ERR 0 を含む 4 条件」) は実装と一致しなかったため、本改訂で「ERR は両側同一 scenario のみ許容」に修正した。
 
+### 2.6 FA-11 (#692): SSE 整数 lowering 追加 と rep movs ネガコン (実測, 2026-10-13)
+
+- 追加: `pcmpeqw` (icmp eq <8 x i16> → sext)、`pshuflw` (下位 4 lane の shufflevector)、`pmovmskb` (xmm → 16bit mask)。
+  `mlift_ops.py` の `emit_sse` に追加。`build_ctrl.sh` の FAIL は `pcmpeqw`・`pshuflw` が消え、
+  残りは `vpcmpeqw ymm1` (256bit AVX2, mlift は ymm 未対応) の 1 件のみ (`failed(funcs with unsupported) 1`)。
+- 残った `vpcmpeqw ymm` は ctrl closure 内 (f_1810577ac @181057857) で、ymm 対応は未実装。
+- rep movs ネガコン (movs 経路の先頭に `llvm.trap` を挿入した一時版): `build_ctrl.sh` + `run_ctrl.sh 2 5` は
+  **15/15 PASS**、`build_comp.sh` + `run_comp.sh 400` は **400/400 PASS**。既存 e2e は movs 経路を実行しない (§2.3 と同じ結論を再確認)。
+  一時 trap は削除済み。
+- 未解決: rep movs/stosw を実行する scenario の追加 (受入 1)、seed 非依存化 (受入 3)、`vpcmpeqw ymm` (受入 2 の残り)。
+
 ## 3. 再現手順 (素材)
 
 ```sh

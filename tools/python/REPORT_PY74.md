@@ -42,6 +42,22 @@ addEffect の plugin 名検証 (`fl_engine.c` の `if (pn[0] && !plugin_kind_ok(
 - 結果: `ilmcp 差分 2 件` で AssertionError、exit 1。差分は `ilmcp.addEffect` の `['Nope', 1, 0]` (mock = code 1、wasm = ok) を含む 2 件。
 - 元のコードでは diffs 0 (上記)。
 
+## 7b-4. device 5 関数 (MIDI scripting 用) の C 実装 (#74)
+
+`device.getPortNumber` / `isAssigned` / `setHasMeters` / `forwardMIDICC` / `midiOutMsg` を `fl_engine.c` に追加 (mock の模擬と同じ意味: forwardMIDICC / midiOutMsg は呼出し件数を数える)。実装 60 → 65、未実装 375 → 370。`tests/device_diff.mjs` (新規) が mock と戻り値・code・件数 (midiOut 4) の差分 0 を確認し、署名違反 4 件が code 5 で拒否されることを wasm 単独で確認する。`fl_engine_midi_out_count` を export して状態を検査可能にした。
+
+| 検証 (HEAD = 本 PR, runner, node 22.23.3, emsdk 6.0.12) | 結果 |
+|---|---|
+| `bash provider/build.sh` | 成功・警告 0。`gen_provider.py --check-handlers`: ハンドラ 65 |
+| `node tests/device_diff.mjs` | calls 7 + reject 4、diffs 0、PASS |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 65 / 未実装 370 / MCP 静的 60) |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true、wall 1.53 秒 |
+| `node tests/all_tools.mjs` (mock) | 48/48 ok、host_calls 37,425 (wasm と一致) |
+| `node tests/midi_script.mjs` | PASS 29 checks、wall 0.59 秒 (mock) |
+| `node tests/ilmcp_e2e.mjs` / `ilmcp_diff.mjs` | PASS (回帰なし) |
+
+素材: `fl-win64` から `block25159/24429/24430/24618_DATA.bin` のみ展開 (`tar --zstd -xf` で 2.2 秒)。`build_cpython_wasm.sh` 3 分 08 秒、`FLPY_SKIP_TABLE=1 build_flpy.sh` 4.7 秒 (flapi 表は再生成せず、コミット済みの表を使用)。
+
 ### 既知の未解決 (文字の扱い)
 
 - JS の `host/ilmcp.mjs` `norm` は `String.prototype.trim()` (Unicode 空白も除去)、C の `browser_key` は `isspace` (ASCII のみ)。`"\u00a0Plugin database"` のような非 ASCII 空白を含むパスで JS は成功し C は code 1 になる。今回の差分テストは ASCII 入力のみのため検出されない。FL の木は ASCII のため現状の実害はない。扱いは #74 の子チケットで決める (起票先: #74)。

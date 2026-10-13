@@ -31,6 +31,7 @@ static double tempo;
 static int playing;
 static int64_t hl_cb;
 static int n_pr, n_run;
+static int dev_port, midi_out_n;
 static const struct { const char *n; double v; } params[] = {{"Cutoff", 0.5}, {"Resonance", 0.2}, {"Gain", 0.8}};
 static double pvals[3];
 #define NPARAM 3
@@ -60,9 +61,11 @@ void fl_engine_reset(void) {
     win[0] = win[2] = win[4] = 1;
     for (int i = 0; i < NPARAM; i++) pvals[i] = params[i].v;
     tempo = 130; playing = 0; hl_cb = 0; n_pr = n_run = 0;
+    dev_port = 0; midi_out_n = 0;
 }
 int64_t fl_engine_highlight_cb(void) { return hl_cb; }
 int fl_engine_channel_count(void) { return nch; }
+int fl_engine_midi_out_count(void) { return midi_out_n; }
 
 #define WRONGN() return fl_err(c, FL_E_WRONG_PARAM, "Wrong number of function parameters or wrong parameter type")
 /* 署名なし (np=-1) の関数は dispatch が個数を見ないので handler が検査する */
@@ -154,6 +157,13 @@ FL_H(playlist, setTrackColor) { PL(0); p->color = A_INT(1, 0); return fl_ret_non
 FL_H(ui, getVisible) { WN(0); return fl_ret_b(c, win[_w]); }
 FL_H(ui, showWindow) { WN(0); win[_w] = 1; return fl_ret_none(c); }
 FL_H(ui, hideWindow) { WN(0); win[_w] = 0; return fl_ret_none(c); }
+
+/* ---- device (5, MIDI scripting 用の最小面) ---- mock と同じ: forwardMIDICC / midiOutMsg は呼出しを数える */
+FL_H(device, getPortNumber) { return fl_ret_i(c, dev_port); }
+FL_H(device, isAssigned) { return fl_ret_b(c, 1); }
+FL_H(device, setHasMeters) { return fl_ret_none(c); }
+FL_H(device, forwardMIDICC) { (void)A_INT(0, 0); (void)A_INT(1, 1); midi_out_n++; return fl_ret_none(c); }
+FL_H(device, midiOutMsg) { (void)A_INT(0, 0); (void)A_INT(1, -1); (void)A_INT(2, -1); (void)A_INT(3, -1); midi_out_n++; return fl_ret_none(c); }
 
 /* ---- plugins (7) ---- (引数順: paramIndex 系は先頭、index/slotIndex/useGlobalIndex が後続) */
 FL_H(plugins, isValid) {

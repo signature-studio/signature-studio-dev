@@ -80,5 +80,6 @@ export async function createWasmEngine({ flprovUrl, ids }) {
     call,
     highlightCb: () => Number(M._fl_engine_highlight_cb()),
     channelCount: () => M._fl_engine_channel_count(),
+    midiOutCount: () => M._fl_engine_midi_out_count(),
   };
 }

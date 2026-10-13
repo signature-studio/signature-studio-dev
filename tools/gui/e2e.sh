@@ -27,6 +27,7 @@ if [ "${SKIP_NATIVE:-0}" != "1" ]; then
   echo "[gui-e2e] 1d/6 GUI-7 popup/tooltip surface・NC 領域・無効領域複数矩形・DPI (独立 Python オラクル golden/gen_golden_nc.py と画素完全一致 + ネガコン 3 本)"; bash "$HERE/test/nc_golden.sh" | tail -6
   echo "[gui-e2e] 1e/6 GUI-7 テスト PE (popup + tooltip + WM_NCPAINT, lift 経由) の golden (独立 Python オラクル golden/gen_golden_ncpe.py と画素完全一致 + ネガコン 2 本: 1 画素改変 / tooltip の TOPMOST 欠陥 PE)"; bash "$HERE/test/nc_pe_golden.sh" | tail -6
   echo "[gui-e2e] 2/6 native lift 実行 (PE->RetDec->gcc, headless host, golden)"; bash "$HERE/test/native_e2e.sh" 2>&1 | grep -E "native_run|\[post\]"
+  echo "[gui-e2e] 2a/6 __pe_image の data 実体化 (.reloc DIR64 補正; GUI-12 #566; ネガコン付き。FAIL なら非 0 で停止)"; bash "$HERE/test/pe_image_e2e.sh" 2>&1 | grep -E "PASS|FAIL|done"
   echo "[gui-e2e] 2b/6 結合準備 native (到達 API ログ / wasm32 署名 adapter / ハンドル 31bit / 改名 selftest; CAB-156)"; bash "$HERE/test/reach_test.sh" 2>&1 | grep -E "passed|FAIL"
 fi
 echo "[gui-e2e] 1c/6 GUI-5 wasm SIMD128 行カーネル (scalar と画素完全一致 + 故意欠陥 4 種を検出 + v128 命令の有無; bench 省略)"

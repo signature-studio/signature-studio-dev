@@ -98,3 +98,19 @@
 | 負の対照 (手順: `set -euo pipefail` 下で失敗コマンドを sed へ流し `\|\| die`) | `DIE x` を出して exit 1、後続は実行されない |
 
 - `test.sh --quick` が再生成した inventory.md / BACKLOG.md / coverage.json / inventory.csv / exports.txt はコミットしていない (§13・§14 と同様)。
+
+**実 IR 実測 (2026-10-13, Actions runner, HEAD 36edc993 = main。素材 work-m11 / work-m6-ott / work-liftlib / work-liftlib-targets 展開済み, `env -u EMSDK`, emcc 6.0.12)**: 各 IR を `sig_gate.sh` (正規化 → `verify_sig.sh`) に通した。
+
+| IR | 正規化前 mismatch | 正規化 adapter / 重複統合 | unresolved | 正規化後 mismatch | 所要 |
+|---|---|---|---|---|---|
+| `tools/m11/work/boot_final2.ll` | 0 | 0 / 1 (`SHGetFolderPathW.1`) | 0 | **0** | 13.7 s |
+| `tools/m11/work/boot_final3.ll` | 0 | 0 / 1 (`SHGetFolderPathW_D1`) | 0 | **0** | 13.6 s |
+| `tools/m8/work/ott_m8.ll` | 0 | 0 / 0 | 0 | **0** | 6.9 s |
+| `tools/liftlib/work/ott_lb10000/work/ott_m8.ll` | 0 | 0 / 0 | 0 | **0** | 6.8 s |
+| `tools/targets/freshair/work/lift_gain/gain_fixed.ll` | 0 | 0 / 0 | 0 | **0** | 6.4 s |
+| `tools/liftlib/work/fa_gain/fa_gain_fixed.ll` | 0 | 0 / 0 | 0 | **0** | 6.5 s |
+
+- 正規化前後とも mismatch 0 (M11 の adapter は重複統合名のみ。§16 の既存結果と一致)。
+- 素材の `work-liftlib-targets` は HeartCore / SlateCore の lift IR を含まない (freshair `lift_gain` と kilohearts `winpkg` のみ)。HeartCore / SlateCore の lift IR は未実測。
+- 除外: `tools/liftlib/work/cab238/p1_only/work/ott_m8.ll` は正規化前の時点で `%p1r_1801209c9_cl1` が未定義 (clang error)。診断用の派生物で正規の成果物ではないため対象外。
+- `sig_test.sh` (HEAD 36edc993, `env -u EMSDK`): **ALL PASS**, 24.1 s, load average 0.65→0.75。(a)〜(h) すべて OK。

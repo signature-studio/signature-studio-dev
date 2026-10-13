@@ -10,6 +10,10 @@
 #       終了後 work/boot_final.ll は fix+alloca 状態になる (CAB-129 受入状態 + 本チケット変更の合成 = 新たな正)。
 #       tools/m11/shimx_link は読取のみ (CAB-177 が build.sh を改変中でも A/B は同一 harness 状態で base/fix 比較)。
 set -uo pipefail
+# #727: 退役。base 側 (ldfix 無し IR) は #680 の fail-closed (m11_build.sh の ldfix=applied・指紋検査) で build できないため、
+# 以下の A/B は実行不能。旧 A/B の実測値は REPORT_APPENDIX_AB.md §3.3 を正とする。履歴として本文は残す (再設計時の参照用)。
+echo "[embed_sx_ab] RETIRED (#727): ldfix 無し base IR は m11_build.sh が拒否する (#680 fail-closed)。実行しない。" >&2
+exit 2
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 M11="$(cd -- "$HERE/.." && pwd)"
 REPO="$(cd -- "$M11/../.." && pwd)"
