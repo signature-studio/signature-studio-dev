@@ -160,3 +160,20 @@ tools/targets/massivex/
 └── license/work/                      (gitignore: mx_strings.json 32,677 文字列, mx_cg.pkl, str_xref_summary.json)
 work/ (gitignore): hdr_block1/2.bin, files.json, locations.json, header_parse.json, extracted/ (125 files), mac/ (dmg 展開), innoextract-git (CRC 警告化パッチ済み 1.10-dev), issrc (Inno 6.4.2 検証用 clone)
 ```
+
+## 11. MX-2 検証の再確認 (#266 / MX2-1 mock 欠陥) — 2026-10-13 実測
+
+- **MX2-1 (zero-init pass)**: commit a770045e で配線済み。HEAD で `license/e2e.sh` を実行:
+  - `-O0` 既定: 11/11 PASS (`e2e.sh` 全体 77.7 s, load 0.58→0.91)
+  - `MX_OPT=-O1`: 11/11 PASS (5 s) / `MX_OPT=-O2`: 11/11 PASS (5 s)
+  - NC `MX_ZEROINIT=0 MX_OPT=-O1`: **6/11 PASS (5 FAIL)** — 対照として欠陥が再現する
+- **dsp 回帰 (MX-3)**: `dsp/e2e.sh` exit 0 (41 s, load 0.63→0.50)。567 root / 257,654 insn /
+  unsup 48,503 site / e8e9 targets 594,978 (非 begin 率は §4 参照)。
+  REPORT §2/§3 の 258,087 insn / 48,612 site とは差がある (数え方の差・未追跡)。
+  `dsp/negctl.sh` 3 件: NC1/NC2/NC3 すべて FAIL (期待どおり) (11 s)。
+- **環境注意**: `shared/env.sh` の REPO_ROOT 既定が `/home/ubuntu/...` のため `MX_X64C` で
+  worktree 内の `tools/flelift/x64c.py` を指定して実行。`numpy` (dsp) と `pefile` / `capstone` (license) を pip 導入。
+- **未達 (MX2-3)**: T12-T14 (N5 demo UI 抑制 / N6 文言) は未実装。`mx_lic_stub.py` に N5/N6 の
+  IR 対象 (0x18010e4e0 / 0x184ffcf87 等) の差し替えが無いため。起票先: 本 issue #266 の後続 (MX-3b 残件)。
+- **未達 (MX-3b 本体)**: process slot 同定 (U1) / closure 厳密化 (U2・U5) / vectorcall・C++ EH (U3・U4)
+  は本 run では未着手。起票先: 後続 issue (#266 の残件として分割予定)。
