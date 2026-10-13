@@ -118,3 +118,11 @@
 - **比較した方式**: (a) CI で R2 素材 (`fl-win64`) から deny-list を毎回生成 (約 34 s + 素材取得が必要で、テスト 1 本のために素材を要求する)、(b) テストで `--skip-release-guard` (採用)、(c) deny-list を commit (素材由来の指紋を repo に置くことになるため不可)。
 - **理由**: (a) は素材取得に依存し、素材の無い run でテストが落ちる。(b) は fixture が素材由来でないことを前提に、テストに限ってゲートを外す。本番 stage (`deploy.sh`・`20-worker --phase release`) は従来どおり `--skip-release-guard` を渡さない。
 - **影響**: 本番 stage でこのフラグを使うと LGL-2 のゲートを通過するため、`deploy.sh` の呼び出し元はフラグを付けない。テストの fixture を素材由来に差し替える場合は、この決定を見直す。
+
+## D12 — ldfix の修復前 wasm / 修復後 wasm の作り方 (fail-closed gate は弱めない)
+
+- **状態**: 採用 (2026-10-14, issue #1290 [LD-43])
+- **決定**: 修復前 wasm は、`M11_LDFIX=0` で作った IR (`ir_conditions.json` の `ldfix=disabled`) を既存の明示 opt-in `M11_ALLOW_LDFIX_DISABLED=1` (#1165) だけで build する。修復後 wasm は、修復前 IR に `ldfix/ldfix.py --pe` (m11_gen_ir2.sh と同じ正規 pass) を適用し、`ldfix=applied` を記録して `--bind` で指紋を更新してから既定 gate で build する。手で作った overlay IR (`--passes f3c` の出力) は build に渡さない。
+- **比較した方式**: (a) gate を外す (`M11_ALLOW_LDFIX_DISABLED` を既定化・指紋検査の省略) — fail-closed を弱めるため不採用。(b) 修復後 IR を `--passes f3c` で重ねた overlay を build する — 正規 pass を経ず指紋 (`ir_sha256`) が一致しないため gate で拒否される。(c) e2e を修復後 wasm 単独に縮める — 修復前比較 (survey 突合・dyn の before 値) が取れなくなるため不採用。(d) 採用: 既存 opt-in と正規 pass のみを使う。
+- **理由**: opt-in は `ldfix=disabled` の記録を残すため、測定時の IR 条件が REPORT と成果物から読める。正規 pass 経由の IR は既定 gate をそのまま通る。`ldfix_img.py` (PE 無し) の出力は正規 pass の代用にならないため、修復後 wasm の入力に使わない。
+- **影響**: `ldfix_509_e2e.sh` の 6/7 は fl-win64 の PE (`FL_WIN64_DIR`) が要る (従来の「PE 無し」の前提を外す)。他の e2e (`ldfix_e2e.sh` 等) の PE 要件は変わらない。
