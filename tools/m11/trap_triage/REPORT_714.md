@@ -106,6 +106,8 @@ python3 trap_triage/check_682.py work/probe714/units_714.json --units 304,555,92
 
 ## 9. OOB 呼出し鎖の再測定と呼出し元 (2026-10-13, 追補 run 3、n=1)
 
+**注意: 本節の数値は、WORKFLOW §4.6 / AGENTS §4.6 に違反した手順で取った値である** (共有 main ツリーで測定。本 PR の HEAD では再現していない)。以下は違反した手順による記録として扱い、検証 commit 限定の数値とする。
+
 測定 (`M11_FIX_535BF2` 既定 0 = OFF、測定 commit `92cfb784`、共有 main 作業ツリーで実施、n=1。コード変更は本 PR に無い): gen_ir2 rc=0 / build rc=0 / survey rc=0 / check_682 2/5 (304=trap 555=trap 923=trap 291=ok 296=ok) rc=1。
 survey の集計は ok 870 / trap 24 / noproc 1 / miss 47 で、§7 (ok 869 / trap 25) と一致しない。**原因は未特定** (下記「検証」)。check_682 の判定は同じ。
 **本検証 (fix run) で再現不能**: 上記の数値は `92cfb784` の共有 main ツリーでの測定値として残すが、検証 commit 限定の数値として扱う。下記「検証」を参照。
@@ -135,7 +137,7 @@ survey の集計は ok 870 / trap 24 / noproc 1 / miss 47 で、§7 (ok 869 / tr
 
 ### 検証 (差し戻し対応 run, 2026-10-13)
 
-- **再測定は不能**。素材 `fl-win64` は `$HOME/artifacts` から `$RUNNER_TEMP/fl-win64` へ展開でき (`extracted/block00031_PE.bin` 実在)、`bash m11_gen_ir2.sh` を実行したが rc=1 (`m11_merge.py` が `work/boot0.lift.ll` を開けない)。lift 成果物は RetDec で作るが、RetDec は `/opt/retdec` に無く (`[RETDEC]`)、`tools/m11/work/` の前回生成物も無い。このため gen_ir2 / build / survey / check_682 は本 run で再実行しておらず、§9 の数値は測定 commit `92cfb784` の記録として残す (検証 commit 限定)。
+- **再測定は不能**。素材 `fl-win64` は `$HOME/artifacts` から `$RUNNER_TEMP/fl-win64` へ展開でき (`extracted/block00031_PE.bin` 実在)、`bash m11_gen_ir2.sh` を実行したが rc=1 (`m11_merge.py` が `work/boot0.lift.ll` を開けない)。lift 成果物は RetDec (`[RETDEC]`) で作るが、本 run の素材指定は `fl-win64` のみで `toolchain-retdec` が無く、`work-m11` / `work-liftdiff` も `$ARTIFACTS_DIR` に無い。`tools/m11/work/` の前回生成物も無い。このため gen_ir2 / build / survey / check_682 は本 run で再実行しておらず、§9 の数値は測定 commit `92cfb784` の記録として残す (検証 commit 限定)。
 - **main 共有ツリーの状態**: 本 run で確認した `git status --porcelain` は ` M package.json` / ` M pnpm-lock.yaml` の 2 件 (本 run は触っていない)。`92cfb784` 測定時の clean 状態は記録が無く、未確認。
 - **鮮度 (92cfb784 → 08fd858a)**: `git diff 92cfb784 08fd858a -- tools/m11 ':!*.md'` の出力は次の 2 ファイルのみ。
   - `tools/m11/m11_zeropad_liftdiff.py` (新規 82 行)
