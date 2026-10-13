@@ -6,8 +6,8 @@
 
 ## 1. 素材と再現
 
-- 素材: `fl-win64` (`$RUNNER_TEMP/extracted/`)、`toolchain-retdec`・`toolchain-emsdk` (`/opt/emsdk` 6.0.12、`/opt/retdec` v5.0)、`work-m11`・`work-liftdiff` (`tools/m11/work/`・`tools/liftdiff/work/` へ展開)。
-- `FL_WIN64_DIR` は PE の親 dir の 1 段上 (`$RUNNER_TEMP`) を指定する (`extracted/block00031_PE.bin` を `$FL_WIN64_DIR/extracted/` で解決するため)。
+- 素材: `fl-win64` (`[WIN64]`、`$FL_WIN64_DIR/extracted/`)、`toolchain-emsdk` (`[EMSDK]` 6.0.12)・`toolchain-retdec` (`[RETDEC]` v5.0)、`work-m11`・`work-liftdiff` (`tools/m11/work/`・`tools/liftdiff/work/` へ展開)。
+- `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` を指定する (`docs/WORKFLOW.md` §11)。PE は `$FL_WIN64_DIR/extracted/block00031_PE.bin` (`[WIN64]`)。
 - IR: `bash tools/m11/m11_gen_ir2.sh` rc 0 (実測 44.0 s、`ldfix=applied`、`boot_final.ll` 490,693 行、`ir_sha256` `2c68ceae…`)。
 - build: `bash tools/m11/m11_build.sh` rc 0 (`wasm-ld signature mismatch: 0, undefined symbol: 0`)。
 - survey: `node tools/m11/trap_triage/survey_units.mjs` 3 回 (13.27 s・全て rc 0)。per-unit JSON は `cmp` で完全一致。
@@ -55,13 +55,13 @@
 ## 7. 再現
 
 ```sh
-export FL_WIN64_DIR=$RUNNER_TEMP   # extracted/block00031_PE.bin の親の 1 段上
+export FL_WIN64_DIR=$RUNNER_TEMP/fl-win64   # PE: $FL_WIN64_DIR/extracted/block00031_PE.bin
 bash tools/m11/m11_gen_ir2.sh
 bash tools/m11/m11_build.sh
 node tools/m11/trap_triage/survey_units.mjs tools/m11/work/trap_triage/run1.json
 node tools/m11/trap_triage/oob_top.mjs tools/m11/work/trap_triage/topall.json   # 最上位 frame と top_off
 python3 tools/m11/trap_triage/oob_insn.py tools/m11/work/m11_boot.cjs.wasm 14873 0x352bb9 40
-LD_M11_PE=$RUNNER_TEMP/extracted/block00031_PE.bin python3 tools/m11/trap_triage/disasm_fn.py 4133f0 4473f0 447df0
+LD_M11_PE=$FL_WIN64_DIR/extracted/block00031_PE.bin python3 tools/m11/trap_triage/disasm_fn.py 4133f0 4473f0 447df0
 ```
 
-注: `disasm_fn.py` は `LD_M11_PE` で PE を指定する (既定の `/home/ubuntu/...` を読むため)。
+注: `disasm_fn.py` は `LD_M11_PE` で PE を指定する (`$FL_WIN64_DIR/extracted/block00031_PE.bin` と同一。`[WIN64]`)。
