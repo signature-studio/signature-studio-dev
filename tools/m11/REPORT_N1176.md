@@ -49,7 +49,7 @@
 - 測定 commit: `12586095` (origin/main、worktree `1396-m11-e2e-full`。コード変更なし)。runner: 4 vCPU・16 GiB、Ubuntu。
 - 素材: fl-win64 (`block00031_PE.bin` sha256 `b2c64da4…`)・toolchain-retdec・toolchain-emsdk・work-m11・work-liftdiff を展開。
   `functions_dll.csv` は素材に無いため、Ghidra 12.1.4 (公式 zip、sha256 `ddac49f9…` 一致) を JDK 21 で headless 実行して再生成。
-  - Ghidra `DumpFunctions.java`: rc 0・8 分 12 秒・`functions_dll.csv` 2,087,706 bytes (§2 過去 REPORT の 59,010 行と同サイズ)。
+  - Ghidra `DumpFunctions.java`: rc 0・8 分 12 秒・`functions_dll.csv` 2,087,706 bytes (REPORT_N1050 の記録と同じ bytes 数。行数は未計測)。
 - `bash tools/m11/m11_e2e.sh --full` (foreground・MAXMEM=12G・JDK 21): **rc 0・8 分 44 秒**。
   - `m11_scan: ok`・`m11_bounds: ok`・`build (emcc 増分): ok`。
   - `reached_stage` 4/6 (stop: trap "unreachable")・`ir_sha256` `9dc2d896…`。build 段の失敗は無い。
