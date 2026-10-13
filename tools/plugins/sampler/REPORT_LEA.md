@@ -86,12 +86,12 @@ lea root を足して `call/jmp rel32` で広げ、新たに入った関数の l
 
 | 項目 | 実測 (main d7da2d2 を取り込んだ検証 HEAD c402faf・4 core の Actions runner) |
 |---|---|
-| `lea_e2e.sh` 全体 (inventory・閉包・lift・判定・host/kernel 再計測を含む、`work/` 無しから) | **exit 0・11 分 09 秒 (668.98 s、`time` 実測・実 CPU user 28 分 32 秒)**。 `closure_lea` PASS 7 checks × 7、`judge shells` PASS 7/7 (`ALLOW_UNIMPL` 撤去後の判定)、`indirect_defs` PASS 7/7、`facts_total` PASS 4 checks × 7 |
-| `lea_e2e.sh --skip-lift` (既存 CSV の再判定、`ALLOW_UNIMPL` 撤去後) | exit 0・1 分 33 秒。 `judge shells` PASS 7/7。 許容を空にした状態で main の declares_unimpl 0 × 7 block を確認 |
+| `lea_e2e.sh` 全体 (lift を含む、`work/` 確認済みの状態から。 許容 `ALLOW_UNIMPL` 有りの版) | exit 0・**11 分 09 秒 (`time` 実測、user 28 分 32 秒)**。 `closure_lea` PASS 7 checks × 7、`judge shells` PASS 7/7、`indirect_defs` PASS 7/7、`facts_total` PASS 4 checks × 7 |
+| `lea_e2e.sh --skip-lift` (許容 `ALLOW_UNIMPL` 撤去後、既存 CSV の再判定) | exit 0・1 分 33 秒。 `judge shells` PASS 7/7。 許容を空にした状態で main の declares_unimpl 0 × 7 block を確認 |
 | `lift` の `declares_unimpl` (main 上の実測) | 7 block 全て 0。 `rep_stosb_memset` の stub は main で解消 |
 | `lea_nega.sh` | exit 0・**2 分 43 秒**。 NC0–NC13 の 23 項目 (対照 6 + 破壊 17) が全て期待通り |
 
-- 検証 HEAD c402faf で実行 (`targets.py` は `ALLOW_UNIMPL` 撤去、`lea_lift.sh` は f80 列の単位統一後)。 `work/` の中間生成物は gitignore (`tools/plugins/work/`)。
+- フル e2e (11 分) は c402faf (`lea_lift.sh` の f80 列統一後、`ALLOW_UNIMPL` は有り) で実行。 その後 `ALLOW_UNIMPL` を撤去し、`--skip-lift` と `lea_nega.sh` (撤去後の判定) で確認。 最終 HEAD での再実行の値は §6b の末尾の行に示す。 `work/` の中間生成物は gitignore (`tools/plugins/work/`)。
 - 旧 f358f17 / ad39596 の検証 (270 / 269 / 268 s、md5 `ceaf59c63860`、`lea_nega` 222 s) は main 基点の値。 main 取り込み後は上の実測に置き換えた。
 - 範囲外: 差分試験 (bit-exact)・wasm リンク・実行時の到達性 (`lea` 先が実際に呼ばれるか)。 通過 ≠ 正しさ (§1 と同じ)。
 
