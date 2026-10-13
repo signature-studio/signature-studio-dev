@@ -312,3 +312,49 @@ UTF-16 blob は 1 pattern 1 本の固定で、長さや内容の変化を試し�
 「native 失敗 RVA からの引数補正」「署名未対応 (vector/struct) の扱い」「状態前提 (InitTable/TLS) の case 生成」は未着手。
 flelift closure (fle_lift.sh 生成物 tools/flelift/work/lift/* が素材に無い) は未実測。
 起票先: 本 issue #235 (部分達成のため Refs)。
+
+### LD-24 (#976) 署名未対応 50 関数の内訳 (REPORT §12 から移動)
+
+m11 closure の `unsupported_sig` 50 件は未実装。分割先は #1193 と #1194。詳細・件数の注記・受入条件: [`REPORT_LD24.md`](REPORT_LD24.md)。
+
+## 13. flelift closure の再採点 (LD-26 / #978、部分達成) — 参考値 (未確定)
+
+素材 (fl-win64・work-m11・work-liftdiff) から `tools/flelift/fle_lift.sh` で lift 生成物 (`tools/flelift/work/lift/*`) を作り直し、`targets/flelift.json` で全数採点した。方式は「fl-win64 からの再生成」(allowlist 追加なし)。issue は方式を PM 判断としているため、この選択は PM の確認対象。
+
+| 工程 | 実測 (本 run・4 core・load 約 0.8) |
+|---|---|
+| `fle_lift.sh` (x64c lift → emcc) | 合計 **67.2 s** (lift 36 s・emcc 31 s)。functions 7018 / insns 340,761 / unsup {} / imports 354 |
+| `liftdiff.py build targets/flelift.json` | **29.0 s**。`sig_mismatch` 0・`undefined` 0 |
+| `bootstate --mode hybrid` | **10.9 s**。units_run **928/942** (InitCount 246 で segv・first_fail 830) |
+| `batch --set closure --shards 4` 前半 (5600 関数) | 1500 s の foreground timeout で打ち切り (rc 124)。JSONL は 400 件ごとに書出済み |
+| 同 後半 (残 1821 関数, `--set file:`) | **653 s** (10 m 53 s)・rc 0 |
+
+> **未検証 (レビュー指摘 1・最重要)**: 前半 JSONL の行数・一意アドレス数は本 run で**確認していない** (打切り後の前半 JSONL が 5,600 件あったことを示す記録が無い)。後半 1,821 件は `--set file:` で別途流した。このため下表の「7,421 関数」は前半の欠損を含む可能性があり、**全数 7,421 の値として扱わない**。前半 JSONL の一意数を確認するか、欠けた関数を再実行して一意数を揃えるまで、下表は参考値。
+>
+> **測定 tree (レビュー指摘 1・3)**: この値は commit 1795f8ff の tree (base a5adb2fc 系) のもので、現 HEAD (7242709f = main 取り込み merge) の値ではない。`git diff 1795f8ff 7242709f --stat -- tools/liftlib/liftlib tools/liftdiff/ldlib` は 5 files, +174 / -1 (`passes/l1_restore.py` +79・`passes/iargs.py` +19/-1・`passes/fp_bind.py` +13・`ldlib/session.py` +35・`ldlib/cases.py` +29)。この差分の上に載せた値は**未検証**。再測定 (fle_lift.sh / liftdiff build / bootstate / batch) は素材不足で本 run では不可。
+
+参考値 (未確定・前後半の合算・前半 JSONL の一意数未確認・重複確認なし。全数 7,421 として扱わない):
+
+| verdict | 件数 |
+|---|---|
+| match (一致) | 4,280 |
+| mismatch (不一致) | 805 |
+| unexec (実行不能) | 2,336 |
+
+実行不能の内訳: native_fault 1,183 / native_null_deref 460 / no_wasm_definition 402 / hang 241 / unsupported_sig 50。
+
+§12 までの値 (17 unit の旧 boot、CAB-232 相当) との遷移: unexec→match 240 / match→mismatch 220 / unexec→mismatch 167 / mismatch→match 142 / mismatch→unexec 73 / match→unexec 25。
+(比較元 `results/flelift_closure_verdicts.tsv` は旧 boot 4,143 / 633 / 2,645。)
+
+**REPORT §1 (928 unit 到達状態の値 4,182 / 741 / 2,498) との不一致**: 本 run は 4,280 / 805 / 2,336 で、
+差は +98 / +64 / −162。§6.2 が示す負荷依存の揺らぎ (native badjson 等) の範囲を超える。原因は未切り分けで、
+候補は shards 4 (REPORT は 14)・前後半の 2 プロセス分割・native 側の状態 (`--state auto`)。
+「本 run の値が正」とは扱わず、再現性の確認を未解決として残す。
+
+未達 (受入条件):
+- `FL_WIN64_DIR=... bash tools/liftdiff/liftdiff_e2e.sh` の PASS は **未実行**。既定の [1/4] が `work-m6-ott` (ott.ll) を要するため、
+  `--m11-only` の確認も本 run の時間内では行えなかった。起票先: 本 issue #978 (部分達成のため Refs)。
+- 48 分の run 内で全数採点を完了したが、shards 数と再現性の差は上記のとおり未解決。
+- 素材の実在確認 (レビュー非ブロッカー): `ARTIFACTS_DIR` (`/home/runner/artifacts`) には `fl-win64.tar.zst` のみ。`work-m6-ott` は無い。
+  本 run の再実行 (前半 batch・lift 再生成) に必要な `work-m11`・`work-liftdiff` も無く、`tools/liftdiff/work`・`tools/flelift/work` は存在しない。
+  このため前半の再実行・一意数確認は本 run では不可能。

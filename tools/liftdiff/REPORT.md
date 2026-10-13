@@ -26,7 +26,7 @@ m11 の boot 状態を 17 → 22 unit に拡大し、flelift route を再採点�
 |---|---|
 | native 全起動 (flelift target, hybrid boot) | **928/942 unit 到達** / **完走 890/942** (§2.1)。entry 246 / units 22。残 3 = 830/895/898、空 47 (proc==0 1 + \*proc==0 46)、未実行 1 (#246)、entry 内未完走 1 (#245) |
 | m11 boot 状態 | 17 → **22 unit** (units モードは最初の失敗で停止なので到達=完走。17→22 は TLS 変更ではなく stub 拡充側、§5.2) |
-| flelift 全数再採点 (928 unit 到達状態) | **一致 4,182 (+39) / 不一致 741 (+108) / 実行不能 2,498 (−147)**。比較可能 4,776 → 4,923 (64.4% → 66.3%) ※絶対値は負荷で変動 (§6.2) |
+| flelift 全数再採点 (928 unit 到達状態) | **一致 4,182 (+39) / 不一致 741 (+108) / 実行不能 2,498 (−147)**。比較可能 4,776 → 4,923 (64.4% → 66.3%) ※絶対値は負荷で変動 (§6.2)。**同一状態の別測定値 4,280 / 805 / 2,336 が [REPORT_APPENDIX.md §13](REPORT_APPENDIX.md) にある** (参考値・未確定: 前半 batch 未検証・1795f8ff tree で現 HEAD 未検証・原因未切り分け) |
 | native 全滅 (fault + null deref) | 1,849 → **1,738** (null deref 691 → 494 / fault 1,158 → 1,244)。hang 357 → 321 |
 | wasm_trap (OOB) | case **2,053 → 941 (−54%)**、関数 361 → 211 |
 | f_410360 カスケード個別化 | 941 case = **trap_direct 246** (f_410360 自身の欠陥) + **trap_upstream 327** (上流乖離) + 非経路 368。innermost = f_410360 が 573 case (うち 237 は呼出列 0 件 = §3 の限定) |
@@ -247,4 +247,4 @@ Actions run `38430714782` (head `9cadda79`) で `liftdiff_e2e.sh` (--m11-only �
 - **未検証**: 0x6cd8a0 の 9 パターン実 PE 実測 (sample:800 に含まれず f2 系素材が必要)。全文・3 run 表・未解決: [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §11。
 
 ## 12. 被覆拡大 2 パターン (LD-4 / #235、部分達成) と fault 由来 fvm (LD-23 / #975)
-`vm0`・`u16` を追加 (sample:800 で 一致 358→361 / 不一致 212→229 / 実行不能 230→210)。fault 由来 `fvm` は遷移 0 件 (360/230/210 不変・VMT slot 未解決)。全文・実測・未達: [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §12・§12.1。
+`vm0`・`u16` を追加 (sample:800 で 一致 358→361 / 不一致 212→229 / 実行不能 230→210)。fault 由来 `fvm` は遷移 0 件 (360/230/210 不変・VMT slot 未解決)。全文・実測・未達: [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §12・§12.1。署名未対応 50 関数 (LD-24 / #976) の内訳と分割は [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §12 末尾・[`REPORT_LD24.md`](REPORT_LD24.md)。

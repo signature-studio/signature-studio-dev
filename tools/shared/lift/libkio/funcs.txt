@@ -1,18 +1,18 @@
-# name addr size  (libkio_x64.dylib x86_64 slice, 純粋ユーティリティ 17 関数)
-__Z6unilenPKt 0x5b88 38
-__Z12wcslen16_RCSPw 0x5bae 36
-__Z11str2comparePKtPKc 0x5bd2 51
-__Z11str4comparePKwPKc 0x5c05 49
-__Z19ConvertUTF16ToUTF32PKt 0x5f5a 179
-__Z18ConvertUTF8ToUTF32PKc 0x6312 92
-__Z12GetFourIntelPhRKl 0xe58e 13
-__Z9Limit_RCSlll 0xe59b 26
-__Z14LimitFloat_RCSfff 0xe5b5 23
-__Z7Fix_RCSf 0xe5cc 11
-__Z9CBool_RCSl 0xe5d7 15
-__Z9FixHi_RCSll 0xe611 33
-__Z20SetDoubleIntelDoublePhRKlRKd 0xefdb 16
-__Z12SetFourIntelPhRKlS1_ 0xefeb 17
-__Z14GetDoubleIntelPhRKl 0xf3b2 14
-__Z13GetFloatIntelPhRKl 0xf3c0 14
-__Z13GetEightIntelPhRKl 0xf3ce 14
+# name addr size ret  (libkio_x64.dylib x86_64 slice)
+# ret: u64 i64 u32 f32 f64 void (引数型は demangle 署名から sig.py が取る)
+# 除外 (lift 対象外・PoC と同じ): ConvertUTF16ToUTF32PKt / ConvertUTF8ToUTF32PKc
+__Z6unilenPKt 0x5b88 38 u64
+__Z12wcslen16_RCSPw 0x5bae 36 u64
+__Z11str2comparePKtPKc 0x5bd2 51 u32
+__Z11str4comparePKwPKc 0x5c05 49 u32
+__Z12GetFourIntelPhRKl 0xe58e 13 i64
+__Z9Limit_RCSlll 0xe59b 26 i64
+__Z14LimitFloat_RCSfff 0xe5b5 23 f32
+__Z7Fix_RCSf 0xe5cc 11 i64
+__Z9CBool_RCSl 0xe5d7 15 u32
+__Z9FixHi_RCSll 0xe611 33 i64
+__Z20SetDoubleIntelDoublePhRKlRKd 0xefdb 16 void
+__Z12SetFourIntelPhRKlS1_ 0xefeb 17 void
+__Z14GetDoubleIntelPhRKl 0xf3b2 14 f64
+__Z13GetFloatIntelPhRKl 0xf3c0 14 f32
+__Z13GetEightIntelPhRKl 0xf3ce 14 i64

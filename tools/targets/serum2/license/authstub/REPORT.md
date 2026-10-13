@@ -240,6 +240,7 @@ sed -n 9872p $LIFT   # => br i1 %110, label %dec_label_pc_1800c2f08, label %dec_
 - 構文: `base` 修復 (`liftlib.passes.base.run_base`) 後の raw / restored の両方を `llvm-as-18` で検査し、rc=0 (未修復の RetDec 出力は constexpr の `or` で `llvm-as-18` が落ちるため、検査は base 後で行う)。
 - e2e (commit a5adb2fc = origin/main 取り込み時点, `plugins-serum2` 展開 sha256 一致): cold = **30.15 s**・23/23 PASS (rc 0, load 0.30→0.66)。warm = **3.72 s**・23/23 PASS (rc 0, load 0.15)。cold と warm は実行条件が違い比較できない。pass は e2e チェーンに入っていないため、この 2 行は **e2e チェーン不変の確認であり本変更の検証ではない**。本 fix commit ではこれらを再実行していない。
 - 未達 (受入条件のうち未完): (1) 復元した `call` の引数 (rcx=host, edx=0x800010) の実行時 ABI は #228 (icall の BLK 経由) の界面に従う別工程で、本 pass は site の VA と制御辺のみ復元する。(2) e2e チェーン (`e2e.sh`) への組込みは未実施。
+- 正とする pass の決定 (#1030 / PR #1227, PM 判断事項): 正は本節の `l1_restore.py` (#1226)。PR #1227 の別 pass `serum2_l1.py` と `authstub/l1_restore.py` は撤回。理由: (1) 同じ `br` を書き換えるため両方適用は `二重適用` で失敗する。(2) 0x1800c2f05 の `call [[rcx]+0x30]` は `icall.py` が間接呼出し `call [reg+off]` に適用する規則と同じく `__icall_dispatch(site_va)` へ落とすのが本パイプラインの扱いで、撤回した pass が出す `@__vcall_notify` は定義が無くリンクできない。(3) 撤回した pass の実測 (census) は本節の pass の値ではないため REPORT から外した。覆す場合は PM が決め、`__vcall_notify` の定義と #228 の ABI との整合を先に示す。
 - 既存の子 issue への紐付け (2026-10-13 時点の状態): census 拡張 (受入 2 の IR 側指標) は #1029 [SR-13] で、PR #1205 (`Closes #1029`) により完了・closed (merge commit `9d1c632f`、本ブランチは取り込み済み)。復元 pass の前後表・ネガコンの正式化 (受入 2〜3 の残り) は #1030 [SR-14] (open)、LF 規則の導出は #1213 [SR-11] (open、`1007-sr-11-authstub-binding`)、global 名の規則化は #1208 [SR-15] (open)。
 
 ## 13b. L1 脱落条件の特定 (#823)
