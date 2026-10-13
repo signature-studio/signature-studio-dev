@@ -1,7 +1,7 @@
-# 付録: M11 REPORT §8 (LB_BASE=0x10000 適用 #222) / §9 (sigfix 0 詰め #131) — tools/m11/
+# 付録: M11 REPORT §8 (LB_BASE=0x10000 適用 #222) / §9 (sigfix 0 詰め #131) / §12 の一部 (#513 新規類型の行案) — tools/m11/
 
-> **正本**: `tools/m11/REPORT.md`。本書は 250 行上限 (`docs/DOC_MAP.md` §1) のため、本体から**そのまま分割移動**した §8・§9 の全文
-> (節見出し・表・数値は無変更。節番号は本体の参照と一致)。§8 の移動元: PR #411 (#132) の REPORT 整理 / §9 の移動元: #513 の REPORT 追記 (§9 は #131 の記録)。
+> **正本**: `tools/m11/REPORT.md`。本書は 250 行上限 (`docs/DOC_MAP.md` §1) のため、本体から**そのまま分割移動**した §8・§9 の全文と §12 の一部
+> (節見出し・表・数値は無変更。節番号は本体の参照と一致)。§8 の移動元: PR #411 (#132) の REPORT 整理 / §9 の移動元: #513 の REPORT 追記 (§9 は #131 の記録) / §12 の一部の移動元: #513 と main の §11 (#572) の統合時。
 
 ## 8. LB_BASE=0x10000 適用 (#222, 達成: 静的層 + `m11_e2e.sh` 実行で LB=0 と同水準を確認)
 
@@ -134,3 +134,10 @@ GitHub Actions runner (4 core, load 0.6–0.9)。素材は work-m11 スナップ
 | xmm 引数 (xmm_arg_drop) の復元 (IR に xmm 引数が無い) | xmm を読む callee では整数引数だけ復元できない (48 引数) | #131 コメントで PM に提案 |
 | `unmatched` 22 / `no_pdata` 23 site | 突合不能 | 同上 |
 | #122 差分ハーネスで 0 詰め箇所を優先検証 | 未実施 (本 PR は survey の unit 比較まで) | #131 コメント |
+
+## 12. (REPORT.md §12 から分割移動) #513: 新規類型の行案
+
+### 新規類型の行案 (DEFECTS.md 形式; 直接編集は PM 判断)
+| 症状 | 根本原因 | 観測 | 検出信号 | 修復 |
+|---|---|---|---|---|
+| 1 プロセス通算 survey で後続 unit が OOM→Halt0 / 破壊 unit が OOM で隠れる | hog unit 1 本 (無限 alloc ループ) が wasm 上限を使い切る測定バイアス | unit 101 が VA の 99.14%・巻き添え 54 unit; unit 144 の image 破壊が旧測定で不可視 | unit 別 VA/GetMem (`M11_SURVEY_COST`)・oom/clobber 分類 | unit 別上限 + InitTable 検査 + image 巻戻し (本 PR) |

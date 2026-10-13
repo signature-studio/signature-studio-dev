@@ -66,6 +66,7 @@ CI や他人の環境では存在しないため、再現手順は本ファイ�
 | `[V-PFFFT-UP]` | `tools/ipp/shim/fft/work/pffft_up/` | 同上 `[V-PFFFT]` の比較用 upstream 複製 | — | なし | BSD 系 | 差分確認用 |
 | `[V-MASSIVEX]` | `tools/targets/massivex/work/{innoextract,issrc}/` | Inno Setup 抽出ツール類 | — | なし | 各種 | gitignore 対象 |
 | `[V-ICALL]` | `tools/icall/disp_size/work/capnext/` | capstone next | — | なし | BSD | gitignore 対象 |
+| `[V-CP932-BESTFIT]` | `tools/shimx/src/cp932_tab.c` (生成物 192 KB) | https://unicode.org/Public/MAPPINGS/VENDORS/MICSFT/WindowsBestFit/bestfit932.txt (Microsoft / Unicode Consortium) | 取得時点 (入力は `tools/shimx/work/` に取得、非 commit) | `tools/shimx/scripts/gen_cp932.py` による C 配列への機械変換のみ (手編集禁止) | Unicode Terms of Use | `tools/shimx/REPORT_SHX-T8.md` §15.3 |
 | `[V-FLP]` | `tools/flp/work/venv/...` | Python venv (`nothing` 等) | — | なし | — | gitignore 対象 |
 
 **vendored の共通ルール**:

@@ -89,7 +89,7 @@ FLEngine rodata の `name\0doc\0…<module>` 並びから機械抽出 (`flapi_ex
 
 ## 7. 未解決・ブロッカー・留意
 
-- **FL 側 Python C API 呼出し面は未抽出**: dlsym 先の関数名が平文で無い。サブインタプリタ運用 (`PyInterpreterConfig` 型の存在から示唆のみ) の実態は不明。wasm で `Py_NewInterpreterFromConfig` が動くかも未検証。
+- **FL 側 Python C API 呼出し面は未抽出**: dlsym 先の関数名が平文で無い。サブインタプリタ運用 (`PyInterpreterConfig` 型の存在から示唆のみ) の実態は不明。wasm で `Py_NewInterpreterFromConfig` が動くかも未検証 (→ §11 で検証: 動く。`_flhost` は未対応)。
 - `mixer.getCurrentTempo(1)`/`setCurrentTempo(bpm,1)` の第 2 引数の意味 (MCPTools は素の BPM 扱い、公式 docs は ×1000) は**実機で未確認**。モックは MCPTools 側に合わせた。
 - FLEngine 側 flapi 実装は**モック(27 API を実装、他は None)**。実エンジンとの意味差 (引数省略時の既定値、-1 の意味) は実機/lift 後に検証が必要。
 - 引数名 (kwargs) は stubs 由来の署名がある関数のみ。新規 43 関数と ilmcp は位置引数のみ (rodata の書式文字列 `i if sdd…` は順序対応が曖昧で未採用)。
@@ -177,3 +177,51 @@ mock との差で見つかったもの: mock は引数の個数/型を検査し�
 | ilmcp B 群 8 tools は最小の偽実装 | UI から呼べるが FL 本来の挙動ではない | 親 #35 の T3 (ilmcp 実装) |
 | `/?mcp=1` のパネルは最小 UI (整形・履歴・複数行 arguments 編集なし)。`pnpm build` 成果物 (`dist/`) は `/py/` を持たないため dev / preview 専用 | 本番配信での公開は未対応 | 親 #35 に提案 (配信設計は #62 H 系と調整) |
 | `build_flpy.sh` が `flapi_table.json` / `FLAPI.md` を再生成する。runner には win PE が無く `win_pair_verified` が false になる | 本 PR では当該 2 ファイルをコミットしていない | #74 の PR (provider) と同じ `/home/ubuntu` 固定パス問題。`fetch_inputs.sh` / `run_all.sh` の env 化を別 issue で提案 |
+
+## 11. MIDI scripting ホスト (PY-6, #76)
+
+既知類型との関係: 該当なし (lift / 逆アセではない。flapi は引き続き `fl_mock.mjs` = FLEngine 模擬)。検証起点 commit `3e25620`。
+
+**結論**: 受入条件のうち「callback 27 個の配送表」は達成。**「同梱 device script (Forward CCs to current plugin Port 10) の動作」は未検証** (この run に `fl-win64` 素材が無い。`tests/midi_bundled_device.mjs` は入力が無いと exit 3 = NOT VERIFIED で止まる)。サブインタプリタは **wasm で動く** が、現行 `_flhost` は未対応で、device script 配送には**不要**と判断 (下記)。
+
+- **device script ローダ** (`src/fl_rt.py`): `load_device_script(name, source|path, port)` が script ごとに独立した module namespace で実行 (`# name=` 等のヘッダも解釈)。例外は FL と同様 stderr に traceback を出して続行し、`errors` に記録 (他 script の配送は継続)。
+- **配送表** (`fl_rt.CALLBACKS`): 27 個 = lifecycle 3 (OnInit/OnInitAll/OnDeInit)・受信 MIDI 10・MIDI Out 1・host 通知 13。引数の個数が表と違う呼出しは reject。順序と停止は公開 stubs 文書 (callbacks / FlMidiMsg.handled) に従う: OnMidiIn → OnMidiMsg → 型別 (OnNoteOn…、sysex は OnSysEx)、各 callback が返った時点で `handled` なら以降を呼ばない (PoC は OnMidiIn の handled を無視していたため是正)。`flmidimsg` の note/velocity/controlNum… は data1/data2 の別名 (書込み双方向)、midiId/midiChan は文書上「常に 0」に合わせた (PoC は midiChan=status&0xF)。
+- **Web MIDI 結線** (`host/midi_host.mjs` `MidiScriptHost.attachWebMidi`): 全入力の `onmidimessage` → `midiIn` (直列キューで到着順を保存)。port は `portMap[id|name]` か接続順の連番、script 側は `port` 一致 (port 無指定は全ポート) だけに配送。アプリ側 `src/runtime/midi_script.ts` が `window.flMidi` (devtools) と `/?midi=1` の UI パネルを公開。device script は利用者が実行時に供給 (配信物に非同梱、`/py/` の許可リスト方式は PY-4 のまま)。
+
+### 検証 (Actions runner 4 core, node 22.23.3, Chrome 154.0.8037.97, emsdk 6.0.12。load average 0.72〜0.84、直列 1 本)
+
+| 受入条件 / 項目 | 結果 | 検証 (`tools/python/` から) |
+|---|---|---|
+| callback 27 個の配送 | 達成 | `node tests/midi_script.mjs`: 23 check PASS。表 27 = FLEngine rodata 27 (`midi_script_callbacks_in_binary`)、引数 26 = stubs 署名。合成 recorder (27 全定義) へ全 callback を想定引数で 1 回ずつ配送、受信 MIDI 8 種 (0x80〜0xE0・sysex) が OnMidiIn→OnMidiMsg→型別の順 |
+| handled / port / 例外 | 達成 | handled で停止 (OnMidiIn・OnMidiMsg 各)・0xF8 は型別なし・port 不一致は非配送・例外の隔離と stderr traceback・未知 callback / 個数不一致 / 不正バイトは reject |
+| Web MIDI → dispatch 結線 | **偽 MIDIAccess で達成**・実デバイス未検証 | node 偽 access: 200 件連投が到着順、portMap・後から接続した入力・detach。Chrome (`node tests/midi_ui_check.mjs`, ルートから): UI でファイル供給→起動→OnInit→60 件連投・port 別配送・devtools から注入、14 check PASS。**実 Chrome の `requestMIDIAccess` はこの runner で `InvalidStateError: Platform dependent initialization failed`** (MIDI backend なし) |
+| 同梱 device script の動作 | **未検証** | `node tests/midi_bundled_device.mjs` → exit 3 (入力 `work/device_Forward CCs…py`・`midi.py`・`utils.py` 無し)。ハーネス自体は合成の代替ファイルで dry-run し exit 0 / `--neg` で exit 1 を確認 (同梱 script ではない) |
+| サブインタプリタ | 下記 | `node tests/subinterp_probe.mjs`: 12 check PASS |
+
+実測 (n=3): `midi_script.mjs` wall 0.59〜0.60 秒。MIDI 1 件のフル配送 (Worker + SAB RPC、OnMidiIn+OnMidiMsg+OnNoteOn の 3 callback) は逐次 137〜143 µs・パイプライン 129〜137 µs (1000 件当り)。`midi_ui_check.mjs` スクリプト内 1.292 / 1.322 / 1.541 秒。`subinterp_probe.mjs` wall 5.09〜5.10 秒。`pnpm typecheck` / `pnpm build` 成功。`flpy.wasm` 5,923,783B / `flpy.data` 3,214,338B / `flpy.js` 120,351B (本 run のリンク。§1 の 5,920,419B との差は同表記の再ビルド変動の範囲で、因果は未切り分け)。CPython クリーンビルド (tgz 取得+native+wasm+記録) 210 秒 (4 core, ログの開始/終了時刻差)。
+
+ネガティブコントロール (終了コード 1 = 検出): `midi_script.mjs --neg` (recorder から OnDirtyChannel を消す → 「27 全配送」だけが FAIL、26/27 と欠落名を表示)・`midi_ui_check.mjs --neg` (構文エラー入り script → 「2 script 読込」だけが FAIL、UI に SyntaxError)・`subinterp_probe.mjs --neg` (拒否 builtin の期待を 1 本欠く → その check だけ FAIL)・`midi_bundled_device.mjs --neg` (midi.py 無し → 読込 check が FAIL)。通常実行の FAIL は exit 2、入力欠落は exit 3 (緑にならない)。
+
+### サブインタプリタ (`flpy_subinterp_run` = 検証用 export)
+
+| 項目 | 実測 |
+|---|---|
+| `Py_NewInterpreterFromConfig` | **3 構成とも成功** (isolated+OWN_GIL / isolated+SHARED_GIL / legacy)。スレッド無しの wasm でも OWN_GIL が成立。破棄後に main は継続 |
+| stdlib | FL 同梱スクリプトが使う 22 module は isolated で全て import 可 |
+| builtin 66 本 | isolated で拒否 5 本 (`_elementtree _flhost _lsprof faulthandler pyexpat`、"does not support loading in subinterpreters")。legacy は 0 本 |
+| 隔離 | isolated は main の `__main__` 変数・`sys.modules` を共有しない |
+| コスト | 作成+`import json, re`+実行+破棄 = 26.74〜28.21 ms/個 (50 個ずつの平均を 1 run 3 batch、3 run)。150 回後も線形メモリ 33,554,432B のまま (増加なし) |
+| **`_flhost`** | isolated では import 不可 (`Py_mod_multiple_interpreters` 未宣言。3.12.1 の既定は非対応)。**legacy では import できるが、`flhost_exec` が static 変数 (`json_loads`/`HostError`/`g_cbs`) を上書きし、サブインタプリタ破棄後に main の `_flhost.call` が壊れる** (trap `memory access out of bounds` / `NameError: isinstance` 等、症状は不定) |
+
+判断 (推定を含む): device script の配送は script ごとの module namespace で足りるため、サブインタプリタは**採用しない**。違いは `sys.modules` を共有する点 (script 間で `utils` 等が共有される)。FL が script ごとにインタプリタを分けているかは `PyInterpreterConfig` 型名の存在以外に証拠が無く未確認。将来必要になれば `_flhost` を module state 化 + `Py_mod_multiple_interpreters` 宣言する改修が前提 (下表)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 同梱 device script の動作が未検証 (`fl-win64` 無し。win64 での block 番号も未特定) | 受入条件 1 が未達のため `Closes` にしない | 本 issue #76 を `oc_artifacts: fl-win64 toolchain-emsdk` で再起動 (配置先 `tools/python/work/`、`midi_bundled_device.mjs` の「[仮説]」check は実ファイルで要確認) |
+| 実ブラウザ / 実 MIDI デバイスでの Web MIDI 受信が未検証 | 結線は偽 MIDIAccess のみ | #37 (AU-14) にコメント。手元ブラウザでの `flMidi.connectWebMidi()` 実行を依頼 |
+| host 通知 13 個と OnMidiOutMsg の**発火元** (OnIdle の 20ms 周期・OnRefresh フラグ・OnUpdateMeters の `device.setHasMeters` ゲート等) は FLEngine 側の責務で、本実装は配送面のみ。OnInitAll の意味 (全 script の OnInit 後に 1 回) は名前からの推定 | エンジン結合時に発火条件を別途実装・実機確認 | 親 #35 に提案 (FLEngine 結線チケット) |
+| 文書 (公開 stubs) 由来の仕様 (handled 伝播・midiId/midiChan=0・timestamp=0) は 26.1.7 実機で未確認 | 実 script が midiChan 等に依存すると差が出る | 上記 #76 再実行時に同梱 script で確認 / 実機があれば #35 |
+| `_flhost` の per-module state 化 + `Py_mod_multiple_interpreters` 宣言 (サブインタプリタ採用時のみ) | 現状 legacy サブインタプリタで main が壊れる | 新規子チケット提案 `[PY-n]` (採用判断後。PM 起票) |
+| mock の `device.*` は forwardMIDICC / midiOutMsg の記録と 3 関数のみ。実エンジン未接続 | 同梱 script が他の device API を使うと None が返る (`midi_bundled_device.mjs` は未実装 API 呼出しを FAIL にする) | #74 (PY-1) 以降 / 親 #35 |
+| `build_flpy.sh` が `flapi_table.json` / `FLAPI.md` を再生成する (`work/fl-stubs` の clone も要る)。runner には win PE が無い | 本 PR では当該 2 ファイルをコミットしていない | PY-4 §10 と同じ。`fetch_inputs.sh` / `run_all.sh` の env 化を別 issue で提案 |
+| PY-4 の `poc_mcp.mjs` / `all_tools.mjs` / `mcp_ui_check.mjs` は MCPTools.pyc が無く再実行不可 (本 run で `dispatch_midi` の PoC 区間のみ `midi_script.mjs` に複製して同結果を確認) | `fl_rt.py` / `fl_mock.mjs` の変更の回帰を全体では未確認 | #76 再実行時に `run_all.sh` 相当を実行 |

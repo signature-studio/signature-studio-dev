@@ -3,7 +3,7 @@
 **判定: 部分達成** (到達 stage 4/6)。`entry_point`(DllMain attach) → `_StartLib` → `_InitLib` → `InitUnits` が
 wasm 上で動作し、**FastMM4 が実際に GetMem → VirtualAlloc でプールを確保するところまで**は実測で到達。
 ただし 942 unit の初期化は通常起動で **22 本完走後、unit #23 (VA 0x467f00) が Delphi 例外 → Halt0 (§10, #132 で #18 の OOB を解消)**、stage 5 (survey trap 無し完走) は未達。
-(下の §1 表と §2〜§8 は #132 以前 = unit #18 OOB 時点の実測。最新値は §10、survey の最新値 (OOM/clobber 分離後) は §11。)
+(下の §1 表と §2〜§8 は #132 以前 = unit #18 OOB 時点の実測。最新値は §10、survey の最新値 (OOM/clobber 分離後) は §12。)
 
 再現: `bash tools/m11/m11_e2e.sh` (work/ があれば増分 build: 実測 29.3〜29.6 秒 (§10, 4 vCPU, n=3) / `--full` で RetDec lift から全再生成: 旧記載「約 10 分」で本 PR では未再測定)。常に exit 0。
 gen_ir2 の ldfix は capstone+pefile が無いと黙ってスキップされる (§10 未解決の末尾)。PE は `/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin` 固定 (runner では symlink)。
@@ -187,7 +187,11 @@ callee が `[rcx+0x2c..0x3e]` (GetCPInfo の LeadByte 表) に書くため、呼
 | `m11_site` 型の診断 (IR へ guest VA を埋める) が m11 に無い | 反復が手作業 | boot/dbg_lift.py (flelift/boot) の m11 版を要検討 |
 | 素材 tarball に `ir_lb_base.stamp` が無く初回 e2e は必ず gen_ir2 が走る。gen_ir2 は capstone/pefile が無いと ldfix を黙ってスキップする (WARNING のみ) | 素材展開直後の数値が ldfix 有無で変わる (`6ad441d` で無し: survey 839/56/46/1、有り: 841/54/46/1) | #132 に継続 (e2e の前提チェック追加を提案) |
 
-## 11. #513: survey の VirtualFree 実解放・OOM/clobber 分離と「ok 849→816」の切り分け
+## 11. #572 [M11-N21]: m11_data_gen.py の DIR64 補正境界 = off-by-one (確定・修正済み)
+
+`lo <= r < lo+len-8` は `<=` が正しい。DIR64 278,531 件のうち落ちるのは `.data` 末尾 RVA `0x11e5000` (値 `0x425f00`, 実行時に unit #12 が表経由で読む `TResStringRec` 風データへのポインタ) の 1 件のみ。`<=` に修正し、`m11_reloc_gate.sh` (ネガコン付き, 不合格で非 0) で補正漏れ 0 を確認。e2e の `M11_SUMMARY` は修正前後で完全一致 (units_run 22 / survey ok 816 trap 79 miss 46)。実行時に観測できた結果 (dest の最終値) は修正前後で同じで、現時点では潜在バグ。全文・実測・未解決 (m6 / liftlib に同条件が複製) は **`REPORT_N21.md`**。
+
+## 12. #513: survey の VirtualFree 実解放・OOM/clobber 分離と「ok 849→816」の切り分け
 
 既知類型との関係: DEFECTS.md に直接の行なし (測定バイアス = 新規類型案を末尾)。unit 87/898 は D1 系 (旧値 load 脱落を C 転記で直した副作用), 巨大 alloc の size は D15 (間接 call 脱落) の疑い (推定)。
 **起点**: 本ブランチ `513-m11-survey-vfree` は PR #411 (`132-m11-stage5`, 未マージ) 上。コード commit `c4a3f72` (= `8059197` + 本 issue の 3 commit; 以降は docs と診断スクリプト `m11_unit_imgdiff.mjs` の追加のみ)。比較対象 main = `c1e4105`。runner 4 vCPU, work-m11/work-liftdiff 展開済み, PE は fl-win64 の `block00031_PE.bin`, capstone+pefile 入り venv。
@@ -235,10 +239,7 @@ callee が `[rcx+0x2c..0x3e]` (GetCPInfo の LeadByte 表) に書くため、呼
 * survey: 上限を外す (`M11_VA_UNIT_BUDGET_MB=0`) と OOM 55 / ok 816 / VA 1,490.0 MB に戻る (NC)。`M11_VFREE_NOOP=1` は survey では**差が出ない** (VirtualFree が呼ばれないため。受入条件「解放を無効化すると OOM が戻る」は survey では成り立たず, 単体テストで成立)。
 * 検証範囲外: FastMM が大ブロック/プール解放で VirtualFree を呼ぶ経路の実行 (survey では FreeMem 37 回中 0 回), 全 unit を通した clobber 検出 (InitTable 以外の破壊は未検出)。
 
-### 新規類型の行案 (DEFECTS.md 形式; 直接編集は PM 判断)
-| 症状 | 根本原因 | 観測 | 検出信号 | 修復 |
-|---|---|---|---|---|
-| 1 プロセス通算 survey で後続 unit が OOM→Halt0 / 破壊 unit が OOM で隠れる | hog unit 1 本 (無限 alloc ループ) が wasm 上限を使い切る測定バイアス | unit 101 が VA の 99.14%・巻き添え 54 unit; unit 144 の image 破壊が旧測定で不可視 | unit 別 VA/GetMem (`M11_SURVEY_COST`)・oom/clobber 分類 | unit 別上限 + InitTable 検査 + image 巻戻し (本 PR) |
+新規類型の行案 (DEFECTS.md 形式; 直接編集は PM 判断) は 250 行上限のため `REPORT_APPENDIX.md` §12 に無変更で分割移動した。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
