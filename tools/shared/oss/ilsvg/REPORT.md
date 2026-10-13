@@ -58,11 +58,11 @@ native 比較は `-lz` を追加。
 再現: `bash tools/shared/oss/ilsvg/build_pair.sh` (末尾で native 描画・wasm 描画 (`wrap/wasm_smoke.cjs`)・`cmp` を一括実行)。
 emsdk は 6.0.12 を使用 (`EMSDK_ENV` で `emsdk_env.sh` の場所を指定可、既定は `/opt/emsdk/emsdk_env.sh`)。
 
-HEAD `1132be60` での実測 (clean 再生成、`tools/shared/work/ilsvg_pair/` を削除してから実行、load average 0.95 開始時):
+HEAD `4c7057e0` (main を merge 済み、ilsvg 配下は merge 前後で差分 0) での実測 (clean 再生成、`tools/shared/work/ilsvg_pair/` を削除してから実行、load average 0.93 開始時):
 
 | 項目 | 実測 |
 |---|---|
-| `build_pair.sh` real | 1 m 43.3 s (exit 0) |
+| `build_pair.sh` real | 1 m 39.7 s (exit 0) |
 | wasm 出力 (ilsvg.wasm) | 388770 B (sha256 先頭 16 桁 `0fa5c92d8eb8ba42`) |
 | native 描画 (`nat`, `svgren::parameters` の `dims_request {64,64}`) | dims 64 64, nonzero_px 4096 |
 | wasm 描画 (`createILSvg` → `svgCreate` → `svgRender(64,64)`) | dims 64 64, nonzero_px 4096 |
