@@ -63,5 +63,8 @@ PY
 echo "== 4/4 独立再計算 (線形 E8/E9 バイトスキャン・別アルゴリズム)"
 python3 "$DSP/scripts/mx_recount.py" "$PE" "$W/rtti_vtables.json" "$W/recount.json" | sed 's/^/   /'
 
+echo "== 5/5 .pdata chained 分割 + leaf 近似の定量化 (MX-5 受入 2・3)"
+python3 "$DSP/scripts/mx_pdata_quant.py" "$PE" "$W/pdata_quant.json" | sed 's/^/   /'
+
 T1=$(date +%s)
 echo "OK  elapsed=$((T1-T0))s  load start=[$L0] end=[$(cut -d' ' -f1-3 /proc/loadavg)]"

@@ -1,0 +1,53 @@
+# MX-5 (#1122) .pdata chained 分割と leaf 境界近似の定量化
+
+- 親: #266 / 起票: #1122 (MX-5)。本ファイルは #1122 の 1 run 分の実測。
+- 素材: `plugins-massivex` → `work/extracted/VST3/Massive X.vst3` (95,356,824 B / md5 `622993e76565f49c094063a2b717d6ca`、REPORT §11.1 と一致)。
+- 計測スクリプト: `dsp/scripts/mx_pdata_quant.py` (e2e.sh の step 5/5)。
+
+## 1. 今 run で達成した範囲 (受入 2・3 の計測部分)
+
+受入条件のうち、本 run は **受入 2 (chained の実測) と受入 3 (leaf 近似の定量化)** の計測のみ。
+受入 1・4 は未着手、受入 2 の「扱いの決定と実装」・受入 3 の「実 unwind への置換」は未達 (§4 の子 issue)。
+
+## 2. 実測値 (.pdata 全数・1 回目 e2e 実行)
+
+| 指標 | 値 | 意味 |
+|---|--:|---|
+| .pdata entry 総数 | 187,084 | `.pdata` の Misc_VirtualSize / 12 |
+| .text 内かつ e>b の entry | 186,961 | 旧 REPORT の 186,960 とは 1 件差 (下記 注 1) |
+| **chained: begin == 直前 entry の end** | **70,489** | issue 本文の「70,533 件」とは 44 件差 (下記 注 2) |
+| UNWIND_INFO に CHAININFO (Flags & 4) | 66,837 | 親 RUNTIME_FUNCTION を持つ entry |
+| 親 entry が .pdata 内に実在 | 62,651 | |
+| うち 親の (begin,end) が完全一致 | 62,498 | 残り 153 は親 begin は在るが end が不一致 |
+| CHAININFO 付きだが親が .pdata に無い | 4,186 | 親 RVA が pdata 外 (未解決) |
+| leaf 近似 (次 begin まで) = pdata end | 70,489 | 近似が正しいのは 37.7% (chained と一致) |
+| leaf 近似 > pdata end (過大評価) | 116,460 | 過大評価の総バイト 2,618,866 B (= .pdata 総 58,062,780 B の 4.5%) |
+| leaf 近似 < pdata end (過小評価) | 12 | |
+
+len ヒストグラム (256 B 刻み): 0〜255 B が 143,802 件、4 KiB 以上が 2,581 件。
+
+注 1: 旧 REPORT (§4 / §9) の 186,960 との 1 件差の原因は未確認 (本計測は `.text` 内 VA の条件・e>b で数える)。
+注 2: 70,533 は issue 起票時の値。今回の e>b・.text 内条件での実測は 70,489。差 44 件の原因 (旧 CAB-263 の集計条件) は未確認。
+
+## 3. 解釈
+
+- CHAININFO の件数 (66,837 / 62,651 / 4,186) は全 valid entry 基準。chained entry (70,489) 基準の内訳は本 run では未集計 (次の子 issue で出す)。
+- (begin,end) が親と完全一致する 62,498 件は、CHAININFO の親を使えば束ねられる候補。ただし chained 判定と CHAININFO の重なりは未計測。
+- 親が pdata 外の 4,186 件と、親 begin は在るが end 不一致の 153 件は、この計測だけでは親を確定できない。
+- leaf 近似は 116,460 件で pdata end より長い (過大評価 2,618,866 B)。`mx_closure.py` の区間は「次の入口まで」なので、closure のバイト数と target 判定へ与える影響は未測定 (U5)。
+
+## 4. 未解決・起票先 (本 run の残り)
+
+| 残件 | 受入 | 起票先 |
+|---|---|---|
+| chained の扱い (CHAININFO 親に束ねる規則) の決定と実装 | 2 | 子 issue (MX-8) |
+| 4,186 件の pdata 外親・153 件の end 不一致の解決 | 2 | 子 issue (MX-8) |
+| leaf 境界を実 unwind / 境界に置換 (過大評価 116,460 件の解消) | 3 | 子 issue (MX-8) |
+| code/data 区別 (jump table・文字列窓) を入れた再帰降下 と round 推移 | 1 | 子 issue (MX-8) |
+| process 起点 closure の確定値 | 4 | #266 (U1 process slot 同定) に依存。依存明記で未解決 |
+
+## 5. 検証
+
+- クリーン HEAD (`origin/main` 起点の worktree `ws-1122`) で `bash dsp/e2e.sh` → rc 0 / 31 s / load 0.23 0.47 0.26 → 0.57 0.53 0.28。
+- `bash dsp/negctl.sh` → NC1 FAIL<期待> (unsup 67 vs 基準 48,612) / NC2 FAIL<期待> (unsup 746) / NC3 FAIL<期待> (unsup 0) 。
+- 計測は `.pdata` 解析のみで closure は変えていない。受入 5 の「negctl 3 件 FAIL」は既存の 3 件が満たす (本 run の変更は e2e.sh 末尾の step 5/5 追加のみ)。
