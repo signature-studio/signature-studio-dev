@@ -232,6 +232,6 @@ m11 sample:800 (12 shard) **93〜95 s**、flelift closure (14 shard) **585 s** (
 
 ## 9. wasm_trap の個別原因 (LD-7 / #307、#305 上に積んだ分、要約)
 
-unreachable 220 関数のうち 83 件は最後の共通 entry が `function_410320` (VMT 間接 call 脱落、D15 型、同型は合計 87/220、残り 133 件は未特定)。
-OOB `function_414ad0` 系 68 件は `[rbx]` 1 段 deref の脱落 (一部のみ修正検証、414ad0 非到達 27 件は未特定)。
-全文・再現手順は [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §9、数値・表は `results/m11_unreachable_diverge.md` (`tests/trace_diverge_unreachable.py`)・`results/m11_oob_414ad0.md` (`tests/oob_414ad0.py`)。
+unreachable 220 関数のうち食い違い観測 212 件で、82 件は最後の共通 entry が `function_410320` (VMT 間接 call が IR に無い。**D15 型候補**、同型候補は合計 86/212、残り 126 件は未特定)。
+OOB `function_414ad0` 系 68 件は `[rbx]` 1 段 deref の IR 脱落 (68 件は全て 414ad0 に到達済み。修正の効果は手元観測のみで第三者再現不可、受入条件の根拠外)。
+全文・再現手順・未解決表は [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §9、数値・表は `results/m11_unreachable_diverge.md` (`tests/trace_diverge_unreachable.py`)・`results/m11_oob_414ad0.md` (`tests/oob_414ad0.py`)。

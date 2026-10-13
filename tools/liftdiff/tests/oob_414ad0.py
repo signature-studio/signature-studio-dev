@@ -9,7 +9,9 @@
 (3) 脱落の影響を、wasm の callee 引数 (0x414850 の arg0 が native=ポインタ / wasm=長さ) の
     batch 実測で裏付ける。
 
-  python3 tests/oob_414ad0.py [--pe PE.bin] [batch.jsonl] [boot_final3.ll] > results/m11_oob_414ad0.md
+  python3 tools/liftdiff/tests/oob_414ad0.py > tools/liftdiff/results/m11_oob_414ad0.md
+
+引数: [--pe PE.bin] [batch.jsonl] [boot_final3.ll]。既定入力は tools/liftdiff/work/m11/batch_closure.jsonl・tools/m11/work/boot_final3.ll (cwd 非依存)。
 """
 import argparse
 import collections
@@ -29,9 +31,8 @@ ap = argparse.ArgumentParser()
 ap.add_argument('batch', nargs='?', default=os.path.join(ROOT, 'work/m11/batch_closure.jsonl'))
 ap.add_argument('ir', nargs='?', default=os.path.join(ROOT, '../m11/work/boot_final3.ll'))
 ap.add_argument('--pe', default=os.environ.get('LD_M11_PE') or json.load(open(os.path.join(ROOT, 'targets/m11.json')))['pe'])
-ap.add_argument('--fn', default='0x414ad0')
 A = ap.parse_args()
-VA = int(A.fn, 16)
+VA = 0x414ad0
 NAME = 'function_%x' % VA
 
 
@@ -77,14 +78,13 @@ def main():
         if d.startswith('memory access out of bounds @ ld_wasm.wasm.%s' % NAME):
             top.append((r, cs[0]))
     w = print
-    w('<!-- 自動生成: python3 tools/liftdiff/tests/oob_414ad0.py (LD-7, #307) -->')
+    w('<!-- 自動生成: python3 tools/liftdiff/tests/oob_414ad0.py > tools/liftdiff/results/m11_oob_414ad0.md (既定入力 = tools/liftdiff/work/m11/batch_closure.jsonl, tools/m11/work/boot_final3.ll, PE = $LD_M11_PE。cwd 非依存) (LD-7, #307) -->')
     w('# m11 OOB: 最上位 frame が %s の関数 (LD-7, #307)' % NAME)
     w('')
     w('対象 = 最初の wasm_trap case が OOB かつ最上位 frame が `%s` の関数 **%d** (batch jsonl %d 行)。' % (NAME, len(top), len(rows)))
     w('')
     ml = machine_loads()
     body = ir_body()
-    var = {}
     # %arg1 が直接 ptr、または inttoptr(%arg1) を ptr とする load
     ptrs = {'%arg1'}
     for m in re.finditer(r'(%\S+) = inttoptr i64 %arg1 to ptr', body):
@@ -98,12 +98,11 @@ def main():
     w('- IR の `store ..., ptr %%arg1` (inttoptr 経由を含む): %d 件 (機械語の `mov [rbx], r` に対応。store 側は残る)' % len(ir_arg1_stores))
     w('- IR で `%%arg1` を値として直接 `icmp eq i64 %%arg1, 0` / `add i64 %%arg1, -N` に使う箇所: %d' % len(re.findall(r'(icmp eq i64 %arg1, 0|add i64 %arg1, -\d+)', body)))
     w('')
-    w('## 2. wasm の callee 引数への影響 (batch 実測)')
+    w('## 2. trace_head への出現 (batch 実測)')
     w('')
     n_w = sum(1 for r, c in top if any(t[0] == '0x%x' % VA for t in c['raw']['wasm']['trace_head']))
     w('- wasm 側 trace_head に %s が現れる: %d / %d' % (NAME, n_w, len(top)))
-    w('- 単体 `liftdiff run --fn 0x414ad0` (手動実行・§再現手順) の pattern q0 で、callee `0x414850` の arg0 は')
-    w('  native=0x22479388 (文字列データのポインタ) / wasm=0x5 (= 長さ引数)。load 脱落で 1 段 deref されず値が取り違う。')
+    w('- 単体 `liftdiff run` の手動実測はこのスクリプトの計算対象外 (`REPORT_APPENDIX.md` §9 「手動実測」)。')
     w('')
     w('## 3. 最後の共通 entry (native/wasm の trace 先頭比較) の内訳')
     w('')
@@ -121,7 +120,8 @@ def main():
         w('| %s | %d |' % (k, v))
     nat = sum(1 for r, c in top if any(t[0] == '0x%x' % VA for t in c['raw']['native']['trace_head']))
     w('')
-    w('- native 側 trace_head にも %s が現れる (= native も到達): %d / %d' % (NAME, nat, len(top)))
+    w('- native 側 trace_head にも %s が現れる: %d / %d' % (NAME, nat, len(top)))
+    w('- 対象 %d 件は全て wasm の最上位 trap frame が %s (= 到達済み)。trace_head は最大 12 件の先頭のみで、現れない件は「位置が保持されていない」だけで非到達の根拠ではない。' % (len(top), NAME))
 
 
 if __name__ == '__main__':
