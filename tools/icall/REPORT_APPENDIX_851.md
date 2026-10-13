@@ -63,3 +63,33 @@
 - `function_128c320` への edge が D で捨てられる段階の特定。
 - rt_flengine chunk0〜3 の再現 — `RANGES_DIR` (`tools/m11/work` 由来、`work-m11` 未取得) が無く未検証。
 
+## #1286 (ICALL-23): 追加 10 件の警告は本体 `0x128c320` 由来 (隣接関数由来ではない)
+
+素材: `fl-win64` (`block00031_PE.bin`)・`toolchain-retdec` (RetDec v5.0)。測定 commit = `c4fba12a` (origin/main 時点)。
+`tools/icall` は本節で変更していないため、コード差分は本文書の追記のみ。
+再現は `tools/icall/fn_boundary_repro.sh` と同じ `--select-ranges` + `--select-decode-only --timeout 100`。
+集計は `grep -c NonRecursiveCFGBuilder <log>`・`grep -c 'function_128c320()' <log>`。runner 上 foreground、`load 0.34–0.78`。
+
+| 範囲 (`--select-ranges`) | rc | sec (n=3 の順) | 警告 | 内訳 |
+|---|--:|---|--:|---|
+| E: `0x128c320-0x128dc44` (本体のみ) | 0 | 13, 13, 13 | 10 | `# empty statement` 3・`rax_1_reload = rax_1_reg2mem` 5・`var515`/`var514`/`var512` 系 2 |
+| F: `0x128c280-0x128c2e1` (隣接 1) | 0 | 10, 10, 10 | 0 | — |
+| G: `0x128c2f0-0x128c313` (隣接 2) | 0 | 8, 8, 9 | 0 | — |
+| A (再現スクリプト): F + E | 0 | 14 (1 回) | 10 | E と同一 |
+
+- 既存記述の訂正: 本文の「A/B にも出る 10 件は隣接関数の decode 範囲由来」は**誤り**。隣接関数を単独で
+  decode すると 0 件で、本体 `0x128c320` を入れた時点で 10 件出る (E・A・B)。`0x128c280` の追加は件数を変えない (E と H で 10 件)。
+- 出現 phase (E.log の行順): 「removing code that is not reachable in a CFG」と「optimizations」の 2 段階。
+  `# empty statement` 3 件・`rax_1_reload` 5 件・`var515` 2 件 (log 上の変数名は run ごとに 514/515 と揺れる)。
+- 生成物 (`E.drc.ll`) には `rax_1_reload` の名前は残らない (RetDec 内部の reg2mem 名で、出力 IR では `%rax.0.reload` 等に変わる)。
+  よって警告文字列から IR 命令を直接引くことはできない。出所の命令特定には RetDec の中間 phase ダンプが要る (未実施)。
+- 既知類型: `docs/DEFECTS.md` に該当する類型は無い (警告は CFG edge の破棄で、命令の誤復号を示す直接の証拠は未確認)。行案は未確定。
+
+### 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 警告 10 件を生む IR 命令 (`rax_1_reload` 等) の特定 (phase 単位のダンプ必要)。DEFECTS 行案も未確定 | 本体 `0x128c320` の一部 edge が破棄されている可能性 | 子 issue ICALL-30 (本 run で起票) |
+| `function_128c320()` edge が D で捨てられる段階の特定 | 呼出元 `0x128f9e0` からの call edge 欠落 | 子 issue ICALL-30 (同上) |
+| 366 site 落ちとの因果 | 1 バイト化とは別の lift 欠落 | 子 issue ICALL-30 (同上) |
+
