@@ -68,3 +68,25 @@
 | `rip_data` (IAT 以外の関数ポインタ変数) の読み出し解決 | 未解決 call (rip_data 8〜56 件/ns, nogui) が closure の外に残る | #849 |
 | 確定 closure の lift / build 最初の失敗点 | 受入 2 未達 | #850 |
 | 人手の検収 (lift 結果の bit-exact 化は本 issue の範囲外) | — | — |
+
+## 5. #848 (this 型の 1 段追跡) の試行結果 (HEAD `0760e367`, 4 vCPU, 各 1 回)
+
+素材 `plugins-kilohearts` を `KH_SRC` で展開 → `extract_installer.sh` (win のみ。mac の `llvm-lipo` は本 run で未使用) →
+`rtti_walk.py` (6,307 class) → `callgraph.py` (120,856 関数, 4 round) → `vtable_closure.py` で §2 の Gain 行を再現 (before 160 / after 555 nogui・1,995 all で一致)。
+
+試行は `scripts/vtable_probe_this.py` (1 行 JSON を出力)。規則: 呼び出し元 f の所有 class が ns 内で一意に決まれば、
+vtable call の候補をその class の同 slot に限る (narrow)。一意に決まらなければ従来どおり ns 全 class の同 slot (wide)。
+
+| 対象 | before 関数 | after (narrow) 関数 | vtable call 内訳 narrow / wide |
+|---|--:|--:|--|
+| 対照 Gain (gain) | 160 | 1,994 | 83 / 1,764 |
+
+- 判定: **棄却**。narrow は after を 1,995 → 1,994 (1 関数) しか縮めない。受入 2 (160 関数との差分 0) には届かない。
+- 原因: closure の大半 (1,764 / 1,847 の vtable call) は呼び出し元が vtable に載らない関数 (shared template・自由関数) で、
+  所有 class を決められない。`this` の型は呼び出し元の vtable 所有では決まらず、呼び出し鎖を通した伝播 (呼出し引数の型) が要る。
+- 含意: vtable 規則の精度は「呼び出し元の所有」では上がらない。次の候補は (a) 呼び出し点の `rcx` (this) を
+  直前の代入 (`mov rcx, reg` / 引数レジスタ) から逆方向に追う、(b) 登録側 (`new ...Dsp` 生成箇所) から class を
+  伝播させる、のいずれか。どちらも本 run の範囲外 (要 Ghidra 等の基盤または別 run)。
+- 受入 1 (before/after 表と未解決 call の内訳): §2 と本節で達成。受入 2・3 は未達 (§3)。
+
+未解決の起票先: (a)/(b) の this 型伝播は #848 に残す (#848 は部分達成・open のまま)。rip_data は #849、lift 失敗点は #850 (§4)。
