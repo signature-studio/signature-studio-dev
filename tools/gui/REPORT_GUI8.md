@@ -1,11 +1,11 @@
 # GUI-8 (#184) — e2e 載せ替え・長時間ストレス・Firefox 取込み
 
-(`tools/gui/REPORT.md` §14 の要約からの参照先。本ファイルの本文は GUI-8 の新規記述であり、REPORT.md から移動したものではない。)
+(`tools/gui/REPORT.md` §15 の要約からの参照先。本ファイルの本文は GUI-8 の新規記述であり、REPORT.md から移動したものではない。)
 
 ### 結論
 - `tools/gui/e2e/e2e.mjs` (CDP 直叩き 247 行) を `tools/e2e/suite/drivers/{agent-browser,puppeteer}.mjs` 経由に載せ替えた (既定 agent-browser 0.39.0、`E2E_DRIVER=puppeteer` で puppeteer-core)。検証起点の `bash tools/gui/e2e.sh` は ALL PASS・golden 差 0 (読み戻し 0/64000 px、スクリーンショット 0 px)。
 - 長時間ストレス (`e2e/stress.sh`): 50,000 フレームで入力リング drop 0・out_full_waits 0・wasm memory 増加なし (固定メモリ版)・surface gen 不変。ネガコン 3 本 (golden 改竄 / burst / leak) は全て exit 1 で不合格を検出。
-- Firefox は #127 (PR #433, `tools/runtime/REPORT.md` RT-9) の結果を取込み、fallback 方針を `PROTOCOL.md §12` に追記。Safari と Firefox の実描画 (WebGL2/AudioWorklet) は未測定。
+- Firefox は #127 (PR #433, `tools/runtime/REPORT.md` RT-9) の結果を取込み、fallback 方針を `PROTOCOL.md §13` に追記。Safari と Firefox の実描画 (WebGL2/AudioWorklet) は未測定。
 
 ### 検証
 検証起点 = コード HEAD `761a045` (`origin/main` を取り込んだ merge)。`0ec2543` (GUI-8 本体の実装 commit) から `761a045` までの間に、main 側の GUI 変更が入っている (`git diff --stat fe6d063 761a045 -- tools/gui src/runtime`: 29 files, +1678 / -126)。以下の表は `761a045` で再実行した実測。runner 4 CPU、`uptime` 1 分平均 0.45 (開始) → 2.22 (終了)。
