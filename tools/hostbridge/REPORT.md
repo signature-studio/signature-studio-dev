@@ -92,10 +92,11 @@
 
 - **実装**: `poc/hb_bridge.mjs` に `SafeLoadLibrary(path, mode)` (SetErrorMode → LoadLibraryW → 旧モード復元, fw:0x449770 と同形)、`SetErrorMode`、`timeGetTime` (起動からの経過 ms, DWORD 折返し)、`CreateProcessW` (呼ばれたら原因付き throw = fail-fast)、`ModuleTable.register` での bridge 種別の native 強制 (`bridge`→0, 要求値は `bridgeRequested` に保持)。`GetProcAddress`/`FreeLibrary`/`LoadLibraryW` は既存実装を流用。
 - **試験**: `poc/test_shim.mjs` (OTT 非依存)。`hostbridge.sh` の [3c] で実行。
+- **前提**: `poc/test_marshal.mjs` は `tools/hostbridge/work/host_vst2.wasm` を読むため、`hostbridge.sh` [2] (build) 実行後にのみ動く (clean checkout では ENOENT)。PR 記載の「checks 13 / broken 0」は build 後の結果。
 - **数え方の定義**: `checks` = 実装側の試験 S1〜S8 に含まれる check 行 (`OK`/`FAIL` の行、`S[0-9]+[a-z]? ` 形式) の件数。`ネガコン` = 実装を外した mutant 6 種 (SafeLoadLibrary のモード非復元 / GetProcAddress の大小無視 / FreeLibrary の refcount 無視 / timeGetTime 定数 / CreateProcessW 黙って成功 / bridged 強制の素通し) のうち、対応 check が 1 件以上 FAIL した数。期待値は 6/6。
 - **再計算**: `bash tools/hostbridge/poc/recount_shim.sh` (`test_shim.mjs` を実行し OK/FAIL 件数と negative controls caught を出力)。
 - **実測** (`recount_shim.sh`, HEAD = 784 ブランチ): real checks OK=18 FAIL=0; negative controls caught=6/6; `[shim] ALL PASS`。
-- **未検証**: OTT 経路 (`run_poc.mjs`) は `tools/m10/work/ott_m10.ll` が必要で、その生成 (`m6_lift.sh`) は `/home/ubuntu/work/analysis/...` の OTT バイナリと `work/ott_ranges.txt` を要するため、本 run では実行できない。issue 受入 1 (既存 OTT 経路の不変確認) は未達。
+- **未検証**: OTT 経路 (`run_poc.mjs`) は `tools/m10/work/ott_m10.ll` が必要で、その生成 (`m6_lift.sh`) は OTT 実機バイナリ (`[ANALYSIS-PLUGINS]` 配下の `ott/binaries/OTT_vst2_win64.dll`) と `work/ott_ranges.txt` を要する。本 run では `analysis-ott-binaries` / `work-m6-ott` の素材が取得されておらず (`$ARTIFACTS_DIR` は `fl-win64` のみ)、`run_poc.mjs` は実行できない。issue 受入 1 (既存 OTT 経路の不変確認) は未達のまま。PM へ: 素材 `oc_artifacts: fl-win64 toolchain-emsdk toolchain-retdec analysis-ott-binaries work-m6-ott` での再起動を要請。
 - **注意**: bridged 強制は `ModuleTable.register` 経由の全 descriptor に効くが、現行 descriptor に `bridge` 欄は無く実効値は常に 0。Wrapper 側 `this+0x761` の本物の制御 (Wrapper を lift した後) は H4 本体の範囲。
 
 ## 6'. 規約遵守メモ
