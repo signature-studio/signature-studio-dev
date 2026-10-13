@@ -165,6 +165,20 @@ NC1 (capstone 未導入) は `bash tools/m11/m11_gen_ir2.sh` が exit 1 にな�
 - 未実施: 別環境 (別 runner / VM) での n>=2、work-m11 の R2 再投入 (素材権限者)、73532f8 (c) の trap 内訳差の原因調査。
 - HEAD 再現 (`a4aa766c`・retdec を PATH に入れない・`work/boot5.*` を削除して lift から): rc 0 / 101 秒 / load 0.07 → 0.83 / ok 870 · trap 25 · oom 1 · clobber 0 · miss 46。修正前は同条件で `retdec-decompiler: command not found` により 1 秒で rc 1。
 
+### 11-b. #729: 別 runner VM での n=2 (`b4dac086` = origin/main 起点の worktree)
+- 環境: 前節 (§11) と別の runner VM (hostname `runnervmmprz5`・machine-id 先頭 `566c0bdf`)。素材 `fl-win64` (PE 1 member, sha256 `b2c64da4…`)・`toolchain-retdec`・`toolchain-emsdk`・`work-m11`・`work-liftdiff` を展開。
+- 前提の追加: `work-m11` に `lift_pe.sha256` が無く、`m11_e2e.sh` は全再生成に入る。`m11_bounds.py` が `tools/m2/work/ghidra_dll/functions_dll.csv` を要求するため、Ghidra 12.1.4 を GitHub Release (`ghidra_12.1.4_PUBLIC_20260921.zip`) から取得して JDK 21 (Temurin)・`MAXMEM=12G`) で `DumpFunctions.java` を実行した (rc 0 / 609 秒 / 59010 行)。
+- IR 生成: `m11_gen_ir2.sh` rc 0 / 44 秒 / ldfix applied。
+
+| 測定 | rc | 所要秒 | load (開始→終了) | ok | oob | halt0 | trap | miss | clobber | oom | ir_sha256 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| E1 (全再生成: scan→lift 4 chunk→tail→IR→build→survey) | 0 | 599 | 0.57 → 1.22 | 870 | — | — | 25 | 46 | 0 | 1 | `20d68876…` |
+| E2 (増分) | 0 | 45 | 1.04 → 1.08 | 870 | — | — | 25 | 46 | 0 | 1 | `20d68876…` |
+
+- E1 の `reached_stage` 4 / `units_run_full` 53 / `wasm_bytes` 6,042,952。trap の停止点は `unreachable @ function_8c5eb0`。E2 の `ir_sha256` は E1 と一致。
+- 結論: 本 VM で n=2 (E1・E2) の survey 値が一致し、§11 (別 run・別 VM 不明) の 870/25/1/0/46 とも一致した。ただし §11 の VM を確認していないため「環境が違う」とは断定しない。別クラウド・別 OS イメージでの一致は未確認。
+- 注: E1 の全再生成の IR sha256 (`20d68876…`) は §11 の `995351f5…` と異なる。§11 は work-m11 から `m11_gen_ir2.sh` のみで作った IR、E1 は scan→lift→tail を走らせ直した IR で、作り方が違うため差は想定内。survey の値は同一。
+
 ## 12. #728: `--full` の実走 (head `2e128c5c`) と lift 成果物の PE 紐付け
 実行環境: 本 runner (4 vCPU, 16 GiB)。素材 `fl-win64` (`block00031_PE.bin`, sha256 `b2c64da4…`)・`toolchain-retdec` ([RETDEC])・`toolchain-emsdk`・`work-m11`・`work-liftdiff` を展開。Ghidra 12.1.4 (公式 release, JDK 21) で `functions_dll.csv` を再生成 (59 009 行, sha256 `90d1bbac…`, Ghidra headless 約 10 分)。capstone 5.0.7 / pefile 2024.8.26。
 - 測定 head: 下表の F1〜F3 は `2e128c5c` (PR 本文の `2e128c5c` 測定)。現 head `74312499` は `2e128c5c..74312499` のスクリプト差分が空で、コード同一。その後の修正 commit `74b365f6` は `m11_lift.sh` の 1 行 (RETDEC_ROOT 既定値) だけを変える。F3 は PATH で retdec を解決しており、この行は通らない。下の (a)(b)(c) で修正後 head を実測。
