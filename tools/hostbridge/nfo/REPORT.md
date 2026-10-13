@@ -89,14 +89,14 @@
 | Massive X | VST3 | 8 (gen) | CID `5653544e6924486d6173736976652078` (§12.5・3 源一致) | `…\VST3\Massive X.vst3` | 単一ファイルモジュール形 (moduleinfo.json 非同梱)。実機 ini 由来の vendor/category を使用 |
 
 - `ps_file_scanflags_0=1`、`ps_file_bitsize_0=64`、`ps_file_type` は実機準拠の 1 (fx) / 2 (gen) (§11.3)。32bit は載せない (bridge 不使用: HOSTBRIDGE §1.6)。
-- Wrapper→VST2 の `hint` (entry export 名) は標準名 (`VSTPluginMain`) なら不要。Kilohearts は stub 消去 (alias) で標準名に揃う。hint を DB に持たせる必要が出た場合の記録先は未特定 (§6-3)。
+- Wrapper→VST2 の `hint` (entry export 名) は常に定数 0 で供給元が無い (#218: `tools/hostbridge/h10/REPORT.md` §3-②)。標準名 (`main` / `VSTPluginMain` 系) の export が必須。Kilohearts は stub 消去 (alias) で標準名に揃う。
 - 生成量: **50 entry / 102 ファイル / 70,571 B** (決定的, `.Plugins.ini` 込み §11.3・Kilohearts 45 + spec 5)。IDB プリロードに載せても無視できる大きさ。
 
 ## 6. 未解決とブロッカー
 
 1. **Installed の実機 v2 サンプルが無く、`.nfo`/`.fst` は「FL コードが受理する形」を静的に再構成したもの**。reader 模型は decompile 準拠だが、FL 本体の実行による検証は未了 (lift 済み FL で `0x910cd0` を動かす検証は H4 以降)。
-2. Fruity Wrapper が生成 `.fst` (record 2/50/51/54/55/56 のみ) を読んで VST2/VST3 を起動できるかは未検証 (Wrapper の chunk reader は未解析; record 1/30/31/32 は Wrapper が補うと推定)。`tools/flp` の独立パーサ受理までは確認。
-3. Wrapper の VST2 `hint` (`TVSTPlugin` 第 6 引数) の供給元レコード (id 57 候補) は未特定。標準名エクスポートでは不要。
+2. ~~Fruity Wrapper が生成 `.fst` を読めるか~~ → **#218 (H10) で reader 解析済み**: chunk は Wrapper の reader に受理され、record 1/30/31/32 は不要 (Wrapper が既定値で補う)。起動可否の実行検証は #267 (`tools/hostbridge/h10/REPORT.md` §3-①・§4)。
+3. ~~Wrapper の VST2 `hint` 供給元 (id 57 候補)~~ → **#218 で解消**: id 57 = `effGetVstVersion`、hint は常に定数 0 で供給元なし (`tools/hostbridge/h10/REPORT.md` §3-②)。
 4. ~~`.Plugins.ini` の文字コード、`ps_file_date` の単位、VerifiedIDs の VST2 `id` 表現~~ → **CAB-219 で解決 (§11)**: ini = UTF-8+BOM / date = TDateTime double bits / VST2 id = magic 10 進 (キー順 `<fmt>:<bits>:<id>`)。VST3 `ps_file_filename` の**選択規則は CAB-218 で確定 (§12, FORMAT §9-3)**。
 5. VST3 CID → `ps_file_guid` の対応は §11.4 で実機確定 (テキスト = CID 文字列、bytes = Windows 配置)。Wrapper が factory へ渡す順序の実行検証は H5 で。
 6. ~~Massive X 素材なし / KH VST2 magic 未確定~~ → **KH magic は CAB-218 で実測確定 (§12.2)**。**Massive X も CAB-46 follow-up (§12.5) で spec 追加・CID 確定** (`~/ダウンロード/Native Instruments Massive X v1.7.1.exe` 解析済。moduleinfo.json は本製品に同梱されない = CID は実機 FL スキャン値を正とした)。
@@ -110,7 +110,7 @@ Windows 実機から `Installed\` 配下の **実機 v2 `.nfo` / `.fst` 単体�
 | # | チケット | 要点 |
 |---|---|---|
 | H4' (P0) | DB 組込み | ~~`generateDb()` (`.nfo`/`.fst`/`.Plugins.ini`/VerifiedIDs 生成) を仮想 FS 初期化 (起動時/ビルド時) に結線し、lift 済み FL の `0x910cd0` / `0xaba430` に生成 DB を読ませて受理を実行検証~~ — **結線まで完了 (CAB-216 §13)**。残は FL 実物 reader の実行検証のみ (§13.6・§14) |
-| H10 (P1) | Wrapper chunk reader の解析 | 生成 `.fst` の record 群を Wrapper が受理するか (hint レコード・record 1/30–32 の要否) を `fw:` 側で確定 |
+| H10 (P1) | Wrapper chunk reader の解析 | ~~生成 `.fst` の record 群を Wrapper が受理するか~~ — **完了 (#218, `tools/hostbridge/h10/REPORT.md`)** |
 | H11 (P2) | VST3 バンドルのパス規則 | ~~選択規則の突合~~ / ~~H9a / H12~~ — **完了 (CAB-215 §10 / CAB-219 §11 / CAB-218 §12)**。残は §7 の任意提供のみ |
 
 ## 9. 規約遵守メモ

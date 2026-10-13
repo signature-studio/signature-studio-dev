@@ -46,11 +46,11 @@ GetConsoleMode ReadConsoleW SetErrorMode SetThreadErrorMode IsDebuggerPresent Lo
 SetVolumeLabelW OutputDebugStringW OutputDebugStringA IsWow64Process
 RtlUnwind RtlUnwindEx
 '''.split())
-FAILFAST_BY_DESIGN = {'RtlUnwind', 'RtlUnwindEx'}   # 呼ばれたら fail-fast (巻き戻し未対応) — 実装済みだが「実質未対応」として注記
+FAILFAST_BY_DESIGN = set()   # #171: RtlUnwind/RtlUnwindEx は SEH frame (setjmp 系) 経由で実巻き戻し。frame 未登録時のみ fail-fast
 
 NOTE = {
-    'RaiseException': 'VEH→UEF→fail-fast (継続可能例外のみ復帰)', 'RtlUnwind': 'fail-fast (SEH 巻き戻しは lift 側課題)',
-    'RtlUnwindEx': 'fail-fast', 'GetProcAddress': '組込み表 (proctable) + 外部フック。未知名は NULL', 'LoadLibraryW': 'モジュール表+load フック。実体ロードは hostbridge',
+    'RaiseException': 'VEH→SEH frame 鎖 (longjmp 捕捉)→UEF→fail-fast (継続可能例外のみ復帰)', 'RtlUnwind': 'SEH frame 巻き戻し (frame 未登録は fail-fast)',
+    'RtlUnwindEx': 'SEH frame 巻き戻し (frame 未登録は fail-fast)', 'GetProcAddress': '組込み表 (proctable) + 外部フック。未知名は NULL', 'LoadLibraryW': 'モジュール表+load フック。実体ロードは hostbridge',
     'CreateProcessW': '常に ERROR_FILE_NOT_FOUND', 'ShellExecuteW': 'shimx_set_shell_execute_hook 経由', 'GetOpenFileNameW': 'キャンセル扱い (Web ファイル選択は下流)',
     'WSAStartup': 'WSASYSNOTREADY (ネットワーク無し)', 'InternetGetConnectedState': 'FALSE', 'timeGetTime': 'M4 継承 (emscripten_get_now)',
     'CreateThread': 'CREATE_SUSPENDED 対応/threadId 修正 (M4 差分)', 'SuspendThread': 'カウントのみ (実停止不可)', 'TerminateThread': '状態のみ完了扱い',

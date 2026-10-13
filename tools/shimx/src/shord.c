@@ -2,7 +2,7 @@
  *   shell32  #74  = SHCreateStdEnumFmtEtc(UINT cfmt, const FORMATETC* afmt, IEnumFORMATETC** out)   (OTT vst2/vst3)
  *   shlwapi  #12  = SHCreateMemStream(const BYTE* data, UINT len) → IStream*                         (Serum2)
  *   shlwapi  #219 = QISearch(void* that, const QITAB* tab, REFIID riid, void** out)                  (Serum2)
- * 序数 → 名前の根拠は tools/shimx/REPORT.md §14 (Wine shell32.spec / shlwapi.spec = Windows の序数表と突合)。
+ * 序数 → 名前の根拠は tools/shimx/REPORT.md §15 (Wine shell32.spec / shlwapi.spec = Windows の序数表と突合)。
  * GetProcAddress(序数) 解決は module.c の shx_ordtable、lift ABI トークンは cbtrans.c の g_lifttab。
  *
  * COM オブジェクトは shimx 既存 (ole.c の IStream/IMalloc) と同じ Win64 vtable 規約: 先頭 8B = vtable ポインタ、

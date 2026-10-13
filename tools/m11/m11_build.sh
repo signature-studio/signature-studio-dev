@@ -29,6 +29,11 @@ for st in ir_lb_base img_lb_base; do
 done
 
 if [ ! -f work/boot_final.ll ]; then echo "[m11build] work/boot_final.ll 無し: m11_gen_ir2.sh を先に" >&2; exit 2; fi
+# alloca 縮退修正 (CAB-129 + #132 R8): RetDec が `alloca i64` (8B) に潰したローカルを拡幅 (idempotent)。
+#   unit #18 OOB の真因 = 44bae0 の stack_var が callee 44ba50 に書かれ 44bb70 の record を破壊 (R8)。
+#   内容が変わった時だけ boot_final.ll を差し替える (mtime を更新して毎回 post/cc を走らせない)。
+python3 alloca/m11_alloca.py work/boot_final.ll work/boot_final.alloca.tmp.ll --report work/alloca_report.json > work/alloca.log
+if ! cmp -s work/boot_final.ll work/boot_final.alloca.tmp.ll; then mv work/boot_final.alloca.tmp.ll work/boot_final.ll; else rm -f work/boot_final.alloca.tmp.ll; fi
 # #131: sigfix 復元モードが変わったら post 結果を無効化 (stamp)
 if [ "$(cat work/sigfix_recover.stamp 2>/dev/null || echo 0)" != "${M11_SIGFIX_RECOVER:-0}" ]; then rm -f work/boot_final3.ll; fi
 echo "${M11_SIGFIX_RECOVER:-0}" > work/sigfix_recover.stamp
@@ -81,7 +86,7 @@ cc work/m11_data.c work/obj/data.o
 
 INITMEM="$((0x12000000))"
 MAXMEM="$((0x72000000))"
-EXPORTS=_m11_boot_enter,_entry_point,_m11_init_count,_m11_boot_stage,_m11_va_used,_m11_va_calls,_m11_set_trace,_m11_icall_ok,_m11_icall_miss,_m11_icall_miss_uniq,_m11_icall_miss_at,_m11_disp_count,_m11_units_run,_m11_units_total,_m11_units_skipped,_m11_stub_total,_m11_stub_uniq,_m11_stub_name,_m11_stub_count,_m11_probe_count,_m11_longjmp_hit,_m11_set_survey,_m11_call_unit,_m11_unit_va,__emscripten_stack_restore,_emscripten_stack_get_current
+EXPORTS=_m11_boot_enter,_entry_point,_m11_init_count,_m11_boot_stage,_m11_va_used,_m11_va_calls,_m11_set_trace,_m11_icall_ok,_m11_icall_miss,_m11_icall_miss_uniq,_m11_icall_miss_at,_m11_icall_cnt_n,_m11_icall_cnt_key,_m11_icall_cnt_ok,_m11_icall_cnt_miss,_m11_icall_cnt_drop,_m11_disp_count,_m11_units_run,_m11_units_total,_m11_units_skipped,_m11_stub_total,_m11_stub_uniq,_m11_stub_name,_m11_stub_count,_m11_probe_count,_m11_longjmp_hit,_m11_set_survey,_m11_call_unit,_m11_unit_va,__emscripten_stack_restore,_emscripten_stack_get_current
 emcc work/obj/*.o -o work/m11_boot.cjs.tmp \
   -O0 -g1 -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8MB -sGLOBAL_BASE="$((0x10000000))" \
   -sENVIRONMENT=node -sMODULARIZE=1 -sEXPORT_NAME=m11create \

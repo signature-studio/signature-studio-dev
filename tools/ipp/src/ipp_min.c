@@ -53,15 +53,43 @@ IppStatus ippsThreshold_LT_32f_I(Ipp32f *sd, int n, Ipp32f lv) { NP1(sd); LEN(n)
 #endif
 IppStatus ippsVectorSlope_32f(Ipp32f *d, int n, Ipp32f off, Ipp32f slope) {
   NP1(d); LEN(n);
-  for (int i = 0; i < n; i++) {
 #if VSLOPE == 0
-    d[i] = off + slope * (float)i;
-#elif VSLOPE == 1
+  /* IPP-9 (#276) / IPP-11 (#473): 実 DLL (SSE2 カーネルを逆アセ。全 ISA 経路同一) の算法。FMA 融合禁止。
+     head: 出力先が 16B 境界に揃うまで (0〜3 要素) 1 要素ずつ peel。peel の p 番目 = lane[0] + off で、
+           lane[j] は初期 j*s に s を p 回直列加算した値。peel 数はポインタ値 & 15 で決まる。
+     body: peel 後の lane[0..3] から 4 ベクトル = 幅 16 ブロック。レーン k=4g+j の値 = (lane[j] に 4s を g 回加算) + off、
+           以降 step=16*s を加算。
+     tail (rem%16): 先頭 = 次ブロックのレーン0、以降は直前要素 + s の直列加算。 */
+  {
+    const float s4 = 4.0f * slope, step = 16.0f * slope;
+    float x[4], lane[16];
+    for (int j = 0; j < 4; j++) x[j] = (float)j * slope;
+    int i = 0;
+    while (((uintptr_t)(d + i) & 15) != 0) {
+      d[i] = x[0] + off;
+      if (++i >= n) return 0;
+      for (int j = 0; j < 4; j++) x[j] += slope;
+    }
+    for (int g = 0; g < 4; g++)
+      for (int j = 0; j < 4; j++) { lane[4 * g + j] = x[j] + off; x[j] += s4; }
+    const int rem = n - i;
+    int b = 0;
+    for (; b + 16 <= rem; b += 16)
+      for (int k = 0; k < 16; k++) { d[i + b + k] = lane[k]; lane[k] += step; }
+    if (b < rem) {
+      d[i + b] = lane[0];
+      for (b++; b < rem; b++) d[i + b] = d[i + b - 1] + slope;
+    }
+  }
+#else
+  for (int i = 0; i < n; i++) {
+#if VSLOPE == 1
     d[i] = (float)((double)off + (double)slope * (double)i);
 #else
     d[i] = fmaf(slope, (float)i, off);
 #endif
   }
+#endif
   return 0;
 }
 

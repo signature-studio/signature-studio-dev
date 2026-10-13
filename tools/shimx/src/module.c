@@ -35,7 +35,7 @@ static const void* (*g_res_provider)(HMODULE, const WCHAR*, const WCHAR*, DWORD*
 /* R3: 序数直指定 GetProcAddress の組込み表 (手書き)。名前表 (proctable.c, 自動生成) は序数を扱えないため別表。
  * 序数 → 名前の対応は Windows 10/11 の shell32.dll エクスポート表 (implib 定義 + wine shell32.spec と突合済み)。
  * SHX-T8 (#175): shell32 74 = SHCreateStdEnumFmtEtc / shlwapi 12 = SHCreateMemStream / 219 = QISearch も実装済み (src/shord.c)。
- * 根拠: tools/shimx/REPORT.md §14。 */
+ * 根拠: tools/shimx/REPORT.md §15。 */
 typedef struct { const char* dll; DWORD ord; void* fn; } ShxOrdEnt;
 static const ShxOrdEnt shx_ordtable[] = {
     { "shell32.dll",  16, (void*)ILFindLastID },

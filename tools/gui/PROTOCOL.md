@@ -41,7 +41,7 @@
 | 0x8940 | out_recs[2048][8×u32] (64 KiB) | shim |
 | 0x18940 | 終端 (= 100,672 B) | |
 
-surface エントリ (128 B): `state, visible, x, y, w, h, stride, pixels(wasm addr), z, gen, _rsv[6], title[64]`。
+surface エントリ (128 B): `state, visible, x, y, w, h, stride, pixels(wasm addr), z, gen, wseq, _rsv[5], title[64]`。`wseq` は seqlock (§4 の 6)。
 `pixels` は **BGRA32 top-down** (Windows DIB と同じ B,G,R,A バイト順)。リサイズ/再確保で `gen++` かつ `SURF_CHANGE`。
 JS ミラー: `src/runtime/gui_proto.ts` (`OFF`, `W`, `S`)。C 側 `_Static_assert` で全オフセット固定、wasm と JS の total_size 不一致は worker 起動時に throw。
 メモリ成長対策: worker は処理毎に `memory.buffer` を取り直す (`WebAssembly.Memory` を init で受領)。静的領域とリングは成長で動かない。
@@ -82,9 +82,15 @@ host は **レコード書込の前に** 共有 pointer 状態 (cursor/buttons/m
 1. 描画先がウィンドウ DC (surface) のとき、プリミティブごとに `surf_dirty(surf, rect)` が surface 単位の dirty 外接矩形に合流。
 2. **flush 契機**: EndPaint / ReleaseDC / GdiFlush / `WM_PAINT` dispatch 後 / `GetMessage` ブロック直前 / PeekMessage 空 / 前回 flush から 16 ms 超 (try_get 入口)。
 3. flush は dirty のある surface ごとに `PRESENT`、最後に `FRAME_END(seq)` を 1 個 (`present_seq++`)。
-4. worker は PRESENT を受けるたび即描画 (BGRA→RGBA, alpha=255 固定, `putImageData`) し、重なる **より前面の surface** の交差領域を再描画して前後関係を維持。
-5. ack: `present_done_seq == present_seq` が「全フレーム描画済み」。tearing 防止の seqlock は未実装 (GDI のフロントバッファ描画と同等)。
-- 想定ホットパス: FL の `BitBlt/StretchDIBits(window DC)` → 1 フレーム 1 PRESENT (外接矩形)。dirty 複数矩形化・WebGL2 テクスチャ転送は将来 (REPORT 下流チケット)。
+4. worker (`gui_renderer.ts`) の既定は従来経路: PRESENT を受けるたび即描画 (BGRA→RGBA, alpha=255 固定, `putImageData`) し、重なる **より前面の surface** の交差領域を再描画して前後関係を維持。
+5. ack: `present_done_seq == present_seq` が「全フレーム描画済み」。
+6. **GUI-4 (#180) の present 拡張** (`GuiPresentOptions`; 既定は 4. の従来経路で挙動不変。`GuiHost.attach({present})` / `/?gui=render-selftest&backend=webgl2&sync=raf&seqlock=1` で選択):
+   - `backend: "webgl2"`: surface ごとの RGBA8 テクスチャへ dirty 矩形を `texSubImage2D` (共有メモリ view を UNPACK_ROW_LENGTH/SKIP_* 付きで直接。拒否するブラウザは非共有バッファへ行コピーに自動降格)、fragment の swizzle `.bgr` で BGRA→RGB、alpha=1.0。合成は整数 `texelFetch` の quad 描画 (補間なし)。`"auto"` は WebGL2 不可なら 2D。
+   - **dirty 複数矩形**: 1 フレーム (PRESENT 群 + FRAME_END) の矩形を surface ごとに `mergeRects` (`gui_dirty.ts`) で併合 (重なり/接触は必ず、離れたものは面積増 ≤ 25% のとき、surface あたり最大 8 個)。shim が PRESENT を複数発行すればそのまま複数矩形で転送される (shim 側の dirty は現状 surface あたり単一外接矩形のまま = 未達)。
+   - `sync: "raf"`: **ingest** (FRAME_END 時点で surface 画素を読む = GL はテクスチャ転送) と **commit** (画面反映 + ack) を分離し、commit のみ `requestAnimationFrame` に同期 (複数 FRAME_END は 1 回の commit に集約し最新 seq を ack)。rAF が来ない場合は `rafTimeoutMs` (既定 100 ms) のタイマで commit。
+   - **seqlock** (`seqlock: true`): `GuiSurface.wseq` は奇数 = guest が flush 後に画素を書込み中/書込み済み、偶数 = 静止。shim は window surface へ描く直前 (`dc_tgt`) に偶数→奇数、`surf_flush` が PRESENT を push する前に全 live surface を奇数→偶数にする。host は `wseq` を読出しの前後で比較し、奇数または不一致なら読出しを破棄して矩形を持ち越し、4 ms 後に再試行する。`staleMs` (既定 100 ms) を超えて連続で読めない場合のみ強制的に読む (飢餓回避; `stats.seqForced`)。
+     **限界**: これは tear の「検出と再試行」で、guest が書込みを止めない限り読めない (back buffer による snapshot isolation ではない)。JS の `Atomics.load` と非 atomic な画素読出しの順序保証はエンジン実装 (SC atomic の full fence) 依存。
+- 想定ホットパス: FL の `BitBlt/StretchDIBits(window DC)` → 1 フレーム 1 PRESENT (外接矩形)。
 
 ## 5. lift ABI (RetDec 産コード ↔ shim)
 - **全 API は `int64_t NAME(int64_t a0, ...)`**。lifter 出力が `int32_t`/ポインタ/`int64_t` を混ぜて呼ぶため、戻り値・引数とも 64bit 整数に統一

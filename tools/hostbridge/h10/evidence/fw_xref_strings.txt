@@ -1,0 +1,12 @@
+=== xrefstr 'SaveRestoreState - load'
+  hit(u16) @008711e4
+    ref from 00870ed2 in FUN_00870da0@00870da0 (to 008711e4)
+=== xrefstr 'LoadPlugin_Finish'
+  hit(u16) @0086feb8
+    ref from 0086eaa9 in FUN_0086e9f0@0086e9f0 (to 0086feb8)
+  hit(u16) @0086ffd8
+=== xrefstr 'Something went wrong loading the'
+  hit(u16) @00875708
+    ref from 00875381 in FUN_00874a40@00874a40 (to 008756fc)
+  hit(u16) @00877058
+    ref from 00876d53 in FUN_00875af0@00875af0 (to 0087704c)
