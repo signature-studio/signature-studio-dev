@@ -1,6 +1,7 @@
 // M11 e2e boot runner: m11_boot.cjs instantiation → m11_boot_enter (DllMain attach) → 実測数値 JSON 出力
 // 環境変数 M11_TRACE=1 で icall / unit init をトレース
 import fs from 'fs';
+import { ptrPre, ptrCheck } from './m11_ptrcheck.mjs';
 const M11 = new URL('./', import.meta.url).pathname.replace(/\/$/, '');
 const wasmSize = fs.statSync(M11 + '/work/m11_boot.cjs.wasm').size;
 const m2 = await import(M11 + '/work/m11_boot.cjs');
@@ -9,6 +10,7 @@ const mod = await (m2.default ? m2.default({ printErr: (s) => { lines.push(Strin
 // PE イメージ (.text/.data/.rdata, LVA 座標) をホストが実行時に載せる (wasm には実バイナリを埋め込まない)
 const img = fs.readFileSync(M11 + '/work/m11_image.bin');
 mod.HEAPU8.set(img, 0);
+const ptrPreSet = ptrPre(mod, img.length);
 if (process.env.M11_TRACE === '1') mod._m11_set_trace(1);
 if (process.env.M11_VFREE_NOOP === '1') mod._m11_set_vfree_noop(1);   // NC (#513): VirtualFree を実解放しない旧挙動
 if (process.env.M11_VA_STACK_AT) mod._m11_set_va_stack_at(Number(process.env.M11_VA_STACK_AT));   // #513: N (>=1; 0 = 無効) 番目 (0 起算) の VirtualAlloc の呼出元スタックを出す
@@ -32,6 +34,7 @@ const probes = {};
 probeNames.forEach((n, i) => { probes[n] = num(() => mod._m11_probe_count(i)); });
 const stubs = [];
 for (let i = 0; i < (num(mod._m11_stub_uniq) || 0); i++) stubs.push(mod.UTF8ToString(mod._m11_stub_name(i)) + ':' + mod._m11_stub_count(i));
+const ptrCheckRes = ptrCheck(mod, ptrPreSet);
 console.log('M11_RESULT ' + JSON.stringify({
   wasm_size: wasmSize,
   image_bytes: img.length,
@@ -57,4 +60,6 @@ console.log('M11_RESULT ' + JSON.stringify({
   longjmp_hit: num(mod._m11_longjmp_hit),
   boot_rc: rc === undefined ? null : String(rc),
   threw,
+  ptrcheck: ptrCheckRes,
 }));
+
