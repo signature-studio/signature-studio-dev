@@ -5,7 +5,7 @@
 - **既定 build (計測なし) の OFF は ok=869 / trap=25** (測定 commit `ba9ba284`・main `53aa0a6a` と同一・`boot_final3.ll` は main と `cmp` 一致、§0)。
 - 計測 build (`M11_INSTR_413060=1`) の OFF は ok=871 / trap=23。計測 probe と dest 観測を入れると集計が変わる。原因は**未特定** (§4 (e))。計測 build は**同一 build 内の比較 (OFF/ON/ネガコン) にだけ使い、既定の基準には使わない**。
 - 受入条件 1 (到達計数): 計測 build の survey で **35 unit** に `function_413060` が呼ばれ、呼出し合計 **227 回** (§1 の列挙)。
-- 受入条件 2 (独立 gate): `M11_OV_413060=1` で 413060 だけを C 転記版に切替。OFF/ON の survey 判定ラベルは 942 unit 全て一致。
+- 受入条件 2 (独立 gate): `M11_OV_413060=1` で 413060 だけを C 転記版に切替。OFF/ON の survey 判定ラベルは 942 unit 全て一致。既定 build (計測なし) でも OFF/ON は 869/25 で一致し、unit 差分 0 (§0)。計測 build の一致 (§1) と合わせて 2 build で確認。
 - 受入条件 3 (ネガコン): dest 観測 (§2) で既知変更 (b) `Q(dest)=p+0x40` が OFF と**指紋差と呼出し数差を作る** (感度あり)。
 
 測定 commit: **`ba9ba284`** (コードを変えた最後の commit。`tools/m11/trap_triage/repro_705.sh` に既定 build の測定を追加)。
@@ -22,6 +22,18 @@
 | main (`origin/main` `53aa0a6a`・既定) | `53aa0a6a` | 869 | 1 | 47 | 25 | 0 | 同じ手順で 1 回 (`m11_gen_ir2.sh` → `m11_build.sh` → `m11_survey.mjs`) |
 | 計測 build (`M11_INSTR_413060=1`) OFF | `ba9ba284` | 871 | 1 | 47 | 23 | 0 | §1。比較専用 |
 
+- 既定 build の OFF/ON 判定一致 (受入条件 2 の既定 build 版・測定 commit `60051601`・直列・単発・`M11_INSTR_413060` 未設定):
+
+  | 構成 | ok | noproc | miss | trap | clobber | unit ラベル |
+  |---|--:|--:|--:|--:|--:|---|
+  | 既定 OFF (`M11_OV_413060=0`) | 869 | 1 | 47 | 25 | 0 | 942 unit |
+  | 既定 ON (`M11_OV_413060=1`) | 869 | 1 | 47 | 25 | 0 | OFF と差分 0 unit |
+
+  - コマンド: `env -u M11_INSTR_413060 M11_OV_413060={0,1} M11_NEG_413060=0 bash m11_build.sh` → `env -u M11_INSTR_413060 M11_SURVEY_UNITS=<units>.json node m11_survey.mjs`。素材は `fl-win64`・`work-m11`・`toolchain-emsdk` (`/opt/emsdk` 既存・6.0.12)。`m11_gen_ir2.sh` で `ir_conditions.json` を生成 (ldfix F1=902 F3c=36 errors=0)。
+  - `boot_final3.ll` の md5 は両 build で `4fd74f373c293325c6ee011a0680c962` (同一。413060 の切替は `m11_ov.o` の再コンパイルで効く。`build_on.log` に `cc m11_ov.c` あり)。
+  - 両 build の `M11_SURVEY` 行 (先頭): `{"units":942,"ok":869,"noproc":1,"miss":47,"trap":25,"clobber":0,...}`。survey 所要 OFF 39 s / ON 32 s、load 0.93 / 0.88。
+  - unit ラベルの OFF/ON 差分 0 unit (`units_off.json` と `units_on.json` を比較)。
+  - 注: `repro_705.sh` は既定 ON の経路を持たないため、本節の既定 ON は上記手順で別途測った。
 - 既定 build の `boot_final3.ll` は main `53aa0a6a` の既定 build の `boot_final3.ll` と `cmp` で一致 (md5 `4fd74f373c293325c6ee011a0680c962`)。`boot_final.ll` も `m11_build.sh` 実行後の状態で PR 側と main `53aa0a6a` の間で diff 0 行 (`m11_gen_ir2.sh` 直後の状態は build 前のため比較対象にしない)。
 - 既定 build の `M11_SURVEY` 行 (`ba9ba284`・直列・単発):
   `{"units":942,"ok":869,"noproc":1,"miss":47,"trap":25,"clobber":0,"trap_oom":1,"trap_other":24,"ok_with_oom":0}`
@@ -129,8 +141,9 @@
 | (b) 残り 14 関数の D4 判定 | 同型 D4 の有無 | #901 ([M11-N48]) |
 | (c) ON 構成 (410360 含む) での 413060 の寄与 | ON の ok 退行との関係 | #704 |
 | (d) #509 (LD-9 ldfix F3c 門拡張) との統合要否 | 検出を ldfix で拾えるか | #509 |
+| (e) 計測 build (`M11_INSTR_413060=1`) の OFF が既定 build と違う 871/23 の原因 (未特定)。候補: dest 観測 hook の volatile 読出しが不正な dest で trap を生んでいる可能性 (未検証・切り分けは未実施) | 計測 build の値 (871/23) を既定の基準に使えない | #1352 ([M11-N85]) |
 
-(e) 計測 build (`M11_INSTR_413060=1`) の OFF が既定 build と違う 871/23 の原因は**未特定**。
+(e) の詳細 (起票先 #1352 の受入条件に対応):
 切り分けの実測 (`ba9ba284` と同じ IR・`M11_DEST_READ=0`・INSTR=1・OFF):
 `{"units":942,"ok":871,"noproc":1,"miss":47,"trap":23,"clobber":0}`・`f413060_calls=227`。
 dest 読出しを止めても 871/23 のまま。よって dest 読出しが原因ではないことだけ分かる。
