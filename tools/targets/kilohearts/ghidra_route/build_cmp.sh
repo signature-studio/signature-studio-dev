@@ -3,7 +3,7 @@
 #   bash ghidra_route/build_cmp.sh <gain|haas|gate> [trials] [seed] [fix]
 # 前提: work/ghidra/out (DecompEach.java), snapins/work/native_ref (snapins/run_all.sh [1] と同じ cc ビルド)
 set -euo pipefail
-HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; KH="$HERE/.."
+HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; KH="$(cd -- "$HERE/.." && pwd)"
 N=$1; TR=${2:-1000}; SEED=${3:-7}; FIX=${4:-}
 source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1
 CORE="$KH/work/winpkg/HeartCore.core_64"; O="$KH/work/gr/$N"

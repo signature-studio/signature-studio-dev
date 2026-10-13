@@ -5,7 +5,7 @@
 #       GHIDRA_HOME (既定 /opt/ghidra/ghidra_12.1.4_PUBLIC)・JDK 21・python に pefile/capstone。
 # 出力: 各段の実測秒 (wall) と load average。結果の正本は REPORT.md §10。
 set -euo pipefail
-HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; KH="$HERE/.."
+HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; KH="$(cd -- "$HERE/.." && pwd)"
 TR=${1:-1000}; SEED=${2:-7}
 GHIDRA_HOME=${GHIDRA_HOME:-/opt/ghidra/ghidra_12.1.4_PUBLIC}
 CORE="$KH/work/winpkg/HeartCore.core_64"
