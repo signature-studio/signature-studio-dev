@@ -6,9 +6,11 @@
       0x15e4790 ロード VA から capstone の detail モード (オペランド構造 base/disp・regs_access) で窓を直接デコードする
   V2  scan 結果の不変条件 (直接参照 0 / write は 0x10c7cd0 内のみ / 静的初期バイト 0)
   V3  run_cases の期待値 (A 群 = flag 0x00・gradeChar 0x40、ネガティブコントロールが期待どおり変化)
+  V6  unit 初期化節 (VM ハンドラ表を作る 11 関数) の独立導出 (0x8c5cc0 の呼び出し元を生バイト走査 + .pdata) との一致
+  V7  ILRegKey 非空ケース (B1/B2/B3/D1/D3) の終了・flag・gradeChar・到達点、ネガコン (NB0–NB3)、ilreg reader.mjs judge() との突合 (judge_xcheck.mjs と --neg)
   V5  gradeChar 追跡のネガティブコントロール (追跡を無効にすると連続形の 196 に戻る / r2 書換えの打切りを外すと件数が増える)
 """
-import json, os, re, sys
+import json, os, re, subprocess, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from peidx import Image  # noqa: E402
 import scan_consumers  # noqa: E402
@@ -94,6 +96,22 @@ def tracked_loads(im, loads, window=GRADE_WINDOW):
     return out
 
 
+def unit_inits_independent(im):
+    """0x8c5cc0 (VM ハンドラ登録) への call rel32 を生バイトから探し、呼び出し元の .pdata 関数先頭の集合を返す。emu_reg.UNIT_INITS とは独立に導出。"""
+    t = im.read(im.text_lo, im.text_hi - im.text_lo)
+    out = set()
+    for m in re.finditer(b'\xe8', t):
+        i = m.start()
+        if i + 5 > len(t):
+            continue
+        va = im.text_lo + i
+        if va + 5 + int.from_bytes(t[i + 1:i + 5], 'little', signed=True) == 0x8c5cc0:
+            f = im.func_of(va)
+            if f:
+                out.add(f)
+    return out
+
+
 def main():
     im = Image()
     d = json.load(open(os.path.join(HERE, 'results', 'flag_sites.json')))
@@ -123,13 +141,40 @@ def main():
     nt, nr = scan_consumers.grade_counts(im, track=False)[1], scan_consumers.grade_counts(im, redef_stop=False)[1]
     check('V5a ネガコン: 追跡を無効にすると連続形の 196 に戻る (≠266)', len(nt) == 196 and len(nt) != 266, f'{len(nt)}')
     check('V5b ネガコン: r2 書換えの打切りを外すと件数が増える (≠266)', len(nr) > 266, f'{len(nr)}')
-    c = {o['case'][:2]: o for o in json.load(open(os.path.join(HERE, 'results', 'cases.json')))}
-    for k in ('A1', 'A2', 'A3', 'A4', 'D2'):
+    c = {o['case'].split()[0]: o for o in json.load(open(os.path.join(HERE, 'results', 'cases.json')))}
+    for k in ('A1', 'A2', 'A3', 'A4', 'A5', 'D2'):
         check(f'V3 {k}: ok / flag 0x00 / gradeChar 0x40', c[k]['status'] == 'ok' and c[k]['flag_hex'] == '00' and c[k]['gradeChar_hex'] == '40')
     check('V3 N1 (gradeChar 初期値改変) → gradeChar 0x42', c['N1']['status'] == 'ok' and c['N1']['gradeChar_hex'] == '42')
     check('V3 N2 (jle を nop) → flag bit0 が立つ', c['N2']['status'] == 'ok' and int(c['N2']['flag_hex'], 16) & 1 == 1)
     check('V3 N3 (flag 初期値改変) → flag 0x04', c['N3']['status'] == 'ok' and c['N3']['flag_hex'] == '04')
-    check('V3 B/D1 は VM 復号経路で停止 (未観測として記録)', all(c[k]['status'] != 'ok' for k in ('B1', 'B2', 'D1')))
+    import emu_reg
+    ind_units = unit_inits_independent(im)
+    # unit 表 (.text 内の 16B 刻み {init, fini} ペア) に init 側として載っていること
+    import struct
+    tbl = {struct.unpack('<Q', im.read(a, 8))[0] for a in range(0x1376be0, 0x1377d00, 16)}
+    check('V6a unit 初期化節 = 0x8c5cc0 呼び出し元の独立導出 (集合一致 11 関数)', ind_units == set(emu_reg.UNIT_INITS) and len(ind_units) == 11,
+          f'独立 {len(ind_units)} / emu {len(emu_reg.UNIT_INITS)} / diff {sorted(hex(x) for x in ind_units ^ set(emu_reg.UNIT_INITS))}')
+    check('V6b 11 関数は全て unit 表 (0x1376be0..) の init 側エントリ', set(emu_reg.UNIT_INITS) <= tbl)
+    for k in ('B1', 'B2', 'B3', 'D1', 'D3'):
+        o = c[k]
+        ph = o['probe_hits']
+        check(f'V7 {k}: ok / flag 0x00 / gradeChar 0x40 / 復号 VM 実行 / tier 全 skip (適用 0)',
+              o['status'] == 'ok' and o['flag_hex'] == '00' and o['gradeChar_hex'] == '40' and ph['vm_decode'] == 1 and ph['tier_apply'] == 0 and ph['tier_skip'] == 3
+              and ph['tier_record_search'] == 0, str(ph))
+    check('V7 B1/B2/B3 の復号結果 head は同一 (マシン情報・cl 非依存)', len({c[k]['head_utf16_hex'] for k in ('B1', 'B2', 'B3')}) == 1)
+    check('V7 D1/D3/B1 の復号結果 head は互いに異なる (入力に依存して VM が動いている)', len({c[k]['head_utf16_hex'] for k in ('B1', 'D1', 'D3')}) == 3)
+    check('V7 A1 (ILRegKey 無し) と D2 (空) は VM を実行しない', c['A1']['probe_hits']['vm_decode'] == 0 and c['D2']['probe_hits']['vm_decode'] == 0)
+    check('V7 NB0 (unit 初期化なし) は B1 と同入力で停止', c['NB0']['status'] != 'ok' and c['B1']['status'] == 'ok')
+    check('V7 NB1 (VM 入口を ret) → head が B1 と変わる', c['NB1']['status'] == 'ok' and c['NB1']['head_utf16_hex'] != c['B1']['head_utf16_hex'])
+    check('V7 NB2 (tier ゲート 4 個を nop) → record 検索・tier 適用に到達し gradeChar が 0x43 になる',
+          c['NB2']['status'] == 'ok' and c['NB2']['probe_hits']['tier_apply'] > 0 and c['NB2']['gradeChar_hex'] == '43')
+    check('V7 NB3 (ゲート 3 個のみ nop) → record 検索へ届くが tier 適用に届かず gradeChar 0x40',
+          c['NB3']['status'] == 'ok' and c['NB3']['probe_hits']['tier_record_search'] > 0 and c['NB3']['probe_hits']['tier_apply'] == 0 and c['NB3']['gradeChar_hex'] == '40')
+    jx = subprocess.run(['node', os.path.join(HERE, 'judge_xcheck.mjs')], capture_output=True, text=True)
+    jr = json.loads(jx.stdout) if jx.stdout.strip() else []
+    check('V7j reader.mjs judge() との突合 (A1/A3/A4/D2/B1/B3/D1/D3 の gradeChar・flag・button が一致)', jx.returncode == 0 and len(jr) == 8, f'{len(jr)} 件 rc={jx.returncode}')
+    jn = subprocess.run(['node', os.path.join(HERE, 'judge_xcheck.mjs'), '--neg'], capture_output=True, text=True)
+    check('V7k ネガコン: B1 の実測に正規書式の合成平文を judge() へ与えると不一致 (gradeChar 0x41) を検出する', jn.returncode == 0, jn.stdout.strip()[:160])
     print('RESULT', 'FAIL' if fails else 'ALL PASS', fails)
     sys.exit(1 if fails else 0)
 

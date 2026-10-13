@@ -32,7 +32,7 @@ def gen_data_c(img, va_base=0x30000000, img_base=None, names=(".rdata", ".data")
     for (n, lo, sd) in secs:
         c = 0
         for r in relocs:
-            if lo <= r < lo + len(sd) - 8:
+            if lo <= r <= lo + len(sd) - 8:  # #593: セクション末尾の 8B slot も対象 (旧 `<` は off-by-one, m11 #572 と同根)
                 off = r - lo
                 v = struct.unpack_from("<Q", sd, off)[0]
                 nt = v - img_base + va_base

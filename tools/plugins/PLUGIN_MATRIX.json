@@ -5168,7 +5168,7 @@
      "lift_rc": 0,
      "emcc_c_rc": 0,
      "f80_funcs": 0,
-     "unimpl_helpers": 1
+     "unimpl_helpers": 0
     }
    },
    "est_days": 1.5,
@@ -17561,7 +17561,7 @@
      "lift_rc": 0,
      "emcc_c_rc": 0,
      "f80_funcs": 0,
-     "unimpl_helpers": 1
+     "unimpl_helpers": 0
     }
    },
    "est_days": 1.5,
@@ -17860,7 +17860,7 @@
      "lift_rc": 0,
      "emcc_c_rc": 0,
      "f80_funcs": 0,
-     "unimpl_helpers": 1
+     "unimpl_helpers": 0
     }
    },
    "est_days": 1.5,
@@ -20517,7 +20517,7 @@
      "lift_rc": 0,
      "emcc_c_rc": 1,
      "f80_funcs": 2,
-     "unimpl_helpers": 1
+     "unimpl_helpers": 0
     }
    },
    "est_days": 1.5,
