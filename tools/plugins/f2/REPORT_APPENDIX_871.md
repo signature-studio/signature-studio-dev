@@ -115,3 +115,13 @@ leaf_diff は IR leaf かつ機械語に間接 call 無しの 23 関数のみを
 - よって「修正後の wasm の扱い (image 外) が native より正しい」とも、「修正前 (RVA 読み) が正しかった」とも**言えない**。native の正しい読み先は `0x70CF34` (= RVA `0x30CF34`) と確定。修正前 wasm は `0x30D0F4` (RVA) を読んでおり、これも `0x30CF34` ではない。両方とも native が読む `0x30CF34` とは一致しない。修正前の match がどの読み値で成立したかは未確認。
 - **未確定**: wasm 側 (修正前・修正後) が 0x5de250 の入力で実際に読んだ値と、native が `0x70CF34` から読んだ値 (`00008033`) の直接比較は未実施 (wasm trace の読み値を取る必要がある)。よって回帰の機序は確定していない。
 - 判定: 回帰 0x5de250 は**未解決のまま**。「期待される差分」としての許容根拠は無い。#923 で wasm 側の読み値 (trace) と `0x70CF34` の比較を行う。
+
+## 10.8 (#871 fix モード 5) committed HEAD `e7a82d82` での再測定 (素材付き)
+
+- 検証 HEAD: `e7a82d82` (`mk_targets.py` は `9d604905` と論理的に同一。reloc 判定を `if to_rva:` で囲んだ書き換えのみ)。測定はこの commit の作業ツリーで実施。
+- 素材: `fl-win64` (`extracted/*_PE.bin` 313 本を run 内に展開)。`/opt/emsdk` (emcc pin 6.0.12) と `/opt/retdec` (RetDec 5.0) は run 環境に実在。
+- `f2_step1.sh` (HEAD `2c2977b9` の作業ツリー、`mk_targets.py` は本 commit と同値): rc 0、9 m 18.3 s、IR leaf 55 / うち機械語でも間接 call 無し 23。
+- `leaf_diff.sh` (HEAD `e7a82d82`): rc 0、2 m 14.6 s、load 0.49。**最終判定 一致 16 / 不一致 7 / 実行不能 0**。集合一致 EQ、IR から call 脱落 0。
+- `nc_leaf.py` (HEAD `e7a82d82`): rc 0、3 m 16.6 s。変異 28 件 (store_drop 5 / load_drop 10 / offset_shift 13) すべて mismatch、未検出 0、unexec 0。
+- 修正前後の遷移 (修正前 `78aa75ad` の `leaf_diff` との突き合わせは、修正前の作業ツリーを再生成していないため本 run では未再計算。§10.4 の前 run 測定を引用): match→match 14、mismatch→mismatch 6、match→mismatch 1 (0x5de250)、mismatch→match 2 (0x6c8fc0, 0x6f1650)。
+- 範囲は leaf 23 関数のみ (§10.5)。残り 7 関数の liftdiff は本 run でも未実施。
