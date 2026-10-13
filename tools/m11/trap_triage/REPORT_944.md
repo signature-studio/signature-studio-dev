@@ -81,6 +81,13 @@
 
 件数 35・合計 227 (計測 run の出力から機械的に確認)。
 
+### 旧記録 (参考・canonical ではない)
+
+- `5dbc6db9` (前 fix run): OFF 11.293 s / ON 11.277 s、ok=869 / trap=25。計測 probe を含む build の値ではない (前 fix 時は既定 build に計測コードが無かった) ため、現 PR の既定 build (869/25) と一致する。
+- `5dbc6db9` (前回レビュー run): OFF 14.199 s / ON 14.113 s、ok=869 / trap=25。同一 HEAD でも elapsed は 11〜14 s で揺れる。
+- `8f7a2303` (旧 HEAD): OFF 14.03 s / ON 13.83 s、ok=869 / trap=25。
+- elapsed は run ごとに揺れるため、判定の根拠にしない (判定は計数・指紋のみ)。
+
 ## 2. 感度 (受入条件 3・ネガコン) と dest 観測
 
 - 観測手段: 計測 build のみ。`m11_post.py` が 413060 の wrapper (OFF) に、`m11_ov.c` が ON 版 function_413060 に、`m11_dest_obs(dest)` を呼ぶ。`m11_rt.c` が呼出し後の `*dest` (文字列ポインタ) を FNV 風に畳み、`_m11_dest_obs_hhi/hlo/n` で export。survey が `dest_obs_n`・`dest_obs_hash` として出力する。
