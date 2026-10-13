@@ -227,3 +227,9 @@ delay closure 142 関数の近似命令は rcpps 4 箇所のみ (すべて 0x180
 |---|---|---|
 | /tmp (tmpfs 3.7GB) の emscripten_temp が `Disk quota exceeded` で一括再実行が失敗 (TMPDIR=`work/tmp` で解消)・一括 1000 trial は globals.c 1.25GB で稀に SIGKILL | 個別 build の和で担保 | 親 CAB-53 にコメント |
 | 検証範囲外: 別 CPU での strict 比較は未実施 (§13-4 の「wasm helper は C テーブル lookup・SIMD 近似命令不使用」も適用。legacy gate の再現は HEAD 版 compare.mjs を `work/` に展開する形・work/ は gitignore) | — | — |
+
+### 1116 HeapAlloc 過大要求・領域超過の 0 返却 (未検証の残り)
+
+- 変更: `lift/gen_stubs_sigs.py` の `HEAP_C` と `harness/scen_khmath.h` `n_HeapAlloc` / `scen_khmaster.h` `khb_HeapAlloc` を同じ規約 (1MiB 超・領域超過で `return 0`、cursor 不変) に揃えた。
+- 実測 (HEAD 19cdf357、gcc -O0 x86_64 ホスト): `python3 tools/targets/kilohearts/snapins/harness/heap_alloc_diff.py` → `total=32 mismatches=0` (exit 0)。
+- 未実施: `run_all.sh` による 13 本 + khmrel/khmaster/khmring の bit-exact 突合、RetDec lift、emcc 再ビルド。理由は素材不足 (`$ARTIFACTS_DIR` は `fl-win64.tar.zst` のみ = FL Studio インストーラー 1 本。`plugins-kilohearts` / `toolchain-retdec` / `toolchain-emsdk` 無し)。#1116 で継続。
