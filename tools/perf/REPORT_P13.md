@@ -55,13 +55,32 @@
 
 - 受入条件 1 (方式比較と決定記録): **達成** (D9)。
 - 受入条件 2 (chunked.mjs → fetchCompile 結線): **達成** (loader_boot.ts)。
-- 受入条件 3 (>24MiB の実測 n≥3, min–max): **部分達成**。合成 32.6 MiB で実施。実 FLEngine 規模 (>24MiB 本体) の実測は未了。
+- 受入条件 3 (>24MiB の実測 n≥3, min–max): **達成** (§7。実 FLEngine wasm 26.4 MiB で実施。合成 32.6 MiB は §3 のとおり参考値)。
 - **結線の範囲: `fetchCompile` 関数レベルまで。runtime の manifest 経路は未接続。** `tools/runtime/stage_wasm.mjs` は単一ファイル URL しか出さず、`*.parts/index.json` を `entry.file` に入れる経路が無い。本番 runtime の経路からはまだ到達しない。manifest 経路の結線は #1166 `[PERF-P18]` で追跡。
 
 ## 6. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 実 FLEngine 規模 (>24MiB) の download→compile→instantiate 実測 | 受入条件 3 の本体 | #1150 `[PERF-P16]` |
+| (解消) 実 FLEngine 規模 (>24MiB) の download→compile→instantiate 実測 | §7 で実施済み (#1150) | — |
 | `chunked.test.mjs` が release-guard deny-list 不在で既存 8 件 FAIL | テストが通らない (CI 環境) | #1151 `[PERF-P17]` |
 | manifest 経路 (`stage_wasm.mjs` → runtime) が `*.parts/index.json` を出さない | 本番 runtime から未到達 | #1166 `[PERF-P18]` |
+
+## 7. 実 FLEngine wasm (26.4 MiB) の実測 (#1150 / PERF-P16)
+
+- **素材**: `tools/flelift/fle_lift.sh` で FLEngine_x64.dll 全体 (7,018 関数 / 340,761 命令 / unsup 0) を lift → emcc -O0 で `flel.wasm` 27,639,303 B (26.4 MiB)。`fl-win64` 素材 (`FL_WIN64_DIR`) から生成。生成物は `tools/flelift/work/` (gitignore)。
+- **分割**: `deploy/scripts/05-stage.mjs --max-file 24MiB --part-size 16MiB` → 2 part (sha `b92b83ae3549`)。
+- **注意 (合成との差)**: wasm は `env` 3 関数・`wasi_snapshot_preview1` 3 関数の import を持つ。bench は全 import を no-op stub で与えて instantiate する。判定は instantiate 成功 + export>0 (`f0` は無い)。実行 (`fle_init` 等) は行っていない。download→compile→instantiate のみの計測。
+- **計測**: `node tools/perf/delivery/chunked_bench.mjs --wasm tools/flelift/work/lift/flel.wasm --reps 3 --mbps 0,100 --out tools/perf/work/chunked_real_head.json`。測定 commit `4d3a32f6` (bench 変更を含む HEAD)。headless Chrome 154、node v22.23.3、4 コア、loadavg 0.29〜0.31。
+
+| 帯域 | 方式 | 中央値 | min–max |
+|---|---|--:|--:|
+| 無制限 (loopback) | streaming | 116.3 | 111.4–162.2 |
+| 無制限 (loopback) | bytes | 115.6 | 113.5–129.7 |
+| 100 Mbps/接続 | streaming | 1422.2 | 1414.2–1441.5 |
+| 100 Mbps/接続 | bytes | 1425.1 | 1421.6–1426.8 |
+
+- 結果: **12/12 PASS** (全件 instantiate 成功、exports>0)。
+- 100 Mbps/接続 の実測 (1422 ms) は、サイズ比で按分した値 (合成 1458 ms × 26.4/32.6 ≈ 1181 ms) より約 20% 大きい。原因は未切り分け (part 数 3→2、wasm の中身の差などが候補。確定には別測定が要る)。
+- 注記: 帯域制限は接続ごと (§2 と同じ)。
+- 残り (未解決): 本番 runtime の manifest 経路は未接続 → #1166 `[PERF-P18]`。
