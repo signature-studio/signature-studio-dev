@@ -171,7 +171,7 @@ leaf_diff は IR leaf かつ機械語に間接 call 無しの 23 関数のみを
 - `leaf_diff.sh`: rc 0、138 s (開始時 load 6.81、スクリプト記録 load 1.08)。**最終判定 一致 17 / 不一致 6 / 実行不能 0**。集合一致 EQ、IR から call 脱落 0。`2b84c6f5` の §10.11 と一致。
   - 0x5de250 (19006): match 8/8/11。0x6f1650 (19059): match 11/11/11。0x6c8fc0 (18975): match 8/8/11。
   - mismatch 6: 0x6bfec0・0x6c9b60・0x6b0ef0・0x6c8c90・0x6cc2e0・0x6ca5c0 (修正前からの未解決と同じ集合)。
-- `nc_leaf.py` (ネガティブコントロール、HEAD `3b38f81d`): rc 0、204 s (開始時 load 0.71)。実行には `FL_WIN64_DIR` を `$RUNNER_TEMP/fl-win64` に向ける必要があった (既定の `/home/ubuntu/...` では PE が無く失敗)。
+- `nc_leaf.py` (ネガティブコントロール、HEAD `3b38f81d`): rc 0、203 s (開始時 load 0.71)。実行には `FL_WIN64_DIR` を `$RUNNER_TEMP/fl-win64` に向ける必要があった (既定の `/home/ubuntu/...` では PE が無く失敗)。
   - 結果 (変異後 mismatch 検出 / ベースライン match の変異対象):
 
 | kind | 変異対象 (ベースライン match) | 変異後 mismatch (検出) | match のまま (未検出) | unexec |
