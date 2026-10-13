@@ -110,7 +110,7 @@
 | パス | 行数目安 | 何が書かれているか |
 |---|---:|---|
 | `tools/m11/REPORT.md` | ~250 | FLEngine_x64.dll 部分起動 PoC (stage 4/6・残 trap・次の一手)・§11 (#572, 要約のみ)・§12 survey の OOM/clobber 分離 (#513)。§8 (LB_BASE #222)・§9 (sigfix #131) は `REPORT_APPENDIX.md` に分割 |
-| `tools/m11/REPORT_APPENDIX.md` | ~140 | m11 REPORT §8 (LB_BASE=0x10000 適用 #222)・§9 (sigfix 0 詰め #131)・§12 の一部 (#513 新規類型の行案) の全文 (250 行上限のため本体から無変更で分割移動) |
+| `tools/m11/REPORT_APPENDIX.md` | ~190 | m11 REPORT §8 (LB_BASE=0x10000 適用 #222)・§9 (sigfix 0 詰め #131)・§12 の一部 (#513 新規類型の行案)・§12b (#513 巨大 VirtualAlloc の n の出所) の全文 (250 行上限のため本体から無変更で分割移動) |
 | `tools/m11/REPORT_N21.md` | ~35 | M11-N21 (#572): m11_data_gen.py の DIR64 補正境界 off-by-one の全数照合・参照経路・修正・ネガコン・実測 (REPORT §11 は要約のみ) |
 | `tools/m11/rtl/REPORT.md` | ~175 | Delphi RTL の VA 範囲確定 + RTL 帯 (System/Types/SysUtils 1,172 関数) の lifter 別 liftdiff 採点 (#129) |
 | `tools/m11/alloca/REPORT.md` | ~150 | alloca 縮退修正 (CAB-129) |

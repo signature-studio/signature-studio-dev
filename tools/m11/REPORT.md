@@ -230,11 +230,9 @@ callee が `[rcx+0x2c..0x3e]` (GetCPInfo の LeadByte 表) に書くため、呼
 
 つまり ok→非 ok の退行は **OOM 除外後 2 本 (87, 898)** のみで, 849→816 の 33 本差は大半が OOM の巻き添えだった (旧 `6ad441d→a71a404` の ok→trap 33 本の内訳も同型と推定。未再測)。
 
-### 巨大 VirtualAlloc (355MB×2) の呼出元と必要性
-現 HEAD では通常起動の VirtualAlloc は 1 回 (1.3 MB) で **355MB×2 は再現しない** (`alloca/REPORT.md` 残置 #5 は R8 等で解消済みの可能性。survey の 64MB 以上要求は下の 2 つだけ, `M11_VA_BIGTRACE=1`):
-* unit 368 (0x5810f0=`function_9810f0`) → `980ed0` (ctor; 基底 ctor `6a3be0` は既定 44100 Hz) → `981000` (8 面バッファ確保: size = 8×((8n+31)&~31) ≈ 64n B, n = `*(int32*)(*(u64*)VA 0x15e4080)`) → `409470` → FastMM 大ブロック。**要求 700.7 MB (main) / 190.6 MB (PR)** と build で変わる = 値が不定。n の出所は**未確定** (image 静的値の指す先は 0、実行時の値は未観測。基底 ctor の `call [rbx]` 仮想呼出しの脱落 = D15 の疑いは**推定**)。
-* unit 888 (0xeaea40=`function_12aea40`) → `129f140` → `417fc0` → `417b70` → `409470`: 71.3 MB (両 build 同値, 必要性は未確認)。
-→ 実機の初期化でこの大きさは要らない (推定)。上限 256MB では unit 368 (main) の 700.7MB 要求が oom 扱いになるため, main と比較するときは 1024MB を使う。
+### 巨大 VirtualAlloc の呼出元と必要性 (確定: 全文は `REPORT_APPENDIX.md` §12b) — 現 HEAD では通常起動の VirtualAlloc は 1 回 (1.3 MB) で 355MB×2 は再現しない。survey の 64MB 以上の要求は 2 unit だけで、**どちらも lift 欠陥の産物で不要**:
+* unit 368 (`980ed0` → `981000` → `409470`): 190.6 MB (本 HEAD) / 700.7 MB (main `c1e4105`)。`980ed0` の `inttoptr i64 22954112` が VA→LVA 未 remap (正しくは 18759808) で、n = linear 0 の残骸 (0x2fa020 / 0x10af2ba8) → 式 8×((8n+31)&~31) の 64KB 丸めが両値と一致。1 行直すと要求が消える。
+* unit 888 (`129f140` → `417fc0` → `417b70`): 71.3 MB。`ptrtoint(inttoptr 18683649)` = 変数 [0x11d1700] のアドレス+1 を count に渡す load 脱落 (正しい値 65 → 260 B)。3 行直すと要求が消える。両方直しても survey の unit 別ラベル 942 本は不変。#516/PR #552 (qstore) の検出 420 行に該当関数なし、#418 (409470 ハング) は 410320 脱落で無関係。
 
 ### ネガティブコントロール (実測)
 * 単体 `node m11_vfree_test.mjs` (3 周 × 8MB × 100 = 累計 2.4 GB を確保→解放): 実解放 = **PASS** (OOM 0, 解放 301 回, 周ごと live 0 MB, 二重解放と未知 ptr は 2 回計数)。`M11_VFREE_NOOP=1` (解放しない) = **OOM 116 回・live 1,544.6 MB** (期待どおり NC_OK)。0.51 秒 (load 0.88)。
@@ -248,5 +246,5 @@ callee が `[rcx+0x2c..0x3e]` (GetCPInfo の LeadByte 表) に書くため、呼
 | unit 101 の `4fa210` list 走査が `47a250` (例外生成) を 23M 回繰り返す根因 (list の index/Count の誤 lift か, raise が戻る経路か) | PR HEAD の survey が 1 unit で 256MB (上限なし 1.48GB) 消費 | 新規子チケット案 [M11-N17] (PM 起票), #132 にコメント |
 | unit 144 の image 破壊 (書込み元関数と, 0 埋めの範囲・値) | clobber 1 unit。他 unit の結果に影響し得る | 同上 |
 | #411 の `418190` / `412d60` 転記が unit 87 / 898 で OOB (ok→trap 2 本) | main に入っている実退行 (#411 は merge 済み) | #132 に継続 (#411 は merge 済みで「PR 内で修正」は不可。新規子チケットを PM が起票) |
-| unit 368 の `981000` の n (700.7MB / 190.6MB) の出所, unit 888 の 71.3MB の必要性 | 巨大 alloc が 256MB 上限に依存 | 新規子チケット案 (D15 疑い) |
+| 10 進 `inttoptr` 命令 4,364 件 (942 関数) の VA→LVA 未 remap (368 の n の原因と同類型)。`M11_M2P=1` は survey が 90 秒で完走しない | 巨大 alloc 2 件は上の個別修正で消える。全件 remap は未解決 | #417 |
 | survey の clobber 検出は InitTable のみ | 他の image 破壊は ok に見える | #132 |
