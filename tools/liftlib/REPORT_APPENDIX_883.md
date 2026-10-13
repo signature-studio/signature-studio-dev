@@ -9,7 +9,7 @@ REPORT_APPENDIX.md が 250 行上限を超えているため、#883 の実測は
 
 | 受入条件 | 状況 |
 |---|---|
-| `leafspec targets/ott_getparam.json --n 200` rc=0・match 1.0・wasm_trap 0 | 未達 (下記ベースライン・出所未確認の引用) |
+| `leafspec targets/ott_getparam.json --n 200` rc=0・match 1.0・wasm_trap 0 | 未達 (§17.9 参照・出所未確認) |
 | 修正方向を機械語と IR の突合で決め REPORT に書く | 一部 (下記「確定事項」)。方式の決定は未了 |
 | ネガコン (修正を外すと match 0) | 未着手 |
 | `liftlib_e2e.sh` / regress 登録 | 未着手 (FAIL のまま登録しない) |
@@ -27,7 +27,7 @@ BLK の算出式・32bit 切り詰め・`ICALL_BLK` 不一致・パイプライ�
 ## 引用値と IR 確認 (未再測定)
 
 本 PR (fix run) では再実行していない。`$ARTIFACTS_DIR` に実在するのは `fl-win64.tar.zst` のみで、`analysis-ott-binaries`・`work-*`・`toolchain-*` は展開されていない。
-下表の leafspec 数値 (`rc=1`・`match=0 / mismatch=200 / wasm_trap=200`) は §17.9 の記録の引用であり、出所未確認の引用。本ファイルで独立に再測定したものではない。
+leafspec の測定値は [`REPORT_APPENDIX.md` §17.9](REPORT_APPENDIX.md) を参照 (出所未確認の引用。本ファイルで独立に再測定したものではない)。
 §17.9 の測定 commit は `83cd9eb4` と記録されているが、その実行 run ID・CI ログは本ファイル作成時点で特定できていない (`gh run list` で `83cd9eb4` に紐づく run は 0 件)。
 
 IR 上の読み (下記) は `work/ott_getparam/` の生成物を参照したものだが、`work/` は gitignore 対象で本 PR からは再生成できず、生成手順・件数の数え方も未記録。**以下はすべて未検証の仮説**であり、件数は根拠にしない:
