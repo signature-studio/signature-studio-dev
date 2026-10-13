@@ -211,7 +211,7 @@ Morphine は後段のみの秒 (下記)。
 
 ## 10. #535: 未実装 helper 7 件と i256 trap の解消
 
-既知類型との関係 (`docs/DEFECTS.md`): 該当なし (silent miscompile ではなく、helper 未実装を loud に宣言していた欠落の補完。 差分試験で命令単位の bit 一致を確認した)。 検証起点 commit: f251ca6。
+既知類型との関係 (`docs/DEFECTS.md`): 該当なし (silent miscompile ではなく、helper 未実装を loud に宣言していた欠落の補完。 差分試験で命令単位の bit 一致を確認した)。 検証起点 commit: aef6120 (下表の `--skip-lift` / `synth_nega.sh` / `helper_diff.sh` は aef6120 で再実行して同じ結果。 f251ca6 以降の変更は helper_diff の 128bit vaddps 検査の追加のみ)。
 
 | 旧 (§2 の記録) | 原因 | 対処 |
 |---|---|---|
@@ -228,11 +228,11 @@ Morphine は後段のみの秒 (下記)。
 | 項目 | 実測 |
 |---|---|
 | `[simd2]` 行 (Harmless / Kepler Exo / Wave Traveller) | declares 62 / 36 / 44: implemented 62 / 36 / 44、**unimplemented 0 / 0 / 0、i256 trap 0 / 0 / 0**。 `fix_avx256` (Harmless): ymm 演算 lower 32 件 / VEX store 復元 8 件 / 不要 declare 除去 7 件。 3 本とも `emcc -c` rc 0 |
-| `bash synth/helper_diff/helper_diff.sh` (native 実命令との差分。 `-mavx2`、N=200000、HEAD f251ca6) | **checks=12,040,001 mismatches=0**、exit 0、7 秒。 検査: cmpnltps / movmskps (NaN・±0・inf 混在) / prefetcht0 / rep movsd (重なり・長さ 0 含む) / rep stosb (al の上位ビットを無視) / ymm の 6 演算 / 128bit `vaddps__8` / vmovaps / vextractf128 0,1 / VEX store (256・128bit) |
+| `bash synth/helper_diff/helper_diff.sh` (native 実命令との差分。 `-mavx2`、N=200000、HEAD aef6120) | **checks=12,040,001 mismatches=0**、exit 0、7 秒。 検査: cmpnltps / movmskps (NaN・±0・inf 混在) / prefetcht0 / rep movsd (重なり・長さ 0 含む) / rep stosb (al の上位ビットを無視) / ymm の 6 演算 / 128bit `vaddps__8` / vmovaps / vextractf128 0,1 / VEX store (256・128bit) |
 | 差分試験のネガティブコントロール (実装を 1 箇所壊す) | **8/8 が rc 1 で mismatch > 0**: cmpnltps (`!(x<y)` → `x>=y`) 308,280 / movmskps (sign bit の位置) 395,374 / stosb (長さ −1) 19,822 / movsd (重なりでも memmove) 11,059 / 128bit vaddps (`x+y` → `x-y`) 306,390 / min (`olt` → `ogt`) 1,019,814 / vextractf128 1 (上位 → 下位) 199,997 / VEX 128bit store (`store i256 0`) 200,000。 sed が当たらなかった変異は FAIL にする |
 | `synth_e2e.sh` 全工程 (`JOBS=4`、スクリプト a824a1d) | exit 1、958 秒。 judge: PASS 12 / KNOWN 9 / NEW-FAIL 0。 strict: PASS 12 / NEW-FAIL 9。 **`matrix_check` が 90/91 で rc 1**: PLUGIN_MATRIX の Harmless `batch.unimpl_helpers` 5 と実測 0 の食い違い。 → `PLUGIN_MATRIX.json` を 5 → 0 に更新 (f251ca6)。 gate は意図通り不一致で落ちた |
-| **コミット済み HEAD f251ca6 の `synth_e2e.sh --skip-lift`** | **exit 0、194 秒** (開始時 load average 0.57、終了時 0.99、並列 1)。 matrix_check 91/91、ids_crosscheck 12/12、judge: PASS 12 / KNOWN 9 / NEW-FAIL 0 / FIXED 0 / MISSING 0。 `[synth_e2e] OK` |
-| HEAD f251ca6 の `synth_nega.sh` | exit 0、11 秒。 NC1〜NC5 すべて期待通り (§6) |
+| **コミット済み HEAD aef6120 の `synth_e2e.sh --skip-lift`** | **exit 0、194 秒** (開始時 load average 0.57、終了時 0.99、並列 1)。 matrix_check 91/91、ids_crosscheck 12/12、judge: PASS 12 / KNOWN 9 / NEW-FAIL 0 / FIXED 0 / MISSING 0。 `[synth_e2e] OK` |
+| HEAD aef6120 の `synth_nega.sh` | exit 0、11 秒。 NC1〜NC5 すべて期待通り (§6) |
 | `known.json` | 3 本の `#535` 行を削除。 baseline に載ったまま解消した行は FIXED で落ちるため、削除が必須 |
 | shell 3 本の lift 秒 (逐次) | 34 / 18 / 41 (旧 §2: 20 / 9 / 19)。 `fix_avx256` 自体は 1 秒未満で、増加の原因は未調査 (同一 HEAD での反復無し。 全工程の run は 4 並列で RetDec と同時に走る別条件) |
 
