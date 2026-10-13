@@ -1,6 +1,8 @@
 """cli.py — python3 -m liftlib <command>
 
-  lift <cfg.json> [--n N] [--no-diff]   RetDec → 修復 pass → helper 自動生成 → emcc → 差分ハーネス (実機 vs wasm)
+  build <cfg.json> [--profile std]      標準ビルド入口 (PERF-P1 / #155): RetDec → 修復 → helper → 標準設定 (-O3 -flto + gc-sections + 最小 export)
+                                        + 署名ガード (ref/o2/o3/std の全変種で出力署名が一致しなければ exit 1・<name>.cjs を作らない)
+  lift <cfg.json> [--n N] [--no-diff]   RetDec → 修復 pass → helper 自動生成 → emcc (旧 -O1) → 差分ハーネス (実機 vs wasm)
   detect <cfg.json>                     修復せず検出器だけ実行 (P1/F7/F2 の所見を JSON で出力)
   diagnose <cfg.json>                   pass 単位の対照実験 (どの修復が必須か) + 未修復所見
   simd gen <ll...> -o out.c [--canon]   __asm_* 宣言から C helper 生成
@@ -18,6 +20,7 @@ import sys
 import time
 
 from . import pipeline, env
+from . import stdbuild as SB
 from .harness import diff as D
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -48,6 +51,20 @@ def cmd_lift(a):
     ok = s["mismatch"] == 0 and s["native_crash"] == 0 and s["match"] > 0
     print("[lift] RESULT %s: %s" % (cfg["name"], "BIT-EXACT %d/%d steps (%d scenarios)" % (s["match"], s["steps"], s["scenarios"]) if ok else "FAIL"))
     return 0 if ok else 1
+
+
+def cmd_build(a):
+    variants = [v for v in a.variants.split(",") if v] if a.variants else None
+    try:
+        cfg, wd, cjs, stats, log, rep = pipeline.run_build(a.cfg, workdir=a.workdir, profile=a.profile, variants=variants, n=a.n,
+                                                           expect=a.expect, timeout=a.timeout)
+    except SB.SignatureMismatch as e:
+        print("[build] FAIL (署名ガード): %s" % e, file=sys.stderr)
+        return 1
+    for v, r in rep["variants"].items():
+        print("[build]   %-5s wasm %8d B  build %5.1fs  sig %s" % (v, r["wasm_bytes"], r["build_s"], r["sig"]))
+    print("[build] PASS %s: profile=%s 署名 %s (%d 変種一致) → %s" % (cfg["name"], a.profile, rep["guard"]["unique"][0], len(rep["variants"]), cjs))
+    return 0
 
 
 def cmd_detect(a):
@@ -278,6 +295,11 @@ def main(argv=None):
     p = sp.add_parser("lift")
     p.add_argument("cfg"); p.add_argument("--n", type=int); p.add_argument("--no-diff", action="store_true")
     p.add_argument("--workdir"); p.add_argument("--timeout", type=int, default=300); p.set_defaults(fn=cmd_lift)
+    p = sp.add_parser("build")
+    p.add_argument("cfg"); p.add_argument("--profile", default=SB.load()["default_profile"], choices=SB.profile_names())
+    p.add_argument("--variants", default="", help="署名ガードの変種 (カンマ区切り; 既定 %s)" % ",".join(SB.load()["guard_variants"]))
+    p.add_argument("--expect", help="期待署名 (cfg.signature.expect でも可)"); p.add_argument("--n", type=int, help="署名用シナリオ数 (cfg.signature.n / spec.scenarios)")
+    p.add_argument("--workdir"); p.add_argument("--timeout", type=int, default=300); p.set_defaults(fn=cmd_build)
     p = sp.add_parser("detect")
     p.add_argument("cfg"); p.add_argument("--workdir"); p.set_defaults(fn=cmd_detect)
     p = sp.add_parser("diagnose")
