@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """x64c の no_wasm_definition 関数 (RTL 帯) の正体を PE から静的に分類する (#410).
 
-usage: thunk_classify.py <block00031_PE.bin> <flelift_batch.jsonl> [--lo 0x401000] [--hi 0x456e98]
-batch.jsonl は liftdiff batch の出力。verdict=unexec かつ unexec_reason=no_wasm_definition の VA を対象にし、
+usage: thunk_classify.py <block00031_PE.bin> <flelift_batch.jsonl|flelift_closure_verdicts.tsv> [--lo 0x401000] [--hi 0x456e98]
+batch.jsonl は liftdiff batch の出力。tools/liftdiff/results/flelift_closure_verdicts.tsv (commit 済み) も入力にできる。verdict=unexec かつ unexec_reason=no_wasm_definition の VA を対象にし、
 各関数の先頭命令が jmp [rip+disp32] (FF 25, import thunk) かを調べ、飛び先 IAT のヒント名 (DLL!関数名) で数える。
 """
 import argparse, collections, json, struct
@@ -59,9 +59,15 @@ def main():
 
     vas = []
     for l in open(a.batch):
-        r = json.loads(l)
-        va = int(r['function']['va'], 16)
-        if lo <= va < hi and r.get('verdict') == 'unexec' and r.get('unexec_reason') == 'no_wasm_definition':
+        if a.batch.endswith('.tsv'):
+            if l.startswith('#'):
+                continue
+            c = l.rstrip('\n').split('\t')
+            va, verdict, reason = int(c[0], 16), c[2], c[5]
+        else:
+            r = json.loads(l)
+            va, verdict, reason = int(r['function']['va'], 16), r.get('verdict'), r.get('unexec_reason')
+        if lo <= va < hi and verdict == 'unexec' and reason == 'no_wasm_definition':
             vas.append(va)
 
     kind = collections.Counter(); who = collections.Counter(); ins = collections.Counter()
