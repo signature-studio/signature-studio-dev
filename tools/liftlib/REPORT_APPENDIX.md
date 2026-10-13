@@ -161,7 +161,9 @@ RetDec は `void(i128,i128,i8)` と lift し ECX/EFLAGS を捨てる → **void 
 | leafspec | RESULT: PASS (exp 40/40, log gate PASS) | — |
 | 同 HEAD の 2 回目 review run: `simd test` / `simd report` / unit T5・T17a / ネガコン NC2 | mismatch 0 / 未被覆 0 / ok / NC2 は BAD で検出し復元後 mismatch 0 | 4.9 秒 (load 0.85 / 0.74 / 0.32) |
 
-`regress` の `ott_auto_none` (旧既定 `--auto none`) は FAIL (census junkHi 175)。reviewer が origin/main `89a1a30` でも census 値まで同一の FAIL を確認しており、**本 PR 起因ではない** (追跡 issue は PM 起票待ち)。
+`regress` の `ott_auto_none` (旧既定 `--auto none`) は当時 FAIL (census junkHi 175 を表示)。reviewer が origin/main `89a1a30` でも census 値まで同一の FAIL を確認しており、**本 PR 起因ではない** (追跡: #478)。
+
+**#478 の調査結果・修正・ネガコン・再計算スクリプトは [`REPORT_APPENDIX_C.md`](REPORT_APPENDIX_C.md) §20 に移した** (本ファイルの 250 行目安のため)。
 
 **(3) 本更新 run の再測定** — HEAD `e86e6e8` (origin/main `91a83a5` を merge 済み)、nproc=4、並列なし。素材は `plugins-ott`・`toolchain-retdec`・`toolchain-emsdk`・`work-liftlib`・`work-liftlib-targets` のみ
 (RetDec の raw `.ll` は `work-liftlib` のキャッシュで `--fresh` ではない):

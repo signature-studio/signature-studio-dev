@@ -456,18 +456,25 @@ def _ext_round64(h2, l2, base, mi, out, chop=False, mul=False):
     v_kf = mi.get(base, 'kf')
     v_kc = mi.get(base, 'kc')
     v_kp = mi.get(base, 'kp')
+    v_lpos = mi.get(base, 'lpos')
+    v_hpos = mi.get(base, 'hpos')
+    v_dec = mi.get(base, 'dec')
     out.append('  %s = bitcast double %s to i64' % (v_bt, h2))
     out.append('  %s = lshr i64 %s, 52' % (v_e10, v_bt))
     out.append('  %s = and i64 %s, 2047' % (v_oa, v_e10))
     out.append('  %s = icmp uge i64 %s, 65' % (v_ob, v_oa))
     out.append('  %s = icmp ule i64 %s, 2044' % (v_ok, v_oa))
     out.append('  %s = and i1 %s, %s' % (v_and, v_ob, v_ok))
-    # grid shift: h2 が厳密に 2 のべき乗で lo < 0 のとき正確値は下の binade に
-    # 落ちるので ulp64 は半分 (shift 64)。それ以外は 63。
+    # grid shift: h2 が厳密に 2 のべき乗で「大きさが減る向き」(h2>0 かつ lo<0 / h2<0 かつ lo>0)
+    # のとき正確値は下の binade に落ちるので ulp64 は半分 (shift 64)。それ以外は 63。
+    # (P0c-8: 旧実装は lo<0 のみ判定で h2=-2^k, lo<0 を誤って shift 64 にしていた)
     out.append('  %s = and i64 %s, 4503599627370495' % (v_pow2, v_bt))
     out.append('  %s = icmp eq i64 %s, 0' % (v_p2z, v_pow2))
     out.append('  %s = fcmp olt double %s, 0.0' % (v_lneg, l2))
-    out.append('  %s = and i1 %s, %s' % (v_shb, v_p2z, v_lneg))
+    out.append('  %s = fcmp ogt double %s, 0.0' % (v_lpos, l2))
+    out.append('  %s = fcmp ogt double %s, 0.0' % (v_hpos, h2))
+    out.append('  %s = select i1 %s, i1 %s, i1 %s' % (v_dec, v_hpos, v_lneg, v_lpos))
+    out.append('  %s = and i1 %s, %s' % (v_shb, v_p2z, v_dec))
     out.append('  %s = select i1 %s, i64 64, i64 63' % (v_sh, v_shb))
     out.append('  %s = add i64 2046, %s' % (v_eb2, v_sh))
     out.append('  %s = sub i64 %s, %s' % (v_eb3, v_eb2, v_oa))
@@ -618,8 +625,8 @@ def _ext_fist_round(X, mi, chop, out):
     """fist の d-based 単一丸め (53-bit 中継を経ない) + R10 clamp。
     ext_core_test.c dd_fist_near / dd_fist_chop と同一 (bit 一致検証済)。
 
-    near: n0 = rint(hi); d = (hi-n0)+lo (exact); |d|>0.5 はその側,
-          |d|=0.5 は偶数側 (n0 の LSB で判定)。
+    near: n0 = rint(hi); d0 = hi-n0 (exact, |d0|<=0.5)。tie 判定は d0==±0.5 と lo の符号で行う
+          (P0c-8: 旧実装は d=(d0+lo) を f64 で丸めて 0.5 と比較し、lo の符号を失っていた)。
     chop: n0 = trunc(hi); (hi-n0)=0 で lo が hi と反符号 -> 0 側 1 歩
           (V = hi+lo は整数から外れる; trunc_tz は整数側に丸まる)。
     clamp: |丸め値| >= 2^31 -> -2^31 (x87 fist overflow -> integer indefinite)。"""
@@ -648,6 +655,8 @@ def _ext_fist_round(X, mi, chop, out):
         n0, d0, d1 = v('n0'), v('d0'), v('d1')
         p1, m1 = v('p1'), v('m1')
         g1, l1 = v('g1'), v('l1')
+        g1a, g1b, l1a, l1b = v('g1a'), v('g1b'), v('l1a'), v('l1b')
+        h5, hm5, lp0, ln0, lz0 = v('h5'), v('hm5'), v('lp0'), v('ln0'), v('lz0')
         q1, q2 = v('q1'), v('q2')
         bt, od, oi = v('bt'), v('od'), v('oi')
         ep, em = v('ep'), v('em')
@@ -658,15 +667,24 @@ def _ext_fist_round(X, mi, chop, out):
             '  %s = fadd double %s, %s' % (d1, d0, vl),
             '  %s = fadd double %s, 1.0' % (p1, n0),
             '  %s = fadd double %s, -1.0' % (m1, n0),
-            '  %s = fcmp ogt double %s, 0.5' % (g1, d1),
-            '  %s = fcmp olt double %s, -0.5' % (l1, d1),
-            '  %s = fcmp oeq double %s, 0.5' % (q1, d1),
-            '  %s = fcmp oeq double %s, -0.5' % (q2, d1),
+            '  %s = fcmp ogt double %s, 0.5' % (g1a, d1),
+            '  %s = fcmp oeq double %s, 0.5' % (h5, d0),
+            '  %s = fcmp oeq double %s, -0.5' % (hm5, d0),
+            '  %s = fcmp ogt double %s, 0.0' % (lp0, vl),
+            '  %s = fcmp olt double %s, 0.0' % (ln0, vl),
+            '  %s = fcmp oeq double %s, 0.0' % (lz0, vl),
+            '  %s = and i1 %s, %s' % (g1b, h5, lp0),
+            '  %s = or i1 %s, %s' % (g1, g1a, g1b),
+            '  %s = fcmp olt double %s, -0.5' % (l1a, d1),
+            '  %s = and i1 %s, %s' % (l1b, hm5, ln0),
+            '  %s = or i1 %s, %s' % (l1, l1a, l1b),
+            '  %s = and i1 %s, %s' % (q1, h5, lz0),
+            '  %s = and i1 %s, %s' % (q2, hm5, lz0),
             '  %s = bitcast double %s to i64' % (bt, n0),
             '  %s = and i64 %s, 1' % (od, bt),
             '  %s = icmp ne i64 %s, 0' % (oi, od),
             '  %s = select i1 %s, double %s, double %s' % (ep, oi, p1, n0),
-            '  %s = select i1 %s, double %s, double %s' % (em, oi, n0, m1),
+            '  %s = select i1 %s, double %s, double %s' % (em, oi, m1, n0),
             '  %s = select i1 %s, double %s, double %s' % (s1, g1, p1, n0),
             '  %s = select i1 %s, double %s, double %s' % (s2, l1, m1, s1),
             '  %s = select i1 %s, double %s, double %s' % (f1, q1, ep, s2),
@@ -722,7 +740,7 @@ def _ext_store_f32(X, mi, chop, out):
     o('  %s = and i1 %s, %s' % (nad_, nong_, away_))
     o('  %s = or i1 %s, %s' % (chopadj_, ca2_, nad_))
     o('  %s = bitcast double %s to i64' % (bt_, vh))
-    o('  %s = and i64 %s, 4503599627370495' % (lo_, bt_))
+    o('  %s = and i64 %s, 536870911' % (lo_, bt_))          # 下位 29 bit (ext_core_test.c と同一: 0x1FFFFFFF)
     o('  %s = icmp eq i64 %s, 268435456' % (midv_, lo_))
     o('  %s = and i1 %s, %s' % (mid_, midv_, nong_))
     o('  %s = xor i1 %s, %s' % (nd_, naw_, away_))
@@ -737,7 +755,7 @@ def _ext_store_f32(X, mi, chop, out):
         o('  %s = fmul float %s, 1.0' % (s_, resc_))
     else:
         o('  %s = select i1 %s, float %s, float %s' % (stepn_, naw_, awayf_, tow_))
-        o('  %s = select i1 %s, float %s, float %s' % (resn_, nearadj_, stepn_, f_))
+        o('  %s = select i1 %s, float %s, float %s' % (resn_, nearadj2_, stepn_, f_))
         o('  %s = fmul float %s, 1.0' % (s_, resn_))
     return s_
 
