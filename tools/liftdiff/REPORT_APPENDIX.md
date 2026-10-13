@@ -133,7 +133,7 @@ case 単位分類 (完全再現) を基準にすること。「実行不能 2,49
   z / s / p0 は wasm=trap/ok → wasm=ok (native_fault) になった。p1 / p01 / pall / pall2 / qall は native・wasm とも fault のまま。
 
 ### 検証範囲 / 範囲外
-- 範囲内: 2 スクリプトの出力 (`results/*.md`) の再計算、ネガティブコントロール (`m11_unreachable_diverge.md` §4: 候補 4 関数の IR に call を足すと全て非候補に変わる)。
+- 範囲内: 2 スクリプトの出力 (`results/*.md`) の再計算、ネガティブコントロール (`m11_unreachable_diverge.md` §5: 候補 4 関数の IR に call を足すと全て非候補に変わる)。
 - 範囲外: 上記 手動実測、`liftdiff_e2e.sh`・batch 再走、`mach()` の線形走査 (最初の `ret`/`int3` まで) による早期 return 関数の間接 call 数え落とし。
 
 ### 未解決
