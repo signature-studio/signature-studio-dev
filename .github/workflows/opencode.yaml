@@ -99,10 +99,14 @@ jobs:
       #    これにより準備ステップが .github/scripts/ 以下のファイルにアクセス可能。
       #    should_run 依存ではなく無条件で実行する。
       # ---------------------------------------------------------------------
+      # pull_request_review の GITHUB_SHA は refs/pull/N/merge なので、ref 未指定だと PR 側の
+      # .github/actions と .github/scripts が secrets 付きで実行される。fix モードでは base
+      # (main の正本) を checkout し、agent が `gh pr checkout` で PR ブランチへ移る。
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          ref: ${{ github.event_name == 'pull_request_review' && github.event.pull_request.base.ref || '' }}
           persist-credentials: false
 
       # ---------------------------------------------------------------------
