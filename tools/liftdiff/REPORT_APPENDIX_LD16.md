@@ -94,7 +94,7 @@ OTT 旧 chain (`build ott_old` + `batch --set closure --shards 4` + `tests/check
 
 ## 7. LD-32 (#1070): 8 関数の機序 (パターン単位の観測) と m11 sample:800 の n=3
 
-測定: `c4e93550` (main 取り込み時点の HEAD)・Actions runner (4 vCPU・load 1 分平均 1.5〜6.9)。素材 `fl-win64` `work-m6-ott` `work-m11` `work-liftdiff` `work-liftlib` `analysis-ott-binaries` を展開。`bash tools/liftdiff/liftdiff_e2e.sh` は exit 0・`LIFTDIFF_E2E PASS`・所要 約 3 分 (本 run 1 回目)。OTT 集計 35 / 112 / 65 は §1 の `986e7415` と一致 (D1〜D6 = 4/6/14/20/26)。ログは `results/liftdiff_e2e_ld32_head_c4e93550_n1.log` (commit 済み)。
+測定: `c4e93550` (main 取り込み時点の HEAD)・Actions runner (4 vCPU・load 1 分平均 1.5〜6.9)。`bash tools/liftdiff/liftdiff_e2e.sh` は exit 0・`LIFTDIFF_E2E PASS`・所要 約 3 分 (本 run 1 回目)。素材の根拠: 測定 run のログ `results/liftdiff_e2e_ld32_head_c4e93550_n1.log` の 118〜123 行に `[4/4] M11 closure 差分バッチ (sample:800)` の実行と 800 件の集計 (360/230/210) が出ており、m11 chain はこの run で実行された。**素材の一覧はこの測定 run では記録していない**。後続の fix run (`ed2b5cd2`〜) の `$ARTIFACTS_DIR` には `fl-win64` のみあり、`work-m11` `work-liftdiff` `work-m6-ott` `analysis-ott-binaries` は無い (PR 本文の「素材」行と一致)。OTT 集計 35 / 112 / 65 は §1 の `986e7415` と一致 (D1〜D6 = 4/6/14/20/26)。ログは `results/liftdiff_e2e_ld32_head_c4e93550_n1.log` (commit 済み)。
 
 ### 7.1 8 関数のパターン別観測 (観測メモ・未検証・再現不可)
 
@@ -119,10 +119,11 @@ OTT 旧 chain (`build ott_old` + `batch --set closure --shards 4` + `tests/check
 
 | run | 一致 | 不一致 | 実行不能 |
 |---|---|---|---|
-| 1 (e2e 内 [4/4]) | 360 | 230 | 210 |
-| 2 (batch のみ・同一 build) | 360 | 230 | 210 |
-| 3 (batch のみ・同一 build) | 360 | 230 | 210 |
+| 1 (e2e 内 [4/4]) | 360 | 230 | 210 | ログあり (`liftdiff_e2e_ld32_head_c4e93550_n1.log` 123 行) |
+| 2 (batch のみ・同一 build) | 360 | 230 | 210 | **報告値・ログ無し** (commit されたログも verdict も無い) |
+| 3 (batch のみ・同一 build) | 360 | 230 | 210 | **報告値・ログ無し** (同上) |
 
+- run2・run3 は一次ログが commit されておらず、件数は報告値として扱う。確認できるのは run1 (e2e ログ) のみ。
 - 件数は 3 回とも一致 (360 / 230 / 210)。これは**件数のみの達成**。関数単位の判定が変わったかは**未検証**: 関数ごとの verdict を記録した TSV が無く、件数が同じでも内訳の入れ替わりを排除できない。全 800 件の verdict TSV と比較手順は素材 `work-m11` `work-liftdiff` の再取得後に commit する (未解決の起票先は下表)。§4 の 361 / 360 / 361 の揺れは本 HEAD では件数の再現に留まる。
 - 結論: 揺れの原因は**特定不能** (再現せず)。§4 の「native timeout・負荷による揺らぎ」は推定のまま。揺れの再現条件 (負荷・shard 配置) は未確認。
 - 測定結果: `results/ld32_m11_sample800_n3_c4e93550.txt` (commit 済み)。
