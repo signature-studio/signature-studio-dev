@@ -5,8 +5,9 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { parseFlp, writeFlp, firstDiff } from '../src/flp.ts';
 import { summarize } from '../src/summary.ts';
 import { listFlhdFiles } from './_corpus.ts';
+import { FL_WIN64_DIR } from '../../shared/paths.mjs';
 
-const WIN = process.env.WIN_ROOT ?? '/home/ubuntu/work/analysis/win64';
+const WIN = process.env.WIN_ROOT ?? FL_WIN64_DIR;
 const man = JSON.parse(readFileSync(`${WIN}/block_manifest.json`, 'utf8')) as { idx: number; kind: string; path: string; dsize: number }[];
 const macHashes = new Set(listFlhdFiles().map((f) => createHash('sha256').update(readFileSync(f.abs)).digest('hex')));
 let winFlhd = 0;

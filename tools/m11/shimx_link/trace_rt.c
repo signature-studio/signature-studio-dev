@@ -2,6 +2,9 @@
  * ラッパ (__sxt_<name>) は gen_link.py が生成し sxt_enter(idx) を呼ぶ。
  * 現在 unit = System.InitContext の InitCount (VA 0x15eac98 = LVA 0x11eac98; InitUnits ループが i+1 を書く)。
  * 0 = InitUnits 開始前 (_StartLib/_InitLib 段階)。 */
+#ifndef M11_LB_BASE
+#define M11_LB_BASE 0   /* #222: LVA = RVA + M11_LB_BASE */
+#endif
 #include <stdint.h>
 #include <stdio.h>
 #include <emscripten.h>
@@ -19,7 +22,7 @@ static uint32_t g_log_n, g_dropped;
 static int g_print;
 
 void sxt_enter(int idx) {
-    uint32_t unit = *(volatile uint32_t*)(uintptr_t)0x11eac98u;
+    uint32_t unit = *(volatile uint32_t*)(uintptr_t)(0x11eac98u + M11_LB_BASE);
     if (g_cnt[idx]++ == 0) { g_first_unit[idx] = unit; g_first_seq[idx] = g_seq; }
     g_last_unit[idx] = unit;
     if (g_log_n < LOGCAP) g_log[g_log_n++] = ((uint32_t)idx << 16) | (unit & 0xffffu); else g_dropped++;

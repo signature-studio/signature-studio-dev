@@ -25,6 +25,12 @@ export type ManifestEntry = {
   memory: MemoryInfo;
   importCount: number;
   exportCount: number;
+  /** emcc glue (.mjs, hash 名) の manifest 相対 URL。あれば emscripten (pthread) 経路で起動する */
+  glue?: string;
+  /** 配信側が事前圧縮 (`<file>.br`) を持つ。サーバは Accept-Encoding: br なら Content-Encoding: br で返す */
+  encoding?: "br";
+  /** 事前圧縮後のバイト数 (wasm / glue) */
+  encodedBytes?: { wasm: number; glue?: number };
 };
 
 export type Manifest = { version: 1; generated: string; entries: ManifestEntry[] };

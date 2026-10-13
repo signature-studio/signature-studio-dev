@@ -1,9 +1,16 @@
 """env.py — emsdk (emcc/node) の環境を 1 回だけ取り込み, 以後 subprocess に引き継ぐ。"""
 import os
 import subprocess
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "shared"))
+from paths import ANALYSIS_DIR, PLUGINS_DIR  # noqa: E402
 
 _DONE = False
 EMSDK = os.environ.get("EMSDK_DIR", "/opt/emsdk")
+OTT_DLL = os.path.join(PLUGINS_DIR, "ott", "binaries", "OTT_vst2_win64.dll")
+# target json のパス欄で `${NAME}` として参照できる環境パス (固定の絶対パスを json に書かない)
+PATH_VARS = {"ANALYSIS_DIR": ANALYSIS_DIR, "PLUGINS_DIR": PLUGINS_DIR, "OTT_DLL": OTT_DLL}
 
 
 def ensure():

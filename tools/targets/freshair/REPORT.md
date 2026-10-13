@@ -116,7 +116,7 @@ RetDec 出力の欠陥と修復 (対照実験 `lift/gain_ablate.sh` で各々が
 | B3 | C++ 実行時層: `shared_ptr`/boost/`std::vector`/TLS/SEH/ヒープ。DSP 直接駆動で多くは回避可だが `FreshAirDsp` ctor→子 snapin 構築→Parameter 登録は経由 | 中 (shim 4 本 + 例外無効化) |
 | B4 | 間接 call 172 (未解決)・vtable 経由の子 snapin 呼出 → closure は下限。RTTI で vtable は確定可 | 中 (m6 `ott_vtables*.py` 手法) |
 | B5 | lift 欠陥 3 類型が OTT と同率 → bit-exact 化は修復 pass 量産が前提 (OTT は M6→M10 で未完) | 中〜高。Gain/Compressor 先行で見積り更新 |
-| B6 | UI (Skia 17MB, .rsrc PNG 177) は lift 対象外。素材は非再配布運用 (EULA は別途確認) | 低 (DSP のみ wasm 化、UI は別実装/shim) |
+| B6 | UI (Skia 17MB, .rsrc PNG 177) は lift 対象外。素材は非再配布運用 (EULA は別途確認) | 低 (DSP のみ wasm 化、UI は別実装/shim)。**方針決定済み: `docs/DECISIONS.md` D7 (2026-10-13, #53)** |
 
 ## 7. 下流チケット案
 
@@ -125,7 +125,7 @@ RetDec 出力の欠陥と修復 (対照実験 `lift/gain_ablate.sh` で各々が
 3. **FA-3 共通 pass 昇格**: ①comis `no_branch` 分岐再構成 (CFG は機械語から) ②脱落 load/branch の機械検出器 ③xmm 引数 signature 復元 ④`gen_msimd` を base 名+型キー化。OTT (M6-M11) と共有。
 4. **FA-4 FreshAirDsp 駆動ハーネス**: `FRAR/DUMP` のチェーン (Filter×2/Compressor×3/Gain×3) と param id (0x157..) 対応表を復元し、マクロ → 子パラメタの写像を確認、factory `.epf` 8 本 (1,244 B) で試験。
 5. **FA-5 Kilohearts target との統合**: SlateCore 内の `ks*` 37 ID は Kilohearts snapin と同系統の可能性が高い (推定)。Kilohearts 解析担当と DSP closure/pass を共有 (同一実装なら 1 回の lift で両対象)。
-6. **FA-6 UI**: `.rsrc` 内 `FRAR/*` PNG 95・vec を使う WebGL/Canvas UI は非同梱運用 (素材はユーザ手元で抽出) — M7 HUD 方針に合流。
+6. **FA-6 UI** (#53): `.rsrc` 内 `FRAR/*` PNG 95・vec を使う WebGL/Canvas UI は非同梱運用 (素材はユーザ手元で抽出) — M7 HUD 方針に合流。**方針は `docs/DECISIONS.md` D7 で決定済み**。素材抽出・描画の実装は HUD 側 (#10) で行い、Fresh Air 固有の UI 実装チケットは起票しない。
 
 ## 8. 成果物
 

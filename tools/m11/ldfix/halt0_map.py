@@ -14,6 +14,10 @@ import sys
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'shared'))
+from paths import FL_WIN64_DIR  # noqa: E402
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from lb_base import LB as LB_BASE, IMG_BASE  # noqa: E402  (#222: LVA = RVA + LB_BASE)
 MSG_RE = re.compile(r"Runtime error\s+(\d+) at ([0-9A-Fa-f]+)")
 
 
@@ -39,7 +43,7 @@ def fn_at(m, vas, va):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('surveys', nargs='+')
-    ap.add_argument('--pe', default='/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin')
+    ap.add_argument('--pe', default=f'{FL_WIN64_DIR}/extracted/block00031_PE.bin')
     ap.add_argument('--out')
     a = ap.parse_args()
     m, vas = load_fn_table(a.pe)
@@ -55,7 +59,7 @@ def main():
                 if not mm:
                     continue
                 err, addr = int(mm.group(1)), int(mm.group(2), 16)
-                va = addr + 0x400000
+                va = addr + IMG_BASE - LB_BASE
                 fn = fn_at(m, vas, va)
                 key = (name, addr, err)
                 e = agg.setdefault(key, {'units': [], 'fn': fn})
@@ -63,7 +67,7 @@ def main():
     rows = []
     for (name, addr, err), e in sorted(agg.items(), key=lambda kv: (-len(kv[1]['units']), kv[0][1])):
         rows.append({'survey': name, 'err': err, 'lva': '0x%X' % addr,
-                     'va': '0x%X' % (addr + 0x400000), 'fn': e['fn'],
+                     'va': '0x%X' % (addr + IMG_BASE - LB_BASE), 'fn': e['fn'],
                      'n_units': len(e['units']), 'units': sorted(e['units'])})
     for r in rows:
         print('%-28s err=%d at %s (%s) n=%d units=%s' % (

@@ -150,3 +150,62 @@ PERF_QUICK=1 bash tools/perf/perf.sh     # 代表変種・反復 1 (数分)
 ```
 注: 巨大 wasm 実験の K 倍素材は M11 の 5,655,905B スナップショット (sha256 先頭 `af1599814c9898e2`; M11 側は以後更新され得る — 現在 6,008,101B)。
 前提: `tools/m10/work/ott_m10.ll` 等 (`bash tools/m10/m10_build.sh` で生成)、`tools/m11/work/boot_final2.ll`。`work/` は gitignore (≈1.9GB)。
+
+## 9. perf 回帰ゲート (PERF-P5 / #164) — bit-exact OTT (x64c) 対象
+
+既知類型との関係: 該当なし (計測ゲートの追加。lift 自体は未変更)。検証起点 commit: `aa4306b` (クリーン detached worktree で実行。数値表は同内容の事前 commit 76fdcad (未 push) での 3 回実測、aa4306b では 1 回再実行し PASS 11/11・36 s・load 0.78〜0.98)。
+
+`bash tools/perf/gate/perf_gate.sh` (1 コマンド。CI 用 workflow は `tools/perf/gate/perf-gate.workflow.yaml.txt`) = `tools/ott/ott_e2e.sh --quick` (native 実機械語との bit-exact; 22 シナリオ・9,620 cell・max_ulp 0) → `ott_x64c_build.sh o0 o2 o3lto` → `ott_x64c_bench.mjs` を 3 反復 (変種を反復内で交互) → `gate/judge.mjs` で判定。
+判定は**相対指標のみ** (絶対 µs は参考表示): 署名 `6b1696f0` 一致・出力非ゼロ 256 cell・o0/o2 p50 比 ≥ 3.0・o2/o3lto p50 比 ∈ [0.9, 2.0]・wasm bytes 上限 (o0 1,200,000 / o2 810,000 / o3lto 780,000)。閾値は env (`GATE_*`) で上書き可。
+
+実測 (GitHub-hosted 相当 runner, node v22.23.3, loadavg 0.45〜1.40, 3 回実行・各 3 反復の中央値。`perf_gate.sh` 全体の所要 36〜38 s, 実測 3 回):
+
+| 指標 | 実測 (3 回の min–max) | 閾値 |
+|---|---|---|
+| 署名 (o0/o2/o3lto 全反復) | `6b1696f0` 一致 | 一致 |
+| o0/o2 p50 比 | 5.68〜5.80 (別途 5 反復の単体測定 5.3〜5.9) | ≥ 3.0 |
+| o2/o3lto p50 比 | 1.18〜1.20 (単体測定 1.15〜1.29) | 0.9〜2.0 |
+| wasm bytes o0 / o2 / o3lto | 1,030,416 / 707,139 / 680,905 | 上記上限 |
+| p50 µs (参考) o0 / o2 / o3lto | 328.65〜335.24 / 57.74〜57.88 / 48.39〜49.12 | 判定に使わない |
+
+ネガティブコントロール (`judge.mjs` へ入力を壊して FAIL を確認; いずれも exit 1): 期待署名を `deadbeef` → 3 件 FAIL (8/11) / o2 bytes 上限 700,000 → FAIL (707,139) / o0/o2 比下限 8 → FAIL (5.52) / o2 の p50 を 3 倍 (o2 退行の模擬) → o0/o2 1.84・o2/o3lto 3.71 で 2 件 FAIL / 1 行だけ署名を `6b1696f1` に改ざん → FAIL。
+
+パス修正 (ハードコード → `tools/shared/env.sh` / `paths.py`): `ott_e2e.sh`・`lift/lift_build.sh`・`native/ottnat.py`・`diff/count_icall.py`・`perf/flags.sh` (`EMSDK_DIR` 既定 `/opt/emsdk`)。
+
+範囲外 / 未解決:
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| **CI workflow 未設置**: GitHub App に `workflows` 権限が無く `.github/workflows/` への push が拒否された (`refusing to allow a GitHub App to create or update workflow ... without workflows permission`)。テンプレートを `tools/perf/gate/perf-gate.workflow.yaml.txt` に置いた。設置後の Actions 実行も未確認 | CI 化 (受入条件) が未達 | #164 (PM が `.github/workflows/perf-gate.yaml` へ移して設置) |
+| 閾値は 1 台の低負荷 runner の実測 (反復 3〜5) から設定。高負荷時の誤検知率は未測 | flaky 化の可能性 | #164 |
+| `perf.sh` (PERF_QUICK, junk 版 M10 RetDec) は本ゲートに含めない。Chrome・M5 カーネル・巨大 wasm は対象外 | 回帰検知範囲は x64c の node 実行のみ | #164 に分割提案 |
+| ゲートは node のみ (Chrome 計測なし) | Chrome 側回帰は検知できない | PERF-P9 (§7) |
+| runner の node は v22.23.3 (§2.1 は node 26) | 絶対値の比較は不可。比のみ判定 | — |
+
+## 10. 配信形態 (PERF-P10 / #170) — br-11 × compileStreaming の実測と現状整理
+
+既知類型との関係: 該当なし (配信計測。lift は未変更)。検証起点 commit: `e036886` (クリーン worktree・コミット済み HEAD で再実行)。
+
+**現状 (main)**: ローダは結線済み。`src/runtime/loader_boot.ts` `fetchCompile` が `fetch → WebAssembly.compileStreaming` (既定。`compile=bytes` は比較用)、`tools/runtime/stage_wasm.mjs` が hash 名 + `.br` (q11) を生成、`vite.config.ts` が `Accept-Encoding: br` に `Content-Encoding: br` で応答 (dev/preview)。大物 (>24MiB) は `deploy/client/chunked.mjs` (連結 ReadableStream → compileStreaming; 314MB 実エッジ実証は `deploy/REPORT.md`)。lazy 既定は V8 既定のまま (追加設定なし)。配信先は DECISIONS D1 で R2 → Workers Static Assets に変更済み。
+
+1 コマンド: `node tools/perf/delivery/delivery_bench.mjs [--mib 16] [--reps 3] [--mbps 100,0]` (結果 `results/delivery.json`)。ローカル HTTP サーバが `Content-Encoding: br` の有無と線上帯域 (10ms 刻み) を切替え、headless Chrome 154.0.8037.97 (Linux, 4 コア, node v22.23.3) で fetch → compileStreaming / compile(bytes) → instantiate → `f0()==42` を計測 (3 反復中央値, loadavg 0.5〜1.1, 全 24 件 PASS)。素材は合成 wasm 17,114,230B (関数 ~360B 単位のコード様バイト列; 実 lift wasm ではない) → br-11 6,214,503B (36.3%)。
+
+| 帯域 | 配信 | streaming ms | bytes ms | 線上 B |
+|---|---|--:|--:|--:|
+| 100 Mbps | 非圧縮 | 1403.6 | 1435.2 | 17,114,230 |
+| 100 Mbps | **br-11** | **516.8** | 553.8 | 6,214,503 |
+| 無制限 (loopback) | 非圧縮 | 74.0 | 90.0 | 17,114,230 |
+| 無制限 (loopback) | br-11 | 136.6 | 164.2 | 6,214,503 |
+
+- 100 Mbps では br-11 で **2.7×** 短縮 (1403.6 → 516.8 ms)。streaming は bytes より 36〜38 ms 速い (compile が転送に隠れる分)。
+- 帯域無制限では br の展開 (Chrome ネットワークスタック) が +40〜60 ms 乗る (br streaming 136.6 vs 非圧縮 74.0)。転送が支配的な回線 (≲ 数百 Mbps) で有利、ローカル/超高速回線では逆転する。
+- 圧縮率は合成素材の値 (36.3%)。実 lift wasm の brotli-11 は §0 転送行 (31.0〜37%) と `tools/runtime/DESIGN.md` (M11 3.31×) を使うこと。
+
+範囲外 / 未解決:
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| **案 S (Static Assets) で br-11 を使う経路が未確定**: `_headers` の `Content-Encoding: br` は二重エンコード (`deploy/EDGE-SIM.md` #9)、エッジ自動圧縮は zstd/br の level 不明。実エッジでの wire サイズ・`Content-Encoding` の実測が無い | 本 issue の「CDN 配信設定」が未達 | #170 に残置 (Closes しない)。実エッジ計測は Access 資格情報が必要 |
+| R2 (`legacy-r2/20-upload.mjs --precompress br`) への実 PUT・ブラウザ透過復号は未実証 (S3 キー無し) | R2 へ戻す場合のみ | `deploy/REPORT.md` §7 の既存起票 (#8) |
+| `chunked.mjs` (大物 part 連結) は `fetchCompile` 未結線 (単一 URL 前提)。part ごとの br 事前圧縮も未設計 (ヘッダ依存の透過復号が使えないため JS 側 decode が要る。Chrome 154 の `DecompressionStream` は gzip/deflate のみ・brotli/zstd 不可を実測) | >24MiB 実 FLEngine wasm の br 配信 | #170 に残置 |
+| 実 FLEngine 規模 (K=10〜100) での streaming 隠蔽効果は合成 17MB のみ。他ブラウザ/実回線は未測 | — | PERF-P9 (§7) |

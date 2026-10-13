@@ -1,0 +1,4 @@
+gaps=29354 gap_bytes=463748 padding_bytes=145350 blocks=20467 block_bytes=318398 insns=61895 ret=5096
+blocks with a direct call/jmp/lea entry ref (kinds 0=rip,1=call,2=jmp,3=jcc): 1352 bytes=101257
+clean-decode blocks: 20459 bytes=318167
+blocks by cut-library window (outside .pdata): {'-': (20250, 316118), 'nlohmann_json': (2, 5), 'libsfz': (37, 296), 'zl_convolver': (10, 80), 'sqlite': (48, 778), 'muparser': (120, 1121)}

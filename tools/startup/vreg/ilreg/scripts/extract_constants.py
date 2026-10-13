@@ -11,7 +11,14 @@ import sys
 
 import pefile
 
-DLL = sys.argv[1] if len(sys.argv) > 1 else '/home/ubuntu/work/webstudio/tools/startup/work/FLEngine_x64.dll'
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', '..', 'shared'))
+from paths import REPO_ROOT, FL_WIN64_DIR  # noqa: E402
+
+DLL_REL = 'tools/startup/work/FLEngine_x64.dll'
+_DLL_DEFAULT = os.path.join(REPO_ROOT, *DLL_REL.split('/'))
+if not os.path.exists(_DLL_DEFAULT):
+    _DLL_DEFAULT = os.path.join(FL_WIN64_DIR, 'extracted', 'block00031_PE.bin')
+DLL = sys.argv[1] if len(sys.argv) > 1 else _DLL_DEFAULT
 OUT = sys.argv[2] if len(sys.argv) > 2 else os.path.join(os.path.dirname(__file__), '..', 'data', 'constants.json')
 
 pe = pefile.PE(DLL, fast_load=True)
@@ -71,7 +78,7 @@ for i in range(8):
     table.append(v)
 
 consts = {
-    'dll': {'path': DLL, 'image_base': BASE, 'size': os.path.getsize(DLL)},
+    'dll': {'path': DLL_REL, 'image_base': BASE, 'size': os.path.getsize(DLL)},
     'flag_byte': {
         'va': '0x14f84a8', 'ptr_slot': '0x15e0698',
         'static_init': pe.get_data(0x14F84A8 - BASE, 1)[0],
