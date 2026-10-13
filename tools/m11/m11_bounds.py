@@ -6,11 +6,12 @@
 import sys, json, csv, struct, os
 from collections import deque
 
-sys.path.insert(0, '/home/ubuntu/work/webstudio/tools/m6')
+SRC = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(SRC, '..', 'm6'))
 from ottlib import Bin
 
-HERE = '/home/ubuntu/work/webstudio/tools/m11/work'
-WINF = '/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin'
+HERE = os.path.join(SRC, 'work')
+WINF = os.environ.get('M11_PE') or os.path.join(os.environ.get('FL_WIN64_DIR') or '/home/ubuntu/work/analysis/win64', 'extracted', 'block00031_PE.bin')
 EP_VA = 0x1376820
 ARR1_RVA = 0xf768e0
 ARR1_N = 0x3ae
@@ -23,7 +24,7 @@ for k, v in callsC.items():
     calls[k + 0x400000] = set(t + 0x400000 for t in v)
 
 gh = {}
-with open('/home/ubuntu/work/webstudio/tools/m2/work/ghidra_dll/functions_dll.csv') as f:
+with open(os.path.join(SRC, '..', 'm2', 'work', 'ghidra_dll', 'functions_dll.csv')) as f:
     for row in csv.DictReader(f):
         va = int(row['entry'].replace('ram:', ''), 16)
         gh[va] = int(row['size'])

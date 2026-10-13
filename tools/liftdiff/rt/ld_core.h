@@ -643,6 +643,8 @@ static void ld_case_begin(void) {
   ld_trace_on = ld_case.trace;
   ld_case_patch_image_pristine();
 }
+/* native ランナが呼出し所要 ms を入れる (wasm ランナは -1 のまま = 出力しない)。liftdiff の「native が長い case」判定用 (LD-11 / #548) */
+static double ld_native_ms = -1.0;
 /* case 終了: 結果 JSON を ld_out に作る. status: "ok" 等. 戻り値 = JSON 文字列 */
 static const char* ld_case_end(const char* status, const char* detail, u64 fault_addr, u64 fault_rip, u64 rax, u64 rdx, u64 x0, u64 x1, int has_ret) {
   ld_ob_reset();
@@ -653,6 +655,7 @@ static const char* ld_case_end(const char* status, const char* detail, u64 fault
     ld_ob("\"");
   }
   if (fault_addr || fault_rip) ld_ob(",\"fault\":{\"addr\":\"0x%llx\",\"rip\":\"0x%llx\"}", (unsigned long long)fault_addr, (unsigned long long)fault_rip);
+  if (ld_native_ms >= 0) ld_ob(",\"ms\":%.3f", ld_native_ms);
   if (has_ret) ld_ob(",\"rax\":\"0x%llx\",\"rdx\":\"0x%llx\",\"x0\":\"0x%llx\",\"x1\":\"0x%llx\"", (unsigned long long)rax, (unsigned long long)rdx, (unsigned long long)x0, (unsigned long long)x1);
   /* 呼出ログ */
   ld_ob(",\"calls\":[");
