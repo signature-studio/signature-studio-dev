@@ -1,11 +1,11 @@
 # REPORT — GUI-3 (#174): 実 FLEngine の lift に GUI shim を結合する
 
 **判定: 部分達成 (受入条件 1 は未達、条件 2 は達成。PR は `Refs #174`)**。実 FLEngine (m11 closure, `FLEngine_x64.dll` の 7,421 関数 lift) に `tools/gui` shim を全 TU `-pthread` でリンクし、
-**自然起動 (DllMain attach) で最初の GUI API (`LoadStringW`) が shim に到達**した。942 unit の隔離 survey では GUI API **19 種**が shim に到達 (実装済み 18 / fail-fast stub 1 = `EnumFontFamiliesExW`)。
+**自然起動 (DllMain attach) で最初の GUI API (`LoadStringW`) が shim に到達**した。942 unit の隔離 survey では GUI API **23 種**が shim に到達 (実装済み 22 / stub 1 = `LoadImageW`。`EnumFontFamiliesExW` は現 main で IMPL)。数値は HEAD `19ebb43` の実測 (§6c) が正。
 一方 **`RegisterClass*` / `CreateWindowEx*` は自然起動でも survey でも未到達** (通常起動は unit #23 で Halt0、#134 / #490 の先)。実 WNDCLASS を JS から指向呼出した場合は
 `RegisterClassW` ×2 が shim に届き、`TApplication` の窓 (hwnd 31bit) が生成できる。再現: `bash tools/gui/flengine/e2e.sh` (gate 12 + ネガコン 5。FAIL なら exit 1)。
 
-> **注 (review #576 指摘 2)**: §1・§3・§4 の数値は merge 前 (`b867b94` 以前) の測定。`main` 取込後の HEAD (`19ebb43`) の実測は **§6c が正**。`EnumFontFamiliesExW` は現在 IMPL で fail-fast stub ではない。
+> **注 (review #576 指摘 2・5)**: §1 表・§4 の数値は merge 前 (`b867b94` 以前) の測定。HEAD の実測は **§6c が正**。`EnumFontFamiliesExW` は現 main で IMPL (`gui_gdi.c` の `EnumFontFamiliesExW`)、`survey_soft.json` / `survey_ff.json` も IMPL と記録している。§3 の本文も同じ前提で書き直した。
 
 既知類型との関係: 該当 `docs/DEFECTS.md` D1b 系 (比較が定数に畳まれ分岐が誤る) の入力側変種 1 件 (§5-2, 新規行案あり) / D1 系は m11 REPORT §10 と同根。他は該当なし。
 
@@ -18,10 +18,10 @@
 | リンク | wasm-ld signature mismatch **0** / undefined **0** / duplicate **0** (ff・soft 両ビルド) | `build.sh` のリンクログを grep。wasm 6,167,297 B |
 | GUI declare ↔ adapter | IR の GUI declare **177** = adapter **177** (実装 153 / stub 24)、突合不一致 c=0 d=0 | `integ/gen_adapt.py --ir boot_final.ll` |
 | 起動の回帰 | shim 有り/無し (同一 IR) で **units_run 22 / init_count 23 / dllmain_done true / GetMem 33 / FreeMem 20 / icall_miss 0 が一致** | baseline = `m11_run.mjs` (GUI 3 本は m11_win.c の暫定 stub) |
-| survey の回帰 | soft ビルド (stub は 0 返却) の survey が baseline と **ok 816 / noproc 1 / miss 46 / trap 79 が一致** (trap 内訳 halt0 65 + OOB 14 も同一) | 942 unit 隔離 (`m11_survey.mjs` 同手順) |
+| survey の回帰 | merge 前: soft の survey が baseline と ok 816 / noproc 1 / miss 46 / trap 79 で一致。**HEAD `19ebb43`: soft ok 864 / noproc 1 / miss 46 / trap 31 で baseline 一致** (S1 PASS) | 942 unit 隔離 (`m11_survey.mjs` 同手順)。切り分けは §6c |
 | 最初の GUI 呼出 (自然起動) | **`LoadStringW` ×4 → shim (IMPL, P1)**。DllMain attach の 22 unit 内 (`shimx_link/REPORT.md` §4.1 は unit #16 付近) | `GUI-REACH` 行 (`boot.json`) |
-| survey で shim に到達した API | **19 種** (IMPL 18 / STUB 1)。§3 | `survey_soft.json` の reach |
-| fail-fast ビルドの survey | ok 815 / trap 80。増えた 1 unit は `EnumFontFamiliesExW` (P2 stub) の fail-fast | `survey_ff.json` |
+| survey で shim に到達した API | **23 種** (IMPL 22 / STUB 1 = `LoadImageW`) (HEAD `19ebb43`)。§3 | `survey_soft.json` の reach |
+| fail-fast ビルドの survey | HEAD `19ebb43`: ok 864 / noproc 1 / miss 46 / trap 31。fail-fast は 1 unit (`LoadImageW`, STUB) | `survey_ff.json` |
 | `RegisterClass*` / `CreateWindowEx*` の自然到達 | **0** (起動・survey とも) | judge の INFO 行 |
 | 指向呼出 (§4) | `RegisterClassW` ×2 成功 (atom 0xC001 / 0xC002)、`TApplication` 窓 hwnd `0x210000e` (< 2^31)、WNDPROC 4 引数が `m11_icall` 経由 | `probe.json` |
 
@@ -65,10 +65,10 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 | 状態 | API (P) |
 |---|---|
 | 起動で到達 | `LoadStringW` (P1) ×4 |
-| survey で到達・実装済み | `GetDC` (P0), `GetDeviceCaps` (P0), `ReleaseDC` (P0), `GetStockObject` (P1), `LoadIconW` (P1), `CreatePalette` (P2), `MessageBoxA` (P2), `RegisterWindowMessageW` (P0), `GetSystemMetrics` (P0), `FindWindowW` (P1), `RegisterClipboardFormatW` (P0), `CharLowerBuffW` (P1), `EnumDisplaySettingsW` (P1), `GetClipCursor` (P0), `EnumDisplayMonitors` (P1), `SystemParametersInfoW` (P0), `GetMonitorInfoW` (P1) |
-| survey で到達・**fail-fast stub** | **`EnumFontFamiliesExW` (P2)** — 1 unit (VCL Graphics 系の初期化と推定) |
+| survey で到達・実装済み | `GetDC` (P0), `GetDeviceCaps` (P0), `ReleaseDC` (P0), `GetStockObject` (P1), `LoadIconW` (P1), `CreatePalette` (P2), `MessageBoxA` (P2), `RegisterWindowMessageW` (P0), `GetSystemMetrics` (P0), `FindWindowW` (P1), `RegisterClipboardFormatW` (P0), `CharLowerBuffW` (P1), `EnumDisplaySettingsW` (P1), `GetClipCursor` (P0), `EnumDisplayMonitors` (P1), `SystemParametersInfoW` (P0), `GetMonitorInfoW` (P1), `EnumFontFamiliesExW` (P2, 1 unit), `LoadCursorW` (P1), `GetKeyboardLayout` (P0), `GetClipboardFormatNameW` (P1) |
+| survey で到達・**stub** | **`LoadImageW` (P2)** — soft は 0 返却で 21 unit、ff は fail-fast で 1 unit |
 
-- **IMPORTS.md の P 分類への入力** (`IMPORTS.md` §4 に自動出力): `EnumFontFamiliesExW` は stub のまま実到達 → **実装必須へ昇格**。`CreatePalette` / `MessageBoxA` / `EnumFontFamiliesExW` は P2 だが実到達 → P1 以上へ昇格候補。
+- **IMPORTS.md の P 分類への入力** (`IMPORTS.md` §4 に自動出力): `EnumFontFamiliesExW` は現 main で IMPL 済みで、実到達 1 unit。`CreatePalette` / `MessageBoxA` は P2 だが実到達 → P1 以上へ昇格候補。`LoadImageW` は STUB のまま実到達 (soft 21 unit) → 実装候補。
   P0 の未到達は現 m11 到達段が浅いため (SendMessage / PostMessage / BitBlt / SelectObject ほか) 「不要」の根拠にはならない。
 - `MessageBoxA` ×55 は Delphi RTL の `Runtime error 0` ダイアログ (unit の Halt0 経路)。shim は host 無しなら即 IDOK。
 - `LoadStringW` は survey 通算 48,116,199 回 (実行ごとに数回ずれる)。1 unit が資源 ID を回している疑い (shim は資源供給 hook 未接続で常に 0 を返す)。**未調査** (§6)。
@@ -197,7 +197,7 @@ judge の 14 gate は全て PASS: L1 (ff・soft) / A1 / B1 (units_run 22・init 
 | `bash tools/gui/e2e.sh` step 1 (ASan) の `heap-use-after-free` (`blit_surf` ↔ `surf_free`)。再現条件: 過去 4 回中 2 回 rc 1 (HEAD `a608f18` で 3 回中 1 回、`96ce3eb` 以前に 1 回)。HEAD `19ebb43` の実行では出ず | gui e2e が非決定的に FAIL する。`blit_surf` と `surf_free` の間の shim 側 race の可能性 | 起票依頼 (PM): GUI-2 系 (issue 番号未割当)。再現時は `tools/gui/build` の ASan ログ (`heap-use-after-free`) を添付 |
 | ~~flengine S1 の回帰 (GUI 結合 soft で 36 unit が ok→trap)~~ | **解消 (§6c, `19ebb43`)**。原因は `run.mjs --survey` の unit 隔離不足で shim ではない | — |
 | 動的に作られる WNDCLASS (スタック/ヒープ上で組む `RegisterClass`) の WNDPROC | 静的走査では拾えない。`function_52a7f0` 等 5 呼出点のうち静的実体を渡すのは 2 点 | m11 / icall 系で PM が起票 |
-| `EnumFontFamiliesExW` 実装 (コールバック `gui_call4` 経由) | survey の 1 unit が fail-fast | GUI-2 系 (P2 stub 昇格, #174 に所見) |
+| ~~`EnumFontFamiliesExW` 実装~~ | **解消 (main で IMPL)**。残る STUB は `LoadImageW` (実到達 21 unit) | 起票依頼 (PM): `LoadImageW` の実装 (GUI-2 系, issue 番号未割当) |
 | `LoadStringW` 48M 回の unit 特定と資源供給 hook (`gui_set_resource_provider` ← shimx / PE .rsrc) の接続 | LoadStringW が常に空文字 | #174 に所見 / GUI-2 または shimx |
 | 受入「`__pe_image` を m11_data_gen 方式の data 実体化へ統合」(スコープ 3) | 未着手 (本 PR は m11 の image 敷設をそのまま利用) | 新規子チケットを PM が起票 |
 | 実ブラウザ host 結線 (`GuiHost.attach`・FL ワーカ化・UI スレッドのスタック量 §2-2 #8) | node の headless host のみ。描画 (#32) は別 | #32 / #121 |
