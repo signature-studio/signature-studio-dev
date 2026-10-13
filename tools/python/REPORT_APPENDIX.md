@@ -109,3 +109,15 @@ stubs (LGPL 参照) 署名との照合 (kwlist のある 103 のうち stubs 署
 | Audio scripts 12 本に `enveditor` 実装が必要 (Edison の波形操作 13 メンバ + Editor 選択) | Audio scripts 0/12 | 新規子チケット案 `[PY-6] enveditor module` (T7 を分割) |
 | `loadScoreFromFile` 未実装 | .fst/.fsc 読込を使うスクリプト | #79 コメント |
 | Chrome 上の pyscript 実行未検証 | node のみ | 新規子チケット案 (browser_check に追加) |
+
+### 14-b. main 競合解消後の再検証 (merge commit `647c9c1`、node v22.23.3、uptime load average 1 分値 2.52 / 2.52 / 2.96)
+
+| 項目 | 結果 |
+|---|---|
+| `tests/pyscript_e2e.mjs` (n=3) | 43/43 PASS・exit 0。wall 1.64 / 0.80 / 0.78 秒 (1 回目は初回読込) |
+| `build_cpython_wasm.sh` | exit 0、real 3m33.880s (native + wasm、本 run の初回ビルド) |
+| `build_flpy.sh` | exit 0、real 5.680s |
+| 回帰 (同 HEAD) | `smoke_direct` exit 0 / `midi_script.mjs` 23 checks OK・`--neg` exit 1 (検出) / `all_tools` 48/48 ok (host_calls 37,425) / `poc_mcp` POC OK |
+| 比較 (同手順で再実行、一時展開) | 旧 head `57326b1`: host_calls 37,424 / `origin/main` `b6311f3`: 37,425 (`get_plugin_parameter_value` に `plugins.getParamValueString` 呼出しが 1 件増)。merge 後 HEAD は main と同値。差は main 側に既存。保存スナップショット `analysis/mcp/tool_coverage.json` (37,424) は現行コードより古い (自動生成物のため本 PR では更新しない) |
+| 素材 | `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`FL_WIN64_DIR`)、`toolchain-emsdk` は `/opt/emsdk`。mac dylib なし (flapi_table は既存表 27 件を引継ぎ) |
+| 範囲 | node + mock engine。Chrome 上の pyscript 実行は未検証 (従来どおり) |
