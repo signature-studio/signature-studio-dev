@@ -16,6 +16,15 @@ Chrome Dedicated Worker で M=130 のオブジェクトを 1 Memory に畳み、
 
 - 検証起点: `origin/main` = `a5adb2fc` の worktree `ws-990` (branch `990-perf-p15-instance-cap`) で計測。素材 `work-m6-ott` を `tools/ott/work/` に展開 (gitignore)。
 - 環境: Chrome 154.0.8037.97 (headless), CPU `AMD EPYC 7763 64-Core Processor` (4 vCPU), node v22.23.3。load average は計測ごとに記録 (表内 `loadavg` 参照)。
+- 測定コードの最終変更 (実測を取った HEAD 再実行の起点): `862ef65b`。以後の差分 `git diff 862ef65b 638ae3fc -- tools/perf` は以下のとおり。`page.html` の `message` リスナー削除は、測定スクリプト (`probe_limit.mjs` / `probe_iso.mjs` / `chrome_shared.mjs`) が `p.eval` で `probeWorkers` を直接呼ぶため測定経路に入らず、数値に影響しない (再測定不要)。
+  ```diff
+  -// 親ページからの依頼 (iframe 経由 = 別 site = 別 renderer プロセス) に応答する。
+  -window.addEventListener('message', (ev) => {
+  -  if (!ev.data || ev.data.p15 !== 'probe') return;
+  -  window.probeWorkers(ev.data.k, ev.data.max).then((r) => ev.source.postMessage({ p15: 'reply', r }, ev.origin));
+  -});
+  ```
+  (REPORT の変更は §3 の表と生データ件数の記載のみ。)
 
 ## 1. 上限の所在 (renderer 単位か Worker 単位か)
 
