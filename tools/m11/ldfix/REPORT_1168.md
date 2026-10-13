@@ -8,8 +8,10 @@
 ## 1. 再現 (`audit_lsf_ssa.py`, work-m11 のみ)
 
 - 測定 commit: `916d9932` (`tools/m11` のコードを最後に変えた commit。以降の変更は docs のみ)
+  - 訂正 (LD-47 review, §4 参照): 上記の「`tools/m11` のコードを最後に変えた commit」と「以降は docs のみ」は誤り。`tools/m11` の非 md 変更は `916d9932..12586095` に 18 件ある。`tools/m11` のコードを最後に変えた commit は `02e2c5a2` (`12586095` の祖先)。本 §1 の実測の基準は §4 の測定 commit `12586095` とする。
 - 素材: `[WORK-M11]` (`docs/REFERENCES.md` §1。取得指定 `oc_artifacts: work-m11`、展開先 `tools/m11/work/`)
 - 鮮度の証跡 (`git diff 916d9932 HEAD -- tools/m11`、`*.md` を除く): 空 = コード差分 0 (`git diff 916d9932 HEAD --name-only -- tools/m11` の結果は `*.md` のみ)
+  - 訂正 (LD-47 review): 上記の証跡は誤り。`git diff --name-only 916d9932 HEAD -- tools/m11` の非 md は 18 件 (`git diff --numstat` で +698 / -27)。空ではない。正しい鮮度の証跡は `git diff 12586095 HEAD -- tools/m11` の非 md = 0 件 (§4 参照)。
 
 - cfg は glob をクォートして渡す (`'../work/boot*.drc.config.json'`)。クォートしないと `boot0` 1 本だけになり、
   集計が `lsf_sites_arg 29` になる (誤り)。クォートすると `90 / 370 / 169` となり、REPORT_968 の修復前と一致する。
@@ -41,7 +43,8 @@
 素材: `work-m11` を `$HOME/artifacts` から `tar --zstd -xf ... -C <repo>` で展開 (展開先は `tools/m11/work/`)、`toolchain-emsdk` は `/opt/emsdk` (emcc 6.0.12)。
 
 - 訂正: §3 の「修復前 53 site」は誤り。`REPORT_968.md` §2 の表では 53 は**修復後**の値。現 HEAD の修復前は store 宛 CELL_COLLAPSED **86 site / 49 関数**。
-- 訂正: §1 の鮮度記述「`916d9932` 以降はドキュメントのみ」は誤り。`git diff --name-only 916d9932 HEAD -- tools/m11` に非 md の変更が 51 件・非 md diff 988 行ある。上記の再現は現 HEAD で行った。
+- 訂正: §1 の鮮度記述「`916d9932` 以降はドキュメントのみ」は誤り。`git diff --name-only 916d9932 HEAD -- tools/m11` の非 md は **18 件**、`git diff --numstat 916d9932 HEAD -- tools/m11` の非 md は **+698 / -27** (本節の旧記載「51 件・988 行」は誤り。LD-47 review で計測し直した)。`tools/m11` のコードを最後に変えた commit は `02e2c5a2` (`12586095` の祖先)。
+- 訂正: §1 の「空 = コード差分 0」の証跡も誤り (上記 18 件と矛盾する)。測定 commit `12586095` から本 PR の HEAD までの `tools/m11` の非 md 差分は 0 件 (`git diff --name-only 12586095 HEAD -- tools/m11 | grep -v '\.md$'` の結果は空)。したがって §4 の数値は本 PR の HEAD でも有効。上記の再現は測定 commit `12586095` の tools/m11 で行った。
 
 e2e (`bash tools/m11/ldfix/fix_d17_e2e.sh`、現 HEAD、foreground、31 秒、emcc rc=0):
 
