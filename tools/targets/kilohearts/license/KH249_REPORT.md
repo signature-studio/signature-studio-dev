@@ -10,7 +10,7 @@
 | 項目 | 結果 |
 |---|---|
 | 完了条件 2: 47 vs 46 の差 1 製品 | **「差 1 製品」は製品ではない**。47 ctor 呼出元の RTTI を全数解決: **製品 EditorModel 45 + `HostProxyEditorModel` (0x180007a40) + `SnapinGroupEditorModel` (0x180267c50) = 47**。product_index.json の 46 = 45 snapin/plugin + `core` (HeartCore 自体、EditorModel なし)。45 製品の id と ctor は最近傍ヒューリスティクスで 1:1 (§2)。KH9 §5-5 の「group/host 系の製品追加」推定は **「host proxy と snapin group の 2 つの非製品 EditorModel」** に確定 (47 − 46 = 非製品 2 − core 1) |
-| 完了条件 1: ブラウザ分類の lift IR | `0x180ef7fc0` (2,549 B) を含む module F (6 関数) が **emcc を通過** (wasm 47,604 B・undefined import 0・[icall] 3 サイト復元)。入口を node 実行すると最初の未 lift callee `0x180112a30` の fail-fast で停止する (= 入口の実行は未 lift callee の手前まで。分類処理本体には到達していない。残りの STL/map/shared_ptr 群は未 lift) |
+| 完了条件 1: ブラウザ分類の lift IR | `0x180ef7fc0` (2,549 B) を含む module F (6 関数) が **emcc を通過** (wasm 54,394 B・undefined import 0・[icall] 3 サイト復元)。入口を node 実行すると最初の未 lift callee `0x180112a30` の fail-fast で停止する (= 入口の実行は未 lift callee の手前まで。分類処理本体には到達していない。残りの STL/map/shared_ptr 群は未 lift) |
 | 分類結果 (stub 定数 9 入力) | lift した実 IR の thunk A/C を status 0..40 で実行しゲート真理値表を再構成: **status 9 → flag 無関係に「一覧に載る・unlocked」**。unlocked 集合 = {5,7,8,9,26}。status 25 は flag=0 で非表示 / flag=1 で locked 表示 (§3) |
 | カテゴリ (Essential/Premium/Hosts/Groups) | id 列 `egskocskpsdktafkqepkswsktfsk` を **PE から機械読出し**し、7 dword = {ksge,ksco,kdsp,kfat,kpeq,ksws,ksft} を得た (KH9 の「推定」の id 列部分を確定)。product_index の 45 製品中、このリストに属する 7 件を リスト L (カテゴリ番号 1) と呼ぶ。残り 38 件はカテゴリ番号 0。**カテゴリ名 (Premium/Essential) と リスト L の意味 (無償/有償) の対応は未確認** (§4 注・§6.2)。分類式は機械語読解の node 再実装で、lift IR の結果ではない |
 | 0x180d5f190 | **`UISnapinLaneModel` (RTTI) の vtable slot 23** (vtable 0x181a37e78 + 0xb8)。`kmic`(Snap Heap)/`kmup`(Multipass)/`grup` の id だけを対象に thunk A∧¬thunk C をゲートして lane 一覧を作る関数 (§5) |
