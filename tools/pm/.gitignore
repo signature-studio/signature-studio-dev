@@ -1,0 +1,10 @@
+# PM ツールの実行時の状態 (リポジトリに入れない)
+issues_state.json
+phase.json
+launched.json
+relaunch.json
+stop_deps_candidates.json
+wave2_cat.json
+pm_launch.log
+pm_watchdog_ping.log
+__pycache__/
