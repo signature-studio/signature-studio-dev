@@ -22,6 +22,7 @@ if [ "${SKIP_NATIVE:-0}" != "1" ]; then
   bash "$HERE/test/fetch_fonts.sh" | tail -1
   [ -f "$FTLIB" ] || FONT="$HERE/work/OpenSans-Regular.ttf" bash "$HERE/../shared/oss/freetype/build.sh" | tail -3
   bash "$HERE/test/text_golden.sh" | tail -7; bash "$HERE/test/ft_wasm.sh" | tail -2
+  echo "[gui-e2e] 1d/6 GUI-7 popup/tooltip surface・NC 領域・無効領域複数矩形・DPI (独立 Python オラクル golden/gen_golden_nc.py と画素完全一致 + ネガコン 3 本)"; bash "$HERE/test/nc_golden.sh" | tail -6
   echo "[gui-e2e] 2/6 native lift 実行 (PE->RetDec->gcc, headless host, golden)"; bash "$HERE/test/native_e2e.sh" 2>&1 | grep -E "native_run|\[post\]"
   echo "[gui-e2e] 2b/6 結合準備 native (到達 API ログ / wasm32 署名 adapter / ハンドル 31bit / 改名 selftest; CAB-156)"; bash "$HERE/test/reach_test.sh" 2>&1 | grep -E "passed|FAIL"
 fi
@@ -29,8 +30,12 @@ echo "[gui-e2e] 1c/6 GUI-5 wasm SIMD128 行カーネル (scalar と画素完全�
 BENCH=0 bash "$HERE/test/simd_e2e.sh" | grep -E "OK|FAIL|ALL PASS|v128|cases"
 echo "[gui-e2e] 3/6 PE -> RetDec lift -> 後処理 (WNDPROC は自動検出)"
 bash "$HERE/lift/gui_lift.sh" "$HERE/test/gui_app.c" "$BUILD/lift"
+# gui_wasm.sh は既定で libfreetype (wasm32) を要するため、SKIP_NATIVE=1 でも step 4 より前に保証する (build.sh はフォントを要する)
+[ -f "$HERE/../shared/work/build/freetype/wasm32/src/objs/.libs/libfreetype.a" ] || { bash "$HERE/test/fetch_fonts.sh" | tail -1; FONT="$HERE/work/OpenSans-Regular.ttf" bash "$HERE/../shared/oss/freetype/build.sh" | tail -3; }
 echo "[gui-e2e] 4/6 emcc (pthread wasm + shim)"
 bash "$HERE/lift/gui_wasm.sh" "$BUILD/lift/lifted.c" "$BUILD/wasm" | tail -2
+echo "[gui-e2e] 4b/6 GUI-13 wasm ビルド (gui_ft.c + libfreetype 組込み) のブラウザ上テキスト描画 (独立オラクルと画素/metrics 全一致 + ネガコン 5 本 + 8x8 経路の回帰; RetDec 不要)"
+bash "$HERE/test/text_wasm_e2e.sh" | grep -E "組込み|regression|negctl|PASS|FAIL"
 echo "[gui-e2e] 5/6 tsc (src/runtime/gui*.ts -> build/js)"
 (cd "$HERE" && "$ROOT_REPO/node_modules/.bin/tsc" -p tsconfig.json)
 echo "[gui-e2e] 6/6 headless Chrome E2E (fixed memory)"
