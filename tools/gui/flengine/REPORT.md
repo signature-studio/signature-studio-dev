@@ -1,6 +1,6 @@
 # REPORT — GUI-3 (#174): 実 FLEngine の lift に GUI shim を結合する
 
-**判定: 部分達成 (受入条件 1 は未達。条件 2 は本 HEAD で達成 (flengine e2e 12/12・親 `tools/gui/e2e.sh` ALL PASS)。PR は `Refs #174`)**。実 FLEngine (m11 closure, `FLEngine_x64.dll` の 7,421 関数 lift) に `tools/gui` shim を全 TU `-pthread` でリンクし、
+**判定: 部分達成 (受入条件 1 は未達。現 HEAD `f1e88c82` の flengine e2e は 13/14 で FAIL = S1 のみ・§6c-3。PR は `Refs #174`)**。実 FLEngine (m11 closure, `FLEngine_x64.dll` の 7,421 関数 lift) に `tools/gui` shim を全 TU `-pthread` でリンクし、
 **自然起動 (DllMain attach) で最初の GUI API (`LoadStringW`) が shim に到達**した。942 unit の隔離 survey では GUI API **32 種**が shim に到達 (実装済み 31 / fail-fast stub 1 = `LoadImageW`)。
 `CreateWindowExW` は survey で **1 回だけ自然到達**したが、直前の `RegisterClassW` は呼ばれず (`GetClassInfoW` の後に直行)、窓は生成されない (§5-2 の lift 欠陥)。受入条件 1 の意図する「実登録を経た窓生成の自然到達」は未達。
 実 WNDCLASS を JS から指向呼出した場合は `RegisterClassW` ×2 が shim に届き、`TApplication` の窓 (hwnd 31bit) が生成できる。
@@ -201,6 +201,23 @@ main 取込後の木 (`c37522c`) で S1 が FAIL (828/67 vs 864/31) したため
 | `bash tools/gui/flengine/e2e.sh` (修正前 `c37522c`) | rc 1。judge **13/14** (S1 のみ FAIL: 828/1/46/67) | 3 分 13 秒 |
 | `bash tools/gui/flengine/e2e.sh` (**HEAD `19ebb43`**) | rc 0。**JUDGE PASS 14/14**。S1 = 864/1/46/31 (base 一致)。ネガコン N1〜N9 は 9/9 が期待どおり FAIL。selftest 0 failed | 2 分 36 秒 (load 0.45 → 0.97) |
 | `bash tools/gui/e2e.sh` (**HEAD `19ebb43`**) | rc 0。ALL PASS (bpp / text / simd / present / Chrome E2E / fail-fast / reach-log / sigprobe)。ASan UAF は本回に出ず | 1 分 33 秒 |
+
+### 6c-3. 現 HEAD の再測 (main `fe53ba30` を merge commit で取込 + e2e の m6/ottlib 複製修正 `f1e88c82`・素材 `work-m11` 由来の IR を再生成)
+
+素材: `fl-win64` → `$RUNNER_TEMP/fl-win64` (`FL_WIN64_DIR`)、`work-m11` → `tools/m11/work/`、`toolchain-retdec` → `/opt/retdec` (RetDec 5.0)、`toolchain-emsdk` → `/opt/emsdk`、`apt-mingw` (`x86_64-w64-mingw32-gcc` 既存)、pefile 2024.8.26 / capstone 5.0.7 を `python3 -m pip install --user` で導入。`m11_gen_ir2.sh` は素材 IR に対して ldfix 適用済みの `ir_conditions.json` を生成 (27.5 秒)。
+
+| 実行 (HEAD `f1e88c82`、merge `95ae6e55` の後に修正) | 結果 | 所要 (実測) |
+|---|---|---|
+| `bash tools/m11/m11_wndseed.sh` (boot6 を RetDec から lift) | rc 0。WNDCLASS 11 / fn WNDPROC 8 / 最終 IR 未定義 0 (`WNDCLASS-CHECK PASS`) | 132.8 秒 (2 分 13 秒) |
+| `bash tools/gui/flengine/e2e.sh` (1 回目 = 修正前 merge の実測・boot6 無し) | 2b で停止 (`ottlib` 不在)。`m6/ottlib.py` 複製を追加後、boot6 無しの IR では W1 FAIL (WNDPROC 8 件が未定義) | 2 分 04 秒 / 2 分 39 秒 |
+| `bash tools/gui/flengine/e2e.sh` run 3 (boot6 取込後) | rc 1。**judge 13/14 FAIL** (S1 のみ FAIL: 869/1/47/25 vs base 871/1/47/23)。W1 PASS (外 0)・P5 PASS (hwnd 0x110000e)。ネガコン 9 本は期待どおり FAIL。selftest 433 passed / 0 failed | 2 分 57 秒 (177 s) |
+| 同 run 4 | rc 1。judge 13/14 (S1 869/1/47/25 同値) | 177 秒 |
+| 同 run 5 | rc 1。judge 13/14 (S1 869/1/47/25 同値) | 186 秒 |
+
+- **n = 3 (run 3〜5) の判定は一致**: 13/14、FAIL は S1 のみ。同一 HEAD での再現性あり。
+- **S1 の差分の内訳** (base 同一 build の unit 別結果と突合): 942 unit のうち差は **2 件**のみ。unit 304 と 555 が base で `ok`、GUI soft で `trap (memory access out of bounds)`。unit 304 の soft 側ログには 125.3 MB の VA 割当 (`[m11][VA-big]`) が出ている。原因 (shim の STUB 経路 `GlobalAddAtomW` 等の戻り値差か、VA 上限の差か) は**未確認**。判定式は緩めていない。
+- 新規 lift 欠陥は本回では見つかっていない。`function_52a7f0` の `RegisterClassW` 脱落 (§5-2) は OPEN のまま (judge の OPEN 行)。
+- 本回で判明した素材の注意: `work-m11` の `boot0..4` は素材のまま、`boot6` は `m11_wndseed.sh` で作る必要がある。`m11_gen_ir2.sh` 単独では WNDPROC 8 件が未定義になり W1 FAIL (e2e run 2 で確認)。
 
 ### 6c-2. HEAD `b3819e2` の再測 (review #576 指摘 2 への対応・素材 `work-m11` / `toolchain-*` / `apt-mingw` を展開して実行)
 
