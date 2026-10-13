@@ -15,6 +15,8 @@ units モード (`work/m11/boot_state.json`・22 unit 状態) の boot 状態で
 `0x11eac90` は **0** のまま (state の img run に含まれない)。InitUnits は何もせず戻る。
 native も wasm も同じく ok を返すため、**空振り一致**になる。
 
+`0x11eac90` / `0x11eac98` は `[WIN64]` の `extracted/block00031_PE.bin` 上で `.bss` (ファイル上の raw size 0) に置かれ、初期値は 0 (`pefile` で section 確認・2026-10-13)。units の img run に値が無いのは pristine 側も 0 のためで、`boot.precondition()` の 0 判定はこの前提で正しい。
+
 ## 2. 実測 (`tests/check_initunits.py`・`liftdiff_e2e.sh --m11-only` の [3b/4])
 
 HEAD (#977 ブランチ) で `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tests/check_initunits.py` を実行 (2026-10-13 実測)。
