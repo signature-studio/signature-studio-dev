@@ -20,12 +20,13 @@
   U3 (iii) total2 ⊆ total3 ⊆ nonfw。 total2 は lea.json (#627) の値と一致
   U4 (iv)  排他合計 (a)+(b)+(c)+(c-lea)+(d) = outside
   U5 (v)   8 バイト VA の dataref (既存の root 定義) を持つ outside 関数が 0 件
+  U6 (vi)  即値辺の識別力: 即値参照 1 件だけで届く関数を持つ合成入力 (synth_check) で、即値辺を含む閉包が対象を取り漏れ 0 (実データの即値辺は 7 本とも 0 件 = REPORT_UNREACHED §2d-3)
 出力: work/sampler/unr/block<B>.ranges.txt (total3 の ranges、lift 入力) / work/sampler/unr.json / stdout の表
 """
 import argparse, json, os, sys, time
 
 import numpy as np
-from capstone import CS_GRP_CALL, CS_GRP_JUMP, CS_OP_IMM
+from capstone import Cs, CS_ARCH_X86, CS_MODE_64, CS_GRP_CALL, CS_GRP_JUMP, CS_OP_IMM
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -77,6 +78,48 @@ def imm_capstone(x, f, starts):
     return va, rv
 
 
+def make_edge3(x, IMM):
+    def edge3(f):
+        i = IMM.get(f, (set(), set()))
+        return x.edges(f)[0] | x.edges(f)[1] | i[0] | i[1]
+    return edge3
+
+
+def closure_miss(x, total3, IMM):
+    """total3 の全関数の call/jmp・lea・即値の先のうち、非共通なのに total3 に無いものの数 (U2 の漏れ)"""
+    miss = 0
+    for f in total3:
+        i = IMM.get(f, (set(), set()))
+        for t in x.edges(f)[0] | x.edges(f)[1] | i[0] | i[1]:
+            if t in x.nonfw and t not in total3:
+                miss += 1
+    return miss
+
+
+def synth_check():
+    """U6: 即値参照 1 件 (E が mov eax,R・R が mov ecx,T) だけで T に届く合成入力。 即値辺を含む閉包が {E,R,T} を取り、漏れ 0 なら True"""
+    base, tv = 0x400000, 0x1000
+    E, R, T = 0x1000, 0x1010, 0x1020
+    tb = bytearray(b'\xcc' * 0x30)
+    for f, code in ((E, b'\xb8' + (base + R).to_bytes(4, 'little') + b'\xc3'),
+                    (R, b'\xb9' + (base + T).to_bytes(4, 'little') + b'\xc3'),
+                    (T, b'\xc3')):
+        tb[f - tv: f - tv + len(code)] = code
+    x = object.__new__(CI.Pe)
+    x.base, x.tv, x.tb = base, tv, bytes(tb)
+    x.ends = {E: E + 6, R: R + 6, T: T + 1}
+    x.nonfw = set(x.ends)
+    x.fw = lambda f: False
+    x.md = Cs(CS_ARCH_X86, CS_MODE_64)
+    x.md.detail = True
+    x._code = {}
+    total2 = {E}
+    IMM = {f: imm_capstone(x, f, x.nonfw) for f in x.nonfw}
+    roots = {t for f in total2 for t in (IMM[f][0] | IMM[f][1])} & (x.nonfw - total2)
+    total3, _ = x.bfs(sorted(total2 | roots), make_edge3(x, IMM))
+    return roots == {R} and total3 == {E, R, T} and closure_miss(x, total3, IMM) == 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--out-dir', default=os.path.join(WORK, 'sampler'))
@@ -86,6 +129,7 @@ def main():
     lea = json.load(open(a.lea_json))
     os.makedirs(os.path.join(a.out_dir, 'unr'), exist_ok=True)
     out, bad = {}, []
+    c6 = synth_check()
     t_start = time.time()
     for name, blk, _ in targets.SHELLS:
         x = CI.Pe(blk, cnt)
@@ -139,18 +183,10 @@ def main():
 
         roots = A | B_live
 
-        def edge3(f):
-            i = IMM.get(f, (set(), set()))
-            return x.edges(f)[0] | x.edges(f)[1] | i[0] | i[1]
-
+        edge3 = make_edge3(x, IMM)
         total3, _ = x.bfs(sorted(total2 | roots), edge3)
         literal, _ = x.bfs(sorted(total2 | A | B_all), edge3)
-        miss = 0
-        for f in total3:
-            i = IMM.get(f, (set(), set()))
-            for t in x.edges(f)[0] | x.edges(f)[1] | i[0] | i[1]:
-                if t in nonfw and t not in total3:
-                    miss += 1
+        miss = closure_miss(x, total3, IMM)
         root_miss = len(roots - total3)
         c2 = miss == 0 and root_miss == 0
         c3 = total2 <= total3 <= nonfw and (len(total2), x.size(total2)) == (lea[name]['total2_funcs'], lea[name]['total2_bytes'])
@@ -170,11 +206,16 @@ def main():
             'total3': cls(total3), 'increment': {'funcs': len(total3) - len(total2), 'bytes': x.size(total3) - x.size(total2)},
             'literal_upper': cls(literal), 'remaining': cls(nonfw - total3),
             'checks': {'U1': c1, 'U2': c2, 'U3': c3, 'U4': c4, 'U5': c5}, 'nonfw_bytes_total': x.size(nonfw),
+            'imm_edges': sum(len(IMM[f][0] | IMM[f][1]) for f in nonfw),
         }
         o = out[name]
         print('%s: total3 %d / %d (total2 %d/%d, +%d/%d) 上界 %d / %d 根 %d (b_live %d / b_all %d) U1-U5 %s' % (
             name, len(total3), x.size(total3), len(total2), x.size(total2), o['increment']['funcs'], o['increment']['bytes'],
             len(literal), x.size(literal), len(roots), len(B_live), len(B_all), 'PASS' if all(o['checks'].values()) else 'FAIL'))
+    if not c6:
+        bad.append('合成入力 (即値参照 1 件): U6 即値辺の識別力')
+    print('\n即値辺 (非共通 → 非共通、7 本別): ' + ', '.join('%s %d' % (n, out[n]['imm_edges']) for n, _, _ in targets.SHELLS))
+    print('U6 即値辺の識別力 (合成入力): %s' % ('PASS' if c6 else 'FAIL'))
     fmt = lambda d: '%s / %s' % (format(d['funcs'], ','), format(d['bytes'], ','))
     print('\n| プラグイン | 非共通 関数 / B | total2 関数 / B | outside 関数 / B | (a) RVA32 排他 | (b) 即値 排他 | (c) call/jmp 排他 | (c-lea) 排他 | (d) 参照なし 排他 |')
     print('|---|--:|--:|--:|--:|--:|--:|--:|--:|')
@@ -198,7 +239,7 @@ def main():
     json.dump(out, open(os.path.join(a.out_dir, 'unr.json'), 'w'), indent=1)
     for b in bad:
         print('FAIL', b, file=sys.stderr)
-    print('closure_unreached: %s (%.1f s)' % ('FAIL %d' % len(bad) if bad else 'PASS 5 checks x %d plugins' % len(targets.SHELLS), time.time() - t_start))
+    print('closure_unreached: %s (%.1f s)' % ('FAIL %d' % len(bad) if bad else 'PASS 6 checks (U1-U5 x %d plugins, U6 合成入力)' % len(targets.SHELLS), time.time() - t_start))
     sys.exit(1 if bad else 0)
 
 

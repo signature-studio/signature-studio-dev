@@ -251,7 +251,7 @@ before は 515.7 s で `p0c/work/kernel_table.json` の置き場所違いによ�
 | `p0c2_sweep.csv` (194 行) | 一致 (52d0c45c63f9) |
 | `p0c2_e2e.sh` stdout (パス正規化後) | 一致 (idempotent OK / argfix idempotent OK / wasm32 compile OK 100972 bytes) |
 
-**RetDec は非決定的** (置換と無関係): `retdec-decompiler` に同一 PE・同一 ranges を与えて 2 回走らせると `k80.drc.ll` の sha256 が変わる (alloca の並びと `uselistorder`)。
+**RetDec は非決定的** (置換と無関係): `retdec-decompiler` に同一 PE・同一 ranges を与えて 2 回走らせると `k80.drc.ll` の sha256 が変わる (alloca の並びと `uselistorder`)。(追記 #695/#887: alloca 並びは `base.canon_alloca_order` で正規化済み。k80 の base.ll は ASLR 有無によらず一致。手順は `tools/liftlib/REPORT_APPENDIX_D.md` §23.4。)
 このため before/after で再 lift した `k80.lift.ll` は 58 行差になる。lift 以降を比較するため、after では `k80.lift.ll` を before のものに揃えてから `p0c2_e2e.sh` を再実行し、上表の一致を得た。
 差が残るのは lift 由来の `k80.*.ll` / `k80_simd.c` / `k80.drc.*`、実行ごとにアドレスが変わるログ (`build.log` `run.err`)、`k80diff` バイナリ、`diff/driver.c` の `map_image(...)` の PE パス 1 行 (これは置換の意図した差)。
 

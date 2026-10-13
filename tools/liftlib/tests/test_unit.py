@@ -470,13 +470,16 @@ def t16():
     assert ("function_180127550", 0x180127559, "function_180126920", 1) in pre["sites_entry"], pre["sites_entry"]
     st, lg = {}, []
     iargs.run(mod, img, lg, st)
-    # HB-H25: 5 番目の引数 (入口 rsp+0x28) を読む 2 site (1801c162b / 1801c1752) は bind 済み。残る unbound は 1801a3117 (rdx) のみ
-    assert st.get("site_unbound") == 1, st
-    assert not [l for l in lg if "1801c162b" in l and "unbound" in l or "1801c1752" in l and "unbound" in l], lg
+    # HB-H25 (#1158) で 5 番目の引数 (入口 rsp+0x28) を読む 2 site (1801c162b / 1801c1752) も bind 済みのため unbound は 0
+    assert st.get("site_unbound", 0) == 0, st
+    assert not [l for l in lg if "unbound" in l], lg
     post = iargs.scan(mod, img)
     assert not post["define_short"] and not post["sites_short"] and not post["sites_entry"], post
     ctor = [l for l in mod.func("function_18011d400").blocks[0].lines if "@function_180127550(" in l]
     assert len(ctor) == 1 and "(i64 %arg1, i64 %arg2, i64 1, i64 20)" in ctor[0], ctor
+    # movzx edx,dl 合成 (site 1801a3117): rdx を入口 dl の 0 拡張として bind する (unbound にならない)
+    assert not any("1801a3117" in l and "unbound" in l for l in lg), [l for l in lg if "1801a3117" in l]
+    assert any("function_1801a30b0@1801a3117" in l and "%ia_1801a3117_1z" in l for l in lg), lg
     # 復元済みの site の rcx (入口素通し) を undef に戻すと detect-only が検出する (逆方向の被覆)
     fn = mod.func("function_18011d400")
     li = next(i for i, l in enumerate(fn.blocks[0].lines) if "@function_180127550(" in l)
@@ -492,6 +495,34 @@ def t16():
     assert not st2.get("define_fixed") and not st2.get("sites_fixed"), st2
     print("T16 ok (iargs: define %d / site %d / entry %d 検出 → 復元 define_fixed=%d sites_fixed=%d site_unbound=%d, 再走査 0/0/0, 冪等)"
           % (len(pre["define_short"]), len(pre["sites_short"]), len(pre["sites_entry"]), st["define_fixed"], st["sites_fixed"], st.get("site_unbound", 0)))
+
+
+def t16b():
+    """[#898 review] movzx の高バイト (dh) は _canon_reg で dl と同じ族に正規化されるため合成してはならない (unbound)。
+    movzx edx,dl は従来どおり合成する (下位 8 bit の 0 拡張)。"""
+    from liftlib.mc import decode_one
+    from liftlib.passes.iargs import _resolve
+
+    class _B:
+        def bind(self, reg, C):
+            return ("%%src_%s" % reg, "i64") if C == 0x1000 else None
+
+        def root_def(self, reg, C):
+            return ("def", 0x1000, reg)
+
+    class _MF:
+        def __init__(self, it):
+            self.insns = {0x1000: it}
+
+    out = {}
+    for txt, code in (("movzx edx, dh", b"\x0f\xb6\xd6"), ("movzx edx, dl", b"\x0f\xb6\xd2")):
+        it = decode_one(code, 0x1000)
+        assert it is not None and it.mnem == "movzx", (txt, it)
+        ins = []
+        out[txt] = _resolve(_B(), _MF(it), None, "rdx", 0x1010, "", "n", ins)
+    assert out["movzx edx, dh"] is None, out
+    assert out["movzx edx, dl"] is not None and out["movzx edx, dl"][1] == "i32", out
+    print("T16b ok (movzx edx,dh は unbound / movzx edx,dl は 0 拡張で bind)")
 
 
 def t17():
@@ -738,6 +769,6 @@ def t23():
 
 
 if __name__ == "__main__":
-    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t17, t18, t19, t20, t21, t22, t23):
+    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t16b, t17, t18, t19, t20, t21, t22, t23):
         f()
     print("ALL UNIT TESTS PASS")

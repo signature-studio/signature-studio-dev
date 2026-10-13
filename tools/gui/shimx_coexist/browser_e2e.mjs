@@ -1,86 +1,99 @@
-// browser_e2e.mjs — shimx×gui 共存 wasm を headless Chrome で走らせ、browserEnv の window.open / File System Access 経路を検査する (#956 / #1159 SHX-T19)。
-//   usage: node browser_e2e.mjs <webdir>   (browser_e2e.sh が webdir を作る)
-//   user activation が要る host 呼出は、ページの #gate を CDP の Input.dispatchMouseEvent (実マウス) で押させる。
-//   exit 0 = 全 PASS / 1 = 判定 FAIL / 2 = 実行エラー / 3 = watchdog
+// browser_e2e.mjs — SHX-T19 (#1159): 実 Chrome で browserEnv の window.open / File System Access 経路を CDP から検査する。
+//   usage: node browser_e2e.mjs <webdir (coexistWeb.js)> <jsdir (gui_hostcall.js)>
+//   user activation は CDP Runtime.evaluate の userGesture:true で与える (有/無しを同じ page で切り替えて比較する)。
+//   exit 0 = 全 PASS / 1 = FAIL / 2 = 実行エラー
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { startServer, launchChrome } from "../e2e/cdp_lib.mjs";
 
-const WEB = path.resolve(process.argv[2]);
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const [WEBDIR, JSDIR] = process.argv.slice(2).map((p) => path.resolve(p));
 const CHROME = process.env.CHROME || "google-chrome";
-const wd = setTimeout(() => { console.error("[browser] WATCHDOG timeout"); process.exit(3); }, Number(process.env.E2E_TIMEOUT_MS || 240000));
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-const { srv, port } = await startServer([["/", WEB]]);
-const udd = fs.mkdtempSync(path.join(process.env.OPENCODE_TMP || os.tmpdir(), "shx-browser-chrome-"));
-const br = await launchChrome(CHROME, udd, 800, 600);
-const cdp = br.cdp;
-const consoleLines = [];
 const checks = [];
-const ck = (name, ok, why = "") => { checks.push([name, !!ok, why]); console.log(`${ok ? "PASS" : "FAIL"} browser: ${name}${ok ? "" : " — " + why}`); };
-let code = 2;
+const ck = (name, ok, why = "") => { checks.push([name, !!ok]); console.log(`${ok ? "PASS" : "FAIL"} browser: ${name}${ok ? "" : " — " + why}`); };
+const wd = setTimeout(() => { console.error("[browser] WATCHDOG timeout"); process.exit(2); }, 240000);
+
+const HTML = `<!doctype html><meta charset="utf-8"><script src="/wasm/coexistWeb.js"></script><script type="module" src="/page/browser_page.mjs"></script>`;
+const { srv, port } = await startServer(
+  [["/wasm/", WEBDIR], ["/js/", JSDIR], ["/page/", HERE]],
+  (url) => (url === "/" ? { type: "text/html", body: HTML } : null),
+);
+const udd = fs.mkdtempSync(path.join(process.env.RUNNER_TEMP || os.tmpdir(), "shx-browser-"));
+const br = await launchChrome(CHROME, udd, 480, 360);
+const { cdp } = br;
+const ver = await fetch(`http://127.0.0.1:${new URL(br.cdp.ws.url).port}/json/version`).then((r) => r.json()).catch(() => null);
+let fail = 0;
 try {
-  const { targetId } = await cdp.send("Target.createTarget", { url: "about:blank" });
+  const { targetId } = await cdp.send("Target.createTarget", { url: `http://127.0.0.1:${port}/` });
   const { sessionId } = await cdp.send("Target.attachToTarget", { targetId, flatten: true });
-  const S = (method, params = {}) => cdp.send(method, params, sessionId);
-  cdp.on((m) => {
-    if (m.sessionId !== sessionId) return;
-    if (m.method === "Runtime.consoleAPICalled") consoleLines.push(m.params.args.map((a) => a.value ?? a.description ?? "").join(" "));
-    if (m.method === "Runtime.exceptionThrown") consoleLines.push("EXC " + (m.params.exceptionDetails?.exception?.description || m.params.exceptionDetails?.text || ""));
-  });
-  await S("Page.enable"); await S("Runtime.enable");
-  const E = async (expr) => { const r = await S("Runtime.evaluate", { expression: expr, awaitPromise: true, returnByValue: true }); if (r.exceptionDetails) throw new Error("eval: " + (r.exceptionDetails.exception?.description || r.exceptionDetails.text)); return r.result.value; };
-  await S("Page.navigate", { url: `http://127.0.0.1:${port}/browser_index.html` });
-
-  const clickGate = async () => {
-    for (let i = 0; i < 600; i++) {
-      const rect = await E(`(() => { const b = document.getElementById("gate"); if (!b || b.style.display === "none") return null; const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, label: b.textContent }; })()`);
-      if (rect) {
-        await S("Input.dispatchMouseEvent", { type: "mouseMoved", x: rect.x, y: rect.y });
-        await S("Input.dispatchMouseEvent", { type: "mousePressed", x: rect.x, y: rect.y, button: "left", clickCount: 1 });
-        await S("Input.dispatchMouseEvent", { type: "mouseReleased", x: rect.x, y: rect.y, button: "left", clickCount: 1 });
-        return rect.label;
-      }
-      await sleep(100);
-    }
-    throw new Error("gate never shown");
+  const S = (m, p) => cdp.send(m, p, sessionId);
+  const logs = []; cdp.on((m) => { if (m.sessionId === sessionId && m.method === "Runtime.exceptionThrown") logs.push(JSON.stringify(m.params.exceptionDetails).slice(0, 400)); });
+  await S("Runtime.enable"); await S("Page.enable");
+  const ev = async (expr, gesture = false) => {
+    const r = await S("Runtime.evaluate", { expression: expr, awaitPromise: true, returnByValue: true, userGesture: gesture, timeout: 60000 });
+    if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description ?? r.exceptionDetails.text);
+    return r.result.value;
   };
-  // host 呼出が gate を出すたびに実クリック。gate が無くなるまで押し続ける (wasm の main 完了まで)
-  const pumping = (async () => { const labels = []; for (;;) { const done = await E(`!!window.__report`); if (done) break; try { labels.push(await clickGate()); } catch (e) { if (String(e.message).includes("never shown")) { await sleep(100); continue; } throw e; } } return labels; })();
-  const labels = await Promise.race([pumping, sleep(200000).then(() => { throw new Error("pump timeout"); })]);
-  const rep = await E(`window.__report`);
-  if (rep.error) throw new Error("page error: " + rep.error);
-  code = rep.code;
+  for (let t = 0; ; t++) {
+    const ok = await ev("typeof window.__init === 'function' && typeof window.coexistWeb === 'function'").catch(() => false);
+    if (ok) break;
+    if (t > 100) throw new Error("page did not load");
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  await ev("window.__init()");
+  // user activation の失効を待つ (Chrome は約 5 秒)。activation 無しの試験を前の gesture に乗らせない
+  const waitIdle = async () => { for (let t = 0; t < 120; t++) { if (!(await ev("navigator.userActivation.isActive"))) return; await new Promise((r) => setTimeout(r, 100)); } throw new Error("activation did not expire"); };
+  const withoutActivation = async (expr) => { await waitIdle(); return ev(expr, false); };
+  ck("実 Chrome の page で web build wasm を起動 (SharedArrayBuffer / pthread)", await ev("typeof SharedArrayBuffer === 'function' && crossOriginIsolated === true"), "crossOriginIsolated 偽");
+  const ua = await ev("navigator.userAgent");
+  const chromeVer = /Chrome\/(\S+)/.exec(ua)?.[1] ?? "?";
+  console.log(`[browser] chrome=${chromeVer} ${ver?.Browser ?? ""}`);
 
-  const m = /RESULT pass=(\d+) fail=(\d+)/.exec(rep.out.join("\n"));
-  ck("wasm 側 C テスト fail=0 (web build)", m && m[2] === "0", `RESULT=${m?.[0]}`);
-  ck("exit code 0", code === 0, `code=${code}`);
-  const wantOpen = ["https://example.com/a?b=1", "mailto:x@example.com", "http://example.com/old-style", "https://blocked.example/"];
-  ck("window.open に渡った URL (C 側で拒否した 4 件は host に来ない)", JSON.stringify(rep.opened.map((o) => o.url)) === JSON.stringify(wantOpen), JSON.stringify(rep.opened));
-  ck("window.open は transient user activation 下で呼ばれた", rep.opened.length > 0 && rep.opened.every((o) => o.active), JSON.stringify(rep.opened));
-  ck("open picker 5 回 + save 1 回", rep.opens.length === 5 && rep.saves.length === 1, `opens=${rep.opens.length} saves=${rep.saves.length}`);
-  ck("picker は user activation 下で開いた", rep.opens.every((o) => o.active) && rep.saves.every((o) => o.active), JSON.stringify(rep.gates));
-  ck("filter → types 変換 (WAV only)", JSON.stringify(rep.opens[0]?.types) === JSON.stringify([{ description: "WAV (*.wav)", accept: { "application/octet-stream": [".wav"] } }]), JSON.stringify(rep.opens[0]?.types));
-  ck("multi フラグ", JSON.stringify(rep.opens.map((o) => o.multiple)) === JSON.stringify([false, false, true, false, false]), JSON.stringify(rep.opens.map((o) => o.multiple)));
-  ck("ステージング: kick.wav の内容 (buffer 反映)", JSON.stringify(rep.stage["kick.wav"]) === JSON.stringify([1, 2, 3]), JSON.stringify(rep.stage["kick.wav"]));
-  ck("ステージング: multi 3 本 (buffer 反映)", JSON.stringify([rep.stage["a.wav"], rep.stage["b.wav"], rep.stage["c.mid"]]) === JSON.stringify([[10], [11], [12]]), JSON.stringify([rep.stage["a.wav"], rep.stage["b.wav"], rep.stage["c.mid"]]));
-  ck("save: FL が書いた内容が実 handle へ反映", rep.flushed === 1 && JSON.stringify(rep.saved) === JSON.stringify([Array.from(Buffer.from("FLP-DATA"))]), `flushed=${rep.flushed} saved=${JSON.stringify(rep.saved)}`);
-  ck("host log に想定外エラー無し (想定: blocked 1 + picker failure 1)", rep.log.filter((l) => !/blocked|simulated/.test(l)).length === 0, JSON.stringify(rep.log));
-  ck("ページで未捕捉の例外無し", !consoleLines.some((l) => l.startsWith("EXC")), consoleLines.filter((l) => l.startsWith("EXC")).slice(0, 3).join(" | "));
-  const bver = (await cdp.send("Browser.getVersion")).product;
-  console.log(`[browser] chrome=${bver} gates=${labels.length} (${rep.gates.map((g) => g.label).join(" / ")})`);
-  if (rep.out.length) console.log("[browser] wasm stdout tail:\n" + rep.out.slice(-6).join("\n"));
+  // ---- 1. ShellExecute → window.open ----
+  const o1 = await ev(`window.__req(1, ["https://example.com/a?b=1"])`, true);
+  ck("window.open: user activation 下の https は開く (result=1)", o1.result === 1, JSON.stringify(o1));
+  const o1h = await ev(`window.__req(1, ["http://example.com/h?x=1"])`, true);
+  ck("window.open: user activation 下の http は開く (result=1)", o1h.result === 1, JSON.stringify(o1h));
+  const o1m = await ev(`window.__req(1, ["mailto:someone@example.com?subject=hi"])`, true);
+  ck("window.open: user activation 下の mailto は開く (result=1)", o1m.result === 1, JSON.stringify(o1m));
+  const o2 = await withoutActivation(`window.__req(1, ["https://example.com/no-activation"])`);
+  ck("window.open: user activation 無しは Chrome のポップアップブロックで失敗 (result=0 → ShellExecute 失敗)", o2.result === 0, JSON.stringify(o2));
+  const o3 = await ev(`window.__req(1, ["javascript:alert(1)"])`, true);
+  ck("window.open: javascript: は host 側で拒否 (result=0・window.open 未呼出)", o3.result === 0);
+
+  // ---- 2. GetOpenFileNameW → showOpenFilePicker ----
+  const f0 = await withoutActivation("window.__req(2, ['Open','', '', '', '', '', '', '', 'WAV (*.wav)', '*.wav'], 0)");
+  ck("showOpenFilePicker: user activation 無しは実 API が SecurityError → 失敗 (result=-16 / HC_ERR)", f0.result === -16, JSON.stringify(f0));
+  const f1 = await ev("window.__req(2, ['Open','', '', '', '/stage', 'C:\\\\s', '0', '0', 'WAV (*.wav)', '*.wav'], 0)", true);
+  ck("showOpenFilePicker: activation 下で呼ばれ、選択結果が guest の応答 buffer に反映 (result=1, 'kick.wav')", f1.result === 1 && f1.out.startsWith("kick.wav"), JSON.stringify(f1));
+  const ff = await ev("window.__fsRead('/stage/kick.wav')");
+  ck("選択ファイルの内容がステージング FS へ書き出される ([1,2,3])", JSON.stringify(ff) === "[1,2,3]", JSON.stringify(ff));
+
+  // ---- 3. GetSaveFileNameW → showSaveFilePicker ----
+  await ev("window.__fsWrite('/stage/song.flp', [70,76,80])");
+  const s0 = await withoutActivation("window.__req(3, ['Save','', 'flp', 'song.flp', '/stage', 'C:\\\\s', '0', '0', 'FL (*.flp)', '*.flp'], 0)");
+  ck("showSaveFilePicker: user activation 無しは失敗 (result=-16)", s0.result === -16, JSON.stringify(s0));
+  const s1 = await ev("window.__req(3, ['Save','', 'flp', 'song.flp', '/stage', 'C:\\\\s', '0', '0', 'FL (*.flp)', '*.flp'], 0)", true);
+  ck("showSaveFilePicker: activation 下で呼ばれ、save 先 handle が返る (result=1, 'song.flp')", s1.result === 1 && s1.out.startsWith("song.flp"), JSON.stringify(s1));
+  const nf = await ev("window.__flush()");
+  const wr = await ev("window.__writes()");
+  ck("save: FL が書いた内容が選択 handle (createWritable) へ反映される", nf === 1 && JSON.stringify(wr) === "[[70,76,80]]", JSON.stringify({ nf, wr }));
+
+  const lg = await ev("window.__log()");
+  // 想定内: activation 無しの window.open (blocked) / javascript: 拒否 (rejected) / activation 無しの open・save picker (user gesture 要求で失敗) の計 4 件
+  const expected = [/^openUrl blocked: https:\/\/example\.com\/no-activation$/, /^openUrl rejected \(scheme javascript:\)$/, /^op 2 failed: .*Must be handling a user gesture/, /^op 3 failed: .*Must be handling a user gesture/];
+  const unexpected = lg.filter((l) => !expected.some((re) => re.test(l)));
+  ck("host log は想定内 (activation 無しの blocked/拒否 3 件) のみ", unexpected.length === 0 && lg.length === expected.length, JSON.stringify({ unexpected, n: lg.length }));
+  ck("page 例外なし", logs.length === 0, logs.join(" | "));
+  console.log(`[browser] calls=${JSON.stringify(await ev("window.__calls()"))}`);
+  console.log(`[browser] log=${JSON.stringify(lg)}`);
 } catch (e) {
-  console.error("[browser] ERROR", e.message, "\n console tail:", consoleLines.slice(-10).join(" | "));
-  code = 2;
+  console.error("[browser] ERROR", e.message); fail = 2;
 } finally {
-  const exited = new Promise((r) => br.chrome.once("exit", r));
-  br.close(); srv.close();
-  await Promise.race([exited, sleep(5000)]);
-  try { fs.rmSync(udd, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* Chrome 終了直後の書込残り (一時dir のみ) */ }
-  clearTimeout(wd);
+  br.close(); srv.close(); clearTimeout(wd);
 }
-const bad = checks.filter((c) => !c[1]).length;
-console.log(`BROWSER RESULT pass=${checks.length - bad} fail=${bad}`);
-process.exit(bad || code !== 0 ? (checks.length ? 1 : 2) : 0);
+const bad = checks.filter(([, ok]) => !ok).length;
+console.log(`BROWSER RESULT pass=${checks.length - bad} fail=${bad} chrome=${ver?.Browser ?? "?"}`);
+process.exit(fail || bad ? 1 : 0);

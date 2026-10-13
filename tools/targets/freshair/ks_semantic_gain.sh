@@ -13,3 +13,4 @@ cc -O1 -o ks_semantic_gain "$HERE/ks_semantic_gain.c" -lm
 ./ks_semantic_gain sc "$SC" "$N" "$SEED" > sc.txt
 ./ks_semantic_gain kh "$KH" "$N" "$SEED" > kh.txt
 python3 "$HERE/ks_semantic_gain_cmp.py" sc.txt kh.txt | tee cmp.json
+python3 "$HERE/ks_semantic_gain_ulp.py" sc.txt kh.txt | tee ulp.json
