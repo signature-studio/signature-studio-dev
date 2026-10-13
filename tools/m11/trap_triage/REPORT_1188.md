@@ -18,8 +18,11 @@ ELF (x86-64, `_start`) を `as`+`gcc -nostdlib -static` で作り、`retdec-deco
 | vA (`xor eax,eax; cmp eax,ebx; jg`) | 即値由来の 0 | 0 | jcc 脱落 |
 | vB (`mov eax,[rcx+0x18]; cmp eax,ebx; jg`) | メモリ読み出し (未知値) | 2 | 残る |
 | vC (`mov eax,0; cmp eax,ebx; jg`) | 即値 0 | 0 | jcc 脱落 |
+| g2 (`8c5eb0` 同型: `cmp [rbp+0x4c],ebx; jg` 先頭ガード + 後方 back-edge `jle` のループ) | スタック読み出し・ループ版 | エントリ終端が無条件 `br` | jcc 脱落 |
 
-再現: `RETDEC=<retdec-decompiler> bash tools/m11/trap_triage/retdec_jcc_cut_1188.sh` (出力は `tools/m11/work/trap1188/`、gitignore)。実測 (本 run): `vA: final_br=0`・`vB: final_br=2`・`vC: final_br=0`。
+ループ版 g2 は受入 1 の形 (先頭 cmp/jg + back-edge ループ) に当たる。エントリブロックの終端を見ると、先頭ガードの `jg` が無条件 `br` に変わっている。
+
+再現: `RETDEC=<retdec-decompiler> bash tools/m11/trap_triage/retdec_jcc_cut_1188.sh` (出力は `tools/m11/work/trap1188/`、gitignore)。実測 (本 run, 2026-10-13 21:54 UTC): `vA: entry guard DROPPED`・`vB: entry guard kept`・`vC: entry guard DROPPED`・`g2: entry guard DROPPED`。
 
 raw モード (`-m raw -a x86-64`) は 32 ビットとして逆アセンブルされるため (REX 前置が `dec eax` になる)、再現には使えない。ELF で行う。
 
