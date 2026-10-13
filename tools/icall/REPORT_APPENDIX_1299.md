@@ -18,7 +18,15 @@
 | `ott_load` (SlateCore) | パス指定 | rc 0 |
 | `fa_nat.py 1803b3d10 --n 3` | xmm0 = 乱数 double, rcx..r9 = 乱数ヒープ 0x400 バイト | 3 件実行、rc 0 |
 | `fa_nat.py 1803b3fc0 --n 3` | 同上 | SIGSEGV (rip が image 外 `0x7ffff7...`、関数ポインタ経由の未初期化 global 参照と見られる・未切り分け)、rc 95 |
-| 引数 rcx=0 で `1803b3d10` | 初版 (ヒープ確保なし) | SIGSEGV addr=0x10、初版の入力を改修 |
+| 引数 rcx=0 で `1803b3d10` | 作業履歴 (測定結果ではない)。初版 (ヒープ確保なし) | SIGSEGV addr=0x10、初版の入力を改修 |
+
+### 3.1 差し戻し後の fix run (本 run の記録)
+
+- 測定 commit: 本 run の fix commit (docstring のみの変更。実行コードの差分は無し)。
+- 素材: 本 run は `fl-win64` のみ取得 (`$HOME/artifacts` に `fl-win64.tar.zst` のみ)。`plugins-freshair`・`toolchain-*`・`work-*` は無い。
+- `tools/ott/native/build.sh` は OK (`work/libottnative.so` を生成)。
+- `python3 tools/icall/diff/fa_nat.py 1803b3d10 --n 3` は `RuntimeError: ott_load failed -1` で rc 1 (DLL パス未指定・未展開のため)。
+- 上記 §2 の rc 0 / 3 件出力 / SIGSEGV の再現は**この run では未実施**。次の run で `oc_artifacts` の素材を取得してから再測定する。
 
 ## 3. 未解決 (子 issue)
 

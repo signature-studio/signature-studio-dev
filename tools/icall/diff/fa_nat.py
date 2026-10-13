@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """fa_nat.py FN_VA [--n N] [--seed S] [--path SlateCore.core_64] : Fresh Air SlateCore の関数を native 実機械語で実行し xmm0 raw 64bit を出す。
-ottnat (OTT 用ローダ) を DLL パス指定で流用する。入力 = xmm0 に乱数 double、rcx..r9 = 0 (fn3_diff.py の gen_inputs と同形)。
+ottnat (OTT 用ローダ) を DLL パス指定で流用する。入力 = xmm0 に乱数 double、rcx..r9 = 0x400 バイトのヒープ確保 (N.alloc) のポインタ。
 既定 DLL: $FA_CORE、無ければ tools/targets/freshair/work/win/Fresh Air/.../SlateCore.core_64 (fetch.sh で展開)。"""
 import sys, os, json, struct, random
 HERE = os.path.dirname(os.path.abspath(__file__))
