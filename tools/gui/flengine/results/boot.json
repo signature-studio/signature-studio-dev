@@ -1,0 +1,42 @@
+{
+ "mode": "boot",
+ "dllmain_done": true,
+ "boot_threw": null,
+ "boot_failfast": null,
+ "units_total": 942,
+ "units_run": 22,
+ "init_count": 23,
+ "survey": null,
+ "reach": [
+  {
+   "order": 1,
+   "name": "LoadStringW",
+   "calls": 4,
+   "kind": "IMPL",
+   "prio": "1"
+  }
+ ],
+ "reach_summary": "reached=1 impl=1 stub=0",
+ "failfast_apis": {},
+ "softstub_apis": {},
+ "failfast_count": 0,
+ "gui_icall_calls": 0,
+ "gui_ring_discarded": 0,
+ "icall_miss": 0,
+ "m11_stub_total": 62,
+ "m11_stubs": [
+  "GetLocaleInfoW:59",
+  "EnumCalendarInfoW:2",
+  "FormatMessageW:1"
+ ],
+ "probes": {
+  "GetMem": 33,
+  "FreeMem": 20,
+  "FastMM_GetMem(407a50)": 34,
+  "FastMM_FreeMem(407e20)": 20,
+  "InitUnits": 0,
+  "Halt0": 1
+ },
+ "va_calls": 1,
+ "va_bytes": 1310720
+}

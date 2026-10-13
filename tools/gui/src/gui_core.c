@@ -783,7 +783,7 @@ API GetDC(I64 h) {
   gui_sh(); ensure_desktop();
   Wnd *w = h ? wnd_from_h((U64)h) : g_desktop;
   if (!w) return 0;
-  if (w == g_desktop) gui_failfast("GetDC", "screen DC (GetDC(NULL)) not implemented");
+  if (w == g_desktop) return (I64)gdi_get_screen_dc();   /* GetDC(NULL): 画面 DC。描画は捨てる計測・互換 DC 用途 (#174) */
   RL clip = {0}; wnd_clip(w, &clip);
   U64 dc = gdi_get_dc_for_wnd(w, 0, &clip);
   rl_free(&clip);

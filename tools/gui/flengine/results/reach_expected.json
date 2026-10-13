@@ -1,0 +1,24 @@
+{
+ "comment": "tools/gui/flengine/e2e.sh の R2 gate (到達 floor)。soft survey + 通常起動で shim に到達した GUI API。m11 が前進して増えるのは可、減るのは退行。更新は bash e2e.sh の結果を見て手動で。",
+ "names": [
+  "CharLowerBuffW",
+  "CreatePalette",
+  "EnumDisplayMonitors",
+  "EnumDisplaySettingsW",
+  "EnumFontFamiliesExW",
+  "FindWindowW",
+  "GetClipCursor",
+  "GetDC",
+  "GetDeviceCaps",
+  "GetMonitorInfoW",
+  "GetStockObject",
+  "GetSystemMetrics",
+  "LoadIconW",
+  "LoadStringW",
+  "MessageBoxA",
+  "RegisterClipboardFormatW",
+  "RegisterWindowMessageW",
+  "ReleaseDC",
+  "SystemParametersInfoW"
+ ]
+}

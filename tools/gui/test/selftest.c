@@ -213,6 +213,17 @@ int main(void) {
   BitBlt(wdc, 60, 40, 16, 16, memdc, 0, 0, SRCCOPY);
   ReleaseDC(h, wdc); flush_wait();
   CHK(desk(10 + 60, 20 + 40 + 1) == rgb(10, 20, 30) && desk(10 + 60 + 12, 20 + 40 + 2) == rgb(200, 100, 50), "BitBlt memdc->window -> desktop");
+  /* GetDC(NULL) = 画面 DC (#174: 実 FLEngine の unit 初期化が呼ぶ。以前は fail-fast) */
+  {
+    int64_t sdc0 = GetDC(0);
+    CHK(sdc0 != 0, "GetDC(NULL) screen DC");
+    CHK(GetDeviceCaps(sdc0, HORZRES) > 0 && GetDeviceCaps(sdc0, BITSPIXEL) == 32, "screen DC GetDeviceCaps");
+    int64_t cb0 = CreateCompatibleBitmap(sdc0, 8, 8);
+    CHK(cb0 != 0, "CreateCompatibleBitmap(screen DC)");
+    CHK(ReleaseDC(0, sdc0) == 1, "ReleaseDC(NULL, screen DC)");
+    CHK(DeleteDC(sdc0) == 0, "released screen DC handle is invalid (double release rejected)");
+    DeleteObject(cb0);
+  }
   /* StretchBlt 2x + flip */
   wdc = GetDC(h);
   StretchBlt(wdc, 0, 0, 32, 32, memdc, 0, 0, 16, 16, SRCCOPY);

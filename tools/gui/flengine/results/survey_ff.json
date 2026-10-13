@@ -1,0 +1,189 @@
+{
+ "mode": "survey",
+ "dllmain_done": true,
+ "boot_threw": null,
+ "boot_failfast": null,
+ "units_total": 942,
+ "units_run": 0,
+ "init_count": 895,
+ "survey": {
+  "ok": 815,
+  "noproc": 1,
+  "miss": 46,
+  "trap": 80,
+  "kinds": {
+   "halt0->longjmp": 65,
+   "memory access out of bounds": 14,
+   "gui_failfast": 1
+  },
+  "failfast_units": {
+   "EnumFontFamiliesExW": 1
+  }
+ },
+ "reach": [
+  {
+   "order": 1,
+   "name": "LoadStringW",
+   "calls": 48116199,
+   "kind": "IMPL",
+   "prio": "1"
+  },
+  {
+   "order": 2,
+   "name": "GetDC",
+   "calls": 3,
+   "kind": "IMPL",
+   "prio": "0"
+  },
+  {
+   "order": 3,
+   "name": "GetDeviceCaps",
+   "calls": 2,
+   "kind": "IMPL",
+   "prio": "0"
+  },
+  {
+   "order": 4,
+   "name": "ReleaseDC",
+   "calls": 2,
+   "kind": "IMPL",
+   "prio": "0"
+  },
+  {
+   "order": 5,
+   "name": "CreatePalette",
+   "calls": 1,
+   "kind": "IMPL",
+   "prio": "2"
+  },
+  {
+   "order": 6,
+   "name": "GetStockObject",
+   "calls": 3,
+   "kind": "IMPL",
+   "prio": "1"
+  },
+  {
+   "order": 7,
+   "name": "LoadIconW",
+   "calls": 1,
+   "kind": "IMPL",
+   "prio": "1"
+  },
+  {
+   "order": 8,
+   "name": "MessageBoxA",
+   "calls": 55,
+   "kind": "IMPL",
+   "prio": "2"
+  },
+  {
+   "order": 9,
+   "name": "RegisterWindowMessageW",
+   "calls": 10,
+   "kind": "IMPL",
+   "prio": "0"
+  },
+  {
+   "order": 10,
+   "name": "GetSystemMetrics",
+   "calls": 6,
+   "kind": "IMPL",
+   "prio": "0"
+  },
+  {
+   "order": 11,
+   "name": "FindWindowW",
+   "calls": 2,
+   "kind": "IMPL",
+   "prio": "1"
+  },
+  {
+   "order": 12,
+   "name": "RegisterClipboardFormatW",
+   "calls": 4,
+   "kind": "IMPL",
+   "prio": "0"
+  },
+  {
+   "order": 13,
+   "name": "CharLowerBuffW",
+   "calls": 8,
+   "kind": "IMPL",
+   "prio": "1"
+  },
+  {
+   "order": 14,
+   "name": "EnumDisplaySettingsW",
+   "calls": 1,
+   "kind": "IMPL",
+   "prio": "1"
+  },
+  {
+   "order": 15,
+   "name": "GetClipCursor",
+   "calls": 1,
+   "kind": "IMPL",
+   "prio": "0"
+  },
+  {
+   "order": 16,
+   "name": "EnumDisplayMonitors",
+   "calls": 1,
+   "kind": "IMPL",
+   "prio": "1"
+  },
+  {
+   "order": 17,
+   "name": "SystemParametersInfoW",
+   "calls": 1,
+   "kind": "IMPL",
+   "prio": "0"
+  },
+  {
+   "order": 18,
+   "name": "GetMonitorInfoW",
+   "calls": 53,
+   "kind": "IMPL",
+   "prio": "1"
+  },
+  {
+   "order": 19,
+   "name": "EnumFontFamiliesExW",
+   "calls": 1,
+   "kind": "STUB",
+   "prio": "2"
+  }
+ ],
+ "reach_summary": "reached=19 impl=18 stub=1",
+ "failfast_apis": {
+  "EnumFontFamiliesExW": 1
+ },
+ "softstub_apis": {},
+ "failfast_count": 1,
+ "gui_icall_calls": 1,
+ "gui_ring_discarded": 0,
+ "icall_miss": 47,
+ "m11_stub_total": 70,
+ "m11_stubs": [
+  "GetLocaleInfoW:59",
+  "EnumCalendarInfoW:2",
+  "FormatMessageW:1",
+  "GetTimeZoneInformation:1",
+  "MulDiv:1",
+  "GlobalAddAtomW:3",
+  "acmMetrics:1",
+  "SHGetMalloc:1",
+  "GetCurrentThread:1"
+ ],
+ "probes": {
+  "GetMem": 24058513,
+  "FreeMem": 21,
+  "FastMM_GetMem(407a50)": 24058555,
+  "FastMM_FreeMem(407e20)": 24,
+  "InitUnits": 0,
+  "Halt0": 66
+ },
+ "va_calls": 1248,
+ "va_bytes": 1554251776
+}

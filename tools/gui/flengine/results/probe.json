@@ -1,0 +1,105 @@
+{
+ "boot_dllmain_done": true,
+ "hinstance": 0,
+ "classes": [
+  {
+   "site": "function_71dd80",
+   "wndclass_va": "0xff5f20",
+   "name": "TLightweightLayeredControl",
+   "lpfnWndProc": "0x31dd10",
+   "atom": -16383,
+   "err": null
+  },
+  {
+   "site": "function_867e10",
+   "wndclass_va": "0x1009cb8",
+   "name": "TApplication",
+   "lpfnWndProc": "0x24920",
+   "atom": -16382,
+   "err": null
+  }
+ ],
+ "util_window": {
+  "fn": "function_52a7f0",
+  "ret": "0x0",
+  "err": null
+ },
+ "windows": [
+  {
+   "name": "TLightweightLayeredControl",
+   "hwnd": "0x0",
+   "hwnd_below_2_31": null,
+   "err": null,
+   "wndproc_icall_calls": 2,
+   "thunk_calls": 0,
+   "m11_icall_miss_delta": 2
+  },
+  {
+   "name": "TApplication",
+   "hwnd": "0x210000e",
+   "hwnd_below_2_31": true,
+   "err": null,
+   "wndproc_icall_calls": 4,
+   "thunk_calls": 4,
+   "m11_icall_miss_delta": 0
+  }
+ ],
+ "abi": {
+  "gui_shared_ptr": 271610880,
+  "gui_shared_ptr_ge_0x10000": true,
+  "screen_dc": "0x120000f",
+  "screen_dc_in_31bit": true
+ },
+ "reach": [
+  {
+   "order": 1,
+   "name": "LoadStringW",
+   "calls": 4,
+   "kind": "IMPL",
+   "prio": "1"
+  },
+  {
+   "order": 2,
+   "name": "RegisterClassW",
+   "calls": 2,
+   "kind": "IMPL",
+   "prio": "0"
+  },
+  {
+   "order": 3,
+   "name": "CreateWindowExW",
+   "calls": 3,
+   "kind": "IMPL",
+   "prio": "0"
+  },
+  {
+   "order": 4,
+   "name": "GetClassInfoW",
+   "calls": 1,
+   "kind": "IMPL",
+   "prio": "0"
+  },
+  {
+   "order": 5,
+   "name": "SetWindowLongPtrW",
+   "calls": 1,
+   "kind": "IMPL",
+   "prio": "0"
+  },
+  {
+   "order": 6,
+   "name": "GetDC",
+   "calls": 1,
+   "kind": "IMPL",
+   "prio": "0"
+  },
+  {
+   "order": 7,
+   "name": "ReleaseDC",
+   "calls": 1,
+   "kind": "IMPL",
+   "prio": "0"
+  }
+ ],
+ "icall_miss": 2
+}
