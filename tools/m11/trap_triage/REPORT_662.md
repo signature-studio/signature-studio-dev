@@ -95,6 +95,7 @@ REPORT_594 §3 の予測 (56 が halt0→oob) と一致。
   - 判定 G1〜G5 が 1 つでも外れると exit 1。終了時に `m11_ov.c` と `work/boot_final3.ll` を復元する。
 - 環境 (本 runner): AMD EPYC 9V74 (4 vCPU)。node v22.23.3 (既定)、node v24.21.0 (hostedtoolcache)、python 3.14.8 (venv: capstone 5.0.7, pefile 2024.8.26)、emcc 6.0.12 (`[EMSDK]`)。REPORT 旧版の前提 node v26 は runner に無く未検証。
 - n=3 (逐次実行): wall は run 1 121.6 秒 (前段 build を含む)・run 2 102.2 秒・run 3 102.0 秒。load average (1 分値) の開始→終了は 0.83→0.98・0.98→1.12・1.12→1.02。
+- コミット済み HEAD `f77c97e` での追加 1 run (n=4): rc=0、G1〜G5 PASS、survey は base 864/31/46/1・cur 864/31/46/1・guard 865/30/46/1・ng 864/31/46/1 (clobber 0 は全構成)。wall 101.8 秒、load 0.07→0.83。
 - node 版: 同じ base build (IR 状態 Q、ネガコン後に残った build) の survey を node v22.23.3 と v24.21.0 で各 n=1 実行し、どちらも 864/31/46/1 (clobber 0)。node 版による差は今回の範囲では出なかった (n=1 のため範囲は限定的)。
 - ネガコン (修正 3): `work/m11_image.bin` を退避して negctl を実行 → `FAIL: survey (base) rc!=0` (`Error: ENOENT`)、exit 1、`units_*.json` は残らない。画像は cmp で復元。
 - e2e (作成者環境の単発記録, コミット `ec513e0`, `bash tools/m11/m11_e2e.sh`, n=1。**本 runner では未再現・未実施**: `m11_e2e.sh` の PE 参照は `[ANALYSIS-DIR]` 配下の固定パスで、14 script が同じ前提を持つ (#680)): `reached_stage 4/6`, `units_run 22`, survey `ok 864 / trap 31 / oom 1 / clobber 0 / miss 46`, `wasm_bytes 6027634`。
