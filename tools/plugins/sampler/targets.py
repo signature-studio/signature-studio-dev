@@ -17,8 +17,9 @@ SHELLS = [
 # Delphi 殻を持たない MSVC C++ 単体 DLL (framework 一致 0)
 MONOLITHS = [('GMS', 23677)]
 # 判定が許す未実装 __asm_* helper の上限 (block -> 件数) と、その名前の許可リスト。 ここに無い block は 0 件でなければ不合格
-ALLOW_UNIMPL = {23658: 1, 23662: 1}
-ALLOW_UNIMPL_NAMES = ['rep_stosb_memset']
+# main 8d883c3 以降 (#629 で rep_stosb_memset 実装) は全 block 0 件 (実測: work/sampler/lealift/status_run.csv)。 許容は撤去
+ALLOW_UNIMPL = {}
+ALLOW_UNIMPL_NAMES = []
 
 
 def shell_blocks():

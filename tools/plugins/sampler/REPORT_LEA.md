@@ -4,7 +4,7 @@
 
 ## 2c. lea 経路を root に加えた閉包 (total2) と lift
 
-検証起点 commit: **f358f17** (`closure_lea.py` / `lea_lift.sh` / `lea_e2e.sh` / `facts_total.py` / `lea_nega.sh`)。 **依存基点: main 042f869** (本 PR の merge-base。 main は 8d883c3 まで 384 commit 先で、rep_stosb_memset の実装 (#629) を含まない)。 既知類型との関係 (`docs/DEFECTS.md`): **該当なし** (差分試験は範囲外。 f80 の扱いは下記 L-3)。
+検証 HEAD: **c402faf** (main d7da2d2 を取り込んだ現 HEAD。 `lea_e2e.sh` / `lea_nega.sh` は main 上で再実行、§6b)。 旧基点 042f869 (rep_stosb_memset が stub の時代) の値は本節の表から差し替え済み。 既知類型との関係 (`docs/DEFECTS.md`): **該当なし** (差分試験は範囲外。 f80 の扱いは下記 L-3)。
 再現: `bash tools/plugins/sampler/lea_e2e.sh` (算出 → lift → 判定 → host/kernel 再計測) / `bash tools/plugins/sampler/lea_nega.sh` (ネガコン)。 `lift/plugin_closure.py` は変更していない。
 
 定義 (`closure_lea.py`): total = #537 の推移閉包。 lea root = 閉包内の関数が `lea reg,[rip+X]` で開始 VA を取っている非共通関数 (閉包に無いもの)。
@@ -31,8 +31,8 @@ lea root を足して `call/jmp rel32` で広げ、新たに入った関数の l
 |---|--:|--:|--:|--:|--:|--:|--:|
 | FL Keys | 22386 | 84 / 32,913 | 88 | 0 | 0 | 0 | 4 |
 | FPC | 23617 | 341 / 131,429 | 343 | 0 | 0 | 0 | 11–12 |
-| Fruity Granulizer | 23658 | 165 / 45,587 | 165 | 1 (rep_stosb_memset) | **3 → 0** | **1 → 0** | 5 |
-| Fruity Slicer | 23662 | 195 / 57,453 | 197 | 1 (rep_stosb_memset) | **3 → 0** | **1 → 0** | 6 |
+| Fruity Granulizer | 23658 | 165 / 45,587 | 165 | 0 | **3 → 0** | **1 → 0** | 5 |
+| Fruity Slicer | 23662 | 195 / 57,453 | 197 | 0 | **3 → 0** | **1 → 0** | 6 |
 | Fruity Slicer 2 (殻) | 23663 | 198 / 69,184 | 198 | 0 | **3 → 0** | **1 → 0** | 8 |
 | Slicex | 24172 | 709 / 262,399 | 713 | 0 | 0 | 0 | 24 |
 | Soundfont Player | 24175 | 2,124 / 791,544 | 2,138 | 0 | 0 | 0 | 64–65 |
@@ -41,7 +41,8 @@ lea root を足して `call/jmp rel32` で広げ、新たに入った関数の l
 - **L-3 f80 (新規の観測)**: lea 由来の関数が x87 を含む。 Granulizer の `function_7442c0` / `function_7443e0`、Slicer の `function_7534f0` / `function_753610`、Slicer 2 の `function_851760` / `function_851880` は lea root (total に無い)、各 block の残り 1 本 (`function_7594e0` / `function_770e00` / `function_8527b0`) は total 内の関数で、**#537 の final.ll には f80 を含む関数が無かった** (f80 0)。
   lowering 前の `emcc -c` は `no libcall available for fmul with type f80` / `do not know how to soften fp_extend` で rc 1 になる。 そこで `lea_lift.sh` は f80 を検出した block に限り **`p0c/f80_lower.py` (x86_fp80→f64、#197 の成果物) を明示の段として通し**、judge には lowering 後の値を渡す (raw 値は CSV の `f80_raw` / `emcc_c_rc_raw` / `lowered` 列に残す)。
   **f80→f64 は拡張精度の丸めが変わり bit-exact を保証しない** (#197)。 通過 ≠ 正しさ。 3 block とも lowering の適用は機械的に通ったが、差分試験は範囲外。 **該当 3 block の PASS は lowering 後の値による** (judge.py の出力「lowering 後の値で判定した block」に列挙。 raw は `f80_raw` / `emcc_c_rc_raw`)。
-- 未実装 helper は #537 から増えていない (Granulizer・Slicer の `rep_stosb_memset` 各 1 = #538)。
+  **機序 (実測で確認した部分)**: 同一関数 `function_7594e0` (Granulizer、total 内) は #537 の閉包 ranges にも total2 の ranges にも含まれ、関数本体の x86_fp80 は total2 の `p.final.ll` で 2 命令 (`fpext float → x86_fp80` 等)。 ranges の関数集合は同じなので、閉包の選択が直接の原因ではない。 **#537 の final.ll で f80 0 になった差の原因 (RetDec の同一 .ll 内の他関数の型伝播か、lift の入力差か) は未解明**。 起票先: §7b。
+- 未実装 helper は main 上で 0 (`rep_stosb_memset` は #629 で実装済み、§6b)。 旧基点 (042f869) では Granulizer・Slicer 各 1 だった (#538 は解消済み)。
 
 ### 検査 (`closure_lea.py`、不合格で exit 1)
 
@@ -83,15 +84,15 @@ lea root を足して `call/jmp rel32` で広げ、新たに入った関数の l
 
 ## 6b. 検証 (コミット済み HEAD f358f17・4 core の Actions runner)
 
-| 項目 | 実測 |
+| 項目 | 実測 (main d7da2d2 を取り込んだ検証 HEAD c402faf・4 core の Actions runner) |
 |---|---|
-| 前提 (`work/` 無しから inventory + #537 の閉包 + `indirect_e2e.sh`) | #537 の `indirect_e2e.sh` を無改変で再実行し exit 0・`judge shells` PASS 7/7・`indirect_defs` PASS 7/7、7 block の define 数 (87 / 323 / 158 / 190 / 193 / 684 / 2,012) が REPORT_INDIRECT.md と一致 (所要秒は未計測) |
-| `closure_lea.py` | exit 0、7 検査 × 7 本 PASS (5.3 s、1 回計測) |
-| `lea_e2e.sh` 全体 (3 回、inventory・`facts.json` 済みから) | exit 0 × 3: **270 s / 269 s / 268 s** (終了時 load average (1 分) 1.00 / 1.01 / 1.00、4 core)。 3 回の出力 (`[lea_lift]` 行の秒と `done` 行を除く) の md5 が一致 (`ceaf59c63860`)、算出表・host/kernel 表とも `diff` 一致 |
-| lift 秒 (n=3、min–max) | FL Keys 4 / FPC 11–12 / Granulizer 5 / Slicer 6 / Slicer 2 8 / Slicex 23–24 / Soundfont Player 64–65 |
-| `lea_nega.sh` | exit 0、**222 s** (終了時 load average 1.14)。 NC0–NC13 の 23 項目 (対照 6 + 破壊 17) が全て期待通り (`!!` 0 件) |
+| `lea_e2e.sh` 全体 (inventory・閉包・lift・判定・host/kernel 再計測を含む、`work/` 無しから) | **exit 0・11 分 09 秒 (668.98 s、`time` 実測・実 CPU user 28 分 32 秒)**。 `closure_lea` PASS 7 checks × 7、`judge shells` PASS 7/7 (`ALLOW_UNIMPL` 撤去後の判定)、`indirect_defs` PASS 7/7、`facts_total` PASS 4 checks × 7 |
+| `lea_e2e.sh --skip-lift` (既存 CSV の再判定、`ALLOW_UNIMPL` 撤去後) | exit 0・1 分 33 秒。 `judge shells` PASS 7/7。 許容を空にした状態で main の declares_unimpl 0 × 7 block を確認 |
+| `lift` の `declares_unimpl` (main 上の実測) | 7 block 全て 0。 `rep_stosb_memset` の stub は main で解消 |
+| `lea_nega.sh` | exit 0・**2 分 43 秒**。 NC0–NC13 の 23 項目 (対照 6 + 破壊 17) が全て期待通り |
 
-- 検証は HEAD f358f17 のスクリプトで実行 (`git status --porcelain=v1 -- tools/plugins/sampler` はスクリプト 5 本が clean、未追跡は本 REPORT のみ)。 `work/` の中間生成物は gitignore。
+- 検証 HEAD c402faf で実行 (`targets.py` は `ALLOW_UNIMPL` 撤去、`lea_lift.sh` は f80 列の単位統一後)。 `work/` の中間生成物は gitignore (`tools/plugins/work/`)。
+- 旧 f358f17 / ad39596 の検証 (270 / 269 / 268 s、md5 `ceaf59c63860`、`lea_nega` 222 s) は main 基点の値。 main 取り込み後は上の実測に置き換えた。
 - 範囲外: 差分試験 (bit-exact)・wasm リンク・実行時の到達性 (`lea` 先が実際に呼ばれるか)。 通過 ≠ 正しさ (§1 と同じ)。
 
 ### ネガティブコントロール (`lea_nega.sh`、対照 = 無改変で rc 0)
@@ -124,3 +125,4 @@ NC1–NC7・NC11–NC13 は sed 置換が当たったことを確認してから
 | Soundfont Player の taint 版 host call 0 site (total2 でも) | host 呼出面の過小計上 | #196 にコメント (taint 精密化) |
 | 0x5dee90 の依存が FPC・Slicer 2 にも広がる | P0c の未解決 kernel #331 の影響範囲 | #197 / #331 にコメント |
 | PLUGIN_MATRIX / 見積 (57.5 人日) への反映 | total2 は #537 の total に +193 関数 / +46,327 B。 見積前提は変わらず | PM 判断 (書き換えていない) |
+| 同一関数 `function_7594e0` (Granulizer) の lift で、#537 では f80 0・total2 では f80 2 になる差の機序 (RetDec の同一 .ll 内の型伝播か、lift 入力差か) | #537 の f80 0 (REPORT_INDIRECT.md) の扱い。 閉包の選び方で lift 結果が変わるなら、他の閉包値も再確認が要る | PM 判断: 起票依頼 (未解明。 切り分けは同一関数を total / total2 で個別に lift する実験) |
