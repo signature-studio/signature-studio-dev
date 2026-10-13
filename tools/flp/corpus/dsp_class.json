@@ -1,0 +1,91 @@
+{
+ "block19059_PE.bin": {
+  "entry": "0x6f0da0",
+  "closureFuncs": 182,
+  "closureBytes": 38562,
+  "insns": 10044,
+  "x87": {
+   "fnclex": 1,
+   "fldcw": 1
+  },
+  "x87Transcendental": {},
+  "importCalls": {},
+  "libmImportCalls": {},
+  "indirectCalls": 81,
+  "sseNonArith": {
+   "divsd": 31,
+   "divss": 5,
+   "sqrtsd": 1,
+   "cvtsi2ss": 8
+  }
+ },
+ "block19021_PE.bin": {
+  "entry": "0x6d5d60",
+  "closureFuncs": 35,
+  "closureBytes": 5751,
+  "insns": 1515,
+  "x87": {
+   "fnclex": 1,
+   "fldcw": 1
+  },
+  "x87Transcendental": {},
+  "importCalls": {},
+  "libmImportCalls": {},
+  "indirectCalls": 53,
+  "sseNonArith": {
+   "divss": 1,
+   "maxss": 2
+  }
+ },
+ "block19069_PE.bin": {
+  "entry": "0x6d5a90",
+  "closureFuncs": 60,
+  "closureBytes": 11389,
+  "insns": 2715,
+  "x87": {},
+  "x87Transcendental": {},
+  "importCalls": {},
+  "libmImportCalls": {},
+  "indirectCalls": 28,
+  "sseNonArith": {
+   "cvtsi2ss": 12,
+   "divss": 4,
+   "divsd": 17,
+   "sqrtsd": 1
+  }
+ },
+ "block19148_PE.bin": {
+  "entry": "0x844380",
+  "closureFuncs": 202,
+  "closureBytes": 50705,
+  "insns": 12958,
+  "x87": {
+   "fxch": 1,
+   "fnclex": 1,
+   "fldcw": 1
+  },
+  "x87Transcendental": {},
+  "importCalls": {},
+  "libmImportCalls": {},
+  "indirectCalls": 134,
+  "sseNonArith": {
+   "cvtsi2ss": 35,
+   "divss": 14,
+   "divsd": 47,
+   "maxss": 2,
+   "sqrtsd": 1
+  }
+ },
+ "block18999_PE.bin": {
+  "entry": "0x6e9b70",
+  "closureFuncs": 1,
+  "closureBytes": 123,
+  "insns": 33,
+  "x87": {},
+  "x87Transcendental": {},
+  "importCalls": {},
+  "libmImportCalls": {},
+  "indirectCalls": 3,
+  "sseNonArith": {}
+ }
+}
