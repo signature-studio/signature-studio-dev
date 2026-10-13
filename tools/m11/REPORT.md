@@ -3,7 +3,7 @@
 **判定: 部分達成** (到達 stage 4/6)。`entry_point`(DllMain attach) → `_StartLib` → `_InitLib` → `InitUnits` が
 wasm 上で動作し、**FastMM4 が実際に GetMem → VirtualAlloc でプールを確保するところまで**は実測で到達。
 ただし 942 unit の初期化は通常起動で **22 本完走後、unit #23 (VA 0x467f00) が Delphi 例外 → Halt0 (§10, #132 で #18 の OOB を解消)**、stage 5 (survey trap 無し完走) は未達。
-(下の §1 表と §2〜§8 は #132 以前 = unit #18 OOB 時点の実測。最新値は §10、survey の最新値 (OOM/clobber 分離後) は §12。)
+(下の §1 表と §2〜§8 は #132 以前 = unit #18 OOB 時点の実測。最新値は §10、survey の最新値 (OOM/clobber 分離後) は §12、#516 qstore 後の最新値は §13。)
 
 再現: `bash tools/m11/m11_e2e.sh` (work/ があれば増分 build: 実測 29.3〜29.6 秒 (§10, 4 vCPU, n=3) / `--full` で RetDec lift から全再生成: 旧記載「約 10 分」で本 PR では未再測定)。常に exit 0。
 gen_ir2 の ldfix は capstone+pefile が無いと黙ってスキップされる (§10 未解決の末尾)。PE は `/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin` 固定 (runner では symlink)。
@@ -228,4 +228,4 @@ reached_stage は全行 4/6 (stage 5 未達)。最終 HEAD は 5 回測定 (gen_
 
 ## 13. #516 [M11-N18]: 64bit スタック局所の即値 store が 4B に縮む欠陥 (DEFECTS.md D17, idx 87/898)
 
-機械語 `mov qword [rbp+X], imm` (8B) が IR で `store ptr null` / `store i32 imm` (wasm32 で 4B) に縮み、上位 4B 未初期化のまま C 転記 `Q(dest)` が読んで OOB (idx 87 = `418190`, idx 898 = `412d60`)。`qstore/m11_qstore.py` が 279 site / 158 関数を `store i64` に戻し (`M11_QSTORE=0` で無効)、survey 816/79 → 817/78 (idx 87 のみ)。数値・site 一覧・再現・未解決は [qstore/REPORT.md](qstore/REPORT.md)。
+機械語 `mov qword [rbp+X], imm` (8B) が IR で `store ptr null` / `store i32 imm` (wasm32 で 4B) に縮み、上位 4B 未初期化のまま C 転記 `Q(dest)` が読んで OOB (idx 87 = `418190`, idx 898 = `412d60`, idx 58–63 = `417b70` の `Q(a)`、後者は `function_8cbb00` の 2 site)。`qstore/m11_qstore.py` が 279 site / 158 関数を `store i64` に戻す (`M11_QSTORE=0` で無効)。**#513 取り込み後の HEAD `8e5f760` の実測 (n=3 一致)**: survey NC 856/38/46/1 (clobber 1) → 修復 864/31/46/1 (clobber 0)、ラベル差 9 unit (58–63・87・898 が trap→ok、144 が clobber→trap)。58–63 は `8cbb00` の 2 site だけを除外すると trap に戻り (858/37/46/1) qstore の効果と確定、144 は別 site (未切り分け)。数値・site 一覧・再現・未解決は [qstore/REPORT.md](qstore/REPORT.md)。
