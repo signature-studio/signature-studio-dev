@@ -128,3 +128,27 @@ DSP 固有 closure (42 効果) にはライセンス/ネット系参照が無く
 ## 11. #249 追記 (ブラウザ分類 lift・ctor 47 vs 46 同定、詳細は `KH249_REPORT.md`)
 
 - 47 ctor = 製品 45 + `HostProxyEditorModel` + `SnapinGroupEditorModel`、product_index 46 = 製品 45 + `core` (KH9 §5-5 の推定を確定)。ブラウザ 0x180ef7fc0 は module F で emcc 通過・status 9 で全エントリ listed/unlocked を実 IR の thunk 実行で確認。
+
+## 12. #710 named import 節 (HeapAlloc shim / 宣言補完) の検証
+
+- 対象: `lift/gen_stubs_sigs.py` (`HEAP_C` / `IMP_SHIM`)・`lic_build.py` (`decl_named_imports`)。snapins 版 `HEAP_C` の同型問題は未修正 (追跡 issue は PR 本文)。
+- 変更点: `kh_heap_alloc` は領域を超える要求で **0 を返す** (旧: `n` を 0xF0000 に切り詰め、末尾超過で先頭へ巻き戻し生存ブロックを上書き)。`decl_named_imports` は引数付き・戻り非 i64・fastcc の呼出を `sys.exit` で停止し、`declare void @llvm.trap()` が無いときも停止する。`defined` は属性付き define (`define internal i64 @Foo(...) #0`) に対応。
+- 再現 (emsdk・winpkg 不要、ホスト gcc のみ): `python3 scripts/kh710_check.py` → 終了 0 で全 PASS。
+
+| 検査 | 期待 | 結果 |
+|---|---|---|
+| decl: 引数なし `call i64 @GetCurrentThreadId()` で `declare i64 @GetCurrentThreadId()` 補完 | 補完 | PASS |
+| decl: 引数付き `call i64 @HeapFree(i64 1, i64 2)` | exit (停止) | PASS |
+| decl: `call fastcc i64 @HeapFree(i64 1)` | exit (停止) | PASS |
+| decl: 属性付き define `define internal i64 @Foo(...) #0` の呼出 | 補完なし・重複なし | PASS |
+| decl: `declare void @llvm.trap()` 無し | exit (停止) | PASS |
+| heap: 100B + 16B 確保が非 0・16B 整列 | 非 0 / 整列 | PASS |
+| heap: 2MB 要求 | 0 | PASS |
+| heap: 0xFFFFFFFFFFFFFFF0 要求 | 0 | PASS |
+| heap: 0xF0000 要求 (領域内) | 非 0 | PASS |
+| heap: 0xF0000 の 2 回目 (領域枯渇) | 0 | PASS |
+| heap: 先に確保したブロックの内容 (0xAB 100B) が後続確保後も保持 | 保持 | PASS |
+
+- 上記は HEAD 変更後の `lift/gen_stubs_sigs.py` の `HEAP_C` を、アドレスだけホストバッファへ差し替えて実行したもの (`kh710_check.py`)。
+- **未実施**: emcc rc=0/1、license A/B/E/F の wasm sha256 再計算、`kh249_check.mjs` の ok=17。`fl-win64` 素材に winpkg・emsdk・RetDec が無く再現できないため、旧 HEAD (`9c1f7c0b`) の sha256 表は**この変更で無効**。再計算は winpkg と emsdk のある環境で `lic_build.py --module A|B|E|F` を実行して行う (未実施・起票先は PR 本文)。
+- `product_index.json` (46 plugins) は `work/winpkg/` の生成物 (gitignore)。差分に出ないのは仕様どおり。再生成には `plugins-kilohearts` 素材が要る (`scripts/kh249_product_index.py`)。

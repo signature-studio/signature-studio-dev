@@ -65,12 +65,21 @@ def capture_stage0(rstr, dst, base):
 def decl_named_imports(txt):
     """呼ばれているが宣言の無い Win32/CRT named import (`call i64 @Name()`) に declare を補う (#710)。
     定義は gen_stubs_sigs.py の IMP_SHIM / fail-fast 節が stubs.c 側に出す。宣言が無いと emcc が未定義参照で落ちる。"""
-    defined = set(re.findall(r'^(?:define|declare) \S+ @([\w.\-]+)\(', txt, re.M))
-    called = set(re.findall(r'call \S+ @([A-Za-z][\w]*)\(', txt))
+    defined = set(re.findall(r'^(?:define|declare)\b[^@\n]*@([\w.\-]+)\(', txt, re.M))
     skip = ('function_', 'kh_', 'llvm', '__asm', 'global_var')
-    add = ['declare i64 @%s()' % n for n in sorted(called - defined) if not n.startswith(skip)]
+    add = set()
+    for m in re.finditer(r'\bcall\b([^@\n]*)@([A-Za-z]\w*)\(([^\n]*?)\)', txt):
+        ty, name, args = m.group(1).strip(), m.group(2), m.group(3).strip()
+        if name in defined or name.startswith(skip):
+            continue
+        if ty != 'i64' or args:
+            sys.exit('decl_named_imports: 未対応の named import 呼出 @%s (戻り %r / 引数 %r)。declare i64 @%s() の補完は引数なし・戻り i64 のみ' % (name, ty, args, name))
+        add.add(name)
+    add = ['declare i64 @%s()' % n for n in sorted(add)]
     if not add:
         return txt
+    if not re.search(r'(?m)^declare void @llvm\.trap\(\)$', txt):
+        sys.exit('decl_named_imports: 挿入位置 `declare void @llvm.trap()` が無い (補完対象: %s)' % ', '.join(add))
     return re.sub(r'(?m)^declare void @llvm\.trap\(\)$', lambda m: '\n'.join(add) + '\n' + m.group(0), txt, count=1)
 
 
