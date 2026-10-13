@@ -90,7 +90,8 @@ FLOAT_XMM = {
     "%2 = load i128, ptr %0": xmm_of("2", 3),
     "%3 = load i128, ptr %0": xmm_of("3", 2),
     "%4 = load i128, ptr %0": xmm_of("4", 1),
-    # [D] ucomiss flags 落ち: `ucomiss xmm1,xmm0` の flags を fcmp に接続する。極性 (ja/jbe) は .ll の br で未検証 (要素材)
+    # [D] ucomiss flags 落ち: `ucomiss xmm1,xmm0` の flags を fcmp ule (arg2 <= arg1) に接続する。
+    #     機械語 `ucomiss xmm1,xmm0`/`ja` と br の対応を確認済み (minss 経路は ja 不成立 = arg2 <= arg1)
     "%5 = load i1, ptr %1": "%5 = fcmp ule float %arg2, %arg1",
     "%6 = load i1, ptr %1": "%6 = fcmp ule float %arg2, %arg1",
   },
