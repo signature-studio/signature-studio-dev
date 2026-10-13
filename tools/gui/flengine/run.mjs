@@ -23,7 +23,7 @@ const msg1 = (e) => ((e && e.message) || String(e)).split('\n')[0];
 
 let bootThrew = null, bootFailfast = null, dllmainDone = false;
 const sp_boot = mod._emscripten_stack_get_current();
-if (survey) mod._m11_set_survey(1);
+if (survey) { mod._m11_set_survey(1); mod._m11_set_va_unit_budget(256); }   // m11_survey.mjs と同じ unit 別 VA 予算 (#513)
 try { mod._m11_boot_enter(0n, 1n); } catch (e) {
   if (isDone(e)) { dllmainDone = true; if (survey) mod.__emscripten_stack_restore(sp_boot); }
   else if (e && e.gui_failfast) bootFailfast = e.gui_failfast;
@@ -35,6 +35,7 @@ const kinds = {}, ffUnits = {};
 if (survey) {
   const sp0 = mod._emscripten_stack_get_current();
   for (let i = 0; i < 942; i++) {
+    mod._m11_va_unit_begin();
     try {
       const r = mod._m11_call_unit(i);
       if (r === 1) res.ok++; else if (r === 0) res.noproc++; else if (r === 2) res.miss++;
