@@ -28,6 +28,20 @@ STORE32 = re.compile(r'^(\s*)store i32 (%[\w.\-]+), ptr (%[\w.\-]+)(.*)$')
 INTPTR = re.compile(r'^\s*(%[\w.\-]+) = inttoptr i64 (%[\w.\-]+) to ptr\s*$')
 
 
+TERM = re.compile(r'^\s*(br|ret|switch|unreachable|invoke|resume|indirectbr|callbr)\b')
+LABEL = re.compile(r'^(\s*[\w.\-]+:|\d+:)')
+
+
+def same_block(lines, a, b):
+    """行 a の定義が行 b の使用より前にあり、間に基本ブロックの境界 (label / 終端命令) が無いこと。"""
+    if not a < b:
+        return False
+    for l in lines[a + 1:b]:
+        if LABEL.match(l) or TERM.match(l):
+            return False
+    return True
+
+
 def fix_fn(lines):
     """関数本体 lines (define 〜 }) に対し (書換え後の lines, 状態) を返す。"""
     fpt = {}
@@ -39,7 +53,7 @@ def fix_fn(lines):
         if m:
             fpt[m.group(1)] = i
         m = TRUNC.match(l)
-        if m and m.group(2) in fpt:
+        if m and m.group(2) in fpt and same_block(lines, fpt[m.group(2)], i):
             trunc[m.group(1)] = (i, m.group(2))
         m = INTPTR.match(l)
         if m:
@@ -50,7 +64,7 @@ def fix_fn(lines):
             uses[t] = uses.get(t, 0) + 1
     for i, l in enumerate(lines):
         m = STORE32.match(l)
-        if m and m.group(2) in trunc:
+        if m and m.group(2) in trunc and same_block(lines, trunc[m.group(2)][0], i):
             stores.append((i, m))
     dead = [p for p in ptrs if uses.get(p, 0) == 1]
     cands = []
@@ -60,11 +74,15 @@ def fix_fn(lines):
         if ent is None:
             continue
         for h in dead:
-            if ptrs[h][1] != ent[1]:
+            # %H の定義が下位 store より前で同一 basic block 内 (支配違反の IR を出さない)
+            if ptrs[h][1] != ent[1] and same_block(lines, ptrs[h][0], si):
                 cands.append((si, x, h, m.group(1)))
     if len(cands) != 1:
         return None, len(cands)
     si, x, h, ind = cands[0]
+    # 挿入する名前が関数内で未使用であることを確認 (衝突すると再定義になる)
+    if uses.get('%fhi_s', 0) or uses.get('%fhi_v', 0):
+        return None, 0
     out = list(lines)
     out[si] = lines[si] + '\n%s%%fhi_s = lshr i64 %s, 32\n%s%%fhi_v = trunc i64 %%fhi_s to i32\n%sstore i32 %%fhi_v, ptr %s' % (
         ind, x, ind, ind, h)
