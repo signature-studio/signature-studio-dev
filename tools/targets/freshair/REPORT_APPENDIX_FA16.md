@@ -68,12 +68,14 @@ found 時は `out[0] = node.+0x28`、`out[1] = node.+0x30` (参照カウンタ�
   - (b) alt: native ERR=8/8 path=static / wasm ERR=8/8 (変化なし)。
   - (c) pert: 差分トークン 0 (ERR のため状態ダンプに届かない)。
   - GATE: **FAIL** — (a) の期待値 (found=0・ERR=0) が旧 baseline のままのため。ゲートは緩めていない。
-- 実測 (`bash run_ctrl.sh 2 5`, `0cf238bb`, wall 0 s): **BIT-EXACT 15/15** (fma0/fma1, 両側 ERR 14/14 同一 scenario)。
+- 実測 (`bash run_ctrl.sh 2 5`, `0cf238bb`, wall 0 s): **BIT-EXACT 15/15** (fma0/fma1, 両側 ERR 14/14 同一 scenario)。※ `0cf238bb` 版の値。現 HEAD の値は §8 を参照。
 
 ## 8. FA-21 (#1535): 受入 1・2 の判定 (HEAD `9480d5ed`、測定 commit `ad1f4768` と lift2 差分 0)
 
 - 既定 OFF (`bash run_fa9.sh`, HEAD, wall 41 s, load 0.36→0.53): (a) base ERR=0・ca1480=72・found=0・da6c00=0 / (b) ERR=8/8 / (b-wasm) ERR=8/8 / (c) 差分 395 トークン / **GATE: PASS** / `run_ctrl 2 5` **BIT-EXACT 15/15** (wall 4 s)。
   → 既定ビルドでは 1 ノードは入らない。受入 1 (native/wasm の 1 ノード構築) と受入 2 (found>=1) は**既定では未達**。
+- 測定 commit の整理: lift2 のコードは `ad1f4768` 以降 HEAD まで変更なし (`git diff ad1f4768 HEAD -- tools/targets/freshair/lift2` = 0 行)。`0cf238bb` の値 (§7 の旧行) は HEAD の根拠にしない。
+- 実測 (HEAD `01c78f64`, 既定 OFF, 再測定): `bash run_ctrl.sh 2 5` **BIT-EXACT 15/15** (wall 3 s, load 0.74) / `bash run_fa9.sh` **GATE PASS** (wall 3 s, load 0.70; (a) ERR=0・ca1480=72・found=0・da6c00=0 / (b) ERR=8/8 / (b-wasm) ERR=8/8 / (c) 差分 395 トークン)。
 - `FA_NODE1=1` 専用 (ゲート外, HEAD, `FA_PROBE9=1`):
   - native: 8/8 scenario で `found=1` (`FA9CA` 行 8/8)。ERR 8/8 (setter `0x180c9d74c` の `addr=0x50` SIGSEGV、#1182 の範囲)。
   - wasm: found は**未観測** (`ctrl_harness.mjs` に FA9CA 相当の観測点が無い)。ERR 8/8 (`RuntimeError: unreachable` at wasm-function[1102], native とは別の失敗形)。wasm 側で 1 ノードが found=1 になったかは本測定では判定できない。
