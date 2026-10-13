@@ -122,6 +122,8 @@ def build(spec, n=None, seed=None):
     seed = spec.get("seed", 1) if seed is None else seed
     steps = spec.get("steps", 1)
     out = []
+    if spec.get("abi") == "ms_pos":           # LIFTLIB-5: 引数レジスタを位置対応で割り当てる (leaf spec のみ)
+        out.append("M pos")
     fixed_seq = spec.get("sequence")          # 明示ステップ列 (vars 上書き) があればシナリオ 0 として固定実行
     nsc = n + (1 if fixed_seq else 0)
     for si in range(nsc):

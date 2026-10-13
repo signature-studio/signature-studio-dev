@@ -7,18 +7,18 @@
  "units_run": 0,
  "init_count": 895,
  "survey": {
-  "ok": 869,
+  "ok": 871,
   "noproc": 1,
   "miss": 47,
-  "trap": 25,
+  "trap": 23,
+  "clobber": 0,
   "kinds": {
    "memory access out of bounds": 15,
-   "gui_failfast": 3,
+   "gui_failfast": 1,
    "halt0->longjmp": 7
   },
   "failfast_units": {
-   "LoadImageW": 1,
-   "SystemParametersInfoW": 2
+   "LoadImageW": 1
   }
  },
  "reach": [
@@ -192,30 +192,22 @@
   },
   {
    "order": 25,
-   "name": "RegisterClassW",
-   "calls": 1,
-   "kind": "IMPL",
-   "prio": "0"
-  },
-  {
-   "order": 26,
    "name": "CreateWindowExW",
    "calls": 1,
    "kind": "IMPL",
    "prio": "0"
   },
   {
-   "order": 27,
+   "order": 26,
    "name": "SetWindowLongPtrW",
    "calls": 1,
    "kind": "IMPL",
    "prio": "0"
   }
  ],
- "reach_summary": "reached=27 impl=26 stub=1",
+ "reach_summary": "reached=26 impl=25 stub=1",
  "failfast_apis": {
-  "LoadImageW": 1,
-  "SystemParametersInfoW": 2
+  "LoadImageW": 1
  },
  "softstub_apis": {},
  "failfast_count": 3,
@@ -247,13 +239,13 @@
   "GetFileVersionInfoSizeW:1"
  ],
  "probes": {
-  "GetMem": 1952,
+  "GetMem": 1949,
   "FreeMem": 158,
-  "FastMM_GetMem(407a50)": 2037,
+  "FastMM_GetMem(407a50)": 2033,
   "FastMM_FreeMem(407e20)": 162,
   "InitUnits": 0,
   "Halt0": 8
  },
- "va_calls": 35,
- "va_bytes": 1252720640
+ "va_calls": 37,
+ "va_bytes": 1295319040
 }
