@@ -128,6 +128,7 @@
 **x64c 生成物の `ULLULL` (本 HEAD で実測)**
 - 生成 C (`x64c_wrapper.py`、block19091、19,816 関数、`tools/ott/lift/x64c.py` は ba13c9dc 版で実行) の `ULLULL` は **18 行**。全 18 行が `cmpxchg qword ptr` の 64bit 分岐の else 節 (`R[RAX] = (R[RAX] & ~0xffffffffffffffffULLULL) | ...`)。
 - 原因行: `tools/ott/lift/x64c.py` の `i_cmpxchg`。ba13c9dc では 1447 行 `amask = '0xffffffffffffffffULL' if sz == 8 else hex(MASK[sz])` と、1449 行の `'... ~%sULL ...' % (..., amask)`。`sz == 8` の amask は既に `ULL` を含むため、`~%sULL` の `ULL` と二重になる。main では同じ箇所が 1491 / 1493 行 (main の x64c.py は 1605 行、ba13c9dc は 1560 行)。
+- main 取込み後の `x64c.py` (HEAD `4900b0f5`) で同じ生成を再実行しても `ULLULL` 18 行・clang エラー 18 件で、原因は残っている (main 版の該当行は 1491 / 1493 行)。
 - 前回 REPORT が挙げた `x64c.py:260` (`hex(MASK[s])`) は原因ではない。`hex(MASK[s])` は `0xff` 形式で `ULL` を含まず、260 行の `~%sULL` は `ULL` が 1 つだけ付く。
 - 補正の効果: 補正なし `clang -fsyntax-only` は 18 件のエラー (`invalid suffix 'ULLULL' on integer constant`)。`sed 's/ULLULL/ULL/g'` 後は 0 件で通過 (28.7 s)。前回の「2 箇所補正」は誤りで、補正箇所は 18 箇所。
 - emcc は本 HEAD の runner に無く、emcc `-c` の再測定はしていない。clang の結果は C 構文の検査であり、emcc 通過の証拠ではない。
