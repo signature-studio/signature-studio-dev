@@ -113,4 +113,20 @@
 - 正規化前後とも mismatch 0 (M11 の adapter は重複統合名のみ。§16 の既存結果と一致)。
 - 素材の `work-liftlib-targets` は HeartCore / SlateCore の lift IR を含まない (freshair `lift_gain` と kilohearts `winpkg` のみ)。HeartCore / SlateCore の lift IR は未実測。
 - 除外: `tools/liftlib/work/cab238/p1_only/work/ott_m8.ll` は正規化前の時点で `%p1r_1801209c9_cl1` が未定義 (clang error)。診断用の派生物で正規の成果物ではないため対象外。
-- `sig_test.sh` (HEAD 36edc993, `env -u EMSDK`): **ALL PASS**, 24.1 s, load average 0.65→0.75。(a)〜(h) すべて OK。
+- `sig_test.sh` (HEAD 36edc993, `env -u EMSDK`): **ALL PASS**, 24.1 s, load average 0.65→0.75。(a)〜(h) すべて OK
+
+**Kilohearts / Fresh Air plugin lift IR の実測 (#966, 2026-10-13, Actions runner, HEAD cf0a08bf (origin/main), `env -u EMSDK`, 素材 plugins-kilohearts / plugins-freshair / toolchain-retdec / toolchain-emsdk 展開済み)**:
+
+| IR (RetDec 生成) | 前処理 | 正規化前 mismatch | adapter / 重複統合 | unresolved | 正規化後 mismatch | sig_gate 所要 |
+|---|---|---|---|---|---|---|
+| SlateCore `process` (Fresh Air gain, `0x180afe090`) | `gain_e2e.sh` と同じ `ir_normalize`→`ir5_patch`→`fa_fix_gain` | 0 | 0 / 0 | 0 | **0** | 7.3 s |
+| HeartCore `process` (Kilohearts Gain, `0x1804b0380`) | `ir_normalize`→`ir5_patch` + **`declare` の完全一致行の重複除去** (下記) | 0 | 0 / 0 | 0 | **0** | 6.7 s |
+| HeartCore Matrix (`kh_lower` stage-0 `final.ll`) | `build.py --path s0 --no-compare` の出力 | 0 | 0 / 0 | 0 | **0** | 6.0 s |
+| HeartCore Haas | 同上 | 0 | 0 / 0 | 0 | **0** | 7.0 s |
+| HeartCore Clipper | 同上 | 0 | 0 / 0 | 0 | **0** | 7.0 s |
+| HeartCore Gate | 同上 | 0 | 0 / 0 | 0 | **0** | 7.0 s |
+
+- 正規化前の mismatch も全件 0 で、adapter は 0 件。今回の IR では署名の揺れが発生していない。
+- **注意 1 (手作業の前処理)**: Gain (HeartCore) の RetDec 出力は `function_18004cf20` の `declare` が同一内容で 2 回出ており、`emcc` が `invalid redefinition` で落ちた。同一行の 2 つ目を除く (awk で完全一致行のみ) ことで解消した。これは既存の lift パイプライン (`ir5_patch` / `kh_lower`) に無い手作業であり、恒常化するなら該当 pass への組み込みが必要 (未起票・下記)。
+- **注意 2**: Fresh Air gain は `gain_e2e.sh` 同様の修復 pass (`fa_fix_gain`) を通した IR で検証した。修復前の生 RetDec IR は `emcc` で 'linking' 段が失敗するため、gate の対象は修復後 IR。
+- **未実測 (受入条件の残り)**: SlateCore / HeartCore の snap-in 残り (Kilohearts 42 効果のうち gain・matrix・haas・clipper・gate 以外、SlateCore の他 snap-in) は本節では未実測。`sig_test.sh` ALL PASS は HEAD cf0a08bf で再現した (25 s, load 0.77→0.85)。。
