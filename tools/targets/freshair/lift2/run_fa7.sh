@@ -27,6 +27,35 @@ echo "== 2. 実 setter 実測 (M 変化位置 / Filter process 出力)"
 ./probe_setid "$CORE" 1 2 3 4 156 157 158 159 15a 15b P9e0c=1000 P9e54=2.0 P4394=0.5 S2=200 S2=1000 S2=8000 S3=0.25 S3=0.5 S3=0.9 > setid.txt 2>&1; cut -c1-150 setid.txt
 echo "== 3. closure 静的読出し"; python3 "$HERE/fa7_static_reads.py" "$CORE" "$HERE/work/filter/filter_rep.json" ids.txt | tee static.txt | head -12
 
+judge_inert() { # setid 形式の観測 (ID 0x156..0x15b の [v=.. setErr=S .. outChanged=C perr=P]) が 18 件すべて S=0 C=0 P=0
+python3 - "$1" <<'EOF'
+import re, sys
+TGT = (0x156, 0x157, 0x158, 0x159, 0x15a, 0x15b)
+trip = re.compile(r'\[v=\S+ setErr=(\d) diffB=\d+(?: off=[0-9a-f,]+)? outChanged=(\d) perr=(\d)\]')
+n = raw = bad = 0
+for l in open(sys.argv[1]):
+    m = re.match(r'ID 0x([0-9a-f]+):', l)
+    if not m or int(m.group(1), 16) not in TGT: continue
+    raw += l.count('[v=')
+    for s, c, p in trip.findall(l):
+        n += 1
+        if (s, c, p) != ('0', '0', '0'): bad += 1
+sys.exit(0 if n == 18 and raw == 18 and bad == 0 else 1)
+EOF
+}
+judge_pc() { # setter 陽性対照 (PC 行 6 件) が全て setErr=0 perr=0 outChanged=1
+python3 - "$1" <<'EOF'
+import re, sys
+pat = re.compile(r'PC ID 0x[23] v=\S+: setErr=(\d) diffB=\d+ outChanged=(\d) perr=(\d)$')
+n = ok = 0
+for l in open(sys.argv[1]):
+    if not l.startswith('PC '): continue
+    n += 1
+    m = pat.match(l.rstrip())
+    if m and m.groups() == ('0', '1', '0'): ok += 1
+sys.exit(0 if n == 6 and ok == 6 else 1)
+EOF
+}
 echo "== 4. 判定"
 python3 - "$@" <<'EOF' && ck "setter 0x1803debc0 が ID 0x156..0x15b で書く M バイトは全て自 descriptor [desc_off, desc_off+0x48) 内 (6 ID × 3 値)" ok || ck "setter 書込範囲" ng
 import re, sys
@@ -45,20 +74,8 @@ for l in open('setid.txt'):
             if not (lo <= int(o, 16) < lo + 0x48): print('OUT-OF-DESC', hex(i), o); sys.exit(1)
 sys.exit(0 if n >= 6 * 3 else 1)    # 観測 0 件の空 PASS を拒否
 EOF
-python3 - <<'EOF' && ck "ID 0x156..0x15b の setter 後 Filter process 出力は 3 値とも不変 (outChanged=0 が 18/18)" ok || ck "出力不変" ng
-import re, sys
-c = t = 0
-for l in open('setid.txt'):
-    m = re.match(r'ID 0x([0-9a-f]+):', l)
-    if m and int(m.group(1), 16) in (0x156, 0x157, 0x158, 0x159, 0x15a, 0x15b):
-        t += l.count('outChanged='); c += l.count('outChanged=0')
-sys.exit(0 if t == 18 and c == 18 else 1)
-EOF
-python3 - <<'EOF' && ck "陽性対照 (setter 経路): 周波数 ID 0x2 / Q ID 0x3 を setter で書くと出力が変わる (PC 6/6 outChanged=1)" ok || ck "陽性対照 setter" ng
-import sys
-pc = [l for l in open('setid.txt') if l.startswith('PC ID 0x2 ') or l.startswith('PC ID 0x3 ')]
-sys.exit(0 if len(pc) == 6 and all(l.rstrip().endswith('outChanged=1 perr=0') for l in pc) else 1)
-EOF
+judge_inert setid.txt && ck "ID 0x156..0x15b の setter 後 Filter 出力は 3 値とも不変 (18/18 で setErr=0・perr=0・outChanged=0)" ok || ck "出力不変" ng
+judge_pc setid.txt && ck "陽性対照 (setter 経路): 周波数 ID 0x2 / Q ID 0x3 を setter で書くと出力が変わる (PC 6/6 で setErr=0・perr=0・outChanged=1)" ok || ck "陽性対照 setter" ng
 python3 - <<'EOF' && ck "陽性対照 (POKE 直書き): M+0x9e0c / M+0x9e54 の直書きで出力が変わる (outChanged=1 ×2)" ok || ck "陽性対照 POKE" ng
 import re, sys
 s = open('setid.txt').read()
@@ -85,15 +102,7 @@ ids = set(int(x) for l in open('static.txt') for x in re.findall(r'^  ID (\d+) '
 sys.exit(0 if ids == {1, 2, 3, 4, 343} else 1)
 EOF
 sed 's/outChanged=0/outChanged=1/g' setid.txt > setid_bad.txt
-python3 - <<'EOF' && { echo "  FAIL NC2: outChanged=1 偽装が PASS"; nc=1; } || echo "  PASS NC2: setid の outChanged を 1 に改竄すると 出力不変判定が FAIL (18 件中 0 件一致)"
-import re, sys
-c = t = 0
-for l in open('setid_bad.txt'):
-    m = re.match(r'ID 0x([0-9a-f]+):', l)
-    if m and int(m.group(1), 16) in (0x156, 0x157, 0x158, 0x159, 0x15a, 0x15b):
-        t += l.count('outChanged='); c += l.count('outChanged=0')
-sys.exit(0 if t == 18 and c == 18 else 1)
-EOF
+judge_inert setid_bad.txt && { echo "  FAIL NC2: outChanged=1 偽装が PASS"; nc=1; } || echo "  PASS NC2: setid の outChanged を 1 に改竄すると 出力不変判定が FAIL (18 件中 0 件一致)"
 grep -v '^ID 0x15[6-9ab]' setid.txt > setid_empty.txt
 python3 - <<'EOF' && { echo "  FAIL NC3: 観測 0 件が PASS (空 PASS)"; nc=1; } || echo "  PASS NC3: 観測行を除去すると 空 PASS せず FAIL"
 import re, sys
@@ -104,11 +113,9 @@ for l in open('setid_empty.txt'):
 sys.exit(0 if n == 18 else 1)
 EOF
 sed '/^PC /s/outChanged=1/outChanged=0/' setid.txt > setid_pc0.txt
-python3 - <<'EOF' && { echo "  FAIL NC4: setter 陽性対照の outChanged を 0 に改竄しても PASS"; nc=1; } || echo "  PASS NC4: PC 行の outChanged を 0 に改竄すると 陽性対照 (setter) が FAIL"
-import sys
-pc = [l for l in open('setid_pc0.txt') if l.startswith('PC ID 0x2 ') or l.startswith('PC ID 0x3 ')]
-sys.exit(0 if len(pc) == 6 and all(l.rstrip().endswith('outChanged=1 perr=0') for l in pc) else 1)
-EOF
+judge_pc setid_pc0.txt && { echo "  FAIL NC4: setter 陽性対照の outChanged を 0 に改竄しても PASS"; nc=1; } || echo "  PASS NC4: PC 行の outChanged を 0 に改竄すると 陽性対照 (setter) が FAIL"
+sed '/^ID 0x15[6-9ab]/s/setErr=0/setErr=1/g' setid.txt > setid_err.txt
+judge_inert setid_err.txt && { echo "  FAIL NC5: ID 0x156..0x15b の setErr を 1 に改竄しても 判定 2 が PASS"; nc=1; } || echo "  PASS NC5: ID 0x156..0x15b の setErr を 1 に改竄すると 判定 2 が FAIL (setErr・perr も fail-closed)"
 [ $nc -eq 0 ] || fail=1
 echo
 if [ $fail -eq 0 ]; then echo "RESULT: run_fa7 ALL PASS"; else echo "RESULT: run_fa7 FAILED"; fi
