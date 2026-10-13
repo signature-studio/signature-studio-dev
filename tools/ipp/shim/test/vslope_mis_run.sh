@@ -3,6 +3,7 @@
 #   1) vslope_verify --mis K (K=0..16): bad_cases=0 であること
 #   2) ネガティブコントロール: head 処理を壊した実装で bad_cases が復帰すること
 #   3) 自前出力の FNV-1a ハッシュが native / wasm scalar / wasm simd128 で K ごとに一致すること
+#   4) 特殊値入力 (inf/NaN/-0/非正規数, --special) でも K=0..16 で NaN 以外の値の不一致が 0 であること (NaN ペイロードのみの差は別計上)
 # 素材は fl-win64 の block24356_PE.bin のみ。env: FL_WIN64_DIR (tools/shared/env.sh)・EMSDK_DIR (既定 /opt/emsdk)。
 set -euo pipefail
 cd "$(dirname "$0")"; HERE=$PWD; IPP=$(cd ../.. && pwd); W=$IPP/work/vslope_mis; mkdir -p "$W"
@@ -59,4 +60,9 @@ if [ -f "${EMSDK_DIR:-/opt/emsdk}/emsdk_env.sh" ]; then
 else
   echo "emsdk なし: wasm 突合をスキップ"
 fi
+echo "== 4) 特殊値入力 (--special): bad_cases=0 (NaN ペイロード差は nan_payload_elements に別計上)"
+for k in $KS; do
+  out=$("$W/vslope_verify" "$DLL" --mis "$k" --special | tail -1 || true); echo "$out"
+  case "$out" in *"bad_cases=0 "*) ;; *) fail=1 ;; esac
+done
 [ "$fail" = 0 ] && echo "RESULT PASS" || { echo "RESULT FAIL"; exit 1; }
