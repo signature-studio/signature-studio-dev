@@ -166,6 +166,25 @@ python3 tools/targets/serum2/license/authstub/authstub_irpass.py \
 - 後続 commit で `replace_at` の未使用引数 `tag` を削除した (挙動不変・呼出 1 箇所のみ更新)。素材 `plugins-serum2` が無く e2e の再実行は未実施 (`python3 -m py_compile` のみ確認)。
 - 未達 (#1007 [SR-11] で追跡): 値 (slot オフセット・global 名・LF4 の定数) は依然 literal。RetDec 出力から規則を導出する部分は未実装。
 
+## 14. LF 束縛の値を RetDec 出力から導く (SR-11, Refs #1007)
+
+- 変更: LF5/LF6/LF7 は `fp_bind.bind_load_slot_at(lines, fn, va, expect_slot, glob, tag)` で束縛する。
+  slot は IR 行 (`%stack_var_<slot>`) から読み、`expect_slot` (`'-72'`/`'-80'`/`'-152'`) と不一致なら `SystemExit` で失敗する (照合)。
+- 未達: slot の値は導出していない。`expect_slot` は照合用の期待値として literal のまま残す。global 名 (`__authstub_doc_root` 等) も literal。導出は子 issue #1208 で追跡。
+- LF4 の定数は IR の `ucomisd.1` 引数由来。`verify_lf4_const.py` で PE 上の定数と IR の値の一致を確認する (要素材 `plugins-serum2`・`toolchain-retdec`)。
+- 機械語 VA の site 数: LF5 2 / LF6 2 / LF7 1 (計 5 件)。各 site 数 1 件。
+- 機械語の slot 参照は IR の slot 名と一致しない (例: 機械語 `[rbp-0x10]` ↔ IR `stack_var_-72`)。そのため slot は機械語の rbp 値からは導かず、IR 行を正とした。
+- ネガティブコントロール: `negctl_slot.py` (合成 IR 1 関数・`bind_load_slot_at` 単体。`python3 negctl_slot.py` で再現、rc 0 = 全条件一致)。
+  - 正例 (VA `0x1800c2c94`・期待 `-72`) → PASS。
+  - 誤 slot (期待 `-80`、IR は `-72`) → `T: slot at 0x1800c2c94 = -72 (expect -80)` で FAIL。
+  - 誤 VA (`0x1800c2c95`) → `candidate = 0 (expect 1)` で FAIL。
+- 実測 (HEAD `6d6726bb`・`work/` 無しから cold・load 0.42):
+  - `bash e2e.sh` cold: real **26.57 s** (RetDec lift 含む)・exit 0・**23/23 PASS**。(前 HEAD `5e7e26fa` でも cold 27.28 s・23/23 PASS。)
+  - 出力 IR sha256 は §12/§13 の値と一致: `patched_base_lf.ll` `c62d9316…8793`、`raw_base_lf.ll` `79ab30ca…0d20` (全文ハッシュで照合)。
+  - `verify_lf4_const.py ../../work/Serum2_win64.vst3 work/patched_base_lf.ll` → `LF4 const OK` (PE 定数 = IR 定数 = 11.00001・bits 4622382073171892366)。
+  - 素材: `plugins-serum2` の `Install_Xfer_Serum2_2.1.5.exe` を `7z x` で展開 → `Serum2.vst3` 19,236,864 B・sha256 `501e7bb3…5283` (展開後に一致確認)。
+- 速度比較は記載しない (warm の再測定が無く、変更前後で cache 条件が揃わないため)。
+
 ## 13. L1 の再現条件 (実測・追跡 #823)
 
 - 測定 commit: origin/main 36edc993。素材: plugins-serum2 → `Install_Xfer_Serum2_2.1.5.exe` の `$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3` (19,236,864 B, sha256 `501e7bb3…5283`)。
@@ -202,6 +221,27 @@ sed -n 9872p $LIFT   # => br i1 %110, label %dec_label_pc_1800c2f08, label %dec_
   - (b) `or i32 …, 8388624` = **L9878 の 1 箇所** (`%114 = or i32 %113, 8388624`) (期待どおり)。
   - (c) 元の検索式 `br i1 (icmp eq %109, 0)` は **0 件** で、表記が違った。実 IR は L9870 `%110 = icmp eq i64 %109, 0` と L9872 `br i1 %110, label %dec_label_pc_1800c2f08, label %dec_label_pc_1800c2d6f`。0 側 (true 側) は `dec_label_pc_1800c2f08` で期待値を満たす。上記の検索式は修正済み。
 - 原因の一本化 (記述上の整理。機構は上記 (a)〜(c) で再確認済み): §6 L1 の「insn.addr メタが 0 個」は (a) の結果で、「`0x1800c2ef4` へ向かう辺が lift 時に `0x1800c2f08` へ付け替わる」ことが脱落の機構。
+
+## 14. L1 復元 pass (#1009 / SR-12, 追跡 #823)
+
+- 実装: `tools/liftlib/liftlib/passes/l1_restore.py`。raw IR の `br` (0x1800c2d69 の `je` の null 枝, IR 行 9872) の真の枝を新設ブロック `dec_label_pc_1800c2ef4` へ戻す。ブロックは `host=[rsi+0x10]` の null 判定と `call @__icall_dispatch(i64 0x1800c2f05)` (#228 の `ir_icall_restore.py` と同じ宣言) を持つ。site は機械語 VA で指定し、1 件でなければ失敗する。元行の `!insn.addr !N` は正規表現で捕捉して再利用する (番号の固定値は使わない)。
+- `%arg1` = rsi の根拠: 同関数 0x1800c2b50 の demo bit `[rsi+0x22792]` (機械語 0x1800c2cfe) は IR で `%x = add i64 %arg1, 141202` (141202 = 0x22792) として現れる (`authstub_irpass.py` の demo bit 検出, L233)。よって IR の `%arg1` は関数引数 this = rsi。raw IR 行の直接確認は本 fix の run では未実施 (raw lift 無し)。
+- 対照 (census, `l1_census.py`, PE sha256 `501e7bb3…5283`。機械語側は raw / restored で同値。pass は IR のみを変え機械語は変えないため、効果は IR 側 2 行だけ):
+
+  | 指標 | pass 無し (raw) | pass 有り (restored) |
+  |---|---|---|
+  | 直接 `call [reg+0x30]` site (機械語) | 1 | 1 |
+  | `edx=0x800010` 即値ロード (機械語) | 1 | 1 |
+  | 入口 edge (機械語 `je`) | 1 | 1 |
+  | `insn.addr` が site 範囲を被覆 (IR) | 0 | 2 |
+  | ブロック `dec_label_pc_1800c2ef4` | 不在 | 存在 |
+
+- 到達性 (`authstub_irpass.reachable_set`): restored では `dec_label_pc_1800c2ef4` と `l1_call` が関数入口から到達可能。
+- 構文: `base` 修復 (`liftlib.passes.base.run_base`) 後の raw / restored の両方を `llvm-as-18` で検査し、rc=0 (未修復の RetDec 出力は constexpr の `or` で `llvm-as-18` が落ちるため、検査は base 後で行う)。
+- e2e (commit a5adb2fc = origin/main 取り込み時点, `plugins-serum2` 展開 sha256 一致): cold = **30.15 s**・23/23 PASS (rc 0, load 0.30→0.66)。warm = **3.72 s**・23/23 PASS (rc 0, load 0.15)。cold と warm は実行条件が違い比較できない。pass は e2e チェーンに入っていないため、この 2 行は **e2e チェーン不変の確認であり本変更の検証ではない**。本 fix commit ではこれらを再実行していない。
+- 未達 (受入条件のうち未完): (1) 復元した `call` の引数 (rcx=host, edx=0x800010) の実行時 ABI は #228 (icall の BLK 経由) の界面に従う別工程で、本 pass は site の VA と制御辺のみ復元する。(2) e2e チェーン (`e2e.sh`) への組込みは未実施。
+- 正とする pass の決定 (#1030 / PR #1227, PM 判断事項): 正は本節の `l1_restore.py` (#1226)。PR #1227 の別 pass `serum2_l1.py` と `authstub/l1_restore.py` は撤回。理由: (1) 同じ `br` を書き換えるため両方適用は `二重適用` で失敗する。(2) 0x1800c2f05 の `call [[rcx]+0x30]` は `icall.py` が間接呼出し `call [reg+off]` に適用する規則と同じく `__icall_dispatch(site_va)` へ落とすのが本パイプラインの扱いで、撤回した pass が出す `@__vcall_notify` は定義が無くリンクできない。(3) 撤回した pass の実測 (census) は本節の pass の値ではないため REPORT から外した。覆す場合は PM が決め、`__vcall_notify` の定義と #228 の ABI との整合を先に示す。
+- 既存の子 issue への紐付け (2026-10-13 時点の状態): census 拡張 (受入 2 の IR 側指標) は #1029 [SR-13] で、PR #1205 (`Closes #1029`) により完了・closed (merge commit `9d1c632f`、本ブランチは取り込み済み)。復元 pass の前後表・ネガコンの正式化 (受入 2〜3 の残り) は #1030 [SR-14] (open)、LF 規則の導出は #1213 [SR-11] (open、`1007-sr-11-authstub-binding`)、global 名の規則化は #1208 [SR-15] (open)。
 
 ## 13b. L1 脱落条件の特定 (#823)
 
