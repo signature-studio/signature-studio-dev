@@ -247,4 +247,4 @@ underrun が 3 秒続くと +B を 1 段ずつ戻す (下限は下げない)。`
 - 再現条件 (負荷・タイミング) は未特定。FAIL は旧 HEAD の 11 run 中 1 件のみで、切り分けは `first_underrun_frame=56576` (producer 遅延か consumer rebuffer か) を起点に行う。追跡 **#863** (AU-15)。
 
 ## 20. AU-15 (#863) 現 HEAD での再試行 (失敗 0 件)
-結論: `origin/main` `2f235a0a` で 15 run 全 PASS (無負荷 9 + 負荷下 6)。全文は [REPORT_APPENDIX_863.md](REPORT_APPENDIX_863.md) §20。
+結論: `origin/main` `2f235a0a` で 15 run 全 PASS (無負荷 9 + 負荷下 6)。`origin/main` `63ed695b` で追加 27 run 全 PASS (強負荷 12 本を含む)。全文は [REPORT_APPENDIX_863.md](REPORT_APPENDIX_863.md) §20・§21。
