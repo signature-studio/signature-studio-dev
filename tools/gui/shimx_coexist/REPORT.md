@@ -215,7 +215,7 @@ bash tools/gui/e2e.sh                        # gui 単体 wasm 回帰
 | picker 実行時の user activation | open 5 件・save 1 件すべて active |
 
 - 測定環境の補足: runner に mingw (`gcc-mingw-w64-x86-64`) と `wabt` が無かったため apt で導入。worktree で `pnpm install --frozen-lockfile` を実行 (main 版 `browser_e2e.sh` が `node_modules/.bin/tsc` を使うため)。
-- 本 PR の版の code 差分 (main 取り込み前後で同一): `src/runtime/gui_hostcall.ts` ほか `tools/gui/shimx_coexist/browser_e2e_t13.{sh,mjs}`・`browser_page.js`・`browser_index.html`。
+- 本 PR の code 変更: `src/runtime/gui_hostcall.ts` ほか `tools/gui/shimx_coexist/browser_e2e_t13.{sh,mjs}`・`browser_page.js`・`browser_index.html` (`origin/main` 比の差分)。
 
 ### 旧 commit の参考値 (code commit `fdc95bf2`、測定 HEAD `fe406aa5`。現 HEAD の実測ではない)
 
