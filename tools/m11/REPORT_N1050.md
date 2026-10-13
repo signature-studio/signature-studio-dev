@@ -66,7 +66,7 @@
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 実 boot で file API が発生しない原因の切り分け (`reached_stage=4` の trap `function_8c5eb0` の手前か後段か)。17 unit までは GetProcAddress / TlsAlloc 等の初期化系のみ | 受入条件「件数と api 内訳」が未達 | #1050 に残す |
-| trace variant build の `signature mismatch=1`: **期待どおりではない**。通常ビルドの既存記録は 0 件 (`tools/m11/trap_triage/REPORT_860.md` L11・`REPORT_596.md` L110 の `wasm-ld signature mismatch 0`)。ただし比較元は `m11_build.sh` で、本 trace variant は `shimx_link/build.sh` のため直接の比較ではない。原因は未特定 | trace variant の link 結果の整合が未確認。`_shimx_set_trace_file` の export 自体は確認済み | #1050 に残す |
+| trace variant build の `signature mismatch=1`: **期待どおりとは確認できていない** (0 件が期待値と思われるが、本 run では根拠の実測なし)。通常ビルドの既存記録は 0 件 (`tools/m11/trap_triage/REPORT_860.md` L11・`REPORT_596.md` L110 の `wasm-ld signature mismatch 0`)。ただし比較元は `m11_build.sh` で、本 trace variant は `shimx_link/build.sh` のため直接の比較ではない。原因は未特定 | trace variant の link 結果の整合が未確認。`_shimx_set_trace_file` の export 自体は確認済み | #1050 に残す |
 | `function_8c5eb0` の trap が D19 (DEFECTS.md, 件数 0 ループの do-while 化) と同一関数。D19 の修復 (`m11_guard699.py`) が本 run の HEAD に効いているかは未確認 | 実 boot が unit 56 付近で止まる。file API 呼出の到達を妨げる可能性 | #1050 に残す |
 | `--full` の IR sha256 は実行ごとに変わる (`tools/m11/REPORT_N27.md` §12 の既知事項)。元 run の `ir_sha256=2290a625...` は 1 回限りの値 | 再現時の比較基準にならない | 既知事項 (対応なし) |
 | SHX-T12 `tools/shimx/REPORT_SHX-T12.md` §7 の「m11 harness に `shimx_set_trace_file` の export を足す」未起票項目は、build.sh の export と run_trace.mjs の ccall で実装済み。SHX-T12 側の記述は本 PR の範囲外のため未更新 | SHX-T12 REPORT の状態表記が古い | PM 判断 (#789 側で REPORT を更新) |
