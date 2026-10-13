@@ -1,5 +1,6 @@
 ; RetDec の declare 署名の揺れを再現する合成 fixture (SHX-T7 / #173)。実 IR は work-m11 / work-m6-ott 素材。
-;  - acmMetrics / CoCreateInstance / GetComputerNameExW / GetFileAttributesExW / midiOutShortMsg: REPORT §4 の 5 件 (shimx は i64 第1/2引数)
+;  - acmMetrics / CoCreateInstance / GetComputerNameExW / GetFileAttributesExW: REPORT §4 の drift (shimx は i64 第1/2引数)
+;  - midiOutShortMsg は #179 で shimx 側 HANDLE (i32) に統一済みのため drift 解消 (fixture の declare は揺れの再現用に残す)
 ;    ここでは逆向き (shimx と異なる ptr / i32 / 戻り i64) の揺れを入れ、adapter が両方向を吸収することを確かめる
 ;  - CreateEventW.1: 重複 declare (NAME.1) で戻り値 ptr・引数 i64 に揺れたもの
 ;  - GetLastError: 揺れ無し (adapter 不要であること)

@@ -59,6 +59,13 @@ if [[ "${E2E_SKIP_BUILD:-0}" != "1" ]]; then
   cp fixtures/add.wasm work/dist/__e2e__/add.wasm
 fi
 
+step "テスト音 wasm (/wasm/audio) を stage (preview/dev: RUNTIME_WASM_DIR 側 / edge-sim: dist 直下へコピー)"
+bash "$ROOT/tools/audio/integration/stage_app.sh"
+mkdir -p work/dist/wasm
+rm -rf work/dist/wasm/audio
+cp -r "$ROOT/tools/runtime/work/wasm/audio" work/dist/wasm/audio
+test -f work/dist/wasm/audio/manifest.json
+
 step "既存 Node ローダ smoke (tools/misc/loader_smoke.mjs)"
 if [[ -f "$ROOT/tools/m1/build/wasm_elf.wasm" ]]; then
   (cd "$ROOT" && node tools/misc/loader_smoke.mjs) 2>&1 | tail -3

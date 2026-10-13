@@ -41,6 +41,7 @@ bash build_flpy_static.sh | tail -1; node tests/static_check.mjs
 step "9c. ilmcp 9 関数 e2e (状態検査 + ネガティブ)"; node tests/ilmcp_e2e.mjs
 python3 analysis/mcp_classify.py
 step "9c. .pyscript ローダ + flpianoroll 回帰 (同梱 Piano roll 5 / Remote 5 / Audio 12 調査)"; node tests/pyscript_e2e.mjs | grep -E '^\{"total"'
+step "9c'. flpianoroll loadScoreFromFile / DialogParams (MOCK) + 64 メンバ再計算 (PY-19 #792)"; node tests/flpianoroll_dialog_load_e2e.mjs | grep -E '^\{"total"'; python3 analysis/flpianoroll_members.py
 step "9d. 同梱 Piano roll 5 本を Chrome (agent-browser) 上の wasm CPython で実行 + node 出力との一致 (PY-11 #466)"
 node tests/pyscript_e2e.mjs --dump work/pyscript_node.json --export-scripts work/pyscripts.json | grep -E '^\{"total"'
 (cd ../e2e && [ -x node_modules/.bin/agent-browser ] || npm ci --no-audit --no-fund --ignore-scripts >/dev/null)

@@ -277,12 +277,17 @@ export class GuiRenderer {
     const s = this.surf(v, id);
     this.blit(s, l, t, r, b);
     const dl = s.x + l, dt = s.y + t, dr = s.x + r, db = s.y + b;
+    const front: Surf[] = [];
     for (let i = 0; i < GUI_MAX_SURF; i++) {
       if (i === id) continue;
       const o = this.surf(v, i);
       if (!o.state || !o.visible || o.z <= s.z) continue;
+      if (Math.min(dr, o.x + o.w) > Math.max(dl, o.x) && Math.min(db, o.y + o.h) > Math.max(dt, o.y)) front.push(o);
+    }
+    front.sort((a, b) => a.z - b.z);
+    for (const o of front) {
       const il = Math.max(dl, o.x), it = Math.max(dt, o.y), ir = Math.min(dr, o.x + o.w), ib = Math.min(db, o.y + o.h);
-      if (ir > il && ib > it) this.blit(o, il - o.x, it - o.y, ir - o.x, ib - o.y);
+      this.blit(o, il - o.x, it - o.y, ir - o.x, ib - o.y);
     }
   }
 
@@ -360,10 +365,15 @@ export class GuiRenderer {
       const s = surfs[q.id];
       this.glDraw(s, q.l, q.t, q.r, q.b);
       const dl = s.x + q.l, dt = s.y + q.t, dr = s.x + q.r, db = s.y + q.b;
+      const front: Surf[] = [];
       for (const o of surfs) {
         if (o.id === q.id || !o.state || !o.visible || o.z <= s.z) continue;
+        if (Math.min(dr, o.x + o.w) > Math.max(dl, o.x) && Math.min(db, o.y + o.h) > Math.max(dt, o.y)) front.push(o);
+      }
+      front.sort((a, b) => a.z - b.z);
+      for (const o of front) {
         const il = Math.max(dl, o.x), it = Math.max(dt, o.y), ir = Math.min(dr, o.x + o.w), ib = Math.min(db, o.y + o.h);
-        if (ir > il && ib > it) this.glDraw(o, il - o.x, it - o.y, ir - o.x, ib - o.y);
+        this.glDraw(o, il - o.x, it - o.y, ir - o.x, ib - o.y);
       }
     }
   }

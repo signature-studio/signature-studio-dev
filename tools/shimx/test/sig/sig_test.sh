@@ -20,8 +20,8 @@ set +u; . "${EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}" >/dev/null 2>&1; set -u
 # (a) 陰性対照: 正規化なし
 RAW=$(bash "$HERE/scripts/verify_sig.sh" "$FX" fx_raw 2>&1 || true)
 NRAW=$(echo "$RAW" | sed -n 's/.*signature mismatch = \([0-9]*\).*/\1/p')
-[ "${NRAW:-0}" -eq 5 ] || ng "(a) 正規化なしの mismatch が 5 でない (=${NRAW:-?})"
-ok "(a) 正規化なし mismatch = $NRAW (期待 5)"
+[ "${NRAW:-0}" -eq 4 ] || ng "(a) 正規化なしの mismatch が 4 でない (=${NRAW:-?})"
+ok "(a) 正規化なし mismatch = $NRAW (期待 4: midiOutShortMsg は #179 で HANDLE (i32) に統一し drift 解消)"
 
 # (b) 正規化後
 SIG_GATE_RAW=0 bash "$HERE/scripts/sig_gate.sh" "$FX" fx > "$W/gate.out" 2>&1 || { cat "$W/gate.out"; ng "(b) sig_gate が失敗"; }
@@ -113,14 +113,14 @@ ok "(g) --ext-policy sext: 負値 -1 が -1 のまま届く (出力 '$OUT')"
 # (h) 文字列定数・; コメント内の @NAME は置換されない (配列長が変わり emcc が落ちる / コメント改変)
 cat > "$W/str.ll" <<'LL'
 target triple = "wasm32-unknown-emscripten"
-declare i32 @midiOutShortMsg(ptr, i32)
-@s = private constant [24 x i8] c"see @midiOutShortMsg ok\00"
-; note @midiOutShortMsg
-define void @f() { call i32 @midiOutShortMsg(ptr null, i32 0)  ret void }
+declare i32 @acmMetrics(ptr, i32, ptr)
+@s = private constant [24 x i8] c"see @acmMetrics ok\00"
+; note @acmMetrics
+define void @f() { call i32 @acmMetrics(ptr null, i32 1, ptr null)  ret void }
 LL
 python3 "$HERE/scripts/sig_normalize.py" "$W/str.ll" "$W/str.norm.ll" --strict > /dev/null || ng "(h) 正規化が失敗"
-grep -q 'c"see @midiOutShortMsg ok' "$W/str.norm.ll" || ng "(h) 文字列定数内の @NAME が書換えられた"
-grep -q '^; note @midiOutShortMsg' "$W/str.norm.ll" || ng "(h) コメント内の @NAME が書換えられた"
-grep -q 'call i32 @__shx_sig_midiOutShortMsg' "$W/str.norm.ll" || ng "(h) 呼出 site が adapter に向いていない"
+grep -q 'c"see @acmMetrics ok' "$W/str.norm.ll" || ng "(h) 文字列定数内の @NAME が書換えられた"
+grep -q '^; note @acmMetrics' "$W/str.norm.ll" || ng "(h) コメント内の @NAME が書換えられた"
+grep -q 'call i32 @__shx_sig_acmMetrics' "$W/str.norm.ll" || ng "(h) 呼出 site が adapter に向いていない"
 ok "(h) 文字列定数・コメント内の @NAME は不変、呼出 site は adapter へ"
 echo "[sig_test] ALL PASS"
