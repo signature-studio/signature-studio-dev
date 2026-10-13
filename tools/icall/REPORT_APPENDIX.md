@@ -155,13 +155,14 @@ awk -F'\t' -v a=401 -v b=404 'NR>1 && $1>=a && $1<=b {s+=$4; l+=$5; n+=$6; u+=$7
 
 測定経路のコード差分 (`a5adb2fc` → `711b58ca`): `measure_flengine_split.sh` と `sccp_stub_drop.py` は無変更 (`git diff` の出力 0 行)。ただし `measure_flengine_split.sh` は `roundtrip.sh` 経由で `audit_icall.py` を使い、`audit_icall.py` は `ecff1c1c` / `53621af2` (#852 の jump table 修正) で変わっている。したがって「同じ値で回帰なし」とは言えず、数値は前回値として扱う。同一 commit での再測定は未実施。
 
-検証起点 commit: `711b58ca` (コード差分の最終 commit)。`docs/WORKFLOW.md` §6 の証跡 (`git diff 711b58ca HEAD -- tools/icall`、本節の修正前 HEAD `3d60a48b` 時点):
+検証起点 commit: `711b58ca` (コード差分の最終 commit)。`docs/WORKFLOW.md` §6 の証跡 (`git diff 711b58ca HEAD -- tools/icall`、HEAD `43896a02` 時点):
 
 ```
- tools/icall/REPORT_APPENDIX.md | 2 +-
+ tools/icall/REPORT_APPENDIX.md | 24 ++++++++++++++++++------
+ 1 file changed, 18 insertions(+), 6 deletions(-)
 ```
 
-コード差分 (`*.md` 除外) は 0 行 (`git diff 711b58ca HEAD -- tools/icall ':!*.md'` の出力 0 バイト)。差分は文書 1 行のみ。`find tools/icall -type f -size +20M -not -path '*/work/*'` は空。
+コード差分 (`git diff 711b58ca HEAD -- tools/icall ':!*.md'`) の出力は 0 バイト。差分は本 REPORT_APPENDIX.md の文書変更のみ。`git status --porcelain=v1 -- tools/icall` は空。`find tools/icall -type f -size +20M -not -path '*/work/*'` は空。
 
 **状態: 仮説 (数値は未再集計)**。前回 run の IR 解析で得た機構の仮説で、今回の修正では再集計していない。
 今回の修正 (PR #1393) では RetDec が無く `measure_flengine_split.sh` / `sccp_stub_drop.py` を再実行できなかった。下表の到達可能数は以下の理由で採用しない。
