@@ -47,14 +47,24 @@ def _fix_trunc_stores_fn(lines):
         m = re.match(r'^\s*(%[\w.\-]+) = (?:sext|zext) i64 (%[\w.\-]+) to i128\s*$', l)
         if m and m.group(2) in calls:
             sext[m.group(1)] = (i, m.group(2))
+    # 呼出結果 / sext 結果が store 以外 (reg2mem の `store i64 %a, ptr %x.reg2mem` 等) からも使われる場合、
+    # その定義を消すと dangling use になる (emcc: use of undefined value)。 他に使用があれば定義を残す
+    uses = {}
+    for l in lines:
+        for t in re.findall(r'%[\w.\-]+', l):
+            uses[t] = uses.get(t, 0) + 1
     for i, l in enumerate(lines):
         m = re.match(r'^(\s*)store i128 (%[\w.\-]+), ptr (%[\w.\-]+)(.*)$', l)
         if m and m.group(2) in sext:
-            ci, v, _ = calls[sext[m.group(2)][1]]
-            si = sext[m.group(2)][0]
+            si, cn = sext[m.group(2)]
+            ci, v, _ = calls[cn]
             lines[i] = '%sstore i128 %s, ptr %s%s' % (m.group(1), v, m.group(3), m.group(4))
-            lines[ci] = ''
-            lines[si] = ''
+            # sext の出現 = 定義 1 + この store 1。 call の出現 = 定義 1 + sext 1
+            if uses[m.group(2)] == 2:
+                lines[si] = ''
+                uses[cn] -= 1
+            if uses[cn] == 1 and lines[si] == '':
+                lines[ci] = ''
             n += 1
     return n
 

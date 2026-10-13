@@ -1,6 +1,6 @@
 # tools/python REPORT 付録
 
-> 正本: `tools/python/REPORT.md`。行数上限 (250 行, `docs/DOC_MAP.md` §1) のため、§7c (ilmcp, PY-3 #82)・§9 (下流チケット T1〜T9 表)・§PY-13 (#588)・§12・§13 (#81 PY-9 b) の全文をここに分割移動した。内容は削除していない (Git 履歴に残る)。
+> 正本: `tools/python/REPORT.md`。行数上限 (250 行, `docs/DOC_MAP.md` §1) のため、§7c (ilmcp, PY-3 #82)・§11b (同梱 device script, PY-6 #76)・§9 (下流チケット T1〜T9 表)・§PY-13 (#588)・§12・§13 (#81 PY-9 b) の全文をここに分割移動した。内容は削除していない (Git 履歴に残る)。
 
 ## 7c. ilmcp 9 関数の実装 (PY-3 / #82) — `host/ilmcp.mjs`
 
@@ -215,24 +215,20 @@ stubs (LGPL 参照) 署名との照合 (kwlist のある 103 のうち stubs 署
 | NC 実測 | (a) 改変版 41 ノート vs oracle 39 ノート / (b) time 値列 [200,248,296,344] vs 期待 [203,251,299,347] (詳細は §15 の NC 段落) |
 | 副作用 | `all_tools` は tracked の `analysis/mcp/tool_coverage.json` を書き換える (実測 37,425 vs 保存値 37,424)。検証後に元の内容へ戻し、commit には含めない |
 
-## 15. 本 PR head の wasm 回帰 (検証 HEAD `a92cd53`、node v22.23.3、4 vCPU)
+## 11b. 同梱 device script (PY-6 #76, fl-win64 26.1.7.5653 で実測。検証 commit `f40fac7`)
 
-§14 の wasm 数値 (`bdd2f7c`) は src が main 取り込みで変わったため、本 head で再計測した。`src/` は `53a013d` 以降不変で、`a70b4c8`→`a92cd53` は docs のみ。
+- **入力の所在 (win64)**: device script は `extracted/block24618_DATA.bin` (1029 B)、`midi.py` = `block24429_DATA.bin`、`utils.py` = `block24430_DATA.bin` (後 2 つは PY-4 から既知)。`block24618` は先頭行 `# name=Forward CCs to current plugin Port 10` で同定でき、`fetch_inputs.sh` の win64 分岐がこれを `work/device_Forward CCs to current plugin Port 10.py` に配置する (同定に失敗すれば exit 1)。ファイルは **CRLF** (改行を `\r` 含みで比較する必要があった)。
+- **実ファイルの挙動** (全文を読んで確定): `OnInit` は `print(general.getVersion())` のみ。`OnMidiIn` は `event.status == midi.MIDI_CONTROLCHANGE` (**0xB0 との完全一致 = ch0 の CC だけ**) のとき `device.forwardMIDICC(status + (data1<<8) + (data2<<16) + (10<<24), 2)` を呼び `handled = True`、それ以外は `handled = False`。`OnMidiMsg` は `handled = False` のみ。port 10 は入力 port ではなく**定数**。
+- **前回の「[仮説]」check は実ファイルと不一致だった**: 「CC 2 件が転送」は ch0 の CC のみ転送が正で (ch5 の CC は転送されない)、転送 message は `mode=2` 付き。check を実ファイルの挙動に置換した (9 check)。もう 1 件、実 script が呼ぶ `general.getVersion` が mock に無く、実行すると「未実装 API 呼出し」check が捕捉する状態だったため mock に追加 (**返り値 1 は実機値ではない**。実機の MIDI scripting version は未実測。script は print するだけで挙動に影響しない)。
+- **結果** (f40fac7 の HEAD、Actions runner 4 core, load average 0.84〜1.19, 直列, n=3): `midi_bundled_device.mjs` 9 check PASS ×3 (exit 0, wall 0.222 / 0.220 / 0.205 秒、min–max 0.205〜0.222 秒)。8 種の入力 (CC1 ch0 / CC7 ch0 / CC74 ch5 / Note On / Note Off / PB / PC / sysex) で script の例外 0。ch0 の CC 2 件のみ `forwardMIDICC` に渡り handled=True で OnMidiMsg に進まず、他は handled=False で OnMidiIn → OnMidiMsg まで進む。
+- **再測定** (同 runner・直列 n=3、9 check PASS ×3): 1dfd087 (main 取り込み後の HEAD) wall 0.339〜0.468 秒 (load 1.3〜3.0)、f40fac7 のソースで再ビルドした flpy wall 0.345〜0.352 秒 (load 1.0〜1.2)。**PR 時点の 0.205〜0.222 秒は同 runner では再現せず**、main 取り込みの影響も無い (同条件比較)。原因は未切り分け。`midi_ui_check.mjs` は PASS ×3 (14 check、wall 10.26 / 1.67 / 1.59 秒、初回は Chrome の cold start)、`--neg` exit 1 を再確認。
+- **ネガコン** (exit 1 = 検出): `--neg` (midi.py 無し → `ModuleNotFoundError: midi`、読込 check だけが FAIL)・`--neg-mutate` (実 script の `(10 << 24)` を `(11 << 24)` に書換え → 転送 message の check **だけ**が FAIL。書換え対象が無ければ exit 3)。通常実行の FAIL は exit 2、入力欠落は exit 3。
+- **回帰** (`fl_mock.mjs` 変更後、MCPTools.pyc を配置して実行): `midi_script.mjs` 23 PASS ×3 (exit 0, wall 0.40 秒) + `--neg` exit 1、`subinterp_probe.mjs` 12 PASS、`poc_mcp.mjs` OK、`all_tools.mjs` 48/48 ok、`midi_ui_check.mjs` PASS ×3 + `--neg` exit 1。
+- **現 HEAD の実測** (検証 commit `ebb6b35b` = origin/main `36ef0a6a` 取り込み後。素材は fl-win64 26.1.7.5653 を `$RUNNER_TEMP/fl` に展開、toolchain-emsdk 6.0.12。`fetch_inputs.sh` → `build_cpython_wasm.sh` (4 分 5 秒、exit 0) → `build_flpy.sh` (24 秒、exit 0、flpy.wasm 5,924,600 B / flpy.data 3,276,601 B)。直列・Actions runner 4 core、開始時 load 3.5):
+  - `midi_bundled_device.mjs` 9 check PASS ×3 (exit 0、wall 0.392 / 0.356 / 0.364 秒)。`--neg` exit 1 (読込 check の 1 件のみ FAIL)、`--neg-mutate` exit 1 (転送 message の check の 1 件のみ FAIL)。
+  - 回帰: `midi_script.mjs` 29 check PASS (exit 0、wall 0.88 秒)・`--neg` exit 1 (wall 0.86 秒)、`subinterp_probe.mjs` exit 0 (wall 27.9 秒)、`poc_mcp.mjs` POC OK (wall 1.24 秒)、`all_tools.mjs` 48/48 ok・host_calls 37,425 (wall 2.05 秒)。
+  - `midi_ui_check.mjs` 20 check PASS ×3 (exit 0、wall 11.51 / 2.89 / 2.72 秒、初回は Chrome の cold start)、`--neg` exit 1 (13 check 中 FAIL 1 件)。`node_modules` 無しでは `vite` 解決で exit 1 になるため、`pnpm install --frozen-lockfile` (19 packages) 後に実行した。
+  - 実行後の `git status` は空 (tracked の生成物の差分なし)。
+- **限界**: 検証は mock flapi 上 (実 FLEngine 非接続)。`event.status` に ch が含まれるか (0xB5 のように) は FL 本体の渡し方次第で、公開 stubs 文書の例 (`status=191` = 0xBF) は含む形だが 26.1.7 実機では未確認 — 含むなら実機でもこの script は ch0 以外の CC を転送しない (script 側の仕様)。
 
-| 手順 (直列・前景) | 結果 | rc | 所要 |
-|---|---|---|---|
-| `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`FL_WIN64_DIR`) | `extracted/` 展開済み | 0 | 5.401 秒 |
-| `fetch_inputs.sh` | 完了 (mac pkg なしのため win64 DATA から取得) | 0 | 0.282 秒 |
-| `build_cpython_wasm.sh` | `python.wasm` 生成 | 0 | 4 分 03.8 秒 |
-| `build_flpy.sh` | `flpy.wasm` 生成 | 0 | 7.037 秒 |
-| `provider/build.sh` | `flprov.wasm` 生成 | 0 | 1.214 秒 |
-| `tests/provider_check.mjs` | PASS (functions 435・implemented 60) | 0 | 0.924 秒 |
-| `tests/all_tools.mjs` (JS mock) | 48/48 ok・host_calls 37,425・callback_roundtrip true | 0 | 3.194 秒 |
-| `FL_ENGINE=wasm tests/all_tools.mjs` | 48/48 ok・host_calls 37,425・callback_roundtrip true | 0 | 3.277 秒 |
-| `tests/kwsig_bind_check.py` | PASS (103 関数・6122 ケース、misbind 0・mismatch 0) | 0 | 0.238 秒 |
-| `tests/mcp_kwcalls_bind.py` (`src` と `analysis/mcp` の calls.json を引数指定) | 14/14 PASS | 0 | — |
-| 同 `--neg` (不合格 1 件を追加) | distinct 15: pass 14, fail 1 → FAIL | 1 | — |
-
-- 実行後の `git status` は空 (`tool_coverage.json` の書き換えなし)。生成物 (`work/`・`dist/`) は gitignore 対象。
-- 差分の手順は `run_all.sh` の step 1・2・5・9b を個別に実行したもの。`run_all.sh` 全体は step 4 の固定パス (#630) のため使えない。
-- 範囲外 (未実行): `mcp_ui_check.mjs` / `midi_ui_check.mjs` (Vite が要る)、`browser_check.mjs`・`midi_script.mjs` 等の §14 記載分は本 head では再計測していない。
+**#601 (load 失敗の巻き戻し)**: `fl_rt.load_device_script` は exec 成功後に `_scripts` へ登録し、例外時は `sys.modules` も戻して再送出する (旧: 登録後に exec → top-level 例外で半端な module が残り midiIn / callback が配送された)。同名の既存 script は先に unload 済みで復元しない。UI (`src/runtime/midi_script.ts`) は読込失敗時に `flMidi.stop()` で巻き戻し (started=false・接続ボタン無効・起動ボタン再有効)。回帰: `midi_script.mjs` §4b (fixture `device_import_fails.py`、29 check)・`midi_ui_check.mjs` 失敗経路 (20 check)。ネガコン (exit 1 = 検出): `midi_script.mjs --neg-legacy` (旧ローダへ差し戻し → 必須 3 check (`LEGACY_KEYS`: listDeviceScripts・sys.modules・midiIn 配送) が FAIL、非 MIDI 配送・同名再読込は FAIL しても可)・`midi_ui_check.mjs --neg-rollback` (UI の stop を無効化 → started・起動ボタン・midiIn の 3 check が FAIL。接続ボタンは catch 節が直接 disabled にするため stop の有無では変わらず検出対象外)。接続ボタン check は起動前に有効化してから失敗させ、失敗後に無効へ戻ることを観測する形に変更 (起動前から disabled だった旧 check は常に PASS で無意味だった)。実測 (HEAD 238353e = main 5d7822a を merge した状態。emsdk 6.0.12 で CPython wasm・flpy をビルド。build_flpy.sh 後の `git status` は空): `midi_script.mjs` exit 0 (29 check 全 PASS)・`--neg-legacy` exit 1 (29 check 中 FAIL 4 件: 必須 3 件 + 非 MIDI 配送 = LEGACY_KEYS 3 本が全て FAIL)・`midi_ui_check.mjs` exit 0 (20 check 全 PASS)・`--neg-rollback` exit 1 (19 check 中 FAIL 3 件: started・起動ボタン・midiIn)。接続ボタンは検出対象外。

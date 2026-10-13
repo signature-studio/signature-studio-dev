@@ -1,4 +1,4 @@
-// kh249_check.mjs — KH-11 (#249) ブラウザ分類 0x180ef7fc0 の検証 (module F)。[1][2] は lift 済み IR の実行、[3] は式の再実装による期待値の確認 (lift IR の分類結果ではない)
+// kh249_check.mjs — KH-11 (#249) ブラウザ分類 0x180ef7fc0 の検査 (module F)。[1][2] は lift 済み IR の実行、[3] は機械語読解の式の再実装 (lift IR 未検証・§6.2)
 //   node kh249_check.mjs [workDir]   (workDir 既定: work/licF)
 // [1] lift 済み実 IR の分類 thunk A (0x1800b4ac0) / C (0x1800b4ae0) を status 0..40 で実行し、ブラウザの
 //     エントリ採否ゲート (0x180ef8732〜0x180ef87c8) の真理値表を再構成 (getStatus は stub 9 を実行)
@@ -52,7 +52,9 @@ const fcc = (id) => id.charCodeAt(0) * 2 ** 24 + id.charCodeAt(1) * 2 ** 16 + id
 const mkCat = (ids, c = { grup: 'grup', t_grup: 3, t_flag: 2, t_in: 1, t_out: 0 }) =>
   (id, flag22) => id === c.grup ? c.t_grup : flag22 ? c.t_flag : (ids.has(fcc(id)) ? c.t_in : c.t_out);
 const cat = mkCat(freeIds);
-const plugins = JSON.parse(fs.readFileSync(path.resolve('..', 'work', 'winpkg', 'product_index.json'), 'utf8')).plugins.filter(p => p.id !== 'core');
+const piPath = path.resolve('..', 'work', 'winpkg', 'product_index.json');
+if (!fs.existsSync(piPath)) { console.error('FAIL: ' + piPath + ' が無い。python3 scripts/kh249_product_index.py で生成 (入力: plugins-kilohearts)'); process.exit(1); }
+const plugins = JSON.parse(fs.readFileSync(piPath, 'utf8')).plugins.filter(p => p.id !== 'core');
 const dist = (f) => JSON.stringify([0, 1, 2, 3].map(k => plugins.filter(p => f(p.id) === k).map(p => p.id)));
 const prem = plugins.filter(p => cat(p.id, 0) === 1).map(p => p.id).sort();
 chk(freeIds.size === 7, 'list size ' + freeIds.size);
