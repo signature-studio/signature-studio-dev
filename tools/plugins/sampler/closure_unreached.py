@@ -138,6 +138,8 @@ def main():
         c5 = len(x.dataref()(sorted(outside))) == 0 if outside else True
 
         roots = A | B_live
+        ed = getattr(x.pe, 'DIRECTORY_ENTRY_EXPORT', None)
+        exp = {s.address for s in ed.symbols if s.address} if ed else set()
 
         def edge3(f):
             i = IMM.get(f, (set(), set()))
@@ -169,12 +171,16 @@ def main():
             'b_live': cls(B_live), 'roots': cls(roots), 'a_bytescan': len(A_bs), 'b_bytescan_va': len(B_va_bs), 'b_bytescan_rva': len(B_rva_bs),
             'total3': cls(total3), 'increment': {'funcs': len(total3) - len(total2), 'bytes': x.size(total3) - x.size(total2)},
             'literal_upper': cls(literal), 'remaining': cls(nonfw - total3),
-            'checks': {'U1': c1, 'U2': c2, 'U3': c3, 'U4': c4, 'U5': c5}, 'nonfw_bytes_total': x.size(nonfw),
+            'checks': {'U1': c1, 'U2': c2, 'U3': c3, 'U4': c4, 'U5': c5},
+            'export': {'total2': len(exp & total2), 'outside': len(exp & outside), 'd': len(exp & ex_d)}, 'nonfw_bytes_total': x.size(nonfw),
         }
+        json.dump({'nonfw': sorted(nonfw), 'total2': sorted(total2), 'outside': sorted(outside), 'd': sorted(ex_d)},
+                  open(os.path.join(a.out_dir, 'unr', 'block%05d.sets.json' % blk), 'w'))
         o = out[name]
-        print('%s: total3 %d / %d (total2 %d/%d, +%d/%d) 上界 %d / %d 根 %d (b_live %d / b_all %d) U1-U5 %s' % (
+        print('%s: total3 %d / %d (total2 %d/%d, +%d/%d) 上界 %d / %d 根 %d (b_live %d / b_all %d) U1-U5 %s export∩total2/outside/(d) %d/%d/%d' % (
             name, len(total3), x.size(total3), len(total2), x.size(total2), o['increment']['funcs'], o['increment']['bytes'],
-            len(literal), x.size(literal), len(roots), len(B_live), len(B_all), 'PASS' if all(o['checks'].values()) else 'FAIL'))
+            len(literal), x.size(literal), len(roots), len(B_live), len(B_all), 'PASS' if all(o['checks'].values()) else 'FAIL',
+            o['export']['total2'], o['export']['outside'], o['export']['d']))
     fmt = lambda d: '%s / %s' % (format(d['funcs'], ','), format(d['bytes'], ','))
     print('\n| プラグイン | 非共通 関数 / B | total2 関数 / B | outside 関数 / B | (a) RVA32 排他 | (b) 即値 排他 | (c) call/jmp 排他 | (c-lea) 排他 | (d) 参照なし 排他 |')
     print('|---|--:|--:|--:|--:|--:|--:|--:|--:|')
