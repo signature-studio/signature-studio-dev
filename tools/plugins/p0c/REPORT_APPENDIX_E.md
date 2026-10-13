@@ -205,3 +205,33 @@ before は 515.7 s で `p0c/work/kernel_table.json` の置き場所違いによ�
 範囲外 / 未解決: `inventory/kernel_table.py:15` と `lift/batch_lift.sh:31` ほか `lift/` 配下の `/home/ubuntu` 既定は別 area の置換 issue (#294 配下) で扱う。
 `k80_diff.py` は `p0c2_e2e.sh` [6] 経由で実行済み (`LIFTP` は `REPO_ROOT` 基準で解決)。RetDec の非決定性は §15.4 に実測を残すのみで、RetDec 非決定は #668、`p0c_e2e.sh` [4] の `kernel_table.json` 置き場所と `nsis_blockmap.json` 生成は #669 に起票。
 
+
+### 15.5 #346 受入条件 2 の実測 (検証 HEAD d529f071 / 比較 before 8af7eb0 + [4] 1 行修正 / after 856be6b)
+
+本節の fresh 実測は検証 HEAD `d529f071` (main `5847ac61` を merge した PR head)。コードは `d529f071` と同一で、後続 commit は本 REPORT のみ変更する。
+素材は `fl-win64` のみを `$RUNNER_TEMP/fl-win64` に展開。RetDec・emsdk は runner 既存の `[RETDEC]`・`[EMSDK]` (`docs/REFERENCES.md`)。依存 (pefile・capstone・numpy) は repo 外の venv。`llvm-as` は `/usr/lib/llvm-18/bin` を PATH に通した。各 n=1・直列・4 コア runner。
+
+| 検証 (`d529f071`・fresh = `work/` 空) | rc | 所要 | stdout 行数 | 開始 load (1 分値) | 終了 load (1 分値) | 注記 |
+|---|---|---|---|---|---|---|
+| `p0c_e2e.sh` ([2] kernel_matrix 込み) run A | 0 | 515 s | 135 | 0.55 | 7.89 | 本表の初回 run |
+| `p0c_e2e.sh` run B (競合解消報告) | 0 | 521 s | 未記録 | 未記録 | 7.80 | 開始 load 未記録 |
+| `p0c2_e2e.sh 200` run A (1 回目) | 0 | 33 s | 75 | 7.26 | 4.49 | 直前の `p0c_e2e.sh` の負荷が残っていた可能性あり (未確定) |
+| `p0c2_e2e.sh 200` run B (2 回目) | 0 | 9 s | 75 | 3.49 | 3.11 | 直前 run A の負荷が残っていた可能性あり (未確定) |
+| `p0c2_e2e.sh 200` run C (競合解消報告) | 0 | 15 s | 未記録 | 未記録 | 2.90 | 開始 load 未記録 |
+
+各 run は n=1・直列。run B・C は報告コメント (head `d529f071`) の実測で、実行順は報告から特定できない。`p0c2_e2e.sh` は全 run で `== p0c2 e2e OK ==` で終了。PR 本文の「検証」節は本表への参照のみとし、数値は本節が正本。
+開始 load の値は負荷が残った状態での値を含むため、同一条件の再現値として扱わない。
+run 3 の HEAD 行 (`b1e5f88a` の `p0c_e2e.sh` 6.7 s・`p0c2_e2e.sh 200` 7.5 s) は kernel_matrix・lift を skip した実行のため fresh 値ではなく、本表から除外した。
+
+受入 2 の before/after 比較 (run 3 の記録。検証 HEAD `b1e5f88a` 時点で、main 取り込み前の tree。**現 HEAD `d529f071` では未検証**。現 HEAD で before/after を比較し直していない。`[WIN64]` と `[RETDEC]` の既存 install を before 側の旧パス参照先として symlink で用意、after は `FL_WIN64_DIR` のみ):
+
+| 項目 | before (8af7eb0 + [4] 1 行修正) | after (856be6b) |
+|---|---|---|
+| `p0c_e2e.sh` 初回 (kernel_matrix 込み) | rc=0、354.4 s (開始時 uptime load 1 分値 0.55) | rc=0、350.9 s (開始時 uptime load 1 分値 3.57) |
+| `p0c2_e2e.sh 200` | rc=0、9.4 s (load 未記録) | rc=0、14.7 s (load 未記録) |
+
+判定 (run 3 の記録。現 HEAD では未検証): `p0c_e2e.sh` の stdout (132 行) と `p0c2_e2e.sh` の stdout (パス正規化後) は before/after で一致。`cmp` 一致 (`work/` 配下の成果物): `k80.final.ll` `table_verify.json` `kernel_matrix.json` `f80_classes.json` `f80_kernels.json` `p0c2_sweep.csv` `k80abi.json` `diff/k80.argfix.ll` `diff/k80.argfix.wasm.o`。
+不一致は `build.log` と `k80diff` バイナリのみで、実行時プロセスのアドレス (`nat=` `ir=`) の ASLR 差。
+
+段階 [4] の不具合: `p0c_e2e.sh` の `kernel_table.json` 参照が `p0c/work/` を見ていた (実体は `tools/plugins/work/`)。before 側の実行では、`8af7eb0` にこの 1 行修正を当てて比較した (修正は main の `72fb21d9` で反映済み。本 PR は修正を含まない)。#669 で扱う。
+ネガティブコントロール・`/home/ubuntu` の grep は §15.2 のとおり。

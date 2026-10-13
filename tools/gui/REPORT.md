@@ -226,3 +226,11 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
 ## 17. GUI-6 (#182): 入力品質 (キー配列 / IME / タッチ・ジェスチャ / Pointer Lock・ClipCursor)
 既知類型との関係: 該当なし (lift 欠陥ではなく shim/host の意味論; `docs/DEFECTS.md` D1a〜D18 に該当なし)。
 - **結論**: 仕様・検証表・ネガコン実測・範囲外と起票先の詳細は付録 [REPORT_APPENDIX.md §14](REPORT_APPENDIX.md)。FL 非依存で CDP 再現できる範囲 (US/DE/FR 配列・IME・タッチ/ZOOM・Pointer Lock/ClipCursor) を実装し、`tools/gui/input/e2e.sh` と selftest・ネガコンで検証。WM_POINTER*・実機確認は未実施のため PR は `Refs #182`。
+
+## 18. GUI-15 (#740): e2e.sh の ASan heap-use-after-free (blit_surf / surf_free race) の再検証
+既知類型との関係 (DEFECTS.md): 該当なし (native headless host と shim の free タイミング競合)。原因と修正は §12 (GUI-12 / #489, 実装 `6e6c9b7`, closed) が正本。本節は修正が HEAD に入った後の再現試行の記録。検証 HEAD `f0d65f32` (`6e6c9b7` を含む)。
+- **selftest 単体** (`bash tools/gui/test/selftest.sh`, ASan): 1 回目 rc 0 / 504 passed / 14.97 s。直列 30 回 rc 0 (UAF 0/30, 開始 load 2.02)。
+- **負荷下** (8 並列 × 8 回 = 64 回, 終了時 load 13.59): rc 0 の失敗 0/64、UAF 0/64。
+- **ネガコン** `bash tools/gui/test/gui12_race.sh 50 30` (所要 4m36s, load 1.76/2.19): 修正版 exit≠0 0/50 (UAF 0) / `-DGUI12_NEGCTL_IMMEDIATE_FREE` 30/30 が UAF → PASS。
+- **未達 (#740 受入条件)**: (1) 修正前の ASan ログを用いた再現は本 run で得られず (修正後 94 回で発火せず)。(2) `e2e.sh` の n≥10 連続 rc 0 は未実施 (RetDec・emsdk を含む全体実行で 1 回約 3 分のため本 run の 60 分内に 10 回は収まらない)。(3) ネガコンは `gui12_race.sh` の 30/30 で代替確認済み。
+- **未解決 (起票先)**: #740 のまま、`e2e.sh` 全体の n≥10 連続 PASS と、修正前 ASan ログの再取得。PM 判断で #740 を #489 の重複として閉じるか決める。
