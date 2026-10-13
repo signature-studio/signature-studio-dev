@@ -115,3 +115,58 @@
 |---|---|---|
 | 8 関数の命令単位 trace (native と wasm の各 step) による機序の確定 | §7.1 は観測と推定の段階 | 本 PR 後に子 issue (LD-32 の残り) |
 | m11 sample:800 の 361 ↔ 360 の再現条件 | 本 HEAD では n=3 で再現せず | 同上 |
+
+## 8. LD-32 (#1070) 追補: 揺れの特定と 8 関数の trace (測定 commit 604e900f)
+
+既知類型との関係: 該当なし (揺れは wasm 側の vm timeout 境界の分類差で、`docs/DEFECTS.md` の D1a〜D20 のいずれにも当たらない。8 関数の欠陥は既存類型 D1・D3・D4_D5・D6 (`check_ott.py` の集計) と `wasm_trap` / `m8_fail` の原因特定に分かれ、後者は未特定)。
+
+測定: `604e900f` (origin/main)・Actions runner (4 vCPU・load 1 分平均 0.9〜5.9)。素材は `fl-win64` `work-m6-ott` `work-m11` `work-liftdiff` `work-liftlib` `analysis-ott-binaries` `toolchain-emsdk` を展開 (`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`・`ANALYSIS_DIR=$HOME/analysis`)。
+
+### 8.1 e2e
+
+- `bash tools/liftdiff/liftdiff_e2e.sh` 2 回目 (本測定): exit 0・`LIFTDIFF_E2E PASS`・所要 203.99 s (3 分 24 秒)。ログ `results/liftdiff_e2e_ld32b_604e900f_n1.log`。
+- OTT 集計 35 / 112 / 65 (D1〜D6 = 4 / 6 / 14 / 20 / 26)。§1 の `986e7415`・`c4e93550` の値と一致。
+- m11 sample:800 集計 360 / 230 / 210 (`[4/4]`)。
+- 1 回目 (`results/liftdiff_e2e_ld32a_604e900f_failed_fl_path.log`) は `FL_WIN64_DIR` に `extracted` を含めた誤設定で [3/4] が `FileNotFoundError` で失敗。環境設定の誤りで、リポジトリの不具合ではない。
+
+### 8.2 m11 sample:800 の n=3 (関数単位)
+
+- batch 3 回 (r1 = e2e 内 [4/4]、r2・r3 = `liftdiff.py batch --set sample:800 --shards 12`)。件数は 3 回とも 360 / 230 / 210。
+- 関数単位の突合: `tests/ld32_verdict_cmp.py`。verdict が変わった関数は **0 件**。case outcome だけが変わった関数は 3 件。結果は `results/ld32_m11_sample800_verdict_n3_604e900f.tsv`。
+
+| 関数 | verdict (r1/r2/r3) | 揺れた pattern (r1 \| r2 \| r3) | 揺れの型 |
+|---|---|---|---|
+| 0x5c5500 | unexec ×3 | fvm: hang \| both_fault \| both_fault、p01・p1・qall・u16 も同様 | wasm 1000 ms 打切り (`timeout`) と wasm の完走 (`trap`) の境界 |
+| 0x67e2b0 | mismatch ×3 | s: both_fault \| hang \| hang | 同上 |
+| 0x903d50 | match ×3 | s: hang \| native_fault \| native_fault | 同上 (r1 のみ wasm 打切り) |
+
+- 揺れの分類: **wasm 側の vm timeout (`wasm_timeout_ms` 既定 1000 ms) の境界**。同じ case が、ある run では `wasm=timeout`、別の run では `wasm=trap` か `wasm=ok` になる。判定への影響は `hang` と `both_fault` / `native_fault` の入れ替わりだけで、match・mismatch・unexec の区分は変わらない。
+- 根拠: 揺れた case はすべて `wasm_status=timeout` を含む `hang` と、同じ case の別 run の `trap` / `ok` の組。native 側の `timeout` (SIGALRM) は揺れ 3 関数では出ていない (0x903d50 p0 は 3 回とも native timeout で固定)。
+- 推定 (未検証): 打切りの境界に乗るのは負荷 (並列 shard 数 12 と runner の load 1 分平均 0.9〜5.9) による wasm 実行時間の揺れ。wasm の実行時間は本 run の batch 出力では測っておらず、直接の確認は未実施。
+- 限界: 揺れの原因の確定 (wasm の実行時間の実測) は #1313 の範囲。
+
+### 8.3 8 関数の pattern 単位の trace
+
+- `liftdiff.py run targets/ott_old.json --fn <8 関数> --pattern z,s,p0,p1,p01,pall,u16,vm0,qall --nobuild` (`results/ld32_ott8_pattern_604e900f.log`)。`--verbose` で entry 単位の trace を取った結果は `results/ld32_ott8_trace_604e900f.log`。
+- 機序の要点 (entry 単位の trace で確認した範囲):
+  - 1801ab1d0・1801ab258: p0・p1 で native が segv (rdi/rax に 0x7e 等の乱数値)。vm0・u16 では両側が正常終了し equal。
+  - 1801ab3ec: vm0・u16 でも native segv が続く (rip 0x1ab420・0x1ab437)。構造 blob では解消しない。
+  - 1801c5e84・1801c621c・1801c69cc: 3 関数で `HeapFree` を呼ぶ call 順序が分岐。wasm 側は `function_1801baef8` (未解決 callee) を呼び、`ret` が `0x1` と `0x0` で不一致。u16 では wasm 側で `HeapFree` 内の OOB trap。
+  - 1801c67a0: wasm 側の `m8_fail` → `abort` が vm0・u16 で trap。native は `ok` (vm0・u16)。p0 では native segv と wasm trap の両方。
+  - 1801c682c: vm0・u16 で `callsite_arg_drop` (`HeapFree` の第 1 引数 0x5 が wasm で 0x0)。
+- **命令単位 trace (native と wasm の各 step) は未取得**。entry・call の単位まで。よって受入条件 1 は未達。残りは #1313 (LD-44)。
+
+### 8.4 受入条件の判定
+
+| 受入条件 | 判定 | 根拠 |
+|---|---|---|
+| 1. 8 関数の機序を関数単位の trace で示す | **未達** (entry・call 単位まで) | §8.3。命令単位 trace は #1313 |
+| 2. sample:800 の揺れ 1 件の関数特定と分類 | 達成 (件数揺れは無し・case 揺れ 3 関数を特定、分類は wasm timeout 境界) | §8.2・`results/ld32_m11_sample800_verdict_n3_604e900f.tsv` |
+| 3. n=3 の結果と分類を REPORT に記録 | 達成 | §8.1・8.2。r2・r3 のログを `results/` に commit |
+
+## 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 8 関数の命令単位 trace による機序の確定 | §8.3 は entry・call 単位 | #1313 ([LD-44]) |
+| wasm 1000 ms 打切り境界の揺れの原因 (wasm の実行 ms の実測) | §8.2 の分類は推定 | #1313 ([LD-44]) |
