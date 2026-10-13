@@ -138,4 +138,59 @@ static inline float approx_rsqrt(float x) {
     return 1.0f / __builtin_sqrtf(x);
 }
 
+/* ---- ymm (i256) ABI (LIFTLIB #241) ----
+ * wasm32 の LLVM IR `i256` は 引数 = 4 × i64 に分割, 戻り値 = sret ポインタ (先頭 i32 引数) に lower される。
+ * C 側は 引数を u64 ×4 に平坦化し, 戻り値は struct Y (= sret) で受ける (gen.py が prologue で Y に束ねる)。
+ * 下位 128bit = q[0..1], 上位 128bit = q[2..3]。 */
+typedef struct { u64 q[4]; } Y;
+static inline u128 YLO(Y y) { return MK128(y.q[0], y.q[1]); }
+static inline u128 YHI(Y y) { return MK128(y.q[2], y.q[3]); }
+static inline Y MKY(u128 lo, u128 hi) {
+    Y y; y.q[0] = (u64)lo; y.q[1] = (u64)(lo >> 64); y.q[2] = (u64)hi; y.q[3] = (u64)(hi >> 64); return y;
+}
+
+/* ---- pcmpistri (SSE4.2 文字列比較, implicit length) ----
+ * a = Intel 第 1 operand, b = 第 2 operand。返値 = ECX。*fl = 実機 EFLAGS 位置 (CF bit0 / ZF bit6 / SF bit7 / OF bit11, AF=PF=0)。
+ * imm8: [1:0] 要素 (00 ub / 01 uw / 10 sb / 11 sw), [3:2] 集約 (equal-any / ranges / equal-each / equal-ordered),
+ *       [5:4] 極性 (00,10 = positive / 01 = negative / 11 = masked-negative), [6] 出力 (0 = LSB / 1 = MSB)。 */
+static inline u32 ll_pcmpistr(u128 a128, u128 b128, int imm, u32* fl) {
+    V a = VQ(a128), b = VQ(b128);
+    int w = imm & 1, sg = (imm >> 1) & 1, agg = (imm >> 2) & 3, pol = (imm >> 4) & 3, msb = (imm >> 6) & 1;
+    int n = w ? 8 : 16, la = n, lb = n;
+    int32_t A[16], B[16];
+    for (int i = 0; i < n; i++) {
+        A[i] = w ? (sg ? (int32_t)a.s[i] : (int32_t)a.h[i]) : (sg ? (int32_t)a.c[i] : (int32_t)a.b[i]);
+        B[i] = w ? (sg ? (int32_t)b.s[i] : (int32_t)b.h[i]) : (sg ? (int32_t)b.c[i] : (int32_t)b.b[i]);
+    }
+    for (int i = 0; i < n; i++) if (!(w ? a.h[i] : a.b[i])) { la = i; break; }
+    for (int i = 0; i < n; i++) if (!(w ? b.h[i] : b.b[i])) { lb = i; break; }
+    int br[16][16];                                   /* br[i][j]: op1 要素 i と op2 要素 j の比較 (無効要素 override 済み) */
+    for (int i = 0; i < n; i++)
+        for (int j = 0; j < n; j++) {
+            int ri = i < la, rj = j < lb, v;
+            if (ri && rj) v = (agg == 1) ? ((i & 1) ? (A[i] >= B[j]) : (A[i] <= B[j])) : (A[i] == B[j]);
+            else if (agg == 2) v = !ri && !rj;
+            else if (agg == 3) v = !ri;
+            else v = 0;
+            br[i][j] = v;
+        }
+    u32 m = (n == 16) ? 0xffffu : 0xffu, r1 = 0;
+    for (int j = 0; j < n; j++) {
+        int v = 0;
+        if (agg == 0) { for (int i = 0; i < n; i++) v |= br[i][j]; }
+        else if (agg == 1) { for (int i = 0; i + 1 < n; i += 2) v |= br[i][j] & br[i + 1][j]; }
+        else if (agg == 2) v = br[j][j];
+        else { v = 1; for (int k = 0; k + j < n; k++) v &= br[k][j + k]; }
+        r1 |= (u32)v << j;
+    }
+    u32 r2 = r1;
+    if (pol == 1) r2 = ~r1 & m;
+    else if (pol == 3) r2 = r1 ^ (((1u << lb) - 1u) & m);
+    u32 ecx = r2 ? (msb ? 31u - (u32)__builtin_clz(r2) : (u32)__builtin_ctz(r2)) : (u32)n;
+    *fl = (r2 != 0) | ((u32)(lb < n) << 6) | ((u32)(la < n) << 7) | ((r2 & 1u) << 11);
+    return ecx;
+}
+/* RetDec は pcmpistri を `void(i128,i128,i8)` と lift し ECX/フラグを落とす。void 形はこの shadow に結果を残す。 */
+extern u32 ll_pcmpistr_ecx, ll_pcmpistr_fl;
+
 #endif

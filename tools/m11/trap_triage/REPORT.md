@@ -41,6 +41,7 @@ CAB-129 REPORT §5 の「GetLocaleInfoW / LoadStringW 相関」は不採用 (hal
    4094da の `llvm.trap` 化けを確認し転記したが、boot 中の unit 884 (`1268010` → `12df090` → `409470`) が
    戻らなくなり survey が完走しなかった (60 s 超でハング。原因は未特定)。転記は採用せず revert。
    → 原因は 409470 ではなく 410320 の脱落 (#418 `REPORT_418.md`) と 5c0270 の deref 脱落 (#474 `REPORT_474.md`)。#474 で再採用済み。
+   `5c03d0` の通知 call (`5c0437`) の脱落は #482 `REPORT_482.md` で復元 (survey の分類は不変)。
    `409470` 経由の OOB 11 unit (`409470 → 408040 → 407e20`) は残っている。
 3. 残 OOB 44 の最上位 frame: `8cc190` ×9 (#130 §6 の通り上流 `8c5cc0` のポインタ破壊)、`414bb0` ×5、`904190` ×4、
    `4fb090`/`410730` ×3、`47d460` ×4 ほか (unit 一覧は `annotate.py` 出力)。個別原因は未調査。
@@ -54,7 +55,7 @@ python3 tools/m11/trap_triage/annotate.py tools/m11/work/trap_triage/after.json 
 python3 tools/m11/trap_triage/disasm_fn.py 417b70 ...   # PE (.pdata 区間) の capstone 逆アセンブル
 ```
 
-環境変数: `SV_ONLY=884` (unit 限定)・`SV_TRACE_AT=884` (その unit だけ trace)・`SV_PROG=1` (進捗を stderr)。
+環境変数: `SV_ONLY=884` (unit 限定)・`SV_TRACE_AT=884` (その unit 以降を trace。#495 で結果を変えないよう透過化済み `REPORT_495.md`)・`SV_PROG=1` (進捗を stderr)・`SV_STK_FILL=ff` (各 unit 直前に SP 下を埋める)。
 `capstone` / `pefile` (pip) が要る。`disasm_fn.py` は `tools/shared/paths.py` の `FL_WIN64_DIR`
 (`docs/REFERENCES.md` `[WIN64]`、Actions での展開は `docs/WORKFLOW.md` §11) 配下の `extracted/block00031_PE.bin` を読む
 (`LD_M11_PE` で PE を直接指定も可)。`m11_e2e.sh` など既存スクリプトは作業 VM の固定パスを前提にするため、

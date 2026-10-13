@@ -212,3 +212,9 @@ python3 tools/icall/diff/fn3_diff.py 1801a9be0 --n 600 --dump    # native / rout
 | Fruity Balance / Kilohearts / Fresh Air の wasm 実行 + 差分検証 | 監査のみのまま | 素材 `plugins-freshair plugins-kilohearts fl-win64` が必要 → #229 |
 | plugin closure T0 42 本へ route バッチ適用 | 未着手 | #15 / #50 と連携、素材同上 |
 | stack 引数の動的検証 (5 引数以上の間接 call を実行) | 本回は静的のみ | IPP 結合 (#246 系) で実行 → #229 |
+
+## 10. #514: icall_rewrite.py の関数配置修正 (連続配置の回避)
+
+既知類型との関係 (`docs/DEFECTS.md` / 本書 §4 とは別体系): **新規 1 件**。plugin 閉包 (eq-filter 11 block) を `tools/plugins/lift/lift_ranges.sh` の `PLUG_ICALL=1` で通したところ、書換え後の関数が 16 byte 整列でちょうど連続配置になる箇所 (関数終端が 16 の倍数) で、RetDec の `--select-ranges` が隣接 range `[a,b)+[b,c)` を 1 関数に併合し、後続関数の `define` が落ちた (4 block で 5 関数。dispatch 数は変わらないので site 突合では見えず、`define` 数 ≠ 閉包関数数で検出)。
+修正: `icall_rewrite.py` の `next_slot()` で、直前の関数/stub と連続になる場合だけ 16 byte 空ける (連続しない配置はバイト一致)。stub・comis stub にも同じ処理。詳細な実測は `tools/plugins/f2/REPORT.md` §7。
+**未検証**: OTT 素材なしの run だったため `icall_e2e.sh` (89 scenario) と `tests/test_icall.py` の pe 部は未実行 (unit 部のみ PASS) → #530。

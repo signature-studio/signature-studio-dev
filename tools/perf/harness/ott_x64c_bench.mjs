@@ -11,6 +11,7 @@ U32[IN_A / 4] = BUF; U32[IN_A / 4 + 2] = BUF + N * 4; U32[OU_A / 4] = BUF + N * 
 let h = 0x811c9dc5 >>> 0;
 for (let k = 1; k <= 1000; k++) { api.process(OBJ, IN_A, OU_A, N); if (k <= 8 || k === 1000) for (let i = 0; i < 2 * N; i++) h = Math.imul(h ^ U32[BUF / 4 + 2 * N + i], 16777619) >>> 0; }
 let nz = 0; for (let i = 0; i < 2 * N; i++) if (F32[BUF / 4 + 2 * N + i] !== 0) nz++;
+if (process.env.SIG_ONLY) { console.log(JSON.stringify({ f: path.basename(f), sig: h.toString(16), nonzeroOut: nz })); process.exit(0); }  // 署名ガード用 (計時なし)
 const per = new Float64Array(B);
 for (let k = 0; k < 300; k++) api.process(OBJ, IN_A, OU_A, N);
 for (let k = 0; k < B; k++) { const t = performance.now(); api.process(OBJ, IN_A, OU_A, N); per[k] = performance.now() - t; }
