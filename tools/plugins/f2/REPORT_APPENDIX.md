@@ -109,7 +109,7 @@
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 不一致 8 関数は xmm 引数脱落 (D5)。`lift_ranges.sh` 鎖に ARG pass 未接続。うち 4 は `spill_slot_deref`、4 は `fp_flag_unreflected` | eq-filter の float 入力を取る leaf が全滅。Eff_Render 側も同じ原因を持つ可能性が高い (§3 の入口は間接 call 脱落が先) | **#547 [PLG-F2-4]** (親 #199) |
-| liftdiff 比較系の偽陽性 2 類型: (a) 部分上書きされた ptr 入り 8B ブロックを `cmp_mem` が正規化できない (0x6cd8a0)、(b) wasm 1 s 打切りによる偽 `wasm_trap` (0x73fa20・0x6ec2a0) | 主採点だけだと 3 関数が不一致に見える。補助 case と `ARTIFACT` 表で上書きしている | **#548 [LD-11]** (親 #122) |
+| liftdiff 比較系の偽陽性 2 類型: (a) 部分上書きされた ptr 入り 8B ブロックを `cmp_mem` が正規化できない (0x6cd8a0)、(b) wasm 1 s 打切りによる偽 `wasm_trap` (0x73fa20・0x6ec2a0) | 1191aef 時点では主採点だけで 3 関数が不一致に見えた (`ARTIFACT` で上書き)。2f77ace では主採点が match に変わり上書き 0 件 | **#548 [LD-11]** (親 #122) |
 | 主採点 9 パターンの検出力不足 (真偽フラグ・ptr 鎖・float 入力型の関数で native 全滅/偶然一致) | 補助 case を手で足した。他 block の leaf 拡大時に再発 | #235 ([LD-4], 被覆拡大) にコメント |
 | 手順 2〜4 (framework link・Host shim・Render test .flp E2E) と `Eff_Render` の差分 | 出口条件 (差分試験 bit-exact) の残り | 既存 #195 / #196 / #197 完了待ち。#199 に残す |
 
