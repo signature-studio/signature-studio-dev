@@ -82,12 +82,14 @@ def bind_load_at(lines, fnva, va, slot, glob, tag):
     lines[i] = re.sub(load, 'load i64, ptr @' + glob, lines[i]) + ' ; LIFTFIX ' + tag
 
 
-def bind_load_slot_at(lines, fnva, va, glob, tag):
+def bind_load_slot_at(lines, fnva, va, expect_slot, glob, tag):
     """機械語 VA va の `load i64, ptr %stack_var_<slot>` を `load i64, ptr @<glob>` に差し替える。
-    slot (オフセット) は IR 行から読む (呼び出し側で書かない)。1 site でなければ失敗。"""
-    pat = r'\s*%\S+ = load i64, ptr %stack_var_-?\d+\b'
+    slot は IR 行から読み、expect_slot と一致しなければ失敗する (照合)。1 site でなければ失敗。"""
+    pat = r'\s*%\S+ = load i64, ptr %stack_var_(-?\d+)\b'
     i = site_at(lines, fnva, va, pat)
-    slot = re.search(r'%stack_var_(-?\d+)\b', lines[i]).group(1)
+    slot = re.match(pat, lines[i]).group(1)
+    if slot != expect_slot:
+        raise SystemExit(f'{tag}: slot at {va:#x} = {slot} (expect {expect_slot})')
     lines[i] = re.sub(r'load i64, ptr %stack_var_' + re.escape(slot) + r'\b',
                       'load i64, ptr @' + glob, lines[i]) + ' ; LIFTFIX ' + tag
     return slot

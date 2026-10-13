@@ -283,17 +283,17 @@ def apply_liftfix(lines, report):
     applied.append('LF1')
 
     # LF5/LF6: DOM root ポインタ (alloca 配置が machine と異なるため global に束縛)
-    # LF5/LF6/LF7 の slot オフセットは IR 行 (stack_var_<slot>) から読む (SR-11)。
-    # global 名だけは RetDec 出力に無い役割名なので、ここで対応付ける。
-    bind_load_slot_at(lines, C, 0x1800c2c94, '__authstub_doc_root', 'LF5')
-    bind_load_slot_at(lines, C, 0x1800c2ca4, '__authstub_doc_root', 'LF5')
+    # LF5/LF6/LF7 の slot は IR 行から読んだ値と照合する (expect_slot 不一致で失敗)。
+    # 照合用の期待値 (-72/-80/-152) と global 名は literal のまま残す (値の導出は未達 #1208)。
+    bind_load_slot_at(lines, C, 0x1800c2c94, '-72', '__authstub_doc_root', 'LF5')
+    bind_load_slot_at(lines, C, 0x1800c2ca4, '-72', '__authstub_doc_root', 'LF5')
     applied.append('LF5')
-    bind_load_slot_at(lines, D, 0x18004fbc6, '__authstub_doc_root', 'LF6')
-    bind_load_slot_at(lines, D, 0x18004fbd6, '__authstub_doc_root', 'LF6')
+    bind_load_slot_at(lines, D, 0x18004fbc6, '-80', '__authstub_doc_root', 'LF6')
+    bind_load_slot_at(lines, D, 0x18004fbd6, '-80', '__authstub_doc_root', 'LF6')
     applied.append('LF6')
 
     # LF7: tag 文字列 len (ctrl LF1 の DSP 版: alloca 配置差を global 束縛で吸収)
-    bind_load_slot_at(lines, D, 0x18004fb74, '__authstub_str_len0', 'LF7')
+    bind_load_slot_at(lines, D, 0x18004fb74, '-152', '__authstub_str_len0', 'LF7')
     applied.append('LF7')
 
     # LF2: `%3 = xor i128 0, 0` (base が入口 undef 読みを fold したもの。
