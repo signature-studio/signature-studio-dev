@@ -98,6 +98,7 @@
 bash tools/gui/e2e.sh            # 全層 (17〜24 s): 解析→API 面生成→golden→selftest→native lift→PE lift→emcc→tsc→Chrome E2E ×3
 bash tools/gui/test/selftest.sh  # native 単体のみ
 bash tools/gui/test/text_golden.sh && bash tools/gui/test/ft_wasm.sh   # GUI-9 FreeType テキスト (前提: tools/shared/oss/freetype/build.sh, test/fetch_fonts.sh)
+bash tools/gui/test/text_wasm_e2e.sh   # GUI-13 wasm ビルド + ブラウザ上テキスト描画 (RetDec 不要; 前提は同上 + emsdk + google-chrome + tsc)
 python3 tools/gui/analysis/gui_imports.py && python3 tools/gui/gen_api.py   # import 面 / IMPORTS.md 再生成 (入力 tools/m2/work/block00031_PE.bin)
 ```
 前提: x86_64-w64-mingw32-gcc, RetDec (`[RETDEC]`), Emscripten (`[EMSDK]`・同梱 node 24 を PATH に使用), google-chrome, gcc。
@@ -167,18 +168,8 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
 | `integ/sigprobe.sh` の `unresolved-imports=0` が `wasm-objdump` 不在で空振り (今回も `command not found`) | 未解決 import なし確認が無効 | #180 (既存コメント) |
 
 ## 11. GUI-9 (#186): GDI テキストの FreeType 描画 (内蔵 8×8 → FreeType 2.7)
-- **実装**: `src/gui_ft.c` (`GuiTextEngine` = FreeType 2.7、hinting は FT 既定) を `gui_set_text_engine(gui_ft_engine())` で有効化。未登録/face 解決不能/stock フォントは従来の 8×8 (既存 golden 維持)。`CreateFont{A,W}`/`CreateFontIndirect{A,W}` は face・height・weight・italic を保持 (`GetObject` の lfHeight は従来通り)、`GetTextMetrics`/`GetTextExtentPoint*`/`TextOut`/`ExtTextOut`/`DrawText` を engine 経由に、`EnumFontFamiliesExW` を STUB→IMPL (登録 face を列挙、`gui_call4` で cb 呼出、fontType=TRUETYPE)。
-- **方針 (#186 PM 判断)**: Windows 標準フォントは同梱しない。`gui_ft_alias("Segoe UI", "Open Sans")` 型の face→OSS フォント代替表、未解決名は最初に登録した face。`gui_ft_register_lazy` で最初の `open` 時に load (VFS #22 取得口; 実 VFS 結線は未)。テスト用フォントは Open Sans (`googlefonts/opensans`) と Barlow (`google/fonts` ofl/barlow) を `test/fetch_fonts.sh` が `work/` (gitignore) へ sha256 検証付きで取得し、リポジトリには入れない。
-- **独立オラクル**: `golden/ft_oracle.c` は shim のコードを一切使わず native FreeType 2.7 (`tools/shared/oss/freetype/build.sh` 産 `libfreetype.a`) を直接叩いて同一シーンの PPM と metrics 表を作る。共有するのは仕様 (ppem 規約・advance=四捨五入した hinted advance・合成式 `(fg*cov+dst*(255-cov)+127)/255`・TA_*/DT_* 配置) のみ。`golden/cmp_text.py` が画素と metrics 表 (2 face × 15 高さ = 30 行 × 9 列) を全一致判定。**実 Windows フォントとの一致は主張しない**。
-- **実測 (HEAD 再現前の作業ツリー; 4 vCPU, gcc ASan/UBSan, emcc 6.0.12, node 24)**:
-  - `bash tools/gui/test/text_golden.sh`: 前景 3826 画素・差 **0**、metrics 30 行・差 **0**、`EnumFontFamiliesExW` (全 2 face / 名指定 1 件=Barlow) OK、ネガコン 4/4 検出 (期待 1 画素+metrics 1 セル破壊 / フォント高さ +1 欠陥 = 1063 画素差 / engine 未登録 (8×8) / オラクルのフォントファイル差替え)。実時間 6.4 s。
-  - `bash tools/gui/test/ft_wasm.sh`: engine (gui_ft.c) の metrics/advance/glyph coverage ダンプ 11 行が native と wasm32 (`-pthread` で再ビルドした FreeType 2.7, FORCE_INT64+patch) で一致 (TOTAL edd537e3b390f846)、ダンプ破壊のネガコン検出。実時間 6.7 s。
-  - 回帰 (変更後): `selftest.sh` 406 passed/0 failed、`bpp_golden.sh` ALL PASS (ネガコン込み)、`simd_e2e.sh` ALL PASS、`reach_test.sh` 11+28 passed。
-- **レビュー対応の再現 (コミット済み HEAD 5813bea; work/・build/・libfreetype 無しのクリーン状態, 4 vCPU)**: `e2e.sh` 1c0 ブロックを原文のまま抽出して実行 (前段に `gen_api.py`; `fetch_fonts.sh` → `FONT=work/OpenSans-Regular.ttf build.sh` → `text_golden.sh` → `ft_wasm.sh`)。rc=0、実時間 1m34.678s (n=1、終了時 load average 2.29)。`build.sh` 自己テスト PASS wasm32/wasm64 (40 行, TOTAL a4eff06d516ef88f)、`text_golden.sh` ALL PASS (前景 3826 画素・差 0 / metrics 30 行・差 0)、`ft_wasm.sh` PASS (11 行, TOTAL edd537e3b390f846)。修正前は `FONT` 既定値 (FL mac 展開物) が無く `build.sh` が exit 1 → `e2e.sh` が 1c0 で abort していた。
-- **ネガコンの厳格化**: `text_golden.sh` は `cmp_text.py` が exit 1 (不一致) で拒否した場合だけ検出扱い (exit 0 受理・exit 2 入力不正はともに FAIL)。オラクル側 PPM を不正入力 (exit 2) にした変異版で `NEGCTL FAIL (rc=2)` と script exit 1 を確認 (従来の「非 0 なら検出」では通っていた)。
-- **8×8 経路の `DrawText` 挙動差 (実測; 旧 = main 59c1169、新 = HEAD 5813bea の engine 未登録、100×40・stock フォント・FNV 画素ハッシュ)**: DT_LEFT 複数行・CRLF DT_LEFT・単一行 DT_CENTER の画素と戻り値は 3 件とも一致。複数行 `ab\ncdef` の DT_CENTER は 1 行目の最小 x が 34→42、DT_RIGHT は 68→84 (旧は全行がブロック幅基準の同一 x0、新は行ごとに配置 = Windows の挙動)。`tools/gui` の既存 golden/selftest/gui_app に `DrawText` 呼出は無い (grep)。`e2e.sh` 全体での確認は未 (下記未解決 (1))。
-- **既知の限界**: カーニング・ClearType・合成 bold/italic・lpDx・DT_WORDBREAK/DT_END_ELLIPSIS/`&` プレフィックス・GetTextExtentExPoint/GetTextFace は未実装 (8×8 時代から DT 簡略のまま)。advance は整数 px (サブピクセル位置決めなし)。`GetTextMetrics` の `tmAveCharWidth` は OS/2 `xAvgCharWidth` (Windows の算出と異なりうる)。
-- **未解決** (本 PR は `Refs #186`): (1) `bash tools/gui/e2e.sh` 全体 ALL PASS は未確認 (この run は RetDec 不在で PE lift 層が走らない。native/wasm 層の GUI-9 検査のみ実行) → #186 に `oc_artifacts: toolchain-emsdk toolchain-retdec` で再実行を依頼。(2) 実 FL が要求する face/サイズの確定 (blockedBy GUI-3 #174) と alias 表の実値。(3) VFS (#22) からの実フォント遅延取得の結線 (口 `gui_ft_register_lazy` のみ)・ブラウザ (wasm 全体) 上のテキスト描画 e2e。(THIRD_PARTY_NOTICES (#86) への Open Sans/Barlow の license 登録は #616 で対応: `tools/legal/notices/REPORT.md`。)(4) `wasm32` の `gui_wasm.sh` ビルドへ `gui_ft.c` + libfreetype の組込み (本 PR は既定 e2e のビルドへ未リンク = 既存 wasm 経路は 8×8 のまま)。
+- 結論: `src/gui_ft.c` (FreeType 2.7) が GDI テキストを描き、native 独立オラクル (`golden/ft_oracle.c`) と画素差 0・metrics 差 0 (ネガコン 4/4)、engine の native == wasm32。未登録/解決不能/stock は従来の 8×8。Windows 標準フォントは同梱せず OSS フォント (Open Sans / Barlow) を alias で代替 (#186 PM 判断)。
+- 実測値・実装詳細・レビュー対応の再現・8×8 経路 `DrawText` の挙動差・未解決 (4 件) の全文は **`REPORT_APPENDIX_B.md`** (無変更で分割移動)。未解決 (4) wasm ビルドへの組込みは §13 (#615) で解消。
 
 ## 12. GUI-12 (#489): headless host の surface 画素 use-after-free (selftest ASan flaky)
 
@@ -204,5 +195,21 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
 | `e2e.sh` 全体 (native_e2e + wasm Chrome) の再実行 | wasm 側で `SurfSnap` / 遅延 free が回帰を起こさないことが未確認 | #489 にコメント (`oc_artifacts: fl-win64 toolchain-emsdk toolchain-retdec` で再実行依頼) |
 | wasm 経路で host が free 済み旧画素を stale に読む可能性 | 画面の一瞬のずれ (crash なし) | #489 にコメント (別チケット候補; 本修正で保留 free の仕組みは入ったので、wasm でも旧画素は `head` 通過まで有効と推論 (未実測)) |
 
-## 13. GUI-8 (#184): e2e の agent-browser 載せ替え・長時間ストレス・Firefox 取込み
+## 13. GUI-13 (#615): gui_wasm.sh の wasm ビルドへ gui_ft.c + libfreetype を組込み + ブラウザ上テキスト描画 e2e
+既知類型との関係 (DEFECTS.md): 該当なし (lift 欠陥ではなく shim のリンク構成)。検証起点 commit: 4890d60 (HEAD)。c4b293d (e2e.sh の FT 順序修正) の再確認は `REPORT_APPENDIX_B.md` §13 追補。
+- **組込み**: `lift/gui_wasm.sh` が既定で `src/gui_ft.c` + `src/gui_ft_wasm.c` + wasm32 `-pthread` libfreetype (`lift/ft_wasm_lib.sh` = `shared/oss/freetype/build.sh` 産の patch 済みツリーを再 make; `ft_wasm.sh` と同方式) をリンク。`GUI_NO_FT=1` で従来ビルド。`gui_ft_add_face` / `gui_ft_add_alias` / `_gui_hostcall_ptr` / `_malloc` / `_free` を export。**host (JS) が `gui_ft_add_face` を呼ぶまで engine は未登録 = 8×8 のまま** (既存 e2e の経路は無変更)。
+- **フォントは同梱しない・sha256 検証・遅延取得**: face は `gui_ft_register_lazy` で登録され、最初の `open` で host call `GUI_HC_FETCH_FONT` (=5) を発行 → host (`src/runtime/gui_fonts.ts` `createFontLoader`) が url から取得 → **manifest の sha256 を検証** → wasm heap へ置いて ptr/size を返す。検証失敗・取得失敗は null → shim が LOG に残して 8×8 フォールバック。manifest 台帳は `test/fonts.tsv` (file/url/sha256/face) で、`test/fetch_fonts.sh` (native 用取得) とブラウザ e2e が同じ sha256 を使う。ブラウザ配信は `loadFont` の取得元 (url) を #22 (VFS) の遅延取得に差し替える口 (本 PR では e2e サーバの `/fonts/*` = 未接続, 下記未解決 (1))。
+- **ブラウザ e2e** (`bash tools/gui/test/text_wasm_e2e.sh`; RetDec 不要): RetDec lift の代わりに C ゲスト `test/text_wasm_app.c` (GUI-9 と共有の `test/text_scene.inc` のシーンを WM_PAINT で描き BitBlt、metrics 表を LOG へ) を `gui_wasm.sh` で wasm 化 → headless Chrome (CDP, COOP/COEP, SAB) → フォント遅延取得 → OffscreenCanvas 読み戻しと CDP スクリーンショットを独立オラクルと比較 (`e2e/text_e2e.mjs`, `e2e/cdp_lib.mjs`)。
+- **実測 (コミット済み HEAD 4890d60 をクリーン worktree へ展開、`build/` 削除から = libfreetype wasm32 `-pthread` 再ビルド込み; 4 vCPU, emcc 6.0.12, Chrome headless; n=3)**: 実時間 13.76–14.53 s (14.53 / 13.76 / 13.78)、開始時 load average (1 分) 1.61 / 2.08 / 2.28、3/3 rc=0。
+  - 本番: 読み戻し vs オラクル **差 0 px**、スクリーンショット vs オラクル **差 0 px** (320×120 = 38400 px 中、オラクル前景 3826 px)、metrics 30 行・差 0。フォント 2 本 (Open Sans 147528 B / Barlow 104068 B) が sha256 ok で遅延取得されたことを host event で確認。wasm サイズ 624736 B (`GUI_NO_FT=1`: 109105 B)。
+  - ネガコン (全て不一致で拒否): N1 face 未登録 (8×8) 4558 px + metrics 30 行差 / N2 manifest の sha256 不正 → `sha256 mismatch` + shim の 8×8 フォールバック LOG、2409 px 差 / N3 別フォントを sha256 整合のまま配信 1944 px 差 / N4 オラクル 1 画素 + 1 metrics セル破壊 → 1 px・1 行差。さらにオラクルを別フォントで作り直すと `text_e2e.mjs` は rc=1、wasm ディレクトリ不在は rc=2 (どちらも exit 0 にならない)。
+  - 8×8 回帰: face 未登録の FT 組込みビルドと `GUI_NO_FT=1` の従来ビルドの出力が読み戻し 0 px・スクリーンショット 0 px・metrics 行一致 (前景 2179 px の非自明シーン)。対照 N5: FreeType 出力と 8×8 基準は 4558 px 差 (区別できる)。 併せて: `text_golden.sh` (シーンを `text_scene.inc` へ共通化後) ALL PASS (前景 3826 px・差 0、ネガコン 4/4)、`ft_wasm.sh` PASS (TOTAL edd537e3b390f846)、`grow` / `reach` 各 variant も `gui_wasm.sh` でビルド成功、`hostcall_help.test.mjs` 3/3 pass、`tsc --noEmit` エラー 0。 **範囲外**: lift 済み PE (`gui_app.c` 経由の既存 `e2e.sh` 全体) の再実行は本 run に RetDec が無く未実施 (`e2e.sh` に 4b として本 e2e を追加済み)。実 FL の face/サイズ (#174)・実 Windows フォントとの一致は主張しない。
+- **未解決** (起票先付き):
+  | 未解決 | 影響 | 起票先 |
+  |---|---|---|
+  | (1) `loadFont` の取得元を #22 (VFS) の遅延取得 (Range/OPFS/R2) へ結線 | 本番ブラウザへの配信は未接続 (e2e は同一オリジン `/fonts/*`) | #660 (GUI-14) |
+  | (2) `bash tools/gui/e2e.sh` 全体 (PE lift 層込み) の ALL PASS 確認 | 7ead604 のレビュー実測 (RetDec あり) で 2 回中 1 回 ALL PASS、もう 1 回は `selftest_wrapped` の既知 flake (ASan blit_surf UAF、単独 30 回で 9/30 失敗) で rc=1 (付録 §13 追補) | flake は `gui_headless.c` の起票を PM 依頼 (未起票)。ALL PASS の追加確認は PM 判断 |
+  | (3) 実 FL の face/サイズ確定・alias 実値 | alias は e2e 用 (Segoe UI/Tahoma → Open Sans) のみ | #174 (GUI-3) / #186 の未解決 (2) |
+
+## 14. GUI-8 (#184): e2e の agent-browser 載せ替え・長時間ストレス・Firefox 取込み
 全文と実測 (検証起点 HEAD `761a045`): `REPORT_GUI8.md`。結論: e2e は `tools/e2e` ドライバ (agent-browser / puppeteer-core) 経由で `bash tools/gui/e2e.sh` ALL PASS (golden 差 0、259 s)、50,000 フレームのストレスで drop 0・メモリ増加なし・surface gen 不変、ネガコン 3 本は不合格を検出。Firefox は #127 の結果を `PROTOCOL.md §12` に取込み (Safari・Firefox 実描画は未測定)。

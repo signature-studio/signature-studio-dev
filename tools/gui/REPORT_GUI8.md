@@ -1,6 +1,6 @@
 # GUI-8 (#184) — e2e 載せ替え・長時間ストレス・Firefox 取込み
 
-(`tools/gui/REPORT.md` §13 の要約からの参照先。本ファイルの本文は GUI-8 の新規記述であり、REPORT.md から移動したものではない。)
+(`tools/gui/REPORT.md` §14 の要約からの参照先。本ファイルの本文は GUI-8 の新規記述であり、REPORT.md から移動したものではない。)
 
 ### 結論
 - `tools/gui/e2e/e2e.mjs` (CDP 直叩き 247 行) を `tools/e2e/suite/drivers/{agent-browser,puppeteer}.mjs` 経由に載せ替えた (既定 agent-browser 0.39.0、`E2E_DRIVER=puppeteer` で puppeteer-core)。検証起点の `bash tools/gui/e2e.sh` は ALL PASS・golden 差 0 (読み戻し 0/64000 px、スクリーンショット 0 px)。
