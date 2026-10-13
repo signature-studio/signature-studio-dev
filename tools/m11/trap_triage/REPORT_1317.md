@@ -7,7 +7,7 @@
 ## 1. 測定の基準
 
 - 検証 HEAD: `851c342e` (`origin/main`)。本ファイルを追加する commit 以外にコード差分は無い。
-- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`extracted/block00031_PE.bin`, 22 MB)。`toolchain-retdec` を `$RUNNER_TEMP/tc/retdec`、`toolchain-emsdk` を `$RUNNER_TEMP/tc/emsdk` に展開 (`RETDEC_ROOT` で指定。emsdk は runner の `/opt/emsdk` を使用)。`work-m11` を `tools/m11/work/` (233 entries)、`work-liftdiff` を `tools/liftdiff/work/` (11 entries) に展開。
+- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`extracted/block00031_PE.bin`, 22 MB)。`toolchain-retdec` を `$RUNNER_TEMP/tc/retdec`、`toolchain-emsdk` を `$RUNNER_TEMP/tc/emsdk` に展開 (`RETDEC_ROOT` で指定。emsdk は `[EMSDK]` を使用)。`work-m11` を `tools/m11/work/` (233 entries)、`work-liftdiff` を `tools/liftdiff/work/` (11 entries) に展開。
 - IR: `m11_gen_ir2.sh` 43 s rc=0 (OFF)。`M11_M2P=1` でも rc=0 (`[ir11][M2p] decimal inttoptr instr VA remap: 4364`)。ldfix は OFF/ON とも `F1=902 F1v=4 F2=30 F3a=3 F3b=5 F3c=36 errors=0`。
 - build: `m11_build.sh` 26 s rc=0 (OFF・ON とも `wasm-ld signature mismatch: 0, undefined symbol: 0`)。
 - load average: 実行中 0.95〜0.99。
@@ -54,6 +54,8 @@ REPORT_1076 §3 の境界 (`0..829`+880 完走 / `0..830`+880 停止) と一致�
 | 所要秒 (n≥3) と REPORT_1076 の未検証 6 件 | #1076 へのコメント |
 
 ## 5. 再現コマンド
+
+§2 (repro_1076.sh・60 s 上限) とは別手段 (survey_units.mjs・上限 20 s) の再現手順。
 
 ```sh
 export FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 ANALYSIS_DIR=$RUNNER_TEMP RETDEC_ROOT=$RUNNER_TEMP/tc/retdec M11_M2P=1
