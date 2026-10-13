@@ -2,6 +2,34 @@
 
 > **正本**: `tools/plugins/p0c/REPORT.md` (本体 §1〜§7 + 付録索引)。本ファイルは本体から**無変更で分割移動**した節の全文 (#378, `docs/DOC_MAP.md` §1)。節番号・見出しは移動前のまま。付録 E の行数上限 (250) のため E から分割移動。
 
+## 15.6 #346 受入 2: 現 HEAD での置換前後 e2e 一致 (検証 HEAD 4b3616e5 / before = 置換のみ戻した main)
+
+素材: `fl-win64` `toolchain-retdec` `toolchain-emsdk` (`oc_artifacts`)。before = `4b3616e5` の `tools/plugins/p0c/*.py` を `856be6b` の置換差分で逆適用し、`p0c_e2e.sh` / `p0c2_e2e.sh` の 3 行 (`source env.sh`・`PE=`) を `/home/ubuntu/work/analysis/win64` に戻したもの。after = `4b3616e5` そのまま。`/home/ubuntu/work/analysis/win64` と `/home/ubuntu/work/webstudio` は before 用に symlink。`PATH` に `/usr/lib/llvm-18/bin` を追加。各 n=1・直列。
+
+| 項目 | before | after |
+|---|---|---|
+| `p0c_e2e.sh` (kernel_matrix 込み・初回) | rc=0、459 s、load 0.27→8.33 | rc=0、462 s、load 4.85→7.93 |
+| `p0c2_e2e.sh 200` | rc=0、14 s、load 6.49→5.27 | rc=0、10 s、load 7.29→6.32 |
+
+一致 (sha256 先頭 12 桁。`work/` 配下の生成物):
+
+| 出力 | before | after | 結果 |
+|---|---|---|---|
+| `kernel_matrix.json` | 487412af06e6 | 487412af06e6 | 一致 |
+| `table_verify.json` | e5709ebd4e62 | e5709ebd4e62 | 一致 |
+| `f80_classes.json` | ef4fdcd06cf9 | ef4fdcd06cf9 | 一致 |
+| `f80_kernels.json` | 83e753172abc | 83e753172abc | 一致 |
+| `k80abi.json` | 418bfc8e0783 | 418bfc8e0783 | 一致 |
+| `p0c2_sweep.csv` | 82a16bfc80f8 | 82a16bfc80f8 | 一致 |
+| `diff/k80.argfix.wasm.o` | 71a4050555e8 | 71a4050555e8 | 一致 |
+| `k80.final.ll` | 953790e6932a | 953790e6932a | 一致 (同一 lift から再生成後) |
+| `diff/k80.argfix.ll` | daa2d6b87a52 | daa2d6b87a52 | 一致 (同上) |
+| `kernel_table.json` (`tools/plugins/work/`) | (cmp) | (cmp) | 一致 |
+
+**RetDec 非決定の切り分け**: 初回の before 側 `k80.lift.ll` (f826f7ef815a) だけが after (d38a7c667c46) と違った。差は 40 行で、全て `alloca` 行の順序入れ替え (非 alloca 行の差 0)。同じ before コードで lift を 2 回取り直すと 2 回とも同一 (after とも 0 行差) だったため、置換由来ではなく初回生成時の RetDec の揺れ (#668)。揃え直した lift から下流 (`k80.final.ll`・`k80.argfix.ll`・`wasm.o`・`p0c2_sweep.csv`) を再生成すると全て一致した。
+
+**結論**: 受入 2 (現 HEAD で置換前後の出力が同一) を満たす。ただし `k80.lift.ll` の alloca 順は RetDec 側で揺れるため、比較は揃えた lift を使う (#668)。
+
 ## 16. P0c-8 (#311, 親 #197・先行 #269): ext IR の wasm32 検証 + framework 統合 (fw_f80.py → f80_lower --ext)
 
 検証起点 commit: `d5e6f98` (origin/main)。担当 dir: `tools/plugins/p0c` / `tools/plugins/framework` (fw_f80.py, fw_stage2.sh のみ)。
