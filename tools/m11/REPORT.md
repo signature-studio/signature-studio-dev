@@ -229,4 +229,4 @@ reached_stage は全行 4/6 (stage 5 未達)。最終 HEAD は 5 回測定 (gen_
 機械語 `mov qword [rbp+X], imm` (8B) が IR で `store ptr null` / `store i32 imm` (wasm32 で 4B) に縮み、上位 4B 未初期化のまま C 転記 `Q(dest)` が読んで OOB (idx 87 = `418190`, idx 898 = `412d60`, idx 58–63 = `417b70` の `Q(a)`、後者は `function_8cbb00` の 2 site)。`qstore/m11_qstore.py` が 279 site / 158 関数を `store i64` に戻す (`M11_QSTORE=0` で無効)。**#513 取り込み後の HEAD `8e5f760` の実測 (n=3 一致)**: survey NC 856/38/46/1 (clobber 1) → 修復 864/31/46/1 (clobber 0)、ラベル差 9 unit (58–63・87・898 が trap→ok、144 が clobber→trap)。58–63 は `8cbb00` の 2 site だけを除外すると trap に戻り (858/37/46/1) qstore の効果と確定、144 は別 site (未切り分け)。数値・site 一覧・再現・未解決は [qstore/REPORT.md](qstore/REPORT.md)。
 
 ## 14. #680: survey 測定基準の固定化 (ldfix/qstore の fail-closed・PE パス env 化)
-ldfix/qstore の skip を非 0 終了にし、IR 生成条件を `work/ir_conditions.json` に記録。既定 (qstore on) は n=2 で ok 864 / oob 23 / trap 31、qstore off は ok 856 / oob 31 / trap 38 (完全一致)。詳細・未解決は [REPORT_N27.md](REPORT_N27.md)。
+ldfix/qstore の skip を非 0 終了にし、IR 生成条件と IR の指紋を `work/ir_conditions.json` に記録する fail-closed 化。qstore on / off の差は本 runner の n=2 で再現した。測定値・未解決・環境間一致 (未実測) は [REPORT_N27.md](REPORT_N27.md)。

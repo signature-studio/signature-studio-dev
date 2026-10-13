@@ -20,10 +20,6 @@ mkdir -p work work/tmp
 LOG=work/e2e_steps.log
 : > "$LOG"
 step() { echo "[m11_e2e] $*"; }
-run() { # run <label> <cmd...> : 失敗しても継続 (rc を記録)
-  local label="$1"; shift
-  if "$@" >> "$LOG" 2>&1; then step "$label: ok"; return 0; else step "$label: FAILED (rc=$?; $LOG 参照)"; return 1; fi
-}
 must() { # must <label> <cmd...> : fail-closed (#680). IR 生成・build の失敗は測定結果を作らず非 0 で終了する
   local label="$1"; shift
   if "$@" >> "$LOG" 2>&1; then step "$label: ok"; return 0; fi
@@ -42,29 +38,34 @@ if [ $miss = 1 ]; then echo "M11_SUMMARY {\"reached_stage\":0,\"stop_reason\":\"
 need_lift=0
 for i in 0 1 2 3; do [ -f work/boot$i.lift.ll ] || need_lift=1; done
 [ -f work/boot_final.ll ] || need_lift=1
+PE_PREV="$(python3 m11_cond.py --get pe)"   # IR を生成した PE (#680 review: PE が変わったら IR・data/image を作り直す)
 if [ $FULL = 1 ] || [ $need_lift = 1 ]; then
   step "全再生成モード (scan → bounds → lift → tail 固定点 → IR)"
-  [ -f work/scan_index.json ] && [ $FULL = 0 ] || run "m11_scan" python3 m11_scan.py
-  run "m11_bounds" python3 m11_bounds.py
-  run "lift 4 chunks (RetDec)" bash m11_lift_all.sh
+  [ -f work/scan_index.json ] && [ $FULL = 0 ] || must "m11_scan" python3 m11_scan.py
+  must "m11_bounds" python3 m11_bounds.py
+  must "lift 4 chunks (RetDec)" bash m11_lift_all.sh
   for it in 1 2 3; do
-    run "m11_tail #$it" python3 m11_tail.py
-    run "lift boot4 #$it" bash m11_lift.sh work/boot_ranges_extra.txt boot4 600
+    must "m11_tail #$it" python3 m11_tail.py
+    must "lift boot4 #$it" bash m11_lift.sh work/boot_ranges_extra.txt boot4 600
     must "gen_ir2 #$it" bash m11_gen_ir2.sh
   done
 else
   # #222: IR の VA→LVA remap は M11_LB_BASE 依存。stamp が違えば lift 成果物 (LB 非依存) から IR だけ再生成
-  if [ ! -f work/boot_final.ll ] || [ "$(cat work/ir_lb_base.stamp 2>/dev/null)" != "${M11_LB_BASE:-0}" ]; then
+  # #680 (review): 既存 work/ の回復 — ldfix 未記録 (旧スナップショット)・IR 指紋不一致・PE 変更でも gen_ir2 を走らせる
+  if [ ! -f work/boot_final.ll ] || [ "$(cat work/ir_lb_base.stamp 2>/dev/null)" != "${M11_LB_BASE:-0}" ] \
+     || [ "$(python3 m11_cond.py --get ldfix)" != applied ] || ! python3 m11_cond.py --check work/boot_final.ll \
+     || [ "$PE_PREV" != "$PE" ]; then
     must "gen_ir2 (M11_LB_BASE=${M11_LB_BASE:-0})" bash m11_gen_ir2.sh
   fi
 fi
 echo "${M11_LB_BASE:-0}" > work/ir_lb_base.stamp
+if [ "$PE_PREV" != "$PE" ]; then rm -f work/m11_data.c work/m11_image.bin; fi
 if [ "$(cat work/img_lb_base.stamp 2>/dev/null)" != "${M11_LB_BASE:-0}" ]; then rm -f work/m11_data.c work/m11_image.bin; fi
 echo "${M11_LB_BASE:-0}" > work/img_lb_base.stamp
-[ -f work/m11_data.c ] || run "m11_data_gen" python3 m11_data_gen.py "$PE"
-[ -f work/m11_image.bin ] || run "m11_image_gen" python3 m11_image_gen.py "$PE"
+[ -f work/m11_data.c ] || must "m11_data_gen" python3 m11_data_gen.py "$PE"
+[ -f work/m11_image.bin ] || must "m11_image_gen" python3 m11_image_gen.py "$PE"
 if python3 -c 'import pefile' 2>/dev/null; then  # #222: LB_BASE 適用の静的検査 (M11_LB_BASE 未指定 = 0 では reloc 値のみ検査)
-  run "lb_check (M11_LB_BASE=${M11_LB_BASE:-0})" python3 lb_check.py "$PE" work/m11_image.bin "${M11_LB_BASE:-0}"
+  must "lb_check (M11_LB_BASE=${M11_LB_BASE:-0})" python3 lb_check.py "$PE" work/m11_image.bin "${M11_LB_BASE:-0}"
 fi
 must "build (emcc 増分)" bash m11_build.sh
 

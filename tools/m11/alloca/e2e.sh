@@ -35,6 +35,7 @@ if [ ! -f "$M11/work/boot_final.prealloca.ll" ]; then
 fi
 step "m11_alloca.py 適用 (in-place)"
 python3 m11_alloca.py "$M11/work/boot_final.ll" "$M11/work/boot_final.ll" --report work/alloca_report.json || exit 1
+python3 "$M11/m11_cond.py" --bind "$M11/work/boot_final.ll" || exit 1   # #680: 正規の pass なので指紋を更新 (m11_build.sh の検査用)
 
 # 2. mainline build + 実行 --------------------------------------------------------
 step "m11_build.sh (増分)"

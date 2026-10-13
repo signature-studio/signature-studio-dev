@@ -35,7 +35,11 @@ PY2
 #   capstone による実機械語 (.pdata 区間) との突合付き。詳細は ldfix/REPORT.md / ldfix/REPORT_CAB131.md。
 #   適用位置は m11_post (weak 化/sigfix) 前 = ここ (ldfix REPORT §6-2 の推奨)。
 #   skip は失敗扱い (#680 fail-closed): 警告のみで IR を作ると測定基準が環境で変わるため。
-if [ -f "$PE" ] && python3 -c 'import capstone, pefile' 2>/dev/null; then
+#   M11_LDFIX=0 は ldfix 適用前の IR を明示的に取る検証用 (ldfix/audit_lsf_e2e.sh)。ir_conditions.json に ldfix=disabled を残し、build は拒否する。
+if [ "${M11_LDFIX:-1}" = 0 ]; then
+  python3 m11_cond.py ldfix=disabled
+  echo "[gen_ir2] M11_LDFIX=0: ldfix を適用しない (ir_conditions.json ldfix=disabled; この IR は build できない)" >&2
+elif [ -f "$PE" ] && python3 -c 'import capstone, pefile' 2>/dev/null; then
   python3 ldfix/ldfix.py work/boot_final.ll work/boot_final.ldfix.ll --pe "$PE" --report work/ldfix_report.json
   mv work/boot_final.ldfix.ll work/boot_final.ll
   python3 m11_cond.py ldfix=applied
@@ -44,4 +48,5 @@ else
   echo "[gen_ir2] ERROR: ldfix skip (PE 無し: $PE / capstone・pefile 無し) — fail-closed で失敗" >&2
   exit 1
 fi
+python3 m11_cond.py --bind work/boot_final.ll   # IR の指紋を記録 (m11_build.sh はこれと一致する IR だけを build する)
 echo "[gen_ir2] OK: work/boot_final.ll ($(wc -l < work/boot_final.ll) 行)"
