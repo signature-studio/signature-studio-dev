@@ -246,6 +246,5 @@ Actions run `38430714782` (head `9cadda79`) で `liftdiff_e2e.sh` (--m11-only �
 - 実測 (HEAD f694ef0・`--m11-only` 3 回 全 exit 0): sample:800 = 一致 358/357/357 · 不一致 212/213/213 · 実行不能 230。origin/main は 353/217/230。安定 +4 (0x1062200・0x1266e70・0x441500・0x9cecc0) と run 依存 1 件 (0x959a40)。`wasm_timeout_native_long` は 0 件。
 - **未検証**: 0x6cd8a0 の 9 パターン実 PE 実測 (sample:800 に含まれず f2 系素材が必要)。全文・3 run 表・未解決: [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §11。
 
-## 12. 被覆拡大 2 パターン (LD-4 / #235、部分達成)
-`vm0` (this/VMT 疑似オブジェクト) と `u16` (UTF-16 文字列 blob) を追加。sample:800 で 一致 358→361 / 不一致 212→229 / 実行不能 230→210 (base 97f28539 比)。未達 (受入条件) は #235 に残す。全文・実測・未達の内訳: [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §12。
-fault 由来 this 疑似 pattern `fvm` (LD-23 / #975): 実装・集計は済み、遷移は 0 件 (sample:800 で 360/230/210 不変)。VMT slot 未解決が原因で未達。全文は [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §12.1。
+## 12. 被覆拡大 2 パターン (LD-4 / #235、部分達成) と fault 由来 fvm (LD-23 / #975)
+`vm0`・`u16` を追加 (sample:800 で 一致 358→361 / 不一致 212→229 / 実行不能 230→210)。fault 由来 `fvm` は遷移 0 件 (360/230/210 不変・VMT slot 未解決)。全文・実測・未達: [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §12・§12.1。

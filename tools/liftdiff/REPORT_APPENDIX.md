@@ -272,6 +272,8 @@ PR head は 358 / 212 / 230 ×2 と 357 / 213 / 230 ×1 (本 run の 3 回と一
 match→mismatch の 4 件 (0x8445b0・0x6681f0・0xfe8e80・0x528680) は新 pattern (vm0/u16) の case だけが diff/wasm_trap で、既存 9 pattern は変わらない (深部経路の露出)。
 `liftdiff_e2e.sh --m11-only` は exit 0 (単体テスト・unit #18 の 3 検査 PASS・closure 361/229/210)。
 
+(本体 REPORT §12 の要約元: `vm0`・`u16` 追加は sample:800 で 一致 358→361 / 不一致 212→229 / 実行不能 230→210 (base 97f28539 比)。)
+
 ### 12.1 fault 由来 this 疑似 pattern `fvm` (LD-23 / #975、部分達成)
 
 - 実装: `cases.fvm_candidates` が `'s'` の native fault addr から this 候補の引数 index を推定 (`SMALL[i] ≤ addr-SMALL[i] < 0x40`)。
