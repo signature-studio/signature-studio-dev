@@ -113,7 +113,7 @@ bash tools/gui/e2e.sh                              # 全体 (PE lift を含む);
 ### 範囲外・未達
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-`bash tools/gui/e2e.sh` 全体は `0b71ab1` で ALL PASS (exit 0, real 1m36.108s; PE lift 層 2/6〜6g/6 を含む)。範囲外の残りは下記の行。
+`bash tools/gui/e2e.sh` 全体は `d1b656dd` で ALL PASS (exit 0, real 2m1.355s; PE lift 層 2/6〜6g/6 を含む; `0b71ab1` では real 1m36.108s)。`input/e2e.sh` は ALL PASS (22 検査, real 4.220s)、`input/negctl.sh` は 12 件検出・検出漏れ 0 (real 2m57.712s)。範囲外の残りは下記の行。
 | WM_POINTER* / RegisterPointerInputTarget 系 (FL の import に無い) と慣性ジェスチャ (GID_PAN の GF_INERTIA)・GID_ROTATE/TWOFINGERTAP/PRESSANDTAP | issue スコープ「タッチ → WM_POINTER*」の一部が未実装 | #182 (実到達ログ: #174 で FL が呼ぶと確定したら) |
 | GID_PAN (1 本指移動の WM_GESTURE) は実装のみで selftest / e2e に検査が無い | パン操作の回帰を検知できない | #182 (テスト追加は次の作業。PM 判断: 今回の PR で足すか) |
 | 配列は US/DE/FR のみ・dead key・IME 配列・実 Windows の KBD テーブルとの照合なし (表は公開仕様から手作成)。Caps の数字行 shift-lock 近似 | 他配列では US 相当に落ちる。表の誤りは実機でしか見つからない | #182 (日本語 JIS/実機確認はユーザ依頼候補; 着手時に具体依頼を起票) |
