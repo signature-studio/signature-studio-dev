@@ -71,7 +71,7 @@ REPORT.md §13 (#516, HEAD `8e5f760`) の「修復 864/31/46/1 (clobber 0)」と
 | `--full` の実走: `m11_bounds` が `tools/m2/work/ghidra_dll/functions_dll.csv` を要求し、素材に無い (§10)。lift 成果物がどの PE から出たかも未記録 | WORKFLOW §11 の再生成手順が未検証 | #728 |
 | 環境間一致の実測 (別環境で n>=2)。同一 runner の n=3 は §10 で実測済み | 「環境間で一致」は未確認 | #729 |
 | `73532f8` (c) の trap 内訳 (halt0 54 / oob 13) と本測定 (halt0 7–8 / oob 23–31) の差、(a) 818/21 の再測定 | 過去数値の解釈 | #729 |
-| `ldfix/embed_sx_ab.sh` (CAB-131 A/B) は ldfix 無しの base IR を install し build する。指紋・ldfix 検査で fail-closed になり、A/B は再実行できない | 旧 A/B 結果の再現不可 | #727 |
+| `ldfix/embed_sx_ab.sh` (CAB-131 A/B) は ldfix 無しの base IR を install し build する。指紋・ldfix 検査で fail-closed になり、A/B は再実行できない | 旧 A/B 結果の再現不可 (実測値は `ldfix/REPORT_APPENDIX_AB.md` §3.3 が正)。#727 で**退役**: 冒頭で理由を出して exit 2。base 専用 opt-out は #680 の fail-closed を弱めるため採らない | #727 (退役済み・実行可否: 不可) |
 | NC1 / NC1b / NC3 の再測定 (work-m11 無し)。本 HEAD で NC1 / NC1b / NC2 / NC3 をログ行付きで再実行済み (§9) | rc と理由行の証跡は揃った。素材での再測定は未実施 | #729 |
 | `m11_build.sh` 冒頭の `source [EMSDK]/emsdk_env.sh` は emsdk 無しで rc 1 で落ちる (既存) | 前提不足の理由が見えにくい | #730 |
 | DEFECTS.md への類型追加 (行案は §7) | カタログ未更新 | #716 (DOCS-9) |
