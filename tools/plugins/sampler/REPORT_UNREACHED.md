@@ -132,6 +132,14 @@
 | 負荷 | 前提生成 (基線の初回) で uptime load 最大 16.32 (4 core、inventory の並列)。 本 run の load は未計測 (終了時の 1 分平均 1.00) |
 | `find tools/plugins/sampler -size +20M` | 0 件 |
 
+**検証 (コミット `273cc10`、改名失敗の rc 反映 + NC8 追加後。 レビュー指摘への対応)**
+
+| 項目 | 結果 |
+|---|---|
+| `unr_e2e.sh` (`TMPDIR=$RUNNER_TEMP`、前提込み) | real 369 s、**rc 0**、`judge shells: PASS 7/7`、`indirect_defs: PASS 7/7`、`[unr_e2e] OK` |
+| `unr_nega.sh` | real 71 s、rc 1。 NC0・NC1・NC3〜NC8 は期待どおり (**NC8 = 改名先の衝突で `export_rename.py` が非 0 → 期待どおり**)。 **NC2 のみ不一致** (既知。 即値辺 0 件) |
+| 負荷 | 開始 load 0.33 (1 分)、e2e 終了時 3.42、nega 終了時 1.71 |
+
 **検証範囲 / 範囲外**: 範囲内は「5 根が独立の define として lift に出ること」と監査の通過。 改名は symbol 名だけの変更で本体は不変 (先頭ラベルの確認は FL Keys の 1 件のみ、残り 4 件は未確認)。 範囲外: wasm リンク、実行時の到達性 (表経由の呼出しで `function_<VA>` が解決されるか)、差分試験 (bit-exact)。 通過 ≠ 正しさ。
 
 **未解決 (起票先)**
