@@ -542,3 +542,15 @@
 | COM オブジェクトの関数ポインタ | Win64 vtable 8B スロットに wasm 関数ポインタ | lifted コードの間接呼出し規約ブリッジ (i64↔i32 署名) | hostbridge |
 | 暗号ハッシュ (advapi32 Crypt*) | 常に失敗 | MD5/SHA を実装 (Serum2 ライセンス系のみ。FL 対象外) | plugins |
 | レジストリ永続化 | `shimx_reg_export_text/import_text` | IndexedDB への保存/復元 | runtime |
+
+## SHX-T9 (#177) 実機 DllMain 経路の残 (2026-10-13 再測)
+
+詳細は `tools/shimx/REPORT_SHX-T9.md`。shimx 起因の fail-fast は逐次起動で 0 (停止は lift 側 #232 の `_UStrAsg` OOB)。
+
+| 区分 | 残 | 起票先 |
+|---|---|---|
+| GetProcAddress 名前空 miss (kernel32 10 / ole32 6 / shell32 1 / advapi32 1 / ntdll 1) | 19 | P1/P2 追加候補 (未実装 API 名の確定が必要) |
+| GetProcAddress 序数 miss (kernel32 `#39682`) | 1 | R1 (intptr 閾値 / 敷設) |
+| LoadLibrary 失敗 (Msctf.dll / avrt / PowrProf.dll) | 3 | R4 |
+| survey 範囲外 (unit 160 以降 range 連鎖) | 783 | #773 (harness) |
+| DllMain closure 完走 (stage 5/6) | 未達 | #232 |
