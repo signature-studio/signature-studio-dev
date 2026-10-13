@@ -117,10 +117,24 @@ python3 tools/icall/diff/rax_callers.py 1801a9a6c 1801c8cb8 1801c8c98
 
 結論: **誤認の原因は範囲分割 (decode 単位)**。バイナリの境界は正しい。`0x128c320` の本体が同じ decode モジュールに無いと、RetDec は 1 バイトの stub として作る。`.pdata` (unwind 表) と一致する。
 
-素材 `fl-win64` (`block00031_PE.bin`)・`toolchain-retdec`。検証起点 commit = `adc7f577` (#851 ブランチ HEAD、main `7c9ea884` 基点)。
-再現: `oc_artifacts: fl-win64 toolchain-retdec` を PR 本文に置いた run で `FL_WIN64_DIR=<展開先> bash tools/icall/fn_boundary_repro.sh <outdir>`。スクリプトは範囲を直書きし `work/` に依存しない (chunk 行は `RANGES_DIR` 指定時のみ)。
+素材 `fl-win64` (`block00031_PE.bin`)・`toolchain-retdec` (RetDec v5.0)。検証起点 commit = `adc7f577` (前回実測) / `d4347c5d` (A〜D 再確認・本節の再実行)。
+再現: `oc_artifacts: fl-win64 toolchain-retdec` を PR 本文に置いた run で `FL_WIN64_DIR=<展開先> RETDEC=<retdec-decompiler> bash tools/icall/fn_boundary_repro.sh <outdir>`。スクリプトは範囲を直書きし `work/` に依存しない (chunk 行は `RANGES_DIR` 指定時のみ)。
 各 run の集計: `<outdir>/<name>.log` に対し `grep -c NonRecursiveCFGBuilder` (警告数)、`<outdir>/<name>.drc.dsm` に対し `grep -h "^; function: function_128c320 at"` (ラベル)、所要はスクリプトが `sec=` で出す。
-**本表の数値 (警告 5 件・5→15・追加 10 件・279 s・rc=0) は前回 run (HEAD `adc7f577`) の実測で、decode log は未コミット。本 run では RetDec と素材 `toolchain-retdec` が無く再実行していない (未検証)。** 再実行で上記の集計と突合するまで、数値は「前回実測・log 未保存」として扱う。
+
+再実行の実測 (`d4347c5d` 系列、main 取り込み後 `51fb3680` で同じ `tools/icall` を再実行、foreground、`load 0.23`、全体 48.7 s):
+
+| run | rc | sec | 警告 全体 / `function_128c320` 関連 | `function_128c320` のラベル | `function_128c280` のラベル |
+|---|--:|--:|---|---|---|
+| A | 0 | 12 | 10 / 0 | `0x128c320--0x128dc44` (正) | (A に無し) |
+| B | 0 | 13 | 10 / 0 | `0x128c320--0x128dc44` (正) | (B に無し) |
+| C | 0 | 10 | 5 / 5 | `0x128c320--0x128c321` (1 B) | `0x128c280--0x128c281` (1 B) |
+| D | 0 | 13 | 15 / 5 | `0x128c320--0x128dc44` (正) | (D に無し) |
+
+- 全体 5 → 15 (D は C に本体を足した場合)。増えた 10 件 (`rax_1_reload = rax_1_reg2mem` 5 件・`# empty statement` 3 件・`var*` 2 件) は A/B にも出るので、本体の有無ではなく隣接関数の decode 範囲由来。`function_128c320()` を指す警告は C / D の 5 件のみ。
+- 前回の「追加 10 件」は、この内訳と整合する。出所 (隣接 edge の扱い) は未調査のまま。
+- rt_flengine chunk 行 (chunk0〜3) は **未検証**。範囲テキスト `before.ranges.N` は `tools/m11/work` (`fle_F.txt`) 由来で、`work-m11` 素材が本 run の `oc_artifacts` に無く、リポジトリ単独では再生成できないため。
+
+**前回 run (`adc7f577`) の数値** (警告 5 件・5→15・279 s・rc=0) は今回の A〜D 再実行 (上表) で突合した。279 s は前回の 4 run + chunk の合計と推定で、本 run の A〜D 合計は 48.7 s。
 
 | decode 範囲 | `function_128c320` のラベル | 備考 |
 |---|---|---|
@@ -145,7 +159,7 @@ python3 tools/icall/diff/rax_callers.py 1801a9a6c 1801c8cb8 1801c8c98
 - 追加の警告 10 件 (`rax_1_reload` 等) の出所は未確認。
 - 366 落ちとの因果は未検証 (本体を足しても警告 5 件が残る)。
 
-## 12. ICALL-16: stack 引数の動的検証の実測 (#1023, REPORT.md §12 から分割移動)
+## 13. ICALL-16: stack 引数の動的検証の実測 (#1023, REPORT.md §12 から分割移動)
 
 結論: **OTT では stack 引数の値一致を動的に検証できない** (stack 引数あり site が実行経路に無い)。達成は未了で、残りは #854 / #229 が追跡する。
 
