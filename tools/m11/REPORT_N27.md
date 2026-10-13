@@ -151,7 +151,7 @@ NC1 (capstone 未導入) は `bash tools/m11/m11_gen_ir2.sh` が exit 1 にな�
 
 ## 11. #729: head での survey n=3 (同一 runner・work-m11 から IR 再生成)
 - 条件: `1f83c5ee` (origin/main) に本 PR の `m11_lift.sh` の RetDec 解決修正のみ。素材は `fl-win64` (PE 1 member)・`work-m11`・`work-liftdiff`。`m11_gen_ir2.sh` を先に実行して `ir_conditions.json` を作成 (42.8 秒, ldfix applied, `ir_sha256` 995351f5…)。
-- 障害: `m11_e2e.sh` が boot5 の RetDec lift で fail-closed (`retdec-decompiler: command not found`)。`/opt/retdec/bin` が PATH に無いことが原因。`m11_lift.sh` の RetDec 解決を `command -v` → `/opt/retdec/bin` に変更して解消。
+- 障害: `m11_e2e.sh` が boot5 の RetDec lift で fail-closed (`retdec-decompiler: command not found`)。`[RETDEC]` の bin が PATH に無いことが原因。`m11_lift.sh` の RetDec 解決を `command -v` → `[RETDEC]` の bin (スクリプト内の既定) に変更して解消。
 
 | 測定 | rc | 所要秒 | load (開始→終了) | ok | oob | halt0 | trap | miss | noproc | clobber | oom |
 |---|---|---|---|---|---|---|---|---|---|---|---|
