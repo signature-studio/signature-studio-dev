@@ -74,13 +74,49 @@ static m11_tr_t disp_find(u32 va) {
     return 0;
 }
 
+/* ---- 間接 call の入口計測 (常設, #494) ----
+ * m11_icall の全呼出しを site (元バイナリの `call` 命令 VA) 別と target (解決先 VA) 別に ok / miss で数える.
+ * site は C 転記側が ICALL_AT(va, m11_icall の引数...) で渡す (m11_icall の署名・呼出し経路は不変: shimx_link が --wrap=m11_icall する).
+ * ICALL_AT を使わない呼出し (外部 TU) は site = M11_SITE_EXT, survey ドライバは M11_SITE_NONE (数えない).
+ * 読出しは m11_icall_cnt_* (survey_units.mjs が unit 前後の差分を JSON の icall 欄に出す). */
+#define M11_SITE_NONE 0xffffffffu
+#define M11_SITE_EXT 1u
+typedef struct { u32 key, ok, miss; } icall_cnt_t;
+typedef struct { icall_cnt_t* e; short* h; u32 cap, n; } icall_tab_t;
+#define ICALL_SITE_CAP 256
+#define ICALL_TGT_CAP 2048
+static icall_cnt_t g_isite_e[ICALL_SITE_CAP], g_itgt_e[ICALL_TGT_CAP];
+static short g_isite_h[ICALL_SITE_CAP * 2], g_itgt_h[ICALL_TGT_CAP * 2];
+static icall_tab_t g_isite = { g_isite_e, g_isite_h, ICALL_SITE_CAP, 0 }, g_itgt = { g_itgt_e, g_itgt_h, ICALL_TGT_CAP, 0 };
+static u32 g_icall_drop = 0, g_icall_site = 0;
+#define ICALL_AT(site, ...) (g_icall_site = (u32)(site), m11_icall(__VA_ARGS__))
+static void icall_bump(icall_tab_t* t, u32 key, int miss) {
+    u32 m = t->cap * 2, h = (key * 2654435761u) % m;
+    for (short s; (s = t->h[h]) != 0; h = (h + 1) % m)
+        if (t->e[s - 1].key == key) { if (miss) t->e[s - 1].miss++; else t->e[s - 1].ok++; return; }
+    if (t->n >= t->cap) { g_icall_drop++; return; }
+    icall_cnt_t* c = &t->e[t->n];
+    c->key = key; c->ok = !miss; c->miss = !!miss;
+    t->h[h] = (short)++t->n;
+}
+static icall_tab_t* icall_tab(int t) { return t ? &g_itgt : &g_isite; }
+EMSCRIPTEN_KEEPALIVE int m11_icall_cnt_n(int t) { return (int)icall_tab(t)->n; }
+EMSCRIPTEN_KEEPALIVE unsigned m11_icall_cnt_key(int t, int i) { return icall_tab(t)->e[i].key; }
+EMSCRIPTEN_KEEPALIVE unsigned m11_icall_cnt_ok(int t, int i) { return icall_tab(t)->e[i].ok; }
+EMSCRIPTEN_KEEPALIVE unsigned m11_icall_cnt_miss(int t, int i) { return icall_tab(t)->e[i].miss; }
+EMSCRIPTEN_KEEPALIVE int m11_icall_cnt_drop(void) { return (int)g_icall_drop; }
+
 /* 間接 call: target は .data ポインタ表由来 (LVA; reloc 補正済) か lea [rip] 由来の VA. */
 u64 m11_icall(u64 target, u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) {
-    m11_tr_t f = disp_find((u32)(target + (0x400000ull - M11_LB_BASE)));
+    u32 site = g_icall_site ? g_icall_site : M11_SITE_EXT;
+    g_icall_site = 0;
+    u32 tkey = (u32)(target + (0x400000ull - M11_LB_BASE));
+    m11_tr_t f = disp_find(tkey);
     if (!f) {
         f = disp_find((u32)target);
-        if (f) g_icall_viaVA++;
+        if (f) { g_icall_viaVA++; tkey = (u32)target; }
     }
+    if (site != M11_SITE_NONE) { icall_bump(&g_isite, site, !f); icall_bump(&g_itgt, tkey, !f); }
     if (!f) {
         g_icall_miss++;
         int seen = 0;
@@ -116,7 +152,7 @@ EMSCRIPTEN_KEEPALIVE int m11_call_unit(int i) {
     if (!proc) return 0;
     u32 m0 = (u32)g_icall_miss;
     D(R(0x11eac98)) = (u32)(i + 1);
-    m11_icall(proc, 0, 0, 0, 0, 0, 0, 0, 0);
+    ICALL_AT(M11_SITE_NONE, proc, 0, 0, 0, 0, 0, 0, 0, 0);
     return (u32)g_icall_miss != m0 ? 2 : 1;
 }
 EMSCRIPTEN_KEEPALIVE unsigned m11_unit_va(int i) {
@@ -141,7 +177,7 @@ u64 function_4120c0(void) {
         if (!proc) continue;
         u32 miss0 = (u32)g_icall_miss;
         if (g_trace) fprintf(stderr, "[m11][unit %d/%d] init=0x%llx\n", i, count, proc);
-        m11_icall(proc, 0, 0, 0, 0, 0, 0, 0, 0);
+        ICALL_AT(0x412126, proc, 0, 0, 0, 0, 0, 0, 0, 0);
         if ((u32)g_icall_miss != miss0) g_units_skipped++;
         else g_units_run++;
     }
@@ -168,9 +204,9 @@ u64 m11_InitLib(u64 ctx, u64 a1, u64 a2, u64 tbl, u64 dllproc, u64 hinst, u64 re
     Q(r13 + 8) = 1;
     B(r13 + 0x30) = (u8)(reason + 1);
     Q(r13 + 0x28) = Q(tbl);
-    if (reason == 1 || reason == 2) m11_icall(Q(tbl + (u64)reason * 8), reason, 0, 0, 0, 0, 0, 0, 0);
-    if (dllproc) m11_icall(dllproc, reason, reserved, 0, 0, 0, 0, 0, 0);
-    if (reason == 3) m11_icall(Q(tbl + (u64)reason * 8), reason, 0, 0, 0, 0, 0, 0, 0);
+    if (reason == 1 || reason == 2) ICALL_AT(0x41223e, Q(tbl + (u64)reason * 8), reason, 0, 0, 0, 0, 0, 0, 0);
+    if (dllproc) ICALL_AT(0x412258, dllproc, reason, reserved, 0, 0, 0, 0, 0, 0);
+    if (reason == 3) ICALL_AT(0x41226d, Q(tbl + (u64)reason * 8), reason, 0, 0, 0, 0, 0, 0, 0);
     if (Q(R(0x11e6078)) == 0) {
         B(R(0x11e6084)) = 1;
         D(R(0xfa5054)) = (u32)function_40a3b0();
@@ -395,7 +431,7 @@ u64 function_41c160(u64 self) {
  * alloc < 0 (継承 ctor 経由) は従来どおり self をそのまま返す. */
 unsigned long long function_410320(unsigned long long self, unsigned int alloc) {
     if ((signed char)(alloc & 0xff) < 0) return self;
-    return m11_icall(Q(self - 0x30), self, 0, 0, 0, 0, 0, 0, 0);
+    return ICALL_AT(0x41032e, Q(self - 0x30), self, 0, 0, 0, 0, 0, 0, 0);
 }
 
 /* function_5c0270  VA 0x5c0270  (参照カウント付きキャッシュ node の Release: self = キャッシュ, node = function_5c00e0 の戻り)
@@ -423,7 +459,7 @@ u64 function_5c0270(u64 self, u64 node) {
     if (zero) {
         u64 key = Q(node + 0xc);
         if (key) function_424090((void*)(uintptr_t)key);
-        m11_icall(Q(Q(self)), self, node, 0, 0, 0, 0, 0, 0);
+        ICALL_AT(0x5c037e, Q(Q(self)), self, node, 0, 0, 0, 0, 0, 0);
         function_409440(node);
     }
     return 0;
@@ -441,7 +477,7 @@ u64 function_5c03d0(u64 self, u64 obj, u64 key) {
     u64 old = Q(obj + 0x18);
     u64 node = function_5c00e0(self, key);
     Q(obj + 0x18) = node;
-    if (node != old) m11_icall(Q(Q(obj) + 0x18), obj, 0, 0, 0, 0, 0, 0, 0);
+    if (node != old) ICALL_AT(0x5c0437, Q(Q(obj) + 0x18), obj, 0, 0, 0, 0, 0, 0, 0);
     function_5c0270(self, old);
     function_423980((void*)(uintptr_t)(self + 0x10));
     return 0;
@@ -451,7 +487,7 @@ u64 function_5c03d0(u64 self, u64 obj, u64 key) {
  * 逆アセンブル転記 (5c0810..5c082e): `cmp [rbx+8],0; je; mov rcx,[rbx+0x10]; mov rdx,rbx; call [rbx+8]`. boot closure 外 (IR に関数が無い). */
 u64 function_5c0810(u64 self) {
     u64 code = Q(self + 8);
-    if (code) m11_icall(code, Q(self + 0x10), self, 0, 0, 0, 0, 0, 0);
+    if (code) ICALL_AT(0x5c0826, code, Q(self + 0x10), self, 0, 0, 0, 0, 0, 0);
     return 0;
 }
 
@@ -461,7 +497,7 @@ u64 function_5c0810(u64 self) {
 u64 function_5c0e70(u64 self) {
     function_5c0810(self);
     u64 owner = Q(self + 0x30);
-    if (owner) m11_icall(Q(Q(owner) + 0x18), owner, 0, 0, 0, 0, 0, 0, 0);
+    if (owner) ICALL_AT(0x5c0e91, Q(Q(owner) + 0x18), owner, 0, 0, 0, 0, 0, 0, 0);
     return 0;
 }
 
