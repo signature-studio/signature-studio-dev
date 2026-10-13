@@ -100,7 +100,7 @@
 
 ## 10. AU-11 (#211) 96kHz/B=256 の burst 4096 abort の解消
 
-要約: burst 4096 (96k/B=256) で旧 `depth>16` abort を解消 (depth 上限撤廃 + 容量超過は `ASE_NoMemory` で返す)。24 シナリオ実測 PASS・未解決 3 件は全文 `REPORT_AU11.md` (分割移動先)。
+要約: burst 4096 (96k/B=256) で旧 `depth>16` abort を解消 (depth 上限撤廃 + 容量超過は `ASE_NoMemory` で返す)。25 シナリオ実測 PASS・未解決 3 件は全文 `REPORT_AU11.md` (分割移動先)。
 
 ## 11. AU-7 (#193) ASIO プロファイル確定・systemTime 規約・outputLatency 吸収
 
