@@ -203,6 +203,27 @@ sed -n 9872p $LIFT   # => br i1 %110, label %dec_label_pc_1800c2f08, label %dec_
   - (c) 元の検索式 `br i1 (icmp eq %109, 0)` は **0 件** で、表記が違った。実 IR は L9870 `%110 = icmp eq i64 %109, 0` と L9872 `br i1 %110, label %dec_label_pc_1800c2f08, label %dec_label_pc_1800c2d6f`。0 側 (true 側) は `dec_label_pc_1800c2f08` で期待値を満たす。上記の検索式は修正済み。
 - 原因の一本化 (記述上の整理。機構は上記 (a)〜(c) で再確認済み): §6 L1 の「insn.addr メタが 0 個」は (a) の結果で、「`0x1800c2ef4` へ向かう辺が lift 時に `0x1800c2f08` へ付け替わる」ことが脱落の機構。
 
+### 13.2 L1 復元 pass (`serum2_l1.py`, #1030 / PR #1227) の実測
+
+- 復元の対象と処置: null 枝 (`br i1 %110`) の skip 先を `dec_label_pc_1800c2f08` から `dec_label_pc_1800c2ef4` へ戻し、機械語 `0x1800c2ef4–f05` を IR に書き起こす。直接 vtable 呼出しは `@__vcall_notify(vt, 48, this, 0x800010)` の 1 件に畳む。
+- `%arg1` = `this` (rsi) の根拠: `authstub_irpass.py` の demo bit 検出 `add i64 %arg1, 141202` (= 0x22792) と、§1 N2a の機械語 `mov [rsi+0x22792],al` が同じ bit を指す。よって `%arg1` が rsi に対応する (`[rsi+0x10]` は `add i64 %arg1, 16`)。
+- ポインタ型: opaque pointer 形式 (`inttoptr i64 %x to ptr` / `load i64, ptr %p, align 8`) に統一 (`fp_bind.py` / `base.py` と同形)。
+- `llvm-as-18`: 挿入ブロックを含む単体モジュールで exit 0 (pass 出力の完全な `.ll` は本 run で raw lift が無く未実施)。
+- 実測 (HEAD `531acc80`, raw lift `authstub.drc.ll`) — **未再現の申告値**。本 run では raw lift と `plugins-serum2` が `$ARTIFACTS_DIR` (fl-win64 のみ) に無く、再実行していない。
+
+  | 指標 | 復元前 | 復元後 | ネガコン |
+  |---|---|---|---|
+  | 直接 call (`@__vcall_notify`) | 0 | 1 | 0 |
+  | edx=0x800010 即値 | 0 | 1 | 0 |
+  | 入口 edge (`label %dec_label_pc_1800c2ef4`) | 0 | 1 | 0 |
+  | insn.addr 被覆 (0x1800c2ef4–f05) | 0 | 9 | 0 |
+  | 機械語側 (`l1_census.py`) | sites=1 / edx=1 / into=1 | | |
+
+  - `dec_label_pc_1800c2ef4` の到達性: 復元前 False / 復元後 True / ネガコン False。
+  - raw lift の sha256: 未記録 (本 run で取得できず)。再現時に記録する。
+  - 再現コマンド (`authstub/` で実行): `python3 l1_restore.py work/lift/authstub.drc.ll work/lift/authstub.l1.ll` (適用・census)。ネガコン: `python3 l1_restore.py work/lift/authstub.drc.ll work/lift/authstub.negctl.ll --negctl`。raw lift の sha256 は再現時に本節へ記録する。
+- 未達: patched 経路では効かない (N2b-2 が `d59→f08` を強制し、`d5f` が到達不能のまま)。N2b (通知抑止) と L1 (通知復元) は仕様衝突で、採否は PM 判断。e2e.sh 未組込み・23/23 未再測定。
+
 ## 13b. L1 脱落条件の特定 (#823)
 
 全文は REPORT_APPENDIX.md §13b (機械語 ↔ raw IR の突合・census の数え方・実測の記録)。
