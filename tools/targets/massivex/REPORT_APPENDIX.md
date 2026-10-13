@@ -128,19 +128,21 @@
 - コード差分: 測定 commit `604e900f` から HEAD までの `tools/targets/massivex/` のうち `.md` 以外は 0 行 (`git diff 604e900f HEAD -- tools/targets/massivex ':!*.md'` が空)。
 - 生ログ: `$RUNNER_TEMP/e2e_O{0,1,2}.log` (`work/` 外・commit しない)。
 
-### 12.7 N6 読み手の直接呼び出し元 (#1017 run・実 PE 未測定)
+### 12.7 N6 読み手の直接呼び出し元 (#1017・実 PE 実測 2026-10-13)
 
-- 作業ディレクトリ (全手順で共通): `tools/targets/massivex` 直下で実行する。展開先は `work/` (gitignore)。
-  `plugins-massivex` を `$RUNNER_TEMP/mx` に展開 → `python3 scripts/parse_setup_headers.py <exe> work` → `python3 scripts/extract_massivex.py <exe> work key` で `work/extracted/VST3/Massive X.vst3` を作る。
-  走査スクリプト (`license/scripts/mx_callers_probe.py` / `mx_callers_linear.py` / `mx_xref_fn.py`) と `license/e2e.sh` (`../work/extracted/...`) はいずれもこの `work/` を読む。
-- 陽性対照 (素材不要・同一 run): `python3 license/scripts/mx_callers_probe.py --selftest` と `python3 license/scripts/mx_callers_linear.py --selftest`。既知 E8 call 1 件 (0x180f95e20) と 2 件 (0x181142370) を含む合成 .text を走査し、他の 3 関数は 0 件。
-  測定 commit `cd1e94ef` (license 配下のコードを変えた最後の commit)。
-  鮮度の証跡: `git diff cd1e94ef bb7c45ca -- tools/targets/massivex/license` は 0 行、`git diff cd1e94ef bb7c45ca -- tools/targets/massivex ':!*.md'` も 0 行 (本 run で確認)。
-  selftest は HEAD `bb7c45ca` でも再実行し、両方 PASS (rc 0)。
-  - probe: 期待 1/2/0/0/0 件 → 検出 1/2/0/0/0 件 PASS (rc 0)
-  - linear: 期待 1/2/0/0/0 件 → 検出 1/2/0/0/0 件 PASS (rc 0)
-- 検算器 (別アルゴリズム): `mx_callers_linear.py` は capstone で .text を先頭から線形逆アセンブルし、命令の call/jmp オペランドを数える。`mx_callers_probe.py` はバイト走査 (E8/E9 + rel32)。実 PE 上で両者の件数が一致することを確認する予定だが、本 run では未実施。
-- 実 PE の走査結果: **未測定**。本 run の `$HOME/artifacts` には `fl-win64` のみあり、`plugins-massivex` が無く `work/extracted/` を生成できなかった。`fl-win64.tar.zst` に Massive X / `.vst3` の entry が無いことも確認した。素材付きで再実行するまで、読み手の直接呼び出し元 0 件は実 PE では確認されていない。
-- 実 PE 上の e2e (`license/e2e.sh`) は本 run では未実行。PR 本文の旧数値 (73.8 s / 12.0 s / 5.2 s・11/11 PASS) は本 run の実測ではないため、REPORT には載せない。e2e の実測は §12.6 (#1447) が正本。
-- 判定 (実 PE 未測定のため暫定): 直接 call/jmp・RIP 参照・絶対 8B で読み手の呼び出し元は見つからない、という 12.2a までの結果を前提にする。間接呼び出し (vtable / 関数ポインタ表) か、文字列 index 経由のテーブル参照の可能性が残る。N5 の読み手は未特定。
-- 次の一手 (子 issue で扱う): 素材付きで本節の手順を再実行し、数値を埋める。vtable / 関数ポインタ表の走査 (`.rdata` 内の 8B 値 = 読み手 VA) と、N5 の QML プロパティ名テーブルの走査。
+- 測定 commit = `2134ff10` (main `31553dd9` を取り込んだ PR HEAD)。実 PE・selftest とも同一 commit で実行。
+- 素材: `plugins-massivex` (`$ARTIFACTS_DIR`) を `$RUNNER_TEMP/mx` に展開 → `scripts/parse_setup_headers.py` → `scripts/extract_massivex.py <exe> work key` (`tools/targets/massivex` 直下、展開先 `work/`)。`work/extracted/VST3/Massive X.vst3` = 95,356,824 B、md5 `622993e76565f49c094063a2b717d6ca` (§11.1 と一致)。
+- 走査スクリプトの読む先: `work/extracted/VST3/Massive X.vst3` (`tools/targets/massivex` 起点)。
+
+| 手順 | コマンド (`tools/targets/massivex` 直下) | 所要 (wall) | 結果 |
+|---|---|--:|---|
+| 陽性対照 (probe) | `python3 license/scripts/mx_callers_probe.py --selftest` | 1.1 s (probe 実走査と合計) | 期待 1/2/0/0/0 → 検出 1/2/0/0/0 PASS (rc 0) |
+| 直接走査 (probe) | `python3 license/scripts/mx_callers_probe.py` | 同上 | 5 読み手への E8/E9 = **0 件** (rc 0) |
+| 陽性対照 (linear) | `python3 license/scripts/mx_callers_linear.py --selftest` | 0.1 s | 期待 1/2/1/0/0 → 検出 1/2/1/0/0 PASS・不正バイト 3 B を挟んでも後続 call を検出 (rc 0) |
+| 線形検算 (linear) | `python3 license/scripts/mx_callers_linear.py` | 36.7 s | `.text` 60,224,000 B 中 **デコード 60,189,833 B (99.94%)**・未デコード 34,167 B。5 読み手への call/jmp = **0 件** (rc 0) |
+
+- 負荷: 測定時 `uptime` load average 0.41 (開始) → 0.47 (linear 完走時)。4 vCPU。並列 1 プロセス。
+- 件数の一致: 読み手 5 関数は probe / linear とも 0 件で一致。0 件の根拠となる陽性対照は selftest (合成 .text) で示した。実 PE での陽性対照として、読み手以外の頻出関数 `0x181a52850` (probe 19,182 件 / linear 19,172 件) で比較した。差 10 件は probe のみが検出した箇所で、逆アセンブルすると命令の途中の `e8` バイト (例: `0x18000e9b3` は `01 00 00 | e8` の 4 バイト目) であり、probe の誤検出。linear のみが検出した件数は 0。
+- 判定 (実 PE・現 HEAD): **直接 call/jmp (E8/E9) で N6 読み手 5 関数を呼ぶ箇所は .text 内に 0 件** (バイト走査・線形逆アセンブルの 2 方式で一致)。間接呼び出し (vtable / 関数ポインタ表) と、テーブル基準の参照は本節では判定していない。N5 の読み手は未特定。
+- 残件: 間接呼び出し元の特定 (vtable / 関数ポインタ表の `.rdata` 走査) → #1439 [MX-9]。N5 の読み手の特定 → #1439 [MX-9]。
+- e2e (`license/e2e.sh`) は本節では未実行。e2e の実測は §12.6 (#1447) が正本。
