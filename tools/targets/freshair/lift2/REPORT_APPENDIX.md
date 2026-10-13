@@ -162,7 +162,7 @@ bash tools/targets/freshair/lift2/lift2_e2e.sh                                  
 
 - 検証基点: `origin/main` = `99b87bc2`。素材は `plugins-freshair` のみ (`FA_DL` → `fetch.sh`、factory .epf 8 本を補完)。
 - 既定 `run_ctrl.sh 2 5` は seed `0xFA2C0001` 固定 (`run_ctrl.sh` 既定値)。#907 受入 1 の「seed を固定値で明記」の方式を採る (コード変更なし)。
-  epf 欠落時は `run_ctrl.sh` が exit 2 で止まる (§2.4 の既存ゲート)。epf 欠落時に PASS することは確認していない。
+  epf 欠落時は `run_ctrl.sh` が exit 2 で止まる (本 run で退避実測: `ERROR: factory .epf 8 本が無い ... 生成シナリオ 7 本`, rc=2)。epf 有時は 15/15 PASS (§9)。
 - 別 seed の実測 (structured 2 + random 5、native のみ、`native_ctrl` 単体):
   - `0x1` / `0x2` / `0x3` はいずれも `native_ctrl` が `Aborted` (rc=134) で途中停止 (出力 8 / 10 / 9 行、15 行に満たない)。
   - 既知限界 (`run_ctrl.sh` 冒頭: 乱数が意味 field に OOB 書込を起こす) の再発で、seed 非依存ではない。
@@ -176,6 +176,7 @@ bash tools/targets/freshair/lift2/lift2_e2e.sh                                  
 
 ## 9. FA-14 (#907) 実測: lift2_e2e.sh (`origin/main` = `99b87bc2`)
 
-- `RESULT: lift2_e2e ALL PASS`, rc=0, real 1m18.548s, user 1m11.032s, load 0.12 (起動時 `uptime`), TMPDIR=`$RUNNER_TEMP`。
+- 検証 HEAD `c531a0cb` (本節 commit 直前の `origin/main` 差分は REPORT のみ)。`RESULT: lift2_e2e ALL PASS`, rc=0, real 1m14.253s, user 1m10.095s, load 0.22 (`uptime`), TMPDIR=`$RUNNER_TEMP`。
+- 基点 `99b87bc2` でも実測: rc=0, real 1m18.548s, load 0.12, ALL PASS。
 - ただし step 6 (ctrl build) は `failed(funcs with unsupported) 1` (`f_1810577ac: vpcmpeqw ymm1, ymm1, ymmword ptr [r9]`)。build は継続し、ctrl 出力は 15/15 BIT-EXACT (epf 8 + structured 2 + random 5, fma0/1)。
 - ctrl ERR: native/wasm 1/1 (同一 scenario)。comp/filter/fuzz/ABI/ablation 5 種はいずれも実測どおり PASS。
