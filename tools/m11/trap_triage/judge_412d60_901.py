@@ -45,6 +45,35 @@ def judge(va):
                 release.add(mm.group(1))
     return store, addref, release
 
+def direct_release(va):
+    # mov rcx,[rbp+off]; call 412d60 : 値 (引数そのもの) を渡す形。&slot ではない
+    rva, size = m.fns[va]
+    insns = list(cs.disasm(m.read(rva, size), va))
+    out = set()
+    for idx, i in enumerate(insns):
+        if i.mnemonic == 'call' and i.op_str == '0x412d60' and idx > 0:
+            prev = insns[idx - 1]
+            mm = re.match(r'mov rcx, qword ptr \[rbp \+ (0x[0-9a-f]+)\]', f'{prev.mnemonic} {prev.op_str}')
+            if mm:
+                out.add(mm.group(1))
+    return out
+
+def order_check(va, store):
+    # 退避 (store) より前に引数レジスタ経由のメモリ参照 (旧値ロード) が無いこと、
+    # 退避 slot が退避後に再代入されないこと。
+    rva, size = m.fns[va]
+    insns = list(cs.disasm(m.read(rva, size), va))
+    notes = []
+    for reg, off in ((r, o) for o, r in store.items()):
+        si = next(k for k, i in enumerate(insns) if i.mnemonic == 'mov' and i.op_str == 'qword ptr [rbp + %s], %s' % (off, reg))
+        for i in insns[:si]:
+            if re.search(r'\[%s\b' % reg, i.op_str):
+                notes.append('PRE-LOAD-OF-ARG %s@%s' % (reg, hex(i.address)))
+        for i in insns[si + 1:]:
+            if i.mnemonic == 'mov' and i.op_str.startswith('qword ptr [rbp + %s], ' % off):
+                notes.append('REWRITE slot %s@%s' % (off, hex(i.address)))
+    return notes
+
 def verdict(store, addref, release):
     hits = sorted(set(store) & release)
     if not hits:
@@ -58,3 +87,11 @@ for a in sys.argv[1:]:
     va = int(a, 16)
     store, addref, release = judge(va)
     print('function_%x: %s' % (va, verdict(store, addref, release)))
+    dr = sorted(direct_release(va) & set(store))
+    if dr:
+        print('  direct-release (値そのものを 412d60 に渡す, &slot ではない): slot ' + ','.join(dr))
+    if not store:
+        print('  order-check: skipped (退避 slot なし)')
+    else:
+        notes = order_check(va, store)
+        print('  order-check: ' + ('OK (PRE-LOAD 0 件・退避後の再代入 0 件)' if not notes else '; '.join(notes)))
