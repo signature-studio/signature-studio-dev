@@ -1,0 +1,5302 @@
+{
+"AcquireSRWLockExclusive": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"AcquireSRWLockShared": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"AddAtomW": {
+"params": [
+"ptr"
+],
+"ret": "i16"
+},
+"AddVectoredExceptionHandler": {
+"params": [
+"i32",
+"ptr"
+],
+"ret": "ptr"
+},
+"AreFileApisANSI": {
+"params": [],
+"ret": "i32"
+},
+"AssignProcessToJobObject": {
+"params": [
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"CLSIDFromString": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"CertCloseStore": {
+"params": [
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"CertFindCertificateInStore": {
+"params": [
+"ptr",
+"i32",
+"i32",
+"i32",
+"ptr",
+"ptr"
+],
+"ret": "ptr"
+},
+"CertFreeCertificateContext": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"CertGetNameStringA": {
+"params": [
+"ptr",
+"i32",
+"i32",
+"ptr",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"CertGetNameStringW": {
+"params": [
+"ptr",
+"i32",
+"i32",
+"ptr",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"ChangeTimerQueueTimer": {
+"params": [
+"i32",
+"i32",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"CharLowerBuffW": {
+"params": [
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"CharLowerW": {
+"params": [
+"ptr"
+],
+"ret": "ptr"
+},
+"CharNextExA": {
+"params": [
+"i16",
+"ptr",
+"i32"
+],
+"ret": "ptr"
+},
+"CharNextW": {
+"params": [
+"ptr"
+],
+"ret": "ptr"
+},
+"CharToOemBuffW": {
+"params": [
+"ptr",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"CharUpperBuffW": {
+"params": [
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"CharUpperW": {
+"params": [
+"ptr"
+],
+"ret": "ptr"
+},
+"CloseHandle": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"ClosePrinter": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"CloseThreadpoolWork": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"CoCreateGuid": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"CoCreateInstance": {
+"params": [
+"i64",
+"ptr",
+"i32",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"CoGetClassObject": {
+"params": [
+"ptr",
+"i32",
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"CoGetInterfaceAndReleaseStream": {
+"params": [
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"CoInitialize": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"CoInitializeEx": {
+"params": [
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"CoMarshalInterThreadInterfaceInStream": {
+"params": [
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"CoTaskMemAlloc": {
+"params": [
+"i32"
+],
+"ret": "ptr"
+},
+"CoTaskMemFree": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"CoTaskMemRealloc": {
+"params": [
+"ptr",
+"i32"
+],
+"ret": "ptr"
+},
+"CoUninitialize": {
+"params": [],
+"ret": "void"
+},
+"CommDlgExtendedError": {
+"params": [],
+"ret": "i32"
+},
+"CompareFileTime": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"CompareStringA": {
+"params": [
+"i32",
+"i32",
+"ptr",
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"CompareStringEx": {
+"params": [
+"ptr",
+"i32",
+"ptr",
+"i32",
+"ptr",
+"i32",
+"ptr",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"CompareStringW": {
+"params": [
+"i32",
+"i32",
+"ptr",
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"CopyFileW": {
+"params": [
+"ptr",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"CreateDataAdviseHolder": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"CreateDirectoryW": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"CreateEventA": {
+"params": [
+"ptr",
+"i32",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"CreateEventExW": {
+"params": [
+"ptr",
+"ptr",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"CreateEventW": {
+"params": [
+"ptr",
+"i32",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"CreateFileA": {
+"params": [
+"ptr",
+"i32",
+"i32",
+"ptr",
+"i32",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"CreateFileMappingA": {
+"params": [
+"i32",
+"ptr",
+"i32",
+"i32",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"CreateFileMappingW": {
+"params": [
+"i32",
+"ptr",
+"i32",
+"i32",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"CreateFileW": {
+"params": [
+"ptr",
+"i32",
+"i32",
+"ptr",
+"i32",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"CreateILockBytesOnHGlobal": {
+"params": [
+"i32",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"CreateIoCompletionPort": {
+"params": [
+"i32",
+"i32",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"CreateMutexA": {
+"params": [
+"ptr",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"CreateMutexW": {
+"params": [
+"ptr",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"CreateProcessW": {
+"params": [
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"i32",
+"i32",
+"ptr",
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"CreateSemaphoreA": {
+"params": [
+"ptr",
+"i32",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"CreateSemaphoreW": {
+"params": [
+"ptr",
+"i32",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"CreateStreamOnHGlobal": {
+"params": [
+"i32",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"CreateSymbolicLinkW": {
+"params": [
+"ptr",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"CreateThread": {
+"params": [
+"ptr",
+"i32",
+"ptr",
+"ptr",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"CreateThreadpoolWork": {
+"params": [
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "ptr"
+},
+"CreateTimerQueue": {
+"params": [],
+"ret": "i32"
+},
+"CreateTimerQueueTimer": {
+"params": [
+"ptr",
+"i32",
+"ptr",
+"ptr",
+"i32",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"CryptAcquireContextA": {
+"params": [
+"ptr",
+"ptr",
+"ptr",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"CryptCreateHash": {
+"params": [
+"i32",
+"i32",
+"i32",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"CryptDecodeObject": {
+"params": [
+"i32",
+"ptr",
+"ptr",
+"i32",
+"i32",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"CryptDestroyHash": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"CryptGetHashParam": {
+"params": [
+"i32",
+"i32",
+"ptr",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"CryptHashData": {
+"params": [
+"i32",
+"ptr",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"CryptMsgClose": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"CryptMsgGetParam": {
+"params": [
+"ptr",
+"i32",
+"i32",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"CryptQueryObject": {
+"params": [
+"i32",
+"ptr",
+"i32",
+"i32",
+"i32",
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"DecodePointer": {
+"params": [
+"ptr"
+],
+"ret": "ptr"
+},
+"DeleteAtom": {
+"params": [
+"i16"
+],
+"ret": "i16"
+},
+"DeleteCriticalSection": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"DeleteFileA": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"DeleteFileW": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"DeleteTimerQueueEx": {
+"params": [
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"DeleteTimerQueueTimer": {
+"params": [
+"i32",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"DeviceIoControl": {
+"params": [
+"i32",
+"i32",
+"ptr",
+"i32",
+"ptr",
+"i32",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"DoDragDrop": {
+"params": [
+"ptr",
+"ptr",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"DocumentPropertiesW": {
+"params": [
+"i32",
+"i32",
+"ptr",
+"ptr",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"DosDateTimeToFileTime": {
+"params": [
+"i16",
+"i16",
+"ptr"
+],
+"ret": "i32"
+},
+"DragAcceptFiles": {
+"params": [
+"i32",
+"i32"
+],
+"ret": "void"
+},
+"DragFinish": {
+"params": [
+"i32"
+],
+"ret": "void"
+},
+"DragQueryFileW": {
+"params": [
+"i32",
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"DragQueryPoint": {
+"params": [
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"DuplicateHandle": {
+"params": [
+"i32",
+"i32",
+"i32",
+"ptr",
+"i32",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"EncodePointer": {
+"params": [
+"ptr"
+],
+"ret": "ptr"
+},
+"EnterCriticalSection": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"EnumCalendarInfoW": {
+"params": [
+"ptr",
+"i32",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"EnumPrintersW": {
+"params": [
+"i32",
+"ptr",
+"i32",
+"ptr",
+"i32",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"EnumSystemLocalesW": {
+"params": [
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"ExitProcess": {
+"params": [
+"i32"
+],
+"ret": "void"
+},
+"ExitThread": {
+"params": [
+"i32"
+],
+"ret": "void"
+},
+"ExpandEnvironmentStringsW": {
+"params": [
+"ptr",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"ExtractAssociatedIconW": {
+"params": [
+"i32",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"FileTimeToDosDateTime": {
+"params": [
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"FileTimeToLocalFileTime": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"FileTimeToSystemTime": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"FindAtomW": {
+"params": [
+"ptr"
+],
+"ret": "i16"
+},
+"FindClose": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"FindFirstFileExW": {
+"params": [
+"ptr",
+"i32",
+"ptr",
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"FindFirstFileW": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"FindNextFileW": {
+"params": [
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"FindResourceA": {
+"params": [
+"i32",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"FindResourceW": {
+"params": [
+"i32",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"FlsAlloc": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"FlsFree": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"FlsGetValue": {
+"params": [
+"i32"
+],
+"ret": "ptr"
+},
+"FlsSetValue": {
+"params": [
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"FlushFileBuffers": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"FlushViewOfFile": {
+"params": [
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"FormatMessageA": {
+"params": [
+"i32",
+"ptr",
+"i32",
+"i32",
+"ptr",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"FormatMessageW": {
+"params": [
+"i32",
+"ptr",
+"i32",
+"i32",
+"ptr",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"FreeEnvironmentStringsW": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"FreeLibrary": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"FreeLibraryAndExitThread": {
+"params": [
+"i32",
+"i32"
+],
+"ret": "void"
+},
+"FreeLibraryWhenCallbackReturns": {
+"params": [
+"ptr",
+"i32"
+],
+"ret": "void"
+},
+"FreeResource": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"GetACP": {
+"params": [],
+"ret": "i32"
+},
+"GetActiveObject": {
+"params": [
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"GetCPInfo": {
+"params": [
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"GetCPInfoExW": {
+"params": [
+"i32",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"GetCommandLineA": {
+"params": [],
+"ret": "ptr"
+},
+"GetCommandLineW": {
+"params": [],
+"ret": "ptr"
+},
+"GetComputerNameExW": {
+"params": [
+"i64",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"GetComputerNameW": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"GetConsoleCP": {
+"params": [],
+"ret": "i32"
+},
+"GetConsoleMode": {
+"params": [
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"GetConsoleOutputCP": {
+"params": [],
+"ret": "i32"
+},
+"GetCurrentDirectoryW": {
+"params": [
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"GetCurrentProcess": {
+"params": [],
+"ret": "i32"
+},
+"GetCurrentProcessId": {
+"params": [],
+"ret": "i32"
+},
+"GetCurrentThread": {
+"params": [],
+"ret": "i32"
+},
+"GetCurrentThreadId": {
+"params": [],
+"ret": "i32"
+},
+"GetDateFormatW": {
+"params": [
+"i32",
+"i32",
+"ptr",
+"ptr",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"GetDefaultPrinterW": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"GetDiskFreeSpaceA": {
+"params": [
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"GetDiskFreeSpaceW": {
+"params": [
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"GetDriveTypeW": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"GetEnvironmentStringsW": {
+"params": [],
+"ret": "ptr"
+},
+"GetEnvironmentVariableW": {
+"params": [
+"ptr",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"GetErrorInfo": {
+"params": [
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"GetExitCodeProcess": {
+"params": [
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"GetExitCodeThread": {
+"params": [
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"GetFileAttributesA": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"GetFileAttributesExW": {
+"params": [
+"ptr",
+"i64",
+"ptr"
+],
+"ret": "i32"
+},
+"GetFileAttributesW": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"GetFileInformationByHandle": {
+"params": [
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"GetFileSize": {
+"params": [
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"GetFileSizeEx": {
+"params": [
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"GetFileTime": {
+"params": [
+"i32",
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"GetFileType": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"GetFileVersionInfoSizeW": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"GetFileVersionInfoW": {
+"params": [
+"ptr",
+"i32",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"GetFinalPathNameByHandleW": {
+"params": [
+"i32",
+"ptr",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"GetFullPathNameA": {
+"params": [
+"ptr",
+"i32",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"GetFullPathNameW": {
+"params": [
+"ptr",
+"i32",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"GetHGlobalFromStream": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"GetHandleInformation": {
+"params": [
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"GetLastError": {
+"params": [],
+"ret": "i32"
+},
+"GetLocalTime": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"GetLocaleInfoEx": {
+"params": [
+"ptr",
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"GetLocaleInfoW": {
+"params": [
+"i32",
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"GetLogicalDriveStringsW": {
+"params": [
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"GetLogicalDrives": {
+"params": [],
+"ret": "i32"
+},
+"GetLogicalProcessorInformation": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"GetModuleFileNameA": {
+"params": [
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"GetModuleFileNameW": {
+"params": [
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"GetModuleHandleA": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"GetModuleHandleExW": {
+"params": [
+"i32",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"GetModuleHandleW": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"GetNativeSystemInfo": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"GetOEMCP": {
+"params": [],
+"ret": "i32"
+},
+"GetOpenFileNameW": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"GetPriorityClass": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"GetPrivateProfileIntW": {
+"params": [
+"ptr",
+"ptr",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"GetPrivateProfileStringW": {
+"params": [
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"GetProcAddress": {
+"params": [
+"i32",
+"ptr"
+],
+"ret": "ptr"
+},
+"GetProcessAffinityMask": {
+"params": [
+"i32",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"GetProcessHeap": {
+"params": [],
+"ret": "i32"
+},
+"GetProcessId": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"GetQueuedCompletionStatus": {
+"params": [
+"i32",
+"ptr",
+"ptr",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"GetSaveFileNameW": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"GetStartupInfoW": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"GetStdHandle": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"GetStringTypeW": {
+"params": [
+"i32",
+"ptr",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"GetSystemDefaultLocaleName": {
+"params": [
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"GetSystemDefaultUILanguage": {
+"params": [],
+"ret": "i16"
+},
+"GetSystemDirectoryW": {
+"params": [
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"GetSystemInfo": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"GetSystemTime": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"GetSystemTimeAsFileTime": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"GetTempFileNameW": {
+"params": [
+"ptr",
+"ptr",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"GetTempPathA": {
+"params": [
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"GetTempPathW": {
+"params": [
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"GetThreadId": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"GetThreadLocale": {
+"params": [],
+"ret": "i32"
+},
+"GetThreadPreferredUILanguages": {
+"params": [
+"i32",
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"GetThreadPriority": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"GetThreadUILanguage": {
+"params": [],
+"ret": "i16"
+},
+"GetTickCount": {
+"params": [],
+"ret": "i32"
+},
+"GetTickCount64": {
+"params": [],
+"ret": "i64"
+},
+"GetTimeFormatW": {
+"params": [
+"i32",
+"i32",
+"ptr",
+"ptr",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"GetTimeZoneInformation": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"GetTimeZoneInformationForYear": {
+"params": [
+"i16",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"GetTokenInformation": {
+"params": [
+"i32",
+"i32",
+"ptr",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"GetUserDefaultLCID": {
+"params": [],
+"ret": "i32"
+},
+"GetUserDefaultUILanguage": {
+"params": [],
+"ret": "i16"
+},
+"GetUserPreferredUILanguages": {
+"params": [
+"i32",
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"GetVersion": {
+"params": [],
+"ret": "i32"
+},
+"GetVersionExW": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"GetVolumeInformationW": {
+"params": [
+"ptr",
+"ptr",
+"i32",
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"GetWindowsDirectoryW": {
+"params": [
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"GlobalAddAtomW": {
+"params": [
+"ptr"
+],
+"ret": "i16"
+},
+"GlobalAlloc": {
+"params": [
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"GlobalDeleteAtom": {
+"params": [
+"i16"
+],
+"ret": "i16"
+},
+"GlobalFindAtomW": {
+"params": [
+"ptr"
+],
+"ret": "i16"
+},
+"GlobalFlags": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"GlobalFree": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"GlobalHandle": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"GlobalLock": {
+"params": [
+"i32"
+],
+"ret": "ptr"
+},
+"GlobalMemoryStatus": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"GlobalMemoryStatusEx": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"GlobalReAlloc": {
+"params": [
+"i32",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"GlobalSize": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"GlobalUnlock": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"HeapAlloc": {
+"params": [
+"i32",
+"i32",
+"i32"
+],
+"ret": "ptr"
+},
+"HeapCompact": {
+"params": [
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"HeapCreate": {
+"params": [
+"i32",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"HeapDestroy": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"HeapFree": {
+"params": [
+"i32",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"HeapLock": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"HeapReAlloc": {
+"params": [
+"i32",
+"i32",
+"ptr",
+"i32"
+],
+"ret": "ptr"
+},
+"HeapSetInformation": {
+"params": [
+"i32",
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"HeapSize": {
+"params": [
+"i32",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"HeapUnlock": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"HeapValidate": {
+"params": [
+"i32",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"HttpAddRequestHeadersW": {
+"params": [
+"ptr",
+"ptr",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"HttpEndRequestW": {
+"params": [
+"ptr",
+"ptr",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"HttpOpenRequestW": {
+"params": [
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"i32",
+"i32"
+],
+"ret": "ptr"
+},
+"HttpQueryInfoA": {
+"params": [
+"ptr",
+"i32",
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"HttpQueryInfoW": {
+"params": [
+"ptr",
+"i32",
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"HttpSendRequestA": {
+"params": [
+"ptr",
+"ptr",
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"HttpSendRequestExW": {
+"params": [
+"ptr",
+"ptr",
+"ptr",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"HttpSendRequestW": {
+"params": [
+"ptr",
+"ptr",
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"ILClone": {
+"params": [
+"ptr"
+],
+"ret": "ptr"
+},
+"ILCloneFirst": {
+"params": [
+"ptr"
+],
+"ret": "ptr"
+},
+"ILCombine": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "ptr"
+},
+"ILCreateFromPathW": {
+"params": [
+"ptr"
+],
+"ret": "ptr"
+},
+"ILFindLastID": {
+"params": [
+"ptr"
+],
+"ret": "ptr"
+},
+"ILFree": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"ILGetNext": {
+"params": [
+"ptr"
+],
+"ret": "ptr"
+},
+"ILGetSize": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"ILIsEqual": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"ILRemoveLastID": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"ImageDirectoryEntryToData": {
+"params": [
+"ptr",
+"i8",
+"i16",
+"ptr"
+],
+"ret": "ptr"
+},
+"ImageNtHeader": {
+"params": [
+"ptr"
+],
+"ret": "ptr"
+},
+"ImageRvaToVa": {
+"params": [
+"ptr",
+"ptr",
+"i32",
+"ptr"
+],
+"ret": "ptr"
+},
+"InitOnceBeginInitialize": {
+"params": [
+"ptr",
+"i32",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"InitOnceComplete": {
+"params": [
+"ptr",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"InitOnceExecuteOnce": {
+"params": [
+"ptr",
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"InitializeConditionVariable": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"InitializeCriticalSection": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"InitializeCriticalSectionAndSpinCount": {
+"params": [
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"InitializeCriticalSectionEx": {
+"params": [
+"ptr",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"InitializeSListHead": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"InitializeSRWLock": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"InterlockedAnd": {
+"params": [
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"InterlockedCompareExchange": {
+"params": [
+"ptr",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"InterlockedCompareExchange64": {
+"params": [
+"ptr",
+"i64",
+"i64"
+],
+"ret": "i64"
+},
+"InterlockedCompareExchangePointer": {
+"params": [
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "ptr"
+},
+"InterlockedDecrement": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"InterlockedDecrement64": {
+"params": [
+"ptr"
+],
+"ret": "i64"
+},
+"InterlockedExchange": {
+"params": [
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"InterlockedExchange64": {
+"params": [
+"ptr",
+"i64"
+],
+"ret": "i64"
+},
+"InterlockedExchangeAdd": {
+"params": [
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"InterlockedExchangeAdd64": {
+"params": [
+"ptr",
+"i64"
+],
+"ret": "i64"
+},
+"InterlockedExchangePointer": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "ptr"
+},
+"InterlockedFlushSList": {
+"params": [
+"ptr"
+],
+"ret": "ptr"
+},
+"InterlockedIncrement": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"InterlockedIncrement64": {
+"params": [
+"ptr"
+],
+"ret": "i64"
+},
+"InterlockedOr": {
+"params": [
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"InterlockedPopEntrySList": {
+"params": [
+"ptr"
+],
+"ret": "ptr"
+},
+"InterlockedPushEntrySList": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "ptr"
+},
+"InterlockedXor": {
+"params": [
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"InternetCheckConnectionA": {
+"params": [
+"ptr",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"InternetCheckConnectionW": {
+"params": [
+"ptr",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"InternetCloseHandle": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"InternetConnectW": {
+"params": [
+"ptr",
+"ptr",
+"i16",
+"ptr",
+"ptr",
+"i32",
+"i32",
+"i32"
+],
+"ret": "ptr"
+},
+"InternetGetConnectedState": {
+"params": [
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"InternetGetLastResponseInfoW": {
+"params": [
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"InternetOpenA": {
+"params": [
+"ptr",
+"i32",
+"ptr",
+"ptr",
+"i32"
+],
+"ret": "ptr"
+},
+"InternetOpenUrlA": {
+"params": [
+"ptr",
+"ptr",
+"ptr",
+"i32",
+"i32",
+"i32"
+],
+"ret": "ptr"
+},
+"InternetOpenUrlW": {
+"params": [
+"ptr",
+"ptr",
+"ptr",
+"i32",
+"i32",
+"i32"
+],
+"ret": "ptr"
+},
+"InternetOpenW": {
+"params": [
+"ptr",
+"i32",
+"ptr",
+"ptr",
+"i32"
+],
+"ret": "ptr"
+},
+"InternetReadFile": {
+"params": [
+"ptr",
+"ptr",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"InternetSetOptionW": {
+"params": [
+"ptr",
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"InternetSetStatusCallbackW": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "ptr"
+},
+"InternetWriteFile": {
+"params": [
+"ptr",
+"ptr",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"IsAccelerator": {
+"params": [
+"i32",
+"i32",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"IsBadReadPtr": {
+"params": [
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"IsBadWritePtr": {
+"params": [
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"IsDBCSLeadByteEx": {
+"params": [
+"i32",
+"i8"
+],
+"ret": "i32"
+},
+"IsDebuggerPresent": {
+"params": [],
+"ret": "i32"
+},
+"IsEqualGUID": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"IsProcessorFeaturePresent": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"IsValidCodePage": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"IsValidLocale": {
+"params": [
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"IsWow64Process": {
+"params": [
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"LCMapStringEx": {
+"params": [
+"ptr",
+"i32",
+"ptr",
+"i32",
+"ptr",
+"i32",
+"ptr",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"LCMapStringW": {
+"params": [
+"i32",
+"i32",
+"ptr",
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"LeaveCriticalSection": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"LoadLibraryA": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"LoadLibraryExW": {
+"params": [
+"ptr",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"LoadLibraryW": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"LoadResource": {
+"params": [
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"LocalAlloc": {
+"params": [
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"LocalFileTimeToFileTime": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"LocalFree": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"LocalLock": {
+"params": [
+"i32"
+],
+"ret": "ptr"
+},
+"LocalReAlloc": {
+"params": [
+"i32",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"LocalSize": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"LocalUnlock": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"LocaleNameToLCID": {
+"params": [
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"LockFile": {
+"params": [
+"i32",
+"i32",
+"i32",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"LockFileEx": {
+"params": [
+"i32",
+"i32",
+"i32",
+"i32",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"LockResource": {
+"params": [
+"i32"
+],
+"ret": "ptr"
+},
+"LresultFromObject": {
+"params": [
+"ptr",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"MapViewOfFile": {
+"params": [
+"i32",
+"i32",
+"i32",
+"i32",
+"i32"
+],
+"ret": "ptr"
+},
+"MemoryBarrier": {
+"params": [],
+"ret": "void"
+},
+"MoveFileExW": {
+"params": [
+"ptr",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"MoveFileW": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"MsgWaitForMultipleObjects": {
+"params": [
+"i32",
+"ptr",
+"i32",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"MsgWaitForMultipleObjectsEx": {
+"params": [
+"i32",
+"ptr",
+"i32",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"MulDiv": {
+"params": [
+"i32",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"MultiByteToWideChar": {
+"params": [
+"i32",
+"i32",
+"ptr",
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"NormalizeString": {
+"params": [
+"i32",
+"ptr",
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"OleDraw": {
+"params": [
+"ptr",
+"i32",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"OleFlushClipboard": {
+"params": [],
+"ret": "i32"
+},
+"OleGetClipboard": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"OleInitialize": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"OleIsCurrentClipboard": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"OleSetClipboard": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"OleSetMenuDescriptor": {
+"params": [
+"i32",
+"i32",
+"i32",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"OleUninitialize": {
+"params": [],
+"ret": "void"
+},
+"OpenEventA": {
+"params": [
+"i32",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"OpenEventW": {
+"params": [
+"i32",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"OpenFileMappingW": {
+"params": [
+"i32",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"OpenMutexW": {
+"params": [
+"i32",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"OpenPrinterW": {
+"params": [
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"OpenProcess": {
+"params": [
+"i32",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"OpenProcessToken": {
+"params": [
+"i32",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"OpenSemaphoreW": {
+"params": [
+"i32",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"OutputDebugStringA": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"OutputDebugStringW": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"PathCleanupSpec": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"PathUnExpandEnvStringsW": {
+"params": [
+"ptr",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"PeekNamedPipe": {
+"params": [
+"i32",
+"ptr",
+"i32",
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"ProgIDFromCLSID": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"PropVariantClear": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"PropVariantToBooleanWithDefault": {
+"params": [
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"PropVariantToFileTime": {
+"params": [
+"ptr",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"PropVariantToStringWithDefault": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "ptr"
+},
+"PropVariantToVariant": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"PulseEvent": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"QueryDepthSList": {
+"params": [
+"ptr"
+],
+"ret": "i16"
+},
+"QueryDosDeviceW": {
+"params": [
+"ptr",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"QueryPerformanceCounter": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"QueryPerformanceFrequency": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"RaiseException": {
+"params": [
+"i32",
+"i32",
+"i32",
+"ptr"
+],
+"ret": "void"
+},
+"ReadConsoleW": {
+"params": [
+"i32",
+"ptr",
+"i32",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"ReadDirectoryChangesW": {
+"params": [
+"i32",
+"ptr",
+"i32",
+"i32",
+"i32",
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"ReadFile": {
+"params": [
+"i32",
+"ptr",
+"i32",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"RegCloseKey": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"RegCreateKeyExA": {
+"params": [
+"i32",
+"ptr",
+"i32",
+"ptr",
+"i32",
+"i32",
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"RegCreateKeyExW": {
+"params": [
+"i32",
+"ptr",
+"i32",
+"ptr",
+"i32",
+"i32",
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"RegCreateKeyW": {
+"params": [
+"i32",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"RegDeleteKeyA": {
+"params": [
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"RegDeleteKeyExW": {
+"params": [
+"i32",
+"ptr",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"RegDeleteKeyValueW": {
+"params": [
+"i32",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"RegDeleteKeyW": {
+"params": [
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"RegDeleteTreeW": {
+"params": [
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"RegDeleteValueA": {
+"params": [
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"RegDeleteValueW": {
+"params": [
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"RegEnumKeyExA": {
+"params": [
+"i32",
+"i32",
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"RegEnumKeyExW": {
+"params": [
+"i32",
+"i32",
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"RegEnumKeyW": {
+"params": [
+"i32",
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"RegEnumValueA": {
+"params": [
+"i32",
+"i32",
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"RegEnumValueW": {
+"params": [
+"i32",
+"i32",
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"RegFlushKey": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"RegGetValueA": {
+"params": [
+"i32",
+"ptr",
+"ptr",
+"i32",
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"RegGetValueW": {
+"params": [
+"i32",
+"ptr",
+"ptr",
+"i32",
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"RegOpenKeyExA": {
+"params": [
+"i32",
+"ptr",
+"i32",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"RegOpenKeyExW": {
+"params": [
+"i32",
+"ptr",
+"i32",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"RegOpenKeyW": {
+"params": [
+"i32",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"RegQueryInfoKeyA": {
+"params": [
+"i32",
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"RegQueryInfoKeyW": {
+"params": [
+"i32",
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"RegQueryValueExA": {
+"params": [
+"i32",
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"RegQueryValueExW": {
+"params": [
+"i32",
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"RegSetKeyValueW": {
+"params": [
+"i32",
+"ptr",
+"ptr",
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"RegSetValueExA": {
+"params": [
+"i32",
+"ptr",
+"i32",
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"RegSetValueExW": {
+"params": [
+"i32",
+"ptr",
+"i32",
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"RegisterDragDrop": {
+"params": [
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"ReleaseMutex": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"ReleaseSRWLockExclusive": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"ReleaseSRWLockShared": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"ReleaseSemaphore": {
+"params": [
+"i32",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"ReleaseStgMedium": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"RemoveDirectoryW": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"RemoveVectoredExceptionHandler": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"ResetEvent": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"ResumeThread": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"RevokeDragDrop": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"RtlCaptureContext": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"RtlLookupFunctionEntry": {
+"params": [
+"i64",
+"ptr",
+"ptr"
+],
+"ret": "ptr"
+},
+"RtlPcToFileHeader": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "ptr"
+},
+"RtlUnwind": {
+"params": [
+"ptr",
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "void"
+},
+"RtlUnwindEx": {
+"params": [
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "void"
+},
+"RtlVirtualUnwind": {
+"params": [
+"i32",
+"i64",
+"i64",
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "ptr"
+},
+"SHAddToRecentDocs": {
+"params": [
+"i32",
+"ptr"
+],
+"ret": "void"
+},
+"SHAppBarMessage": {
+"params": [
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"SHChangeNotifyDeregister": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"SHChangeNotifyRegister": {
+"params": [
+"i32",
+"i32",
+"i32",
+"i32",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"SHCreateDirectoryExW": {
+"params": [
+"i32",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"SHCreateItemFromParsingName": {
+"params": [
+"ptr",
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"SHCreateStreamOnFileEx": {
+"params": [
+"ptr",
+"i32",
+"i32",
+"i32",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"SHFileOperationW": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"SHGetDesktopFolder": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"SHGetFileInfoW": {
+"params": [
+"ptr",
+"i32",
+"ptr",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"SHGetFolderPathW": {
+"params": [
+"i32",
+"i32",
+"i32",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"SHGetKnownFolderPath": {
+"params": [
+"ptr",
+"i32",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"SHGetMalloc": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"SHGetPathFromIDListW": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"SHGetSpecialFolderLocation": {
+"params": [
+"i32",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"SHGetSpecialFolderPathW": {
+"params": [
+"i32",
+"ptr",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"SHOpenFolderAndSelectItems": {
+"params": [
+"ptr",
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"SafeArrayAccessData": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"SafeArrayCreate": {
+"params": [
+"i16",
+"i32",
+"ptr"
+],
+"ret": "ptr"
+},
+"SafeArrayDestroy": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"SafeArrayGetElement": {
+"params": [
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"SafeArrayGetElemsize": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"SafeArrayGetLBound": {
+"params": [
+"ptr",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"SafeArrayGetUBound": {
+"params": [
+"ptr",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"SafeArrayPtrOfIndex": {
+"params": [
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"SafeArrayPutElement": {
+"params": [
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"SafeArrayUnaccessData": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"SetCriticalSectionSpinCount": {
+"params": [
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"SetCurrentDirectoryW": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"SetDllDirectoryW": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"SetEndOfFile": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"SetEnvironmentVariableW": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"SetErrorMode": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"SetEvent": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"SetFileAttributesW": {
+"params": [
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"SetFilePointer": {
+"params": [
+"i32",
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"SetFilePointerEx": {
+"params": [
+"i32",
+"i64",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"SetFileTime": {
+"params": [
+"i32",
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"SetHandleInformation": {
+"params": [
+"i32",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"SetLastError": {
+"params": [
+"i32"
+],
+"ret": "void"
+},
+"SetPriorityClass": {
+"params": [
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"SetProcessAffinityMask": {
+"params": [
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"SetStdHandle": {
+"params": [
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"SetThreadAffinityMask": {
+"params": [
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"SetThreadErrorMode": {
+"params": [
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"SetThreadExecutionState": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"SetThreadLocale": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"SetThreadPreferredUILanguages": {
+"params": [
+"i32",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"SetThreadPriority": {
+"params": [
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"SetUnhandledExceptionFilter": {
+"params": [
+"ptr"
+],
+"ret": "ptr"
+},
+"SetVolumeLabelW": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"ShellExecuteA": {
+"params": [
+"i32",
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"ShellExecuteExA": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"ShellExecuteExW": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"ShellExecuteW": {
+"params": [
+"i32",
+"ptr",
+"ptr",
+"ptr",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"Shell_NotifyIconW": {
+"params": [
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"SignalObjectAndWait": {
+"params": [
+"i32",
+"i32",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"SizeofResource": {
+"params": [
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"Sleep": {
+"params": [
+"i32"
+],
+"ret": "void"
+},
+"SleepConditionVariableCS": {
+"params": [
+"ptr",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"SleepConditionVariableSRW": {
+"params": [
+"ptr",
+"ptr",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"SleepEx": {
+"params": [
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"StgCreateDocfileOnILockBytes": {
+"params": [
+"ptr",
+"i32",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"StringFromCLSID": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"StringFromGUID2": {
+"params": [
+"ptr",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"SubmitThreadpoolWork": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"SuspendThread": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"SwitchToThread": {
+"params": [],
+"ret": "i32"
+},
+"SysAllocString": {
+"params": [
+"ptr"
+],
+"ret": "ptr"
+},
+"SysAllocStringByteLen": {
+"params": [
+"ptr",
+"i32"
+],
+"ret": "ptr"
+},
+"SysAllocStringLen": {
+"params": [
+"ptr",
+"i32"
+],
+"ret": "ptr"
+},
+"SysFreeString": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"SysReAllocStringLen": {
+"params": [
+"ptr",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"SysStringByteLen": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"SysStringLen": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"SystemTimeToFileTime": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"SystemTimeToTzSpecificLocalTime": {
+"params": [
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"TerminateProcess": {
+"params": [
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"TerminateThread": {
+"params": [
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"TlsAlloc": {
+"params": [],
+"ret": "i32"
+},
+"TlsFree": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"TlsGetValue": {
+"params": [
+"i32"
+],
+"ret": "ptr"
+},
+"TlsSetValue": {
+"params": [
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"TryAcquireSRWLockExclusive": {
+"params": [
+"ptr"
+],
+"ret": "i8"
+},
+"TryAcquireSRWLockShared": {
+"params": [
+"ptr"
+],
+"ret": "i8"
+},
+"TryEnterCriticalSection": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"TzSpecificLocalTimeToSystemTime": {
+"params": [
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"UnhandledExceptionFilter": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"UnlockFile": {
+"params": [
+"i32",
+"i32",
+"i32",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"UnlockFileEx": {
+"params": [
+"i32",
+"i32",
+"i32",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"UnmapViewOfFile": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"UuidCreate": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"VariantChangeType": {
+"params": [
+"ptr",
+"ptr",
+"i16",
+"i16"
+],
+"ret": "i32"
+},
+"VariantClear": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"VariantCopy": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"VariantCopyInd": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"VariantInit": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"VariantToPropVariant": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"VerQueryValueW": {
+"params": [
+"ptr",
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"VerSetConditionMask": {
+"params": [
+"i64",
+"i32",
+"i8"
+],
+"ret": "i64"
+},
+"VerifyVersionInfoW": {
+"params": [
+"ptr",
+"i32",
+"i64"
+],
+"ret": "i32"
+},
+"VirtualAlloc": {
+"params": [
+"ptr",
+"i32",
+"i32",
+"i32"
+],
+"ret": "ptr"
+},
+"VirtualFree": {
+"params": [
+"ptr",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"VirtualProtect": {
+"params": [
+"ptr",
+"i32",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"VirtualQuery": {
+"params": [
+"ptr",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"VirtualQueryEx": {
+"params": [
+"i32",
+"ptr",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"WNetCloseEnum": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"WNetEnumResourceW": {
+"params": [
+"i32",
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"WNetGetUniversalNameW": {
+"params": [
+"ptr",
+"i32",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"WNetOpenEnumW": {
+"params": [
+"i32",
+"i32",
+"i32",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"WSACleanup": {
+"params": [],
+"ret": "i32"
+},
+"WSAGetLastError": {
+"params": [],
+"ret": "i32"
+},
+"WSAPoll": {
+"params": [
+"ptr",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"WSASetLastError": {
+"params": [
+"i32"
+],
+"ret": "void"
+},
+"WSASocketW": {
+"params": [
+"i32",
+"i32",
+"i32",
+"ptr",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"WSAStartup": {
+"params": [
+"i16",
+"ptr"
+],
+"ret": "i32"
+},
+"WTSRegisterSessionNotification": {
+"params": [
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"WTSUnRegisterSessionNotification": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"WaitForMultipleObjects": {
+"params": [
+"i32",
+"ptr",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"WaitForMultipleObjectsEx": {
+"params": [
+"i32",
+"ptr",
+"i32",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"WaitForSingleObject": {
+"params": [
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"WaitForSingleObjectEx": {
+"params": [
+"i32",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"WakeAllConditionVariable": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"WakeConditionVariable": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"WideCharToMultiByte": {
+"params": [
+"i32",
+"i32",
+"ptr",
+"i32",
+"ptr",
+"i32",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"WinVerifyTrust": {
+"params": [
+"i32",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"WriteConsoleW": {
+"params": [
+"i32",
+"ptr",
+"i32",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"WriteFile": {
+"params": [
+"i32",
+"ptr",
+"i32",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"WritePrivateProfileStringW": {
+"params": [
+"ptr",
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"__acrt_lock": {
+"params": [
+"i32"
+],
+"ret": "void"
+},
+"__acrt_unlock": {
+"params": [
+"i32"
+],
+"ret": "void"
+},
+"__readgsbyte": {
+"params": [
+"i64"
+],
+"ret": "i8"
+},
+"__readgsdword": {
+"params": [
+"i64"
+],
+"ret": "i32"
+},
+"__readgsqword": {
+"params": [
+"i64"
+],
+"ret": "i64"
+},
+"__readgsword": {
+"params": [
+"i64"
+],
+"ret": "i16"
+},
+"__writegsdword": {
+"params": [
+"i64",
+"i32"
+],
+"ret": "void"
+},
+"__writegsqword": {
+"params": [
+"i64",
+"i64"
+],
+"ret": "void"
+},
+"_amsg_exit": {
+"params": [
+"i32"
+],
+"ret": "void"
+},
+"_lock": {
+"params": [
+"i32"
+],
+"ret": "void"
+},
+"_lock_file": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"_mlock": {
+"params": [
+"i32"
+],
+"ret": "void"
+},
+"_munlock": {
+"params": [
+"i32"
+],
+"ret": "void"
+},
+"_unlock": {
+"params": [
+"i32"
+],
+"ret": "void"
+},
+"_unlock_file": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"acmDriverClose": {
+"params": [
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"acmDriverDetailsA": {
+"params": [
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"acmDriverEnum": {
+"params": [
+"ptr",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"acmDriverOpen": {
+"params": [
+"ptr",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"acmFormatChooseW": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"acmFormatSuggest": {
+"params": [
+"i32",
+"ptr",
+"ptr",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"acmMetrics": {
+"params": [
+"i64",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"acmStreamClose": {
+"params": [
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"acmStreamConvert": {
+"params": [
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"acmStreamMessage": {
+"params": [
+"i32",
+"i32",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"acmStreamOpen": {
+"params": [
+"ptr",
+"i32",
+"ptr",
+"ptr",
+"ptr",
+"i32",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"acmStreamPrepareHeader": {
+"params": [
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"acmStreamSize": {
+"params": [
+"i32",
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"acmStreamUnprepareHeader": {
+"params": [
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"closesocket": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"ioctlsocket": {
+"params": [
+"i32",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"lstrcatW": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "ptr"
+},
+"lstrcmpA": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"lstrcmpW": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"lstrcmpiA": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"lstrcmpiW": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"lstrcpyA": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "ptr"
+},
+"lstrcpyW": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "ptr"
+},
+"lstrcpynW": {
+"params": [
+"ptr",
+"ptr",
+"i32"
+],
+"ret": "ptr"
+},
+"lstrlenA": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"lstrlenW": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"midiInAddBuffer": {
+"params": [
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"midiInClose": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"midiInGetDevCapsW": {
+"params": [
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"midiInGetErrorTextW": {
+"params": [
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"midiInGetNumDevs": {
+"params": [],
+"ret": "i32"
+},
+"midiInOpen": {
+"params": [
+"ptr",
+"i32",
+"i32",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"midiInPrepareHeader": {
+"params": [
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"midiInReset": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"midiInStart": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"midiInStop": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"midiInUnprepareHeader": {
+"params": [
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"midiOutClose": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"midiOutGetDevCapsW": {
+"params": [
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"midiOutGetErrorTextW": {
+"params": [
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"midiOutGetNumDevs": {
+"params": [],
+"ret": "i32"
+},
+"midiOutLongMsg": {
+"params": [
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"midiOutOpen": {
+"params": [
+"ptr",
+"i32",
+"i32",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"midiOutPrepareHeader": {
+"params": [
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"midiOutShortMsg": {
+"params": [
+"i64",
+"i32"
+],
+"ret": "i32"
+},
+"midiOutUnprepareHeader": {
+"params": [
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"shim_unimplemented": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"shimx_cb_translator": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "ptr"
+},
+"shimx_cbtrans_calls": {
+"params": [],
+"ret": "i32"
+},
+"shimx_cbtrans_get_invoke": {
+"params": [],
+"ret": "ptr"
+},
+"shimx_cbtrans_install": {
+"params": [],
+"ret": "ptr"
+},
+"shimx_cbtrans_registrations": {
+"params": [],
+"ret": "i32"
+},
+"shimx_cbtrans_reset": {
+"params": [],
+"ret": "void"
+},
+"shimx_cbtrans_set_invoke": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"shimx_cbtrans_slot_va": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"shimx_cbtrans_slots": {
+"params": [],
+"ret": "i32"
+},
+"shimx_get_callback_translator": {
+"params": [],
+"ret": "ptr"
+},
+"shimx_get_drop_target": {
+"params": [
+"i32"
+],
+"ret": "ptr"
+},
+"shimx_get_intptr_limit": {
+"params": [],
+"ret": "i32"
+},
+"shimx_handle_stats": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "void"
+},
+"shimx_init": {
+"params": [],
+"ret": "void"
+},
+"shimx_lifttab_count": {
+"params": [],
+"ret": "i32"
+},
+"shimx_lifttab_name": {
+"params": [
+"i32"
+],
+"ret": "ptr"
+},
+"shimx_lifttab_proc_resolver": {
+"params": [
+"i32",
+"ptr",
+"i32"
+],
+"ret": "ptr"
+},
+"shimx_lifttab_token": {
+"params": [
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"shimx_lifttab_trampoline": {
+"params": [
+"i32"
+],
+"ret": "ptr"
+},
+"shimx_module_register": {
+"params": [
+"ptr",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"shimx_path_to_posix": {
+"params": [
+"ptr",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"shimx_proc_register": {
+"params": [
+"i32",
+"ptr",
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"shimx_reg_export_text": {
+"params": [],
+"ret": "ptr"
+},
+"shimx_reg_import_text": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"shimx_reg_reset": {
+"params": [],
+"ret": "void"
+},
+"shimx_reg_set": {
+"params": [
+"ptr",
+"ptr",
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"shimx_reg_set_dword": {
+"params": [
+"ptr",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"shimx_reg_set_sz": {
+"params": [
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"shimx_reg_stats": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "void"
+},
+"shimx_set_acp": {
+"params": [
+"i32"
+],
+"ret": "void"
+},
+"shimx_set_callback_translator": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"shimx_set_command_line": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"shimx_set_cs_null_ok": {
+"params": [
+"i32"
+],
+"ret": "void"
+},
+"shimx_set_exe_path": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"shimx_set_exit_hook": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"shimx_set_intptr_limit": {
+"params": [
+"i32"
+],
+"ret": "void"
+},
+"shimx_set_load_hook": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"shimx_set_locale": {
+"params": [
+"i32"
+],
+"ret": "void"
+},
+"shimx_set_path_mapper": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"shimx_set_proc_resolver": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"shimx_set_pseudo_load": {
+"params": [
+"i32"
+],
+"ret": "void"
+},
+"shimx_set_raise_hook": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"shimx_set_resource_provider": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"shimx_set_shell_execute_hook": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"shimx_set_strict": {
+"params": [
+"i32"
+],
+"ret": "void"
+},
+"shimx_set_trace": {
+"params": [
+"i32"
+],
+"ret": "void"
+},
+"shimx_set_trust_ok": {
+"params": [
+"i32"
+],
+"ret": "void"
+},
+"shimx_set_version": {
+"params": [
+"i32",
+"i32",
+"i32",
+"i32",
+"i32"
+],
+"ret": "void"
+},
+"shimx_setenv_utf8": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"shimx_towlower": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"shimx_towupper": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"shimx_utf16_to_utf8": {
+"params": [
+"ptr",
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"shimx_utf8_to_utf16": {
+"params": [
+"ptr",
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"shimx_wininet_call_count": {
+"params": [],
+"ret": "i32"
+},
+"shx_acp": {
+"params": [],
+"ret": "i32"
+},
+"shx_alloc_tid": {
+"params": [],
+"ret": "i32"
+},
+"shx_aname": {
+"params": [
+"ptr"
+],
+"ret": "ptr"
+},
+"shx_apath_to_posix": {
+"params": [
+"ptr",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"shx_clear_self": {
+"params": [],
+"ret": "void"
+},
+"shx_ensure_init": {
+"params": [],
+"ret": "void"
+},
+"shx_file_destroy": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"shx_find_destroy": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"shx_futex_wait": {
+"params": [
+"ptr",
+"i32",
+"double"
+],
+"ret": "void"
+},
+"shx_futex_wake": {
+"params": [
+"ptr",
+"i32"
+],
+"ret": "void"
+},
+"shx_handle_dup": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"shx_handle_new": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"shx_init_env": {
+"params": [],
+"ret": "void"
+},
+"shx_init_modules": {
+"params": [],
+"ret": "void"
+},
+"shx_init_reg": {
+"params": [],
+"ret": "void"
+},
+"shx_init_std_handles": {
+"params": [],
+"ret": "void"
+},
+"shx_key_destroy": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"shx_locale_init": {
+"params": [],
+"ret": "void"
+},
+"shx_lock": {
+"params": [],
+"ret": "void"
+},
+"shx_map_destroy": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"shx_mod_name": {
+"params": [
+"i32"
+],
+"ret": "ptr"
+},
+"shx_mutex_lock": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"shx_mutex_trylock": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"shx_mutex_unlock": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"shx_named_add": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "void"
+},
+"shx_named_create": {
+"params": [
+"i32",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"shx_named_find": {
+"params": [
+"ptr"
+],
+"ret": "ptr"
+},
+"shx_named_open": {
+"params": [
+"i32",
+"ptr"
+],
+"ret": "i32"
+},
+"shx_notify": {
+"params": [],
+"ret": "void"
+},
+"shx_now_ms": {
+"params": [],
+"ret": "double"
+},
+"shx_obj_new": {
+"params": [
+"i32"
+],
+"ret": "ptr"
+},
+"shx_ref": {
+"params": [
+"i32",
+"i32"
+],
+"ret": "ptr"
+},
+"shx_self_thread_obj": {
+"params": [],
+"ret": "ptr"
+},
+"shx_set_last_error": {
+"params": [
+"i32"
+],
+"ret": "void"
+},
+"shx_set_self": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"shx_strict_mode": {
+"params": [],
+"ret": "i32"
+},
+"shx_teb": {
+"params": [],
+"ret": "ptr"
+},
+"shx_thread_destroy": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"shx_thread_exit_cleanup": {
+"params": [],
+"ret": "void"
+},
+"shx_tid": {
+"params": [],
+"ret": "i32"
+},
+"shx_translate_cb": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "ptr"
+},
+"shx_unlock": {
+"params": [],
+"ret": "void"
+},
+"shx_unref": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"shx_wait_objs": {
+"params": [
+"i32",
+"ptr",
+"i32",
+"i32"
+],
+"ret": "i32"
+},
+"shx_wcopy_out": {
+"params": [
+"ptr",
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"shx_wcsdup_utf8": {
+"params": [
+"ptr"
+],
+"ret": "ptr"
+},
+"shx_wcsicmp": {
+"params": [
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"shx_wcsnicmp": {
+"params": [
+"ptr",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"shx_wname": {
+"params": [
+"ptr"
+],
+"ret": "ptr"
+},
+"shx_wpath_to_posix": {
+"params": [
+"ptr",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"shx_wstr_len": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
+"timeBeginPeriod": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"timeEndPeriod": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
+"timeGetDevCaps": {
+"params": [
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"timeGetTime": {
+"params": [],
+"ret": "i32"
+},
+"vreg_clear_all": {
+"params": [],
+"ret": "void"
+},
+"vreg_clear_root": {
+"params": [
+"i32"
+],
+"ret": "void"
+},
+"vreg_export_root": {
+"params": [
+"i32"
+],
+"ret": "ptr"
+},
+"vreg_generation": {
+"params": [],
+"ret": "i32"
+},
+"vreg_set_notify": {
+"params": [
+"ptr"
+],
+"ret": "void"
+}
+}

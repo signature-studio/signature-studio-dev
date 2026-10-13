@@ -345,3 +345,34 @@ username 統一により、winstubs (CAB-96) が wrap していた **5 API が s
 
 - `verify_ott` と M11 closure の突合は `work-m11` / `work-m6-ott` 素材が無く SKIP。このため `test.sh` が再生成した inventory.md / BACKLOG.md / coverage.json / inventory.csv は m11 closure が空になるので**コミットしていない** (次回素材付き run で再生成)。`exports.txt` と `proctable.c` は差分 5 行のみ反映。
 - `shimx_wininet_call_count` 以外の公開面変更は `shimx.h` の 4 宣言のみ。
+
+
+## 14. 署名正規化 IR pass + ゲート (#173, SHX-T7)
+
+既知類型との関係: 該当なし (`docs/DEFECTS.md` D1〜D16 は命令レベルの miscompile。本件は declare 署名の揺れによる wasm-ld mismatch → 実行時 trap で、§4 項 4 の 5 件が実害例)。
+
+**結論**: 案A (IR pass) + 案B (ゲート) を実装した。`sig_normalize.py` が lift IR の外部 declare を shimx 定義署名 (`data/sigs.json`) へ正規化し、`sig_gate.sh` が「正規化 → `verify_sig.sh` mismatch 0」を強制する (unresolved が 1 件でもあれば exit 1)。`test.sh` 6b は実 IR をこのゲート経由で検査し、合成 fixture の回帰 `test/sig/sig_test.sh` を追加した。**実 IR (M11 / OTT) での実測は素材が無く未実施** (下表)。
+
+- 方式: 署名が wasm スロット粒度 (i1/i8/i16/i32/ptr = i32, i64, float, double) で異なる declare `@N` に対し、IR 側署名の adapter `@__shx_sig_N` を IR 末尾に定義して基名を shimx 署名で呼び、`@N` の全参照 (call・関数ポインタ) を adapter へ向ける。呼出 site の命令は書換えない。`NAME.1` / `NAME_D1` 形式の重複 declare も同じ経路で基名へ統合する。変換は 整数↔整数 / 整数↔ptr / float↔double、余る引数は捨て・足りない引数は 0。float↔整数・構造体・vector・可変長は書換えず `unresolved`。
+- `data/sigs.json`: `src/*.c` を `emcc -S -emit-llvm` して外部リンケージの `define` から生成 (725 関数)。`gen_sigs.py --check` が shimx 側署名変更の取りこぼしを検出し、`sig_gate.sh` が毎回実行する。
+- 再現: `bash tools/shimx/test/sig/sig_test.sh` / `bash tools/shimx/scripts/sig_gate.sh <ir.ll> <tag>`。
+
+| 検証 (2026-10-13, Actions runner, 検証起点は PR HEAD) | 結果 |
+|---|---|
+| `test/sig/sig_test.sh` (load average 0.10, 1 run) | **ALL PASS**, 10 s |
+| (a) 陰性対照: 合成 fixture (§4 項 4 の 5 件の逆向き揺れ) を正規化せず `verify_sig.sh` | mismatch **5** 検出 |
+| (b) 正規化後 | 5 adapter + 重複統合 1 → mismatch **0** |
+| (c) adapter 経由の実行 (node) | `midiOutShortMsg` が 5 (MMSYSERR_INVALHANDLE)、`acmMetrics` が out に 0 を書く = shimx 定義まで届く |
+| (d) 未対応型 (float 引数) | `UNRESOLVED` で `sig_gate.sh` exit 1 |
+| (e) `sigs.json` の acmMetrics 第1引数を i64→i32 に壊す | `gen_sigs.py --check` exit 1 |
+| `bash tools/shimx/test.sh --quick` (load average 0.19) | **exit 0**, 26 s (MT 5 グループ / ST PASS / fail-fast 8 / M4 互換 PASS / 未実装 0) |
+| GUI declare fixture (`tools/gui/integ/fixtures/boot_final_gui_declares.ll`) | adapter 0 (wasm スロットで既に一致。偽陽性なし) |
+
+- 検証範囲外: M11 closure (`boot_final2/3.ll`)・OTT (`ott_m8.ll`) と各プラグイン lift 成果物での実測。`work-m11` / `work-m6-ott` 素材が無く、`test.sh` 6b は SKIP。
+- `test.sh` が再生成した inventory.md / BACKLOG.md / coverage.json / inventory.csv / exports.txt は m11 closure 不在で内容が変わるため、§13 と同様にコミットしていない。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 実 IR (M11 / OTT / 各プラグイン) での `sig_gate.sh` 実測 | 受入条件の「lift 成果物で mismatch 0」が未実証 | #173 (`oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk work-m11 work-m6-ott` で再実行) |
+| GitHub Actions に `test.sh` を常時回す job が無い (現状の workflow は opencode のみ) | 案B の「CI で常時」は test.sh 経由 (手動 / レビュー run) に留まる | #284 系 `[CI-n]` に提案 (要 素材取得 + emsdk 展開を含む job) |
+| adapter 経由になるため RetDec 側が i64 で渡す HANDLE の上位 32bit は落ちる (trunc) | wasm32 の HANDLE は 32bit 値のため実害は想定しないが未検証 | #173 (実 IR で `normalized` 一覧を確認) |

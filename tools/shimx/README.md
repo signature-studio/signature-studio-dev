@@ -22,6 +22,7 @@ emcc <lift IR / runtime> tools/shimx/src/*.c ... -sGLOBAL_BASE=<64KB 以上>    
 - 未対応 API は `shim_unimplemented("関数名")` で名前を出して abort (M4 方針を維持)。lift 産物 IR の未提供 API 用スタブは
   `python3 scripts/ir_undef.py <ir.ll> --emit-stubs stubs.c` で署名付き生成できる。
 - IR の declare 署名と shimx 定義の wasm 署名の一致検査: `bash scripts/verify_sig.sh <ir.ll> <tag>`。
+- 署名の正規化 + 検査 (SHX-T7): `bash scripts/sig_gate.sh <ir.ll> <tag>` (`sig_normalize.py` で declare を `data/sigs.json` の shimx 署名へ寄せ、`verify_sig.sh` で mismatch 0 を強制。`data/sigs.json` は `scripts/gen_sigs.py` で再生成)。REPORT §14。
 - 構造体は Win64 レイアウト (ポインタ 8B スロット)。ポインタ値 < 0x10000 は整数 (序数/MAKEINTRESOURCE/単一文字) とみなすので GLOBAL_BASE は 64KB 以上。
 
 ## 運用フック (`shimx_*`, 詳細は shimx.h 末尾)
@@ -49,4 +50,4 @@ emcc <lift IR / runtime> tools/shimx/src/*.c ... -sGLOBAL_BASE=<64KB 以上>    
 | `src/reg.c` `env.c` `module.c` `seh.c` | レジストリ(メモリ内, vreg 拡張取込: 世代/通知・import 強化・追加 6 API — REPORT §11)+Crypt スタブ, 環境/システム情報/バージョン/アトム, モジュール表/GetProcAddress/リソース/IMAGEHLP, SEH 第一手+CRT ロック |
 | `src/ole.c` `shell.c` `net.c` | BSTR/VARIANT/SAFEARRAY/IStream/IMalloc, shell32/version/各種スタブ, ネットワーク・認証・MIDI の常時エラー |
 | `src/proctable.c` `shimx_stubs.h` `exports.txt` | 自動生成 (test.sh)。GetProcAddress の組込み表 / 未宣言 API の prototype / 公開関数一覧 |
-| `scripts/` | import_scan(PE 走査) / build_objs / gen_proctable / gen_stub_protos / gen_inventory / ir_undef / verify_sig / verify_ott |
+| `scripts/` | import_scan(PE 走査) / build_objs / gen_proctable / gen_stub_protos / gen_inventory / ir_undef / verify_sig / sig_normalize / sig_gate / gen_sigs / verify_ott |
