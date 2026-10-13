@@ -198,7 +198,8 @@ if [ ! -f fw_route.cjs ]; then
   # S2/S3/S4 回帰ガード (CAB-269): clang/emcc が落とす IR エラーは llvm-as で 3 s で再現できる
   #   (multiple definition of local value / use of undefined value '@fw_fldenv' /
   #    invalid cast opcode for cast from 'i64' to 'i128' — 実測は REPORT §参照)
-  llvm-as fw_flat4_canon3.ll -o tmp/fw_canon3.bc || { echo "[s2] IR 検証失敗 (llvm-as)" >&2; exit 1; }
+  # llvm-as は runner に無いため、emsdk 同梱 clang の .ll 入力で同等の検証を行う (CAB-195 #195 run)
+  clang -x ir -c fw_flat4_canon3.ll -o tmp/fw_canon3.bc -w || { echo "[s2] IR 検証失敗 (clang -x ir)" >&2; exit 1; }
   emcc fw_flat4_canon3.ll fw_simd.c fw_table.c fw_rt.c fw_boot.c "$HERE/hostshim/hostshim.c" \
     -I. -I"$HERE/hostshim" -I"$T/tools/liftlib/liftlib/simd" \
     -w -O0 -g -ffp-contract=off -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8MB \
