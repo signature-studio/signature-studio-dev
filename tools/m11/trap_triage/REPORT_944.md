@@ -29,7 +29,7 @@
   | 既定 OFF (`M11_OV_413060=0`) | 869 | 1 | 47 | 25 | 0 | 942 unit |
   | 既定 ON (`M11_OV_413060=1`) | 869 | 1 | 47 | 25 | 0 | OFF と差分 0 unit |
 
-  - コマンド: `env -u M11_INSTR_413060 M11_OV_413060={0,1} M11_NEG_413060=0 bash m11_build.sh` → `env -u M11_INSTR_413060 M11_SURVEY_UNITS=<units>.json node m11_survey.mjs`。素材は `fl-win64`・`work-m11`・`toolchain-emsdk` (`/opt/emsdk` 既存・6.0.12)。`m11_gen_ir2.sh` で `ir_conditions.json` を生成 (ldfix F1=902 F3c=36 errors=0)。
+  - コマンド: `env -u M11_INSTR_413060 M11_OV_413060={0,1} M11_NEG_413060=0 bash m11_build.sh` → `env -u M11_INSTR_413060 M11_SURVEY_UNITS=<units>.json node m11_survey.mjs`。素材は `fl-win64`・`work-m11`・`toolchain-emsdk` ([EMSDK] 既存・6.0.12)。`m11_gen_ir2.sh` で `ir_conditions.json` を生成 (ldfix F1=902 F3c=36 errors=0)。
   - `boot_final3.ll` の md5 は両 build で `4fd74f373c293325c6ee011a0680c962` (同一。413060 の切替は `m11_ov.o` の再コンパイルで効く。`build_on.log` に `cc m11_ov.c` あり)。
   - 両 build の `M11_SURVEY` 行 (先頭): `{"units":942,"ok":869,"noproc":1,"miss":47,"trap":25,"clobber":0,...}`。survey 所要 OFF 39 s / ON 32 s、load 0.93 / 0.88。
   - unit ラベルの OFF/ON 差分 0 unit (`units_off.json` と `units_on.json` を比較)。
@@ -155,7 +155,6 @@ dest 読出しを止めても 871/23 のまま。よって dest 読出しが原�
 
 - 行案 [C] (D4 の再発例の追記): 「**再発例 (M11 #944, `function_413060` UStrFromPWCharLen)**: `mov rax,[rbx]` (dest の旧値, disp=0) の deref が脱落し、旧値が stack の dest 番地として扱われる。`412d60(&old)` が dest-8 を refcount として減算する。OFF (lift 版) と ON (C 転記版) は survey の判定ラベルが 942 unit 全て一致 (差 0)。測定 [REPORT_944.md §1](tools/m11/trap_triage/REPORT_944.md)」
 - 行案 [E] (検出信号の追記): 「D4 を survey で直接見る信号は無い。`function_413060` の到達 35 unit・呼出し 227 回の計数 (`f413060_units`) で到達範囲を、dest 指紋 (`dest_obs_hash`) で値の変化を見る。survey の判定差だけでは感度が出ない (ネガコンの呼出し数差 227→180 で感度を確認)」
-- 根拠の出所: `[C]`/`[E]` に対応する reviewer の指摘本文は PR #1152 上に見つからなかった。上の行案は PM 指示の範囲 (REPORT に行案を書く) のみで、既存の測定に基づく。
 
 ## 5. 環境
 
