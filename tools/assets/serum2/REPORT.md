@@ -122,4 +122,5 @@ HEAD `62ba0b54` (判定を sha 起因に絞った後) で `SERUM2_WORK=<prep> ba
 
 - 判定: pass (`failed=0`, exit 0) / neg-sha (全 sha を 0 に置換, `failed=3`, `sha_fail=3`, exit 1)。`chrome-e2e.sh` 実行 wall 1 分 53 秒 (pass 57 s / neg 56 s、load 2.20 1.44 0.73)。
 - **全件は OPFS 上限 (1,020 slot) を超える**ため warm でも chunk 再取得 (573 request) が起きる。sample 151 件 (§6) では warm chunk request 0 を期待できたが、全件では期待しない。`browser-test.ts` は全件のとき warm の chunk 上限判定を行わず、件数を info 行に出すよう変更 (`NFILES < inv.length` のときのみ assert)。
-- 変更前の初回実行では、この上限判定 (`<= 2`) のみが落ち、pass は `failed=1`、neg は `failed=4` になった。sha 照合は全件で一致していた (判定を変えただけで sha の失敗はこの run の数値に含まれない)。
+- 変更前の初回実行では、この上限判定 (`<= 2`) のみが落ち、pass は `failed=1`、neg は `failed=4` になった。sha 照合は全件で一致していた。
+- 再現 (committed HEAD `01510d43`、同条件で 2 回目): pass exit 0 / failed=0 (58 s)、neg-sha exit 1 / failed=3 / sha_fail=3 (59 s)、`SERUM2 CHROME E2E OK`、wall 1 分 57 秒、warm server chunk request 572 (上の表は初回 run の値)。
