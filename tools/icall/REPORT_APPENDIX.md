@@ -197,7 +197,7 @@ awk -F'\t' -v a=401 -v b=404 'NR>1 && $1>=a && $1<=b {s+=$4; l+=$5; n+=$6; u+=$7
 
 - `measure_flengine_split.sh`: 132.7 s (real, 4 core) は HEAD `12586095` で新規取得した実測。
 - 段 dump の `!N` 番号は最終 `.ll` の `!N` と一致しない (例: 最終 `.ll` の `!392` は `30189433`)。`map.json` の `sites[].new` と最終 `.ll` の META 値の共通は 0 件。site → 段 dump ブロックの突合は現成果物では組めず、段単位で `!N` を保存する修正が要る。
-- `__icall_dispatch(i64 <site VA>)` は restored IR に 8 件で、`sites_after.json` の kept 8 と一致。dropped 366 の VA は現れない。
+- `__icall_dispatch(i64 <site VA>)` は restored IR に 8 件あり、§12.3 の kept 集合と一致する。dropped の VA は現れない。
 
 受入条件 2・3 は未達。次 run の入力: `oc_artifacts: fl-win64 toolchain-retdec`。
 
