@@ -14,7 +14,6 @@ echo "== [1] PE 修復 (ヘッダ clamp + .text 2B 修復, work copy のみ) =="
 python3 scripts/mx_pefix.py "$PE_IN" "$PE"
 
 echo "== [2] RetDec lift (select-decode-only, TMPDIR=work/tmp) =="
-mkdir -p $W/lift $W/tmp
 if [ ! -f $W/lift/lic.drc.ll ]; then
   (cd $W/lift && TMPDIR=../tmp "${RETDEC:-/opt/retdec}/bin/retdec-decompiler" ../mx_fixed.vst3 -o lic.drc.c \
     --select-ranges "0x18115de60-0x18115ee55" --select-decode-only --timeout 600 > lic.log 2>&1)
