@@ -130,3 +130,4 @@
 - **注意 1 (手作業の前処理)**: Gain (HeartCore) の RetDec 出力は `function_18004cf20` の `declare` が同一内容で 2 回出ており、`emcc` が `invalid redefinition` で落ちた。同一行の 2 つ目を除く (awk で完全一致行のみ) ことで解消した。これは既存の lift パイプライン (`ir5_patch` / `kh_lower`) に無い手作業であり、恒常化するなら該当 pass への組み込みが必要 (#1170 の受入条件 5 項目目に起票済み)。
 - **注意 2**: Fresh Air gain は `gain_e2e.sh` 同様の修復 pass (`fa_fix_gain`) を通した IR で検証した。修復前の生 RetDec IR は `emcc` で 'linking' 段が失敗するため、gate の対象は修復後 IR。
 - **未実測 (受入条件の残り)**: SlateCore / HeartCore の snap-in 残り (Kilohearts 42 効果のうち gain・matrix・haas・clipper・gate 以外、SlateCore の他 snap-in) は本節では未実測 (#1170 に起票済み)。`sig_test.sh` ALL PASS は HEAD cf0a08bf で再現した (25 s, load 0.77→0.85)。
+- **修文後の再実行 (HEAD d92f3116, Actions runner)**: `sig_test.sh` ALL PASS, exit 0, 24.2 s, load 0.34→0.63。素材 `toolchain-emsdk` が未展開で `/opt/emsdk` が無い run では、(a) の前に `verify_sig.sh` が exit 1 して出力が空になる (環境起因。emsdk 6.0.12 を導入して解消)。
