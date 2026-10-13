@@ -47,13 +47,31 @@ const hi = rd(0x180ef8262 + 0x14ab2ea, 16), lo = rd(0x180ef826d + 0x14ab2d3, 16)
 const list = Buffer.concat([lo, hi.subarray(4)]);   // [rax+0] = lo(16B), [rax+0xc] = hi(16B) (12..28 が重なる)
 const freeIds = new Set(); for (let i = 0; i < 28; i += 4) freeIds.add(list.readUInt32LE(i));
 const fcc = (id) => id.charCodeAt(0) * 2 ** 24 + id.charCodeAt(1) * 2 ** 16 + id.charCodeAt(2) * 2 ** 8 + id.charCodeAt(3);
-const cat = (id, flag22) => id === 'grup' ? 3 : flag22 ? 2 : (freeIds.has(fcc(id)) ? 1 : 0);
+// 注: 本節は lift IR (function_180ef7fc0) を通した検証ではない (入口は未 lift callee で停止する = [2])。機械語読解の式の再実装であり、
+//     式の定数を PE の命令バイトと照合 ([3a]) し、式を壊すと結果が変わること ([3b] 負律対照) を確認するところまで。
+const mkCat = (ids, c = { grup: 'grup', t_grup: 3, t_flag: 2, t_in: 1, t_out: 0 }) =>
+  (id, flag22) => id === c.grup ? c.t_grup : flag22 ? c.t_flag : (ids.has(fcc(id)) ? c.t_in : c.t_out);
+const cat = mkCat(freeIds);
 const plugins = JSON.parse(fs.readFileSync(path.resolve('..', 'work', 'winpkg', 'product_index.json'), 'utf8')).plugins.filter(p => p.id !== 'core');
+const dist = (f) => JSON.stringify([0, 1, 2, 3].map(k => plugins.filter(p => f(p.id) === k).map(p => p.id)));
 const prem = plugins.filter(p => cat(p.id, 0) === 1).map(p => p.id).sort();
 chk(freeIds.size === 7, 'list size ' + freeIds.size);
 chk(JSON.stringify(prem) === JSON.stringify(['kdsp', 'kfat', 'kpeq', 'ksco', 'ksft', 'ksge', 'ksws']), 'category1 ids ' + prem);
 chk(plugins.length === 45 && plugins.filter(p => cat(p.id, 0) === 0).length === 38, 'category0 count');
 chk(cat('grup', 0) === 3 && cat('ksgn', 1) === 2, 'grup/hosts flag');
-console.log('  category1 (Premium):', prem.join(','), ' category0 (Essential):', plugins.filter(p => cat(p.id, 0) === 0).length);
+// [3a] 式の定数を命令バイトから照合 (0x180ef82d7..0x180ef82f2): mov r8d,[rbp-0x48]; mov edx,3; cmp r8d,'grup'; je; mov edx,2; cmp byte [rbp-0x36],0; jne
+const code = rd(0x180ef82d7, 0x1c).toString('hex');
+chk(/^448b45b8ba030000004181f87075726774[0-9a-f]{2}ba02000000807dca0075/.test(code), 'grup 比較/カテゴリ定数 3,2/entry+0x22 の命令バイト ' + code);
+// [3b] 負律対照: 式を壊すと結果が変わる (変わらなければ検査が自明 = NG)
+const base = dist(cat);
+const mut = {
+  'list 空': mkCat(new Set()),
+  'list 1 id 欠落': mkCat(new Set([...freeIds].slice(1))),
+  'list にダミー id 追加': mkCat(new Set([...freeIds, fcc('kscm')])),
+  'grup→別 id': mkCat(freeIds, { grup: 'kscm', t_grup: 3, t_flag: 2, t_in: 1, t_out: 0 }),
+  'in/out 入替': mkCat(freeIds, { grup: 'grup', t_grup: 3, t_flag: 2, t_in: 0, t_out: 1 }),
+};
+for (const [k, f] of Object.entries(mut)) chk(dist(f) !== base, '負律対照 (' + k + ') で結果が変わらない');
+console.log('  category1 (Premium):', prem.join(','), ' category0 (Essential):', plugins.filter(p => cat(p.id, 0) === 0).length, ' mutation controls:', Object.keys(mut).length);
 console.log(`kh249_check ok=${ok} ng=${ng}`);
 process.exit(ng ? 1 : 0);

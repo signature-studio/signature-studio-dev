@@ -37,4 +37,30 @@ for lo, hi in PD:
 out = {'%x' % f: {'ids': sorted(v['ids']), 'ctors': ['%x' % c for c in sorted(v['ctors'])]} for f, v in hits.items() if v['ids']}
 for f, v in sorted(out.items()):
     print(f, v['ids'], [ctors['%x' % int(c, 16)]['rtti'][4:30] for c in v['ctors']])
-if arg('--json'): json.dump(out, open(arg('--json'), 'w'), indent=1)
+
+# 製品 id ↔ ctor の最近傍 (アドレス) 対応 (KH249_REPORT §2): 各 ctor (47) に対し、id imm32 を持つ関数のうち
+# |関数 VA - ctor VA| が最小のものを選び、その関数の id を ctor の id 候補とする (ctor 自身は id を持たない)。
+NONPRODUCT = ('HostProxyEditorModel', 'SnapinGroupEditorModel')
+id_funcs = sorted((int(f, 16), v['ids']) for f, v in out.items())
+nn = {}
+for c, r in sorted(ctor_set.items()):
+    f, fids = min(id_funcs, key=lambda x: (abs(x[0] - c), x[0]))
+    nn[c] = {'rtti': r['rtti'], 'nearest_func': f, 'dist': abs(f - c), 'ids': fids,
+             'nonproduct': any(n in r['rtti'] for n in NONPRODUCT)}
+by_id = collections.defaultdict(list)
+for c, v in nn.items():
+    for i in v['ids']: by_id[i].append(c)
+dup = {i: cs for i, cs in by_id.items() if len(cs) > 1}
+unused = sorted(set(ids.values()) - {'core'} - set(by_id))
+prod = {c: v for c, v in nn.items() if not v['nonproduct']}
+prod_by_id = collections.Counter(i for v in prod.values() for i in v['ids'])
+print('nearest: ctors=%d product_ctors=%d nonproduct=%d' % (len(nn), len(prod), len(nn) - len(prod)))
+print('nearest: duplicated ids (all 47 ctors) =', {i: ['%x' % c for c in cs] for i, cs in dup.items()})
+for i, cs in dup.items():
+    print('  dup', i, [(('%x' % c), nn[c]['rtti'][4:30], 'nonproduct' if nn[c]['nonproduct'] else 'product') for c in cs])
+print('nearest: product ctors only: duplicated ids =', sorted(i for i, n in prod_by_id.items() if n > 1),
+      ' ids unused by any product ctor =', sorted(set(ids.values()) - {'core'} - set(prod_by_id)))
+print('nearest: ids unused by any ctor =', unused)
+if arg('--json'):
+    out['_nearest'] = {'%x' % c: {'rtti': v['rtti'], 'nearest_func': '%x' % v['nearest_func'], 'dist': v['dist'], 'ids': v['ids'], 'nonproduct': v['nonproduct']} for c, v in nn.items()}
+    json.dump(out, open(arg('--json'), 'w'), indent=1)
