@@ -167,7 +167,7 @@ class Disasm:
                 break
         if n is not None and not (1 <= n <= 4096):
             n = None
-        cand = []  # (table_va, scale, rel_base or None)
+        cand = []  # (table_va, scale, rel_base or None, lea_based)
         def from_mem(ins_op):
             m = ins_op.mem
             if not m.index or m.scale not in (4, 8):
@@ -177,9 +177,9 @@ class Disasm:
                 bv = lea.get(bn)
                 if bv is None:
                     return None
-                return (bv + m.disp, m.scale, bv if m.scale == 4 else None)
+                return (bv + m.disp, m.scale, bv if m.scale == 4 else None, True)
             if not m.base:
-                return ((m.disp & 0xFFFFFFFFFFFFFFFF), m.scale, img.base if m.scale == 4 else None)
+                return ((m.disp & 0xFFFFFFFFFFFFFFFF), m.scale, img.base if m.scale == 4 else None, False)
             return None
         op = jmp_ins.operands[0]
         if op.type == x86.X86_OP_MEM:
@@ -193,10 +193,23 @@ class Disasm:
                     if r:
                         cand.append(r)
                         break
-        for taddr, scale, relb in cand:
+        for taddr, scale, relb, lea_based in cand:
             lim = n if n else 256
             tl = []
-            for i in range(lim):
+            # Delphi の `sub idx,8; jmp [B+idx*8+d]` 形 (B は lea 基点) は index が負側 (基点より前) に伸びる。
+            # lea 基点の絶対 8 byte 表に限り、基点から後退して関数内 target が続く間だけ先頭を延ばす。
+            back = 0
+            if lea_based and relb is None and scale == 8:
+                while back < 256:
+                    raw = img.read(taddr - (back + 1) * scale, scale)
+                    if raw is None:
+                        break
+                    t = struct.unpack('<Q', raw)[0]
+                    if not (fstart <= t < fend):
+                        break
+                    back += 1
+                taddr -= back * scale
+            for i in range(back + lim):
                 raw = img.read(taddr + i * scale, scale)
                 if raw is None:
                     break
@@ -205,13 +218,13 @@ class Disasm:
                 if scale == 4 and relb is not None and t > 0xFFFFFFFFFFFF:
                     break
                 if not (fstart <= t < fend):
-                    if n is None:
+                    if n is None and i >= back:
                         break
                     continue
                 tl.append(t)
             if tl:
                 self.last_jt = (taddr, scale, relb, len(tl))
-                self.data_ranges.append((taddr, taddr + max(len(tl), n or 0) * scale))
+                self.data_ranges.append((taddr, taddr + (max(len(tl), n or 0) + back) * scale))
                 return tl
         return None
 
