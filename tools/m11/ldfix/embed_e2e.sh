@@ -21,7 +21,8 @@ HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 REPO="$(cd -- "$HERE/../../.." && pwd)"
 cd "$REPO"
 export PATH="$HOME/.local/share/pnpm/bin:$PATH"
-PE=/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin
+source "$REPO/tools/shared/env.sh"
+PE="$FL_WIN64_DIR/extracted/block00031_PE.bin"
 BATCH=0
 for a in "$@"; do case "$a" in --batch) BATCH=1 ;; esac; done
 
@@ -133,7 +134,7 @@ if [ $BATCH = 1 ] && ! done_p "batch"; then
   mkdir -p tools/liftdiff/work/m11_ldfix_embedded
   cmp -s tools/liftdiff/work/m11_ldfix/boot_state.json tools/liftdiff/work/m11_ldfix_embedded/boot_state.json || \
     cp tools/liftdiff/work/m11_ldfix/boot_state.json tools/liftdiff/work/m11_ldfix_embedded/boot_state.json
-  python3 tools/liftdiff/liftdiff.py batch "$HERE/targets/m11_ldfix_embedded.json" --set closure --shards 12 --state auto \
+  python3 tools/liftdiff/liftdiff.py batch "$(python3 "$HERE/render_target.py" "$HERE/targets/m11_ldfix_embedded.json")" --set closure --shards 12 --state auto \
     --out "$HERE/work/batch_embed.jsonl" > "$HERE/work/batch_embed.log" 2>&1 || step "WARNING: batch rc=$?"
   python3 tools/liftdiff/liftdiff.py summary "$HERE/work/batch_embed.jsonl" | head -8 || true
   mark "batch"

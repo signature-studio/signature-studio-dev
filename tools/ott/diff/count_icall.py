@@ -4,7 +4,9 @@
 import json, os, re, sys, bisect, collections
 import pefile, capstone
 HERE = os.path.dirname(os.path.abspath(__file__))
-DLL = '/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll'
+sys.path.insert(0, os.path.join(HERE, '..', '..', 'shared'))
+from paths import PLUGINS_DIR
+DLL = os.path.join(PLUGINS_DIR, 'ott', 'binaries', 'OTT_vst2_win64.dll')
 IR = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, '..', '..', 'm6', 'work', 'full_t1.drc.ll')
 pe = pefile.PE(DLL); base = pe.OPTIONAL_HEADER.ImageBase
 cov = json.load(open(os.path.join(HERE, '..', 'ref', 'cov_all.json')))

@@ -591,3 +591,10 @@ T12 は「join split が発動すること」を assert していたが、LIFTLI
 |---|---|---|
 | e2e を素材付きで未実行 | 置換行以外の挙動は未検証 (置換は DLL パス定義のみ) | 本 PR のレビュー run (PR 本文の `oc_artifacts:` 行) |
 | `tools/liftlib/` 直下 5 ファイルに `/home/ubuntu` が残る | runner では symlink 必須 | 未起票 (2026-10-13 時点で `gh issue list --search "CI-4-liftlib"` は #386 のみ)。親 #294 にコメントで起票を提案 |
+
+## 17. HB-H3 (#93): 整数引数脱落 (D3) の機械検出・復元 pass `iargs` — 付録へ移動
+
+全文は **[`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §17** (本体の 250 行上限対応で分割移動。内容は削除していない)。
+- 結論: `passes.iargs` (既定 off) が RetDec の整数引数 (rdx/r8/r9) 脱落を機械語基準で検出・復元する。OTT ctor の native 突合は iargs ON 200/200・ネガコン (OFF) 0/200 (§17.2)。
+- 検出 `iargs.scan()` は define 15 / 引数不足 site 15 / 入口素通し位置の誤値 site 17 (`sites_entry`, #427 で実装) を返す (§17.7)。
+- 未達: getParameter の xmm0 戻り (RetDec route; jump table 欠落が先, §17.3)。未解決は §17.5。

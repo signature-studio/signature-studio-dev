@@ -1,0 +1,53 @@
+name: Perf Gate
+
+# bit-exact OTT (x64c lift) の相対指標ゲート (署名一致・o0/o2/o3lto 比・wasm bytes)。
+# 絶対 µs は判定に使わない (共有ホスト負荷で ±2× 振れるため)。詳細: tools/perf/REPORT.md §6
+on:
+  pull_request:
+    paths:
+      - 'tools/perf/**'
+      - 'tools/ott/**'
+      - 'tools/shared/**'
+      - '.github/workflows/perf-gate.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perf-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  perf-gate:
+    # fork 由来の PR には secrets (R2 認証情報) が渡らないので走らせない
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # 素材: toolchain-emsdk → /opt/emsdk, analysis-ott-binaries → $HOME/analysis (ANALYSIS_DIR)
+      - name: Setup toolchain and artifacts
+        uses: ./.github/actions/agent-setup
+        with:
+          artifacts: toolchain-emsdk analysis-ott-binaries
+          cf-account-id: ${{ secrets.CF_ACCOUNT_ID }}
+          cf-r2-access-key-id: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          cf-r2-secret-access-key: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+
+      - name: Install python deps
+        run: python3 -m pip install capstone pefile
+
+      - name: Run perf gate
+        run: bash tools/perf/gate/perf_gate.sh 2>&1 | tee "$RUNNER_TEMP/perf_gate.log"
+
+      - name: Step summary
+        if: always()
+        run: |
+          {
+            echo '## perf gate'
+            echo '```'
+            tail -30 "$RUNNER_TEMP/perf_gate.log" 2>/dev/null || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

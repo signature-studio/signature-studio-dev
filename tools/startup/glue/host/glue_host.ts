@@ -46,6 +46,8 @@ export interface GlueHostOptions {
   waitMode?: number;
   /** FL boot 貫通後は m11 の export 解決結果をここに渡す (未達の間は C 側スタブ) */
   createFruity?: CreateFruityJs;
+  /** `fldiagnostic /restartfl` 検知時 (G12)。flush 後に 1 回だけ呼ぶ。browser = location.reload() */
+  onRestart?: () => void | Promise<void>;
 }
 
 export interface StageRecord { id: number; name: string; ms: number; ok: boolean; detail?: string; }
@@ -116,6 +118,7 @@ export class GlueHost {
       workDir: o.workDir ?? path.join(GLUEDIR(), 'work/wvfs-e2e'),
       waitMode: o.waitMode ?? -1,
       createFruity: o.createFruity as CreateFruityJs,
+      onRestart: o.onRestart ?? (() => { (globalThis as any).location?.reload?.(); }),
     };
     // FL boot 貫通後は m11 の export 解決結果を登録する (未達の間は C 側スタブのまま)
     if (this.o.createFruity) {
@@ -322,6 +325,19 @@ export class GlueHost {
     await this.home?.onYield();
     await this.tmp?.onYield();
     this.flushes++;
+    await this.checkRestart();
+  }
+
+  /** winstubs の ShellExecute が `fldiagnostic /restartfl` を検知していれば、flush 済みの状態で onRestart を 1 回呼ぶ */
+  restartRequested(): boolean {
+    return !!this.mod._winstubs_restart_requested?.();
+  }
+  restarts = 0;
+  async checkRestart(): Promise<boolean> {
+    if (this.restarts > 0 || !this.restartRequested()) return false;
+    this.restarts++;
+    await this.o.onRestart();
+    return true;
   }
 
   // ------------------------------------------------------------ ファイル経路 (wvfs 書込)

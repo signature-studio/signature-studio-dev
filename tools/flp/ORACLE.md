@@ -1,6 +1,6 @@
 # ORACLE.md — wasm FLEngine 比較オラクル設計
 
-状態: 設計 + 実装済みの部品 (`src/wav.ts`, `src/flpdiff.ts`, `cli/wavcmp.ts`, `cli/flpdiff.ts`, `corpus/*`) / 最終更新 2026-10-10
+状態: 設計 + 実装済みの部品 (`src/wav.ts`, `src/stft.ts`, `src/flpdiff.ts`, `cli/wavcmp.ts`, `cli/flpdiff.ts`, `corpus/*`) / 最終更新 2026-10-10
 前提: **ネイティブ FL は動かせない** → 「正解 WAV」は存在しない。したがって「正解との一致」ではなく
 **複数の独立した相対オラクルの積み上げ** で wasm FLEngine の正しさを判定する。外部 golden (§7) が得られれば最上位層として追加する。
 
@@ -73,10 +73,17 @@ float32 の 1 ULP (フルスケール近傍) = 2^-23 ≈ 1.19e-7 (−138.5 dBFS)
 B の導出: libm 1 呼出 ≤ 1–2 ULP、1 サンプル経路に 2–3 回、その後の線形段で拡大しない前提で 4 ULP; 絶対上限 1e-6 は 4 ULP を 8 LSB24 相当まで緩めた安全側。C/D の閾値は **暫定** (ネイティブ golden 入手後に実測分布で再校正; §7)。
 
 ### 4.3 出力レポート
-`cli/wavcmp.ts a.wav b.wav <class>` が JSON (`frames, sha256, bitExact, maxAbs, maxUlp, rmsDiffDb, snrDb, peakDiffDb, verdict{pass,why}`) を出し、PASS で exit 0。CI は Render test 毎に呼び、**最初に差が出たフレーム位置** も記録する (TODO: 現状は集計値のみ)。
+`cli/wavcmp.ts a.wav b.wav <class>` が JSON (`a/b{frames,ch,rate,bits,sha256}, metrics{bitExact,maxAbs,maxUlp,rmsDiffDb,snrDb,peakDiffDb,…}, spectral{lufs*,truePeak*,stft{…,first,worst}} (D のみ), firstDiff, verdict{pass,why}`) を出し、PASS で exit 0。CI は Render test 毎に呼ぶ。
+**最初の差分位置** (`firstDiff`, `firstViolation()`): A = 最初に bit が異なる sample, B = 最初に ULP>4 または |差|>1e-6 の sample, C = 最初に |差|>1e-4 の sample (いずれも `{channel, frame, timeSec, a, b, absDiff}`; frame 優先・同一 frame は ch 順), D = 最初に STFT 許容外となったビン `{channel, frame (STFT), startSample, timeSec, bin, freqHz, refDb, testDb, diffDb}`。shape 不一致 / NaN 時は null。`verdict.why` にも D の first 位置を載せる。
 
-### 4.4 D クラスの STFT 判定 (未実装 — チケット案 L-5)
-Hann 4096 / hop 1024、ピーク −60 dB 以内のビンで |振幅差| ≤ 0.1 dB、BS.1770 LUFS-I ±0.1 LU、true-peak ±0.1 dB。
+### 4.4 D クラスの STFT 判定 (実装済み — `src/stft.ts`, `judgeWav()`; #108)
+Hann 4096 / hop 1024、ピーク −60 dB 以内のビンで |振幅差| ≤ 0.1 dB、BS.1770 LUFS-I ±0.1 LU、true-peak ±0.1 dB。D-spectral の合格 = 上記 §4.2 の時間領域条件 **かつ** 次の 3 つ全て:
+
+- **STFT**: 周期 Hann 4096 / hop 1024 / 全チャンネル対。窓は全て full window (末尾は終端に揃えた 1 窓で覆い、ゼロ詰め窓は使わない; 4096 f 未満の信号のみゼロ詰め 1 窓)。比較対象ビン = 参照側の全フレーム・全 ch の最大ビン振幅から −60 dB 以内のビン。1 ビンでも `|20log10(test/ref)| > 0.1 dB` なら FAIL。参照が完全無音なら test も完全無音のときのみ PASS。
+- **LUFS-I**: BS.1770-4 K-weighting (任意 fs の bilinear 係数) + 400 ms ブロック / 75 % 重なり / −70 LUFS 絶対ゲート / −10 LU 相対ゲート (400 ms 未満は 1 ブロック扱い)。`|ΔLUFS-I| ≤ 0.1 LU`。5 ch 以上は Ls/Rs に 1.41 を掛け LFE を除外。
+- **true-peak**: 4× (fs<96k) / 2× (<192k) オーバーサンプル、16 tap Kaiser(β=8) sinc を位相ごとに DC 正規化 (BS.1770 Annex 2 の 48 tap FIR そのものではなく同等の近似; fs/4 付近までの正弦で誤差 ≤ 0.001 dB)。`|ΔTP| ≤ 0.1 dB`。
+- `judge(m, 'D-spectral')` は `SpectralMetrics` が無いと **fail-closed**。`judgeWav(a, b, cls)` が compare → STFT/LUFS/TP → judge を一括で行う。
+- 閾値は §4.2 と同じく **暫定** (§7 のネイティブ golden 入手後に再校正)。
 
 ## 5. FLP load/save 忠実度 (T1)
 
