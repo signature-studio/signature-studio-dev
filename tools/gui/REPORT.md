@@ -184,6 +184,7 @@ bash tools/gui/e2e.sh                              # 全体 (PE lift を含む);
 | wasm SIMD128 (`bash tools/gui/test/simd_e2e.sh`, emcc 6.0.12 + node v22.23.3) | SIMD == scalar: ROP 15 種 × 長さ 0..70 × アライメント 0..3、α 全 256 値 × 2 方式、不透明化コピー・2x 拡大の端数、1080p 1 行 (1920 px): **15,679 ケース不一致 0**。`gui_gdi.c` を `-msimd128` で wasm 化すると v128 系命令 1,020 / `-DGUI_NO_SIMD` で 0 (SIMD 経路が実際に入る) | SIMD 無効ビルドの simd_test は exit 2 で拒否 (scalar 同士の比較で PASS しない) / 故意の欠陥 4 種 (`-DGS_FAULT=1..4`: div255 丸め・SRCINVERT→OR・shuffle 誤り・OR 落ち) は全て FAIL (不一致 1,632 / 271 / 252 / 268) |
 | 既存層 | `reach_test` 11 passed・`adapt_test` 28 passed・改名 selftest 378 passed (`test/reach_test.sh`)、`tsc -p tools/gui/tsconfig.json` rc 0、`sigprobe` signature mismatch=0 (陰性対照 177)、present e2e (`PRESENT_SKIP_BENCH=1`) 7 pass / 0 fail ALL PASS (18.8 s) | — |
 | **未実行** | `bash tools/gui/e2e.sh` の PE lift 層 (RetDec 不在)。`e2e.sh` に 1b/6 (bpp golden)・1c/6 (SIMD) を追加済みだが全体の ALL PASS は未確認 | — |
+- **origin/main (`d1ff878`; #172 shimx・#118 等) との merge 後 `04dd71e`**: `selftest` 406 passed / 0 failed (3 回連続; main 側の `selftest_fd.inc` +28 を含む)・`bpp_golden` EXACT MATCH 16,000 px・`simd_e2e` ALL PASS・`reach_test` 11/28 passed・改名 selftest 406 passed・`tsc` rc 0 を再確認。
 - 再現 1 コマンド: `bash tools/gui/test/selftest.sh` / `bash tools/gui/test/bpp_golden.sh` / `bash tools/gui/test/simd_e2e.sh` (bench は `BENCH=0` で省略。上記 3 本 + reach_test の合計 44.0 s, load 1.05)。
 - **既存の不安定 (本変更と無関係)**: native `selftest` は ASan で `gui_headless.c:blit_surf` の heap-use-after-free で 20 回中 4 回 (20%) exit 1 (全て同一スタック; §9 の #489)。それ以外の失敗は 0。
 
