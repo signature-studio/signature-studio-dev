@@ -1,6 +1,6 @@
 # #699: `8c5eb0` の件数 0 ループ先頭ガードを IR に復元 (unit 56: OOB → ok) と、同型の全 IR 関数走査
 
-**判定: 受入 1・3・4 と 2 (unit 56 ok・退行 0) を達成。Closes ではなく Refs (未達 1 件 = RetDec の脱落機構の記録は未了、§6)。**
+**判定: 受入 1 (ガード復元)・ネガコン・unit 56 の ok 化は実測で達成。「退行 0」は survey ラベルの比較のみで、出力の同一性は未確認。Closes ではなく Refs (未達 = RetDec の脱落機構の記録, §6)。**
 件数 0 の空リストを `8c6530` へ渡す経路は塞がり、unit 56 は trap から ok になった。
 
 既知類型との関係 (DEFECTS.md): **D1b と同型の症状・検出信号** (機械語の jcc に対応する IR `br` が無く、飛び先が無条件実行になる)。ただし **根本原因は未切り分け** (D1b は stage-0 のフラグが定数に畳まれる機構。本件は生 lift の段階で既に jcc が無く、同じ機構かは未確認。§2, §6)。新規番号は付けず、行案 (§5) は PM 判断。番号は (DEFECTS.md) 体系。
@@ -21,22 +21,26 @@ e2e 実測は `9dd4d55` の清潔な作業ツリーで実行した (§3-3)。
 ```
 
 IR (`dec_label_pc_8c5ef5`) は `%9 = load i32 [rcx+0x14]` (件数) の後、無条件 `br label %dec_label_pc_8c5f23` に進む。
-修復はこの末尾の `br` を次の形に置換する (`tools/m11/guard699/m11_guard699.py`):
+修復はこの末尾の `br` を、ガード辺専用ブロックを挟む形に置換する (`tools/m11/guard699/m11_guard699.py`):
 
 ```llvm
+  %g699 = icmp sle i32 %9, 0
+  br i1 %g699, label %dec_label_pc_8c5ef5_g699, label %dec_label_pc_8c5f23
+dec_label_pc_8c5ef5_g699:
   store i64 0, ptr %rax.0.reg2mem          ; rax.0 := 0 (機械語で確定, 下記)
   %g699rdx = and i64 %arg2, 255            ; rdx.1 := zext(arg2 下位 byte) (未検証の仮定, 下記)
   store i64 %g699rdx, ptr %rdx.1.reg2mem
-  %g699 = icmp sle i32 %9, 0
-  br i1 %g699, label %dec_label_pc_8c6066, label %dec_label_pc_8c5f23
+  br label %dec_label_pc_8c6066
 ```
 
+- **件数 > 0 の経路は元 IR と一致する**: 件数 > 0 は `dec_label_pc_8c5f23` への枝を取るため、store は通らない。元 IR との差分は末尾 `br` 1 行の置換 (`diff` で確認: `br label %dec_label_pc_8c5f23` → 上記 6 行)。store は専用ブロック `_g699` にだけ置く (前版は分岐の前に置いていたため件数 > 0 でも rdx を上書きした。レビュー指摘 2 の 2 回目)。
 - 分岐条件: `count <= 0` は機械語の `jg` と件数 ∈ [INT_MIN+1, 0] で一致する。**count = INT_MIN のみ不一致**: 機械語は `sub ebx,1` が wrap して `0x7FFFFFFF` と比較し jg が立たず本体を実行、IR は飛ばす。件数は非負の list 長なので本件では到達しないと見なすが、確認はしていない (厳密化 `sub` + `icmp slt` は未実施)。
-- **ガード辺の値 (レビュー指摘 2)**: ガードで飛ばすと、元 IR で `%rax.0.reg2mem`・`%rdx.1.reg2mem` を store するのは `dec_label_pc_8c6034`・`dec_label_pc_8c603f` だけで、飛び先 `dec_label_pc_8c6066` が両方を load する。このままでは 0 件経路で未定義値になる。次のように明示 store する。
-  - **rax.0 := 0 (機械語で確定)**: `8c5f06: xor eax,eax` の後、`8c5f18: jg` まで rax は書かれない (`8c5f08`〜`8c5f15` は rcx・ebx・[rbp+0x4c]・flags のみ)。0 件経路は rax=0 のまま `8c6066` に入る。
-  - **rdx.1 := zext(arg2 下位 byte) (未検証の仮定)**: 機械語では `8c5efd: call 8c67a0` の後の rdx は callee 依存。`8c67a0` は中で `8c7c80` を呼び (`mov rdx, rbx` 後), `8c5eda` の `410320` は `call qword ptr [rax-0x30]` (vtable 間接 call、target は IR から決まらない) を呼ぶ。rdx の出力は IR から確定できない。`8c5ee1: movzx rdx, byte [rbp+0x88]` を経由する値として、既存 IR の `8c6071` (`8ca670` 後の rdx を引数 rdx と同じとする) と同じ pass-through 規約に合わせた。**410320 と 8c67a0 が rdx を変えないことは確認していない**。
+- **ガード辺の値**: ガードで飛ばすと、元 IR で `%rax.0.reg2mem`・`%rdx.1.reg2mem` を store するのは `dec_label_pc_8c6034`・`dec_label_pc_8c603f` だけで、飛び先 `dec_label_pc_8c6066` が両方を load する (phi は無い)。このままでは 0 件経路で未定義値になるため、専用ブロックで明示 store する。
+  - **rax.0 := 0 (機械語で確定)**: `8c5f06: xor eax,eax` の後、`8c5f18: jg` まで rax は書かれない (`8c5f08`〜`8c5f15` は rcx・ebx・[rbp+0x4c]・flags のみ)。0 件経路は rax=0 のまま `8c6066` に入る。ただし `8c6066`〜`8c60df` の間で rax は読まれず `8c60df` で上書きされるため、この値が結果に効く経路は無い。
+  - **rdx.1 := zext(arg2 下位 byte) (未検証の仮定。approve 判断に影響)**: 機械語では `8c5efd: call 8c67a0` の後の rdx は callee 依存。`8c67a0` は中で `8c7c80` を呼び (`mov rdx, rbx` 後), `8c5eda` の `410320` は `call qword ptr [rax-0x30]` (vtable 間接 call、target は IR から決まらない) を呼ぶ。rdx の出力は IR から確定できない。`8c5ee1: movzx rdx, byte [rbp+0x88]` を経由する値として、既存 IR の `8c6071` (`8ca670` 後の rdx を引数 rdx と同じとする) と同じ pass-through 規約に合わせた。**410320 と 8c67a0 が rdx を変えないことは確認していない**。
   - **残る未証明の経路**: 0 件 ∧ arg3 (r8) == 0 ∧ arg2 下位 byte ≠ 0 のとき `8c608d: call 410360` の第 2 引数 (rdx) が、この仮定値と一致するか。同経路は `8c608d` まで到達する (arg2 下位 byte = 0 では到達しない)。機械語の値を確定するには vtable target と `8c7c80` の rdx 出力の確認が要る。未確定のまま残す (§6)。
-- pass は冪等で、`--mode off` が逆変換する (`on → off` で元の IR に一致, `on → on` で無変更を確認)。
+  - 上記の未証明により、**「unit 56 ok」は件数 0 経路が正しいことの証拠ではない**。unit 56 は survey のラベル (ok/trap) が変わったことを示すだけで、出力の同一性は比較していない。
+- pass は冪等で、`--mode off` が逆変換する (`on → off` で元の IR にバイト一致, `on → on` で無変更を確認)。
 - `m11_build.sh` は alloca 修正の後に pass を適用する (既定 on)。`M11_GUARD699=off` で脱落状態に戻す。`M11_GUARD699_COND` で条件を差し替える (ネガコン用)。
 
 ## 2. 機構の切り分け (RetDec 段)
@@ -46,30 +50,22 @@ RetDec の CFG 復元 (jcc の終端化) と命令翻訳 (フラグ) のどち�
 
 ## 3. 実測
 
-### 3-1. negctl (`bash tools/m11/trap_triage/negctl_699.sh`, 3 回)
+### 3-1. negctl (`bash tools/m11/trap_triage/negctl_699.sh`, 1 回 (r5))
 
-4 構成の build + survey を各 1 回、計 3 回実行。構成: base = `8d883c3` の `m11_ov.c` + guard 無効 / cur = 現 `m11_ov.c` (8c7710 転記) + guard 無効 / fix = cur + guard 有効 (既定) / ng = cur + 偽ガード (`icmp eq i32 %9, 123456789`)。
+比較元は **同一の m11_ov.c** (main 取り込み後, #700 の 8c7710 転記を含む) に固定し、guard のみ変える 3 構成。構成: off = guard 無効 (基準) / fix = guard 有効 (既定) / ng = 偽ガード (`icmp eq i32 %9, 123456789`)。
 
-| 構成 | ok | trap (oom 以外) | oom | miss | noproc | 計 | unit 56 | 実施回数 |
-|---|---|---|---|---|---|---|---|---|
-| base | 864 | 30 | 1 | 46 | 1 | 942 | trap | 1 (r2) |
-| cur | 864 | 30 | 1 | 46 | 1 | 942 | trap | 1 (r2) |
-| fix | **865** | 29 | 1 | 46 | 1 | 942 | **ok** | 1 (r2) |
-| ng | 864 | 30 | 1 | 46 | 1 | 942 | trap | 1 (r2) |
+| 構成 | ok | trap (oom 除く) | oom | miss | noproc | 計 | unit 56 |
+|---|---|---|---|---|---|---|---|
+| off | 863 | 29 | 2 | 47 | 1 | 942 | trap |
+| fix | **864** | 28 | 2 | 47 | 1 | 942 | **ok** |
+| ng | 863 | 29 | 2 | 47 | 1 | 942 | trap |
 
-- **実施回数は 1 回 (r2) のみ**。3 回の再実行は時間制限のため未実施 (§6)。
-- r1 (最初の実行) は無効。`FL_WIN64_DIR` 未設定で PE (`/home/ubuntu/...`) を読めず、`m11_build.sh` が qstore (D17) を skip した。その結果 base/cur/fix/ng が全て 856/38 となり、fix でも unit 56 が trap のままだった。r2 は `FL_WIN64_DIR` を設定して qstore を有効にした値。
-- 旧版 (REPORT 初版) の数値は 3 回の実測で得たもの。本版の r2 は同一値を再現した。
-
-- 集計の定義: `units_<cfg>.json` の値を数えた (942 unit, trap と oom は排他)。survey 行の `trap` は oom を含む合計 (base 31 / fix 30)。e2e のサマリも同じ定義 (§3-3)。
-- 判定 G1〜G5 は r2 で PASS (exit 0)。
-  - G1 cur vs base: unit 差 0 (回帰 0)。
-  - G2 cur: unit 56 は trap。
-  - G3 fix vs base: 差は unit 56 の trap→ok のみ。
-  - G4 fix vs cur: 差は unit 56 の trap→ok のみ。
-  - G5 ng vs cur: unit 差 0 かつ unit 56 は trap (ネガコン)。
-- 所要: 4 構成の build + survey 合計 103 秒 (r1)。r2・r3 は各 `negctl699_r*.log` を参照。load は 4 vCPU で約 0.2〜1.0。
-- **限界**: 3 回とも一致した。#662 のレビュー (reviewer 実測) で観測された base の揺らぎ (856/38, 859/36) は、この環境では再現しなかった。揺らぎの原因は未特定で、#680 の範囲。「回帰 0」は**この環境で安定して再現した範囲**での主張。node は v22.23.3 (e2e 想定の v26 ではない)。
+- 判定 G1〜G3 は PASS、rc=0。差分は `off→fix` が unit 56 の trap→ok の 1 件のみ、`off→ng` は 0 件。
+- 所要: 3 構成の build + survey 合計 95 秒 (r5)。qstore 有効 (`capstone` 5.0.7 / `pefile` 導入後。skip 警告なし)。
+- **旧版からの変更点**: 前版の G1 (cur vs base) は、`origin/main` の取り込みで `m11_ov.c` が変わったため比較が成立しなくなった。比較元を同一 m11_ov.c に固定し直した。前版の base/cur/fix/ng の数値 (864/865 等) はこの版と比較できないため、採用しない。
+- 失敗した試行 (記録): r1 = `FL_WIN64_DIR` 未設定で PE を読めず qstore が skip された (unit 56 は trap のまま)。r4 = qstore は有効だが `capstone`/`pefile` 未導入の環境で、fix は unit 56 ok だが G1 / G3 は旧 base との比較で FAIL。r4 のスクリプトは比較元を変えたため廃止。
+- 限界: 1 回の実測のみ。再現性 (n≥3) は未測定。survey の揺らぎ (#662 reviewer 観測の base 856/38, 859/36) は本環境では再現していない。node は v22.23.3 (e2e 想定の v26 ではない)。
+- 「退行 0」は **survey の ok/trap ラベルの比較のみ** に基づく。出力 (unit の戻り値・メモリ) の同一性は未比較。fix で unit 56 以外の unit の出力が変わっている可能性は本件では排除していない。
 
 ### 3-2. 全 IR 関数の分岐突合走査 (`guard699/scan_guard.py`)
 
@@ -88,15 +84,16 @@ RetDec の CFG 復元 (jcc の終端化) と命令翻訳 (フラグ) のどち�
 - **走査の範囲**: 全 IR 関数 (= 全 unit の閉包を含む上位集合)。unit への帰属は行っていない。
 - **限界 (重要)**: strict の 405 件は**未検証の候補**。規則は heuristic で、偽陽性の率は未測定。405 件のうち miscompile である件数は本件では言えない。`dropped_target_not_label` の 7058 は内訳 (関数外への tail jump か否か) 未調査。
 
-### 3-3. e2e (`bash tools/m11/m11_e2e.sh`, 修正版 (コミット 9dbdd1e 以降の作業ツリー), 1 回)
+### 3-3. e2e (`bash tools/m11/m11_e2e.sh`, 修正版 (本版の作業ツリー), 1 回)
 
-| 回 | 所要 (秒) | rc | 備考 |
+| 回 | 所要 (秒, real) | rc | 備考 |
 |---|---|---|---|
-| r1 | 66.3 (`time` の real) | 0 | `FL_WIN64_DIR` 設定・PE (`[WIN64]`) 参照で qstore 有効 |
+| r2 | 61.7 | 0 | qstore 有効 (`capstone`/`pefile` 導入・PE は `FL_WIN64_DIR` 経由。skip 警告なし)。guard699 = on |
 
-- サマリ: `reached_stage 4`、`stop_reason` = DllMain attach 完走、`units_run_full 22 / 942`、survey `ok 865 / trap 30 (うち oom 1) / clobber 0 / miss 46`、`wasm_bytes 6027674`。
-- **実施は 1 回のみ** (3 回は時間制限のため未実施 (§6))。load・3 回の再現性は未測定。
-- 変更前 (`8d883c3`) は #662 の REPORT で 69.2 秒・survey 864/31 (oom を含む)。本 e2e は unit 56 が ok になった分だけ survey が変わる (865/30)。到達 stage は変わらない (4/6)。unit 56 の後段の停止点は本件の範囲外。
+- サマリ: `reached_stage 4`、`units_run_full 91 / 942`、survey `ok 866 / trap 28 (うち oom 2) / clobber 0 / miss 47`、`wasm_bytes 6028429`。
+- **§3-1 の negctl fix (864 / trap 28 / oom 2) と ok が 2 unit ずれる**。原因は未切り分け。同じ条件 (guard on・qstore 有効) で数値が一致しない点は、survey の揺らぎ (§6) の可能性がある。
+- **実施は 1 回のみ**。load・再現性は未測定 (§6)。
+- 到達 stage は変わらない (4/6)。unit 56 の後段の停止点 (`function_47ad70` の OOB) は本件の範囲外。
 - 所要の数え方: `date +%s.%N` の差 (`m11_e2e.sh` の開始から終了まで)。4 vCPU。
 - 検証範囲: e2e の survey は `unit 56 = ok` を含めて 942 unit 全件。e2e 末尾の `m11_icall_audit.py` の出力 (`脱落率 100.0%`) は本件と無関係の既存監査で、本件では判定していない。
 
@@ -122,7 +119,7 @@ bash m11_e2e.sh                                        # §3-3
 ```
 
 前提: `tools/m11/work/` に work-m11 が展開済み。`FL_WIN64_DIR` に fl-win64 が展開済み (`extracted/block00031_PE.bin`)。`capstone`・`pefile` を import できること (無いと qstore が skip される)。
-`m11_e2e.sh` は `[WIN64]` (`docs/REFERENCES.md`) の `extracted/block00031_PE.bin` を固定パスで参照する (#680 の範囲)。runner では展開先 (`fl-win64` 展開物の `extracted/`) への symlink を作って合わせた。
+`m11_e2e.sh` / `m11_gen_ir2.sh` は `FL_WIN64_DIR` (既定は固定パス。#680 の範囲) 配下の `extracted/block00031_PE.bin` を読む。`FL_WIN64_DIR` を設定すれば固定パスは不要。前提の `capstone`・`pefile` は導入済みであること (無いと qstore / ldfix が skip される)。
 
 ## 5. DEFECTS.md 行案 (PM 判断。直接編集はしない)
 
@@ -137,7 +134,8 @@ bash m11_e2e.sh                                        # §3-3
 | RetDec が先頭 `cmp/jg` を落とす機構 (CFG 復元か命令翻訳か) の切り分け | 同型の再発防止 (修復は IR pass で済んでいるが原因は未特定) | #718 (`[M11-N35]`) |
 | strict 候補 405 件の真偽 (偽陽性率を含む) | 他 unit の miscompile の有無。survey の trap 29 本との関係も未確認 | #718 (`[M11-N35]`) |
 | `dropped_target_not_label` 7058 の内訳 | 走査の見落とし/偽陽性の見積もり | #718 (`[M11-N35]`) |
-| `m11_e2e.sh` の PE 固定パス (`[WIN64]`) と node v26 前提 | runner では symlink と node v22 で動かしている | #680 |
+| `m11_e2e.sh` の PE 固定パス (`[WIN64]`) と node v26 前提 | runner では `FL_WIN64_DIR` と node v22 で動かしている | #680 |
+| negctl fix と e2e の survey 値のずれ (2 unit, §3-3) | 原因未切り分け。guard の効果の判定に直接影響 | 起票依頼 (PM 採番。#680 が近いが別件の可能性) |
 | survey の揺らぎ (#662 reviewer 観測: 856/38, 859/36) | 再実行で同じ値 (856/38) が出た (§3-1)。原因未特定 | #680 |
 | `docs/DEFECTS.md` の行案 (D1b との関係の判定を含む) | PM 判断 | PM (§5) |
 | ガード辺の rdx.1 の値 (0 件 ∧ arg3==0 ∧ arg2 下位≠0 の `8c608d` 経路) | 仮定 (zext(arg2)) を置いた。410320 の vtable target と 8c7c80 の rdx 出力を確認するまで正しさは未証明 | #718 (`[M11-N35]`) へ追記 |
