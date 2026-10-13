@@ -145,6 +145,16 @@ def uninit_reads(lines, s, e):
     """(alloca 名, alloca 型) → 初期化前に load されたか。dominance ベース。"""
     blocks = split_blocks(lines, s, e)
     order = list(blocks.keys())
+    # entry から到達不能な block (RetDec が残す死んだ block) は dom={自分のみ} になり
+    # 後続の共通部分を空にして偽陽性を出すため、解析対象から外す
+    seen, stack = set(), order[:1]
+    while stack:
+        b = stack.pop()
+        if b in seen or b not in blocks:
+            continue
+        seen.add(b)
+        stack.extend(succ_of(blocks, b))
+    order = [b for b in order if b in seen]
     dom = dom_analysis(blocks, order)
     allocas = {}          # name -> (ty, entry index of alloca insn)
     for i in range(s + 1, e):
@@ -154,9 +164,9 @@ def uninit_reads(lines, s, e):
     stores = collections.defaultdict(list)   # name -> [block, ...]
     for b in order:
         for i in blocks[b]:
-            m = STORE_PTR_RE.match(lines[i])
+            m = STORE_PTR_RE.match(lines[i].strip())
             if m:
-                stores[m.group(1)].append(b)
+                stores[m.group(1).split()[-1]].append(b)
     bad = {}
     for b in order:
         for i in blocks[b]:

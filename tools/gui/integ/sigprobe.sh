@@ -20,6 +20,7 @@ LF=(-pthread -O1 -I "$GUI/include" -I "$GUI/src" -sGLOBAL_BASE=1048576 --no-entr
 emcc "${LF[@]}" "${BASE[@]}" "$W/adapt.o" -o "$W/with_adapt.js" >"$W/with_adapt.log" 2>&1 || { tail -20 "$W/with_adapt.log"; exit 1; }
 emcc "${LF[@]}" "${BASE[@]}" "$W/wrap.o" -o "$W/no_adapt.js" >"$W/no_adapt.log" 2>&1 || true
 A=$(grep -c "signature mismatch" "$W/with_adapt.log" || true); B=$(grep -c "signature mismatch" "$W/no_adapt.log" || true)
-U=$(wasm-objdump -j Import -x "$W/with_adapt.wasm" | grep -cE "<env\.(gui_|[A-Z])" || true)   # 未解決のまま wasm import になった shim/GUI シンボル
+python3 "$HERE/wasm_imports.py" --selftest >/dev/null || { echo "[sigprobe] wasm_imports selftest FAIL" >&2; exit 1; }
+U=$(python3 "$HERE/wasm_imports.py" "$W/with_adapt.wasm")   # 未解決のまま wasm import になった shim/GUI シンボル (wasm-objdump 不要。不在で空振りさせない)
 echo "[sigprobe] declares=$(grep -c '^declare' "$W/probe.ll")  with adapter: signature mismatch=$A unresolved-imports=$U | without adapter (negative control): mismatch=$B"
 [ "$A" = 0 ] && [ "$U" = 0 ] && [ "$B" -gt 0 ]

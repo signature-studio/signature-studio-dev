@@ -13,12 +13,22 @@ t0=$(date +%s); S "start load=$(cut -d' ' -f1-3 /proc/loadavg) nproc=$(nproc)"
 for f in boot_final.ll boot_final3.ll m11_image.bin; do [ -f "$SRC/work/$f" ] || { S "前提欠如: tools/m11/work/$f (work-m11 素材 + m11_gen_ir2.sh)"; exit 2; }; done
 [ -f "${FL_WIN64_DIR:-/nonexistent}/extracted/block00031_PE.bin" ] || { S "前提欠如: FL_WIN64_DIR/extracted/block00031_PE.bin (import thunk 表)"; exit 2; }
 command -v x86_64-w64-mingw32-gcc >/dev/null || { S "前提欠如: x86_64-w64-mingw32-gcc (gen_api.py の arity 表)"; exit 2; }
+command -v "${RETDEC:-retdec-decompiler}" >/dev/null || { S "前提欠如: retdec-decompiler (m11_wndseed.sh の boot6 lift。PATH か RETDEC= で指定)"; exit 2; }
+python3 -c "import capstone, pefile" 2>/dev/null || { S "前提欠如: python3 の capstone / pefile (m11_wndclass_scan.py・m11_wndseed.sh)"; exit 2; }
+for i in 0 1 2 3 4; do [ -f "$SRC/work/boot$i.lift.ll" ] || { S "前提欠如: tools/m11/work/boot$i.lift.ll (work-m11 素材。m11_wndseed.sh が boot0..4 を基準にする)"; exit 2; }; done
+# tools/m11 は読取のみ (AGENTS §4-4): m11_build.sh は work/ を書き換えるため、work 込みで複製した検証スナップショットで以降を回す
+SNAP="$W/snap"; rm -rf "$SNAP"; mkdir -p "$SNAP"
+cp -a "$GF_M11" "$SNAP/m11" && cp -a "$GF_M11/../shared" "$SNAP/shared" && cp -a "$GF_M11/../shim" "$SNAP/shim" || { S "検証スナップショットの複製に失敗"; exit 2; }
+export GF_M11="$SNAP/m11"; M="$GF_M11"; S "検証スナップショット: $M (元の tools/m11 は読取のみ)"
 
 S "0/6 複製: tools/m11 + tools/shim + tools/shared → $TREE (m11_build.sh の相対参照を保つ)"
-rm -rf "$TREE"; mkdir -p "$TREE"; cp -a "$SRC" "$GF_GUI/../shim" "$GF_GUI/../shared" "$TREE/"
+rm -rf "$TREE"; mkdir -p "$TREE"; cp -a "$SRC" "$GF_GUI/../shim" "$GF_GUI/../shared" "$GF_GUI/../m2" "$GF_GUI/../m5" "$TREE/"   # m2/m5: m11_lift.sh が ../m2/ir_normalize.py・../m5/ir5_patch.py を呼ぶ
 mkdir -p "$TREE/m6" && cp -a "$GF_GUI/../m6/ottlib.py" "$TREE/m6/"   # m11_wndclass_scan.py は ../m6/ottlib.py を import する
 export GF_M11="$TREE/m11"; M="$GF_M11"
 ( cd "$M" && bash m11_gen_ir2.sh > "$W/res/m11_gen_ir2.log" 2>&1 ) || { S "m11_gen_ir2.sh 失敗 (複製側で IR 再生成。#680 の ldfix=applied 記録が必要)"; tail -5 "$W/res/m11_gen_ir2.log"; exit 2; }   # main #680: m11_build.sh は ir_conditions.json の ldfix=applied を要求する。素材の旧 IR は使えない
+( cd "$M" && bash m11_wndseed.sh > "$W/res/m11_wndseed.log" 2>&1 ) || { S "m11_wndseed.sh 失敗 (boot6 lift + 最終 IR。RetDec / PE を確認)"; tail -5 "$W/res/m11_wndseed.log"; exit 2; }   # #565: WNDCLASS 静的実体の WNDPROC 閉包 (boot6) が無いと最終 IR で WNDPROC 8 件が未定義 (W1 FAIL)
+[ -f "$M/work/boot6.lift.ll" ] || { S "前提欠如: boot6.lift.ll が生成されていない (m11_wndseed.sh)"; exit 2; }
+tail -1 "$W/res/m11_wndseed.log" | sed 's/^/[gf_e2e] wndseed: /'
 (cd "$SRC/work" && sha256sum boot_final.ll boot_final3.ll | sed 's/^/material  /') > "$R/ir_sha256.txt"   # 素材そのままの IR (provenance)
 S "0/6 baseline (GUI shim 無し, 同一 IR): m11_build.sh → m11_run.mjs / m11_survey.mjs (複製側)"
 ( cd "$M" && bash m11_build.sh > "$W/res/m11_build.log" 2>&1 ) || { S "m11_build.sh 失敗"; tail -5 "$W/res/m11_build.log"; exit 2; }
@@ -56,6 +66,12 @@ python3 "$GF_GUI/gen_api.py" > /dev/null    # IMPORTS.md の「実到達」列�
 
 S "4/6 native selftest (tools/gui/test/selftest.sh)"
 bash "$GF_GUI/test/selftest.sh" 2>&1 | tail -1 | tee "$W/res/selftest.txt"; grep -q ", 0 failed" "$W/res/selftest.txt" || rc=1
+
+S "4b/6 __pe_image の data 実体化 (GUI-12 #566): 共通規則 vs m11_data_gen.py (実 FLEngine PE, LB=0/0x10000) + ネガコン"
+python3 "$HERE/pe_image_parity.py" --pe "$FL_WIN64_DIR/extracted/block00031_PE.bin" > "$W/res/pe_image_parity.txt" 2>&1; pr=$?
+grep -E "PASS|FAIL|done" "$W/res/pe_image_parity.txt"; [ $pr = 0 ] || rc=1
+bash "$GF_GUI/test/pe_image_e2e.sh" > "$W/res/pe_image_e2e.txt" 2>&1; pr=$?
+grep -E "PASS|FAIL|done" "$W/res/pe_image_e2e.txt"; [ $pr = 0 ] || rc=1
 
 S "5/6 ネガティブコントロール (全て FAIL / 非 0 になることを要求)"
 nc() { # nc <label> <regex that the failing output must match> <cmd...> : 非 0 かつ regex に一致 (judge のクラッシュ等を FAIL 確認と誤認しない)

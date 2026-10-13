@@ -16,7 +16,10 @@ NAME="$2"
 TMO="${3:-2400}"
 NFN="$(echo "$RANGES" | tr ',' '\n' | wc -l)"
 echo "[lift] $NAME: ranges=$NFN timeout=$TMO"
-"${RETDEC:-$(command -v retdec-decompiler || echo /opt/retdec/bin/retdec-decompiler)}" "$BIN" -o "work/$NAME.drc.c" \
+RETDEC_BIN="${RETDEC:-$(command -v retdec-decompiler || true)}"
+[ -n "$RETDEC_BIN" ] || RETDEC_BIN="${RETDEC_ROOT:-/opt/retdec}/bin/retdec-decompiler"
+[ -x "$RETDEC_BIN" ] || { echo "[lift] FAIL: retdec-decompiler 無し (RETDEC_ROOT=${RETDEC_ROOT:-unset}; REFERENCES [RETDEC])" >&2; exit 1; }
+"$RETDEC_BIN" "$BIN" -o "work/$NAME.drc.c" \
   --select-ranges "$RANGES" --select-decode-only --timeout "$TMO" \
   > "work/$NAME.retdec.log" 2>&1
 touch "work/$NAME.retdec.DONE"
