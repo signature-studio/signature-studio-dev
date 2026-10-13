@@ -32,8 +32,11 @@ export async function spawnServer(root: string, o: { latencyMs?: number; mbps?: 
     shape: async (l, m) => void (await fetch(`${url}/__shape?latency=${l}&mbps=${m}`)),
     waitReport: async (ms) => {
       // ロングポール 1 本で受信 (反复 GET ポーリングだと pendingReport を先に消費してしまう競合がある)
-      const r = await fetch(`${url}/__report?wait=${Math.min(ms, 110000)}`);
-      if (r.status === 200) return r.json();
+      const end = Date.now() + ms;
+      while (Date.now() < end) {
+        const r = await fetch(`${url}/__report?wait=${Math.min(end - Date.now(), 110000)}`);
+        if (r.status === 200) return r.json();
+      }
       throw new Error('report timeout');
     },
     close: async () => void cp.kill(),

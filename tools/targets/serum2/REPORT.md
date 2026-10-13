@@ -239,7 +239,7 @@ GHIDRA=1 bash tools/targets/serum2/scripts/run_all.sh   # +Ghidra 全自動解�
 ### 11.5 未解決
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| zlib/zstd/libsndfile/FLAC/muParser/PFFFT/libsfz の版が未確定 | 再ビルド対象版を固定できない | #71 継続 (本 PR は Refs。版は定数表の一致比較 or 動的トレースで) |
+| zlib/zstd/PFFFT/libSFZ は版文字列から確定不能。muParser は 2.2.x 系と推定 (2.2.0〜2.2.4 未突合)。libsndfile/FLAC は未検査 | 再ビルド対象版を固定できない | #71 継続 (詳細は `REPORT_SR3b.md`・再現 `scripts/sr3b_run.sh`) |
 | muParser 窓が組込み関数の登録側を含まない (§11.3 の 6 関数) | lift 対象に muParser 一部が残る | #71 継続 |
 | nlohmann::json instantiation が 36 関数しか seed 化できていない (推定: 実数は数百) | 除外不足 (lift 側に残るだけで安全側) | #19 と共有 |
 | 窓内 `window` タグ (SQLite 921 / zstd 202 ほか) はリンク連結による推定で、upstream 関数との 1:1 照合なし | 過除外すると DSP を落とす恐れ。SQLite は §11.3 の検算で支持 (183/189) | SR-4 着手時の動的トレース (blockedBy #71) |

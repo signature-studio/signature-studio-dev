@@ -34,14 +34,28 @@
 - **実測 (検証 HEAD = 739a4fe1。3bdb1d74 に origin/main 570bcb73 を merge し REPORT を更新した commit。空の W から stage-2 全再構築、素材 fl-win64 + toolchain-emsdk + work-fw-stage1、2026-10-13 runner)**:
   - `fw_269_verify.sh`: rc=0, `fw_stage2.sh` 253 s (load 0.42 0.77 0.60 → 2.62 1.78 1.04), smoke ×3 PASS (81/81/81 ms, dispatch=38 units_done=0 va=1 heap=1 ff=0)、smoke 同値 差分行=0/0、wasm 15,062,169 B (`--size` 未指定のため照合は警告止まり)。
   - `hs_e2e.sh --fresh`: rc=0, 88 s (load 0.64 1.30 0.94 → 1.34 1.32 0.98), `E2E PASS`。Phase B は `Phase B 例外: memory access out of bounds` を出し、emcc 側の実行ログにも `Aborted(Runtime error: The application has corrupted its heap memory area (address zero)!)` が出る。判定 (hs.mjs §判定) は `plug===0` 時の ID prefix 照合のみで、GOLDEN 6 ID すべて一致 → `E2E PASS`。`plug != 0` の完全生成は REPORT §7.1 の次段扱い。
-  - Phase B 例外の切り分け (レビュー指摘 2): origin/main の `gen.py` では `fw_stage2.sh` が `KeyError: 'g224'` で停止し `fw_image.bin` を生成できない。したがって origin/main では Phase B に到達せず、同素材の baseline は取得不可。本 PR の `_params` 修正 (`CT.get(t, "u128")`) で到達可能になった経路が例外の原因である可能性を否定できない。**既存仕様とは断定しない**。切り分けと判定は #884 (`[P0c-11]`) で行う。
+  - Phase B 例外の切り分け (レビュー指摘 2): 当初は「origin/main は `KeyError: 'g224'` で停止し baseline 取得不可」と記したが、**現 main (`99b87bc2`) では `fw_stage2.sh` は完走する** (下記 §#884)。`_params` の `CT.get` 修正 (382c345a) は main に入っている。
+- **#884 切り分け (HEAD `99b87bc2` = origin/main、素材 fl-win64 + toolchain-emsdk + work-fw-stage1、runner 2026-10-13)**:
+  - `fw_stage2.sh` (空の `tools/plugins/work/fw` から全再構築): rc=0, 433 s, load 0.21 0.53 0.28 → 2.33 2.28 1.17, smoke `dispatch=38 units_done=0 va=1 heap=1 ff=0` PASS。
+  - `hs_e2e.sh --fresh`: rc=0, 159 s, load 2.05 2.22 1.16 → 1.08 1.72 1.13, Phase A smoke PASS, Phase B `memory access out of bounds` (`status=0xffffffff plug=0x0 rec=7`), `E2E PASS` (判定は plug===0 の ID prefix のみ)。同一バイナリで再実行 (`hs_route.cjs` は再ビルド不要のため 1 s) も同一の Phase B 例外を再現。
+  - **`_params` の CT.get フォールバックの寄与**: `fw_flat4.ll` の `__asm_` 宣言 295 件を gen 入力で集計したところ、`CT` に無いタグは 0 件 (フォールバックは現入力で未使用)。フォールバックを外して (`CT[t]`) `gen.py` を再実行した `fw_simd.c` は既存出力と**バイト一致** (`cmp` 差分 0)。よって Phase B の OOB は CT.get 修正の副作用ではない。
+  - Phase A の `RestoreContext` 直後にも同種の `Aborted(... corrupted its heap memory area (address zero)!)` が出るが、Phase A の smoke 判定は PASS (`dispatch=38 ff=0`)。
+  - 結論: **回帰ではない** (origin/main 上で再現し、本 PR 由来の変更を外しても生成物が変わらない)。原因は REPORT.md §6・§7 の RTL fold deref (RetDec の引数定数折畳み) で、#985 `[PLG-P0b-1]` が追跡する。#884 の受入 1・2 はここで満たす。
+  - 残件: `hs_e2e.mjs` の判定が Phase B 例外時に PASS となる点は #985 受入 2 で扱う (本件では未変更)。
   - `_stub` (指摘 1 対応): `d0e15d52` の `_stub` 書き換えを元に戻した。未知タグ `?` を含む形と既知型形を含む 8 形で 56aa8795 と出力一致 (diff 0)。`['g224']` / `['x','g224']` の `_params` 経路は `u128` にフォールバックして正常生成 (旧版は KeyError)。`gen.py` の PR 差分は `_params` の 1 行のみ。
 - 副作用の確認: `liftlib/simd/gen.py` の既知型 (x/d/q/b/y 等) の `_stub` 出力は origin/main と一致 (5 形で diff 0)。`tests/test_unit.py` は `m6/work` 等の素材が無く実行不可 (既存の前提)。
-- **未達 (受入 3 の FW_EXT_FUNCS 指定経路)**: 本 run は既定経路 (FW_EXT_FUNCS 未指定) のみ検証。ext 指定時の e2e は未実施。
+- **#610 再検証 (HEAD = b37d20ac、素材 fl-win64 + toolchain-emsdk + work-fw-stage1、runner 2026-10-13)**:
+  - 既定経路 (FW_EXT_FUNCS 未指定): `fw_269_verify.sh` ALL PASS (空の W から, `fw_stage2.sh` 318 s, load 0.44 0.68 0.58 → 2.57 1.81 1.07, smoke ×3 PASS, 差分行 0/0, wasm 15,062,169 B)。`hs_e2e.sh --fresh` E2E PASS (97.9 s)。Phase B `memory access out of bounds` は本節 1 段上と同一。
+  - ext 指定 (`FW_EXT_FUNCS=function_5dfd30,function_5dfdb0,function_5de820,function_5dedf0`): `fw_269_verify.sh` ALL PASS (`fw_stage2.sh` 319 s, load 0.81 1.16 1.02 → 2.63 1.98 1.36, smoke ×3 PASS, 差分行 0/0)。`fw_f80.ll.ext.json` で `ext_functions: 4`・skip 0 を確認。ただし wasm サイズは既定と同一 15,062,169 B で、ext 化が最終 wasm に反映されたかは未確認。
+  - ext 指定 (`function_5dfbe0,5dfc90,5dfd30,5dfdb0,5de820,5dedf0,5dfb60` の 7 関数): **fail**。`function_5dfb60` / `5dfbe0` / `5dfc90` が `skip:no-ext-values` で ext 化されず、`fw_f80.py` が exit 1 (fail-fast 設計どおり)。
+  - `hs_e2e.sh` の ext 指定版: `FW_EXT_FUNCS=...` 付きで E2E PASS (97.9 → 99.2 s)。ただし hs は既定経路で生成済みの `fw_flat4_canon3.ll` を読むため、ext 版の中間生成物を経由していない。
+  - 修正: `fw_269_verify.sh` の snapshot に `tools/plugins/p0c` を追加 (ext 指定時の `f80_lower.py` 不在を解消)。
+  - 環境: `pefile` が runner の python3 に無く、venv (`uv pip install pefile capstone numpy`) を PATH 先頭に置いて実行。
+- **未達 (受入 3 の FW_EXT_FUNCS 指定経路)**: 7 関数指定は 3 関数が ext 化不可。`fw_flat4_canon3.ll` を ext 版で再生成した e2e は未実施。ext 対象の選定根拠 (x87 関数の一覧) は未作成。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | FW_EXT_FUNCS 指定 (ext 対象関数あり) 時の fw_269_verify.sh / hs_e2e.sh 再検証 | #311 受入条件 3 の残り | #197 (選定後に再 run) |
 | FW_EXT_FUNCS 対象 x87 関数の一覧と選定根拠 | 未決 | #197 |
-| Phase B `memory access out of bounds` の原因切り分け (origin/main に baseline 無し) | `_params` の CT.get 経路で到達可能になった可能性。既存仕様か回帰かは未確定 | #884 |
+| Phase B `memory access out of bounds` の原因 | 回帰ではない (下記 #884 切り分け)。原因の RTL fold deref は #985 で追跡 | #985 (#884 は切り分け済み) |
 | `tests/test_unit.py` の素材依存 (`m6/work/ott.drc.ll` 等) | 単体テストが素材無しで実行不可 | 別途 (未起票・次 PM 判断) |

@@ -25,6 +25,7 @@ REPORT 本体 §4 から分割移動した経緯と実行条件 (内容は削除
 
 - 実行: `bash tools/plugins/modulation/engine_lift.sh <block> 300` を 4 本 (18977・19143・19266・19268) 順次実行。実測値は本体 §4 の表と直下の段落に記録した。
 - 上記は emsdk 入りの環境で行われた。修正 run の runner には `emcc` と `/opt/emsdk` が無いため、再実行していない。
+- #527 レビュー差し戻し対応 (fix run): `work/modulation/engine<N>/` (lift 出力・`ranges.txt`・`summary.csv`) が無く、`$ARTIFACTS_DIR` は `fl-win64.tar.zst` のみ。4 本の `engine_name_gap.py` stdout と `ranges.txt` 件数は**取得不可**で、本付録にも REPORT にも実機値を載せない。`engine_name_gap.py` の検証は合成入力のみ (注釈 1 件・関数名 `helper_x`/`lookup` の 2 件照合、件数不一致で exit 1)。
 
 ## E. 受入条件の状態 (PR #804 本文より)
 

@@ -92,12 +92,33 @@ argfix の `helper_xmm` が 9 → 12 に増え 0x5e09f0 / 0x5e0a70 / 0x5e0b10 �
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| ~~0x5de3e0 の `[rdx]` store 欠落 (lift)~~ | 解決 (#982, §14.6) | — |
-| 0x5dee90 / 0x5df040 / 0x5e02b0 の残差 | buf_diff 約 2.57M | #331 |
+| ~~0x5de3e0 の `[rdx]` store 欠落 (lift)~~ | 解決 (#982, §14.7) | — |
 | 0x5e12b0 の ucomiss 落ち (lift) | abi-mismatch のまま | #331 |
+
+(0x5dee90 / 0x5df040 / 0x5e02b0 は §14.6 で解消。当初の「x87 模型の問題」の推定は外れ、原因は deref の落ち。)
 
 #331 の対象 kernel は 0x5de3e0 / 0x5dee90 / 0x5df040 / 0x5e02b0 / 0x5e12b0 の 5 つ (0x5e0d80 は含まない)。
 | ext 精度が必要な kernel の wasm32 検証・framework 統合 | #269 §12.4 と同じ | #197 (既存提案) |
+
+### 14.6 #983: 残差 3 kernel の原因確定と修復 (検証 HEAD `cb34601`)
+
+原因 (機械語を capstone で読んで確定。lift 前段で RetDec が落としていた):
+
+- **0x5dee90 / 0x5df040** (buf_diff 2,565,360 / 2,565,277): 先頭の `movups xmm7,[r10]` (r10 = r9 = 第 4 引数 arg4) の読み元が、
+  IR で arg4 でなく未初期化 `alloca %r9` になっていた。修復後も `fix_asm_stores` を通さないと 993 cell 残る (下記)。
+- **0x5e02b0** (buf_diff 2,578,706): `mov rdx,[rdx]` (record の第 1 qword を base にする) が落ち、2 本目の出力 base が arg2 自体になっていた。
+
+修復: `k80_deref_fix.py` (新規、関数単位の置換で 1 箇所一致を assert、負論対照 `K80_NO_DEREF_FIX=1` は no-op)。
+`p0c3_e2e.sh` / `p0c4_abi_e2e.py` の chain に組み込み。`p0c3` は lift 後段と揃えるため `fix_asm_stores` を前段に追加した。
+
+| 実測 (HEAD `cb34601`、素材 `fl-win64` のみ、2000 case) | 結果 |
+|---|---|
+| `p0c4_abi_e2e.py 2000` | rc=0、27.0 s (load 0.14〜0.38)、`run=67 ok=67 sig11=0`、3 kernel とも buf_diff=0 |
+| `p0c3_e2e.sh 2000` | rc=0、50.1 s (load 0.41〜0.44)、回帰 11 + 3 kernel とも buf_diff=0 |
+| 修復前 (同じ素材・同じ chain) | 0x5dee90=2,565,360 / 0x5df040=2,565,277 / 0x5e02b0=2,578,706 |
+
+注意: `p0c3` で `fix_asm_stores` を外すと 0x5dee90 / 0x5df040 は buf_diff=993 になる (`p0c4` は 0)。
+pass の順序依存で、lift 後段の順序 (`fix_asm_stores` → f80_lower) に揃えた。
 
 ### 14.5 再現
 
@@ -117,7 +138,7 @@ INTERSECT `run=66`)。MEMW の差は CSV の buf_diff でのみ検出できる�
 で再生成。`llvm-as` / `clang` は PATH に必要 (runner では `/usr/lib/llvm-18/bin`)。
 `/opt/retdec` と `/home/ubuntu/work/{analysis,webstudio}` は runner 上の symlink で代替 (§12.4)。
 
-### 14.6 0x5de3e0 の上位 dword store 復元 (#982、親 #331)
+### 14.7 0x5de3e0 の上位 dword store 復元 (#982、親 #331)
 
 機械語 `fistp qword [rbp+8]` の後に `mov [rdx], eax` (上位 dword) と `mov [r8], eax` (下位 dword) の 2 store がある。
 RetDec IR は下位 store (`%arg3`) のみで、`%arg2` の `inttoptr` が未使用だった (lift 欠落、§14.4 の未解決)。
@@ -239,3 +260,33 @@ before は 515.7 s で `p0c/work/kernel_table.json` の置き場所違いによ�
 範囲外 / 未解決: `inventory/kernel_table.py:15` と `lift/batch_lift.sh:31` ほか `lift/` 配下の `/home/ubuntu` 既定は別 area の置換 issue (#294 配下) で扱う。
 `k80_diff.py` は `p0c2_e2e.sh` [6] 経由で実行済み (`LIFTP` は `REPO_ROOT` 基準で解決)。RetDec の非決定性は §15.4 に実測を残すのみで、RetDec 非決定は #668、`p0c_e2e.sh` [4] の `kernel_table.json` 置き場所と `nsis_blockmap.json` 生成は #669 に起票。
 
+
+### 15.5 #346 受入条件 2 の実測 (検証 HEAD d529f071 / 比較 before 8af7eb0 + [4] 1 行修正 / after 856be6b)
+
+本節の fresh 実測は検証 HEAD `d529f071` (main `5847ac61` を merge した PR head)。コードは `d529f071` と同一で、後続 commit は本 REPORT のみ変更する。
+素材は `fl-win64` のみを `$RUNNER_TEMP/fl-win64` に展開。RetDec・emsdk は runner 既存の `[RETDEC]`・`[EMSDK]` (`docs/REFERENCES.md`)。依存 (pefile・capstone・numpy) は repo 外の venv。`llvm-as` は `/usr/lib/llvm-18/bin` を PATH に通した。各 n=1・直列・4 コア runner。
+
+| 検証 (`d529f071`・fresh = `work/` 空) | rc | 所要 | stdout 行数 | 開始 load (1 分値) | 終了 load (1 分値) | 注記 |
+|---|---|---|---|---|---|---|
+| `p0c_e2e.sh` ([2] kernel_matrix 込み) run A | 0 | 515 s | 135 | 0.55 | 7.89 | 本表の初回 run |
+| `p0c_e2e.sh` run B (競合解消報告) | 0 | 521 s | 未記録 | 未記録 | 7.80 | 開始 load 未記録 |
+| `p0c2_e2e.sh 200` run A (1 回目) | 0 | 33 s | 75 | 7.26 | 4.49 | 直前の `p0c_e2e.sh` の負荷が残っていた可能性あり (未確定) |
+| `p0c2_e2e.sh 200` run B (2 回目) | 0 | 9 s | 75 | 3.49 | 3.11 | 直前 run A の負荷が残っていた可能性あり (未確定) |
+| `p0c2_e2e.sh 200` run C (競合解消報告) | 0 | 15 s | 未記録 | 未記録 | 2.90 | 開始 load 未記録 |
+
+各 run は n=1・直列。run B・C は報告コメント (head `d529f071`) の実測で、実行順は報告から特定できない。`p0c2_e2e.sh` は全 run で `== p0c2 e2e OK ==` で終了。PR 本文の「検証」節は本表への参照のみとし、数値は本節が正本。
+開始 load の値は負荷が残った状態での値を含むため、同一条件の再現値として扱わない。
+run 3 の HEAD 行 (`b1e5f88a` の `p0c_e2e.sh` 6.7 s・`p0c2_e2e.sh 200` 7.5 s) は kernel_matrix・lift を skip した実行のため fresh 値ではなく、本表から除外した。
+
+受入 2 の before/after 比較 (run 3 の記録。検証 HEAD `b1e5f88a` 時点で、main 取り込み前の tree。**現 HEAD `d529f071` では未検証**。現 HEAD で before/after を比較し直していない。`[WIN64]` と `[RETDEC]` の既存 install を before 側の旧パス参照先として symlink で用意、after は `FL_WIN64_DIR` のみ):
+
+| 項目 | before (8af7eb0 + [4] 1 行修正) | after (856be6b) |
+|---|---|---|
+| `p0c_e2e.sh` 初回 (kernel_matrix 込み) | rc=0、354.4 s (開始時 uptime load 1 分値 0.55) | rc=0、350.9 s (開始時 uptime load 1 分値 3.57) |
+| `p0c2_e2e.sh 200` | rc=0、9.4 s (load 未記録) | rc=0、14.7 s (load 未記録) |
+
+判定 (run 3 の記録。現 HEAD では未検証): `p0c_e2e.sh` の stdout (132 行) と `p0c2_e2e.sh` の stdout (パス正規化後) は before/after で一致。`cmp` 一致 (`work/` 配下の成果物): `k80.final.ll` `table_verify.json` `kernel_matrix.json` `f80_classes.json` `f80_kernels.json` `p0c2_sweep.csv` `k80abi.json` `diff/k80.argfix.ll` `diff/k80.argfix.wasm.o`。
+不一致は `build.log` と `k80diff` バイナリのみで、実行時プロセスのアドレス (`nat=` `ir=`) の ASLR 差。
+
+段階 [4] の不具合: `p0c_e2e.sh` の `kernel_table.json` 参照が `p0c/work/` を見ていた (実体は `tools/plugins/work/`)。before 側の実行では、`8af7eb0` にこの 1 行修正を当てて比較した (修正は main の `72fb21d9` で反映済み。本 PR は修正を含まない)。#669 で扱う。
+ネガティブコントロール・`/home/ubuntu` の grep は §15.2 のとおり。

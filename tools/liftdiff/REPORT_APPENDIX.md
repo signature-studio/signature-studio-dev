@@ -117,10 +117,12 @@ case 単位分類 (完全再現) を基準にすること。「実行不能 2,49
   410320 については IR が `ret %arg1` のみで call 0 件、機械語は間接 call 1 件 (上記) であり、候補としては強い。残り 126 件は別の分岐 (0x417b70 32 / 0x40a3d0 24 / 0x418be0 20 ほか)。**未特定**。
 - ExitProcess へ至る連鎖 (例 0x6ae290: wasm のみ `409470 → 409730 → 4096d0 → 4096b0 → 412a40 → 4128b0`) は「alloc 失敗を示す Delphi の runerror 経路」と読めるが、
   410320 の call 脱落からその経路に入るまでの因果は trace_head (最大 12 件) に収まらず**直接確認していない** (推定)。
+- **分岐の型 (LD-17 / #864)**: 残りを排他的に型 B (L が ret まで call 無し・tail jump 無し) / C (L の直接 call 先で分岐) / D (直接 call 先に無い) に分類した。件数は `results/m11_unreachable_diverge.md` §2 が正本。
+  型 B は「L の内部では食い違わず、L の戻り後の呼出元で次 entry が現れる」と読める (推定)。根拠は B に入る L の機械語を ret まで読んで jmp 先 (tail jump) が無いことを確認した点のみ (`tail_jmps`)。戻り後の実際の呼出元は未確認。個別原因は未特定 → 子 issue #1034 (型 B)・#1035 (型 C・D)。
 - **OOB function_414ad0 系 (68 件)**: 機械語は入口 rcx (var 文字列のアドレス) の 1 段 deref `mov r,[rbx]` が 4 箇所 (0x414af3/0x414b49/0x414b64/0x414b78)。
   lift 後 IR には `%arg1` を ptr とする load が 0 件で、`%arg1` を値のまま `icmp`/`add` に使っている (ldfix F3a/F3b 型の値↔アドレス取り違え)。
   68 件は全て最上位 trap frame が `function_414ad0` (= wasm は 414ad0 に到達している)。wasm trace_head に 414ad0 が現れるのは 41 件で、
-  残り 27 件は trace_head (最大 12 件) に位置が保持されていないだけで、**非到達・別原因とは言えない** (原因は 41 件と同じか否か未確認)。
+  残り 27 件は trace_head (最大 12 件) に位置が保持されていないだけで、**非到達・別原因とは言えない** (原因は 41 件と同じか否か未確認)。 27 件の到達確認 (25/27 到達) と OOB 他の最上位 frame 集計 (LD-18 / #865) は `REPORT_APPENDIX_865.md` (新規節・件数の定義もそこ)。
 
 ### 手動実測 (単体 run、スクリプト非対応・第三者再現不可)
 
@@ -131,16 +133,16 @@ case 単位分類 (完全再現) を基準にすること。「実行不能 2,49
   z / s / p0 は wasm=trap/ok → wasm=ok (native_fault) になった。p1 / p01 / pall / pall2 / qall は native・wasm とも fault のまま。
 
 ### 検証範囲 / 範囲外
-- 範囲内: 2 スクリプトの出力 (`results/*.md`) の再計算、ネガティブコントロール (`m11_unreachable_diverge.md` §4: 候補 4 関数の IR に call を足すと全て非候補に変わる)。
+- 範囲内: 2 スクリプトの出力 (`results/*.md`) の再計算、ネガティブコントロール (`m11_unreachable_diverge.md` §5: 候補 4 関数の IR に call を足すと全て非候補に変わる)。
 - 範囲外: 上記 手動実測、`liftdiff_e2e.sh`・batch 再走、`mach()` の線形走査 (最初の `ret`/`int3` まで) による早期 return 関数の間接 call 数え落とし。
 
 ### 未解決
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | unreachable の 410320 以外 126 件の分岐 | 原因未特定 | #307 に残す + 子 issue 起票を PM に依頼 (PR コメント) |
-| OOB 414ad0 の 41 件以外の 27 件と、414ad0 系でも他パターンで fault が残る件 | 原因未確認 | 同上 |
-| OOB 他 70 種の最上位 frame | 未調査 | 同上 |
-| `load` 追加 IR の再現手段 (patch / 再生成スクリプト) | 手動実測が検証不能 | 同上 |
+| 27 件のうち 0x6525b0 (414ad0 非到達) と 0x66ea90 (再走で trap 無し)・414ad0 系で他パターンの fault | 原因未確認 | 同上 |
+| OOB 他の最上位 frame (上位 5 種以外) の種類数・内訳 | 未集計 (`oob_top_frames.py` は種類数を出力しない。旧記述の「70 種」は出典なしのため撤回) | 同上 |
+| `load` 追加 IR の再現手段 (patch / 再生成スクリプト) — 受入条件 1 | 手動実測が検証不能 | #683 (共通。重複起票しない) |
 | D15 候補の call site 対応づけ (機械語 call ↔ IR block) | 候補止まり | 同上 |
 | `targets/m11.json` の `pe` が環境固有の絶対パス固定 (`[WIN64]` 相当) | `--pe` / `LD_M11_PE` が必須 | #294 |
 
@@ -154,6 +156,7 @@ pip install numpy capstone pefile
 python3 tools/liftdiff/tests/trace_diverge_unreachable.py > tools/liftdiff/results/m11_unreachable_diverge.md
 python3 tools/liftdiff/tests/oob_414ad0.py > tools/liftdiff/results/m11_oob_414ad0.md
 ```
+LD-17 (#864) の型分類は `results/m11_unreachable_diverge.md` §2 (同じスクリプトの出力)。PE 展開は `block00031_PE.bin` 1 ファイルで足りる (実測 22227016 bytes)。スクリプトの入力は `work-liftdiff` (batch_closure.jsonl) と `work-m11` (boot_final3.ll) を要するため、これら素材が無い環境では再生成できない。
 単体実行 (手動実測) は `[WIN64]` の PE を指す `pe` に書き換えた `targets/m11.json` の複製で `python3 liftdiff.py run <target.json> --fn 0x414ad0 --state auto --nobuild -v` (`targets/m11.json` 自体の固定パスは #294)。
 
 ## 10. OTT 旧 chain (D1〜D6) の Actions 再現 (LD-8 / #406)

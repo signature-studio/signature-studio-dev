@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # M11 e2e (1 コマンド再現): FLEngine_x64.dll 部分起動 PoC (audio/GUI なし)
 #   DllMain(entry_point) → _StartLib → _InitLib → InitUnits(942 unit) を RetDec lift → emcc → wasm → node で実行し,
-#   到達 stage / 停止理由 / FastMM4 状態 / 各種数値を機械判定して出力する. 未達 (到達 stage が低い) は現在の到達点を再現して exit 0.
+#   到達 stage / 停止理由 / FastMM4 状態 / 各種数値を機械判定して出力する. 期待値 (e2e_expect.env) を下回れば exit 1 (#715 回帰ゲート).
 #   #680 fail-closed: 前提不足 (PE・emsdk・node・capstone/pefile) / IR 生成 (ldfix skip 含む) / build (qstore skip 含む) の失敗は非 0.
 #   PE は tools/shared/env.sh の FL_WIN64_DIR 経由 (既定 /home/ubuntu/work/analysis/win64)。IR 生成条件は work/ir_conditions.json に記録し judge が印字する.
 # 使い方:
+#   M11_EXPECT_STAGE=5 M11_EXPECT_SURVEY_OK=850 bash tools/m11/m11_e2e.sh  # 期待値の上書き (既定は e2e_expect.env)。下回れば exit 1 (#715)
 #   bash tools/m11/m11_e2e.sh           # work/ の成果物があれば再利用 (無ければ自動で全再生成), build は増分
 #   bash tools/m11/m11_e2e.sh --full    # RetDec lift から全再生成 (scan→bounds→lift 4chunk→tail 固定点→IR→build; 約 10 分)
 #   bash tools/m11/m11_e2e.sh --trace   # icall / unit init のトレースを stderr に出す
@@ -12,6 +13,11 @@
 # 前提: /opt/emsdk, /opt/retdec, node(v26: ~/.local/share/pnpm/bin), analysis/win64/extracted/block00031_PE.bin
 set -u
 cd "$(dirname "$0")"
+# #715 fail-closed: 期待値ファイルが無いと回帰ゲートが黙って無効になるため、無ければ前提確認より前に非 0 で止める
+[ -f e2e_expect.env ] || { echo "[m11_e2e] e2e_expect.env 無し: 回帰ゲートの期待値が読めない (fail-closed)"; echo "M11_SUMMARY {\"reached_stage\":0,\"stop_reason\":\"e2e_expect.env missing (fail-closed)\"}"; exit 1; }
+source e2e_expect.env     # M11_EXPECT_STAGE / M11_EXPECT_SURVEY_OK (環境変数が優先)
+case "$M11_EXPECT_STAGE" in ''|*[!0-9]*) echo "[m11_e2e] M11_EXPECT_STAGE が整数でない: '$M11_EXPECT_STAGE' (fail-closed)"; exit 1 ;; esac
+case "$M11_EXPECT_SURVEY_OK" in ''|*[!0-9]*) echo "[m11_e2e] M11_EXPECT_SURVEY_OK が整数でない: '$M11_EXPECT_SURVEY_OK' (fail-closed)"; exit 1 ;; esac
 source ../shared/env.sh   # FL_WIN64_DIR (既定は従来どおり /home/ubuntu/work/analysis/win64)
 export PATH="$HOME/.local/share/pnpm/bin:$PATH"
 FULL=0; TRACE=0
@@ -91,6 +97,7 @@ M11_TRACE=$TRACE timeout 300 node m11_run.mjs > work/e2e_full.out 2>&1 || true
 step "実行 B: unit survey (942 unit を try/catch 隔離)"
 timeout 600 node m11_survey.mjs > work/e2e_survey.out 2>&1 || true
 
-python3 m11_judge.py
+# #715: 回帰ゲート。期待値 (e2e_expect.env・環境変数で上書き可) を下回れば judge が非 0 を返し、e2e も非 0 で終わる
+python3 m11_judge.py --require-stage "$M11_EXPECT_STAGE" --min-survey-ok "$M11_EXPECT_SURVEY_OK"; rc=$?
 python3 m11_icall_audit.py 2>/dev/null | tail -1 || true
-exit 0
+exit $rc

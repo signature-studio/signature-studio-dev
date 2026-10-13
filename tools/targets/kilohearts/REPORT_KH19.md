@@ -54,17 +54,75 @@
 - 対照 Gain の before は closure 160 関数。REPORT §4 の Gain 固有 1,727 B は own (共通基盤除く) の数であり、本表とは別。
 - 未解決 call の内訳: `reg` / `indexed` / `other` / `rip_data` はいずれも解決未着手 (`rip_data` は #849 で扱う)。
 
-## 3. 判定
+## 3. 判定 (#782 の受入条件)
 
-- 受入 1 (間接 call を追跡して 3 種の closure を再計算し before/after を表にする): **部分達成**。IAT 分離後の HEAD で再計測した表を出した。after は過大評価で、真の closure ではない。
-- 受入 2 (lift / build の最初の失敗点): **未達**。正確な closure が無いため lift 対象を確定できない。
-- 受入 3 (数え方と再計算スクリプトを REPORT に書く): **達成** (§1・§2、スクリプトは `scripts/vtable_closure.py`)。
+- #782 受入 1 (間接 call を追跡して 3 種の closure を再計算し before/after を表にする): **部分達成**。IAT 分離後の HEAD で再計測した表を出した。after は過大評価で、真の closure ではない。
+- #782 受入 2 (lift / build の最初の失敗点): **未達**。正確な closure が無いため lift 対象を確定できない。
+- #782 受入 3 (数え方と再計算スクリプトを REPORT に書く): **達成** (§1・§2、スクリプトは `scripts/vtable_closure.py`)。
 
-## 4. 未解決
+## 4. rip_data (IAT 以外の関数ポインタ変数) の読み出し解決 (#849)
+
+- 数え方: 「rip_data call 件数」= closure 内の `call [rip+..]` (IAT 以外) の件数 (§2 の rip_data 列と同じ)。「slot 種別」= その参照先 slot (VA) を 1 本ずつ分類した数。
+- 規則 (`scripts/vtable_closure.py`): 参照先 slot S について
+  - `runtime_store` (.text に `mov [rip+S], x` があり実行時に書き換わる) / `addr_taken` (`lea` で S の番地を取る) → 未確定
+  - `null_unused` (初期値 0) / `nonfunc_init` (初期値が関数先頭でない) → 未確定
+  - `trampoline` (初期値の関数先頭が `jmp reg` または IAT 外の `jmp [rip+..]`) → 呼び先が静的に決まらない thunk。未確定
+  - `static_fn` (初期値の関数が上記以外) → 確定し候補に加える (after_rip)
+- 再計測 (HEAD `d7cf3c77` + 本 PR, 4 vCPU, 各 1 回, 各 run 11〜13 s):
+
+| ns | モード | rip_data call 件数 | 参照先 slot | slot 種別 | 確定 slot | after (旧) 関数 | after_rip 関数 |
+|---|---|--:|--:|---|--:|--:|--:|
+| Snap Heap (micropass) | nogui | 20 | 2 | trampoline 2 | 0 | 1,531 / 722,713 B | 1,531 / 722,713 B |
+| Snap Heap (micropass) | all | 54 | 2 | trampoline 2 | 0 | 3,094 / 1,388,293 B | 3,094 / 1,388,293 B |
+| Multipass (multipass) | nogui | 20 | 2 | trampoline 2 | 0 | 1,802 / 817,610 B | 1,802 / 817,610 B |
+| Multipass (multipass) | all | 54 | 2 | trampoline 2 | 0 | 3,328 / 1,476,922 B | 3,328 / 1,476,922 B |
+| Phase Plant (phaseplant) | nogui | 56 | 2 | trampoline 2 | 0 | 3,767 / 1,791,711 B | 3,767 / 1,791,711 B |
+| Phase Plant (phaseplant) | all | 56 | 2 | trampoline 2 | 0 | 5,582 / 2,768,378 B | 5,582 / 2,768,378 B |
+| 対照 Gain (gain) | nogui | 8 | 2 | trampoline 2 | 0 | 555 / 178,451 B | 555 / 178,451 B |
+| 対照 Gain (gain) | all | 54 | 2 | trampoline 2 | 0 | 1,995 / 731,396 B | 1,995 / 731,396 B |
+
+- 全 8 条件で、rip_data の参照先 slot は同じ 2 本 (`0x1813a1d38` / `0x1813a1d40`, `.rdata`)。どちらも初期値は thunk:
+  - `0x1813a1d38` → `jmp rax` (レジスタ間接。呼び先は実行時に決まる)
+  - `0x1813a1d40` → `jmp [rip+0x1dee2]` → `0x1813a1d38` (上と同じ slot を経由)
+- **結論: rip_data の読み出し解決で確定できた候補は 0 件。** after と after_rip は全条件で一致し、rip_data の件数は closure を広げない。
+- 過程の誤り (記録): 初版は初期値の先 (thunk) を関数とみなして `static_fn` 判定し、after_rip を +2 関数と出した。thunk の先頭命令を見て `trampoline` 判定を足したところ、確定 0 件になった。この 2 本を関数として扱うのは誤り。
+- 残りの未解決 (本 PR 後): rip_data call 件数 8〜56 件/ns は、すべて上記 2 本の thunk 経由。呼び先を決めるには `jmp rax` の `rax` の値 (呼び出し側で `lea`/`mov` により入る関数) を追う必要がある。これは「reg に入る値の追跡」で、#848 (KH-19b、間接 call の型追跡) の対象。本 issue では扱わない。
+- 対象外 (明記): res 外 (sweep されなかった関数) が S へ書き込む可能性は未確認。store 走査は `callgraph.pkl` の res 内関数だけ。
+
+## 5. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 型を追う (this の型追跡) による正確な closure。現在は slot 番号一致の過大評価 | after 表が真値でない | #848 |
-| `rip_data` (IAT 以外の関数ポインタ変数) の読み出し解決 | 未解決 call (rip_data 8〜56 件/ns, nogui) が closure の外に残る | #849 |
+| `rip_data` の読み出し解決 (#849 で試行): 参照先 2 本はすべて thunk (`jmp rax` / `jmp [rip]`)。確定 0 件 | rip_data 8〜56 件/ns が closure の外に残る。呼び先は reg 値の追跡が要る | #848 |
 | 確定 closure の lift / build 最初の失敗点 | 受入 2 未達 | #850 |
 | 人手の検収 (lift 結果の bit-exact 化は本 issue の範囲外) | — | — |
+
+## 5. #848 (this 型の 1 段追跡) の試行結果 (再測定 HEAD `54fc6273`, 4 vCPU, 各 1 回)
+
+- 測定コード (`vtable_probe_this.py`) は `c36afb68` で追加した。その後 `d8a873a9` は文書のみの変更で、`main` を merge した HEAD (`54fc6273`) では `vtable_closure.py` が `main` 側で更新されている。
+- 表の値は `54fc6273` (merge 後の `scripts/`) で再測定した。素材 `plugins-kilohearts` の `Kilohearts Offline Installer.zip` を `tar --zstd -xf` で展開し、Windows 側のみ `unzip` → `rtti_walk.py` (6,307 class) → `callgraph.py` (120,856 関数, 4 round) → `vtable_closure.py` / `vtable_probe_this.py` の順で実行した。
+- 再測定の結果: Gain before 160 / vtable_closure nogui 555 / all 1,995 / probe narrow 1,994 (vtable sites narrow 83・wide 1,764)。いずれも前回の報告値と一致。
+
+試行は `scripts/vtable_probe_this.py` (1 行 JSON を出力)。規則: 呼び出し元 f の所有 class が ns 内で一意に決まれば、
+vtable call の候補をその class の同 slot に限る (narrow)。一意に決まらなければ従来どおり ns 全 class の同 slot (wide)。
+
+| 対象 | before 関数 | after (narrow) 関数 | vtable call 内訳 narrow / wide |
+|---|--:|--:|--|
+| 対照 Gain (gain) | 160 | 1,994 | 83 / 1,764 |
+
+- 判定: **棄却**。narrow は after を 1,995 → 1,994 (1 関数) しか縮めない。受入 2 (160 関数との差分 0) には届かない。
+- 原因: closure の大半 (1,764 / 1,847 の vtable call) は呼び出し元が vtable に載らない関数 (shared template・自由関数) で、
+  所有 class を決められない。`this` の型は呼び出し元の vtable 所有では決まらず、呼び出し鎖を通した伝播 (呼出し引数の型) が要る。
+- 含意: vtable 規則の精度は「呼び出し元の所有」では上がらない。次の候補は (a) 呼び出し点の `rcx` (this) を
+  直前の代入 (`mov rcx, reg` / 引数レジスタ) から逆方向に追う、(b) 登録側 (`new ...Dsp` 生成箇所) から class を
+  伝播させる、のいずれか。どちらも本 run の範囲外 (要 Ghidra 等の基盤または別 run)。
+#### #848 の受入条件への対応 (本節)
+
+- 受入 1 (this 型を追跡し、Snap Heap / Multipass / Phase Plant の 3 種の間接 call 候補を型に限定して closure を再計算): **部分達成**。Gain のみ narrow を実装・計測。3 種は未実施。
+- 受入 2 (対照 Gain の closure が手検証の 160 関数と差分 0): **未達**。narrow は 1,994 関数 (差分 1,834)。
+- 受入 3 (before/after 表と未解決 call の内訳を REPORT に書く): **部分達成**。本節の表は Gain のみ。§2 の表は #782 の wide 規則による値で、3 種の narrow 表は無い。
+
+#782 の受入 (lift / build の最初の失敗点) は未達で、§3 に記載。
+
+未解決の起票先: (a)/(b) の this 型伝播は #848 に残す (#848 は部分達成・open のまま)。rip_data は #849、lift 失敗点は #850 (§4)。

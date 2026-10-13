@@ -7,6 +7,7 @@ score の出入りは `load_score(dict)` / `dump_score()` (JSON 互換) で行�
 
 FL 実機で未確認の挙動 (推定) は `# ASSUMPTION:` で明示する。REPORT の「未解決」表が一覧。
 """
+import json
 import sys
 import types
 
@@ -184,7 +185,13 @@ class Score:
         return g
 
     def loadScoreFromFile(self, path):
-        raise NotImplementedError("loadScoreFromFile: host file access is not wired (未実装)")
+        # ASSUMPTION: FL の .fst/.fsc (独自形式) は未解析。仮想 FS 上の JSON (dump() と同形式) を読む。
+        # 存在しないパスは Python 標準の FileNotFoundError (実 FL の失敗種別は未確認)。
+        with open(path, "rb") as f:
+            d = json.loads(f.read().decode("utf-8"))
+        if not isinstance(d, dict):
+            raise ValueError(f"loadScoreFromFile: score object expected, got {type(d).__name__}")
+        self.load(d)
 
     # -- host sync (JSON 互換)
     def load(self, d):
@@ -301,6 +308,11 @@ class ScriptDialog:
             if c["type"] in ("knob", "knobint") and not (c["min"] <= v <= c["max"]):
                 _warn(f"{k!r} = {v!r} outside [{c['min']}, {c['max']}]")
             c["value"] = v
+
+    def DialogParams(self):
+        # MOCK: 実 FL の戻り値の形 (dict / オブジェクト / キー名) は未確認。現在の控制値を {name: value} で返す。
+        # 実 FL との照合は #81 (PY-9) の範囲。
+        return {c["name"]: c["value"] for c in self._controls}
 
     def describe(self):
         return {"title": self.title, "description": self.description,

@@ -100,6 +100,10 @@ def main():
          os.path.join(d3, 'k80.argfix.ll'), os.path.join(d3, 'k80.x87fix.ll'),
          '--report', os.path.join(d3, 'x87fix.json'), '--funcs', funcs,
          '--chop-f32-fns', 'function_5dfbe0,function_5dfc90,function_5dfdb0'])
+    # #983: レジスタ経由 deref の落ち (0x5dee90 / 0x5df040 の arg4 読み元, 0x5e02b0 の [arg2] base) を機械語どおりに戻す
+    dfx = os.path.join(d3, 'k80.deref.ll')
+    run(['python3', os.path.join(HERE, 'k80_deref_fix.py'),
+         os.path.join(d3, 'k80.x87fix.ll'), dfx])
 
     print('== [3] llvm-as + x87fix 冪等性 ==')
     run(['llvm-as', os.path.join(d3, 'k80.x87fix.ll'), '-o', os.path.join(d3, 'k80.x87fix.bc')])
@@ -123,7 +127,7 @@ def main():
 
     print('== [5] 差分試験 (native vs 修復後 IR, %d case/kernel, fork 隔離) ==' % cases)
     out = run(['python3', os.path.join(HERE, 'k80_diff.py'),
-               '--ir', os.path.join(d3, 'k80.x87fix.ll'), '--cases', str(cases)])
+               '--ir', dfx, '--cases', str(cases)])
     rows = {}
     for ln in out.split('\n'):
         f = ln.split(',')

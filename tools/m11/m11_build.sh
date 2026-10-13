@@ -16,7 +16,8 @@ mkdir -p work/tmp work/obj
 M11_LB_BASE="${M11_LB_BASE:-0}"; export M11_LB_BASE   # #222: LVA = RVA + M11_LB_BASE (0 = 従来)
 M11_OV_CLASSCREATE="${M11_OV_CLASSCREATE:-0}"   # #419: 1 = m11_ov.c の実験 override (410360 のみ; 8cbda0/8cbce0 は #503 で既定 ON) を有効化 (既定 0)
 M11_OV_414AD0="${M11_OV_414AD0:-0}"   # #683: 1 = m11_ov.c の UStrSetLength 版 function_414ad0 (arg1 deref 復元) に切替; 0 = main の LStrSetLength 版 (#134) を使う (既定; closure 退行 7 件が未解決のため)
-CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=$M11_LB_BASE -DM11_OV_CLASSCREATE=$M11_OV_CLASSCREATE -DM11_OV_414AD0=$M11_OV_414AD0"
+M11_FIX_652500="${M11_FIX_652500:-0}"   # #748: 1 = m11_ov.c の function_652500 (*arg1 の 1 段 deref 復元) を有効化; 0 = lift 版 (既定)
+CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=$M11_LB_BASE -DM11_OV_CLASSCREATE=$M11_OV_CLASSCREATE -DM11_OV_414AD0=$M11_OV_414AD0 -DM11_FIX_652500=$M11_FIX_652500"
 # image 終端 (SizeOfImage 0x18c0000) + LB_BASE が GLOBAL_BASE (0x10000000) 以内であること
 python3 - <<PYEOF
 import sys
@@ -135,6 +136,9 @@ echo "$M11_OV_CLASSCREATE" > work/ov_classcreate.stamp
 # M11_OV_414AD0 が変わったら ov.o だけ無効化 (#683: ON/OFF の切替で古い ov.o を再リンクしない)
 if [ "$(cat work/ov_414ad0.stamp 2>/dev/null || echo none)" != "$M11_OV_414AD0" ]; then rm -f work/obj/ov.o; fi
 echo "$M11_OV_414AD0" > work/ov_414ad0.stamp
+# M11_FIX_652500 が変わったら ov.o だけ無効化 (#748)
+if [ "$(cat work/ov_652500.stamp 2>/dev/null || echo none)" != "$M11_FIX_652500" ]; then rm -f work/obj/ov.o; fi
+echo "$M11_FIX_652500" > work/ov_652500.stamp
 cc m11_ov.c work/obj/ov.o work/boot_final3_sigs.h
 cc work/m11_data.c work/obj/data.o
 
