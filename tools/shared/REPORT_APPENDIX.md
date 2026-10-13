@@ -19,14 +19,12 @@
 - **`FT_*` を import する PE**: `block24836`・`block24851`・`block24856` (`libfreetype-6.dll` を import = GTK/pango 系の同梱ライブラリ用。FL 本体ではない)。`block24837` (`libfreetype-6.dll` 本体・227 名)・`block24890` (pango 系の文字列) も FL 本体ではない。`block24435` は libass (字幕) の文字列。
 - **結論 (前 run, 静的 import)**: `freetype.dll` (2.4.10) の FT_* を呼ぶ FL 側の呼出元は、静的 import の経路では特定できなかった。
 - **呼出元の特定 (本 run, 2026-10-14, #1356)**: 前 run の走査は ASCII 限定だったため漏れがあった。UTF-16LE で走査すると、FL 製 `QuickFontCache.dll` (i386 `block24349_PE.bin` / x64 `block24350_PE.bin`) が `freetype.dll` と FT_* 名 14 本を UTF-16LE で持つ。
-  - **動的解決の実体**: x64 `block24350` は `LoadLibraryW` (IAT `0x1dc494`) で `freetype.dll` を開き、`GetProcAddress` (IAT `0x1dc340`) で名前解決する。`objdump -d` で、`freetype.dll` の UTF-16 文字列 (VA `0x563550`) を `lea 0x529(%rip),%rcx` で参照する箇所 (`0x563020`) の周辺で、FT_* の UTF-16 名を 1 つずつ `lea` し、直後に `call` する構造を確認 (14 名すべて同形)。解決を担う thunk の同定は未実施。i386 `block24349` は UTF-16 の名前一覧 (`strings` 抽出) が x64 と同一であることを確認 (VA の対応は未確認)。
+  - **動的解決の実体**: x64 `block24350` は `LoadLibraryW` (IAT `0x1dc494`) で `freetype.dll` を開き、`GetProcAddress` (IAT `0x1dc340`) で名前解決する。`objdump -d -M intel --start-address=0x563020 block24350_PE.bin` の出力で、`0x563020` が `lea rcx,[rip+0x529]` (= VA `0x563550`、UTF-16 `freetype.dll`) を読み、`call 0x522d20` に続く (本 run で確認)。その後 `0x5630c3` 以降に `lea rcx,[name]` + `call 0x411540` + `call 0x41d760` の組が 14 回並ぶ (`lea` 先 VA `0x563578` = `FT_Init_FreeType` の UTF-16 名を確認)。14 組の名前がすべて対応することは未確認 (一覧は `strings` 抽出による)。解決を担う thunk `0x411540` の同定は未実施。i386 `block24349` は UTF-16 の名前一覧 (`strings` 抽出) が x64 と同一であることを確認 (VA の対応は未確認)。
   - **解決される名前 (14 本, 両版で一致)**: `FT_Attach_File` / `FT_Done_Face` / `FT_Done_FreeType` / `FT_Get_Char_Index` / `FT_Get_Kerning` / `FT_Init_FreeType` / `FT_Load_Glyph` / `FT_New_Face` / `FT_New_Memory_Face` / `FT_Render_Glyph` / `FT_Select_Charmap` / `FT_Set_Char_Size` / `FT_Set_Charmap` / `FT_Set_Pixel_Sizes`。
   - **2.7 との対応**: 上記 14 本は `freetype_export_diff.json` の win 欠落 17 本に含まれない (= 2.7 の export に存在)。
   - **17 本の到達性 (受入条件 2)**: 欠落 17 本 (`FT_Alloc`/`FT_Free`/`FT_Realloc`/`FT_Sqrt32`/`FTC_*` 等) は QuickFontCache の名前表に **0 件**。全 PE の ASCII / UTF-16LE の名前文字列を走査しても、この 17 本は `block24837` (libfreetype 本体の内部) と `block24890` (pango 系) にのみ現れる (`block24358`/`block24359` は freetype DLL 自身)。**結論 (名前ベース): FL 側の PE に、欠落 17 本を名前で解決する経路は実測で見つからなかった → shim/stub は呼出元から到達しないと判断できる。** ただし、序数・ハッシュによる解決は本走査では除外できていない。これは子 issue で確認する。
-  - **残り (本 run 未実施)**: 14 本の shim 結線と native/wasm の出力一致 (受入条件 3) は未着手。`test_ft.c` の 40 行一致は既存ハーネス (FreeType 2.7) で実施可能だが、2.7 wasm 再ビルドに `/opt/emsdk` と mac 由来の OpenSans (`FL_MAC_DIR`) が要り、1 run 内で収まらないため子 issue に分割する。
+  - **残り (本 run 未実施)**: 14 本の shim 結線と native/wasm の出力一致 (受入条件 3) は未着手。`test_ft.c` の 40 行一致は既存ハーネス (FreeType 2.7) で実施可能だが、2.7 wasm 再ビルドに `[EMSDK]` と mac 由来の OpenSans (`FL_MAC_DIR`) が要り、1 run 内で収まらないため子 issue に分割する。
 - **走査スクリプト**: `oss/freetype/callers_scan.sh` を UTF-16LE 走査込みに改訂 (本 run)。`bash oss/freetype/callers_scan.sh <extracted_dir>` が rc 0 で完了することを実測。
-- **17 本の到達性 (受入条件 2)**: 17 名は `block24358`・`block24359`・`block24837` (`FTC_*`・`FT_Alloc` 等の名前を持つ FreeType 本体側) には出るが、FL 本体・`Shared\` DLL の呼出元には出ない。到達性は呼出元が特定できないため実測できず、未達。
-- **shim 結線 (受入条件 3)**: 未着手。呼出元が無いため結線対象が確定しない。
 
 ## 10. 各ライブラリのビルド詳細
 
