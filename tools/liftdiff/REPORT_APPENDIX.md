@@ -159,6 +159,13 @@ python3 tools/liftdiff/tests/oob_414ad0.py > tools/liftdiff/results/m11_oob_414a
 LD-17 (#864) の型分類は `results/m11_unreachable_diverge.md` §2 (同じスクリプトの出力)。PE 展開は `block00031_PE.bin` 1 ファイルで足りる (実測 22227016 bytes)。スクリプトの入力は `work-liftdiff` (batch_closure.jsonl) と `work-m11` (boot_final3.ll) を要するため、これら素材が無い環境では再生成できない。
 単体実行 (手動実測) は `[WIN64]` の PE を指す `pe` に書き換えた `targets/m11.json` の複製で `python3 liftdiff.py run <target.json> --fn 0x414ad0 --state auto --nobuild -v` (`targets/m11.json` 自体の固定パスは #294)。
 
+#### 型 C・D の原因候補 (LD-28 / #1035)
+集計 = `tests/trace_diverge_cd.py` → `results/m11_unreachable_cd.md` (件数の正本)。型 A・B (#864 の D15 候補・leaf) を除いた型 C・D の食い違いを対象にする。
+- P2 (呼出元の直接 call 脱落): 0x41c820 が 20 件。0x418be0 (20 件) の食い違いは、呼出元 0x41c820 の機械語 `call 0x418be0` → `call 0x407030` (`LoadStringW` ラッパ) → `call 0x413060` のうち、IR では `call 0x407030` が無く `call 0x413060` に直結している (`boot_final3.ll` の `function_41c820` を確認)。
+- P1 (L 内の直接 call 脱落): 9 件。0x41c8c0 ほか。
+- P3 (未特定): 63 件。0x417b70 (32 件) を含む。0x417b70 は IR に機械語の全直接 call 先があり、食い違いは L 内の分岐条件の差と読める (推定・未確認)。
+- 候補判定は call 先の集合差分のみで、call site と IR block の対応づけはしていない。P1・P2 は候補であり確定ではない。
+
 ## 10. OTT 旧 chain (D1〜D6) の Actions 再現 (LD-8 / #406)
 
 既知類型との関係 (DEFECTS.md): 新規類型なし (D1〜D6 は OTT 旧 chain の既存分類 = `check_ott.py`)。
