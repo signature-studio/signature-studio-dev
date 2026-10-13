@@ -236,3 +236,10 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
 - **ネガコン** `bash tools/gui/test/gui12_race.sh 50 30` (所要 4m36s, load 1.76/2.19): 修正版 exit≠0 0/50 (UAF 0) / `-DGUI12_NEGCTL_IMMEDIATE_FREE` 30/30 が UAF → PASS。
 - **未達 (#740 受入条件)**: (1) 修正前の ASan ログを用いた再現は本 run で得られず (修正後 94 回で発火せず)。(2) `e2e.sh` の n≥10 連続 rc 0 は未実施 (RetDec・emsdk を含む全体実行で 1 回約 3 分のため本 run の 60 分内に 10 回は収まらない)。(3) ネガコンは `gui12_race.sh` の 30/30 で代替確認済み。
 - **未解決 (起票先)**: #740 のまま、`e2e.sh` 全体の n≥10 連続 PASS と、修正前 ASan ログの再取得。PM 判断で #740 を #489 の重複として閉じるか決める。
+
+## 19. GUI-15 (#740) 続き: e2e.sh 連続実行 (HEAD 29f63707)
+- 連続 8 回 (run1〜8): rc 0 が 7 回、rc 1 が 1 回 (run8) → **連続 8 回中 7 回 PASS**。単発 1 回 (rc 0) を加えた 9 回では **9 回中 8 回 PASS**。
+- run8 の失敗: step 6h の CDP timeout (`Runtime.evaluate`)、ASan の UAF 0 件。別経路と推定 (未検証)。
+- 所要・load の run ごとの値は未記録 (生ログ未保存)。min–max は未確定。
+- 残件 (n≥10 連続 rc 0・6h 原因・修正前 ASan ログ) は #1217 (GUI-20) へ移管。
+- 再現: `bash tools/gui/e2e.sh` (連続は for ループ)。
