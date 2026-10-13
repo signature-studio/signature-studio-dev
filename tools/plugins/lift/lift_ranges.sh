@@ -7,6 +7,7 @@
 # 出力: <outdir>/<name>.drc.ll, .norm0.ll, .lift.ll, .final.ll, <name>_simd.c と各 .report.json
 # 環境変数: PLUG_IMG_HI (対象 PE の ImageBase+SizeOfImage; 省略時は PE から自動算出)
 #           PLUG_REUSE_DRC=1 (既定 0): RetDec を再実行せず、既存の <name>.drc.ll から後段の pass 鎖だけを再開 (pass の修復の検証用)
+#           PLUG_NO_STATIC_DETECT=1 (未設定時は無効。値が空でなければ 0 でも有効): RetDec に --disable-static-code-detection を渡す。 既定だと定数 libc 系の関数を「statically linked function」として define を出さない (#1486)
 #           PLUG_F80_LOWER=1 (既定 0): m11_passes の後に p0c/f80_lower.py (x86_fp80 → f64) を適用。 lowering 前は <name>.pre_f80.ll
 #           PLUG_ICALL=1 (既定 0; batch_lift.sh は既定 1): RetDec の前に tools/icall/icall_rewrite.py で PE を decode 専用に書換え (間接 call/jmp → memory-ABI + 共有 stub)、
 #             RetDec の後に ir_icall_restore.py で stub 呼出し → `call void @__icall_dispatch(i64 <元 site VA>)` へ戻す。RetDec は間接 call を decoder 段で捨てる ((icall §4) D1)。
@@ -47,7 +48,7 @@ if [ "${PLUG_REUSE_DRC:-0}" = "1" ] && [ -f "$DRC_LL" ]; then
   echo "[lift] PLUG_REUSE_DRC=1: RetDec を再実行せず既存の $DRC_LL から後段を再開"
 else
 /opt/retdec/bin/retdec-decompiler "$DEC_PE" -o "$OUT/$NAME.drc.c" \
-  --select-ranges "$DEC_RANGES" --select-decode-only --timeout "$TMO" > "$OUT/$NAME.retdec.log" 2>&1
+  --select-ranges "$DEC_RANGES" --select-decode-only ${PLUG_NO_STATIC_DETECT:+--disable-static-code-detection} --timeout "$TMO" > "$OUT/$NAME.retdec.log" 2>&1
 fi
 [ -f "$OUT/$NAME.drc.ll" ] || { echo "[lift] FAIL: RetDec 出力なし" >&2; tail -20 "$OUT/$NAME.retdec.log"; exit 1; }
 if [ "${PLUG_ICALL:-0}" = "1" ]; then
@@ -76,7 +77,15 @@ if [ -n "$FH_ARGS" ]; then
 else
   cp "$OUT/$NAME.oc.ll" "$OUT/$NAME.fh.ll"
 fi
-python3 "$P/fix_dup_decls.py" "$OUT/$NAME.fh.ll" "$OUT/$NAME.dd.ll"
+# opt-in: 本体で inttoptr として使う i32 仮引数の i64 化 (#1485; PLUG_I32PTR_FUNCS="function_180049450 ...")
+I3_ARGS=""
+for f in ${PLUG_I32PTR_FUNCS:-}; do I3_ARGS="$I3_ARGS --func $f"; done
+if [ -n "$I3_ARGS" ]; then
+  python3 "$P/fix_i32_ptr_arg.py" "$OUT/$NAME.fh.ll" "$OUT/$NAME.i3.ll" $I3_ARGS
+else
+  cp "$OUT/$NAME.fh.ll" "$OUT/$NAME.i3.ll"
+fi
+python3 "$P/fix_dup_decls.py" "$OUT/$NAME.i3.ll" "$OUT/$NAME.dd.ll"
 python3 "$P/fix_ptr_params.py" "$OUT/$NAME.dd.ll" "$OUT/$NAME.pp0.ll"
 python3 "$P/fix_icmp_ptr.py" "$OUT/$NAME.pp0.ll" "$OUT/$NAME.pp.ll"
 # opt-in (PLUG_XMMARG=1): 機械語が xmm0..3 を入力に読むのに IR 署名に無い関数へ float/double 引数を復元 ((DEFECTS.md) D5, PLG-F2-4 #547)

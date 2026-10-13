@@ -9,6 +9,7 @@
 **CAB-270 (COM 経由 120s soak)**: `com_soak120_b256` を追加。既定 120 秒で **underrun 0 / silence 0 / ramp 0 mismatch / bufferSwitchTimeInfo bad 0 / COM 面 (sellog・参照カウント) 一致**を 9 回連続で実測 (§3-2)。`--quick` では soak を実行しない (親 e2e 規約)、`--soak N` で秒数変更可。
 
 > AU-17 (#1102) の COM 経由 30 分ソーク・p+1 照合の 24bit 修正の実測は `REPORT_APPENDIX_1102.md` に分割移動 (250 行上限)。
+> AU-19 (#1358) のキャプチャ分割照合 (ring 16 MiB・ソーク PASS 30 分 28 秒) は `REPORT_APPENDIX_1358.md`。
 
 ## 1. 前回中断 (insufficient_credits) の残骸精査 → **引継ぎ採用**
 
@@ -242,7 +243,7 @@ bash tools/audio/e2e.sh --out tools/audio/work/results_parent.json   # 親 e2e 2
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 実行 A の underrun の原因 (負荷・ring 深さ・worklet スケジューリング) が未特定。本 5 回と §11 B〜E では再現せず | ゲート (underrun 0) が通算 1/10 回揺らぐ。merge 判定で再実行が必要になり得る | #998 |
-| 負荷を掛けた状態 (並行 e2e) での再現試験が未実施 | 原因の切り分けができない | #998 |
+| 負荷下の再現は §12-3 で実施 (完全実行 6 回中 2 回 underrun)。原因は未特定。underrun 時の ring 深さ・worklet 側ログは未採取 | 原因の切り分けができない | #998 |
 | 実行 A は HEAD `fef39e5` (別コミット)。同一 HEAD での再現ではない | 同一 HEAD の再現条件が未確定 | #998 |
 
-負荷下の再現試験 (L1〜L3) は [REPORT_APPENDIX_998.md](REPORT_APPENDIX_998.md) を参照。負荷下で完全実行 2 回中 1 回 underrun (`com_ramp_b256_d2`)。
+負荷下の再現試験 (L1〜L3・§12-3 の A〜D) は [REPORT_APPENDIX_998.md](REPORT_APPENDIX_998.md) を参照。負荷下の完全実行 6 回中 2 回 underrun (`com_ramp_b256_d2`)。underrun 時は ring 充填が 0 まで枯渇 (`min_fill=0`)。原因は未特定。

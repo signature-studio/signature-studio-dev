@@ -27,6 +27,12 @@ RUNS = [
     ("unpatched+g1+lowver", "out_u_g1_lowver"),
     ("patched+g1+demo_payload", "out_p_g1_demo_payload"),
     ("unpatched+g1+demo_payload", "out_u_g1_demo_payload"),
+    ("patched+wq+lic_sent", "out_p_wq_lic_sent"),
+    ("unpatched+wq+lic_sent", "out_u_wq_lic_sent"),
+    ("patched+wq+lowver", "out_p_wq_lowver"),
+    ("unpatched+wq+lowver", "out_u_wq_lowver"),
+    ("patched+wq+demo_payload", "out_p_wq_demo_payload"),
+    ("unpatched+wq+demo_payload", "out_u_wq_demo_payload"),
 ]
 SENT_PBR, SENT_PRESET = 24, "SENTINEL"  # make_cases.py と一致
 
@@ -253,6 +259,20 @@ def main():
     # #623: mpatch N2a-1 は `mov al,0` (定数 0 store)。IR pass の「常時 0」と一致する。
     chk("patched+g1+lic_sent: demo bit == 0・0x800010 無し (N2a-1 定数 0 store; IR pass と一致)",
         bit_n("patched+g1+lic_sent") == 0 and not has800010("patched+g1+lic_sent"))
+    # 4d. #1360: wrapper QI (IVst3ToAUWrapper/AAX → kResultOk) で既定ゲートを 1 に上げる。
+    #   gate 1 の経路では 0x800010 が出る (unpatched の pv<2.0.20 / demo 系)。patched は authstub で中和。
+    chk("unpatched+wq+lic_sent: 0x800010 無し・demo bit 0 (pv 2.1.5 は store 無し)",
+        bit_n("unpatched+wq+lic_sent") == 0 and not has800010("unpatched+wq+lic_sent"))
+    chk("unpatched+wq+lowver: demo bit 1・0x800010 受信 (既定ゲート到達の pv 比較)",
+        bit_n("unpatched+wq+lowver") == 1 and has800010("unpatched+wq+lowver"))
+    chk("unpatched+wq+demo_payload: demo bit 1・0x800010 受信 (マーカ経路)",
+        bit_n("unpatched+wq+demo_payload") == 1 and has800010("unpatched+wq+demo_payload"))
+    chk("patched+wq+lowver: demo bit 0・0x800010 無し (authstub が中和)",
+        bit_n("patched+wq+lowver") == 0 and not has800010("patched+wq+lowver"))
+    chk("patched+wq+demo_payload: demo bit 0・0x800010 無し (authstub が中和)",
+        bit_n("patched+wq+demo_payload") == 0 and not has800010("patched+wq+demo_payload"))
+    chk("patched+wq+lic_sent: demo bit 0・0x800010 無し (N2a-1 定数 0 store)",
+        bit_n("patched+wq+lic_sent") == 0 and not has800010("patched+wq+lic_sent"))
     # 5. 0x800010 は本 host セッションでは未発火 (restartComponent(0x10) は観測) — 記録
     r = by.get("patched+licensed")
     if r:
