@@ -41,7 +41,7 @@
 
 ## C. Morphine (23944) 通常経路の実測 (f3ffd7ba、#1487)
 
-- 測定 commit: **f3ffd7ba** (= origin/main 取り込み後の HEAD)。`git diff f3ffd7ba HEAD -- tools/plugins` は空 (差分 0)。
+- 測定 commit: **f3ffd7ba** (= origin/main 取り込み後の HEAD)。`git diff f3ffd7ba HEAD -- tools/plugins ':!tools/plugins/synth/REPORT_APPENDIX.md'` は 0 行 (REPORT_APPENDIX.md を除くコード範囲の差分 0)。
 - 測定コマンド: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP HLL_CAP=100000000 bash tools/plugins/synth/cpp_lift.sh 23944 2400`。
   `HLL_CAP` を 1e8 秒にして HLL 段の kill 判定が発火しないようにした (= kill 無しの通常経路)。`timeout 2280` で包んで実行。
 - 所要時間: 壁時計 14 分 27 秒 (23:03:30 開始 → 23:17:57 終了、`date` 実測)。lift 秒 **854** (summary.csv)。RetDec 内訳は `e.retdec.log`: IR 出力 (`e.drc.ll` 最終更新 23:04:24 = 開始から約 54 s)、C 生成 (HLL) 段 685 s、finalization 762 s。
@@ -52,12 +52,12 @@
 |---|--:|--:|
 | lift_rc | 0 | 0 |
 | defines | 3,321 | 3,321 |
-| 未実装 helper | 121 | 121 |
+| 未実装 helper | 52 | 121 |
 | i256 trap | 24 | 24 |
 | f80 関数 | 0 | 0 |
 | `emcc_c_rc` | **0** | 0 |
 | lift 秒 | 854 | 407 |
 | `hll_killed_s` | **0** | 354 |
 
-- `emcc -c` は通過 (`emcc.log` 0 バイト、`first_errors.txt` 空)。summary.csv の全列が §A の再開経路と一致した (lift 秒を除く)。`.ll` 本体の差分比較はしていない。
+- `emcc -c` は通過 (`emcc.log` 0 バイト、`first_errors.txt` 空)。未実装 helper は §A と不一致 (52 vs 121)。差の原因は `m11_simd2.py` の変更 (711d9ece・f2bbad10、#1163。VEX 3 オペランド形の SSE 委譲、cvt/rep 系の対応追加) で、§A (604e900f) の時点より未実装が減ったことによる。コードの差分からの説明であり、旧 commit での再測定はしていない。それ以外の列 (defines / i256 trap / f80 / emcc_c_rc / lift 秒を除く) は §A の再開経路と一致した。`.ll` 本体の差分比較はしていない。
 - 出力: `tools/plugins/work/synth/cpp23944/` (gitignore)。
