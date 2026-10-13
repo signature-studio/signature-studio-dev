@@ -6,14 +6,11 @@ RetDec の IR (dec_label_pc_8c5ef5) ではこの分岐が脱落し、無条件�
 --mode on : 末尾の無条件 br を次の形に置換する (REPORT_699 §1 が正本)。
               %g699 = <cond>                        ; 既定 icmp sle i32 %9, 0 (件数 <= 0)
               br i1 %g699, label %dec_label_pc_8c5ef5_g699, label %dec_label_pc_8c5f23
-            dec_label_pc_8c5ef5_g699:               ; ガード辺専用ブロック
-              %g699a/%g699b/%g699t/%g699c          ; 0 件 ∧ arg3==0 ∧ arg2 下位 byte≠0
-              br i1 %g699c, ..._g699_t, ..._g699_e
-            ..._g699_t:                             ; fail-fast (llvm.trap)
-            ..._g699_e:
-              store i64 0, ptr %rax.0.reg2mem       ; rax.0 := 0 (機械語 8c5f06 xor eax,eax で確定)
-              store i64 0, ptr %rdx.1.reg2mem       ; 読まれない経路の store (rdx の値は未確定)
-              br label %dec_label_pc_8c6066
+            dec_label_pc_8c5ef5_g699:               ; ガード辺専用ブロック。8c6066 へ合流させない
+              arg2 下位 byte != 0 → _t (llvm.trap, fail-fast。8c608d の rdx は未確定のため)
+              arg2 下位 byte == 0 → _e:
+                arg3 == 0 → ret [rbp+0x80]          (機械語 8c6067 je 8c6084 → 8c608b je 8c60df → mov rax,[rbp+0x80])
+                arg3 != 0 → call 8ca670(arg3, [rbp+0x80]) してから ret [rbp+0x80] (機械語 8c6071〜8c607f)
             件数 > 0 の経路 (dec_label_pc_8c5f23 への枝) は元 IR と一致する (store は通らない)。
 --mode off: 逆変換 (脱落状態に戻す。ネガコン用)。
 対象ブロックが 1 件でない・想定形でない場合は exit 1 (黙って通さない)。
@@ -25,7 +22,6 @@ import sys
 
 BLK = 'dec_label_pc_8c5ef5'
 GD = BLK + '_g699'
-EXIT = 'dec_label_pc_8c6066'
 NEXT = 'dec_label_pc_8c5f23'
 COUNT = '%9 = load i32, ptr %8, align 4'
 TAG = '%g699'
@@ -34,16 +30,18 @@ PLAIN = '  br label %' + NEXT + '\n'
 GD_BLOCK = (GD + ':\n'
             '  %g699a = and i64 %arg2, 255\n'
             '  %g699b = icmp ne i64 %g699a, 0\n'
-            '  %g699t = icmp eq i64 %arg3, 0\n'
-            '  %g699c = and i1 %g699t, %g699b\n'
-            '  br i1 %g699c, label %' + GD + '_t, label %' + GD + '_e\n'
+            '  br i1 %g699b, label %' + GD + '_t, label %' + GD + '_e\n'
             + GD + '_t:\n'
             '  call void @llvm.trap()\n'
             '  unreachable\n'
             + GD + '_e:\n'
-            '  store i64 0, ptr %rax.0.reg2mem\n'
-            '  store i64 0, ptr %rdx.1.reg2mem\n'
-            '  br label %' + EXIT + '\n')
+            '  %g699c = icmp eq i64 %arg3, 0\n'
+            '  br i1 %g699c, label %' + GD + '_r, label %' + GD + '_c\n'
+            + GD + '_c:\n'
+            '  %g699d = call i64 @function_8ca670(i64 %arg3, i64 %stack_var_8.0.reload)\n'
+            '  br label %' + GD + '_r\n'
+            + GD + '_r:\n'
+            '  ret i64 %stack_var_8.0.reload\n')
 GUARDED = re.compile(r'  ' + re.escape(TAG) + r' = (icmp [^\n]*)\n  br i1 ' + re.escape(TAG)
                      + r', label %' + GD + r', label %' + NEXT + r'\n' + re.escape(GD_BLOCK))
 
@@ -73,8 +71,8 @@ def main():
     blk = s[i:j]
     if blk.count(COUNT) != 1:
         fail('件数 load (%s) が 1 件でない' % COUNT)
-    if ('label %' + EXIT) not in s:
-        fail('飛び先 %s が無い' % EXIT)
+    if 'define i64 @function_8ca670(' not in s and 'declare i64 @function_8ca670(' not in s:
+        fail('function_8ca670 の宣言が無い')
 
     m = GUARDED.search(blk)
     if m and m.end() == len(blk):
