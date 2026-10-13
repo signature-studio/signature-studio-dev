@@ -280,11 +280,13 @@ match→mismatch の 4 件 (0x8445b0・0x6681f0・0xfe8e80・0x528680) は新 pa
   `session._fvm_cases` は **全 pattern が未実行 (equal/diff/wasm_trap 無し) の関数に限り**、候補引数だけを `vm` blob の疑似オブジェクトにした case `fvm<arg>` を追加する。既存 pattern の case 生成と結果は変えない。
 - 集計: `tests/fvm_transitions.py BASE.jsonl NEW.jsonl` が verdict 遷移と「既存 pattern が変わった関数」を出す。
 - 実測 (m11 sample:800・`--shards 12 --state auto`・同一 worktree で base / 新を連続実行):
-  - base: match 360 / mismatch 230 / unexec 210 (1m42s, load 0.46→5.70)
-  - 新: match 360 / mismatch 230 / unexec 210 (1m41s, load 1.27→ ※終了時 load は未採取)
+  - base (fvm 追加直前の親 `2f235a0a` の tree): match 360 / mismatch 230 / unexec 210 (1m42s, load 0.46→5.70)
+  - 新 (`0596772f`): match 360 / mismatch 230 / unexec 210 (1m41s, load 1.27→ ※終了時 load は未採取)
   - 関数単位の遷移: match→match 360・mismatch→mismatch 230・unexec→unexec 210 (**遷移 0 件**)。
   - `fvm` case は 437 件走り、native_fault 193 / both_fault 243 / hang 1。**1 件も equal/diff/wasm_trap にならなかった**。
-  - 既存 pattern の outcome が 7 関数で変わったが (hang ↔ both_fault 等)、verdict は全関数で不変。native の timeout 揺らぎと判断 (§6.2 と同じ性質)。
+  - **測定 commit の注意**: §12 の vm0/u16 の「新 361」は `ecb45fee` 時点の測定で、本節の base (`2f235a0a`) とは commit が異なる。`2f235a0a` は `ecb45fee` 以降の main 取り込みを含む。361 と 360 の 1 件差は**未切り分け** (§6.2 で記録した 0x959a40 の run 依存が候補だが、本 PR では確認していない)。
+  - **case 単位の outcome 変化 7 関数は未検証**: 対象 VA・base/new の outcome・native 実行時間の raw jsonl を保存していないため、根拠を記録できない。「timeout の揺らぎ」は仮説であり、断定しない。検証として再実行 (`tests/fvm_transitions.py BASE.jsonl NEW.jsonl` で VA を出力) を子 issue に残す。
+    受入条件の「既存 pattern の一致 (verdict) は変えない」は、上の関数単位 verdict 遷移 (match→match 360 等) で成立する。case の outcome 変化とは区別する。
 - **原因 (未達の根拠)**: fvm の fault 位置 (rip 0x41a7xx・0xd2b1 等、または addr 0xb) は、this の VMT slot が 0 埋めのため仮想 call 先で落ちる。
   引数 this を正しく指しても、VMT の slot を解決しない限り native は仮想 call を完走できない。受入条件 (2) の「一致/不一致への遷移」は現設計では 0 件。
 - **残り (子 issue へ)**: VMT slot に ret stub (または wasm 側で解決可能な関数) を置く設計。これは wasm 側の仮想 call 解決と整合させる必要がある。
