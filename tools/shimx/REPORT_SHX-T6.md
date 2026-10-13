@@ -54,7 +54,7 @@ mirror は guest ヘッダと 1:1 (guest アドレスで引く)。Prepare で確
 
 ### 19.5 生成物の扱い (SHX-T6 で変わったもの)
 
-- `exports.txt` / `data/sigs.json`: `test.sh` / `gen_sigs.py` が shimx ソースから再生成した結果。差分は `shimx_set_midi_backend` / `shimx_set_notify_hook` / `shimx_seh_*` 等の追加と、`midiOutShortMsg` の HANDLE (i64→i32) 統一。中身の削除は無い (並びだけ変わる)。
+- `exports.txt` / `data/sigs.json`: `test.sh` / `gen_sigs.py` が shimx ソースから再生成した結果。差分は `shimx_set_midi_backend` / `shimx_set_notify_hook` / `shimx_seh_*` 等の追加と、`midiOutShortMsg` の HANDLE (i64→i32) 統一。中身の削除は無い (並びだけ変わる)。`shimx_set_trace_file` の行も同じ再生成で入った (main の `shimx.h` に宣言済みで、main の `exports.txt` が古かったための追随。SHX-T12 の変更であり SHX-T6 の変更ではない)。
 - `data/inventory.csv`: midi 18 行の `source` 列を `net.c` → `midi_conv.c` へ変更 (ソースの所在の記録のみ)。数値列は不変。
 - `data/coverage.json`: `shimx_hooks` 68 → 69 (`shimx_set_midi_backend` の 1 件のみ) のみ。`m11_closure` / `ott_api_resolved` は main の値を維持。
 - `BACKLOG.md` / `inventory.md` / `data/inventory.csv` の残りの行: **コミットしていない**。`test.sh` 再生成は入力 (`work/ir_m11.json` 等の M11 IR) が無いと `m11_closure` を空にするため、main の値を維持した。M11 IR が揃った環境で再生成する。
@@ -67,9 +67,11 @@ mirror は guest ヘッダと 1:1 (guest アドレスで引く)。Prepare で確
 
 | 検証 | コマンド | 結果 | 所要 / 備考 |
 |---|---|---|---|
-| shimx 全体 (MT/ST・fail-fast 10 モード・M4 53/53・署名 mismatch 0・midi 単体テスト) | `bash tools/shimx/test.sh` | exit 0 (MT/ST PASS・fail-fast 10・M4 MT/ST PASS・sig_test ALL PASS・mismatch 0) | 49.0 s (1687d0e6 = main 再 merge 後で実測) |
+| shimx 全体 (MT/ST・fail-fast 10 モード・M4 53/53・署名 mismatch 0・midi 単体テスト) | `bash tools/shimx/test.sh` | exit 0 (MT/ST PASS・fail-fast 10・M4 MT/ST PASS・sig_test ALL PASS・mismatch 0) | 32 s (HEAD 5914dc0d・load 0.19→0.76) |
 | `verify_ott` | 同上 (§7) | **SKIP** (`tools/m8/work/ott_m8.ll` / `tools/m6/work` が無い) | OTT 検証は未実施。素材 (`toolchain-retdec` / `work-m6-ott`) が要る |
-| audio MIDI e2e (audio 単体。shimx 変更はビルド対象外) | `bash tools/audio/e2e_midi.sh` | 4/4 PASS, exit 0 | 71.0 s (fcc85854 で実測・load 0.00→0.08) |
+| audio MIDI e2e (audio 単体。shimx 変更はビルド対象外) | `bash tools/audio/e2e_midi.sh` | 4/4 PASS, exit 0 | 69 s (HEAD 5914dc0d・load 0.49) |
+
+注: `test.sh` は実行中に `BACKLOG.md` / `inventory.md` / `data/coverage.json` / `data/inventory.csv` を M11 入力欠落の状態で再生成する。検証後はこれらを main の内容へ戻してある (コミットに含めない)。
 
 e2e 内訳: `midi_all` 54/54 (2,801 ms) / `negctl_drop_one_short_msg` 62,500 ms / `negctl_flip_sysex_bit` 1,892 ms / `worker_webmidi_probe` PASS (記録のみ)。
 注: `e2e_midi.sh` は shimx をビルドしないため、この PASS は audio 側の回帰確認に限られる。shimx と audio の結合は未検証 (§19.8)。
