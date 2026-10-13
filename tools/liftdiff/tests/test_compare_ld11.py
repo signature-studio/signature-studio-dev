@@ -8,6 +8,7 @@
     ネガコン = 書込み byte の値差 / 書込まれていない byte の rebase 漏れ / 片側だけ書込み / 書込み byte に ptr を入れて rebase 漏れ → 全て diff。
 (2) compare_case: wasm timeout で native が長い case は wasm_trap でなく wasm_timeout_native_long。
     ネガコン = native が短い (native_ms * slowdown < timeout) / native ms 不明 → 従来どおり wasm_trap (欠陥として残る)。
+(3) target JSON の wasm_timeout_ms / wasm_slowdown_bound の検証: 0・負数・非数は ValueError (ランナ既定値との食い違い防止)。
 """
 import os, sys, unittest
 
@@ -116,6 +117,39 @@ class WasmTimeout(unittest.TestCase):
         self.assertEqual(classify.unexec_reason(rec), 'wasm_timeout_native_long')
         # 他 case に実不一致があれば mismatch のまま (偽陽性除去が本物の欠陥を隠さない)
         self.assertEqual(classify.verdict({'cases': [c, {'outcome': 'diff'}]}), 'mismatch')
+
+
+class WasmTimingParams(unittest.TestCase):
+    def test_defaults(self):
+        self.assertEqual(compare.wasm_timing_params({}), (1000, 20.0))
+
+    def test_valid_override(self):
+        self.assertEqual(compare.wasm_timing_params({'wasm_timeout_ms': 5000, 'wasm_slowdown_bound': 8}), (5000, 8.0))
+
+    # ---- ネガコン: 0 / 負数 / 非数はランナの既定値 (Number(x) || 1000) と判定閾値が食い違うので拒否する ----
+    def test_neg_timeout_zero_rejected(self):
+        with self.assertRaises(ValueError):
+            compare.wasm_timing_params({'wasm_timeout_ms': 0})
+
+    def test_neg_timeout_negative_rejected(self):
+        with self.assertRaises(ValueError):
+            compare.wasm_timing_params({'wasm_timeout_ms': -5})
+
+    def test_neg_timeout_fraction_rejected(self):
+        with self.assertRaises(ValueError):
+            compare.wasm_timing_params({'wasm_timeout_ms': 1.5})
+
+    def test_neg_timeout_string_rejected(self):
+        with self.assertRaises(ValueError):
+            compare.wasm_timing_params({'wasm_timeout_ms': '1000'})
+
+    def test_neg_slowdown_zero_rejected(self):
+        with self.assertRaises(ValueError):
+            compare.wasm_timing_params({'wasm_slowdown_bound': 0})
+
+    def test_neg_slowdown_negative_rejected(self):
+        with self.assertRaises(ValueError):
+            compare.wasm_timing_params({'wasm_slowdown_bound': -1.0})
 
 
 if __name__ == '__main__':

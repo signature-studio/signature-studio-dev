@@ -1,10 +1,23 @@
 """native / wasm の case 結果を比較して差分 (diffs) を作る。ポインタは address ずれ (delta) を許容して正規化する。"""
+import math
 
 M64 = (1 << 64) - 1
 NATIVE_STACK_LO = 0x7000_0000_0000
 SENTINEL = 0xCAFEBABE0BADF00D
 DEFAULT_WASM_TIMEOUT_MS = 1000     # ld_runner.mjs の vm timeout 既定 (target JSON wasm_timeout_ms で上書き)
 DEFAULT_WASM_SLOWDOWN = 20.0       # wasm (-O0 + 計装) が native の何倍まで遅くなり得るかの仮定 (target JSON wasm_slowdown_bound)
+
+
+def wasm_timing_params(t):
+    """target JSON の wasm_timeout_ms (正の整数) / wasm_slowdown_bound (正の数) を検証して (ms, slowdown) を返す。
+    不正値は raise する: ランナ側の既定値 (Number(x) || 1000) と判定閾値が食い違うのを防ぐ。"""
+    ms = t.get('wasm_timeout_ms', DEFAULT_WASM_TIMEOUT_MS)
+    sl = t.get('wasm_slowdown_bound', DEFAULT_WASM_SLOWDOWN)
+    if isinstance(ms, bool) or not isinstance(ms, (int, float)) or not math.isfinite(ms) or ms <= 0 or int(ms) != ms:
+        raise ValueError('wasm_timeout_ms must be a positive integer (got %r)' % (ms,))
+    if isinstance(sl, bool) or not isinstance(sl, (int, float)) or not math.isfinite(sl) or sl <= 0:
+        raise ValueError('wasm_slowdown_bound must be a positive number (got %r)' % (sl,))
+    return int(ms), float(sl)
 
 
 class Ctx:

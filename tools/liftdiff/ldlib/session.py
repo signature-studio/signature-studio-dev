@@ -35,10 +35,9 @@ class Session:
         wins = [(self.origin, self.origin + self.pe.size),
                 (self.lay['arena'], self.lay['arena'] + self.lay['arena_size']),
                 (self.lay['heap'], self.lay['heap'] + self.lay['heap_size'])]
-        self.wasm_timeout_ms = int(self.t.get('wasm_timeout_ms', compare.DEFAULT_WASM_TIMEOUT_MS))
+        self.wasm_timeout_ms, wasm_slowdown = compare.wasm_timing_params(self.t)
         self.ctx = compare.Ctx(self.delta, wins, (self.lay['stack_end'], self.lay['stack_base']),
-                               wasm_timeout_ms=self.wasm_timeout_ms,
-                               wasm_slowdown=float(self.t.get('wasm_slowdown_bound', compare.DEFAULT_WASM_SLOWDOWN)))
+                               wasm_timeout_ms=self.wasm_timeout_ms, wasm_slowdown=wasm_slowdown)
         self.analyzer = Analyzer(self.pe)
         self.state = None
         if state:

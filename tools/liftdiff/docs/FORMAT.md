@@ -72,7 +72,7 @@ native の case 結果には呼出し所要 `ms` (ld_ms_call 前後の CLOCK_MON
 {"liftdiff_version":1,"target":"m11",
  "function":{"va":"0x4133f0","name":"function_4133f0","sig":{"ret":"i64","params":["i64","i64"],"defined":true}},
  "verdict":"match|mismatch|unexec",
- "unexec_reason":"native_fault_all_patterns|native_null_deref_all_patterns|native_timeout|native_sigill|hang|unsupported_sig|no_wasm_definition",
+ "unexec_reason":"native_fault_all_patterns|native_null_deref_all_patterns|native_timeout|native_sigill|hang|wasm_timeout_native_long|unsupported_sig|no_wasm_definition",
  "tags":[{"tag":"load_dropped","confidence":"high|medium|low","evidence":"..."}],
  "cases":[{"id":"4133f0:p01","pattern":"p01","outcome":"equal|diff|wasm_trap|wasm_timeout_native_long|native_fault|both_fault|hang",
            "native_status":"ok","wasm_status":"ok",
