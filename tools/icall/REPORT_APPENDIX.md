@@ -149,7 +149,7 @@ awk -F'\t' -v a=401 -v b=404 'NR>1 && $1>=a && $1<=b {s+=$4; l+=$5; n+=$6; u+=$7
 
 ### 12.3 ICALL-15 (#1014): SCCP が 0x1dc0080 の load を undef にする条件 (HEAD `a5adb2fc`)
 
-前回 run (HEAD `a5adb2fc`) の検証: `measure_flengine_split.sh` 133 s (load 0.62 → 1.43, 4 core) で base 366 / c2 366 を再現。`sccp_stub_drop.py` 49 s で dump 709 本。RetDec v5.0 (`toolchain-retdec`)。`sites_after.json` の per-site 集計は dropped 366 / kept_indirect 8 で、dropped は関数別に 0xc589b0 = 183 / 0x128f9e0 = 183 (kept 8)。全段の IR は前回 run の一時領域にのみあり、保存していない (commit なし)。現 HEAD (`d8c67a2c` 以降) では未再実行。以下の数値はすべて前回 run の値。
+再測定 (HEAD `711b58ca`、本 run で実機再実行): `measure_flengine_split.sh` 97.9 s (wall, 4 core) で base 366 / c2 366 を再現。`sccp_stub_drop.py` 32.7 s で dump 709 本。RetDec は `/opt/retdec/bin/retdec-decompiler` (`toolchain-retdec`)。`sites_after.json` の per-site 集計は 374 site 中 dropped 366 / kept_indirect 8 で、dropped は関数別に 0xc589b0 = 183 / 0x128f9e0 = 183 (kept 8 は 0x128f9e0 側)。全 site は `call` / kind `vtable` (`call qword ptr [reg + disp]`、reg は rax / rbx、disp は 24 / 32 / 40 / 56 / 64 / 96)。`passes.tsv` / `sccp_pairs.tsv` の値は §12.1 と一致 (GVN → SCCP で stub 377 → 11、`br i1 undef` 0 → 322 (2 関数計))。前回 run (HEAD `a5adb2fc`) と同じ値で、回帰はない。全段 IR は本 run の一時領域にのみあり、commit はしていない。
 
 **状態: 仮説 (数値は未再集計)**。前回 run の IR 解析で得た機構の仮説で、本 fix run では再集計していない。
 本 fix run は RetDec (`toolchain-retdec`) が無く、`measure_flengine_split.sh` / `sccp_stub_drop.py` を再実行できなかった (`$ARTIFACTS_DIR` は `fl-win64` のみ)。下表の到達可能数は以下の理由で採用しない。
