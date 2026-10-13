@@ -21,8 +21,9 @@ REPORT_APPENDIX.md が 250 行上限を超えているため、#898 の節はこ
 - `iargs.run` (OTT `ott.drc.ll`): `site_unbound` 3 → 2。
 - `leafspec targets/ott_iargs.json --n 200`: match=200 mismatch=0 wasm_trap=0 (rate 1.000 → PASS)。所要 22.8 秒 (rc=0)。
 - 測定の出所: PR 作成時の単一測定。実行 ID・出力全文は保存していない。同じ HEAD の再測定値は別に存在しない。
+- 現 HEAD (2b456966) との関係: `iargs.py` は 220c4703 から不変 (`git diff` で確認)。一方、main 取り込み (c3ce2796) で `passes/base.py` の `canon_alloca_order` と `tests/test_unit.py` の T23 が加わっており、上記の測定はそれらを含まない。現 HEAD での T16 / leafspec は未実測。
 
 ### 再実行できなかった検証 (レビュー指摘 5)
 
-- 本 fix run (HEAD 39a70381 系) では `$ARTIFACTS_DIR` に `fl-win64.tar.zst` のみがあり、OTT 素材 (`tools/m6/work/ott.drc.ll`・`OTT_vst2_win64.dll`) が無い。T16 と leafspec は再実行できず、本節の数値は再検証していない。
+- 本 fix run (HEAD 2b456966) では `$ARTIFACTS_DIR` に `fl-win64.tar.zst` のみがあり、OTT 素材 (`tools/m6/work/ott.drc.ll`・`OTT_vst2_win64.dll`) が無い。T16 と leafspec は再実行できず、本節の数値は再検証していない。
 - 再実行に必要な素材: `fl-win64 work-m6-ott analysis-ott-binaries work-liftlib` (`docs/WORKFLOW.md` §11)。素材が揃った run の Actions run ID と出力全文を、ここに追記すること。
