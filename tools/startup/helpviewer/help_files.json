@@ -1,0 +1,286 @@
+{
+ "fl": "26.1.7.5653 (win64)",
+ "note": "FL install path / size / sha256 of Help/** + System/Internet/error-offline.html. Metadata only (no content).",
+ "files": [
+  {
+   "path": "Help/HelpAliases.scr",
+   "size": 8682,
+   "sha256": "c69f82c57ee8aba99c0b7ba13850eca5c6f2a013df6973968f059a0243fc47ae"
+  },
+  {
+   "path": "Help/HelpPlugins.scr",
+   "size": 2267,
+   "sha256": "654e8d7e06308a80b0d17b898944bbbf83979d336eccb1a3f22bac182d72d51b"
+  },
+  {
+   "path": "Help/WhatsNew.htm",
+   "size": 980991,
+   "sha256": "5d2ba50499b88e3383a2429ceebc23e57295d2f183a1e4b95ec25f111fe4f71b"
+  },
+  {
+   "path": "Help/flstudio.css",
+   "size": 29891,
+   "sha256": "7d4b4a0e43d146d572f7cc49d5ba66a95cff3b5bdf2cd50a337847f1ad6e9c28"
+  },
+  {
+   "path": "Help/index_offline.html",
+   "size": 3999,
+   "sha256": "a3e0fcf71b30fc2f1f4572406b7680dbfee078027c324de2b4e6a405b08a8f53"
+  },
+  {
+   "path": "Help/fonts/ILGlyphsEx.eot",
+   "size": 95750,
+   "sha256": "719a44622a54d6da4e84b75e3ace51bcb7d998e26d59124495ef650add1ce4b7"
+  },
+  {
+   "path": "Help/fonts/ILGlyphsEx.otf",
+   "size": 95508,
+   "sha256": "b987731ee0ef8689576ffa9e7d8a3f0c9243c53f545c55b8dcd4ae47edfb7c76"
+  },
+  {
+   "path": "Help/fonts/ILGlyphsEx.svg",
+   "size": 213821,
+   "sha256": "e11e1e0da18a47542e8e69c306df304e002b22d9f727ceb26cd3a539a1388015"
+  },
+  {
+   "path": "Help/fonts/ILGlyphsEx.ttf",
+   "size": 95544,
+   "sha256": "dbf7bc6dd14b19a21162766092a97e5567f67eb60b85a5e645dd24f6129bc779"
+  },
+  {
+   "path": "Help/fonts/ILGlyphsEx.woff",
+   "size": 53628,
+   "sha256": "b8ffbe8355b18fa5f451063a980ac9c8a8ead416836edd8e937f1e5ab6824c89"
+  },
+  {
+   "path": "Help/html/FD/web/index.html",
+   "size": 1533,
+   "sha256": "f12bfef8351ea01360c2067a007b4f0cb06742c6907cb0e41e4d8136fccf3331"
+  },
+  {
+   "path": "Help/html/FD/web/jquery.js",
+   "size": 85582,
+   "sha256": "b409c14a10b4caad6b54844aa63a5faf748b83eecc2dd0d4fb1d913f8de55365"
+  },
+  {
+   "path": "Help/html/FD/web/documents/Editions_FL12__fruity.png",
+   "size": 18774,
+   "sha256": "861fc0b2021f654f6ea726f769b16a4952a949b389590434a03952d301400064"
+  },
+  {
+   "path": "Help/html/FD/web/documents/Editions_FL__fruity.png",
+   "size": 18774,
+   "sha256": "861fc0b2021f654f6ea726f769b16a4952a949b389590434a03952d301400064"
+  },
+  {
+   "path": "Help/html/FD/web/documents/Editions_FL12_producer_1.png",
+   "size": 19483,
+   "sha256": "d9c11568b4b2928682dfd3414bc1bee0d1a76d0407d85005de66a0a0ec259c61"
+  },
+  {
+   "path": "Help/html/FD/web/documents/Editions_FL_producer_1.png",
+   "size": 19483,
+   "sha256": "d9c11568b4b2928682dfd3414bc1bee0d1a76d0407d85005de66a0a0ec259c61"
+  },
+  {
+   "path": "Help/html/FD/web/documents/Editions_FL12_signature.png",
+   "size": 19409,
+   "sha256": "b26c8e9804889a4ac06e82d6e0a1384171928b39b80eb61119e2ce04d12e0f55"
+  },
+  {
+   "path": "Help/html/FD/web/documents/Editions_FL_signature.png",
+   "size": 19409,
+   "sha256": "b26c8e9804889a4ac06e82d6e0a1384171928b39b80eb61119e2ce04d12e0f55"
+  },
+  {
+   "path": "Help/html/FD/web/documents/RegisterDrumaxx.jpg",
+   "size": 53814,
+   "sha256": "e5851e96a58891986fa016916ff62621bcf730eea6e699e88bd79a40cfb9f32e"
+  },
+  {
+   "path": "Help/html/FD/web/documents/Register_Content.png",
+   "size": 29136,
+   "sha256": "36fed9bb0da03572157b8262b0f582db2a0e2663a97b51afa5f9305b2be82661"
+  },
+  {
+   "path": "Help/html/FD/web/documents/Register_DirectWave_ezg_2.jpg",
+   "size": 47698,
+   "sha256": "c27b0336d7057aac0f215a3a68240b7c70da1c542b15567738305e9b6afc1ead"
+  },
+  {
+   "path": "Help/html/FD/web/documents/Register_FLMobile_5.png",
+   "size": 29267,
+   "sha256": "457056bb26ffcce47ff499cd5192dbc6dfd538b577dca3fd32b74d8c3c9ef339"
+  },
+  {
+   "path": "Help/html/FD/web/documents/Register_GrossBeat.jpg",
+   "size": 46293,
+   "sha256": "661c7ec8e5d251e4e7b94e0ec87c5a1ae75171e39be108d924dd52baa8a6babb"
+  },
+  {
+   "path": "Help/html/FD/web/documents/Register_Hardcore_1.jpg",
+   "size": 52097,
+   "sha256": "f296a99ca3db80fc86dc74718df2dafb8e0cb09b7b6a897bae99d5fda70f41d4"
+  },
+  {
+   "path": "Help/html/FD/web/documents/Register_Harmless.jpg",
+   "size": 44653,
+   "sha256": "adeb095ace442fdb26a139b4aa1643e6d28db8afd2984eca9e64331bfd8254de"
+  },
+  {
+   "path": "Help/html/FD/web/documents/Register_Harmor.png",
+   "size": 48666,
+   "sha256": "a96de5f90a635468ce06d857b12920f164329df2226f9853087718bdb0f045b5"
+  },
+  {
+   "path": "Help/html/FD/web/documents/Register_ILRemote.png",
+   "size": 36021,
+   "sha256": "ff821dfa531e4d8fdaf02e698fcdea07f1b37106b3b916d67f8b12983a3eea30"
+  },
+  {
+   "path": "Help/html/FD/web/documents/Register_Maximus_2.jpg",
+   "size": 46634,
+   "sha256": "f1a1e9b36799b9386a93572b4bf82cbe0d47644c1e8943b2f59495de35bbffea"
+  },
+  {
+   "path": "Help/html/FD/web/documents/Register_Morphine_ezg_2.jpg",
+   "size": 49866,
+   "sha256": "ecd203acca68b74785ae2d1fe7e4ece5dd9e3daf3772941d78c7047950d42d67"
+  },
+  {
+   "path": "Help/html/FD/web/documents/Register_Newtone.jpg",
+   "size": 41435,
+   "sha256": "5c02d1b20599b49f1c74795efa747e5460f9ab058d27edd721fc15070f6cbc78"
+  },
+  {
+   "path": "Help/html/FD/web/documents/Register_Ogun.jpg",
+   "size": 43655,
+   "sha256": "847be64056642b12f3bbd5f881b056521ceb1257599cd921e851b3842ab0891d"
+  },
+  {
+   "path": "Help/html/FD/web/documents/Register_Pitcher.jpg",
+   "size": 48215,
+   "sha256": "35e4b02dc3acfd78ee16506fee503c899cf61c5c16efa12f262b1c62cee03a6e"
+  },
+  {
+   "path": "Help/html/FD/web/documents/Register_Plugins_1.png",
+   "size": 37243,
+   "sha256": "fda58d4fe42a3d2da0da06e12bcf2b8ae489fec3f925fde929fcacfdc18d3d37"
+  },
+  {
+   "path": "Help/html/FD/web/documents/Register_Sakura.jpg",
+   "size": 47791,
+   "sha256": "74fceb6df50f41c0b27594446051f0ff30ff20333b4c64a1420a758c5da98684"
+  },
+  {
+   "path": "Help/html/FD/web/documents/Register_Sawer_1.jpg",
+   "size": 43924,
+   "sha256": "455fa5ca26b1f7a6534fe4eb9715b789e00c7a76b3114693fb924f95cffb634b"
+  },
+  {
+   "path": "Help/html/FD/web/documents/Register_Slicex.jpg",
+   "size": 45532,
+   "sha256": "d9ea01aaf0eac50cce07c6fd3a6bf3bd9132c307d445b63ff0d0232c1dfeea59"
+  },
+  {
+   "path": "Help/html/FD/web/documents/Register_Sytrus_ezg_1.jpg",
+   "size": 43856,
+   "sha256": "ae94e91f70dcdea582968749b707e9c6946a58ba87d752d930f7da64eebdd882"
+  },
+  {
+   "path": "Help/html/FD/web/documents/Register_ToxicBio.jpg",
+   "size": 52592,
+   "sha256": "993d3c43e9dfdc2f1dba54f6b29dafc55d0db459d2dea6cada92f973ad6b9f68"
+  },
+  {
+   "path": "Help/html/FD/web/documents/Register_TransientProcessor_2.jpg",
+   "size": 7982,
+   "sha256": "33d986a2f980d192d88f6b043584cbc80b0c11144912ea848642cc51c0c51641"
+  },
+  {
+   "path": "Help/html/FD/web/documents/Register_TransistorBass.jpg",
+   "size": 8508,
+   "sha256": "eb738ec7d44ae8674a5f211c33feffe29d2f2e6bf4e41b5d47f5686eca1bb5c4"
+  },
+  {
+   "path": "Help/html/FD/web/documents/Register_Vocodex_1.jpg",
+   "size": 44426,
+   "sha256": "4ecd6bf8b122528e7357a8c87783c1eaed5355542ad2fc1a723a9264b802b8b0"
+  },
+  {
+   "path": "Help/html/FD/web/documents/_case6.html",
+   "size": 6006,
+   "sha256": "5163f16b349cae5f826a7df70b917a0f9e0234bfcf3008353b4bc7255fac9832"
+  },
+  {
+   "path": "Help/html/FD/web/documents/boxregreminder.html",
+   "size": 7844,
+   "sha256": "138f43aad7e7cfae5f136ebe4bf5c61c87a22fad156f2f5ce07b7c348adf4674"
+  },
+  {
+   "path": "Help/html/FD/web/documents/debug.log",
+   "size": 1440,
+   "sha256": "36ce565ab7b3cf0520988a3f68288e256b7a1352f69086e05e77badf61356c3f"
+  },
+  {
+   "path": "Help/html/FD/web/documents/demoplugincannotbesaved.html",
+   "size": 21948,
+   "sha256": "75b1f4bd08677f04e42396edbf9f0e17e027d3881d00d75179092c70711aa3bc"
+  },
+  {
+   "path": "Help/html/FD/web/documents/expirationregcode.html",
+   "size": 3577,
+   "sha256": "64a50560a234306397efa7c5ab16a79da745329f1748e690b3c83ba436a20db6"
+  },
+  {
+   "path": "Help/html/FD/web/documents/info.html",
+   "size": 2399,
+   "sha256": "d28db2bfab3a6988ec7df98b1c5b37b896222c9cbc2b84044fca6dee7399445d"
+  },
+  {
+   "path": "Help/html/FD/web/documents/internetconnection.html",
+   "size": 3442,
+   "sha256": "a3950f664257c80b1e978577a1ac62a0f6c25abb331dc7dce33be3e0774a5996"
+  },
+  {
+   "path": "Help/html/FD/web/documents/panel_online_deactivate_1.png",
+   "size": 35942,
+   "sha256": "48cf5d5a3dc91c25bd0718821447c621c03e8c7d04807198b916e6fd49db22bc"
+  },
+  {
+   "path": "Help/html/FD/web/documents/productinfo.html",
+   "size": 7526,
+   "sha256": "76a29bceb83ef3e0407d14974d51b9c12545a4f96639eb45e6e423d140deccc4"
+  },
+  {
+   "path": "Help/html/FD/web/documents/regcodeexpired.html",
+   "size": 3889,
+   "sha256": "7df1af25a09a6c9dfb0d47ff222a7cb02fb015c26b59eb6f6ade2523c37f7519"
+  },
+  {
+   "path": "Help/html/FD/web/documents/regoftrial.html",
+   "size": 12056,
+   "sha256": "55036ff880d49b139f1d5daba6c650fe691204759d210045f827ef364e4fa0b5"
+  },
+  {
+   "path": "Help/html/FD/web/documents/textstyles_nf.css",
+   "size": 16918,
+   "sha256": "cb9e598ba83114ff23fb89668b97d3c3818737dd5cc12c2803529b5d83b59a00"
+  },
+  {
+   "path": "Help/html/FD/web/documents/toolsandapplications.html",
+   "size": 6247,
+   "sha256": "a35bb20f9422f6b84c55f9ca55c4b3174d34b06ede6cd94949c8983a8a4aa13a"
+  },
+  {
+   "path": "Help/html/img_shot/settings_system_about.png",
+   "size": 64704,
+   "sha256": "0a508604e05335a7fe7b21fd6889292b17b811d42316bf3e1bcdb53d037276bb"
+  },
+  {
+   "path": "System/Internet/error-offline.html",
+   "size": 44729,
+   "sha256": "0b8daf3cf85659606c93a4993523020255f09dd81b14dd97ee07cdc1e8c2e6df"
+  }
+ ]
+}

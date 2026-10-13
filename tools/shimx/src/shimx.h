@@ -1007,6 +1007,10 @@ LPVOID  ILCombine(const void* a, const void* b);
 UINT    ILGetSize(const void* pidl);
 LPVOID  ILGetNext(const void* pidl);
 HRESULT SHGetMalloc(LPVOID* out);
+/* 序数 import でしか参照されない 3 API (SHX-T8 / src/shord.c): shell32 #74 / shlwapi #12 / #219 */
+HRESULT SHCreateStdEnumFmtEtc(UINT cfmt, const void* afmt, LPVOID* out);
+LPVOID  SHCreateMemStream(const BYTE* data, UINT len);
+HRESULT QISearch(void* that, const void* tab, const GUID* riid, LPVOID* out);
 HRESULT SHGetDesktopFolder(LPVOID* out);
 HRESULT SHCreateItemFromParsingName(LPCWSTR p, LPVOID bc, const GUID* iid, LPVOID* out);
 HRESULT SHOpenFolderAndSelectItems(LPVOID pidl, UINT n, LPVOID* children, DWORD flags);
@@ -1064,6 +1068,7 @@ BOOL    CryptCreateHash(HANDLE prov, DWORD alg, HANDLE key, DWORD flags, LPHANDL
 BOOL    CryptHashData(HANDLE h, const BYTE* d, DWORD n, DWORD flags);
 BOOL    CryptGetHashParam(HANDLE h, DWORD p, BYTE* d, LPDWORD n, DWORD flags);
 BOOL    CryptDestroyHash(HANDLE h);
+BOOL    CryptReleaseContext(HANDLE prov, DWORD flags);
 
 /* winmm (MIDI は「デバイス 0 台」スタブ。Web MIDI 連携は下流) */
 UINT    timeBeginPeriod(UINT ms);
@@ -1172,6 +1177,10 @@ void shimx_set_proc_resolver(void* (*fn)(HMODULE m, const char* name, DWORD ordi
 void shimx_set_load_hook(HMODULE (*fn)(const char* nameUtf8, DWORD flags));
 void shimx_set_resource_provider(const void* (*fn)(HMODULE m, const WCHAR* name, const WCHAR* type, DWORD* size));
 void shimx_set_shell_execute_hook(int (*fn)(const char* verb, const char* file, const char* params));
+/* GUI 連携 (#172 SHX-T5): gui が user32 側 (MsgWait* / WM_DROPFILES) から呼ぶ口 */
+void shimx_set_notify_hook(void (*fn)(void));                  /* kernel object の状態変化ごとに呼ぶ (任意スレッド・shx_lock 外) */
+int  shimx_drag_accepts(HWND w);                               /* DragAcceptFiles(w, TRUE) 済みか */
+HANDLE shimx_hdrop_create(const WCHAR* const* wpaths, DWORD n, int x, int y, int nc);   /* DROPFILES を作り HDROP を返す (DragFinish で解放) */
 void shimx_set_trust_ok(int on);
 unsigned shimx_wininet_call_count(void);   /* wininet 接続系 API の呼出回数 (全て失敗扱い) */
 void shimx_set_version(DWORD major, DWORD minor, DWORD build, DWORD fileHi, DWORD fileLo);

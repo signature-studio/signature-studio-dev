@@ -2,9 +2,10 @@
 """ILWASAPI2ASIO_x64.dll の ILWasapiToAsioDriver vtable を RTTI から復元し、
 IASIO 各スロットの先頭命令を逆アセンブルして FL が期待する driver 面 (sample type,
 buffer size 範囲, latency, sample rate 等) を実測する。出力: stdout (JSON は --json)。"""
-import sys, struct, json, os
+import sys, os, struct, json
 import pefile
 from capstone import Cs, CS_ARCH_X86, CS_MODE_64
+
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "shared"))
 from paths import FL_WIN64_DIR
 

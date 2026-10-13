@@ -1,0 +1,96 @@
+{
+ "21202": {
+  "name": "BooBass (cpp-engine)",
+  "fails": [
+   "declares_unimpl",
+   "emcc_c_rc",
+   "i256_trap",
+   "missing_define"
+  ],
+  "ref": "#534"
+ },
+ "23914": {
+  "name": "Kepler (cpp-engine)",
+  "fails": [
+   "declares_unimpl",
+   "emcc_c_rc",
+   "i256_trap",
+   "missing_define"
+  ],
+  "ref": "#534"
+ },
+ "23916": {
+  "name": "Kepler Exo (cpp-engine)",
+  "fails": [
+   "declares_unimpl",
+   "emcc_c_rc",
+   "f80_funcs",
+   "i256_trap",
+   "missing_define"
+  ],
+  "ref": "#534"
+ },
+ "23944": {
+  "name": "Morphine (cpp-single)",
+  "fails": [
+   "declares_unimpl",
+   "emcc_c_rc",
+   "i256_trap",
+   "missing_define"
+  ],
+  "ref": "#534"
+ },
+ "24159": {
+  "name": "PoiZone (cpp-engine)",
+  "fails": [
+   "declares_unimpl",
+   "emcc_c_rc",
+   "i256_trap",
+   "missing_define"
+  ],
+  "ref": "#534"
+ },
+ "24163": {
+  "name": "Sakura (cpp-engine)",
+  "fails": [
+   "declares_unimpl",
+   "emcc_c_rc",
+   "f80_funcs",
+   "i256_trap",
+   "missing_define"
+  ],
+  "ref": "#534"
+ },
+ "24167": {
+  "name": "Sawer (cpp-engine)",
+  "fails": [
+   "declares_unimpl",
+   "emcc_c_rc",
+   "f80_funcs",
+   "i256_trap",
+   "missing_define"
+  ],
+  "ref": "#534"
+ },
+ "24216": {
+  "name": "Toxic Biohazard (cpp-single)",
+  "fails": [
+   "declares_unimpl",
+   "emcc_c_rc",
+   "f80_funcs",
+   "i256_trap",
+   "missing_define"
+  ],
+  "ref": "#534"
+ },
+ "24298": {
+  "name": "Transistor Bass (cpp-engine)",
+  "fails": [
+   "declares_unimpl",
+   "emcc_c_rc",
+   "i256_trap",
+   "missing_define"
+  ],
+  "ref": "#534"
+ }
+}

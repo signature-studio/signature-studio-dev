@@ -10,12 +10,16 @@ CallNextHookEx
 CallWindowProcA
 CallWindowProcW
 CharLowerBuffW
+CharLowerW
+CharNextExA
 CharNextW
+CharToOemBuffW
 CharUpperBuffW
 CharUpperW
 ClientToScreen
 CloseClipboard
 CombineRgn
+CommDlgExtendedError
 CopyRect
 CreateBitmap
 CreateCaret
@@ -62,6 +66,7 @@ EnumChildWindows
 EnumClipboardFormats
 EnumDisplayMonitors
 EnumDisplaySettingsW
+EnumFontFamiliesExW
 EnumThreadWindows
 EnumWindows
 EqualRect
@@ -102,6 +107,7 @@ GetCursorInfo
 GetCursorPos
 GetDC
 GetDCEx
+GetDIBColorTable
 GetDIBits
 GetDesktopWindow
 GetDeviceCaps
@@ -128,6 +134,7 @@ GetModuleHandleW
 GetMonitorInfoW
 GetObjectA
 GetObjectW
+GetOpenFileNameW
 GetParent
 GetPhysicalCursorPos
 GetPixel
@@ -135,6 +142,7 @@ GetPropW
 GetRandomRgn
 GetRegionData
 GetRgnBox
+GetSaveFileNameW
 GetStockObject
 GetStretchBltMode
 GetSysColor
@@ -254,6 +262,7 @@ SetClassLongPtrW
 SetClipboardData
 SetCursor
 SetCursorPos
+SetDIBColorTable
 SetDIBits
 SetDIBitsToDevice
 SetFocus
@@ -309,5 +318,7 @@ UnregisterClassW
 UpdateWindow
 ValidateRect
 ValidateRgn
+WTSRegisterSessionNotification
+WTSUnRegisterSessionNotification
 WaitMessage
 WindowFromPoint

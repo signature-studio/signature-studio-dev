@@ -10,7 +10,9 @@ if [ -f "$EMSDK" ]; then set +u; . "$EMSDK" >/dev/null 2>&1 || true; set -u; fi
 command -v emcc >/dev/null || { echo "[audio] emcc not found" >&2; exit 1; }
 . "$HERE/flags.sh"
 mkdir -p "$OUT/worklets" "$OUT/js"
-emcc "${FLA_CLANG_FLAGS[@]}" "${FLA_EMCC_FLAGS[@]}" \
+# FLA_DEFS: ビルド variant 用の追加 -D (例 FLA_DEFS="-DFLASIO_PROFILE_ILWASAPI=0 -DFLASIO_SYSTIME_AUDIBLE=1")。既定は空
+# shellcheck disable=SC2086
+emcc "${FLA_CLANG_FLAGS[@]}" "${FLA_EMCC_FLAGS[@]}" ${FLA_DEFS:-} \
   -I"$HERE/src" \
   "$HERE/src/flaudio.c" "$HERE/src/flasio.c" "$HERE/src/flwasapi.c" "$HERE/src/flds.c" "$HERE/test/fla_test.c" \
   -o "$OUT/fla_test.js"

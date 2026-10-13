@@ -50,12 +50,13 @@ fail-fast: 未初期化/`bufferSwitch==NULL`/チャネル外/`buffer_frames` が
 
 ## 4. バッファ・レイテンシ選択と「バースト」
 
-- worklet は **128 フレーム固定**。ASIO バッファは **128 の倍数** (既定報告 min=128/max=4096/pref=512/granularity=128。ILWASAPI 値 256/4096/512/0 は `-DFLASIO_PROFILE_ILWASAPI=1`)。
+- worklet は **128 フレーム固定**。ASIO バッファは **128 の倍数** を createBuffers が受理 (profile に依らず [128,4096])。getBufferSize の既定報告は **ILWASAPI 値 min=256/max=4096/pref=512/granularity=0** (AU-7 #193 で確定; FL は min/max/granularity を読まない: REPORT §11)。shim 単体用の min=128/granularity=128 は `-DFLASIO_PROFILE_ILWASAPI=0`。
 - **重要な実測**: ブラウザは quantum を 1 つずつでなく **バースト** (OS 出力バッファ単位) で連続呼出する。headless Chrome では 48k で 512f (10.7ms) 周期、96k では 2048–3072f。`ctx.baseLatency` は 96k で実態 (3072f) より小さい (1024f) ため当てにならない。
 - よって目標充填 `T = depth*B` は **T ≥ burst×1.25 + B** が必要 (1 バースト通過で ring が枯渇しないこと)。決定手順:
   1. OPEN 時に 96 quanta の較正プローブ (`fl-burst-probe`, 約 0.25s) で実バーストを測定、`max(baseLatency, probe)` を ACK で返す → `fla_open` が `depth` を引き上げ。
   2. 実行中は worklet が `burst_obs` を更新、producer が `T` を拡張 (underrun 毎に +B も加算)。拡張のみ (縮小なし)。`kAsioLatenciesChanged` 通知は既定 OFF (FL の `asioMessage` は selector 6 を内部コマンド 0x17 に配線 = 再起動の疑い: INVENTORY §2) 。
 - 報告レイテンシ: `output = T + 128 + (baseLatency + outputLatency)·sr`, `input = B + 128 + baseLatency·sr` (推定。実測 shim in→out = T フレーム)。
+- `outputLatency` は起動直後 0 で約 250ms 後に更新される。FL は createBuffers 直後の getLatencies を一度だけ読むため、ATTACH は outputLatency>0 になるまで最大 600ms 待ってから CreateBuffers を返す (`FlAudioShimOptions.outputLatencyWaitMs`, 0 で無効)。上限まで 0 のブラウザは 0 のまま進む。
 - サンプルレート: `AudioContext({sampleRate})` を要求 (ブラウザが必要ならリサンプル)。`SetSampleRate` は停止中のみ → `SET_SR` コマンドで ctx 再生成 → ring はそのまま再接続、`sampleRateDidChange` をホストへ。
 
 ## 5. Underrun 処理 (クロック連続・データ非破壊)
@@ -71,7 +72,7 @@ worklet は quantum 毎に `avail = write-read` を見る:
 ## 6. クロック同期 (worklet = master)
 
 - worklet は毎 quantum 先頭で `(currentFrame, currentTime)` を seqlock 付きで公開。`performance` は AudioWorkletGlobalScope に無い (実測 `typeof performance === "undefined"`) ため、system 時刻は main thread が `ctx.getOutputTimestamp()` を 250ms 毎に取得し、直近 16 点の最小二乗直線で平滑化した `(ref_ctx_time, ref_epoch_ms=performance.timeOrigin+performanceTime)` を公開 (±数ms のジッタを低減)。
-- wasm 側 `fla_clock_read`: `audible_ns = ref_epoch + (ctx_time(quantum) - ref_ctx)·1000`。= **その quantum 先頭が「聴こえる」時刻** (outputLatency を含む)。ASIO `GetSamplePosition` / `ASIOTime.timeInfo` は `(dev_frames - play_start_frame, audible_ns)` を返す (`kSystemTimeValid|kSamplePositionValid|kSampleRateValid`)。
+- wasm 側 `fla_clock_read`: `audible_ns = ref_epoch + (ctx_time(quantum) - ref_ctx)·1000`。= **その quantum 先頭が「聴こえる」時刻** (outputLatency を含む)。`fla_clock_read` の `audible_ns` は shim 内部の時刻写像 (e2e の `clock.*` はこれを直接測る)。ASIO `GetSamplePosition` / `ASIOTime.timeInfo` は `(dev_frames - play_start_frame, systemTime)` を返し (`kSystemTimeValid|kSamplePositionValid|kSampleRateValid`)、**`systemTime` は既定で基準ドライバ ILWASAPI2ASIO と同じ「コールバック時刻」= `(uint32)timeGetTime() ms × 1e6` ns** (AU-7 #193; FL は systemTime だけを読み timeGetTime と同じ時間軸で扱う: REPORT §11)。従来の可聴時刻は `-DFLASIO_SYSTIME_AUDIBLE=1`。
 - 位置の意味: デバイスクロック基準 (underrun 中の無音も進む)。FL の再生カーソル `pbtrackingmode` はこの位置で補間される想定。
 
 ## 7. WASAPI 風 (`flwasapi_*`, P2)
