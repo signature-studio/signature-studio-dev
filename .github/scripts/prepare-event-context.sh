@@ -128,9 +128,11 @@ printf 'should_run=%s\n' "$should_run" >> "${GITHUB_OUTPUT:-/dev/null}"
 # 本文に `oc_artifacts: fl-win64 plugins-ott` の行があれば、その素材を agent-setup が
 # R2 から取得する。本文は untrusted なので allowlist に一致する語だけを通す。
 # 指定が無ければ空 (workflow 側で既定の fl-win64 になる)。
+# `none` を単独で書くと「追加素材なし」の明示として空扱いにする。他の名前との混在は拒否する。
 # 注意: 全素材で約 17.7 GiB (2026-10-13 実測)。runner の空きに収まるよう必要なものだけ指定すること。
 ARTIFACT_RE='^(fl-win64|plugins-(ott|freshair|serum2|massivex|kilohearts)|toolchain-(retdec|emsdk)|work-(m11|liftdiff|m6-ott|liftlib-targets|liftlib|icall|fw-stage1)|analysis-(ott-binaries|mac-shared)|apt-mingw)$'
 artifacts=""
+none_count=0
 # pull_request_review (reviewer の差し戻し) の本文は reviewer の指摘であり、素材の指定は PR 本文にある。
 ARTIFACTS_SRC="$COMMENT_FILE"
 case "$EVENT_NAME" in pull_request | pull_request_review) ARTIFACTS_SRC="$PR_BODY_FILE" ;; esac
@@ -142,12 +144,22 @@ fi
 artifacts_line="$(grep -m1 -E '^[[:space:]]*oc_artifacts:' "$ARTIFACTS_SRC" || true)"
 if [ -n "$artifacts_line" ]; then
   for name in $(printf '%s' "${artifacts_line#*oc_artifacts:}" | tr -cd 'a-z0-9 -'); do
+    if [ "$name" = none ]; then
+      none_count=$((none_count + 1))
+      continue
+    fi
     if ! printf '%s' "$name" | grep -qE "$ARTIFACT_RE"; then
-      printf '::error::oc_artifacts: unknown artifact "%s" (allowed: fl-win64, plugins-{ott,freshair,serum2,massivex,kilohearts}, toolchain-{retdec,emsdk}, work-{m11,liftdiff,m6-ott,liftlib-targets,liftlib,icall,fw-stage1}, analysis-{ott-binaries,mac-shared}, apt-mingw)\n' "$name"
+      printf '::error::oc_artifacts: unknown artifact "%s" (allowed: none, fl-win64, plugins-{ott,freshair,serum2,massivex,kilohearts}, toolchain-{retdec,emsdk}, work-{m11,liftdiff,m6-ott,liftlib-targets,liftlib,icall,fw-stage1}, analysis-{ott-binaries,mac-shared}, apt-mingw)\n' "$name"
       exit 1
     fi
     artifacts="${artifacts:+$artifacts }$name"
   done
+  if [ "$none_count" -gt 0 ]; then
+    if [ "$none_count" -gt 1 ] || [ -n "$artifacts" ]; then
+      printf '::error::oc_artifacts: "none" must be the only name (no other names, no repeats)\n'
+      exit 1
+    fi
+  fi
 fi
 printf 'artifacts=%s\n' "$artifacts" >> "${GITHUB_OUTPUT:-/dev/null}"
 

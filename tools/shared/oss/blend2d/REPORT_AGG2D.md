@@ -39,7 +39,57 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| Agg2D の vtable / メソッド数の確定 (逆アセンブル) | 「~140 symbol」の根拠が無い。lift と C++ 再実装の工数が見積もれない | #146 (継続) |
+| ~~Agg2D の vtable / メソッド数の確定 (逆アセンブル)~~ | 解決: §5 で 130 slot / 79 unique を実測 | 完了 (§5) |
 | lift か C++ 再実装かの方針決定 | 本採用の実装に入れない (REPORT_SIMD.md §4 と同じく人判断) | #146 (PM/ユーザ判断) |
 | FL 実描画経路の画素比較 | 本 run では未実施 (fl-win64 は展開済みだが描画経路の harness が無い) | #146 (継続) |
 | FL が使う Blend2D commit の symbol 集合比較 | pre-v0.20 の近似のまま。export が 1 本のため symbol 比較の手段が要再設計 | #146 (継続) |
+
+## 5. vtable の実測 (逆アセンブル)
+
+> 再現: `FL_WIN64_DIR=<fl-win64 展開先> python3 tools/shared/oss/blend2d/agg2d_vtable.py`
+> (依存: `pefile`・`capstone`)。出力は `tools/shared/work/agg2d_vtable.json` (gitignore)。
+
+- `AggCreateInstance` (`0x180059a60`) は `0x1170` B を確保し、`0x1800568a0` のコンストラクタに tail-jump する。
+- コンストラクタは `lea rax,[rip+0x185607]` で vtable (VA `0x1801DBEC0`) を先頭に書く。
+- vtable は `.text` 内を指す qword が **130 slot** 連続し、終端値 `0x504d42` (コード外) で止まる。
+
+| 項目 | 値 | 根拠 |
+|---|---|---|
+| vtable slot 数 | **130** | `agg2d_vtable.py` |
+| 相異なる関数 (unique target) | **79** | 同上 |
+| 種別 (unique) | code 76 / trivial_ret 3 | 先頭命令の判定 (capstone) |
+| 種別 (slot 単位) | code 76 / trivial_ret 54 | 同上 |
+
+**判明**: 「~140 symbol」の出所は、vtable slot 130 に近いが一致しない。slot 数は 130、関数は 79。
+140 という数は再現できないので、本文の「~140」は **旧推定値** として扱う。
+
+**未判明**: 各関数が呼ぶ Blend2D API、引数の型、Agg2D のどのメソッドが FL から実際に呼ばれるか。
+lift か C++ 再実装かの判断には、この依存の確定が要る。`trivial_ret` 54 slot は共通スタブの可能性がある (未検証)。
+
+## 6. vtable 各関数の依存 (呼び出し先の推移閉包)
+
+> 再現: `FL_WIN64_DIR=<fl-win64 展開先> python3 tools/shared/oss/blend2d/agg2d_callees.py`
+> (依存: `pefile`・`capstone`)。出力は `tools/shared/work/agg2d_callees.json` (gitignore)。
+> 各 root から直接 call/jmp で到達する内部関数を再帰で辿り、IAT (`call [rip+disp]`) の import を集計する。
+
+| 項目 | 値 | 根拠 |
+|---|---|---|
+| unique root (vtable 関数) | **79** | §5 と同じ |
+| 内部関数の到達数 (全 root の和集合) | **217** | `agg2d_callees.py` |
+| 2 root 以上から到達する内部関数 | **97** | 同上 |
+| 到達数 (root 別) | 1〜83 (中央値 32) | 同上 |
+| import に到達する root | **42 / 79** | 同上 |
+| 到達する import の種類 | **28** (KERNEL32 の名前付き 27 件 + 未解決 1 件) | 同上 |
+
+- 42 root が共通に到達する import: `EnterCriticalSection`・`LeaveCriticalSection`・`HeapAlloc`・`HeapFree`・`GetLastError`・`SetLastError`・`TlsGetValue`・`TlsSetValue`・`LoadLibraryExW`・`GetProcAddress`・`FreeLibrary` と、未解決 1 件 (下記)。
+- 16 root が共通に到達する import: `RaiseException`・`RtlCaptureContext`・`RtlLookupFunctionEntry`・`RtlVirtualUnwind`・`UnhandledExceptionFilter`・`SetUnhandledExceptionFilter`・`IsProcessorFeaturePresent`・`GetCurrentProcess`・`TerminateProcess`。例外処理・フェイルファスト系の共通経路と読める (**未検証**)。
+- 「exclusive」 (その root だけが到達する内部関数) は大半が **1 (root 自身)**。Agg2D 固有の実装量は小さく、大部分は共有の Blend2D 内部関数に依存している可能性が高い (**未検証**)。
+
+**判明**: 79 root のうち内部呼び出し先を持たない (`reachable_funcs` = 1) のは **34 / 79**、到達数 5 以下は **37 / 79**。到達数の中央値は 32 で、root により差が大きい。2 root 以上から到達する内部関数は 217 中 **97**。
+**未判明 / 制約**:
+- 間接 call (`call reg`・`jmp reg`) は辿れない。推移閉包は**下限**。
+- `unresolved@1801b7308` (42 root が到達) は IAT 範囲 (`0x1801b7000`〜`0x1801b72e8`) の外。import テーブルではない参照先で、中身は未確認。
+- 本スクリプトは線形スイープを行わず、vtable の root から call/jmp で到達する関数だけを集計する。到達しない `.text` 領域は集計外で、全体の網羅は未実施。
+- 「Blend2D API の名前」は特定できていない (export 無し・シンボル無し)。関数の役割 (描画 / パス / 画素処理) は未判定。
+
+**結論**: vtable の規模は確定 (§5)。依存は「共有ヘルパ + KERNEL32 の少数 import」に寄るが、lift 対象の実質規模 (間接 call 込み、関数の役割) は未確定のため、lift か再実装かの決定は本 run ではしない。
