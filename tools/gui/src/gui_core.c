@@ -323,13 +323,16 @@ static void nc_metrics(uint32_t style, uint32_t ex, int *l, int *t, int *r, int 
   int cap = ((style & WS_CAPTION) == WS_CAPTION) ? dscale(23) : 0;
   *l = *r = *b = bw; *t = bw + cap;
 }
+static WRECT *g_nc_cur;   /* 送信中の NCCALCSIZE_PARAMS.rgrc: lift 済み WndProc は lParam を int32 に切り詰める (REPORT §4-6) ため native (64bit) では下位 32bit 一致で復元 */
 /* ウィンドウ矩形 (親 client 座標) を与え WM_NCCALCSIZE で client 寸法と NC 幅を確定 */
 static void calc_nc(Wnd *w, int ww_, int wh_) {
   struct { WRECT r[3]; U64 pwp; } p;
   struct { U64 hwnd, after; int32_t x, y, cx, cy; uint32_t flags, _p; } wp = { w->h, 0, w->x, w->y, ww_, wh_, 0, 0 };
   WRECT win = { w->x, w->y, w->x + ww_, w->y + wh_ };
   p.r[0] = p.r[1] = p.r[2] = win; p.pwp = H_(&wp);
+  WRECT *saved = g_nc_cur; g_nc_cur = p.r;
   send_message(w->h, WM_NCCALCSIZE, 1, H_(&p));
+  g_nc_cur = saved;
   WRECT c = p.r[0];
   if (c.left < win.left) c.left = win.left;
   if (c.top < win.top) c.top = win.top;
@@ -1318,7 +1321,7 @@ static API defproc_impl(I64 h, I64 msg, I64 wp, I64 lp, int wide) {
       return 1;
     }
     case WM_NCCALCSIZE: {   /* wParam=1: NCCALCSIZE_PARAMS (rgrc[0] = 新 window rect -> client rect)、0: RECT */
-      WRECT *r = (WRECT *)P_(wp ? lp : lp); int l, t, rr, b; nc_metrics(w->style, w->exstyle, &l, &t, &rr, &b);
+      WRECT *r = (g_nc_cur && (uint32_t)lp == (uint32_t)(uintptr_t)g_nc_cur) ? g_nc_cur : (WRECT *)P_(lp); int l, t, rr, b; nc_metrics(w->style, w->exstyle, &l, &t, &rr, &b);
       r->left += l; r->top += t; r->right -= rr; r->bottom -= b; return 0;
     }
     case WM_NCPAINT: {   /* window DC に枠 (4 辺) とキャプション帯を描く。client は塗らない */
