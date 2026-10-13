@@ -112,6 +112,8 @@ runs:
         # fl-win64-anything.tar.zst も拾うため、オブジェクトを明示して取得する。
         missing=""
         for name in ${R2_ARTIFACTS:-}; do
+          # apt-* は R2 の素材ではない (後段で apt から入れる)
+          case "$name" in apt-*) continue ;; esac
           key="artifacts/${name}.tar.zst"
           if aws s3 cp "s3://${R2_BUCKET}/$key" "$artifacts_dir" \
             --endpoint-url "$endpoint" --only-show-errors; then
@@ -201,6 +203,19 @@ runs:
           fi
           echo "::warning::continuing without them because artifacts-required=false"
         fi
+
+        # apt-mingw は R2 の素材ではなく apt パッケージ (mingw-w64: PE を作るテスト用)。
+        # R2 から取得する対象 (上の for) には入れず、ここで要求された時だけ入れる。
+        case " ${R2_ARTIFACTS:-} " in
+          *" apt-mingw "*)
+            if sudo apt-get install -y --no-install-recommends gcc-mingw-w64-x86-64 >/dev/null 2>&1; then
+              echo "installed gcc-mingw-w64-x86-64: $(command -v x86_64-w64-mingw32-gcc)"
+            else
+              echo "::error::failed to install gcc-mingw-w64-x86-64"
+              [ "${R2_REQUIRED:-true}" = 'true' ] && exit 1
+            fi
+            ;;
+        esac
 
         du -sh "$artifacts_dir" 2>/dev/null || true
         {

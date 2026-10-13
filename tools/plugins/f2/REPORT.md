@@ -1,9 +1,9 @@
-# tools/plugins/f2 REPORT — PLG-F2 eq-filter 11 本: 手順 1 (固有閉包 lift) の再現と、差分試験の前提監査 (#199) + icall 復元の接続と回帰ゲート (#514, §7)
+# tools/plugins/f2 REPORT — PLG-F2 eq-filter 11 本: 手順 1 (固有閉包 lift) の再現と、差分試験の前提監査 (#199) + icall 復元の接続と回帰ゲート (#514, §7) + leaf 23 関数の関数単位差分 (#515, §8)
 
 - 検証起点 commit: **09d9fd8** (origin/main 0f22d9c を基点とする `199-plg-f2-eq-filter-step1`)。数値はすべてこの HEAD から `bash tools/plugins/f2/f2_step1.sh` を 3 回実行して取得。
 - 日付: 2026-10-13 / 担当 dir: `tools/plugins/f2/` のみ (生成物は `tools/plugins/work/` = gitignore)
 - 既知類型との関係: **(icall §4) D1 = 間接 call/jmp 脱落** が 11 閉包すべてで再現 (§3)。(DEFECTS.md) D15 は x64c stage-0 経路の同種事象で、本件は RetDec 経路 (別経路)。新規類型なし。
-- 範囲: issue #199 の手順 1 (固有閉包 lift → `emcc -c`) と、手順 3 (差分試験) の実行可否の判定まで。**手順 2〜4 と出口条件 (差分試験 bit-exact) は未達** (§5)。
+- 範囲: issue #199 の手順 1 (固有閉包 lift → `emcc -c`) と、手順 3 (差分試験) の実行可否の判定まで。**§8 (#515) で「機械語にも間接 call 無し」の leaf 23 関数だけ関数単位差分を実施**。**手順 2〜4 と出口条件 (差分試験 bit-exact) は未達** (§5)。
 
 ## 0. 結論 (先出し)
 
@@ -87,7 +87,7 @@
 |---|---|---|
 | `batch_lift.sh` の鎖に `tools/icall` の間接 call 復元 (binary pre-rewrite + `__icall_dispatch`) が無く、550 site 脱落 | 11 本すべて。接続しない限り差分試験は必ず不一致 | **解消 → #514 (§7)**: 接続済み + 回帰ゲート `icall_gate.py` |
 | 手順 2〜4: 共有 framework wasm とのリンク・Host shim・kernel 表・`Eff_Render` 差分試験・Render test .flp E2E | 出口条件 (差分試験 bit-exact) | 既存 #195 (P0a) / #196 (P0b) / #197 (P0c) が完了待ち。`framework/REPORT.md` §0 は `TFruityPlug*` 実体生成が未達と記録。本 issue (#199) に残す |
-| 23 個の「機械語でも間接 call 無し」leaf の関数単位差分 (native ms_abi と wasm; `lift/t0_balance` 方式の一般化) | 部分的な bit-exact 実績。浮動小数引数には ARG pass 再適用が必要 | **新規子チケット案** `[PLG-F2-3]` (親 #199)。ARG pass は #197 |
+| 23 個の「機械語でも間接 call 無し」leaf の関数単位差分 (native ms_abi と wasm; `lift/t0_balance` 方式の一般化) | 部分的な bit-exact 実績。浮動小数引数には ARG pass 再適用が必要 | **新規子チケット案** `[PLG-F2-3]` (親 #199)。ARG pass は #197 | → **#515 で実施 (§8): 一致 15 / 不一致 8。不一致は ARG pass 未接続 (#547)**
 | Frequency Splitter の engine DLL (block 18980、MSVC C++ 3.35 MB、T3) | 1 plugin。本 PR では Delphi 殻 18979 のみ | 既存 #28 ([PLG-E1]、タイトルに Frequency Splitter を含む) にコメントし別トラック化を PM が判断 |
 | `win_funcs.py` が 4 core で 8 分 22 秒かかり、Actions の 60 分枠を圧迫 | 再実行コスト | `work-plugins-f2` のような素材 (`tools/plugins/work/` の winfuncs) 化は #293 (allowlist 追加) で PM 判断 |
 
@@ -198,3 +198,42 @@ python3 tools/plugins/f2/xcheck_icall.py 18953 18975 18979 18982 18984 19005 190
 | restored IR の wasm リンク・実行 (BLK、`__icall_dispatch` の VA→関数表、`ir_flatten --table`)、Host shim、差分試験 | 出口条件 (#199 手順 2〜4)。本 PR は IR 上の被覆まで | 既存 #195 / #196 / #197、#199 に残す |
 | `closure_stats.py` の leaf 定義: 復元後は `__icall_dispatch` 呼出しが外部呼出しになり leaf が減る (18953: 8 → 1)。ABI も `i64 f(void)` (引数は BLK 経由) | #515 の leaf 23 関数の選定は `PLUG_ICALL=0` (`f2_step1.sh`) の IR か機械語側 (`icall_summary.py`) を使うこと。native ms_abi との差分には BLK 経由の harness が要る | 既存 **#515** にコメント |
 | 18979 の waiver は手作業の到達不能性確認 (前提: `[rbp+0x40]` が書換わらない) | 1 site。誤りなら F1 を隠す | waiver の `evidence` に根拠を残した。反証が出たら waiver を削除すれば FAIL に戻る (NC5) |
+
+## 8. PLG-F2-3 (#515): 「IR leaf かつ機械語に間接 call 無し」23 関数の関数単位差分試験
+
+- 本節は結論のみ。対象 23 関数の表・ネガコン詳細・限界・再現・実測時間は **`REPORT_APPENDIX.md` (§8 全文を無変更で分割移動)**。
+- 検証起点 commit: **cb70945** (origin/main 6a0a8c8 基点)。main 取り込みの merge (758a06b・87541c3) 後も leaf 系スクリプトは不変で、`f2_step1.sh`・`icall_gate.py`・`matrix_check.py` 等は main 版。
+- 既知類型との関係: 不一致 8 関数は全て **(DEFECTS.md) D5** (xmm 引数脱落)。重なる類型は **(DEFECTS.md) D4** 系・**(DEFECTS.md) D1a**。比較系の偽陽性 2 類型は新規 (§8.5 の DEFECTS.md 行案)。
+- 範囲: native 参照は Linux 上で PE の機械語を ImageBase に mmap して MS x64 ABI で直接実行した値 (`tools/liftdiff/rt/ld_native.c`)。FL Studio 実機・framework・TFruityPlug 実体とのリンク (#195〜#197) は範囲外。
+
+### 8.0 結論
+
+1. 対象 23 関数 (IR leaf 55 のうち機械語にも非 IAT 間接 call が無いもの)。別算法 (`xcheck_leaf.py`) で同じ 23 関数を再導出 (集合一致 EQ)。
+2. **最終判定: 一致 15 / 不一致 8 / 実行不能 0**。主採点だけなら 一致 9 / 不一致 9 / 実行不能 5 で、補助 case を足して確定。主採点の一致 2 関数 (0x6bfec0・0x6c9b60) は補助 case で不一致に覆った。
+3. 不一致 8 関数は全て「機械語が xmm 入力を読むのに IR 署名に float 引数が無い」(D5)。`lift_ranges.sh` 鎖に ARG pass が未接続 → #547。
+4. 一致 15 関数は 9 パターン+補助 case の範囲で戻り値・書換えメモリ・entry 列が bit 一致。**入力空間全体の等価性は主張しない**。
+5. ネガティブコントロール: 変異 30 件 (store_drop 6・load_drop 11・offset_shift 13) を全て検出 (詳細は付録 §8.3)。
+
+### 8.1 ARTIFACT (偽陽性 3 関数) の根拠
+
+主採点が mismatch で、補助 case が match の 3 関数。根拠の区別:
+
+| VA | 確認済み (再実行で観測) | 推定 (未検証) |
+|---|---|---|
+| 0x6cd8a0 (EQUO, pall2) | mem 差分は 1 語のみ。native `0x01000000224623b0` / wasm `0x01000000220623b0`、差 0x400000 (= delta) | `cmp_mem` が部分上書きされた ptr 入り語を正規化できない (D17 行案) |
+| 0x73fa20・0x6ec2a0 (pall) | native=ok / wasm=timeout | wasm 1 s 打切りによる偽 `wasm_trap` (D18 行案)。比較器欠陥か否かは未切り分け |
+
+「偽陽性確定」は上表の確認済み範囲に限る。比較器の欠陥は推定 (#548 [LD-11])。
+
+### 8.2 未解決
+
+| 未解決 | 起票先 |
+|---|---|
+| 不一致 8 関数の xmm 引数脱落 (D5)。ARG pass 未接続 | **#547 [PLG-F2-4]** (親 #199) |
+| liftdiff 比較系の偽陽性 2 類型 | **#548 [LD-11]** (親 #122) |
+| 主採点 9 パターンの検出力不足 | #235 ([LD-4]) にコメント |
+| 手順 2〜4 (framework link・Host shim・Render test .flp E2E) | 既存 #195 / #196 / #197、#199 に残す |
+
+### 8.3 再現
+
+`bash tools/plugins/f2/f2_step1.sh` → `bash tools/plugins/f2/leaf_diff.sh` → `python3 tools/plugins/f2/nc_leaf.py` (手順・ファイル役割・実測時間は付録 §8.6・§8.7)。

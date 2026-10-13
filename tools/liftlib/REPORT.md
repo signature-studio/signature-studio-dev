@@ -2,7 +2,7 @@
 
 > 正本: `tools/liftlib/REPORT.md` (§0〜§9 + 要約)。
 > **付録 (分割移動・内容は削除していない)**: [`REPORT_APPENDIX_A.md`](REPORT_APPENDIX_A.md) (§10〜§12)・
-> [`REPORT_APPENDIX_B.md`](REPORT_APPENDIX_B.md) (§13〜§16)・[`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) (§17・§18)・[`REPORT_APPENDIX_C.md`](REPORT_APPENDIX_C.md) (§19)。
+> [`REPORT_APPENDIX_B.md`](REPORT_APPENDIX_B.md) (§13〜§16)・[`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) (§17・§18)・[`REPORT_APPENDIX_C.md`](REPORT_APPENDIX_C.md) (§19)・[`REPORT_APPENDIX_D.md`](REPORT_APPENDIX_D.md) (§22)。
 > 節番号は全ファイルで通し番号 (本体の §N 参照は付録の同番号節を指す)。
 
 - 日付: 2026-10-11 / 担当 dir: `tools/liftlib/` (他 dir は読取のみ) / 再現: `bash tools/liftlib/liftlib_e2e.sh` (キャッシュ時 約 25 秒 + leaf spec 約 4 分, `--fresh` で FA/KH を RetDec lift から約 1 分)
@@ -197,3 +197,44 @@ FA の P1' (comisd×2+jbe/jae+xorps/movaps+jmp, 合流先は reg2mem alloca) が
 | (初版の記述: `tools/ott/avx/build_avx.sh`・`tools/ott/crtinit/lift_crt.sh`・`tools/ott/accept/acc_crt_table.py`・`tools/ott/avx/unsup_scan.py`・`tools/m9/m9_tablebind.py`・`tools/shimx/scripts/import_scan.py`・`tools/liftlib/tests/test_unit.py`・`tools/liftlib/xmm0_ret_census.py` にも同一の固定パスが残る。同種の移植性欠陥 (本 issue の範囲外)。新規子チケット案 (CI-4 系列)) | **解消済み**: a4f8a08 (#450 / PR #460) と 2db928d (#427 / PR #438) で main に merge 済み。この HEAD で 8 ファイルとも `/home/ubuntu` の出現数 0 を実測。#450 `[CI-4-ott-liftlib]` は CLOSED | 起票不要 |
 | `OTT_DLL` が [3] (`build_x64c.sh`) と `--full` に伝わらない。[3] は `libottnative.so` (既定 DLL 由来) と比較するため、別 DLL を指定しても [3] だけ既定 DLL を検証する | 別 DLL を `OTT_DLL` で指定した検証が [1][2] と [3] で別対象になる | 未起票 (新規子チケット案、CI-4 系列・親 #294。PM に起票依頼) |
 | `capstone` / `pefile` の依存がどこにも宣言されていない。素材展開だけでは [1] の最初の python 呼び出しで落ちる | Actions 上で e2e を再実行する度に手動インストールが要る | 未起票 (新規子チケット案、CI 系列。PM に起票依頼) |
+
+## 21. DIR64 補正境界 (section 末尾 8B slot) の複製の全数列挙と修正 (#593 / M11-N22, 親 #572)
+
+既知類型との関係: 該当なし (DEFECTS.md の D1a〜D16 にも icall §4 にも無い。データ敷設 C 生成器の境界 off-by-one で、m11 #572 と同根)。検証起点 commit: `1a94ac2` (修正コード)。
+
+- 結論: 旧境界 `r < lo + len - 8` は 3 箇所 (`tools/m6/m6_data_gen.py:42` / `tools/liftlib/liftlib/passes/dataimage.py:35` / `tools/liftlib/tests/test_unit.py:116`) に複製されており、全て `<=` に修正。**FL 本体 PE (`block00031_PE.bin`) では `.data` 末尾 slot (RVA `0x11e5000`) が旧条件で補正漏れ、修正後は 0**。OTT 実機 DLL (`OTT_vst2_win64.dll`) は補正漏れ 0 (末尾 slot 自体が存在せず旧条件でも漏れない = 潜在バグは OTT 生成物には顕在化していなかった。下記「OTT 実機の実測」)。
+- 再現: `bash tools/liftlib/dir64_boundary_gate.sh` (1 コマンド。PE 省略時 `$FL_WIN64_DIR/extracted/block00031_PE.bin`)。不合格は非 0 で終了する。
+
+| 検査 | 算法 | 結果 |
+|---|---|---|
+| [1] 全数列挙 (`dir64_boundary_enum.py`) | (A) 行 regex と (B) python `ast` の Compare 走査を突合 (`tools/` 配下の `.py/.mjs/.js/.ts/.sh/.c/.h`、`work/` 除外、`reloc`/`DIR64` を含むファイルのみ) | 和集合 8 件 (grep 8 / ast 8, `.py` の不一致 0)。旧境界 0 件。意図的に旧式を残す `m11/m11_reloc_audit.py:83` (旧条件との選択差を測る式 OLD) だけ許可リスト |
+| [2] 実バイト (`dir64_boundary_check.py`) | pefile の `DIRECTORY_ENTRY_BASERELOC` で DIR64 を列挙 (生成器は `.reloc` を手パース = 別算法) し、生成 C の `dlld_*[]` の slot を `v - IMG + VA_BASE` と比較 | m6 / liftlib とも 補正対象の末尾 slot 1 件 / 補正 1 / 補正漏れ 0 / 不正値 0 |
+| [3] ネガコン | 3 箇所の条件を旧 `<` に戻した複製 | 列挙は OLD=3 で FAIL (rc 非 0)。実バイトは m6 / liftlib とも `MISS .data RVA 0x11e5000` 補正漏れ 1 (期待 1 で PASS)。現行コードに期待 1 を与えると FAIL |
+
+- 影響なし (境界が正しい) と判定した箇所: `ott/lift/data_gen.py:28`・`hostbridge/lowbase/x64c/lb_data_gen.py:30` (`< lo + len - 7`、slot が収まる = `<= lo + len - 8` と同値)、`hostbridge/lowbase/audit_va.py` (`range(va, va+vs-7, 8)`)、`m11/m11_image_gen.py`・`plugins/lift/passes/m11_image_gen.py` (`r + 8 <= top`)、`m11/lb_check.py` (`r + 8 <= va + vs`)、`m11/m11_data_gen.py:50` (#572 で修正済)、`flelift/fle_data_gen.py` (生バイトコピーで補正なし)。
+- 実測 (runner 4 vCPU、コミット済み HEAD を `git worktree add --detach` で展開): gate 3 回 全て ALL PASS・37.05 / 37.06 / 37.14 秒 (load average 0.31→0.65→0.81、直列)。
+- 範囲外: 実行時の差 (LoadStringW 実装後の回帰確認) は #132 に依頼済み。
+
+### OTT 実機の実測 (`analysis-ott-binaries` の `OTT_vst2_win64.dll`、検証起点 commit `f9adacd` = #636 merge 済み main)
+
+| 検査 | 結果 |
+|---|---|
+| `dir64_boundary_check.py OTT_vst2_win64.dll --gen m6 / --gen liftlib` (`--expect-missed 0`、pefile 独立算法) | 両方 PASS: DIR64 total=13000 / 補正対象=13000 / 補正漏れ=0 / 不正値=0 / 末尾 slot 対象=0 |
+| 旧条件 `<` に戻した複製 (m6 / liftlib) | 同じく補正漏れ=0 (OTT では旧条件でも落ちない) |
+| `tests/test_unit.py` T7 (`t7()` 単独、3 回) | 3 回とも `T7 ok`: 補正 12329 件 (.rdata) = base 非依存、うち nt<0x400000 12329 件。0.611 / 0.596 / 0.600 秒 (load average 0.73→0.75→0.75、直列) |
+| `dir64_boundary_gate.sh` (FL 本体 PE、同 HEAD) | ALL PASS・36.173 秒 (load average 0.69→0.83)。ネガコン (列挙 OLD=3 / 補正漏れ 1 / 期待逆転) 全て期待通り |
+
+- 末尾 slot が無い理由: 補正対象 section は `.rdata` (VS=511510, 最終 DIR64 RVA 0x225618、末尾まで 235518 B) と `.data` (VS=56268, 最終 DIR64 RVA 0x268e70、末尾まで 15708 B) の 2 つで、どちらも最終 reloc から section 末尾まで 8B より十分離れている。他 section (`.text` / `.pdata` / `_RDATA` / `.rsrc` / `.reloc`) に DIR64 は 0 件。よって旧境界 `r < lo + len - 8` は OTT では結果を変えない。
+- 測定条件: runner 4 vCPU、`$HOME/analysis/plugins/ott/binaries/OTT_vst2_win64.dll` (3146752 B)、`FL_WIN64_DIR` は `fl-win64` を展開した dir、`pefile` / `capstone` は uv venv に導入。
+- T7 以外の `test_unit.py` 全体 (`python3 tests/test_unit.py`) は T6 で停止: Fresh Air 素材 (`targets/freshair/work/win/...SlateCore.core_64` = `work-liftlib-targets`) が今回の `oc_artifacts` に無いため。T1〜T5 は PASS (T6 以降未実行)。T7 は上記の通り単独実行で PASS。本 issue の受入条件は T7 のみ。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 実行時の差の顕在化 (LoadStringW 実装後の回帰確認) | m11 同様、潜在バグで顕在化条件は未確認 | #132 にコメントで回帰確認項目を依頼 |
+
+## 22. LIFTLIB-9 (#668): RetDec raw lift 出力の非決定性 — 付録 D へ分割 (要約)
+
+- **結論**: 同一 PE・同一 ranges の RetDec raw `*.drc.ll` は実行ごとに変わり得る (ASLR 有効の実行群で distinct 1〜6 種)。差分は `uselistorder` 指示の行 (行の有無と並び)。`.drc.c` は 8/8 同一。既存の A7 段 (`run_base` / `ir5_patch`) がこの行を除去するため、liftlib base 段は 6/6、m6 chain は 3/3 が同一 (OTT 入力)。
+- **対策**: raw は sha256 比較しない・A7 後の成果物で判定する。回帰 gate `lift_determinism_e2e.sh` は PASS し、1 行追加の検出と A7 外し (FAIL・rc=1) を確認。`setarch -R` は決定性の手段として採らない (ASLR 無効でも raw が一致しない事例があり、契機は未分離)。
+- **未解決**: k80 (block18983_PE.bin) の alloca 並び差は OTT で再現せず、A7 後に残るかは未検証 (fl-win64 が必要) → `[LIFTLIB-10]` #695 に起票。PR は `Refs #668`。
+- 詳細・全実測・受入条件の達成状況は [`REPORT_APPENDIX_D.md`](REPORT_APPENDIX_D.md) (§22.1〜§22.12)。再現: `bash tools/liftlib/lift_determinism_e2e.sh` (N=2、HEAD `116cbb3` で総 17 秒) / `bash tools/liftlib/lift_determinism_probe.sh 4` (同 33 秒)。レビュー指摘 (PR #696) の対応は §22.12。
