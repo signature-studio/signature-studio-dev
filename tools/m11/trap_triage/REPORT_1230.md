@@ -7,7 +7,7 @@
 ## 0. 検証環境
 
 - 測定 base: `origin/main` `2b2faf52`、branch `1230-m11-unit149-oob-412e40` (worktree `ws-1230`)。
-- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`FL_WIN64_DIR` は末尾 `/` 無しの `$RUNNER_TEMP/fl-win64`)。`work-m11` / `work-liftdiff` は worktree の `tools/` 直下に展開。`/opt/retdec` `/opt/emsdk` は runner 既存。
+- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`FL_WIN64_DIR` は末尾 `/` 無しの `$RUNNER_TEMP/fl-win64`)。`work-m11` / `work-liftdiff` は worktree の `tools/` 直下に展開。`[RETDEC]` `[EMSDK]` は runner 既存。
 - `m11_gen_ir2.sh`: rc=0, 43.8 s, `ldfix=applied`, `boot_final.ll` 490693 行。
 - `M11_FIX_652500={0,1} m11_build.sh`: 両方 rc=0 (OFF 26 s)。
 - 注意: `FL_WIN64_DIR` の末尾に `/` を付けると IR の PE パスと不一致で build が拒否される (`m11_build.sh` の fail-closed)。
