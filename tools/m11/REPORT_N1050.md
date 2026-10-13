@@ -12,7 +12,7 @@
 
 ## 2. 実測
 
-環境: ランナー (Ubuntu, JDK 21.0.12, Ghidra 12.1.4 build 20260921)。素材 `fl-win64` / `toolchain-retdec` / `toolchain-emsdk` / `work-m11` を展開。
+環境: ランナー (Ubuntu, JDK 21.0.12, Ghidra 12.1.4 build 20260921)。下表の実測は元 run のもの (実行 commit は §2-1 のとおり未特定)。本 fix run で展開した素材は `work-m11` の 4 ファイル (`tools/m11/work/m11_image.bin`・`tools/m11/work/shimx_link/m11_sx_trace_soft.{cjs,cjs.wasm,run.json}`) のみ。`fl-win64` / `toolchain-retdec` / `toolchain-emsdk` は本 fix run では展開していない。
 
 | 段階 | コマンド | 結果 |
 |---|---|---|
@@ -25,6 +25,8 @@
 - 回帰ゲート: `m11_judge.py --require-stage 4 --min-survey-ok 800` は rc=0 (`survey_ok=870` / `survey_trap=25` / `survey_miss=46`)。`units_run_full=53`。
 - `--trace` (fail-fast GUI) 版は `LoadStringW` 未実装で `Aborted` (0.45 s)。`--soft` 版を採用。
 - 全再生成前の旧 `work-m11` IR では `memory access out of bounds` で unit 17 前後に停止していた (`m11_run.mjs` の trace 無し経路でも同じ)。全再生成後は解消。
+- 本 fix run の再実行 (展開した `work-m11` の `m11_sx_trace_soft.cjs` を `tools/m11/shimx_link/run_trace.mjs` で実行、HEAD `1aa0f211`): rc=0。`boot_stage=1` `units_run=17` `icall_ok=19` `icall_miss=1` `dllmain_done=false` `longjmp_hit=0` `threw="memory access out of bounds"` / trace `total_calls=94` `distinct_called=26` `dropped=0`。`run.json` の保存値と一致。file API 名の積集合は空。
+- 同じ再実行で `SHIMX_TRACE_FILE` を指定すると `Aborted('FS' was not exported)` で落ちる (artifact の `.cjs` は `FS` を export しない版。現在の `build.sh` L127 は export する)。そのため ftrace ファイルは生成されず、行数は取得できていない (§5)。
 
 ### 2-1. 検証起点
 
@@ -51,16 +53,16 @@
 
 本修正 run で次を実行した:
 
-- 前提: `[EMSDK]` (pin 版) の既存 install を使用 (`toolchain-emsdk` は本 run では未展開のため、install 先の既存状態を使用)。
-- 実行 HEAD: `8597b970` (commit 済み)。コマンド: `bash tools/shimx/test/ftrace/ftrace_test.sh`
-- 結果: rc=0 / 3.62 s。
+- 前提: `tools/shimx/test/ftrace/ftrace_test.sh` L15 が `[EMSDK]` (`docs/REFERENCES.md`) の `emsdk_env.sh` を source する。この経路は runner 上の既存 install を使う。`toolchain-emsdk` の artifact は本 fix run では展開していない。
+- 実行 HEAD: `1aa0f211` (commit 済み・PR head)。コマンド: `bash tools/shimx/test/ftrace/ftrace_test.sh`
+- 結果: rc=0 / 3.89 s (`uptime` load average 0.60)。全 6 段 PASS (`完了: SHX-T12 ftrace 全 PASS`)。
   - `events=10` / `by_api` = CreateFileW 2・CreateFileA 1・GetFileAttributesW 2・FindFirstFileW 2・FindNextFileW 2・ReadFile 1。file API の呼出が JSON 行として記録された。
   - ネガコン ✓ トレース無効時は JSON 行なし。
   - ネガコン ✓ `SHIMX_TRACE_FILE` 指定あり → JSON 行 1 件以上 / 指定なし → ファイル無し。
   - ✓ 既存 stderr トレースと JSON 行は混ざらない。
-- loadavg は未計測。
+- loadavg は実行直後の `uptime` で 0.60 (1 分平均) のみ記録。
 
-注: SHX-T12 単体テストは NODERAWFS の環境変数経路と ST ビルドで行を出すことを示すもので、m11 本番 wasm 上で行が出る実測 (probe) ではない。素材 `work-m11` は展開可能だが、本 fix run では probe (m11 本番 wasm での file API 1 回呼出) を実行していない (時間上限のため)。
+注: SHX-T12 単体テストは NODERAWFS の環境変数経路と ST ビルドで行を出すことを示すもので、m11 本番 wasm 上で行が出る実測 (probe) ではない。本 fix run の m11 本番 wasm 再実行は `FS` 未 export のため ftrace を書けず (§2)、probe は未達。
 
 ## 4. 未解決 (起票先)
 
@@ -77,5 +79,7 @@
 - 実施: §2-1 の検証起点、§3-2 のネガコン (SHX-T12 単体テスト rc=0 / 3.62 s、実行 HEAD `8597b970`)、§4 の既知類型・signature mismatch・未解決の表形式化。
 - 未実施 (理由つき):
   - **ftrace ファイル自体の `wc -l`**: `work-m11.tar.zst` (`$ARTIFACTS_DIR` に存在) には `tools/m11/work/shimx_link/` の `run.json` / `stderr.txt` / `cjs.wasm` 等が入るが、`ftrace` を含むエントリは 0 件 (`tar --zstd -tf | grep -c ftrace` = 0)。よって tarball からは `<tag>.ftrace.jsonl` の行数を再計測できない。
-  - **全再生成・trace build・実 boot の再実行**: Ghidra 600 s + regen 605 s + 実 boot が fix の上限 40 分に収まらないため、この run では再実行しない。
-- 素材の実在: `$ARTIFACTS_DIR` には `fl-win64` / `toolchain-emsdk` / `toolchain-retdec` / `work-m11` の 4 本が存在する (本 fix run で `ls` 確認)。
+  - **全再生成・trace build の再実行**: Ghidra 600 s + regen 605 s が fix の上限 40 分に収まらないため、この run では再実行しない。実 boot は展開済み `.cjs` で再実行した (§2)。
+  - **ftrace 行数の取得**: 上記のとおり `.cjs` が `FS` を export しないため、`SHIMX_TRACE_FILE` 付きの実 boot では ftrace が生成されない。`wc -l` は取得できていない。取り直すには `FS` を export した trace variant (`build.sh --trace --soft`) の再 build が必要で、これは全再生成と同じく本 run の上限を超える。
+- 素材の実在: `$ARTIFACTS_DIR` には `fl-win64` / `toolchain-emsdk` / `toolchain-retdec` / `work-m11` の 4 本が存在する (本 fix run で `ls` 確認)。展開したのは `work-m11` の上記 4 ファイルのみ。
+- 検証 HEAD: 差分範囲は `git diff 8597b970 1aa0f211 --stat` (`tools/m11/REPORT_N1050.md` のみ・コード差分 0)。ネガコン (§3-2) は `1aa0f211` で実行済み。
