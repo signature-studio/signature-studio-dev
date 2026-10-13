@@ -1,6 +1,6 @@
 # tools/plugins/modulation/REPORT.md — PLG-F5 (#202) modulation 8 本: lift 前提の実測
 
-- 日付: 2026-10-13 / 担当 dir: `tools/plugins/modulation/` のみ / 検証起点 commit: §6 に記載 (コミット済み HEAD)
+- 日付: 2026-10-13 / 担当 dir: `tools/plugins/modulation/` のみ (+ `docs/DOC_MAP.md` の索引 1 行) / 検証起点 commit: **519b3aa** (スクリプト一式。以降の差分は REPORT.md と DOC_MAP.md のみ)
 - 再現: `bash tools/plugins/modulation/modulation_e2e.sh` (判定 + 実測) / `bash tools/plugins/modulation/modulation_nega.sh` (ネガティブコントロール) / `python3 tools/plugins/modulation/report_tables.py` (§1〜§4 の表)
 - 素材: `fl-win64` / `toolchain-retdec` (`/opt/retdec`) / `toolchain-emsdk` (`/opt/emsdk`) (`docs/WORKFLOW.md` §11)。環境は `modulation/env.sh`
 - 方法の出典: PR #506 (PLG-F3 dynamics、未マージ) の `dynamics_e2e.sh` / `matrix_check.py` / `ids_crosscheck.py` と、PR #504 (PLG-F2、マージ済) の間接 call 監査。#506 の reviewer 指摘 (§5) は最初から回避した
@@ -161,8 +161,10 @@ e2e の exit 0 が意味するのは「殻 8 本の judge / matrix_check / ids_c
 | `modulation_e2e.sh` 全体 (`--skip-lift` 無し、3 回連続) | **210 s / 208 s / 206 s**、3 回とも exit 0 (8 閉包 + `closure_facts` + engine 4 本、逐次で並列数 1)。開始時 load average (1 分) は run 2: 0.66、run 3: 1.04 (run 1 は未記録)。 **この 3 回は `icall_check.py` の組込み前のスクリプト** (run 1 は未コミットの作業ツリーだが内容は e431efc と同一、run 2・3 は b95b8ae) |
 | 3 回の結果一致 | 判定列 (lift_rc / defines / f80 / unimpl / `emcc -c`)・engine 欠落監査・`facts.json` (sha256 `c9911472…a8aa8`) は 3 回ともバイト一致 |
 | lift 秒 (`status.csv` の seconds、3 回の min–max) | §1 の表の通り (8 本計 23–25 s)。engine は 18977: 16–17、19143: 15–16、19266: 18、19268: 22 |
-| 前提 inventory (初回のみ) | `inventory/win_funcs.py` 518 s (Pool(14) を 4 core で実行、load average 最大 16.43)。 PR #504 の記録 (8 分 22 秒 = 502 s) と同程度。 block map は PLUGIN_MATRIX から再構成 (`block_manifest.json` が tarball に無く `nsis_names.py` が動かないため) |
-| 最終 HEAD の再現 | (実行中。結果は後続コミットで追記) |
+| 前提 inventory (初回のみ) | `inventory/win_funcs.py` 518 s (Pool(14) を 4 core で実行、実行中に観測した 1 分 load average は 13.94〜16.43)。 PR #504 REPORT の記録は 8 分 22 秒 (502 s)。 block map は PLUGIN_MATRIX から再構成 (`block_manifest.json` が tarball に無く `nsis_names.py` が動かないため) |
+| クリーン worktree での全工程再現 (HEAD 519b3aa、`env -i` で HOME・PATH のみ、新規 `RUNNER_TEMP` で fl-win64 展開 + venv 作成から、inventory 生成を含む) | `modulation_e2e.sh` exit 0、**761 s** (開始時 load average 0.44 / 1.09 / 2.87、終了時 1.38 / 7.08 / 7.10)。判定 8/8・matrix 68/68・ID 8/8・icall 検算一致・`facts.json` (sha256 一致)・engine 欠落監査は上と同一。続けて `modulation_nega.sh` exit 0 (28 ケース全て期待どおり)。worktree は終了後に削除。 `env.sh` は `uv` が `PATH` に無いと fl-win64 展開の後で `uv: command not found` (rc 127) になる (`PATH` に `uv` を足して再実行) |
+| 最終 HEAD cc1edb8 (スクリプトは 519b3aa から不変) の再実行 | `modulation_e2e.sh` exit 0、**213 s** (開始時 load average 0.91 / 6.25 / 6.82 — 直前のクリーン検証の余波で 5 分値が高い)。判定 8/8・matrix 68/68・ID 8/8・icall 脱落 8/8 本・`facts.json` sha256 一致。続けて `modulation_nega.sh` exit 0、**19 s** (NC2 の再 lift を含む。 `nega_gates.py` 単体は 5 s 未満) |
+| 規約検査 | `git status --porcelain=v1 -- tools/plugins/modulation`: 追跡外・未コミットなし (REPORT 修正の commit 後)。 20 MiB 超のファイル 0 (`find tools/plugins/modulation -type f -size +20M`)。 `work/` は gitignore で未追跡 |
 
 ネガティブコントロール (`modulation_nega.sh`、全 28 ケース。壊したケースは終了コードに加え、狙った理由の文字列が出力に含まれることも確認):
 - NC1: `final.ll` (Fruity Flanger 19007) の関数 1 つの `ret` を除去 → `emcc -c` が **rc 1** (無改変は rc 0)。
