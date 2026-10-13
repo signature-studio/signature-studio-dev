@@ -166,4 +166,9 @@ bash tools/targets/freshair/lift2/lift2_e2e.sh                                  
   - trap 版: `build_ctrl.sh` ok → `run_ctrl.sh 2 5` **exit 1** (`MISMATCH in ctrl scenarios`)。`native/wasm` の行数 15/0、ERR は wasm 側 `RuntimeError: unreachable` の 1 件で native 側 ERR 1 件とは同一 scenario ではない (`同一 scenario: NO`)。
   - 元に戻した版: `build_ctrl.sh` ok → `run_ctrl.sh 2 5` **exit 0** (`ctrl BIT-EXACT 15/15`, real 3 s, load 0.77)。
 - 判定: rep 経路の誤りは ctrl e2e で検出される。これで #666 の受入条件 4 (ネガコン) を満たす。comp / filter の rep 経路 (`ml/comp_full_rep.json` 等) は動的に未確認 (§5 の未解決のまま)。
-- `lift2_e2e.sh` 全体の実測は本節の commit 後に別途記録する (§7.1)。
+
+### 7.1 lift2_e2e.sh 全体 (HEAD `32f3561b`、rep 経路の一時 trap は含まず)
+
+- `RESULT: lift2_e2e ALL PASS`, exit 0, real **56 s**, load 0.78→0.78 (nproc 4, TMPDIR=`$RUNNER_TEMP`)。
+- comp 400/400 BIT-EXACT・filter fuzz 4 系統 mismatch 0・ABI violations 0・ctrl BIT-EXACT 15/15 (S2001 の ERR は両側同一)・ablation 5 種すべて検出。
+- 素材: `work-liftlib-targets` を worktree に展開。`plugins-freshair` は `FA_DL` で `fetch.sh` を実行し factory `.epf` 8 本を補完 (#693 の手動手順)。emsdk / retdec は `/opt` 既存。
