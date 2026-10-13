@@ -3,7 +3,7 @@
 - 日付: 2026-10-10 / 親: CAB-13 (アプリケーション完成 マイルストーン) / 前段: CAB-71 (5012887, REPORT §7 の N1–N8 が入力)
 - 方針根拠: `docs/LEGAL.md` §6.0-4 (bc07970: 全ライセンス機構無力化・アクティベーション無条件通過・ライセンス状態データの配置/合成はユーザ承認済み)
 - 範囲: 本 dir (`tools/targets/serum2/license/authstub/`) のみ新設。CAB-71 既存ファイルは無変更 (license/REPORT.md への §10 追記のみ)。
-- 再現: `bash tools/targets/serum2/license/authstub/e2e.sh` (1 コマンド, lift キャッシュ利用時 約 25 秒)
+- 再現: `bash tools/targets/serum2/license/authstub/e2e.sh` (1 コマンド。実測の wall 時間は §13 参照)
 
 ## 0. 結論 (先出し)
 
@@ -79,7 +79,7 @@
 
 | ID | 事実 (実測) | 影響 | 本タスクでの扱い |
 |---|---|---|---|
-| L1 | 0x1800c2b50 の 0x1800c2ef4–f05 (host への**直接** vtable 通知 `call [rax+0x30]`, edx=0x800010) が raw RetDec IR から**脱落** (当該 VA の insn.addr メタが 0 個, 間接 call も 0) | 通知経路の半分が IR に無い (本 stub には有利だが忠実性欠落) | 機械語参照パッチ (mpatch.py) で補完。本 lift 時は再現要確認 |
+| L1 | 0x1800c2b50 の 0x1800c2ef4–f05 (host への**直接** vtable 通知 `call [rax+0x30]`, edx=0x800010) が raw RetDec IR から**脱落** (当該 VA の insn.addr メタが 0 個, 間接 call も 0。機構は §13) | 通知経路の半分が IR に無い (本 stub には有利だが忠実性欠落) | 機械語参照パッチ (mpatch.py) で補完。本 lift 時は再現要確認。原因の説明は §13 に一本化 |
 | L2 | 0x1800c2b50 の tag 文字列 len が callee が書く caller stack なのに undef alloca 読みになり base で 0 fold → tag check が常時偽 | setState が IR 上常に kResultFalse | LF1: len を global 束縛 |
 | L3 | 0x18004fad0 の ucomisd 後の分岐が**直前の整数 compare の stale flag** 再読出しになっている | version 範囲判定が誤分岐 | LF3: fcmp uge に置換 |
 | L4 | 0x18004fad0 の 2 つ目の ucomisd (v ≤ 11.00001) の分岐が脱落 | 範囲外 version も復元経路に進む | LF4: fcmp ugt + br を挿入 (動作実証済み) |
@@ -142,7 +142,7 @@ python3 tools/targets/serum2/license/authstub/authstub_irpass.py \
 - 注: 最初の試行は venv 未導入で `data_globals_gen.py` が `pefile` 不足により step [6] で停止した (環境要因。コード変更なし)。venv 導入後に上記の cold / warm を取り直した。
 - 残: 「変更前 (main 側 authstub 版) の再測定」は未実施。baseline 比較は行わない。
 - N4 (process / funclet 無変更) assert OK。変更関数は 18004fad0 / 1800c2b50 / 1800c6090 の 3 件。
-- 本束縛の共通化で達成したのは「既存 e2e の再現」と「束縛プリミティブの共通化」まで。L1 の復元 pass と LF 規則の一般化 (RetDec 出力からの規則導出) は未達。追跡は #1007 [SR-11] (OPEN) で行う。
+- 本束縛の共通化で達成したのは「既存 e2e の再現」と「束縛プリミティブの共通化」まで。L1 の復元 pass は #823、LF 規則の一般化 (RetDec 出力からの規則導出) は #1007 [SR-11] で追跡する (いずれも open)。
 
 ## 12. LF 束縛の機械語 VA キー化 (SR-9, Refs #824)
 
@@ -166,53 +166,43 @@ python3 tools/targets/serum2/license/authstub/authstub_irpass.py \
 - 後続 commit で `replace_at` の未使用引数 `tag` を削除した (挙動不変・呼出 1 箇所のみ更新)。素材 `plugins-serum2` が無く e2e の再実行は未実施 (`python3 -m py_compile` のみ確認)。
 - 未達 (#1007 [SR-11] で追跡): 値 (slot オフセット・global 名・LF4 の定数) は依然 literal。RetDec 出力から規則を導出する部分は未実装。
 
-## 13. L1 脱落条件の特定 (#823, 機械語 ↔ raw IR の突合)
+## 13. L1 の再現条件 (実測・追跡 #823)
 
-- 対象 PE: `Serum2_win64.vst3` sha256 `501e7bb3…5283` (19,236,864 B)。raw lift: `work/lift/authstub.drc.ll` (e2e.sh [1])。
-- 機械語 (capstone 実測):
+- 測定 commit: origin/main 36edc993。素材: plugins-serum2 → `Install_Xfer_Serum2_2.1.5.exe` の `$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3` (19,236,864 B, sha256 `501e7bb3…5283`)。
+- 再検証 (runner 4 core, 2026-10-13 UTC, `plugins-serum2` 取得・sha256 `501e7bb3…5283` 一致): `e2e.sh` を cold 1 回 (`work/` 無し) と warm 2 回。
+  - HEAD `5723cad5` (`origin/main` 取り込み後の PR head): cold = wall **30.66 s** (step [1] の RetDec lift を含む) / warm = **4.79 s**・**4.19 s**。いずれも exit 0・**23/23 PASS**。開始時 load (1 分平均) 0.95。
+  - merge `7b850441` 上の先行実測: cold 35.2 s / warm 5.47 s・5.45 s、23/23 PASS。生成物 `patched_base_lf.ll` `c62d9316…8793`、`raw_base_lf.ll` `79ab30ca…0d20` は §12 と一致。
+- 元測定の `load 0.92 → 0.35` は採取方法が本節に無く、この再検証では 0.92 は再現していない。実測値は上記を正とする。
+- 機械語 (0x1800c2d59–d76): `[rsi+0x90]` が非 0 なら `or dword [rax+8], 0x800010` (deferred 経路)、0 なら `je 0x1800c2ef4` で直接経路 `mov rcx,[rsi+0x10]; mov rax,[rcx]; mov edx,0x800010; call [rax+0x30]` へ分岐する。
+- raw IR では `dec_label_pc_1800c2d5f` の `icmp eq i64 %109, 0` の 0 側 (true 側) が機械語の `je 0x1800c2ef4` ではなく `dec_label_pc_1800c2f08` に付け替えられており、`0x1800c2ef4` 相当のブロックは関数内のどの分岐からも到達しない (`insn.addr` 0 件)。
+- 結論: 脱落は「`0x1800c2ef4` へ向かう辺が lift 時に `0x1800c2f08` へ付け替わる」形で起きている。raw IR の `0x800010` 即値は `or i32 …, 8388624` (L9878, `0x1800c2d6f` 側の deferred 経路) の 1 箇所のみ。
+- 残: 失われた辺を復元する pass の実装と検証は未着手 (#823)。N2b (表 §1 参照。`0x1800c2d59` → f08 の強制 = deferred 経路除去) は直接経路の復元とは別問題。
 
-  ```
-  0x1800c2d66 test rax, rax            ; rax = [rsi+0x90] (deferred 通知先)
-  0x1800c2d69 je   0x1800c2ef4         ; ★ 唯一の入口 (rax==0 の枝)
-  0x1800c2d6f or   dword ptr [rax+8], 0x800010   ; rax!=0 の枝 (deferred)
-  0x1800c2ef4 mov  rcx, [rsi+0x10]     ; host handler
-  0x1800c2ef8 test rcx, rcx
-  0x1800c2efb je   0x1800c2f08
-  0x1800c2efd mov  rax, [rcx]
-  0x1800c2f00 mov  edx, 0x800010
-  0x1800c2f05 call [rax+0x30]          ; ★ 直接 vtable 通知
-  ```
+### 13.1 確認手順 (中間物と再生)
 
-- 脱落の機構: raw IR で `[rsi+0x90]` の null 判定 (`%110 = icmp eq i64 %109, 0`, `br i1 %110, label %dec_label_pc_1800c2f08, ...`, authstub.drc.ll 行 9870–9872) の**null 枝の飛び先が 0x1800c2f08 (skip) になっている**。機械語の `je` は 0x1800c2ef4 (直接通知) へ飛ぶ。このため 0x1800c2ef4 の基本ブロックは IR に生成されない。
-- 枝の向きは逆: IR の null 枝は「通知しない」、機械語の null 枝は「host へ直接通知する」。
+- 中間物: `e2e.sh` の step [1] が出力する `tools/targets/serum2/license/authstub/work/lift/authstub.drc.ll` (RetDec raw IR、select-ranges に 0x1800c2b50-0x1800c2f99 を含む)。`work/` は gitignore。
+- 素材: `plugins-serum2` (§11 と同じ PE。展開手順 (installer から `Serum2_win64.vst3` を 7z で取り出す) は §11 の測定 commit 行を参照)。`work/lift/` が無い場合は `bash e2e.sh` の step [1] で生成する (RetDec 単独実行 33.6 s 実測)。
+- 再生コマンド (`authstub/` で実行):
 
-### 数え方 (census)
+```sh
+LIFT=work/lift/authstub.drc.ll
+# (a) 0x1800c2ef4 の insn.addr メタ件数 (期待: 0)
+VA=$(printf '%d' 0x1800c2ef4)
+grep -cE "^![0-9]+ = !\{i64 $VA\}" $LIFT
+# (b) 0x800010 即値 (or i32 ..., 8388624) の出現箇所 (期待: L9878 の 1 箇所)
+grep -nE 'or i32 .*, 8388624' $LIFT
+# (c) 0x1800c2d5f の icmp eq の 0 側 (true 側) ターゲット (期待: dec_label_pc_1800c2f08)
+#     grep 単独は別関数 (L389) も拾うため、判定は L9872 の br 行で行う
+grep -nE 'icmp eq i64 %109, 0' $LIFT
+sed -n 9872p $LIFT   # => br i1 %110, label %dec_label_pc_1800c2f08, label %dec_label_pc_1800c2d6f
+```
 
-`python3 tools/targets/serum2/license/authstub/l1_census.py <PE> <raw.ll>` が出力するのは次の 4 指標のみ:
-機械語側の直接 call site 数 (`sites`)・`edx=0x800010` 即値ロード数 (`edx_const`)・site への入口 edge 数 (`into`)、
-および raw IR 側の `insn.addr` 被覆数とブロック `dec_label_pc_1800c2ef4` の有無。
-IR 側の「直接 call」「`edx=0x800010`」「入口 edge」の件数は**スクリプトの出力に含まれない**。
+- 再検証結果 (HEAD `5723cad5`, `work/lift/authstub.drc.ll` = 710,978 B, RetDec v5.0 の cold lift。上記 e2e の cold 実行で生成したものに対して実行):
+  - (a) `0x1800c2ef4` の insn.addr メタ件数 = **0** (期待どおり)。同じ式で `0x1800c2d5f` と `0x1800c2f08` は各 1 件ヒットし、検索式が機能していることも確認した。
+  - (b) `or i32 …, 8388624` = **L9878 の 1 箇所** (`%114 = or i32 %113, 8388624`) (期待どおり)。
+  - (c) 元の検索式 `br i1 (icmp eq %109, 0)` は **0 件** で、表記が違った。実 IR は L9870 `%110 = icmp eq i64 %109, 0` と L9872 `br i1 %110, label %dec_label_pc_1800c2f08, label %dec_label_pc_1800c2d6f`。0 側 (true 側) は `dec_label_pc_1800c2f08` で期待値を満たす。上記の検索式は修正済み。
+- 原因の一本化 (記述上の整理。機構は上記 (a)〜(c) で再確認済み): §6 L1 の「insn.addr メタが 0 個」は (a) の結果で、「`0x1800c2ef4` へ向かう辺が lift 時に `0x1800c2f08` へ付け替わる」ことが脱落の機構。
 
-| 指標 | 機械語 (スクリプト出力) | raw IR (スクリプト出力) | raw IR (手確認・スクリプト外) |
-|---|---|---|---|
-| 直接 `call [reg+0x30]` site (0x1800c2ef4–f05) | `sites` = 1 | — | 0 件 (9872–9900 行の `call` は `@function_180034560` の 1 件のみ。`add ..., 48` は 1461・2178・2649 行の 3 件で、いずれも本 site の範囲外) |
-| `edx=0x800010` 即値ロード | `edx_const` = 1 | — | `i32 8388608` / `8388624` の即値は 0x800010 を含む `or` が 9878 行の 1 件のみ (rax≠0 の deferred 側) |
-| 0x1800c2ef4 への入口 edge | `into` = 1 (`je` @0x1800c2d69) | — | `dec_label_pc_1800c2ef4` の参照 0 件 (grep `dec_label_pc_1800c2ef4`) |
-| `insn.addr` が site 範囲を被覆 | — | 0 件 (`covered`) | — |
-| ブロック `dec_label_pc_1800c2ef4` | — | 不在 (`has_block`) | — |
+## 13b. L1 脱落条件の特定 (#823)
 
-- 手確認の列は raw `.ll` を grep / sed で読んだ事実のみ。スクリプトの出力には含まれない (census 拡張は子 issue #1029)。
-- 9872 行の `br i1 %110, label %dec_label_pc_1800c2f08, label %dec_label_pc_1800c2d6f` は、null 枝 (`%110` = true) が skip 先 `0x1800c2f08` を指す。`0x1800c2ef4` を指す枝は IR に無い。
-
-### 実測の記録 (e2e・census)
-
-- 実行: 2026-10-13 (UTC 17:45)・HEAD `c7fd0739` (main 取り込み後)・load average 0.06 (1 分平均、run 開始時)。
-  PE は `plugins-serum2` の `Install_Xfer_Serum2_2.1.5.exe` から `7z x` で `$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3` を取り出した (19,236,864 B・sha256 `501e7bb3…5283`)。
-- `bash tools/targets/serum2/license/authstub/e2e.sh` (`work/` を削除してから cold 実行): exit 0・**23/23 PASS**・real 34.8 s (lift は本実行で新規生成。`authstub.drc.ll` 710,975 B)。
-- `python3 tools/targets/serum2/license/authstub/l1_census.py <PE> work/lift/authstub.drc.ll`: exit 0・real 0.16 s。
-  `sites=1` / `edx_const=1` / `into=1` / `covered=0` / `has_block=False`。
-- 同一 HEAD `4df84cd4` (main 取り込み前) でも 2026-10-13 17:40 に e2e 23/23 PASS・34.9 s、census は同じ 5 指標を確認。
-- 前 run (HEAD `3afb7674`) の申告値 (3.2 s・23/23) は一次ログ無しのため本節には含めない。本節が一次の実測。
-
-- 事実の範囲: 上記は raw lift 1 本での実測。復元 pass は未実装 (受入条件 2・3 は未達、子 issue に分割)。
-- 未測定 (断定しない): 0x1800c2d59 の `je` は `[rsi+0x22792]` の bit で分岐し、その bit を 1 にする store は 0x1800c2d42 の 1 箇所のみ。N2a でこの store を 0 に置換した後の到達性は、本 census では測っていない。e2e の 23/23 との関係も未確認。
+全文は REPORT_APPENDIX.md §13b (機械語 ↔ raw IR の突合・census の数え方・実測の記録)。
