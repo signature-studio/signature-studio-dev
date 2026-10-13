@@ -113,3 +113,21 @@ python3 tools/m11/m11_wasmnames.py tools/m11/ldfix/work/stage4/base/m11_boot.cjs
 ```
 
 `trap_units.mjs` は commit 済み (本 run で追加)。閉包表 (§2 旧版) の算出スクリプトは前 run で消失しており、本 run では再算出していない。
+
+## 7. 次 run の追加切り分け (run 3・測定 commit `2b99366a` の worktree `942-m11-trap-load`)
+
+- 実測: `bash tools/m11/ldfix/ldfix_e2e.sh` 61 秒・rc 0・judge PASS (units 17/942・icall 24・survey ok 136 / trap 9、base = fix)。
+  修復件数 F3a 2 / F3c 33 / F1 0 / F2 0 / F3b 0 (§1 と同一)。
+- **前節 §2 の訂正**: 本 run で `trap_units.mjs` の frame 番号を取り直すと、unit 17 の最上位 frame は `wasm-function[14871]` (function_4133f0) ではなく、
+  単独実行 (先行 unit を走らせない) では `wasm-function[1874]` = `function_407a50__lifted` (FastMM_GetMem 実体) の `i64.load` (0x13c488) だった。
+  先行 unit の副作用で frame が変わるため、§2 の「unit ごとの最上位 frame」は実行順に依存する。単独 unit で取り直すこと。
+- 発生 load: `function_407a50__lifted` の空きリスト走査 (IR の `%26-8` 読み。IR 行 `load i64, ptr %33`)。
+  `tools/m11/ldfix/trap_bins.mjs` (commit 済み) で bin 表 (BASE 16404744 + 16k) を走査すると、有効に見える bin ポインタ P のうち
+  `F=[P+24]` の `F-8` が線形メモリ外のものが 4 件ある (k184 P=0x7a50 / k185 P=0x8040 / k186 P=0x8870 / k236 P=0xa027)。
+  - F の値は機械語らしきバイト列に見える (例: `0x48000000b2850f07`・`0x8b4820ec83485500`)。P は 0x7a50 等の小さい値。
+    ただし P の正体 (ヒープか・イメージ内か) と、boot 直後で既に壊れているかは**未確認** (この run では boot 直後の bin 表は scan していない・
+    `trap_bins.mjs` の BEFORE 行は unit 17 の直前 = boot 後の状態で、その時点で既に上記 4 件が OOB)。
+  - base と fix で同一 (修復前から存在)。ldfix の修復が bin 表を壊していないことは、この観測の範囲で確認。
+- 結論 (受入 1・2 の進捗): 「trap の発生 load」は、unit 17 では FastMM の bin 表 (F-8 読み) まで特定。
+  bin 表の値がどこから来たか (書き込み元) は未特定。次の入口は、boot 後の bin 表領域への書き込み元と、P/F の値の由来の確認。
+- 未解決 (起票先): bin 表の上書き元の特定 → #942 (次 run)。現 main 生成 IR での再判定 → #1292 (`[CI-25]`)。
