@@ -198,6 +198,28 @@ shim 候補 (SR-3/SR-4 入力) は呼出確認 110 件のうち kernel32 (メモ
   - watch hit の値 2 と、同 console の `kNoInterface` 2 件 (両 QI 失敗) は時系列で整合する。戻り値 (`0x180037600`) そのものは未記録のため、「両 QI 失敗 → 2」の因果は未確認。
   - 呼出元の所属 class は未確定。0x800010 の受信 (= +0xdc が 1 へ遷移する条件) は未解明。
 
+## 4-4. [#1360] gate==2 の原因 (wrapper QI 2 件) と既定ゲート到達の A/B
+
+- 検証 commit: 実装 commit (本節のコード差分を含む commit)。素材 `plugins-serum2` の DLL sha256 `501e7bb3…5283` (§1-0 と一致)。
+- 値 2 の経路 (逆アセンブル, `host/sr1e_qi_map.py Serum2_win64.vst3 0x180037600`):
+  - `0x180037600` は context (`rcx`) に対し `IVst3ToAUWrapper` (rdata `0x11be750`) を QI し、失敗なら `IVst3ToAAXWrapper` (`0x11be8e8`) を QI する。両方失敗で `mov eax,2`、A 成功で 1、B 成功で 0 を返す。
+  - 実測 (既定 host, watch): QI 2 件 `kNoInterface` (§4-3 と同一)、`+0xdc` の書込は `2` (hit#1)。時系列・IID・戻り値の 3 点が一致した。
+- 仮説の実測 (`S2HOST_WRAPPER_QI=1`, opt-in。既定は無変更): HostApp の QI で 2 IID に `kResultOk` を返す。
+  - watch: `value=1` (従来は 2)。`[gate] 最終 +0xdc=1`。
+  - ctrl `initialize` 後の gate も `1` (既定は 2)。
+
+  | 条件 (wq = S2HOST_WRAPPER_QI=1) | gate | 0x800010 | demo bit | 保存マーカ | 判定 |
+  |---|---|---|---|---|---|
+  | unpatched + wq + lic_sent (pv 2.1.5) | 1 | 無し | 0 | 無し | 契約と一致 |
+  | unpatched + wq + lowver (pv 2.0.19) | 1 | **受信** (0x800010 ×2) | **1** | 有り | 契約と一致 |
+  | unpatched + wq + demo_payload | 1 | **受信** (0x800010 ×2) | **1** | 無し (ctrl マーカ false) | 契約と一致 |
+  | patched + wq + lic_sent | 1 | 無し | 0 | 無し | 一致 (N2a-1 定数 0) |
+  | patched + wq + lowver | 1 | 無し | 0 | 無し | authstub が中和 |
+  | patched + wq + demo_payload | 1 | 無し | 0 | 無し | authstub が中和 |
+
+  - 既定 (フラグ無し) の 50 件は変わらず 50/50 OK (`e2e.sh` 再実行)。wq の 6 run を追加し判定 62/62 OK (`summarize.py` に 6 check 追加)。
+- 結論: **既定 host で 0x800010 が出ないのは、gate 値 2 が「wrapper QI 2 件の失敗」で決まるため**。wrapper に応答すれば gate は 1 になり、既定ゲートのまま #238 契約 (pv<2.0.20 → demo bit 1 + 0x800010) が成立する。これは host 側の応答で変わる。ただし「host がこの 2 IID に応答する」ことが実 host の正しい挙動かは未確定 (実 Image-Line/Xfer host の挙動は未観測)。
+
 ## 5. 未解決 (起票先)
 
 | 未解決 | 影響 | 起票先 |
