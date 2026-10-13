@@ -21,7 +21,7 @@ import sys
 import tempfile
 import time
 
-DEF_RE = re.compile(r"^[^\s/][^;=]*\bfunction_([0-9a-f]+)\s*\([^;]*\)\s*\{", re.M)
+DEF_RE = re.compile(r"^[^\s/][^\n;=]*\bfunction_([0-9a-f]+)\s*\([^\n;{}]*\)\s*\{", re.M)
 ERR_RE = re.compile(r"^(?P<file>[^:\n]+):(?P<line>\d+):\d+: (?:fatal )?error: ", re.M)
 ANY_ERR_RE = re.compile(r"(?:^|\n)[^\n]*\berror: ", re.M)
 

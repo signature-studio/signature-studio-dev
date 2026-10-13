@@ -249,12 +249,132 @@ for (const n of Object.keys(PR)) {
     check("Audio Play To End: 既定 (No/No) で全 region の SampleEnd = Length-1 (独立 oracle)", JSON.stringify(ends) === "[99,99]", JSON.stringify(ends));
     if (!r.err) ex.push("playtoend");
   }
-  // 残りは実行が例外なく完了することを確認 (数値 oracle は未実装。ring mod は clipboard mock が空のため変化なしが期待)
-  for (const k of ["br", "dest", "lim", "rm", "pulse", "saw"]) {
-    const r = await exOk(k, () => ra(A[k], mono(64, (i) => Math.sin(i / 5) * 0.5), [0, 63], {}));
-    check(`Audio ${k}: 実行が例外なく完了`, !r.err, r.err || "");
+  // PY-28 (#1310): 残り 6 本の数値 oracle。JS で手導出 (mock の意味論: _span の [0,Length-1] クリップ・PasteFromTo の MIX・Python round は半偶数)。
+  // Limiter は同じ手順の JS 再実装 (Lookahead / Smoothing を写す) を独立 oracle とする。
+  const rhe = (x) => { const f = Math.floor(x), d = x - f; if (d < 0.5) return f; if (d > 0.5) return f + 1; return f % 2 === 0 ? f : f + 1; };
+  const inR = (n, lo, hi) => n >= lo && n <= hi;
+  const cmpCh = (got, exp) => Array.isArray(got) && got.length === exp.length && got.every((c, i) => c.length === exp[i].length && c.every((v, n) => near(v, exp[i][n])));
+  const stereo = (a, b) => ({ ch: [a, b], rate: 44100 });
+  const padTo = (xs, len = 44100) => xs.concat(new Array(len - xs.length).fill(0));
+  const syn = (terms) => Array.from({ length: 1000 }, (_, n) => terms.reduce((acc, [f, ph, a]) => acc + a * Math.sin((2 * Math.PI * f * n) / 44100 + ph), 0));
+  const NYQ = 44100 * 0.5;
+  const pulseT = (freq, ph, vol) => { const t = []; for (let f = freq, m = 1; f < NYQ; f += 2 * freq, m += 2) t.push([f, ph * m, (vol * 0.5) / m]); return t; };
+  const sawT = (freq, ph, vol) => { const t = []; for (let f = freq, m = 1; f < NYQ; f += freq, m += 1) t.push([f, ph * m, (vol * 0.5) / m]); return t; };
+  const limOracle = (chIn, x1, x2, gain, LAms, relMs, thres, tension, sr) => {
+    const NC = chIn.length, X = chIn.map((c) => c.slice());
+    const LAL = rhe((LAms * sr) / 1000);
+    const bufLen = Math.max(LAL, 1);
+    const vbuf = new Array(bufLen).fill(0), bbuf = new Array((bufLen + 15) >> 4).fill(0);
+    let ftime = 0;
+    const lookIn = (value) => { ftime += 1; if (ftime >= bufLen) ftime = 0; vbuf[ftime] = value; const t = ftime >> 4; if ((ftime & 15) === 0) bbuf[t] = value; else if (value > bbuf[t]) bbuf[t] = value; };
+    const peakR = (buf, s, e) => { let v = 0; for (let i = s; i < e; i++) if (buf[i] > v) v = buf[i]; return v; };
+    const lookPeak = () => { let ret = peakR(bbuf, 0, bbuf.length); const t1 = ftime + 1; let t2 = ftime + 16; if (t2 > bufLen) t2 = bufLen; if (t2 > t1) { const v = peakR(vbuf, t1, t2 - t1); if (v > ret) ret = v; } return ret; };
+    const Sm = (type, scale, sm) => {
+      const o = { mem: [0, 0, 0], init: 0, coef: [0, 0, 0], gain: [0, 0, 0], type: scale <= 0 ? -1 : type }, L = Math.log;
+      if (o.type === 0) o.coef[0] = Math.exp(L(0.01) / Math.max(scale, 1));
+      if (o.type === 1) {
+        const a = 1 - 4.8 / Math.max(scale, 10), b = sm;
+        o.coef = [a, a * b, a * b * b];
+        const mg = 1 / (-1 / (L(a) + 2 * L(b)) + 2 / (L(a) + L(b)) - 1.0 / L(a));
+        o.gain = [mg, mg * (L(a * b * b) * (L(a) - L(a * b)) / ((L(a * b * b) - L(a * b)) * L(a * b)) - L(a) / L(a * b)), mg * (-(L(a) - L(a * b)) / (L(a * b * b) - L(a * b)))];
+      }
+      o.reset = (v) => { o.init = v; o.mem = [0, 0, 0]; };
+      o.process = (value) => {
+        if (o.type === 0) { o.init = value + (o.init - value) * o.coef[0]; return o.init; }
+        value = value - o.init;
+        for (let k = 0; k < 3; k++) o.mem[k] = o.coef[k] * o.mem[k] + value;
+        return o.init + o.gain[0] * o.mem[0] + o.gain[1] * o.mem[1] + o.gain[2] * o.mem[2];
+      };
+      return o;
+    };
+    const max = 0.95;
+    const silTime = rhe((200 * sr) / 1000);
+    const rela = Sm(0, rhe((relMs * sr) / 1000), 0); rela.reset(1);
+    const fade = Sm(0, silTime, tension); fade.reset(1);
+    const smooth = Sm(1, LAL, tension); smooth.reset(1);
+    let silCount = silTime, lx = x1, oldV2 = 0;
+    const G = [];
+    for (let n = x1; n <= x2; n++) {
+      const end = Math.min(n + LAL, x2);
+      for (let q = lx; q < end; q++) { let v = 0; for (let c = 0; c < NC; c++) { const a = Math.abs(X[c][q]); if (a > v) v = a; } lookIn(v); }
+      lx = n + LAL;
+      let v = lookPeak();
+      if (v > oldV2) rela.reset(v);
+      v = rela.process(v);
+      let v2 = v * gain > max ? max / v : gain;
+      if (v < thres) { if (silCount === 0) fade.reset(v2); silCount += 1; v2 = fade.process(1); }
+      else silCount = 0;
+      const g = smooth.process(v2);
+      G.push(g);
+      for (let c = 0; c < NC; c++) X[c][n] = X[c][n] * g;
+    }
+    return { ch: X, env: G };
+  };
+  const sa = [0.31, -0.72, 0.18, 0.93, -0.11, 0.64], sb = [-0.45, 0.22, -0.8, 0.05, 0.67, -0.3];
+  const brA = [0.3, 0.125, -0.375, 0.9, -0.333, 0.6], brB = [0.2, -0.5, 0.0625, 0.7, 0.45, -0.9];
+  const CB = [[0.5, -1, 0.25], [0.2, 0.4, -0.6]];
+  const cbSet = (rate) => `import enveditor; enveditor.set_clipboard(${JSON.stringify({ ch: CB, rate })})`;
+  const rmExp = [sa, sb].map((ch, c) => ch.map((v, n) => (inR(n, 1, 3) ? v * CB[c][n - 1] * 0.5 + v * 0.5 : v)));
+  // 振幅を 0.7 (max 分岐: v*gain > 0.95) → 0.3 (通常分岐: v*gain ≤ 0.95) → 0.02 (無音分岐: v < thres) と変えて 3 分岐を通す
+  const LX = Array.from({ length: 600 }, (_, n) => (n < 150 ? 0.7 : n < 300 ? 0.3 : 0.02) * Math.sin(0.05 * n));
+  const LY = Array.from({ length: 600 }, (_, n) => (n < 150 ? 0.5 : n < 300 ? 0.25 : 0.02) * Math.cos(0.031 * n));
+  const LO = limOracle([LX, LY], 20, 560, 2, 5, 100, 0.1, 0.99, 44100);
+  const limV = (env) => ({ "Input gain": 2, Lookahead: 5, Release: 100, "Silence thres": 0.1, Tension: 0.99, Envelope: env });
+  const cases = [
+    { k: "br", name: "Bit depth 3 (半偶数丸め・選択 [1,4])", vals: { "Bit depth": 3 }, sample: stereo(brA, brB), sel: [1, 4],
+      exp: [brA, brB].map((ch) => ch.map((v, n) => (inR(n, 1, 4) ? rhe(v * 4) * 0.25 : v))) },
+    { k: "dest", name: "非全選択 (mix 0.75)", vals: { Freq: 8000, Distortion: 50, Mix: 0.75 }, sample: stereo(sa, sb), sel: [1, 4],
+      exp: [sa, sb].map((ch) => ch.map((v, n) => (inR(n, 1, 4) ? 0.75 * (Math.atan(v * 50) * 0.2) + 0.25 * v : v))) },
+    { k: "dest", name: "全選択 mix 1 (EditorSample 直接・rate 8000)", vals: { Freq: 8000, Distortion: 50, Mix: 1 }, sample: stereo(sa, sb), sel: [0, 5], rate: 8000,
+      exp: [sa, sb].map((ch) => ch.map((v) => Math.atan(v * 50) * 0.2)) },
+    { k: "rm", name: "clip 3 点・選択 [1,4] は CB 長で [1,3] に切詰め", pre: cbSet(44100), vals: { Mix: 0.5, Oversample: 0 }, sample: stereo(sa, sb), sel: [1, 4], exp: rmExp },
+    { k: "rm", name: "Oversample 1 (CB rate 22050・終了後 rate 44100 に復元)", pre: cbSet(22050), vals: { Mix: 0.5, Oversample: 1 }, sample: stereo(sa, sb), sel: [1, 4], exp: rmExp },
+    { k: "rm", name: "clipboard 空 → 無変化", pre: "import enveditor; enveditor.set_clipboard(None)", vals: { Mix: 0.5, Oversample: 0 }, sample: stereo(sa, sb), sel: [1, 4], exp: [sa, sb] },
+    { k: "pulse", name: "Phase 0.3・Volume 1 (0 から生成・44100 samples)", vals: { Volume: 1, "Base freq (Hz)": 500, Phase: 0.3 }, sample: { ch: [[]], rate: 44100 }, sel: [0, 999],
+      exp: [padTo(syn(pulseT(500, 0.3, 1)))] },
+    { k: "saw", name: "Phase 0.3・Volume 0.8 (0 から生成・44100 samples)", vals: { "Base freq (Hz)": 500, Phase: 0.3, Volume: 0.8 }, sample: { ch: [[]], rate: 44100 }, sel: [0, 999],
+      exp: [padTo(syn(sawT(500, 0.3, 0.8)))] },
+    { k: "lim", name: "Envelope No (選択 [20,560])", vals: limV(0), sample: { ch: [LX, LY], rate: 44100 }, sel: [20, 560], exp: LO.ch },
+    { k: "lim", name: "Envelope Yes (出力 = g/2-1)", vals: limV(1), sample: { ch: [LX, LY], rate: 44100 }, sel: [20, 560],
+      exp: [LX, LY].map((ch) => ch.map((v, n) => (inR(n, 20, 560) ? LO.env[n - 20] / 2 - 1 : v))) },
+  ];
+  for (const c of cases) {
+    if (c.pre) await py.run(c.pre);
+    const r = await exOk(c.k, () => ra(A[c.k], c.sample, c.sel, c.vals));
+    const got = r.sample ? r.sample.ch : [];
+    const rate = r.sample ? r.sample.rate : null;
+    check(`Audio ${c.k} (${c.name}): 数値 oracle 一致 (独立 oracle)`, cmpCh(got, c.exp) && rate === (c.rate ?? 44100), `ch=${got.length} rate=${rate}`);
   }
   info("Audio 実行 OK 本数", `${ex.length}`);
+  // PY-28 ネガティブコントロール (対象 6 本それぞれ): (1) 先頭 1 バイト反転 (2) 適用量の改変。どちらも oracle か load/run で FAIL を検出すること。
+  const MUT = { br: ["s = round(s * v1) * v2", "s = round(s * v1) * v2 * 2"], dest: ["s = math.atan(s*v1)*v2", "s = math.atan(s*v1)*v2*2"],
+    rm: ["s=(s1*s2)*v1+s1*v2;", "s=(s1*s2)*v1*2+s1*v2;"], pulse: ["vol = vol*0.5", "vol = vol*0.25"], saw: ["vol = vol*0.5", "vol = vol*0.25"],
+    lim: ["v2 = gain", "v2 = gain*1.01"] };
+  const detect = async (src, c) => {
+    const mn = `Mut_${c.k}`;
+    const { py: pm } = await boot({ [mn]: src });
+    try {
+      if (c.pre) await pm.run(c.pre);
+      const lr = await pm.call("fl_rt:load_pyscript", { path: `/fl/Scripts/${mn}.pyscript`, name: mn });
+      if (lr.err) return `load: ${String(lr.err).slice(0, 60)}`;
+      const rr = await pm.call("fl_rt:run_audio", { name: mn, sample: c.sample, selection: c.sel, values: c.vals });
+      if (rr.err) return `run: ${String(rr.err).slice(0, 60)}`;
+      return cmpCh(rr.ok.sample.ch, c.exp) ? null : "oracle mismatch";
+    } finally { await pm.terminate(); }
+  };
+  const seen = new Set();
+  for (const c of cases) {
+    if (seen.has(c.k)) continue;
+    seen.add(c.k);
+    const base = AUDIO.find(([f]) => f === A[c.k])[1];
+    const flipped = String.fromCharCode(base.charCodeAt(0) ^ 1) + base.slice(1);
+    const dFlip = await detect(flipped, c);
+    check(`NEG-${c.k} 先頭 1 バイト反転 → FAIL を検出 (${dFlip})`, dFlip !== null, dFlip ?? "not detected");
+    const [from, to] = MUT[c.k];
+    if (!base.includes(from)) throw new Error(`NEG ${c.k}: 改変対象が見つからない: ${from}`);
+    const dAmt = await detect(base.replace(from, to), c);
+    check(`NEG-${c.k} 適用量改変 (${from} → ${to}) → FAIL を検出 (${dAmt})`, dAmt !== null, dAmt ?? "not detected");
+  }
   // NEG-d: Amp の適用量を 1 箇所改変 (value → value*2) → 独立 oracle と不一致になる (FAIL を検出)
   const ampSrc = AUDIO.find(([f]) => f === A.amp)[1];
   const ampMut = ampSrc.replace("EditorSample.AmpFromTo(x1,x2,value)", "EditorSample.AmpFromTo(x1,x2,value*2)");

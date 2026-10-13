@@ -24,4 +24,12 @@ bash "$HERE/stage_app.sh"
 ( cd "$TMP" && "$ROOT/node_modules/.bin/tsc" --noEmit && echo "[au9] typecheck OK (patched)" )
 ( cd "$TMP" && "$ROOT/node_modules/.bin/vite" build --logLevel warn && echo "[au9] vite build OK" && ls dist/worklets )
 
-AU9_ROOT="$TMP" node "$HERE/e2e.mjs" "$@"
+# 失敗ログを残す (tools/audio/work/ は gitignore)。終了コードは node の値をそのまま返す
+LOG_DIR="$ROOT/tools/audio/work"; mkdir -p "$LOG_DIR"
+LOG="$LOG_DIR/e2e_last.log"
+set +e
+AU9_ROOT="$TMP" node "$HERE/e2e.mjs" "$@" 2>&1 | tee "$LOG"
+rc=${PIPESTATUS[0]}
+set -e
+echo "[au9] log -> $LOG (exit=$rc)"
+exit "$rc"

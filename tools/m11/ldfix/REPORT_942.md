@@ -89,6 +89,7 @@ unit ごとの trap 9 件 (base/fix とも同一 VA)。**旧版の閉包表 (下
   現 main での効果は判定できていない。REPORT.md の値 (F1 902 / F3c 26) とも比較していない。
 - F3a 2 関数 (413480, 413540) と F3c 33 関数の修復は、stage4 (units_run / probe / icall) と survey (ok / trap / miss) の
   いずれにも**反映されていない** (base = fix)。
+- **注 (現 main の IR での判定は §8-2 を正とする。本節は snapshot 限定の記録)**。
 - 理由 (推定・未確定): 修復関数は trap 閉包 (§2) に含まれるが、trap の最上位 frame の wasm index (14871 / 14873 / 14875 / 5263 /
   1875 / 75 / 725) が修復関数のどれに当たるかは未確認 (§2 の限界)。確認できているのは「修復後も同じ wasm 関数で同じ種類の trap が起きる」まで。
   修復が効く経路が trap より後にあるため先に止まる、という説明は仮説として残す。
@@ -131,3 +132,101 @@ python3 tools/m11/m11_wasmnames.py tools/m11/ldfix/work/stage4/base/m11_boot.cjs
 - 結論 (受入 1・2 の進捗): 「trap の発生 load」は、unit 17 では FastMM の bin 表 (F-8 読み) まで特定。
   bin 表の値がどこから来たか (書き込み元) は未特定。次の入口は、boot 後の bin 表領域への書き込み元と、P/F の値の由来の確認。
 - 未解決 (起票先): bin 表の上書き元の特定 → #942 (次 run)。現 main 生成 IR での再判定 → #1292 (`[CI-25]`)。
+
+## 8. 現 main 生成 IR での再判定 (#1292・受入 1〜4)
+
+測定 commit: `604e900f` (origin/main、PR の親。測定に使った `tools/` はこの commit と同一)。
+検証 HEAD: `8702c274` (コード差分 0。`git diff 604e900f 8702c274 -- tools/ ':!*.md'` は 0 行。§8-5)。runner: nproc=4。load average は各回の前後を採取 (§8-1)。
+素材: fl-win64 / work-m11 / work-liftdiff / toolchain-emsdk (`[EMSDK]`) / toolchain-retdec (`[RETDEC]`) を展開。
+IR は `bash tools/m11/m11_gen_ir2.sh` (現 main の手順) で作り、`ldfix_e2e.sh` の base は `M11_LDFIX=0` の IR から `m11_build.sh` で作った `boot_final3.ll`。
+
+### 8-1. 実測 (n=3)
+
+IR 生成 (現 main の手順、`ir_conditions.json` 付き):
+
+- ldfix 適用: `ir_sha256` 2c68ceae…・490693 行・F1=902 / F2=30 / F3a=3 / F3b=5 / F3c=36 (7421 関数中)。
+- ldfix 無し (`M11_LDFIX=0`): `ir_sha256` 25e931f2…・491108 行。ここから `m11_build.sh` (`M11_ALLOW_LDFIX_DISABLED=1`) で base の `boot_final3.ll` を作った。
+
+`bash tools/m11/ldfix/ldfix_e2e.sh` (base = ldfix 無し / fix = ldfix 適用)、n=3:
+
+| 回 | wall (秒) | load (実行前 → 後) | judge |
+|---|--:|---|---|
+| 1 | 73.3 | 0.74 0.54 0.24 → 1.29 0.72 0.32 | PASS |
+| 2 | 62.6 | 1.09 0.69 0.32 → 1.25 0.81 0.38 | PASS |
+| 3 | 62.4 | 1.15 0.79 0.38 → 1.21 0.87 0.43 | PASS |
+
+- 並列数: nproc=4。survey は base/fix の 2 並列 (`ldfix_e2e.sh` の `for N in base fix` が `&` で並走)。
+- wall の min–max: 62.4–73.3 秒。1 回目は `boot_final3.ll` の build 直後で、2・3 回目は 62.4–62.6 秒。
+
+stage4 (n=3 とも同値):
+
+| 項目 | base (ldfix 無し) | fix (ldfix 適用) |
+|---|---|---|
+| units_run / units_total | 52 / 942 | 52 / 942 |
+| threw | unreachable | unreachable |
+| icall_ok / icall_miss | 234 / 5 | 234 / 5 |
+| init_count | 54 | 54 |
+
+survey (n=3 とも同値。min–max は全 run で同一):
+
+| | ok | miss | trap | trap の内訳 |
+|---|--:|--:|--:|---|
+| base | 868 (868–868) | 47 (47–47) | 26 (26–26) | unreachable 1 / halt0 8 / OOB 17 |
+| fix | 870 (870–870) | 47 (47–47) | 24 (24–24) | unreachable 1 / halt0 7 / OOB 16 |
+
+- judge: `STAGE4_JUDGE pass: true` (3 回とも)。
+- 参考 (手順の訂正): 前 run の 1 回目の e2e は `boot_final3.ll` が ldfix 適用済みのまま base に使われ、ldfix が 2 回掛かった (F3a=2・survey 870/870・trap 24/24)。before/after になっていないため採用しない。以降は上記の手順どおり base を `M11_LDFIX=0` の IR に差し替えて測定。
+- 注: boot の threw は snapshot (§1) の `memory access out of bounds` ではなく、現 main では base/fix とも `unreachable`。
+
+### 8-2. 受入 3: 修復件数の反映
+
+- 現 main での survey 件数は trap 26 → 24・ok 868 → 870 (base/fix の差)。
+- 修復が trap 件数に反映されたかは、**1 件で確認・1 件は帰属未確認**:
+  - 確認: `0x26d1a0` (unit 158) は base OOB → fix ok。base の最上位 frame 707 = `function_413540` (F3a)。
+  - 未確認: `0x6d9ba0` (unit 493) は base halt0 → fix ok。halt0 経路のため frame が無く、修復との帰属は確認できない。
+- F3a 残存: `0x6d5700` (unit 492) は base・fix とも OOB、最上位 frame 14873 = `function_4133f0` (F3a)。修復後も trap は残る。
+- 種別が変わった unit は 2 件 (どちらも依然 trap):
+  - `0x25c540` (unit 144): base halt0 → fix OOB。fix の最上位 frame 1875 = `function_407e20__lifted`。因果は未確認。
+  - `0xeddfe0` (unit 895): base OOB (frame 2001 = `function_40ff70`) → fix halt0。
+- unit の変化は 4 件。ok に入ったのが 2 件 (`0x26d1a0`・`0x6d9ba0`)、種別だけ変わったのが 2 件 (`0x25c540`・`0xeddfe0`、いずれも trap のまま)。この 4 件で trap 26 → 24・ok 868 → 870 の差が説明できる。
+- したがって「修復が件数に反映される」は現 main でも**限定的**: 帰属が確認できたのは `0x26d1a0` の 1 件。snapshot 限定の判定を「解消」とは言わない。
+
+### 8-3. 受入 4: trap 最上位 frame と #942 の結論
+
+全 unit の表 (base 26 件・fix 24 件) は `REPORT_942_APPENDIX.md` に分割移動。取得方法は `tools/m11/ldfix/trap_units.mjs` (`S4_NAME=base|fix`)。
+
+- 結論: #942 の「修復対象は function_409c80 の 1 件のみ」は現 main では**一致しない**。`function_409c80` (F2・F3c) は trap の最上位 frame に現れない。最上位 frame に現れる F3a は `function_413540` (base の unit 0x26d1a0 のみ) と `function_4133f0` (unit 0x6d5700。修復後も残る)。
+- survey の `top_frame_idx` の `14877` (`function_412770`) は base 8 件・fix 7 件で、halt0 unit 数と一致する。halt0 経路は frame を取れない。
+- chain 上の関数 (非最上位) の判定は未確認。
+
+### 8-4. F3a 3 件・F3c 36 件の所在と差分
+
+- F3a 3 件 (`ldfix_report.json` `f3a_vas`): `function_4133f0` / `function_413480` / `function_413540`。
+- 旧 snapshot の F3a (413480・413540) との対応: `function_413540` と `function_413480` は新旧で F3a。`function_4133f0` は**現 main で新たに F3a に入った関数**で、旧 snapshot の F3a には無い。
+- F3c 36 (`f3c_vas`) は `ldfix_report.json` を参照。`function_409c80` は F3c に含まれる。
+- F3c 36 と REPORT.md §1 の F3c 26 の差: **原因は未確認**。REPORT.md §1 の 955 (F1 902 + F3c 26 等) は旧 snapshot 時点の測定値で、旧 snapshot: units_run 17 / survey ok 812。現 main (§8-1): units_run 52/942、ok 868。F1 902 は一致する。
+
+### 8-5. 検証範囲と手順
+
+- 本節の数値は本 fix run (2026-10-13・PR #1469 の差し戻し対応) で実測。素材は `oc_artifacts: fl-win64 work-m11 work-liftdiff toolchain-emsdk toolchain-retdec` で展開。
+- 手順 (実行順):
+  ```
+  M11_LDFIX=0 bash tools/m11/m11_gen_ir2.sh                     # ldfix 無しの IR (ir_conditions.json: ldfix=disabled)
+  rm -f tools/m11/work/boot_final3.ll tools/m11/work/obj/*.o     # ldfix 適用済みの boot_final3.ll を消す
+  M11_ALLOW_LDFIX_DISABLED=1 bash tools/m11/m11_build.sh        # ldfix 無し IR の build は明示 opt-in (#1165)
+  bash tools/m11/ldfix/ldfix_e2e.sh                             # base = 上の boot_final3.ll / fix = ldfix 適用
+  S4_NAME=base S4_IMAGE=tools/m11/work/m11_image.bin node tools/m11/ldfix/trap_units.mjs   # 全 unit の frame
+  S4_NAME=fix  S4_IMAGE=tools/m11/work/m11_image.bin node tools/m11/ldfix/trap_units.mjs
+  ```
+  `ldfix_e2e.sh` は `boot_final3.ll` を base として読み、その上に ldfix を掛けて fix を作る (ldfix_e2e.sh:28)。base が ldfix 適用済みだと ldfix が 2 回掛かる (§8-1 の参考)。
+- 最後の `work/` の状態: 検証の最後に `M11_LDFIX=0 bash tools/m11/m11_gen_ir2.sh` を実行して戻したため、`ir_conditions.json` は `ldfix=disabled` (`ir_sha256` 25e931f2…)。`boot_final3.ll` は ldfix 無しの base IR から作ったもの。
+- 測定基準は `8702c274` に統一 (§8 冒頭の「検証 HEAD」と同じ)。`8702c274` 以降 (`bff2ac54`) の差は REPORT の記述修正のみ。
+- 差分 0 の証跡: `git diff 604e900f 8702c274 -- tools/ ':!*.md'` の出力は 0 行 (`bff2ac54` まででも 0 行)。`git diff 604e900f 8702c274 --stat -- tools/` は `tools/m11/ldfix/REPORT_942.md` と `REPORT_942_APPENDIX.md` のみ (本文の記述修正は `*.md` のため上記の差分には含まれない)。
+- 未解決 (起票先):
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| F3c 36 と REPORT.md §1 の 26 の差の原因 | 修復件数の記録の正確さ | #942 (次 run) |
+| `function_4133f0` (unit 0x6d5700) の F3a 修復後も残る trap の発生 load | 受入 1 | #942 (次 run) |
+| unit 144 (0x25c540) の halt0 → OOB の因果 (`function_407e20__lifted`) | 受入 2・3 | #942 (次 run) |
+| unit 0x6d9ba0 (halt0) の修復との帰属 (frame 無し) | 受入 3 | #942 (次 run) |

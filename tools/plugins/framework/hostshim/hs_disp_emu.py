@@ -41,6 +41,9 @@ MAX_STEPS = 400000
 PAGE = 0x1000
 # 経路上の判定用 VA (hostshim.c / hs_disp_tree.py の主張の検証点)
 WATCH = {0x131bb5c, 0x13281af, 0x1320dd9, 0x1322b53, 0x131b8dd, 0x1320840}
+# HS_DISP_RET_ARG=1 のとき、機械語で rax=第1引数 と確定した callee は rcx を返す (#1222 §7)
+RET_ARG = os.environ.get('HS_DISP_RET_ARG') == '1'
+RET_ARG_VA = {0x412d60, 0x416230}
 ACCESS_NAME = {UC_MEM_READ_UNMAPPED: 'read', UC_MEM_WRITE_UNMAPPED: 'write', UC_MEM_FETCH_UNMAPPED: 'fetch'}
 
 
@@ -79,7 +82,10 @@ def run_one(ident, image, base, size, pe_data_sections):
             sp = uc_.reg_read(UC_X86_REG_RSP)
             ret = int.from_bytes(uc_.mem_read(sp, 8), 'little')
             st['callouts'].append('0x%x' % addr)
-            uc_.reg_write(UC_X86_REG_RAX, 0)
+            ret_rax = 0
+            if RET_ARG and addr in RET_ARG_VA:
+                ret_rax = uc_.reg_read(UC_X86_REG_RCX)
+            uc_.reg_write(UC_X86_REG_RAX, ret_rax)
             uc_.reg_write(UC_X86_REG_RSP, sp + 8)
             uc_.reg_write(UC_X86_REG_RIP, ret)
             return

@@ -145,7 +145,7 @@
 | (d) #509 (LD-9 ldfix F3c 門拡張) との統合要否 | 検出を ldfix で拾えるか | #509 |
 | (e) 計測 build (`M11_INSTR_413060=1`) の OFF が既定 build と違う 871/23 の原因 (未特定)。候補: dest 観測 hook の volatile 読出しが不正な dest で trap を生んでいる可能性 (未検証・切り分けは未実施) | 計測 build の値 (871/23) を既定の基準に使えない | #1352 ([M11-N85]) |
 
-(e) の詳細 (起票先 #1352 の受入条件に対応):
+(e) の詳細 (起票先 #1352 の受入条件に対応。**#1352 の実測で HEAD `1be53b3f` では計測 build の OFF は 870/24/0 で既定と一致し、871/23 は再現しなかった。dest 読出しを止めても 870/24/0 (`M11_DEST_READ=0`)。詳細は [REPORT_1352.md](REPORT_1352.md)**):
 切り分けの実測 (`ba9ba284` と同じ IR・`M11_DEST_READ=0`・INSTR=1・OFF):
 `{"units":942,"ok":871,"noproc":1,"miss":47,"trap":23,"clobber":0}`・`f413060_calls=227`。
 dest 読出しを止めても 871/23 のまま。よって dest 読出しが原因ではないことだけ分かる。
@@ -189,3 +189,27 @@ dest 読出しを止めても 871/23 のまま。よって dest 読出しが原�
 
 `a3641979` 以降の main (`tools/m11` 変更を含む) で既定 build は 870/24 (`repro_705.sh` の旧基準 869/25 は不一致)。
 §0 の表と `repro_705.sh` の基準を HEAD の実測値に合わせた。869/25 は `53aa0a6a` 時点の値として残す。
+
+## 7. icall 差分 (受入条件 2 の残り・kind・ok・icall)
+
+測定 commit: **`15beb1fb`** (main 取り込み時点の HEAD。このブランチでコードは変えていない)。
+`git diff 15beb1fb HEAD -- tools/m11` は空 (本節の文書追記のみ)。
+既定 build は `M11_INSTR_413060` 未設定 (計測なし)。`M11_OV_413060` のみ切り替え (OFF=0 / ON=1)。
+コマンド: `env -u M11_INSTR_413060 M11_OV_413060={0,1} M11_NEG_413060=0 bash m11_build.sh` → `env -u M11_INSTR_413060 M11_SURVEY_UNITS=<units>.json node m11_survey.mjs` (直列・単発)。
+素材: `fl-win64`・`work-m11` (`m11_gen_ir2.sh` で `ir_conditions.json` 再生成: F1=902 F3c=36 errors=0)・`toolchain-emsdk`。
+
+| 構成 | ok | noproc | miss | trap | clobber | icall_miss | icall_miss_uniq | stub_total | stub_uniq | getmem | freemem | va_calls | survey elapsed | load (開始) |
+|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|
+| OFF (`M11_OV_413060=0`) | 870 | 1 | 47 | 24 | 0 | 50 | 3 | 251 | 46 | 2012 | 162 | 36 | 16.323 s | 0.98 |
+| ON (`M11_OV_413060=1`) | 870 | 1 | 47 | 24 | 0 | 50 | 3 | 251 | 46 | 2013 | 164 | 36 | 16.072 s | 0.94 |
+| OFF 再測定 (決定性) | 870 | 1 | 47 | 24 | 0 | 50 | 3 | 251 | 46 | 2012 | 162 | 36 | — | — |
+
+- 既定 OFF の基準 870/24/0 は §0 (main 基準) と一致。
+- unit ラベル (`ok`/`noproc`/`miss`/`trap`) は OFF/ON の 942 unit 全てで一致 (差分 0 unit。`units_off.json` と `units_on.json` を比較)。OFF 再測定の unit ラベルも `units_off.json` と `cmp` 一致。
+- `trap_kinds` (unreachable 1 / halt0->longjmp 7 / memory access out of bounds 16) は OFF/ON 一致。`stub_hits` も OFF/ON で一致。
+- icall: `icall_miss` 50・`icall_miss_uniq` 3 は OFF/ON/OFF 再測定で一致 (icall の差分 0)。
+- 差分: `getmem` 2012→2013・`freemem` 162→164 (ON で +1 / +2)。OFF 再測定は 2012/162 で決定的。差の原因は未切り分け (ON の C 転記版が呼ぶ alloc 回数の差の可能性はあるが未検証)。判定 (unit ラベル・trap・icall) には出ない。
+- 感度: icall は差が出ない項目なので、本節の一致は「差なし」の確認であり感度の証明ではない。感度は §2・§6 のネガコン (呼出し数 227→180) が担う。
+- 所要 (survey 単発): OFF 16.323 s / ON 16.072 s。elapsed の run 間揺れ (§1) があるため判定には使わない。
+- 再現 (受入条件 4・HEAD `c55e6d25`・直列・単発・`m11_gen_ir2.sh` を HEAD で再実行してから実行): `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/m11/trap_triage/repro_705.sh` 全体 154.7 s (`time` の real、load 開始 1.20)・判定 `PASS`。計数は OFF/ON/OFF 再実行/ネガコンで 870/24・870/24・870/24・867/27。dest 指紋は OFF `acb2345ddb678281` (再実行で一致)・ON `ac2d2efb758d4bb1`・ネガコン `18e582921189ec13`。unit ラベル差分 0。
+- 注: `repro_705.sh` の既定 build の `boot_final3.ll` md5 は `7304232a4b2a28e1456cb3e7527b653d` (§0 の `4fd74f…` と異なる)。計数 870/24 は §0・§6 の基準と一致。md5 の差の原因は未切り分け (`m11_gen_ir2.sh` を HEAD で再実行した IR から作ったため)。

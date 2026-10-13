@@ -188,3 +188,37 @@
 
 **採用方式 (暫定、受入条件 4)**: **x64c (Wrapper 経由) を採用候補とする**。両 block が生成・`emcc -c`・wasm link を通る。RetDec 分割 lift は、修復なしの `emcc -c` 通過が未計測 (旧値は撤回) で、修復 (undeclared helper・goto/label) が必要なため build 可否が出ない。
 ただし x64c の実行結果 (bit 一致) と CreatePlugInstance 到達 (#829) は未検証。よって「採用」は build 経路の判定であり、実行検証は残る。
+
+## 8. #1339: RetDec 分割 lift 出力 C の修復 (検証 HEAD: 本 PR の commit、2026-10-13 run)
+
+測定 commit: 本 PR の最後のコード commit。環境: `[RETDEC]` v5.0・`[EMSDK]` 6.0.12 (emcc)・clang 同梱、`fl-win64`、`work-*` 系は未使用。
+
+**判定の誤りの修正 (§5 の `no_definition` 93 件の原因)**: `DEF_RE` の `[^;=]*` が改行をまたぎ、前関数の閉じ `}` 直後のコメント行から次の定義行までを 1 つの一致に飲み込んでいた。その結果、定義行が見えず `no_definition` になっていた。`[^\n;=]*` / `[^\n;{}]*` に直して再計算すると、93 件のうち 89 件は定義あり。残り 4 件 (0x41c480・0x570b30 と block19091 の 0x86ab10 / 0x87cdf0、block23676 の 0x86a970 / 0x87cfc0) は RetDec 出力に定義が無い。`no_definition` の 4 件は §1 の decode 不能範囲とは重ならない。原因は未特定。`0x86ab10` / `0x86a970` は CreatePlugInstance。
+
+**修復なしの emcc `-c` (関数単位・修正後 DEF_RE、`emcc_per_function.py`)**:
+
+| 項目 | block19091 | block23676 |
+|---|---|---|
+| 関数数 (pdata 併合後) | 19,816 | 19,826 |
+| RetDec 定義あり | 19,812 | 19,822 |
+| emcc `-c` 通過 (修復なし) | 16,815 | 16,821 |
+| emcc exit | 40 ファイル全て 1 | 40 ファイル全て 1 |
+| error 行 | 11,432 | 11,475 |
+| emcc 所要 (合計) | 9.72 s | 9.63 s |
+
+**helper 宣言の補修 (`retdec_repair.py`) 後**:
+
+| 項目 | block19091 | block23676 |
+|---|---|---|
+| 補った宣言 | 919 | 922 |
+| emcc `-c` 通過 | 17,758 | 17,769 |
+| error 行 | 3,433 | 3,432 |
+| emcc 所要 (合計) | 8.67 s | 8.83 s |
+
+- 補修内容: 本体で呼ばれるが宣言の無い helper (`__asm_*`・`llvm_*`・`__read*` 等) を `int64_t NAME();` で宣言する。非破壊 (入力は変えない)。
+- **未修復 (残り error の内訳, block19091 `0_` 単一ファイル例)**: int/pointer 混在 (`int64_t v7 = &v3` 等、`-Wint-conversion` 系 約 50 件)、goto 由来の `break` / `statement not in loop` (約 15 件)、`use of undeclared label` (3 件)、残りの未宣言 helper (約 60 件)。goto/break は C の制御構造を変えるため機械的修復は行わない (silent miscompile の危険)。
+- 通過数は `emcc_exit` が全て 1 のため、通過はファイル内の帰属で数えた値。`unattributed_error_lines` は 1 件 (fail-closed で 1 ファイルを失敗扱い)。
+
+**wasm link・採用方式 (受入条件 2・3)**: 未実施。修復済みでも 40 ファイル全てが `emcc -c` で exit 1 のため、link に進めない。wasm link の所要・サイズは未測定。採用方式は未決定 (§7 の暫定 x64c 候補は変更なし)。
+
+**本 run で未達のもの → 子 issue**: goto/break・int/pointer 混在の修復と emcc exit 0 化 → #1521 (HB-H31)。`no_definition` 残り 4 件の原因、wasm link の所要・サイズ、方式比較表の完成 → #1522 (HB-H32)。
