@@ -258,6 +258,7 @@
 | `tools/targets/kilohearts/snapins/REPORT.md` | ~200 | KH 共通基盤 lift + SnapinMasterDsp ホストハーネス |
 | `tools/targets/kilohearts/ui_eval/REPORT.md` | ~135 | KH-7 Kilohearts UI (Skia CPU ラスタ) → M7 HUD 接続可否評価 |
 | `tools/targets/freshair/REPORT.md` | ~145 | Fresh Air インストーラ解析 + lift 可否 |
+| `tools/targets/freshair/REPORT_APPENDIX_FA5.md` | ~25 | freshair REPORT §11 (FA-5 #52) の付録: 最大値の除外基準 (§A1) と `.rdata` 不一致 20 関数の分類詳細 (§A2)。250 行上限のため無変更で分割移動 |
 | `tools/targets/freshair/lift2/REPORT.md` | ~210 | Fresh Air Compressor/Filter/制御層 lift (§12 は `REPORT_APPENDIX_FA4.md` に分割移動) |
 | `tools/targets/freshair/lift2/REPORT_APPENDIX.md` | ~120 | lift2 FA-10 (#666): ctrl 工程 FAILED の epf 素材切り分け (同一コード A/B)・rep movs/stosw の実装と e2e 未実行の実測・未解決 FA-11/FA-12 (REPORT §12 から参照) |
 | `tools/targets/freshair/lift2/REPORT_APPENDIX_FA4.md` | ~50 | lift2 REPORT §12 全文 (FA-4 #51: チェーン構成 / マクロ→子パラメタ ID 写像)。250 行上限のため無変更で分割移動 |
