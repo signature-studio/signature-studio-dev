@@ -89,10 +89,10 @@ FLEngine rodata の `name\0doc\0…<module>` 並びから機械抽出 (`flapi_ex
 
 ## 7. 未解決・ブロッカー・留意
 
-- **FL 側 Python C API 呼出し面は未抽出**: dlsym 先の関数名が平文で無い。サブインタプリタ運用 (`PyInterpreterConfig` 型の存在から示唆のみ) の実態は不明。wasm で `Py_NewInterpreterFromConfig` が動くかも未検証。
+- **FL 側 Python C API 呼出し面は未抽出**: dlsym 先の関数名が平文で無い。サブインタプリタ運用 (`PyInterpreterConfig` 型の存在から示唆のみ) の実態は不明。wasm で `Py_NewInterpreterFromConfig` が動くかも未検証 (→ §11 で検証: 動く。`_flhost` は未対応)。
 - `mixer.getCurrentTempo(1)`/`setCurrentTempo(bpm,1)` の第 2 引数の意味 (MCPTools は素の BPM 扱い、公式 docs は ×1000) は**実機で未確認**。モックは MCPTools 側に合わせた。
 - FLEngine 側 flapi 実装は**モック(27 API を実装、他は None)**。実エンジンとの意味差 (引数省略時の既定値、-1 の意味) は実機/lift 後に検証が必要。
-- **kwargs 署名の静的復元 (PY-9 b, #81) 済み**: rodata の並び順ではなく、FLEngine (win PE) の `.data` 内メソッド表 (name/fn/flags/doc, 32B 刻み) と各ラッパー冒頭の `lea [rip+x]` から `PyArg_ParseTupleAndKeywords` の書式と kwlist を復元 (`analysis/flapi_kwargs.py` → `analysis/flapi/flapi_kwargs.json`、`flapi_table.json` の各関数に `kwsig` を追記)。結果は §11。
+- **kwargs 署名の静的復元 (PY-9 b, #81) 済み**: rodata の並び順ではなく、FLEngine (win PE) の `.data` 内メソッド表 (name/fn/flags/doc, 32B 刻み) と各ラッパー冒頭の `lea [rip+x]` から `PyArg_ParseTupleAndKeywords` の書式と kwlist を復元 (`analysis/flapi_kwargs.py` → `analysis/flapi/flapi_kwargs.json`、`flapi_table.json` の各関数に `kwsig` を追記)。結果は §12。
 - 旧 stubs (LGPL) は**参照入力のみ**でリポジトリ非同梱 (`fetch_inputs.sh` が clone)。FL 由来 pyc/py も非同梱 — 利用者の FL から実行時供給。EULA 判断は行わない (事実整理のみ)。
 - 呼出しコストは node/Chrome headless の mock 実測。実 FLEngine(wasm) 結合時に再計測要。
 - **MCPTools 内のテンポ規約が不整合に見える**: `get_session_context` は `mixer.getCurrentTempo()` (引数なし) を `/1000` して BPM 化、`get_tempo` は `getCurrentTempo(1)` を素の BPM として表示、`set_tempo` は `setCurrentTempo(bpm, 1)`。モックは後者に合わせたため `get_session_context` が `tempo_bpm: 0.13` を返す (`mcp_classification.json` 側の解析メモ)。どちらが実 FL の挙動かは未確認。
@@ -178,31 +178,72 @@ mock との差で見つかったもの: mock は引数の個数/型を検査し�
 | `/?mcp=1` のパネルは最小 UI (整形・履歴・複数行 arguments 編集なし)。`pnpm build` 成果物 (`dist/`) は `/py/` を持たないため dev / preview 専用 | 本番配信での公開は未対応 | 親 #35 に提案 (配信設計は #62 H 系と調整) |
 | `build_flpy.sh` が `flapi_table.json` / `FLAPI.md` を再生成する。runner には win PE が無く `win_pair_verified` が false になる | 本 PR では当該 2 ファイルをコミットしていない | #74 の PR (provider) と同じ `/home/ubuntu` 固定パス問題。`fetch_inputs.sh` / `run_all.sh` の env 化を別 issue で提案 |
 
-## 11. kwargs シグネチャの静的復元 (PY-9 b, #81)
+## 11. MIDI scripting ホスト (PY-6, #76)
 
-方式・入力: §7 の kwargs 項目参照。再現: `FL_WIN64_DIR=<fl-win64 展開先> python3 analysis/flapi_kwargs.py` (要 capstone, pefile) の後 `python3 tests/kwsig_check.py` (wasm 不要)。
+既知類型との関係: 該当なし (lift / 逆アセではない。flapi は引き続き `fl_mock.mjs` = FLEngine 模擬)。検証起点 commit `3e25620`。
+
+**結論**: 受入条件のうち「callback 27 個の配送表」は達成。**「同梱 device script (Forward CCs to current plugin Port 10) の動作」は未検証** (この run に `fl-win64` 素材が無い。`tests/midi_bundled_device.mjs` は入力が無いと exit 3 = NOT VERIFIED で止まる)。サブインタプリタは **wasm で動く** が、現行 `_flhost` は未対応で、device script 配送には**不要**と判断 (下記)。
+
+- **device script ローダ** (`src/fl_rt.py`): `load_device_script(name, source|path, port)` が script ごとに独立した module namespace で実行 (`# name=` 等のヘッダも解釈)。例外は FL と同様 stderr に traceback を出して続行し、`errors` に記録 (他 script の配送は継続)。
+- **配送表** (`fl_rt.CALLBACKS`): 27 個 = lifecycle 3 (OnInit/OnInitAll/OnDeInit)・受信 MIDI 10・MIDI Out 1・host 通知 13。引数の個数が表と違う呼出しは reject。順序と停止は公開 stubs 文書 (callbacks / FlMidiMsg.handled) に従う: OnMidiIn → OnMidiMsg → 型別 (OnNoteOn…、sysex は OnSysEx)、各 callback が返った時点で `handled` なら以降を呼ばない (PoC は OnMidiIn の handled を無視していたため是正)。`flmidimsg` の note/velocity/controlNum… は data1/data2 の別名 (書込み双方向)、midiId/midiChan は文書上「常に 0」に合わせた (PoC は midiChan=status&0xF)。
+- **Web MIDI 結線** (`host/midi_host.mjs` `MidiScriptHost.attachWebMidi`): 全入力の `onmidimessage` → `midiIn` (直列キューで到着順を保存)。port は `portMap[id|name]` か接続順の連番、script 側は `port` 一致 (port 無指定は全ポート) だけに配送。アプリ側 `src/runtime/midi_script.ts` が `window.flMidi` (devtools) と `/?midi=1` の UI パネルを公開。device script は利用者が実行時に供給 (配信物に非同梱、`/py/` の許可リスト方式は PY-4 のまま)。
+
+### 検証 (Actions runner 4 core, node 22.23.3, Chrome 154.0.8037.97, emsdk 6.0.12。load average 0.72〜0.84、直列 1 本)
+
+| 受入条件 / 項目 | 結果 | 検証 (`tools/python/` から) |
+|---|---|---|
+| callback 27 個の配送 | 達成 | `node tests/midi_script.mjs`: 23 check PASS。表 27 = FLEngine rodata 27 (`midi_script_callbacks_in_binary`)、引数 26 = stubs 署名。合成 recorder (27 全定義) へ全 callback を想定引数で 1 回ずつ配送、受信 MIDI 8 種 (0x80〜0xE0・sysex) が OnMidiIn→OnMidiMsg→型別の順 |
+| handled / port / 例外 | 達成 | handled で停止 (OnMidiIn・OnMidiMsg 各)・0xF8 は型別なし・port 不一致は非配送・例外の隔離と stderr traceback・未知 callback / 個数不一致 / 不正バイトは reject |
+| Web MIDI → dispatch 結線 | **偽 MIDIAccess で達成**・実デバイス未検証 | node 偽 access: 200 件連投が到着順、portMap・後から接続した入力・detach。Chrome (`node tests/midi_ui_check.mjs`, ルートから): UI でファイル供給→起動→OnInit→60 件連投・port 別配送・devtools から注入、14 check PASS。**実 Chrome の `requestMIDIAccess` はこの runner で `InvalidStateError: Platform dependent initialization failed`** (MIDI backend なし) |
+| 同梱 device script の動作 | **未検証** | `node tests/midi_bundled_device.mjs` → exit 3 (入力 `work/device_Forward CCs…py`・`midi.py`・`utils.py` 無し)。ハーネス自体は合成の代替ファイルで dry-run し exit 0 / `--neg` で exit 1 を確認 (同梱 script ではない) |
+| サブインタプリタ | 下記 | `node tests/subinterp_probe.mjs`: 12 check PASS |
+
+実測 (n=3): `midi_script.mjs` wall 0.59〜0.60 秒。MIDI 1 件のフル配送 (Worker + SAB RPC、OnMidiIn+OnMidiMsg+OnNoteOn の 3 callback) は逐次 137〜143 µs・パイプライン 129〜137 µs (1000 件当り)。`midi_ui_check.mjs` スクリプト内 1.292 / 1.322 / 1.541 秒。`subinterp_probe.mjs` wall 5.09〜5.10 秒。`pnpm typecheck` / `pnpm build` 成功。`flpy.wasm` 5,923,783B / `flpy.data` 3,214,338B / `flpy.js` 120,351B (本 run のリンク。§1 の 5,920,419B との差は同表記の再ビルド変動の範囲で、因果は未切り分け)。CPython クリーンビルド (tgz 取得+native+wasm+記録) 210 秒 (4 core, ログの開始/終了時刻差)。
+
+ネガティブコントロール (終了コード 1 = 検出): `midi_script.mjs --neg` (recorder から OnDirtyChannel を消す → 「27 全配送」だけが FAIL、26/27 と欠落名を表示)・`midi_ui_check.mjs --neg` (構文エラー入り script → 「2 script 読込」だけが FAIL、UI に SyntaxError)・`subinterp_probe.mjs --neg` (拒否 builtin の期待を 1 本欠く → その check だけ FAIL)・`midi_bundled_device.mjs --neg` (midi.py 無し → 読込 check が FAIL)。通常実行の FAIL は exit 2、入力欠落は exit 3 (緑にならない)。
+
+### サブインタプリタ (`flpy_subinterp_run` = 検証用 export)
 
 | 項目 | 実測 |
 |---|---|
-| メソッド表から 435 関数全件に対応付け | 435/435 (13 module) |
+| `Py_NewInterpreterFromConfig` | **3 構成とも成功** (isolated+OWN_GIL / isolated+SHARED_GIL / legacy)。スレッド無しの wasm でも OWN_GIL が成立。破棄後に main は継続 |
+| stdlib | FL 同梱スクリプトが使う 22 module は isolated で全て import 可 |
+| builtin 66 本 | isolated で拒否 5 本 (`_elementtree _flhost _lsprof faulthandler pyexpat`、"does not support loading in subinterpreters")。legacy は 0 本 |
+| 隔離 | isolated は main の `__main__` 変数・`sys.modules` を共有しない |
+| コスト | 作成+`import json, re`+実行+破棄 = 26.74〜28.21 ms/個 (50 個ずつの平均を 1 run 3 batch、3 run)。150 回後も線形メモリ 33,554,432B のまま (増加なし) |
+| **`_flhost`** | isolated では import 不可 (`Py_mod_multiple_interpreters` 未宣言。3.12.1 の既定は非対応)。**legacy では import できるが、`flhost_exec` が static 変数 (`json_loads`/`HostError`/`g_cbs`) を上書きし、サブインタプリタ破棄後に main の `_flhost.call` が壊れる** (trap `memory access out of bounds` / `NameError: isinstance` 等、症状は不定) |
+
+判断 (推定を含む): device script の配送は script ごとの module namespace で足りるため、サブインタプリタは**採用しない**。違いは `sys.modules` を共有する点 (script 間で `utils` 等が共有される)。FL が script ごとにインタプリタを分けているかは `PyInterpreterConfig` 型名の存在以外に証拠が無く未確認。将来必要になれば `_flhost` を module state 化 + `Py_mod_multiple_interpreters` 宣言する改修が前提 (下表)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 同梱 device script の動作が未検証 (`fl-win64` 無し。win64 での block 番号も未特定) | 受入条件 1 が未達のため `Closes` にしない | 本 issue #76 を `oc_artifacts: fl-win64 toolchain-emsdk` で再起動 (配置先 `tools/python/work/`、`midi_bundled_device.mjs` の「[仮説]」check は実ファイルで要確認) |
+| 実ブラウザ / 実 MIDI デバイスでの Web MIDI 受信が未検証 | 結線は偽 MIDIAccess のみ | #37 (AU-14) にコメント。手元ブラウザでの `flMidi.connectWebMidi()` 実行を依頼 |
+| host 通知 13 個と OnMidiOutMsg の**発火元** (OnIdle の 20ms 周期・OnRefresh フラグ・OnUpdateMeters の `device.setHasMeters` ゲート等) は FLEngine 側の責務で、本実装は配送面のみ。OnInitAll の意味 (全 script の OnInit 後に 1 回) は名前からの推定 | エンジン結合時に発火条件を別途実装・実機確認 | 親 #35 に提案 (FLEngine 結線チケット) |
+| 文書 (公開 stubs) 由来の仕様 (handled 伝播・midiId/midiChan=0・timestamp=0) は 26.1.7 実機で未確認 | 実 script が midiChan 等に依存すると差が出る | 上記 #76 再実行時に同梱 script で確認 / 実機があれば #35 |
+| `_flhost` の per-module state 化 + `Py_mod_multiple_interpreters` 宣言 (サブインタプリタ採用時のみ) | 現状 legacy サブインタプリタで main が壊れる | 新規子チケット提案 `[PY-n]` (採用判断後。PM 起票) |
+| mock の `device.*` は forwardMIDICC / midiOutMsg の記録と 3 関数のみ。実エンジン未接続 | 同梱 script が他の device API を使うと None が返る (`midi_bundled_device.mjs` は未実装 API 呼出しを FAIL にする) | #74 (PY-1) 以降 / 親 #35 |
+| `build_flpy.sh` が `flapi_table.json` / `FLAPI.md` を再生成する (`work/fl-stubs` の clone も要る)。runner には win PE が無い | 本 PR では当該 2 ファイルをコミットしていない | PY-4 §10 と同じ。`fetch_inputs.sh` / `run_all.sh` の env 化を別 issue で提案 |
+| PY-4 の `poc_mcp.mjs` / `all_tools.mjs` / `mcp_ui_check.mjs` は MCPTools.pyc が無く再実行不可 (本 run で `dispatch_midi` の PoC 区間のみ `midi_script.mjs` に複製して同結果を確認) | `fl_rt.py` / `fl_mock.mjs` の変更の回帰を全体では未確認 | #76 再実行時に `run_all.sh` 相当を実行 |
+
+## 12. kwargs シグネチャの静的復元 (PY-9 b, #81)
+方式・入力: §7 の kwargs 項目参照。再現: `FL_WIN64_DIR=<fl-win64 展開先> python3 analysis/flapi_kwargs.py` (要 capstone, pefile。出力は commit 済み JSON とバイト一致) の後 `python3 tests/kwsig_check.py` (wasm 不要)。
+
+| 項目 | 実測 |
+|---|---|
+| メソッド表から 435 関数全件に対応付け | 435/435 (13 module)。メソッド表に載るが本 table の module 外の 8 表 (flpianoroll/flcpt/ScriptDialog 等のクラスメソッド) は対象外 |
 | 書式文字列を復元 (flags=1/3 + 引数あり) | 303 関数 (flags=1: 200 / flags=3: 103。flags 全体は 1=205, 3=105, 4=125)。flags=4 (NOARGS) 125 件は書式無し。初版の「309 (flags=4: 6)」は `ret` を越えて隣の関数の `lea` を拾った誤検出で、`ret`/`int3` 打切りと NOARGS 除外で修正 (変化は 6 関数のみ。flags=1/3 の 303 件は全て最初の `ret`/`int3` より前に間接 call があり、再生成の前後で不変) |
-| **kwlist (引数名) を復元** (flags=3 = VARARGS\|KEYWORDS) | **103 関数**。全件で `len(kwlist) == 書式の最大引数数` |
-| flags=3 だが書式/kwlist 未復元 | 2 (`device.flrMidiNote`, `device.flrMidiCC`: lea の並びが他と異なる) |
+| **kwlist (引数名) を復元** (flags=3 = VARARGS\|KEYWORDS) | **103 関数**。全件で `len(kwlist) == 書式の最大引数数`。flags=3 で未復元は 2 (`device.flrMidiNote`, `flrMidiCC`: lea の並びが他と異なる) |
 | flags=1 (VARARGS のみ、実 FL は kwargs を受けない可能性) | 205 (うち書式あり 200)。**位置引数のみ**。ただし MCPTools が `channels.channelCount(globalCount=)` を kw 呼出しするため kwargs 拒否にはしていない |
 | 新規 43 関数のうち | 書式あり 32 / kwlist あり 9 (`fillEachNSteps` `rerollLoopStarter*` `setPluginMixLevel` `setPluginMuteState` `setLoopStarterRootNote` `releaseCC` `selectionSet` 等)。残りは flags=1 (位置引数のみ)/4 (引数なし) |
-| メソッド表に載らない表 (flpianoroll/flcpt/ScriptDialog 等のクラスメソッド) | 8 表 (本 table の module 外のため対象外) |
 
 stubs (LGPL 参照) 署名との照合 (kwlist のある 103 のうち stubs 署名がある関数): 名前一致 66 / **不一致 28** (バイナリ側を正とする)。例: `channels.getChannelName` は stubs の `index` でなくバイナリの kwlist 先頭が `value`、`channels.getChannelVolume` は `mode` でなく `useDb`、`channels.setChannelPitch` は `mode` でなく `pitchUnit`、`mixer.getTrackVolume` は `mode` でなく `flag`、`plugins.setParamValue` は `value` でなく `paramValue`、`transport.globalTransport` は `command` でなく `index`、`device.forwardMIDICC` は `mode` でなく `forwardTo`、`mixer.automateEvent` は `speed` でなく `smoothSpeed`。書式の引数数 (必須/最大) は stubs 署名と 230 件一致 / 49 件不一致 (stubs の引数が欠けている・書式の `|` 位置が異なる等)。
-
 - `fl_api.py`: kwlist があれば stubs 名より優先して kwargs を束縛。省略可能引数の既定値が C 側で静的に不明なとき、それを飛ばして後続だけ指定する呼出しは `TypeError` (推測値で埋めない)。stubs の既定値は、同名の引数のものを引き継ぎ、名前だけ変わった同位置の引数 (`mode`→`useDb` 等) のものも引き継ぐ。stubs 側の名前が kwlist の別位置にある (位置がずれた) 3 関数 `channels.soloChannel` / `plugins.getColor` / `plugins.getParamValueString` は別の引数の既定値になるため引き継がない。未知の kwarg は既定値の評価より先に `TypeError`。
 - **kwlist の重複 1 件 (バイナリ由来)**: `arrangement.selectionSet` = `['selStart','selStart','selectNotes','updateSongLoop','scroll']` (kwlist 表 0x151dc00 の先頭 2 エントリが同じ文字列 0xd7890c を指す。2 つ目は `selEnd` の記載ミスと推定)。bind は最初の出現だけを kw で束縛し、2 つ目以降は位置専用 (kw では埋まらない)。実 CPython (3.14, ctypes で `PyArg_ParseTupleAndKeywords` を直接呼出し) は `selStart=5` のみ → 必須欠落 `TypeError` (mock と同じ) だが、位置 1 個 + `selStart=5` は 2 つ目に束縛されて通り、mock はこれを拒否する (誤記を kw で踏まない側に倒した差)。
-- **MCPTools.pyc の実 kwargs 呼出し** (`KW_NAMES` を逆アセンブルして flapi 呼出しに対応付け): kwlist のある関数への呼出しは全て kwlist 名と一致 (`plugins.*` の `slotIndex/useGlobalIndex/pickupMode`、`channels.getChannelName/setChannelName/setTargetFxTrack/showEditor` の `useGlobalIndex/value`)。`print(..., file=/indent=)` 等は flapi 呼出しではない。
-- 検証: `tests/kwsig_check.py` PASS (435 関数に kwsig・kwlist 103・NOARGS 書式無し・bind の 9 区分)。区分 8 は PR 前 (stubs 署名のみ) の bind との新旧比較: 94 関数 (stubs 署名と kwlist の両方あり) で位置 k 個 + kw 1 個 (kwlist の名前) の呼出しのうち旧が通った 224 件が対象、新も同結果 219 件、差 5 件 (4 関数: `getStepParam` はバイナリが 5 引数で 6 つ目を渡さない / 上記のずれた 3 関数)。MCPTools.pyc の flapi への kw 呼出し 20 箇所 (重複除き 14 パターン; `KW_NAMES` 付き `CALL` を 3.12 `dis` で抽出) は新 bind で 14/14 通る (旧 main の bind は 13/14: `plugins.getParamValueString(slotIndex=, useGlobalIndex=)` が stubs 既定値 `midi.PIM_None` の `eval` で `NameError`)。**wasm 上の `tests/all_tools.mjs` (48/48) は未再実行** (§12 参照。FL 同梱 `midi.py`/`utils.py` は mac 側のみで fl-win64 素材に無く、入力が揃わないため)。
+- 検証 (`tests/kwsig_check.py`): 435 関数に kwsig・kwlist 103・NOARGS 書式無し・bind の 9 区分。区分 8 は PR 前 (stubs 署名のみ) の bind との新旧比較で、94 関数 (stubs 署名と kwlist の両方あり) の「位置 k 個 + kw 1 個 (kwlist の名前)」呼出しのうち旧が通った 224 件が対象、新も同結果 219 件、差 5 件 (4 関数: `getStepParam` はバイナリが 5 引数で 6 つ目を渡さない / 上記のずれた 3 関数)。MCPTools.pyc の flapi への kw 呼出し 20 箇所 (重複除き 14 パターン; `KW_NAMES` 付き `CALL` を 3.12 `dis` で抽出。`print(..., file=)` 等は対象外) は新 bind で 14/14 通り、kwlist のある関数では全て kwlist 名と一致 (旧 main の bind は 13/14: `plugins.getParamValueString(slotIndex=, useGlobalIndex=)` が stubs 既定値 `midi.PIM_None` の `eval` で `NameError`)。
+- wasm 回帰: (検証中)
 
-## 12. 未解決 (#81)
-
-- (a) 実機 FL での `mixer.getCurrentTempo(1)` 等の意味差確認は実機が必要で未着手 (#81 のブロッカーのまま)。
-- `device.flrMidiNote` / `flrMidiCC` の書式・kwlist 未復元 (2 件)。
+## 13. 未解決 (#81)
+- (a) 実機 FL での `mixer.getCurrentTempo(1)` 等の意味差確認は実機が必要で未着手 (#81 のブロッカーのまま)。`device.flrMidiNote` / `flrMidiCC` の書式・kwlist も未復元 (2 件)。
 - stubs 既定値が C 側で不明な引数を飛ばす呼出し (`channels.soloChannel(1, useGlobalIndex=True)` 等 3 関数) は `TypeError`。実 FL は C 側の既定値で通すため意味差。ホストへの「省略」の渡し方 (provider は `None`=handler 既定値、JS mock の `tog` は `undefined` のみ省略扱い) が未統一で、PM 判断待ち (PR #463 コメントに起票依頼)。
 - stubs 既定値 `midi.*` 10 種 (21 引数: `PIM_None` 7、`GT_All` 5 ほか) は `eval(…, {})` で `NameError` (main 既存の問題)。PM が別 issue で追跡 (PR #463 コメントに起票依頼)。
-- wasm 回帰 (`bash tools/python/run_all.sh`, 48/48) は本 run で未実行 (入力の mac 由来 `midi.py`/`utils.py`・`[MAC]` 素材が無い)。`fl_api.py` の変更は kwargs 経路のみで位置引数呼出しは従来と同一。

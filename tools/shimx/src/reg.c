@@ -818,12 +818,3 @@ void shx_init_reg(void) {
     g_reg_inited = 1;
     seed_defaults();
 }
-
-/* ---- advapi32 Crypt* (ハッシュ API) は非対応: 常に失敗 (NTE_PROVIDER_DLL_FAIL) ---- */
-BOOL CryptAcquireContextA(LPHANDLE prov, LPCSTR cont, LPCSTR name, DWORD type, DWORD flags) {
-    (void)cont; (void)name; (void)type; (void)flags; if (prov) *prov = 0; SetLastError(0x8009001Du); return FALSE;
-}
-BOOL CryptCreateHash(HANDLE prov, DWORD alg, HANDLE key, DWORD flags, LPHANDLE hash) { (void)prov; (void)alg; (void)key; (void)flags; if (hash) *hash = 0; SetLastError(0x80090008u); return FALSE; }
-BOOL CryptHashData(HANDLE h, const BYTE* d, DWORD n, DWORD flags) { (void)h; (void)d; (void)n; (void)flags; SetLastError(ERROR_INVALID_HANDLE); return FALSE; }
-BOOL CryptGetHashParam(HANDLE h, DWORD p, BYTE* d, LPDWORD n, DWORD flags) { (void)h; (void)p; (void)d; (void)n; (void)flags; SetLastError(ERROR_INVALID_HANDLE); return FALSE; }
-BOOL CryptDestroyHash(HANDLE h) { (void)h; return TRUE; }
