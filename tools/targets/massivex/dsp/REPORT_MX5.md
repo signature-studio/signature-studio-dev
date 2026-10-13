@@ -50,6 +50,7 @@ len ヒストグラム (256 B 刻み): 0〜255 B が 143,802 件、4 KiB 以上�
 ## 5. 検証
 
 - 実行記録の出典 (未統一・要再測定): 実装 run の記録は PR 本文 (34 s / load 0.09 0.36 0.25 → 0.50 0.43 0.28 / `tools/targets/massivex/dsp/e2e.sh`) と本ファイルの旧記載 (31 s / load 0.23 0.47 0.26 → 0.57 0.53 0.28 / `dsp/e2e.sh`) で食い違う。どちらが実測かを示す run ログが本 fix run からは取得できず、素材 `plugins-massivex` も無いため再測定していない。n≥3 の min–max レンジは未取得。
-- 測定 commit: 375fc6ac (e2e.sh step 5/5 を含むコード差分の最終 commit)。`git diff 375fc6ac HEAD -- tools/targets/massivex/dsp` の結果は fix commit 後に §5 末尾へ追記する。
+- 測定 commit: 375fc6ac (e2e.sh step 5/5 を含むコード差分の最終 commit)。
+- 差分 (`git diff 375fc6ac ec0a3237 -- tools/targets/massivex/dsp`): REPORT_MX5.md 16 行 (+/−)・e2e.sh 8 行 (+/−)、合計 13 insertions / 11 deletions。e2e.sh の差分は `echo "== n/4"` → `echo "== n/5"` の表示文字列のみで、計算・入出力は不変。REPORT の差分は数値の定義・注記・出典の文言のみ。実測値 (表 §2) は変えていない。
 - `bash dsp/negctl.sh` → NC1 FAIL<期待> (unsup 67 vs 基準 48,612) / NC2 FAIL<期待> (unsup 746) / NC3 FAIL<期待> (unsup 0) 。
 - 計測は `.pdata` 解析のみで closure は変えていない。受入 5 の「negctl 3 件 FAIL」は既存の 3 件が満たす (本 run の変更は e2e.sh 末尾の step 5/5 追加のみ)。
