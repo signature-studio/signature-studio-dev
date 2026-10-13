@@ -1,6 +1,6 @@
 # G python-mcp — CPython wasm + flapi/MCP 解析 + ブリッジ設計 (2026-10-10)
 
-> 行数上限 (250 行) のため、§7c (#82)・§9 (T1〜T9 表)・§PY-13 (#588) と §12・§13 (#81) の全文は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) に分割移動 (本体は要約のみ)。
+> 行数上限 (250 行) のため、§7c (#82)・§9 (T1〜T9 表)・§PY-13 (#588)・§12・§13 (#81) の全文は [REPORT_APPENDIX.md](REPORT_APPENDIX.md)、§15 (#654) の全文は [REPORT_PY16.md](REPORT_PY16.md) に分割移動 (本体は要約のみ)。
 
 ## 結論 (先出し)
 
@@ -198,6 +198,8 @@ T1〜T9 の表は 250 行上限のため [REPORT_APPENDIX.md](REPORT_APPENDIX.md
 
 ネガティブコントロール (終了コード 1 = 検出): `midi_script.mjs --neg` (recorder から OnDirtyChannel を消す → 「27 全配送」だけが FAIL、26/27 と欠落名を表示)・`midi_ui_check.mjs --neg` (構文エラー入り script → 「2 script 読込」だけが FAIL、UI に SyntaxError)・`subinterp_probe.mjs --neg` (拒否 builtin の期待を 1 本欠く → その check だけ FAIL)・`midi_bundled_device.mjs --neg` (midi.py 無し → 読込 check が FAIL)。通常実行の FAIL は exit 2、入力欠落は exit 3 (緑にならない)。
 
+**#601 (load 失敗の巻き戻し)**: `fl_rt.load_device_script` は exec 成功後に `_scripts` へ登録し、例外時は `sys.modules` も戻して再送出する (旧: 登録後に exec → top-level 例外で半端な module が残り midiIn / callback が配送された)。同名の既存 script は先に unload 済みで復元しない。UI (`src/runtime/midi_script.ts`) は読込失敗時に `flMidi.stop()` で巻き戻し (started=false・接続ボタン無効・起動ボタン再有効)。回帰: `midi_script.mjs` §4b (fixture `device_import_fails.py`、29 check)・`midi_ui_check.mjs` 失敗経路 (20 check)。ネガコン (exit 1 = 検出): `midi_script.mjs --neg-legacy` (旧ローダへ差し戻し → 必須 3 check (`LEGACY_KEYS`: listDeviceScripts・sys.modules・midiIn 配送) が FAIL、非 MIDI 配送・同名再読込は FAIL しても可)・`midi_ui_check.mjs --neg-rollback` (UI の stop を無効化 → started・起動ボタン・midiIn の 3 check が FAIL。接続ボタンは catch 節が直接 disabled にするため stop の有無では変わらず検出対象外)。接続ボタン check は起動前に有効化してから失敗させ、失敗後に無効へ戻ることを観測する形に変更 (起動前から disabled だった旧 check は常に PASS で無意味だった)。実測 (HEAD 238353e = main 5d7822a を merge した状態。emsdk 6.0.12 で CPython wasm・flpy をビルド。build_flpy.sh 後の `git status` は空): `midi_script.mjs` exit 0 (29 check 全 PASS)・`--neg-legacy` exit 1 (29 check 中 FAIL 4 件: 必須 3 件 + 非 MIDI 配送 = LEGACY_KEYS 3 本が全て FAIL)・`midi_ui_check.mjs` exit 0 (20 check 全 PASS)・`--neg-rollback` exit 1 (19 check 中 FAIL 3 件: started・起動ボタン・midiIn)。接続ボタンは検出対象外。
+
 ### サブインタプリタ (`flpy_subinterp_run` = 検証用 export)
 
 | 項目 | 実測 |
@@ -233,8 +235,11 @@ T1〜T9 の表は 250 行上限のため [REPORT_APPENDIX.md](REPORT_APPENDIX.md
 FLEngine の PyMethodDef 表から 435/435 関数を対応付け、書式 303 関数・kwlist 103 関数を復元 (flags=4 の 125 件は書式無し)。`fl_api.bind` は kwlist 名を stubs 名より優先し、既定値が静的に不明な引数の省略後は後続の既定値を足さない (`getGridBit(index=1)` → `(1,)`)。stubs 名とは 66 一致 / 28 不一致 (バイナリを正とする)。再現: `FL_WIN64_DIR=<fl-win64 展開先> python3 analysis/flapi_kwargs.py` の後 `python3 tests/kwsig_check.py` (0.03〜0.04 秒)。wasm 回帰 (`all_tools.mjs` 48/48 ほか)・stubs 照合の例・`arrangement.selectionSet` の kwlist 重複の CPython 実測: [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §12。
 
 ## 13. 未解決 (#81)
-(a) 実機 FL での `mixer.getCurrentTempo(1)` 確認 (#81 のブロッカー)、`device.flrMidiNote` / `flrMidiCC` の書式未復元、省略引数のホストへの渡し方・stubs 既定値 `midi.*` の `eval` NameError は PM 判断待ち (PR #463 コメントに起票依頼)。詳細: [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §13。
+(a) 実機 FL での `mixer.getCurrentTempo(1)` 確認 (#81 のブロッカー)、`device.flrMidiNote` / `flrMidiCC` の書式未復元、省略引数のホストへの渡し方・stubs 既定値 `midi.*` の NameError は #654 (PY-16) で解消 (§15)。詳細: [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §13。
 
 ## 14. Piano roll scripting (`flpianoroll` + `.pyscript` ローダ) — #79 (PY-5)
 
 結論: 同梱 Piano roll scripts 5/5 を wasm 上で回帰テスト化 (`tests/pyscript_e2e.mjs`)。Remote Scripts 5/5・Audio scripts 0/12 (`enveditor` 依存)。flpianoroll は 64 メンバ中 62 実装 (`ScriptDialog.DialogParams` 未実装・`Score.loadScoreFromFile` は stub)。全文・実測・未解決は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §14。
+
+## 15. stubs 既定値 `midi.*` の評価 (PY-16, #654)
+結論: `fl_api.bind` の `eval` を、許可した式だけを評価する `_default_value` に置換した。`midi.*` の既定値 **20 関数・21 引数・名前 10 種** は利用者の `midi` から実行時に解決し、repo には値を置かない (`docs/LEGAL.md`)。検証起点 `8d883c3`、修正 commit `4b3cbe2`。`kwsig_check` PASS (wall 43〜45 ms)、旧コード + 新テストは `NameError` で FAIL、実物 midi.py で 21/21 一致。wasm 回帰は all_tools 48/48 (wasm・mock とも)、provider・poc・midi_script・subinterp PASS。追跡の `tool_coverage.json` は旧 NameError で欠けていた 1 tool の出力を新結果に更新。全数列挙・検証の詳細は [REPORT_PY16.md](REPORT_PY16.md)。
