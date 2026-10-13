@@ -28,15 +28,18 @@
 | C4 | 殻が `32bit\ilbridge.exe`・`64bit\ilbridge.exe`・`-wrapper`・`-address`・`-processid` の文字列を持つ | 5 文字列とも各 1 件 (存在のみの検査) | `.rdata` の Delphi UnicodeString |
 | C5 | `ilbridge.exe` の実体 (x86 EXE と x64 EXE) が FL に同梱され、共有メモリ/プロセス API を使う | block **24765** (x86 EXE, 4,124,744 B)・block **24766** (x64 EXE, 6,200,392 B)。 両方 `TBridgeCommandLineParams`・`OpenFileMappingW`・`MapViewOfFile`・`CreateFileMappingW`・`LoadLibraryW`・`GetProcAddress`・`OpenProcess` を持つ | `TBridgeCommandLineParams` を持つ PE は全 block 中この 2 本のみ (`grep -l -a`) |
 | C6 | engine の `main` が VST2 の `main(audioMasterCallback)` で、`audioMaster(0, 1 /* audioMasterVersion */, 0,0,0,0)` を呼び、AEffect に magic `'VstP'` (0x56737450) を書く | `main`=0x10007ca0、`push 0 ×4; push 1; push 0; call esi` を確認。 `'VstP'` の即値は `.text` 内 1 箇所 (0x1000113d) | 命令列。 `0x10001000` 以降の `[eax+0x40]->vtable` 転送 stub が `AEffect.dispatcher/process/setParameter/getParameter` (offset 0x24/0x28/0x2c/0x30) |
-| C7 | engine は SIMD 命令 0・x87 あり | 線形掃引 25,349 命令 (`.text` 73,002 B。 `.text` 内データが命令に化けるため近似): SIMD 0、x87 4,203、`fldcw`/`fnstcw`/`fstcw` 50、間接 call 302 | capstone (CS_MODE_32) |
+| C7 | engine は SIMD 命令 0・x87 あり | 線形掃引 25,349 命令 (`.text` 73,002 B。 `.text` 内データが命令に化けるため近似): SIMD 0、x87 4,203 (mnemonic が `f` で始まるもの。 `fldcw`/`fnstcw`/`fstcw` 50 を**含む**)、間接 call 302 | capstone (CS_MODE_32) |
 
 解釈:
 
 - 殻の生成関数 `0x4521e0` は `Slayer_Engine.dll` のパスを組み立てて `0x4529c0` に渡し、`0x4529c0` は `0x35bf10` (bridge クライアントの生成。 `+0x761` に種別を保持) 経由で `CreateProcessW` を呼ぶ関数に到達する (C2・C3)。
-  種別 (`0x35bdb0`) はロード対象 PE のヘッダを読む `0x1c0520` (RVA。 VA 0x5c0520) が決める: `Machine` が 0x14c なら 32 ビット、0x200 / 0x8664 なら 64 ビットと分類し (`0x1c0659`〜`0x1c068c`)、
+  種別 (`0x35bdb0`) はロード対象 PE のヘッダを読む `0x1c0520` (RVA。 VA 0x5c0520) が決める。 `0x35bdb0` は直接ではなく、1 段のラッパ `0x1c0740` を呼び、そこから `0x1c0520` を呼ぶ。
+  `0x1c0520` は `Machine` が 0x14c なら 32 ビット、0x200 / 0x8664 なら 64 ビットと分類し (`0x1c0659`〜`0x1c068c`)、
   `IMAGE_FILE_DLL` (0x2000) が立っていれば 32 ビットに種別コード 7、64 ビットに 6 を割り当てる (`0x1c0691`〜`0x1c06b7`)。 x86 の `Slayer_Engine.dll` は `Machine`=0x14c・DLL なので 32 ビット側 (コード 7)。
-  `0x35bdb0` がコード 7 → 2、6 → 3 に写し (`0x35be46`〜`0x35be5b`)、`0x35d440` が 2 なら `.data` の `0x4b0320` (`32bit\ilbridge.exe` への文字列ポインタ)、3 なら `0x4b0328` (`64bit\ilbridge.exe`) を選ぶ
-  (`0x35d4c5`〜`0x35d4ff`)。 つまり **x86 engine は `32bit\ilbridge.exe` に流れる** (手作業の逆アセンブル読み。 `slayer_x86.py` の検査には入れていない)。
+  `0x35bdb0` がコード 7 → 2、6 → 3 に写し (`0x35be46`〜`0x35be5b`)、この値が `this+0x761` に入る。
+  `0x35d440` は `[this+0x761]` を `sub cl,2` / `sub cl,1` で判定し、2 の側は `0x330a80` を呼ぶ (`0x35d4dd`〜`0x35d4e1`)。 `0x330a80` は `.data` の `0x4b0330` を読み (RVA。 `0x4b0330` 自体の値は 0 で、ここは未解決)、
+  続けて `0x35d4ee` の `[rip+0x16b54b]` が指す `.data` の間接スロット `0x4c8a40` を読む。 `0x4c8a40` の値は `0x4b0320` (`32bit\ilbridge.exe` の UnicodeString) で、3 の側 (`0x35d503`〜) は `0x4c7df0` → `0x4b0328` (`64bit\ilbridge.exe`) を選ぶ。
+  つまり **x86 engine は `32bit\ilbridge.exe` に流れる** (手作業の逆アセンブル読み。 `slayer_x86.py` の検査には入れていない)。
   なお `0x35bdb0` が `0x1c0520` に渡す「対象 PE」が Slayer の engine であること自体 (引数の出所) は追っていない (**未確認**)。
   FL 全体の bridged 経路の一般解析は `tools/hostbridge/HOSTBRIDGE.md` §1.6 にあり、本件はその Slayer への適用。
 - engine の `main` は VST2 の標準エントリで、`audioMaster` コールバック (殻/ブリッジ側が提供) を呼んで `AEffect` を返す (C6)。 つまり**ホスト API は VST2 だけ**で、FL の `TFruityHost` (Dispatcher ID) には直接触れない。
@@ -58,14 +61,14 @@
 
 | 候補 | 判定 | 理由 |
 |---|---|---|
-| **A. 32bit 鎖の整備 (x64c 系の ia32 front-end で engine のみ lift)** | **採用** | engine は小さい (`.text` 73,002 B、export `main` 1 つ、KERNEL32 のみ、SIMD 0)。 x87 は 4,203 / 25,349 命令 (16.6%、線形掃引の近似) あり、SIMD は 0。 x87 は `tools/plugins/p0c/REPORT.md` §3 で f80→f64 lowering の実測差が小さいことが示済み (f32 系 kernel 21/28 は 0 差分、f64 出力系 ±1 ulp が 0.018%)。 engine の x87 を同じ方針で扱える見込み (**推定**。 engine での実測は #674) |
-| B. 別実装 | 不採用 | FL Slayer は reFX 由来の音源 (文字列 "Slayer engine copyright (c) 2003 reFX") で、音の同一性を示す仕様が無い。 差分試験の参照 (native 実行) を作れる A のほうが出口条件 (#207) に合う |
+| **A. 32bit 鎖の整備 (x64c 系の ia32 front-end で engine のみ lift)** | **採用** | engine は小さい (`.text` 73,002 B、export `main` 1 つ、KERNEL32 のみ、SIMD 0)。 x87 は 4,203 / 25,349 命令 (16.6%、線形掃引の近似) あり、SIMD は 0。 x87 の f80→f64 lowering は `tools/plugins/p0c/REPORT.md` §3.4 で kernel 分類ごとに判定済み: f32 系 21 本と int32 系 8 本は実測 0 差分、f64 出力系 4 本は ±1 ulp が 0.018%、**int64 系 2 本は f64 経由で 64% 不一致** (i64 保持の lowering pass が必要と結論)。 engine の x87 は同じ分類で扱える見込み (**推定**。 engine 単体での実測は #674。 int64 系相当の命令が engine にあるかは未確認) |
+| B. 別実装 | 不採用 | FL Slayer は reFX 由来の音源 (engine の VERSIONINFO に `CompanyName = reFX`・`LegalCopyright = Copyright (C) 2002/2003 reFX`。 殻 block 22433 の VERSIONINFO `Comments` に「Slayer engine copyright (c) 2003 reFX」) で、音の同一性を示す仕様が無い。 差分試験の参照 (native 実行) を作れる A のほうが出口条件 (#207) に合う |
 | C. 提供しない | 不採用 | 受入条件の「決定がなければ FL Slayer は #207 の出口条件を満たせない」の裏返しで、提供しないと #207 の対象 14 本が 13 本になる。 A で最小コスト (engine 73 KB) で収まる見込みがあるため、先に A を試す (A が不成立の場合に C へ降りる判断を #674 の末尾に残す) |
 
 A の中での方式選択:
 
 - **RetDec 鎖の 32bit 化は採らない**。 `docs/DECISIONS.md` D5 (RetDec は過去の試験的手段・新規 lift は x64c) に従う。 実測でも §4 のとおり emcc 不通過の要因が 2 件連続で出て、x87 混入もある。
-- **プロセス境界 (`ilbridge.exe`) は wasm では作らない**。 殻 → engine を wasm 内の関数呼出にする。 `tools/hostbridge/HOSTBRIDGE.md` §2 の方針 (bridged 無効化・`CreateProcessW` は shim で fail-fast、プロセス分離の目的は wasm の instance 分離で代替) と同じ。
+- **プロセス境界 (`ilbridge.exe`) は wasm では作らない**。 殻 → engine を wasm 内の関数呼出にする。 `tools/hostbridge/HOSTBRIDGE.md` §1.6 の wasm 移植方針 (bridged 無効化・`CreateProcessW` は shim で fail-fast、プロセス分離の目的は wasm の instance 分離で代替) と同じ。
   engine は 32bit (ILP32) のため、殻 (LP64 の x64 レイアウト) との間で `AEffect`・`ERect`・`VstEvents` 等のポインタ幅差を marshal する層が要る (#674)。
   engine の lift 先は wasm32 で自然にポインタ 4 B となるため、engine 側の構造体レイアウトは native のまま保てる (**推定**)。
 - 殻側の `0x4529c0` (engine ロード) → `LoadLibrary("Slayer_Engine.dll")` の解決は #94 (HB-H4) の shim と接続する。
@@ -108,7 +111,7 @@ x87 を含む関数数 114 は RetDec の IR 型。 機械語の x87 命令 4,20
 
 | 項目 | 値 |
 |---|---|
-| 検証起点 commit | `3163914` (C4 の docstring のみの `a6f082a` は 検査の挙動が同一。 ただし `a6f082a` 自体での 3 回実行は未実施) |
+| 検証起点 commit | `55ee377` (本 PR の HEAD。 この commit での 3 回実行の値は下表。 `3163914`→`a6f082a` は C4 の docstring のみ、`a6f082a`→`55ee377` は REPORT / DOC_MAP のみで、検査の挙動は同一) |
 | 実行方法 | `git worktree add --detach $RUNNER_TEMP/wt_verify HEAD` で展開し `bash tools/plugins/slayer_x86/slayer_x86.sh` |
 | 結果 (3 回) | 全て `[slayer_x86] OK (7/7)`・`nega: 0/7 miss`・`[slayer_x86.sh] OK` |
 | 所要 (`slayer_x86.sh` 全体) | 58.3 s / 58.3 s / 58.8 s (min–max 58.3–58.8 s) |
