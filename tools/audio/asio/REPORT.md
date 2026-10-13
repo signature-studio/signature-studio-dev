@@ -216,3 +216,21 @@ bash tools/audio/e2e.sh --out tools/audio/work/results_parent.json   # 親 e2e 2
 2. **呼出規約ブリッジ**: lifted FLEngine からの vtable 間接呼出は hostbridge の i64↔i32 ブリッジを要する (shimx REPORT §3-8 同項, iasio.h 冒頭に記載)。
 3. **CoGetClassObject の IID**: クラスオブジェクトは IID_IUnknown/IID_IClassFactory のみ受付 (COM 標準どおり)。CoCreateInstance 経由なら IID_IASIO で取得可 — 本検収で実証済み。
 4.asioMessage selector 6 の内部コマンド 0x17 の正体 (再起動系と推定) は未解消 (INVENTORY §6 既知事項のまま)。
+
+## 12. #998 [AU-16] com_ramp_b256_d2 の underrun フレーク調査 (HEAD a89d4ea3)
+
+**結論: 5/5 PASS。ただし §11 実行 A の underrun の原因は特定できていない (再現せず)。ゲート基準 underrun 0 は変更していない。**
+
+実測 (`bash tools/audio/asio/e2e.sh` を HEAD `a89d4ea3` の worktree で foreground 連続 5 回、exit 0 / 各 203〜204 秒 / 実行前 load 0.01〜0.24):
+
+| 実行 | exit | node check | Chrome | underruns (4 シナリオ) | ramp mismatch (b256_d2 / b1024_d2 / soak) |
+|---|---|---|---|---|---|
+| 1 | 0 | 126/126 | 4/4 | 0 / 0 / 0 / 0 | 0 / 0 / 0 |
+| 2 | 0 | 126/126 | 4/4 | 0 / 0 / 0 / 0 | 0 / 0 / 0 |
+| 3 | 0 | 126/126 | 4/4 | 0 / 0 / 0 / 0 | 0 / 0 / 0 |
+| 4 | 0 | 126/126 | 4/4 | 0 / 0 / 0 / 0 | 0 / 0 / 0 |
+| 5 | 0 | 126/126 | 4/4 | 0 / 0 / 0 / 0 | 0 / 0 / 0 |
+
+- 通算で `com_ramp_b256_d2` の underrun は 1/10 回 (issue #998 本文の実行 A〜E の 5 回中 1 回 = 実行 A (HEAD `fef39e5`)、本 run の 5 回は 0)。実行 A は HEAD `a89d4ea3` とは別コミットのため、同一 HEAD での再現ではない。
+- 原因未特定。候補 (負荷・ring 深さ・worklet スケジューリング) は本調査の 5 回では再現条件を掴めなかった。
+- 次の一手 (未実施): 負荷を人為的に掛けた状態 (並行 e2e) での再現試験。起票先は #998 のまま (本 run では未起票)。
