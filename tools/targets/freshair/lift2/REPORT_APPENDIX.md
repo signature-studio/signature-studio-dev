@@ -132,7 +132,7 @@ bash tools/targets/freshair/lift2/lift2_e2e.sh                                  
 
 ## 6. FA-11 (#692) 途中経過: SSE 整数 pcmpeq{b,d} の lowering (部分達成)
 
-- 検証 HEAD: `db279818` (重複解消 `1496922d` を含む。`mlift_ops.py` の本 PR 差分は `pcmpeq{b,d}` の 8 行のみ)。
+- 検証 HEAD: `c8895fe9` (重複解消 `1496922d` を含む。`mlift_ops.py` の本 PR 差分は `pcmpeq{b,d}` の 8 行のみ。`c8895fe9` 以降はこの節の REPORT 更新のみ)。
 - 追加 (本 PR): `mlift/mlift_ops.py` の `emit_sse` に `pcmpeq{b,d}` (legacy 2 オペランド、`icmp eq` + `sext`)。
 - `8c217092` との関係: main の `8c217092` が `pcmpeqw` / `pshuflw` (と `pmovmskb`) の lowering を既に入れている。本 PR の初版は `pshuflw` と `pcmpeq[bwd]` の分岐を先に評価させ、main 側を覆っていた (dead code)。`1496922d` で `pshuflw` 分岐を削除し、`pcmpeq` の正規表現を `[bd]` に絞った。以後 `pcmpeqw` / `pshuflw` は main 側だけが実行される。
 - ctrl build (`build_ctrl.sh`, `db279818`): `failed(funcs with unsupported)` 1 件 (`f_1810577ac: vpcmpeqw ymm1, ymm1, [r9]`、ymm 非対応)。解消前の `90ff81f4` で失敗していた `pmovmskb` 2 件は main `8c217092` の lowering で解消済み。
