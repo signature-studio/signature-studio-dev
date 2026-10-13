@@ -247,6 +247,7 @@ load average: 実行中 0.01〜0.33 (1 分平均)。
 **本 PR の受入の扱い (PM 判断・部分 PR)**: gate (`leafspec` rc=0・match 1.0) は本 PR では未達のまま。修正は icall pass の BLK 配線と this 仮引数化の整合であり、1 run で検証まで終えられないため **#883 (HB-H21) に分離**。本 PR は target・idx spec・再現手順 (`gen_ott_getparam_F.sh`)・本節の実測を揃えるまでとする。`liftlib_e2e.sh` / regress には登録しない (FAIL のまま回帰に入れない)。
 
 iargs 未対応の 3 site (§17.2 の残 unbound: `1801a3117`・`1801c162b`・`1801c1752`) は、本 PR の範囲外で未着手。起票先は #898 (`[HB-H22]`)。
+→ HB-H25 (#1124) で `1801c162b`・`1801c1752` を解決 (下記 §17.11)。`1801a3117` (rdx) は残。
 
 ### 17.10 #415 原因切り分け (HEAD 04b4cc5f, コード変更なし): BLK 配置と entry 配線の不整合
 
@@ -264,3 +265,11 @@ iargs 未対応の 3 site (§17.2 の残 unbound: `1801a3117`・`1801c162b`・`1
 | harness の引数位置 | `spec.py` L182-184 が引数の宣言順を `A <slot>` で出力 (`this`=slot 0, `idx`=slot 1)。`native_runner.c` L128 (`c.gpr[sl]`) と `wasm_runner.mjs` L71 がその slot の位置で渡す。`ms_call.S` L18-19 が gpr[0]→rcx、gpr[1]→rdx に載せる。IR が BLK から読むなら、この値は届かない (前行の未確認事項に依存) |
 
 修正と検証 (ネガコン含む) は 1 run では終えられないため、**#883 (HB-H21) に残す**。再実測と確定事項は [`REPORT_APPENDIX_883.md`](REPORT_APPENDIX_883.md)。
+
+### 17.11 HB-H25 (#1124): 5 番目の引数 (入口 rsp+0x28) の bind
+
+- 呼出元 (`function_1801c1584` / `function_1801c16ac`) の prologue は `mov rax,rsp` → `lea rbp,[rax-0x37]`。よって `mov r8d,[rbp+0x5f]` は入口 rsp+0x28 = 5 番目の引数で、IR の呼出元 `%arg5` (`i32`) に対応する。
+- `iargs._resolve` に「入口 rsp 相対の load を呼出元の `%argK` (K≥5) に写す」分岐を追加 (`_entry_off`: 入口 rsp からのオフセットを lea/mov の連鎖で求める)。
+- 実測 (HEAD 603e7acd): `iargs.run` の `site_unbound` 3 → 1。`1801c162b`・`1801c1752` は `%ia_*_2z = zext i32 %arg5 to i64` で接続。残る 1 件 `1801a3117` (rdx = `movzx edx,dl` 合成未対応) は本件の範囲外。
+- T16 (`tests/test_unit.py`): `site_unbound == 1` と、2 site が unbound でないことを assert に追加。T16 ok。
+- `leafspec targets/ott_iargs.json --n 200`: **match=200 mismatch=0 (200/200) PASS**, 23.5 s (HEAD 603e7acd で再実行, 22.9 s)。
