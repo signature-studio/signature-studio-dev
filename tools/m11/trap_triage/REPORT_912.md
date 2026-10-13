@@ -1,8 +1,19 @@
 # REPORT_912 — ClassCreate ON の ok 退行 4 件 (101 190 291 296) の oob 経路の切り分け (#912, 親 #704)
 
-結論: unit 101 / 291 / 296 の oob は、`function_4fb090` の `4fa070` 呼出し第 2 引数 `dl` の IR 取り違え (機械語 `mov dl,1` を、IR がスタック番地の下位 byte にしていた) を直すと ok に戻る (実測。§6・§7)。修復 pass `fix912/m11_fix912.py` は既定 OFF (`M11_FIX_912=1` で有効化)。既定を OFF にした理由: 測定 commit `c05c11e4` (M2q 込み IR) では ON/OFF の survey 差が 0 (942 unit 全一致、§10)。101 / 291 / 296 の oob 解消は**旧 IR (測定 commit `a5e9c1ed`、M2q 無し) での実測**であり、M2q 込み IR では効果を確認できない。現 HEAD (main 取り込み後) は未測定 (§10 の差分節)。機構 (`dl=0` → `410320` 欠落 → `410360` の oob) は仮説で、直接観測していない。190 は旧 IR でのみ ON で ok→oob (未解決 #1274。c05c11e4 では ok)。受入条件 3 は c05c11e4 で ON/OFF の差 0 で成立するが、fix912 の効果によるものではない (M2q で同じ現象が消えている可能性。未確認)。PR は `Refs #912` の部分達成。
+結論 (PM 判断・2026-10-14、確定): `M11_FIX_912` の既定は **0 (OFF)**。修復 pass `fix912/m11_fix912.py` は撤去せず、保険として残す (`M11_FIX_912=1` で有効化)。前回の「既定 ON」の承認は撤回した (根拠の旧 IR 測定が、M2q 込み IR で崩れたため)。
+
+- **旧 IR での事実** (測定 commit `a5e9c1ed`、M2q 無し、§7-旧): `function_4fb090` の `4fa070` 呼出し第 2 引数 `dl` が IR では定数 1 ではなくスタック変数の下位 byte。`fix912` で 1 に置換すると unit 101 / 291 / 296 が oob→ok に戻った。
+- **現 head での事実** (測定 commit `ca3001ce`、M2q 込み IR、§12): 既定 ON と `M11_FIX_912=0` の survey は全 942 unit 一致 (ok 870 / oob 16)。fix912 は現 head では効果なし。101 / 190 / 291 / 296 は ON・OFF とも ok。
+- 旧 IR での効果が M2q で消えた理由 (M2q `pass_m2q_fn980ed0` の影響か) は未切り分け → #912。
+- 機構 (`dl=0` → `410320` 欠落 → `410360` の oob) は仮説で、直接観測していない。
+- 190 は旧 IR でのみ ON で ok→oob (未解決 #1274。M2q 込み IR では ok)。
+- PR は `Refs #912` の部分達成。
+
+
 
 ## 1. 基準
+
+> **注 (2026-10-14)**: PR の現 head の測定は **§12 (測定 commit `ca3001ce`) が正**。本節と §9 の「現 HEAD は未測定」「差分 0 の条件を満たさない」は §12 の測定で解消した。下記の §1〜§11 は履歴として残す (旧 IR・旧 commit の記録)。
 
 - 検証起点 (測定の基準 main): `origin/main` = `412e302d`。PR ブランチの merge-base もこの commit (`git merge-base` で確認)。REPORT 旧版の「99b87bc2」は誤記で、`99b87bc2` は `412e302d` の祖先。
 - 測定 commit (コードを変えた最後): `a5e9c1ed`。`2e6fba53` は `m11_build.sh` の既定値 (`M11_FIX_912:-0`→`:-1`) とコメントだけを変え、`fix912/` は変えていない (`git diff a5e9c1ed 2e6fba53 -- tools/m11/fix912` は 0 行)。
@@ -103,6 +114,8 @@
 
 ## 9. 既定値変更の鮮度と、現 HEAD の再測定
 
+> **注 (2026-10-14)**: 下の「現 HEAD の再測定は本 run では未実施」は §12 で実施済みのため古い。現 HEAD の数値は §12 が正。
+
 - 既定値は現在 OFF (`M11_FIX_912` 既定 0)。`m11_build.sh` の fix912 ブロックは、`c05c11e4` (既定 1) から `e8dde459` (既定 0) で 3 行置換された (`:-1`→`:-0` を含む。差分の詳細は §10)。
 - 既定 0 の動作は `M11_FIX_912=0` と同じ OFF 経路 (`[ "${M11_FIX_912:-0}" = 1 ]` が偽) なので、§10 の OFF 行は既定 build の動作の実測として扱う。
 - 現 HEAD (main 取り込み後) の再測定は本 run では未実施。理由は §10 の「差分」節のとおり。現 HEAD の数値は本 REPORT に無い。
@@ -153,3 +166,29 @@
 - **`cmp work/boot_final3.ll` (ws-1276 の既定 build と main の build): 一致 (CMP_IDENTICAL)。**
 - 結論: `e8dde459` 時点の既定 build の挙動は、同時点の main (`90a6e664`) と同一。fix912 は既定 OFF で no-op。ON 時 (`M11_FIX_912=1`) の効果は §10 (`c05c11e4` 測定の ON/OFF 差 0) を参照。
 - 注意: 上の cmp は `90a6e664` との比較で、merge `2fe2dd25` で取り込んだ main (`a03c1d2f`) とは比較していない。現 HEAD と main の cmp は未実施 (§9・§10 と同じ理由)。
+
+## 12. 現 head の実測 (測定 commit `ca3001ce`・M2q 込み IR)
+
+- **測定 commit**: `ca3001ce` (PR `912-m11-classcreate-oob` の head。コードを変えた最後の commit。本節の測定はこの commit のコードで行った)。以後 `tools/m11` のコードは変えていない (本 commit は REPORT のみ)。
+- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開し `FL_WIN64_DIR` に指定。`work-m11` を repo ルートに展開 (アーカイブのパスが `tools/m11/work/...` で始まるため、`tools/m11` に展開すると二重になる)。`toolchain-emsdk` も展開。`ir_conditions.json` は `m11_gen_ir2.sh` が作る。
+- IR: `m11_gen_ir2.sh` rc=0 (44.2 s)。`ldfix=applied` (F1=902、errors=0)。`[ir11][M2q] function_980ed0 VA->LVA remap: 1 sites` (M2q 込み)。
+- build (既定、環境変数なし): rc=0 (25.1 s)。`[fix912] mode=off replaced=0` (既定は OFF)。
+- build (`M11_FIX_912=1`): rc=0。`[fix912] mode=on replaced=1`。
+- survey: `trap_triage/survey_units.mjs` (13.1 s / ON 側も同程度、rc=0)。load average 0.49–0.68。
+
+| 構成 | ok | oob | halt0 | miss | noproc | other | abort |
+|---|--:|--:|--:|--:|--:|--:|--:|
+| 既定 (OFF、`M11_FIX_912` 未設定) | 870 | 16 | 7 | 47 | 1 | 1 | 0 |
+| ON (`M11_FIX_912=1`) | 870 | 16 | 7 | 47 | 1 | 1 | 0 |
+
+- unit 単位の kind 比較 (942 unit): 既定 (OFF) と ON は**全 942 unit 一致** (kind 差 0)。
+- 101 / 190 / 291 / 296 は既定・ON とも ok。oob の 16 unit は既定・ON で同一。
+- 結論: 現 head では fix912 は survey の kind を 1 件も変えない。既定 OFF の妥当性は本節で確認済み (§10 の c05c11e4 と同じ結果を現 head でも再現)。
+
+### 差分 (測定 commit `ca3001ce` から HEAD まで)
+
+測定 commit が HEAD のため差分は 0 (`git diff ca3001ce HEAD -- tools/m11 ':(exclude)*.md'` は 0 行)。本 commit は REPORT_912.md (md) のみを変える。
+
+### 旧 IR 時点の効果との関係
+
+§7-旧 (`a5e9c1ed`、M2q 無し IR) では ON で 101 / 291 / 296 が oob→ok に戻った。現 head (M2q 込み IR) ではその現象は見えない。M2q 由来の変化か、別の要因かは未切り分け (#912)。
