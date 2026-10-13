@@ -70,7 +70,7 @@ REPORT 以外 (`':!tools/icall/REPORT*'`) の差分は 0 行。よって `604e90
 
 ### (1) 再現 (A〜D、`fn_boundary_repro.sh`)
 
-前節 #851 の表と一致 (再現済み)。
+前節 #851 の表と一致する元測定 (`604e900f`) の値。本 run では `fn_boundary_repro.sh` を再実行していない。
 
 | run | rc | sec | 警告 全体 | `function_128c320` 関連 | ラベル |
 |---|--:|--:|--:|--:|---|
