@@ -221,7 +221,7 @@ sed -n 9872p $LIFT   # => br i1 %110, label %dec_label_pc_1800c2f08, label %dec_
 - 構文: `base` 修復 (`liftlib.passes.base.run_base`) 後の raw / restored の両方を `llvm-as-18` で検査し、rc=0 (未修復の RetDec 出力は constexpr の `or` で `llvm-as-18` が落ちるため、検査は base 後で行う)。
 - e2e (commit a5adb2fc = origin/main 取り込み時点, `plugins-serum2` 展開 sha256 一致): cold = **30.15 s**・23/23 PASS (rc 0, load 0.30→0.66)。warm = **3.72 s**・23/23 PASS (rc 0, load 0.15)。cold と warm は実行条件が違い比較できない。pass は e2e チェーンに入っていないため、この 2 行は **e2e チェーン不変の確認であり本変更の検証ではない**。本 fix commit ではこれらを再実行していない。
 - 未達 (受入条件のうち未完): (1) 復元した `call` の引数 (rcx=host, edx=0x800010) の実行時 ABI は #228 (icall の BLK 経由) の界面に従う別工程で、本 pass は site の VA と制御辺のみ復元する。(2) e2e チェーン (`e2e.sh`) への組込みは未実施。
-- 既存の子 issue への紐付け: census 拡張 (受入 2 の IR 側指標) は #1029 [SR-13]、復元 pass の本体と前後表・ネガコン (受入 2〜3 の残り) は #1030 [SR-14]、LF 規則の導出は #1213 [SR-11] (`1007-sr-11-authstub-binding`)、global 名の規則化は #1208 [SR-15]。いずれも open。
+- 既存の子 issue への紐付け (2026-10-13 時点の状態): census 拡張 (受入 2 の IR 側指標) は #1029 [SR-13] で、PR #1205 (`Closes #1029`) により完了・closed (merge commit `9d1c632f`、本ブランチは取り込み済み)。復元 pass の前後表・ネガコンの正式化 (受入 2〜3 の残り) は #1030 [SR-14] (open)、LF 規則の導出は #1213 [SR-11] (open、`1007-sr-11-authstub-binding`)、global 名の規則化は #1208 [SR-15] (open)。
 
 ## 13b. L1 脱落条件の特定 (#823)
 
