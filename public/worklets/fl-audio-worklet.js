@@ -38,7 +38,7 @@ class FlShimProcessor extends AudioWorkletProcessor {
     if (o.capture) {
       const c = o.capture;
       this.cap = {
-        hdr: new Int32Array(c.sab, 0, 16), frames: c.frames, och: c.outCh, ich: c.inCh,
+        ring: !!c.ring, hdr: new Int32Array(c.sab, 0, 16), frames: c.frames, och: c.outCh, ich: c.inCh,
         out: new Float32Array(c.sab, 64, c.frames * c.outCh),
         in: new Float32Array(c.sab, 64 + c.frames * c.outCh * 4, c.frames * c.inCh),
         fill: new Int32Array(c.sab, 64 + c.frames * (c.outCh + c.inCh) * 4, c.frames / Q),
@@ -163,10 +163,10 @@ class FlShimProcessor extends AudioWorkletProcessor {
         }
         Atomics.store(i, x.in_write, (iw + Q) | 0);
       }
-      if (this.cap && p >= 0 && p + Q <= this.cap.frames) {
+      if (this.capOk(p)) {
         for (let c = 0; c < this.cap.ich; c++) {
           const src = inp[c];
-          if (src) this.cap.in.set(src, c * this.cap.frames + p);
+          if (src) this.capPut(this.cap.in, c * this.cap.frames, p, src);
         }
       }
     }
@@ -174,7 +174,7 @@ class FlShimProcessor extends AudioWorkletProcessor {
     // ---- 出力 ----
     const rd = Atomics.load(i, x.out_read), wr = Atomics.load(i, x.out_write);
     const avail = (wr - rd) | 0;
-    if (this.cap && p >= 0 && (p >> 7) < this.cap.fill.length) this.cap.fill[p >> 7] = avail;
+    if (this.capOk(p)) this.cap.fill[this.cap.ring ? (p >> 7) % this.cap.fill.length : p >> 7] = avail;
     let consumed = 0;
     let produced = 0;   // この quantum で実音声を書いたフレーム数 (declick 起点)
 
@@ -234,11 +234,22 @@ class FlShimProcessor extends AudioWorkletProcessor {
       Atomics.add(i, x.silence_frames, this.everPlayed ? Q : 0);
     }
     for (let c = 0; c < outp.length && c < this.last.length; c++) this.last[c] = outp[c][Q - 1];
-    if (this.cap && p >= 0 && p + Q <= this.cap.frames) {
-      for (let c = 0; c < this.cap.och; c++) if (outp[c]) this.cap.out.set(outp[c], c * this.cap.frames + p);
+    if (this.capOk(p)) {
+      for (let c = 0; c < this.cap.och; c++) if (outp[c]) this.capPut(this.cap.out, c * this.cap.frames, p, outp[c]);
       Atomics.store(this.cap.hdr, 0, p + Q);
     }
     void quanta; void produced;
+  }
+
+  capOk(p) { return !!this.cap && p >= 0 && (this.cap.ring || p + Q <= this.cap.frames); }
+
+  // ring 時は絶対フレーム p を frames で剰余した位置へ書く (照合側は未照合区間を ring 容量内で読む)
+  capPut(a, off, p, src) {
+    const n = this.cap.frames;
+    if (!this.cap.ring) { a.set(src, off + p); return; }
+    const s = p % n, first = Math.min(Q, n - s);
+    a.set(src.subarray(0, first), off + s);
+    if (first < Q) a.set(src.subarray(first, Q), off);
   }
 }
 

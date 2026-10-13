@@ -27,6 +27,8 @@ export interface FlCaptureSpec {
   frames: number;
   outCh: number;
   inCh: number;
+  /** true なら frames 容量の ring として扱う (絶対フレーム p は p % frames へ書く。照合側が未照合区間を畳み込む) */
+  ring?: boolean;
 }
 
 export interface FlAudioShimOptions {
