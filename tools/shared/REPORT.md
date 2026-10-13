@@ -73,6 +73,12 @@
 - native gcc / wasm32 / wasm64 を同一ハーネス (`test_ft.c`: Init/New_Face/Set_Pixel_Sizes/Load_Glyph/Render/Outline CBox, OpenSans, 3 サイズ×6 字×hint on/off) で比較。**3 者 40 行完全一致 (TOTAL 1c0c857a3891256f)**。libfreetype.a wasm32 715KB, 試験 wasm 489KB。
 - **LP64 依存 (要注意)**: 素の wasm32 は 30/40 行がずれる (検収で `oss/freetype/unpatched_check.sh` を追加し 30/40 を再現確認; 「1LSB」の程度は未検証)。原因 2 点: ① `ftoption.h` が `#undef FT_CONFIG_OPTION_FORCE_INT64` (clang は `__STDC__` 定義のため FT_LONG64 が立たず**別 rasterizer 実装** `gray_render_scanline` を使う)、② `FT_UDIV` が `long` 幅依存。対策 = (wasm32) FORCE_INT64 有効化 + `ftgrays_lp64.patch` (2 行)、または **wasm64 (-sMEMORY64=1) は無改変で bit 一致**。
 - export 被覆: mac 190/190、win freetype.dll 254/271 (win は別 version: `FT_Alloc` 等 17 本が 2.7 に無い → T-SH-01 で win version 特定)。
+- **本採用 (#145, docs/DECISIONS.md D8)**: wasm32 + FORCE_INT64 + `ftgrays_lp64.patch`。wasm64 は退避路。
+- **再現 (#145, 検証起点 48a4b30, emcc 6.0.12, GitHub runner 4 vCPU, フォントは DejaVuSans = OpenSans 非取得のため上記 TOTAL とは別値)**:
+  `bash oss/freetype/build.sh` **36.7 s** (load average 終了時 2.99): `PASS wasm32` / `PASS wasm64` とも native と 40/40 行一致 (TOTAL 82b7580a3d8e846b)。
+  `unpatched_check.sh`: 素の wasm32 は **26/40 行**ずれ (OpenSans の 30/40 とはフォント依存で差)。分解 (差分行数/40): patch のみ (FORCE_INT64 無し) 26、FORCE_INT64 のみ (patch 無し) 6、両方 0 → **2 つとも必須**。
+  build.sh の wasm64 実行を修正: システム node v22 は wasm64 の table64 を compile できず CompileError → `EMSDK_NODE` (v24) を使う。旧 `||` フォールバックは失敗を隠すため廃止。
+- **win freetype.dll の version 帯** (`bash oss/freetype/win_version_probe.sh`; 判定 = 17 名が upstream tag の `src/ include/` に語として存在するか): **2.4.12 以前 17/17、2.5.0 以降 3/17 以下** → win の FreeType は **2.4.x 以前の旧版** (2.5.0 で内部 API 名が消えた)。厳密な patch 版は未特定 (実バイナリの version 文字列/`FT_Library_Version` を未確認: fl-win64 素材が必要)。
 
 ### 3.2 libogg 1.3.2 + libvorbis 1.3.5 — `bash oss/ogg/build.sh` (~15s)
 - 23 ソースを直接 emcc (autotools は cross 判定で Ogg check が落ちる)。合成 PCM 2s→Vorbis VBR(0.4) エンコード→Ogg→復号。**ogg 30,695B hash 一致 (wasm32/64)**、復号 88,200 frame の PCM hash 一致。wasm 504KB (wasm32)。
@@ -99,7 +105,7 @@
 | DirectWaveCtEngine | C++ | 1.71M | 2.6% | 23% | 難 | FS shim 後 |
 | dsp_ippv2 | C++/asm | 11.7M | 43% | 3% | (lift しない) | §2 |
 
-(補足: libreverb `BaseReverb::Process_Fruity_32FM_32FS` (0x25c0-0x2f87, 外部 call 無し) は RetDec 0.3s で lift 可、IR 73KB に `__asm_{movss,mulss,addss,subss,xorps,movaps,cmpneqss,andps,andnps,orps}` 計 185 call — M6-M11 の helper 生成で実行可能になる見込み (**実行検証は未実施**)。
+(補足: libreverb `BaseReverb::Process_Fruity_32FM_32FS` (0x25c0-0x2f87, 外部 call 無し) は RetDec 0.3s で lift 可、IR 73KB に `__asm_{movss,mulss,addss,subss,xorps,movaps,cmpneqss,andps,andnps,orps}` 計 185 call — M6-M11 の helper 生成で実行可能になる見込み (mac slice の実行検証は未実施)。**win 版 `Reverb.dll` の Process_Fruity/UF は lift + native 実機械語との差分テスト 240/240 一致・ネガコン 4 件 FAIL を確認済 (T-SH-15 #161 部分達成、詳細は [lift/libreverb/REPORT.md](lift/libreverb/REPORT.md); win は範囲が別: Fruity 0x1240–0x1b7f / UF 0x1ba0–0x278b)**。ildsp の lift は未着手。
 (命令数/SIMD/間接 call 率 = indirect/全 call は `llvm-objdump -d` 全逆アセンブル実測。C++/Pascal の vtable 比率の目安)
 
 ### libkio lift PoC (`bash tools/shared/lift/libkio/lift.sh`)
@@ -120,7 +126,7 @@
 |---|---|---|
 | T-SH-07 | **ipp_shim** → **CAB-37 に統合** (tools/ipp の 239 関数・420 名 export・fail-fast・SIMD128・MS x64 ABI thunk)。初版の「P0 win 6 / P1 12 / P2 159」は下限値ベースで破棄 | **最高** |
 | T-SH-02 | Blend2D 本採用: `-msimd128` 性能検証、**Agg2D glue (~140 symbol, `AggCreateInstance`) の lift or C++ 再実装**、FL 描画経路での画素比較 | **高** |
-| T-SH-01 | FreeType 2.7 本採用 (patch か wasm64 の選択)、win freetype.dll version 特定 (17 export 差)、FT_* 呼出面の shim | 高 |
+| T-SH-01 | ~~FreeType 2.7 本採用~~ (#145: wasm32+patch, D8)、win freetype.dll version 厳密特定 (2.4.12 以前の帯までは特定済)、FT_* 呼出面の shim | 高 |
 | T-SH-03 | Xiph スタック: libFLAC 1.3.1/1.5.0 再ビルド、liboggio `Oggio*` 9 export の再実装、静的 IPP 部置換 | 中 |
 | T-SH-03b | LAME 3.99.5 / WavPack 4.80 再ビルド | 低 |
 | T-SH-04 | FFmpeg n4.4.x (LGPL) wasm + libILVideo glue | 低 |

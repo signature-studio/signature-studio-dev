@@ -14,11 +14,15 @@
 
 使い方: python3 tools/ott/accept/acc_crt_table.py [OTT_vst2_win64.dll]
 """
+import os
 import struct
 import sys
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'shared'))
+from paths import PLUGINS_DIR  # noqa: E402
+
 DLL = sys.argv[1] if len(sys.argv) > 1 else \
-    '/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll'
+    os.path.join(PLUGINS_DIR, 'ott', 'binaries', 'OTT_vst2_win64.dll')
 IMG = 0x180000000
 COOKIE_RVA, TABLE_RVA, N = 0x260ce0, 0x26c9f0, 32
 ESLOT_RVA = [0x26c028, 0x26c388, 0x26cb40, 0x26cb88]

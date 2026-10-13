@@ -63,10 +63,23 @@ static void bufferSwitch(ASIOLong idx, ASIOBool direct) {
 static uint32_t g_resets, g_rate_changes;
 static int g_panel_code = 1;   /* flasio_control_panel の戻り値 (1 = 未呼出) */
 static uint64_t g_ti_last; static uint32_t g_ti_bad, g_ti_n;
+/* FLEngine (0xc56ae0, AU-7 #193) は timeInfo.flags の kSystemTimeValid と systemTime だけを読み、ns を 1e6 で割って int32 ms にし
+ * timeGetTime() (= shimx の emscripten_get_now() 下位 32bit) と同じ時間軸で扱う。同じ変換で d = systemTime_ms − timeGetTime() を測る。 */
+static uint32_t g_st_n, g_st_invalid, g_st_nonmono; static int32_t g_st_dmin = 0x7fffffff, g_st_dmax = -0x7fffffff, g_st_last;
 static ASIOTime *bufferSwitchTimeInfo(ASIOTime *t, ASIOLong idx, ASIOBool direct) {
     uint64_t pos = ((uint64_t)t->timeInfo.samplePosition.hi << 32) | t->timeInfo.samplePosition.lo;
     if (g_ti_n && pos < g_ti_last) g_ti_bad++;            /* サンプル位置の単調性 */
     if (t->timeInfo.sampleRate != (double)P.sr) g_ti_bad++;
+    if (!(t->timeInfo.flags & kSystemTimeValid)) g_st_invalid++;
+    else {
+        int64_t ns = (int64_t)(((uint64_t)t->timeInfo.systemTime.hi << 32) | t->timeInfo.systemTime.lo);
+        int32_t ms = (int32_t)(ns / 1000000);
+        int32_t d = (int32_t)((uint32_t)ms - (uint32_t)(uint64_t)emscripten_get_now());
+        if (d < g_st_dmin) g_st_dmin = d;
+        if (d > g_st_dmax) g_st_dmax = d;
+        if (g_st_n && (int32_t)((uint32_t)ms - (uint32_t)g_st_last) < 0) g_st_nonmono++;
+        g_st_last = ms; g_st_n++;
+    }
     g_ti_last = pos; g_ti_n++;
     bufferSwitch(idx, direct);
     return NULL;
@@ -133,6 +146,7 @@ static int run_asio(char *j, size_t jn) {
     }
     ASIOLong lin, lout;
     flasio_get_latencies(&lin, &lout);
+    const ASIOLong lout0 = lout; const uint32_t olat_us0 = fla_ctl()->out_latency_us;   /* FL が createBuffers 直後に読む値 (0xc58348) */
     ASIOChannelInfo ci = { .channel = 0, .isInput = 0 };
     flasio_get_channel_info(&ci);
     for (uint32_t k = 0; k < P.stress; k++) { pthread_t t; pthread_create(&t, NULL, stress_fn, NULL); pthread_detach(t); }
@@ -145,8 +159,9 @@ static int run_asio(char *j, size_t jn) {
         ASIOSamples sp, ts;
         if (flasio_get_sample_position(&sp, &ts) == ASE_OK && ns < 256) {
             double pos = (double)(((uint64_t)sp.hi << 32) | sp.lo);
-            uint64_t t = ((uint64_t)ts.hi << 32) | ts.lo;
-            if (t) { smp[ns].pos = pos; smp[ns].ns = (double)t; smp[ns].now_ms = fla_now_ms(); ns++; }
+            (void)ts;
+            fla_clock_t k; fla_clock_read(&k);     /* 「聴こえる時刻」の写像は ASIO systemTime の意味 (コールバック時刻) とは独立に直接測る */
+            if (k.audible_ns) { smp[ns].pos = pos; smp[ns].ns = (double)k.audible_ns; smp[ns].now_ms = fla_now_ms(); ns++; }
             if (pos < lastpos) mono = 0;
             lastpos = pos;
         }
@@ -162,18 +177,19 @@ static int run_asio(char *j, size_t jn) {
     g_stress_stop = 1;
     snprintf(j, jn,
         "{\"api\":\"asio\",\"driver\":\"%s\",\"buf\":%u,\"depth\":%u,\"sr\":%u,\"mode\":%d,\"secs_wall\":%.3f,"
-        "\"reported\":{\"nin\":%d,\"nout\":%d,\"min\":%d,\"max\":%d,\"pref\":%d,\"gran\":%d,\"lat_in\":%d,\"lat_out\":%d,\"ch_type\":%d},"
+        "\"reported\":{\"nin\":%d,\"nout\":%d,\"min\":%d,\"max\":%d,\"pref\":%d,\"gran\":%d,\"lat_in\":%d,\"lat_out\":%d,\"lat_out0\":%d,\"olat_us0\":%u,\"ch_type\":%d},"
         "\"stats\":{\"cb_count\":%u,\"cb_late\":%u,\"cb_max_us\":%u,\"cb_avg_us\":%u,\"underruns\":%u,\"silence_frames\":%u,"
         "\"in_overruns\":%u,\"in_underflows\":%u,\"min_fill\":%u,\"avg_fill\":%u,\"wake_count\":%u,\"wait_timeouts\":%u,"
-        "\"ring_frames\":%u,\"quanta\":%u,\"reset_requests\":%u,\"wake_hist\":[%u,%u,%u,%u,%u,%u],\"latency_changes\":%u,\"T\":%u,\"burst_obs\":%u,\"timeinfo_cb\":%u},\"timeinfo\":{\"calls\":%u,\"bad\":%u},"
+        "\"ring_frames\":%u,\"quanta\":%u,\"reset_requests\":%u,\"wake_hist\":[%u,%u,%u,%u,%u,%u],\"latency_changes\":%u,\"T\":%u,\"burst_obs\":%u,\"timeinfo_cb\":%u},\"timeinfo\":{\"calls\":%u,\"bad\":%u,\"st_n\":%u,\"st_invalid\":%u,\"st_nonmono\":%u,\"st_dmin\":%d,\"st_dmax\":%d},"
         "\"clock\":{\"samples\":%d,\"fit_ok\":%d,\"rate_hz\":%.3f,\"audible_minus_now_ms\":%.3f,\"monotonic\":%d},"
         "\"produced_frames\":%llu,\"resets_seen\":%u,\"rate_changes\":%u,\"panel_code\":%d}",
         name, P.buf, st.depth, P.sr, P.mode, elapsed / 1000.0,
-        nin, nout, mn, mx, pref, gran, lin, lout, ci.type,
+        nin, nout, mn, mx, pref, gran, lin, lout, lout0, olat_us0, ci.type,
         st.cb_count, st.cb_late, st.cb_max_us, st.cb_avg_us, st.underruns, st.silence_frames,
         st.in_overruns, st.in_underflows, st.min_fill, st.avg_fill, st.wake_count, st.wait_timeouts,
         st.ring_frames, st.quanta, st.reset_requests,
         st.wake_hist[0], st.wake_hist[1], st.wake_hist[2], st.wake_hist[3], st.wake_hist[4], st.wake_hist[5], st.latency_changes, st.T, st.burst_obs, st.timeinfo_cb, g_ti_n, g_ti_bad,
+        g_st_n, g_st_invalid, g_st_nonmono, g_st_n ? g_st_dmin : 0, g_st_n ? g_st_dmax : 0,
         ns, fit == 0, rate, offs, mono, (unsigned long long)g_n, g_resets, g_rate_changes, g_panel_code);
     return 0;
 }

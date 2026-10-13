@@ -23,6 +23,8 @@ const cfg = {
   lose: q.get("lose") === "1",     // 中間で入力 track の ended を発生 (デバイス喪失)
   jank: q.get("jank") === "1",     // main thread を 30ms/100ms ブロック
   suspend: q.get("suspend") === "1", // 中間で ctx.suspend()/resume()
+  olat_zero_ms: +(q.get("olat_zero_ms") ?? 0), // >0: 最初の呼出から N ms の間 outputLatency=0 を返す (起動直後 0 の再現)
+  olat_wait_ms: q.has("olat_wait_ms") ? +q.get("olat_wait_ms") : undefined, // ATTACH の待ち上限 (0 = 待たない旧挙動)
 };
 const logEl = document.getElementById("log");
 const log = (s) => { logEl.textContent += s + "\n"; console.log(s); };
@@ -60,6 +62,7 @@ window.__done = new Promise((resolveAll, rejectAll) => {
         layoutName: (i) => M.UTF8ToString(M._fla_layout_name(i)),
       };
       let ctxInfo = {};
+      let zeroT0;
       const refLog = [];
       window.__refLog = refLog;
       const ui = { events: [], devices: [], panelOpened: 0, switched: null, labels: [] };
@@ -87,6 +90,10 @@ window.__done = new Promise((resolveAll, rejectAll) => {
         } : undefined,
         refLog,
         log,
+        outputLatencyWaitMs: cfg.olat_wait_ms,
+        readOutputLatency: cfg.olat_zero_ms > 0
+          ? (ctx) => { zeroT0 ??= performance.now(); return performance.now() - zeroT0 < cfg.olat_zero_ms ? 0 : ctx.outputLatency; }
+          : undefined,
         captureFactory: (outCh, inCh) => {
           const frames = Math.ceil((cfg.secs * cfg.sr + 8192) / 128) * 128;
           const bytes = 64 + frames * (outCh + inCh) * 4 + (frames / 128) * 4;

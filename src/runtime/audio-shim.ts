@@ -44,6 +44,11 @@ export interface FlAudioShimOptions {
   refLog?: { ctxTime: number; epochMs: number }[];
   /** AudioContext 作成オプションの上書き (テスト用) */
   contextOptions?: AudioContextOptions;
+  /** outputLatency (秒) の読み出しの差し替え (テスト用: 起動直後 0 → 後から更新される環境の再現)。既定は ctx.outputLatency */
+  readOutputLatency?: (ctx: AudioContext) => number;
+  /** ATTACH 時に outputLatency が 0 の間待つ上限 (ms, 既定 600, 0 で待たない)。FL は createBuffers 直後の getLatencies で一度だけ読むため
+   *  (FLEngine 0xc58348, AU-7 #193)、起動直後の 0 を読ませないための吸収。上限まで 0 のままのブラウザ (未実装/常時 0) は 0 のまま進む */
+  outputLatencyWaitMs?: number;
 }
 
 type WaitAsyncResult = { async: false; value: "not-equal" | "timed-out" } | { async: true; value: Promise<"ok" | "timed-out"> };
@@ -78,6 +83,7 @@ export class FlAudioShim {
   get context(): AudioContext | null { return this.ctx; }
   get node_(): AudioWorkletNode | null { return this.node; }
   private log(m: string) { this.opts.log?.(`[audio-shim] ${m}`); }
+  private outLat(ctx: AudioContext): number { return (this.opts.readOutputLatency ? this.opts.readOutputLatency(ctx) : ctx.outputLatency) || 0; }
 
   private ix(f: FlaField): number { return FLA_LAYOUT[f] >> 2; }
   private ld(f: FlaField): number { return Atomics.load(this.i32, this.ix(f)); }
@@ -215,7 +221,7 @@ export class FlAudioShim {
     const probed = await this.probeBurst(ctx);
     res[0] = Math.max(Math.round((ctx.baseLatency || 0) * ctx.sampleRate), probed);
     res[1] = ctx.sampleRate;
-    res[2] = Math.round((ctx.outputLatency || 0) * 1e6);
+    res[2] = Math.round(this.outLat(ctx) * 1e6);
     this.pendingOpen = { outCh: 0, inCh: 0 };
     this.log(`OPEN sr=${ctx.sampleRate} baseLatency=${ctx.baseLatency} probed_burst=${probed} -> burst ${res[0]} frames state=${ctx.state}`);
     return 0;
@@ -257,9 +263,10 @@ export class FlAudioShim {
       await this.opts.input.connect(ctx, node).catch((e) => this.log(`input connect failed: ${(e as Error).message ?? e}`));
     }
     await ctx.resume();
+    const waited = await this.waitOutputLatency(ctx);
     this.updateRef();
     this.refTimer = setInterval(() => this.updateRef(), 250);
-    this.log(`ATTACH out=${outCh} in=${inCh} ring=${this.ld("ring_frames")} depth=${this.ld("depth")} outLat=${ctx.outputLatency} state=${ctx.state}`);
+    this.log(`ATTACH out=${outCh} in=${inCh} ring=${this.ld("ring_frames")} depth=${this.ld("depth")} outLat=${this.outLat(ctx)} waited=${waited.toFixed(0)}ms state=${ctx.state}`);
     return 0;
   }
 
@@ -268,6 +275,14 @@ export class FlAudioShim {
     this.controlPanelCalls++;
     await this.opts.controlPanel();
     return 0;
+  }
+
+  /** outputLatency が 0 の間 (起動直後は約 250ms 0 のまま) 最大 outputLatencyWaitMs だけ待つ。待った ms を返す */
+  private async waitOutputLatency(ctx: AudioContext): Promise<number> {
+    const max = this.opts.outputLatencyWaitMs ?? 600;
+    const t0 = performance.now();
+    while (!(this.outLat(ctx) > 0) && performance.now() - t0 < max) await new Promise<void>((r) => setTimeout(r, 20));
+    return performance.now() - t0;
   }
 
   private async cmdClose(): Promise<number> {
@@ -290,7 +305,7 @@ export class FlAudioShim {
     if (!ctx || !this.i32) return;
     const ts = ctx.getOutputTimestamp();
     this.st("base_latency_us", Math.round((ctx.baseLatency || 0) * 1e6));
-    this.st("out_latency_us", Math.round((ctx.outputLatency || 0) * 1e6));
+    this.st("out_latency_us", Math.round(this.outLat(ctx) * 1e6));
     if (!ts.performanceTime || ts.contextTime === undefined) return;
     const epochMs = performance.timeOrigin + ts.performanceTime;
     this.opts.refLog?.push({ ctxTime: ts.contextTime, epochMs });

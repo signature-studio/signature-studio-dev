@@ -11,7 +11,8 @@ set +u; . "${EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}" >/dev/null 2>&1 || true; set -
 command -v emcc >/dev/null || { echo "emcc not found" >&2; exit 2; }
 python3 "$ROOT/gen_api.py" >/dev/null
 # 定型: tools/m1/flags.sh の CLANG_FLAGS 系に準拠 (lifter 産 C 向けに -w/-Wno-error=int-conversion, -fwrapv)
-CFLAGS=(-O1 -fwrapv -w -fno-strict-aliasing -pthread
+SIMD=(-msimd128); [ "${GUI_NO_SIMD:-0}" = 1 ] && SIMD=(-DGUI_NO_SIMD)   # GUI-5: gui_simd.h の行カーネルを wasm SIMD128 で (GUI_NO_SIMD=1 で scalar 参照ビルド)
+CFLAGS=("${SIMD[@]}" -O1 -fwrapv -w -fno-strict-aliasing -pthread
   -Wno-error=int-conversion -Wno-error=incompatible-pointer-types -Wno-error=int-to-pointer-cast -Wno-error=implicit-function-declaration
   -I "$ROOT/include" -I "$ROOT/src" -I "$BUILD")
 SHIM=("$ROOT"/src/gui_platform.c "$ROOT"/src/gui_reach.c "$BUILD"/gui_reach_tab.c)

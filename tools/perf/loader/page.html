@@ -1,0 +1,44 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>worklet loader e2e</title>
+<script type="module">
+import { createWasmWorkletHost } from '/s/worklet_loader.js';
+
+// cfg: { wasm: '/g/x.wasm', prewarmBlocks, keepModule, probe }
+window.run = async (cfg) => {
+  const out = { cfg, crossOriginIsolated, ua: navigator.userAgent };
+  const ctx = new AudioContext({ latencyHint: 'interactive', sampleRate: 48000 });
+  const tA = performance.now();
+  const host = await createWasmWorkletHost(ctx, '/w/wasm-host-worklet.js');
+  out.addModuleMs = performance.now() - tA;
+  if (cfg.probe) {
+    const m = new WebAssembly.Module(new Uint8Array([0, 0x61, 0x73, 0x6d, 1, 0, 0, 0]));
+    out.moduleDirectPostFailed = await host.probeModulePost(m);
+  }
+  const tF = performance.now();
+  const bytes = await (await fetch(cfg.wasm)).arrayBuffer();
+  out.fetchMs = performance.now() - tF;
+  out.bytes = bytes.byteLength;
+  const src = new ConstantSourceNode(ctx, { offset: 0.5 });
+  src.connect(host.node);
+  src.start();
+  const t0 = performance.now();
+  out.load = await host.load(bytes, { prewarmBlocks: cfg.prewarmBlocks, keepModule: !!cfg.keepModule });
+  out.detached = bytes.byteLength === 0;
+  out.mainModuleKept = !!host.mainModule;
+  const t1 = performance.now();
+  host.node.connect(ctx.destination);
+  await ctx.resume();
+  const fb = await host.firstBlocks();
+  const t2 = performance.now();
+  out.loadToFirstBlocksMs = t2 - t1;
+  out.startupToFirstBlocksMs = t2 - t0;
+  out.blockMs = fb.blockMs;
+  out.firstBlockMs = fb.blockMs[0];
+  out.maxBlockMs = Math.max(...fb.blockMs);
+  out.captures = fb.captures.map((c) => ({ in: Array.from(c.in), out: Array.from(c.out) }));
+  out.ctxState = ctx.state;
+  await ctx.close();
+  return out;
+};
+</script>

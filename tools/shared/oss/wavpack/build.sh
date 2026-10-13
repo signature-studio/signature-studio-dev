@@ -72,4 +72,17 @@ for a in ("wasm32","wasm64"):
 PY
   echo "[wavpack $V] native output:"; sel "$B/$V-native/out.txt" | sed 's/^/    /'
 done
+
+# LGL-3 (#86): 再ビルド記録 (WavPack 4.80.0 / 4.60.1)
+if [ "$RC" = 0 ]; then
+  for V in 4.80.0 4.60.1; do
+    [ -d "$S/WavPack-$V" ] || continue
+    LIC=COPYING; [ -f "$S/WavPack-$V/COPYING" ] || LIC=license.txt
+    node "$ROOT/../legal/notices/record.mjs" --id "wavpack-$V" --name WavPack --version "$V" --license-spdx BSD-3-Clause \
+      --url "https://github.com/dbry/WavPack/archive/refs/tags/$V.tar.gz" --archive "$S/wavpack-$V.tar.gz" \
+      --src-dir "$S/WavPack-$V" --license-file "$LIC" \
+      --script "$HERE/build.sh" --toolchain emcc --target wasm32 --target wasm64 \
+      --step "compile=emcc $CF -I<src>/include -DPACKAGE_VERSION=\\\"$V\\\" <src>/src/*.c (autotools 不使用)"
+  done
+fi
 exit $RC
