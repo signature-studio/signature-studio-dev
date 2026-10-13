@@ -14,10 +14,10 @@
    fetch+compileStreaming 489–541 ms / instantiate 11.9–13.6 ms / boot 呼出 484–545 ms。boot は node 参照と**同一結果** (units_run 209/942, GetMem 1,890 / FreeMem 776, 停止 `unlifted:0x6a7b70`)。
 3. **ダウンロードが支配的になるのは 123.6 Mbps 以下** (算術: br 後 16,196,755 B×8 を 1 Gbps 時の総時間中央値 1.048 s で割った値)。サーバ側で br 圧縮後 16.2 MB を帯域制限した実測の総時間:
    10 Mbps 13.8–13.9 s / 50 Mbps 3.38–3.39 s / 100 Mbps 1.84–1.86 s / 1 Gbps 1.03–1.09 s (§5)。1 Gbps では compile+boot が総時間の大半。
-4. **compile は線形外挿どおり**: bytes→`WebAssembly.compile` 212–220 ms (= 1.75–1.82 ms/MiB wasm, 2.09–2.17 ms/MiB code)。M11 合成の 1.5 ms/MiB 外挿 (推定 ≈ 182 ms) に対し +17–21%。
+4. **compile は線形外挿どおり**: bytes→`WebAssembly.compile` 212–220 ms (= 1.75–1.82 ms/MiB wasm, 2.09–2.17 ms/MiB code)。M11 合成の 1.5 ms/MiB を 121.1 MiB に外挿した値 (推定) 181.7 ms に対し +17–21%。
    一方 **eager (`--no-wasm-lazy-compilation`) は 4,118–4,140 ms** で、PERF-P6 の事前見積り (1.2 s, 推定) の 3.4 倍。code が見積り 38.7 MB の 2.75 倍 (106.5 MB) だったため (§7)。
 5. **tier-up**: 同一 Module から 6 instance を連続 boot すると boot 呼出は 515–558 → 106–108 → 105–123 → 57–86 → 61–66 → 64–67 ms。初回 (中央値 520 ms) の 79% (→ 108 ms) は lazy compile (初回呼出時の関数コンパイル)、残りが Liftoff→TurboFan (§6)。
-6. **soak (boot ループ代替)**: instance 作成→boot→破棄を 180 s 回して 2,913 cycle、boot 中央値は全区間 54 ms で不変、renderer RSS 556–656 MB で単調増加なし。540 s 版は §8。
+6. **soak (boot ループ代替)**: instance 作成→boot→破棄を 540 s 回して **8,726 cycle**、boot 中央値は全 90 s 区間で 54 ms 不変、renderer RSS 462–684 MB で**単調増加なし**、unit 209 の結果は全 cycle 同一 (180 s 版 2,913 cycle も同傾向)。実 FL の soak ではない (§8)。
 7. **測れなかったもの**: 「初回フレーム総時間」と「実 FL の長時間 soak」。boot が InitUnits の unit 209/942 で止まり (上流 `f_653f40` の早期 return, #253)、GUI 初期化・初回描画に届かないため。理由と起票先は §9。
 
 ## 1. 依頼と到達状況 (測れた範囲 / 測れない範囲)
@@ -120,7 +120,7 @@ transferSize=0 でも **compile 時間は短縮されない** (Chrome の wasm c
 | #5 | 61–66 | 124–127 | 62–65 |
 | #6 | 64–67 | 124–126 | 61–62 |
 
-- 既定: #1→#2 で **−79%** (515–558 → 106–108): 差分 ≈ 初回の lazy コンパイル分。#2→#6 で更に −41% (中央値 108 → 64): TurboFan への動的 tier-up (バックグラウンドスレッド)。
+- 既定: #1→#2 で **−79%** (515–558 → 106–108): 差分は初回の lazy コンパイル分。#2→#6 で更に −41% (中央値 108 → 64): TurboFan への動的 tier-up (バックグラウンドスレッド)。
 - `--liftoff-only` は #2 以降 115〜127 ms で頭打ち (tier-up なし) → 既定の定常 64 ms は **TurboFan 効果が 1.8–2.0 倍**。
 - 注意: これは boot コード (InitUnits 209 unit まで、GetMem/FreeMem 2,666 回など) に限った tier-up。実 FL の定常ループ (オーディオ/GUI) の tier-up は**測れていない**。
 - instantiate は #1 10 ms → #3 以降 3.8–4.2 ms (Memory 確保が主)。
@@ -129,11 +129,11 @@ transferSize=0 でも **compile 時間は短縮されない** (Chrome の wasm c
 
 | 事前見積り (推定) | 出典 | 実測 |
 |---|---|---|
-| 実 FL の code 38.7 MB | PERF-P6 (M11 closure から K≈12 外挿) | **106.5 MB** (2.75 倍) |
+| 実 FL の code 38.7 MB | PERF-P6 (M11 closure から K=12 外挿, 推定) | **106.5 MB** (2.75 倍) |
 | 関数数 70k〜110k | 同 | **31,684** (平均 3,362 B/関数。合成 K=10 は 375 B/関数) |
 | lazy compile 0.1〜0.2 s | #128 本文 / PERF-P6 | bytes compile **0.212–0.220 s** / streaming 込み 0.489–0.541 s |
 | eager 4 コア 1.2 s | 同 | **4.118–4.140 s** (3.4 倍。code 比 2.75 倍 + 関数が大きい分) |
-| bytes compile ≈1.5 ms/MiB | RT (M11×K ≤52 MiB) | 1.75 ms/MiB (wasm 全体) = 実測は外挿の +17–21% |
+| bytes compile 1.5 ms/MiB | RT (M11×K ≤52 MiB) | 1.75–1.82 ms/MiB (wasm 全体) = 実測は外挿の +17–21% |
 | brotli 3.31× (M11 6.0 MB) | RT DESIGN §3 | **7.84×** (x64c -O0 の冗長性) |
 
 結論: 外挿の**関数数**前提は過大・**バイト数**前提は過小だった。V8 の compile は関数数でなく**バイト数で効く**。
@@ -143,7 +143,16 @@ transferSize=0 でも **compile 時間は短縮されない** (Chrome の wasm c
 `rt10_worker.mjs`: 同一 Module から instance 作成 → `_fle_boot_enter(0)` → 破棄を条件時間ループ。renderer RSS は `/proc/<pid>/status` を 5 s 毎に採取。
 **これは「実 FL を動かし続ける soak」ではない**。boot の再実行 (毎回 InitUnits 209 unit + 864 MiB instance の確保/破棄) による instance 生成破棄のリーク検査と、同一コードの定常 tier-up の観測に限る。
 
-SOAK_PLACEHOLDER
+| 実行 | cycle 数 | boot 呼出 ms (min–max, 中央値) | instantiate ms (min–max, 中央値) | renderer RSS MB (min–max, サンプル数) |
+|---|---|---|---|---|
+| 180 s (load@開始 4.44) | 2,913 | 52–138, 54 | 3.0–11.4, 3.4 | 556–656 (36) |
+| 540 s (load@開始 0.21) | 8,726 | 52–167, 54 | 2.9–9.6, 3.5 | 462–684 (108) |
+
+- 区間別 (540 s, 90 s 刻み) の RSS min–max: 569–684 / 462–659 / 512–613 / 474–607 / 477–609 / 463–597 MB。boot 中央値は 6 区間とも 54 ms。180 s 版 (30 s 刻み 6 区間) も 54 ms 不変、RSS 556–656 MB。
+- 先頭 5 cycle の boot は 62–102 ms (中央値 85) → 末尾 5 cycle は 52–54 ms (中央値 54): 初回 boot (§6 #1 の中央値 520 ms) の後、数 cycle で TurboFan 到達後の定常値に落ち着き、その後 **8,726 cycle の間に退行 (deopt/再コンパイル) なし**。
+- instance あたり 864 MiB の Memory を 8,726 回確保・破棄してもリークなし (RSS が下がる区間もあり単調増加でない)。全 cycle で `units_run 209`、例外・OOM・Worker crash は 0。
+- RSS は `/proc` の renderer プロセス (最大 RSS のもの) の VmRSS を採取。HWM はサンプル時点で選ばれた renderer が入れ替わりうるため本書では使わない。
+- 限界: 毎 cycle 同一の 209 unit を再実行するだけで、実 FL のメッセージループ・GUI・オーディオ・ファイル I/O を含まない。メモリ増加の検出対象は instance 生成破棄と shim のみ。
 
 ## 9. 未解決・測れない項目
 
@@ -161,8 +170,12 @@ SOAK_PLACEHOLDER
 
 ## 10. 検証
 
-- **別アルゴリズムの検算** (`bash tools/runtime/rt10/verify.sh`): VERIFY_PLACEHOLDER
-- **ネガティブコントロール**: NEG_PLACEHOLDER
+- **別アルゴリズムの検算** (`bash tools/runtime/rt10/verify.sh`): 
+  - python 独立パーサ: total 126,995,440 B / code 106,525,508 B / data 20,432,171 B / 定義関数 31,684 → node 版 `measure.mjs sizes` と**完全一致**。
+  - `.br` 往復: 復号 sha256 == 原本 sha256 (原本 126,995,440 B → br 16,196,755 B)。Chrome 側 `decodedBodySize` も cold/warm/bw 全行で 126,995,440。
+  - boot 結果の突合: node 参照 (`node tools/flelift/boot/fle_boot.mjs <abs>/fleboot_plain.cjs out.json --boot-only`, 別実装の node 用 glue) = units_run 209 / units_total 942 / 停止 `unlifted` / GetMem 1,890 / FreeMem 776 / exit 0 (wall 9.76 s; brotli 圧縮と並走中の 1 回)。Chrome Worker の全 cold 15 回・soak 全 cycle と一致。
+- **ネガティブコントロール**: wasm を 100,000,000 B に切り詰めて (原本 126,995,440 B) 同じハーネスへ流すと `ok:false` / `CompileError: WebAssembly.compileStreaming(): section (code 10, …` (`results/rt10_cold_neg.jsonl`)。通常 wasm は cold 15/15 が `ok:true`。
+  ただしこれは「壊れた入力を検出できる」確認で、boot 動作の不一致を人工的に作った試験ではない (boot 等価性の否定試験は未実施 → 弱い点として残る)。
 - 検出力の確認 (本計測内): eager と既定で boot 呼出が 138–153 ms と 484–545 ms に分かれる (ハーネスが 3.5 倍差を弁別)。
 - 範囲外: 上記のとおり実 FL のフレーム・soak・実ネットワーク。
 
@@ -170,7 +183,7 @@ SOAK_PLACEHOLDER
 
 ```sh
 export FL_WIN64_DIR=<fl-win64 展開先>            # extracted/block00031_PE.bin を含むディレクトリ
-bash tools/runtime/rt10/run_all.sh [--skip-build] [--soak-sec 180]   # build → sizes → cold/warm/bw/tier/soak (約 981 s build + 約 9 min 計測)
+bash tools/runtime/rt10/run_all.sh [--skip-build] [--soak-sec 180]   # build → sizes → cold/warm/bw/tier/soak (build 981.4 s の実測 + 計測)
 node tools/runtime/rt10/measure.mjs soak --sec 540 --flags default --tag _long   # 540 s 版
 node tools/runtime/rt10/summarize.mjs            # results/rt10_*.jsonl → 本書の表
 bash tools/runtime/rt10/verify.sh                # 検算 + ネガティブコントロール
