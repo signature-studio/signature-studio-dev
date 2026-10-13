@@ -16,9 +16,9 @@
 | JDK | Temurin 21 (JDK 21)。runner 既定の 17 では使わない |
 | 入力 | `fl-win64` の `block00031_PE.bin` |
 | 出力 | `tools/m2/work/ghidra_dll/functions_dll.csv` 59010 行 (測定時に記録した値)、sha256 `90d1bbac…` (REPORT_N27 と一致と記載) |
-
-> 行数の注記: REPORT_N27 は同じ sha256 に対し、L170 で 59010 行、L183 で 59 009 行、L199 で 59 010 行と記す。数え方の差 (ヘッダ行の有無など) は未確認。CSV は worktree に存在しないため現時点で再計数できない。
 | 所要 | analyzeHeadless 20:14:10 → 20:24:25 UTC (約 10 分 15 秒)、rc 0、`MAXMEM=8G` |
+
+行数の注記: REPORT_N27 は同じ sha256 に対し、L170 で 59010 行、L183 で 59 009 行、L199 で 59 010 行と記す。数え方の差 (ヘッダ行の有無など) は未確認。CSV は worktree に存在しないため現時点で再計数できない。
 
 ## m11_e2e.sh 全体 (受入 2)
 
@@ -49,13 +49,14 @@ ON の増分 build で `work/ov_414ad0.stamp` が `1`、`work/obj/ov.o` が再�
 
 ## 測定 commit と現 HEAD の差分 (WORKFLOW §6)
 
-測定 commit `48496bd5` から検証 HEAD までの、測定対象範囲の差分。
+測定 commit `48496bd5` から検証 HEAD (`6191db7d` 時点の内容) までの差分。
 
 ```sh
-git diff 48496bd5 HEAD -- tools/m11 tools/m2 tools/shared ':!tools/m11/REPORT_N1042.md'
+git diff 48496bd5 HEAD -- tools/m2 tools/shared            # 0 行
+git diff 48496bd5 HEAD -- tools/m11 --name-only            # tools/m11/REPORT_N1042.md のみ
 ```
 
-出力: 0 行 (差分 0)。本 REPORT (`tools/m11/REPORT_N1042.md`) 以外に測定対象コードの変更は無い。
+測定対象コードの差分は 0 行。`tools/m11` の変更は本 REPORT のみ。
 
 ## 未解決
 
