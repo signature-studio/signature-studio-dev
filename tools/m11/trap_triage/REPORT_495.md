@@ -93,7 +93,7 @@ wasm の frame 寸法は不変 (`m11_icall` 128 B / `m11_call_unit` 32 B / `func
 |---|---|---|
 | `function_413870` (rcx=p1 / rdx=p2 / r8=len の比較ルーチン。CompareMem 相当と**推定**) が 0 引数に lift されている。呼出し `function_639920` ×2・`function_d14470` ×1 も引数なし (機械語は 639920 で渡している。d14470 は未確認) | unit 134 の ok は SP 下がゼロな間だけ。他 unit の変更で SP 下の使われ方が変われば同じ ok→oob が起きる。実機でも残骸次第で trap | **新規子チケット (M11)**: C 転記で `function_413870` と 3 呼出元の引数を復元 (REPORT_482 の 5c03d0 と同じ手順)。#474 REPORT §6 の「D15 / ldfix 検出漏れ全数」子チケットに「引数脱落 + 未初期化 alloca」版として併記 |
 | 残骸に感度のある unit が 134 以外に 4 つ: 138 (frames 深さ 11→15)・291 (8→10)・368 (va_mb 734.7→なし)・923 (va_mb なし→1.3、frames 10→13)。どれも未初期化読みの出所は未調査 | survey の va_mb / frames がビルド・trace・他修正で揺れる | **新規子チケット (M11)**: `SV_STK_FILL=ff` / `00` の差分 unit を個別に追う (本 REPORT の `negctl_495.sh` が入口) |
-| `survey_units.mjs` の `frames` が非 halt0 で最上位 frame を捨てる (`.slice(1)`) | oob の「最上位 frame」集計 (`annotate.py` の `8cc190` ×9 など) が実際の trap 関数より 1 段上を数えている疑い (推定。halt0 の分岐は別実装) | #130 にコメント。直すと全 oob unit の frames が 1 段増え survey_diff の基準が変わるため本 PR では未変更 |
+| `survey_units.mjs` の `frames` が非 halt0 で最上位 frame を捨てる (`.slice(1)`) | oob の「最上位 frame」集計 (`annotate.py` の `8cc190` ×9 など) が実際の trap 関数より 1 段上を数えている疑い (推定。halt0 の分岐は別実装) | #130 にコメント。直すと全 oob unit の frames が 1 段増え survey_diff の基準が変わるため本 PR では未変更 → **#663 で解消** (REPORT_663.md) |
 | `TRACE_RE` は trace 行の prefix を手で列挙している | `M11_TRACE` に新しい書式を足したときに `TRACE_RE` へ足し忘れると、その行が `rec.err` に入る | 起票不要 (本 REPORT §3 に記載。新規 trace は `[m11][<名>]` 形式で `TRACE_RE` に追加) |
 
 DEFECTS.md 行案 (D5 に隣接する新規類型。編集は PM 判断): 「**整数 reg 引数 (rcx/rdx/r8) の脱落 + 未初期化 alloca 代役** — `function_413870` (比較ルーチン) が 0 引数で lift され、callee は reg2mem の未初期化 alloca から
