@@ -430,6 +430,17 @@ struct HostApp : public IHostApplication {
       addRef();
       return kResultOk;
     }
+    // #1360: 実験オプション。0x180037600 が context に対して IVst3ToAUWrapper / IVst3ToAAXWrapper を QI し、
+    // 両方失敗で +0xdc を 2 にする (REPORT_SR1c §4-2)。S2HOST_WRAPPER_QI=1 のときだけ両 IID に kResultOk を返す。
+    static const TUID kAUWrapperIid = {(char)0xC5,(char)0xC6,(char)0xB8,(char)0xA3,(char)0x95,(char)0xC0,(char)0x88,(char)0x46,(char)0xB0,(char)0x91,0x6F,0x0B,(char)0xB6,(char)0x97,(char)0xAA,0x44};
+    static const TUID kAAXWrapperIid = {(char)0xC6,(char)0x9D,0x31,0x6D,(char)0xC5,0x60,0x42,0x62,(char)0xB3,0x2C,(char)0x95,0x1B,(char)0x93,(char)0xBE,(char)0xF4,(char)0xC6};
+    if (getenv("S2HOST_WRAPPER_QI") && (memcmp(_iid, kAUWrapperIid, sizeof(TUID)) == 0 ||
+                                       memcmp(_iid, kAAXWrapperIid, sizeof(TUID)) == 0)) {
+      L("[P->H] HostApp::queryInterface wrapper iid=%s -> kResultOk (S2HOST_WRAPPER_QI)", uidHex(_iid).c_str());
+      *obj = (FUnknown*)this;
+      addRef();
+      return kResultOk;
+    }
     L("[P->H] HostApp::queryInterface unknown iid=%s -> kNoInterface", uidHex(_iid).c_str());
     *obj = nullptr;
     return kNoInterface;

@@ -89,6 +89,18 @@ for c in lic_sent lowver demo_payload; do
   done
 done
 
+# #1360: 既定 host の gate==2 の原因 (0x180037600 の wrapper QI 2 件が kNoInterface) を、
+# S2HOST_WRAPPER_QI=1 で IVst3ToAUWrapper/IVst3ToAAXWrapper に kResultOk を返して外す。
+# gate は 1 になり 0x800010 が出る (既定 host では出ない)。既定 run は上の 50 件を変えない。
+# {patched,unpatched} × {lic_sent, lowver, demo_payload} (ゲート強制無し)
+for c in lic_sent lowver demo_payload; do
+  for d in p u; do
+    [ $d = p ] && DLLX="$DLL_PATCH" || DLLX="$DLL_ORIG"
+    mkdir -p "$W/out_${d}_wq_${c}"
+    S2HOST_WRAPPER_QI=1 run "$DLLX" "$ZS2\\host\\work\\cases\\$c" "$OUTB\\out_${d}_wq_${c}" 16
+  done
+done
+
 # corrupt payload run (payload が setState 内で実処理されることの実証)
 python3 - <<'PYEOF'
 import os
