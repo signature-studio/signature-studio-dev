@@ -1125,6 +1125,8 @@ void* shimx_cb_translator(const char* api, void* cb);       /* R2 実体: VA≥i
 void* shimx_cbtrans_install(void);                          /* R2 実体の取付 (set_callback_translator(shimx_cb_translator))。戻り=前のフック */
 void shimx_cbtrans_set_invoke(shimx_cb_invoke_fn fn);       /* lift 側 dispatch (m11_icall / __icall_dispatch(BLK) 相当) を登録 */
 shimx_cb_invoke_fn shimx_cbtrans_get_invoke(void);
+struct shimx_midi_vtbl;
+void shimx_set_midi_backend(const struct shimx_midi_vtbl *t);   /* #179 SHX-T6: winmm midi* の実体表 (midi_backend.h) を登録。NULL で解除 */
 int  shimx_cbtrans_slots(void);                             /* 使用中スロット数 (distinct VA 数) */
 unsigned shimx_cbtrans_slot_va(int slot);                   /* slot → 登録 VA (診断) */
 unsigned shimx_cbtrans_registrations(void);                 /* 累計登録数 */

@@ -68,7 +68,7 @@ UINT midiOutGetNumDevs(void);
 UINT midiOutLongMsg(HANDLE h, LPVOID hdr, UINT n);
 UINT midiOutOpen(LPHANDLE h, UINT id, ULONG_PTR cb, ULONG_PTR inst, DWORD flags);
 UINT midiOutPrepareHeader(HANDLE h, LPVOID hdr, UINT n);
-UINT midiOutShortMsg(uint64_t h, DWORD msg);
+UINT midiOutShortMsg(HANDLE h, DWORD msg);
 UINT midiOutUnprepareHeader(HANDLE h, LPVOID hdr, UINT n);
 #ifdef __cplusplus
 }
