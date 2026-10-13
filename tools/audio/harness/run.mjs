@@ -15,6 +15,7 @@ const S = (full, q) => (quick ? q : full);
 const soakSecs = args.includes("--soak30") ? 1800 : args.includes("--soak") ? +args[args.indexOf("--soak") + 1] : 0;
 if (args.includes("--soak") && !(soakSecs > 0)) { console.error("--soak には 1 以上の秒数が必要です"); process.exit(2); }
 const injectHiccup = args.includes("--inject-hiccup");
+if (injectHiccup && !(soakSecs > 0)) { console.error("--inject-hiccup は --soak30 / --soak <秒> と併用してください"); process.exit(2); }
 // 既定の results/results.json (全シナリオの記録) を soak 単独実行で上書きしない: soak は results/soak_<秒>[_negctl].json
 const outFile = args.includes("--out") ? args[args.indexOf("--out") + 1]
   : path.join(here, "../results", soakSecs > 0 ? `soak_${soakSecs}${injectHiccup ? "_negctl" : ""}.json` : "results.json");
