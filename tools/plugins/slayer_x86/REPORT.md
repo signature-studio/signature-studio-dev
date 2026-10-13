@@ -111,11 +111,12 @@ x87 を含む関数数 114 は RetDec の IR 型。 機械語の x87 命令 4,20
 
 | 項目 | 値 |
 |---|---|
-| 検証起点 commit | `30c444c` (`55ee377` に REPORT の訂正のみを積んだ commit。 検査の挙動は `55ee377` と同一。 下表の 3 回は `30c444c` を detached worktree に展開して実行) |
-| 実行方法 | `git worktree add --detach <dir> 30c444c` で展開し `RUNNER_TEMP=/home/runner/work/_temp FL_WIN64_DIR=/home/runner/work/_temp/fl-win64 bash tools/plugins/slayer_x86/slayer_x86.sh` |
-| 結果 (3 回) | 全て exit 0・`[slayer_x86] OK (7/7)`・`nega: 0/7 miss`・`[slayer_x86.sh] OK`・`[probe] retdec rc=0 defines=488 defines_with_x86_fp80=114 emcc_rc=1` |
-| 所要 (`slayer_x86.sh` 全体、wall) | 51 s / 51 s / 51 s (`slayer_x86.sh` 自身の表示も 51 s × 3) |
-| load average | 開始時 0.67 (2 回目) / 0.79 (3 回目)。 1 回目は開始時を取り損ね、終了直後の 1 分平均 0.80 |
+| 検証起点 commit | `524af3e` (本 REPORT の最終版を含む HEAD。 検査の挙動は `55ee377` と同一。 下表は `524af3e` を detached worktree に展開して 1 回実行した実測) |
+| 実行方法 | `git worktree add --detach <dir> 524af3e` で展開し `RUNNER_TEMP=/home/runner/work/_temp FL_WIN64_DIR=/home/runner/work/_temp/fl-win64 bash tools/plugins/slayer_x86/slayer_x86.sh` |
+| 結果 | exit 0・`[slayer_x86] OK (7/7)`・`nega: 0/7 miss`・`[slayer_x86.sh] OK (51 s, load 0.71 0.63 0.36)`・`[probe] retdec rc=0 defines=488 defines_with_x86_fp80=114 emcc_rc=1` |
+| 所要 (wall) | 51 s |
+| load average | 開始時 0.33 / 終了時 (1 分平均) 0.71。 4 core の Actions runner、並列数 1 |
+| 同条件の再現 | 直前の `30c444c` で 3 回 (各 51 s・exit 0・同じ判定) を確認済み (`55ee377`→`30c444c` は REPORT のみの差) |
 | 内訳 | 本 run では内訳未計測。 前回 (`3163914`) の内訳: C1〜C7 5.5 s、`--nega` 37.7 s、`--probe-retdec` 11.5 s (n=3 は 11.45–11.53 s) |
 | `git status --porcelain=v1 -- tools/plugins/slayer_x86` | 空 |
 | 20 MiB 超の blob | 無し (`find tools/plugins/slayer_x86 -type f -size +20M`) |
