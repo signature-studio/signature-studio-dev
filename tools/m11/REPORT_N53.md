@@ -6,7 +6,7 @@
 
 `why:` は分類結果ごとの理由。`boundary` = 窓が call / jmp / jcc / ret / 分岐先で切れた, `entry` = 関数入口まで代入が無い (caller の live-in を素通し), set 系の `load` / `reg` / `arith` / `other` = 代入命令の型。
 
-kind 別の件数 (callee_unused 313 / set_const 18 / set_const_xmm_callee 48 / set_other 378 / stack_set_other 32 / inherit 1,172 / callee_nopdata 2、計 1,963) は `REPORT_APPENDIX.md` §9 の表が正本。以下は各 kind の why 内訳のみ (各行の和は §9 の件数と一致)。
+kind 件数は `REPORT_APPENDIX.md` §9 が正本。以下は各 kind の why 内訳のみ (各行の和は §9 の件数と一致)。
 
 | kind | 理由 (内訳) |
 |---|---|
