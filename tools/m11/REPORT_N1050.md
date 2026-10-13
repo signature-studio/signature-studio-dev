@@ -87,3 +87,15 @@
   - `SHIMX_TRACE_FILE` あり: rc=1 `Aborted('FS' was not exported)`。ftrace ファイルは生成されず、`wc -l` は**取得不可** (未生成)。§5 の未実施は継続。
   - `trace.calls` の内訳 (`run.json`、26 種・合計 94): GetLocaleInfoW 48・GetCurrentThreadId 5・GetModuleHandleW 5・GetProcAddress 5・LoadStringW 3・VirtualAlloc 3・VerSetConditionMask 3・EnumCalendarInfoW 2・GetVersion 2・InitializeCriticalSection 2 ほか 16 種 (各 1)。file API (CreateFileW / CreateFileA / GetFileAttributesW / FindFirstFileW / FindFirstFileExW / FindNextFileW / ReadFile) の積集合は空。
 - 検証 HEAD: 差分範囲は `git diff 8597b970 1aa0f211 --stat` (`tools/m11/REPORT_N1050.md` のみ・コード差分 0)。ネガコン (§3-2) は `1aa0f211` で実行済み。
+
+## 6. 現行 main での ftrace 再測定 (run 2026-10-13 21:24 UTC)
+
+- 測定 HEAD: `80c32a06` (origin/main)。`git diff c8354cd7 80c32a06 -- tools/m11 tools/shimx` は 0 行。
+- 素材: `work-m11.tar.zst` を `tools/m11/work/` に展開 (`tar --zstd -xf`, 2.5 s)。
+- trace variant 再 build: `bash tools/m11/shimx_link/build.sh --trace --soft` rc=0 / 14.0 s / `signature mismatch=1 undefined symbol=0 duplicate=0` (§4 の未解決のまま)。`_shimx_set_trace_file` は export 済み。
+- 実 boot: `SHIMX_TRACE_FILE=<path> node tools/m11/shimx_link/run_trace.mjs tools/m11/work/shimx_link/m11_sx_trace_soft.cjs --out work/ftrace` rc=0 / 0.44 s。
+  - `boot_stage=1` `units_run=17` `dllmain_done=false` `threw="memory access out of bounds"` `icall_ok=24` `icall_miss=1`。
+  - trace `total_calls=97` `distinct_called=28` `dropped=0`。file API (CreateFileW / CreateFileA / GetFileAttributesW / FindFirstFileW / FindFirstFileExW / FindNextFileW / ReadFile) は **0 件**。
+  - `m11_sx_trace_soft.ftrace.jsonl` は **0 バイト (0 行)**。`FS` は export されており `ftrace_error` は無い。以前の `Aborted('FS' was not exported)` は古い `.cjs` 固有の事象で、現行 build では再現しない。
+  - trap 位置は前回と同じ unit 17〜18 付近 (`wasm-function[1338]` が最上段、`dllmain_done=false`)。
+- 結論: 件数 >0 の実 boot ftrace は**未取得**。未達は本 issue に残す。原因の切り分け (§4 の 1 行目・3 行目) は lift 側の調査が必要で、本 run の上限では完了しない。
