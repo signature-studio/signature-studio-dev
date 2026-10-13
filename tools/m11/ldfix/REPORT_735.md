@@ -62,6 +62,8 @@ IR 表 (`tools/m11/work/` = `work-m11` の既存ファイル。本 run で検証
 
 機械語 load に変位 (disp) を持たせ、IR の `store` 値の `load (argN + c)` の c と照合する。`audit_lsf.py` は変更していない (既存の SUSPECT_VAS / SUSPECT_USE_VAS は不変)。
 
+**本 run で再測定していない。以下の数値 (135 関数・SUSPECT 4 件・個別の判定) は元 run の記録に依る。**
+
 測定条件 (以下は記録できた事項のみ。再現性は未確認):
 - 測定 commit: `d684ed9f` (`audit_lsf_disp.py` 追加 commit)。以後 `tools/m11/ldfix/` の本体コードは変わっていない (`git diff d684ed9f HEAD -- tools/m11/ldfix/audit_lsf_disp.py tools/m11/ldfix/audit_lsf.py tools/m11/ldfix/ldmach.py tools/m11/ldfix/ldmach_img.py` の出力は空)。
 - 実行コマンド: PR 本文・元 run のログは省略形 (`--json ...`) しか残っておらず、完全なコマンドは復元できない。判明している形は `python3 tools/m11/ldfix/audit_lsf_disp.py <boot_final.ll> <m11_image.bin> '<boot*.drc.config.json>'` (引数は `audit_lsf_disp.py` の `main()` の仕様どおり)。`--json` の出力先は記録されておらず、JSON の現物は無い。
@@ -89,7 +91,7 @@ IR 表 (`tools/m11/work/` = `work-m11` の既存ファイル。本 run で検証
 - 判定 (採用しない・未突合 3 件は #1091) は、上記の元 run の数値に依る。再測定で数値が変われば判定を見直す。
 
 fix run の確認 (レビュー指摘 2・3 への対応):
-- 確認時刻の `$ARTIFACTS_DIR` (`/home/runner/artifacts`) は `fl-win64.tar.zst` (2,324,302,252 bytes) の 1 件のみ。`work-m11` は無い。`tools/m11/ldfix/work/` も無い。
+- 確認時刻の `$ARTIFACTS_DIR` は `fl-win64.tar.zst` (2,324,302,252 bytes) の 1 件のみ。`work-m11` は無い。`tools/m11/ldfix/work/` も無い。
 - `boot_final.ll` / `m11_image.bin` を `/` 以下から探したが時間切れで見つからず、入力の sha256 は取れていない。
 - よって再実行・135 / 4 件の再確認は本 fix run では未実施。`audit_lsf_disp.py` の py_compile のみ通る。
 - 次回の再測定 (PR 本文の `oc_artifacts: fl-win64 work-m11` で素材を取得してから実行する):
