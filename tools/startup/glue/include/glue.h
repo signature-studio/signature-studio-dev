@@ -173,6 +173,10 @@ void glue_trace_clear(void);
 void glue_trace_dump(void);                        /* stdout に全行 */
 int  glue_trace_dropped(void);                     /* あふれて落とした行数 */
 
+/* G12 検証口 (ST-T10): ShellExecuteW(verb,file,params) を呼び戻りの HINSTANCE 値を返す。
+ * `fldiagnostic /restartfl` は 2 を返し winstubs_restart_requested() が 1 になる */
+int  glue_probe_shell_execute(const char* verb, const char* file, const char* params);
+
 #ifdef __cplusplus
 }
 #endif

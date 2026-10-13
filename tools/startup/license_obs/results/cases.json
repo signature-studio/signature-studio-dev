@@ -1,0 +1,254 @@
+[
+ {
+  "case": "A1 ILRegKey 無し (cl=0)",
+  "cl": 0,
+  "status": "ok",
+  "flag_hex": "00",
+  "gradeChar_hex": "40",
+  "button_id": 0,
+  "unknown_apis": [],
+  "api_calls": 375,
+  "registry_values_read": [
+   "HKCU\\Software\\Image-Line\\Registrations :: FL Studio license plate",
+   "HKCU\\Software\\Image-Line\\Registrations :: FL Studio user name",
+   "HKCU\\Software\\Image-Line\\Registrations :: FL Studio webpass",
+   "HKCU\\Software\\Image-Line\\Registrations :: FLS Info",
+   "HKLM\\SOFTWARE\\Microsoft\\Cryptography :: MachineGuid"
+  ],
+  "registry_keys_opened": [
+   "HKCU\\Software\\Image-Line\\Registrations",
+   "HKCU\\Software\\Image-Line\\Registrations\\FL Studio 26.1",
+   "HKLM\\SOFTWARE\\Microsoft\\Cryptography",
+   "HKLM\\Software\\Image-Line\\Registrations\\FL Studio 26.1"
+  ]
+ },
+ {
+  "case": "A2 ILRegKey 無し (cl=1 Fire check)",
+  "cl": 1,
+  "status": "ok",
+  "flag_hex": "00",
+  "gradeChar_hex": "40",
+  "button_id": 0,
+  "unknown_apis": [],
+  "api_calls": 375,
+  "registry_values_read": [
+   "HKCU\\Software\\Image-Line\\Registrations :: FL Studio license plate",
+   "HKCU\\Software\\Image-Line\\Registrations :: FL Studio user name",
+   "HKCU\\Software\\Image-Line\\Registrations :: FL Studio webpass",
+   "HKCU\\Software\\Image-Line\\Registrations :: FLS Info",
+   "HKLM\\SOFTWARE\\Microsoft\\Cryptography :: MachineGuid"
+  ],
+  "registry_keys_opened": [
+   "HKCU\\Software\\Image-Line\\Registrations",
+   "HKCU\\Software\\Image-Line\\Registrations\\FL Studio 26.1",
+   "HKLM\\SOFTWARE\\Microsoft\\Cryptography",
+   "HKLM\\Software\\Image-Line\\Registrations\\FL Studio 26.1"
+  ]
+ },
+ {
+  "case": "A3 ILRegKey 無し + 別 MachineGuid / ComputerName / AppData",
+  "cl": 0,
+  "status": "ok",
+  "flag_hex": "00",
+  "gradeChar_hex": "40",
+  "button_id": 0,
+  "unknown_apis": [],
+  "api_calls": 366,
+  "registry_values_read": [
+   "HKCU\\Software\\Image-Line\\Registrations :: FL Studio license plate",
+   "HKCU\\Software\\Image-Line\\Registrations :: FL Studio user name",
+   "HKCU\\Software\\Image-Line\\Registrations :: FL Studio webpass",
+   "HKCU\\Software\\Image-Line\\Registrations :: FLS Info",
+   "HKLM\\SOFTWARE\\Microsoft\\Cryptography :: MachineGuid"
+  ],
+  "registry_keys_opened": [
+   "HKCU\\Software\\Image-Line\\Registrations",
+   "HKCU\\Software\\Image-Line\\Registrations\\FL Studio 26.1",
+   "HKLM\\SOFTWARE\\Microsoft\\Cryptography",
+   "HKLM\\Software\\Image-Line\\Registrations\\FL Studio 26.1"
+  ]
+ },
+ {
+  "case": "A4 ILRegKey 無し + MachineGuid 取得失敗",
+  "cl": 0,
+  "status": "ok",
+  "flag_hex": "00",
+  "gradeChar_hex": "40",
+  "button_id": 0,
+  "unknown_apis": [],
+  "api_calls": 337,
+  "registry_values_read": [
+   "HKCU\\Software\\Image-Line\\Registrations :: FL Studio license plate",
+   "HKCU\\Software\\Image-Line\\Registrations :: FL Studio user name",
+   "HKCU\\Software\\Image-Line\\Registrations :: FL Studio webpass",
+   "HKCU\\Software\\Image-Line\\Registrations :: FLS Info"
+  ],
+  "registry_keys_opened": [
+   "HKCU\\Software\\Image-Line\\Registrations",
+   "HKCU\\Software\\Image-Line\\Registrations\\FL Studio 26.1",
+   "HKLM\\SOFTWARE\\Microsoft\\Cryptography",
+   "HKLM\\Software\\Image-Line\\Registrations\\FL Studio 26.1"
+  ]
+ },
+ {
+  "case": "D2 空文字列の ILRegKey",
+  "cl": 0,
+  "status": "ok",
+  "flag_hex": "00",
+  "gradeChar_hex": "40",
+  "button_id": 0,
+  "unknown_apis": [],
+  "api_calls": 377,
+  "registry_values_read": [
+   "HKCU\\Software\\Image-Line\\Registrations :: FL Studio license plate",
+   "HKCU\\Software\\Image-Line\\Registrations :: FL Studio user name",
+   "HKCU\\Software\\Image-Line\\Registrations :: FL Studio webpass",
+   "HKCU\\Software\\Image-Line\\Registrations :: FLS Info",
+   "HKCU\\Software\\Image-Line\\Registrations\\FL Studio 26.1 :: ILRegKey",
+   "HKLM\\SOFTWARE\\Microsoft\\Cryptography :: MachineGuid"
+  ],
+  "registry_keys_opened": [
+   "HKCU\\Software\\Image-Line\\Registrations",
+   "HKCU\\Software\\Image-Line\\Registrations\\FL Studio 26.1",
+   "HKLM\\SOFTWARE\\Microsoft\\Cryptography"
+  ]
+ },
+ {
+  "case": "B1 vreg seed のプレースホルダ (cl=0)",
+  "cl": 0,
+  "status": "UcError: Invalid memory read (UC_ERR_READ_UNMAPPED) unmapped=(19, 68, 8, 9215356) rip=0x8c9d7c stack_ret_cands=['0x8bd058', '0x8ca3d9', '0x8c1501', '0x8c1530', ",
+  "flag_hex": "00",
+  "gradeChar_hex": "40",
+  "button_id": 0,
+  "unknown_apis": [],
+  "api_calls": 307,
+  "registry_values_read": [
+   "HKCU\\Software\\Image-Line\\Registrations :: FL Studio license plate",
+   "HKCU\\Software\\Image-Line\\Registrations :: FL Studio user name",
+   "HKCU\\Software\\Image-Line\\Registrations :: FL Studio webpass",
+   "HKCU\\Software\\Image-Line\\Registrations :: FLS Info",
+   "HKCU\\Software\\Image-Line\\Registrations\\FL Studio 26.1 :: ILRegKey",
+   "HKLM\\SOFTWARE\\Microsoft\\Cryptography :: MachineGuid"
+  ],
+  "registry_keys_opened": [
+   "HKCU\\Software\\Image-Line\\Registrations",
+   "HKCU\\Software\\Image-Line\\Registrations\\FL Studio 26.1",
+   "HKLM\\SOFTWARE\\Microsoft\\Cryptography"
+  ]
+ },
+ {
+  "case": "B2 vreg seed のプレースホルダ (cl=1)",
+  "cl": 1,
+  "status": "UcError: Invalid memory read (UC_ERR_READ_UNMAPPED) unmapped=(19, 68, 8, 9215356) rip=0x8c9d7c stack_ret_cands=['0x8bd058', '0x8ca3d9', '0x8c1501', '0x8c1530', ",
+  "flag_hex": "00",
+  "gradeChar_hex": "40",
+  "button_id": 0,
+  "unknown_apis": [],
+  "api_calls": 307,
+  "registry_values_read": [
+   "HKCU\\Software\\Image-Line\\Registrations :: FL Studio license plate",
+   "HKCU\\Software\\Image-Line\\Registrations :: FL Studio user name",
+   "HKCU\\Software\\Image-Line\\Registrations :: FL Studio webpass",
+   "HKCU\\Software\\Image-Line\\Registrations :: FLS Info",
+   "HKCU\\Software\\Image-Line\\Registrations\\FL Studio 26.1 :: ILRegKey",
+   "HKLM\\SOFTWARE\\Microsoft\\Cryptography :: MachineGuid"
+  ],
+  "registry_keys_opened": [
+   "HKCU\\Software\\Image-Line\\Registrations",
+   "HKCU\\Software\\Image-Line\\Registrations\\FL Studio 26.1",
+   "HKLM\\SOFTWARE\\Microsoft\\Cryptography"
+  ]
+ },
+ {
+  "case": "D1 16 進 128 文字の非正規 ILRegKey",
+  "cl": 0,
+  "status": "UcError: Invalid memory read (UC_ERR_READ_UNMAPPED) unmapped=(19, 68, 8, 9215356) rip=0x8c9d7c stack_ret_cands=['0x8bd058', '0x8ca3d9', '0x8c1501', '0x8c1530', ",
+  "flag_hex": "00",
+  "gradeChar_hex": "40",
+  "button_id": 0,
+  "unknown_apis": [],
+  "api_calls": 404,
+  "registry_values_read": [
+   "HKCU\\Software\\Image-Line\\Registrations :: FL Studio license plate",
+   "HKCU\\Software\\Image-Line\\Registrations :: FL Studio user name",
+   "HKCU\\Software\\Image-Line\\Registrations :: FL Studio webpass",
+   "HKCU\\Software\\Image-Line\\Registrations :: FLS Info",
+   "HKCU\\Software\\Image-Line\\Registrations\\FL Studio 26.1 :: ILRegKey",
+   "HKLM\\SOFTWARE\\Microsoft\\Cryptography :: MachineGuid"
+  ],
+  "registry_keys_opened": [
+   "HKCU\\Software\\Image-Line\\Registrations",
+   "HKCU\\Software\\Image-Line\\Registrations\\FL Studio 26.1",
+   "HKLM\\SOFTWARE\\Microsoft\\Cryptography"
+  ]
+ },
+ {
+  "case": "N1 gradeChar 初期値 imm 0x40→0x42 に改変 (0x10ca56f)",
+  "cl": 0,
+  "status": "ok",
+  "flag_hex": "00",
+  "gradeChar_hex": "42",
+  "button_id": 1,
+  "unknown_apis": [],
+  "api_calls": 361,
+  "registry_values_read": [
+   "HKCU\\Software\\Image-Line\\Registrations :: FL Studio license plate",
+   "HKCU\\Software\\Image-Line\\Registrations :: FL Studio user name",
+   "HKCU\\Software\\Image-Line\\Registrations :: FL Studio webpass",
+   "HKCU\\Software\\Image-Line\\Registrations :: FLS Info",
+   "HKLM\\SOFTWARE\\Microsoft\\Cryptography :: MachineGuid"
+  ],
+  "registry_keys_opened": [
+   "HKCU\\Software\\Image-Line\\Registrations",
+   "HKCU\\Software\\Image-Line\\Registrations\\FL Studio 26.1",
+   "HKLM\\SOFTWARE\\Microsoft\\Cryptography",
+   "HKLM\\Software\\Image-Line\\Registrations\\FL Studio 26.1"
+  ]
+ },
+ {
+  "case": "N2 bit0 を立てる or の直前の jle を nop 化 (0x10cf4e4)",
+  "cl": 0,
+  "status": "ok",
+  "flag_hex": "01",
+  "gradeChar_hex": "40",
+  "button_id": 3,
+  "unknown_apis": [],
+  "api_calls": 377,
+  "registry_values_read": [
+   "HKCU\\Software\\Image-Line\\Registrations :: FL Studio license plate",
+   "HKCU\\Software\\Image-Line\\Registrations :: FL Studio user name",
+   "HKCU\\Software\\Image-Line\\Registrations :: FL Studio webpass",
+   "HKCU\\Software\\Image-Line\\Registrations :: FLS Info",
+   "HKLM\\SOFTWARE\\Microsoft\\Cryptography :: MachineGuid"
+  ],
+  "registry_keys_opened": [
+   "HKCU\\Software\\Image-Line\\Registrations",
+   "HKCU\\Software\\Image-Line\\Registrations\\FL Studio 26.1",
+   "HKLM\\SOFTWARE\\Microsoft\\Cryptography",
+   "HKLM\\Software\\Image-Line\\Registrations\\FL Studio 26.1"
+  ]
+ },
+ {
+  "case": "N3 FLAG の初期化値 imm 改変: store 元 0x10d08d8 を 0x04 に (.data)",
+  "cl": 0,
+  "status": "ok",
+  "flag_hex": "04",
+  "gradeChar_hex": "40",
+  "button_id": 0,
+  "unknown_apis": [],
+  "api_calls": 375,
+  "registry_values_read": [
+   "HKCU\\Software\\Image-Line\\Registrations :: FL Studio license plate",
+   "HKCU\\Software\\Image-Line\\Registrations :: FL Studio user name",
+   "HKCU\\Software\\Image-Line\\Registrations :: FL Studio webpass",
+   "HKCU\\Software\\Image-Line\\Registrations :: FLS Info",
+   "HKLM\\SOFTWARE\\Microsoft\\Cryptography :: MachineGuid"
+  ],
+  "registry_keys_opened": [
+   "HKCU\\Software\\Image-Line\\Registrations",
+   "HKCU\\Software\\Image-Line\\Registrations\\FL Studio 26.1",
+   "HKLM\\SOFTWARE\\Microsoft\\Cryptography",
+   "HKLM\\Software\\Image-Line\\Registrations\\FL Studio 26.1"
+  ]
+ }
+]

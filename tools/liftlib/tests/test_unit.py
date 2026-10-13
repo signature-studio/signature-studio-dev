@@ -5,7 +5,7 @@
   T2 p1_legacy / shift / gdata_legacy が OTT 元チェーンの中間成果物と一致
   T3 SIMD 生成が RetDec の接尾番号 (`__N`) に依存しない (接尾を付け替えても生成 C が同一)
   T4 同じ名前でも署名が違えば別 helper になる (FA の mulss(i128,i32) と OTT の mulss(i128,i128))
-  T5 mnemonic 被覆: KH census 205 種のうち未被覆は pcmpistri / vinsertf128 のみ
+  T5 mnemonic 被覆: KH census 205 種のうち未被覆 0 (pcmpistri / vinsertf128 は LIFTLIB #241 で被覆)
   T6 機械語解析: FA gain の live-in / 到達定義
 """
 import json
@@ -26,7 +26,7 @@ from liftlib.pe import Image                       # noqa: E402
 from liftlib.mc import MFunc                       # noqa: E402
 
 FA_PE = os.path.join(T, "targets/freshair/work/win/Fresh Air/C__ProgramData_Slate Digital/Fresh Air/SlateCore.core_64")
-OTT_DLL = "/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll"
+from liftlib.env import OTT_DLL                    # noqa: E402
 DUP = ("declare i64 @function_1803ded20", "declare i64 @function_18004cf20")
 
 
@@ -90,7 +90,7 @@ def t5():
     d = json.load(open(os.path.join(HERE, "..", "data/kh_mnemonics.json")))
     allm = sorted(set(d["effects"]) | set(d["infra"]) | set(d["hosts"]))
     cov, unc = gen.coverage(allm)
-    assert unc == ["pcmpistri", "vinsertf128"], unc
+    assert unc == [], unc
     print("T5 ok (mnemonic %d 種中 未被覆 %s)" % (len(allm), unc))
 
 
@@ -446,7 +446,83 @@ def t15():
           % (st1["unsupported"], st2["unsupported"], st3["unsupported"]))
 
 
+def t16():
+    """[HB-H3 / #93] iargs: 整数引数 (rdx/r8/r9) 脱落の機械検出と復元 (OTT, RetDec raw .ll)。
+
+    - 検出: AudioEffect ctor の委譲 (function_180127550 は rcx のみ, 機械語は r8/r9 まで素通し) を含む
+      define 15 / call site 15 を検出する (実測値)。
+    - 復元: 復元後は再走査で 0 / 0。ctor の呼出しが (this, audioMaster, 1, 20) になる。
+    - 冪等: 2 回流しても変化なし。
+    """
+    raw = os.path.join(T, "m6/work/ott.drc.ll")
+    if not os.path.exists(raw):
+        print("T16 skip (OTT raw .ll 無し)")
+        return
+    from liftlib.passes import iargs
+    img = Image(OTT_DLL)
+    text, _ = base.run_base(open(raw).read(), base.make_args())
+    mod = IR.Module.parse(text)
+    pre = iargs.scan(mod, img)
+    assert len(pre["define_short"]) == 15 and len(pre["sites_short"]) == 15, (len(pre["define_short"]), len(pre["sites_short"]))
+    assert ("function_180127550", 1, 4) in pre["define_short"], pre["define_short"]
+    # sites_entry: 引数の個数は足りているが入口値素通し位置に別値 (undef 等) を渡している site (実測 17)
+    assert len(pre["sites_entry"]) == 17, len(pre["sites_entry"])
+    assert ("function_180127550", 0x180127559, "function_180126920", 1) in pre["sites_entry"], pre["sites_entry"]
+    st, lg = {}, []
+    iargs.run(mod, img, lg, st)
+    post = iargs.scan(mod, img)
+    assert not post["define_short"] and not post["sites_short"] and not post["sites_entry"], post
+    ctor = [l for l in mod.func("function_18011d400").blocks[0].lines if "@function_180127550(" in l]
+    assert len(ctor) == 1 and "(i64 %arg1, i64 %arg2, i64 1, i64 20)" in ctor[0], ctor
+    # 復元済みの site の rcx (入口素通し) を undef に戻すと detect-only が検出する (逆方向の被覆)
+    fn = mod.func("function_18011d400")
+    li = next(i for i, l in enumerate(fn.blocks[0].lines) if "@function_180127550(" in l)
+    good = fn.blocks[0].lines[li]
+    fn.blocks[0].lines[li] = good.replace("(i64 %arg1, ", "(i64 undef, ", 1)
+    assert fn.blocks[0].lines[li] != good
+    bad = iargs.scan(mod, img)
+    assert [s for s in bad["sites_entry"] if s[0] == "function_18011d400" and s[2] == "function_180127550" and s[3] == 0], bad["sites_entry"]
+    fn.blocks[0].lines[li] = good
+    assert not iargs.scan(mod, img)["sites_entry"]
+    st2, lg2 = {}, []
+    iargs.run(mod, img, lg2, st2)
+    assert not st2.get("define_fixed") and not st2.get("sites_fixed"), st2
+    print("T16 ok (iargs: define %d / site %d / entry %d 検出 → 復元 define_fixed=%d sites_fixed=%d site_unbound=%d, 再走査 0/0/0, 冪等)"
+          % (len(pre["define_short"]), len(pre["sites_short"]), len(pre["sites_entry"]), st["define_fixed"], st["sites_fixed"], st.get("site_unbound", 0)))
+
+
+def t17():
+    """[LIFTLIB #241] i256 ABI + pcmpistri + F2 xmm 戻り搬送。
+    (a) gen.py が i256 形を u64×4 平坦化 / Y 戻りで生成し, 実体 (kernels) を持つ (stub でない)
+    (b) pcmpistri (void / i32 形) が生成される
+    (c) F2 xmm 戻り: LL_XRET_LL (RetDec raw .ll) と LL_XRET_DLL (OTT_x64.dll) があれば検出→修復→再検出 + 注入評価を固定"""
+    ll = ("declare i256 @__asm_vinsertf128(i256, i128, i8)\ndeclare void @__asm_vmovaps__3(i256, i256)\n"
+          "declare void @__asm_vpcmpistri(i128, i128, i8)\ndeclare i32 @__asm_pcmpistri__2(i128, i128, i8)\n")
+    c, rep = gen.emit_c(gen.scan_decls(ll), use_names="canon")
+    assert not rep["unsupported"], rep["unsupported"]
+    assert "Y __asm_vinsertf128__yyxb(u64 p0_0, u64 p0_1, u64 p0_2, u64 p0_3, u128 p1, u8 p2)" in c, c
+    assert "__builtin_trap" not in c and "ll_pcmpistr_ecx" in c
+    print("T17a ok (i256 ABI: u64x4 平坦化 + Y 戻り / pcmpistri void,i32 形とも生成)")
+    xl, xd = os.environ.get("LL_XRET_LL"), os.environ.get("LL_XRET_DLL")
+    if not (xl and xd and os.path.exists(xl) and os.path.exists(xd)):
+        print("T17b skip (LL_XRET_LL / LL_XRET_DLL 未設定)")
+        return
+    from liftlib import inject
+    from liftlib.passes import f2
+    img = Image(xd)
+    text, _ = base.run_base(open(xl).read(), base.make_args())
+    mod = IR.Module.parse(text)
+    st = {}
+    f2.run_xmm_ret(mod, img, [], st, repair=True)
+    assert st["xret_callees_pending"] == 3 and st["xret_rets_pending"] == 11, st
+    assert st["xret_threaded"] == 9 and st["xret_rets_after"] == 2, st
+    ev = inject.eval_f2_xret(mod, img)
+    assert ev["injected"] == 9 and ev["detected"] == 9, ev
+    print("T17b ok (F2 xmm 戻り: 検出 %d callee/%d ret → 搬送 %d → 残 %d, 注入 %d/%d 検出)"
+          % (st["xret_callees_pending"], st["xret_rets_pending"], st["xret_threaded"], st["xret_rets_after"], ev["detected"], ev["injected"]))
+
+
 if __name__ == "__main__":
-    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15):
+    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t17):
         f()
     print("ALL UNIT TESTS PASS")

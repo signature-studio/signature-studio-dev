@@ -1,0 +1,47 @@
+"""liftlib.passes.icall — 間接 call/jmp 脱落 (RetDec D1) の根絶: lift 前に PE を書換え (tools/icall/icall_rewrite.py), lift 後に復元 (ir_icall_restore.py).
+
+cfg (JSON) の passes.icall:
+  {"funcs": "work/xxx_F.txt" (必須: 書換え対象関数集合を書いたファイルのパス。inline の range 文字列 ("0xA-0xB,...") は不可 =
+            pipeline.rpath() 経由で icall_rewrite.py が open() するため。閉包は tools/icall/closure.py で作れる),
+   "rip_data": true, "derefix": true, "abi": true, "comis": true, "jtchain": true}      (全て既定 true; 個別 off 用)
+効果: ① call/jmp [reg+off] / reg / [rip+data] / CFG thunk を memory-ABI stub 経由で IR に残し __icall_dispatch(site_va) へ復元
+      ② RetDec D7 (zero-disp 参照が live-in reg 経由だと load が消える) を lea 補償で回避  ③ closure 内 ABI を BLK 経由に仮想化 (xmm/r8/r9 引数脱落 D3 を根絶)
+      ④ comis/ucomis flag を stub+sahf 化  ⑤ jump table を cmp/je 列へ展開  ⑥ chained .pdata 断片を親へ inline
+出力: 書換え済み PE (workdir/<name>.icall.dll), map.json, 復元済み raw ll。runtime 側は tools/icall/rt/icall_rt.c (BLK + __icall_dispatch + __icall_comis) を emcc sources に追加。
+"""
+import json
+import os
+import subprocess
+import sys
+
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
+ICALL = os.path.join(ROOT, "tools", "icall")
+
+
+def _py(script, *args):
+    r = subprocess.run([sys.executable, os.path.join(ICALL, script)] + [str(a) for a in args], capture_output=True, text=True)
+    if r.returncode:
+        raise RuntimeError("%s failed:\n%s" % (script, (r.stdout + r.stderr)[-2000:]))
+    return r.stdout
+
+
+def prelift(cfg, image, funcs_file, workdir, log):
+    """書換え済み PE と RetDec ranges を作る。返値 (image', ranges_csv, map_path)"""
+    pc = cfg.get("passes", {}).get("icall", {})
+    out = os.path.join(workdir, cfg["name"] + ".icall.dll")
+    mp = os.path.join(workdir, cfg["name"] + ".icall.map.json")
+    args = ["--pe", image, "--funcs", funcs_file, "--out", out, "--map", mp]
+    for k, flag in (("rip_data", "--no-rip-data"), ("derefix", "--no-derefix"), ("abi", "--no-abi"), ("comis", "--no-comis"), ("jtchain", "--no-jtchain")):
+        if pc.get(k, True) is False:
+            args.append(flag)
+    log.append("icall.prelift: " + _py("icall_rewrite.py", *args).strip())
+    m = json.load(open(mp))
+    ranges = open(mp + ".ranges").read() + ",0x%x-0x%x,0x%x-0x%x" % (m["stub"], m["stub"] + m.get("stub_len", 78), m["comis_stub"], m["comis_stub"] + m.get("comis_stub_len", 29))
+    return out, ranges, mp
+
+
+def restore(raw_ll, map_path, workdir, log):
+    """RetDec raw ll (書換え PE 由来) → 元 VA 体系 + __icall_dispatch へ。返値 restored ll path"""
+    out = os.path.splitext(raw_ll)[0] + ".restored.ll"
+    log.append("icall.restore: " + _py("ir_icall_restore.py", "--ir", raw_ll, "--map", map_path, "--out", out).strip())
+    return out

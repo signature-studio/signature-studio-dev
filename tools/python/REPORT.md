@@ -100,6 +100,41 @@ FLEngine rodata の `name\0doc\0…<module>` 並びから機械抽出 (`flapi_ex
 - 「LGPL stubs 非同梱」はファイルとしての話: stubs 由来の署名 (引数名/型/既定値、394 関数・535 引数) と callback 名 26 が `flapi_table.json` に取り込み済み (docstring 本文は無し)。`flapi_table.json` の doc 欄 (≤66 字) と `raw_*.json` は FLEngine rodata の抽出文字列、`mcp_tools.json` / `MCP_TOOLS.md` の description は MCPTools.pyc の先頭 160 字。
 - 再ビルドで成果物バイト数は ±0.2% 程度変動 (クリーン再ビルドで wasm 5,921,416 / data 3,204,697 / js 120,269、検収時)。
 
+## 7b. PY-1 flapi provider (C `fl_api_call`, #74 — 2026-10-13)
+
+`provider/` = `fl_api_call(fn_id, const fl_slot* argv, int argc, fl_slot* ret)` (16B スロット ABI は §5 / BRIDGE.md §2 と同一)。`gen_provider.py` が `flapi_table.json` + `flapi_ids.json` から `provider/gen/fl_table.c` (fn_id 順の記述子 435 行: 戻り型・引数数・型列) を生成し、`fl_dispatch.c` が個数/型検査・戻り型・エラー code を担う。ハンドラ (`fl_engine.c`) は `FL_H(module, name)` を weak 参照するだけなので、未実装は表に NULL で入り "Unspecified error (not implemented: …)" (code 2) を返す。`host/fl_provider.mjs` が `createMockEngine()` と同じ `engine.call(name,args)` で包む (Worker/SAB RPC は無変更)。
+
+| 項目 | 実測 (HEAD b76d221, GitHub Actions runner, node 22.23.3, load average 0.08〜0.46) |
+|---|---|
+| 実装ハンドラ | **60** = MCPTools 静的参照の全て (公開 52: channels 18 / mixer 18 / plugins 7 / playlist 4 / ui 3 / transport 2 + ilmcp 8)。残り 375 は未実装 (`tests/provider_check.mjs` が 60/375 を assert) |
+| `tests/all_tools.mjs` (`FL_ENGINE=wasm`) | **48/48 ok**、soft_error 0・raised 0、host_calls 37,424、callback 往復 true。所要 2.08 / 2.11 / 2.25 秒 (3 回、b76d221 クリーン再ビルド後。mock 2.06 秒)。`provider_check` 0.33 秒、`poc_mcp` (mock) 1.21 秒 POC OK で回帰なし。tool 別の結果文字列・api_calls は mock と **48/48 完全一致** (`tool_coverage.json` との差 0 件) |
+| `tests/provider_check.mjs` | PASS: 戻り型 (C 側: float=`D`/int=`I`/bool/str/None/JSON) が Python 型で float/int/bool/str/dict、kwargs 経由、code 4 → `IndexError`、code 5 → `TypeError`、未実装 → `RuntimeError` |
+| wasm | `flprov.wasm` 43,225B (`-O2`、provider 単体、b2225e1。b76d221〜d2706e1 は 42,953B)。CPython と同一 wasm にはまだ入れていない (T2) |
+| ネガティブコントロール | `mixer.getTrackName` ハンドラを削除して再ビルド → all_tools **33/48 ok・soft_error 15・host_calls 1,079**、provider_check は「MCP 使用 mixer.getTrackName が未実装」で失敗 (= テストが実際に C 実装を踏んでいる) |
+
+mock との差で見つかったもの: mock は引数の個数/型を検査しないため通っていた呼出しを C 側が拒否した (`ilmcp.showHighlight` の `whenDone` 内の 3 引数呼出し → 個数 3〜5 を許可に修正)。`getChannelName` 等は署名の引数数 (index, useGlobalIndex) を超えると code 5。
+
+エラー code の割当 (`provider/fl_api.h`): FLEngine PE の文言 9 種 (Invalid value / Unspecified error / Operation unsafe at current time / Range error / Index out of range / Wrong number of function parameters or wrong parameter type / Linked device not assigned / Device not assigned / Plugin not valid) を 1〜8 に割当 (`Range error` と `Index out of range` は 4 に束ねた)。provider が実際に返すのは 2 / 4 / 5 のみで、1 (Invalid value)・3 (unsafe)・6〜8 は定義だけ (実エンジンの発生条件が未解明)。**数値は Python 側 `fl_api._ERR` の写像と整合させた暫定値で、実エンジンの数値は未確認**。
+
+再現: `bash provider/build.sh && node tests/provider_check.mjs && FL_ENGINE=wasm node tests/all_tools.mjs` (前提: `build_flpy.sh` 済み。runner では `EMSDK_ENV=<emsdk>/emsdk_env.sh`、`FL_WIN64_DIR`)。
+入力の用意 (mac pkg 無しの Actions): `oc_artifacts: fl-win64 toolchain-emsdk` + `FL_WIN64_DIR=<fl-win64 展開先> bash fetch_inputs.sh` (パスは `tools/shared/env.sh` 経由。`$FL_MAC_DIR` に mac pkg が無ければ win64 の `block25159_DATA.bin` = MCPTools.pyc、`block24429_DATA.bin` = midi.py (770 行)、`block24430_DATA.bin` = utils.py (213 行) を `work/` に置く)。続けて `build_cpython_wasm.sh` → `build_flpy.sh` (注: `build_flpy.sh` は先頭で `analysis/flapi_table.py` を再実行し、mac dylib / win PE が無い環境では追跡中の `flapi_table.json` / `FLAPI.md` を書き換える。commit しないこと)。
+
+### 7b-2. レビュー指摘 (d2706e1) の修正: `ilmcp.getBrowserNames` の固定バッファ
+
+原因: `b[2048]` へ `w += snprintf(w, 残量, ...)` で連結していたため、切り詰められた出力でも snprintf の戻り値 (= 切り詰めなければ書いた長さ) が `w` に加わり、`w` が `b + sizeof b` を越えると次の `(size_t)(b + sizeof b - w)` が巨大な値になって境界なしに書いた。`q[512]` / `full[288]` / `e[576]` と `json_str` も黙って切り詰めていた。修正 (`provider/fl_engine.c`): `json_str` と `buf_add` が残量 (`size_t`) を持ち、`n >= remaining` なら何も書かず失敗 → ハンドラは `Range error` (code 4) を返す。`full` も `snprintf` の戻り値 `>= sizeof full` で失敗にする。
+
+| 項目 | 実測 (HEAD b2225e1, GitHub Actions runner, node 22.23.3, emsdk 6.0.12, load average 0.53〜1.84) |
+|---|---|
+| 回帰ケース | `tests/provider_check.mjs` 節 2b: 収まる 7 + 溢れる 5 = **12 ケース**。収まる: `""` / `"db"` / 引用符・バックスラッシュ / 制御文字 4 / 日本語 90 字 (270B) / `a`×273 (full 287B ちょうど) / 制御文字×80 + `a`×17 (b[2048] に 2047B ちょうど)。溢れる: `a`×274 (full 288B) / 制御文字×80 + `a`×18 (q・full・e は収まり b だけ溢れる、2051B) / 制御文字×85 (q) / 制御文字×100 (reviewer 再現) / `a`×100000。溢れた後に `getBrowserNames("db")` が正常応答することも各ケースで確認。b の長さ = 59 + 4X (X = エスケープ後の名前長) |
+| 旧コード (d2706e1) × 新テスト | **FAIL**: 溢れる 5 ケース中 5 つ。`a`×274 と `a`×100000 は黙って切り詰めた ok (`…/Fruity Slice`)、他 3 つは不正 JSON (`position 2047` の SyntaxError / `Unexpected end of JSON input`)。収まる 7 ケースは旧コードでも一致 (= 正常系の挙動は不変) |
+| 修正後 × 新テスト | **PASS**: `provider_check` 0.31 / 0.29 / 0.28 秒 (3 回)。節 1〜3 全体 (Python 側の型・例外写像を含む) |
+| メモリ安全 (ASan) | `emcc -fsanitize=address` で旧・新を同テスト (節 1〜2b) 実行: 旧 = **`stack-buffer-overflow` WRITE of size 1**、新 = 検出 0 件で PASS |
+| 回帰なし | `FL_ENGINE=wasm node tests/all_tools.mjs` **48/48 ok**、soft_error 0・raised 0、host_calls 37,424、callback 往復 true、1.59 / 1.61 / 1.61 秒 (3 回)。`tool_coverage.wasm.json` と追跡中の `tool_coverage.json` の tool 別差 **0/48**。`poc_mcp` (mock) POC OK 1.06 秒 |
+| ネガティブコントロール | `full` の判定 `>=` → `>` : 溢れる `a`×274 で FAIL。`buf_add` が溢れても 0 を返す: `98 文字` で FAIL (`",]}"` の不正 JSON)。生き残り 2 件 (等価変異): q の `json_str` 失敗を無視 / `json_str` の残量判定を 2B 緩める — q・e の境界は API 経由では b[2048] (4X) が先に律速して到達できないため (いずれも b が先に失敗するので出力は同じ)。これらの個別境界は `json_str` 単体の C テスト無しでは検出できない |
+
+検証範囲: 上記は mac pkg 無しで `fetch_inputs.sh` の win64 DATA block 経路から配置した MCPTools.pyc / midi.py / utils.py で実行した (b76d221 時点の自己申告値 host_calls 37,424・48/48 と同値)。範囲外: `run_all.sh` 全体・headless Chrome (`browser_check`) は未実施。
+
+
 ## 8. ユーザ依頼事項
 
 特になし (全て既存素材で完結)。任意: 実機 FL で `mixer.getCurrentTempo(1)` の戻り値 (130 か 130000 か) を確認できれば §7 の 2 点目が解消。
@@ -108,7 +143,7 @@ FLEngine rodata の `name\0doc\0…<module>` 並びから機械抽出 (`flapi_ex
 
 | # | 内容 | 規模 |
 |---|---|---|
-| T1 | FLEngine wasm に flapi provider (`fl_api_call(fn_id,slots)`) を実装: まず MCP が使う 60 (公開 52 + ilmcp 8) + MIDI 経路 (device/transport/mixer/channels) 優先 → 426 関数。`flapi_table.json` から C 雛形を生成 | L |
+| T1 | **(MCP 60 関数は §7b で完了。残り MIDI 経路 → 426 関数は未着手)** FLEngine wasm に flapi provider (`fl_api_call(fn_id,slots)`) を実装: まず MCP が使う 60 (公開 52 + ilmcp 8) + MIDI 経路 (device/transport/mixer/channels) 優先 → 426 関数。`flapi_table.json` から C 雛形を生成 | L |
 | T2 | CPython を FLEngine wasm へ静的リンク (JS 往復撤廃)。`flpy.c` 再利用、スレッド/GIL 方針確定 | M |
 | T3 | `ilmcp` 9 関数の実装 (PluginDB/Browser 列挙、addChannel/addEffect、PRScript store/run) → MCP B 群 8 tools | L |
 | T4 | MCP JSON-RPC をアプリ内 UI/devtools に公開 (`mcp_rpc.mjs` を FLEngine UI に接続、外部 LLM 無し) | S |
@@ -117,3 +152,28 @@ FLEngine rodata の `name\0doc\0…<module>` 並びから機械抽出 (`flapi_ex
 | T7 | Edison `enveditor` / `flcpt` / `flrack` module と Chord progression ツール (pyc 39 + pyscript 2) の動作検証 | M |
 | T8 | 性能: 構造値の binary ABI、バッチ API、MIDI 1 イベント当り呼出し数の計測 | S |
 | T9 | 実機 FL でのモック意味差検証 (ユーザ環境があれば) と kwargs 署名の rodata 書式文字列からの自動復元 | S |
+
+## 10. MCP JSON-RPC をアプリ UI / devtools に公開 (PY-4, #77)
+
+既知類型との関係: 該当なし (lift / 逆アセではない。flapi は引き続き `fl_mock.mjs` = FLEngine 模擬)。
+
+- 公開面: `window.flMcp` (`start(files)` `rpc(req)` `list()` `call(name,args)` `stop()`) + `/?mcp=1` の UI パネル。実装 `src/runtime/mcp_panel.ts`、配信 `vite.config.ts` `pyAssets` (`/py/` = host/・dist/flpy.{js,wasm,data}・flapi_ids.json の許可リストのみ)。設計は `BRIDGE.md` §3。
+- `mcp_rpc.mjs` 変更: `tools/call` は `tools/list` に出る name だけ受理 (未知 / 非 tool は isError=true。変更前は `__main__` の任意属性を呼べた)、不正 JSON は -32700。`flpython.mjs` は呼出し側が Worker を渡せる `worker` 引数を追加 (既存呼出しは無変更)。
+- MCPTools.pyc / midi.py / utils.py は**配信しない**: 利用者が UI のファイル選択 (または `flMcp.start({...})`) で供給する。未供給の `start()` は「供給が必要」で reject。
+
+| 受入条件 | 結果 | 検証 (`node tools/python/tests/mcp_ui_check.mjs`) |
+|---|---|---|
+| アプリ内から tools/list = 48、tools/call 実行 | 達成 (UI・devtools 両方) | UI で状態表示 `tools/list = 48`・`get_tempo` 実行 `Current tempo is 130 BPM.`。devtools で `flMcp.rpc` の tools/list = 48 (inputSchema あり・id エコー)、`set_tempo(140)` → `get_tempo` = 140 |
+| MCPTools.pyc は実行時供給 (非同梱) | 達成 | `/py/work/MCPTools.pyc` `/py/work/midi.py` `/py/src/fl_rt.py` は 404、未供給 `start()` は reject。リポジトリ内に FL 由来ファイル無し (`work/` は gitignore) |
+| 未知 tool は isError=true | 達成 | `no_such_tool` と非 tool 属性 `get_mcp_tools_json` が isError=true、既知 tool に不正引数も isError=true |
+
+検証環境: Actions runner (4 core, node 22.23.3, Chrome 154.0.8037.97)。入力は `fl-win64` 素材の `extracted/block25159_DATA.bin` (MCPTools.pyc, 100,674B, magic cb0d0d0a) / `block24429_DATA.bin` (midi.py) / `block24430_DATA.bin` (utils.py) を `work/` へコピー。CPython wasm は本 run でクリーンビルド (3m13.8s)。
+実測 (コミット 281784f の HEAD、n=3): `mcp_ui_check.mjs` 全 14 check PASS、スクリプト内計測 1.261 / 1.362 / 1.308 秒 (wall 1.39 / 1.49 / 1.44 秒、load average 0.18〜0.57、直列 1 本)。同 HEAD で `pnpm typecheck` / `pnpm build` 成功、既存 `poc_mcp.mjs` POC OK・`all_tools.mjs` 48/48 ok (host_calls 37,424)・`browser_check.mjs` BROWSER OK。範囲外: `run_all.sh` 全体 (runner に win PE が無く analysis 再生成が走らないため未実施)。
+ネガティブコントロール: MCPTools.pyc の先頭 1 バイトを壊す (`--neg`) → `UI: tools/list = 48` が FAIL し、原因が `pyc magic mismatch` として UI に出る (ハングしない)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| flapi の提供側がモック (`fl_mock.mjs`) のまま。実 FLEngine wasm の `fl_api_call` に差替え未了 | tool の結果はモック値で、実 FL と同一動作の保証なし | #74 (PY-1, PR #459) 以降 / 親 #35 |
+| ilmcp B 群 8 tools は最小の偽実装 | UI から呼べるが FL 本来の挙動ではない | 親 #35 の T3 (ilmcp 実装) |
+| `/?mcp=1` のパネルは最小 UI (整形・履歴・複数行 arguments 編集なし)。`pnpm build` 成果物 (`dist/`) は `/py/` を持たないため dev / preview 専用 | 本番配信での公開は未対応 | 親 #35 に提案 (配信設計は #62 H 系と調整) |
+| `build_flpy.sh` が `flapi_table.json` / `FLAPI.md` を再生成する。runner には win PE が無く `win_pair_verified` が false になる | 本 PR では当該 2 ファイルをコミットしていない | #74 の PR (provider) と同じ `/home/ubuntu` 固定パス問題。`fetch_inputs.sh` / `run_all.sh` の env 化を別 issue で提案 |

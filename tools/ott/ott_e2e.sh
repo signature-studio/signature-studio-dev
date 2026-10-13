@@ -14,7 +14,8 @@ NODE_BIN="$(command -v node || true)"
 export NODE="$NODE_BIN" PATH="$(dirname "$NODE_BIN"):$PATH"
 QUICK=""; [ "${1:-}" = "--quick" ] && QUICK="--quick"
 python3 -c "import capstone, pefile" 2>/dev/null || { echo "[ott_e2e] python: capstone/pefile が必要 (pip install capstone pefile)" >&2; exit 2; }
-DLL=/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll
+source "$OTT/../shared/env.sh"
+DLL="$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll"
 [ -f "$DLL" ] || { echo "[ott_e2e] $DLL 無し" >&2; exit 2; }
 
 echo "[1/6] native 参照ローダ build (PE を 0x180000000 に敷設, 実機械語を MS x64 ABI で直接実行)"

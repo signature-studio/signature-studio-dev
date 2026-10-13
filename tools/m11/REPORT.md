@@ -2,9 +2,11 @@
 
 **判定: 部分達成** (到達 stage 4/6)。`entry_point`(DllMain attach) → `_StartLib` → `_InitLib` → `InitUnits` が
 wasm 上で動作し、**FastMM4 が実際に GetMem → VirtualAlloc でプールを確保するところまで**は実測で到達。
-ただし 942 unit の初期化は通常起動で **17 本完走後、unit #18 (VA 0x455790) で trap**、`DllMain` の正常終了(Halt0→longjmp)には未達。
+ただし 942 unit の初期化は通常起動で **22 本完走後、unit #23 (VA 0x467f00) が Delphi 例外 → Halt0 (§10, #132 で #18 の OOB を解消)**、stage 5 (survey trap 無し完走) は未達。
+(下の §1 表と §2〜§8 は #132 以前 = unit #18 OOB 時点の実測。最新値は §10。)
 
-再現: `bash tools/m11/m11_e2e.sh` (増分約 10 秒 / `--full` で RetDec lift から全再生成 約 10 分)。常に exit 0。
+再現: `bash tools/m11/m11_e2e.sh` (work/ があれば増分 build: 実測 29.3〜29.6 秒 (§10, 4 vCPU, n=3) / `--full` で RetDec lift から全再生成: 旧記載「約 10 分」で本 PR では未再測定)。常に exit 0。
+gen_ir2 の ldfix は capstone+pefile が無いと黙ってスキップされる (§10 未解決の末尾)。PE は `/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin` 固定 (runner では symlink)。
 
 ## 1. 結論と実測 (m11_e2e.sh 出力)
 
@@ -19,6 +21,8 @@ wasm 上で動作し、**FastMM4 が実際に GetMem → VirtualAlloc でプー�
 | lift closure | lift 入力 7,380 関数 (base 7,361 + tail/間接 seed 19) → IR 定義 7,421 (RetDec が内部入口 41 個を別関数化), 1.41 MB code → IR 約 49.1 万行 → wasm 6.0 MB (wasm-ld 署名不一致 0 / 未定義 symbol 0) |
 | 間接 call 表 | 7,399 トランポリン (`m11_tr_function_X`, VA 二分探索) |
 | 実行時間 | 起動〜停止 約 0.2 秒 (-O0) |
+
+survey の ok / trap 数は `function_417b70` 転記 (#130) 前の値。転記後の件数と trap の個別原因は [trap_triage/REPORT.md](trap_triage/REPORT.md)。
 
 **「FastMM4 heap 初期化完走」は未証明**。到達しているのは「GetMem が medium pool を VirtualAlloc して返す」までで、
 FastMM4 の初期化関数群 (InitializeMemoryManager 相当) を単体で検証してはいない。state は probe 計数 (GetMem/FreeMem/VirtualAlloc 量) のみ。
@@ -114,76 +118,122 @@ RTL の範囲確定と RetDec/x64c 別の liftdiff 採点 (#129): `tools/m11/rtl
 
 ## 8. LB_BASE=0x10000 適用 (#222, 達成: 静的層 + `m11_e2e.sh` 実行で LB=0 と同水準を確認)
 
-既知類型との関係: 該当なし (関連: DEFECTS.md D11 = PE VA リテラルの wasm32 切捨て。本件は VA→LVA 規約の変更で別件)。
+`M11_LB_BASE` (既定 0 = LVA=RVA / `0x10000` で LVA=RVA+0x10000) で全層 (image_gen / data_gen / passes / ov.c / rt.c / build / ldfix) を切替可能にした。既定 0 は従来と byte 一致。
+**全文 (層ごとの変更表・静的層実測・IAT 738 スロット・LB=0 vs 0x10000 の `m11_e2e.sh` 実測・未検証) は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) に分割移動 (250 行上限, 内容は無変更)。**
 
-`M11_LB_BASE` (既定 0 = 従来 LVA=RVA / `0x10000` で LVA=RVA+0x10000) で全層を切替可能にした。既定 0 は従来と byte 一致。
+## 9. sigfix 0 詰めの計測・機械語分類・定数復元 (#131, 部分達成)
 
-| 層 | 変更 |
-|---|---|
-| `lb_base.py` | `M11_LB_BASE` の単一定義 (64KiB 境界を assert) |
-| `m11_image_gen.py` / `m11_data_gen.py` | reloc 補正 `-0x400000` → `-0x400000+LB`、image 先頭に LB 分の 0 領域 / data の memcpy 先に +LB |
-| `m11_passes.py` | IR の VA→LVA remap (M1/M2/M2b) の差分 `BASE_VA = 0x400000 - LB` |
-| `m11_ov.c` `m11_rt.c` `shimx_link/trace_rt.c` | 手書き RVA 定数 (`R()` 経由)・icall 表引き `target+(0x400000-LB)`・`hinst` を `-DM11_LB_BASE` で補正 |
-| `ldfix/ldfix.py` `ldfix/halt0_map.py` `shimx_link/analyze.py` `run_trace.mjs` | LVA↔VA 換算に LB を反映 |
-| `m11_build.sh` / `m11_e2e.sh` | `-DM11_LB_BASE`・stamp 不一致時の再生成/拒否・GLOBAL_BASE 衝突 assert・`lb_check.py` 実行 |
+既知類型との関係: 該当 (icall §4 の `callsite_arg_drop` = liftdiff 分類、`ldfix/REPORT_APPENDIX_AB.md` 優先 1)。`docs/DEFECTS.md` D1〜D16 に直接の行は無く、D7 (stack 引数のずれ) は別件 (新規行案は下記)。
 
-`m11_bounds.py` / `m11_tail.py` / `m11_icall_audit.py` は VA 空間 (LB 非依存) なので変更不要。GLOBAL_BASE 0x10000000 は image 終端 0x18c0000+0x10000 より後ろで変更不要 (assert 済み)。initial 288MiB / max 1.8GiB も未変更。
-
-### 実測 静的層 (コミット済み HEAD `95054de`, FLEngine_x64.dll 22,227,016 B)
+### 計測 (コミット済み HEAD `3e49295`, `bash tools/m11/m11_sigfix_stats.sh`, 3.50 / 3.49 / 3.48 秒, load 0.52, n=3 直列)
+単位: **0 詰め site** = `m11_post.py` sigfix が「call site の実引数数 < callee 定義の引数数」で書換えた call (分母: sigfix 書換え 6,675 site)。**0 詰め引数** = 補われた引数の総数。集計は `m11_post.py --pads`。
 
 | 項目 | 実測 |
 |---|---|
-| DIR64 reloc 総数 / 指す先 RVA<0x10000 (LB 適用前) | 278,531 / 55,929 (`lb_check.py` が別実装で再計算し `audit_va.py` と一致) |
-| LB=0x10000 適用後 linear<0x10000 の reloc 先 | **0** (全 278,531 が >=0x10000; 値は `v-0x400000+0x10000` と全件一致, 不一致 0) |
-| 非 reloc バイト不一致 / 先頭 64KiB の非 0 バイト | 0 / 0 |
-| LB=0 の image | 旧 `m11_image_gen.py` 出力と `cmp` 一致 (22,515,781 B) |
-| LB=0x10000 の image | 22,581,317 B (+65,536 B) |
-| 実行 (HEAD, n=3, load 0.17–0.36, 直列) | image_gen + lb_check: 8.21–8.40 秒, 3/3 PASS |
-| ネガティブコントロール | reloc 1 件の LB 補正を落とすと `dir64_value_mismatch=1` で FAIL; LB=0 image を LB=0x10000 で検査すると FAIL (長さ不足) |
-| IR remap pass 単体 | 試料 IR で store 即値 4096 (LB=0) → 69632 (LB=0x10000) を確認 (全 IR での件数は未計測) |
+| 0 詰め site / 0 詰め引数 | **1,049 site / 2,064 引数** (217 callee / 475 caller。位置 0..3 = 1,892、位置 4 以降 (stack) = 172) |
+| 既定出力 | 従来の `work/boot_final3.ll` と `cmp` byte 一致 (計測追加で出力不変) |
+| 機械語と突合できた site | 1,004 / 1,049 (`no_pdata` 23 = caller が .pdata 区間外、`unmatched` 22 = IR の callee 呼出し数と機械語の直接 call 数が不一致で k 番目の対応が取れない) |
 
-再現: `M11_LB_BASE=0x10000 python3 tools/m11/m11_image_gen.py <PE> && uv run --with pefile python tools/m11/lb_check.py <PE> work/m11_image.bin 0x10000`
+突合済み 1,004 site の 0 詰め引数 1,963 の分類 (`m11_argrecover.py`, capstone の線型 disasm。Win64: rcx/rdx/r8/r9 → `[rsp+0x20+8(i-4)]`):
 
-### IAT 738 スロット (要確認項目 4)
-全 738 スロットは `.idata` 内の hint/name RVA を持ち (IAT==ILT 738/738, by-name 738)、`.reloc` に載るのは 0 件、image 範囲値に見えるのは RVA を VA と誤認しているだけ。m11 の image は `.idata` を敷設せず (`KEEP` に無し)、`m11_genstubs.py` / `m11_win.c` は IAT を参照しない (grep 0 件; Win32 は IR の declare 名で stub 化)。**LVA 化への追従は不要**。`audit_va.py` の IAT 判定 (exit 1) は Delphi 側ではなく PE 標準の bound 前 IAT の誤検知で、FLEngine には不適。
+| 分類 | 引数数 | 意味 |
+|---|---:|---|
+| callee_unused | 313 | callee 入口の直線部で読む前に全幅書込み (stack 引数は callee 全体に読出し無し)。**0 詰めは無害** |
+| set_const | 18 | caller の直前窓 (同一基本ブロック) で定数代入。**復元済み** (`M11_SIGFIX_RECOVER=1`) |
+| set_const_xmm_callee | 48 | 定数代入だが callee が xmm0..3 を引数に読む。復元しない (下記退行) |
+| set_other | 378 / stack_set_other 32 | 窓内で非定数 (reg/メモリ由来) を代入。SSA 値との対応づけが必要で**未復元** |
+| inherit | 1,172 | 窓内で未代入 (caller 引数の素通し/遠方 def)。**未復元** |
+| callee_nopdata | 2 | callee が .pdata 外 |
 
-### 実測 `m11_e2e.sh` (LB=0 vs LB=0x10000; コミット済み HEAD `3162415`)
-GitHub Actions runner (4 core, load 0.6–0.9)。素材は work-m11 スナップショット (lift 成果物 `boot*.lift.ll` は LB 非依存で再利用; `gen_ir2` で IR の VA→LVA remap・data/image・emcc 増分ビルド・実行 A/B を再実行)。各 1 回, 直列。
+**削減**: 0 詰め引数 2,064 のうち 18 (0.87%) を実値に置換、313 (15.2%) は無害と判定。残り (set_other 378 + stack_set_other 32 + inherit 1,172 + xmm 48 + nopdata 2 + 未突合 101) は意味未保証のまま。残りの site 別一覧: `results/sigfix_zeropad_remaining.tsv` (1,049 行, 引数ごとの分類付き)。1 site が全引数 callee_unused or set_const で**完全解決**するのは 31 site。
 
-| 項目 | LB=0 | LB=0x10000 |
+### 検証 (実測)
+| 項目 | 結果 |
+|---|---|
+| 別アルゴリズム検算 `m11_argrecover_verify.py` (capstone の regs_access を使わず op_str の文字列で後ろ向き走査) | 復元 18 件が 18/18 一致 (初版 63 件では xor r9,r9 の 64bit 形を検算側が拾えず 10 件不一致 → 検算側の誤りと機械語で確認して修正し 63/63) |
+| ネガティブコントロール (値を 3 件 +1) | 15/18 一致・不一致 3 で exit 1 |
+| `m11_e2e.sh` (HEAD `3e49295`, `M11_SIGFIX_RECOVER=1`, 31.3 秒 (増分), load 0.88) | stage 4/6, 通常起動 17/942, survey **ok 812 / trap 83 / miss 46 / noproc 1** = 復元なし (60.6 秒, 全 obj 再生成) と同一。trap 内訳 OOB 34 / Halt0 48 / abort 1 も同一。unit 別 (942 本) 比較で差 0 |
+| 初版 (定数 63 件復元) | survey **ok 809 / trap 86** に**退行** (unit 838, 882, 885: ok → OOB)。二分探索で `function_c349a0` → `function_6a3d50` の 1 site (rcx=`lea` の ptr 定数) に特定。callee は xmm1..3 を引数に読むが IR に xmm 引数が無く 0 になる (推定: 実在オブジェクトへ xmm=0 で書込みが進み OOB)。xmm 引数を読む callee は部分復元しない規則を追加し、同等に戻った |
+
+つまり**定数復元は survey の数値を改善しなかった** (18 件は ok/trap どの unit にも影響しない)。意味補完の本体 (set_other / inherit の 1,550 引数) は未達。
+
+### 使い方・成果物
+* `m11_post.py --pads P.json` (0 詰め site 一覧出力) / `--fixes F.json` (復元適用)。`m11_argrecover.py` (分類+fix 生成)、`m11_argrecover_verify.py` (検算)、`m11_sigfix_stats.sh` (1 コマンド再現)。
+* `M11_SIGFIX_RECOVER=1 bash m11_e2e.sh` で復元を有効化 (既定 0 = 従来と byte 一致)。`M11_SURVEY_UNITS=<path>` で survey が unit 別結果 JSON を出す。
+* runner では `m11_e2e.sh` の PE パスが `/home/ubuntu/work/analysis/win64/extracted` ハードコードのため symlink で回避 (`m11_build.sh` は `FL_WIN64_DIR` 参照)。
+
+### 新規類型の行案 (DEFECTS.md 形式; 直接編集は PM 判断)
+| 症状 | 根本原因 | 観測 | 検出信号 | 修復 |
+|---|---|---|---|---|
+| 0 詰め引数を一部だけ実値化すると退行 | callee が xmm 引数 (IR に現れない) を読むのに整数引数だけ実値化し、callee が実オブジェクトを触って OOB | unit 838/882/885 ok→OOB (survey) | survey の unit 別差分 + 二分探索 | xmm 引数を読む callee は復元対象外 (本 PR) |
+
+### 未解決
+| 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `m11_e2e.sh` 所要 (実行 A/B 込み) | 38 秒 (boot/data 等の全 obj を emcc; gen_ir2 は直前の失敗実行で済) | 61 秒 (gen_ir2 + 全 obj を emcc) |
-| lb_check | PASS | PASS (linear<0x10000 の reloc 先 0) |
-| 到達 stage | 4/6 | 4/6 |
-| 通常起動 | unit 17/942 完走後 `memory access out of bounds` | 同 |
-| FastMM4 (通常起動) GetMem / FreeMem / VirtualAlloc | 13 / 1 / 3 | 13 / 1 / 3 |
-| survey ok / noproc / miss / trap | 812 / 1 / 46 / 83 | 812 / 1 / 46 / 83 |
-| trap 内訳 (OOB / Halt0 / abort) | 34 / 48 / 1 | 34 / 48 / 1 |
-| wasm サイズ / image | 6,010,298 / 22,515,781 B | 6,010,681 / 22,581,317 B |
+| set_other 410 / inherit 1,172 引数の復元 (機械語 reg → IR SSA 値対応のデータフロー; #90 の間接 call 復元と共通基盤) | 0 詰めの大半が意味未保証のまま | #131 に残 (Refs)。新規子チケットは PM 起票 |
+| xmm 引数 (xmm_arg_drop) の復元 (IR に xmm 引数が無い) | xmm を読む callee では整数引数だけ復元できない (48 引数) | #131 コメントで PM に提案 |
+| `unmatched` 22 / `no_pdata` 23 site | 突合不能 | 同上 |
+| #122 差分ハーネスで 0 詰め箇所を優先検証 | 未実施 (本 PR は survey の unit 比較まで) | #131 コメント |
 
-**stage 進行・survey 集計は一致**。unit 別 (942 本) に結果種別 (ok / noproc / miss / trap 種別) を比較すると差 0 (frame idx は unit 477 の `5385`→`5386` のみ。LB 依存の関数番号ずれで、同一 unit 477 の trap 種別は OOB のまま)。unit 別の副次カウンタ (GetMem / VirtualAlloc / stub 呼出) の差は 2 unit のみ:
-* unit 745 (VA 0xacb3b0, `function_ebb3b0`): LB=0x10000 だけ `SelectObject` stub が 3 回追加で呼ばれる (stub は 0 を返して継続; どちらも後続で OOB trap し種別は同一)。呼出元は未特定。原因 (LB 依存の分岐か、未初期化読みの値差か) は未調査。
-* unit 873 (VA 0xe61210): LB=0 は `VirtualAlloc` 1914MB 要求が 2GiB 上限で OOM → NULL → `Halt0`、LB=0x10000 は VirtualAlloc 要求自体が無く `Halt0` (どちらも Halt0→longjmp で種別同一)。要求サイズが LB で変わる原因は未調査。
-どちらも終了種別は不変で、集計 (ok 812 / trap 83) には影響しない。
+## 10. #132: unit #18 OOB の真因解消 (通常起動 17 → 22 unit)
 
-ネガティブコントロール (wasm と image の LB 不一致が実行で検出できること = 比較が鈍感でないこと):
-| 組合せ | 通常起動 | survey |
-|---|---|---|
-| wasm LB=0x10000 + image LB=0 | `init_count` 0, `units_run` 0, icall_miss 717 | ok 0 / miss 920 / noproc 21 |
-| wasm LB=0 + image LB=0x10000 | `units_run` 8, icall_miss 12,213, OOB | ok 2 / miss 939 |
+既知類型との関係: DEFECTS.md D7/D10 (alloca 縮退) の変種 (callee へ escape した stack_var) + D1 系 (旧値 load 脱落, `_UStrAsg` と同型) + D4 (`410b10` の `[obj]` deref 脱落)。
 
-再現 (m11_build.sh は `llvm-nm` を PATH から引くので `export PATH=/opt/emsdk/upstream/bin:$PATH` 相当が要る。runner では emsdk_env.sh が `llvm-nm` を PATH に載せず build が rc=127 で FAILED になるため `llvm-nm` の symlink を PATH に置いた): `M11_LB_BASE=0x10000 bash tools/m11/m11_e2e.sh` (PE パスは `/home/ubuntu/work/...` ハードコードのため symlink で回避)。
+**起点 commit `b760fa2`** (本 PR の最終コード = origin/main `c1e4105` + 本 PR; 以降の commit は docs のみ)。`bash tools/m11/m11_e2e.sh` (work-m11 / work-liftdiff 展開済み, PE は fl-win64 の
+`block00031_PE.bin`, capstone+pefile 入り venv で gen_ir2 の ldfix が有効, 4 vCPU runner)。load average = `/proc/loadavg` の 1 分値 (開始→終了; 開始値は直前の作業を含む)。
 
-### 軽微修正 (本 PR の同梱)
-* `lb_check.py`: image が `LB + 節末` より短いとき `struct.error` になっていたのを、先に長さを判定して `errors` を出し FAIL (exit 1) するよう修正 (長さ 1000 B の image で FAIL 出力を確認)。
-* `ldfix/ldfix.py` / `ldfix/halt0_map.py`: `M11_LB_BASE` の個別 parse をやめ `lb_base.py` (`LB`, `IMG_BASE`) を使う。`M11_LB_BASE=0x10000` で `ldfix.BASE == 0x3f0000` を確認。
+| commit | 内容 | units_run | 停止理由 (通常起動) | survey ok/trap/miss/noproc | trap 内訳 | GetMem/FreeMem | 所要 / load |
+|---|---|---|---|---|---|---|---|
+| `2c23bef` | 本 PR 初版 (旧 main 0a9e9d3 上) | 22/942 | DllMain attach 完走 (longjmp 経路) | 817/78/46/1 | halt0 39 + OOB 39 | 28/20 | 100 s / 1.06→1.26 (並行 2 本) |
+| `0f22d9c` | main (#414/#447/#481 後) | 17/942 | OOB | 839/56/46/1 | halt0 32 + OOB 24 | 16/1 | 46 s / 1.06→1.65 (並行 2 本) |
+| `6ad441d` | 0f22d9c + R8 + 3 override (410b10 無し) | 17/942 | OOB | 841/54/46/1 | halt0 32 + OOB 22 | 8/1 | 45.7 s / 0.26→0.72 |
+| `a71a404` | 6ad441d + 410b10 転記 | 22/942 | DllMain attach 完走 | 809/86/46/1 | halt0 72 + OOB 14 | 33/20 | 50.6 s / 0.12→0.66 |
+| `c1e4105` | main (#491/#496/#500 後 = 現 origin/main) | 17/942 | OOB | 849/43/49/1 | halt0 17 + OOB 26 | 16/1 | 43 s / 0.51→1.97 (手動 gen_ir2 と並行) |
+| **`b760fa2`** | **最終 HEAD** (c1e4105 + 本 PR) | **22/942** | **DllMain attach 完走 (longjmp 経路)** | **816/79/46/1** | halt0 65 + OOB 14 | 33/20 | 50.5 s (gen_ir2+ldfix+alloca+build 込み) / 1.36→1.77; 以降 29.3 / 29.4 / 29.6 s / 1.77→1.54, 1.54→1.32, 1.32→1.20 |
+| (NC) `b760fa2` − 410b10 | ネガティブコントロール | 17/942 | OOB | 850/45/46/1 | halt0 20 + OOB 25 | 8/1 | 49 s / 1.18→1.28 |
 
-### 未検証 / 範囲外
-* 全 IR での remap 件数・実行後の guest ポインタ assert は未計測 (stage / survey が一致することで代替確認)。IR の VA→LVA remap の regex (`m11_passes.py` M2b) は VA 側を見るので LB 非依存の見立ては、e2e 結果と整合 (補正漏れがあれば上記ネガティブコントロールのように崩れる)。
-* `#221` (liftlib `dataimage.py:37` フィルタ) は別 issue のまま。
-* 上記 unit 745 / 873 の副次差の原因調査は未実施 (集計に影響しないため本 PR の範囲外)。
+reached_stage は全行 4/6 (stage 5 未達)。最終 HEAD は 5 回測定 (gen_ir2 から 2 回 + 増分 3 回) すべて units_run 22 / survey 816/79/46/1 / halt0 65 + OOB 14 で一致 (変動なし)。
+
+- 解消したのは **unit #18 の OOB** であり、unit #23 (0x467f00) の **Delphi 例外 (45a2a0, 0xEEDFADE) → Halt0 は未解消** (旧版の表の「例外なし」は誤り)。停止理由「DllMain attach 完走」は Halt0 → longjmp 経路の判定。
+- PR 本文の「コードは 499bdfa と同一」は誤りだった。数値の測定コードは上表の commit ごとに別物 (`2c23bef` = 499bdfa と REPORT のみ差。最終は main merge + `410b10` 転記を含む)。
+- 最終 HEAD の survey ok (816) は main (849) より少ない。survey は 942 unit を 1 プロセスで通算実行し `VirtualFree` が no-op (leak) のため、VirtualAlloc 累計が上限 (1,490〜1,502 MB) に達すると
+  `[m11][VA] OOM` (calloc 失敗 → NULL) になる。この OOM の回数は NC 3 回 (VirtualAlloc 1,101 回) に対し最終 HEAD 55 回 (1,199 回)。`6ad441d` → `a71a404` の unit 別比較 (`M11_SURVEY_UNITS`) は
+  ok→trap 33 本 / trap→ok 1 本で、ok→trap の 4 本 (unit 235/265/276/313) のスタックは 409410/409470 (GetMem/ReallocMem) → 409730 (Error) → 412a40 → 4128b0 (Halt0) = GetMem 失敗 → Error → Halt0 と整合。
+  unit #18 が完走して消費が増えたためと**推定**するが、OOM を除いた意味の退行の有無は**未切り分け** (起票: #132)。
+
+**真因 (実測)**: 44bb70 の record (392B, CAB-129 で拡幅済) の +16 が、直前に呼ぶ `function_44bae0` の呼出し前後で 0 → 0x100000001 に変化
+(`m11_site` を IR に埋めて前後値を実測)。44bae0 の `stack_var_-88` が `alloca i64` (8B) だが、`call 44ba50(ptr)` で escape し
+callee が `[rcx+0x2c..0x3e]` (GetCPInfo の LeadByte 表) に書くため、呼出し元フレーム (= 44bb70 の record) を破壊していた。
+
+修正 (4 点):
+1. `alloca/m11_alloca.py` **R8**: escape する `stack_var_-N` を「次の stack_var までの間隔」に拡幅 (**サイズを供給しない推定型の規則**; 契約・数値・過大拡幅の注意は `alloca/REPORT.md` §2)。
+   gen_ir2 の素の IR に適用して 4,077 サイト → 2,408 alloca / 1,347 関数, +1,153,849 B stack (最終 HEAD で実測)。R8 だけでは OOB 解消のみ (units_run 17 のまま, unit #18 が Halt0 へ)。
+2. `m11_build.sh`: alloca pass を build 時に常設 (idempotent, 内容が同じなら mtime を触らない)。`m11_e2e.sh` の既定経路で pass が掛かる。
+3. `m11_ov.c`: `function_412d60` (`_UStrClr`) / `418190` (`_LStrArrayClr` 系) を C 転記 (RetDec が `mov rax,[rbx]` 型の旧値 load を脱落, D1 系)。
+   `_CopyArray` 416db0 も初版で転記したが (kind の `movzx rcx,[r8]` 脱落が unit #18 の Halt0 原因)、main の #417 (#496) が同関数を kind 12 (416720 の間接 call) 込みで転記したため、
+   merge で本 PR 側を削除し main 版を採用した (kind 12 が src を渡さない Copilot 指摘は main 版で解消)。
+4. `m11_ov.c`: `function_410b10` (TMonitor の GetMonitor 相当) を C 転記 (`a71a404`)。RetDec が `mov rax,[rcx]` (obj → VMT) を落とし `[obj-0x80]` を読む (D4)。
+   旧 main は `_ClassCreate` が TClass 自身を返したため偶然 InstanceSize になっていた。40fb40 で実オブジェクトが作られると `[obj-0x80]` がヒープ上の任意値になり、
+   `410820` (TMonitor.Enter) が LockCount=1 / Recursion=1 / Owner を FastMM の小ブロックプールヘッダ (0x10bd1990: BlockType 0xfa5148 → 0x100000001) に書き、後の `_UStrClr` → FreeMem が OOB (`6ad441d` の停止)。
+   逆アセンブル 0x410b10〜0x410b81 と突合。
+
+ネガティブコントロール (実測): (a) 本 PR 無しの main `c1e4105` = units_run 17 + OOB。(b) 最終 HEAD から 4 の `410b10` だけ外した (NC) = units_run 17 + OOB (停止は 455790 → 44bb70 → 446400 → 447860 → 412d60 → 409440 → 407e20; `6ad441d` で同じ停止を確認)。
+修正 1〜3 を個別に外した切り分けは**現 main 上では未実施** (旧 main 上の実測: 3 点を外すと units_run 17 + OOB)。検証範囲外: 417b70 / 409470 / 410320 / 40fb40 / 416db0 の機械語突合 (main 側の転記; 本 PR の差分ではない)。
+
+**次 blocker (unit #23 = 0x467f00)**: `467f00 → 467c40 → 45a640 → 45a2a0 → 411e80 → 411d20 → 412a60 → Halt0`。467c40 は
+`call [rax]` (IAT 経由の Win32 API, `mov ecx,eax` で戻り値を 45a640 に渡す) の結果で `45a640(ecx, dx=11, r8w=8)` を呼び、ecx が 0 以外・
+`0x7ffdfffb` 系でない値のとき 45a2a0 (例外送出, 0xEEDFADE) に進む。`467c40` の IR には間接 call が **0 件** (機械語 0x467cc9 `call [rax]` / 0x467d5d `call [rax]` が丸ごと脱落 = D15 型, `work/icall_audit.json` の
+`capstone_fns_with_indirect_call` 系と同じ現象)。脱落した戻り値の代わりに `45a640` へ未定義値 (ecx) が渡り例外送出へ進む可能性が高い (推定)。
+`[rip+0x117be27]` の指す IAT スロットの import 名は未特定。
+
+外した内容 (4c3baa4 の 467c40 間接 call 復元・boot5 25 関数 lift・配線 / faee5b6 の 417b70・409470 転記・BSTR スタブ) は #414/#447/#481 と重複するため本 PR に含めない。**#490 ([M11-N15]) で追跡**。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| unit 745 / 873 の副次カウンタ差 (SelectObject 3 回 / VirtualAlloc 要求有無) の原因 | 集計には無影響。LB 依存の分岐が残っていないかの確認 | #222 コメントに記録 (未起票。要なら PM が起票) |
-| `audit_va.py` の IAT 判定が FLEngine で常に exit 1 | CI 検査に使えない | #91 にコメント (PE 標準 IAT は除外すべき) |
+| unit #23 (0x467f00) の Delphi 例外 → Halt0 (467c40 の脱落した間接 call 0x467cc9 / 0x467d5d の復元・boot5) | 通常起動 22 で停止、stage 5/6 未達 | **#490** (旧 4c3baa4 の内容) |
+| 417b70 / 409470 の転記・BSTR alloc スタブ (旧 faee5b6) | main 側の転記と重複のため外した。整合の確認が要る | #490 |
+| survey の VirtualFree no-op による leak と OOM (`used=1490MB` で NULL → Halt0, 最終 HEAD 55 回) | survey の ok/trap 数がメモリ上限依存で、意味の退行と区別できない | #132 に継続 (VirtualFree の実解放を提案) |
+| survey trap 79 (halt0 65 / OOB 14)・closure 外 46 | stage 5 判定 (survey trap 無し) 未達 | #132 に継続 |
+| 巨大 VirtualAlloc 要求 (355MB×2, unit #18 のサイズ算出の未初期化値) | 通常起動で 711.7MB 確保 (`alloca/REPORT.md` 残置 #5) | #132 に継続 |
+| `m11_site` 型の診断 (IR へ guest VA を埋める) が m11 に無い | 反復が手作業 | boot/dbg_lift.py (flelift/boot) の m11 版を要検討 |
+| 素材 tarball に `ir_lb_base.stamp` が無く初回 e2e は必ず gen_ir2 が走る。gen_ir2 は capstone/pefile が無いと ldfix を黙ってスキップする (WARNING のみ) | 素材展開直後の数値が ldfix 有無で変わる (`6ad441d` で無し: survey 839/56/46/1、有り: 841/54/46/1) | #132 に継続 (e2e の前提チェック追加を提案) |

@@ -170,3 +170,25 @@ def eval_f2(mod, img):
     st, lg = {}, []
     f2.run(m2, img, lg, st, repair=False)
     return dict(injected=injected, detected=st.get("callees_pending", 0))
+
+
+def eval_f2_xret(mod, img):
+    """F2 xmm 戻り注入 (LIFTLIB #241): xmm 戻り搬送済み IR の各 `ret i64 %lf_*` を `ret i64 0` (xmm0 を落とした形) に
+    1 件ずつ戻し, `f2.xmm_ret_scan` が当該 callee を検出するか数える。mod は修復済み IR (run_xmm_ret 後)。"""
+    inj = det = 0
+    for fn in list(mod.funcs()):
+        if not re.match(r"function_[0-9a-f]+$", fn.name):
+            continue
+        base_bad = f2.xmm_ret_scan(mod, img, {fn.name}).get(fn.name, (0, 0))[1]
+        for b in fn.blocks:
+            for i, l in enumerate(b.lines):
+                if not f2.XRET_OK_RE.match(IR.strip_tokens(l)):
+                    continue
+                old = b.lines[i]
+                b.lines[i] = re.sub(r"ret i(64|32) %lf_[0-9a-f]+_t\d*", lambda m: "ret i%s 0" % m.group(1), old, count=1)
+                inj += 1
+                got = f2.xmm_ret_scan(mod, img, {fn.name}).get(fn.name, (0, 0))[1]
+                if got == base_bad + 1:
+                    det += 1
+                b.lines[i] = old
+    return dict(injected=inj, detected=det)

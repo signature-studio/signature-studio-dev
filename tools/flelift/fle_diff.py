@@ -10,7 +10,7 @@ usage: python3 fle_diff.py [--out work/verdict.jsonl] [--summary work/verdict_su
 import argparse, json, os, struct, subprocess, sys, collections
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PE = os.environ.get('FLE_PE', '/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin')
+PE = os.environ.get('FLE_PE') or os.path.join(os.environ.get('FL_WIN64_DIR', '/home/ubuntu/work/analysis/win64'), 'extracted', 'block00031_PE.bin')
 IMG = 0x400000
 DATA_LO, DATA_HI = 0x13a5000, 0x196f000   # .data + .bss (VA)
 TEB = 0x1D00000
