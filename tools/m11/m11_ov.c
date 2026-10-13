@@ -620,17 +620,25 @@ unsigned long long function_417b70(unsigned long long a, unsigned long long ti, 
     return 0;
 }
 
-#ifdef M11_OV_CLASSCREATE
+#ifndef M11_OV_CLASSCREATE
+#define M11_OV_CLASSCREATE 0
+#endif
+#if M11_OV_CLASSCREATE
 /* function_410360  VA 0x410360  (System.TObject: AfterConstruction 呼出し stub) (#419) — 実験: 既定 OFF (-DM11_OV_CLASSCREATE=1 で有効)。
  * 410320 (ClassCreate) / 40f960 (NewInstance) / 40fb40 (InitInstance) / 40fac0 は main (#474) が既定で転記済みのため本ブロックには持たない。
  * RetDec は `call [rbx-0x50]` (= AfterConstruction) を落とし `ret arg1` に誤 lift した (DEFECTS D15 型, call site 492)。
- * VMT slot 呼出し: closure 外の AfterConstruction 既定実装 410070 (= ret) は C で直接処理 */
-static u64 m11_vcall(u64 target, u64 self) {
-    if (target == R(0x10070)) return self;
-    return m11_icall(target, self, 0, 0, 0, 0, 0, 0, 0);
+ * VMT slot 呼出し: closure 外の AfterConstruction 既定実装 410070 (= ret) は呼ばず (miss 計上を避ける), #494 の site/target 計測には ok で計上する。
+ * site は元バイナリの `call [rbx-0x50]` の VA 0x41037d (逆アセンブルで確認) */
+static u64 m11_vcall(u32 site, u64 target, u64 self) {
+    if (target == R(0x10070)) {
+        icall_bump(&g_isite, site, 0);
+        icall_bump(&g_itgt, 0x410070u, 0);
+        return self;
+    }
+    return ICALL_AT(site, target, self, 0, 0, 0, 0, 0, 0, 0);
 }
 unsigned long long function_410360(unsigned long long inst) {
-    m11_vcall(Q(Q(inst) - 0x50), inst);
+    m11_vcall(0x41037d, Q(Q(inst) - 0x50), inst);
     return inst;
 }
 /* function_8cbda0 / function_8cbce0  (Generics.Collections TDictionary: comparer の GetHashCode / Equals = interface slot 0x20 / 0x18 の間接 call 脱落)
@@ -638,7 +646,7 @@ unsigned long long function_410360(unsigned long long inst) {
  *   8cbce0(this,key,hash): 開番地 probe。items=[this+8] (24B/entry: +0 hash, +8 key), n=[items-8]; hash==-1 → ~i; 一致 → comparer->vtbl[0x18](c, entry.key, key) */
 u64 function_8cbda0(u64 self) {
     u64 c = Q(self + 0x18);
-    u64 h = m11_icall(Q(Q(c) + 0x20), c, 0, 0, 0, 0, 0, 0, 0);
+    u64 h = ICALL_AT(0x8cbdae, Q(Q(c) + 0x20), c, 0, 0, 0, 0, 0, 0, 0);
     return (u64)(((u32)h & 0x7fffffffu) + 1u & 0x7fffffffu);
 }
 u64 function_8cbce0(u64 self, u64 key, u64 hash) {
@@ -652,7 +660,7 @@ u64 function_8cbce0(u64 self, u64 key, u64 hash) {
         if (h == 0xffffffffu) return ~(u64)i;
         if (h == (u32)hash) {
             u64 c = Q(self + 0x18);
-            u64 r = m11_icall(Q(Q(c) + 0x18), c, Q(e + 8), key, 0, 0, 0, 0, 0);
+            u64 r = ICALL_AT(0x8cbd61, Q(Q(c) + 0x18), c, Q(e + 8), key, 0, 0, 0, 0, 0);
             if (r & 0xff) return (u64)i;
         }
         i++; e += 24;
