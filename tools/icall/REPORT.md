@@ -224,7 +224,7 @@ python3 tools/icall/diff/fn3_diff.py 1801a9be0 --n 600 --dump    # native / rout
 
 | 検査 | 結果 (実測) |
 |---|---|
-| `icall_e2e.sh` (GitHub Actions runner, load 0.45 開始・直列 1 本) | **PASS**, 71 秒, exit 0 |
+| `icall_e2e.sh` (GitHub Actions runner, load 0.45 開始・直列 1 本) | **PASS**, 71 秒, exit 0 (コミット済み HEAD `9410981` で再実行: PASS, 70 秒, load 0.27 開始) |
 | 〃 [4/4] matrix | scenario 89, failed 0, cell 50,236 中 50,236 が native と bit 一致, max_ulp 0, state_diff_qwords 0 |
 | 〃 [3/4] 監査 | OTT F 非IAT間接 call 81: 落ち 70 → 0, tail-jmp 11: 落ち 11 → 0, jump table 8 展開 |
 | 〃 [+] CRT 関数単位 gate | SSE2 経路 6 関数すべて xmm0 600/600 bit 一致 → PASS |
