@@ -81,7 +81,7 @@ def main():
         print('known.json: block %s は今回の対象に無い' % b, file=sys.stderr)
     out, ok = judge(rows, known, want, a.strict)
     for b, n, k, f in out:
-        print('%-9s %-6s %-18s %s%s' % (k, b, n, ','.join(f) or '-', ('  ref=%s' % known[b]['ref']) if k == 'KNOWN' else ''))
+        print('%-9s %-6s %-18s %s%s' % (k, b, n, ','.join(f) or '-', ('  ref=%s' % known[b].get('ref', '-')) if k == 'KNOWN' else ''))
     cnt = {k: sum(1 for o in out if o[2] == k) for k in ('PASS', 'KNOWN', 'NEW-FAIL', 'FIXED', 'MISSING')}
     print('judge%s: %d rows; PASS %d / KNOWN %d / NEW-FAIL %d / FIXED %d / MISSING %d' % (
         ' (strict)' if a.strict else '', len(out), cnt['PASS'], cnt['KNOWN'], cnt['NEW-FAIL'], cnt['FIXED'], cnt['MISSING']))
