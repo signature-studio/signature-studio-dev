@@ -1,11 +1,13 @@
 # M11 LB_BASE=0x10000 の残差調査 (#403, 部分達成)
 
 親: #222 (PR #303)。素材: fl-win64 (`block00031_PE.bin` 22,227,016 B)。work-m11・toolchain-emsdk・toolchain-retdec は本 PR の作業 runner に無い (§2・§4 参照)。
-e2e の測定は HEAD `64d09590` で実施。c8b9ad75 との差は `audit_va.py` のみで e2e 結果に影響しない (§1 の audit 実測は c8b9ad75 で実施)。
-実行は各 1 回ずつ直列 (ただし同一条件の再実行 2 回で結果が一致したものを記す)。
+測定主体の区別: e2e の数値 (§2・§4・§5) は HEAD `64d09590` で測定した**前回記録の引用**で、本 PR の作業 runner では再測定していない。§1 の audit は本 PR の作業 runner で再実行した。各節の冒頭に出所を明記する。
 既知類型との関係: 該当なし (LB 依存差は未切り分けで、`docs/DEFECTS.md` の D1a〜D18 への帰属は未確認。近縁は D11 = PE VA リテラルの切り捨て)。
 
 ## 1. audit_va.py の IAT 判定 (受入 1: 原因特定 — 完了)
+
+測定主体: 本 PR の作業 runner (2026-10-13) で再実行。`fl-win64.tar.zst` から `block00031_PE.bin` (22,227,016 B) のみを展開し、`audit_va.py <PE> 0x10000` を実行。exit 0。
+出力の要点: `iat_slots=738`・`iat_slots_holding_hint_name_rva=738`・`iat_slots_holding_image_VA=0`・`dir64_targets_outside_image=0`・`reloc_dir64_total=278531`。
 
 - 原因: IAT スロット 738/738 の値は **hint/name テーブルの RVA** (ILT と同値、例 `0x15721a4` = `PathUnExpandEnvStringsW`)。
   `[ImageBase, ImageBase+SizeOfImage)` の範囲に入るため VA と誤判定していた。
@@ -15,6 +17,8 @@ e2e の測定は HEAD `64d09590` で実施。c8b9ad75 との差は `audit_va.py`
 - 既存 REPORT (`REPORT_APPENDIX.md` の IAT 節) の結論「PE 標準の bound 前 IAT の誤検知」と一致。
 
 ## 2. LB=0 と LB=0x10000 の `m11_e2e.sh` 比較 (受入 2: 未達)
+
+測定主体: 下表は HEAD `64d09590` での前回記録の引用 (§4 と同一記録)。本 PR では再測定していない。
 
 | 項目 | LB=0 (2 回) | LB=0x10000 (2 回) |
 |---|---|---|
@@ -63,8 +67,13 @@ unit 40 の trap (上表) はこの Halt0 と同じ経路。**LB 依存で Halt 
   うち image VA 範囲 `[0x400000, 0x400000+0x1ac0000)` に残るもの (= 未 remap) **4,368 件**。
   この件数は本 runner では再計算していない (`work/boot_final.ll` が無い)。
   `m2_inttoptr_remap = 0`・`m2b_remap = 0` (`ir_report.json`) と合わせ、残件の解消先は未特定 (§未解決 参照)。
-- 指紋の不一致 (未切り分け): 旧記録 (main 版 §3) は LB=0 `9a9e223e…`・LB=0x10000 `451ecd03…`。本 PR の記録は LB=0 `3a9ceb17…`・LB=0x10000 `5dfb1473…`。
-  本 PR は IR 生成・build の経路 (`m11_gen_ir2.sh`・`m11_build.sh`・`m11_lift.sh`) を変更しておらず、本 runner では IR を再生成していない。
+- IR 指紋 (`ir_sha256`) は記録ごとに次の値があり、同一ファイル内でも一致していない (記録の出所別に整理):
+  | 記録 | LB=0 | LB=0x10000 | 出所 |
+  |---|---|---|---|
+  | 旧 main 版 (REPORT_N715 系) | `9a9e223e…` | `451ecd03…` | HEAD `64d09590` 以前の記録 (引用) |
+  | 本 PR §3 | `3a9ceb17…` | `5dfb1473…` | 作成者の手元記録 (引用。本 runner で未再現) |
+  | 本 PR §5 | `1fc847d4…` | `b529a344…` | 作成者の手元記録 (引用。本 runner で未再現) |
+  §3 と §5 は同一 run の記録ではない可能性があり、どちらが測定時の IR かは未確定。本 PR の作業 runner では IR を再生成していない。
   `REPORT_N27.md` では同一手順の 2 run で `ir_sha256` が異なった記録があり (RetDec・gen_ir2 の出力の非決定性の可能性)、指紋の差はこれと区別できていない。
   したがって「IR は変更していない」とは言えない。どの IR (指紋) を使った測定かは未確定。
 - 実行後の guest ポインタ assert (実行結果の VA 範囲検査) は未実装。子 issue #1004 (M11-N57) の範囲。
@@ -80,7 +89,7 @@ unit 40 の trap (上表) はこの Halt0 と同じ経路。**LB 依存で Halt 
 | `M11_LB_BASE=0` | 150 s | 0 | units_run 53 / survey ok 870 / trap 25 / miss 46 / wasm 6,042,920 |
 | `M11_LB_BASE=0x10000` | 98 s | 0 | units_run 37 / survey ok 868 / trap 27 / miss 46 / wasm 6,043,303 / halt0_early=true |
 
-- 上の値は §2 の表と同じ測定 (同一記録)。二重の独立検証ではない。
+- 上の値は §2 の表と同じ測定 (同一記録)。二重の独立検証ではない。§5 の ok/trap は同じ値だが、§5 の記録は別 run の引用で、IR 指紋も異なる (§3 参照)。
 - 本 PR の変更 (`m11_remap_count*`・REPORT) は e2e の経路に入らないため、この値は本 PR の変更では変わらない見込みだが、再測定はしていない。
 - 再測定の手順: `M11_LB_BASE=0 bash tools/m11/m11_e2e.sh` / `M11_LB_BASE=0x10000 bash tools/m11/m11_e2e.sh` (work-m11 と fl-win64 が必要)。
 
@@ -92,18 +101,22 @@ unit 40 の trap (上表) はこの Halt0 と同じ経路。**LB 依存で Halt 
 | REPORT_APPENDIX の旧 HEAD 集計 (812/83) と現 HEAD (870/25) の差 | 既存の数値の根拠が現 HEAD で再現しない | PM が起票 (#222 系) |
 | 実行後の guest ポインタ assert (未実装) | 受入 3 の後半 | 子 issue #1004 (M11-N57) |
 | 未 remap の image VA 即値 4,368 件 (件数の解消先) | 受入 3 の件数は計測済み。解消を担当する issue は未特定 (#417 は halt0 21 unit の別件、#1004 は実行後 assert で範囲外) | PM 起票を要求 (担当 issue 未確定) |
-| IR 指紋の不一致 (旧 `9a9e223e…`/`451ecd03…` と本記録 `3a9ceb17…`/`5dfb1473…`) | どの IR で測定したかが未確定 | PM 確認 (work-m11 の `ir_conditions.json` で照合) |
+| IR 指紋の不一致 (§3 の `3a9ceb17…`/`5dfb1473…`、§5 の `1fc847d4…`/`b529a344…`、旧 main 版の `9a9e223e…`/`451ecd03…` の 3 組) | どの IR で測定したかが未確定。§2 の表 (LB=0 870/25) と §5 の LB=0 の値は同じ ok/trap だが指紋は別 | PM 確認 (work-m11 の `ir_conditions.json` で照合) |
+| 手で作った `work/lift_pe.sha256` による lift 指紋検査の迂回 (§5) | §5 の測定が「全再生成と同一の lift 成果物」かは保証されない | 本 PR 内で記録。work-m11 の更新 (#728 以降の再生成) は PM 起票 |
 
-## 5. unit 別の LB 依存差の実測 (2026-10-13 run・受入 2 の切り分け・原因は未特定)
+## 5. unit 別の LB 依存差 (作成者の前回 run の記録・受入 2 の切り分け・原因は未特定)
 
-- 素材: fl-win64 → `$HOME/analysis/win64`、work-m11 / work-liftdiff → `tools/m11/work/`、toolchain-emsdk / retdec → `/opt/`。
+測定主体: 下の数値は作成者の前回 run の**記録の引用**である。本 PR の作業 runner では再測定していない (work-m11・toolchain が無い)。
+測定 HEAD は記録間で食い違う: PR 本文は d2a9102d の worktree、§2・§4 は 64d09590 と記載。どちらで測ったかは未確定。「2 回一致」は引用元の記録での主張で、本 runner では確認していない。
+- 素材の前提 (引用元の記録): fl-win64 を展開。work-m11 / work-liftdiff は `tools/m11/work/` に展開。toolchain-emsdk / retdec は `[EMSDK]`・`[RETDEC]` (`docs/REFERENCES.md`) の環境。
   work-m11 は #728 以前のスナップショットで `work/lift_pe.sha256` が無く、`m11_e2e.sh` が全再生成に入って Ghidra の `functions_dll.csv` を要求して止まる。
-  そのため `work/lift_pe.sha256` に現 PE の sha256 (`b2c64da4…`) を手で書き、lift 成果物を再利用した (全再生成はしていない)。
-- e2e 実測 (同一 worktree・同一 work/・各条件 2 回以上):
+- **指紋検査の迂回 (前回 run の操作。REPORT の出所として明記)**: `work/lift_pe.sha256` に PE の sha256 を手で書き、lift 成果物を再利用した (全再生成はしていない)。
+  これは `docs/WORKFLOW.md` §11 が定める「PE が変われば作り直す」指紋検査を手で迂回した操作である。
+  **その結果が全再生成と同一である保証はない。** §5 の数値は、この迂回が生成結果を変えていないという前提に依存する。
+- 引用の記録 (上の前提の下での値。§2 の表・§4 とは別の run 記録だが、ok/trap の値は §2 と同じ):
   - `M11_LB_BASE=0`: units_run 53 / survey ok 870 / trap 25 / miss 46 / ir_sha256 `1fc847d4…`
   - `M11_LB_BASE=0x10000`: units_run 37 / survey ok 868 / trap 27 / miss 46 / halt0_early=true / ir_sha256 `b529a344…`
-  - LB=0 の 2 回目 (`e2e_lb0c`) も 870/25 で一致。前回 PR #1006 の記録とも一致。
-- unit 別の食い違い (`M11_SURVEY_UNITS` で取った 942 件ラベル。index 比較):
+- unit 別の食い違い (`M11_SURVEY_UNITS` で取った 942 件ラベル。index 比較の引用):
   食い違いは index 40 / 153 / 158 / 745 の 4 件のみ。
 
 | index | VA (LB=0) | LB=0 | VA (LB=0x10000) | LB=0x10000 | LB=0x10000 側の trap 位置 (wasm 関数名) |
