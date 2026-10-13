@@ -1,0 +1,5 @@
+[sxl_e2e] build : [sxlink] OK plain_failfast: signature mismatch=1 undefined symbol=0 duplicate=0  -> /home/runner/work/_temp/ws-1258/tools/m11/work/shimx_link/m11_sx_plain_failfast.cjs
+[sxl_e2e] build --soft: [sxlink] OK plain_soft: signature mismatch=1 undefined symbol=0 duplicate=0  -> /home/runner/work/_temp/ws-1258/tools/m11/work/shimx_link/m11_sx_plain_soft.cjs
+[sxl_e2e] build --soft --fix: [sxlink] OK plain_soft_fix: signature mismatch=1 undefined symbol=0 duplicate=0  -> /home/runner/work/_temp/ws-1258/tools/m11/work/shimx_link/m11_sx_plain_soft_fix.cjs
+[sxl_e2e] build --trace --soft --fix: [sxlink] OK trace_soft_fix: signature mismatch=1 undefined symbol=0 duplicate=0  -> /home/runner/work/_temp/ws-1258/tools/m11/work/shimx_link/m11_sx_trace_soft_fix.cjs
+[sxl_e2e] build --trace --fix: [sxlink] OK trace_failfast_fix: signature mismatch=1 undefined symbol=0 duplicate=0  -> /home/runner/work/_temp/ws-1258/tools/m11/work/shimx_link/m11_sx_trace_failfast_fix.cjs
