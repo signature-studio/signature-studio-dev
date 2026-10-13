@@ -46,4 +46,17 @@ rc=0
 for v in wasm32 wasm64; do
   if diff -q "$B/dec_native.txt" "$B/dec_$v.txt" >/dev/null; then echo "[ogg] PASS DEC $v: decoded PCM hash == native"; else diff "$B/dec_native.txt" "$B/dec_$v.txt"; echo "[ogg] FAIL DEC $v"; rc=1; fi
 done
+
+# LGL-3 (#86): 再ビルド記録 (libogg / libvorbis)
+if [ "$rc" = 0 ]; then
+  NSRC_FILES="$(for f in $SRCS; do basename "$f"; done | sort | paste -sd' ')"
+  for L in libogg:1.3.2:libogg-1.3.2.tar.gz:https://downloads.xiph.org/releases/ogg/libogg-1.3.2.tar.gz libvorbis:1.3.5:libvorbis-1.3.5.tar.gz:https://downloads.xiph.org/releases/vorbis/libvorbis-1.3.5.tar.gz; do
+    IFS=: read -r N V A U <<<"$L"
+    case "$N" in libogg) FILES="bitwise.c framing.c" ;; *) FILES="$(for f in $SRCS; do case "$f" in "$VOR"/*) basename "$f" ;; esac; done | sort | paste -sd' ')" ;; esac
+    node "$ROOT/../legal/notices/record.mjs" --id "$N-$V" --name "$N" --version "$V" --license-spdx BSD-3-Clause \
+      --url "$U" --archive "$S/$A" --src-dir "$S/$N-$V" --license-file COPYING \
+      --script "$HERE/build.sh" --toolchain emcc --target wasm32 --target wasm64 \
+      --step "compile=emcc $CF -I<build>/inc -I<libvorbis>/include -I<libvorbis>/lib <sources: $FILES> (autotools 不使用。config_types.h のみ native ./configure 生成)"
+  done
+fi
 exit $rc

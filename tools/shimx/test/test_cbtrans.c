@@ -276,8 +276,27 @@ static void test_cbtrans_r3_lifttab(void) {
     shimx_lift_thunk_fn th_free = shimx_lifttab_trampoline((unsigned)(uintptr_t)tok_free);
     CHECK(th_free != NULL && th_free((u64x)(uintptr_t)p, 0, 0, 0, 0, 0, 0, 0) == 0);
 
-    /* 対象外 (shell32 #74 = SHCreateStdEnumFmtEtc 未実装) はトークン化されない */
-    CHECK(shimx_lifttab_token(NULL, 74) == 0);
+    /* SHX-T8: shell32 #74 / shlwapi #12・#219 もトークン化される。未知序数は対象外 */
+    CHECK(shimx_lifttab_token(NULL, 74) != 0 && shimx_lifttab_token(NULL, 75) == 0);
+    HMODULE shl = GetModuleHandleW(W("shlwapi.dll"));
+    CHECK(shl);
+    void* tok_ms = GetProcAddress(shl, (LPCSTR)(uintptr_t)12);
+    void* tok_qi = GetProcAddress(shl, (LPCSTR)(uintptr_t)219);
+    CHECK((uintptr_t)tok_ms >= 0x7F000000u && (uintptr_t)tok_qi >= 0x7F000000u && tok_ms != tok_qi);
+    CHECK(GetProcAddress(shl, (LPCSTR)(uintptr_t)16) == NULL);              /* shlwapi #16 は shell32 #16 のトークンを返してはならない */
+    shimx_lift_thunk_fn th_ms = shimx_lifttab_trampoline((unsigned)(uintptr_t)tok_ms);
+    CHECK(th_ms != NULL);
+    void* ms = (void*)(uintptr_t)th_ms((u64x)(uintptr_t)"abc", 3, 0, 0, 0, 0, 0, 0);
+    CHECK(ms != NULL);
+    uint64_t* vt = (uint64_t*)(uintptr_t)*(uint64_t*)ms;
+    char buf[8]; ULONG got = 0;
+    CHECK(((HRESULT (*)(void*, void*, ULONG, ULONG*))(uintptr_t)vt[3])(ms, buf, 3, &got) == S_OK && got == 3 && !memcmp(buf, "abc", 3));
+    ((ULONG (*)(void*))(uintptr_t)vt[2])(ms);
+    shimx_lift_thunk_fn th_en = shimx_lifttab_trampoline((unsigned)(uintptr_t)GetProcAddress(sh, (LPCSTR)(uintptr_t)74));
+    CHECK(th_en != NULL);
+    void* en = NULL; uint8_t fe[32] = { 0x0F, 0 };
+    CHECK(th_en(1, (u64x)(uintptr_t)fe, (u64x)(uintptr_t)&en, 0, 0, 0, 0, 0) == 0 && en);
+    ((ULONG (*)(void*))(uintptr_t)(*(uint64_t**)en)[2])(en);
 
     /* 解除: 組込み表の実 C ポインタに戻る */
     shimx_set_proc_resolver(NULL);

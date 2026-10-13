@@ -3,3 +3,6 @@ dist/
 __pycache__/
 *.pyc
 node_modules/
+
+# 生成物 (provider/gen は生成元と同 commit で追跡)
+analysis/mcp/tool_coverage.wasm.json

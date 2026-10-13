@@ -1,5 +1,6 @@
 // shim テストページ: URL クエリで構成を受け取り、wasm (fla_test) + FlAudioShim を起動して結果を window.__done (Promise) に返す。
 import { FlAudioShim } from "./js/audio-shim.js";
+import { FlAudioInput } from "./js/audio-input.js";
 
 const q = new URLSearchParams(location.search);
 const cfg = {
@@ -16,9 +17,14 @@ const cfg = {
   timeinfo: +(q.get("timeinfo") ?? 0),
   sr_after: +(q.get("sr_after") ?? 0),
   burst_floor: +(q.get("burst_floor") ?? 0),
-  input: q.get("input") ?? "none", // noise | gum
+  input: q.get("input") ?? "none", // noise | gum | ui (FlAudioInput 経由)
+  panel: +(q.get("panel") ?? 0),   // 1: ASIO controlPanel を呼ぶ (ui 入力: 別デバイスへ切替える UI 代替を登録)
+  panel_ui: q.get("panel_ui") !== "0", // 0: controlPanel 未登録 (NotPresent 経路)
+  lose: q.get("lose") === "1",     // 中間で入力 track の ended を発生 (デバイス喪失)
   jank: q.get("jank") === "1",     // main thread を 30ms/100ms ブロック
   suspend: q.get("suspend") === "1", // 中間で ctx.suspend()/resume()
+  olat_zero_ms: +(q.get("olat_zero_ms") ?? 0), // >0: 最初の呼出から N ms の間 outputLatency=0 を返す (起動直後 0 の再現)
+  olat_wait_ms: q.has("olat_wait_ms") ? +q.get("olat_wait_ms") : undefined, // ATTACH の待ち上限 (0 = 待たない旧挙動)
 };
 const logEl = document.getElementById("log");
 const log = (s) => { logEl.textContent += s + "\n"; console.log(s); };
@@ -42,7 +48,7 @@ window.__done = new Promise((resolveAll, rejectAll) => {
     arguments: [
       `api=${cfg.api}`, `mode=${cfg.mode}`, `buf=${cfg.buf}`, `depth=${cfg.depth}`, `secs=${cfg.secs}`, `sr=${cfg.sr}`,
       `stress=${cfg.stress}`, `work_us=${cfg.work_us}`, `hiccup_ms=${cfg.hiccup_ms}`, `hiccup_every=${cfg.hiccup_every}`, `timeinfo=${cfg.timeinfo}`, `sr_after=${cfg.sr_after}`,
-      `burst_floor=${cfg.burst_floor}`,
+      `burst_floor=${cfg.burst_floor}`, `panel=${cfg.panel}`,
     ],
     print: (t) => log("[wasm] " + t),
     printErr: (t) => { stderr.push(String(t)); log("[wasm!] " + t); if (String(t).includes("FAIL-FAST")) setTimeout(() => resolveAll({ aborted: true, what: "fail-fast", stderr, cfg }), 500); },
@@ -56,12 +62,38 @@ window.__done = new Promise((resolveAll, rejectAll) => {
         layoutName: (i) => M.UTF8ToString(M._fla_layout_name(i)),
       };
       let ctxInfo = {};
+      let zeroT0;
       const refLog = [];
       window.__refLog = refLog;
+      const ui = { events: [], devices: [], panelOpened: 0, switched: null, labels: [] };
+      let input = null;
+      if (cfg.input === "ui" || cfg.input === "ui_denied") {
+        // ui_denied: getUserMedia が NotAllowedError で拒否される環境 (権限ダイアログで「ブロック」)。出力は継続する必要がある
+        const denied = { getUserMedia: () => Promise.reject(new DOMException("denied", "NotAllowedError")), enumerateDevices: async () => [], addEventListener() {}, removeEventListener() {} };
+        input = new FlAudioInput({ log, storage: null, mediaDevices: cfg.input === "ui_denied" ? denied : undefined });
+        input.on((e) => ui.events.push(e.type === "devices" ? { type: "devices", n: e.devices.length } : e));
+        window.__input = input;
+      }
       shim = new FlAudioShim(api, {
         workletUrl: "worklets/fl-audio-worklet.js",
+        input: input ?? undefined,
+        controlPanel: cfg.panel && cfg.panel_ui ? async () => {
+          ui.panelOpened++;
+          // パネル UI の代替: 権限状態 → デバイス一覧 → 既定以外の最初のデバイスを選択 (ライブ切替)
+          ui.permission = await input.permission();
+          ui.devices = (await input.listDevices()).map((d) => d.label);
+          const cur = input.activeTrack?.label;
+          ui.labels.push(cur);
+          ui.permission_after = await input.requestPermission();
+          const alt = (await input.listDevices()).find((d) => d.deviceId !== "default" && d.label && d.label !== cur);
+          if (alt) { await input.select(alt.deviceId); ui.switched = input.activeTrack?.label ?? null; ui.labels.push(ui.switched); }
+        } : undefined,
         refLog,
         log,
+        outputLatencyWaitMs: cfg.olat_wait_ms,
+        readOutputLatency: cfg.olat_zero_ms > 0
+          ? (ctx) => { zeroT0 ??= performance.now(); return performance.now() - zeroT0 < cfg.olat_zero_ms ? 0 : ctx.outputLatency; }
+          : undefined,
         captureFactory: (outCh, inCh) => {
           const frames = Math.ceil((cfg.secs * cfg.sr + 8192) / 128) * 128;
           const bytes = 64 + frames * (outCh + inCh) * 4 + (frames / 128) * 4;
@@ -75,6 +107,8 @@ window.__done = new Promise((resolveAll, rejectAll) => {
             src.loop = true;
             src.connect(node);
             src.start();
+          } else if (cfg.input === "ui" || cfg.input === "ui_denied") {
+            // 実運用経路: FlAudioShim が input.connect() を呼ぶ (onNode の後)
           } else if (cfg.input === "gum") {
             const ms = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 2 } });
             ctxInfo.gumTracks = ms.getAudioTracks().map((t) => ({ label: t.label, settings: t.getSettings() }));
@@ -86,6 +120,9 @@ window.__done = new Promise((resolveAll, rejectAll) => {
       window.__shim = shim;
       if (cfg.jank) {
         setInterval(() => { const t = performance.now(); while (performance.now() - t < 30) { /* busy */ } }, 100);
+      }
+      if (cfg.lose) {
+        setTimeout(() => { const t = input?.activeTrack; ui.lostTrack = t?.label ?? null; t?.dispatchEvent(new Event("ended")); }, cfg.secs * 500);
       }
       if (cfg.suspend) {
         setTimeout(async () => { await shim.context?.suspend(); setTimeout(() => shim.context?.resume(), 500); }, cfg.secs * 500);
@@ -108,6 +145,10 @@ window.__done = new Promise((resolveAll, rejectAll) => {
         try { result = JSON.parse(text); } catch (e) { rejectAll(new Error("bad result json: " + text)); return; }
         result.exit = code;
         result.ctx = ctxInfo;
+        if (input) {
+          ui.controlPanelCalls = shim.controlPanelCalls;
+          result.ui = ui;
+        }
         result.snapshot = shim.snapshot();
         result.workletErrors = shim.workletErrors;
         result.cfg = cfg;

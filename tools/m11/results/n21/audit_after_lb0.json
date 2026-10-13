@@ -1,0 +1,80 @@
+{
+ "pe": "/home/runner/work/_temp/fl-win64/extracted/block00031_PE.bin",
+ "lb": 0,
+ "dir64_total": 278531,
+ "by_section": {
+  ".data": {
+   "dir64": 10284,
+   "fits": 10284,
+   "value_ok": 10284,
+   "old_picks": 10283,
+   "new_picks": 10284,
+   "actually_patched": 10284,
+   "missed": 0
+  },
+  ".rdata": {
+   "dir64": 0,
+   "fits": 0,
+   "value_ok": 0,
+   "old_picks": 0,
+   "new_picks": 0,
+   "actually_patched": 0,
+   "missed": 0
+  }
+ },
+ "other_sections": {
+  ".text": 268133,
+  ".didata": 114
+ },
+ "old_new_diff": [
+  {
+   "sec": ".data",
+   "rva": 18763776,
+   "v": 4349696,
+   "old": false,
+   "new": true,
+   "patched": true,
+   "right": true,
+   "miss": false
+  }
+ ],
+ "missed": [],
+ "inconsistent": [],
+ "boundary": {
+  ".data": {
+   "lo": 16404480,
+   "end": 18763784,
+   "len": 2359304,
+   "last_slot_rva": 18763776,
+   "tail16": [
+    {
+     "sec": ".data",
+     "rva": 18763768,
+     "v": 4348672,
+     "old": true,
+     "new": true,
+     "patched": true,
+     "right": true,
+     "miss": false
+    },
+    {
+     "sec": ".data",
+     "rva": 18763776,
+     "v": 4349696,
+     "old": false,
+     "new": true,
+     "patched": true,
+     "right": true,
+     "miss": false
+    }
+   ]
+  },
+  ".rdata": {
+   "lo": 22515712,
+   "end": 22515781,
+   "len": 69,
+   "last_slot_rva": 22515773,
+   "tail16": []
+  }
+ }
+}

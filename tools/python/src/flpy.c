@@ -17,13 +17,23 @@ extern int flhost_call(int fn_id, const unsigned char *argv, int argc, unsigned 
 
 enum { T_NONE = 'N', T_BOOL = 'B', T_INT = 'I', T_DBL = 'D', T_STR = 'S', T_BYTES = 'Y', T_JSON = 'J', T_ERR = 'E', T_CB = 'F' };
 
-static PyObject *HostError;
-static PyObject *json_loads;
-static PyObject *g_cbs;      /* callable handle table: id -> callable (Python→FL→Python 非同期コールバック用) */
-static long g_cb_counter;
-static char g_last_error[4096];
+/* PY-12 (#587): _flhost の状態は module state (インタプリタごと)。static 変数に持つとサブインタプリタ間で共有・上書きされる。 */
+typedef struct {
+    PyObject *HostError;
+    PyObject *json_loads;
+    PyObject *cbs;      /* callable handle table: id -> callable (Python→FL→Python 非同期コールバック用) */
+    long cb_counter;
+} flhost_state;
+
+static char g_last_error[4096];  /* ホスト向け診断バッファ (インタプリタ非依存・スレッド無し) */
+
+static flhost_state *flhost_get_state(PyObject *m) {
+    return (flhost_state *)PyModule_GetState(m);
+}
 
 static PyObject *flhost_call_py(PyObject *self, PyObject *args) {
+    flhost_state *st = flhost_get_state(self);
+    if (!st) return NULL;
     int fn_id;
     PyObject *tup;
     if (!PyArg_ParseTuple(args, "iO!", &fn_id, &PyTuple_Type, &tup)) return NULL;
@@ -50,9 +60,9 @@ static PyObject *flhost_call_py(PyObject *self, PyObject *args) {
             s[0] = T_BYTES; *(uint32_t *)(s + 8) = (uint32_t)(uintptr_t)PyBytes_AS_STRING(o);
             *(uint32_t *)(s + 12) = (uint32_t)PyBytes_GET_SIZE(o);
         } else if (PyCallable_Check(o)) {
-            long id = ++g_cb_counter;
+            long id = ++st->cb_counter;
             PyObject *key = PyLong_FromLong(id);
-            if (!key || PyDict_SetItem(g_cbs, key, o) < 0) { Py_XDECREF(key); return NULL; }
+            if (!key || PyDict_SetItem(st->cbs, key, o) < 0) { Py_XDECREF(key); return NULL; }
             Py_DECREF(key);
             s[0] = T_CB; *(int64_t *)(s + 8) = id;
         } else {
@@ -63,7 +73,7 @@ static PyObject *flhost_call_py(PyObject *self, PyObject *args) {
     unsigned char ret[16];
     memset(ret, 0, sizeof(ret));
     int rc = flhost_call(fn_id, argv, (int)n, ret);
-    if (rc != 0) { PyErr_Format(HostError, "host call %d failed rc=%d", fn_id, rc); return NULL; }
+    if (rc != 0) { PyErr_Format(st->HostError, "host call %d failed rc=%d", fn_id, rc); return NULL; }
     PyObject *out = NULL;
     uint32_t p = *(uint32_t *)(ret + 8), l = *(uint32_t *)(ret + 12);
     switch (ret[0]) {
@@ -78,7 +88,7 @@ static PyObject *flhost_call_py(PyObject *self, PyObject *args) {
         PyObject *s = PyUnicode_DecodeUTF8((const char *)(uintptr_t)p, l, "replace");
         free((void *)(uintptr_t)p);
         if (!s) return NULL;
-        out = PyObject_CallFunctionObjArgs(json_loads, s, NULL);
+        out = PyObject_CallFunctionObjArgs(st->json_loads, s, NULL);
         Py_DECREF(s);
         break;
     }
@@ -87,11 +97,11 @@ static PyObject *flhost_call_py(PyObject *self, PyObject *args) {
         PyObject *msg = PyUnicode_DecodeUTF8((const char *)(uintptr_t)p, l, "replace");
         free((void *)(uintptr_t)p);
         PyObject *ex = Py_BuildValue("(iN)", code, msg);
-        PyErr_SetObject(HostError, ex);
+        PyErr_SetObject(st->HostError, ex);
         Py_XDECREF(ex);
         return NULL;
     }
-    default: PyErr_Format(HostError, "bad host return tag %d", ret[0]); return NULL;
+    default: PyErr_Format(st->HostError, "bad host return tag %d", ret[0]); return NULL;
     }
     return out;
 }
@@ -101,23 +111,40 @@ static PyMethodDef flhost_methods[] = {
     {NULL, NULL, 0, NULL}};
 
 static int flhost_exec(PyObject *m) {
-    HostError = PyErr_NewException("_flhost.HostError", PyExc_Exception, NULL);
-    if (!HostError) return -1;
-    Py_INCREF(HostError);
-    if (PyModule_AddObject(m, "HostError", HostError) < 0) return -1;
-    g_cbs = PyDict_New();
-    if (!g_cbs) return -1;
-    Py_INCREF(g_cbs);
-    if (PyModule_AddObject(m, "_cbs", g_cbs) < 0) return -1;
+    flhost_state *st = flhost_get_state(m);
+    if (!st) return -1;
+    st->HostError = PyErr_NewException("_flhost.HostError", PyExc_Exception, NULL);
+    if (!st->HostError) return -1;
+    if (PyModule_AddObjectRef(m, "HostError", st->HostError) < 0) return -1;
+    st->cbs = PyDict_New();
+    if (!st->cbs) return -1;
+    if (PyModule_AddObjectRef(m, "_cbs", st->cbs) < 0) return -1;
     PyObject *json = PyImport_ImportModule("json");
     if (!json) return -1;
-    json_loads = PyObject_GetAttrString(json, "loads");
+    st->json_loads = PyObject_GetAttrString(json, "loads");
     Py_DECREF(json);
-    return json_loads ? 0 : -1;
+    return st->json_loads ? 0 : -1;
 }
 
-static PyModuleDef_Slot flhost_slots[] = {{Py_mod_exec, flhost_exec}, {0, NULL}};
-static struct PyModuleDef flhost_def = {PyModuleDef_HEAD_INIT, "_flhost", "FL host boundary", 0, flhost_methods, flhost_slots, NULL, NULL, NULL};
+static int flhost_traverse(PyObject *m, visitproc visit, void *arg) {
+    flhost_state *st = flhost_get_state(m);
+    if (st) { Py_VISIT(st->HostError); Py_VISIT(st->json_loads); Py_VISIT(st->cbs); }
+    return 0;
+}
+
+static int flhost_clear(PyObject *m) {
+    flhost_state *st = flhost_get_state(m);
+    if (st) { Py_CLEAR(st->HostError); Py_CLEAR(st->json_loads); Py_CLEAR(st->cbs); }
+    return 0;
+}
+
+static void flhost_free(void *m) { flhost_clear((PyObject *)m); }
+
+static PyModuleDef_Slot flhost_slots[] = {
+    {Py_mod_exec, flhost_exec},
+    {Py_mod_multiple_interpreters, Py_MOD_PER_INTERPRETER_GIL_SUPPORTED},
+    {0, NULL}};
+static struct PyModuleDef flhost_def = {PyModuleDef_HEAD_INIT, "_flhost", "FL host boundary", (Py_ssize_t)sizeof(flhost_state), flhost_methods, flhost_slots, flhost_traverse, flhost_clear, flhost_free};
 PyMODINIT_FUNC PyInit__flhost(void) { return PyModuleDef_Init(&flhost_def); }
 
 /* ---------------- ホスト向け export ---------------- */
@@ -217,6 +244,63 @@ EMSCRIPTEN_KEEPALIVE char *flpy_call_json(const char *target, const char *args_j
     out = strdup(u ? u : "{\"err\":\"non-utf8\"}");
     Py_DECREF(r);
     return out;
+}
+
+/* ---------------- PY-6 (#76): サブインタプリタ可否の検証用 export ----------------
+ * code を新しいサブインタプリタの __main__ で実行し、その __main__.result (str) を返す → インタプリタを破棄して元に戻る。
+ * mode: 0 = isolated (_PyInterpreterConfig_INIT: 独立 obmalloc / 単相初期化 ext 拒否 / OWN_GIL)
+ *       1 = isolated + SHARED_GIL (wasm はスレッド無しなので OWN_GIL が成立するかの切り分け用)
+ *       2 = legacy (_PyInterpreterConfig_LEGACY_INIT: main と obmalloc/GIL を共有、ext 制限なし)
+ * 戻り値: malloc'ed JSON {"ok":true,"result":..} | {"ok":false,"stage":..,"err":..} (flpy_free で解放)。
+ * 本番経路 (flpy_run / flpy_call_json) はこの関数を使わない。 */
+static char *json_reply(int ok, const char *stage, const char *text) {
+    PyObject *d = PyDict_New();
+    PyDict_SetItemString(d, "ok", ok ? Py_True : Py_False);
+    if (stage) { PyObject *o = PyUnicode_FromString(stage); PyDict_SetItemString(d, "stage", o); Py_DECREF(o); }
+    if (text) { PyObject *o = PyUnicode_DecodeUTF8(text, (Py_ssize_t)strlen(text), "replace"); PyDict_SetItemString(d, ok ? "result" : "err", o); Py_DECREF(o); }
+    PyObject *dumps = NULL, *out = NULL;
+    PyObject *js = PyImport_ImportModule("json");
+    if (js) dumps = PyObject_GetAttrString(js, "dumps");
+    if (dumps) out = PyObject_CallFunctionObjArgs(dumps, d, NULL);
+    const char *u = out ? PyUnicode_AsUTF8(out) : NULL;
+    char *r = strdup(u ? u : "{\"ok\":false,\"err\":\"json_reply failed\"}");
+    Py_XDECREF(out); Py_XDECREF(dumps); Py_XDECREF(js); Py_DECREF(d);
+    PyErr_Clear();
+    return r;
+}
+
+EMSCRIPTEN_KEEPALIVE char *flpy_subinterp_run(const char *code, int mode) {
+    PyThreadState *main_ts = PyThreadState_Get();
+    PyInterpreterConfig cfg = mode == 2 ? (PyInterpreterConfig)_PyInterpreterConfig_LEGACY_INIT : (PyInterpreterConfig)_PyInterpreterConfig_INIT;
+    if (mode == 1) cfg.gil = PyInterpreterConfig_SHARED_GIL;
+    PyThreadState *sub = NULL;
+    PyStatus st = Py_NewInterpreterFromConfig(&sub, &cfg);
+    if (PyStatus_Exception(st) || !sub) {
+        PyThreadState_Swap(main_ts);
+        return json_reply(0, "new_interpreter", st.err_msg ? st.err_msg : "Py_NewInterpreterFromConfig failed");
+    }
+    char *text = NULL;
+    int ok = 0;
+    PyObject *main_mod = PyImport_AddModule("__main__");
+    PyObject *globals = main_mod ? PyModule_GetDict(main_mod) : NULL;
+    PyObject *co = globals ? Py_CompileString(code, "<subinterp>", Py_file_input) : NULL;
+    PyObject *r = co ? PyEval_EvalCode(co, globals, globals) : NULL;
+    if (!r) {
+        set_err_from_python("subinterp");
+        text = strdup(g_last_error);
+    } else {
+        Py_DECREF(r);
+        PyObject *res = PyDict_GetItemString(globals, "result");
+        const char *u = res ? PyUnicode_AsUTF8(res) : NULL;
+        text = strdup(u ? u : "");
+        ok = 1;
+    }
+    Py_XDECREF(co);
+    Py_EndInterpreter(sub);
+    PyThreadState_Swap(main_ts);
+    char *reply = json_reply(ok, ok ? NULL : "exec", text);  /* 応答は元の (main) インタプリタで組み立てる */
+    free(text);
+    return reply;
 }
 
 EMSCRIPTEN_KEEPALIVE const char *flpy_last_error(void) { return g_last_error; }

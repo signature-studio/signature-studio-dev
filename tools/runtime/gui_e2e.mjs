@@ -134,21 +134,25 @@ async function run(mode) {
 }
 
 /** gui_worker.ts → gui_renderer.ts 切り出しの回帰: 合成 GuiShared で GuiHost → render worker → OffscreenCanvas */
-async function runRender() {
-  const url = `http://127.0.0.1:${port}/?gui=render-selftest`;
+async function runRender(extra = "", tag = "render", wantBackend = null) {
+  const url = `http://127.0.0.1:${port}/?gui=render-selftest${extra}`;
   console.log(`\n[gui-e2e] render-selftest (GuiHost + gui_worker + 合成 GuiShared)  ${url}`);
   const page = await chrome.newPage(url);
   const r = await page.waitForExpr("window.__guiRender && window.__guiRender.state !== 'running' && window.__guiRender", 60000);
-  ck("[render] GuiHost.attach → SURF_CREATE/PRESENT/FRAME_END → frame ack", r.state === "done" && r.frames >= 1, r.error ?? `frames=${r.frames}`);
+  ck(`[${tag}] GuiHost.attach → SURF_CREATE/PRESENT/FRAME_END → frame ack`, r.state === "done" && r.frames >= 1, r.error ?? `frames=${r.frames}`);
+  if (wantBackend) ck(`[${tag}] 採用された present 方式 = ${wantBackend}`, r.present && r.present.backend === wantBackend, JSON.stringify(r.present));
   const exp = [240, 128, 16];
-  ck("[render] readback: surface 画素 BGRA→RGBA 変換 (20,20)=(240,128,16)", Array.isArray(r.readbackPixel) && near(r.readbackPixel, exp, 0), JSON.stringify(r.readbackPixel));
+  ck(`[${tag}] readback: surface 画素 BGRA→RGBA 変換 (20,20)=(240,128,16)`, Array.isArray(r.readbackPixel) && near(r.readbackPixel, exp, 0), JSON.stringify(r.readbackPixel));
   const shot = decodePNG(Buffer.from((await page.send("Page.captureScreenshot", { format: "png", clip: { x: 0, y: 0, width: W, height: H, scale: 1 } })).data, "base64"));
-  ck("[render] screenshot: surface 内 (20,20) と 外 (5,5)=黒", near(shot.px(20, 20), exp, 2) && near(shot.px(5, 5), [0, 0, 0], 0), `in=${shot.px(20, 20)} out=${shot.px(5, 5)}`);
-  if (page.exceptions.length) ck("[render] page exceptions == 0", false, page.exceptions[0].slice(0, 300));
+  ck(`[${tag}] screenshot: surface 内 (20,20) と 外 (5,5)=黒`, near(shot.px(20, 20), exp, 2) && near(shot.px(5, 5), [0, 0, 0], 0), `in=${shot.px(20, 20)} out=${shot.px(5, 5)}`);
+  if (page.exceptions.length) ck(`[${tag}] page exceptions == 0`, false, page.exceptions[0].slice(0, 300));
 }
 
 try {
-  if (!args.has("neg")) await runRender();
+  if (!args.has("neg")) {
+    await runRender();
+    await runRender("&backend=webgl2&sync=raf&seqlock=1", "render-webgl2", "webgl2");   // GUI-4: WebGL2 + rAF + seqlock (Vite バンドルの本番 worker 経由)
+  }
   for (const m of modes) await run(m);
 } catch (e) {
   console.error("[gui-e2e] FAILED:", e.stack || e);

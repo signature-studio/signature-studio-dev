@@ -12,9 +12,15 @@
     "runtime:e2e:prod": "node tools/runtime/e2e.mjs --prod",
     "runtime:gui-e2e": "node tools/runtime/gui_e2e.mjs",
     "runtime:gui-e2e:prod": "node tools/runtime/gui_e2e.mjs --prod",
+    "runtime:memload": "node tools/runtime/memload/run_memload.mjs",
     "release-guard:build": "node tools/legal/release-guard/cli.mjs build",
     "release-guard": "node tools/legal/release-guard/cli.mjs scan",
-    "release-guard:test": "node --test tools/legal/release-guard/guard.test.mjs"
+    "release-guard:test": "node --test tools/legal/release-guard/guard.test.mjs",
+    "notices": "node tools/legal/notices/cli.mjs generate",
+    "notices:check": "node tools/legal/notices/cli.mjs check",
+    "notices:test": "node --test tools/legal/notices/notices.test.mjs",
+    "terms-watch": "node tools/legal/terms-watch/cli.mjs",
+    "terms-watch:test": "node --test tools/legal/terms-watch/terms-watch.test.mjs"
   },
   "keywords": [],
   "author": "",

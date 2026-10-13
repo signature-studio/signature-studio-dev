@@ -1,0 +1,24 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>web midi worker probe</title>
+<body><pre id="log"></pre>
+<script type="module">
+// Worker 内で Web MIDI が使えるかの実測 (W3C: MIDIAccess は Exposed=(Window,Worker))。結果は window.__done
+const probe = `
+  const r = { hasNavigator: typeof navigator !== 'undefined', hasRequestMIDIAccess: typeof navigator !== 'undefined' && typeof navigator.requestMIDIAccess === 'function',
+    hasMIDIAccessCtor: typeof MIDIAccess !== 'undefined', hasMIDIInputCtor: typeof MIDIInput !== 'undefined', isSecure: self.isSecureContext, scope: self.constructor.name };
+  (async () => {
+    if (r.hasRequestMIDIAccess) {
+      try { const a = await Promise.race([navigator.requestMIDIAccess({ sysex: true }), new Promise((_, ng) => setTimeout(() => ng(new Error('timeout 8s')), 8000))]);
+        r.access = { ok: true, inputs: a.inputs.size, outputs: a.outputs.size, sysexEnabled: a.sysexEnabled }; }
+      catch (e) { r.access = { ok: false, name: e.name, message: String(e.message) }; }
+    }
+    postMessage(r);
+  })();`;
+const main = { hasRequestMIDIAccess: typeof navigator.requestMIDIAccess === 'function', isSecure: isSecureContext };
+if (main.hasRequestMIDIAccess) {
+  try { const a = await Promise.race([navigator.requestMIDIAccess({ sysex: true }), new Promise((_, ng) => setTimeout(() => ng(new Error('timeout 8s')), 8000))]); main.access = { ok: true, inputs: a.inputs.size, outputs: a.outputs.size, sysexEnabled: a.sysexEnabled }; }
+  catch (e) { main.access = { ok: false, name: e.name, message: String(e.message) }; }
+}
+window.__done = new Promise((ok) => { const w = new Worker(URL.createObjectURL(new Blob([probe], { type: 'text/javascript' }))); w.onmessage = (e) => ok({ main, worker: e.data }); w.onerror = (e) => ok({ main, worker: { error: String(e.message) } }); });
+</script>

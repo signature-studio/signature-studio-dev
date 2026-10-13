@@ -50,12 +50,13 @@ fail-fast: 未初期化/`bufferSwitch==NULL`/チャネル外/`buffer_frames` が
 
 ## 4. バッファ・レイテンシ選択と「バースト」
 
-- worklet は **128 フレーム固定**。ASIO バッファは **128 の倍数** (既定報告 min=128/max=4096/pref=512/granularity=128。ILWASAPI 値 256/4096/512/0 は `-DFLASIO_PROFILE_ILWASAPI=1`)。
+- worklet は **128 フレーム固定**。ASIO バッファは **128 の倍数** を createBuffers が受理 (profile に依らず [128,4096])。getBufferSize の既定報告は **ILWASAPI 値 min=256/max=4096/pref=512/granularity=0** (AU-7 #193 で確定; FL は min/max/granularity を読まない: REPORT §11)。shim 単体用の min=128/granularity=128 は `-DFLASIO_PROFILE_ILWASAPI=0`。
 - **重要な実測**: ブラウザは quantum を 1 つずつでなく **バースト** (OS 出力バッファ単位) で連続呼出する。headless Chrome では 48k で 512f (10.7ms) 周期、96k では 2048–3072f。`ctx.baseLatency` は 96k で実態 (3072f) より小さい (1024f) ため当てにならない。
 - よって目標充填 `T = depth*B` は **T ≥ burst×1.25 + B** が必要 (1 バースト通過で ring が枯渇しないこと)。決定手順:
   1. OPEN 時に 96 quanta の較正プローブ (`fl-burst-probe`, 約 0.25s) で実バーストを測定、`max(baseLatency, probe)` を ACK で返す → `fla_open` が `depth` を引き上げ。
   2. 実行中は worklet が `burst_obs` を更新、producer が `T` を拡張 (underrun 毎に +B も加算)。拡張のみ (縮小なし)。`kAsioLatenciesChanged` 通知は既定 OFF (FL の `asioMessage` は selector 6 を内部コマンド 0x17 に配線 = 再起動の疑い: INVENTORY §2) 。
 - 報告レイテンシ: `output = T + 128 + (baseLatency + outputLatency)·sr`, `input = B + 128 + baseLatency·sr` (推定。実測 shim in→out = T フレーム)。
+- `outputLatency` は起動直後 0 で約 250ms 後に更新される。FL は createBuffers 直後の getLatencies を一度だけ読むため、ATTACH は outputLatency>0 になるまで最大 600ms 待ってから CreateBuffers を返す (`FlAudioShimOptions.outputLatencyWaitMs`, 0 で無効)。上限まで 0 のブラウザは 0 のまま進む。
 - サンプルレート: `AudioContext({sampleRate})` を要求 (ブラウザが必要ならリサンプル)。`SetSampleRate` は停止中のみ → `SET_SR` コマンドで ctx 再生成 → ring はそのまま再接続、`sampleRateDidChange` をホストへ。
 
 ## 5. Underrun 処理 (クロック連続・データ非破壊)
@@ -71,7 +72,7 @@ worklet は quantum 毎に `avail = write-read` を見る:
 ## 6. クロック同期 (worklet = master)
 
 - worklet は毎 quantum 先頭で `(currentFrame, currentTime)` を seqlock 付きで公開。`performance` は AudioWorkletGlobalScope に無い (実測 `typeof performance === "undefined"`) ため、system 時刻は main thread が `ctx.getOutputTimestamp()` を 250ms 毎に取得し、直近 16 点の最小二乗直線で平滑化した `(ref_ctx_time, ref_epoch_ms=performance.timeOrigin+performanceTime)` を公開 (±数ms のジッタを低減)。
-- wasm 側 `fla_clock_read`: `audible_ns = ref_epoch + (ctx_time(quantum) - ref_ctx)·1000`。= **その quantum 先頭が「聴こえる」時刻** (outputLatency を含む)。ASIO `GetSamplePosition` / `ASIOTime.timeInfo` は `(dev_frames - play_start_frame, audible_ns)` を返す (`kSystemTimeValid|kSamplePositionValid|kSampleRateValid`)。
+- wasm 側 `fla_clock_read`: `audible_ns = ref_epoch + (ctx_time(quantum) - ref_ctx)·1000`。= **その quantum 先頭が「聴こえる」時刻** (outputLatency を含む)。`fla_clock_read` の `audible_ns` は shim 内部の時刻写像 (e2e の `clock.*` はこれを直接測る)。ASIO `GetSamplePosition` / `ASIOTime.timeInfo` は `(dev_frames - play_start_frame, systemTime)` を返し (`kSystemTimeValid|kSamplePositionValid|kSampleRateValid`)、**`systemTime` は既定で基準ドライバ ILWASAPI2ASIO と同じ「コールバック時刻」= `(uint32)timeGetTime() ms × 1e6` ns** (AU-7 #193; FL は systemTime だけを読み timeGetTime と同じ時間軸で扱う: REPORT §11)。従来の可聴時刻は `-DFLASIO_SYSTIME_AUDIBLE=1`。
 - 位置の意味: デバイスクロック基準 (underrun 中の無音も進む)。FL の再生カーソル `pbtrackingmode` はこの位置で補間される想定。
 
 ## 7. WASAPI 風 (`flwasapi_*`, P2)
@@ -99,6 +100,6 @@ FL は `DirectSoundCreate` → `CreateSoundBuffer`(primary/secondary) → `SetFo
 
 **MIDI (WinMM `midiIn*/midiOut*` 20 関数、macOS CoreMIDI 16 関数)**: FL は `midiInOpen(CALLBACK_FUNCTION=0x30000)` でコールバックを受け取り (実測 dwFlags)、SysEx は `midiInPrepareHeader/AddBuffer` の MIDIHDR バッファ。
 - 制御: main thread で `navigator.requestMIDIAccess({sysex:true})` (secure context + 権限、ユーザ操作後)。`midiInGetNumDevs/GetDevCapsW` は OPEN 時スナップショット (`MIDIInputMap` 反復順 = デバイス ID、`szPname` は 31 文字に切詰め)、`onstatechange` はホットプラグ → 再スキャン通知。
-- 入力: `MIDIInput.onmidimessage` (main) → **SPSC MIDI ring (SAB, 16B エントリ: ms タイムスタンプ + packed short msg / SysEx は別 ring にバイト列)** → wasm の専用 MIDI スレッドが `Atomics.wait` で受け、FL のコールバックを呼ぶ (`MIM_DATA 0x3C3`, `MIM_LONGDATA 0x3C4`; `dwParam2` = `midiInStart` からの ms)。W3C WD 2025 では `MIDIAccess` は `Exposed=(Window,Worker), Transferable` なので、worker 内直接受信 (main 中継を省略) は Chrome の実装状況を確認して切替 (**未検証**)。
-- 出力: `midiOutShortMsg/LongMsg` → out ring → main が `MIDIOutput.send(data, timestamp)` (`performance.now` 基準)。Safari は Web MIDI 非対応 (caniuse)。Firefox は権限アドオン要。
+- 入力: `MIDIInput.onmidimessage` (main) → **SPSC MIDI ring (SAB, 1 本。レコード = 16B ヘッダ + payload。short は packed msg を `w1` に、SysEx は `w1` にバイト長を置いて直後にバイト列を続ける。16B 境界へ切上げ。形式の正は `flmidi.h` 冒頭)** → wasm の専用 MIDI スレッドが `Atomics.wait` で受け、FL のコールバックを呼ぶ (`MIM_DATA 0x3C3`, `MIM_LONGDATA 0x3C4`; `dwParam2` = `midiInStart` からの ms)。W3C WD 2025 では `MIDIAccess` は `Exposed=(Window,Worker), Transferable` だが、**Chrome 154 の DedicatedWorker には `navigator.requestMIDIAccess`・`MIDIAccess` が無い (実測, REPORT_MIDI §13-2)** → main 中継が必須。実装: `src/flmidi*.c` (wasm) + `src/runtime/midi-shim.ts` (JS)、ring/レイアウトは `src/flmidi.h` が単一の真実 (TS `midi-layout.ts` が起動時に照合)、数値・検証は REPORT_MIDI.md。
+- 出力: `midiOutShortMsg/LongMsg` → out ring → main が `MIDIOutput.send(data)` を呼ぶ (実装は timestamp 未指定 = 即時送信。`send(data, timestamp)` による時刻指定は未実装, REPORT_MIDI §13-3(d))。Safari は Web MIDI 非対応 (caniuse)。Firefox は権限アドオン要。
 **オーディオ入力 (getUserMedia)**: `{echoCancellation:false, noiseSuppression:false, autoGainControl:false, channelCount}` → `MediaStreamAudioSourceNode` を worklet node の入力へ接続 (PoC で fake device 経由 `input_rms≈0.14` / 相関 1.0 を確認、`asio_loop_gum_fake`)。入力 ring へ worklet が write、`bufferSwitch` 直前に producer が `buffers[idx]` へ read。デバイス選択は `enumerateDevices` (ラベルは権限後) + ASIO `controlPanel` UI、変更は `kAsioResetRequest`。入力側ブラウザ内部バッファで +20–40ms (survey 4.2、未実測)。
