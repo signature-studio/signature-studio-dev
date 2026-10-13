@@ -154,7 +154,7 @@ DSP 固有 closure (42 効果) にはライセンス/ネット系参照が無く
 - `product_index.json` (46 plugins) は `work/winpkg/` の生成物 (gitignore)。差分に出ないのは仕様どおり。再生成には `plugins-kilohearts` 素材が要る (`scripts/kh249_product_index.py`)。
 - **libc / CRT 名衝突 (レビュー指摘 3・#710)**: `gen_stubs_sigs.py` は body 中の未知の `@Name(` に `abort()` 付きの定義を生成するため、`memcpy`・`strlen`・`sqrt` 等が named import として出ると libc を上書きする。`LIBC_NAMES` (memcpy/memset/strlen/sqrt/malloc/printf 等 33 名) に当たる名前が `used_names` に出たら生成段で `sys.exit` する (`scripts/kh710_check.py` の `libc_clash:*` で検査: memcpy は停止 / GetCurrentThreadId は通過 = PASS)。
   - 実 lift 出力での `used_names` 列挙: **実施済み** (12.2 参照。4 module とも空で、`LIBC_NAMES` との衝突なし)。
-- 実行 (HEAD `e49f9640`): `python3 scripts/kh710_check.py` → `RESULT PASS` (rc=0・PASS 15 / FAIL 0)。
+- 実行 (HEAD `8e56adc8`): `python3 scripts/kh710_check.py` → `RESULT PASS` (rc=0・PASS 15 / FAIL 0)。
 
 ### 12.1 回帰確認 (実測・旧 HEAD `9c1f7c0b` を同条件で再ビルドして比較)
 
@@ -164,9 +164,9 @@ DSP 固有 closure (42 効果) にはライセンス/ネット系参照が無く
 | module | 旧 `9c1f7c0b` sha256 | 現 HEAD sha256 | wasm bytes | 判定 |
 |---|---|---|---|---|
 | A | `411007b8…b6fc` | `411007b8…b6fc` | 26705 | 一致 |
-| B | `62182947…cf04` | `62182947…cf04` | 25249 | 一致 |
+| B | `62182947…f04b` | `62182947…f04b` | 25249 | 一致 |
 | E | `0cf066d1…6fed8` | `0cf066d1…6fed8` | 364770 | 一致 |
-| F | `7ba79e65…7707` | `7ba79e65…7707` | 54394 | 一致 |
+| F | `7ba79e65…8c7707` | `7ba79e65…8c7707` | 54394 | 一致 |
 
 - 各 module の `lic_build.py` rc は 0。`undefined_imports` は全て `[]`。emcc は全 module で成功 (rc=0)。
 - `kh249_check.mjs` (module F): 旧・現とも `kh249_check ok=17 ng=0`、rc=0。
@@ -197,7 +197,7 @@ DSP 固有 closure (42 効果) にはライセンス/ネット系参照が無く
 | 1 | 旧 HEAD `9c1f7c0b` の module A 再ビルド (比較基準) | sha `411007b8…b6fc`・26,705 B・undefined `[]` | 29.5 s |
 | 2 | 現 HEAD `8e56adc8` の `used_names` 突合 (module A/B/E/F、現 HEAD の `LIBC_NAMES` 32 名) | 4 module とも `used_names = []`・衝突 0 | 数秒 |
 | 3 | 現 HEAD `lic_build.py --module A` | sha `411007b8…b6fc`・26,705 B (旧と一致) | 11.3 s |
-| 4 | 現 HEAD `--module B` | rc=0・sha `62182947…cf04`・25,249 B (旧と一致) | 12 s |
+| 4 | 現 HEAD `--module B` | rc=0・sha `62182947…f04b`・25,249 B (旧と一致) | 12 s |
 | 5 | 現 HEAD `--module E` | rc=0・sha `0cf066d1…6fed8`・364,770 B (旧と一致) | 13 s |
 | 6 | 現 HEAD `--module F` | rc=0・sha `7ba79e65…8c7707`・54,394 B (旧と一致) | 11 s |
 | 7 | 現 HEAD `kh249_check.mjs` | rc=0・`kh249_check ok=17 ng=0` | 数秒 |
