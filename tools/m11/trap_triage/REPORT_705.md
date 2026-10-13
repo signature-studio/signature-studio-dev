@@ -2,9 +2,11 @@
 
 既知類型との関係: D4 (`docs/DEFECTS.md`)。`413060` の IR は `old := [rbx]` を捨て、`412d60` に dest の値 (`arg1`) を入れたスロットを渡す。
 
-結論 (本 run の時点):
+結論 (本 run の時点・Refs #705 のまま。Closes しない):
 
-- 受入条件 1 (OFF の実害) は **kind 単位では実害なし**と実測。`413060` の D4 IR 版と C 転記版 (413060 だけを有効化) の survey は 942 unit で差 0。
+- 受入条件 1 (OFF の実害) は **未達 (実測できていない)**。以前の「kind 単位では実害なし」は撤回する。前版の「413060 だけ有効化した C 転記版の survey で差 0」は、(a) survey 中に `function_413060` が呼ばれた unit 数を計数しておらず、(b) 413060 だけを切り替えるゲートが `m11_ov.c` に無い (`M11_OV_CLASSCREATE` は 410360 等も同時に有効化する) ため、比較が効いていたかを示せない。差 0 は「影響なし」の根拠にならない。
+  - 到達性: 静的には `413060` へ直接 rel32 call/jmp が 60 件以上ある (fl-win64 PE の全域走査, §3-b)。survey (942 unit) での到達 unit 数は**未計数**。現行の `survey_units.mjs` は関数ごとの到達を記録しない (`frames` は trap 時のみ) ため、到達数は既存出力から出せない。計数には `413060` 入口の呼出し計装 (例: `m11_ov.c` の入口に unit 別カウンタ) の追加が要る (未実装)。
+  - ネガティブコントロール: **未実施**。survey の再実行には `work-m11` (IR) と `toolchain-emsdk` が要るが、本 run では展開されていない。
 - 受入条件 2 (同型 `412d60(&slot)` の全数列挙) は **一部のみ**。IR 上の候補は 15 件。うち機械語で D4 と確定したのは `413060` の 1 件のみ。残り 14 件の判定は未了。
 - 受入条件 3 (#509 との統合) は **未判定**。
 
@@ -22,9 +24,10 @@
 | OFF (既定, IR の 413060 は D4 形) | `m11_build.sh` (M11_OV_CLASSCREATE=0) → `survey_units.mjs` | 869 | 17 | 8 | 47 | 1 |
 | OFF + 413060 のみ C 転記 | `m11_ov.c` から 410360 系 (`#if M11_OV_CLASSCREATE`) を外し 413060 だけ有効化 → build → survey | 869 | 17 | 8 | 47 | 1 |
 
-- 差分 (`survey_diff.py`): kind 差 0・ok 退行 0・icall sites / targets の差 0。
-- build は 2 回とも成功 (`cc` のみ、qstore・ldfix 適用済み)。`ov.o` に `function_413060` (T) が入ることを `llvm-nm` で確認。
-- survey wall: 10.8 s (OFF 単発)。load average 0.95 / 0.59 / 0.30。
+- 差分 (`survey_diff.py`): kind 差 0・ok 退行 0・icall sites / targets の差 0 (**ただし前提が未検証のため判定の根拠にしない**。§2 注)。
+- 注 (撤回): 上表の「OFF + 413060 のみ C 転記」の構成は、本ブランチの `m11_ov.c` に存在しない手編集で作った。`413060` は `#if M11_OV_CLASSCREATE` の内側にあり、413060 だけを切り替える gate は無い。コミット済みの再現手段が無いため、この行の数値は再現扱いしない。
+- 本 run の survey 実測: **未実施**。`tools/m11/work/` (work-m11) と `/opt/emsdk` が無く build できない (`m11_build.sh` は `ir_conditions.json` の無い IR を fail-closed で止める)。
+- 旧 survey wall 10.8 s / loadavg 0.95 / 0.59 / 0.30 の記録も、上記の手編集構成の値として扱い、再現値とはしない。
 
 注: 本ベース (`03d1642a`) の値は REPORT_595 §1 (`8445b39` 時点の 818/21/56/46/1) と**一致しない**。main が #595 以降に進み、`work-m11` の IR も再生成しているため、比較は本表の同一 HEAD 内 (OFF vs 413060 転記) でのみ行う。
 
@@ -34,9 +37,12 @@
 413074: mov rax, qword ptr [rbx]          ; 旧値 old := [rbx]
 413077: mov qword ptr [rbp + 0x28], rax   ; old を stack に退避
 ...
-4130af: lea rcx, [rbp + 0x28]            ; &old を渡す
+4130ab: lea rcx, [rbp + 0x28]            ; &old を渡す
 4130af: call 0x412d60                    ; 旧文字列を解放
 ```
+
+(a) 本 run で `capstone` により上記アドレス (413074 / 413077 / 4130ab / 4130af) を再確認。
+(b) 直接 call/jmp の走査: fl-win64 PE (`block00031_PE.bin`, ImageBase 0x400000) の rel32 で `0x413060` を指す箇所は 60 件以上。絶対参照 (abs64) は 0 件。survey での unit 別到達は未計数。
 
 IR (`work/boot_final.ll`, `function_413060`) は 413074 のロードを持たず、`store i64 %arg1, ptr %stack_var_-48` → `call @function_412d60(i64 ptrtoint(%stack_var_-48))` となる。つまり `412d60` が読む「旧文字列ポインタ」が dest のアドレスに置き換わっている (D4 形)。
 
@@ -44,7 +50,7 @@ IR (`work/boot_final.ll`, `function_413060`) は 413074 のロードを持たず
 
 判定条件: (a) 関数の引数をスロットに store し、(b) そのスロットの `ptrtoint` を `412d60` に渡す。IR 全体で `412d60` の call は 994 site、うち (a)(b) を満たすのは 15 関数。
 
-| 関数 | スロット | 保存された引数 | 機械語の旧値ロード (`mov r, [r]`) | 判定 |
+| 関数 | スロット | 保存された引数 | 関数内に `mov r, [r]` が有るか (順序未確認) | 判定 |
 |---|---|---|---|---|
 | 413060 | -48 | arg1 | あり (413074) | **D4 確定** (§3) |
 | 418f80 | 16 | arg2 | なし | 未判定 (正当な `&local` の形と見える) |
@@ -68,6 +74,7 @@ IR (`work/boot_final.ll`, `function_413060`) は 413074 のロードを持たず
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
+| (0) 受入条件 1 の実測 (到達数の計数 / 413060 だけを切り替える gate / ネガコン) | 「影響なし」の根拠が無い。`tools/m11/trap_triage/repro_705.sh` は未検証・B 構成未実装 | 本 PR では未対応 (`Refs #705`)。実測は work-m11 + toolchain-emsdk の素材を指定した再実行で行う |
 | (1) 残り 14 関数の D4 判定 (§4) | 同型 D4 の有無が未確定 | #901 ([M11-N48]、本 run で起票) |
 | (2) ON 構成 (410360 含む) での 413060 の寄与の分離 (本 run では未測定) | ON の ok 退行 415 との関係が未確定 | #704 (既存の ON 退行の issue) |
 | (3) #509 (LD-9 ldfix F3c 門拡張) との統合要否 | D4 検出を ldfix の F3c で拾えるかが未判定 | #509 |
