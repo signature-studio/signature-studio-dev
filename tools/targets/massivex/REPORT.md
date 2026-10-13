@@ -163,17 +163,34 @@ work/ (gitignore): hdr_block1/2.bin, files.json, locations.json, header_parse.js
 
 ## 11. MX-2 検証の再確認 (#266 / MX2-1 mock 欠陥) — 2026-10-13 実測
 
-- **MX2-1 (zero-init pass)**: commit a770045e で配線済み。HEAD で `license/e2e.sh` を実行:
-  - `-O0` 既定: 11/11 PASS (`e2e.sh` 全体 77.7 s, load 0.58→0.91)
-  - `MX_OPT=-O1`: 11/11 PASS (5 s) / `MX_OPT=-O2`: 11/11 PASS (5 s)
-  - NC `MX_ZEROINIT=0 MX_OPT=-O1`: **6/11 PASS (5 FAIL)** — 対照として欠陥が再現する
-- **dsp 回帰 (MX-3)**: `dsp/e2e.sh` exit 0 (41 s, load 0.63→0.50)。567 root / 257,654 insn /
-  unsup 48,503 site / e8e9 targets 594,978 (非 begin 率は §4 参照)。
-  REPORT §2/§3 の 258,087 insn / 48,612 site とは差がある (数え方の差・未追跡)。
-  `dsp/negctl.sh` 3 件: NC1/NC2/NC3 すべて FAIL (期待どおり) (11 s)。
-- **環境注意**: `shared/env.sh` の REPO_ROOT 既定が `/home/ubuntu/...` のため `MX_X64C` で
-  worktree 内の `tools/flelift/x64c.py` を指定して実行。`numpy` (dsp) と `pefile` / `capstone` (license) を pip 導入。
-- **未達 (MX2-3)**: T12-T14 (N5 demo UI 抑制 / N6 文言) は未実装。`mx_lic_stub.py` に N5/N6 の
-  IR 対象 (0x18010e4e0 / 0x184ffcf87 等) の差し替えが無いため。起票先: 本 issue #266 の後続 (MX-3b 残件)。
-- **未達 (MX-3b 本体)**: process slot 同定 (U1) / closure 厳密化 (U2・U5) / vectorcall・C++ EH (U3・U4)
-  は本 run では未着手。起票先: 後続 issue (#266 の残件として分割予定)。
+### 11.1 検証状況 (HEAD 20f680e6)
+
+- **本 run では e2e / dsp / negctl を再実行していない**。素材 `plugins-massivex` / `toolchain-retdec` /
+  `toolchain-emsdk` が取得できず、`[RETDEC]` / `[EMSDK]` が無いため。
+- 下表は**旧 HEAD d9373f3e での実測** (参考。現 HEAD の値ではない)。現 HEAD での再実行は未了。
+
+| 項目 (旧 HEAD d9373f3e) | 結果 |
+|---|---|
+| license e2e -O0 (既定) / -O1 / -O2 | 11/11 PASS / 11/11 PASS / 11/11 PASS |
+| NC `MX_ZEROINIT=0 MX_OPT=-O1` | 6/11 PASS (5 FAIL) — 欠陥が再現 |
+| dsp/e2e.sh | exit 0 |
+| dsp/negctl.sh NC1-3 | 3 件 FAIL (期待どおり) |
+
+### 11.2 未解決 (起票先付き)
+
+- **現 HEAD での再実行**: 素材取得後に `license/e2e.sh` (-O0/-O1/-O2 と NC) と `dsp/e2e.sh`・`dsp/negctl.sh` を実行し、
+  head SHA を明記して本節を更新する。起票先: 本 PR #798 (`oc_artifacts` 指定で再依頼)。
+- **dsp 数値の不一致**: `dsp/REPORT.md` (MX-3 測定・クリーン HEAD 再現済) の 258,087 insn / 48,612 site が
+  本書 §2/§3 と dsp の唯一の正値。旧 run で得た別値は同一測定の二重記載になるため本書からは削除した
+  (git 履歴 d9373f3e に残る)。再測定で差が出た場合は dsp/REPORT.md に一本化する。起票先: #266 (MX-3b)。
+- **clen 回帰**: massivex 配下に clen を検証する script は無い (`clen` は serum2 の `sr3_cut.py` のみ)。
+  受入条件の「clen」の対象が特定できず未実施。起票先: #266 (受入条件の対象を確定して実施)。
+- **MX2-3 (N5 demo UI 抑制 / N6 文言)**: 未実装。起票先: #830。
+- **MX-3b 本体 (U1 process slot 同定 / U2・U5 closure 厳密化 / U3 vectorcall・U4 C++ EH)**: 未着手。起票先: #266。
+
+### 11.3 環境
+
+- 既定パスは `tools/shared/env.sh` (REFERENCES `[ANALYSIS-DIR]`)。`REPO_ROOT` 既定が作業用 VM 固定のため
+  `MX_X64C` で worktree 内の `tools/flelift/x64c.py` を指定して実行する。
+- `e2e.sh` の retdec / emsdk は `RETDEC` / `EMSDK` 環境変数で上書き可能 (既定 `/opt/...`, REFERENCES `[RETDEC]` / `[EMSDK]`)。
+- `numpy` (dsp) と `pefile` / `capstone` (license) を pip 導入して実行する。
