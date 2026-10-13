@@ -38,7 +38,7 @@
 
 - 集計: 非 GUI 20 (kernel32 11 + ntdll 1 + ole32 6 + shell32 1 + advapi32 1) / GUI 系 44 (dwmapi 23 + user32 8 + comctl32 12 + shcore 1) / 序数 1。計 65。
 - comctl32 は DLL 名で GUI 系に分類した (common controls は GUI 担当の領域)。ログに名前が出ていないため、個々の API 名での分類は未確認。
-- R3 (lifttab) で kernel32 UI 言語 3 名と shell32 序数 9 名はトークン解決済み (`[shimx] lifttab:` 行で確認)。
+- R3 (lifttab) で kernel32 UI 言語 3 名はトークン解決済み (`[shimx] lifttab:` 行で確認)。`(null)` 行は DLL 名を出さないため、序数 miss の DLL 帰属は未確認。
 
 ### 2.2 LoadLibrary 失敗
 
@@ -54,9 +54,10 @@
 
 ### 2.4 fail-fast 到達
 
-- **逐次起動 (`trace_soft_fix`, 17 unit + #18) の shimx 起因 fail-fast: 0**。停止要因は `_UStrAsg` OOB (lift 側の #232)。
+- **逐次起動 `trace_soft_fix` (soft モード, 17 unit + #18) では shimx 起因の fail-fast は 0**。停止要因は `_UStrAsg` OOB (lift 側の #232)。
+- **逐次起動 plain (既定 fail-fast) では shimx 起因の fail-fast で停止する**: `m11_sx_plain_failfast` / `m11_sx_trace_failfast_fix` とも `[shim] FAIL-FAST: unimplemented Win32 API: LoadStringW` (top frame `shim_unimplemented`) で Aborted。init_count 16 / units_run 15 で止まる。survey の LoadStringW 初出も unit 16。LoadStringW は GUI 系 API のスタブだが、shimx 側の fail-fast であることに変わりはない (unit 115 と同じ扱い)。
 - **survey の unit 115**: `[shim] FAIL-FAST: unimplemented Win32 API: EnterCriticalSection (NULL/misaligned)` (`results/survey.md` §fail-fast、`results/stub_usage.md`)。shimx `locks.c` の `cs_of()` が出す fail-fast であり、shimx 起因として数える。R7 (`tools/shimx/REPORT_R1-R8.md`) の既定方針 (NULL は fail-fast のまま) に従う。lift 側ポインタ不正が原因かは未確認。起票先: R7 の既存項目 (新規起票なし)。
-- **GUI 系**: `plain_failfast` は `LoadStringW` の fail-fast で Aborted (`results/runs.json`)。GUI 担当。
+- **plain 逐次起動の LoadStringW fail-fast**: 上記 (§2 の表) の通り shimx 起因として数える。起票先: tools/gui (GUI stub の実装側)。
 
 ## 3. survey の unit 160 以降 (前版の記述を取り下げ)
 
@@ -72,8 +73,9 @@
 | GetProcAddress 名前空 miss (非 GUI) | 20 | shimx BACKLOG (P1/P2 追加候補) |
 | GetProcAddress GUI 系 miss | 44 | tools/gui |
 | GetProcAddress 序数 miss (kernel32 `#39682`) | 1 | R1 (intptr 閾値 / 敷設) |
-| LoadLibrary 失敗 (Msctf / avrt / PowrProf) | 3 | R4 → #178 系 |
-| survey unit 115 の shimx fail-fast (EnterCriticalSection NULL) | 1 | R7 (既存) |
+| LoadLibrary 失敗 (Msctf / avrt / PowrProf) | 3 | R4 (`tools/shimx/REPORT_R1-R8.md`) |
+| survey unit 115 の shimx fail-fast (EnterCriticalSection NULL) | 1 | R7 (`tools/shimx/REPORT_R1-R8.md`・既存) |
+| plain 逐次起動の shimx fail-fast (LoadStringW, GUI stub) | 1 | tools/gui |
 | survey unit 160 以降 (range 連鎖の有無) | 未確認 | #773 |
 
 ## 5. 再現性
