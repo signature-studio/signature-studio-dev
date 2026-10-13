@@ -68,7 +68,7 @@ if [ "$JUDGE_ONLY" = 1 ]; then echo "[sampler_e2e] judge-only: shells PASS"; exi
 if [ "$SKIP" = 0 ]; then
   echo "block,pdata_funcs,lift_rc,defines,f80_funcs,unimpl_helpers,emcc_c_rc,fixcmp_patched,emcc_c_rc_after_fixcmp,lift_s,missing_define,missing_bytes,missing_ref,extra_inside,function_defines" > work/sampler/engines.csv
   for eb in "${ENGINES[@]}"; do
-    ( bash sampler/engine_lift.sh "$eb" 1500 | tail -n 1 > "work/sampler/engine$eb.line" ) &
+    ( bash sampler/engine_lift.sh "$eb" 900 | tail -n 1 > "work/sampler/engine$eb.line" ) &
   done
 fi
 
