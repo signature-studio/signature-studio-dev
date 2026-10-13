@@ -42,7 +42,7 @@ fl-win64 素材 (`block00031_PE.bin`、image base 0x400000) の `.text` を caps
 1. **IR の署名と機械語の入口が一致しない関数がある** (`40c660` `40c750` 等)。case 生成を IR 署名から
    自動で組むと、読まれない引数を投入して比較するだけになり、判定が無意味になる。
 2. `i128` 引数の渡し方は**未決**。候補は (a) 2 レジスタ分解 (rdx:r8 等の低・高) と (b) ポインタ渡し (実体へのポインタ 1 本)。
-   機械語の読みは両者で食い違う。653c80 は第 3 引数 (r8) を下位半分として読むので (a) と整合する。691dd0 は r8b を第 3 引数として読むので (b) と整合する。
+   機械語の読みは両者で食い違う。653c80 は第 3 引数 (r8) を下位半分として読むので (a) と整合する。691dd0 の読みは (a)/(b) のどちらとも決められない (§6.3)。
    どちらの候補も、この入口だけでは決定できない。(b) の出典 (LLVM Win64 の i128 規約) も本 PR では確認していない。
    受入条件の「i128 を 2 レジスタ分に分解して投入する ABI を機械語で確認」は未達のまま。前提 (a) は未検証。
 3. `%tagPOINT` の値渡しは、対象 VA が import thunk のため本体の確認に至らない。
@@ -124,17 +124,20 @@ fl-win64 素材 (`block00031_PE.bin`、image base 0x400000) の `.text` を caps
 
 ### 6.6 再現コマンドと実出力 (LD-51 追記分)
 
-素材: `fl-win64.tar.zst` の `extracted/block00031_PE.bin` のみ `$RUNNER_TEMP/fl-win64/` に展開 (`tar --zstd -xf ... extracted/block00031_PE.bin`、2.9 秒)。`work-m11` は本 run に無いため `tools/m11/work/boot_final3.ll` は使えない。IR 無しで実行するため、`ld39_abi_dump.py` の署名列は空で出る (IR 依存の部分は §6.2 の値を参照)。
+素材: `fl-win64.tar.zst` の `extracted/block00031_PE.bin` のみ `$RUNNER_TEMP/fl-win64/` に展開 (`tar --zstd -xf ... extracted/block00031_PE.bin`、2.2 秒)。`work-m11` は本 run に無いため `tools/m11/work/boot_final3.ll` は使えない。IR 無しで実行するため、`ld39_abi_dump.py` の署名列は空で出る (IR 依存の部分は §6.2 の値を参照)。
 
 ```
 P="$RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin"
 python3 tools/liftdiff/tests/ld39_callsites.py "$P" --show 6 --list-dir work/ld39_callsites --iat 0x1970df8
+: > "$RUNNER_TEMP/empty.ll"
 python3 tools/liftdiff/tests/ld39_abi_dump.py "$P" "$RUNNER_TEMP/empty.ll" > work/ld39_abi.txt
 ```
 
-- `ld39_callsites.py` の rc=0 (実測 0.203 秒)。件数: `40c660` 5021 / `40c750` 543 / `4256c0` 4 / `664890` 26 / `6649b0` 3 / `6649c0` 8 / `664a80` 2 / `442a50` 14 / `442b90` 10 / `653c80` 3 / `691dd0` 13。
+(`empty.ll` を作らないと `irtool.parse_sigs` が `FileNotFoundError` で rc=1 になる。空ファイルを先に作る。)
+
+- `ld39_callsites.py` の rc=0 (実測 wall 5.0 秒、本 run の再実行)。件数: `40c660` 5021 / `40c750` 543 / `4256c0` 4 / `664890` 26 / `6649b0` 3 / `6649c0` 8 / `664a80` 2 / `442a50` 14 / `442b90` 10 / `653c80` 3 / `691dd0` 13。
 - `--iat 0x1970df8` の出力: `== IAT 0x1970df8 -> user32.dll!WindowFromPoint` (pefile の import テーブルで引いた値。§6.1 の根拠)。
-- `ld39_abi_dump.py` の rc=0 (実測 0.093 秒)。IAT 行が `-> 0x0` と出るのは、ディスク上の IAT slot が未束縛のため。import 名は `--iat` で引く。
+- `ld39_abi_dump.py` の rc=0 (実測 0.073 秒、`empty.ll` を作成した上で再実行)。IAT 行が `-> 0x0` と出るのは、ディスク上の IAT slot が未束縛のため。import 名は `--iat` で引く。
 
 `ld39_abi_dump.py` の出力 (抜粋。11 関数それぞれ先頭 2 命令と解決先。全行は `work/ld39_abi.txt`。IR を空にして実行したため `IR: ret=None params=` は空):
 
