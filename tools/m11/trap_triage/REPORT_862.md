@@ -93,9 +93,11 @@ python3 tools/m11/trap_triage/halt0_classify.py tools/m11/work/trap_triage/head.
 | 2 | 12.96 s | 869 | 16 | 8 | 47 | 1 | 1 |
 | 3 | 12.95 s | 869 | 16 | 8 | 47 | 1 | 1 |
 
-- 3 回の unit 別 kind の差は 0 (per-unit JSON で照合)。`986e7415` の結果 (ok 869 / oob 16 / halt0 8) と一致。
+- 3 回の unit 別 kind の差は 0 (per-unit JSON で照合)。`986e7415` の結果とは件数 (ok 869 / oob 16 / halt0 8) のみ一致し、unit 単位の一致は未確認。
 - unit 492: 3 回とも `oob`、frames `4133f0 ← 4473f0 ← 446400 ← 446ad0 ← ad5700`。
 - `410630` を含む frame は全 unit で 0 件。`410630` の IR 呼出元は `function_4109f0` のみ (`boot_final.ll`)。
 - halt0 は unit 114 / 245 / 279 / 314 / 368 / 509 / 647 / 895 の 8 件。
+- 前回 (§1〜§5 時点) の halt0 残 8 件には unit 492 が含まれていたが、本再測定では 492 が oob に変わっている。変化の要因は未切り分け (IR 生成条件の差の可能性。§6 と同じ扱い)。
+- 上記の数値と `410630` の IR 呼出元 (`function_4109f0` のみ) は前回 run の記録であり、レビュー run では再現していない。素材 (`work-m11`・`toolchain-retdec`・`toolchain-emsdk`) が `$ARTIFACTS_DIR` に無く、IR 再生成・build・survey を再実行できなかったため。再確認は `oc_artifacts:` で素材を指定した再実行で行う。
 
 受入条件 1・2 は対象 (`410630` の到達) が現 main に存在しないため引き続き未達。原因追跡は #1046 (unit 492 の OOB `4133f0`) に引き継ぐ。
