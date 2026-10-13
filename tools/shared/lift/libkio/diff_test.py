@@ -8,17 +8,25 @@ W = sys.argv[1]; HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, "../..")
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
 from macho_util import MachO
+from sig import params
 
-# (ret, args) ; ret: u64 i64 u32 f32 f64 void ; arg: i64 f32 str16 str32 str8 buf ref64 f64ref
-SIG = {
- "__Z6unilenPKt": ("u64", ["str16"]), "__Z12wcslen16_RCSPw": ("u64", ["str32"]),
- "__Z11str2comparePKtPKc": ("u32", ["str16", "str8"]), "__Z11str4comparePKwPKc": ("u32", ["str32", "str8"]),
- "__Z12GetFourIntelPhRKl": ("i64", ["buf", "ref64"]), "__Z13GetEightIntelPhRKl": ("i64", ["buf", "ref64"]),
- "__Z13GetFloatIntelPhRKl": ("f32", ["buf", "ref64"]), "__Z14GetDoubleIntelPhRKl": ("f64", ["buf", "ref64"]),
- "__Z12SetFourIntelPhRKlS1_": ("void", ["buf", "ref64", "ref64v"]), "__Z20SetDoubleIntelDoublePhRKlRKd": ("void", ["buf", "ref64", "f64ref"]),
- "__Z9Limit_RCSlll": ("i64", ["i64", "i64", "i64"]), "__Z9FixHi_RCSll": ("i64", ["i64", "i64"]),
- "__Z9CBool_RCSl": ("u32", ["i64"]), "__Z7Fix_RCSf": ("i64", ["f32"]), "__Z14LimitFloat_RCSfff": ("f32", ["f32", "f32", "f32"]),
-}
+# SIG は funcs.txt (戻り値型) と demangle 署名 (sig.py) から生成する。関数名の手書き表は持たない。
+# テスト用の引数種別: i64 f32 str16 str32 str8 buf ref64 ref64v f64ref
+# 参照引数は 1 つ目を「オフセット (0..47)」、2 つ目以降を「値 (ref64v)」として生成する (従来の SIG と同じ分布)。
+def _targs(kinds):
+    out = []; refs = 0
+    for k in kinds:
+        if k == "ref64":
+            out.append("ref64" if refs == 0 else "ref64v"); refs += 1
+        elif k == "i64": out.append("i64")
+        else: out.append(k)
+    return out
+SIG = {}
+for row in (l.split() for l in open(os.path.join(HERE, "funcs.txt")) if not l.startswith("#") and l.strip()):
+    name, ret = row[0], row[3]
+    kinds = params(name)
+    if kinds is None or any(k in ("f64",) for k in kinds): raise SystemExit(f"[diff_test] 未対応の署名: {name} {kinds}")
+    SIG[name] = (ret, _targs(kinds))
 rng = random.Random(0xF1)
 def rbytes(n): return bytes(rng.randrange(256) for _ in range(n))
 def i64v(wide):
@@ -65,7 +73,7 @@ mm = mmap.mmap(-1, (size + 4095) & ~4095, prot=mmap.PROT_READ | mmap.PROT_WRITE 
 for n, vm, vs, fo, fs in m.segs:
     if fs and n != "__LINKEDIT": mm[vm:vm + fs] = m.d[fo:fo + fs]
 base = ctypes.addressof(ctypes.c_char.from_buffer(mm))
-addrs = {n: int(a, 16) for n, a, s in (l.split() for l in open(f"{HERE}/funcs.txt") if not l.startswith("#") and l.strip())}
+addrs = {r[0]: int(r[1], 16) for r in (l.split() for l in open(f"{HERE}/funcs.txt") if not l.startswith("#") and l.strip())}
 CT = {"i64": ctypes.c_int64, "f32": ctypes.c_float, "buf": ctypes.c_void_p}
 RT = {"u64": ctypes.c_uint64, "i64": ctypes.c_int64, "u32": ctypes.c_uint32, "f32": ctypes.c_float, "f64": ctypes.c_double, "void": None}
 def bits(rt, v):
