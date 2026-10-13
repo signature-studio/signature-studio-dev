@@ -42,8 +42,8 @@
 | 検証 | 結果 |
 |---|---|
 | `test/sig/sig_test.sh` (n=3) | 3 run とも exit 0 (ALL PASS), 19.3 / 19.3 / 19.3 s, load average (1 分値, 開始前→終了後) 0.62→0.81 / 0.81→0.85 / 0.85→0.90。(f) 符号不明の拡張 2 件 (`lstrcmpA` 戻り i32→i64、`SetFilePointerEx` 引数 i32→i64) が `UNRESOLVED` exit 1、(g) `sext` 明示時 `lstrcmpA("a","b")` が **-1** のまま届く (zext 固定だった修正前は 4 294 967 295、レビュアー再現値)、(h) 文字列定数・`;` コメント内 `@NAME` は不変 |
-| 実 IR `tools/m11/work/boot_final2.ll` (`sig_gate.sh`, 11.3 s) | 正規化前 mismatch 0 / adapter 0 / 重複統合 1 (`SHGetFolderPathW.1`) / unresolved 0 / 正規化後 mismatch **0** |
-| 実 IR `tools/m11/work/boot_final3.ll` (12.5 s) | adapter 0 / 重複統合 1 (`SHGetFolderPathW_D1`) / unresolved 0 / mismatch **0** |
+| 実 IR `tools/m11/work/boot_final2.ll` (`sig_gate.sh`, 11.3 s) | 正規化前 mismatch 0 / **adapter 1** (`@__shx_sig_SHGetFolderPathW.1`。重複統合名の adapter。サマリ行の「正規化 N (adapter)」は重複統合分を含まない) / 重複統合 1 (`SHGetFolderPathW.1`) / unresolved 0 / 正規化後 mismatch **0** |
+| 実 IR `tools/m11/work/boot_final3.ll` (12.5 s) | **adapter 1** (`@__shx_sig_SHGetFolderPathW_D1`。重複統合名の adapter) / 重複統合 1 (`SHGetFolderPathW_D1`) / unresolved 0 / mismatch **0** |
 | 実 IR `tools/m8/work/ott_m8.ll` (5.5 s) | adapter 0 / 重複統合 0 / unresolved 0 / mismatch **0** |
 | `test.sh --quick` (実 IR あり、6b は SKIP でない, 76.0 s, load average 終了後 0.92) | exit 0, 7/7 完了 (MT / ST / M4 互換 / fail-fast 全 PASS, 公開関数 680) |
 
@@ -54,7 +54,8 @@
 |---|---|---|
 | 実 IR のうち M11 closure (`boot_final2/3.ll`) と OTT (`ott_m8.ll`) は実測済み (下記)。FreshAir / Serum2 / MassiveX / Kilohearts 等の各プラグイン lift 成果物は未実測 | 受入条件「lift 成果物で mismatch 0」の残り範囲 | #173 (`work-liftlib-targets` ほか素材を指定して再実行) |
 | GitHub Actions に `test.sh` を常時回す job が無い (現状の workflow は opencode のみ) | 案B の「CI で常時」は test.sh 経由 (手動 / レビュー run) に留まる | #284 系 `[CI-n]` に提案 (要 素材取得 + emsdk 展開を含む job) |
-| adapter 経由になるため RetDec 側が i64 で渡す HANDLE の上位 32bit は落ちる (trunc) | 実 IR (M11 / OTT) の adapter は 0 件のため該当なし。他プラグインで adapter が出た時に `normalized` 一覧で確認 | #173 |
+| adapter 経由になるため RetDec 側が i64 で渡す HANDLE の上位 32bit は落ちる (trunc) | 実 IR で出た adapter は `SHGetFolderPathW.1` / `_D1` の 1 件ずつのみで、いずれも引数 0 個・戻り値 i64 (sext)。HANDLE 引数の trunc は実 IR では未発火。他プラグインで adapter が出た時は `normalized` / `dup_merged` 一覧で確認 | #173 |
+| lift 側の引数欠落 (M11): `function_593450` は引数 0 個で lift されるが、呼出元 `function_81bca0` は boot_final2 で `function_593450(i32 0)` を渡し、boot_final3 では引数なしで呼ぶ。SHGetFolderPathW の 5 引数 (hwnd・csidl・hToken・flags・path) は IR に残っていない。正規化 adapter と R6 `--normalize-dup` は足りない引数を 0 / null で補完し、shimx は `csidl 0` / `path NULL` で `E_INVALIDARG` を返す。`function_81bca0` は戻り値 ≠ 0 として fallback `function_81bb20` へ分岐する。**silent** (`--emit-stubs` 経路の「名前を出して abort」は loud)。「従来のスタブと同等」は誤り | #173 (lift 欠陥。引数欠落の扱い = unresolved 化 / lift 側修正 / 許容 は PM 判断) |
 | `data/sig_ext.json` の拡張方針は 3 API 分を手で書いた (`GetComputerNameExW` / `GetFileAttributesExW` = 非負 enum・BOOL の zext、`SHGetFolderPathW` ret = HRESULT の sext)。新しい API で adapter が必要になるたび符号の根拠を人が判断して追記する | 既定は unresolved (fail-loud) なので silent miscompile にはならないが、追記は手作業 | #173 |
 
 **main 競合解消後の再検証 (2026-10-13, Actions runner, 検証起点 = コミット 3d75d44 (merge 629837b + sigs.json 再生成), n=1, 素材 work-m11 / work-m6-ott 展開済み, emcc 6.0.12 (`/opt/emsdk`))**: main の SHX-T8 (#175) を取り込んだ merge 直後は shimx 関数が増えて `sigs.json` が陳腐化していたため、再生成してから検証した。

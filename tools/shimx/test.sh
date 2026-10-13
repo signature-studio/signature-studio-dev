@@ -105,10 +105,10 @@ if [ -f "$HERE/../m8/work/ott_m8.ll" ]; then
 fi
 for pair in "m11:$HERE/../m11/work/boot_final2.ll" "m11_3:$HERE/../m11/work/boot_final3.ll" "ott:$HERE/../m8/work/ott_m8.ll"; do
     tag="${pair%%:*}"; ir="${pair#*:}"
-    if [ -f "$ir" ]; then bash "$HERE/scripts/sig_gate.sh" "$ir" "$tag" | sed 's/^/    /'; [ "${PIPESTATUS[0]}" -eq 0 ] || die "署名不一致 ($tag): sig_normalize.py 後も lift IR の declare と shimx 定義が wasm 署名で食い違う (または未解決型)"; fi
+    if [ -f "$ir" ]; then bash "$HERE/scripts/sig_gate.sh" "$ir" "$tag" | sed 's/^/    /' || die "署名不一致 ($tag): sig_normalize.py 後も lift IR の declare と shimx 定義が wasm 署名で食い違う (または未解決型)"; fi
 done
 # SHX-T7 (#173): 合成 fixture による署名正規化の回帰 (陰性対照・adapter 実行・sigs.json 乖離検出を含む)
-bash "$HERE/test/sig/sig_test.sh" | sed 's/^/    /'; [ "${PIPESTATUS[0]}" -eq 0 ] || die "署名正規化テスト (test/sig/sig_test.sh) 失敗"
+bash "$HERE/test/sig/sig_test.sh" | sed 's/^/    /' || die "署名正規化テスト (test/sig/sig_test.sh) 失敗"
 # R6: 構造体展開スタブ + 重複 declare 正規化 (M11 IR があれば実測)
 if [ -f "$HERE/../m11/work/boot_final3.ll" ]; then
     python3 "$HERE/scripts/ir_undef.py" "$HERE/../m11/work/boot_final3.ll" --nm "$HERE/work/nm_MT.txt" \
