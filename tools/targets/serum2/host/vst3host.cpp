@@ -83,8 +83,8 @@ static LONG CALLBACK watchVeh(PEXCEPTION_POINTERS ep) {
       const DWORD rvas[2] = {0x11be750, 0x11be8e8};
       for (int i = 0; i < 2; i++) {
         const unsigned char* p = (const unsigned char*)m + rvas[i];
-        L("[watch] iid@%lX = %02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X", (unsigned long)rvas[i],
-          p[3], p[2], p[1], p[0], p[5], p[4], p[7], p[6], p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15]);
+        L("[watch] iid@%lX = %02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X", (unsigned long)rvas[i],
+          p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15]);
       }
     }
     return EXCEPTION_CONTINUE_EXECUTION;
