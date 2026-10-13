@@ -24,7 +24,7 @@ const KEY = "UI: 2 device script を読込み・OnInit 済み";
 
 const tmp = mkdtempSync(path.join(tmpdir(), "midi-ui-"));
 const fixture = (n) => readFileSync(path.join(here, "fixtures", n), "utf8");
-const FAIL_KEYS = ["UI 失敗: 起動が「失敗:」で原因 (ModuleNotFoundError) を表示", "UI 失敗: flMidi.started が false に戻る", "UI 失敗: Web MIDI 接続ボタンは無効のまま", "UI 失敗: 起動ボタンが再び有効 (再試行可能)", "UI 失敗: 巻き戻し後の midiIn は reject (半端な script に配送されない)"];
+const FAIL_KEYS = ["UI 失敗: 起動が「失敗:」で原因 (ModuleNotFoundError) を表示", "UI 失敗: flMidi.started が false に戻る", "UI 失敗: Web MIDI 接続ボタンが (起動前に有効化したあと) 無効に戻る", "UI 失敗: 起動ボタンが再び有効 (再試行可能)", "UI 失敗: 巻き戻し後の midiIn は reject (半端な script に配送されない)"];
 const files = [
   ["device_rec.py", fixture("device_recorder.py") + (neg ? "\ndef (:\n" : "")],
   ["device_fwd.py", fixture("device_forward_cc.py")],
@@ -124,6 +124,7 @@ try {
   if (negRollback) await page2.evaluate(`window.flMidi.stop = async () => {}`); // 旧 UI: 失敗しても start() 済みのまま
   await setFiles(page2, [failFile]);
   await page2.waitForExpr(`!document.getElementById("midi-start").disabled`, 10000);
+  await page2.evaluate(`document.getElementById("midi-connect").disabled = false`); // 失敗時の無効化 (catch) を観測できるよう、起動前に有効化しておく
   await page2.evaluate(`document.getElementById("midi-start").click()`);
   const failText = await waitState(page2);
   check(FAIL_KEYS[0], /^失敗:[\s\S]*ModuleNotFoundError/.test(failText), failText);
@@ -156,7 +157,7 @@ try {
 // --neg の期待: 主判定 (KEY) が FAIL し、原因が SyntaxError として UI に出る。終了コード: PASS=0 / FAIL=2 / --neg で検出できたとき 1
 if (crashed) { console.log("MIDI UI FAIL (exception)"); process.exit(2); }
 const failed = Object.entries(checks).filter(([, v]) => !v).map(([k]) => k);
-// --neg-rollback: 巻き戻し系 (started / 接続ボタン / 起動ボタン / midiIn の 4 本) だけが FAIL し、「失敗:」の表示と他の check は PASS
+// --neg-rollback: stop() 無効化で FAIL するのは started / 起動ボタン / midiIn (stop 依存)。接続ボタンは catch 節が直接 disabled にするため stop の有無では変わらず PASS のまま (検出対象外)。「失敗:」の表示と他の check は PASS
 const ROLLBACK_KEYS = FAIL_KEYS.slice(1);
 const detected = neg ? failed.length === 1 && failed[0] === KEY
   : negRollback ? failed.includes(FAIL_KEYS[1]) && failed.includes(FAIL_KEYS[4]) && failed.every((k) => ROLLBACK_KEYS.includes(k))
