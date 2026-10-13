@@ -40,7 +40,21 @@
 
 ## 4. 未達・残り
 
-- 受入条件 1 (`m11_e2e.sh --full` が work-m11 展開直後に build を通る): **この runner では未検証** (未解決は #1396 [M11-N89])。`--full` は Ghidra の
-  `functions_dll.csv` (`tools/m2/work/ghidra_dll/`) が前提で、素材 (fl-win64 / toolchain-* / work-m11 / work-liftdiff) に含まれず、
-  `/opt/ghidra` も無い。build 段の修正は上記 §1 の通り実測済み。`--full` の通し確認は Ghidra 素材 (または `functions_dll.csv` を含む素材) を用意して行う必要がある。
+- 受入条件 1 (`m11_e2e.sh --full` が work-m11 展開直後に build を通る): §5 で実測済み (#1396 [M11-N89])。
+  `functions_dll.csv` は素材に無いため、Ghidra 12.1.4 headless で run 内に再生成した (§5)。
 - 受入条件 2 (再現手順の REPORT 実測): 本ファイル §1 に記録 (rc・所要)。
+
+## 5. `--full` の通し確認 (#1396 [M11-N89])
+
+- 測定 commit: `12586095` (origin/main、worktree `1396-m11-e2e-full`。コード変更なし)。runner: 4 vCPU・16 GiB、Ubuntu。
+- 素材: fl-win64 (`block00031_PE.bin` sha256 `b2c64da4…`)・toolchain-retdec・toolchain-emsdk・work-m11・work-liftdiff を展開。
+  `functions_dll.csv` は素材に無いため、Ghidra 12.1.4 (公式 zip、sha256 `ddac49f9…` 一致) を JDK 21 で headless 実行して再生成。
+  - Ghidra `DumpFunctions.java`: rc 0・8 分 12 秒・`functions_dll.csv` 2,087,706 bytes (§2 過去 REPORT の 59,010 行と同サイズ)。
+- `bash tools/m11/m11_e2e.sh --full` (foreground・MAXMEM=12G・JDK 21): **rc 0・8 分 44 秒**。
+  - `m11_scan: ok`・`m11_bounds: ok`・`build (emcc 増分): ok`。
+  - `reached_stage` 4/6 (stop: trap "unreachable")・`ir_sha256` `9dc2d896…`。build 段の失敗は無い。
+- 人工条件 `touch work/obj/{rt,win}.o` 後の `bash tools/m11/m11_build.sh`: **rc 0・16.4 s**。
+  - `rtwin.sha256` の stamp 不一致で rt.o/win.o を作り直し、`OK: work/m11_boot.cjs(+.wasm) wasm-ld signature mismatch: 0, undefined symbol: 0`。
+  - 作り直し後の `llvm-nm rt.o` で `m11_set_va_bigtrace` が `T` (定義あり)。GNU `nm` は wasm を読めないため 0 件表示になる (手元の誤読、結論に影響なし)。
+- 測定 commit `12586095` から HEAD までのコード差分: 本節の追記 commit は `tools/m11/REPORT_N1176.md` のみ。`git diff 12586095 HEAD -- tools/m11/*.sh tools/m11/*.c` は空。
+- 注意: 本 run の展開は worktree 内 `tools/m11/work/` (gitignore)。`functions_dll.csv` は `tools/m2/work/ghidra_dll/` (gitignore)。いずれも commit しない。
