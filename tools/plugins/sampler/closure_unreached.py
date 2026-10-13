@@ -138,6 +138,7 @@ def main():
         c5 = len(x.dataref()(sorted(outside))) == 0 if outside else True
 
         roots = A | B_live
+        x.pe.parse_data_directories(directories=[0])
         ed = getattr(x.pe, 'DIRECTORY_ENTRY_EXPORT', None)
         exp = {s.address for s in ed.symbols if s.address} if ed else set()
 
