@@ -34,6 +34,7 @@ fail-open の封じ込め (PR #497 レビュー指摘、修正コミット `8406
 - `canon_digest` は R 行 0 件 (= 空文字の sha256 `e3b0c44298fc1c14`) で `StdBuildError`。CLI `guard` は引数パスをキーにし、同名 basename の別ファイルを 1 件に潰さない。重複パス・1 件のみは exit 1。
 - `tests/test_stdbuild.py` のネガコン N1〜N4 + C1 (同名 basename 2 件を 2 変種で比較) を追加。`stdbuild_e2e.sh <WORKDIR>` は既存 dir を消さず拒否 (省略時の `work/stdbuild_test` のみ作り直す)。
 - 実測 (クリーン detached worktree の HEAD `84067cb`): `bash tools/liftlib/stdbuild_e2e.sh` 3 回 3/3 PASS、所要 13 / 13 / 13 s、load(start) 0.77 / 0.82 / 0.85。S1 署名 `ddd24d668fb43743`・C1 `510de60e` は修正前と同値。
+- main 取り込み後 (merge commit `3ca9cda`、節番号衝突の解消のみ): 同 e2e 3 回 3/3 PASS、所要 13 / 13 / 13 s、load(start) 0.15 / 0.28 / 0.73。`OTT_SKIP_INFO=1 bash tools/ott/ott_e2e.sh --quick` PASS 10.7 s (22 シナリオ・9620 cell 全 bit-equal・max_ulp 0)。
 - 旧コード (`085b829` の stdbuild.py / pipeline.py + 新テスト) では N1 (`TIMEOUT` 同士が guard を通る)・N2 (存在しない probe で CLI exit 0・「PASS: 1 変種」)・N3 (`canon_digest("")` が署名化)・N4 (全変種 TIMEOUT で `build_variants` 成功)・C1 (a/x.cjs b/x.cjs が「1 変種」に潰れる) がいずれも FAIL。
 - 実 OTT (同 HEAD、素材 `analysis-ott-binaries`): `LIFT_GUARD=1 LIFT_OUT=tools/ott/work/lift bash tools/ott/lift/lift_build.sh` PASS 8 s (std / ref とも署名 `6b1696f0`)。空 `.cjs` 2 件 + `ott_x64c_bench.mjs` (`SIG_ONLY=1`) の CLI guard は `PROBE-FAIL(rc=1)` 同士でも exit 1。
 
