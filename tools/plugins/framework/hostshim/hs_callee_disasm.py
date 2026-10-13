@@ -28,6 +28,9 @@ for a in sys.argv[2:]:
     va = int(a, 0)
     print('== %s' % hex(va))
     code = read_va(va, n * 15)
+    if not code:
+        print('  WARN: VA が block00031 の section 範囲外 (出力なし)')
+        continue
     for i, ins in enumerate(md.disasm(code, va)):
         print('  0x%x: %s %s' % (ins.address, ins.mnemonic, ins.op_str))
         if i >= n - 1:
