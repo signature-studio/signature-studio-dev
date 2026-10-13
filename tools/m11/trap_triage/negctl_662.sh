@@ -6,12 +6,23 @@
 #   ng    = cur + 偽ガード (icmp eq 123456789 = 常に不成立) 期待: cur と unit 差 0 (ネガコン: 効果はガードの条件由来)
 # 前提: work/ に work-m11 (boot_final.ll, boot_final3.ll, obj/ 等) があり m11_build.sh が通ること。PE は FL_WIN64_DIR (build の qstore 用)。
 # 終了時に m11_ov.c と work/boot_final3.ll を元に戻す。判定が 1 つでも外れたら exit 1。
+# survey は各構成の前に units_<name>.json を消し, 非 0 終了または JSON 無しなら exit 1 (前回の値で PASS しない)。
+# IR 状態 (#680): qstore (#516) は boot_final.ll を書き換え, post で boot_final3.ll が再生成される。artifact の boot_final3.ll は qstore 前の IR なので,
+#   4 構成の入力は「前段 build を通した boot_final3.ll」(orig) に揃える。qstore は capstone/pefile が要るため, 無ければ FAIL。
 set -u
 HERE="$(cd -- "$(dirname -- "$0")/.." && pwd)"
 cd "$HERE"
 OUT=work/v662
 mkdir -p "$OUT"
-[ -f "$OUT/boot_final3.orig.ll" ] || { echo "FAIL: $OUT/boot_final3.orig.ll 無し (work-m11 の boot_final3.ll を先に保存)"; exit 1; }
+python3 -c 'import capstone, pefile' 2>/dev/null || { echo "FAIL: capstone/pefile 無し (qstore が skip され IR 状態が変わる)"; exit 1; }
+source "$HERE/../shared/env.sh"
+PE_CHK="${PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}"
+[ -f "$PE_CHK" ] || { echo "FAIL: PE 無し ($PE_CHK) (qstore が skip され IR 状態が変わる。FL_WIN64_DIR を fl-win64 の展開先にする)"; exit 1; }
+if [ ! -f "$OUT/boot_final3.orig.ll" ]; then
+  rm -f work/boot_final3.ll
+  bash m11_build.sh > "$OUT/build_prep.log" 2>&1 || { echo "FAIL: 前段 build ($OUT/build_prep.log)"; exit 1; }
+  cp work/boot_final3.ll "$OUT/boot_final3.orig.ll" || { echo "FAIL: $OUT/boot_final3.orig.ll の保存 (work-m11 を先に展開)"; exit 1; }
+fi
 cp m11_ov.c "$OUT/ov.cur.c"
 git show 8d883c3:tools/m11/m11_ov.c > "$OUT/ov.base.c" || { echo "FAIL: git show 8d883c3"; exit 1; }
 restore() { cp "$OUT/ov.cur.c" m11_ov.c; cp "$OUT/boot_final3.orig.ll" work/boot_final3.ll; }
@@ -37,7 +48,10 @@ open(p, 'w').write(s.replace(old, new, 1))
 PYEOF
   fi
   bash m11_build.sh > "$OUT/build_$name.log" 2>&1 || { echo "FAIL: build ($name) rc!=0 ($OUT/build_$name.log)"; exit 1; }
-  M11_SURVEY_UNITS="$OUT/units_$name.json" timeout 300 node m11_survey.mjs > "$OUT/survey_$name.out" 2>&1
+  rm -f "$OUT/units_$name.json"
+  M11_SURVEY_UNITS="$OUT/units_$name.json" timeout 300 node m11_survey.mjs > "$OUT/survey_$name.out" 2>&1 \
+    || { echo "FAIL: survey ($name) rc!=0 ($OUT/survey_$name.out)"; exit 1; }
+  [ -f "$OUT/units_$name.json" ] || { echo "FAIL: survey ($name) が units JSON を出さなかった ($OUT/survey_$name.out)"; exit 1; }
   grep '^M11_SURVEY ' "$OUT/survey_$name.out" | cut -c1-200 | sed "s/^/[$name] /"
 }
 
