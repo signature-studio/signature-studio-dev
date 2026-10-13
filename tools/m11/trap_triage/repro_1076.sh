@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # #1076: M2p ON survey の停止位置の二分探索 (REPORT_1076.md §3 の再現)。
-# 前提: FL_WIN64_DIR (fl-win64 展開先) / /opt/retdec / /opt/emsdk / tools/m11/work (work-m11 展開) が要る。
+# 前提: FL_WIN64_DIR (fl-win64 展開先) / [RETDEC] / [EMSDK] (docs/REFERENCES.md) / tools/m11/work (work-m11 展開) が要る。
 set -u
 cd "$(dirname "$0")/.."
 export FL_WIN64_DIR="${FL_WIN64_DIR:?FL_WIN64_DIR を指定}"
