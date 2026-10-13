@@ -218,7 +218,7 @@ Morphine は後段のみの秒 (下記)。
 | Harmless `prefetcht0` / `cmpnltps` / `movmskps` | `m11_simd2.py` に実装が無い | `m11_simd2.py` に実装: `prefetcht*` (no-op) / `cmp{eq,lt,le,unord,neq,nlt,nle,ord}{ps,pd}` / `movmsk{ps,pd}` |
 | Harmless `vaddps__8` / `vmovaps__9` (128bit VEX) と ymm の i256 trap 6 箇所 (`vmovaps` / `vsubps` / `vmulps` / `vaddps` / `vextractf128` / `vmovaps__10`) | `function_745c00` (VA 0x745c00) が **ymm を無条件に使う** AVX 関数。 呼出元は 0x7467f8 の 1 箇所で、`[rip+..]` の機能 bit 0x40000 が立っている時だけ到達する。 この bit は 0x5a39a4 で CPUID (`ecx & 0x18000000`) と `xgetbv` (0x5a37b3、`eax & 6`) の両方を通った時に立つ | **CPUID 固定ではなく IR へ lower** (新 pass `lift/passes/fix_avx256.py`、`lift_ranges.sh` の `m11_passes` 直後): ymm の `v{add,sub,mul,div,min,max}ps`・`vmov*`・`vextractf128`・VEX store 形を `<8 x float>` 演算 / `store` へ。 C の i256 ABI (wasm の sret / 引数分割) に依存しない。 128bit の VEX `v{add,..}ps` / `vmov*` は `m11_simd2.py` の SSE 実装に合流 |
 | Kepler Exo `rep_movsd_memcpy` | 実装無し | `m11_simd2.py`: dst が src の直後で重なる場合も前方コピー意味を保持 |
-| Wave Traveller `rep_stosb_memset` | 実装無し | `m11_simd2.py`: `memset(a, (u8)b, c)` (al のみ有効) |
+| Wave Traveller `rep_stosb_memset` | 実装無し | `m11_simd2.py` の `memset(a, b & 0xff, c)` (al のみ有効)。 これは本 PR と並行して #538 (main) が同内容で実装済みで、マージ (146f168) で 1 箇所になった。 本 PR の `helper_diff` はこれも native `rep stosb` と比較する |
 
 - #207 本文は「CPUID 分岐で SSE 路に固定」を想定していたが、0x745c00 自体は分岐を持たない (呼出元の機能 bit が分岐)。 CPUID 側の返値表 (`m11_simd2.py` の `CPUID_BODY` は SSE2 まで、`xgetbv` は 0) は維持したので、wasm では通常 0x745c00 に到達しない。 lower 済みなので到達しても trap しない。
 - `synth/cpp_lift.sh` は `PLUG_AVX256=0` (既定) で C++ DLL 9 本の結果列を #535 の pass で変えない (#534 の領分)。 実測: 9 本は KNOWN のまま (judge: NEW-FAIL 0 / FIXED 0)。

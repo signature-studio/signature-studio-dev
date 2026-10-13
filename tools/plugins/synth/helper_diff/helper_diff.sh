@@ -38,7 +38,7 @@ nc() {  # nc <name> <file-to-mutate: ll|simd.c> <sed-expr>
 }
 nc nc_cmpnltps   simd.c 's/!(x < y)/(x >= y)/'                      # NaN の扱いを変える
 nc nc_movmskps   simd.c 's/>> 31)/>> 30)/'                           # sign bit の位置
-nc nc_stosb_len  simd.c 's/memset(a, (int)(u8)b, (size_t)c)/memset(a, (int)(u8)b, (size_t)(c ? c - 1 : 0))/'
+nc nc_stosb_len  simd.c 's/memset(a, (int)(b \& 0xffu), (size_t)c)/memset(a, (int)(b \& 0xffu), (size_t)(c ? c - 1 : 0))/'
 nc nc_movsd_ovlp simd.c 's/if (d <= s || d >= s + (size_t)c \* 4u)/if (1)/'   # 重なり (dst>src) でも memmove にする
 nc nc_add128    simd.c 's/rs\[i\] = x + y;/rs[i] = x - y;/'
 nc nc_min        ll     's/fcmp olt <8 x float>/fcmp ogt <8 x float>/'
