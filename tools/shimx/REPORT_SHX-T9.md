@@ -67,8 +67,9 @@
 - 原因: unit 159 (1 始まり, VA 0x26d1a0) の OOB 後、`*(0x11eac90)` (InitTable ポインタ) が `0xf768b0` から 0 に変わる。`m11_call_unit` は `tbl==0` で -1 を返すため、160 以降の全 unit が `lva=0x0` の range になる。
 - 修正 (`survey_trace.mjs`): baseline (`m11_survey.mjs`) と同じく InitTable (先頭・末尾の proc VA) の破壊を検出し、その unit を `clobber` と記録して boot をやり直す。image の書き戻し方式は採らない (書き戻すと closure_outside が 796 件に増えた。shimx の import 状態が壊れるため)。
 - 修正後: `SXL_SURVEY` kinds は ok 789 / oob 95 / closure_outside 47 / halt0 9 / clobber 1 / noproc 1 / reboots 1。range は 0。
-- baseline (`m11_boot`) は ok 800 / oob 50 / halt0 44 / closure_outside 46 / abort 1 / noproc 1 (reboots 1)。
-- 差分の説明 (未完): baseline は unit 115 で `EnterCriticalSection` の fail-fast (abort) に当たって reboot するが、shimx 版では同 unit が halt0 になり fail-fast に当たらない。以後の unit は状態がずれ、oob と halt0/ok が unit 単位で入れ替わる (unit 単位の差分は 81 件)。oob 増 (50→95) の内訳を unit 単位で説明するところまでは未達。起票先: #773 の子 issue (下記)。
+- baseline (`m11_boot`) は ok 800 / oob 50 / halt0 44 / closure_outside 46 / abort 1 / noproc 1 (reboots 1)。ログ: `tools/m11/alloca/results/run/m11_boot_surveytrace.out` (`SXL_SURVEY` 行、追跡済み)。
+- 裏付けの状態: 修正前・修正後の shimx 版の `SXL_SURVEY` 行は本 PR に含まれておらず、再測定できる素材 (`work-m11`) も本 run に無いため、上記の shimx 版の数値は未再現 (ログ未添付)。再測定は `work-m11` / `work-liftdiff` を指定して行い、その出力を添付する。
+- 差分の説明 (未完): baseline は unit 115 で `EnterCriticalSection` の fail-fast (abort) に当たって reboot するが、shimx 版では同 unit が halt0 になり fail-fast に当たらない。以後の unit は状態がずれ、oob と halt0/ok が unit 単位で入れ替わる (unit 単位の差分は 81 件)。oob 増 (50→95) の内訳を unit 単位で説明するところまでは未達。起票先: 子 issue #1255 (`[SHX-T9c]`)。
 
 ## 4. 残一覧 (BACKLOG 反映用の要約)
 
@@ -82,7 +83,7 @@
 | survey unit 115 の shimx fail-fast (EnterCriticalSection NULL) | 1 | R7 (`tools/shimx/REPORT_R1-R8.md`・既存) |
 | plain 逐次起動の shimx fail-fast (LoadStringW, GUI stub) | 1 | tools/gui |
 | survey unit 160 以降の range 連鎖 | 解消 (harness 修正) | #773 |
-| survey の unit 単位差分 (oob 増・unit 115 の fail-fast 差) | 未説明 | 子 issue (#773 から起票) |
+| survey の unit 単位差分 (oob 増・unit 115 の fail-fast 差) | 未説明 | #1255 (`[SHX-T9c]`) |
 
 ## 5. 再現性
 

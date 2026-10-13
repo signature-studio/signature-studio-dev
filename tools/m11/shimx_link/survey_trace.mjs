@@ -61,9 +61,11 @@ for (let i = 0; i < N; i++) {
   }
   let clobbered = false;
   if (!tableIntact()) {
-    detail = 'InitTable 破壊 (元の kind=' + kind + ')' + (detail ? ': ' + detail : '');
-    kind = 'clobber';
     clobbered = true;
+    if (kind !== 'abort') {
+      detail = 'InitTable 破壊 (元の kind=' + kind + ')' + (detail ? ': ' + detail : '');
+      kind = 'clobber';
+    }
   }
   const called = {};
   if (kind !== 'abort' && HAS()) {
@@ -72,7 +74,7 @@ for (let i = 0; i < N; i++) {
   }
   for (const l of errs.slice(e0)) if (l.startsWith('[shimx]')) { const a = (shimxMsgs[l] ||= { count: 0, first_unit: i + 1 }); a.count++; }
   const msgs = errs.slice(e0).filter((l) => /MessageBox|\[shimx\]/.test(l)).slice(0, 3);
-  perUnit.push({ unit: i + 1, lva: '0x' + lva.toString(16), kind, detail, shim_calls: called, ...(msgs.length ? { msgs } : {}) });
+  perUnit.push({ unit: i + 1, lva: '0x' + lva.toString(16), kind, detail, shim_calls: called, ...(clobbered ? { clobbered: true } : {}), ...(msgs.length ? { msgs } : {}) });
   kinds[kind] = (kinds[kind] || 0) + 1;
   for (const [nm, c] of Object.entries(called)) { const a = (apiUnits[nm] ||= { units: 0, calls: 0, first_unit: i + 1 }); a.units++; a.calls += c; }
   if (kind === 'abort' || clobbered) {
