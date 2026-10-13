@@ -2,7 +2,8 @@
 # engine 分離型 4 本 の C++ engine DLL 全 .pdata 関数を RetDec+pass 鎖で lift → emcc -c (到達性のみ; 正しさは別)
 #   bash tools/plugins/modulation/engine_lift.sh <block> [timeout_sec]      例: 18977 (Frequency Shifter engine)
 # 出力: work/modulation/engine<block>/ と 1 行サマリ (block,pdata_funcs,lift_rc,defines,f80_funcs,unimpl_helpers,emcc_c_rc,fixcmp_patched,emcc_c_rc_after_fixcmp,lift_s,
-#   missing_define,missing_bytes,missing_ref,extra_inside,function_defines  ← engine_defs.py)
+#   missing_define,missing_bytes,missing_ref,extra_inside,function_defines  ← engine_defs.py,
+#   emcc_c_rc_after_f80_lower  ← f80 段 (erc2 != 0 かつ f80 関数あり のときだけ実行。それ以外は erc2 と同値))
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 source "$HERE/env.sh"
