@@ -24,17 +24,15 @@
 
 `bash trap_triage/neg_683.sh` (ON/OFF を順に build + `survey_units.mjs` + `survey_diff.py`)。素材 `work-m11` は #516/#680 以前の生成物で `ir_conditions.json` が無く、そのままでは build が fail-closed で止まる。そこで `m11_gen_ir2.sh` で同じ `boot*.lift.ll` から IR を作り直した (ldfix=applied、20 s)。以下はその再生成 IR の実測。
 
-- 実行: `956d2ed` の worktree (`/home/runner/work/ws-713`) で 2 回実行 (測定 1・2)。各回で ON build → survey → OFF build → survey の順。
-- 所要 (実測、`/proc/loadavg` 1 分値 = 測定時): 測定 2 = 全体 70 s (ON build 24.0 s / survey 17.1 s (load 0.75) / OFF build 18.3 s / survey 17.1 s (load 0.94))。
+- 実行: commit `956d2ed` の worktree (`/home/runner/work/ws-713`) で、`m11_gen_ir2.sh` による IR 再生成後に 3 回実行 (測定 1・2・3)。各回で ON build → survey → OFF build → survey の順。C 側・build スクリプトは `956d2ed` から変更していない (本 fix の commit は REPORT・スクリプトの文言と cp 修正のみ)。
+- 所要 (実測、測定 3): 全体 72 s (ON build 18.4 s / survey 17.5 s (load 0.50) / OFF build 18.4 s / survey 17.0 s (load 0.72))。
 
 | 構成 | ok | oob | halt0 | miss | noproc | trap | 計 |
 |---|--:|--:|--:|--:|--:|--:|--:|
-| OFF (既定, gate=0) 測定 1 | 828 | 11 | 55 | 47 | 1 | 66 | 942 |
-| OFF (既定, gate=0) 測定 2 | 828 | 11 | 55 | 47 | 1 | 66 | 942 |
-| ON (gate=1) 測定 1 | 828 | 11 | 55 | 47 | 1 | 66 | 942 |
-| ON (gate=1) 測定 2 | 828 | 11 | 55 | 47 | 1 | 66 | 942 |
+| OFF (既定, gate=0) n=3 | 828 | 11 | 55 | 47 | 1 | 66 | 942 |
+| ON (gate=1) n=3 | 828 | 11 | 55 | 47 | 1 | 66 | 942 |
 
-- **決定的**: 同じ構成の 2 回の測定は一致 (差 0)。OFF と ON も一致 (差 0)。
+- **決定的**: 測定 1〜3 は全件一致 (min = max)。OFF と ON も一致 (差 0)。
 - **遷移 (OFF → ON)**: 942 unit 全件で kind 不変 (ok→ok 828 / oob→oob 11 / halt0→halt0 55 / miss→miss 47 / noproc→noproc 1)。frames の深さの変化も 0。icall sites / targets の [ok, miss] 差も 0。
 - **PR 旧記述 (ON で ok 818→827、ok +9、副作用 58-63・307/311/917・56) は再生成 IR の実測で再現しない**。58-63 / 307 / 311 / 917 は OFF の段階で既に ok、56 は OFF・ON とも oob。
 - **対象 4 unit**: 149 は OFF = ON = oob (最上位 frame `653660 ← 6539e0 ← 664190`)。158/280/659 は OFF = ON = halt0 (`412770 ← 4128b0__lifted ← 4128b0`)。**4 unit とも ok にならない → 受入条件 1 は未達。**
