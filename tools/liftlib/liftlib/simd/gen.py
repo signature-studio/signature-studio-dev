@@ -138,8 +138,7 @@ def _params(d):
 
 
 def _stub(nm, d, why):
-    params = ", ".join("%s p%d" % (CT.get(t, "u128"), i) for i, t in enumerate(d.args)) if "?" in "".join(d.args) else _params(d)[0]
-    params = params or "void"
+    params, _ = _params(d) if "?" not in "".join(d.args) else (", ".join("u128 p%d" % i for i in range(len(d.args))) or "void", "")
     rt = CT.get(d.ret, "u128")
     ret = "" if rt == "void" else ("Y z = {{0, 0, 0, 0}}; return z;" if rt == "Y" else "return 0;")
     return ("LL_EXPORT %s %s(%s) { __builtin_trap(); %s } /* %s */"
