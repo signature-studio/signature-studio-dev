@@ -113,6 +113,7 @@
 - 本 run (fix 対応) の確認: `ls $ARTIFACTS_DIR` は `fl-win64.tar.zst` と `toolchain-retdec.tar.zst` (`[RETDEC]` の `bin/` が存在)。ただし次の 2 点が揃わず、IR 再生成と build を完走できなかった。
   - `m11_bounds.py` の入力 `tools/m2/work/ghidra_dll/functions_dll.csv` (Ghidra 12.1.4 出力) が無い。`fl-win64` の一覧 (25168 entry) に Ghidra 出力は無く、[GHIDRA] も無い。
   - `m11_build.sh` は [EMSDK] の `emsdk_env.sh` を要求するが、`toolchain-emsdk` は未指定で [EMSDK] が無い。
+- (注: 以下は前 run の記録。現 HEAD の再測定と `functions_dll.csv` の作成は §10 で実施済み。)
 - よって現 HEAD での既定値の再測定は未実施。不足の内訳 (この run の確認):
   - `functions_dll.csv` は素材ではなく、Ghidra 12.1.4 headless (`tools/m2/README.md`・`DumpFunctions.java`) で作る中間物。[GHIDRA] (`docs/REFERENCES.md`) は無く、JDK 21 (temurin) は runner 同梱のものを使う。GitHub への到達は確認済み (200)。
   - `toolchain-emsdk` は未取得 ([EMSDK] 無し)。PR 本文の `oc_artifacts:` 行に追加する。
@@ -145,3 +146,10 @@
 ### 差分 (測定 commit から HEAD まで)
 
 `git diff c05c11e4 HEAD -- tools/m11 ':(exclude)*.md'` の出力: 0 行。
+
+### functions_dll.csv の作成 (依頼 3)
+
+- 作成: 可。Ghidra 12.1.4 (`Ghidra_12.1.4_build` の公開 release zip を `gh release download` で取得し `$RUNNER_TEMP` に展開) + JDK 21 (`/usr/lib/jvm/temurin-21-jdk-amd64`)。`tools/m2/README.md` の headless 手順 (`DumpFunctions.java`、`-analysisTimeoutPerFile 1200`) で `$RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin` を解析。rc=0、9 分 44 秒。
+- 出力: `tools/m2/work/ghidra_dll/functions_dll.csv` (2.0 MB)。gitignore 対象のため commit しない。
+- `m11_gen_ir2.sh` と `m11_build.sh` は `functions_dll.csv` を読まずに完走した (§10)。`functions_dll.csv` は `m11_bounds.py` 等の別経路の入力。
+- 注意: `FL_WIN64_DIR` を export せずに Ghidra を起動すると、空のパス `/extracted/block00031_PE.bin` で即失敗する。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` を明示する。
