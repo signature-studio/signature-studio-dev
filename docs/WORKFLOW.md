@@ -196,10 +196,12 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     IR の正は `bash tools/m11/m11_e2e.sh --full` (RetDec から再生成) の出力とする。ただし `--full` は **未成功**
     (head `4e084e1` で実行し `m11_bounds` が `tools/m2/work/ghidra_dll/functions_dll.csv` の欠落で fail-closed。この CSV は素材に無い Ghidra の中間物。`tools/m11/REPORT_N27.md` §10-3・#728)。PE とパスは `FL_WIN64_DIR` 経由・相対パス化済み。
     `work/ir_conditions.json` の `ldfix=applied` と `ir_sha256` (IR の指紋) が一致しない IR は build されない (`m11_build.sh`)。
+    **使う側が最初に `bash tools/m11/m11_gen_ir2.sh` を実行して `ir_conditions.json` を作る** (`FL_WIN64_DIR` の PE が要るので `fl-win64` も指定する)。
+    `ir_conditions.json` は生成時の PE の絶対パスを記録し、`m11_build.sh` は現在の PE と一致しないと build を拒否するため、別の環境で作った json を素材に同梱しても使えない。
   - `work-fw-stage1` → `tools/plugins/work/fw/` に framework stage-1 成果物 (fw_icall.dll / fw_map.json /
     fw[0-7].restored.ll / r2.restored.ll / r3.restored.ll の 12 ファイル。#610)。`fw_269_verify.sh` の既定 SRC がそのまま使える。
-    **R2 実体は未 upload** (upload 完了までこの名前を `oc_artifacts:` に書くと `missing R2 object(s)` で run が失敗する)。
-    作成・検証は `bash tools/plugins/framework/fw_pack_stage1.sh pack` → `artifacts/work-fw-stage1.tar.zst` (`verify` で単独検査も可。R2 への upload は依頼者が行う)。
+    作成・検証は `bash tools/plugins/framework/fw_pack_stage1.sh pack` → `artifacts/work-fw-stage1.tar.zst` (`verify` で単独検査も可)。
+    R2 への投入は PM が行う (S3 multipart、R2 から再ダウンロードした sha256 と梱包元の一致を確認する)。
   - 追加の `work-*` は R2 に置いて、`prepare-event-context.sh` の allowlist に足す (#293)。
 - **fl-win64 の展開と `FL_WIN64_DIR`**: tarball は最上位に `extracted/` と installer exe を持つ
   (`extracted/block00031_PE.bin` 等)。展開先ディレクトリがそのまま `FL_WIN64_DIR` になる。
