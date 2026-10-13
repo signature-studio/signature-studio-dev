@@ -6,11 +6,12 @@
 入力: PE (既定 $FL_WIN64_DIR/extracted/block00031_PE.bin。targets/m11.json の pe と同じ)。
       IR (既定 tools/m11/work/boot_final3.ll) の define 行から署名を引く。
 出力: 関数ごとの IR 署名・先頭命令列・単純な jmp thunk の解決結果。
-ABI の読み方 (MS x64): 整数/ポインタ引数は rcx,rdx,r8,r9 (第 3 以降は stack)。
-  i128 は 16 バイトの値なので 2 レジスタ (低 64bit・高 64bit) に分かれて入るのが想定。
-  double 引数は xmm0..3。{i32,i32} (8 バイト) の値渡しは 1 レジスタ (rcx 下位 32bit) に入るのが想定。
-  戻り値 i128 は rax:rdx。
-この script は ABI を断定しない。入口の命令列を並べるだけで、判定は REPORT_LD39.md で人が行う。
+ABI の想定 (未検証の仮説。出典は未確認で、判定は REPORT_LD39.md §2 で人が行う):
+  MS x64 の整数/ポインタ引数は rcx,rdx,r8,r9 (第 3 以降は stack)、double 引数は xmm0..3 と想定する。
+  i128 (16 バイト) の渡し方は未確定で、候補を 2 つ残す:
+    (a) 2 レジスタ分解 (低 64bit・高 64bit を連続するレジスタに入れる)
+    (b) ポインタ渡し (実体へのポインタ 1 本。LLVM の Win64 規約の想定として挙がっているが、本 script では確認していない)
+  この script は候補のどちらも選ばない。入口の命令列を並べるだけ。
 """
 import os
 import re
