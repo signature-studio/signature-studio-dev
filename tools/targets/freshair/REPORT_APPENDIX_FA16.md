@@ -54,3 +54,15 @@ found 時は `out[0] = node.+0x28`、`out[1] = node.+0x30` (参照カウンタ�
 - `native/ctrl_harness.mjs` に `FA_ALT9=1` (C+0x328 を C+0x2d0 と不一致にし静的分岐を強制) を追加。`run_fa9.sh` の判定ゲートに `(b-wasm)` を追加。
 - 実測 (`run_fa9.sh`, 同 commit): (a) base ERR=0・ca1480=72・path=map・found=0・da6c00=0 / (b) native alt ERR=8/8 path=static / (b-wasm) wasm alt ERR=8/8 / GATE: PASS / run_ctrl BIT-EXACT 15/15。
 - 非空 map (受入 1〜3) は未着手。found=0・da6c00=0 のまま (§4)。
+
+## 7. FA-21 (#1535): 1 ノードの非空 controller map (native / wasm 同時変更)
+
+- 変更 (測定 commit `0cf238bb`): `native/native_ctrl.c` と `native/ctrl_harness.mjs` に同一の 1 ノードを追加 (`C+0x21b8` の head に接続、key u16=1、value=Z、blk=RB0)。
+  key=1 は静的読み §1 の `[C+0x328]` 比較の後の探索 key (`keycnt`、`0x180ca1499` の `edx`) に合わせた。key=0 では found=0 のまま (実測)。
+- 実測 (`bash run_fa9.sh`, `0cf238bb`, clean build, load 0.18→0.55, wall 35.98 s):
+  - (a) base: scenarios=8, ERR=8/8, ca1480=72, path=map, **found=1 (72/72)**, da6c00=0 (旧 baseline は found=0)。
+  - 失敗原因: found=1 の後、setter (`0x180c9d74c`) が `addr=0x50` で SIGSEGV (`out[0]+0x10` の vtable が未構築)。受入 2 後半 (0x180da6c00 到達) は範囲外 (#1182)。
+  - (b) alt: native ERR=8/8 path=static / wasm ERR=8/8 (変化なし)。
+  - (c) pert: 差分トークン 0 (ERR のため状態ダンプに届かない)。
+  - GATE: **FAIL** — (a) の期待値 (found=0・ERR=0) が旧 baseline のままのため。ゲートは緩めていない。
+- 実測 (`bash run_ctrl.sh 2 5`, `0cf238bb`, wall 0 s): **BIT-EXACT 15/15** (fma0/fma1, 両側 ERR 14/14 同一 scenario)。
