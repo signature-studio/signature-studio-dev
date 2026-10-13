@@ -28,6 +28,8 @@
 | `loadpaths.json` | 配置 group の宣言 (glob・phase・推奨 tier・読込単位・読み手関数 VA・`claims` / `calls`) |
 | `check.py` + `mapcheck.mjs` | group を実ファイル一覧に当てて件数・サイズ・Win→VFS 写像 (pathreg JS ミラーを import) を実測 |
 | `crosscheck.py` | 別算法 (RSA の乗算展開 / 64 bit ワード演算の XOR / 標準 `gettext`) による検算 + ネガコン |
+| `svc_check.py` | 検索パス服務 (§8) の vtable スロット・call 辺・import 名・機械語を DLL から機械照合 (43 項目) + `--mutate` ネガコン (#590) |
+| `lang_seed_check.mjs` | 非 en seed の seed 層確認 (`Program language` を apply:true・value=ja にした派生をメモリ上で作り、値の出現と外した時の不出現を確認。wasm/素材不要) (#590) |
 | `e2e.sh` | 上記 1 コマンド検証 |
 
 ## 2. 言語ファイル (.moe)
@@ -46,7 +48,7 @@ CreateFruityInstance 0x1375990 ── call ─→ 0x13754b0 ── call ─→ �
 検索パス登録 0x9db5b0: 区分 0x40f に `Languages\` (level 0 = ユーザ) 、`Languages\` (level 2) 、`System\Languages\` (level 1 = インストール先) を登録
 ```
 
-- 検索順の意味 (level 0→1) は登録順・命名からの推定。`0x9de400` が呼ぶ `[self+0xa8]->vtbl+0x30` の実体は未追跡 (§6)。
+- 検索順の意味 (level 0→1) は登録順・命名からの推定。`0x9de400` が呼ぶ `[self+0xa8]->vtbl+0x30` の実体と不在時挙動は **§8 で静的に確定** (#590。動的確認は未了)。
 - 言語の選択は**レジストリの `Program Language` のみ**。現行 seed `tools/startup/vreg/data/seed.json` では `Shared\Language` の `Program language` は catalog のみ (value `""`・`apply:false`) で起動時に書かれない → エンジン既定 `en`。OS 言語の自動採用は `zh` だけ
   (その場合は `Program language` を書き戻す)。shimx は UI 言語 API を `en-US` 固定で実装済み (`tools/shimx/REPORT.md` R3、`GetUserPreferredUILanguages` は inventory 上 locale.c で機能実装。返値の実測は未実施 → §6)。
 
@@ -161,7 +163,7 @@ files / bytes は `$INSTDIR` 相対のユニークパス (`inventory_files` 2740
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | `phase` / tier の動的確定 (boot 中の open() トレース) | §3・§4 の推奨は静的根拠。boot が `CreateFruityInstance` に未到達 (unit 初期化 209 で停止) の間は答え合わせ不可 | #105 (T1・`assettrace` が入力、本 REPORT の group を diff の基準にする) / 依存 [FLE-2] #253 |
-| `0x9de400` の `[self+0xa8]->vtbl+0x30` (検索パス服務) の実体と、ユーザ側ディレクトリ不在時の挙動 | `Languages\` 等の level 0 を VFS でどう見せるか (空ディレクトリ要否) | 新規子チケットを PM が起票 (親 #39。boot 到達後に実測) |
+| ~~`0x9de400` の `[self+0xa8]->vtbl+0x30` (検索パス服務) の実体と、ユーザ側ディレクトリ不在時の挙動~~ | 静的に確定 (§8-1・§8-2)。**VFS / shimx 側の実測は未了** (§8-4) | #590 (本 PR)。実測は §8-4 の起票先 |
 | 非 en 言語 (`Program Language`=`ja` を seed + `/fl/System/Languages/ja.moe`) の実読込 e2e と、`en` で .moe を一切開かないことの実測 | §0-1 の動的確認 | 同上 (非 en の seed 先は `tools/startup/vreg/data/seed.json`。生成元 `scripts/build_seed.py` の `OVERRIDES` で `Program language` を `apply:true`・value=`ja` にする) |
 | ~~`GetUserPreferredUILanguages` が en-US を返すことの実測~~ | **#591 で実測済み**: 既定 `en-US`、`zh-CN` のときだけ Program language を自動書込み (`tools/startup/uilang/REPORT.md` §1) | — |
 | ~~`lang-svg` の参照元~~ | **#591 で特定**: 0xdceea0 `FlagBtnPaint` (同 §2)。初回描画が起動中かは未確認 | #105 |
@@ -177,3 +179,65 @@ DEFECTS.md 追記案: なし (新しい silent miscompile 類型は見つけて�
 1. boot が `CreateFruityInstance` を抜けた時点で `assettrace` を実行し、§3 の phase / §4 の差分 6 点を実測で答え合わせする (#105)。
 2. 非 en seed の言語 e2e: `tools/startup/vreg/data/seed.json` (生成元 `build_seed.py` の `OVERRIDES` で `Program language` を `apply:true`・value=`ja` にした派生) + `/fl/System/Languages/<code>.moe` の全量読込を確認する子チケット。
 3. `bootset` の規則に §4 の差分を反映する PR (`tools/assets`)。
+
+## 8. #590: 検索パス服務の実体・不在時挙動 (静的確定) と非 en seed
+
+検証範囲: `FLEngine_x64.dll` の静的構造のみ (`svc_check.py`)。**boot は `CreateFruityInstance` に未到達 (`tools/flelift/boot/REPORT.md` §0: unit 209 で停止、依存 #253)** のため、
+#590 受入条件 1 (`ja.moe` 全量読込の e2e)・3 のうち「エンジンが en に戻る」動的確認は**未実施**。以下の静的結論は実行で裏取りしていない。
+
+### 8-1. `0x9de400` の `[self+0xa8]->vtbl+0x30` の実体
+
+| 項目 | 内容 (絶対 VA) |
+|---|---|
+| 呼出点 | 0x9de4ab / 0x9de52f の `call [rbx+0x30]`。引数 = (service, 区分 id **0x40f**, 名前 `<lang>.moe` / `<lang>.mo`, 0, flags=0, 出力 buffer)。`.mo` は内部フラグ [0x15e26e0] が真のときだけ |
+| service の出所 | 0x9deaa0 の第 1 引数 = `0x75b3d0` の戻り (`mov rax,[rcx+0x28]`)。0x13754b0 が `[[[0x15e4790]]+0x30]` に適用して渡す。`[owner+0x28]` は 0x758b90 が `0x75b9e0` で作る (class cell 0x751088 → vtable 0x751150) |
+| 実体 | vtable **0x751150** (RTTI 名に `PathManagerImpl`)。`+0x30` = **0x75b750** (名前引数を文字列変換して `0x758330(owner=[this+8], …)` へ委譲。変換関数 0x41c6e0 / 0x81b2e0 の中身は未確認)、`+0x38` = 0x75b870 (同型の別 overload)。0x75b750 の戻りは「見つかったら -1(true)」 |
+| 探索本体 0x758330 | 登録済みの level 列 (0x9db5b0 が区分 0x40f 等に level **0 → 2 → 1** の順で登録) を回り、0x759320 で候補パスを作り、0x758200 で存在確認し、最初に存在したものを返す |
+| 登録 0x9db5b0 | 0x759c80 を level 0・2・1 で呼ぶ (`xor edx,edx` / `mov dl,2` / `mov dl,1`)。0x40f への対応づけは 0x9db73f が書く集合 id を 0x9dc7b4 が読む |
+
+- level の**意味** (0=ユーザ側 / 1=インストール先) と、0x758b90 の object が `[[0x15e4790]+0x30]` と同一であることは**未確認** (登録順・`+0x28` の型整合からの推定)。
+- 0x758330 内の level 反復と `[owner+0x18]` の表引きの細部 (どの level にどの相対ディレクトリが対応するか) は未追跡。§2.1 の `Languages\` ×2 + `System\Languages\` は 0x9db5b0 のリテラルから。
+
+### 8-2. ユーザ側ディレクトリ不在時の挙動 (静的)
+
+存在確認 0x758200 → **0x43ba70 (FileExists)** → `kernel32!GetFileAttributesW`:
+
+| GetFileAttributesW の結果 | 挙動 |
+|---|---|
+| `INVALID_FILE_ATTRIBUTES` かつ `GetLastError` = **2 / 3 / 0x7b** | **false を返す** (例外なし)。次の level / 次の候補名へ進む |
+| `INVALID_FILE_ATTRIBUTES` かつ上記以外 (例: 5) | `FindFirstFileW` / `FindClose` (0x43ba20) での再確認に回る。見つからなければ false |
+| 属性あり・ディレクトリでない・reparse でない | true。(`CreateFileW` で開けるかの確認は reparse point の場合のみ) |
+
+- 結論: **不在は fail-soft**。`en` の既定でも `en.moe` の探索は走るが、VFS は GetFileAttributesW を `INVALID_FILE_ATTRIBUTES` + `ERROR_FILE_NOT_FOUND`(2) / `ERROR_PATH_NOT_FOUND`(3) で返せば足り、ユーザ側 `Languages\` を空ディレクトリとして作っておく必要はない (§4 の「空ディレクトリ要否」への答え)。
+- 呼出元 0x9de400 は結果を bool (`setne`) としてだけ使う。見つからなければ出力文字列を空にして false を返す。0x9de620 は `xx_YY → xx` の縮約と LC_MESSAGES 系を順に試し、**全滅しても 0x9de810 (フォールバック) → 組込み英語**。
+- 0x758200 には「存在確認の省略」(`[this+0xb8]` の bit2) があるが、0x9de400 の引数との対応は未追跡 (省略されるなら不在でも true になりうる。§8-4)。
+
+### 8-3. 非 en seed (seed 層のみ)
+
+- `seed.json` の `Shared\Language` `Program language` は `apply:false`・value `""` (catalog のみ)。`lang_seed_check.mjs` は**メモリ上の派生** (apply:true・value=`ja`) で REG_SZ `ja` が出ること、
+  apply を戻す・group を skip すると出ないことを確認する。`seed.json` 本体と `build_seed.py` の `OVERRIDES` は**変更していない** (既定を `ja` にすると全 e2e の前提が変わるため。派生は e2e の入力として別途用意する)。
+- これは「seed が値を載せる」層の確認で、**エンジンがその値で `ja.moe` を全量読むこと (受入条件 1) の確認ではない**。
+
+### 8-4. 未達・未解決
+
+| 項目 | 状態 | 起票先 |
+|---|---|---|
+| 受入条件 1: `ja` seed で `/fl/System/Languages/ja.moe` が全量読まれることの e2e | **未達** (boot が `CreateFruityInstance` に未到達) | #590 を開いたまま (依存 #253)。到達後に `assettrace` 系で open() を実測 |
+| 受入条件 3: ネガコン「言語 seed を外すと en 組込みに戻る」の動的確認 | **seed 層のみ** (§8-3)。エンジン側は未達 | 同上 |
+| 0x758200 の bit2 省略が 0x9de400 の呼出で有効か | 未追跡 (有効なら §8-2 の fail-soft 結論が変わりうる) | #590 に残す (boot 到達後の実測で同時に確認) |
+| 受入条件 2 の動的側: shimx/VFS が不在パスで `INVALID_FILE_ATTRIBUTES` + 2/3 を返すことの実測 | 静的な要求仕様のみ確定 (§8-2) | #658 |
+
+## 9. #590 の検証 (実測)
+
+コミット済み `b159cf0` の clean worktree で `bash tools/startup/loadpaths/e2e.sh` (並列 1、node v22.23.3 / python3.14、capstone は調査時のみで本ツールは不要):
+
+| 項目 | 結果 |
+|---|---|
+| e2e 3 回 | exit 0 ×3 / 所要 **16.41 / 15.91 / 16.46 秒** / load average (1 分) 開始 0.08・0.34・0.49 → 終了 0.34・0.49・0.60 |
+| `svc_check.py` | 43/43 一致 |
+| ネガコン (`svc_check.py --mutate`) | vtable スロット / call 辺 / import 名 / 機械語の出現回数 / グローバル対応 / 別 level の 6 種を壊して全て検出 (exit 0)。見逃しがあれば exit 1 |
+| `lang_seed_check.mjs` | PASS (現行 seed 不出現 / 派生 ja 出現 / ネガコン 3 種) |
+| 既存 [1]〜[3] | 変更前と同じ結果 (PASS) |
+
+**この検証が示さないこと**: エンジンの実行 (boot 未到達)。受入条件 1 は未達 (§8-4)。
+

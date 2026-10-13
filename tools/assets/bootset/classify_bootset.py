@@ -31,7 +31,14 @@ def has(lit):
 
 # (tier, glob(path は / 区切り・大小無視), 証拠リテラル[], 理由)
 RULES = [
-    ('T0', 'Artwork/Skins/Default/*', ['Artwork\\Skins\\', 'Title.png', 'BigFruit.png', 'ClipHanger.png', 'PickerChan.png', 'ScopeGradient.bmp', 'StartSnd.wv'], '既定スキン (起動画面/UI 素材, 起動音)'),
+    ('T0p', 'Artwork/Skins/Default/StartSnd.wv', ['StartSnd.wv'], '起動音 (flags&8 の条件付き; ST-T14 §4 #4)'),
+    ('T1', 'Artwork/Skins/Default/BigFruit.png', ['BigFruit.png'], '操作時のみ (ST-T14 §4 #5)'),
+    ('T1', 'Artwork/Skins/Default/ClipHanger.png', ['ClipHanger.png'], '操作時のみ (ST-T14 §4 #5)'),
+    ('T1', 'Artwork/Skins/Default/PickerChan.png', ['PickerChan.png'], '操作時のみ (ST-T14 §4 #5)'),
+    ('T1', 'Artwork/Skins/Default/ScopeGradient.bmp', ['ScopeGradient.bmp'], '操作時のみ (ST-T14 §4 #5)'),
+    ('T1', 'Artwork/Skins/Default/RenderSnd.wv', ['RenderSnd.wv'], '操作時のみ (ST-T14 §4 #5)'),
+    ('T0', 'Artwork/Skins/Default/*', ['Artwork\\Skins\\', 'Title.png'], '既定スキン (起動画面/UI 素材)'),
+    ('T0', 'Artwork/Wallpapers/Default.txt', ['Default.txt', 'Wallpapers'], '起動中のフォーム生成で読む既定壁紙定義 (ST-T14 §4 #2)'),
     ('T0', 'Artwork/Themes/thmDefault.png', ['thmDefault.png'], '既定テーマ画像'),
     ('T0', 'Artwork/Themes/tweak_default.png', ['tweak_default.png'], '既定テーマ調整画像'),
     ('T0', 'Artwork/Fonts/Fruity microfont.ttf', ['Artwork\\Fonts', '.ttf'], 'マイクロフォント'),
@@ -52,10 +59,10 @@ RULES = [
     ('T0p', 'System/Config/FL Studio Remote Scripts/*', ['System\\Config\\FL Studio Remote Scripts'], 'リモートスクリプト列挙'),
     ('T1', 'System/Config/Thumbnails/*', ['System\\Config\\Thumbnails\\', 'edition-signature.png'], 'ブラウザ/エディション サムネイル'),
     ('T0', 'System/Plugin Formats/*', ['System\\Plugin Formats\\', 'formats.txt'], 'プラグイン形式定義'),
-    ('T0p', 'System/Texts/*.txt', ['System\\Texts\\', 'BoxEdition.txt', 'NotReggedTxt.txt', 'DemoTxt.txt'], 'エディション/案内文'),
-    ('T1', 'System/Texts/*', ['System\\Texts\\'], 'About/ライセンス文'),
+    ('T1', 'System/Texts/*', ['System\\Texts\\', 'BoxEdition.txt', 'NotReggedTxt.txt', 'DemoTxt.txt'], 'エディション/案内文・About/ライセンス文 (ダイアログ経路のみ; 直下 .txt は ST-T14 §4 #6 で T0p→T1)'),
     ('T0p', 'System/Internet/*', ['System\\Internet\\', 'error-offline.html'], 'ニュース/オフライン案内 (外部通信は対象外, 既定ページのみ)'),
-    ('T1', 'System/Languages/*', ['System\\Languages\\', 'Languages\\'], '言語ファイル (英語は内蔵; 選択言語のみ 1 ファイル)'),
+    ('T2', 'System/Languages/*.moe', ['System\\Languages\\', '.moe'], '言語 .moe (既定 en では開かない; ST-T14 §4 #3)'),
+    ('T1', 'System/Languages/*', ['System\\Languages\\', 'Languages\\'], '言語補助 (.svg 等)'),
     ('T1', 'System/Hardware specific/*', ['System\\Hardware specific\\'], 'MIDI コントローラ定義 (デバイス接続時)'),
     ('T0', 'Data/System/*.fst', ['Data\\System\\', 'AudioTrack.fst', 'SamplerTrack.fst', 'MIDITrack.fst', 'AutoTrack.fst', 'DirectWaveTrack.fst'], 'チャンネル既定 state (.fst)'),
     ('T0', 'Data/System/Empty.flp', ['Data\\System\\Empty.flp', 'Empty.flp'], '空プロジェクト'),
@@ -72,7 +79,7 @@ RULES = [
     ('T0p', 'Plugins/Fruity/*/*/Plugin.nfo', ['Plugin.nfo', '.nfo', 'Plugins\\Fruity\\'], 'プラグインスキャン用メタ'),
     ('T0p', 'Plugins/Fruity/*/*.nfo', ['.nfo', 'Plugins\\Fruity\\'], 'プラグインスキャン用メタ'),
     ('T1', 'Help/index_offline.html', ['index_offline.html'], 'オフラインヘルプ入口'),
-    ('T1', 'Help/*.scr', ['HelpPlugins.scr', 'HelpAliases.scr'], 'ヘルプ別名表'),
+    ('T0p', 'Help/*.scr', ['HelpPlugins.scr', 'HelpAliases.scr'], 'ヘルプ別名表 (LoadSettings の Initialize the help file で起動時に読む; ST-T14 §4 #1)'),
     ('T1', 'WhatsNew.rtf', ['WhatsNew.htm'], '更新情報'),
     ('T1', 'Shared/Python/*', ['InitSharedPython'], 'Python 3.12 標準ライブラリ (スクリプト実行時)'),
 ]
@@ -159,7 +166,11 @@ def main():
     for t, sz in uniq.values():
         U[t][0] += 1
         U[t][1] += sz
-    md = ['# BOOTSET — 起動時ファイル階層 (推定)', '', '| tier | files | bytes | MB | unique-content files | unique-content MB |', '|---|---:|---:|---:|---:|---:|']
+    md = ['# 自動生成: `python3 tools/assets/bootset/classify_bootset.py` (`bootset/bootset.json`・`work/tiers.json` と同時生成)', '',
+          '> **人手編集禁止** (生成元の `classify_bootset.py` を直す)。推定 tier の記載ここが正本。',
+          '> 起動 tier の解釈・配信順への反映は `tools/assets/MANIFEST.md`、実施記録は `tools/assets/REPORT.md`。',
+          '> tier の確度は「推定」(実機トレース未取得。根拠は FLEngine 文字列 + ツリー構造規則)。', '',
+          '# BOOTSET — 起動時ファイル階層 (推定)', '', '| tier | files | bytes | MB | unique-content files | unique-content MB |', '|---|---:|---:|---:|---:|---:|']
     for t in ['T0', 'T0p', 'T1', 'T2', 'X-lift', 'X-rebuild', 'X-skip']:
         if t in S:
             md.append('| %s | %d | %d | %.2f | %d | %.2f |' % (t, S[t][0], S[t][1], S[t][1] / 1e6, U[t][0], U[t][1] / 1e6))
