@@ -77,7 +77,9 @@ addEffect の plugin 名検証 (`fl_engine.c` の `if (pn[0] && !plugin_kind_ok(
 | `node tests/midi_script.mjs` | checks 29、failed [] | 0.86 秒 |
 | `node tests/ilmcp_diff.mjs` | calls 32、diffs 0、PASS | — |
 
-素材: `fl-win64` から block25159/24429/24430/24618 のみ展開 (`tar --zstd -xf` で 2.9 秒)。`toolchain-emsdk` は `/opt/emsdk` を使用。
+素材: `fl-win64` から block25159/24429/24430/24618 のみ展開 (`tar --zstd -xf` で 2.9 秒)。`toolchain-emsdk` は `[EMSDK]` (docs/REFERENCES.md) を使用。
+
+ネガティブコントロール (`transport_diff.mjs` が壊れを検出することの確認): `provider/fl_engine.c` の `transport.isPlaying` の戻りを `!playing` に反転 → `provider/build.sh` 再ビルド → `transport_diff.mjs` は `transport 差分 4 件` で AssertionError・終了コード 1 (FAIL)。`git checkout` で復元 → 再ビルド → calls 7、diffs 0、PASS・終了コード 0。
 
 ### 既知の未解決 (文字の扱い)
 
