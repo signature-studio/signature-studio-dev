@@ -13,13 +13,12 @@
   "trap": 29,
   "clobber": 0,
   "kinds": {
-   "memory access out of bounds": 19,
+   "memory access out of bounds": 21,
    "halt0->longjmp": 7,
-   "gui_failfast": 3
+   "gui_failfast": 1
   },
   "failfast_units": {
-   "LoadImageW": 1,
-   "SystemParametersInfoW": 2
+   "LoadImageW": 1
   }
  },
  "reach": [
@@ -208,11 +207,10 @@
  ],
  "reach_summary": "reached=26 impl=25 stub=1",
  "failfast_apis": {
-  "LoadImageW": 1,
-  "SystemParametersInfoW": 2
+  "LoadImageW": 1
  },
  "softstub_apis": {},
- "failfast_count": 3,
+ "failfast_count": 1,
  "gui_icall_calls": 1,
  "gui_ring_discarded": 0,
  "icall_miss": 49,
@@ -241,13 +239,13 @@
   "GetFileVersionInfoSizeW:1"
  ],
  "probes": {
-  "GetMem": 4184357,
+  "GetMem": 4184359,
   "FreeMem": 156,
-  "FastMM_GetMem(407a50)": 4184432,
+  "FastMM_GetMem(407a50)": 4184434,
   "FastMM_FreeMem(407e20)": 161,
   "InitUnits": 0,
   "Halt0": 8
  },
- "va_calls": 232,
- "va_bytes": 455868416
+ "va_calls": 234,
+ "va_bytes": 498466816
 }

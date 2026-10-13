@@ -62,7 +62,7 @@ GUI 系 DLL (user32.dll, gdi32.dll, comctl32.dll, comdlg32.dll, opengl32.dll, ux
 |---|---|---|---|---|---|
 | SendMessageW | user32 | message | 219 | IMPL |  |
 | PostMessageW | user32 | message | 140 | IMPL |  |
-| DeleteObject | gdi32 | bitmap/blit | 136 | IMPL |  |
+| DeleteObject | gdi32 | bitmap/blit | 136 | IMPL | ●survey |
 | SelectObject | gdi32 | bitmap/blit | 97 | IMPL |  |
 | ReleaseDC | user32 | paint | 84 | IMPL | ●survey/probe |
 | GetCursorPos | user32 | input | 83 | IMPL |  |
@@ -86,7 +86,7 @@ GUI 系 DLL (user32.dll, gdi32.dll, comctl32.dll, comdlg32.dll, opengl32.dll, ux
 | OffsetRect | user32 | util | 29 | IMPL |  |
 | ShowWindow | user32 | window | 29 | IMPL |  |
 | RegisterClipboardFormatW | user32 | clipboard | 28 | IMPL | ●survey |
-| GetObjectW | gdi32 | bitmap/blit | 27 | IMPL |  |
+| GetObjectW | gdi32 | bitmap/blit | 27 | IMPL | ●survey |
 | SetTextColor | gdi32 | dc-state | 27 | IMPL |  |
 | DrawTextW | user32 | user-draw | 25 | IMPL |  |
 | MapWindowPoints | user32 | window | 25 | IMPL |  |
@@ -200,7 +200,7 @@ GUI 系 DLL (user32.dll, gdi32.dll, comctl32.dll, comdlg32.dll, opengl32.dll, ux
 | SelectClipRgn | gdi32 | clip/region | 12 | IMPL |  |
 | GetStockObject | gdi32 | dc-state | 11 | IMPL | ●survey |
 | GetTextMetricsW | gdi32 | text/font | 11 | IMPL |  |
-| CharNextW | user32 | util | 11 | IMPL |  |
+| CharNextW | user32 | util | 11 | IMPL | ●survey |
 | GetClipboardData | user32 | clipboard | 11 | IMPL |  |
 | LoadStringW | user32 | util | 11 | IMPL | ●起動/survey/probe |
 | NotifyWinEvent | user32 | hook/sync | 11 | IMPL |  |
@@ -228,7 +228,7 @@ GUI 系 DLL (user32.dll, gdi32.dll, comctl32.dll, comdlg32.dll, opengl32.dll, ux
 | SetRectRgn | gdi32 | util | 6 | IMPL |  |
 | EnumThreadWindows | user32 | window-aux | 6 | IMPL |  |
 | GetDlgItem | user32 | window-aux | 6 | IMPL |  |
-| GetIconInfo | user32 | cursor/icon | 6 | IMPL |  |
+| GetIconInfo | user32 | cursor/icon | 6 | IMPL | ●survey |
 | GetLastActivePopup | user32 | window-aux | 6 | IMPL |  |
 | MessageBeep | user32 | util | 6 | IMPL |  |
 | MonitorFromWindow | user32 | system | 6 | IMPL |  |
@@ -381,7 +381,7 @@ GUI 系 DLL (user32.dll, gdi32.dll, comctl32.dll, comdlg32.dll, opengl32.dll, ux
 | TextOutW | gdi32 | text/font | 2 | IMPL |  |
 | GetDpiForMonitor | shcore | system | 2 | STUB |  |
 | GetProcessDpiAwareness | shcore | system | 2 | STUB |  |
-| CharLowerW | user32 | util | 2 | IMPL |  |
+| CharLowerW | user32 | util | 2 | IMPL | ●survey |
 | CharNextExA | user32 | util | 2 | IMPL |  |
 | CharToOemBuffW | user32 | util | 2 | IMPL |  |
 | CopyImage | user32 | cursor/icon | 2 | STUB |  |
@@ -511,10 +511,10 @@ GUI 系 DLL (user32.dll, gdi32.dll, comctl32.dll, comdlg32.dll, opengl32.dll, ux
 
 | 区分 | API (P 分類) |
 |---|---|
-| 到達 & 実装済み | CharLowerBuffW (P1), CreatePalette (P2), CreateWindowExW (P0), EnumDisplayMonitors (P1), EnumDisplaySettingsW (P1), EnumFontFamiliesExW (P2), FindWindowW (P1), GetClassInfoW (P0), GetClipCursor (P0), GetClipboardFormatNameW (P1), GetDC (P0), GetDeviceCaps (P0), GetKeyboardLayout (P0), GetMonitorInfoW (P1), GetStockObject (P1), GetSystemMetrics (P0), LoadCursorW (P1), LoadIconW (P1), LoadStringW (P1), MessageBoxA (P2), MessageBoxW (P1), RegisterClassW (P0), RegisterClipboardFormatW (P0), RegisterWindowMessageW (P0), ReleaseDC (P0), SetWindowLongPtrW (P0), SystemParametersInfoW (P0) |
+| 到達 & 実装済み | CharLowerBuffW (P1), CharLowerW (P2), CharNextW (P1), CreatePalette (P2), CreateWindowExW (P0), DeleteObject (P0), EnumDisplayMonitors (P1), EnumDisplaySettingsW (P1), EnumFontFamiliesExW (P2), FindWindowW (P1), GetClassInfoW (P0), GetClipCursor (P0), GetClipboardFormatNameW (P1), GetDC (P0), GetDeviceCaps (P0), GetIconInfo (P1), GetKeyboardLayout (P0), GetMonitorInfoW (P1), GetObjectW (P0), GetStockObject (P1), GetSystemMetrics (P0), LoadCursorW (P1), LoadIconW (P1), LoadStringW (P1), MessageBoxA (P2), MessageBoxW (P1), RegisterClassW (P0), RegisterClipboardFormatW (P0), RegisterWindowMessageW (P0), ReleaseDC (P0), SetWindowLongPtrW (P0), SystemParametersInfoW (P0) |
 | 到達 & fail-fast stub (**実装必須へ昇格**) | LoadImageW (P2) |
-| 到達 & P2/P3 (**P1 以上へ昇格候補**) | CreatePalette (P2), EnumFontFamiliesExW (P2), LoadImageW (P2), MessageBoxA (P2) |
-| 未到達の P0 (現 m11 到達段では未実行) | SendMessageW, PostMessageW, DeleteObject, SelectObject, GetCursorPos, GetWindowLongPtrW, GetCapture, DeleteDC, SetWindowPos, BitBlt, SetBkColor, SetCursor, IntersectRect, IsWindowVisible, SetFocus, CreateCompatibleDC, GetWindowRect, ReleaseCapture, OffsetRect, ShowWindow, GetObjectW, SetTextColor, DrawTextW, MapWindowPoints, DefWindowProcW, SetWindowOrgEx, GetKeyState, PeekMessageW, CombineRgn, RestoreDC, FillRect, GetParent, InvalidateRect, RedrawWindow, SetActiveWindow, EndPaint, DispatchMessageW, StretchBlt, GetFocus, GetWindowThreadProcessId, SetTimer, CallWindowProcW, GetAsyncKeyState, GetWindow, IsWindowEnabled, SetStretchBltMode, BeginPaint, SetCursorPos, SetPhysicalCursorPos, GetClientRect, UnregisterClassW, GetDIBits, GetActiveWindow, CreateBitmap, CreateCompatibleBitmap, DestroyWindow, IsIconic, LockWindowUpdate, SetCapture, GdiFlush, PatBlt, ClientToScreen, GetWindowDC, IsWindow, MapVirtualKeyW, PhysicalToLogicalPoint, TranslateMessage, CreateDIBSection, GetDCEx, GetDesktopWindow, GetKeyboardState, PostQuitMessage, SetWindowTextW, AlphaBlend, GetForegroundWindow, ActivateKeyboardLayout, GetPhysicalCursorPos, IsChild, KillTimer, SetForegroundWindow, ValidateRect, WindowFromPoint, StretchDIBits, EnableWindow, GetAncestor, LogicalToPhysicalPoint, ScreenToClient, SetDIBits, AdjustWindowRectEx, GetMessagePos, GetUpdateRect, IsZoomed, LoadKeyboardLayoutW, SetParent, ToAscii, UpdateWindow, WaitMessage, GetStretchBltMode, SetDIBitsToDevice, DispatchMessageA, GetMessageTime, GetMessageW, GetWindowTextW, InvalidateRgn, PostThreadMessageW, SendMessageA, SetWindowTextA |
+| 到達 & P2/P3 (**P1 以上へ昇格候補**) | CharLowerW (P2), CreatePalette (P2), EnumFontFamiliesExW (P2), LoadImageW (P2), MessageBoxA (P2) |
+| 未到達の P0 (現 m11 到達段では未実行) | SendMessageW, PostMessageW, SelectObject, GetCursorPos, GetWindowLongPtrW, GetCapture, DeleteDC, SetWindowPos, BitBlt, SetBkColor, SetCursor, IntersectRect, IsWindowVisible, SetFocus, CreateCompatibleDC, GetWindowRect, ReleaseCapture, OffsetRect, ShowWindow, SetTextColor, DrawTextW, MapWindowPoints, DefWindowProcW, SetWindowOrgEx, GetKeyState, PeekMessageW, CombineRgn, RestoreDC, FillRect, GetParent, InvalidateRect, RedrawWindow, SetActiveWindow, EndPaint, DispatchMessageW, StretchBlt, GetFocus, GetWindowThreadProcessId, SetTimer, CallWindowProcW, GetAsyncKeyState, GetWindow, IsWindowEnabled, SetStretchBltMode, BeginPaint, SetCursorPos, SetPhysicalCursorPos, GetClientRect, UnregisterClassW, GetDIBits, GetActiveWindow, CreateBitmap, CreateCompatibleBitmap, DestroyWindow, IsIconic, LockWindowUpdate, SetCapture, GdiFlush, PatBlt, ClientToScreen, GetWindowDC, IsWindow, MapVirtualKeyW, PhysicalToLogicalPoint, TranslateMessage, CreateDIBSection, GetDCEx, GetDesktopWindow, GetKeyboardState, PostQuitMessage, SetWindowTextW, AlphaBlend, GetForegroundWindow, ActivateKeyboardLayout, GetPhysicalCursorPos, IsChild, KillTimer, SetForegroundWindow, ValidateRect, WindowFromPoint, StretchDIBits, EnableWindow, GetAncestor, LogicalToPhysicalPoint, ScreenToClient, SetDIBits, AdjustWindowRectEx, GetMessagePos, GetUpdateRect, IsZoomed, LoadKeyboardLayoutW, SetParent, ToAscii, UpdateWindow, WaitMessage, GetStretchBltMode, SetDIBitsToDevice, DispatchMessageA, GetMessageTime, GetMessageW, GetWindowTextW, InvalidateRgn, PostThreadMessageW, SendMessageA, SetWindowTextA |
 
 ## 5. arity 不明 (mingw ヘッダ未収録) で stub 未生成
 
