@@ -938,7 +938,6 @@ static void kbd_set_layout(uint32_t langid);                 /* gui_core_ext.inc
 static uint32_t kbd_layout_vk(uint32_t sc, int ext);
 static void ime_input(const uint32_t *r);
 static void touch_input(const uint32_t *r);
-static int g_ptr_locked;
 static void translate_input(const uint32_t *r) {
   GuiShared *sh = gui_sh();
   uint32_t type = r[0]; int x = (int32_t)r[2], y = (int32_t)r[3]; uint32_t a = r[4], b = r[5], t = r[6];
@@ -982,7 +981,7 @@ static void translate_input(const uint32_t *r) {
     case GUI_IN_LAYOUT: kbd_set_layout(a & 0xFFFF); return;
     case GUI_IN_IME: ime_input(r); return;
     case GUI_IN_TOUCH: touch_input(r); return;
-    case GUI_IN_POINTER_LOCK: g_ptr_locked = (int)(a & 1); return;
+    case GUI_IN_POINTER_LOCK: return;   /* 成立は host 通知。shim 側の状態は持たない (要求は ptrlock_update が出す) */
     case GUI_IN_KEY_DOWN: case GUI_IN_KEY_UP: {
       uint32_t vk = a & 0xFF;
       { uint32_t lvk = kbd_layout_vk((b >> 8) & 0xFF, (b >> 1) & 1); if (lvk) vk = lvk; }   /* 物理キー (scancode) → 現配列の VK */

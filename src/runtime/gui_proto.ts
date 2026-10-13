@@ -101,7 +101,8 @@ export const CSS_CURSOR: Record<number, string> = {
   32650: "progress", 32651: "help",
 };
 
-/** KeyboardEvent.code -> [set 1 スキャンコード, extended]。shim の gui_core_ext.inc g_sc と同一表 (test/kbd_xcheck.sh が全件突合) */
+/** KeyboardEvent.code -> [set 1 スキャンコード, extended]。shim の gui_core_ext.inc g_sc と同一表 (手で同期。自動突合スクリプトは無い)。
+ * ISO 配列の追加キー (<>|, IntlBackslash) は US 表に無いので shim 側でレイアウト表から引く (VK は 0xE2 = VK_OEM_102)。 */
 export const SCAN_BY_CODE: Record<string, [number, number]> = {
   Escape: [0x01, 0], Digit1: [0x02, 0], Digit2: [0x03, 0], Digit3: [0x04, 0], Digit4: [0x05, 0], Digit5: [0x06, 0], Digit6: [0x07, 0],
   Digit7: [0x08, 0], Digit8: [0x09, 0], Digit9: [0x0a, 0], Digit0: [0x0b, 0], Minus: [0x0c, 0], Equal: [0x0d, 0], Backspace: [0x0e, 0], Tab: [0x0f, 0],
@@ -120,4 +121,3 @@ export const SCAN_BY_CODE: Record<string, [number, number]> = {
   Insert: [0x52, 1], Delete: [0x53, 1], MetaLeft: [0x5b, 1], MetaRight: [0x5c, 1], ContextMenu: [0x5d, 1],
   IntlBackslash: [0x56, 0],
 };
-/** ISO 配列の追加キー (<>|) は US 表に無いので shim 側でレイアウト表から引く (VK は 0xE2 = VK_OEM_102) */

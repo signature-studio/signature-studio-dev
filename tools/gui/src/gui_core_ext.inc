@@ -413,7 +413,9 @@ API MapVirtualKeyW(I64 code, I64 type) {
     case 0: { const LkEnt *e = lk_by_vk(c); if (e) return e->sc;                                                  /* MAPVK_VK_TO_VSC */
               for (size_t i = 0; i < sizeof g_sc / sizeof g_sc[0]; i++) if (g_sc[i].ext == 0 && g_sc[i].vk == c) { if (g_kl && lk_by_sc(g_sc[i].sc)) continue; return g_sc[i].sc; } return 0; }
     case 1: case 3: { uint32_t v = kbd_layout_vk(c & 0xFF, (c >> 8) == 0xE0); if (v) return v; return vk_from_scan(c & 0xFF, (c >> 8) == 0xE0); }   /* MAPVK_VSC_TO_VK(_EX) */
-    case 2: { uint8_t st[256] = { 0 }; int ch = layout_to_char(c, 0, st); if (ch < 0) ch = vk_to_char(c, st); if (c >= 'A' && c <= 'Z') ch = (g_kl ? ch : (int)c); return ch > 0 ? ch & 0x7FFFFFFF : 0; }   /* MAPVK_VK_TO_CHAR: 大文字で返す */
+    case 2: { uint8_t st[256] = { 0 }; int ch = layout_to_char(c, 0, st); if (ch < 0) ch = vk_to_char(c, st);
+              if (c >= 'A' && c <= 'Z' && ch >= 'a' && ch <= 'z') ch -= 32;   /* MAPVK_VK_TO_CHAR: 英字は大文字 (US/DE/FR 共通) */
+              return ch > 0 ? ch & 0x7FFFFFFF : 0; }
   }
   return 0;
 }
@@ -522,7 +524,7 @@ API ImmSetCandidateWindow(I64 himc, I64 cf) {   /* CANDIDATEFORM: dwIndex(4) dwS
   const int32_t *p = (const int32_t *)P_(cf); Wnd *w = g_focus ? g_focus : g_active; int sx = 0, sy = 0; if (w) to_screen_origin(w, &sx, &sy);
   out_cmd(GUI_CMD_IME_POS, w && w->surf >= 0 ? (uint32_t)w->surf : 0, (uint32_t)(sx + p[2]), (uint32_t)(sy + p[3]), 0, 0, 0); return 1;
 }
-API ImmNotifyIME(I64 himc, I64 action, I64 index, I64 value) {   /* NI_COMPOSITIONSTR=0x15: CPS_CANCEL=4 / CPS_COMPLETE=1 */
+API ImmNotifyIME(I64 himc, I64 action, I64 index, I64 value) {   /* NI_COMPOSITIONSTR=0x15 のみ対応。index (CPS_CANCEL=4 / CPS_COMPLETE=1) は区別せず、常に表示中の composition をクリアする (DOM 側の確定・取消は host から行えないため表示状態の消去のみ) */
   (void)index; (void)value; if (himc != HIMC_) return 0;
   if (action == 0x15) { g_ime_ncomp = 0; g_ime_cursor = 0; return 1; }
   return 0;

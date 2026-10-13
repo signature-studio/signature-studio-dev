@@ -91,8 +91,8 @@ try {
   // ---- 3) IME: CDP の imeSetComposition / insertText → composition イベント → WM_IME_* ----
   await page.evaluate("window.__g6.host.ime.focus()", { awaitPromise: false });
   await page.send("Input.imeSetComposition", { text: "かんじ", selectionStart: 3, selectionEnd: 3 });
-  const comp = await waitLog("G6 IME", 3);
-  const compOk = comp.length >= 2 && comp[0] === "G6 IME START" && /^G6 IME COMP n=3 u=304b3093305 8?/.test(comp[1].replace(/\s/g, "")) || (comp.length >= 2 && comp[0] === "G6 IME START" && comp[1].startsWith("G6 IME COMP n=3 u=304b30933058"));
+  const comp = await waitLog("G6 IME", 2);   // START + COMP (host は 2 件しか送らない)
+  const compOk = comp.length >= 2 && comp[0] === "G6 IME START" && comp[1].startsWith("G6 IME COMP n=3 u=304b30933058");
   ck("IME: compositionstart/update → START + COMPOSITION(GCS_COMPSTR) 'かんじ'", compOk, comp.join(" | "));
   const charsBefore = (await logs()).filter((x) => x.startsWith("G6 CHAR")).length;
   await page.send("Input.insertText", { text: "漢字" });

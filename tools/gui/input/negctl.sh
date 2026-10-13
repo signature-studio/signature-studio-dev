@@ -33,7 +33,9 @@ check nc3-altgr-ignored src/gui_core_ext.inc 's|if (ctrl \&\& alt) return e->g; 
 check nc4-ime-commit-lparam src/gui_core_ext.inc 's|send_message(w->h, WM_IME_COMPOSITION_, 0, GCS_RESULTSTR_);|send_message(w->h, WM_IME_COMPOSITION_, 0, GCS_COMPSTR_);|'
 check nc5-zoom-end-count src/gui_core_ext.inc 's| - (phase >= 2 ? 1 : 0); uint32_t want| ; uint32_t want|'
 check nc6-clipcursor-no-clamp src/gui_core.c 's|if (g_cclip_on) { if (cx < g_cclip.left)|if (0) { if (cx < g_cclip.left)|'
-echo "[negctl] (shim 側 6 ケース) 検出漏れ: $miss"
+check nc7-mapvk-letter-lowercase src/gui_core_ext.inc "s|if (c >= 'A' && c <= 'Z' && ch >= 'a' && ch <= 'z') ch -= 32;||"
+check nc8-pointerlock-push-dropped src/gui_core.c 's|out_cmd(GUI_CMD_POINTER_LOCK, 0, (uint32_t)want, 0, 0, 0, 0);|;|'
+echo "[negctl] (shim 側 8 ケース) 検出漏れ: $miss"
 # ---- host (gui.js) 側: build/js のコピーを壊して Chrome e2e が FAIL することを確認 ----
 host_nc() {  # name sed-expr
   local name="$1" expr="$2" d="$W/host-$1"; mkdir -p "$d"; cp -r "$GUI/build/js" "$d/js"

@@ -54,6 +54,7 @@ static void run_gui6(void) {
   CHK(GetKeyboardLayout(0) == 0x04070407, "DE layout applied via input ring");
   CHK(MapVirtualKeyW(0x2C, 1) == 'Y' && MapVirtualKeyW(0x15, 1) == 'Z', "DE: scan 0x2C -> VK_Y, scan 0x15 -> VK_Z (QWERTZ)");
   CHK(MapVirtualKeyW('Z', 0) == 0x15 && MapVirtualKeyW('Y', 0) == 0x2C, "DE: VK_Z -> sc 0x15, VK_Y -> sc 0x2C");
+  CHK(MapVirtualKeyW('Q', 2) == 'Q' && MapVirtualKeyW('Z', 2) == 'Z' && MapVirtualKeyW('M', 2) == 'M', "DE MAPVK_VK_TO_CHAR letters upper-case (Q,Z,M)");
   CHK(ToUnicode('Z', 0x15, PTR(st), PTR(o), 4, 0) == 1 && o[0] == 'z', "DE: sc 0x15 -> 'z'");
   st[VK_SHIFT] = 0x80; CHK(ToUnicode('Z', 0x15, PTR(st), PTR(o), 4, 0) == 1 && o[0] == 'Z', "DE: Shift sc 0x15 -> 'Z'");
   CHK(ToUnicode('2', 0x03, PTR(st), PTR(o), 4, 0) == 1 && o[0] == '"', "DE: Shift+2 -> '\"'");
@@ -70,6 +71,7 @@ static void run_gui6(void) {
   { WMSG m; for (int i = 0; i < 50 && GetKeyboardLayout(0) != 0x040C040C; i++) { PeekMessageA(PTR(&m), 0, 0, 0, PM_REMOVE); gui_futex_wait(&gui_shared_native()->doorbell, gui_shared_native()->doorbell, 5); } }
   CHK(GetKeyboardLayout(0) == 0x040C040C, "FR layout applied");
   CHK(MapVirtualKeyW(0x10, 1) == 'A' && MapVirtualKeyW(0x1E, 1) == 'Q' && MapVirtualKeyW(0x2C, 1) == 'W', "FR: AZERTY scan 0x10 -> A, 0x1E -> Q, 0x2C -> W");
+  CHK(MapVirtualKeyW('A', 2) == 'A' && MapVirtualKeyW('Q', 2) == 'Q' && MapVirtualKeyW('W', 2) == 'W', "FR MAPVK_VK_TO_CHAR letters upper-case (A,Q,W)");
   CHK(ToUnicode('A', 0x10, PTR(st), PTR(o), 4, 0) == 1 && o[0] == 'a', "FR: sc 0x10 -> 'a'");
   CHK(ToUnicode('1', 0x02, PTR(st), PTR(o), 4, 0) == 1 && o[0] == '&', "FR: unshifted digit row sc 0x02 -> '&'");
   st[VK_SHIFT] = 0x80; CHK(ToUnicode('1', 0x02, PTR(st), PTR(o), 4, 0) == 1 && o[0] == '1', "FR: Shift sc 0x02 -> '1'");
@@ -126,7 +128,7 @@ static void run_gui6(void) {
   { uint32_t cv = 0, sn = 9; CHK(ImmGetConversionStatus(0x7D000001, PTR(&cv), PTR(&sn)) == 1 && cv == 1 && sn == 0, "ImmGetConversionStatus"); }
   CHK(ImmGetCompositionStringW(0xBAD, 0x8, 0, 0) == -1 && ImmSetOpenStatus(0xBAD, 1) == 0, "invalid HIMC rejected (-1 / 0)");
 
-  SECTION("GUI-6: touch -> WM_TOUCH / WM_GESTURE (zoom, pan) / mouse promotion");
+  SECTION("GUI-6: touch -> WM_TOUCH / WM_GESTURE (zoom; GID_PAN は未検証) / mouse promotion");
   g_g6_n = 0;
   /* 未登録窓: primary 接触がマウスへ昇格 */
   gui_hl_input(GUI_IN_TOUCH, 0, 50, 60, 1u | (0u << 8) | (1u << 12), 0);
@@ -166,13 +168,17 @@ static void run_gui6(void) {
     SetCursorPos(500, 400); GetCursorPos(PTR(&p)); CHK(p.x == 500 && p.y == 400, "no clip -> unclamped");
     WRECT bad = { 5, 5, 5, 5 }; CHK(ClipCursor(PTR(&bad)) == 0, "empty rect rejected");
     CHK(S->out_pushed > before, "CLIP_RECT commands emitted");
-    int cnt0 = (int)ShowCursor(0);   /* 非表示 */
-    SetCapture(h);
+    ShowCursor(0);   /* 非表示 (カウンタ -1) */
+    uint32_t p0 = S->out_pushed;
+    SetCapture(h);   /* 非表示 + capture → POINTER_LOCK 要求 (w2=1) を 1 回 push */
+    uint32_t p1 = S->out_pushed;
     gui_hl_input(GUI_IN_POINTER_LOCK, 0, 0, 0, 1, 0);
     { uint32_t t0 = gui_now_ms(); while (gui_now_ms() - t0 < 200) { g6_drain(h); gui_futex_wait(&S->doorbell, S->doorbell, 5); } }
-    ReleaseCapture(); while (ShowCursor(1) < 0) {}
-    (void)cnt0;
-    CHK(1, "capture + hidden cursor sequence completed");
+    ReleaseCapture();   /* 解除 → POINTER_LOCK 解除 (w2=0) を 1 回 push */
+    uint32_t p2 = S->out_pushed;
+    while (ShowCursor(1) < 0) {}   /* 表示に戻す: 既に解除済みなので push なし */
+    uint32_t p3 = S->out_pushed;
+    CHK(p1 - p0 == 1 && p2 - p1 == 1 && p3 == p2, "Pointer Lock request: SetCapture with hidden cursor pushes one POINTER_LOCK (w2=1), ReleaseCapture pushes one (w2=0), ShowCursor(TRUE) none (push %u/%u/%u)", p1 - p0, p2 - p1, p3 - p2);
   }
   DestroyWindow(h);
 }
