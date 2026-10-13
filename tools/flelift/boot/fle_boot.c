@@ -106,7 +106,7 @@ EM_JS(void, fle_js_err, (const char* s), { console.error(UTF8ToString(s)); });
 #define IPP_TOK_BASE 0x7F100000u
 #define IPP_MAX 512
 static const char* g_ipp_nm[IPP_MAX]; static u32 g_ipp_n, g_ipp_calls[IPP_MAX], g_ipp_total;
-static u64 g_ipp_h; static int g_ipp_on = 1;
+static u64 g_ipp_h; static int g_ipp_on = 0;   /* 既定は無効 (通常 boot の挙動を変えない)。fle_boot_set_ipp(1) で有効 */
 static u32 ipp_token(const char* nm) {
     for (u32 i = 0; i < g_ipp_n; i++) if (!strcmp(g_ipp_nm[i], nm)) return IPP_TOK_BASE + i;
     if (g_ipp_n >= IPP_MAX) return 0;

@@ -23,8 +23,9 @@ let m = await (mod.default ? mod.default() : mod());
 const U8 = m.HEAPU8;
 
 if (TRACE) { try { m._shimx_set_trace(1); } catch { /* nosx では未 export */ } }
-// FLE-6 ネガコン: FLE_IPP=0 で dsp_ippv2 の LoadLibrary/GetProcAddress 修正を外す (修正前の挙動)
-if (process.env.FLE_IPP === '0') m._fle_boot_set_ipp(0);
+// FLE-6: dsp_ippv2 shim は既定で無効。FLE_IPP=1 のときだけ有効 (ネガコン FLE_IPP=0 / 未指定 = 修正前の挙動)
+const IPP_ON = process.env.FLE_IPP === '1';
+m._fle_boot_set_ipp(IPP_ON ? 1 : 0);
 
 const MM = 0x13a5c90, PKG = 0x13768b0;
 function rd64(a) { return '0x' + U8.slice(a, a + 8).reduce((s, b, i) => s + BigInt(b) * (1n << BigInt(8 * i)), 0n).toString(16); }
@@ -128,7 +129,7 @@ const summary = {
     boot,
     survey,
     soft_top: softs.slice(0, 40),
-    ipp: { on: process.env.FLE_IPP !== '0', ptr_15F34A0: boot.ipp_ptr_15F34A0, ptr_15F40E8: boot.ipp_ptr_15F40E8, total: boot.ipp_total, called: boot.ipp_called },
+    ipp: { on: IPP_ON, ptr_15F34A0: boot.ipp_ptr_15F34A0, ptr_15F40E8: boot.ipp_ptr_15F40E8, total: boot.ipp_total, called: boot.ipp_called },
     notes: {
         entry: '0x1376820', longjmp_target: '0x1376840', init_table: '0x13768b0',
         baseline_retdec: {
@@ -148,10 +149,10 @@ console.log('FLEBOOT_RESULT ' + JSON.stringify({
     longjmp: boot.longjmp, getmem: boot.getmem, freemem: boot.freemem,
     va_calls: boot.va_calls, va_bytes: boot.va_bytes, exit: boot.exit,
     survey: survey && survey.byCls ? survey.byCls : (survey && survey.prologue_threw || null),
-    ipp_on: process.env.FLE_IPP !== '0', ipp_ptr_15F34A0: boot.ipp_ptr_15F34A0,
+    ipp_on: IPP_ON, ipp_ptr_15F34A0: boot.ipp_ptr_15F34A0,
     ipp_total: boot.ipp_total, ipp_called: boot.ipp_called,
 }));
-// FLE-6 ネガコン判定: shim 無し (FLE_IPP=0) なら 0x15F34A0 = 0、shim 有りなら非 0 でなければならない
-const ippPtrOk = process.env.FLE_IPP === '0' ? /^0x0+$/.test(boot.ipp_ptr_15F34A0) : !/^0x0+$/.test(boot.ipp_ptr_15F34A0);
-console.log('FLEBOOT_IPP_CHECK ' + JSON.stringify({ ipp_on: process.env.FLE_IPP !== '0', ptr_15F34A0: boot.ipp_ptr_15F34A0, ok: ippPtrOk }));
+// FLE-6 ネガコン判定: shim 無し (既定 / FLE_IPP=0) なら 0x15F34A0 = 0、shim 有り (FLE_IPP=1) なら非 0 でなければならない
+const ippPtrOk = IPP_ON ? !/^0x0+$/.test(boot.ipp_ptr_15F34A0) : /^0x0+$/.test(boot.ipp_ptr_15F34A0);
+console.log('FLEBOOT_IPP_CHECK ' + JSON.stringify({ ipp_on: IPP_ON, ptr_15F34A0: boot.ipp_ptr_15F34A0, ok: ippPtrOk }));
 if (!ippPtrOk) process.exitCode = 3;

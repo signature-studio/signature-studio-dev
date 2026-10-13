@@ -7,6 +7,7 @@
 # 工程: gen_boot (phase A) → x64c lift (closure 2) → fle_data_gen → gen_boot (phase B: imp bridge)
 #       → build.sh plain (lifted C の clang -O0 1 本) → boot 実行 (--boot-only)
 #       → ネガコン FLE_IPP=0 (dsp_ippv2 shim 無効) で同じ boot を再実行。
+#       dsp_ippv2 shim は既定で無効 (FLE_IPP=1 のときだけ有効)。本スクリプトは shim 有 = FLE_IPP=1 で測る。
 # 0x6a7b70 は boot_roots.json には入れず、本スクリプトだけが FLE_EXTRA_ROOTS で一時的に root 化する
 # (iterate_roots.sh の blocklist 不変条件を崩さないため)。
 # 前提: FL_WIN64_DIR (fl-win64 展開先) / python3 (capstone, pefile) / SS_EMSDK_ENV (emsdk_env.sh, 既定 /opt/emsdk) / node。
