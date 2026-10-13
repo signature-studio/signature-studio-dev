@@ -155,11 +155,10 @@ leaf_diff は IR leaf かつ機械語に間接 call 無しの 23 関数のみを
 ## 10.11 (#871 fix モード 8・PM 方式 (a')) 測定 commit `2b84c6f5` での再測定
 
 - 測定 commit: `2b84c6f5` (`mk_targets.py` の変更はこの 1 件)。変更は `RVA_MODE_BLOCKS = {19006}` の追加で、block 19006 だけ従来の RVA 配置 (reloc の VA→RVA 補正あり、`wasm_origin` = 0x0) に戻し、他 block は絶対 VA 配置のまま。
-- 機序の切り分け (方式 (b)) は本 run で確定できなかった。`leaf_diff` の trace (`raw.trace_head`) で、wasm 側が 0x5de250 で読む値と native `0x70CF34` (`00008033`) を比べたところ、IR 定数 `0x30D0F4` + ImageBase `0x400000` = `0x70D0F4` と native の読み先 `0x70CF34` は `0x1C0` ずれる。このずれの出どころは未確定。
+- 機序の切り分け (方式 (b)) は本 run で確定できなかった。確認できたのは算術のみ: IR 定数 `0x30D0F4` + ImageBase `0x400000` = `0x70D0F4` と native の読み先 `0x70CF34` (`00008033`) は `0x1C0` ずれる。wasm 側が 0x5de250 で実際に読んだ値 (trace) と `0x70CF34` の直接比較は**未実施**。このずれの出どころは未確定。
 - 素材: `fl-win64` `toolchain-retdec` `toolchain-emsdk` を `$RUNNER_TEMP` に展開 (`$HOME/artifacts` 実在を確認)。`[EMSDK]` emcc 6.0.12、`[RETDEC]` v5.0 (pin どおり)。
 - `f2_step1.sh` (HEAD `2b84c6f5` 直前の lift 入力と同一、コード変更なし): rc 0、575 s、load 6.15。`DIFF count = 0`。IR leaf 55 / うち機械語でも間接 call 無し 23。
 - `leaf_diff.sh` (測定 commit `2b84c6f5`): rc 0、135 s、load 0.54。**最終判定 一致 17 / 不一致 6 / 実行不能 0**。集合一致 EQ、IR から call 脱落 0。
 - 判定 (23 関数): 0x5de250 **match** (8/8/11、修正前 match 8/8/11 に戻った)、0x6f1650 **match** (11/11/11)、0x6c8fc0 **match** (8/8/11)。mismatch 6 は 0x6bfec0・0x6c9b60・0x6b0ef0・0x6c8c90・0x6cc2e0・0x6ca5c0 (修正前からの未解決と同じ集合)。
-- 修正前 (`78aa75ad`) との突き合わせ: 修正前 match 15 (match→match のうち 0x5de250 を含む) はすべて維持。回帰 0 件。
-- 注: 修正前 match→match の内訳は §10.4 の前 run 引用と同じ判定を、本 run の全 23 関数判定と突き合わせて確認した (0x5de300・0x6cd8a0・0x662fc0 等は match で変化なし)。
+- 修正前 (`78aa75ad`、§10.4 の前 run 引用) は一致 15 / 不一致 8。本 commit は一致 17 / 不一致 6 で、件数の整合は取れる (前 run の match 15 に 0x6c8fc0・0x6f1650 が加わり、不一致 6 は未解決 6 と同じ集合)。ただし**全 23 関数の直接突き合わせは本 run で再計算していない** (修正前の作業ツリーを再生成していないため)。
 - 注: この方式 (a') は 0x5de250 の機序を解消していない。block 19006 の RVA 配置を残すだけで、「0x30D0F4 の読み先」の正しさは未確定。この配置がなぜ native と一致するかは #923 で切り分ける。0x6cc2e0 (同 block の別関数) は mismatch のまま。
