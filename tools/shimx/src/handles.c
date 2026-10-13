@@ -46,9 +46,13 @@ void shx_lock(void)   { shx_mutex_lock(&g_big); }
 void shx_unlock(void) { shx_mutex_unlock(&g_big); }
 
 volatile uint32_t g_shx_sig_seq = 0;
+static void (*g_notify_hook)(void);
+void shimx_set_notify_hook(void (*fn)(void)) { g_notify_hook = fn; }   /* #172: GUI メッセージ待ち (MsgWait*) を kernel object の状態変化で起こす */
 void shx_notify(void) {
     __atomic_add_fetch(&g_shx_sig_seq, 1u, __ATOMIC_SEQ_CST);
     shx_futex_wake(&g_shx_sig_seq, 0x7fffffff);
+    void (*h)(void) = g_notify_hook;
+    if (h) h();
 }
 
 /* ---------------------------------------------------------------

@@ -79,9 +79,11 @@
 | `shimx/pathreg` | パス写像/レジストリ接続 | `tools/shimx/pathreg/REPORT.md` |
 | `startup` | 起動シーケンス設計+stub 計画 | `tools/startup/REPORT.md` |
 | `startup/{glue,keyfix,pump,vreg,winstubs}` | 各実装済 | 各 `REPORT.md` |
+| `startup/helpviewer` | Help viewer 実装済 (エンジン結線は未) | `tools/startup/helpviewer/REPORT.md` |
 | `runtime` | 設計・基盤 | `tools/runtime/REPORT.md` |
 | `hostbridge` | 設計+mini VST2 host PoC | `tools/hostbridge/REPORT.md` |
 | `hostbridge/{cb,h2,lowbase,nfo}` | 各実装済 | 各 `REPORT.md` |
+| `hostbridge/h10` | Wrapper chunk reader 静的解析済 (実行検証は #267) | `tools/hostbridge/h10/REPORT.md` |
 | `gui` | 設計+PoC | `tools/gui/REPORT.md` |
 | `audio` | 設計+PoC (e2e で既知 FAIL 1 件あり・詳細は REPORT) | `tools/audio/REPORT.md`・`tools/audio/asio/REPORT.md` |
 | `audio/asio` | COM アダプタ+soak | `tools/audio/asio/REPORT.md` |
@@ -107,6 +109,7 @@
 | `targets/freshair/lift2` | lift2 実装 | `tools/targets/freshair/lift2/REPORT.md` |
 | `e2e` | ハーネス+PASS 実績 | `tools/e2e/REPORT.md` |
 | `hosting` | 配信構成 (案 S) | `tools/hosting/REPORT.md` |
+| `legal/notices` | THIRD_PARTY_NOTICES 自動生成+記録なし OSS の検出 (LGL-3) | `tools/legal/notices/REPORT.md` |
 | `deploy` | デプロイ構成・実績 | `deploy/README.md`・`deploy/REPORT.md` |
 | `perf` | 性能計測 | `tools/perf/REPORT.md`・`tools/perf/PERF.md` |
 

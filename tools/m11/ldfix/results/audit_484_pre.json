@@ -1,0 +1,187 @@
+{
+ "summary": {
+  "functions": 7421,
+  "mach_fns": 7421,
+  "lsf_sites": 90,
+  "lsf_unresolved_base_sites": 370,
+  "fns_with_unresolved_base": 169,
+  "range_table_shorter_than_ir_labels": 535,
+  "fns_with_lsf": 65,
+  "range_table_le_2_bytes": 15,
+  "suspect_fns": 8,
+  "suspect_sites": 12,
+  "suspect_vas": [
+   "409c80",
+   "417b70",
+   "41a670",
+   "5c0270",
+   "66e080",
+   "7e5240",
+   "806740",
+   "c62780"
+  ]
+ },
+ "suspects": {
+  "409c80": [
+   {
+    "arg": 1,
+    "width": 32,
+    "m_lsf": 1,
+    "m_ptr": 0,
+    "ir_store": 1,
+    "excess": 1,
+    "ir_loads_of_arg": 0,
+    "mach_sites": [
+     "409cc0: mov dword ptr [rdx], eax"
+    ],
+    "ir_lines": [
+     "store i32 %32, ptr %38"
+    ]
+   },
+   {
+    "arg": 1,
+    "width": 64,
+    "m_lsf": 1,
+    "m_ptr": 0,
+    "ir_store": 1,
+    "excess": 1,
+    "ir_loads_of_arg": 0,
+    "mach_sites": [
+     "409cac: mov qword ptr [rdx], r8"
+    ],
+    "ir_lines": [
+     "store i64 %arg1, ptr %26"
+    ]
+   }
+  ],
+  "417b70": [
+   {
+    "arg": 4,
+    "width": 64,
+    "m_lsf": 4,
+    "m_ptr": 0,
+    "ir_store": 1,
+    "excess": 1,
+    "ir_loads_of_arg": 0,
+    "mach_sites": [
+     "417bb4: mov qword ptr [rbp + 0x60], rax",
+     "417cc1: mov qword ptr [rbp + 0x50], rax",
+     "417dce: mov qword ptr [rbp + 0x50], rax",
+     "417e55: mov qword ptr [rax + 8], rcx"
+    ],
+    "ir_lines": [
+     "store i64 %arg4, ptr %87"
+    ]
+   }
+  ],
+  "41a670": [
+   {
+    "arg": 1,
+    "width": 64,
+    "m_lsf": 2,
+    "m_ptr": 0,
+    "ir_store": 1,
+    "excess": 1,
+    "ir_loads_of_arg": 0,
+    "mach_sites": [
+     "41a6a3: mov qword ptr [rip + 0xf8a9d6], rax",
+     "41a6d6: mov qword ptr [rax], rcx"
+    ],
+    "ir_lines": [
+     "store i64 %arg1, ptr %8"
+    ]
+   }
+  ],
+  "5c0270": [
+   {
+    "arg": 2,
+    "width": 64,
+    "m_lsf": 2,
+    "m_ptr": 0,
+    "ir_store": 2,
+    "excess": 2,
+    "ir_loads_of_arg": 0,
+    "mach_sites": [
+     "5c0301: mov qword ptr [rax + 8], rcx",
+     "5c032f: mov qword ptr [rax], rcx"
+    ],
+    "ir_lines": [
+     "store i64 %arg2, ptr %13",
+     "store i64 %arg2, ptr %18"
+    ]
+   }
+  ],
+  "66e080": [
+   {
+    "arg": 1,
+    "width": 64,
+    "m_lsf": 3,
+    "m_ptr": 0,
+    "ir_store": 3,
+    "excess": 3,
+    "ir_loads_of_arg": 0,
+    "mach_sites": [
+     "66e1b2: mov qword ptr [rbx + 8], rax",
+     "66e209: mov qword ptr [rbx + 8], rax",
+     "66e210: mov qword ptr [rbx + 0x10], rax"
+    ],
+    "ir_lines": [
+     "store i64 %arg1, ptr %63",
+     "store i64 %arg1, ptr %80",
+     "store i64 %arg1, ptr %82"
+    ]
+   }
+  ],
+  "7e5240": [
+   {
+    "arg": 3,
+    "width": 32,
+    "m_lsf": 1,
+    "m_ptr": 0,
+    "ir_store": 1,
+    "excess": 1,
+    "ir_loads_of_arg": 0,
+    "mach_sites": [
+     "7e526a: mov dword ptr [rdx + 4], eax"
+    ],
+    "ir_lines": [
+     "store i32 %15, ptr %27"
+    ]
+   }
+  ],
+  "806740": [
+   {
+    "arg": 3,
+    "width": 64,
+    "m_lsf": 1,
+    "m_ptr": 0,
+    "ir_store": 1,
+    "excess": 1,
+    "ir_loads_of_arg": 0,
+    "mach_sites": [
+     "806792: mov qword ptr [rbx + 0x6bc], rax"
+    ],
+    "ir_lines": [
+     "store i64 %arg3, ptr %17"
+    ]
+   }
+  ],
+  "c62780": [
+   {
+    "arg": 3,
+    "width": 64,
+    "m_lsf": 1,
+    "m_ptr": 0,
+    "ir_store": 1,
+    "excess": 1,
+    "ir_loads_of_arg": 0,
+    "mach_sites": [
+     "c627ae: mov qword ptr [rax + rdx*8 + 8], rcx"
+    ],
+    "ir_lines": [
+     "store i64 %arg3, ptr %6"
+    ]
+   }
+  ]
+ }
+}

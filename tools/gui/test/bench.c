@@ -26,6 +26,18 @@ int main(void) {
   t = now(); for (int i = 0; i < it; i++) StretchBlt(m2, 0, 0, 1920, 1080, m1, 0, 0, 960, 540, SRCCOPY); report("StretchBlt 2x nearest", 1920, 1080, it, now() - t);
   WBMIH bi; memset(&bi, 0, sizeof bi); bi.biSize = 40; bi.biWidth = 1920; bi.biHeight = -1080; bi.biPlanes = 1; bi.biBitCount = 32;
   t = now(); for (int i = 0; i < it; i++) StretchDIBits(m2, 0, 0, 1920, 1080, 0, 0, 1920, 1080, (int64_t)(uintptr_t)b1, (int64_t)(uintptr_t)&bi, 0, SRCCOPY); report("StretchDIBits 1:1 (per-pixel)", 1920, 1080, it, now() - t);
+  t = now(); for (int i = 0; i < it; i++) AlphaBlend(m2, 0, 0, 1920, 1080, m1, 0, 0, 1920, 1080, (1u << 24) | (128u << 16)); report("AlphaBlend per-pixel alpha (sca=128)", 1920, 1080, it, now() - t);
+  t = now(); for (int i = 0; i < it; i++) AlphaBlend(m2, 0, 0, 1920, 1080, m1, 0, 0, 1920, 1080, (128u << 16)); report("AlphaBlend const (sca=128)", 1920, 1080, it, now() - t);
+  t = now(); for (int i = 0; i < it; i++) BitBlt(m2, 0, 0, 1920, 1080, m1, 0, 0, SRCPAINT); report("BitBlt SRCPAINT (per-pixel)", 1920, 1080, it, now() - t);
+#ifdef BENCH_BPP   /* GUI-5: 24/8bpp 源 (旧実装では fail-fast のため after のみ) */
+  { uint8_t *p24 = (uint8_t *)malloc((size_t)1920 * 3 * 1080), *p8 = (uint8_t *)malloc((size_t)1920 * 1080); memset(p24, 0x5A, (size_t)1920 * 3 * 1080); memset(p8, 7, (size_t)1920 * 1080);
+    WBMIH b24 = bi; b24.biBitCount = 24; struct { WBMIH h; uint32_t c[256]; } b8; memset(&b8, 0, sizeof b8); b8.h = bi; b8.h.biBitCount = 8; b8.h.biClrUsed = 256; for (int i = 0; i < 256; i++) b8.c[i] = i * 0x010101;
+    t = now(); for (int i = 0; i < it; i++) StretchDIBits(m2, 0, 0, 1920, 1080, 0, 0, 1920, 1080, (int64_t)(uintptr_t)p24, (int64_t)(uintptr_t)&b24, 0, SRCCOPY); report("StretchDIBits 24bpp 1:1", 1920, 1080, it, now() - t);
+    t = now(); for (int i = 0; i < it; i++) StretchDIBits(m2, 0, 0, 1920, 1080, 0, 0, 1920, 1080, (int64_t)(uintptr_t)p8, (int64_t)(uintptr_t)&b8, 0, SRCCOPY); report("StretchDIBits 8bpp 1:1", 1920, 1080, it, now() - t);
+    WBMIH s24 = bi; s24.biBitCount = 24; uint64_t pv = 0; int64_t d24 = CreateDIBSection(0, (int64_t)(uintptr_t)&s24, 0, (int64_t)(uintptr_t)&pv, 0, 0), m24 = CreateCompatibleDC(0); SelectObject(m24, d24);
+    t = now(); for (int i = 0; i < it; i++) BitBlt(m2, 0, 0, 1920, 1080, m24, 0, 0, SRCCOPY); report("BitBlt SRCCOPY from 24bpp DIB section", 1920, 1080, it, now() - t);
+    t = now(); for (int i = 0; i < it; i++) BitBlt(m24, 0, 0, 1920, 1080, m1, 0, 0, SRCCOPY); report("BitBlt SRCCOPY into 24bpp DIB section", 1920, 1080, it, now() - t); }
+#endif
   WRECT r = { 0, 0, 1920, 1080 }; int64_t br = CreateSolidBrush(0x123456);
   t = now(); for (int i = 0; i < it; i++) FillRect(m2, (int64_t)(uintptr_t)&r, br); report("FillRect solid", 1920, 1080, it, now() - t);
   t = now(); for (int i = 0; i < it; i++) { BitBlt(wdc, 0, 0, 1920, 1080, m1, 0, 0, SRCCOPY); GdiFlush(); } report("BitBlt->window + present(headless)", 1920, 1080, it, now() - t);

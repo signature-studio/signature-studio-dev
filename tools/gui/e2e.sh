@@ -16,9 +16,12 @@ python3 "$HERE/integ/check_p1_tests.py"
 python3 "$HERE/golden/gen_golden.py"
 if [ "${SKIP_NATIVE:-0}" != "1" ]; then
   echo "[gui-e2e] 1/6 native 単体テスト (ASan/UBSan)"; bash "$HERE/test/selftest.sh" | tail -2
+  echo "[gui-e2e] 1b/6 GUI-5 各 bpp シーン (独立 Python オラクル golden/gen_golden_bpp.py と画素完全一致 + ネガコン 2 本)"; bash "$HERE/test/bpp_golden.sh" | tail -4
   echo "[gui-e2e] 2/6 native lift 実行 (PE->RetDec->gcc, headless host, golden)"; bash "$HERE/test/native_e2e.sh" 2>&1 | grep -E "native_run|\[post\]"
   echo "[gui-e2e] 2b/6 結合準備 native (到達 API ログ / wasm32 署名 adapter / ハンドル 31bit / 改名 selftest; CAB-156)"; bash "$HERE/test/reach_test.sh" 2>&1 | grep -E "passed|FAIL"
 fi
+echo "[gui-e2e] 1c/6 GUI-5 wasm SIMD128 行カーネル (scalar と画素完全一致 + 故意欠陥 4 種を検出 + v128 命令の有無; bench 省略)"
+BENCH=0 bash "$HERE/test/simd_e2e.sh" | grep -E "OK|FAIL|ALL PASS|v128|cases"
 echo "[gui-e2e] 3/6 PE -> RetDec lift -> 後処理 (WNDPROC は自動検出)"
 bash "$HERE/lift/gui_lift.sh" "$HERE/test/gui_app.c" "$BUILD/lift"
 echo "[gui-e2e] 4/6 emcc (pthread wasm + shim)"
@@ -40,4 +43,6 @@ GUI_WASM_DIR="$BUILD/wasm_reach" E2E_MODE=reach node "$HERE/e2e/e2e.mjs" | grep 
 echo "[gui-e2e] 6e/6 sigprobe (m11 IR の GUI declare 署名 vs adapter, wasm-ld 署名検査 + 陰性対照)"
 bash "$HERE/integ/sigprobe.sh" | tail -1
 python3 "$HERE/integ/reach_report.py" "$BUILD/e2e/reach.log" >/dev/null
+echo "[gui-e2e] 6f/6 present e2e (GUI-4: WebGL2 golden 一致 / 複数矩形 / rAF / seqlock; 模擬 guest, bench 省略)"
+PRESENT_SKIP_BENCH=1 bash "$HERE/present/e2e.sh" | grep -E "^# (pass|fail)|ALL PASS|FAIL"
 echo "[gui-e2e] ALL PASS"

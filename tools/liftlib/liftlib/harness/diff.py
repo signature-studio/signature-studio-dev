@@ -46,6 +46,19 @@ def wasm_sig(ll_path, fname):
     return sig
 
 
+def run_wasm(cjs, wasm_func, sig_path, scen_path, out_path, timeout=240):
+    """wasm 側だけを走らせて出力 (out_path) を作る (署名ガード用; native 不要)。正常 True / タイムアウト False。"""
+    try:
+        r = env.run(["node", os.path.join(HERE, "wasm_runner.mjs"), cjs, wasm_func, sig_path, scen_path, out_path],
+                    capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        open(out_path, "w").close()
+        return None
+    if r.returncode:
+        raise RuntimeError("wasm runner rc=%d: %s" % (r.returncode, r.stderr[-800:]))
+    return True
+
+
 def parse_out(path):
     res = {}
     cur = None

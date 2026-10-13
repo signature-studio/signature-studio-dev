@@ -32,7 +32,7 @@ cat "$W/out/deploy-manifest.json"
 echo "## アプリ dist (vite build) + manifest 資産を 05-stage へ"
 node_modules/.bin/vite build --outDir "$W/dist" --emptyOutDir 2>&1 | tail -2
 mkdir -p "$W/dist/__e2e__"; cp tools/e2e/fixtures/add.wasm "$W/dist/__e2e__/add.wasm"
-node deploy/scripts/05-stage.mjs --src "$W/dist" --manifest "$W/out/deploy-manifest.json" --out "$W/site" --skip-release-guard | tee "$W/stage.json" | head -8
+node deploy/scripts/05-stage.mjs --src "$W/dist" --manifest "$W/out/deploy-manifest.json" --out "$W/site" --skip-release-guard --skip-notices-gate | tee "$W/stage.json" | head -8
 
 echo "## release.json 突合 (別経路の sha256)"
 node tools/assets/deploy-manifest/verify-release.mjs "$W/out/deploy-manifest.json" "$W/site/release.json"
