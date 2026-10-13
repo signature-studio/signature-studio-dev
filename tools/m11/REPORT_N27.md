@@ -7,7 +7,8 @@
 - 「OFF が 818/21 ↔ 828/13 と変わる」の原因は、本 PR では断定しない。(a) 旧 IR は再測定しておらず、trap 内訳の差も未調査 (§4・§6)。本 PR で確定したのは、IR 生成条件の欠落・不一致を fail-closed にし、条件を `work/ir_conditions.json` に記録すること。
 - 修正 (commit `3807851`・後続 review 対応 commit): skip は非 0 終了。PE は `FL_WIN64_DIR` / `M11_PE` 経由 (既定値は従来どおり)。IR 生成条件と IR の指紋 (sha256) を記録し、`m11_judge.py` が印字する。build は指紋・PE・ldfix の記録が一致する IR だけを受け付ける。
 - 測定 (本 runner, capstone 5.0.7 / pefile 2024.8.26, PE は [WIN64] の `extracted/block00031_PE.bin` 1 member, 測定は `3807851` 時点のコード): 既定 (qstore on) は n=2 で完全一致 (ok 864 / oob 23 / trap 31 / miss 46 / noproc 1 / clobber 0)。qstore off は n=2 で完全一致 (ok 856 / oob 31 / trap 38 / clobber 1)。qstore の有無で ok が 8 件、clobber が 1 件動く。
-- **未達**: 環境間一致 (別環境との比較) は未実測。本 runner の n=2 は再現性のみ (WORKFLOW §5 の n≥3 未満)。R2 への work-m11 再投入は権限なし。`--full` (M3) は未実施 (§5)。
+- 修正後の再測定 (§10): head `4e084e1` (測定時の HEAD) で n=3 (survey ok 866 / oob 21 / halt0 8 / trap 29 / miss 46 / noproc 1 / clobber 0 が 3 回一致)。`origin/main` 77340a4 で 1 回 (同値)。§3 の 864/23/31 (`3807851` 時点) との差は本 PR の変更ではなく、その後 main に入った m11 変更による (§10)。
+- **未達**: 環境間一致 (別環境との比較) は未実測。R2 への work-m11 再投入は権限なし。`--full` (M3) は head で実行し `m11_bounds` で fail-closed になった (入力 `tools/m2/work/ghidra_dll/functions_dll.csv` が素材に無い・§10)。
 
 ## 2. 原因の切り分け (コード調査)
 | 箇所 | 修正前 | 修正後 (3807851) |
@@ -20,7 +21,7 @@
 | `m11_e2e.sh` IR 生成・build 失敗 | `run` で継続 (stale wasm で survey 実行) | `must` で即失敗 (exit 1) |
 | PE パス | `m11_e2e.sh` `m11_gen_ir2.sh` `m11_data_gen.py` `m11_image_gen.py` `m11_icall_audit.py` が repo 外の固定パス (`tools/shared/env.sh` の既定) | `FL_WIN64_DIR` / `M11_PE` 経由 (既定値は従来どおり) |
 
-## 3. 測定 (全て commit `3807851` の HEAD 内容・同一 runner・ `FL_WIN64_DIR` は [WIN64] 展開先)
+## 3. 測定 (旧: 全て commit `3807851` の HEAD 内容・同一 runner・ `FL_WIN64_DIR` は [WIN64] 展開先。現 head の再測定は §10)
 所要秒は `date` 差分、load は `uptime` の 1 分値 (開始→終了)。survey 値は `M11_SURVEY` (`work/e2e_survey.out`)。oob は survey の trap kind `memory access out of bounds` 件数。
 
 | 測定 | コマンド | rc | 所要秒 | load (開始→終了) | ok | oob | halt0 | trap | miss | noproc | clobber | IR 条件 |
@@ -57,23 +58,23 @@ REPORT.md §13 (#516, HEAD `8e5f760`) の「修復 864/31/46/1 (clobber 0)」と
 - 本 PR で確定したのは「IR 生成条件を記録し、不一致・欠落を fail-closed にする」こと。測定基準は `ir_conditions.json` の値で識別できる。
 
 ## 5. 検証範囲 / 範囲外
-- 範囲: 本 runner の 1 ホスト。PE は [WIN64] 展開物の 1 member。ldfix/qstore の両方適用 (既定) と qstore off の 2 条件。
-- 範囲外: 別環境 (作業 VM 等) との一致、R2 の work-m11 再投入、`--full` (RetDec 再生成) の実行。
-- **M3 未実施の理由**: `--full` は [RETDEC] (RetDec) と work-m11 (lift 成果物) を要する。本 run は `toolchain-retdec` を取得していないため [RETDEC] が無く、実行できない。
+- 範囲: 本 runner の 1 ホスト。PE は [WIN64] 展開物の 1 member。ldfix/qstore の両方適用 (既定) と qstore off の 2 条件 (qstore off は §3 の旧測定のみ)。
+- 範囲外: 別環境 (作業 VM 等) との一致、R2 の work-m11 再投入、`--full` の成功実走。
+- **M3 (`--full`) の現状**: head で実行した (§10)。`m11_scan` は ok、`m11_bounds` が rc 1 で止まる。入力の `tools/m2/work/ghidra_dll/functions_dll.csv` は Ghidra の中間物で、work-m11 にも fl-win64 にも無い。`toolchain-retdec` ([RETDEC]) は取得可能で展開済みだが、CSV が無いため RetDec の lift まで届かない。
 - `--full` 経路の repo 外パス (`m11_scan.py` `m11_bounds.py` `m11_tail.py` `m11_lift.sh` `m11_lift_all.sh` `m11_postjs.py`) は、PE を `FL_WIN64_DIR`/`M11_PE` 経由に、work・m2/m6 の参照を repo 内の相対パスに直した (静的確認のみ: `py_compile`・`bash -n`)。実行による確認は未了 (§6)。
 - 本 PR で追加した fail-closed 分岐の実測は §9 (NC2 は本 HEAD で実行、build の指紋・PE・qstore 分岐は一時コピーで実行)。
 
 ## 6. 未解決
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| work-m11 スナップショットの R2 再投入 (本 subagent に権限なし)。`docs/WORKFLOW.md` §11 は再生成手順を正とする旨を記載 | 測定基準が Actions 再生成に依存する | Issue #680 の子 (R2 権限者) |
-| `--full` 経路: パスは env/相対化済みだが実行していない (RetDec・work-m11 無し)。`lift` の PE 由来 (lift 成果物がどの PE から出たかは記録していない) | WORKFLOW §11 の再生成手順が未検証 | PM 起票依頼 (`--full` 実走 + lift 成果物の PE 指紋化) |
-| 環境間一致の実測 (別環境で n>=2)。本 PR は同一 runner の n=2 のみ。n≥3 (WORKFLOW §5) も未実施 | 「環境間で一致」は未確認 | Issue #680 の子 (R2 権限者が素材を用意) |
-| `73532f8` (c) の trap 内訳 (halt0 54 / oob 13) と本測定 (halt0 7–8 / oob 23–31) の差、(a) 818/21 の再測定 | 過去数値の解釈 | Issue #680 の子 |
-| `ldfix/embed_sx_ab.sh` (CAB-131 A/B) は ldfix 無しの base IR を install し build する。指紋・ldfix 検査で fail-closed になり、A/B は再実行できない | 旧 A/B 結果の再現不可 | PM 判断 (退役 or base 専用の明示 opt-out の設計) |
-| NC1 / NC1b / NC3 の再測定とログ行の証跡 (work-m11 無し)。本 HEAD では NC2 と一時コピーでの gate 分岐のみ実測 (§9) | 旧 rc 値の証跡が rc のみ | Issue #680 の子 (素材入手後に再測定) |
-| `m11_build.sh` 冒頭の `source [EMSDK]/emsdk_env.sh` は emsdk 無しで rc 1 で落ちる (既存) | 前提不足の理由が見えにくい | PM 起票依頼 (前提チェックへの統合) |
-| DEFECTS.md への類型追加 (行案は §7) | カタログ未更新 | PM (docs/DEFECTS.md 更新) |
+| work-m11 スナップショットの R2 再投入 (本 subagent に権限なし)。`docs/WORKFLOW.md` §11 は再生成手順を正とする旨を記載 | 測定基準が Actions 再生成に依存する | #729 (R2 権限者) |
+| `--full` の実走: `m11_bounds` が `tools/m2/work/ghidra_dll/functions_dll.csv` を要求し、素材に無い (§10)。lift 成果物がどの PE から出たかも未記録 | WORKFLOW §11 の再生成手順が未検証 | #728 |
+| 環境間一致の実測 (別環境で n>=2)。同一 runner の n=3 は §10 で実測済み | 「環境間で一致」は未確認 | #729 |
+| `73532f8` (c) の trap 内訳 (halt0 54 / oob 13) と本測定 (halt0 7–8 / oob 23–31) の差、(a) 818/21 の再測定 | 過去数値の解釈 | #729 |
+| `ldfix/embed_sx_ab.sh` (CAB-131 A/B) は ldfix 無しの base IR を install し build する。指紋・ldfix 検査で fail-closed になり、A/B は再実行できない | 旧 A/B 結果の再現不可 | #727 |
+| NC1 / NC1b / NC3 の再測定 (work-m11 無し)。本 HEAD で NC1 / NC1b / NC2 / NC3 をログ行付きで再実行済み (§9) | rc と理由行の証跡は揃った。素材での再測定は未実施 | #729 |
+| `m11_build.sh` 冒頭の `source [EMSDK]/emsdk_env.sh` は emsdk 無しで rc 1 で落ちる (既存) | 前提不足の理由が見えにくい | #730 |
+| DEFECTS.md への類型追加 (行案は §7) | カタログ未更新 | #716 (DOCS-9) |
 
 ## 7. 類型行案 (DEFECTS.md 本体は未編集)
 - 行案: 「前処理の依存 (capstone/pefile・実機バイナリ) が無いとき、IR 生成条件 (ldfix・qstore) を WARNING のみでスキップし、測定基準が環境で変わる (fail-open harness 欠陥)」。検出: `ir_conditions.json` の値。対処: skip を非 0 終了にする (本 PR)。
@@ -102,8 +103,8 @@ NC1 (capstone 未導入) は `bash tools/m11/m11_gen_ir2.sh` が exit 1 にな�
 | 必須 3: `--full` の PE・repo 外パス | 直した (未実行) | `m11_scan/bounds/tail/lift/lift_all/postjs` を env・相対パスに。[RETDEC] 未取得のため未実行 |
 | 必須 4: PR 本文 (Refs・oc_artifacts・検証・起票先) | 直した | PR 本文を更新 (`Refs #680`・`oc_artifacts` 行・検証 節・未解決の起票先) |
 | 推奨 5: fail-closed の取りこぼし | 直した | lift 4 chunks・tail・lift boot4・m11_scan・bounds・data/image・lb_check を `must` に |
-| 推奨 6: NC の証跡が rc のみ | 未対応 (素材無し) | 本 HEAD では NC2 のみ再実行 (§9 上部)。他は §6 で再測定を起票依頼 |
-| 推奨 7: n=2 | 未対応 (素材無し) | WORKFLOW §5 の n≥3 は未実施。survey 件数の一致は n=2 まで (§6) |
+| 推奨 6: NC の証跡が rc のみ | 直した (§10) | NC1 / NC1b / NC2 / NC3 を本 HEAD でログ行付きで再実行 (§10-2) |
+| 推奨 7: n=2 | 直した (§10) | 同一 head で n=3 (survey 件数 3 回一致)。別環境は未実測 (#729) |
 | 軽微: `m11_cond.py --get` の IndexError | 直した | usage を出して rc 1 |
 | 軽微: commit 件名の途切れ | 不採用 (事実確認) | `git log` で `d1a20ed` の件名は完全。履歴の書換えは force push になるため行わない |
 | Copilot: ldfix マーカーを IR に結び付ける | 直した | `ir_sha256` (sha256) を正規 pass (gen_ir2・qstore・alloca) の直後に bind。build は一致しない IR を拒否 (§9 上部) |
@@ -114,9 +115,36 @@ NC1 (capstone 未導入) は `bash tools/m11/m11_gen_ir2.sh` が exit 1 にな�
 | Copilot: REPORT §15 の数値重複 | 直した | 数値を削除し導線のみ (数値の正は本書) |
 | Copilot: 直接原因の断定 | 直した | §1 を「確認できた機構」と「断定しない」に分けた |
 
-起票依頼 (PM / ユーザ判断。Issue 番号は未起票):
-- `--full` を実走させ、lift 成果物がどの PE から出たかを記録する (PM 起票)。
-- `ldfix/embed_sx_ab.sh` (CAB-131 A/B) は新しい指紋・ldfix 検査で拒否される。退役するか、base 専用の明示 opt-out を設計するか (PM 判断・追跡 issue は未起票。起票依頼)。
-- NC1/NC1b/NC3 の再測定、n≥3、環境間一致、work-m11 の R2 再投入 (Issue #680 の子・素材権限者)。
-- `m11_build.sh` の emsdk 前提の明示チェック (既存・PM 起票)。
-- DEFECTS.md の類型追加 (PM)。
+起票 (番号は §6 の表を正とする): `--full` の実走と PE 紐付け = #728 / `ldfix/embed_sx_ab.sh` の退役か opt-out = #727 / n≥3 (同一 runner は §10 で実測済み)・環境間一致・work-m11 の R2 再投入・NC の素材での再測定 = #729 / emsdk 前提チェック = #730 / DEFECTS.md 類型追加 = #716。
+
+## 10. head `4e084e1` での再測定 (レビュー指摘 3・推奨 5・6・7)
+実行環境: 本 runner (ubuntu, load 0.2–1.1)。`FL_WIN64_DIR` は `fl-win64.tar.zst` の `extracted/block00031_PE.bin` (1 member, 22 227 016 B)。capstone 5.0.7 / pefile 2024.8.26 (`pip install --user`)。`work/` は `work-m11` の旧スナップショット (`ir_conditions.json` 無し) から開始。
+
+### 10-1. survey n=3 (head `4e084e1`) と main (77340a4) の比較
+| 測定 | コマンド | rc | 所要秒 | load (開始→終了) | ok | oob | halt0 | trap | miss | noproc | clobber | IR 条件 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| H1 | `bash m11_e2e.sh` (旧スナップショット。lift 成果物は有効で、`ir_conditions.json` 無しのため gen_ir2 で IR を回復 → build) | 0 | 101 | 0.93 → 1.07 | 866 | 21 | 8 | 29 | 46 | 1 | 0 | ldfix=applied qstore=applied |
+| H2 | `bash m11_e2e.sh` (同, 増分) | 0 | 41 | 0.85 → 0.92 | 866 | 21 | 8 | 29 | 46 | 1 | 0 | 同上 |
+| H3 | `bash m11_e2e.sh` (同, 増分) | 0 | 41 | 0.62 → 0.81 | 866 | 21 | 8 | 29 | 46 | 1 | 0 | 同上 |
+| M-main | `origin/main` 77340a4 の `bash m11_e2e.sh` (IR を削除して作り直し, `m11_bounds`/`m11_tail` が rc 1 で失敗し `run` で継続した後に gen_ir2 / build) | 0 | 164 | 0.85 (開始) | 866 | 21 | 8 | 29 | 46 | 1 | 0 | 同上 |
+
+- H1〜H3 の survey 件数は全 run で一致 (n=3)。M-main も同値。
+- 差分の出所: §3 の 864/23/31 は `3807851` 時点の測定。その後 main に入った m11 変更 (`8afdc9e` の boot5・`c293660` の `M11_PE`・`de50ffa`・`04fafae` 等。`git log 3807851..origin/main -- tools/m11` で 19 files, +665/-116) が差の源。本 PR の差分でも、`origin/main` でも同じ結果になるため、本 PR は survey の出力を変えていない。
+- 注: M-main の 2 回目以降 (`m11_bounds` 失敗の経路) は `run` の継続で走るため、main の `--full` 経路は未確認のまま。
+
+### 10-2. NC (本 HEAD のコード。ログ行付き)
+| 測定 | コマンド | rc | ログ行 |
+|---|---|---|---|
+| NC1 | capstone を `ImportError` にした一時ツリーで `bash m11_gen_ir2.sh` | 1 | `[gen_ir2] ERROR: ldfix skip (PE 無し: ... / capstone・pefile 無し) — fail-closed で失敗`。`ir_conditions.ldfix=skipped` |
+| NC1b | 一時ツリーで `PE=/nonexistent bash m11_build.sh` (qstore=applied の IR) | 1 | `[m11build] ERROR: qstore skip (PE 無し: /nonexistent / capstone・pefile 無し) — fail-closed で失敗`。`qstore=applied` は残る |
+| NC1b' | `PE=/nonexistent` (記録 PE は実 PE) で `m11_build.sh` | 2 | `[m11build] ERROR: IR の生成 PE (...) と現在の PE (/nonexistent) が違う` |
+| NC2 | `FL_WIN64_DIR=/nonexistent bash m11_e2e.sh` | 1 | `[m11_e2e] PE バイナリ無し: /nonexistent/...` / `M11_SUMMARY {"reached_stage":0,"stop_reason":"prerequisite missing"}` |
+| NC3 | 一時ツリーで `M11_QSTORE=0 bash m11_build.sh` (PE は記録と一致, qstore=applied の IR) | 2 | `[m11build] ERROR: work/boot_final.ll は qstore 適用済み (ir_conditions.json)。M11_QSTORE=0 の前に m11_gen_ir2.sh で IR を作り直すこと` |
+
+- NC3 は PE を記録と揃えた状態で、qstore gate (rc 2) に到達した (推奨 5 への対応)。PE 不一致で先に落ちる試験ではない。
+
+### 10-3. `--full` (head)
+- `bash m11_e2e.sh --full` → rc 1 (fail-closed)。`m11_scan: ok` の後、`m11_bounds` が `FileNotFoundError: tools/m2/work/ghidra_dll/functions_dll.csv` で失敗。
+- `functions_dll.csv` は `tools/m2/m2.sh` が Ghidra headless (`DumpFunctions.java`) で作る中間物で、`work-m11` にも `fl-win64` にも含まれない。`toolchain-retdec` ([RETDEC]) は展開されるが、この CSV が無いので RetDec の lift に届かない。
+- 結論: `--full` は本 runner では成功しない。WORKFLOW §11 の `--full` が正という記述は未検証のまま (#728)。
+- 検証 (推奨 6): `--full` の実走を試みた。「実走しない理由」は CSV 欠落 (上記)。
