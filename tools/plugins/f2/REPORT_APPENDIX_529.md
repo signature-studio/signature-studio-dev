@@ -18,6 +18,22 @@
   3. 閉包外からの AV・SEH (`RtlRaiseException` 経由でない hardware 例外) の扱い。
 - 再現: `python3 tools/plugins/f2/raise_scan.py <block>` → `raise_reach.py <block>` (前提: `work/closure/`・`FL_WIN64_DIR`)。結果は `work/f2/raise_scan_<block>.json`・`raise_reach_<block>.json` (gitignore)。
 
+### 1b. #1056 追補: 閉包外を含む PE 全体の直接 call 追跡 (`raise_reach_frontier.py`)
+
+- **方法**: 根は waiver 関数 (W = 0x780d00・0x78a660 @19148、0x77a550・0x783eb0 @19245)。`.pdata` の関数範囲で閉包外も含めて直接 call/jmp を辿る。IAT thunk (`jmp [rip+slot]`・`.pdata` 無し) は import 名に解決して例外 API を判定する。間接 call は辺にせず、その site を列挙する。
+- **実測 (commit 5de92a12・19148/19245 とも 1.5 秒以内・truncated=False)**:
+
+| block | 根 | 到達関数 | trap 命令 | 例外 API | 未解決 direct target | 間接 call site |
+|---|--:|--:|--:|--:|--:|--:|
+| 19148 | 2 (W) | 31 | 0 | 1 (`ExitProcess`) | 1 (0x407190) | 23 (18 関数) |
+| 19245 | 2 (W) | 31 | 0 | 1 (`ExitProcess`) | 1 (0x407190) | 23 (18 関数) |
+
+- **`ExitProcess`**: 0x411a80 → 0x411bdd で呼ばれる。経路は `W 0x780d00 → 0x40f530 → 0x411190 → 0x411c30 → 0x411c10 → 0x411a80`。プロセス終了で例外 unwind は起きないため、pad が走る経路にはならない (waiver の前提は崩れない)。
+- **0x407190**: `jmp [rip+0x4d00ca]` の slot が IAT に無い (間接ポインタ)。到達先は未解決。
+- **未解決 (= 受入条件の残り)**: W から到達する 31 関数の間接 call 23 件 (vtable・関数ポインタ) の実値。子 issue **#1305** で扱う。この段階では waiver の reason を書き換えない。
+- 再現: `python3 tools/plugins/f2/raise_reach_frontier.py <block>` (前提: `work/closure/`・`work/winfuncs/` = `plugin_closure.py` 出力・`FL_WIN64_DIR`)。
+- 閉包全体を根にした結果 (`--roots closure`・実測 commit 5de92a12): 19148 は 1278 関数到達・trap 関数 15 件 (div/idiv)・例外 API 関数 1 件。19245 は 1096 関数到達・trap 関数 10 件・例外 API 関数 1 件。閉包の関数は W から到達しない (上の表が waiver 判定の対象)。
+
 ## 2. §7.9 未解決 (§7.7 から継続)
 
 | 未解決 | 影響 | 起票先 |
