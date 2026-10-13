@@ -1,8 +1,8 @@
 # tools/plugins/g1/REPORT.md — PLG-G1 (#206) synth-simple + drum-synth 14 本: lift 前提の実測
 
-- 日付: 2026-10-13 / 担当 dir: `tools/plugins/g1/` のみ (生成物は `tools/plugins/work/` = gitignore) / 検証起点 commit: **86ca2d5** (スクリプト一式。 これ以降の commit は REPORT.md・`dropped_entries.py`・DOC_MAP の追加と、`g1_e2e.sh` の echo 文言 1 行 (§6 → §10) の修正のみ) / 再現: `bash tools/plugins/g1/g1_e2e.sh` (測定 + gate 5 本) / `bash tools/plugins/g1/g1_nega.sh` (ネガティブコントロール 9 件)。 環境は `g1/env.sh`
+- 日付: 2026-10-13 / 担当 dir: `tools/plugins/g1/` のみ (生成物は `tools/plugins/work/` = gitignore) / 検証起点 commit: **1364a65** (§9。 旧版 86ca2d5 は `REPORT_APPENDIX.md`。 以降の commit は REPORT・DOC_MAP のみ) / 再現: `bash tools/plugins/g1/g1_e2e.sh` (測定 + gate 5 本) / `bash tools/plugins/g1/g1_nega.sh` (ネガティブコントロール 9 件)。 環境は `g1/env.sh`
 - 素材: `fl-win64` / `toolchain-retdec` / `toolchain-emsdk` (`docs/WORKFLOW.md` §11)。 手法の出所: PR #506 (PLG-F3) と `tools/plugins/f2/` (PLG-F2)
-- 既知類型との関係: **(icall §4) D1 = 間接 call/jmp 脱落**が 12 閉包すべてで再現 (§6; (DEFECTS.md) D15 は x64c stage-0 経路の同種事象で、本件は RetDec 経路)。 新規の loud な IR 型エラー 2 類型 (E4/E5) を §7 で報告 (行案は §11)。 silent miscompile の新規類型は**未検出** (差分試験を未実施のため、無いことの証明ではない)
+- 既知類型との関係: **(icall §4) D1 = 間接 call/jmp 脱落**が、復元前の鎖 (`PLUG_ICALL=0`) では 12 閉包すべてで再現し、main の既定鎖 (`PLUG_ICALL=1`, #539) では復元される (§6, §6.1; (DEFECTS.md) D15 は x64c stage-0 経路の同種事象で、本件は RetDec 経路)。 新規の loud な IR 型エラー 2 類型 (E4/E5) を §7 で報告 (行案は §11)。 silent miscompile の新規類型は**未検出** (差分試験を未実施のため、無いことの証明ではない)
 - 範囲: issue #206 の手順 1 (固有閉包 lift → `emcc -c`) の再現と手順 2〜4 の前提監査。 **手順 2〜4 と出口条件 (差分試験 bit-exact + Render test .flp) は未達** (§10)
 
 ## 0. 結論 (先出し)
@@ -11,9 +11,9 @@
    Generator の発音試験に要る MIDI 入力 (#37) も OPEN (オーディオ経路 #11 は CLOSED)。
 2. **手順 1 は Delphi 殻 12 block (13 本; Wasp と Wasp XT は同一 PE) で 12/12 通った**: lift_rc 0 / `emcc -c` rc 0 / `x86_fp80` 関数 0 / 未実装 `__asm_*` helper 宣言 0。
    閉包は block 重複なしで **497 関数 / 207,507 B** (§2)。 `PLUGIN_MATRIX.json` の `lift` 欄との突合は 148/148 項目一致 (T2 の殻 5 本 = BassDrum / Drumaxx / Drumpad / DrumSynth Live / SimSynth は matrix に `lift.batch` 欄が無く、lift と `emcc -c` は今回が初測定。 SimSynth は閉包の数値も matrix に無く比較対象外)。
-3. **ただし `emcc -c` 通過は正しさを意味しない**: 12 閉包の機械語に非 IAT の間接 call が **計 659 site** あるが、lift 後 IR の間接 call は **0** (12/12 block、`Gen_Render` / `TriggerVoice` / `Voice_Render` / `Eff_Render` の入口を含む)。
-   よって**現行の鎖の出力は、差分試験を実施しても必ず不一致になる**。 eq-filter (#199) の 550 site と同じ欠陥で、接続は [PLG-F2-2] #514 が追跡している (§6)。
-4. **host 呼出面は P0b の応答表でほぼ覆える**: 閉包が即値 ID で発行する Dispatcher ID は taint 版で {2, 3, 8, 25, 36, 50, 90} と動的 ID 3 site (Dance)。 **ID 25 (Wasp / Wasp XT 各 1 site) は `hs_ids.json` (35 ID) に無い**。
+3. **ただし `emcc -c` 通過は正しさを意味しない**: 12 閉包の機械語に非 IAT の間接 call が **計 659 site** ある。 本測定の鎖 (`PLUG_ICALL=0` = #539 以前の復元なしの鎖) では lift 後 IR の間接 call は **0** (12/12 block)。
+   main の既定鎖 (`PLUG_ICALL=1`) では `@__icall_dispatch` 呼出が 12 block で計 659 になり、静的 site と block ごとに一致する (§6.1)。 ただし既定鎖は gate 1b が BeepMap で不合格になる (§6.1)。 復元後の IR が差分試験で一致するかは未測定。
+4. **host 呼出面のうち `hs_ids.json` (35 ID) に無いのは、taint 版で 7 ID 中 ID 25 の 1 つだけ**: 閉包が即値 ID で発行する Dispatcher ID は taint 版で {2, 3, 8, 25, 36, 50, 90} と動的 ID 3 site (Dance)。 ID 25 は Wasp / Wasp XT 各 1 site。
    別算法の独立走査は ID 64 (4 本 × 各 4 site) と ID 128 (Dance 1 site) も検出し、この 2 つも応答表に無い (host 呼出か否かは未判別) (§4)。
 5. **SIMD kernel 依存は 5 本**: 3x Osc / BeepMap / Fruit Kick / Fruity DX10 が閉包内に各 11 site、SimSynth が 1 site。 残り 7 殻は閉包にも frontier にも 0 site (§5)。
 6. **付随 C++ DLL 7 本 (engine 6 + MiniSynth 単体) は RetDec まで通るが、`emcc -c` は 7/7 とも未通過** (§7)。 5 類型の IR 型エラーが連鎖し、2 本 (DrumSynth Live engine / SimSynth_Eng) は `.pdata` の 206 / 219 関数が define 無し。
@@ -72,14 +72,14 @@ frontier = 閉包から呼ぶ framework 関数 (P0a の共有 wasm 側)。 vcall
 
 | gate | スクリプト | 不合格条件 (exit 1) | NC |
 |---|---|---|---|
-| 1 | `judge.py` (`status.csv`) | block ごとに: 行がちょうど 1 つ / 全列整数 / `closure_funcs>0` / `lift_rc==0` / `emcc_c_rc==0` / `f80_funcs==0` / `declares_unimpl==0` (-1 = 件数行なしも不合格) / `defines>=closure_funcs`。 要求外の block の行・ヘッダ不正・ファイル不在も不合格。 `--out` は全 block 合格時のみ書く | NC3, NC4 |
+| 1 | `judge.py` (`status.csv`) | ヘッダは 10 列 (#539 以前) または末尾に `icall,dispatch_calls` を足した 12 列 (#539 以降)。 12 列なら `icall==0` かつ `dispatch_calls==0` (= `PLUG_ICALL=0` の鎖) も要求。 block ごとに: 行がちょうど 1 つ / 全列整数 / `closure_funcs>0` / `lift_rc==0` / `emcc_c_rc==0` / `f80_funcs==0` / `declares_unimpl==0` (-1 = 件数行なしも不合格) / `defines>=closure_funcs`。 要求外の block の行・ヘッダ不正・ファイル不在も不合格。 `--out` は全 block 合格時のみ書く | NC3, NC4 |
 | 1b | `define_audit.py` | 閉包 range の開始 VA ごとに `function_<VA>` の define が `p.final.ll` に在ること (欠落 > 0 → 不合格)、range 外の define (unexpected) > 0 → 不合格。 range 内部の余剰 define は件数を報告して許容 | NC9 |
 | 2 | `matrix_check.py` | `closure_funcs/bytes`・frontier 関数/B・vcall・ptr が matrix の `lift` 欄と不一致、matrix の `lift.batch` (lift_rc / emcc_c_rc / f80 / unimpl) が status と不一致、対象 plugin 集合・block 割当が matrix と不一致、facts が空 | NC5 |
 | 3 | `ids_crosscheck.py` | taint 版の Dispatcher ID 件数 > 独立走査の件数 (取りこぼし)、facts の plugin 集合が `common.py` と不一致 | NC6 |
 | 4 | `icall_check.py` | 独立算法の線形 sweep の数 ≠ `audit_icall.py` の到達 site + `gap_sites`、audit JSON 不在 | NC7 |
 | (形式) | `engine_check.py` | C++ DLL 7 本の行が揃い全列整数で `lift_rc>=0`・`defines>=1`。 **`emcc -c` rc は合否に使わない** (§7 の通り全 7 本が既知の理由で非 0) | NC8 |
 
-**gate にしないもの** (誤解防止): IR の間接 call 数 (§6)、`hs_ids.json` に無い Dispatcher ID (§4)、C++ DLL の `emcc -c` rc (§7)。 いずれも「現状の未解決」を測るもので、`findings.py` が e2e 末尾に件数を出す (常に exit 0)。
+**gate にしないもの** (誤解防止): IR の間接 call 数 (§6; 本測定の鎖は `PLUG_ICALL=0` 固定)、`hs_ids.json` に無い Dispatcher ID (§4)、C++ DLL の `emcc -c` rc (§7)。 いずれも「現状の未解決」を測るもので、`findings.py` が e2e 末尾に件数を出す (常に exit 0)。
 gate にすると e2e が常に落ちるため、起票先付きの未解決として §10 に置いた。
 
 実装中に gate が実際に落とした事例:
@@ -150,8 +150,16 @@ gate にすると e2e が常に落ちるため、起票先付きの未解決と�
 | 計 | | **659** | 5 | | **0** | 入口を持つ 11 block で ≥1 → 0 |
 
 - 線形 sweep は 12/12 block で「静的 site + gap」と一致 (計 664 = 659 + 5)。 全スロットの内訳は `work/g1/icall_table.md`。
-- eq-filter (#199) と同じ欠陥で、`batch_lift.sh` の鎖に `tools/icall` の復元が無いことが原因 → **[PLG-F2-2] #514** (batch_lift への icall 接続と回帰ゲート化) の対象に本 12 block を含める。
-- 間接 call を持たない入口 (Plucked! の `Gen_Render` / `Voice_Render`) は関数単位の差分試験候補 (浮動小数引数には ARG pass が要る: #197)。 [PLG-F2-3] #515 の方式の一般化を検討。
+- eq-filter (#199) と同じ欠陥 ((icall §4) D1) で、`PLUG_ICALL=0` の鎖に `tools/icall` の復元が無いことが原因。 **[PLG-F2-2] #514 / #539 で `batch_lift.sh` に復元が接続済み** (既定 `PLUG_ICALL=1`)。 既定鎖の測定は §6.1。
+- 上表の IR 0 は `PLUG_ICALL=0` (復元前の鎖) の値。 `g1_e2e.sh` はこれを固定して測る (#539 で `batch_lift.sh` の既定が 1 になったため)。
+- 間接 call を持たない入口 (Plucked! の `Gen_Render` / `Voice_Render`) は関数単位の差分試験候補 (ARG pass が要る: #197)。 [PLG-F2-3] #515 の一般化を検討。
+
+### 6.1 既定鎖 (`PLUG_ICALL=1`, #539) の測定 (別 run、`g1_e2e.sh` の gate には含めない)
+
+`PLUG_ICALL=1 bash lift/batch_lift.sh <12 block>` (87 s、rc 0): 12/12 が lift_rc 0 / `emcc -c` 0 / f80 0。 `p.final.ll` の `call void @__icall_dispatch(` は 84 / 86 / 109 / 34 / 27 / 73 / 74 / 49 / 66 / 20 / 28 / 9 = **計 659** (§6 表の静的 site と block ごとに一致、`status.csv` の `dispatch_calls`)。
+- `f2/icall_gate.py` (12 block): 7 block PASS、**5 block FAIL (F1 missing=1 / F2)**: 3x Osc 0x72b8b2 / BeepMap 0x721cf2 / Fruit Kick 0x721242 / DX10 0x722222 / Dance 0x71793f。 機械語の間接 call 664 − dispatch 659 = **5 = §6 の gap 5 site と同数・同 block** (audit が到達不能とした gap の call; 復元対象外)。 waiver は無い。
+- **gate 1b は BeepMap (21194) だけ FAIL**: `unexpected` = `function_898870` / `function_898876` (range 外)。 `p.icall.map.json` の復元用 stub 領域 (section 0x88d000–0x899cfd) 内にある。 `function_898876` は 1 箇所から呼ばれる (L15907、i128 を返す 4 引数の関数)。 他 11 block は 0。 原因 (RetDec が stub を別 define に切り出した) は推定で、stub 領域の扱いは未確認。
+- `icall_check.py` の「IR の間接 call」は `@__icall_dispatch` を数えないため既定鎖でも 0 と出る。 復元の有無は `icall_gate.py` で見る。 既定鎖を gate 化するには gate 1b の stub 領域 define の扱いと 5 gap site の扱いの決定が要る (PM 判断; §10)。
 
 ## 7. 付随 C++ DLL 7 本 (engine 6 + MiniSynth 単体)
 
@@ -196,31 +204,25 @@ gate にすると e2e が常に落ちるため、起票先付きの未解決と�
 
 ## 9. 検証
 
-コミット済み HEAD **86ca2d5** を `git worktree add --detach` した別 worktree (`work/` 空) で実行。 4 core / 15 GiB の Actions runner、実行は逐次 (並列数 1)、各 run の間に他の重い処理は走らせていない。
-前提 inventory (`prep.sh`) は clean worktree へ dev worktree の生成物 (`win_scan` / `winfuncs` / `win_unique` / `win_abi` / `kernel_table` の JSON) をコピーして使い、再生成していない。
+検証起点 HEAD **1364a65** (`origin/main` = cf828e9 を merge 済み。 以降の commit は REPORT・DOC_MAP のみ)。 ブランチ worktree (`work/` 空から開始)、4 core Actions runner、逐次実行。 旧版 (86ca2d5 の 3 run・NC 詳細) は `REPORT_APPENDIX.md`。
 
 | 項目 | 実測 |
 |---|---|
-| 前提 inventory の生成 (dev worktree で 1 回、`prep.sh`) | **377 s** (`win_funcs.py` が主。 `Pool(14)` を 4 core で実行、終了時 load average (1 分) 16.3)。 `g1_e2e.sh` は work/ が在れば作り直さない |
-| `g1_e2e.sh` 全体 (C++ DLL 7 本を含む。 3 run: dev / clean / clean 2 回目) | **440 / 442 / 448 s** (dev / clean 1 回目 / clean 2 回目)、いずれも exit 0 |
-| 開始時 load average (1 分) | 0.62 / 0.51 / 0.90 (同順) |
-| lift 秒 (`status.csv` の seconds 12 block 計。 同上 3 run の min–max) | **33–39 s** (39 / 33 / 36) |
-| C++ DLL 7 本の lift 秒 (`engines.csv` の `lift_s`、3 run の min–max、block 順は §7) | 9 / 38–39 / 45–46 / 33–34 / 39–40 / 36 / 46–52 |
-| run 間の一致 | dev と clean 2 回で `facts.json` はバイト一致 (sha256 先頭 `6152896e`)。 `status12.csv` (seconds 列を除く)・`icall_table.md`・`define_table.md`・`cpp_facts.json`・`engines.csv` (lift_s 列を除く) も一致 |
-| gate 通過 | clean HEAD で gate 1 (12/12 block) / 1b (不合格 0) / 2 (148/148) / 3 (13/13) / 4 (sweep ≠ 到達 + gap の block 0) / C++ DLL 形式検査 (7/7) すべて合格、exit 0 |
-| `g1_nega.sh` (clean HEAD 86ca2d5) | exit 0、**38 s**、NC1〜NC9 すべて DETECTED (dev worktree の同内容の run も全 DETECTED) |
+| `g1_e2e.sh` 初回 (前提 inventory 生成込み。 commit e4c8662 = 1364a65 と `findings.py` / `icall_check.py` の文言のみ違う) | exit 0、**1130 s** (`win_funcs.py` が主。 開始時 load average 0.16 / 並列 14 で終了時 16 超) |
+| `g1_e2e.sh` 再実行 (1364a65、inventory は生成済み) | exit 0、**594 s**、開始時 load average (1 分) 0.04。 gate 1 (12/12) / 1b (不合格 0) / 2 (148/148) / 3 (13/13) / 4 (sweep ≠ 到達 + gap の block 0) / C++ DLL 形式検査 すべて合格 |
+| lift 秒 (`status12.csv` seconds 12 block 計) | **43 s** (旧 33–39 s) |
+| C++ DLL 7 本の lift 秒 (`engines.csv`、21149 / 21183 / 21298 / 22384 / 23645 / 23921 / 24168) | 13 / 52 / 63 / 45 / 52 / 46 / 64 |
+| `facts.json` | sha256 先頭 **6152896e** (旧版と同一) |
+| `g1_nega.sh` (1364a65) | exit 0、**50 s**、NC1〜NC9 すべて DETECTED |
+| 既定鎖 (`PLUG_ICALL=1`) の `batch_lift.sh` 12 block (§6.1) | rc 0、**87 s**。 dispatch 計 659。 gate 1b は BeepMap で FAIL、`icall_gate.py` は 5 block FAIL |
 
-ネガティブコントロール (数値; 対照は無改変で合格することを併記):
-- NC1 `emcc -c` (Wasp 24302): `final.ll` の定義 1 つの `ret` を除去 → rc **0 → 1**。
-- NC2 ranges: 閉包 ranges 8 → 7 (末尾 `function_6a55f0` を落として再 lift) → define 9 → 7、 対象関数 1 → 0。
-- NC3 `judge.py`: 実測 `status12.csv` (12 行、対照 rc 0) を 1 箇所ずつ壊した **137 変異** (block ごとに lift_rc=1 / f80=3 / emcc_c_rc=1 / unimpl=5 と -1 / defines=closure-1 / closure=defines+1 / closure=0 / seconds 非数値 / 行削除 / 行重複の 10 種 × 12、要求外 block 追加 1、ファイル全体 4 = ヘッダのみ・空・ヘッダ不正・不在) → **受理 0 / 拒否 137**。
-- NC4 e2e の終了コード: 先頭 block の `emcc_c_rc` を 1 にした CSV を `G1_STATUS_CSV` で渡して `g1_e2e.sh --skip-lift --judge-only` → **rc 1、通過行 0** (対照 rc 0、通過行 1)。 `work/g1/status12.csv` は不合格 run の前後で sha256 不変。
-- NC5 `matrix_check.py` / NC6 `ids_crosscheck.py`: 対照 rc 0。 BassDrum の `closure_funcs`+1・Fruit Kick を欠く・空 facts → rc 1 (3 件とも)。 3x Osc の ID 2 の件数 3 → 4・空 facts → rc 1。
-- NC7 `icall_check.py` / NC8 `engine_check.py`: 対照 rc 0。 3x Osc の audit 静的 site +1・audit JSON 1 本欠く → rc 1。 engines.csv の末尾行を欠く・`lift_rc` を非整数 → rc 1。
-- NC9 `define_audit.py`: 対照 rc 0 / `function_408930` を `function_ffffff` に改名 → rc 1 / `final.ll` 無し → rc 1。
+ネガティブコントロール (対照は無改変で合格):
+- NC1 `emcc -c` (Wasp 24302): `ret` 除去 → rc **0 → 1**。 NC2: 閉包 ranges 8 → 7 で `function_6a55f0` が消え define 9 → 7。
+- NC3 `judge.py`: 実測 `status12.csv` (**12 列**、12 行、対照 rc 0) の **175 変異** (行/列 169 + ファイル全体 6) → **受理 0 / 拒否 175**。 列変異は block ごと 12 種 (lift_rc=1 / f80=3 / emcc_c_rc=1 / unimpl=5 と -1 / defines=closure-1 / closure=defines+1 / closure=0 / seconds 非数値 / icall=1 / dispatch_calls=5 と非数値) + 行削除 + 行重複 = 14 種 × 12 = 168 + 要求外 block 1、ファイル全体 6 (ヘッダのみ・空・ヘッダ不正・不在・11 列・12 列で列順入替)。 icall 2 列を落とした 10 列版も対照 rc 0。
+- NC4: 先頭 block の `emcc_c_rc=1` の CSV で `g1_e2e.sh --skip-lift --judge-only` → **rc 1、通過行 0** (対照 rc 0、通過行 1)、`status12.csv` は run の前後で不変。
+- NC5 / NC6: 対照 rc 0、壊した facts は全件 rc 1。 NC7 / NC8: 対照 rc 0、静的 site +1・JSON 欠落・末尾行欠落・非整数は全件 rc 1。 NC9: `function_408930` を `function_ffffff` に改名・`final.ll` 無し → rc 1。
 
-別系統の突合は gate 2 (matrix 148 項目) / 3 (ID の独立走査) / 4 (間接 call の線形 sweep)。 規約確認 (HEAD): `git diff bfccd23 HEAD --stat` の変更は `tools/plugins/g1/` と `docs/DOC_MAP.md` のみ。 20 MiB 超の blob なし (`find tools/plugins/g1 -size +20M` 空)。 REPORT は 250 行以内。
-検証範囲: 閉包の機械的な到達性 (RetDec+pass 鎖 → `emcc -c`) と host / kernel / 間接 call の静的な数え上げ。 範囲外: wasm のリンクと実行、native との出力比較、framework / host shim との結合、Render test .flp。 範囲外の項目について本書は何も主張しない。
+規約確認: 変更は `tools/plugins/g1/` と `docs/DOC_MAP.md` のみ、20 MiB 超 blob なし。 検証範囲: 閉包の機械的な到達性と host / kernel / 間接 call の静的な数え上げ。 範囲外: wasm のリンクと実行、native との出力比較、framework / host shim との結合、Render test .flp (これらについて本書は何も主張しない)。
 
 ## 10. 未解決 (起票先付き)
 
@@ -228,7 +230,7 @@ gate にすると e2e が常に落ちるため、起票先付きの未解決と�
 |---|---|---|
 | 差分試験 bit-exact (出口条件 3)。 Gen_Render / Eff_Render 単位の native (ms_abi VA 敷設) ⟷ wasm harness が未整備 ([LD-6] #122 は関数単位)、P0a/P0b 未完 | #206 を閉じられない | #195 / #196 の完了後に #206 を再開 (Closes はその時)。 harness は #506 §6 が PM に依頼済みの「[PLG-F3a]」を family 共通として流用できるか PM 判断 |
 | Render test .flp の E2E (出口条件 4)、発音試験に要る MIDI 入力 | 同上 | FLEngine 統合待ち。 MIDI 入力は #37 (OPEN)。 親 #14 / #206 |
-| 間接 call 659 site の脱落 (12/12 block)。 `batch_lift.sh` に icall 復元が未接続 | 全 13 本。 接続しない限り差分試験は必ず不一致 | **#514** ([PLG-F2-2]) に本 12 block を追記済み (コメント) |
+| 既定鎖 (`PLUG_ICALL=1`) で gate 1b が BeepMap で不合格 (stub 領域 define 2 件) / `icall_gate.py` が 5 block (gap 5 site) で FAIL (§6.1)。 復元後 IR の差分試験は未実施 | 既定鎖で本 12 block を gate にできない | **PM に起票依頼** (PR コメント): 「[PLG-F2-2] 後続: stub 領域 define と gap 5 site の扱い」。 #514 / #539 への追記ではなく新規かは PM 判断 |
 | 間接 call を持たない入口 (Plucked! の Gen_Render / Voice_Render) の関数単位差分 | 部分的な bit-exact 実績 | **#515** ([PLG-F2-3]) の方式の一般化を PM 判断 |
 | Dispatcher ID 25 (Wasp / Wasp XT) が応答表に無い。 ID 64 (4 本 × 4 site)・128 (Dance) は host 呼出か未判別。 動的 ID (Dance 3 site)・slot 0x128 / 0x58 / 0x18 の意味も未解析 | P0b の応答表 / host 呼出面の網羅 | #196 に追記済み (0x13173a0 全 case 解析と合わせる) |
 | DLL 固有 VA の callee (4 plugin × 3 callee × 計 4 site, §5) と共通 22 site の正体 | kernel 依存の網羅 | #197 / #195 の統合時に所在関数を特定 |
@@ -241,10 +243,8 @@ gate にすると e2e が常に落ちるため、起票先付きの未解決と�
 ## 11. DEFECTS.md 行案 (候補・loud な IR 型エラー。 追加の可否は PM 判断)
 
 - **E4 `zext` の型落ち**: 症状 `%x = zext 0 to i64` (元の型が無い) / 観測 BassDrum・Drumaxx engine / 検出信号 emcc "expected type" / 修復 未。
-- **E5 select 定数式**: 症状 `add i64 0, select (i1 ..., ...)` / 観測 SimSynth_Eng / 検出信号 emcc "select constexprs are no longer supported" / 修復 未。 (E1〜E3 は #506 §7 と同一。 間接 call 脱落は既存 (icall §4) D1 / D15 の再確認。)
+- **E5 select 定数式**: 症状 `add i64 0, select (i1 ..., ...)` / 観測 SimSynth_Eng / 検出信号 emcc "select constexprs are no longer supported" / 修復 未。 (E1〜E3 は #506 §7 と同一。 間接 call 脱落は既存 (icall §4) D1。)
 
 ## 12. 成果物
 
-`g1_e2e.sh` (prep → 閉包 lift → gate 1/1b/2/3/4 → C++ DLL 7 本 → 未解決の件数; `--skip-lift` / `--skip-engines` / `--judge-only`) / `g1_nega.sh` + `judge_nc.py` (NC 9 件) /
-gate 本体 `judge.py` `define_audit.py` `matrix_check.py` `ids_crosscheck.py` `icall_check.py` `engine_check.py` (単独実行可; `g1/env.sh` を source) /
-測定 `closure_facts.py` `findings.py` `dropped_entries.py`、 対象の正本 `common.py` / 前提 `prep.sh` `mk_blockmap.py` (`block_manifest.json` 不要) `env.sh` / C++ DLL `engine_lift.sh` `engine_ranges.py` `engine_defs.py` `engine_fixcmp.py` (#506 から移植)。
+`g1_e2e.sh` (prep → 閉包 lift → gate 1/1b/2/3/4 → C++ DLL 7 本 → 未解決の件数; `--skip-lift` / `--skip-engines` / `--judge-only`) / `g1_nega.sh` + `judge_nc.py` (NC 9 件) / gate 本体 `judge.py` `define_audit.py` `matrix_check.py` `ids_crosscheck.py` `icall_check.py` `engine_check.py` (単独実行可; `g1/env.sh` を source) / 測定 `closure_facts.py` `findings.py` `dropped_entries.py`、 対象の正本 `common.py` / 前提 `prep.sh` `mk_blockmap.py` (`block_manifest.json` 不要) `env.sh` / C++ DLL `engine_lift.sh` `engine_ranges.py` `engine_defs.py` `engine_fixcmp.py` (#506 から移植)。
