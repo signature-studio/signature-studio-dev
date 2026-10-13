@@ -6,7 +6,7 @@ set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; FA="$(dirname "$HERE")"
 CORE="$FA/work/win/Fresh Air/C__ProgramData_Slate Digital/Fresh Air/SlateCore.core_64"
 EPF="$FA/work/win/Fresh Air/C__ProgramData_Slate Digital/Fresh Air/FACTORY Presets/Factory Bank"
-W="$HERE/work/ctrl"; [ -f "$W/iat_slots.txt" ] || bash "$HERE/build_ctrl.sh" >/dev/null || exit 2
+W="$HERE/work/ctrl"; { [ -x "$W/native_ctrl" ] && [ -f "$W/ctrl_full.cjs" ] && [ -f "$W/iat_slots.txt" ]; } || bash "$HERE/build_ctrl.sh" >/dev/null || exit 2
 cd "$W"; source "$HERE/env.sh"
 python3 "$HERE/gen_ctrl_scen.py" ctrl_scen.txt 2 5 0xFA2C0001 >/dev/null
 clang -O1 -ffp-contract=off -frounding-math -w -o native_ctrl_trace "$HERE/native/native_ctrl.c" || exit 2

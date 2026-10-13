@@ -125,7 +125,7 @@ stubs (LGPL 参照) 署名との照合 (kwlist のある 103 のうち stubs 署
 ## 13. 未解決 (#81)
 - (a) 実機 FL での `mixer.getCurrentTempo(1)` 等の意味差確認は実機が必要で未着手 (#81 のブロッカーのまま)。`device.flrMidiNote` / `flrMidiCC` の書式・kwlist も未復元 (2 件)。
 - stubs 既定値が C 側で不明な引数を飛ばす呼出し (`channels.soloChannel(1, useGlobalIndex=True)` 等 3 関数) は `TypeError`。実 FL は C 側の既定値で通すため意味差。ホストへの「省略」の渡し方 (provider は `None`=handler 既定値、JS mock の `tog` は `undefined` のみ省略扱い) が未統一で、PM 判断待ち (PR #463 コメントに起票依頼)。
-- stubs 既定値 `midi.*` 10 種 (21 引数: `PIM_None` 7、`GT_All` 5 ほか) は `eval(…, {})` で `NameError` (main 既存の問題)。PM が別 issue で追跡 (PR #463 コメントに起票依頼)。
+- stubs 既定値 `midi.*` 10 種 (21 引数: `PIM_None` 7、`GT_All` 5 ほか) は `eval(…, {})` で `NameError` (main 既存の問題)。本 issue #654 (PY-16) で対応 (`eval` を除き、許可した式だけを評価する)。全文は [REPORT_PY16.md](REPORT_PY16.md)。
 
 ## 14. Piano roll scripting (`flpianoroll` + `.pyscript` ローダ) — #79 (PY-5)
 
