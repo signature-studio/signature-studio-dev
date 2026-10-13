@@ -158,6 +158,8 @@ ok 830 / oob 44 / halt0 20 / abort 1 / miss 46 / noproc 1 (§1 の 829/66 とは
 
 ### 8.1 最上位 frame 別の分類 (合流前 `fa918df` 基準、OOB 44。現基準の分類は §8.2)
 
+※ #663: 下表は旧 frames 基準で**無効**。修正後の値は trap_triage/REPORT_663.md §2-1。
+
 | 最上位 frame | unit 数 | 原因の状態 |
 |---|--:|---|
 | `8cc190` (←`8c7a10`←`8c5cc0`) | 11 (53 54 56 58 59 60 61 62 63 307 311) | **原因特定 (合流前、`REPORT_419.md` §A)**: TObject.Create の VMT 間接 call 脱落 |
@@ -177,6 +179,7 @@ ok 830 / oob 44 / halt0 20 / abort 1 / miss 46 / noproc 1 (§1 の 829/66 とは
 **測定の基準 (採用)**: `m11_e2e.sh` と同じ手順で IR・data・image を**再生成**し、PE (fl-win64 素材) を揃えた状態。
 ldfix は `PE` と capstone/pefile の両方が揃った時だけ走るため、`uv run --with capstone --with pefile` と PE パスの差替え (一時コピー、コミットしない) で実行した。
 work-m11 スナップショットの IR / data は古い生成物で、現 main の生成手順と一致しない (下表 (c) と (a) の差) ため採用しない。
+※ #663 訂正: 本節の「OOB 最上位 frame」集計 (下の段落と §8.1 の表) は**旧 frames 基準 (oob の最上位を 1 段捨てていた) で無効**。修正後の値は基準 (a) で trap_triage/REPORT_663.md §2-1、基準 (c) での再測定は未実施 (REPORT_663 §5)。
 
 | IR 生成条件 | 対照 (main の m11_ov.c) / OFF | ON (`M11_OV_CLASSCREATE=1`, 410360 のみ) | ok 退行 |
 |---|---|---|---|
@@ -193,7 +196,7 @@ work-m11 スナップショットの IR / data は古い生成物で、現 main 
 - **決定性**: ON を 2 回測定し kind 以外を含め差 0。
 - **所要**: スナップショット基準の OFF survey 17.2 s / ON 17.8 s (load average は 0.5 前後)。(c) の build・survey は時間未計測。
 
-**OOB 最上位 frame (基準 (c))**: OFF 13 件 = `4f9ff0` ×5 (291 296 304 555 923)、`414bb0` ×4 (149 158 280 659)、各 1 件 (95 `536da0`、275 `80e040`、477 `904190`、895 `40ffe0`)。ON は 304 が `4fb090` になるのみ。
+**OOB 最上位 frame (基準 (c)、旧 frames 基準で無効 — #663)**: OFF 13 件 = `4f9ff0` ×5 (291 296 304 555 923)、`414bb0` ×4 (149 158 280 659)、各 1 件 (95 `536da0`、275 `80e040`、477 `904190`、895 `40ffe0`)。ON は 304 が `4fb090` になるのみ。
 
 **旧最多分類 `8cc190` 系 11 unit (53 54 56 58–63 307 311)**: 基準 (c) の OFF では 56 のみ halt0、他 10 件は **ok**。ON で遷移 0。
 スナップショット基準では 56・58–63 (7 件) が OOB だったが、再生成で解消した (基準 (b) でも 10 件 ok)。PR の前提 (「最多分類 11 が OOB」) は現 main の生成手順では成立しない。
@@ -229,6 +232,6 @@ python3 trap_triage/survey_diff.py out_off.json out_on.json
 ### 8.3 #307 (liftdiff OOB 222) との関係
 
 liftdiff は hybrid closure の per-case 採点 (#307 は `414ad0` 系 68 が最多)、本調査は m11 の 942 unit survey で最多は `8cc190` 系 11。
-**`414ad0` は m11 survey の OOB 最上位 frame に現れない** (最上位 frame は上表 16 種)。重なるのは 410360 カスケード
+**`414ad0` は m11 survey の OOB 最上位 frame に現れない** (最上位 frame は上表 16 種)。 ※ #663 で訂正: 旧 frames は oob の最上位を捨てていたため、修正後は `414ad0` が最上位 (unit 149/158/280/659)。REPORT_663 §2-1。重なるのは 410360 カスケード
 (liftdiff `results/cascade_410360.md`: innermost `f_410360` 573 case、`f_410360<40f9e0` 100 case) と本件の根因 (410320/410360 の VMT 間接 call 脱落) で、
 **同一欠陥の別症状である可能性が高い (未検証)**。ただし両者の trap 件数は比較軸 (case と unit) が違うため数値の突合はしていない。
