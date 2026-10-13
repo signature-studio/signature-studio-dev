@@ -24,7 +24,7 @@ REPORT_APPENDIX.md が 250 行上限を超えているため、#883 の実測は
 BLK の算出式・32bit 切り詰め・`ICALL_BLK` 不一致・パイプライン順序は §17.10 を参照 (本ファイルでは再掲しない)。
 本 PR で新たに確定できた差分はない。
 
-## 実測 (再現・IR 確認)
+## 引用値と IR 確認 (未再測定)
 
 本 PR (fix run) では再実行していない。`$ARTIFACTS_DIR` に実在するのは `fl-win64.tar.zst` のみで、`analysis-ott-binaries`・`work-*`・`toolchain-*` は展開されていない。
 下表の leafspec 数値 (`rc=1`・`match=0 / mismatch=200 / wasm_trap=200`) は §17.9 の記録の引用であり、出所未確認の引用。本ファイルで独立に再測定したものではない。
@@ -37,11 +37,11 @@ IR 上の読み (下記) は `work/ott_getparam/` の生成物を参照したも
 - 戻り値の store 先は BLK+0x80 (rax)・BLK+0x88 (xmm0) に見える。
 - 参照範囲は BLK+0x00〜+0x88 の inttoptr 定数に見える。
 
-観測済みの事実は次の 1 点のみ: §17.9 L240 の wasm trap 解析 (`LL_VERBOSE=1`) で BLK+8 (rcx) の load が OOB で trap したこと。
+出所未確認の記録にある事実は次の 1 点のみ: §17.9 L240 の wasm trap 解析 (`LL_VERBOSE=1`) で BLK+8 (rcx) の load が OOB で trap したこと。
 
 ## 確定事項 (アドレス算出)
 
-1. `icall_rewrite.py` L653 の算出で BLK = `0x184308000`。wasm32 (`p:32:32`) では BLK+0x08 が `0x84308008` に切り詰められる。線形メモリ上限との関係は未確認 (§17.10。`blk_va` 指定が RIP 相対 int32 の制約で不可な点も §17.10 参照)。観測済みは §17.9 L240 の BLK+8 load の trap のみ。
+1. `icall_rewrite.py` L653 の算出で BLK = `0x184308000`。wasm32 (`p:32:32`) では BLK+0x08 が `0x84308008` に切り詰められる。線形メモリ上限との関係は未確認 (§17.10。`blk_va` 指定が RIP 相対 int32 の制約で不可な点も §17.10 参照)。§17.9 の記録 (出所未確認) にある BLK+8 load の trap 解析の記載のみ。
 
 ## 仮説 (未検証)
 
