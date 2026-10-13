@@ -122,6 +122,7 @@
   "specs/ott_leaf_exp.json",
   "specs/ott_leaf_log.json",
   "specs/ott_leaf_tan.json",
+  "specs/ott_leaf_tanf.json",
   "specs/ott_leaf_svf.json",
   "specs/ott_leaf_cvt.json"
  ],

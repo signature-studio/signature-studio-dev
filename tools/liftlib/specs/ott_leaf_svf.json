@@ -1,5 +1,6 @@
 {
  "name": "ott_leaf_svf",
+ "abi": "ms_pos",
  "func": "0x180126040",
  "wasm_func": "function_180126040",
  "scenarios": 200,

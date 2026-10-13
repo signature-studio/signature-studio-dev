@@ -92,10 +92,11 @@ int main(int argc, char** argv) {
     struct sigaction sa; memset(&sa, 0, sizeof sa); sa.sa_handler = on_sig; sa.sa_flags = SA_NODEFER;
     sigaction(SIGSEGV, &sa, NULL); sigaction(SIGBUS, &sa, NULL); sigaction(SIGILL, &sa, NULL); sigaction(SIGFPE, &sa, NULL);
     static char line[1 << 22];
-    int scen = -1, step = 0;
+    int scen = -1, step = 0, posabi = 0;
     while (fgets(line, sizeof line, fi)) {
         char* nl = strchr(line, '\n'); if (nl) *nl = 0;
         char c0[8], a[64], b[64], d[64]; unsigned long long x, y; int k;
+        if (!strcmp(line, "M pos")) { posabi = 1; continue; }
         if (line[0] == 'S') { sscanf(line, "S %d", &scen); step = 0; for (int i = 0; i < nb; i++) free(bufs[i].p); nb = npf = nargs = 0; continue; }
         if (line[0] == 'B') {
             char nm[32]; size_t sz; sscanf(line, "B %31s %zu", nm, &sz);
@@ -117,11 +118,22 @@ int main(int argc, char** argv) {
         }
         if (line[0] == 'C') {
             struct ms_ctx c; memset(&c, 0, sizeof c); c.fn = (void*)(uintptr_t)fva;
-            /* MS x64 ABI: float 引数は xmm を独立カウント, それ以外は gpr を独立カウント (A 行は宣言順) */
-            int gp = 0, xp = 0;
-            for (int i = 0; i < nargs; i++) {
-                u64 val = !strcmp(args[i].kind, "ptr") ? (u64)(uintptr_t)bufs[args[i].pb].p : args[i].v;
-                if (!strcmp(args[i].kind, "f32") || !strcmp(args[i].kind, "f64")) c.xmm[xp++] = val; else c.gpr[gp++] = val;
+            if (posabi) {
+                /* LIFTLIB-5 (spec abi=ms_pos): MS x64 引数レジスタは位置で決まる (第 N 引数 = rcx/rdx/r8/r9 または
+                 * xmm0..3 の N 番目, 他方は未使用)。leaf (tan/SVF 等) の IR は位置対応の %xmmK/%argN で生成される。 */
+                for (int i = 0; i < nargs; i++) {
+                    u64 val = !strcmp(args[i].kind, "ptr") ? (u64)(uintptr_t)bufs[args[i].pb].p : args[i].v;
+                    int sl = args[i].slot;
+                    if (sl < 0 || sl > 3) continue;
+                    if (!strcmp(args[i].kind, "f32") || !strcmp(args[i].kind, "f64")) c.xmm[sl] = val; else c.gpr[sl] = val;
+                }
+            } else {
+                /* MS x64 ABI: float 引数は xmm を独立カウント, それ以外は gpr を独立カウント (A 行は宣言順) */
+                int gp = 0, xp = 0;
+                for (int i = 0; i < nargs; i++) {
+                    u64 val = !strcmp(args[i].kind, "ptr") ? (u64)(uintptr_t)bufs[args[i].pb].p : args[i].v;
+                    if (!strcmp(args[i].kind, "f32") || !strcmp(args[i].kind, "f64")) c.xmm[xp++] = val; else c.gpr[gp++] = val;
+                }
             }
             crashed = 0;
             if (sigsetjmp(jb, 1) == 0) ll_ms_call(&c);
