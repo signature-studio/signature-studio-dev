@@ -277,18 +277,18 @@ def dedupe_declares(text):
 # ext-emulation mode (--ext): x87 64-bit mantissa via double-double
 # ============================================================
 LIT_RE = re.compile(r'^(0x[0-9A-Fa-f]+|[-\d.]+(?:[eE][-\d]+)?)$')
-RE_EXT_DEF = re.compile(r'^(\s*)(%[\w.$-]+) = (fadd|fsub|fmul) double ([\w.%$-]+), ([\w.%$-]+)\s*$')
-RE_EXT_FPRLOAD = re.compile(r'^(\s*)(%[\w.$-]+) = call double @__frontend_reg_load\.fpr\(i32 ([\w.%$-]+)\)\s*$')
-RE_EXT_FPRSTORE = re.compile(r'^(\s*)call void @__frontend_reg_store\.fpr\(i32 ([\w.%$-]+), double ([\w.%$-]+)\)\s*$')
-RE_EXT_SLOTSTORE = re.compile(r'^(\s*)store double ([\w.%$-]+), (?:ptr|double\*) ([\w.%$-]+)\s*$')
-RE_EXT_SLOTLOAD = re.compile(r'^(\s*)(%[\w.$-]+) = load double, (?:ptr|double\*) ([\w.%$-]+)\s*$')
-RE_EXT_ALLOCA = re.compile(r'^(\s*)(%[\w.$-]+) = alloca double\s*$')
-RE_EXT_FPTRUNC = re.compile(r'^(\s*)(%[\w.$-]+) = fptrunc double ([\w.%$-]+) to float\s*$')
-RE_EXT_RINT = re.compile(r'^(\s*)(%[\w.$-]+) = call double @llvm\.rint\.f64\(double ([\w.%$-]+)\)\s*$')
-RE_EXT_FPTOSI = re.compile(r'^(\s*)(%[\w.$-]+) = fptosi double ([\w.%$-]+) to i\d+\s*$')
-RE_EXT_CMP = re.compile(r'^(\s*)(%[\w.$-]+) = fcmp \w+ double ([\w.%$-]+), ([\w.%$-]+)\s*$')
-RE_EXT_SELECT = re.compile(r'^(\s*)(%[\w.$-]+) = select i1 ([\w.%$-]+), double ([\w.%$-]+), double ([\w.%$-]+)\s*$')
-RE_EXT_RET = re.compile(r'^(\s*)ret double ([\w.%$-]+)\s*$')
+RE_EXT_DEF = re.compile(r'^(\s*)(%[\w.$-]+) = (fadd|fsub|fmul) double ([\w.%$-]+), ([\w.%$-]+)(?:,\s*![\w.]+\s*!\d+)*\s*$')
+RE_EXT_FPRLOAD = re.compile(r'^(\s*)(%[\w.$-]+) = call double @__frontend_reg_load\.fpr\(i32 ([\w.%$-]+)\)(?:,\s*![\w.]+\s*!\d+)*\s*$')
+RE_EXT_FPRSTORE = re.compile(r'^(\s*)call void @__frontend_reg_store\.fpr\(i32 ([\w.%$-]+), double ([\w.%$-]+)\)(?:,\s*![\w.]+\s*!\d+)*\s*$')
+RE_EXT_SLOTSTORE = re.compile(r'^(\s*)store double ([\w.%$-]+), (?:ptr|double\*) ([\w.%$-]+)(?:,\s*![\w.]+\s*!\d+)*\s*$')
+RE_EXT_SLOTLOAD = re.compile(r'^(\s*)(%[\w.$-]+) = load double, (?:ptr|double\*) ([\w.%$-]+)(?:,\s*![\w.]+\s*!\d+)*\s*$')
+RE_EXT_ALLOCA = re.compile(r'^(\s*)(%[\w.$-]+) = alloca double(?:,\s*![\w.]+\s*!\d+)*\s*$')
+RE_EXT_FPTRUNC = re.compile(r'^(\s*)(%[\w.$-]+) = fptrunc double ([\w.%$-]+) to float(?:,\s*![\w.]+\s*!\d+)*\s*$')
+RE_EXT_RINT = re.compile(r'^(\s*)(%[\w.$-]+) = call double @llvm\.rint\.f64\(double ([\w.%$-]+)\)(?:,\s*![\w.]+\s*!\d+)*\s*$')
+RE_EXT_FPTOSI = re.compile(r'^(\s*)(%[\w.$-]+) = fptosi double ([\w.%$-]+) to i\d+(?:,\s*![\w.]+\s*!\d+)*\s*$')
+RE_EXT_CMP = re.compile(r'^(\s*)(%[\w.$-]+) = fcmp \w+ double ([\w.%$-]+), ([\w.%$-]+)(?:,\s*![\w.]+\s*!\d+)*\s*$')
+RE_EXT_SELECT = re.compile(r'^(\s*)(%[\w.$-]+) = select i1 ([\w.%$-]+), double ([\w.%$-]+), double ([\w.%$-]+)(?:,\s*![\w.]+\s*!\d+)*\s*$')
+RE_EXT_RET = re.compile(r'^(\s*)ret double ([\w.%$-]+)(?:,\s*![\w.]+\s*!\d+)*\s*$')
 
 # fpr2 モデルの IR 自己完続実装 (ハーネス C 側変更を不要にする)。
 # C 実装は g_fpr[i & 7] (8 slot)。dd 化しても slot 対応を変えないため
@@ -934,7 +934,7 @@ def ext_emulate(text, ext_funcs, rep, chop_funcs='', chop_ranges=None):
                 for lj in range(li + 1, min(len(lines), li + 30)):
                     if lines[lj].lstrip().startswith('dec_label_'):
                         break
-                    if re.search(r'fptosi double %s to i\d+\s*$'
+                    if re.search(r'fptosi double %s to i\d+(?:,\s*![\w.]+\s*!\d+)*\s*$'
                                  % re.escape(mr.group(2)), lines[lj]):
                         near_fptosi = True
                         break
@@ -980,7 +980,7 @@ def ext_emulate(text, ext_funcs, rep, chop_funcs='', chop_ranges=None):
                     sink_use[X] = True
                     seq = []
                     n = _ext_fist_round(X, mi, chop_here(li), seq)
-                    it = re.search(r'to (i\d+)\s*$', ln).group(1)
+                    it = re.search(r'to (i\d+)(?:,\s*![\w.]+\s*!\d+)*\s*$', ln).group(1)
                     seq.append('  %s = fptosi double %s to %s' % (m2.group(2), n, it))
                     used_rint = True
                     plans[li] = seq
@@ -1044,14 +1044,14 @@ def ext_emulate(text, ext_funcs, rep, chop_funcs='', chop_ranges=None):
                 if a in need_m:
                     ln2 = ln2.replace('double %s,' % a, 'double %s,' % _xn(a, 'm'), 1)
                 if b in need_m:
-                    ln2 = re.sub(r'(, )%s(\s*)$' % re.escape(b), r'\g<1>%s\g<2>' % _xn(b, 'm'), ln2, count=1)
+                    ln2 = re.sub(r'(, )%s((?:,\s*![\w.]+\s*!\d+)*\s*)$' % re.escape(b), r'\g<1>%s\g<2>' % _xn(b, 'm'), ln2, count=1)
             m2 = RE_EXT_SELECT.match(ln2)
             if m2:
                 a, b = m2.group(4), m2.group(5)
                 if a in need_m:
                     ln2 = ln2.replace('double %s,' % a, 'double %s,' % _xn(a, 'm'), 1)
                 if b in need_m:
-                    ln2 = re.sub(r'(, double )%s(\s*)$' % re.escape(b), r'\g<1>%s\g<2>' % _xn(b, 'm'), ln2, count=1)
+                    ln2 = re.sub(r'(, double )%s((?:,\s*![\w.]+\s*!\d+)*\s*)$' % re.escape(b), r'\g<1>%s\g<2>' % _xn(b, 'm'), ln2, count=1)
             m2 = RE_EXT_RET.match(ln2)
             if m2 and m2.group(2) in need_m:
                 ln2 = ln2.replace('ret double %s' % m2.group(2), 'ret double %s' % _xn(m2.group(2), 'm'), 1)
@@ -1059,9 +1059,16 @@ def ext_emulate(text, ext_funcs, rep, chop_funcs='', chop_ranges=None):
             ma = RE_EXT_ALLOCA.match(ln)
             if ma and ma.group(2) in slot_ptrs:
                 out.append('  %s = alloca double' % slot_ptrs[ma.group(2)])
+        rewritten = len(plans) + len(store_rewrites) + len(drop_lines)
+        if rewritten == 0:
+            rep['ext_functions'].append({'name': fname, 'status': 'skip:no-rewrite',
+                                         'ext_values': len(ext),
+                                         'slots': sorted(slot_ptrs.keys())})
+            continue
         chunks[ci][1] = '\n'.join(out)
         rep['ext_functions'].append({'name': fname, 'status': 'ext',
                                      'ext_values': len(ext),
+                                     'rewritten': rewritten,
                                      'slots': sorted(slot_ptrs.keys())})
     result = head
     for header, body, inter in chunks:
