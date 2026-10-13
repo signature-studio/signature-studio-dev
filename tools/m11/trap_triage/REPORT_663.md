@@ -1,6 +1,6 @@
 # #663 [M11-N27]: `survey_units.mjs` の oob frames が最上位 frame を捨てる (`.slice(1)`) を直し、annotate の最上位集計を実測で更新
 
-**判定: 受入条件 2 件は commit `18dbb43` で実測して達成 (§2〜§4)。最終 HEAD (`a732daa` 以降の filter アンカー化を含む) でも survey を再測定し、同じ結果を確認 (§8)。** 残る未解決は基準 (c) の再測定のみ (§5)。
+**判定: 受入条件 2 件は commit `18dbb43` で実測して達成 (§2〜§4)。コード HEAD `523f55a` (filter アンカー化を含む) でも survey を再測定し、同じ結果を確認 (§8)。** 最終 HEAD `e4f79f9` (main 取り込み後) は未測定 (§8 の末尾)。残る未解決は、最終 HEAD での再測定と基準 (c) の再測定 (§5)。
 修正は `survey_units.mjs` の非 halt0 分岐 (`slice(1, 30)` → `slice(0, 30)`、後段で filter を `/^\s*at /` にアンカー。PR #703 と同一行)。kind は 942 unit 全てで不変 (ok 退行 0・icall 差 0)、
 oob 21 unit の frames だけが最上位 frame を含む 1 段増えた。`annotate.py` は**コード変更なし** (入力の frames が正しくなったので集計が正しくなる)。
 修正前の起点 = `8d883c3` (`origin/main`)。実測の commit = `18dbb43` (修正本体 = `442c46e`)。本 PR の最終 HEAD は PR コメントに記載。
@@ -109,9 +109,24 @@ oob の message (`memory access out of bounds`) では新旧の出力は同一�
 
 ## 7. 再現手順
 
-## 8. 最終 HEAD での再測定 (`523f55a`)
+```sh
+cd tools/m11                                   # work/ = work-m11 展開済み、emsdk ([EMSDK]、docs/REFERENCES.md) が要る
+bash m11_build.sh                              # HEAD のソースで再リンク (snapshot の IR を使用)
+bash trap_triage/negctl_663.sh                 # 修正前 (8d883c3) / 修正後 / ネガコン 2 種 / survey_diff の判定。期待と違えば exit 1
+python3 trap_triage/annotate.py work/negctl_663/post.json
+python3 trap_triage/survey_diff.py work/negctl_663/pre.json work/negctl_663/post.json
+```
+
+## 8. コード HEAD での再測定 (`523f55a`)
 
 素材 `toolchain-emsdk`・`work-m11` を取得して実測 (`oc_artifacts` 行頭指定の run)。`work-m11` 展開後に `m11_build.sh` で再リンク (OK、`real 11.4 s`)、`bash trap_triage/negctl_663.sh` を foreground で実行。
+この測定は main 取り込み前 (`523f55a`) の build。`survey_units.mjs` は `523f55a` → `e4f79f9` で変更なし (`git diff` 0 行)。
+
+**最終 HEAD `e4f79f9` (main 取り込み後) は未測定。** 同一の素材では再現できない:
+- `m11_build.sh` は `work/ir_conditions.json` の `ldfix=applied` 記録が無いと fail-closed で止まる (`[m11build] ERROR: ... ldfix=applied の記録無し`)。`work-m11` にはこのファイルが無い。
+- 既存の `work/m11_boot.cjs` で `survey_units.mjs` を直接走らせると `TypeError: mod._m11_icall_cnt_n is not a function` で落ちる。
+- 再測定には IR 再生成 (`m11_gen_ir2.sh`、PE = `fl-win64` の `block00031_PE.bin` が要る) が必要。この run では `fl-win64` を取得していない。
+- 未実施の理由と PM 判断事項は PR コメントに記載。
 
 | 項目 | 結果 (`523f55a`) |
 |---|---|
@@ -126,14 +141,4 @@ oob の message (`memory access out of bounds`) では新旧の出力は同一�
 | load average | 0.68 → 0.99 (1 分)、node v22.23.3 |
 
 基準 JSON の md5 は `18dbb43` の実測と同じ (pre `a13bcb65a949`、post `de499c37a63d`)。survey 出力は `18dbb43` と一致し、`a732daa` 以降の filter アンカー化は kind・frames に影響しなかった。
-残る未解決は §5 の基準 (c) の再測定のみ。
-
-## 7. 再現手順 (補足)
-
-```sh
-cd tools/m11                                   # work/ = work-m11 展開済み、emsdk ([EMSDK]、docs/REFERENCES.md) が要る
-bash m11_build.sh                              # HEAD のソースで再リンク (snapshot の IR を使用)
-bash trap_triage/negctl_663.sh                 # 修正前 (8d883c3) / 修正後 / ネガコン 2 種 / survey_diff の判定。期待と違えば exit 1
-python3 trap_triage/annotate.py work/negctl_663/post.json
-python3 trap_triage/survey_diff.py work/negctl_663/pre.json work/negctl_663/post.json
-```
+残る未解決は §5 の基準 (c) の再測定と、最終 HEAD `e4f79f9` での再測定 (上記の理由で未実施)。
