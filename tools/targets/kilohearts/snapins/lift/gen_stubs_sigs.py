@@ -20,9 +20,9 @@ static u64 kh_heap_alloc(u64 bytes) {
   u64 cur = *(u64*)(unsigned int)0x04000100ULL;   /* bump 状態はアリーナ内 (scenario が trial 毎に 0 reset) */
   if (cur == 0) cur = KH_HEAP + 16;
   u64 a = (cur + 15) & ~(u64)15;
+  if (bytes > KH_HEAP_END - KH_HEAP) return 0;
   u64 n = (bytes + 15) & ~(u64)15;
-  if (n > 0xF0000ULL) n = 0xF0000ULL;
-  if (a + n > KH_HEAP_END) a = KH_HEAP + 16;
+  if (a + n > KH_HEAP_END) return 0;
   unsigned char* m = (unsigned char*)(unsigned int)a;
   for (u64 i = 0; i < n; i++) m[i] = 0;
   *(u64*)(unsigned int)0x04000100ULL = a + n;
