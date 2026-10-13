@@ -1,6 +1,6 @@
 # #699: `8c5eb0` の件数 0 ループ先頭ガードを IR に復元 (unit 56: OOB → ok) と、同型の全 IR 関数走査
 
-**判定 (b' 版, §3-6)**: 受入 1 (ガード復元) とネガコンは実測で達成。unit 56 は ok にならず、0 件 ∧ arg3==0 ∧ arg2 下位 byte≠0 の経路を fail-fast (`llvm.trap`) に落とした。unit 56 の ok 化は未達 (旧版の ok 化は未証明の rdx 仮定に依存していたため撤回)。「退行 0」は survey ラベルの比較のみで、出力の同一性は未確認。Closes ではなく Refs (未達 = RetDec の脱落機構の記録, §6)。
+**判定 (b' 版, §3-7)**: 受入 1 (ガード復元) とネガコンは実測で達成。改訂後の受入 2 (guard 有無で unit 56 の OOB `function_8c6530` が消える) は実測で達成 (off=OOB → on=`function_8c5eb0` の fail-fast)。当初の受入 2 (unit 56 が ok) は未達 (main の変更後、別原因で trap。子 issue #856)。0 件 ∧ arg3==0 ∧ arg2 下位 byte≠0 の経路は fail-fast (`llvm.trap`) に落とした。「退行 0」は survey ラベルの比較のみで、出力の同一性は未確認。RetDec の脱落機構は未記録 (§6, #718)。Refs #699 (Closes ではない)。
 件数 0 の空リストを `8c6530` へ渡す経路は塞がり、unit 56 は trap から ok になった。
 
 既知類型との関係 (DEFECTS.md): **D1b と同型の症状・検出信号** (機械語の jcc に対応する IR `br` が無く、飛び先が無条件実行になる)。ただし **根本原因は未切り分け** (D1b は stage-0 のフラグが定数に畳まれる機構。本件は生 lift の段階で既に jcc が無く、同じ機構かは未確認。§2, §6)。新規番号は付けず、行案 (§5) は PM 判断。番号は (DEFECTS.md) 体系。
@@ -159,12 +159,34 @@ RetDec の CFG 復元 (jcc の終端化) と命令翻訳 (フラグ) のどち�
 - 限界: survey の ok/trap ラベル比較のみ。出力の同一性は未比較。
 - 旧版 (`93382f48` 時点) の e2e 所要時間の記述は、同一節内で 2 系統に食い違い、ログも無いため検証できない。削除した (本節の数値は `a2190b26` の n=3 のみ)。
 
+### 3-7. 改訂後の受入条件 2 の実測 (現 head, n=3)
+
+- 測定 HEAD: `f41c797a` + `main 60713be6` を merge (#700 取り込み)。素材 `fl-win64`・`toolchain-emsdk`・`toolchain-retdec`・`work-m11` を展開し、`m11_gen_ir2.sh` で `ir_conditions.json` を作り直した (`ldfix=applied`)。
+- **unit 56 の最上位 trap (`M11_SURVEY_STACK=56`, `-g` 付きの調査用リンク。repo 外)**:
+
+| `M11_GUARD699` | trap 種別 | 最上位 trap 関数 | 呼出元 |
+|---|---|---|---|
+| off | memory access out of bounds | `function_8c6530` | `function_8c5eb0` ← `function_56fde0` |
+| on (既定) | unreachable | `function_8c5eb0` (ガード辺の `llvm.trap`) | `function_56fde0` ← `m11_tr_function_56fde0` |
+
+- **negctl_699.sh (n=3, 現 head)**: 3 回とも rc 0、所要 119・119・119 秒。G1 / G2 / G3 は 3 回とも PASS (G2: off=OOB → fix=unreachable)。`diff off->fix: n=0`, `diff off->ng: n=0` (3 回とも)。unit 56 は全構成で trap。
+  - survey の ok 件数は run 間で揺らぐ: run1 = off/fix/ng とも `ok 869 / miss 47 / trap 24`、run2・run3 = `ok 870 / miss 46 / trap 24` (3 構成とも同一)。揺らぎの原因は未切り分け (§6)。guard の on/off による差は 0。
+- **m11_e2e.sh (n=3, 現 head)**: 3 回とも rc 0。所要 158.2・47.0・47.0 秒 (1 回目は negctl の直後で IR が qstore=applied に変わったため)。`reached_stage 4`、停止理由 `trap "unreachable" @ function_8c5eb0`、`units_run_full 53/942`、survey `ok 870 / trap 25 (oom 1) / clobber 0 / miss 46`、`wasm_bytes 6042851` (3 回同一)。
+  - 注: `ir_conditions.json` の `qstore` は 1 回目 (`applied`) と 2 回目以降で同じ。negctl の run と e2e の run の survey 値 (ok 870) は一致した。
+- **旧 G2 の期待値を変えた理由** (3 行):
+  1. 旧 G2 は「unit 56 のみ trap→ok」だった。これは rdx.1 の `zext(arg2)` 仮定を含む旧版 (前提) で成立していた。
+  2. b' 版は 0 件 ∧ arg3==0 ∧ arg2 下位≠0 の経路を fail-fast に落とすため、unit 56 は ok にならない。
+  3. main の変更で unit 56 は guard の有無に関係なく別原因の trap を持つ。そこで G2 を「OOB の消失」(改訂後の受入条件 2) に直した。
+- **旧 G2 の結果 (参考)**: §3-6 の n=3 (`a2190b26`) では旧 G2 が 3 回とも FAIL。改訂前の判定として残す。
+- **限界**: survey の ok/trap ラベル比較のみ。出力 (戻り値・メモリ) の同一性は未比較。`8c60df` の戻り値は未測定 (§3-5, #718)。
+
 ## 3-4. 判定の表 (受入条件との対応)
 
 | 受入条件 (#699) | 結果 | 根拠 |
 |---|---|---|
 | 8c5eb0 の件数 0 ガードを復元 (IR pass) | 達成 | §1, `m11_guard699.py`, `m11_build.sh` 組込み |
-| unit 56 が ok。off 比の退行 0 (survey ラベルのみ。56 のみ trap→ok) | **未達** (b' 版は fail-fast で trap のまま。off 比の差 0)。旧版の ok 化は rdx 仮定に依存していたため撤回 | §3-6 (n=3)。G2 の期待値の改訂は PM |
+| **改訂後 (PM 判断 #699 コメント 6147966392)**: guard 有/無で unit 56 の OOB (`function_8c6530`) が消える | **達成** (off=`function_8c6530` の OOB、on=`function_8c5eb0` の fail-fast `unreachable`)。OOB の消失を実測 | §3-7 (n=3)。G2 を改訂 |
+| 当初条件: unit 56 が ok。off 比の退行 0 (survey ラベルのみ) | **未達 (別原因で trap)**。main の変更後、guard の有無に関係なく unit 56 は trap。b' 版は fail-fast で止める。旧版の ok 化は rdx 仮定に依存していたため撤回 | §3-6 (旧 G2 の判定, 参考), §3-7。子 issue #856 |
 | ネガコン (ガード条件を壊すと 56 が trap に戻る) を数値で残す | 達成 | §3-1 G3 (ng: 865/27, unit 56 trap, off 比 0) |
 | 同型の脱落を全 unit 走査し件数を測る | 達成 (件数のみ。真偽は未検証) | §3-2 (strict 406 / 405) |
 | RetDec がなぜ分岐を落としたかの機構を記録 | **未達** (生 lift 段で既に欠落まで。CFG 復元か翻訳かは未切り分け) | §2, §6 → #718 |
