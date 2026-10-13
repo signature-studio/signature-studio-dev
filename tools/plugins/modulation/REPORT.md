@@ -164,6 +164,13 @@ define = `p.final.ll` の `^define` 数。f80 = `x86_fp80` を含む define 数�
 - VEX (AVX/FMA) の未実装 helper は distinct で 50〜71 (648383c・b9fe1d8 とも同値)。CPUID 分岐で SSE 路に固定できるかは未確認 (T1 の AVX 2 種は CPUID 分岐で SSE 路固定と `plugins/REPORT.md` §4.3 に記録あり)。
 - f80 関数は Vintage Chorus の `function_18001c320` と Vintage Phaser の `function_1800218a0` の 1 本ずつ (#197 の対象)。
 - 以上は到達性の実測で、engine の正しさは何も示していない。
+- **追補 (PLG-F5-2 / #527、`engine_lift.sh` に `p0c/f80_lower.py` の段を追加)**: 19266・19268 は fixcmp 後の `emcc -c` が `fp_extend` で失敗し、f80 関数 1 本ずつ (f80 tokens 11 → 0) を lowering すると rc 0 になった。 4 本すべて `emcc -c` rc 0 (`summary.csv` 最終列 `erc3`)。 f80→f64 は bit-exact ではない (#197 で未検証)。 未実装 helper (VEX 含む) は残るため、 `emcc -c` 通過は stub を含む通過で、正しさは未確認。
+  | engine | 追補後 `emcc -c` (erc3) | f80 関数 | 未実装 helper | lift 秒 (min–max) |
+  |--:|--:|--:|--:|--:|
+  | 18977 | 0 | 0 | 70 | 13–14 |
+  | 19143 | 0 | 0 | 64 | 13 |
+  | 19266 | 0 (f80 段後) | 1 → 0 | 60 | 15 |
+  | 19268 | 0 (f80 段後) | 1 → 0 | 92 | 17–18 |
 
 ## 5. 判定 (gate) の設計と PR #506 の reviewer 指摘への対応
 

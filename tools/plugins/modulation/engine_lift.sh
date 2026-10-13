@@ -33,6 +33,13 @@ if [ -f "$OUT/e.final.ll" ]; then
   NP=$(python3 modulation/engine_fixcmp.py "$OUT/e.final.ll" "$OUT/e.fixcmp.ll" 2>&1 | sed 's/.*= //')
   erc2=$(emcc_c "$OUT/e.fixcmp.ll" "$OUT/emcc_fixcmp.log")
   { echo "[final.ll]"; grep -m1 'error' "$OUT/emcc.log" || true; echo "[fixcmp.ll]"; grep -m1 'error' "$OUT/emcc_fixcmp.log" || true; } > "$OUT/first_errors.txt"
+  # f80 関数が wasm バックエンドで落ちる (fp_extend / frem / fp_round) 場合の既存 pass (p0c/f80_lower.py: x86_fp80 → f64、#197)。 f80 が無ければ erc3=erc2
+  erc3=$erc2
+  if [ "$erc2" != 0 ] && [ "$F80" -gt 0 ] 2>/dev/null; then
+    python3 "$HERE/../p0c/f80_lower.py" "$OUT/e.fixcmp.ll" "$OUT/e.f80.ll" --report "$OUT/f80.json" > "$OUT/f80_lower.log" 2>&1
+    erc3=$(emcc_c "$OUT/e.f80.ll" "$OUT/emcc_f80.log")
+    { echo "[f80.ll]"; grep -m1 'error' "$OUT/emcc_f80.log" || true; } >> "$OUT/first_errors.txt"
+  fi
 fi
 DEFS=$(python3 modulation/engine_defs.py "$OUT" 2>/dev/null || echo "-1,-1,-1,-1,-1")
-echo "$B,$(cut -d' ' -f1 "$OUT/ranges.info"),$rc,$DEF,$F80,${UNI:--1},$erc,$NP,$erc2,$((t1-t0)),$DEFS" | tee "$OUT/summary.csv"
+echo "$B,$(cut -d' ' -f1 "$OUT/ranges.info"),$rc,$DEF,$F80,${UNI:--1},$erc,$NP,$erc2,$((t1-t0)),$DEFS,$erc3" | tee "$OUT/summary.csv"
