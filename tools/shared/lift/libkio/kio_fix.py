@@ -30,5 +30,30 @@ for fn, idxs in DEREF.items():
     for i in idxs:
         new = re.sub(r"(%\w+) = ptrtoint \S+ %arg" + str(i) + r" to i64", r"\1 = load i64, ptr %arg" + str(i) + ", align 8", new)
     s = s.replace(body, new); n += 1
+# [A] 汎用: マングル名の引数型が P/PK (ポインタ) の引数 N について、RetDec が `trunc i64 %argN to iM` と
+#     整数化して `icmp eq iM _, 0` している箇所は、元機械語の `cmp <M>[ptr N], 0` (deref) である。
+#     名前ではなく署名から位置とポインタ性を決め、該当 trunc を inttoptr+load に置換する。
+def ptr_params(fn):
+    m = re.match(r"__Z(\d+)", fn)
+    if not m: return None
+    rest = fn[m.end() + int(m.group(1)):]
+    toks = re.findall(r"PK[a-zA-Z]|P[a-zA-Z]|[a-zA-Z]", rest)
+    if "".join(toks) != rest: return None
+    return [i + 1 for i, t in enumerate(toks) if t.startswith("P")]
+BITS = {"i8": 1, "i16": 2, "i32": 4, "i64": 8}
+for fn in sorted(set(re.findall(r"(?m)^define [^\n]*@(__Z\w+)\(", s))):
+    idxs = ptr_params(fn)
+    if not idxs: continue
+    m = re.search(r"(?ms)^define [^\n]*@" + re.escape(fn) + r"\(.*?^}\n", s)
+    body = m.group(0); new = body
+    for i in idxs:
+        for ty in ("i16", "i32", "i8"):
+            pat = r"(%\w+) = trunc i64 %arg" + str(i) + " to " + ty + r"\n"
+            if not (re.search(pat, new) and re.search(r"icmp eq " + ty + r" %\w+, 0", new)): continue
+            def rep(k, i=i, ty=ty):
+                v, p = k.group(1), "%ptr" + k.group(1)[1:]
+                return f"{p} = inttoptr i64 %arg{i} to ptr\n  {v} = load {ty}, ptr {p}, align {BITS[ty]}\n"
+            new = re.sub(pat, rep, new)
+    if new != body: s = s.replace(body, new); n += 1
 open(sys.argv[2], "w").write(s)
 print(f"[kio_fix] widened {n} functions")
