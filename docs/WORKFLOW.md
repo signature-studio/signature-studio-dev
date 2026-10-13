@@ -190,7 +190,8 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   行を書く (許可名: fl-win64 / plugins-ott / plugins-freshair / plugins-serum2 / plugins-massivex /
   plugins-kilohearts / toolchain-retdec / toolchain-emsdk / work-m11 / work-liftdiff / work-m6-ott /
   work-liftlib-targets / work-liftlib / work-icall / work-fw-stage1 / analysis-ott-binaries / analysis-mac-shared / apt-mingw。それ以外は
-  run が失敗する)。全素材は約 17.7 GiB (2026-10-13 実測) のため必要分だけ指定する。
+  run が失敗する)。`oc_artifacts: none` は「追加素材なし」の明示で、単独なら空扱い (既定の fl-win64 になる)。他の名前との混在は失敗する。
+  全素材は約 17.7 GiB (2026-10-13 実測) のため必要分だけ指定する。
   - `toolchain-retdec` → `/opt/retdec`、`toolchain-emsdk` → `/opt/emsdk` に展開される。
   - `work-m6-ott` → `tools/m6/work/` + `tools/ott/work/` + `tools/m8/work/` + `tools/m9/work/` + `tools/m10/work/`
     (`tar --zstd -tf` で実測)、`work-liftlib` → `tools/liftlib/work/`、
