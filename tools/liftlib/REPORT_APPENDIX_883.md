@@ -39,15 +39,13 @@ IR 上の読み (下記) は `work/ott_getparam/` の生成物を参照したも
 
 観測済みの事実は次の 1 点のみ: §17.9 L240 の wasm trap 解析 (`LL_VERBOSE=1`) で BLK+8 (rcx) の load が OOB で trap したこと。
 
-wasm32 (`p:32:32`) では BLK+0x08 = `0x84308008` に切り詰められ、wasm の線形メモリ外になる。
+## 確定事項 (アドレス算出)
 
-## 確定した因果
-
-1. **BLK の配置 (静的に確定)**: `icall_rewrite.py` L653 の `0x184308000` は wasm32 の線形メモリ外。BLK 参照の load・store は OOB で trap する (§17.9 L240 の BLK+8 trap と整合)。`blk_va` 指定は RIP 相対 int32 の制約で不可 (§17.10)。
+1. `icall_rewrite.py` L653 の算出で BLK = `0x184308000`。wasm32 (`p:32:32`) では BLK+0x08 が `0x84308008` に切り詰められる。線形メモリ上限との関係は未確認 (§17.10。`blk_va` 指定が RIP 相対 int32 の制約で不可な点も §17.10 参照)。観測済みは §17.9 L240 の BLK+8 load の trap のみ。
 
 ## 仮説 (未検証)
 
-2. **入力の欠落**: entry が `this`/`idx` を BLK から読み、`%arg` を読まないのであれば、harness は BLK へ書かないため (`wasm_runner.mjs` に BLK を書く処理は無い)、仮に BLK が読めても値は 0 になる。この読みは IR 再生成で確認するまで仮説として扱う。
+1. **入力の欠落**: entry が `this`/`idx` を BLK から読み、`%arg` を読まないのであれば、harness は BLK へ書かないため (`wasm_runner.mjs` に BLK を書く処理は無い)、仮に BLK が読めても値は 0 になる。この読みは IR 再生成で確認するまで仮説として扱う。
 
 ## 修正方式 (未決定・子 issue で実施)
 
