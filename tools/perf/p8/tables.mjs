@@ -3,6 +3,8 @@ import fs from 'node:fs'; import path from 'node:path'; import zlib from 'node:z
 const HERE = path.dirname(fileURLToPath(import.meta.url)); const RES = path.join(HERE, 'results'); const W = path.join(HERE, 'work');
 const ALL = fs.readFileSync(path.join(RES, 'p8.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
 const med = (a) => { const s = [...a].sort((x, y) => x - y); return s[s.length >> 1]; };
+const RTS = [...new Set(ALL.map((r) => r.runtime).filter(Boolean))];
+for (const r of ALL) if (!r.runtime) r.runtime = (/127\.0\.0\.1/.test(String(r.error)) ? RTS.find((x) => x.startsWith('chrome')) : RTS.find((x) => x.startsWith('node'))) ?? 'unknown'; // 旧版は error 行に runtime が無い
 let rows = ALL;
 const grp = (mode) => { const m = new Map(); for (const r of rows.filter((x) => x.mode === mode)) { const k = `${r.cfg}|${r.N}`; (m.get(k) ?? m.set(k, []).get(k)).push(r); } return m; };
 const rng = (v, key, d = 2) => { const a = v.filter((x) => x[key] != null).map((x) => x[key]); if (!a.length) return '-'; const lo = Math.min(...a), hi = Math.max(...a); return `${med(a).toFixed(d)} (${lo.toFixed(d)}–${hi.toFixed(d)})`; };
@@ -52,8 +54,14 @@ for (const rt of [...new Set(ALL.map((r) => r.runtime))]) {
   o.push('');
 }
 }
+for (const [f, title] of [['p8_diag.jsonl', '## 診断: Chrome の tier を固定した定常 µs/ブロック (steady, `P8_JSFLAGS` で `--no-liftoff`=TurboFan のみ / `--liftoff-only`)'], ['p8_limit.jsonl', '## 診断: Chrome の Memory 本数上限 (memory モード; OK/ERR)']]) {
+  const p = path.join(RES, f); if (!fs.existsSync(p)) continue; const d = fs.readFileSync(p, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+  o.push(title, '', f.includes('diag') ? '| jsflags | 構成 | N | µs/ブロック (p50, 1 回) | 対 static_based |\n|---|---|--:|--:|--:|' : '| 構成 | N | 結果 |\n|---|--:|---|');
+  for (const r of d) o.push(f.includes('diag') ? `| ${r.jsflags} | ${r.cfg} | ${r.N} | ${r.us_per_block.toFixed(2)} | ×${(r.us_per_block / d.find((x) => x.jsflags === r.jsflags && x.cfg === 'static_based' && x.N === r.N).us_per_block).toFixed(3)} |` : `| ${r.cfg} | ${r.N} | ${r.error ? 'ERR ' + String(r.error).split('\n')[0].slice(-70) : 'OK (Memory ' + r.memories + ' 本)'} |`);
+  o.push('');
+}
 { // sizes
-  o.push('## wasm サイズ (B)', '', '| ファイル | raw | gzip-9 | brotli-11 |', '|---|--:|--:|--:|');
+  o.push('## wasm サイズ (B)', '', '(合成カーネルは 256 関数が近似反復のため圧縮率は実 lift wasm の値ではない。raw のみ参照)', '', '| ファイル | raw | gzip-9 | brotli-11 |', '|---|--:|--:|--:|');
   for (const f of ['static_based_1', 'static_based_16', 'sep_abs_hi', 'sep_based', 'side_def', 'side_hid', 'dyn_main'].map((x) => x + '.wasm')) { const p = path.join(W, f); if (!fs.existsSync(p)) continue; const b = fs.readFileSync(p); o.push(`| ${f} | ${b.length} | ${zlib.gzipSync(b, { level: 9 }).length} | ${zlib.brotliCompressSync(b, { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 11, [zlib.constants.BROTLI_PARAM_SIZE_HINT]: b.length } }).length} |`); }
   o.push('');
 }

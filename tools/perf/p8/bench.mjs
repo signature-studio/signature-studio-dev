@@ -19,7 +19,7 @@ const env = {
 const emit = (o) => { fs.mkdirSync(RES, { recursive: true }); fs.appendFileSync(path.join(RES, 'p8.jsonl'), JSON.stringify(o) + '\n'); console.log(JSON.stringify(o)); };
 function child(mode, cfg, N) {
   const r = spawnSync(process.execPath, [process.argv[1], '--one', mode, cfg, String(N), '--reps', String(REPS), '--sfx', SFX, '--target-ms', String(TARGET_MS)], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });
-  if (r.status !== 0) emit({ mode, cfg: cfg + SFX, N, error: (r.stdout || '').slice(-300) || `exit ${r.status}${r.signal ? ' ' + r.signal : ''}` });
+  if (r.status !== 0) emit({ mode, cfg: cfg + SFX, N, runtime: env.info.runtime, error: (r.stdout || '').slice(-300) || `exit ${r.status}${r.signal ? ' ' + r.signal : ''}` });
   else process.stdout.write(r.stdout);
 }
 const oi = argv.indexOf('--one');
