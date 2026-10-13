@@ -216,3 +216,5 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
 - FL 非依存部は実装・検証済み (golden 28,000 px 差 0、nc_golden asserts 26/0、ネガコン 3 本拒否)。FL の窓種別に基づく部分は未達 → PR は `Refs #183`。
 - 全文・実測 (HEAD `63cfe0f` の e2e ALL PASS 191 s、`67d5cb7` / `87c20fc` の記録を含む) は `REPORT_APPENDIX_C.md` §14。
 - 未解決 (起票先): FL 実窓種別の確定 (#174 / #564 / #565 後に #183 へ追記)・Chrome 上の NC/popup 描画 (#183)・メニュー (#175)。
+## 15. GUI-8 (#184): e2e の agent-browser 載せ替え・長時間ストレス・Firefox 取込み
+全文と実測 (検証起点 コード HEAD `3bd220d3`): `REPORT_GUI8.md`。結論: e2e は `tools/e2e` ドライバ (agent-browser / puppeteer-core) 経由で `bash tools/gui/e2e.sh` ALL PASS (golden 差 0、203 s)、50,000 フレームのストレスで drop 0・メモリ増加なし・surface gen 不変、ネガコン 3 本は不合格を検出。Firefox は #127 の結果を `PROTOCOL.md §13` に取込み (Safari・Firefox 実描画は未測定)。

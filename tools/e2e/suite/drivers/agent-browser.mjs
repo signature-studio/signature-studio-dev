@@ -79,6 +79,19 @@ export async function createDriver({
         await wait(100);
       }
     },
+    // 低レベル入力 (実 CDP Input イベント)。action = move|down|up。down/up の button は left 固定
+    async mouse(action, x, y) {
+      if (action === "move") await ab(["mouse", "move", String(x), String(y)]);
+      else if (action === "down" || action === "up") await ab(["mouse", action, "left"]);
+      else throw new Error(`mouse: 未知の action ${action}`);
+    },
+    // key = "A" / "Escape" 等 (keydown+keyup)
+    async press(key) {
+      await ab(["press", key]);
+    },
+    async setViewport(w, h) {
+      await ab(["set", "viewport", String(w), String(h)]);
+    },
     async screenshot(file) {
       await ab(["screenshot", file]);
     },
