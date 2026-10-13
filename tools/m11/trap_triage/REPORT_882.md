@@ -1,7 +1,7 @@
 # #882 unit 95 / 895 の出所調査: 現行 main での再測定
 
 親: #684 (REPORT_684.md §4・§5)。子の依頼元: #684 の受入条件の残り。
-検証起点: main `7736a5c5` (PR #1057 取込み後)。素材: fl-win64 / work-m11 / toolchain-emsdk / toolchain-retdec (`$ARTIFACTS_DIR`)。
+検証起点: main `7736a5c5` (PR #1057 取込み後)。素材: 元 run (`9245ca8a`) のログでは `fl-win64` の取得のみ確認。`work-m11` 等の取得は run ログで未確認 (§7)。
 
 ## 0. 結論
 
