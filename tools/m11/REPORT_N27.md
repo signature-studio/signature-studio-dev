@@ -176,7 +176,7 @@ NC1 (capstone 未導入) は `bash tools/m11/m11_gen_ir2.sh` が exit 1 にな�
 | F3 | 同上 (head `2e128c5c`: fail-closed 化 + PE 指紋記録 + RetDec の PATH 解決) | 0 | 633 | 全段 ok。`reached_stage` 4、同じ trap。`ir_sha256` = `fd628f3d…` (F2 は `a5841949…`) |
 
 - F3 の survey: units_run_full 53 / 942、survey_ok 870、trap 25 (oom 1)、clobber 0、miss 46、wasm 6 042 784 B。
-- **解決経路の実測 (修正後 head `74b365f6`)**: `m11_lift.sh` を 3 range (`chunk_0.txt` の先頭 3 range, `work-m11` 由来) で実行。`--full` ではない。
+- **解決経路の実測 (修正 commit `74b365f6`)**: `m11_lift.sh` を 3 range (`chunk_0.txt` の先頭 3 range, `work-m11` 由来) で実行。`--full` ではない。最終 head `162d9a80` (main を merge) では `tools/m11/m11_lift.sh` が `74b365f6` と同一で、(a)(b)(c) を再実行して同じ結果を確認した。
   - (a) PATH・RETDEC 無し、`RETDEC_ROOT=<[RETDEC]>`: rc 0 / `[lift] RetDec OK: 32 lines` / `[lift] ir5 OK: 27 lines` (解決して進む)。
   - (b) PATH・RETDEC・RETDEC_ROOT が無効 (`/nonexistent`): rc 1 / `[lift] FAIL: retdec-decompiler 無し (RETDEC_ROOT=/nonexistent; REFERENCES [RETDEC])`。
   - (c) PATH・RETDEC 無し、RETDEC_ROOT 未設定: 解決先 `<[RETDEC]>/bin/retdec-decompiler`、実行可 (`exec-ok`)。
