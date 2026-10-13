@@ -31,6 +31,12 @@ step "9. 48 tools 全実行"; node tests/all_tools.mjs
 step "9b. C provider (fl_api_call) 版 flprov.wasm + 48 tools"; bash provider/build.sh | tail -2; node tests/provider_check.mjs; FL_ENGINE=wasm node tests/all_tools.mjs
 python3 analysis/mcp_classify.py
 step "9c. .pyscript ローダ + flpianoroll 回帰 (同梱 Piano roll 5 / Remote 5 / Audio 12 調査)"; node tests/pyscript_e2e.mjs | grep -E '^\{"total"'
+step "9d. 同梱 Piano roll 5 本を Chrome (agent-browser) 上の wasm CPython で実行 + node 出力との一致 (PY-11 #466)"
+node tests/pyscript_e2e.mjs --dump work/pyscript_node.json --export-scripts work/pyscripts.json | grep -E '^\{"total"'
+(cd ../e2e && [ -x node_modules/.bin/agent-browser ] || npm ci --no-audit --no-fund --ignore-scripts >/dev/null)
+node tests/pyscript_browser.mjs --dump work/pyscript_chrome.json | grep -E '^\{"env"'
+python3 tests/pyscript_compare.py work/pyscript_node.json work/pyscript_chrome.json
+python3 tests/pyscript_compare.py work/pyscript_node.json work/pyscript_chrome.json --neg >/dev/null && { echo "NEG が不一致を検出しなかった"; exit 1; } || true   # ネガコン: exit 1 で検出できたとき正常
 step "10. headless Chrome (module Worker + SAB)"; node tests/browser_check.mjs
 step "11. MCP JSON-RPC を アプリ UI / devtools に公開 (Vite + headless Chrome, PY-4 #77)"; (cd "$HERE/../.." && node tools/python/tests/mcp_ui_check.mjs 2>&1 | grep -v shim_port | cut -c1-300)
 step "ALL OK"
