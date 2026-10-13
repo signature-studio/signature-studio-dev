@@ -50,7 +50,9 @@ try {
       const bad = await page.evaluate("window.__audio.verifyShifted(1.01)");
       rec(tag("neg1-shifted-rate"), bad.max_abs_err > 1e-3, `sr×1.01 で max_err=${bad.max_abs_err.toExponential(2)} (>1e-3 で検出)`);
       const errs = page.exceptions.slice();
-      const logs = page.logs.filter((l) => (l.type === "error" || l.type === "warning") && !/favicon/.test(l.text));
+      // index.ts の fail-fast フォワーダ疎通テストが意図的に出す 1 件 (tools/e2e/suite/checks.mjs console-clean と同じ許容) と favicon 404 のみ許容
+      const allow = [/\[imports\] 未実装 import が呼ばれました: "shim_port\.not_implemented_yet"/, /favicon/];
+      const logs = page.logs.filter((l) => (l.type === "error" || l.type === "warning") && !allow.some((a) => a.test(l.text)));
       rec(tag("console-clean"), errs.length === 0 && logs.length === 0, `exceptions=${errs.length} console err/warn=${logs.length}${logs.length ? " " + JSON.stringify(logs.slice(0, 3)) : ""}`);
     } finally {
       if (mode === "dev") await srv.close(); else await new Promise((r) => srv.httpServer.close(r));
