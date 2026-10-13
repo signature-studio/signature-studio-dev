@@ -37,7 +37,7 @@ host→Python 入口 (flpy.c export): `flpy_init(syspath)` `flpy_run(src,file)` 
 | MCP `tools/list` `tools/call` | `host/mcp_rpc.mjs` (JSON-RPC 2.0, 応答は FLEngine の固定テンプレート形) → `py.call("__main__:<tool>")`。MCPTools.pyc は FL と同じく **`__main__` として実行** (`get_mcp_tools_json` が `sys.modules['__main__']` を走査するため) ✔ |
 | アプリ UI / devtools (PY-4 #77) | `src/runtime/mcp_panel.ts` が `window.flMcp` (`start(files)` / `rpc(req)` / `list()` / `call(name,args)` / `stop()`) を常時公開、`/?mcp=1` で UI パネル (MCPTools.pyc・midi.py・utils.py を選択/ドロップ → 起動 → tool 選択 → tools/call)。`tools/python` の host/・dist/flpy.*・flapi_ids.json だけを Vite が `/py/` で配信 (`vite.config.ts` `pyAssets`、許可リスト方式。`work/` = FL 由来ファイルは配信しない)。flapi の提供側は FLEngine 未完成の間 `fl_mock.mjs` (実エンジン結合時は engine を差替)。`tools/call` は `tools/list` に出る name のみ受理 (未知 / 非 tool は isError=true) ✔ |
 | MIDI scripting (PY-6 #76) | `host/midi_host.mjs` `MidiScriptHost`: device script (.py) を `fl_rt.load_device_script` で script ごとの module namespace に読込み (利用者が FL から供給、非同梱)、`init()` で OnInit→OnInitAll、Web MIDI の全入力を `attachWebMidi` で `midiIn` に結線 (直列キュー・port 採番)。受信は FL 順 OnMidiIn → OnMidiMsg → 型別 (handled で停止)、非 MIDI の 27 callback は `fl_rt.CALLBACKS` 表 (個数不一致は reject) で `callback()`。アプリ側は `window.flMidi` / `/?midi=1` (`src/runtime/midi_script.ts`)。`flmidimsg` 23 フィールド ✔。実エンジンからの host 通知 (OnIdle/OnRefresh…) の発火は FLEngine 側 (未結線) |
-| Piano roll scripting | `.pyscript` の `createDialog()` / `apply(form)` + `flpianoroll` module (Note/Marker/score/Utils/ScriptDialog 64 メンバ)。**未実装** (チケット T5) |
+| Piano roll scripting | `.pyscript` の `createDialog()` / `apply(form)` + `flpianoroll` module (Note/Marker/score/Utils/ScriptDialog)。**実装済 ✔** (`src/flpianoroll.py` + `fl_rt.load_pyscript` / `run_pyscript`、#79。詳細は REPORT_APPENDIX §14) |
 | stdout/stderr | FL は `fl.FLTextOutput` で Script output へ。本 PoC は Worker→main の `stdout/stderr` メッセージ ✔ |
 
 ## 4. スレッド/リアルタイム
@@ -55,5 +55,5 @@ C. FL 側に固有の Python C API 使用 (`PythonSession`/`TMCPPythonSession`, 
 
 - 戻り値の float/int 区別はモックのみ `F()` が必要。構造値は JSON (getTrackInfo 等)。
 - `Atomics.wait` を使うため COOP/COEP 必須 (本プロジェクト全体の前提と同一)。`Worker` は module worker (Chrome ✔ 実測)。
-- ilmcp 9 関数 (PluginDB/Browser/PRScript/highlight) は FLEngine 内部機能で、mock は最小の偽実装。実装は T3。
+- ilmcp 9 関数 (PluginDB/Browser/PRScript/highlight) は `host/ilmcp.mjs` に JS ホスト実装 (PY-3, REPORT §7c)。実 FLEngine 内部機能への結線と C provider への移植は未了。
 - `mixer.getCurrentTempo(1)` の意味: MCPTools は素の BPM として扱う (clamp 10..522)。公式 docs の asInt=×1000 と食い違う可能性 → 実機未検証 (mock は MCPTools に合わせた)。

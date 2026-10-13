@@ -48,11 +48,11 @@ for b, e in F['engines'].items():
     print('| %s | %s | %s | %s | %s / %s | %s |' % (e['name'], b, n(e['size']), n(e['text_bytes']), n(e['pdata_funcs']), n(e['pdata_bytes']),
                                                    ', '.join('%s: %d' % (k.replace('.dll', ''), v) for k, v in e['imports'].items())))
 print()
-print('| DLL | RetDec rc | final.ll define | `.pdata` で define 無し (関数 / B) | f80 関数 | 未実装 helper | `emcc -c` | fixcmp 後の `emcc -c` | lift 秒 |')
+print('| DLL | RetDec rc | final.ll define | `.pdata` で define 無し (関数 / B) | f80 関数 | 未実装 helper | `emcc -c` | f80 lowering 前の f80 関数 / `emcc -c` | lift 秒 |')
 print('|---|--:|--:|--:|--:|--:|--:|--:|--:|')
 for b, e in F['engines'].items():
     r = E[b]
     names = set(re.findall(r'^   unimplemented: .*?(__asm_\w+)', open(os.path.join(D, 'engine' + b, 'e.simd.log')).read(), re.M))
     vex = sum(1 for x in names if x.startswith('__asm_v'))
     print('| %s | %s | %s | %s / %s | %s | %s (うち VEX %d) | %s | %s | %s |' % (e['name'], r['lift_rc'], n(r['defines']), r['missing_define'], r['missing_bytes'], r['f80_funcs'],
-                                                                r['unimpl_helpers'], vex, r['emcc_c_rc'], r['emcc_c_rc_after_fixcmp'], r['lift_s']))
+                                                                r['unimpl_helpers'], vex, r['emcc_c_rc'], '%s / %s' % (r['f80_funcs_pre'], r['emcc_c_rc_pre_f80']), r['lift_s']))

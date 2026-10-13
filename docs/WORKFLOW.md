@@ -259,14 +259,30 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   - **起動主体は完全一致**: fix を起動する reviewer (`oc-reviewer-for-signature-studio[bot]`、`user.type == 'Bot'`) と、
     停止コメント・完了コメントの実装 App (`opencode-for-signature-studio[bot]`) は login の完全一致で見る
     (前方一致だと別名のアカウントでも write 権限の fix が起動し、停止コメントを偽装して数え直しもできてしまう)。
-  - **テスト**: `.github/scripts/tests/test-pr-loop.sh` (fake gh) を `.github/workflows/scripts-test.yaml` が
-    `.github/scripts/**`・`.github/actions/**`・`opencode.yaml` の変更ごとに実行する。
+  - **テスト**: `.github/scripts/tests/test-pr-loop.sh` (fix / verify / reopen) と `test-watchdog.sh` (watchdog の判定と操作)
+    を、fake gh で `.github/workflows/scripts-test.yaml` が `.github/scripts/**`・`.github/actions/**`・`opencode.yaml` の
+    変更ごとに実行する。
   - **並行制御**: implement job は `opencode-impl-<N>`、review job は `opencode-review-<N>` と group を分ける。
     同じ group だと fix が pending の間に review が入って fix が黙って取り消される (pending は 1 件しか持てない)。
     その代わり fix と review が重なりうるので、reviewer は `gh pr merge --match-head-commit <レビューした head>` で
     未レビューの commit を巻き込まない。
   - PR は **常に ready・base は main** で作る (draft / stacked は REVIEWING でも FIXING でもない状態を作るため禁止)。
     未完でも ready で出して `Refs #N` と未解決を書く。前提 PR が未 merge の作業は着手しない。
+
+  **watchdog** (`.github/scripts/watchdog.sh`、`opencode.yaml` の `watchdog` job): `push` to main と 5 分おきの
+  `schedule` で、REVIEWING でも FIXING でもない PR (IDLE) を機械的に元の 2 状態へ戻す。実行中の run と PR を突き合わせ、
+  push 直後の PR は SETTLE (4 分) の間は触らない。1 回の点検で動かす PR は 12 件までで、REST だけを使う。
+
+  | IDLE の理由 | watchdog がすること |
+  |---|---|
+  | main と競合している | reviewer App 名義で `[conflict]` の request-changes を出す (-> fix が main を取り込んで解消) |
+  | draft | ready にする |
+  | 現在の head に verdict が無い | close -> reopen で review を再起動する |
+  | 差し戻し済みだが fix が動いていない | `[watchdog]` の request-changes を出し直す (-> fix) |
+  | approve 済みで未 merge | `gh pr merge --merge --match-head-commit <head>`。失敗したら `[merge-failed]` の request-changes |
+
+  `oc:stuck` ラベルの PR は触らない (人の判断待ち)。同じ head への watchdog の差し戻しが 6 回、または review の再起動が
+  3 回に達したら `oc:stuck` を付けて止める。`DRY=1` なら計画だけを出す。reviewer は login の完全一致 + `Bot` 型で見る。
 
   PM の運用スクリプト (`pr_gaps.py` で IDLE を計測、`sweep_prs.sh` で復旧) は **バックストップ**であり、
   IDLE が 1 件でも出たらそれ自体を workflow の不具合として扱う (所在は `docs/REFERENCES.md` `[PM-SCRIPTS]`)。
