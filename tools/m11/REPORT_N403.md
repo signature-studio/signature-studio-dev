@@ -93,3 +93,29 @@ unit 40 の trap (上表) はこの Halt0 と同じ経路。**LB 依存で Halt 
 | 実行後の guest ポインタ assert (未実装) | 受入 3 の後半 | 子 issue #1004 (M11-N57) |
 | 未 remap の image VA 即値 4,368 件 (件数の解消先) | 受入 3 の件数は計測済み。解消を担当する issue は未特定 (#417 は halt0 21 unit の別件、#1004 は実行後 assert で範囲外) | PM 起票を要求 (担当 issue 未確定) |
 | IR 指紋の不一致 (旧 `9a9e223e…`/`451ecd03…` と本記録 `3a9ceb17…`/`5dfb1473…`) | どの IR で測定したかが未確定 | PM 確認 (work-m11 の `ir_conditions.json` で照合) |
+
+## 5. unit 別の LB 依存差の実測 (2026-10-13 run・受入 2 の切り分け・原因は未特定)
+
+- 素材: fl-win64 → `$HOME/analysis/win64`、work-m11 / work-liftdiff → `tools/m11/work/`、toolchain-emsdk / retdec → `/opt/`。
+  work-m11 は #728 以前のスナップショットで `work/lift_pe.sha256` が無く、`m11_e2e.sh` が全再生成に入って Ghidra の `functions_dll.csv` を要求して止まる。
+  そのため `work/lift_pe.sha256` に現 PE の sha256 (`b2c64da4…`) を手で書き、lift 成果物を再利用した (全再生成はしていない)。
+- e2e 実測 (同一 worktree・同一 work/・各条件 2 回以上):
+  - `M11_LB_BASE=0`: units_run 53 / survey ok 870 / trap 25 / miss 46 / ir_sha256 `1fc847d4…`
+  - `M11_LB_BASE=0x10000`: units_run 37 / survey ok 868 / trap 27 / miss 46 / halt0_early=true / ir_sha256 `b529a344…`
+  - LB=0 の 2 回目 (`e2e_lb0c`) も 870/25 で一致。前回 PR #1006 の記録とも一致。
+- unit 別の食い違い (`M11_SURVEY_UNITS` で取った 942 件ラベル。index 比較):
+  食い違いは index 40 / 153 / 158 / 745 の 4 件のみ。
+
+| index | VA (LB=0) | LB=0 | VA (LB=0x10000) | LB=0x10000 | LB=0x10000 側の trap 位置 (wasm 関数名) |
+|---|---|---|---|---|---|
+| 40 | 0x105bd0 | ok | 0x115bd0 | trap: Halt0→longjmp | `m11_throw_dllmain_done` ← `function_412770` ← `function_4128b0` ← `function_412a40`/`412a60` ← `function_411d20` ← `function_411e80` |
+| 153 | 0x265b90 | ok | 0x275b90 | trap: OOB | `function_412e40` ← `function_664fd0` ← `function_665b90` |
+| 158 | 0x26d1a0 | ok | 0x27d1a0 | trap: OOB | `function_412c20` ← `function_4136a0` ← `function_413760` ← `function_414bb0` ← `function_653660` |
+| 745 | 0xabb3b0 | trap: OOB | 0xacb3b0 | ok | (LB=0 側の trap: `function_407e20` ← `function_409440` ← `function_666bb0` ← `function_7745a0` ← `function_ebb3b0`) |
+
+- 注: 上の VA は LVA 基準 (LB ぶんずれる)。LB=0 側の trap スタック名は LB=0 build で取った (`m11_survey.mjs` の `M11_SURVEY_STACK`)。
+- 解釈 (推定と明記): 4 unit はいずれも LB 依存の分岐 (VA 即値・絶対アドレスの比較) を含む可能性があるが、**分岐の原因は未特定**。
+  unit 40 は LB=0x10000 だけ Halt を呼ぶ経路に入り、通常起動が 37 unit で止まる (§2 の Halt0 早期終了と同じ経路)。
+  unit 745 の LB=0 側 OOB も LB 依存の別経路の可能性があるが、未確認。
+- 次の一手 (未着手): `function_412770` と `function_411d20` の IR で、Halt を呼ぶ条件の比較に使われる定数・ポインタを取り、
+  LB=0 と LB=0x10000 の `boot_final.ll` の該当箇所を diff する。`m11_remap_count.py` の未 remap 即値 (§3) と突合する。
