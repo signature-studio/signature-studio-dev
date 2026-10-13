@@ -85,7 +85,7 @@ Chrome Dedicated Worker で M=130 のオブジェクトを 1 Memory に畳み、
 | 130 | 2 | 139.73 [138.80–141.15] | 0.04814 | 11.17 | 789.91 | `6b1696f0` (130/130) | 368.5 |
 | 130 | HEAD 再実行 (`862ef65b`) | 139.02 [138.56–139.62] | 0.04790 | 11.13 | 779.63 | `6b1696f0` (130/130) | -152.2 |
 
-- M=130 の µs/block p50 の中央値は 140.56 µs (3 回の中央値)。M=1 の中央値は 138.50 µs。obj 数に依らず定常はほぼ平坦 (+1.5%)。
+- M=130 の µs/block p50 の中央値は 140.56 µs (run 0〜2 の 3 回の中央値。4 行目の扱いは §6 参照)。M=1 の中央値は 138.50 µs。obj 数に依らず定常はほぼ平坦 (+1.5%)。
 - RTF は 1 obj あたり 0.0477〜0.0485 (128 サンプル/44.1 kHz 換算)。
 - renderer RSS の増分は負値を含み、原因は未切り分け。RSS は参考値で、受入判定には使わない。
 
@@ -103,8 +103,32 @@ Chrome Dedicated Worker で M=130 のオブジェクトを 1 Memory に畳み、
 export PERF_TMP=$RUNNER_TEMP/perf
 node tools/perf/p15/probe_limit.mjs --k 1,2,4 --max 160 --runs 2   # §1
 node tools/perf/p15/probe_iso.mjs --k1 1 --k2 1 --max 160 --runs 2  # §1 (別 renderer)
-node tools/perf/p15/shared_obj.mjs tools/ott/work/lift/ottl.cjs 130 50  # §2
 node tools/perf/p15/chrome_shared.mjs --m 1,4,130 --reps 7 --blk 1000 --runs 3  # §3
 ```
 
 前提: `oc_artifacts: work-m6-ott` (`tools/ott/work/lift/ottl.wasm`・`ottl.cjs`)。
+
+## 6. 再測定 (2026-10-14, 素材 work-m6-ott で 4 スクリプトを実行)
+
+- 測定 commit: `2b2faf52` (origin/main の worktree `ws-990`)。`tools/perf/p15` の差分は `862ef65b` 以降 `page.html` の未使用リスナー削除のみ (測定経路外・§0)。
+- 環境: Chrome 154.0.8037.97 (headless), CPU `AMD EPYC 9V45 96-Core Processor` (4 vCPU。§0 の 7763 とは別機), node v22.23.3。
+- 生データ: `tools/perf/p15/results/rerun_20261014_*.jsonl` (`probe_limit` 6 行・`probe_iso` 2 行・`chrome_shared` 9 行。いずれも本再測定の行のみで、`2b2faf52` の既存 `results/*.jsonl` と完全一致する行は除外)。
+- `shared_obj.mjs` (M=130 の `sig_unique` / setup 時間) は本節の根拠から外す。同じ実行の生データ (標準出力) が残っておらず、jsonl にも保存できなかったため。N=130 の署名一致は下表の `chrome_shared` M=130 の 3 行 (`sig_ok=true`、sig_n=130) で示す。
+
+| 項目 | 前回 (`862ef65b`, EPYC 7763) | 再測定 (`2b2faf52`, EPYC 9V45) |
+|---|---|---|
+| probe_limit K=1 (Worker 1 個) | 125 | 125 / 125 (2 回) |
+| probe_limit K=2 合計 | 124 / 188 | 125 / 124 |
+| probe_limit K=4 合計 | 243 / 253 | 182 / 216 |
+| probe_iso 別 origin 各 1 Worker | 124〜125 | 124〜125 (renderers=7, 2 回とも) |
+| chrome_shared M=1 µs/block p50 (3 回) | 138.41 / 139.71 / 138.50 | 135.89 / 120.08 / 126.17 (中央値 126.17) |
+| chrome_shared M=4 µs/block p50 (3 回) | 140.58 / 139.09 / 139.12 | 121.59 / 140.77 / 140.01 (中央値 140.01) |
+| chrome_shared M=130 µs/block p50 (前回 4 値) | 140.56 / 140.75 / 139.73 / 139.02 (中央値 140.15) | 118.93 / 125.70 / 138.69 (中央値 125.70) |
+| M=130 署名 | 130/130 一致 (4 行, `sig_ok=true` 全て) | 130/130 一致 (3 回, `sig_ok=true` 全て) |
+
+- 前回 M=130 の 4 行の出自: `fcc0eb02` 時点では M=130 は 3 行 (run 0〜2)。4 行目 (p50 139.02, `run: 0`, loadavg `[1.00, 0.83, 0.65]`, setup 779.63 ms) は `862ef65b` で 1 行だけ追記された行で、他の 3 行とは別の呼び出しの行と見られる。追記時の commit message・ログから実行の対応は確定できないため、表には 4 値をそのまま載せた。中央値は 4 値で 140.15 (3 値なら 140.56)。
+- 結論は変わらない。M=130 を 1 instance で instantiate 失敗なし・全 obj 署名一致で駆動できる。obj 数に対する定常コストは横ばい (M=1 と M=130 の中央値の差は前回 +1.2% (138.50→140.15)、再測定では -0.4% (126.17→125.70))。機差 (CPU 世代) が大きく、絶対値は機ごとに比較しない。
+- Worker 分割 (K=2) の合計は再測定でも 124〜125 で、N=130 に届かない。K=4 の合計は 182〜253 で、回ごとのばらつきが大きい。(b) を退けた根拠 (割り当てが再現せず不安定) は再測定でも成立する。
+- chrome_shared の µs/block は run 間で 118.93〜140.77 に散る (全 9 行の min/max)。定常の数値は 1 回の値ではなく 3 回の中央値で読む。
+
+**測定 commit から HEAD までの tools/perf 差分**: 測定コード (スクリプト) の差分は空。HEAD で追加されたのは `results/rerun_20261014_*.jsonl` の 3 ファイル (17 行) のみ。`git diff --stat 2b2faf52 HEAD -- tools/perf/p15` の出力は PR 本文の「検証」節と一致する。
