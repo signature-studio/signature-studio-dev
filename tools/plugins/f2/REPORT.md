@@ -190,7 +190,7 @@ python3 tools/plugins/f2/xcheck_icall.py 18953 18975 18979 18982 18984 19005 190
 | 仮 ID | 層 | 症状 | 根本原因 | 検出信号 | 修復 |
 |---|---|---|---|---|---|
 | N1 | ours (icall_rewrite) | 後続関数の `define` が 1 個落ちる (eq-filter 4 block で 5 関数)。dispatch は残るので site 突合では見えない | 関数終端が 16 の倍数だと次の関数と連続配置になり、RetDec の `--select-ranges` が `[a,b)+[b,c)` を 1 関数に併合する (`p.drc.config.json` の `function_7b1cd0` の `endAddr` が次関数の終端) | `define` 数 ≠ 閉包関数数 (`closure_stats.py` の assert) | `icall_rewrite.py` の `next_slot()`: 連続になる場合だけ 16 byte 空ける (連続しない配置はバイト一致) |
-| N2 | fe (RetDec opt) | 機械語の間接 call site が IR に無い。ただし正当な場合がある | RetDec が到達不能な基本ブロックを除去 (18979 0x741035)。call だけが落ちたのではなくブロックごと | raw IR に当該 VA の `insn.addr` 命令が 0 件 (call 落ちなら BLK store 列が残る) | 修復不要。waiver (理由必須) で明示し、ゲートが機械検証 |
+| N2 | fe (RetDec opt) | 機械語の間接 call site が IR に無い。ただし正当な場合がある | RetDec が基本ブロックを除去 (18979 0x741035。通常制御フローから到達不能と推定)。call だけが落ちたのではなくブロックごと | raw IR に当該 VA の `insn.addr` 命令が 0 件 (call 落ちなら BLK store 列が残る) | 修復不要。waiver (理由必須) で明示し、ゲートが機械検証 |
 
 ### 7.7 #529 (PLG-F3-2): dynamics 4 site の D12 landing pad を waiver 方式 (b) で処理
 
@@ -219,7 +219,7 @@ python3 tools/plugins/f2/xcheck_icall.py 18953 18975 18979 18982 18984 19005 190
 | `icall_rewrite.py` の配置修正を OTT 素材で回帰していない (`icall_e2e.sh` の 89 scenario、`test_icall.py` pe 部) | 連続しない配置はバイト一致のはずだが未実測 | **#530** `[ICALL-7]` |
 | restored IR の wasm リンク・実行 (BLK、`__icall_dispatch` の VA→関数表、`ir_flatten --table`)、Host shim、差分試験 | 出口条件 (#199 手順 2〜4)。本 PR は IR 上の被覆まで | 既存 #195 / #196 / #197、#199 に残す |
 | `closure_stats.py` の leaf 定義: 復元後は `__icall_dispatch` 呼出しが外部呼出しになり leaf が減る (18953: 8 → 1)。ABI も `i64 f(void)` (引数は BLK 経由) | #515 の leaf 23 関数の選定は `PLUG_ICALL=0` (`f2_step1.sh`) の IR か機械語側 (`icall_summary.py`) を使うこと。native ms_abi との差分には BLK 経由の harness が要る | 既存 **#515** にコメント |
-| 18979 の waiver は手作業の到達不能性確認 (前提: `[rbp+0x40]` が書換わらない) | 1 site。誤りなら F1 を隠す | waiver の `evidence` に根拠を残した。反証が出たら waiver を削除すれば FAIL に戻る (NC5) |
+| 18979 の waiver は手作業の到達不能推定 (前提: `[rbp+0x40]` が書換わらない) | 1 site。誤りなら F1 を隠す | waiver の `evidence` に根拠を残した。反証が出たら waiver を削除すれば FAIL に戻る (NC5) |
 
 ## 8. PLG-F2-3 (#515): leaf 23 関数の関数単位差分試験 → 付録
 
