@@ -5,7 +5,11 @@
 
 前提: `REPORT_968.md` §4。単一 load 規則 (`fix_d17.py`) の対象外の 28 関数 / 53 site。
 
-## 1. 再現 (`audit_lsf_ssa.py`, HEAD 起点, work-m11 のみ)
+## 1. 再現 (`audit_lsf_ssa.py`, work-m11 のみ)
+
+- 測定 commit: `916d9932` (`tools/m11` のコードを最後に変えた commit。以降の変更は docs のみ)
+- 素材: `[WORK-M11]` (`docs/REFERENCES.md` §1。取得指定 `oc_artifacts: work-m11`、展開先 `tools/m11/work/`)
+- 鮮度の証跡 (`git diff 916d9932 HEAD -- tools/m11`、`*.md` を除く): 空 = コード差分 0 (`git diff 916d9932 HEAD --name-only -- tools/m11` の結果は `*.md` のみ)
 
 - cfg は glob をクォートして渡す (`'../work/boot*.drc.config.json'`)。クォートしないと `boot0` 1 本だけになり、
   集計が `lsf_sites_arg 29` になる (誤り)。クォートすると `90 / 370 / 169` となり、REPORT_968 の修復前と一致する。
