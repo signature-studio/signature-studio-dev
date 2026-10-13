@@ -45,13 +45,14 @@
 - 再現: `ks_rdata_class.py` の出力 `rdata_class.json` を入力に `python3 ks_rdata_value.py <HeartCore.core_64> <SlateCore.core_64> rdata_class.json share.json out.json` (uv で pefile/numpy/capstone)。素材は `work-liftlib-targets`。
 - 方法: `value` 17 関数の rip 参照 (32 B) を 8 B 語で対にし、差分語を分類。`rva_off_*` は「SC 語が指すセクション内 RVA の 16 B」を KH 側と比べる。
 - 前提の訂正: 旧 §A4 の `rva32` (セクション範囲内の整数) は、RVA ポインタなのか定数なのかを区別していなかった。本節の検査では、差分語は RVA として扱えるものだけを対象にした。
-- 実測 (2 回実行で byte 一致、EXIT=0、0.66 s real):
-  `{"dbl": 13, "fn_value_differs": 17, "int": 30, "rva_off_absent": 72, "text": 24}`
-  - `layout` 0 件・`target_eq` 0 件 (配置差で説明できる語は無い)。
-  - RVA 候補 72 語 (すべて `.rdata` を指す) は、SC が指す 16 B が **KH の `.rdata` の全バイト位置のどこにも無い** (`rva_off_absent` 72 / 72、`rva_off_found` 0)。
-  - `int` 30 / `dbl` 13 / `text` 24 は、差分語のうち RVA 候補でないもの (整数・倍精度・文字列断片)。
-- 読み: `value` 17 件は「配置がずれただけ」ではなく、指す先の内容自体が違う。ただし参照先がさらにポインタを含む場合は未追跡 (下限)。`dbl` 13 / `int` 30 が同一位置の定数差か、そもそも対応しない語の組み合わせかは未確定。
-- 判定: `value` 17 件は **配置差だと言えない**。ただし「意味が違う」とも言えない (定数表や型テーブルの内容差の可能性)。意味同一性は #1264 (FA-18) の差分実行で判定する。
+- 実測 (測定 commit `1b3a1b33`、2 回実行で byte 一致、EXIT=0): 下記の数値が本 PR の正本。
+  `{"abs_vs_const": 8, "dbl": 13, "fn_value_differs": 17, "int": 23, "rva_off_absent": 72, "text": 23}`
+  - `abs_` 接頭辞は、片側以上が ImageBase〜SizeOfImage の 8 B 絶対アドレスである組。`abs_vs_const` 8 語は、片側だけが絶対アドレスで、もう片側が RVA として解決できない定数。
+  - `layout` 0 件・`target_eq` 0 件・`abs_layout` 0 件・`abs_target_eq` 0 件 (配置差で説明できる語は無い)。
+  - RVA 候補 72 語 (すべて `.rdata` を指す) は、SC が指す 16 B が KH の `.rdata` の全バイト位置のどこにも無い (`rva_off_absent` 72 / 72、`rva_off_found` 0)。
+  - `int` 23 / `dbl` 13 / `text` 23 は、差分語のうち RVA 候補・絶対アドレスでないもの (整数・倍精度・文字列断片)。
+- 読み: `value` 17 件は「配置がずれただけ」とは言えず、RVA 候補の指す先の 16 B が KH 側に無い。参照先がさらにポインタを含む場合は未追跡 (下限)。`dbl` 13 / `int` 23 が同一位置の定数差か、そもそも対応しない語の組み合わせかは未確定。
+- 判定: `value` 17 件は **配置差だけでは説明できない**。「内容が違う」の断定は下限としてのみ言える。「意味が違う」とは言えない (定数表や型テーブルの内容差の可能性)。意味同一性は #1264 (FA-18) の差分実行で判定する。
 - 起票先: 残件の意味判定 → #1264 (FA-18)、`dbl`/`int` 対応付けは #52 残件。
 
 ## §A3. Gain の意味同一性 (native ⇄ native 差分, REPORT §11-2 ① の実施)
