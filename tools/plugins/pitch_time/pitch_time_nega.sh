@@ -3,8 +3,8 @@
 # 1 つでも外れたら exit 1。 事前: pitch_time_e2e.sh を実行済み (work/pitch_time/{status7.csv,facts.json,cpp.csv}, work/batch/19087)。
 #   NC1  emcc -c ゲート       : Fruity Vocoder (19087, 最小の殻) の final.ll の関数 1 つの ret を除去 → emcc -c が非 0 (対照: 無改変は 0)
 #   NC2  ranges が lift 範囲を決める : 閉包 ranges の末尾 1 つを落として再 lift → その function_<VA> の define が消える (対照: ある)
-#   NC3  judge.py (shell 判定) : 実測 status7.csv から不合格を 1 つずつ作り、期待終了コードを確認 (対照 = 無改変 → 0)
-#   NC4  e2e の配線           : `pitch_time_e2e.sh --judge-only` に不合格 CSV を渡し、非 0 かつ PASS 行が出ないこと
+#   NC3  judge.py (shell 判定) : 実測 status7.csv / final.ll / ranges から不合格を 1 つずつ作り、期待終了コードを確認 (対照 = 無改変 → 0)
+#   NC4  e2e の配線           : `pitch_time_e2e.sh --judge-only` に不合格の status CSV / cpp CSV を渡し、非 0 かつ PASS 行が出ないこと
 #   NC5  matrix_check.py      : facts.json / status7.csv を 1 項目ずつ壊し exit 1 (対照 → 0)
 #   NC6  ids_crosscheck.py    : taint 側の ID 件数を +1 / ID を空にして exit 1 (対照 → 0)
 #   NC7  judge.py --engines   : expected_cpp.csv の 1 値を変えて exit 1 (対照 → 0)
@@ -66,26 +66,47 @@ d1=$(grep -c '^define' "$N/lift/p.final.ll"); h1=$(grep -c "^define .*@function_
 echo "  NC2: ranges $n_all -> $((n_all - 1)), 落とした関数 function_$LAST: control define=$d0 present=$h0 / minus1 define=$d1 present=$h1 (期待: present 1 -> 0, define 減)"
 { [ "$c0" = 0 ] && [ "$c1" != 0 ] && [ "$h0" = 1 ] && [ "$h1" = 0 ] && [ "$d1" -lt "$d0" ] && [ "$d1" -gt 0 ]; } || { echo "  NC1/NC2 <-- FAIL"; FAILS=$((FAILS + 1)); }
 
-echo "NC3: judge.py (shell 判定)。 対象 block: Fruity Scratcher 19071 / Newtime 19166 を使う"
-chk NC3-control 0 $J "$S0" "${SHELLS[@]}"
-mut "$S0" "$N/a.csv" 19071 emcc_c_rc 1;            chk NC3-a-emcc_c_rc1 1 $J "$N/a.csv" "${SHELLS[@]}"
-mut "$S0" "$N/b.csv" 19071 lift_rc 1;              chk NC3-b-lift_rc1 1 $J "$N/b.csv" "${SHELLS[@]}"
-mut "$S0" "$N/c.csv" 19166 f80_funcs 3;            chk NC3-c-f80_funcs3 1 $J "$N/c.csv" "${SHELLS[@]}"
-mut "$S0" "$N/d.csv" 19166 declares_unimpl 5;      chk NC3-d-declares_unimpl5 1 $J "$N/d.csv" "${SHELLS[@]}"
-cf=$(python3 -c "import csv;print([r for r in csv.DictReader(open('$S0')) if r['block']=='19166'][0]['closure_funcs'])")
-mut "$S0" "$N/e.csv" 19166 defines $((cf - 1));    chk NC3-e-defines_lt_closure 1 $J "$N/e.csv" "${SHELLS[@]}"
-mut "$S0" "$N/f.csv" 19166 x DROP;                 chk NC3-f-row_missing 1 $J "$N/f.csv" "${SHELLS[@]}"
-mut "$S0" "$N/g.csv" 19166 f80_funcs -1;           chk NC3-g-f80_unmeasured_-1 1 $J "$N/g.csv" "${SHELLS[@]}"
-mut "$S0" "$N/h.csv" 19166 emcc_c_rc x;            chk NC3-h-non_numeric 2 $J "$N/h.csv" "${SHELLS[@]}"
-chk NC3-i-no_blocks 2 $J "$S0"
-chk NC3-j-stale_rows_ignored 1 $J "$S0" "${SHELLS[@]}" --since-line "$(wc -l < "$S0")"
-chk NC3-k-no_file 2 $J "$N/none.csv" "${SHELLS[@]}"
+echo "NC3: judge.py (shell 判定)。 Fruity Scratcher 19071 / Newtime 19166 を壊す"
+JA="--closure-dir work/closure --ll-dir work/batch"
+chk NC3-control 0 $J "$S0" "${SHELLS[@]}" $JA
+mut "$S0" "$N/a.csv" 19071 emcc_c_rc 1;            chk NC3-a-emcc_c_rc1 1 $J "$N/a.csv" "${SHELLS[@]}" $JA
+mut "$S0" "$N/b.csv" 19071 lift_rc 1;              chk NC3-b-lift_rc1 1 $J "$N/b.csv" "${SHELLS[@]}" $JA
+mut "$S0" "$N/c.csv" 19166 f80_funcs 3;            chk NC3-c-f80_funcs3 1 $J "$N/c.csv" "${SHELLS[@]}" $JA
+mut "$S0" "$N/d.csv" 19166 declares_unimpl 5;      chk NC3-d-declares_unimpl5 1 $J "$N/d.csv" "${SHELLS[@]}" $JA
+mut "$S0" "$N/f.csv" 19166 x DROP;                 chk NC3-f-row_missing 1 $J "$N/f.csv" "${SHELLS[@]}" $JA
+mut "$S0" "$N/g.csv" 19166 f80_funcs -1;           chk NC3-g-f80_unmeasured 1 $J "$N/g.csv" "${SHELLS[@]}" $JA
+mut "$S0" "$N/h.csv" 19166 emcc_c_rc x;            chk NC3-h-non_numeric 2 $J "$N/h.csv" "${SHELLS[@]}" $JA
+chk NC3-i-no_blocks 2 $J "$S0" $JA
+chk NC3-j-stale_rows_ignored 1 $J "$S0" "${SHELLS[@]}" $JA --since-line "$(wc -l < "$S0")"
+chk NC3-k-no_file 2 $J "$N/none.csv" "${SHELLS[@]}" $JA
+chk NC3-l-no_audit_args 2 $J "$S0" "${SHELLS[@]}"
+# e: 欠落監査。 Newtime の final.ll で最後の range の define 名を変えて「関数が 1 つ脱落した」状態を作る (他の block は実物へのリンク)
+mkdir -p "$N/ll"
+for b in "${SHELLS[@]}"; do mkdir -p "$N/ll/$b"; ln -sf "$PWD/work/batch/$b/p.final.ll" "$N/ll/$b/p.final.ll"; done
+LASTN=$(tr ',' '\n' < work/closure/block19166.ranges.txt | tail -n 1 | cut -d- -f1 | sed 's/^0x//')
+rm "$N/ll/19166/p.final.ll"; sed "s/^\(define [^@]*\)@function_$LASTN\b/\1@lost_$LASTN/" work/batch/19166/p.final.ll > "$N/ll/19166/p.final.ll"
+echo "  (e: 19166 の function_$LASTN を脱落させた final.ll: define $(grep -c '^define' work/batch/19166/p.final.ll) -> $(grep -c '^define .*@function_' "$N/ll/19166/p.final.ll"))"
+chk NC3-e-define_lost 1 $J "$S0" "${SHELLS[@]}" --closure-dir work/closure --ll-dir "$N/ll"
+# m: ranges.txt と status の closure_funcs が食い違う (range を 1 つ足す)
+mkdir -p "$N/closure"; cp work/closure/block*.ranges.txt "$N/closure/"
+echo -n ",0x1000-0x1001" >> "$N/closure/block19166.ranges.txt"
+chk NC3-m-ranges_ne_closure_funcs 1 $J "$S0" "${SHELLS[@]}" --closure-dir "$N/closure" --ll-dir work/batch
 
 echo "NC4: pitch_time_e2e.sh --judge-only の配線 (不合格 CSV を STATUS_CSV で渡す)"
 STATUS_CSV="$N/a.csv" bash pitch_time/pitch_time_e2e.sh --judge-only > "$N/e2e_bad.out" 2>&1; rc=$?
 if [ "$rc" != 0 ] && ! grep -q 'PASS$' "$N/e2e_bad.out" && grep -q 'FAIL (exit' "$N/e2e_bad.out"; then echo "  NC4-bad: rc=$rc (期待 非0)、PASS 行なし、FAIL 行あり OK"; else echo "  NC4-bad: rc=$rc <-- FAIL"; FAILS=$((FAILS + 1)); fi
 STATUS_CSV="$S0" bash pitch_time/pitch_time_e2e.sh --judge-only > "$N/e2e_good.out" 2>&1; rc=$?
 if [ "$rc" = 0 ] && grep -q 'JUDGE-ONLY PASS$' "$N/e2e_good.out"; then echo "  NC4-good: rc=$rc (期待 0)、PASS 行あり OK"; else echo "  NC4-good: rc=$rc <-- FAIL"; FAILS=$((FAILS + 1)); fi
+
+# C++ module の judge --engines の配線: 測定値を 1 つ変えた cpp.csv を CPP_CSV で渡す
+python3 - "$W/cpp.csv" "$N/cpp_bad.csv" <<'PY'
+import csv, sys
+rows = list(csv.reader(open(sys.argv[1])))
+i = rows[0].index('emcc_c_fail_chunks'); rows[1][i] = str(1 - int(rows[1][i]))
+csv.writer(open(sys.argv[2], 'w', newline=''), lineterminator='\n').writerows(rows)
+PY
+STATUS_CSV="$S0" CPP_CSV="$N/cpp_bad.csv" bash pitch_time/pitch_time_e2e.sh --judge-only > "$N/e2e_badcpp.out" 2>&1; rc=$?
+if [ "$rc" != 0 ] && ! grep -q 'PASS$' "$N/e2e_badcpp.out" && grep -q 'FAIL (exit' "$N/e2e_badcpp.out"; then echo "  NC4-badcpp: rc=$rc (期待 非0)、PASS 行なし、FAIL 行あり OK"; else echo "  NC4-badcpp: rc=$rc <-- FAIL"; FAILS=$((FAILS + 1)); fi
 
 echo "NC5: matrix_check.py"
 chk NC5-control 0 python3 pitch_time/matrix_check.py
@@ -123,16 +144,17 @@ chk NC6-b-empty_ids 1 python3 pitch_time/ids_crosscheck.py --facts "$N/facts_i0.
 
 echo "NC7: judge.py --engines"
 CPP=$W/cpp.csv; EXPC=pitch_time/expected_cpp.csv
-chk NC7-control 0 $J --engines "$CPP" "$EXPC"
+chk NC7-control 0 $J --engines "$CPP" "$EXPC" 19222 19072
 python3 - "$EXPC" "$N/exp_bad.csv" <<'PY'
 import csv, sys
 rows = list(csv.reader(open(sys.argv[1])))
 i = rows[0].index('emcc_c_fail_chunks'); rows[1][i] = str(int(rows[1][i]) + 1)
 csv.writer(open(sys.argv[2], 'w')).writerows(rows)
 PY
-chk NC7-a-expected_changed 1 $J --engines "$CPP" "$N/exp_bad.csv"
+chk NC7-a-expected_changed 1 $J --engines "$CPP" "$N/exp_bad.csv" 19222 19072
 head -n 2 "$CPP" > "$N/cpp_short.csv"
-chk NC7-b-row_missing 1 $J --engines "$N/cpp_short.csv" "$EXPC"
+chk NC7-b-row_missing 1 $J --engines "$N/cpp_short.csv" "$EXPC" 19222 19072
+chk NC7-c-unknown_block 2 $J --engines "$CPP" "$EXPC" 99999
 
 if [ "$FAILS" = 0 ]; then echo "[pitch_time_nega] OK"; exit 0; fi
 echo "[pitch_time_nega] FAIL: $FAILS 件" >&2; exit 1

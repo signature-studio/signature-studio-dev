@@ -95,7 +95,10 @@ def kernel_facts(block, ranges):
         elif fva in fr:
             in_fr.append(s)
     norm = lambda s: inv.get(s['kernel'], s['kernel'])
-    return {'init_found': True, 'callsites_dll_unique_scan': len(cs),
+    kt = {k['va']: k for k in json.load(open(os.path.join(WORK, 'kernel_table.json')))['kernels']}
+    kin = sorted({norm(s) for s in in_clo})
+    return {'init_found': True,
+            'closure_kernels_x87': {k: (kt[k]['x87'] if k in kt else None) for k in kin}, 'callsites_dll_unique_scan': len(cs),
             'callsites_in_closure': len(in_clo), 'callsites_in_frontier': len(in_fr),
             'kernels_in_closure': dict(sorted(collections.Counter(norm(s) for s in in_clo).items())),
             'kernels_in_dll_scan': dict(sorted(used.items())), 'n_kernels_dll_scan': len(used),
