@@ -29,4 +29,5 @@ step "9. 48 tools 全実行"; node tests/all_tools.mjs
 step "9b. ilmcp 9 関数 e2e (状態検査 + ネガティブ)"; node tests/ilmcp_e2e.mjs
 python3 analysis/mcp_classify.py
 step "10. headless Chrome (module Worker + SAB)"; node tests/browser_check.mjs
+step "11. MCP JSON-RPC を アプリ UI / devtools に公開 (Vite + headless Chrome, PY-4 #77)"; (cd "$HERE/../.." && node tools/python/tests/mcp_ui_check.mjs 2>&1 | grep -v shim_port | cut -c1-300)
 step "ALL OK"

@@ -164,3 +164,28 @@ FLEngine rodata の `name\0doc\0…<module>` 並びから機械抽出 (`flapi_ex
 | 実機の戻り形・例外の確認 | 上記「仮定」 | #81 (PY-9) |
 | `run_all.sh` が `/home/ubuntu` 固定のまま | CI で一括実行できない (本 run は手動で work/ 配置) | #450 系の env 化チケットにコメント |
 | カタログ (プラグイン名 141 件) と highlight 名 21 件の commit 可否 | FL 由来の名称文字列をリポジトリに含める | PM 判断 (`docs/LEGAL.md` 照合は未実施。不可なら実行時に利用者の FL から生成する形へ変更) |
+
+## 10. MCP JSON-RPC をアプリ UI / devtools に公開 (PY-4, #77)
+
+既知類型との関係: 該当なし (lift / 逆アセではない。flapi は引き続き `fl_mock.mjs` = FLEngine 模擬)。
+
+- 公開面: `window.flMcp` (`start(files)` `rpc(req)` `list()` `call(name,args)` `stop()`) + `/?mcp=1` の UI パネル。実装 `src/runtime/mcp_panel.ts`、配信 `vite.config.ts` `pyAssets` (`/py/` = host/・dist/flpy.{js,wasm,data}・flapi_ids.json の許可リストのみ)。設計は `BRIDGE.md` §3。
+- `mcp_rpc.mjs` 変更: `tools/call` は `tools/list` に出る name だけ受理 (未知 / 非 tool は isError=true。変更前は `__main__` の任意属性を呼べた)、不正 JSON は -32700。`flpython.mjs` は呼出し側が Worker を渡せる `worker` 引数を追加 (既存呼出しは無変更)。
+- MCPTools.pyc / midi.py / utils.py は**配信しない**: 利用者が UI のファイル選択 (または `flMcp.start({...})`) で供給する。未供給の `start()` は「供給が必要」で reject。
+
+| 受入条件 | 結果 | 検証 (`node tools/python/tests/mcp_ui_check.mjs`) |
+|---|---|---|
+| アプリ内から tools/list = 48、tools/call 実行 | 達成 (UI・devtools 両方) | UI で状態表示 `tools/list = 48`・`get_tempo` 実行 `Current tempo is 130 BPM.`。devtools で `flMcp.rpc` の tools/list = 48 (inputSchema あり・id エコー)、`set_tempo(140)` → `get_tempo` = 140 |
+| MCPTools.pyc は実行時供給 (非同梱) | 達成 | `/py/work/MCPTools.pyc` `/py/work/midi.py` `/py/src/fl_rt.py` は 404、未供給 `start()` は reject。リポジトリ内に FL 由来ファイル無し (`work/` は gitignore) |
+| 未知 tool は isError=true | 達成 | `no_such_tool` と非 tool 属性 `get_mcp_tools_json` が isError=true、既知 tool に不正引数も isError=true |
+
+検証環境: Actions runner (4 core, node 22.23.3, Chrome 154.0.8037.97)。入力は `fl-win64` 素材の `extracted/block25159_DATA.bin` (MCPTools.pyc, 100,674B, magic cb0d0d0a) / `block24429_DATA.bin` (midi.py) / `block24430_DATA.bin` (utils.py) を `work/` へコピー。CPython wasm は本 run でクリーンビルド (3m13.8s)。
+実測 (コミット 281784f の HEAD、n=3): `mcp_ui_check.mjs` 全 14 check PASS、スクリプト内計測 1.261 / 1.362 / 1.308 秒 (wall 1.39 / 1.49 / 1.44 秒、load average 0.18〜0.57、直列 1 本)。同 HEAD で `pnpm typecheck` / `pnpm build` 成功、既存 `poc_mcp.mjs` POC OK・`all_tools.mjs` 48/48 ok (host_calls 37,424)・`browser_check.mjs` BROWSER OK。範囲外: `run_all.sh` 全体 (runner に win PE が無く analysis 再生成が走らないため未実施)。
+ネガティブコントロール: MCPTools.pyc の先頭 1 バイトを壊す (`--neg`) → `UI: tools/list = 48` が FAIL し、原因が `pyc magic mismatch` として UI に出る (ハングしない)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| flapi の提供側がモック (`fl_mock.mjs`) のまま。実 FLEngine wasm の `fl_api_call` に差替え未了 | tool の結果はモック値で、実 FL と同一動作の保証なし | #74 (PY-1, PR #459) 以降 / 親 #35 |
+| ilmcp B 群 8 tools は最小の偽実装 | UI から呼べるが FL 本来の挙動ではない | 親 #35 の T3 (ilmcp 実装) |
+| `/?mcp=1` のパネルは最小 UI (整形・履歴・複数行 arguments 編集なし)。`pnpm build` 成果物 (`dist/`) は `/py/` を持たないため dev / preview 専用 | 本番配信での公開は未対応 | 親 #35 に提案 (配信設計は #62 H 系と調整) |
+| `build_flpy.sh` が `flapi_table.json` / `FLAPI.md` を再生成する。runner には win PE が無く `win_pair_verified` が false になる | 本 PR では当該 2 ファイルをコミットしていない | #74 の PR (provider) と同じ `/home/ubuntu` 固定パス問題。`fetch_inputs.sh` / `run_all.sh` の env 化を別 issue で提案 |

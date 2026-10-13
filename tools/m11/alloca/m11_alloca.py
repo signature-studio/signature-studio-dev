@@ -6,9 +6,14 @@ RetDec は Delphi の集成体ローカル (record / OSVERSIONINFOEXW 等) を `
 潰れた alloca への記録域書込み (rep stos / FillChar / Win32 API の出力パラメータ) は shadow stack を
 破壊し、unit survey の OOB / halt0 の主要因だった (tools/m11/REPORT.md §4, tools/m11/shimx_link/REPORT.md §3)。
 
-本 pass は closure IR (boot_final.ll, 全 7,421 定義) を走査し、**使用箇所の要求サイズが alloca 実体積を
+本 pass は closure IR (boot_final.ll, 全 7,421 定義) を走査し、**使用箇所から求めた要求サイズが alloca 実体積を
 超える場合だけ** alloca を [K x i64] に拡幅する。ポインタ値・他の IR は一切変更しない (idempotent:
-既に要求サイズ以上なら不変)。
+既に要求サイズ以上なら不変)。要求サイズの出どころは 2 種類ある:
+  * R1〜R7 = 使用箇所が**具体的なサイズを供給する**もの (定数長・API 仕様・store の型幅)。証拠が無ければ拡幅しない。
+  * R8     = 使用箇所はサイズを供給しない。alloca のアドレスが call / ptrtoint に渡る (escape) だけで、
+             callee の参照幅は静的に分からないため、フレーム上の隣接領域までを要求サイズと**推定する (ヒューリスティクス)**。
+             証拠は「escape した」ことだけなので、実際には使われない stack を足す過大拡幅がありうる (拡幅は別 alloca とは
+             重ならないので安全側)。RetDec の `%stack_var_-N` 命名に依存し、他の名前の alloca には効かない。
 
 検出規則 (証拠 → 要求バイト数):
   R1 rep stos  : __asm_rep_stos{b,w,d,q}_memset(dst, v, N)   → dst >= N*幅      (定数 N のみ)
@@ -19,9 +24,14 @@ RetDec は Delphi の集成体ローカル (record / OSVERSIONINFOEXW 等) を `
   R6 Win32 (buf, count) 表 (COUNT_BUF): count が定数の呼出し → buf >= count*要素幅
       (GetLocaleInfoW の cch*2 等。halt0 53 unit × GetLocaleInfoW 相関の対策)
   R7 直接広 store: store T, ptr %bc (root が alloca) で sizeof(T) > alloca 実体積 → sizeof(T)
+  R8 escape gap : %stack_var_-N が call / ptrtoint の引数に渡る (bitcast 別名含む) → 次の stack_var までの間隔
+                  (N の昇順に並べた隣との差。最小の N は N 全体)。推定であり証拠サイズではない (上記)。
+                  実例: 44bae0 の stack_var_-88 を callee 44ba50 が [rcx+0x2c..0x3e] (GetCPInfo) へ書き 44bb70 の
+                  record を壊していた (#132, tools/m11/REPORT.md §10)。R1〜R7 とは別集計 (detector_counts / widened_by_rule の `R8_escape_gap`)
 
-dst/%bc は bitcast 連鎖 (RetDec が多段に出す) を辿って alloca に帰着させ、GEP/ptrtoint+add 経由の
-参照は closure 実測 0 件であることを確認済み (pass 実行時に検出したら警告を出す)。
+dst/%bc は bitcast 連鎖 (RetDec が多段に出す) を辿って alloca に帰着させ、R1〜R7 の検出が使う GEP 経由の
+参照は closure 実測 0 件であることを確認済み (pass 実行時に検出したら警告を出す)。R8 の escape 判定だけは
+ptrtoint も数える (ptrtoint+add で作った別アドレスへの書込みは追跡しない)。
 
 使い方: m11_alloca.py <in.ll> <out.ll> [--report report.json]
 """
@@ -102,7 +112,7 @@ def main():
     rep_path = sys.argv[sys.argv.index('--report') + 1] if '--report' in sys.argv else None
     src = open(src_path, errors='replace').read()
     funcs = list(re.finditer(r'^define [^\n]*@([\w.$-]+)\([^\n]*\{\n.*?^\}\n', src, re.S | re.M))
-    det = {'R1_rep_stos': 0, 'R2_rep_movs': 0, 'R3_fillchar': 0, 'R4_llvm_mem': 0, 'R5_api_out': 0, 'R6_count_buf': 0, 'R7_wide_store': 0}
+    det = {'R1_rep_stos': 0, 'R2_rep_movs': 0, 'R3_fillchar': 0, 'R4_llvm_mem': 0, 'R5_api_out': 0, 'R6_count_buf': 0, 'R7_wide_store': 0, 'R8_escape_gap': 0}
     widened, over_cap, gep_warn = [], [], []
     pieces, last = [], 0
     for fm in funcs:
@@ -178,6 +188,31 @@ def main():
             sz = SZ.get(m.group(1))
             if sz:
                 require(m.group(2), sz, 'R7_wide_store')
+
+        # R8: alloca のアドレスが call / ptrtoint で escape する場合, callee が [arg+K] で自フレーム内の隣接領域を
+        #     読み書きする (例: 44bae0 → 44ba50 が rcx=rbp から +0x2c..+0x3e を書く)。callee の参照幅は静的に分からないため、
+        #     RetDec の `stack_var_-N` 名 (N = フレーム上端からの距離) から「次の stack var までの間隔」(最上位は N 全体) へ拡幅する。
+        #     拡幅は stack を増やすだけで安全 (別 alloca とは重ならない)。
+        svars = {}
+        for v in allocas:
+            sm = re.match(r'^%stack_var_-(\d+)$', v)
+            if sm:
+                svars[v] = int(sm.group(1))
+        if svars:
+            ns = sorted(set(svars.values()))
+            gap = {}
+            for i, n in enumerate(ns):
+                gap[n] = n - (ns[i - 1] if i > 0 else 0)
+            for v, n in svars.items():
+                esc = False
+                aliases = {v} | {c for c, r in cast.items() if root(c) == v}
+                for m in re.finditer(r'^\s*(?:%[\w.$-]+ = )?(call [^\n]*|ptrtoint [^\n]*)$', body, re.M):
+                    line = m.group(1)
+                    if any(re.search(re.escape(a) + r'(?![\w.$-])', line) for a in aliases):
+                        esc = True
+                        break
+                if esc:
+                    require(v, gap[n], 'R8_escape_gap')
 
         nb = body
         for v, sz in sorted(need.items()):

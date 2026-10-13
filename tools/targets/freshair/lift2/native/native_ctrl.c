@@ -23,6 +23,16 @@ static const unsigned long long WRAP_VT[3] = {0x1810e1be8ULL, 0x1810faad0ULL, 0x
 static float __attribute__((ms_abi)) host_get(void* self) { float f; memcpy(&f, (char*)self + 8, 4); return f; }
 static uint64_t VT[8][32];
 static unsigned char *g_sc, *g_io, *g_sl, *g_sr2;
+/* FA-4 観測フック (FA_MAP_TRACE=1): 0x180c9d700 (child param 設定 setter) を差替え、(child 種別/idx, id, value) を記録する。
+ * harness の controller map (C+0x318) は空で本物の setter は param を解決できず no-op のため、差替えでも挙動は変わらない。 */
+static unsigned char* g_trCk[8]; static int g_trSidx;
+static void __attribute__((ms_abi)) map_hook(void* child, int id, float v, void* key) {
+    int k = -1; for (int i = 0; i < 8; i++) if ((void*)g_trCk[i] == child) k = i;
+    uint32_t vb; memcpy(&vb, &v, 4); uint32_t kc = 0xffffffff, kidx = 0xffffffff;
+    if (key) { memcpy(&kc, key, 4); memcpy(&kidx, (char*)key + 4, 4); }
+    fprintf(stderr, "MAPTRACE S%d k=%d type=%s id=0x%x value=%08x keycnt=%u key0=%u\n", g_trSidx, k,
+            k < 0 ? "?" : (CHAIN[k] == 0 ? "comp" : CHAIN[k] == 1 ? "filter" : "gain"), id, vb, kc, kidx);
+}
 #define W64(b, o, v) do { uint64_t _t = (uint64_t)(uintptr_t)(v); memcpy((b) + (o), &_t, 8); } while (0)
 #define W32(b, o, v) do { uint32_t _t = (uint32_t)(v); memcpy((b) + (o), &_t, 4); } while (0)
 static void build_tree(uint8_t* im, unsigned char** Fp, unsigned char** Mp, unsigned char** Ck, unsigned char** Wk,
@@ -97,6 +107,10 @@ int main(int argc, char** argv) {
     if (getenv("FA_HEAP_ZERO")) g_heap_zero = 1;   /* FA-2c: machine heap 0 初期化 (wasm 側と determinism 揃え) */
     patch_iat(getenv("FA_IAT") ? getenv("FA_IAT") : "iat_slots.txt");
     patch_pokes(getenv("FA_POKES") ? getenv("FA_POKES") : "pokes.txt");
+    if (getenv("FA_MAP_TRACE")) {   /* mov rax, imm64 ; jmp rax */
+        unsigned char* h = im + (0x180c9d700ULL - 0x180000000ULL); uint64_t t = (uint64_t)(uintptr_t)&map_hook;
+        h[0] = 0x48; h[1] = 0xb8; memcpy(h + 2, &t, 8); h[10] = 0xff; h[11] = 0xe0;
+    }
     volatile int* fma = (int*)0x1813070f8ULL;
     int fma_v = argc > 3 ? atoi(argv[3]) : 0;
     proc_t fn = (proc_t)PROCESS;
@@ -109,6 +123,8 @@ int main(int argc, char** argv) {
         unsigned char *F, *M, *Ck[8], *Wk[8], *Pk[8], *Qk[8], *blk[8], *Rgk[8], *Rbk[8];
         build_tree(im, &F, &M, Ck, Wk, Pk, Qk, blk, Rgk, Rbk, vcap);
         unsigned char* ctx = gr_alloc(0x100);
+        for (int i = 0; i < 8; i++) g_trCk[i] = Ck[i];
+        g_trSidx = sidx;
         if (getenv("FA_FT")) fprintf(stderr, "post-ctor F=%p *(F+0x90)=%p M=%p\n", (void*)F, (void*)*(void**)(F + 0x90), (void*)M);
         *fma = fma_v;
         printf("S%d", sidx);

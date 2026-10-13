@@ -1,0 +1,16 @@
+{
+ "comment": "lift→wasm 標準ビルド設定の単一の正本 (PERF-P1 / #155)。根拠: tools/perf/REPORT.md §2.1 (bit-exact OTT x64c lift 実測)。liftlib/stdbuild.py と shell (stdbuild.py flags) が読む",
+ "fp": ["-ffp-contract=off", "-fno-fast-math"],
+ "fp_rounding": ["-ffp-contract=off", "-frounding-math", "-fno-fast-math"],
+ "profiles": {
+  "std": {"opt": ["-O3", "-flto"], "link": ["-Wl,--gc-sections"], "enforce": true,
+          "why": "-O2 以上必須 (O0 比 7×) / LTO 無害 (O2 比 1.15×) / gc-sections + 最小 export (サイズ -5.6%)"},
+  "o2": {"opt": ["-O2"], "link": ["-Wl,--gc-sections"], "enforce": true, "why": "O2 (署名ガードの変種)"},
+  "o3": {"opt": ["-O3"], "link": ["-Wl,--gc-sections"], "enforce": true, "why": "O3 LTO 無し (署名ガードの変種)"},
+  "ref": {"opt": ["-O0"], "link": ["-Wl,--no-gc-sections"], "enforce": false, "why": "署名の基準 (最適化なし・全関数保持)"},
+  "dev": {"opt": ["-O1"], "link": ["-Wl,--no-gc-sections"], "enforce": false, "why": "旧 pipeline 既定 (-O1 / no-gc)。後方互換のみ・性能目的には使わない"}
+ },
+ "forbidden_in_enforced": ["-O0", "-O1", "-Os", "-Oz", "-msimd128", "-mrelaxed-simd", "-ffast-math", "-Ofast", "-Wl,--no-gc-sections", "-sEXPORT_ALL=1", "-sEXPORT_ALL", "--converge"],
+ "default_profile": "std",
+ "guard_variants": ["ref", "o2", "o3", "std"]
+}
