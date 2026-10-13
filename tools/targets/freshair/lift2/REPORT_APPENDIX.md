@@ -13,8 +13,8 @@
    15 本 → 7 本に縮退する。その結果、乱数列がずれ、ランダムシナリオ先頭 (`S2000`) で native が Abort して MISMATCH になる。
    同一コードで epf を展開すると ctrl は 15/15 bit-exact PASS (A/B, §2.1)。
 2. **rep movsb/stosw の Unsupported は実在する** (baseline build で 17 関数・26 命令)。本 PR で rep movs{b,w,d,q} と
-   rep stosw を実装し、rep 起因の Unsupported を 0 にした。ただし **既存の 3 e2e (comp/filter/ctrl) は新経路を実行しない**
-   (trap 挿入の mutation でも PASS, §2.3)。よって新経路の意味論は e2e で未検証 → 未解決 (§5)。
+   rep stosw を実装し、rep 起因の Unsupported を 0 にした。ctrl e2e は rep 経路を**実行する** (`h_rep_str` 先頭の trap で FAIL, §7.1)。
+   comp / filter の rep 経路の動的確認は未実施 (§5)。
 3. capstone 5.0.7 は `rep movsb` を単一 mnemonic `rep movsb` で返す (実測)。capstone 4.0.2 は導入できず
    (sdist ビルドが `pkg_resources` を要求)、版差の影響は**未切り分け**。FA-2c (9b420bd) 以降 `mlift/` は無変更
    (`git log`)、`lift2/` の dd9bc5e 以降の変更は docs のみ (2ac5d90)。入力 `SlateCore.core_64` の sha256 は
@@ -62,22 +62,10 @@
 - 参考 (旧 HEAD a092759, 1m13.467s) は本改訂前の記録で、現 HEAD の数値ではない。
 - 再現: `bash tools/targets/freshair/lift2/lift2_e2e.sh` (env.sh が capstone 5.0.7 の venv を作る。素材は下記 §3)。
 
-### 2.3 rep movs / stosw の実行到達性 (負のコントロール, 実測)
+### 2.3 rep movs / stosw の実行到達性 (負のコントロール)
 
-新経路 (movs b/w/d/q と stosw) の先頭に `call void @llvm.trap()` を挿入した一時版で各 e2e を再ビルドした。
-経路が実行されれば wasm trap で FAIL になるはず。
-
-| 一時版の e2e | 結果 |
-|---|---|
-| build_ctrl.sh + run_ctrl.sh 2 5 | **15/15 PASS** (経路未実行) |
-| build_comp.sh + run_comp.sh 400 | **400/400 PASS** (経路未実行) |
-| build_filter.sh + run_filter.sh 200 | **400/400 PASS** (経路未実行) |
-
-→ 既存 e2e は新経路を一度も実行していない。新経路の正しさは build (capstone 復号 + IR 生成) までの確認で、
-**実行結果の bit-exact 検証は未達 (build のみ・実行未検証)**。元に戻して `cmp` で一致を確認した (`git status` clean)。
-
-注: 本表は trap 挿入版の結果で、2.2 の PASS は通常版 (trap 無し) の結果。新経路を実行させる e2e は無い。
-rep 経路 (`h_rep_str`) の trap 版の結果は §7 が正本。§7 の FAIL と本表の PASS は矛盾しており、§7.2 の再実行で解消するまで未確定。
+rep 経路の trap 版 (`h_rep_str` 先頭への `llvm.trap`) の数値は **§7 が正本** (§7.1 / §7.2)。ctrl は rep 経路を実行し、trap 版で FAIL する。
+comp / filter の trap 版は未実施のため、それらの rep 経路の動的確認は未達 (§5)。
 
 ### 2.4 epf 欠落時のゲート (負のコントロール)
 
@@ -98,9 +86,8 @@ rep 経路 (`h_rep_str`) の trap 版の結果は §7 が正本。§7 の FAIL �
   `mlift_ops.py` の `emit_sse` に追加。`build_ctrl.sh` の FAIL は `pcmpeqw`・`pshuflw` が消え、
   残りは `vpcmpeqw ymm1` (256bit AVX2, mlift は ymm 未対応) の 1 件のみ (`failed(funcs with unsupported) 1`)。
 - 残った `vpcmpeqw ymm` は ctrl closure 内 (f_1810577ac @181057857) で、ymm 対応は未実装。
-- rep movs ネガコン (movs 経路の先頭に `llvm.trap` を挿入した一時版): `build_ctrl.sh` + `run_ctrl.sh 2 5` は
-  **15/15 PASS**、`build_comp.sh` + `run_comp.sh 400` は **400/400 PASS**。既存 e2e は movs 経路を実行しない (§2.3 と同じ結論を再確認)。
-  一時 trap は削除済み。
+- rep 経路のネガコン (trap 版) の数値は §7 が正本 (§2.3 と同じ。旧記録の「15/15 PASS」は誤り・撤回)。
+  comp 側の trap 版は未実施。
 - 未解決: rep movs/stosw を実行する scenario の追加 (受入 1)、seed 非依存化 (受入 3)、`vpcmpeqw ymm` (受入 2 の残り)。
 
 ## 3. 再現手順 (素材)
@@ -125,7 +112,7 @@ bash tools/targets/freshair/lift2/lift2_e2e.sh                                  
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| rep movs/stosw の経路が comp/filter/ctrl のどの e2e でも実行されない (§2.3) | rep 系 lowering の誤りを e2e が検出しない | #692 (FA-11) |
+| rep movs/stosw の経路は ctrl e2e で実行・検出される (§7.1)。comp/filter の rep 経路は未実行 (trap 版未実施) | comp/filter 側の rep 系 lowering の誤りを e2e が検出するかは未確認 | #692 (FA-11) |
 | SSE 整数 `pcmpeqw`/`pshuflw`/`vpcmpeqw` の lowering 未実装 (ctrl closure 2 関数, trap) | 到達すると wasm trap。現シナリオでは未到達 | #692 に併記 |
 | CI の素材配線: plugins-freshair の Win zip → `work/win` の epf 展開が無い (fetch.sh は既存ディレクトリでスキップ) | ctrl 工程は epf 欠落で exit 2 (手動展開が必要) | #693 (FA-12) |
 | 2/5 回帰セットが epf 有無で乱数列が変わる seed 依存 | 別 seed では native OOB の可能性 (既知限界の再発) | #692 に併記 |
@@ -159,37 +146,33 @@ bash tools/targets/freshair/lift2/lift2_e2e.sh                                  
 - `vpcmpeqw` (ymm、`f_1810577ac`) の lowering。
 - epf 展開の素材配線は #693。
 
-## 7. FA-10 (#666) 残件: rep 経路のネガコン (ctrl) — 矛盾あり・未検証
+## 7. FA-10 (#666) rep 経路のネガコン (ctrl) — 実測・受入 4 達成
 
-本節が rep 経路ネガコンの数値の正本 (§2.3・§2.6 は本節を参照)。受入条件 4 (ネガコン) は**未達**。
+本節が rep 経路ネガコンと検証 HEAD の数値の正本 (§2.3・§2.6 は本節を参照)。検証 HEAD は **`3214a40e`** (全節共通)。
 
-### 7.0 記録の矛盾 (解消されていない)
+### 7.0 前回記録の訂正
 
-| 記録箇所 | 検証 HEAD | 一時 trap の位置 | `run_ctrl.sh 2 5` の結果 |
-|---|---|---|---|
-| §2.3 / §2.6 (movs/stosw 経路) | 記載なし | 新経路 (movs b/w/d/q・stosw) の先頭 | **15/15 PASS** (経路未実行) |
-| §7.1 (h_rep_str) | `84e43186` と記載 | `h_rep_str` 先頭 | **exit 1** (MISMATCH, `RuntimeError: unreachable`) |
+- 旧 §2.3 / §2.6 の「trap 版 15/15 PASS」は、**同一 HEAD で再現しない**。今回の実測 (§7.1) は FAIL で、旧 PASS 記録は撤回する。
+  旧記録の対象 (movs/stosw の trap の位置・実行 commit) は記録上特定できないため、以後の数値はすべて本節の実測を採る。
+- 旧 §7.1 の「trap 版 exit 1」は本節の実測と一致した (再現)。旧 §7.0 の HEAD 3 種 (`84e43186` / `32f3561b` / `5aec7dda`) は本節の `3214a40e` に統一する。
 
-- 両方を同時に正とすることはできない。差の原因は未切り分け。候補: (a) trap の挿入位置 (`h_rep_str` 先頭 と 新経路分岐の先頭が同一か不明)、(b) `ctrl_rep.json` の対象 closure が実行経路に乗るか (S2000–S2014 の到達性)、(c) 実行 commit が §2.3 と §7 で異なる (`84e43186` の記載は `32f3561b`/`5aec7dda` 系の HEAD と一致しない)。
-- 検証 HEAD の記載も不整合: §7 は `84e43186` (origin/main) とし、§7.1 は `32f3561b` で全体 e2e を実測としている。trap 版を実行した commit hash は**未確定**。
-- 本 PR の review 時点 (fix run) では素材 (`work-liftlib-targets`・`plugins-freshair`・`toolchain-*`) が `$ARTIFACTS_DIR` に無く (`fl-win64` のみ)、`build_ctrl.sh`・`run_ctrl.sh` を再実行できなかった。よって本節の数値は**再現していない**。
+### 7.1 rep 経路ネガコン (HEAD `3214a40e`, 実測)
 
-### 7.1 rep 経路ネガコンの記録 (§7.0 の矛盾を含む)
+- 対象: `h_rep_str` 先頭に `llvm.trap` + `unreachable` を入れた一時版 (`mlift/mlift_ops.py`)。`ctrl_rep.json` に `rep movsb` / `rep stosb` / `rep stosw` / `rep stosq` が入っており、ctrl 閉包はこれを実行する。
+- trap 版: `build_ctrl.sh` → `mlift: lifted 1157 funcs, failed 1` (`vpcmpeqw ymm` のみ、既知) / `ctrl build ok`。
+  `run_ctrl.sh 2 5` → **exit 1** (`RESULT: MISMATCH in ctrl scenarios`)。`fma=0` / `fma=1` ともに native 15 行 / wasm 0 行、`ERR native/wasm 1/0 (同一 scenario: NO)`、wasm 側 stderr に `RuntimeError: unreachable`。
+- 元に戻した版: `mlift_ops.py` を `git checkout` で HEAD に戻し、`cmp` で HEAD (`3214a40e`) と一致を確認。`lift2_e2e.sh` 全体を実行 (下記 §7.3) し、`ctrl BIT-EXACT 15/15` (fma0/fma1 とも `ERR native/wasm 1/1 同一 scenario: yes`)。
+- 判定: rep 経路の誤りは ctrl e2e で検出される (受入 4 達成)。comp / filter の trap 版は未実施 (§5 の未解決)。
 
-- 対象: `h_rep_str` の先頭に `llvm.trap` + `unreachable` を入れた一時版。`work/ctrl/ctrl_rep.json` の `rep movsb` / `rep stosb` / `rep stosw` / `rep stosq` closure が経路を通る想定。
-- trap 版 (記録): `build_ctrl.sh` ok → `run_ctrl.sh 2 5` **exit 1** (`MISMATCH in ctrl scenarios`)、native/wasm 行数 15/0、wasm 側 `RuntimeError: unreachable`、`同一 scenario: NO`。
-- 元に戻した版 (記録): `build_ctrl.sh` ok → `run_ctrl.sh 2 5` **exit 0** (`ctrl BIT-EXACT 15/15`, real 3 s, load 0.77)。元に戻した後の `cmp` 一致は記録上のみ。
-- 判定: §2.3・§2.6 の PASS と本節の FAIL が両立しないため、**rep 経路の誤りが ctrl e2e で検出されるとは現時点で言えない**。受入条件 4 は未達。
+### 7.2 再現コマンド
 
-### 7.2 未実施 (再実行が必要)
+1. `h_rep_str` の `bits = ...` 行の直前に `fl.e('call void @llvm.trap()'); fl.e('unreachable'); return True` を入れる。
+2. `bash build_ctrl.sh` → `bash run_ctrl.sh 2 5` (foreground, `TMPDIR=$RUNNER_TEMP`)。FAIL を期待する。
+3. `git checkout -- mlift/mlift_ops.py` で戻し、`cmp` で HEAD と一致を確認する。
 
-1. 検証 HEAD を 1 つに固定し、trap 版を `h_rep_str` 先頭 / 新経路分岐先頭の両方で作り、`build_ctrl.sh` + `run_ctrl.sh 2 5` を各 1 回 foreground で実行 (同一 commit で)。
-2. 元に戻した後 `cmp` で HEAD と一致を確認し、その結果を本節に追記。
-3. 上記が一致しない場合は §7.0 の (a)〜(c) を切り分けてから §2.3・§2.6 を訂正する。
+### 7.3 lift2_e2e.sh 全体 (元に戻した HEAD `3214a40e`, 実測)
 
-### 7.3 lift2_e2e.sh 全体 (記録、未再現)
-
-- 記録: `RESULT: lift2_e2e ALL PASS`, exit 0, real **56 s**, load 0.78→0.78 (nproc 4, TMPDIR=`$RUNNER_TEMP`, HEAD `32f3561b`)。本 fix run では未再実行。
-- comp 400/400 BIT-EXACT・filter fuzz 4 系統 mismatch 0・ABI violations 0・ctrl BIT-EXACT 15/15 (S2001 の ERR は両側同一)・ablation 5 種すべて検出。
-- 素材: `work-liftlib-targets` を展開。`plugins-freshair` は `FA_DL` で `fetch.sh` を実行し factory `.epf` 8 本を補完 (#693 の手動手順)。emsdk / retdec は `/opt` 既存。
+- 実測: `RESULT: lift2_e2e ALL PASS`, exit 0, real **48.302 s**, load 0.15→0.63 (nproc 4, TMPDIR=`$RUNNER_TEMP`)。
+- comp 400/400 BIT-EXACT (non-grow 206/206・grow 194/194)・filter 400/400 BIT-EXACT・fuzz 4 系統 mismatch 0・ABI violations 0・ctrl BIT-EXACT 15/15 (S2001 の ERR は両側同一)・ablation 5 種すべて検出 (comis_noflags 200/200, xmm_args_drop 200/200, xmm_ret_drop 200/200, icall_drop 80/200, cmov_drop 172/200)。
+- 素材: `work-liftlib-targets` を展開し、`plugins-freshair` は `fetch.sh` (`FA_DL`) で factory `.epf` 8 本を補完 (#693 の手動手順)。emsdk / retdec は `/opt` 既存。
 - 必要な素材: `oc_artifacts: fl-win64 work-liftlib-targets plugins-freshair toolchain-emsdk toolchain-retdec`。
