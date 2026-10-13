@@ -133,7 +133,7 @@ def _params(d):
             ps += ["u64 p%d_%d" % (i, k) for k in range(4)]
             pro += "Y p%d = {{p%d_0, p%d_1, p%d_2, p%d_3}}; " % ((i,) * 5)
         else:
-            ps.append("%s p%d" % (CT[t], i))
+            ps.append("%s p%d" % (CT.get(t, "u128"), i))
     return ", ".join(ps) or "void", pro
 
 
