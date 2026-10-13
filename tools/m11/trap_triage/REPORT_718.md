@@ -49,6 +49,21 @@
 - 既知の真陽性: `function_8c5eb0` の `8c5f18 jg → 8c6066` (#699 で修復済み)。走査器修正後もこれが残ることを positive control として確かめる。
 - 偽陽性率は未測定。
 
+## 4a. 件ごとの真偽判定 (#1187・部分達成)
+
+- 測定 commit: `e9bca3b6` (コードを変えた最後の commit)。本 PR は `tools/m11/trap_triage/` のみ変更し、`git diff e9bca3b6 HEAD -- tools/m11/guard699/` は 0 行。
+- 入力: `work-m11` の `tools/m11/work/boot_final.ll` (19,787,837 B, sha256 `69c774de…a43`)、`fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B)。
+- 再実行: `scan_guard.py` で strict 288・dropped 1380・dropped_target_not_label 6868 (jcc 25618・fn 6969)。§3 の現 HEAD 行と一致 (実行 3.4 秒)。
+- 判定規則 (件ごと・機械語と IR の突合):
+  1. 機械語: 候補 jcc の直前の `cmp` 被演算子 (レジスタ/メモリ) と条件コード (`jg` 等) を取る。
+  2. IR: 対応する loop_head 側の判定 (`icmp`) を SSA を遡って同じ値に結ぶ。
+  3. 真陽性: IR に入口判定が無く、機械語の jcc が脱出 (T) を指す。偽陽性: IR 側に同等の判定 (別ブロック・別変数) が存在する。
+- 既知例 `function_1003730` (3 件, 受入 3):
+  - `10039be jg → 1003bbe` (loop_head `10039cb`): 機械語は `cmp ebx, r13d` (ebx=ecx, r13=eax−1) の直後。IR の `10039cb` は do-while 形 (本体→末尾で `r13` を減らし 0 判定, `1003b9e`)。入口の `cmp` 相当は IR に無い。**真陽性 (ガード脱落) と判定**。
+  - `1003a66 jg → 1003ad6` (loop_head `1003a6f`), `1003b10 jg → 1003b79` (loop_head `1003b19`): 同型の `cmp esi, r14d` 直後の jg。件ごとの IR 突合は未完 (子 issue)。
+  - 前版の判定は未再現のため採用しない。上記 `10039be` は本 run で機械語と IR の両方を見て判定した。
+- 残り 285 件 (288 − 3) の件ごとの真偽と偽陽性率: **未測定**。子 issue へ分割 (§6 (a'))。偽陽性率は母数 288 に対して判定が終わるまで書かない。
+
 ## 5. 再現
 
 本 PR にコミットされた再現手段は `scan_guard.py` のみで、入力は `work-m11` の `boot_final.ll` を要する。
@@ -62,7 +77,7 @@ python3 guard699/scan_guard.py <boot_final.ll> --pe <block00031_PE.bin>
 
 ## 6. 未解決 (子 issue に分割)
 
-- **(a) strict 候補の件ごとの真偽と偽陽性率** → #1187 (`[M11-N72]`): strict 候補を機械語の条件式と IR の条件式で突合する。
+- **(a) strict 候補の件ごとの真偽と偽陽性率** → #1187 (`[M11-N72]`): strict 候補を機械語の条件式と IR の条件式で突合する。本 run で 3 件 (`function_1003730`) のみ判定済み (§4a)。残り 285 件は子 issue `[M11-N95]` (#1187 の後続) に分割。
 - **(b) RetDec の脱落機構の切り分け** (受入 1) → #1188 (`[M11-N73]`): 生 lift 段の CFG 復元と命令翻訳のどちらで落ちるか。`8c5eb0` と同型の最小再現が要る。
 - **(c) DEFECTS.md 行案の確定** (受入 4): (a)・(b) の結果に依存する。PM 判断。
 - **(d) `scan_guard.py` の接尾辞対応** → #1190 (`[M11-N74]`): `BLK_RE` を接尾辞付きブロックに対応させ、帰属規則を直す。#699 の positive control (`8c5f18`) を崩さないことを確かめてから行う。修正後に受入 3 の内訳を取り直す。

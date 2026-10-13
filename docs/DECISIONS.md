@@ -126,3 +126,11 @@
 - **比較した方式**: (a) gate を外す (`M11_ALLOW_LDFIX_DISABLED` を既定化・指紋検査の省略) — fail-closed を弱めるため不採用。(b) 修復後 IR を `--passes f3c` で重ねた overlay を build する — 正規 pass を経ず指紋 (`ir_sha256`) が一致しないため gate で拒否される。(c) e2e を修復後 wasm 単独に縮める — 修復前比較 (survey 突合・dyn の before 値) が取れなくなるため不採用。(d) 採用: 既存 opt-in と正規 pass のみを使う。
 - **理由**: opt-in は `ldfix=disabled` の記録を残すため、測定時の IR 条件が REPORT と成果物から読める。正規 pass 経由の IR は既定 gate をそのまま通る。`ldfix_img.py` (PE 無し) の出力は正規 pass の代用にならないため、修復後 wasm の入力に使わない。
 - **影響**: `ldfix_509_e2e.sh` の 6/7 は fl-win64 の PE (`FL_WIN64_DIR`) が要る (従来の「PE 無し」の前提を外す)。他の e2e (`ldfix_e2e.sh` 等) の PE 要件は変わらない。
+
+## D13 — liftdiff の既定 batch 状態は units のまま据え置く (hybrid への切替は根拠待ち)
+
+- **状態**: 保留 (2026-10-13, issue #1248 [LD-42]。子 issue #1464 [LD-50] で判断)
+- **決定**: `liftdiff_e2e.sh` [4/4] の既定 batch 状態は `units` のまま変えない。InitTable 充足の `hybrid` は `--state` で明示したときだけ使う。
+- **比較した方式**: (a) 既定を hybrid に切替 (InitUnits が実際に走り、空振り一致が 0 件になる)、(b) units のまま据え置き (採用・保留)。
+- **理由**: hybrid にすると sample:800 の判定が変わる (件数は `tools/liftdiff/REPORT_APPENDIX_LD42.md` §1・§3)。どちらが正しいかは関数ごとの差分根拠が無いと決まらないため、根拠無しに基準値を動かさない。units の InitUnits 空振り一致は `check_initunits.py` で検出済み (LD-25) で、この検出は hybrid 側でのみ成立する。
+- **影響**: 既定 batch の一致数は「InitUnits が呼ばれない状態での一致」である (件数の測定値は `tools/liftdiff/REPORT_APPENDIX_LD42.md` §1)。この数値を外部へ「実行初期化済みの一致」として出さない。

@@ -1,0 +1,146 @@
+0x1801ab1d0 function_1801ab1d0 verdict=match
+   case z      native_fault native=segv wasm=ok
+   case s      native_fault native=segv wasm=ok
+   case p0     native_fault native=segv wasm=ok
+   case p1     native_fault native=segv wasm=ok
+   case p01    native_fault native=segv wasm=ok
+   case pall   native_fault native=segv wasm=ok
+   case u16    equal        native=ok wasm=ok
+   case vm0    equal        native=ok wasm=ok
+   case qall   native_fault native=segv wasm=ok
+0x1801ab258 function_1801ab258 verdict=match
+   case z      native_fault native=segv wasm=ok
+   case s      native_fault native=segv wasm=ok
+   case p0     native_fault native=segv wasm=ok
+   case p1     native_fault native=segv wasm=ok
+   case p01    native_fault native=segv wasm=ok
+   case pall   native_fault native=segv wasm=ok
+   case u16    equal        native=ok wasm=ok
+   case vm0    equal        native=ok wasm=ok
+   case qall   native_fault native=segv wasm=ok
+0x1801ab3ec function_1801ab3ec verdict=unexec reason=native_fault_all_patterns
+   case z      native_fault native=segv wasm=ok
+   case s      native_fault native=segv wasm=ok
+   case p0     native_fault native=segv wasm=ok
+   case p1     native_fault native=segv wasm=ok
+   case p01    native_fault native=segv wasm=ok
+   case pall   native_fault native=segv wasm=ok
+   case u16    native_fault native=segv wasm=ok
+   case vm0    native_fault native=segv wasm=ok
+   case qall   native_fault native=segv wasm=ok
+   case fvm    native_fault native=segv wasm=ok
+0x1801c5e84 function_1801c5e84 verdict=mismatch
+   tag callee_divergence      [medium] trace entry_va at #2
+   tag import_call_seq        [medium] call_name at #0
+   tag unresolved_callee      [high] wasm called undefined function_1801baef8
+   tag wasm_trap              [high] oob: memory access out of bounds @ ld_wasm.wasm.block_ok < ld_wasm.wasm.HeapFree < ld_wasm.wasm.function_1801c0b6c < ld_wasm.wasm.function_1801c5e84 < globalThis.__l
+   case z      equal        native=ok wasm=ok
+   case s      native_fault native=segv wasm=ok
+   case p0     diff         native=ok wasm=ok
+        ret: {"native_rax": "0x1", "wasm_rax": "0x0", "width": 64}
+        calls: {"index": 0, "native": "HeapFree", "wasm": "function_1801baef8", "kind": "call_name"}
+        trace: {"index": 2, "kind": "entry_va", "native": "0x1801c0b6c", "wasm": "0x1801bafb0", "native_len": 6, "wasm_len": 22}
+   case p1     both_fault   native=segv wasm=trap
+   case p01    both_fault   native=segv wasm=trap
+   case pall   both_fault   native=segv wasm=trap
+   case u16    wasm_trap    native=ok wasm=trap
+        wasm: memory access out of bounds @ ld_wasm.wasm.block_ok < ld_wasm.wasm.HeapFree < ld_wasm.wasm.function_1801c0b6c < ld_wasm.wasm.function_1801c5e84 < globalThis.__ld_call < Script.runInThisContext < Object.runInThisContext < runCase
+   case vm0    diff         native=ok wasm=ok
+        ret: {"native_rax": "0x1", "wasm_rax": "0x0", "width": 64}
+        calls: {"index": 0, "native": "HeapFree", "wasm": "function_1801baef8", "kind": "call_name"}
+        trace: {"index": 2, "kind": "entry_va", "native": "0x1801c0b6c", "wasm": "0x1801bafb0", "native_len": 6, "wasm_len": 10}
+   case qall   both_fault   native=segv wasm=trap
+0x1801c621c function_1801c621c verdict=mismatch
+   tag callee_divergence      [medium] trace entry_va at #3
+   tag import_call_seq        [medium] call_name at #0
+   tag unresolved_callee      [high] wasm called undefined function_1801baef8
+   tag wasm_trap              [high] oob: memory access out of bounds @ ld_wasm.wasm.block_ok < ld_wasm.wasm.HeapFree < ld_wasm.wasm.function_1801c0b6c < ld_wasm.wasm.function_1801c5e84 < ld_wasm.wasm.f
+   case z      equal        native=ok wasm=ok
+   case s      both_fault   native=segv wasm=trap
+   case p0     diff         native=ok wasm=ok
+        ret: {"native_rax": "0x1", "wasm_rax": "0x0", "width": 64}
+        calls: {"index": 0, "native": "HeapFree", "wasm": "function_1801baef8", "kind": "call_name"}
+        trace: {"index": 3, "kind": "entry_va", "native": "0x1801c0b6c", "wasm": "0x1801bafb0", "native_len": 98, "wasm_len": 314}
+   case p1     both_fault   native=segv wasm=trap
+   case p01    diff         native=ok wasm=ok
+        ret: {"native_rax": "0x1", "wasm_rax": "0x0", "width": 64}
+        calls: {"index": 0, "native": "HeapFree", "wasm": "function_1801baef8", "kind": "call_name"}
+        trace: {"index": 3, "kind": "entry_va", "native": "0x1801c0b6c", "wasm": "0x1801bafb0", "native_len": 98, "wasm_len": 342}
+   case pall   diff         native=ok wasm=ok
+        ret: {"native_rax": "0x1", "wasm_rax": "0x0", "width": 64}
+        calls: {"index": 0, "native": "HeapFree", "wasm": "function_1801baef8", "kind": "call_name"}
+        trace: {"index": 3, "kind": "entry_va", "native": "0x1801c0b6c", "wasm": "0x1801bafb0", "native_len": 98, "wasm_len": 314}
+   case u16    wasm_trap    native=ok wasm=trap
+        wasm: memory access out of bounds @ ld_wasm.wasm.block_ok < ld_wasm.wasm.HeapFree < ld_wasm.wasm.function_1801c0b6c < ld_wasm.wasm.function_1801c5e84 < ld_wasm.wasm.function_1801c621c < globalThis.__ld_call < Script.runInThisContext < Object.runInThisContext
+   case vm0    diff         native=ok wasm=ok
+        ret: {"native_rax": "0x1720f22a0", "wasm_rax": "0x1801c5e84", "width": 64}
+        calls: {"index": 0, "native": "HeapFree", "wasm": "function_1801baef8", "kind": "call_name"}
+        trace: {"index": 3, "kind": "entry_va", "native": "0x1801c0b6c", "wasm": "0x1801bafb0", "native_len": 98, "wasm_len": 102}
+   case qall   diff         native=ok wasm=ok
+        ret: {"native_rax": "0x1", "wasm_rax": "0x0", "width": 64}
+        calls: {"index": 0, "native": "HeapFree", "wasm": "function_1801baef8", "kind": "call_name"}
+        trace: {"index": 3, "kind": "entry_va", "native": "0x1801c0b6c", "wasm": "0x1801bafb0", "native_len": 98, "wasm_len": 446}
+0x1801c67a0 function_1801c67a0 verdict=mismatch
+   tag wasm_trap              [high] other: Aborted(native code called abort()) @ abort < __abort_js < ld_wasm.wasm.abort < ld_wasm.wasm.m8_fail < ld_wasm.wasm.function_1801c67a0 < globalThis.__ld_call < 
+   case z      both_fault   native=segv wasm=trap
+   case s      both_fault   native=segv wasm=trap
+   case p0     both_fault   native=segv wasm=trap
+   case p1     both_fault   native=segv wasm=trap
+   case p01    both_fault   native=segv wasm=trap
+   case pall   both_fault   native=segv wasm=trap
+   case u16    wasm_trap    native=ok wasm=trap
+        wasm: Aborted(native code called abort()) @ abort < __abort_js < ld_wasm.wasm.abort < ld_wasm.wasm.m8_fail < ld_wasm.wasm.function_1801c67a0 < globalThis.__ld_call < Script.runInThisContext < Object.runInThisContext
+   case vm0    wasm_trap    native=ok wasm=trap
+        wasm: Aborted(native code called abort()) @ abort < __abort_js < ld_wasm.wasm.abort < ld_wasm.wasm.m8_fail < ld_wasm.wasm.function_1801c67a0 < globalThis.__ld_call < Script.runInThisContext < Object.runInThisContext
+   case qall   both_fault   native=segv wasm=trap
+0x1801c682c function_1801c682c verdict=mismatch
+   tag callsite_arg_drop      [high] callee 0x1801c0b6c arg1: native=0x5 but wasm passes 0 (call site lost the argument; zero-padded)
+   tag callee_divergence      [medium] callee 0x1801c0b6c arg1 native=0x5 wasm=0x0
+   tag import_call_seq        [medium] call_name at #0
+   tag unresolved_callee      [high] wasm called undefined function_1801baef8
+   case z      both_fault   native=segv wasm=trap
+   case s      both_fault   native=segv wasm=trap
+   case p0     both_fault   native=segv wasm=trap
+   case p1     both_fault   native=segv wasm=trap
+   case p01    both_fault   native=segv wasm=trap
+   case pall   both_fault   native=segv wasm=trap
+   case u16    diff         native=ok wasm=ok
+        ret: {"native_rax": "0x1", "wasm_rax": "0x0", "width": 64}
+        calls: {"index": 0, "native": "HeapFree", "wasm": "function_1801baef8", "kind": "call_name"}
+        trace: {"index": 2, "kind": "entry_arg", "va": "0x1801c0b6c", "pos": 1, "type": "i64", "native": "0x5", "wasm": "0x0"}
+   case vm0    diff         native=ok wasm=ok
+        ret: {"native_rax": "0x1", "wasm_rax": "0x0", "width": 64}
+        calls: {"index": 0, "native": "HeapFree", "wasm": "function_1801baef8", "kind": "call_name"}
+        trace: {"index": 2, "kind": "entry_arg", "va": "0x1801c0b6c", "pos": 1, "type": "i64", "native": "0x5", "wasm": "0x0"}
+   case qall   native_fault native=segv wasm=ok
+0x1801c69cc function_1801c69cc verdict=mismatch
+   tag callee_divergence      [medium] trace wasm_extra_entry at #1
+   tag import_call_seq        [medium] wasm_extra_call at #0
+   tag unresolved_callee      [high] wasm called undefined function_1801baef8
+   tag wasm_trap              [high] oob: memory access out of bounds @ ld_wasm.wasm.block_ok < ld_wasm.wasm.HeapFree < ld_wasm.wasm.function_1801c0b6c < ld_wasm.wasm.function_1801c5e84 < ld_wasm.wasm.f
+   case z      equal        native=ok wasm=ok
+   case s      both_fault   native=segv wasm=trap
+   case p0     diff         native=ok wasm=ok
+        ret: {"native_rax": "0x1", "wasm_rax": "0x0", "width": 64}
+        calls: {"index": 0, "native": null, "wasm": "function_1801baef8", "kind": "wasm_extra_call", "native_len": 0, "wasm_len": 55}
+        trace: {"index": 1, "kind": "wasm_extra_entry", "va": "0x1801c621c", "native_len": 1, "wasm_len": 320}
+   case p1     both_fault   native=segv wasm=trap
+   case p01    diff         native=ok wasm=ok
+        ret: {"native_rax": "0x1", "wasm_rax": "0x0", "width": 64}
+        calls: {"index": 0, "native": "HeapFree", "wasm": "function_1801baef8", "kind": "call_name"}
+        trace: {"index": 4, "kind": "entry_va", "native": "0x1801c0b6c", "wasm": "0x1801bafb0", "native_len": 100, "wasm_len": 348}
+   case pall   diff         native=ok wasm=ok
+        ret: {"native_rax": "0x1", "wasm_rax": "0x0", "width": 64}
+        calls: {"index": 0, "native": null, "wasm": "function_1801baef8", "kind": "wasm_extra_call", "native_len": 0, "wasm_len": 55}
+        trace: {"index": 1, "kind": "wasm_extra_entry", "va": "0x1801c621c", "native_len": 1, "wasm_len": 320}
+   case u16    wasm_trap    native=ok wasm=trap
+        wasm: memory access out of bounds @ ld_wasm.wasm.block_ok < ld_wasm.wasm.HeapFree < ld_wasm.wasm.function_1801c0b6c < ld_wasm.wasm.function_1801c5e84 < ld_wasm.wasm.function_1801c621c < ld_wasm.wasm.function_1801c69cc < globalThis.__ld_call < Script.runInThisContext
+   case vm0    diff         native=ok wasm=ok
+        ret: {"native_rax": "0x1", "wasm_rax": "0x0", "width": 64}
+        calls: {"index": 0, "native": "HeapFree", "wasm": "function_1801baef8", "kind": "call_name"}
+        trace: {"index": 4, "kind": "entry_va", "native": "0x1801c0b6c", "wasm": "0x1801bafb0", "native_len": 100, "wasm_len": 108}
+   case qall   diff         native=ok wasm=ok
+        ret: {"native_rax": "0x1", "wasm_rax": "0x0", "width": 64}
+        calls: {"index": 0, "native": null, "wasm": "function_1801baef8", "kind": "wasm_extra_call", "native_len": 0, "wasm_len": 88}
+        trace: {"index": 1, "kind": "wasm_extra_entry", "va": "0x1801c621c", "native_len": 1, "wasm_len": 452}
+wrote work/ld32_n3/ott8_run.json
