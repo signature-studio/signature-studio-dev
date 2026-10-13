@@ -7,6 +7,7 @@
    usage: ./fill3_oracle [dll] [--dump <file>] */
 #define _GNU_SOURCE
 #include "../../ref/pe_load.h"
+#include "fl_dll_path.h"
 #include "../../src/ipp_min.h"
 #include "../../shim/gen/ipp_proto.h"
 #include <stdio.h>
@@ -566,13 +567,14 @@ static void err_grid_il(const char *nm, int kind, int nch) {
 
 int main(int argc, char **argv) {
   setvbuf(stdout, NULL, _IONBF, 0);
-  const char *dll = "/home/ubuntu/work/analysis/win64/extracted/block24356_PE.bin";
+  const char *dll = NULL;
   const char *path = NULL;
   for (int i = 1; i < argc; i++) {
     if (!strcmp(argv[i], "--dump") && i + 1 < argc) path = argv[++i];
     else if (!strcmp(argv[i], "--replay") && i + 1 < argc) path = argv[++i];
     else dll = argv[i];
   }
+  if (!dll) dll = fl_ipp_dll_path();
 #ifndef WASM_REPLAY
   if (pe_load(dll, &pe)) return 1;
   ((int (MS *)(uint64_t))ex("ippSetCpuFeatures"))(~0ULL);

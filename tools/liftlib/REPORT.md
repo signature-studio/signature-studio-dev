@@ -592,12 +592,19 @@ T12 は「join split が発動すること」を assert していたが、LIFTLI
 | e2e を素材付きで未実行 | 置換行以外の挙動は未検証 (置換は DLL パス定義のみ) | 本 PR のレビュー run (PR 本文の `oc_artifacts:` 行) |
 | `tools/liftlib/` 直下 5 ファイルに `/home/ubuntu` が残る | runner では symlink 必須 | 未起票 (2026-10-13 時点で `gh issue list --search "CI-4-liftlib"` は #386 のみ)。親 #294 にコメントで起票を提案 |
 
-## 17. LIFTLIB-5 (#342) — tan / tanf bit-exact・SVF 20/40 (未達)
+## 17. HB-H3 (#93): 整数引数脱落 (D3) の機械検出・復元 pass `iargs` — 付録へ移動
 
-- 既知類型との関係: 該当なし (DEFECTS.md D1a〜D16 未登録。新類型行案は §17.5)
+全文は **[`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §17** (本体の 250 行上限対応で分割移動。内容は削除していない)。
+- 結論: `passes.iargs` (既定 off) が RetDec の整数引数 (rdx/r8/r9) 脱落を機械語基準で検出・復元する。OTT ctor の native 突合は iargs ON 200/200・ネガコン (OFF) 0/200 (§17.2)。
+- 検出 `iargs.scan()` は define 15 / 引数不足 site 15 / 入口素通し位置の誤値 site 17 (`sites_entry`, #427 で実装) を返す (§17.7)。
+- 未達: getParameter の xmm0 戻り (RetDec route; jump table 欠落が先, §17.3)。未解決は §17.5。
+
+## 18. LIFTLIB-5 (#342) — tan / tanf bit-exact・SVF 20/40 (未達)
+
+- 既知類型との関係: 該当なし (DEFECTS.md D1a〜D16 未登録。新類型行案は §18.5)
 - 検証起点 commit: `7e00ff2` (clean HEAD ではなく ws-342 worktree。`bash liftlib_e2e.sh` はコミット済み状態で実行)
 
-### 17.1 結論
+### 18.1 結論
 | leaf (leafspec 40 scenario) | LIFTLIB-4 | LIFTLIB-5 |
 |---|---|---|
 | tan 1801a9be0 | 11/40 | **40/40** (mismatch 0 / crash 0) |
@@ -608,19 +615,19 @@ T12 は「join split が発動すること」を assert していたが、LIFTLI
 
 tan / tanf は `expect_match_min: 1.0` で gate 化した。SVF は未達のため gate 無し。
 
-### 17.2 原因と修復 (tan)
+### 18.2 原因と修復 (tan)
 1. **call の def 範囲** (`mc.py`): call は VOLATILE 全部を def にしていたため、callee が書かない `r10` (入口 sign) が call を跨ぐと bind 不能。callee 機械語の書込集合 (推移閉包) に絞る (`LL_NO_CALLEE_PRESERVE`)。
 2. **領域の多定義 bind** (`p1.py`): 領域は D からしか入らないが、生存側 S だけが書く def も候補に入れて復元不能になっていた。領域に流れる def に限定 (`LL_NO_REGION_DEFS`)。
 3. **setcc の i1** (`p1.py`): `xor r,r ; setcc r8` の結果が i1 で GPR bind に使えなかった。直前 8 命令内に同 reg のゼロ化がある時のみ `zext i1 → i64` で復元 (`LL_NO_SETCC_I1`)。
 4. **合流点 dead reg** (`p1.py`): 合流で live でない reg が束縛不能でも領域全体を捨てていた。dead なら合成せず捨てる (`LL_NO_DEAD_JOIN`)。
 5. **GPR rsp spill/reload** (`p1.py`): `mov [rsp+k], r64` / 逆を領域内で扱う (`LL_NO_GPR_SPILL`)。tan 単体の結果には効かないが領域再構成を通す語彙として追加。
 6. **ret / RX の複製 call** (`leafabi.py`): p1 が call を複製すると単一 SSA が ret を支配しない。全複製の戻りを alloca (i128) に store し ret/RX 前で load (`LL_NO_RET_PHI`)。RX は call 後の xmm0 読み手を全て差し替える (`LL_NO_RX_ALL`)。
-7. すべて `mc.LEAF_EXT` (leaf cfg のみ ON) の内側。FA/KH/OTT 既定は不変 (§17.4)。
+7. すべて `mc.LEAF_EXT` (leaf cfg のみ ON) の内側。FA/KH/OTT 既定は不変 (§18.4)。
 
-### 17.3 ハーネス修正 (SVF/cvt の測定が変わった理由)
+### 18.3 ハーネス修正 (SVF/cvt の測定が変わった理由)
 `native_runner.c` / `wasm_runner.mjs` は MS x64 ABI の引数レジスタを「gpr/xmm 独立カウント (SysV 的)」で割り当てていた。MS x64 は**位置**で決まる (第 N 引数 = rcx/rdx/r8/r9 か xmm0..3 の N 番目)。`(this, float, float)` の 2 つ目の float が xmm0 に入り xmm2 が 0 になっていたので、位置対応に直した。これで SVF 2/40 → 20/40、cvt 11/40 → 26/40 (trap 6 → 0)。`diff.py` に `ret_bits` を追加 (f32 戻りは下位 32bit のみ比較)。
 
-### 17.4 ネガティブコントロール (tan leafspec 一致数, 各 switch を 1 つだけ止めた実測)
+### 18.4 ネガティブコントロール (tan leafspec 一致数, 各 switch を 1 つだけ止めた実測)
 | switch | tan | 判定 |
 |---|---|---|
 | (全 ON) | 40/40 | — |
@@ -631,11 +638,11 @@ tan / tanf は `expect_match_min: 1.0` で gate 化した。SVF は未達のた�
 | `LL_NO_RET_PHI=1` | emcc 失敗 (does not dominate) | 効いている |
 | `LL_NO_GPR_SPILL=1` / `LL_NO_RX_ALL=1` | 40/40 | tan には不要 (SVF/汎用の語彙。効果は未測定) |
 
-### 17.5 検証 (実測)
+### 18.5 検証 (実測)
 `bash tools/liftlib/liftlib_e2e.sh` (HEAD `7e00ff2`、nproc=4): **ALL PASS / real 2m21.641s / 終了時 load average 0.99, 0.92, 0.69**。FA 400/400・KH 366/366・OTT checks 8/0・`--auto none` SHA 42/42・注入 94/94・T15 (残留 6) 不変。
 経過: LEAF_EXT 導入前は OTT 既定で emcc 失敗 + T15 が 15→14 でずれたため、拡張を leaf cfg に限定した。
 
-### 17.6 未解決 (起票先)
+### 18.6 未解決 (起票先)
 | 未解決 | 起票先 |
 |---|---|
 | SVF 20/40: mismatch 13 + trap 2 + crash 7。`this+0x10/0x14/0x18` (tanf 結果 `%18` を読む addss/mulss) の xmm0 差し替えが RetDec の insn.addr ずれで一部効かない | #342 (Refs で継続) |

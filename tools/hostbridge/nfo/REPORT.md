@@ -372,3 +372,20 @@ CAB-215 の主眼 (writeEntry ↔ 実機比較) は **ini セクション経由�
 - **クリーン HEAD**: `git worktree add --detach work/wt_h4 HEAD` で `h4_e2e.sh` を再実行 → node 側 42 ok / 0 FAIL・`h4_recount.mjs` exit 0。**Chrome フェーズのみ `report timeout`** (入れ子 `work/wt_*` パスで spawn-server の URL 解決が失敗するハーネス事象。実装側 §13.6 の記載と一致。実ディレクトリでは 3 回連続 exit 0)。検証後の worktree は撤去済。
 
 
+
+## 15. 追記 (#347 / PR #391, 2026-10-13): nfo_e2e.sh の typecheck 破損 (TS7016) を修正
+
+既知類型との関係: 該当なし (型検査設定のみ・lift 無関係)。
+
+- `/home/ubuntu` 絶対パスの置換 (`_fl.ts`・`metrics.ts`・`h4_e2e.ts`・`real_fst_check.mjs`・`reproduce.sh`・`kh_magic_check.mjs`・`ott_fst_dump.json`) は **#362 / PR #376 (`1c54e11`, merged) で main に入っている**。#347 は #362 の重複起票で、#347 の完了根拠は「#362 で完了済み」。本 PR はこの置換を含まない。
+- 本 PR の差分: `tsconfig.json` に `allowJs: true` / `checkJs: false` を追加、`nfo_e2e.sh` の env コメント更新、本節。
+- 修正の理由: #376 で `cli/metrics.ts`・`test/_fl.ts` が `tools/shared/paths.mjs` を import するようになり、型宣言が無いため main の `nfo_e2e.sh` typecheck が TS7016 で失敗していた。`allowJs` で `.mjs` を解決する (`checkJs:false` なので `.mjs` 自体は検査しない)。
+- 検証 (検証起点: 現 main `fac2c47` vs head `563b11e`、fl-win64 展開済み・`FL_WIN64_DIR` 指定、4 コア / load 1.00、`cd tools/hostbridge/nfo && SKIP_H4=1 bash nfo_e2e.sh`):
+
+| 対象 | exit | 所要 | 結果 |
+|---|---|---|---|
+| main `fac2c47` | **1** | 0.168 s | typecheck で `cli/metrics.ts(9,27)` / `test/_fl.ts(3,28)` が TS7016 |
+| head `563b11e` | **0** | 2.635 s | typecheck 出力なし・browser-safety ok・ini 406/406・CAB-218 failed 0 |
+
+  `node --test test/*.test.ts`: main・head とも tests 40 / pass 36 / fail 0 / skipped 4 (mac コーパス `FL_MAC_DIR` 素材なしで corpus 4 件 SKIP)。Chrome 段 (`h4_e2e.sh`) は本変更と無関係のため `SKIP_H4=1`。
+- 行数: 本 REPORT は 250 行上限 (DOC_MAP §1) を main 時点で超過済み (374 行)。分割は #437 (DOCS-5) で追跡する (#378 は p0c 領域で別件)。

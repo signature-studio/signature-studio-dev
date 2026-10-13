@@ -18,6 +18,8 @@ export type GuiHostOptions = {
   height: number;
   /** gui_worker.js の URL */
   workerUrl: URL | string;
+  /** frame 通知ごとに累計フレーム数で呼ばれる (window.__webstudio.frames の更新用) */
+  onFrame?: (totalFrames: number) => void;
 };
 
 type Waiter<T> = { match: (v: T) => boolean; resolve: (v: T) => void };
@@ -30,6 +32,7 @@ export class GuiHost {
   exitCode: number | null = null;
   private readonly worker: Worker;
   private readonly canvas: HTMLCanvasElement;
+  private readonly onFrame?: (totalFrames: number) => void;
   private readonly logWaiters: Array<Waiter<string>> = [];
   private readonly frameWaiters: Array<Waiter<number>> = [];
   private readbackId = 0;
@@ -42,6 +45,7 @@ export class GuiHost {
 
   private constructor(o: GuiHostOptions) {
     this.canvas = o.canvas;
+    this.onFrame = o.onFrame;
     this.view = new GuiView(o.memory.buffer, o.base);
     this.worker = new Worker(o.workerUrl, { type: "module" });
   }
@@ -88,6 +92,7 @@ export class GuiHost {
         break;
       case "frame":
         this.frames++; this.lastFrameSeq = m.seq;
+        this.onFrame?.(this.frames);
         for (let i = this.frameWaiters.length - 1; i >= 0; i--) {
           const w = this.frameWaiters[i];
           if (w.match(m.seq)) { this.frameWaiters.splice(i, 1); w.resolve(m.seq); }

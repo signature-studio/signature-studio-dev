@@ -74,6 +74,7 @@ T1 startup-glue (THostInstance+CreateFruityInstance+終了処理) / T2 vreg (仮
 T4 wininet-offline / T5 vfs-layout+asset-trace / T6 message-pump (SAB ring, Worker ブロック) / T7 cpython-wasm (任意) / T8 help-viewer (任意) /
 T9 license-import (任意・ユーザ起点) / T10 crash-restart / T11 license-observation。内容と依存は `stub_plan.md` §8。
 推奨順: **T2 → T3 → T1 (m11 の DllMain closure 後) → T6 → T5 → T11**。
+T5 の trace → 最小 asset 集合の変換器は `tools/startup/assettrace/REPORT.md` (実 FL trace は T1 待ち・#105)。
 
 ## 7. 参照した既存資産 (読取のみ)
 
