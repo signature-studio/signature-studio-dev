@@ -58,6 +58,9 @@ REGLIVE 2,509 (関数入口 live-in 等で脱落でない) / **FRAME_IN_ESCAPED 
 実測 (4 vCPU, `f4_e2e.sh`): コミット済み HEAD `7be6bab` で **175 s, rc 0, 6 gate 全 PASS / ネガコン 4/4** (開始時 load average 0.31 は初回。本回は終了時 0.99)。
 同一コード・初回実装時の再実行は 172 s / rc 0 (1 回目は監査集約の `riperead` キー誤記で rc 1・173 s。修正済み)。**n=2 (rc 0 の回)**、分散は未評価。
 
+**main 取り込み後の再実測** (merge commit `8637316`、Refs #577。`bash tools/m11/ldfix/f4_e2e.sh`、4 vCPU、開始 load 0.86 / 終了 1.00): **294 s, rc 0**、6 gate 全 PASS、ネガコン 4/4 が期待行付きで FAIL。RegisterClassW 2→3、ret 0x0→0x110000f は上の表と同じ。
+survey は **ok 864 / noproc 1 / miss 46 / trap 31** (pre・post 同一、units_run 22 / init_count 23 / icall_miss 0) で、上の表 (816/1/46/79) と一致しない。差 48 件のうち 36 件は main 取り込みで入った `m11_survey.mjs` の unit 別 VirtualAlloc 上限 (#513、既定 256 MB) の効果: 上限 0 (旧挙動) で再実行すると 828/1/46/67。残る 12 件 (828 vs 816) は未分離 (main 側 `m11_build.sh` 等の寄与の可能性)。`results/f4_564_{pre,noand,post}.json` は 8637316 の実行出力で上書きした。上の表の値は PR 時点 (7be6bab) の実測として残す。
+
 ## 5. 未解決 / 限界
 
 | 未解決 | 影響 | 起票先 (PM 採番) |

@@ -22,8 +22,8 @@
  "units_run": 22,
  "init_count": 23,
  "icall_miss": 0,
- "ok": 816,
+ "ok": 864,
  "noproc": 1,
  "miss": 46,
- "trap": 79
+ "trap": 31
 }
