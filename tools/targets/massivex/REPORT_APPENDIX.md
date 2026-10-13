@@ -135,6 +135,8 @@
   走査スクリプト (`license/scripts/mx_callers_probe.py` / `mx_callers_linear.py` / `mx_xref_fn.py`) と `license/e2e.sh` (`../work/extracted/...`) はいずれもこの `work/` を読む。
 - 陽性対照 (素材不要・同一 run): `python3 license/scripts/mx_callers_probe.py --selftest` と `python3 license/scripts/mx_callers_linear.py --selftest`。既知 E8 call 1 件 (0x180f95e20) と 2 件 (0x181142370) を含む合成 .text を走査し、他の 3 関数は 0 件。
   測定 commit `cd1e94ef` (license 配下のコードを変えた最後の commit)。
+  鮮度の証跡: `git diff cd1e94ef bb7c45ca -- tools/targets/massivex/license` は 0 行、`git diff cd1e94ef bb7c45ca -- tools/targets/massivex ':!*.md'` も 0 行 (本 run で確認)。
+  selftest は HEAD `bb7c45ca` でも再実行し、両方 PASS (rc 0)。
   - probe: 期待 1/2/0/0/0 件 → 検出 1/2/0/0/0 件 PASS (rc 0)
   - linear: 期待 1/2/0/0/0 件 → 検出 1/2/0/0/0 件 PASS (rc 0)
 - 検算器 (別アルゴリズム): `mx_callers_linear.py` は capstone で .text を先頭から線形逆アセンブルし、命令の call/jmp オペランドを数える。`mx_callers_probe.py` はバイト走査 (E8/E9 + rel32)。実 PE 上で両者の件数が一致することを確認する予定だが、本 run では未実施。
