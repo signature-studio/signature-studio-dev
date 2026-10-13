@@ -130,18 +130,19 @@ REPORT_N53 の 410 (378 + 32) とは一致する。
 
 ## 6. survey 退行検査 (受入 2)
 
-測定は `m11_e2e.sh` (`M11_SIGFIX_RECOVER=0` と `=1`) を foreground で実行した。`e2e_expect.env` の期待値 (stage 4 / survey ok 800) は両方で満たした。
+測定 commit: `8ddf7b41` (HEAD。main `004e6ad6` を取り込んだ merge。`git diff ac5d246c HEAD -- tools/m11 ':(exclude)*.md'` は 860 行の差分があるため、HEAD で再測定した)。
+測定は `m11_e2e.sh` を foreground で実行 (`M11_SIGFIX_RECOVER=0` と `=1`)。期待値 (stage 4 / survey ok 800) は両方で満たした。
 
-| IR | `M11_SIGFIX_RECOVER` | reached_stage | survey ok / trap / miss / clobber | 所要 |
+| `M11_SIGFIX_RECOVER` | reached_stage | survey ok / trap / miss / clobber | IR sha256 (`ir_sha256`) | 所要 |
 |---|---|---|---|---|
-| 再生成 IR `c9308c98…` (1061 site・416 件) | 0 | 4 | 872 / 23 / 46 / 0 | 2 分 34 秒 |
-| 再生成 IR `c9308c98…` (1061 site・416 件) | 1 | 4 | 872 / 23 / 46 / 0 | 54.9 秒 (`m11_e2e.sh` の全体) |
+| 0 | 4 | 872 / 23 / 46 / 0 | `c9308c98…` | 51 秒 (load 0.66 → 0.97) |
+| 1 | 4 | 872 / 23 / 46 / 0 | `c9308c98…` | 54 秒 |
 
-**受入 2 の判定**: ok 872 ≥ 870 で退行なし。ただし、測定に使った IR は `69c774…` ではなく `c9308c…` である。
+**受入 2 の判定**: ok 872 ≥ 870 で退行なし (両モード)。ただし測定に使った IR は reviewer が指定した `69c774…` ではなく、再生成 IR `c9308c98…` である。
 
-経緯: 展開物の `boot_final.ll` (`69c774…`・1049 site) を `m11_e2e.sh` で使うと、`m11_e2e.sh` が `gen_ir2 (boot5 追加)` を毎回呼び、IR を `c9308c…` に作り直す。`ir_conditions` の指紋・`lift_pe.sha256`・`boot5` の mtime は揃えたが、再生成を止められなかった (原因は未特定)。このため `69c774…` の IR に対する survey は取れていない。
+経緯 (再現手順): `m11_e2e.sh` は `work-m11` の展開物だけでは IR を保てず、毎回 `gen_ir2 (boot5 追加)` を呼んで `boot_final.ll` を `c9308c98…` に作り直す。`ir_conditions` の指紋・`lift_pe.sha256`・`boot5` の mtime を揃えて `touch` もしたが、再生成は止まらなかった (原因は未特定)。`69c774…` の IR での survey は本 PR では取れていない。
 
-**残件**: `69c774…` の IR での survey 再測定 (再生成を止める条件の特定が必要)。起票先は #1154。
+再生成 IR (`c9308c98…`) の値: 0 詰め site 1061・引数 2084、set_other 系 416 (384 + 32)。台帳と検算は `m11_setother_ledger_verify.py` で `match 416` / exit 0。
 
 ## 7. 再現
 
