@@ -229,6 +229,8 @@ build 8.0 s / survey 8.7 s (load average 0.4〜0.6、PE 無し・work-m11 スナ
 
 `SV_SKIP=<unit,...>`: 列挙した unit を実行せず `kind: "hang"` で記録する (ハングする unit を飛ばす用。上記 ON では不要)。
 
+**現 main (`0865903`) + 本 head での ON (410360 のみ) の再測定と ok 退行の原因は [REPORT_595.md](REPORT_595.md)** (OFF = main 対照と差 0、ON は ok 退行 5→1。上の §8.2 の表は旧 tree の値)。
+
 ### 8.3 #307 (liftdiff OOB 222) との関係
 
 liftdiff は hybrid closure の per-case 採点 (#307 は `414ad0` 系 68 が最多)、本調査は m11 の 942 unit survey で最多は `8cc190` 系 11。

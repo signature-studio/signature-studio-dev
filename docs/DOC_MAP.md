@@ -117,6 +117,7 @@
 | `tools/m11/alloca/REPORT.md` | ~150 | alloca 縮退修正 (CAB-129) |
 | `tools/m11/trap_triage/REPORT.md` | ~230 | M11 survey trap の個別原因切り分け (#130)・halt0 20 の原因 (#417)・OOB 44 分類 (#419) |
 | `tools/m11/trap_triage/REPORT_418.md` | ~70 | 409470 転記ハングの原因特定 (#418) |
+| `tools/m11/trap_triage/REPORT_595.md` | ~60 | ClassCreate ON (`M11_OV_CLASSCREATE=1`) の ok 退行 5→1 (`41c130` / `413060` 転記)・残る unit 415 の原因・ネガコン (#595) |
 | `tools/m11/trap_triage/REPORT_474.md` | ~100 | 410320 補完後の unit 114 ハング = 5c0270 の unlink deref 脱落 (#474)・409470/410320 再採用 |
 | `tools/m11/trap_triage/REPORT_482.md` | ~100 | `5c03d0` の node 差替え通知 `call [rbx+0x18]` の D15 脱落を復元 (#482)・survey 不変の実測 |
 | `tools/m11/trap_triage/REPORT_495.md` | ~115 | `SV_TRACE_AT` 付き survey で unit 134 が ok→oob になる原因 (trace の fprintf が残す stack 残骸 × `function_413870` の引数脱落) と trace の透過化 (#495) |
