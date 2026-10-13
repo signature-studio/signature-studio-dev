@@ -235,3 +235,6 @@ callee が `[rcx+0x2c..0x3e]` (GetCPInfo の LeadByte 表) に書くため、呼
 
 **必要性の判断**: unit 368 の 190.6 / 700.7 MB と unit 888 の 71.3 MB は**どちらも不要**。実際に要る大きさは、368 が 0 B (image の静的値 n=0)・888 が 260 B (count=65)。根拠は上の 5(b)(c) と 888 の再 build (要求が消え、survey の unit 別ラベル 942 本が不変)。
 **対処**: 上限緩和ではなく IR 修正側の問題。368 は M2p の全件 remap (#417) と同じ類型。本 issue では IR を直さず、原因確定と検証スクリプトのみを入れる (個別パッチは verify スクリプトの `patch_ir` に再現用として持つ)。M11_VA_UNIT_BUDGET_MB の既定 256MB で main の unit 368 (700.7MB) が oom 扱いになるのは、この欠陥の症状。
+
+## 15. (REPORT.md §15 から分割移動) #680: survey 測定基準の固定化 (ldfix/qstore の fail-closed・PE パス env 化)
+ldfix/qstore の skip を非 0 終了にし、IR 生成条件と IR の指紋を `work/ir_conditions.json` に記録する fail-closed 化。qstore on / off の差は本 runner の n=2 で再現した。測定値・未解決・環境間一致 (未実測) は [REPORT_N27.md](REPORT_N27.md)。

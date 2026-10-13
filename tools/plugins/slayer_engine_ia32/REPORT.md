@@ -186,6 +186,27 @@ ia32 で要注意の mnemonic (件数): cdq 21 / movzx 51 / movsx 54 / lea 590 /
 | N2 | x32 sizeof 期待を 0xA0 に誤る | `x32 sizeof 0x90 != 0xa0` (HIT) |
 | N3 | 期待 magic を 1 ずらす | `engine magic @0x0 = 1450406992, want 1450406993` (HIT) |
 
-### 9.3 未解決 (起票先: #674)
+### 9.3 dispatcher の実測 (#894 受入 1・2)
 
-§6 の未解決と同じ (VstEvents / ERect の engine 側読取、殻側の実物構造体、engine の store 値の実行確認)。
+`marshal.py` の `dispatch_facts` が検証する (RVA は ImageBase 0x10000000 からの相対)。
+
+| 項目 | 実測 |
+|---|---|
+| dispatcher (vtable[+0x18] の転送先) | RVA 0x1300 の opcode switch。 上限 `cmp eax,0x18` (= 24)、`ja` 先 0x149C |
+| opcode 25 (effProcessEvents) | 範囲外 → 既定分岐 0x149C (`mov eax,esi; ret 0x14`)。 VstEvents は読まれない |
+| opcode 13 (effEditGetRect) | 分岐先 0x1406: `ecx=[ecx+8]` (editor) → `vtable[+4]` へ `ERect**` を渡す |
+| ctor の `this+8` | 0 に初期化 (RVA 0x10E0 の `mov [edx+8],esi`、esi=0) |
+
+- **ERect の実書込みは block22434 の外 (editor クラス)**。 受入 2 は「書込み箇所の特定」まで。 実測の書込み箇所は別 block の探索が要る。
+- **VstEvents の読取箇所は、この dispatcher では見つからない**。 engine の events 読取は別経路 (process 系や別 block) にあると推定 (未確認)。 受入 1 は未達。
+- 殻 (x64) 側の VstEvents / ERect の実物定義は、リポジトリ内 (`vst2_abi.h` を含む) に無い。 受入 3 は未達。
+
+| NC | 壊した入力・期待 | 実測 FAIL |
+|---|---|---|
+| N4 | dispatcher の switch 上限 `cmp eax,0x18` → `0x19` (opcode 25 が範囲内に入る) | `opcode 25 (effProcessEvents) is inside the switch (bound 0x19)` (HIT) |
+
+`marshal.py` (gate) は `[marshal] OK`・exit 0。 `marshal.py --nega` は `nega: 0/4 miss`・exit 0 (N1〜N4 すべて期待どおりの理由で FAIL)。
+
+### 9.4 未解決 (起票先: #674)
+
+§6 の未解決と同じ (VstEvents / ERect の engine 側読取、殻側の実物構造体、engine の store 値の実行確認)。 受入 1・2 は「dispatcher 内に読取・書込みが無い」ことまで確定し、実際の箇所は未特定。
