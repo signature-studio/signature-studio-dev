@@ -133,6 +133,35 @@ def build_state(sess, upto=None, log=print, mode='units'):
                   'first_fail': fails[0][0] if fails else None, 'mode': mode, 'detail': detail}
 
 
+INIT_TABLE_PTR_RVA = 0x11eac90   # System.@InitUnits が読む InitTable 参照 (global slot)
+INIT_COUNT_RVA = 0x11eac98       # System.InitCount (InitUnits が進める)
+TLS_ARRAY_OFF = 0x1000           # heap 内 TLS 配列 (rt/ld_core.h LD_TLS_OFF)
+
+
+def _img_u64(st, addr, n=8):
+    """STATE の image run から addr の n byte を読む (無ければ None)"""
+    for rva, hx in st['img']:
+        a = int(rva, 16)
+        if a <= addr and addr + n <= a + len(hx) // 2:
+            return bytes.fromhex(hx)[addr - a:addr - a + n]
+    return None
+
+
+def precondition(st):
+    """boot 状態が InitUnits の前提 (InitTable 参照・InitCount・TLS index) を満たすか。
+    InitUnits は InitTable 参照が 0 だと何もせず戻るため、これが無い状態での比較は空振り一致になる。
+    戻り: dict(table_ptr, init_count, tls_set, ok)"""
+    tp = _img_u64(st, INIT_TABLE_PTR_RVA)
+    ic = _img_u64(st, INIT_COUNT_RVA, 4)
+    h = bytes.fromhex(st['heap'])
+    tls_set = sum(1 for i in range(1, 1024) if int.from_bytes(h[TLS_ARRAY_OFF + i * 8:TLS_ARRAY_OFF + i * 8 + 8], 'little'))
+    d = {'table_ptr': int.from_bytes(tp, 'little') if tp else 0,
+         'init_count': int.from_bytes(ic, 'little') if ic else 0,
+         'tls_set': tls_set}
+    d['ok'] = d['table_ptr'] != 0 and d['init_count'] != 0 and d['tls_set'] > 0
+    return d
+
+
 def _dump_state(r):
     r._send('STATE')
     r.p.stdin.flush()

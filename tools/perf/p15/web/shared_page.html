@@ -1,0 +1,11 @@
+<!doctype html><meta charset="utf-8"><title>p15 shared</title>
+<script>
+let w = null;
+window.runShared = (msg) => new Promise((res, rej) => {
+  if (w) w.terminate();
+  w = new Worker('/l/web/shared_worker.mjs', { type: 'module' });
+  w.onmessage = (ev) => (ev.data.ok ? res(ev.data.r) : rej(new Error(ev.data.error)));
+  w.onerror = (e) => rej(new Error('worker error ' + e.message));
+  w.postMessage(msg);
+});
+</script>

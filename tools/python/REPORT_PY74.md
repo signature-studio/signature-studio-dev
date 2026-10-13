@@ -87,3 +87,19 @@ wall の `1 秒` は `date +%s` の整数差。`—` は今回計時していな
 ### 既知の未解決 (文字の扱い)
 
 - JS の `host/ilmcp.mjs` `norm` は `String.prototype.trim()` (Unicode 空白も除去)、C の `browser_key` は `isspace` (ASCII のみ)。`"\u00a0Plugin database"` のような非 ASCII 空白を含むパスで JS は成功し C は code 1 になる。今回の差分テストは ASCII 入力のみのため検出されない。FL の木は ASCII のため現状の実害はない。扱いは #74 の子チケットで決める (起票先: #74)。
+
+## 7b-6. mixer 18 関数の差分検査 (#1136 / PY-25)
+
+mock (`host/fl_mock.mjs`) に定義がある `mixer.*` は 18 件で、C 側 (`provider/fl_engine.c`) も 18 件実装済み (ハンドラ 70 のうち)。mock に定義が無い残り 57 関数 (`mixer.getTrackInfo`・`getEqBandCount` 等) は意味論が無いため実装していない (mock に先に定義してから C に移す判断が必要)。本 PR が追加するのは `tests/mixer_diff.mjs` (48 呼出し、diffs 0)。`focusEditor` は署名 2 引数のため mock 比較では `plugIndex` を明示する。
+
+検証 (測定 commit = daad8883, runner 4 core, node 22.23.3, emsdk 6.0.12。wall は実測):
+
+| コマンド | 結果 | wall |
+|---|---|---|
+| `bash provider/build.sh` | exit 0・ハンドラ 70 | — |
+| `build_cpython_wasm.sh` | exit 0 (dist/python.wasm 5.9 MB) | 3 分 56 秒 |
+| `FLPY_SKIP_TABLE=1 build_flpy.sh` | exit 0 (dist/flpy.wasm 5.9 MB) | 5.8 秒 |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 70 / 未実装 365 / MCP 静的 60) | 0.34 秒 |
+| `node tests/mixer_diff.mjs` | calls 48、diffs 0、PASS | 0.05 秒 |
+| `node tests/device_diff.mjs` | calls 7 + reject 4、diffs 0、PASS | 0.05 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425 | 1.5 秒 |

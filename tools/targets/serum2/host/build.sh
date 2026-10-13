@@ -13,7 +13,7 @@ fi
 mkdir -p work/build
 x86_64-w64-mingw32-g++ -std=c++17 -O2 \
   -I"$SDK" \
-  -static-libgcc -static-libstdc++ \
+  -static -static-libgcc -static-libstdc++ \
   vst3host.cpp -o work/build/vst3host.exe \
   -lole32 -luuid
 echo "build ok: work/build/vst3host.exe"

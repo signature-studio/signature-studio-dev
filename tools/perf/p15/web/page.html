@@ -1,0 +1,10 @@
+<!doctype html><meta charset="utf-8"><title>p15 probe</title>
+<script>
+// K 個の Worker を立て、各 Worker で max 本まで instance 化する。合計成功数を返す。
+window.probeWorkers = (k, max) => Promise.all(Array.from({ length: k }, () => new Promise((res, rej) => {
+  const w = new Worker('/l/web/worker.mjs', { type: 'module' });
+  w.onmessage = (ev) => { res(ev.data); w.terminate(); };
+  w.onerror = (e) => rej(new Error('worker error ' + e.message));
+  w.postMessage({ max });
+}))).then((rs) => ({ k, max, per_worker: rs.map((r) => r.ok), total_ok: rs.reduce((a, r) => a + r.ok, 0), errors: [...new Set(rs.map((r) => r.err).filter(Boolean))] }));
+</script>
