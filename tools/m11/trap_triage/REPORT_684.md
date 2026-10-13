@@ -1,7 +1,7 @@
 # #684 単発 OOB 4 unit (95 / 275 / 477 / 895) の個別原因
 
 親: #596 (PR #675)。対象: `tools/m11/trap_triage/REPORT.md` §8.2 の OOB 13 件のうち単発の 4 unit。
-検証起点: `6c1a34f` (本 PR の最終コード HEAD。以降は docs のみ)。素材: work-m11 (`tools/m11/work` の複製) + fl-win64 (`$RUNNER_TEMP/fl-win64`)。
+検証起点: `791cce5` (本 PR の最終コード HEAD。以降 `718849f` まで docs のみ)。素材: work-m11 (`tools/m11/work` の複製) + fl-win64 (`$RUNNER_TEMP/fl-win64`)。
 
 既知類型との関係 (`docs/DEFECTS.md`): **477 は D11 の変種と判定** (10 進 `inttoptr` 形の VA 未変換)。95 / 275 / 895 は未判定。
 `tools/icall/REPORT.md` §4 の D 体系とは対応させていない。
@@ -45,8 +45,8 @@
 命令境界の検証: 4 unit の offset はすべて命令境界に一致。境界でないオフセット `0x18f8e0` は `not an instruction boundary` で失敗 (ネガコン)。
 
 - **95** `function_47ad70` @ `0x18f8df` = `i64.load offset=0`。直前は `local.get 5; i64.const 3; i64.shl; local.get 0; i64.add; i32.wrap_i64` (`oob_insn.py` の実出力)。`i32.wrap_i64` は `i64.add` の後・`i64.load offset=0` の前にある。
-  ループ内で `*(arg0 + (v << 3))` を読む (v = record の `+8` の値)。caller: `536da0` ← `4fe150` ← `5d2680` (unit 本体)。
-  この unit の直前に GDI 系 stub (GetDC / GetDeviceCaps / CreatePalette / GetStockObject / LoadIconW / MulDiv) が呼ばれる。
+  ループ内で `*(arg1 + (v << 3))` を読む (`arg1` は IR の `%arg1` = wasm local 0。v = record の `+8` の値)。caller: `536da0` ← `4fe150` ← `5d2680` (unit 本体)。
+  unit 内で GDI 系 stub (GetDC / GetDeviceCaps / CreatePalette / GetStockObject / LoadIconW / MulDiv) が呼ばれる (呼出し回数のみ確認、順序は未確認)。
 - **275** `function_864fe0` @ `0x935bf` = `i64.load offset=0` (`this+8` = `GetMonitorInfoW` の hMonitor)。`this` (arg1) が不正。
   caller: `80e040` のループ (項目を `function_8657b0` で取得し 864fe0 へ) ← `80e140` ← `80e170` (unit 本体)。
   unit 内で `GetMonitorInfoW` が 20 回、`EnumDisplayMonitors` が 1 回呼ばれる。両 stub は常に 0 を返し、コールバックを呼ばない (`tools/m11/work/m11_winstubs.c`)。
@@ -110,8 +110,8 @@ mkdir -p "$FL_WIN64_DIR" && tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C 
 tar --zstd -xf "$ARTIFACTS_DIR/work-m11.tar.zst" -C "$(git rev-parse --show-toplevel)"   # 内部パスは tools/m11/work/ 始まり (リポジトリ直下に展開)
 cd tools/m11
 mkdir -p work/trap_triage
-uv run --with capstone --with pefile bash m11_e2e.sh      # e2e (30.5〜30.7 s)
-SV_RAW=1 node trap_triage/survey_units.mjs work/trap_triage/head.json   # survey (12.4〜12.6 s) + 生 frame
+uv run --with capstone --with pefile bash m11_e2e.sh      # e2e (所要時間は §8)
+SV_RAW=1 node trap_triage/survey_units.mjs work/trap_triage/head.json   # survey (所要時間は §8) + 生 frame
 python3 trap_triage/oob_insn.py work/m11_boot.cjs.wasm 3067 18f8df 3   # 命令逆引き (wasm index, offset)
 node trap_triage/oob684_probe.mjs 477 0,22953608                          # unit 477 直前の値
 node trap_triage/oob684_probe.mjs 477 0 watch                             # address 0 の書込み元 unit
@@ -120,13 +120,15 @@ node trap_triage/oob684_probe.mjs 477 0 watch                             # addr
 `work-m11` 素材には `work/trap_triage/` が含まれず (`tar --zstd -tf` の grep で 0 件)、`survey_units.mjs` も出力先を作らないため、survey の前に `mkdir -p` が要る。
 survey は e2e で再生成した `work/m11_boot.cjs(.wasm)` に対して実行する。snapshot 単独では不可 (§5)。
 
-## 8. 検証結果 (実測、HEAD `6c1a34f`)
+## 8. 検証結果 (実測。HEAD ごとに記載、最新は下記の `718849f` 節)
+
+### 初回 (HEAD `6c1a34f`)
 
 - e2e `m11_e2e.sh` n=3: 30.5 / 30.6 / 30.7 s、load 0.45 / 0.67 / 0.80 (1 並列)。3 回とも reached_stage 4/6、units 22/942、survey ok 864 / trap 31 (oom 1) / miss 46 / noproc 1 / clobber 0。
   §8.2 (c) の e2e 値 (864 / 31 / 46 / 1) と一致。
 - survey `survey_units.mjs` n=3: 12.6 / 12.4 / 12.6 s、load 0.89 / 0.91 / 1.00。3 回とも ok 828 / halt0 54 / miss 46 / oob 13 / noproc 1。
 - 旧 frame との差: 13/13 (§1)。decoder の境界ネガコン (§2)。477 の 1 箇所実験 + ネガコン (§3)。
-- 修正の影響範囲: 修正箇所 (`survey_units.mjs` の非 halt0 の catch) は trap 全般 (oob / abort / other) に掛かる。本 run の非 halt0 trap は oob 13 件のみで、frames が出たのもその 13 件 (halt0 54 件の frames は別の分岐で作られ、本修正の対象外)。`annotate.py` の最上位 frame 集計は新しい値になる。
+- 修正の影響範囲: 修正箇所 (`survey_units.mjs` の非 halt0 の catch、`^\s*at ` 行の取得) は非 halt0 の trap 全般 (oob / abort / other) に掛かる。本 run の非 halt0 trap は oob 13 件のみで、いずれも frames を持つ。frames を持つのは oob 13 件 (本修正の対象) と halt0 54 件 (`survey_units.mjs` L69 の halt0 分岐が別に作る。本修正の対象外)。`annotate.py` の最上位 frame 集計は新しい値になる。
 
 ### 再検証 (review 2、検証起点 `791cce5` = oob_insn.py 修正の commit A)
 
