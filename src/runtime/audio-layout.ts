@@ -21,9 +21,9 @@ export const FLA_LAYOUT = {
 export type FlaField = keyof typeof FLA_LAYOUT;
 
 /** コマンド番号 (flaudio.h FLA_CMD_*) */
-export const FLA_CMD = { NONE: 0, OPEN: 1, CLOSE: 2, RESUME: 3, SET_SR: 4, MIDI_LIST: 5, INPUT_OPEN: 6, ATTACH: 7 } as const;
+export const FLA_CMD = { NONE: 0, OPEN: 1, CLOSE: 2, RESUME: 3, SET_SR: 4, MIDI_LIST: 5, INPUT_OPEN: 6, ATTACH: 7, CONTROL_PANEL: 8 } as const;
 /** dev_events ビット (flaudio.h FLA_EV_*) */
-export const FLA_EV = { SUSPENDED: 1, CLOSED: 2, RATE_CHANGED: 4, RESUMED: 8 } as const;
+export const FLA_EV = { SUSPENDED: 1, CLOSED: 2, RATE_CHANGED: 4, RESUMED: 8, INPUT_CHANGED: 16 } as const;
 
 /** wasm 側が報告するレイアウトと TS 表が一致することを検証する。不一致は fail-fast (throw) */
 export function verifyLayout(

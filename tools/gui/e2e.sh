@@ -30,8 +30,12 @@ echo "[gui-e2e] 1c/6 GUI-5 wasm SIMD128 行カーネル (scalar と画素完全�
 BENCH=0 bash "$HERE/test/simd_e2e.sh" | grep -E "OK|FAIL|ALL PASS|v128|cases"
 echo "[gui-e2e] 3/6 PE -> RetDec lift -> 後処理 (WNDPROC は自動検出)"
 bash "$HERE/lift/gui_lift.sh" "$HERE/test/gui_app.c" "$BUILD/lift"
+# gui_wasm.sh は既定で libfreetype (wasm32) を要するため、SKIP_NATIVE=1 でも step 4 より前に保証する (build.sh はフォントを要する)
+[ -f "$HERE/../shared/work/build/freetype/wasm32/src/objs/.libs/libfreetype.a" ] || { bash "$HERE/test/fetch_fonts.sh" | tail -1; FONT="$HERE/work/OpenSans-Regular.ttf" bash "$HERE/../shared/oss/freetype/build.sh" | tail -3; }
 echo "[gui-e2e] 4/6 emcc (pthread wasm + shim)"
 bash "$HERE/lift/gui_wasm.sh" "$BUILD/lift/lifted.c" "$BUILD/wasm" | tail -2
+echo "[gui-e2e] 4b/6 GUI-13 wasm ビルド (gui_ft.c + libfreetype 組込み) のブラウザ上テキスト描画 (独立オラクルと画素/metrics 全一致 + ネガコン 5 本 + 8x8 経路の回帰; RetDec 不要)"
+bash "$HERE/test/text_wasm_e2e.sh" | grep -E "組込み|regression|negctl|PASS|FAIL"
 echo "[gui-e2e] 5/6 tsc (src/runtime/gui*.ts -> build/js)"
 (cd "$HERE" && "$ROOT_REPO/node_modules/.bin/tsc" -p tsconfig.json)
 echo "[gui-e2e] 6/6 headless Chrome E2E (fixed memory)"

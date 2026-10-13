@@ -5,9 +5,10 @@
      native_ctrl.c の CHAIN 定数 {1,0,1,0,2,0,2,2} (0=comp 1=filter 2=gain) と一致することを確認する。
   2) native_ctrl (FA_MAP_TRACE=1) が記録した 0x180c9d700(child,id,value) 呼出を、factory .epf 8 本の macro 値から
      期待値を計算して突合する (S900.. = .epf をファイル名ソートした順。各 scenario 1 回目の process = 3 呼出)。
-       id 0x157 <- powf(M[0x9dc4], 0.62)   id 0x158 <- powf(M[0x9e0c], 0.62)   id 0x15a <- M[0x9e60] (そのまま)
+       id 0x157 <- powf(M[0x9dc4], 0.62)   id 0x158 <- powf(M[0x9e0c], 0.62)   id 0x15a <- 0.0 (リテラル照合・M[0x9e60] とは突合しない)
      宛先は全て子リスト entry 0 (= チェーン先頭の Filter)。0.62 は rdata 0x1810cac08 の f32。
-  exit 0 = 全 epf で一致。
+  判定は 1 周目 (先頭 3 呼出) のみ。2・3 周目の値は epf 直値から予測できず (0x157 は周回ごとに変化)、観測のみで表示する。
+  exit 0 = 全 epf の 1 周目で一致。
 """
 import glob, math, os, re, struct, sys
 import pefile
@@ -58,6 +59,7 @@ for ln in open(trace):
         tr.setdefault(int(s), []).append((int(k), ty, int(i, 16), struct.unpack('<f', bytes.fromhex(v)[::-1])[0], int(kc), int(k0)))
 EXP = f32(0.62)
 bad = 0
+later_n = {0x157: 0, 0x158: 0, 0x15a: 0}; later_ok = {0x157: 0, 0x158: 0, 0x15a: 0}
 print('\n%-20s %8s %8s | %-26s %-26s %-18s' % ('epf', 'mid', 'high', '0x157 got/exp(pow .62)', '0x158 got/exp(pow .62)', '0x15a got'))
 for i, f in enumerate(epfs):
     d = open(f, 'rb').read()
@@ -69,8 +71,13 @@ for i, f in enumerate(epfs):
     if ok:
         ok = ulp_diff(first[0][3], e157) <= 2 and ulp_diff(first[1][3], e158) <= 2 and first[2][3] == 0.0
     bad += not ok
+    for c in calls[3:]:   # 2・3 周目: 観測のみ (判定外)。epf 直値からの予測 (1 周目と同じ式) に一致するかを数える
+        later_n[c[2]] += 1
+        later_ok[c[2]] += (c[3] == 0.0) if c[2] == 0x15a else (ulp_diff(c[3], e157 if c[2] == 0x157 else e158) <= 2)
     g = [c[3] for c in first] + [float('nan')] * 3
     print('%-20s %8.4f %8.4f | %.7f / %.7f     %.7f / %.7f     %.7f  %s' % (os.path.basename(f)[:-4], mid, high, g[0], e157, g[1], e158, g[2], 'OK' if ok else 'FAIL'))
-print('\nRESULT: macro->child map %s (%d/%d epf, calls/scenario=%s)' % ('OK' if bad == 0 else 'FAIL', len(epfs) - bad, len(epfs),
+print('観測のみ (判定外) 2・3 周目: 0x157 予測一致 %d/%d, 0x158 予測一致 %d/%d, 0x15a=0.0 一致 %d/%d' % (
+      later_ok[0x157], later_n[0x157], later_ok[0x158], later_n[0x158], later_ok[0x15a], later_n[0x15a]))
+print('\nRESULT: macro->child map %s (%d/%d epf, calls/scenario=%s)' % ('OK' if bad == 0 and len(epfs) == 8 else 'FAIL', len(epfs) - bad, len(epfs),
       sorted({len(tr.get(900 + i, [])) for i in range(len(epfs))})))
 sys.exit(1 if bad or len(epfs) != 8 else 0)

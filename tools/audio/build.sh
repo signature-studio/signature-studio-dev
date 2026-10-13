@@ -14,13 +14,13 @@ mkdir -p "$OUT/worklets" "$OUT/js"
 # shellcheck disable=SC2086
 emcc "${FLA_CLANG_FLAGS[@]}" "${FLA_EMCC_FLAGS[@]}" ${FLA_DEFS:-} \
   -I"$HERE/src" \
-  "$HERE/src/flaudio.c" "$HERE/src/flasio.c" "$HERE/src/flwasapi.c" "$HERE/test/fla_test.c" \
+  "$HERE/src/flaudio.c" "$HERE/src/flasio.c" "$HERE/src/flwasapi.c" "$HERE/src/flds.c" "$HERE/test/fla_test.c" \
   -o "$OUT/fla_test.js"
 # JS 側: TS を ES module へトランスパイル (型検査は pnpm typecheck 側)、worklet は public/ をそのまま配置
 cp "$ROOT/public/worklets/fl-audio-worklet.js" "$OUT/worklets/"
 "$ROOT/node_modules/.bin/tsc" --target es2022 --module es2022 --moduleResolution bundler --skipLibCheck \
   --lib es2022,dom,dom.iterable --outDir "$OUT/js" --rootDir "$ROOT/src/runtime" --noEmit false --isolatedModules \
-  --strict --ignoreConfig "$ROOT/src/runtime/audio-layout.ts" "$ROOT/src/runtime/audio-shim.ts"
+  --strict --ignoreConfig "$ROOT/src/runtime/audio-layout.ts" "$ROOT/src/runtime/audio-shim.ts" "$ROOT/src/runtime/audio-input.ts"
 sed -i 's|from "./audio-layout"|from "./audio-layout.js"|' "$OUT/js/audio-shim.js"
 cp "$HERE/test/index.html" "$HERE/test/page.mjs" "$OUT/"
 # MIDI shim (AU-3 #188): flmidi_test.wasm + midi-shim.ts

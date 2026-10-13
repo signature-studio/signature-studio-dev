@@ -1,9 +1,11 @@
 /* fla_test.c — shim PoC テストプログラム (emcc -pthread, PROXY_TO_PTHREAD=1 で main が worker 上で走る)。
  * 引数: api=asio|wasapi mode=sine|ramp|loop buf=256 depth=2 secs=10 sr=48000 stress=0 work_us=0
  *       hiccup_ms=0 hiccup_every=0 profile=0
+ *       DirectSound: api=ds|ds_apicheck|ds_stopresume|ff_ds_excl  ds_fmt=pcm16|f32 ds_mode=poll|notify ds_size=<frames> mode=ramp|ramp16|sine|sine16
  * 結果は g_result (JSON 文字列) + g_done (futex) で main thread JS へ返す。 */
 #include "flasio.h"
 #include "flwasapi.h"
+#include "flds.h"
 #include "flaudio.h"
 #include <emscripten.h>
 #include <math.h>
@@ -14,9 +16,10 @@
 
 static struct {
     int asio; int apikind; int mode; /* 0 sine 1 ramp 2 loop */
-    uint32_t buf, depth, sr, stress, work_us, hiccup_ms, hiccup_every, timeinfo, sr_after, burst_floor;
+    uint32_t buf, depth, sr, stress, work_us, hiccup_ms, hiccup_every, timeinfo, sr_after, burst_floor, panel;
+    uint32_t ds_f32, ds_notify, ds_size;
     double secs;
-} P = { .asio = 1, .mode = 0, .buf = 256, .depth = 2, .sr = 48000, .secs = 10 };
+} P = { .asio = 1, .mode = 0, .buf = 256, .depth = 2, .sr = 48000, .secs = 10, .ds_size = 16384 };
 
 static char g_result[8192];
 static uint32_t g_done;
@@ -61,6 +64,7 @@ static void bufferSwitch(ASIOLong idx, ASIOBool direct) {
     load_sim();
 }
 static uint32_t g_resets, g_rate_changes;
+static int g_panel_code = 1;   /* flasio_control_panel の戻り値 (1 = 未呼出) */
 static uint64_t g_ti_last; static uint32_t g_ti_bad, g_ti_n;
 /* FLEngine (0xc56ae0, AU-7 #193) は timeInfo.flags の kSystemTimeValid と systemTime だけを読み、ns を 1e6 で割って int32 ms にし
  * timeGetTime() (= shimx の emscripten_get_now() 下位 32bit) と同じ時間軸で扱う。同じ変換で d = systemTime_ms − timeGetTime() を測る。 */
@@ -138,6 +142,7 @@ static int run_asio(char *j, size_t jn) {
     if (e != ASE_OK) { snprintf(j, jn, "{\"error\":\"createBuffers\",\"code\":%d}", e); return 1; }
     for (int i = 0; i < n; i++)
         for (int b = 0; b < 2; b++) (infos[i].isInput ? g_ibuf : g_obuf)[b][infos[i].channelNum] = infos[i].buffers[b];
+    if (P.panel) g_panel_code = flasio_control_panel();   /* FL の asiopanelbtn 相当 */
     if (P.sr_after) {   /* CreateBuffers 後・Start 前の SetSampleRate → main が AudioContext を再生成 */
         if (flasio_set_sample_rate((double)P.sr_after) != ASE_OK) { snprintf(j, jn, "{\"error\":\"setSampleRate_after\"}"); return 1; }
         P.sr = P.sr_after;
@@ -180,7 +185,7 @@ static int run_asio(char *j, size_t jn) {
         "\"in_overruns\":%u,\"in_underflows\":%u,\"min_fill\":%u,\"avg_fill\":%u,\"wake_count\":%u,\"wait_timeouts\":%u,"
         "\"ring_frames\":%u,\"quanta\":%u,\"reset_requests\":%u,\"wake_hist\":[%u,%u,%u,%u,%u,%u],\"latency_changes\":%u,\"T\":%u,\"burst_obs\":%u,\"timeinfo_cb\":%u},\"timeinfo\":{\"calls\":%u,\"bad\":%u,\"st_n\":%u,\"st_invalid\":%u,\"st_nonmono\":%u,\"st_dmin\":%d,\"st_dmax\":%d},"
         "\"clock\":{\"samples\":%d,\"fit_ok\":%d,\"rate_hz\":%.3f,\"audible_minus_now_ms\":%.3f,\"monotonic\":%d},"
-        "\"produced_frames\":%llu,\"resets_seen\":%u,\"rate_changes\":%u}",
+        "\"produced_frames\":%llu,\"resets_seen\":%u,\"rate_changes\":%u,\"panel_code\":%d}",
         name, P.buf, st.depth, P.sr, P.mode, elapsed / 1000.0,
         nin, nout, mn, mx, pref, gran, lin, lout, lout0, olat_us0, ci.type,
         st.cb_count, st.cb_late, st.cb_max_us, st.cb_avg_us, st.underruns, st.silence_frames,
@@ -188,7 +193,7 @@ static int run_asio(char *j, size_t jn) {
         st.ring_frames, st.quanta, st.reset_requests,
         st.wake_hist[0], st.wake_hist[1], st.wake_hist[2], st.wake_hist[3], st.wake_hist[4], st.wake_hist[5], st.latency_changes, st.T, st.burst_obs, st.timeinfo_cb, g_ti_n, g_ti_bad,
         g_st_n, g_st_invalid, g_st_nonmono, g_st_n ? g_st_dmin : 0, g_st_n ? g_st_dmax : 0,
-        ns, fit == 0, rate, offs, mono, (unsigned long long)g_n, g_resets, g_rate_changes);
+        ns, fit == 0, rate, offs, mono, (unsigned long long)g_n, g_resets, g_rate_changes, g_panel_code);
     return 0;
 }
 
@@ -286,12 +291,263 @@ static int run_apicheck(char *j, size_t jn) {
     return 0;
 }
 
+
+/* ---- DirectSound shim テスト: FL の呼出手順 (INVENTORY §2 / results/ds_static.txt) を再現するクライアント ----
+ * SetCooperativeLevel(PRIORITY) → CreateSoundBuffer(primary) → SetFormat → CreateSoundBuffer(secondary: 0x18000|0x100|0x8) →
+ * (notify: SetNotificationPositions 2 点) → 全域 Lock/Unlock でプリフィル → SetCurrentPosition(0) → Play(LOOPING) → 供給ループ。
+ * ds_fmt=pcm16 は WAVE_FORMAT_PCM (FL の 0x674e10 組立)、f32 は EXTENSIBLE+IEEE_FLOAT (0x674e50 組立)。 */
+static void ds_make_wfx(flds_wfx_t *w, int f32, uint32_t sr) {
+    memset(w, 0, sizeof *w);
+    w->nChannels = 2; w->nSamplesPerSec = sr;
+    if (f32) {
+        static const uint8_t sub[16] = { 3, 0, 0, 0, 0, 0, 0x10, 0, 0x80, 0, 0, 0xaa, 0, 0x38, 0x9b, 0x71 };
+        w->wFormatTag = FLDS_WAVE_FORMAT_EXTENSIBLE; w->wBitsPerSample = 32; w->cbSize = 22; w->wValidBitsPerSample = 32; w->dwChannelMask = 3;
+        memcpy(w->SubFormat, sub, 16);
+    } else { w->wFormatTag = FLDS_WAVE_FORMAT_PCM; w->wBitsPerSample = 16; w->cbSize = 0; }
+    w->nBlockAlign = (uint16_t)(2 * w->wBitsPerSample / 8);
+    w->nAvgBytesPerSec = sr * w->nBlockAlign;
+}
+static uint64_t g_ds_n;   /* クライアントが生成した総フレーム */
+static void ds_gen(uint8_t *dst, uint32_t frames, int f32) {
+    for (uint32_t k = 0; k < frames; k++) {
+        uint64_t n = g_ds_n + k;
+        if (f32) {
+            float *o = (float *)(dst + (size_t)k * 8);
+            if (P.mode == 0) { o[0] = (float)(0.5 * sin(2.0 * M_PI * 440.0 * (double)n / (double)P.sr)); o[1] = (float)(0.5 * sin(2.0 * M_PI * 660.0 * (double)n / (double)P.sr)); }
+            else { o[0] = (float)((n & 0xFFFFFFu) + 1); o[1] = -o[0]; }
+        } else {
+            int16_t *o = (int16_t *)(dst + (size_t)k * 4);
+            o[0] = (int16_t)(n % 30000 + 1); o[1] = (int16_t)-o[0];   /* page.mjs の ramp16 期待値と同じ式 */
+        }
+    }
+    g_ds_n += frames;
+}
+static int ds_write(uint32_t off_bytes, uint32_t bytes, int f32, uint32_t blk) {
+    void *p1, *p2; uint32_t n1, n2;
+    FLDSHR hr = flds_buf_lock(off_bytes, bytes, &p1, &n1, &p2, &n2, 0);
+    if (hr != FLDS_OK) return -1;
+    ds_gen((uint8_t *)p1, n1 / blk, f32);
+    if (p2 && n2) ds_gen((uint8_t *)p2, n2 / blk, f32);
+    return flds_buf_unlock(p1, n1, p2, n2) == FLDS_OK ? 0 : -2;
+}
+/* FL と同じ前処理。secondary を作り、プリフィルまで行う。失敗時 FLDSHR のステップ番号を負で返す */
+static int ds_setup(int f32, uint32_t size_frames, int notify, flds_wfx_t *wfx, uint32_t *size_bytes) {
+    flds_configure(P.buf, P.depth);
+    uint32_t blk = f32 ? 8 : 4;
+    ds_make_wfx(wfx, f32, P.sr);
+    flds_bufdesc_t pd = { 20, FLDSBCAPS_PRIMARYBUFFER, 0, 0, NULL };
+    uint32_t fl = 0x18000u | 0x8u | (notify ? FLDSBCAPS_CTRLPOSITIONNOTIFY : 0);
+    flds_bufdesc_t sd = { 20, fl, size_frames * blk, 0, wfx };
+    if (flds_create() != FLDS_OK) return -1;
+    if (flds_set_cooperative_level(FLDSSCL_PRIORITY) != FLDS_OK) return -2;
+    if (flds_create_sound_buffer(&pd) != FLDS_OK) return -3;
+    if (flds_primary_set_format(wfx) != FLDS_OK) return -4;
+    if (flds_create_sound_buffer(&sd) != FLDS_OK) return -5;
+    *size_bytes = size_frames * blk;
+    if (notify) {
+        flds_notify_pos_t np[2] = { { 0, 0 }, { *size_bytes / 2, 1 } };
+        if (flds_notify_set_positions(2, np) != FLDS_OK) return -6;
+    }
+    if (ds_write(0, *size_bytes, f32, blk) != 0) return -7;
+    if (flds_buf_set_current_position(0) != FLDS_OK) return -8;
+    return 0;
+}
+
+static int run_ds(char *j, size_t jn) {
+    const int f32 = P.ds_f32, notify = P.ds_notify;
+    const uint32_t S = P.ds_size, blk = f32 ? 8 : 4, half = S / 2;
+    flds_wfx_t wfx; uint32_t sb = 0;
+    int st = ds_setup(f32, S, notify, &wfx, &sb);
+    if (st) { snprintf(j, jn, "{\"error\":\"ds_setup\",\"step\":%d}", st); return 1; }
+    for (uint32_t k = 0; k < P.stress; k++) { pthread_t t; pthread_create(&t, NULL, stress_fn, NULL); pthread_detach(t); }
+    flds_wfx_t got; flds_primary_get_format(&got);
+    if (flds_buf_play(0, 0, FLDSBPLAY_LOOPING) != FLDS_OK) { snprintf(j, jn, "{\"error\":\"play\"}"); return 1; }
+    double t0 = emscripten_get_now();
+    uint64_t filled = S;            /* クライアントが書いた総フレーム (プリフィル済み = S) */
+    uint64_t played = 0; uint32_t last_p = 0;
+    uint32_t polls = 0, notifies = 0, fills = 0, back = 0;
+    uint32_t ahead_min = 0xffffffffu, ahead_max = 0, wrapped = 0, misses = 0, order_bad = 0;
+    uint32_t next_half = 0;         /* notify: 次に補充する半面 (0/1)。初回は S/2 を通過した時 = 半面 0 */
+    while (emscripten_get_now() - t0 < P.secs * 1000.0) {
+        uint32_t pb, wb;
+        if (notify) {
+            uint32_t mask = 0;
+            int rc = flds_wait_notify(100, &mask);
+            if (rc != 0) { if (rc == 1) misses++; continue; }
+            notifies++;
+            if (flds_buf_get_current_position(&pb, &wb) != FLDS_OK) fla_failfast("test", "GetCurrentPosition failed");
+            /* 通知 1 回 = 半面 1 個を再生し終えた。合体 (複数 bit) は fill_half を複数回呼ぶ */
+            /* bit1 (offset S/2 を通過) → 半面 0 が再生済み、bit0 (offset 0 を通過) → 半面 1 が再生済み。
+             * 通知は再生順に交互にしか来ないので、単独 bit は期待する半面と一致しなければならない (順序違反の検出)。合体 (2 bit) は 2 面分補充 */
+            uint32_t nb = (uint32_t)__builtin_popcount(mask);
+            if (nb == 1 && (mask == 2u ? 0u : 1u) != next_half) order_bad++;
+            for (uint32_t b = 0; b < nb; b++) {
+                if (ds_write(next_half * half * blk, half * blk, f32, blk) != 0) fla_failfast("test", "Lock/Unlock failed");
+                filled += half; fills++; next_half ^= 1;
+            }
+            load_sim();
+        } else {
+            wait_ms(1);
+            polls++;
+            if (flds_buf_get_current_position(&pb, &wb) != FLDS_OK) fla_failfast("test", "GetCurrentPosition failed");
+            uint32_t pf = pb / blk;
+            uint32_t d = (pf + S - last_p) % S;
+            if (d > S / 2) back++; else { if (pf < last_p) wrapped++; played += d; }
+            last_p = pf;
+            if (filled - played < S / 2) {   /* 先行量が半分を切ったら S/4 を補充 (連続領域を Lock) */
+                uint32_t k = S / 4;
+                if (ds_write((uint32_t)(filled % S) * blk, k * blk, f32, blk) != 0) fla_failfast("test", "Lock/Unlock failed");
+                filled += k; fills++;
+            }
+            load_sim();
+        }
+        uint32_t pf = pb / blk, wf = wb / blk;
+        uint32_t ahead = (wf + S - pf) % S;   /* write cursor が play cursor から何フレーム先か */
+        if (pb >= sb || wb >= sb || pb % blk || wb % blk) back += 1000;   /* 範囲/整列違反 */
+        if (ahead < ahead_min) ahead_min = ahead;
+        if (ahead > ahead_max) ahead_max = ahead;
+    }
+    double elapsed = emscripten_get_now() - t0;
+    flds_stats_t s; flds_get_stats(&s);
+    fla_ctl_t *c = fla_ctl();
+    uint32_t quanta = __atomic_load_n(&c->quanta, __ATOMIC_SEQ_CST);
+    flds_release();
+    g_stress_stop = 1;
+    snprintf(j, jn,
+        "{\"api\":\"ds\",\"fmt\":\"%s\",\"notify\":%d,\"buf\":%u,\"depth\":%u,\"sr\":%u,\"mode\":%d,\"secs_wall\":%.3f,"
+        "\"reported\":{\"size_frames\":%u,\"primary_tag\":%u,\"primary_bits\":%u},"
+        "\"stats\":{\"underruns\":%u,\"silence_frames\":%u,\"quanta\":%u,\"T\":%u,\"ring_frames\":%u,\"latency_changes\":%u,"
+        "\"polls\":%u,\"notifies\":%u,\"notify_timeouts\":%u,\"notify_order_bad\":%u,\"fills\":%u,\"unlocked_frames\":%llu},"
+        "\"cursor\":{\"backward_or_range_bad\":%u,\"wraps_seen\":%u,\"write_ahead_min\":%u,\"write_ahead_max\":%u},"
+        "\"produced_frames\":%llu}",
+        f32 ? "f32" : "pcm16", notify, P.buf, s.depth, P.sr, P.mode, elapsed / 1000.0,
+        S, got.wFormatTag, got.wBitsPerSample,
+        s.underruns, s.silence_frames, quanta, s.T, s.ring_frames, s.latency_changes,
+        polls, notifies, misses, order_bad, fills, (unsigned long long)(s.bytes_unlocked / blk),
+        back, wrapped, ahead_min, ahead_max, (unsigned long long)g_ds_n);
+    return 0;
+}
+
+/* Stop → カーソル凍結 → SetCurrentPosition → Play で再開、を検証する */
+static int run_ds_stopresume(char *j, size_t jn) {
+    const int f32 = P.ds_f32; const uint32_t S = P.ds_size, blk = f32 ? 8 : 4;
+    flds_wfx_t wfx; uint32_t sb = 0;
+    int st = ds_setup(f32, S, 0, &wfx, &sb);
+    if (st) { snprintf(j, jn, "{\"error\":\"ds_setup\",\"step\":%d}", st); return 1; }
+    uint32_t pos[8] = {0}, fills = 0;
+    uint64_t filled = S, played = 0; uint32_t last_p = 0;
+    uint32_t stat_bits = 0, stat_run, stat_stop;
+    flds_buf_get_status(&stat_bits);
+    uint32_t stat_idle = stat_bits;
+    FLDSHR setpos_playing = 0;
+    flds_buf_play(0, 0, FLDSBPLAY_LOOPING);
+    flds_buf_get_status(&stat_run);
+    double t0 = emscripten_get_now();
+    while (emscripten_get_now() - t0 < P.secs * 400.0) {
+        wait_ms(1);
+        uint32_t pb; flds_buf_get_current_position(&pb, NULL);
+        uint32_t pf = pb / blk, d = (pf + S - last_p) % S; played += d; last_p = pf;
+        if (filled - played < S / 2) { uint32_t k = S / 4; ds_write((uint32_t)(filled % S) * blk, k * blk, f32, blk); filled += k; fills++; }
+    }
+    setpos_playing = flds_buf_set_current_position(0);          /* 再生中は INVALIDCALL */
+    flds_buf_stop();
+    flds_buf_get_status(&stat_stop);
+    flds_buf_get_current_position(&pos[0], NULL);
+    wait_ms(400);
+    flds_buf_get_current_position(&pos[1], NULL);                /* 停止中は不変 */
+    FLDSHR sp = flds_buf_set_current_position(1024 * blk);       /* 停止中は移動可 */
+    flds_buf_get_current_position(&pos[2], NULL);
+    flds_buf_play(0, 0, FLDSBPLAY_LOOPING);
+    wait_ms(400);
+    flds_buf_get_current_position(&pos[3], NULL);
+    double t1 = emscripten_get_now();
+    uint32_t pw = 0;
+    while (emscripten_get_now() - t1 < 800) { wait_ms(2); flds_buf_get_current_position(&pw, NULL); }
+    pos[4] = pw;
+    flds_buf_stop();
+    flds_release();
+    snprintf(j, jn,
+        "{\"api\":\"ds_stopresume\",\"fmt\":\"%s\",\"size_frames\":%u,\"blk\":%u,"
+        "\"pos\":[%u,%u,%u,%u,%u],\"set_pos_playing\":%d,\"set_pos_stopped\":%d,\"status\":{\"idle\":%u,\"run\":%u,\"stop\":%u},\"fills\":%u}",
+        f32 ? "f32" : "pcm16", S, blk, pos[0], pos[1], pos[2], pos[3], pos[4], setpos_playing, sp, stat_idle, stat_run, stat_stop, fills);
+    return 0;
+}
+
+static int run_ds_apicheck(char *j, size_t jn) {
+    flds_wfx_t w16, w24, wbad;
+    ds_make_wfx(&w16, 0, 48000); ds_make_wfx(&w24, 0, 48000); w24.wBitsPerSample = 24; w24.nBlockAlign = 6; w24.nAvgBytesPerSec = 48000 * 6;
+    ds_make_wfx(&wbad, 0, 48000); wbad.wFormatTag = 7;
+    void *p1, *p2; uint32_t n1, n2;
+    int c_lock_nosec = flds_buf_lock(0, 16, &p1, &n1, &p2, &n2, 0);
+    int c_create_noinit = flds_set_cooperative_level(FLDSSCL_PRIORITY);
+    flds_create();
+    flds_bufdesc_t pd = { 20, FLDSBCAPS_PRIMARYBUFFER, 0, 0, NULL };
+    int c_setfmt_noprim = flds_primary_set_format(&w16);
+    int c_prim = flds_create_sound_buffer(&pd);
+    int c_prim_twice = flds_create_sound_buffer(&pd);
+    int c_setfmt_nopri = flds_primary_set_format(&w16);       /* NORMAL 協調レベルでは PRIOLEVELNEEDED */
+    flds_set_cooperative_level(FLDSSCL_PRIORITY);
+    int c_setfmt_bad = flds_primary_set_format(&wbad);
+    int c_setfmt_24 = flds_primary_set_format(&w24);
+    int c_setfmt_ok = flds_primary_set_format(&w16);
+    flds_configure(256, 2);
+    flds_bufdesc_t hw = { 20, FLDSBCAPS_LOCHARDWARE, 16384, 0, &w16 };
+    int c_hw = flds_create_sound_buffer(&hw);
+    flds_bufdesc_t tiny = { 20, 0, 4 * 100, 0, &w16 };
+    int c_tiny = flds_create_sound_buffer(&tiny);
+    flds_bufdesc_t odd = { 20, 0, 4 * 4096 + 2, 0, &w16 };
+    int c_odd = flds_create_sound_buffer(&odd);
+    flds_bufdesc_t nof = { 20, 0, 4 * 4096, 0, NULL };
+    int c_nofmt = flds_create_sound_buffer(&nof);
+    flds_bufdesc_t ok = { 20, 0x18000u | FLDSBCAPS_LOCSOFTWARE, 4 * 16384, 0, &w16 };
+    int c_sec = flds_create_sound_buffer(&ok);
+    int c_sec_twice = flds_create_sound_buffer(&ok);
+    flds_notify_pos_t np[1] = { { 0, 0 } };
+    int c_notify_nocaps = flds_notify_set_positions(1, np);
+    int c_lock_wrap = flds_buf_lock(4 * 16384 - 4, 16, &p1, &n1, &p2, &n2, 0);
+    uint32_t wrap_n1 = n1, wrap_n2 = n2; int wrap_p2_is_base = 0;
+    uint8_t *base1 = (uint8_t *)p1 - (4 * 16384 - 4);
+    wrap_p2_is_base = p2 == (void *)base1;
+    int c_lock_twice = flds_buf_lock(0, 16, &p1, &n1, &p2, &n2, 0);      /* lock 中の再 Lock → INVALIDCALL */
+    int c_unlock_bad = flds_buf_unlock((uint8_t *)base1 + 8, 4, NULL, 0);  /* lock 区間と一致しない → INVALIDPARAM */
+    int c_unlock_ok = flds_buf_unlock((uint8_t *)base1 + (4 * 16384 - 4), 4, base1, 12);
+    int c_unlock_again = flds_buf_unlock((uint8_t *)base1 + (4 * 16384 - 4), 4, base1, 12);
+    int c_lock_oob = flds_buf_lock(4 * 16384, 4, &p1, &n1, &p2, &n2, 0);
+    int c_lock_entire = flds_buf_lock(77, 3, &p1, &n1, &p2, &n2, FLDSBLOCK_ENTIREBUFFER);
+    uint32_t ent_n1 = n1; flds_buf_unlock(p1, n1, p2, n2);
+    int c_setpos_unaligned = flds_buf_set_current_position(2);
+    int c_setpos_oob = flds_buf_set_current_position(4 * 16384);
+    int c_setpos_ok = flds_buf_set_current_position(4096);
+    uint32_t play = 0, write = 0;
+    int c_getpos = flds_buf_get_current_position(&play, &write);
+    int c_getpos_null = flds_buf_get_current_position(NULL, NULL);
+    uint32_t status = 99; flds_buf_get_status(&status);
+    int c_stop_idle = flds_buf_stop();
+    flds_release();
+    int c_after_release = flds_buf_get_current_position(&play, &write);
+    snprintf(j, jn,
+        "{\"api\":\"ds_apicheck\",\"codes\":{\"lock_nosec\":%d,\"coop_noinit\":%d,\"setfmt_noprim\":%d,\"prim\":%d,\"prim_twice\":%d,\"setfmt_nopri\":%d,\"setfmt_bad\":%d,\"setfmt_24\":%d,\"setfmt_ok\":%d,"
+        "\"hw\":%d,\"tiny\":%d,\"odd\":%d,\"nofmt\":%d,\"sec\":%d,\"sec_twice\":%d,\"notify_nocaps\":%d,\"lock_wrap\":%d,\"wrap_n1\":%u,\"wrap_n2\":%u,\"wrap_p2_is_base\":%d,"
+        "\"lock_twice\":%d,\"unlock_bad\":%d,\"unlock_ok\":%d,\"unlock_again\":%d,\"lock_oob\":%d,\"lock_entire\":%d,\"ent_n1\":%u,"
+        "\"setpos_unaligned\":%d,\"setpos_oob\":%d,\"setpos_ok\":%d,\"getpos\":%d,\"play\":%u,\"write\":%u,\"getpos_null\":%d,\"status\":%u,\"stop_idle\":%d,\"after_release\":%d}}",
+        c_lock_nosec, c_create_noinit, c_setfmt_noprim, c_prim, c_prim_twice, c_setfmt_nopri, c_setfmt_bad, c_setfmt_24, c_setfmt_ok,
+        c_hw, c_tiny, c_odd, c_nofmt, c_sec, c_sec_twice, c_notify_nocaps, c_lock_wrap, wrap_n1, wrap_n2, wrap_p2_is_base,
+        c_lock_twice, c_unlock_bad, c_unlock_ok, c_unlock_again, c_lock_oob, c_lock_entire, ent_n1,
+        c_setpos_unaligned, c_setpos_oob, c_setpos_ok, c_getpos, play, write, c_getpos_null, status, c_stop_idle, c_after_release);
+    return 0;
+}
+
 int main(int argc, char **argv) {
     for (int i = 1; i < argc; i++) {
         char *a = argv[i], *v = strchr(a, '=');
         if (!v) continue;
         *v++ = 0;
-        if (!strcmp(a, "api")) { P.asio = strcmp(v, "wasapi") != 0; P.apikind = !strcmp(v, "ff_uninit") ? 2 : !strcmp(v, "ff_excl") ? 3 : !strcmp(v, "apicheck") ? 4 : !strcmp(v, "nomem") ? 5 : 0; }
+        if (!strcmp(a, "api")) { P.asio = strcmp(v, "wasapi") != 0; P.apikind = !strcmp(v, "ff_uninit") ? 2 : !strcmp(v, "ff_excl") ? 3 : !strcmp(v, "apicheck") ? 4 : !strcmp(v, "nomem") ? 5 :
+            !strcmp(v, "ds") ? 6 : !strcmp(v, "ds_apicheck") ? 7 : !strcmp(v, "ds_stopresume") ? 8 : !strcmp(v, "ff_ds_excl") ? 9 : 0; }
+        else if (!strcmp(a, "panel")) P.panel = (uint32_t)atoi(v);
+        else if (!strcmp(a, "ds_fmt")) P.ds_f32 = !strcmp(v, "f32");
+        else if (!strcmp(a, "ds_mode")) P.ds_notify = !strcmp(v, "notify");
+        else if (!strcmp(a, "ds_size")) P.ds_size = (uint32_t)atoi(v);
         else if (!strcmp(a, "burst_floor")) P.burst_floor = (uint32_t)atoi(v);
         else if (!strcmp(a, "mode")) P.mode = !strcmp(v, "ramp") ? 1 : !strcmp(v, "loop") ? 2 : 0;
         else if (!strcmp(a, "buf")) P.buf = (uint32_t)atoi(v);
@@ -310,6 +566,10 @@ int main(int argc, char **argv) {
     else if (P.apikind == 3) { flwasapi_fmt_t f = { 48000, 2 }; flwasapi_initialize(1, 0, 0, 0, &f); rc = 0; }   /* exclusive → fail-fast */
     else if (P.apikind == 4) rc = run_apicheck(g_result, sizeof g_result);
     else if (P.apikind == 5) rc = run_nomem(g_result, sizeof g_result);
+    else if (P.apikind == 6) rc = run_ds(g_result, sizeof g_result);
+    else if (P.apikind == 7) rc = run_ds_apicheck(g_result, sizeof g_result);
+    else if (P.apikind == 8) rc = run_ds_stopresume(g_result, sizeof g_result);
+    else if (P.apikind == 9) { flds_create(); flds_set_cooperative_level(FLDSSCL_EXCLUSIVE); rc = 0; }   /* exclusive → fail-fast */
     else rc = P.asio ? run_asio(g_result, sizeof g_result) : run_wasapi(g_result, sizeof g_result);
     __atomic_store_n(&g_done, rc ? 2 : 1, __ATOMIC_SEQ_CST);
     __builtin_wasm_memory_atomic_notify((int *)&g_done, 0x7fffffff);
