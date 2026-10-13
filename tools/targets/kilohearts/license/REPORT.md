@@ -154,4 +154,5 @@ DSP 固有 closure (42 効果) にはライセンス/ネット系参照が無く
 - `product_index.json` (46 plugins) は `work/winpkg/` の生成物 (gitignore)。差分に出ないのは仕様どおり。再生成には `plugins-kilohearts` 素材が要る (`scripts/kh249_product_index.py`)。
 - **libc / CRT 名衝突 (レビュー指摘 3・#710)**: `gen_stubs_sigs.py` は body 中の未知の `@Name(` に `abort()` 付きの定義を生成するため、`memcpy`・`strlen`・`sqrt` 等が named import として出ると libc を上書きする。`LIBC_NAMES` (memcpy/memset/strlen/sqrt/malloc/printf 等 33 名) に当たる名前が `used_names` に出たら生成段で `sys.exit` する (`scripts/kh710_check.py` の `libc_clash:*` で検査: memcpy は停止 / GetCurrentThreadId は通過 = PASS)。
   - **実 lift 出力での `used_names` 列挙は未実施**。`lic_build.py` は RetDec・winpkg・emsdk を要し、`fl-win64` 素材にはいずれも無い。素材が揃った環境で `final.ll` の `used_names` を出し、`LIBC_NAMES` と突き合わせて空を確認すること (未確認・起票先は PR 本文)。
-- 実行: `python3 scripts/kh710_check.py` → `RESULT PASS` (rc=0・全 15 項目 PASS)。
+- 実行: `python3 scripts/kh710_check.py` → `RESULT PASS` (rc=0・全 16 項目 PASS)。
+- **define 名の stub 化 (review 指摘 2)**: `used_names` は `define` 行の名前も拾い、同一モジュール内で定義された非 `function_` 関数 (`define internal i64 @LocalHelper(...)` を `function_1` が呼ぶ形) に `abort()` stub を生成していた。修正: `local` (`^define ... @Name(`) を `used_names` から除外。再現 (修正前): `gen_stubs_sigs.py` で `LocalHelper(void)` の stub 出力。修正後: 出力 0 件。検査 `define_not_stubbed` を `kh710_check.py` に追加 (PASS)。

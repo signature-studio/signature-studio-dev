@@ -57,6 +57,13 @@ def libc_clash_cases():
             r = subprocess.run([sys.executable, gen, src, os.path.join(td, 's.c'), os.path.join(td, 's.json')],
                                capture_output=True, text=True)
             check('libc_clash:%s_%s' % (name, 'rejected' if want else 'accepted'), (r.returncode != 0) == bool(want))
+        open(src, 'w').write('define internal i64 @LocalHelper(i64 %a) #0 {\n  ret i64 %a\n}\n'
+                             'define i64 @function_1()\n{\n  %1 = call i64 @LocalHelper(i64 1)\n  ret i64 %1\n}\n'
+                             'declare void @llvm.trap()\nattributes #0 = { nounwind }\n')
+        r = subprocess.run([sys.executable, gen, src, os.path.join(td, 's.c'), os.path.join(td, 's.json')],
+                           capture_output=True, text=True)
+        stubbed = 'LocalHelper(void)' in open(os.path.join(td, 's.c')).read()
+        check('define_not_stubbed', r.returncode == 0 and not stubbed)
 
 
 def heap_cases():

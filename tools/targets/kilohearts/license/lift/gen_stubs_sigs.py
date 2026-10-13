@@ -99,8 +99,9 @@ def main():
         out.append('extern u64 rax, rcx, rdx, r8;')
     # ---- named import (Win32/CRT) の使用確認 → shim または fail-fast stub (レジスタグローバル ABI)
     body = '\n'.join(x for x in text if not x.startswith('declare '))
+    local = {m.group(1) for m in (re.match(r'^define\b[^@]*@([A-Za-z]\w*)\(', x) for x in text) if m}
     used_names = sorted({n for n in re.findall(r'@([A-Za-z][\w]*)\(', body)
-                         if not n.startswith(('function_', 'kh_', 'llvm', 'global_var'))})
+                         if not n.startswith(('function_', 'kh_', 'llvm', 'global_var')) and n not in local})
     clash = [n for n in used_names if n in LIBC_NAMES]
     if clash:
         sys.exit('gen_stubs_sigs: named import が libc/CRT 名と衝突 (abort stub が libc を上書きする): %s。shim 化か除外が必要' % ', '.join(clash))
