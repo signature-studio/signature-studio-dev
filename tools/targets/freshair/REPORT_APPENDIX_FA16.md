@@ -1,0 +1,50 @@
+# freshair FA-16 (#1182): 非空 controller map の静的読み (受入 1 の前半)
+
+REPORT §12-5 の未解決 (非空 map による 0x180da6c00 到達) の付録。FA-9 本体の測定値は `REPORT.md` §12 が正本。
+本付録は**静的読み (逆アセンブル, capstone 5.0.7・disasm.py) のみ**で、実行による検証は含まない。
+
+## 1. 0x180ca1480 の分岐 (controller lookup)
+
+| 機械語 | 意味 |
+|---|---|
+| `0x180ca14a4..14b2`: `[C+0x328]` と `[C+0x2d0]` を比較、一致で `0x180ca151b` (map 経路) | 等しければ map を引く |
+| `0x180ca14b4..14dc`: 不一致かつ keycnt==1 かつ key0==0 → `{C+0x308, C+0x470}` を返す (静的分岐) | map を引かない |
+| `0x180ca151b`: `rcx = [C+0x318] + 0xa8`、`r8w = key0`、`rdx = out` で `0x180ca7db0` を呼ぶ | controller map の検索 |
+| `0x180ca153c`: `[out+0]` が非 0 なら found (`0x180ca156f`)、0 なら `{0,...}` を返す | found 判定 |
+
+## 2. 0x180ca7db0 (map lower_bound) のノード配置
+
+`0x180ca7db0(rcx = map header, rdx = out, r8w = key)` は MSVC 形式の `std::map` 下限探索。読み取った配置:
+
+| オフセット | 内容 |
+|---|---|
+| `+0x00` | left |
+| `+0x10` | right |
+| `+0x19` (byte) | isnil (1 で終端) |
+| `+0x20` (u16) | key |
+| `+0x28` | value (qword, `out[0]` へコピー) |
+| `+0x30` | shared_ptr 制御ブロック (`out[1]`。参照カウンタ `+8`) |
+
+候補ノードは `0x180ca7dbb..0x180ca7dd8` で isnil 終端まで辿る。found 判定は `0x180ca7de1`: `key < node.key` (`jb`) なら not found、`node == head` でも not found。
+found 時は `out[0] = node.+0x28`、`out[1] = node.+0x30` (参照カウンタを増やす)。
+
+## 3. 0x180c9d700 (setter) と 0x180da6c00 の入口条件
+
+- setter は `0x180ca1480` の `out[0]` が非 0 のときだけ後段へ進む (`0x180c9d737: je 0x180c9d813`)。
+- found 後、`obj = out[0]+0x10` の vtable `+0x50(id)` → 戻り値の vtable `+0x18` → 戻り値の vtable `+8(value)` を呼ぶ。
+- その後 `0x180da6c00(out[1], id, idx, r9=2)` を呼ぶ (`0x180c9d791`)。
+- `0x180da6c00` は `r9==2` のとき `0x180f9e540` の結果 (`[rax]`) と `this+0xe8` を比較し、**一致で** `[this]+0x50` 経路 (`0x180da6c67`)、**不一致で**表 `this+0x30` への書き込み (`0x180da6c39`) へ進む。
+
+したがって非空 map で `0x180da6c00` に届くには、(a) `C+0x2d0 == C+0x328`、(b) 検索 key で `[C+0x318]+0xa8` の木に node が 1 つ以上、(c) found 後の `out[0]+0x10` の vtable `+0x50/+0x18/+8` が有効、の 3 条件が必要。
+
+## 4. 現行 harness との差 (実測済みの事実)
+
+- `native/native_ctrl.c` の `build_tree` は `W64(C + 0x21a8, 8, C + 0x21b8)` で head を空 (`H.isnil=1`, `H = C+0x21b8`) にする。
+- MAPTRACE (FA-4) の key は `{keycnt=1, key0=0}` で、found 無し (`run_fa9.sh` (a): found=0 が 72/72、da6c00=0)。
+- 既存の判定ゲートは wasm 側 `native/ctrl_harness.mjs` と bit-exact 比較 (15/15) するため、map を変えるときは **native と wasm の両方を同時に変える**必要がある。
+
+## 5. 未確認 (次の作業)
+
+- (c) の vtable 配置 (`out[0]+0x10` が指す object の vtable 実体、`+0x50` の戻り先) は未読。
+- node を 1 つ構築した際の `0x180ca7db0` の返り値が設計どおりか (found の実測) は未実行。
+- 受入 2 以降 (Filter 出力変化の比較・DUMP idx 2・wasm ネガコン) は未着手。子 issue で扱う。

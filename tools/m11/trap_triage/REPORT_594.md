@@ -94,6 +94,14 @@ FL_WIN64_DIR=<fl-win64 の展開先> bash tools/m11/trap_triage/negctl_594.sh   
 ### 6-2. 既知の制約
 - `m11_e2e.sh` の全再生成経路 (lift_pe.sha256 無し) は `m2/work/ghidra_dll/functions_dll.csv` を要求する。runner に Ghidra が無いため `m11_bounds` が fail-closed で止まる。units_run (`m11_e2e.sh` 全体) はこの経路では未測定。子 issue #1042。
 
+### 6-3. #1041 での実測 (main `dc7c11df`・ldfix 有無の 2 状態)
+- ldfix=applied (`m11_gen_ir2.sh` rc 0, 43 秒): base (qstore 無し) の oob 集合を再測定し §6-1 と一致。
+- ldfix=disabled (`M11_LDFIX=0 m11_gen_ir2.sh` rc 0, 9.6 秒): `m11_build.sh` は `ldfix=applied` 以外を拒否する (line 43) ため、一時コピーで**この 1 行だけ外して**リンク (rc 0, 12.5 秒)。survey (1 回, 12.2 秒): 58–63 は全て ok、56 は other。**58–63 について**は ldfix の有無で状態は変わらない。一時コピーは削除済み・commit していない。
+- 未解決 (起票先 #1041): oob 集合は ldfix の有無で変わる。applied にあって disabled に無いのは 144、disabled にあって applied に無いのは 895 (共通は 18 件)。58–63 の結論には影響しないが、この 144 ↔ 895 の差の原因は本 REPORT では未調査。
+- `negctl_594.sh` を HEAD で foreground 実行: **exit 1**、所要 **4 分 35 秒** (`real 4m34.926s`)、survey 1 回 12.1–13.1 秒、load 0.87–1.17、SUMMARY FAIL (G1, G5, G8, G10, G12)。FAIL の内訳: G1 n=0 (期待 7)、G5 oob→ok 0 件、G8 maskneg の 58–63 が ok、G10 fillff の 58–63 が ok。G12 は probe 透過差 2 件 (304, 555 が oob→ok)。
+- 判断: base で 8cc190 系の OOB が 0 件のため、mask 実験は救済する対象を持たない。G1/G5 の前提を満たす IR 状態は、本 main では再現できない。gate の期待値は緩めていない。
+- 再設計の判断 (期待値を残すか・gate を廃止するか・8cc190 系の別の再現源を使うか) は PM 判断。下記 §6 の表 #1041 行の解消は未了。
+
 ## 6. 検証範囲 / 範囲外 / 未解決
 
 範囲: `m11_ov.c` + `work-m11` スナップショットの survey 942 unit を、qstore 無し (`M11_QSTORE=0`) と qstore 有り (main の既定) の両方で測定。範囲外: `m11_e2e.sh` 全体 (units_run は未測定)、`M11_OV_CLASSCREATE` (#419 / PR #446 の opt-in。main に無いため対象外)。
@@ -102,7 +110,7 @@ PE (`extracted/block00031_PE.bin`) と capstone/pefile が無い環境では qst
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | (解決) 58–63 の修復 (qstore) は #552 として main に merge 済み | main で 58–63 は ok (G13) | — |
-| negctl 前提の再設計 (ldfix 適用後の IR で 58–63 は base で ok) | gate G1/G5/G8/G10/G12 が FAIL | #1041 (M11-N59) |
+| negctl 前提の再設計 (ldfix 適用後の IR で 58–63 は base で ok) | gate G1/G5/G8/G10/G12 が FAIL (§6-3 実測) | #1041 (M11-N59) |
 | units_run 測定経路 (`functions_dll.csv` の入手) | `m11_e2e.sh` 全体が未測定 | #1042 (M11-N60) |
 | unit 56: `8c7710` の D4 型 deref 脱落は #662 (closed)。`8c5eb0` の 0 件ガードは #717 (merged) で IR に復元。残る fail-fast の到達可否 | 56 の未解決部分 | #856 (M11-N36, open) |
 | `survey_units.mjs` oob の `.slice(1)` (§4 は c26b41d 時点の記述) | 現 main の `survey_units.mjs:74` は `.slice(0, 30)` で先頭 frame を残す (#663 closed) | #663 (closed) |

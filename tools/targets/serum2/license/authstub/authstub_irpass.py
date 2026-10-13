@@ -16,7 +16,7 @@ usage:
 """
 import argparse, json, os, re, sys, collections
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', '..', 'liftlib'))
-from liftlib.passes.fp_bind import replace_lines, replace_at, site_at, bind_load_at, insert_after, fn_span
+from liftlib.passes.fp_bind import replace_lines, replace_at, site_at, bind_load_at, bind_load_slot_at, insert_after, fn_span
 
 # ---- 差し替え点テーブル (実測座標。machine 側対応は mpatch.py と対) ----
 # at      : 分岐 / store の機械語 VA
@@ -283,15 +283,17 @@ def apply_liftfix(lines, report):
     applied.append('LF1')
 
     # LF5/LF6: DOM root ポインタ (alloca 配置が machine と異なるため global に束縛)
-    bind_load_at(lines, C, 0x1800c2c94, '-72', '__authstub_doc_root', 'LF5')
-    bind_load_at(lines, C, 0x1800c2ca4, '-72', '__authstub_doc_root', 'LF5')
+    # LF5/LF6/LF7 の slot は IR 行から読んだ値と照合する (expect_slot 不一致で失敗)。
+    # 照合用の期待値 (-72/-80/-152) と global 名は literal のまま残す (値の導出は未達 #1208)。
+    bind_load_slot_at(lines, C, 0x1800c2c94, '-72', '__authstub_doc_root', 'LF5')
+    bind_load_slot_at(lines, C, 0x1800c2ca4, '-72', '__authstub_doc_root', 'LF5')
     applied.append('LF5')
-    bind_load_at(lines, D, 0x18004fbc6, '-80', '__authstub_doc_root', 'LF6')
-    bind_load_at(lines, D, 0x18004fbd6, '-80', '__authstub_doc_root', 'LF6')
+    bind_load_slot_at(lines, D, 0x18004fbc6, '-80', '__authstub_doc_root', 'LF6')
+    bind_load_slot_at(lines, D, 0x18004fbd6, '-80', '__authstub_doc_root', 'LF6')
     applied.append('LF6')
 
     # LF7: tag 文字列 len (ctrl LF1 の DSP 版: alloca 配置差を global 束縛で吸収)
-    bind_load_at(lines, D, 0x18004fb74, '-152', '__authstub_str_len0', 'LF7')
+    bind_load_slot_at(lines, D, 0x18004fb74, '-152', '__authstub_str_len0', 'LF7')
     applied.append('LF7')
 
     # LF2: `%3 = xor i128 0, 0` (base が入口 undef 読みを fold したもの。

@@ -77,3 +77,27 @@ bash tools/m11/m11_build.sh          # PE=<...>/extracted/block00031_PE.bin
 node tools/m11/trap_triage/survey_units.mjs tools/m11/work/trap_triage/head.json
 python3 tools/m11/trap_triage/halt0_classify.py tools/m11/work/trap_triage/head.json
 ```
+
+## 9. 追補: origin/main `1ef8ccfb` での再測定 (#862 再 run)
+
+§1〜§5 の結論 (`410630` が現 main で到達 0、unit 492 は OOB) が main の進行後も成り立つかを確認した。
+
+- 検証起点: `origin/main` = `1ef8ccfb` (`986e7415` から m11 関連 commit 多数を含む)。`tools/m11/` のコードは変更していない。
+- IR 再生成: `bash tools/m11/m11_gen_ir2.sh` rc 0 (実測 43.8 s、ldfix applied)。
+- build: `bash tools/m11/m11_build.sh` rc 0 (`wasm-ld signature mismatch: 0, undefined symbol: 0`)。
+- survey (`survey_units.mjs`、3 回反復、load average 1.09→0.77 付近):
+
+| 回 | 所要 | ok | oob | halt0 | miss | other | noproc |
+|---|--:|--:|--:|--:|--:|--:|--:|
+| 1 | 13.19 s | 869 | 16 | 8 | 47 | 1 | 1 |
+| 2 | 12.96 s | 869 | 16 | 8 | 47 | 1 | 1 |
+| 3 | 12.95 s | 869 | 16 | 8 | 47 | 1 | 1 |
+
+- 3 回の unit 別 kind の差は 0 (per-unit JSON で照合)。`986e7415` の結果とは件数 (ok 869 / oob 16 / halt0 8) のみ一致し、unit 単位の一致は未確認。
+- unit 492: 3 回とも `oob`、frames `4133f0 ← 4473f0 ← 446400 ← 446ad0 ← ad5700`。
+- `410630` を含む frame は全 unit で 0 件。`410630` の IR 呼出元は `function_4109f0` のみ (`boot_final.ll`、検証 HEAD `8311dcb2` で再確認)。
+- halt0 は unit 114 / 245 / 279 / 314 / 368 / 509 / 647 / 895 の 8 件。
+- 前回 (§1〜§5 時点) の halt0 残 8 件には unit 492 が含まれていたが、本再測定では 492 が oob に変わっている。変化の要因は未切り分け (IR 生成条件の差の可能性。§6 と同じ扱い)。
+- 検証 HEAD `8311dcb2` でレビュー run が再実行した (素材は `oc_artifacts:` で `fl-win64`・`toolchain-retdec`・`toolchain-emsdk`・`work-m11`・`work-liftdiff` を取得)。`m11_gen_ir2.sh` rc 0 (ldfix applied、`boot_final.ll` 490,693 行)、`m11_build.sh` rc 0 (`wasm-ld signature mismatch: 0, undefined symbol: 0`)、survey 3 回 (13.21〜13.37 s) は ok 869 / oob 16 / halt0 8 / miss 47 / other 1 / noproc 1 で、3 回の per-unit JSON は `cmp` で完全一致。unit 492 は 3 回とも oob、frames `4133f0 ← 4473f0 ← 446400 ← 446ad0 ← ad5700`。halt0 は上記 8 件と一致し、`410630` を含む frame は 0 件、IR 呼出元は `function_4109f0` のみ。
+
+受入条件 1・2 は対象 (`410630` の到達) が現 main に存在しないため引き続き未達。原因追跡は #1046 (unit 492 の OOB `4133f0`) に引き継ぐ。
