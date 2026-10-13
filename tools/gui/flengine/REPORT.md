@@ -159,10 +159,20 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 - 親 `bash tools/gui/e2e.sh` (HEAD `0246df1f`・1 回): **rc 0 / ALL PASS**、wall 209 s (シェルで開始・終了時刻を取った実測)。前提欠如は 2 回: `tsc` 不在 (rc 127、`pnpm install --frozen-lockfile` で解消) と `agent-browser` 不在 (rc 2、`tools/e2e` の `npm ci` で解消)。どちらも ASan 由来ではない。
 - `results/` は e2e が再生成した。`wasm_size` 6912872 → **6913035**、`ir_sha256.txt` の `material` / `after_m11_build` は変化 (`boot_final.ll` `e9aa138e…`・`boot_final3.ll` `5586d206…`)。`c994306b` の値とは一致しない。
 - `results/probe.json` は本 e2e で変化なし (git 上で差分無し)。`util_window.ret` = `0x1100010` の値は c994306b の再生成物のまま。本 e2e のログに `util_window.ret` は出ない (P4 の `TApplication` hwnd = `0x110000f` のみ確認)。`REPORT_564.md` §4 の 0x110000f (f4_e2e の post 実測) との差は未解決。
-- **HEAD `530fb5ef` の再実行** (foreground 1 回・`EMSDK_ENV` と `FL_WIN64_DIR` 指定、`RETDEC` は絶対パス指定): **459 s, rc 0**。judge **14/14 PASS**、ネガコン 9/9 期待どおり FAIL、native selftest **504 passed / 0 failed**。`P4` hwnd `0x110000f`、`P5` hwnd `0x110000e`。`S1` 871/1/47/23/0 = base。`results/probe.json` の `util_window.ret` = `0x1100010` は、この e2e が build する ff 系 wasm の値。f4_e2e の `--soft` 系 post probe では `0x110000f` で、両 build の差が原因と推定 (同一 build での直接比較は未実施)。
+- **HEAD `530fb5ef` の再実行** (foreground 1 回・`EMSDK_ENV` と `FL_WIN64_DIR` 指定、`RETDEC` は絶対パス指定): **459 s, rc 0**。judge **14/14 PASS**、ネガコン 9/9 期待どおり FAIL、native selftest **504 passed / 0 failed**。`P4` hwnd `0x110000f`、`P5` hwnd `0x110000e`。`S1` 871/1/47/23/0 = base。`results/probe.json` の `util_window.ret` = `0x1100010` は、この e2e が使う flengine 複製 tree の IR から作った wasm の値。f4_e2e の post (`tools/m11/work` の IR) では `0x110000f`。build 差ではないことを `703b4857` で同一 tree の ff/soft 比較により確認済み (§6 現 HEAD 節)。
 - 旧 `40e4e4b0` の値 (selftest 500/0・judge 12/12) は本 HEAD で 504/0・14/14 に変わった。増分の原因は未確認。
 
-### 現 HEAD `3885765a` の実測 (本節を正とする)
+### HEAD `703b4857` の実測 (main `b892fdc6` 取り込み後・本 PR の最終 HEAD。本節を正とする)
+
+| 対象 | rc | 所要 | 結果 |
+|---|---|---|---|
+| `bash tools/gui/flengine/e2e.sh` (foreground 1 回) | 0 | **464 s** (done 行) | judge **14/14 PASS**、native selftest **504 passed / 0 failed**、ネガコン N1〜N9 期待どおり FAIL。S1 `871/1/47/23/0` = base。`probe.json` の `util_window.ret` = `0x1100010` (flengine 複製 tree の IR) |
+| `bash tools/gui/e2e.sh` (親, foreground 1 回) | 0 | **214 s** | **ALL PASS** (`SKIP_NATIVE` 無し。native selftest 504 / 0 も含む) |
+| 同一 tree の ff / soft 比較 (`probe.mjs`, 同 HEAD) | 0 / 0 | — | ff `ret 0x1100010` = soft `ret 0x1100010` (build 差は無し)。窓: `TLightweightLayeredControl` 0x110000e、`TApplication` 0x110000f |
+
+- ret の出所: `f4_e2e` の post (`0x110000f`) は `tools/m11/work` の `boot_final.ll` (sha256 `fd059f2f…`)、本 e2e の probe (`0x1100010`) は複製 tree の `boot_final.ll` (sha256 `a57be8fd…`) から作った wasm の値。同じ tree の ff/soft では一致するため、差は IR の出所によるものと推定 (未判定)。
+
+### 旧 HEAD `3885765a` の実測 (参考)
 
 | 対象 | rc | 所要 | 結果 |
 |---|---|---|---|

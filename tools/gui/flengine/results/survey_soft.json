@@ -291,7 +291,9 @@
   "FastMM_GetMem(407a50)": 2086,
   "FastMM_FreeMem(407e20)": 166,
   "InitUnits": 0,
-  "Halt0": 9
+  "Halt0": 9,
+  "ListFind(4fa210)": 2,
+  "ListRaise(47a250)": 0
  },
  "va_calls": 37,
  "va_bytes": 1412366336

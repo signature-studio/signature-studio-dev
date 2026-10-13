@@ -1,7 +1,7 @@
 # REPORT_564 — function_52a7f0 (AllocateHWnd) の `cmp [TempClass.lpfnWndProc]` 脱落 (#564 / M11-N19)
 
 **判定: 部分達成 (Refs #564, Closes しない)**。欠陥の型を特定し、ldfix に **F4** を追加して 10 関数を機械語突合で修復した。
-修復後、指向呼出 (JS から `function_52a7f0` を直接呼ぶ) で `RegisterClassW` に到達する (ret hwnd 0 → 0x110000f。HEAD `0246df1f` の f4_e2e 実測)。自然起動での到達ではない
+修復後、指向呼出 (JS から `function_52a7f0` を直接呼ぶ) で `RegisterClassW` に到達する (ret hwnd 0 → 0x110000f。HEAD `703b4857` の f4_e2e 実測、§4)。自然起動での到達ではない
 (自然起動は unit #23 で Halt0 のため #134/#490 の先)。全数走査は実施したが検出器に偽陰性があり (§3)、F4 が直した 10 関数のうち
 動的に効果を確認したのは 52a7f0 だけ (§5)。依存: PR #563 (`tools/gui/flengine` の probe を使う。#563 未 merge のため同ブランチを取り込み済み)。
 
@@ -48,18 +48,17 @@ REGLIVE 2,509 (関数入口 live-in 等で脱落でない) / **FRAME_IN_ESCAPED 
 |---|---|---|---|
 | F4 修復関数 | 0 | 10 | 10 |
 | `RegisterClassW` 到達 (probe 通算) | 2 | 2 | **3** |
-| `function_52a7f0` の戻り | 0x0 (CreateWindowExW NULL) | 0x0 | **0x110000f** (HEAD `0246df1f` 実測。results/probe.json は 0x1100010) |
+| `function_52a7f0` の戻り | 0x0 (CreateWindowExW NULL) | 0x0 | **0x110000f** (HEAD `703b4857` 実測。下記 ret の出所の注記) |
 | 通常起動 units_run / init_count | 52 / 54 | 同 | 同 |
 | survey ok / noproc / miss / trap | 869 / 1 / 47 / 25 | 同 | 同 |
+
+**ret の出所 (HEAD `703b4857` 実測)**: `f4_e2e` の post (`0x110000f`) は `tools/m11/work` の `boot_final.ll` (sha256 `fd059f2f…`) から作った wasm の値。`flengine/e2e.sh` の `results/probe.json` (`0x1100010`) は flengine の複製 tree (`tools/gui/work/flengine/tree/m11/work`、`boot_final.ll` sha256 `a57be8fd…`) から作った wasm の値。同じ tree の ff build と soft build で probe を取ると、どちらも `0x1100010` で一致した (build 差は否定)。したがって差は IR の出所 (複製 tree は `m11_wndseed.sh` で IR を作り直している) によるものと推定する。どちらの IR が正しいかは未判定で、同一 IR での比較は未実施。PR の受入条件は値を「`f4_e2e` の post (`tools/m11/work` の IR) の値」と明記して読む。
 
 `f4_judge.py` 6 gate (F1 修復対象 / F2 IR 形 / D1 到達 / D2 load だけでは未到達 / P1 起動・survey 不変 / A1 監査分類) 全 PASS。
 ネガコン 4/4 が「期待した FAIL 行」付きで FAIL: N1 pre を post として判定 (D1) / N2 noand を post として判定 (D1) / N3 到達増分 ≥5 を要求 (D1) / N4 survey 1 unit を ok→trap に改竄 (P1)。
 
-**HEAD `0246df1f` の実測** (`EMSDK_ENV=<[EMSDK] の emsdk_env.sh> FL_WIN64_DIR=<[WIN64] の fl-win64 展開先> bash tools/m11/ldfix/f4_e2e.sh`、4 vCPU、開始 load 0.48 / 終了 1.00): **397 s, rc 0**。6 gate 全 PASS、ネガコン 4/4 が期待行付きで FAIL。pre / noand / post とも units_run 52 / init_count 54 / icall_miss 5、survey ok / noproc / miss / trap = **869 / 1 / 47 / 25**。RegisterClassW 2 → 2 → 3、`function_52a7f0` ret 0x0 → 0x0 → **0x110000f**。同じ HEAD の `results/probe.json` (c994306b 再生成) は 0x1100010 で、この 1 ずれの原因は未確認 (f4_e2e.sh は results を書き換えない)。監査 sites 2,846 / FRAME_IN_ESCAPED 56。
-**HEAD `530fb5ef` の実測** (同じ f4_e2e.sh、foreground 1 回、`EMSDK_ENV` と `FL_WIN64_DIR` 指定): **391 s, rc 0**。6 gate 全 PASS、ネガコン 4/4 が期待行付きで FAIL。pre / noand / post とも units_run 52 / init_count 54 / icall_miss 5、survey = **869 / 1 / 47 / 25**。`function_52a7f0` ret 0x0 → 0x0 → **0x110000f** (`f4_e2e` の probe は `--soft` build)。`flengine/e2e.sh` (ff build の `results/probe.json`) は同じ関数で **0x1100010**。両 build の差が原因と推定するが、同一 build での直接比較は未実施。
-
-**旧 head `40e4e4b0` の実測** (`EMSDK_ENV=<[EMSDK] の emsdk_env.sh> FL_WIN64_DIR=<[WIN64] の fl-win64 展開先> bash tools/m11/ldfix/f4_e2e.sh`、4 vCPU、開始 load 0.58 / 終了 1.10): **426 s (wall 7 分 05 秒), rc 0**。6 gate 全 PASS、ネガコン 4/4 が期待行付きで FAIL。pre / noand / post とも units_run 52 / init_count 54 / icall_miss 5、survey ok / noproc / miss / trap = **869 / 1 / 47 / 25**。RegisterClassW 2 → 2 → 3、`function_52a7f0` ret 0x0 → 0x0 → 0x110000f。監査 sites 2,846 / FRAME_IN_ESCAPED 56 (`results/audit_undefload_564.json`)。
-履歴: `7d44c033` (main `6aa4b397` 取り込み後) で 326 s, rc 0、値は同じ 869/1/47/25。`545883bb` (main `33fd25a2` 取り込み後) で 382 s, rc 0、値は同じ。PR 初回 `7be6bab` 175 s の 816/1/46/79 は main 取り込み前の値。
+**HEAD `703b4857` の実測** (main `b892fdc6` 取り込み後、`EMSDK_ENV=<[EMSDK] の emsdk_env.sh> FL_WIN64_DIR=<[WIN64] の fl-win64 展開先> bash tools/m11/ldfix/f4_e2e.sh`、4 vCPU、開始 load 0.15 / 終了 1.13): **404 s, rc 0**。6 gate 全 PASS、ネガコン 4/4 が期待行付きで FAIL。pre / noand / post とも units_run 52 / init_count 54 / icall_miss 5、survey ok / noproc / miss / trap = **869 / 1 / 47 / 25**。RegisterClassW 2 → 2 → 3、`function_52a7f0` ret 0x0 → 0x0 → **0x110000f**。監査 sites 2,846 / FRAME_IN_ESCAPED 56。
+履歴 (同じ f4_e2e.sh・同じ値): `0246df1f` 397 s / `530fb5ef` 391 s / `40e4e4b0` 426 s、いずれも rc 0 / 869/1/47/25。`7be6bab` 175 s の 816/1/46/79 は main 取り込み前の値。
 
 ## 5. 未解決 / 限界
 
