@@ -219,7 +219,7 @@ python3 gui/vstgui_version.py    # 0.70 s (real, 逐次, load 未計測)
 
 ## 11. 14.0〜14.3 の差分リテラル法 (2026-10-14 run, #1350)
 
-§10 の残件 (14.0〜14.3) を、版間の製品コード差分にバイナリ出現する文字列リテラルがあるかで試した。入力は §10 と同一 (sha256 `501e7bb3dd9cafe4…` / 19,236,864 B、`plugins-serum2` から再展開して一致確認)。
+§10 の残件 (14.0〜14.3) を、版間の製品コード差分にバイナリ出現する文字列リテラルがあるかで試した。入力は §9 の入力 (sha256 とバイト数の正は §9-1 の `sha256sum` 行)。**本 run では素材 `plugins-serum2` が `$ARTIFACTS_DIR` に無く (`fl-win64` のみ)、入力の再照合もバイナリ照合も未実施。** 下表の値は前 run の実測で、本 run では再現していない。
 
 | 段 (製品コード, `tests/` 除外) | 差分の変更行数 | 差分に現れる文字列リテラル | バイナリ内の出現 | 判定 |
 |---|---|---|---|---|
@@ -238,8 +238,15 @@ python3 gui/vstgui_version.py    # 0.70 s (real, 逐次, load 未計測)
 # tools/targets/serum2/ を cwd・work/vstgui4 は §9-1 の clone
 for p in "vstgui4_14_0 vstgui4_14_1" "vstgui4_14_1 vstgui4_14_2" "vstgui4_14_2 vstgui4_14_3"; do
   set -- $p; git -C work/vstgui4 diff --stat $1 $2 -- vstgui/ ':!*/tests/*' | tail -1
-  git -C work/vstgui4 diff -U0 $1 $2 -- vstgui/ ':!*/tests/*' | grep -E '^[-+][^-+]' | grep -oE '"[^"]{4,80}"' | sort | uniq -c
+  git -C work/vstgui4 diff -U0 $1 $2 -- vstgui/ ':!*/tests/*' | grep -E '^[-+][^-+]' | grep -oE '"[^"]{4,80}"' | sort -u > work/lit_$1_$2.txt
+  while IFS= read -r q; do
+    s=${q:1:-1}
+    echo "$1 -> $2 | $(grep -o -a -F -- "$s" work/Serum2_win64.vst3 | wc -l) | $s"
+  done < work/lit_$1_$2.txt
 done
 ```
 
-- 所要 (real, 逐次): `vstgui_version.py` 1.80 s。差分 3 段の `git diff` は合計で数秒 (load 未計測)。
+- 照合段の出力は「段 | バイナリ内の出現数 | リテラル」。`grep -o -a -F | wc -l` は出現回数を数える (`grep -c` は行数で、バイナリでは出現数と一致しないため使わない)。表の「バイナリ内の出現」列はこの出現数と一致させる。
+- 前提: `work/Serum2_win64.vst3` は §9-1 の手順 (`plugins-serum2` の展開と `7z` 抽出) で用意する。`work/vstgui4` は §9-1 の clone。
+- 本 run の照合: **未実施** (素材 `plugins-serum2` が `$ARTIFACTS_DIR` に無く、`work/` が無いため)。上表の出現数は前 run の値。
+- 所要 (real, 逐次): `vstgui_version.py` 1.80 s。差分 3 段と照合は未計測 (load 未計測)。
