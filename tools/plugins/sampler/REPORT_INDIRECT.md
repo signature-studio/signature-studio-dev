@@ -52,10 +52,10 @@ total = base ∪ root から `call/jmp rel32` で到達する非共通関数 (fr
 | `indirect_e2e.sh` 全体 (3 回、inventory 済みから) | exit 0 × 3: **141 s / 139 s / 138 s** (終了時 load average (1 分) 0.99 / 1.00 / 1.01)。 3 回の `[indirect_lift]` 行 (秒を除く) の md5 が一致、算出表も一致 (`diff`) |
 | `indirect_nega.sh` | exit 0、19 s (NC0–NC7 全て期待通り) |
 
-HEAD を `e0ee8d4` (ALLOW 0・#629 取り込み後) に進めたため、上記 (`0f50a1b`・inventory 済み) とは別条件で、以下を分けて記録する。 いずれも前回 fix run の実測 (そのログの値) で、本 run では再実行していない (PR の差分範囲が #551 merge 待ちのため)。
-- `indirect_e2e.sh` (`e0ee8d4`・前提生成込み・許容 0): exit 0、**real 11 分 20.699 秒**、judge 7/7 PASS、indirect_defs 7/7 PASS。
-- `indirect_nega.sh` (`e0ee8d4`・許容 0): exit 0、**17.5 秒**、NC0–NC7 期待通り。
-- 対比: 同じ 138–141 秒の `indirect_e2e.sh` は inventory 済み (前提生成なし) の `0f50a1b` 条件。 前提生成の有無で数値が大きく変わるため、比較時は条件を揃える。
+HEAD を `9f9a9bb` (main 4f33fdd 取り込み後・#551 由来の差分を除去後・許容 0) に進めた。 以下は本 run で HEAD `9f9a9bb` から実測したもの (素材 fl-win64 / toolchain-retdec / toolchain-emsdk を `$ARTIFACTS_DIR` から展開、4 core、`work/` 無し・前提生成込み):
+- `indirect_e2e.sh` (`9f9a9bb`・前提生成込み・許容 0): exit 0、**real 10 分 58.933 秒** (user 35 分 58.210 秒)。 judge 7/7 PASS (lift_rc / emcc_c_rc / f80 全 0・未実装 helper 0)、indirect_defs 7/7 PASS、`[indirect_e2e] OK`。 `closure_indirect.py` 4 検査 × 7 本 PASS。
+- `indirect_nega.sh` (`9f9a9bb`・許容 0): exit 0、**16.324 秒**、NC0–NC7 全て期待通り (NC4: ranges 82 → 81、define 87 → 85)。
+- 前回 (`e0ee8d4`・前提生成込み) の 11 分 20.699 秒・17.5 秒は参考値。 `0f50a1b` (inventory 済み) の 138–141 秒は前提生成なしの別条件で、比較時は条件を揃える。
 
 `closure_indirect.py` の 4 検査 (不合格で exit 1): **C1** entry だけから BFS した結果が `plugin_closure.py` の ranges と完全一致 (BFS 実装の同一性) / **C2** root の関数数・バイトが `unreached.json` (§2、`unreached_unique.py` の出力) と一致 (同一定義 = 8 バイト整列 qword 一致 の再計算。 独立検算ではない。 NC2・NC3 で検出力を確認) /
 **C3** total ⊆ 非共通 かつ base ⊆ total (framework を lift 対象に混ぜない) / **C4** 別算法: 命令境界を見ず関数バイト列の `E8`/`E9` rel32 を全オフセットで拾う過大近似の閉包に total が含まれる (独立検算は C4 のみ)。
