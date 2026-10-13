@@ -231,5 +231,6 @@ underrun が 3 秒続くと +B を 1 段ずつ戻す (下限は下げない)。`
 
 検証 (commit 755ecb23・e2e.sh 1 run ずつの実測): 無負荷 `c1` 13/13 PASS, 7.6 s, exit 0 / 無負荷 5 run 全 PASS, 7.7〜7.8 s / 負荷下 3 run 全 PASS, 9.2〜9.3 s。
 最終 HEAD `e983c1b6` (main 取り込み後・`pnpm install --frozen-lockfile` 後): `bash tools/audio/integration/e2e.sh` **13/13 PASS, exit 0, 7.8 s**。`tsc` OK・`vite build` OK。dev:tone `max_err=1.49e-8`・underrun 0・zero_runs 0・preview 同値。
+最終 HEAD `948e6fb3` (REPORT §10 の件数修正のみ・コード差分なし、`FL_WIN64_DIR` 展開 `fl-win64`): `bash tools/audio/integration/e2e.sh` を 3 回実行 → **13/13 PASS・exit 0 が 3 回** (7.9 s / 7.8 s / 7.7 s、wall 12.0 s / 10.6 s / 10.4 s、load 0.48 / 0.47 / 0.81)。FAIL 0 件。
 
 残り: `public/worklets/dummy-worklet.js` は `deploy/probe/policy-check.mjs`・`tools/e2e/suite/checks.mjs` が参照するため今回は削除せず、追跡 **#839** (E2E-5)。`tools/e2e` スイートの再実行は未実施 (#839 で実施)。
