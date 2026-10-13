@@ -19,6 +19,7 @@ from . import env
 from . import ir as IR
 from .pe import Image
 from .passes import base as B, p1, f7, f2, iargs, remap
+from .passes import icall as ICALL
 from .simd import gen as SG
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
@@ -27,6 +28,7 @@ SIMD_DIR = os.path.join(HERE, "simd")
 
 
 def rpath(p):
+    """repo 相対 / 絶対パス。`${PLUGINS_DIR}` 等 (env.PATH_VARS のキー) は環境変数優先で展開する"""
     if p is None:
         return None
     p = re.sub(r"\$\{(\w+)\}", lambda m: env.PATH_VARS[m.group(1)], p)
@@ -198,7 +200,15 @@ def run_all(cfg_path, workdir=None, detect_only=False):
     os.makedirs(workdir, exist_ok=True)
     log, stats = [], {}
     img = Image(rpath(cfg["image"]))
-    raw = retdec_lift(cfg, workdir, log)
+    ic = cfg.get("passes", {}).get("icall")
+    if ic:   # lift 前に PE を書換え (間接 call/jmp 復元 + ABI 仮想化 + D7 回避)。img (修復 pass が参照する正本) は元 PE のまま
+        rimg, rranges, icmap = ICALL.prelift(cfg, rpath(cfg["image"]), rpath(ic["funcs"]), workdir, log)
+        cfg = dict(cfg, image=rimg, retdec=dict(cfg.get("retdec", {}), ranges=rranges))
+        raw = retdec_lift(cfg, workdir, log)
+        raw = ICALL.restore(raw, icmap, workdir, log)
+        cfg["raw_ll"] = raw
+    else:
+        raw = retdec_lift(cfg, workdir, log)
     mod, st = repair_ll(cfg, raw, img, log, detect_only=detect_only)
     stats.update(st)
     cjs = None

@@ -50,7 +50,12 @@ export type ToWorker =
   | { t: "boot"; baseUrl: string; entry: ManifestEntry; opts: BootOptions; ring: SharedArrayBuffer | null }
   | { t: "ping"; n: number }
   /** ポンプ自己検証: ring を consumer として GetMessage ループし、APP_RUNTIME_STOP / WM_QUIT で結果を返す */
-  | { t: "pump-selftest"; ring: SharedArrayBuffer; timerId: number; timerMs: number };
+  | { t: "pump-selftest"; ring: SharedArrayBuffer; timerId: number; timerMs: number }
+  /** RT-3: OffscreenCanvas を Worker に渡し、ring を consumer として入力を描画へ反映する (gui_selftest.ts) */
+  | { t: "gui-selftest"; ring: SharedArrayBuffer; canvas: OffscreenCanvas; width: number; height: number; present: GuiPresentMode };
+
+/** Worker 内描画の present 方式。blocking = getMessage で寝たまま描く (commit 検証用) / yield = イベントループへ戻って描く */
+export type GuiPresentMode = "blocking" | "yield";
 
 export type PumpSelfTestResult = {
   received: number;
@@ -101,4 +106,22 @@ export type FromWorker =
     }
   | { t: "error"; message: string; stack?: string }
   | { t: "pong"; n: number; tWorker: number }
-  | { t: "pump-result"; result: PumpSelfTestResult };
+  | { t: "pump-result"; result: PumpSelfTestResult }
+  | { t: "gui-ready"; mode: GuiPresentMode }
+  | { t: "gui-result"; result: GuiSelfTestResult };
+
+export type GuiSelfTestResult = {
+  mode: GuiPresentMode;
+  received: number;
+  byMessage: Record<string, number>;
+  /** 最後に受けた MOUSEMOVE の (x, y) */
+  lastMove: [number, number] | null;
+  keys: number[];
+  chars: string;
+  focus: boolean | null;
+  wheel: number;
+  blockedWaits: number;
+  dropped: number;
+  /** Worker 内 getImageData の desktop 内容 (検証用) */
+  pixelAtLastMove: [number, number, number, number] | null;
+};
