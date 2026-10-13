@@ -643,12 +643,12 @@ class FnLift:
             return self.L('goto %s;' % self.label(t))
         if ins.address in self.jtabs:
             sw = ' '.join('case %s: goto %s;' % (hx(sh(t)), self.label(t)) for t in sorted(set(self.jtabs[ins.address])))
-            return self.L('switch (%s) { %s default: ott_badjump(%s, %s); }' % (self.rd(ins, op, 8), sw, hx(ins.address), self.rd(ins, op, 8)))
+            return self.L('switch (%s) { %s default: ott_badjump(%s, %s); }' % (self.rd(ins, op, PTR), sw, hx(ins.address), self.rd(ins, op, PTR)))
         slot = iat_slot(ins, op)
         if slot is not None and slot in self.pe.iat:
             return self.L('imp_%s(); return;' % self.pe.iat[slot])
         # 間接 tail jmp (CFG dispatch 等): target を値として dispatch
-        return self.L('{ uint64_t t_ = %s; ott_dispatch(t_); return; }' % self.rd(ins, op, 8))
+        return self.L('{ uint64_t t_ = %s; ott_dispatch(t_); return; }' % self.rd(ins, op, PTR))
 
     def i_call(self, ins, ops):
         op = ops[0]
@@ -657,7 +657,7 @@ class FnLift:
         slot = iat_slot(ins, op)
         if slot is not None and slot in self.pe.iat:
             return self.L(self.call_stmt(ins, 'imp_%s();' % self.pe.iat[slot]))
-        self.L('{ uint64_t t_ = %s; ' % self.rd(ins, op, 8) + self.call_stmt(ins, 'ott_dispatch(t_);') + ' }')
+        self.L('{ uint64_t t_ = %s; ' % self.rd(ins, op, PTR) + self.call_stmt(ins, 'ott_dispatch(t_);') + ' }')
 
     def i_ret(self, ins, ops):
         if IA32 and ops:   # ia32 の ret imm16 (stdcall): 戻り先 + 引数分を捨てる。x64 の出力は不変
