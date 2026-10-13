@@ -57,6 +57,8 @@ struct fl_desc {
     fl_handler h;       /* NULL = 未実装 */
 };
 
+int fl_api_call(int fn_id, const fl_slot *argv, int argc, fl_slot *ret);
+
 extern const fl_desc fl_table[]; /* gen_provider.py 生成。添字 = fn_id */
 extern const int fl_table_n;
 
