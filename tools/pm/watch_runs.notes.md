@@ -35,7 +35,7 @@ watch_runs.sh の完了通知ごとに、結果処理と合わせて実行する
 - 競合 PR の fix は repository_dispatch (watchdog) で実機動作を確認済み (#576, #689。計測値は REPORT §8)。schedule(*/5) は発火が無く、repository_dispatch (oc-watchdog) で起こす経路を使う。
 
 ## 2026-10-13 13:24Z 追記
-- watchdog を VM から起こす: `pm-watchdog.timer` (systemd user、5 分おき、`pm_watchdog_ping.sh` が repository_dispatch oc-watchdog を送る)。ログ: `$PM_DIR/pm_watchdog_ping.log`。実機で run 名 `watchdog` の起動を確認済み (13:22:51Z)。GitHub の schedule(*/5) は #724 の merge から 2 時間 0 件。止めるとき: `systemctl --user disable --now pm-watchdog.timer`。
+- watchdog を VM から起こす: `pm-watchdog.timer` (systemd user、5 分おき、`pm_watchdog_ping.sh` が repository_dispatch oc-watchdog を送る)。ログ: `$PM_DIR/pm_watchdog_ping.log`。実機で run 名 `watchdog` の起動を確認済み (13:22:51Z)。schedule(*/5) の発火実測は [REPORT §8](REPORT.md) を参照。止めるとき: `systemctl --user disable --now pm-watchdog.timer`。
 - keyring がロックされると gh が失敗し、ping が FAILED とログに残る (推測・平文保存はしない。依頼者に解錠を依頼)。
 - 新しい shell で `cf` を使うとき: PATH に bun が無いことがある。`mkdir -p "$PM_TMP/shim"; ln -sf "$(command -v bun)" "$PM_TMP/shim/node"; export PATH="$PM_TMP/shim:$PATH"`。
 - R2 投入の一時昇格ポリシー: `$PM_TMP/r2up/pol-rw.json` / `pol-ro.json` (消えたら再作成する: 対象は R2 バケット `signature-studio-artifacts` のリソース、権限は「Workers R2 Storage Bucket Item Read」と「Write」。Cloudflare のアカウント ID は `docs/REFERENCES.md` を参照)。
