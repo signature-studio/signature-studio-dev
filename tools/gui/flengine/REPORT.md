@@ -1,6 +1,7 @@
 # REPORT — GUI-3 (#174): 実 FLEngine の lift に GUI shim を結合する
 
-**判定: 部分達成 (受入条件 1 は未達。条件 2 は本 HEAD で達成 (flengine e2e 12/12・親 `tools/gui/e2e.sh` ALL PASS)。PR は `Refs #174`)**。実 FLEngine (m11 closure, `FLEngine_x64.dll` の 7,421 関数 lift) に `tools/gui` shim を全 TU `-pthread` でリンクし、
+**判定: 部分達成 (受入条件 1 は未達。条件 2 は現 HEAD `3885765a` で達成 (flengine e2e 12/12 ×3・親 `tools/gui/e2e.sh` ALL PASS、step 0〜6h 全 PASS。§6)。PR は `Refs #174`)**。
+§1〜§5 の数値・記述は旧 HEAD `52e6bd57` 時点のもの (参考)。現 HEAD の実測は §6 を正とする。実 FLEngine (m11 closure, `FLEngine_x64.dll` の 7,421 関数 lift) に `tools/gui` shim を全 TU `-pthread` でリンクし、
 **自然起動 (DllMain attach) で最初の GUI API (`LoadStringW`) が shim に到達**した。942 unit の隔離 survey では GUI API **32 種**が shim に到達 (実装済み 31 / fail-fast stub 1 = `LoadImageW`)。
 `CreateWindowExW` は survey で **1 回だけ自然到達**したが、直前の `RegisterClassW` は呼ばれず (`GetClassInfoW` の後に直行)、窓は生成されない (§5-2 の lift 欠陥)。受入条件 1 の意図する「実登録を経た窓生成の自然到達」は未達。
 実 WNDCLASS を JS から指向呼出した場合は `RegisterClassW` ×2 が shim に届き、`TApplication` の窓 (hwnd 31bit) が生成できる。
@@ -11,7 +12,7 @@
 
 ## 1. 結論と実測
 
-検証起点: コード HEAD `52e6bd57` (main `c9053db3` を取り込んだ `1b99a5a4` の上で、S1 の比較元を GUI と同じ `-pthread` build に揃えた修正 (`52e6bd57`))。環境: runner 4 vCPU, node v22.23.3, emcc 6.0.12 (`[EMSDK]`)、素材 `work-m11` + `fl-win64`、`python3` の pefile・capstone、`x86_64-w64-mingw32-gcc` (`apt-mingw`)。
+検証起点 (§1 表): 旧 HEAD `52e6bd57` (`d46b024` 時点の値、参考)。現 HEAD `3885765a` の実測は §6。環境: runner 4 vCPU, node v22.23.3, emcc 6.0.12 (`[EMSDK]`)、素材 `work-m11` + `fl-win64`、`python3` の pefile・capstone、`x86_64-w64-mingw32-gcc` (`apt-mingw`)。
 IR は素材 `work-m11` の中間 IR (`boot0..4.lift.ll`) から、`tools/gui/work/flengine/tree/` の複製側で `m11_gen_ir2.sh` (ldfix 適用、main #680 の要件) を回して作り直し、続けて `m11_build.sh` (qstore・alloca・post) を実行してから測った。`tools/m11/work` (素材) は書き換えていない。sha256 は §6。
 
 | 項目 | 実測 (52e6bd57, 3 回。全 rc 0・12/12 PASS) | 定義 / 分母 |
@@ -130,7 +131,23 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 
 ## 6. 検証
 
-実行: `ANALYSIS_DIR=$HOME/analysis FL_WIN64_DIR=$HOME/analysis/win64 bash tools/gui/flengine/e2e.sh` (HEAD = `a927ac87`。main `fe53ba30` (#563 = `d6b2940` 取込済) に #571 の merge `e94d6c8a`、重複 step 除去 `a927ac87`。runner 4 vCPU, 3 回直列)。
+実行: `ANALYSIS_DIR=$RUNNER_TEMP FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 PATH=<pefile・capstone の venv>:$PATH bash tools/gui/flengine/e2e.sh` (現 HEAD = `3885765a`。main `6aa4b397` 取込済 (`de8d603e`)、REPORT・probe.json のみ変更。runner 4 vCPU, 直列)。
+素材の前提 (本 run で確認): `$HOME/artifacts` の `fl-win64` / `work-m11` / `toolchain-emsdk` / `toolchain-retdec` を展開し、`tools/m11/m11_gen_ir2.sh` を素材 `tools/m11/work/` で 1 回実行 (`ir_conditions.json` の `ldfix=applied`、gitignore 対象で commit なし)。`apt-mingw` は `/usr/bin/x86_64-w64-mingw32-gcc`。
+
+### 現 HEAD `3885765a` の実測 (本節を正とする)
+
+| 対象 | rc | 所要 | 結果 |
+|---|---|---|---|
+| `tools/gui/flengine/e2e.sh` (n=3) | 0 / 0 / 0 | **153 / 146 / 149 s** (e2e.sh の done 行。`time` の real は 2m33 / 2m27 / 2m29 の実測) | judge **12/12 PASS** ×3、native selftest 500 passed / 0 failed ×3、pe_image P1・P2・N1・N2 PASS ×3、parity exit 0 (P1 LB=0 / LB=0x10000 PASS、補正 10,284 = m11_data_gen.py) ×3、ネガコン N1〜N5 期待どおり FAIL ×3 |
+| `tools/gui/e2e.sh` (親, 1 回) | 0 | **wall 124 s** (`time` real 2m04) | **ALL PASS** (step 0〜6h の全 PASS。step 6 (headless Chrome E2E) は `tools/e2e` の `npm ci` 後に実行) |
+
+- judge の一致 (3 回): B1 `units_run 52 (base 52)` / `threw memory access out of bounds (base 同じ)`、L1 `0/0/0`、A1 `177 = 177 (impl 159 / stub 18)`、S1 `871/1/47/23/0 (base 871/1/47/23/0)`、S2 `LoadImageW` のみ fail-fast (ff 1 unit) = soft STUB、R1 first `LoadStringW` (calls=3)、R2 reached 32 (floor 19)、P1 atoms `[-16383, -16382]` / `RegisterClassW=2 CreateWindowExW=3`、P4 hwnd `0x210000e`。
+- `results/probe.json` の `gui_shared_ptr` は実行ごとに変わる値 (ヒープ位置)。判定は範囲チェックのため PASS に影響しない。
+- 前提の補足 (親 e2e): 最初の run は worktree に root の `node_modules` が無く step 5 の `tsc` が rc 127 で落ちた。`pnpm install --frozen-lockfile` 後に ALL PASS。`tools/e2e` の `npm ci` (agent-browser / puppeteer-core) を入れて step 6 を実行。どちらも環境の前提で、コードは変えていない。
+
+### 旧 HEAD の実測 (参考・現 HEAD の値ではない)
+
+以下の表と箇条書きは旧 HEAD `a927ac87` と `de8d603e` 時点の実測。現 HEAD の実測は上の表を正とする。
 前提: 素材 `fl-win64` ([WIN64] = `$ANALYSIS_DIR/win64` に展開)、`work-m11` (`tools/m11/work/` に展開。e2e は読取のみで、複製 `tools/gui/work/flengine/snap/` 側で使う)、`toolchain-emsdk` ([EMSDK])、`toolchain-retdec` ([RETDEC])、`apt-mingw` (`x86_64-w64-mingw32-gcc`)、Python の pefile・capstone (runner の system python は PEP 668 で pip 不可のため venv を作って PATH の先頭に置いた)。`m11_gen_ir2.sh` を素材の `tools/m11/work/` で 1 回実行して `ir_conditions.json` の `ldfix=applied` を作った。
 
 以下の表は main 取込み前の HEAD `a927ac87` の実測 (参考)。現 HEAD `de8d603e` の実測は上の箇条書きを正とする。
@@ -222,7 +239,6 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | RetDec C 経路で実 FLEngine 規模の PE を通した実測なし (§8-4) | `gN` 分割の実機挙動が未検証 | 範囲外 (FLEngine は m11 IR 経路) |
-| 現 HEAD (`a927ac87`) の §1〜§7 測定値は §6 のとおり (素材が揃い 3 回実測済み)。§1〜§5 の旧数値 (秒数・survey 等) は `d46b024` 時点のまま残る | §1〜§5 の本文を §6 の値に合わせ直す | 本 PR 内で後続 commit (差し戻し対応) |
-| `e2e.sh` の pe_image step (4b) は `pe_image_parity.py` と `pe_image_e2e.sh` の全実測を含むが、親 `tools/gui/e2e.sh` (受入条件 2) は未実行 | 親 e2e の結果を §6 に書き足す | 本 PR 内 (未実施の場合は PR 本文で明示) |
+| §1〜§5 の数値・記述 (秒数・survey・`52e6bd57` 時点) は参考。現 HEAD の値は §6 の表を正とする | 本 PR の後続 commit で本文を書き直すのは別作業 (文書の整理) | 本 PR 内で行う (未実施なら PR 本文で明示) |
 
 範囲外: 実ブラウザ・Canvas 描画、audio、UI スレッドのスタック量、`gui_reach` の性能影響 (INTEGRATION §4-12 の未計測は継続)。
