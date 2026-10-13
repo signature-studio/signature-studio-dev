@@ -67,9 +67,12 @@ mirror は guest ヘッダと 1:1 (guest アドレスで引く)。Prepare で確
 
 | 検証 | コマンド | 結果 | 所要 / 備考 |
 |---|---|---|---|
-| shimx 全体 (MT/ST・fail-fast 10 モード・M4 53/53・署名 mismatch 0・midi 単体テスト) | `bash tools/shimx/test.sh` | exit 0 | 49 s (本 run 実測) |
+| shimx 全体 (MT/ST・fail-fast 10 モード・M4 53/53・署名 mismatch 0・midi 単体テスト) | `bash tools/shimx/test.sh` | exit 0 (MT/ST PASS・fail-fast 10・M4 MT/ST PASS・sig_test ALL PASS・mismatch 0) | 48.9 s (fcc85854 で実測) |
 | `verify_ott` | 同上 (§7) | **SKIP** (`tools/m8/work/ott_m8.ll` / `tools/m6/work` が無い) | OTT 検証は未実施。素材 (`toolchain-retdec` / `work-m6-ott`) が要る |
-| audio MIDI e2e | `bash tools/audio/e2e_midi.sh` | 4/4 PASS, exit 0 | 本 run 実測 (下記 HEAD) |
+| audio MIDI e2e (audio 単体。shimx 変更はビルド対象外) | `bash tools/audio/e2e_midi.sh` | 4/4 PASS, exit 0 | 71.0 s (fcc85854 で実測・load 0.00→0.08) |
+
+e2e 内訳: `midi_all` 54/54 (2,801 ms) / `negctl_drop_one_short_msg` 62,500 ms / `negctl_flip_sysex_bit` 1,892 ms / `worker_webmidi_probe` PASS (記録のみ)。
+注: `e2e_midi.sh` は shimx をビルドしないため、この PASS は audio 側の回帰確認に限られる。shimx と audio の結合は未検証 (§19.8)。
 
 `verify_ott` の SKIP は既存挙動で、本変更の影響ではない。`test.sh` 全体 exit 0 は「OTT 検証を除く」を意味する。
 
