@@ -881,6 +881,15 @@ PM を含む全てのセッションは ephemeral で中断・削除される可
 > 別に4ドルくらい今すぐ払えるし、私はそれに4ドル以上の価値を感じているので
 > https://docs.github.com/en/actions/reference/limits#job-concurrency-limits-for-github-hosted-runners
 
+### 指示 126（2026-10-13、Team プランへの課金完了・モデル変更・モデル変数を変更する 2 コマンドの許可）
+
+> 支払いました。状況を確認してください。
+>
+> LLM率については、Sonnet 5.5 XhighからHaiku 5.5 Maxに変更済みです。ベンチマークスコアから以前このワークスペースで使用していたGLM-5.3-Flashと遜色ない性能を期待できること、今確認したところ5h quotaが約20分で1%ほど増加していた=レート制限に対し全く問題ないことから、当分は問題ないものとして決定します。
+> もしレートリミットによりactionsが失敗する場合、あなたが `gh variable set -R signature-studio/signature-studio-dev OC_MODEL_ID -b "console-openrouter/anthropic/claude-haiku-5.5#xhigh"` を実行しモデルを従量課金に変更してください。その場合の料金も閾値内であることは立証済みです。サブスクに戻す場合は `gh variable set -R signature-studio/signature-studio-dev OC_MODEL_ID -b "console-cloudflare-ai-gateway-custom/claude-haiku-5-5#max"` です。
+> モデル管理は私の領域ですが、継続的な監視と変更に関して上記2コマンドのみあなたに許可します。
+> あなた（PM）は常に従量課金で稼働しているため、いかなる場合も止まらないと考えて大丈夫です。
+
 ---
 
 ## 2. PM による解釈・運用への反映
@@ -912,6 +921,7 @@ PM を含む全てのセッションは ephemeral で中断・削除される可
 | 指示 123: レビュワーが突き返したとき、実装 agent は PM の力を借りず自発的に動作する。全ての Opened PR は『レビュー中』『レビューを受けて修正中』の 2 種類のみで、どちらでもない状態は 1 秒も存在しない | **現状は実現できていない**: 実測 (2026-10-13 09:20Z、PM の分類) で open PR の過半がどちらでもない状態だった (数値は `tools/pm/REPORT.md` §4)。原因は、差し戻しで実装 run を起動する仕組みが workflow に無かったこと、競合 PR・draft・stacked・Copilot 待ち・merge 順待ちが『どちらでもない』を作ること。対策: PR #721 (差し戻しで fix モードの実装 run を自動起動、往復の上限と `oc:stuck`)・watchdog (PR #724、5 分おきに IDLE を検出して動かす)。PR #721 は 2026-10-13 10:36:05Z に merge 済み。**未検証は main 上の実 Actions 動作のみ** | `docs/pm/RETRO_2026-10-13.md` §2 #5・#6・§4、PR #721、issue #719 |
 | 指示 124: 全ての Opened PR に、Reviewer または修正 Implement が稼働中・待機中か。漏れはないか | **実測で答える**。`watchdog.sh` を `DRY=1` で本物のリポジトリに当て、open PR を『担当 run あり / 担当なし』に数える。漏れは理由別に分け、その場で依頼を投入して再測定する。主観では答えない | `docs/WORKFLOW.md` §11 (watchdog)・PR #724 |
 | 指示 125: Actions の同時実行数 (Free 20) を、今月だけ Team (60) に上げた方が良いか | 課金は依頼者の判断領域であり、PM は操作しない。実測 (所有者の組織のプラン・席数・リポジトリの公開範囲・同時実行の飽和) と公式の制限値を根拠に推奨と注意点を提示する。費用の本体は GitHub の席代ではなく LLM の推論費用と、API の率制限 | 本ファイル・`docs/WORKFLOW.md` §11 |
+| 指示 126: Team プランへの課金完了、モデルを Haiku 5.5 Max に変更、率制限で失敗したら `OC_MODEL_ID` を従量課金に切り替える 2 コマンドのみ PM に許可 | モデル管理は依頼者の領域。PM に許可されたのは **`OC_MODEL_ID` の 2 つの値への切り替えだけ**: 従量課金 `console-openrouter/anthropic/claude-haiku-5.5#xhigh`、サブスク `console-cloudflare-ai-gateway-custom/claude-haiku-5-5#max`。切り替えの条件は『率制限 (`rate_limit_error` など) による run の失敗』を**ログで確認した場合**に限る。他の原因 (例: `Argument list too long`) の失敗では切り替えない。切り替えたら依頼者に報告する。他のモデル・他の variable・課金の操作はしない | 本ファイル・`restart_failed.sh` |
 
 ---
 
