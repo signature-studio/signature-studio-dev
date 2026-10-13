@@ -37,6 +37,13 @@ on:
         description: 'auto | releases | npm'
         required: false
         default: ''
+  # main が進むと、既に open の PR が競合になる。競合 PR には pull_request の event が起きず、review も
+  # 修正も始まらないので、main への push のたびに全 open PR を点検する (watchdog job)。
+  push:
+    branches: [main]
+  # event の取りこぼしや run の失敗で「レビューも修正もされていない」PR が残らないよう、定期的に点検する。
+  schedule:
+    - cron: '*/5 * * * *'
 
 # すべての GitHub API 認証は
 # actions/create-github-app-token が発行する App installation token が担う。
@@ -51,6 +58,44 @@ permissions: {}
 # 実行中のエージェントを push で中断すると作業内容が失われる。
 
 jobs:
+  watchdog:
+    # open PR を「レビュー中」か「レビューを受けて修正中」のどちらかに保つ (#719、指示 122/123)。
+    # 主経路はイベント駆動 (差し戻し -> fix、push -> review)。これはバックストップで、イベントが起きない
+    # 競合と、取りこぼし・失敗した run を点検して戻す。詳細は .github/scripts/watchdog.sh の冒頭。
+    # review の提出・merge・ready・close/reopen は reviewer App 名義で行う (同一 App は自分が作った
+    # PR に request-changes できない)。
+    if: github.event_name == 'push' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # GITHUB_TOKEN は実行中の run の一覧 (actions:read) にだけ使う。他の権限は付けない。
+    permissions:
+      actions: read
+    concurrency:
+      group: opencode-watchdog
+      cancel-in-progress: false
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/create-github-app-token@v3
+        id: reviewer-token
+        with:
+          client-id: ${{ vars.OC_REVIEW_APP_CLIENT_ID }}
+          private-key: ${{ secrets.OC_REVIEW_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-issues: write
+
+      - name: Keep every open PR either under review or being fixed
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.reviewer-token.outputs.token }}
+          RUNS_TOKEN: ${{ github.token }}
+          OC_REPO: ${{ github.repository }}
+        run: bash .github/scripts/watchdog.sh
+
   implement:
     # 実装エージェント: issue_comment (/oc) または workflow_dispatch で起動。
     # PR 上の /oc コメントは conflict 解消などの追加作業。
