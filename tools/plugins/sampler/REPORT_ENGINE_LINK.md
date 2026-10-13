@@ -108,8 +108,27 @@
 | 既定 `lift_ranges.sh` 直行 (前 run #810 の実測、本 HEAD では未再測定) | 23664 | 614 s 時点で RSS 8.15 GiB、"out of memory; trying to recover" 3 回。 未完で手動停止。 run id 未確認 |
 | `--backend-no-opts` (前 run #810 の実測、本 HEAD では未再測定) | 23664 | **exit 0、441 s、Maximum RSS 3.52 GB**。 `.ll` 75 MB・`.c` 39.6 MB 出力まで完走。 run id 未確認 |
 
-- 結論: `--backend-no-opts` で RSS は 8.15 GiB → 3.52 GB に下がり、C 出力まで完走する。 ただし 441 s は `lift_from_ll.sh` (.ll 出力後に停止、既定経路) より長い。 共有 `lift_ranges.sh` は変更せず、既定経路は `lift_from_ll.sh` のまま (判断: 変更しない)。
-- 理由: `lift_from_ll.sh` は C 出力を使わず `.ll` の後段だけ使うため、`--backend-no-opts` を入れても時間の利点が無い。 `--no-memory-limit` は本 HEAD では未測定 (RSS は 3.5 GB で上限に届かなかった)。
+- 結論: 前 run の値では `--backend-no-opts` で RSS が 8.15 GiB から下がり、C 出力まで完走した (上表)。 共有 `lift_ranges.sh` は変更せず、既定経路は `lift_from_ll.sh` のまま (判断: 変更しない)。
+- 理由: `lift_from_ll.sh` は C 出力を使わず `.ll` の後段だけ使う。 `.ll` 出力までの秒数は本書で未記録のため、既定経路との時間比較は行わない。
+- 本 HEAD (main dc7c11df・fl-win64 展開 `$RUNNER_TEMP/fl-win64`、23664 の ranges 5,160 関数) での測定。 **n=1 の単発測定**。 環境は 4 vCPU・RAM 15 GiB (`nproc`・`free -g`)。 run id・load average・並列数は未記録 (レビュー run `38459725194` (head 3f80a201、`pull_request` の review job) のログと #540 のコメントに該当出力が無いことを確認済み)。 min–max レンジは未取得。 したがって下表の秒数・RSS は **出所不明の参考値** として扱い、判断の根拠は exit 137・C 出力未完・完走の有無という観測事実に限る:
+
+| 方式 | 結果 (n=1 実測) |
+|---|---|
+| `--no-memory-limit` (既定 `--backend-*` のまま) | exit 137、`--timeout 1100` で打ち切り (経過 18:20.34)、Maximum RSS 11.19 GB。 "out of memory" 0 件。 "emission of the target code [c]" に 922.76 s で入り、C 出力の途中で打ち切り。 C 出力は未完 |
+| `--backend-no-opts` | exit 0、8:18.90 (498.90 s)、Maximum RSS 3.52 GB。 `.ll` 75 MB・`.c` 39.6 MB 出力まで完走 |
+
+- 結論 (受入条件 3・n=1 の範囲): 上表の n=1 測定では `--no-memory-limit` は C 出力を完了できなかった。 `--backend-no-opts` は完走した。 共有 `lift_ranges.sh` には入れない (判断: 変更しない)。 RetDec の既定経路は本 HEAD でも `lift_from_ll.sh` を使う。 n≥3 の min–max は未取得のため、受入条件 3 は「判断まで完了 (測定は n=1、再測定は未実施)」。
+- 鮮度 (WORKFLOW §6): 測定 commit は dc7c11df。 検証 HEAD 77b85cec までの sampler コード差分は 0 行。 出力:
+
+  ```
+  $ git diff dc7c11df 77b85cec -- tools/plugins/sampler ':!*.md' | wc -l
+  0
+  $ git diff --stat dc7c11df 77b85cec -- tools/plugins/sampler
+   tools/plugins/sampler/REPORT_ENGINE_LINK.md | 25 ++++++++++++++++++++++---
+   1 file changed, 22 insertions(+), 3 deletions(-)
+  ```
+
+  差分は本 REPORT (md) のみ。 本 REPORT の更新 commit も md のみのため、dc7c11df の測定結果は現 HEAD でも同じ sampler コードに対するものとして扱う。 再測定は要求しない。
 
 ### 5. VEX helper の CPUID 分岐 (前 run の引用、main f0d65f32。本 HEAD では未再測定)
 
@@ -127,7 +146,7 @@
 | 未解決 | 起票先 |
 |---|---|
 | 殻の selector 9 件の `r8`/`r9` 引数の完全な意味・戻り値の型 (engine 側 case ごとの読解) | 本 #540 (継続) |
-| `--no-memory-limit` の実測 (今回 RSS 3.5 GB で未到達) | 本 #540 (継続) |
+| `--no-memory-limit` の n=1 測定の扱い (§5 参照) | 本 #540 (継続、受入条件 3 は判断まで完了) |
 | VEX helper の SSE 固定の動的確認 (直接 call 鎖では guard 無し。間接 call は未追跡) | #527 にコメント予定 (既存・重複起票せず) |
 | 受入条件 1・2 の再測定 (`sampler_engines.sh`) | 本 HEAD の検証 run は runner に [RETDEC] が無く未再現。 RetDec 環境のある run で再測定 (#540 継続) |
 
