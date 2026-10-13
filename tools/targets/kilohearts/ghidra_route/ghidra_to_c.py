@@ -28,7 +28,7 @@ SNAPINS = {
     'gain': {'proc': 0x1804b0380, 'exports': [0x1804b0380], 'stubs': {}},
     'haas': {'proc': 0x1804d0280, 'exports': [0x1804d0280, 0x1804d0180, 0x1804cff00, 0x1804cff90, 0x1804d0720], 'stubs': {}},
     'gate': {'proc': 0x1804c2f50, 'exports': [0x1804c2f50], 'stubs': {}, 'also': [0x180295f20, 0x180020e70]},
-    'resonator': {'proc': 0x180743390, 'exports': [0x180743390], 'stubs': {}, 'also': [0x180fbc1f4, 0x180fbbfb8, 0x180fbdfcc, 0x180fbe018, 0x180fcf904, 0x180fd54cc, 0x180fd62dc, 0x180fd6320, 0x180fb6ce0, 0x180fd648c, 0x180fbdef4, 0x180fe5dfc]},
+    'resonator': {'proc': 0x180743390, 'exports': [0x180743390], 'stubs': {}, 'also': [0x180fbc1f4, 0x180fbbfb8, 0x180fbdfcc, 0x180fbe018, 0x180fcf904, 0x180fd54cc, 0x180fd62dc, 0x180fd6320, 0x180fb6ce0, 0x180fd648c, 0x180fbdef4, 0x180fe5dfc, 0x180fd6498, 0x180fd662c, 0x180fe5f40, 0x180fd3144]},
 }
 STUB = {  # 未 decompile の callee → C 実装 (RetDec stage-0 + kh_lower ルート (snapins/lift/kh_lower.py) の shims/fail-fast stub と同じ扱い)
     0x181384040: 'void* FUN_181384040(void* d, const void* s, ulonglong n) { return memmove(d, s, (size_t)n); }',
@@ -80,6 +80,15 @@ def main():
         d = pe_bytes(pe, va, 16)
         out.append('static unsigned char gd_%x[16] __attribute__((aligned(16))) = {%s};' % (va, ','.join(str(x) for x in d)))
         out.append('#define %s_%x (*(%s*)gd_%x)' % (kind, va, ty, va))
+    # --- 配列参照 (&UNK_x + 添字 = テーブル先頭からのバイト位置): 参照された範囲を 1 本の byte 配列にする
+    tabs = sorted(set(int(x, 16) for x in re.findall(r'&UNK_([0-9a-f]{8,9})\b', alltxt)))
+    tbase = tend = None
+    if tabs:
+        tbase = tabs[0] & ~0xf
+        tend = max(tabs) + 0x40
+        tb = pe_bytes(pe, tbase, tend - tbase)
+        out.append('static unsigned char gt_%x[%d] __attribute__((aligned(16))) = {%s};' % (
+            tbase, tend - tbase, ','.join(str(x) for x in tb)))
     # --- 前方宣言 (Ghidra の定義シグネチャから)
     protos = []
     bodies = []
@@ -87,6 +96,8 @@ def main():
         t = src[va]
         t = re.sub(r'/\*.*?\*/', '', t, flags=re.S)
         t = re.sub(r'undefined1 (auVar\d+) \[16\];', r'V128 \1;', t)
+        if tbase is not None:
+            t = re.sub(r'&UNK_([0-9a-f]{8,9})\b', lambda m: '((unsigned char*)gt_%x + 0x%x)' % (tbase, int(m.group(1), 16) - tbase), t)
         t = re.sub(r'\*\(undefined1 \(\*\) \[16\]\)\((.*?)\) = (auVar\d+) << 0x20;', r'v128_store_shl32((void*)(\1), \2);', t)
         if 'bitcast' in fixes:
             t = re.sub(r'\(float\)\(\(uint\)(\(.*?\)) & (_DAT_[0-9a-f]+|uVar\d+)\)', r'u2f(f2u\1 & \2)', t)
