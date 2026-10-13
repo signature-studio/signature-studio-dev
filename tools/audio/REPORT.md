@@ -226,4 +226,4 @@ winmm `midiIn`/`midiOut` 20 関数の Web MIDI 実体を `src/flmidi*.c` / `src/
 
 ## 15. AU-10 (#191) 30 分ソーク (`--soak30`)
 
-無負荷 30 分 (1800 s, B=256 48k ランプ) は PASS (underrun 0・ramp mismatch 0)、負荷下は 420 s で PASS。ただし head `525cbd9` 上の 30 分ソークは未実施。実機・Firefox/Safari は未計測。実測値・再現・未解決は `REPORT_AU10.md` (分割移動先) を参照。
+無負荷 30 分 (1800 s, B=256 48k ランプ) は PASS (underrun 0・ramp mismatch 0)、負荷下は 420 s で PASS。ただし head `57519ca` 上の 30 分ソークは未実施 (未計測)。head `57519ca` の 10 秒ソークは 4 回中 1 回 FAIL (ramp mismatch 411,392/480,512、原因未特定) で、他 3 回は PASS。実機・Firefox/Safari は未計測。実測値・再現・未解決は `REPORT_AU10.md` (分割移動先) を参照。
