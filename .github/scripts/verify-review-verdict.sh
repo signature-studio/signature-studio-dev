@@ -8,8 +8,8 @@
 #   - 現在の head に対する oc-reviewer の review が APPROVED または CHANGES_REQUESTED
 #   - この run が見ていた head より PR の head が進んでいる (進んだ push の synchronize が
 #     新しい review run を起動済みなので、古い head の欠落は問わない)
-# COMMENT だけの review は verdict と認めない (Copilot 待ちの保留は廃止した: 直近 15 PR に
-# Copilot の review は 0 件で、保留した PR が動かなくなるため)。
+# COMMENT だけの review は verdict と認めない (Copilot 待ちの保留は廃止した: Copilot の review は
+# 来ないことがあり、保留した PR は誰にも動かされず止まるため)。
 # それ以外は reopen-pr.sh (close -> reopen) で review を再起動する。同じ head に
 # OC_REVIEW_MAX_ATTEMPTS 回再起動しても verdict が出なければ PR に警告を残して失敗する。
 #
