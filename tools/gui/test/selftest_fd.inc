@@ -72,7 +72,20 @@ static int fd_match(const uint16_t *file, int n, int nlen, int wide, uint16_t nf
   return *p == 0;
 }
 
+static void ff_child_ofn_hook(void) {
+  uint8_t o[152]; memset(o, 0, sizeof o); uint16_t file[16] = {0};
+  *(uint32_t *)o = 152; *(uint64_t *)(o + 48) = (uint64_t)(uintptr_t)file; *(uint32_t *)(o + 56) = 16; *(uint32_t *)(o + 96) = 0x00080000u | 0x20u;   /* OFN_ENABLEHOOK */
+  GetOpenFileNameW((int64_t)(uintptr_t)o);
+}
+static void ff_child_ofn_tmpl(void) {
+  uint8_t o[152]; memset(o, 0, sizeof o); uint16_t file[16] = {0};
+  *(uint32_t *)o = 152; *(uint64_t *)(o + 48) = (uint64_t)(uintptr_t)file; *(uint32_t *)(o + 56) = 16; *(uint32_t *)(o + 96) = 0x00080000u | 0x40u;   /* OFN_ENABLETEMPLATE */
+  GetOpenFileNameW((int64_t)(uintptr_t)o);
+}
 static void run_fd_bounds(void) {
+  SECTION("GetOpenFileNameW hook / テンプレート は fail-fast で明示 (SHX-T14 #957)");
+  expect_failfast(ff_child_ofn_hook, "GetOpenFileNameW OFN_ENABLEHOOK", "GetOpenFileNameW");
+  expect_failfast(ff_child_ofn_tmpl, "GetOpenFileNameW OFN_ENABLETEMPLATE", "GetOpenFileNameW");
   SECTION("GetOpenFileNameW 複数選択の境界 (#172 review: w[] / 切り詰め / names[64])");
   pthread_t th; g_fd_stop = 0; pthread_create(&th, NULL, fd_host, NULL);
   while (!__atomic_load_n(&gui_hostcall_native()->host_ready, __ATOMIC_ACQUIRE)) usleep(1000);

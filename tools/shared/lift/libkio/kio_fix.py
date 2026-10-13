@@ -4,9 +4,10 @@
       対象は demangle 署名 (Z9Limit_RCSlll / Z9FixHi_RCSll / Z9CBool_RCSl) の `l` 引数のみ。
   [E] idiv (符号付き除算) が urem に化ける符号欠陥: FixHi_RCS の `urem i64` を `srem i64` へ。
   [A] deref 落ち ([rsi] が rsi そのものに化ける): 参照渡し引数を持つ Get*/Set*Intel 6 関数のみ修復。
-      unilen/wcslen16/str*compare の `cmp word ptr [rdi],0` 系、[B] float 引数落ち、[D] ucomiss flags 落ちは
-      この PoC では修復しない (tools/m7 ir7_argpass / m8 ir8_valueflow 相当の関数別 pass が必要; REPORT §4)。"""
-import re, sys
+      unilen/wcslen16/str*compare の `cmp word ptr [rdi],0` 系は [A] 汎用 pass の対象外 (REPORT §4)。
+      [D] ucomiss flags 落ちは LimitFloat_RCSfff のみ FLOAT_XMM (関数名直書き PoC) で修復する。汎用化は #1129。
+      [A'] 引数レジスタ接続の欠落は汎用 pass で修復する (str2compare/str4compare の 2nd arg, REPORT §4)。"""
+import os, re, sys
 WIDEN = ["__Z9Limit_RCSlll", "__Z9FixHi_RCSll", "__Z9CBool_RCSl"]
 s = open(sys.argv[1]).read()
 n = 0
@@ -81,5 +82,58 @@ for fn in sorted(set(re.findall(r"(?m)^define [^\n]*@(__Z\w+)\(", s))):
             return f"%fpbits{k} = bitcast {fty} %arg{k} to i{bits}\n  {v} = zext i{bits} %fpbits{k} to i128\n"
         new = re.sub(pat, rep, new)
     if new != body: s = s.replace(body, new); n += 1
+# [B'] 個別規則 (xmm 番号が既知の関数, PoC): 逆アセンブル確認済みの対応 (xmm0=arg1, xmm1=arg2, xmm2=arg3)。
+# LimitFloat_RCSfff は fp 引数 3 つのため汎用 [B] の対象外。Fix_RCSf は汎用 [B] で処理済みのため規則を置かない。
+def xmm_of(v, arg): return f"%fbits{v} = bitcast float %arg{arg} to i32\n  %{v} = zext i32 %fbits{v} to i128"
+FLOAT_XMM = {
+  "__Z14LimitFloat_RCSfff": {
+    "%2 = load i128, ptr %0": xmm_of("2", 3),
+    "%3 = load i128, ptr %0": xmm_of("3", 2),
+    "%4 = load i128, ptr %0": xmm_of("4", 1),
+    # [D] ucomiss flags 落ち: `ucomiss xmm1,xmm0` の flags を fcmp ule (arg2 <= arg1) に接続する。
+    #     機械語 `ucomiss xmm1,xmm0`/`ja` と br の対応を確認済み (minss 経路は ja 不成立 = arg2 <= arg1)
+    "%5 = load i1, ptr %1": "%5 = fcmp ule float %arg2, %arg1",
+    "%6 = load i1, ptr %1": "%6 = fcmp ule float %arg2, %arg1",
+  },
+}
+for fn, rules in FLOAT_XMM.items():
+    m = re.search(r"(?ms)^define [^\n]*@" + re.escape(fn) + r"\(.*?^}\n", s)
+    if not m: continue
+    body = m.group(0); new = body
+    for old, rep in rules.items():
+        new = new.replace(old, rep)
+    new = re.sub(r"(?m)^  uselistorder .*\n", "", new)
+    if new != body: s = s.replace(body, new); n += 1
+# [A'] 引数レジスタ接続の欠落 (汎用): RetDec は整数引数 k 番目を、store の無い未初期化 alloca からの k 番目の load
+#     として読むことがある (str2compare: %1=rdi, %2=rsi が同じ %0 を読み %arg2 が未参照)。SysV では k 番目の
+#     整数クラス引数は k 番目の整数レジスタ = 署名の k 番目の引数。署名の k 番目が P/PK のときだけ
+#     `ptrtoint ptr %argK` に置換する。f/d を含む署名は対象外。R は対象外にしない (参照引数は整数レジスタ 1 本を
+#     使うポインタ。ただし置換は P/PK 位置のみ)。前提: 単一 alloca に全引数が spill され、その k 番目の load が
+#     整数引数 k。R/K は独立トークンとして添字を数えるため、R/K の後ろに P が来る署名では添字がずれる。
+#     KIO_ARGREG=0 で無効化 (ネガティブコントロール)。
+def int_params(fn):
+    m = re.match(r"__Z(\d+)", fn)
+    if not m: return None
+    rest = fn[m.end() + int(m.group(1)):]
+    toks = re.findall(r"PK[a-zA-Z]|P[a-zA-Z]|[a-zA-Z]", rest)
+    if "".join(toks) != rest or any(t in ("f", "d") for t in toks): return None
+    return toks
+for fn in (sorted(set(re.findall(r"(?m)^define [^\n]*@(__Z\w+)\(", s))) if os.environ.get("KIO_ARGREG", "1") != "0" else []):
+    toks = int_params(fn)
+    if not toks or not any(t.startswith("P") for t in toks): continue
+    m = re.search(r"(?ms)^define [^\n]*@" + re.escape(fn) + r"\(.*?^}\n", s)
+    body = m.group(0); new = body
+    for al in sorted(set(re.findall(r"(%\w+) = alloca i64", new))):
+        if re.search(r"store [^\n]*, ptr " + re.escape(al) + r"[,\s]", new): continue
+        cnt = [0]
+        def rep(mm, toks=toks, cnt=cnt):
+            j = cnt[0]; cnt[0] += 1
+            if j < len(toks) and toks[j].startswith("P"):
+                return f"{mm.group(1)} = ptrtoint ptr %arg{j + 1} to i64\n"
+            return mm.group(0)
+        new = re.sub(r"(%\w+) = load i64, ptr " + re.escape(al) + r"\n", rep, new)
+    if new != body:
+        new = re.sub(r"(?m)^  uselistorder [^\n]*\n", "", new)
+        s = s.replace(body, new); n += 1
 open(sys.argv[2], "w").write(s)
 print(f"[kio_fix] widened {n} functions")
