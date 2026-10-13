@@ -4,10 +4,9 @@
 
 ## 結論
 
-`pnpm terms-watch` の 1 コマンドで、各社規約 7 件のうち **6 件を取得 → テキスト化 → 正規化 → SHA-256 比較 → 台帳 (`docs/LEGAL_TERMS_LEDGER.{json,md}`) 更新**し、差分があれば **exit 1** (取得不能は exit 3) で落とす。
-**未達: Xfer EULA の基準線が未取得** (公開 Web 版が無く、Win インストーラ (NSIS) のヘッダ内ライセンスページにしか無い。素材 `plugins-ott` 等が run に無かった)。issue #88 の完了条件「全文書」を満たさないため PR は `Refs #88`。
-Xfer の取得機構 (`kind: nsis-license`: NSIS インストーラのヘッダからライセンス文を取り出す) は実装済みで、**実 `makensis` 3.09 が作った合成インストーラ**で検証した (§NSIS 取得の検証)。**実 Xfer インストーラでは未検証**。
-次の run の手順は「未解決」表の先頭行。
+`pnpm terms-watch` の 1 コマンドで、各社規約 7 件を **取得 → テキスト化 → 正規化 → SHA-256 比較 → 台帳 (`docs/LEGAL_TERMS_LEDGER.{json,md}`) 更新**し、差分があれば **exit 1** (取得不能は exit 3) で落とす。**7 件すべての基準線が台帳に入った。**
+Xfer EULA は公開 Web 版が無く、Win インストーラ (NSIS) のヘッダ内ライセンスページにしか無い。取得機構 (`kind: nsis-license`: NSIS インストーラのヘッダからライセンス文を取り出す) は実 `makensis` 3.09 製の合成インストーラで検証し (§NSIS 取得の検証)、基準線は **実 OTT インストーラ `Install_Xfer_OTT_137.exe` (`plugins-ott`)** から記録した (§Xfer 基準線)。
+issue #88 の完了条件「全文書」は満たすが、定期実行・FL 追従への組込が残る (「未解決」表) ため、`Closes` にするかは PM 判断。
 
 ## 使い方 (1 コマンド)
 
@@ -15,7 +14,7 @@ Xfer の取得機構 (`kind: nsis-license`: NSIS インストーラのヘッダ�
 export FL_WIN64_DIR=<fl-win64 展開先>              # docs/WORKFLOW.md §11。未設定/無しなら FL 同梱 2 文書は SKIP (= exit 3)
 export PLUGINS_DIR=<plugins-ott 等の展開先>        # Xfer の NSIS インストーラを再帰探索 (--plugins-dir でも可)。無ければ xfer-eula のみ SKIP
 pnpm terms-watch                                   # 取得・比較・台帳更新。差分/未レビュー変更で exit 1
-pnpm terms-watch -- ack <id|all>                   # 差分を docs/LEGAL.md に反映した後、レビュー済みにする
+pnpm terms-watch -- ack <id|all>                   # 差分を docs/LEGAL.md に反映した後、レビュー済みにする (pnpm は `--` をそのまま渡すので cli.mjs が先頭の `--` を除去する。`pnpm terms-watch ack <id|all>` も可)
 pnpm terms-watch -- --only ni-eula --no-write      # 一部のみ・台帳を書かない
 pnpm terms-watch:test                              # 単体テスト (素材・外部ネットワーク不要)
 bash tools/legal/terms-watch/negative_control.sh   # 実素材でのネガティブコントロール (Web 文書の分はネットワークが要る)
@@ -38,7 +37,7 @@ Xfer の指定方法 (優先順): `TERMS_WATCH_XFER_EULA` (プレーンテキス
 | `kilohearts-eula` | `https://kilohearts.com/resources/media_static/documents/eula.pdf` | 全文 (PDF → `uv run --with pypdf==5.9.0`) | `Last updated: YYYY-MM-DD` |
 | `slate-audiotonix-terms` | `https://slatedigital.com/terms-of-service/` | 見出し `Audiotonix General Terms of Use` 以降 | 取得したページ本文に日付表記なし |
 | `ni-eula` | `https://www.native-instruments.com/pages/end-user-license-agreement` | `END USER LICENSE AGREEMENT` 〜 第三者ライセンス節の直前 | `Latest Version YYYY-MM-DD` |
-| `xfer-eula` | Win インストーラ (NSIS 3 Unicode / deflate) のヘッダ内ライセンスページ (`PLUGINS_DIR` 内を署名で探索、または環境変数指定。optional) | 全文 (ヘッダの文字列表から。形式フラグ SF_TEXT / SF_RTF で text / RTF を判別) | — (**基準線未取得**) |
+| `xfer-eula` | Win インストーラ (NSIS 3 Unicode / deflate) のヘッダ内ライセンスページ (`PLUGINS_DIR` 内を署名で探索、または環境変数指定。optional) | 全文 (ヘッダの文字列表から。形式フラグ SF_TEXT / SF_RTF で text / RTF を判別) | 文書内になし |
 
 - 値 (版表記・SHA-256・文字数・取得日) は台帳 `docs/LEGAL_TERMS_LEDGER.md` が正本。本文は保存しない (ハッシュのみ。差分表示用の正規化テキストは gitignore 済み `work/snapshots/`)。
 - FL の 2 系統 (EULA.html と ToU) はどちらも文書本文に日付が無い (EULA.html の `<meta name="last-modified">` は 2018 年の雛形値で版表記として使えない) ため、取得日とハッシュだけが手掛かり。
@@ -53,21 +52,21 @@ Xfer の指定方法 (優先順): `TERMS_WATCH_XFER_EULA` (プレーンテキス
 
 ## 実測
 
-検証起点: コミット a8b0fd6 (クリーン HEAD の detached worktree で単体テスト・全文書チェック・`nsis_e2e.sh` を実行。`negative_control.sh`・`crosscheck.py` は同コードの ws 上で再実行。コードは HEAD と同一)。環境: GitHub Actions runner、node v22.23.3、load average 0.09〜0.16、並列 1。素材: `fl-win64.tar.zst` 展開 (`extracted/` 25,166 エントリ)。
+検証起点: コミット 727d34d (クリーン HEAD の detached worktree で以下すべてを実行)。環境: GitHub Actions runner、node v22.23.3、pnpm 12.10.1、load average 0.20〜0.26 (各実行の開始時点)、並列 1。素材: `fl-win64.tar.zst` 展開 (`extracted/` 25,166 エントリ)・`plugins-ott.tar.zst` 展開 (`Install_Xfer_OTT_137.exe` 8,397,928 B)。
 
 | 項目 | 実測 | 定義 |
 |---|---|---|
-| 単体テスト | 10/10 PASS、0.74 / 0.72 / 0.74 s (n=3) | `pnpm terms-watch:test` (NSIS 系 3 件を含む。合成 NSIS バイト列で makensis 不要) |
-| 全文書の取得・比較 | UNCHANGED 6 / SKIP 1 (xfer)、exit 0、2.61 / 2.45 / 2.24 s (n=3、Web 取得 4 件を含む) | `pnpm terms-watch -- --no-write` (台帳の 6 件のハッシュは a65a73b の基準線のまま不変 = NSIS 追加で回帰なし) |
+| 単体テスト | 11/11 PASS、0.95 / 0.96 / 0.96 s (n=3、`node --test` の duration_ms) | `pnpm terms-watch:test` (NSIS 系 3 件・pnpm 経由 argv の回帰 1 件を含む。合成 NSIS バイト列で makensis 不要) |
+| 全文書の取得・比較 | UNCHANGED 7、exit 0、2.59 / 2.60 / 2.34 s (n=3、Web 取得 4 件を含む) | `FL_WIN64_DIR=… PLUGINS_DIR=… pnpm terms-watch -- --no-write` (台帳の既存 6 件は a65a73b の基準線のまま不変 = 回帰なし) |
 | 台帳の安定性 | 基準線の記録後、同一セッション内 (約 5 分間) に Web 4 文書を含む全文書を 9 回取得して全回 UNCHANGED (a65a73b で測定、a8b0fd6 では未再測定) | 日・週単位の安定性は **未検証** |
 | 再実行で台帳が変化しないこと | 書込モードで実行後、`git status --short` が空 | 同日内 |
 | FL 同梱文書の探索 | 25,166 エントリ中の `*_DATA.bin` を内容署名で走査、各 1 件に特定 (同一内容の重複は許容、内容違いが複数なら ERROR) | `locateFlFile` |
 
 ### 別算法の検算
 
-`crosscheck.py` (html.parser と正規表現 RTF トークナイザ。`lib.mjs` とコード非共有) の SHA-256 が、台帳の `fl-eula-html` / `fl-tou-rtf` と **2/2 一致** (文字数 33313 / 64633)。Web/PDF 文書は live 内容に依存するため対象外。
+`crosscheck.py` (html.parser と正規表現 RTF トークナイザ。`lib.mjs` とコード非共有) の SHA-256 が、台帳の `fl-eula-html` / `fl-tou-rtf` と **2/2 一致** (文字数は台帳 `.md` が正本)。Web/PDF 文書は live 内容に依存するため対象外。
 
-### ネガティブコントロール (`negative_control.sh`。実 FL 素材 / 実 Web。a8b0fd6 のコードで再実行して全件同一結果、6.3 s)
+### ネガティブコントロール (`negative_control.sh`。実 FL 素材 / 実 Web / 実 OTT インストーラ。727d34d で 14 ケース全件期待どおり、6.49 s)
 
 | 操作 | 期待 | 実測 |
 |---|---|---|
@@ -78,8 +77,11 @@ Xfer の指定方法 (優先順): `TERMS_WATCH_XFER_EULA` (プレーンテキス
 | FL 抽出物 dir 無し | 3 | 3 |
 | 台帳の SHA-256 先頭 1 文字を改変 (Web 4 文書それぞれ) | 1 ×4 | 1 ×4 |
 | 接続不能 URL (ni-eula を `127.0.0.1:9` に差替え) | 3 | 3 |
+| xfer: 無改変の台帳 (実 OTT インストーラ) | 0 | 0 |
+| xfer: 台帳の SHA-256 先頭 1 文字を改変 | 1 | 1 |
+| xfer: `--plugins-dir` が無い dir + `--strict` | 3 | 3 |
 
-単体テスト側で追加確認: ノイズ (nonce・ヘッダ/フッタ)・空白・charset 差で UNCHANGED、本文変更で CHANGED→PENDING→`ack`→UNCHANGED、404・短文ボット壁・必須語句欠落で ERROR かつ台帳不変、改変は `diff -u` で表示。
+単体テスト側で追加確認: ノイズ (nonce・ヘッダ/フッタ)・空白・charset 差 (本文に非 ASCII の é / en dash / € を含み、windows-1252 バイト列と UTF-8 で同一ハッシュ) で UNCHANGED、本文変更で CHANGED→PENDING→`ack`→UNCHANGED、404・短文ボット壁・必須語句欠落で ERROR かつ台帳不変、改変は `diff -u` で表示。
 
 ### NSIS 取得の検証 (`xfer-eula`、`nsis_e2e.sh`。実 Xfer インストーラではなく合成物)
 
@@ -97,11 +99,28 @@ Xfer の指定方法 (優先順): `TERMS_WATCH_XFER_EULA` (プレーンテキス
 | `PLUGINS_DIR` 無し / 同 + `--strict` | 0 (SKIP) / 3 | 0 / 3 |
 | インストーラ直指定 / プレーンテキスト直指定 | 0 / 0 | 0 / 0 |
 
-- 結果: 13/13 一致。a8b0fd6 で 2.04 s (初回、`apt-get download` 込み) / 0.79 s / 0.80 s (n=3)。非 NSIS の exe (乱数 300,000 B) が同じ dir にあっても無視される。
+- 結果: 13/13 一致。727d34d で 2.35 s (初回、`apt-get download` 込み) / 0.81 s / 0.82 s (n=3)。非 NSIS の exe (乱数 300,000 B) が同じ dir にあっても無視される。
 - 別算法: `crosscheck_nsis.py` (Python、zlib + struct。`nsis.mjs` とコード非共有) の抽出ハッシュ = 元 `License.txt` を同規則で正規化したハッシュ = JS の台帳値 (NSIS 経由・RTF 経由・平文直指定)、4 者が `de741d348d8e8b16200248f624b0bbf6885510098031299884c2fc46981970cb` (2288 文字) で一致。
 - ネガティブコントロール (a8b0fd6 の複製を破壊して `nsis_e2e.sh`): 文字列表のブロック番号を 4 に変更 → 7 ケース FAIL + ハッシュ不一致 / 署名照合の空白圧縮を外す → E が FAIL (1 件) / 形式フラグ判定を外す (常に text 扱い) → R が FAIL (1 件)。なお文字列表の開始を entries ブロックまで広げる変更は上位集合を読むだけで検出されない (等価変異。許容)。
 
+### Xfer 基準線 (`xfer-eula`、実 OTT インストーラ)
+
+素材 `plugins-ott` の `Install_Xfer_OTT_137.exe` から `PLUGINS_DIR=<展開先> pnpm terms-watch -- --only xfer-eula` で記録 (台帳 `docs/LEGAL_TERMS_LEDGER.{json,md}` の `xfer-eula` 行、origin `nsis:Install_Xfer_OTT_137.exe`)。
+
+| 項目 | 実測 | 定義 |
+|---|---|---|
+| 取得 | NEW、1914 文字、exit 0。0.008 / 0.009 / 0.008 s (n=3、load average 0.29。CLI 表示の処理時間) | 空の台帳 (`{"schema":1,"docs":{}}`) に対し `cli.mjs check --only xfer-eula --no-write --ledger <空台帳>` |
+| 文字数の照合 | `docs/LEGAL.md` §1 `[XFER]` の「1,914 文字」と一致 | 正規化後の文字数 |
+| 別算法 | `crosscheck_nsis.py` (Python、`nsis.mjs` とコード非共有) の抽出ハッシュ = 台帳値 (一致) | `python3 tools/legal/terms-watch/crosscheck_nsis.py <installer.exe>` |
+| 台帳記録後の再取得 | UNCHANGED、exit 0 | 全文書チェックの行を参照 |
+| ネガティブコントロール | 上表 xfer 3 ケース | `negative_control.sh` (`PLUGINS_DIR` 配下に `*.exe` がある時だけ実行) |
+
+検証範囲: 台帳の基準線は OTT win インストーラ 1 本のみ。`docs/LEGAL.md` §1 が記す Serum 2 (win / mac pkg) との一致は本 PR で再検証していない (「未解決」表)。
+
 ### 開発中に直した誤り (記録)
+
+pnpm 経由の ack (oc-reviewer 指摘 `b7038ef`・`f4f56fa`・`fda02b5`、修正 3c3cf2a): pnpm 12.10.1 は `pnpm terms-watch -- ack <id>` を `cli.mjs -- ack <id>` として渡す (実測 argv `["--","ack","ni-eula"]`)。`cli.mjs` は先頭の `--` をフラグ扱いして `check` に落とし、`pendingReview` が解除されなかった。先頭の `--` を除去して修正。単体テストは `node cli.mjs ack` を直接呼ぶだけで、この形を踏んでいなかった (回帰テストを追加。修正前の `cli.mjs` では FAIL することを確認)。同時に、charset テストが ASCII のみで非 ASCII の復号を検証していなかった (`decodeBody` が charset を無視する変異を旧テストは検出できず、新テストは検出する) ため、本文に非 ASCII を含めた。
+
 
 NSIS 取得 (a8b0fd6): (1) `nsis_e2e.sh` の E (空白差のみ) が ERROR になった。内容署名を生テキストに適用しており、`reverse  engineering` (空白倍化) / 行折返しで外れた。空白圧縮後に照合するよう修正 (実規約は折返しを含み得る。FL の EULA.html も `reverse`/`engineer` の間で改行されている)。(2) 探索対象を「100,000 B 以上の exe」にしていたため 99,782 B の合成インストーラが走査 0 件になった。根拠のない下限だったので 4,096 B に下げた。(3) 実装前の下書きで firstheader の `length_of_header` の位置を 24 と書いたが、ダンプ (`5608` = offset 20) との照合で 20 に直した。
 
@@ -111,11 +130,11 @@ FL/Web 系 (a65a73b):
 
 ## 範囲 / 範囲外
 
-検証範囲: 上記 6 文書の取得・正規化・比較・台帳更新・終了コードと、Xfer の取得機構 (NSIS ヘッダ解析) の合成インストーラでの動作。範囲外 (主張しない): **実 Xfer インストーラ (OTT / Serum 2) からの取得と Xfer EULA の基準線**・NSIS の LZMA / bzip2 / ソリッド圧縮ヘッダ・ANSI (非 Unicode) NSIS・規約文に `$` 変数 (NSIS の内部コード化) を含む場合・mac 同梱文書 (`FL_MAC_DIR`。`docs/LEGAL.md` §1 では win と同一と記載、本 run では未検証)・プラグインインストーラ同梱の EULA (Kilohearts `EULA.txt` 等)・Image-Line の他の Specific Terms (Mobile EULA 等)・日本語等の言語別版・変更の法的意味の判定 (1 文字の誤植修正でも CHANGED になる)。
+検証範囲: 上記 7 文書 (Xfer は OTT win インストーラ) の取得・正規化・比較・台帳更新・終了コードと、Xfer の取得機構 (NSIS ヘッダ解析) の合成インストーラでの動作。範囲外 (主張しない): **Serum 2 の Xfer インストーラ・Serum 2 mac pkg からの取得** (`docs/LEGAL.md` §1 は OTT win / Serum 2 win / Serum 2 mac の 3 者が空白正規化後に一致と記載。本 PR で再検証していない)・NSIS の LZMA / bzip2 / ソリッド圧縮ヘッダ・ANSI (非 Unicode) NSIS・規約文に `$` 変数 (NSIS の内部コード化) を含む場合・mac 同梱文書 (`FL_MAC_DIR`。`docs/LEGAL.md` §1 では win と同一と記載、本 run では未検証)・プラグインインストーラ同梱の EULA (Kilohearts `EULA.txt` 等)・Image-Line の他の Specific Terms (Mobile EULA 等)・日本語等の言語別版・変更の法的意味の判定 (1 文字の誤植修正でも CHANGED になる)。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| Xfer EULA の基準線が未取得 (`xfer-eula` は SKIP)。実 Xfer インストーラでの取得は未検証 | Xfer の改定を検出できない。完了条件「全文書」未達 | #88 に残す。再実行: `oc_artifacts: fl-win64 plugins-ott` (OTT の NSIS インストーラが入る想定 = 推定。`tools/icall/REPORT.md` §8 が「plugins-ott 内 NSIS インストーラ」と記述。無ければ `plugins-serum2`) → 展開して `PLUGINS_DIR=<展開先> pnpm terms-watch -- --only xfer-eula` (NEW で台帳に基準線が入る。文字数は `docs/LEGAL.md` §1 の 1,914 文字と照合) → `docs/LEGAL_TERMS_LEDGER.{json,md}` を commit。`ERROR` なら本表の限界 (圧縮方式・`$` 変数) を疑い #88 にメッセージを貼る |
+| Xfer 基準線は OTT win インストーラ 1 本から記録した。Serum 2 の Xfer インストーラ (win / mac pkg) では取得を未検証 | Serum 2 側だけ規約が改定されても、この 1 本の基準線では検出できない可能性 | #88 にコメント。`oc_artifacts: plugins-serum2` で `PLUGINS_DIR=<展開先> pnpm terms-watch -- --only xfer-eula --no-write` を実行し、UNCHANGED になるか確認 |
 | NSIS ヘッダの LZMA / bzip2 / ソリッド圧縮・ANSI ビルド・`$` 変数入りの規約文は未対応 | その形式の Xfer インストーラでは ERROR (exit 3、理由付き) | 本 REPORT の限界。実インストーラで ERROR になったら #88 にコメントし対応を追加 |
 | 定期実行・通知が未配線 (FL 追従プロセスの実体も repo に無い) | 30 日ルール (FL) を人が実行しないと検出できない | 新規子チケット `[CI-n]`: 週次 schedule で Web 4 文書 (`--only fl-tou-web,kilohearts-eula,slate-audiotonix-terms,ni-eula`) を回し exit 1/3 で失敗通知。FL 追従手順 (新版取り込み) からの `pnpm terms-watch` 呼出は #88 / MS11 (`docs/STATUS.md`) へコメント |
 | Slate は短い UA (`Mozilla/5.0` のみ) の curl で HTTP 403、ブラウザ相当の UA + Accept で 200 | ボット対策の強化で取得不能 (exit 3) になり得る | 本 REPORT の限界。発生したら #88 にコメント |
