@@ -30,6 +30,14 @@ class SignatureMismatch(StdBuildError):
     pass
 
 
+# 署名が取れなかったことを表す番兵。同じ失敗が全変種で起きても「一致」にしてはいけない (fail-closed)
+SENTINEL_SIGS = ("TIMEOUT", "NO-RESULT")
+
+
+def is_sentinel(sig):
+    return not sig or sig in SENTINEL_SIGS or sig.startswith("PROBE-FAIL")
+
+
 def load():
     return json.load(open(CFG_PATH))
 
@@ -75,7 +83,8 @@ def digest(text):
 
 def canon_digest(out_text, spec):
     """wasm_runner の出力 (R/D/E 行) を、diff.py の比較規則と同じ正規化 (compare_ret / ret_from_xmm0 / ignore_buffers /
-    mask_ranges / ポインタトークン) で署名化する。malloc 配置に依存する値 (生ポインタの rax 等) は署名に入れない。"""
+    mask_ranges / ポインタトークン) で署名化する。malloc 配置に依存する値 (生ポインタの rax 等) は署名に入れない。
+    R 行が 1 件も無い出力 (runner が何も出さなかった) は署名化せず StdBuildError (空文字の sha256 が全変種で一致してしまうため)。"""
     cmp_ret = spec.get("compare_ret", False) or spec.get("ret_from_xmm0", False)
     ign = set(spec.get("ignore_buffers", []))
     masks = spec.get("mask_ranges", {})
@@ -93,20 +102,24 @@ def canon_digest(out_text, spec):
             lines.append("D %s %s %s" % (w[1], hx, w[3] if len(w) > 3 else "-"))
         elif w[0] == "E":
             lines.append(ln.rstrip())
+    if not any(ln.startswith("R ") for ln in lines):
+        raise StdBuildError("出力に R 行が 0 件 (wasm_runner が結果を出していない): 署名化しない")
     return digest("\n".join(lines))
 
 
 def guard(sigs, expect=None):
-    """sigs: {variant: signature}。全一致 (+ expect 一致) で report、不一致なら SignatureMismatch。"""
+    """sigs: {variant: signature}。全一致 (+ expect 一致) で report、不一致なら SignatureMismatch。
+    署名が取れていない変種 (番兵 TIMEOUT / PROBE-FAIL* / NO-RESULT / 空) が 1 つでもあれば、全変種が同じ失敗でも SignatureMismatch。"""
     if not sigs:
         raise StdBuildError("署名が空 (変種が 0)")
+    bad = {k: v for k, v in sigs.items() if is_sentinel(v)}
+    if bad:
+        raise SignatureMismatch("署名が取得できていない変種 (失敗は一致とみなさない): " + ", ".join("%s=%s" % (k, v or "<空>") for k, v in bad.items()))
     uniq = sorted(set(sigs.values()))
     rep = dict(sigs=dict(sigs), unique=uniq, expect=expect, ok=True)
     if len(uniq) != 1:
-        rep["ok"] = False
         raise SignatureMismatch("署名不一致: " + ", ".join("%s=%s" % (k, v) for k, v in sigs.items()))
     if expect is not None and uniq[0] != expect:
-        rep["ok"] = False
         raise SignatureMismatch("期待署名 %s と不一致: %s" % (expect, uniq[0]))
     return rep
 
@@ -148,10 +161,14 @@ def _main(argv):
         print("[stdbuild] ok: profile %s 禁止フラグなし" % a.profile)
         return 0
     import shlex
+    real = [os.path.realpath(f) for f in a.cjs]
+    if len(a.cjs) < 2 or len(set(real)) != len(real):
+        print("[sigguard] FAIL: 比較には異なるファイルが 2 件以上必要 (重複・1 件のみは拒否): %s" % " ".join(a.cjs), file=sys.stderr)
+        return 1
     envx = dict(kv.split("=", 1) for kv in a.env)
-    sigs = {os.path.basename(f): probe_cmd(shlex.split(a.probe), a.regex, os.path.abspath(f), envx, a.timeout) for f in a.cjs}
+    sigs = {f: probe_cmd(shlex.split(a.probe), a.regex, os.path.abspath(f), envx, a.timeout) for f in a.cjs}
     for k, v in sigs.items():
-        print("[sigguard] %-24s %s" % (k, v))
+        print("[sigguard] %s  %s" % (k, v))
     try:
         guard(sigs, a.expect)
     except SignatureMismatch as e:

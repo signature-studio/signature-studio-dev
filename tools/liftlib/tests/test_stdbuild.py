@@ -5,20 +5,27 @@
   S1     合成 lift IR (tests/std/synth.ll) を pipeline.build_variants で ref/o2/o3/std 全変種ビルド → 署名一致 + <name>.cjs 確定
   S2     ネガティブコントロール: 同 IR に -ffast-math の変種 (variant_extra) を足すと署名ガードが FAIL・<name>.cjs を作らない
   S3     enforce profile (std) に -msimd128 を足すと StdBuildError / --expect 不一致で SignatureMismatch / 失敗時 <name>.cjs 無し
-  C1     x64c 形の C ビルド (emcc_cmd + 外部 probe): CLI `stdbuild.py guard` が全変種一致で exit 0、-ffast-math 変種を足すと exit 1
+  C1     x64c 形の C ビルド (emcc_cmd + 外部 probe): CLI `stdbuild.py guard` が全変種一致で exit 0、-ffast-math 変種を足すと exit 1。
+         basename が同じ別ファイル (a/x.cjs b/x.cjs) は 1 件に潰れず 2 変種として比較される
+  N1-N4  fail-open の封じ込め (ネガティブコントロール; 全変種が「同じ失敗」をしても PASS にしない):
+         N1 番兵署名 (TIMEOUT / PROBE-FAIL / 空) 同士の guard が SignatureMismatch   N2 存在しない probe / 空 cjs / 重複 / 1 件の CLI guard が exit 1
+         N3 canon_digest が R 行 0 件で StdBuildError                              N4 build_variants が全変種 TIMEOUT / R 行 0 件で SignatureMismatch・<name>.cjs 無し
 前提: emcc (EMSDK_DIR) / node / python capstone,pefile (pipeline の import 用)。使い方: python3 tests/test_stdbuild.py [WORKDIR]
+WORKDIR は存在しない dir のみ受け付ける (既存 dir は消さず拒否)。省略時の work/stdbuild_test (gitignore 配下の専用 scratch) だけは毎回作り直す。
 """
 import json
 import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PKG = os.path.abspath(os.path.join(HERE, ".."))
 sys.path.insert(0, PKG)
-WORK = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else os.path.join(PKG, "work", "stdbuild_test")
+EXPLICIT_WORK = len(sys.argv) > 1
+WORK = os.path.abspath(sys.argv[1]) if EXPLICIT_WORK else os.path.join(PKG, "work", "stdbuild_test")
 from liftlib import stdbuild as SB   # noqa: E402
 
 
@@ -61,7 +68,8 @@ def u1_u6():
 
 def s1_s3():
     from liftlib import pipeline, ir as IR
-    shutil.rmtree(WORK, ignore_errors=True)
+    if not EXPLICIT_WORK:
+        shutil.rmtree(WORK, ignore_errors=True)
     os.makedirs(WORK)
     cfg = pipeline.load_cfg(os.path.join(HERE, "std", "synth_target.json"))
     mod = IR.Module.parse(open(os.path.join(HERE, "std", "synth.ll")).read())
@@ -99,6 +107,82 @@ def s1_s3():
         assert not os.path.exists(os.path.join(wd3, "synth.cjs"))
         print("S3 ok (-msimd128 混入 / 期待署名 deadbeef… 不一致でいずれも FAIL・成果物なし)")
 
+def n1():
+    for pair in ({"a": "TIMEOUT", "b": "TIMEOUT"}, {"a": "PROBE-FAIL(rc=1)", "b": "PROBE-FAIL(rc=1)"}, {"a": "", "b": ""},
+                 {"a": "NO-RESULT", "b": "NO-RESULT"}, {"a": "TIMEOUT"}):
+        for exp in (None, "TIMEOUT"):
+            try:
+                SB.guard(pair, exp)
+                raise SystemExit("N1: 番兵署名 %r が guard を通った (fail-open)" % (pair,))
+            except SB.SignatureMismatch:
+                pass
+    assert SB.guard({"a": "ddd24d66", "b": "ddd24d66"})["ok"]    # 通常署名は従来どおり通る
+    print("N1 ok (番兵 TIMEOUT / PROBE-FAIL / NO-RESULT / 空 は全変種同値でも SignatureMismatch)")
+
+
+def n2():
+    probe = os.path.join(HERE, "std", "synth_probe.mjs")
+    g = [sys.executable, os.path.join(PKG, "liftlib", "stdbuild.py"), "guard", "--regex", r'"sig":"(\w+)"']
+    with tempfile.TemporaryDirectory() as td:
+        for d in ("a", "b"):
+            os.makedirs(os.path.join(td, d))
+            open(os.path.join(td, d, "x.cjs"), "w").close()
+        a, b = os.path.join(td, "a", "x.cjs"), os.path.join(td, "b", "x.cjs")
+        cases = (("存在しない probe", ["--probe", "node /nonexistent_probe.mjs {cjs}", a, b]),
+                 ("空 cjs", ["--probe", "node %s {cjs}" % probe, a, b]),
+                 ("存在しない cjs", ["--probe", "node %s {cjs}" % probe, os.path.join(td, "no1.cjs"), os.path.join(td, "no2.cjs")]),
+                 ("重複パス", ["--probe", "node %s {cjs}" % probe, a, a]),
+                 ("1 件のみ", ["--probe", "node %s {cjs}" % probe, a]))
+        for name, args in cases:
+            r = subprocess.run(g + args, capture_output=True, text=True)
+            assert r.returncode == 1, "N2: %s で CLI guard が exit 1 にならない (rc=%d): %s" % (name, r.returncode, r.stdout + r.stderr)
+    print("N2 ok (CLI guard: 存在しない probe / 空 cjs / 存在しない cjs / 重複 / 1 件のみ はいずれも exit 1)")
+
+
+def n3():
+    for txt in ("", "S 0\nE 0", "D out 00112233 -\n"):
+        try:
+            SB.canon_digest(txt, {})
+            raise SystemExit("N3: R 行 0 件の出力 %r を署名化できてしまう (fail-open)" % txt)
+        except SB.StdBuildError:
+            pass
+    print("N3 ok (canon_digest: R 行 0 件は StdBuildError)")
+
+
+def n4():
+    from liftlib import pipeline, ir as IR
+    from liftlib.harness import diff as D
+    cfg = pipeline.load_cfg(os.path.join(HERE, "std", "synth_target.json"))
+    real_run = D.run_wasm
+
+    def timeout_run(cjs, fn, sigp, scen, outp, timeout=240):
+        open(outp, "w").close()
+        return None
+
+    def empty_run(cjs, fn, sigp, scen, outp, timeout=240):
+        open(outp, "w").write("S 0\nE 0\n")
+        return True
+
+    base = tempfile.mkdtemp(prefix="n4_")
+    try:
+        for name, fake, want in (("全変種 TIMEOUT", timeout_run, "TIMEOUT"), ("全変種 R 行 0 件", empty_run, "NO-RESULT")):
+            wd = os.path.join(base, want)
+            os.makedirs(wd)
+            D.run_wasm = fake
+            try:
+                pipeline.build_variants(cfg, IR.Module.parse(open(os.path.join(HERE, "std", "synth.ll")).read()), wd, [], {}, variants=["ref"])
+                raise SystemExit("N4: %s で build_variants が成功した (fail-open)" % name)
+            except SB.SignatureMismatch as e:
+                assert want in str(e), str(e)
+            finally:
+                D.run_wasm = real_run
+            assert not os.path.exists(os.path.join(wd, cfg["name"] + ".cjs")), "N4: %s なのに <name>.cjs ができている" % name
+            sj = json.load(open(os.path.join(wd, cfg["name"] + ".sig.json")))
+            assert {v["sig"] for v in sj["variants"].values()} == {want}
+    finally:
+        shutil.rmtree(base, ignore_errors=True)
+    print("N4 ok (build_variants: 全変種 TIMEOUT / R 行 0 件でも SignatureMismatch・成果物 <name>.cjs 無し)")
+
 
 def c1():
     wd = os.path.join(WORK, "c")
@@ -125,12 +209,24 @@ def c1():
     assert bad.returncode == 1, "fastmath 変種で exit 1 にならない: " + bad.stdout
     bad2 = subprocess.run(g + ["--expect", "deadbeef", outs["ref"], outs["std"]], capture_output=True, text=True)
     assert bad2.returncode == 1
-    print("C1 ok (CLI guard: 3 変種一致 exit 0 / -ffast-math 変種を足すと exit 1 / --expect 不一致 exit 1)")
+    for d in ("da", "db"):
+        os.makedirs(os.path.join(wd, d))
+        shutil.copyfile(outs["std"][:-4] + ".wasm", os.path.join(wd, d, "std.wasm"))    # cjs は自身の wasm 名 (std.wasm) を参照する
+        shutil.copyfile(outs["std"], os.path.join(wd, d, "x.cjs"))
+    same = subprocess.run(g + [os.path.join(wd, "da", "x.cjs"), os.path.join(wd, "db", "x.cjs")], capture_output=True, text=True)
+    assert same.returncode == 0 and "2 変種" in same.stdout, "同名 basename の別ファイルが 1 件に潰れている: " + same.stdout + same.stderr
+    print("C1 ok (CLI guard: 3 変種一致 exit 0 / -ffast-math 変種を足すと exit 1 / --expect 不一致 exit 1 / 同名 basename 2 件を 2 変種として比較)")
     print("   " + bad.stdout.strip().splitlines()[-1] if bad.stdout.strip() else "")
 
 
 if __name__ == "__main__":
+    if EXPLICIT_WORK and os.path.exists(WORK):
+        sys.exit("[test_stdbuild] WORKDIR %s は既に存在する。消さずに拒否する (存在しない dir を指定するか省略)" % WORK)
     u1_u6()
+    n1()
+    n2()
+    n3()
     s1_s3()
+    n4()
     c1()
     print("test_stdbuild: ALL PASS")

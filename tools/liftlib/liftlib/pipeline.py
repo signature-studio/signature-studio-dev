@@ -238,11 +238,16 @@ def build_variants(cfg, mod, workdir, log, stats, profile="std", variants=None, 
         t_build = time.time() - t0
         outp = os.path.join(workdir, "sigguard_out_%s.txt" % v)
         t0 = time.time()
-        sig = D.run_wasm(cjs, cfg["wasm_func"], sigp, scen, outp, timeout)
-        if sig is not None:
-            sig = SB.canon_digest(open(outp).read(), spec)
+        if D.run_wasm(cjs, cfg["wasm_func"], sigp, scen, outp, timeout) is None:
+            sig = "TIMEOUT"
+        else:
+            try:
+                sig = SB.canon_digest(open(outp).read(), spec)
+            except SB.StdBuildError as e:
+                sig = "NO-RESULT"
+                log.append("stdbuild: %s %s" % (v, e))
         res[v] = dict(cjs=cjs, wasm_bytes=os.path.getsize(cjs[:-4] + ".wasm"), build_s=round(t_build, 2), run_s=round(time.time() - t0, 2),
-                      sig=sig or "TIMEOUT")
+                      sig=sig)
         log.append("stdbuild: %s %dB build %.1fs sig %s" % (v, res[v]["wasm_bytes"], t_build, res[v]["sig"]))
     rep = dict(variants=res, profile=profile)
     try:
