@@ -140,13 +140,15 @@ bash tools/targets/freshair/lift2/lift2_e2e.sh                                  
 - 新 lowering の実行到達 (review 指摘 2 の (a) 実測): 追加 lowering の先頭に `call void @llvm.trap()` を入れた一時版で `build_ctrl.sh` → `run_ctrl.sh 2 5` を実行。
   - 対照 (trap 手法が効くことの確認): `pshufd` (ctrl で実行される既存命令) の先頭に trap を入れると `run_ctrl` は **FAIL** (`RESULT: MISMATCH in ctrl scenarios`, exit 1, `S900` で wasm 側のみ `ERR`)。
   - 新 lowering の trap 版 (`pshuflw` / `pcmpeq{b,w,d}`): `run_ctrl` は **PASS** (`ctrl BIT-EXACT 15/15`, exit 0)。ctrl IR に trap 入り `icmp eq <8 x i16>` は 3 件、`pshuflw` の shufflevector は 1 件が存在する。
-  - 結論: `pcmpeq{b,w,d}` / `pshuflw` は ctrl の e2e 経路では**実行されない** (trap を入れても FAIL しない)。
+  - S2001 を除いた 14 シナリオ (fma0/1 とも) では、trap 版でも HEAD と同じく全行一致 (mismatch 0)。よって新 lowering は S2001 以外の ctrl シナリオでは実行されない。
+  - S2001 (両側 ERR) は判定に含まれず、新 lowering が S2001 内で発火していないことは**未証明**。根拠: trap 版と HEAD 版の S2001 の wasm スタックは最内フレーム index が 1090 と 1091 で異なる (関数 index の対応付けには wasm の name section が必要だが、ctrl_full.wasm には関数名が無く対応を取れなかった)。ネイティブ側の ERR も両版で同じ戻り先 (`ret=18100cc61`) で、実機で既に落ちるシナリオである。
+  - 結論 (修正): 新 lowering は **S2001 以外の ctrl 14 シナリオでは実行されない**。S2001 内での実行有無は未切り分けのため、「ctrl 経路で実行されない」とは断定しない。受入条件 2 の残りは #692 に残す。
   - comp / filter: `run_comp.sh` / `run_filter.sh` は実行していない。代わりに、trap 版の `build_comp.sh` / `build_filter.sh` の生成 IR で、新 lowering の出力 (`icmp eq <16 x i8>` / `<8 x i16>` / `<4 x i32>` と `shufflevector <8 x i16>…<8 x i32>`) を grep した: `comp_full.ll` は全て 0 件、`filter.ll` も 0 件 (`sext <N x i1>` 8 件は既存命令)。よって comp / filter の e2e 経路に新 lowering の出力は現れないと判断する (IR 静的確認。動的確認ではない)。
   - 既存の ctrl ERR (S2001, 両側 ERR) は trap 版・HEAD 版とも同じ `RuntimeError: unreachable` (既存の trap。新 lowering とは無関係)。
   - 元に戻し: `mlift/mlift_ops.py` を HEAD (`d3e6e968` 以降の内容) と `cmp` で一致確認済み。
   - 元に戻した HEAD (`6a906bce` の `mlift_ops.py`) で `lift2_e2e.sh` を再実行: `RESULT: lift2_e2e ALL PASS`, exit 0, real 64 s, load 0.27→0.93, nproc 4。comp 400/400・filter 400/400・ctx-fuzz 4 系統 mismatch 0・ctrl 15/15・ablation 5 種すべて検出。
   - main 取り込み後 HEAD `2e4960f8` で再実行: `RESULT: lift2_e2e ALL PASS`, exit 0, real 62 s, load 0.28→0.93, nproc 4。内訳は上と同値 (comp 400/400・filter 400/400・ctx-fuzz mismatch 0・ctrl 15/15・ablation 5 種)。
-  - 本結論は「追加 lowering が e2e で実行されない」を示す。lowering 自体の正しさは e2e では検証されていない (実行されないため)。受入条件 2 の残りは #692 に残す。
+  - 本結論は「追加 lowering は S2001 以外の ctrl シナリオで実行されない」まで。S2001 内の実行有無と、comp / filter の動的確認は未了。lowering 自体の正しさは e2e では検証されていない。受入条件 2 の残りは #692 に残す。
   - 実行環境: `work-liftlib-targets` / `plugins-freshair` / `fl-win64` を `$ARTIFACTS_DIR` から展開して実施 (epf 8 本は `plugins-freshair` の `Fresh Air.Win.zip` を `tools/targets/freshair/work/win` に展開)。emsdk 6.0.12 は `[EMSDK]` の手順で `$RUNNER_TEMP` に導入し、`env.sh` の前提に合わせて配置。
 - 未了 (#692 に残す): `pmovmskb` と ymm 形式の `vpcmpeqw` (関数 `f_1810577ac` / `f_18107d41c`)、rep 経路の e2e 到達 (受入条件 1・ネガコン)、回帰セットの seed 非依存化 (受入条件 3)。
   ctrl closure には `rep stosb` 84・`rep movsb` 39・`rep stosw` 6・`rep stosq` 1 が lift 済みで存在する (`work/ctrl/ctrl_rep.json` の mnemonics 実測)。
