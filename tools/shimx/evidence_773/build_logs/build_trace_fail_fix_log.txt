@@ -1,0 +1,6 @@
+[gen_link] 外部参照 570: shimx=184 lift_c=211 lift_unresolved=0 libc=0 intrinsic=3 gui=170 audio=1 unknown=1
+[gen_link] ラッパ 356 本 (varargs で除外 0: ) / スタブ 172 本
+[sxlink] cc gui_stubs_failfast.c
+[sxlink] cc boot_trace.ll
+[sxlink] cc trace_wrap.c
+[sxlink] OK trace_failfast_fix: signature mismatch=1 undefined symbol=0 duplicate=0  -> tools/m11/work/shimx_link/m11_sx_trace_failfast_fix.cjs

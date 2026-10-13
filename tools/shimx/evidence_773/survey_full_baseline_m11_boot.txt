@@ -1,0 +1,1 @@
+SXL_SURVEY {"variant":"m11_boot","units":942,"kinds":{"ok":800,"oob":50,"halt0":44,"closure_outside":46,"abort":1,"noproc":1},"reboots":1,"shimx_trace_msgs":{},"api_units":0,"aborts":1}
