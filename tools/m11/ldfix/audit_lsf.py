@@ -282,7 +282,13 @@ def main():
         if only and va not in only:
             continue
         tot['functions'] += 1
-        ms = machine_sites(mach, va, [int(x, 16) for x in re.findall(r'^dec_label_pc_([0-9a-f]+)[:.]', body, re.M)])
+        labels = [int(x, 16) for x in re.findall(r'^dec_label_pc_([0-9a-f]+)[:.]', body, re.M)]
+        ent = mach.fns.get(va)
+        if ent and labels and max(labels) >= va + ent[1]:
+            tot['range_table_shorter_than_ir_labels'] += 1
+        if ent and ent[1] <= 2:
+            tot['range_table_le_2_bytes'] += 1
+        ms = machine_sites(mach, va, labels)
         if ms is None:
             tot['no_machine_range'] += 1
             continue
@@ -290,6 +296,7 @@ def main():
         tot['mach_fns'] += 1
         tot['lsf_sites'] += len(lsf)
         tot['lsf_unresolved_base_sites'] += unk
+        tot['fns_with_unresolved_base'] += 1 if unk else 0
         if not lsf:
             continue
         tot['fns_with_lsf'] += 1
