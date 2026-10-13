@@ -38,7 +38,13 @@ dec_label_pc_8c5ef5_g699:
 - **ガード辺の値**: ガードで飛ばすと、元 IR で `%rax.0.reg2mem`・`%rdx.1.reg2mem` を store するのは `dec_label_pc_8c6034`・`dec_label_pc_8c603f` だけで、飛び先 `dec_label_pc_8c6066` が両方を load する (phi は無い)。このままでは 0 件経路で未定義値になるため、専用ブロックで明示 store する。
   - **rax.0 := 0 (機械語で確定)**: `8c5f06: xor eax,eax` の後、`8c5f18: jg` まで rax は書かれない (`8c5f08`〜`8c5f15` は rcx・ebx・[rbp+0x4c]・flags のみ)。0 件経路は rax=0 のまま `8c6066` に入る。ただし `8c6066`〜`8c60df` の間で rax は読まれず `8c60df` で上書きされるため、この値が結果に効く経路は無い。
   - **rdx.1 := zext(arg2 下位 byte) (未検証の仮定。approve 判断に影響)**: 機械語では `8c5efd: call 8c67a0` の後の rdx は callee 依存。`8c67a0` は中で `8c7c80` を呼び (`mov rdx, rbx` 後), `8c5eda` の `410320` は `call qword ptr [rax-0x30]` (vtable 間接 call、target は IR から決まらない) を呼ぶ。rdx の出力は IR から確定できない。`8c5ee1: movzx rdx, byte [rbp+0x88]` を経由する値として、既存 IR の `8c6071` (`8ca670` 後の rdx を引数 rdx と同じとする) と同じ pass-through 規約に合わせた。**410320 と 8c67a0 が rdx を変えないことは確認していない**。
-  - **残る未証明の経路**: 0 件 ∧ arg3 (r8) == 0 ∧ arg2 下位 byte ≠ 0 のとき `8c608d: call 410360` の第 2 引数 (rdx) が、この仮定値と一致するか。同経路は `8c608d` まで到達する (arg2 下位 byte = 0 では到達しない)。機械語の値を確定するには vtable target と `8c7c80` の rdx 出力の確認が要る。未確定のまま残す (§6)。
+  - **機械語での確認 (head b47f7f7, capstone 5.0.7, `block00031_PE.bin` を VA 直接逆アセンブル)**:
+    - `8c5efd: call 8c67a0` → `8c67a0` は `call 8c5c90` の後 `call 8c7c80` して `ret` のみ (rdx を書かない)。8c5f02 時点の rdx は `8c7c80` の ret 時の rdx と同じ。
+    - `8c7c80` の ret 時の rdx は末尾の経路で決まり、`8c7710` の戻り・`40f9e0` の戻り・vtable 間接 call (`call qword ptr [rbx]`) の戻りのいずれかになる。callee 依存で、逆アセンブルだけでは確定しない。
+    - 0 件 ∧ arg3 == 0 ∧ arg2 下位 byte ≠ 0 の経路 (`8c608d: call 410360`): `410360` は rdx を読まず、rcx だけ設定して `call qword ptr [rbx-0x50]` (vtable 先) へ rdx をそのまま渡す。vtable 先が rdx を読むかは未確認。したがってこの経路で rdx は参照されうる。
+    - **結論: rdx.1 の正しい値は未確定。0 件経路で結果に影響しないことも未証明。** 仮定 `zext(arg2)` は未証明のまま残す。approve 判断に影響する。
+    - 未実施: `410360` の vtable 先 (`[rbx-0x50]`) の特定と、その rdx 読取りの確認。`8c7c80` の全 ret 経路の rdx 解析。
+  - **残る未証明の経路**: 0 件 ∧ arg3 (r8) == 0 ∧ arg2 下位 byte ≠ 0 のとき `8c608d: call 410360` の第 2 引数 (rdx) が、この仮定値と一致するか。同経路は `8c608d` まで到達する (arg2 下位 byte = 0 では到達しない)。上記の確認で、この rdx は callee 依存と分かった。未確定のまま残す (§6)。
   - 上記の未証明により、**「unit 56 ok」は件数 0 経路が正しいことの証拠ではない**。unit 56 は survey のラベル (ok/trap) が変わったことを示すだけで、出力の同一性は比較していない。
 - pass は冪等で、`--mode off` が逆変換する (`on → off` で元の IR にバイト一致, `on → on` で無変更を確認)。
 - `m11_build.sh` は alloca 修正の後に pass を適用する (既定 on)。`M11_GUARD699=off` で脱落状態に戻す。`M11_GUARD699_COND` で条件を差し替える (ネガコン用)。

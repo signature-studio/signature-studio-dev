@@ -14,7 +14,8 @@ OUT=work/v699
 mkdir -p "$OUT"
 cp m11_ov.c "$OUT/ov.cur.c"
 cp work/boot_final.ll "$OUT/boot_final.start.ll" || { echo "FAIL: work/boot_final.ll が無い"; exit 1; }
-restore() { cp "$OUT/ov.cur.c" m11_ov.c; cp "$OUT/boot_final.start.ll" work/boot_final.ll; }
+cp work/ir_conditions.json "$OUT/ir_conditions.start.json" || { echo "FAIL: work/ir_conditions.json が無い"; exit 1; }
+restore() { cp "$OUT/ov.cur.c" m11_ov.c; cp "$OUT/boot_final.start.ll" work/boot_final.ll; cp "$OUT/ir_conditions.start.json" work/ir_conditions.json; }
 trap restore EXIT
 export TMPDIR="${TMPDIR:-${RUNNER_TEMP:-/tmp}}"
 
