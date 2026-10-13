@@ -9,7 +9,7 @@ import icall_rewrite as R
 import audit_icall as A
 import capstone
 
-OTT = '/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll'
+OTT = os.path.join(os.environ.get('ANALYSIS_DIR', '/home/ubuntu/work/analysis'), 'plugins/ott/binaries/OTT_vst2_win64.dll')
 fails = []
 
 
@@ -109,6 +109,11 @@ if os.path.exists(OTT):
         check('rewrite OTT sites == 96', m['nsites'] == 96, m['nsites'])
         check('rewrite errors == {}', m['errors'] == {}, m['errors'])
         check('rewrite jt-chain >= 5', m['njt'] >= 5, m['njt'])
+        # #514/#530: 書換え後の関数 range + stub が連続配置 ([a,b)+[b,c)) だと RetDec --select-ranges が併合して define が落ちる
+        spans = sorted([(int(a, 16), int(b, 16)) for a, b in m['func_range_new'].values()]
+                       + [(m['stub'], m['stub'] + m['stub_len']), (m['comis_stub'], m['comis_stub'] + m['comis_stub_len'])])
+        contig = [(hex(a[1]), hex(b[0])) for a, b in zip(spans, spans[1:]) if a[1] == b[0]]
+        check('rewrite 関数 range が連続配置でない (#514)', not contig, '%d 組: %s' % (len(contig), contig[:3]))
         # 書換え後 PE 上で、元の site 位置が展開されている (call stub が存在)
         img2 = A.Image(out)
         check('新 section が PE に追加', any(s[3] == '.icall' for s in img2.secs))
