@@ -150,6 +150,14 @@ reach_test 11 / adapt_test 28 passed、sigprobe は adapter 有り mismatch 0 / 
 - ネガコン (期待した FAIL 行まで検査): **N6** seed 導入前 IR (boot0 のみ) で `--check` → `WNDCLASS-CHECK FAIL` / **N7** その走査 JSON を judge → W1 FAIL / **N8** 検出 floor を実測+1 → floor FAIL (空振り PASS 防止) / **N9** hwnd=NULL の probe → P5 FAIL。
 - `m11_wndclass_scan.py --check` は 走査 0 件・未定義 WNDPROC のどちらでも exit 1 (終了コードをそのまま gate に使う)。
 
+### 6b-2. 実測 (コード commit `b867b94` の HEAD、`git status --porcelain -- tools` 空で実行)
+
+- `bash tools/gui/flengine/e2e.sh`: **rc 0 / 160 秒** (load average 開始 0.35 → 終了 1.04)。judge **14/14 PASS** (W1 / P5 追加)、native selftest 324 passed / 0 failed、ネガコン **9/9** が期待した FAIL 行つきで FAIL (N1〜N5 既存、N6〜N9 追加)。実行前の同内容 (未 commit) の 1 回目も rc 0 / 163 秒・同一結果。
+- `bash tools/gui/e2e.sh` (受入条件 3): 1 回目 **rc 1** — step 1 の native selftest (ASan) が `heap-use-after-free` (`gui_headless.c:33 blit_surf` を render スレッドが読み、`gui_core.c:174 surf_free` を main スレッドが先に解放)。同じ HEAD で再実行した 2 回目は **rc 0 / 61 秒** (selftest 324 passed、native lift・Chrome とも golden EXACT MATCH 0/64000 px、reach_test 11 / adapt_test 28 passed)。
+  この PR は `tools/gui/src`・`test`・`include` を **変更していない** (`git diff a38ba81 HEAD` が空)。selftest 単体を 3 連続実行した結果は 3 回とも 324 passed / 0 failed。1/6 回の失敗の原因 (render スレッドと surface 解放の競合と推定、**未確認**) は未調査 → §7。
+  なお最初の rc 1 の前に、新規 worktree に `node_modules` が無く step 5 (tsc) で rc 1 になる環境起因の失敗が 1 回あった (本 PR と無関係。symlink で解消)。
+- 環境: runner 4 vCPU、素材 work-m11 + fl-win64、`/home/ubuntu/...` 固定パスは symlink。`m11_wndseed.sh` の lift 実測: RetDec 1,212 range が 2 分 0.5 秒 (3 回目) / gen_ir2 30.0 秒。
+
 ## 7. 未解決
 
 | 未解決 | 影響 | 起票先 |
@@ -158,6 +166,7 @@ reach_test 11 / adapt_test 28 passed、sigprobe は adapter 有り mismatch 0 / 
 | `function_52a7f0` の `TempClass.lpfnWndProc` load 脱落 (§5-2) | AllocateHWnd 経路 (TPUtilWindow = Timer / 非同期 window) が全滅 | [M11] / ldfix 子チケットを PM が起票 (本 REPORT の DEFECTS 行案) |
 | ~~WNDCLASS 静的実体の WNDPROC を closure seed に追加する pass~~ | **解消 (#565, §6b)** | — |
 | probe の `m11_icall` miss target `0x6c6f` (3 件) の由来 | 窓生成は成功。WM_NCCREATE の WNDPROC 差替え経路と推定 (未確認) | #565 に所見 (未起票。PM 判断) |
+| `bash tools/gui/e2e.sh` step 1 (ASan) の `heap-use-after-free` (`blit_surf` ↔ `surf_free`) が 2 回中 1 回出た (shim は本 PR で未変更) | gui e2e が非決定的に FAIL。受入条件 3 の「ALL PASS 維持」は 2 回目で満たしたが安定とは言えない | GUI-2 系で PM が起票 (再現頻度の測定から) |
 | 動的に作られる WNDCLASS (スタック/ヒープ上で組む `RegisterClass`) の WNDPROC | 静的走査では拾えない。`function_52a7f0` 等 5 呼出点のうち静的実体を渡すのは 2 点 | m11 / icall 系で PM が起票 |
 | `EnumFontFamiliesExW` 実装 (コールバック `gui_call4` 経由) | survey の 1 unit が fail-fast | GUI-2 系 (P2 stub 昇格, #174 に所見) |
 | `LoadStringW` 48M 回の unit 特定と資源供給 hook (`gui_set_resource_provider` ← shimx / PE .rsrc) の接続 | LoadStringW が常に空文字 | #174 に所見 / GUI-2 または shimx |
