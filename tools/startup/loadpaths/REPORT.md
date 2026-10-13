@@ -47,7 +47,7 @@ CreateFruityInstance 0x1375990 ── call ─→ 0x13754b0 ── call ─→ �
 ```
 
 - 検索順の意味 (level 0→1) は登録順・命名からの推定。`0x9de400` が呼ぶ `[self+0xa8]->vtbl+0x30` の実体は未追跡 (§6)。
-- 言語の選択は**レジストリの `Program Language` のみ**。`tools/startup/data/vreg_seed.json` に当該値は無い → 既定 `en`。OS 言語の自動採用は `zh` だけ
+- 言語の選択は**レジストリの `Program Language` のみ**。現行 seed `tools/startup/vreg/data/seed.json` では `Shared\Language` の `Program language` は catalog のみ (value `""`・`apply:false`) で起動時に書かれない → エンジン既定 `en`。OS 言語の自動採用は `zh` だけ
   (その場合は `Program language` を書き戻す)。shimx は UI 言語 API を `en-US` 固定で実装済み (`tools/shimx/REPORT.md` R3、`GetUserPreferredUILanguages` は inventory 上 locale.c で機能実装。返値の実測は未実施 → §6)。
 
 ### 2.2 形式と復号 (逆アセンブル 0x8e13f0 / 0x8d85d0 / 0x8d5670 / 0x8d8510 から確定)
@@ -154,15 +154,15 @@ files / bytes は `$INSTDIR` 相対のユニークパス (`inventory_files` 2740
 再現: `source tools/shared/env.sh` (または `FL_WIN64_DIR` 指定) → `bash tools/startup/loadpaths/e2e.sh`。fl-win64 展開は `docs/WORKFLOW.md` §11。
 
 **検証範囲**: DLL の静的構造 (関数境界・RIP 相対の文字列参照・直接 call) と、インストーラ由来のファイル一覧・サイズ。
-**範囲外**: FL の実行 (boot が `CreateFruityInstance` 内で停止中: `tools/flelift/boot/REPORT.md`)。間接 call / vtable 経由の到達性、レジストリ値の実測、ファイル不在時の挙動。`phase` は静的な呼出点の位置づけで、「実際に開かれる」ことの実測ではない。
+**範囲外**: FL の実行 (boot は `CreateFruityInstance` に未到達 — unit 初期化 209 で停止: `tools/flelift/boot/REPORT.md` §0)。間接 call / vtable 経由の到達性、レジストリ値の実測、ファイル不在時の挙動。`phase` は静的な呼出点の位置づけで、「実際に開かれる」ことの実測ではない。
 
 ## 6. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `phase` / tier の動的確定 (boot 中の open() トレース) | §3・§4 の推奨は静的根拠。`CreateFruityInstance` が最後まで走らない間は答え合わせ不可 | #105 (T1・`assettrace` が入力、本 REPORT の group を diff の基準にする) / 依存 [ICALL-1] #227 |
+| `phase` / tier の動的確定 (boot 中の open() トレース) | §3・§4 の推奨は静的根拠。boot が `CreateFruityInstance` に未到達 (unit 初期化 209 で停止) の間は答え合わせ不可 | #105 (T1・`assettrace` が入力、本 REPORT の group を diff の基準にする) / 依存 [FLE-2] #253 |
 | `0x9de400` の `[self+0xa8]->vtbl+0x30` (検索パス服務) の実体と、ユーザ側ディレクトリ不在時の挙動 | `Languages\` 等の level 0 を VFS でどう見せるか (空ディレクトリ要否) | 新規子チケットを PM が起票 (親 #39。boot 到達後に実測) |
-| 非 en 言語 (`Program Language`=`ja` を seed + `/fl/System/Languages/ja.moe`) の実読込 e2e と、`en` で .moe を一切開かないことの実測 | §0-1 の動的確認 | 同上 (T1 の seed は #95 vreg、`tools/startup/data/vreg_seed.json`) |
+| 非 en 言語 (`Program Language`=`ja` を seed + `/fl/System/Languages/ja.moe`) の実読込 e2e と、`en` で .moe を一切開かないことの実測 | §0-1 の動的確認 | 同上 (非 en の seed 先は `tools/startup/vreg/data/seed.json`。生成元 `scripts/build_seed.py` の `OVERRIDES` で `Program language` を `apply:true`・value=`ja` にする) |
 | `GetUserPreferredUILanguages` が en-US を返すことの実測 (非 `zh` を保証。`zh` 返却だと `Program language` が自動書込みされ 0x9deaa0 の分岐が変わる) | 言語の決定性 | shimx 側 (#13 系) / winstubs の子チケットを PM が起票 |
 | `lang-svg` の参照元 (推定: 言語選択 UI) | 8 ファイル 4025 byte の phase が `unresolved` | 同上 (boot 到達後に UI 経路で確定) |
 | Windows 標準フォント名 (`segoeui` `tahoma` `consola` `lucon`) の代替解決 (VFS に無い) | GUI の文字描画 | GUI 側 (#10 の子) へ PM が起票。`fonts` group の `Shared/Artwork/Fonts/*` が代替の候補 |
@@ -175,5 +175,5 @@ DEFECTS.md 追記案: なし (新しい silent miscompile 類型は見つけて�
 ## 7. 次タスク提案
 
 1. boot が `CreateFruityInstance` を抜けた時点で `assettrace` を実行し、§3 の phase / §4 の差分 6 点を実測で答え合わせする (#105)。
-2. 非 en seed の言語 e2e: `vreg_seed` に `Program Language` を足した派生 seed + `/fl/System/Languages/<code>.moe` の全量読込を確認する子チケット。
+2. 非 en seed の言語 e2e: `tools/startup/vreg/data/seed.json` (生成元 `build_seed.py` の `OVERRIDES` で `Program language` を `apply:true`・value=`ja` にした派生) + `/fl/System/Languages/<code>.moe` の全量読込を確認する子チケット。
 3. `bootset` の規則に §4 の差分を反映する PR (`tools/assets`)。
