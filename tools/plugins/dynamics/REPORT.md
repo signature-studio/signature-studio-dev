@@ -130,6 +130,7 @@ P0c (`p0c/REPORT.md`) で見た各 kernel の現状 (本 PR では再測定し�
 | 3 回の結果一致 | 判定列 (lift_rc / defines / f80 / `emcc -c`)・engine 欠落監査・`facts.json` は 3 回とも同一 (`facts.json` はバイト一致)。 `matrix_check`: 42/42 項目一致を 3 回とも確認 |
 | `dynamics_nega.sh` | exit 0、2.4 s (NC1: rc 0 → 1、NC2: define 27 → 25 かつ対象関数 1 → 0) |
 | `ids_crosscheck.py` (HEAD 2ba3978) | exit 0。 7/7 本で取りこぼしなし (§2) |
+| クリーン worktree での全工程再現 (HEAD 2ba3978、環境変数なしの `env -i`、新規 `RUNNER_TEMP` で fl-win64 展開 + venv 作成から、inventory 生成を含む) | `dynamics_e2e.sh` exit 0、**379 s** (終了時 load average 2.88 / 6.65 / 4.61)。 判定列・`facts.json`・engine 欠落監査は上の 3 回と同一 (`facts.json` はバイト一致)。 続けて `ids_crosscheck.py` 7/7、`dynamics_nega.sh` OK。 worktree は終了後に削除 |
 | 前提 inventory (初回のみ) | `inventory/win_funcs.py` 242.12 s (並列 14 プロセス / 4 core)、他 5 s 未満。 `block_manifest.json` が tarball に無く `nsis_names.py` が動かないため、`mk_blockmap.py` が `PLUGIN_MATRIX.json` から代替の blockmap (182 record) を合成 |
 
 ネガティブコントロール (Fruity Limiter 19021):
