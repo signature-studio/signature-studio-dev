@@ -179,7 +179,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
 - **素材**: 既定で取得されるのは `fl-win64` のみ。他は本文に `oc_artifacts: fl-win64 plugins-ott` の
   行を書く (許可名: fl-win64 / plugins-ott / plugins-freshair / plugins-serum2 / plugins-massivex /
   plugins-kilohearts / toolchain-retdec / toolchain-emsdk / work-m11 / work-liftdiff / work-m6-ott /
-  work-liftlib-targets / work-liftlib / work-icall / analysis-ott-binaries。それ以外は
+  work-liftlib-targets / work-liftlib / work-icall / work-fw-stage1 / analysis-ott-binaries。それ以外は
   run が失敗する)。全素材は約 17.7 GiB (2026-10-13 実測) のため必要分だけ指定する。
   - `toolchain-retdec` → `/opt/retdec`、`toolchain-emsdk` → `/opt/emsdk` に展開される。
   - `work-m6-ott` → `tools/m6/work/` + `tools/ott/work/`、`work-liftlib` → `tools/liftlib/work/`、
@@ -189,6 +189,9 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     展開後は `ANALYSIS_DIR=$HOME/analysis` が環境に入る。tools/shared/env.sh の既定 /home/ubuntu/work/analysis を上書きする)
   - `work-m11` → `tools/m11/work/`、`work-liftdiff` → `tools/liftdiff/work/` に展開される
     (gitignore 対象の検証スナップショット。commit しない)。
+  - `work-fw-stage1` → `tools/plugins/work/fw/` に framework stage-1 成果物 (fw_icall.dll / fw_map.json /
+    fw[0-7].restored.ll / r2.restored.ll / r3.restored.ll の 12 ファイル。#610)。`fw_269_verify.sh` の既定 SRC がそのまま使える。
+    作成・検証は `bash tools/plugins/framework/fw_pack_stage1.sh` (R2 への upload は依頼者が行う)。
   - 追加の `work-*` は R2 に置いて、`prepare-event-context.sh` の allowlist に足す (#293)。
 - **fl-win64 の展開と `FL_WIN64_DIR`**: tarball は最上位に `extracted/` と installer exe を持つ
   (`extracted/block00031_PE.bin` 等)。展開先ディレクトリがそのまま `FL_WIN64_DIR` になる。
