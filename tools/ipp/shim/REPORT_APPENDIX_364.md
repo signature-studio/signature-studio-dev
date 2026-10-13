@@ -23,9 +23,9 @@ env を source しなくても (直接起動でも) 従来どおり動く。`res
 引数ループの後に `dll` が未設定のときだけヘルパーを呼ぶ (`verify_cab262_quirks` は従来から `argc > 1 ? argv[1] : helper`)。
 既定値を変えるときは env.sh・paths.py・paths.mjs・`fl_dll_path.h` の 4 か所を揃える。
 
-### 検証 (検証起点 `origin/main` = 1353c62、素材は `fl-win64` のみ)
+### 検証 (検証時点の置換前 `origin/main` = 1353c62、素材は `fl-win64` のみ)
 
-- 受入条件 1: `grep -rn '/home/ubuntu' tools/ipp/shim --include=*.sh --include=*.py --include=*.json --include=*.ts --include=*.mjs --exclude-dir=work | wc -l` → 0 (`--include` を付けず REPORT 以外の全ファイルでも 0)。
+- 受入条件 1: `grep -rn '/home/ubuntu' tools/ipp/shim --include=*.sh --include=*.py --include=*.json --include=*.ts --include=*.mjs --exclude-dir=work | wc -l` → 0。`--include` を外して `work/` 以外を全検索すると `test/fl_dll_path.h:9` の C 既定値定数 (`FL_DLL_DEFAULT_ANALYSIS_DIR`、main 由来) と `REPORT.md` の説明文が残る。`.h` の定数は本 PR の対象外 (別 issue で扱う)。
 - 受入条件 2: 置換前 (`origin/main` の detached worktree) と置換後を gcc でビルドし、DLL を開くパスを `strace -e trace=openat` で採取。
   置換前は旧 VM 既定パス (`[WIN64]` への symlink → fl-win64 展開先)、置換後は `$FL_WIN64_DIR/extracted/block24356_PE.bin` を開く。
   3 バイナリ (`verify_cab262_quirks` `resize_oracle` `fill3_oracle`) 全て、置換前後で同一ファイル内容を参照。
@@ -39,7 +39,7 @@ env を source しなくても (直接起動でも) 従来どおり動く。`res
 ### 検証 (Copilot Code Review 指摘 medium への修正後)
 
 修正: C ヘルパーが env 未設定で exit していた退行 (従来は直接起動できた) を、env.sh と同じ既定値連鎖に直した。`[dll]` 明示時はヘルパーを呼ばない。
-Runner = Intel Xeon 6973P (`/proc/cpuinfo` の avx512 フラグあり、このため SIGILL せず完走)。素材 `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開し、
+Runner = Intel Xeon 6973P (当時の記録: `/proc/cpuinfo` の avx512 フラグあり、このため SIGILL せず完走)。※この記録の採取時 CPU は本ファイルに根拠 (`/proc/cpuinfo`) が残っていないため未確認。下の AMD EPYC 7763 の 2026-10-13 実測 (SIGILL) と同一 Runner かは判定できないので、両者を同一 Runner の結果として扱わない。素材 `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開し、
 旧 VM 既定パスを同 dir への symlink で用意して「従来どおりの直接起動」を再現した。ビルドは `gcc -O1 -I src -I test ... -lm` (`*_oracle_run.sh` と同じフラグ)。
 
 | 起動 | 結果 (`strace -e trace=openat` で採取した DLL パス) |
@@ -52,7 +52,20 @@ Runner = Intel Xeon 6973P (`/proc/cpuinfo` の avx512 フラグあり、この�
 所要: `sp57` 30.2 s (strace 下)・`resize_oracle` 0.26 s・`fill3_oracle` 0.04 s・`sweep2` 0.23 s・`verify_cab262_quirks` 0.02 s。load average 0.56 (1 分値)、直列。
 env なし直接起動 (strace なし) の完走結果: `resize_oracle` rc=0・39 行・
 `SUM {"cases":82056,"case_diff":359,"st_mis":0,"byte_diff":55588,"px_diff":55588,"px_tot":5912624}`、`fill3_oracle` rc=0・76 行、`verify_cab262_quirks` rc=0・65 行。
-これらは AVX-512 対応 Runner での実測で、置換前後の mismatch 数の突き合わせ (origin/main 側の再ビルド比較) は本修正では行っていない (置換行以外の変更なし)。
+これらは上記 Xeon 6973P 記録 (採取時 CPU 未確認・avx512 あり) の時点での実測で、置換前後の mismatch 数の突き合わせ (origin/main 側の再ビルド比較) は本修正では行っていない (置換行以外の変更なし)。
+
+### 検証 (再検証・受入条件 2 の残り、検証対象 = 置換前 `1353c62` / 置換後 `af8ba9cc`)
+
+- 置換前 = `1353c62` (detached worktree)・置換後 = `af8ba9cc` を、同一の gcc フラグ (`-O1 -g -ffp-contract=off -fno-fast-math`) で
+  `resize_oracle` `fill3_oracle` `verify_cab262_quirks` にビルド (`gen_shim.py` は `work/flengine_ipp_names.json` を要するため未実行。gen/ のコミット済み生成物を使用)。
+- 既定値 (env 未設定・引数なし) の `openat` を `strace -f -e trace=openat` で採取: 3 本とも置換前後で **同一パス** (旧 VM 既定値 `[WIN64]` 相当の `extracted/block24356_PE.bin`) を開き、
+  Runner には存在しないため ENOENT (rc=1)。既定値の同一性はこの一致で確認。
+- `FL_WIN64_DIR=$RUNNER_TEMP` (`fl-win64` 展開先 `extracted/`) を与えた実行: 3 本とも rc=132 (SIGILL)、置換前後の stdout は 1 行目 (`--dump` 出力先) を除き `diff` 一致 (`resize_oracle` 26 行・`fill3_oracle` 8 行・`verify_cab262_quirks` 1 行)。
+- 所要: 各実行 0〜1 秒、直列。素材 `fl-win64` の展開 10.5 s (`tar --zstd -xf`)。Runner CPU は AMD EPYC 7763 (`/proc/cpuinfo` model name = `AMD EPYC 7763 64-Core Processor`、avx512f フラグ 0 件、nproc 4。2026-10-13 採取)。上の Xeon 6973P 記録 (採取時 CPU 未確認) とは同一視しない。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| AVX-512 非対応 Runner で実 DLL オラクルが SIGILL のため、置換前後の mismatch 数 (`SUM` 行) を比較できない | 既定パス・SIGILL 点までの出力の一致のみ確認 | #294 (AVX-512 対応 Runner) |
 
 ### 検証範囲 / 範囲外 / 未解決
 

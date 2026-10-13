@@ -211,6 +211,4 @@ JSON は `${FL_WIN64_DIR}` プレースホルダとし、e2e が `render_target.
 
 注意 (置換とは無関係): 比較基点を `5984f7e^` 全体にすると、その間の他 PR の `ldfix.py` 変更で F3c が 0 → 26 と変わる。比較は置換対象以外が同一の tree で行うこと。
 
-既存欠陥: 上記の全工程で **stage4 が到達せず** (`m11_simd.c: '../msimd11_core.h' file not found`・boot `missing function: __asm_movapd__112`)、
-base / fix とも survey ok 0・units_run 0 だが `judge_e2e.py` は PASS と判定する。置換前後で同一の失敗。起票 #757。
-したがって本 e2e は「置換前後の同一性」の検証には使えるが、「ldfix の効果」の検証にはなっていない。
+既存欠陥 (#757 で修正・2026-10-13 実測): 修正前は stage4 が到達せず (`m11_simd.c: '../msimd11_core.h' file not found`・boot `missing function: __asm_movapd__112`)、base / fix とも survey ok 0・units_run 0 でも `judge_e2e.py` が PASS と判定していた。原因は `stage4.sh` が header を `work/stage4/` に置かず、simd.o が link されていなかったこと。`stage4.sh` で header を配置し、`judge_e2e.py` に「stage4 到達 (>=4) と survey ok >=1」の前提を入れた。修正後 HEAD `b4af8272`: `ldfix_e2e.sh` 全工程 PASS (50.8 秒・rc 0)。`missing function: __asm_movapd__112` の消失と link の `undefined symbol` / `signature mismatch` 0 件は、この run のログから grep 件数を記録していないため未測定 (受入条件として未達扱い)。base / fix とも stage 4/6・units_run 17/942・survey ok 136・trap 9 で、ldfix の差は出ていない (F3c=26 は適用されるが survey 件数は不変)。
