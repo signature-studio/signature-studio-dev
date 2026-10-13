@@ -68,6 +68,7 @@
 | 検出器自身の変異 | 禁止表から gpl/nonfree/version3 を抜く / `check_config` が常に空を返す、のどちらも selftest rc=1 を `ci_detect.sh` が CAUGHT |
 | Actions 上の実測 | **未実施** (§5 の workflow 配置待ち) |
 
+## 5. 未解決
 
 | 項目 | 起票先 |
 |---|---|
