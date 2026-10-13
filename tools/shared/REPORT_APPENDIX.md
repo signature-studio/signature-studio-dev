@@ -10,6 +10,17 @@
 - **バイト列照合**: x64 `block24359_PE.bin` の `c7 43 disp imm32` を検索すると、`[+0x8]=2`・`[+0xc]=4`・`[+0x10]=10` の並びが 0x175de / 0x175e5 / 0x175ec に連続して 1 箇所だけ出現。`[+0x10]=11` と `=12` は 0 件。**結論: win freetype.dll (x64) = FreeType 2.4.10 (確定)**。export 集合は 3 版とも 271/271 で同一。
 - **撤回した旧記述 (経緯)**: 「厳密な patch 版は未特定」「2.4.10〜2.4.12 のいずれか」「上流ソース照合は未実施 (gitlab が取得不可)」は、上記の照合で確定したため撤回。
 
+## B. FT_* 呼出面の調査 (#1144, 2026-10-13)
+
+- **素材**: `fl-win64` (`flstudio_win64_26.1.7.5653.exe`) の `extracted/` から PE 313 本 (`*_PE.bin`) を `tar --zstd -xf fl-win64.tar.zst --wildcards 'extracted/*_PE.bin'` で展開して調査 (`work/ft/extracted/`・gitignore)。`--wildcards` は必須で、無いと GNU tar が `Not found in archive` で空展開する。再現は `bash oss/freetype/callers_scan.sh <extracted_dir>`。
+- **再現確認 (HEAD 上)**: 上記の `--wildcards` 付き展開で 313 本を取得し、`callers_scan.sh work/ft/extracted` が rc=0 で完了 (FT_names=0 GPA=2、FT_ 名を持つ PE 23 本、`DLL Name: freetype` を import する PE 3 本)。
+- **FL 本体 `block00031_PE.bin`**: `FT_*` の名前が 0 件、`freetype` の文字列も無い。GetProcAddress/LoadLibraryA は import 済み (ただし解決する名前は文字列に現れない)。
+- **`freetype.dll` を import する PE は 0 件**。`freetype.dll` の名前を持つのは installer file table (`block25162_PE.bin`: `Shared\freetype.dll/486712`・`Shared\freetype_x64.dll/607032`) と DLL 自身 (`block24358`/`block24359`) のみ。`Shared\` 配下の FL 製 DLL (ILSvg / Blend2D / ildsp / dsp_ippv2 / QuickFontCache 等) も `freetype` を import していない。
+- **`FT_*` を import する PE**: `block24836`・`block24851`・`block24856` (`libfreetype-6.dll` を import = GTK/pango 系の同梱ライブラリ用。FL 本体ではない)。`block24837` (`libfreetype-6.dll` 本体・227 名)・`block24890` (pango 系の文字列) も FL 本体ではない。`block24435` は libass (字幕) の文字列。
+- **結論**: `freetype.dll` (2.4.10) の FT_* を呼ぶ FL 側の呼出元は、静的 import の経路では特定できなかった。残る経路は `LoadLibraryA`/`GetProcAddress` の動的解決 (解決名が文字列化されていない場合は特定不能) と、FL 本体以外の Shared DLL (ILSvg 等) の内部呼出。したがって「FL が実際に呼ぶ FT_* 集合」(受入条件 1) は未達。呼出元の追跡は子 issue に分割する。
+- **17 本の到達性 (受入条件 2)**: 17 名は `block24358`・`block24359`・`block24837` (`FTC_*`・`FT_Alloc` 等の名前を持つ FreeType 本体側) には出るが、FL 本体・`Shared\` DLL の呼出元には出ない。到達性は呼出元が特定できないため実測できず、未達。
+- **shim 結線 (受入条件 3)**: 未着手。呼出元が無いため結線対象が確定しない。
+
 ## 10. 各ライブラリのビルド詳細
 
 ### 10.1 libFLAC 1.5.0 / 1.3.1 (`bash oss/flac/build.sh` + `bash oss/flac/negctl.sh <ver>`)
