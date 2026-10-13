@@ -1,0 +1,41 @@
+# 配置待ち: GitHub App (実装 agent) は `workflows` 権限が無く .github/workflows/ を push できない (#309)。
+# `workflows` 権限を持つ人が `.github/workflows/detect-tests.yaml` にコピーして commit する。
+name: Detect tests
+
+# 検出テスト (GPL 混入検出 check_license_flags.py など) を CI ジョブとして実行する (#309)。
+# 素材・emsdk・ネットワークは不要。secrets も使わない (permissions は contents: read のみ)。
+# 注: opencode.yaml の review ジョブと違い、pull_request の workflow は PR の merge ref の
+# .github/workflows/ が使われる。この workflow を変更する PR は、その変更で自分自身が走る。
+on:
+  pull_request:
+    paths:
+      - 'tools/shared/oss/sidemod/**'
+      - '.github/workflows/detect-tests.yaml'
+  push:
+    branches: [main]
+    paths:
+      - 'tools/shared/oss/sidemod/**'
+      - '.github/workflows/detect-tests.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: detect-tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gpl-guard:
+    name: gpl-guard (check_license_flags.py)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # 失敗すれば job が赤になる (bash -e)。判定を握りつぶす `|| true` / continue-on-error は置かない。
+      - name: GPL guard (selftest + positive + negative controls)
+        shell: bash
+        run: bash tools/shared/oss/sidemod/ci_detect.sh

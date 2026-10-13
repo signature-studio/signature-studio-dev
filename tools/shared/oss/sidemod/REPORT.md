@@ -20,6 +20,7 @@
 | `host.c` | `dlopen` ローダ兼テスト。パスを変えるだけで別ビルドの side module に入れ替えられる |
 | `check_license_flags.py` | GPL 混入検出 (`selftest` で 18 ケース) |
 | `e2e.sh` | build → ロード・動作 → 差し替え → 検出ネガコン |
+| `ci_detect.sh` | 検出テストだけを emsdk・ネットワーク無しで実行 (Actions の `gpl-guard` ジョブ用。#309)。workflow 本体は `detect-tests.workflow.yaml` (配置待ち、§5)。陽性 + 禁止表全件のネガコン + 検出器自身のネガコン。期待 rc を厳密比較 |
 
 - FFmpeg の configure は `oss/ffmpeg/build.sh` と同じ最小構成 (decoder flac/mp3/vorbis/pcm_s16le/wmav2/aac 等) + `--enable-pic`、`--disable-programs`。
 - LAME は `--disable-decoder` (mpglib = GPL を含めない)、ソース一覧からも `mpglib` を除外。upstream の `COPYING` (LGPL) をそのまま採用。
@@ -65,4 +66,5 @@
 | LGPL-2.1 §6(b) に「side module + dlopen」が当たるか、LGPL §6 の再リンク可能性を wasm でどう満たすかは専門家確認 | #87 コメント (`docs/LEGAL.md` §3.2 と同じ未確定事項) |
 | FL 由来 wasm から `ss_*` を呼ぶ結線、および LGL-3 (THIRD_PARTY_NOTICES・ソース提供の記録) との連動 | LGL-3 の issue |
 | 禁止フラグ表は手転記。FFmpeg 更新時の追従は人手 | #87 コメント |
-| CI (GitHub Actions) への組込み。`.github/workflows` に e2e ジョブは追加していない (workflows 権限の有無は未確認) | 新規 issue を #87 コメントで提案 |
+| `detect-tests.workflow.yaml` を `.github/workflows/detect-tests.yaml` に置く作業 (App に `workflows` 権限が無く push 拒否された)。置くまで CI ジョブは未稼働・Actions 上のネガコン未実測 | [CI-6] #309 (open のまま) |
+| e2e.sh (build 込み・emsdk 要) は CI 未配線 | 必要なら #309 にコメント |
