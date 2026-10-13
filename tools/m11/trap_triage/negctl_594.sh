@@ -28,7 +28,10 @@ pre() { echo "FAIL: 前提 $1" >&2; exit 1; }
 [ -n "${FL_WIN64_DIR:-}" ] && [ -f "$PE" ] || pre "PE 無し ($PE)。FL_WIN64_DIR に fl-win64 を展開すること"
 python3 -c 'import capstone, pefile' 2>/dev/null || pre "capstone/pefile を import できない (python3 -m pip install capstone pefile)"
 [ -f work/boot_final.ll ] || pre "work/boot_final.ll 無し (work-m11 を展開すること)"
-[ -f work/boot_final.pristine.ll ] || cp work/boot_final.ll work/boot_final.pristine.ll
+# pristine は m11_gen_ir2.sh の直後の IR (ldfix=applied・qstore=not-applied・指紋記録済み) から作る。
+# 旧 snapshot の boot_final.ll は qstore 適用済みの場合があるため複製元にしない (#594 前 run の FAIL 原因)
+bash m11_gen_ir2.sh > "$OUT/gen_ir2.log" 2>&1 || pre "m11_gen_ir2.sh 失敗 ($OUT/gen_ir2.log)"
+cp work/boot_final.ll work/boot_final.pristine.ll
 python3 qstore/m11_qstore.py work/boot_final.pristine.ll work/qstore_pre.tmp.ll --pe "$PE" --detect-only \
   --report "$OUT/pristine_detect.json" --sites "$OUT/pristine_sites.tsv" > "$OUT/pristine_detect.log" 2>&1
 rm -f work/qstore_pre.tmp.ll

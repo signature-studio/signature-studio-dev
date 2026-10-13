@@ -81,6 +81,18 @@ FL_WIN64_DIR=<fl-win64 の展開先> bash tools/m11/trap_triage/negctl_594.sh   
 旧版 (qstore 無しのみ, 7 構成, G1–G10) の計測は 2 分 44 秒。現版との比較ではない。
 `gate` は FAIL で `exit 1` (終了時に `m11_ov.c` 由来の `ov.o` を再生成)。
 
+### 6-1. 2 回目の実測 (main d7cf3c77 相当, 素材を展開し直し, `m11_gen_ir2.sh` で ir_conditions.json を作成)
+- 前提 (qstore 検出 pristine) = 279 site、survey 1 回 6.4–7.5 秒、load 0.59–0.94、全体 175 秒、exit 1。
+- SUMMARY: FAIL (G1, G5, G8, G10, G12)。SUMMARY の行まで出力される (fail-closed は機能)。
+- 原因 (実測): main の ldfix 適用済み IR では、qstore 無し (`M11_QSTORE=0`) の base で 58–63 が既に `ok` (base の oob 19 = 87,144,149,158,275,280,304,477,484,492,513,520,555,659,745,830,880,898,923)。
+  unit 56 は `other` (`function_8c5eb0` の unreachable)。`8cc190←8c7a10` 系 OOB は base で n=0。
+  よって G1/G5/G8/G10 の前提 (base で 58–63 が oob) は main の ldfix 適用後の IR では成立しない。ldfix 版 IR の残す 58–63 修復を外す ldfix=disabled 比較は、build 拒否 (`ldfix=disabled` は fail-closed) のため未測定。
+- G12 は probe 透過で差 2 件 (304, 555 が oob→ok)。probe の追加で trap の出方が変わる = probe は透過でない。
+- ゲートの期待値は緩めていない。ゲート判定の修正は未実施 (前提の作り直しは別 issue)。
+
+### 6-2. 既知の制約
+- `m11_e2e.sh` の全再生成経路 (lift_pe.sha256 無し) は `m2/work/ghidra_dll/functions_dll.csv` を要求する。runner に Ghidra が無いため `m11_bounds` が fail-closed で止まる。units_run (`m11_e2e.sh` 全体) はこの経路では未測定。
+
 ## 6. 検証範囲 / 範囲外 / 未解決
 
 範囲: `m11_ov.c` + `work-m11` スナップショットの survey 942 unit を、qstore 無し (`M11_QSTORE=0`) と qstore 有り (main の既定) の両方で測定。範囲外: `m11_e2e.sh` 全体 (units_run は未測定)、`M11_OV_CLASSCREATE` (#419 / PR #446 の opt-in。main に無いため対象外)。
