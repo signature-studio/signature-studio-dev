@@ -178,3 +178,9 @@ FL_WIN64_DIR=... PY=... bash tools/m11/trap_triage/liftdiff68_683.sh
   - 鮮度: 素材の生成 commit は未特定。`git diff c4e93550 HEAD -- tools/m2 tools/m5 tools/m11` は本 PR で REPORT_683.md の 6 行のみだが、素材の生成 commit から HEAD までの差分は未確認 (lift 系の変更で行番号・有無が変わり得る。#729)。鮮度は未確定。
   - 再現手順 (未実行。作成時に実際に使ったコマンドは記録していない。素材が揃えば次の形で再確認できる): capstone で PE の `0x815050` / `0x6cefb0` を逆アセンブルし、`work/boot1.drc.ll` と `work/boot1.drc.c` に対して `grep -n "stack_var_-255\|function_6cefb0" work/boot1.drc.ll` / `grep -n "bp-255\|function_6cefb0" work/boot1.drc.c` を実行する。
   - 未完 (起票先): 因果 (この差が 6cefb0 の OOB の原因か)・置換を行った pass・修復・survey 再測定と退行確認は #1293 (`[M11-N80]`)。
+- **再確認 (#1293 run、素材 `work-m11` = #516/#680 以前の生成物、HEAD `604e900f`)**: 上記の段の観測は同じ素材で再現した。
+  - 機械語 (`boot1.drc.dsm`): `0x8158f5: 41 b0 01` (`mov r8b, 1`) → `0x8158f8: call 0x6cefb0`。
+  - RetDec 出力 (`boot1.drc.c` 63944-63945): `int64_t v69; // bp-255, 0x815050` → `function_6cefb0(v68, v68, &v69)`。`boot1.drc.ll` 126348 行でも `i64* nonnull %stack_var_-255`。
+  - callee (`boot1.drc.c` 41206 ff.): 第 3 引数は `(int64_t)a3` と `(char)v1` としてのみ使われ、ポインタとしては読まれない。よって ptr 化は誤りと読める。
+  - `boot_final3.ll` (現 IR 系) でも 318822 行に `ptr nonnull %stack_var_-255` が残る。
+  - 未確認のまま: 即値 1 を alloca に置き換えた pass・段 (RetDec の型推定か後段か)、修復、survey 942 unit の再測定、因果。これらは子 issue `[M11-N93]` に分割して起票する。
