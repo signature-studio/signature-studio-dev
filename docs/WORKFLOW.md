@@ -279,7 +279,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
 
   | IDLE の理由 | watchdog がすること |
   |---|---|
-  | main と競合している | reviewer App 名義で `[conflict]` の request-changes を出す (-> fix が main を取り込んで解消) |
+  | main と競合している | **何もしない** (競合 PR は `pull_request`・`pull_request_review` でワークフローが起動せず、差し戻しは往復回数を消費するだけ。起動手段は #731 で追加する) |
   | draft | ready にする |
   | 現在の head に verdict が無い | close -> reopen で review を再起動する |
   | 差し戻し済みだが fix が動いていない | `[watchdog]` の request-changes を出し直す (-> fix) |

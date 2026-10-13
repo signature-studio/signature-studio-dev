@@ -80,13 +80,22 @@ detail() {
 review() { printf '{"user":{"login":"%s","type":"%s"},"commit_id":"%s","state":"%s","body":"%s"}' "$1" "${5:-Bot}" "$2" "$3" "${4:-}"; }
 wd() { bash "$SCRIPTS/watchdog.sh" > "$TMP/out" 2>&1; }
 
-# 1. 競合 -> reviewer 名義の [conflict] 差し戻し
+# 1. 競合 PR には差し戻しを出さない (競合 PR は review イベントでワークフローが起動せず、差し戻しは往復回数を消費するだけ。#731)
 reset
 base "[$(pr 1 aaa111 false "$OLD")]"
 detail 1 false
 wd
-logged 'pr review 1 .*--request-changes' && logged '\[conflict\]'
-expect "conflict -> request-changes [conflict]" $?
+not_logged 'pr review 1' && grep -q 'CONFLICT: not actioned' "$TMP/out"
+expect "conflict -> no request-changes (events cannot start a fix on a conflicting PR)" $?
+
+# 1b. 競合 PR は点検の操作件数 (OC_MAX_ACTIONS) を消費しない
+reset
+base "[$(pr 1 aaa111 false "$OLD"),$(pr 2 bbb222 true "$OLD")]"
+detail 1 false
+detail 2 true
+OC_MAX_ACTIONS=1 wd
+logged 'pr ready 2'
+expect "a conflicting PR does not use up the action budget" $?
 
 # 2. draft -> ready
 reset

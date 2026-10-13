@@ -10,7 +10,8 @@
 #                      PM の /oc コメント起動は run のタイトルが PR タイトルと一致する)
 # カバーされていなければ IDLE であり、理由ごとに戻す (updated_at が SETTLE 分以内なら、直前の操作の
 # イベントが伝播中とみなして次回に回す):
-#   CONFLICT          main と競合 (競合 PR は pull_request run が起動しない) -> reviewer App 名義の CHANGES_REQUESTED で fix 経路へ
+#   CONFLICT          main と競合。競合 PR は pull_request も pull_request_review も起動しないため、差し戻しでは fix を動かせない
+#                     (往復回数だけ消費して oc:stuck に近づく)。差し戻しは出さず一覧に出す。repository_dispatch での起動は #731
 #   DRAFT             draft -> ready (ready_for_review で review が起動する)
 #   FIX_IDLE          現在の head に CHANGES_REQUESTED があるのに fix run が無い -> CHANGES_REQUESTED を再提出して fix 経路へ
 #   APPROVED          approve 済みで未 merge -> merge。失敗したら理由付きの CHANGES_REQUESTED
@@ -175,8 +176,9 @@ for i in $(seq 0 $((total - 1))); do
 
   case "$reason" in
     CONFLICT)
-      do_it "request-changes (conflict) on #$n" request_changes "$n" \
-        "[conflict] main と競合しています (mergeable=false)。競合 PR は review が起動しないため、この差し戻しで修正 run を起動します。origin/main を merge して競合を解消し、push してください (競合解消以外の変更はしない。main 側の変更を消さない)。競合した箇所と解消方針を PR にコメントで報告してください。(watchdog)"
+      # 競合 PR にはイベント駆動の経路が無い (#731)。差し戻しは fix を動かせず往復回数を消費するだけなので出さない。
+      acted=$((acted - 1))
+      echo "  CONFLICT: not actioned (a conflicting PR starts no workflow on review events; see #731)"
       ;;
     DRAFT)
       do_it "ready #$n" gh pr ready "$n" --repo "$R"
