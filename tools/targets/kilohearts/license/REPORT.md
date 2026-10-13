@@ -128,3 +128,86 @@ DSP 固有 closure (42 効果) にはライセンス/ネット系参照が無く
 ## 11. #249 追記 (ブラウザ分類 lift・ctor 47 vs 46 同定、詳細は `KH249_REPORT.md`)
 
 - 47 ctor = 製品 45 + `HostProxyEditorModel` + `SnapinGroupEditorModel`、product_index 46 = 製品 45 + `core` (KH9 §5-5 の推定を確定)。ブラウザ 0x180ef7fc0 は module F で emcc 通過・status 9 で全エントリ listed/unlocked を実 IR の thunk 実行で確認。
+
+## 12. #710 named import 節 (HeapAlloc shim / 宣言補完) の検証
+
+- 対象: `lift/gen_stubs_sigs.py` (`HEAP_C` / `IMP_SHIM`)・`lic_build.py` (`decl_named_imports`)。snapins 版 `HEAP_C` の同型問題は未修正 (追跡 #1116)。
+- 変更点: `kh_heap_alloc` は領域を超える要求で **0 を返す** (旧: `n` を 0xF0000 に切り詰め、末尾超過で先頭へ巻き戻し生存ブロックを上書き)。`decl_named_imports` は引数付き・戻り非 i64・fastcc の呼出を `sys.exit` で停止し、`declare void @llvm.trap()` が無いときも停止する。`defined` は属性付き define (`define internal i64 @Foo(...) #0`) に対応。
+- 再現 (emsdk・winpkg 不要、ホスト gcc のみ): `python3 scripts/kh710_check.py` → 終了 0 で全 PASS。
+
+| 検査 | 期待 | 結果 |
+|---|---|---|
+| decl: 引数なし `call i64 @GetCurrentThreadId()` で `declare i64 @GetCurrentThreadId()` 補完 | 補完 | PASS |
+| decl: 引数付き `call i64 @HeapFree(i64 1, i64 2)` | exit (停止) | PASS |
+| decl: `call fastcc i64 @HeapFree(i64 1)` | exit (停止) | PASS |
+| decl: 属性付き define `define internal i64 @Foo(...) #0` の呼出 | 補完なし・重複なし | PASS |
+| decl: `declare void @llvm.trap()` 無し | exit (停止) | PASS |
+| heap: 100B + 16B 確保が非 0・16B 整列 | 非 0 / 整列 | PASS |
+| heap: 2MB 要求 | 0 | PASS |
+| heap: 0xFFFFFFFFFFFFFFF0 要求 | 0 | PASS |
+| heap: 0xF0000 要求 (領域内) | 非 0 | PASS |
+| heap: 0xF0000 の 2 回目 (領域枯渇) | 0 | PASS |
+| heap: 先に確保したブロックの内容 (0xAB 100B) が後続確保後も保持 | 保持 | PASS |
+
+- 上記は HEAD 変更後の `lift/gen_stubs_sigs.py` の `HEAP_C` を、アドレスだけホストバッファへ差し替えて実行したもの (`kh710_check.py`)。
+- 回帰確認 (emcc rc・sha256・`kh249_check.mjs` ok=17): **実施済み** (12.1 参照。旧 HEAD を同条件で再ビルドして一致)。
+- `product_index.json` (46 plugins) は `work/winpkg/` の生成物 (gitignore)。差分に出ないのは仕様どおり。再生成には `plugins-kilohearts` 素材が要る (`scripts/kh249_product_index.py`)。
+- **libc / CRT 名衝突 (レビュー指摘 3・#710)**: `gen_stubs_sigs.py` は body 中の未知の `@Name(` に `abort()` 付きの定義を生成するため、`memcpy`・`strlen`・`sqrt` 等が named import として出ると libc を上書きする。`LIBC_NAMES` (memcpy/memset/strlen/sqrt/malloc/printf 等 33 名) に当たる名前が `used_names` に出たら生成段で `sys.exit` する (`scripts/kh710_check.py` の `libc_clash:*` で検査: memcpy は停止 / GetCurrentThreadId は通過 = PASS)。
+  - 実 lift 出力での `used_names` 列挙: **実施済み** (12.2 参照。4 module とも空で、`LIBC_NAMES` との衝突なし)。
+- 実行 (HEAD `8e56adc8`): `python3 scripts/kh710_check.py` → `RESULT PASS` (rc=0・PASS 15 / FAIL 0)。
+
+### 12.1 回帰確認 (実測・旧 HEAD `9c1f7c0b` を同条件で再ビルドして比較)
+
+- 素材: `fl-win64` / `plugins-kilohearts` (installer zip → `work/winpkg/HeartCore.core_64`) / `toolchain-emsdk` (`/opt/emsdk`, node 24.19.0) / `toolchain-retdec` (`/opt/retdec`)。
+- 旧 HEAD は `git worktree` (detached `9c1f7c0b`) で `winpkg` を複製し、`lic_build.py --module A|B|E|F` を実行。現 HEAD は同じ `lic_build.py` を実行。
+
+| module | 旧 `9c1f7c0b` sha256 | 現 HEAD sha256 | wasm bytes | 判定 |
+|---|---|---|---|---|
+| A | `411007b8…b6fc` | `411007b8…b6fc` | 26705 | 一致 |
+| B | `62182947…f04b` | `62182947…f04b` | 25249 | 一致 |
+| E | `0cf066d1…6fed8` | `0cf066d1…6fed8` | 364770 | 一致 |
+| F | `7ba79e65…8c7707` | `7ba79e65…8c7707` | 54394 | 一致 |
+
+- 各 module の `lic_build.py` rc は 0。`undefined_imports` は全て `[]`。emcc は全 module で成功 (rc=0)。
+- `kh249_check.mjs` (module F): 旧・現とも `kh249_check ok=17 ng=0`、rc=0。
+- 全 module の `stubs.c` に `kh_heap_alloc` / `kh_cursor` は出力されず (`grep -c` = 0)、HeapAlloc shim は本 4 module では使われない。したがって `kh_heap_alloc` の失敗値変更は 4 module の wasm には影響しない (sha 一致の理由)。
+- sha 表の数値は同じ `lic_build.py` を同条件で 2 HEAD から実行した結果 (旧 HEAD 側は `ws-1084-base` worktree)。
+
+### 12.2 実 lift 出力の `used_names` と `LIBC_NAMES` の突合 (実測)
+
+- 対象: `work/licA|B|E|F/final.ll` (RetDec stage-0 → lower → normalize → stub pass の出力) に対し、`gen_stubs_sigs.py` と同じ式で `used_names` を計算 (define/declare 名と `function_`・`kh_`・`llvm`・`global_var` を除外)。
+- 結果: 4 module とも `used_names = []`。`LIBC_NAMES` (memcpy・strlen・sqrt 等) との交差は空。libc / CRT 名の衝突は実 lift 出力では発生しない。
+- 注記: 現在の 4 module は named import (HeapAlloc 等) を呼ばない。`used_names` が非空になる入力での経路は `kh710_check.py` の `libc_clash:*` で検査する。
+
+### 12.3 HeapAlloc カーソルの配置修正 (review 指摘 1)
+
+- 指摘: `kh_heap_alloc` のカーソルが `0x04000100` (arena の `operator new` 確保域 = newheap の先頭) に置かれ、`TlsGetValue`/`FlsGetValue` の返却値 `0x04000200` も同域内だった。
+- 修正: カーソルを `static u64 kh_cursor` に移す。TLS/FLS の返却値を `KH_TLS` (`0x05200000`、`KH_HEAP_END` 直後の未使用域) にする。
+- 検査: `kh710_check.py` に `placement:*` を追加 (TLS 返却値が arena・cave・heap 域外 / カーソルが static / TLS shim が `KH_TLS` を使う) → 全 PASS。
+- 影響: 上記 12.1 のとおり、4 module の wasm は変わらない (sha 一致)。
+- **define 名の stub 化 (review 指摘 2)**: `used_names` は `define` 行の名前も拾い、同一モジュール内で定義された非 `function_` 関数 (`define internal i64 @LocalHelper(...)` を `function_1` が呼ぶ形) に `abort()` stub を生成していた。修正: `local` (`^define ... @Name(`) を `used_names` から除外。再現 (修正前): `gen_stubs_sigs.py` で `LocalHelper(void)` の stub 出力。修正後: 出力 0 件。検査 `define_not_stubbed` を `kh710_check.py` に追加 (PASS)。
+
+### 12.4 本 run の実測 (HEAD `8e56adc8`・素材 4 種展開・旧 HEAD `9c1f7c0b` 比較)
+
+- 素材: `plugins-kilohearts` は installer zip (取得 60 s) → `payload.dat` (取得 74 s) → `windows.zip` → `work/winpkg/HeartCore.core_64` のみ展開。`toolchain-emsdk` (`/opt/emsdk`)・`toolchain-retdec` (`/opt/retdec`) は既存。`KH_EM_CACHE=$RUNNER_TEMP/emcache`。
+- 手順 (順序固定・1 つ終わるごとに本節へ追記):
+
+| 順 | 測定 | 結果 | 時間 |
+|---|---|---|---|
+| 1 | 旧 HEAD `9c1f7c0b` の module A 再ビルド (比較基準) | sha `411007b8…b6fc`・26,705 B・undefined `[]` | 29.5 s |
+| 2 | 現 HEAD `8e56adc8` の `used_names` 突合 (module A/B/E/F、現 HEAD の `LIBC_NAMES` 32 名) | 4 module とも `used_names = []`・衝突 0 | 数秒 |
+| 3 | 現 HEAD `lic_build.py --module A` | sha `411007b8…b6fc`・26,705 B (旧と一致) | 11.3 s |
+| 4 | 現 HEAD `--module B` | rc=0・sha `62182947…f04b`・25,249 B (旧と一致) | 12 s |
+| 5 | 現 HEAD `--module E` | rc=0・sha `0cf066d1…6fed8`・364,770 B (旧と一致) | 13 s |
+| 6 | 現 HEAD `--module F` | rc=0・sha `7ba79e65…8c7707`・54,394 B (旧と一致) | 11 s |
+| 7 | 現 HEAD `kh249_check.mjs` | rc=0・`kh249_check ok=17 ng=0` | 数秒 |
+
+- emcc rc: A/B/E/F 全て 0。`undefined_imports` は A で `[]`。
+- 注: 旧 HEAD `9c1f7c0b` には `LIBC_NAMES` が無い (`b08b431a` で追加) ため、`used_names` 突合は現 HEAD の定義を使った。
+
+### 12.5 ネガコン (宣言補完を無効化) の実測 — 不成立
+
+- 操作: `lic_build.py` の `txt = decl_named_imports(txt)` (137 行) を一時的に無効化し、`--module F` を 1 回ビルド。作業ツリーは測定後に復元 (commit なし)。
+- 結果: **rc=0**・`undefined_imports: []`。宣言補完を外しても module F は失敗しなかった。
+- 解釈: module F は `used_names` が空 (§12.2) で、そもそも named import を呼ばない。よって本 4 module は宣言補完のネガコンに不適。#710 の本来の失敗 (閉包展開での `@GetCurrentThreadId` 宣言欠落) は、その名前を呼ぶ閉包を含む入力でしか再現しない。
+- 未実施・起票先: 閉包展開で named import を呼ぶ入力でのネガコン (#656)。本 run では測定できていないため、受入条件のこの項目は未達のまま。
