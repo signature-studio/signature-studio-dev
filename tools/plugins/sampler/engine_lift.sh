@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # C++ engine / 単体 DLL 全 .pdata 関数を RetDec+pass 鎖で lift → emcc -c (到達性のみ; 正しさは別)
 #   bash tools/plugins/sampler/engine_lift.sh <block> [timeout_sec]      例: 23664 (Fruity Slicer 2 engine) / 23677 (GMS 単体 DLL)
+# 環境変数 LIFT=sampler/lift_from_ll.sh: RetDec を走らせず既存の engine<block>/e.drc.ll から後段だけ実行する (RetDec の C バックエンドが長い/大メモリの時)
 # 出力: work/sampler/engine<block>/ と 1 行サマリ (block,pdata_funcs,lift_rc,defines,f80_funcs,unimpl_helpers,emcc_c_rc,fixcmp_patched,emcc_c_rc_after_fixcmp,lift_s,
 #   missing_define,missing_bytes,missing_ref,extra_inside,function_defines  ← engine_defs.py)
 set -uo pipefail
@@ -11,7 +12,7 @@ B="$1"; TMO="${2:-1200}"
 OUT="work/sampler/engine$B"; mkdir -p "$OUT/tmp"
 python3 sampler/engine_ranges.py "$B" > "$OUT/ranges.txt" 2> "$OUT/ranges.info"
 t0=$(date +%s)
-bash lift/lift_ranges.sh "$FL_WIN64_DIR/extracted/block$(printf %05d "$B")_PE.bin" "$OUT/ranges.txt" "$OUT" e "$TMO" > "$OUT/lift.log" 2>&1
+bash "${LIFT:-lift/lift_ranges.sh}" "$FL_WIN64_DIR/extracted/block$(printf %05d "$B")_PE.bin" "$OUT/ranges.txt" "$OUT" e "$TMO" > "$OUT/lift.log" 2>&1
 rc=$?
 t1=$(date +%s)
 DEF=$(grep -c '^define' "$OUT/e.final.ll" 2>/dev/null || echo 0)
