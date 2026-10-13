@@ -5,7 +5,7 @@
 ## 1. 測定 (実測・2026-10-13)
 
 測定 commit: `2b2faf52` (origin/main。本 PR は `tests/ld42_transition.py` の追加と本付録のみで、e2e の経路は変えていない)。
-素材: `fl-win64 toolchain-emsdk work-m11 work-liftdiff` を展開 (`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`・`TMPDIR=$RUNNER_TEMP`)。emsdk は `/opt/emsdk` に既存。
+素材: `fl-win64 toolchain-emsdk work-m11 work-liftdiff` を展開 (`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`・`TMPDIR=$RUNNER_TEMP`)。emsdk は `[EMSDK]` (`docs/REFERENCES.md`) を使用。
 
 | 測定 | コマンド | 結果 |
 |---|---|---|

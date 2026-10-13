@@ -23,9 +23,8 @@ def tags_of(r):
     if r is None:
         return ''
     s = set()
-    for c in r.get('cases', []):
-        for t in c.get('tags', []) or []:
-            s.add(t if isinstance(t, str) else str(t.get('tag', t)))
+    for t in r.get('tags', []):
+        s.add(t['tag'] if isinstance(t, dict) else str(t))
     return ','.join(sorted(s))
 
 
