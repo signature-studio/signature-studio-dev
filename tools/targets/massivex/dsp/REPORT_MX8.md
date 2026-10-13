@@ -3,11 +3,13 @@
 - 親: #1122 (MX-5) / 起票: #1321 (MX-8)。本ファイルは #1321 の実測。
 - 素材: `plugins-massivex` → `work/extracted/VST3/Massive X.vst3` (95,356,824 B / md5 `622993e76565f49c094063a2b717d6ca`、REPORT_MX5 §5 と一致)。
 - 計測スクリプト: `dsp/scripts/mx_pdata_quant.py` (e2e.sh の step 5/5)。
+- 入力の計測値 (chained・解決・CHAININFO・親一致・過大評価) は REPORT_MX5.md §2 が正本。本ファイルは束ね規則の適用結果だけを書く。
 
 ## 1. 今 run で達成した範囲
 
-受入 2 のうち「chained 親への束ね規則の決定と実装 (CHAININFO 親に束ねる)」のみ。
-受入 1 (code/data 区別と再帰降下)・受入 3 (leaf 境界の実 unwind 化)・受入 4 の closure 側は未着手 (§5 の子 issue)。
+受入 2 のうち「chained 親への束ね規則の決定と計測上の実装 (CHAININFO 親に束ねる)」のみ。
+mx_pdata_quant.py の計測カウンタに規則を入れた段階で、closure 側 (mx_roots.py / mx_closure.py の関数根) は未変更。
+受入 1 (code/data 区別と再帰降下)・受入 3 (leaf 境界の実 unwind 化)・受入 4 の closure 側は未着手 (§4 の子 issue #1488)。
 
 ## 2. 束ね規則
 
@@ -18,29 +20,29 @@
 
 ## 3. 実測 (測定 commit `5e26f032`)
 
+束ね規則 (§2) を適用した結果。MX-8 で新たに測った値は次の 2 つだけ。
+
 | 指標 | 値 |
 |---|--:|
-| valid entry | 186,961 |
-| UNWIND_INFO 解決 1 件の entry | 167,541 |
-| CHAININFO (解決済み) | 62,516 |
-| 親が valid .pdata 内に完全一致 | 62,498 |
 | **束ねた member (chain member bound)** | **62,498** |
-| **束ね後の関数の根 (valid − member)** | **124,463** |
-| 参考: chained (begin == 直前 end) | 70,489 |
-| 参考: leaf 近似 > pdata end (過大評価) | 116,460 |
+| **束ね後の関数の根 (valid entry 数 − member)** | **124,463** |
 
-- 62,516 − 62,498 = 18 件は親が pdata 内に無い (MX-5 注と同じ)。束ねず独立扱い。
-- 解決不能 19,420 件 (section 0 件・2 件以上) は規則上束ねない。その中の CHAININFO 件数は未確定。
+- 親が valid .pdata に完全一致しない CHAININFO entry は束ねず、独立関数として数える。件数は REPORT_MX5.md §2 の「親が valid 外」行。
+- 解決不能 (section 0 件・2 件以上・REPORT_MX5.md §2 注 4) の entry は規則上束ねない。その中の CHAININFO 件数は未確定。
 
 ## 4. 未解決 (子 issue へ)
 
 | 残件 | 受入 | 起票先 |
 |---|---|---|
-| 解決不能 19,420 件の UNWIND_INFO の正しい読み方、親 18 件の解決 | 2 | 子 issue (下記) |
-| chained (begin == 直前 end) 70,489 と CHAININFO 束ね 62,498 の関係の確定 | 2 | 子 issue (下記) |
-| leaf 境界を実 unwind / 境界に置換 (過大評価 116,460 件) | 3 | 子 issue (下記) |
-| code/data 区別 (jump table・文字列窓) を入れた再帰降下と round 推移 | 1 | 子 issue (下記) |
+| 解決不能 19,420 件の UNWIND_INFO の正しい読み方、親 18 件の解決 | 2 | 子 issue #1488 |
+| chained (begin == 直前 end) と CHAININFO 束ねの関係の確定 | 2 | 子 issue #1488 |
+| leaf 境界を実 unwind / 境界に置換 (過大評価の解消) | 3 | 子 issue #1488 |
+| code/data 区別 (jump table・文字列窓) を入れた再帰降下と round 推移 | 1 | 子 issue #1488 |
 | process 起点 closure の確定値 | 4 | #266 (U1) に依存 |
+
+### 受入 2 の未決の扱い (#1321)
+
+#1321 受入 2 の旧数値 4,186 件・153 件は、REPORT_MX5.md §2 注 4 のとおり section 解決の欠陥による誤りとして撤回済み。現行の未解決は、解決不能 19,420 件 (section 0 件・2 件以上) と、親が valid .pdata に一致しない CHAININFO 18 件 (REPORT_MX5.md §2 の内訳: 全 pdata 内 7 件・pdata 外 11 件) であり、これらは子 issue #1488 で扱う。
 
 ## 5. 検証
 
@@ -48,5 +50,5 @@
 - **e2e (`bash dsp/e2e.sh`・測定 commit・n=1)**: rc 0 / `OK elapsed=43s` / load 0.54 0.49 0.23 → 0.78 0.56 0.27。step 5/5 で `chain_member_bound` 出力を確認。
 - **e2e (ベースライン 851c342e・変更前)**: rc 0 / `OK elapsed=43s` / load 0.78 0.47 0.19 → 0.89 0.54 0.23。
 - **negctl (`bash dsp/negctl.sh`・測定 commit)**: NC1 unsup 67 / NC2 unsup 746 / NC3 insns 31 unsup 0 → 3 件とも FAIL<期待>。
-- **step 5 再現 (MX-5 との突合)**: chained 70,489 / 解決 1 件 167,541 / CHAININFO 62,516 / 親一致 62,498 / 過大評価 116,460 件・2,618,866 B / 過小評価 12。MX-5 と完全一致。
+- **step 5 突合 (MX-5 との一致)**: step 5 の出力は REPORT_MX5.md §2 と一致。値は MX-5 側のみに記載する。
 - **鮮度 (WORKFLOW §6)**: `git diff 5e26f032 HEAD -- tools/targets/massivex/dsp/e2e.sh tools/targets/massivex/dsp/negctl.sh tools/targets/massivex/dsp/scripts/mx_pdata_quant.py tools/flelift/x64c.py tools/shared/env.sh` は 0 行 (本 REPORT の commit は dsp 外のみ)。
