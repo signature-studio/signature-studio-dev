@@ -45,3 +45,13 @@
 | N5 demo UI 抑制 (QML 側の demoExpired / subscriptionExpired / MXDemoPopup 表示経路の特定と差し替え) | 受入条件 1 未達 | #1017 [MX-4] (OPEN) |
 | N6 Native Access 誘導文言 6 種の抑制 (参照元の特定が先) | 受入条件 2 未達 | #1017 [MX-4] (OPEN) |
 | `acpt_verify_mx2.py` の N5/N6 検査は文字列実在のみ | 「抑制済み」の機械検証が無い | #1017 [MX-4] (OPEN) |
+
+### 12.4 #1017 の再確認 (HEAD = `2f235a0a`・実測)
+
+- 測定: `license/scripts/mx_n5n6_probe.py` (文字列 VA・周辺文脈) と `license/scripts/mx_n5n6_refscan.py` (8B 絶対 / 4B RVA 全域走査)。素材は `plugins-massivex` の `Native Instruments Massive X v1.7.1.exe` を展開し、`Massive X.vst3` (95,356,824 B) を `work/` 側で再取得。
+- 文字列 VA は §12.2 と一致 (N6 0x184ffcf87 / 0x184ffcfe8 / 0x184ffd03f、N5 0x18415f411 / 0x1848792b9 / 0x18487941a)。
+- N5 名 (`demoExpired` / `demoExpiredChanged` / `subscriptionExpired` / `MXDemoPopup`) は Qt の moc 文字列表 (`MXFrameEvents::...` の signal・property 並び) と `MXDemoPopup.qml` の UTF-16 資源名として `.rdata` に並ぶ。
+- N6 の 6 文言は `MPEG::Header::parse()` / `Speex::Properties::read()` 等の一般文字列プール (`.rdata` 0x4ffa000 台) の中にある。
+- 絶対 8B は全 7 VA で 0 件。4B RVA は `0x184ffd03f` のみ 1 件 (raw 0x3c8af47, `.rdata`)。周辺は圧縮データ状のバイト列で、関数参照の形ではないため偶然一致と判断 [推]。
+- **結論 (変更なし)**: 読み手は (a) moc / qrc 系の相対オフセット表、(b) 文字列 index 経由 (テーブル基準の 4B 相対差分)、のいずれかと推定 [推]。前回の RVA32 検索はテーブル基準の差分を見ないため、「参照 0 件」は (a)(b) を除外していない。
+- 差し替え点は未特定のため、`mx_lic_stub.py` は変更しない。e2e は本 run では再実行しない (コード変更なし)。次の一手は #1017 で (b) のテーブル基準を総当たりで確かめる。
