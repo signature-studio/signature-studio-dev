@@ -28,6 +28,33 @@
 - `known.json`: 通過 4 本の `emcc_c_rc` を除去。残りの fails (`declares_unimpl` / `i256_trap` / `missing_define` と不通過 5 本の `emcc_c_rc`) は未解決。
 - judge (C++ 9 本の行のみ、`mk_status.py` 相当の列で作成): KNOWN 9 / NEW-FAIL 0 / FIXED 0 / MISSING 0 / exit 0。`synth_e2e.sh` 全体 (shell 12 本) は未実行。
 
+## C. E3 修復 (#1485; `function_180049450` の i32 仮引数)
+
+修復 pass: `tools/plugins/lift/passes/fix_i32_ptr_arg.py` [P-T2] (opt-in: `PLUG_I32PTR_FUNCS=function_180049450`)。
+
+呼出側の上位ビットの扱い (`function_180049450` 呼出 19 箇所。`function_180049450(i64 …, i32 X)`):
+
+| 種別 | 箇所 | 扱い |
+|---|--:|---|
+| `i32 0` (定数) | 8 | `i64 0` (値は同じ) |
+| `i32 %V`、定義元 `%V = trunc i64 %W to i32` | 10 | `%V = add i64 %W, 0` (上位 32bit を保つ) |
+| `i32 %arg1` (呼出元 `function_180056120` の `i32` 仮引数) | 1 | 呼出元の署名が `i32` のため未修復。下記 未解決 |
+
+決定の根拠: ネイティブ `0x180049450` は第 2 引数 (rdx) の 64bit 全体を `test rdx, rdx` / `movups [rdx]` でポインタとして使う。
+`trunc` による上位 32bit の切り捨ては、非 0 の上位を持つポインタで別アドレスを読むため silent に値が変わる。よって `i64` 化して上位を保つ。0 拡張・符号拡張は起こさない。
+
+実測 (`bash tools/plugins/synth/cpp_lift.sh 21202 1500`、作業ツリーのみ・コミット前):
+
+| 条件 | summary.csv | `emcc_c_rc` | 最初のエラー |
+|---|---|--:|---|
+| 修復前 (main f3ffd7ba) | `21202,1579,0,1393,0,3,3,1,0,1,36,211,25828,67,23,1391,0` | 1 | `e.final.ll:114486:21 '%arg2' defined with type 'i32' but expected 'i64'` |
+| `PLUG_I32PTR_FUNCS=function_180049450` | `21202,1579,0,1393,0,3,3,1,0,1,36,211,25828,67,23,1391,0` | 1 | `e.final.ll:135551:56 '%arg1' defined with type 'i32' but expected 'i64'` |
+| 既定 (opt-in 無効、修復後のコード) | `21202,1579,0,1393,0,3,3,1,0,1,39,211,25828,67,23,1391,0` | 1 | 同上 (baseline と同一) |
+
+- `emcc_c_rc=0` は未達。エラーは `function_180049450` から `function_180056120(i32 %arg1, …)` (呼出 4 箇所) の `i32` 仮引数へ進んだ。
+  この `%arg1` は本体で `inttoptr` されず、`call` に渡すだけのため、本 pass の対象条件には当たらない。
+- 既定経路 (opt-in 無効) の summary は修復前と同一。他 8 本の `emcc_c_rc` は未測定 (本 run の時間内では回していない)。
+
 ## B. 未解決 (起票先)
 
 | 未解決 | 影響 | 起票先 |

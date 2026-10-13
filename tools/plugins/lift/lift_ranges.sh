@@ -70,7 +70,15 @@ if [ -n "$FH_ARGS" ]; then
 else
   cp "$OUT/$NAME.oc.ll" "$OUT/$NAME.fh.ll"
 fi
-python3 "$P/fix_dup_decls.py" "$OUT/$NAME.fh.ll" "$OUT/$NAME.dd.ll"
+# opt-in: 本体で inttoptr として使う i32 仮引数の i64 化 (#1485; PLUG_I32PTR_FUNCS="function_180049450 ...")
+I3_ARGS=""
+for f in ${PLUG_I32PTR_FUNCS:-}; do I3_ARGS="$I3_ARGS --func $f"; done
+if [ -n "$I3_ARGS" ]; then
+  python3 "$P/fix_i32_ptr_arg.py" "$OUT/$NAME.fh.ll" "$OUT/$NAME.i3.ll" $I3_ARGS
+else
+  cp "$OUT/$NAME.fh.ll" "$OUT/$NAME.i3.ll"
+fi
+python3 "$P/fix_dup_decls.py" "$OUT/$NAME.i3.ll" "$OUT/$NAME.dd.ll"
 python3 "$P/fix_ptr_params.py" "$OUT/$NAME.dd.ll" "$OUT/$NAME.pp0.ll"
 python3 "$P/fix_icmp_ptr.py" "$OUT/$NAME.pp0.ll" "$OUT/$NAME.pp.ll"
 # opt-in (PLUG_XMMARG=1): 機械語が xmm0..3 を入力に読むのに IR 署名に無い関数へ float/double 引数を復元 ((DEFECTS.md) D5, PLG-F2-4 #547)
