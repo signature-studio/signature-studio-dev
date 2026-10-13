@@ -85,10 +85,10 @@
 
 | 項目 | 実測 |
 |---|---|
-| 前提生成 (初回。 inventory 含む、`win_scan` 〜 `closure_lea`) | 549 s (rc 0。 inventory 段の負荷 load average 17 の時間帯あり) |
-| `closure_unreached.py` (7 本) | 26.8 s (rc 0、PASS 5 × 7) |
+| 前提生成 (初回。 inventory 含む、`win_scan` 〜 `closure_lea`、HEAD 7d3ac70 の run) | 549 s (rc 0。 inventory 段の負荷 load average 17 の時間帯あり) |
+| `closure_unreached.py` (7 本、HEAD 7d3ac70 の run) | 26.8 s (rc 0、PASS 5 × 7) |
 | `unr_lift.sh` (7 本、逐次) | 138 s (wall、40:15 → 42:33)。 block 別 4 / 13 / 6 / 6 / 8 / 25 / 68 s |
-| `unr_e2e.sh` (前提生成込み・work/ 空から、lift・judge・欠落監査まで、HEAD c2dfeaf) | **11 分 59 秒 (719 s、`real`)、rc 1** (judge 7/7 PASS、indirect_defs FAIL 5 件)。 closure_unreached 25.6 s・lift 段は block 別 5 / 13 / 5 / 6 / 9 / 25 / 66 s (計 129 s 前後) |
+| `unr_e2e.sh` (前提生成込み・work/ 空から、lift・judge・欠落監査まで、HEAD c2dfeaf。 438 s (HEAD 7d3ac70) とは別の run) | **11 分 59 秒 (719 s、`real`)、rc 1** (judge 7/7 PASS、indirect_defs FAIL 5 件)。 closure_unreached 25.6 s・lift 段は block 別 5 / 13 / 5 / 6 / 9 / 25 / 66 s (計 129 s 前後) |
 | `unr_nega.sh` (HEAD c2dfeaf、§2d-7) | 1 分 45 秒 (`real` 104.8 s)、rc 1 (NC6 対照のみ不合格。 他は期待どおり) |
 
 ### 2d-7. ネガティブコントロール (`unr_nega.sh`、HEAD c2dfeaf で rc 1 = NC6 対照のみ不合格)
@@ -108,7 +108,7 @@
 
 実測: 対照 NC0・NC5 対照・NC1・NC2 (2 件)・NC3・NC4・NC5・NC6 (追記)・NC7 は期待どおり。 **NC6 対照のみ不合格** (AC2 gate 由来)。 `status_run.csv` は各 NC の後に元へ復元 (trap と cp)。
 
-**PM 判断 (2026-10-13、#667 に記録)**: NC6 対照の期待値は書き換えない。 rc 1 は AC2 の range 欠落 5 件 (PE export 関数、§2d-9) が残るためで、#707 (PR #720) の merge で解消する見込み。 解消までは赤のまま残し、その事実を本節で明示する。 merge 後に `unr_nega.sh` を付け替え後の HEAD で再実行し、本表を差し替える。
+**PM 判断 (2026-10-13、#667 に記録)**: NC6 対照の期待値は書き換えない。 rc 1 は AC2 の range 欠落 5 件 (PE export 関数、§2d-9) が残るためで、#707 (PR #720) の merge で解消する見込み。 解消までは赤のまま残し、その事実を本節で明示する。 merge 順 (#676 → #708 → #720) では **本 PR の merge 後も #720 の merge までは main で `unr_nega.sh` の NC6 対照が rc 1 のまま**。 これは期待値を書き換えないための既知の状態であり、#720 の merge で解消する。 付け替え後に `unr_nega.sh` を付け替え後の HEAD で再実行し、本表を差し替える。
 
 ### 2d-8. byte 走査の一致 31 箇所の判定 (`bytescan_hits.py`、capstone の IMM 集合に入らなかったもの)
 
@@ -191,9 +191,8 @@
 | (d) 参照なし 1,477 関数 / 738,944 B は dead code 候補にすぎない | 間接経路が他にある可能性。 未使用の確定ではない | #667 にコメント / 次タスク (§8c) |
 | total3 の wasm リンク・実行時の到達性 | 範囲外。 lift 通過 ≠ 正しさ | #667 にコメント |
 | f80 lowering の対象 (lea 段と同じ 3 関数 × 3 block) の bit-exact 未検証 | 差分試験の対象に入るか未定 | #197 にコメント (既存) |
-| **AC2 gate 不合格** (range 欠落 5 件 = PE export 関数 5 件、§2d-9) | PM 判断 (2026-10-13): AC2 は #707 へ移譲し、#667 の AC は AC1・AC3 のみ。 gate は本 PR で緩めていない。 #707 の merge まで `unr_e2e.sh` は rc 1 のまま | #707 (PM 判断で移譲済み) |
-| **基点 #676 (`627-sampler-lea-closure`) が未 merge** (CHANGES_REQUESTED、main とは 384 commit 差)。 main では `rep_stosb_memset` が実装済み (9b5ea38)。 merge 前に main へ付け替えて再測定が必要 | merge 順: #676 → #720 → 本 PR。 付け替え後に `unr_e2e.sh`・`unr_nega.sh` を再実行 | PM (merge 順は PM 判断で確定) |
-
+| **AC2 gate 不合格** (range 欠落 5 件 = PE export 関数 5 件、§2d-9) | PM 判断 (2026-10-13): AC2 は #707 へ移譲し、#667 の AC は AC1・AC3 のみ。 gate は本 PR で緩めていない。 本 PR の merge 時点 (#676 → #708 → #720 の順) では `unr_e2e.sh` は rc 1 のまま。 #720 の merge 後に main で gate が通ることを #707 側で確認する | #707 (PM 判断で移譲済み)。 #720 の merge まで main の gate は赤 |
+| **基点 #676 (`627-sampler-lea-closure`) が未 merge** (CHANGES_REQUESTED、main とは 384 commit 差)。 main では `rep_stosb_memset` が実装済み (9b5ea38)。 merge 前に main へ付け替えて再測定が必要 | merge 順 (PM 訂正 2026-10-13 12:56): #676 → 本 PR (#708) → #720。 #720 の枝には本 PR の commit (b36fef5〜36479de0) が含まれるため、#720 を先に merge できない。 本 PR の merge 時点では AC2 gate は不合格のまま。 付け替え後に `unr_e2e.sh`・`unr_nega.sh` を再実行 | PM (merge 順は PM 判断で確定) |
 | byte 一致 31 箇所のうちデータ推定 4 件 (Granulizer・Slicer・Slicex) の中身の確認 | 参照元の判定には影響しない (対象は d)。 未確認 | #667 にコメント |
 | `REPORT_UNREACHED.md` は `docs/DOC_MAP.md` の索引に未掲載 (既存の `REPORT_LEA.md`・`REPORT_INDIRECT.md` も未掲載、grep 確認) | 索引の追記は PM 判断 | PM |
 
@@ -204,6 +203,6 @@
 
 ## 8c. 次タスク提案
 
-1. 5 関数 (4 block) の定義名を `function_<VA>` へ揃える改名は #720 (#707 の PR) にある (未 merge)。 AC2 は #707 へ分割済み (PM 判断 2026-10-13)。 #676 → #720 の順に merge した後、本 PR を `--base main` へ付け替え、`unr_e2e.sh` と `unr_nega.sh` を再実行して REPORT の実測を差し替える。
+1. 5 関数 (4 block) の定義名を `function_<VA>` へ揃える改名は #720 (#707 の PR) にある (未 merge)。 AC2 は #707 へ分割済み (PM 判断 2026-10-13)。 #676 → 本 PR (#708) → #720 の順に merge し、本 PR を `--base main` へ付け替え、`unr_e2e.sh` と `unr_nega.sh` を再実行して REPORT の実測を差し替える。
 2. (c) 750 関数 / 406,591 B の呼び元 (outside 同士の呼出鎖) を辿り、どこまでが dead 側かを確定する。
 3. (d) 1,477 関数 / 738,944 B の dead code 候補を、同 DLL 内の他の参照 (未確認の間接経路) で検証する。
