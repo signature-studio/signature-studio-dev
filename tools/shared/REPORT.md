@@ -113,10 +113,10 @@
 ### libkio lift PoC (`bash tools/shared/lift/libkio/lift.sh`)
 - 対象: libkio_x64 の純粋ユーティリティ 15 関数 (`GetFourIntel`/`GetEightIntel`/`GetFloat…`/`GetDouble…`/`SetFour…`/`SetDouble…`/`Limit`/`LimitFloat`/`Fix`/`FixHi`/`CBool`/`unilen`/`wcslen16`/`str2compare`/`str4compare`)。RetDec `--select-ranges` 1.7s → m2 `ir_normalize` → emcc standalone wasm (31.9KB)。`ConvertUTF8/16ToUTF32` は静的バッファ+libc 依存のため除外。
 - **差分テスト**: 元の mac x86_64 機械語を `mmap(RWX)`+ctypes で直接実行 (SysV ABI は Linux と同一; 非循環の参照) と wasm を同一 760 ケース (small=int32 範囲 / wide=64bit 値) で比較し戻り値ビット+書込バッファを照合。
-- **結果 (本 PR 実測, 検証起点 commit `REPLACE_MEASURE_COMMIT`)**: `FL_MAC_DIR=$HOME/analysis/mac bash tools/shared/lift/libkio/lift.sh` (FIX=1 既定) **TOTAL 760/760**。difftable の全 19 行が 40/40。ネガティブコントロール `FIX=0` (kio_fix 無し) **TOTAL 226/760**。`KIO_ARGREG=0` (汎用 [A'] のみ無効化) **TOTAL 725/760** (str2compare / str4compare が 40/40 未満)。
+- **結果 (本 PR 実測, 検証起点 commit `bec4f886`)**: `FL_MAC_DIR=$HOME/analysis/mac bash tools/shared/lift/libkio/lift.sh` (FIX=1 既定) **TOTAL 760/760**。difftable の全 19 行が 40/40。ネガティブコントロール `FIX=0` (kio_fix 無し) **TOTAL 226/760**。`KIO_ARGREG=0` (汎用 [A'] のみ無効化) **TOTAL 725/760** (str2compare / str4compare が 40/40 未満)。
 - **汎用化の範囲 (未達を明記)**: 関数名直書きは無いが、[B][D] の `FLOAT3` (f32×3 の対応表) は `LimitFloat_RCSfff` の 1 関数専用であり、汎用化は未了 (#938)。
 - **SIG の生成**: `diff_test.py` の SIG は手書きをやめ、`funcs.txt` の戻り値型 (4 列目) と `sig.py` (`c++filt` で demangle した引数型) から生成する。`kio_fix.py` も関数名を見ず、署名と DSM の `idiv` (`sig.idiv_fns`) から規則を選ぶ。
-- **所要 (REPLACE_TIMING)**。
+- **所要** (n=3, 測定 commit `bec4f886`・クリーン worktree `work/wt_verify`・`nproc`=4・素材展開済み・実行は直列 1 本): FIX=1 **3.23 / 3.03 / 3.09 s** (min–max 3.03–3.23 s, 実行直前 load 0.27–0.87)。FIX=0 **2.84 / 2.84 / 2.90 s** (2.84–2.90 s, load 0.77–0.79)。KIO_ARGREG=0 **3.04 / 3.00 / 3.00 s** (3.00–3.04 s, load 0.72–0.75)。
 - **[D] 極性の照合 (実測)**: 機械語 `0xe5b5` (x86_64 スライス, llvm-objdump) は `ucomiss %xmm0,%xmm1` (Intel: `ucomiss xmm1,xmm0`) → `ja 0xe5c7`。`ja` 不成立 (arg2 ≤ arg1) で `minss` 経路 (`0xe5be`)。IR は `%7 = or(%5,%6)` が真で `dec_label_pc_e5be` (minss) に分岐し、`%5`/`%6` = `fcmp ule float %arg2, %arg1` で一致する。
 - **欠陥類型** (RetDec decode-only IR; M7/M8 既知と同型 → 汎用 pass 化が T-SH-16):
   - [A] **deref 落ち** `mov rax,[rsi]` が rsi そのものに化ける (Get/Set*Intel の `ref64` 引数、unilen/wcslen16/str*compare のポインタ引数) — 署名の `ref64`/`f64ref` 位置は `ptrtoint`→`load`、P/PK 位置の `trunc i64 %argN`+`icmp` は deref load に置換 (汎用)。
