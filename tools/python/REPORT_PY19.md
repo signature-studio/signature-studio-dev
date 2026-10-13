@@ -9,7 +9,7 @@
 |---|---|
 | `Score.loadScoreFromFile` を仮想 FS 経由で実装。ネガコン (存在しないパスで失敗) | 達成 (§2) |
 | `ScriptDialog.DialogParams` を実装。実 FL の戻り値が未確認の部分は mock と明記 | 達成 (実装は MOCK、§3) |
-| 既存 `pyscript_e2e.mjs` (43/43) が不変。数え方の定義と再計算スクリプトを REPORT に書く | 達成 (§4、§5) |
+| 既存 `pyscript_e2e.mjs` が不変。数え方の定義と再計算スクリプトを REPORT に書く | 再計算スクリプトは達成 (§4、§5)。既存 `pyscript_e2e.mjs` が不変であることは本 run では未確認 (§6 の再実行で確認) |
 
 ## 2. Score.loadScoreFromFile (仮想 FS 読込)
 
