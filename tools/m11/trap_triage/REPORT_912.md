@@ -148,7 +148,7 @@
 
 ## 11. 既定 OFF の build と main の cmp (本 head `e8dde459`)
 
-- 測定 commit (コードを変えた最後): `e8dde459` (`M11_FIX_912` 既定 0)。`git diff origin/main e8dde459 -- tools/m11/m11_build.sh` は fix912 の 3 行 (呼出し・既定 0・コメント) のみ。main (`90a6e664`) との差はこの 3 行だけ。
+- 測定 commit (コードを変えた最後): `e8dde459` (`M11_FIX_912` 既定 0)。`git diff origin/main e8dde459 -- tools/m11/m11_build.sh` は fix912 の 4 行追加 (コメント 2 行・呼出し・`cmp` による置換) のみ。main (`90a6e664`) との差はこの 4 行だけ。
 - IR: `m11_gen_ir2.sh` rc=0 (43.7 s)。`boot_final.ll` sha256 = `16d1bae6…d869` (fix912 適用前、§10 と同一)。main 側 (`origin/main` = `90a6e664` の detached worktree) でも同じ IR・同じ sha256 `16d1bae6…`。
 - build (既定、環境変数なし): `m11_build.sh` rc=0 (25.1 s)。`[fix912] mode=off replaced=0` (no-op)。`boot_final3.ll` sha256 = `12a49c09…b99`。
 - main 側の既定 build: rc=0 (22.7 s)。`boot_final3.ll` sha256 = `12a49c09…b99`。
