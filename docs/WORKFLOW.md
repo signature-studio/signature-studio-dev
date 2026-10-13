@@ -205,8 +205,11 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
 - **レビュー run の素材**: review ジョブも PR 本文の `oc_artifacts:` 行を読んで素材を取得する
   (素材を要する e2e をレビュワーが独立再実行するため)。PR 作成者は、素材を要する PR の本文に
   実装時と同じ行を書くこと。
-- **結果**: agent の最終回答は run のログ (`gh run view <id> --log` の `Write step summary`) と
-  `$GITHUB_STEP_SUMMARY` の両方に出る。issue へのコメントは agent が `gh issue comment` で行う。
+- **結果**: agent の text ブロックは全て run のログ (`gh run view <id> --log` の `Write step summary`) と
+  `$GITHUB_STEP_SUMMARY` の両方に出る。`Dump OpenCode events` には作業の流れ (tool 名・状態・所要 ms・
+  入力の先頭 200 文字・cost) が出る。repo が public のため、**tool の出力と生 JSONL はログに出さない**
+  (認証情報・FL 由来物の漏洩防止。secret マスクは登録値との完全一致でしか効かない)。
+  issue へのコメントは agent が `gh issue comment` で行う。
 - **上限**: job は 60 分。収まらない作業は中間 commit + draft PR で区切る。
 - 稼働本数は「走っている Actions run 数」で数える (`gh run list --status in_progress`)。
 - **PM の watch ルール (依頼者指示 116)**: 起動した全ての run は無条件で `gh run watch` する。PM が
