@@ -78,3 +78,30 @@ LD_M11_PE=$FL_WIN64_DIR/extracted/block00031_PE.bin python3 tools/m11/trap_triag
 - `.data` の表 (RVA `0xfac120` / `0xfac158`) の中身は絶対 VA (`0x4260f0`, `0x426100`, … / `0x426160`, `0x426170`, …、ImageBase `0x400000` 付き)。RVA の `.text` では読めず `.data` 配置で読んだ。§5-2 の「6 要素のポインタ配列」は同じ値を指し、その要素が絶対 VA である点を示す。これにより §5-2 の「D11 は否定」は撤回する (上記 §5-2 参照)。
 - `SV_ONLY=492 SV_TRACE_AT=492` の単独実行: `oob` 1 件のみ (trace 行 4 件)。全 unit 実行の `SV_TRACE_AT=492` では trace 行 `[m11][UStrAsg]` が 146 件 (dest/src の 0 が 24 件、`src=0x10e1ac` が 9 件)。ただし unit 境界の行が出ないため、unit 492 の OOB 直前の `UStrAsg` を切り出せなかった。
 - 結論: 受入 1 (OOB 入力値 `src`) は未達のまま。入力値を取るには `function_4133f0` の入口で unit 番号つきの値を記録するビルドが要る (`m11_ov.c` の `M11_TRACE` は unit 番号を出さない)。受入 2・3 も未達。未解決は #1288 (`[M11-N79]`) に残す。
+
+## 10. #1288 の実測: unit 492 の OOB 入力値 (HEAD `604e900f` 起点、測定 commit は本節を含む commit)
+
+- 再現: `m11_gen_ir2.sh` rc 0 (44.8 s、490,693 行) → `m11_build.sh` rc 0 → `survey_units.mjs` rc 0 (13.1 s)。結果 `ok 870 / oob 16 / halt0 7 / miss 47 / other 1 / noproc 1` で §2 と一致。
+- 計装: `m11_ov.c` の `[m11][UStrAsg]` trace 行に `old=Q(dest)` を追加 (trace 有効時のみ出力。非 trace の survey 結果は不変)。
+  `SV_PROG=1 SV_TRACE_AT=492 node survey_units.mjs <out>.json` で unit 492 の trace を切り出した (`unit 492` 〜 `unit 493` の間)。
+- unit 492 の UStrAsg 全 12 行のうち最後の 2 件 (実測):
+  - `dest=0x10a9f908 src=0x0 old=0x0`
+  - `dest=0x10a9f910 src=0x0 old=0x100000003` ← **OOB の入力**。`old` は wasm32 の有効ポインタではない (下位 dword 3・上位 dword 1 の packed 値)。
+- `0x10a9f910` は unit 492 内の先行 UStrAsg の dest に現れない。値を書いたのは UStrAsg 以外の store (未特定)。
+- `0x100000003` は IR 定数として `boot_final.ll` に無い (`grep 4294967299` 0 件)。実行時に作られた値。
+- 呼出経路: `4473f0` (IR 147983〜) の `447df0` 出力スロット `stack_var_-48/-56` は `store i64 0` で初期化されている。OOB の dest はこの経路の引数 (`%rdi` = `arg2+256` 系) ではなく、`446400` 側の別 frame の slot。
+
+### 受入条件の判定 (#1288)
+
+| # | 条件 | 判定 |
+|---|---|---|
+| 1 | `4133f0` の OOB 入力値 (ポインタ・長さ) を実測 | **達成 (値)**: `dest=0x10a9f910`、`old=0x100000003` (上記)。`src` 側は `0x0` (NULL) で OOB と無関係。書込み元の store は未特定 |
+| 2 | `4473f0` の配列長計算 `0x92492493` が原因か実測 | **未達**。今回の OOB 入力は `447df0` 経由の表要素ではなく `old` (dest 側)。配列長の影響は未検証 |
+| 3 | DEFECTS 類型への対応 | **部分**。packed 値 (dword 2 つ分の 3・1) が 8B slot に入る形は D17 (qword store の 4B 縮退で上位 4B が未初期化 → ゴミ) と同型の疑い。書込み元の store を確定していないため未確定 |
+| 4 | 修復後の unit 492 kind と per-unit JSON 回帰確認 | **未達** (修復未実施。測定のみ) |
+
+### 未解決 (起票先: #1288 を継続)
+
+1. `0x10a9f910` に `0x100000003` を書いた store の特定 (`watch_store_682` 方式で `addr == 0x10a9f910` の書込み元 IR site を取る)。
+2. その store が D17 (qword → i32 縮退) か別類型かの判定。
+3. `4473f0` の `0x92492493` 配列長計算は未検証 (受入 2)。

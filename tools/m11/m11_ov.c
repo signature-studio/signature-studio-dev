@@ -322,7 +322,7 @@ unsigned long long function_412510(void* tbl) {
  *   old=*dest; *dest=src; old!=nil && refcnt(old-8)>0 → --refcnt==0 なら 0x409440(old-0x10) (FreeMem) */
 unsigned long long function_4133f0(unsigned long long dest, unsigned long long src) {
     u64 s = src;
-    if (g_trace) M11_TRACE("[m11][UStrAsg] dest=0x%llx src=0x%llx\n", dest, src);
+    if (g_trace) M11_TRACE("[m11][UStrAsg] dest=0x%llx src=0x%llx old=0x%llx\n", dest, src, Q(dest));
     if (s) {
         if ((int)D(s - 8) < 0) {
             u32 len = D(s - 4);
