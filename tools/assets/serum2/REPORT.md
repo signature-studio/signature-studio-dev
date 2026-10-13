@@ -75,13 +75,24 @@ pass 3 回とも `failures=0`、FLAC 4,747/4,747 PCM 一致、MD5 有り 4,747�
 - 回帰: `node tools/assets/test/slotcache-tail-test.ts` (修正版: 5 件中 5 件復元 exit 0) / `--neg` (旧 scan 相当の切り詰め: 4/5 で exit 1)。
 - 影響範囲: 既存 asset e2e (`tools/assets/e2e.sh`) は本 PR で再実行していない (§5)。
 
+## 6. 実 Chrome e2e (`bash tools/assets/serum2/chrome-e2e.sh`)
+
+Chrome 154.0.8037.97 headless (実ディスクプロファイル) / 同一 inventory・pack (`pack/pack.ts`, quality 9, 7,357 files) / `browser-test.ts --sample 150` (sha256 照合 151 files・29.2 MB)。
+
+| 項目 | 実測 |
+|---|---|
+| pass (cold / warm / xhr-cold) | exit 0, failed=0, 5 s (load 0.61 0.48 0.23) |
+| neg (全 sha を 0 に置換) | exit 1, failed=3, 6 s |
+| 各 run の sha256 照合 | 151/151 一致 (cold / warm / xhr-cold すべて) |
+| server chunk request (cold / warm / xhr-cold) | 133 / 0 / 133 |
+
 ## 5. 検証範囲 / 範囲外 (未解決は起票先付き)
 
 検証範囲: node 上のローカル HTTP サーバ (`tools/assets/test/server.ts`) への配信、SAB loader + node fs SlotCache、wasm (node 内 `WebAssembly`) での FLAC 復号、原本 (7z 展開物) との全件照合。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 実 Chrome (OPFS SyncAccessHandle + SAB + Range) での同等 e2e が無い | ブラウザでの cold/warm・容量・所要は未実測 | #70 に残す (受入に含めるなら別 run で `tools/assets/test/browser-test.ts` 系へ拡張) |
+| 実 Chrome での Serum 2 全件 (7,357 files) 試験は未実施。実施済みは sample 151 files / 29.2 MB (§6) | 容量・全件の OPFS 所要・Firefox/Safari は未測定 | #70 に残す (全件 + 容量の別 run) |
 | **VFS 自体は Range リクエストを発行しない** (chunk object 全体を GET)。Range は raw 格納 chunk へのサーバ側 GET のみ検証 (4/4 で 206 + bytes 一致、br 格納は `Accept-Ranges: none`) | issue 文言「HTTP Range」は chunk 単位取得で満たしている解釈 (推定)。FLAC (raw) をファイル途中から Range で読む経路は未実装 | #70 にコメント (PM 判断: chunk 取得で足りるか) |
 | R2 非公開バケット + Access 配信・実 URL 配信は未実施 (`cf` CLI/認証が runner に無い) | 本番配信経路の実測なし | #63 (配備 manifest)。#18 は CLOSED のため起票先から外した |
 | Serum 2 本体 (lift 後) の FS 呼び出し (Windows パス・ユーザ領域の既定 content dir) と VFS の接続 | データ層が音声経路に載るかは未確認 | #71 (OSS 境界) / SR-4 側 |
