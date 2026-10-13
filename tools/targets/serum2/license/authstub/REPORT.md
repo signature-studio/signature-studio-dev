@@ -167,15 +167,30 @@ python3 tools/targets/serum2/license/authstub/authstub_irpass.py \
 
 ### 数え方 (census)
 
-`python3 tools/targets/serum2/license/authstub/l1_census.py <PE> <raw.ll>` (機械語 site 数 / 入口 edge 数 / IR の insn.addr 被覆 / ブロック有無)。
+`python3 tools/targets/serum2/license/authstub/l1_census.py <PE> <raw.ll>` が出力するのは次の 4 指標のみ:
+機械語側の直接 call site 数 (`sites`)・`edx=0x800010` 即値ロード数 (`edx_const`)・site への入口 edge 数 (`into`)、
+および raw IR 側の `insn.addr` 被覆数とブロック `dec_label_pc_1800c2ef4` の有無。
+IR 側の「直接 call」「`edx=0x800010`」「入口 edge」の件数は**スクリプトの出力に含まれない**。
 
-| 指標 | 機械語 | raw IR |
-|---|---|---|
-| 直接 `call [reg+0x30]` site (0x1800c2ef4–f05) | 1 | 0 |
-| `edx=0x800010` 即値ロード | 1 | 0 |
-| 0x1800c2ef4 への入口 edge | 1 (`je` @0x1800c2d69) | 0 |
-| `insn.addr` が site 範囲を被覆 | — | 0 件 |
-| ブロック `dec_label_pc_1800c2ef4` | — | 不在 |
+| 指標 | 機械語 (スクリプト出力) | raw IR (スクリプト出力) | raw IR (手確認・スクリプト外) |
+|---|---|---|---|
+| 直接 `call [reg+0x30]` site (0x1800c2ef4–f05) | `sites` = 1 | — | 0 (再現未確認) |
+| `edx=0x800010` 即値ロード | `edx_const` = 1 | — | 0 (再現未確認) |
+| 0x1800c2ef4 への入口 edge | `into` = 1 (`je` @0x1800c2d69) | — | 0 (再現未確認) |
+| `insn.addr` が site 範囲を被覆 | — | 0 件 (`covered`) | — |
+| ブロック `dec_label_pc_1800c2ef4` | — | 不在 (`has_block`) | — |
+
+- 手確認の列は「raw `.ll` を読んで数えた値」で、スクリプトでは再計算していない。本 REPORT の作成 run では raw `.ll` が無く再現できていない。再現にはスクリプトの拡張 (子 issue 参照) が必要。
+
+### 実測の記録 (e2e・census の再現状況)
+
+- 本節の作成 run (2026-10-13 review fix) では以下が**不在**のため、census・e2e を再実行していない:
+  Serum2 PE (`tools/targets/serum2/work/Serum2_win64.vst3`)・raw lift (`work/lift/authstub.drc.ll`)・
+  `plugins-serum2` 素材・toolchain-retdec / toolchain-emsdk。
+- 前 run (PR 本文の申告値・HEAD `3afb7674`) の e2e 値: `bash tools/targets/serum2/license/authstub/e2e.sh` exit 0・23/23 PASS・所要 3.2 s (lift キャッシュ利用)。
+  申告の実行日時・load・exit code の一次ログは残っておらず、本 run では**再現未確認**。
+- 再現手順: `oc_artifacts: plugins-serum2 toolchain-retdec toolchain-emsdk` を PR 本文に指定し、
+  §11 の素材展開手順で PE を配置してから e2e.sh と census を実行する。結果は本節に日時・HEAD SHA・exit code・PASS 件数を追記する。
 
 - 事実の範囲: 上記は raw lift 1 本での実測。復元 pass は未実装 (受入条件 2・3 は未達、子 issue に分割)。
 - 未測定 (断定しない): 0x1800c2d59 の `je` は `[rsi+0x22792]` の bit で分岐し、その bit を 1 にする store は 0x1800c2d42 の 1 箇所のみ。N2a でこの store を 0 に置換した後の到達性は、本 census では測っていない。e2e の 23/23 との関係も未確認。
