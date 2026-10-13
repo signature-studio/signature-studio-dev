@@ -135,7 +135,7 @@
   - NC2: gate==2 の unpatched+lowver の summary を g1+lowver のもの (bit 1) に差替 → exit=1, NG=1。
   - 「不一致」行は `[KNOWN-DIVERGENCE]` として現状値 (bit==1) を pin。修正されて bit==0 になると NG になり再確認を促す。
   - 判定が NG のとき e2e.sh は非 0 で終了 (`PIPESTATUS`)。
-- **e2e (コミット済み HEAD `b251dd9` で 3 回)**: **50/50 OK, 66.94 / 66.98 / 66.95 s (min–max 66.94–66.98), load average (1 分値, 開始時) 0.00 / 0.02 / 0.01, 並列 1 (逐次), NC1/NC2 とも期待どおり**。3 回とも各回 `work/out_*` / `cases` を削除してから再実行。追加前は 23/23 OK, 44.1 s。
+- **e2e (コミット済み HEAD `b251dd9` で 3 回)**: **50/50 OK, 66.94 / 66.98 / 66.95 s (min–max 66.94–66.98), load average (1 分値, 開始時) 0.00 / 0.02 / 0.01, 並列 1 (逐次), NC1/NC2 とも期待どおり**。3 回とも各回 `work/out_*` / `cases` を削除してから再実行。追加前は 23/23 OK, 44.1 s。最終 HEAD `99ca79f` (b251dd9 からの差分は summarize.py のコメントと REPORT のみ) でも 1 回再実行: 50/50 OK, 66.94 s, load 0.10, NC1/NC2 期待どおり。
 - **範囲外**: meta のみ pv を下げる A/B (§3-4 で meta は 2.1.5 固定のみ。meta 側を下げた場合は未実施)、controller +0xdc の setter 特定 (SR-1c #256)、wasm/IR 側の再検証 (CAB-237 ハーネスの bit≡0 主張は本 A/B と上記の不一致を踏まえた再確認が必要)。
 - **DEFECTS 行案** (PM 判断で追記): 類型「機械語パッチと IR pass の意図不一致」— 症状: patched+gate=1+pv≥2.0.20 で demo bit=1 / 根拠: N2a-1 が `xor al,0` で lookup 値をそのまま store / 観測: §3-6 表 / 検出信号: 強制ゲート A/B の bit / 修復: N2a-1 を `mov al,0` 相当 (xor→定数) に変えるか、bit を読む箇所を別途中和。
 
