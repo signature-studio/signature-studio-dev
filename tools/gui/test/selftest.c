@@ -278,6 +278,20 @@ int main(void) {
     SetDIBitsToDevice(wdc, 30, 31, 2, 1, 0, 0, 0, 2, (int64_t)(uintptr_t)tdsrc, (int64_t)(uintptr_t)&tb, DIB_RGB_COLORS);
     ReleaseDC(h, wdc); flush_wait();
     CHK(desk(10 + 30, 20 + 31) == rgb(255, 0, 0) && desk(10 + 31, 20 + 31) == rgb(255, 0, 0), "SetDIBitsToDevice top-down partial rect picks bottom row (ySrc=0 -> memory row 1): %06x %06x", desk(40, 51), desk(41, 51)); }
+  /* SetDIBitsToDevice top-down band (StartScan>0, cLines<H): H=4 の DIB のうち image 行 2,3 だけを持つ 2 行 band。bits は band 先頭 (malloc は 2 行ぶんだけ) */
+  { uint32_t *band = (uint32_t *)malloc(4 * sizeof(uint32_t));
+    band[0] = 0xFF00FF00; band[1] = 0xFF00FF00; band[2] = 0xFFFF00FF; band[3] = 0xFFFF00FF;   /* band 行0 = image 行2 (green), 行1 = image 行3 (magenta) */
+    WBMIH bb; memset(&bb, 0, sizeof bb); bb.biSize = 40; bb.biWidth = 2; bb.biHeight = -4; bb.biPlanes = 1; bb.biBitCount = 32;
+    WRECT pb = { 34, 30, 36, 34 }; wdc = GetDC(h); gb = CreateSolidBrush(cref(5, 5, 5)); FillRect(wdc, (int64_t)(uintptr_t)&pb, gb); DeleteObject(gb); ReleaseDC(h, wdc); flush_wait();
+    wdc = GetDC(h);
+    SetDIBitsToDevice(wdc, 34, 30, 2, 2, 0, 0, 2, 2, (int64_t)(uintptr_t)band, (int64_t)(uintptr_t)&bb, DIB_RGB_COLORS);
+    ReleaseDC(h, wdc); flush_wait();
+    CHK(desk(10 + 34, 20 + 30) == rgb(0, 255, 0) && desk(10 + 35, 20 + 30) == rgb(0, 255, 0) && desk(10 + 34, 20 + 31) == rgb(255, 0, 255) && desk(10 + 35, 20 + 31) == rgb(255, 0, 255) && desk(10 + 34, 20 + 32) == rgb(5, 5, 5), "SetDIBitsToDevice top-down band (StartScan=2 cLines=2 ySrc=0 h=2) -> band rows 0,1: %06x %06x %06x", desk(44, 50), desk(44, 51), desk(44, 52));
+    wdc = GetDC(h);
+    SetDIBitsToDevice(wdc, 34, 33, 2, 1, 0, 1, 2, 2, (int64_t)(uintptr_t)band, (int64_t)(uintptr_t)&bb, DIB_RGB_COLORS);
+    ReleaseDC(h, wdc); flush_wait();
+    CHK(desk(10 + 34, 20 + 33) == rgb(0, 255, 0) && desk(10 + 35, 20 + 33) == rgb(0, 255, 0) && desk(10 + 34, 20 + 32) == rgb(5, 5, 5), "SetDIBitsToDevice top-down band (StartScan=2 cLines=2 ySrc=1 h=1) -> band row 0 only: %06x %06x", desk(44, 53), desk(44, 52));
+    free(band); }
   /* AlphaBlend 50% constant */
   { WBMIH ab; memset(&ab, 0, sizeof ab); ab.biSize = 40; ab.biWidth = 2; ab.biHeight = -2; ab.biPlanes = 1; ab.biBitCount = 32; uint64_t bp2 = 0;
     int64_t d2 = CreateDIBSection(0, (int64_t)(uintptr_t)&ab, 0, (int64_t)(uintptr_t)&bp2, 0, 0); int64_t m2 = CreateCompatibleDC(0); SelectObject(m2, d2);

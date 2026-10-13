@@ -878,7 +878,8 @@ API StretchBlt(I64 hd, I64 x, I64 y, I64 w, I64 h, I64 hs, I64 sx, I64 sy, I64 s
 }
 
 /* DIB 入力 (BITMAPINFO + bits; 1/4/8/24/32bpp) -> 描画先へ nearest 転送 (SRCCOPY のみ)。<=8bpp は bmiColors (DIB_RGB_COLORS) の色テーブル */
-static int dib_to_dc(DC *d, int xd, int yd, int wd, int hd, int xs, int ys, int ws, int hs, const void *bits, const WBMIH *bi, uint32_t rop, uint32_t usage, const char *api) {
+/* rows = bits が実際に持つ行数 (SetDIBitsToDevice は cLines, StretchDIBits は全高)。bits はこの範囲の外を読まない */
+static int dib_to_dc(DC *d, int xd, int yd, int wd, int hd, int xs, int ys, int ws, int hs, const void *bits, const WBMIH *bi, int rows, uint32_t rop, uint32_t usage, const char *api) {
   if (rop != SRCCOPY) gui_failfast(api, "rop other than SRCCOPY");
   if (bi->biCompression != BI_RGB && bi->biCompression != BI_BITFIELDS) gui_failfast(api, "compressed DIB");
   int bpp = bi->biBitCount;
@@ -914,6 +915,7 @@ static int dib_to_dc(DC *d, int xd, int yd, int wd, int hd, int xs, int ys, int 
       if (sy < 0 || sy >= bh) continue;
       if (sy != cached_sy) {
         int row = bi->biHeight < 0 ? sy : (bh - 1 - sy);
+        if (row < 0 || row >= rows) continue;
         const uint8_t *rp = (const uint8_t *)bits + (size_t)row * bstride;
         if (bpp == 32) srow = (const uint32_t *)rp;   /* 32bpp は変換不要: 行を直接参照し kernel が alpha を 0xFF 化 */
         else { row_decode(bpp, rp, bw, pal, rowbuf); srow = rowbuf; }
@@ -931,15 +933,19 @@ static int dib_to_dc(DC *d, int xd, int yd, int wd, int hd, int xs, int ys, int 
 }
 API StretchDIBits(I64 hdc, I64 xd, I64 yd, I64 wd, I64 hd, I64 xs, I64 ys, I64 ws, I64 hs, I64 bits, I64 bmi, I64 usage, I64 rop) {
   DC *d = dc_of((U64)hdc); if (!d) return 0;
-  return dib_to_dc(d, (int)xd, (int)yd, (int)wd, (int)hd, (int)xs, (int)ys, (int)ws, (int)hs, P_(bits), (const WBMIH *)P_(bmi), (uint32_t)rop, (uint32_t)usage, "StretchDIBits") ? (int)(hd < 0 ? -hd : hd) : 0;
+  const WBMIH *bi = (const WBMIH *)P_(bmi);
+  int bh = bi->biHeight < 0 ? -bi->biHeight : bi->biHeight;
+  return dib_to_dc(d, (int)xd, (int)yd, (int)wd, (int)hd, (int)xs, (int)ys, (int)ws, (int)hs, P_(bits), bi, bh, (uint32_t)rop, (uint32_t)usage, "StretchDIBits") ? (int)(hd < 0 ? -hd : hd) : 0;
 }
 API SetDIBitsToDevice(I64 hdc, I64 xd, I64 yd, I64 w, I64 h, I64 xs, I64 ys, I64 start, I64 lines, I64 bits, I64 bmi, I64 usage) {
   DC *d = dc_of((U64)hdc); if (!d) return 0;
-  /* ySrc は下原点 (MS Learn: lower-left)。top-down DIB の上端からの行 = start + lines - (ys + h) (Wine nulldrv_SetDIBitsToDevice と同式)。
-     bottom-up は dib_to_dc が (bh - ys - hs) で変換するため従来どおり ys をそのまま渡す */
+  /* ySrc は下原点 (MS Learn: lower-left)。bits は start 行目から始まる lines 行の band 先頭を指す。
+     top-down DIB では全体の上端からの行 = H - (ys + h) を band 先頭基準にして H - (ys + h) - start。
+     bottom-up は dib_to_dc が (bh - ys - hs) で全体行に変換するため従来どおり ys をそのまま渡す (band 未対応は従来どおり) */
   const WBMIH *bi = (const WBMIH *)P_(bmi);
-  int ys_eff = bi->biHeight < 0 ? (int)start + (int)lines - ((int)ys + (int)h) : (int)ys;
-  return dib_to_dc(d, (int)xd, (int)yd, (int)w, (int)h, (int)xs, ys_eff, (int)w, (int)h, P_(bits), bi, SRCCOPY, (uint32_t)usage, "SetDIBitsToDevice") ? (int)h : 0;
+  int bh = bi->biHeight < 0 ? -bi->biHeight : bi->biHeight;
+  int ys_eff = bi->biHeight < 0 ? bh - ((int)ys + (int)h) - (int)start : (int)ys;
+  return dib_to_dc(d, (int)xd, (int)yd, (int)w, (int)h, (int)xs, ys_eff, (int)w, (int)h, P_(bits), bi, (int)lines, SRCCOPY, (uint32_t)usage, "SetDIBitsToDevice") ? (int)h : 0;
 }
 /* GetDIBits で bpp<=8 を要求されたときの色テーブル: DIB section は自身のテーブル (同 bpp のとき)、それ以外は決定論的な既定表
  * (1bpp = 黒/白, 4bpp = VGA16, 8bpp = 3-3-2 を 8bit へ拡張) */
