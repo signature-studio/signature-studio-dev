@@ -82,7 +82,7 @@ host (`deliverDrop` / `installDropTarget`) が DataTransfer のファイルを�
 
 ## 5. 変更ファイル
 
-`tools/gui/src/{gui_core.c, gui_core_ext.inc, gui_platform.c}`・`tools/gui/include/gui_hostcall.h`・`src/runtime/gui_hostcall.ts`・`tools/shimx/src/{shell.c, handles.c, shimx.h}`・`tools/gui/gen_api.py` (生成物ヘッダを出力に含める。手編集されていた `IMPORTS.md` 先頭と一致させ、再生成で差分が出ない)・`tools/gui/{IMPORTS.md, exports.txt}` (再生成: 実装済み 270→275)・`tools/gui/shimx_coexist/`。
+`tools/gui/src/{gui_core.c, gui_core_ext.inc, gui_platform.c}`・`tools/gui/include/gui_hostcall.h`・`src/runtime/gui_hostcall.ts`・`tools/shimx/src/{shell.c, handles.c, shimx.h}`・`tools/gui/gen_api.py` (生成物ヘッダを出力に含める。手編集されていた `IMPORTS.md` 先頭と一致させ、再生成で差分が出ない)・`tools/gui/{IMPORTS.md, exports.txt}` (再生成: 実装済み 270→277。`IMPORTS.md` は fail-fast stub 159→152 で、差分 7 は §2 で IMPL 化した 7 名と一致)・`tools/gui/shimx_coexist/`。
 shimx の生成物 (`BACKLOG.md` / `inventory.md` / `data/*` / `exports.txt`) は再生成しなかった: `test.sh --quick` は OTT 素材が無いと OTT 列と `ott_api_resolved` を落とす (実測: 24→0)。新設の 3 公開関数 (`shimx_set_notify_hook` / `shimx_drag_accepts` / `shimx_hdrop_create`) は次回のフル `test.sh` 再生成で反映される。
 
 ## 6. 未解決・範囲外
