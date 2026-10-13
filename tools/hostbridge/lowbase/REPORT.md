@@ -126,7 +126,7 @@ python3 tools/hostbridge/lowbase/audit_va.py <dll> 0x10000
 
 ## 9. HB-H24 (#974): ブラウザ実機検証の受入条件の対応 (2026-10-13 実測)
 
-前提はすべて当 run で生成・展開した (`fl-win64` → `$HOME/analysis/win64`、`plugins-ott` → `$HOME/analysis/plugins`、`analysis-ott-binaries`・`work-m6-ott`・`work-liftlib` を展開)。`tools/hostbridge/work/ott_hb.cjs` は `bash tools/hostbridge/hostbridge.sh` (ALL PASS)、`tools/plugins/work/balance/k.final.ll` は `t0_e2e.sh` (357/357 × seed 3 本) で生成した。
+前提はすべて当 run で生成・展開した (素材 `fl-win64` → `[WIN64]`、`plugins-ott` → `[ANALYSIS-PLUGINS]`、`analysis-ott-binaries`・`work-m6-ott`・`work-liftlib` を展開。展開先は `docs/REFERENCES.md` 参照)。`tools/hostbridge/work/ott_hb.cjs` は `bash tools/hostbridge/hostbridge.sh` (ALL PASS)、`tools/plugins/work/balance/k.final.ll` は `t0_e2e.sh` (357/357 × seed 3 本) で生成した。
 
 | # | 受入条件 (#974) | 実測 | 判定 |
 |---|---|---|---|
@@ -136,6 +136,6 @@ python3 tools/hostbridge/lowbase/audit_va.py <dll> 0x10000
 | 4 | Worker を SAB + `Atomics.wait` RPC で呼び出し、`VSTPluginMain` 経由の処理が往復 | 未実施 (`chrome_worker.mjs` は直接呼出のみ) | 未達 → 子 issue |
 | 5 | 128 frame の 1 処理の実時間を実測 | C5: median **0.820 ms** / p99 1.010 ms / min 0.795 ms (n=1000, 50 回ウォームアップ後, OTT 単独 `effs[0]`) / 予算 2.902 ms (128/44100) | 達成 (headless Worker 計測。AudioWorklet 上の値ではない) |
 
-- 検証 e2e: `bash tools/hostbridge/lowbase/lowbase_e2e.sh` = **ALL PASS**、所要 **98 秒** (Chrome 込み・全ビルド込み、worktree `ws-974`, Chrome 154)。
+- 検証 e2e: `bash tools/hostbridge/lowbase/lowbase_e2e.sh` = **ALL PASS**、所要 **98 秒** (Chrome 込み・全ビルド込み、worktree `ws-974`, Chrome 154)。※ PR 作成 run (38452251025) の記録。当該 run のログは保存されていないため未再現。素材付き再実行 (`oc_artifacts: fl-win64 plugins-ott analysis-ott-binaries work-m6-ott work-liftlib`) で ALL PASS 行と C1〜C5 値を確認するまで、本節の数値は確定扱いにしない。
 - 修正: §3 の wasm 名前空間検査が `wasm-objdump` (runner に無い) に依存して 0 件と誤判定していた。node の `WebAssembly.Module.exports` で数えるよう変更 (`ott_function_*` 211 件 / 無接頭 `function_*` 0 件)。
 - 残り (子 issue): 受入 3・4 は AudioWorklet 側の SAB ring 消費と `Atomics.wait` RPC の新規実装が要る。RT-4 (#123) の「AudioWorklet は ring 消費専用 (`Atomics.wait` 不可)」制約を前提に設計する。
