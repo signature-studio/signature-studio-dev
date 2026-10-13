@@ -15,7 +15,8 @@ command -v x86_64-w64-mingw32-gcc >/dev/null || { S "前提欠如: x86_64-w64-mi
 
 S "0/6 baseline (GUI shim 無し, 同一 IR): m11_build.sh → m11_run.mjs / m11_survey.mjs"
 ( cd "$M" && bash m11_build.sh > "$W/res/m11_build.log" 2>&1 ) || { S "m11_build.sh 失敗"; tail -5 "$W/res/m11_build.log"; exit 2; }
-( cd "$M" && node m11_run.mjs 2>/dev/null | sed -n 's/^M11_RESULT //p' > "$W/res/baseline_boot.json" && node m11_survey.mjs 2>/dev/null | sed -n 's/^M11_SURVEY //p' > "$W/res/baseline_survey.json" )
+# baseline survey は VA 上限 0 (旧挙動) で取る: soft 側の run.mjs --survey は上限を掛けないため (既定 256 だと unit 単位の上限で soft と食い違う)
+( cd "$M" && node m11_run.mjs 2>/dev/null | sed -n 's/^M11_RESULT //p' > "$W/res/baseline_boot.json" && M11_VA_UNIT_BUDGET_MB=0 node m11_survey.mjs 2>/dev/null | sed -n 's/^M11_SURVEY //p' > "$W/res/baseline_survey.json" )
 [ -s "$W/res/baseline_boot.json" ] && [ -s "$W/res/baseline_survey.json" ] || { S "baseline 取得失敗"; exit 2; }
 
 S "1/6 build: ff (fail-fast 例外) / soft (STUB は 0 返却) / plain (到達ログ無し = ネガコン用)"

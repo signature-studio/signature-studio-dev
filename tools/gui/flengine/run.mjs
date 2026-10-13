@@ -1,7 +1,7 @@
 // GUI-3 (#174): m11 + GUI shim の実行ハーネス (node)。
 //   node run.mjs [--survey] [--out result.json] [--wasm path.cjs]
 //   既定: DllMain attach (通常起動) を実行し、shim に到達した GUI API (GUI-REACH) と未実装 API (FAIL-FAST) を回収する。
-//   --survey: m11_survey.mjs と同じく InitUnits を抑止して 942 unit を 1 本ずつ隔離実行 (未実装 API に当たった unit は例外で脱出し次へ)。
+//   --survey: m11_survey.mjs と同じく InitUnits を抑止して 942 unit を 1 本ずつ隔離実行 (未実装 API に当たった unit は例外で脱出し次へ)。VA 上限は掛けない (m11_survey 側は M11_VA_UNIT_BUDGET_MB=0 で揃える)。
 // 出力: 標準出力に FLGUI_RESULT <json>。--out で同じ JSON をファイルへ。常に exit 0 (判定は judge.py)。
 import fs from 'fs';
 import path from 'path';

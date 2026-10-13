@@ -45,7 +45,7 @@
   }
  ],
  "abi": {
-  "gui_shared_ptr": 271610880,
+  "gui_shared_ptr": 271661888,
   "gui_shared_ptr_ge_0x10000": true,
   "screen_dc": "0x120000f",
   "screen_dc_in_31bit": true

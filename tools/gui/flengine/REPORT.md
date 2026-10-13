@@ -9,17 +9,17 @@
 
 ## 1. 結論と実測
 
-検証起点: コード commit `d4665eb` (以降 docs と results の再生成のみ)。環境: runner 4 vCPU, node v22.23.3, emcc (`/opt/emsdk`), 素材 work-m11 + fl-win64。m11 は `m11_gen_ir2.sh` (ldfix 有効, 20.5 秒) → `m11_build.sh` で現 main の IR を再生成してから測った。
+検証起点: コード commit `d4665eb` (以降 docs と results の再生成のみ)。環境: runner 4 vCPU, node v22.23.3, emcc (`[EMSDK]`), 素材 work-m11 + fl-win64。m11 は `m11_gen_ir2.sh` (ldfix 有効, 20.5 秒) → `m11_build.sh` で現 main の IR を再生成してから測った。
 
 | 項目 | 実測 | 定義 / 分母 |
 |---|---|---|
 | リンク | wasm-ld signature mismatch **0** / undefined **0** / duplicate **0** (ff・soft 両ビルド) | `build.sh` のリンクログを grep。wasm 6,167,297 B |
-| GUI declare ↔ adapter | IR の GUI declare **177** = adapter **177** (実装 153 / stub 24)、突合不一致 c=0 d=0 | `integ/gen_adapt.py --ir boot_final.ll` |
+| GUI declare ↔ adapter | IR の GUI declare **177** = adapter **177** (実装 158 / stub 19)、突合不一致 c=0 d=0 | `integ/gen_adapt.py --ir boot_final.ll` |
 | 起動の回帰 | shim 有り/無し (同一 IR) で **units_run 22 / init_count 23 / dllmain_done true / GetMem 33 / FreeMem 20 / icall_miss 0 が一致** | baseline = `m11_run.mjs` (GUI 3 本は m11_win.c の暫定 stub) |
-| survey の回帰 | soft ビルド (stub は 0 返却) の survey が baseline と **ok 816 / noproc 1 / miss 46 / trap 79 が一致** (trap 内訳 halt0 65 + OOB 14 も同一) | 942 unit 隔離 (`m11_survey.mjs` 同手順) |
+| survey の回帰 | soft ビルド (stub は 0 返却) の survey が baseline と **ok 828 / noproc 1 / miss 46 / trap 67 が一致** (soft の trap 内訳 halt0 54 + OOB 13) | 942 unit 隔離 (`m11_survey.mjs` 同手順、VA 上限 0 = `M11_VA_UNIT_BUDGET_MB=0`。既定 256 の m11 survey は ok 864 / trap 31 で、run.mjs は上限を掛けないため baseline 側を 0 に揃えた) |
 | 最初の GUI 呼出 (自然起動) | **`LoadStringW` ×4 → shim (IMPL, P1)**。DllMain attach の 22 unit 内 (`shimx_link/REPORT.md` §4.1 は unit #16 付近) | `GUI-REACH` 行 (`boot.json`) |
-| survey で shim に到達した API | **19 種** (IMPL 18 / STUB 1)。§3 | `survey_soft.json` の reach |
-| fail-fast ビルドの survey | ok 815 / trap 80。増えた 1 unit は `EnumFontFamiliesExW` (P2 stub) の fail-fast | `survey_ff.json` |
+| survey で shim に到達した API | **19 種** (IMPL 19 / STUB 0)。§3 | `survey_soft.json` の reach |
+| fail-fast ビルドの survey | ok 828 / trap 67 (soft と同一)。fail-fast は 0 件 (到達した API は全て実装済み) | `survey_ff.json` |
 | `RegisterClass*` / `CreateWindowEx*` の自然到達 | **0** (起動・survey とも) | judge の INFO 行 |
 | 指向呼出 (§4) | `RegisterClassW` ×2 成功 (atom 0xC001 / 0xC002)、`TApplication` 窓 hwnd `0x210000e` (< 2^31)、WNDPROC 4 引数が `m11_icall` 経由 | `probe.json` |
 
@@ -42,7 +42,7 @@
 | 1 | `LinkError: memory import has 256 pages which is smaller than the declared initial of 4608` | `-pthread` では共有メモリを JS 側が `INITIAL_MEMORY` で作る。`-Wl,--initial-memory` は効かない | `-sINITIAL_MEMORY=0x12000000 -sMAXIMUM_MEMORY=0x72000000` (< 2 GiB, INTEGRATION §4-5) |
 | 2 | m11 の `m11_win.c` と shim が `LoadStringW` / `MessageBoxA` / `MessageBoxW` を二重定義 | m11 が user32 の 3 本を暫定実装 | m11 を変えず `-DLoadStringW=m11_win_LoadStringW` 等で改名コンパイル (shim 定義が勝つ) |
 | 3 | shim の `gui_failfast` は `abort()` で wasm ごと止まる | 隔離 survey ができず「最初の 1 本」しか分からない | `-Wl,--wrap=gui_failfast` → 同じ `FAIL-FAST:` 行を出して JS 例外で脱出 (m11 の Halt0 と同流儀)。`--soft` は STUB を 0 返却にして後続の API まで集める計測用 (shim 本体は無変更) |
-| 4 | `GetDC(NULL)` が fail-fast (survey の 2 unit。後続の `GetDeviceCaps` / `CreatePalette` / `GetStockObject` / `LoadIconW` が見えない) | shim は画面 DC 未実装 | `gdi_get_screen_dc()` = 既定 1x1 ビットマップ選択済みのメモリ DC (既存 `CreateCompatibleDC` と同じ方式。描画は捨てる) を追加。native selftest 324 passed / 0 failed |
+| 4 | `GetDC(NULL)` が fail-fast (survey の 2 unit。後続の `GetDeviceCaps` / `CreatePalette` / `GetStockObject` / `LoadIconW` が見えない) | shim は画面 DC 未実装 | `gdi_get_screen_dc()` = 既定 1x1 ビットマップ選択済みのメモリ DC (既存 `CreateCompatibleDC` と同じ方式。描画は捨てる) を追加。native selftest 431 passed / 0 failed |
 | 5 | `TApplication` の `CreateWindowExW` が NULL | `WNDCLASS.lpfnWndProc = 0x24920` は **`DefWindowProcW` の import thunk** (`ff 25 …`) で lift closure の関数ではない → `m11_icall` が miss → WM_NCCREATE=0 | `gen_thunks.py` の表を glue の icall hook で先に引き、shim の `DefWindowProcW` へ。thunk は PE 全体で 1 本 (`0x24920`) |
 
 ### 2-2. ABI チェックリスト (INTEGRATION.md §4) の実機確認
@@ -64,7 +64,7 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 |---|---|
 | 起動で到達 | `LoadStringW` (P1) ×4 |
 | survey で到達・実装済み | `GetDC` (P0), `GetDeviceCaps` (P0), `ReleaseDC` (P0), `GetStockObject` (P1), `LoadIconW` (P1), `CreatePalette` (P2), `MessageBoxA` (P2), `RegisterWindowMessageW` (P0), `GetSystemMetrics` (P0), `FindWindowW` (P1), `RegisterClipboardFormatW` (P0), `CharLowerBuffW` (P1), `EnumDisplaySettingsW` (P1), `GetClipCursor` (P0), `EnumDisplayMonitors` (P1), `SystemParametersInfoW` (P0), `GetMonitorInfoW` (P1) |
-| survey で到達・**fail-fast stub** | **`EnumFontFamiliesExW` (P2)** — 1 unit (VCL Graphics 系の初期化と推定) |
+| survey で到達・fail-fast stub | なし (0 件)。`EnumFontFamiliesExW` (P2) は現 head で IMPL 扱いの 1 回到達 (旧版の stub 記述は d4665eb 時点) |
 
 - **IMPORTS.md の P 分類への入力** (`IMPORTS.md` §4 に自動出力): `EnumFontFamiliesExW` は stub のまま実到達 → **実装必須へ昇格**。`CreatePalette` / `MessageBoxA` / `EnumFontFamiliesExW` は P2 だが実到達 → P1 以上へ昇格候補。
   P0 の未到達は現 m11 到達段が浅いため (SendMessage / PostMessage / BitBlt / SelectObject ほか) 「不要」の根拠にはならない。
@@ -119,11 +119,12 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 | N4 | survey の 1 unit を ok→trap に改竄 | S1 FAIL, exit 1 |
 | N5 | `GetDC(NULL)` を元の fail-fast に戻した shim で native selftest | `FAIL-FAST: unimplemented Win32 API: GetDC`, exit 134 |
 
-実測 (コード commit `d4665eb` + glue のコメントのみ変更, `e2e.sh` 全体を 3 回直列, 4 vCPU): **126 / 125 / 124 秒** (開始時 load average 0.56→1.22→1.24, 終了時 1.22 / 1.24 / 1.03)、毎回 judge **12/12 PASS**・ネガコン 5/5 期待どおり FAIL・native selftest 324 passed / 0 failed・`results/*.json` は 3 回とも同一。
+main 取込前 (コード commit `d4665eb` 時点, 当時の値 816/1/46/79), `e2e.sh` 全体を 3 回直列, 4 vCPU): **126 / 125 / 124 秒** (開始時 load average 0.56→1.22→1.24, 終了時 1.22 / 1.24 / 1.03)、毎回 judge **12/12 PASS**・ネガコン 5/5 期待どおり FAIL・native selftest 431 passed / 0 failed・`results/*.json` は 3 回とも同一。
+**修正後 head の実測** (`e2e.sh` 1 回, 4 vCPU): **118 秒, rc 0** (load 1.17 → 0.85 → 0.49)。judge **12/12 PASS** (S1: soft 828/1/46/67 = baseline 828/1/46/67)、ネガコン 5/5 期待どおり FAIL、native selftest **431 passed / 0 failed**。修正前は S1 が soft 828/1/46/67 vs baseline 864/1/46/31 で FAIL だった (baseline 側が既定 VA 上限 256 を掛け、run.mjs は掛けないため)。修正 = baseline を `M11_VA_UNIT_BUDGET_MB=0` で取る (`e2e.sh`)。
 個別の単発計測 (開発中, load 0.3〜0.9): `m11_gen_ir2.sh` 20.5 秒 / `m11_build.sh` 12.3 秒 / baseline 起動 0.386 秒 / baseline survey 16.9 秒 / 結合 build 10.6〜17.0 秒 / 結合起動 0.371 秒 / 結合 survey 18.2〜24.1 秒 (ff・soft・EnumFontFamiliesExW 前後で差)。`gen_ir2` は e2e の前提側 (本スクリプトは IR を再生成しない)。
-`git status --porcelain=v1 -- tools/gui` は commit 後クリーン (results と IMPORTS.md は再生成しても差分 0)。
-受入条件 2 (`bash tools/gui/e2e.sh` ALL PASS 維持): 本 PR の shim 変更 (`GetDC(NULL)`) 後に実行し **rc 0 / ALL PASS (64 秒, load average 0.75→1.03, 1 回)**。native selftest 324 passed / 0 failed、native lift と Chrome の画素が golden と **EXACT MATCH (0 / 64000 px)**、
-reach_test 11 / adapt_test 28 passed、sigprobe は adapter 有り mismatch 0 / 無し (陰性対照) 177、present e2e 7 pass / 0 fail。`wasm-objdump: command not found` が出るが既存 (sigprobe の補助表示のみ)。
+`results/*.json` と `IMPORTS.md` は本修正で e2e が再生成し、コミットに含めた (baseline_survey.json は上限 0 の値に更新。IMPORTS.md は main 版から `gen_api.py` の出力へ)。
+受入条件 2 (`bash tools/gui/e2e.sh` ALL PASS 維持): 修正後 head で全体を実行 (`FL_WIN64_DIR` 指定) → **rc 1**。step 1 の native selftest (ASan) が `gui_headless.c:33` で heap-use-after-free により abort (headless の render thread が、main thread が `surf_free` した surface を読む競合)。`gui_headless.c` は main と同一で、本 PR では未変更。selftest 単独の再実行 3 回中 1 回が同じ abort。
+`SKIP_NATIVE=1 bash tools/gui/e2e.sh` (step 1c・3〜6: SIMD 15,679 cases・lift・wasm・tsc・Chrome 3 系統・fail-fast・reach-log・sigprobe・present) は **rc 0 / ALL PASS (42.7 秒)**、Chrome の画素は golden と EXACT MATCH (0 / 64000 px)。競合の修正は本 PR の範囲外 (起票依頼)。
 
 ## 7. 未解決
 
@@ -132,10 +133,12 @@ reach_test 11 / adapt_test 28 passed、sigprobe は adapter 有り mismatch 0 / 
 | `RegisterClass*` / `CreateWindowEx*` の自然到達 (#134 / #490 の先) | 受入条件 1 | #134 / #490 に依存。到達後に `bash tools/gui/flengine/e2e.sh` の INFO 行が変わる (R2 floor を更新) |
 | `function_52a7f0` の `TempClass.lpfnWndProc` load 脱落 (§5-2) | AllocateHWnd 経路 (TPUtilWindow = Timer / 非同期 window) が全滅 | [M11] / ldfix 子チケットを PM が起票 (本 REPORT の DEFECTS 行案) |
 | WNDCLASS 静的実体の WNDPROC を closure seed に追加する pass (`TLightweightLayeredControl` 0x31dd10 ほか) | その class の窓生成が NULL | m11 / icall 系で PM が起票 (#90 の間接 call 復元と近い) |
-| `EnumFontFamiliesExW` 実装 (コールバック `gui_call4` 経由) | survey の 1 unit が fail-fast | GUI-2 系 (P2 stub 昇格, #174 に所見) |
+| `EnumFontFamiliesExW` の stub 昇格 | 解消: 現 head では IMPL で 1 回到達、fail-fast 0 件 | — |
 | `LoadStringW` 48M 回の unit 特定と資源供給 hook (`gui_set_resource_provider` ← shimx / PE .rsrc) の接続 | LoadStringW が常に空文字 | #174 に所見 / GUI-2 または shimx |
 | 受入「`__pe_image` を m11_data_gen 方式の data 実体化へ統合」(スコープ 3) | 未着手 (本 PR は m11 の image 敷設をそのまま利用) | 新規子チケットを PM が起票 |
 | 実ブラウザ host 結線 (`GuiHost.attach`・FL ワーカ化・UI スレッドのスタック量 §2-2 #8) | node の headless host のみ。描画 (#32) は別 | #32 / #121 |
-| `tools/m11/m11_e2e.sh` と `m11_gen_ir2.sh` が PE パスを `/home/ubuntu/...` 固定 | runner では ldfix が黙ってスキップされ数値が変わる (本 PR は sed で回避) | m11 に `FL_WIN64_DIR` 参照を提案 (#132 の未解決と同件) |
+| `tools/m11/m11_e2e.sh` が PE を `[WIN64]` の固定パスで引く (`m11_gen_ir2.sh` は本 PR で `FL_WIN64_DIR` 参照に変更済み) | `m11_e2e.sh` 経由では runner で ldfix が黙ってスキップされ数値が変わる。本 PR は `m11_gen_ir2.sh` を直接呼ぶため影響なし | m11 に `FL_WIN64_DIR` 参照を提案 (#132 の未解決と同件) |
+
+| native selftest の ASan race (`gui_headless.c` の render thread と `surf_free`) | `bash tools/gui/e2e.sh` の step 1 が約 1/3 で abort (`SKIP_NATIVE=1` は PASS)。本 PR 外の既存コード | GUI-2 / GUI-3 系で PM が起票 (#174 に所見) |
 
 範囲外: 実ブラウザ・Canvas 描画、audio、UI スレッドのスタック量、`gui_reach` の性能影響 (INTEGRATION §4-12 の未計測は継続)。
