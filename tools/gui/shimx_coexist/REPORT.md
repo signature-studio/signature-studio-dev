@@ -169,12 +169,12 @@ bash tools/gui/e2e.sh                        # gui 単体 wasm 回帰
 - **window.open**: 実 API を呼ぶが遷移先は `about:blank` (外部通信なし)。URL に `blocked` を含む場合のみ null を返してポップアップブロックを模擬。
 - 変更: `HostCallEnv.openWindow` を `boolean | Promise<boolean>` にし、`openUrl` を async 化 (ブラウザ側の戻り値を await する)。node 側の挙動は不変。
 
-### 実測 (commit `fdc95bf2`、runner、Chrome 154.0.8037.97、load average 1 分値 0.46〜0.54)
+### 実測 (code commit `fdc95bf2`、測定 HEAD `fe406aa5` = REPORT のみの差分。runner、Chrome 154.0.8037.97、直列実行、開始時 load average 1 分値 coexist 0.21 / browser 1.16)
 
 | 項目 | 結果 |
 |---|---|
-| `coexist.sh` (node + mock) | rc=0 / 15.75 s / link duplicate 0・warning 0・undefined 0 / ALL PASS (件数は §4 を参照) |
-| `browser_e2e.sh` (web build + CDP) | rc=0 / 132.01 s / web link rc=0 / **BROWSER RESULT pass=13 fail=0** |
+| `coexist.sh` (node + mock) | rc=0 / 14.72 s / link duplicate 0・warning 0・undefined 0 / ALL PASS (件数は §4 を参照) |
+| `browser_e2e.sh` (web build + CDP) | rc=0 / 108.25 s / web link rc=0 / **BROWSER RESULT pass=13 fail=0** |
 | wasm 側 C テスト (web build) | 全 PASS (件数は §4 を参照) |
 | window.open 実行時の user activation | 4 件すべて active |
 | picker 実行時の user activation | open 5 件・save 1 件すべて active |
