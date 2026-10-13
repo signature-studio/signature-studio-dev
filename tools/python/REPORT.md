@@ -91,7 +91,7 @@ FLEngine rodata の `name\0doc\0…<module>` 並びから機械抽出 (`flapi_ex
 
 ## 7. 未解決・ブロッカー・留意
 
-- **FL 側 Python C API 呼出し面は未抽出**: dlsym 先の関数名が平文で無い。サブインタプリタ運用 (`PyInterpreterConfig` 型の存在から示唆のみ) の実態は不明。wasm で `Py_NewInterpreterFromConfig` が動くかも未検証 (→ §11 で検証: 動く。`_flhost` は PY-12 #587 で対応済み = PY-12 節)。
+- **FL 側 Python C API 呼出し面は抽出済み (§7d で訂正: 名前は UTF-16LE で PE 内にあり 110 件抽出済み)。以前の記述: dlsym 先の関数名が平文で無い。サブインタプリタ運用 (`PyInterpreterConfig` 型の存在から示唆のみ) の実態は不明。wasm で `Py_NewInterpreterFromConfig` が動くかも未検証 (→ §11 で検証: 動く。`_flhost` は PY-12 #587 で対応済み = PY-12 節)。
 - `mixer.getCurrentTempo(1)`/`setCurrentTempo(bpm,1)` の第 2 引数の意味 (MCPTools は素の BPM 扱い、公式 docs は ×1000) は**実機で未確認**。モックは MCPTools 側に合わせた。
 - FLEngine 側 flapi 実装は**モック(27 API を実装、他は None)**。実エンジンとの意味差 (引数省略時の既定値、-1 の意味) は実機/lift 後に検証が必要。
 - **kwargs 署名の静的復元 (PY-9 b, #81) 済み**: rodata の並び順ではなく、FLEngine (win PE) の `.data` 内メソッド表 (name/fn/flags/doc, 32B 刻み) と各ラッパー冒頭の `lea [rip+x]` から `PyArg_ParseTupleAndKeywords` の書式と kwlist を復元 (`analysis/flapi_kwargs.py` → `analysis/flapi/flapi_kwargs.json`、`flapi_table.json` の各関数に `kwsig` を追記)。結果は §12。
@@ -136,6 +136,10 @@ mock との差で見つかったもの: mock は引数の個数/型を検査し�
 
 検証範囲: 上記は mac pkg 無しで `fetch_inputs.sh` の win64 DATA block 経路から配置した MCPTools.pyc / midi.py / utils.py で実行した (b76d221 時点の自己申告値 host_calls 37,424・48/48 と同値)。範囲外: `run_all.sh` 全体・headless Chrome (`browser_check`) は未実施。
 
+
+## 7d. CPython を provider と同一 wasm に静的リンク (PY-2, #83 / #115) — 全文は `REPORT_PY2.md`
+
+結論: `build_flpy_static.sh` で CPython + flapi provider を 1 つの wasm (`flpy_static.wasm`) にリンクし、`_flhost.call` を同一 wasm 内 C 呼出しにした。48/48 tool が SAB+provider 版・モック版と tool 別差 0/48、Python 込み往復は median 0.34µs (Worker+SAB 版 25〜27µs)。FL の `Py_*` 動的束縛 110 名を PE (`0xc395a0`) から機械抽出し (§7 の「未抽出」を訂正)、109 件が `libpython3.12.a` に存在・1 件は Py_REF_DEBUG 限定。実 FLEngine wasm へのリンクは未実施。1 コマンド: `node tests/static_check.mjs` (前提 `build_flpy_static.sh`)。
 
 ## 8. ユーザ依頼事項
 
