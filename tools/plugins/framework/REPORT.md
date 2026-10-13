@@ -205,3 +205,22 @@ FLE 側 case 別応答値の**意味論**は未解析 (FL 本体の case 分岐�
 - 中間産物: `tools/plugins/work/hs/` (gitignore, ~360 MB)
 
 ---
+
+## 14. stage-2 runner 再構築の検証記録 (PR #803・#195)
+
+- 検証起点 commit: **01544f44** (PR #803 の HEAD)。本 PR の差分は `fw_stage2.sh` (llvm-as → `clang -x ir -c`) と `fw_269_verify.sh` (`git archive` に `tools/shared` 追加) のみ。
+  `liftlib/simd/gen.py` の `_stub` 変更は revert 済み (`TAG` の値域は全て `CT` のキーで、旧 `"?" in` と新 `all(t in CT)` は同値。`g224` は `TAG` に無く、到達しない)。
+- 実行コマンド (実装 run): `bash tools/plugins/framework/fw_269_verify.sh <tools/plugins/work/fw>` (stage-1 のみの独立 W から stage-2 を再構築)。
+- 実測 (実装 run・n 件数を併記):
+  - `fw_stage2.sh` exit=0 / 437 s (n=1) / load avg 0.62 1.78 1.02 → 2.36 2.62 1.62
+  - smoke ×3: 137 / 135 / 132 ms (n=3・min–max 132–137 ms) / `dispatch=38 units_done=0 va=1 heap=1 ff=0`
+  - wasm 15,062,176 B (参照 HEAD 15,061,227 B。HEAD ツリーでは `--size` 未指定のため照合は未実施)
+  - 結果: `ALL PASS (e2e + smoke ×3 同値)`
+- **この fix run での再現: 未実施**。`$ARTIFACTS_DIR` は `fl-win64.tar.zst` のみ (`ls` 実測)。`work-fw-stage1` 未展開・`[EMSDK]`・`[RETDEC]` (`docs/REFERENCES.md`) とも無いため e2e は実行不能。上の実測値は実装 run の記録であり、独立再現ではない。
+- `clang -x ir -c` 回帰ガードの実測 (この fix run・clang 18.1.3): 不正 trunc (i64→i128) exit=1 / 未定義値 `%nope` exit=1 / SSA 再定義 exit=1 / 正しい IR exit=0。
+- 未解決 (起票先):
+  - 上記 e2e の独立再現 (stage-1 素材と emsdk が揃う run) → #195 残部
+  - `fw_stage2.sh` が `[EMSDK]`・`[RETDEC]` を固定パスで参照 → #270
+  - bit-exact 比較 (RTL fold deref 解消後) → #195 残部
+
+---

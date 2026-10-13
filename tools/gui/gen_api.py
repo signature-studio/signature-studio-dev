@@ -188,11 +188,12 @@ def main():
     for r in data["imports"]:
         d = per_dll.setdefault(r["dll"], [0, 0]); d[0] += 1; d[1] += r["xref"]
     # GUI-3 (#174): 実 FLEngine lift で shim に実到達した API (tools/gui/flengine/e2e.sh が results/*.json を更新する)
-    reach = {}
+    reach = {}; reach_kind = {}
     for fn, tag in (("boot.json", "起動"), ("survey_soft.json", "survey"), ("probe.json", "probe")):
         try:
             for e in json.load(open(os.path.join(HERE, "flengine", "results", fn)))["reach"]:
                 reach.setdefault(e["name"], []).append(tag)
+                reach_kind.setdefault(e["name"], set()).add(e["kind"])  # 実行時の kind (IMPL / STUB)。静的表 (st) は使わない
         except (OSError, KeyError, ValueError):
             pass
     with open(os.path.join(HERE, "IMPORTS.md"), "w") as f:
@@ -228,9 +229,9 @@ def main():
               "回数・分母・手順は `tools/gui/flengine/REPORT.md`、機械可読は `tools/gui/flengine/results/*.json`。\n\n"
               "| 区分 | API (P 分類) |\n|---|---|\n")
             def lab(n): return "%s (P%d)" % (n, gui_names[n][0]) if n in gui_names else n
-            w("| 到達 & 実装済み | %s |\n" % ", ".join(lab(n) for n in sorted(reach) if n in gui_names and gui_names[n][5] == "IMPL"))
-            w("| 到達 & fail-fast stub (**実装必須へ昇格**) | %s |\n" % (", ".join(lab(n) for n in sorted(reach) if n in gui_names and gui_names[n][5] != "IMPL") or "なし"))
-            w("| 到達 & P2/P3 (**P1 以上へ昇格候補**) | %s |\n" % (", ".join(lab(n) for n in sorted(reach) if n in gui_names and gui_names[n][0] >= 2 and gui_names[n][5] != "IMPL") or "なし"))
+            w("| 到達 & 実装済み (実行時 kind = IMPL のみ) | %s |\n" % ", ".join(lab(n) for n in sorted(reach) if n in gui_names and reach_kind[n] == {"IMPL"}))
+            w("| 到達 & STUB 経路を通った (**実装必須へ昇格**) | %s |\n" % (", ".join(lab(n) for n in sorted(reach) if n in gui_names and reach_kind[n] != {"IMPL"}) or "なし"))
+            w("| 到達 & P2/P3 (**P1 以上へ昇格候補**) | %s |\n" % (", ".join(lab(n) for n in sorted(reach) if n in gui_names and gui_names[n][0] >= 2) or "なし"))
             w("| 未到達の P0 (現 m11 到達段では未実行) | %s |\n\n" % ", ".join(r[3] for r in rows if r[0] == 0 and r[3] not in reach))
         w(("## %d. arity 不明 (mingw ヘッダ未収録) で stub 未生成\n\n" % (5 if reach else 4)) + (", ".join(still) if still else "なし") + "\n")
     print("gui imports=%d impl=%d stub=%d nohdr=%d (impl total in sources=%d)" % (tot_gui, n_impl, n_stub, len(still), len(impl)))

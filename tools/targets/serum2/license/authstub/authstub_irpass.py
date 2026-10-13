@@ -14,7 +14,9 @@
 usage:
   python3 authstub_irpass.py in.ll out.ll --report patch_report.json [--check]
 """
-import argparse, json, re, sys, collections
+import argparse, json, os, re, sys, collections
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', '..', 'liftlib'))
+from liftlib.passes.fp_bind import replace_lines, bind_slot_loads, insert_after, fn_span
 
 # ---- 差し替え点テーブル (実測座標。machine 側対応は mpatch.py と対) ----
 # at      : 分岐 / store の機械語 VA
@@ -270,95 +272,57 @@ LIFTFIX_DECL = [
 def apply_liftfix(lines, report):
     """base 後 IR に対する束縛。全ルール exactly-1 でなければ失敗。"""
     applied = []
+    C = 0x1800c2b50  # controller setState
+    D = 0x18004fad0  # DSP setState
 
-    def fn_span(fnva):
-        want = 'function_%x(' % fnva
-        s = next(i for i, l in enumerate(lines) if l.startswith('define') and want in l)
-        e = next(i for i in range(s, len(lines)) if lines[i].startswith('}'))
-        return s, e
-
-    # LF1: fn 0x1800c2b50 — tag 文字列 len (base が undef alloca 読みを xor 0 に fold。
+    # LF1: tag 文字列 len (base が undef alloca 読みを xor 0 に fold。
     # machine は call 後に [rbp-0x28] を読む → 呼出後に mock が書く global から読む)
-    s, e = fn_span(0x1800c2b50)
-    hits = [i for i in range(s + 1, e)
-            if re.match(r'\s*%\S+ = trunc i128 %\S+ to i64, .*!insn\.addr !2583', lines[i])]
-    if len(hits) != 1:
-        raise SystemExit(f'LF1: candidate = {len(hits)} (expect 1)')
-    i = hits[0]
-    lines[i] = '  %36 = load i64, ptr @__authstub_str_len0, !insn.addr !2583 ; LIFTFIX LF1 (旧: trunc of undef-fold)'
+    replace_lines(lines, C,
+                  r'\s*%\S+ = trunc i128 %\S+ to i64, .*!insn\.addr !2583',
+                  lambda m, l: ['  %36 = load i64, ptr @__authstub_str_len0, !insn.addr !2583 '
+                                '; LIFTFIX LF1 (旧: trunc of undef-fold)'], 1, 'LF1')
     applied.append('LF1')
 
-    # LF5: fn 0x1800c2b50 — DOM root ポインタ (alloca 配置が machine と異なるため global に束縛)
-    n5 = 0
-    for i in range(s + 1, e):
-        if re.match(r'\s*%\S+ = load i64, ptr %stack_var_-72\b', lines[i]):
-            lines[i] = re.sub(r'load i64, ptr %stack_var_-72',
-                              'load i64, ptr @__authstub_doc_root', lines[i]) + ' ; LIFTFIX LF5'
-            n5 += 1
-    if n5 != 2:
-        raise SystemExit(f'LF5: sites = {n5} (expect 2)')
+    # LF5/LF6: DOM root ポインタ (alloca 配置が machine と異なるため global に束縛)
+    bind_slot_loads(lines, C, '-72', '__authstub_doc_root', 2, 'LF5')
     applied.append('LF5')
-
-    # LF6: fn 0x18004fad0 — 同上 (DSP 側の DOM root)
-    s2, e2 = fn_span(0x18004fad0)
-    n6 = 0
-    for i in range(s2 + 1, e2):
-        if re.match(r'\s*%\S+ = load i64, ptr %stack_var_-80\b', lines[i]):
-            lines[i] = re.sub(r'load i64, ptr %stack_var_-80\b',
-                              'load i64, ptr @__authstub_doc_root', lines[i]) + ' ; LIFTFIX LF6'
-            n6 += 1
-    if n6 != 2:
-        raise SystemExit(f'LF6: sites = {n6} (expect 2)')
+    bind_slot_loads(lines, D, '-80', '__authstub_doc_root', 2, 'LF6')
     applied.append('LF6')
 
-    # LF7: fn 0x18004fad0 — tag 文字列 len (ctrl LF1 の DSP 版: alloca 配置差を global 束縛で吸収)
-    n7 = 0
-    for i in range(s2 + 1, e2):
-        if re.match(r'\s*%\S+ = load i64, ptr %stack_var_-152\b', lines[i]):
-            lines[i] = re.sub(r'load i64, ptr %stack_var_-152\b',
-                              'load i64, ptr @__authstub_str_len0', lines[i]) + ' ; LIFTFIX LF7'
-            n7 += 1
-    if n7 != 1:
-        raise SystemExit(f'LF7: sites = {n7} (expect 1)')
+    # LF7: tag 文字列 len (ctrl LF1 の DSP 版: alloca 配置差を global 束縛で吸収)
+    bind_slot_loads(lines, D, '-152', '__authstub_str_len0', 1, 'LF7')
     applied.append('LF7')
 
-    # LF2: fn 0x18004fad0 — `%3 = xor i128 0, 0` (base が入口 undef 読みを fold したもの。
+    # LF2: `%3 = xor i128 0, 0` (base が入口 undef 読みを fold したもの。
     # ucomisd の version double 値) → global から読む (mock が callee 戻りを書込)
-    s, e = fn_span(0x18004fad0)
-    hits = [i for i in range(s + 1, e)
-            if re.match(r'\s*%3 = xor i128 0, 0', lines[i])]
-    if len(hits) != 1:
-        raise SystemExit(f'LF2: candidate = {len(hits)} (expect 1)')
-    i = hits[0]
-    lines[i] = '  %3 = load i128, ptr @__authstub_dbl_ret0, !insn.addr !0 ; LIFTFIX LF2 (旧: xor i128 0,0)'
+    replace_lines(lines, D, r'\s*%3 = xor i128 0, 0',
+                  lambda m, l: ['  %3 = load i128, ptr @__authstub_dbl_ret0, !insn.addr !0 '
+                                '; LIFTFIX LF2 (旧: xor i128 0,0)'], 1, 'LF2')
     applied.append('LF2')
 
-    # LF3: fn 0x18004fad0 — ucomisd(0, v) 後の stale flag 再読出し (or cf,zf) を実 fcmp に置換
+    # LF3: ucomisd(0, v) 後の stale flag 再読出し (or cf,zf) を実 fcmp に置換
     # (machine: ucomisd xmm1=0, xmm0=v; ja → out。IR は entry 時の整数 flag を再利用するため誤分岐)
     # version 値は mock が呼出中に書く global から「比较時に」読む (entry hoist を避ける)
-    s, e = fn_span(0x18004fad0)
-    hits = [i for i in range(s + 1, e)
-            if re.match(r'\s*%\S+ = or i1 %cf\.0\.reload, %zf\.0\.reload', lines[i])]
-    if len(hits) != 1:
-        raise SystemExit(f'LF3: candidate = {len(hits)} (expect 1)')
-    i = hits[0]
-    var = re.match(r'\s*(%\S+) = or i1', lines[i]).group(1)
-    lines[i:i + 1] = [
-        '  %lf3t = load i64, ptr @__authstub_dbl_ret0 ; LIFTFIX LF3 (stale flag → 実比較, 呼出後の値)',
-        '  %lf3d = bitcast i64 %lf3t to double ; LIFTFIX LF3',
-        f'  {var} = fcmp uge double %lf3d, 0.0 ; LIFTFIX LF3',
-    ]
+    def lf3(m, l):
+        var = re.match(r'\s*(%\S+) = or i1', l).group(1)
+        return [
+            '  %lf3t = load i64, ptr @__authstub_dbl_ret0 ; LIFTFIX LF3 (stale flag → 実比較, 呼出後の値)',
+            '  %lf3d = bitcast i64 %lf3t to double ; LIFTFIX LF3',
+            f'  {var} = fcmp uge double %lf3d, 0.0 ; LIFTFIX LF3',
+        ]
+    replace_lines(lines, D, r'\s*%\S+ = or i1 %cf\.0\.reload, %zf\.0\.reload', lf3, 1, 'LF3')
     applied.append('LF3')
 
-    # LF4: fn 0x18004fad0 — 2 つ目の ucomisd (v <= 11.00001) の分岐が脱落しているため挿入
+    # LF4: 2 つ目の ucomisd (v <= 11.00001) の分岐が脱落しているため挿入
     # (machine: ucomisd xmm0, [11.00001]; ja 0x18004ff26)
+    s, e = fn_span(lines, D)
     hits = [i for i in range(s + 1, e)
             if re.match(r'\s*call void @__asm_ucomisd__1\(', lines[i])]
     if len(hits) != 1:
         raise SystemExit(f'LF4: candidate = {len(hits)} (expect 1)')
     i = hits[0]
     cst = re.search(r'i128 %3, (i64 )?(\d+)\)', lines[i]).group(2)
-    lines[i + 1:i + 1] = [
+    insert_after(lines, i, [
         '  %lf4t = load i64, ptr @__authstub_dbl_ret0 ; LIFTFIX LF4 (脱落分岐の復元, 呼出後の値)',
         '  %lf4d = bitcast i64 %lf4t to double ; LIFTFIX LF4',
         f'  %lf4c = bitcast i64 {cst} to double ; LIFTFIX LF4',
@@ -366,7 +330,7 @@ def apply_liftfix(lines, report):
         '  br i1 %lf4, label %dec_label_pc_18004ff26, label %lf4_cont ; LIFTFIX LF4',
         '',
         'lf4_cont: ; LIFTFIX LF4',
-    ]
+    ])
     applied.append('LF4')
 
     # 宣言を先頭 (target triple 行の後) に足す

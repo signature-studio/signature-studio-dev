@@ -22,6 +22,8 @@ cd "$W"
 mkdir -p tmp
 export TMPDIR="$W/tmp"
 source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1
+# runner は emsdk に llvm-as が無く Ubuntu の llvm-as-18 だけ入っている (IR 検証 llvm-as 用)
+command -v llvm-as >/dev/null 2>&1 || llvm-as() { llvm-as-18 "$@"; }
 
 # ---- emcc 入力 (相対参照) と hs_e2e.sh の前提ファイルを W に揃える ----
 # S1 (CAB-269): fw_rt.h/fw_rt.c は cp していたが fw_boot.c は漏れていた
@@ -157,7 +159,7 @@ class DynTag(dict):
         if m: return 'g%s' % m.group(1)
         return d or '?'
 G.TAG = DynTag({'i128':'x','i64':'q','i32':'d','i16':'w','i8':'b','i256':'y','void':'v','ptr':'p','float':'f','double':'F'})
-G.CT.update({'p':'void*','f':'float','F':'double'})
+G.CT.update({'p':'void*','f':'float','F':'double','g224':'u64'})
 sys.argv = ['gen', 'fw_flat4.ll', '-o', 'fw_simd.c', '--canon', 'fw_flat4_canon.ll']
 G.main(sys.argv[1:])
 PY
@@ -198,7 +200,8 @@ if [ ! -f fw_route.cjs ]; then
   # S2/S3/S4 回帰ガード (CAB-269): clang/emcc が落とす IR エラーは llvm-as で 3 s で再現できる
   #   (multiple definition of local value / use of undefined value '@fw_fldenv' /
   #    invalid cast opcode for cast from 'i64' to 'i128' — 実測は REPORT §参照)
-  llvm-as fw_flat4_canon3.ll -o tmp/fw_canon3.bc || { echo "[s2] IR 検証失敗 (llvm-as)" >&2; exit 1; }
+  # llvm-as は runner に無いため、emsdk 同梱 clang の .ll 入力で同等の検証を行う (CAB-195 #195 run)
+  clang -x ir -c fw_flat4_canon3.ll -o tmp/fw_canon3.bc -w || { echo "[s2] IR 検証失敗 (clang -x ir)" >&2; exit 1; }
   emcc fw_flat4_canon3.ll fw_simd.c fw_table.c fw_rt.c fw_boot.c "$HERE/hostshim/hostshim.c" \
     -I. -I"$HERE/hostshim" -I"$T/tools/liftlib/liftlib/simd" \
     -w -O0 -g -ffp-contract=off -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8MB \

@@ -68,6 +68,14 @@ scenarios.push({ name: "asio_sine_b256_setsr_48k_to_44k", q: `api=asio&mode=sine
 scenarios.push({ name: "asio_ramp_b256_hiccup", q: `api=asio&mode=ramp&buf=256&depth=2&hiccup_ms=60&hiccup_every=200&secs=${S(15, 6)}`,
   expect: (r) => { const t = r.verify.ramp.tail_shift_exact; return [r.stats.underruns > 0 && r.stats.silence_frames > 0 && t.exact === t.checked && t.checked > 0 && r.workletErrors.length === 0,
     `強制 60ms hiccup: underruns=${r.stats.underruns} silence=${r.stats.silence_frames}f → 復帰後 ramp[p-S] 一致 ${t.exact}/${t.checked}`]; } });
+// AU-6 (#190): T の減衰。hiccup 期間に T を拡張 → hiccup 停止後 (安定 3s 毎に B 刻み) で T が元の下限 (T0) まで戻ること。
+// 判定: 拡張が起き (grows>0, T_max > T0)、減衰が起き (shrinks>0)、終端 T は T0 (= depth0*B) に戻る。hiccup 無しの対照は T 不変。
+scenarios.push({ name: "asio_shrink_after_hiccup_b256", q: `api=asio&mode=ramp&buf=256&depth=2&hiccup_ms=60&hiccup_every=200&hiccup_stop_ms=3000&secs=16`,
+  expect: (r) => { const s = r.stats, t = r.verify.ramp?.tail_shift_exact ?? { exact: 0, checked: 0 };
+    return [s.grows > 0 && s.shrinks > 0 && s.T_max > s.T0 && s.T === s.T0 && t.checked > 0 && t.exact === t.checked && r.workletErrors.length === 0,
+      `grows=${s.grows} shrinks=${s.shrinks} T0=${s.T0} T_max=${s.T_max} T_end=${s.T}; 復帰後 ramp 一致 ${t.exact}/${t.checked}; underruns=${s.underruns}`]; } });
+scenarios.push({ name: "asio_shrink_control_no_underrun_b256", q: `api=asio&mode=sine&buf=256&depth=2&secs=${S(8, 5)}`,
+  expect: (r) => { const [a, m1] = all(underrunFree, sineOk)(r); const s = r.stats; return [a && s.grows === 0 && s.shrinks === 0 && s.T === s.T0, `${m1}; grows=${s.grows} shrinks=${s.shrinks} T=${s.T} T0=${s.T0}`]; } });
 scenarios.push({ name: "asio_ramp_b256_suspend", q: `api=asio&mode=ramp&buf=256&depth=2&suspend=1&secs=${S(10, 5)}`,
   expect: (r) => [r.resets_seen >= 1 && r.workletErrors.length === 0, `kAsioResetRequest 受信=${r.resets_seen}, underruns=${r.stats.underruns}`] });
 for (const buf of [128, 256, 512])
