@@ -124,7 +124,7 @@ RTL の範囲確定と RetDec/x64c 別の liftdiff 採点 (#129): `tools/m11/rtl
 ## 9. sigfix 0 詰めの計測・機械語分類・定数復元 (#131, 部分達成)
 
 0 詰め 1,049 site / 2,064 引数 (単位: sigfix が callee 定義より実引数の少ない call を書換えた site / 補った引数数)。うち 18 引数を機械語突合で実値に復元 (`M11_SIGFIX_RECOVER=1`)、survey の数値は不変。
-**全文 (計測表・分類・検算・退行の二分探索・新規類型の行案・未解決) は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) に分割移動 (250 行上限, 内容は無変更)。** 差分ハーネスによる 0 詰め site の判定 (一致 170 / 不一致 293 / 未到達 586) は [REPORT_N55.md](REPORT_N55.md)。
+**全文 (計測表・分類・検算・退行の二分探索・新規類型の行案・未解決) は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) に分割移動 (250 行上限, 内容は無変更)。** 差分ハーネスによる 0 詰め site の判定 (一致 170 / 不一致 293 / 未到達 586) は [REPORT_N55.md](REPORT_N55.md)。#953 の理由別分類と退行検査 (ok 870 = 870, 18/18 検算) は [REPORT_N53.md](REPORT_N53.md)。
 
 ## 10. #132: unit #18 OOB の真因解消 (通常起動 17 → 22 unit)
 

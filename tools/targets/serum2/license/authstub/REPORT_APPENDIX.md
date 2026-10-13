@@ -49,6 +49,10 @@ IR 側の「直接 call」「`edx=0x800010`」「入口 edge」の件数は**ス
   `sites=1` / `edx_const=1` / `into=1` / `covered=0` / `has_block=False`。
 - 同一 HEAD `4df84cd4` (main 取り込み前) でも 2026-10-13 17:40 に e2e 23/23 PASS・34.9 s、census は同じ 5 指標を確認。
 - 前 run (HEAD `3afb7674`) の申告値 (3.2 s・23/23) は一次ログ無しのため本節には含めない。本節が一次の実測。
+- 実行 (#823 再実行): HEAD `1ef8ccfb` (origin/main)・`work/` 無し (cold)・load average 1.08 (1 分平均、起動 5 分後)。PE は `plugins-serum2` から同手順で取り出し、sha256 `501e7bb3…5283` (19,236,864 B) を一致確認。
+  - `bash e2e.sh`: exit 0・**23/23 PASS**・real 36.07 s (step [1] の RetDec lift を含む)。
+  - `l1_census.py`: `sites=1` / `edx_const=1` / `into=1` / `covered=0` / `has_block=False` (上の 5 指標と一致)。
+- 上記は復元 pass 適用前の基準値 (前後比較の「前」)。復元 pass は未実装のため「後」の値は無い。
 
 - 事実の範囲: 上記は raw lift 1 本での実測。復元 pass は未実装 (受入条件 2・3 は未達、子 issue に分割)。
 - 未測定 (断定しない): 0x1800c2d59 の `je` は `[rsi+0x22792]` の bit で分岐し、その bit を 1 にする store は 0x1800c2d42 の 1 箇所のみ。N2a でこの store を 0 に置換した後の到達性は、本 census では測っていない。e2e の 23/23 との関係も未確認。
