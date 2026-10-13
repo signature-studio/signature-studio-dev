@@ -2,7 +2,7 @@
 
 - 日付: 2026-10-13 / 担当 dir: `tools/plugins/slayer_engine_ia32/` のみ / 親 #536 (結合方式は決定済み・PR #677 は未マージ。本件はその成果に依存しない独立計測) / 本 issue #674 の**中間成果** (受入条件 5 項目は 0/5 達成)
 - 対象: block22434 (`extracted/block22434_PE.bin`, 179,512 B, sha256 `84b64c43…de724a9`) = FL Slayer の x86 engine
-- 検証起点 commit: 本 PR の修正 commit (hash は §6)。 初版は `bd8690c`。
+- 検証起点 commit: `5574803` (修正版。 検証記録は §6)。 初版は `bd8690c`。
 - 再現: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 $PY tools/plugins/slayer_engine_ia32/measure.py --dump` (gate) と `… measure.py --nega` (ネガコン)。 `$PY` は `uv venv $RUNNER_TEMP/venv_ia32 && uv pip install --python $RUNNER_TEMP/venv_ia32/bin/python capstone==5.0.7`。 capstone の版が 5.0.7 以外、または入力の SHA-256 (`84b64c43cc6528401e1c4e84074785e100e8453c4db4c8322a5d5f608de724a9`) が一致しない場合は gate の前に exit 1 (`[pin]` / `[input] FAIL`)。
 - 既知類型との関係 (`docs/DEFECTS.md`): **該当なし**。 本件は decode の静的計測で lift 出力は作っていない (silent miscompile の観測対象外)。 新類型の候補は §7 の行案のみ (DEFECTS.md は未編集)
 
@@ -31,7 +31,7 @@
 |---|---|---|
 | 命令数 | 25,349 | 1 回のデコードで得た命令の数 |
 | デコード不能 | 4 B (0.0055%)、最大連続 1 B | 掃引位置で decode 失敗 → 1 B 捨てて続行。 分母は .text VirtualSize |
-| 所要 / load average / 並列数 | n≥3 の min–max は §6 (`measure.py` の `[timing]` 行、単一プロセス) | 単回値は採らない |
+| 所要 / load average / 並列数 | gate: in-process 0.55–0.60 s、wall 622–676 ms (n=3)。 load 1 分 0.27 → 0.27・並列数 1 (cpu 4) | `measure.py` の `[timing]` 行 (単一プロセス)。 min–max は §6 |
 | x87 (mnemonic `f*`) | 4,203 | 指定どおりの生数。 `fxsave`/`fxrstor`/`femms` を除いた数も 4,203 (該当 0) |
 | x87 制御系 | fldcw 32・fnstcw 18・fstcw 0・fnstenv 2・fldenv 2 | 指定の 5 種 |
 | SIMD (xmm/mm/ymm またはグループ) | 0 | 指定どおり (#536 C7 と一致) |
@@ -106,15 +106,18 @@ ia32 で要注意の mnemonic (件数): cdq 21 / movzx 51 / movsx 54 / lea 590 /
 
 ## 6. 検証の実行記録 / 範囲外 / 未解決
 
-検証 (worktree 再現) は本 REPORT を含む修正 commit の HEAD で行う。 `git worktree add --detach $RUNNER_TEMP/wt_verify HEAD` で展開し、§6 冒頭の再現コマンドを実行して §3・§4・§5 の数値と照合する。 結果は次の docs commit で下表に記録する (本 commit では空欄)。
+検証 (worktree 再現) は本 REPORT を含む修正 commit の HEAD で行う。 `git worktree add --detach $RUNNER_TEMP/wt_verify HEAD` で展開し、§6 冒頭の再現コマンドを実行して §3・§4・§5 の数値と照合する。 結果は下表 (検証起点 `5574803`、クリーン HEAD で実行)。
 
 | 項目 | 値 |
 |---|---|
-| 検証起点 commit | (次の docs commit で記録) |
-| 所要 (gate 単独、n≥3 の min–max) | (次の docs commit で記録) |
-| 所要 (nega、n≥3 の min–max) | (次の docs commit で記録) |
-| `git status --porcelain=v1 -- tools/plugins/slayer_engine_ia32` | (次の docs commit で記録) |
-| 20 MiB 超の blob | (次の docs commit で記録) |
+| 検証起点 commit | `5574803` (`git worktree add --detach $RUNNER_TEMP/wt_verify HEAD` で展開・実行後に `worktree remove --force`) |
+| gate (`measure.py --dump`、n=3) | `[measure] OK (4/4)` ×3。 in-process 0.55–0.60 s、wall 622–676 ms、load 1 分 0.27 → 0.27、並列数 1 (cpu 4) |
+| nega (`measure.py --nega`、n=3) | `nega: 0/3 miss` ×3。 wall 1,623–1,674 ms (load は nega で未記録。 同じ run の gate 側は 0.27) |
+| 修正前の作業ツリー出力との照合 | gate の出力は `[timing]` 行を除き完全一致 (`diff` 0 行)。 §3・§4・§5 の数値は同 commit で再現 |
+| N2 の seed 表 (§5) | 18 本 (seed 674・0〜7 × 300 / 512 B) を同 commit で再実行し、表の値と全件一致 |
+| 検算 (`xcheck_objdump.py`) | 命令 25,312・`(bad)` 3 (0x924a・0xc530・0x10e60)・x87 4,204・fldcw 32・fnstcw 10 / fstcw 8・fnstenv 2・fldenv 2・call 1,029 (727 / 302)・jmp 652・priv 15 (§3 の位置と一致) |
+| `git status --porcelain=v1 -- tools/plugins/slayer_engine_ia32` | 空 (検証 worktree) |
+| 20 MiB 超の blob | 無し (`find tools/plugins/slayer_engine_ia32 -type f -size +20M -not -path '*/work/*'` は 0 件) |
 
 範囲外 (受入条件のうち今回やらなかったもの): **emcc -c 通過** (ia32 front-end 本体が無い) / **x87 方針と差分試験** (f80→f64 の bit 差分は未実測) / **marshal 表** (殻↔engine の 32/64bit 構造体) / **native vs wasm 差分試験** / **LoadLibrary shim**。 いずれも #674 の継続。
 
