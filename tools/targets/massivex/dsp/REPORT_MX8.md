@@ -20,7 +20,7 @@ mx_pdata_quant.py の計測カウンタに規則を入れた段階で、closure 
 
 ## 3. 実測 (測定 commit `5e26f032`)
 
-束ね規則 (§2) を適用した結果。MX-8 で新たに測った値は次の 2 つだけ。
+束ね規則 (§2) を適用した結果。下表の 2 指標は MX-8 で新たに測った束ね後の値で、入力の内訳 (MX-5 の値) は REPORT_MX5.md §2 が正本。
 
 | 指標 | 値 |
 |---|--:|
@@ -34,7 +34,7 @@ mx_pdata_quant.py の計測カウンタに規則を入れた段階で、closure 
 
 | 残件 | 受入 | 起票先 |
 |---|---|---|
-| 解決不能 19,420 件の UNWIND_INFO の正しい読み方、親 18 件の解決 | 2 | 子 issue #1488 |
+| 解決不能 entry の UNWIND_INFO の正しい読み方、親が valid .pdata 外の CHAININFO の解決 (件数は REPORT_MX5.md §2) | 2 | 子 issue #1488 |
 | chained (begin == 直前 end) と CHAININFO 束ねの関係の確定 | 2 | 子 issue #1488 |
 | leaf 境界を実 unwind / 境界に置換 (過大評価の解消) | 3 | 子 issue #1488 |
 | code/data 区別 (jump table・文字列窓) を入れた再帰降下と round 推移 | 1 | 子 issue #1488 |
@@ -42,7 +42,7 @@ mx_pdata_quant.py の計測カウンタに規則を入れた段階で、closure 
 
 ### 受入 2 の未決の扱い (#1321)
 
-#1321 受入 2 の旧数値 4,186 件・153 件は、REPORT_MX5.md §2 注 4 のとおり section 解決の欠陥による誤りとして撤回済み。現行の未解決は、解決不能 19,420 件 (section 0 件・2 件以上) と、親が valid .pdata に一致しない CHAININFO 18 件 (REPORT_MX5.md §2 の内訳: 全 pdata 内 7 件・pdata 外 11 件) であり、これらは子 issue #1488 で扱う。
+#1321 受入 2 の旧数値は、REPORT_MX5.md §2 注 4 のとおり撤回済み。現行の未解決は REPORT_MX5.md §2 の解決不能・親 valid 外の件数が正本で、子 issue #1488 で扱う。
 
 ## 5. 検証
 
