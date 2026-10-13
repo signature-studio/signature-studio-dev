@@ -5,7 +5,7 @@
 #           boot5 は #132 の間接 call fallback (m11_extra_ranges5.txt) が使うため、名前を分けている
 set -euo pipefail
 cd "$(dirname "$0")"
-source ../shared/env.sh   # FL_WIN64_DIR (既定は従来どおり /home/ubuntu/work/analysis/win64)
+source ../shared/env.sh   # FL_WIN64_DIR (環境変数で指定)
 PE="${M11_PE:-${PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}}"
 python3 m11_cond.py --reset ldfix=pending qstore=not-applied pe="$PE"   # #680: IR 生成条件を記録 (work/ir_conditions.json)
 CH="work/boot0.lift.ll work/boot1.lift.ll work/boot2.lift.ll work/boot3.lift.ll"
