@@ -1,0 +1,180 @@
+== [0/4] 比較系の単体テスト (LD-11 / #548: cmp_mem byte 単位・wasm timeout の別 outcome。ネガコン込み。失敗で set -e により中断)
+test_full_word_ptr_write_still_equal (__main__.CmpMem.test_full_word_ptr_write_still_equal) ... ok
+test_issue_0x6cd8a0_equal (__main__.CmpMem.test_issue_0x6cd8a0_equal) ... ok
+test_issue_values_would_fail_with_word_compare (__main__.CmpMem.test_issue_values_would_fail_with_word_compare) ... ok
+test_neg_only_native_writes (__main__.CmpMem.test_neg_only_native_writes) ... ok
+test_neg_unchanged_bytes_wrong_rebase (__main__.CmpMem.test_neg_unchanged_bytes_wrong_rebase) ... ok
+test_neg_wasm_only_block (__main__.CmpMem.test_neg_wasm_only_block) ... ok
+test_neg_written_byte_value_differs (__main__.CmpMem.test_neg_written_byte_value_differs) ... ok
+test_neg_written_bytes_differ_in_ptr_word (__main__.CmpMem.test_neg_written_bytes_differ_in_ptr_word) ... ok
+test_unchanged_block_ptr_still_equal (__main__.CmpMem.test_unchanged_block_ptr_still_equal) ... ok
+test_native_long_is_not_a_mismatch_verdict (__main__.WasmTimeout.test_native_long_is_not_a_mismatch_verdict) ... ok
+test_native_long_is_separate_outcome (__main__.WasmTimeout.test_native_long_is_separate_outcome) ... ok
+test_neg_native_short_stays_wasm_trap (__main__.WasmTimeout.test_neg_native_short_stays_wasm_trap) ... ok
+test_neg_unknown_native_ms_stays_wasm_trap (__main__.WasmTimeout.test_neg_unknown_native_ms_stays_wasm_trap) ... ok
+test_non_timeout_trap_unchanged (__main__.WasmTimeout.test_non_timeout_trap_unchanged) ... ok
+test_threshold_follows_target_timeout (__main__.WasmTimeout.test_threshold_follows_target_timeout) ... ok
+test_defaults (__main__.WasmTimingParams.test_defaults) ... ok
+test_neg_slowdown_negative_rejected (__main__.WasmTimingParams.test_neg_slowdown_negative_rejected) ... ok
+test_neg_slowdown_zero_rejected (__main__.WasmTimingParams.test_neg_slowdown_zero_rejected) ... ok
+test_neg_timeout_fraction_rejected (__main__.WasmTimingParams.test_neg_timeout_fraction_rejected) ... ok
+test_neg_timeout_negative_rejected (__main__.WasmTimingParams.test_neg_timeout_negative_rejected) ... ok
+test_neg_timeout_string_rejected (__main__.WasmTimingParams.test_neg_timeout_string_rejected) ... ok
+test_neg_timeout_zero_rejected (__main__.WasmTimingParams.test_neg_timeout_zero_rejected) ... ok
+test_valid_override (__main__.WasmTimingParams.test_valid_override) ... ok
+
+----------------------------------------------------------------------
+Ran 23 tests in 0.001s
+
+OK
+== [1/4] build
+In file included from rt/ld_native.c:6:
+rt/ld_core.h: In function ‘ld_model_call’:
+rt/ld_core.h:249:36: warning: ‘%s’ directive output may be truncated writing up to 2047 bytes into a region of size 192 [-Wformat-truncation=]
+  249 |       snprintf(full, sizeof full, "%s!%s", mn, pn);
+      |                                    ^~
+In file included from /usr/include/stdio.h:980,
+                 from rt/ld_core.h:12:
+In function ‘snprintf’,
+    inlined from ‘ld_model_call’ at rt/ld_core.h:249:7:
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:54:10: note: ‘__builtin___snprintf_chk’ output between 2 and 2128 bytes into a destination of size 192
+   54 |   return __builtin___snprintf_chk (__s, __n, __USE_FORTIFY_LEVEL - 1,
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   55 |                                    __glibc_objsize (__s), __fmt,
+      |                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   56 |                                    __va_arg_pack ());
+      |                                    ~~~~~~~~~~~~~~~~~
+rt/ld_core.h: In function ‘ld_model_call’:
+rt/ld_core.h:137:75: warning: ‘%s’ directive output may be truncated writing up to 191 bytes into a region of size 96 [-Wformat-truncation=]
+  137 |   snprintf(ld_fakeprocs[ld_nfakeproc].name, sizeof ld_fakeprocs[0].name, "%s", nm);
+      |                                                                           ^~
+......
+  250 |       return ld_fakeproc_get(mod, full);
+      |                                   ~~~~                                     
+In function ‘snprintf’,
+    inlined from ‘ld_fakeproc_get’ at rt/ld_core.h:137:3,
+    inlined from ‘ld_model_call’ at rt/ld_core.h:250:14:
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:54:10: note: ‘__builtin_snprintf’ output between 1 and 192 bytes into a destination of size 96
+   54 |   return __builtin___snprintf_chk (__s, __n, __USE_FORTIFY_LEVEL - 1,
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   55 |                                    __glibc_objsize (__s), __fmt,
+      |                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   56 |                                    __va_arg_pack ());
+      |                                    ~~~~~~~~~~~~~~~~~
+rt/ld_core.h: In function ‘ld_model_call’:
+rt/ld_core.h:128:64: warning: ‘%s’ directive output may be truncated writing up to 95 bytes into a region of size 64 [-Wformat-truncation=]
+  128 |   snprintf(ld_fakemod_n[ld_nfakemod], sizeof ld_fakemod_n[0], "%s", nm);
+      |                                                                ^~
+......
+  238 |       return ld_fakemod_get(nm);
+      |                             ~~                                  
+In function ‘snprintf’,
+    inlined from ‘ld_fakemod_get’ at rt/ld_core.h:128:3,
+    inlined from ‘ld_model_call’ at rt/ld_core.h:238:14:
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:54:10: note: ‘__builtin___snprintf_chk’ output between 1 and 96 bytes into a destination of size 64
+   54 |   return __builtin___snprintf_chk (__s, __n, __USE_FORTIFY_LEVEL - 1,
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   55 |                                    __glibc_objsize (__s), __fmt,
+      |                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   56 |                                    __va_arg_pack ());
+      |                                    ~~~~~~~~~~~~~~~~~
+== [2/4] OTT 旧 chain: 欠陥 D1〜D6 の検出
+  xmm_arg_drop             主因    12   該当    19
+  unresolved_callee        主因    12   該当    17
+  wasm_trap                主因     8   該当    18
+  memory_semantics         主因     8   該当     8
+  import_call_seq          主因     7   該当    34
+  callsite_arg_drop        主因     7   該当     7
+  arg_drop                 主因     6   該当     7
+  short_global             主因     6   該当     6
+  icall_drop               主因     3   該当     4
+  zero_init_drop           主因     3   該当     6
+  spill_slot_deref         主因     2   該当     2
+  simd_helper              主因     1   該当     1
+  rep_string_helper        主因     1   該当     1
+  import_arg_diff          主因     1   該当     2
+
+不一致のうち callee を一切呼ばずに差分が出た (= その関数自身の欠陥と確定) : 55 / wasm trap を含む : 18
+
+実行不能の内訳:
+  native_null_deref_all_patterns        38
+  native_fault_all_patterns             20
+  hang                                   4
+  unsupported_sig                        3
+OTT_SUMMARY {"functions": 212, "match": 35, "mismatch": 112, "unexec": 65, "defects": {"D1_indirect_call_drop": 4, "D2_short_global": 6, "D3_callsite_arg_drop": 14, "D4_D5_c_defined_ports": 20, "D6_body_layer": 26}, "ctor_18011d400": {"verdict": "mismatch", "tags": ["icall_drop", "callsite_arg_drop", "callee_divergence", "import_call_seq", "zero_init_drop", "fp_flag_unreflected"]}}
+PASS positive: 無加工 batch → exit 0
+PASS NC[D1]: タグ除去 → check_ott.py exit 1
+PASS NC[D2]: タグ除去 → check_ott.py exit 1
+PASS NC[D3]: タグ除去 → check_ott.py exit 1
+PASS NC[D6]: タグ除去 → check_ott.py exit 1
+== [3/4] M11 unit #18 の原因特定 (boot 状態 = native unit 0..16)
+[boot] InitTable: 942 units (mode=units)
+[boot] unit #22 (init 0x467f00) failed natively: segv rip_rva=0x1d15a rsp=0x7fffffffc260 rbp=0x7fffffffc2d0 rbx=0x401328 rdi=0x467f00 rsi=0x400 rax=0x10471000 rcx=0xffffffff rdx=0 r8=0x1 s0=0 s1=0 s2=0 s3=0 s4=0 s5=0x417b1e s6=0 s7=0
+[boot] units_run=22/942 first_fail=None mode=units img_runs=64 heap_used=1376272 hw=1441808 -> /home/runner/work/signature-studio-dev/ws-1070/tools/liftdiff/work/m11/boot_state.json
+[boot] precondition InitTable=0x0 InitCount=0 TLS_set=0 ok=False
+UNIT18_SUMMARY {"UStrAsg(dest->P[refcnt 2], src=0)": {"fn": "function_4133f0", "verdict": "mismatch", "tags": ["memory_semantics"], "outcome": "diff", "diffs": {"mem": {"count": 1, "first": [{"r": "arena", "o": "0x2ff8", "native": "0x1", "wasm": "unchanged(0x2)"}]}}, "native_trace": 1, "wasm_trace": 1, "native_status": "ok", "wasm_status": "ok"}, "446370(GetLocaleInfo wrapper)": {"fn": "function_4
+PASS _UStrAsg: 旧値(dest が保持する文字列)の解放が native と異なる (mem diff)
+PASS Delphi Move(409c80): [rcx] が spill alloca を直接読む (spill_slot_deref)
+PASS 4123c0: resourcestring 初期化が wasm で脱落 (native entry 67 > wasm 46, callsite_arg_drop, mem diff 7)
+== [3b/4] InitUnits の空振り一致検出 (LD-25 / #977: InitTable 充足の boot 状態で空振りが出ないこと)
+[boot] InitTable: 942 units (mode=hybrid)
+[boot] entry_point 止まり: segv rip_rva=0x26833d rsp=0x7fffffffbfb0 rbp=0x7fffffffbfb0 rbx=0 (InitCount=246)
+[boot] unit 単位フェーズ: ok+682 / fail 3 (最初: (830, '10d50d0', 'segv'))
+[boot] hybrid units_run=928/942 first_fail=830 heap_used=34668528 -> /home/runner/work/signature-studio-dev/ws-1070/tools/liftdiff/work/m11/boot_state_hybrid.json
+[units] precondition={'table_ptr': 0, 'init_count': 0, 'tls_set': 0, 'ok': False} patterns=11 empty_match=11 outcomes={'equal': 11}
+  z       equal        native=ok wasm=ok calls=0/0 mem=0/0  [EMPTY]
+  s       equal        native=ok wasm=ok calls=0/0 mem=0/0  [EMPTY]
+  p0      equal        native=ok wasm=ok calls=0/0 mem=0/0  [EMPTY]
+  p1      equal        native=ok wasm=ok calls=0/0 mem=0/0  [EMPTY]
+  p01     equal        native=ok wasm=ok calls=0/0 mem=0/0  [EMPTY]
+  pall    equal        native=ok wasm=ok calls=0/0 mem=0/0  [EMPTY]
+  pall2   equal        native=ok wasm=ok calls=0/0 mem=0/0  [EMPTY]
+  q0      equal        native=ok wasm=ok calls=0/0 mem=0/0  [EMPTY]
+  qall    equal        native=ok wasm=ok calls=0/0 mem=0/0  [EMPTY]
+  vm0     equal        native=ok wasm=ok calls=0/0 mem=0/0  [EMPTY]
+  u16     equal        native=ok wasm=ok calls=0/0 mem=0/0  [EMPTY]
+[hybrid] precondition={'table_ptr': 20408496, 'init_count': 246, 'tls_set': 1, 'ok': True} patterns=11 empty_match=0 outcomes={'native_fault': 11}
+  z       native_fault native=segv wasm=ok calls=0/0 mem=139/1
+  s       native_fault native=segv wasm=ok calls=0/0 mem=139/1
+  p0      native_fault native=segv wasm=ok calls=0/0 mem=139/1
+  p1      native_fault native=segv wasm=ok calls=0/0 mem=139/1
+  p01     native_fault native=segv wasm=ok calls=0/0 mem=139/1
+  pall    native_fault native=segv wasm=ok calls=0/0 mem=139/1
+  pall2   native_fault native=segv wasm=ok calls=0/0 mem=139/1
+  q0      native_fault native=segv wasm=ok calls=0/0 mem=139/1
+  qall    native_fault native=segv wasm=ok calls=0/0 mem=139/1
+  vm0     native_fault native=segv wasm=ok calls=0/0 mem=139/1
+  u16     native_fault native=segv wasm=ok calls=0/0 mem=139/1
+CHECK_INITUNITS PASS
+== [4/4] M11 closure 差分バッチ (sample:800)
+[batch] 800 functions, shards=12
+[batch] 400/800  52s
+[batch] 800/800  107s
+[batch] done 107s -> work/m11/batch_sample_800.jsonl
+関数数 800: 一致 360 / 不一致 230 / 実行不能 210
+
+不一致の類型 (主因 = 優先順位最上位の1つ / 該当数 = 複数タグ重複あり):
+  callee_divergence        主因    54   該当   103
+  wasm_trap                主因    44   該当    69
+  callsite_arg_drop        主因    27   該当    27
+  memory_semantics         主因    25   該当    26
+  ret_only                 主因    16   該当    16
+  icall_drop               主因    16   該当    20
+  xmm_arg_drop             主因    15   該当    21
+  import_arg_diff          主因    10   該当    11
+  simd_helper              主因     6   該当     6
+  zero_init_drop           主因     5   該当     9
+  fp_flag_unreflected      主因     4   該当    15
+  spill_slot_deref         主因     3   該当     3
+  import_call_seq          主因     2   該当    23
+  unresolved_callee        主因     2   該当     3
+  arg_drop                 主因     1   該当     2
+
+不一致のうち callee を一切呼ばずに差分が出た (= その関数自身の欠陥と確定) : 49 / wasm trap を含む : 69
+
+実行不能の内訳:
+  native_fault_all_patterns            131
+  native_null_deref_all_patterns        41
+  hang                                  37
+  unsupported_sig                        1
+LIFTDIFF_E2E PASS

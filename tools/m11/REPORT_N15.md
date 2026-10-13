@@ -31,5 +31,24 @@
 - 受入 2 (kind 12 unit の実測): **未達**。baseline で `_CopyArray` 系の入口 unit 86 / 357 / 496 は survey で ok。ただし `m11_ov.c` の case 12 に stderr probe を入れて再ビルドしても、full survey の stderr に `[CA_KIND]`・`[K12HIT]` が 0 件 (survey_units.mjs は stderr を捕捉しない・単独 SV_ONLY は OOB で baseline と不整合)。kind 12 の通過は未実証。probe は作業ツリーから除去済み。
 - 次の作業: (a) faee5b6 の寄与を hunk 単位で手動アブレーション、(b) survey 側で stderr を捕捉する手段 (または trace 出力) を入れてから kind 12 を確認。
 
+### #1141 再実行 (run 2): faee5b6 寄与の単独アブレーション (測定 commit f3ffd7ba = origin/main)
+
+起点 `f3ffd7ba` で `work-m11` を `tools/m11/work/` に展開 (gitignore)、fl-win64 の PE は `$RUNNER_TEMP/win64/extracted/block00031_PE.bin` (sha256 b2c64da4…)。`work/lift_pe.sha256` に PE の sha256 を手で書いて差分経路で測定 (前回と同じ限界)。load は各実行とも 0.3〜0.6。
+アブレーションは **一時 gate (`#if !M11_ABL_*`) で 1 関数ずつ無効化** した (他は main のまま)。gate は測定後に作業ツリーから除去済みで、コードには残していない。
+
+| 構成 | units_run | 停止 | survey ok/trap/miss/clobber | e2e 所要 | rc |
+|---|---|---|---|---|---|
+| baseline (f3ffd7ba) | 53 | `unreachable` @ function_8c5eb0 | 872/23/46/0 | 153 s | 0 |
+| A: `function_417b70` (DynArraySetLength) を無効 | 50 | (未記録) | 422/26/492/1 | 39 s | 1 (SURVEY_OK 800 未満) |
+| B: `function_409470` (ReallocMem) を無効 | 22 | OOB @ function_408040 <- 409470 <- 417b70 | 839/56/46/0 | 38 s | 0 |
+| C: `SysAllocStringLen` (BSTR) を無効 | 22 | Halt0 経由の早期終了 | 871/24/46/0 | 47 s | 0 |
+
+- 注意 1: 上の表は **1 つずつの単独無効化** であり、二分 (半分ずつ) ではない。`SysReAllocStringLen` / `SysStringLen` は C の gate に含めていない。
+- 注意 2: 1 回目に gate を `-D` 無しで入れた試行は ov.o に強シンボルが残り無効化されていなかったため (nm で確認)、破棄して gate を `CF` 経由に直した。上表は gate が効いたことを nm で確認した後の値のみ。
+- 読み取り: 417b70 と 409470 の override は、どちらを外しても units_run が大きく落ちる (53 → 50 / 22)。faee5b6 の 2 override が退行を抑えている側であり、4c3baa4 (boot5) の寄与 (前回の 53→52) より大きい。ただし「faee5b6 が退行を起こした」の実証ではなく、override を外すと lift 版 (RetDec・既知の D7 型欠陥) に戻って壊れる、という結果。4c3baa4 単独の無効化は未測定。
+- 受入 2 (`_CopyArray` kind 12 の実行 unit): **今 run では未実施**。survey_units.mjs が stderr を捕捉しない問題は未解決のため、kind 12 の通過は未実証のまま。次は survey 側の trace 出力の追加 (子 issue #1511 [M11-N97] で追跡)。
+- 全再生成 (`m11_bounds.py`) が要求する `functions_dll.csv` の問題は前回と同じく未解決 (#1141 のコメントで追跡)。
+- 未測定 (#1141 残り): 4c3baa4 (boot5 / 467c40 間接 call) の単独無効化は前回の boot5 除去のみ。faee5b6 の `SysReAllocStringLen`・`SysStringLen` 単独の寄与は未測定。
+
 ## 16. #490 [M11-N15]: main HEAD の 4c3baa4 / faee5b6 状態 (部分達成, 本体 REPORT.md から移動)
 main `6e5c8dac` で通常起動・survey は完走 (53/942, survey ok 870)。ネガコン (boot5 除去) は 52/942 で「元の停止に戻る」は不成立。faee5b6 の二分は逆パッチが衝突し未成立。詳細は `REPORT_N15.md` §16。

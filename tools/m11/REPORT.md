@@ -204,7 +204,7 @@ commit 別の測定表 (`2c23bef`〜`b760fa2`・NC) と注記は [REPORT_APPENDI
 | unit 101 の `4fa210` list 走査が `47a250` (例外生成) を 23M 回繰り返す根因 (list の index/Count の誤 lift か, raise が戻る経路か) | PR HEAD の survey が 1 unit で 256MB (上限なし 1.48GB) 消費 | 新規子チケット案 [M11-N17] (PM 起票), #132 にコメント |
 | unit 144 の image 破壊 (書込み元関数と, 0 埋めの範囲・値) | clobber 1 unit。他 unit の結果に影響し得る | 同上 |
 | #411 の `418190` / `412d60` 転記が unit 87 / 898 で OOB (ok→trap 2 本) | main に入っている実退行 (#411 は merge 済み) | #132 に継続 (#411 は merge 済みで「PR 内で修正」は不可。新規子チケットを PM が起票) |
-| 10 進 `inttoptr` 命令 4,364 件 (942 関数) の VA→LVA 未 remap (368 の n の原因と同類型)。`M11_M2P=1` は survey が 90 秒で完走しない | 巨大 alloc 2 件は上の個別修正で消える。全件 remap は未解決 | #417 |
+| 10 進 `inttoptr` 命令 4,364 件 (942 関数) の VA→LVA 未 remap (368 の n の原因と同類型)。`M11_M2P=1` は survey が 90 秒で完走しない。仕分けは [REPORT_N1318.md](REPORT_N1318.md) (VA→LVA 4363 件・QPF 整数 1 件は remap してはならない) | 巨大 alloc 2 件は上の個別修正で消える。全件 remap は未解決 | #417 |
 | survey の clobber 検出は InitTable のみ | 他の image 破壊は ok に見える | #132 |
 
 ## 13. #516 [M11-N18]: 64bit スタック局所の即値 store が 4B に縮む欠陥 (DEFECTS.md D17, idx 87/898)

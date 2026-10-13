@@ -70,14 +70,34 @@
 | 実 FL (Edison) の `EditorSample` 各メンバの戻り値・境界挙動 (`NormalizeFromTo`・`PasteFromTo` の mode 挙動・`Length` setter 等) | mock 値のため実機と異なる可能性 | #81 (PY-9) |
 | `br` `dest` `lim` `rm` `pulse` `saw` は実行完了のみ (数値 oracle 未実装) | 数値の正しさは未検証 | #1310 (PY-28) |
 | ソース先頭 1 バイト反転のネガティブコントロール | 受入条件の文言 (pyc) と不一致 | #1310 (PY-28) |
-| Chrome (headless) 上の Audio 実行 (本検証は node のみ) | ブラウザ実行経路は未検証 #1323 (PY-29) |
+| Chrome (headless) 上の Audio 実行 (本検証は node のみ) | §7 で解決 (#1323 / PY-29) | #1323 (解決済み) |
 
 ## 6. 残り (子 issue)
 
 受入条件のうち「6 本の数値 oracle」と「先頭 1 バイト反転のネガコン」は本 run では未達。
 子 issue **#1310 [PY-28]** に起票済み (OPEN)。上の未解決表の 2 行目・3 行目がこれに対応する。
 
-## 7. PY-28 (#1310): 残り 6 本の数値 oracle とネガティブコントロール
+## 7. Chrome (headless) 上の Audio 12 本の実行検証 (#1323 / PY-29)
+
+既存の Chrome 版ハーネス (`tests/pyscript_browser.mjs` + `tests/pyscript_scenarios.mjs`、PY-11 / #466) が Audio 12 本も同一シナリオで実行する。本 run ではハーネスを変えずに、Audio 12 本の実行と node 版との一致を確認した。
+
+- 測定 commit: `18e9910b` (main 取り込み済み・コード変更なし)。
+- 手順 (HEAD で再現): `FL_WIN64_DIR=<fl-win64> bash build_cpython_wasm.sh` → `bash fetch_inputs.sh` → `bash build_flpy.sh` → `node tests/pyscript_e2e.mjs --dump work/pyscript_node.json --export-scripts work/pyscripts.json` → `node tests/pyscript_browser.mjs --dump work/pyscript_chrome.json` → `python3 tests/pyscript_compare.py work/pyscript_node.json work/pyscript_chrome.json`。
+- ブラウザ: Chrome 154.0.0.0 headless、agent-browser 0.39.0、`crossOriginIsolated=true`。node v22.23.3。runner 4 core。
+
+| 回 | load average (1 分, 開始時) | node (56 check) | Chrome (56 check, スクリプト内 / wall) | compare |
+|---|---|---|---|---|
+| 1 | 0.40 | 56/56 PASS, 1.2 s wall | 56/56 PASS, 1.4 s / 2.3 s wall | checks 56/56, outputs 19 件 不一致 0, exit 0 |
+| 2 | 0.40 | 56/56 PASS, 1.2 s wall | 56/56 PASS, 1.4 s / 2.3 s wall | 同上 |
+| 3 | 0.45 | 56/56 PASS, 1.2 s wall | 56/56 PASS, 1.4 s / 2.3 s wall | 同上 |
+
+- Audio 12 本の内訳 (node / Chrome とも同一): load 12/12 PASS。独立 oracle 6 本 (Amp・Old school・Silence generator・Sine generator・Region 変換・Play To End) PASS。残り 6 本 (`br` `dest` `lim` `rm` `pulse` `saw`) は実行完了のみ PASS。NEG-d (Amp の適用量改変) は両環境で FAIL を検出。
+- 差分: check 名・ok は node と Chrome で全件一致 (差分 0)。Audio 関連 check は 15 件 (node 15/15、Chrome 15/15)。
+- 実行時の異常: 初回の Chrome 実行で `serve.mjs` の stderr が親から継承され、パイプが閉じずに止まった (500 秒超で打ち切り。残存プロセスは PID 指定で停止)。以後は `timeout` 付き・ログファイル出力で実行し、再現しなかった。ハーネスは未修正。
+- 検証範囲: Chrome は mock engine (`host/fl_mock.mjs`) 上の実行。実 FL (Edison) との照合は #81 (PY-9)。
+- git diff (測定 commit → HEAD、コード範囲): `git diff 18e9910b HEAD -- tools/python/src tools/python/tests tools/python/build_flpy.sh` は 0 行。
+
+## 8. PY-28 (#1310): 残り 6 本の数値 oracle とネガティブコントロール
 
 - 数値 oracle を追加: `br` (半偶数丸め・選択 [1,4])、`dest` (mix 0.75 / mix 1・rate 8000)、`rm` (clip 3 点で切詰め・Oversample 0/1・clipboard 空)、`pulse` / `saw` (Phase 0.3・0 から生成・44100 samples・倍音和)、`lim` (振幅 0.7/0.3/0.02 で max・通常・無音の 3 分岐を通す。Envelope No/Yes)。JS で手導出 (`lim` は Lookahead / Smoothing を写した JS 再実装を独立 oracle とする)。
 - `rm` の clipboard は `enveditor.set_clipboard()` (新規ホスト hook。`src/enveditor.py`) で注入する。従来は未注入で空だった。

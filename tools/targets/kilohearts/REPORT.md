@@ -238,3 +238,9 @@ VEX-256 は 344 関数 189,611 B 中 **closure 内は 6 関数のみ** (Convolve
 - 回帰確認 (同一 HEAD・同一 shim): Gain 1000/1000 (wasm 15,161 B, emcc 0.75 s)・Haas 1000/1000 (16,878 B, 0.65 s)・Gate 1000/1000 (17,367 B, 0.66 s)。`compare.mjs` の結果は `bit-exact` 3 件とも全件一致。Gain/Haas/Gate の decompile は `--fix bitcast,intload,stackpair,assoc,concat` で C 化し直した (別 decompile 集合 `out_reg`)。
 - Resonator の突合・ablation・ネガコンは未実施 (emcc 未通過のため)。
 - 起票: 残件 → #1405 [KH-25]。Stereo / Delay → #1216 [KH-24]。
+
+#### 10-7f. #1405 (KH-25) run: 残件の再現と callee 閉包の試行 (未達・コード変更なし)
+- 再現 (main 851c342e・`resonator` 修復なし・`-ferror-limit=0`): emcc error 28 件 (#1405 表と一致)。素材 `plugins-kilohearts` → Installer zip → payload.dat → windows.zip → HeartCore.core_64、Ghidra 12.1.4 (sha256 一致)、emsdk 6.0.12 は素材の `toolchain-emsdk`。
+- 試行: `also` に `FUN_180fd4f30`・`FUN_180fd51cc`・`FUN_180fd2d38` を追加 → decompile 20 件 OK (error 件数は未集計)。さらに `FUN_180fd2c90`・`FUN_180fd2c10`・`FUN_180fd1ac4`・`func_0x…e5c6c`・`func_0x…b6c0c` を追加 → decompile 25 件 OK、error 38 件 (`grep -c error:`)。新たに未解決 `func_0x…1f84`・`1f30`・`FUN_180fd2f20`・`FUN_180fd1b00`・`LOCK`/`UNLOCK`・`HeapAlloc`/`HeapFree` が出現。閉包は収束しなかったため、converter の変更は破棄 (コミットなし)。
+- 逆アセンブル (capstone, IAT 判定): `func_0x…81e4`・`81ec` は `jmp [rip+…]` の IAT thunk (Win API 経由)。`func_0x…bdfcc`・`648c`・`662c`・`bdef4` は通常の関数先頭。`func_0x…1f84`・`1f30` は `movsxd` で始まる通常関数。thunk は関数名の書換えでなく Win API stub として扱う必要がある。
+- 結論: callee を Ghidra 出力どおり `also` に足す方式は閉包が広がるだけで、emcc は改善しない。次 run は (a) IAT thunk を stub 化する規則、(b) `LOCK`/`UNLOCK`・`MXCSR` の意味付け、の 2 点を先に決める。

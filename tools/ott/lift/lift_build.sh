@@ -16,7 +16,7 @@ mkdir -p "$OUT"
 python3 "$OTT/lift/x64c.py" --pe "$DLL" --entries "$ENT" --out "$OUT" --closure "${LIFT_CLOSURE:-2}" \
   --override 1801c8c00=ovr_handle_error_d --override 1801c8cb8=ovr_handle_error_f --override 1801a9a6c=ovr_sqrt_d --override 1801a9b38=ovr_sqrt_f
 python3 "$OTT/lift/data_gen.py" "$DLL" "$OUT/ott_data.c" "$OUT/lift_meta.json" >/dev/null
-EXPORTS=_ott_run,_ott_xmm0,_ott_set_stackarg,_ott_data_install,_ott_rget,_malloc
+EXPORTS=_ott_run,_ott_xmm0,_ott_set_stackarg,_ott_data_install,_ott_rget,_malloc,_ott_set_gbase
 STDB="$OTT/../liftlib/liftlib/stdbuild.py"
 build_one() {   # build_one <profile> <out.cjs>
   local flags; flags="$(python3 "$STDB" flags "$1")"
