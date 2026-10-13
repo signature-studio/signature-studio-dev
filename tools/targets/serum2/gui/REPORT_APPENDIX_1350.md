@@ -115,7 +115,53 @@ python3 gui/cursor_switch_bound.py 172140 1727f1   # 同上 (2 件目)
 - 測定 commit: `100cff73` (§2-2・§5 の数値の取得元)。測定時点の `tools/targets/serum2` のコードは `4a834e8c` と同一 (`git diff 4a834e8c 100cff73 -- tools/targets/serum2/gui/cursor_switch_*.py` = 0 行)。
 - コード変更の最後の commit: `4a834e8c` (DOC_MAP 索引・本付録の記述訂正・スクリプトの operand 解析修正・括弧追加)。
 - 素材: `$ARTIFACTS_DIR/plugins-serum2.tar.zst` を `tar --zstd -xf` で展開し `Install_Xfer_Serum2_2.1.5.exe` を取り出し、`7z x` で展開。`Serum2.vst3/Contents/x86_64-win/Serum2.vst3` = 19,236,864 B、sha256 `501e7bb3dd9cafe416b3412df3d4e084c01b7468201e5690b9009d7ecd4e5283` (REPORT §0 と一致)。
-- `git diff 388bf469 HEAD -- tools/targets/serum2` の出力 (測定起点 `388bf469` からの差分、非空): `REPORT_APPENDIX_1350.md` 8 行、`cursor_switch_bound.py` 1 行、`cursor_switch_scan.py` 12 行の変更 (`4a834e8c` の 1 commit)。
+- `git diff 388bf469 HEAD -- tools/targets/serum2` の出力 (測定起点 `388bf469` からの差分、非空): `REPORT_APPENDIX_1350.md` 8 行、`cursor_switch_bound.py` 1 行、`cursor_switch_scan.py` 12 行の変更 (`4a834e8c` の 1 commit)。スクリプト部分の出力:
+
+```diff
+diff --git a/tools/targets/serum2/gui/cursor_switch_bound.py b/tools/targets/serum2/gui/cursor_switch_bound.py
+index b8418ad9..f73bcbd0 100644
+--- a/tools/targets/serum2/gui/cursor_switch_bound.py
++++ b/tools/targets/serum2/gui/cursor_switch_bound.py
+@@ -25,7 +25,7 @@ def main():
+     md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
+     for i in md.disasm(data[off0:off1], base + start_rva):
+         s = f"{i.address - base:x}: {i.mnemonic} {i.op_str}"
+-        if i.mnemonic in ("cmp", "ja", "jbe", "jmp", "lea") or "[" in i.op_str and "rip" in i.op_str:
++        if i.mnemonic in ("cmp", "ja", "jbe", "jmp", "lea") or ("[" in i.op_str and "rip" in i.op_str):
+             print(s)
+     return 0
+ 
+diff --git a/tools/targets/serum2/gui/cursor_switch_scan.py b/tools/targets/serum2/gui/cursor_switch_scan.py
+index 57eefde8..b3c3eb7e 100644
+--- a/tools/targets/serum2/gui/cursor_switch_scan.py
++++ b/tools/targets/serum2/gui/cursor_switch_scan.py
+@@ -4,6 +4,7 @@
+ 入力: work/Serum2_win64.vst3 (REPORT §9-1 で展開)。
+ 出力: 各ヒットの関数開始 RVA (直前の int3/nop 境界から推定)、関数内の cursor ID 即値の一覧。
+ """
++import re
+ import sys
+ import struct
+ 
+@@ -40,12 +41,11 @@ def main():
+                 break
+         ids = []
+         for i in md.disasm(data[start:end], va0 + start):
+-            if i.mnemonic in ("mov", "lea", "cmp") and "0x7f" in i.op_str:
+-                for tok in i.op_str.replace(",", " ").split():
+-                    if tok.startswith("0x7f"):
+-                        v = int(tok, 16)
+-                        if 0x7F00 <= v <= 0x7FFF:
+-                            ids.append((hex(i.address), v))
++            if i.mnemonic in ("mov", "lea", "cmp"):
++                for m in re.finditer(r"(?<![0-9a-fx])0x([0-9a-f]+)", i.op_str):
++                    v = int(m.group(1), 16)
++                    if 0x7F00 <= v <= 0x7FFF:
++                        ids.append((hex(i.address), v))
+         print(f"hit RVA 0x{va0 + off:x}: func 0x{va0 + start:x}..0x{va0 + end:x} "
+               f"({end - start} B), cursor-ID imm {len(ids)} 件")
+         for addr, v in ids:
+```
 - `git diff 100cff73 HEAD -- tools/targets/serum2`: 本 commit で追加される差分は本付録 (docs) のみ。スクリプトの差分は 0 行。
 - `find tools/targets/serum2 -size +20M`: 0 件。
 - 新しい operand 解析は合成入力で確認: Capstone が出す `eax, dword ptr [rax + 0x7f00]` に対し、旧コード (`split` + `int(tok,16)`) は `ValueError: invalid literal for int() with base 16: '0x7f00]'` で落ち、新コードは `0x7f00` を抽出する。
