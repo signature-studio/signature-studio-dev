@@ -39,7 +39,31 @@ log() { printf '%s\n' "$*"; }
 # ---------------------------------------------------------------- untrusted 本文
 # 本文は env 経由でしか受け取らない。${{ }} 展開は actionlint が untrusted として
 # 検出するうえ、repo が public なので issue には誰でもコメントできる。
-if [ -n "${OC_COMMENT_BODY:-}" ]; then
+# repository_dispatch (type oc-fix: watchdog が競合 PR を fix run に載せる。#731) は、payload から
+# PR 番号 (数字のみ)・理由 (列挙値)・素材名 (allowlist) だけを受け取る。自由な文字列は受け取らず、
+# 指示文はこのスクリプトが理由から組み立てる。
+dispatch_pr=""
+dispatch_artifacts=""
+dispatch_ok=true
+if [ "$EVENT_NAME" = repository_dispatch ]; then
+  dispatch_pr="$(jq -r '(.client_payload.pr // "") | tostring' "$GITHUB_EVENT_PATH")"
+  dispatch_reason="$(jq -r '(.client_payload.reason // "") | tostring' "$GITHUB_EVENT_PATH")"
+  dispatch_artifacts="$(jq -r '(.client_payload.artifacts // "") | tostring | .[0:300]' "$GITHUB_EVENT_PATH")"
+  if ! printf '%s' "$dispatch_pr" | grep -qE '^[0-9]{1,7}$'; then
+    printf '::error::repository_dispatch: client_payload.pr must be digits only\n'
+    dispatch_ok=false
+  fi
+  case "$dispatch_reason" in
+    conflict)
+      comment_body='この PR は main と競合しています。競合 PR は review イベントでワークフローが起動しないため、watchdog がこの依頼を送りました。origin/main を merge して競合を解消し、push してください (競合解消以外の変更はしない。main 側の変更を消さない)。競合した箇所と解消方針を PR にコメントで報告してください。'
+      ;;
+    *)
+      printf '::error::repository_dispatch: unknown reason "%s"\n' "$(printf '%s' "$dispatch_reason" | tr -cd 'a-z0-9-' | head -c 40)"
+      dispatch_ok=false
+      comment_body=""
+      ;;
+  esac
+elif [ -n "${OC_COMMENT_BODY:-}" ]; then
   comment_body="$OC_COMMENT_BODY"
 else
   comment_body="$(jq -r --argjson max "$MAX_CHARS" '
@@ -75,6 +99,9 @@ if [ "$EVENT_NAME" = issue_comment ] && ! grep -qE "$COMMAND_RE" "$COMMENT_FILE"
   log "::notice::no /oc or /opencode command on a line of its own; the agent will not run"
   should_run=false
 fi
+if [ "$dispatch_ok" != true ]; then
+  should_run=false
+fi
 printf 'should_run=%s\n' "$should_run" >> "${GITHUB_OUTPUT:-/dev/null}"
 
 # ---------------------------------------------------------------- 素材 (R2 artifacts)
@@ -87,6 +114,11 @@ artifacts=""
 # pull_request_review (reviewer の差し戻し) の本文は reviewer の指摘であり、素材の指定は PR 本文にある。
 ARTIFACTS_SRC="$COMMENT_FILE"
 [ "$EVENT_NAME" = pull_request_review ] && ARTIFACTS_SRC="$PR_BODY_FILE"
+if [ "$EVENT_NAME" = repository_dispatch ]; then
+  ARTIFACTS_SRC="$RUNNER_TEMP/opencode-dispatch-artifacts.txt"
+  printf 'oc_artifacts: %s\n' "$dispatch_artifacts" > "$ARTIFACTS_SRC"
+  chmod 600 "$ARTIFACTS_SRC"
+fi
 artifacts_line="$(grep -m1 -E '^[[:space:]]*oc_artifacts:' "$ARTIFACTS_SRC" || true)"
 if [ -n "$artifacts_line" ]; then
   for name in $(printf '%s' "${artifacts_line#*oc_artifacts:}" | tr -cd 'a-z0-9 -'); do
@@ -114,6 +146,7 @@ esac
 
 issue_number="$(jq -r '.issue.number // empty' "$GITHUB_EVENT_PATH")"
 pr_number="$(jq -r '.issue.number // .pull_request.number // empty' "$GITHUB_EVENT_PATH")"
+[ "$EVENT_NAME" = repository_dispatch ] && [ "$dispatch_ok" = true ] && pr_number="$dispatch_pr"
 
 # ------------------------------------------------------- $GITHUB_ENV への書き込み
 # ここから下は「1 行の値」しか書かない。複数行・heredoc・untrusted 本文は書かない。

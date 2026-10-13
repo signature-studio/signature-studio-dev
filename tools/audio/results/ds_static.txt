@@ -1,0 +1,37 @@
+## DirectSound 呼出面 (受け手 = rcx のロード元 rip 相対グローバル; 0x12ae000..0x12b2000)
+  IDirectSound                   CreateSoundBuffer          x2
+  IDirectSound                   SetCooperativeLevel        x1
+  IDirectSoundNotify             SetNotificationPositions   x1
+  primary IDirectSoundBuffer     GetFormat                  x1
+  primary IDirectSoundBuffer     SetFormat                  x1
+  secondary IDirectSoundBuffer   GetCurrentPosition         x2
+  secondary IDirectSoundBuffer   Lock                       x2
+  secondary IDirectSoundBuffer   Play                       x1
+  secondary IDirectSoundBuffer   QueryInterface             x1
+  secondary IDirectSoundBuffer   SetCurrentPosition         x1
+  secondary IDirectSoundBuffer   Stop                       x1
+  secondary IDirectSoundBuffer   Unlock                     x2
+## DS オブジェクト以外への仮想呼出 (Delphi 側。disp 衝突で INVENTORY §2 の集計に混入していたもの)
+  receiver 0x15e13b8  [+0x28] x2
+  receiver 0x15e13b8  [+0x78] x1
+  receiver 0x15e13b8  [+0xc8] x1
+  receiver 0x15e22d8  [+0x78] x2
+  receiver 0x15e4790  [+0x18] x1
+  receiver 0x15e4790  [+0x88] x1
+  receiver ?          [+0x0] x6
+## バッファ形式の決定 (primary SetFormat 組立 0x12afcd0..0x12afd3d)
+  0x12afcd0 cmp byte [0x15d3296], 0 ; jne 経路 → 0x674e50(wfx, tag=0xFFFE, rate, bits=0x20, ch=2) / 0 経路 → 0x674e10(wfx, rate, bits=0x10, ch=2)
+  0x674e50: wFormatTag=dx(0xFFFE) cbSize=0x16 wValidBitsPerSample=0x20 dwChannelMask=3 (FL+FR) SubFormat=00000003-0000-0010-8000-00aa00389b71 (= KSDATAFORMAT_SUBTYPE_IEEE_FLOAT)
+  0x674e10: wFormatTag=1 (PCM) cbSize=0
+  設定→bool グローバル (0x135b000: ctl[+off]->byte[+0x49e] を bool へコピー): ctl+0xc40->0x15d3294, ctl+0xc38->0x15d3295, ctl+0xc48->0x15d3296
+  0x12af5c0: byte [0x15d3294] の参照: 0x12af6f2: dword ptr [rbp + 0x6c], 0x100 / 0x12af78a: jne 0x12af8c5 (通知設定をスキップ)
+  0x12af5c0: byte [0x15d3295] の参照: 0x12af702: dword ptr [rbp + 0x6c], 8
+  → 0x15d3294 != 0 で IDirectSoundNotify 設定をスキップ (0 のとき DSBCAPS_CTRLPOSITIONNOTIFY=0x100 を要求) = 'pollbox' (ポーリング) と整合。0x15d3295 == 0 で DSBCAPS_LOCSOFTWARE=0x8 = 'hardbufbox' (ハードウェアバッファ) の否定と整合。残る 0x15d3296 が形式フラグ = 'ds_32bitbufbox' (UI 名との対応は用途の整合による推定。形式フラグが分岐を決める事実自体は上記 0x12afcd0 の命令列から確定。DFM フィールド表は未解析)
+  静的イメージ上の初期値: byte[0x15d3294]=1 byte[0x15d3295]=1 byte[0x15d3296]=0 (実際の値は保存設定 (FL の設定ファイル) 由来で静的には不定)
+  secondary の lpwfxFormat = lea [rip+..] = 0x16bd4b0  (primary SetFormat が渡す wfx 0x16bd4b0 と同一 = secondary も同形式)
+  secondary dwFlags 基底 0x18000 (GETCURRENTPOSITION2|GLOBALFOCUS) | 0x100 (非ポーリング時) | 0x8 (ソフトウェア時)
+## secondary への書込み (0x12aeec0 の Lock 後)
+  cmp word [0x16bd4be](=wBitsPerSample), 0x20 → 0x20 なら関数ポインタ [0x15e2d40] 経由 (引数 count = bytes>>3 = ステレオ float32 のフレーム数) / それ以外は 0x12c7420 (count = bytes>>2 = ステレオ 16bit のフレーム数) で 16bit PCM へ変換。変換の係数 (xmm2/xmm3 定数)・ディザ/クリップの有無は未解析
+## 通知位置 (0x12af82f..0x12af886): 2 点。ループ ecx=0..1 で offset_i = (i*A + B) mod C (idiv; A/B/C は 0x16bd4xx のグローバルで内訳は未解析)、各要素の 2 つ目の 8 バイトはイベントハンドル表から
+## secondary 総長 (0x12af67e..0x12af698): [0x16bd4a8] = X × nBlockAlign、[0x16bd4a4] = 2 × [0x16bd4a8] (X = 設定のバッファ長由来のフレーム数、下限 0x80)
+## GetCurrentPosition (arg: rdx=play, r8=write): 0x12aef11 は r8=NULL (play のみ取得)、0x12af1e5 は rdx=NULL (write のみ取得)
