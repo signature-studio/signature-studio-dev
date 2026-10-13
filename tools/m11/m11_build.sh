@@ -10,7 +10,8 @@ source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1
 export TMPDIR="$HERE/work/tmp"
 mkdir -p work/tmp work/obj
 M11_LB_BASE="${M11_LB_BASE:-0}"; export M11_LB_BASE   # #222: LVA = RVA + M11_LB_BASE (0 = 従来)
-CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=$M11_LB_BASE"
+M11_OV_CLASSCREATE="${M11_OV_CLASSCREATE:-0}"   # #419: 1 = m11_ov.c の実験 override (410360 のみ; 8cbda0/8cbce0 は #503 で既定 ON) を有効化 (既定 0)
+CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=$M11_LB_BASE -DM11_OV_CLASSCREATE=$M11_OV_CLASSCREATE"
 # image 終端 (SizeOfImage 0x18c0000) + LB_BASE が GLOBAL_BASE (0x10000000) 以内であること
 python3 - <<PYEOF
 import sys
@@ -93,6 +94,9 @@ cc work/boot_final3.ll work/obj/boot.o
 cc work/m11_simd.c work/obj/simd.o msimd11_core.h
 cc work/m11_winstubs.c work/obj/winstubs.o
 cc work/m11_fnstubs.c work/obj/fnstubs.o
+# M11_OV_CLASSCREATE が変わったら ov.o だけ無効化 (stamp; ON/OFF の切替で古い ov.o を再リンクしない)
+if [ "$(cat work/ov_classcreate.stamp 2>/dev/null || echo 0)" != "$M11_OV_CLASSCREATE" ]; then rm -f work/obj/ov.o; fi
+echo "$M11_OV_CLASSCREATE" > work/ov_classcreate.stamp
 cc m11_ov.c work/obj/ov.o work/boot_final3_sigs.h
 cc work/m11_data.c work/obj/data.o
 
