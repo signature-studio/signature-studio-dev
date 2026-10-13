@@ -213,3 +213,17 @@ ia32 で要注意の mnemonic (件数): cdq 21 / movzx 51 / movsx 54 / lea 590 /
 §6 の未解決と同じ (VstEvents / ERect の engine 側読取、殻側の実物構造体、engine の store 値の実行確認)。 受入 1・2 は「dispatcher 内に読取・書込みが無い」ことまで確定し、実際の箇所は未特定。
 - route 突合 (`ROUTE_EXPECT`: `bound`・`opcode25_default`・`erect_child_slot`) は現在の静的構造の**観測値**を守る回帰ガードである。 VstEvents の読取・ERect の書込みを証明するものではない。 gate の N5・N6 はこの突合の FAIL を検査する。
 - `opcode25_default` は `PROCESS_EVENTS > bound` の**定数比較** (`marshal.py` の `route_facts`) であり、実バイナリの読取ではない。 既定分岐 (0x1000149c) の内容は `default_returns_zero` で別途検査する (`mov eax,esi; ret 0x14` を逆アセンブルで読んだ結果)。
+
+### 9.5 events[] 読取の探索 (#894 受入 1 の追加調査・未達)
+
+素材の検索範囲と結果 (`fl-win64` 展開・`extracted/` 配下):
+
+| 対象 | 実測 |
+|---|---|
+| `block22434_PE.bin` (engine, sha256 `84b64c43…`) | 線形掃引 (CS_MODE_32, capstone 5.0.7) で `[index*4 + 8]` の memory operand は **0 件** (`events[]` の要素アクセス形の探索) |
+| 同 block の添字付き memory operand 全体 | 上位は x87 の `[base+idx*4+disp]` (配列アクセス) と `[ebx+ecx*4+...]` 形。 VstEvents の形に一致するものは確認できず |
+| 素材内の他 block | `block22433_PE.bin` は machine 0x8664 (x64 本体)・ImageBase 0x0 で engine ではない。 ia32 の PE は block22434 のみ |
+| `slayer_x86/` の REPORT | 殻 ↔ engine の ILP32 marshal の必要性のみ記載 (読取箇所の記載なし) |
+
+- この探索は「添字 `*4+8` の形」に限定した静的検索であり、**読取の不在を証明しない**。 `numEvents` (+0) は `[reg]`・`events[]` 要素は `[reg+4]` や `[reg+idx*4+4]` (ptr 内の値) で読まれる可能性がある (未確認)。
+- 次の一手 (未着手): effProcessEvents(25) の**呼出し元**を辿る方向 (dispatcher の外から opcode 25 を受ける経路・vtable 初期化) か、`events` を受ける関数の探索を、`[reg+4]` を含む形へ広げて行う。 いずれも #894 の継続。
