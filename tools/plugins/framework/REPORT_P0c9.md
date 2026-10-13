@@ -37,7 +37,14 @@
   - Phase B 例外の切り分け (レビュー指摘 2): origin/main の `gen.py` では `fw_stage2.sh` が `KeyError: 'g224'` で停止し `fw_image.bin` を生成できない。したがって origin/main では Phase B に到達せず、同素材の baseline は取得不可。本 PR の `_params` 修正 (`CT.get(t, "u128")`) で到達可能になった経路が例外の原因である可能性を否定できない。**既存仕様とは断定しない**。切り分けと判定は #884 (`[P0c-11]`) で行う。
   - `_stub` (指摘 1 対応): `d0e15d52` の `_stub` 書き換えを元に戻した。未知タグ `?` を含む形と既知型形を含む 8 形で 56aa8795 と出力一致 (diff 0)。`['g224']` / `['x','g224']` の `_params` 経路は `u128` にフォールバックして正常生成 (旧版は KeyError)。`gen.py` の PR 差分は `_params` の 1 行のみ。
 - 副作用の確認: `liftlib/simd/gen.py` の既知型 (x/d/q/b/y 等) の `_stub` 出力は origin/main と一致 (5 形で diff 0)。`tests/test_unit.py` は `m6/work` 等の素材が無く実行不可 (既存の前提)。
-- **未達 (受入 3 の FW_EXT_FUNCS 指定経路)**: 本 run は既定経路 (FW_EXT_FUNCS 未指定) のみ検証。ext 指定時の e2e は未実施。
+- **#610 再検証 (HEAD = b37d20ac、素材 fl-win64 + toolchain-emsdk + work-fw-stage1、runner 2026-10-13)**:
+  - 既定経路 (FW_EXT_FUNCS 未指定): `fw_269_verify.sh` ALL PASS (空の W から, `fw_stage2.sh` 318 s, load 0.44 0.68 0.58 → 2.57 1.81 1.07, smoke ×3 PASS, 差分行 0/0, wasm 15,062,169 B)。`hs_e2e.sh --fresh` E2E PASS (97.9 s)。Phase B `memory access out of bounds` は本節 1 段上と同一。
+  - ext 指定 (`FW_EXT_FUNCS=function_5dfd30,function_5dfdb0,function_5de820,function_5dedf0`): `fw_269_verify.sh` ALL PASS (`fw_stage2.sh` 319 s, load 0.81 1.16 1.02 → 2.63 1.98 1.36, smoke ×3 PASS, 差分行 0/0)。`fw_f80.ll.ext.json` で `ext_functions: 4`・skip 0 を確認。ただし wasm サイズは既定と同一 15,062,169 B で、ext 化が最終 wasm に反映されたかは未確認。
+  - ext 指定 (`function_5dfbe0,5dfc90,5dfd30,5dfdb0,5de820,5dedf0,5dfb60` の 7 関数): **fail**。`function_5dfb60` / `5dfbe0` / `5dfc90` が `skip:no-ext-values` で ext 化されず、`fw_f80.py` が exit 1 (fail-fast 設計どおり)。
+  - `hs_e2e.sh` の ext 指定版: `FW_EXT_FUNCS=...` 付きで E2E PASS (97.9 → 99.2 s)。ただし hs は既定経路で生成済みの `fw_flat4_canon3.ll` を読むため、ext 版の中間生成物を経由していない。
+  - 修正: `fw_269_verify.sh` の snapshot に `tools/plugins/p0c` を追加 (ext 指定時の `f80_lower.py` 不在を解消)。
+  - 環境: `pefile` が runner の python3 に無く、venv (`uv pip install pefile capstone numpy`) を PATH 先頭に置いて実行。
+- **未達 (受入 3 の FW_EXT_FUNCS 指定経路)**: 7 関数指定は 3 関数が ext 化不可。`fw_flat4_canon3.ll` を ext 版で再生成した e2e は未実施。ext 対象の選定根拠 (x87 関数の一覧) は未作成。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
