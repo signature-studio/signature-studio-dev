@@ -53,18 +53,24 @@ native 比較は `-lz` を追加。
 
 3 関数 wrapper: `svgCreate` / `svgRender` / `svgDestroy` (`oss/ilsvg/wrap/ilsvg_wrap.cpp`)。
 
-### 検証 (スモーク SVG 64x64: linearGradient 矩形 + 円)
+### 検証 (スモーク SVG 64x64: linearGradient 矩形 + 円, `wrap/smoke.svg`)
+
+再現: `bash tools/shared/oss/ilsvg/build_pair.sh` (末尾で native 描画・wasm 描画 (`wrap/wasm_smoke.cjs`)・`cmp` を一括実行)。
+emsdk は 6.0.12 を使用 (`EMSDK_ENV` で `emsdk_env.sh` の場所を指定可、既定は `/opt/emsdk/emsdk_env.sh`)。
+
+HEAD `1132be60` での実測 (clean 再生成、`tools/shared/work/ilsvg_pair/` を削除してから実行、load average 0.95 開始時):
 
 | 項目 | 実測 |
 |---|---|
-| wasm 出力 (ilsvg.wasm) | 388770 B |
-| wasm 描画 | dims 64 64, nonzero_px 3136 / 4096 |
-| native 描画 (同ソース, g++ -O2) | dims 64 64, nonzero_px 3136 / 4096 |
-| 画素列の一致 | wasm / native の ARGB32 生データ 16384 B が `cmp` で完全一致 |
+| `build_pair.sh` real | 1 m 43.3 s (exit 0) |
+| wasm 出力 (ilsvg.wasm) | 388770 B (sha256 先頭 16 桁 `0fa5c92d8eb8ba42`) |
+| native 描画 (`nat`, `svgren::parameters` の `dims_request {64,64}`) | dims 64 64, nonzero_px 4096 |
+| wasm 描画 (`createILSvg` → `svgCreate` → `svgRender(64,64)`) | dims 64 64, nonzero_px 4096 |
+| 画素列の一致 | native / wasm の ARGB32 生データ 16384 B が `cmp` で IDENTICAL |
 
 mac dylib (`Shared/ILSvg_x64.dylib`) は素材に無いため、受入条件 4 の「mac dylib との出力比較」は未実施。native との一致で代替。
 
-HEAD `e0c3c59b` からの再現 (clean 再ビルド、load average 0.22 開始時): `build_pair.sh` real 1 m 36 s。wasm 388770 B (sha256 先頭 16 桁 `0fa5c92d8eb8ba42`)。描画 dims 64 64 / nonzero_px 3136、画素列 16384 B が `cmp` 一致。
+注: 旧版の REPORT にあった `nonzero_px 3136` は、この smoke SVG (`wrap/smoke.svg`) を当時使ったという根拠が無く、今回の再現では 4096 になるため撤回する。`smoke.svg` を正本とする。
 
 ## 未解決 (起票先)
 
