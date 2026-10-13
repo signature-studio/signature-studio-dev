@@ -143,5 +143,22 @@ e0=$(JE work/sampler/engines.csv); e1=$(JE "$N/eng_lift_rc.csv"); e2=$(JE "$N/en
 echo "NC7: judge engines 対照 rc=$e0 / lift_rc=1 に改変 rc=$e1 / 末尾行欠落 rc=$e2  (期待: 0 / 1 1)"
 expect NC7-control "$e0" 0; expect NC7-broken "$e1 $e2" "1 1"
 
+# NC8: judge engines の #540 追加条件 (最終 IR の emcc -c / 参照されるのに define が無い関数 / 旧 15 列 header)。 1 列だけ壊し、対照は同じ engines.csv
+python3 - work/sampler/engines.csv "$N" <<'PY'
+import csv, sys
+rows = list(csv.reader(open(sys.argv[1]))); h = rows[0]; n = sys.argv[2]
+def w(name, col, val):
+    r = [list(x) for x in rows]
+    r[1][h.index(col)] = val
+    csv.writer(open('%s/eng_%s.csv' % (n, name), 'w')).writerows(r)
+w('f80rc', 'emcc_c_rc_after_f80', '1')
+w('unmeasured', 'emcc_c_rc_after_f80', '-1')
+w('missref', 'missing_ref', '1')
+csv.writer(open('%s/eng_oldhdr.csv' % n, 'w')).writerows([x[:-1] for x in rows])
+PY
+f1=$(JE "$N/eng_f80rc.csv"); f2=$(JE "$N/eng_unmeasured.csv"); f3=$(JE "$N/eng_missref.csv"); f4=$(JE "$N/eng_oldhdr.csv")
+echo "NC8: judge engines 対照 rc=$e0 / emcc_c_rc_after_f80=1 rc=$f1 / =-1 rc=$f2 / missing_ref=1 rc=$f3 / 旧 header rc=$f4  (期待: 0 / 1 1 1 2)"
+expect NC8-broken "$f1 $f2 $f3 $f4" "1 1 1 2"
+
 [ "$FAIL" = 0 ] && { echo "[sampler_nega] OK"; exit 0; }
 echo "[sampler_nega] FAIL" >&2; exit 1

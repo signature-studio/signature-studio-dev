@@ -22,5 +22,9 @@ else
   cp "$WB/block25159_DATA.bin" "$W/MCPTools.pyc"
   cp "$WB/block24429_DATA.bin" "$W/midi.py"
   cp "$WB/block24430_DATA.bin" "$W/utils.py"
+  # PY-6 (#76): 同梱 device script は win64 の block24618 (FL 26.1.7.5653 で実測)。先頭ヘッダで同定する
+  head -n1 "$WB/block24618_DATA.bin" | tr -d '\r' | grep -qx '# name=Forward CCs to current plugin Port 10' \
+    || { echo "block24618 が device script 'Forward CCs to current plugin Port 10' ではない (FL 版が違う?)" >&2; exit 1; }
+  cp "$WB/block24618_DATA.bin" "$W/device_Forward CCs to current plugin Port 10.py"
 fi
 [ -d "$W/fl-stubs" ] || git clone -q --depth 1 https://github.com/IL-Group/FL-Studio-API-Stubs.git "$W/fl-stubs"

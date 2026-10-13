@@ -5,7 +5,7 @@
 #   work/sampler/engines.csv にまとめて judge.py engines で判定する。 RetDec の C バックエンドを待つ lift_ranges.sh 直行は
 #   Fruity Slicer 2 の engine 1 本で 10 分超・8 GiB 超 (REPORT §5) のため使わない。 FULL_RETDEC=1 なら lift_ranges.sh を使う (逐次実行を推奨)
 # --collect: lift せず work/sampler/engine<block>/summary.csv を集計して判定だけ行う (別プロセスで lift 済みの時)
-# 判定: 計測が成立したか (judge.py engines)。 不成立なら exit 1。 emcc -c の成否は判定外 (到達性の実測値)
+# 判定 (judge.py engines): lift_rc 0 / define>0 / 最終 IR の emcc -c rc 0 (emcc_c_rc_after_f80) / missing_ref 0。 1 件でも不合格なら exit 1
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 source "$HERE/env.sh"
@@ -22,7 +22,7 @@ if [ "${1:-}" != "--collect" ]; then
   done
   wait
 fi
-echo "block,pdata_funcs,lift_rc,defines,f80_funcs,unimpl_helpers,emcc_c_rc,fixcmp_patched,emcc_c_rc_after_fixcmp,lift_s,missing_define,missing_bytes,missing_ref,extra_inside,function_defines" > work/sampler/engines.csv
+echo "block,pdata_funcs,lift_rc,defines,f80_funcs,unimpl_helpers,emcc_c_rc,fixcmp_patched,emcc_c_rc_after_fixcmp,lift_s,missing_define,missing_bytes,missing_ref,extra_inside,function_defines,emcc_c_rc_after_f80" > work/sampler/engines.csv
 for eb in "${ENGINES[@]}"; do
   [ -f "work/sampler/engine$eb/summary.csv" ] && cat "work/sampler/engine$eb/summary.csv" >> work/sampler/engines.csv || echo "engine $eb: summary.csv が無い" >&2
 done

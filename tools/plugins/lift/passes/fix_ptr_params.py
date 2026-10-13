@@ -69,6 +69,24 @@ for l in out:
         continue
     if cur in sig and curptr:
         for i in sorted(curptr):
+            # `icmp P ptr %a, %argN` / `icmp P ptr %argN, %b`: 型が先頭オペランドにしか付かず `ptr %argN` に一致しない (E1)
+            mi = re.match(r'^(\s*)(%[\w.\-]+) = icmp (\w+) ptr (\S+), (\S+)(.*)$', l)
+            if mi and not l.lstrip().startswith('phi'):
+                ind, dst, pred, a, b, tail = mi.groups()
+                a2, b2, pre = a, b, []
+                for k, v in (('a', a), ('b', b)):
+                    if v == '%%arg%d' % i:
+                        uid2 += 1
+                        nm = '%%pt1p_%d' % uid2
+                        pre.append('%s%s = inttoptr i64 %s to ptr' % (ind, nm, v))
+                        if k == 'a':
+                            a2 = nm
+                        else:
+                            b2 = nm
+                if pre:
+                    res.extend(pre)
+                    l = '%s%s = icmp %s ptr %s, %s%s' % (ind, dst, pred, a2, b2, tail)
+                    nu += 1
             pat = re.compile(r'\bptr (?:nonnull |noundef |readonly )*%arg' + str(i) + r'\b')
             if pat.search(l) and not l.lstrip().startswith('phi') and 'inttoptr i64 %%arg%d to ptr' % i not in l:
                 uid2 += 1

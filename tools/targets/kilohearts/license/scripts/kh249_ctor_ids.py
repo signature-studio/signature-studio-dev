@@ -50,7 +50,12 @@ for s in sites:
                      'rtti': rtti_name(vt) if vt else None}
 for f, r in res.items():
     print(f, r['size'], r['vtable'], r['rtti'])
-print('callers=%d rtti_resolved=%d' % (len(res), sum(1 for r in res.values() if r['rtti'])))
+n_ok = sum(1 for r in res.values() if r['rtti'])
+print('callers=%d rtti_resolved=%d' % (len(res), n_ok))
+# em_check.mjs は ctors47.length で回すため、47 件・全件 RTTI 解決を満たさない出力は書かない (黙って縮むのを防ぐ)
+if len(res) != 47 or n_ok != len(res):
+    print('FAIL: 47 ctor 呼出元の全件 RTTI 解決が必要 (callers=%d rtti_resolved=%d)。出力は書きません' % (len(res), n_ok), file=sys.stderr)
+    sys.exit(1)
 if outj:
     json.dump(res, open(outj, 'w'), indent=1)
     # em_check.mjs が読む work/ctors47.json ([{ctor: <呼出元関数 VA>}] × 47) も再生成する (clean HEAD 再現用)

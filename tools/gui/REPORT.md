@@ -160,9 +160,9 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
 ### 範囲外・未達
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-`bash tools/gui/e2e.sh` 全体 ALL PASS → 付録 §14 で実測。現 HEAD `b44ddcd` で ALL PASS (rc=0, 99 s, 1 回)。ただし 1/6 の ASan UAF が同 src 群の 7 回中 2 回で発火し解消ではない | 受入扱いは PM 判断 | #489 `[GUI-12]` (既存)・PM |
+`bash tools/gui/e2e.sh` 全体 ALL PASS → 付録 §15 で実測。現 HEAD `b44ddcd` で ALL PASS (rc=0, 99 s, 1 回)。ただし 1/6 の ASan UAF が同 src 群の 7 回中 2 回で発火し解消ではない | 受入扱いは PM 判断 | #489 `[GUI-12]` (既存)・PM |
 | 実 FLEngine が要求する bpp/ROP の確定 (GUI-3 #174 の到達ログ待ち)・16bpp DIB・DIB_PAL_COLORS・`CreateBitmap` 4/8/16bpp の初期 bits・RLE/JPEG/PNG 圧縮 DIB | 実 FL が要求したら fail-fast で止まる (理由付き) | #174 到達後に #181 へ追記 |
-| Chrome 上の lift 済みアプリ込みの API 単位 frame time → §14 (wasm shim 全体は取得済み。Chrome 上のアプリ込みは未取得、理由は §14) | — | #181 |
+| Chrome 上の lift 済みアプリ込みの API 単位 frame time → §15 (wasm shim 全体は取得済み。Chrome 上のアプリ込みは未取得、理由は §15) | — | #181 |
 | mono / パレットの色写像の実 Windows との照合 (近似) | 色が実機と数階調ずれる可能性 | #181 (実機比較はユーザ依頼候補) |
 | native selftest の ASan UAF (20 回中 4 回) | `e2e.sh` 1/6 が約 20% で FAIL | #489 `[GUI-12]` で修正 (本 REPORT §12) |
 | `integ/sigprobe.sh` の `unresolved-imports=0` が `wasm-objdump` 不在で空振り (今回も `command not found`) | 未解決 import なし確認が無効 | #180 (既存コメント) |
@@ -211,6 +211,12 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
   | (2) `bash tools/gui/e2e.sh` 全体 (PE lift 層込み) の ALL PASS 確認 | 7ead604 のレビュー実測 (RetDec あり) で 2 回中 1 回 ALL PASS、もう 1 回は `selftest_wrapped` の既知 flake (ASan blit_surf UAF、単独 30 回で 9/30 失敗) で rc=1 (付録 §13 追補) | flake は `gui_headless.c` の起票を PM 依頼 (未起票)。ALL PASS の追加確認は PM 判断 |
   | (3) 実 FL の face/サイズ確定・alias 実値 | alias は e2e 用 (Segoe UI/Tahoma → Open Sans) のみ | #174 (GUI-3) / #186 の未解決 (2) |
 
-## 14. GUI-5 (#181) 続き: e2e.sh 全体 ALL PASS と wasm shim 全体の SIMD/scalar 比較
+## 14. GUI-7 (#183): popup/tooltip・非クライアント領域・無効領域複数矩形・DPI (FL 非依存部)
+既知類型との関係 (DEFECTS.md): 該当なし (shim の意味論)。ただし lift 済み WndProc の `WM_NCCALCSIZE` の `NCCALCSIZE_PARAMS*` lParam が int32 切り詰めで取りこぼされ native で SEGV (§4-6 の既知要件の再発)。修正は shim 側で送信中ポインタを保持。
+- FL 非依存部は実装・検証済み (golden 28,000 px 差 0、nc_golden asserts 26/0、ネガコン 3 本拒否)。FL の窓種別に基づく部分は未達 → PR は `Refs #183`。
+- 全文・実測 (HEAD `63cfe0f` の e2e ALL PASS 191 s、`67d5cb7` / `87c20fc` の記録を含む) は `REPORT_APPENDIX_C.md` §14。
+- 未解決 (起票先): FL 実窓種別の確定 (#174 / #564 / #565 後に #183 へ追記)・Chrome 上の NC/popup 描画 (#183)・メニュー (#175)。
 
-本文は `REPORT_APPENDIX.md` §14 (250 行上限による分割)。結論 (現 HEAD `b44ddcd`): RetDec 付き `bash tools/gui/e2e.sh` は ALL PASS (rc=0, 99 s, 1 回)。ただし 1/6 の ASan UAF (#489) は有効 7 回中 2 回で発火しており解消ではない。wbench (`bash tools/gui/test/wbench.sh 5`): v128 simd=708 / scalar=0 (測定値は付録 §14 §2)。
+## 15. GUI-5 (#181) 続き: e2e.sh 全体 ALL PASS と wasm shim 全体の SIMD/scalar 比較
+
+本文は `REPORT_APPENDIX.md` §15 (250 行上限による分割)。結論 (現 HEAD `b44ddcd`): RetDec 付き `bash tools/gui/e2e.sh` は ALL PASS (rc=0, 99 s, 1 回)。ただし 1/6 の ASan UAF (#489) は有効 7 回中 2 回で発火しており解消ではない。wbench (`bash tools/gui/test/wbench.sh 5`): v128 simd=708 / scalar=0 (測定値は付録 §15 §2)。

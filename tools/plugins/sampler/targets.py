@@ -17,7 +17,7 @@ SHELLS = [
 # Delphi 殻を持たない MSVC C++ 単体 DLL (framework 一致 0)
 MONOLITHS = [('GMS', 23677)]
 # 判定が許す未実装 __asm_* helper の上限 (block -> 件数) と、その名前の許可リスト。 ここに無い block は 0 件でなければ不合格
-# #538 (rep_stosb_memset) は #629 で解消済みのため許容は空
+# rep_stosb_memset は #629 (m11_simd2.py) で実装済みのため許容は空 (旧 stub 許容 {23658: 1, 23662: 1} は撤去)
 ALLOW_UNIMPL = {}
 ALLOW_UNIMPL_NAMES = []
 
@@ -38,5 +38,7 @@ if __name__ == '__main__':
         print(' '.join(map(str, engine_blocks())))
     elif cmd == 'allow-unimpl':
         print(','.join('%d=%d' % kv for kv in ALLOW_UNIMPL.items()))
+    elif cmd == 'monoliths':
+        print(' '.join(str(b) for _, b in MONOLITHS))
     else:
-        sys.exit('usage: targets.py blocks|engines|allow-unimpl')
+        sys.exit('usage: targets.py blocks|engines|allow-unimpl|monoliths')
