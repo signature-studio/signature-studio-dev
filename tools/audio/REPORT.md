@@ -43,7 +43,7 @@
 | `tools/audio/test/*`, `harness/*` | テスト wasm (正弦/ランプ/ループバック), CDP 駆動 headless Chrome ランナー (COOP/COEP 付き静的サーバ込み) |
 | `tools/audio/{inventory.sh,e2e.sh,build.sh,flags.sh}`, `*.py` | 実測スクリプト群 (capstone/pefile/llvm-nm), emcc フラグは `tools/m1,shim/flags.sh` 流儀 |
 
-## 5. 検証結果 (`results/results.json` = 原実行 22/22 PASS。検収の独立再実行は §9)
+## 5. 検証結果 (下表は原実行 (検収時) の値。`results/results.json` は merged HEAD `a6212bc` の 33/33 run。差分は §14 / `REPORT_AU5.md`。検収の独立再実行は §9)
 
 | シナリオ | 結果 |
 |---|---|
@@ -52,7 +52,7 @@
 | **ソーク 120s** (B=256 48k ランプ) | **underrun 0**, 5,764,608f bit-exact, コールバック 22,516 回, 最大 cb 504 µs, wake 遅延 <1ms 96.2% / 1–2ms 3.7% / 2–8ms 10 回 |
 | `bufferSwitchTimeInfo` (ASIOTime 148B) | 1,883 回, 位置単調・sampleRate 一致 (bad 0), 正弦 PASS。※検収で起動時の samplePosition 巻き戻り (bad=1) が 2/8 回で再現 → `flasio.c` 修正済み (§9) |
 | 過負荷 (busy 6 本 + main 30ms/100ms 停止 + cb 毎 1.5ms 演算) | underrun 0 (別実行では 1〜3 回/256〜1024f: 負荷依存で記録のみ), 復帰後ランプ一致 |
-| 強制 60ms hiccup (200 cb 毎) | underrun 5 (4352f 無音) → T が 1536→2816f へ自動拡張, **復帰後 ramp[p−S] 17000/17000 一致** (データ非破壊) |
+| 強制 60ms hiccup (200 cb 毎) | underrun 5 (4352f 無音) → T が 1536→2816f へ自動拡張, **復帰後 ramp[p−S] 17000/17000 一致** (データ非破壊)。※原実行値 (検収時)。merged HEAD の再生成 run では underrun 6 / 4736f / T=3072 (`results/results.json`、`REPORT_AU5.md` 参照) |
 | `SetSampleRate` 48k→44.1k (CreateBuffers 後, Start 前) | `SET_SR` で AudioContext 再生成 → `ctx.sampleRate=44100`, `sampleRateDidChange` 1 回, 正弦誤差 1.49e-8, underrun 0 |
 | `ctx.suspend()` 0.5s → resume | `kAsioResetRequest` 1 回受信, worklet 呼出間隔 max 508 ms を検知 |
 | ループバック (入力→wasm→出力, 合成ノイズ入力) | B=128/256/512 で lag = 1408/1536/2048 f (29.3/32.0/42.7 ms), 相関 1.0000, in_overruns 0, in_underflows 0 (検収再実行: lag は run 変動、B=128 で in_underflows=4 の回あり) |
@@ -65,9 +65,9 @@
 ## 6. 限界と未実装 (正直ベース)
 
 - **fake シンクの数値**: 音声 HW が無いため `outputLatency` 35ms/`baseLatency` 10.7ms は fake 値。実デバイス (Windows WASAPI/mac CoreAudio, Firefox, Safari) での burst・遅延・underrun は**未計測**。往復の総遅延 (入力ブラウザバッファ含む) も未計測。
-- **未実装**: COM vtable アダプタ (win64 ABI/8 バイトポインタの ASIOCallbacks・ASIOBufferInfo・ASIOTime への変換; リフタ呼出規約待ち)、レジストリ `SOFTWARE\ASIO\FL Studio ASIO` と `CoCreateInstance` 配線 (別 shim 行)、DirectSound shim、WebMIDI shim、getUserMedia のデバイス選択 UI、WASAPI capture/exclusive/loopback、T の縮小 (拡張のみ)、macOS 固有 (AudioUnit 面) の薄いアダプタ。
+- **未実装**: COM vtable アダプタ (win64 ABI/8 バイトポインタの ASIOCallbacks・ASIOBufferInfo・ASIOTime への変換; リフタ呼出規約待ち)、レジストリ `SOFTWARE\ASIO\FL Studio ASIO` と `CoCreateInstance` 配線 (別 shim 行)、DirectSound shim、~~WebMIDI shim~~ (AU-3 で実装, §13。FL 結線は未)、getUserMedia のデバイス選択の**製品 UI** (部品は §14 で実装、画面は AU-9 #184)、WASAPI capture/exclusive/loopback、T の縮小 (拡張のみ)、macOS 固有 (AudioUnit 面) の薄いアダプタ。
 - B=128 は ILWASAPI2ASIO の min 256 より小さい (shim 単体の性能であり FL 実運用値ではない)。→ AU-7 で既定 profile を ILWASAPI 値に確定し、FL が min/max/granularity を読まないことを静的に確認 (§11)。
-- 未確認 (推定): `asioMessage` selector 6 → コマンド 0x17 が再起動かどうか、~~FL が granularity=128/min=128 を受理するか~~ (解決: FL は読まない, §11)、DS バッファの 16/32bit、Web MIDI の Worker 内実装状況 (W3C 仕様上は `Exposed=(Window,Worker)`, 実装未確認)。
+- 未確認 (推定): `asioMessage` selector 6 → コマンド 0x17 が再起動かどうか、~~FL が granularity=128/min=128 を受理するか~~ (解決: FL は読まない, §11)、DS バッファの 16/32bit、Web MIDI の Firefox/Safari の挙動 (Chrome 154 の DedicatedWorker に Web MIDI が無いことは実測済み, `tools/audio/REPORT_MIDI.md` §13-2)。
 - `ctx.outputLatency` は起動直後 0 → 約 250ms 後に更新される。`getLatencies` は呼出時の値で、FL が起動直後に読むと小さく見える。→ AU-7 で ATTACH 側の待ちを実装 (§11-3)。
 
 ## 7. ユーザ依頼事項
@@ -78,12 +78,12 @@
 2. **[audio-realdevice]** 実機 Chrome/Firefox/Safari での burst・outputLatency・underrun 行列、ループバックケーブルによる総往復遅延、T 下限の再評価。
 3. **[audio-midi]** WebMIDI shim (SAB MIDI ring, `midiIn/Out` 20 関数, CALLBACK_FUNCTION スレッド, SysEx バッファ, 再スキャン) と Worker 直受信の実機検証。
 4. **[audio-directsound]** DirectSound shim (ring を循環バッファ化, Lock/Unlock/GetCurrentPosition/Notify)。FL の DS バッファ形式 (16/float) の確認を含む。
-5. **[audio-input-ui]** getUserMedia デバイス選択 + `controlPanel` UI + `kAsioResetRequest` 連携、入力遅延実測。
+5. **[audio-input-ui]** (#192, 部品は §14 で実装済み。FL 本体側の再初期化確認と入力遅延実測は未達) getUserMedia デバイス選択 + `controlPanel` UI + `kAsioResetRequest` 連携、入力遅延実測。
 6. **[audio-latency-policy]** T の縮小 (安定時に B 刻みで減衰)、安全モード/低遅延モードの UI、FL の selector 6 (0x17) 挙動確認後に `kAsioLatenciesChanged` を使うか決定。
 7. **[audio-fl-profile]** (AU-7 #193) 静的に確定できた部分は §11。実 FLEngine 起動後の profile / `pbtrackingmode` 各モード (Driver/Hybrid/Mixer) でのカーソル追従確認は #34 待ち。
 8. **[audio-worklet-wasm]** (任意) FL ミキサを Wasm Audio Worklet 内で直接走らせる案との遅延比較 (ブロッキング不可のため FL スレッド構造の再設計が前提)。
 9. **[audio-ui-integration]** `src/index.ts` への組込 (ユーザジェスチャで `FlAudioShim.attach`, 既存 `audio.ts` ハーネスとの統合/置換)。
-10. ~~**[audio-soak30]**~~ 30 分ソーク: 無負荷は実施済み (#191, §13)。負荷下 30 分は未実施。
+10. ~~**[audio-soak30]**~~ 30 分ソーク: 無負荷は実施済み (#191, §15)。負荷下 30 分は未実施。
 11. ~~**[audio-96k-depth]**~~ 解決 (#211, §10)。
 
 対応表: AU-1 audio-com-adapter=CAB-97 / AU-2 realdevice=CAB-186 / AU-3 midi=CAB-187 / AU-4 directsound=CAB-188 / AU-5 input-ui=CAB-191 / AU-6 latency-policy=CAB-189 / AU-7 fl-profile=CAB-192 / AU-8 worklet-wasm=CAB-193 / AU-9 ui-integration=CAB-184 / AU-10 soak30=CAB-190 / AU-11 96k-depth=CAB-210 (親は全て CAB-9)。
@@ -129,7 +129,7 @@ e2e 追加 3 本 (`harness/run.mjs`, 計 25 シナリオ): `asio_sine_b512_96k` 
 
 ## 11. AU-7 (#193) ASIO プロファイル確定・systemTime 規約・outputLatency 吸収
 
-既知類型との関係: 該当なし (lift 欠陥ではなく、FLEngine の ASIO 呼出面の静的解析とランタイム shim の規約合わせ)。検証起点 commit `712bcdd` (コード)。再現: 静的 `FL_WIN64_DIR=<fl-win64 展開先> python3 tools/audio/fl_asio_profile.py [--negctl]` (要 capstone/pefile)、動的 `bash tools/audio/build.sh && node tools/audio/harness/run.mjs` (`tools/audio/e2e.sh` 先頭の inventory.sh は `/home/ubuntu` 固定パスのため runner では使えない)。
+既知類型との関係: 該当なし (lift 欠陥ではなく、FLEngine の ASIO 呼出面の静的解析とランタイム shim の規約合わせ)。検証起点 commit `712bcdd` (コード)。再現: 静的 `FL_WIN64_DIR=<fl-win64 展開先> python3 tools/audio/fl_asio_profile.py [--negctl]` (要 capstone/pefile)、動的 `bash tools/audio/build.sh && node tools/audio/harness/run.mjs` (`tools/audio/e2e.sh` 先頭の inventory.sh は固定ホームパス参照のため runner では使えない)。
 
 **結論**: (1) FL は getBufferSize の **min/max/granularity を読まない** → 既定 profile を ILWASAPI 値 (256/4096/512/0) に確定 (報告値は FL の挙動を変えない)。(2) FL の `bufferSwitchTimeInfo` は **samplePosition を読まず systemTime だけ**を使うので、systemTime を基準ドライバ ILWASAPI と同じ「コールバック時刻」に揃えた。(3) 起動直後 outputLatency=0 は ATTACH の待ちで吸収。**実 FLEngine 上の確認 (profile・pbtrackingmode 各モードのカーソル追従) は #34/#98 待ちで未達**。
 
@@ -175,7 +175,7 @@ e2e 追加 3 本 (`harness/run.mjs`, 計 25 シナリオ): `asio_sine_b512_96k` 
 | モード大域 0x15d89d0 と UI の Driver/Hybrid/Mixer の対応 (setter 0x12539b0 は設定構造体の別フィールドと組合せ) 未解読 | どのモードが systemTime を使うか確定していない | #34 にコメント |
 | FL が ts + outLat で可聴時刻を作るか (消費側 0xc56b46〜) 未解析 | systemTime 規約変更の効果を静的に確認できていない | #34 にコメント |
 | 実機で outputLatency が上限 600 ms まで 0 のまま (Firefox/Safari 等) の場合、0 のまま進む | 遅延を過小報告 | #187 (AU-2) にコメント |
-| `tools/audio/e2e.sh` 先頭の `inventory.sh` が `/home/ubuntu` 固定パスと M2 の work 参照 | runner で 1 コマンド e2e が通らない | #66 (E2E) にコメント |
+| `tools/audio/e2e.sh` 先頭の `inventory.sh` が固定ホームパスと M2 の work 参照 | runner で 1 コマンド e2e が通らない | #66 (E2E) にコメント |
 
 ## 12. AU-9 (#185) src/index.ts 組込パッチ設計 (`tools/audio/integration/`)
 
@@ -216,29 +216,14 @@ e2e 追加 3 本 (`harness/run.mjs`, 計 25 シナリオ): `asio_sine_b512_96k` 
 | `stage_wasm.mjs` / ルート `package.json` script への `stage_app.sh` 組込 | 現状は手動実行 | 適用 PR (#25 管轄) |
 | `tools/e2e` スイートのパッチ適用後再実行 | 既存 `audioworklet` チェックとの互換は推定 (status 文言 `worklet 実行中`・samplePos 128f 単位は維持) | 適用 PR で実行 |
 
-## 13. AU-10 (#191) 30 分ソーク (`--soak30`)
+## 13. AU-3 (#188) Web MIDI shim (全文: `REPORT_MIDI.md`)
 
-既知類型との関係: 該当なし (ランタイム shim の長時間検証)。検証起点 commit: `0a721b0` (ブランチ `191-audio-soak30`, base `149f073`)。環境: GitHub runner 4 core / 15 GiB, headless Chrome 154.0.8037.97 (fake 出力シンク), emcc は toolchain-emsdk。
+winmm `midiIn`/`midiOut` 20 関数の Web MIDI 実体を `src/flmidi*.c` / `src/runtime/midi-shim.ts` に実装。結論: **Chrome 154 の Worker には Web MIDI が無い (実測) ため main thread 中継が必須**。検証の数値・内訳は `REPORT_MIDI.md` §13-1、未解決は §13-3 を参照。モック `MIDIAccess` での検証のみで、実デバイス (AU-2 #187)・FL 結線/shimx 強定義置換 (#179, #37) は未達。
 
-**実測の版の注意**: 下表の 30 分・負荷下・ネガコンは 0a721b0 (AU-7 取り込み前) の実測。head `85887e2` は main (`59c1169`) を取り込んでおり、`FLASIO_PROFILE_ILWASAPI` 既定 0→1 (報告 min/gran 128/128 → 256/0)・`audio-shim.ts` の ATTACH 待ち (outputLatency 0 の間 最大 600 ms)・`flasio.c` の systemTime を含む。head での 30 分は未計測 (下の未解決表を参照)。
+## 14. AU-5 (#192) 入力デバイス選択・controlPanel・入力喪失リセット (main thread 部品)
 
-再現: `bash tools/audio/build.sh && node tools/audio/harness/run.mjs --soak30` (既定の全シナリオ実行・`e2e.sh` には含めない。`--soak <秒>` で秒数指定、`--inject-hiccup` でネガコン)。結果は `results/soak_<秒>.json` (既定の `results/results.json` は上書きしない)。合格条件 (AND): underrun 0 / silence 0 / ランプ全フレーム bit-exact / 実フレーム ≥ 公称×99% / `secs_wall` ≥ 公称 / worklet エラー 0・abort なし・exit=1(完了)。不合格は runner が exit 1。
+`FlAudioInput` (入力デバイス選択・権限・入力喪失)・`FlAudioShimOptions.input` / `controlPanel`・`FLA_CMD_CONTROL_PANEL` (=8)・`FLA_EV_INPUT_CHANGED` (=16) を実装。e2e 33/33 PASS (merged HEAD `a6212bc`、新規 5 シナリオ含む)。結論: 部品と UI 代替フックまで。FL 本体の kAsioResetRequest 再初期化確認 (#192)・入力遅延の実機実測 (#187)・製品 UI (#184) は未解決。詳細・検証回次・シナリオ表は `REPORT_AU5.md`。
 
-| 実行 | 結果 | 所要 / load average (開始→終了, 1 分平均) |
-|---|---|---|
-| **30 分 (1800 s) B=256 48k ランプ・無負荷** | **PASS**: underruns 0, silence 0, ramp mismatches **0 / 86,402,944 f**, cb 337,509 回 (late 0, 最大 199 µs), `T`=1536 f 固定 (lat_changes 0), clock 48000.0 Hz, `secs_wall` 1800.053 | 1801.5 s / 0.11 → 0.07 |
-| 420 s ランプ・**負荷下** (busy ループ 14 本を 560 s 並走) | **PASS**: underruns 0, silence 0, ramp 0 / 20,159,232 f, cb 78,747 回 (late 0, 最大 479 µs), lat_changes 2 (T=1536 のまま), clock 47996.2 Hz | 476.1 s / 0.06 → **16.56** (15 分平均 6.76 まで上昇) |
-| ネガコン: 15 s + 60 ms hiccup 混入 (`--inject-hiccup`) | **FAIL (exit 1)**: underruns 8, silence 5120 f, ramp mismatches 670,464 / 721,408 | 68.5 s / 0.04 |
-| 短縮確認 `--soak 10` (3 回) | 初回は gate の完了判定が `exit===0` で誤って FAIL (完了コードは 1) → `exit===1` に修正。修正後 2 回とも PASS (ramp 0 / 481,024 f) | 63.5 s (修正後 1 回目) / 0.16 → 0.06 |
+## 15. AU-10 (#191) 30 分ソーク (`--soak30`)
 
-**既存バグの修正 (副産物)**: `test/fla_test.c` のランプは `(n & 0xFFFFFF)+1` で 2^24 f (= 349.5 s @48k) で巻き戻るが、`test/page.mjs` の照合は `p+1` 固定だった。120 s では露見せず、**30 分では必ず mismatch になる**ので 24bit 巻き戻しに合わせた。420 s / 1800 s の PASS は巻き戻しを跨いだ照合 (1800 s では 86,402,944 ÷ 16,777,216 = 5.15 → 5 回) を含む。旧照合での FAIL 再現 (ネガコン) は**未実施** (巻き戻し地点以降は定義上不一致、の理屈のみ)。
-
-検証範囲 / 範囲外: fake 出力シンクで、実機デバイス・Firefox/Safari は未計測 (#187 AU-2)。無負荷 30 分は 1 回 (n=1)。**負荷下 (load avg 10 超) の 30 分は未実施** (60 分ジョブ上限のため 420 s で代替)。キャプチャ SAB は 1800 s で 86,402,944 f × 2ch × 4 B ≈ 659 MiB。COM 経路 (#271) の 30 分、親 e2e `asio_ramp_b256_soak120` の既定組込は範囲外。
-
-| 未解決 | 影響 | 起票先 |
-|---|---|---|
-| 負荷下 (load avg 10 超) の **30 分**ソーク未実施 | #191 スコープの「負荷下の結果も記録」は 420 s のみ | #191 にコメント (別 run で `--soak30` + busy 並走) |
-| COM 経由 (`asio/e2e.sh --soak 1800`) 30 分 | #271 が COM 経路。キャプチャ約 661 MiB の分割照合設計が要る | #191 に提案 |
-| COM 経路 harness の固定 `p + 1` 照合 (`asio/harness/com_page.mjs:95`)。生成元 `asio/test/com_test.c:84` は `(n & 0xFFFFFF)+1` で 2^24 f で巻き戻る = test/page.mjs と同一バグ | `asio/e2e.sh --soak` で 349.5 s 超は ramp mismatch → FAIL (コード読解による判断・未実行) | #191 にコメント。COM 側の修正は 360 s 以上の実測を添えて別 commit |
-| head `525cbd9` での 30 分ソーク (無負荷) は**未実施** (未計測)。上の表の 30 分行は `0a721b0` (AU-7 取り込み前) のもので、マージ後の shim (`audio-shim.ts` ATTACH 待ち・`FLASIO_PROFILE_ILWASAPI` 既定 1) では未計測 | #191 にコメント (別 run で `bash tools/audio/build.sh && node tools/audio/harness/run.mjs --soak30` を head で実施) |
-| 旧 page.mjs (巻き戻し非対応) での FAIL 再現未実施 | 修正の必要性は理屈のみ | 本 REPORT に明記 |
+無負荷 30 分 (1800 s, B=256 48k ランプ) は PASS (underrun 0・ramp mismatch 0)、負荷下は 420 s で PASS。ただし head `525cbd9` 上の 30 分ソークは未実施。実機・Firefox/Safari は未計測。実測値・再現・未解決は `REPORT_AU10.md` (分割移動先) を参照。

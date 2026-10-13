@@ -5,11 +5,13 @@
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 cd "$HERE"
+source "$HERE/../shared/env.sh"   # FL_WIN64_DIR (既定 $ANALYSIS_DIR/win64 = /home/ubuntu/work/analysis/win64)
 source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1
 export TMPDIR="$HERE/work/tmp"
 mkdir -p work/tmp work/obj
 M11_LB_BASE="${M11_LB_BASE:-0}"; export M11_LB_BASE   # #222: LVA = RVA + M11_LB_BASE (0 = 従来)
-CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=$M11_LB_BASE"
+M11_OV_CLASSCREATE="${M11_OV_CLASSCREATE:-0}"   # #419: 1 = m11_ov.c の実験 override (410360 のみ; 8cbda0/8cbce0 は #503 で既定 ON) を有効化 (既定 0)
+CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=$M11_LB_BASE -DM11_OV_CLASSCREATE=$M11_OV_CLASSCREATE"
 # image 終端 (SizeOfImage 0x18c0000) + LB_BASE が GLOBAL_BASE (0x10000000) 以内であること
 python3 - <<PYEOF
 import sys
@@ -29,18 +31,54 @@ for st in ir_lb_base img_lb_base; do
 done
 
 if [ ! -f work/boot_final.ll ]; then echo "[m11build] work/boot_final.ll 無し: m11_gen_ir2.sh を先に" >&2; exit 2; fi
+PE_QS="${PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}"
+# #680: ldfix 適用の記録が無い IR (旧スナップショット等) は build しない (m11_gen_ir2.sh で作り直す)
+if [ "$(python3 m11_cond.py --get ldfix)" != applied ]; then
+  echo "[m11build] ERROR: work/ir_conditions.json に ldfix=applied の記録無し (現在: '$(python3 m11_cond.py --get ldfix)')。m11_gen_ir2.sh で IR を作り直すこと" >&2; exit 2
+fi
+# #680 (review): 記録の無い差替え (正規 pass を経ない IR の書換え) を拒否する。正規 pass は直後に --bind で指紋を更新する
+if ! python3 m11_cond.py --check work/boot_final.ll; then
+  echo "[m11build] ERROR: work/boot_final.ll が ir_conditions.json の指紋と不一致。m11_gen_ir2.sh で IR を作り直すこと" >&2; exit 2
+fi
+# #680 (review): IR を生成した PE と現在の PE が違えば build しない
+if [ "$(python3 m11_cond.py --get pe)" != "$PE_QS" ]; then
+  echo "[m11build] ERROR: IR の生成 PE ('$(python3 m11_cond.py --get pe)') と現在の PE ($PE_QS) が違う。m11_gen_ir2.sh で作り直すこと" >&2; exit 2
+fi
+# qstore (#516): 機械語 `mov qword [rbp+X],imm` が IR で `store ptr null`/`store i32 imm` (4B) に縮む site を `store i64` に戻す
+#   (capstone 突合で確定した site のみ; idempotent)。M11_QSTORE=0 で無効化 (ネガコン; 無効化は m11_gen_ir2.sh で IR を作り直してから)。
+#   #680: skip は失敗扱い (fail-closed)。適用有無は work/ir_conditions.json に記録する (m11_cond.py)。
+if [ "${M11_QSTORE:-1}" = 1 ]; then
+  if [ -f "$PE_QS" ] && python3 -c 'import capstone, pefile' 2>/dev/null; then
+    python3 qstore/m11_qstore.py work/boot_final.ll work/boot_final.qstore.tmp.ll --pe "$PE_QS" --report work/qstore_report.json > work/qstore.log
+    if ! cmp -s work/boot_final.ll work/boot_final.qstore.tmp.ll; then mv work/boot_final.qstore.tmp.ll work/boot_final.ll; else rm -f work/boot_final.qstore.tmp.ll; fi
+    python3 m11_cond.py qstore=applied
+    python3 m11_cond.py --bind work/boot_final.ll
+  else
+    # 適用済み IR (applied) の記録は残す: M11_QSTORE=0 の拒否 (下の else 側) を外さないため
+    [ "$(python3 m11_cond.py --get qstore)" = applied ] || python3 m11_cond.py qstore=skipped
+    echo "[m11build] ERROR: qstore skip (PE 無し: $PE_QS / capstone・pefile 無し) — fail-closed で失敗。明示的に外すなら M11_QSTORE=0" >&2
+    exit 1
+  fi
+else
+  if [ "$(python3 m11_cond.py --get qstore)" = applied ]; then
+    echo "[m11build] ERROR: work/boot_final.ll は qstore 適用済み (ir_conditions.json)。M11_QSTORE=0 の前に m11_gen_ir2.sh で IR を作り直すこと" >&2
+    exit 2
+  fi
+  python3 m11_cond.py qstore=disabled
+fi
 # alloca 縮退修正 (CAB-129 + #132 R8): RetDec が `alloca i64` (8B) に潰したローカルを拡幅 (idempotent)。
 #   unit #18 OOB の真因 = 44bae0 の stack_var が callee 44ba50 に書かれ 44bb70 の record を破壊 (R8)。
 #   内容が変わった時だけ boot_final.ll を差し替える (mtime を更新して毎回 post/cc を走らせない)。
 python3 alloca/m11_alloca.py work/boot_final.ll work/boot_final.alloca.tmp.ll --report work/alloca_report.json > work/alloca.log
 if ! cmp -s work/boot_final.ll work/boot_final.alloca.tmp.ll; then mv work/boot_final.alloca.tmp.ll work/boot_final.ll; else rm -f work/boot_final.alloca.tmp.ll; fi
+python3 m11_cond.py --bind work/boot_final.ll
 # #131: sigfix 復元モードが変わったら post 結果を無効化 (stamp)
 if [ "$(cat work/sigfix_recover.stamp 2>/dev/null || echo 0)" != "${M11_SIGFIX_RECOVER:-0}" ]; then rm -f work/boot_final3.ll; fi
 echo "${M11_SIGFIX_RECOVER:-0}" > work/sigfix_recover.stamp
 if [ ! -f work/boot_final3.ll ] || [ work/boot_final.ll -nt work/boot_final3.ll ] || [ m11_post.py -nt work/boot_final3.ll ] || [ m11_argrecover.py -nt work/boot_final3.ll ]; then
   # M11_SIGFIX_RECOVER=1 (#131): sigfix の 0 詰め site を機械語突合し、定数代入が確定する引数だけ復元 (m11_argrecover.py)
   if [ "${M11_SIGFIX_RECOVER:-0}" = 1 ]; then
-    PE="${PE:-${FL_WIN64_DIR:-/home/ubuntu/work/analysis/win64}/extracted/block00031_PE.bin}"
+    PE="${PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}"
     python3 m11_post.py work/boot_final.ll work/boot_final3.ll --report work/post_report.json --pads work/sigfix_pads.json
     FIXES="${M11_SIGFIX_FIXES:-work/sigfix_fixes.json}"
     [ -n "${M11_SIGFIX_FIXES:-}" ] || python3 m11_argrecover.py work/sigfix_pads.json --pe "$PE" --lb "$M11_LB_BASE" --out "$FIXES"
@@ -81,12 +119,15 @@ cc work/boot_final3.ll work/obj/boot.o
 cc work/m11_simd.c work/obj/simd.o msimd11_core.h
 cc work/m11_winstubs.c work/obj/winstubs.o
 cc work/m11_fnstubs.c work/obj/fnstubs.o
+# M11_OV_CLASSCREATE が変わったら ov.o だけ無効化 (stamp; ON/OFF の切替で古い ov.o を再リンクしない)
+if [ "$(cat work/ov_classcreate.stamp 2>/dev/null || echo 0)" != "$M11_OV_CLASSCREATE" ]; then rm -f work/obj/ov.o; fi
+echo "$M11_OV_CLASSCREATE" > work/ov_classcreate.stamp
 cc m11_ov.c work/obj/ov.o work/boot_final3_sigs.h
 cc work/m11_data.c work/obj/data.o
 
 INITMEM="$((0x12000000))"
 MAXMEM="$((0x72000000))"
-EXPORTS=_m11_boot_enter,_entry_point,_m11_init_count,_m11_boot_stage,_m11_va_used,_m11_va_calls,_m11_set_trace,_m11_icall_ok,_m11_icall_miss,_m11_icall_miss_uniq,_m11_icall_miss_at,_m11_icall_cnt_n,_m11_icall_cnt_key,_m11_icall_cnt_ok,_m11_icall_cnt_miss,_m11_icall_cnt_drop,_m11_disp_count,_m11_units_run,_m11_units_total,_m11_units_skipped,_m11_stub_total,_m11_stub_uniq,_m11_stub_name,_m11_stub_count,_m11_probe_count,_m11_longjmp_hit,_m11_set_survey,_m11_call_unit,_m11_unit_va,__emscripten_stack_restore,_emscripten_stack_get_current
+EXPORTS=_m11_boot_enter,_entry_point,_m11_init_count,_m11_boot_stage,_VirtualAlloc,_VirtualFree,_m11_va_used,_m11_va_calls,_m11_va_live,_m11_va_peak,_m11_va_oom,_m11_va_freed,_m11_va_freed_bytes,_m11_va_free_unknown,_m11_va_free_skipped,_m11_va_decommit,_m11_va_big,_m11_set_vfree_noop,_m11_set_va_bigtrace,_m11_set_va_stack_at,_m11_set_va_unit_budget,_m11_va_unit_begin,_m11_va_denied,_m11_set_trace,_m11_icall_ok,_m11_icall_miss,_m11_icall_miss_uniq,_m11_icall_miss_at,_m11_icall_cnt_n,_m11_icall_cnt_key,_m11_icall_cnt_ok,_m11_icall_cnt_miss,_m11_icall_cnt_drop,_m11_disp_count,_m11_units_run,_m11_units_total,_m11_units_skipped,_m11_stub_total,_m11_stub_uniq,_m11_stub_name,_m11_stub_count,_m11_probe_count,_m11_longjmp_hit,_m11_set_survey,_m11_call_unit,_m11_unit_va,__emscripten_stack_restore,_emscripten_stack_get_current
 emcc work/obj/*.o -o work/m11_boot.cjs.tmp \
   -O0 -g1 -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8MB -sGLOBAL_BASE="$((0x10000000))" \
   -sENVIRONMENT=node -sMODULARIZE=1 -sEXPORT_NAME=m11create \

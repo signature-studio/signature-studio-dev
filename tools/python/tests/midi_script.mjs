@@ -1,8 +1,9 @@
 // PY-6 (#76) e2e: MIDI scripting ホスト (device script ローダ / 27 callback 配送 / Web MIDI 結線)。
-//   node tools/python/tests/midi_script.mjs [--neg]
+//   node tools/python/tests/midi_script.mjs [--neg | --neg-legacy]
 //   PASS: "MIDI SCRIPT OK {...}" exit 0 / FAIL: exit 2 / --neg で壊した入力を検出できたとき: "NEG-CONTROL DETECTED" exit 1 (検出できなければ exit 2)
 // 前提: tools/python/dist/ (build_flpy.sh)。FL 由来ファイルは不要 (fixtures/ は本 repo の合成スクリプト。FL 同梱の device script ではない)。
 //   --neg: recorder の OnDirtyChannel を消して供給 → 「27 callback 全て配送」の判定が FAIL することを確認する。
+//   --neg-legacy (#601): fl_rt.load_device_script を旧実装 (登録してから exec) に差し戻す → 「読込失敗後に script が残らない」系の check が FAIL することを確認する。
 import fs from "node:fs";
 import assert from "node:assert/strict";
 import { FlPython } from "../host/flpython.mjs";
@@ -10,6 +11,7 @@ import { createMockEngine } from "../host/fl_mock.mjs";
 import { MidiScriptHost, parseMidiBytes } from "../host/midi_host.mjs";
 
 const neg = process.argv.includes("--neg");
+const negLegacy = process.argv.includes("--neg-legacy");
 const root = new URL("../", import.meta.url);
 const fx = (n) => fs.readFileSync(new URL(`tests/fixtures/${n}`, root), "utf8");
 const ids = JSON.parse(fs.readFileSync(new URL("analysis/flapi/flapi_ids.json", root)));
@@ -117,6 +119,52 @@ await take();
 const initFwd = await host.init("fwd");
 check("script 指定の init (fwd のみ) → fwd.OnInit が device.getPortNumber を呼ぶ", stdout.some((l) => /fixture forward-cc init, port 0/.test(l)) && initFwd[0].results.length === 1, stdout);
 
+const rej = async (p) => { try { await p; return null; } catch (e) { return String(e.message); } };
+
+// ---- 4b. top-level 例外で読込に失敗した script は登録されない (#601): reject / list / sys.modules / 配送 / 同名再読込 ----
+if (negLegacy) {
+  // 旧実装 (_scripts へ登録してから exec) に差し戻す。回帰 check だけが FAIL することの確認用
+  await py.run(`
+import sys, types, json, fl_rt
+def _legacy_load(name, source=None, path=None, port=None):
+    meta = fl_rt.parse_meta(source)
+    if name in fl_rt._scripts:
+        fl_rt.unload_device_script(name)
+    key = "fl_device_%d" % next(fl_rt._script_seq)
+    mod = types.ModuleType(key)
+    mod.__file__ = path or f"<device:{name}>"
+    code = compile(source, mod.__file__, "exec")
+    sys.modules[key] = mod
+    fl_rt._scripts[name] = {"module": mod, "port": port, "meta": meta, "path": path, "key": key}
+    exec(code, mod.__dict__)
+    return json.dumps({"name": name, "module": key, "meta": meta, "port": port, "callbacks": sorted(cb for cb in fl_rt.CALLBACKS if callable(getattr(mod, cb, None)))})
+_fixed_load = fl_rt.load_device_script
+fl_rt.load_device_script = _legacy_load
+`);
+}
+const modCount = async () => {
+  stdout.length = 0;
+  await py.run(`import sys; print("fl_device modules:", sum(1 for k in sys.modules if k.startswith("fl_device_")))`);
+  return Number(/fl_device modules: (\d+)/.exec(stdout.join("\n"))?.[1]);
+};
+const modsBefore = await modCount();
+const eBad = await rej(host.loadDeviceScript({ name: "bad", source: fx("device_import_fails.py"), port: null }));
+check("top-level 例外 (import no_such_module) の script は loadDeviceScript が reject (原因 ModuleNotFoundError)", /ModuleNotFoundError/.test(eBad ?? ""), eBad);
+const listAfterBad = await host.listDeviceScripts();
+check("読込失敗後の listDeviceScripts に bad が残らない (rec のみ)", !("bad" in listAfterBad) && "rec" in listAfterBad, Object.keys(listAfterBad));
+check("読込失敗後に sys.modules へ fl_device_* が漏れない", (await modCount()) === modsBefore, { before: modsBefore });
+stdout.length = 0;
+const rBad = await host.midiIn(Uint8Array.from([0x90, 63, 90]), { port: 0 });
+check("読込失敗後の midiIn は bad へ配送されない (OnMidiIn 未実行)", !rBad.results.some((x) => x.script === "bad") && !stdout.some((l) => /bad OnMidiIn delivered/.test(l)), { scripts: rBad.results.map((x) => x.script), stdout: stdout.slice(-3) });
+await take();
+const cbBad = await host.callback("OnRefresh", [4]);
+check("読込失敗後の非 MIDI callback も bad へ配送されない", !cbBad.results.some((x) => x.script === "bad"), cbBad.results.map((x) => x.script));
+await take();
+const reBad = await host.loadDeviceScript({ name: "bad", source: "def OnInit(): pass\n", port: null });
+check("失敗後に同名で読込み直せる (成功すれば登録される)", reBad.callbacks.join() === "OnInit" && "bad" in (await host.listDeviceScripts()), reBad);
+await host.unloadDeviceScript("bad");
+if (negLegacy) await py.run("fl_rt.load_device_script = _fixed_load");
+
 // ---- 5. 合成 "Forward CCs" fixture: CC は device.forwardMIDICC へ、Note は転送しない ----
 engine.state.midiOut.length = 0;
 await host.midiIn(Uint8Array.from([0xb2, 74, 99]), { port: 1 });
@@ -127,7 +175,6 @@ const expectMsg = 0xb2 + (74 << 8) + (99 << 16) + (1 << 24);
 check("CC → device.forwardMIDICC(status+data1<<8+data2<<16+port<<24) 1 回のみ、Note は転送なし", out.length === 1 && out[0].api === "forwardMIDICC" && out[0].message === expectMsg, out);
 
 // ---- 6. 不正入力の拒否 (ネガティブ) ----
-const rej = async (p) => { try { await p; return null; } catch (e) { return String(e.message); } };
 const e1 = await rej(host.callback("OnNoSuchCallback", []));
 const e2 = await rej(host.callback("OnRefresh", []));
 const e3 = await rej(host.callback("OnNoteOn", [{ status: 0x90 }]));
@@ -209,8 +256,12 @@ detail.latency = { events: M, sequential_us_per_event: Math.round((seqMs * 1000)
 
 await py.terminate();
 const KEY = "27 callback 全てが想定引数で 1 回ずつ配送";
-const ok = Object.keys(checks).length > 0 && (neg
-  ? checks[KEY] === false && Object.entries(checks).every(([k, v]) => k === KEY || v)
-  : Object.values(checks).every(Boolean));
-console.log((ok ? (neg ? "MIDI SCRIPT NEG-CONTROL DETECTED " : "MIDI SCRIPT OK ") : "MIDI SCRIPT FAIL ") + JSON.stringify({ ok, neg, checks: Object.keys(checks).length, failed: Object.entries(checks).filter(([, v]) => !v).map(([k]) => k), detail, hostStats: host.stats }));
-process.exit(ok ? (neg ? 1 : 0) : 2);
+// --neg-legacy: 旧ローダ (登録してから exec) に差し戻す → 読込失敗の回帰 check (下の 3 本) が FAIL し、それ以外は全て PASS のとき検出成功
+const LEGACY_KEYS = ["読込失敗後の listDeviceScripts に bad が残らない (rec のみ)", "読込失敗後に sys.modules へ fl_device_* が漏れない", "読込失敗後の midiIn は bad へ配送されない (OnMidiIn 未実行)"];
+const failedKeys = Object.entries(checks).filter(([, v]) => !v).map(([k]) => k);
+const detected = negLegacy
+  ? LEGACY_KEYS.every((k) => failedKeys.includes(k)) && failedKeys.every((k) => LEGACY_KEYS.includes(k) || /^読込失敗後の非 MIDI|^失敗後に同名/.test(k))
+  : checks[KEY] === false && Object.entries(checks).every(([k, v]) => k === KEY || v);
+const ok = Object.keys(checks).length > 0 && (neg || negLegacy ? detected : Object.values(checks).every(Boolean));
+console.log((ok ? (neg || negLegacy ? "MIDI SCRIPT NEG-CONTROL DETECTED " : "MIDI SCRIPT OK ") : "MIDI SCRIPT FAIL ") + JSON.stringify({ ok, neg, negLegacy, checks: Object.keys(checks).length, failed: Object.entries(checks).filter(([, v]) => !v).map(([k]) => k), detail, hostStats: host.stats }));
+process.exit(ok ? (neg || negLegacy ? 1 : 0) : 2);

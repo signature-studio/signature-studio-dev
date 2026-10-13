@@ -7,7 +7,7 @@
 #   NC-I : ids_crosscheck.py に、独立走査の件数より多い ID 件数 (+1) を持つ facts を与える → exit 1 (対照 0)
 #   NC-M : matrix_check.py に closure_funcs +1 の facts / emcc_c_rc を変えた status を与える → exit 1 (対照 0)
 #   NC-W : e2e 本体 (--skip-lift) に判定が落ちる lift 結果を与える → 非 0 かつ OK 行なし
-#   NC-N : unimpl_names.py に許容外 / 件数不一致 / log 無しの simd.log を与える → exit 1 (対照 0)
+#   NC-N : unimpl_names.py に未実装名 (旧許容の rep_stosb_memset を含む) / 件数不一致 / log 無しの simd.log を与える → exit 1 (対照 0)
 #   NC-D : engine_defs.py に実在しない range を 1 本足した ranges を与える → missing_define が 1 増える
 # 事前: distortion_e2e.sh を実行済み。 exit 0 = 全 NC が期待通り
 set -uo pipefail
@@ -69,7 +69,7 @@ emcc_c1 19004 emcc_c_rc 1 emcc_c_rc=1
 lift_rc1 19078 lift_rc 1 lift_rc=1
 f80_3 18987 f80_funcs 3 f80_funcs=3
 unimpl5 19082 declares_unimpl 5 declares_unimpl=5
-unimpl_over_allow 19024 declares_unimpl 2 declares_unimpl=2
+unimpl_was_allowed 19024 declares_unimpl 1 declares_unimpl=1
 unimpl_unknown 18914 declares_unimpl -1 declares_unimpl=-1
 defines0 19089 defines 0 defines=0
 defines_ne_closure 18972 defines 9999 defines=9999
@@ -121,26 +121,41 @@ w('e_lift_rc1', lambda b: b[0].__setitem__(hdr.index('lift_rc'), '1'))
 w('e_defines0', lambda b: b[-1].__setitem__(hdr.index('defines'), '0'))
 w('e_unknown', lambda b: b[0].__setitem__(hdr.index('missing_define'), '-1'))
 w('e_deleted', lambda b: b.pop(0))
+w('e_emcc1', lambda b: b[0].__setitem__(hdr.index('emcc_c_rc'), '1'))
+w('e_miss1', lambda b: b[-1].__setitem__(hdr.index('missing_define'), '1'))
+w('e_f80', lambda b: b[0].__setitem__(hdr.index('f80_funcs'), '1'))
 PY
 rc=$(je e_ctrl "$N/e_ctrl.csv"); echo "NC-JE 対照 (実測 engines.csv): exit=$rc (期待 0)"; [ "$rc" = 0 ] && chk 'NC-JE 対照' ok || chk 'NC-JE 対照' ng
-for nm in e_lift_rc1 e_defines0 e_unknown e_deleted; do
+for nm in e_lift_rc1 e_defines0 e_unknown e_deleted e_emcc1 e_miss1 e_f80; do
   rc=$(je "$nm" "$N/$nm.csv"); echo "NC-JE $nm: exit=$rc (期待 非0)"; [ "$rc" != 0 ] && chk "NC-JE $nm" ok || chk "NC-JE $nm" ng
 done
+# emcc_c_rc / missing_define / f80_funcs の不合格は、その列名の理由で落ちること
+for pr in e_emcc1:emcc_c_rc=1 e_miss1:missing_define=1 e_f80:f80_funcs=1; do
+  nm=${pr%%:*}; pat=${pr#*:}
+  if grep -q "$pat" "$N/$nm.out"; then echo "NC-JE $nm 理由 [$pat]: 一致"; chk "NC-JE $nm 理由" ok; else echo "NC-JE $nm 理由 [$pat]: 不一致"; chk "NC-JE $nm 理由" ng; fi
+done
+
+# ---- NC-C: C++ 閉包 (closure_cpp.py) — seed を断つと非 0 -------------------------------------
+python3 distortion/closure_cpp.py 19101 > "$N/cc_ctrl.out" 2>&1; rc0=$?
+CLOSURE_CPP_SEED_DEPTH=0 python3 distortion/closure_cpp.py 19101 > "$N/cc_bad.out" 2>&1; rc1=$?
+echo "NC-C: closure_cpp 19101 対照 exit=$rc0 (期待 0) / seed 探索深さ 0 exit=$rc1 (期待 非0, 理由 seed_vtables=0)"
+[ "$rc0" = 0 ] && [ "$rc1" != 0 ] && grep -q 'seed_vtables=0' "$N/cc_bad.out" && chk 'NC-C' ok || chk 'NC-C' ng
 
 # ---- NC-N: 未実装 helper の名前 (件数だけの judge を補う) ---------------------------------
 mkdir -p "$N/ub/19024" "$N/ub/19004" "$N/ub_bad/19024" "$N/ub_bad2/19004" "$N/ub_bad3/19024"
 cp work/batch/19024/p.simd.log "$N/ub/19024/"; cp work/batch/19004/p.simd.log "$N/ub/19004/"
-sed 's/__asm_rep_stosb_memset/__asm_rep_stosw_memset/' work/batch/19024/p.simd.log > "$N/ub_bad/19024/p.simd.log"
-{ cat work/batch/19004/p.simd.log; echo '   unimplemented: void __asm_fake_helper(ptr)'; } > "$N/ub_bad2/19004/p.simd.log"
-grep -v '^   unimplemented' work/batch/19024/p.simd.log > "$N/ub_bad3/19024/p.simd.log"
-AL='--allow 19024=__asm_rep_stosb_memset'
+bump() { sed -E 's/(unimplemented )[0-9]+/\11/' "$1"; }   # 集計行の未実装件数を 1 にする
+{ bump work/batch/19024/p.simd.log; echo '   unimplemented: void __asm_rep_stosb_memset(ptr, i8, i64)'; } > "$N/ub_bad/19024/p.simd.log"
+{ bump work/batch/19004/p.simd.log; echo '   unimplemented: void __asm_fake_helper(ptr)'; } > "$N/ub_bad2/19004/p.simd.log"
+bump work/batch/19024/p.simd.log > "$N/ub_bad3/19024/p.simd.log"
+AL=''
 python3 distortion/unimpl_names.py "$N/ub" --blocks 19024,19004 $AL > "$N/un0.out" 2>&1; rc=$?
 echo "NC-N 対照 (実測 p.simd.log): exit=$rc  $(tail -n 1 "$N/un0.out")  (期待 0)"
 [ "$rc" = 0 ] && chk 'NC-N 対照' ok || chk 'NC-N 対照' ng
 python3 distortion/unimpl_names.py "$N/ub_bad" --blocks 19024 $AL > "$N/un1.out" 2>&1; rc=$?
-echo "NC-N 別名の helper (stosb -> stosw): exit=$rc  (期待 1)"; [ "$rc" = 1 ] && chk 'NC-N 別名' ok || chk 'NC-N 別名' ng
+echo "NC-N 旧許容 helper (rep_stosb_memset) が再び未実装: exit=$rc  (期待 1)"; [ "$rc" = 1 ] && chk 'NC-N 別名' ok || chk 'NC-N 別名' ng
 python3 distortion/unimpl_names.py "$N/ub_bad2" --blocks 19004 $AL > "$N/un2.out" 2>&1; rc=$?
-echo "NC-N 未実装 0 の block に名前を追記: exit=$rc  (期待 1)"; [ "$rc" = 1 ] && chk 'NC-N 追記' ok || chk 'NC-N 追記' ng
+echo "NC-N 未実装 0 の block に未知の名前 (件数も 1 に揃える): exit=$rc  (期待 1)"; [ "$rc" = 1 ] && chk 'NC-N 追記' ok || chk 'NC-N 追記' ng
 python3 distortion/unimpl_names.py "$N/ub_bad3" --blocks 19024 $AL > "$N/un3.out" 2>&1; rc=$?
 echo "NC-N 件数 1 だが名前の行が無い: exit=$rc  (期待 1)"; [ "$rc" = 1 ] && chk 'NC-N 件数不一致' ok || chk 'NC-N 件数不一致' ng
 python3 distortion/unimpl_names.py "$N/ub" --blocks 19024,18914 $AL > "$N/un4.out" 2>&1; rc=$?
@@ -226,7 +241,7 @@ echo "NC-D: $(basename "$ED") missing_define 対照=$m0  実在しない range �
 
 # ---- NC-W: e2e 全体の配線 (--skip-lift 経路で、判定が落ちる status を与えたとき e2e 本体が非 0 で終わり OK 行を出さない) ----
 cp "$OUT/status.csv" "$N/backup_status.csv"; cp "$OUT/shell_audit.csv" "$N/backup_audit.csv"
-cp work/batch/status.csv "$N/poison_batch.csv"; echo "19004,Fruity Fast Dist,12,8381,0,12,0,0,1,2" >> "$N/poison_batch.csv"
+cp work/batch/status.csv "$N/poison_batch.csv"; echo "19004,Fruity Fast Dist,12,8381,0,12,0,0,1,2,1,13" >> "$N/poison_batch.csv"
 o=$(BATCH_STATUS="$N/poison_batch.csv" bash distortion/distortion_e2e.sh --skip-lift 2>&1); rc=$?
 ok=0; echo "$o" | grep -q '^\[distortion_e2e\] OK' && ok=1
 w=0; echo "$o" | grep -q 'FAIL  block 19004.*emcc_c_rc=1' && w=1
