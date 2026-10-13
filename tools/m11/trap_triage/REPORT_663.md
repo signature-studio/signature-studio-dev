@@ -62,7 +62,7 @@ JS の末尾 frame `file:///…/survey_units*.mjs` は配置場所だけで決�
 | 構成 | 期待 | 結果 |
 |---|---|---|
 | (a) 修正前 (`git show 8d883c3:…`) vs 修正後 → `frames_check.py` | PASS | **PASS** (exit 0) |
-| (b) 修正前 vs 修正前 (修正を外した状態) → `frames_check.py` | FAIL | **FAIL** (exit 1): 違反 21 = oob 全件 (unit 95: `pre 8 / post 9` 等) |
+| (b) 修正前 vs 修正前 (修正を外した状態) → `frames_check.py` | FAIL | **FAIL** (exit 1): 違反 21 = oob 全件 (同一 JSON 同士なので `frames[1:]` が 1 段ずれず一致しない) |
 | (c) 修正後の 1 unit (unit 0, ok) の kind を oob に書換えた JSON → `frames_check.py` | FAIL | **FAIL** (exit 1) |
 | (c) の `survey_diff.py` | ok 退行 1 | **ok 退行 1 `[0]`** |
 
@@ -71,7 +71,7 @@ JS の末尾 frame `file:///…/survey_units*.mjs` は配置場所だけで決�
 ## 4. 所要と load (実測)
 
 - `m11_build.sh` (再リンク): 7.728 s real (cached obj を流用)
-- survey 1 回 (942 unit): 修正前 8.41 s (初回 `base_head`)。`negctl_663.sh` の pre / post は、作業ツリー段階で 8.10 / 8.04 s。コミット済み HEAD (`442c46e`) での 2 回: pre 8.08 / 8.10 s、post 8.11 / 8.04 s (min–max、n=2)
+- survey 1 回 (942 unit): 修正前 8.41 s (初回 `base_head`)。`negctl_663.sh` の pre / post は、作業ツリー段階で 8.10 / 8.04 s。コミット `442c46e` (survey 本体) を含む HEAD `18dbb43` での 2 回: pre 8.08 / 8.10 s、post 8.11 / 8.04 s (min–max、n=2)
 - `negctl_663.sh` 全体: 16.27 s (survey 2 本 + checker 3 本 + survey_diff 2 本)。HEAD 上の 2 回とも `NEGCTL_663 ALL EXPECTED`
 - 基準 JSON の md5 は全 run で一致: pre `9d9f778d9481`、post `b2815724d940`
 - load average (1 分): 0.13–0.52 (各 run の前後 `uptime`)、並列数 1 (node は単一プロセス)、node `v22.23.3` (PATH の node)
