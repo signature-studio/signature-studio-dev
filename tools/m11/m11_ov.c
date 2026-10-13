@@ -546,3 +546,28 @@ unsigned long long function_417b70(unsigned long long a, unsigned long long ti, 
     Q(a) = data;
     return 0;
 }
+
+/* function_410b10  VA 0x410b10  (System.TMonitor の GetMonitor 相当: obj の monitor スロット = obj + InstanceSize - 8 を返し, 無ければ 410650 で作って cmpxchg で差す)
+ * RetDec は `mov rax,[rcx]` (obj → VMT) を落とし, `[obj-0x80]` (InstanceSize = [VMT-0x80]) を読んだ (D4: disp=0 の deref 脱落).
+ * _ClassCreate が TClass 自身を「オブジェクト」として返していた間は [obj-0x80] が偶然 InstanceSize になっていたが, 40fb40 以降の実オブジェクトでは
+ * ヒープ上の任意値になり, 不正アドレスに TMonitor の LockCount/Recursion/Owner を書いて FastMM のプールヘッダを壊した (unit #18 OOB の再発).
+ *   rsi = obj + sext([[obj]-0x80]) - 8; cur = *rsi; (cur & ~1) があればそれを返す.
+ *   無ければ new = 410650() (TMonitor 作成); lock cmpxchg(*rsi, cur → new | (cur & 1)); 再読込して (*rsi & ~1) == 0 なら再試行;
+ *   勝った値が new と異なれば new を 407e20 (FreeMem) で解放. 戻り = *rsi & ~1. */
+extern unsigned long long function_410650(void);
+extern unsigned long long function_407e20(unsigned long long);
+unsigned long long function_410b10(unsigned long long obj) {
+    u64 slot = obj + (u64)(long long)(int)D(Q(obj) - 0x80) - 8;
+    u64 cur = Q(slot);
+    u64 mon = cur & ~1ull;
+    if (mon) return mon;
+    u64 nw = function_410650();
+    for (;;) {
+        if (Q(slot) == cur) Q(slot) = nw | (cur & 1);
+        cur = Q(slot);
+        mon = cur & ~1ull;
+        if (mon) break;
+    }
+    if (mon != nw) function_407e20(nw);
+    return mon;
+}
