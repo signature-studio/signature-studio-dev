@@ -84,8 +84,8 @@ OOB 16 件の最上位 frame (現行 build): 144 `407e20` / 149 `412e40` / 275 `
 ## 7. main `8bc34ed9` での再確認 (再実行)
 
 - 起点: origin/main `8bc34ed9` (PR #1242 取込み後、`7736a5c5` から 473 commit 先)。
-- 素材: `fl-win64` (展開先は `docs/REFERENCES.md` の `[WIN64]`)、`work-m11`、`work-liftdiff`、`toolchain-emsdk`、`toolchain-retdec` の 5 つを PR 本文の `oc_artifacts:` 行に記載する。ただし元の検証 run の展開ログは確認できていない。
-- 注記: 差し戻し対応の run (`pull_request_review`) の `$ARTIFACTS_DIR` には `fl-win64` しか無く、`work-m11` は無かった。このため fix run では §7 の数値を再実行していない。上の数値は元の run の記録で、再現は `oc_artifacts` 指定で素材を取得した run で行う。
+- 素材: 上の数値を出した run で `work-m11` 等を展開したことは、現時点のログでは確認できていない (`pull_request` run のログは `fl-win64` の取得のみ)。再現に必要な素材は PR 本文の `oc_artifacts:` 行で指定する。
+- 注記: 差し戻し対応の run の `$ARTIFACTS_DIR` には `fl-win64` しか無く、`work-m11` は無かった。このため fix run では §7 の数値を再実行していない。上の数値は再現されるまで未検証として扱う。
 - `m11_gen_ir2.sh`: rc=0、46.2 s、`ldfix` F1=902 F2=30 F3c=36 errors=0。
 - `m11_build.sh`: rc=0、27.1 s、`wasm-ld signature mismatch: 0`。
 - `survey_units.mjs` (`SV_RAW=1`): rc=0、20.0 s。集計は §6 の `7736a5c5` の値と一致 (JSON は §6 に記載済みのため重複させない)。
