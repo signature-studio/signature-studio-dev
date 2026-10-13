@@ -79,6 +79,8 @@ EMSCRIPTEN_KEEPALIVE int m11_disp_count(void) { return (int)m11_disp_n; }
 extern unsigned long long function_40f960(unsigned long long);
 extern unsigned long long function_41c160(unsigned long long);
 extern unsigned long long function_5c0e70(unsigned long long);
+/* 481790 (逆アセンブル #704): rcx = ptr, dl = flag(1 byte) → rax = ptr 幅の戻り値 (u64 で切り捨てなし) */
+extern unsigned long long function_481790(void* rcx, unsigned long long dl);
 static u64 tr_40f960(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return function_40f960(a0); }
 static u64 tr_41c160(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return function_41c160(a0); }
 static u64 tr_5c0e70(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return function_5c0e70(a0); }
@@ -107,6 +109,7 @@ static u64 tr_479b10(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64
 static u64 tr_41c130(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) {
     u32 old = *(volatile u32*)(uintptr_t)(a0 + 8); *(volatile u32*)(uintptr_t)(a0 + 8) = old - 1; return old;
 }
+static u64 tr_9b4b00(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7);
 #endif
 
 static m11_tr_t disp_find(u32 va) {
@@ -129,6 +132,7 @@ static m11_tr_t disp_find(u32 va) {
     case 0x479b10: return tr_479b10;
 #if M11_OV_CLASSCREATE
     case 0x41c130: return tr_41c130;   /* TInterfacedObject.AfterConstruction (#595) */
+    case 0x9b4b00: return tr_9b4b00;   /* ユーザクラス AfterConstruction (closure 外; #704) */
 #endif
     }
     return 0;
@@ -523,6 +527,35 @@ u64 function_47b260(u64 self, void* src, u64 unused) {
 }
 #endif
 
+/* function_535bf2 / function_535c11  VA 0x535bf2 / 0x535c11  (rcx = self; 24B 要素の配列を走査し dword = -1 で空と判定)
+ * 逆アセンブル: 535bf0 = jmp 535c11.
+ *   535c11: items = [[self+8]+8]; bound = (items ? [items-8] : 0) - 1; [self+0x10] < bound (signed) なら 535bf2, 否なら 0 を返す.
+ *   535bf2: [self+0x10] += 1; dword items[idx*24] ≠ -1 なら (items & ~0xff) | 1 を返す (al=1), = -1 なら 535c11 へ.
+ * RetDec は 535bf2 末尾の `ret` (VA 0x535c2e) を未定義の function_535c2e への call にし, 535c11 の jl 先 535bf2 を rcx=0 の call にした (#714).
+ * 同じ分岐を C で書き、closure 外参照を転記で消す (seed 追加では解けないため). */
+#ifndef M11_FIX_535BF2
+#define M11_FIX_535BF2 0
+#endif
+#if M11_FIX_535BF2
+u64 function_535c11(u64 self) {
+    for (;;) {
+        u64 items = Q(Q(self + 8) + 8);
+        long long bound = (long long)(items ? Q(items - 8) : 0) - 1;
+        if (!((long long)Q(self + 0x10) < bound)) return 0;
+        Q(self + 0x10) += 1;
+        items = Q(Q(self + 8) + 8);
+        if (*(volatile u32*)(uintptr_t)(items + Q(self + 0x10) * 24) != 0xffffffffu) return (items & ~0xffULL) | 1;
+    }
+}
+u64 function_535bf2(u64 self) {
+    u64 items;
+    Q(self + 0x10) += 1;
+    items = Q(Q(self + 8) + 8);
+    if (*(volatile u32*)(uintptr_t)(items + Q(self + 0x10) * 24) != 0xffffffffu) return (items & ~0xffULL) | 1;
+    return function_535c11(self);
+}
+#endif
+
 /* function_5c0270  VA 0x5c0270  (参照カウント付きキャッシュ node の Release: self = キャッシュ, node = function_5c00e0 の戻り)
  * 逆アセンブル転記 (5c0270..5c0392). node = {+0 next, +8 refcount(dword), +0xc 第 1 qword キー, +0x14 hash(word), +0x18 tid(dword), +0x1c payload}.
  * RetDec は 3 点を落とした (#474):
@@ -804,6 +837,42 @@ unsigned long long function_410360(unsigned long long inst) {
     m11_vcall(0x41037d, Q(Q(inst) - 0x50), inst);
     return inst;
 }
+
+/* function_9b5450  VA 0x9b5450  (ユーザクラス初期化: フィールドを 0 クリアし 412d60 で解放) (#704)
+ * 逆アセンブル: mov qword/dword [rcx+off],0 (0x5c,0x20,0x88,0x78,0x08,0x64,0x6c,0x10,0x50,0x74) → lea rcx,[rcx+0x28]; call 412d60; ret */
+static void function_9b5450(u64 rcx) {
+    Q(rcx + 0x5c) = 0;
+    Q(rcx + 0x20) = 0;
+    Q(rcx + 0x88) = 0;
+    Q(rcx + 0x78) = 0;
+    Q(rcx + 8) = 0;
+    Q(rcx + 0x64) = 0;
+    Q(rcx + 0x6c) = 0;
+    Q(rcx + 0x10) = 0;
+    D(rcx + 0x50) = 0;
+    D(rcx + 0x74) = 0;
+    function_412d60(rcx + 0x28, 0);
+}
+
+/* function_9b4b00  VA 0x9b4b00  (ユーザクラス AfterConstruction 相当。410360 ON 時に [vmt-0x50] 経由で呼ばれる; #704)
+ * 逆アセンブル (103 byte): push rbx; mov rbx,rcx; call 410070 (ret); rcx=[0x9b4b00+...]; dl=1; call 481790 → [rbx+0x54]=rax;
+ *   byte [rbx+0x34]=0; call 9b5450(rbx); call 4133f0(rbx+0x48, rip+0x3b); call 412d60(rbx+0x80); dword [rbx+0x3c]=0;
+ *   call 412d60(rbx+0x28); dword [rbx+0x30]=0xffffff9d; ret
+ * closure 外 (boot_fns.json に無い) のため m11_icall が miss していた (REPORT_595 §2.3)。 */
+static u64 function_9b4b00(u64 rcx) {
+    u64 rbx = rcx;
+    u64 rax = function_481790((void*)(uintptr_t)Q(R(0x805a8)), 1);
+    Q(rbx + 0x54) = rax;
+    *(volatile u8*)(uintptr_t)(rbx + 0x34) = 0;
+    function_9b5450(rbx);
+    function_4133f0(rbx + 0x48, R(0x5b4b74));
+    function_412d60(rbx + 0x80, 0);
+    D(rbx + 0x3c) = 0;
+    function_412d60(rbx + 0x28, 0);
+    D(rbx + 0x30) = 0xffffff9d;
+    return rbx;
+}
+static u64 tr_9b4b00(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return function_9b4b00(a0); }
 
 /* function_413060  VA 0x413060  (System._UStrFromPWCharLen 系: dest: PPointer, src: PWideChar, len: Integer) (#595)
  * 逆アセンブル: `old := [rbx]` を stack に退避 → len>0 なら [rbx] := 412c20(len), src があれば 409c80(src, new, len*2) / len<=0 なら [rbx] := 0 → 最後に 412d60(&old) で旧文字列を解放。

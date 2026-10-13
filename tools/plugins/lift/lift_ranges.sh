@@ -66,9 +66,15 @@ python3 "$P/fix_dup_decls.py" "$OUT/$NAME.oc.ll" "$OUT/$NAME.dd.ll"
 python3 "$P/fix_ptr_params.py" "$OUT/$NAME.dd.ll" "$OUT/$NAME.pp0.ll"
 python3 "$P/fix_icmp_ptr.py" "$OUT/$NAME.pp0.ll" "$OUT/$NAME.pp.ll"
 # opt-in (PLUG_XMMARG=1): 機械語が xmm0..3 を入力に読むのに IR 署名に無い関数へ float/double 引数を復元 ((DEFECTS.md) D5, PLG-F2-4 #547)
-AF_IN="$OUT/$NAME.pp.ll"
+# opt-in (PLUG_LDFIX=1): RetDec の load 取り違え (値↔アドレス・spill_slot_deref) を機械語と突合して修復 (#232 LD-1, tools/m11/ldfix)
+LD_IN="$OUT/$NAME.pp.ll"
+if [ "${PLUG_LDFIX:-0}" = "1" ]; then
+  python3 "$HERE/../../m11/ldfix/ldfix.py" "$LD_IN" "$OUT/$NAME.ldfix.ll" --pe "$PE" --report "$OUT/$NAME.ldfix.json"
+  LD_IN="$OUT/$NAME.ldfix.ll"
+fi
+AF_IN="$LD_IN"
 if [ "${PLUG_XMMARG:-0}" = "1" ]; then
-  python3 "$P/fix_xmm_args.py" "$OUT/$NAME.pp.ll" "$OUT/$NAME.xa.ll" --pe "$PE" --report "$OUT/$NAME.xa.json"
+  python3 "$P/fix_xmm_args.py" "$LD_IN" "$OUT/$NAME.xa.ll" --pe "$PE" --report "$OUT/$NAME.xa.json"
   AF_IN="$OUT/$NAME.xa.ll"
 fi
 python3 "$P/m11_asmfix.py" "$AF_IN" "$OUT/$NAME.asmfix.ll"

@@ -6,6 +6,10 @@ set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 cd "$HERE"
 source "$HERE/../shared/env.sh"   # FL_WIN64_DIR (既定 $ANALYSIS_DIR/win64 = /home/ubuntu/work/analysis/win64)
+# #730: emsdk 無しで後段の emcc が不明瞭に失敗するのを避け、前提不足の理由を明示して止める (m11_e2e.sh の prerequisite チェックと揃える)
+if [ ! -f /opt/emsdk/emsdk_env.sh ]; then
+  echo "[m11build] ERROR: prerequisite missing: emsdk 無し (/opt/emsdk/emsdk_env.sh が見つからない)" >&2; exit 1
+fi
 source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1
 export TMPDIR="$HERE/work/tmp"
 mkdir -p work/tmp work/obj

@@ -158,12 +158,55 @@ python3 tools/liftdiff/tests/oob_414ad0.py > tools/liftdiff/results/m11_oob_414a
 
 ## 10. OTT 旧 chain (D1〜D6) の Actions 再現 (LD-8 / #406)
 
-既知類型との関係 (DEFECTS.md): 新規類型なし (D1〜D6 は OTT 旧 chain の既存分類 = `check_ott.py`)。検証起点 commit: `59eea5c` (main `bb76f7c` 上)。
-素材 (run 3 で全展開): `fl-win64 toolchain-emsdk work-m11 work-liftdiff work-m6-ott analysis-ott-binaries` (`toolchain-retdec` と `plugins-ott` は未取得。`liftdiff_e2e.sh` は retdec を要求しない)。
-展開先: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`・`ANALYSIS_DIR=$HOME/analysis`・`tools/{m11,liftdiff,m6,ott}/work/` (repo 直下、gitignore)。Python 依存は `uv venv` + `uv pip install numpy capstone pefile` で導入 (素の runner に無い)。
+既知類型との関係 (DEFECTS.md): 新規類型なし (D1〜D6 は OTT 旧 chain の既存分類 = `check_ott.py`)。
 
-- **PE パス解決**: `targets/ott_old.json` の `pe` = `${PLUGINS_DIR}/ott/binaries/OTT_vst2_win64.dll`。`PLUGINS_DIR` 未設定・`ANALYSIS_DIR=/home/runner/analysis` で
-  `ldlib/build_wasm.py` と同じ展開式 (`tools/shared/paths.py` 既定 `$ANALYSIS_DIR/plugins`) が `/home/runner/analysis/plugins/ott/binaries/OTT_vst2_win64.dll` (3,146,752 B, 実在) に解決。
+### 実測 run (受入条件 1 の再実行)
+
+- **Actions run ID**: `38430714782` (`GITHUB_RUN_ID`。本節の実測 run)。ログは commit 済みの [`results/liftdiff_e2e_run38430714782_9cadda79.log`](results/liftdiff_e2e_run38430714782_9cadda79.log) (`results/` は gitignore 対象外)。Actions 上の run ログには `liftdiff_e2e.sh` の stdout を残していないため、この commit 済みログが根拠。
+- **検証 HEAD**: `9cadda79` (PR の最終 head。`main` `909cf37b` を merge した後の commit。merge 後も e2e を再実行)
+- **実行**: `bash tools/liftdiff/liftdiff_e2e.sh` (`--m11-only` なし・既定 `sample:800`)。`ANALYSIS_DIR=$HOME/analysis`・`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`・`PLUGINS_DIR=$HOME/analysis/plugins`・`TMPDIR=$RUNNER_TEMP`。素材は `oc_artifacts` の 6 件を `$HOME/artifacts` で実在確認してから展開。
+
+| 検証 HEAD | 結果 | 所要 (wall clock) | load (1 分平均) | [2/4] 212 関数 (一致 / 不一致 / 実行不能) | D1 / D2 / D3 / D4_D5 / D6 |
+|---|---|---|---|---|---|
+| `9cadda79` (本節・最終 head) | exit 0・`LIFTDIFF_E2E PASS` | 179 s | 終了時 6.05 (開始時は未取得) | **35 / 112 / 65** | 4 / 6 / 14 / 20 / 26 |
+
+- **ネガコン**: 無加工 exit 0 + NC[D1] / NC[D2] / NC[D3] / NC[D6] が各 exit 1 = 5/5 PASS
+- **ログ抜粋** (commit 済みログの該当行をそのまま):
+  ```
+  OTT_SUMMARY {"functions": 212, "match": 35, "mismatch": 112, "unexec": 65, "defects": {"D1_indirect_call_drop": 4, "D2_short_global": 6, "D3_callsite_arg_drop": 14, "D4_D5_c_defined_ports": 20, "D6_body_layer": 26}, ...}
+  PASS positive: 無加工 batch → exit 0
+  PASS NC[D1]: タグ除去 → check_ott.py exit 1
+  PASS NC[D2]: タグ除去 → check_ott.py exit 1
+  PASS NC[D3]: タグ除去 → check_ott.py exit 1
+  PASS NC[D6]: タグ除去 → check_ott.py exit 1
+  PASS _UStrAsg: 旧値(dest が保持する文字列)の解放が native と異なる (mem diff)
+  PASS Delphi Move(409c80): [rcx] が spill alloca を直接読む (spill_slot_deref)
+  PASS 4123c0: resourcestring 初期化が wasm で脱落 (native entry 67 > wasm 46, callsite_arg_drop, mem diff 7)
+  関数数 800: 一致 361 / 不一致 229 / 実行不能 210
+  LIFTDIFF_E2E PASS
+  ```
+- **注意**: 以前の記録 (run `38423629378` の 33/110/69 と 35/112/65 など) は、ログが残っておらず run との対応を確認できないため、受入の根拠にしない。前回比の差分の原因切り分けは #825。
+- **他段 (本 run)**: [0/4] 単体 23 tests OK (`Ran 23 tests`・`OK`) / [1/4] build ・ネガコン 5/5 / [3/4] unit #18 3 件 PASS (`UStrAsg` mem diff・`Move(409c80)` spill_slot_deref・`4123c0` 脱落 native 67 > wasm 46) / [4/4] `sample:800` 一致 361 / 不一致 229 / 実行不能 210 (batch 105 s)。boot は unit 22 で native segv (`units_run=22/942`、判定条件外)。
+- **素材 (`oc_artifacts`)**: `fl-win64 toolchain-retdec toolchain-emsdk work-m11 work-liftdiff work-m6-ott analysis-ott-binaries` (PR 本文と同一)。`$HOME/artifacts` の 7 件の実在を確認して展開:
+  - `fl-win64` → `$RUNNER_TEMP/fl-win64` (`FL_WIN64_DIR`)
+  - `work-m11` / `work-liftdiff` / `work-m6-ott` → repo 直下の `tools/{m11,liftdiff,m6}/work/` 他 (gitignore・commit なし)
+  - `analysis-ott-binaries` → `$HOME/analysis/plugins/ott/binaries/` (`ANALYSIS_DIR=$HOME/analysis`)
+  - `toolchain-retdec` → [RETDEC]・`toolchain-emsdk` → [EMSDK] (展開済み。`docs/REFERENCES.md`)
+  - python 依存: `numpy capstone pefile` は本 run 前に `pip install` で導入 (素の runner では要導入。未解決表を参照)
+- **前回比**: 旧 3 回実測 (`59eea5c`) 38 / 108 / 66 との差分 (D3・D4_D5 の変化) は #825 で切り分ける。上の表の 35/112/65 は本 run の実測値。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 旧実測 (38/108/66) から本 run (35/112/65) への OTT 集計変化 (D3 14・D4_D5 18→20) の原因切り分け | D3・D4_D5 の変化理由が不明。受入判定 (D1〜D6 検出) には影響しない | #825 |
+| runner に numpy/capstone/pefile が無く e2e 前に `pip install` が必要 | 素の Actions で e2e が exit 2 (`missing python deps`) | PM に起票依頼 (agent-setup への追加) |
+| `fl-win64` / `analysis-ott-binaries` が agent-setup で自動展開されず手動展開が必要 | 同上 | PM に起票依頼 (agent-setup の別 issue) |
+
+### 旧 3 回実測 (`59eea5c`・前回比の基準)
+
+素材 (run 3 で全展開): `fl-win64 toolchain-emsdk work-m11 work-liftdiff work-m6-ott analysis-ott-binaries`。展開先: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`・`ANALYSIS_DIR=$HOME/analysis`・`tools/{m11,liftdiff,m6,ott}/work/` (repo 直下、gitignore)。
+
+- **PE パス解決**: `targets/ott_old.json` の `pe` = `${PLUGINS_DIR}/ott/binaries/OTT_vst2_win64.dll`。`PLUGINS_DIR` 未設定・`ANALYSIS_DIR=$HOME/analysis` で
+  `ldlib/build_wasm.py` と同じ展開式 (`tools/shared/paths.py` 既定 `$ANALYSIS_DIR/plugins`) が `$HOME/analysis/plugins/ott/binaries/OTT_vst2_win64.dll` (3,146,752 B, 実在) に解決。
 - **D1〜D6 検出** (`ld_native` + `build ott_old` + `batch --set closure --shards 4` + `tests/check_ott.py`、クリーン worktree で 3 回): 3 回とも exit 0・出力同一。
   212 関数 = 一致 38 / 不一致 108 / 実行不能 66。D1 icall_drop 4 / D2 short_global 6 / D3 callsite_arg_drop+arg_drop 14 / D4_D5 C 定義 port 18 / D6 body 層 26 (分母 = 212 関数、タグは複数重複あり)。
   ctor `18011d400` = mismatch (icall_drop, callsite_arg_drop, callee_divergence, import_call_seq, zero_init_drop, fp_flag_unreflected)。
@@ -171,14 +214,6 @@ python3 tools/liftdiff/tests/oob_414ad0.py > tools/liftdiff/results/m11_oob_414a
 - **所要 (実測、4 vCPU runner)**: build+batch+check 20.2 / 22.7 / 21.8 s (load 0.67 / 1.16 / 1.24)。単独 build 6.4 s・batch 15.0 s・nc 0.37 s。
 - **ネガコン** (`tests/nc_check_ott.sh`、新規・`liftdiff_e2e.sh` [2/4] から呼ぶ): batch 複製から D1 / D2 / D3 / D6 のタグを 1 系統ずつ除去 → `check_ott.py` は 4/4 とも exit 1、無加工は exit 0 (計 5/5 PASS)。
   1 つでも期待外なら nc は exit 1 で e2e が落ちる。
-- **検証範囲 (run 3 で更新)**: `fl-win64`・`work-m11` を取得し、`liftdiff_e2e.sh` 全体 (--m11-only なし) を exit 0 で確認 (170 s)。
-  [2/4] の集計は旧 3 回実測と D3・D4_D5・一致・実行不能が 1 件ずつずれる (§10 の run 3 節参照)。
-
-| 未解決 | 影響 | 起票先 |
-|---|---|---|
-| OTT 旧 chain の集計が旧 3 回実測と 1 件ずつずれる (D3 13 vs 14・D4_D5 19 vs 18・一致 33 vs 38) | 受入の判定 (D1〜D6 が検出される) には影響しない。数値の正本が曖昧 | #406 (原因調査と REPORT 数値の確定) |
-| runner に numpy/capstone/pefile が無く e2e 前に依存導入が必要 (run 3 は手動で uv venv) | 素の Actions で e2e が exit 2 | 別 issue 化を PM に提案 (agent-setup への追加) |
-
 ## 11. 比較系の偽陽性 2 類型の修正 (LD-11 / #548) — 全文
 
 既知類型との関係: 該当なし (DEFECTS.md の lift 欠陥ではなく比較器側の偽陽性。f2 REPORT §7 起点)。本体 [`REPORT.md`](REPORT.md) §11 の要約から分割移動。

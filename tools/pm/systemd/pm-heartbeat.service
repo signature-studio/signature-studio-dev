@@ -1,0 +1,10 @@
+[Unit]
+Description=PM heartbeat: wake the PM session every 30 minutes so the project never stalls
+
+[Service]
+ExecStart=/bin/bash /PATH/TO/REPO/tools/pm/heartbeat.sh
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=default.target

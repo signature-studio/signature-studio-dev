@@ -4,6 +4,7 @@ import fs from "node:fs";
 import assert from "node:assert/strict";
 import { FlPython } from "../host/flpython.mjs";
 import { createWasmEngine } from "../host/fl_provider.mjs";
+import { createMockEngine } from "../host/fl_mock.mjs";
 
 const root = new URL("../", import.meta.url);
 const ids = JSON.parse(fs.readFileSync(new URL("analysis/flapi/flapi_ids.json", root)));
@@ -16,15 +17,17 @@ assert.deepEqual(flat, ids);
 const mcp = new Set(Object.entries(table.modules).flatMap(([m, fs_]) => Object.entries(fs_).filter(([, v]) => v.mcp_tools.length).map(([n]) => `${m}.${n}`)));
 assert.equal(mcp.size, 60);
 const direct = (name, ...a) => { try { return { ok: engine.call(name, a) }; } catch (e) { return { err: e.message, code: e.flCode }; } };
+const dev = new Set(["device.getPortNumber", "device.isAssigned", "device.setHasMeters", "device.forwardMIDICC", "device.midiOutMsg"]);
 let impl = 0, unimpl = 0;
 for (const id of ids) {
   const r = direct(id, ...Array(40).fill(null).slice(0, 0));
   const notImpl = r.err?.startsWith("Unspecified error (not implemented:");
-  if (mcp.has(id)) assert.ok(!notImpl, `MCP 使用 ${id} が未実装`);
+  if (mcp.has(id) || dev.has(id)) assert.ok(!notImpl, `実装済みのはず: ${id} が未実装`);
   else assert.ok(notImpl, `${id} は未実装のはず`);
   notImpl ? unimpl++ : impl++;
 }
-assert.equal(impl, 60); assert.equal(unimpl, 375);
+// 実装 = MCP 静的 60 + device 5 (MIDI scripting 用、tests/device_diff.mjs が mock と照合)
+assert.equal(impl, 65); assert.equal(unimpl, 370);
 
 // 2. エラー code (C 側): range / wrong param / 型 / unspecified
 const E = (name, ...a) => direct(name, ...a);
@@ -119,4 +122,9 @@ assert.deepEqual(m.json, ["list"]);
 assert.deepEqual(m.range[0], ["IndexError", "Index out of range"]);
 assert.equal(m.type[0][0], "TypeError");
 assert.equal(m.unimpl[0][0], "RuntimeError");
+// 6. 省略表現: 引数の None は省略 (既定値) と同じ。JS mock (fl_mock.mjs) と C provider で結果が一致する
+const mock = createMockEngine();
+for (const a of [[0], [0, null], [0, -1]]) {
+  assert.equal(engine.call("plugins.getPluginName", a), mock.call("plugins.getPluginName", a), `getPluginName(${a})`);
+}
 console.log(JSON.stringify({ functions: ids.length, implemented: impl, unimplemented: unimpl, mcp_static: mcp.size, PASS: true }));

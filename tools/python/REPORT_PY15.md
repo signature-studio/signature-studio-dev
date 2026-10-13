@@ -126,7 +126,7 @@ cases 6122
 |---|---|---|
 | 旧 main の 13/14 (§12 旧記述) の再現条件が不明 | 判定結果には影響しない (main も 14/14) | #653 (PM コメント 2026-10-13 09:04Z で追跡) |
 | 省略引数の C 側既定値との一致 (実機) | 期待値は stubs 同名既定値を正とする | #81 (a) |
-| kwlist なし `channels.incEventValue` の `1 / 24` 既定値の消失 | 検証範囲外。kwlist なし関数の省略時の値が変わる (上の追補) | #711 (PY-17) |
+| kwlist なし `channels.incEventValue` の `1 / 24` 既定値の消失 | PY-17 (#711) で解消 (下の 16-c)。旧 `eval` と同じ値に戻した | #711 (PY-17、PR で Closes) |
 | provider の `None` と JS mock の `undefined` による省略の表し方の統一 | 本 PR は省略を短い tuple で渡す。provider・mock 側の扱いは未確認 | #712 (PY-18) |
 | `run_all.sh` の `FL_MAC` / `FL_WIN` 固定パス | run_all 全体は本 run で未実行 | #630 (既存) |
 | `tool_coverage.json` の tracked 版が main の既存コードの出力と不一致 (37,424 vs 37,425) | 生成物の更新漏れ。本 PR の変更とは無関係 (旧 main でも同じ出力) | #712 (PY-18) |
@@ -211,3 +211,34 @@ wasm 系 (素材 `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開、`FL_WIN64_DI
 - 実行後の `git status` は空 (`tool_coverage.json` の書き換えなし)。生成物 (`work/`・`dist/`) は gitignore 対象。
 - 差分の手順は `run_all.sh` の step 1・2・5・9b を個別に実行したもの。`run_all.sh` 全体は step 4 の固定パス (#630) のため使えない。
 - 範囲外 (未実行): `mcp_ui_check.mjs` / `midi_ui_check.mjs` (Vite が要る)、`browser_check.mjs`・`midi_script.mjs` 等の §14 記載分は本 head では再計測していない。
+
+### #630 run_all.sh の env.sh 化 (実測)
+
+- 変更: `run_all.sh` の `FL_MAC` / `FL_WIN` を `FL_MAC_DIR` / `FL_WIN64_DIR` (`tools/shared/env.sh`) 経由に。`fetch_inputs.sh` は MCPTools.pyc の実在で mac 分岐を選ぶ (`Resources/FL` の存在だけでは `analysis-mac-shared` の Shared/ のみの素材で落ちるため)。
+- 前提検査: step 1 の前に `FLEngine_x64.dylib` / `block00031_PE.bin` / `MCPTools.pyc` の実在を確認し、欠けていれば `exit 2` で止める。
+- 実測 (素材: `fl-win64` + `analysis-mac-shared` を展開。`FL_MAC_DIR=$HOME/analysis/mac`): `run_all.sh` は 0.008 秒で rc=2、`ERROR: 前提不足で停止: .../Libs/FLEngine_x64.dylib が無い`。空出力・追跡ファイルの変更は無し。
+- 参考 (前検査を入れる前の 1 回目): step 1〜3 は通ったが step 3b が `files: 0` の空 `scripts_inventory.json` を書いた (mac の `Resources/FL` 不在)。このため前検査を追加した。
+- 未解決: mac pkg (`Libs/FLEngine_x64.dylib`・`System/Tools/MCP/`・`Resources/FL/`) を含む素材は `analysis-mac-shared` に無い。`run_all.sh` を Actions で最後まで通すには mac pkg 素材の追加が要る (R2 投入は PM)。受入条件 3 の「完走」は未達。素材追加の起票先: 子 issue #874 (CI-18)。
+
+### 16-c. kwlist なし `channels.incEventValue` の `1 / 24` 既定値 (PY-17, #711)
+
+- 全数列挙 (`flapi_table.json`): kwlist なし 332 関数のうち stubs 既定値が `ast.literal_eval` で通らない式は 3 件。`channels.incEventValue.res` (`1 / 24`)、`mixer.getSongTickPos.mode` (`midi.ST_Int`)、`transport.fastForward.flags` (`midi.GT_All`)。後者 2 件は PY-16 の許可表で解決済み。
+- 旧 (`origin/main` `1f83c5ee`): `1 / 24` は採用されず、`incEventValue(1, step=5)` は `(1, 5)` (C 側既定値に任せる)。旧 `eval` 版は `(1, 5, 0.041666666666666664)`。
+- 修正: `_stub_defaults` で、`_default_value` (PY-16 の許可式評価器・eval 不使用) が評価できる式を採用する。`1 / 24` は `operator` で計算して旧 eval と同値。
+- 実測 (HEAD は `ws-711` の PR HEAD、wasm 経路は `origin/main` 1f83c5ee + 本 PR):
+
+| 検査 | 結果 | rc |
+|---|---|---|
+| `tests/kwsig_check.py` (新 (b'') `incEventValue(1, step=5)` == `(1, 5, 1/24)` を追加) | OK | 0 |
+| ネガコン (`origin/main` の `fl_api.py` + 新テスト) | `AssertionError: (1, 5)` | 1 |
+| `tests/kwsig_bind_check.py` | PASS (103 関数・6122 ケース、misbind 0・mismatch 0) | 0 |
+| kwlist なし 5 呼出し (旧/新 比較: `getSongTickPos(mode=1)`・`fastForward(1)`・`fastForward(1, flags=2)`・`fastForward(startStop=1)`・`incEventValue(1, step=5)`) | 新は `incEventValue` のみ `(1, 5, 1/24)`。他 4 件は旧新一致 | — |
+| wasm: `fetch_inputs.sh` + `build_cpython_wasm.sh` (clean, `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`) | rc 0、4 分 02 秒 | 0 |
+| `build_flpy.sh` | rc 0、7.1 秒 | 0 |
+| `provider/build.sh` | rc 0、1.2 秒 | 0 |
+| `tests/all_tools.mjs` (JS mock) | 48/48 ok・soft_error 0・raised 0・host_calls 37,425・callback_roundtrip true | 0 |
+| `FL_ENGINE=wasm tests/all_tools.mjs` | 48/48 ok・host_calls 37,425・callback_roundtrip true | 0 |
+| `tests/provider_check.mjs` | PASS (0.35 秒) | 0 |
+
+- 生成物差分: 実行後の `git status` は `fl_api.py` / `kwsig_check.py` / 本 REPORT のみ (`tool_coverage.json` 等の書き換えなし)。
+- 限界: 期待値は PY-15 と同じく stubs 既定値 (1/24) を正とする。C 側の実既定値との一致は #81 (a) の実機確認。
