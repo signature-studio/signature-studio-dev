@@ -29,15 +29,22 @@ PY
 # 3. RetDec decode-only
 ( cd "$W" && TMPDIR="$W/tmp" /opt/retdec/bin/retdec-decompiler ott_icall.dll -o oi.drc.c --select-ranges "$(cat ranges.txt)" --select-decode-only --timeout 2400 > retdec.log 2>&1 )
 # 4. 復元 (new→orig VA, stub → __icall_dispatch)
-python3 "$HERE/ir_icall_restore.py" --ir "$W/oi.drc.ll" --map "$W/map.json" --out "$W/oi.restored.ll" --report "$W/restore.json"
+python3 "$HERE/ir_icall_restore.py" --ir "$W/oi.drc.ll" --map "$W/map.json" --out "$W/oi.restored0.ll" --report "$W/restore.json"
+if [ "${ICALL_FIX_MASK:-1}" = "1" ]; then python3 "$HERE/ir_fix_mask.py" "$W/oi.restored0.ll" "$W/oi.restored.ll" | tee "$W/fix_mask.json"
+else cp "$W/oi.restored0.ll" "$W/oi.restored.ll"; echo '{"hi32_mask_fixed": "skipped (negative control)"}' | tee "$W/fix_mask.json"; fi
 # 5. 既存 pass (normalize / ir5_patch) → flatten (global→絶対 addr + shift + dispatch 表)
 python3 "$T/m2/ir_normalize.py" "$W/oi.restored.ll" "$W/oi.norm0.ll" >/dev/null
 python3 "$T/m5/ir5_patch.py" "$W/oi.norm0.ll" "$W/oi.lift.ll" --report "$W/ir5.json" >/dev/null 2>&1
 cp "$W/oi.lift.ll" "$W/oi.p1.ll"   # comis は icall_rewrite の stub+sahf 経路で処理 (m6 ir6_pass P1 不要)
-python3 "$HERE/ir_flatten.py" "$W/oi.p1.ll" "$W/oi.flat.ll" --table "$W/oi.table.c" --cfg "$(python3 -c "import json;print(','.join('%x' % v for v in json.load(open('$W/map.json'))['cfg_thunks']))")"
-python3 "$T/m11/m11_simd2.py" "$W/oi.flat.ll" 2> "$W/simd.log" | sed 's#"../msimd11_core.h"#"'"$T"'/m11/msimd11_core.h"#' | grep -v -E '__asm_(cmplesd|cmpnltsd|cvttpd2dq|cvtpd2dq|sqrtpd)\(' > "$W/oi.simd.c"
+python3 "$HERE/ir_flatten.py" "$W/oi.p1.ll" "$W/oi.flat0.ll" --table "$W/oi.table.c" --cfg "$(python3 -c "import json;print(','.join('%x' % v for v in json.load(open('$W/map.json'))['cfg_thunks']))")"
+# CRT エラー報告経路 3 関数を C override (rt/icall_ovr.c) に置換 (R の ott_ovr.c 移植)
+python3 "$HERE/ir_override.py" "$W/oi.flat0.ll" "$W/oi.flat.ll" "${ICALL_OVR:-1801c8c00,1801a9a6c,1801a9b38}" | tee "$W/override.json"
+python3 "$T/m11/m11_simd2.py" "$W/oi.flat.ll" 2> "$W/simd.log" | sed 's#"../msimd11_core.h"#"'"$T"'/m11/msimd11_core.h"#' > "$W/oi.simd0.c"
+# 補完 helper: SSE2 5 種 (固定 C) + AVX/FMA3 VEX.128 (vex_gen.py が IR の署名から生成)。残る未実装 stub は silent (0 を返す) でなく fail-fast にする
+python3 "$HERE/vex_gen.py" "$W/oi.flat.ll" "$W/oi.vex.c" | tee "$W/vex_gen.json"
+python3 "$HERE/simd_merge.py" "$W/oi.simd0.c" "$W/oi.simd.c" "$HERE/rt/icall_simd_extra.c" "$W/oi.vex.c" --report "$W/simd_merge.json"
 # 6. build
-emcc "$W/oi.flat.ll" "$W/oi.simd.c" "$W/oi.table.c" "$HERE/rt/icall_rt.c" "$HERE/rt/icall_simd_extra.c" "$T/ott/work/lift/ott_data.c" \
+emcc "$W/oi.flat.ll" "$W/oi.simd.c" "$W/oi.vex.c" "$W/oi.table.c" "$HERE/rt/icall_rt.c" "$HERE/rt/icall_ovr.c" "$HERE/rt/icall_simd_extra.c" "$T/ott/work/lift/ott_data.c" \
   -w -O"${ICALL_OPT:-0}" -g -ffp-contract=off -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=2MB -sGLOBAL_BASE=268435456 \
   -sENVIRONMENT=node -sMODULARIZE=1 -sEXPORT_NAME=createModule -sEXIT_RUNTIME=1 -sERROR_ON_UNDEFINED_SYMBOLS=0 \
   -sEXPORTED_FUNCTIONS=_ott_run,_ott_xmm0,_ott_data_install,_malloc -sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAPU32,HEAPF32,HEAPF64 \

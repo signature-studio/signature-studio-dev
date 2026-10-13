@@ -8,6 +8,9 @@
  *
  * (shim 実装統合の規約: tools/shim/src/heap.c の HeapAlloc/HeapFree 等を静的リンクで併用)
  */
+#ifndef M11_LB_BASE
+#define M11_LB_BASE 0   /* #222: LVA = RVA + M11_LB_BASE (m11_build.sh が -D で渡す) */
+#endif
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -97,8 +100,9 @@ int64_t m11_boot_enter(int64_t hinst, int64_t reason) {
     if (!data_installed) {
         m11_data_install();
         data_installed = 1;
-        fprintf(stderr, "[m11] PE image .data/.rdata installed (LVA base 0)\n");
+        fprintf(stderr, "[m11] PE image .data/.rdata installed (LVA = RVA + 0x%x)\n", (unsigned)M11_LB_BASE);
     }
+    hinst += (int64_t)M11_LB_BASE;   /* hinst = LVA 上の image 先頭 (ホストは従来どおり 0 を渡す; LVA=RVA では 0) */
     g_m11_boot_stage = 1;
     fflush(stdout);
     fprintf(stderr, "[m11][args] entry_point(0x%llx, 0x%llx, 0x%llx)\n",

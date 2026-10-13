@@ -144,7 +144,7 @@ def cmd_ott(a):
     print("[ott] census[0x248]=1:", r["census1"])
     if r.get("outhash"):
         # outhash は旧既定 (--auto none = m10 chain 再現) モードで実施する (CAB-238: auto 既定モードは
-        # 修復由来の SHA 変化が正のため突合を省略し, 差分は REPORT.md §12 の表を参照)。
+        # 修復由来の SHA 変化が正のため突合を省略し, 差分は REPORT_APPENDIX_A.md §12 の表を参照)。
         print("[ott] 出力 SHA (param×[0x248]×振幅): liftlib 生成 helper 版 vs 元 m10 成果物 =", json.dumps(r["outhash"]))
         if not auto:
             if r["outhash"].get("equal") is False and r["outhash"].get("f0_equal") != r["outhash"].get("f0_total"):
@@ -184,7 +184,7 @@ def cmd_inject(a):
     if os.path.exists(m6raw):
         text, _ = base.run_base(open(m6raw).read(), base.make_args())
         mod = IR.Module.parse(text)
-        img = Image("/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll")
+        img = Image(env.OTT_DLL)
         out["ott"] = dict(F7=inject.eval_f7(mod, img, limit=3, max_total=150), P1_fold=inject.eval_p1_fold(mod, img))
     for k, v in out.items():
         print("[inject] %s: %s" % (k, json.dumps(v, ensure_ascii=False)))

@@ -129,9 +129,14 @@ fla_ctl_t *fla_ctl(void);                 /* 静的コントロールブロッ�
 uintptr_t  fla_ctl_ptr(void);
 /* 同期 RPC: メイン JS へコマンド送信し ack を待つ。timeout_ms 超過 → -1。pthread 内専用 (main browser thread では fail-fast) */
 int  fla_cmd(uint32_t op, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t res[4], uint32_t timeout_ms);
-/* ring 確保 + ctl 初期化。成功 0 */
+/* ring 確保 + ctl 初期化。成功 0。失敗は負値 (abort しない):
+ *   -1 = RPC 失敗/タイムアウト, FLA_E_BURST_TOO_LARGE = OPEN 較正 burst が大きすぎ ring に収まらない
+ *   ((depth+2)*B > FLA_MAX_RING。depth は burst から自動算出し固定上限なし。AudioContext は閉じて CLOSED に戻す) */
+#define FLA_E_BURST_TOO_LARGE (-100)
 int  fla_open(uint32_t sr, uint32_t out_ch, uint32_t in_ch, uint32_t buffer_frames, uint32_t depth, uint32_t flags);
 void fla_close(void);
+/* テスト専用: OPEN 較正 burst の下限を強制 (0 = 無効)。ring 超過エラー経路を決定的に再現する */
+void fla_test_set_burst_floor(uint32_t frames);
 /* start: ring/idx リセット → (prefill は呼び出し側) → fla_go() */
 void fla_reset_indexes(void);
 void fla_go(void);

@@ -35,6 +35,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
 NINE = ['0x5de820', '0x5dedf0', '0x5dfb60', '0x5df210', '0x5df240', '0x5e0760',
         '0x5e0b70', '0x5e0bb0', '0x5e1590', '0x5e1780', '0x5e0330']
 CRASH4 = ['0x5de710', '0x5df610', '0x5e05b0', '0x5e0d80']
+B6 = ['0x5dee90', '0x5df040', '0x5e09f0', '0x5e0a70', '0x5e0b10', '0x5e1210']
 
 
 def run(cmd, **kw):
@@ -60,14 +61,28 @@ def main():
     print('   ptr_struct=%s' % {k: v['ptr_struct'] for k, v in abi.items() if v['ptr_struct']})
 
     print('== [2] f80_lower → k80_argfix → x87fix ==')
+    # lift_ranges.sh は ir5_patch の後に fix_asm_stores (movlps/movsd 等の 64bit 部分 store 復元) を
+    # 適用するが、k80.lift.ll はその前段出力。本 e2e でも同 pass を先に通す (P0c-5 / #269)。
+    st_in = os.path.join(HERE, 'work', 'k80.lift.ll')
+    if os.environ.get('K80_NO_ASMSTORES') != '1':
+        st_in = os.path.join(d3, 'k80.lift.st.ll')
+        run(['python3', os.path.join(HERE, '..', 'lift', 'passes', 'fix_asm_stores.py'),
+             os.path.join(HERE, 'work', 'k80.lift.ll'), st_in])
     run(['python3', os.path.join(HERE, 'f80_lower.py'),
-         os.path.join(HERE, 'work', 'k80.lift.ll'), os.path.join(d3, 'k80.lower.ll'),
+         st_in, os.path.join(d3, 'k80.lower.ll'),
          '--report', os.path.join(d3, 'k80.lower.json'),
          '--chop-funcs', 'function_5dfbe0,function_5dfc90,function_5dfdb0'])
     run(['python3', os.path.join(HERE, 'k80_argfix.py'),
          os.path.join(d3, 'k80.lower.ll'), os.path.join(d3, 'k80.argfix.ll'),
          '--abi', os.path.join(HERE, 'work', 'k80abi.json'),
          '--report', os.path.join(d3, 'k80.argfix.json')])
+    # P0c-7 (#310): ucomiss 結果を捨てて符号が定数化された lift (0x5e0d80) の修復
+    if os.environ.get('K80_NO_UCOMISIGN') != '1':
+        ucs = os.path.join(d3, 'k80.argfix.ucs.ll')
+        run(['python3', os.path.join(HERE, 'k80_ucomi_sign.py'),
+             os.path.join(d3, 'k80.argfix.ll'), ucs, '--func', 'function_5e0d80',
+             '--report', os.path.join(d3, 'k80.ucomi_sign.json')])
+        os.replace(ucs, os.path.join(d3, 'k80.argfix.ll'))
     rep = json.load(open(os.path.join(d3, 'k80.argfix.json')))
     print('   argfix: movd=%d helper_xmm=%d struct_copy=%d orphan(gpr/float)=%d/%d' % (
         rep['movd_fixed'], rep['helper_xmm_fixed'], rep['struct_copy_fixed'],
@@ -127,6 +142,15 @@ def main():
         r = rows.get(k)
         if r is None or r[7].startswith('sig'):
             fails.append('%s %s (期待: sig なし)' % (k, r[7] if r else 'not-run'))
+    # #277: native crash (sig) の kernel が 0 / 対象 B の 6 kernel が ok モデルで CSV に出る
+    # (0x5e12b0 は RetDec が ucomiss のフラグと被演算子を落とすため引数接続では救えない: REPORT §14)
+    for k in sorted(rows):
+        if rows[k][7].startswith('sig'):
+            fails.append('%s %s (期待: sig なし)' % (k, rows[k][7]))
+    for k in B6:
+        r = rows.get(k)
+        if r is None or r[7] != 'ok':
+            fails.append('%s %s (期待: ok モデル)' % (k, r[7] if r else 'not-run'))
     if fails:
         for f in fails:
             print('   [FAIL]', f)

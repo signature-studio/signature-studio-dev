@@ -7,7 +7,10 @@ import json, os, sys, glob, collections, warnings
 warnings.filterwarnings('ignore')
 import pyflp
 
-ROOT = os.environ.get('FL_ROOT', '/home/ubuntu/work/analysis/mac/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL')
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'shared'))
+from paths import FL_MAC_DIR
+
+ROOT = os.environ.get('FL_ROOT', f'{FL_MAC_DIR}/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL')
 ours = {p['rel']: p for p in json.load(open('corpus/manifest.json'))['projects']}
 rows = []
 agree = collections.Counter()

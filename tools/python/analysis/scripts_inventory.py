@@ -11,7 +11,10 @@ import os
 import sys
 import types
 
-FL = "/home/ubuntu/work/analysis/mac/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL"
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "shared"))
+from paths import FL_MAC_DIR  # noqa: E402
+
+FL = f"{FL_MAC_DIR}/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL"
 STD = set(sys.stdlib_module_names)
 FLMODS = {"transport", "ui", "midi", "channels", "playlist", "patterns", "plugins", "arrangement", "general", "device",
           "mixer", "ilmcp", "flpianoroll", "enveditor", "launchMapPages", "screen", "utils", "flcpt", "flrack", "fl"}

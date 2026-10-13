@@ -7,9 +7,10 @@
 #   かつ tools/ott/ott_e2e.sh (DSP 本筋) も引き続き PASS。
 set -euo pipefail
 OTT="$(cd -- "$(dirname -- "$0")/.." && pwd)"
+source "$OTT/../shared/env.sh"
 ENTRY="$OTT/entry"
 OUT="$OTT/work/entrylift"
-DLL=/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll
+DLL="$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll"
 NODE_BIN="$(command -v node || true)"; [ -n "$NODE_BIN" ] || NODE_BIN="$(ls /opt/emsdk/node/*/bin/node 2>/dev/null | head -1)"
 export NODE="$NODE_BIN"
 [ -f "$DLL" ] || { echo "[entry_e2e] $DLL 無し" >&2; exit 2; }

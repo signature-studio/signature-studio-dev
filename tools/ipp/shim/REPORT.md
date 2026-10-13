@@ -447,3 +447,8 @@ V==H (it=6)、cubic との差の定量化、GetBufSize 実測。
 - `shim/test/resize_oracle.c`: GetBufSize 族に it=5/6/7 (1,800 ケース) を追加
 - `shim/verify_cab274_kernel.py` (新規, 独立再計算)、`work/resize/probe274/` (flat/spk2d/imp2d/ksweep/gbs probe)
 - spike ログ `work/resize/swv6.txt` (it=6 V-pass)、`ksw{4,5,6,7}.txt` (2D インパルス) は gitignore (再生成コマンドはスクリプト docstring)
+
+## 環境パス置換 (#364, 親 #294): 外部資産パスを tools/shared の env 定義へ
+
+- `/home/ubuntu` 絶対パス 10 行を `FL_WIN64_DIR` (`docs/REFERENCES.md` `[WIN64]`) 経由に置換。既定値は従来と同一で、env 未設定の直接起動も従来どおり動く。
+- 変更表・検証 (env なし直接起動 / 明示引数 / AVX-512 有無の実測)・未解決: [`REPORT_APPENDIX_364.md`](REPORT_APPENDIX_364.md) (本体から分割移動した全文)。

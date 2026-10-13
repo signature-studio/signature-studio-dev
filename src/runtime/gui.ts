@@ -16,8 +16,12 @@ export type GuiHostOptions = {
   base: number;
   width: number;
   height: number;
-  /** gui_worker.js の URL */
-  workerUrl: URL | string;
+  /** gui_worker.js の URL (worker 未指定時) */
+  workerUrl?: URL | string;
+  /** 呼び出し側で生成済みの描画 Worker (バンドラが Worker チャンクを作れるよう `new Worker(new URL(..., import.meta.url))` を呼び出し側に置く場合) */
+  worker?: Worker;
+  /** frame 通知ごとに累計フレーム数で呼ばれる (window.__webstudio.frames の更新用) */
+  onFrame?: (totalFrames: number) => void;
 };
 
 type Waiter<T> = { match: (v: T) => boolean; resolve: (v: T) => void };
@@ -30,6 +34,7 @@ export class GuiHost {
   exitCode: number | null = null;
   private readonly worker: Worker;
   private readonly canvas: HTMLCanvasElement;
+  private readonly onFrame?: (totalFrames: number) => void;
   private readonly logWaiters: Array<Waiter<string>> = [];
   private readonly frameWaiters: Array<Waiter<number>> = [];
   private readbackId = 0;
@@ -42,8 +47,10 @@ export class GuiHost {
 
   private constructor(o: GuiHostOptions) {
     this.canvas = o.canvas;
+    this.onFrame = o.onFrame;
     this.view = new GuiView(o.memory.buffer, o.base);
-    this.worker = new Worker(o.workerUrl, { type: "module" });
+    if (!o.worker && !o.workerUrl) throw new Error("[gui] worker か workerUrl が必要");
+    this.worker = o.worker ?? new Worker(o.workerUrl as URL | string, { type: "module" });
   }
 
   /** 共有領域を初期化し worker を起動、入力を接続する */
@@ -88,6 +95,7 @@ export class GuiHost {
         break;
       case "frame":
         this.frames++; this.lastFrameSeq = m.seq;
+        this.onFrame?.(this.frames);
         for (let i = this.frameWaiters.length - 1; i >= 0; i--) {
           const w = this.frameWaiters[i];
           if (w.match(m.seq)) { this.frameWaiters.splice(i, 1); w.resolve(m.seq); }

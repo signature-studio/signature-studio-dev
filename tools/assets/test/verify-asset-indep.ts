@@ -17,11 +17,12 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import crypto from 'node:crypto';
 import { parseWasmSections } from './wasm-sections.ts';
+import { REPO_ROOT } from '../../shared/paths.mjs';
 
 const A: Record<string, string> = {};
 for (let i = 2; i < process.argv.length; i += 2) A[process.argv[i].replace(/^--/, '')] = process.argv[i + 1];
 const root = path.join(path.dirname(new URL(import.meta.url).pathname), '..');
-const SRC = path.resolve(A.src ?? '/home/ubuntu/work/webstudio/tools/perf/work/huge/k100.wasm');
+const SRC = path.resolve(A.src ?? `${REPO_ROOT}/tools/perf/work/huge/k100.wasm`);
 const expected = JSON.parse(fs.readFileSync(path.join(root, A.pkg ?? 'work/asset-expected.json').replace(/asset-expected\.json$/, 'asset-expected.json'), 'utf8'));
 const PKG = path.resolve(root, expected.pkg);
 

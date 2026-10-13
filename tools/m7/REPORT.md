@@ -1,5 +1,7 @@
 # tools/m7/REPORT.md — M7 準備 (m6.sh 1 コマンド E2E 化 + f32 引数接続 PoC)
 
+> **参照専用 (LIFTLIB-1 / #224)**: 本 dir の lift IR pass・スクリプトは新規実行・改変しない。IR pass の正本は `tools/liftlib` (対応表: `tools/liftlib/README.md`「旧 dir pass → liftlib 対応表」)。既存 e2e 成果物・本 REPORT は歴史として残置し、旧成果物に対する既存 e2e (`tools/m7/m6_e2e.sh`・m8/m9/m10 の `*_e2e.sh`) が引き続き PASS することは `tools/liftlib/REPORT_APPENDIX_B.md` §15 で実測。
+
 - 日付: 2026-10-10。HEAD 基点: 188479b。M6b 検収 (wasm 署名不一致 0 / undefined 57 種 /
   t1 run complete / t3 OK / trap_test OK 6 FAIL 13) を前提に subagent 実行。
 - 成果物: `tools/m7/` 配下のみ。`tools/m6/` / `tools/m5/` / `tools/shim/` は読取のみ

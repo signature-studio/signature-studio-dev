@@ -16,6 +16,14 @@
 2. **レビュー実行**:
    - 承認できる場合: `gh pr review <N> --approve --body "..."`
    - 問題がある場合: `gh pr review <N> --request-changes --body "..."` (理由を具体的に)
+   - **マージ前に、Copilot Code Review の指摘 (`copilot-pull-request-reviewer[bot]` の review と
+     inline コメント) を必ず読む**: `gh api repos/<repo>/pulls/<N>/reviews` と
+     `gh api repos/<repo>/pulls/<N>/comments`。Copilot は並行して走るので、approve 直前に取り直すこと。
+     指摘ごとに「妥当 / 不当 (理由)」を判断し、**妥当な指摘が 1 件でも未対応なら approve せず
+     request-changes にする** (妥当な指摘を放置して merge しない)。軽微で後回しにしてよいと判断した
+     指摘は、approve 本文に「対応しない理由」と追跡 issue 番号を書く (issue が無ければ起票を PM に求める)。
+     経緯: PR #416 は Copilot の妥当な指摘 4 件 (scan() の未実装の戻り値・固定パス・REPORT 行数超過・
+     外部絶対パス) が残ったまま merge された。
 3. **マージ**: Auto Merge が有効な場合はそのまま待つ。
    Auto Merge が使えない/失敗する場合は、**レビュワーがマージまで担当してよい**:
    - `gh pr merge <N> --merge --delete-branch` (approve 後のみ)
@@ -30,6 +38,10 @@
   コメント + マージ (許可されていれば) を行う。プロジェクト設定で approve が必須なら、
   その旨をコメントして終了する。
 - diff が 10 万文字を超える場合は前半を重点的にレビューし、残りは「未レビュー」と明記する。
+- **素材は PR 本文の `oc_artifacts:` 行で指定される** (例: `oc_artifacts: plugins-serum2 toolchain-retdec`)。
+  指定名と展開先は `docs/WORKFLOW.md` §11 が正本。PR 本文に行が無く、e2e の再実行に素材が要るときは、
+  必要な名前を request-changes の本文に書くこと。PR 本文に行を足して push (または close → reopen)
+  するとレビューが再起動する (workflow のトリガは opened / synchronize / reopened のみ。本文だけの編集では再起動しない)。
 - **素材 (FL Studio・プラグイン) は R2 から取得できたとは限らない**。
   `$ARTIFACTS_DIR` を `ls` して実在を確認してから再実行する。空なら手元の検証
   スナップショットを使う。どちらも無ければ「素材なしで e2e は実行できない」と報告して

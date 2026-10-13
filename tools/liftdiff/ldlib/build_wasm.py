@@ -5,17 +5,27 @@
 
 出力: work/<target>/{sigs.json, ir_instr.ll, stubs.c, ld_wasm.cjs(+.wasm), build.json}
 """
-import json, os, subprocess, sys, time, hashlib
+import json, os, re, subprocess, sys, time, hashlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, '..'))
 REPO = os.path.abspath(os.path.join(ROOT, '..', '..'))
 sys.path.insert(0, ROOT)
+sys.path.insert(0, os.path.join(REPO, 'tools', 'shared'))
 from ldlib import irtool
+import paths as shared_paths
+
+
+def expand_vars(s):
+    # target JSON の ${VAR} を展開 (環境変数優先、未設定は tools/shared/paths.py の既定値)
+    return re.sub(r'\$\{(\w+)\}', lambda m: os.environ.get(m.group(1)) or shared_paths.ALL.get(m.group(1)) or m.group(0), s)
 
 
 def load_target(path):
     t = json.load(open(path))
+    for k in ('pe', 'ir', 'image'):
+        if isinstance(t.get(k), str):
+            t[k] = expand_vars(t[k])
     t['_path'] = os.path.abspath(path)
     for k in ('pe', 'ir', 'image'):
         if t.get(k) and not os.path.isabs(t[k]):

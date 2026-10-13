@@ -8,7 +8,9 @@ import json, os, re, sys, hashlib
 from multiprocessing import Pool
 import pefile
 
-EXT = '/home/ubuntu/work/analysis/win64/extracted'
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'shared'))
+from paths import FL_WIN64_DIR  # noqa: E402
+EXT = os.path.join(FL_WIN64_DIR, 'extracted')
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'work', 'win_pe_scan.json')
 
 DELPHI_MARKS = [b'Embarcadero', b'Borland', b'SOFTWARE\\Borland\\Delphi\\RTL', b'System.SysUtils',

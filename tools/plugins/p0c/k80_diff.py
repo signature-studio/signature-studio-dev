@@ -23,10 +23,13 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-LIFTP = '/home/ubuntu/work/webstudio/tools/plugins/lift/passes'
-PE = '/home/ubuntu/work/analysis/win64/extracted/block18983_PE.bin'
+sys.path.insert(0, os.path.join(HERE, '..', '..', 'shared'))
+from paths import FL_WIN64_DIR, REPO_ROOT  # noqa: E402
+LIFTP = os.path.join(REPO_ROOT, 'tools', 'plugins', 'lift', 'passes')
+PE = os.path.join(FL_WIN64_DIR, 'extracted', 'block18983_PE.bin')
 
 HELPER_CIMPL = {
     'function_409d00': 'u64 function_409d00(u128 a) { return (u64)(i64)llrint(lane0_d(a)); }   /* cvtsd2si RC=nearest */',
@@ -175,6 +178,20 @@ def build_argmodel(func, abi):
             irmap.append(('slot', j))
             named.add(j)
         else:
+            # RetDec の %argN は win64 gpr 序数 (rcx,rdx,r8,r9) そのもの。機械語が rcx を読まない
+            # kernel (0x5e1280: rdx,r8 のみ) でも arg1=rcx のため、使用 slot を詰めて割り当てると
+            # 1 つずれて IR 側が NULL へ store する (#277)
+            # 末尾の未使用 gpr (0x5de710 の r9) は RetDec が詰めるため序数固定しない:
+            # その slot か、より後ろの gpr slot を機械語が使う (= 手前に穴がある) ときだけ固定する
+            ma = re.match(r'%arg(\d+)$', pn)
+            if (ma and 1 <= int(ma.group(1)) <= 4 and pt not in ('float', 'double')
+                    and os.environ.get('K80_NO_ARGORD') != '1'):
+                n = int(ma.group(1)) - 1
+                if any(g in gused for g in GORD[n:]):
+                    j = next(k for k, s in enumerate(mslots) if s[0] == 'gpr' and s[1] == GORD[n])
+                    irmap.append(('slot', j))
+                    named.add(j)
+                    continue
             irmap.append(('pos', pt))
     pool_gpr = [k for k, (kind, d, u, dr) in enumerate(mslots) if kind == 'gpr' and u and k not in named]
     pool_xmm = [k for k, (kind, d, u, dr) in enumerate(mslots) if kind == 'xmm' and k not in named]
@@ -349,6 +366,7 @@ def build_param_layout(abi):
 def gen_driver(kernels, funcs, cases, proto=None):
     if proto is None:
         proto = os.environ.get('K80_NO_PROTO') != '1'
+    bufpad = 0 if os.environ.get('K80_NO_BUFPAD') == '1' else 64
     out = ['/* k80_diff driver.c — auto-generated (手編集禁止) */',
            '#include <stdint.h>', '#include <stdio.h>', '#include <stdlib.h>', '#include <string.h>',
            '#include <math.h>', '#include <sys/wait.h>', '#include <unistd.h>', '#include <sys/types.h>', '#include "msimd11_core.h"',
@@ -458,10 +476,14 @@ def gen_driver(kernels, funcs, cases, proto=None):
                 # clip_index kernel (添字アクセス) は fp scalar を有限・非負に制限する
                 # (負または inf/NaN の gain → trunc が 0x8000.. → 負添字 → OOB read → SIGSEGV)
                 gate = '' if (clip and os.environ.get('K80_NO_NNEGF') != '1') else 'if ((rnd() >> 40) > 5) '
+                # clip_index kernel: gain が大きいと cvttsd2si が 0x80000000 を返し、neg でも INT_MIN の
+                # まま clamp を素通りして負添字 OOB (0x5e0c00; 2000 case 中に発生。仮説は
+                # K80_NO_CLIPRANGE=1 で sig11 再現を確認)。gain 指数を 2^-9..2^-1 に絞る (#277)
+                nexp = 9 if (clip and os.environ.get('K80_NO_CLIPRANGE') != '1') else 25
                 gen = ('{ double v = (double)(int64_t)(rnd() %% 4000001) / 1000.0; vA[%d].f = vI[%d].f = v; }'
                        % (pid, pid)) if w == 64 else (
-                    '{ uint32_t rr = (uint32_t)rnd(); %srr = (rr & 0x807fffffu) | ((((rnd() >> 40) & 0xffu) %% 25u + 118u) << 23); vA[%d].f = vI[%d].f = %s; }'
-                    % (gate, pid, pid, ('nnegf((double)bits2f(rr))'
+                    '{ uint32_t rr = (uint32_t)rnd(); %srr = (rr & 0x807fffffu) | ((((rnd() >> 40) & 0xffu) %% %du + 118u) << 23); vA[%d].f = vI[%d].f = %s; }'
+                    % (gate, nexp, pid, pid, ('nnegf((double)bits2f(rr))'
                                        if (clip and os.environ.get('K80_NO_NNEGF') != '1')
                                        else '(double)bits2f(rr)')))
                 out.append('    ' + gen)
@@ -471,7 +493,10 @@ def gen_driver(kernels, funcs, cases, proto=None):
             if si in struct_slots:
                 continue
             out.append('    memcpy(bA%d, bK%d, NBUF_B); memcpy(bI%d, bK%d, NBUF_B);' % (si, si, si, si))
-            out.append('    vA[%d].u = (u64)(uintptr_t)bA%d; vI[%d].u = (u64)(uintptr_t)bI%d;' % (si, si, si, si))
+            # 先頭 BUFPAD byte 内側を渡す: 0x5dfdb0 は添字を [-1, bound] にクランプして
+            # tbl[-1] を読むため、先頭を渡すと nat/IR で別 static 配列の直前 byte を読み差分になる
+            out.append('    vA[%d].u = (u64)(uintptr_t)bA%d + %d; vI[%d].u = (u64)(uintptr_t)bI%d + %d;'
+                       % (si, si, bufpad, si, si, bufpad))
         for k, ps in enumerate(struct_slots):
             # struct buffer 先頭 16B = {extra buf, extra buf} (nat/IR で別領域を指す)
             t0, t1 = 200 + 10 * k, 200 + 10 * k + 1

@@ -2,9 +2,10 @@
 import { readdirSync, readFileSync, lstatSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { isFlpMagic } from '../src/flp.ts';
+import { FL_MAC_DIR } from '../../shared/paths.mjs';
 
 export const DEFAULT_FL_ROOT =
-  '/home/ubuntu/work/analysis/mac/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL';
+  `${FL_MAC_DIR}/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL`;
 
 export function flRoot(): string {
   return process.env.FL_ROOT ?? DEFAULT_FL_ROOT;

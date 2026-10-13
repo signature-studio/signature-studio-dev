@@ -15,6 +15,7 @@ const cfg = {
   hiccup_every: +(q.get("hiccup_every") ?? 0),
   timeinfo: +(q.get("timeinfo") ?? 0),
   sr_after: +(q.get("sr_after") ?? 0),
+  burst_floor: +(q.get("burst_floor") ?? 0),
   input: q.get("input") ?? "none", // noise | gum
   jank: q.get("jank") === "1",     // main thread を 30ms/100ms ブロック
   suspend: q.get("suspend") === "1", // 中間で ctx.suspend()/resume()
@@ -41,6 +42,7 @@ window.__done = new Promise((resolveAll, rejectAll) => {
     arguments: [
       `api=${cfg.api}`, `mode=${cfg.mode}`, `buf=${cfg.buf}`, `depth=${cfg.depth}`, `secs=${cfg.secs}`, `sr=${cfg.sr}`,
       `stress=${cfg.stress}`, `work_us=${cfg.work_us}`, `hiccup_ms=${cfg.hiccup_ms}`, `hiccup_every=${cfg.hiccup_every}`, `timeinfo=${cfg.timeinfo}`, `sr_after=${cfg.sr_after}`,
+      `burst_floor=${cfg.burst_floor}`,
     ],
     print: (t) => log("[wasm] " + t),
     printErr: (t) => { stderr.push(String(t)); log("[wasm!] " + t); if (String(t).includes("FAIL-FAST")) setTimeout(() => resolveAll({ aborted: true, what: "fail-fast", stderr, cfg }), 500); },

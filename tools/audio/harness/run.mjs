@@ -21,6 +21,14 @@ for (const buf of [128, 256, 512, 1024])
 scenarios.push({ name: "asio_sine_b256_d2", q: `api=asio&mode=sine&buf=256&depth=2&secs=${S(15, 4)}`, expect: all(underrunFree, sineOk) });
 scenarios.push({ name: "asio_sine_b512_d4_44k", q: `api=asio&mode=sine&buf=512&depth=4&sr=44100&secs=${S(10, 4)}`, expect: all(underrunFree, sineOk) });
 scenarios.push({ name: "asio_sine_b256_96k", q: `api=asio&mode=sine&buf=256&depth=2&sr=96000&secs=${S(10, 4)}`, expect: all(underrunFree, sineOk) });
+// AU-11: 96kHz × B=512 (ILWASAPI preferred) は burst 2048〜4096 でも depth 12〜 で堅牢。B=256 は burst 4096 でも depth 21 で成功 (固定 depth 上限を撤廃)
+scenarios.push({ name: "asio_sine_b512_96k", q: `api=asio&mode=sine&buf=512&depth=2&sr=96000&secs=${S(10, 4)}`, expect: all(underrunFree, sineOk) });
+// burst を 4096 に強制 (OPEN 較正値の揺れを決定的に再現): B=256 → depth 21 で成功 (abort しない)
+scenarios.push({ name: "asio_sine_b256_96k_burst4096", q: `api=asio&mode=sine&buf=256&depth=2&sr=96000&burst_floor=4096&secs=${S(10, 4)}`,
+  expect: (r) => { const [a, m1] = all(underrunFree, sineOk)(r); return [a && !r.aborted && r.stats.T >= 5120, `${m1}; T=${r.stats.T} burst_obs=${r.stats.burst_obs}`]; } });
+// ring に収まらない burst は abort でなく CreateBuffers が ASE_NoMemory(-994) を返し、その後の再 CreateBuffers が成功する
+scenarios.push({ name: "asio_createbuffers_burst_overflow", q: "api=nomem&buf=256&sr=96000&burst_floor=40000&secs=1",
+  expect: (r) => [!r.aborted && r.codes?.first === -994 && r.codes?.retry === 0 && r.codes?.dispose === 0, `first=${r.codes?.first}(want -994 ASE_NoMemory) retry=${r.codes?.retry}(want 0) dispose=${r.codes?.dispose}(want 0) aborted=${!!r.aborted}`] });
 // 過負荷: 6 本の busy スレッド + main thread 30ms/100ms ブロック + コールバック毎 1.5ms 相当の演算。共有ホスト (load avg ~12/16コア) 上。
 // 合格条件 = 「劣化しても連続性が保たれる」: underruns<=5 かつ復帰後 ramp[p-S] 完全一致 (underrun 件数自体は実測値として記録)
 scenarios.push({ name: "asio_ramp_b256_load", q: `api=asio&mode=ramp&buf=256&depth=2&stress=6&jank=1&work_us=1500&secs=${S(20, 5)}`,

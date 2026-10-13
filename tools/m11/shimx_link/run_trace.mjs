@@ -39,7 +39,7 @@ if (stack) {   // wasm-function[N] を export 名で注釈 (--export-all のた�
   } catch (_) {}
 }
 const num = (f) => { try { return Number(f()); } catch (_) { return null; } };
-const initCount = mod.HEAPU32[0x11eac98 >> 2];
+const initCount = mod.HEAPU32[(0x11eac98 + Number(process.env.M11_LB_BASE || 0)) >> 2];
 const units = [];
 const stubs = [];
 for (let i = 0; i < (num(mod._m11_stub_uniq) || 0); i++) stubs.push(mod.UTF8ToString(mod._m11_stub_name(i)) + ':' + mod._m11_stub_count(i));

@@ -141,7 +141,9 @@ runs:
         extract_failed=""
         for f in "$artifacts_dir"/toolchain-*.tar.zst; do
           [ -e "$f" ] || continue
-          if sudo tar --zstd -xf "$f" -C /opt; then
+          # root で展開すると emsdk の cache (emcc が書き込む) が runner から書けず、
+          # emcc が PermissionError で落ちる (#223 の run)。展開後に所有者を runner にする。
+          if sudo tar --zstd -xf "$f" -C /opt && sudo chown -R "$(id -u):$(id -g)" "/opt/$(basename "$f" .tar.zst | sed 's/^toolchain-//')"; then
             echo "extracted $(basename "$f") -> /opt"
           else
             extract_failed="$extract_failed $(basename "$f")"
@@ -151,6 +153,19 @@ runs:
           [ -e "$f" ] || continue
           if tar --zstd -xf "$f" -C "$GITHUB_WORKSPACE"; then
             echo "extracted $(basename "$f") -> $GITHUB_WORKSPACE"
+          else
+            extract_failed="$extract_failed $(basename "$f")"
+          fi
+        done
+        # analysis-* は ANALYSIS_DIR (tools/shared/env.sh の既定の親。#294) へ展開する。
+        # tarball の先頭が plugins/... なので $ANALYSIS_DIR/plugins/... になる。
+        analysis_dir="$HOME/analysis"
+        for f in "$artifacts_dir"/analysis-*.tar.zst; do
+          [ -e "$f" ] || continue
+          mkdir -p "$analysis_dir"
+          if tar --zstd -xf "$f" -C "$analysis_dir"; then
+            echo "extracted $(basename "$f") -> $analysis_dir"
+            echo "ANALYSIS_DIR=$analysis_dir" >> "$GITHUB_ENV"
           else
             extract_failed="$extract_failed $(basename "$f")"
           fi
@@ -168,3 +183,14 @@ runs:
           echo "ARTIFACTS_DIR=$artifacts_dir"
           echo "TMPDIR=$RUNNER_TEMP"
         } >> "$GITHUB_ENV"
+        # emsdk の upstream/bin の llvm-* (llvm-nm ほか) を ~/.local/bin に symlink する。
+        # build.sh が `source /opt/emsdk/emsdk_env.sh` で PATH を作り直しても、~/.local/bin は
+        # 残る (#223 の run: GITHUB_PATH への追加は emsdk_env.sh の後では効かなかった)。
+        # upstream/bin を丸ごと PATH に入れないのは、runner の clang 等を隠さないため。
+        if [ -d /opt/emsdk/upstream/bin ]; then
+          mkdir -p "$HOME/.local/bin"
+          for t in /opt/emsdk/upstream/bin/llvm-*; do
+            ln -sf "$t" "$HOME/.local/bin/$(basename "$t")"
+          done
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+        fi

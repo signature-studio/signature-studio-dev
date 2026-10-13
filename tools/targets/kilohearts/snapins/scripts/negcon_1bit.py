@@ -26,6 +26,8 @@ import struct
 import subprocess
 import sys
 import json
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', '..', 'shared'))
+from paths import REPO_ROOT
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NODE = '/opt/emsdk/node/24.19.0_64bit/bin/node'
@@ -148,7 +150,7 @@ def main():
     #    撤去後の compare.mjs には tolerance 経路が無いので、HEAD (撤去前) の compare.mjs を
     #    work/ に展開してそれを使う (= 同一改変を旧実装で再判定)。tol 設定も HEAD の
     #    snapins.json から読み直す (build.py が書いていた tol.json と同形)。
-    repo = '/home/ubuntu/work/webstudio'
+    repo = REPO_ROOT
     legacy_cmp = os.path.join(ROOT, 'work', 'negcon_compare_legacy.mjs')
     r = subprocess.run(['git', '-C', repo, 'show', 'HEAD:%s/harness/compare.mjs' % REL],
                        capture_output=True, text=True)

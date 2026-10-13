@@ -82,6 +82,9 @@ int fla_cmd(uint32_t op, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3, uin
 
 static uint32_t pow2_ge(uint32_t v) { uint32_t p = 1; while (p < v) p <<= 1; return p; }
 
+static uint32_t g_burst_floor;
+void fla_test_set_burst_floor(uint32_t frames) { g_burst_floor = frames; }
+
 int fla_open(uint32_t sr, uint32_t out_ch, uint32_t in_ch, uint32_t buffer_frames, uint32_t depth, uint32_t flags) {
     fla_ctl_t *c = &g_ctl;
     if (LD(c->state) != FLA_ST_CLOSED) fla_failfast("fla_open", "already open");
@@ -95,17 +98,25 @@ int fla_open(uint32_t sr, uint32_t out_ch, uint32_t in_ch, uint32_t buffer_frame
     int rc = fla_cmd(FLA_CMD_OPEN, sr, out_ch, in_ch, flags >> 8 & 0xff, res, 15000);
     if (rc != 0) return rc ? rc : -1;
     uint32_t burst = (res[0] + FLA_QUANTUM - 1) / FLA_QUANTUM * FLA_QUANTUM;
+    if (burst < g_burst_floor) burst = g_burst_floor;
     if (burst < FLA_QUANTUM) burst = FLA_QUANTUM;
-    /* 目標充填 T: worklet は burst (= baseLatency 相当, 通常 128..1024) フレームを連続で引く。
+    /* 目標充填 T: worklet は burst (= baseLatency 相当, 通常 128..1024; 96kHz では 2048..4096) フレームを連続で引く。
      * T >= burst + buffer_frames でないと 1 回の burst で枯渇する (PROTOCOL.md §4) */
-    uint32_t need = (burst + burst / 4 + buffer_frames + buffer_frames - 1) / buffer_frames;
-    if (need > depth) depth = need;
-    if (depth > 16) fla_failfast("fla_open", "effective depth > 16 (buffer_frames too small for the browser burst size)");
+    uint64_t need = ((uint64_t)burst + burst / 4 + buffer_frames + buffer_frames - 1) / buffer_frames;
+    if (need > depth) depth = (uint32_t)need;
+    /* depth の固定上限は置かない。制約は ring 容量のみ: 動的 T 拡張 (flasio, 上限 ring-2B) の余地を含め
+     * (depth+2)*B <= FLA_MAX_RING が必要。超過はホストを落とさずエラー返却 (呼び側が CreateBuffers エラーに写像) */
+    uint64_t t_min = ((uint64_t)depth + 2) * buffer_frames;
+    if (t_min > FLA_MAX_RING) {
+        fprintf(stderr, "[flaudio] fla_open: burst %u frames needs depth %u x B=%u (+2B headroom = %llu frames) > FLA_MAX_RING %u -> FLA_E_BURST_TOO_LARGE\n",
+                burst, depth, buffer_frames, (unsigned long long)t_min, FLA_MAX_RING);
+        fla_cmd(FLA_CMD_CLOSE, 0, 0, 0, 0, NULL, 5000);   /* phase 1 で作った AudioContext を片付ける */
+        return FLA_E_BURST_TOO_LARGE;
+    }
     /* 動的 T 拡張 (flasio) の余地として 4x を確保。最小 16384 frames */
     uint32_t ring = pow2_ge(4 * (depth + 1) * buffer_frames);
     if (ring < 16384) ring = 16384;
     if (ring > FLA_MAX_RING) ring = FLA_MAX_RING;
-    if ((depth + 1) * buffer_frames > ring) fla_failfast("fla_open", "ring too large");
     g_out_ring = aligned_alloc(64, (size_t)ring * out_ch * sizeof(float));
     g_in_ring = in_ch ? aligned_alloc(64, (size_t)ring * in_ch * sizeof(float)) : NULL;
     if (!g_out_ring || (in_ch && !g_in_ring)) fla_failfast("fla_open", "out of memory");

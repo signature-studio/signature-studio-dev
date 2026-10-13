@@ -12,7 +12,8 @@
 # 触らず独立再現するときは `FW_W=<空dir> bash fw_stage2.sh` (dir に stage-1 成果物を置く)。
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
-T=/home/ubuntu/work/webstudio
+source "$HERE/../../shared/env.sh"
+T="$REPO_ROOT"
 W="${FW_W:-$HERE/../work/fw}"
 PE="$W/fw_icall.dll"
 FRESH=0
@@ -66,8 +67,8 @@ fi
 # ---- 4. liftlib base normalize ----
 if [ ! -f fw_norm.ll ]; then
   python3 - <<'PY'
-import sys
-sys.path.insert(0, '/home/ubuntu/work/webstudio/tools/liftlib')
+import os, sys
+sys.path.insert(0, os.environ['REPO_ROOT'] + '/tools/liftlib')
 from liftlib.passes import base
 text = open('fw_f80.ll', errors='replace').read()
 open('fw_norm.ll', 'w').write(base.normalize(text))
@@ -140,8 +141,8 @@ fi
 if [ ! -f fw_simd.c ]; then
   # liftlib simd gen (TAG 拡張)
   python3 - <<'PY'
-import sys, re
-sys.path.insert(0, '/home/ubuntu/work/webstudio/tools/liftlib')
+import os, sys, re
+sys.path.insert(0, os.environ['REPO_ROOT'] + '/tools/liftlib')
 from liftlib.simd import gen as G
 class DynTag(dict):
     def get(self, k, d=None):

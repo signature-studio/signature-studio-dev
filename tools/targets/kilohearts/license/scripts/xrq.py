@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """xrq.py — hc_xrefs.pkl (rip/iat xref cache) による高速 xref 照会。
 usage: xrq.py VA[,VA...] [--calls-only]"""
+import os as _os, sys as _sys
+_sys.path.append(_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', '..', '..', '..', 'shared'))
+from paths import REPO_ROOT
 import sys, pickle, struct
 import pefile
-d = pickle.load(open('/home/ubuntu/work/webstudio/tools/targets/kilohearts/license/work/hc_xrefs.pkl', 'rb'))
+d = pickle.load(open(_os.path.join(REPO_ROOT, 'tools/targets/kilohearts/license/work/hc_xrefs.pkl'), 'rb'))
 rip = d['rip']
 import capstone
 from pe_dis import pe, data, BASE, rd

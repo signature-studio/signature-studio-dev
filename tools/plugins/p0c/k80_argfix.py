@@ -45,6 +45,7 @@ import re
 
 SLOT_GPR = ['rcx', 'rdx', 'r8', 'r9']
 SLOT_XMM = ['xmm0', 'xmm1', 'xmm2', 'xmm3']
+SKIP_SPILLFIX = os.environ.get('K80_NO_SPILLFIX') == '1'
 
 
 def func_name(header):
@@ -254,8 +255,15 @@ def fix_movd_from_zero(header, body, habi, rep, fname):
             uses = [l for l in lines if re.search(r'(?<![\w.%-])' + esc + r'(?![\w.-])', l) and l != dline]
             if not uses:
                 continue
-            calls = [l for l in uses if re.search(r'call (?:i32|i64) @__asm_mov\w*\(i128 ' + esc + r'\)', l)]
+            calls = [l for l in uses if re.search(r'call (?:i32|i64) @__asm_mov\w*\(i128 ' + esc + r'\)', l)
+                     or (not SKIP_SPILLFIX
+                         and re.search(r'call i128 @__asm_movaps\(i128 ' + esc + r'\)', l))]
             if len(calls) != len(uses):
+                continue
+            # movdqa [rsp/rbp+N], xmmK は非 volatile xmm6-15 の callee-save spill で引数ではない
+            # (0x5df610: spill の placeholder に xmm3 を割り当て、実際に xmm3 を読む
+            # `movss xmm7, xmm3` の placeholder が未接続のままだった)。
+            if not SKIP_SPILLFIX and all('@__asm_movdqa(' in l for l in calls):
                 continue
             site = rep['movd_sites'].get(fname, 0)
             xs = [x for x in habi.get('xmm_slots', []) if int(x[3:]) < 4]
@@ -263,7 +271,7 @@ def fix_movd_from_zero(header, body, habi, rep, fname):
             rep['movd_sites'][fname] = site + 1
             pname = '%%in.%s.bits' % xmm
             helper = re.search(r'@(__asm_mov\w*)', calls[0]).group(1)
-            if 'movd' in helper:
+            if 'movd' in helper or (helper == '__asm_movaps' and habi.get('xmm_width', {}).get(xmm, 32) == 32):
                 stmts = ['  %%trunc.%s = trunc i64 %s to i32' % (pname[1:], pname),
                          '  %s = zext i32 %%trunc.%s to i128' % (z, pname[1:])]
             else:                                          # movq 等は 64bit
@@ -353,23 +361,60 @@ def fix_helper_operand_xmm(header, body, habi, rep, fname):
                 k = ptr.get(key, 0)
                 cand = sites.get(key, [])
                 if k >= len(cand):
-                    ok = False
-                    break
-                regmap = cand[k]
+                    cand = []
+                    regmap = {}
+                else:
+                    regmap = cand[k]
                 ptr[key] = k + 1
                 # IR の i128 オペランド (順) ↔ 機械語の xmm reg オペランド (順)
                 i128pos = [i for i, x in enumerate(ops) if x.startswith('i128 %')]
+                site_ok = True
                 for oi, op in enumerate(ops):
                     if op.split()[-1] != z:
                         continue
                     j = i128pos.index(oi) if oi in i128pos else None
                     reg = regmap.get(j) if j is not None else None
                     if reg is None or reg not in argslots:
-                        ok = False
+                        site_ok = False
                         break
                     slots.add(reg)
-                if not ok:
+                if not site_ok and os.environ.get('K80_NO_REGSRC') != '1':
+                    # reg-reg 形の単項変換 (cvtss2sd xmm0, xmm3 → __asm_cvtss2sd(i128 xmm3)):
+                    # RetDec は dest を被演算子に含めないので、機械語の xmm 数が 1 多い (#277)。
+                    # 手前の突合で mem 形 (cvtss2sd xmm1, [m]) を誤って引いた分を戻し、
+                    # xmm reg が 2 個の site の source (位置 1) を探す
+                    ptr[key] = k
+                    alt = sites.get((mn, len(ops) - nimm + 1), [])
+                    kk = ptr.get((mn, 'rr'), 0)
+                    alt = [d for d in alt if 1 in d]
+                    site_ok = False
+                    if kk < len(alt) and len(i128pos) == 1 and ops[i128pos[0]].split()[-1] == z:
+                        reg = alt[kk].get(1)
+                        if reg in argslots:
+                            slots.add(reg)
+                            ptr[(mn, 'rr')] = kk + 1
+                            site_ok = True
+                if not site_ok:
+                    ok = False
                     break
+            if (not ok or len(slots) != 1) and os.environ.get('K80_NO_INTERSECT') != '1':
+                # fallback (#277): 出現順の突合が破綻する placeholder (0x5e1210: xmm3 が movss と
+                # cvtss2sd の両方に使われ、順序対応が合わない)。各 use が取り得る xmm 引数 slot の
+                # 集合 (同ニーモニックの全 site の reg) の積が 1 つに決まるときだけ接続する
+                inter = None
+                for l, hname in helper_uses:
+                    mn = hname[len('__asm_'):].split('__')[0]
+                    am = re.search(r'@' + re.escape(hname) + r'\(([^)]*)\)', l)
+                    ops = [x.strip() for x in am.group(1).split(',') if x.strip()] if am else []
+                    n = len(ops) - sum(1 for x in ops if re.match(r'^i\d+ -?\d+$', x))
+                    regs = set()
+                    for nn in (n, n + 1):
+                        for d in sites.get((mn, nn), []):
+                            regs.update(d.values())
+                    regs &= argslots
+                    inter = regs if inter is None else (inter & regs)
+                if inter is not None and len(inter) == 1:
+                    slots, ok = set(inter), True
             if not ok or len(slots) != 1:
                 continue
             xmm = slots.pop()

@@ -1,5 +1,5 @@
 {
- "file": "/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin",
+ "file": "${FL_WIN64_DIR}/extracted/block00031_PE.bin",
  "slice": "pe",
  "modules": {
   "channels": [
