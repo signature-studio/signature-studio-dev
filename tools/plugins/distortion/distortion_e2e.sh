@@ -56,7 +56,9 @@ fi
 # 閉包 range と final.ll の突合 (全 range の開始 VA に define があるか)
 echo "block,missing_define,missing_bytes,missing_ref,extra_inside,function_defines" > "$OUT/shell_audit.csv"
 for b in "${SHELLS[@]}"; do
-  echo "$b,$(python3 distortion/engine_defs.py --ranges "work/closure/block$(printf %05d "$b").ranges.txt" --ll "work/batch/$b/p.final.ll")" >> "$OUT/shell_audit.csv"
+  # icall 書換え (batch_lift の既定 PLUG_ICALL=1, #514) では RetDec が range 内部に切り出した追加 define の名前が書換え後 PE のアドレスになる (PLG-F6-2 #545 で露見)。 両方の range で数える
+  R2="work/batch/$b/p.icall.map.json.ranges"; ALSO=(); [ -f "$R2" ] && ALSO=(--also-ranges "$R2")
+  echo "$b,$(python3 distortion/engine_defs.py --ranges "work/closure/block$(printf %05d "$b").ranges.txt" --ll "work/batch/$b/p.final.ll" "${ALSO[@]}")" >> "$OUT/shell_audit.csv"
 done
 judge_shells "$OUT/status.csv" "$OUT/shell_audit.csv"
 python3 distortion/unimpl_names.py work/batch --blocks "$SHELLS_CSV" --allow 19024=__asm_rep_stosb_memset
