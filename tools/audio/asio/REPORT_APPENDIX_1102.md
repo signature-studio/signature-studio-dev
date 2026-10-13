@@ -21,13 +21,14 @@
 - `com_sine_b256_d2`: PASS (maxErr 1.49e-8, underrun 0)。
 - `com_ramp_b256_d2`: **FAIL**。underrun 1 / silence 640 f。ramp mismatch 195,328/240,384 は underrun 後の出力ずれと思われるが**原因は未調査**。REPORT §12 (#998 [AU-16]) と同じ負荷依存 underrun の同形事象。
 - 同一 run の 30 分ソーク自体は underrun 0 で PASS。短シナリオの FAIL とは別に扱い、再現の有無は次回 e2e で確認する (未確定)。
-- **e2e 全体の終了コード**: 本 run は exit 1 (`com_ramp_b256_d2` の上記 FAIL による)。ソーク単体 (`com_soak1800_b256`) は PASS。#1102 受入条件 1 の文言 (`e2e.sh --soak 1800` が PASS) は**未達**のまま。head での再測定 (§7) も exit 1 で、e2e 全体 exit 0 は未達のまま残す。
+- **受入条件 1 (PM 改訂・#1102 のコメント)**: ソーク単体 PASS (`com_soak1800_b256`) を判定対象とし、本 run で達成。
+- **e2e 全体の終了コード**: 本 run は exit 1 (`com_ramp_b256_d2` の上記 FAIL による)。`e2e.sh --soak` 全体の exit 0 は**未達 (別の欠陥。追跡 #998)**。head での再測定 (§7) も exit 1 で、未達のまま残す。
 
 ## 4. 未達 (子 issue へ分割)
 
 - 受入条件 1 (キャプチャ SAB 約 661 MiB を一括保持せず分割照合): **未実装**。現行 `com_page.mjs` は `captureFactory` で frames 全量の SAB を一括確保する。分割照合の設計変更は子 issue **#1358 [AU-19]** に分割 (範囲は分割照合のみ)。
 - `com_ramp_b256_d2` の underrun 1 / silence 640 f の追跡先は **#998 [AU-16]** (負荷依存 underrun の正本。WORKFLOW §12)。#1358 では扱わない。
-- #1102 は本 PR で Close しない (`Refs #1102`)。受入条件 1 の未達が残るため。
+- #1102 は本 PR で Close しない (`Refs #1102`)。キャプチャ SAB 分割照合が未達のため。
 
 ## 5. 測定 commit と差分 0 の証跡 (WORKFLOW §6)
 
@@ -38,8 +39,7 @@
 
 ## 6. head での再実行 (実施済み・§7 参照)
 
-- head での `bash tools/audio/asio/e2e.sh --soak=1800` の再実行: 実施済み (§7)。exit 1 で、受入条件 1 は未達。
-- 追跡: exit 0 の記録は #1102 (受入条件 1) の未達として #1102 側で扱う。
+- head での `bash tools/audio/asio/e2e.sh --soak=1800` の再実行: 実施済み (§7)。exit 1。受入条件 1 (ソーク単体 PASS) は達成、`e2e.sh --soak` 全体 exit 0 は未達 (別の欠陥。追跡 #998)。
 
 ## 7. head 再測定 (`bash tools/audio/asio/e2e.sh --soak=1800`, 実測)
 
@@ -54,4 +54,4 @@
   - `com_soak1800_b256` PASS (underrun 0 / silence 0 / ramp 0 / 86,403,968 f / bufferSwitchTimeInfo 337,520 calls bad=0)。
   - `com_ramp_b256_d2` **FAIL**: underrun 1 / silence 128 f / ramp 195,456 / 240,512 不一致。
 - 同形の FAIL を 3 回記録 (測定 run `35c6fa15`: silence 640 f / reviewer 再現 `5837d1f7`: silence 384 f / 本回 `23dc1754`: silence 128 f)。silence 量は run ごとに変動する。ramp 不一致は毎回 `com_ramp_b256_d2` のみ。
-- 判定: 受入条件 1 (exit 0) は head でも未達。#1102 は Close しない。
+- 判定: 受入条件 1 (ソーク単体 PASS) は head でも達成。`e2e.sh --soak` 全体 exit 0 は head でも未達 (別の欠陥。追跡 #998)。#1102 は Close しない。
