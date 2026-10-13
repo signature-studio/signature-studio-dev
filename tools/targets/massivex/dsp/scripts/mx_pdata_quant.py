@@ -35,15 +35,16 @@ def main(path, outp):
     def in_text_rva(r):
         return t_lo <= r < t_hi
 
+    # RVA → file offset の規則: VirtualSize の範囲 [VA, VA+VirtualSize) に当たる section が
+    # ちょうど 1 つのときだけ解決する。0 件・2 件以上は「解決不能」として読まない
+    # (この PE は .qtmimed が .xdata と VA 範囲で重なり、先頭一致では件数が揺れる)。
     def unwind_bytes(u):
-        # UNWIND_INFO は .rdata 等にあるので、全 section から RVA を解決する
-        for s in pe.sections:
-            lo = s.VirtualAddress
-            hi = lo + max(s.Misc_VirtualSize, s.SizeOfRawData)
-            if lo <= u < hi:
-                off = s.PointerToRawData + (u - lo)
-                return data[off: off + 4 + 2 * 256 + 12]
-        return None
+        hits = [s for s in pe.sections if s.VirtualAddress <= u < s.VirtualAddress + s.Misc_VirtualSize]
+        if len(hits) != 1:
+            return None, len(hits)
+        s = hits[0]
+        off = s.PointerToRawData + (u - s.VirtualAddress)
+        return data[off: off + 4 + 2 * 256 + 12], 1
 
     valid = [(b, e, u) for (b, e, u) in ents if e > b and b and in_text_rva(b) and e <= t_hi]
     by_begin = {b: (b, e, u) for (b, e, u) in valid}
@@ -53,6 +54,7 @@ def main(path, outp):
     chained_parent_hit = 0
     chain_flag = 0
     chain_parent_in_pdata = 0
+    unres = collections.Counter()
     approx_eq = approx_over = approx_under = 0
     over_sum = 0
     lens = collections.Counter()
@@ -61,7 +63,8 @@ def main(path, outp):
         if prev_end is not None and b == prev_end:
             chained += 1
         prev_end = e
-        ub = unwind_bytes(u)
+        ub, nhit = unwind_bytes(u)
+        unres[nhit] += 1
         if ub:
             flags = ub[0] >> 3
             if flags & 0x4:
@@ -90,6 +93,7 @@ def main(path, outp):
         'pdata_entries_total': n_all,
         'pdata_entries_valid_in_text': len(valid),
         'chained_begin_eq_prev_end': chained,
+        'unwind_resolve_section_hits_hist': {str(k): v for k, v in sorted(unres.items())},
         'unwind_chaininfo_flag': chain_flag,
         'chain_parent_in_pdata': chain_parent_in_pdata,
         'chain_parent_exact_match': chained_parent_hit,
