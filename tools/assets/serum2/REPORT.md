@@ -35,8 +35,8 @@
 
 ### 2-b. wasm 経路の再実行 (HEAD `24c22fc`、`toolchain-emsdk` 付き、n≥3)
 
-素材 `plugins-serum2` と `toolchain-emsdk` を `$ARTIFACTS_DIR` から取得 (`/opt/emsdk` 展開済み、emcc 6.0.12)。
-`SERUM2_INSTALLER=<7z 展開元 exe> EMSDK_ENV=/opt/emsdk/emsdk_env.sh bash tools/assets/serum2/e2e.sh` 1 回目で
+素材 `plugins-serum2` と `toolchain-emsdk` を `$ARTIFACTS_DIR` から取得 (`toolchain-emsdk` は `[EMSDK]`、emcc 6.0.12)。
+`SERUM2_INSTALLER=<7z 展開元 exe> EMSDK_ENV=<[EMSDK] の emsdk_env.sh> bash tools/assets/serum2/e2e.sh` 1 回目で
 pass + neg 3 件すべて OK (`SERUM2 E2E OK`、全体 4 分 01 秒)。pass は追加で 2 回回した (計 3 回)。
 
 | 項目 (pass 3 回の min–max) | 値 |
