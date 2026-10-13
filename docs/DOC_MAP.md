@@ -185,6 +185,8 @@
 | `tools/plugins/g1/REPORT_APPENDIX.md` | ~30 | g1 REPORT §9 旧版 (検証起点 86ca2d5、#539 取り込み前の 3 run・NC 詳細) の全文 (250 行上限のため分割移動) |
 | `tools/plugins/framework/REPORT.md` | ~520 | TFruityHost shim 実装と検収 |
 | `tools/plugins/p0c/REPORT.md` | ~665 | kernel 表妥当性検証 + f80 assessment |
+| `tools/plugins/sampler/REPORT.md` | ~250 | PLG-G3 sampler 8 本 (Delphi 殻 7 本 + Fruity Slicer 2 engine / GMS の C++ 単体): 閉包 lift・host/kernel/閉包外の監査・engine lift 鎖の根本原因と `emcc -c` gate・NC (#208 / #540) |
+| `tools/plugins/sampler/REPORT_APPENDIX.md` | ~50 | sampler REPORT §6 の旧版 (検証起点 53c2eb6、#208 段階の 3 run) の全文 (250 行上限のため分割移動) |
 | `tools/shared/REPORT.md` | ~295 | FL Shared ライブラリの分類・IPP 実測・OSS wasm 再ビルド・プロプラ lift PoC |
 | `tools/shared/oss/sidemod/REPORT.md` | ~60 | FFmpeg/LAME を差し替え可能な side module として再ビルド + GPL 混入検出 (LGL-4) |
 
