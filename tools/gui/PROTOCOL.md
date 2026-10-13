@@ -175,3 +175,16 @@ host は **レコード書込の前に** 共有 pointer 状態 (cursor/buttons/m
 - **GDI**: `DrawEdge` は矩形のみ (`BF_DIAGONAL` は fail-fast; SOFT は近似)。`DrawFrameControl` は形状簡略 (ボタン/チェック/ラジオ/スクロール矢印/キャプション/メニュー記号)。`DrawFocusRect` は (x+y)偶数画素の XOR (2 回で復帰)。
   `CreateDCW("DISPLAY")` は画面寸法を返す互換 DC (描画は破棄; 画面直描きは不可)。`GetClipRgn` は論理座標、`GetRandomRgn` は SYSRGN=画面座標 / CLIPRGN=DC 原点基準。`GetRegionData` は RDH_RECTANGLES を (top,left) 順で返す。
   アイコン/カーソルは標準 (擬似ハンドル) のみ: 32x32 のプレースホルダ画像を生成して `GetIconInfo`/`DrawIcon[Ex]` が使う (実画像資源・`CreateIconIndirect`・`LoadImage` は GUI-2)。
+
+## 12. ブラウザ互換 fallback 方針 (GUI-8 #184; 入力 = #127 RT-9 の Firefox 157 headless 実測。Safari は未測定)
+測定値の正本は `tools/runtime/REPORT.md` (RT-9)。ここは gui host が取る方針のみ。
+| 機能 | Chrome 154 | Firefox 157 | gui host の方針 |
+|---|---|---|---|
+| SAB / `crossOriginIsolated` (COOP+COEP) | 可 | 可 | 必須。`GuiHost.attach` 前に `crossOriginIsolated && memory.buffer instanceof SharedArrayBuffer` を確認し、偽なら起動せず理由を表示 (fail-fast; 代替実装なし) |
+| `Atomics.waitAsync` (描画 worker の out ring 消費) | 可 | 可 | そのまま使う。無い環境 (Safari 未測定) は `setTimeout` ポーリングへ落とす案 (**未実装**; Safari 測定後に判断) |
+| Worker 内 `Atomics.wait` / メイン `Atomics.wait` 不可 | 同 | 同 | 既存設計どおり: wasm UI スレッドは worker、メインは `waitAsync`/イベントのみ |
+| OffscreenCanvas 2D (`transferControlToOffscreen`) | 可 | 可 | 既定経路 (2D + putImageData) は両者で使える |
+| Worker 内 WebGL2 (GUI-4 の WebGL2 present) | 可 (SwiftShader) | 判定不能 (headless で null) | `present.backend` は worker が実際に採用した方式を `presentInfo` で返す。WebGL2 を取れなければ 2D へ落ちる既存フォールバックを正とする。Firefox 実機で未確認 |
+| rAF (worker) | 可 | 可 | `present.sync="raf"` 可。無ければ `rafTimeoutMs` の timer flush |
+- **メモリ**: 非 shared memory64 の 8 GiB grow が Firefox で 35〜37 s (Chromium 0.5 ms)。gui の共有領域は wasm32 の shared memory 上なので該当しないが、memory64 版 FLEngine を同一 Memory で動かす場合は初期確保を前倒しする (Firefox での grow 戦略は #127 / RT 系で決定)。
+- **未確認 (起票先 #127)**: Safari 全般、Firefox の実描画 (gui e2e の Firefox 実行)。これらが取れるまで、サポート対象は Chrome のみとし、Firefox は「機能検出は通るが e2e 未実施」と扱う。

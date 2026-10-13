@@ -226,3 +226,6 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
 | mono / パレットの色写像の実 Windows との照合 (近似) | 色が実機と数階調ずれる可能性 | #181 (実機比較はユーザ依頼候補) |
 | native selftest の ASan UAF (20 回中 4 回) | `e2e.sh` 1/6 が約 20% で FAIL | #489 `[GUI-12]` (既存) |
 | `integ/sigprobe.sh` の `unresolved-imports=0` が `wasm-objdump` 不在で空振り (今回も `command not found`) | 未解決 import なし確認が無効 | #180 (既存コメント) |
+
+## 11. GUI-8 (#184): e2e の agent-browser 載せ替え・長時間ストレス・Firefox 取込み
+全文と実測: `REPORT_GUI8.md`。結論: e2e は `tools/e2e` ドライバ (agent-browser / puppeteer-core) 経由で `bash tools/gui/e2e.sh` ALL PASS (golden 差 0)、50,000 フレームのストレスで drop 0・メモリ増加なし・surface gen 不変、ネガコン 3 本は不合格を検出。Firefox は #127 の結果を `PROTOCOL.md §12` に取込み (Safari・Firefox 実描画は未測定)。
