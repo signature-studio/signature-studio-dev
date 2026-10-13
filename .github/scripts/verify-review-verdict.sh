@@ -10,8 +10,8 @@
 #     新しい review run を起動済みなので、古い head の欠落は問わない)
 # COMMENT だけの review は verdict と認めない (Copilot 待ちの保留は廃止した: 直近 15 PR に
 # Copilot の review は 0 件で、保留した PR が動かなくなるため)。
-# それ以外は close -> reopen で review を再起動する。同じ head に OC_REVIEW_MAX_ATTEMPTS 回
-# 再起動しても verdict が出なければ PR に警告を残して失敗する。
+# それ以外は reopen-pr.sh (close -> reopen) で review を再起動する。同じ head に
+# OC_REVIEW_MAX_ATTEMPTS 回再起動しても verdict が出なければ PR に警告を残して失敗する。
 #
 # 入力 (env): GH_TOKEN, OC_REPO, OC_PR_NUMBER
 set -euo pipefail
@@ -59,7 +59,5 @@ fi
 
 gh pr comment "$OC_PR_NUMBER" --repo "$OC_REPO" \
   --body "review run が verdict (approve / request-changes) を投稿せずに終了したため、review を再実行します (試行 $((tries + 1))/${MAX_ATTEMPTS}、head ${head:0:7})。<!-- $marker -->"
-gh pr close "$OC_PR_NUMBER" --repo "$OC_REPO"
-sleep 3
-gh pr reopen "$OC_PR_NUMBER" --repo "$OC_REPO"
+bash "$(dirname "$0")/reopen-pr.sh"
 echo "re-triggered the review for PR #$OC_PR_NUMBER (retry $((tries + 1))/$MAX_ATTEMPTS)"

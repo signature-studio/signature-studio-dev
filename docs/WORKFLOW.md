@@ -237,17 +237,23 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
 
   - **review**: run の最後に `verify-review-verdict.sh` が現在の head への verdict (APPROVED / CHANGES_REQUESTED) を
     確認し、無ければ PR にコメントを残して close -> reopen で review を再起動する (同じ head に 3 回まで。超えたら警告して失敗)。
+    close -> reopen は `reopen-pr.sh` が行い、reopen が 3 回失敗したら PR に `oc:stuck` を付けて失敗する (closed のまま放置しない)。
+    reviewer の step に 50 分の上限 (`timeout-minutes: 50`) を置くと、verify を job の 60 分と App token の 1 時間寿命の内側で
+    必ず走らせられる (実測: review job の setup は約 1 分、reviewer は 3〜9 分)。この workflow 変更は App に `workflows` 権限が
+    無く push できないため PM 適用待ち (#721 のコメント)。適用されるまでは reviewer の上限は job の 60 分。
     COMMENT だけの review は verdict と認めない。**Copilot の review を待って verdict を保留することはしない**
     (直近 15 PR に Copilot の review は 0 件で、保留した PR は誰にも動かされず止まるため)。Copilot の review が
     approve 前に既にあれば読んで判断する。run の途中で head が進んだ場合は、その push の synchronize が起動する
     review が担当するので検証は免除する。
   - **fix**: run の最後に `fix-progress.sh` が「head が進んだ (pushed)」「push せずコメントした (answered: close -> reopen で
     review を起動)」「どちらもしていない (none: 1 回再試行し、なお none なら job を失敗させる)」を判定する。
-    判定・再試行・reopen・失敗の各 step は `always()` なので、agent step が失敗しても timeout しても走る
-    (agent step には fix モードで 40 分の上限を置き、後続 step の時間を残す)。
-  - **往復の上限**: oc-reviewer の CHANGES_REQUESTED が 1 PR で 10 件に達すると、fix を起動せず PR にコメントを残し
+    判定・再試行・reopen・失敗の各 step は `always()` なので、agent step が失敗しても走る (step の timeout 後に走るかは未実測。merge 後の実 run で確認する)
+    (fix モードの step 上限は agent 40 分・retry 15 分。setup (実測 30 秒〜1 分) を足して約 57 分。job の 60 分に対する
+    余裕は数分しか無いので、setup が長くなる素材指定の PR では retry の上限を縮めることを検討する)。
+  - **往復の上限**: oc-reviewer の CHANGES_REQUESTED が 1 PR で 5 件に達すると、fix を起動せず PR にコメントを残し
     ラベル `oc:stuck` を付けて止める (`changes_requested -> fix -> review` と `answered -> reopen -> review` の
-    どちらの循環も 1 周に 1 件増えるため)。ラベルを外すと再開する。
+    どちらの循環も 1 周に 1 件増えるため)。件数は直前の停止コメント (`<!-- oc-fix-limit -->`、bot 投稿) 以降の差し戻しに限る。
+    ラベルを外すと再開し、次の差し戻しから数え直す (停止前の件数を持ち越さない)。
   - **並行制御**: implement job は `opencode-impl-<N>`、review job は `opencode-review-<N>` と group を分ける。
     同じ group だと fix が pending の間に review が入って fix が黙って取り消される (pending は 1 件しか持てない)。
     その代わり fix と review が重なりうるので、reviewer は `gh pr merge --match-head-commit <レビューした head>` で

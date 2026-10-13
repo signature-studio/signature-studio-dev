@@ -1,23 +1,33 @@
 #!/bin/bash
-# test-pr-loop.sh — fix-progress.sh / verify-review-verdict.sh の分岐を fake gh で検証する (#719)。
+# test-pr-loop.sh — fix-progress.sh / verify-review-verdict.sh / reopen-pr.sh の分岐を fake gh で検証する (#719, #721)。
 # 実行: bash .github/scripts/tests/test-pr-loop.sh   (全て通れば exit 0、1 件でも落ちれば exit 1)
+# CI: tests/pr-loop-tests.workflow.yml を .github/workflows/pr-loop-tests.yml に置くと PR ごとに実行される
+#     (App は workflows 権限が無く、そのファイルは automation から push できない。PM が配置する)。
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 SCRIPTS="$HERE/.."
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
-export OC_REPO=o/r OC_PR_NUMBER=7 RUNNER_TEMP="$TMP"
+export OC_REPO=o/r OC_PR_NUMBER=7 RUNNER_TEMP="$TMP" OC_REOPEN_WAIT=0
 
 # fake gh: `gh api [--paginate] [-X M] repos/... [--jq E]` は $FIX/<path の / を _ にした名前> を返す。
 # `gh pr comment|close|reopen` と POST は $LOG に記録するだけ。
+# FAKE_REOPEN_FAILS=N なら、最初の N 回の `gh pr reopen` を失敗させる。
 FIX="$TMP/fixtures"
 LOG="$TMP/gh.log"
 mkdir -p "$FIX" "$TMP/bin"
 cat > "$TMP/bin/gh" << 'EOF'
 #!/bin/bash
 echo "gh $*" >> "$FAKE_LOG"
-if [ "$1" = pr ]; then exit 0; fi
+if [ "$1" = pr ]; then
+  if [ "$2" = reopen ] && [ -n "${FAKE_REOPEN_FAILS:-}" ]; then
+    n=$(($(cat "$FAKE_FIX/reopen_calls" 2> /dev/null || echo 0) + 1))
+    echo "$n" > "$FAKE_FIX/reopen_calls"
+    [ "$n" -le "$FAKE_REOPEN_FAILS" ] && exit 1
+  fi
+  exit 0
+fi
 shift
 path="" jq_expr="" method=GET
 while [ $# -gt 0 ]; do
@@ -59,17 +69,30 @@ setup() { # <head> <labels json> <n changes_requested reviews>
   fx repos/o/r/pulls/7/reviews "${r%,}]"
   fx repos/o/r/issues/7/comments '[]'
 }
+reviews() { # <submitted_at> <count> [<submitted_at> <count> ...]: oc-reviewer の CHANGES_REQUESTED review の JSON 配列
+  local s="" i
+  while [ $# -ge 2 ]; do
+    for ((i = 0; i < $2; i++)); do
+      s="$s{\"user\":{\"login\":\"oc-reviewer-for-signature-studio[bot]\"},\"state\":\"CHANGES_REQUESTED\",\"commit_id\":\"c\",\"submitted_at\":\"$1\"},"
+    done
+    shift 2
+  done
+  printf '[%s]' "${s%,}"
+}
+stop_at() { # <created_at> [login]: 停止コメント (マーカー付き) の JSON 配列
+  printf '[{"created_at":"%s","user":{"login":"%s"},"body":"上限 <!-- oc-fix-limit -->"}]' "$1" "${2:-opencode-for-signature-studio[bot]}"
+}
 run_fix() { GITHUB_ENV="$TMP/env" GITHUB_OUTPUT="$TMP/out" bash "$SCRIPTS/fix-progress.sh" "$@"; }
 
-echo "== fix-progress.sh record (往復の上限)"
+echo "== fix-progress.sh record (往復の上限 5 件)"
 setup aaa '[]' 3
 run_fix record > /dev/null
 grep -qx 'stop=false' "$TMP/out"; expect "3 件の差し戻し -> stop=false" $?
 grep -qx 'OC_HEAD_BEFORE=aaa' "$TMP/env"; expect "起動時の head を記録する" $?
 
-setup aaa '[]' 10
+setup aaa '[]' 5
 run_fix record > /dev/null
-grep -qx 'stop=true' "$TMP/out"; expect "10 件で stop=true" $?
+grep -qx 'stop=true' "$TMP/out"; expect "5 件で stop=true" $?
 logged 'issues/7/labels'; expect "oc:stuck ラベルを付ける" $?
 logged 'pr comment 7'; expect "PR に停止のコメントを残す" $?
 
@@ -77,6 +100,27 @@ setup aaa '[{"name":"oc:stuck"}]' 0
 run_fix record > /dev/null
 grep -qx 'stop=true' "$TMP/out"; expect "ラベル済みなら stop=true" $?
 ! logged 'pr comment'; expect "ラベル済みなら再コメントしない" $?
+
+echo "== fix-progress.sh record (上限は直前の停止コメント以降の差し戻しを数える)"
+setup aaa '[]' 0
+fx repos/o/r/pulls/7/reviews "$(reviews 2026-01-01T00:00:00Z 5 2026-01-03T00:00:00Z 1)"
+fx repos/o/r/issues/7/comments "$(stop_at 2026-01-02T00:00:00Z)"
+run_fix record > /dev/null
+grep -qx 'stop=false' "$TMP/out"; expect "停止コメントの後の差し戻し 1 件 -> stop=false (ラベルを外して再開)" $?
+! logged 'issues/7/labels' && ! logged 'pr comment'; expect "再開時に停止のラベル・コメントを付け直さない" $?
+
+setup aaa '[]' 0
+fx repos/o/r/pulls/7/reviews "$(reviews 2026-01-01T00:00:00Z 5 2026-01-03T00:00:00Z 5)"
+fx repos/o/r/issues/7/comments "$(stop_at 2026-01-02T00:00:00Z)"
+run_fix record > /dev/null
+grep -qx 'stop=true' "$TMP/out"; expect "停止コメントの後に上限ぶん差し戻し -> stop=true" $?
+logged 'pr comment 7'; expect "再度の停止で PR にコメントする" $?
+
+setup aaa '[]' 0
+fx repos/o/r/pulls/7/reviews "$(reviews 2026-01-01T00:00:00Z 5 2026-01-03T00:00:00Z 1)"
+fx repos/o/r/issues/7/comments "$(stop_at 2026-01-02T00:00:00Z someone)"
+run_fix record > /dev/null
+grep -qx 'stop=true' "$TMP/out"; expect "他人の oc-fix-limit マーカーは区切りにしない (6 件 -> stop=true)" $?
 
 echo "== fix-progress.sh check (pushed / answered / none)"
 setup bbb '[]' 1
@@ -92,6 +136,22 @@ setup aaa '[]' 1
 fx repos/o/r/issues/7/comments '[{"created_at":"2025-12-31T00:00:00Z","user":{"login":"opencode-for-signature-studio[bot]"}},{"created_at":"2026-01-02T00:00:00Z","user":{"login":"someone"}}]'
 OC_HEAD_BEFORE=aaa OC_START_TS=2026-01-01T00:00:00Z run_fix check > /dev/null
 grep -qx 'result=none' "$TMP/out"; expect "起動前の bot コメント・他人のコメントは数えない -> none" $?
+
+echo "== reopen-pr.sh (close -> reopen。reopen は 3 回まで再試行)"
+reset
+FAKE_REOPEN_FAILS=1 bash "$SCRIPTS/reopen-pr.sh" > "$TMP/v.out" 2>&1; rc=$?
+{ [ $rc = 0 ] && logged 'pr close 7' && [ "$(grep -c 'pr reopen 7' "$LOG")" = 2 ]; }; expect "reopen が 1 回失敗しても再試行で再開する" $?
+! logged 'issues/7/labels'; expect "再開できたら oc:stuck を付けない" $?
+
+reset
+FAKE_REOPEN_FAILS=99 bash "$SCRIPTS/reopen-pr.sh" > "$TMP/v.out" 2>&1; rc=$?
+{ [ $rc = 1 ] && [ "$(grep -c 'pr reopen 7' "$LOG")" = 3 ]; }; expect "reopen が 3 回失敗 -> 非 0 で終わる" $?
+{ logged 'issues/7/labels' && logged 'pr comment 7'; }; expect "reopen 失敗時は oc:stuck を付けて PR にコメントする" $?
+
+echo "== fix-progress.sh reopen (旧 workflow との互換)"
+reset
+run_fix reopen > /dev/null 2>&1; rc=$?
+{ [ $rc = 0 ] && logged 'pr close 7' && logged 'pr reopen 7'; }; expect "reopen サブコマンドは reopen-pr.sh に委譲する" $?
 
 echo "== verify-review-verdict.sh"
 verify() { GITHUB_EVENT_PATH="${1:-/dev/null}" bash "$SCRIPTS/verify-review-verdict.sh" > "$TMP/v.out" 2>&1; }

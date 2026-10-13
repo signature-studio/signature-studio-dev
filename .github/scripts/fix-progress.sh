@@ -6,10 +6,10 @@
 #                 $GITHUB_OUTPUT に出す (oc:stuck ラベルを付けて PR にコメントする)
 #   check         head が進んだか / 根拠コメントを投稿したかを判定し、result を $GITHUB_OUTPUT に出す
 #                   pushed   : head が進んだ (push が synchronize を起こし、review が再起動する)
-#                   answered : push せず PR にコメントした (review は起動しないので reopen が要る)
+#                   answered : push せず PR にコメントした (review は起動しないので reopen で起こす)
 #                   none     : どちらもしていない
 #   retry-prompt  none だったときの再試行用プロンプトを作る
-#   reopen        close -> reopen で pull_request:reopened を起こす
+#   reopen        reopen-pr.sh に委譲する (close -> reopen。旧 workflow との互換)
 #
 # 入力 (env): GH_TOKEN, OC_REPO, OC_PR_NUMBER, RUNNER_TEMP, GITHUB_ENV, GITHUB_OUTPUT
 # 実装 App は PR の comment を投稿する時 user.login が opencode-for-signature-studio[bot] になる。
@@ -21,7 +21,9 @@ STUCK_LABEL="${OC_STUCK_LABEL:-oc:stuck}"
 # 差し戻しの往復 (changes_requested -> fix -> push -> review -> changes_requested) と、
 # push せず根拠だけ返す往復 (answered -> reopen -> review -> changes_requested) は、どちらも
 # 1 周に oc-reviewer の CHANGES_REQUESTED review を 1 件ずつ増やす。件数で両方を抑える。
-MAX_FIX_REVIEWS="${OC_MAX_FIX_REVIEWS:-10}"
+# 件数は直前の停止コメント以降の差し戻しに限る (ラベルを外して再開したとき、停止前の件数で即座に止めないため)。
+STOP_MARK='<!-- oc-fix-limit -->'
+MAX_FIX_REVIEWS="${OC_MAX_FIX_REVIEWS:-5}"
 
 case "${1:-}" in
   record)
@@ -36,16 +38,19 @@ case "${1:-}" in
       stop=true
       echo "PR #$OC_PR_NUMBER already has $STUCK_LABEL: the fix run is skipped"
     else
+      # 直前の停止コメント (bot 投稿・マーカー付き) の時刻。無ければ全期間の差し戻しを数える。
+      since="$(gh api --paginate "repos/$OC_REPO/issues/$OC_PR_NUMBER/comments" \
+        | jq -s -r --arg m "$STOP_MARK" '[.[][] | select((.user.login | startswith("opencode-for-signature-studio")) and (.body | contains($m))) | .created_at] | max // ""')"
       n="$(gh api --paginate "repos/$OC_REPO/pulls/$OC_PR_NUMBER/reviews" \
-        | jq -s '[.[][] | select((.user.login | startswith("oc-reviewer")) and .state == "CHANGES_REQUESTED")] | length')"
-      echo "oc-reviewer CHANGES_REQUESTED reviews on PR #$OC_PR_NUMBER: $n (limit $MAX_FIX_REVIEWS)"
+        | jq -s --arg since "$since" '[.[][] | select((.user.login | startswith("oc-reviewer")) and .state == "CHANGES_REQUESTED" and ($since == "" or (.submitted_at // "") > $since))] | length')"
+      echo "oc-reviewer CHANGES_REQUESTED reviews on PR #$OC_PR_NUMBER since ${since:-the start}: $n (limit $MAX_FIX_REVIEWS)"
       if [ "$n" -ge "$MAX_FIX_REVIEWS" ]; then
         stop=true
         gh api -X POST "repos/$OC_REPO/labels" -f name="$STUCK_LABEL" -f color=B60205 \
           -f description="automation gave up: needs a human/PM decision" > /dev/null 2>&1 || true
         gh api -X POST "repos/$OC_REPO/issues/$OC_PR_NUMBER/labels" -f "labels[]=$STUCK_LABEL" > /dev/null
         gh pr comment "$OC_PR_NUMBER" --repo "$OC_REPO" \
-          --body "reviewer の差し戻しが ${n} 件に達したため、自動修正を止めます (上限 ${MAX_FIX_REVIEWS})。PM の判断が必要です。ラベル \`${STUCK_LABEL}\` を外すと再開できます。<!-- oc-fix-limit -->"
+          --body "reviewer の差し戻しが ${n} 件に達したため、自動修正を止めます (上限 ${MAX_FIX_REVIEWS})。PM の判断が必要です。ラベル \`${STUCK_LABEL}\` を外すと再開できます (再開後は、この停止コメント以降の差し戻しだけを数えます)。${STOP_MARK}"
       fi
     fi
     echo "stop=$stop" >> "$GITHUB_OUTPUT"
@@ -77,8 +82,8 @@ case "${1:-}" in
     echo "prompt_file=$out" >> "$GITHUB_OUTPUT"
     ;;
   reopen)
-    gh pr close "$OC_PR_NUMBER" --repo "$OC_REPO"
-    gh pr reopen "$OC_PR_NUMBER" --repo "$OC_REPO"
+    # 旧 workflow (reopen サブコマンドを呼ぶ版) との互換。実体は reopen-pr.sh。
+    exec bash "$(dirname "$0")/reopen-pr.sh"
     ;;
   *)
     echo "usage: $0 record|check|retry-prompt|reopen" >&2
