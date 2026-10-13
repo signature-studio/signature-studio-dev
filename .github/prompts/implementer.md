@@ -36,6 +36,9 @@
 5. **main を作業ツリーにしない**: 既定ブランチは `main`。共有ワークツリーで作業せず、
    branch → worktree → PR の順で進める。
 6. **検証**: 変更したら該当 e2e を実行し、結果 (所要時間・load・PASS/FAIL) を REPORT に実測値で残す。
+   測定した commit (コードを変えた最後の commit) を REPORT に書き、そこから HEAD までのコード差分
+   (`git diff <測定 commit> HEAD -- <範囲>`) の出力も添える。差分 0 なら、main 取り込み後に再測定は要らない
+   (`docs/WORKFLOW.md` §6)。
    「約○分」等の推定表記は禁止。検証はコミット済み HEAD で再現してから報告する。
 7. **大物ファイル**: 20MiB 超の blob を commit しない。生成物は `work/` (gitignore) に置く。
 8. **ブランチ/PR**: 作業は `N-<slug>` (N = issue 番号) ブランチで行い、push 後 `gh pr create`
