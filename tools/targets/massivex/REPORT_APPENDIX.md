@@ -124,6 +124,6 @@
 | `-O1` (既定) | 52.4 s | 0.88 → 1.19 | 11/11 | PASS (exit 0) |
 | `-O2` | 47.6 s | 1.01 → 1.00 | 11/11 | PASS (exit 0) |
 
-- 全レベルで T1〜T11 が PASS。`-O1`/`-O2` で T7〜T11 が TRAP しないこと (MX2-1 zero-init pass の効果) も確認。
+- 全レベルで T1〜T11 が PASS。`-O1`/`-O2` の T7〜T11 が TRAP しなかったことは確認したが、MX2-1 zero-init pass の寄与は未測定 (`MX_ZEROINIT=0` の対照実験は本節では実施していない)。
 - コード差分: 測定 commit `604e900f` から HEAD までの `tools/targets/massivex/` のうち `.md` 以外は 0 行 (`git diff 604e900f HEAD -- tools/targets/massivex ':!*.md'` が空)。
 - 生ログ: `$RUNNER_TEMP/e2e_O{0,1,2}.log` (`work/` 外・commit しない)。
