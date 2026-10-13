@@ -103,6 +103,7 @@ void *VirtualAlloc(void* addr, unsigned size, unsigned type, unsigned protect) {
     return raw + off;
 }
 
+EMSCRIPTEN_KEEPALIVE
 int VirtualFree(void* p, unsigned size, unsigned type) {
     (void)size;
     if (type & 0x4000) { g_va_decommit++; return 1; }          /* MEM_DECOMMIT: 領域は保持 */
