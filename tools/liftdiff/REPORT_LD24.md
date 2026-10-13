@@ -1,4 +1,4 @@
-# liftdiff LD-24 (#976) — 署名未対応 (vector/struct) 50 関数の実測と分割
+# liftdiff LD-24 (#976) — 署名未対応 (vector/struct) 50 関数の内訳と分割
 
 > 正本: `tools/liftdiff/REPORT.md` §12 から派生。親 issue #235 の残り (#976)。
 > 本節は REPORT (250 行上限) の分割移動として新設。判定は**未実装** (下記 §3 の分割で子 issue に委譲)。
@@ -22,7 +22,9 @@ python3 tools/liftdiff/tests/ld24_sig_breakdown.py tools/m11/work/boot_final3.ll
 - 集計: 署名形 (ret, params) ごとの件数。出力の関数別表で `va` → ret/params の対応を確認できる (`work/` は gitignore)。
 - IR に無い関数は末尾に列挙し、終了コード 1 で返す。
 
-| 署名形 (ret / params) | 関数数 |
+**注記: 下表の件数は未検証 (IR 未照合)**。本 run では再現できていない。確定値ではない。
+
+| 署名形 (ret / params) | 関数数 (未検証) |
 |---|---|
 | ret=`i128`, params=`i64` | 21 |
 | ret=`i128`, params=なし | 8 |
@@ -50,13 +52,13 @@ case 生成 (`cases.py`)・native 実行器 (`rt/ld_native.c`・`ld_ms_call.S`)�
 
 振り分けの規則 (1 関数を 1 子に限定する): ret=`i128` は戻り値側として #1193 に入れる (params が `i128` でも #1194 には数えない)。
 ret が `i128` 以外で params に `i128` または `%tagPOINT` を含むものを #1194 に入れる。
-これにより #1193 = 39 件、#1194 = 11 件 (内訳: `ret=i64/params=i128` 8 + `ret=i64/params=i64,i64,i128` 1 + `ret=i64/params=i64,i128,i64` 1 + `ret=ptr/params=%tagPOINT` 1)、計 50 件で重なりは無い。
+振り分け規則により、#1193 と #1194 の件数は互いに重ならず計 50 件になる。ただし各子の件数 (#1193 / #1194) は IR 未照合のため**未検証**で、`ld24_sig_breakdown.py` で件数を先に確定させる必要がある。
 ret=`i128`・params=`i128` の 1 関数は #1193 のみで扱う (#1194 の件数には含めない)。
 
 | 子 | 対象 | 受入条件 (要点) |
 |---|---|---|
-| LD-38 (#1193) | ret=`i128` 39 関数 | i128 戻り値の rax:rdx を native/wasm 両方で取得し `cmp_ret` で上位 64bit も比較。既存 pattern の結果が変わらないこと |
-| LD-39 (#1194) | params に `i128` / `%tagPOINT` を含む 11 関数 | i128 引数を 2 レジスタ分に分解して投入。`%tagPOINT` の値渡しの ABI を確認し対応 |
+| LD-38 (#1193) | ret=`i128` 関数 (件数は未検証) | i128 戻り値の rax:rdx を native/wasm 両方で取得し `cmp_ret` で上位 64bit も比較。既存 pattern の結果が変わらないこと |
+| LD-39 (#1194) | params に `i128` / `%tagPOINT` を含む関数 (件数は未検証) | i128 引数を 2 レジスタ分に分解して投入。`%tagPOINT` の値渡しの ABI を確認し対応 |
 
 子 issue: #1193 (LD-38)・#1194 (LD-39)。各本文に `oc_artifacts:` 行あり。
 
@@ -64,6 +66,7 @@ ret=`i128`・params=`i128` の 1 関数は #1193 のみで扱う (#1194 の件�
 
 | 未解決 | 起票先 |
 |---|---|
-| i128 戻り値の上位 64bit 比較 (39 関数) | #1193 (LD-38) |
-| i128 引数・tagPOINT 値渡しの case 生成 (11 関数) | #1194 (LD-39) |
+| i128 戻り値の上位 64bit 比較 (件数未検証) | #1193 (LD-38) |
+| i128 引数・tagPOINT 値渡しの case 生成 (件数未検証) | #1194 (LD-39) |
+| 署名内訳の IR 照合 (`ld24_sig_breakdown.py` の実行と件数確定) | #976 の残件 (PM が #1193 / #1194 本文へ前提を追記) |
 | 対応後の m11 sample:800 / closure 再採点の実測 | #1193 / #1194 の受入条件 |

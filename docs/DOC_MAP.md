@@ -93,7 +93,7 @@
 | `tools/liftdiff/REPORT_APPENDIX.md` | ~240 | liftdiff REPORT の分割移動節の全文: §5/§5.1/§5.2 (回帰 A/B・Ablation)・§6.1/§6.2 (検収・再現性)・§8/§9 (wasm_trap)・§10 (OTT 旧 chain)・§11 (比較系偽陽性)・§12 (被覆拡大 vm0/u16)。250 行上限のため無変更で分割移動 |
 | `tools/liftdiff/REPORT_APPENDIX_LD16.md` | ~90 | liftdiff REPORT §10 (OTT 旧 chain 前回比) の全文: 集計差分 (33/110/69 → 35/112/65) の原因切り分け (`ldlib/cases.py` pattern 追加)・関数単位の判定変化・n=3 非決定性。関数単位の突合は `tools/liftdiff/tests/ott_delta.py` (LD-16 / #825) |
 | `tools/liftdiff/REPORT_APPENDIX_865.md` | ~20 | liftdiff LD-18 (#865) 新規節: trace_head 外 27 件の 414ad0 到達確認 (25/27)・OOB 最上位 frame 集計 (239 件、件数定義と 222 件との差)。`REPORT_APPENDIX.md` は 250 行上限のため増やさず別置き |
-| `tools/liftdiff/REPORT_LD24.md` | ~70 | liftdiff LD-24 (#976) 節: m11 closure `unsupported_sig` 50 件の署名内訳 (TSV 件数は実測・署名内訳は IR 未照合) と #1193 (i128 戻り値 39) / #1194 (i128 引数・tagPOINT 11) への分割。REPORT.md §12 から参照 |
+| `tools/liftdiff/REPORT_LD24.md` | ~70 | liftdiff LD-24 (#976) 節: m11 closure `unsupported_sig` 50 件の内訳と #1193 / #1194 への分割 (署名内訳は IR 未照合)。REPORT.md §12 から参照 |
 | `tools/liftdiff/tests/ld24_sig_breakdown.py` | ~110 | LD-24 (#976) の署名内訳スクリプト: `unsupported_sig` 50 行の va/name を IR (`boot_final3.ll`) の define/declare 行から引き、署名形ごとの件数と #1193/#1194 振り分けを出力 (IR 必須・IR 無しは終了コード 1) |
 | `tools/icall/REPORT.md` | ~245 | 間接 call/jmp 落ち監査 + 復元 pass。§10.1 (#530)・§11 (ICALL-6 #361)・§12 (ICALL-16 #1023) は要約のみで全文は `REPORT_APPENDIX.md` §14 に分割。§13 (#1026 Fresh Air 残落ち 6 件) は結論 1 行のみで全文は `REPORT_APPENDIX.md` §13 |
 | `tools/icall/REPORT_APPENDIX.md` | ~214 | icall REPORT §10.1 (#530 OTT 回帰再実行)・§11 (ICALL-6 #361)・§12 (#229 FLEngine 分割 lift・§12.1 ICALL-9 #847)・§13 (#1026: Fresh Air 残落ち 6 件)・§14 (ICALL-16 #1023 stack 引数の実測。REPORT §12 から分割移動)・§15 (#851 の結論 1 行) の全文 (250 行上限のため分割移動) |

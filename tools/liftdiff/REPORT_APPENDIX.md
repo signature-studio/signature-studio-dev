@@ -280,6 +280,4 @@ flelift closure (fle_lift.sh 生成物 tools/flelift/work/lift/* が素材に無
 
 ### LD-24 (#976) 署名未対応 50 関数の内訳 (REPORT §12 から移動)
 
-m11 closure の `unsupported_sig` 50 件の内訳は未実装。分割先 #1193 (ret=`i128` 39 件) と #1194 (params に `i128`・`%tagPOINT` を含む 11 件)。
-件数の再計算と関数ごとの va→署名対応は `tests/ld24_sig_breakdown.py` (入力: `results/m11_closure_verdicts.tsv` と `tools/m11/work/boot_final3.ll`)。
-詳細・受入条件: [`REPORT_LD24.md`](REPORT_LD24.md)。
+m11 closure の `unsupported_sig` 50 件は未実装。分割先は #1193 と #1194。詳細・件数の注記・受入条件: [`REPORT_LD24.md`](REPORT_LD24.md)。
