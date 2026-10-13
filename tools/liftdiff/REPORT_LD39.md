@@ -135,9 +135,49 @@ python3 tools/liftdiff/tests/ld39_abi_dump.py "$P" "$RUNNER_TEMP/empty.ll" > wor
 - `ld39_callsites.py` の rc=0 (実測 0.203 秒)。件数: `40c660` 5021 / `40c750` 543 / `4256c0` 4 / `664890` 26 / `6649b0` 3 / `6649c0` 8 / `664a80` 2 / `442a50` 14 / `442b90` 10 / `653c80` 3 / `691dd0` 13。
 - `--iat 0x1970df8` の出力: `== IAT 0x1970df8 -> user32.dll!WindowFromPoint` (pefile の import テーブルで引いた値。§6.1 の根拠)。
 - `ld39_abi_dump.py` の rc=0 (実測 0.093 秒)。IAT 行が `-> 0x0` と出るのは、ディスク上の IAT slot が未束縛のため。import 名は `--iat` で引く。
+
+`ld39_abi_dump.py` の出力 (抜粋。11 関数それぞれ先頭 2 命令と解決先。全行は `work/ld39_abi.txt`。IR を空にして実行したため `IR: ret=None params=` は空):
+
+```
+== 40c660  IR: ret=None params=  (LD-24 表の想定: i64 (i128))
+  40c660: cvtsd2si rax, xmm0
+  40c665: ret 
+== 40c750  IR: ret=None params=  (LD-24 表の想定: i64 (i128))
+  40c750: cvttsd2si rax, xmm0
+  40c755: ret 
+== 4256c0  IR: ret=None params=  (LD-24 表の想定: ptr (%tagPOINT))
+  4256c0: jmp qword ptr [rip + 0x154b732]
+    -> IAT slot 0x1970df8 -> 0x0 (import thunk: 以降は呼び先の ABI に従う)
+== 664890  IR: ret=None params=  (LD-24 表の想定: i64 (i128))
+  664890: sub rsp, 0x28
+  664894: call 0x476930
+== 6649b0  IR: ret=None params=  (LD-24 表の想定: i64 (i128))
+  6649b0: sub rsp, 0x28
+  6649b4: call 0x476500
+== 6649c0  IR: ret=None params=  (LD-24 表の想定: i64 (i128))
+  6649c0: sub rsp, 0x28
+  6649c4: call 0x4764c0
+== 664a80  IR: ret=None params=  (LD-24 表の想定: i64 (i128))
+  664a80: sub rsp, 0x28
+  664a84: call 0x476020
+== 442a50  IR: ret=None params=  (LD-24 表の想定: i64 (i128))
+  442a50: push rbp
+  442a51: sub rsp, 0x40
+== 442b90  IR: ret=None params=  (LD-24 表の想定: i64 (i128))
+  442b90: sub rsp, 0x28
+  442b94: call 0x442420
+== 653c80  IR: ret=None params=  (LD-24 表の想定: i64 (i64,i64,i128))
+  653c80: sub rsp, 0x28
+  653c84: cmp r8, 0x7fffffff
+== 691dd0  IR: ret=None params=  (LD-24 表の想定: i64 (i64,i128,i64))
+  691dd0: push rbp
+  691dd1: sub rsp, 0x50
+== IAT 0x1970df8 -> user32.dll!WindowFromPoint
+```
+
 - 全件の VA 一覧は `work/ld39_callsites/<VA>.txt` に出る (commit しない)。
 
 `40c660` の先頭 4 件 (E8 走査順): `440c50`・`440e7f`・`442435`・`45c430`。`40c750` の先頭 6 件: `40b76e`・`42080a`・`420829`・`420848`・`420868`・`442dd6`。`653c80` の 3 件: `6833c4`・`69b099`・`c7a451`。`691dd0` の 13 件のうち §6.3 で読んだ `682814`・`682e57`・`690291`・`a6465a`・`a9b5a0`・`a9b8c2`。`4256c0` の 4 件: `6065d2`・`6074c3`・`70a174`・`8660cc`。
 
 - 注: `ld39_callsites.py` は E8 のバイト走査で、命令境界・data 上の E8 を含む偽陽性の上限値。件数は「その VA に向かう E8 rel32 の数」で、真の呼出し件数とは限らない。
-- 検証 HEAD: 本節を含むコミット (PR の HEAD)。`git diff dee0e1ee HEAD -- tools/liftdiff` の差分は本節の script 追加と REPORT の変更のみ。
+- 測定 commit: `dee0e1ee` 基点。コードを変えた commit は `209cab78` (`ld39_callsites.py` 追加)。`git diff dee0e1ee 209cab78 -- tools/liftdiff/tests` は `ld39_callsites.py` の追加 (94 行) のみ。
