@@ -237,7 +237,18 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
 - **未達 (#740 受入条件)**: (1) 修正前の ASan ログを用いた再現は本 run で得られず (修正後 94 回で発火せず)。(2) `e2e.sh` の n≥10 連続 rc 0 は未実施 (RetDec・emsdk を含む全体実行で 1 回約 3 分のため本 run の 60 分内に 10 回は収まらない)。(3) ネガコンは `gui12_race.sh` の 30/30 で代替確認済み。
 - **未解決 (起票先)**: #740 のまま、`e2e.sh` 全体の n≥10 連続 PASS と、修正前 ASan ログの再取得。PM 判断で #740 を #489 の重複として閉じるか決める。
 
-## 19. GUI-15 (#740) 続き: e2e.sh 連続実行 (HEAD 29f63707, load 1.4〜3.7)
-- 連続実行 (`bash tools/gui/e2e.sh`, 1 回 ~197 s): run1〜7 rc 0 (7/7)、run8 rc 1 (step 6h の `agent-browser eval: CDP command timed out: Runtime.evaluate`、ASan の UAF 0 件)。単発で先に取った run (rc 0) を含めると 8 回中 7 回 PASS。
-- 6h の CDP タイムアウトは GUI-15 の race とは別経路と推定 (未検証)。残件 (原因特定・n≥10 連続・修正前 ASan ログ) は子 issue #1217 (GUI-20) に起票。
-- n≥10 連続 rc 0 は本 run では未達 (7 連続まで)。
+## 19. GUI-15 (#740) 続き: e2e.sh 連続実行 (HEAD 29f63707)
+- 集計対象: 連続実行 `bash tools/gui/e2e.sh` の run1〜8 (連続 8 回) と、連続の前に取った単発 1 回 (rc 0)。
+  - 連続 8 回: rc 0 が 7 回、rc 1 が 1 回 (run8) → **連続 8 回中 7 回 PASS**。
+  - 単発を加えた 9 回: rc 0 が 8 回 → **単発込み 9 回中 8 回 PASS**。
+- run1〜8 の rc・所要・load の生ログは保存していない。下表の所要・load は未記録のため、所要の min–max と load の範囲は確定できない (以前の「1 回 ~197 s」「load 1.4〜3.7」「1.8〜3.7」は出典を確認できないため取り消す)。
+
+| run | rc | 所要 | load |
+|---|---|---|---|
+| 単発 | 0 | 未記録 | 未記録 |
+| run1〜7 | 0 | 未記録 | 未記録 |
+| run8 | 1 | 未記録 | 未記録 |
+
+- run8 の失敗: step 6h の `agent-browser eval: CDP command timed out: Runtime.evaluate`、ASan の UAF 0 件。6h の CDP タイムアウトは GUI-15 の race とは別経路と推定 (未検証)。
+- 再現: `bash tools/gui/e2e.sh` (連続は for ループ)。次回測定では run ごとの rc・所要・load を表に残す。
+- n≥10 連続 rc 0 は未達 (連続 7 回 rc 0 まで)。残件 (原因特定・n≥10 連続・修正前 ASan ログ) は子 issue #1217 (GUI-20) へ移管。
