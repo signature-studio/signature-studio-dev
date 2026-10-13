@@ -219,6 +219,63 @@ EMSCRIPTEN_KEEPALIVE char *flpy_call_json(const char *target, const char *args_j
     return out;
 }
 
+/* ---------------- PY-6 (#76): サブインタプリタ可否の検証用 export ----------------
+ * code を新しいサブインタプリタの __main__ で実行し、その __main__.result (str) を返す → インタプリタを破棄して元に戻る。
+ * mode: 0 = isolated (_PyInterpreterConfig_INIT: 独立 obmalloc / 単相初期化 ext 拒否 / OWN_GIL)
+ *       1 = isolated + SHARED_GIL (wasm はスレッド無しなので OWN_GIL が成立するかの切り分け用)
+ *       2 = legacy (_PyInterpreterConfig_LEGACY_INIT: main と obmalloc/GIL を共有、ext 制限なし)
+ * 戻り値: malloc'ed JSON {"ok":true,"result":..} | {"ok":false,"stage":..,"err":..} (flpy_free で解放)。
+ * 本番経路 (flpy_run / flpy_call_json) はこの関数を使わない。 */
+static char *json_reply(int ok, const char *stage, const char *text) {
+    PyObject *d = PyDict_New();
+    PyDict_SetItemString(d, "ok", ok ? Py_True : Py_False);
+    if (stage) { PyObject *o = PyUnicode_FromString(stage); PyDict_SetItemString(d, "stage", o); Py_DECREF(o); }
+    if (text) { PyObject *o = PyUnicode_DecodeUTF8(text, (Py_ssize_t)strlen(text), "replace"); PyDict_SetItemString(d, ok ? "result" : "err", o); Py_DECREF(o); }
+    PyObject *dumps = NULL, *out = NULL;
+    PyObject *js = PyImport_ImportModule("json");
+    if (js) dumps = PyObject_GetAttrString(js, "dumps");
+    if (dumps) out = PyObject_CallFunctionObjArgs(dumps, d, NULL);
+    const char *u = out ? PyUnicode_AsUTF8(out) : NULL;
+    char *r = strdup(u ? u : "{\"ok\":false,\"err\":\"json_reply failed\"}");
+    Py_XDECREF(out); Py_XDECREF(dumps); Py_XDECREF(js); Py_DECREF(d);
+    PyErr_Clear();
+    return r;
+}
+
+EMSCRIPTEN_KEEPALIVE char *flpy_subinterp_run(const char *code, int mode) {
+    PyThreadState *main_ts = PyThreadState_Get();
+    PyInterpreterConfig cfg = mode == 2 ? (PyInterpreterConfig)_PyInterpreterConfig_LEGACY_INIT : (PyInterpreterConfig)_PyInterpreterConfig_INIT;
+    if (mode == 1) cfg.gil = PyInterpreterConfig_SHARED_GIL;
+    PyThreadState *sub = NULL;
+    PyStatus st = Py_NewInterpreterFromConfig(&sub, &cfg);
+    if (PyStatus_Exception(st) || !sub) {
+        PyThreadState_Swap(main_ts);
+        return json_reply(0, "new_interpreter", st.err_msg ? st.err_msg : "Py_NewInterpreterFromConfig failed");
+    }
+    char *text = NULL;
+    int ok = 0;
+    PyObject *main_mod = PyImport_AddModule("__main__");
+    PyObject *globals = main_mod ? PyModule_GetDict(main_mod) : NULL;
+    PyObject *co = globals ? Py_CompileString(code, "<subinterp>", Py_file_input) : NULL;
+    PyObject *r = co ? PyEval_EvalCode(co, globals, globals) : NULL;
+    if (!r) {
+        set_err_from_python("subinterp");
+        text = strdup(g_last_error);
+    } else {
+        Py_DECREF(r);
+        PyObject *res = PyDict_GetItemString(globals, "result");
+        const char *u = res ? PyUnicode_AsUTF8(res) : NULL;
+        text = strdup(u ? u : "");
+        ok = 1;
+    }
+    Py_XDECREF(co);
+    Py_EndInterpreter(sub);
+    PyThreadState_Swap(main_ts);
+    char *reply = json_reply(ok, ok ? NULL : "exec", text);  /* 応答は元の (main) インタプリタで組み立てる */
+    free(text);
+    return reply;
+}
+
 EMSCRIPTEN_KEEPALIVE const char *flpy_last_error(void) { return g_last_error; }
 EMSCRIPTEN_KEEPALIVE void flpy_free(void *p) { free(p); }
 EMSCRIPTEN_KEEPALIVE int flpy_finalize(void) { return Py_FinalizeEx(); }

@@ -3,6 +3,19 @@ import fs from 'fs';
 Error.stackTraceLimit = 40;
 const M11 = new URL('../', import.meta.url).pathname.replace(/\/$/, '');
 const m2 = await import(M11 + '/work/m11_boot.cjs');
+// frames は wasm 関数 index のままだとビルド間で名前がずれるため, 実行した wasm の export 名で解決して JSON に残す (#483)
+const wasmBin = fs.readFileSync(M11 + '/work/m11_boot.cjs.wasm');
+const fnNames = new Map();
+{
+  let pos = 8;
+  const leb = () => { let r = 0, s = 0, x; do { x = wasmBin[pos++]; r |= (x & 0x7f) << s; s += 7; } while (x & 0x80); return r >>> 0; };
+  while (pos < wasmBin.length) {
+    const id = wasmBin[pos++]; const sz = leb(); const end = pos + sz;
+    if (id === 7) { const n = leb(); for (let k = 0; k < n; k++) { const l = leb(); const nm = wasmBin.toString('utf8', pos, pos + l); pos += l; const kind = wasmBin[pos++]; const idx = leb(); if (kind === 0 && !fnNames.has(idx)) fnNames.set(idx, nm); } }
+    pos = end;
+  }
+}
+const resolve = (f) => { const m = /wasm-function\[(\d+)\]/.exec(f); return m && fnNames.has(+m[1]) ? fnNames.get(+m[1]) : f; };
 const errs = [];
 // trace 行 (m11_ov.c の M11_TRACE) は診断用の別チャンネル: rec.err には入れない (SV_TRACE_AT の有無で survey JSON を変えないため, #495)
 const TRACE_RE = /^\[m11\]\[(icall|icall-miss|InitUnits|unit \d+\/\d+|InitLib|UStrAsg|longjmp)\]/;
@@ -44,6 +57,7 @@ for (let i = 0; i < 942; i++) {
   if (process.env.SV_TRACE_AT && String(i) === process.env.SV_TRACE_AT) mod._m11_set_trace(1);
   if (process.env.SV_STK_FILL) { const sp = mod._emscripten_stack_get_current(); mod.HEAPU8.fill(parseInt(process.env.SV_STK_FILL, 16), sp - 8192, sp); }   // 各 unit の直前に SP 直下 8 KiB を埋める (残骸への感度の検査)
   const before = stubCounts(); const va0 = Number(mod._m11_va_used());
+  const miss0 = mod._m11_icall_miss(), uniq0 = mod._m11_icall_miss_uniq();
   const ic0 = icallCounts();
   const e0 = errs.length;
   if (process.env.SV_PROG) fs.writeSync(2, 'unit ' + i + '\n');
@@ -52,15 +66,17 @@ for (let i = 0; i < 942; i++) {
     const r = mod._m11_call_unit(i);
     rec.kind = r === 1 ? 'ok' : r === 0 ? 'noproc' : 'miss';
   } catch (e) {
-    if (e && e.m11_dllmain_done !== undefined) { rec.kind = 'halt0'; rec.frames = ((e.stack) || '').split('\n').filter(l => /wasm-function/.test(l)).slice(0, 30).map(l => l.trim()); }
+    if (e && e.m11_dllmain_done !== undefined) { rec.kind = 'halt0'; rec.frames = ((e.stack) || '').split('\n').filter(l => /wasm-function/.test(l)).slice(0, 30).map(l => resolve(l.trim())); }
     else {
       const msg = ((e && e.message) || String(e)).split('\n')[0];
       rec.kind = /out of bounds/.test(msg) && !/table/.test(msg) ? 'oob' : /abort/i.test(msg) ? 'abort' : 'other';
       rec.msg = msg;
-      rec.frames = ((e && e.stack) || '').split('\n').filter(l => /wasm-function|at /.test(l)).slice(1, 30).map(l => l.trim().replace(/^at /, '').split(' ')[0]);
+      rec.frames = ((e && e.stack) || '').split('\n').filter(l => /wasm-function|at /.test(l)).slice(1, 30).map(l => resolve(l.trim().replace(/^at /, '').split(' ')[0]));
     }
     mod.__emscripten_stack_restore(sp0);
   }
+  const dm = mod._m11_icall_miss() - miss0;
+  if (dm) { rec.miss_n = dm; rec.miss_new = []; for (let k = uniq0; k < mod._m11_icall_miss_uniq(); k++) rec.miss_new.push('0x' + (mod._m11_icall_miss_at(k) >>> 0).toString(16)); }
   const after = stubCounts(); rec.va_mb = +((Number(mod._m11_va_used()) - va0) / 1e6).toFixed(1); if (!rec.va_mb) delete rec.va_mb;
   const d = {}; for (const k in after) if (after[k] !== (before[k] || 0)) d[k] = after[k] - (before[k] || 0);
   if (Object.keys(d).length) rec.stubs = d;

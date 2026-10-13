@@ -9,7 +9,7 @@ source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1
 export TMPDIR="$HERE/work/tmp"
 mkdir -p work/tmp work/obj
 M11_LB_BASE="${M11_LB_BASE:-0}"; export M11_LB_BASE   # #222: LVA = RVA + M11_LB_BASE (0 = 従来)
-M11_OV_CLASSCREATE="${M11_OV_CLASSCREATE:-0}"   # #419: 1 = m11_ov.c の実験 override (410360/8cbda0/8cbce0) を有効化 (既定 0)
+M11_OV_CLASSCREATE="${M11_OV_CLASSCREATE:-0}"   # #419: 1 = m11_ov.c の実験 override (410360 のみ; 8cbda0/8cbce0 は #503 で既定 ON) を有効化 (既定 0)
 CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=$M11_LB_BASE -DM11_OV_CLASSCREATE=$M11_OV_CLASSCREATE"
 # image 終端 (SizeOfImage 0x18c0000) + LB_BASE が GLOBAL_BASE (0x10000000) 以内であること
 python3 - <<PYEOF
@@ -90,7 +90,7 @@ cc work/m11_data.c work/obj/data.o
 
 INITMEM="$((0x12000000))"
 MAXMEM="$((0x72000000))"
-EXPORTS=_m11_boot_enter,_entry_point,_m11_init_count,_m11_boot_stage,_m11_va_used,_m11_va_calls,_m11_set_trace,_m11_icall_ok,_m11_icall_miss,_m11_icall_miss_uniq,_m11_icall_miss_at,_m11_icall_cnt_n,_m11_icall_cnt_key,_m11_icall_cnt_ok,_m11_icall_cnt_miss,_m11_icall_cnt_drop,_m11_disp_count,_m11_units_run,_m11_units_total,_m11_units_skipped,_m11_stub_total,_m11_stub_uniq,_m11_stub_name,_m11_stub_count,_m11_probe_count,_m11_longjmp_hit,_m11_set_survey,_m11_call_unit,_m11_unit_va,__emscripten_stack_restore,_emscripten_stack_get_current
+EXPORTS=_m11_boot_enter,_entry_point,_m11_init_count,_m11_boot_stage,_VirtualAlloc,_VirtualFree,_m11_va_used,_m11_va_calls,_m11_va_live,_m11_va_peak,_m11_va_oom,_m11_va_freed,_m11_va_freed_bytes,_m11_va_free_unknown,_m11_va_free_skipped,_m11_va_decommit,_m11_va_big,_m11_set_vfree_noop,_m11_set_va_bigtrace,_m11_set_va_stack_at,_m11_set_va_unit_budget,_m11_va_unit_begin,_m11_va_denied,_m11_set_trace,_m11_icall_ok,_m11_icall_miss,_m11_icall_miss_uniq,_m11_icall_miss_at,_m11_icall_cnt_n,_m11_icall_cnt_key,_m11_icall_cnt_ok,_m11_icall_cnt_miss,_m11_icall_cnt_drop,_m11_disp_count,_m11_units_run,_m11_units_total,_m11_units_skipped,_m11_stub_total,_m11_stub_uniq,_m11_stub_name,_m11_stub_count,_m11_probe_count,_m11_longjmp_hit,_m11_set_survey,_m11_call_unit,_m11_unit_va,__emscripten_stack_restore,_emscripten_stack_get_current
 emcc work/obj/*.o -o work/m11_boot.cjs.tmp \
   -O0 -g1 -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8MB -sGLOBAL_BASE="$((0x10000000))" \
   -sENVIRONMENT=node -sMODULARIZE=1 -sEXPORT_NAME=m11create \

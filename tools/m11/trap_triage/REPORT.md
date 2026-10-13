@@ -151,7 +151,9 @@ M2p の opt-in 検証は `M11_M2P=1 python3 tools/m11/m11_passes.py work/boot_al
 
 > **main 合流後の注記 (競合解消)**: 下の §8.1・§8.2 の「合流前」表は #414 HEAD `fa918df` 時点の実測で、当時の `410320`/`410360` 転記は本 PR 独自のものだった。
 > その後 main に #474 が `410320` / `40f960` / `40fb40` / `40fac0` を **既定 ON** で入れたため、`M11_OV_CLASSCREATE` ブロックは重複定義を避けて
-> `410360` (AfterConstruction stub) と `8cbda0`/`8cbce0` だけに縮めた (既定 OFF のまま)。**合流後の ON 構成は §8.2「合流後の再測定」で測り直した** (旧表の数値は現 tree の ON には当てはまらない)。
+> `410360` (AfterConstruction stub) と `8cbda0`/`8cbce0` だけに縮めた (既定 OFF のまま)。さらに #503 が `8cbce0` / `ov_dict_hash` (`8cbda0` 相当) /
+> `8cc190` / `8cbde0` を **既定 ON** で入れたため、ブロックから `8cbda0`/`8cbce0` も削除し、**`410360` (AfterConstruction stub) だけ**にした (既定 OFF のまま)。
+> **§8.2 の「合流後の再測定」表は #503 より前の main (`021fd75` 系) での値で、現 main の ON (410360 のみ) には当てはまらない。現 main での再測定は未実施 (§8.2 末尾)。**
 
 素材: work-m11 スナップショット + `m11_build.sh` + `survey_units.mjs` (PE 無しで実行可。逆アセンブルは PE の代わりに
 `work/m11_image.bin` を読む `disasm_img.py`)。ベースライン = #414 HEAD `fa918df` の m11_ov.c を build し直した survey:
@@ -199,7 +201,11 @@ unit 遷移 (+8cbda0/8cbce0): oob→ok 4 / ok→miss 3 (42 45 415) / ok→oob 2 
 **ネガコン**: 既定 OFF で build し直した survey は ベースラインと unit 単位で完全一致 (差 0、ok 830 / oob 44 / halt0 20 / abort 1 / miss 46)。
 OFF のまま e2e 入口 (`m11_run.mjs`) は不変、units_run 17/942。
 
-#### 合流後の再測定 (main 合流済み `1d6bfe5` + 本修正のコード HEAD `cf327ba`)
+#### 合流後の再測定 (#503 より前の main `021fd75` 系 + 旧 ON ブロック = 410360 + 8cbda0/8cbce0。コード HEAD `cf327ba`)
+
+**この節の表は #503 マージ前の測定で、ON の内容も旧ブロック (410360 + 8cbda0/8cbce0) のもの。現 main (#503 で 8cbce0 / 8cc190 / 8cbde0 / ov_dict_hash が既定 ON) の
+「ON = 410360 のみ」には当てはまらない。現 main での再測定は未実施** (最後の merge 解消 run は素材 `fl-win64` のみで `work-m11` / emsdk が無く build / survey 不可。
+`oc_artifacts: toolchain-emsdk work-m11` で再測定する)。以下の手順の `function_8cbda0` 確認は現ブロックでは `function_410360` のみに読み替える。
 
 手順: `bash m11_build.sh` (既定 OFF) / `M11_OV_CLASSCREATE=1 bash m11_build.sh` (ON) → `node trap_triage/survey_units.mjs out.json` → `survey_diff.py off.json on.json`。
 `m11_build.sh` が `M11_OV_CLASSCREATE` を `-D` で `m11_ov.c` に渡し、`work/ov_classcreate.stamp` で `work/obj/ov.o` を無効化する (ON/OFF の切替で古い ov.o を再リンクしない。
@@ -215,8 +221,10 @@ build 8.0 s / survey 8.7 s (load average 0.4〜0.6、PE 無し・work-m11 スナ
 `SV_SKIP=114` を付けた旧手順では unit 114 が skip マーカー (`hang`) になるだけで、付けなくても ON は 60 s 以内に完走する。
 `8cc190` 系 11 unit (53 54 56 58 59 60 61 62 63 307 311) は現 main の OFF では halt0 だが、ON では **11/11 が oob** (ok にはならない)。
 
-**受入条件 2 の再判定: 部分達成**。trap 総数は 79→44 (ok +31) と減ったが、減った分は最多分類 (`8cc190` 系) の修復ではない (11 unit は oob のまま)。
-`8cbda0`/`8cbce0` を足す前後の寄与の分離 (410360 単独など) は、マクロが 1 本のため本 PR では測っていない。ok 退行 5 件が残るため既定 ON への昇格はしない。
+**受入条件 2 の再判定 (旧ブロックでの値): 部分達成**。trap 総数は 79→44 (ok +31) と減ったが、減った分は最多分類 (`8cc190` 系) の修復ではない (11 unit は oob のまま)。
+旧ブロックでは 8cbda0/8cbce0 を足す前後の寄与の分離は測っていない。ok 退行 5 件が残るため既定 ON への昇格はしない。
+(参考: 先行 review の独立再実行では 410360 単独でも ok 847 / trap 43 で、ok の増加は 410360 によるもの・8cbda0/8cbce0 のみでは ok 不変と報告されている。本 run の実測ではない。)
+**現 main (410360 のみ) での判定は再測定待ち**。ネガコン (既定 OFF) の対照差 0 は旧 tree での実測で、現 main では未再確認。
 ネガコン (既定 OFF で対照と差 0) は成立。ICALL_AT 経由にしたため、ON の `0x41037d` (410360 の `call [rbx-0x50]`) は site 計測に ok 888 / miss 22 で乗る (410070 直処理は ok 計上)。
 
 `SV_SKIP=<unit,...>`: 列挙した unit を実行せず `kind: "hang"` で記録する (ハングする unit を飛ばす用。上記 ON では不要)。
