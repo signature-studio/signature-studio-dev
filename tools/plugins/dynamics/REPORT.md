@@ -121,6 +121,8 @@ P0c (`p0c/REPORT.md`) で見た各 kernel の現状 (本 PR では再測定し�
   | 19048 Multiband | 34 | 6 | `movntps` / スカラー FMA 5 種 (`vfmadd213sd`・`vfmadd231sd`×2・`vfnmadd132sd`・`vfnmadd231sd`) |
 
 - 生成 helper C (`*_simd.c`) は両 engine とも `msimd11_core.h` と合わせて `emcc -c` rc 0 (`work/dynamics/simdchk/`)。 `e.final.ll` の `emcc -c` だけでは helper 側の型不整合は測れないため、この確認を別に行った。
+- 再現手順 (`work/dynamics/simdchk/` は `**/work/` で gitignore 対象。 入力は engine ごとの `engine_lift.sh` 出力): (1) `work/dynamics/engine<B>/e.final.ll` を入力に `python3 tools/plugins/lift/passes/m11_simd2.py <final.ll> > <dir>/m11_simd.c` で helper C を生成 (統計は stderr)。 (2) `msimd11_core.h` (`tools/plugins/lift/passes/msimd11_core.h`) を同じ dir に置き、`#include "../msimd11_core.h"` を `"msimd11_core.h"` に直して `emcc -c -msimd128 -w -O0 <m11_simd.c> -o /dev/null` を実行 (rc を見る)。 `include` の書換えは generator の出力先に合わせた一時措置。 2026-10-14 の `simdchk` 本体の生成コマンドは本 REPORT 以外に記録が無い。 本 HEAD での再実行は emsdk 未展開のため未実施。
+- int3 修正 (`m11_simd2.py`・本 HEAD): `void` 版は `abort()` のみ、戻り値あり版は `abort(); return 0;` を生成する。 `int3` を含む合成 `.ll` (`declare void @__asm_int3()` と `declare i32 @__asm_int3__1()`) で生成した C を `clang -c -Wall -Werror=return-type` で検査: 修正後 rc 0、修正前 (`f50ca8ad`) は `void function '__asm_int3' should not return a value` で rc 1。 `emcc -c` は本 run の runner に無く未実行 (clang での同等確認のみ)。 engine 全体の `engine_lift.sh` 再測定は未実施 (下記)。
 - 受入条件の判定: `emcc -c` rc 0 は 2 本とも達成。 f80 関数 0 も 2 本とも達成。 未実装 helper 宣言 0 は**未達** (12 / 6)。 残件は下記の子 issue へ。
 - 既知の限界: `ucomis`/`comis` の SSE 形は従来どおり `(void)a; (void)b;` で flag を反映しない (`m6 ir6 [P1]` 相当は未移植)。 本 PR はこれを変えていない。 `movntps`・`vmovsd` store・FMA の意味は未確定で stub のまま。
 
@@ -131,6 +133,7 @@ P0c (`p0c/REPORT.md`) で見た各 kernel の現状 (本 PR では再測定し�
   2. 19048: `inttoptr i64 %arg2` で `%arg2` が i32 → 修正済み (`zext i32 → i64` を挿入。 `function_18004f7f8` の 1 件)。 修正後の `emcc -c` rc 0。
   3. 19252: 旧記載の `zext` 定数式 (`__asm_rep_stosq_memset`) は今回の HEAD では露見せず。 代わりに f80 (`fpext`/`frem`/`fp_round` on x86_fp80) が `emcc -c` を落としていた → `PLUG_F80_LOWER=1` (既存の `p0c/f80_lower.py`) で解消。 `engine_lift.sh` の既定を `1` にした。
 - 残り (本 issue の範囲外として子 issue へ): 未実装 helper 宣言 (VEX 含む) の 59 / 34、 `.pdata` 関数の define 脱落 (19252 2 件 / 19048 210 件、うち 19048 の 67 件は call 先) の原因。 脱落の原因は本 run では未調査。
+- VEX 形の委譲の前提 (未検証を含む): (a) 委譲は `gen_body` で SSE 形を呼ぶため、SSE 分岐の条件 (`n == 2` 等) を満たす 2 引数 VEX 形 (`__asm_vaddsd(i128,i128)`・`__asm_vaddsd__21(i128,i64)`) だけが実装される。 合成 `.ll` で確認: 3 引数 `__asm_vaddsd__30(i128,i128,i128)` と `__asm_vfmadd213sd(i128,i128,i64)` は委譲後も未実装のまま。 (b) 残件表に 3 引数形が出ない理由は**未確認** (engine の `final.ll` 宣言の引数数を見ていないため。 `work/` の engine 出力が本 run に無い)。 (c) VEX.128 は dst の上位 128bit をゼロにするが、委譲は SSE 形と同じく src1 由来で保持する。 ymm 系は i256 trap で止まるため現状の到達には影響しない前提 (未検証)。
 - VEX helper 未実装 (`vaddsd` / `vfmadd*` / `vcvt*` 等、distinct 宣言数) は、CPUID 分岐で SSE 路に固定できるかが未確認 (T1 の AVX 2 種は CPUID 分岐で SSE 路固定と plugins/REPORT.md §4.3 に記録あり)。
   Transient engine の f80 1 関数は #197 の `f80_lower.py` の適用対象。
 - 以上は到達性の実測で、engine の正しさは何も示していない。
