@@ -1,5 +1,6 @@
 {
  "name": "ott_leaf_log",
+ "abi": "ms_pos",
  "func": "0x1801b4900",
  "wasm_func": "function_1801b4900",
  "scenarios": 300,

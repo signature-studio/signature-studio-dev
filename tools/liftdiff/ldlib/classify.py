@@ -77,7 +77,12 @@ def classify(rec, mach, irf, sig, route='ir'):
         if need_total > np_sig and (fp_sig == 0 or need_total > np_sig):
             add('arg_drop', 'high' if bad else 'medium', 'machine uses %d arg slots (gpr=%d, stack=%s), IR signature has %d' % (need_total, need_gpr, stk, np_sig))
         if mach['arity_x'] > fp_sig:
-            add('xmm_arg_drop', 'medium', 'machine reads xmm0..%d, IR fp params=%d' % (mach['arity_x'] - 1, fp_sig))
+            # win64 の xmm 引数は位置 N = xmm N。読む slot が全て IR 署名の同じ位置で float/double なら脱落ではない
+            # (fix_xmm_args.py のように slot の隙間を i64 で埋める署名では、fp 引数の個数 < arity_x になる)
+            slots = mach.get('xmm_slots')
+            ptypes = sig['params'] if sig else []
+            if not (slots and all(i < len(ptypes) and ptypes[i] in ('float', 'double') for i in slots)):
+                add('xmm_arg_drop', 'medium', 'machine reads xmm0..%d, IR fp params=%d' % (mach['arity_x'] - 1, fp_sig))
     t = diffs.get('trace')
     if irf and irf.get('short_global_loads', 0) > 0 and ('mem' in diffs or 'ret' in diffs or 'trace' in diffs):
         add('short_global', 'medium', 'IR loads %d wider value(s) than the declared size of a global (e.g. 20xf32 default table declared as [8 x i8])' % irf['short_global_loads'])

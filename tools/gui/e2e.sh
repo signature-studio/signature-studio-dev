@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # gui_e2e.sh — 1 コマンド E2E:
 #   mingw PE -> RetDec lift -> 後処理 -> emcc (pthread wasm) + shim -> tsc (gui.ts/gui_worker.ts)
-#   -> headless Chrome (CDP 実入力) -> OffscreenCanvas 読み戻し/スクリーンショット vs golden (exact)
+#   -> headless Chrome (tools/e2e の agent-browser ドライバ経由の実入力; E2E_DRIVER=puppeteer で puppeteer-core)
+#   -> OffscreenCanvas 読み戻し/スクリーンショット vs golden (exact) -> 長時間ストレス (e2e/stress.sh)
+#   前提: tools/e2e で `npm ci` (agent-browser / puppeteer-core)
 #   事前に native 単体テスト (selftest) と native lift 実行 (native_e2e) も流す。SKIP_NATIVE=1 で省略。
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; BUILD="$HERE/build"; mkdir -p "$BUILD"
@@ -40,6 +42,10 @@ echo "[gui-e2e] 5/6 tsc (src/runtime/gui*.ts -> build/js)"
 (cd "$HERE" && "$ROOT_REPO/node_modules/.bin/tsc" -p tsconfig.json)
 echo "[gui-e2e] 6/6 headless Chrome E2E (fixed memory)"
 node "$HERE/e2e/e2e.mjs"
+echo "[gui-e2e] 6a/6 ネガコン: golden を 1 画素改竄すると E2E が exit 1 で落ちる (判定が不合格を握りつぶさない)"
+rc=0; E2E_TAMPER=1 node "$HERE/e2e/e2e.mjs" >"$BUILD/e2e/negctl.log" 2>&1 || rc=$?
+[ "$rc" -eq 1 ] && grep -q "MISMATCH" "$BUILD/e2e/negctl.log" || { echo "negctl FAIL: tampered golden -> exit=$rc (want 1)" >&2; tail -5 "$BUILD/e2e/negctl.log" >&2; exit 1; }
+echo "  negctl OK: tampered golden rejected (exit 1)"
 echo "[gui-e2e] 6b/6 headless Chrome E2E (ALLOW_MEMORY_GROWTH variant)"
 bash "$HERE/lift/gui_wasm.sh" "$BUILD/lift/lifted.c" "$BUILD/wasm_grow" grow | tail -1
 GUI_WASM_DIR="$BUILD/wasm_grow" node "$HERE/e2e/e2e.mjs" | grep -E "EXACT|MISMATCH|memory|PASS|FAIL"
@@ -57,4 +63,6 @@ echo "[gui-e2e] 6f/6 present e2e (GUI-4: WebGL2 golden 一致 / 複数矩形 / r
 PRESENT_SKIP_BENCH=1 bash "$HERE/present/e2e.sh" | grep -E "^# (pass|fail)|ALL PASS|FAIL"
 echo "[gui-e2e] 6g/6 GUI-6 入力品質 e2e (キー配列 / IME / タッチ・ジェスチャ / Pointer Lock; CDP 実入力, 入力リング drop 0; RetDec 不要)"
 bash "$HERE/input/e2e.sh" | grep -E "FAIL|ALL PASS|input ring"
+echo "[gui-e2e] 6h/6 長時間ストレス (GUI-8: 50000 frames / drop 0 / memory 有界 / surface gen 不変 + ネガコン burst・leak)"
+bash "$HERE/e2e/stress.sh"
 echo "[gui-e2e] ALL PASS"

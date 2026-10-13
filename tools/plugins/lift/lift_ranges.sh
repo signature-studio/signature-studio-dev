@@ -65,7 +65,13 @@ python3 "$P/fix_orcond_xnor.py" "$OUT/$NAME.st.ll" "$OUT/$NAME.oc.ll" $OC_ARGS
 python3 "$P/fix_dup_decls.py" "$OUT/$NAME.oc.ll" "$OUT/$NAME.dd.ll"
 python3 "$P/fix_ptr_params.py" "$OUT/$NAME.dd.ll" "$OUT/$NAME.pp0.ll"
 python3 "$P/fix_icmp_ptr.py" "$OUT/$NAME.pp0.ll" "$OUT/$NAME.pp.ll"
-python3 "$P/m11_asmfix.py" "$OUT/$NAME.pp.ll" "$OUT/$NAME.asmfix.ll"
+# opt-in (PLUG_XMMARG=1): 機械語が xmm0..3 を入力に読むのに IR 署名に無い関数へ float/double 引数を復元 ((DEFECTS.md) D5, PLG-F2-4 #547)
+AF_IN="$OUT/$NAME.pp.ll"
+if [ "${PLUG_XMMARG:-0}" = "1" ]; then
+  python3 "$P/fix_xmm_args.py" "$OUT/$NAME.pp.ll" "$OUT/$NAME.xa.ll" --pe "$PE" --report "$OUT/$NAME.xa.json"
+  AF_IN="$OUT/$NAME.xa.ll"
+fi
+python3 "$P/m11_asmfix.py" "$AF_IN" "$OUT/$NAME.asmfix.ll"
 if [ "${PLUG_F80_LOWER:-0}" = "1" ]; then
   # opt-in: x86_fp80 (x87) → f64 lowering (p0c/f80_lower.py)。 wasm の LLVM backend は fp80 (fpext / frem / 算術) を legalize できず `emcc -c` が落ちる。
   # f64 化は精度を落とす (x87 の 64bit 仮数が 53bit になる) ので既定は off。 呼び出し側が到達性 (emcc -c) だけを測る時に使う。 lowering 前の IR は <name>.pre_f80.ll
