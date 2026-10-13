@@ -182,7 +182,8 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   work-liftlib-targets / work-liftlib / work-icall / analysis-ott-binaries / apt-mingw。それ以外は
   run が失敗する)。全素材は約 17.7 GiB (2026-10-13 実測) のため必要分だけ指定する。
   - `toolchain-retdec` → `/opt/retdec`、`toolchain-emsdk` → `/opt/emsdk` に展開される。
-  - `work-m6-ott` → `tools/m6/work/` + `tools/ott/work/`、`work-liftlib` → `tools/liftlib/work/`、
+  - `work-m6-ott` → `tools/m6/work/` + `tools/ott/work/` + `tools/m8/work/` + `tools/m9/work/` + `tools/m10/work/`
+    (`tar --zstd -tf` で実測)、`work-liftlib` → `tools/liftlib/work/`、
     `work-icall` → `tools/icall/work/`、`work-liftlib-targets` → `tools/targets/{freshair,kilohearts}/work/`
     の HeartCore / SlateCore のみ (liftlib_e2e.sh の `need` 対象) に展開される
   - `analysis-ott-binaries` → `$HOME/analysis/plugins/ott/binaries/` (OTT_vst2_win64.dll ほか実機バイナリ。
