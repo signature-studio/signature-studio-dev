@@ -164,7 +164,7 @@ IR は `bash tools/m11/m11_gen_ir2.sh` (現 main の手順。`work/ir_conditions
   - 確認: `0x26d1a0` (unit 158) は trap → ok。base の最上位 frame 707 = `function_413540` (F3a 修復対象) で、修復対象の関数が trap の入口にあった unit の変化として対応する。
   - 未確認: `0x6d9ba0` (unit 493) も trap → ok だが、base の最上位 frame が取れておらず (halt0)、修復との対応は確認していない。
 - 種別が変わった unit は 2 件: `0x25c540` (unit 144) は halt0 → OOB、`0xeddfe0` (unit 895) は OOB → halt0。どちらも unit は依然 trap。unit 144 は修復後に `function_407e20__lifted` (FastMM_GetMem 実体) の読みで OOB になった (frame 1875 を fix 側で確認。因果は未確認)。`0xeddfe0` の frame は未取得。
-- §4 の「反映されない」は snapshot 限定の結論だった。現 main の判定は本節。ただし、本 fix run ではこの数値を再現できていない (§8-5)。
+- §4 の「反映されない」は snapshot 限定の結論だった。現 main の判定は本節 (1 件確認・1 件未確認)。ただし、本 fix run ではこの数値を再現できていない (§8-5)。「snapshot 限定を解消」とは本 run では言えない。
 
 ### 8-3. 受入 4: trap 最上位 frame と #942 の結論
 
@@ -194,7 +194,8 @@ base の trap は survey で 26 件。以下は unit VA 単位で、取得でき
 | 0x6d9ba0 | trap (種別未取得) | (未取得) | 未確認 |
 
 - 0x25c540 の base 種別は halt0 (fix は OOB。§8-2)。0xeddfe0 は base OOB → fix halt0。0x6d9ba0 は base trap → fix ok (frame 無し)。いずれも base の frame が未取得のため、修復との帰属は書けない。
-- 本表は base の 26 件のうち 17 unit (15 行) のみ。残り 9 件は frame 未取得で、本表には載せていない。
+- 本表は base の 26 件のうち 17 unit (15 行) のみ。残り 9 件は frame 未取得で、本表には載せていない (取得できなかった理由: 前 run の作業ログが残っておらず、`trap_units.mjs` の再実行には work-m11 が要る。本 run は素材なし)。
+- 「修復対象」列は base IR の F3a/F3c 判定に依る。fix 側の frame 表は無い。したがって「修復対象が最上位 frame に現れる」は base 側の情報のみからの結論で、fix 側での消失・残存は未確認。
 
 **fix (ldfix 適用 IR)**: 最上位 frame を取得したのは 0x25c540 の frame 1875 (`function_407e20__lifted`) のみ (§8-2)。fix 側の frame 表は作っていない。
 
@@ -216,6 +217,10 @@ base の trap は survey で 26 件。以下は unit VA 単位で、取得でき
 
 - 本 fix run (2026-10-13・PR #1469 の差し戻し対応) の runner には `work-m11` / `work-liftdiff` が無く、`$HOME/artifacts` には `fl-win64.tar.zst` のみだった。
   このため **IR の再生成・`ldfix_e2e.sh` の再実行は本 run で行っていない**。§8-1 の数値・§8-2・§8-3 は前 run の記録の転記で、本 run では再現していない。
+- 差し戻し (fix 依頼 1〜6) への対応状況 (本 run):
+  - 1・2・3・6 (再実行・所要/load/並列数・F3a 3 件の関数名・F3c 36 と 26 の差): **未対応**。必要素材: `work-m11` `work-liftdiff` `toolchain-emsdk` `toolchain-retdec` (runner に無し・`oc_artifacts:` に指定して再起動が必要)。
+  - 4 (§8-2 の帰属): 文言は 1 件確認・1 件未確認のまま。PR 本文の「snapshot 限定を解消」は取り下げた。
+  - 5 (§8-3 の 26 件・fix 側表): 上記の通り明記のみ。残 9 件の frame は未取得のまま。
 - 未検証の項目 (再現には素材が要る):
   - 現 main IR の F3a 3 件の関数名: `ldfix.py` の実行時ログ (work/ 配下) にしか出ない。本 REPORT には記録が無く、「function_413540 と function_4133f0 がその 3 件に含まれる」は未確認。
     旧 snapshot の F3a (413480・413540) との対応は次のとおり。413540 は新旧両方の F3a に現れる (ただし新旧の F3a 一覧は本 run で照合していない)。413480 は §8-3 の frame 表に現れない。4133f0 は旧 snapshot の F3a (413480・413540) に含まれず、§8-3 では base の最上位 frame として現れる。
