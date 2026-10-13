@@ -11,7 +11,9 @@ set -euo pipefail
 FLE="$(cd -- "$(dirname -- "$0")" && pwd)"
 cd "$FLE"
 source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1
-PE="${FLE_PE:-/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin}"
+source "$FLE/../shared/env.sh"
+PE="${FLE_PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}"
+export FLE_PE="$PE"
 ENT="${FLE_ENTRIES:-$FLE/work/fle_entries.json}"
 # entries が無ければコミット済み fle_entries.json (M11 closure F 集合 7,421 roots) から生成
 mkdir -p "$FLE/work"
@@ -35,6 +37,9 @@ PY
 
 echo "== [2] smoke (UStrAsg lock xadd + Move) =="
 node t_ustrasg.mjs || FAIL=1
+
+echo "== [3a] build fle_natdrv (native 参照 driver) =="
+gcc -O1 -g -w -D_GNU_SOURCE -fPIE -pie -o work/fle_natdrv fle_natdrv.c fle_ms_call.S -lm
 
 echo "== [3] spot diff (native vs wasm, FORMAT.md v1) =="
 python3 fle_diff.py 2>&1 | tail -10 || FAIL=1
