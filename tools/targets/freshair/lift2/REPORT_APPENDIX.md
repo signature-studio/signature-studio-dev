@@ -150,5 +150,9 @@ bash tools/targets/freshair/lift2/lift2_e2e.sh                                  
   - main 取り込み後 HEAD `2e4960f8` で再実行: `RESULT: lift2_e2e ALL PASS`, exit 0, real 62 s, load 0.28→0.93, nproc 4。内訳は上と同値 (comp 400/400・filter 400/400・ctx-fuzz mismatch 0・ctrl 15/15・ablation 5 種)。
   - 本結論は「追加 lowering は S2001 以外の ctrl シナリオで実行されない」まで。S2001 内の実行有無と、comp / filter の動的確認は未了。lowering 自体の正しさは e2e では検証されていない。受入条件 2 の残りは #692 に残す。
   - 実行環境: `work-liftlib-targets` / `plugins-freshair` / `fl-win64` を `$ARTIFACTS_DIR` から展開して実施 (epf 8 本は `plugins-freshair` の `Fresh Air.Win.zip` を `tools/targets/freshair/work/win` に展開)。emsdk 6.0.12 は `[EMSDK]` の手順で `$RUNNER_TEMP` に導入し、`env.sh` の前提に合わせて配置。
+- `8c217092` との関係 (重複の解消, commit `1496922d`): main の `8c217092` が `emit_sse` に `pcmpeqw` (`icmp eq <8 x i16>` + `sext`) と `pshuflw` を既に入れている。本 PR 側の `pshuflw` と `pcmpeq[bwd]` の分岐は、先に評価されるため main 側を覆い、main 側の `pcmpeqw` / `pshuflw` は到達しない状態だった。本 PR では `pshuflw` の分岐を削除し、`pcmpeq` の正規表現を `[bd]` に絞った。`pcmpeqw` と `pshuflw` は main 側だけが生きる。本 PR の残りの追加は `pcmpeqb` / `pcmpeqd`。
+- 重複解消後の再検証は未実施: `SlateCore.core_64` (`work-liftlib-targets`) と epf 8 本 (`plugins-freshair`) が `$ARTIFACTS_DIR` に無く、本 run の `oc_artifacts` 指定にも含まれないため、`build_ctrl.sh` / `run_ctrl.sh` / `lift2_e2e.sh` は実行できない (`lift2_e2e.sh` は `ERROR: ... CORE が無い` で exit 2)。このため下記の数値は**重複解消前の head (`90ff81f4`)** のもの。
+  - ctrl build 件数: 上の「2 → 2」は解消前 head の値。重複解消後の正しい件数は未測定 (`8c217092` の「2 → 1」は main 側の記録で、本 PR では再測定していない)。
+  - trap probe (`pcmpeq{b,d}`): 解消前 head の `pcmpeq{b,w,d}` の結果。解消後 head の `pcmpeq{b,d}` は未測定。
 - 未了 (#692 に残す): `pmovmskb` と ymm 形式の `vpcmpeqw` (関数 `f_1810577ac` / `f_18107d41c`)、rep 経路の e2e 到達 (受入条件 1・ネガコン)、回帰セットの seed 非依存化 (受入条件 3)。
   ctrl closure には `rep stosb` 84・`rep movsb` 39・`rep stosw` 6・`rep stosq` 1 が lift 済みで存在する (`work/ctrl/ctrl_rep.json` の mnemonics 実測)。
