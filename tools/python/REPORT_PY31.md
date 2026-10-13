@@ -12,7 +12,7 @@
 
 - flapi mixer 公開数 75。C 実装済み 18 (`FL_H(mixer, *)` の定義)。未実装 57。
 - mock (`host/fl_mock.mjs`) に定義がある mixer.* は 18 件で、すべて C 実装済み (mock-only の未実装 0 件)。
-- MCP (`analysis/mcp/MCP_TOOLS.md`) が使う mixer 関数 18 件はすべて C 実装済み (MCP 側の未実装 0 件)。
+- MCP (`tools/python/analysis/mcp/MCP_TOOLS.md`) が使う mixer 関数 18 件はすべて C 実装済み (MCP 側の未実装 0 件)。
 - 未実装 57 件のうち MCP 利用 0 件・mock 定義 0 件。
 
 ## 未実装 57 件 (分割先 #941)
