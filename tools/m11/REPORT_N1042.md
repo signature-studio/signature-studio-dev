@@ -13,9 +13,11 @@
 | 項目 | 値 |
 |---|---|
 | Ghidra | 12.1.4 PUBLIC (`ghidra_12.1.4_PUBLIC_20260921.zip`)、sha256 `ddac49f903da9d5bac833e5cc79395098b9c33cfd3279be5f31bd00387d2d4db` (`REPORT_APPENDIX_960.md` と一致) |
-| JDK | Temurin 21 (`/usr/lib/jvm/temurin-21-jdk-amd64`)。runner 既定の 17 では使わない |
+| JDK | Temurin 21 (JDK 21)。runner 既定の 17 では使わない |
 | 入力 | `fl-win64` の `block00031_PE.bin` |
-| 出力 | `tools/m2/work/ghidra_dll/functions_dll.csv` 59010 行、sha256 `90d1bbac…` (REPORT_N27 と一致) |
+| 出力 | `tools/m2/work/ghidra_dll/functions_dll.csv` 59010 行 (測定時に記録した値)、sha256 `90d1bbac…` (REPORT_N27 と一致と記載) |
+
+> 行数の注記: REPORT_N27 は同じ sha256 に対し、L170 で 59010 行、L183 で 59 009 行、L199 で 59 010 行と記す。数え方の差 (ヘッダ行の有無など) は未確認。CSV は worktree に存在しないため現時点で再計数できない。
 | 所要 | analyzeHeadless 20:14:10 → 20:24:25 UTC (約 10 分 15 秒)、rc 0、`MAXMEM=8G` |
 
 ## m11_e2e.sh 全体 (受入 2)
@@ -24,7 +26,7 @@
 
 | 項目 | 値 |
 |---|---|
-| コマンド | `FL_WIN64_DIR=<RUNNER_TEMP>/fl-win64 bash tools/m11/m11_e2e.sh` (`M11_OV_414AD0` 既定 0) |
+| コマンド | `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/m11/m11_e2e.sh` (`M11_OV_414AD0` 既定 0) |
 | 所要 (wall) | 10 分 6.8 秒 (user 9 分 49.9 秒、sys 17.0 秒) |
 | 経路 | m11_scan → m11_bounds → lift 4 chunks (RetDec) → tail 固定点 ×3 → gen_ir2 → build → 実行 A・B |
 | reached_stage | 4/6 (stage 5・6 は未達。期待値 `e2e_expect.env` は stage 4・survey_ok 800 で、judge 通過) |
@@ -44,6 +46,16 @@
 | ON (`M11_OV_414AD0=1`、増分 build) | 48.0 秒 (lift・IR は再利用) | `5566a396…` | OFF と byte 一致 |
 
 ON の増分 build で `work/ov_414ad0.stamp` が `1`、`work/obj/ov.o` が再生成された (20:35)。unit 別の集計 (kind・frames・icall) は survey 出力 (`work/e2e_survey_{off,on}.out`) の同一性で確認。
+
+## 測定 commit と現 HEAD の差分 (WORKFLOW §6)
+
+測定 commit `48496bd5` から検証 HEAD までの、測定対象範囲の差分。
+
+```sh
+git diff 48496bd5 HEAD -- tools/m11 tools/m2 tools/shared ':!tools/m11/REPORT_N1042.md'
+```
+
+出力: 0 行 (差分 0)。本 REPORT (`tools/m11/REPORT_N1042.md`) 以外に測定対象コードの変更は無い。
 
 ## 未解決
 
