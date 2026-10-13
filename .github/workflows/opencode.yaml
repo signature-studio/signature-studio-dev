@@ -208,9 +208,11 @@ jobs:
       #   answered -> push せず根拠をコメントした。review を起動し直す (下の reopen)
       #   none     -> 何もしていない。1 回だけ再試行し、なお none なら job を失敗させる
       # ---------------------------------------------------------------------
+      # `always()` ではなく `!cancelled()`: always() は run の cancel 後も走るため、PM が fix run を cancel しても
+      # retry (write、15 分) が起動して push しうる。!cancelled() は失敗・step の timeout の後には走り、cancel の後には走らない。
       - name: Check the fix progress
         id: progress
-        if: always() && steps.context.outputs.should_run == 'true' && github.event_name == 'pull_request_review' && steps.fixrec.outputs.stop != 'true'
+        if: ${{ !cancelled() && steps.context.outputs.should_run == 'true' && github.event_name == 'pull_request_review' && steps.fixrec.outputs.stop != 'true' }}
         shell: bash
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -218,7 +220,7 @@ jobs:
 
       - name: Prepare the retry prompt
         id: retry-prompt
-        if: always() && steps.progress.outputs.result == 'none'
+        if: ${{ !cancelled() && steps.progress.outputs.result == 'none' }}
         shell: bash
         env:
           OC_PROMPT_SRC: ${{ steps.prompt.outputs.prompt_file }}
@@ -226,7 +228,7 @@ jobs:
 
       - name: Run OpenCode (implementer, retry)
         id: oc-retry
-        if: always() && steps.progress.outputs.result == 'none'
+        if: ${{ !cancelled() && steps.progress.outputs.result == 'none' }}
         timeout-minutes: 15
         uses: ./.github/actions/opencode
         with:
@@ -239,7 +241,7 @@ jobs:
 
       - name: Check the fix progress (retry)
         id: progress-retry
-        if: always() && steps.progress.outputs.result == 'none'
+        if: ${{ !cancelled() && steps.progress.outputs.result == 'none' }}
         shell: bash
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -248,21 +250,21 @@ jobs:
       # push せず根拠だけをコメントして終えた場合、コメントは review を起動しないので
       # close -> reopen で pull_request:reopened を起こし、reviewer に再判断させる。
       - name: Re-trigger the review after an answer without a push
-        if: always() && (steps.progress.outputs.result == 'answered' || steps.progress-retry.outputs.result == 'answered')
+        if: ${{ !cancelled() && (steps.progress.outputs.result == 'answered' || steps.progress-retry.outputs.result == 'answered') }}
         shell: bash
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: bash .github/scripts/fix-progress.sh reopen
 
       - name: Fail when the fix run made no progress
-        if: always() && steps.progress-retry.outputs.result == 'none'
+        if: ${{ !cancelled() && steps.progress-retry.outputs.result == 'none' }}
         shell: bash
         run: |
           echo "::error::the fix run neither pushed a commit nor commented on the PR, even after one retry"
           exit 1
 
   review:
-    # レビュワーエージェント: PR opened / synchronize / reopened で起動し、
+    # レビュワーエージェント: PR opened / synchronize / reopened / ready_for_review で起動し、
     # approve/request-changes を出したうえで必要ならマージまで行う。
     #
     # fork PR ガード: pull_request イベントでは fork 由来の PR に secrets が渡らない
@@ -402,9 +404,10 @@ jobs:
 
       # reviewer が success で終わっても verdict を投稿しないことがある (PR #462)。そのままだと
       # 「レビューもされず修正もされない」PR になるので、verdict を検証し、無ければ review を再実行する。
-      # always(): reviewer の job が失敗・タイムアウトした場合も同様に再実行へ回す。
+      # !cancelled(): reviewer の step が失敗・タイムアウトした場合も再実行へ回す (cancel された run は再実行しない:
+      # PM の停止手段を効かせる)。
       - name: Verify that a review verdict was posted
-        if: always()
+        if: ${{ !cancelled() }}
         shell: bash
         env:
           GH_TOKEN: ${{ steps.reviewer-token.outputs.token || steps.app-token.outputs.token }}

@@ -1,8 +1,7 @@
 #!/bin/bash
 # test-pr-loop.sh — fix-progress.sh / verify-review-verdict.sh / reopen-pr.sh の分岐を fake gh で検証する (#719, #721)。
 # 実行: bash .github/scripts/tests/test-pr-loop.sh   (全て通れば exit 0、1 件でも落ちれば exit 1)
-# CI: tests/pr-loop-tests.workflow.yml を .github/workflows/pr-loop-tests.yml に置くと PR ごとに実行される
-#     (App は workflows 権限が無く、そのファイルは automation から push できない。PM が配置する)。
+# CI: .github/workflows/scripts-test.yaml が .github/scripts/**・.github/actions/**・opencode.yaml の変更ごとに実行する。
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
