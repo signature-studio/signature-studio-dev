@@ -10,6 +10,7 @@
   dbl       : それ以外の倍精度候補 (定数値の差の候補)
   int       : それ以外の整数候補
   text      : 印字可能 ASCII を含む語 (文字列断片)
+  abs_vs_const : 片側だけが絶対ポインタ (ImageBase 範囲) で、もう片側が RVA として解決できない定数 (配置差では説明できない)
 判定: 関数ごとに、差分語が layout / target_eq (abs_ 付きを含む) のみなら layout_only、それ以外を含めば value_differs。
 注: rva_off_absent は、RVA 候補の指す 16 B 自体が相手側の .rdata に無いことを示す。指す先の内部がさらにポインタを含む場合は未追跡 (下限)。
 usage: ks_rdata_value.py <HeartCore.core_64> <SlateCore.core_64> <ks_rdata_class.json> <ks_closure_share.json> <out.json>
@@ -40,12 +41,16 @@ def is_text(v):
     return all(c == 0 or 32 <= c < 127 for c in bs) and any(32 <= c < 127 for c in bs)
 
 
+def in_img(pe, v):
+    return pe.base <= v < pe.base + pe.pe.OPTIONAL_HEADER.SizeOfImage
+
+
 def pair_kind(x, y, sc, kh, kraw):
     if x == y:
         return 'same'
-    if is_text(x) or is_text(y):
-        return 'text'
     sx, sy = sec_of(sc, x), sec_of(kh, y)
+    if (in_img(sc, x) or in_img(kh, y)) and not (sx and sy):
+        return 'abs_vs_const'
     if sx and sy:
         pre = 'abs_' if (sx[3] or sy[3]) else ''
         if sx[0] == sy[0] and sx[1] == sy[1]:
@@ -54,6 +59,8 @@ def pair_kind(x, y, sc, kh, kraw):
         if blk == kh.rva_bytes(sy[2], 16):
             return pre + 'target_eq'
         return pre + ('rva_off_found' if blk in kraw else 'rva_off_absent')
+    if is_text(x) or is_text(y):
+        return 'text'
     dx, dy = struct.unpack('<d', struct.pack('<Q', x))[0], struct.unpack('<d', struct.pack('<Q', y))[0]
     if math.isfinite(dx) and math.isfinite(dy) and dx != 0 and dy != 0 and abs(dx) > 1e-300 and abs(dy) > 1e-300:
         return 'dbl'
