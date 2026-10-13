@@ -15,7 +15,8 @@ for v in vA vB vC g2; do
   gcc -nostdlib -static -no-pie -Wl,-e,_start -o "$v.elf" "$v.o"
   timeout 300 "$RETDEC_BIN" "$v.elf" -o "$v.c" --print-before-all > "$v.log" 2>&1
   # エントリブロックの終端が条件分岐 (br i1) なら先頭ガード残存、無条件 br なら脱落
-  entry="$(grep -o 'dec_label_pc_[0-9a-f]*:' "$v.ll" | head -1)"
+  entry="$(grep -o 'dec_label_pc_[0-9a-f]*:' "$v.ll" | head -1 || true)"
+  [ -n "$entry" ] || { echo "$v: FAIL: entry label 無し ($v.ll を確認)" >&2; exit 1; }
   term="$(awk -v E="$entry" 'index($0,E)==1{f=1} f&&/^ *br /{print; exit}' "$v.ll")"
   case "$term" in
     *"br i1"*) echo "$v: entry guard kept" ;;
