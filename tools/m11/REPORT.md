@@ -241,3 +241,6 @@ judge: stage 6 は Halt0/longjmp 無し・全 942 unit 実行・skip 0・DllMain
 | unit 57 (0x16fde0) の 0xf960 (GetMem+40fb40) ↔ 0x79b10 反復後の Halt0 (未読) | 53/942 (完了 56) で停止, stage 5/6 未達 | 起票依頼 (PM 判断: 子 issue 新設 or #134 コメント)。#490 は本 PR が範囲 (unit 23 の間接 call 復元・boot5・BSTR) を取り込み済みのため積み増し先として不適 |
 | unit 30/39/40 の Init 値 0xfa9390 (.text の関数途中・closure 外・skip 3)。skip は ret 0 のため当該 3 unit の init は未実行 | stage 6 の `skip 0` 未達。出所未確認 | 上と同じ (起票依頼 PM 判断) |
 | D4 同型 (`mov r64,[reg]` の 1 段 deref 脱落) の他サイトの全数 | 他 unit の silent 誤動作の恐れ | DEFECTS.md 行案 (PM 判断) |
+
+## 15. #680: survey 測定基準の固定化 (ldfix/qstore の fail-closed・PE パス env 化)
+ldfix/qstore の skip を非 0 終了にし、IR 生成条件と IR の指紋を `work/ir_conditions.json` に記録する fail-closed 化。qstore on / off の差は本 runner の n=2 で再現した。測定値・未解決・環境間一致 (未実測) は [REPORT_N27.md](REPORT_N27.md)。

@@ -9,6 +9,7 @@
 # 実時間: 約 2 分 + 制御層 build 約 1 分 (RetDec 不使用のため lift は数秒)。
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; FA="$(dirname "$HERE")"
+source "$HERE/env.sh"
 CORE="$FA/work/win/Fresh Air/C__ProgramData_Slate Digital/Fresh Air/SlateCore.core_64"
 [ -f "$CORE" ] || { echo "ERROR: $CORE が無い (bash tools/targets/freshair/fetch.sh を先に実行)"; exit 2; }
 fail=0

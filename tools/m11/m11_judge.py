@@ -58,6 +58,10 @@ sv_txt = read(os.path.join(W, 'e2e_survey.out'))
 F = jline(full_txt, 'M11_RESULT')
 S = jline(sv_txt, 'M11_SURVEY')
 N = names()
+try:
+    COND = json.loads(read(os.path.join(W, 'ir_conditions.json')) or '{}')
+except ValueError:
+    COND = {}
 
 STAGES = [
     (1, 'PE image (.text/.data/.rdata, LVA) を linear memory に敷設'),
@@ -92,6 +96,7 @@ if F:
 print('=' * 72)
 print('M11 e2e: FLEngine_x64.dll 部分起動 PoC (audio/GUI なし; RetDec lift → emcc → wasm → node)')
 print('=' * 72)
+print('IR 生成条件 (work/ir_conditions.json): ldfix=%s qstore=%s pe=%s' % (COND.get('ldfix', '-'), COND.get('qstore', '-'), COND.get('pe', '-')))
 if not F:
     print('reached_stage: 0 (実行出力なし: m11_boot.cjs が未生成か node 起動失敗)')
     print('stop_reason: e2e_full.out に M11_RESULT 無し')
@@ -161,7 +166,7 @@ if S:
 
 print('-' * 72)
 print('M11_SUMMARY ' + json.dumps({
-    'reached_stage': reached, 'stop_reason': stop,
+    'reached_stage': reached, 'stop_reason': stop, 'ir_conditions': COND,
     'units_run_full': F.get('units_run'), 'units_total': F.get('units_total'),
     'survey_ok': S.get('ok') if S else None, 'survey_trap': S.get('trap') if S else None, 'survey_trap_oom': S.get('trap_oom') if S else None, 'survey_clobber': S.get('clobber') if S else None, 'survey_miss': S.get('miss') if S else None,
     'getmem': pr.get('GetMem'), 'freemem': pr.get('FreeMem'), 'va_calls': F.get('va_calls'), 'va_mb': round((F.get('va_used') or 0) / 1e6, 1),
