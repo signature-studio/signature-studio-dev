@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """m11_judge.py: m11_e2e.sh の実測出力 (work/e2e_full.out, work/e2e_survey.out) を機械判定して要約を印字する.
 既定は報告のみで exit 0 (未達でも現在の到達点を再現して数値を出す).
-`--require-stage N` を付けた時だけ, 到達 stage < N なら exit 1 (機械判定ゲート; e2e からは呼ばない).
+`--require-stage N` を付けた時だけ, 到達 stage < N なら exit 1 (機械判定ゲート).
+`--min-survey-ok N` を付けた時だけ, survey の ok < N (または survey 無し) なら exit 1 (#715).
+m11_e2e.sh は M11_EXPECT_STAGE / M11_EXPECT_SURVEY_OK (既定は tools/m11/e2e_expect.env) からこの 2 つを渡す。
 stage 6 は「全 942 unit が Halt0 を経由せず完走し, DllMain が TRUE (=1) を正常 return」の時だけ (#134).
 Halt0 → longjmp 経由の巻き戻し (早期終了) は stage 6 にしない."""
 import json, os, re, subprocess, sys
@@ -9,14 +11,24 @@ import json, os, re, subprocess, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 W = os.environ.get('M11_JUDGE_WORK') or os.path.join(HERE, 'work')
 REQUIRE = None
-if '--require-stage' in sys.argv:
+MIN_SV_OK = None
+
+
+def _opt(flag):
+    if flag not in sys.argv:
+        return None
     try:
-        REQUIRE = int(sys.argv[sys.argv.index('--require-stage') + 1])
+        return int(sys.argv[sys.argv.index(flag) + 1])
     except (IndexError, ValueError):
-        REQUIRE = None
-    if REQUIRE not in range(1, 7):
-        sys.stderr.write('usage: m11_judge.py [--require-stage N]  (N は 1〜6 の整数)\n')
+        sys.stderr.write('usage: m11_judge.py [--require-stage N] [--min-survey-ok N]  (N は整数)\n')
         sys.exit(2)
+
+
+REQUIRE = _opt('--require-stage')
+MIN_SV_OK = _opt('--min-survey-ok')
+if REQUIRE is not None and REQUIRE not in range(1, 7):
+    sys.stderr.write('usage: m11_judge.py [--require-stage N] (N は 1〜6)\n')
+    sys.exit(2)
 
 
 def read(p):
@@ -101,7 +113,7 @@ if not F:
     print('reached_stage: 0 (実行出力なし: m11_boot.cjs が未生成か node 起動失敗)')
     print('stop_reason: e2e_full.out に M11_RESULT 無し')
     print(full_txt[-800:])
-    sys.exit(1 if REQUIRE is not None else 0)
+    sys.exit(1 if (REQUIRE is not None or MIN_SV_OK is not None) else 0)
 
 stage_name = dict(STAGES).get(reached, '未達')
 print('reached_stage: %d/6  (%s)' % (reached, stage_name))
@@ -173,7 +185,13 @@ print('M11_SUMMARY ' + json.dumps({
     'wasm_bytes': F.get('wasm_size'), 'trampolines': F.get('disp_entries'),
     'halt0_early': halt0, 'dllmain_normal_true': complete6,
 }, ensure_ascii=False))
+fail = False
 if REQUIRE is not None and reached < REQUIRE:
     print('REQUIRE_STAGE_FAILED: reached_stage=%d < required=%d' % (reached, REQUIRE))
-    sys.exit(1)
-sys.exit(0)
+    fail = True
+if MIN_SV_OK is not None:
+    sv_ok = S.get('ok') if S else None
+    if sv_ok is None or sv_ok < MIN_SV_OK:
+        print('SURVEY_OK_FAILED: survey ok=%s < required=%d' % (sv_ok, MIN_SV_OK))
+        fail = True
+sys.exit(1 if fail else 0)
