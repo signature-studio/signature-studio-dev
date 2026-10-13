@@ -248,18 +248,18 @@ load average: 実行中 0.01〜0.33 (1 分平均)。
 
 iargs 未対応の 3 site (§17.2 の残 unbound: `1801a3117`・`1801c162b`・`1801c1752`) は、本 PR の範囲外で未着手。起票先は #898 (`[HB-H22]`)。
 
-### 17.10 #415 原因切り分け (HEAD 04b4cc5f, run 実測・コード変更なし): BLK 配置と entry 配線の不整合
+### 17.10 #415 原因切り分け (HEAD 04b4cc5f, コード変更なし): BLK 配置と entry 配線の不整合
 
-素材: `work-icall` / `work-liftlib` / `work-m6-ott` / `analysis-ott-binaries` / `toolchain-retdec` / `toolchain-emsdk` を展開済み (実在確認済み)。`OTT_DLL=$HOME/analysis/plugins/ott/binaries/OTT_vst2_win64.dll`。capstone・pefile は runner 外の venv に導入。
+素材: `work-icall` / `work-liftlib` / `work-m6-ott` / `analysis-ott-binaries` / `toolchain-retdec` / `toolchain-emsdk` を展開済み (実在確認済み)。`OTT_DLL` は `[ANALYSIS-PLUGINS]` 配下の `ott/binaries/OTT_vst2_win64.dll` (§17.9 と同じ)。capstone・pefile は venv に導入。
 
-| 項目 | 実測 |
+原因の内容 (BLK 配置と entry 配線) と #883 への分離は §17.9 を参照。本節は §17.9 にない根拠だけを残す。
+
+| 項目 | 根拠 |
 |---|---|
-| `gen_ott_getparam_F.sh` | OK (0.45 s, closure 1 func / 460 B) |
-| `leafspec targets/ott_getparam.json --n 200` | **rc=1, 3.3 s**, match=0 / mismatch=200 / wasm_trap=200 / native_crash=0 (§17.9 と一致) |
-| icall の BLK 配置 (`map.json` の `blk`) | `0x184308000` (`image_base` 0x180000000 + image 直後 + 0x4000000 の規則, `icall_rewrite.py` L653) |
-| 生成 IR の `this` 読み込み | `inttoptr (i64 6512738312)` = BLK+8 (rcx) を entry で直接 load。`iargs` が足した `%arg2` (this) は未使用。`idx` も BLK+0x10 から読む |
-| 生成 IR の datalayout | `ott_getparam_fixed.ll` は `p:32:32` (wasm32)。`0x184308008` は 32bit に切り詰められ `0x84308008` となり、既定 `MAXIMUM_MEMORY` 64 MiB の外になる |
-| C runtime の既定 BLK | `tools/icall/rt/icall_rt.c` / `icall_ovr.c` は `ICALL_BLK = 0x34308000` (既定)。rewriter の `0x184308000` と不一致。ただし leaf build の stub は `__icall_dispatch` を trap に置換しており、runtime は link されない |
-| harness の引数渡し | `ms_pos`: `this`・`idx` を rcx/rdx 位置で渡す (`native_runner.c` L124・`wasm_runner.mjs` L64)。IR は BLK から読むので、harness の値は届かない |
+| BLK の算出式 | `blk = img.base + image_size + 0x4000000` (`img.base > 0x100000000` の枝, `tools/icall/icall_rewrite.py` L653)。`img.base` 0x180000000 のため VA は 4 GiB 超 |
+| 32bit 切り詰め | `ott_getparam_fixed.ll` は `p:32:32` (wasm32)。BLK+8 = `0x184308008` は `0x84308008` に切り詰められ、既定 `MAXIMUM_MEMORY` 64 MiB の外になる |
+| 読み先 | 生成 IR は entry で BLK+8 (`this`) と BLK+0x10 (`idx`) を直接 load する。`iargs` が足した `%arg2` (this) は未使用 |
+| C runtime の既定 BLK | `tools/icall/rt/icall_rt.c` / `icall_ovr.c` は `ICALL_BLK = 0x34308000` で、rewriter の `0x184308000` と不一致。leaf build の stub は `__icall_dispatch` を trap に置換しており runtime は link されない |
+| harness の引数位置 | `spec.py` L182-184 が引数の宣言順を `A <slot>` で出力 (`this`=slot 0, `idx`=slot 1)。`native_runner.c` L128 (`c.gpr[sl]`) と `wasm_runner.mjs` L71 がその slot の位置で渡す。`ms_call.S` L18-19 が gpr[0]→rcx、gpr[1]→rdx に載せる。IR は BLK から読むため、この値は届かない |
 
-結論 (根拠付き): 失敗の本体は 2 点。(a) BLK が 4 GiB 超の VA に置かれ wasm32 で切り詰められる (trap の直接原因)。(b) closure entry の rcx/rdx が仮引数 (`%arg`) へ配線されず BLK 固定スロット経由になっている (harness の値が届かない原因)。どちらも `icall` 側 (BLK 配置・entry の store) の修正が要る。1 run では修正と検証 (ネガコン含む) まで終えられないため、**#883 (HB-H21) に残す**。ネガコン (jtchain / leafabi OFF) は §17.9 のとおり FAIL のままで、寄与の切り分けは未了。
+修正と検証 (ネガコン含む) は 1 run では終えられないため、**#883 (HB-H21) に残す**。
