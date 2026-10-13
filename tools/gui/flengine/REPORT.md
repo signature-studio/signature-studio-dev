@@ -143,6 +143,7 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 - parity (`pe_image_parity.py --pe block00031_PE.bin`): `.data` 補正 10,284 件 = m11 `m11_data_gen.py` の 10,284 件 (LB=0 / LB=0x10000 とも一致)。PR 側の旧 off-by-one (`<`) は `c39ca16` で `<=` に直済み (レビュー必須 1)。
 - 所要は 211–212 s (e2e.sh の done 行)。
 - IR provenance (`results/ir_sha256.txt`): 今回は素材の `boot_final.ll` を `m11_gen_ir2.sh` で作り直した (ldfix=applied)。material `boot_final.ll` = `995351f5…` (旧記録 `69c774de…` は素材そのままの IR の指紋)。`boot_final3.ll` は `010451ad…` (不変)。`m11_build.sh` 後は `boot_final.ll` `2be93e55…`・`boot_final3.ll` `ac64ad01…`。
+- 親 `bash tools/gui/e2e.sh` (受入条件 2): **ALL PASS / rc 0** (HEAD `a927ac87`、1 回・wall 191 s、load 2.77 1.78 1.22 (終了時))。前提 `tools/e2e` の `npm ci` (rc 0)・`pnpm install --frozen-lockfile` (rc 0) を先に実行。初回 run は前提不足 (`tsc`・`agent-browser` 不在) で落ちたため、前提を入れてから再実行した。
 - `results/*.json` と `IMPORTS.md` は今回の 3 回目の run で再生成。`IMPORTS.md` は `CharLowerW`・`CreatePalette`・`EnumFontFamiliesExW`・`MessageBoxA` が「P2/P3 昇格候補」から外れた (実装済みのため)。
 
 ネガティブコントロール (全て「期待した FAIL 行が出る」まで検査。judge のクラッシュを FAIL 確認と誤認しない。run1 で確認):
