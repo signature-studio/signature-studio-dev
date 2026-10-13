@@ -62,14 +62,34 @@ IR 表 (`tools/m11/work/` = `work-m11` の既存ファイル。本 run で検証
 
 機械語 load に変位 (disp) を持たせ、IR の `store` 値の `load (argN + c)` の c と照合する。`audit_lsf.py` は変更していない (既存の SUSPECT_VAS / SUSPECT_USE_VAS は不変)。
 
-**本 run で再測定していない。以下の数値 (135 関数・SUSPECT 4 件・個別の判定) は元 run の記録に依る。**
+**本 fix run で再測定済み。下記の数値 (135 関数・SUSPECT 4 件・個別の判定) は本 run の実測と一致した。**
 
-測定条件 (以下は記録できた事項のみ。再現性は未確認):
+測定条件:
 - 測定 commit: `d684ed9f` (`audit_lsf_disp.py` 追加 commit)。以後 `tools/m11/ldfix/` の本体コードは変わっていない (`git diff d684ed9f HEAD -- tools/m11/ldfix/audit_lsf_disp.py tools/m11/ldfix/audit_lsf.py tools/m11/ldfix/ldmach.py tools/m11/ldfix/ldmach_img.py` の出力は空)。
-- 実行コマンド: PR 本文・元 run のログは省略形 (`--json ...`) しか残っておらず、完全なコマンドは復元できない。判明している形は `python3 tools/m11/ldfix/audit_lsf_disp.py <boot_final.ll> <m11_image.bin> '<boot*.drc.config.json>'` (引数は `audit_lsf_disp.py` の `main()` の仕様どおり)。`--json` の出力先は記録されておらず、JSON の現物は無い。
-- 入力 (`work-m11`) の出所: `work-m11` は `docs/WORKFLOW.md` §11 の R2 スナップショット (#516 qstore 以前の旧版・`ir_conditions.json` 無し)。`tools/m11/m11_gen_ir2.sh` からの生成物ではない。このため `ldfix=applied` と `ir_sha256` の照合はできない。
+- 入力: `$ARTIFACTS_DIR/work-m11.tar.zst` を `tar --zstd -xf` で `tools/m11/work/` に展開 (gitignore 対象)。`work-m11` は `docs/WORKFLOW.md` §11 の R2 スナップショット (#516 qstore 以前の旧版・`ir_conditions.json` 無し)。`tools/m11/m11_gen_ir2.sh` からの生成物ではない。このため `ldfix=applied` と `ir_sha256` の照合はできない。
 
-実測 (元 run の記録。全 7421 関数、12.2 s):
+再測定 (本 fix run、HEAD のコードで実行):
+
+1. 実行コマンド (作業ディレクトリは repo root):
+   ```
+   python3 tools/m11/ldfix/audit_lsf_disp.py tools/m11/work/boot_final.ll tools/m11/work/m11_image.bin 'tools/m11/work/boot*.drc.config.json' --json tools/m11/ldfix/work/audit_735_disp.json
+   ```
+   出力 (rc 0、10.5 s):
+   ```
+   {"functions": 7421, "mach_fns": 135, "suspect_fns": 4, "suspect_keys": 4}
+   SUSPECT_DISP_VAS 41a670 6677a0 d237e0 de1da0
+   ```
+2. 入力の sha256 (`sha256sum` の実測):
+   - `boot_final.ll` `69c774ded8aaf717c66d765925ff7435c65771ba63db952243daf5c5a7932a43`
+   - `m11_image.bin` `2d10d6926f3fd2b57d0f6a140380bdb0764517f8c514fa0ca1320c4c7e10feeb`
+   - `boot0.drc.config.json` `068bf845195daf5eafd0d65679b46e7fdb2e21fcc0ae2c8fa816e0db6d7ac50e`
+   - `boot1.drc.config.json` `431601c6b15a9a7848a8f39d23d2b63205774dcd512881c014e927bc072f6b82`
+   - `boot2.drc.config.json` `18a68547e3a19ee4eb8a5fbeb141b99aea13e735032ab0421c3ec7bb15ce1ac1`
+   - `boot3.drc.config.json` `a68346e13e4249ceb3ee003e99054ee225c8017c3149ea25f8518cd91eea0452`
+   - `boot4.drc.config.json` `afce98523c2d960e626181810a2a9e1e8ad8c1ac49794ea4ffc1c7964ba2254c`
+3. JSON (`tools/m11/ldfix/work/audit_735_disp.json`、gitignore 対象・コミットしない) の miss 集合: `41a670` (arg1,64) disp {0} / IR {8} / miss {8}、`6677a0` (arg2,64) disp {72,80,88,96} / IR {36,72,80,88,96} / miss {36}、`d237e0` (arg2,64) disp {20,72,96} / IR {20,36,72,96} / miss {36}、`de1da0` (arg1,64) disp {172,192} / IR {172,192,244} / miss {244}。
+
+実測 (全 7421 関数):
 
 | 項目 | 値 |
 |---|---|
@@ -78,27 +98,16 @@ IR 表 (`tools/m11/work/` = `work-m11` の既存ファイル。本 run で検証
 
 - `41a670`: 機械語の (arg1, 64bit) disp = {0}、IR の c = {8}、miss = {8}。目的の型。
 - `6677a0` (arg2, 64): 機械語 disp = {72,80,88,96}、IR c = {36,72,80,88,96}、miss = {36}。IR の `arg2+36` は `store i64` 3 本のうち 1 本。機械語側の列挙漏れの可能性が高いが、未突合。
-- `d237e0` (arg2, 64): miss = {36}。IR `arg2+36` は `load i64` の結果を `store` しない (`store i32 %2`)。ほぼ誤検出。未突合。
+- `d237e0` (arg2, 64): miss = {36}。IR の `arg2+36` は `%126 = add i64 %arg2, 36` → `load i64` (`%128`) → `store i64 %128` (`arg1+632` へ書く) で、load 値は捨てられていない。よって「ほぼ誤検出」とは断定せず、未突合として扱う。
 - `de1da0` (arg1, 64): miss = {244}。未突合。
 
 判定: **検出信号としては採用しない** (誤検出・列挙漏れ 3 件の突合が未了)。`41a670` は 1 件で拾える。
 次に必要なのは、3 件の機械語 (disp 列挙の漏れ・store 先ごとの値) の逆アセンブル突合。これは #1091 (LD-33) の範囲に含める。
 
-再現性 (本 run で確認した事実):
-- `$ARTIFACTS_DIR` は `fl-win64.tar.zst` のみ (`work-m11` 未取得)。`tools/m11/work/` は checkout に無い。よって §2b の 135 / 4 件は本 run では再現していない。
-- 元の入力 (`boot_final.ll` / `m11_image.bin` / `boot*.drc.config.json`) の sha256 は記録していない。再測定には `work-m11` の再取得 (`oc_artifacts: fl-win64 work-m11`) が要る。
-- `audit_lsf_disp.py` は `python3 -m py_compile` が通る (本 run で確認)。本 run では IR・image が無く、実行による再測定はしていない。
-- 判定 (採用しない・未突合 3 件は #1091) は、上記の元 run の数値に依る。再測定で数値が変われば判定を見直す。
-
-fix run の確認 (レビュー指摘 2・3 への対応):
-- 確認時刻の `$ARTIFACTS_DIR` は `fl-win64.tar.zst` (2,324,302,252 bytes) の 1 件のみ。`work-m11` は無い。`tools/m11/ldfix/work/` も無い。
-- `boot_final.ll` / `m11_image.bin` を `/` 以下から探したが時間切れで見つからず、入力の sha256 は取れていない。
-- よって再実行・135 / 4 件の再確認は本 fix run では未実施。`audit_lsf_disp.py` の py_compile のみ通る。
-- 次回の再測定 (PR 本文の `oc_artifacts: fl-win64 work-m11` で素材を取得してから実行する):
-  1. `python3 tools/m11/ldfix/audit_lsf_disp.py <work-m11 の boot_final.ll> <work-m11 の m11_image.bin> '<work-m11 の boot*.drc.config.json>' --json tools/m11/ldfix/work/audit_735_disp.json`
-     (`work/` は gitignore。`--json` の出力先をこの 1 行の固定パスとして定める。入力の相対パスは素材展開後に確定する)
-  2. 3 入力の `sha256sum` を REPORT に記録。
-  3. 結果 (LSF 列挙関数数・SUSPECT 関数) を上の表と照合し、一致・不一致を書く。不一致なら判定を見直す。
+再現性:
+- 上記 1〜3 は本 fix run で実行した。同じ入力・同じコードで再実行すれば同じ結果になることを確認した (元 run の記録とも一致)。
+- `audit_lsf_disp.py` は `python3 -m py_compile` も通る。
+- 入力 (`work-m11`) は R2 の旧スナップショットで、`ir_conditions.json` 無し。`ir_sha256` の照合はできない (上記)。
 
 ## 3. 再現
 
