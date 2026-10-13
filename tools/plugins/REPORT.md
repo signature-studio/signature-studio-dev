@@ -101,7 +101,7 @@ R1/S1c/S1d/C1 (§3), D1 重複 declare (T0 5/42 本), T1 ptr 仮引数不整合 
 ```sh
 bash tools/plugins/build_all.sh --quick            # マトリクス再生成 (~1 分)
 bash tools/plugins/lift/t0_balance/t0_e2e.sh       # T0 実証 (2 秒)
-bash tools/plugins/lift/batch_lift.sh --tier T0    # T0 バッチ lift (~1.5 分)
+bash tools/plugins/lift/batch_lift.sh --tier T0    # T0 バッチ lift (~1.5 分)。 間接 call 復元 (tools/icall) は既定 ON、PLUG_ICALL=0 で従来鎖 (#514, f2/REPORT.md §7)
 ```
 
 ## 8. 次タスク提案 (下流チケット)

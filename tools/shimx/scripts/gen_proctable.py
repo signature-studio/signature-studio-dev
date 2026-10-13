@@ -12,6 +12,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, '..')
 
 PREFIX_DLL = [
+    ('SHCreateMemStream', 'shlwapi.dll'), ('QISearch', 'shlwapi.dll'),          # SHX-T8: 接頭辞 'SH' (shell32) より先に判定
+    ('CryptReleaseContext', 'advapi32.dll'),
     ('Reg', 'advapi32.dll'), ('OpenProcessToken', 'advapi32.dll'), ('GetTokenInformation', 'advapi32.dll'),
     ('Sys', 'oleaut32.dll'), ('Variant', 'oleaut32.dll'), ('Safe', 'oleaut32.dll'),
     ('Co', 'ole32.dll'), ('Ole', 'ole32.dll'), ('StringFrom', 'ole32.dll'), ('CLSIDFrom', 'ole32.dll'), ('ProgIDFrom', 'ole32.dll'),

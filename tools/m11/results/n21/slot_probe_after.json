@@ -1,0 +1,15 @@
+{
+ "lb": 0,
+ "slot": "0x25f00",
+ "slot_fixed": true,
+ "unit12_counter_before": 0,
+ "unit12_counter_after": -1,
+ "unit12_ret": 1,
+ "unit12_trap": null,
+ "unit12_dest_0xfa9a58": "0x0",
+ "rsi_field8_seen_by_41c820": "0xffb5",
+ "stderr_tail": [
+  "[m11] PE image .data/.rdata installed (LVA = RVA + 0x0)",
+  "[m11][args] entry_point(0x0, 0x1, 0x1)"
+ ]
+}
