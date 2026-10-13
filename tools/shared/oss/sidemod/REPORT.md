@@ -59,7 +59,15 @@
 
 所要時間は 1 回の単発値 (build 込み)。ネガコンの 2 回の build.sh 失敗は configure 前なので時間にほぼ影響しない。
 
-## 5. 未解決
+### 4.1 `ci_detect.sh` (#309、検証起点 d7d847f、ローカル runner nproc=4)
+
+| 項目 | 実測 |
+|---|---|
+| クリーン HEAD | **rc=0 / ALL PASS / PASS 65 件 (うちネガコン 54 件) / 2 s** (loadavg 0.05 0.15 0.08)。ネガコン = rc=1 かつ `GPL-GUARD FAIL` 出力を要求、引数誤り rc=2 は検出と数えない |
+| ネガコン (build.sh の FF_ARGS に `--enable-gpl` を実際に書き込んだ作業ツリー) | **rc=1 / FAILED** (`build.sh の実引数` と `GPL-GUARD OK 出力` の 2 件が FAIL)。戻すと rc=0 |
+| 検出器自身の変異 | 禁止表から gpl/nonfree/version3 を抜く / `check_config` が常に空を返す、のどちらも selftest rc=1 を `ci_detect.sh` が CAUGHT |
+| Actions 上の実測 | **未実施** (§5 の workflow 配置待ち) |
+
 
 | 項目 | 起票先 |
 |---|---|
