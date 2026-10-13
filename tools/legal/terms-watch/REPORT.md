@@ -136,7 +136,9 @@ FL/Web 系 (a65a73b):
 - `workflow_dispatch` の入力 `negative_control` に id を選ぶと `--tamper` 付きで実行し、job 失敗 + 自動起票 (題は「ネガコン」) を確認できる。
 - Slate の 403: 取得は元からブラウザ相当の UA + Accept (`lib.mjs` `BROWSER_HEADERS`)。単体テスト 12 本目で UA が短いと 403 になる模擬サーバに対し取得成功・短い UA で `HTTP 403` を確認 (UA を `Mozilla/5.0` のみに変える変異で 12 本目だけ FAIL)。
 
-実測 (検証起点 ea92a05、クリーン HEAD の detached worktree、runner、node v22.23.3、load average 0.23 (開始時点)、並列 1): 単体テスト 12/12 PASS、1.20 / 0.82 / 0.80 s (n=3、`pnpm terms-watch:test` の実時間)。`negative_control_ci.sh` 8/8 期待どおり、21.28 s (実 Web 取得 4 件 × 6 回を含む)。`notify_test.sh` 6/6、既存 issue 照合を壊した変異で FAIL (exit 1)。変異: UA を `Mozilla/5.0` のみに変えると単体テスト 12 本目だけ FAIL。未実測: Actions 上の実行 (「未解決」表の先頭行)。
+実測 (検証起点 7661266、コミット済み HEAD の worktree、runner、node v22.23.3、load average 0.52 (開始時点)、並列 1): 単体テスト 12/12 PASS、1.90 / 0.76 / 0.78 s (n=3、`node --test` の実時間)。`negative_control_ci.sh` 8/8 期待どおり、19.22 s (実 Web 取得 4 件 × 6 回を含む)。`notify_test.sh` 6/6 (0.06 s)。既存 issue 照合を壊した変異で FAIL (exit 1) は 397f6e6 時点の実測 (7661266 では workflow yaml 以外に変更なし、再実行していない)。変異: UA を `Mozilla/5.0` のみに変えると単体テスト 12 本目だけ FAIL (同上)。未実測: Actions 上の実行 (「未解決」表の先頭行)。
+
+静的検証 (actionlint v1.7.7): 397f6e6 の `workflow/terms-watch.yaml` は `39:19: context "runner" is not allowed here` で exit 1 (job レベル `env:` では `runner` コンテキスト不可)。job `env` の `TW_OUT` を削除した 7661266 は exit 0 (指摘 0 件)。`ci.sh` / `notify.sh` は `TW_OUT` 未設定なら `${RUNNER_TEMP}/terms-watch` を既定にするため、upload-artifact の `path:` (`${{ runner.temp }}/terms-watch/...`、`with` 内なので可) と一致する。actionlint は構文・式の静的検査のみで、Actions 上の実行の代替にはならない。
 
 | 再現 | 内容 |
 |---|---|
