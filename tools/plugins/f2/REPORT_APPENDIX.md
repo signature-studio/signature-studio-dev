@@ -37,8 +37,8 @@
 
 | VA | 確認済み (再実行で観測) | 推定 (未検証) |
 |---|---|---|
-| 0x6cd8a0 (EQUO, pall2) | mem 差分は 1 語のみ。native `0x01000000224623b0` / wasm `0x01000000220623b0`、差 0x400000 (= delta) | `cmp_mem` が部分上書きされた ptr 入り語を正規化できない (D17 行案) |
-| 0x73fa20・0x6ec2a0 (pall) | native=ok / wasm=timeout | wasm 1 s 打切りによる偽 `wasm_trap` (D18 行案)。比較器欠陥か否かは未切り分け |
+| 0x6cd8a0 (EQUO, pall2) | mem 差分は 1 語のみ。native `0x01000000224623b0` / wasm `0x01000000220623b0`、差 0x400000 (= delta) | `cmp_mem` が部分上書きされた ptr 入り語を正規化できない (DEF-f2-a 行案) |
+| 0x73fa20・0x6ec2a0 (pall) | native=ok / wasm=timeout | wasm 1 s 打切りによる偽 `wasm_trap` (DEF-f2-b 行案)。比較器欠陥か否かは未切り分け |
 
 「偽陽性確定」は上表の確認済み範囲に限る。比較器の欠陥は推定 (#548 [LD-11])。主採点が変わった理由 (main 取り込みの `fix_avx256`・`m11_simd2` 由来と推定) は未切り分け。
 
@@ -113,7 +113,9 @@
 | 主採点 9 パターンの検出力不足 (真偽フラグ・ptr 鎖・float 入力型の関数で native 全滅/偶然一致) | 補助 case を手で足した。他 block の leaf 拡大時に再発 | #235 ([LD-4], 被覆拡大) にコメント |
 | 手順 2〜4 (framework link・Host shim・Render test .flp E2E) と `Eff_Render` の差分 | 出口条件 (差分試験 bit-exact) の残り | 既存 #195 / #196 / #197 完了待ち。#199 に残す |
 
-DEFECTS.md 行案 (PM 判断で追記): `D17 | ours (harness) | 新規 (#515) | 部分上書きされた ptr 入りワードが偽の mem 差分になる | compare.cmp_mem が書込み後の語を ptr と認識できず delta (0x400000) 差を不一致とする | EQUO 0x6cd8a0 (byte 1 を [this+0x35af] へ) 主採点 2/9 case で偽 diff、ptr 無し arena では equal | native−wasm = delta かつ書込み byte 以外同値 | byte 単位比較`、`D18 | ours (harness) | 新規 (#515) | ループ長が引数依存の関数が wasm 1 s 上限で偽 wasm_trap | ld_runner.mjs の vm timeout=1000 ms (native 上限は 10 s) | 0x73fa20 / 0x6ec2a0 (count 下位 32bit ≒ 5.7e8 回) pall | native 完走 + wasm timeout で loop 幅が引数由来 | timeout の target 指定`。
+DEFECTS.md 行案 (PM 判断で追記・番号は PM が採番): 本文書では番号を確定しない。`docs/DEFECTS.md` は D1a〜D17 まで使用済みで、`D18`〜`D23` は別文書の候補として既に使われているため衝突する。仮称 `DEF-f2-a` / `DEF-f2-b` で示す。
+- `DEF-f2-a | ours (harness) | 新規 (#515) | 部分上書きされた ptr 入りワードが偽の mem 差分になる | compare.cmp_mem が書込み後の語を ptr と認識できず delta (0x400000) 差を不一致とする | EQUO 0x6cd8a0 (byte 1 を [this+0x35af] へ) 主採点 2/9 case で偽 diff、ptr 無し arena では equal | native−wasm = delta かつ書込み byte 以外同値 | byte 単位比較`
+- `DEF-f2-b | ours (harness) | 新規 (#515) | ループ長が引数依存の関数が wasm 1 s 上限で偽 wasm_trap | ld_runner.mjs の vm timeout=1000 ms (native 上限は 10 s) | 0x73fa20 / 0x6ec2a0 (count 下位 32bit ≒ 5.7e8 回) pall | native 完走 + wasm timeout で loop 幅が引数由来 | timeout の target 指定`
 
 ### 8.6 再現
 
