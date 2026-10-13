@@ -66,6 +66,7 @@ EnumChildWindows
 EnumClipboardFormats
 EnumDisplayMonitors
 EnumDisplaySettingsW
+EnumFontFamiliesExW
 EnumThreadWindows
 EnumWindows
 EqualRect
