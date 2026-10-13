@@ -49,11 +49,11 @@ ON の増分 build で `work/ov_414ad0.stamp` が `1`、`work/obj/ov.o` が再�
 
 ## 測定 commit と現 HEAD の差分 (WORKFLOW §6)
 
-測定 commit `48496bd5` から検証 HEAD (`6191db7d` 時点の内容) までの差分。
+測定 commit `48496bd5` から、本 REPORT を含む検証 HEAD までの差分。
 
 ```sh
-git diff 48496bd5 HEAD -- tools/m2 tools/shared            # 0 行
-git diff 48496bd5 HEAD -- tools/m11 --name-only            # tools/m11/REPORT_N1042.md のみ
+git diff 48496bd5 HEAD -- tools/m2 tools/shared | wc -l    # 0
+git diff --name-only 48496bd5 HEAD -- tools/m11            # tools/m11/REPORT_N1042.md のみ
 ```
 
 測定対象コードの差分は 0 行。`tools/m11` の変更は本 REPORT のみ。
