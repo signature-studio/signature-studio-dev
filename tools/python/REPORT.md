@@ -1,6 +1,6 @@
 # G python-mcp — CPython wasm + flapi/MCP 解析 + ブリッジ設計 (2026-10-10)
 
-> 行数上限 (250 行) のため、§7c (#82)・§9 (T1〜T9 表)・§PY-13 (#588) と §12・§13 (#81) の全文は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) に分割移動 (本体は要約のみ)。
+> 行数上限 (250 行) のため、§7c (#82)・§9 (T1〜T9 表)・§PY-13 (#588)・§12・§13 (#81) の全文は [REPORT_APPENDIX.md](REPORT_APPENDIX.md)、§15 (#654) の全文は [REPORT_PY16.md](REPORT_PY16.md) に分割移動 (本体は要約のみ)。
 
 ## 結論 (先出し)
 
@@ -91,7 +91,7 @@ FLEngine rodata の `name\0doc\0…<module>` 並びから機械抽出 (`flapi_ex
 
 ## 7. 未解決・ブロッカー・留意
 
-- **FL 側 Python C API 呼出し面は未抽出**: dlsym 先の関数名が平文で無い。サブインタプリタ運用 (`PyInterpreterConfig` 型の存在から示唆のみ) の実態は不明。wasm で `Py_NewInterpreterFromConfig` が動くかも未検証 (→ §11 で検証: 動く。`_flhost` は PY-12 #587 で対応済み = PY-12 節)。
+- **FL 側 Python C API 呼出し面は抽出済み (§7d で訂正: 名前は UTF-16LE で PE 内にあり 110 件抽出済み)。以前の記述: dlsym 先の関数名が平文で無い。サブインタプリタ運用 (`PyInterpreterConfig` 型の存在から示唆のみ) の実態は不明。wasm で `Py_NewInterpreterFromConfig` が動くかも未検証 (→ §11 で検証: 動く。`_flhost` は PY-12 #587 で対応済み = PY-12 節)。
 - `mixer.getCurrentTempo(1)`/`setCurrentTempo(bpm,1)` の第 2 引数の意味 (MCPTools は素の BPM 扱い、公式 docs は ×1000) は**実機で未確認**。モックは MCPTools 側に合わせた。
 - FLEngine 側 flapi 実装は**モック(27 API を実装、他は None)**。実エンジンとの意味差 (引数省略時の既定値、-1 の意味) は実機/lift 後に検証が必要。
 - **kwargs 署名の静的復元 (PY-9 b, #81) 済み**: rodata の並び順ではなく、FLEngine (win PE) の `.data` 内メソッド表 (name/fn/flags/doc, 32B 刻み) と各ラッパー冒頭の `lea [rip+x]` から `PyArg_ParseTupleAndKeywords` の書式と kwlist を復元 (`analysis/flapi_kwargs.py` → `analysis/flapi/flapi_kwargs.json`、`flapi_table.json` の各関数に `kwsig` を追記)。結果は §12。
@@ -136,6 +136,10 @@ mock との差で見つかったもの: mock は引数の個数/型を検査し�
 
 検証範囲: 上記は mac pkg 無しで `fetch_inputs.sh` の win64 DATA block 経路から配置した MCPTools.pyc / midi.py / utils.py で実行した (b76d221 時点の自己申告値 host_calls 37,424・48/48 と同値)。範囲外: `run_all.sh` 全体・headless Chrome (`browser_check`) は未実施。
 
+
+## 7d. CPython を provider と同一 wasm に静的リンク (PY-2, #83 / #115) — 全文は `REPORT_PY2.md`
+
+結論: `build_flpy_static.sh` で CPython + flapi provider を 1 つの wasm (`flpy_static.wasm`) にリンクし、`_flhost.call` を同一 wasm 内 C 呼出しにした。48/48 tool が SAB+provider 版・モック版と tool 別差 0/48、Python 込み往復は median 0.34µs (Worker+SAB 版 25〜27µs)。FL の `Py_*` 動的束縛 110 名を PE (`0xc395a0`) から機械抽出し (§7 の「未抽出」を訂正)、109 件が `libpython3.12.a` に存在・1 件は Py_REF_DEBUG 限定。実 FLEngine wasm へのリンクは未実施。1 コマンド: `node tests/static_check.mjs` (前提 `build_flpy_static.sh`)。
 
 ## 8. ユーザ依頼事項
 
@@ -235,8 +239,11 @@ T1〜T9 の表は 250 行上限のため [REPORT_APPENDIX.md](REPORT_APPENDIX.md
 FLEngine の PyMethodDef 表から 435/435 関数を対応付け、書式 303 関数・kwlist 103 関数を復元 (flags=4 の 125 件は書式無し)。`fl_api.bind` は kwlist 名を stubs 名より優先し、既定値が静的に不明な引数の省略後は後続の既定値を足さない (`getGridBit(index=1)` → `(1,)`)。stubs 名とは 66 一致 / 28 不一致 (バイナリを正とする)。再現: `FL_WIN64_DIR=<fl-win64 展開先> python3 analysis/flapi_kwargs.py` の後 `python3 tests/kwsig_check.py` (0.03〜0.04 秒)。wasm 回帰 (`all_tools.mjs` 48/48 ほか)・stubs 照合の例・`arrangement.selectionSet` の kwlist 重複の CPython 実測: [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §12。
 
 ## 13. 未解決 (#81)
-(a) 実機 FL での `mixer.getCurrentTempo(1)` 確認 (#81 のブロッカー)、`device.flrMidiNote` / `flrMidiCC` の書式未復元、省略引数のホストへの渡し方・stubs 既定値 `midi.*` の `eval` NameError は PM 判断待ち (PR #463 コメントに起票依頼)。詳細: [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §13。
+(a) 実機 FL での `mixer.getCurrentTempo(1)` 確認 (#81 のブロッカー)、`device.flrMidiNote` / `flrMidiCC` の書式未復元、省略引数のホストへの渡し方・stubs 既定値 `midi.*` の NameError は #654 (PY-16) で解消 (§15)。詳細: [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §13。
 
 ## 14. Piano roll scripting (`flpianoroll` + `.pyscript` ローダ) — #79 (PY-5)
 
-結論: 同梱 Piano roll scripts 5/5 を wasm 上で回帰テスト化 (`tests/pyscript_e2e.mjs`)。Remote Scripts 5/5・Audio scripts 0/12 (`enveditor` 依存)。flpianoroll は 64 メンバ中 62 実装 (`ScriptDialog.DialogParams` 未実装・`Score.loadScoreFromFile` は stub)。全文・実測・未解決は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §14。
+結論: 同梱 Piano roll scripts 5/5 を wasm 上で回帰テスト化 (`tests/pyscript_e2e.mjs`)。Remote Scripts 5/5・Audio scripts 0/12 (`enveditor` 依存)。flpianoroll は 64 メンバ中 62 実装 (`ScriptDialog.DialogParams` 未実装・`Score.loadScoreFromFile` は stub)。全文・実測・未解決は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §14。Chrome (headless) 上の同梱 Piano roll 5/5 実行と node との出力一致 (#466) は [REPORT_CHROME.md](REPORT_CHROME.md) §14b。
+
+## 15. stubs 既定値 `midi.*` の評価 (PY-16, #654)
+結論: `fl_api.bind` の `eval` を、許可した式だけを評価する `_default_value` に置換した。`midi.*` の既定値 **20 関数・21 引数・名前 10 種** は利用者の `midi` から実行時に解決し、repo には値を置かない (`docs/LEGAL.md`)。検証起点 `8d883c3`、修正 commit `4b3cbe2`。`kwsig_check` PASS (wall 43〜45 ms)、旧コード + 新テストは `NameError` で FAIL、実物 midi.py で 21/21 一致。wasm 回帰は all_tools 48/48 (wasm・mock とも)、provider・poc・midi_script・subinterp PASS。追跡の `tool_coverage.json` は旧 NameError で欠けていた 1 tool の出力を新結果に更新。全数列挙・検証の詳細は [REPORT_PY16.md](REPORT_PY16.md)。
