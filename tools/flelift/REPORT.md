@@ -224,3 +224,8 @@ bash tools/ott/ott_e2e.sh                         # OTT 回帰 (読取のみ, �
 - `fle_e2e.sh` が `fle_natdrv` を build しないため、クリーン環境で spot diff が `rc=127` で失敗していた → e2e に gcc build 工程 [3a] を追加
   (`-D_GNU_SOURCE` が必要: 無いと `REG_RIP` 未宣言で build 失敗)。
 - PE パスの既定を `/home/ubuntu/...` 固定から `FL_WIN64_DIR` (`tools/shared/env.sh`) 経由に変更 (`FLE_PE` での上書きは従来どおり)。
+
+## 10. PERF-P9 (#168) ④: closure の最適化 variant 別 build (LTO 効果)
+
+- **判定**: wasm サイズと emcc 時間は実測で確定 (-O0 27.6 MB / -O2 13.7 MB / -O2 -flto 11.1 MB)。出力は 3 variant で一致 (署名 `533e70fd7efebaa0`)。実行時間の LTO 効果は 2 関数の微小測定では判定できず、closure 全体は未測 (boot 連鎖の lift が RAM 上限、#918)。
+- 詳細 (表・測定条件): `REPORT_APPENDIX.md` §10
