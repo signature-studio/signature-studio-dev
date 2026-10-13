@@ -17,8 +17,12 @@ M11_LB_BASE="${M11_LB_BASE:-0}"; export M11_LB_BASE   # #222: LVA = RVA + M11_LB
 M11_OV_CLASSCREATE="${M11_OV_CLASSCREATE:-0}"   # #419: 1 = m11_ov.c の実験 override (410360 のみ; 8cbda0/8cbce0 は #503 で既定 ON) を有効化 (既定 0)
 M11_OV_414AD0="${M11_OV_414AD0:-0}"   # #683: 1 = m11_ov.c の UStrSetLength 版 function_414ad0 (arg1 deref 復元) に切替; 0 = main の LStrSetLength 版 (#134) を使う (既定; closure 退行 7 件が未解決のため)
 M11_FIX_652500="${M11_FIX_652500:-0}"   # #748: 1 = m11_ov.c の function_652500 (*arg1 の 1 段 deref 復元) を有効化; 0 = lift 版 (既定)
+M11_OV_413060="${M11_OV_413060:-0}"   # #944: 1 = m11_ov.c の function_413060 (dest の旧値 deref 復元, D4) を有効化; 0 = lift 版 (既定)。413060 だけを切り替える独立 gate
+M11_NEG_413060="${M11_NEG_413060:-0}"   # #944 ネガコン: 1 = dest に p+0x40 を書く既知変更 (b)。感度確認用。既定 0
+M11_INSTR_413060="${M11_INSTR_413060:-0}"   # #944: 1 = 計測専用に function_413060 へ probe (index 8) と dest 観測 hook を post で入れる。既定 0 は main と同一の post 出力
+M11_DEST_READ="${M11_DEST_READ:-1}"   # #944: 0 = 413060 後の dest 読出し (指紋) を止める。読出しが挙動を変えるかの切り分け用。既定 1
 M11_FIX_535BF2="${M11_FIX_535BF2:-0}"   # #714: 1 = m11_ov.c の function_535c11/535bf2 転記 (IR 未定義 535c2e・境界 535c11 の再現); 0 = lift 版 (既定)
-CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=$M11_LB_BASE -DM11_OV_CLASSCREATE=$M11_OV_CLASSCREATE -DM11_OV_414AD0=$M11_OV_414AD0 -DM11_FIX_652500=$M11_FIX_652500 -DM11_FIX_535BF2=$M11_FIX_535BF2"
+CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=$M11_LB_BASE -DM11_OV_CLASSCREATE=$M11_OV_CLASSCREATE -DM11_OV_414AD0=$M11_OV_414AD0 -DM11_FIX_652500=$M11_FIX_652500 -DM11_OV_413060=$M11_OV_413060 -DM11_NEG_413060=$M11_NEG_413060 -DM11_DEST_READ=$M11_DEST_READ -DM11_INSTR_413060=$M11_INSTR_413060 -DM11_FIX_535BF2=$M11_FIX_535BF2"
 # image 終端 (SizeOfImage 0x18c0000) + LB_BASE が GLOBAL_BASE (0x10000000) 以内であること
 python3 - <<PYEOF
 import sys
@@ -40,8 +44,12 @@ done
 if [ ! -f work/boot_final.ll ]; then echo "[m11build] work/boot_final.ll 無し: m11_gen_ir2.sh を先に" >&2; exit 2; fi
 PE_QS="${PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}"
 # #680: ldfix 適用の記録が無い IR (旧スナップショット等) は build しない (m11_gen_ir2.sh で作り直す)
-if [ "$(python3 m11_cond.py --get ldfix)" != applied ]; then
-  echo "[m11build] ERROR: work/ir_conditions.json に ldfix=applied の記録無し (現在: '$(python3 m11_cond.py --get ldfix)')。m11_gen_ir2.sh で IR を作り直すこと" >&2; exit 2
+if [ "$(python3 m11_cond.py --get ldfix)" = disabled ] && [ "${M11_ALLOW_LDFIX_DISABLED:-0}" = 1 ]; then
+  # #1165: ldfix 無し IR (M11_LDFIX=0 で生成したもの) の build は明示 opt-in のときだけ許す。既定は拒否のまま。
+  #   指紋 (--check) と PE の一致は下で従来どおり検査する。測定時は ldfix=disabled を REPORT に明記すること。
+  echo "[m11build] WARNING: M11_ALLOW_LDFIX_DISABLED=1: ldfix 無しの IR で build する (ir_conditions.json ldfix=disabled)" >&2
+elif [ "$(python3 m11_cond.py --get ldfix)" != applied ]; then
+  echo "[m11build] ERROR: work/ir_conditions.json に ldfix=applied の記録無し (現在: '$(python3 m11_cond.py --get ldfix)')。m11_gen_ir2.sh で IR を作り直すこと (ldfix 無しで測るなら M11_ALLOW_LDFIX_DISABLED=1)" >&2; exit 2
 fi
 # #680 (review): 記録の無い差替え (正規 pass を経ない IR の書換え) を拒否する。正規 pass は直後に --bind で指紋を更新する
 if ! python3 m11_cond.py --check work/boot_final.ll; then
@@ -90,6 +98,9 @@ if ! cmp -s work/boot_final.ll work/boot_final.fix912.tmp.ll; then mv work/boot_
 python3 m11_cond.py --bind work/boot_final.ll
 # #131: sigfix 復元モードが変わったら post 結果を無効化 (stamp)
 if [ "$(cat work/sigfix_recover.stamp 2>/dev/null || echo 0)" != "${M11_SIGFIX_RECOVER:-0}" ]; then rm -f work/boot_final3.ll; fi
+# #944: 計測 probe の有無が変わったら post 結果を無効化 (stamp)
+if [ "$(cat work/instr_413060.stamp 2>/dev/null || echo none)" != "$M11_INSTR_413060" ]; then rm -f work/boot_final3.ll; fi
+echo "$M11_INSTR_413060" > work/instr_413060.stamp
 echo "${M11_SIGFIX_RECOVER:-0}" > work/sigfix_recover.stamp
 if [ ! -f work/boot_final3.ll ] || [ work/boot_final.ll -nt work/boot_final3.ll ] || [ m11_post.py -nt work/boot_final3.ll ] || [ m11_argrecover.py -nt work/boot_final3.ll ]; then
   # M11_SIGFIX_RECOVER=1 (#131): sigfix の 0 詰め site を機械語突合し、定数代入が確定する引数だけ復元 (m11_argrecover.py)
@@ -124,8 +135,16 @@ cc() { # cc <src> <obj> [extra deps...]
 }
 # 別 TU (tools/shim, m11_rt/ov/win) が定義する Win32 API は winstubs から除外 (duplicate symbol 回避)
 for f in heap failfast file timer sync; do cc ../shim/src/$f.c work/obj/shim_$f.o; done
+S_NEG="$M11_NEG_413060-$M11_DEST_READ-$M11_INSTR_413060"
+if [ "$(cat work/neg_413060.stamp 2>/dev/null || echo none)" != "$S_NEG" ]; then rm -f work/obj/rt.o; fi
+echo "$S_NEG" > work/neg_413060.stamp
+# #1176: work-m11 同梱の rt.o/win.o は古い snapshot のことがある (mtime だけでは判定できない: 同梱 obj が source より新しく見える)。
+#   ソースの sha256 が記録と違えば作り直す (stamp 無し = 初回・snapshot 由来も作り直す)。
+RTWIN_SHA="$(cat m11_rt.c m11_win.c | sha256sum | cut -d' ' -f1)"
+if [ "$(cat work/rtwin.sha256 2>/dev/null || echo none)" != "$RTWIN_SHA" ]; then rm -f work/obj/rt.o work/obj/win.o; fi
 cc m11_rt.c work/obj/rt.o
 cc m11_win.c work/obj/win.o
+echo "$RTWIN_SHA" > work/rtwin.sha256
 llvm-nm --defined-only work/obj/shim_*.o work/obj/rt.o work/obj/win.o 2>/dev/null | awk '$2 ~ /^[TtWwDd]$/ {print $3}' | sort -u > work/defined_c.txt
 if [ ! -f work/m11_winstubs.c ] || [ work/defined_c.txt -nt work/m11_winstubs.c ] || [ m11_genstubs.py -nt work/m11_winstubs.c ] || [ work/boot_final.ll -nt work/m11_winstubs.c ]; then
   M11_EXCLUDE=work/defined_c.txt python3 m11_genstubs.py work/boot_final.ll work > work/genstubs.log
@@ -144,6 +163,10 @@ echo "$M11_OV_414AD0" > work/ov_414ad0.stamp
 # M11_FIX_652500 が変わったら ov.o だけ無効化 (#748)
 if [ "$(cat work/ov_652500.stamp 2>/dev/null || echo none)" != "$M11_FIX_652500" ]; then rm -f work/obj/ov.o; fi
 echo "$M11_FIX_652500" > work/ov_652500.stamp
+# M11_OV_413060 が変わったら ov.o だけ無効化 (#944)
+S413="$M11_OV_413060-$M11_NEG_413060-$M11_INSTR_413060"
+if [ "$(cat work/ov_413060.stamp 2>/dev/null || echo none)" != "$S413" ]; then rm -f work/obj/ov.o; fi
+echo "$S413" > work/ov_413060.stamp
 # M11_FIX_535BF2 が変わったら ov.o だけ無効化 (#714)
 if [ "$(cat work/ov_535bf2.stamp 2>/dev/null || echo none)" != "$M11_FIX_535BF2" ]; then rm -f work/obj/ov.o; fi
 echo "$M11_FIX_535BF2" > work/ov_535bf2.stamp
@@ -159,7 +182,7 @@ emcc work/obj/*.o -o work/m11_boot.cjs.tmp \
   -sERROR_ON_UNDEFINED_SYMBOLS=0 -sEXIT_RUNTIME=1 \
   --no-entry -Wl,--export-all \
   -sEXPORTED_RUNTIME_METHODS=UTF8ToString,HEAPU8,HEAPF32,HEAP32,HEAPF64,HEAPU32,HEAP64,wasmTable,addFunction \
-  -sEXPORTED_FUNCTIONS=$EXPORTS \
+  -sEXPORTED_FUNCTIONS=$EXPORTS$( [ "$M11_INSTR_413060" = 1 ] && echo ,_m11_dest_obs_n,_m11_dest_obs_hhi,_m11_dest_obs_hlo ) \
   -Wl,--initial-memory="$INITMEM" -Wl,--max-memory="$MAXMEM" 2> work/link.log || { tail -30 work/link.log; exit 1; }
 mv work/m11_boot.cjs.tmp work/m11_boot.cjs
 python3 m11_postjs.py work/m11_boot.cjs 2>/dev/null
