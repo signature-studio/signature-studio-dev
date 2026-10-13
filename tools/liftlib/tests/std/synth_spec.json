@@ -1,0 +1,11 @@
+{
+ "name": "synth", "func": "0x1000", "wasm_func": "function_1000",
+ "scenarios": 60, "steps": 1, "seed": 155,
+ "compare_ret": true,
+ "vars": [{"name": "n", "gen": {"mix": [[0.4, {"choice": [0, 1, 2, 3, 7, 16, 31, 64]}], [0.6, {"int": [1, 128]}]]}}],
+ "args": [{"ptr": "in"}, {"ptr": "out"}, {"int": "n"}],
+ "buffers": {
+  "in": {"size": "4*n+4", "fill": {"type": "f32", "count": "n", "gen": {"sample": 1}}},
+  "out": {"size": "4*n+4"}
+ }
+}
