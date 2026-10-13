@@ -40,6 +40,8 @@ need_lift=0
 for i in 0 1 2 3; do [ -f work/boot$i.lift.ll ] || need_lift=1; done
 [ -f work/boot_final.ll ] || need_lift=1
 PE_PREV="$(python3 m11_cond.py --get pe)"   # IR を生成した PE (#680 review: PE が変わったら IR・data/image を作り直す)
+PE_SHA="$(sha256sum "$PE" | cut -d' ' -f1)"   # #728: lift 成果物を生成した PE の指紋 (work/lift_pe.sha256)
+[ "$(cat work/lift_pe.sha256 2>/dev/null)" = "$PE_SHA" ] || need_lift=1
 if [ $FULL = 1 ] || [ $need_lift = 1 ]; then
   step "全再生成モード (scan → bounds → lift → tail 固定点 → IR)"
   [ -f work/scan_index.json ] && [ $FULL = 0 ] || must "m11_scan" python3 m11_scan.py
@@ -51,6 +53,7 @@ if [ $FULL = 1 ] || [ $need_lift = 1 ]; then
     must "gen_ir2 #$it" bash m11_gen_ir2.sh
   done
   [ -f m11_extra_ranges5.txt ] && { must "lift boot5 (RetDec)" bash m11_lift.sh m11_extra_ranges5.txt boot5 600; must "gen_ir2 (boot5 追加)" bash m11_gen_ir2.sh; }
+  echo "$PE_SHA" > work/lift_pe.sha256
 else
   # #222: IR の VA→LVA remap は M11_LB_BASE 依存。stamp が違えば lift 成果物 (LB 非依存) から IR だけ再生成
   # #680 (review): 既存 work/ の回復 — ldfix 未記録 (旧スナップショット)・IR 指紋不一致・PE 変更でも gen_ir2 を走らせる
