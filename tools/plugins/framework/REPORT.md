@@ -3,8 +3,8 @@
 > 行数: 本体は 250 行上限内。分割は 2026-10-13 (内容の削除なし・Git 履歴に元の節あり)。
 
 - 検収起点 commit: **9b420bd** (`tools/plugins/framework` ツリーは b8e762d と同一: `git diff b8e762d HEAD -- tools/plugins/` = 0 行)
-- 行数目安: 実装部 (§0-§9) 187 行 + 検収記録 (§10-§11) 105 行 + CAB-194 検収 (§12) 78 行 + CAB-269 (§13) 118 行 = 488 行
-  (実ファイル 476 行)。検収記録・修正記録は規則 37〜42
+- 行数目安 (分割前): 実装部 (§0-§9) 187 行 + 検収記録 (§10-§11) 105 行 + CAB-194 検収 (§12) 78 行 + CAB-269 (§13) 118 行 = 488 行
+  (実ファイル 476 行)。分割後: 本体 207 行・付録 `REPORT_APPENDIX.md` 318 行。検収記録・修正記録は規則 37〜42
   (独立再計算・ネガティブコントロール・検証範囲・起票先つき未解決) の必須項目を含むため 200 行上限を
   超過。超過分は CAB-269 (§13) の実測・訂正の記録にも使った。
 - 日付: 2026-10-11 / 担当 dir: `tools/plugins/framework/` (hostshim/) / 再現: `bash tools/plugins/framework/hostshim/hs_e2e.sh`
@@ -20,7 +20,7 @@
 | ctor 連鎖 (主目的) | `CreatePlugInstance(Host, Tag)` → `TestPlug26.Create` 0x6be800 → `TDelphiFruityPlug` base ctor 0x6b8e80 に到達。Dispatcher ID 序列 **0x47, 0x56, 0x0d, 0x2e, 0x47, 0x1d** を native 順序どおり記録 (Host ポインタ伝播 = BLK+8 実測値が host オブジェクトと一致) — **native 側も capstone で独立照合済 (8/8 OK, `hs_native_check.py`)** |
 | headless smoke 拡張 | framework smoke からの **dispatcher 経由 host call 連鎖**を検証。`hs_rec` 記録 7 件 (slot0 ×6 + slot6 ×1) を `fw_hs_records()` で JS から照合 |
 | RTL ユーティリティ | lock xadd を持つ 6 関数 (refcount / DynArray / TObject list) を `hs_utl.c` の C 実装に接続 (`fw_hostfix.py` override) |
-| 回帰 (CAB-194) | framework smoke: **unit init ×16 + unit finalize ×16 / dispatch 38 / trap 0 / fail-fast 0** を維持 (**ただし Phase A は stale artifact を再利用していたため実質 38 は再現されていない — §1 訂正・§10**) |
+| 回帰 (CAB-194) | framework smoke: **unit init ×16 + unit finalize ×16 / dispatch 38 / trap 0 / fail-fast 0** を維持 (**ただし Phase A は stale artifact を再利用していたため実質 38 は再現されていない — §1 訂正・付録 §10**) |
 | Eff_Render 差分 | **未実施 (次段 手順 §6)** — ctor 連鎖の完全到達が先決で本 ticket では未到達 |
 | 未達 | `TFruityPlug*` 実体生成 (instance field / vtable 照合) — RTL ハッシュ表 (0x52cf40)・名前検索 (0x40b930)・TStream (0x412fc0) の fold deref 残存が原因 (§7.1) |
 
@@ -38,7 +38,7 @@ Phase B: work/hs/hs_route.cjs (派生ビルド) で host shim 連鎖 + 呼出記
 
 > **検収による訂正 (2026-10-11)**: 「追加リンクのみで framework build 挙動が不変」は**誤り**。
 > `hs_fwdiff.sh` で同一 IR から差分ビルドを作り差し替え実測したところ、差分は **`fw_rt.c` のみ**
-> (§10 Ablation)。hostshim.c 追加リンク・`fw_table.py` の slot 登録・decode-miss fail-soft 化は単独では不変。
+> (付録 §10 Ablation)。hostshim.c 追加リンク・`fw_table.py` の slot 登録・decode-miss fail-soft 化は単独では不変。
 > さらに **`work/fw/fw_route.cjs` は 02:11 に親 commit の `fw_rt.c` で焼かれた stale artifact**
 > (wasm 内に soft-miss 文字列が無く FAIL-FAST 文字列が残る) だったため、Phase A の dispatch=38 /
 > ff=0 は「変更後も不変」の証拠にならない。HEAD 相当 build では smoke が **OOB trap**
@@ -111,7 +111,7 @@ FLE 側 case 別応答値の**意味論**は未解析 (FL 本体の case 分岐�
 | 0x6bd197 | `call [rax+0x30]` (edx=0x40f) | 0x47 応答の BOOL 仮想呼出 (slot6) |
 | 0x6b8f4b / 0x6b8fdd / 0x6b90ff / 0x6b9151 | `call [rax]` (r8d=0x0d / 0x2e / 0x47 / 0x1d) | `TDelphiFruityPlug` base ctor 突入とその継続 |
 
-検証済み (ID 一致)。独立照合は §10 の `hs_native_check.py` (8/8 OK)。
+検証済み (ID 一致)。独立照合は付録 §10 の `hs_native_check.py` (8/8 OK)。
 
 ### 3.3 Host ポインタ伝播
 - init 経路 (0x47/0x56 @6bd210): RetDec が「Host 引数」を定数畳み込み cell (0x24/0x10000448) に
