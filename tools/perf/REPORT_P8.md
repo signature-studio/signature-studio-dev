@@ -126,3 +126,28 @@ node tools/perf/p8/check.mjs --negative   # ネガティブコントロール (�
 ```
 
 次タスク提案: 実 OTT での再測 (上表 1 行目)、PIC 回帰ゲート (`dyn_def`/`dyn_hid` の比を perf gate に追加; しきい値は §2.5 のホスト差 ×1.036〜1.254 を踏まえて要設計)、VA 相対化 lift。
+
+## 7. 実 OTT (bit-exact x64c lift) での再測 (PERF-P8 未達項目の解消)
+
+既知類型との関係: 該当なし (計測のみ。lift・既存 wasm は未変更)。検証 HEAD: `72e1ae3e` (`bash tools/perf/p8/real/p8_real.sh`, `NS="1 2 4 8 16"`)。素材 `oc_artifacts: work-m6-ott` (`tools/ott/work/lift/ottl.cjs` = 既存 `tools/ott` の x64c lift 産物, 26 KB glue + 793 KB wasm, 署名 `6b1696f0`)。
+生データ: `tools/perf/p8/results/real_ott.jsonl` (N=1,2,4,8,16 の各別プロセス)。node v22.23.3, 4 コア runner, loadavg 0.2〜0.6 (計測時)。CPU 型番は未記録 (本 run は `os.cpus()` の型番を取っていない)。
+
+**方式**: 1 プロセスで `ottl.cjs` の `createModule` を N 回呼び、各 instance が独立の Memory を持つ状態で同一 OTT の `process` (128f = 1 block) を instance 順に round-robin 駆動。定常 = 1000 block × 7 rep の p50、instance 当たり µs/block。署名は `ott_x64c_bench.mjs` と同一手順 (全 instance で一致を確認)。
+
+| N (instance) | load ms | setup ms | RSS 増分 MiB | µs/block (p50 [min–max]) | RTF@44.1k / instance | 署名 |
+|---|---|---|---|---|---|---|
+| 1 | 23.6 | 21.0 | 20.6 | 110.39 [110.03–113.59] | 0.03803 | 6b1696f0 ×1 |
+| 2 | 28.8 | 27.1 | 28.2 | 111.29 [110.75–113.07] | 0.03834 | 6b1696f0 ×2 |
+| 4 | 40.4 | 42.1 | 41.7 | 112.62 [112.05–115.79] | 0.03880 | 6b1696f0 ×4 |
+| 8 | 56.6 | 56.7 | 65.2 | 113.92 [113.26–115.63] | 0.03925 | 6b1696f0 ×8 |
+| 16 | 88.4 | 118.4 | 114.6 | 113.14 [112.35–114.34] | 0.03898 | 6b1696f0 ×16 |
+
+コミット済み HEAD での再実行 (`72e1ae3e`): N=1 110.43 / N=16 113.57 µs/block、署名は全 N で `6b1696f0` (表と同じ傾向)。
+
+**読み取り**:
+- 実 OTT でも **定常コストは instance 数に依らず平坦** (N=1→16 で +2.5%、先の合成カーネルの「plugin 別 Memory は静的リンクと同等」と整合)。各 instance は 1 block あたり約 111〜114 µs で、44.1 kHz では約 3.9% の RTF。
+- **1 instance の追加コスト**: load 約 4.4 ms + setup 約 6.6 ms + RSS 約 6.5〜7 MiB (N=16 の値)。N=16 で合計 RSS 288 MiB。
+- 合成カーネルと違い、実 OTT は **絶対 VA (0x30000000 台) 固定** のため、動的リンク / 静的同居の比較は本 lift のままでは組めない (guest VA の相対化 pass が前提; 下記未解決)。したがって実 OTT で測れたのは「plugin 別 instance」の構成のみ。
+- 合成カーネルの PIC 税 (SIDE_MODULE) は実 OTT では測れていない (未達のまま)。
+
+**範囲外 (未測)**: Chrome Worker / AudioWorklet での実 OTT 複数 instance (本 run は node のみ)。Chrome の Memory 本数上限 (124〜125) は合成カーネルで確認済みで、実 OTT の initial 864 MiB でも同じ上限が当たる見込みだが、実 OTT では未確認。
