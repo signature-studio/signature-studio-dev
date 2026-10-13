@@ -1,0 +1,91 @@
+units 942 / kind 差分 81
+kind 遷移 (baseline -> shimx): ok->oob 31, halt0->oob 26, halt0->ok 10, oob->ok 10, halt0->closure_outside 1, abort->halt0 1, oob->halt0 1, oob->clobber 1
+oob: baseline 50 / shimx 95 (増 57・減 12)
+oob 増の baseline kind: {'halt0': 26, 'ok': 31}
+oob 減の shimx kind: {'ok': 10, 'halt0': 1, 'clobber': 1}
+差分の 100 unit 区分別: [(0, 13), (100, 10), (200, 9), (300, 10), (400, 7), (500, 6), (600, 8), (700, 3), (800, 11), (900, 4)]
+最初の差分 unit: 23 (halt0 -> closure_outside)
+unit 115: baseline abort ([shim] FAIL-FAST: unimplemented Win32 API: EnterCriticalSection (未初期化/未登録)) / shimx halt0
+
+unit 別 (unit, lva, baseline, shimx):
+23 0x67f00 halt0 closure_outside
+41 0x105bd0 halt0 ok
+55 0x1658e0 oob ok
+59 0x177290 oob ok
+60 0x177fd0 oob ok
+61 0x179610 oob ok
+62 0x17fd50 oob ok
+63 0x180970 oob ok
+64 0x182230 oob ok
+86 0x1998a0 halt0 ok
+87 0x19b100 halt0 ok
+88 0x19f9a0 halt0 oob
+96 0x1d2680 oob ok
+102 0x1de960 oob ok
+115 0x223840 abort halt0
+139 0x243270 halt0 ok
+145 0x25c540 oob halt0
+154 0x265b90 oob ok
+159 0x26d1a0 oob clobber
+161 0x26e010 halt0 oob
+163 0x26e9a0 halt0 ok
+185 0x29fcd0 halt0 ok
+186 0x2a6890 halt0 ok
+221 0x2d7640 ok oob
+234 0x2fd0a0 ok oob
+238 0x30f910 ok oob
+239 0x3121e0 ok oob
+240 0x31d1a0 ok oob
+246 0x333090 halt0 oob
+273 0x3f5350 ok oob
+277 0x40f980 ok oob
+280 0x4136d0 halt0 oob
+303 0x46d240 ok oob
+308 0x4b2080 halt0 oob
+309 0x4b43f0 ok oob
+312 0x4cb690 halt0 oob
+314 0x4d8840 ok oob
+329 0x502960 halt0 oob
+366 0x577100 halt0 oob
+369 0x5810f0 halt0 oob
+370 0x581550 ok oob
+371 0x5823d0 halt0 ok
+416 0x5b6180 ok oob
+422 0x5cefd0 ok oob
+425 0x5d95f0 ok oob
+430 0x5df8a0 ok oob
+433 0x631210 ok oob
+493 0x6d5700 halt0 oob
+494 0x6d9ba0 halt0 oob
+504 0x6ee5a0 halt0 oob
+509 0x722ae0 ok oob
+510 0x739ca0 halt0 oob
+520 0x776a70 halt0 oob
+586 0x8217b0 ok oob
+598 0x82eff0 ok oob
+605 0x844460 halt0 oob
+616 0x8620b0 halt0 oob
+648 0x897ac0 halt0 oob
+650 0x89c620 ok oob
+653 0x8aa5b0 halt0 oob
+662 0x8f06e0 halt0 oob
+667 0x90eee0 ok oob
+670 0x933480 ok oob
+720 0x9db790 ok oob
+767 0xb55b10 ok oob
+771 0xb8cba0 halt0 oob
+807 0xc2b010 ok oob
+830 0xcc3210 halt0 oob
+851 0xd02fb0 ok oob
+865 0xd562a0 ok oob
+866 0xd573e0 ok oob
+874 0xe51210 halt0 oob
+877 0xe53c20 halt0 oob
+881 0xe63540 halt0 oob
+889 0xeaea40 halt0 ok
+891 0xebf9b0 ok oob
+899 0xf06110 halt0 oob
+906 0xf2dea0 halt0 ok
+908 0xf314e0 ok oob
+918 0xf4c760 ok oob
+936 0xf74350 halt0 oob

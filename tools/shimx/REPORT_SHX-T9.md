@@ -72,6 +72,25 @@
 - 素材 `work-m11` 同梱の `m11_sx_trace_soft_fix.cjs` (sha256 `f100dd66…`, 2026-10-10 build, `.cjs.wasm` 同梱) は別 image。修正後 harness で測ると ok 800 / oob 41 / halt0 53 / closure_outside 46 / abort 1 / noproc 1 / reboots 1 / clobber 0 / range 0 (`survey_full_material_work-m11_f100dd66.txt`)。この image では range 783 も clobber も出ない。よって本節の数値は上の clean rebuild image に対するものに限る。
 - 差分の説明 (未完): baseline は unit 115 で `EnterCriticalSection` の fail-fast (abort) に当たって reboot するが、shimx 版では同 unit が halt0 になり fail-fast に当たらない。以後の unit は状態がずれ、oob と halt0/ok が unit 単位で入れ替わる (unit 単位の差分は 81 件)。oob 増 (50→95) の内訳を unit 単位で説明するところまでは未達。起票先: 子 issue #1255 (`[SHX-T9c]`)。
 
+### 3.1 #1255 の切り分け (実測)
+
+測定 commit: `604e900f` (origin/main)。shimx 版は `tools/m11/shimx_link/build.sh --trace --soft --fix` で clean rebuild (17 秒・`[sxlink] OK`、sha256 `c6461194…`)。baseline は素材 `work-m11` の `m11_boot.cjs` (sha256 `e826e6c0…`)。survey は `SHIMX_TRACE=1 node survey_trace.mjs` (foreground 5 分 13 秒)。load 0.38–0.47 (4 CPU)。
+
+- shimx 版: ok 789 / oob 95 / closure_outside 47 / halt0 9 / clobber 1 / noproc 1 / reboots 1 (`evidence_773` の集計と一致)。
+- baseline: ok 800 / oob 50 / halt0 44 / closure_outside 46 / abort 1 / noproc 1 / reboots 1。
+- 差分 81 unit の kind 遷移: ok→oob 31 / halt0→oob 26 / halt0→ok 10 / oob→ok 10 / halt0→closure_outside 1 / abort→halt0 1 / oob→halt0 1 / oob→clobber 1。差分は全 100 unit 区間にわたる (最多 0 区間 13)。
+- 最初の差分は **unit 23** (LVA 0x67f00、baseline halt0 → shimx closure_outside)。unit 115 より前。
+
+**unit 115 の差 (受入条件 1)**: 同じ前処理 (unit 1〜114 を順に実行) で、baseline は `m11_boot.cjs` 単独でも `EnterCriticalSection (未初期化/未登録)` で abort する (`tools/shim/src/sync.c`: CS を表に登録した後の mutex 写影で、表に無い CS を fail-fast)。shimx 版は同じ unit で `EnterCriticalSection` 18 回・`LeaveCriticalSection` 18 回が対で通り、halt0 (正常停止) になる (`tools/shimx/src/locks.c` は ゼロ初期化の CS を未ロック扱いし、NULL/非整列のみ fail-fast)。差は「未登録 CS を abort するか、未ロックとして扱うか」の実装差で、shimx 版の halt0 は fail-fast の欠如による到達。CS ポインタの具体値 (両者の一致) は未比較。
+
+**oob 増 (受入条件 2)**: oob 増 57 件 (ok→oob 31 / halt0→oob 26) と減 12 件 (oob→ok 10 / oob→halt0 1 / oob→clobber 1)。増分の内訳の unit 単位説明は未完 (起票先: 子 issue #1465 `[SHX-T9d]`)。`evidence_1255/unit_diff_out.txt` が unit 別の遷移一覧。
+
+再現: `python3 tools/shimx/evidence_1255/unit_diff.py <baseline.survey.json> <shimx.survey.json>` (per-unit JSON は `evidence_1255/` に保存)。
+
+### 3.2 検証の commit と差分 (WORKFLOW §6)
+
+- 測定 commit: `604e900f` (origin/main)。本 PR の変更は `tools/shimx/REPORT_SHX-T9.md` と `tools/shimx/evidence_1255/` のみで、測定対象のコード (`tools/m11/shimx_link/`・`tools/shimx/src`) には差分が無い。
+
 ## 4. 残一覧 (BACKLOG 反映用の要約)
 
 | 区分 | 件数 | 起票先 |
@@ -84,7 +103,8 @@
 | survey unit 115 の shimx fail-fast (EnterCriticalSection NULL) | 1 | R7 (`tools/shimx/REPORT_R1-R8.md`・既存) |
 | plain 逐次起動の shimx fail-fast (LoadStringW, GUI stub) | 1 | tools/gui |
 | survey unit 160 以降の range 連鎖 | 解消 (harness 修正) | #773 |
-| survey の unit 単位差分 (oob 増・unit 115 の fail-fast 差) | 未説明 | #1255 (`[SHX-T9c]`) |
+| survey の unit 単位差分: unit 115 の fail-fast 差 | 原因切り分け済み (§3.1)。CS 実装差 | #1255 (`[SHX-T9c]`) |
+| survey の unit 単位差分: unit 23 の分岐・oob 増 57 件の内訳 | 未説明 | #1465 (`[SHX-T9d]`) |
 
 ## 5. 再現性
 
