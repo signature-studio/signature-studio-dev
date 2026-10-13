@@ -740,6 +740,12 @@ u64 function_8cbde0(u64 self, u64 key) {
     return Q(Q(self + 8) + (u64)idx * 24 + 0x10);
 }
 
+/* function_8c7710  VA 0x8c7710  (GetItem の呼出し口: 辞書 = [self+0x410], key = [obj] (obj の VMT = TClass))
+ *   機械語 `mov rax,[rbp+0x30]; mov rax,[rax]; ... call 8cbde0` の 1 段 deref (key = [arg2]) が IR で脱落し arg2 がそのまま渡っていた (D4 型, #662) */
+u64 function_8c7710(u64 self, u64 obj) {
+    return function_8cbde0(Q(self + 0x410), Q(obj));
+}
+
 /* function_478420  VA 0x478420  (IEqualityComparer getter: tkInteger / tkEnumeration; OrdType (byte [info+1+nameLen+1]) で static 実体を選ぶ)
  *   OrdType 0,1 (byte) → LVA 0xfb21e0 / 2,3 (word) → 0xfb21e8 / 4,5 (long) → 0xfb21f0 / 他 → Error(reInvalidPtr) */
 static u64 ov_getter_478420(u64 info) {
