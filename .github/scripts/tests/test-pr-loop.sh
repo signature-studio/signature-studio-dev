@@ -232,6 +232,10 @@ fx repos/o/r/pulls/7 '{"state":"closed","head":{"sha":"hhh"}}'
 verify; rc=$?
 { [ $rc = 0 ] && ! logged 'pr close'; }; expect "PR が closed/merged -> 何もしない" $?
 
+vsetup NONE
+env -u OC_REPO -u OC_PR_NUMBER GH_TOKEN=x GITHUB_EVENT_PATH=/dev/null RUNNER_TEMP="$TMP" bash "$SCRIPTS/verify-review-verdict.sh" > "$TMP/v.out" 2>&1; rc=$?
+{ [ $rc = 0 ] && ! logged 'pr close' && ! logged 'pr reopen' && ! logged 'pr comment'; }; expect "Prepare PR context 失敗で OC_REPO/OC_PR_NUMBER が無い -> 何もせず 0 で終わる (二次失敗しない)" $?
+
 echo
 printf '%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" = 0 ]
