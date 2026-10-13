@@ -235,4 +235,4 @@ python3 tools/ott/avx/unsup_scan.py tools/ott/work/avx/entries.json \
 
 - 置換行の経路: `build_avx.sh` の `DLL` は `x64c.py --pe` と `data_gen.py` の入力になるため、gate [1] は置換後の `PLUGINS_DIR` 経由の DLL パスで走っている。
 - gate 単位の結果は、同 head の oc-reviewer 独立再実行と一致 (所要は別 run のため異なる)。
-- 範囲外: `ott_e2e.sh` / `entry_e2e.sh` / `crt_e2e.sh` の単体実行 (`avx_e2e.sh` の [6/6] は手動・回帰扱い)。起票先: 本 PR #394 のレビューで PM 判断に上げる (未起票)。
+- 範囲外: `ott_e2e.sh` / `entry_e2e.sh` / `crt_e2e.sh` の単体実行 (`avx_e2e.sh` の [6/6] は手動・回帰扱い)。起票先: #294 (コメント)。
