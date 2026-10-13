@@ -4,6 +4,8 @@
 #   → python3 liftdiff.py build targets/ott_old.json → batch targets/ott_old.json --set closure --shards 4 --nobuild
 #   → python3 tests/check_ott.py。build と batch は毎回実行。runner は 4 vCPU (nproc=4)。
 # 各行の D 内訳は表示できた値のみ。空欄は未表示。
+# 注: 本ファイルは手作業の抜粋で、生の OTT_SUMMARY ログは未 commit (59eea5c・origin/main 行は報告値)。
+#     986e7415 行の一次ログは results/liftdiff_e2e_head986e7415_n{1,2,3}.log。
 
 [59eea5c 旧 worktree] rep1 match 38 / mismatch 108 / unexec 66 | D1 4, D2 6, D3 14, D4_D5 18, D6 26 | batch 16.1 s
 [59eea5c 旧 worktree] rep2 match 38 / mismatch 108 / unexec 66 | D1 4, D2 6, D3 14, D4_D5 18 (D6 未表示) | build+batch 22.7 s
