@@ -28,7 +28,7 @@ PY-6 §11 の 26.74〜28.21 ms (別 run・同一コード系列) より本 run �
 - **メモリ**: 各系列 150 個の間は線形メモリ 33,554,432B のまま増えない。ただし 201〜250 個目の間で増加 (isolated `json, re` のみ、50 個ごとの線形メモリ B: 33,554,432 ×5 → 40,304,640 → 48,365,568)。**`_flhost` を import しない系列・修正前 flpy.c の同系列でも同じ値列で再現** (`work/memprobe*.mjs` の一時計測。コミット対象外。1 run) = 本変更起因ではない既存挙動。修正前の isolated+`_flhost` は 151〜200 個目の間で増加 (修正後 201〜250 個目より早い。1 run のみで差の有意性は未確認)。PY-6 §11 の「150 回後も増加なし」は 150 回までの範囲でのみ正しい。修正前の legacy+`_flhost` は 51〜100 個目の間から増加し 300 個で 144,703,488B (static 状態の上書きと整合するが因果は未切り分け)。修正後の legacy+`_flhost` は上記 `json, re` のみと同じ値列。
 - **PY-6 までの check の更新**: `subinterp_probe.mjs` の「`_flhost` は isolated で拒否」「legacy の既知の危険」の 2 check は、修正を固定する check に置換 (前者の期待が実装の変更で反転したため。通過条件を緩めたのではなく、反対側を厳格化)。
 
-### 検証 (Actions runner 4 core, node 26, emsdk /opt/emsdk, CPython 3.12.1。load average 0.98〜1.04、直列 1 本)
+### 検証 (Actions runner 4 core, node 26, emsdk `[EMSDK]`, CPython 3.12.1。load average 0.98〜1.04、直列 1 本)
 
 実測: `subinterp_probe.mjs` wall 26.711 秒 (1 回目の誤 FAIL を直した後の 1 run)、`tests/subinterp_negcontrol_old.sh` wall 28.279 秒 (リンク 6 秒+probe)。CPython クリーンビルド (tgz 取得+native+wasm+記録) は `build_cpython_wasm.sh` が 06:29〜06:33 (uptime 時刻の区間。秒単位の計測はしていない)。`flpy.wasm` 5,924,633B (修正前 `8f55002` 5,923,834B、差 +799B)。
 
@@ -45,4 +45,4 @@ PY-6 §11 の 26.74〜28.21 ms (別 run・同一コード系列) より本 run �
 |---|---|---|
 | 201〜250 個目付近からの線形メモリ増加の原因 (リーク / 断片化 / 成長のみ) が未切り分け | サブインタプリタを大量に作る運用では上限が要る (現行は不採用なので影響なし) | 採用検討時に新規 `[PY-n]` (PM 起票)。#587 にコメント |
 | 実 FL がサブインタプリタを使うかは未確認 | 採用判断は性能のみに基づく | #76 (実機バイナリ解析の再実行時) |
-| (解消) `build_flpy.sh` の `flapi_table.py` 再生成が win PE 無しで表を劣化させる | #588 (PY-13) で入力欠落は exit 2。`FLPY_SKIP_TABLE=1` は「再生成せず追跡済みの表をそのまま使う」明示オプションとして残した (negcontrol が win PE 無しの runner で link だけ行うため) | `REPORT_PY13.md` |
+| (解消) `build_flpy.sh` の `flapi_table.py` 再生成が win PE 無しで表を劣化させる | #588 (PY-13) で入力欠落は exit 2。`FLPY_SKIP_TABLE=1` は「再生成せず追跡済みの表をそのまま使う」明示オプションとして残した (negcontrol が win PE 無しの runner で link だけ行うため) | §PY-13 (`REPORT_APPENDIX.md`) |
