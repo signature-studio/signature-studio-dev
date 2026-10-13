@@ -171,13 +171,13 @@ LD-17 (#864) の型分類は `results/m11_unreachable_diverge.md` §2 (同じス
 - 結論: 型 C・D の食い違いは原因候補 (P1・P2・P3) に分類した。P2 は L が F の直接 call 先であることを条件に含む。内訳は results 参照。
 - P2 の代表例 0x418be0 (呼出元 0x41c820) は P2 候補に分類した。IR 側 (`call 0x407030` の欠落) は再確認していない。call site と IR block の対応づけは未実施。
 - P2 の全 20 件で F→L の直接 call 辺 (`L ∈ direct_calls(F)`) が成立することを PE 実測で確認した。
-- **測定 commit = `516a2b07`** (本節の数値はこの commit での実測)。`results/m11_unreachable_cd.md` はその commit の出力と一致 (入力 work-m11 / work-liftdiff で再生成し exit 0・16.56 s・diff 0 行)。この測定は前回 run の記録で、本 fix run では素材が無く再実行していない。コードを変えた最後の commit は `8119565c` (P2 の F→L 辺の要求)。
+- **測定 commit = `200cc2b4`** (PR #1434 の検証 run: `trace_diverge_cd.py` 15.6 s・`results/m11_unreachable_cd.md` と diff 0 行)。同じ 3 ファイルは `516a2b07` (前回 run の記録: 16.56 s・diff 0 行) でも同一内容。`results/m11_unreachable_cd.md` の再実行は、この fix run では素材が無く行っていない。3 ファイルを最後に変えた commit は `8119565c`。
 - **鮮度 (#1268・`docs/WORKFLOW.md` §6)**: 測定 commit からの、測定に使う 3 ファイルの差分。
   ```
-  $ git diff 516a2b07 HEAD -- tools/liftdiff/ldlib/pe.py tools/liftdiff/tests/trace_diverge_cd.py tools/liftdiff/results/m11_unreachable_cd.md
+  $ git diff 200cc2b4 HEAD -- tools/liftdiff/ldlib/pe.py tools/liftdiff/tests/trace_diverge_cd.py tools/liftdiff/results/m11_unreachable_cd.md
   (出力 0 行)
   ```
-  同じ 3 ファイルは `8119565c` から `516a2b07` の間も差分 0 行。以後の commit は REPORT・PR 本文のみ。
+  以後の commit は REPORT_APPENDIX の文書のみ。
 - P2 の全 20 件で `L ∈ direct_calls(F)` が成立 (同一 PE・同一入力で 20/20 を確認)。
 - 候補判定は call 先の集合差分のみ。P1・P2 は候補であり確定ではない。
 - **0x417b70 (LD-28 受入条件 1・静的確認のみ、動的未確認)**: 食い違い 32 件の次 entry は native 側 0x409470 (18)・0x409410 (11)・0x418190 (3)、wasm 側 0x409730 (17)・0x409410 (15)。
