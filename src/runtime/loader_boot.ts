@@ -9,6 +9,7 @@
 
 import { createImportForwarder } from "./imports";
 import type { ResourceInfo } from "./worker_protocol";
+import { chunkedResponse } from "../../deploy/client/chunked.mjs";
 
 export type FetchCompileOptions = {
   cacheMode: "http" | "cacheapi" | "none";
@@ -66,10 +67,31 @@ function resourceInfo(url: string, fromCacheApi: boolean): ResourceInfo {
   };
 }
 
+/**
+ * 大物 (>24MiB, Static Assets 上限超え) は `<asset>.parts/index.json` (descriptor) で配信される。
+ * part は事前非圧縮 (Chrome の DecompressionStream は brotli/zstd 不可) で、連結と sha256 検証は
+ * deploy/client/chunked.mjs が行う。part は immutable なので HTTP キャッシュ任せ (cacheapi は単一 URL 前提のため使わない)。
+ */
+export function isChunkedDescriptor(url: string): boolean {
+  return url.endsWith(".parts/index.json");
+}
+
+async function openChunked(url: string, onProgress?: (loaded: number, total: number) => void): Promise<{ res: Response; fromCacheApi: boolean }> {
+  const res = await chunkedResponse(url, { onProgress: onProgress ? (p) => onProgress(p.loaded, p.total) : undefined });
+  return { res, fromCacheApi: false };
+}
+
 export async function fetchCompile(
   url: string,
   opts: FetchCompileOptions,
 ): Promise<{ module: WebAssembly.Module; resource: ResourceInfo }> {
+  if (isChunkedDescriptor(url)) {
+    const { res } = await openChunked(url, opts.onProgress);
+    const module = opts.compile === "streaming"
+      ? await WebAssembly.compileStreaming(res)
+      : await WebAssembly.compile(await res.arrayBuffer());
+    return { module, resource: resourceInfo(url, false) };
+  }
   const { res, fromCacheApi } = await openResponse(url, opts.cacheMode);
   let module: WebAssembly.Module;
   if (opts.compile === "streaming") {

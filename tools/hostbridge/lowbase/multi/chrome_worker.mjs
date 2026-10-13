@@ -37,6 +37,11 @@ self.onmessage = async (ev) => {
     R.interleave_ms = performance.now() - t0;
     const all = new Uint8Array(chunks0.length * 2 * H * 4); chunks0.forEach((c, i) => all.set(c, i * 2 * H * 4));
     R.ott0_sha256 = await sha256(all); R.bal_first_block_sha256 = await sha256(balChunks[0]);
+    // 128 frame 1 処理の実時間 (OTT 単独 = effs[0]・ウォームアップ 50 回後に 1000 回計測)
+    { const au = auds[0], f = new Float32Array(x.memory.buffer, au.inB, 2 * H); for (let i = 0; i < 2 * H; i++) f[i] = 0.1;
+      for (let i = 0; i < 50; i++) x.host_process(effs[0], au.inA, au.outA, H);
+      const ts2 = []; for (let i = 0; i < 1000; i++) { const s = performance.now(); x.host_process(effs[0], au.inA, au.outA, H); ts2.push(performance.now() - s); }
+      ts2.sort((a, b) => a - b); R.frame128 = { n: ts2.length, median_ms: ts2[500], p99_ms: ts2[990], min_ms: ts2[0], budget_ms: H / 44100 * 1000 }; }
     // 追加 instance 生成: Memory 個数/時間 (lowbase 24MiB initial / 64MiB max)
     const keep = []; const ts = performance.now();
     try { for (let i = 0; i < nspawn; i++) keep.push(await ottF()); } catch (e) { R.spawn_error = String(e.message || e).slice(0, 120); }

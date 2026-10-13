@@ -1,0 +1,177 @@
+{
+ "chrome": "Chrome/154.0.8037.97",
+ "node": "v22.23.3",
+ "cpus": 4,
+ "wasmBytes": 34229227,
+ "parts": 3,
+ "partSize": 16777216,
+ "reps": 3,
+ "rows": [
+  {
+   "mbps": 0,
+   "mode": "streaming",
+   "rep": 0,
+   "loadavg1": 0.54,
+   "fetchCompileMs": 239.7,
+   "instantiateMs": 35.5,
+   "totalMs": 275.1,
+   "f0": 42,
+   "exports": 1
+  },
+  {
+   "mbps": 0,
+   "mode": "streaming",
+   "rep": 1,
+   "loadavg1": 0.82,
+   "fetchCompileMs": 129.7,
+   "instantiateMs": 0.6,
+   "totalMs": 130.3,
+   "f0": 42,
+   "exports": 1
+  },
+  {
+   "mbps": 0,
+   "mode": "streaming",
+   "rep": 2,
+   "loadavg1": 0.82,
+   "fetchCompileMs": 128,
+   "instantiateMs": 0.6,
+   "totalMs": 128.6,
+   "f0": 42,
+   "exports": 1
+  },
+  {
+   "mbps": 0,
+   "mode": "bytes",
+   "rep": 0,
+   "loadavg1": 0.82,
+   "fetchCompileMs": 120,
+   "instantiateMs": 0.4,
+   "totalMs": 120.4,
+   "f0": 42,
+   "exports": 1
+  },
+  {
+   "mbps": 0,
+   "mode": "bytes",
+   "rep": 1,
+   "loadavg1": 0.82,
+   "fetchCompileMs": 123.7,
+   "instantiateMs": 0.4,
+   "totalMs": 124,
+   "f0": 42,
+   "exports": 1
+  },
+  {
+   "mbps": 0,
+   "mode": "bytes",
+   "rep": 2,
+   "loadavg1": 0.82,
+   "fetchCompileMs": 139.6,
+   "instantiateMs": 0.4,
+   "totalMs": 140,
+   "f0": 42,
+   "exports": 1
+  },
+  {
+   "mbps": 100,
+   "mode": "streaming",
+   "rep": 0,
+   "loadavg1": 0.82,
+   "fetchCompileMs": 1457.1,
+   "instantiateMs": 0.6,
+   "totalMs": 1457.7,
+   "f0": 42,
+   "exports": 1
+  },
+  {
+   "mbps": 100,
+   "mode": "streaming",
+   "rep": 1,
+   "loadavg1": 0.82,
+   "fetchCompileMs": 1454,
+   "instantiateMs": 0.6,
+   "totalMs": 1454.6,
+   "f0": 42,
+   "exports": 1
+  },
+  {
+   "mbps": 100,
+   "mode": "streaming",
+   "rep": 2,
+   "loadavg1": 0.82,
+   "fetchCompileMs": 1463.5,
+   "instantiateMs": 0.6,
+   "totalMs": 1464.1,
+   "f0": 42,
+   "exports": 1
+  },
+  {
+   "mbps": 100,
+   "mode": "bytes",
+   "rep": 0,
+   "loadavg1": 0.75,
+   "fetchCompileMs": 1473.5,
+   "instantiateMs": 0.4,
+   "totalMs": 1473.9,
+   "f0": 42,
+   "exports": 1
+  },
+  {
+   "mbps": 100,
+   "mode": "bytes",
+   "rep": 1,
+   "loadavg1": 0.75,
+   "fetchCompileMs": 1454,
+   "instantiateMs": 0.4,
+   "totalMs": 1454.4,
+   "f0": 42,
+   "exports": 1
+  },
+  {
+   "mbps": 100,
+   "mode": "bytes",
+   "rep": 2,
+   "loadavg1": 0.75,
+   "fetchCompileMs": 1458.5,
+   "instantiateMs": 0.4,
+   "totalMs": 1458.9,
+   "f0": 42,
+   "exports": 1
+  }
+ ],
+ "summary": [
+  {
+   "mbps": 0,
+   "mode": "streaming",
+   "medianTotalMs": 130.3,
+   "minTotalMs": 128.6,
+   "maxTotalMs": 275.1,
+   "medianFetchCompileMs": 129.7
+  },
+  {
+   "mbps": 0,
+   "mode": "bytes",
+   "medianTotalMs": 124,
+   "minTotalMs": 120.4,
+   "maxTotalMs": 140,
+   "medianFetchCompileMs": 123.7
+  },
+  {
+   "mbps": 100,
+   "mode": "streaming",
+   "medianTotalMs": 1457.7,
+   "minTotalMs": 1454.6,
+   "maxTotalMs": 1464.1,
+   "medianFetchCompileMs": 1457.1
+  },
+  {
+   "mbps": 100,
+   "mode": "bytes",
+   "medianTotalMs": 1458.9,
+   "minTotalMs": 1454.4,
+   "maxTotalMs": 1473.9,
+   "medianFetchCompileMs": 1458.5
+  }
+ ]
+}
