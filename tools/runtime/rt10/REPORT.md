@@ -176,6 +176,8 @@ transferSize=0 でも **compile 時間は短縮されない** (Chrome の wasm c
   - boot 結果の突合: node 参照 (`node tools/flelift/boot/fle_boot.mjs <abs>/fleboot_plain.cjs out.json --boot-only`, 別実装の node 用 glue) = units_run 209 / units_total 942 / 停止 `unlifted` / GetMem 1,890 / FreeMem 776 / exit 0 (wall 9.76 s; brotli 圧縮と並走中の 1 回)。Chrome Worker の全 cold 15 回・soak 全 cycle と一致。
 - **ネガティブコントロール**: wasm を 100,000,000 B に切り詰めて (原本 126,995,440 B) 同じハーネスへ流すと `ok:false` / `CompileError: WebAssembly.compileStreaming(): section (code 10, …` (`results/rt10_cold_neg.jsonl`)。通常 wasm は cold 15/15 が `ok:true`。
   ただしこれは「壊れた入力を検出できる」確認で、boot 動作の不一致を人工的に作った試験ではない (boot 等価性の否定試験は未実施 → 弱い点として残る)。
+- **コミット済み HEAD での再現**: 計測は harness commit `3e0cd6d` の内容で実行 (以後の差分は `--tag` 出力名オプションと REPORT のみ)。HEAD `d96fc45` で `measure.mjs cold --reps 3 --flags default --tag _headcheck` を再実行 (`results/rt10_cold_headcheck.jsonl`, load 0.36):
+  合計 1,039–1,126 ms (fetch+compile 515–569 / instantiate 10.7–12.6 / boot 496–540)、units_run 209 / GetMem 1,890 / FreeMem 776 で一致。§3 の 1,022–1,096 ms と同水準だが上端が 30 ms 高く、run 間変動はこの程度ある (2 セット併せた合計の範囲 1,022–1,126 ms, n=6)。
 - 検出力の確認 (本計測内): eager と既定で boot 呼出が 138–153 ms と 484–545 ms に分かれる (ハーネスが 3.5 倍差を弁別)。
 - 範囲外: 上記のとおり実 FL のフレーム・soak・実ネットワーク。
 
