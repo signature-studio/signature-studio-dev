@@ -38,7 +38,7 @@ bash "$HERE/scripts/verify_sig_ir.sh" "$WORK"
 
 info "6/8 shimx 回帰: winstubs 層 (--wrap, 未 init) を挟んでも shimx 単体テストが ST/MT で ALL PASS"
 for m in ST MT; do
-    $B link $m "$WORK/shimxtest_$m.cjs" wrap -I"$HERE/../../shimx/pathreg/include" "$HERE/../../shimx/pathreg/src/pathmap.c" $(ls "$HERE"/../../shimx/test/*.c)
+    $B link $m "$WORK/shimxtest_$m.cjs" wrap -I"$HERE/../../shimx/src" -I"$HERE/../../shimx/pathreg/include" "$HERE/../../shimx/pathreg/src/pathmap.c" $(ls "$HERE"/../../shimx/test/*.c)
     node "$WORK/shimxtest_$m.cjs" > "$WORK/shimxtest_$m.out" 2> "$WORK/shimxtest_$m.err" || { tail -5 "$WORK/shimxtest_$m.err"; echo "[winstubs] FAIL: shimx 回帰 $m"; exit 1; }
     grep -q "ALL PASS" "$WORK/shimxtest_$m.out" || { echo "[winstubs] FAIL: shimx 回帰 $m: ALL PASS が無い"; exit 1; }
     info "    $m: $(grep 'ALL PASS' "$WORK/shimxtest_$m.out")"
