@@ -48,3 +48,10 @@ PLUG_F80_LOWER=1 bash tools/plugins/reverb_delay/engine_lift.sh 19000 800
 - **推定原因 (推定)**: `%11` のポインタ型が f80 と推定されたのは lift 側 (RetDec の型推定) の誤りの可能性が高い。 整数スロットを f80 として読んでいるなら、`bitcast` 以前に型が違う。 `p0c/f80_lower.py` の通常モード (`token_lower`) は `x86_fp80`→`double` の型名置換と f80 定数・intrinsic 名の変換を行うが、`bitcast` 命令を書き換える規則を持たない。 そのため `bitcast x86_fp80 to i80` が `bitcast double to i80` になり、i80 を含む規則が無いまま残る。 これは `f80_lower.py` のコードを読んだうえの推定で、実行による確認はしていない。
 - **対処方針 (未実施)**: (a) lift 側の型修復で `%11` の load を `i64` に差し替える (先に試す)。 (b) `f80_lower.py` に i80 ビット列の規則を足す (共有鎖のため T0/T1 退行確認が必要)。
 - **残りの類型 (転記・未再現)**: 同 IR で `do not know how to soften fp_extend` と `no libcall available for fp_round with type f80` が出る (`f80_lower` 無し時と記録)。 E7 を消しても f80 の libcall が残るため、19165 が `emcc -c` rc 0 になるには E7 の修正に加えて f80 の扱いを決める必要がある。
+
+## 15. #523 E7 の engine-local 修復の試行 (2026-10-13 · 実測 · 負の結果)
+
+- **HEAD**: `80c32a06` (origin/main 起点の作業ブランチ。 測定コードは共有鎖を含めて未変更)。
+- **再現 (lift + emcc, `ENGINE_RANGE_ARGS="--exclude IPPCODE --exclude-ranges <78 件>" ENGINE_TAG=_noipp_nobad engine_lift.sh 19165 900`)**: summary `19165,2000,0,2608,6,241,139,0,139,612,2,445,0,608,2606`。 lift rc 0 / define 2,608 / f80 6 / `emcc -c` rc **139** (segfault) / wall 10 分 28 秒 / load 1.15 (5 分平均 0.99)。 §13 の 2 回目 (6 分 42 秒) と一致し、E7 の `invalid cast` は既定の経路では出ない (segfault が先に出る)。
+- **試行 (engine-local)**: `e.final.ll` の x87 `load x86_fp80` (26 箇所) を `load i80` + `bitcast i80 to x86_fp80` に置換して `emcc -c` を再実行した。 結果は **rc 139 (segfault)** のまま。 IR 構文は有効になり、`do not know how to soften fp_extend` / `no libcall available for sint_to_fp with type f80` が出た。 置換は 7 秒で終わる再実行で、lift の再実行は不要。
+- **判断**: segfault は `load` の型だけでは消えない。 §14 の推定 (E7 = 型誤り) は、少なくとも単独では成立しなかった。 残る経路は (a) f80 の libcall 不足 (`fp_extend` / `sint_to_fp` / `fp_round`) の共有鎖での扱い、(b) `function_1800ceec0` の DAG combine の segfault。 いずれも共有鎖 (`p0c/f80_lower.py` / lift) の変更になり、T0/T1 の退行確認 (#523 受入条件 2) が必要。 engine-local の試行は本節で打ち切り、修正コードは commit しない。
