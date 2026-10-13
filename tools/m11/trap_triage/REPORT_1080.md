@@ -73,3 +73,13 @@ REPORT_882 の値 (869 / 8) との差 (1 件 `halt0` 差) は、同じ手順の�
 | unit 895 の `Runtime error 210` の発生源 (`412770` の手前の `4128b0` 側か、別経路か) | 895 の halt0 原因が未特定 | #684 (親)。本 issue の範囲外として残す |
 | DEFECTS 行案の採否 (D4 再発例への追記) | 文書のみ | PM 判断 (DEFECTS.md 直接編集は PM) |
 | HEAD 値の再現差 (REPORT_882 の `869 / 8` と本 run の `870 / 7`) | 比較基準の揺れ | #684 へのコメントで報告 |
+
+## 7. 測定 commit と HEAD までの差分
+
+- 測定 commit: `c4e93550` (実測はこの commit の build・IR 生成で行った)。
+- `git diff c4e93550 HEAD -- tools/m11/` の差分は本 commit で追加した 3 ファイルのみ (コード・IR 生成経路は不変)。
+  ```
+  tools/m11/trap_triage/REPORT_1080.md         | 75 +
+  tools/m11/trap_triage/negctl_1080.sh          | 44 +
+  tools/m11/trap_triage/patch_412770_1080.py    | 32 +
+  ```
