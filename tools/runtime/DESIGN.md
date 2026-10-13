@@ -165,7 +165,7 @@ e2e (`pnpm runtime:e2e`): stage → Vite dev (COOP/COEP) → headless Chrome →
 
 ## 5. 未解決・要確認
 1. **Safari は未測定**。Firefox 157 は headless で実測済み (REPORT.md)。Firefox の AudioWorklet / Worker WebGL2 は headless で判定不能。
-2. 実 FL サイズ (22MiB PE × lift 膨張) の wasm は RT-10 (#128) で実測済み (x64c boot 連鎖 126,995,440 B。数値は [`rt10/REPORT.md`](rt10/REPORT.md))。合成からの外挿との差もそちら。
+2. 実 FL サイズ (22MiB PE × lift 膨張) の wasm は RT-10 (#128) で実測済み (x64c boot 連鎖。数値は [`rt10/REPORT.md`](rt10/REPORT.md))。合成からの外挿との差もそちら。
 3. 本番 FL ビルドを pthread 化した boot e2e: shim MT 自己テストでは実証済み (RT-2 #120, 実測は REPORT.md)。実 FLEngine lift での確認は未実施。
 4. ヘッドレス WebGL2 は SwiftShader。実 GPU での OffscreenCanvas 性能は未測定。
 5. Memory 個数上限 (~125) と「プラグイン=1 Memory」方針の整合 (§1.4)。

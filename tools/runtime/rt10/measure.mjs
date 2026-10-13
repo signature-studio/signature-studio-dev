@@ -143,7 +143,7 @@ if (exp === 'sizes') {
     if (id === 3) funcs = leb(p)[0]; if (id === 2) imports = leb(p)[0]; if (id === 7) exportsN = leb(p)[0];
     o = p + size;
   }
-  const res = { exp, file: f, bytes: buf.length, sections: secs, funcCount: funcs, importCount: imports, exportCount: exportsN, sections_legend: '1=type 2=import 3=function 5=memory 7=export 10=code 11=data' };
+  const res = { exp, file: path.relative(path.resolve(here, '../../..'), f), bytes: buf.length, sections: secs, funcCount: funcs, importCount: imports, exportCount: exportsN, sections_legend: '1=type 2=import 3=function 5=memory 7=export 10=code 11=data' };
   const t = (fn) => { const s = process.hrtime.bigint(); const v = fn(); return [v, Number(process.hrtime.bigint() - s) / 1e9]; };
   if (opt('compress', '1') === '1') {
     const [br, brS] = t(() => zlib.brotliCompressSync(buf, { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 11, [zlib.constants.BROTLI_PARAM_LGWIN]: 24, [zlib.constants.BROTLI_PARAM_SIZE_HINT]: buf.length } }));

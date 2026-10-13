@@ -61,7 +61,7 @@
 - **headless では判定不能**: `AudioContext` 経路 (`resume()` と AudioWorklet) が Firefox headless で 20 s 内に完了せず (step timeout)、Worker 内 WebGL2 は null。runner に音声デバイス・GPU が無い影響の可能性が高く、**Firefox の AudioWorklet / WebGL2 可否は未確定** (実機が必要)。
 - **変更**: `features.js` に各 step 20 s の hang ガードと `window.__partial/__step` を追加 (旧版は 1 step の hang で `__result` が出ず全体が止まる)。Chrome 結果への影響なし (`run_features.mjs` で Chromium 完走を確認)。
 
-**RT-10 実 FLEngine lift の起動時間・tier-up・soak (#128)** — 実 x64c lift (boot 連鎖) の wasm 126,995,440 B を Chrome 154 Worker で計測。cold 合計 (fetch+compile+instantiate+boot unit 209 まで) 1,022–1,096 ms、br 7.84×、ダウンロード支配は 123.6 Mbps 以下。**初回フレームと実 FL の soak は未測** (boot が unit 209/942 で停止)。詳細・再現: [`rt10/REPORT.md`](rt10/REPORT.md)。
+**RT-10 実 FLEngine lift の起動時間・tier-up・soak (#128)** — 実 x64c lift (boot 連鎖) の wasm を Chrome Worker で計測 (サイズ・圧縮・起動・帯域・tier-up・boot ループ soak)。**初回フレームと実 FL の soak は未測** (boot が unit 209/942 で停止)。数値・再現: [`rt10/REPORT.md`](rt10/REPORT.md)。
 
 **その他の確定事実**: AudioWorklet 内で `Atomics.wait` は TypeError (消費専用)、Worker 内 OffscreenCanvas(WebGL2/2D/rAF)・OPFS sync handle・nested Worker すべて可、`Memory.toResizableBuffer` あり、JSPI あり、shared wasm32 4GiB / memory64 8GiB grow 可。
 
@@ -74,7 +74,7 @@
 ## 未解決・ブロッカー
 0. **RT-3 (#121)**: (a) 実 FLEngine / `tools/gui/e2e.sh` (emsdk+RetDec 要) 経由の実 shim での入力往復は未実施 (本 run は素材・emsdk 無し)。(b) **入力経路が 2 本** (GuiShared 入力リング `gui.ts` と PumpRing): どちらを正とするかは GUI-3 #174 / GUI-11 #32 で決定 (DESIGN §2.6)。(c) index.html の `#screen` は `setupCanvas` が 2d context 取得済みで `transferControlToOffscreen` 不可 → FL 結合時に寄せる。(d) Firefox/Safari の OffscreenCanvas commit 挙動は未測定 (RT-9)。
 1. **Safari 未測定** (Firefox 157 headless は #127 で測定済み)。Safari 実機で `window.__result` の共有が必要 (起票先: #127)。Firefox の AudioWorklet / Worker WebGL2 も headless では判定不能 (実機が必要)。
-2. **実 FL サイズ wasm**: x64c boot 連鎖の 126,995,440 B で実測済み (RT-10 #128, `rt10/REPORT.md`)。残: boot が初回フレームに届いた後の総時間と実 FL の soak (起票先: #541 [RT-12])。
+2. **実 FL サイズ wasm**: x64c boot 連鎖で実測済み (RT-10 #128, 数値は `rt10/REPORT.md`)。残: boot が初回フレームに届いた後の総時間と実 FL の soak (起票先: #541 [RT-12])。
 3. 本番 pthread ビルドの boot e2e は **shim MT 自己テスト main で実証済み (#120)**。残: 実 FLEngine lift を同フラグでビルドした boot (起票先: #227 ICALL-1 / RT-10)。
 3b. この run は `work-m11` 無しで M1/M6/M10/M11 の既存 e2e が skip された。`oc_artifacts: fl-win64 work-m11` で再実行し、本変更後も 4 本が ALL OK のままか確認 (起票先: #120 に再検証コメント / PM 判断)。
 3c. 本番 R2 配信では glue (.mjs) にも COOP/COEP/CORP を付ける必要 (起票先: RT-7)。

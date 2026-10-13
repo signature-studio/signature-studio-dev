@@ -4,7 +4,7 @@
 #   (2) Chrome Worker 用 web/ESM 版 (同一 .o を ENVIRONMENT=web,worker で再 link)
 # の 2 通りに build する。lift/gen/shimx obj は tools/flelift/boot/boot_e2e.sh の phase 1–3 と同一手順。
 #   bash tools/runtime/rt10/build_fle_boot.sh      → tools/flelift/work/boot/{fleboot_plain.cjs(.wasm), web/fleweb.mjs(.wasm)}
-# 所要は各工程を stderr に [t=秒] で出す。素材: FL_WIN64_DIR (fl-win64) と /opt/emsdk (toolchain-emsdk)。
+# 所要は各工程を stderr に [t=秒] で出す。素材: FL_WIN64_DIR (fl-win64) と [EMSDK] (toolchain-emsdk, EMSDK_ENV で上書き可。docs/REFERENCES.md)。
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 REPO="$(cd "$HERE/../../.." && pwd)"
@@ -16,7 +16,7 @@ W="$FLE/work/boot"
 PE="${FLE_PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}"
 mkdir -p "$W/obj" "$W/tmp" "$W/web"
 export TMPDIR="$W/tmp"
-set +u; source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1; set -u
+set +u; source "${EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}" > /dev/null 2>&1; set -u
 T0=$(date +%s.%N); tick() { echo "[t=$(echo "$(date +%s.%N) - $T0" | bc)] $*" >&2; }
 LIFT="$W/lift"
 

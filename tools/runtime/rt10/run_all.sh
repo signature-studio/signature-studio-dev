@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # run_all.sh — RT-10 (#128) 1 コマンド再現: 実 FLEngine lift の build → サイズ/圧縮 → Chrome 計測一式。
 #   bash tools/runtime/rt10/run_all.sh [--skip-build] [--soak-sec 180]
-# 素材: FL_WIN64_DIR (fl-win64 展開先), /opt/emsdk。build は RAM 16GB + swap 追加が必要 (REPORT 参照)。
+# 素材: FL_WIN64_DIR (fl-win64 展開先), [EMSDK] (EMSDK_ENV で上書き可。docs/REFERENCES.md)。build は RAM 16GB + swap 追加が必要 (REPORT 参照)。
 # 結果: tools/runtime/rt10/results/rt10_*.jsonl (追記。再実行前に消すこと)
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"

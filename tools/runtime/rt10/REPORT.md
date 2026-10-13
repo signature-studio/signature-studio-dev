@@ -12,7 +12,7 @@
    (従来の M11 実測 3.31× は RetDec 経路 6.0 MB の値。x64c -O0 は冗長なため圧縮が効く)。gzip -9 は 34,595,917 B (3.67×)、zstd -19 は 17,186,585 B (7.39×)。
 2. **Chrome Worker での download→compile→instantiate→boot (unit 209 まで) は cold で合計 1,022–1,096 ms** (localhost・br 配信・既定 flags・n=3):
    fetch+compileStreaming 489–541 ms / instantiate 11.9–13.6 ms / boot 呼出 484–545 ms。boot は node 参照と**同一結果** (units_run 209/942, GetMem 1,890 / FreeMem 776, 停止 `unlifted:0x6a7b70`)。
-3. **ダウンロードが支配的になるのは 123.6 Mbps 以下** (算術: br 後 16,196,755 B×8 を 1 Gbps 時の総時間中央値 1.048 s で割った値)。サーバ側で br 圧縮後 16.2 MB を帯域制限した実測の総時間:
+3. **ダウンロードが支配的になるのは 123.5 Mbps 以下** (算術: br 後 16,196,755 B×8 を §5 の 1 Gbps 総時間中央値 1.049 s で割った値)。サーバ側で br 圧縮後 16.2 MB を帯域制限した実測の総時間:
    10 Mbps 13.8–13.9 s / 50 Mbps 3.38–3.39 s / 100 Mbps 1.84–1.86 s / 1 Gbps 1.03–1.09 s (§5)。1 Gbps では compile+boot が総時間の大半。
 4. **compile は線形外挿どおり**: bytes→`WebAssembly.compile` 212–220 ms (= 1.75–1.82 ms/MiB wasm, 2.09–2.17 ms/MiB code)。M11 合成の 1.5 ms/MiB を 121.1 MiB に外挿した値 (推定) 181.7 ms に対し +17–21%。
    一方 **eager (`--no-wasm-lazy-compilation`) は 4,118–4,140 ms** で、PERF-P6 の事前見積り (1.2 s, 推定) の 3.4 倍。code が見積り 38.7 MB の 2.75 倍 (106.5 MB) だったため (§7)。
@@ -102,7 +102,9 @@ transferSize=0 でも **compile 時間は短縮されない** (Chrome の wasm c
 | 100 Mbps | 1.30 s | 1,348–1,353 | 1,363–1,368 | 1,837–1,857 |
 | 1 Gbps | 0.13 s | 452–475 | 469–493 | 1,026–1,090 |
 
-- 10〜100 Mbps では fetch+compile − resource.duration = +15〜25 ms: compile は streaming でダウンロードに**完全に隠れ**る。fetch+compile 完了後に残る時間 (total − fetch+compile = instantiate + boot 呼出) は 10 Mbps 477–491 / 50 Mbps 680–697 / 100 Mbps 483–488 / 1 Gbps 556–605 ms。**ダウンロード支配**を確認。
+- 10〜100 Mbps では fetch+compile − resource.duration = +15〜25 ms: compile は streaming でダウンロードに**完全に隠れ**る。fetch+compile 完了後に残る時間 (total − fetch+compile = instantiate + boot 呼出) は 10 Mbps 477–491 / 50 Mbps 680–697 / 100 Mbps 475–488 / 1 Gbps 556–605 ms。**ダウンロード支配**を確認。
+- load (各回開始時の 1 分 load average, 4 vCPU): 10 Mbps 3.67–4.23 / 50 Mbps 3.13–3.32 / 100 Mbps 2.88–3.61 / 1 Gbps 3.61–4.28。計測中は帯域ペーシング用のサーバ (node) と Chrome が同居しており、1 Gbps 行の compile+boot は他の負荷の影響を受けうる。
+- 50 Mbps だけ boot 呼出が 652–675 ms (10/100 Mbps は 453–468 ms, 1 Gbps は 525–562 ms) と長い。n=3 で 3 回とも高く、load は他帯域より低い (3.13–3.32) ので load では説明できない。**原因未調査** (§9-10)。
 - 1 Gbps (算術の転送 0.13 s) でも実測 fetch+compile は 469–493 ms: 下限は br 復号 + 検証 + compile (§3 の無制限 489–541 ms と同程度)。
 - 無圧縮 (126,995,440 B) を同じ帯域で送った場合は算術で 10 Mbps 101.6 s / 100 Mbps 10.2 s (**実測していない**)。br 事前圧縮が前提 (#170 PERF-P10)。
 - 限界: localhost の単純ペーシングで RTT・TLS・CDN・並列接続・R2 の Range/圧縮応答は再現していない。
@@ -110,6 +112,7 @@ transferSize=0 でも **compile 時間は短縮されない** (Chrome の wasm c
 ## 6. tier-up 影響 (同一 Module から連続 instance、各 boot は unit 209 まで)
 
 各 instance は新規 (864 MiB メモリ)、Module は 1 回 compile したものを共有。n=3 セット × 6 instance。
+load (開始時 1 分 load average, 4 vCPU): 既定 4.28–5.30 / `--liftoff-only` 4.71–5.04 / `--no-wasm-dynamic-tiering` 4.66–4.71。**4 vCPU がほぼ飽和**した状態の値で、動的 tier-up はバックグラウンドスレッドを使うため、空き CPU がある環境では #2〜#6 の遷移が速い可能性がある (未測)。
 
 | 回 | 既定 boot ms | `--liftoff-only` boot ms | `--no-wasm-dynamic-tiering` boot ms |
 |---|---|---|---|
@@ -123,7 +126,7 @@ transferSize=0 でも **compile 時間は短縮されない** (Chrome の wasm c
 - 既定: #1→#2 で **−79%** (515–558 → 106–108): 差分は初回の lazy コンパイル分。#2→#6 で更に −41% (中央値 108 → 64): TurboFan への動的 tier-up (バックグラウンドスレッド)。
 - `--liftoff-only` は #2 以降 115〜127 ms で頭打ち (tier-up なし) → 既定の定常 64 ms は **TurboFan 効果が 1.8–2.0 倍**。
 - 注意: これは boot コード (InitUnits 209 unit まで、GetMem/FreeMem 2,666 回など) に限った tier-up。実 FL の定常ループ (オーディオ/GUI) の tier-up は**測れていない**。
-- instantiate は #1 10 ms → #3 以降 3.8–4.2 ms (Memory 確保が主)。
+- instantiate (既定): #1 9.9–10.6 / #2 9.6–10.1 / #3 4.2–4.6 / #4 4.2–7.9 / #5 3.8–4.1 / #6 3.8–3.9 ms。#3 以降で約半減し #5 以降は 3.8–4.1 ms に落ち着く (Memory 確保が主)。`--no-wasm-dynamic-tiering` は #3 5.2–8.1 / #4 4.8–5.6 ms で、#5 以降に 3.9–4.2 ms。
 
 ## 7. 事前推定との差 (推定ラベル付き)
 
@@ -167,6 +170,7 @@ transferSize=0 でも **compile 時間は短縮されない** (Chrome の wasm c
 | 7 | warm #3 の boot 664–707 ms (他より長い) の原因 | 再現性はあるが原因未調査 | #541 [RT-12] |
 | 8 | wasm が boot REPORT の記録と 210 B 差 (§2) | 再現性 (結果は一致) | #253 にコメント |
 | 9 | m11 (RetDec) 経路の同計測: `work-m11` 未取得 (本 run の素材は `fl-win64 toolchain-emsdk`) | 経路比較は未実施 | 不要なら見送り (x64c が推奨ルート, `tools/flelift/REPORT.md` §9.3) |
+| 10 | bw 50 Mbps だけ boot 呼出が 652–675 ms (10/100 Mbps は 453–468 ms, §5) | 原因不明。load は他帯域より低く、n=3 で 3 回とも再現 | #541 [RT-12] |
 
 ## 10. 検証
 
@@ -176,7 +180,7 @@ transferSize=0 でも **compile 時間は短縮されない** (Chrome の wasm c
   - boot 結果の突合: node 参照 (`node tools/flelift/boot/fle_boot.mjs <abs>/fleboot_plain.cjs out.json --boot-only`, 別実装の node 用 glue) = units_run 209 / units_total 942 / 停止 `unlifted` / GetMem 1,890 / FreeMem 776 / exit 0 (wall 9.76 s; brotli 圧縮と並走中の 1 回)。Chrome Worker の全 cold 15 回・soak 全 cycle と一致。
 - **ネガティブコントロール**: wasm を 100,000,000 B に切り詰めて (原本 126,995,440 B) 同じハーネスへ流すと `ok:false` / `CompileError: WebAssembly.compileStreaming(): section (code 10, …` (`results/rt10_cold_neg.jsonl`)。通常 wasm は cold 15/15 が `ok:true`。
   ただしこれは「壊れた入力を検出できる」確認で、boot 動作の不一致を人工的に作った試験ではない (boot 等価性の否定試験は未実施 → 弱い点として残る)。
-- **コミット済み HEAD での再現**: 計測は harness commit `3e0cd6d` の内容で実行 (以後の差分は `--tag` 出力名オプションと REPORT のみ)。HEAD `d96fc45` で `measure.mjs cold --reps 3 --flags default --tag _headcheck` を再実行 (`results/rt10_cold_headcheck.jsonl`, load 0.36):
+- **コミット済み HEAD での再現**: 計測は harness commit `3e0cd6d` の内容で実行 (`3e0cd6d` 以降、`measure.mjs` の変更は `sizes` 出力の `file` を repo 相対パスにした 1 行のみ。計測値に影響しない。他は REPORT と results の追加)。HEAD `d96fc45` で `measure.mjs cold --reps 3 --flags default --tag _headcheck` を再実行 (`results/rt10_cold_headcheck.jsonl`, load 0.36):
   合計 1,039–1,126 ms (fetch+compile 515–569 / instantiate 10.7–12.6 / boot 496–540)、units_run 209 / GetMem 1,890 / FreeMem 776 で一致。§3 の 1,022–1,096 ms と同水準だが上端が 30 ms 高く、run 間変動はこの程度ある (2 セット併せた合計の範囲 1,022–1,126 ms, n=6)。
 - 検出力の確認 (本計測内): eager と既定で boot 呼出が 138–153 ms と 484–545 ms に分かれる (ハーネスが 3.5 倍差を弁別)。
 - 範囲外: 上記のとおり実 FL のフレーム・soak・実ネットワーク。
@@ -190,4 +194,4 @@ node tools/runtime/rt10/measure.mjs soak --sec 540 --flags default --tag _long  
 node tools/runtime/rt10/summarize.mjs            # results/rt10_*.jsonl → 本書の表
 bash tools/runtime/rt10/verify.sh                # 検算 + ネガティブコントロール
 ```
-RAM 16GB の runner では build 前に swap を追加すること (`fallocate -l 24G /mnt/swap2 && mkswap && swapon`)。生成物は `tools/flelift/work/boot/` (gitignore)。
+RAM 16GB の runner では build 前に swap を追加すること (24GB の swap ファイルを `fallocate -l 24G <swapfile> && mkswap <swapfile> && swapon <swapfile>` で追加)。生成物は `tools/flelift/work/boot/` (gitignore)。
