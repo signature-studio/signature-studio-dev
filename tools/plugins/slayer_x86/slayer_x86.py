@@ -137,7 +137,7 @@ def c3_spawn_chain(sh):
 
 
 def c4_bridge_names(sh):
-    """殻は '32bit\\ilbridge.exe' / '64bit\\ilbridge.exe' と起動引数 -wrapper/-address/-processid の文字列を持ち、前者 2 本は global ポインタ表から参照される。"""
+    """殻は '32bit\\ilbridge.exe' / '64bit\\ilbridge.exe' と起動引数 -wrapper/-address/-processid の文字列 (UTF-16) をそれぞれちょうど 1 つ持つ (存在のみの検査。 参照関係は見ない)。"""
     names = ['32bit\\ilbridge.exe', '64bit\\ilbridge.exe', '-wrapper', '-address', '-processid']
     cnt = {n: len(sh.ustr_rva(n)) for n in names}
     return all(v == 1 for v in cnt.values()), str(cnt)
