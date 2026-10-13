@@ -18,6 +18,9 @@ const BODY = "The Licensee shall not reverse engineer, decompile or disassemble 
 const page = ({ nonce = "a", extra = "", body = BODY, charset = "utf-8" } = {}) =>
   `<!doctype html><html><head><meta charset="${charset}"><title>Terms</title><script>var n="${nonce}"</script></head><body>` +
   `<header>Cart ${nonce}</header><nav>menu ${nonce}</nav><main><h1>Terms of Use</h1><p>${body}${extra}</p></main><footer>© ${nonce}</footer></body></html>`;
+// é (0xE9)・en dash (0x96)・€ (0x80) は windows-1252 と UTF-8 でバイト列が異なる
+const NON_ASCII = " Caf\u00e9 \u2013 5\u20ac.";
+const cp1252 = (html) => Buffer.from(html.replace("\u2013", "\x96").replace("\u20ac", "\x80"), "latin1");
 
 test("normalizeText: 空白・符号化差は同一、語句の変更は別", () => {
   const a = normalizeText("It’s “ok” — fine…  \n\tdone\u00a0here\u200b.");
@@ -48,7 +51,7 @@ test("extractSection: start/end/last・マーカ欠落は SourceError", () => {
 });
 
 test("runCheck(url): NEW → UNCHANGED → CHANGED → PENDING → ack → UNCHANGED、ノイズ/符号化差では変わらず、エラーは台帳不変", async () => {
-  let cur = { status: 200, type: "text/html; charset=utf-8", body: Buffer.from(page()) };
+  let cur = { status: 200, type: "text/html; charset=utf-8", body: Buffer.from(page({ extra: NON_ASCII })) };
   const srv = http.createServer((req, res) => {
     res.writeHead(cur.status, { "content-type": cur.type });
     res.end(cur.body);
@@ -62,15 +65,15 @@ test("runCheck(url): NEW → UNCHANGED → CHANGED → PENDING → ack → UNCHA
     let [r] = await run("2026-10-13T00:00:00Z");
     assert.equal(r.status, "NEW");
     const h0 = r.sha256;
-    cur.body = Buffer.from(page({ nonce: "zzz" }).replace("<p>", "<p>\n  ").replace(/\. /g, ".\r\n"));
+    cur.body = Buffer.from(page({ nonce: "zzz", extra: NON_ASCII }).replace("<p>", "<p>\n  ").replace(/\. /g, ".\r\n"));
     [r] = await run("2026-10-14T00:00:00Z");
     assert.equal(r.status, "UNCHANGED", "nonce・空白差で変わってはならない");
     cur.type = "text/html; charset=windows-1252";
-    cur.body = Buffer.from(page({ charset: "windows-1252", body: BODY.replace("Software", "Softwar&eacute;") }).replace("Softwar&eacute;", "Software"), "latin1");
+    cur.body = cp1252(page({ charset: "windows-1252", extra: NON_ASCII }));
     [r] = await run("2026-10-14T00:00:00Z");
-    assert.equal(r.status, "UNCHANGED", "charset 差で変わってはならない");
+    assert.equal(r.status, "UNCHANGED", "非 ASCII を含む本文が windows-1252 / UTF-8 の charset 差で変わってはならない");
 
-    cur = { status: 200, type: "text/html; charset=utf-8", body: Buffer.from(page({ extra: " Rev 2: new clause." })) };
+    cur = { status: 200, type: "text/html; charset=utf-8", body: Buffer.from(page({ extra: NON_ASCII + " Rev 2: new clause." })) };
     [r] = await run("2026-11-01T00:00:00Z");
     assert.equal(r.status, "CHANGED");
     assert.equal(r.previous.sha256, h0);
@@ -149,6 +152,30 @@ test("CLI 終了コード: 0 → 0 → 1 → 1 → ack → 0、素材なし 3 (-
   assert.equal(cli("bogus").status, 2);
   assert.equal(cli("ack").status, 2);
   assert.equal(loadLedger(ledger).docs.doc.pendingReview, false);
+});
+
+test("CLI: pnpm 経由の argv (先頭 `--` 付き) でも ack は ack、check は check として動く", () => {
+  const d = path.join(tmp, "pnpm-argv");
+  mkdirSync(d, { recursive: true });
+  const f = path.join(d, "doc.txt");
+  const sources = path.join(d, "sources.json");
+  const ledger = path.join(d, "ledger.json");
+  writeFileSync(f, "The Licensee shall not reverse engineer the Software. ".repeat(30));
+  writeFileSync(sources, JSON.stringify([{ id: "doc", vendor: "V", title: "T", kind: "file", path: f, format: "text", mustContain: ["reverse engineer"], minChars: 500 }]));
+  const env = { ...process.env, TERMS_WATCH_NOW: "2026-10-13T00:00:00Z" };
+  const opts = ["--sources", sources, "--ledger", ledger, "--md", path.join(d, "ledger.md"), "--snapshots", path.join(d, "snap")];
+  const cli = (...a) => spawnSync("node", [CLI, ...a, ...opts], { encoding: "utf8", env });
+  assert.equal(cli("--", "--only", "doc").status, 0, "`-- --only doc` は check");
+  writeFileSync(f, readFileSync(f, "utf8").replace("shall not", "shall now"));
+  assert.equal(cli("--", "--only", "doc").status, 1);
+  assert.equal(loadLedger(ledger).docs.doc.pendingReview, true);
+  const acked = cli("--", "ack", "doc");
+  assert.equal(acked.status, 0, acked.stderr);
+  assert.match(acked.stdout, /terms-watch: ack doc/);
+  assert.doesNotMatch(acked.stdout, /UNCHANGED|CHANGED|PENDING/, "ack の代わりに check が走ってはならない");
+  assert.equal(loadLedger(ledger).docs.doc.pendingReview, false, "`-- ack <id>` で pendingReview が解除される");
+  assert.equal(cli("--", "ack").status, 2, "`-- ack` (id 無し) は check に落ちず引数不正");
+  assert.equal(cli("--", "bogus").status, 2);
 });
 
 // 合成 NSIS インストーラ (stub 4096 B + firstheader + raw deflate ヘッダ)。実 makensis での検証は nsis_e2e.sh

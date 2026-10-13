@@ -11,9 +11,11 @@ import { FL_WIN64_DIR, PLUGINS_DIR, REPO_ROOT } from "../../shared/paths.mjs";
 import { ackDocs, exitCodeFor, loadLedger, renderLedgerMd, runCheck, serializeLedger } from "./lib.mjs";
 
 const here = import.meta.dirname;
-const [first, ...restAll] = process.argv.slice(2);
+const argv = process.argv.slice(2);
+if (argv[0] === "--") argv.shift();
+const [first, ...restAll] = argv;
 const cmd = first && !first.startsWith("--") ? first : "check";
-const rest = first && !first.startsWith("--") ? restAll : process.argv.slice(2);
+const rest = first && !first.startsWith("--") ? restAll : argv;
 const opt = (name) => { const i = rest.indexOf(`--${name}`); return i >= 0 ? rest[i + 1] : undefined; };
 const flag = (name) => rest.includes(`--${name}`);
 const usage = () => {
