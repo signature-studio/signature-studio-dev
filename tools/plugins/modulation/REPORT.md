@@ -29,7 +29,7 @@
 
 定義: 閉包 = vtable override 実装 (DestroyObject / Dispatcher / SaveRestoreState / GetName / ProcessEvent / ProcessParam / Eff_Render) から `call/jmp rel32` で到達する、
 framework 共通ハッシュ (13 DLL 以上) でない `.pdata` 関数 (`lift/plugin_closure.py`)。frontier = 閉包から呼ぶ framework 関数 (P0a の共有 wasm 側)。vcall / ptr = 間接呼出 site 数。iat = `plugin_closure.py` が数える RIP 相対メモリ operand の call/jmp site (IAT 経由 Win32 呼出が大半だが IAT slot とは限らない。Fruity Chorus の 1 site は `.bss` 上の実行時設定の関数ポインタ変数 0x713060 への `call [rip+…]` @0x40e4b6)。
-define = `p.final.ll` の `^define` 数。f80 = `x86_fp80` を含む define 数。未実装 helper = `p.simd.log` の `unimplemented N`。`emcc -c` 列は `emcc -c -O0 -msimd128` の終了コード。lift 秒は既定鎖 (`PLUG_ICALL=1`、icall 復元を含む) の e2e 実行 (8603db1 の 1 回と 648383c の 1 回) の min–max。
+define = `p.final.ll` の `^define` 数。f80 = `x86_fp80` を含む define 数。未実装 helper = `p.simd.log` の `unimplemented N`。`emcc -c` 列は `emcc -c -O0 -msimd128` の終了コード。lift 秒は既定鎖 (`PLUG_ICALL=1`、icall 復元を含む) の e2e 実行の値 (出典は §4 直下の注)。
 
 | プラグイン | block | Tier | 閉包 関数 / B | frontier 関数 / B | vcall | ptr | iat | define | f80 | 未実装 helper | `emcc -c` | lift 秒 |
 |---|--:|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|
@@ -158,7 +158,7 @@ define = `p.final.ll` の `^define` 数。f80 = `x86_fp80` を含む define 数�
 | 19266 (Vintage Chorus) | 0 | 573 | 2 / 542 (159) | 31 | 1 | 60 (50) | 1 (失敗) | 1 (失敗、適用 0 件) | 0 (f80 段後、f80 1 → 0) | 15–18 |
 | 19268 (Vintage Phaser) | 0 | 657 | 2 / 626 (420) | 31 | 1 | 92 (71) | 1 (失敗) | 1 (失敗、適用 0 件) | 0 (f80 段後、f80 1 → 0) | 17–22 |
 
-- `emcc -c` の列は b9fe1d8 の実測 (`engines.csv`)、「f80 段後」列は 35d8f3d5 の実測 (`summary.csv` erc3)。lift 秒は b9fe1d8・648383c・35d8f3d5 の全記録値の min–max。8603db1・648383c の 0/4 本から変わった。旧記述 (4 本とも E1 → E2) は P-E1 取り込み後は成り立たず、`engine_fixcmp.py` は 0 件 (E2 は b9fe1d8 で未確認)。
+- `emcc -c` の列は b9fe1d8 の実測 (`engines.csv`)、「f80 段後」列は 35d8f3d5 の実測 (`summary.csv` erc3)。8603db1・648383c の 0/4 本から変わった。旧記述 (4 本とも E1 → E2) は P-E1 取り込み後は成り立たず、`engine_fixcmp.py` は 0 件 (E2 は b9fe1d8 で未確認)。lift 秒の出典は raw の `summary.csv`・`engines.csv` が無く (`work/` は gitignore)、run 番号も未記録のため commit 履歴の記載に基づく: (a) 4d57b9ef・8603db17 (8603db1 時点) と 4282160f (648383c 時点) の本体表 = 18977 16–17 / 19143 15–16 / 19266 18 / 19268 22 (58297bfe で 21–22、4282160f で 20–22)、(b) 9f661ead が統合した 35d8f3d5 の PR 作成時の追補 = 18977 13–14 / 19143 13 / 19266 15 / 19268 17–18。表は (a) と (b) の union。19268 の 20・21 は (a) の記載にのみ現れ、元の記録が無いため出典不明。
 - `.pdata` で define 無し = `function_<開始VA>` の define が final.ll に無い range 数 (`engine_defs.py`。分母は `.pdata` 関数数、括弧は欠けた range の合計 B)。4 本とも欠けた 2 件は call 先として参照されない (missing_ref 0)。原因 (RetDec の関数境界統合 / 復号失敗) は未調査。
 - 失敗した 2 本 (19266・19268): 最初のエラーは `e.final.ll` の `emcc -c` (`first_errors.txt`) で、E1 (icmp ptr/i64) でも E2 (zext 定数式) でもない。エラーは 4 件 (`4 errors generated.`): `do not know how to soften fp_extend` ×2、`no libcall available for frem with type f80` ×1、`no libcall available for fp_round with type f80` ×1。どちらも `e.final.ll` に x86_fp80 を含む define が 8 個ある (`grep -c x86_fp80`) うちの、どの関数で出たかは未特定。f80 型の演算の legalize 失敗で、#197 の `f80_lower.py` (f80 → f64) の対象と見られる (未検証)。
 - VEX (AVX/FMA) の未実装 helper は distinct で 50〜71 (648383c・b9fe1d8 とも同値)。CPUID 分岐で SSE 路に固定できるかは未確認 (T1 の AVX 2 種は CPUID 分岐で SSE 路固定と `plugins/REPORT.md` §4.3 に記録あり)。
