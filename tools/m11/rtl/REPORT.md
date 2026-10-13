@@ -197,3 +197,21 @@ VA/RVA 変換の ImageBase 化は、`ImageBase` が `0x400000` の PE では出�
 * 退行候補 (一致→不一致) 7 件の定義: `rtl_verdicts.tsv` で m11 = match かつ x64c = mismatch (`rtl_compare.py` の遷移と同じ)。batch 側の status は mismatch 5 (`0x4090e0` / `0x41cd70` / `0x42d830` / `0x44a590` / `0x4511d0`) と unexec 2 (`0x412020` / `0x455650`)。batch で不一致になったのは 5 件のみ。
 * 検証状態: `work-liftdiff` 同梱 jsonl で再実行し、results txt と diff 0 行 (再実行 run: 38429463570)。入力 jsonl: sha256 = `d9995bfa90d96266f56f246f7e398809895c9f003ea225a2ec7d10799f6e0e6b`、7,421 行。
 * 未達: 上位の原因からの修復 (受入 2 後半)・ネガコン付きの一致数増加 (受入 3)・一致→不一致の退行 7 件の原因特定。修復には tools/flelift の変更とリビルド・batch 再採点が要るため、起票先は #410 に継続 (本 PR は分類まで)。
+
+### 9-1. 退行 7 件の jsonl 上の手がかり (#410 受入 2 後半; 原因は未確定)
+
+jsonl の該当レコードを読んだ結果 (`batch_closure_hybrid.jsonl`、batch 再実行なし)。確定ではなく、次に検証すべき仮説として扱う。
+
+| va | batch 判定 | 主なタグ | jsonl 上の手がかり |
+|---|---|---|---|
+| `0x4090e0` | mismatch | memory_semantics | image 領域の書込み集合が native と wasm で不一致 |
+| `0x41cd70` | mismatch | unlifted_callee, wasm_trap | wasm が lift 閉包外の間接 call 63 件を ret-0 で継続し、OOB trap |
+| `0x42d830` | mismatch | callee_divergence | trace #2 で native 側だけ `0x412d60` に入る (native_extra_entry) |
+| `0x44a590` | mismatch | callee_divergence, unlifted_callee | trace #2 で native `0x415c30` / wasm `0x40faa0`。wasm 側が lift 閉包外の間接 call 18 件を ret-0 で継続 |
+| `0x4511d0` | mismatch | callee_divergence, unlifted_callee | trace #3 で native `0x4103c0` / wasm `0x40faa0`。閉包外の間接 call 9 件 |
+| `0x412020` | unexec | (none) | 差分なし (実行不能) |
+| `0x455650` | unexec | (none) | 差分なし (実行不能) |
+
+* 観測: `0x44a590` と `0x4511d0` は、wasm の入口がどちらも `0x40faa0` に収束している。`fle_lifted_tr.c` 上で `0x40faa0` は `0x44a505` から直接 call されており (`call 0x40faa0`)、native 側の呼出先 (`0x415c30` / `0x4103c0`) と一致しない。仮説: x64c の間接 call 解決が、同じ呼出し点でも対象を取り違えている。未検証。
+* 2 件 (`0x412020` / `0x455650`) は unexec のため、batch の差分からは原因を取れない。
+* 次の一手 (本 run では未実施): 退行 5 件を単独で再採点し、trace 差分の入口 (`0x40faa0`) の間接 call 解決を確認する。修復は tools/flelift の変更が要るため #410 に継続。
