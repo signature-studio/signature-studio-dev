@@ -1,5 +1,6 @@
 {
  "name": "ott_leaf_tan",
+ "abi": "ms_pos",
  "func": "0x1801a9be0",
  "wasm_func": "function_1801a9be0",
  "scenarios": 300,

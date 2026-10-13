@@ -13,7 +13,7 @@ if (!M['_' + fname]) { console.error('no export _' + fname); process.exit(3); }
 const GUARD = 64;
 const lines = fs.readFileSync(scenPath, 'utf8').split('\n');
 const out = [];
-let bufs = [], pf = [], args = [], scen = -1, step = 0, dead = false;
+let bufs = [], pf = [], args = [], scen = -1, step = 0, dead = false, posabi = false;
 const find = (nm) => { const i = bufs.findIndex((b) => b.name === nm); if (i < 0) throw new Error('no buffer ' + nm); return i; };
 const dv = () => new DataView(M.HEAPU8.buffer);
 const freeAll = () => { try { for (const b of bufs) M._free(b.p); } catch (e) { /* ヒープ破損: 次シナリオ前に再初期化 */ } bufs = []; pf = []; args = []; };
@@ -55,21 +55,21 @@ for (const line of lines) {
       f.db = find(w[3]); f.doff = parseInt(w[4]); applyPtr(f); break;
     }
     case 'U': M.HEAPU8.set(unhex(w[3]), bufs[find(w[1])].p + parseInt(w[2])); break;
+    case 'M': posabi = w[1] === 'pos'; break;
     case 'A': args.push({ slot: parseInt(w[1]), kind: w[2], v: w[3] }); break;
     case 'C': {
       const slotval = (a) => a.kind === 'ptr' ? BigInt(bufs[find(a.v)].p) : BigInt('0x' + a.v);
-      // native_runner と同じ MS x64 ABI 分割 (LIFTLIB-3): f32/f64 の A 行は xmm 仮引数
-      // (%xmmK_bits), それ以外は gpr 仮引数 (%argN) に対応させる。位置対応だと
-      // RetDec が誤解析した余分な %argN (tan = 実体 xmm0 1 引数なのに %arg1..3) が
-      // f64 の値を横取りし %xmm0_bits が 0 になる (tan 1/40 の主因)。
-      // LIFTLIB-5: MS x64 ABI は位置対応 (native_runner と同じ)。xmm K 仮引数 = 第 K 引数が f32/f64 の時のみ,
-      // gpr slot K 仮引数 = 第 K 引数が非 float の時のみ (他方のレジスタは 0)。
       const isF = (a) => a.kind === 'f32' || a.kind === 'f64';
       const call = [];
+      // posabi (LIFTLIB-5, leaf spec): 第 K 引数の位置で xmm K / gpr K を決める。
+      // 既定 (main): K 番目の float → xmm K, 非 float は登場順に gpr (native_runner の独立カウンタと同じ)。
+      const gArgs = args.filter((x) => !isF(x));
+      const fArgs = args.filter((x) => isF(x));
+      let gi = 0;
       for (const s of sig) {
-        const a = (s.xmm !== undefined)
-          ? args.find((x) => x.slot === s.xmm && isF(x))
-          : args.find((x) => x.slot === s.slot && !isF(x));
+        let a;
+        if (posabi) a = (s.xmm !== undefined) ? args.find((x) => x.slot === s.xmm && isF(x)) : args.find((x) => x.slot === s.slot && !isF(x));
+        else a = (s.xmm !== undefined) ? fArgs[s.xmm] : gArgs[gi++];
         const v = a ? slotval(a) : 0n;
         if (s.ty === 'i32') call.push(Number(v & 0xFFFFFFFFn)); else call.push(BigInt.asUintN(64, v));
       }
