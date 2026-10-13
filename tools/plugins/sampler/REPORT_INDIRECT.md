@@ -52,6 +52,11 @@ total = base ∪ root から `call/jmp rel32` で到達する非共通関数 (fr
 | `indirect_e2e.sh` 全体 (3 回、inventory 済みから) | exit 0 × 3: **141 s / 139 s / 138 s** (終了時 load average (1 分) 0.99 / 1.00 / 1.01)。 3 回の `[indirect_lift]` 行 (秒を除く) の md5 が一致、算出表も一致 (`diff`) |
 | `indirect_nega.sh` | exit 0、19 s (NC0–NC7 全て期待通り) |
 
+HEAD を `e0ee8d4` (ALLOW 0・#629 取り込み後) に進めたため、上記 (`0f50a1b`・inventory 済み) とは別条件で、以下を分けて記録する。 いずれも前回 fix run の実測 (そのログの値) で、本 run では再実行していない (PR の差分範囲が #551 merge 待ちのため)。
+- `indirect_e2e.sh` (`e0ee8d4`・前提生成込み・許容 0): exit 0、**real 11 分 20.699 秒**、judge 7/7 PASS、indirect_defs 7/7 PASS。
+- `indirect_nega.sh` (`e0ee8d4`・許容 0): exit 0、**17.5 秒**、NC0–NC7 期待通り。
+- 対比: 同じ 138–141 秒の `indirect_e2e.sh` は inventory 済み (前提生成なし) の `0f50a1b` 条件。 前提生成の有無で数値が大きく変わるため、比較時は条件を揃える。
+
 `closure_indirect.py` の 4 検査 (不合格で exit 1): **C1** entry だけから BFS した結果が `plugin_closure.py` の ranges と完全一致 (BFS 実装の同一性) / **C2** root の関数数・バイトが `unreached.json` (§2、`unreached_unique.py` の出力) と一致 (同一定義 = 8 バイト整列 qword 一致 の再計算。 独立検算ではない。 NC2・NC3 で検出力を確認) /
 **C3** total ⊆ 非共通 かつ base ⊆ total (framework を lift 対象に混ぜない) / **C4** 別算法: 命令境界を見ず関数バイト列の `E8`/`E9` rel32 を全オフセットで拾う過大近似の閉包に total が含まれる (独立検算は C4 のみ)。
 C4 の過大近似は 7 本とも total と同数 (3,623 関数) だった。 capstone 版が取りこぼしていないことは示すが、過大近似側に余分が出なかったので「偽の到達先を拾っていない」ことの強い裏付けではない。
