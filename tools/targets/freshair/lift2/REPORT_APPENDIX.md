@@ -152,8 +152,56 @@ bash tools/targets/freshair/lift2/lift2_e2e.sh                                  
 - HEAD (`db279818`) の `work/ml/comp_full.ll` と `work/filter/filter.ll` に `icmp eq <16 x i8>` / `icmp eq <4 x i32>` は 0 件 (`icmp eq <8 x i16>` も 0 件)。
 - `run_comp.sh` / `run_filter.sh` の trap 版は未実施。
 
+## 7. FA-13 (#905): rep movs/stosw の実行到達 (実測, 2026-10-13, 測定 HEAD 863f3d3c)
+
+- HEAD の対応: 測定は `863f3d3c` で行った。以後 `12146acf`・`a01812f9`・`15243d54`・`8048c43a` の差分は本ファイル (文書) のみで、コードは `863f3d3c` から不変。確認: `git diff --stat 863f3d3c 8048c43a` → `REPORT_APPENDIX.md | 15 +++` (1 file changed, 15 insertions)。`git diff 863f3d3c 8048c43a -- tools/targets/freshair/lift2 ':!*REPORT*'` は 0 行。
+- 検証: worktree `ws-905` (branch `905-lift2-rep-movs-e2e`)。素材 `plugins-freshair` (`Fresh Air.Win.zip` に `SlateCore.core_64` と factory `.epf` 8 本) を `fetch.sh` で展開 (`FA_DL=$RUNNER_TEMP/pf`)。
+- `build_ctrl.sh`: exit 0, real 38.1 s。mlift は `lifted 1256 funcs`, `failed 1` (`f_1810577ac` の `vpcmpeqw ymm`、既知)。
+- 基準 `run_ctrl.sh 2 5` (trap 無し): **15/15 BIT-EXACT**, exit 0, real 4.3 s。
+- rep 出現箇所 (実測, 測定 HEAD `863f3d3c` の mlift 出力を `c91d292b` でも再現): `work/ctrl/ctrl_full.ll` の `; <addr>: rep (movs[bwdq]|stosw) ` コメント行を数えた結果は **45 行・15 関数**。
+  - 正規表現: `^\s*; [0-9a-f]+: rep (movs[bwdq]|stosw) ` (ll 内のコメント行。mlift が命令ごとに出す)。
+  - 命令別: `rep movsb` 39 / `rep stosw` 6 (計 45)。`rep movsw`・`rep movsd`・`rep movsq` は 0。
+  - 関数別 (行数): f_1803e12c0 (4)・e2190 (1)・e2240 (8)・e2600 (8)・e2b50 (1)・e4ee0 (1)・e5070 (1)・e8b70 (2)・e95f0 (7)・fb860 (3)・fbb80 (3)・fdc70 (1)・f_180401070 (1)・f_180402e50 (1)・f_180ca4e70 (3)。
+  - 旧記録の「40 箇所 (12 関数)」は、上の列挙のうち先頭 12 関数の合計 (40) と一致する。残り 3 関数 (f_180401070・f_180402e50・f_180ca4e70、計 5 行) が漏れていた。**正しい値は 45 行 (15 関数)**。
+  - 参考: `ctrl_rep.json` の mnemonic 集計も `rep movsb` 39・`rep stosw` 6 で一致。`rep stosb` 84・`rep stosq` 1 は §7 の対象外 (movs / stosw のみ)。
+- ネガコン (旧記録, 測定 HEAD `863f3d3c`, 本 run では未再現): 旧記録では 40 箇所に `llvm.trap` を入れ emcc で再ビルドした版の `run_ctrl.sh 2 5` が **15/15 PASS**, exit 0 とされている。旧記録の 40 箇所は、漏れた 5 行 (f_180401070・f_180402e50・f_180ca4e70) を含まないため、**45 箇所全体のネガコンではない**。
+- 挿入後の trap 件数 (本 run, 実測): 45 箇所 (rep の `done` 先頭ブロックの直前に `call void @llvm.trap()`、作業用コピー `work/ctrl/ctrl_neg.ll`) を入れた結果、`grep -c llvm.trap` は **1695** (= 挿入前 1650 + 45)。`diff ctrl_full.ll ctrl_neg.ll` は `>` 行 45 のみ。元の `ctrl_full.ll` は sha256 `dadbc54b…` のまま不変。
+- 本 run で **未実施**: (a) `ctrl_neg.ll` の emcc 再ビルドと `run_ctrl.sh` 実行 (runner に `/opt/emsdk` が無く emcc 不在のため wasm 段が実行不能)、(b) 陽性対照 (既到達関数先頭に trap を入れ `run_ctrl.sh` が FAIL することの確認)。よって 45 箇所版のネガコン結果は未取得。
+- 「既定 seed では rep 経路は実行されない」は**未検証の推定**。旧 40 箇所版の PASS と、既定 seed の到達を示す実測 (trace) がないため断定しない。
+- 探索 seed (`2 40 0xFA2C0001`, `10 60 0xFA2C0002`) は trap 版でも trap 無し版でも同じ形で **MISMATCH** (wasm 側 0 行)。trap 版と trap 無し版で同一の結果のため、rep 経路の到達判定には使えない (既知限界の乱数 OOB と同根と推定。根拠となる節・issue は未特定)。
+- 元に戻した後、`ctrl_full.ll` の sha256 が挿入前と一致 (`dadbc54b…`)、`.cjs` は `cmp` で一致。`git status` は clean。
+- 件数の解消 (本 run): 旧 40 件は漏れ (上記)。正しい値は **45 行 (movsb 39 + stosw 6・15 関数)**。PM 中間コメントの 45 と一致する。
+- 素材 (本 run): `$ARTIFACTS_DIR` に `fl-win64.tar.zst` と `plugins-freshair.tar.zst` の両方が実在。`plugins-freshair` を `tar --zstd -xf` で `$RUNNER_TEMP/plugins-freshair` に展開し、`FA_DL=... fetch.sh` で factory `.epf` 8 本を確認 (`win: 17 files, factory .epf: 8`)。
+- mlift 段の再実行: `build_ctrl.sh` の mlift 部分 (emcc より前) を `c91d292b` の worktree で実行。`lifted 1256 funcs / failed 1` (`f_1810577ac` の `vpcmpeqw ymm`、既知)。`env.sh` は `/opt/emsdk` を source するため、そこだけ外して実行した (mlift は emsdk 不要)。
+- 結論: 受入 1 (実行到達 scenario) は**未達**。rep 経路の到達は本 run で確認していない (trace 未取得)。受入 2 (ネガコン FAIL) は、45 箇所版の trap 件数 (1695) までは確認、wasm 再ビルドと陽性対照は**未実施**のため判定不能。残りは #692 で扱う。
+
 ## 未解決 (起票先 #692)
 - 新 lowering `pcmpeq{b,d}` の comp / filter 経路の動的確認 (trap 版の `run_comp` / `run_filter`)。
 - rep 経路の e2e 到達・ネガコン (受入条件 1)、回帰セットの seed 非依存化 (3)。
 - `vpcmpeqw` (ymm、`f_1810577ac`) の lowering。
 - epf 展開の素材配線は #693。
+
+## 7. FA-14 (#907): 回帰セットの seed 依存の実測 (2026-10-13)
+
+- 検証基点: `origin/main` = `99b87bc2`。素材は `plugins-freshair` のみ (`FA_DL` → `fetch.sh`、factory .epf 8 本を補完)。
+- 既定 `run_ctrl.sh 2 5` は seed `0xFA2C0001` 固定 (`run_ctrl.sh` 既定値)。#907 受入 1 の「seed を固定値で明記」の方式を採る (コード変更なし)。
+  epf 欠落時は `run_ctrl.sh` が exit 2 で止まる (本 run で退避実測: `ERROR: factory .epf 8 本が無い ... 生成シナリオ 7 本`, rc=2)。この rc=2 は PASS ではなくゲート停止であり、epf 欠落時の PASS は仕様上対象外。epf 有時は 15/15 PASS (§9)。
+- 別 seed の実測 (structured 2 + random 5、native のみ、`native_ctrl` 単体):
+  - `0x1` / `0x2` / `0x3` はいずれも `native_ctrl` が `Aborted` (rc=134) で途中停止 (出力 8 / 10 / 9 行、15 行に満たない)。
+  - 既知限界 (`run_ctrl.sh` 冒頭: 乱数が意味 field に OOB 書込を起こす) の再発で、seed 非依存ではない。
+- epf 8 本のみ (`gen_ctrl_scen.py <out> 0 0 <seed>`、乱数未使用) の native 出力は seed 0x1/0x2/0x3 で全て rc=0・8/8 行・ERR 0。
+  seed 間の出力差の内訳は本 run では分類していない。判定の根拠は `ctrl_norm.py` の規則 (8 byte 単位で値 ≥ `MASK_MIN` = 0x100000000 の 16 桁を両側同時にマスク) のみで、マスク後に一致することは本 run では未実測 (seed 0x1/0x2/0x3 の wasm 側出力は未取得)。同一 seed の再実行で差が変わるかも未測定 (素材不足で e2e を再実行できない)。
+- 結論: 既定の structured/random を含む回帰は seed 依存 (0x1/0x2/0x3 で native_ctrl が abort、上記実測)。epf 8 本のみの部分は native で seed 0x1/0x2/0x3 とも rc=0 だが、seed 非依存とは未確認 (wasm 比較は未実施)。
+
+## 8. FA-14 (#907) 未達と起票先
+- 受入 2 (`vpcmpeqw ymm`): mlift のレジスタは `XMM = <4 x i32>` 固定で ymm (256bit) の上位を保持できず、構造変更が要る。1 run に収まらないため子 issue に分割する。
+- 受入 3 (`lift2_e2e.sh` ALL PASS): §9 に実測 (実測 commit `c531a0cb`)。
+- 受入 2 の子 issue: [FA-15] lift2 ctrl closure の vpcmpeqw ymm (AVX2 256bit) lowering — #1105 (OPEN、親 #907)。
+
+## 9. FA-14 (#907) 実測: lift2_e2e.sh (`origin/main` = `99b87bc2`)
+
+- 実測の commit: `c531a0cb`。lift2 コードは `99b87bc2` と同一で、`99b87bc2..c531a0cb` の差分は本ファイル (REPORT_APPENDIX.md) のみ。`RESULT: lift2_e2e ALL PASS`, rc=0, real 1m14.253s, user 1m10.095s, load 0.22 (`uptime`), TMPDIR=`$RUNNER_TEMP`。
+- 基点 `99b87bc2` でも実測: rc=0, real 1m18.548s, load 0.12, ALL PASS。
+- 注: 上記は素材取得時の実測。後続のレビュー run では素材不足で再実行できていない (未再検証)。
+- ただし step 6 (ctrl build) は `failed(funcs with unsupported) 1` (`f_1810577ac: vpcmpeqw ymm1, ymm1, ymmword ptr [r9]`)。build は継続し、ctrl 出力は 15/15 BIT-EXACT (epf 8 + structured 2 + random 5, fma0/1)。
+- ctrl ERR: native/wasm 1/1 (同一 scenario)。comp/filter/fuzz/ABI/ablation 5 種はいずれも実測どおり PASS。

@@ -191,3 +191,26 @@ distinct: ASLR on = raw 2 / no_uselist 1 / c 1。ASLR off = raw 1 / no_uselist 1
 
 - 受入条件のうち「alloca 並びの原因 (RetDec 内の順序か) の特定」と「決定化手段 (正規化 pass) の実装と回帰 gate 組込み」は本 run では未了。alloca 単位のソートによる正規化を試したが、`%N` 参照の付け替えが必要で単純ソートでは一致しなかった (36 行差が残る)。
 - p0c REPORT §15.4 の注記更新は、ASLR 固定 (`setarch -R`) で lift する運用にするか、正規化を入れるかの決定後に行う。
+
+### 23.4 LIFTLIB-11 (#887): alloca 正規化 pass と gate 組込み
+
+HEAD `8475e243` (同型 tie の修正後の計測。前版 `57cfa758` の計測は base sha `4bfa6e1003a5` で一致していた)。素材: `fl-win64` (`block18983_PE.bin` sha256 `a399cbe060ec…`)・`toolchain-retdec` (RetDec v5.0、`/opt/retdec` へ symlink)・`work-liftlib`。入力は 23.1 と同じ (`kernel_ranges_balance.txt`、80 ranges)。
+
+**原因 (実測で言えること)**: 差分は `uselistorder` を除いた後も alloca 行の並びと、それに伴う `%N` 参照の付け替えだけ。k80 の連続 alloca run は型が全て異なり (型の重複 0 件、8 本で確認)、型順に並べ替えて参照を付け替えると ASLR on/off・run の差が全て消えた (8 本の canon 後 sha256 が 1 種)。RetDec 内部の並びを決める箇所は未特定のまま (§22.5 の推定と同じ)。
+
+**決定化**: `base.canon_alloca_order` (`tools/liftlib/liftlib/passes/base.py`) を追加。A7 (`run_base`) の後段で、関数ごとの連続 alloca run を型全体 (`align N` を除く) の文字列順に並べ、同型は番号の数値順、スロット名 `%N` は番号の昇順に振り直して `%N` 参照を付け替える。型キーは型全体を使う (先頭トークンだけだと `{ i32, i8 }` と `{ i64, i64 }` が tie になり入力順に依存する)。同型 tie は番号を第 2 キーにして解消する (前版では同型 2 本の行順入替で store の参照先がずれた。`64fbd6ef` で修正し、T23 に同型入替のケースを追加)。`run_base` の既定出力は変えていない (gate と呼び出し側のみ適用)。
+
+**gate**: `lift_determinism_e2e.sh` は奇数 run を ASLR 有効、偶数 run を `setarch -R` (ASLR 無効) で混ぜる。入力は `DET_PE` / `DET_RANGES` / `DET_OUT` で差し替え可能 (既定は従来どおり OTT)。`lift_determinism_check.py` は base.ll に canon を適用して比較し、ネガコン 3 として「raw の alloca 並びを逆順にした複製」を使う。canon 後は一致、canon 無し (A7 のみ) では不一致になることを判定に含める (`canon-same/nocanon-DIFF`)。
+
+| 検証 (HEAD `8475e243`、runner nproc=4、RetDec v5.0 Linux 版を `/opt/retdec` へ symlink) | 結果 | 所要 | load (開始 → 終了) |
+|---|---|---|---|
+| `DET_RUNS=8 lift_determinism_e2e.sh` (k80, ASLR 混在) | PASS、negctrl detected、negctrl 3 OK (`canon-same/nocanon-DIFF`)、rc=0。base 8/8 `4bfa6e1003a5`、base_lines 10932。raw は run ごとに 3〜4 種 (情報のみ・比較対象外) | 総 19 s (RetDec 10 s) | 0.52 → 2.13 |
+| `DET_NEGCTRL_NO_BASE=1` (A7 を外し raw を比較) | `determinism FAIL`、rc=1 (期待どおり) | 11 s | — |
+| 既定 (`DET_RUNS` 未指定、N=2) | PASS、negctrl 3 OK、rc=0 | 7 s | — |
+
+再実行 (HEAD `8475e243`、main 取り込み後): `DET_RUNS=8` PASS (総 19 s、base 8/8 `4bfa6e1003a5`)、NO_BASE rc=1、既定 PASS (総 6 s)。
+| `tests/test_unit.py` T23 (合成入力、同型入替を含む) | PASS (前版 `57cfa758` の同型入替では store の参照先がずれる反例を再現) | — | — |
+
+**raw 値の扱い**: raw sha256 は TMPDIR・出力パスの影響を受け得るため比較・記録の対象にしない (§22.6)。判定は base.ll (`4bfa6e1003a5`、全 run 一致) のみ。`tests/test_unit.py` T23 (合成入力・素材不要) は旧版 `e8bf48e8` で AssertionError、修正版 `75e332c8` で PASS を確認した。
+
+**p0c 注記**: p0c REPORT_APPENDIX_B §15.4 に「lift 段を揃える手順」を 1 行追記した (本 run で更新)。OTT の `run_base` 既定出力は変えていない。`tools/plugins/lift/` の他 chain の canon 適用は未測定。

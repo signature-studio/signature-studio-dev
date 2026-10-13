@@ -31,6 +31,7 @@ const oomUnits = [], bigUnits = [], clobberUnits = [];   // bigUnits: 64MB 以�
 const sp0 = mod._emscripten_stack_get_current();
 const first = [];
 const perUnit = [];
+const detail = [];                     // M11_SURVEY_DETAIL: unit 別の kind と trap 種別 (oob / halt0 / unreachable)
 const hex = (i) => '0x' + mod._m11_unit_va(i).toString(16);
 // clobber 検出: InitTable (unit 先頭と末尾の proc VA) が実行前と同じか. 壊れたら unit 実行前の image (先頭 image.length B) を書き戻す
 const unitVa0 = [mod._m11_unit_va(0), mod._m11_unit_va(941)];
@@ -54,12 +55,13 @@ for (let i = 0; i < 942; i++) {
   if (Number(mod._m11_va_big()) > big0) bigUnits.push(va + ':' + (err ? 'trap' : 'ok') + ':' + (Number(mod._m11_va_big()) - big0));
   if (process.env.M11_SURVEY_STACK && process.env.M11_SURVEY_STACK.split(',').includes(String(i))) console.error('[survey][stack] unit ' + i + ' ' + va + (clob ? ' (clobber)' : '') + ': ' + (err ? ((err && err.stack) || err) : 'returned ' + r));
   if (clob) {
-    res.clobber++; clobberUnits.push(va); perUnit.push('clobber');
+    res.clobber++; clobberUnits.push(va); perUnit.push('clobber'); detail.push({ i, va, kind: 'clobber' });
     if (err) mod.__emscripten_stack_restore(sp0);
     continue;
   }
   if (!err) {
     perUnit.push(r === 1 ? 'ok' : r === 0 ? 'noproc' : r === 2 ? 'miss' : 'r' + r);
+    detail.push({ i, va, kind: perUnit[perUnit.length - 1], ret: r });
     if (r === 1) res.ok++; else if (r === 0) res.noproc++; else if (r === 2) res.miss++;
     if (hadOom) { okWithOom++; oomUnits.push(va); }
     continue;
@@ -71,6 +73,7 @@ for (let i = 0; i < 942; i++) {
   let k;
   if (e && e.m11_dllmain_done !== undefined) { k = 'halt0->longjmp (unit が Halt を呼んだ)'; halted.push(va); }
   else k = ((e && e.message) || String(e)).split('\n')[0];
+  detail.push({ i, va, kind: hadOom ? 'oom' : 'trap', trap: k });
   kinds[k] = (kinds[k] || 0) + 1;
   if (!hadOom) kindsNonOom[k] = (kindsNonOom[k] || 0) + 1;
   const m = e && e.stack && /wasm-function\[(\d+)\]/.exec(e.stack);
@@ -79,6 +82,7 @@ for (let i = 0; i < 942; i++) {
   mod.__emscripten_stack_restore(sp0);
 }
 if (process.env.M11_SURVEY_UNITS) fs.writeFileSync(process.env.M11_SURVEY_UNITS, JSON.stringify(perUnit));
+if (process.env.M11_SURVEY_DETAIL) fs.writeFileSync(process.env.M11_SURVEY_DETAIL, JSON.stringify(detail));
 if (process.env.M11_SURVEY_COST) fs.writeFileSync(process.env.M11_SURVEY_COST, JSON.stringify(perUnitCost));
 const topBy = (k) => perUnitCost.filter((c) => c[k] > 0).sort((a, b) => b[k] - a[k]).slice(0, 8).map((c) => c.va + ':' + c.i + ':' + c[k]);
 const ff = {};
