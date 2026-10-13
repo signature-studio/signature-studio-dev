@@ -4,10 +4,12 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 source ../shared/env.sh   # FL_WIN64_DIR (既定は従来どおり /home/ubuntu/work/analysis/win64)
-PE="${PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}"
+PE="${M11_PE:-${PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}}"
 python3 m11_cond.py --reset ldfix=pending qstore=not-applied pe="$PE"   # #680: IR 生成条件を記録 (work/ir_conditions.json)
 CH="work/boot0.lift.ll work/boot1.lift.ll work/boot2.lift.ll work/boot3.lift.ll"
 [ -f work/boot4.lift.ll ] && CH="$CH work/boot4.lift.ll"
+# boot5 = 間接 call 先の fallback 実装 (m11_extra_ranges5.txt; #132 unit #23)
+[ -f work/boot5.lift.ll ] && CH="$CH work/boot5.lift.ll"
 python3 m11_merge.py $CH -o work/boot_all.ll
 python3 - <<'PYnum'
 import re

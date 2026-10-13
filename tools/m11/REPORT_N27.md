@@ -59,7 +59,7 @@ REPORT.md §13 (#516, HEAD `8e5f760`) の「修復 864/31/46/1 (clobber 0)」と
 ## 5. 検証範囲 / 範囲外
 - 範囲: 本 runner の 1 ホスト。PE は [WIN64] 展開物の 1 member。ldfix/qstore の両方適用 (既定) と qstore off の 2 条件。
 - 範囲外: 別環境 (作業 VM 等) との一致、R2 の work-m11 再投入、`--full` (RetDec 再生成) の実行。
-- **M3 未実施の理由**: `--full` は `/opt/retdec` (RetDec) と work-m11 (lift 成果物) を要する。本 runner には `/opt/retdec` も `work-m11` も無く、実行できない。
+- **M3 未実施の理由**: `--full` は [RETDEC] (RetDec) と work-m11 (lift 成果物) を要する。本 run は `toolchain-retdec` を取得していないため [RETDEC] が無く、実行できない。
 - `--full` 経路の repo 外パス (`m11_scan.py` `m11_bounds.py` `m11_tail.py` `m11_lift.sh` `m11_lift_all.sh` `m11_postjs.py`) は、PE を `FL_WIN64_DIR`/`M11_PE` 経由に、work・m2/m6 の参照を repo 内の相対パスに直した (静的確認のみ: `py_compile`・`bash -n`)。実行による確認は未了 (§6)。
 - 本 PR で追加した fail-closed 分岐の実測は §9 (NC2 は本 HEAD で実行、build の指紋・PE・qstore 分岐は一時コピーで実行)。
 
@@ -72,7 +72,7 @@ REPORT.md §13 (#516, HEAD `8e5f760`) の「修復 864/31/46/1 (clobber 0)」と
 | `73532f8` (c) の trap 内訳 (halt0 54 / oob 13) と本測定 (halt0 7–8 / oob 23–31) の差、(a) 818/21 の再測定 | 過去数値の解釈 | Issue #680 の子 |
 | `ldfix/embed_sx_ab.sh` (CAB-131 A/B) は ldfix 無しの base IR を install し build する。指紋・ldfix 検査で fail-closed になり、A/B は再実行できない | 旧 A/B 結果の再現不可 | PM 判断 (退役 or base 専用の明示 opt-out の設計) |
 | NC1 / NC1b / NC3 の再測定とログ行の証跡 (work-m11 無し)。本 HEAD では NC2 と一時コピーでの gate 分岐のみ実測 (§9) | 旧 rc 値の証跡が rc のみ | Issue #680 の子 (素材入手後に再測定) |
-| `m11_build.sh` 冒頭の `source /opt/emsdk/emsdk_env.sh` は emsdk 無しで rc 1 で落ちる (既存) | 前提不足の理由が見えにくい | PM 起票依頼 (前提チェックへの統合) |
+| `m11_build.sh` 冒頭の `source [EMSDK]/emsdk_env.sh` は emsdk 無しで rc 1 で落ちる (既存) | 前提不足の理由が見えにくい | PM 起票依頼 (前提チェックへの統合) |
 | DEFECTS.md への類型追加 (行案は §7) | カタログ未更新 | PM (docs/DEFECTS.md 更新) |
 
 ## 7. 類型行案 (DEFECTS.md 本体は未編集)
@@ -99,7 +99,7 @@ NC1 (capstone 未導入) は `bash tools/m11/m11_gen_ir2.sh` が exit 1 にな�
 |---|---|---|
 | 必須 1: `ldfix/audit_lsf_e2e.sh` が PE 無し前提で gen_ir2 を呼ぶ | 直した | `M11_LDFIX=0` の明示 opt-out (ir_conditions `ldfix=disabled`・build 拒否)。加えて、`3807851` で gen_ir2 が `tools/shared/env.sh` を source するようになったため、複製に `tools/shared` を含める (無いと source で失敗)。end-to-end は素材無しで未実行 |
 | 必須 2: 既存 work/ の回復経路 (`m11_e2e.sh`) | 直した | ldfix 未記録・指紋不一致・PE 変更で gen_ir2 を自動実行。`alloca/e2e.sh` は指紋を bind して継続可。`ldfix/embed_sx_ab.sh` は §6 で PM 判断 |
-| 必須 3: `--full` の PE・repo 外パス | 直した (未実行) | `m11_scan/bounds/tail/lift/lift_all/postjs` を env・相対パスに。`/opt/retdec` 無しで未実行 |
+| 必須 3: `--full` の PE・repo 外パス | 直した (未実行) | `m11_scan/bounds/tail/lift/lift_all/postjs` を env・相対パスに。[RETDEC] 未取得のため未実行 |
 | 必須 4: PR 本文 (Refs・oc_artifacts・検証・起票先) | 直した | PR 本文を更新 (`Refs #680`・`oc_artifacts` 行・検証 節・未解決の起票先) |
 | 推奨 5: fail-closed の取りこぼし | 直した | lift 4 chunks・tail・lift boot4・m11_scan・bounds・data/image・lb_check を `must` に |
 | 推奨 6: NC の証跡が rc のみ | 未対応 (素材無し) | 本 HEAD では NC2 のみ再実行 (§9 上部)。他は §6 で再測定を起票依頼 |
@@ -111,12 +111,12 @@ NC1 (capstone 未導入) は `bash tools/m11/m11_gen_ir2.sh` が exit 1 にな�
 | Copilot: PE 変更で成果物が無効化されない | 直した (lift は未対応) | `pe` を比較し不一致なら gen_ir2・data/image を作り直し。build は pe 不一致を拒否。lift 成果物の PE 指紋は未対応 (§6) |
 | Copilot: 検証範囲の索引 (環境間一致) | 直した | DOC_MAP の索引を「本 runner の n=2 のみ・環境間一致は未実測」に |
 | Copilot: repo 外の絶対パス (WORKFLOW・本書) | 直した | `FL_WIN64_DIR` 経由・記述を一般化 (`docs/REFERENCES.md` の ID 参照) |
-| Copilot: REPORT §14 の数値重複 | 直した | 数値を削除し導線のみ (数値の正は本書) |
+| Copilot: REPORT §15 の数値重複 | 直した | 数値を削除し導線のみ (数値の正は本書) |
 | Copilot: 直接原因の断定 | 直した | §1 を「確認できた機構」と「断定しない」に分けた |
 
 起票依頼 (PM / ユーザ判断。Issue 番号は未起票):
 - `--full` を実走させ、lift 成果物がどの PE から出たかを記録する (PM 起票)。
-- `ldfix/embed_sx_ab.sh` (CAB-131 A/B) は新しい指紋・ldfix 検査で拒否される。退役するか、base 専用の明示 opt-out を設計するか (PM 判断)。
+- `ldfix/embed_sx_ab.sh` (CAB-131 A/B) は新しい指紋・ldfix 検査で拒否される。退役するか、base 専用の明示 opt-out を設計するか (PM 判断・追跡 issue は未起票。起票依頼)。
 - NC1/NC1b/NC3 の再測定、n≥3、環境間一致、work-m11 の R2 再投入 (Issue #680 の子・素材権限者)。
 - `m11_build.sh` の emsdk 前提の明示チェック (既存・PM 起票)。
 - DEFECTS.md の類型追加 (PM)。

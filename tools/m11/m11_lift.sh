@@ -6,7 +6,7 @@ HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 cd "$HERE"
 source ../shared/env.sh   # FL_WIN64_DIR (#680: PE は env 経由)
 mkdir -p work
-BIN="${PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}"
+BIN="${M11_PE:-${PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}}"
 export TMPDIR="$HERE/work/tmp"
 mkdir -p work/tmp
 

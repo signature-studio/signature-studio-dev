@@ -27,7 +27,8 @@ must() { # must <label> <cmd...> : fail-closed (#680). IR 生成・build の失�
   echo "M11_SUMMARY {\"reached_stage\":0,\"stop_reason\":\"$label failed (fail-closed)\"}"; exit 1
 }
 
-PE="${PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}"
+PE="${M11_PE:-${PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}}"
+export PE M11_PE="$PE"
 miss=0
 [ -f "$PE" ] || { step "PE バイナリ無し: $PE"; miss=1; }
 [ -x /opt/emsdk/emsdk_env.sh ] || [ -f /opt/emsdk/emsdk_env.sh ] || { step "emsdk 無し"; miss=1; }
@@ -49,6 +50,7 @@ if [ $FULL = 1 ] || [ $need_lift = 1 ]; then
     must "lift boot4 #$it" bash m11_lift.sh work/boot_ranges_extra.txt boot4 600
     must "gen_ir2 #$it" bash m11_gen_ir2.sh
   done
+  [ -f m11_extra_ranges5.txt ] && { must "lift boot5 (RetDec)" bash m11_lift.sh m11_extra_ranges5.txt boot5 600; must "gen_ir2 (boot5 追加)" bash m11_gen_ir2.sh; }
 else
   # #222: IR の VA→LVA remap は M11_LB_BASE 依存。stamp が違えば lift 成果物 (LB 非依存) から IR だけ再生成
   # #680 (review): 既存 work/ の回復 — ldfix 未記録 (旧スナップショット)・IR 指紋不一致・PE 変更でも gen_ir2 を走らせる
@@ -56,6 +58,13 @@ else
      || [ "$(python3 m11_cond.py --get ldfix)" != applied ] || ! python3 m11_cond.py --check work/boot_final.ll \
      || [ "$PE_PREV" != "$PE" ]; then
     must "gen_ir2 (M11_LB_BASE=${M11_LB_BASE:-0})" bash m11_gen_ir2.sh
+  fi
+fi
+# #132: boot5 = 間接 call 先の fallback 実装 (m11_extra_ranges5.txt, 25 関数). 無ければ RetDec で lift して IR を作り直す
+if [ -f m11_extra_ranges5.txt ]; then
+  [ -f work/boot5.lift.ll ] || must "lift boot5 (RetDec)" bash m11_lift.sh m11_extra_ranges5.txt boot5 600
+  if [ work/boot5.lift.ll -nt work/boot_final.ll ] || ! grep -q '^define [^@]*@function_457860(' work/boot_final.ll; then
+    must "gen_ir2 (boot5 追加)" bash m11_gen_ir2.sh
   fi
 fi
 echo "${M11_LB_BASE:-0}" > work/ir_lb_base.stamp
