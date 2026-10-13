@@ -59,6 +59,7 @@ node harness/compare.mjs work/emfire_200_1.bin work/licE/mod.cjs work/licE/sigs.
 
 echo "== [4b] KH-11b (#249): snap-in ブラウザ分類 0x180ef7fc0 の lift (module F) → 分類ゲート/カテゴリ実行検証 + 47 ctor の RTTI 同定"
 python3 lic_build.py --module F | tail -1
+python3 scripts/kh249_product_index.py
 node kh249_check.mjs | tail -1
 python3 scripts/kh249_id_scan.py --json work/id_scan.json | tail -1
 

@@ -86,6 +86,7 @@ def main():
     ap.add_argument('--rounds', type=int, default=8)
     a = ap.parse_args()
     rounds = []
+    closed = False
     for n in range(1, a.rounds + 1):
         f = load_f()
         lift = list(f['lift'])
@@ -104,10 +105,15 @@ def main():
         rounds.append(rec)
         print(json.dumps(rec, ensure_ascii=False))
         if not todo:
+            closed = True
             break
         set_key('lift', lift + todo)
     os.makedirs(os.path.dirname(ROUNDS_JSON), exist_ok=True)
     json.dump(rounds, open(ROUNDS_JSON, 'w'), indent=1, ensure_ascii=False)
+    # 閉包に到達したとき (todo == []) だけ成功。--rounds を使い切った場合は、追記した lift が未検証のまま残るため非 0
+    if not closed:
+        print('FAIL: --rounds %d 内に閉包 (todo == []) へ到達せず。最終 lift 集合は未検証' % a.rounds, file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == '__main__':

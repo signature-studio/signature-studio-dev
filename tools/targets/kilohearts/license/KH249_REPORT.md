@@ -105,6 +105,7 @@
 - `[EMSDK]/upstream/emscripten/cache` が読取専用で `emcc` が filelock の PermissionError (`js_output.lock`) で失敗 → `KH_EM_CACHE=<書込可 dir>` を指定 (`lic_build.py`)。`emsdk_env.sh` が `EM_CACHE` を unset するため source 後に再設定している。
 - Python は `uv venv work/venv` に `pefile capstone numpy` を入れて PATH 先頭に置く (system python は PEP 668 で pip 不可)。
 - `plugins-kilohearts` は Windows zip だけ展開 (`work/win` → `work/blobs/windows.zip/*` → `work/winpkg`)。macOS dmg / llvm-lipo は本チケットでは不要。
+- **`work/winpkg/product_index.json` の入力元**: 素材 `plugins-kilohearts` の `Kilohearts Offline Installer.zip` → `payload.dat` 内 `index.json` の `releases[0].plugins` (87 件) のうち、formats が `bank` のみでない 46 件 (45 製品 + `core`)。生成は `python3 scripts/kh249_product_index.py` (`run_all.sh` [4b] から実行)。`extract_installer.sh` は `index.json` を `work/blobs/` に置くが `product_index.json` は作らないため、生成は本スクリプトが担う。素材または `KH_SRC` が無い場合・件数が 46 でない場合は exit 1 で止まり、`kh249_check.mjs` / `kh249_id_scan.py` も欠落時に明示メッセージで落ちる。
 
 ## 8. 既存欠陥の発見と修正 (スコープ内)
 - `harness/compare.mjs` (license 側コピー) に `bitsToF32/bitsToF64/f32bits` の定義が無く、float/double 引数を持つ関数 (matrix 0x1804f4180 / clipper) の比較が ReferenceError で落ちた。compare.json が生成されず `lic_build.py` は `trials_ok=None` を出すのみで、`run_all.sh` はそれを失敗扱いにしなかった (= **「200/200」未達のまま exit=0**)。`snapins/harness/compare.mjs` の同定義を移植して修正し、`run_all.sh [5]` で `trials_ok !== trials` を FAIL 化 (exit 1) した。この repo HEAD の license/harness 単体では matrix/clipper の比較は再現していなかった (KH-9 / KH-11 REPORT の記載値と食い違う経緯は未調査)。修正後の再実行で 12 系すべて 200/200 を確認 (§6.3)。

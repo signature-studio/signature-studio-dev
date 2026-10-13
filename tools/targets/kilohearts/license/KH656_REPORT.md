@@ -31,7 +31,7 @@
 | 分類 | 件数 | VA |
 |---|---|---|
 | shim (C 実装で置換、lift しない) | 4 | 0x180107430 (getManager) / 0x180f878e0 (new) / 0x180f8791c (delete) / 0x181384040 (memcpy) |
-| AVX2 (ymm 命令を含む、lift 不可) | 2 | 0x180f89cf0 / 0x180fb6124 (`i256` 検出は閉包展開の試行時の n1.ll で実測、§4) |
+| AVX2 (ymm 命令を含む、lift 不可) | 2 | 0x180f89cf0 / 0x180fb6124 (`scripts/kh656_census.py` が PE 関数範囲の逆アセンブルで ymm 命令を検出して実測、§4) |
 | fail-fast (未 lift、呼ばれると停止) | 34 | 0x180005000 0x180005c30 0x180005c50 0x18000caf0 0x18000f590 0x180021490 0x1800219b0 0x180021d40 0x1800448e0 0x1800541b0 0x18006ac50 0x18006c040 0x18010b6c0 **0x180112a30 (入口経路の先頭)** 0x18012e420 0x18012fba0 0x180130560 0x18013b9e0 0x18013c9c0 0x18024b2e0 0x1803965a0 0x180396b00 0x180396f40 0x18065bbd0 0x180c433b0 0x180c44b50 0x180c44d20 0x180c44d30 0x180c44d50 0x180c47b50 0x180ef8ef0 0x180ef92b0 0x180ef9b70 0x180fb5f5c |
 | **合計 (未 lift 扱い)** | **40** | (元 41 − lift 追加 2 + 新規出現 1 `18000caf0`) |
 
@@ -41,7 +41,7 @@
 
 | 項目 | 変更前 (PR #329 HEAD `d238c27` 相当) | 変更後 (本 PR) |
 |---|---|---|
-| `lic_build.py --module F` wall time | 24.9 s (retdec stage-0 10.8 s・emcc 11.8 s・user 37.0 s・sys 10.9 s。キャッシュ無し初回) | 同コマンド・キャッシュ有り (emcc 0.5 s。retdec は range key 不変のため再利用) |
+| `lic_build.py --module F` wall time (n=3, min–max) | 変更前の計測 (PR #329 HEAD) は emcc キャッシュ条件が揃っていないため比較から除外 | cold (`KH_EM_CACHE` 空の新規 dir) **16.30–16.46 s** / warm (同 dir 再利用) **2.69–2.72 s**。両条件とも `work/retdec0` 既存 (retdec 再実行なし)。差は emcc キャッシュの有無のみ |
 | wasm | 47,604 B | **54,394 B** (sha256 `7ba79e65ec158a711646316579e6f8bc3d8c12f47c61851710a5e2077b8c7707`) |
 | undefined import | 0 | 0 |
 | unlifted callee (kh_lower) | 41 | 40 (shim 4 を含む) |
@@ -77,4 +77,4 @@
 
 - 範囲内: module F の build (lift→stub→emcc)・`kh249_check.mjs` (17 項目)・未 lift callee の census。
 - 範囲外: 閉包展開の完了、分類結果の lift IR 照合、native oracle との突合、module A/B/E/snapin 6 種の再実行 (本変更は F のみ)。
-- 作業ログ: 素材 (`plugins-kilohearts` の Windows installer zip 3.8 GB) は `$RUNNER_TEMP/kh_src` に展開し、`tools/targets/kilohearts/work/winpkg` (gitignore) に Windows 側のみ展開。emsdk/retdec は `/opt/` 既設を使用。Python 依存は `$RUNNER_TEMP/kh_venv` (pefile/capstone/numpy)。
+- 作業ログ: 素材 (`plugins-kilohearts` の Windows installer zip 3.8 GB) は `$RUNNER_TEMP/kh_src` に展開し、`tools/targets/kilohearts/work/winpkg` (gitignore) に Windows 側のみ展開。emsdk/retdec は `[EMSDK]`・`[RETDEC]` (`docs/REFERENCES.md`) の既設を使用。Python 依存は `$RUNNER_TEMP/kh_venv` (pefile/capstone/numpy)。
