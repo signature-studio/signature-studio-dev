@@ -35,9 +35,20 @@
 
 注: `fix_f3c_fn` (関数単位収支門) の結果は変更していない。HEAD 版と変更版で `f3c_fns` の総数は 48 → 36 と減るが、それは block-local の 12 を外した分。
 
+### 3.1 コミット済み HEAD (`b5eeb32`) での再現
+
+`ldfix_509_e2e.sh` (HEAD, `EMSDK_ENV=/opt/emsdk/emsdk_env.sh`, 1 回実行、所要 142 s、load 1.03):
+
+- steps 1–5 完走。`ldfix` F1=902 / F1v=4 / F2=30 / F3a=3 / F3b=5 / F3c=36。
+- `audit_lsf.py` (修復前 → 新版): store 形 SUSPECT 8 関数 / 12 site → **0**。消費者形 pure 52 → **23**、mixed 124 → 119。
+- 12 関数の門を外したことによる `SUSPECT_USE` の増減は、上記 (§3) の旧版/新版の正規化差分と一致する (本体が異なる 12 関数のみ)。
+- ネガコン (step 5): NC:nc_store で 806740 が戻る (1 関数 / 1 site)、NC:nc_use で 1063090 が戻る。
+
+**未実施**: step 6 (wasm 再ビルド・survey) と step 7 (動的確認) は失敗。原因は e2e の設計: 修復前 IR を `M11_LDFIX=0` で作るため `ir_conditions.json` が `ldfix=disabled` となり、`m11_build.sh` が fail-closed で拒否する (`build_base.log`: `ir_conditions.json に ldfix=applied の記録無し`)。修復前後の wasm 比較 (受入条件 2 の動的確認) は未実施。
+
 ## 4. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 修復 (旧) を外した 12 関数の wasm 側の動的確認。liftdiff で native と突合していない | 門の変更が survey / liftdiff の結果を変えるかは未測定 | 本 issue の子 (要 `oc_artifacts: fl-win64 toolchain-emsdk work-m11 work-liftdiff`)。起票は PM 判断 |
-| wasm 再ビルドと survey 942 unit の突合 | 未実施 | 同上 |
+| 修復 (旧) を外した 12 関数の wasm 側の動的確認。liftdiff で native と突合していない | 門の変更が survey / liftdiff の結果を変えるかは未測定 | 本 issue の子。起票は PM 判断 (`oc_artifacts: fl-win64 toolchain-emsdk work-m11 work-liftdiff`) |
+| `ldfix_509_e2e.sh` steps 6–7 が `ir_conditions.json` の `ldfix=disabled` で build 拒否される | 動的確認 (wasm 比較) が再現できない | 本 issue の子、または #737 (LD-15)。PM 判断 |
