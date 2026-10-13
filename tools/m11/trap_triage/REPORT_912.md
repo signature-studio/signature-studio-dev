@@ -104,7 +104,7 @@
   - `m11_bounds.py` の入力 `tools/m2/work/ghidra_dll/functions_dll.csv` (Ghidra 12.1.4 出力) が無い。`fl-win64` の一覧 (25168 entry) に Ghidra 出力は無く、[GHIDRA] も無い。
   - `m11_build.sh` は [EMSDK] の `emsdk_env.sh` を要求するが、`toolchain-emsdk` は未指定で [EMSDK] が無い。
 - よって現 HEAD での既定値の再測定は未実施。不足の内訳 (この run の確認):
-  - `functions_dll.csv` は素材ではなく、Ghidra 12.1.4 headless (`tools/m2/README.md`・`DumpFunctions.java`) で作る中間物。[GHIDRA] (`/opt/ghidra`) は無く、JDK 21 は `/usr/lib/jvm/temurin-21-jdk-amd64` に有る。GitHub への到達は確認済み (200)。
+  - `functions_dll.csv` は素材ではなく、Ghidra 12.1.4 headless (`tools/m2/README.md`・`DumpFunctions.java`) で作る中間物。[GHIDRA] (`docs/REFERENCES.md`) は無く、JDK 21 (temurin) は runner 同梱のものを使う。GitHub への到達は確認済み (200)。
   - `toolchain-emsdk` は未取得 ([EMSDK] 無し)。PR 本文の `oc_artifacts:` 行に追加する。
   - `work/boot*.lift.ll` は RetDec の全 lift (`m11_lift_all.sh`) が無いと生成されない。`docs/WORKFLOW.md` §11 の実測は `--full` が 633 秒 (head `2e128c5c`) で、素材と Ghidra 出力が揃っている前提。
   - この run は fix モードの上限 40 分で、Ghidra の取得と解析・emsdk の導入・全 lift を連続で行うと上限に収まらないと判断した。途中で打ち切られると push も記録も残らないため、再測定は行わず、この記録と素材の追加指定に留めた。
