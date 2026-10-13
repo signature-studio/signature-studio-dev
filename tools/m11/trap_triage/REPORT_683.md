@@ -169,3 +169,9 @@ FL_WIN64_DIR=... PY=... bash tools/m11/trap_triage/liftdiff68_683.sh
 - **未確認**: 定数 1 がスタック slot のアドレスに置き換わった経路 (型推定・ptr 復元の pass) は未特定。`6cefb0` の OOB がこの分岐差から来るという因果も未検証。
 - **影響**: 修復の範囲 (ldfix 型か否か) は暫定でも判定しない (pass 未特定・因果未検証)。survey 再測定と退行確認は、修復を入れたときに行う。本 run では修復を入れていない (受入条件 2 は対象外)。
 - **起票**: 残り (型推定で byte 値が ptr 化される欠陥の特定と修復、280/659 の ok 化) は子 issue に分割する。
+- **経路の特定 (#1081, 実測)**: 素材 `work-m11` (旧生成) の `boot1.lift.ll` と、その上流の RetDec 生出力 `boot1.drc.ll` / `boot1.drc.c` で確認した。
+  - PE (`block00031_PE.bin`) の逆アセンブル (capstone): `815050` の `8158f5: mov r8b, 1` → `8158f8: call 6cefb0`。`6cefb0` は `6cf021: cmp byte ptr [rcx+0x496], r8b` で第 3 引数 (r8b) を比較に使う。
+  - `boot1.drc.c` (RetDec の C 出力) では `int64_t v69; // bp-255` → `function_6cefb0(v68, v68, &v69)`。`boot1.drc.ll` 126348 行でも `i64* nonnull %stack_var_-255`。
+  - 置換は **RetDec の段階で起きている**。`m2/ir_normalize.py` (ir5 前段) は該当の型変換を持たず、`m5/ir5_patch.py` は `patch_uninit_alloca` (未初期化 alloca への store 補完) のみで、値を ptr 化しない。よって原因 pass は `ir5_patch` ではない。
+  - RetDec の入力側で「8bit 即値 `r8b` を第 3 引数 (`int64_t*`) として推定した」ことが直接の原因と見られる。RetDec の型推定 (ptr 化) を止める修復は、RetDec 側か後段の再型付けのどちらかで入れる必要があり、未実装。
+  - 因果 (この差が 6cefb0 の OOB の原因か) と survey 再測定は未実施 (再生成 + build + 942 unit survey が 1 run に収まらないため)。受入条件 2・3 は子 issue に分割する。
