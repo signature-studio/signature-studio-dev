@@ -142,11 +142,16 @@ Fruity Slicer 2 は殻 (block 23663) とは別に C++ engine DLL (block 23664、
 
 ## 6. 検証 (コミット済み HEAD・4 core / 15 GiB の Actions runner)
 
-検証起点 commit は **53c2eb6** (以降の commit は REPORT.md のみ)。 以下は全てコミット済み HEAD で実行した。
+検証起点 commit は **5abf4d5** (#629 取り込み後の再検証。 以下は全てコミット済み HEAD で実行した。 旧 run の記録は履歴として残す)。
 
 | 項目 | 実測 |
 |---|---|
-| `sampler_e2e.sh` 全体 (最終版、HEAD 53c2eb6、inventory 済みから) | exit 0、**211.95 s** (開始時 load average (1 分) 1.31)。 内訳: 7 閉包の lift 79 s、残りは `closure_facts.py` + `matrix_check.py` |
+| **HEAD 5abf4d5 (#629 取り込み後)** `sampler_e2e.sh` | exit 0、**349 s** (開始時 load 0.72)。 `judge shells` PASS 7/7、許容 (`ALLOW_UNIMPL` / 名前リスト) は空、`matrix_check` 54/54、`ids_crosscheck` 7/7 |
+| **HEAD 5abf4d5** `sampler_engines.sh` | exit 0、**291 s**。 engine 2 本 `judge engines` PASS 2/2。 未実装 helper 188 / 128 |
+| **HEAD 5abf4d5** `sampler_nega.sh` | exit 0、**11 s**。 NC1–NC7 は全て期待どおり (期待外の rc なし) |
+| **HEAD 5abf4d5** `ids_crosscheck.py` / `unreached_unique.py` | exit 0、2 s / 2 s |
+| 初回 (inventory 無し、HEAD 5abf4d5 の前段として `work/` を生成した run) | exit 0、**884 s**。 `win_funcs` 等の inventory 生成が大半 |
+| 旧 (HEAD 53c2eb6、#629 取り込み前) `sampler_e2e.sh` | exit 0、**211.95 s** (開始時 load average (1 分) 1.31)。 内訳: 7 閉包の lift 79 s、残りは `closure_facts.py` + `matrix_check.py` |
 | 同 (HEAD aec2fac) | exit 0、276.46 s (開始時 load 1.97。 engine の後段 pass 2 プロセスと RetDec 1 本が同時に走っていた) |
 | 初版 (engine 込み、HEAD 56aeefe) | **exit 1**、921.34 s。 RetDec の C 出力段が終わらず私が 2 本を停止したため engine 判定が FAIL (§5)。 現行版は engine を `sampler_engines.sh` に分離 |
 | 7 閉包の lift 秒 (`status.csv` の seconds、3 回の合計) | 76 s / 109 s / 79 s (run 2 は並走プロセスがあり Slicex 15 → 23 s、Soundfont Player 33 → 57 s)。 プラグイン別の min–max は §1 の最右列 |
