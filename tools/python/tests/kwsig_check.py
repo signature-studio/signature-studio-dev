@@ -5,9 +5,11 @@
   2. fl_api の bind: kwlist 名での呼出し・VARARGS のみ関数の kwargs 拒否・省略任意引数
   3. stubs の既定値を持つ引数の kw 呼出しが PR 前 (stubs 署名のみ) の bind と同じ結果になる (既知の差だけ許可)
   4. kwlist の重複名 (arrangement.selectionSet) の扱い
+  10. stubs 既定値の評価器 (fl_api._default_value): midi.* 許可表・正の検証・負の対照・eval 不使用の静的ガード
 """
 import json
 import os
+import re
 import sys
 import types
 
@@ -112,7 +114,7 @@ pl.triggerLiveClip(index=1, blockNum=2)  # flags が gap。後続 velocity (stub
 assert last() == (1, 2), last()
 expect(TypeError, ch.getGridBit, index=1, useGlobalIndex=True)  # gap を越えた明示指定は従来どおり TypeError
 expect(TypeError, pl.triggerLiveClip, index=1, blockNum=2, velocity=5)
-# 未知の kwarg は既定値の評価 (stubs 由来の midi.* は eval できない) より先に TypeError
+# 未知の kwarg は既定値の評価 (stubs 由来の midi.* は利用者の midi から解決) より先に TypeError
 expect(TypeError, dv.linkToLastTweaked, 1, 2, eventId=3)
 
 # (8) PR 前の bind (stubs 署名のみ。fl_api._make の旧実装と同一ロジック) との新旧比較。
@@ -182,4 +184,43 @@ assert last() == (1, 2, 1), last()
 expect(TypeError, arr.selectionSet, selStart=5)  # 2 つ目の selStart が埋まらない (必須)
 expect(TypeError, arr.selectionSet, 1, selStart=5)  # kw は最初の出現にしか束縛されない
 expect(TypeError, arr.selectionSet, 1, 2, selStart=5)
+
+# (10) stubs 既定値の評価器 (_default_value)。eval は使わず許可した式だけを評価する。midi.* の値は利用者の midi から実行時に取る。
+EXPECTED_NAMES = {"midi.PIM_None", "midi.GT_All", "midi.LB_Status_Default", "midi.EKRes", "midi.MaxInt",
+                  "midi.ST_Int", "midi.PME_System", "midi.REC_None", "midi.GC_BackgroundColor", "midi.FPN_Param"}
+# (a) 全数列挙: sig の既定値のうち midi. を含むもの = 20 関数・21 引数・名前 10 種 (固定値)
+midi_args = [(m, n, p["name"], p["default"]) for m, fs in t["modules"].items() for n, e in fs.items() if e.get("sig")
+             for p in e["sig"]["params"] if p["default"] is not None and "midi." in p["default"]]
+assert len(midi_args) == 21 and len({(m, n) for m, n, _, _ in midi_args}) == 20, midi_args
+assert {d for _, _, _, d in midi_args} == EXPECTED_NAMES, {d for _, _, _, d in midi_args}
+# (b) 正の検証: 偽の midi (値は任意) を sys.modules に入れると、既定値がその値で host へ渡る
+FAKE = {nm.split(".")[1]: 9000 + i for i, nm in enumerate(sorted(EXPECTED_NAMES))}
+fake_midi = types.ModuleType("midi")
+fake_midi.__dict__.update(FAKE)
+sys.modules["midi"] = fake_midi
+tr = sys.modules["transport"]
+ch.setChannelPitch(1, value=5, pitchUnit=1, useGlobalIndex=False)  # pickupMode (midi.PIM_None) を省略
+assert last() == (1, 5, 1, FAKE["PIM_None"], False), last()
+tr.rewind(startStop=1)  # flags (midi.GT_All)
+assert last() == (1, FAKE["GT_All"]), last()
+tr.globalTransport(index=1, value=2)  # pmeFlags (midi.PME_System) と flags (midi.GT_All)
+assert last() == (1, 2, FAKE["PME_System"], FAKE["GT_All"]), last()
+mx.getEventValue(index=1)  # value (midi.MaxInt)。smoothTarget (stubs 既定 1) も同時に入る
+assert last() == (1, FAKE["MaxInt"], 1), last()
+# midi. 以外の既定値は従来の eval と同じ値 (既存挙動を変えない)
+for fs in t["modules"].values():
+    for e in fs.values():
+        for p in e["sig"]["params"] if e.get("sig") else []:
+            if p["default"] is not None and "midi." not in p["default"]:
+                assert fl_api._default_value(p["default"]) == eval(p["default"], {}), p["default"]
+# (c) 負の対照: 旧方式 (eval に midi を渡さない) は NameError。PR #463 の bind が落ちた原因
+expect(NameError, eval, "midi.PIM_None", {})
+# (d) 評価器の拒否: 許可表の外・許可した形の外は ValueError。1 / 24 は通る
+assert fl_api._DEFAULT_NAMES == EXPECTED_NAMES
+assert fl_api._default_value("1 / 24") == 1 / 24
+for bad in ["__import__('os')", "midi.NoSuch", "open", "'x'"]:
+    expect(ValueError, fl_api._default_value, bad)
+# (e) 静的ガード: 本番コードに eval( の呼出しを残さない
+src = open(os.path.join(ROOT, "src", "fl_api.py"), encoding="utf-8").read()
+assert re.search(r"\beval\s*\(", src) is None, "src/fl_api.py に eval( が残っている"
 print("kwsig_check: OK")
