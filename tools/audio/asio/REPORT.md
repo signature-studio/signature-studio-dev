@@ -245,4 +245,4 @@ bash tools/audio/e2e.sh --out tools/audio/work/results_parent.json   # 親 e2e 2
 | 負荷を掛けた状態 (並行 e2e) での再現試験が未実施 | 原因の切り分けができない | #998 |
 | 実行 A は HEAD `fef39e5` (別コミット)。同一 HEAD での再現ではない | 同一 HEAD の再現条件が未確定 | #998 |
 
-負荷下の再現試験 (L1〜L3) は [REPORT_APPENDIX_998.md](REPORT_APPENDIX_998.md) を参照。負荷下で完全実行 2 回中 1 回 underrun (`com_ramp_b256_d2`)。
+負荷下の再現試験 (L1〜L3・§12-3 の A〜D) は [REPORT_APPENDIX_998.md](REPORT_APPENDIX_998.md) を参照。負荷下の完全実行 6 回中 2 回 underrun (`com_ramp_b256_d2`)。underrun 時は ring 充填が 0 まで枯渇 (`min_fill=0`)。原因は未特定。
