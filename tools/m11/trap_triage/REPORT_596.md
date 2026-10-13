@@ -43,7 +43,7 @@
 - `536c20` = TList 系のコンストラクタ (`call 0x410320` ClassCreate → `40f9e0` TObject.Create → `5373f0` で `[self+8]` に items を設定、`410360` で AfterConstruction)。`410360` (AfterConstruction) の IR は `ret arg1` だけの関数で VMT 間接 call が脱落している (#419 / PR #446 REPORT §8.2 の観測。本 run では未再確認)。直前の入口が `410360` であることと、この脱落が items 破損の原因かどうかは別 (**推定**、未検証)。
 - 判定の実測: 単体 `SV_ONLY=291,296,304,555,923` は 5 unit とも **halt0 (oob ではない)**。unit 45 を前置すると 45 だけ oob に変わり、5 unit は halt0 のまま (n=1)。つまり oob になる条件は「前の unit 群が積んだ状態」。**書き込み元の関数までは特定できていない** (probe は入口単位で、関数内の書込み命令は見ていない)。
 
-未特定: `0x10a9f948` が items として書かれる経路。次の一手は `[g+8]` への store を wasm の watchpoint 相当 (IR の store に probe) で捕える。
+未特定: 値 (probe build では `0x10a9f948`、非 probe では `0x10a9f888`) が items として書かれる経路。次の一手は `[g+8]` への store を wasm の watchpoint 相当 (IR の store に probe) で捕える (→ #682)。
 
 ## 4. 414ad0 系 (4 unit) と #307 の OOB との突合
 
@@ -66,7 +66,7 @@ survey の 4 unit (149 158 280 659) は同じ連鎖 `414ad0 ← 414bb0 ← 65250
 
 **「同じ定義」は jsonl 基準で同じ定義という意味** (`oob_414ad0.py` と同じ: 関数ごとの「最初の `wasm_trap` case」が `memory access out of bounds` のもの)。
 #307 本文と `tools/liftdiff/REPORT_APPENDIX.md` §8 の「OOB 222・71 種」は別の集計 `results/m11_wasm_trap_triage.md` (verdicts TSV の tags に `wasm_trap` があり、最初の wasm_trap case の kind が oob) で、batch jsonl 基準の 239 とは **別 run の結果** (REPORT_APPENDIX §8 と `results/m11_wasm_trap_triage.md` §5: wasm_trap 関数は TSV 578 / jsonl 582 で、共通 511・TSV のみ 67・jsonl のみ 71)。
-TSV 基準では `414ad0` 68・`40ff70` 2 (下表の括弧内) で、jsonl 基準と同じ件数。TSV 222 は jsonl 239 の部分集合 (TSV のみ 0 / jsonl のみ 17)、jsonl のみの 17 関数はいずれも TSV の tags に `wasm_trap` が無い (`oob_cross307.py` の出力)。
+TSV 基準では `414ad0` 68・`40ff70` 2 (下表) で、jsonl 基準と同じ件数。TSV 222 は jsonl 239 の部分集合 (TSV のみ 0 / jsonl のみ 17)、jsonl のみの 17 関数はいずれも TSV の tags に `wasm_trap` が無い (`oob_cross307.py` の出力)。
 
 | 軸 | #307 liftdiff (jsonl 基準 / TSV 基準) | 本件 m11 survey |
 |---|---|---|
