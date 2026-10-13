@@ -239,5 +239,4 @@ FLEngine の PyMethodDef 表から 435/435 関数を対応付け、書式 303 �
 
 ## 14. 省略引数のホスト受け渡し方式と誤束縛 0 検証 (PY-15, #653)
 - **方式**: 末尾の省略は positional tuple を短くして C 側の既定値に任せる。既定値不明の途中の省略は呼出しを `TypeError` にする (sentinel は不採用、推測値で埋めない)。既定値は stubs の**同名**引数の単純リテラルだけ。
-- **検証**: `tests/kwsig_bind_check.py` — kwlist 103 関数・6122 呼出し: 誤束縛 0 / 不一致 0 → PASS。ネガコン (main の `fl_api.py`) は misbind 25 / mismatch 102 で FAIL。
-- 詳細・計測・未解決: [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §14。
+- **検証**: `tests/kwsig_bind_check.py` で kwlist 103 関数の全呼出しの誤束縛 0 を機械検証 (PASS)。ネガコン (main の `fl_api.py`) は FAIL。数値・ネガコン・未解決: [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §14。

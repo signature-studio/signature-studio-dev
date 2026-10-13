@@ -12,13 +12,13 @@
 | stubs clone | `FL_STUBS_DIR` | `tools/python/work/fl-stubs` (`fetch_inputs.sh` が clone) | exit 2 (旧: 例外) |
 | mac dylib | `FL_ENGINE_DYLIB` | `$FL_MAC_DIR/.../FLEngine_x64.dylib` | WARN + 出力先の既存 `flapi_table.json` の `midi_script_callbacks_in_binary` を引き継ぐ。引き継ぎ元も無ければ exit 2 (旧: 空配列で上書き) |
 | 出力先 | `FLAPI_OUT_DIR` | `analysis/flapi` | — |
-| emsdk | `EMSDK_DIR` | `/opt/emsdk` | exit 2 (link 段のみ) |
+| emsdk | `EMSDK_DIR` | `[EMSDK]` (`docs/REFERENCES.md`) | exit 2 (link 段のみ) |
 
 - PE 照合が 1 件も一致しない (別ファイル・破損) 場合も exit 2。`FLPY_TABLE_ONLY=1 bash build_flpy.sh` は table / ids / `FLAPI.md` の再生成だけで終了 (emsdk・CPython wasm 不要)。
 - 副次: 旧 `flapi_table.py` は `FLAPI.md` 先頭の「自動生成・人手編集禁止」ヘッダを出力せず、再生成で追跡中のファイルが差分になっていた。生成側に移した。
 - 検証: `FL_WIN64_DIR=<fl-win64 展開先> bash tests/flapi_table_check.sh` (出力先は一時ディレクトリ。追跡中のファイルは書き換えない)。判定: 再生成 3 ファイルが追跡中とバイト一致 + `win_pair_verified=true` > 0 + ネガコン 6 本が全て exit 非 0 + 理由表示 + 出力不変。前提入力が無ければ exit 3 (NOT VERIFIED)。
 - 実測 (Actions runner、oc_artifacts: fl-win64 toolchain-emsdk、直列、n=3): 3 回とも exit 0・wall 2.20 / 2.20 / 2.20 秒・load average 0.13〜0.20。正常系 3 / 3 ファイル一致 (差分 0)、`win_pair_verified=true` 388 件 (REPORT §3 の 388/399 と一致)。ネガコン 6 本 (PE 無し / PE 空 / PE が別物 / stubs 無し / emsdk 無し / dylib も既存 table も無し) は全て exit=2 + 理由表示。
-- gate 自体のネガコン: 入力 PE を乱数 1 MB に差し替えると `flapi_table_check.sh` は exit 1、PE 無しは exit 3 (どちらも緑にならない)。範囲外: `build_flpy.sh` の emcc link 段 (CPython wasm の事前ビルド `build_cpython_wasm.sh` が必要で未実施。emsdk の実在 `/opt/emsdk/emsdk_env.sh` のみ確認)、`fetch_inputs.sh` / `run_all.sh` の `/home/ubuntu` 固定パス (run_all.sh の `FL_MAC` / `FL_WIN`)。
+- gate 自体のネガコン: 入力 PE を乱数 1 MB に差し替えると `flapi_table_check.sh` は exit 1、PE 無しは exit 3 (どちらも緑にならない)。範囲外: `build_flpy.sh` の emcc link 段 (CPython wasm の事前ビルド `build_cpython_wasm.sh` が必要で未実施。emsdk の実在 `[EMSDK]` の `emsdk_env.sh` のみ確認)、`fetch_inputs.sh` / `run_all.sh` の `/home/ubuntu` 固定パス (run_all.sh の `FL_MAC` / `FL_WIN`)。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
@@ -79,7 +79,7 @@ stubs (LGPL 参照) 署名との照合 (kwlist のある 103 のうち stubs 署
 
 - kwlist 関数の検証定義: misbind = 位置 j ≥ k の値が「その位置の kw 識別子 (値 200000+最初の位置)」でも「同名 stubs 既定値」でもない。mismatch = それ以外の不一致 (期待と違う例外・長さ・値)。
 - 期待値は `flapi_table.json` の仕様 (kwlist・required・同名リテラル既定値) から `tests/kwsig_bind_check.py` 内で組む (`src/fl_api.py` の実装は見ない)。positional のみ (kw 0 個) は既存仕様どおり素通し。
-- MCP 14 パターンは旧 main でも 14/14 PASS した。REPORT §12 旧記述の「旧 main は 13/14 (`plugins.getParamValueString` の `NameError`)」は、本 run の抽出形式 (positional 個数 = CALL の argc) と値検査付き判定では再現しなかった。旧計測の呼出し形式は不明で、**原因未確定**。起票先: 既存 #653 へのコメント (PM 依頼。文面は PR #686 のコメント)。
+- MCP 14 パターンは旧 main でも 14/14 PASS した。REPORT §12 旧記述の「旧 main は 13/14 (`plugins.getParamValueString` の `NameError`)」は、本 run の抽出形式 (positional 個数 = CALL の argc) と値検査付き判定では再現しなかった。旧計測の呼出し形式は不明で、**原因未確定**。起票先: #653 (PM コメント 2026-10-13 09:04Z で本 issue 追跡と記載済み)。
 
 ### 検証環境
 - 実測 load average・秒は表の値。`tests/kwsig_bind_check.py` の並列 1 本、Python 3.14、`tools/python` の既存テスト (`kwsig_check.py`) と同一条件。
@@ -91,6 +91,7 @@ stubs (LGPL 参照) 署名との照合 (kwlist のある 103 のうち stubs 署
 - (a) 名前だけ違う同位置の既定値を引き継がない → 末尾は省略 (C 側の既定値)、途中は `TypeError`。対象 8 関数: channels.getChannelVolume / soloChannel / setChannelPitch, mixer.getTrackVolume / getEventIDName / automateEvent, general.saveUndo, device.forwardMIDICC。
 - (b) 旧が位置をずらして誤束縛していた → 新は束縛せず `TypeError`。対象 2 関数: plugins.getColor (useGlobalIndex を paramIndex の位置へ)、plugins.getParamValueString (5 引数目を渡す)。
 - (c) バイナリは 5 引数なので旧の 6 つ目 (useGlobalIndex の stubs 既定値) を渡さない。対象 1 関数: channels.getStepParam。
+- 注 (基準の範囲): (a)〜(c) の対象は上の 224 件基準 (旧 bind が通った呼出しのみ)。6122 基準の拒否 19 件には、この 8 関数に入らない `device.linkToLastTweaked` (3 件: 位置 0〜2 + kw `eventID`) が含まれる。stubs の `global_link` (既定 `False`) が kwlist の `globalLink` (同位置・名前違い) に当たり (a) と同型。224 件基準から外れたのは、旧 bind 側で stubs 既定値 `midi.REC_None` を eval すると `NameError` になるため (`kwsig_check.py` (8) は旧が `ok` の呼出しだけを比べる)。
 
 **挙動変更の内訳 (旧 = main `8d883c3` の fl_api.py、新 = 本 PR)**: `tests/kwsig_bind_check.py --dump` の全 6122 ケースを `tests/kwsig_behavior_diff.py` で比べた。値の表示は識別子 (位置引数 = 100000+i、kw = 200000+i)。再現: `python3 tests/kwsig_bind_check.py --src <main の src> --dump old.jsonl; python3 tests/kwsig_bind_check.py --dump new.jsonl; python3 tests/kwsig_behavior_diff.py old.jsonl new.jsonl` (2 回実行、出力のバイト一致)。
 
@@ -151,7 +152,7 @@ cases 6122
 | `mcp_kwcalls_bind.py` (本 PR) | 14 パターン | 14/14 PASS | 0 |
 
 **wasm 回帰 (本 PR head。`fetch_inputs.sh`・`build_flpy.sh`・`provider/build.sh` を同一 worktree で実行)**
-- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` (2,324,302,252 B) を `tar --zstd -xf` で `$RUNNER_TEMP/fl-win64` に展開 (6.4 秒、`extracted/` 25,166 件)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`。`$ARTIFACTS_DIR/toolchain-emsdk.tar.zst` の実在を確認し、`/opt/emsdk` (emcc 6.0.12) を使用。
+- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` (2,324,302,252 B) を `tar --zstd -xf` で `$RUNNER_TEMP/fl-win64` に展開 (6.4 秒、`extracted/` 25,166 件)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`。`$ARTIFACTS_DIR/toolchain-emsdk.tar.zst` の実在を確認し、`[EMSDK]` (emcc 6.0.12) を使用。
 - CPython 3.12.1 wasm: `build_cpython_wasm.sh` rc=0、4 分 07 秒 (native + wasm)。
 - `fetch_inputs.sh` + `build_flpy.sh` + `provider/build.sh`: rc=0、8.9 秒。WARN は mac dylib 無し (既存の `midi_script_callbacks_in_binary` 27 件を引き継ぎ・既知)。ビルド後 `git status` に tracked の差分なし。
 - `node tests/all_tools.mjs` (JS mock): 48/48 ok、soft_error 0、raised 0、host_calls 37,425、callback_roundtrip true、rc=0、1.967 秒。
@@ -167,10 +168,10 @@ cases 6122
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 旧 main の 13/14 (§12 旧記述) の再現条件が不明 | 判定結果には影響しない (main も 14/14) | 既存 #653 へのコメント (PM 依頼) |
+| 旧 main の 13/14 (§12 旧記述) の再現条件が不明 | 判定結果には影響しない (main も 14/14) | #653 (PM コメント 2026-10-13 09:04Z で追跡) |
 | 省略引数の C 側既定値との一致 (実機) | 期待値は stubs 同名既定値を正とする | #81 (a) |
-| kwlist なし `channels.incEventValue` の `1 / 24` 既定値の消失 | 検証範囲外。kwlist なし関数の省略時の値が変わる (上の追補) | PM 依頼 (PR #686 コメント) |
-| provider の `None` と JS mock の `undefined` による省略の表し方の統一 | 本 PR は省略を短い tuple で渡す。provider・mock 側の扱いは未確認 | PM 依頼 (PR #686 コメント) |
+| kwlist なし `channels.incEventValue` の `1 / 24` 既定値の消失 | 検証範囲外。kwlist なし関数の省略時の値が変わる (上の追補) | #711 (PY-17) |
+| provider の `None` と JS mock の `undefined` による省略の表し方の統一 | 本 PR は省略を短い tuple で渡す。provider・mock 側の扱いは未確認 | #712 (PY-18) |
 | `run_all.sh` step 4 の `/home/ubuntu` 固定 | run_all 全体は本 run で未実行 | #630 (既存) |
-| `tool_coverage.json` の tracked 版が main の既存コードの出力と不一致 (37,424 vs 37,425) | 生成物の更新漏れ。本 PR の変更とは無関係 (旧 main でも同じ出力) | PM 依頼 (PR #686 コメント) |
-| `browser_check` / `mcp_ui_check` / `midi_ui_check` 未実行 | UI 側の影響は未検証 | PM 依頼 (PR #686 コメント) |
+| `tool_coverage.json` の tracked 版が main の既存コードの出力と不一致 (37,424 vs 37,425) | 生成物の更新漏れ。本 PR の変更とは無関係 (旧 main でも同じ出力) | #712 (PY-18) |
+| `browser_check` / `mcp_ui_check` / `midi_ui_check` 未実行 | UI 側の影響は未検証 | #712 (PY-18) |
