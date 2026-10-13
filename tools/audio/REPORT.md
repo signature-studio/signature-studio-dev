@@ -240,6 +240,6 @@ DirectSound shim を実装 (secondary = 循環バイト列, pump が T まで充
 
 検証: 素材 `fl-win64` を `$RUNNER_TEMP/fl-win64` へ展開 (7.5 s) し `FL_WIN64_DIR` に指定。HEAD `321c94fa` (適用済み・audio.ts 削除後) で `bash tools/audio/integration/e2e.sh`: **13/13 PASS, exit 0, 67 s** (e2e.sh 全体)。同条件の直前 run (`3c52be7a`) は 13/13 PASS, 63 s / 60.7 s、その前の run は 13/13 PASS, 70 s。tsc --noEmit OK。
 
-dev 側で一度 `dev:tone` / `dev:underruns` が FAIL (underruns=1, zero_runs=1) した (run4 とは別。`e5f043c3` の run3 相当) が、同 HEAD の再実行は全 PASS。再現性は未確定のため、dev 側の初回 underrun は要監視。
+旧パッチ適用経路 (`e5f043c3`・index.ts 未コミット状態) の 3 回目 run では dev 側 `dev:tone` / `dev:underruns` が 1 回だけ FAIL (underruns=1, zero_runs=1)。以降の 3 run (`2d68a5bd`〜`321c94fa`) は dev/preview とも全 PASS。再現性は未確定のため、dev 側の underrun は要監視。
 
 残り: `public/worklets/dummy-worklet.js` は `deploy/probe/policy-check.mjs`・`tools/e2e/suite/checks.mjs` が参照するため今回は削除せず (管轄: #62 系 / tools/e2e)。`tools/e2e` スイートの再実行は未実施。
