@@ -215,7 +215,7 @@ T12 は「join split が発動すること」を assert していたが、LIFTLI
 ### 15.4 検証範囲・範囲外
 - 範囲: 上表の e2e が旧成果物・liftlib 成果物に対し PASS すること、対応表の記載。
 - 範囲外: 旧 dir スクリプトへの実行禁止の機械的強制 (注記のみ)。`recipes/ott` (#12–16, 18) の insn.addr 駆動汎用化。
-- **lift 段を揃える手順 (LIFTLIB-11 / #887 で追記)**: RetDec raw の alloca 並びは実行ごとに変わり得る (k80 の ASLR on/off 間で `run_base` 後も 58 行差、8 本中 2 種を実測)。前後比較で k80 系の成果物を揃えるには、`run_base` の後に `base.canon_alloca_order` を適用して比較する (`tools/liftlib/lift_determinism_e2e.sh` の判定と同じ手順)。詳細は `REPORT_APPENDIX_D.md` §23.4。`run_base` の既定出力は変えていない。
+- **lift 段を揃える手順 (LIFTLIB-11 / #887 で追記)**: RetDec raw の alloca 並びは実行ごとに変わり得る (k80 で `run_base` 後の base.ll が 8 本中 2 種に割れることを実測。揺れは ASLR 設定とは対応しなかった)。前後比較で k80 系の成果物を揃えるには、`run_base` の後に `base.canon_alloca_order` を適用して比較する (`tools/liftlib/lift_determinism_e2e.sh` の判定と同じ手順)。詳細は `REPORT_APPENDIX_D.md` §23.4。`run_base` の既定出力は変えていない。
 
 ### 15.5 未解決 (起票先付き)
 | 未解決 | 影響 | 起票先 |
