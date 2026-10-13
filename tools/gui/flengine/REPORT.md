@@ -9,11 +9,11 @@
 
 ## 1. 結論と実測
 
-検証コード: `d46b024` (`main` (`df0704a`) を取り込んだ merge commit) で得た e2e 実測。`results/*.json` はその時点の値のまま (`7a73c02` での再測定は未実施。§6)。環境: runner 4 vCPU, node v22.23.3, emcc ([EMSDK], pin 6.0.12)、retdec ([RETDEC])、素材 work-m11 + fl-win64 (`docs/REFERENCES.md` の [WIN64])、x86_64-w64-mingw32-gcc (apt-mingw)、pefile / capstone (pip)。work-m11 素材の `boot_final.ll` は ldfix 未適用 (ir_conditions.json 無し) のため、`m11_gen_ir2.sh` で作り直して (ldfix=applied) から e2e を回した。e2e 本体は IR を再生成しない。
+検証コード: `d46b024` (`main` (`df0704a`) を取り込んだ merge commit) で得た e2e 実測。`results/*.json` と `IMPORTS.md` はその時点の値のまま。現 HEAD (`edc5b2e` 以降) での再測定は未実施 (素材不足。§6)。環境: runner 4 vCPU, node v22.23.3, emcc ([EMSDK], pin 6.0.12)、retdec ([RETDEC])、素材 work-m11 + fl-win64 (`docs/REFERENCES.md` の [WIN64])、x86_64-w64-mingw32-gcc (apt-mingw)、pefile / capstone (pip)。work-m11 素材の `boot_final.ll` は ldfix 未適用 (ir_conditions.json 無し) のため、`m11_gen_ir2.sh` で作り直して (ldfix=applied) から e2e を回した。e2e 本体は IR を再生成しない。
 
-**判定**: `d46b024` の e2e 実測 (n=3) は 10/12 (FAIL 2 件 = B1・S2)。その後 judge の判定式を次のとおり直し、committed の結果 JSON に対して **12/12 PASS** を確認した (`judge.py --dir` 再計算。e2e の再実行ではない)。判定の期待値 (units_run 52、ok/miss/trap、STUB 集合) は緩めていない。
+**判定**: `d46b024` の e2e 実測 (n=3) は 10/12 (FAIL 2 件 = B1・S2)。PM 決定 (#571 コメント) に従い判定式を次のとおり直した。期待値 (units_run 52、ok/miss/trap、STUB 集合) は緩めていない。現 HEAD で e2e を再実行した判定結果は未取得 (§6)。
 - B1: baseline 側の `threw` を shim 側 `boot_threw` と比較 (両者 `memory access out of bounds`、同じ unit 52 で停止)。
-- S2: fail-fast のうち `IMPORTS.md` で STUB のものだけを対象にし、IMPL 側の未対応 action (`SystemParametersInfoW`) は INFO 行に出す (§7 の (a))。
+- S2: 旧式 (`7a73c02`) のまま。fail-fast した API (`LoadImageW` と IMPL 側の `SystemParametersInfoW`) は soft で STUB であることを要求する。IMPL 側の未対応 action は #563 で実装する (PM 決定、§7)。`d46b024` の実測では S2 が FAIL する (期待どおり、§6)。
 
 | 項目 | 実測 (n=3 の範囲) | 定義 / 分母 |
 |---|---|---|
@@ -133,14 +133,13 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 - `bash tools/gui/flengine/e2e.sh` (`d46b024`, n=3): rc 1 / **judge 10/12 (FAIL: B1・S2、3 回とも同一)**。所要 **97 / 91 / 92 秒** (`6/6 done` 行の load: 1.12 / 1.01 / 1.25)。
   - PASS 10: L1 (ff・soft 各 0/0/0)、A1 (declare 177 = adapter 177、impl 158 / stub 19、c=d=0)、R1 (`LoadStringW` IMPL)、R2 (到達 27 ≥ floor 19)、S1 (soft 865/1/47/29 = base)、P1〜P4 (atoms −16383/−16382、hwnd 0x210000e、screen DC 0x120000f、hook calls [2,4])。
   - B1 (`d46b024` 実測では FAIL): `units_run` 52 = base 52、`GetMem` 560 / `FreeMem` 20 / `icall_miss` 5 は一致。shim 版の `boot_threw` は `memory access out of bounds`。baseline の `threw` も同じ文字列 (shim 無しでも unit 52 で停止)。旧比較式は `boot_threw is None` で、baseline 側を見ていなかった。現在の式は `boot_threw == baseline.threw` (判定式の修正、§7)。
-  - S2 (`d46b024` 実測では FAIL): ff survey の fail-fast = `LoadImageW` (STUB, 1 unit) + `SystemParametersInfoW` (IMPL の未対応 action, 2 unit)。現在の式は STUB 集合のみを対象とし、`SystemParametersInfoW` は INFO (`IMPL-side fail-fast`) に出す。
-  - ネガコン 5/5 は期待どおり FAIL (N1 R1 / N2 B1 / N3 R2 / N4 S1 / N5 selftest rc 134)。pe_image parity P1・P2・N1〜N3 PASS (exit 0)、`pe_image_e2e` P1・P2・N1・N2 PASS。
-  - 選択 (§7): 判定の期待値は変えていない。B1 と S2 の修正は PM 判断。
+  - S2 (`d46b024` 実測では FAIL, 期待どおり): ff survey の fail-fast = `LoadImageW` (STUB, 1 unit) + `SystemParametersInfoW` (IMPL の未対応 action, 2 unit)。`SystemParametersInfoW` は soft 側で STUB ではないため S2 は FAIL する。解消は #563 での action 実装 (PM 決定、§7)。判定式は緩めていない。
+  - ネガコン 5/5 は期待どおり FAIL (N1 R1 / N2 B1 / N3 R2 / N4 S1 / N5 selftest rc 134)。pe_image parity P1・P2・N1〜N3 PASS (exit 0)、`pe_image_e2e` P1・P2・N1・N2 PASS。 (注: 上記の 5/5 と pe_image の実測は `d46b024` 時点。現 HEAD では未取得。)
 - 前回 (`e6f2d7c` / `e391713`、main 取り込み前) の測定: judge 12/12、所要 108 / 109 / 113 秒。main 取り込みで baseline (`units_run` 22 → 52) が変わったため、旧値は現 HEAD では無効。
 - `bash tools/gui/e2e.sh` (GUI 本体 e2e) は本 run では未再実行。前回値 (取り込み前) は現 HEAD では無効。
 
-**`7a73c02` (fix run) で実行したもの**: `pe_image_parity.py --pe block00031_PE.bin` = exit 0 (P1・P2・N1〜N3 PASS)。`judge.py` (committed 結果 JSON の再計算) = 12/12 PASS。
-**未実施 (素材不足; `$ARTIFACTS_DIR` に fl-win64 のみ)**: `e2e.sh` / `build.sh` / `gen_api.py` (mingw 無し)、`pe_image_e2e.sh` (retdec 無し)、`gui/e2e.sh`。`results/*.json` と `IMPORTS.md` は `d46b024` 時点のまま。n≥3 の min–max 再測定は次の run で行う。
+****現 HEAD で再実行できなかったもの (素材不足; `$ARTIFACTS_DIR` に fl-win64 のみ)**: `e2e.sh` / `build.sh` / `gen_api.py` (mingw 無し)、`pe_image_e2e.sh` (retdec 無し)、`gui/e2e.sh`。`results/*.json` と `IMPORTS.md` は `d46b024` 時点のまま。
+**注意**: `judge.py` は `build_ff.log` / `build_soft.log` (リンクログ・adapter 行) も読むため、`results/` だけでは再計算できない (`judge.py --dir results` は FileNotFoundError)。judge の再現は e2e の実行 (`build_*.log` を含む作業ディレクトリ) が必要。n≥3 の min–max 再測定と judge 12/12・ネガコン 5/5 の実測は素材の揃う run で行う。
 
 個別の単発計測 (開発中・取り込み前): baseline survey 16.9 秒 / 結合 build 10.6〜17.0 秒 / 結合起動 0.371 秒 / 結合 survey 18.2〜24.1 秒。
 `git status --porcelain -- tools/gui` は commit 後クリーン (results と IMPORTS.md は再生成しても差分 0)。
@@ -155,7 +154,7 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 | `function_52a7f0` の `TempClass.lpfnWndProc` load 脱落 (§5-2) | AllocateHWnd 経路 (TPUtilWindow = Timer / 非同期 window) が全滅 | ldfix 系の子チケットを PM が起票 (本 REPORT の DEFECTS 行案) |
 | WNDCLASS 静的実体の WNDPROC を closure seed に追加する pass (`TLightweightLayeredControl` 0x31dd10 ほか) | その class の窓生成が NULL | m11 / icall 系で PM が起票 (#90 の間接 call 復元と近い) |
 | `LoadImageW` 実装 (P2 STUB、survey で fail-fast 1 unit) | survey の 1 unit が fail-fast | GUI-2 系 (P2 stub 昇格, #174 に所見) |
-| `SystemParametersInfoW` の未対応 action (IMPL 側 fail-fast、survey 2 unit) | S2 は STUB 由来のみを判定し、IMPL 由来は INFO に出す (判定式の修正、§6)。action 自体は未実装 (2 unit、survey で止まる) | GUI-3 #174 の子チケット候補 (PM 判断: action の実装 or 残す) |
+| `SystemParametersInfoW` の未対応 action (IMPL 側 fail-fast、survey 2 unit) | S2 が FAIL する (§6)。PM 決定: 未対応 action は `FALSE` + `ERROR_INVALID_PARAMETER` を返す方針で #563 に実装し、判定式は緩めない | #563 (PM 決定、merge 順 #563 → #571) |
 | main 取り込みによる m11 起動の unit 52 停止 (`memory access out of bounds`) | shim 無しの baseline でも同じ停止。B1 は baseline の `threw` と一致を要求する形に修正済み。起動の完走 (DllMain 完了) は未達 | m11 #134 系 (PM 判断) |
 | `LoadStringW` 多数回の unit 特定と資源供給 hook (`gui_set_resource_provider` ← shimx / PE .rsrc) の接続 | LoadStringW が常に空文字 | #174 に所見 / GUI-2 または shimx |
 | `tools/m11` の `m11_e2e.sh` と `m11_gen_ir2.sh` は PE パスが固定 (`FL_WIN64_DIR` 非対応) | runner では ldfix が黙ってスキップされ数値が変わる (本 e2e は `FL_WIN64_DIR` で回避) | m11 に `FL_WIN64_DIR` 参照を提案 (#132 の未解決と同件) |
