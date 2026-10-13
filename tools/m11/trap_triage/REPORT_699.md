@@ -133,6 +133,9 @@ RetDec の CFG 復元 (jcc の終端化) と命令翻訳 (フラグ) のどち�
 | r3 | 0 | 44 秒 | 同左 | 同左 | 同左 |
 
 - 停止理由は `function_8c5eb0` の fail-fast (`unreachable`)。full InitUnits run はここで止まる。
+- **停止時点の `units_run` と未検証 unit 数は、本 HEAD (`6948c5b7`) の 3 run では記録していない**。e2e のログ (`work/e2e_steps.log` 等) は本 run の環境に残っておらず、`work/` は未展開、素材 `work-m11` / `toolchain-retdec` は未取得のため、再取得もできない。よって「停止後に検証されなかった unit 数」は本 HEAD では確定しない。e2e が unit 56 の fail-fast で早期終了した可能性を否定しない。
+- 参考 (別 HEAD・別コード版): guard 実装が `6948c5b7` より前の `a2190b26` では `units_run=53/942` (停止後 889 未検証) を記録している。guard の書き換えで停止位置が変わり得るため、この値を本 HEAD に流用しない。
+- survey (下表の 942 unit 個別隔離) と e2e の full run は別の測定。survey の `ok 870 / trap 25` は全 942 unit の独立実行結果で、fail-fast の影響を受けない。
 - 所要は `date +%s` の差 (`m11_e2e.sh` の開始から終了まで, 4 vCPU)。
 - 前提: `ir_conditions.json` を `m11_e2e.sh` が作り直した (`ldfix=applied`, `qstore=applied`)。
 - 限界: survey の ok/trap ラベル比較のみ。出力 (戻り値・メモリ) の同一性は未比較。
