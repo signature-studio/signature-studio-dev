@@ -211,3 +211,19 @@ DSP 固有 closure (42 効果) にはライセンス/ネット系参照が無く
 - 結果: **rc=0**・`undefined_imports: []`。宣言補完を外しても module F は失敗しなかった。
 - 解釈: module F は `used_names` が空 (§12.2) で、そもそも named import を呼ばない。よって本 4 module は宣言補完のネガコンに不適。#710 の本来の失敗 (閉包展開での `@GetCurrentThreadId` 宣言欠落) は、その名前を呼ぶ閉包を含む入力でしか再現しない。
 - 未実施・起票先: 閉包展開で named import を呼ぶ入力でのネガコン (#656)。本 run では測定できていないため、受入条件のこの項目は未達のまま。
+
+### 12.6 完全 sha256 の実測 (HEAD `b6de0a26`・旧 HEAD `9c1f7c0b` 同条件再ビルド)
+
+- 手順: `lic_build.py --module A|B|E|F` を `ws-1084` (現 HEAD) と `ws-1084-base` (旧 HEAD `9c1f7c0b`・`work/winpkg` は現 HEAD と共有) で実行し、`wasm_sha256` を比較。`kh249_check.mjs` は `work/licF` に対して実行。
+- 素材: `fl-win64` は使わず、`plugins-kilohearts` (`Kilohearts Offline Installer.zip` → `payload.dat` → `windows.zip` → `HeartCore.core_64` 76,642,304 B) と `toolchain-emsdk`・`toolchain-retdec` を使用。`kh249_product_index.py` (`KH_SRC` = 展開した installer の親ディレクトリ) で `product_index.json` (46 plugins) を生成。
+
+| module | 完全 sha256 (現 HEAD `b6de0a26`) | 旧 HEAD `9c1f7c0b` | wasm bytes | 判定 |
+|---|---|---|---|---|
+| A | `411007b825c22f577a3e5bb909715d61ae987ba3949bd78bfdfd71e2a598b6fc` | 同一 | 26705 | 一致 |
+| B | `621829471e36be6b760411edfdcc123a7b71f50ccbf026a834d4e984d00cf04b` | 同一 | 25249 | 一致 |
+| E | `0cf066d167115d4b91edd80f4851bc5d84d6640d28fdb9d97d14641682b6fed8` | 同一 | 364770 | 一致 |
+| F | `7ba79e65ec158a711646316579e6f8bc3d8c12f47c61851710a5e2077b8c7707` | 同一 | 54394 | 一致 |
+
+- 4 module とも `lic_build.py` rc=0・`undefined_imports: []`。`kh249_check ok=17 ng=0` (rc=0)。
+- `final.ll` から `used_names` を再抽出 (gen_stubs_sigs.py と同じ式): A/B/E/F とも `[]`。
+- 注: §12.1 の表は省略表記 (先頭 8 文字 `…` 末尾 4〜6 文字) のままで、完全値は本節が正本。
