@@ -36,7 +36,7 @@
 - `product_index.json` 46 = `plugins` 配列 46 要素 = 45 製品 + `core` (HeartCore, formats=['heartcore']・dependencies 無し)。`core` は EditorModel を持たない
 - **47 = 45 + 2、46 = 45 + 1 (core)**。差 1 は「製品 1 つ」ではなく、非製品 EditorModel 2 (host proxy / snapin group) と core 1 の差
 
-## 3. ブラウザ分類ゲート (完了条件 1・lift IR のゲート検証)
+## 3. ブラウザ分類ゲート (完了条件 1・ゲート thunk の IR 実行 / 分類式は node 再実装で期待値を確認)
 
 関数 0x180ef7fc0 のエントリ採否 (機械語 0x180ef8710〜0x180ef87c8):
 `status = getStatus(...)` → `A(status)` (0x1800b4ac0・許可集合) が偽なら不採用候補、真なら `r13 = !C(status)` (0x1800b4ae0 = status==25)。`r13 != 0` で unlocked 登録、`r13 == 0` のときグローバル flag `[0x182358298]` が非 0 なら locked 登録・0 なら非表示。なお id==`grup` のエントリは別経路 (0x180ef862a): `r13 = [mgr+0xed9]` (byte) を使い、この表の対象外 (§6.2)。
@@ -81,7 +81,7 @@
 ### 6.2 範囲外 (規則 40)
 - ブラウザ関数本体は **入口〜最初の未 lift callee まで**。std::map/string/vector/shared_ptr 等の callee は未 lift で、リスト構築・描画へ進む経路の bit 一致は未検証。
 - 未 lift callee の数え方 (実測・`work/licF/stat.json` の `unlifted callees`、HEAD `b0db3a1` で `lic_build.py --module F`): kh_lower の `unlifted callees` は **40 件**。内訳は shim 4 (`new`/`delete`/`memcpy`/`getManager`) + 残り 36。`gen_stubs_sigs.py` の `stubs 33` (fail-fast 定義) は final.ll に `declare` が残った数で、残り 7 件は fail-fast 定義に現れない。`n1s.ll` には 48 件すべての declare が残るが、`final.ll` は 40 件に減る (`lic_build.py` の重複 declare 除去は、本体 `call` が 1 箇所だけの declare を消す)。`180107430` は shim 側 (`shims` で C 実装に置換)。`180021490`・`1800219b0`・`180021d40`・`18006c040`・`18010b6c0`・`18024b2e0` の 6 件は、`stub_only` の `getStatus` (0x180054bd0) の本体を `lic_stub.py` が stub に置換した後、その本体 (`n1.ll` 1292〜2133 行) にあった `call` だけが残る declare として除去される。ここの機構は実測の観察で、`lic_build.py` の該当箇所 (107〜114 行) の挙動から導いた説明であり、6 件の個別の経路は未追跡。本 REPORT の 41 件・40 件は kh_lower の出力 (shim 追加前後) を指し、stub 33 件とは数え方が異なる。
-- 分類式・ゲート式は機械語読解の node 再実装 (lift IR のブラウザ本体をカテゴリまで流した結果ではない)。thunk A/C・getStatus は実 IR 実行。分類式は「lift IR では未検証」。`kh249_check.mjs` [3a] で式定数を命令バイトと照合し、[3b] で式を 5 通り壊して結果が変わることを確認するが、これは式の再実装が PE の読解と整合する・検査が自明でないことの確認までで、lift IR の分類結果の検証ではない。lift IR で検証するには未 lift callee (41 件) の shim が要る。
+- 分類式・ゲート式は機械語読解の node 再実装 (lift IR のブラウザ本体をカテゴリまで流した結果ではない)。thunk A/C・getStatus は実 IR 実行。分類式は「lift IR では未検証」。`kh249_check.mjs` [3a] で式定数を命令バイトと照合し、[3b] で式を 5 通り壊して結果が変わることを確認するが、これは式の再実装が PE の読解と整合する・検査が自明でないことの確認までで、lift IR の分類結果の検証ではない。lift IR で検証するには未 lift callee (40 件。shim 追加前は 41 件) の shim が要る。
 - `grup` エントリのゲート (`[mgr+0xed9]`) は未検証 (§3 の表は非 grup のみ)。
 - 製品 id ↔ ctor の 1:1 対応は「id を持つ関数の最近傍」ヒューリスティクス (§2)。RTTI クラス名の 47/47 同定とは独立で、製品名の対応は一部 (`Matrix`=kscm 等) クラス名からの読み替え。
 - native oracle (ctx-fuzz) との bit 突合は未実施。
@@ -116,7 +116,7 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| ブラウザ本体の STL/shared_ptr 群 (41 callee) 未 lift、native oracle 突合なし | リスト構築〜描画の bit 一致未証明 | #249 (本 issue) 継続 / 親 #15 |
+| ブラウザ本体の STL/shared_ptr 群 (未 lift callee 40 件。shim 追加前は 41 件) 未 lift、native oracle 突合なし | リスト構築〜描画の bit 一致未証明 | #249 (本 issue) 継続 / 親 #15。**子 issue 起票依頼中 (PM 採番待ち・番号未採番)** |
 | entry+0x22 の意味 (Hosts 判定) 未同定 | `Effects Hosts` が実際にどのエントリかは不明 | #249 継続 |
 | カテゴリ名と無償/有償の対応未確認 | 「無償系」解釈は推定 | #249 継続 |
 | 0x180d52990 の本体 lift 未実施 | Phase Plant 等 3 呼出元の closure は呼出元同定まで | #249 継続 |
