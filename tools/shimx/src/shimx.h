@@ -1172,6 +1172,10 @@ void shimx_set_proc_resolver(void* (*fn)(HMODULE m, const char* name, DWORD ordi
 void shimx_set_load_hook(HMODULE (*fn)(const char* nameUtf8, DWORD flags));
 void shimx_set_resource_provider(const void* (*fn)(HMODULE m, const WCHAR* name, const WCHAR* type, DWORD* size));
 void shimx_set_shell_execute_hook(int (*fn)(const char* verb, const char* file, const char* params));
+/* GUI 連携 (#172 SHX-T5): gui が user32 側 (MsgWait* / WM_DROPFILES) から呼ぶ口 */
+void shimx_set_notify_hook(void (*fn)(void));                  /* kernel object の状態変化ごとに呼ぶ (任意スレッド・shx_lock 外) */
+int  shimx_drag_accepts(HWND w);                               /* DragAcceptFiles(w, TRUE) 済みか */
+HANDLE shimx_hdrop_create(const WCHAR* const* wpaths, DWORD n, int x, int y, int nc);   /* DROPFILES を作り HDROP を返す (DragFinish で解放) */
 void shimx_set_trust_ok(int on);
 unsigned shimx_wininet_call_count(void);   /* wininet 接続系 API の呼出回数 (全て失敗扱い) */
 void shimx_set_version(DWORD major, DWORD minor, DWORD build, DWORD fileHi, DWORD fileLo);

@@ -11,7 +11,7 @@ gcc $CF -o "$W/fill3_oracle" "$HERE/fill3_oracle.c" "$IPP/ref/pe_load.c" $IMPL -
 "$W/fill3_oracle" "$DLL" --dump "$W/cases.hash" > "$W/oracle.log" 2>&1
 tail -3 "$W/oracle.log"
 # wasm replay (native 記録ハッシュとの突合 — bit 一致する関数は mismatch 0)
-source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1
+source "${EMSDK_DIR:-/opt/emsdk}/emsdk_env.sh" >/dev/null 2>&1
 emcc $CF -DWASM_REPLAY -sENVIRONMENT=node -sEXIT_RUNTIME=1 -sALLOW_MEMORY_GROWTH=1 -sNODERAWFS \
   -lnodefs.js -lnoderawfs.js \
   -o "$W/fill3_oracle.wasm.cjs" "$HERE/fill3_oracle.c" $IMPL 2> "$W/emcc.log"

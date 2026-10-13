@@ -9,12 +9,14 @@ pass と helper を 1 本に統合した (元 dir は無改変)。
 bash tools/liftlib/liftlib_e2e.sh            # 回帰 (OTT = auto f7,p1 既定 (checks 8/0 = param 0.0/0.1/0.9/1.0 sweep 付き) + 旧既定 --auto none + leaf spec。所要は REPORT_APPENDIX_A.md §12 参照): ユニット + FA 400/400 + KH 366/366 + OTT + SIMD 281 form + 注入 94/94 + OTT leaf native spec
 bash tools/liftlib/liftlib_e2e.sh --quick    # 回帰のみ (FA/KH/OTT)
 bash tools/liftlib/liftlib_e2e.sh --fresh    # FA/KH を RetDec の lift から再生成 (全体で約 1 分)
+bash tools/liftlib/stdbuild_e2e.sh           # 標準ビルド設定 + 署名ガード (PERF-P1 / #155): 合成入力で全変種署名一致 + ネガコン (plugin バイナリ・RetDec 不要。数秒)
 bash tools/liftlib/lowbase_e2e.sh            # lowbase 検証 (CAB-220): audit_va + OTT を低位 base で最初から生成 (2 base) + x64c native bit 一致 3 構成 150,708 cell (--full で CAB-90 e2e 全体も)
 ```
 
 ## CLI (`python3 -m liftlib …`, cwd=tools/liftlib)
 | コマンド | 内容 |
 |---|---|
+| `build <cfg> [--profile std] [--variants ref,o2,o3,std] [--expect SIG]` | **標準ビルド入口 (PERF-P1)**: RetDec → 修復 → helper → 標準設定 (`-O3 -flto` + gc-sections + 最小 export; 正本 `data/std_build.json` / `liftlib/stdbuild.py`) で全変種ビルド → 同一シナリオの wasm 出力署名が全一致のときだけ `<name>.cjs` を確定 (不一致 exit 1)。shell は `python3 liftlib/stdbuild.py flags std` / `guard` |
 | `lift targets/fa_gain.json` | RetDec → base 正規化 → P1/F7/F2 修復 → helper 自動生成 → emcc → **差分ハーネス** (実機 vs wasm) |
 | `detect <cfg>` | 修復せず検出だけ (所見 JSON) |
 | `diagnose <cfg>` | pass ごとに無効化して再評価 (どの修復が必須か) + 未修復所見 |

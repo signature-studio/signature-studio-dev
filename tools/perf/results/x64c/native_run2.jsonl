@@ -1,0 +1,7 @@
+{"env":"native-x64","sig":"6b1696f0","nonzeroOut":256,"p50us":14.11,"p99us":19.72,"maxus":39.86,"minus":13.92,"batch64p50us":14.12,"rtf44":0.00486,"load":1.23}
+{"env":"native-x64","sig":"6b1696f0","nonzeroOut":256,"p50us":14.08,"p99us":19.62,"maxus":84.77,"minus":13.88,"batch64p50us":14.03,"rtf44":0.00485,"load":1.23}
+{"env":"native-x64","sig":"6b1696f0","nonzeroOut":256,"p50us":14.16,"p99us":19.94,"maxus":84.53,"minus":13.95,"batch64p50us":14.06,"rtf44":0.00488,"load":1.21}
+{"env":"native-x64","sig":"6b1696f0","nonzeroOut":256,"p50us":14.09,"p99us":19.72,"maxus":36.10,"minus":13.82,"batch64p50us":14.12,"rtf44":0.00485,"load":1.21}
+{"env":"native-x64","sig":"6b1696f0","nonzeroOut":256,"p50us":14.00,"p99us":19.53,"maxus":60.46,"minus":13.70,"batch64p50us":14.10,"rtf44":0.00482,"load":1.21}
+{"env":"native-x64","sig":"6b1696f0","nonzeroOut":256,"p50us":14.00,"p99us":19.58,"maxus":75.20,"minus":13.79,"batch64p50us":14.09,"rtf44":0.00482,"load":1.21}
+{"env":"native-x64","sig":"6b1696f0","nonzeroOut":256,"p50us":14.17,"p99us":19.90,"maxus":78.69,"minus":13.75,"batch64p50us":14.22,"rtf44":0.00488,"load":1.21}
