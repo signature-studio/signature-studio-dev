@@ -26,9 +26,9 @@ work-m11 素材には `ir_conditions.json` が無い (`tar --zstd -tf ... | grep
 
 ## 3. 検証
 
-- 測定 commit: `3c6b9d8e` (コードを変えた最後の commit)。`git diff 3c6b9d8e HEAD -- tools/m11` = 0 行 (本 REPORT の追記後も差分 0)。
+- 測定 commit: `3c6b9d8e` (コードを変えた最後の commit)。`git diff 3c6b9d8e HEAD -- tools/m11 ':!*.md'` = 0 行 (実行コード (`.md` 除く) の差分 0 行。`.md` のみ差分あり = 本 REPORT の文書修正)。
 - クリーン検証: `git worktree add --detach <RUNNER_TEMP>/wt_verify_1290 3c6b9d8e` で展開し、同じ手順で再実行 (rc=0・5 分 01.9 秒・DYN after_fail=0/5)。
-- 実行: `EMSDK_ENV=/opt/emsdk/emsdk_env.sh FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 M11_WORK=<ws-1290>/tools/m11/work bash tools/m11/ldfix/ldfix_509_e2e.sh`
+- 実行: `EMSDK_ENV=<[EMSDK] の emsdk_env.sh> FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 M11_WORK=<ws-1290>/tools/m11/work bash tools/m11/ldfix/ldfix_509_e2e.sh`
 - 素材: fl-win64 (PE `block00031_PE.bin`)・toolchain-emsdk・work-m11 (`tools/m11/work/`)。PE は `$RUNNER_TEMP/fl-win64/extracted/` に展開。
 - 所要: 実測 5 分 06 秒 (real 306 s / user 293 s、worktree 実行)。クリーン HEAD 再実行は 5 分 01.9 秒 (real 302 s / user 288 s)。load average (終了時) 1.09 / 1.00。並列数 1 (`nproc` = 4)。
 
@@ -73,7 +73,7 @@ step 6 の survey 突合で、修復前後の unit 記録 (kind・msg・frame・
 ## 5. 再現
 
 ```sh
-EMSDK_ENV=/opt/emsdk/emsdk_env.sh FL_WIN64_DIR=<fl-win64 展開先> M11_WORK=<tools/m11/work> \
+EMSDK_ENV=<[EMSDK] の emsdk_env.sh> FL_WIN64_DIR=<fl-win64 展開先> M11_WORK=<tools/m11/work> \
   bash tools/m11/ldfix/ldfix_509_e2e.sh
 ```
 
