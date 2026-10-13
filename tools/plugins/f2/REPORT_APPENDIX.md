@@ -141,35 +141,70 @@ python3 tools/plugins/f2/nc_leaf.py      # ネガティブコントロール (ki
 
 ## 9. PLG-F2-4 (#547): xmm 引数復元 pass の接続 (**未達: 不一致 8 のまま・中間報告**)
 
-- 検証起点 commit: **875ab8e** (`547-plg-f2-4-xmm-argpass`、#553 の branch `515-plg-f2-3-leaf-diff` 758a06b 基点)。
+- 検証起点 commit: **1191aef** (`547-plg-f2-4-xmm-argpass`、#553 の branch `515-plg-f2-3-leaf-diff` 758a06b 基点)。`git status --porcelain=v1` は 0 行 (コミット済み HEAD で実測)。数値は下記 9.4 の 3 コマンドをこの HEAD で実行して取得 (初版は 875ab8e で、レビュー指摘の修正 (9.5) 後に再測した)。
 - 既知類型との関係: **(DEFECTS.md) D5** (xmm 引数脱落)。D4 系 `spill_slot_deref` 4 / D1a `fp_flag_unreflected` 4 は本件では未着手。
 - 範囲: pass の実装と鎖への opt-in 接続、eq-filter 6 block での lift/`emcc -c`/`leaf_diff.sh` 実測。既定鎖への ON 化・ablation 完走は範囲外 (下記)。
 
 ### 9.1 結論
 1. `ir7_argpass.py` は OTT `setParameter` (function_180120af0) 専用 (jump table を dsm から再生成する) で、汎用の xmm 復元ではない。鎖に繋げても eq-filter には効かない。汎用品は kernel 向け `p0c/k80_argfix.py` + `p0c/k80abi.py` (#254 系) だったので、その [A]/[C] を再利用する `lift/passes/fix_xmm_args.py` を新規作成した。k80abi の `scan_function` で関数ごとの xmm 入力 slot を機械語から求め、IR 署名の slot 位置 N に `float`/`double` 引数を足す (隙間は `i64 %padN`)。closure 内の呼出し元には 0 / 0.0 を渡す。
 2. `lift_ranges.sh` に **opt-in `PLUG_XMMARG=1` (既定 0)** で接続した。既定 ON にしていないのは、下記 3 の結果が出ておらず全 plugin への影響を測っていないため。
-3. **受入条件 1 は未達**: `PLUG_XMMARG=1 PLUG_ICALL=0` で 6 block (18975 18982 19005 19006 19013 19059) を lift し直した `leaf_diff.sh` (133 秒、load average 0.29) の最終判定は **一致 15 / 不一致 8 / 実行不能 0** (接続前と同一)。タグ集計も `xmm_arg_drop 8` のまま。
+3. **受入条件 1 は未達**: `PLUG_XMMARG=1 PLUG_ICALL=0` で 6 block (18975 18982 19005 19006 19013 19059) を lift し直した `leaf_diff.sh` の最終判定は **一致 15 / 不一致 8 / 実行不能 0** (接続前と同一)。タグ集計は `xmm_arg_drop 7`・`ret_only 1` (接続前は `xmm_arg_drop 8`; 差の 1 は 0x6f1650 の分類が分類器修正 (9.5 の C1) で変わったもので、不一致自体は残っている)。
 4. 受入条件 2 (回帰) は、一致 15 が一致のままであることだけ確認 (上記 3 の同判定)。**ablation (pass を外すと 8 関数が戻る) は無意味**: pass 有無で不一致が同数のため、ネガコンとして成立していない。
 5. 受入条件 3 (#232 / #233 の適用可否判定) は未実施。
 
-### 9.2 実測 (`PLUG_XMMARG=1`、block ごとの `p.xa.json`)
-| block | 復元した関数 | skip した関数 | call site に 0 を渡した数 | `emcc -c` rc |
+### 9.2 実測 (`PLUG_XMMARG=1`、block ごとの `p.xa.json`、HEAD 1191aef)
+| block | 復元した関数 | skip した関数 (内訳) | call site に 0 を渡した数 | `emcc -c` rc |
 |--:|--:|--:|--:|--:|
-| 18975 | 4 | 11 (`no_placeholder` / `slot_occupied`) | 5 | 0 |
-| 18982 | 1 | 2 | 1 | 0 |
-| 19005 | 3 | 2 | 4 | 0 |
-| 19006 | 2 | 2 | 2 | 0 |
-| 19013 | 3 | 1 | 3 | 0 |
-| 19059 | 2 | 10 | 2 | 0 |
+| 18975 | 3 | 12 (`slot_occupied` 6 / `no_placeholder` 5 / `partial_slots` 1) | 4 | 0 |
+| 18982 | 1 | 2 (`slot_occupied` 1 / `no_placeholder` 1) | 1 | 0 |
+| 19005 | 2 | 3 (`slot_occupied` 2 / `partial_slots` 1) | 3 | 0 |
+| 19006 | 2 | 2 (`slot_occupied` 2) | 2 | 0 |
+| 19013 | 3 | 1 (`slot_occupied` 1) | 3 | 0 |
+| 19059 | 1 | 11 (`slot_occupied` 6 / `no_placeholder` 4 / `partial_slots` 1) | 1 | 0 |
 
+- 875ab8e 版 (初版) は 18975 が 4 関数・19005 が 3 関数・19059 が 2 関数を「復元」としていたが、うち 3 関数 (`function_6c1580` recovered=xmm0,xmm1 / machine=xmm0..3、`function_6c86b0` recovered=xmm2 / machine=xmm1,xmm2、`function_6f1f30` recovered=xmm1,xmm2 / machine=xmm0..2) は機械語が読む slot の一部しか placeholder に接続できていない半端な復元だった (Copilot 指摘)。現行版は `partial_slots` として署名を変えずに skip する。
 - 不一致 8 関数の内訳: IR 署名が機械語 ABI と一致するようになったのは **3 関数** (0x6b0ef0 `i64(i64,i64,double)`、0x6ca5c0 同、0x6f1650 `float(i64,float)`)。0x6bfec0・0x6c8fc0・0x6c9b60 は `no_placeholder` で署名が変わらない (RetDec の placeholder が `xor i128 0,0` の形をしていない: 0x6bfec0 は `__asm_movss__4` 結果を `ucomiss` に渡す形、0x6c8fc0 は `__asm_addss(i128 %1, ...)` の %1 が `xor i128 0,0` だが [C] の突合が不成立)。0x6c8c90・0x6cc2e0 は `slot_occupied` (RetDec が slot 3 を整数 `%arg4` で宣言済み)。
 - 署名が直った 0x6f1650 でも、case z で native x0=0x3f11c71c、wasm x0=0xffc00000 (NaN) で不一致のまま。引数が値として届いていない。**原因は未特定** (候補: `mk_targets.py` の i128 ABI アダプタが `%pad0` を含む仮引数をそのまま実引数に使う / liftdiff の float 引数の割当て位置 / `__asm_movaps` の i128 上位ビット)。
+- **2 つの機械語解析の食い違い (新規所見)**: 0x6b0ef0 は pass が使う `k80abi.scan_function` では xmm 入力 slot = `xmm2` のみ (幅 64) だが、liftdiff の `ldlib/pe.py` の解析では `xmm_slots=[1,2,3]` (`arity_x`=4)。pass は xmm2 だけを `double` で足すので、liftdiff の見方では slot 1・3 が未復元のまま残り、0x6b0ef0・0x6ca5c0 は分類器修正後も `xmm_arg_drop` が付く (上表の 7 のうち 2)。どちらの解析が正しいかは未確認 (起票: 9.3)。
 
 ### 9.3 未解決
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 署名が直った 0x6f1650 / 0x6b0ef0 / 0x6ca5c0 でも差分が残る原因の特定 | 受入条件 1 | 新規 [PLG-F2-5] |
-| `no_placeholder` 3 関数・`slot_occupied` 2 関数 (RetDec が xmm 位置を整数引数で宣言) の復元 | 受入条件 1 | 同上 |
-| 呼出し元の xmm 値の接続 (現状 0 を渡す) | closure 内の呼出し経由では float 値が失われたまま | 同上 |
-| spill_slot_deref 4 / fp_flag_unreflected 4 の #232 / #233 適用可否 | 受入条件 3 | 同上 |
-| PLUG_XMMARG 既定 ON 化と、全 block での `emcc -c`・matrix 突合の回帰 (6 block のみ実測) | 既定化の可否 | 同上 |
+| 署名が直った 0x6f1650 / 0x6b0ef0 / 0x6ca5c0 でも差分が残る原因の特定 | 受入条件 1 | 新規 [PLG-F2-5] = #613 |
+| k80abi (`scan_function`) と liftdiff (`ldlib/pe.py`) の xmm 入力 slot 解析の食い違い (0x6b0ef0: xmm2 のみ vs xmm1..3) の解消 | pass の復元 slot 集合の妥当性。どちらかが誤り | #613 |
+| `no_placeholder` (計 10 関数 = 5+1+4 の block 別合計; 同一コードの重複あり)・`slot_occupied` (RetDec が xmm 位置を整数引数で宣言) の復元 | 受入条件 1 | #613 |
+| `partial_slots` 3 関数 (6c1580 / 6c86b0 / 6f1f30) の全 slot 復元 | 部分復元を適用しないことにしたため未復元のまま | #613 |
+| 呼出し元の xmm 値の接続 (現状 0 を渡す) | closure 内の呼出し経由では float 値が失われたまま | #613 |
+| call 以外の `@function_xxx` 参照 (関数ポインタ・ptrtoint 定数式・他関数の引数) を持つ関数は `non_call_ref` で skip する (署名を変えると参照側の型と食い違うため)。参照側の型更新は未対応 | 該当関数は復元できない (今回の 6 block では `non_call_ref` skip 0 件) | #613 |
+| spill_slot_deref 4 / fp_flag_unreflected 4 の #232 / #233 適用可否 | 受入条件 3 | #613 |
+| PLUG_XMMARG 既定 ON 化と、全 block での `emcc -c`・matrix 突合の回帰 (6 block のみ実測) | 既定化の可否 | #613 |
+
+### 9.4 再現と実測 (HEAD 1191aef、4 core Actions runner)
+```sh
+source tools/shared/env.sh && source tools/plugins/f2/env.sh
+time bash tools/plugins/f2/f2_step1.sh                                                              # 前提 (PLUG_ICALL=0 の既定鎖)
+cd tools/plugins && time PLUG_XMMARG=1 PLUG_ICALL=0 bash lift/batch_lift.sh 18975 18982 19005 19006 19013 19059; cd ../..
+time bash tools/plugins/f2/leaf_diff.sh                                                             # 最終判定の再計算
+bash tools/plugins/f2/nc_leaf.py の 3 kind 並列 (--kinds K --run-only) → python3 tools/plugins/f2/nc_leaf.py --reuse
+```
+| コマンド | `time` の real | 開始時 load average (1 分) | 結果 |
+|---|--:|--:|---|
+| `f2_step1.sh` (`work/` 生成済み。`win_funcs.py` 初回は別途 **517 秒**、終了時 load 16) | 0m51.042s | 8.78 | exit 0、matrix DIFF count = 0 |
+| `PLUG_XMMARG=1 PLUG_ICALL=0 batch_lift.sh` (6 block) | 0m21.675s | 4.49 | 6/6 lift_rc=0・`emcc -c` rc=0 |
+| `leaf_diff.sh` | 2m22.983s (スクリプト内の `LEAF_DIFF elapsed` = 143 s) | 3.30 (終了時 0.97) | exit 0。一致 15 / 不一致 8 / 実行不能 0。別算法 `xcheck_leaf.py` 集合一致 EQ |
+| `nc_leaf.py` (3 kind 並列 → `--reuse` 集計) | 87 s (並列部) | 0.88 | rc=0。`store_drop` 6/6・`load_drop` 11/11・`offset_shift` 13/13 検出、未検出 0・unexec 0 |
+
+- 初版の「133 秒、load 0.29」は §8.7 の cold 実行 (133 s) と秒数が偶然一致していたが、初版時に `time` 出力を残していなかった。上表は今回の再測で、`time` の出力そのもの。
+- ネガコン `nc_leaf.py` は、変異が 1 つでも match のまま / unexec なら exit 1 (9.5 の C2)。上記は全検出で rc=0。
+
+### 9.5 レビュー指摘への対応 (oc-reviewer / Copilot)
+| ID | 指摘 | 対応 |
+|---|---|---|
+| R1 | REPORT 250 行上限超過 | §8・§9 を本付録へ無変更で分割。本体 208 行、DOC_MAP 更新 |
+| R2 | §5 表の行が壊れている | セル内に収めた (指摘の「§1」は実際は §5 の表) |
+| P1 | `fix_xmm_args.py` の call 書換え regex が定数式で切れる | 括弧の対応を取る書換えに変更。call 以外の `@function_xxx` 参照を持つ関数は `non_call_ref` で skip。未使用の `done`・`if True:` を削除 |
+| P2 | 半端な slot 復元を `fixed` にする (Copilot) | 復元 slot 集合が機械語の slot 集合と一致しなければ `partial_slots` で skip し、k80_argfix が数えた件数も戻す |
+| C1 | 分類器が slot 位置でなく個数で `xmm_arg_drop` を付ける (Copilot) | `ldlib/pe.py` が `xmm_slots` を出し、`classify.py` は全 slot が IR 署名の同位置で float/double ならタグを付けない |
+| C2 | ネガコンが未検出でも exit 0 (Copilot) | 未検出・unexec があれば exit 1 |
+| C3 | 古い生成物が再実行・集計に混ざる (Copilot) | `leaf_diff.sh` が targets / leaf / leaf_custom の生成物を消してから再生成 |
+| C4 | `/opt/emsdk` の直書き (Copilot) | `[EMSDK]` (docs/REFERENCES.md) 参照に変更 |

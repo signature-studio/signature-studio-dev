@@ -207,4 +207,4 @@ python3 tools/plugins/f2/xcheck_icall.py 18953 18975 18979 18982 18984 19005 190
 
 ## 9. PLG-F2-4 (#547): xmm 引数復元 pass (opt-in `PLUG_XMMARG=1`) → 付録
 
-受入条件 1 は**未達** (不一致 8 のまま)。実測・未解決は [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §9。
+受入条件 1 は**未達** (不一致 8 のまま。pass は opt-in `PLUG_XMMARG=1`・既定 OFF)。実測・未解決は [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §9。

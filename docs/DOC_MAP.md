@@ -163,7 +163,7 @@
 | `tools/flp/REPORT.md` | ~120 | FLP/FST パーサ・ライタ・往復コーパス |
 | `tools/plugins/REPORT.md` | ~115 | Fruity プラグイン 141 種 wasm 化マップ (カウントの正本) |
 | `tools/plugins/f2/REPORT.md` | ~208 | PLG-F2 eq-filter 11 本: 固有閉包 lift の再現と間接 call 脱落の監査 (#199)、icall 復元の batch_lift 接続と回帰ゲート (#514, §7)。§8 (#515 leaf 23 関数の関数単位差分試験)・§9 (#547 xmm 引数復元 pass) は `REPORT_APPENDIX.md` に分割 |
-| `tools/plugins/f2/REPORT_APPENDIX.md` | ~175 | f2 REPORT §8 (PLG-F2-3 #515: leaf 23 関数の関数単位差分・ネガコン・限界) と §9 (PLG-F2-4 #547: xmm 引数復元 pass の実測と未解決) の全文 (250 行上限のため無変更で分割移動) |
+| `tools/plugins/f2/REPORT_APPENDIX.md` | ~210 | f2 REPORT §8 (PLG-F2-3 #515: leaf 23 関数の関数単位差分・ネガコン・限界) と §9 (PLG-F2-4 #547: xmm 引数復元 pass の実測と未解決) の全文 (250 行上限のため無変更で分割移動) |
 | `tools/plugins/framework/REPORT.md` | ~520 | TFruityHost shim 実装と検収 |
 | `tools/plugins/p0c/REPORT.md` | ~665 | kernel 表妥当性検証 + f80 assessment |
 | `tools/shared/REPORT.md` | ~295 | FL Shared ライブラリの分類・IPP 実測・OSS wasm 再ビルド・プロプラ lift PoC |
