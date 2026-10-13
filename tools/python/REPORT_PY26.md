@@ -32,7 +32,7 @@
 
 ## 差分 (測定 commit 以降のコード差分)
 
-`git diff dcdf96f0 HEAD -- tools/python` の出力は空 (この REPORT のみ追加)。
+`git diff dcdf96f0 HEAD -- tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (コード差分 0)。HEAD 側の追加は `REPORT_PY26.md` のみ (commit `8d057b65`)。
 
 ## 受入条件の判定
 
