@@ -16,12 +16,11 @@ read -ra SHELLS < <(python3 distortion/targets.py shells)
 read -ra ENGINES < <(python3 distortion/targets.py engines)
 SHELLS_CSV="$(IFS=,; echo "${SHELLS[*]}")"
 ENGINES_CSV="$(IFS=,; echo "${ENGINES[*]}")"
-ALLOW=(--allow-unimpl 19024=1)   # targets.ALLOW_UNIMPL と同じ (Love Philter の rep_stosb_memset 1 件)
 OUT=work/distortion
 BATCH_STATUS="${BATCH_STATUS:-work/batch/status.csv}"   # --skip-lift が読む lift 結果 (NC で差し替える)
 
 judge_shells() {   # $1 = status.csv, $2 = 欠落監査 csv。 非 0 ならここで set -e により終了する
-  python3 distortion/judge.py "$1" --blocks "$SHELLS_CSV" --audit "$2" "${ALLOW[@]}"
+  python3 distortion/judge.py "$1" --blocks "$SHELLS_CSV" --audit "$2"
 }
 
 if [ "${1:-}" = "--judge-only" ]; then
@@ -59,7 +58,7 @@ for b in "${SHELLS[@]}"; do
   echo "$b,$(python3 distortion/engine_defs.py --ranges "work/closure/block$(printf %05d "$b").ranges.txt" --ll "work/batch/$b/p.final.ll")" >> "$OUT/shell_audit.csv"
 done
 judge_shells "$OUT/status.csv" "$OUT/shell_audit.csv"
-python3 distortion/unimpl_names.py work/batch --blocks "$SHELLS_CSV" --allow 19024=__asm_rep_stosb_memset
+python3 distortion/unimpl_names.py work/batch --blocks "$SHELLS_CSV"
 
 python3 distortion/closure_facts.py > "$OUT/facts.stdout.json" 2> "$OUT/facts.err"
 python3 distortion/matrix_check.py

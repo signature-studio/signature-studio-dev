@@ -1,6 +1,6 @@
 # gui REPORT 付録 — §9 GUI-4 (#180) 全文
 
-REPORT.md の 250 行上限のため §9 を無変更で分割移動 (#489 の §11 追加時)。本体: [REPORT.md](REPORT.md)。
+REPORT.md の 250 行上限のため §9 を無変更で分割移動 (#489 の §12 追加時)。本体: [REPORT.md](REPORT.md)。
 
 ## 9. GUI-4 (#180): WebGL2 present / dirty 複数矩形 / rAF 同期 / seqlock
 既知類型との関係: 該当なし (lift 欠陥ではなく present 経路の設計。`docs/DEFECTS.md` への追加類型なし)。検証起点 commit: コードは `88efd49` (レビュー指摘 A・B・軽微 2 の修正後; present e2e 30 run・seqlock・tearing・golden・auto 降格の数値は全てこの HEAD・クリーン tree での実測)。frame time 表だけは修正前の `09e3db9` での実測 (bench は再測定していない; `88efd49` は seqlock 経路・staged 転送の関数分割 `stage()`/`uploadStaged()`・auto 判定のみを変え、seqlock off の GL 経路の処理は同一)。

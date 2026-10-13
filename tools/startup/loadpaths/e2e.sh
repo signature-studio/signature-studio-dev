@@ -5,6 +5,7 @@
 # 手順: [1] 配置照合 (check.py: 再構成 manifest → パス復元 → group 件数/写像)
 #       [2] 静的根拠の機械照合 (verify_refs.py) + ネガコン
 #       [3] .moe 復号 + 検査 (moe.py) + 別算法/ネガコン (crosscheck.py)
+#       [4] 検索パス服務の実体・不在時挙動の静的照合 + ネガコン (svc_check.py, #590) / 非 en seed の seed 層確認 (lang_seed_check.mjs)
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 # shellcheck source=/dev/null
@@ -15,7 +16,7 @@ WORK="$HERE/work"; mkdir -p "$WORK"
 T0=$(date +%s.%N)
 echo "[loadpaths] load average (開始): $(cut -d' ' -f1-3 /proc/loadavg)"
 
-echo "[1/3] check.py"
+echo "[1/4] check.py"
 python3 "$HERE/check.py" "$EXE" "$EXT" --work "$WORK" --out "$WORK/result.json" > "$WORK/check.log"
 python3 - "$WORK/result.json" "$WORK/win_paths.json" "$WORK/inputs.txt" <<'PY'
 import json, sys
@@ -34,7 +35,7 @@ PY
 DLL="$FL_WIN64_DIR/$(sed -n 1p "$WORK/inputs.txt")"
 mapfile -t MOES < <(sed -n '2,$p' "$WORK/inputs.txt" | sed "s#^#$FL_WIN64_DIR/#")
 
-echo "[2/3] verify_refs.py"
+echo "[2/4] verify_refs.py"
 python3 "$HERE/verify_refs.py" "$DLL"
 python3 - "$HERE/loadpaths.json" "$WORK/spec_nc.json" <<'PY'
 import json, sys
@@ -47,7 +48,7 @@ if python3 "$HERE/verify_refs.py" "$DLL" "$WORK/spec_nc.json" > "$WORK/nc.log"; 
 echo "  NC (文字列 1 + 呼出辺 1 を壊す): $(grep -c '^FAIL' "$WORK/nc.log") 件検出 (期待 2)"
 [ "$(grep -c '^FAIL' "$WORK/nc.log")" = 2 ]
 
-echo "[3/3] moe.py / crosscheck.py"
+echo "[3/4] moe.py / crosscheck.py"
 python3 "$HERE/moe.py" "$DLL" "${MOES[@]}" --json | python3 -c "
 import json, sys
 d = json.load(sys.stdin)
@@ -56,6 +57,11 @@ for f in d['files']:
     print('  ', {k: f[k] for k in ('entries', 'mo_bytes', 'charset_utf8', 'language')})
 "
 python3 "$HERE/crosscheck.py" "$DLL" "${MOES[@]}" | tail -6
+
+echo "[4/4] svc_check.py / lang_seed_check.mjs"
+python3 "$HERE/svc_check.py" "$DLL"
+python3 "$HERE/svc_check.py" "$DLL" --mutate
+node "$HERE/lang_seed_check.mjs" ja | tail -3
 
 T1=$(date +%s.%N)
 echo "[loadpaths] e2e PASS 所要 $(printf '%.2f' "$(echo "$T1 - $T0" | bc)") 秒 / load average (終了): $(cut -d' ' -f1-3 /proc/loadavg)"
