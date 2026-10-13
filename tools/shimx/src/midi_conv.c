@@ -18,7 +18,6 @@
 #define MMSYSERR_BADDEVICEID 2u
 #define MMSYSERR_INVALHANDLE 5u
 #define MIDIERR_UNPREPARED 64u
-void shimx_midi_dispatch_for_test(uintptr_t cb, uintptr_t h, uint32_t msg, uintptr_t inst, uintptr_t p1, uintptr_t p2);
 #define MIM_LONGDATA_MSG 0x3C4u
 #define MOM_DONE_MSG 0x3C9u
 

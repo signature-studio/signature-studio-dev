@@ -56,7 +56,7 @@ mirror は guest ヘッダと 1:1 (guest アドレスで引く)。Prepare で確
 
 - `exports.txt` / `data/sigs.json`: `test.sh` / `gen_sigs.py` が shimx ソースから再生成した結果。差分は `shimx_set_midi_backend` / `shimx_set_notify_hook` / `shimx_seh_*` 等の追加と、`midiOutShortMsg` の HANDLE (i64→i32) 統一。中身の削除は無い (並びだけ変わる)。
 - `data/inventory.csv`: midi 18 行の `source` 列を `net.c` → `midi_conv.c` へ変更 (ソースの所在の記録のみ)。数値列は不変。
-- `data/coverage.json`: `shimx_hooks` 59 → 70 (運用フックの追加分) のみ。`m11_closure` / `ott_api_resolved` は main の値を維持。
+- `data/coverage.json`: `shimx_hooks` 68 → 69 (`shimx_set_midi_backend` の 1 件のみ) のみ。`m11_closure` / `ott_api_resolved` は main の値を維持。
 - `BACKLOG.md` / `inventory.md` / `data/inventory.csv` の残りの行: **コミットしていない**。`test.sh` 再生成は入力 (`work/ir_m11.json` 等の M11 IR) が無いと `m11_closure` を空にするため、main の値を維持した。M11 IR が揃った環境で再生成する。
 
 ### 19.6 `sig_test.sh` の期待値 (5 → 4)
