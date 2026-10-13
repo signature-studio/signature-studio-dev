@@ -9,7 +9,7 @@
 - total2 外の非共通 **2,653 関数 / 1,200,793 B** の排他分類 (優先順位 (a)>(b)>(c)>(c-lea)>(d)): **(a) RVA32 表 314 関数 / 27,031 B**、(b) 命令内即値 **0 件**、(c) total2 外の呼出 **750 関数 / 406,591 B**、(c-lea) total2 外の lea **112 関数 / 28,227 B**、**(d) 参照なし 1,477 関数 / 738,944 B**。 排他合計 = 2,653 / 1,200,793 (検査 U4 PASS)。
 - 到達しうる根 = (a) ∪ (b_live) = 314 関数 / 27,031 B。 **total3 = 4,231 関数 / 1,456,503 B** (total2 から **+415 関数 / +65,994 B**、うち根 314 + 根から呼ばれて入った 101 (推定ではなく差分の実測))。 未到達 (非共通 − total3) = 2,238 関数 / 1,134,799 B。
 - **字義どおり根 = (a) ∪ (b) の上界は 7 本とも total3 と同値** (即値の参照が 0 件のため)。
-- **lift**: `judge.py shells` は 7/7 PASS (lift_rc / emcc_c_rc / f80 が全 0) だが、**range 欠落監査 (`indirect_defs.py`) が 5 関数 (4 block) で FAIL**。 `unr_e2e.sh` は exit 1 で `[unr_e2e] OK` は出ない。 欠落 5 件は RetDec が親関数の本体に畳み込んだもの (下記 §2d-4)。
+- **lift**: `judge.py shells` は 7/7 PASS (lift_rc / emcc_c_rc / f80 が全 0) だが、**range 欠落監査 (`indirect_defs.py`) が 5 関数 (4 block) で FAIL**。 `unr_e2e.sh` は exit 1 で `[unr_e2e] OK` は出ない。 欠落 5 件は RetDec が別の関数の本体に畳み込んだもので、**5 件とも PE export 関数** (下記 §2d-4・§2d-9)。
 - **AC 達成状況**: AC1 達成 / AC2 **未達** (閉包と検査 U1–U5 は PASS、range 監査が FAIL) / AC3 達成 (d = 1,477 関数 / 738,944 B)。 Closes ではなく Refs・draft PR が妥当 (PM 判断)。
 
 **既知類型との関係** (`docs/DEFECTS.md`): **該当なし** (分類と到達性の判定。 lift の変換規則は変更していない)。 range 欠落 5 件は既知の D1a〜D16 のどれにも対応づけていない → 新規類型の候補 (§7d 参照。 DEFECTS.md は本 REPORT では編集しない)。
@@ -56,7 +56,7 @@
 | **計** | **314 / 27,031** | **0 / 0** | 765 / 412,507 | 116 / 29,199 | 1,589 / 767,171 | **314 / 27,031** | 3,816 → **4,231** (+415 / +65,994) | **4,231 / 1,456,503** | **2,238 / 1,134,799** |
 
 - 字義どおり根 (a)∪(b) の上界 = 根 (b_live) と同値。 (b) の実測は 7 本とも 0 件 (capstone 復号の IMM オペランドで非共通の開始 VA/RVA に一致するもの無し)。
-- 全オフセットの byte 走査 (検査 U1 の別算法) では、nonfw 本体中に VA 下位 32 bit / RVA と一致する 4 バイト列が FPC 1 ・ Granulizer 1 ・ Slicer 1 ・ Slicex RVA 2 ・ Soundfont VA 2 / RVA 8 あるが、capstone は IMM オペランドとして復号しなかった (推定: 変位部や命令内の偶然一致。 個別には未確認)。 これは byte 走査が capstone の上位集合であることの確認 (U1) に使い、根には入れていない。
+- 全オフセットの byte 走査 (検査 U1 の別算法) では、nonfw 本体中に VA 下位 32 bit / RVA と一致する 4 バイト列が FPC 1 ・ Granulizer 1 ・ Slicer 1 ・ Slicex RVA 2 ・ Soundfont VA 2 / RVA 8 あるが、capstone は IMM オペランドとして復号しなかった。 **1 件ずつの判定は §2d-8** (即値 0 件、変位 4 件 = RIP 相対の disp 欄の数値一致で参照ではない、偶発 23 件、データ推定 4 件)。 これは byte 走査が capstone の上位集合であることの確認 (U1) に使い、根には入れていない。
 - **根 314 関数のうち 309 関数は RetDec 出力で独立の関数として出る。 残り 5 関数 (4 block) が欠落**: §2d-4 を参照。
 - 増分 +415 = 根 314 + 根から call/jmp・lea で入った 101 (差分の実測)。
 
@@ -74,7 +74,7 @@
 
 - **judge.py shells: PASS 7/7**。 lift_rc・emcc_c_rc・f80 は全 0 (lowering 後)。 未実装 helper は許容内 (Granulizer・Slicer 各 1 = #538 の既知)。 f80 の lowering (`p0c/f80_lower.py`) は lea 段と同じ 3 block で、bit-exact は未検証 (#197)。
 - **indirect_defs.py: FAIL** (欠落 5 件 / 4 block)。 `unr_e2e.sh` は exit 1。 lea 段 (total2) では欠落 0 だったので、欠落は total3 で新たに入った根に由来する。
-- **§2d-4 (欠落の原因、実測)**: 5 件は全て RVA32 表 (a) の根。 RetDec の出力では独立の `define` にならず、親関数の本体に `dec_label_pc_<VA>` として畳み込まれている。 親は FL Keys 0x71f030 → `CreatePlugInstance`、Slicer 2 0x842950 → `DecodeAudioFile`、0x842fc0 → `FinishAudioFile`、Slicex 0x879ed0 → `CreatePlugInstance`、Soundfont 0x762c70 → `CreatePlugInstance`。 いずれも `function_<VA>` を参照する箇所は final.ll に **0 件** (呼出しからは参照されていない)。 コードは lift に残っているが、表経由で `function_<VA>` を呼ぶ経路が将来入ると未定義シンボルになる (推定。 wasm リンクは未検証)。
+- **§2d-4 (欠落の原因、実測)**: 5 件は全て RVA32 表 (a) の根。 RetDec の出力では独立の `define` にならず、final.ll 内の別の関数の本体に `dec_label_pc_<VA>` として畳み込まれている。 **欠落 5 件の開始 VA は全て PE export 表の関数** (FL Keys 0x71f030 `CreatePlugInstance`、Slicer 2 0x842950 `DecodeAudioFile`、0x842fc0 `FinishAudioFile`、Slicex 0x879ed0 `CreatePlugInstance`、Soundfont 0x762c70 `CreatePlugInstance`。 §2d-9 で実測)。 旧版の「親」表記は欠落関数の export 名を書いたもので、畳み込み先の関数は未特定 (訂正)。 いずれも `function_<VA>` を参照する箇所は final.ll に **0 件** (呼出しからは参照されていない)。 コードは lift に残っているが、表経由で `function_<VA>` を呼ぶ経路が将来入ると未定義シンボルになる (推定。 wasm リンクは未検証)。
 - 比較: 同じ 7 本で total2 の lea 段は欠落 0 (REPORT_LEA.md §2c)。 欠落を「定義を緩めて通す」ことはしていない (監査の定義は不変)。
 
 ### 2d-5. 検査 U1–U5 (`closure_unreached.py`、7 本 × 5 検査 全て PASS)
@@ -88,28 +88,92 @@
 | 前提生成 (初回。 inventory 含む、`win_scan` 〜 `closure_lea`) | 549 s (rc 0。 inventory 段の負荷 load average 17 の時間帯あり) |
 | `closure_unreached.py` (7 本) | 26.8 s (rc 0、PASS 5 × 7) |
 | `unr_lift.sh` (7 本、逐次) | 138 s (wall、40:15 → 42:33)。 block 別 4 / 13 / 6 / 6 / 8 / 25 / 68 s |
-| `unr_e2e.sh` (前提込み、lift 込み) | **176 s、rc 1** (indirect_defs FAIL)。 load average (1 分) 開始 1.06 → 終了 1.08 |
-| `unr_nega.sh` | 129 s、rc 1 (§2d-7 の NC2 / 対照 NC6 が不一致)。 load average 1.30 → 1.11 |
+| `unr_e2e.sh` (前提生成込み・work/ 空から、lift・judge・欠落監査まで) | **438 s (11:09:12 → 11:16:30)、rc 1** (judge 7/7 PASS、indirect_defs FAIL 5 件)。 旧版の 176 s は前提生成を含まない区間の値で、「前提込み」の表記は誤り (訂正) |
+| `unr_nega.sh` (改訂版、§2d-7) | rc 0 (期待どおり 9 項目、NC2 は未検証として除外)。 所要は未計測 |
 
-### 2d-7. ネガティブコントロール (`unr_nega.sh`、9 項目中 7 が期待どおり)
+### 2d-7. ネガティブコントロール (`unr_nega.sh` 改訂版、HEAD で rc 0)
 
 | NC | 壊した入力 | 期待 | 実測 |
 |---|---|---|---|
 | 対照 | `closure_unreached.py` (無改変) | rc 0 | **rc 0** ✓ |
 | NC1 | BFS の seed から (a) RVA32 の根を外す | U2 FAIL | **rc 1 (U2)** ✓ |
-| NC2 | BFS の辺から命令内即値を外す (U2 の検証側は残す) | U2 FAIL | **rc 0 ✗**。 即値の辺は 7 本とも 0 件 (§2d-3) のため、外しても結果が変わらない。 **本データでは識別力が無い** |
+| NC2 | BFS の辺から命令内即値を外す (U2 の検証側は残す) | U2 FAIL | **未検証 (受入から除外)**。 即値の辺は 7 本とも 0 件 (§2d-3) のため、外しても結果が変わらない。 識別には即値辺を含む実データか合成 fixture が要る (起票: §7c) |
 | NC3 | 排他分類の (c) に (a) を二重計上 | U4 FAIL | **rc 1 (U4)** ✓ |
 | NC4 | capstone 側の RVA32 集合に偽の値 0x7fffff01 を注入 | U1 FAIL | **rc 1 (U1)** ✓ |
 | NC5 対照 | `judge.py shells` (無改変 status_run.csv) | rc 0 | **rc 0** ✓ |
 | NC5 | FL Keys の行に emcc_c_rc=1 | judge FAIL | **rc 1** ✓ |
-| NC6 対照 | `unr_e2e.sh --skip-lift` (無改変) | rc 0・OK あり | **rc 1 ✗** (range 欠落監査 FAIL のため。 実データの不合格を正しく検出している) |
-| NC6 | 同 + emcc_c_rc=1 の行を追記 | rc ≠ 0・OK 無し | **rc ≠ 0・OK 無し** ✓ |
+| NC6 対照 | `unr_e2e.sh --skip-lift` (無改変) | 既知の range 欠落だけで rc 1 (judge PASS・indirect_defs FAIL・OK 無し) | **rc 1 ✓** (judge PASS 7/7、indirect_defs FAIL、OK 無し) |
+| NC6 | 同 + emcc_c_rc=1 の行を追記 | judge FAIL・rc ≠ 0・OK 無し | **rc ≠ 0・judge FAIL・OK 無し** ✓ |
+| NC7 (新規) | 合成 bytes `mov rax, imm64` (= 開始 VA) を `imm_capstone` に入力 | 開始 VA ありで検出 / なしで非検出 | **rc 0** ✓ (即値の検出経路の動作確認。 BFS 側の即値辺は NC2 のとおり未検証) |
 
-9 項目中 7 が期待どおり、2 が不一致 (NC2: 非識別、NC6 対照: 実データの FAIL)。 NC 実行後、`status_run.csv` は元の 8 行 (header + 7) に復元した。
+期待どおり 9 項目 (NC0・NC1・NC3・NC4・NC5 対照/NC5・NC6 対照/NC6・NC7)、未検証 1 項目 (NC2、受入から除外)。 `status_run.csv` は各 NC の後に元へ復元 (trap と cp)。
+
+### 2d-8. byte 走査の一致 31 箇所の判定 (`bytescan_hits.py`、capstone の IMM 集合に入らなかったもの)
+
+判定: 一致位置を含む命令を関数先頭からの線形走査 (capstone) で求め、 即値 = IMM の下位 32 bit が一致 / 変位 = メモリ disp の下位 32 bit が一致 / 偶発 = 含む命令の中に一致するが IMM にも disp にも一致しない / データ = どの命令にも含まれない (線形走査が復号を止めた後)。
+対象は 15 (VA 下位 32 bit 一致 / RVA 一致の別)、一致箇所は 31。 **結果: 即値 0 件 / 変位 4 件 / 偶発 23 件 / データ推定 4 件**。
+
+- **変位 4 件** (Slicex 0x497240、Soundfont 0x16d3b0・0x148110・0x132b30): 全て `[rip + disp]`。 参照先は next_ip + disp であり、disp 欄の数値が対象 RVA と一致しているだけ (絶対参照ではない)。 → 参照ではない。
+- **偶発 23 件**: 含む命令の符号化バイトそのものが値と一致する例 (例: `cmp byte ptr [rbp + 0x67], 0` の 4 バイト `80 7d 67 00` = 0x00677d80 = VA 0x677d80 (base 0x400000 + RVA 0x277d80))、 call 命令の内部のバイト、 命令境界をまたぐ窓。 いずれも絶対アドレスの即値 (IMM) として一致する命令は無い (capstone の IMM 集合に入らない)。 → 参照ではない。
+- **データ推定 4 件** (Granulizer 0xa770、Slicer 0xa770、Slicex 0x3d000 ×2): 含む関数の線形走査が一致位置より前で停止しており、非命令バイト (データ・テーブル) の可能性が高い。 **未確認** (対象は d 集合で、参照元の判定には影響しない)。 起票: §7c。
+
+結論: 即値として絶対参照されている非共通関数は本データで **0 件** (根 (b) = 0 件の判定は、byte 走査の 31 箇所を見ても変わらない)。 ただし データ推定 4 件は未確認。
+
+| プラグイン | 種別 | 対象 (RVA) | 含む関数 (RVA) | 関数内オフセット | VA | 含む命令 | 判定 | 関数の区分 | 対象の区分 |
+|---|---|---|---|--:|---|---|---|---|---|
+| FPC | VA | 0x43e900 | 0xad30 | 0x116 | 0x40ae46 | `movsd xmm6, qword ptr [rip + 0x47fb41]` | 偶発 (命令内の他のバイト) | total2 | total2 |
+| Fruity Granulizer | VA | 0xa770 | 0x22460 | 0x5f66 | 0x4283c6 | `-` | データ (復号範囲外・命令境界外) | outside | d |
+| Fruity Slicer | VA | 0xa770 | 0x22470 | 0x5f66 | 0x4283d6 | `-` | データ (復号範囲外・命令境界外) | outside | d |
+| Slicex | RVA | 0x497240 | 0x1be90 | 0x13 | 0x41bea3 | `cmp dword ptr [rip + 0x497240], -1` | 変位 | total2 | total2 |
+| Slicex | RVA | 0x3d000 | 0x25620 | 0x5302 | 0x42a922 | `-` | データ (復号範囲外・命令境界外) | outside | d |
+| Slicex | RVA | 0x3d000 | 0x25620 | 0x5306 | 0x42a926 | `-` | データ (復号範囲外・命令境界外) | outside | d |
+| Soundfont Player | RVA | 0x17d130 | 0x180e30 | 0x12c | 0x580f5c | `call 0x6fe090` | 偶発 (命令内の他のバイト) | total2 | total2 |
+| Soundfont Player | RVA | 0x17d080 | 0x180e30 | 0x1dc | 0x58100c | `call 0x6fe090` | 偶発 (命令内の他のバイト) | total2 | outside |
+| Soundfont Player | VA | 0x277d80 | 0x188390 | 0x200 | 0x588590 | `cmp byte ptr [rbp + 0x67], 0` | 偶発 (命令内の他のバイト) | total2 | d |
+| Soundfont Player | VA | 0x277d80 | 0x188390 | 0x323 | 0x5886b3 | `cmp byte ptr [rbp + 0x67], 0` | 偶発 (命令内の他のバイト) | total2 | d |
+| Soundfont Player | VA | 0x277d80 | 0x188390 | 0x406 | 0x588796 | `cmp byte ptr [rbp + 0x67], 0` | 偶発 (命令内の他のバイト) | total2 | d |
+| Soundfont Player | VA | 0x34e850 | 0x1dbc80 | 0x46 | 0x5dbcc6 | `mov rcx, qword ptr [rbp + 0x50]` | 偶発 (命令内の他のバイト) | total2 | total2 |
+| Soundfont Player | RVA | 0x16d3b0 | 0x25ff70 | 0x54 | 0x65ffc4 | `mov rax, qword ptr [rip + 0x16d3b0]` | 変位 | total2 | total2 |
+| Soundfont Player | RVA | 0x2e0f00 | 0x26e540 | 0x2b | 0x66e56b | `mov rax, qword ptr [rip + 0x15e03c]` | 偶発 (命令内の他のバイト) | total2 | d |
+| Soundfont Player | RVA | 0x2e0f00 | 0x26e540 | 0x6f | 0x66e5af | `mov rax, qword ptr [rip + 0x15ea68]` | 偶発 (命令内の他のバイト) | total2 | d |
+| Soundfont Player | RVA | 0x2e0f00 | 0x26eca0 | 0x2f | 0x66eccf | `mov rax, qword ptr [rip + 0x15e348]` | 偶発 (命令内の他のバイト) | outside | d |
+| Soundfont Player | RVA | 0x2e0f00 | 0x26ef50 | 0x3c | 0x66ef8c | `mov rax, qword ptr [rip + 0x15e08b]` | 偶発 (命令内の他のバイト) | outside | d |
+| Soundfont Player | RVA | 0x2e0f00 | 0x26ef50 | 0x80 | 0x66efd0 | `mov rax, qword ptr [rip + 0x15d5d7]` | 偶発 (命令内の他のバイト) | outside | d |
+| Soundfont Player | RVA | 0x148110 | 0x284db0 | 0x21c | 0x684fcc | `mov rax, qword ptr [rip + 0x148110]` | 変位 | total2 | total2 |
+| Soundfont Player | RVA | 0x2e0f00 | 0x284db0 | 0x35cd | 0x68837d | `mov rax, qword ptr [rip + 0x1443da]` | 偶発 (命令内の他のバイト) | total2 | d |
+| Soundfont Player | RVA | 0x2e0f00 | 0x296910 | 0x74 | 0x696984 | `mov rax, qword ptr [rip + 0x135c53]` | 偶発 (命令内の他のバイト) | total2 | d |
+| Soundfont Player | RVA | 0x132b30 | 0x299f50 | 0x65c | 0x69a5ac | `mov rax, qword ptr [rip + 0x132b30]` | 変位 | total2 | total2 |
+| Soundfont Player | VA | 0x277d80 | 0x2a6e80 | 0x34 | 0x6a6eb4 | `cmp byte ptr [rbp + 0x67], 0` | 偶発 (命令内の他のバイト) | total2 | d |
+| Soundfont Player | RVA | 0x20b900 | 0x2b74d0 | 0x11d | 0x6b75ed | `mov dword ptr [rbp + 0x4c], 0` | 偶発 (命令内の他のバイト) | total2 | d |
+| Soundfont Player | VA | 0x277d80 | 0x304ed0 | 0x2c1 | 0x705191 | `cmp byte ptr [rbp + 0x67], 0` | 偶発 (命令内の他のバイト) | total2 | d |
+| Soundfont Player | VA | 0x277d80 | 0x304ed0 | 0x2fb | 0x7051cb | `cmp byte ptr [rbp + 0x67], 0` | 偶発 (命令内の他のバイト) | total2 | d |
+| Soundfont Player | RVA | 0x20b900 | 0x30d220 | 0x189 | 0x70d3a9 | `movzx rax, byte ptr [rax]` | 偶発 (命令内の他のバイト) | total2 | d |
+| Soundfont Player | RVA | 0x36840 | 0x3175e0 | 0x17f | 0x71775f | `mov dword ptr [rax + 0x68], 3` | 偶発 (命令内の他のバイト) | total2 | d |
+| Soundfont Player | RVA | 0x36840 | 0x318200 | 0x30a | 0x71850a | `mov dword ptr [rax + 0x68], 3` | 偶発 (命令内の他のバイト) | total2 | d |
+| Soundfont Player | RVA | 0x36840 | 0x318a30 | 0x351 | 0x718d81 | `mov dword ptr [rax + 0x68], 3` | 偶発 (命令内の他のバイト) | total2 | d |
+| Soundfont Player | VA | 0x277d80 | 0x348610 | 0xeb | 0x7486fb | `cmp byte ptr [rbp + 0x67], 0` | 偶発 (命令内の他のバイト) | total2 | d |
+
+件数 31: データ (復号範囲外・命令境界外) 4, 偶発 (命令内の他のバイト) 23, 変位 4
+
+### 2d-9. PE export 表と (d) (`closure_unreached.py` の `export` 件数、export 表を明示的に parse)
+
+| プラグイン | export ∩ total2 | export ∩ 非共通 outside | export ∩ (d) |
+|---|--:|--:|--:|
+| FL Keys | 0 | 1 (`CreatePlugInstance` 0x31f030) | 0 |
+| FPC | 0 | 0 | 0 |
+| Fruity Granulizer | 0 | 0 | 0 |
+| Fruity Slicer | 0 | 0 | 0 |
+| Fruity Slicer 2 | 0 | 2 (`DecodeAudioFile` 0x442950、`FinishAudioFile` 0x442fc0) | 0 |
+| Slicex | 0 | 1 (`CreatePlugInstance` 0x479ed0) | 0 |
+| Soundfont Player | 0 | 1 (`CreatePlugInstance` 0x362c70) | 0 |
+
+- export かつ非共通 outside の 5 件は、§2d-4 の range 欠落 5 件と同一の関数 (RVA で一致、VA は base 0x400000 からの換算)。 (d) に入った export は 0 件。
+- 閉包の起点 (entries) は ABI impl のみで、export 表は起点にも (d) の除外にも使っていない (`lift/plugin_closure.py`)。 本データでは、export 経由で host から呼ばれる関数が (d) に入る例は 0 件。 ただし export 関数が (a)〜(c-lea) のどれで total3 に入ったかは未確認 (推定: (a) = export address table の値)。
+- 含意: 欠落 5 件は dead code ではなく **host から直接呼ばれる入口** である。 §2d-4 の欠落は、wasm 側で入口関数が未定義になることを意味しうる (PM 判断: §7c)。
 
 ## 6c. 検証起点・取りこぼし確認
 
-- 検証起点 commit: **b36fef5** (`feat(plugins): sampler unreached-function classification and total3 closure (Refs #667)`)。 分類・total3・lift・e2e・ネガコンは全て b36fef5 のスクリプトで実行。 以後の commit はこの REPORT のみ。
+- 検証起点 commit: **b36fef5** (`feat(plugins): sampler unreached-function classification and total3 closure (Refs #667)`)。 分類・total3・lift・e2e は b36fef5 のスクリプトで実行。 fix 版: `closure_unreached.py` に export 件数と分類集合 (`unr/block*.sets.json`) の出力を追加 (分類・total3・ranges は不変)、 `unr_nega.sh` を改訂 (§2d-7)、 `bytescan_hits.py` を新規追加 (§2d-8)。 `unr_e2e.sh` は fix 版の commit 7d3ac70 で全段を実行 (438 s、rc 1)。 その後 `closure_unreached.py` の export 解析 1 行 (`parse_data_directories`) を直し、同 HEAD で再実行 (PASS 5 × 7、total3 不変)。 `unr_nega.sh` と `bytescan_hits.py` も同 HEAD で実行。
 - `git status --porcelain=v1 -- tools/plugins/sampler`: 実行後も空 (取りこぼし・混入なし)。 `tools/plugins/work/` (gitignore) の生成物は未 commit。
 - `find tools/plugins/sampler -type f -size +20M` = **0 件**。
 - 検証範囲: 分類・閉包・lift の判定 (lift 通過と range 監査)。 範囲外: 差分試験 (bit-exact)・wasm リンク・実行時の到達性・根 314 関数の偶発一致の判別。 通過 ≠ 正しさ。
@@ -125,6 +189,11 @@
 | (d) 参照なし 1,477 関数 / 738,944 B は dead code 候補にすぎない | 間接経路が他にある可能性。 未使用の確定ではない | #667 にコメント / 次タスク (§8c) |
 | total3 の wasm リンク・実行時の到達性 | 範囲外。 lift 通過 ≠ 正しさ | #667 にコメント |
 | f80 lowering の対象 (lea 段と同じ 3 関数 × 3 block) の bit-exact 未検証 | 差分試験の対象に入るか未定 | #197 にコメント (既存) |
+| **AC2 gate 不合格** (range 欠落 5 件 = PE export 関数 5 件、§2d-9) | 受入 AC2 は未達。 PM 判断: (a) #707 へ移譲して #667 の AC を分割 / (b) gate の定義を変える (変える場合は欠落 5 件を許容する理由と total3・(d) への影響を REPORT に書く)。 本 run では gate を緩めていない | PM (#667・#707) |
+| **基点 #676 (`627-sampler-lea-closure`) が未 merge** (CHANGES_REQUESTED、main とは 384 commit 差)。 main では `rep_stosb_memset` が実装済み (9b5ea38)。 merge 前に main へ付け替えて再測定が必要 | 付け替え後に `unr_e2e.sh`・`unr_nega.sh` を再実行 | PM |
+| 即値辺を含む実データ (または合成 fixture) での NC2 の再確認 | 即値辺は本データで 0 件 | PM (#667 に起票依頼) |
+| byte 一致 31 箇所のうちデータ推定 4 件 (Granulizer・Slicer・Slicex) の中身の確認 | 参照元の判定には影響しない (対象は d)。 未確認 | #667 にコメント |
+| `REPORT_UNREACHED.md` は `docs/DOC_MAP.md` の索引に未掲載 (既存の `REPORT_LEA.md`・`REPORT_INDIRECT.md` も未掲載、grep 確認) | 索引の追記は PM 判断 | PM |
 
 ## 7d. 既知類型との関係 (DEFECTS.md の候補行)
 
