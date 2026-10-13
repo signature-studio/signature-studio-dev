@@ -39,6 +39,31 @@ assert.equal(E("general.getVersion").code, 2);                       // 未実�
 assert.equal(E("ilmcp.showHighlight", "a").code, 5);
 assert.equal(E("mixer.getCurrentTempo", 1, 2).code, 5);
 
+// 2b. ilmcp.getBrowserNames の固定バッファ (q[512] / full[288] / e[576] / b[2048]) 境界。
+//   収まらない入力は切り詰めず Range error (code 4)。エスケープ後の名前長を X とすると b の長さ = 59 + 4X、
+//   b は NUL 込みで X <= 497。制御文字 1 個は 6B (\u00XX) に展開される。
+const BN = ["Fruity Slicer", "3x Osc", "Sampler"];
+const browse = (nm) => E("ilmcp.getBrowserNames", nm, 0);
+const okBrowse = (nm) => ({ ok: { name: nm, items: BN.map((n) => `${nm}/${n}`) } });
+const RANGE_ERR = { err: "Range error", code: 4 };
+const fits = ["", "db", 'a"b\\c', "\x01\x1f\n\t", "あ".repeat(90), "a".repeat(273), "\x01".repeat(80) + "a".repeat(17)];
+const overflows = [
+  "a".repeat(274),                      // full[288]: 274 + "/Fruity Slicer" = 288B
+  "\x01".repeat(80) + "a".repeat(18),   // X = 498: q / full / e は収まり b[2048] だけが溢れる
+  "\x01".repeat(85),                    // X = 510: q[512]
+  "\x01".repeat(100),                   // reviewer 再現ケース (b を越えて書いていた)
+  "a".repeat(100000),
+];
+const brief = (r) => JSON.stringify(r).slice(0, 100);
+const bad = [];
+for (const nm of fits) if (JSON.stringify(browse(nm)) !== JSON.stringify(okBrowse(nm))) bad.push(`収まる入力 ${nm.length} 文字: ${brief(browse(nm))}`);
+for (const nm of overflows) {
+  const r = browse(nm);
+  if (JSON.stringify(r) !== JSON.stringify(RANGE_ERR)) bad.push(`溢れる入力 ${nm.length} 文字: ${brief(r)}`);
+  if (JSON.stringify(browse("db")) !== JSON.stringify(okBrowse("db"))) bad.push(`溢れた後に engine が異常 (${nm.length} 文字)`);
+}
+assert.deepEqual(bad, [], "ilmcp.getBrowserNames の固定バッファ境界");
+
 // 3. 戻り型は C 側 (整数値の float でも D): Python 側で type を見る
 const py = await FlPython.create({
   flpyUrl: new URL("dist/flpy.js", root), engine, ids, files: { "/fl/Lib/midi.py": fs.readFileSync(new URL("work/midi.py", root)) },
@@ -87,4 +112,4 @@ assert.deepEqual(m.json, ["dict"]);
 assert.deepEqual(m.range[0], ["IndexError", "Index out of range"]);
 assert.equal(m.type[0][0], "TypeError");
 assert.equal(m.unimpl[0][0], "RuntimeError");
-console.log(JSON.stringify({ functions: ids.length, implemented: impl, unimplemented: unimpl, mcp_static: mcp.size, PASS: true }));
+console.log(JSON.stringify({ functions: ids.length, implemented: impl, unimplemented: unimpl, mcp_static: mcp.size, browser_names_cases: fits.length + overflows.length, PASS: true }));

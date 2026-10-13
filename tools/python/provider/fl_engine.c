@@ -172,31 +172,46 @@ FL_H(plugins, getParamValueString) { PP(0); char b[48]; snprintf(b, sizeof b, "%
 FL_H(plugins, setParamValue) { double v = A_DBL(0, 0); int64_t q = A_INT(1, 0); if (q < 0 || q >= NPARAM) RANGE(); pvals[q] = v; return fl_ret_none(c); }
 
 /* ---- ilmcp (8) ---- */
-static void json_str(char *dst, size_t cap, const char *s) {
+/* 出力が収まらない場合は切り詰めずに -1 を返す (呼出し側が fl_err(RANGE) にする)。 */
+static int json_str(char *dst, size_t cap, const char *s) {
     size_t o = 0;
+    if (cap < 3) return -1;
     dst[o++] = '"';
-    for (; *s && o + 8 < cap; s++) {
+    for (; *s; s++) {
         unsigned char ch_ = (unsigned char)*s;
-        if (ch_ == '"' || ch_ == '\\') { dst[o++] = '\\'; dst[o++] = (char)ch_; }
-        else if (ch_ < 0x20) o += (size_t)snprintf(dst + o, 8, "\\u%04x", ch_);
+        size_t need = (ch_ == '"' || ch_ == '\\') ? 2 : ch_ < 0x20 ? 6 : 1;
+        if (need > cap - o - 2) return -1; /* 閉じ引用符と NUL の 2B を残す */
+        if (need == 6) { snprintf(dst + o, 7, "\\u%04x", ch_); o += 6; }
+        else if (need == 2) { dst[o++] = '\\'; dst[o++] = (char)ch_; }
         else dst[o++] = (char)ch_;
     }
     dst[o++] = '"'; dst[o] = 0;
+    return 0;
 }
+/* b[0..*o) に s を追記する。NUL 込みで残量に収まらなければ (n >= remaining) 何も書かず -1。 */
+static int buf_add(char *b, size_t cap, size_t *o, const char *s) {
+    size_t n = strlen(s), remaining = cap - *o;
+    if (n >= remaining) return -1;
+    memcpy(b + *o, s, n + 1); *o += n;
+    return 0;
+}
+#define OVERFLOW() return fl_err(c, FL_E_RANGE, "Range error")
 FL_H(ilmcp, getBrowserNames) {
     NARGS(0, 2);
     const char *nm = (c->n > 0 && c->a[0].tag == 'S') ? A_STR(0) : "";
-    char q[512], b[2048], *w = b;
-    json_str(q, sizeof q, nm);
+    char q[512], b[2048];
+    size_t o = 0;
+    if (json_str(q, sizeof q, nm)) OVERFLOW();
     static const char *items[] = {"Fruity Slicer", "3x Osc", "Sampler"};
-    w += snprintf(w, sizeof b, "{\"name\":%s,\"items\":[", q);
+    if (buf_add(b, sizeof b, &o, "{\"name\":") || buf_add(b, sizeof b, &o, q) || buf_add(b, sizeof b, &o, ",\"items\":[")) OVERFLOW();
     for (int i = 0; i < 3; i++) {
         char full[NAME * 3], e[NAME * 6];
-        snprintf(full, sizeof full, "%s/%s", nm, items[i]);
-        json_str(e, sizeof e, full);
-        w += snprintf(w, (size_t)(b + sizeof b - w), "%s%s", i ? "," : "", e);
+        int n = snprintf(full, sizeof full, "%s/%s", nm, items[i]);
+        if (n < 0 || (size_t)n >= sizeof full) OVERFLOW();
+        if (json_str(e, sizeof e, full)) OVERFLOW();
+        if ((i && buf_add(b, sizeof b, &o, ",")) || buf_add(b, sizeof b, &o, e)) OVERFLOW();
     }
-    snprintf(w, (size_t)(b + sizeof b - w), "]}");
+    if (buf_add(b, sizeof b, &o, "]}")) OVERFLOW();
     return fl_ret_json(c, b);
 }
 FL_H(ilmcp, getHighlightNames) {
