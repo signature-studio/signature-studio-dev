@@ -32,28 +32,40 @@
 
 修復 pass: `tools/plugins/lift/passes/fix_i32_ptr_arg.py` [P-T2] (opt-in: `PLUG_I32PTR_FUNCS=function_180049450`)。
 
-呼出側の上位ビットの扱い (`function_180049450` 呼出 19 箇所。`function_180049450(i64 …, i32 X)`):
+修復 pass: `tools/plugins/lift/passes/fix_i32_ptr_arg.py` [P-T2] (opt-in: `PLUG_I32PTR_FUNCS=function_180049450`)。
+pass は次の場合に**出力を書かず非 0 終了**する (`lift_ranges.sh` が `set -e` で止まる): 実引数が定数・`trunc` 定義以外 / 本体で `inttoptr`・`icmp` 以外に使われる / 呼出が解釈できない形。
+`i32` → `i64` の書換えは、`trunc` 定義を変えず `add i64 %W, 0` を挿入して行う (定義元を変えると他の `i32` 使用が壊れるため)。
 
-| 種別 | 箇所 | 扱い |
+呼出側の分類 (`function_180049450` の呼出 19 件。`classify_i32_callers.py` で再生成可):
+
+| 種別 | 件数 | 扱い |
 |---|--:|---|
-| `i32 0` (定数) | 8 | `i64 0` (値は同じ) |
-| `i32 %V`、定義元 `%V = trunc i64 %W to i32` | 10 | `%V = add i64 %W, 0` (上位 32bit を保つ) |
-| `i32 %arg1` (呼出元 `function_180056120` の `i32` 仮引数) | 1 | 呼出元の署名が `i32` のため未修復。下記 未解決 |
+| `i32 0`〜定数 | 8 | `i64 0` (値は同じ) |
+| `i32 %V`、定義元 `%V = trunc i64 %W to i32` (同一 define 内、距離制限なし) | 10 | `%i3x.N = add i64 %W, 0` を挿入し、それを渡す (上位 32bit を保つ) |
+| `i32 %arg1` (呼出元 `function_180056120` の `i32` 仮引数) | 1 | 対象外 → pass が失敗 |
 
-決定の根拠: ネイティブ `0x180049450` は第 2 引数 (rdx) の 64bit 全体を `test rdx, rdx` / `movups [rdx]` でポインタとして使う。
-`trunc` による上位 32bit の切り捨ては、非 0 の上位を持つポインタで別アドレスを読むため silent に値が変わる。よって `i64` 化して上位を保つ。0 拡張・符号拡張は起こさない。
+- 件数の揃え: 「呼出 4 箇所」は `function_180056120` 自体の呼出数 (4 件)。上の 19 件は `function_180049450` の呼出数で、混同していた。
+- 決定の根拠: ネイティブ `0x180049450` は第 2 引数 (rdx) の 64bit 全体を `test rdx, rdx` / `movups [rdx]` でポインタとして使う。
+  `trunc` による上位 32bit の切り捨ては、非 0 の上位を持つポインタで別アドレスを読むため silent に値が変わる。よって `i64` 化して上位を保つ。
+  定数 (0 〜 2^31-1) は `i32`/`i64` で値が同じ。0 拡張・符号拡張は使わない。
 
-実測 (`bash tools/plugins/synth/cpp_lift.sh 21202 1500`、作業ツリーのみ・コミット前):
+回帰テスト: `bash tools/plugins/lift/passes/test_fix_i32_ptr_arg.sh` (5 ケース: 定数 / trunc 定義 (定義と呼出が 30 行以上離れる) → 変換して clang 構文検証 / 仮引数の受け渡し → 失敗 / 本体が i32 を別用途に使う → 失敗 / icmp の被演算子が変数 → 失敗)。
 
-| 条件 | summary.csv | `emcc_c_rc` | 最初のエラー |
-|---|---|--:|---|
-| 修復前 (main f3ffd7ba) | `21202,1579,0,1393,0,3,3,1,0,1,36,211,25828,67,23,1391,0` | 1 | `e.final.ll:114486:21 '%arg2' defined with type 'i32' but expected 'i64'` |
-| `PLUG_I32PTR_FUNCS=function_180049450` | `21202,1579,0,1393,0,3,3,1,0,1,36,211,25828,67,23,1391,0` | 1 | `e.final.ll:135551:56 '%arg1' defined with type 'i32' but expected 'i64'` |
-| 既定 (opt-in 無効、修復後のコード) | `21202,1579,0,1393,0,3,3,1,0,1,39,211,25828,67,23,1391,0` | 1 | 同上 (baseline と同一) |
+実測 (`bash tools/plugins/synth/cpp_lift.sh 21202 1500`、fl-win64 の 21202 PE・RetDec v5.0・emcc 6.0.12 を使用):
 
-- `emcc_c_rc=0` は未達。エラーは `function_180049450` から `function_180056120(i32 %arg1, …)` (呼出 4 箇所) の `i32` 仮引数へ進んだ。
-  この `%arg1` は本体で `inttoptr` されず、`call` に渡すだけのため、本 pass の対象条件には当たらない。
-- 既定経路 (opt-in 無効) の summary は修復前と同一。他 8 本の `emcc_c_rc` は未測定 (本 run の時間内では回していない)。
+| 条件 | lift rc | summary.csv | `emcc_c_rc` | 最初のエラー |
+|---|--:|---|--:|---|
+| 修復前 (main f3ffd7ba) | 0 | `21202,1579,0,1393,0,3,3,1,0,1,36,211,25828,67,23,1391,0` | 1 | `e.final.ll:114486:21 '%arg2' defined with type 'i32' but expected 'i64'` |
+| 既定 (opt-in 無効、f6274470 の pass) | 0 | `21202,1579,0,1393,0,3,3,1,0,1,45,211,25828,67,23,1391,0` | 1 | 同上 (baseline と同一) |
+| `PLUG_I32PTR_FUNCS=function_180049450` | 1 | (lift が pass で停止、summary の emcc 列は未生成) | — | `[P-T2] FAIL: 呼出の実引数 %arg1 が trunc 定義でも定数でもない (line 134656)` |
+
+- opt-in 経路は、仕様どおり `function_180056120(i32 %arg1, …)` の呼出で止まる。出力 `.i3.ll` は作られず、`.final.ll` も無い。
+  外側の `i32` 署名を i64 化すると範囲が広がるため、本 pass では扱わない (下記 未解決)。
+- そのため「opt-in の `.ll` が `llvm-as`/clang で構文検証を通る」という受入条件は、実データでは**達成していない**。
+  代わりに検証用の入力 (実データの `e.fh.ll` で `function_180056120` の `i32 %arg1` 1 件だけを定数 0 に置換したコピー。本番の修復ではない) を作り、
+  pass の出力 (const 9 / trunc 10) が `clang -x ir -fsyntax-only` を通ることを確認した。
+- 既定経路の summary は修復前と同一 (`emcc_c_rc`=1、最初のエラーも同一)。`lift_s` のみ測定ごとに変動 (36 → 45 秒)。他 8 本の `emcc_c_rc` は未測定。
+- 注: `e.fh.ll` は llvm-as 18 では 7651 行の `add i64 0, i64 %...` で不正 (RetDec 出力の元からの問題)。clang 18 の `-fsyntax-only` は通る。検証は clang で行う。
 
 ## B. 未解決 (起票先)
 
