@@ -62,7 +62,7 @@ harness は `liftdiff.py build targets/m11.json` (sig_mismatch 0) → `liftdiff.
 * 判定表 `results/sigfix_zeropad_liftdiff.tsv`: 1,050 行 (ヘッダ 1 + 1,049 site)。sha256 `7ac498d8a3d9c62ed457458d5d10d9965929b3d514861b7de1dcb47f70ab5ad8`。
 * 入力 status 内訳 (`sigfix_zeropad_remaining.tsv`): matched 1,004 / unmatched 22 / no_pdata 23 (合計 1,049)。
 * 所要 / 集計 (75/173/419) の数値は §1 の初回 run の記録値。下記の batch 生データが無いため、この fix run では再実行していない。
-* 起点: 本 commit `e1ac1cfb` の親は origin/main `352f4e96`。harness 実行は `352f4e96` 上で行った (初回 run は `29f63707` (ローカル main) でも行ったが、同一結果を `352f4e96` で得た時点の記録のみ採用)。
+* 起点: 本 commit `e1ac1cfb` の親は origin/main `352f4e96`。初回 run の harness 実行 HEAD は `352f4e96` と記録しているが、`29f63707` での実行記録は本 run で確認できず未検証 (PR 本文の旧記述は撤回)。
 * 生データ batch.jsonl: 未 commit。ローカル・`$HOME/artifacts` のいずれにも存在しない (`tools/liftdiff/work/` も無い)。ハッシュ・行数は未記録。
 * この run の素材: `$HOME/artifacts` には `fl-win64.tar.zst` (2,324,302,252 bytes) のみ。`toolchain-emsdk` / `toolchain-retdec` / `work-m11` / `work-liftdiff` は実在せず、`liftdiff.py build` / `batch` は実行不能。
 * 未達 (次の run で解消する): (a) `oc_artifacts` 指定で素材を揃えて `liftdiff.py batch` を再実行し、batch.jsonl の sha256・行数を記録する。(b) 再生成した判定表 TSV の sha256 が上記と一致することを確認する。
