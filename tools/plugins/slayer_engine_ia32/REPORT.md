@@ -2,7 +2,7 @@
 
 - 日付: 2026-10-13 / 担当 dir: `tools/plugins/slayer_engine_ia32/` のみ / 親 #536 (結合方式は決定済み・PR #677 は未マージ。本件はその成果に依存しない独立計測) / 本 issue #674 の**中間成果** (受入条件 5 項目は 0/5 達成)
 - 対象: block22434 (`extracted/block22434_PE.bin`, 179,512 B, sha256 `84b64c43…de724a9`) = FL Slayer の x86 engine
-- 検証起点 commit: 本ファイルを含む commit (PR 本文と最終回答に記載。検証記録は §6)
+- 検証起点 commit: `bd8690c` (実装 commit。検証記録は §6)
 - 再現: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 $PY tools/plugins/slayer_engine_ia32/measure.py --dump` (gate) と `… measure.py --nega` (ネガコン)。 `$PY` は `uv venv $RUNNER_TEMP/venv_ia32 && uv pip install --python $RUNNER_TEMP/venv_ia32/bin/python capstone` (capstone 5.0.7)
 - 既知類型との関係 (`docs/DEFECTS.md`): **該当なし**。 本件は decode の静的計測で lift 出力は作っていない (silent miscompile の観測対象外)。 新類型の候補は §7 の行案のみ (DEFECTS.md は未編集)
 
@@ -75,10 +75,12 @@ ia32 で要注意の mnemonic (件数): cdq 21 / movzx 51 / movsx 54 / lea 590 /
 
 | 項目 | 値 |
 |---|---|
+| 検証起点 commit | `bd8690c` (`git worktree add --detach $RUNNER_TEMP/wt_verify HEAD` で展開・実行後に `worktree remove --force`) |
 | 1 回目 (作業ツリー) | gate OK (4/4)・nega 0/3 miss・命令 25,349・不能 4 B・x87 4,203・priv 15 |
-| worktree 再現 | (検証後に記録) |
-| `git status --porcelain=v1 -- tools/plugins/slayer_engine_ia32` | (検証後に記録) |
-| 20 MiB 超の blob | (検証後に記録) |
+| worktree 再現 | 一致: `[measure] OK (4/4)`・`nega: 0/3 miss`・§3・§4 の全数値が作業ツリーの出力と同一 (`diff` で差分なし。 timing 行と入力パス行を除く) |
+| 所要 (worktree, gate + nega 直列) | 3.23 s (壁時計)・gate 単独 0.82 s・load average 1 分 0.04 → 0.04・並列数 1 |
+| `git status --porcelain=v1 -- tools/plugins/slayer_engine_ia32` | 空 (commit 後) |
+| 20 MiB 超の blob | 無し (`find tools/plugins/slayer_engine_ia32 -type f -size +20M -not -path '*/work/*'` は 0 件) |
 
 範囲外 (受入条件のうち今回やらなかったもの): **emcc -c 通過** (ia32 front-end 本体が無い) / **x87 方針と差分試験** (f80→f64 の bit 差分は未実測) / **marshal 表** (殻↔engine の 32/64bit 構造体) / **native vs wasm 差分試験** / **LoadLibrary shim**。 いずれも #674 の継続。
 
