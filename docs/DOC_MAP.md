@@ -93,8 +93,9 @@
 | `tools/iltools/REPORT.md` | ~36 | T-SH-12 (#154): ILTools_x64.dll の x64c lift 測定 (11,747 関数・unsup 1,236 は全て x87 → 未達)。x87 命令一式が x64c 未対応 |
 | `tools/liftdiff/REPORT.md` | ~250 | flelift (x64c) 全数採点 + native 全起動の参照化 (§5/§6.1/§6.2 は `REPORT_APPENDIX.md` に分割)。§12 (被覆拡大 vm0/u16) は要約のみで全文は `REPORT_APPENDIX.md` §12 |
 | `tools/liftdiff/REPORT_APPENDIX.md` | ~355 | liftdiff REPORT の分割移動節の全文: §5/§5.1/§5.2 (回帰 A/B・Ablation)・§6.1/§6.2 (検収・再現性)・§8/§9 (wasm_trap)・§10 (OTT 旧 chain)・§11 (比較系偽陽性)・§12 (被覆拡大 vm0/u16)。250 行上限のため無変更で分割移動 |
-| `tools/liftdiff/REPORT_APPENDIX_LD16.md` | ~120 | liftdiff REPORT §10 (OTT 旧 chain 前回比) の全文: 集計差分 (38→35 main・HEAD。うち cases.py で 38→40) の原因切り分け・前回比の基準 (同一 HEAD で n=3 採点・PM 判断 #1069)・n=3 非決定性。関数単位の突合は `tools/liftdiff/tests/ott_delta.py` (LD-16 / #825) |
+| `tools/liftdiff/REPORT_APPENDIX_LD16.md` | ~172 | liftdiff REPORT §10 (OTT 旧 chain 前回比) の全文と、§7 (LD-32 / #1070: 8 関数のパターン別観測・m11 sample:800 の n=3)・§8 (LD-32 追補: m11 sample:800 の case outcome 揺れ 3 関数 = `tests/ld32_verdict_cmp.py` の tsv、8 関数の entry・call 単位 trace。命令単位は #1313)。集計差分 (38→35 main・HEAD。うち cases.py で 38→40) の原因切り分け・前回比の基準 (同一 HEAD で n=3 採点・PM 判断 #1069)・n=3 非決定性。関数単位の突合は `tools/liftdiff/tests/ott_delta.py` (LD-16 / #825) |
 | `tools/liftdiff/REPORT_APPENDIX_LD25.md` | ~80 | liftdiff REPORT §12 末尾の LD-25 行 (InitUnits の空振り一致・InitTable 充足の boot 状態) の全文: 機械語で確定した原因・units/hybrid の precondition 実測・sample:800 の判定遷移。検査は `tools/liftdiff/tests/check_initunits.py` (LD-25 / #977) |
+| `tools/liftdiff/REPORT_APPENDIX_LD42.md` | ~50 | liftdiff LD-42 (#1248) の実測: units/hybrid の sample:800 判定遷移 (関数単位の突合は `tests/ld42_transition.py`)、TLS precondition、既定 batch を units に据え置く判断 (保留・子 #1464 で判断)。方式決定は DECISIONS D13 |
 | `tools/liftdiff/REPORT_APPENDIX_LD40.md` | ~34 | liftdiff LD-40 (#1199) の既存コード確認 (native `ld_fake_ptr` の thunk・wasm `ott_dispatch` 捕捉・fvm VMT 0 埋め)、未達理由 (1 run の上限内で完結せず)、子 issue #1398 (LD-48) への分割 |
 | `tools/liftdiff/REPORT_APPENDIX_865.md` | ~20 | liftdiff LD-18 (#865) 新規節: trace_head 外 27 件の 414ad0 到達確認 (25/27)・OOB 最上位 frame 集計 (239 件、件数定義と 222 件との差)。`REPORT_APPENDIX.md` は 250 行上限のため増やさず別置き |
 | `tools/liftdiff/REPORT_APPENDIX_LD28.md` | ~26 | liftdiff LD-28 (#1035) の型 C・D 原因候補 (P1〜P3)・0x417b70 の idiv/udiv 仮説の節全文 (REPORT_APPENDIX §9 から分割移動)。測定 commit・鮮度の証跡・数値例 (count = 1 の反例を含む) |
@@ -244,6 +245,7 @@
 | `tools/python/REPORT.md` | ~250 | CPython wasm + flapi/MCP 解析 + ブリッジ設計。§7c (ilmcp, PY-3 #82)・§9 (下流チケット案 T1〜T9) は要約のみで全文は `REPORT_APPENDIX.md` に、§PY-12 (#587) は要約のみで全文は `REPORT_PY12.md` に、§PY-13 (#588)・§12/§13 (#81 kwargs 署名の静的復元)・§14 (#79 Piano roll) は要約のみで全文は `REPORT_APPENDIX.md` に、§15 (#654 PY-16) は要約のみで全文は `REPORT_PY16.md`、§16 (#653 PY-15 省略引数) は要約のみで全文は `REPORT_PY15.md` に分割 |
 | `tools/python/REPORT_CHROME.md` | ~55 | python REPORT §14b: Piano roll scripts の Chrome (headless, agent-browser) 上の実行と node との出力一致 (#466 PY-11)。250 行上限のため分離 |
 | `tools/python/REPORT_PY12.md` | ~46 | PY-12 (#587): `_flhost` の per-module state 化・サブインタプリタ採用判断の実測 (REPORT.md の PY-12 節の全文。250 行上限のため分離) |
+| `tools/python/REPORT_PY31.md` | ~50 | PY-31 (#1329): mixer 残り 57 関数の扱い決定 (今回非実装・根拠は MCP 利用 0 件と mock 定義 0 件)、未実装 57 件の一覧、分割先 #941、検証 (provider_check / mixer_diff / all_tools) |
 | `tools/python/REPORT_PY74.md` | ~50 | PY-1 ilmcp 意味論の整合 (#74, PR #763): getBrowserNames 木・getHighlightNames 21 件・addChannel/addEffect/storePRScript 検証の実測表、`tests/ilmcp_diff.mjs` の結果、NC (addEffect 検証を外して 2 件差分)、非 ASCII 空白の未解決。REPORT.md §7b-3 の実測表の全文 |
 | `tools/python/REPORT_PY8.md` | ~45 | PY-8 (#80): MIDI 1 イベント flapi 呼出し数・所要時間と遅いモード切り分け (REPORT.md の分割ではなく新規。250 行上限とは無関係) |
 | `tools/python/REPORT_PY15.md` | ~130 | PY-15 (#653): 省略引数のホスト受け渡し方式・kwlist 103 関数の誤束縛 0 検証・挙動変更の内訳・ネガコン (REPORT.md §16 の全文。250 行上限のため分離) |

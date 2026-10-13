@@ -69,6 +69,19 @@
 
 - 留保: `8651a0` / `5dca50` の `EnumDisplayMonitors` 呼出しが list を埋めるかは未確認。空 list で `50aa70` が `[0+16]=3204488` を件数として読むのは、NULL 相当の `0` 番地の残骸 (REPORT_684 §3 の address 0 書換えと同種) を読んでいる可能性がある。残骸の出所は未特定。
 
+## 4.2 再測定 (#1331、HEAD `6ad3229b` = origin/main、本 run で実測)
+
+- e2e `bash m11_e2e.sh` (incremental、foreground、rc=0、155 s、load 0.77→1.06、`work/lift_pe.sha256` を PE から再作成): reached_stage 4、units_run_full 53/942、survey_ok 872、stop_reason `trap "unreachable" @ function_8c5eb0`。
+- survey `SV_RAW=1 survey_units.mjs` n=2 (13 s / 15 s、rc 0): 両回とも `{"ok":872,"miss":46,"other":1,"halt0":7,"oob":15,"noproc":1}`。unit 275 は両回 `oob` (frames `864fe0 ← 80e040 ← 80e140 ← 80e170`)。
+- ok 値の不一致: §1 の 870 と §4.1 の 871 は、本 HEAD では 872 に収束した (6ad3229b。`EnumDisplayMonitors` の実装 (#1316) がマージ済みのため、§4.1 (a)+(b) と同じコード状態)。
+- icall trace `SV_TRACE=1 survey_units.mjs` (rc 0、12 s): `target:0x85df70` の hit unit は **[114, 275]** (ok=2、miss=0)。REPORT_881 §4.1 で「根拠未確認」だった callback 呼出し先 275 は、この測定で裏付けられた。
+- probe `probe881_275b.mjs`: list=0 の読み、添字 13 で `this=0x10b80000070000` (範囲外)、unit 275 は trap。§2 と一致。
+- probe `probe881_watch.mjs` (全 942 unit): `[obj+188]` は初期 0・最終 0 のまま。callback 実行後も list は埋まらない。
+- IR (`work/boot_final.ll`): `function_85df70` は `function_40f9e0(4536504, dwData)` でブロックを確保し、`[ret+8]=arg1` (=monitor)・`[ret+16]=[arg4+16]` (=dwData の 4 byte) を書いたのち `function_50a830(arg4, ret)` で `arg4` 側の項目列に追加する。したがって callback は `arg4` が指す list に 1 件 push する。
+- 矛盾点: `867510` が渡す `arg4` は `[G2+188]` (= 0 のまま)。`50a830` は `[0+16]` を読んで `[0+8]` に書くため、NULL 相当の番地に書き込む。空 list の監視 (`[obj+188]`=0) と、callback が push する list (`arg4`) が同一かは未確定。`50a830` が NULL 相当を書く点は trap にならない (線形メモリ内) ため、観測されず無音で壊れている可能性がある。
+- 未実施 (本 run): 変更前 / IR のみ の 2 条件のネガコン (n≥2)。HEAD の survey 2 回のみ。
+- 判定: 受入条件 3・4 の一部 (callback 呼出し先) は確定。「list 空 = 275 の OOB の原因」は、callback が 275 で走った上でも list が埋まらないため、**残るが未確定** (反証でも確定でもない)。次は `867510` の `arg4` の値 (呼出し時の G2・[G2+188]) と、callback 内の `50a830` が書く先を実行時に取る。
+
 ## 5. 未達と起票先
 
 | 未達 | 理由 | 起票先 |
