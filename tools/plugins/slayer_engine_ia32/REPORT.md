@@ -248,3 +248,17 @@ ia32 で要注意の mnemonic (件数): cdq 21 / movzx 51 / movsx 54 / lea 590 /
 
 - この探索は「添字 `*4+8` の形」に限定した静的検索であり、**読取の不在を証明しない**。 `numEvents` (+0) は `[reg]`・`events[]` 要素は `[reg+4]` や `[reg+idx*4+4]` (ptr 内の値) で読まれる可能性がある (未確認)。
 - 次の一手 (未着手): effProcessEvents(25) の**呼出し元**を辿る方向 (dispatcher の外から opcode 25 を受ける経路・vtable 初期化) か、`events` を受ける関数の探索を、`[reg+4]` を含む形へ広げて行う。 いずれも #894 の継続。
+
+### 9.6 `mov r,[X+8]` → `[r+idx*4]` の形による events[] 候補の列挙 (#894 受入 1 の追加調査・未達)
+
+再現: `python3 tools/plugins/slayer_engine_ia32/scan_events.py` (素材 sha256 `84b64c43…` を検証、capstone 5.0.7・CS_MODE_32、線形掃引)。 base を `[X+8]` から読み、直後 6 命令以内に `[base+idx*4]` を読む形を列挙する。
+
+| VA | 候補の読込み | 直後の添字読み | 判定 |
+|---|---|---|---|
+| `0x1000ebbc` | `mov edi,[ebx+8]` | `cmp [edi+ecx*4+4],0`・`call [edi+ecx*4+4]` | stride 12 (`lea ecx,[esi+esi*2]`) のレコード。 関数ポインタ呼出し。 events[] ではない |
+| `0x1000ec13` | `mov edi,[ebx+8]` | `mov esi,[edi+ecx*4]` (stride 12) | 同上 |
+| `0x1000f737` | `mov eax,[esp+8]` | `test [eax+esi*4],edx` | 32bit ビット集合の操作 (`idiv 32`・`shl`・`not`) |
+| `0x1000f7e8` | `mov eax,[ebp+8]` | `lea eax,[eax+ecx*4]` | ビット集合の添字計算。 読取ではない |
+| `0x1000f837` | `mov edx,[ebp+8]` | `lea edi,[edx+eax*4]`・`rep stosd` | ビット集合の 0 埋め。 読取ではない |
+
+結論: この形の候補 5 件はいずれも VstEvents の `events[i]` 読取と判定できない。 `events[i]` (ポインタ 4 B, stride 4) と一致する読取は、この探索の範囲では見つからない。 **読取の不在は証明できていない** (base を `[X+8]` 以外から得る経路、`numEvents` の `[reg]` 読取は未探索)。 受入 1 は未達のまま。
