@@ -66,6 +66,7 @@ EnumChildWindows
 EnumClipboardFormats
 EnumDisplayMonitors
 EnumDisplaySettingsW
+EnumFontFamiliesExW
 EnumThreadWindows
 EnumWindows
 EqualRect
@@ -106,6 +107,7 @@ GetCursorInfo
 GetCursorPos
 GetDC
 GetDCEx
+GetDIBColorTable
 GetDIBits
 GetDesktopWindow
 GetDeviceCaps
@@ -260,6 +262,7 @@ SetClassLongPtrW
 SetClipboardData
 SetCursor
 SetCursorPos
+SetDIBColorTable
 SetDIBits
 SetDIBitsToDevice
 SetFocus

@@ -48,14 +48,14 @@
 ## 3. 本 PR で入れた liftlib の変更 (pilot を成立させるための最小)
 
 ### 3.1 S1c — `movlps/movlpd/movhps/movhpd` store 復元 (`liftlib/passes/base.py` `lower_asm_lane_store`)
-RetDec は `movlps [m], xmm` を `call void @__asm_movlps(i64 <m の旧値 load>, i128 xmm)` にして書込みを落とす (DEFECTS.md D3 の i64 幅。S1a は i128 の movups/movaps/movdqa のみ)。旧値が直前の `load i64, ptr P` なら `store i64 (trunc/lshr xmm), ptr P` に復元。load 由来でない旧値は触らない。svf_setup で適用前は `wasm_trap=400/400` (helper 未対応の stub trap)、適用後 bit-exact。OTT/FA/KH の既存 IR に該当形が無ければ IR 不変 (合成 IR の単体試験 `tests/test_unit.py` T18、Serum2 PE 有りで `add_func` も試験)。
+RetDec は `movlps [m], xmm` を `call void @__asm_movlps(i64 <m の旧値 load>, i128 xmm)` にして書込みを落とす (DEFECTS.md D3 の i64 幅。S1a は i128 の movups/movaps/movdqa のみ)。旧値が直前の `load i64, ptr P` なら `store i64 (trunc/lshr xmm), ptr P` に復元。load 由来でない旧値は触らない。svf_setup で適用前は `wasm_trap=400/400` (helper 未対応の stub trap)、適用後 bit-exact。OTT/FA/KH の既存 IR に該当形が無ければ IR 不変 (合成 IR の単体試験 `tests/test_unit.py` T19、Serum2 PE 有りで `add_func` も試験)。
 ### 3.2 `Image.add_func` / cfg `extra_funcs` (`liftlib/pe.py` `pipeline.py`)
 `.pdata` 外の leaf (unwind 情報なし) を合成エントリとして登録。無いと P1/F2 が `no_pdata` で機械語参照を諦め、xmm 引数 (`%xmm1_bits`) が足されない。`.pdata` 範囲と重なる登録は `ValueError`。
 ### 3.3 wasm ハーネスの xmm 引数対応 (`harness/wasm_runner.mjs`)
 `%xmmK_bits` 仮引数は『登場順』ではなく **K 番目の float 引数**に対応 (native の `c.xmm[K]` と同じ)。xmm1 だけを読む関数で xmm1_bits が先頭の float 引数 (native では xmm0) を拾っていた。xmm0 から連続する既存 sig では結果不変 (推論。OTT/FA/KH の回帰は未実行 — §6)。
 
 ### 3.4 F2 の D5 型救済 (`liftlib/passes/f2.py` `find_sext_arg_for`)
-RetDec は `movss [rcx+0xc], xmm1` で xmm1 を undef でなく `sext i64 %arg1 to i128` (= this ポインタ) に束ね、F2 は『xmm1 の undef 値が見つからない (引数のみ追加)』で結線できなかった (DEFECTS.md D5)。undef が見つからないときに限り、使用が全て xmm reader の機械語アドレス上にある `sext i64 %argN` を xmm 値の定義とみなして `zext %xmmK_bits` に差替える。ladder_setp: 修復前 0/200 → 修復後 **200/200 bit-exact**。undef が見つかる既存形は経路が変わらない (単体 T19 に reader 上/外の両ケース)。
+RetDec は `movss [rcx+0xc], xmm1` で xmm1 を undef でなく `sext i64 %arg1 to i128` (= this ポインタ) に束ね、F2 は『xmm1 の undef 値が見つからない (引数のみ追加)』で結線できなかった (DEFECTS.md D5)。undef が見つからないときに限り、使用が全て xmm reader の機械語アドレス上にある `sext i64 %argN` を xmm 値の定義とみなして `zext %xmmK_bits` に差替える。ladder_setp: 修復前 0/200 → 修復後 **200/200 bit-exact**。undef が見つかる既存形は経路が変わらない (単体 T20 に reader 上/外の両ケース)。
 
 ## 4. 不一致・未達の原因分類
 
@@ -103,5 +103,5 @@ RetDec は `movss [rcx+0xc], xmm1` で xmm1 を undef でなく `sext i64 %arg1 
   | d | 期待 fail の osc_setscale を bit-exact+被覆 1.0 に偽装 | pilot gate exit 1 | exit 1 |
   | e | strict gate | 5/56 で exit 1 | exit 1 |
   - 初版の NC-a は定数を +1 ulp (double) だけ変えたが**最終 float 変換で丸められ bit-exact のまま**で、NC 判定側が『mismatch でない』と報告した (= NC の検出力不足を NC 自身が検出)。2^34 に変更。また NC-a/b の初版は `sr4_pilots.py` の出力 dir 未作成で gate が入力不正 exit 2 を返し『FAIL を検出』と誤認した → 期待 rc を厳密化 (gate 不合格は 1・入力不正は 2)。
-- `find tools/targets/serum2 tools/liftlib -type f -size +20M -not -path '*/work/*'` = 0 件。`tools/liftlib/tests/test_unit.py` は T1〜T17 が `work-m6-ott` 等を要するため未実行、T18・T19 (本 PR 追加) のみ単独実行 ok。
+- `find tools/targets/serum2 tools/liftlib -type f -size +20M -not -path '*/work/*'` = 0 件。`tools/liftlib/tests/test_unit.py` は T1〜T17 が `work-m6-ott` 等を要するため未実行、T19・T20 (本 PR 追加; main の T18 = ott_judge と衝突したため改名) のみ単独実行 ok。
 - 範囲外: 実 Serum 2 の host 駆動 (SR-1) での Voice 実行・音声出力・libm 差の dB 評価 (SR-5)・GUI・FX/mod/arp/spectral (§6.1 の残り 3〜5 人月分)・mac 版。
