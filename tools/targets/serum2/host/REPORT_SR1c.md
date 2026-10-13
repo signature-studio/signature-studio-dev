@@ -131,38 +131,37 @@ shim 候補 (SR-3/SR-4 入力) は呼出確認 110 件のうち kernel32 (メモ
 
 ## 4-2. 値 2 の由来 (実行時 IID 読出し)
 
-- 区分 (明示):
-  - **実測 (§4-3, 本 run で再取得)**: 2 IID のメモリ値を watch hit 直後に読み出し、SDK 計算値と GUID で一致を確認。`S2HOST_WATCH=1` の console は `host/work/watch_b2.console` (gitignore) に保存。
-  - **計算 (SDK 由来)**: VST3 SDK `pluginterfaces/vst/ivsthostapplication.h` の `DECLARE_CLASS_IID` (:103 IVst3ToAUWrapper / :122 IVst3ToAAXWrapper) の 4 個の 32bit 値を `base/funknown.h` の `INLINE_UID` (バイト順) で展開した値。参照先は VST3 SDK の `pluginterfaces` submodule commit `4f547e8e102b47de4a8b8aaf343c73b700786372` の `vst/ivsthostapplication.h` (親リポジトリ直下には無い)。版は固定していない。
-  - **未実測**: 前 run の `hit#1 … value=2` 直後の IID 読出し、`HostApp::queryInterface` の `kNoInterface` 応答。
-- 計算した IID (`uidHex` と同じ連続 hex。`vst3host.cpp` の watch 出力も同形式):
-  - RVA `0x11be750` → `A3B8C6C5C0954688B0916F0BB697AA44` = IVst3ToAUWrapper
-  - RVA `0x11be8e8` → `6D319DC660C56242B32C951B93BEF4C6` = IVst3ToAAXWrapper
-  - RVA の対応 (lea rdx の解決先) は逆アセンブル読みで、実メモリ値との一致は未確認。
+- IID の値そのもの (実メモリ値・SDK 計算値) は §4-3 に一本化した (数値を二重に書かない)。本節は出所の区分のみ:
+  - **計算 (SDK 由来)**: VST3 SDK `pluginterfaces/vst/ivsthostapplication.h` の `DECLARE_CLASS_IID` (IVst3ToAUWrapper / IVst3ToAAXWrapper) の 32bit 値を `base/funknown.h` の `INLINE_UID` で展開した値。参照先は `pluginterfaces` submodule commit `4f547e8e102b47de4a8b8aaf343c73b700786372` (親リポジトリ直下には無い。版は固定していない)。
+  - **実測の範囲**: §4-3 の記録値は watch hit 直後のメモリ読出しで、上記 SDK 計算値と GUID 単位で一致した。
+  - **未確定**: `RVA` と `lea rdx` の対応 (逆アセンブル読み) は §4-3 の記録値とは独立に確認していない。`HostApp::queryInterface` の `kNoInterface` 応答は未観測。
 - 逆アセンブル読み (§4-1): 両 QI 失敗の経路で `2`。両 QI 失敗の実行時再現は未確認。
 - 含意 (未検証): 値 2 は、両 IID が host 側で `kNoInterface` になった場合の結果と読める。その場合 `+0x10c` を 1 にするには host が当該 IID に応答する必要がある可能性がある。書込元 `0xb1332` (関数 `0xacf70`) の呼出元は未確定のまま。
 - 次の一手: `S2HOST_WATCH=1` の run を素材 (`plugins-serum2`) 付きで再実行し、`[watch] iid@…` 行と `HostApp::queryInterface unknown iid=…` 行を同形式で突合する。
 
 ## 4-3. 書込元 0xacf70 の呼出元 (静的 + 実行時スタック)
 
-- 検証 HEAD: 本 run の commit (下記 §4-4)。素材 `plugins-serum2` を本 run で取得し、`sha256 501e7bb3…`・19,236,864 B の DLL を `work/Serum2_win64.vst3` に配置して実測。
+- 検証 HEAD: `163461c45b0b60bca1e737e7330d6f598cad88b5` (PR head)。**本節の数値は前 run の記録であり、HEAD での再取得は未実施**。`plugins-serum2` (`sha256 501e7bb3…`・19,236,864 B) が再実行環境に無いため。build commit の確定は §5 の未解決行。
 - 静的 (`host/sr1c_callers.py`):
   - `0xacf70` への直接 `call/jmp` は **1 件** (`0x1800b4ea4`)。ただしこれは thunk で、`0x1800b4ea0: add rcx,-0x20` → `0x1800b4ea4: jmp 0x1800acf70` の形 (this を -0x20 して本体へ tail-jump)。
   - thunk `0xb4ea0` は `.rdata` の vtable 要素 (RVA `0xa2bf70`) に現れる。本体 `0xacf70` は `.rdata` `0xa2bf00`。vtable の所属 class は、RTTI (`.?AV` 名) が DLL 内に無いため**未確定**。
   - thunk の先頭 `0xb4ea0` は `.pdata` に該当エントリが無い (`host/sr1c_func_head.py` が「pdata に該当なし」を返す)。
   - vtable 経由の間接 call は候補が多数 (`call [reg+0x70/0x78]` 1126 件) で、静的には一意に決まらない。
-- 実行時 (`S2HOST_WATCH=1`, 既定 host, 4 blocks): watch hit (`value=2`) の時点のスタック上の戻り番地候補 (モジュール内の値) は次の 2 件。
+- 実行時 (`S2HOST_WATCH=1`, 既定 host, 4 blocks): watch hit (`value=2`) の時点のスタック上の戻り番地候補 (モジュール内の値) は次の 2 件。hit 行と突合できるよう、同一 run の行を並べる (raw console は `host/work/` (gitignore) にのみ存在し、commit されていない):
   ```
+  [watch] armed DR0=00007f87cf47d28c (controller iface+0xdc)
+  [watch] hit#1 RIP=00006ffff8af1338 (base=00006ffff8a40000, Serum2_win64.vst3) value=2
   [watch] stack[47]=00006ffff9b74d60 RVA=0x1134d60
   [watch] stack[61]=00006ffff8ec954d RVA=0x48954d
   ```
+  - 上の行は §4-1 / §4-3 の前 run の記録 (作成時の転記)。raw console は `host/work/` (gitignore) にしか無く、commit されていないため本 runner では照合できない。`[watch] iid@…` の raw 行も同じ理由で示せない (再実行まで未取得)。
   - `RVA 0x48954d` は関数 `0x4894c0` (size 180) 内の `call 0x1809a8f0c` の直後 (命令境界と一致)。関数は `static` の初期化 guard 風 (`0xfffffffffffffffe`・`0x7fffffff` の guard 値) を持つ。所属 class は未確定。
   - `RVA 0x1134d60` は戻り番地として逆アセンブルで確認していない (未確定)。
   - 戻り番地の列挙は RSP から 64 語。実際の呼出連鎖 (thunk → 本体) は、スタックの取り方 (frame pointer 省略) のため完全には追えていない。
-- IID の実メモリ値 (実測, `[watch] iid@…`):
-  - RVA `0x11be750` → メモリ `C5C6B8A3 95C08846 B0916F0B B697AA44`。GUID 表記 `A3B8C6C5-C095-4688-B091-6F0BB697AA44` = IVst3ToAUWrapper (§4-2 の計算値と一致)。
-  - RVA `0x11be8e8` → メモリ `C69D316D C5604262 B32C951B 93BEF4C6`。GUID 表記 `6D319DC6-60C5-4262-B32C-951B93BEF4C6` = IVst3ToAAXWrapper (§4-2 の計算値と一致)。
-  - §4-2 で「実測なし・計算値」とした IID は、本 run で**実メモリ値と一致**を確認した。ただし §4-2 の「連続 hex の並び」は計算値の書式 (`uidHex`) であり、メモリの並び (構造体の各フィールドのバイト順) とは別物。
+- IID の実メモリ値 (前 run の記録。上の `iid@` 行):
+  - RVA `0x11be750` → メモリ `C5C6B8A3 95C08846 B0916F0B B697AA44`。GUID 表記 `A3B8C6C5-C095-4688-B091-6F0BB697AA44` = IVst3ToAUWrapper。
+  - RVA `0x11be8e8` → メモリ `C69D316D C5604262 B32C951B 93BEF4C6`。GUID 表記 `6D319DC6-60C5-4262-B32C-951B93BEF4C6` = IVst3ToAAXWrapper。
+  - SDK 計算値 (§4-2) と GUID 単位で一致。メモリの並びは GUID の構造体フィールドのバイト順であり、`uidHex` の連続 hex とは書式が異なる。
 - 結論 (本 run の範囲):
   - watch hit の値 2 は、IVst3ToAUWrapper / IVst3ToAAXWrapper の 2 回の QI が**両方失敗**した結果と読める (§4-2 の逆アセンブル読みと整合)。実行時の両失敗の観測は、戻り値そのものを記録していないため未確認。
   - 呼出元の所属 class は未確定。0x800010 の受信 (= +0xdc が 1 へ遷移する条件) は本 run では未解明。
@@ -171,7 +170,9 @@ shim 候補 (SR-3/SR-4 入力) は呼出確認 110 件のうち kernel32 (メモ
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| +0x10c の実行時 writer 確定 (wine watchpoint 未実施) | 既定 host で +0xdc が 2 のまま。0x800010 経路の前提が未解明 | #256 (本 issue、次回 run) |
+| +0x10c の実行時 writer: 部分達成 (DR0 watch で main スレッドの書込 1 件を観測、RIP RVA `0xb1332`)。全スレッド・全書込の確定と wine watchpoint は未実施 | 既定 host で +0xdc が 2 のまま。0x800010 経路の前提が未解明 | #256 (本 issue、次回 run) |
+| 測定 commit の不一致: §4-1 の watch / e2e は `c9fbfc54` (`vst3host.cpp` = `35737960`)、PR 本文は `163461c4` で取得したと記載。stack 行 (`163461c4` で追加) の build commit は未確定 | 本付録の実測の由来が一意に決まらない | #256 |
+| HEAD `163461c4` での e2e 再実行と raw console の commit は未実施 (`plugins-serum2` が本 runner の `$ARTIFACTS_DIR` に無い。`oc_artifacts: fl-win64 plugins-serum2` で再起動が必要) | WORKFLOW §6 の鮮度証跡が未達 | #256 |
 | 0x800010 の既定 host での受信 | 同上 | #256 |
 | 未呼出 217 件の shim 分類 (GUI / ネット経路の到達可否と kernelbase 経由の呼出) | SR-3/SR-4 の入力 | #256 |
 | 静的走査は下限 (間接参照・多段 base を拾えない) | writer の取りこぼし | #256 (watchpoint で補完) |
