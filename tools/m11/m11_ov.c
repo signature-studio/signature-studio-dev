@@ -54,6 +54,20 @@ extern unsigned long long function_41c160(unsigned long long);
 static u64 tr_40f960(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return function_40f960(a0); }
 static u64 tr_41c160(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return function_41c160(a0); }
 static u64 tr_ret0(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return 0; }
+/* closure 外の既定 IEqualityComparer<pointer-size ordinal> のメソッド (#483): 479b00 Equals = `cmp rdx,r8; sete al`,
+ * 479b10 GetHashCode = FNV-1a(&Value, 8, 0x811c9dc5) (475ba0 も closure 外のため直接展開) */
+static u64 tr_479b00(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return a1 == a2; }
+static u64 ov_getter_478420(u64 info);
+static u64 ov_getter_478540(u64 info);
+static u64 ov_getter_478c70(u64 info, u64 size);
+static u64 tr_478420(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return ov_getter_478420(a0); }
+static u64 tr_478540(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return ov_getter_478540(a0); }
+static u64 tr_478c70(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return ov_getter_478c70(a0, a1); }
+static u64 tr_479b10(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) {
+    u32 h = 0x811c9dc5u;
+    for (int i = 0; i < 8; i++) h = (h ^ (u32)((a1 >> (8 * i)) & 0xff)) * 0x1000193u;
+    return h;
+}
 
 static m11_tr_t disp_find(u32 va) {
     int lo = 0, hi = (int)m11_disp_n - 1;
@@ -67,6 +81,11 @@ static m11_tr_t disp_find(u32 va) {
     case 0x40f960: return tr_40f960;
     case 0x41c160: return tr_41c160;
     case 0x5c04a0: return tr_ret0;   /* `ret` 1 命令 (キャッシュ node 解放フックの既定実体) */
+    case 0x478420: return tr_478420;
+    case 0x478540: return tr_478540;
+    case 0x478c70: return tr_478c70;
+    case 0x479b00: return tr_479b00;
+    case 0x479b10: return tr_479b10;
     }
     return 0;
 }
@@ -472,5 +491,134 @@ unsigned long long function_417b70(unsigned long long a, unsigned long long ti, 
         for (u64 i = 0; (long long)i < (long long)len; i++) function_417b70(data + i * 8, elt, dc, lv);
     }
     Q(a) = data;
+    return 0;
+}
+
+/* ---- #483: TDictionary<K,V> (Generics.Collections) の Add/GetItem が全て「重複キー」と誤判定される原因 3 点の C 転記 ----
+ * 8cc190 (Add) は FComparer = TEqualityComparer<K>.Default (53df80 → 479b40 _LookupVtableInfo) の GetHashCode/Equals を使う.
+ *   479b40  `movzx rcx,byte [rbx]` (TypeInfo.Kind) の deref 脱落 (D4) で Kind=0 固定, `test cl,2; call rax` (getter 呼出し) 脱落 (D15)
+ *           → FComparer が実体でなく getter 関数 478b10 自身 (0x78b10) になる
+ *   8cbda0  GetHashCode: `call [vt+0x20]` 脱落 (D15) + 引数 rdx (key) が唯一の使用者を失って IR 署名から消える → hash = [FComparer]+1 の定数
+ *   8cbce0  Find:        `call [vt+0x18]` (Equals) 脱落 (D15) → `test al,al` が [FComparer] の下位 byte を読み 常に真 → 2 個目のキーが必ず「重複」
+ * → 8cc190 が EListError を生成して 411e80 (RaiseExcept) を呼び Halt0 (survey halt0 11 unit, REPORT_483).
+ * 逆アセンブル (479b40..479bd6 / 8cbda0..8cbdc2 / 8cbce0..8cbd90 / 8cc190..8cc214 / 8cbde0..8cbe3a) から転記.
+ * 8cbda0 は引数 key を取れないので helper (ov_dict_hash) に置き, IR 署名を変えずに済むよう呼出元の 8cc190 / 8cbde0 も転記する. */
+
+/* function_479b40  VA 0x479b40  (_LookupVtableInfo(intf: u8; info: PTypeInfo; size: Integer): Pointer)
+ *   表 @LVA 0xfb2c28: [intf * 0x170 + info.Kind * 16] = { u8 flags; u64 data @+8 }
+ *   flags&2: data := data(info, size) (getter) / flags&1: data := MakeInstance(data, info, size) (4781a0).
+ *   info = nil: intf 0 → 478a90(nil,size) / 1 → 478b10(nil,size) / 他 → Error(reInvalidPtr). */
+u64 function_479b40(u64 intf, void* infop, u64 size) {
+    u64 info = (u64)(uintptr_t)infop;
+    if (info) {
+        u64 e = R(0xfb2c28) + (intf & 0xff) * 0x170 + (u64)B(info) * 16;
+        u64 data = Q(e + 8);
+        if (B(e) & 2) data = m11_icall(data, info, size, 0, 0, 0, 0, 0, 0);
+        if (B(e) & 1) data = function_4781a0(data, info, size);
+        return data;
+    }
+    if ((intf & 0xff) == 0) return function_478a90(0, size);
+    if ((intf & 0xff) == 1) return function_478b10(0, size);
+    function_409730(4);
+    return 0;
+}
+
+/* function_8cbda0 の転記 (key を引数に取る): GetHashCode(FComparer, key) を m11_icall で呼び (vt+0x20), (h & 0x7fffffff) + 1 を再マスク */
+static u32 ov_dict_hash(u64 self, u64 key) {
+    u64 cmp = Q(self + 0x18);
+    u32 h = (u32)m11_icall(Q(Q(cmp) + 0x20), cmp, key, 0, 0, 0, 0, 0, 0);
+    return ((h & 0x7fffffffu) + 1u) & 0x7fffffffu;
+}
+
+/* function_8cbce0  VA 0x8cbce0  (TDictionary.GetBucketIndex(key, hash): 戻り >= 0 = 発見 index, < 0 = ~(挿入位置), 空表は 0x8000000000000000)
+ *   バケット = 24B { u32 hash (0xffffffff = 空); u64 key @+8; u64 value @+0x10 }, 線形探査, 配列長は [arr-8]. Equals は [FComparer.vt + 0x18]. */
+u64 function_8cbce0(u64 self, u64 key, u64 hash) {
+    u32 h = (u32)hash;
+    u64 arr = Q(self + 8);
+    long long n = arr ? (long long)Q(arr - 8) : 0;
+    if (n == 0) return 0x8000000000000000ull;
+    long long i = (long long)(int)h & (n - 1);
+    u64 p = arr + (u64)i * 24;
+    for (;;) {
+        u32 eh = D(p);
+        if (eh == 0xffffffffu) return ~(u64)i;
+        if (eh == h) {
+            u64 cmp = Q(self + 0x18);
+            if ((u8)m11_icall(Q(Q(cmp) + 0x18), cmp, Q(p + 8), key, 0, 0, 0, 0, 0)) return (u64)i;
+        }
+        i++; p += 24;
+        if (i >= n) { i = 0; p = Q(self + 8); }
+    }
+}
+
+/* function_8cc190  VA 0x8cc190  (TDictionary.Add(key, value)): 満杯なら Grow(8cbcb0) → hash → Find → 発見なら EListError を生成して RaiseExcept (411e80) /
+ * 未発見なら 8cbe40 (AddItem(self, hash, ~idx, key, value)). EListError クラス = [LVA 0x2f078], メッセージ resourcestring = [LVA 0x11e00e0]. */
+u64 function_8cc190(u64 self, u64 key, u64 val) {
+    if ((long long)Q(self + 0x10) >= (long long)Q(self + 0x20)) function_8cbcb0(self);
+    u32 h = ov_dict_hash(self, key);
+    long long idx = (long long)function_8cbce0(self, key, h);
+    if (idx >= 0) function_411e80(function_448ee0(Q(R(0x2f078)), 1, Q(R(0x11e00e0))));
+    return function_8cbe40(self, h, ~(u64)idx, key, val);
+}
+
+/* function_8cbde0  VA 0x8cbde0  (TDictionary.GetItem(key): value; 未発見は EListError [msg = LVA 0x11e0080]) */
+u64 function_8cbde0(u64 self, u64 key) {
+    u32 h = ov_dict_hash(self, key);
+    long long idx = (long long)function_8cbce0(self, key, h);
+    if (idx < 0) {
+        function_411e80(function_448ee0(Q(R(0x2f078)), 1, Q(R(0x11e0080))));
+        return 0;
+    }
+    return Q(Q(self + 8) + (u64)idx * 24 + 0x10);
+}
+
+/* function_478420  VA 0x478420  (IEqualityComparer getter: tkInteger / tkEnumeration; OrdType (byte [info+1+nameLen+1]) で static 実体を選ぶ)
+ *   OrdType 0,1 (byte) → LVA 0xfb21e0 / 2,3 (word) → 0xfb21e8 / 4,5 (long) → 0xfb21f0 / 他 → Error(reInvalidPtr) */
+static u64 ov_getter_478420(u64 info) {
+    u8 ot = B(info + B(info + 1) + 2);
+    if (ot < 2) return R(0xfb21e0);
+    ot -= 2;
+    if (ot < 2) return R(0xfb21e8);
+    ot -= 2;
+    if (ot < 2) return R(0xfb21f0);
+    function_409730(4);
+    return 0;
+}
+
+/* function_478540  VA 0x478540  (IComparer getter: tkInt64; MaxInt64Value > MinInt64Value (符号付き比較) なら符号付き用 / 他は符号なし用の static 実体) */
+static u64 ov_getter_478540(u64 info) {
+    u64 n = B(info + 1);
+    return (long long)Q(info + n + 0xa) > (long long)Q(info + n + 2) ? R(0xfb2218) : R(0xfb2240);
+}
+
+/* function_471310  VA 0x471310  (record 型の比較方式分類: 0 = 非 record / 1 = 4B 以下で最初の RecOp が奇数 / 2 = 4B 以下で単純 / 3 = 4B 超か複数 RecOp).
+ *   Kind は tkRecord (14) / tkMRecord (22) だけ対象 (word 表 @LVA 0x71400 = 0x4040 の bit (Kind-8)). RecSize (dword) > 4 → 3, tkRecord → 2,
+ *   tkMRecord は ManagedFld (16B x Count) を飛ばした先の RecOps を最大 4 個見る. */
+static u8 ov_rec_kind(u64 info) {
+    if (!info) return 0;
+    u8 k = (u8)(B(info) - 8);
+    if (k > 0xf || !((1u << k) & 0x4040u)) return 0;
+    u64 n = info + 1;
+    if ((int)D(n + B(n) + 1) > 4) return 3;
+    if (B(info) == 0xe) return 2;
+    u64 a = n + B(n) + 5;
+    u32 cnt = D(a);
+    a += 4 + (u64)(long long)((int)(cnt << 4));
+    u8 c = B(a);
+    a += 1;
+    if (c != 0 && (Q(a) & 1)) return 1;
+    if (c > 1 && Q(a + 8) != 0) return 3;
+    if (c > 2 && Q(a + 0x10) != 0) return 3;
+    if (c > 3 && Q(a + 0x18) != 0) return 3;
+    return 2;
+}
+
+/* function_478c70  VA 0x478c70  (IComparer getter: tkRecord / tkMRecord; ov_rec_kind で static vtable を選び 4781a0 でインスタンス化) */
+static u64 ov_getter_478c70(u64 info, u64 size) {
+    switch (ov_rec_kind(info)) {
+    case 1: return function_4781a0(R(0xfb2670), info, size);
+    case 2: return function_478a90(info, size);
+    case 3: return function_4781a0(R(0xfb2488), info, size);
+    }
     return 0;
 }

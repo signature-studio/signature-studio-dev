@@ -19,6 +19,7 @@ for (let i = 0; i < 942; i++) {
   if (only && !only.includes(i)) continue;
   if (process.env.SV_TRACE_AT && String(i) === process.env.SV_TRACE_AT) mod._m11_set_trace(1);
   const before = stubCounts(); const va0 = Number(mod._m11_va_used());
+  const miss0 = mod._m11_icall_miss(), uniq0 = mod._m11_icall_miss_uniq();
   const e0 = errs.length;
   if (process.env.SV_PROG) fs.writeSync(2, 'unit ' + i + '\n');
   const rec = { unit: i, va: '0x' + mod._m11_unit_va(i).toString(16) };
@@ -35,6 +36,8 @@ for (let i = 0; i < 942; i++) {
     }
     mod.__emscripten_stack_restore(sp0);
   }
+  const dm = mod._m11_icall_miss() - miss0;
+  if (dm) { rec.miss_n = dm; rec.miss_new = []; for (let k = uniq0; k < mod._m11_icall_miss_uniq(); k++) rec.miss_new.push('0x' + (mod._m11_icall_miss_at(k) >>> 0).toString(16)); }
   const after = stubCounts(); rec.va_mb = +((Number(mod._m11_va_used()) - va0) / 1e6).toFixed(1); if (!rec.va_mb) delete rec.va_mb;
   const d = {}; for (const k in after) if (after[k] !== (before[k] || 0)) d[k] = after[k] - (before[k] || 0);
   if (Object.keys(d).length) rec.stubs = d;
