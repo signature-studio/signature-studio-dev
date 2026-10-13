@@ -1,0 +1,49 @@
+# modulation 付録 (#527 PLG-F5-2 engine gate)
+
+本体 `REPORT.md` の §4 (engine 4 本) の到達性 gate。判定は `engine_judge.py` (exit code 化)。
+
+## I. engine 到達性 gate (受入 1 の exit code 化)
+
+- 判定: `engine_judge.py <outdir>` (`engine_lift.sh` の出力 `summary.csv` と `engine_name_gap.py` の名前照合)。
+  - 合格: `lift_rc == 0` かつ `erc3 == 0` かつ define 無し range (名前照合後) が 0 件 (0 B)。exit 0。
+  - 不合格: 上記のどれかが欠ける。exit 1。
+  - 入力不正 (summary.csv の欠落・列数・非整数、名前照合の失敗)。exit 2。
+- 出力行には `stub=` (未実装 helper 数) を必ず併記する。stub を含む `emcc -c` 通過は正しさを示さない (bit-exact は #197 で未検証)。
+- ネガティブコントロール: `engine_judge.py --selftest` (合成入力 8 ケース、全て期待 exit と理由文字列を確認)。
+
+### I.1 NC (selftest、HEAD の commit で実行)
+
+| ケース | 期待 exit | 実測 exit | 理由の文字列 |
+|---|--:|--:|---|
+| 無改変 (good) | 0 | 0 | PASS |
+| `lift_rc=1` | 1 | 1 | `lift_rc=1` |
+| `erc3=1` | 1 | 1 | `emcc_c_rc(erc3)=1` |
+| `function_2000` の define を除去 (名前照合で解決不可) | 1 | 1 | `define 無し range 1 件` |
+| 同名 `entry_point` の欠落 range 2 件 (define 1 件) | 1 | 1 | `define 無し range 2 件` |
+| 列数不足 (16 → 15 列) | 2 | 2 | `列数` |
+| 非整数 (`x`) | 2 | 2 | `整数` |
+| summary.csv 無し | 2 | 2 | `summary.csv` |
+
+`selftest: OK` (exit 0)。
+
+### I.2 実測 (4 本、`engine_lift.sh <block> 300` の順次実行、`engine_judge.py` で判定)
+
+- 測定値の正本は `REPORT.md` §4 の表 (lift_rc・define 数・未実装 helper・erc3)。ここには持たない。
+- 判定結果 (前 run の記録。本 PR では未再現): 4 本とも `define 無し (名前照合後)` 0 件 (0 B)、judge PASS (exit 0)。REPORT.md §4 の「4 本すべて `emcc -c` rc 0」も同じ前 run の記録。
+  - 名前照合の内訳 (define 無し 2 件の解決先): 18977 `dispatch` + `entry_point` / 19143 `DispatchToEngine` + `entry_point` / 19266 `VSTPluginMain` + `entry_point` / 19268 `entry_point` + `VSTPluginMain`。
+- 測定 commit: origin/main 2b99366a の上に `engine_judge.py` を追加した worktree (`ws-527`)。lift 本体は未変更。
+
+#### I.2.1 生データの所在 (未取得の項目)
+
+本 run では 4 本の lift を再実行できない (`toolchain-retdec`・`toolchain-emsdk`・`work-liftlib`・`work-fw-stage1` 未取得。`/opt/emsdk` 無し)。上記の判定結果は前 run の記録で、本 PR では再現していない。
+
+| 項目 | 状態 |
+|---|---|
+| `summary.csv` の 4 行 (`engine_lift.sh` の出力) | 未取得 (`work/` は gitignore。raw が残っていない) |
+| `engine_name_gap.py` の出力 4 行 (`named,rest,rest_bytes,unresolved`) | 未取得 (同上) |
+| 測定の run 日時・終了時 loadavg・並列数 | 未記録 (順次実行。loadavg は取っていない) |
+| 測定 commit の `git rev-parse` 確認 | 本 run では `ws-527` を確認できず未確認 |
+
+上の 4 項目が揃うまで、「名前照合で 4 本とも define 無し 0」は実測として扱わない。
+- 注意: この gate は到達性のみ。stub (未実装 helper) を含み、bit-exact は未検証 (#197・#534・#779)。
+- 受入 1 の残り: judge 相当の exit code gate は本 PR で追加。bit-exact は #197 依存のため未達。

@@ -190,12 +190,67 @@ static void test_drop(void) {
   CHK(drop_and_wait(900, 900, 1, "a.wav\0", &got, &wp, &hw) == 0 && !got, "窓の外は 0");
 }
 
+/* ---- SHX-T23 (#1388): RegisterDragDrop 窓。偽 guest の IDropTarget (vtable = VA 4 個) を mock invoke が C 関数として呼ぶ。
+ * IDataObject の呼出しは lifttab トークン経由 (guest→C 経路)。C→guest 経路は shimx_cbtrans_set_invoke の mock で代替。 */
+static uint64_t g_idt_vt[7];
+static struct { uint64_t vt; } g_idt_obj;
+static int g_idt_calls[4], g_idt_eff, g_idt_qgd_ok, g_idt_qgd_bad, g_idt_blk_len;
+static uint8_t g_idt_blk[512];
+static unsigned long long idt_invoke(unsigned long long va, unsigned long long a0, unsigned long long a1, unsigned long long a2,
+                                     unsigned long long a3, unsigned long long a4, unsigned long long a5, unsigned long long a6, unsigned long long a7) {
+  (void)a0; (void)a2; (void)a5; (void)a6; (void)a7;
+  if (va == 0x1001) { g_idt_calls[0]++; *(uint32_t *)(uintptr_t)a4 = 1; return 0; }   /* DragEnter(this, pDataObj, grfKeyState, pt, pdwEffect) */
+  if (va == 0x1002) { g_idt_calls[1]++; *(uint32_t *)(uintptr_t)a3 = 1; return 0; }   /* DragOver(this, grfKeyState, pt, pdwEffect) */
+  if (va == 0x1003) { g_idt_calls[2]++; return 0; }                                    /* DragLeave(this) */
+  if (va != 0x1004) return 0x80004005u;
+  g_idt_calls[3]++;
+  uint64_t *tv = (uint64_t *)(uintptr_t)*(uint64_t *)(uintptr_t)a1;   /* IDataObject の vtable (lifttab トークン) */
+  uint8_t fe[32], sm[24];
+  memset(fe, 0, sizeof fe); memset(sm, 0, sizeof sm);
+  *(uint16_t *)fe = 15; *(uint32_t *)(fe + 16) = 1; *(int32_t *)(fe + 20) = -1; *(uint32_t *)(fe + 24) = 1;   /* CF_HDROP, DVASPECT_CONTENT, lindex -1, TYMED_HGLOBAL */
+  shimx_lift_thunk_fn qgd = shimx_lifttab_trampoline((unsigned)tv[5]);
+  g_idt_qgd_ok = qgd((uintptr_t)a1, (uintptr_t)fe, 0, 0, 0, 0, 0, 0) == 0;
+  uint8_t bad[32]; memcpy(bad, fe, 32); *(uint16_t *)bad = 1;
+  g_idt_qgd_bad = qgd((uintptr_t)a1, (uintptr_t)bad, 0, 0, 0, 0, 0, 0) == 0x80040064ull;
+  shimx_lift_thunk_fn gd = shimx_lifttab_trampoline((unsigned)tv[3]);
+  if (gd((uintptr_t)a1, (uintptr_t)fe, (uintptr_t)sm, 0, 0, 0, 0, 0) == 0 && *(uint32_t *)sm == 1) {
+    HGLOBAL h = (HGLOBAL)(uintptr_t)*(uint64_t *)(sm + 8);
+    size_t n = GlobalSize(h); if (n > sizeof g_idt_blk) n = sizeof g_idt_blk;
+    memcpy(g_idt_blk, GlobalLock(h), n); GlobalUnlock(h);
+    g_idt_blk_len = (int)n;
+  }
+  *(uint32_t *)(uintptr_t)a4 = 1; g_idt_eff = 1;
+  return 0;
+}
+static const unsigned short *wnext(const unsigned short *p) { while (*p) p++; return p + 1; }
+static void test_idt(void) {
+  shimx_cbtrans_set_invoke(idt_invoke);
+  g_idt_vt[3] = 0x1001; g_idt_vt[4] = 0x1002; g_idt_vt[5] = 0x1003; g_idt_vt[6] = 0x1004;
+  g_idt_obj.vt = (uint64_t)(uintptr_t)g_idt_vt;
+  int64_t w2 = t_make_window(400, 20, 200, 200);
+  CHK(w2 != 0, "window2 create");
+  CHK(RegisterDragDrop((HWND)(uintptr_t)w2, &g_idt_obj) == S_OK && shimx_get_drop_target((HWND)(uintptr_t)w2) == (LPVOID)&g_idt_obj, "RegisterDragDrop (window2)");
+  int got; int64_t wp = 0, hw = 0;
+  CHK(drop_and_wait(450, 60, 2, "a.wav\0b.mid\0", &got, &wp, &hw) == 2 && !got, "RegisterDragDrop 窓への drop → IDropTarget が処理 (配送結果 2・WM_DROPFILES なし)");
+  CHK(g_idt_calls[0] == 1 && g_idt_calls[1] == 1 && g_idt_calls[2] == 0 && g_idt_calls[3] == 1,
+      "DragEnter/DragOver/Drop の順に 1 回ずつ (DragLeave は受理時に呼ばない): got %d/%d/%d/%d", g_idt_calls[0], g_idt_calls[1], g_idt_calls[2], g_idt_calls[3]);
+  CHK(g_idt_eff == 1, "pdwEffect が guest に書かれた");
+  CHK(g_idt_qgd_ok && g_idt_qgd_bad, "IDataObject::QueryGetData: CF_HDROP/HGLOBAL は S_OK、他 cf は DV_E_FORMATETC");
+  CHK(g_idt_blk_len >= 20 && *(uint32_t *)g_idt_blk == 20 && g_idt_blk[16] == 1, "GetData: DROPFILES ブロック (pFiles=20, fWide=1)");
+  const unsigned short *p0 = (const unsigned short *)(g_idt_blk + 20), *p1 = wnext(p0);
+  CHK(weq(p0, "C:\\Users\\webstudio\\Documents\\WebImport\\a.wav"), "GetData: 1 件目のファイル名 (HDROP 由来)");
+  CHK(weq(p1, "C:\\Users\\webstudio\\Documents\\WebImport\\b.mid"), "GetData: 2 件目のファイル名 (HDROP 由来)");
+  RevokeDragDrop((HWND)(uintptr_t)w2);
+  CHK(drop_and_wait(450, 60, 1, "a.wav\0", &got, &wp, &hw) == 0 && !got, "RevokeDragDrop 後は 0");
+  shimx_cbtrans_set_invoke(NULL);
+}
+
 int main(void) {
   setvbuf(stdout, NULL, _IONBF, 0);
   gui_headless_attach(800, 600);
   int att = gui_shimx_attach();
-  CHK(att == 3, "gui_shimx_attach bits=%d", att);
-  test_char(); test_msgwait(); test_shell(); test_dialog(); test_drop();
+  CHK(att == 7, "gui_shimx_attach bits=%d", att);
+  test_char(); test_msgwait(); test_shell(); test_dialog(); test_drop(); test_idt();
   printf("RESULT pass=%d fail=%d\n", g_pass, g_fail);
   return g_fail ? 1 : 0;
 }

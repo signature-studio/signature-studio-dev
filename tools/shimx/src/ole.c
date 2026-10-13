@@ -640,3 +640,98 @@ HRESULT CreateDataAdviseHolder(LPVOID* out) { if (out) *out = NULL; return E_NOT
 HRESULT OleDraw(LPVOID unk, DWORD aspect, HANDLE dc, LPVOID rc) { (void)unk; (void)aspect; (void)dc; (void)rc; return E_NOTIMPL; }
 BOOL IsAccelerator(HANDLE haccel, int n, LPVOID msg, WORD* cmd) { (void)haccel; (void)n; (void)msg; (void)cmd; return FALSE; }
 HRESULT OleSetMenuDescriptor(HANDLE h, HWND frame, HWND obj, LPVOID f, LPVOID o) { (void)h; (void)frame; (void)obj; (void)f; (void)o; return E_NOTIMPL; }
+
+/* ---------------- SHX-T23 (#1388): RegisterDragDrop 経路の guest 呼出し橋 ----------------
+ * 方式 (tools/gui/shimx_coexist/REPORT.md §10):
+ *   C→guest: guest の IDropTarget vtable (8B スロット) の各 VA を shimx_cbtrans_get_invoke() (= lift 側 m11_icall) で呼ぶ。
+ *   guest→C: 渡す IDataObject の vtable スロットは lifttab トークン (cbtrans.c の "IDataObject.*" 行) にする。
+ *            guest が間接呼出しすると __wrap_m11_icall → shimx_lifttab_trampoline → shimx_ido_* に落ちる。
+ * 検証は node + mock (C 側の偽 guest)。実 FL guest の vtable 呼出しの正しさは実機でのみ検証可能 (#177 と同じ制約)。 */
+#define SHX_CF_HDROP 15
+#define SHX_DVASPECT_CONTENT 1
+#define SHX_TYMED_HGLOBAL 1
+#define SHX_DV_E_FORMATETC 0x80040064
+#define SHX_DV_E_LINDEX 0x80040068
+#define SHX_DV_E_TYMED 0x80040069
+#define SHX_DV_E_DVASPECT 0x8004006B
+#define SHX_E_UNEXPECTED 0x8000FFFF
+#define SHX_IDT_FAILED(r) ((int32_t)(uint32_t)(r) < 0)
+typedef struct { uint64_t vtbl; LONG refs; HANDLE hd; } ShxDataObj;
+static uint64_t g_ido_vt[12];
+static const char* const g_ido_names[12] = {
+    "IDataObject.QueryInterface", "IDataObject.AddRef", "IDataObject.Release", "IDataObject.GetData",
+    "IDataObject.NotImpl", "IDataObject.QueryGetData", "IDataObject.NotImpl", "IDataObject.NotImpl",
+    "IDataObject.NotImpl", "IDataObject.NotImpl", "IDataObject.NotImpl", "IDataObject.NotImpl",
+};
+static void ido_vt_init(void) {
+    if (g_ido_vt[0]) return;
+    for (int i = 0; i < 12; i++) g_ido_vt[i] = shimx_lifttab_token(g_ido_names[i], 0);
+}
+static HRESULT ido_fmt_check(const void* fe) {
+    if (!fe) return E_INVALIDARG;
+    const uint8_t* f = (const uint8_t*)fe;
+    if (*(const uint16_t*)f != SHX_CF_HDROP) return SHX_DV_E_FORMATETC;
+    if (*(const uint32_t*)(f + 16) != SHX_DVASPECT_CONTENT) return SHX_DV_E_DVASPECT;
+    if (*(const int32_t*)(f + 20) != -1) return SHX_DV_E_LINDEX;
+    if (!(*(const uint32_t*)(f + 24) & SHX_TYMED_HGLOBAL)) return SHX_DV_E_TYMED;
+    return S_OK;
+}
+HRESULT shimx_ido_QueryInterface(void* self, const GUID* iid, void** out) {
+    static const GUID iid_unk = { 0, 0, 0, { 0xC0, 0, 0, 0, 0, 0, 0, 0x46 } };
+    static const GUID iid_ido = { 0x0000010E, 0, 0, { 0xC0, 0, 0, 0, 0, 0, 0, 0x46 } };
+    if (!out) return E_POINTER;
+    *out = NULL;
+    if (!iid || (!IsEqualGUID(iid, &iid_unk) && !IsEqualGUID(iid, &iid_ido))) return E_NOINTERFACE;
+    *out = self;
+    shimx_ido_AddRef(self);
+    return S_OK;
+}
+ULONG shimx_ido_AddRef(void* self) { return (ULONG)InterlockedIncrement(&((ShxDataObj*)self)->refs); }
+ULONG shimx_ido_Release(void* self) {
+    LONG r = InterlockedDecrement(&((ShxDataObj*)self)->refs);
+    if (r == 0) free(self);
+    return (ULONG)r;
+}
+HRESULT shimx_ido_GetData(void* self, const void* fe, void* sm) {
+    ShxDataObj* o = (ShxDataObj*)self;
+    HRESULT hr = ido_fmt_check(fe);
+    if (FAILED(hr)) return hr;
+    if (!sm) return E_POINTER;
+    size_t sz = 0;
+    const uint8_t* src = shimx_hdrop_bytes(o->hd, &sz);
+    if (!src) return SHX_E_UNEXPECTED;
+    HGLOBAL g = GlobalAlloc(GMEM_MOVEABLE, sz);
+    if (!g) return E_OUTOFMEMORY;
+    memcpy(GlobalLock(g), src, sz);
+    GlobalUnlock(g);
+    memset(sm, 0, 24);
+    *(uint32_t*)sm = SHX_TYMED_HGLOBAL;
+    *(uint64_t*)((uint8_t*)sm + 8) = (uint64_t)(uintptr_t)g;
+    return S_OK;
+}
+HRESULT shimx_ido_QueryGetData(void* self, const void* fe) { (void)self; return ido_fmt_check(fe); }
+HRESULT shimx_ido_NotImpl(void) { return E_NOTIMPL; }
+
+int shimx_drop_invoke(void* target, uint64_t hwnd, size_t hdrop, int x, int y) {
+    (void)hwnd;
+    shimx_cb_invoke_fn f = shimx_cbtrans_get_invoke();
+    if (!f || !target || !hdrop) return 0;
+    ido_vt_init();
+    ShxDataObj* o = (ShxDataObj*)calloc(1, sizeof *o);
+    if (!o) return 0;
+    o->vtbl = (uint64_t)(uintptr_t)g_ido_vt; o->refs = 1; o->hd = (HANDLE)hdrop;
+    uint64_t* vt = (uint64_t*)(uintptr_t)*(uint64_t*)target;
+    uint64_t self = (uint64_t)(uintptr_t)target, ido = (uint64_t)(uintptr_t)o;
+    uint64_t pt = (uint64_t)(uint32_t)x | ((uint64_t)(uint32_t)y << 32);
+    uint32_t eff = 1;
+    uint64_t ea = (uint64_t)(uintptr_t)&eff;
+    int entered = 0, handled = 0;
+    if (!SHX_IDT_FAILED(f(vt[3], self, ido, 0, pt, ea, 0, 0, 0))) {
+        entered = 1;
+        if (!SHX_IDT_FAILED(f(vt[4], self, 0, pt, ea, 0, 0, 0, 0)) && eff)
+            handled = !SHX_IDT_FAILED(f(vt[6], self, ido, 0, pt, ea, 0, 0, 0));
+    }
+    if (entered && !handled) f(vt[5], self, 0, 0, 0, 0, 0, 0, 0);
+    shimx_ido_Release(o);
+    return handled;
+}
