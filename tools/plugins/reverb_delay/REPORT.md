@@ -5,7 +5,7 @@
 - 再現: `bash tools/plugins/reverb_delay/reverb_delay_e2e.sh` (gate 付き。不合格なら exit 1) / `bash tools/plugins/reverb_delay/reverb_delay_nega.sh` (NC 22 件)
 - 素材: `fl-win64` / `toolchain-retdec` / `toolchain-emsdk` (`docs/WORKFLOW.md` §11)。環境は `reverb_delay/env.sh`
 - 既知類型との関係: (icall §4) **D1 (間接 call 脱落)** が 9 閉包すべてで再現 (§5)。(icall §4) **D12 (Delphi unwind landing pad が CFG 非到達)** を 3 site で再現 (§5)。
-  (`docs/DEFECTS.md`) D1〜D16 に該当する silent miscompile は未確認 (差分試験を未実施のため)。engine で loud な新類型 E4 / E5 を見つけた (§7、行案は §10)
+  (`docs/DEFECTS.md`) D1〜D16 に該当する silent miscompile は未確認 (差分試験を未実施のため)。engine で loud な新類型 E4 / E5 / E6 を見つけた (§7、行案は §10)
 
 ## 0. 結論 (先出し)
 
@@ -18,7 +18,7 @@
 4. **host 呼出面は P0b の応答表で覆える**: 閉包の即値 Dispatcher ID は {2, 14, 36, 50, 67} の 5 種 (計 14 site)、すべて `hs_ids.json` の 35 ID に含まれる。 別算法の独立走査も 9/9 本で取りこぼしなし (§3)。 動的 ID は Convolver の 2 site。
 5. **SIMD kernel 依存は 5 本、うち 4 本 (Convolver / Delay 2 / Delay Bank / Reeverb 2) の閉包が #331 ([P0c-7]) 未解決の 0x5dee90 / 0x5df040 を呼ぶ** (§4)。 Delay 3 / Reeverb / LuxeVerb / Multiband Delay の殻は閉包内 kernel 呼出 0 site。
 6. **Convolver の FFT は IPP 経由ではない (静的調査)**: IPP 関数ポインタ 420 変数のうち DLL 全体で参照する関数は Convolver 5 / LuxeVerb 4 / 他 7 本 0 で、名前は Move / Zero / Add / MulC のみ。 FFT 系 (`fft`/`dft`/`conv`/`corr`) の参照は 0。 → #38 ([IPP-10]) 側の FFT 代替は Convolver に不要と推定 (§6、範囲は§6 の但し書き)。
-7. **T3 の C++ engine 2 本は `emcc -c` 未通過**: Delay 3 engine (19000) は RetDec 完走だが IR 型エラー (E1 → E4) で止まる。 **Multiband Delay engine (19165) は RetDec が `.text` の 78/2,078 関数で落ちる (`Should not be possible.`) ため IR が出ない。**
+7. **T3 の C++ engine 2 本は `emcc -c` 未通過**: Delay 3 engine (19000) は RetDec 完走だが IR 型エラー (E1 → E4) で止まる。 **Multiband Delay engine (19165) は RetDec が `.text` の 78/2,078 関数で落ちる (`Should not be possible.`) ため IR が出ない。** 78 関数を除いても E6 / E1 / zext 定数式で止まる。
    78 関数は AVX2/AVX-512 命令 (`vpermpd` / `vpermd` / `vpexpandd` / `vshufi32x4` / `valignd`) を含み、残り 2,000 関数は 1 本も含まない (§7)。 さらに 272 関数 / 513,403 B は静的リンクされた Intel IPP (`IPPCODE` section)。
 
 ## 1. 閉包 lift 結果 (Delphi 殻 9 本)
@@ -147,6 +147,7 @@ frontier = 閉包から呼ぶ framework 関数 (P0a の共有 wasm 側)。 vcall
 |---|--:|--:|--:|--:|--:|--:|--:|
 | 19000 Delay 3 | 0 | 4,107 | 2 / 3,632 (404 B) | 1 | 93 | 1 (E1) | 1 (E4) |
 | 19165 Multiband Delay | **1** (IR 出力なし) | — | — | — | — | — | — |
+| 19165 (78 関数 + IPPCODE を除外) | 完走 (`m11_simd2.py` で rc 1) | 2,608 | 2 / 2,000 (445 B) | 6 | 算出不能 (-1) | 1 (E1) | 1 (zext 定数式) |
 
 - 19000: 最初のエラーは #506 の E1 と同型 (`'%arg3' defined with type 'i64' but expected 'ptr'`)。 `engine_fixcmp.py` で 7 operand を直すと **E4** `use of undefined value '%20'` に進む。
   E4 は `function_180013107` で、`e.rp.ll` にあった `%20 = call i64 @__asm_movaps(i128 %16)` の定義が `fix_asm_stores.py` (`e.rp.ll` → `e.st.ll`) で消え、`%23 = and i64 %20, ...` の使用だけが残る (dangling SSA use)。
@@ -154,7 +155,7 @@ frontier = 閉包から呼ぶ framework 関数 (P0a の共有 wasm 側)。 vcall
 - 19165: RetDec が 0.35 s で `[capstone2llvmir]: Should not be possible.` を出して終了する (**E5**)。 `.pdata` を `.text` 2,078 関数に絞っても同じ (`engine_ranges.py --exclude IPPCODE`)。
   `engine_bisect.py` の二分探索 (349 試行) で、**単独で RetDec を落とす関数が 78/2,078 (286,914 B / 1,904,499 B)** と特定した。 `bisect_census.py` の命令比較: `vpermpd` (64 関数)・`vpermd` (56)・`vpexpandd` (22)・`vshufi32x4` (4)・`valignd` (2) のいずれかを含む関数は
   落ちる 78 関数では **78/78**、落ちない 2,000 関数では **0/2,000**。 相関であり、単一命令での因果確認は未実施 (RetDec の capstone2llvmir が AVX2 permute / AVX-512 を未変換と推定)。
-- 78 関数を除いた残り 2,000 関数の lift (`ENGINE_RANGE_ARGS="--exclude IPPCODE --exclude-ranges work/reverb_delay/bisect19165.out" ENGINE_TAG=_noipp_nobad bash reverb_delay/engine_lift.sh 19165`) は実行中で、結果は未取得。
+- **78 関数と `IPPCODE` を除いた 2,000 関数 (1,617,585 B)** で再 lift (`ENGINE_RANGE_ARGS="--exclude IPPCODE --exclude-ranges work/reverb_delay/bisect19165.out" ENGINE_TAG=_noipp_nobad bash reverb_delay/engine_lift.sh 19165`、1 回のみ実測 367 s): RetDec と pass 鎖は `final.ll` (505,860 行・define 2,608・`.pdata` で define 無し 2 関数 (445 B)・range 内部の別 define 608) まで進むが、(a) 鎖の最終段 `m11_simd2.py` が `IndexError: string index out of range` (`'abc'[i]` に 4 個以上の引数型が来る = 4 引数以上の `__asm_*` helper と推定) で rc 1 (**E6**)、(b) `emcc -c` は E1 (`'%arg3' defined with type 'i64' but expected 'ptr'`) → `engine_fixcmp.py` 4 operand 後に `zext constexprs are no longer supported` (#506 の E2 と同型)、(c) `x86_fp80` 関数 6。 つまり E5 を回避しても engine は更に 3 類型で止まる。
 - 19165 の `IPPCODE` section は 272 関数 / 513,403 B (`.text` は 2,078 関数 / 1,904,499 B)。 IPP の static link と推定 (関数名は未解析)。 殻との結合 (LoadLibrary 経路) は未解析。
 - 以上は到達性の実測で、engine の正しさは何も示していない。
 
@@ -167,6 +168,7 @@ frontier = 閉包から呼ぶ framework 関数 (P0a の共有 wasm 側)。 vcall
 | 3 回の結果一致 | 判定列 (`status.csv` の秒を除く 9 列)・`facts.json` (バイト一致、sha256 先頭 `b49a112e`)・engine 行 (秒を除く)・`ipp_use.json` の集計値・gate の出力行は 3 回とも同一 |
 | `reverb_delay_nega.sh` (HEAD 8a68603) | exit 0、**158 s**、開始時 load average 0.51。 **22/22 件 DETECTED** (対照は全て rc 0 / 壊した入力は全て rc 1。 内訳は下) |
 | 前提 inventory (初回のみ・`prep.sh`) | 4 分 28 秒 (`win_funcs.py` が大半。 並列 14 プロセス / 4 core)。 `block_manifest.json` が tarball に無く `nsis_names.py` が動かないため `f2/mk_blockmap.py` で blockmap を再構成 |
+| 最終 HEAD (commit 2cc882a: コメントと `engine_ranges.py` の flag 追加のみ変更) | `reverb_delay_e2e.sh --skip-lift` exit 0、**107 s** (judge 9/9・matrix_check 82/82・ids_crosscheck 9/9・xcheck_icall OK)。 lift・engine 段は 8a68603 の 3 回の結果を採用 |
 | 最初の e2e 実行 (記録) | 1 回目は `xcheck_icall.py` が件数一致を要求して **exit 1** (Convolver 181 vs 179、Delay Bank 70 vs 69)。 原因 3 site を特定し VA 固定の gate に改めた (§5)。 gate が実際に落とした実例 |
 
 ネガティブコントロール (`reverb_delay_nega.sh`、すべて「対照 rc 0 / 壊した入力 rc 1」):
@@ -195,7 +197,7 @@ frontier = 閉包から呼ぶ framework 関数 (P0a の共有 wasm 側)。 vcall
 | 差分試験 bit-exact (出口条件 3)。 Eff_Render 単位の native / wasm harness が無く、P0a/P0b/P0c 未完 | #201 を閉じられない | #195 / #196 / #197 の完了後に #201 を再開 (Closes はその時)。 harness は #506 REPORT §6 が提案した [PLG-F3a] と共通 (PM 未起票。重複起票しない) |
 | Render test .flp の E2E (出口条件 4)。 RT 列が付くのは Convolver / Delay 2 / Delay Bank / Reeverb / Reeverb 2 の 5 本 | 同上 | FLEngine 統合待ち。 親 #14 / #201 |
 | 非 IAT 間接 call 514 site の脱落 (D1) と、audit が辿れない 3 site (D12) | 9 本すべて。 接続しない限り差分試験は必ず不一致 | #514 ([PLG-F2-2]) に追記済み |
-| C++ engine 2 本 (Delay 3 / Multiband Delay): E1・E4・E5、19165 の `IPPCODE` (静的リンク IPP) | T3 の 2 本 | **#523 ([PLG-F4-2])** を起票 |
+| C++ engine 2 本 (Delay 3 / Multiband Delay): E1・E4・E5・E6、19165 の `IPPCODE` (静的リンク IPP) | T3 の 2 本 | **#523 ([PLG-F4-2])** を起票 |
 | #331 の 0x5dee90 / 0x5df040 に依存する閉包 4 本 | kernel の保証 | #331 に追記済み |
 | 動的 ID 2 site (Convolver)・slot 0x120 ×1 (LuxeVerb)・ID 14 / 67 の応答 | host 呼出面の意味 | #196 に追記済み |
 | Delay 3 engine の f80 1 関数・0x635b80 (Convolver)・0x5de390 22 site の所在 | kernel / f80 の網羅 | #197 に追記済み |
@@ -211,6 +213,7 @@ frontier = 閉包から呼ぶ framework 関数 (P0a の共有 wasm 側)。 vcall
 | E1 icmp ptr/i64 混在 | `icmp eq ptr %x, %argN` (argN は i64) | 19000 Delay 3 engine (#506 の E1 と同型) | emcc "defined with type 'i64' but expected 'ptr'" | `engine_fixcmp.py` (局所)。 `fix_ptr_params.py` の拡張が本筋 |
 | E4 dangling SSA use | `fix_asm_stores.py` が `%N = call @__asm_movaps(i128)` の定義を消し、`%N` の使用が残る | 19000 の `function_180013107` | emcc "use of undefined value '%20'" | 未修復 (定義を消す条件に「使用が無い」確認を足す) |
 | E5 RetDec capstone2llvmir 異常終了 | `[capstone2llvmir]: Should not be possible.` で IR 出力なし | 19165 の 78 関数 (AVX2/AVX-512 permute 系を含む) | RetDec rc 1 + `.ll` 無し | 未修復 (対象命令の変換追加、または該当関数の除外/別経路) |
+| E6 m11_simd2 の helper 引数数 | `m11_simd2.py` が 4 引数以上の `__asm_*` helper で `'abc'[i]` の IndexError | 19165 (78 関数 + IPPCODE 除外後) | lift の終了コード 1 + `e.simd.log` の traceback | 未修復 (引数名を 3 個固定でなく生成する) |
 
 ## 11. 成果物
 
