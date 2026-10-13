@@ -123,6 +123,15 @@ vtable call の候補をその class の同 slot に限る (narrow)。一意に�
 - 受入 2 (対照 Gain の closure が手検証の 160 関数と差分 0): **未達**。narrow は 1,994 関数 (差分 1,834)。
 - 受入 3 (before/after 表と未解決 call の内訳を REPORT に書く): **部分達成**。本節の表は Gain のみ。§2 の表は #782 の wide 規則による値で、3 種の narrow 表は無い。
 
+## 6. #848 (KH-19b) 受入 2 の検証と判定 (HEAD `2f235a0a`, 4 vCPU, 各 1 回)
+
+- 再現: 素材 `plugins-kilohearts` を展開 → `extract_installer.sh` (win 成功, mac の `llvm-lipo` 不在は無関係) → `rtti_walk.py` (6,307 class) → `callgraph.py` (120,856 関数)。§5 と同じ値を再現 (before 160 / nogui 555 / all 1,995 / narrow 1,994)。
+- 計測 `scripts/vtable_gap_probe.py` (gain): before 160 関数の中の vtable call 112 部位。候補 (全 class の同 slot) 781 件のうち 458 件が before の外。112 部位すべてに before 外の候補がある。
+- 呼び出し直前に `rcx` (this) へ書く命令 (同一関数内・直前のみ): `mov reg, reg` 102 / 書き手なし 6 / その他 4。レジスタ由来は同関数内では追えず、this 型は呼び出し鎖の伝播が要る (§5 と同じ結論)。
+- 外れる候補の class 内訳 (`*Dsp` 系の家族規則で切ったとき): GUI 系 (Editor/Controller/Ui/View/Gui/Skia) 409 件・その他 99 件。
+- 家族規則 (`*MasterDsp` / `*Dsp` / `*DspModel` の vtable slot のみを候補にする) は before 160 との差分が 0 になる。ただし家族の全 slot を roots に入れているため、差分 0 は**構造上自明**であり、closure の正確さの証拠にはならない。
+- **受入 2 の判定: 未達のまま**。「手検証の 160 関数」の正本 (一覧ファイル) がリポジトリに無く、差分 0 を正しさとして示せない。家族規則を採用するかは、手検証の一覧を得てから判断する。
+
 #782 の受入 (lift / build の最初の失敗点) は未達で、§3 に記載。
 
 未解決の起票先: (a)/(b) の this 型伝播は #848 に残す (#848 は部分達成・open のまま)。rip_data は #849、lift 失敗点は #850 (§4)。
