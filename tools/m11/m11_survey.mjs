@@ -42,13 +42,15 @@ for (let i = 0; i < 942; i++) {
   mod._m11_va_unit_begin();
   const oom0 = Number(mod._m11_va_oom()), big0 = Number(mod._m11_va_big());
   const vaUsed0 = Number(mod._m11_va_used()), gm0 = Number(mod._m11_probe_count(0)), fm0 = Number(mod._m11_probe_count(1));
+  const lf0 = Number(mod._m11_probe_count(6)), lr0 = Number(mod._m11_probe_count(7));
   let r, err = null;
   try { r = mod._m11_call_unit(i); } catch (e) { err = e; }
   const clob = !tableIntact();
   if (clob) { mod.HEAPU8.set(snap, 0); }
   const hadOom = Number(mod._m11_va_oom()) > oom0;
   perUnitCost.push({ i, va, va_bytes: Number(mod._m11_va_used()) - vaUsed0, getmem: Number(mod._m11_probe_count(0)) - gm0,
-    freemem: Number(mod._m11_probe_count(1)) - fm0, oom: Number(mod._m11_va_oom()) - oom0, clobber: clob });
+    freemem: Number(mod._m11_probe_count(1)) - fm0, oom: Number(mod._m11_va_oom()) - oom0, clobber: clob,
+    listfind: Number(mod._m11_probe_count(6)) - lf0, listraise: Number(mod._m11_probe_count(7)) - lr0 });
   if (Number(mod._m11_va_big()) > big0) bigUnits.push(va + ':' + (err ? 'trap' : 'ok') + ':' + (Number(mod._m11_va_big()) - big0));
   if (process.env.M11_SURVEY_STACK && process.env.M11_SURVEY_STACK.split(',').includes(String(i))) console.error('[survey][stack] unit ' + i + ' ' + va + (clob ? ' (clobber)' : '') + ': ' + (err ? ((err && err.stack) || err) : 'returned ' + r));
   if (clob) {

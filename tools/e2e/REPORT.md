@@ -126,6 +126,24 @@ dev は `__e2e__/add.wasm` fixture が配信されないため wasm-load 内の 
 | repo variable `E2E_URL` と secrets `E2E_ACCESS_CLIENT_ID/SECRET` の登録 | 週次 remote ジョブは登録まで skip | 本 issue (#66) へコメント (ユーザ/PM 作業。token secret は `deploy/work/secrets/` にしか無い) |
 | 実 URL に対する週次ジョブの初回実績 | remote の PASS 未確認 | #66 (登録後に `gh workflow run e2e.yaml -f remote=true`) |
 
+## 839 E2E-5: dummy-worklet 参照の差し替え後の再測定 (#839・#1010)
+`/worklets/dummy-worklet.js` の参照を `/worklets/fl-audio-worklet.js` へ差し替えた後 (commit `8e27b776` → 修正 commit は PR head を参照)、
+edge-sim の `audioworklet`・`console-clean` が `/wasm/audio/manifest.json` の 404 で FAIL していた。原因は edge-sim が `work/dist` を
+静的配信し `/wasm/*` の vite middleware を通らないため、テスト音 wasm が配信元に無かったこと。`run.sh` が build 後に
+`tools/audio/integration/stage_app.sh` を実行し、`work/dist/wasm/audio/` へコピーするよう修正した (#1010 の対応)。
+
+| 条件 (同一マシン・同一 Chrome 154.0.8037.97・`bash tools/e2e/run.sh --driver both --targets preview,edge-sim`) | 結果 | 所要 (wall) | load (開始 → 終了) |
+|---|---|---|---|
+| 修正前 `8e27b776` (ベース) | **PASS=26 FAIL=8 SKIP=6**, exit 1 | 92 s (1791912565 → 1791912657) | 0.34 → 0.42 |
+| 修正後 (本 PR head) | **PASS=34 FAIL=0 SKIP=6**, exit 0 | 15 s (1791912689 → 1791912704) | 0.23 → 2.07 |
+
+- コミット済み HEAD `22419ef4` で再実行 (同条件・Node v22.23.3): **PASS=34 FAIL=0 SKIP=6**, exit 0, 所要 13 s (1791912812 → 1791912825)、load 0.60 → 0.81 (ログ `head-22419ef4.log`)。
+- 修正前の FAIL 8 = `audioworklet` ×4 (preview/edge-sim × 2 driver) + `console-clean` ×4。全件 `/wasm/audio/manifest.json HTTP 404`。
+  preview 側も同じ 404 で落ちていた (修正前は preview の `audioworklet` も FAIL)。
+- 修正後の `audioworklet` 実測 (samplePos 進行): preview agent-browser 40495 frames/s、preview puppeteer 47059、edge-sim agent-browser 39035、edge-sim puppeteer 51451 (いずれも 128f 単位)。
+- 残る SKIP 6 は `fl-boot` (FL 未統合) と `edge-policy` の preview 側 (strict 限定) で、従来どおり。
+- ログ: `tools/e2e/work/logs/base-8e27b776.log` (修正前)・`fix1.log` (修正後)。gitignore 配下のため正本はこの表。
+
 ## FL 起動契約 (#65)
 ページは `window.__webstudio = { state: 'booting'|'running'|'error', frames: <number>, error?: string }` を公開する。
 実装は `src/runtime/webstudio_state.ts` (`src/index.ts` が `installWebstudioContract()` を読込時に呼ぶ)。
