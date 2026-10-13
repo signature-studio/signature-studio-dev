@@ -83,7 +83,8 @@ window.runOnce = async (url, mode) => {
   const tCompiled = performance.now();
   const imports = {};
   for (const i of WebAssembly.Module.imports(mod)) {
-    (imports[i.module] ??= {})[i.name] = i.kind === "function" ? (() => 0) : undefined;
+    if (i.kind !== "function") throw new Error(\`unsupported import kind=\${i.kind} \${i.module}.\${i.name}\`);
+    (imports[i.module] ??= {})[i.name] = () => 0;
   }
   const inst = await WebAssembly.instantiate(mod, imports);
   const tInst = performance.now();
