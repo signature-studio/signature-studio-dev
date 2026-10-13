@@ -225,13 +225,13 @@ DEFECTS.md 追記案: なし (新しい silent miscompile 類型は見つけて�
 | 受入条件 1: `ja` seed で `/fl/System/Languages/ja.moe` が全量読まれることの e2e | **未達** (boot が `CreateFruityInstance` に未到達) | #590 を開いたまま (依存 #253)。到達後に `assettrace` 系で open() を実測 |
 | 受入条件 3: ネガコン「言語 seed を外すと en 組込みに戻る」の動的確認 | **seed 層のみ** (§8-3)。エンジン側は未達 | 同上 |
 | ~~0x758200 の bit2 省略が 0x9de400 の呼出で有効か~~ | 静的に**無効**と確定 (§8-5)。動的確認は boot 到達後に #590 で同時に行う | #590 |
-| 受入条件 2 の動的側: shimx/VFS が不在パスで `INVALID_FILE_ATTRIBUTES` + 2/3 を返すことの実測 | shimx 側は **未実測** (`tools/shimx/test/test_absent.c` は作成済みだが e2e 未実行。`tools/shimx/REPORT.md` に §16 は未作成)。FL 実行中の実測も未了 | #658 (shimx 側) / #590 (FL 側) |
+| 受入条件 2 の動的側: shimx/VFS が不在パスで `INVALID_FILE_ATTRIBUTES` + 2/3 を返すことの実測 | shimx 側は node e2e で実測済み (`tools/shimx/REPORT.md` §16.1: `test_absent.c` 不在 2/3・実在ネガコン・MT/ST 3 回 PASS)。FL 実行中の実測は未了 | #658 (shimx 側) / #590 (FL 側) |
 
 ### 8-5. bit2 の確定 (#658・静的)
 
 `F` = 0x9de400 の vtbl+0x30 の第 5 引数。0x9de48e・0x9de512 が `mov dword [rsp+0x20], 0` で固定 → 0x75b750 が `[rbp+0xb0]` を 0x758330 の第 6 引数へ転送 (0x75b7bd) → 0x758330 の 0x758200 呼出は `this = rbp` (0x7583a1・0x758497) のため `[this+0xb8] = F`。
 
-`test eax,4` (0x75822f) は F=0 で偽 → 省略せず 0x43ba70 (FileExists) → 偽なら 0x43bb50 (ディレクトリとして存在) で判定。**bit2 は 0x9de400 経路では無効**。不在パスは両方偽 (0x43ba70 は GetFileAttributesW=-1 かつ GetLastError∈{2,3,0x7b} で偽)。機械照合は `svc_check.py` 49/49 (機械語 3 件を追加し、ネガコン 2 件を追加して計 8 件検出)。検証: commit `5727ea7` の clean worktree で `e2e.sh` 3 回 = exit 0 ×3 / 所要 **21.59・21.54・21.36 秒** (実行順) / load average (1 分) 開始 0.17・0.56・0.94 → 終了 0.56・0.94・0.96 (同一 runner で shimx 側の作業が並行)。
+`test eax,4` (0x75822f) は F=0 で偽 → 省略せず 0x43ba70 (FileExists) → 偽なら 0x43bb50 (ディレクトリとして存在) で判定。**bit2 は 0x9de400 経路では無効**。不在パスは両方偽 (0x43ba70 は GetFileAttributesW=-1 かつ GetLastError∈{2,3,0x7b} で偽)。機械照合は `svc_check.py` 49/49 (機械語 3 件を追加し、ネガコン 2 件を追加して計 8 件検出)。`0x758330` 範囲内の `4889e9488b95a8000000` は 0x758397 の 1 箇所のみ (`0x758490` の `mov rcx,rbp` 後は `[rbp+0xb8]` を `test eax,1` (bit0) で読むため bit2 連鎖ではない。実バイトで確認)。検証: commit `5727ea7` の clean worktree で `e2e.sh` 3 回 = exit 0 ×3 / 所要 **21.59・21.54・21.36 秒** (実行順) / load average (1 分) 開始 0.17・0.56・0.94 → 終了 0.56・0.94・0.96 (同一 runner で shimx 側の作業が並行)。
 
 ## 9. #590 の検証 (実測)
 
