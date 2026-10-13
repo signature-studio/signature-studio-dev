@@ -145,9 +145,9 @@ lang = 0x9dece0(…, 1)                              ← 'Program Language' (既
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | `[0x15e43a8]` (言語の上書き値) の実体 (起動引数由来か) と既定値。`zh` のときの 0x9deaa0 先頭分岐の意味 (+0x18/+0x20 の設定)。`FlagBtnPaint` の初回描画が起動中か | §1 の「既定は en 固定」は上書き値が `zh` 以外という前提。`lang-svg` の phase も絞れない | #105 (boot 到達後の `assettrace`) |
-| 0x668d30 の `segoeuisl.ttf` / `tahoma` / `consola` / `lucon` 不在時の最終的な落ち先、`P_*` ごとの対応の確定 | P_Tiny / P_NormalLight / P_Monospaced の表示 | #186 (GDI テキスト実描画。本 REPORT §3 を入力にする) |
-| Open Sans 本体のライセンス本文が LEGAL §3.1 に無い | OpenSans を代替の本命にする前提 | LGL 系 (#86 THIRD_PARTY_NOTICES に合流) へ PM が起票 |
-| 等幅フォントの調達 (VFS に無い) | P_Monospaced | PM 判断 (#186 の同梱方針に追記) |
+| 0x668d30 の `segoeuisl.ttf` / `tahoma` / `consola` / `lucon` 不在時の最終的な落ち先、`P_*` ごとの対応の確定 | P_Tiny / P_NormalLight / P_Monospaced の表示 | #660 [GUI-14] (フォント配信と face/alias 登録。本 REPORT §3 を入力にする) |
+| Open Sans 本体のライセンス本文が LEGAL §3.1 に無い | OpenSans を代替の本命にする前提 | #616 [LGL-8] (Open Sans / Barlow の license 登録) にコメント |
+| 等幅フォントの調達 (VFS に無い) | P_Monospaced | #660 [GUI-14] にコメント (同梱方針は PM 判断) |
 | ブラウザ言語 → LCID の渡し方 (`zh` のときだけ起動時に `zh.moe` を読む) | zh ブラウザの初回起動が重くなる (847827 byte) | `tools/runtime` 側の子チケットを PM が起票 (本 REPORT §1.2 を入力) |
 | `loadpaths` の tier (`lang-moe`=T2 推奨) との整合 | `zh` 環境だけ起動で読む | #105 の実トレースで答え合わせ |
 
@@ -156,5 +156,5 @@ DEFECTS.md 追記案: なし (新しい silent miscompile 類型は見つけて�
 ## 6. 次タスク提案
 
 1. boot が `CreateFruityInstance` を抜けた時点で `assettrace` に本 REPORT の A〜E (呼出順・ファイル不在時の落ち先) を答え合わせさせる (#105)。
-2. #186 に §3.2 / §3.3 を入力として渡し、`CreateFontW` の face 名 → OSS フォントの写像を実装する。
+2. #660 [GUI-14] に §3.2 / §3.3 を入力として渡し、`CreateFontW` の face 名 → OSS フォントの写像を実装する (描画側は #615 [GUI-13])。
 3. ランタイムの `shimx_set_locale` 呼出方針 (既定は呼ばない = `en` 固定) を `tools/runtime` に明記する。
