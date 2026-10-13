@@ -1,0 +1,5 @@
+# LD-32 (#1070) m11 sample:800 n=3 on HEAD c4e93550 (batch only, same binary/build)
+run1: match 360 mismatch 230 unexec 210
+run2: match 360 mismatch 230 unexec 210
+run3: match 360 mismatch 230 unexec 210
+flipping functions across run1-3: 0

@@ -91,3 +91,43 @@ OTT 旧 chain (`build ott_old` + `batch --set closure --shards 4` + `tests/check
 | 関数単位の tag 変化の機序 (vm0/u16 pattern がなぜ unexec の native fault を解消するか) は未確認 | pattern 追加の効果の説明が推定止まり | #1070 ([LD-32]) |
 | m11 sample:800 の 1 件揺れの関数特定 | 非決定性の出所が未特定 | #1070 ([LD-32]) |
 | 素材の展開・python 依存 (`numpy capstone pefile`) は run ごとに必要 | 素の runner で e2e が exit 2 | 既に REPORT_APPENDIX §10 の未解決 (agent-setup) |
+
+## 7. LD-32 (#1070): 8 関数の機序 (パターン単位の観測) と m11 sample:800 の n=3
+
+測定: `c4e93550` (main 取り込み時点の HEAD)・Actions runner (4 vCPU・load 1 分平均 1.5〜6.9)。素材 `fl-win64` `work-m6-ott` `work-m11` `work-liftdiff` `work-liftlib` `analysis-ott-binaries` を展開。`bash tools/liftdiff/liftdiff_e2e.sh` は exit 0・`LIFTDIFF_E2E PASS`・所要 約 3 分 (本 run 1 回目)。OTT 集計 35 / 112 / 65 は §1 の `986e7415` と一致 (D1〜D6 = 4/6/14/20/26)。ログは `results/liftdiff_e2e_ld32_head_c4e93550_n1.log` (commit 済み)。
+
+### 7.1 8 関数のパターン別観測 (`work/ott_old/batch.jsonl` の cases から)
+
+| 関数 | 判定 | z | s | p0 | vm0 | u16 | 観測 |
+|---|---|---|---|---|---|---|---|
+| 1801ab1d0 | match | BF(divzero) | NF@1ab1dc | NF@1ab23d | equal | equal | vm0/u16 で初めて両側が正常終了 |
+| 1801ab258 | match | NF@1ab25d | NF@1ab25d | NF@1ab2cb | equal | equal | 同上 |
+| 1801ab3ec | unexec | NF@1ab41a | NF@1ab41a | NF@1ab420 | NF@1ab437 | NF@1ab420 | vm0/u16 でも native fault のまま。理由が null_deref→fault に変化 (§3) |
+| 1801c5e84 | mismatch | equal | NF@1c5eb8 | diff | diff | wasm_trap | vm0 で diff に到達 (tag は wasm_trap が u16 由来) |
+| 1801c621c | mismatch | equal | BF | diff | diff | wasm_trap | vm0 で diff に到達 |
+| 1801c67a0 | mismatch | BF | BF | BF | wasm_trap | wasm_trap | 全パターンで wasm 側が m8_fail (abort)。vm0/u16 で wasm 側だけ trap |
+| 1801c682c | mismatch | BF | BF | BF | diff | diff | vm0/u16 で diff に到達。qall のみ native fault |
+| 1801c69cc | mismatch | equal | BF | diff | diff | wasm_trap | vm0 で diff に到達 |
+
+- 機序の観測 (仮説・未確認): 乱数 blob (`r1`〜`r4`) では native 側が blob の値 (0x7e 等) を長さ・添字として使い、NF で止まる関数がある (1ab258 p0: rax=0x7e・r8=0x7e・addr=0x7e)。vm0/u16 は構造を持つ blob (VMT ptr・UnicodeString ヘッダ) なので native が最後まで走り、比較 (equal / diff) に進める。**これは行の値からの推定で、関数内の命令 trace (native と wasm の各 step) は本 run では取っていない**。
+- 1801ab3ec: vm0/u16 でも native が 0x1ab41a〜0x1ab458 で fault し続けるため、構造 blob では解消しない。
+- 1801c67a0: wasm 側の `m8_fail` (function_1801c721c 経由) が vm0/u16 で trap する。native は全パターンで abort/segv。この型は `wasm_trap` の原因関数 (wasm 側の m8 検査失敗) の特定が次の作業。
+
+### 7.2 m11 sample:800 の n=3 (c4e93550)
+
+| run | 一致 | 不一致 | 実行不能 |
+|---|---|---|---|
+| 1 (e2e 内 [4/4]) | 360 | 230 | 210 |
+| 2 (batch のみ・同一 build) | 360 | 230 | 210 |
+| 3 (batch のみ・同一 build) | 360 | 230 | 210 |
+
+- 判定が変わった関数は 0 件 (run1〜3 の verdict を全 800 件で比較)。§4 の 361 / 360 / 361 の揺れは本 HEAD では再現しなかった。
+- 結論: 揺れの原因は**特定不能** (再現せず)。§4 の「native timeout・負荷による揺らぎ」は推定のまま。揺れの再現条件 (負荷・shard 配置) は未確認。
+- 測定結果: `results/ld32_m11_sample800_n3_c4e93550.txt` (commit 済み)。
+
+### 7.3 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 8 関数の命令単位 trace (native と wasm の各 step) による機序の確定 | §7.1 は観測と推定の段階 | 本 PR 後に子 issue (LD-32 の残り) |
+| m11 sample:800 の 361 ↔ 360 の再現条件 | 本 HEAD では n=3 で再現せず | 同上 |
