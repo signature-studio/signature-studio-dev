@@ -247,6 +247,8 @@ EMSCRIPTEN_KEEPALIVE double m11_probe_count(int i) { return (i >= 0 && i < PROBE
 #endif
 #if M11_INSTR_413060
 static unsigned long long g_dest_h = 1469598103934665603ULL, g_dest_n;
+#define M11_DEST_REC_MAX 512
+static unsigned long long g_rec_st[M11_DEST_REC_MAX], g_rec_len[M11_DEST_REC_MAX], g_rec_rc[M11_DEST_REC_MAX], g_rec_h[M11_DEST_REC_MAX];
 #ifndef M11_NEG_413060
 #define M11_NEG_413060 0
 #endif
@@ -261,7 +263,37 @@ void m11_dest_obs(unsigned long long dest) {
     return;
 #endif
     unsigned long long v = *(volatile unsigned long long*)(uintptr_t)dest;
+    unsigned long long k = g_dest_n;
     g_dest_h = (g_dest_h ^ v) * 1099511628211ULL; g_dest_n++;
+    if (k < M11_DEST_REC_MAX) {
+        /* #1389: 呼出し k の dest の値 (文字列の内容) を記録する。ポインタ値はヒープ配置で変わるため指紋に使わない。
+         * 読むのは線形メモリの範囲内だけ (範囲外・長さ異常は st=2)。refcount は dest の文字列ヘッダ (p-8)。 */
+        unsigned long long heap = (unsigned long long)__builtin_wasm_memory_size(0) * 65536ULL;
+        unsigned long long h = 1469598103934665603ULL, len = 0, rc = 0, st = 0;
+        if (v == 0) st = 0;
+        else if (v < 8 || v + 4 > heap) st = 2;
+        else {
+            len = *(volatile unsigned int*)(uintptr_t)(v - 4);
+            rc = *(volatile unsigned int*)(uintptr_t)(v - 8);
+            if (len > (1ull << 24) || v + len * 2 > heap) st = 2;
+            else {
+                for (unsigned long long j = 0; j < len * 2; j++)
+                    h = (h ^ *(volatile unsigned char*)(uintptr_t)(v + j)) * 1099511628211ULL;
+                st = 1;
+            }
+        }
+        g_rec_st[k] = st; g_rec_len[k] = len; g_rec_rc[k] = rc; g_rec_h[k] = h;
+    }
+}
+EMSCRIPTEN_KEEPALIVE double m11_dest_rec(int k, int field) {
+    if (k < 0 || k >= (int)M11_DEST_REC_MAX) return -1.0;
+    switch (field) {
+    case 0: return (double)g_rec_st[k];
+    case 1: return (double)g_rec_len[k];
+    case 2: return (double)g_rec_rc[k];
+    case 3: return (double)(unsigned)(g_rec_h[k] >> 32);
+    default: return (double)(unsigned)(g_rec_h[k] & 0xffffffffu);
+    }
 }
 EMSCRIPTEN_KEEPALIVE double m11_dest_obs_n(void) { return (double)g_dest_n; }
 EMSCRIPTEN_KEEPALIVE double m11_dest_obs_hhi(void) { return (double)(unsigned)(g_dest_h >> 32); }

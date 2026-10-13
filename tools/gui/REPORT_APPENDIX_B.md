@@ -45,6 +45,28 @@
 - **結果**: rc=0 / `[gui-e2e] ALL PASS` / 実時間 211 s / 開始時 load 0.37 (1 分値)。stress の negctl 4 本は FAIL を検出して拒否 (stress 本体は ALL PASS)。
 - **安定性**: 本 run は 1 回のみ。受入条件「維持」の判定 (n 連続) は #1217 で扱う。flake (`blit_surf` の heap-use-after-free) の追跡は #740 (GUI-15)。
 
+## GUI-20 (#1217): e2e.sh 連続実行と 6h CDP タイムアウトの再現確認
+
+測定 commit `f2370c95` (= 本 run の PR head。コード部分は `0e9fcaae` と同一で、`git diff 0e9fcaae f2370c95 -- tools/gui` の差分は本節の REPORT_APPENDIX_B.md のみ)。`git diff f7bebc7b f2370c95 -- tools/gui` = 6 files / +190 −4 (main 取り込み由来。e2e 経路に `gui_core_ext.inc` +2 行を含む) のため、本節の数値は `f2370c95` の tree の実測として扱う (`docs/WORKFLOW.md` §6)。`TMPDIR=$RUNNER_TEMP`、`bash tools/gui/e2e.sh` を foreground で実行。素材: fl-win64 / toolchain-emsdk / toolchain-retdec を `$ARTIFACTS_DIR` で実在確認し、[EMSDK]・[RETDEC] に展開済み。
+
+- **前処理 (記録のみ・判定外)**: 本 run の worktree は `pnpm install --frozen-lockfile` と `tools/e2e` の `npm ci --ignore-scripts` を実施し、`gcc-mingw-w64-x86-64` を apt で導入してから測定。前回 run までの前処理欠落 (mingw 不在・node_modules 無し) は解消済みの前提で、以下 7 run は同一環境で連続実行。
+- **連続実行 (head `f2370c95`、foreground、7 回)**:
+
+| run | rc | 実時間 | 開始時 load (1 分値) | 結果 | step 6h CDP timeout |
+|---|---|---|---|---|---|
+| 1 | 0 | 308 s | 0.61 | ALL PASS | 0 |
+| 2 | 0 | 212 s | 2.90 | ALL PASS | 0 |
+| 3 | 0 | 212 s | 2.54 | ALL PASS | 0 |
+| 4 | **1** | 204 s | 3.12 | FAIL (step 6h `stress.sh` で `agent-browser eval: CDP command timed out: Runtime.evaluate`) | **1** |
+| 5 | 0 | 212 s | 1.79 | ALL PASS | 0 |
+| 6 | 0 | 210 s | 2.01 | ALL PASS | 0 |
+| 7 | 0 | 210 s | 2.35 | ALL PASS | 0 |
+
+- **run4 の失敗**: step 6h (GUI-8 長時間ストレス) で CDP 呼び出しがタイムアウトし、`stress.sh` が非 0 で終了して e2e が rc 1。step 1〜6g は run4 でも PASS。他 6 run の 6h は PASS。前回 run の失敗 (`0e9fcaae` 測定 run5) と同一の症状で、2 回の再現を確認。失敗の再現条件 (負荷・eval 待ち時間) は未特定。
+- **前回 (`0e9fcaae`、6 回) との比較**: rc 0 は 5/6 (CDP timeout 1 件)。今回は rc 0 が 6/7 (CDP timeout 1 件)。通算 13 回中 rc 0 は 11 回、CDP timeout は 2 回。
+- **判定**: 受入条件 2 (n≥10 連続 rc 0) は **未達** (同一 head の連続実行は 7 回。run4 で中断ではなく rc 1 として記録)。10 連続の取得は fix モードの時間上限 (40 分) を超えるため、本 run では 7 回で打ち切った。受入条件 1 (6h の CDP タイムアウト原因の特定) は **未達**。受入条件 3 (#740 の修正前 ASan 再現ログ) は **未達** (未取得)。
+- 未解決の起票先: #1217 (本 issue を open のまま残す)。
+
 ## 11 追補 3. e2e.sh ALL PASS の連続実測 (#186 受入条件 3 点目、run 186-e2e-stability)
 
 測定 commit: origin/main `80c32a06` (コード HEAD。以後コード差分 0)。クリーン worktree `186-e2e-stability`、`build/` 無し。`TMPDIR=$RUNNER_TEMP`、`bash tools/gui/e2e.sh` を foreground で同一 HEAD に 10 回連続実行。素材: fl-win64・toolchain-retdec・toolchain-emsdk を `ls` で実在確認、`/opt/retdec`・`/opt/emsdk` 展開済み。前提: `gcc-mingw-w64-x86-64` 導入済み、`pnpm install --frozen-lockfile` 済み。

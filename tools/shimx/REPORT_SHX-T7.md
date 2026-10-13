@@ -115,6 +115,23 @@
 - 除外: `tools/liftlib/work/cab238/p1_only/work/ott_m8.ll` は正規化前の時点で `%p1r_1801209c9_cl1` が未定義 (clang error)。診断用の派生物で正規の成果物ではないため対象外。
 - `sig_test.sh` (HEAD 36edc993, `env -u EMSDK`): **ALL PASS**, 24.1 s, load average 0.65→0.75。(a)〜(h) すべて OK
 
+**実 IR 再実測 (2026-10-13, Actions runner, HEAD dee0e1ee = origin/main 起点の `173-sig-verify-ci`, `env -u EMSDK` 無し・emsdk source 経由, 素材 work-m11 / work-m6-ott / work-liftlib / work-liftlib-targets / fl-win64 / toolchain-* 展開済み)**:
+
+| IR | 正規化前 mismatch | adapter / 重複統合 | unresolved | 正規化後 mismatch | sig_gate 所要 |
+|---|---|---|---|---|---|
+| `tools/m11/work/boot_final2.ll` | 1 | 1 / 1 | 0 | **0** | 9.96 s |
+| `tools/m11/work/boot_final3.ll` | 1 | 1 / 1 | 0 | **0** | 11.27 s |
+| `tools/m8/work/ott_m8.ll` | 0 | 0 / 0 | 0 | **0** | 5.66 s |
+| `tools/liftlib/work/ott_leaf/ott_leaf_fixed.ll` | 0 | 0 / 0 | 0 | **0** | — |
+| `tools/liftlib/work/fa_gain/fa_gain_fixed.ll` | 0 | 0 / 0 | 0 | **0** | — |
+| `tools/targets/freshair/work/lift_gain/gain_lift.ll` | — | — | — | **対象外** (下記) | — |
+| `tools/liftlib/work/fa_gain/fa_gain.drc.ll` | — | — | — | **対象外** (下記) | — |
+
+- **前回 (36edc993 時点) と差が出た点**: boot_final2/3 で adapter `@__shx_sig_midiOutShortMsg` が 1 件ずつ発火した。`midiOutShortMsg` の shimx 署名は、36edc993 の `(i64, i32)` から #179 (winmm midi 実装, main 取込) で `(i32, i32)` に変わっている (`data/sigs.json`)。IR は `declare i32 @midiOutShortMsg(i64, i32)` のため、adapter は `%a0` を `trunc i64 → i32` する。
+- **未解決 (本 issue の残件)**: この `trunc` は HANDLE の上位 32bit を落とす。shimx 側 `midiOutOpen` は `uintptr_t` (wasm32 で 4 バイト) で HANDLE を発行するため、発行元と IR 側の値が 32bit に収まる限り実害は無いと推定されるが、**未検証**。実 IR の値域は本 run の IR 静的解析では確定できない。検証には IR 実行 (trap・値の追跡) が要る。
+- **対象外 (gate 以前の失敗)**: `tools/targets/freshair/work/lift_gain/gain_lift.ll` は `declare i64 @function_1803ded20` が 7 行目と 359 行目で重複し、raw 段階で `invalid redefinition` (IR 不正・署名とは無関係)。`tools/liftlib/work/fa_gain/fa_gain.drc.ll` は target と合わない datalayout で clang が backend crash (raw 段階)。どちらも `fa_fix_gain` / `ir5_patch` 等の前処理を通した派生物 (`*_fixed.ll`) で代替して検証した (上表の fixed 版は mismatch 0)。
+- `test/sig/sig_test.sh` (HEAD dee0e1ee, `env -u EMSDK`): **ALL PASS**, 15.3 s, load average 0.14→。(a)〜(h) すべて OK。
+
 **Kilohearts / Fresh Air plugin lift IR の実測 (#966, 2026-10-13, Actions runner, HEAD cf0a08bf (origin/main), `env -u EMSDK`, 素材 plugins-kilohearts / plugins-freshair / toolchain-retdec / toolchain-emsdk 展開済み)**:
 
 | IR (RetDec 生成) | 前処理 | 正規化前 mismatch | adapter / 重複統合 | unresolved | 正規化後 mismatch | sig_gate 所要 |
