@@ -246,3 +246,5 @@ OTT_ULP_TOL=2 bash tools/ott/ott_e2e.sh  # 許容 ulp 指定
 
 - x64 の回帰は**未実測**: fl-win64 素材に x64 の PE が無く、plugins-ott の展開物にも OTT DLL が無い (インストーラのみ)。 変更は ia32 でのみ成立する条件 (`IA32 and ...`) で、x64 の出力は構造上不変と推定。 差分確認は OTT DLL 素材で行うこと。
 - 未解決: (1) 0x10001300 の case 内 x87 `fmul` 1 件 (unsup)。 (2) 受入 1 の「main」(0x10007ca0) は jump table を持たない (`call esi` のみ) ため、main 自体は表の検証対象にならない。 PM が受入の対象関数を再定義する必要あり。 (3) x64 の回帰は OTT DLL 素材が無く未実測。
+
+## 15. #1200 — 相対化 (OTT_RELOC=1): 既定 base 同一性のみ (b5d7663c)。N=16・別 base・crtinit chain 未実施 → #1200。詳細 `tools/ott/REPORT_APPENDIX_1200.md`

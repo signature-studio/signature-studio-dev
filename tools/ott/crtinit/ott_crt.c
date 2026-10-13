@@ -29,20 +29,24 @@
 #define RET() (R[RSP] += 8)
 
 /* ---- guest 側 image data への書き込み (ott_data_install 後に呼ぶこと) ---- */
-#define COOKIE_ADDR 0x30260ce0ull          /* = 0x30000000 + 0x260ce0 */
-#define APISET_TABLE 0x3026c9f0ull
+/* guest image 内の番地は RVA (image VA - 0x180000000) で持ち、ott_gbase (wasm 上の base) を足して使う。
+ * 既定 base 0x30000000 では従来の絶対番地 (0x30260ce0 等) と同一値になる。 */
+#define GADDR(rva) (ott_gbase + (rva))
+#define COOKIE_RVA 0x260ce0ull
+#define APISET_TABLE_RVA 0x26c9f0ull
 #define APISET_N 32
-#define FLS_INDEX_ADDR 0x302610e4ull
-static const uint64_t ENCODED_SLOTS[] = { 0x3026c028, 0x3026c388, 0x3026cb40, 0x3026cb88 };
-#define N_ESLOT (sizeof(ENCODED_SLOTS) / sizeof(ENCODED_SLOTS[0]))
+#define FLS_INDEX_RVA 0x2610e4ull
+#define TRAMP_RVA 0x2f9000ull            /* trampoline 窓 (FlsAlloc = +0x00, 以下 16 B 刻み) */
+static const uint64_t ENCODED_SLOT_RVA[] = { 0x26c028, 0x26c388, 0x26cb40, 0x26cb88 };
+#define N_ESLOT (sizeof(ENCODED_SLOT_RVA) / sizeof(ENCODED_SLOT_RVA[0]))
 
 /* MXCSR の software shadow (stmxcsr/ldmxcsr 用) は rt/ott_cpu.c の ott_mxcsr (既定 0x1f80) を共有 */
 
 void ott_crt_init_tables(void) {
-    uint64_t cookie = LD64(COOKIE_ADDR);
-    for (int i = 0; i < APISET_N; i++) ST64(APISET_TABLE + 8 * (uint64_t)i, cookie);
-    for (unsigned k = 0; k < N_ESLOT; k++) ST64(ENCODED_SLOTS[k], cookie);
-    ST32(FLS_INDEX_ADDR, 1u);              /* __FlsIndex = FlsAlloc 第 1 return (native と共有の選択) */
+    uint64_t cookie = LD64(GADDR(COOKIE_RVA));
+    for (int i = 0; i < APISET_N; i++) ST64(GADDR(APISET_TABLE_RVA + 8 * (uint64_t)i), cookie);
+    for (unsigned k = 0; k < N_ESLOT; k++) ST64(GADDR(ENCODED_SLOT_RVA[k]), cookie);
+    ST32(GADDR(FLS_INDEX_RVA), 1u);        /* __FlsIndex = FlsAlloc 第 1 return (native と共有の選択) */
 }
 
 /* ---- TLS/FLS slot (native k_TlsGetValue/TlsSetValue と同一意味論) ---- */
@@ -72,20 +76,20 @@ void imp_GetProcAddress(void) {
         }
         buf[sizeof(buf) - 1] = 0;
         const struct { const char* n; uint64_t fn; } T[] = {
-            {"FlsAlloc", 0x302f9000ull},
-            {"FlsFree", 0x302f9010ull},
-            {"FlsGetValue", 0x302f9020ull},
-            {"FlsSetValue", 0x302f9030ull},
-            {"TlsGetValue", 0x302f9020ull},
-            {"TlsSetValue", 0x302f9030ull},
-            {"InitializeCriticalSectionEx", 0x302f9040ull},
-            {"GetSystemTimePreciseAsFileTime", 0x302f9050ull},
+            {"FlsAlloc", TRAMP_RVA + 0x00},
+            {"FlsFree", TRAMP_RVA + 0x10},
+            {"FlsGetValue", TRAMP_RVA + 0x20},
+            {"FlsSetValue", TRAMP_RVA + 0x30},
+            {"TlsGetValue", TRAMP_RVA + 0x20},
+            {"TlsSetValue", TRAMP_RVA + 0x30},
+            {"InitializeCriticalSectionEx", TRAMP_RVA + 0x40},
+            {"GetSystemTimePreciseAsFileTime", TRAMP_RVA + 0x50},
         };
         for (unsigned k = 0; k < sizeof(T) / sizeof(T[0]); k++) {
             const char* a = T[k].n;
             unsigned j = 0;
             while (a[j] && a[j] == buf[j]) j++;
-            if (!a[j] && !buf[j]) { fn = T[k].fn; break; }
+            if (!a[j] && !buf[j]) { fn = GADDR(T[k].fn); break; }
         }
     }
     R[RAX] = fn;

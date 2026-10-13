@@ -36,7 +36,7 @@ void ott_unsup(uint64_t addr, const char* what) {
     fprintf(stderr, "[ott] UNSUPPORTED instruction at %#llx: %s\n", (unsigned long long)addr, what); abort();
 }
 void ott_unlifted(uint64_t va) {
-    fprintf(stderr, "[ott] call to UNLIFTED function %#llx (shifted VA; RVA %#llx) ret=%#llx\n", (unsigned long long)va, (unsigned long long)(va - 0x30000000ull), (unsigned long long)LD64(R[RSP])); abort();
+    fprintf(stderr, "[ott] call to UNLIFTED function %#llx (shifted VA; RVA %#llx) ret=%#llx\n", (unsigned long long)va, (unsigned long long)(va - ott_gbase), (unsigned long long)LD64(R[RSP])); abort();
 }
 void ott_badjump(uint64_t addr, uint64_t target) {
     fprintf(stderr, "[ott] bad jump at %#llx target %#llx\n", (unsigned long long)addr, (unsigned long long)target); abort();
