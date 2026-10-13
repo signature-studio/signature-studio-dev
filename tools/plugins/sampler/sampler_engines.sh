@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # sampler の C++ engine / 単体 DLL (targets.py の engines: Fruity Slicer 2 の engine 23664・GMS 23677) の全 .pdata lift の到達性実測。
 #   bash tools/plugins/sampler/sampler_engines.sh [--collect]
-# 既定: engine を **1 本ずつ逐次** に engine_lift.sh で lift し、work/sampler/engines.csv にまとめて judge.py engines で判定する。
-#   (RetDec の C バックエンドは 2.1 MB の engine 1 本で 8 GiB 超・10 分超 → 15 GiB の runner で 2 本並列は余裕が無い)
-#   FROM_LL="23664": そのブロックは RetDec を走らせず既存の engine<block>/e.drc.ll から後段だけ実行 (lift_from_ll.sh)
+# 既定: engine を 2 本並列に lift_from_ll.sh (RetDec は .ll 書き出し後に止める → 後段 pass 鎖) → emcc -c で lift し、
+#   work/sampler/engines.csv にまとめて judge.py engines で判定する。 RetDec の C バックエンドを待つ lift_ranges.sh 直行は
+#   Fruity Slicer 2 の engine 1 本で 10 分超・8 GiB 超 (REPORT §5) のため使わない。 FULL_RETDEC=1 なら lift_ranges.sh を使う (逐次実行を推奨)
 # --collect: lift せず work/sampler/engine<block>/summary.csv を集計して判定だけ行う (別プロセスで lift 済みの時)
 # 判定: 計測が成立したか (judge.py engines)。 不成立なら exit 1。 emcc -c の成否は判定外 (到達性の実測値)
 set -euo pipefail
@@ -14,11 +14,13 @@ read -r -a ENGINES <<< "$(python3 sampler/targets.py engines)"
 EL="$(IFS=,; echo "${ENGINES[*]}")"
 mkdir -p work/sampler
 if [ "${1:-}" != "--collect" ]; then
+  L=sampler/lift_from_ll.sh; [ "${FULL_RETDEC:-0}" = 1 ] && L=lift/lift_ranges.sh
   for eb in "${ENGINES[@]}"; do
-    L=lift/lift_ranges.sh
-    case " ${FROM_LL:-} " in *" $eb "*) L=sampler/lift_from_ll.sh ;; esac
-    LIFT="$L" bash sampler/engine_lift.sh "$eb" 900 > /dev/null
+    rm -rf "work/sampler/engine$eb"
+    ( LIFT="$L" bash sampler/engine_lift.sh "$eb" 900 > /dev/null ) &
+    [ "${FULL_RETDEC:-0}" = 1 ] && wait
   done
+  wait
 fi
 echo "block,pdata_funcs,lift_rc,defines,f80_funcs,unimpl_helpers,emcc_c_rc,fixcmp_patched,emcc_c_rc_after_fixcmp,lift_s,missing_define,missing_bytes,missing_ref,extra_inside,function_defines" > work/sampler/engines.csv
 for eb in "${ENGINES[@]}"; do
