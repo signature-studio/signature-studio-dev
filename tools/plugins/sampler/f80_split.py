@@ -21,18 +21,36 @@ def body_f80(path):
             out[cur] += 1
     return out
 
-def x87_of(pe, base, md, ranges, va):
+def func_ends(pe, base):
+    ends = {}
+    for e in getattr(pe, 'DIRECTORY_ENTRY_EXCEPTION', []) or []:
+        s = e.struct
+        ends[base + s.BeginAddress] = base + s.EndAddress
+    return ends
+
+def x87_of(pe, base, md, ranges, va, ends):
     for r in ranges:
         a, b = r
         if a <= va < b:
-            code = pe.get_data(a - base, b - a)
-            return sorted({i.mnemonic for i in md.disasm(code, a) if i.mnemonic.startswith('f')})
+            end = min(ends[va], b) if va in ends else b
+            code = pe.get_data(va - base, end - va)
+            out = set()
+            for i in md.disasm(code, va):
+                if i.address >= end:
+                    break
+                if i.mnemonic.startswith('f'):
+                    out.add(i.mnemonic)
+                if va not in ends and i.mnemonic.startswith('ret'):
+                    break
+            return sorted(out)
     return None
 
 def main():
     pe_path, rng_path, lls = sys.argv[1], sys.argv[2], sys.argv[3:]
     pe = pefile.PE(pe_path, fast_load=True)
+    pe.parse_data_directories(directories=[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_EXCEPTION']])
     base = pe.OPTIONAL_HEADER.ImageBase
+    ends = func_ends(pe, base)
     md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
     ranges = [tuple(int(x, 16) for x in r.split('-')) for r in open(rng_path).read().strip().split(',')]
     for ll in lls:
@@ -43,7 +61,7 @@ def main():
             va = int(k.rsplit('function_', 1)[1], 16) if k.startswith('function_') else None
             if va is None:
                 continue
-            print(f'  {k}: machine x87 mnemonics={x87_of(pe, base, md, ranges, va)}')
+            print(f'  {k}: machine x87 mnemonics={x87_of(pe, base, md, ranges, va, ends)}')
 
 if __name__ == '__main__':
     main()
