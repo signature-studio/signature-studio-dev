@@ -375,3 +375,23 @@ review `b9f0b32b` の指摘 1 (S1) と 2 (run.mjs のコメント) への対応�
 | 実ブラウザ host 結線 (`GuiHost.attach`・FL ワーカ化・UI スレッドのスタック量 §2-2 #8) | node の headless host のみ。描画 (#32) は別 | #32 / #121 |
 | `tools/m11/m11_e2e.sh` が PE パスを `[ANALYSIS-DIR]` の固定既定値で持つ (`[WIN64]` 経由にしていない)。`m11_gen_ir2.sh` は本 PR で `FL_WIN64_DIR` 参照に変更済み | `m11_e2e.sh` を直接使うと runner では ldfix が黙ってスキップされ数値が変わる。本 PR の測定は `m11_gen_ir2.sh` (FL_WIN64_DIR 経由) を使う | m11_e2e.sh に `FL_WIN64_DIR` 参照を入れる件は PM 起票依頼 (#132 の未解決と同件) |
 | 前回 run で観測した selftest (ASAN) の `heap-use-after-free` (`gui_headless` の描画スレッドと `surf_free`。前 run で約 2/8 で再現) | 本 HEAD の 3 回では再現せず (433/0 ×3)。HEAD 7d44c033 の 1 回 (500/0) でも再現せず。main 側の #489 系 (headless surface UAF) の merge を含む HEAD での結果。再現率の定量確認は未実施 | PM 起票依頼 (gui_headless の描画と surf_free の排他) |
+
+## 6e. 再測定と main 切り分け (PR #577 の PM 指示 1・2。測定 commit `a88aabfa`)
+
+測定対象のコード差分は `22062917` 以降 0 (`git diff 22062917 a88aabfa -- tools/gui tools/m11` は `results/` のみ)。`a88aabfa` は `results/baseline_boot.json` と `results/ir_sha256.txt` の再生成のみ commit。
+
+| 実行 (foreground・1 回・rc は実測) | rc | 所要 | 結果 |
+|---|---|---|---|
+| `flengine/e2e.sh` (HEAD `22062917`、`pnpm install` 前は gui/e2e.sh のみ tsc 欠落) | **1** | 304 s (load 1.00→1.00) | judge **13/14**。S1 FAIL `870/1/47/24/0` (base `872/1/47/22/0`)。他 13 PASS。P1 `RegisterClassW=3`、P4 `hwnd=0x110000f`、P5 `hwnd=0x110000e`。ネガコン N1〜N9 期待どおり FAIL |
+| `flengine/e2e.sh` (**origin/main `c6f70c98`**、検証用 worktree `work/main_wt`) | **1** | — | **main 単体は build 段で停止**: `wasm-ld: duplicate symbol: GetMonitorInfoW` (#1096 `6f979463` の `tools/m11/m11_win.c` と `tools/gui/build/gui_adapt_w32.c` の重複)。S1 まで到達せず |
+| 同 (main、重複 2 関数 `GetMonitorInfoW`・`EnumDisplayMonitors` を scratch で削除。**コミットしない**) | **1** | 301 s (load 1.00→1.00) | judge **13/14**。**S1 FAIL `870/1/47/24/0` (base `872/1/47/22/0`)**。S1 の値は HEAD と同一 |
+| `gui/e2e.sh` (HEAD `a88aabfa`、`pnpm install --frozen-lockfile` 後) | **0** | 139 s (load 2.60→1.60) | ALL PASS (selftest 506/0、stress negctl 2/2 exit 1、text/pe_image/present/input ALL PASS) |
+| `m11/ldfix/f4_e2e.sh` (HEAD `a88aabfa`) | **0** | 249 s (load 1.04→1.27) | 6 gate PASS (F1/F2/D1/D2/P1/A1)。ネガコン 4/4 期待行付き FAIL。RegisterClassW pre 2 / noand 2 / post 3。survey `870/1/47/24` |
+
+**切り分けの結論 (PM 指示 1)**: S1 FAIL は main でも同じ値で再現する。したがって **この PR の変更が原因ではない**。S1 の判定は緩和していない (FAIL のまま)。原因特定は子 issue **#1442** (`[GUI-21]`、親 #564) に起票。#1275 ([M11-N78]) とは対象 unit が一致するが、同系統かは未確認。
+
+注記: main の build 段の重複は scratch の削除で回避しただけで、main 側の修正は行っていない。起票先は本 PR の範囲外 (`#1096` の作者 / m11 系の PM 判断)。
+
+**ret 値の IR 併記 (PM 指示・受入条件 3)**: `function_52a7f0` の ret は IR ごとに異なる値。どの IR の値か:
+- `f4_e2e.sh` の post IR (`m11_gen_ir2.sh` → `m11_build.sh`、wndseed 無し): **`0x110000f`**
+- `flengine/e2e.sh` の最終 IR (wndseed 込み。`m11_wndseed.sh` を実行): **`0x1100010`** (§6d-2)
