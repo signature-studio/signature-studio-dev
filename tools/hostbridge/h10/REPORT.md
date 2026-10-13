@@ -2,7 +2,7 @@
 
 > 正本: `tools/hostbridge/h10/REPORT.md`。書式仕様は `tools/hostbridge/nfo/FORMAT.md` §8 (本解析で更新)。親 #99 (H9)。
 
-最終更新 2026-10-13 / 検証起点 commit は §6 / 再現: `bash tools/hostbridge/h10/h10_e2e.sh` (exit 0 = 全 PASS。前提: `FL_WIN64_DIR` に fl-win64 展開済み。Ghidra 不要)。evidence の再生成: `bash tools/hostbridge/h10/analysis/reproduce.sh` (Ghidra 12.1.4 + JDK 21 必須、`REGEN_FLE=1` で FLEngine 側も)。
+最終更新 2026-10-13 / 検証起点 commit・実測は §6 / 再現: `bash tools/hostbridge/h10/h10_e2e.sh` (exit 0 = 全 PASS。前提: `FL_WIN64_DIR` に fl-win64 展開済み。Ghidra 不要)。evidence の再生成: `bash tools/hostbridge/h10/analysis/reproduce.sh` (Ghidra 12.1.4 + JDK 21 必須、`REGEN_FLE=1` で FLEngine 側も)。
 
 既知類型との関係 (`docs/DEFECTS.md`): 該当なし (静的解析のみで lift・IR pass を使っていない)。
 
@@ -99,7 +99,27 @@ reader が読む id の表は上のとおり (`h10_check.py` が dispatch tree �
 
 検証起点 commit・実測は下表 (コミット済み HEAD の clean worktree で実行)。
 
-<!-- VERIFY-TABLE -->
+検証起点 commit: **`cf2ddd4`** (コード・evidence・文書が確定した commit。以降の commit は本表の数値追記のみ)。`$RUNNER_TEMP` 配下の detached worktree (`git worktree add --detach … cf2ddd4`、`work/` なし = venv 新規作成から) で実行、4 コア runner、fl-win64 展開済み (`FL_WIN64_DIR`)。
+
+| 実行 | 結果 | 所要 (wall) | load average (1/5/15 分) 開始 → 終了 |
+|---|---|---|---|
+| `bash h10_e2e.sh` 1 回目 (venv 新規作成込み) | exit 0 | 50.13 s | 0.02 0.48 0.75 → 0.58 0.56 0.76 |
+| 同 2 回目 | exit 0 | 49.96 s | 0.58 0.56 0.76 → 0.82 0.63 0.77 |
+| 同 3 回目 | exit 0 | 50.12 s | 0.82 0.63 0.77 → 0.92 0.69 0.79 |
+| 範囲 (n = 3) | exit 0 × 3 | **49.96–50.13 s** | 並列数 1 (他 run なし) |
+
+| 検査 | 実測 |
+|---|---|
+| PE バイト検査 `h10_check.py` (fw_a + fw_b) | **62 PASS / 0 FAIL** (31 × 2 build) |
+| FLEngine PE バイト検査 `fle_check.py` | **15 PASS / 0 FAIL** |
+| evidence 文面検査 `evidence_check.py` | **19 PASS / 0 FAIL** |
+| ネガティブコントロール | **10 / 10 検出** |
+| typecheck (`tsc -p h10/tsconfig.json`) | エラー 0 |
+| reader 模型 test (`node --test test/*.test.ts`) | tests 10 / pass 10 / fail 0 / skipped 0 |
+| 既存 `nfo_e2e.sh` (`SKIP_H4=1`、本 PR の文書変更後) | exit 0 (回帰なし。`SKIP_H4=1` は Chrome 段 `h4_e2e.sh` を除外) |
+
+別アルゴリズムによる突合: `h10_check.py` (capstone で dispatch tree を asm から抽象実行) と `evidence_check.py` (Ghidra decompile 文面の正規表現) は同じ主張を独立に検査する。record 57 の「唯一の使用は bitness 不一致分岐」は前者が PE バイト、後者が decompile から確認。
+
 
 数え方: 「checks」= 各 `*.py` が出す `PASS`/`FAIL` 行数 (h10_check は build ごとに 31 件 × 2 build = 62、fle_check 15、evidence_check 19)。「neg」= `--break <key>` で期待表の 1 要素を壊し、検査が FAIL を検出した数 (検出 = exit 0)。reader 模型 test = `node --test test/*.test.ts` の `tests`。
 
@@ -124,7 +144,7 @@ reader が読む id の表は上のとおり (`h10_check.py` が dispatch tree �
 | FL 側 msg 7 handler の特定 (`fle:0x915750` の呼出元 `0x12b9e70` / `0x13173a0`、後者 (71,339 B) は decompile が timeout (120 s)) と、Wrapper 問い合わせ書式 (§4-B) が生成 DB を引けるかの実行検証 | 「起動できる」の最終確認 (段 B) | (a) #267 [HB-H4d] にコメント |
 | `tools/flp` の `kind` 呼称・id 50 必須・id 57/58 の扱い | 実データ解析で誤ラベル | (a) #110 [L-7] にコメント |
 | `block23676` (Wrapper 別ビルド) の Ghidra 解析と差分の意味 | 本解析は PE バイト検査のみ | (a) #94 [HB-H4] にコメント |
-| version 8 は ANSI: 非 ASCII の plugin 名/パスは `CP_ACP` 依存 | wasm 側 shim の codepage 選択 | (b) 新規子チケット (本 PR 本文に番号を記載) |
+| version 8 は ANSI: 非 ASCII の plugin 名/パスは `CP_ACP` 依存 | wasm 側 shim の codepage 選択 | (b) 新規子チケット #549 [HB-H14] |
 | record 2 の個別 option bit の名前 (binary 由来の特定) | option を生成器から指定したい場合のみ | (c) 親 #99 への提案 (現状は 0x400000 で既定任せ) |
 
 ## 8. 次タスク提案
