@@ -98,8 +98,10 @@ def emit_insn(fl, i, ):
         m = m[5:]
     if m.startswith('rep'):
         inner = m.split(' ', 1)[1] if ' ' in m else ''
-        if inner in ('stosb', 'stosd', 'stosq'):
-            return h_rep_stos(fl, i, inner)
+        if inner in ('stosb', 'stosw', 'stosd', 'stosq'):
+            return h_rep_str(fl, i, 'stos', inner)
+        if inner in ('movsb', 'movsw', 'movsd', 'movsq'):
+            return h_rep_str(fl, i, 'movs', inner)
         raise Unsupported('rep prefix ' + m)
     ops = i.operands
     O = ops
@@ -124,24 +126,32 @@ def emit_insn(fl, i, ):
 def h_nop(fl, i, m, O): return False
 
 
-def h_rep_stos(fl, i, kind):
-    """rep stos{b,d,q}: while(rcx){ [rdi]=al/eax/rax; rdi+=sz; rcx-- } (DF=0 前提, cld/std は未対応)
+def h_rep_str(fl, i, op, kind):
+    """rep stos{b,w,d,q} / rep movs{b,w,d,q}: while(rcx){ 1 要素 [rdi]=al/ax/eax/rax (movs は [rdi]=[rsi]); rdi+=n; (rsi+=n); rcx-- }
+    (DF=0 前提, cld/std は未対応)。要素逐次処理なので rdi/rsi の重なりも命令仕様どおり。
 
     rcx はループ頭で **毎回ロード** する (ループ持ち回し変数)。初期値を一度だけ読んで
     `rcx0-1` を毎回書くと rcx0>1 のとき終了条件が成立せず無限ループになり OOB する
     (FA-2c で実測: __chkstk 内の rep stosb → wasm memory access out of bounds)。"""
-    sz = {'stosb': 8, 'stosd': 32, 'stosq': 64}[kind]
-    vreg = {8: 'al', 32: 'eax', 64: 'rax'}[sz]
+    bits = {'b': 8, 'w': 16, 'd': 32, 'q': 64}[kind[-1]]
+    nb = bits // 8
+    vreg = {8: 'al', 16: 'ax', 32: 'eax', 64: 'rax'}[bits]
     loop = fl.tmp_lbl(); done = fl.tmp_lbl()
     r0 = fl.t(); fl.e('%s = load i64, ptr %%R_rcx' % r0)
     z0 = fl.t(); fl.e('%s = icmp eq i64 %s, 0' % (z0, r0))
     fl.e('br i1 %s, label %%%s, label %%%s' % (z0, done, loop))
     fl.lines.append('%s:' % loop)
-    val = fl.rd_reg(vreg)
+    if op == 'movs':
+        src = fl.g_get64('rsi')
+        sp = fl.t(); fl.e('%s = inttoptr i64 %s to ptr' % (sp, src))
+        val = fl.ld(sp, bits)
+        s2 = fl.t(); fl.e('%s = add i64 %s, %d' % (s2, src, nb)); fl.g_set64('rsi', s2)
+    else:
+        val = fl.rd_reg(vreg)
     dst = fl.g_get64('rdi')
     p = fl.t(); fl.e('%s = inttoptr i64 %s to ptr' % (p, dst))
-    fl.st(p, val, sz)
-    d2 = fl.t(); fl.e('%s = add i64 %s, %d' % (d2, dst, sz // 8))
+    fl.st(p, val, bits)
+    d2 = fl.t(); fl.e('%s = add i64 %s, %d' % (d2, dst, nb))
     fl.g_set64('rdi', d2)
     rc = fl.t(); fl.e('%s = load i64, ptr %%R_rcx' % rc)   # 現在値 (ループ持ち回し)
     c2 = fl.t(); fl.e('%s = sub i64 %s, 1' % (c2, rc))

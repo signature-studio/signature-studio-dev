@@ -2,7 +2,7 @@
 """[engine-local] `icmp P ptr %a, %b` で片辺が i64 値 (仮引数 / i64 を返す命令) の型不整合を `inttoptr` 挿入で解消する。
 観測: C++ engine の lift IR で `%11 = icmp eq ptr %10, %arg3` (%arg3 は i64 仮引数) → clang "'%arg3' defined with type 'i64' but expected 'ptr'"。
 fix_ptr_params.py (T1 用) は仮引数型と call site のみを直し、ptr 同士の比較に混入した i64 被演算子は扱わない。
-本 pass は distortion (PLG-F6 #203) の engine lift 専用 (共有 lift 鎖には入れていない)。
+本 pass は g1 の engine lift 専用 (共有 lift 鎖には入れていない)。
 usage: engine_fixcmp.py IN.ll OUT.ll   (stderr: 修正箇所数)
 """
 import re, sys
