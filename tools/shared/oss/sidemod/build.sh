@@ -80,3 +80,18 @@ gcc -O2 -w -fPIC -shared -ffp-contract=off -include "$B/lame-wasm-config.h" $LIN
   -o "$B/lame-native.so" "$HERE/lame_side.c" $LSRC -lm
 gcc -O2 -w -o "$B/host-native" "$HERE/host.c" -ldl
 echo "[sidemod] build done"
+
+# LGL-3 (#86): 再ビルド記録 (配布する side module の FFmpeg / LAME)。configure 引数は上で実際に使った配列そのもの
+REC="$HERE/../../../legal/notices/record.mjs"
+node "$REC" --id "ffmpeg-$FFV" --name FFmpeg --version "n$FFV" --license-spdx "LGPL-2.1-or-later" \
+  --url "https://ffmpeg.org/releases/ffmpeg-$FFV.tar.bz2" --archive "$S/ffmpeg-$FFV.tar.bz2" \
+  --src-dir "$S/ffmpeg-$FFV" --license-file COPYING.LGPLv2.1 --license-file LICENSE.md \
+  --script "$HERE/build.sh" --toolchain emcc --target wasm32 \
+  --step "configure=emconfigure ./configure ${FF_ARGS[*]} --cc=emcc --cxx=em++ --ar=emar --ranlib=emranlib --nm=llvm-nm --strip=llvm-strip" \
+  --step "link=emcc -O2 -fPIC -sSIDE_MODULE=2 -o ffmpeg.wasm ffmpeg_side.c libavformat.a libavcodec.a libavutil.a"
+node "$REC" --id "lame-$LV" --name LAME --version "$LV" --license-spdx "LGPL-2.0-or-later" \
+  --url "https://downloads.sourceforge.net/project/lame/lame/3.99/lame-$LV.tar.gz" --archive "$S/lame-$LV.tar.gz" \
+  --src-dir "$S/lame-$LV" --license-file COPYING \
+  --script "$HERE/build.sh" --toolchain emcc --target wasm32 \
+  --step "configure=./configure ${LAME_ARGS[*]} --build=x86_64-pc-linux-gnu (native で config.h を生成し HAVE_XMMINTRIN_H / MIN_ARCH_SSE を落として wasm 用に使う)" \
+  --step "compile=emcc -O2 -fPIC -ffp-contract=off -include <wasm config.h> -sSIDE_MODULE=2 -o lame.wasm lame_side.c <libmp3lame/*.c (i386 / vector / logo / mpglib を除外)>"

@@ -1,0 +1,8 @@
+{"p":"Artwork/Skins/Default/Title.png","size":1000,"cat":"image","tier":"T0"}
+{"p":"Artwork/Skins/Default/BigFruit.png","size":2000,"cat":"image","tier":"T0"}
+{"p":"System/Config/Chords.map","size":2700,"cat":"data","tier":"T0"}
+{"p":"System/Config/MP3Genres.txt","size":400,"cat":"text","tier":"T0"}
+{"p":"System/Config/NamePresets_Channel.txt","size":300,"cat":"text","tier":"T0"}
+{"p":"System/Config/other.bin","size":50,"cat":"data","tier":"T2"}
+{"p":"System/Config/Thumbnails/a.png","size":6000,"cat":"image","tier":"T1"}
+{"p":"Help/index_offline.html","size":3900,"cat":"text","tier":"T1"}

@@ -38,10 +38,20 @@ typedef struct {
     ASIOTime *(*bufferSwitchTimeInfo)(ASIOTime *params, ASIOLong doubleBufferIndex, ASIOBool directProcess);
 } ASIOCallbacks;
 
-/* 報告値の既定 (ILWASAPI2ASIO_x64 実測 + worklet 128 量子化): min256/max4096/pref512/gran0 は ILWASAPI。
- * 本 shim は 128 の倍数なら何でも受理 (min=128, gran=128) — FLASIO_PROFILE_ILWASAPI=1 で ILWASAPI 値に切替。 */
+/* getBufferSize の報告値 (AU-7 #193 で既定を ILWASAPI に確定)。FLEngine は getBufferSize の min/max/granularity を読まず
+ * (0xc58970 は出力先を自フレームに取り捨て、pref だけを大域へ保存して createBuffers に渡す; REPORT §11)、報告値は FL の挙動を変えない。
+ * 既定 = ILWASAPI2ASIO_x64 実測値 (min256/max4096/pref512/gran0)。FLASIO_PROFILE_ILWASAPI=0 で shim 単体用の min=128/gran=128。
+ * createBuffers はどちらの profile でも 128 の倍数 [128,4096] を受理する (B=128 e2e のため。profile は報告値だけを変える)。 */
 #ifndef FLASIO_PROFILE_ILWASAPI
-#define FLASIO_PROFILE_ILWASAPI 0
+#define FLASIO_PROFILE_ILWASAPI 1
+#endif
+
+/* bufferSwitchTimeInfo / getSamplePosition の systemTime の意味 (AU-7 #193)。
+ * 既定 = ILWASAPI2ASIO と同じ「コールバック時刻」: (uint32)timeGetTime() ms × 1e6 ns (FLEngine は systemTime だけを読み ms に変換して
+ *        timeGetTime() と同じ時間軸で扱う; samplePosition/sampleRate は読まない)。shimx の timeGetTime は emscripten_get_now() なので同一基準。
+ * FLASIO_SYSTIME_AUDIBLE=1 = 従来の「デバイス位置が聴こえる時刻 (outputLatency 込み)」。 */
+#ifndef FLASIO_SYSTIME_AUDIBLE
+#define FLASIO_SYSTIME_AUDIBLE 0
 #endif
 
 ASIOBool  flasio_init(void *sysHandle);

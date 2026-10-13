@@ -1,0 +1,60 @@
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -1,4 +1,4 @@
+-import { createAudioHarness, type AudioHarness } from "./runtime/audio";
++import { startFlAudio, verifyToneCapture, type FlAudioSession } from "./runtime/audio_app";
+ import { setupCanvas, blitFrame, type FrameTarget } from "./runtime/canvas";
+ import { createImportForwarder } from "./runtime/imports";
+ import { instantiateWasm } from "./runtime/loader";
+@@ -40,7 +40,7 @@
+   blitFrame(target, frame);
+ }
+ 
+-let harness: AudioHarness | null = null;
++let session: FlAudioSession | null = null;
+ 
+ // ---------------------------------------------------------------------------
+ // ローダ スモークテスト (フェーズ 3)
+@@ -98,21 +98,35 @@
+ })();
+ 
+ startBtn.disabled = !crossOriginIsolated;
++// AU-9: ユーザジェスチャ (クリック) 内で FlAudioShim.attach (OPEN→ATTACH の 2 相は wasm 側コマンドで shim が実行)。
++// /?audio_capture=1 で worklet 出力をダンプし、正弦 (440/660Hz) との照合結果を window.__audio に公開する (e2e 用)。
+ startBtn.addEventListener("click", async () => {
+-  if (!harness) harness = createAudioHarness();
+-  const h = harness;
++  if (session) return;
++  startBtn.disabled = true;
++  const capture = new URLSearchParams(location.search).has("audio_capture");
+   try {
+-    await h.start();
+-    statusEl.textContent = "オーディオ: worklet 実行中 (無音スタブ)";
+-    // sample position は worklet マスター → メインは読み取り表示のみ
++    statusEl.textContent = "オーディオ: shim 起動中…";
++    const s = (session = await startFlAudio({ secs: capture ? 6 : 3600, capture, log: (m) => console.log(m) }));
+     const tick = () => {
+-      statusEl.textContent = `オーディオ: worklet 実行中 (無音スタブ) samplePos=${h.samplePosition()}`;
++      const pos = s.samplePosition();
++      statusEl.textContent = pos > 0
++        ? `オーディオ: worklet 実行中 (FlAudioShim テスト音 440/660Hz) samplePos=${pos} underruns=${s.underruns()}`
++        : "オーディオ: shim attach 済み (OPEN/ATTACH 待ち)";
+       requestAnimationFrame(tick);
+     };
+     requestAnimationFrame(tick);
++    if (capture) {
++      (window as unknown as { __audio: unknown }).__audio = {
++        verify: () => (s.capture ? { ...verifyToneCapture(s.capture, s.sampleRate), sampleRate: s.sampleRate, underruns: s.underruns() } : null),
++        // ネガティブコントロール用: 照合に使う sampleRate を係数倍してずらす (検出力の確認)
++        verifyShifted: (k: number) => (s.capture ? verifyToneCapture(s.capture, s.sampleRate * k) : null),
++      };
++    }
+   } catch (e) {
++    session = null;
++    startBtn.disabled = false;
+     statusEl.textContent = `オーディオ開始に失敗: ${String(e)}`;
+-    console.error("[harness] audio start failed:", e);
++    console.error("[audio] start failed:", e);
+   }
+ });
+ 

@@ -263,6 +263,8 @@ wasm replay: records=297 mismatch=0 -> PASS
 - 独立再計算: `python3 shim/count_fill3.py` (nm で実装シンボルを直接数えて data/ipp_sigs.json の impl 集合と照合、差 0 を assert)
 
 ### 13-5. 未解決 (起票先付き)
+> **更新 (IPP-9 #276)**: 下表の VectorSlope_64f/_32f の bit 不一致は、出力先が揃った場合について解消した (算法・検証・残課題は `shim/REPORT_IPP9.md`)。出力先が揃わない場合も IPP-11 #473 で解消した (`shim/REPORT_IPP11.md`)。以下は #263 時点の記録として残す。
+
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | `ippsVectorSlope_64f` が実 DLL と bit 不一致 (オラクル 9 ケース L={1,2,3,7,16,17,33,1000,4097} の計 **5,176 要素中 4,757 要素 = 91.9%**。ULP 距離は大半が 1〜数 ULP だが n=4097 では最大 52 ULP、最大絶対差 5.912e-12・最大相対差 5.77e-15 を検収が実測。実装は `offset + (double)i*slope` の 1 行)。実 DLL は SIMD ブロック累積経路で値を生成していると推定されるが、block8/16/32 × mul/fma × 直接積の 14 通り (work/fill7/vs*.c, vs4.txt) および増分累積 (検収の B=1..64 総当たり) を試しても n=7 は一致するが n>=16 で不一致。`ippsVectorSlope_32f` も同種で bit 再現未解決 (REPORT §4)。 | 64f の厳密 bit 一致。相対 1e-15 帯で絶対値は 1e-12 以下、FL の呼出は 49 モジュールだが音階生成用途のため実害は限定的 (推定)。 | 本チケット §13-5 に記録。win カーネル逆アセ (CPU dispatch 込み) で解明する子チケットを提案 |
@@ -445,3 +447,8 @@ V==H (it=6)、cubic との差の定量化、GetBufSize 実測。
 - `shim/test/resize_oracle.c`: GetBufSize 族に it=5/6/7 (1,800 ケース) を追加
 - `shim/verify_cab274_kernel.py` (新規, 独立再計算)、`work/resize/probe274/` (flat/spk2d/imp2d/ksweep/gbs probe)
 - spike ログ `work/resize/swv6.txt` (it=6 V-pass)、`ksw{4,5,6,7}.txt` (2D インパルス) は gitignore (再生成コマンドはスクリプト docstring)
+
+## 環境パス置換 (#364, 親 #294): 外部資産パスを tools/shared の env 定義へ
+
+- `/home/ubuntu` 絶対パス 10 行を `FL_WIN64_DIR` (`docs/REFERENCES.md` `[WIN64]`) 経由に置換。既定値は従来と同一で、env 未設定の直接起動も従来どおり動く。
+- 変更表・検証 (env なし直接起動 / 明示引数 / AVX-512 有無の実測)・未解決: [`REPORT_APPENDIX_364.md`](REPORT_APPENDIX_364.md) (本体から分割移動した全文)。

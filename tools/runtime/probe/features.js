@@ -1,5 +1,6 @@
 const R = { env: {}, wasm: {}, js: {}, memory: {}, worker: {}, audio: {}, storage: {}, threads: {} };
-const t = async (sec, k, fn) => { try { R[sec][k] = await fn(); } catch (e) { R[sec][k] = "ERR: " + (e && e.message || e); } };
+window.__partial = R; window.__step = "start";
+const t = async (sec, k, fn) => { window.__step = sec + "." + k; try { R[sec][k] = await Promise.race([fn(), new Promise((_, rej) => setTimeout(() => rej(new Error("step timeout 20s (hang)")), 20000))]); } catch (e) { R[sec][k] = "ERR: " + (e && e.message || e); } };
 const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 const feats = await (await fetch("./features.json")).json();
 

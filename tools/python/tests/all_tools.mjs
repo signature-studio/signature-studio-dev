@@ -3,10 +3,14 @@
 import fs from "node:fs";
 import { FlPython } from "../host/flpython.mjs";
 import { createMockEngine } from "../host/fl_mock.mjs";
+import { createWasmEngine } from "../host/fl_provider.mjs";
 
+// FL_ENGINE=wasm: provider/ の C 実装 (fl_api_call) を使う。既定は JS モック。
+//   wasm のとき analysis/mcp/tool_coverage.json は更新せず tool_coverage.wasm.json に書く。
 const root = new URL("../", import.meta.url);
 const ids = JSON.parse(fs.readFileSync(new URL("analysis/flapi/flapi_ids.json", root)));
-const engine = createMockEngine();
+const useWasm = process.env.FL_ENGINE === "wasm";
+const engine = useWasm ? await createWasmEngine({ flprovUrl: new URL("dist/flprov.js", root), ids }) : createMockEngine();
 const py = await FlPython.create({
   flpyUrl: new URL("dist/flpy.js", root), engine, ids,
   files: {
@@ -84,12 +88,12 @@ for (const t of tools) {
   });
 }
 // ilmcp.showHighlight に渡された Python callable (whenDone) をホスト側から呼び戻す
-const hl = engine.state.highlight;
+const hlId = useWasm ? engine.highlightCb() : engine.state.highlight?.cb?.__cb;
 let cbOk = false;
-if (hl && hl.cb && hl.cb.__cb) { const r = await py.call("fl_rt:invoke_cb", { id: hl.cb.__cb, args: [] }); cbOk = !r.err; }
+if (hlId) { const r = await py.call("fl_rt:invoke_cb", { id: hlId, args: [] }); cbOk = !r.err; }
 await py.terminate();
 const by = (s) => cov.filter((c) => c.status === s).length;
 const summary = { total: cov.length, ok: by("ok"), soft_error: by("soft-error"), raised: by("raised"), no_args: by("no-args-defined"), host_calls: engine.record.length, callback_roundtrip: cbOk };
-fs.writeFileSync(new URL("analysis/mcp/tool_coverage.json", root), J({ summary, tools: cov }, null, 1));
+fs.writeFileSync(new URL(useWasm ? "analysis/mcp/tool_coverage.wasm.json" : "analysis/mcp/tool_coverage.json", root), J({ summary, tools: cov }, null, 1));
 console.log(J(summary));
 for (const c of cov.filter((c) => c.status !== "ok")) console.log(c.status, c.name, (c.result || "").replace(/\n/g, " ").slice(0, 160));

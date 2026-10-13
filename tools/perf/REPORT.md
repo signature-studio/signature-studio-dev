@@ -7,7 +7,7 @@ emsdk 6.0.12、binaryen 133 (`results/env.json`)。
 > **⚠ 重要な前提 (検収で追記)**: 本 REPORT の OTT RTF 表 (§0/§2) は **M10 の RetDec lift 出力 = junk を生成する wasm** の速度である
 > (tools/ott f4e0514: 間接 call 54 箇所脱落等で実行経路が本来と異なり、処理量が過少)。**bit-exact な正しい lift (tools/ott 自作 x64c lifter) で再測した結果は §2.1**:
 > RTF は O2/O3 で **0.017〜0.019** (junk 版 0.025/0.017 と同程度) だが、**LTO は 1.15× しか効かず (junk 版の 17× は `__asm_*` helper が別 C ファイルだった RetDec chain 固有)**。
-> 「LTO が決定打」「0.0013 / 745 インスタンス/コア」は **bit-exact 版では成立しない**。下流の標準ビルド設定の根拠には §2.1 の数値を使うこと。
+> 「LTO が決定打」「0.0013 / 745 インスタンス/コア」は **bit-exact 版では成立しない**。下流の標準ビルド設定の根拠には §2.1 の数値を使うこと。 (組込済み: `tools/liftlib/data/std_build.json` + 署名ガード = PERF-P1 / #155、実測は `tools/liftlib/REPORT_APPENDIX_C.md` §19)
 
 ## 0. 結論
 
@@ -34,7 +34,7 @@ tools/perf/
   build/ott_build.sh      OTT (M10 最終 IR + helper C) を任意 emcc 構成でビルド (ES6 glue, node/Chrome 共用)
   build/ott_matrix.sh     最適化マトリクス 29 変種 / build/wasmopt_matrix.sh  wasm-opt 10 構成 × 3 入力
   build/m5_build.sh       M5 純 SSE カーネル (waveshaper/distortion) 7 構成 / build/m11_build.sh  M11 closure 任意 -O
-  harness/                bench_core(共通) node_one/node_bench, cdp(依存なし CDP クライアント)/server(COOP/COEP,帯域制限)/chrome_bench, ott_worklet
+  harness/                bench_core(共通) node_one/node_bench, cdp(依存なし CDP クライアント)/server(COOP/COEP,帯域制限)/chrome_bench, ott_worklet; x64c_* (§12: bit-exact OTT を node/Worker/実 AudioWorklet で計測), x64c_suite.sh + native/native_bench.* (§12 の 1 コマンド再現)
   huge/                   wasm_dup.py (実 wasm を K 倍に複製), huge_chrome.mjs (scale/cores/hints/limits/funcs/sync/idb/mem/bw/worklet/ottscale/cache)
   report/                 tables_*.mjs (表生成), compress.mjs, key.mjs, env.sh
   results/                *.jsonl (生データ 1.7MB), TABLES.md, env.json, compress.json, wasmopt_m11.tsv
@@ -122,13 +122,13 @@ M5 純 SSE カーネル (128 sample/call, µs): waveshaper O0 2.11 / O2 0.845 / 
 
 ## 5. 未解決・制約
 
-1. **junk 版の LTO 効果 (17×) は bit-exact 版に移らない** (§2.1 で 1.15×)。M5 カーネル (純 SSE) の SIMD 効果は別 (OTT x64c lift には SIMD 化余地なし)。bit-exact 版の Chrome 実測・M11 級 closure での LTO 効果は未測。
+1. **junk 版の LTO 効果 (17×) は bit-exact 版に移らない** (§2.1 で 1.15×)。M5 カーネル (純 SSE) の SIMD 効果は別 (OTT x64c lift には SIMD 化余地なし)。bit-exact 版の Chrome Worker・実 AudioWorklet 実測は §12 で実施 (LTO 1.2×)。M11 級 closure での LTO 効果は未測 (§12 未解決)。
 2. 共有ホスト (loadavg 5〜25/16C): **単発 max に 5〜6 ms の外れ値** (O3+LTO の 4 µs ブロックでも発生)=スケジューラ起因。実 underrun 評価は低負荷+実オーディオデバイスで要再測 (headless は null sink)。
-3. Chrome 自動 wasm code cache は headless で未観測 (headful 未確認)。compilationHints は「無効果」までで機序未解明 (eager/bg/lazybase ヒントで global eager 時 CPU 9.3→5.7 s、wall 2.3→3.3〜4.1 s)。
+3. Chrome 自動 wasm code cache は headless で未観測 (Xvfb headful でも未観測・実ウィンドウ/GPU 有の実機は未確認: `REPORT_P7.md`)。compilationHints は「無効果」までで機序未解明 (eager/bg/lazybase ヒントで global eager 時 CPU 9.3→5.7 s、wall 2.3→3.3〜4.1 s)。
 4. FLEngine 実体の wasm は未存在: 規模は M11 closure の K 倍複製+x86 サイズ比の**外挿 (推定)**。`-O1/-O2` の M11 は到達可能関数のみ (619〜810 関数, code 44〜53KB) になり比較に使えない。
-5. Chrome 154 (Linux, Zen5) のみ。Firefox/Safari/モバイル CPU (3〜10× 低速想定) は未測。SIMD は AVX-512 機で有利な可能性。
-6. wasm vs native 比 (M3 は crc で 1.3〜1.4×) は OTT では未測 (lift IR の VA 固定が native 側の障壁)。
-7. 動的リンク (MAIN/SIDE_MODULE, PIC 税) 未測定。
+5. Chrome 154 (Linux, Zen5) が主。Firefox 157 の compile/上限/同期 compile は `REPORT_P7.md` で測定済み。Safari/モバイル CPU (3〜10× 低速想定)・実オーディオデバイスは未測 (PERF-P7 #165 に残置)。SIMD は AVX-512 機で有利な可能性。
+6. wasm vs native 比 (M3 は crc で 1.3〜1.4×): OTT x64c 版は `tools/ott/native` の実機械語参照と同一手順で測定可能になり §12 で測定 (旧 RetDec 版 (junk) は未測)。
+7. 動的リンク (MAIN/SIDE_MODULE, PIC 税) → **PERF-P8 (#166) で合成カーネルを測定済み: 全文・表は `REPORT_P8.md`** (`bash tools/perf/p8/p8.sh`)。結論: 現行 lift (VA 固定) の plugin は plugin 別 module/instance/Memory、動的リンクは `-fvisibility=hidden` 必須 (既定 visibility の PIC 税の大きさはホスト依存)。実 OTT (x64c) / FLEngine 実体での再測は未実施。
 
 ## 6. ユーザ依頼事項
 
@@ -139,7 +139,7 @@ M5 純 SSE カーネル (128 sample/call, µs): waveshaper O0 2.11 / O2 0.845 / 
 P1 lift ビルド標準を LTO+O3+最小 export に (署名ガード付き) / P2 `__asm_*` を LLVM vector IR へ lowering (SIMD+LTO 両立) /
 P3 AudioWorklet ローダ (bytes transfer・worklet 内 compile・pre-warm・main 側 Module 保持) / P4 lifted VA の低位再配置 (initial 864MiB→数十MB) /
 P5 perf 回帰ゲート (PERF_QUICK を CI) / P6 FLEngine 実 closure の起動〜初回 audio E2E / P7 headful・Firefox・Safari・Android 再測 /
-P8 プラグイン別 module vs 動的リンクの比較 / P9 OTT 機能修復後の RTF 再測 (**node 版は §2.1 で実施済み**; Chrome・低負荷再測が残)。
+P8 プラグイン別 module vs 動的リンクの比較 / P9 OTT 機能修復後の RTF 再測 (**node 版は §2.1、Chrome Worker・AudioWorklet・低負荷・native 比は §12 で実施済み**; M11 級 closure が残)。
 
 ## 8. 再現
 
@@ -150,3 +150,100 @@ PERF_QUICK=1 bash tools/perf/perf.sh     # 代表変種・反復 1 (数分)
 ```
 注: 巨大 wasm 実験の K 倍素材は M11 の 5,655,905B スナップショット (sha256 先頭 `af1599814c9898e2`; M11 側は以後更新され得る — 現在 6,008,101B)。
 前提: `tools/m10/work/ott_m10.ll` 等 (`bash tools/m10/m10_build.sh` で生成)、`tools/m11/work/boot_final2.ll`。`work/` は gitignore (≈1.9GB)。
+
+## 9. perf 回帰ゲート (PERF-P5 / #164) — bit-exact OTT (x64c) 対象
+
+既知類型との関係: 該当なし (計測ゲートの追加。lift 自体は未変更)。検証起点 commit: `aa4306b` (クリーン detached worktree で実行。数値表は同内容の事前 commit 76fdcad (未 push) での 3 回実測、aa4306b では 1 回再実行し PASS 11/11・36 s・load 0.78〜0.98)。
+
+`bash tools/perf/gate/perf_gate.sh` (1 コマンド。CI 用 workflow は `tools/perf/gate/perf-gate.workflow.yaml.txt`) = `tools/ott/ott_e2e.sh --quick` (native 実機械語との bit-exact; 22 シナリオ・9,620 cell・max_ulp 0) → `ott_x64c_build.sh o0 o2 o3lto` → `ott_x64c_bench.mjs` を 3 反復 (変種を反復内で交互) → `gate/judge.mjs` で判定。
+判定は**相対指標のみ** (絶対 µs は参考表示): 署名 `6b1696f0` 一致・出力非ゼロ 256 cell・o0/o2 p50 比 ≥ 3.0・o2/o3lto p50 比 ∈ [0.9, 2.0]・wasm bytes 上限 (o0 1,200,000 / o2 810,000 / o3lto 780,000)。閾値は env (`GATE_*`) で上書き可。
+
+実測 (GitHub-hosted 相当 runner, node v22.23.3, loadavg 0.45〜1.40, 3 回実行・各 3 反復の中央値。`perf_gate.sh` 全体の所要 36〜38 s, 実測 3 回):
+
+| 指標 | 実測 (3 回の min–max) | 閾値 |
+|---|---|---|
+| 署名 (o0/o2/o3lto 全反復) | `6b1696f0` 一致 | 一致 |
+| o0/o2 p50 比 | 5.68〜5.80 (別途 5 反復の単体測定 5.3〜5.9) | ≥ 3.0 |
+| o2/o3lto p50 比 | 1.18〜1.20 (単体測定 1.15〜1.29) | 0.9〜2.0 |
+| wasm bytes o0 / o2 / o3lto | 1,030,416 / 707,139 / 680,905 | 上記上限 |
+| p50 µs (参考) o0 / o2 / o3lto | 328.65〜335.24 / 57.74〜57.88 / 48.39〜49.12 | 判定に使わない |
+
+ネガティブコントロール (`judge.mjs` へ入力を壊して FAIL を確認; いずれも exit 1): 期待署名を `deadbeef` → 3 件 FAIL (8/11) / o2 bytes 上限 700,000 → FAIL (707,139) / o0/o2 比下限 8 → FAIL (5.52) / o2 の p50 を 3 倍 (o2 退行の模擬) → o0/o2 1.84・o2/o3lto 3.71 で 2 件 FAIL / 1 行だけ署名を `6b1696f1` に改ざん → FAIL。
+
+パス修正 (ハードコード → `tools/shared/env.sh` / `paths.py`): `ott_e2e.sh`・`lift/lift_build.sh`・`native/ottnat.py`・`diff/count_icall.py`・`perf/flags.sh` (`EMSDK_DIR` 既定 `/opt/emsdk`)。
+
+範囲外 / 未解決:
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| **CI workflow 未設置**: GitHub App に `workflows` 権限が無く `.github/workflows/` への push が拒否された (`refusing to allow a GitHub App to create or update workflow ... without workflows permission`)。テンプレートを `tools/perf/gate/perf-gate.workflow.yaml.txt` に置いた。設置後の Actions 実行も未確認 | CI 化 (受入条件) が未達 | #164 (PM が `.github/workflows/perf-gate.yaml` へ移して設置) |
+| 閾値は 1 台の低負荷 runner の実測 (反復 3〜5) から設定。高負荷時の誤検知率は未測 | flaky 化の可能性 | #164 |
+| `perf.sh` (PERF_QUICK, junk 版 M10 RetDec) は本ゲートに含めない。Chrome・M5 カーネル・巨大 wasm は対象外 | 回帰検知範囲は x64c の node 実行のみ | #164 に分割提案 |
+| ゲートは node のみ (Chrome 計測なし) | Chrome 側回帰は検知できない | PERF-P9 (§7) |
+| runner の node は v22.23.3 (§2.1 は node 26) | 絶対値の比較は不可。比のみ判定 | — |
+
+## 10. 配信形態 (PERF-P10 / #170) — br-11 × compileStreaming の実測と現状整理
+
+既知類型との関係: 該当なし (配信計測。lift は未変更)。検証起点 commit: `e036886` (クリーン worktree・コミット済み HEAD で再実行)。
+
+**現状 (main)**: ローダは結線済み。`src/runtime/loader_boot.ts` `fetchCompile` が `fetch → WebAssembly.compileStreaming` (既定。`compile=bytes` は比較用)、`tools/runtime/stage_wasm.mjs` が hash 名 + `.br` (q11) を生成、`vite.config.ts` が `Accept-Encoding: br` に `Content-Encoding: br` で応答 (dev/preview)。大物 (>24MiB) は `deploy/client/chunked.mjs` (連結 ReadableStream → compileStreaming; 314MB 実エッジ実証は `deploy/REPORT.md`)。lazy 既定は V8 既定のまま (追加設定なし)。配信先は DECISIONS D1 で R2 → Workers Static Assets に変更済み。
+
+1 コマンド: `node tools/perf/delivery/delivery_bench.mjs [--mib 16] [--reps 3] [--mbps 100,0]` (結果 `results/delivery.json`)。ローカル HTTP サーバが `Content-Encoding: br` の有無と線上帯域 (10ms 刻み) を切替え、headless Chrome 154.0.8037.97 (Linux, 4 コア, node v22.23.3) で fetch → compileStreaming / compile(bytes) → instantiate → `f0()==42` を計測 (3 反復中央値, loadavg 0.5〜1.1, 全 24 件 PASS)。素材は合成 wasm 17,114,230B (関数 ~360B 単位のコード様バイト列; 実 lift wasm ではない) → br-11 6,214,503B (36.3%)。
+
+| 帯域 | 配信 | streaming ms | bytes ms | 線上 B |
+|---|---|--:|--:|--:|
+| 100 Mbps | 非圧縮 | 1403.6 | 1435.2 | 17,114,230 |
+| 100 Mbps | **br-11** | **516.8** | 553.8 | 6,214,503 |
+| 無制限 (loopback) | 非圧縮 | 74.0 | 90.0 | 17,114,230 |
+| 無制限 (loopback) | br-11 | 136.6 | 164.2 | 6,214,503 |
+
+- 100 Mbps では br-11 で **2.7×** 短縮 (1403.6 → 516.8 ms)。streaming は bytes より 36〜38 ms 速い (compile が転送に隠れる分)。
+- 帯域無制限では br の展開 (Chrome ネットワークスタック) が +40〜60 ms 乗る (br streaming 136.6 vs 非圧縮 74.0)。転送が支配的な回線 (≲ 数百 Mbps) で有利、ローカル/超高速回線では逆転する。
+- 圧縮率は合成素材の値 (36.3%)。実 lift wasm の brotli-11 は §0 転送行 (31.0〜37%) と `tools/runtime/DESIGN.md` (M11 3.31×) を使うこと。
+
+範囲外 / 未解決:
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| **案 S (Static Assets) で br-11 を使う経路が未確定**: `_headers` の `Content-Encoding: br` は二重エンコード (`deploy/EDGE-SIM.md` #9)、エッジ自動圧縮は zstd/br の level 不明。実エッジでの wire サイズ・`Content-Encoding` の実測が無い | 本 issue の「CDN 配信設定」が未達 | #170 に残置 (Closes しない)。実エッジ計測は Access 資格情報が必要 |
+| R2 (`legacy-r2/20-upload.mjs --precompress br`) への実 PUT・ブラウザ透過復号は未実証 (S3 キー無し) | R2 へ戻す場合のみ | `deploy/REPORT.md` §7 の既存起票 (#8) |
+| `chunked.mjs` (大物 part 連結) は `fetchCompile` 未結線 (単一 URL 前提)。part ごとの br 事前圧縮も未設計 (ヘッダ依存の透過復号が使えないため JS 側 decode が要る。Chrome 154 の `DecompressionStream` は gzip/deflate のみ・brotli/zstd 不可を実測) | >24MiB 実 FLEngine wasm の br 配信 | #170 に残置 |
+| 実 FLEngine 規模 (K=10〜100) での streaming 隠蔽効果は合成 17MB のみ。他ブラウザ/実回線は未測 | — | PERF-P9 (§7) |
+
+## 11. AudioWorklet 向け wasm ローダ (PERF-P3 / #162)
+
+既知類型との関係: 該当なし (lift 無し・ローダ + 合成 wasm の計測)。検証起点 commit: `c3cd3e8` (detached worktree で 3 回実行)。
+実装: `src/runtime/worklet_loader.ts` (main 側 API `createWasmWorkletHost` → `host.load(bytes, {prewarmBlocks, keepModule, stubImports})`・`host.firstBlocks()`・`host.probeModulePost()`) と
+`public/worklets/wasm-host-worklet.js` (processor `wasm-host`: bytes 受信 → `WebAssembly.compile` → `instantiate` → `ws_init` → pre-warm → `ws_reset` → `loaded` 通知、`process()` が最初の 16 ブロックの処理時間と先頭 4 ブロックの入出力を報告)。
+wasm ABI `ws_v1`: export `memory` / `ws_buffers()->i32` (in[128] f32 直後に out[128] f32) / `ws_process(i32)`、任意 `ws_init` / `ws_reset`。違反は `loaded` ではなく `error` で reject (e2e で確認)。
+
+e2e: `node tools/perf/loader/loader_e2e.mjs [--reps 5] [--quick]` (Chrome 起動は条件×反復ごとに新規 = NativeModule キャッシュを持ち越さない。`gen_wasm.mjs` が emcc 不要の合成 wasm を生成)。
+対象 wasm: small = 4,778 B (1000 → 64 段 IIR)、big = 33,554,432 B (1000 段 + 各段 nops 200 + 呼ばれない filler 関数 90,000 + padding section; lazy compile 対象は約 1000 関数)。OTT/FLEngine 実 wasm ではない。
+計測は 48 kHz AudioContext・headless Chrome 154 (null sink)・runner 4 コア。worklet 内は `Date.now()` のみ (**1 ms 分解能**)。
+
+検査 (7 項目、3 回とも PASS 7 / FAIL 0。所要 34.7 / 33.9 / 34.5 s、終了時 loadavg 4.5 / 5.7 / 7.7): Module 直 postMessage が messageerror になる・transfer 後に main の buffer が detach・main Module 保持・先頭 4 ブロックの出力が参照モデル (JS, 全段 fround) と bit 一致 (4 ブロック×128 サンプル・非ゼロ 128)・ABI 違反 wasm の reject。
+ネガティブコントロール: 参照への入力を 1 サンプル 0.001 ずらすと 4/4 ブロックが不一致 → FAIL 判定が効く。1000 段の初版 (係数でゲイン > 1 → Infinity) は bit 一致検査が `mism=3` で FAIL し、係数修正で解消した。
+
+| 条件 (n=5 の中央値、3 回実行の範囲) | worklet compile ms | main compile ms | roundtrip (transfer→loaded) ms | block0 ms | 最初の 16 ブロックの最大 ms |
+|---|--:|--:|--:|--:|--:|
+| small / pre-warm 0 / keep 0 | 0〜1 | - | 1.4 前後 | 0〜1 | 0〜1 |
+| big / pre-warm 0 / keep 0 | 21〜23 | - | 21.6〜29.6 | **6〜9** | **6〜11** |
+| big / pre-warm 8 / keep 0 | 20〜22 | - | 32.8〜42.8 | **0〜1** | **1〜2** |
+| big / pre-warm 0 / keep 1 | 21〜23 | 27.9〜33.2 | 21.4〜27.5 | 6〜10 | 6〜10 |
+| big / pre-warm 8 / keep 1 | 20〜21 | 29.0〜31.8 | 32.4〜41.8 | 0〜1 | 1 |
+
+- **pre-warm の効果**: 初回ブロックの処理 6〜11 ms (128f = 2.67 ms の予算の 2〜4 倍 = 初回で underrun) → 0〜2 ms。コストは load の roundtrip +11〜13 ms (pre-warm 8 ブロックの計 11〜12 ms を worklet 内で払う)。small (関数 ~65) では初回も 0〜1 ms で差は 1 ms 分解能以下。
+- **main 側 Module 保持 (`keepModule`) は lazy compile では効果なし**: worklet compile は keep 0/1 とも 21 ms 前後で変わらず、main compile (27.9〜33.2 ms) が startup 〜 first16 に**加算** (66〜75 ms → 90〜118 ms)。§3 の「main で eager compile 済みなら worklet 33 ms」は **eager (`--no-wasm-lazy-compilation`) 時の NativeModule 共有**の話で、既定 lazy では当てはまらない (本実験の Chrome は既定 flag)。→ 既定では `keepModule` は使わず、eager 設定を採るときだけ要再測。
+- load 完了から ctx.resume → 最初の 16 ブロック完了までは 25〜47 ms (small 28〜47 / big 25〜47, null sink の起動待ちが支配; wasm サイズ依存ではない)。startup→first16 (transfer 開始から計): small 32〜50 ms、big 61〜75 ms (keep 0)。
+- 再現: 上のコマンド 1 本。生データ `tools/perf/loader/work/loader_e2e.jsonl` (gitignore)。
+
+| 未解決・限界 | 影響 | 起票先 |
+|---|---|---|
+| 合成 wasm のみ。bit-exact OTT (x64c) / FLEngine 実 closure の worklet 計測は未実施 (REPORT §5.4: FLEngine wasm 未存在) | pre-warm 効果量 (6〜11 ms) は実 closure で変わる | PERF-P9 (#168: bit-exact OTT の Chrome Worker / AudioWorklet 再測) にコメント。FLEngine 実 closure の起動〜初回 audio E2E (旧 P6 案) は issue 未起票 → PM 判断で新規起票 |
+| `Date.now()` 1 ms 分解能・null sink (headless)。実デバイスの underrun 計測なし | 初回ブロック < 1 ms は判別不能・実 underrun 未評価 | PERF-P7 (#165: 実機再測) |
+| eager compile + keepModule の効果 (§3 の 481→33 ms) をローダ経由で未再測 | keepModule の採否判断 | 本 issue のコメントで PM 判断 (必要なら子チケット) |
+| `src/index.ts` / `audio.ts` (dummy-worklet) への組込みはしていない | ローダは未接続の部品 | RT / AU 系 (FLEngine 結線時) |
+
+## 12. bit-exact OTT の RTF 再測 — Chrome Worker / 実 AudioWorklet / 低負荷 / native 比 (PERF-P9 / #168)
+
+全文・表・未解決は `REPORT_APPENDIX.md` §12 (検証起点 `1f98990`、再現 `bash tools/perf/x64c_suite.sh`)。結論: **node = Chrome Worker = 実 AudioWorklet (±4%)**、AudioWorklet で 128f 時間超過 0 / 15,000 block、LTO 1.2×、native 実機械語比 3.6〜4.4×。**M11 級 closure での LTO 効果は未測** (`fl-win64` + FLEngine x64c lift が必要 → 新規 `[PERF-P12]` 起票依頼)。

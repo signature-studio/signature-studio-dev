@@ -89,14 +89,14 @@
 | Massive X | VST3 | 8 (gen) | CID `5653544e6924486d6173736976652078` (§12.5・3 源一致) | `…\VST3\Massive X.vst3` | 単一ファイルモジュール形 (moduleinfo.json 非同梱)。実機 ini 由来の vendor/category を使用 |
 
 - `ps_file_scanflags_0=1`、`ps_file_bitsize_0=64`、`ps_file_type` は実機準拠の 1 (fx) / 2 (gen) (§11.3)。32bit は載せない (bridge 不使用: HOSTBRIDGE §1.6)。
-- Wrapper→VST2 の `hint` (entry export 名) は標準名 (`VSTPluginMain`) なら不要。Kilohearts は stub 消去 (alias) で標準名に揃う。hint を DB に持たせる必要が出た場合の記録先は未特定 (§6-3)。
+- Wrapper→VST2 の `hint` (entry export 名) は常に定数 0 で供給元が無い (#218: `tools/hostbridge/h10/REPORT.md` §3-②)。標準名 (`main` / `VSTPluginMain` 系) の export が必須。Kilohearts は stub 消去 (alias) で標準名に揃う。
 - 生成量: **50 entry / 102 ファイル / 70,571 B** (決定的, `.Plugins.ini` 込み §11.3・Kilohearts 45 + spec 5)。IDB プリロードに載せても無視できる大きさ。
 
 ## 6. 未解決とブロッカー
 
 1. **Installed の実機 v2 サンプルが無く、`.nfo`/`.fst` は「FL コードが受理する形」を静的に再構成したもの**。reader 模型は decompile 準拠だが、FL 本体の実行による検証は未了 (lift 済み FL で `0x910cd0` を動かす検証は H4 以降)。
-2. Fruity Wrapper が生成 `.fst` (record 2/50/51/54/55/56 のみ) を読んで VST2/VST3 を起動できるかは未検証 (Wrapper の chunk reader は未解析; record 1/30/31/32 は Wrapper が補うと推定)。`tools/flp` の独立パーサ受理までは確認。
-3. Wrapper の VST2 `hint` (`TVSTPlugin` 第 6 引数) の供給元レコード (id 57 候補) は未特定。標準名エクスポートでは不要。
+2. ~~Fruity Wrapper が生成 `.fst` を読めるか~~ → **#218 (H10) で reader 解析済み**: chunk は Wrapper の reader に受理され、record 1/30/31/32 は不要 (Wrapper が既定値で補う)。起動可否の実行検証は #267 (`tools/hostbridge/h10/REPORT.md` §3-①・§4)。
+3. ~~Wrapper の VST2 `hint` 供給元 (id 57 候補)~~ → **#218 で解消**: id 57 = `effGetVstVersion`、hint は常に定数 0 で供給元なし (`tools/hostbridge/h10/REPORT.md` §3-②)。
 4. ~~`.Plugins.ini` の文字コード、`ps_file_date` の単位、VerifiedIDs の VST2 `id` 表現~~ → **CAB-219 で解決 (§11)**: ini = UTF-8+BOM / date = TDateTime double bits / VST2 id = magic 10 進 (キー順 `<fmt>:<bits>:<id>`)。VST3 `ps_file_filename` の**選択規則は CAB-218 で確定 (§12, FORMAT §9-3)**。
 5. VST3 CID → `ps_file_guid` の対応は §11.4 で実機確定 (テキスト = CID 文字列、bytes = Windows 配置)。Wrapper が factory へ渡す順序の実行検証は H5 で。
 6. ~~Massive X 素材なし / KH VST2 magic 未確定~~ → **KH magic は CAB-218 で実測確定 (§12.2)**。**Massive X も CAB-46 follow-up (§12.5) で spec 追加・CID 確定** (`~/ダウンロード/Native Instruments Massive X v1.7.1.exe` 解析済。moduleinfo.json は本製品に同梱されない = CID は実機 FL スキャン値を正とした)。
@@ -110,7 +110,7 @@ Windows 実機から `Installed\` 配下の **実機 v2 `.nfo` / `.fst` 単体�
 | # | チケット | 要点 |
 |---|---|---|
 | H4' (P0) | DB 組込み | ~~`generateDb()` (`.nfo`/`.fst`/`.Plugins.ini`/VerifiedIDs 生成) を仮想 FS 初期化 (起動時/ビルド時) に結線し、lift 済み FL の `0x910cd0` / `0xaba430` に生成 DB を読ませて受理を実行検証~~ — **結線まで完了 (CAB-216 §13)**。残は FL 実物 reader の実行検証のみ (§13.6・§14) |
-| H10 (P1) | Wrapper chunk reader の解析 | 生成 `.fst` の record 群を Wrapper が受理するか (hint レコード・record 1/30–32 の要否) を `fw:` 側で確定 |
+| H10 (P1) | Wrapper chunk reader の解析 | ~~生成 `.fst` の record 群を Wrapper が受理するか~~ — **完了 (#218, `tools/hostbridge/h10/REPORT.md`)** |
 | H11 (P2) | VST3 バンドルのパス規則 | ~~選択規則の突合~~ / ~~H9a / H12~~ — **完了 (CAB-215 §10 / CAB-219 §11 / CAB-218 §12)**。残は §7 の任意提供のみ |
 
 ## 9. 規約遵守メモ
@@ -372,3 +372,20 @@ CAB-215 の主眼 (writeEntry ↔ 実機比較) は **ini セクション経由�
 - **クリーン HEAD**: `git worktree add --detach work/wt_h4 HEAD` で `h4_e2e.sh` を再実行 → node 側 42 ok / 0 FAIL・`h4_recount.mjs` exit 0。**Chrome フェーズのみ `report timeout`** (入れ子 `work/wt_*` パスで spawn-server の URL 解決が失敗するハーネス事象。実装側 §13.6 の記載と一致。実ディレクトリでは 3 回連続 exit 0)。検証後の worktree は撤去済。
 
 
+
+## 15. 追記 (#347 / PR #391, 2026-10-13): nfo_e2e.sh の typecheck 破損 (TS7016) を修正
+
+既知類型との関係: 該当なし (型検査設定のみ・lift 無関係)。
+
+- `/home/ubuntu` 絶対パスの置換 (`_fl.ts`・`metrics.ts`・`h4_e2e.ts`・`real_fst_check.mjs`・`reproduce.sh`・`kh_magic_check.mjs`・`ott_fst_dump.json`) は **#362 / PR #376 (`1c54e11`, merged) で main に入っている**。#347 は #362 の重複起票で、#347 の完了根拠は「#362 で完了済み」。本 PR はこの置換を含まない。
+- 本 PR の差分: `tsconfig.json` に `allowJs: true` / `checkJs: false` を追加、`nfo_e2e.sh` の env コメント更新、本節。
+- 修正の理由: #376 で `cli/metrics.ts`・`test/_fl.ts` が `tools/shared/paths.mjs` を import するようになり、型宣言が無いため main の `nfo_e2e.sh` typecheck が TS7016 で失敗していた。`allowJs` で `.mjs` を解決する (`checkJs:false` なので `.mjs` 自体は検査しない)。
+- 検証 (検証起点: 現 main `fac2c47` vs head `563b11e`、fl-win64 展開済み・`FL_WIN64_DIR` 指定、4 コア / load 1.00、`cd tools/hostbridge/nfo && SKIP_H4=1 bash nfo_e2e.sh`):
+
+| 対象 | exit | 所要 | 結果 |
+|---|---|---|---|
+| main `fac2c47` | **1** | 0.168 s | typecheck で `cli/metrics.ts(9,27)` / `test/_fl.ts(3,28)` が TS7016 |
+| head `563b11e` | **0** | 2.635 s | typecheck 出力なし・browser-safety ok・ini 406/406・CAB-218 failed 0 |
+
+  `node --test test/*.test.ts`: main・head とも tests 40 / pass 36 / fail 0 / skipped 4 (mac コーパス `FL_MAC_DIR` 素材なしで corpus 4 件 SKIP)。Chrome 段 (`h4_e2e.sh`) は本変更と無関係のため `SKIP_H4=1`。
+- 行数: 本 REPORT は 250 行上限 (DOC_MAP §1) を main 時点で超過済み (374 行)。分割は #437 (DOCS-5) で追跡する (#378 は p0c 領域で別件)。

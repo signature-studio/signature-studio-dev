@@ -46,6 +46,19 @@ def wasm_sig(ll_path, fname):
     return sig
 
 
+def run_wasm(cjs, wasm_func, sig_path, scen_path, out_path, timeout=240):
+    """wasm 側だけを走らせて出力 (out_path) を作る (署名ガード用; native 不要)。正常 True / タイムアウト False。"""
+    try:
+        r = env.run(["node", os.path.join(HERE, "wasm_runner.mjs"), cjs, wasm_func, sig_path, scen_path, out_path],
+                    capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        open(out_path, "w").close()
+        return None
+    if r.returncode:
+        raise RuntimeError("wasm runner rc=%d: %s" % (r.returncode, r.stderr[-800:]))
+    return True
+
+
 def parse_out(path):
     res = {}
     cur = None
@@ -112,6 +125,9 @@ def run_diff(image, func_va, spec, cjs, ll_path, wasm_func, out_dir, n=None, see
             if nm in ign:
                 continue
             hb, tb = b["bufs"].get(nm, ("", "-"))
+            for (o, n_) in spec.get("mask_ranges", {}).get(nm, []):     # 環境依存値 (vtable の絶対 VA 等) を比較から除く
+                hx = hx[:2 * o] + "00" * n_ + hx[2 * (o + n_):]
+                hb = hb[:2 * o] + "00" * n_ + hb[2 * (o + n_):]
             if hx != hb or tok != tb:
                 A = bytes.fromhex(hx)
                 Bv = bytes.fromhex(hb) if hb else b""

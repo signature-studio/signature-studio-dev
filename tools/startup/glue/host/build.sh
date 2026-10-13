@@ -85,6 +85,7 @@ link)
     # 同名の export_name を持つ組 (pump_calibrate / pump_clock_offset / pump_clock_calibrated /
     # pump_set_clock_offset / pump_set_wndproc) は **C シンボル名 (_e 付き) 側** を指定する
     # (JS 名は export_name どおり _pump_xxx)。
+    EXP="$EXP,_winstubs_init,_winstubs_restart_requested,_winstubs_stats"
     EXP="$EXP,_pump_ring_addr,_pump_ring_capacity,_pump_set_wait_mode,_pump_get_wait_mode,_pump_step,_pump_wait_ms"
     EXP="$EXP,_pump_calibrate_e,_pump_clock_offset_e,_pump_clock_calibrated_e,_pump_now_raw,_pump_set_clock_offset_e,_pump_set_wndproc_e"
     EXP="$EXP,_pump_stats_addr,_pump_pop_log_addr,_pump_pop_log_count,_pump_ctrl_req_addr,_pump_ctrl_resp_addr"

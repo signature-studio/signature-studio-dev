@@ -1,0 +1,105 @@
+{
+ "name": "ott_iargs_ctor",
+ "func": "0x180127550",
+ "wasm_func": "function_180127550",
+ "scenarios": 200,
+ "steps": 1,
+ "seed": 93001,
+ "vars": [
+  {
+   "name": "am",
+   "gen": {
+    "choice": [
+     0,
+     4096,
+     65536
+    ]
+   }
+  },
+  {
+   "name": "np",
+   "gen": {
+    "mix": [
+     [
+      0.5,
+      {
+       "choice": [
+        1,
+        2,
+        16
+       ]
+      }
+     ],
+     [
+      0.5,
+      {
+       "int": [
+        0,
+        64
+       ]
+      }
+     ]
+    ]
+   }
+  },
+  {
+   "name": "npar",
+   "gen": {
+    "mix": [
+     [
+      0.5,
+      {
+       "choice": [
+        0,
+        20,
+        128
+       ]
+      }
+     ],
+     [
+      0.5,
+      {
+       "int": [
+        0,
+        255
+       ]
+      }
+     ]
+    ]
+   }
+  }
+ ],
+ "args": [
+  {
+   "ptr": "this"
+  },
+  {
+   "int": "am"
+  },
+  {
+   "int": "np"
+  },
+  {
+   "int": "npar"
+  }
+ ],
+ "buffers": {
+  "this": {
+   "size": 512,
+   "fields": []
+  }
+ },
+ "mask_ranges": {
+  "this": [
+   [
+    0,
+    8
+   ],
+   [
+    144,
+    8
+   ]
+  ]
+ },
+ "expect_match_min": 1.0
+}

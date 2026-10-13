@@ -119,3 +119,34 @@
 - **FL 起動後の再デプロイ**: `/wasm/` 配下に FL 本体 wasm (314MB 級) を `--manifest` で追加。chunk 化 (16MiB part + index.json) が初めて本番で効く。E ローダの `chunked.mjs` 結線が前提。
 - edge-sim の Static Assets 追従 (EDGE-SIM.md §B) → tools/e2e `edge-policy` の 307 修正 (CAB-6)。
 - `/c/` `/m/` `/latest.json` の edge-policy 正本取込み (tools/assets pack 使用時)。
+
+## 7. R2 次点構成の事前圧縮保存・大容量方針 (#64 [E2E-2], 検証起点 2847625)
+
+既知類型との関係 (DEFECTS.md): 該当なし (lift 対象外)。現行配信は案 S (DECISIONS D1)。本節は `legacy-r2/` へ戻る場合の準備。
+
+**実装**: `deploy/legacy-r2/20-upload.mjs` に `--precompress br` / `--no-transform` を追加 (`--backend aws` 専用。`cf r2 objects put` は Content-Type しか保存できないため `--backend cf` との併用は起動時に中止)。
+- `--precompress br`: immutable かつ policy の compression 対象拡張子のファイルを brotli (q11、>64MB は q9、lgwin 24) で `deploy/work/precompressed/<key>.br` に生成し、`aws s3 cp --content-encoding br` で元キーへ保存。圧縮後が元より小さい時だけ採用。`release.json` の `files[key]` に `encoding` / `encodedSize` を追記し、`size` / `sha256` は元バイト列のまま (展開後の値)。
+- `--no-transform`: immutable の Cache-Control に `no-transform` を追加。
+- aws backend の multipart (aws cli 自動) と `--cache-control` は既存。
+
+**検証 (dry-run、ネットワーク無し、合成入力 3 ファイル: 13.00MB wasm 反復データ / 1.00MB 乱数 wasm / 800KB js)**:
+
+| 項目 | 実測 |
+|---|---|
+| 圧縮採用 | 反復 wasm・js の 2 件のみ。乱数 wasm は圧縮後が元以上のため非採用 (encoding なし) |
+| 復号照合 | 採用 2 件とも `brotliDecompressSync` 後の長さ・sha256 が `release.json` の size/sha256 と一致 (2/2) |
+| dry-run コマンド | 採用ファイルは `aws s3 cp <.br> s3://<bucket>/<元キー> ... --content-encoding br` を構築 (OK)。非採用は `--content-encoding` なし |
+| ガード | `--backend cf` + `--precompress br` → 中止、`--precompress gz` → 中止 (各 1/1) |
+| 所要 | `--precompress br --no-transform` 2.008s / 無し 1.668s (load average 0.52、n=1、合成データのため圧縮率・時間は実 wasm の代表値ではない) |
+
+実 R2 への PUT・実 wasm の圧縮率は未実施 (R2 S3 キー無し・FL 本体 wasm 未統合)。実 wasm の既測値は `tools/runtime/DESIGN.md` (M11 6,044,445B → br q11 1,823,721B)。
+
+**判断 (事実は #64 本文の公式 docs 引用に依拠。未再検証)**:
+1. **分割**: R2 単一 PUT は 4.995 GiB、CF キャッシュ可能上限は 512MB (Free/Pro/Business)。FL 本体 wasm が 100MB 級なら R2 では**分割不要** (単一オブジェクトで aws multipart PUT)。512MB 超またはキャッシュ不可になる場合のみ Range 並列取得 (R2 方式は Range 対応: tools/hosting/REPORT.md の案 A は 25 分割並列 70 MB/s・全て 206)。案 S (現行) では Range 非対応のため既存の 16MiB part + `chunked.mjs` を使う (314MB・19 part 実測済み、§3)。
+2. **事前圧縮 vs 動的圧縮**: 事前圧縮は Content-Encoding 付きオブジェクトの Range がエンコード後バイト列になる (tools/assets/MANIFEST.md) ため、Range 取得する資産には使わない。丸ごと GET の wasm/js には `--precompress br` で q11 を使える (エッジ動的圧縮より高圧縮が可能)。
+3. **進捗バー (Content-Length) とのトレードオフ**: 圧縮配信では転送バイト数 ≠ 展開後サイズになるため Content-Length を分母にできない。分母は `release.json` の `size` (展開後) を使い、進捗は展開後バイト数で数える。`no-transform` は「エッジが再圧縮しない」だけで、事前圧縮オブジェクトの Content-Encoding は維持される。エッジ動的圧縮を使う場合 `no-transform` を付けると圧縮されなくなるため、**事前圧縮と no-transform は併用、動的圧縮に任せる資産には付けない**。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 実 R2 への `--precompress br --execute` 実証 (S3 キー要) | 事前圧縮オブジェクトのブラウザ透過復号・Content-Length 挙動が未実測 | #8 (H-2) にコメント / 実 R2 構成へ戻す時に新規子 issue |
+| クライアントが `release.json` の `size` を進捗分母に使う結線 | 進捗バー | #12 (FL 起動) 側 |
