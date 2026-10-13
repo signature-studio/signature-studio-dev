@@ -30,6 +30,9 @@ print(v['total3']['funcs'], v['total3']['bytes'])")"
   if [ -f "$OUT/p.final.ll" ]; then
     cp "$OUT/p.final.ll" "$OUT/p.prerename.ll"
     python3 sampler/export_rename.py "$OUT/p.final.ll" "$PE" "$R" --report "$OUT/export_rename.json" >> "$OUT/lift.log" 2>&1
+    rr=$?
+    # 改名の失敗 (衝突など) は lift 失敗として扱う。 judge.py shells は lift_rc で不合格にする
+    [ "$rr" = 0 ] || { echo "[unr_lift] $b export_rename rc=$rr" >> "$OUT/lift.log"; [ "$rc" != 0 ] || rc=$rr; }
   fi
   t1=$(date +%s)
   DEF=$(grep -c '^define' "$OUT/p.final.ll" 2>/dev/null || echo 0)

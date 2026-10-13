@@ -9,7 +9,7 @@
 - total2 外の非共通 **2,653 関数 / 1,200,793 B** の排他分類 (優先順位 (a)>(b)>(c)>(c-lea)>(d)): **(a) RVA32 表 314 関数 / 27,031 B**、(b) 命令内即値 **0 件**、(c) total2 外の呼出 **750 関数 / 406,591 B**、(c-lea) total2 外の lea **112 関数 / 28,227 B**、**(d) 参照なし 1,477 関数 / 738,944 B**。 排他合計 = 2,653 / 1,200,793 (検査 U4 PASS)。
 - 到達しうる根 = (a) ∪ (b_live) = 314 関数 / 27,031 B。 **total3 = 4,231 関数 / 1,456,503 B** (total2 から **+415 関数 / +65,994 B**、うち根 314 + 根から呼ばれて入った 101 (推定ではなく差分の実測))。 未到達 (非共通 − total3) = 2,238 関数 / 1,134,799 B。
 - **字義どおり根 = (a) ∪ (b) の上界は 7 本とも total3 と同値** (即値の参照が 0 件のため)。
-- **lift**: `judge.py shells` は 7/7 PASS (lift_rc / emcc_c_rc / f80 が全 0) だが、**range 欠落監査 (`indirect_defs.py`) が 5 関数 (4 block) で FAIL**。 `unr_e2e.sh` は exit 1 で `[unr_e2e] OK` は出ない。 欠落 5 件は RetDec が親関数の本体に畳み込んだもの (下記 §2d-4)。
+- **lift**: `judge.py shells` は 7/7 PASS (lift_rc / emcc_c_rc / f80 が全 0) だが、**range 欠落監査 (`indirect_defs.py`) が 5 関数 (4 block) で FAIL**。 `unr_e2e.sh` は exit 1 で `[unr_e2e] OK` は出ない。 欠落 5 件は RetDec が export 名で命名したことが原因 (下記 §2d-4・§2e。 旧「畳み込み」説は誤り)。
 - **AC 達成状況**: AC1 達成 / AC2 **未達** (閉包と検査 U1–U5 は PASS、range 監査が FAIL) / AC3 達成 (d = 1,477 関数 / 738,944 B)。 Closes ではなく Refs・draft PR が妥当 (PM 判断)。
 
 **既知類型との関係** (`docs/DEFECTS.md`): **該当なし** (分類と到達性の判定。 lift の変換規則は変更していない)。 range 欠落 5 件は既知の D1a〜D16 のどれにも対応づけていない → 新規類型の候補 (§7d 参照。 DEFECTS.md は本 REPORT では編集しない)。
@@ -74,7 +74,7 @@
 
 - **judge.py shells: PASS 7/7**。 lift_rc・emcc_c_rc・f80 は全 0 (lowering 後)。 未実装 helper は許容内 (Granulizer・Slicer 各 1 = #538 の既知)。 f80 の lowering (`p0c/f80_lower.py`) は lea 段と同じ 3 block で、bit-exact は未検証 (#197)。
 - **indirect_defs.py: FAIL** (欠落 5 件 / 4 block)。 `unr_e2e.sh` は exit 1。 lea 段 (total2) では欠落 0 だったので、欠落は total3 で新たに入った根に由来する。
-- **§2d-4 (欠落の原因、実測)**: 5 件は全て RVA32 表 (a) の根。 RetDec の出力では独立の `define` にならず、親関数の本体に `dec_label_pc_<VA>` として畳み込まれている。 親は FL Keys 0x71f030 → `CreatePlugInstance`、Slicer 2 0x842950 → `DecodeAudioFile`、0x842fc0 → `FinishAudioFile`、Slicex 0x879ed0 → `CreatePlugInstance`、Soundfont 0x762c70 → `CreatePlugInstance`。 いずれも `function_<VA>` を参照する箇所は final.ll に **0 件** (呼出しからは参照されていない)。 コードは lift に残っているが、表経由で `function_<VA>` を呼ぶ経路が将来入ると未定義シンボルになる (推定。 wasm リンクは未検証)。
+- **§2d-4 (欠落の原因、実測)**: 5 件は全て RVA32 表 (a) の根。 (下記の訂正 §2e を参照。 旧記述の「親関数への畳み込み」は誤り) RetDec は export 表に載る関数を export 名 (例: `@CreatePlugInstance`) で出力し、`function_<VA>` で出していなかった。 対象は FL Keys 0x71f030 (`CreatePlugInstance`)、Slicer 2 0x842950 (`DecodeAudioFile`) / 0x842fc0 (`FinishAudioFile`)、Slicex 0x879ed0 (`CreatePlugInstance`)、Soundfont 0x762c70 (`CreatePlugInstance`)。 改名前の出力では `function_<VA>` の参照は 0 件。 `export_rename.py` で改名して解消 (§2e)。
 - 比較: 同じ 7 本で total2 の lea 段は欠落 0 (REPORT_LEA.md §2c)。 欠落を「定義を緩めて通す」ことはしていない (監査の定義は不変)。
 
 - **訂正 (#707、§2e)**: 上の「親関数の本体に畳み込まれている」は誤り。 5 関数は畳み込まれていない。 RetDec が export 表に載る関数を **export 名で命名**し (`define i64 @CreatePlugInstance`)、`function_<VA>` で出していなかった。 本体は欠けていない。 `dec_label_pc_<VA>:` が define の先頭ラベルとして入っていることを確認済み。
@@ -170,6 +170,6 @@
 
 ## 8c. 次タスク提案
 
-1. 畳み込まれた 5 関数 (4 block) の境界を RetDec 側で独立関数にする方法を調べる (子チケット候補)。 これが直るまで AC2 は未達。
+1. (完了・#707 §2e) 5 関数 (4 block) の欠落は export 名命名が原因で、`export_rename.py` で解消 (AC2 達成)。 残りは改名後の `function_<VA>` の wasm リンク・実行時解決の検証 (#197 / #667 に起票)。
 2. (c) 750 関数 / 406,591 B の呼び元 (outside 同士の呼出鎖) を辿り、どこまでが dead 側かを確定する。
 3. (d) 1,477 関数 / 738,944 B の dead code 候補を、同 DLL 内の他の参照 (未確認の間接経路) で検証する。

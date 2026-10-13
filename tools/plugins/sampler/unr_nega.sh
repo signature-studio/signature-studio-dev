@@ -81,4 +81,24 @@ for d in work/sampler/unrlift/*/; do
 done
 expect "NC7 改名前 (export 名のまま) → indirect_defs FAIL" "$(rc python3 sampler/indirect_defs.py --lift-dir "$N/nc7" --ranges-dir work/sampler/unr)" 1; needfail 'FAIL' NC7
 
+# NC8: 改名先 function_<VA> が既に出力中 (衝突) → export_rename.py が非 0 で終わる (unr_lift.sh はこの rc を lift_rc に反映する)
+rm -rf "$N/nc8"; mkdir -p "$N/nc8"
+read -r NC8_B NC8_LL NC8_NEW <<< "$(python3 - "$N/nc8" <<'PY'
+import glob, json, os, shutil, sys
+out = sys.argv[1]
+for d in sorted(glob.glob('work/sampler/unrlift/*/')):
+    rep = os.path.join(d, 'export_rename.json')
+    if not os.path.exists(rep) or not json.load(open(rep)):
+        continue
+    b = os.path.basename(os.path.normpath(d)); v = next(iter(json.load(open(rep)).values()))
+    ll = os.path.join(out, 'p.ll'); shutil.copy(os.path.join(d, 'p.prerename.ll'), ll)
+    open(ll, 'a').write('\ndefine void @%s() {\n  ret void\n}\n' % v['new'])
+    print(b, ll, v['new']); break
+PY
+)"
+[ -n "${NC8_B:-}" ] || { echo "  !! NC8: 改名された関数が無い" >&2; FAIL=1; }
+NC8_PE="$FL_WIN64_DIR/extracted/block$(printf %05d "${NC8_B:-0}")_PE.bin"
+NC8_R="work/sampler/unr/block$(printf %05d "${NC8_B:-0}").ranges.txt"
+expect "NC8 改名先が既に存在 (衝突) → export_rename.py 非 0" "$(rc python3 sampler/export_rename.py "$NC8_LL" "$NC8_PE" "$NC8_R")" 1
+
 [ "$FAIL" = 0 ] && echo "[unr_nega] OK: 全ネガコンが期待通り" || { echo "[unr_nega] FAIL" >&2; exit 1; }
