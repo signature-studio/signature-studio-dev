@@ -79,4 +79,4 @@ cd tools/m11/work && awk '/^define .*function_41a670\(/{p=1} p{print} p&&/^}/{ex
 - 本 run の `git status --porcelain=v1 -- tools/m11/ldfix` (commit 直前): `M REPORT_735.md` の 1 件のみ (他担当 WIP 無し)。`disasm_735.py` は `d08d51be` で commit 済み。
 - `git diff origin/735-ld13-wrong-value-reuse HEAD -- tools/m11/ldfix`: 変更は `REPORT_735.md` のみ (fix commit)。
 - 20MiB 超の blob: `find tools/m11/ldfix -type f -size +20M -not -path '*/work/*'` の結果は空 (本 run で確認)。
-- REPORT の行数: 81 行 (`wc -l`、250 行以内)。
+- REPORT の行数: 82 行 (`wc -l`、250 行以内)。
