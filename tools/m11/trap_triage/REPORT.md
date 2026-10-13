@@ -175,6 +175,7 @@ ok 830 / oob 44 / halt0 20 / abort 1 / miss 46 / noproc 1 (§1 の 829/66 とは
 **測定の基準 (採用)**: `m11_e2e.sh` と同じ手順で IR・data・image を**再生成**し、PE (fl-win64 素材) を揃えた状態。
 ldfix は `PE` と capstone/pefile の両方が揃った時だけ走るため、`uv run --with capstone --with pefile` と PE パスの差替え (一時コピー、コミットしない) で実行した。
 work-m11 スナップショットの IR / data は古い生成物で、現 main の生成手順と一致しない (下表 (c) と (a) の差) ため採用しない。
+※ #663: 本節の最上位 frame 集計は oob の最上位を捨てる旧 frames 基準。修正後の値 (基準 (a)) は trap_triage/REPORT_663.md §2-1。
 
 | IR 生成条件 | 対照 (main の m11_ov.c) / OFF | ON (`M11_OV_CLASSCREATE=1`, 410360 のみ) | ok 退行 |
 |---|---|---|---|
@@ -223,6 +224,6 @@ python3 trap_triage/survey_diff.py out_off.json out_on.json
 ### 8.3 #307 (liftdiff OOB 222) との関係
 
 liftdiff は hybrid closure の per-case 採点 (#307 は `414ad0` 系 68 が最多)、本調査は m11 の 942 unit survey で最多は `8cc190` 系 11。
-**`414ad0` は m11 survey の OOB 最上位 frame に現れない** (最上位 frame は上表 16 種)。重なるのは 410360 カスケード
+**`414ad0` は m11 survey の OOB 最上位 frame に現れない** (最上位 frame は上表 16 種)。 ※ #663 で訂正: 旧 frames は oob の最上位を捨てていたため、修正後は `414ad0` が最上位 (unit 149/158/280/659)。REPORT_663 §2-1。重なるのは 410360 カスケード
 (liftdiff `results/cascade_410360.md`: innermost `f_410360` 573 case、`f_410360<40f9e0` 100 case) と本件の根因 (410320/410360 の VMT 間接 call 脱落) で、
 **同一欠陥の別症状である可能性が高い (未検証)**。ただし両者の trap 件数は比較軸 (case と unit) が違うため数値の突合はしていない。
