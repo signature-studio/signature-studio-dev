@@ -122,6 +122,16 @@ case 単位分類 (完全再現) を基準にすること。「実行不能 2,49
   68 件は全て最上位 trap frame が `function_414ad0` (= wasm は 414ad0 に到達している)。wasm trace_head に 414ad0 が現れるのは 41 件で、
   残り 27 件は trace_head (最大 12 件) に位置が保持されていないだけで、**非到達・別原因とは言えない** (原因は 41 件と同じか否か未確認)。
 
+### 27 件の到達確認 (LD-18 / #865、実測)
+
+`tests/rerun_414ad0_27.sh` で 27 件を `trace_head=200` (`-v`) で単体再走 → `tests/oob_414ad0_27.py` → `results/m11_oob_414ad0_27.md`。
+**25 / 27 件が wasm trace に 0x414ad0 を含み、最上位 frame も全 25 件が function_414ad0** (= 到達)。
+残り 2 件: 0x6525b0 は最上位 frame が function_4133f0 (414ad0 無し)、0x66ea90 は再走で trap せず both_fault。
+
+OOB 他の最上位 frame 集計 (LD-18、`tests/oob_top_frames.py` → `results/m11_oob_top_frames.md`): 上位 5 種は function_414ad0 68・__asm_rep_movsq_memcpy 13・function_412e40 12・function_4133f0 11・function_1062930 11。
+IR 分類は候補のみ (`inttoptr %arg` 経由の deref の有無)。機械語との突合・単体再走はしていないため**原因は未確定**。
+(本節の集計は batch jsonl 全体の OOB 239 件が対象。§8 の TSV 222 件とは別集計。)
+
 ### 手動実測 (単体 run、スクリプト非対応・第三者再現不可)
 
 次は `tools/liftdiff/work/` 配下の未 commit 成果物に基づく手元観測で、**受入条件 2 の根拠には含めない** (AGENTS §4-4: `work/` は commit 対象外)。
@@ -138,9 +148,9 @@ case 単位分類 (完全再現) を基準にすること。「実行不能 2,49
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | unreachable の 410320 以外 126 件の分岐 | 原因未特定 | #307 に残す + 子 issue 起票を PM に依頼 (PR コメント) |
-| OOB 414ad0 の 41 件以外の 27 件と、414ad0 系でも他パターンで fault が残る件 | 原因未確認 | 同上 |
+| 27 件のうち 0x6525b0 (414ad0 非到達) と 0x66ea90 (再走で trap 無し)・414ad0 系で他パターンの fault | 原因未確認 | 同上 |
 | OOB 他 70 種の最上位 frame | 未調査 | 同上 |
-| `load` 追加 IR の再現手段 (patch / 再生成スクリプト) | 手動実測が検証不能 | 同上 |
+| `load` 追加 IR の再現手段 (patch / 再生成スクリプト) — 受入条件 1 | 手動実測が検証不能 | #683 (共通。重複起票しない) |
 | D15 候補の call site 対応づけ (機械語 call ↔ IR block) | 候補止まり | 同上 |
 | `targets/m11.json` の `pe` が環境固有の絶対パス固定 (`[WIN64]` 相当) | `--pe` / `LD_M11_PE` が必須 | #294 |
 
