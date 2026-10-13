@@ -40,4 +40,6 @@ GUI_WASM_DIR="$BUILD/wasm_reach" E2E_MODE=reach node "$HERE/e2e/e2e.mjs" | grep 
 echo "[gui-e2e] 6e/6 sigprobe (m11 IR の GUI declare 署名 vs adapter, wasm-ld 署名検査 + 陰性対照)"
 bash "$HERE/integ/sigprobe.sh" | tail -1
 python3 "$HERE/integ/reach_report.py" "$BUILD/e2e/reach.log" >/dev/null
+echo "[gui-e2e] 6f/6 present e2e (GUI-4: WebGL2 golden 一致 / 複数矩形 / rAF / seqlock; 模擬 guest, bench 省略)"
+PRESENT_SKIP_BENCH=1 bash "$HERE/present/e2e.sh" | grep -E "^# (pass|fail)|ALL PASS|FAIL"
 echo "[gui-e2e] ALL PASS"

@@ -14,7 +14,7 @@ Spec は C 本体 (引数名 p0,p1,p2) と, 実機 inline asm による検証用
 """
 from collections import namedtuple
 
-Spec = namedtuple("Spec", "body asm ops result imms exact note")
+Spec = namedtuple("Spec", "body asm ops result imms exact note lanes", defaults=(None,))
 
 
 def S(body, asm=None, ops="", result=None, imms=None, exact=True, note=""):
@@ -549,8 +549,97 @@ def fam_misc(b, vex, R, A):
     return None
 
 
-FAMILIES = [fam_misc, fam_comis, fam_scalar_bin, fam_scalar_sqrt, fam_packed_bin, fam_packed_un, fam_logic,
+def fam_strcmp(b, vex, R, A):
+    """pcmpistri (SSE4.2 implicit-length 文字列比較)。RetDec は `void(i128,i128,i8)` と lift し ECX/EFLAGS を捨てる。
+    void 形: 結果 (ECX / CF,ZF,SF,OF) を shadow global (ll_pcmpistr_ecx/_fl) に残す。d 形 (ECX を返す lift 形): ECX を返す。
+    実機突合: result='pcmp' (ECX + EFLAGS[CF,ZF,SF,OF]) / 'rr' (ECX)。imm8 全 128 値 (bit7 は予約) を検証。"""
+    if b != "pcmpistri" or A != ["x", "x", "b"]:
+        return None
+    pre = "v" if vex else ""
+    imms = list(range(128))
+    if R == "v":
+        return S("u32 fl; ll_pcmpistr_ecx = ll_pcmpistr(p0, p1, p2, &fl); ll_pcmpistr_fl = fl;",
+                 "%spcmpistri $$IMM, %%[p1], %%[p0]\\n\\tpushfq\\n\\tpopq %%[fl]" % pre, "p0:x p1:x rr:=c fl:=r", "pcmp", imms=imms,
+                 note="ECX/フラグは shadow global (ll_pcmpistr_ecx/_fl) へ。flags 消費は P1 系 pass が担う")
+    if R == "d":
+        return S("u32 fl; return ll_pcmpistr(p0, p1, p2, &fl);", "%spcmpistri $$IMM, %%[p1], %%[p0]" % pre, "p0:x p1:x rr:=c", "rr", imms=imms,
+                 note="ECX を返す lift 形")
+    return None
+
+
+FAMILIES = [fam_strcmp, fam_misc, fam_comis, fam_scalar_bin, fam_scalar_sqrt, fam_packed_bin, fam_packed_un, fam_logic,
             fam_int_arith, fam_shift, fam_shuffle, fam_cvt, fam_cmp, fam_move, fam_fma, fam_round]
+
+
+# ---------------------------------------------------------------------------------
+# ymm (i256) — LIFTLIB #241。wasm32 ABI: 引数 = u64×4 に平坦化 / 戻り = sret (liftlib_simd.h の struct Y)
+# ---------------------------------------------------------------------------------
+# 128bit レーンを独立に処理する VEX-256 命令 = xmm 版 kernel を下位/上位に適用 (命令意味が同一であることが前提)。
+# レーン横断 (vperm*/vinsertf128/vextractf128/vbroadcast*) と幅変更 (vcvtdq2pd ymm, vpmovmskb ymm 等) は含めない。
+_LANEWISE_X = {"vmovups", "vmovaps", "vmovupd", "vmovapd", "vmovdqu", "vmovdqa"}
+
+
+YMM_LANEWISE = set("v" + x for x in (
+    "addps addpd subps subpd mulps mulpd divps divpd minps minpd maxps maxpd sqrtps sqrtpd andps andpd andnps andnpd orps orpd xorps xorpd "
+    "pand por pxor pandn paddd paddq psubd psubq pslld psrld psllq psrlq psrad pshufd shufps unpcklps unpckhps unpcklpd unpckhpd "
+    "cvtdq2ps cvttps2dq cvtps2dq movshdup movsldup movddup roundps roundpd haddps haddpd hsubps hsubpd "
+    "pcmpeqd pcmpgtd pmaxsw pminsw punpckldq punpckhdq packssdw cmpltps cmpneqpd").split())
+
+
+_YMM_SHIFT = {"vpslld", "vpsrld", "vpsllq", "vpsrlq", "vpsrad"}
+
+
+def fam_ymm(b, R, A, vex):
+    if not vex or ("y" not in A and R != "y"):
+        return None
+    bb = "v" + b
+    if bb in _LANEWISE_X and R == "y" and A == ["y"]:
+        return S("return p0;", "%s %%[p0], %%[r]" % bb, "r:=x p0:x", "r")
+    if bb in _LANEWISE_X and R == "v" and A == ["y", "y"]:
+        return S("(void)p0; (void)p1;", note="ストア形 (S1a で store に復元されなかった残存; 実ストアは IR 側)")
+    if bb in ("vmovntps", "vmovntpd", "vmovntdq") and R == "v" and A == ["y", "y"]:
+        return S("(void)p0; (void)p1;", note="non-temporal store: IR 側の通常ストアで代替")
+    if bb == "vinsertf128" and R == "y" and A == ["y", "x", "b"]:
+        return S("return (p2 & 1) ? MKY(YLO(p0), p1) : MKY(p1, YHI(p0));", "vinsertf128 $$IMM, %[p1], %[p0], %[r]", "r:=x p0:x p1:x", "r",
+                 imms=[0, 1])
+    if bb == "vextractf128" and R == "x" and A == ["y", "b"]:
+        return S("return (p1 & 1) ? YHI(p0) : YLO(p0);", "vextractf128 $$IMM, %[p0], %[r]", "r:=x p0:x", "r", imms=[0, 1])
+    if bb == "vperm2f128" and R == "y" and A == ["y", "y", "b"]:
+        pick = "(((p2 >> %d) & 3) == 0 ? YLO(p0) : ((p2 >> %d) & 3) == 1 ? YHI(p0) : ((p2 >> %d) & 3) == 2 ? YLO(p1) : YHI(p1))"
+        lo = pick % (0, 0, 0)
+        hi = pick % (4, 4, 4)
+        return S("u128 lo = (p2 & 8) ? 0 : %s; u128 hi = (p2 & 128) ? 0 : %s; return MKY(lo, hi);" % (lo, hi),
+                 "vperm2f128 $$IMM, %[p1], %[p0], %[r]", "r:=x p0:x p1:x", "r", imms=[0x20, 0x31, 0x01, 0x10, 0x08, 0x80, 0x13, 0x02])
+    if bb == "vshufpd" and R == "y" and A == ["y", "y", "b"]:
+        # ymm 版は上位レーンが imm bit[3:2] を使う (128bit 版の同 imm 再適用では不一致 — 実機突合で判明)
+        return S("V a = VQ(YLO(p0)), b = VQ(YLO(p1)), c = VQ(YHI(p0)), d = VQ(YHI(p1)), r, t;"
+                 " r.d[0] = a.d[p2 & 1]; r.d[1] = b.d[(p2 >> 1) & 1]; t.d[0] = c.d[(p2 >> 2) & 1]; t.d[1] = d.d[(p2 >> 3) & 1]; return MKY(r.q, t.q);",
+                 "vshufpd $$IMM, %[p1], %[p0], %[r]", "r:=x p0:x p1:x", "r", imms=[0, 1, 2, 3, 5, 10, 12, 15])
+    if bb == "vbroadcastf128":
+        return None
+    # 汎用: 128bit レーン独立の packed 命令 (YMM_LANEWISE) -> xmm 版 kernel を下位/上位に適用
+    if bb not in YMM_LANEWISE:
+        return None
+    # シフトの count は xmm 固定 (両レーンで共通), それ以外は全 operand が ymm
+    if bb in _YMM_SHIFT:
+        if A not in (["y", "x"], ["y", "b"]):
+            return None
+    elif any(t not in ("y", "b") for t in A):
+        return None
+    inner_args = ["x" if t == "y" else t for t in A]
+    inner_ret = "x" if R == "y" else R
+    if R == "y" and inner_args and all(t in ("x", "b") for t in inner_args):
+        sp = None
+        for fam in FAMILIES:
+            try:
+                sp = fam(b, True, inner_ret, list(inner_args))
+            except Exception:
+                sp = None
+            if sp is not None:
+                break
+        if sp is not None and sp.asm is not None:
+            return Spec("", sp.asm, sp.ops, sp.result, sp.imms, sp.exact, sp.note, (sp, inner_args))
+    return None
 
 
 def lookup(base, ret, args):
@@ -559,6 +648,14 @@ def lookup(base, ret, args):
     if base.startswith("v") and len(base) > 2:
         cands.insert(0, (base[1:], True))
     for b, vex in cands:
+        if ret == "y" or "y" in args:
+            try:
+                sp = fam_ymm(b, ret, list(args), vex)
+            except Exception:
+                sp = None
+            if sp is not None:
+                return sp
+            continue
         for fam in FAMILIES:
             try:
                 sp = fam(b, vex, ret, list(args))
