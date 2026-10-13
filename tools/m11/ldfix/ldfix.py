@@ -1413,6 +1413,21 @@ def fix_f3c_block(fn, fv, rep, ctr):
         if reg_store:
             rep['f3c_reg_store'] = rep.get('f3c_reg_store', 0) + 1
             continue
+        # #736: 読んだ値 rD そのものが同幅で memory に store されていなければ見送る。
+        # 戻り値 reg へのコピー (`mov rax,rcx`) や call 先 (`call [rbx+0x18]`) は値の store ではない
+        val_store = False
+        for ins in mins:
+            if ins.mnemonic != 'mov':
+                continue
+            try:
+                o0, o1 = ins.operands
+            except Exception:
+                continue
+            if len(ins.operands) == 2 and o0.type == 3 and o1.type == 1 and fv.cs.reg_name(o1.reg) == rD and o0.size * 8 == bits:
+                val_store = True
+        if not val_store:
+            rep['f3c_no_val_store'] = rep.get('f3c_no_val_store', 0) + 1
+            continue
         # store の値が argN (生 / trunc / zext) の行を探す
         stores = []
         for k in range(ia, ib):
