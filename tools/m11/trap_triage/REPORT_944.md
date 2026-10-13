@@ -83,7 +83,7 @@
 
 ### 旧記録 (参考・canonical ではない)
 
-- `5dbc6db9` (前 fix run): OFF 11.293 s / ON 11.277 s、ok=869 / trap=25。計測 probe を含む build の値ではない (前 fix 時は既定 build に計測コードが無かった) ため、現 PR の既定 build (869/25) と一致する。
+- `5dbc6db9` (前 fix run): OFF 11.293 s / ON 11.277 s、ok=869 / trap=25。この run では当時の build 構成 (計測 probe の有無) を再確認していない。現 PR の既定 build (869/25) と数値が一致する、という事実だけを記録する。
 - `5dbc6db9` (前回レビュー run): OFF 14.199 s / ON 14.113 s、ok=869 / trap=25。同一 HEAD でも elapsed は 11〜14 s で揺れる。
 - `8f7a2303` (旧 HEAD): OFF 14.03 s / ON 13.83 s、ok=869 / trap=25。
 - elapsed は run ごとに揺れるため、判定の根拠にしない (判定は計数・指紋のみ)。
