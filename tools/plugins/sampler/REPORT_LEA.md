@@ -4,7 +4,7 @@
 
 ## 2c. lea 経路を root に加えた閉包 (total2) と lift
 
-検証起点 commit: **f358f17** (`closure_lea.py` / `lea_lift.sh` / `lea_e2e.sh` / `facts_total.py` / `lea_nega.sh`)。 既知類型との関係 (`docs/DEFECTS.md`): **該当なし** (差分試験は範囲外。 f80 の扱いは下記 L-3)。
+検証起点 commit: **f358f17** (`closure_lea.py` / `lea_lift.sh` / `lea_e2e.sh` / `facts_total.py` / `lea_nega.sh`)。 **依存基点: main 042f869** (本 PR の merge-base。 main は 8d883c3 まで 384 commit 先で、rep_stosb_memset の実装 (#629) を含まない)。 既知類型との関係 (`docs/DEFECTS.md`): **該当なし** (差分試験は範囲外。 f80 の扱いは下記 L-3)。
 再現: `bash tools/plugins/sampler/lea_e2e.sh` (算出 → lift → 判定 → host/kernel 再計測) / `bash tools/plugins/sampler/lea_nega.sh` (ネガコン)。 `lift/plugin_closure.py` は変更していない。
 
 定義 (`closure_lea.py`): total = #537 の推移閉包。 lea root = 閉包内の関数が `lea reg,[rip+X]` で開始 VA を取っている非共通関数 (閉包に無いもの)。
@@ -40,7 +40,7 @@ lea root を足して `call/jmp rel32` で広げ、新たに入った関数の l
 - **7/7 通過** (lift_rc 0 / lowering 後の `emcc -c` rc 0 / lowering 後の f80 0)。 range 欠落監査 (`indirect_defs.py --lift-dir lealift --ranges-dir lea`): 全 7 本で ranges の全関数 (計 3,816) が final.ll に define あり (欠落 0)。
 - **L-3 f80 (新規の観測)**: lea 由来の関数が x87 を含む。 Granulizer の `function_7442c0` / `function_7443e0`、Slicer の `function_7534f0` / `function_753610`、Slicer 2 の `function_851760` / `function_851880` は lea root (total に無い)、各 block の残り 1 本 (`function_7594e0` / `function_770e00` / `function_8527b0`) は total 内の関数で、**#537 の final.ll には f80 を含む関数が無かった** (f80 0)。
   lowering 前の `emcc -c` は `no libcall available for fmul with type f80` / `do not know how to soften fp_extend` で rc 1 になる。 そこで `lea_lift.sh` は f80 を検出した block に限り **`p0c/f80_lower.py` (x86_fp80→f64、#197 の成果物) を明示の段として通し**、judge には lowering 後の値を渡す (raw 値は CSV の `f80_raw` / `emcc_c_rc_raw` / `lowered` 列に残す)。
-  **f80→f64 は拡張精度の丸めが変わり bit-exact を保証しない** (#197)。 通過 ≠ 正しさ。 3 block とも lowering の適用は機械的に通ったが、差分試験は範囲外。
+  **f80→f64 は拡張精度の丸めが変わり bit-exact を保証しない** (#197)。 通過 ≠ 正しさ。 3 block とも lowering の適用は機械的に通ったが、差分試験は範囲外。 **該当 3 block の PASS は lowering 後の値による** (judge.py の出力「lowering 後の値で判定した block」に列挙。 raw は `f80_raw` / `emcc_c_rc_raw`)。
 - 未実装 helper は #537 から増えていない (Granulizer・Slicer の `rep_stosb_memset` 各 1 = #538)。
 
 ### 検査 (`closure_lea.py`、不合格で exit 1)

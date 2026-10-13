@@ -24,6 +24,7 @@
 5. **SIMD kernel 依存は 5 本**: FL Keys 1 / FPC 4 / Granulizer 11 / Slicer 11 / Slicex 11 site (Slicer 2 殻・Soundfont Player は 0)。 うち FPC 3 / Granulizer 4 / Slicer 4 / Slicex 2 site は
    Balance の 80 実装表に逆引きできない呼出先 (§4)。 Slicex は P0c の #331 未解決 kernel (0x5dee90 / 0x5df040) を使う。
 6. **Granulizer・Slicer の未実装 helper `rep_stosb_memset` は各 1 call site**。 `m11_simd2.py` は `rep_stosq_memset` しか実装せず、`stosb` は `m11_simd_unimpl_once("__asm_rep_stosb_memset")` を呼ぶだけの空 stub になる (初回だけ stderr に出し、memset されない)。 `emcc -c` は通るので judge の `declares_unimpl` 許容 (上限 1 + 名前の許可リスト) でのみ検出できる (§5)。
+   注記: 上記は基点 042f869 の状態。 main 8d883c3 では #629 で `rep_stosb_memset` が実装済み (`tools/plugins/lift/passes/m11_simd2.py`)。 本 PR HEAD は未実装のまま (§7)。
 7. **C++ engine / 単体 DLL**: Fruity Slicer 2 の engine (5,160 関数) と GMS (2,355 関数) は RetDec の `.ll` 出力 + pass 鎖が完走 (lift_rc 0、define 5,993 / 2,525) するが `emcc -c` は未通過 (dangling use・`zext 0 to i64`)。 RetDec の C バックエンドが 10 分超・8 GiB 超かかるため `.ll` 出力後に止める方式にした (§5)。
 8. **GMS (MSVC C++ 単体) は Delphi 殻の閉包方式が使えない**: vtable 規約が違い `plugin_closure.py` の対象外 (framework 一致 0)。 全 `.pdata` lift を行った (§5)。 直接 Win32 API は registry 6 / dynload 3 / file_io 17 / gdi_direct 6 / clipboard_dnd 3 / threads 1 (`PLUGIN_MATRIX.json` `win_direct_api`)。
 
@@ -215,6 +216,8 @@ NC4 は #506 の reviewer が再現した「不合格行を追記しても exit 
 | Slicex が使う 0x5dee90 / 0x5df040 | P0c の未解決 kernel | #331 にコメント |
 | Slicer 2 殻と engine の結合方式 (LoadLibrary 経路・`DispatchToEngine`) が未解析 | engine を殻に結線できない | 新規 #540 [PLG-G3-2] (起票済み) の受入条件 4 |
 | `docs/DOC_MAP.md` の REPORT 索引に本書が未掲載 | 索引漏れ | PM が追記 |
+| 本 PR HEAD の基点は main 042f869 (main は 8d883c3 まで 384 commit 先)。 `rep_stosb_memset` の許容 (`targets.py` の `ALLOW_UNIMPL`) と lowering の要否を main 上で再測定する | 本 PR HEAD では撤去すると FAIL する (未実装のまま)。 main 上の値は未測定 | 先行 #551 → #624 の merge と base の main 付け替え後に再測定 (PM 判断: merge 順) |
+| 本 PR HEAD の基点は main 042f869 (main は 8d883c3 まで 384 commit 先)。 `rep_stosb_memset` の許容 (`targets.py` の `ALLOW_UNIMPL`) と lowering の要否を main 上で再測定する | 本 PR HEAD では撤去すると FAIL する (未実装のまま)。 main 上の値は未測定 | 先行 #551 → #624 の merge と base の main 付け替え後に再測定 (PM 判断: merge 順) |
 
 ## 8. DEFECTS.md 行案 (候補・追加の可否は PM 判断)
 
