@@ -70,7 +70,7 @@ bash tools/gui/e2e.sh                              # 全体 (PE lift を含む);
 ## 14. GUI-5 (#181) 続き: e2e.sh 全体と wasm shim 全体の SIMD/scalar 比較
 
 既知類型との関係: lift 欠陥ではなく shim の意味論 (§10 の同一サーフェス複数クリップ欠陥は `docs/DEFECTS.md` D18 に登録)。
-検証起点: 旧 HEAD `1f20ec7` (main `8d883c3` 取り込み後) の実測に続き、現 main (`origin/main`) を取り込んだ merge commit `ea7a538` で e2e と wbench を取り直した (本節の最終値)。本 PR は main に対して `tools/gui/src`・`include` を変えていない (`git diff origin/main HEAD -- tools/gui/src tools/gui/include` が空)。差分は `wbench.sh` / `wbench_shim.c` の新設・`REPORT.md` の番号整理・`DOC_MAP.md` / `DEFECTS.md` / `AGENTS.md` / `WORKFLOW.md` の D18 表記。runner 4 CPU、`/opt/emsdk`・`/opt/retdec`、mingw-w64 GCC 13 (apt `gcc-mingw-w64-x86-64`)、`fl-win64` を `$RUNNER_TEMP/fl-win64/extracted` に展開。
+検証起点: 旧 HEAD `1f20ec7` (main `8d883c3` 取り込み後) の実測に続き、現 main (`origin/main`) を取り込んだ merge commit `ea7a538` で e2e と wbench を取り直した (本節の最終値)。本 PR は main に対して `tools/gui/src`・`include` を変えていない (`git diff origin/main HEAD -- tools/gui/src tools/gui/include` が空)。差分は `wbench.sh` / `wbench_shim.c` の新設・`REPORT.md` の番号整理・`DOC_MAP.md` / `DEFECTS.md` / `AGENTS.md` / `WORKFLOW.md` の D18 表記。runner 4 CPU、`[EMSDK]`・`[RETDEC]`、mingw-w64 GCC 13 (apt `gcc-mingw-w64-x86-64`)、`fl-win64` を `$RUNNER_TEMP/fl-win64/extracted` に展開。
 
 ### 1. `bash tools/gui/e2e.sh` (RetDec 付き・全層)
 
@@ -89,6 +89,7 @@ bash tools/gui/e2e.sh                              # 全体 (PE lift を含む);
 
 - **結論**: 最終 HEAD `ea7a538` で rc=0・ALL PASS (1 回)。
 - **ただし解消ではない**: 1/6 に到達した有効 7 回中 2 回 (T1・R2) が ASan UAF で rc=1 になった。既存の race (#489 `[GUI-12]`)。`ea7a538` の 1 回は発火していない。`src` は main 取り込み後も本 PR で変えていない。「ALL PASS」を受入とみなすかは PM 判断。
+- **現 HEAD は未実測**: main 取り込み (`2e96a86`) で `tools/gui/src/gui_ft_wasm.c` (+34) と `include/gui_hostcall.h` が入ったため、`ea7a538` の値は現 HEAD の値ではない。現 HEAD の e2e・wbench は本 run では未実施 (試行表には載せない)。理由: 検証 run に emcc・`[EMSDK]`・`[RETDEC]`・mingw が無く、`$ARTIFACTS_DIR` は `fl-win64` のみ。`oc_artifacts: toolchain-emsdk toolchain-retdec` での再実行を PR 本文で依頼する。
 - 層ごとの結果 (run3 `ea7a538`):
 
 | 層 | 結果 (`ea7a538`) |

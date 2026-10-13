@@ -160,7 +160,7 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
 ### 範囲外・未達
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `bash tools/gui/e2e.sh` 全体 ALL PASS → 付録 §14 で実測。main 取り込み後の HEAD `ea7a538` で ALL PASS (rc=0, 104 s, 1 回)。ただし 1/6 の ASan UAF が同 src 群の 6 回中 2 回で発火し解消ではない | 受入扱いは PM 判断 | #489 `[GUI-12]` (既存)・PM |
+| `bash tools/gui/e2e.sh` 全体 ALL PASS → 付録 §14 で実測。main 取り込み後の HEAD `ea7a538` で ALL PASS (rc=0, 104 s, 1 回)。ただし 1/6 の ASan UAF が同 src 群の 7 回中 2 回で発火し解消ではない | 受入扱いは PM 判断 | #489 `[GUI-12]` (既存)・PM |
 | 実 FLEngine が要求する bpp/ROP の確定 (GUI-3 #174 の到達ログ待ち)・16bpp DIB・DIB_PAL_COLORS・`CreateBitmap` 4/8/16bpp の初期 bits・RLE/JPEG/PNG 圧縮 DIB | 実 FL が要求したら fail-fast で止まる (理由付き) | #174 到達後に #181 へ追記 |
 | Chrome 上の lift 済みアプリ込みの API 単位 frame time → §14 (wasm shim 全体は取得済み。Chrome 上のアプリ込みは未取得、理由は §14) | — | #181 |
 | mono / パレットの色写像の実 Windows との照合 (近似) | 色が実機と数階調ずれる可能性 | #181 (実機比較はユーザ依頼候補) |
