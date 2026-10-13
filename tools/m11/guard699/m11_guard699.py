@@ -28,10 +28,19 @@ COUNT = '%9 = load i32, ptr %8, align 4'
 TAG = '%g699'
 DEFAULT_COND = 'icmp sle i32 %9, 0'
 PLAIN = '  br label %' + NEXT + '\n'
-GD_STORES = ('  store i64 0, ptr %rax.0.reg2mem\n'
-             '  %g699rdx = and i64 %arg2, 255\n'
-             '  store i64 %g699rdx, ptr %rdx.1.reg2mem\n')
-GD_BLOCK = GD + ':\n' + GD_STORES + '  br label %' + EXIT + '\n'
+GD_BLOCK = (GD + ':\n'
+            '  %g699a = and i64 %arg2, 255\n'
+            '  %g699b = icmp ne i64 %g699a, 0\n'
+            '  %g699t = icmp eq i64 %arg3, 0\n'
+            '  %g699c = and i1 %g699t, %g699b\n'
+            '  br i1 %g699c, label %' + GD + '_t, label %' + GD + '_e\n'
+            + GD + '_t:\n'
+            '  call void @llvm.trap()\n'
+            '  unreachable\n'
+            + GD + '_e:\n'
+            '  store i64 0, ptr %rax.0.reg2mem\n'
+            '  store i64 0, ptr %rdx.1.reg2mem\n'
+            '  br label %' + EXIT + '\n')
 GUARDED = re.compile(r'  ' + re.escape(TAG) + r' = (icmp [^\n]*)\n  br i1 ' + re.escape(TAG)
                      + r', label %' + GD + r', label %' + NEXT + r'\n' + re.escape(GD_BLOCK))
 
