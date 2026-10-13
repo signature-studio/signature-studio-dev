@@ -141,7 +141,7 @@ Morphine は後段のみの秒 (下記)。
   E4 は 23914 の `function_1800280c7` で追跡した。 `e.rp.ll` には def 2 行があり、`fix_asm_stores.py` (`rp` → `st`) の段で消える (`SX_CALL` は D2 の `movaps` 符号拡張の修復)。
 - engine は KERNEL32 に加え USER32 / GDI32 / OPENGL32 (36 import) / d3d9 / WINMM を import する engine がある (Kepler・Kepler Exo・Transistor Bass: OPENGL32 36・d3d9 1)。 UI 描画を含む DLL を
   全 `.pdata` で lift しており、DSP のみの閉包ではない。 DSP の閉包抽出は未実施 (#534)。
-- 上表は旧 HEAD の値のみ。 HEAD 3418333a の再測定は未実施 (素材不足)。 現 HEAD の `emcc -c` 結果は未確認。 `emcc -c` 列は `cpp_lift.sh` の `emcc_c_rc` (終了コード: 0 = 通過、1 = 不通過。 件数ではない)。
+- 上表は旧 HEAD の値。 現 HEAD (9aad4595) の実測は `emcc -c` 通過 4/9 (23914・23944・24159・24298)。 詳細は REPORT_APPENDIX.md §A。 `emcc -c` 列は `cpp_lift.sh` の `emcc_c_rc` (終了コード: 0 = 通過、1 = 不通過。 件数ではない)。
 - 以上は到達性の実測で、正しさは何も示していない。
 
 ## 6. 検証 (HEAD は下表。 4 core / 15 GiB の Actions runner)
