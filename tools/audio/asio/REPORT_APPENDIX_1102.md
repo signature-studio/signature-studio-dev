@@ -37,5 +37,5 @@
 
 ## 6. 未実施 (次回の検証として残す)
 
-- head での `bash tools/audio/asio/e2e.sh --soak=1800` の再実行: 本 fix run では未実施。理由は emsdk (`/opt/emsdk`) が runner に無く、30 分ソーク + 導入が fix モードの上限 (40 分) に収まらないため。exit 0 / exit 1 のいずれも未記録。
-- 追跡: 再実行と exit 0 の記録は #1102 (受入条件 1) の未達として #1102 側で扱う。
+- head での `bash tools/audio/asio/e2e.sh --soak=1800` の再実行: 次節 §7 に記録 (実施済み)。
+- 追跡: exit 0 の記録は #1102 (受入条件 1) の未達として #1102 側で扱う。
