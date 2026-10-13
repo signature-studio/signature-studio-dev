@@ -42,10 +42,16 @@ tan / tanf は `expect_match_min: 1.0` で gate 化した。SVF は未達のた�
 | `LL_NO_RX_ALL=1` | 40/40 | tan 不要。**SVF は 20/40 + mismatch 13 + trap 2 + crash 7 で不変**、全 leaf の一致数も不変。IR は 1 site 差 (`rx_threaded` 32→31 / `rx_nodomin` 2→1) |
 
 ### 23.5 検証 (実測)
-`bash tools/liftlib/liftlib_e2e.sh` (コミット済み HEAD `14d5bc8`、nproc=4、2026-10-13): **ALL PASS / real 352.690 s / 終了時 load average 1.04, 0.97, 0.67**。unit T1〜T20 PASS (T17b は `LL_XRET_*` 未設定で skip)・FA 400/400・KH 366/366・OTT checks 8/0・`--auto none` SHA 42/42・SIMD 205 mnemonic mismatch 0・注入 94/94 (偽陽性 0)・T15 (残留 6) 不変。leafspec は §23.1 の表と同一 (tan 40 / tanf 40 / exp 40 / log 32+crash 8 / SVF 20+mismatch 13+trap 2+crash 7 / cvt 26+crash 14)。
+`bash tools/liftlib/liftlib_e2e.sh` (コミット済み HEAD `448a6d89`、nproc=4、2026-10-13): **ALL PASS / real 5m19.813s (319.8 s) / 開始 load 0.35 → 終了 load 1.03, 0.82, 0.44**。unit T1〜T22 **ALL UNIT TESTS PASS** (T17b は `LL_XRET_*` 未設定で skip)・FA 400/400・KH 366/366・OTT checks 8/0・`--auto none` 系 PASS・SIMD 205 mnemonic mismatch 0・注入 94/94 (偽陽性 0)。leafspec は §23.1 の表と同一 (tan 40 / tanf 40 / exp 40 / log 32+crash 8 / SVF 20+mismatch 13+trap 2+crash 7 / cvt 26+crash 14)。
+- 検証 HEAD `448a6d89` は `d7da2d2` merge 後の SR-4 対応 commit。`pefile` / `capstone` は runner に未導入だったため `python3 -m pip install pefile capstone numpy` で入れてから実行 (初回の空振りは import 失敗で即 FAIL・副作用なし)。
+- SR-4 pilot (`tools/targets/serum2/sr4/`) は本 run で素材 `plugins-serum2` が取得されていないため**未実測**。代わりに、位置対応を leaf spec (`abi: ms_pos`) に限定し、SR-4 の既定経路 (独立カウンタ) はコード上 main と同一 (`M pos` 行なしの分岐は main の旧コードそのもの) にした。SR-4 の再測定は素材取得後に別途行う。
 - 旧実測 (`7e00ff2`、real 2m21.641s) より長い。`7e00ff2`→`14d5bc8` は main の merge (iargs T16 ほか) と §23.7 の修正を含む。T16 単体は `REPORT_APPENDIX.md` §17 に 123.4 s と記録済み (推定: 差分の主因)。
 - 前提: `work-liftlib` の tarball 内 symlink が `<WORK_ROOT>/webstudio/...` (`<WORK_ROOT>` = 旧 worktree 配置の作業ルート) の絶対パス。`<WORK_ROOT>/webstudio → ws-342` の symlink が無いと `regress` の OTT が `FileExistsError` (`os.path.exists` は dangling symlink で False)。`REPORT_APPENDIX_B.md` §15.3 と同件。
 - 経過: LEAF_EXT 導入前は OTT 既定で emcc 失敗 + T15 が 15→14 でずれたため、拡張を leaf cfg に限定した。
+
+### 23.5a SR-4 回帰対応 (PR 差し戻し 1)
+位置対応 (MS x64 の第 N 引数 = xmm N / gpr N) を全 spec の既定にしていたため、main の SR-4 pilot (K 番目の float → xmm K の独立カウンタ前提) の経路が変わり得た。対応: シナリオ先頭の `M pos` 行 (spec `"abi": "ms_pos"`) で位置対応をオプトインし、既定 (行なし) は main と同じ独立カウンタ。leaf 6 spec (tan/tanf/exp/log/svf/cvt) のみ `ms_pos`。SR-4 spec・pilots.tsv は無変更。
+- 根拠: `native_runner.c` / `wasm_runner.mjs` の既定分岐は main の旧コードと同一。leaf 6 spec の一致数は §23.5 の実測と同じ。
 
 ### 23.6 未解決 (起票先)
 | 未解決 | 起票先 |
