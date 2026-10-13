@@ -6,9 +6,9 @@
 
 ## 0. 基準
 
-- 測定 commit: `604e900f` (origin/main 取込時点。コード変更なし)。本 PR は `40c35ed5` (再現スクリプト `n78_measure.sh` のみ追加)。
+- 測定 commit: `604e900f` (origin/main 取込時点。コード変更なし)。本 PR は `40c35ed5` (再現スクリプト `n78_measure.sh` のみ追加)。現 HEAD は `a57e158b` (その後は REPORT・DOC_MAP のみ変更。コード差分は §8)。
 - 素材: fl-win64 (`$RUNNER_TEMP/fl-win64`)・toolchain-retdec・toolchain-emsdk・work-m11・work-liftdiff (`$HOME/artifacts` から展開。実在確認済み)。`m11_gen_ir2.sh` で IR を作り直した (`ldfix=applied`)。
-- 再現: `FL_WIN64_DIR=... RETDEC_ROOT=... EMSDK=... bash tools/m11/trap_triage/n78_measure.sh` (全工程 rc=0、所要 2 分 20 秒、load average 0.13〜0.6)。
+- 再現: `FL_WIN64_DIR=... RETDEC_ROOT=... EMSDK=... bash tools/m11/trap_triage/n78_measure.sh` (全工程 rc=0。測定 commit `604e900f` で 2 分 20 秒、load 0.13〜0.6。HEAD `a57e158b` で再実行し 2 分 25 秒、開始時 load average 1.38・終了時 1.08。両方とも §4 と同じ数値)。
 
 ## 1. 受入条件の判定
 
@@ -54,35 +54,69 @@
 
 ## 4. kind 遷移 (`survey_diff.py`、測定 commit `604e900f`)
 
-| 構成 | ok | oob | abort | halt0 | miss | noproc | other | trap |
-|---|--:|--:|--:|--:|--:|--:|--:|--:|
-| OFF | 870 | 16 | 0 | 7 | 47 | 1 | 1 | 24 |
-| ON | 869 | 15 | 2 | 7 | 47 | 1 | 1 | 25 |
-| ON + `M11_FIX_535BF2=1` | 869 | 17 | 0 | 7 | 47 | 1 | 1 | 25 |
+種別の合計は 3 構成とも 942 unit (`survey_units.mjs` の出力と一致)。`trap` 列は `survey_diff.py` の派生値 (`oob + halt0 + abort + other`) で、種別の 1 つではないので合計に含めない。
 
-遷移 (OFF → ON):
+| 構成 | ok | oob | abort | halt0 | miss | noproc | other | 合計 | trap (派生) |
+|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|
+| OFF | 870 | 16 | 0 | 7 | 47 | 1 | 1 | 942 | 24 |
+| ON | 869 | 15 | 2 | 7 | 47 | 1 | 1 | 942 | 25 |
+| ON + `M11_FIX_535BF2=1` | 869 | 17 | 0 | 7 | 47 | 1 | 1 | 942 | 25 |
+
+`trap` の OFF → ON の +1 は unit 190 (ok→oob) による。304/555 の oob→abort は trap 数を変えない (2 件とも trap のまま)。
+
+`survey_diff.py` の全出力 (HEAD `a57e158b`、上記の数値と同じ実行):
 
 ```
+$ python3 trap_triage/survey_diff.py work/n78/units_off.json work/n78/units_on.json 304 555 101 190 291 296 923
+A: {'halt0': 7, 'miss': 47, 'noproc': 1, 'ok': 870, 'oob': 16, 'other': 1}  trap=24
+B: {'abort': 2, 'halt0': 7, 'miss': 47, 'noproc': 1, 'ok': 869, 'oob': 15, 'other': 1}  trap=25
+遷移 (A -> B):
+  halt0   -> halt0   7
+  miss    -> miss    47
+  noproc  -> noproc  1
   ok      -> ok      869
-  ok      -> oob     1    (unit 190)
-  oob     -> abort   2    (unit 304, 555)
+  ok      -> oob     1
+  oob     -> abort   2
   oob     -> oob     14
-  miss/halt0/noproc/other は不変
+  other   -> other   1
 ok 退行 unit: 1 [190]
-```
+unit 304: oob -> abort Aborted(native code called abort())
+unit 555: oob -> abort Aborted(native code called abort())
+unit 101: ok -> ok 
+unit 190: ok -> oob memory access out of bounds
+unit 291: ok -> ok 
+unit 296: ok -> ok 
+unit 923: oob -> oob memory access out of bounds
+kind 以外も含めた差分 unit (frames は深さのみ比較): 10 [114, 190, 280, 291, 296, 302, 304, 555, 659, 888]
 
-遷移 (OFF → ON+転記):
-
-```
+$ python3 trap_triage/survey_diff.py work/n78/units_off.json work/n78/units_on_fix.json 304 555 101 190 291 296 923
+A: {'halt0': 7, 'miss': 47, 'noproc': 1, 'ok': 870, 'oob': 16, 'other': 1}  trap=24
+B: {'halt0': 7, 'miss': 47, 'noproc': 1, 'ok': 869, 'oob': 17, 'other': 1}  trap=25
+遷移 (A -> B):
+  halt0   -> halt0   7
+  miss    -> miss    47
+  noproc  -> noproc  1
   ok      -> ok      869
-  ok      -> oob     1    (unit 190)
+  ok      -> oob     1
   oob     -> oob     16
+  other   -> other   1
 ok 退行 unit: 1 [190]
+unit 304: oob -> oob memory access out of bounds
+unit 555: oob -> oob memory access out of bounds
+unit 101: ok -> ok 
+unit 190: ok -> oob memory access out of bounds
+unit 291: ok -> ok 
+unit 296: ok -> ok 
+unit 923: oob -> oob memory access out of bounds
+kind 以外も含めた差分 unit (frames は深さのみ比較): 10 [114, 190, 280, 291, 296, 302, 304, 555, 659, 888]
 ```
+
+遷移 (OFF → ON) の要約: ok→ok 869、ok→oob 1 (unit 190)、oob→abort 2 (unit 304, 555)、oob→oob 14、miss/halt0/noproc/other は不変。
+遷移 (OFF → ON+転記) の要約: ok→ok 869、ok→oob 1 (unit 190)、oob→oob 16 (304/555 を含む)、miss/halt0/noproc/other は不変。
 
 - 304 / 555: OFF `oob` → ON `abort` → ON+転記 `oob`。kind 遷移の判定はこの通り。
 - 291 / 296 (REPORT_682 の ok 対象): OFF・ON とも `ok`。ネガコンは §5。
-- `check_682.py` (304/555/923/291/296): OFF 2/5・rc=1。受入 (5 unit 全 ok) は未達のまま (期待通り。本 issue はこの 5 件の ok 化を目的としない)。
+- `check_682.py` (304/555/923/291/296): 実測の出力は `units ok 0 / 5`・rc=1。kind は 291・296 が ok、304・555・923 が oob で、ok 判定は 2/5 が正しい。0/5 になるのは `check_682.py` が `labels[u]` を文字列として比べているのに、`survey_units.mjs` の出力は unit ごとの dict のため (スクリプトの不具合・本 PR では未修正。`n78_measure.sh` の末尾行の「2/5 が期待値」も同じ理由で実出力と合わない)。受入 (5 unit 全 ok) は未達のまま (本 issue はこの 5 件の ok 化を目的としない)。
 
 ## 5. 検証と限界
 
@@ -110,12 +144,12 @@ ok 退行 unit: 1 [190]
 
 ## 8. 差分 (差分 0 の証跡)
 
-測定 commit `604e900f` (origin/main) から HEAD `40c35ed5` までの差分:
+測定 commit `604e900f` (origin/main) から現 HEAD `a57e158b` までの差分 (md を除く):
 
 ```
-$ git diff 604e900f 40c35ed5 -- tools/m11 ':!*.md'
+$ git diff 604e900f a57e158b -- tools/m11 ':!*.md'
  tools/m11/trap_triage/n78_measure.sh | 19 +++++++++++++++++++
  1 file changed, 19 insertions(+)
 ```
 
-コード差分は再現スクリプト `n78_measure.sh` の追加のみ。`m11_*.sh`・`m11_ov.c`・`survey_units.mjs`・`survey_diff.py` は未変更。測定はスクリプトの追加前の HEAD (`604e900f`) で手動実行し、スクリプト追加後に同スクリプトを通しで実行して §4 の数字と一致することを確認した。
+コード差分は再現スクリプト `n78_measure.sh` の追加のみ。`m11_*.sh`・`m11_ov.c`・`survey_units.mjs`・`survey_diff.py` は未変更。測定はスクリプトの追加前の `604e900f` で手動実行した。スクリプトは HEAD `a57e158b` で通しで再実行し (rc=0、§0)、§4 の数字と一致することを確認した。`40c35ed5` 以降の docs のみの commit (`211ced3d`・`a57e158b`) は測定対象外。
