@@ -1,0 +1,45 @@
+PASS	E1 get_cbor_string	literal refs=['0x18025bbd0'] expect 0x18025bbd0
+PASS	E1 get_cbor_binary	literal refs=['0x18025b510'] expect 0x18025b510
+PASS	E1 get_msgpack_string	literal refs=['0x18025d200'] expect 0x18025d200
+PASS	E1 get_ubjson_size_type	literal refs=['0x180261c90'] expect 0x180261c90
+PASS	E1 get_ubjson_size_value	literal refs=['0x18025fbb0'] expect 0x18025fbb0
+PASS	E1 get_ubjson_type	literal refs=['0x180263d10'] expect 0x180263d10
+PASS	E1 get_ubjson_object	literal refs=['0x180261410'] expect 0x180261410
+PASS	E1 parse_bson_element_internal	literal refs=['0x1802598d0'] expect 0x1802598d0
+PASS	E1 parse_cbor_internal/sax_parse tail	literal refs=['0x180256dc0'] expect 0x180256dc0
+PASS	NEGCTL E1 literal with last char flipped has 0 hits	
+PASS	NEGCTL E1 wrong expectation (get_cbor_string != 0x18025b510)	
+PASS	E2 jump table is 5 entries (cbor,msgpack,ubjson,bson,bjdata)	table=0x180a4b26c
+PASS	E2 fmt=1 cbor -> parse_cbor_internal	case=0x180256e6f callee=0x1802571e0
+PASS	E2 fmt=2 msgpack -> parse_msgpack_internal	case=0x180256e8e callee=0x1802580d0
+PASS	E2 fmt=3 ubjson -> parse_ubjson_internal	case=0x180256e03 callee=0x18025e340
+PASS	E2 fmt=4 bson -> parse_bson_internal	case=0x180256e59 callee=0x180257130
+PASS	E2 fmt=5 bjdata -> parse_ubjson_internal (shared with ubjson)	case=0x180256e03 callee=0x18025e340
+PASS	E2 parse_cbor_internal(0x1802571e0) calls get_cbor_string+get_cbor_binary	
+PASS	E2 parse_msgpack_internal(0x1802580d0) calls get_msgpack_string	
+PASS	NEGCTL E2 wrong: msgpack case calls get_cbor_string	
+PASS	NEGCTL E2 wrong: ubjson case == cbor callee	
+PASS	E3 0x1801bfb00 passes format 1 (= cbor)	edx=1
+PASS	E3 0x1801bf5f0 passes format 3 (= ubjson)	edx=3
+PASS	NEGCTL E3 wrong: 0x1801bfb00 is ubjson	
+PASS	NEGCTL E3 wrong: 0x1801bf5f0 is cbor	
+PASS	E3 0x1801bf1c0 calls both 0x1801bfb00 and 0x1801bf5f0	
+PASS	E4 version==2 branch (cmp eax,2; je) first calls 0x1801bf480	je target=0x1801bf325
+PASS	E4 0x1801bf480 result checked with `cmp rax, -0x78` (= ZSTD_isError: ZSTD_error_maxCode 120)	rax, -0x78
+PASS	E4 order: 0x1801bf480 -> 0x1801bfb00 (version 2 = zstd + CBOR)	
+PASS	E4 order: 0x180571dc0 -> 0x1801bf5f0 (version 0/1 = zlib-window + UBJSON)	
+PASS	NEGCTL E4 wrong: version 2 reaches 0x180571dc0 first	
+PASS	NEGCTL E4 wrong: 0x1801bf5f0 called before 0x180571dc0	
+PASS	W1 writer 0x1801be2e0 calls 0x1801bea90	
+PASS	W2 0x1801bea90 calls write_cbor 0x180256250	
+PASS	W3 write_cbor 0x180256250 emits 0xF6 null, 0xF4|b bool, 0xF9 half-float, 0xFC	
+PASS	W4 0x180256c70 holds cbor float prefixes 0xFA/0xFB (+ msgpack twins 0xCA/0xCB)	
+PASS	W5 write_cbor 0x180256250 calls 0x180256c70 (float prefix)	
+PASS	NEGCTL W3 wrong: msgpack null 0xc0 emitted by write_cbor 0x180256250	
+PASS	NEGCTL W4 wrong: 0xfa also in neighbour helper 0x180256bb0	
+PASS	L1 write_cbor reads basic_json type byte @+0 and value ptr @+8	
+PASS	L2 write_cbor array size = (end-begin)>>4 (16-byte element, MSVC vector begin/end)	
+PASS	L3 write_cbor map walk tests byte [node+0x19] (MSVC std::map _Isnil)	
+PASS	NEGCTL L3 wrong: _Isnil at +0x1a	
+
+RESULT ALL PASS
