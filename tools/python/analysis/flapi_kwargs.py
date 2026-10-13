@@ -9,8 +9,9 @@
   2. 各 fn の冒頭を逆アセンブルし、最初の call までの `lea reg,[rip+disp]` を回収。
      flags=3 (VARARGS|KEYWORDS): r8=書式, r9=kwlist (char* 配列, NULL 終端)
      flags=1 (VARARGS のみ)    : rdx=書式 (kwlist 無し = 実 FL はキーワード引数を受けない)
-     flags=4 (NOARGS)          : 引数なし
+     flags=4 (NOARGS)          : 引数なし (PyArg_Parse* を呼ばないので書式は復元しない)
      最初の間接 call (= PyArg_Parse* のインポート表呼出し) 直前までの lea [rip+x] を見る。
+     その前に ret / int3 に当たったら (= 関数末尾を越えて隣の関数の lea を拾うことになる) 書式無しとする。
   3. 表ごとに flapi_table.json の module と名前集合の重なりで module を決定。
 """
 import json
@@ -94,15 +95,23 @@ class Image:
         return [[e for _, e in t] for t in tables]
 
     def wrapper_args(self, fn, flags):
-        """ラッパー冒頭 (最初の call まで) の lea [rip+x] を回収し (fmt, kwlist) を返す。"""
+        """ラッパー冒頭 (最初の間接 call まで) の lea [rip+x] を回収し (fmt, kwlist) を返す。"""
+        if flags & 4:
+            return None, None  # METH_NOARGS
         o = self.off(fn)
         lea = {}
+        parsed = False
         for i in self.md.disasm(self.b[o:o + 0x200], fn):
             if i.mnemonic == "call" and i.op_str.startswith("qword ptr ["):
+                parsed = True
                 break  # PyArg_Parse* はインポート表経由の間接 call
+            if i.mnemonic in ("ret", "int3"):
+                break
             if i.mnemonic == "lea" and len(i.operands) == 2 and i.operands[1].type == X86_OP_MEM \
                     and i.operands[1].mem.base == X86_REG_RIP:
                 lea[i.reg_name(i.operands[0].reg)] = i.address + i.size + i.operands[1].mem.disp
+        if not parsed:
+            return None, None
         kw = flags & 2
         fmt_reg = "r8" if kw else "rdx"
         fmt = self.cstr(lea.get(fmt_reg), 40) if fmt_reg in lea else None

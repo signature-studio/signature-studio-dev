@@ -26,9 +26,26 @@ def _make(mod, name, fid, sig, kwsig=None):
     # kwlist 無し (flags=1/4) は stubs 署名のまま (flags=1 の channelCount を MCPTools が globalCount= で呼ぶため、
     # kwargs 拒否にはしない。実 FL の挙動は未確認)。
     required = None
+    kwnames = names
     if kwsig:
         if kwsig.get("kwlist") is not None:
             names = list(kwsig["kwlist"])
+            sn = [p["name"] for p in params] if params else []
+            # stubs の既定値の引き継ぎ: 同名ならその引数の値、改名 (同位置で名前だけ違う) なら同位置の値。
+            # stubs 側の名前が kwlist の別位置に現れる (位置がずれた) 場合は別の引数の値なので引き継がない。
+            defaults = {}
+            for i, n in enumerate(names):
+                if n in sn:
+                    d = params[sn.index(n)]["default"]
+                elif i < len(sn) and sn[i] not in names:
+                    d = params[i]["default"]
+                else:
+                    d = None
+                if d is not None:
+                    defaults[n] = d
+            # kwlist 内の重複名 (バイナリ由来。arrangement.selectionSet の 2 つ目) は、最初の出現だけを kw で束縛し、
+            # 2 つ目以降は位置専用として扱う (実 CPython は重複の 2 つ目を kw で束縛する場合があるが、誤記を kw で踏まない側に倒す)。
+            kwnames = [n if n not in names[:i] else None for i, n in enumerate(names)]
         required = kwsig.get("required")
 
     def bind(args, kw):
@@ -36,10 +53,14 @@ def _make(mod, name, fid, sig, kwsig=None):
             return args
         if names is None:
             raise TypeError(f"{mod}.{name}() takes no keyword arguments (signature unknown)")
+        free = {n for i, n in enumerate(kwnames) if i >= len(args) and n is not None}
+        extra = sorted(k for k in kw if k not in free)
+        if extra:
+            raise TypeError(f"{mod}.{name}() unexpected keyword arguments {extra}")
         out = list(args)
         gap = None  # 省略された任意引数 (既定値が C 側にあり不明) の位置
         for i, n in enumerate(names[len(args):], start=len(args)):
-            if n in kw:
+            if kwnames[i] is not None and n in kw:
                 if gap is not None:
                     raise TypeError(f"{mod}.{name}() cannot skip optional argument '{names[gap]}' (default unknown)")
                 out.append(kw.pop(n))
@@ -49,8 +70,6 @@ def _make(mod, name, fid, sig, kwsig=None):
                 gap = i if gap is None else gap
             else:
                 raise TypeError(f"{mod}.{name}() missing argument '{n}'")
-        if kw:
-            raise TypeError(f"{mod}.{name}() unexpected keyword arguments {sorted(kw)}")
         return tuple(out)
 
     def f(*args, **kw):

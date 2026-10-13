@@ -114,19 +114,15 @@
    },
    "selectAll": {
     "flags": 4,
-    "fmt": "i",
+    "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd56d00",
-    "required": 1,
-    "max": 1
+    "fn_va": "0xd56d00"
    },
    "deselectAll": {
     "flags": 4,
-    "fmt": "i",
+    "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd56dd0",
-    "required": 1,
-    "max": 1
+    "fn_va": "0xd56dd0"
    },
    "getTrackActivityLevel": {
     "flags": 1,
@@ -2444,11 +2440,9 @@
    },
    "getProgTitle": {
     "flags": 4,
-    "fmt": "F",
+    "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6c250",
-    "required": 1,
-    "max": 1
+    "fn_va": "0xd6c250"
    },
    "getVersion": {
     "flags": 1,
@@ -2514,11 +2508,9 @@
    },
    "setTimeDispMin": {
     "flags": 4,
-    "fmt": "i",
+    "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6ccb0",
-    "required": 1,
-    "max": 1
+    "fn_va": "0xd6ccb0"
    },
    "getFocused": {
     "flags": 1,
@@ -3003,11 +2995,9 @@
    },
    "getDeviceID": {
     "flags": 4,
-    "fmt": "$",
+    "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd76ef0",
-    "required": 1,
-    "max": 1
+    "fn_va": "0xd76ef0"
    },
    "flrMidiNote": {
     "flags": 3,
@@ -3301,11 +3291,9 @@
    },
    "hideMenu": {
     "flags": 4,
-    "fmt": "iiii",
+    "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd7b1f0",
-    "required": 4,
-    "max": 4
+    "fn_va": "0xd7b1f0"
    },
    "findTextLine": {
     "flags": 1,

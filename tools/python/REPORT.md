@@ -185,7 +185,7 @@ mock との差で見つかったもの: mock は引数の個数/型を検査し�
 | 項目 | 実測 |
 |---|---|
 | メソッド表から 435 関数全件に対応付け | 435/435 (13 module) |
-| 書式文字列を復元 (flags=1/3/4 + 引数あり) | 309 関数 (flags=1: 200 / flags=3: 103 / flags=4: 6。flags 全体は 1=205, 3=105, 4=125) |
+| 書式文字列を復元 (flags=1/3 + 引数あり) | 303 関数 (flags=1: 200 / flags=3: 103。flags 全体は 1=205, 3=105, 4=125)。flags=4 (NOARGS) 125 件は書式無し。初版の「309 (flags=4: 6)」は `ret` を越えて隣の関数の `lea` を拾った誤検出で、`ret`/`int3` 打切りと NOARGS 除外で修正 (変化は 6 関数のみ。flags=1/3 の 303 件は全て最初の `ret`/`int3` より前に間接 call があり、再生成の前後で不変) |
 | **kwlist (引数名) を復元** (flags=3 = VARARGS\|KEYWORDS) | **103 関数**。全件で `len(kwlist) == 書式の最大引数数` |
 | flags=3 だが書式/kwlist 未復元 | 2 (`device.flrMidiNote`, `device.flrMidiCC`: lea の並びが他と異なる) |
 | flags=1 (VARARGS のみ、実 FL は kwargs を受けない可能性) | 205 (うち書式あり 200)。**位置引数のみ**。ただし MCPTools が `channels.channelCount(globalCount=)` を kw 呼出しするため kwargs 拒否にはしていない |
@@ -194,12 +194,15 @@ mock との差で見つかったもの: mock は引数の個数/型を検査し�
 
 stubs (LGPL 参照) 署名との照合 (kwlist のある 103 のうち stubs 署名がある関数): 名前一致 66 / **不一致 28** (バイナリ側を正とする)。例: `channels.getChannelName` は stubs の `index` でなくバイナリの kwlist 先頭が `value`、`channels.getChannelVolume` は `mode` でなく `useDb`、`channels.setChannelPitch` は `mode` でなく `pitchUnit`、`mixer.getTrackVolume` は `mode` でなく `flag`、`plugins.setParamValue` は `value` でなく `paramValue`、`transport.globalTransport` は `command` でなく `index`、`device.forwardMIDICC` は `mode` でなく `forwardTo`、`mixer.automateEvent` は `speed` でなく `smoothSpeed`。書式の引数数 (必須/最大) は stubs 署名と 230 件一致 / 49 件不一致 (stubs の引数が欠けている・書式の `|` 位置が異なる等)。
 
-- `fl_api.py`: kwlist があれば stubs 名より優先して kwargs を束縛。省略可能引数の既定値が C 側で静的に不明なとき、それを飛ばして後続だけ指定する呼出しは `TypeError` (推測値で埋めない)。stubs の既定値がある引数は従来どおり stubs 値を使う。
+- `fl_api.py`: kwlist があれば stubs 名より優先して kwargs を束縛。省略可能引数の既定値が C 側で静的に不明なとき、それを飛ばして後続だけ指定する呼出しは `TypeError` (推測値で埋めない)。stubs の既定値は、同名の引数のものを引き継ぎ、名前だけ変わった同位置の引数 (`mode`→`useDb` 等) のものも引き継ぐ。stubs 側の名前が kwlist の別位置にある (位置がずれた) 3 関数 `channels.soloChannel` / `plugins.getColor` / `plugins.getParamValueString` は別の引数の既定値になるため引き継がない。未知の kwarg は既定値の評価より先に `TypeError`。
+- **kwlist の重複 1 件 (バイナリ由来)**: `arrangement.selectionSet` = `['selStart','selStart','selectNotes','updateSongLoop','scroll']` (kwlist 表 0x151dc00 の先頭 2 エントリが同じ文字列 0xd7890c を指す。2 つ目は `selEnd` の記載ミスと推定)。bind は最初の出現だけを kw で束縛し、2 つ目以降は位置専用 (kw では埋まらない)。実 CPython (3.14, ctypes で `PyArg_ParseTupleAndKeywords` を直接呼出し) は `selStart=5` のみ → 必須欠落 `TypeError` (mock と同じ) だが、位置 1 個 + `selStart=5` は 2 つ目に束縛されて通り、mock はこれを拒否する (誤記を kw で踏まない側に倒した差)。
 - **MCPTools.pyc の実 kwargs 呼出し** (`KW_NAMES` を逆アセンブルして flapi 呼出しに対応付け): kwlist のある関数への呼出しは全て kwlist 名と一致 (`plugins.*` の `slotIndex/useGlobalIndex/pickupMode`、`channels.getChannelName/setChannelName/setTargetFxTrack/showEditor` の `useGlobalIndex/value`)。`print(..., file=/indent=)` 等は flapi 呼出しではない。
-- 検証: `tests/kwsig_check.py` PASS (0.03 秒: 435 関数に kwsig・kwlist 103・bind の 6 区分)。MCPTools の実 kwargs 呼出し 11 パターンを新 bind に通して全て通る。**wasm 上の `tests/all_tools.mjs` (48/48) は未再実行** (§12 参照。FL 同梱 `midi.py`/`utils.py` は mac 側のみで fl-win64 素材に無く、入力が揃わないため)。
+- 検証: `tests/kwsig_check.py` PASS (435 関数に kwsig・kwlist 103・NOARGS 書式無し・bind の 9 区分)。区分 8 は PR 前 (stubs 署名のみ) の bind との新旧比較: 94 関数 (stubs 署名と kwlist の両方あり) で位置 k 個 + kw 1 個 (kwlist の名前) の呼出しのうち旧が通った 224 件が対象、新も同結果 219 件、差 5 件 (4 関数: `getStepParam` はバイナリが 5 引数で 6 つ目を渡さない / 上記のずれた 3 関数)。MCPTools.pyc の flapi への kw 呼出し 20 箇所 (重複除き 14 パターン; `KW_NAMES` 付き `CALL` を 3.12 `dis` で抽出) は新 bind で 14/14 通る (旧 main の bind は 13/14: `plugins.getParamValueString(slotIndex=, useGlobalIndex=)` が stubs 既定値 `midi.PIM_None` の `eval` で `NameError`)。**wasm 上の `tests/all_tools.mjs` (48/48) は未再実行** (§12 参照。FL 同梱 `midi.py`/`utils.py` は mac 側のみで fl-win64 素材に無く、入力が揃わないため)。
 
 ## 12. 未解決 (#81)
 
 - (a) 実機 FL での `mixer.getCurrentTempo(1)` 等の意味差確認は実機が必要で未着手 (#81 のブロッカーのまま)。
 - `device.flrMidiNote` / `flrMidiCC` の書式・kwlist 未復元 (2 件)。
+- stubs 既定値が C 側で不明な引数を飛ばす呼出し (`channels.soloChannel(1, useGlobalIndex=True)` 等 3 関数) は `TypeError`。実 FL は C 側の既定値で通すため意味差。ホストへの「省略」の渡し方 (provider は `None`=handler 既定値、JS mock の `tog` は `undefined` のみ省略扱い) が未統一で、PM 判断待ち (PR #463 コメントに起票依頼)。
+- stubs 既定値 `midi.*` 10 種 (21 引数: `PIM_None` 7、`GT_All` 5 ほか) は `eval(…, {})` で `NameError` (main 既存の問題)。PM が別 issue で追跡 (PR #463 コメントに起票依頼)。
 - wasm 回帰 (`bash tools/python/run_all.sh`, 48/48) は本 run で未実行 (入力の mac 由来 `midi.py`/`utils.py`・`[MAC]` 素材が無い)。`fl_api.py` の変更は kwargs 経路のみで位置引数呼出しは従来と同一。

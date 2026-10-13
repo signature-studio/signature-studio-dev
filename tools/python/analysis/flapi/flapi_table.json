@@ -31,9 +31,7 @@
     "mcp_tools": [],
     "kwsig": {
      "flags": 4,
-     "fmt": "i",
-     "required": 1,
-     "max": 1
+     "fmt": null
     }
    },
    "getDisplayZone": {
@@ -859,9 +857,7 @@
     "mcp_tools": [],
     "kwsig": {
      "flags": 4,
-     "fmt": "i",
-     "required": 1,
-     "max": 1
+     "fmt": null
     }
    },
    "selectTool": {
@@ -6942,9 +6938,7 @@
     "mcp_tools": [],
     "kwsig": {
      "flags": 4,
-     "fmt": "F",
-     "required": 1,
-     "max": 1
+     "fmt": null
     }
    },
    "getSnapMode": {
@@ -7843,9 +7837,7 @@
     "mcp_tools": [],
     "kwsig": {
      "flags": 4,
-     "fmt": "i",
-     "required": 1,
-     "max": 1
+     "fmt": null
     }
    },
    "showNotification": {
@@ -8362,9 +8354,7 @@
     "mcp_tools": [],
     "kwsig": {
      "flags": 4,
-     "fmt": "$",
-     "required": 1,
-     "max": 1
+     "fmt": null
     }
    },
    "getIdleElapsed": {
@@ -9818,9 +9808,7 @@
     "mcp_tools": [],
     "kwsig": {
      "flags": 4,
-     "fmt": "iiii",
-     "required": 4,
-     "max": 4
+     "fmt": null
     }
    },
    "init": {
