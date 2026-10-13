@@ -4,7 +4,7 @@
 - 再現: `bash tools/plugins/distortion/distortion_e2e.sh` (測定 + 判定。 不合格は非 0) / `bash tools/plugins/distortion/distortion_nega.sh` (ネガティブコントロール) / `python3 tools/plugins/distortion/tables.py` (本書 §1〜§4 の表を出力)
 - 素材: `fl-win64` / `toolchain-retdec` / `toolchain-emsdk` (`docs/WORKFLOW.md` §11)。 環境は `distortion/env.sh`
 - 手法の出典: PR #506 (PLG-F3 dynamics, 未マージ) の e2e / matrix_check / ids_crosscheck / engine_lift を踏襲。 #506 の reviewer 指摘 2 点 (判定が不合格でも exit 0 / 判定そのものの NC が無い) は §5 の通り最初から潰した
-- 既知類型との関係 (`docs/DEFECTS.md`): **該当なし** (閉包の判定は「通る」ことだけで silent miscompile を検出しない。 差分試験は未実施。 §4 の engine 型エラー E1/E2/E4 は emcc が拒否する loud な IR 型エラー、§7)
+- 既知類型との関係 (`docs/DEFECTS.md`): **該当なし** (閉包の判定は「通る」ことだけで silent miscompile を検出しない。 差分試験は未実施。 §4 の engine 型エラー E1/E2/E5 は emcc が拒否する loud な IR 型エラー、§7)
 
 ## 0. 結論 (先出し)
 
@@ -20,7 +20,7 @@
    この 4 本の DSP は閉包内のインライン SSE に載っていると推定する (未確認)。 kernel 単位の差分試験 (P0c) では保証できず、**Eff_Render 単位の差分試験が必須**。
    **WaveShaper (2+2 site) と Love Philter (1+1 site) は P0c が bit-exact 未達と記録する 0x5dfd30 / 0x5dfdb0 を閉包で呼ぶ** (P0c §10.3: buf_diff 508,385 など。 dd 演算系列が真因)。
    Love Philter は #331 の対象に列挙された 0x5df040 も 1 site 使う。 Love Philter / `module` / Soft Clipper には Balance の 80 kernel にハッシュ対応付けできない呼出が計 7 種 (`raw:`) ある。
-5. **C++ DLL 2 本 (Effector engine / Hardcore) は RetDec+pass 鎖までは通るが `emcc -c` は未通過** (§4)。 両者とも型エラーが連鎖し (E1 → E2 / E4)、VEX を含む未実装 helper 宣言が 110 / 102、`x86_fp80` 関数が 1 ずつある。
+5. **C++ DLL 2 本 (Effector engine / Hardcore) は RetDec+pass 鎖までは通るが `emcc -c` は未通過** (§4)。 両者とも型エラーが連鎖し (E1 → E2 / E5)、VEX を含む未実装 helper 宣言が 110 / 102、`x86_fp80` 関数が 1 ずつある。
    **Hardcore は Delphi framework 無しだが、全 `.pdata` 1,726 関数を lift しただけで、DSP の閉包 (エントリからの到達集合) は未算出**。 T2 の見積 4 人日/本には engine 側の未知工数が残る。
 
 ## 1. 閉包 lift 結果 (Delphi 製 9 DLL)
@@ -121,7 +121,7 @@ P0c (`p0c/REPORT.md`) で見た各 kernel の現状 (本 PR では再測定し�
 失敗の連鎖 (clang は最初の型エラーで止まるため 1 件ずつ露見。 `first_errors.txt` に記録):
 1. 両 DLL: `icmp eq ptr %x, %arg1` (`%arg1` は i64 仮引数) → "defined with type 'i64' but expected 'ptr'" (#506 §7 の E1 と同型)。 `engine_fixcmp.py` (engine 局所 pass、共有鎖には未組込) で Effector engine 6 / Hardcore 11 operand を直す。
 2. Effector engine: 次に `__asm_rep_stosq_memset` 呼出の引数が SSA 値を含む `zext` 定数式 → "zext constexprs are no longer supported" (#506 §7 の E2 と同型)。
-3. Hardcore: 次に `%ce1n11_function_180018de0 = zext 0 to i64` (型の無い定数を zext、`function_180018de0`、final.ll に 1 site) → "expected type" (**E4、新規**)。 `zext (…)` 定数式も 1 site 残り、E2 も後に露見する。
+3. Hardcore: 次に `%ce1n11_function_180018de0 = zext 0 to i64` (型の無い定数を zext、`function_180018de0`、final.ll に 1 site) → "expected type" (**E5、新規**。 #534 の E4 = `fix_asm_stores.py` の dangling use とは別類型)。 `zext (…)` 定数式も 1 site 残り、E2 も後に露見する。
 - 未実装 helper (distinct 宣言数) は Effector engine 110 (VEX 79)、Hardcore 102 (VEX 68)。 非 VEX は `blendv*`・`cmp*pd/ps`・`pmulld`・`pmuludq`・`fxsave`・`rep_movsb_memcpy` など。 VEX が CPUID 分岐で SSE 路に固定できるかは未確認。
   `x86_fp80` 関数は各 1 (#197 の `f80_lower.py` の適用対象)。
 - 以上は到達性の実測で、engine の正しさは何も示していない。
@@ -160,11 +160,11 @@ P0c (`p0c/REPORT.md`) で見た各 kernel の現状 (本 PR では再測定し�
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 差分試験 bit-exact (出口条件 3)。 Eff_Render 単位の native / wasm harness が無く、P0a/P0b 未完 | #203 を閉じられない | #195 / #196 / #197 の完了後に #203 を再開 (Closes はその時)。 harness は #506 §6 の「[PLG-F3a] Eff_Render 単位の native(ms_abi VA 敷設) ⟷ wasm 差分 harness」と共通のため、同チケットに #203 を足すよう PM に依頼 (未起票) |
+| 差分試験 bit-exact (出口条件 3)。 Eff_Render 単位の native / wasm harness が無く、P0a/P0b 未完 | #203 を閉じられない | #195 / #196 / #197 の完了後に #203 を再開 (Closes はその時)。 harness は新規 **#544 [PLG-F6-1]** に起票 (#506 §6 が提案する PLG-F3a と共通化できるので統合は PM 判断) |
 | Render test .flp の E2E (出口条件 4) | 同上 | FLEngine 統合待ち。 親 #14 / #203 |
-| Effector engine / Hardcore の `emcc -c` 未通過 (E1 → E2 / E4 の連鎖、VEX 含む未実装 helper 110 / 102、f80 各 1) | T2 の 2 本 | #506 §6 の「[PLG-F3b] C++ engine DLL の lift 鎖」(未起票) に #203 の 2 本を追加するよう PM に依頼 |
-| Hardcore の DSP 閉包 (CreatePlugInstance / TFruityPlug 殻のエントリからの到達集合) が未算出 | Hardcore の工数 (見積 4 人日) の根拠 | #203 の次 run。 `plugin_closure.py` は Delphi vtable 前提のため C++ 用のエントリ抽出が要る |
-| Distructor 殻と `module` (18916) の結合方式 | DSP がどちらにあるかの確定 | #203 の次 run |
+| Effector engine / Hardcore の `emcc -c` 未通過 (E1 → E2 / E5 の連鎖、VEX 含む未実装 helper 110 / 102、f80 各 1) | T2 の 2 本 | 新規 **#545 [PLG-F6-2]** に起票 (共有鎖の修復は #534 / #523 / #527 / #540 と共通化) |
+| Hardcore の DSP 閉包 (CreatePlugInstance / TFruityPlug 殻のエントリからの到達集合) が未算出 | Hardcore の工数 (見積 4 人日) の根拠 | #545 (`plugin_closure.py` は Delphi vtable 前提のため C++ 用のエントリ抽出が要る) |
+| Distructor 殻と `module` (18916) の結合方式 | DSP がどちらにあるかの確定 | #544 (差分 harness の設計時に結合方式を解析する) |
 | Love Philter の `__asm_rep_stosb_memset` (未実装 helper) | wasm 化 | #197 にコメント (issue 記載の memset 写像で足りるか) |
 | 0x5dfd30 / 0x5dfdb0 の bit-exact 未達 (P0c §10.3) を WaveShaper 各 2 / Love Philter 各 1 site が閉包で使う | 両 plugin の出口条件 (bit-exact か許容条件の記録) | #197 にコメント (両 kernel の残差を許容条件にするか再実装かの判断が要る) |
 | 0x5df040 (Love Philter が閉包で 1 site 使用) の P0c 残差 | Love Philter の kernel 保証 | #331 に依存を追記 |
@@ -181,7 +181,7 @@ P0c (`p0c/REPORT.md`) で見た各 kernel の現状 (本 PR では再測定し�
 |---|---|---|---|---|
 | E1 icmp ptr/i64 混在 | `icmp eq ptr %x, %argN` (argN は i64) | Effector engine 6 operand / Hardcore 11 operand | emcc "defined with type 'i64' but expected 'ptr'" | `engine_fixcmp.py` (局所)。 `fix_ptr_params.py` の拡張が本筋 |
 | E2 SSA 値入りの定数式 | `__asm_rep_stosq_memset` の引数に `zext (… i64 %v …)` | Effector engine 1 site / Hardcore 1 site | emcc "zext constexprs are no longer supported" | 未修復 |
-| E4 型の無い zext | `%x = zext 0 to i64` | Hardcore `function_180018de0` 1 site | emcc "expected type" | 未修復 |
+| E5 型の無い zext | `%x = zext 0 to i64` | Hardcore `function_180018de0` 1 site | emcc "expected type" | 未修復 |
 
 ## 8. 成果物
 
