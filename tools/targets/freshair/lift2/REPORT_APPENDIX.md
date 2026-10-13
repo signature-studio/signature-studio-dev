@@ -77,6 +77,7 @@
 **実行結果の bit-exact 検証は未達 (build のみ・実行未検証)**。元に戻して `cmp` で一致を確認した (`git status` clean)。
 
 注: 本表は trap 挿入版の結果で、2.2 の PASS は通常版 (trap 無し) の結果。新経路を実行させる e2e は無い。
+rep 経路 (`h_rep_str`) の trap 版の結果は §7 が正本。§7 の FAIL と本表の PASS は矛盾しており、§7.2 の再実行で解消するまで未確定。
 
 ### 2.4 epf 欠落時のゲート (負のコントロール)
 
@@ -158,17 +159,37 @@ bash tools/targets/freshair/lift2/lift2_e2e.sh                                  
 - `vpcmpeqw` (ymm、`f_1810577ac`) の lowering。
 - epf 展開の素材配線は #693。
 
-## 7. FA-10 (#666) 残件: rep 経路のネガコン (ctrl)
+## 7. FA-10 (#666) 残件: rep 経路のネガコン (ctrl) — 矛盾あり・未検証
 
-- 検証 HEAD: `84e43186` (origin/main)。変更は `mlift/mlift_ops.py` の一時 trap 1 行のみ (検証後に `cmp` で HEAD と一致を確認して戻した)。
-- 対象: `h_rep_str` の先頭に `llvm.trap` + `unreachable` を入れた一時版。`work/ctrl/ctrl_rep.json` に実在する `rep movsb` / `rep stosb` / `rep stosw` / `rep stosq` の closure がこの経路を通る。
-- 結果 (実測):
-  - trap 版: `build_ctrl.sh` ok → `run_ctrl.sh 2 5` **exit 1** (`MISMATCH in ctrl scenarios`)。`native/wasm` の行数 15/0、ERR は wasm 側 `RuntimeError: unreachable` の 1 件で native 側 ERR 1 件とは同一 scenario ではない (`同一 scenario: NO`)。
-  - 元に戻した版: `build_ctrl.sh` ok → `run_ctrl.sh 2 5` **exit 0** (`ctrl BIT-EXACT 15/15`, real 3 s, load 0.77)。
-- 判定: rep 経路の誤りは ctrl e2e で検出される。これで #666 の受入条件 4 (ネガコン) を満たす。comp / filter の rep 経路 (`ml/comp_full_rep.json` 等) は動的に未確認 (§5 の未解決のまま)。
+本節が rep 経路ネガコンの数値の正本 (§2.3・§2.6 は本節を参照)。受入条件 4 (ネガコン) は**未達**。
 
-### 7.1 lift2_e2e.sh 全体 (HEAD `32f3561b`、rep 経路の一時 trap は含まず)
+### 7.0 記録の矛盾 (解消されていない)
 
-- `RESULT: lift2_e2e ALL PASS`, exit 0, real **56 s**, load 0.78→0.78 (nproc 4, TMPDIR=`$RUNNER_TEMP`)。
+| 記録箇所 | 検証 HEAD | 一時 trap の位置 | `run_ctrl.sh 2 5` の結果 |
+|---|---|---|---|
+| §2.3 / §2.6 (movs/stosw 経路) | 記載なし | 新経路 (movs b/w/d/q・stosw) の先頭 | **15/15 PASS** (経路未実行) |
+| §7.1 (h_rep_str) | `84e43186` と記載 | `h_rep_str` 先頭 | **exit 1** (MISMATCH, `RuntimeError: unreachable`) |
+
+- 両方を同時に正とすることはできない。差の原因は未切り分け。候補: (a) trap の挿入位置 (`h_rep_str` 先頭 と 新経路分岐の先頭が同一か不明)、(b) `ctrl_rep.json` の対象 closure が実行経路に乗るか (S2000–S2014 の到達性)、(c) 実行 commit が §2.3 と §7 で異なる (`84e43186` の記載は `32f3561b`/`5aec7dda` 系の HEAD と一致しない)。
+- 検証 HEAD の記載も不整合: §7 は `84e43186` (origin/main) とし、§7.1 は `32f3561b` で全体 e2e を実測としている。trap 版を実行した commit hash は**未確定**。
+- 本 PR の review 時点 (fix run) では素材 (`work-liftlib-targets`・`plugins-freshair`・`toolchain-*`) が `$ARTIFACTS_DIR` に無く (`fl-win64` のみ)、`build_ctrl.sh`・`run_ctrl.sh` を再実行できなかった。よって本節の数値は**再現していない**。
+
+### 7.1 rep 経路ネガコンの記録 (§7.0 の矛盾を含む)
+
+- 対象: `h_rep_str` の先頭に `llvm.trap` + `unreachable` を入れた一時版。`work/ctrl/ctrl_rep.json` の `rep movsb` / `rep stosb` / `rep stosw` / `rep stosq` closure が経路を通る想定。
+- trap 版 (記録): `build_ctrl.sh` ok → `run_ctrl.sh 2 5` **exit 1** (`MISMATCH in ctrl scenarios`)、native/wasm 行数 15/0、wasm 側 `RuntimeError: unreachable`、`同一 scenario: NO`。
+- 元に戻した版 (記録): `build_ctrl.sh` ok → `run_ctrl.sh 2 5` **exit 0** (`ctrl BIT-EXACT 15/15`, real 3 s, load 0.77)。元に戻した後の `cmp` 一致は記録上のみ。
+- 判定: §2.3・§2.6 の PASS と本節の FAIL が両立しないため、**rep 経路の誤りが ctrl e2e で検出されるとは現時点で言えない**。受入条件 4 は未達。
+
+### 7.2 未実施 (再実行が必要)
+
+1. 検証 HEAD を 1 つに固定し、trap 版を `h_rep_str` 先頭 / 新経路分岐先頭の両方で作り、`build_ctrl.sh` + `run_ctrl.sh 2 5` を各 1 回 foreground で実行 (同一 commit で)。
+2. 元に戻した後 `cmp` で HEAD と一致を確認し、その結果を本節に追記。
+3. 上記が一致しない場合は §7.0 の (a)〜(c) を切り分けてから §2.3・§2.6 を訂正する。
+
+### 7.3 lift2_e2e.sh 全体 (記録、未再現)
+
+- 記録: `RESULT: lift2_e2e ALL PASS`, exit 0, real **56 s**, load 0.78→0.78 (nproc 4, TMPDIR=`$RUNNER_TEMP`, HEAD `32f3561b`)。本 fix run では未再実行。
 - comp 400/400 BIT-EXACT・filter fuzz 4 系統 mismatch 0・ABI violations 0・ctrl BIT-EXACT 15/15 (S2001 の ERR は両側同一)・ablation 5 種すべて検出。
-- 素材: `work-liftlib-targets` を worktree に展開。`plugins-freshair` は `FA_DL` で `fetch.sh` を実行し factory `.epf` 8 本を補完 (#693 の手動手順)。emsdk / retdec は `/opt` 既存。
+- 素材: `work-liftlib-targets` を展開。`plugins-freshair` は `FA_DL` で `fetch.sh` を実行し factory `.epf` 8 本を補完 (#693 の手動手順)。emsdk / retdec は `/opt` 既存。
+- 必要な素材: `oc_artifacts: fl-win64 work-liftlib-targets plugins-freshair toolchain-emsdk toolchain-retdec`。
