@@ -5,8 +5,8 @@ sr4_ladder_reset   PASS   PASS   bit-exact 50/50, fp_alu 0/0
 sr4_osc_setscale   FAIL   FAIL   result=mismatch [warn: p1_unsupported=4]
 sr4_svf_process    FAIL   FAIL   result=mismatch; fp_alu_cov=0.0083
 sr4_osc_zero       PASS   PASS   bit-exact 50/50, fp_alu 0/0
-sr4_ladder_setp    FAIL   FAIL   result=mismatch
+sr4_ladder_setp    PASS   PASS   bit-exact 200/200, fp_alu 0/0
 sr4_osc_get620     FAIL   FAIL   result=mismatch
 sr4_wt_const       FAIL   FAIL   result=mismatch
-stage1 roots bit-exact: 4/56 (wt_osc 21 / filter 11 / voice 24 roots; union 56)
+stage1 roots bit-exact: 5/56 (wt_osc 21 / filter 11 / voice 24 roots; union 56)
 PILOT GATE OK (0 expectation mismatches)

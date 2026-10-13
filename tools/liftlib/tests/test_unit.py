@@ -554,7 +554,30 @@ def t18():
     print("T18 ok (S1c movlps/movhpd store 復元 2 件 + 非 load 旧値は不変 + Image.add_func 登録/重複拒否)")
 
 
+def t19():
+    """SR-4 (#75): F2 の D5 型 (xmm 引数が `sext i64 %argN` に束ねられた形) 検出。"""
+    from liftlib.passes import f2
+    ll = "\n".join([
+        "define i64 @function_18008b2a0(i64 %arg1) local_unnamed_addr {",
+        "dec_label_pc_18008b2a0:",
+        "  %2 = sext i64 %arg1 to i128, !insn.addr !0",
+        "  %3 = call i64 @__asm_movss__qx(i128 %2), !insn.addr !0",
+        "  %4 = sext i64 %arg1 to i128, !insn.addr !1",
+        "  %5 = call i64 @__asm_movss__qx(i128 %4), !insn.addr !2",
+        "  ret i64 0, !insn.addr !2",
+        "}",
+        "declare i64 @__asm_movss__qx(i128) local_unnamed_addr",
+        "!0 = !{i64 6443020960}", "!1 = !{i64 6443020965}", "!2 = !{i64 6443020970}", ""])
+    mod = IR.Module.parse(ll)
+    fn = mod.funcs()[0]
+    hit = f2.find_sext_arg_for(mod, fn, [6443020960])
+    assert hit is not None and hit[2] == "%2", hit                 # reader アドレス上でのみ使われる sext
+    assert f2.find_sext_arg_for(mod, fn, [6443020999]) is None     # reader 外 -> 対象外
+    assert f2.find_sext_arg_for(mod, fn, [6443020960, 6443020970]) is not None
+    print("T19 ok (F2 D5 型: reader 上の sext i64 %arg を xmm 値定義として検出 / reader 外は不検出)")
+
+
 if __name__ == "__main__":
-    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t17, t18):
+    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t17, t18, t19):
         f()
     print("ALL UNIT TESTS PASS")

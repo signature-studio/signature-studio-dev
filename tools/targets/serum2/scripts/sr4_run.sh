@@ -78,8 +78,8 @@ for d in r:
 json.dump(r, open(sys.argv[2], 'w'))
 EOF
 $PY scripts/sr4_gate.py $O/sr4_summary.json $RUN/nc_d.json --pilot >/dev/null; nc "d: 期待 fail の pilot が PASS に化けると pilot gate が FAIL" $? 1
-# NC-e: strict gate -- 56 root 中 4 のみ PASS の状態は exit 1
-nc "e: strict gate は第 1 段未達 (root 4/56 < 56) で exit 1" $SRC 1
+# NC-e: strict gate -- 56 root 中 5 のみ PASS の状態は exit 1
+nc "e: strict gate は第 1 段未達 (root 5/56 < 56) で exit 1" $SRC 1
 
 echo "## verdict"
 echo "pilot gate rc=$PRC / strict gate rc=$SRC / negative-control failures=$FAILS"
