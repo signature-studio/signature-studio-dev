@@ -137,11 +137,18 @@ RetDec IR は下位 store (`%arg3`) のみで、`%arg2` の `inttoptr` が未使
 - レビュー指摘への対応 (支配チェック): 下位 store より後で定義される `%H` への挿入は、`llvm-as` が
   `Instruction does not dominate all uses!` で落ちるため候補から除外した。`%fhi_s` / `%fhi_v` が既存のときも書き換えない。
   回帰テストは `tools/plugins/lift/passes/test_fix_fistp_hi_store.sh` (`llvm-as` で検査。ok / dom / name / 旧 pass の負論対照)。
-  実行結果は `OK` (4 ケースとも期待どおり)。最新 HEAD `2ff98135` で `test_fix_fistp_hi_store.sh` を再実行 → `OK` (rc=0)。
-  この修正の後に `p0c4_abi_e2e.py` は再実行していない。
-  再実行に必要な `toolchain-retdec` / `toolchain-emsdk` / `work-liftlib` は本 run の素材に無かった (`ls $ARTIFACTS_DIR` は `fl-win64.tar.zst` のみ)。
-  PR 本文に `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk work-liftlib` を追加し、次の review run で素材付きの再実行を依頼する。
-  支配チェックが 0x5de3e0 の候補を落とさないかは未確認 (IR は `work/` にあり本 run では得られない)。
+  実行結果は `OK` (4 ケースとも期待どおり)。`887d59fb` でも `test_fix_fistp_hi_store.sh` → `OK` (rc=0)。支配チェック後の pass で 0x5de3e0 の候補は落ちず `fixed` になる。
+  `887d59fb` で `p0c4_abi_e2e.py 2000` を実測 (素材 `fl-win64` `toolchain-retdec` `toolchain-emsdk` `work-liftlib` を展開。`k80.lift.ll` は `lift_ranges.sh` で再生成 (80 defines)、`f80_assess.py` → `p0c4` の順)。下表。
+
+  | 条件 | 検証 HEAD | rc | 所要 | load (開始時) | 0x5de3e0 buf_diff | ok かつ buf_diff=0 | run / ok / sig11 |
+  |---|---|---:|---:|---:|---:|---:|---|
+  | 修復なし (`K80_NO_FISTP_HI=1 p0c4_abi_e2e.py 2000`) | `887d59fb` | 0 | 30.5 s | 0.10 | 2000 | 45 | 67 / 67 / 0 |
+  | 修復あり (`p0c4_abi_e2e.py 2000`) | `887d59fb` | 0 | 36.1 s | 0.09 | 0 | 46 | 67 / 67 / 0 |
+
+  - 修復なしと修復ありの kernel 行の差分は 0x5de3e0 の 1 行 (buf_diff 2000 → 0) のみ。他 66 kernel は run / ok / buf_diff が同一。
+  - 受入基準 ①〜④ と kernel 表 (45 変数 / 80 実装 / 10,886 B / x87 28) は修復ありで通過。
+  - 残差 0x5dee90 / 0x5df040 / 0x5e02b0 は修復ありでも buf_diff 2,565,360 / 2,565,277 / 2,578,706 のまま。本ブランチ `887d59fb` は origin/main (`b53f24e0`) より 170 コミット古く、main の `k80_deref_fix.py` (#983、`cb346018`) を含まないため。main 取り込み後の再測定は #331 の範囲 (本 PR の範囲外)。
+  - 未検証: `p0c3_e2e.sh` (0x5de3e0 を回帰判定から除外する別経路)、`p0c_e2e.sh` / `p0c2_e2e.sh`。
 - 未検証: 残る 0x5dee90 / 0x5df040 / 0x5e02b0 / 0x5e12b0 (#331) と、`p0c3_e2e.sh` の回帰判定 (0x5de3e0 除外の既存処理) の見直し。
 
 ## 15. 環境パス置換 (#346, 親 #294・先行 #312): /home/ubuntu 絶対パスを tools/shared へ
