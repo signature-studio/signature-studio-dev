@@ -17,6 +17,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <emscripten.h>
 #include "../../shimx/src/shimx.h"
 #include "../rt/fle_cpu.h"
@@ -95,10 +96,52 @@ long fle_soft_hit(const char* nm) {
 /* fle_cpu.c の fail-fast を JS 例外化 (survey を 1 インスタンスで継続できるように) */
 EM_JS(void, fle_js_err, (const char* s), { console.error(UTF8ToString(s)); });
 
+/* ---------------- FLE-6: dsp_ippv2_x64.dll ローダ (f_653f40 の fill コールバック登録) ----------------
+ * f_6539e0 は LoadLibraryW("dsp_ippv2_x64.dll") の戻りを 0x15F40E8 に保存し、f_653f40 は 0 だと
+ * 早期 return する。さらに f_653dd0 が GetProcAddress(h, 423 名) の戻りを .bss に格納する
+ * (0x15F34A0 = ippsZero_8u)。LoadLibraryW 失敗 + GetProcAddress 常に 0 が「0x15F34A0 未登録」の原因。
+ * ここでは dsp_ippv2_x64.dll を擬似モジュール登録し、GetProcAddress に名前ごとのトークン
+ * (guest 側では dispatch → ott_unlifted → fle_ff で処理) を返す。実装は ippsZero_8u のみ
+ * (guest メモリを 0 埋め)、他は ippStsNoErr(0) を返す fail-soft + 呼出計数。 */
+#define IPP_TOK_BASE 0x7F100000u
+#define IPP_MAX 512
+static const char* g_ipp_nm[IPP_MAX]; static u32 g_ipp_n, g_ipp_calls[IPP_MAX], g_ipp_total;
+static u64 g_ipp_h; static int g_ipp_on = 0;   /* 既定は無効 (通常 boot の挙動を変えない)。fle_boot_set_ipp(1) で有効 */
+static u32 ipp_token(const char* nm) {
+    for (u32 i = 0; i < g_ipp_n; i++) if (!strcmp(g_ipp_nm[i], nm)) return IPP_TOK_BASE + i;
+    if (g_ipp_n >= IPP_MAX) return 0;
+    char* d = (char*)malloc(strlen(nm) + 1); strcpy(d, nm);
+    g_ipp_nm[g_ipp_n] = d;
+    return IPP_TOK_BASE + g_ipp_n++;
+}
+static int ipp_call(u64 t) {   /* fle_ff から。処理したら 1 */
+    if (t < IPP_TOK_BASE || t >= IPP_TOK_BASE + g_ipp_n) return 0;
+    u32 i = (u32)(t - IPP_TOK_BASE);
+    g_ipp_calls[i]++; g_ipp_total++;
+    if (!strcmp(g_ipp_nm[i], "ippsZero_8u")) {   /* IppStatus ippsZero_8u(Ipp8u* pDst, int len) */
+        u64 dst = R[1]; int len = (int)(R[2] & 0xffffffffu);
+        if (dst && len > 0) memset((void*)(uintptr_t)dst, 0, (size_t)len);
+    }
+    R[4] += 8; R[0] = 0;
+    return 1;
+}
+#define IPP_HMOD 0x7F0F0000u   /* wasm メモリ外の擬似 HMODULE */
+static HMODULE fle_ipp_load_hook(const char* name, DWORD flags) {
+    (void)flags;
+    if (g_ipp_on && name && strstr(name, "dsp_ippv2")) { g_ipp_h = IPP_HMOD; return (HMODULE)(uintptr_t)IPP_HMOD; }
+    return 0;
+}
+EMSCRIPTEN_KEEPALIVE void fle_boot_set_ipp(int on) { g_ipp_on = (int)(on != 0); }
+EMSCRIPTEN_KEEPALIVE u32 fle_ipp_total(void) { return g_ipp_total; }
+EMSCRIPTEN_KEEPALIVE u32 fle_ipp_names(void) { return g_ipp_n; }
+EMSCRIPTEN_KEEPALIVE const char* fle_ipp_name(int i) { return (u32)i < g_ipp_n ? g_ipp_nm[i] : ""; }
+EMSCRIPTEN_KEEPALIVE u32 fle_ipp_count(int i) { return (u32)i < g_ipp_n ? g_ipp_calls[i] : 0; }
+
 /* fle_cpu.c の fail-fast を JS 例外化 (survey を 1 インスタンスで継続できるように)。
  * unlifted(0) は m11 の icall-miss (ret 0) 揃えで容忍: retaddr を pop して RAX=0 で dispatch に戻る。 */
 static void fle_ff(const char* kind, u64 a) {
     char buf[160];
+    if (!strcmp(kind, "unlifted") && ipp_call(a)) return;
     if (!strcmp(kind, "unlifted") && a == 0) {
         snprintf(buf, sizeof buf, "[fleboot][ff] dispatch(0) -> ret 0 (m11 icall-miss 揃え, call site ret=0x%llx)",
                  (unsigned long long)LD64(R[4]));
@@ -153,7 +196,11 @@ void imp_ExitProcess(void) {
     fle_throw_kind((long)(intptr_t)"exit", (long)(R[1] & 0xffffffff));
 }
 void imp_TerminateProcess(void) { g_n_exit++; fle_throw_kind((long)(intptr_t)"exit", 3); }
-void imp_GetProcAddress(void) { g_n_getproc++; R[4] += 8; R[0] = 0; }  /* m11 旧 stub 揃え (REPORT §4) */
+void imp_GetProcAddress(void) {  /* m11 旧 stub 揃え (REPORT §4)。FLE-6: dsp_ippv2 のみトークンを返す */
+    u64 h = R[1] & 0xffffffffu, nm = R[2];
+    g_n_getproc++; R[4] += 8; R[0] = 0;
+    if (g_ipp_on && g_ipp_h && h == g_ipp_h && nm >= 0x10000ull) R[0] = ipp_token((const char*)(uintptr_t)nm);
+}
 void imp_LoadStringW(void) {   /* gui_compat.c と同一: buf[0]=0 を書かないと LoadResString が暴走 */
     u64 buf = R[9];
     g_n_loadstr++;
@@ -526,6 +573,8 @@ EMSCRIPTEN_KEEPALIVE void fle_boot_enter(int survey) {
          * boot 連鎖の先を伸ばす。副作用: Enter/Leave/TryEnter の意味が失われる
          * (survey の lock 依存 unit は誤判定する可能性 — REPORT §5 に記録)。 */
         shimx_set_cs_null_ok(1);
+        /* FLE-6: dsp_ippv2_x64.dll の LoadLibraryW を成功させる (f_6539e0 → 0x15F40E8) */
+        shimx_set_load_hook(fle_ipp_load_hook);
 #endif
         fle_ff_hook = fle_ff;
         fle_dispatch_probe = fle_probe_dispatch;
