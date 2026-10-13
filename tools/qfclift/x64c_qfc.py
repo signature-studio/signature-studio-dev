@@ -34,7 +34,6 @@ def i_phaddw(self, ins, ops):
 #   pshufb = 0x80 bit の 0 化を落とす / phaddw = 各和に +1 する。いずれも qfc_diff が FAIL することを確認する
 NEG = os.environ.get('QFC_NEGCTL', '')
 if NEG == 'pmulhrsw':
-    _old = i_pmulhrsw
     def i_pmulhrsw(self, ins, ops):
         self.lane(ins, ops, 'w', 8, '(uint16_t)(((int32_t)a_.sw[k_] * (int32_t)b_.sw[k_] >> 15))')
 elif NEG == 'pshufb':
