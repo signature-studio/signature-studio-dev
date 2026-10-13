@@ -16,7 +16,7 @@ usage:
 """
 import argparse, json, os, re, sys, collections
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', '..', 'liftlib'))
-from liftlib.passes.fp_bind import replace_lines, bind_slot_loads, insert_after, fn_span
+from liftlib.passes.fp_bind import replace_lines, replace_at, site_at, bind_load_at, insert_after, fn_span
 
 # ---- 差し替え点テーブル (実測座標。machine 側対応は mpatch.py と対) ----
 # at      : 分岐 / store の機械語 VA
@@ -277,20 +277,21 @@ def apply_liftfix(lines, report):
 
     # LF1: tag 文字列 len (base が undef alloca 読みを xor 0 に fold。
     # machine は call 後に [rbp-0x28] を読む → 呼出後に mock が書く global から読む)
-    replace_lines(lines, C,
-                  r'\s*%\S+ = trunc i128 %\S+ to i64, .*!insn\.addr !2583',
-                  lambda m, l: ['  %36 = load i64, ptr @__authstub_str_len0, !insn.addr !2583 '
-                                '; LIFTFIX LF1 (旧: trunc of undef-fold)'], 1, 'LF1')
+    replace_at(lines, C, 0x1800c2c1f, r'\s*%\S+ = trunc i128 %\S+ to i64, ',
+               ['  %36 = load i64, ptr @__authstub_str_len0, !insn.addr !2583 '
+                '; LIFTFIX LF1 (旧: trunc of undef-fold)'])
     applied.append('LF1')
 
     # LF5/LF6: DOM root ポインタ (alloca 配置が machine と異なるため global に束縛)
-    bind_slot_loads(lines, C, '-72', '__authstub_doc_root', 2, 'LF5')
+    bind_load_at(lines, C, 0x1800c2c94, '-72', '__authstub_doc_root', 'LF5')
+    bind_load_at(lines, C, 0x1800c2ca4, '-72', '__authstub_doc_root', 'LF5')
     applied.append('LF5')
-    bind_slot_loads(lines, D, '-80', '__authstub_doc_root', 2, 'LF6')
+    bind_load_at(lines, D, 0x18004fbc6, '-80', '__authstub_doc_root', 'LF6')
+    bind_load_at(lines, D, 0x18004fbd6, '-80', '__authstub_doc_root', 'LF6')
     applied.append('LF6')
 
     # LF7: tag 文字列 len (ctrl LF1 の DSP 版: alloca 配置差を global 束縛で吸収)
-    bind_slot_loads(lines, D, '-152', '__authstub_str_len0', 1, 'LF7')
+    bind_load_at(lines, D, 0x18004fb74, '-152', '__authstub_str_len0', 'LF7')
     applied.append('LF7')
 
     # LF2: `%3 = xor i128 0, 0` (base が入口 undef 読みを fold したもの。
@@ -303,24 +304,18 @@ def apply_liftfix(lines, report):
     # LF3: ucomisd(0, v) 後の stale flag 再読出し (or cf,zf) を実 fcmp に置換
     # (machine: ucomisd xmm1=0, xmm0=v; ja → out。IR は entry 時の整数 flag を再利用するため誤分岐)
     # version 値は mock が呼出中に書く global から「比较時に」読む (entry hoist を避ける)
-    def lf3(m, l):
-        var = re.match(r'\s*(%\S+) = or i1', l).group(1)
-        return [
-            '  %lf3t = load i64, ptr @__authstub_dbl_ret0 ; LIFTFIX LF3 (stale flag → 実比較, 呼出後の値)',
-            '  %lf3d = bitcast i64 %lf3t to double ; LIFTFIX LF3',
-            f'  {var} = fcmp uge double %lf3d, 0.0 ; LIFTFIX LF3',
-        ]
-    replace_lines(lines, D, r'\s*%\S+ = or i1 %cf\.0\.reload, %zf\.0\.reload', lf3, 1, 'LF3')
+    i3 = site_at(lines, D, 0x18004fe46, r'\s*%\S+ = or i1 %cf\.0\.reload, %zf\.0\.reload')
+    var = re.match(r'\s*(%\S+) = or i1', lines[i3]).group(1)
+    lines[i3:i3 + 1] = [
+        '  %lf3t = load i64, ptr @__authstub_dbl_ret0 ; LIFTFIX LF3 (stale flag → 実比較, 呼出後の値)',
+        '  %lf3d = bitcast i64 %lf3t to double ; LIFTFIX LF3',
+        f'  {var} = fcmp uge double %lf3d, 0.0 ; LIFTFIX LF3',
+    ]
     applied.append('LF3')
 
     # LF4: 2 つ目の ucomisd (v <= 11.00001) の分岐が脱落しているため挿入
     # (machine: ucomisd xmm0, [11.00001]; ja 0x18004ff26)
-    s, e = fn_span(lines, D)
-    hits = [i for i in range(s + 1, e)
-            if re.match(r'\s*call void @__asm_ucomisd__1\(', lines[i])]
-    if len(hits) != 1:
-        raise SystemExit(f'LF4: candidate = {len(hits)} (expect 1)')
-    i = hits[0]
+    i = site_at(lines, D, 0x18004fe4c, r'\s*call void @__asm_ucomisd__1\(')
     cst = re.search(r'i128 %3, (i64 )?(\d+)\)', lines[i]).group(2)
     insert_after(lines, i, [
         '  %lf4t = load i64, ptr @__authstub_dbl_ret0 ; LIFTFIX LF4 (脱落分岐の復元, 呼出後の値)',

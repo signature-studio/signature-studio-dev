@@ -25,7 +25,7 @@ const rep = (ok, msg) => { if (!ok) bad++; console.log(`${ok ? "ok " : "NG "} ${
 rep(!!jsPath, `index.html から /assets/*.js を取得: ${jsPath}`);
 const idx = await get("/index.html");
 rep(idx.status === 307 && new URL(idx.headers.get("location"), base).pathname === "/", `/index.html -> ${idx.status} Location=${idx.headers.get("location")} (e2e 側は 307 を許容して / に統一する必要あり)`);
-for (const p of ["/", jsPath, "/worklets/dummy-worklet.js", "/__e2e__/add.wasm"]) {
+for (const p of ["/", jsPath, "/worklets/fl-audio-worklet.js", "/__e2e__/add.wasm"]) {
   const r = await get(p);
   if (r.status !== 200) { rep(false, `${p} status ${r.status}`); continue; }
   const eff = applyRequestRewrite(policy, p);
