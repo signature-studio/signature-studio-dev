@@ -105,10 +105,9 @@ IR (`work/boot_final3.ll`): `function_abfd60` 内の `%ce0n11_function_abfd60 = 
 ## 7. 再現手順
 
 ```sh
-export FL_WIN64_DIR=$RUNNER_TEMP/fl-win64   # 展開先 (未設定なら /home/runner/work/_temp/fl-win64)
+export FL_WIN64_DIR=$RUNNER_TEMP/fl-win64     # PE: $FL_WIN64_DIR/extracted/block00031_PE.bin
 mkdir -p "$FL_WIN64_DIR" && tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C "$FL_WIN64_DIR"
 tar --zstd -xf "$ARTIFACTS_DIR/work-m11.tar.zst" -C "$(git rev-parse --show-toplevel)"   # 内部パスは tools/m11/work/ 始まり (リポジトリ直下に展開)
-export FL_WIN64_DIR=$RUNNER_TEMP/fl-win64          # PE: $FL_WIN64_DIR/extracted/block00031_PE.bin
 cd tools/m11
 mkdir -p work/trap_triage
 uv run --with capstone --with pefile bash m11_e2e.sh      # e2e (30.5〜30.7 s)
@@ -145,7 +144,7 @@ survey は e2e で再生成した `work/m11_boot.cjs(.wasm)` に対して実行�
 - e2e `m11_e2e.sh` n=3 (`791cce5`、3 回とも増分で gen_ir2 なし):
   - 所要 43.6 / 34.8 / 34.9 s、load 0.34→0.58 / 0.49→0.72 / 0.66→0.81 (run 1 は開始・終了の時刻を別の call で取ったため tool の往復を含む)。
   - 3 回とも reached_stage 4/6、units 22/942、survey ok 864 / trap 31 (oom 1) / miss 46 / noproc 1 / clobber 0。
-  - commit 前に warm-up 1 回 (作業ツリーは oob_insn.py の未コミット変更のみ。e2e は oob_insn.py を読まない。gen_ir2・data/image 再生成・build を含む。時間は未計測。結果は同じ)。
+  - commit 前に warm-up として 1 回実行 (作業ツリーは oob_insn.py の未コミット変更のみ。e2e は oob_insn.py を読まない。結果は下記と同一。所要は未計測)。
   - 前回 (上記 §8 本文): 30.5 / 30.6 / 30.7 s、load 0.45 / 0.67 / 0.80。
 - survey `survey_units.mjs` (`SV_RAW=1`) n=3 (`791cce5`、e2e 後の build):
   - 所要 16.55 / 16.79 / 16.91 s、load 0.75→1.07 / 0.98→0.99 / 0.91→0.93。
