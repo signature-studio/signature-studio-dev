@@ -84,4 +84,4 @@ python3 tools/plugins/f2/indirect_resolve.py 19148        # 間接 call 23 件�
 
 - 測定 commit: 892a5c7d (f2 の `.py` 3 本の追加 commit)。
 - 再実行 (HEAD、`FL_WIN64_DIR` は block19148/19245 のみ展開): `raise_reach_frontier.py 19148` = visited 31・indirect 23・unresolved 1・raise_api 1 (1.6 秒)、19245 も同値。`raise_root_reach.py` は 2 root ずつ `reaches_raise: true`。`indirect_resolve.py` は raise_via_slot 3 / slot_no_store 5 / object_or_register_based 15 (両 block)。
-- `git diff 892a5c7d HEAD -- tools/plugins/f2/`: REPORT_1305.md のみ。`.py` は不変のため、数値は再測定不要。
+- `git diff 892a5c7d 6cfbac24 -- tools/plugins/f2/ --stat` の出力: `tools/plugins/f2/REPORT_1305.md | 30 +++++++++++++++++++++--------` / `1 file changed, 22 insertions(+), 8 deletions(-)`。`.py` は不変のため、数値は再測定不要。
