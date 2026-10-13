@@ -113,11 +113,11 @@ python3 tools/icall/diff/rax_callers.py 1801a9a6c 1801c8cb8 1801c8c98
 再現手順 (検証 HEAD はコミット後に更新):
 ```sh
 FL_WIN64_DIR=<fl-win64 展開先>/extracted bash tools/icall/measure_flengine_split.sh $OUT   # base/rw.dll・base/after.ranges を作る
-RETDEC_BIN=<RetDec>/bin/retdec-decompiler python3 tools/icall/sccp_stub_drop.py $OUT/base/rw.dll $OUT/base/after.ranges tools/icall/work/sccp_stub_drop
+RETDEC_BIN=<RetDec>/bin/retdec-decompiler python3 tools/icall/sccp_stub_drop.py $OUT/base/rw.dll $OUT/base/after.ranges $OUT/sccp_stub_drop
 ```
-`sccp_stub_drop.py` は `--print-after-all` の全 dump (709 本) を読み、関数ごとに stub 数・IR 行数・基本ブロック (ラベル数)・`br i1 undef`・0x1dc0080 の load/store を `dumps.tsv` に出し、stub 数が変わった関数の直前・直後を `sccp_pairs.tsv` に書く。`passes_stub_count.py` は段の変化点しか出さず、本節の行数・基本ブロック・`br i1 undef` は出さない。`tools/icall/work/` は gitignore。
+`sccp_stub_drop.py` は `--print-after-all` の全 dump (709 本) を読み、関数ごとに stub 数・IR 行数・基本ブロック (ラベル数)・`br i1 undef`・0x1dc0080 の load/store を `dumps.tsv` に出す。段名 (pass) ごとの合計は同じ実行が `passes.tsv` に出す (段の集計を手で足さない)。stub 数が変わった関数の直前・直後は `sccp_pairs.tsv`。`passes_stub_count.py` は段の変化点しか出さず、本節の行数・基本ブロック・`br i1 undef` は出さない。
 
-段ごとの実測 (`sccp_stub_drop.py` の `dumps.tsv` = dump 1 本ごとの生データから集計。関数 `function_1cc0000` / `function_1cc9b70` / `function_1cd3f30` / `function_1cd3fe0` の 4 関数が段ごとに 1 組ずつ出る):
+段ごとの実測 (`$OUT/sccp_stub_drop/passes.tsv` の値。関数 `function_1cc0000` / `function_1cc9b70` / `function_1cd3f30` / `function_1cd3fe0` の 4 関数が段ごとに 1 組ずつ出る):
 
 | 段 (dump 名) | stub 呼出し (関数合計) | 関数 IR 行数 (4 関数) | 基本ブロック | `br i1 undef` |
 |---|--:|--:|--:|--:|

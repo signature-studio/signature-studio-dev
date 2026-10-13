@@ -8,14 +8,14 @@ RetDec の --print-after-all 全段 dump を 1 段ずつ分け、段ごとに関
   br_undef   : `br i1 undef` の本数
   ld_1dc0080 : `load ... inttoptr (i64 31195264 ...)` (= 0x1dc0080) の本数
   st_1dc0080 : 同 store の本数
-を数え、dump 1 本ごとの生データを OUTDIR/dumps.tsv に書く (段の合計は dumps.tsv から集計する)。
-stub 数が変わった関数の直前・直後を OUTDIR/sccp_pairs.tsv に書く。
+を数え、dump 1 本ごとの生データを OUTDIR/dumps.tsv に書く。
+段名 (pass) ごとの合計 (dump 数・関数数・stub・行数・基本ブロック・br i1 undef・0x1dc0080 の load/store) を
+OUTDIR/passes.tsv に書く。stub 数が変わった関数の直前・直後を OUTDIR/sccp_pairs.tsv に書く。
 
 用途: RetDec の段ごとの IR 変化を再現する。RetDec は RETDEC_BIN (既定 /opt/retdec/bin/retdec-decompiler)。
 入力 RW_PE は measure_flengine_split.sh の base/rw.dll (after.ranges と組で使う)。
 """
 import os, re, subprocess, sys, tempfile
-from collections import defaultdict
 
 RETDEC = os.environ.get('RETDEC_BIN', '/opt/retdec/bin/retdec-decompiler')
 STUB = re.compile(r'function_1cd3f30\(\)|function_1cd3fe0\(\)')
@@ -79,6 +79,26 @@ def main():
                                                               v['bbs'], v['br_undef'], v['ld_1dc0080'],
                                                               v['st_1dc0080']))
             k += 1
+    # 段名ごとの合計 (出現順)。dump 名が同じ段は関数単位の dump が複数本に分かれて出るため、名前で合算する
+    tot, order = {}, []
+    for name, fs in dumps:
+        if name not in tot:
+            tot[name] = [0] * 8
+            order.append(name)
+        t = tot[name]
+        t[0] += 1
+        for v in fs.values():
+            t[1] += 1
+            t[2] += v['stub']
+            t[3] += v['lines']
+            t[4] += v['bbs']
+            t[5] += v['br_undef']
+            t[6] += v['ld_1dc0080']
+            t[7] += v['st_1dc0080']
+    with open(os.path.join(outdir, 'passes.tsv'), 'w') as f:
+        f.write('pass\tdumps\tfuncs\tstub\tlines\tbbs\tbr_undef\tld_1dc0080\tst_1dc0080\n')
+        for name in order:
+            f.write(name + '\t' + '\t'.join(str(x) for x in tot[name]) + '\n')
     # 関数ごとに stub 数が変わった段の直前 (before) と直後 (after)
     with open(os.path.join(outdir, 'sccp_pairs.tsv'), 'w') as f:
         f.write('func\tpass_before\tstub\tlines\tbbs\tbr_undef\tld_1dc0080\tpass_after\tstub\tlines\tbbs\tbr_undef\tld_1dc0080\tst_1dc0080\n')
