@@ -14,7 +14,7 @@
 
 ## 2. 実測
 
-環境: `$HOME/artifacts` から展開 (`work-fw-stage1` → `tools/plugins/work/fw/`、`toolchain-emsdk` → `/opt/emsdk` 既存 (emcc 6.0.12)、`toolchain-retdec` → `/opt/retdec` 既存 (RetDec v5.0))。
+環境: 素材は `docs/WORKFLOW.md` §11 の手順で取得し、`work-fw-stage1` を `tools/plugins/work/fw/` に展開 (`work/` は gitignore 対象で commit しない。`fw_stage2.sh` の標準的な使い方)。toolchain は `[EMSDK]` (emcc 6.0.12)・`[RETDEC]` (RetDec v5.0) を既存配置のまま使用 (`docs/REFERENCES.md` §1)。
 Python `pefile` / `capstone` は導入済み (判定 `import` OK)。
 
 | 手順 | 結果 | 所要時間 | load (終了時 1/5/15 分) |
