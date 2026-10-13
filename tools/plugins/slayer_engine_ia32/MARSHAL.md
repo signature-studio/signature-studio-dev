@@ -58,7 +58,7 @@
 | ERect | top / left / bottom / right (int16) | 0 / 2 / 4 / 6 | 同左 (ポインタ無し) |
 
 - VstEvents の x32 側 `events[]` の要素は **ポインタ** (4 B)。 殻が渡す `VstEvent*` は 8 B 配列なので、要素を 1 件ずつ詰め直す必要がある (deep copy)。
-- **未確認 (経路の静的実測・gate で機械判定)**: guest switch `0x10001300` は opcode 0..24 のみ処理し、`effProcessEvents` (25) は default で戻り値 0。 switch 内に VstEvents の読取は無い。 読取箇所は未特定 (次 run の対象 §6)。
+- **未確認 (経路の静的実測・gate は観測値の回帰ガード)**: guest switch `0x10001300` は opcode 0..24 のみ処理し、`effProcessEvents` (25) は default (`0x1000149c`、逆アセンブル読取) で戻り値 0。 switch 内に VstEvents の読取は無い。 gate の `opcode25_default` は定数比較で、VstEvents の読取を証明しない。 読取箇所は未特定 (次 run の対象 §6)。
 - ERect: `effEditGetRect` (13) は `[this+8]` の子オブジェクトの slot+4 へ転送する。 子 vtable は実行時に設定されるため、ERect 書込み箇所は静的に未特定。
 
 ## 5. ネガコン

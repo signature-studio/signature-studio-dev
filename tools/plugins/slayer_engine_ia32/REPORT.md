@@ -176,8 +176,11 @@ ia32 で要注意の mnemonic (件数): cdq 21 / movzx 51 / movsx 54 / lea 590 /
 
 | 項目 | 実測 |
 |---|---|
-| gate (`marshal.py`) | `[marshal] OK`・exit 0 |
-| nega (`marshal.py --nega`) | `nega: 0/5 miss`・exit 0 |
+| gate (`marshal.py`) | `[marshal] OK`・exit 0。 wall 67–68 ms (n=3)。 実行前 load 1 分 0.22・cpu 4 |
+| nega (`marshal.py --nega`) | `nega: 0/5 miss`・exit 0。 wall 72–73 ms (n=3)。 実行前 load 1 分 0.22・cpu 4 |
+
+- 所要は HEAD `693c394` で再測定 (`time` 相当の wall を `date +%s%N` で計測・各 n=3 の min–max)。 旧版の単発値 (0.065 s / 0.056 s) は本表で置き換えた。
+- 本節 (§9.2) の表は marshal.py の gate と N1〜N5 の結果。 route 突合 (N4・N5) は §9.3 の注意を参照。
 
 | NC | 壊した入力・期待 | 実測 FAIL |
 |---|---|---|
@@ -194,10 +197,12 @@ dispatcher `0x10001000` は `[this+0x40]` の vtable slot+0x18 (`0x10001300`) �
 | 項目 | 実測 | 意味 |
 |---|---|---|
 | switch 上限 (`cmp eax, 0x18`) | 24 | 0..24 のみ jump table |
-| opcode 25 (effProcessEvents) | **default (`0x1000149c`)・戻り値 0** | switch 内に VstEvents の読取は無い |
-| opcode 13 (effEditGetRect) | jump table → `0x10001406` | `ecx = [ecx+8]` (editor 子) の slot+4 へ転送 |
+| opcode 25 (effProcessEvents) | `ja` の飛び先 `0x1000149c` (逆アセンブル読取) = `mov eax,esi; ret 0x14`・戻り値 0 | switch 内に VstEvents の読取は無い。 「25 が default に落ちる」の判定自体は定数比較 (`PROCESS_EVENTS=25 > bound=0x18`) |
+| opcode 13 (effEditGetRect) | jump table → `0x10001406` (逆アセンブル読取) | `ecx = [ecx+8]` (editor 子) の slot+4 へ転送 |
 
-- `push 0x19` (= 25) を含む箇所は `0x100025db`・`0x10009bb0` の 2 件。 いずれも dispatcher 経由の opcode 分岐ではなく、 `0x10009bb0` は `0x1000a806` (audio master 系) を呼ぶ。 VstEvents の読取箇所は未特定。
+- **`ROUTE_EXPECT` の位置づけ**: `bound=0x18`・`opcode25_default=True`・`erect_child_slot=4` は現在の静的構造の**観測値そのもの**であり、 「今の静的構造が変わっていない」ことを守る回帰ガードである。 VstEvents の読取・ERect の書込みを証明するものではない (受入 1〜2 は未達)。
+- `opcode25_default` は `PROCESS_EVENTS > bound` の定数比較で、 その真偽を機械判定しているだけである。 N5 もこの式の真偽だけを見ている。 `ja` の飛び先が default 処理であることは上の表で逆アセンブル結果から読んだ (`default_returns_zero` で検査)。
+- `push 0x19` (= 25) を含む箇所は `0x100025db`・`0x10009bb0` の 2 件。 いずれも dispatcher 経由の opcode 分岐ではない。 `0x10009bb0` は `push 0x19` の後に `0x1000a806` を呼ぶが、 `0x1000a806` の処理内容は未読であり、 VstEvents との関係は未確認。 VstEvents の読取箇所は未特定。
 - effEditGetRect の子 vtable は `[this+8]` に**実行時に**設定されるため、静的な store 列からは ERect 書込み先を特定できない (未解決)。
 
 ### 9.4 未解決 (起票先: #674 / #894)
