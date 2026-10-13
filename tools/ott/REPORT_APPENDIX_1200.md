@@ -111,6 +111,20 @@ index 9e1b32f6..7693c4c0 100644
 - crtinit の chain (cookie・trampoline) を通す e2e → 未実施 (#1200 に残す)。lift・署名の範囲のみ。
 - 相対化の CPU コスト・SIDE_MODULE PIC 税 → #1201 (起票済み・既存)。
 
+## N=16 別 base の署名確認 (測定 commit `2b1f0288`)
+
+- 相対化 lift (`OTT_RELOC=1 LIFT_OUT=... lift_build.sh`): OK、`functions 75, insns 5790, unsup {}`、real 4 m 35 s。
+- `lift_build.sh` の EXPORTS に `_ott_set_gbase` を追加 (JS から gbase を指定するため)。
+- `diff/reloc_multi.mjs <ottl.cjs> 16`: 16 個の独立 wasm インスタンスを、それぞれ別 gbase (`0x30000000 + k*0x200000`、k=0..15、`0x30000000`〜`0x31e00000`) に敷設し、`ott_set_gbase` → `ott_data_install` の順で初期化して署名を計算。
+  - 結果: **16/16 インスタンスとも `6b1696f0`** (nonzeroOut 256)。real 1.8 s。
+  - N=1 (`0x30000000`, `0x31000000` の 2 base も確認): 両方 `6b1696f0`。
+- e2e (HEAD `2b1f0288`):
+  - 既定 `bash tools/ott/ott_e2e.sh`: **PASS**、real 24.66 s、scenario 89 / cells 50236 / bit-equal 50236 / max_ulp 0 / state_diff_qwords 0。
+  - 相対化 `OTT_RELOC=1 bash tools/ott/ott_e2e.sh`: **PASS**、real 4 m 53 s、同上の結果。
+  - load average: 既定 0.84 前後、相対化 1.07〜1.14 (1 分値)。直列実行。
+- コード差分 (測定 commit `2b1f0288` → HEAD、`tools/ott` のうち REPORT 系を除く): 0 行。
+- 未実施: crtinit chain (cookie・trampoline) の e2e (`tools/ott/crtinit/crt_e2e.sh`)。受入条件の対象外。
+
 ## 前版 (参考。現行の値ではない)
 
 - 測定 commit `110d65e7` (main 取り込み前。`x64c.py` の ia32 jump table 変更を含まない): 既定 lift real 6.3 s、相対化 lift real 3 m 36 s、load 1.08、`ott_gbase` 807 箇所、署名 `6b1696f0`。
