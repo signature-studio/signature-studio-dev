@@ -16,7 +16,7 @@
    Eff_Render / 各 override 単位で native と wasm を比べる harness も repo に無い。 GUI 5 本 (HTML NoteBook / NoteBook / NoteBook 2 / Big Clock / Dashboard) は
    GUI shim #10 にも依存する。 → PR は **`Refs #205`** (Closes しない)。
 2. **手順 1 (固有閉包の lift) は 28 本中 27 本が gate を通り、Dashboard 1 本が不合格。** 27 本は RetDec+pass 鎖が完走 (lift_rc 0)、`emcc -c` 通過、`x86_fp80` 関数 0、
-   未実装 helper 宣言 0。 Dashboard は lift_rc 0・`emcc -c` 通過だが **`__asm_rep_stosb_memset(ptr,i8,i64)` が未実装で宣言のみ残る** (link で未解決になる。 §6)。
+   未実装 helper 宣言 0。 Dashboard は lift_rc 0・`emcc -c` 通過だが **`__asm_rep_stosb_memset(ptr,i8,i64)` が未実装で宣言のみ残る** (定義が供給されなければ link で未解決になる。 §6・§7)。
    `emcc -c` 通過は宣言だけで通るため、`declares_unimpl` を判定に含めない gate ではこの 1 本を見逃す。
    このため `ctlvfx_e2e.sh` は **意図的に exit 1** (28/28 になるまで赤)。 閉包合計 **1822 関数 / 654,352 B** (28 本、`PLUGIN_MATRIX.json` の `lift` 欄と 28 本 × 6 項目すべて一致)。
 3. **規模は 2 極**: Dashboard (417 関数 / 128,061 B) と Fruity Envelope Controller (423 / 133,907 B) の 2 本で 840 関数 / 261,968 B (全体の 関数 46.1% / バイト 40.0%)。 残り 26 本は 7〜94 関数 / 1,863〜43,660 B。
