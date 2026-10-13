@@ -108,3 +108,27 @@ node tools/perf/p15/chrome_shared.mjs --m 1,4,130 --reps 7 --blk 1000 --runs 3  
 ```
 
 前提: `oc_artifacts: work-m6-ott` (`tools/ott/work/lift/ottl.wasm`・`ottl.cjs`)。
+
+## 6. 再測定 (2026-10-14, 素材 work-m6-ott で 4 スクリプトを実行)
+
+- 測定 commit: `2b2faf52` (origin/main の worktree `ws-990`)。`tools/perf/p15` の差分は `862ef65b` 以降 `page.html` の未使用リスナー削除のみ (測定経路外・§0)。
+- 環境: Chrome 154.0.8037.97 (headless), CPU `AMD EPYC 9V45 96-Core Processor` (4 vCPU。§0 の 7763 とは別機), node v22.23.3。
+- 生データ: `tools/perf/p15/results/rerun_20261014_*.jsonl` (`probe_limit` 12 行・`probe_iso` 4 行・`chrome_shared` 19 行)。
+
+| 項目 | 前回 (`862ef65b`, EPYC 7763) | 再測定 (`2b2faf52`, EPYC 9V45) |
+|---|---|---|
+| shared_obj M=130 `sig_unique` / `sig_n` | `6b1696f0` / 130 | `6b1696f0` / 130 (`sig_ok=true`, setup 470.77 ms) |
+| probe_limit K=1 (Worker 1 個) | 125 | 125 / 125 (2 回) |
+| probe_limit K=2 合計 | 124 / 188 | 125 / 124 |
+| probe_limit K=4 合計 | 243 / 253 | 182 / 216 |
+| probe_iso 別 origin 各 1 Worker | 124〜125 | 124〜125 (renderers=7, 2 回とも) |
+| chrome_shared M=1 µs/block p50 (3 回) | 138.41 / 139.71 / 138.50 | 135.89 / 120.08 / 126.17 (中央値 126.17) |
+| chrome_shared M=4 µs/block p50 (3 回) | 140.58 / 139.09 / 139.12 | 121.59 / 140.77 / 140.01 (中央値 140.01) |
+| chrome_shared M=130 µs/block p50 (3 回) | 140.56 / 140.75 / 139.73 | 118.93 / 125.70 / 138.69 (中央値 125.70) |
+| M=130 署名 | 130/130 一致 (3 回) | 130/130 一致 (3 回, `sig_ok=true` 全て) |
+
+- 結論は変わらない。M=130 を 1 instance で instantiate 失敗なし・全 obj 署名一致で駆動できる。obj 数に対する定常コストは横ばい (M=1 と M=130 の中央値の差は前回 +1.5% (138.50→140.56)、再測定では -0.4% (126.17→125.70))。機差 (CPU 世代) が大きく、絶対値は機ごとに比較しない。
+- Worker 分割 (K=2) の合計は再測定でも 124〜125 で、N=130 に届かない。K=4 の合計は 182〜253 で、回ごとのばらつきが大きい。(b) を退けた根拠 (割り当てが再現せず不安定) は再測定でも成立する。
+- chrome_shared の µs/block は run 間で 118.93〜140.77 に散る (全 9 行の min/max)。定常の数値は 1 回の値ではなく 3 回の中央値で読む。
+
+**測定 commit から HEAD までの tools/perf 差分**: 本節追記のコミットは REPORT_P15.md と `results/rerun_20261014_*.jsonl` のみで、測定コードは変更していない。`git diff 2b2faf52 HEAD -- tools/perf/p15` は追記コミットの時点で空になる (出力は PR 本文の「検証」節に記載)。
