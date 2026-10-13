@@ -234,3 +234,7 @@ FLEngine 0x40d253 `jmp [r10+rdx*8+0x40]` (Delphi `sub rdx,8` 形) は、基点 `
 ## 15. #851: `0x128c320` の関数境界誤認 (1 バイト関数化) の原因
 
 全文は `REPORT_APPENDIX_851.md` (250 行上限のため別置き)。結論: 範囲分割 (decode 単位) が原因。バイナリの境界は正しい。HEAD `a2243d34` で A〜D を再実行し一致 (数値は同ファイル)。chunk0〜3 は未検証。
+
+## 17. #1206 (ICALL-21): jump table の cmp/je 展開の効果 (測定 commit `f7bebc7b` = main)
+
+全文は `REPORT_APPENDIX_1206.md` (250 行上限のため分割移動)。結論: FLEngine の展開効果は構造上 0 (メモリ形 `jmp [mem]` は対象外)。Balance は jt 0 件。Fresh Air の jt_dropped は 2 件 (`sites_after.json`) と 1 件 (`audit_fa.json`) で不一致・原因未確定。OTT F は未再実行。未解決 → #1402 (ICALL-26) / #1403 (ICALL-27)。

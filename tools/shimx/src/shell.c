@@ -301,7 +301,7 @@ BOOL Shell_NotifyIconW(DWORD msg, void* data) { (void)msg; (void)data; return FA
 #define DA_MAX 64
 #define HD_MAX 64
 static HWND g_da[DA_MAX];
-static struct { uint8_t* blk; DWORD nfiles; } g_hd[HD_MAX];
+static struct { uint8_t* blk; DWORD nfiles; size_t sz; } g_hd[HD_MAX];
 void DragAcceptFiles(HWND w, BOOL a) {
     if (!w) return;
     shx_lock();
@@ -323,14 +323,15 @@ int shimx_drag_accepts(HWND w) {
 HANDLE shimx_hdrop_create(const WCHAR* const* wpaths, DWORD n, int x, int y, int nc) {
     size_t chars = 1;
     for (DWORD i = 0; i < n; i++) chars += (size_t)shx_wstr_len(wpaths[i]) + 1;
-    uint8_t* b = (uint8_t*)calloc(1, 20 + chars * 2);
+    size_t sz = 20 + chars * 2;
+    uint8_t* b = (uint8_t*)calloc(1, sz);
     if (!b) return 0;
     ((uint32_t*)b)[0] = 20; ((int32_t*)b)[1] = x; ((int32_t*)b)[2] = y; ((uint32_t*)b)[3] = nc ? 1u : 0u; ((uint32_t*)b)[4] = 1u;
     WCHAR* d = (WCHAR*)(b + 20);
     for (DWORD i = 0; i < n; i++) { size_t l = (size_t)shx_wstr_len(wpaths[i]) + 1; memcpy(d, wpaths[i], l * 2); d += l; }
     HANDLE h = 0;
     shx_lock();
-    for (int i = 0; i < HD_MAX; i++) if (!g_hd[i].blk) { g_hd[i].blk = b; g_hd[i].nfiles = n; h = (HANDLE)(uintptr_t)b; break; }
+    for (int i = 0; i < HD_MAX; i++) if (!g_hd[i].blk) { g_hd[i].blk = b; g_hd[i].nfiles = n; g_hd[i].sz = sz; h = (HANDLE)(uintptr_t)b; break; }
     shx_unlock();
     if (!h) free(b);
     return h;
@@ -339,6 +340,13 @@ static uint8_t* hdrop_find(HANDLE d, DWORD* n) {
     uint8_t* r = NULL;
     shx_lock();
     for (int i = 0; i < HD_MAX; i++) if (g_hd[i].blk && (uintptr_t)g_hd[i].blk == (uintptr_t)d) { r = g_hd[i].blk; if (n) *n = g_hd[i].nfiles; break; }
+    shx_unlock();
+    return r;
+}
+const uint8_t* shimx_hdrop_bytes(HANDLE d, size_t* sz) {
+    const uint8_t* r = NULL;
+    shx_lock();
+    for (int i = 0; i < HD_MAX; i++) if (g_hd[i].blk && (uintptr_t)g_hd[i].blk == (uintptr_t)d) { r = g_hd[i].blk; if (sz) *sz = g_hd[i].sz; break; }
     shx_unlock();
     return r;
 }

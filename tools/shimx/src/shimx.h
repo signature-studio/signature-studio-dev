@@ -1137,6 +1137,15 @@ void* shimx_lifttab_proc_resolver(HMODULE m, const char* name, DWORD ordinal); /
 shimx_lift_thunk_fn shimx_lifttab_trampoline(unsigned token);   /* R3: トークン → u64×8 thunk (実 C 署名へ marshal)。未知は NULL */
 int  shimx_lifttab_count(void);
 const char* shimx_lifttab_name(int i);
+/* SHX-T23 (#1388): RegisterDragDrop 経路。guest の IDropTarget は shimx_drop_invoke が vtable 経由で呼ぶ (C→guest = shimx_cbtrans_get_invoke)。
+ * guest が渡された IDataObject の vtable は lifttab トークン (shimx_lifttab_token("IDataObject.*")) で組む (guest→C = trampoline)。 */
+HRESULT shimx_ido_QueryInterface(void* self, const GUID* iid, void** out);
+ULONG shimx_ido_AddRef(void* self);
+ULONG shimx_ido_Release(void* self);
+HRESULT shimx_ido_GetData(void* self, const void* fe, void* sm);
+HRESULT shimx_ido_QueryGetData(void* self, const void* fe);
+HRESULT shimx_ido_NotImpl(void);
+int  shimx_drop_invoke(void* target, uint64_t hwnd, size_t hdrop, int x, int y);   /* gui_set_drop_target_invoker の実体。0=未処理 / 1=Drop 受理 */
 void shimx_set_pseudo_load(int on);                         /* R4: 1 = 未知 DLL の LoadLibrary を擬似モジュール登録で成功させる (既定 0 = 失敗) */
 void shimx_set_cs_null_ok(int on);                          /* R7: 1 = CRITICAL_SECTION の NULL/非整列を no-op で通す (既定 0 = fail-fast = Win32 AV 相当) */
 void shimx_set_path_mapper(shimx_path_mapper_fn fn);        /* VFS 連携: Win パス → FS パス */
@@ -1184,6 +1193,7 @@ void shimx_set_shell_execute_hook(int (*fn)(const char* verb, const char* file, 
 void shimx_set_notify_hook(void (*fn)(void));                  /* kernel object の状態変化ごとに呼ぶ (任意スレッド・shx_lock 外) */
 int  shimx_drag_accepts(HWND w);                               /* DragAcceptFiles(w, TRUE) 済みか */
 HANDLE shimx_hdrop_create(const WCHAR* const* wpaths, DWORD n, int x, int y, int nc);   /* DROPFILES を作り HDROP を返す (DragFinish で解放) */
+const uint8_t* shimx_hdrop_bytes(HANDLE drop, size_t* sz);                              /* HDROP の生ブロックと大きさ (IDataObject::GetData のコピー元)。無効は NULL */
 void shimx_set_trust_ok(int on);
 unsigned shimx_wininet_call_count(void);   /* wininet 接続系 API の呼出回数 (全て失敗扱い) */
 void shimx_set_version(DWORD major, DWORD minor, DWORD build, DWORD fileHi, DWORD fileLo);
