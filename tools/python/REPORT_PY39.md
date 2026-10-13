@@ -13,7 +13,10 @@
 - 解析対象: `$FL_WIN64_DIR/extracted/block00031_PE.bin` (FLEngine PE、[WIN64])。`fl-win64` 素材を `tar --zstd -xf ... --wildcards '*block00031_PE.bin'` で展開。
 - 解析補助: `tools/python/analysis/flapi/pe_handler_probe.py` (PyMethodDef 表の名前 VA を引き、ハンドラ先頭を逆アセンブル、RIP 相対の文字列を出す)。
 - 実行: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_handler_probe.py` (終了 0・7 関数すべての表エントリを検出)。
-- 測定 commit: 本 PR の最後のコード commit (`git log -1 -- tools/python/analysis/flapi/pe_handler_probe.py` で確認)。コード差分 (`provider/` `host/` `tests/`) は 0 行。
+- 展開: `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst --wildcards '*block00031_PE.bin'` (実測 1.6 秒)。
+- 測定 commit: `41120437` (本 PR のコード commit。`pe_handler_probe.py` と本 REPORT の初版)。
+- 差分 0 の証跡: `git diff 41120437 HEAD -- provider host tests` の出力は 0 行 (fix commit 後の HEAD で確認)。
+- probe の出力の曖昧さ: `selectAll` は PE 内に 4 件の表エントリ (`fn=0xd56d00`・`0xd5b150`・`0xd61400`・`0xd66430`) があり、probe は module を出さない。下表の `selectAll` (`0xd5b150`・entry `0x15174a8`) は channels 側の 1 件で、flapi_kwargs.json の `modules.channels` と照合して選んだもの。`processRECEvent` も同様に `0xd58e00` (channels) と `0xd69f00` (general) の 2 件ある。
 
 ## ハンドラ位置と書式 (PE 実測)
 
@@ -31,7 +34,7 @@
 
 ## 未解決 (次 run で決める)
 
-1. **processRECEvent の引数不一致**: flapi は引数 0 だが、ハンドラは書式 `Iii` で 3 つの値を受け取り、その 3 値を下位関数へ渡している。flapi 側の署名が誤っている可能性がある。実機の呼出し例 (MCP 側の使用) で確かめるまでは確定しない。
+1. **processRECEvent の引数不一致**: flapi は引数 0 だが、ハンドラは書式 `Iii` で 3 つの値を受け取り、その 3 値を下位関数へ渡している。flapi 側の署名が誤っている可能性がある。実機の呼出し例 (MCP 側の使用) で確かめるまでは確定しない。同名の `general.processRECEvent` (fn `0xd69f00`) は flapi 3 引数・書式 `Iii` で一致する。channels 側 (`0xd58e00`) だけ不一致。
 2. **incEventValue**: ハンドラは `Ii|d` で受け、`res` 既定値 `0x3fa5555555555555` (= 1/24) を置いている (`movabs` で確認)。下位関数 0x1051330 の戻り規約は未解析。
 3. **selectAll / selectOneChannel / setChannelPitch / setStepParameterByIndex / midiNoteOn**: ハンドラは `0xd5e620` 等の小関数を経由し、関数ポインタ表 (`call qword ptr [rax]`) で呼ぶ。0xd5e620・0xd58d80 は先頭 5 命令のみ確認 (薄い委譲)。0xd843d0・0xd84740・0xd82c20 は未読。実処理の関数 (channel 配列の参照・選択状態の更新) の特定が必要。
 4. 範囲外 code: 上記のどれも、範囲外時に返す code (`FL_E_RANGE` = 4 か、別の code か) は未確定。

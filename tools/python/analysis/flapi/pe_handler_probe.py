@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """channels 関数の PyMethodDef エントリを FLEngine PE から引き、ハンドラ先頭の逆アセンブルと
-RIP 相対で参照する文字列 (PyArg 書式・kwlist 等) を出す (PY-39 の解析補助。flapi_kwargs.py の方式と同じ)。
+RIP 相対で参照する文字列 (PyArg 書式・kwlist 等) を出す (PY-39 の解析補助。方式は analysis/flapi_kwargs.py と同じ)。
 
   FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_handler_probe.py [名前 ...]
 """
