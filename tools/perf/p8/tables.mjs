@@ -1,0 +1,44 @@
+// results/p8.jsonl → results/TABLES.md (自動生成)。使い方: node tables.mjs [--tag <label>]
+import fs from 'node:fs'; import path from 'node:path'; import zlib from 'node:zlib'; import { fileURLToPath } from 'node:url';
+const HERE = path.dirname(fileURLToPath(import.meta.url)); const RES = path.join(HERE, 'results'); const W = path.join(HERE, 'work');
+const rows = fs.readFileSync(path.join(RES, 'p8.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+const med = (a) => { const s = [...a].sort((x, y) => x - y); return s[s.length >> 1]; };
+const grp = (mode) => { const m = new Map(); for (const r of rows.filter((x) => x.mode === mode)) { const k = `${r.cfg}|${r.N}`; (m.get(k) ?? m.set(k, []).get(k)).push(r); } return m; };
+const rng = (v, key, d = 2) => { const a = v.filter((x) => x[key] != null).map((x) => x[key]); if (!a.length) return '-'; const lo = Math.min(...a), hi = Math.max(...a); return `${med(a).toFixed(d)} (${lo.toFixed(d)}–${hi.toFixed(d)})`; };
+const MB = (b) => (b / 1048576).toFixed(1);
+let o = ['<!-- 自動生成: node tools/perf/p8/tables.mjs (入力 results/p8.jsonl)。人手編集禁止 -->', '', '# P8 TABLES', ''];
+const env = rows[0] ? `${rows[0].runtime}, ${rows[0].cpus} cores, loadavg(測定開始時) ${rows.map((r) => r.loadavg[0]).sort((a, b) => a - b)[0]}〜${rows.map((r) => r.loadavg[0]).sort((a, b) => b - a)[0]}` : ''; o.push(env, '');
+{ // steady
+  const m = grp('steady'); const cfgs = [...new Set([...m.keys()].map((k) => k.split('|')[0]))]; const Ns = [...new Set([...m.keys()].map((k) => +k.split('|')[1]))].sort((a, b) => a - b);
+  for (const kind of ['', '_light']) {
+    const cs = cfgs.filter((c) => (kind ? c.endsWith('_light') : !c.endsWith('_light'))); if (!cs.length) continue;
+    o.push(`## 定常 µs / 128f ブロック (${kind ? '軽量カーネル NST=1' : '標準カーネル NST=32'}; 各セル = 独立プロセス間の p50 の中央値 (min–max)、比 = 同 N の static_based${kind} 比)`, '');
+    o.push(`| 構成 | ${Ns.map((n) => `N=${n}`).join(' | ')} |`, `|---|${Ns.map(() => '--:').join('|')}|`);
+    for (const c of cs) o.push(`| ${c} | ${Ns.map((n) => { const v = m.get(`${c}|${n}`); if (!v) return '-'; const b = m.get(`static_based${kind}|${n}`) ?? m.get(`sep_based${kind}|${n}`); const ratio = b ? ` ×${(med(v.map((x) => x.us_per_block)) / med(b.map((x) => x.us_per_block))).toFixed(3)}` : ''; return `${rng(v, 'us_per_block', kind ? 3 : 2)}${ratio}`; }).join(' | ')} |`);
+    o.push('');
+  }
+}
+{ // startup
+  const m = grp('startup'); const cfgs = [...new Set([...m.keys()].map((k) => k.split('|')[0]))]; const Ns = [...new Set([...m.keys()].map((k) => +k.split('|')[1]))].sort((a, b) => a - b);
+  for (const [key, title] of [['load_ms', 'load = compile+instantiate(+init / dlopen) 合計 ms'], ['first_block_ms', '初回 chain 1 ブロック ms (lazy 初回呼出 stall)']]) {
+    o.push(`## 起動: ${title} (独立プロセス n 回の中央値 (min–max))`, '', `| 構成 | ${Ns.map((n) => `N=${n}`).join(' | ')} |`, `|---|${Ns.map(() => '--:').join('|')}|`);
+    for (const c of cfgs) o.push(`| ${c} | ${Ns.map((n) => { const v = m.get(`${c}|${n}`); return v ? (v[0].error ? 'ERR' : rng(v, key, 1)) : '-'; }).join(' | ')} |`);
+    o.push('');
+  }
+  o.push('## dlopen 内訳 ms (dyn_*): main instantiate / 1 本目 / 2 本目以降 p50', '', '| 構成 | N | main instantiate | dlopen 1 本目 | dlopen 2 本目以降 p50 | dlopen 合計 |', '|---|--:|--:|--:|--:|--:|');
+  for (const [k, v] of m) if (k.startsWith('dyn')) o.push(`| ${k.split('|')[0]} | ${k.split('|')[1]} | ${rng(v, 'main_instantiate', 1)} | ${rng(v, 'dlopen_first', 1)} | ${rng(v, 'dlopen_rest_p50', 2)} | ${rng(v, 'dlopen_sum', 1)} |`);
+  o.push('', '## compile / instantiate 内訳 ms (static_*, sep_*)', '', '| 構成 | N | compile 合計 | instantiate 合計 |', '|---|--:|--:|--:|');
+  for (const [k, v] of m) if (!k.startsWith('dyn')) o.push(`| ${k.split('|')[0]} | ${k.split('|')[1]} | ${rng(v, 'compile', 1)} | ${rng(v, 'instantiate', 1)} |`);
+  o.push('');
+}
+{ // memory
+  const m = grp('memory'); o.push('## メモリ (N 個 load + 1 ブロック後; 独立プロセス 1 回)', '', '| 構成 | N | WebAssembly.Memory 本数 | 予約 memory 合計 MiB | RSS 増分 MiB | プロセス HWM MiB |', '|---|--:|--:|--:|--:|--:|');
+  for (const [k, v] of m) { const r = v[0]; o.push(r.error ? `| ${r.cfg} | ${r.N} | ERR: ${String(r.error).replace(/\|/g, '/').slice(0, 120)} | | | |` : `| ${r.cfg} | ${r.N} | ${r.memories} | ${MB(r.wasm_memory_bytes)} | ${MB(r.rss_delta_bytes)} | ${MB(r.hwm_bytes)} |`); }
+  o.push('');
+}
+{ // sizes
+  o.push('## wasm サイズ (B)', '', '| ファイル | raw | gzip-9 | brotli-11 |', '|---|--:|--:|--:|');
+  for (const f of ['static_based_1', 'static_based_16', 'sep_abs_hi', 'sep_based', 'side_def', 'side_hid', 'dyn_main'].map((x) => x + '.wasm')) { const p = path.join(W, f); if (!fs.existsSync(p)) continue; const b = fs.readFileSync(p); o.push(`| ${f} | ${b.length} | ${zlib.gzipSync(b, { level: 9 }).length} | ${zlib.brotliCompressSync(b, { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 11, [zlib.constants.BROTLI_PARAM_SIZE_HINT]: b.length } }).length} |`); }
+  o.push('');
+}
+fs.writeFileSync(path.join(RES, 'TABLES.md'), o.join('\n')); console.log(o.join('\n'));
