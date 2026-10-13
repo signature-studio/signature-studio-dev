@@ -55,3 +55,13 @@ PLUG_F80_LOWER=1 bash tools/plugins/reverb_delay/engine_lift.sh 19000 800
 - **再現 (lift + emcc, `ENGINE_RANGE_ARGS="--exclude IPPCODE --exclude-ranges <78 件>" ENGINE_TAG=_noipp_nobad engine_lift.sh 19165 900`)**: summary `19165,2000,0,2608,6,241,139,0,139,612,2,445,0,608,2606`。 lift rc 0 / define 2,608 / f80 6 / `emcc -c` rc **139** (segfault) / wall 10 分 28 秒 / load 1.15 (5 分平均 0.99)。 §13 の 2 回目 (6 分 42 秒) と一致し、E7 の `invalid cast` は既定の経路では出ない (segfault が先に出る)。
 - **試行 (engine-local)**: `e.final.ll` の x87 `load x86_fp80` (26 箇所) を `load i80` + `bitcast i80 to x86_fp80` に置換して `emcc -c` を再実行した。 結果は **rc 139 (segfault)** のまま。 IR 構文は有効になり、`do not know how to soften fp_extend` / `no libcall available for sint_to_fp with type f80` が出た。 置換は 7 秒で終わる再実行で、lift の再実行は不要。
 - **判断**: segfault は `load` の型だけでは消えない。 §14 の推定 (E7 = 型誤り) は、少なくとも単独では成立しなかった。 残る経路は (a) f80 の libcall 不足 (`fp_extend` / `sint_to_fp` / `fp_round`) の共有鎖での扱い、(b) `function_1800ceec0` の DAG combine の segfault。 いずれも共有鎖 (`p0c/f80_lower.py` / lift) の変更になり、T0/T1 の退行確認 (#523 受入条件 2) が必要。 engine-local の試行は本節で打ち切り、修正コードは commit しない。
+
+## 16. #523 segfault の切り分け (2026-10-13 · 実測 · 診断のみ · コード変更なし)
+
+- **HEAD**: `13bdc5fe` (origin/main)。 測定入力は §15 と同じ `80c32a06` 系の engine lift 出力 (lift 側の差分 0。 `git diff 512c53ab origin/main -- tools/plugins/reverb_delay tools/lift tools/p0c` は空)。
+- **再現 (19165, IPPCODE 除外 + AVX 系 78 除外)**: summary `19165,2000,0,2608,6,148,139,0,139,601,...`。 lift rc 0 / define 2,608 / f80 6 / `emcc -c` **rc 139**。 §15 と define・f80・rc が一致。 unimpl helper は 148 (§15 の 241 とは不一致。 未切り分け)。 601 は lift 段の秒数 (`engine_lift.sh` の `t1-t0`)。
+- **スタック上限は原因でない**: `ulimit -s unlimited` でも rc 139。 クラッシュは `WebAssembly Instruction Selection` 中の `DAGCombiner::visitSTORE` (LLVM の DAG combine)。
+- **落ちる関数は 2 つ**: 関数単位でスタブ化 (`unreachable` 置換・診断専用・コミットせず) して `emcc -c` を再実行したところ、`function_1800ceec0` (f80 参照 859 箇所) を外すと次は `function_1801439a0` (f80 参照 879 箇所) で落ち、両方を外すと segfault は消えた (rc 1)。 いずれも x87 を大量に含む。
+- **両スタブ外し後の残り (ferror-limit=0)**: `emcc -c` rc 1 / error 296 件。 内訳は `no libcall available for fmul with type f80` 134、`fadd` 116、`do not know how to soften fp_extend` 22、`fp_round` 19、`sint_to_fp` 4、`frem` 1。 segfault 以外の未解決はすべて f80 の libcall 不足。
+- **判断**: 19165 の `emcc -c` rc 0 の前提は「f80 の扱い」の 1 点に集約される。 f80 を f64 に下げる (`PLUG_F80_LOWER=1`) と segfault は消えた (§13 で 19165 rc 1 = E7)。 一方で E7 の型誤り推定は §15 で単独では成立しなかった。 次の判断は PM 側で、(a) f80 を持つ関数の扱い (精度を落とす lowering か、関数単位の除外か)、(b) x87 を含む 2 関数の DAG combine 回避 (LLVM 側・wasm backend の回避策) のどちらを取るか。
+- **注意**: スタブ版の wasm は生成していない (関数を消すため miscompile)。 本節の数値は到達性の診断であり、engine の正しさは示さない。

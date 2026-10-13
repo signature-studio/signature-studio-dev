@@ -35,7 +35,7 @@ TIMEOUT = int(os.environ.get("TIMEOUT", "300"))
 NC_N = 20
 TMP = os.path.join(WORK, "retdec_tmp")
 KEEP_DIR = os.environ.get("KEEP_DIR", "")
-DEF_RE = re.compile(r"^[^\s/][^;=]*\bfunction_([0-9a-f]+)\s*\([^;]*\)\s*\{", re.M)
+DEF_RE = re.compile(r"^[^\s/][^\n;=]*\bfunction_([0-9a-f]+)\s*\([^\n;{}]*\)\s*\{", re.M)
 
 
 def funcs_of(img):

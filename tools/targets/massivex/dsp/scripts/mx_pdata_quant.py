@@ -51,6 +51,7 @@ def main(path, outp):
     srt = sorted(valid)
 
     chained = 0
+    chain_member = set()
     chained_parent_hit = 0
     chain_flag = 0
     chain_parent_in_pdata = 0
@@ -77,6 +78,8 @@ def main(path, outp):
                     chain_parent_in_pdata += 1
                     if by_begin[pb][1] == pe_:
                         chained_parent_hit += 1
+                        if pb != b:
+                            chain_member.add(b)
         nxt = srt[idx + 1][0] if idx + 1 < len(srt) else t_hi
         approx = nxt - b
         if approx == e - b:
@@ -97,6 +100,8 @@ def main(path, outp):
         'unwind_chaininfo_flag': chain_flag,
         'chain_parent_in_pdata': chain_parent_in_pdata,
         'chain_parent_exact_match': chained_parent_hit,
+        'chain_member_bound': len(chain_member),
+        'function_roots_after_chain_bind': len(valid) - len(chain_member),
         'leaf_approx_eq_pdata': approx_eq,
         'leaf_approx_over_pdata': approx_over,
         'leaf_approx_over_bytes_sum': over_sum,

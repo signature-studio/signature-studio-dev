@@ -133,7 +133,9 @@
 |---|---:|---|
 | `tools/m11/REPORT.md` | ~229 | FLEngine_x64.dll 部分起動 PoC (stage 4/6・残 trap・次の一手)・§11 (#572, 要約のみ)・§12 survey の OOM/clobber 分離 (#513)・§13 (#516 qstore D17, 要約のみ)。§8 (LB_BASE #222)・§9 (sigfix #131)・§10 の commit 別測定表 (#132, §10a)・§10 の一部 (真因・修正 4 点・NC・次 blocker, §10b) は `REPORT_APPENDIX.md` に分割 |
 | `tools/m11/REPORT_N15.md` | ~16 | m11 REPORT §16 (#490 main HEAD の 4c3baa4 / faee5b6 状態の実測・ネガコン) の付録 (250 行上限のため分割) |
+| `tools/m11/REPORT_APPENDIX_1430.md` | ~60 | m11 #1430 の基準 (before) 節の全文 (`REPORT_APPENDIX.md` §9 の後続。xmm 引数の callee 署名復元の前測定 (survey 基準 ok/trap/miss/noproc の実測)・`work-m11` 由来の 7 カテゴリ (和 1,963)。全再生成 IR の測定は #1532) |
 | `tools/m11/REPORT_APPENDIX.md` | ~238 | m11 REPORT §8 (LB_BASE=0x10000 適用 #222)・§9 (sigfix 0 詰め #131)・§10a (#132 commit 別測定表と注記)・§10b (#132 真因・修正 4 点・NC・次 blocker・外した内容)・§12 の一部 (#513 新規類型の行案)・§12b (#513 巨大 VirtualAlloc の n の出所) の全文 (250 行上限のため本体から無変更で分割移動) |
+| `tools/m11/REPORT_N1318.md` | ~69 | #1318 (N82): 10 進 inttoptr 4364 件の VA→LVA 仕分け表 (分類件数・判定規則・QPF 整数定数 1 件の誤 remap)・再現 `m11_inttoptr_class.py` |
 | `tools/m11/REPORT_N55.md` | 74 | #955: sigfix 0 詰め site 1,049 件の liftdiff 差分ハーネス判定 (一致 174 / 不一致 289 / 未到達 586)・判定表 `results/sigfix_zeropad_liftdiff.tsv`・再現 `m11_zeropad_liftdiff.py` |
 | `tools/m11/REPORT_N53.md` | ~49 | #953: sigfix 0 詰め引数の理由別 (why) 内訳・未復元件数 (kind 件数の正本は REPORT_APPENDIX §9)・`M11_SIGFIX_RECOVER=1` の退行検査 (#131 子) |
 | `tools/m11/REPORT_N21.md` | ~35 | M11-N21 (#572): m11_data_gen.py の DIR64 補正境界 off-by-one の全数照合・参照経路・修正・ネガコン・実測 (REPORT §11 は要約のみ) |
@@ -244,6 +246,7 @@
 | `tools/python/REPORT.md` | ~250 | CPython wasm + flapi/MCP 解析 + ブリッジ設計。§7c (ilmcp, PY-3 #82)・§9 (下流チケット案 T1〜T9) は要約のみで全文は `REPORT_APPENDIX.md` に、§PY-12 (#587) は要約のみで全文は `REPORT_PY12.md` に、§PY-13 (#588)・§12/§13 (#81 kwargs 署名の静的復元)・§14 (#79 Piano roll) は要約のみで全文は `REPORT_APPENDIX.md` に、§15 (#654 PY-16) は要約のみで全文は `REPORT_PY16.md`、§16 (#653 PY-15 省略引数) は要約のみで全文は `REPORT_PY15.md` に分割 |
 | `tools/python/REPORT_CHROME.md` | ~55 | python REPORT §14b: Piano roll scripts の Chrome (headless, agent-browser) 上の実行と node との出力一致 (#466 PY-11)。250 行上限のため分離 |
 | `tools/python/REPORT_PY12.md` | ~46 | PY-12 (#587): `_flhost` の per-module state 化・サブインタプリタ採用判断の実測 (REPORT.md の PY-12 節の全文。250 行上限のため分離) |
+| `tools/python/REPORT_PY31.md` | ~50 | PY-31 (#1329): mixer 残り 57 関数の扱い決定 (今回非実装・根拠は MCP 利用 0 件と mock 定義 0 件)、未実装 57 件の一覧、分割先 #941、検証 (provider_check / mixer_diff / all_tools) |
 | `tools/python/REPORT_PY74.md` | ~50 | PY-1 ilmcp 意味論の整合 (#74, PR #763): getBrowserNames 木・getHighlightNames 21 件・addChannel/addEffect/storePRScript 検証の実測表、`tests/ilmcp_diff.mjs` の結果、NC (addEffect 検証を外して 2 件差分)、非 ASCII 空白の未解決。REPORT.md §7b-3 の実測表の全文 |
 | `tools/python/REPORT_PY8.md` | ~45 | PY-8 (#80): MIDI 1 イベント flapi 呼出し数・所要時間と遅いモード切り分け (REPORT.md の分割ではなく新規。250 行上限とは無関係) |
 | `tools/python/REPORT_PY15.md` | ~130 | PY-15 (#653): 省略引数のホスト受け渡し方式・kwlist 103 関数の誤束縛 0 検証・挙動変更の内訳・ネガコン (REPORT.md §16 の全文。250 行上限のため分離) |

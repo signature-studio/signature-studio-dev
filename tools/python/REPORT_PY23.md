@@ -96,3 +96,18 @@
 - 実行時の異常: 初回の Chrome 実行で `serve.mjs` の stderr が親から継承され、パイプが閉じずに止まった (500 秒超で打ち切り。残存プロセスは PID 指定で停止)。以後は `timeout` 付き・ログファイル出力で実行し、再現しなかった。ハーネスは未修正。
 - 検証範囲: Chrome は mock engine (`host/fl_mock.mjs`) 上の実行。実 FL (Edison) との照合は #81 (PY-9)。
 - git diff (測定 commit → HEAD、コード範囲): `git diff 18e9910b HEAD -- tools/python/src tools/python/tests tools/python/build_flpy.sh` は 0 行。
+
+## 8. PY-28 (#1310): 残り 6 本の数値 oracle とネガティブコントロール
+
+- 数値 oracle を追加: `br` (半偶数丸め・選択 [1,4])、`dest` (mix 0.75 / mix 1・rate 8000)、`rm` (clip 3 点で切詰め・Oversample 0/1・clipboard 空)、`pulse` / `saw` (Phase 0.3・0 から生成・44100 samples・倍音和)、`lim` (振幅 0.7/0.3/0.02 で max・通常・無音の 3 分岐を通す。Envelope No/Yes)。JS で手導出 (`lim` は Lookahead / Smoothing を写した JS 再実装を独立 oracle とする)。
+- `rm` の clipboard は `enveditor.set_clipboard()` (新規ホスト hook。`src/enveditor.py`) で注入する。従来は未注入で空だった。
+- ネガティブコントロール (対象 6 本それぞれ): (1) 先頭 1 バイト反転 → load が SyntaxError で FAIL を検出、(2) 適用量改変 (例 `vol*0.5`→`vol*0.25`、`v2 = gain`→`gain*1.01`) → oracle 不一致で FAIL を検出。
+- 旧 "実行完了のみ" 6 本は、数値 oracle の検査へ置き換えた。
+
+### 実測 (コミット済み HEAD)
+
+- 測定 commit: `9d597acc` (`test(python): numeric oracles and negative controls for br/dest/lim/rm/pulse/saw (Refs #1310)`)。
+- `node tests/pyscript_e2e.mjs`: **2.2 秒 (wall)**、72/72 PASS、FAIL 0 (変更前は 56/56・1.0 秒)。node v22.23.3、4 core、load average 0.46 / 0.28 / 0.35。
+- `node tests/flpianoroll_dialog_load_e2e.mjs`: 11/11 PASS、FAIL 0。
+- `python3 analysis/flpianoroll_members.py`: exit 0。
+- `git diff 9d597acc HEAD -- tools/python/src tools/python/tests tools/python/build_flpy.sh` の出力は 0 行 (測定後にコード変更なし)。
