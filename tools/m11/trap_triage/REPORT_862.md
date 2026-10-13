@@ -101,3 +101,24 @@ python3 tools/m11/trap_triage/halt0_classify.py tools/m11/work/trap_triage/head.
 - 検証 HEAD `8311dcb2` でレビュー run が再実行した (素材は `oc_artifacts:` で `fl-win64`・`toolchain-retdec`・`toolchain-emsdk`・`work-m11`・`work-liftdiff` を取得)。`m11_gen_ir2.sh` rc 0 (ldfix applied、`boot_final.ll` 490,693 行)、`m11_build.sh` rc 0 (`wasm-ld signature mismatch: 0, undefined symbol: 0`)、survey 3 回 (13.21〜13.37 s) は ok 869 / oob 16 / halt0 8 / miss 47 / other 1 / noproc 1 で、3 回の per-unit JSON は `cmp` で完全一致。unit 492 は 3 回とも oob、frames `4133f0 ← 4473f0 ← 446400 ← 446ad0 ← ad5700`。halt0 は上記 8 件と一致し、`410630` を含む frame は 0 件、IR 呼出元は `function_4109f0` のみ。
 
 受入条件 1・2 は対象 (`410630` の到達) が現 main に存在しないため引き続き未達。原因追跡は #1046 (unit 492 の OOB `4133f0`) に引き継ぐ。
+
+## 10. 追補: origin/main `63ed695b` での再測定 (#862 再々 run)
+
+§9 の後に main へ入った m11 関連 commit (PR #1289 ほか) を含めて、同じ結論が成り立つかを確認した。
+
+- 測定 commit: `63ed695b` (origin/main)。`tools/m11/` のコードは変更していない (本 PR は REPORT のみ)。
+- IR 再生成: `m11_gen_ir2.sh` rc 0 (ldfix applied、`boot_final.ll` 490,693 行)。build: rc 0 (`wasm-ld signature mismatch: 0, undefined symbol: 0`)。
+- survey (`survey_units.mjs`、3 回反復、13.04〜13.23 s、load average 0.89〜1.00):
+
+| 基準 | ok | oob | halt0 | miss | other | noproc |
+|---|--:|--:|--:|--:|--:|--:|
+| `97156643` (§9 の基準) | 869 | 16 | 8 | 47 | 1 | 1 |
+| `63ed695b` (本測定、3 回とも同一) | 870 | 16 | 7 | 47 | 1 | 1 |
+
+- 3 回の per-unit JSON は `cmp` で完全一致。
+- `97156643` → `63ed695b` の per-unit 遷移は **halt0→ok 1 件 (unit 368) のみ**。ok→非 ok は 0 件 (受入条件 4 の回帰なし)。
+- unit 492: 3 回とも `oob` (`memory access out of bounds`)、frames `4133f0 ← 4473f0 ← 446400 ← 446ad0 ← ad5700`。
+- `410630` の IR 呼出元は `function_4109f0` のみ (`tools/m11/work/boot_final.ll`)。survey の全 unit の frame に `4109f0` / `410630` は 0 件。
+- halt0 残 7 件: 114 / 245 / 279 / 314 / 509 / 647 / 895 (`function_412770` 系)。
+
+受入条件の判定は §5 から変わらない。1・2 は対象 (`410630` の到達) が現 main に存在しないため未達。3 は修復未実施で未達。4 は充足。残りは #1046 に引き継ぐ。
