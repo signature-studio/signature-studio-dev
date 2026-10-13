@@ -96,9 +96,10 @@ static void build_tree(uint8_t* im, unsigned char** Fp, unsigned char** Mp, unsi
         W64(C + 0x21a8, 8, C + 0x21b8);                             /* map._Myhead = H */
         for (int i = 0; i < 3; i++) W64(C + 0x21b8, i * 8, C + 0x21b8);  /* H.left/parent/right = H */
         C[0x21d0] = 1; C[0x21d1] = 1;                                     /* H._Isnil (H = C+0x21b8, +0x18/+0x19) */
-        /* FA-16: 1 ノードを木に入れる。map 経路の探索 key は keycnt (0x180ca1499 の edx) なので node key = 1。
+        /* FA-16: 1 ノードを木に入れる (FA_NODE1=1 のときのみ。既定 OFF = 既存 baseline found=0 を維持)。
+         * map 経路の探索 key は keycnt (0x180ca1499 の edx) なので node key = 1。
          * node: +0 left, +8 parent, +0x10 right, +0x19 isnil, +0x20 key(u16), +0x28 value, +0x30 blk */
-        { unsigned char* N = gr_alloc(0x40); unsigned char* Z = gr_alloc(0x40); unsigned char* NB = gr_alloc(0x30);
+        if (getenv("FA_NODE1")) { unsigned char* N = gr_alloc(0x40); unsigned char* Z = gr_alloc(0x40); unsigned char* NB = gr_alloc(0x30);
           memset(N, 0, 0x40); memset(Z, 0, 0x40); memset(NB, 0, 0x30);
           unsigned short k1 = 1; memcpy(N + 0x20, &k1, 2);
           W64(N, 0x00, C + 0x21b8); W64(N, 0x08, C + 0x21b8); W64(N, 0x10, C + 0x21b8);

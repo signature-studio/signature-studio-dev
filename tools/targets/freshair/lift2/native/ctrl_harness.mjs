@@ -51,7 +51,7 @@ for (const line of lines) {
     w64(C + 0x21b0, C + 0x21b8);                                  // map._Myhead = H
     for (let i = 0; i < 3; i++) w64(C + 0x21b8 + i * 8, C + 0x21b8);
     M.HEAPU8[C + 0x21d0] = 1; M.HEAPU8[C + 0x21d1] = 1;           // H._Isnil
-    { const N = al(0x40), Z = al(0x40), NB = al(0x30);            // FA-16: native_ctrl.c と同一の 1 ノード (key u16=1)
+    if (process.env.FA_NODE1) { const N = al(0x40), Z = al(0x40), NB = al(0x30);   // FA-16: native_ctrl.c と同一の 1 ノード (FA_NODE1=1 のみ)
       M.HEAPU8[N + 0x20] = 1; M.HEAPU8[N + 0x21] = 0;
       w64(N + 0x00, C + 0x21b8); w64(N + 0x08, C + 0x21b8); w64(N + 0x10, C + 0x21b8);
       w64(N + 0x28, Z); w64(N + 0x30, NB);
