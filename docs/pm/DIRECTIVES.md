@@ -951,7 +951,7 @@ PM を含む全てのセッションは ephemeral で中断・削除される可
 | 指示 126: Team プランへの課金完了、モデルを Haiku 5.5 Max に変更、率制限で失敗したら `OC_MODEL_ID` を従量課金に切り替える 2 コマンドのみ PM に許可 | モデル管理は依頼者の領域。PM に許可されたのは **`OC_MODEL_ID` の 2 つの値への切り替えだけ**: 従量課金 `console-openrouter/anthropic/claude-haiku-5.5#xhigh`、サブスク `console-cloudflare-ai-gateway-custom/claude-haiku-5-5#max`。切り替えの条件は『率制限 (`rate_limit_error` など) による run の失敗』を**ログで確認した場合**に限る。他の原因 (例: `Argument list too long`) の失敗では切り替えない。切り替えたら依頼者に報告する。他のモデル・他の variable・課金の操作はしない | 本ファイル・`restart_failed.sh` |
 | 指示 127: 同時実行の上限が 60 に引き上げられたことの共有 | 上限は計画どおり 60。待機が長引いた原因は未検証 (推定の断定はしない)。以後は『実行中・待機中の run が担当 PR を持つか』で見る | `docs/WORKFLOW.md` §11 |
 | 指示 128: 通知 (LLM の Quota の増加は 30 分で 1%・マシンを再起動した) | 率制限による失敗の可能性は低い。失敗は原因をログで確認してから対処する (率制限と決めつけない)。再起動で background のコマンドは止まるので、再起動後は watcher を最優先で再起動する | 本ファイル |
-| 指示 129: 予算の件は解決済み・PAT 案は not planned・就寝・止まるな・方針の復唱 | (1) 従量課金の予算の件は依頼者の対応を要しない (OpenRouter 側の誤設定は解決済み。失敗の原因は run 作成時の古い変数の値だった)。(2) `gh` の認証方式の変更 (PAT / systemd-creds) は行わない。(解釈: 以下は逐語の指示ではなく PM 側の運用ルール) keyring がロックされたら依頼者に解錠を依頼する。(3) 依頼者が就寝している間も止まらず、指示 121〜123 の方針で運用を続ける。30 分ごとに自分を起こす heartbeat を systemd のユーザーサービス (`pm-heartbeat.service`) で常駐させた | `pm-heartbeat.service` (systemd ユーザーサービス)・本ファイル |
+| 指示 129: 予算の件は解決済み・PAT 案は not planned・就寝・止まるな・方針の復唱 | (1) 従量課金の予算の件は依頼者の対応を要しない (OpenRouter 側の誤設定は解決済み)。(2) `gh` の認証方式の変更 (PAT / systemd-creds) は行わない。(解釈: 以下は逐語の指示ではなく PM 側の運用ルール) keyring がロックされたら依頼者に解錠を依頼する。(3) 依頼者が就寝している間も止まらず、指示 121〜123 の方針で運用を続ける。30 分ごとに自分を起こす heartbeat を systemd のユーザーサービス (`pm-heartbeat.service`) で常駐させた | `pm-heartbeat.service` (systemd ユーザーサービス)・本ファイル |
 
 ---
 
