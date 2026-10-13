@@ -67,7 +67,7 @@ mirror は guest ヘッダと 1:1 (guest アドレスで引く)。Prepare で確
 
 | 検証 | コマンド | 結果 | 所要 / 備考 |
 |---|---|---|---|
-| shimx 全体 (MT/ST・fail-fast 10 モード・M4 53/53・署名 mismatch 0・midi 単体テスト) | `bash tools/shimx/test.sh` | exit 0 (MT/ST PASS・fail-fast 10・M4 MT/ST PASS・sig_test ALL PASS・mismatch 0) | 48.9 s (fcc85854 で実測) |
+| shimx 全体 (MT/ST・fail-fast 10 モード・M4 53/53・署名 mismatch 0・midi 単体テスト) | `bash tools/shimx/test.sh` | exit 0 (MT/ST PASS・fail-fast 10・M4 MT/ST PASS・sig_test ALL PASS・mismatch 0) | 49.0 s (1687d0e6 = main 再 merge 後で実測) |
 | `verify_ott` | 同上 (§7) | **SKIP** (`tools/m8/work/ott_m8.ll` / `tools/m6/work` が無い) | OTT 検証は未実施。素材 (`toolchain-retdec` / `work-m6-ott`) が要る |
 | audio MIDI e2e (audio 単体。shimx 変更はビルド対象外) | `bash tools/audio/e2e_midi.sh` | 4/4 PASS, exit 0 | 71.0 s (fcc85854 で実測・load 0.00→0.08) |
 
