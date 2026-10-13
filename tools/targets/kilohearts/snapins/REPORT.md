@@ -118,9 +118,9 @@ delay closure 142 関数の近似命令は rcpps 4 箇所のみ (すべて 0x180
 
 語彙は推定で足さず、難 4 本の snap-in 固有 closure (`closures_sets.pkl` の unique) を capstone で全命令走査して決める。再現: `python3 snapins/scripts/vex256_census.py --json work/vex256_census.json` (前提 = `closures.py` と `callgraph.py` の出力)。
 
-- **数え方**: unique closure の各関数の全命令を走査し、(a) オペランドに `ymm` を含む命令、または (b) mnemonic が `vf` で始まる命令を 1 件と数える。同一 VA は 1 回。**測定範囲の限界**: (a) は ymm オペランド形、(b) は `vf*` のみ。xmm 形の `vblend*` / `vperm*` は**未計測** (census の filter 外)。
-- **実測 (2026-10-13, HeartCore.core_64 / callgraph 120,856 関数)**: ymm 命令は Convolver 40・Filter Table 40 (Ladder・Slice EQ は 0)。
-- **再計測の状態**: 本 run では `work/closures_sets.pkl` / `work/callgraph.pkl` が runner に無く census を再実行していない。下表は上記実測の値。再計測 (census の生出力の貼付) は次 run で行う (起票先 = #779)。
+- **数え方**: unique closure の各関数の全命令を走査し、(a) オペランドに `ymm` を含む命令、または (b) mnemonic が `v` で始まる VEX 符号化命令 (xmm 形を含む) を 1 件と数える。同一 VA は 1 回。
+- **実測 (2026-10-13, HeartCore.core_64 / callgraph 120,856 関数・closures infra 188 / 53,010 B)**: ymm 命令は Convolver 40・Filter Table 40 (Ladder・Slice EQ は 0)。**再計測済み** (PR #827 の値と一致)。VEX 全体は 54 mnemonic / 917 命令。**xmm 形の `vblend*` / `vperm*` は 0 件** (vblend/vperm の mnemonic は出現せず)。
+- 生出力: `python3 snapins/scripts/vex256_census.py --json OUT` の stdout は mnemonic ごとに `per_snapin` / `total` / 先頭例を出す (本文の表はその抜粋)。
 
 | mnemonic | Convolver | Filter Table | Ladder | Slice EQ | 合計 |
 |---|--:|--:|--:|--:|--:|
@@ -137,8 +137,8 @@ delay closure 142 関数の近似命令は rcpps 4 箇所のみ (すべて 0x180
 | `vfmadd132sd` (xmm) | – | – | 1 | – | 1 |
 
 - **xmm FMA 計 27 件** (Ladder 11 / Filter Table 6 / Slice EQ 10 = 上表の `vf*` 行の合計)。
-- **未解決 (本 PR では未実施)**: ymm 命令の lift (RetDec が ymm を `i256` の `__asm_v*` として出すか、gen_simd の declare 駆動で扱えるか) は未確認。`gen_simd.py` の VEX 別名表は xmm 形のみで、ymm 形の意味 (`vaddps` 等の 8 lane・upper lane 規則) は未実装。`vfmadd*` の scalar 形は既存 `gen_simd.py` で対応済み。xmm 形の `vblend*` / `vperm*` の有無は未計測 (起票先 = #779、census の filter を広げて次 run で測る)。
-- **受入条件の残り**: 語彙追加・既存 14 snap-in のハッシュ不変・語彙ごとの bit-exact テストとネガコン・run_all.sh 再実行は未実施。
+- **未解決**: ymm 命令の lift (RetDec が ymm を `i256` の `__asm_v*` として出すか、gen_simd の declare 駆動で扱えるか) は未確認。`gen_simd.py` の VEX 別名表は xmm 形のみで、ymm 形の意味 (`vaddps` 等の 8 lane・upper lane 規則) は未実装。`vfmadd*` の scalar 形は既存 `gen_simd.py` で対応済み。xmm 形の `vblend*` / `vperm*` は 0 件のため語彙追加の対象外。
+- **受入条件の残り**: 語彙追加・既存 14 snap-in のハッシュ不変・語彙ごとの bit-exact テストとネガコン・run_all.sh 再実行は未実施 (起票先 = #779)。
 
 ## 13. KH-6 第 2 弾 (CAB-258 続, 2026-10-11) — rcpps/rsqrtps 実機近似表で Resonator/Stereo/Delay が bit-exact 化
 

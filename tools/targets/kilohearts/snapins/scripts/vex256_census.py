@@ -6,7 +6,7 @@
   + HeartCore.core_64 (work/winpkg)。closure の集計は scripts/closures.py と同じ unique 定義。
 usage (tools/targets/kilohearts から): python3 snapins/scripts/vex256_census.py [--json OUT]
 数え方: unique closure の各関数を capstone で全命令走査し、(a) オペランドに ymm を含む命令、
-  または (b) mnemonic が vf で始まる命令 を 1 件と数える (同一 VA の再計数はしない)。
+  または (b) mnemonic が v で始まる命令 (VEX 符号化、xmm 形 vblend*/vperm* を含む) を 1 件と数える (同一 VA の再計数はしない)。
 """
 import collections, json, os, pickle, sys
 
@@ -33,7 +33,7 @@ for ns in NS:
             is_ymm = 'ymm' in i.op_str
             if is_ymm:
                 ymm_total[ns] += 1
-            if is_ymm or i.mnemonic.startswith('vf'):
+            if is_ymm or i.mnemonic.startswith('v'):
                 per[i.mnemonic][ns] += 1
                 example.setdefault(i.mnemonic, '%x %s %s' % (i.address, i.mnemonic, i.op_str))
 
