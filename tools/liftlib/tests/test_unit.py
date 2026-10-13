@@ -470,6 +470,9 @@ def t16():
     assert ("function_180127550", 0x180127559, "function_180126920", 1) in pre["sites_entry"], pre["sites_entry"]
     st, lg = {}, []
     iargs.run(mod, img, lg, st)
+    # HB-H25: 5 番目の引数 (入口 rsp+0x28) を読む 2 site (1801c162b / 1801c1752) は bind 済み。残る unbound は 1801a3117 (rdx) のみ
+    assert st.get("site_unbound") == 1, st
+    assert not [l for l in lg if "1801c162b" in l and "unbound" in l or "1801c1752" in l and "unbound" in l], lg
     post = iargs.scan(mod, img)
     assert not post["define_short"] and not post["sites_short"] and not post["sites_entry"], post
     ctor = [l for l in mod.func("function_18011d400").blocks[0].lines if "@function_180127550(" in l]

@@ -109,15 +109,19 @@ P0c (`p0c/REPORT.md`) で見た各 kernel の現状 (本 PR では再測定し�
 
 | engine | RetDec rc | final.ll define | `.pdata` で define 無し | f80 関数 | 未実装 helper (うち VEX) | `emcc -c` | 局所修復後の `emcc -c` |
 |---|--:|--:|--:|--:|--:|--:|--:|
-| 19252 Transient | 0 | 551 | 2 / 522 (165 B) | 1 | 66 (57) | 1 (失敗) | 1 (失敗) |
-| 19048 Multiband | 0 | 1,504 | 210 / 1,658 (22,916 B) | 0 | 39 (31) | 1 (失敗) | 1 (失敗) |
+| 19252 Transient | 0 | 551 | 2 / 522 (165 B) | 0 (既定の `PLUG_F80_LOWER=1` で 1 → 0) | 59 | **0 (成功)** (旧 1 失敗) | — (不要) |
+| 19048 Multiband | 0 | 1,504 | 210 / 1,658 (22,916 B) | 0 | 34 | 1 (失敗) | **0 (成功)** (`engine_fixcmp.py` の i32 修正後) |
+
+- 2026-10-14 実測 (HEAD `29f63707` + 本 PR の差分、`engine_lift.sh` 単独実行、各 17 s / 60 s)。 未実装 helper の列は `e.simd.log` の `unimplemented N` の値。 旧表の 66 (57) / 39 (31) は distinct 宣言数で数え方が違うため直接比べない。
+- 受入条件の判定: `emcc -c` rc 0 は 2 本とも達成。 f80 関数 0 も 2 本とも達成。 未実装 helper 宣言 0 は**未達** (59 / 34)。 VEX helper 未実装の対応は子 issue へ (下記)。
 
 - `.pdata` で define 無し = `function_<開始VA>` の define が final.ll に無い range 数 (`engine_defs.py`。 分母は `.pdata` 関数数、括弧は欠けた range の合計長)。 19048 は 210 件のうち 67 件が call 先として `declare` だけ残り、link 時に未解決になる。
   19252 の 2 件は参照なし。 原因 (RetDec の関数境界統合 / 復号失敗) は未調査。 逆に range 内部に別 define が増えた件数は 19252 で 29、19048 で 54。
-- 失敗の連鎖 (clang は最初の型エラーで止まるため 1 件ずつ露見):
-  1. 両 engine: `icmp eq ptr %x, %arg3` (`%arg3` は i64 仮引数) → "defined with type 'i64' but expected 'ptr'"。 `dynamics/engine_fixcmp.py` (engine 局所 pass、共有鎖には未組込) で各 4 operand を直す。
-  2. 19252: 次に `__asm_rep_stosq_memset` 呼出の引数が SSA 値を含む `zext` 定数式 → "zext constexprs are no longer supported"。
-  3. 19048: 次に `inttoptr i64 %arg2` で `%arg2` が i32 → "defined with type 'i32' but expected 'i64'"。
+- 失敗の連鎖と修正 (clang は最初の型エラーで止まるため 1 件ずつ露見。 修正は engine 局所の `dynamics/engine_fixcmp.py`、共有鎖には未組込):
+  1. 両 engine: `icmp eq ptr %x, %arg3` (`%arg3` は i64 仮引数) → 修正済み (19252 は該当 0 件、19048 は 1 件)。
+  2. 19048: `inttoptr i64 %arg2` で `%arg2` が i32 → 修正済み (`zext i32 → i64` を挿入。 `function_18004f7f8` の 1 件)。 修正後の `emcc -c` rc 0。
+  3. 19252: 旧記載の `zext` 定数式 (`__asm_rep_stosq_memset`) は今回の HEAD では露見せず。 代わりに f80 (`fpext`/`frem`/`fp_round` on x86_fp80) が `emcc -c` を落としていた → `PLUG_F80_LOWER=1` (既存の `p0c/f80_lower.py`) で解消。 `engine_lift.sh` の既定を `1` にした。
+- 残り (本 issue の範囲外として子 issue へ): 未実装 helper 宣言 (VEX 含む) の 59 / 34、 `.pdata` 関数の define 脱落 (19252 2 件 / 19048 210 件、うち 19048 の 67 件は call 先) の原因。 脱落の原因は本 run では未調査。
 - VEX helper 未実装 (`vaddsd` / `vfmadd*` / `vcvt*` 等、distinct 宣言数) は、CPUID 分岐で SSE 路に固定できるかが未確認 (T1 の AVX 2 種は CPUID 分岐で SSE 路固定と plugins/REPORT.md §4.3 に記録あり)。
   Transient engine の f80 1 関数は #197 の `f80_lower.py` の適用対象。
 - 以上は到達性の実測で、engine の正しさは何も示していない。
