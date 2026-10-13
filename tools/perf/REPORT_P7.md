@@ -33,7 +33,7 @@
 |---|---|
 | ネガコン `node tools/perf/p7/p7.mjs --negative` | 正しい出力で FAIL 0・PASS 9 / 期待 hash を 1 bit 破壊で FAIL 9/9 / `done` 無しで FAIL 10 → exit 0 |
 | 本測定 `xvfb-run -a node tools/perf/p7/p7.mjs --full --rounds 3` (採取コミット前の作業ツリー) | wall 105.9 s (chrome-headless 25.2 s / chrome-headful 22.2 s / firefox-headless 45.5 s)、`summary: PASS=29 FAIL=0 SKIP=0 UNMEASURED=1` (UNMEASURED = Firefox worklet)、exit 0 |
-| コミット済み HEAD での再実行 | §5 に追記 |
+| コミット済み HEAD `0589b42` での再実行 (同コマンド) | wall 104.1 s (24.1 / 21.9 / 45.4 s)、`PASS=29 FAIL=0 SKIP=0 UNMEASURED=1`、exit 0。ネガコン再実行も exit 0。数値表 (`TABLES.md`) は初回の採取 (本測定行) のもの |
 
 判定は **FAIL を 1 件でも出したら exit 1** (hash 不一致・done 未到達・ブラウザ異常終了・タイムアウト)。測れなかった項目は PASS に数えず `UNMEASURED` / `SKIP` として明示行を出す (`--require-worklet` で worklet 不通を FAIL に昇格できる)。
 
