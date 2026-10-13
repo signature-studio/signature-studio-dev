@@ -71,7 +71,7 @@
 - **素材**: `tools/flelift/fle_lift.sh` で FLEngine_x64.dll 全体 (7,018 関数 / 340,761 命令 / unsup 0) を lift → emcc -O0 で `flel.wasm` 27,639,303 B (26.4 MiB)。`fl-win64` 素材 (`FL_WIN64_DIR`) から生成。生成物は `tools/flelift/work/` (gitignore)。
 - **分割**: `deploy/scripts/05-stage.mjs --max-file 24MiB --part-size 16MiB` → 2 part (sha `b92b83ae3549`)。
 - **注意 (合成との差)**: wasm は `env` 3 関数・`wasi_snapshot_preview1` 3 関数の import を持つ。bench は全 import を no-op stub で与えて instantiate する。判定は instantiate 成功 + export>0 (`f0` は無い)。実行 (`fle_init` 等) は行っていない。download→compile→instantiate のみの計測。
-- **計測**: `node tools/perf/delivery/chunked_bench.mjs --wasm tools/flelift/work/lift/flel.wasm --reps 3 --mbps 0,100 --out tools/perf/work/chunked_real_head.json`。測定 commit `82c30421` (fetchCompile check の f0 判定修正を含む HEAD。bench 本体は `4d3a32f6` から不変)。headless Chrome 154.0.8037.97、node v22.23.3、4 コア、loadavg 0.22〜0.75 (測定中 0.55〜0.75)。`flel.wasm` は `tools/flelift/fle_lift.sh` (`FL_WIN64_DIR` = fl-win64 展開先、emsdk 6.0.12) で再生成 (27,639,303 B)。
+- **計測**: `node tools/perf/delivery/chunked_bench.mjs --wasm tools/flelift/work/lift/flel.wasm --reps 3 --mbps 0,100 --out tools/perf/work/chunked_real_head.json`。測定 commit `82c30421` (fetchCompile check の f0 判定修正を含む。`chunked_bench.mjs` は同 commit で非 function import の扱いを変更し、以降の `tools/perf/delivery` は不変)。headless Chrome 154.0.8037.97、node v22.23.3、4 コア、loadavg 0.22〜0.75 (測定中 0.55〜0.75)。`flel.wasm` は `tools/flelift/fle_lift.sh` (`FL_WIN64_DIR` = fl-win64 展開先、emsdk 6.0.12) で再生成 (27,639,303 B)。
 - **指摘への対応 (#1387 レビュー)**: 合成 wasm 用の `f0 === 42` 判定を実 wasm に流用していた箇所を直した。実 wasm は `f0` を持たないので `f0=null` を出力し、判定は「instantiate 成功 + exports > 0」。`f0` があるときだけ `=== 42` を判定する。function 以外の import は stub せず明示的に throw する (黙って LinkError にしない)。
 
 | 帯域 | 方式 | 中央値 | min–max |
@@ -83,7 +83,16 @@
 
 - 結果: **12/12 PASS** (全件 instantiate 成功、`f0=null`)。
 - `fetchCompile` 経路 (src の本物・受入条件 1): `bun tools/perf/delivery/fetch_compile_chunked_check.ts tools/perf/work/chunked/site big.b92b83ae3549.wasm` → streaming 199.2 ms (f0=null, exports=24) / bytes 186.7 ms (f0=null, exports=24)、progress 4 回、PASS (測定 commit `82c30421` の作業ツリー)。
-- 測定 commit `82c30421` から HEAD (`11bc17b1`) までの差分: `deploy/client/chunked.test.mjs` のみ (テスト引数 `--skip-release-guard` の追加。測定経路の `chunked.mjs`・bench・fetch check・`loader_boot.ts` は不変)。
+- 測定 commit `82c30421` から HEAD (`8dbeddf5`) までの差分 (`git diff 82c30421 8dbeddf5 -- tools/perf/delivery deploy/client deploy/scripts/05-stage.mjs src/runtime/loader_boot.ts tools/runtime/lib/chrome.mjs` の出力。変更行のみ抜粋):
+
+```diff
+diff --git a/deploy/client/chunked.test.mjs b/deploy/client/chunked.test.mjs
+@@ -36,7 +36,7 @@ before(async () => {
+-  execFileSync("node", [path.join(here, "../scripts/05-stage.mjs"), "--src", src, "--out", site, "--max-file", "1024", "--part-size", "700", "--skip-notices-gate"], { stdio: "pipe" });
++  execFileSync("node", [path.join(here, "../scripts/05-stage.mjs"), "--src", src, "--out", site, "--max-file", "1024", "--part-size", "700", "--skip-notices-gate", "--skip-release-guard"], { stdio: "pipe" });
+```
+
+  測定経路 (`tools/perf/delivery`・`chunked.mjs`・`05-stage.mjs`・`loader_boot.ts`・`chrome.mjs`) の差分は 0。差分は `chunked.test.mjs` のテスト引数 (main 由来) のみ。
 - 今回の再測定 (新 HEAD) では 100 Mbps/接続 が 1448 ms (旧 測定 1422 ms と同水準)。按分値 (合成 1458 ms × 26.4/32.6 ≈ 1181 ms) との差は依然として約 23% で、原因は未切り分け (part 数 3→2、wasm の中身の差などが候補。確定には別測定が要る)。
 - 注記: 帯域制限は接続ごと (§2 と同じ)。
 - 残り (未解決): 本番 runtime の manifest 経路は未接続 → #1166 `[PERF-P18]`。
