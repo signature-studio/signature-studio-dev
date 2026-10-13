@@ -83,7 +83,7 @@
 7. **[audio-fl-profile]** (AU-7 #193) 静的に確定できた部分は §11。実 FLEngine 起動後の profile / `pbtrackingmode` 各モード (Driver/Hybrid/Mixer) でのカーソル追従確認は #34 待ち。
 8. **[audio-worklet-wasm]** (任意) FL ミキサを Wasm Audio Worklet 内で直接走らせる案との遅延比較 (ブロッキング不可のため FL スレッド構造の再設計が前提)。
 9. **[audio-ui-integration]** `src/index.ts` への組込 (ユーザジェスチャで `FlAudioShim.attach`, 既存 `audio.ts` ハーネスとの統合/置換)。
-10. ~~**[audio-soak30]**~~ 30 分ソーク: 無負荷は実施済み (#191, §12)。負荷下 30 分は未実施。
+10. ~~**[audio-soak30]**~~ 30 分ソーク: 無負荷は実施済み (#191, §13)。負荷下 30 分は未実施。
 11. ~~**[audio-96k-depth]**~~ 解決 (#211, §10)。
 
 対応表: AU-1 audio-com-adapter=CAB-97 / AU-2 realdevice=CAB-186 / AU-3 midi=CAB-187 / AU-4 directsound=CAB-188 / AU-5 input-ui=CAB-191 / AU-6 latency-policy=CAB-189 / AU-7 fl-profile=CAB-192 / AU-8 worklet-wasm=CAB-193 / AU-9 ui-integration=CAB-184 / AU-10 soak30=CAB-190 / AU-11 96k-depth=CAB-210 (親は全て CAB-9)。
@@ -216,7 +216,7 @@ e2e 追加 3 本 (`harness/run.mjs`, 計 25 シナリオ): `asio_sine_b512_96k` 
 | `stage_wasm.mjs` / ルート `package.json` script への `stage_app.sh` 組込 | 現状は手動実行 | 適用 PR (#25 管轄) |
 | `tools/e2e` スイートのパッチ適用後再実行 | 既存 `audioworklet` チェックとの互換は推定 (status 文言 `worklet 実行中`・samplePos 128f 単位は維持) | 適用 PR で実行 |
 
-## 12. AU-10 (#191) 30 分ソーク (`--soak30`)
+## 13. AU-10 (#191) 30 分ソーク (`--soak30`)
 
 既知類型との関係: 該当なし (ランタイム shim の長時間検証)。検証起点 commit: `0a721b0` (ブランチ `191-audio-soak30`, base `149f073`)。環境: GitHub runner 4 core / 15 GiB, headless Chrome 154.0.8037.97 (fake 出力シンク), emcc は toolchain-emsdk。
 
