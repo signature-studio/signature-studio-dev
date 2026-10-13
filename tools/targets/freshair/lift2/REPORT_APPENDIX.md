@@ -161,7 +161,8 @@ bash tools/targets/freshair/lift2/lift2_e2e.sh                                  
 - ネガコン (40 箇所それぞれの直後に `llvm.trap`、emcc 再ビルド): `run_ctrl.sh 2 5` は **15/15 PASS**, exit 0。既定 seed の 15 シナリオでは rep 経路の 40 箇所は**いずれも実行されない**。
 - 探索 seed (`2 40 0xFA2C0001`, `10 60 0xFA2C0002`) は trap 版でも trap 無し版でも同じ形で **MISMATCH** (wasm 側 0 行)。trap 版と trap 無し版で同一の結果のため、rep 経路の到達判定には使えない (既知限界の乱数 OOB と同根と推定。根拠となる節・issue は未特定)。
 - 元に戻した後、`ctrl_full.ll` の sha256 が挿入前と一致 (`dadbc54b…`)、`.cjs` は `cmp` で一致。`git status` は clean。
-- 結論: 受入 1 (実行到達 scenario) は**未達**。既存入力では rep 経路に届かない。受入 2 (ネガコン FAIL) は届かないため判定不能。残りは #692 で扱う。
+- 未確認 (本 HEAD で再計測できていない): 上記 40 箇所の件数は、#905 の PM 中間コメント (18:08) の「movsb 39 + stosw 6 = 45 件」と食い違う。数え方 (正規表現・命令別内訳) は未記録。陽性対照 (`llvm.trap` 件数 grep・既到達関数先頭への trap で FAIL) も本 run では未実施。素材 `plugins-freshair` が取得できず `ctrl_full.ll` を再生成できなかったため。
+- 結論: 受入 1 (実行到達 scenario) は**未達**。既存入力では rep 経路に届かない可能性が高いが、上記の未確認項目があるため「届かない」とは断定しない。受入 2 (ネガコン FAIL) は届かないため判定不能。残りは #692 で扱う。
 
 ## 未解決 (起票先 #692)
 - 新 lowering `pcmpeq{b,d}` の comp / filter 経路の動的確認 (trap 版の `run_comp` / `run_filter`)。
