@@ -123,6 +123,9 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
 ```
 
 - 検証起点の commit hash を REPORT に書く (`規則 45 相当`)。
+- **実測値の鮮度の基準 (#1268)**: 測定対象は「コード差分の最終 commit」。main 取り込み merge と文書のみの
+  commit では測定対象は変わらない。REPORT に測定 commit と `git diff <測定 commit> HEAD -- <範囲>` の出力
+  (差分 0 の証跡) を書けば、reviewer は現 head での再測定を求めない。差分が有れば、その分だけ再測定する。
 - 検証は**コミット済み HEAD の内容**で再現してから報告する。未コミット WIP に依存した数値を報告しない。
 - クリーン HEAD 検証: `git worktree add --detach <dir>/work/wt_verify HEAD` で展開して実行し、
   終了時に `git worktree remove --force`。`work_verify/` を使う場合は gitignore 外なので **commit 前に必ず削除**。

@@ -11,16 +11,16 @@ import sys; sys.path.insert(0, "$ROOT/scripts")
 from common import *
 import shutil
 shutil.copy(fat_slice(f"{MAC_SHARED}/libkio_x64.dylib"), "$W/kio.dylib")
-rows=[l.split() for l in open("$HERE/funcs.txt") if not l.startswith('#') and l.strip() and 'ConvertUTF' not in l]
-open("$W/ranges.txt","w").write(','.join('%s-0x%x'%(a,int(a,16)+int(s)) for n,a,s in rows))
-open("$W/exports.txt","w").write('\n'.join(n for n,a,s in rows))
+rows=[l.split() for l in open("$HERE/funcs.txt") if not l.startswith('#') and l.strip()]
+open("$W/ranges.txt","w").write(','.join('%s-0x%x'%(a,int(a,16)+int(s)) for n,a,s,*_ in rows))
+open("$W/exports.txt","w").write('\n'.join(n for n,a,s,*_ in rows))
 PY
 cd "$W"
 /opt/retdec/bin/retdec-decompiler kio.dylib -o kio.drc.c --select-ranges "$(cat ranges.txt)" --select-decode-only --timeout 600 > kio.retdec.log 2>&1
 echo "[kio] retdec: $(grep -c '^define' kio.drc.ll) functions lifted"
 python3 "$HERE/ir_normalize.py" kio.drc.ll kio_norm_raw.ll >/dev/null
 cp kio_norm_raw.ll kio_norm.ll
-[ "${FIX:-1}" = 1 ] && python3 "$HERE/kio_fix.py" kio_norm_raw.ll kio_norm.ll
+[ "${FIX:-1}" = 1 ] && python3 "$HERE/kio_fix.py" kio_norm_raw.ll kio_norm.ll kio.drc.dsm
 EXP=$(sed 's/^/-Wl,--export=/' exports.txt | tr '\n' ' ')
 emcc kio_norm.ll "$HERE/kio_simd.c" -o kio.wasm -O1 -w -Wno-error=int-conversion \
   -sSTANDALONE_WASM=1 -sERROR_ON_UNDEFINED_SYMBOLS=0 -sALLOW_MEMORY_GROWTH=0 -sINITIAL_MEMORY=16MB -sSTACK_SIZE=256KB \
