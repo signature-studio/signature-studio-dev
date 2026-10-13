@@ -218,5 +218,5 @@ work/ (gitignore): hdr_block1/2.bin, files.json, locations.json, header_parse.js
 
 ## 12. MX2-3 (N5 / N6) 実測 — 2026-10-13 (#830)
 
-- 結論: N5/N6 は現行 IR pass の差し替え点を指定できない (文字列に参照元が無い)。e2e は 3 レベルとも 11/11 PASS (`d7cf3c77`)。
+- 結論: N6-1 の読み手関数 0x180f95e20 を確定 (全 pdata 走査)。N6-2〜6 と N5 の読み手は未確定。e2e は 3 レベルとも 11/11 PASS (`d7cf3c77`)。
 - 詳細・実測表・§6 の N3 訂正: [REPORT_APPENDIX.md §12](REPORT_APPENDIX.md)。未達 (N5/N6) の起票先は #1017 [MX-4] (OPEN・同節 §12.3)。
