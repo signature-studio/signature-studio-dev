@@ -150,4 +150,40 @@ node tools/perf/p8/check.mjs --negative   # ネガティブコントロール (�
 - 合成カーネルと違い、実 OTT は **絶対 VA (0x30000000 台) 固定** のため、動的リンク / 静的同居の比較は本 lift のままでは組めない (guest VA の相対化 pass が前提; 下記未解決)。したがって実 OTT で測れたのは「plugin 別 instance」の構成のみ。
 - 合成カーネルの PIC 税 (SIDE_MODULE) は実 OTT では測れていない (未達のまま)。
 
-**範囲外 (未測)**: Chrome Worker / AudioWorklet での実 OTT 複数 instance (本 run は node のみ)。Chrome の Memory 本数上限 (124〜125) は合成カーネルで確認済み (§2.4 `p8_limit.jsonl`)。実 OTT の initial 864 MiB でも同じ上限が当たる見込みだが、実 OTT では未確認。
+**範囲外 (未測)**: AudioWorklet での実 OTT 複数 instance (node と Chrome Worker は §8 で測定済み)。Chrome の Memory 本数上限 (124〜125) は実 OTT でも §8.2 で確認 (合成カーネルは §2.4 `p8_limit.jsonl`)。
+
+## 8. 実 OTT の Chrome Worker 計測と Memory 本数上限 (PERF-P8 未達項目の解消 2)
+
+既知類型との関係: 該当なし (計測のみ。lift・既存 wasm は未変更)。検証 HEAD: `f85ea3f4` (`node tools/perf/p8/real/chrome_real.mjs --n 1,4,16 --reps 7 --blk 1000 --runs 3` と `--limit 160 --runs 3`)。素材 `oc_artifacts: work-m6-ott` (`tools/ott/work/lift/ottl.wasm`, 864 MiB initial memory, import 5 関数)。
+ブラウザ版は glue (`ottl.cjs`) が node 専用 (`node:fs`) のため使わず、wasm の import (`env` 2 + `wasi_snapshot_preview1` 3) を直接満たして `WebAssembly.instantiate` → `__wasm_call_ctors` → `ott_data_install` の順で初期化する (`tools/perf/p8/real/web/real_worker.mjs`)。処理手順・署名は node の `bench_real.mjs` と同一。
+Chrome 154.0.8037.97 headless, Dedicated Worker, `AMD EPYC 9V45 96-Core Processor` (4 vCPU, `os.cpus()` 記録), loadavg 0.4〜1.4。条件×反復ごとに Chrome を新規起動。生データ: `tools/perf/p8/results/chrome_real.jsonl` (9 行) / `chrome_real_limit.jsonl` (3 行)。
+
+### 8.1 定常・起動 (N = plugin 別 instance 数, 3 回の Chrome 起動の中央値 [min–max])
+
+| N | 回 | µs/block p50 | RTF@44.1k / instance | load ms | setup ms | renderer RSS 増分 MiB | 署名 |
+|---|---|---|---|---|---|---|---|
+| 1 | 1 / 2 / 3 | 129.27 / 119.83 / 120.44 | 0.04454 / 0.04129 / 0.04150 | 14.20 / 8.17 / 8.31 | 27.88 / 16.53 / 23.18 | 24.9 / 21.7 / 13.4 | 6b1696f0 ×1 (3/3) |
+| 4 | 1 / 2 / 3 | 137.37 / 127.78 / 128.01 | 0.04733 / 0.04403 / 0.04410 | 15.40 / 28.11 / 22.23 | 37.32 / 28.35 / 35.85 | 62.6 / 73.6 / 59.7 | 6b1696f0 ×4 (3/3) |
+| 16 | 1 / 2 / 3 | 131.80 / 129.07 / 149.66 | 0.04541 / 0.04447 / 0.05156 | 65.03 / 53.79 / 42.83 | 67.32 / 84.55 / 82.47 | 237.1 / 238.6 / 236.2 | 6b1696f0 ×16 (3/3) |
+
+(RTF = µs/block ÷ (128/44100 s)。µs/block は 1000 block × 7 rep の instance 当たり中央値。各回は Chrome を新規起動。)
+
+**読み取り**:
+- 実 OTT の Chrome 定常コストも N に対して **ほぼ平坦** (N=1 の中央値 120.44 → N=16 の中央値 131.80 µs、+9.4%)。node (§7、N=1→16 で +2.8%) より増分は大きいが、合成カーネル (§2) の「静的リンクと同等」からの大きなずれではない。増分の正確な機序は未特定 (run 間のばらつき 119.8〜149.7 µs と重なる)。
+- 1 instance の追加コスト (N=16, 3 回の中央値): load 53.79/16 ≈ 3.4 ms + setup 82.47/16 ≈ 5.2 ms、RSS 増分 237.1/16 ≈ 14.8 MiB。N=16 の合計 renderer RSS 約 362 MiB (`renderer_rss_mib` 362.2 ほか)。
+- 起動時間は N にほぼ比例する (N=1→16 で load 中央値 8.31→53.79 ms)。
+
+### 8.2 Memory 本数上限 (実 OTT, 1 Worker 内で instance を 160 本まで生成を試行)
+
+| 試行 | 成功 instance 数 | 失敗メッセージ | renderer RSS MiB |
+|---|---|---|---|
+| 1 | 125 | `WebAssembly.instantiate(): Out of memory: Cannot allocate Wasm memory for new instance` | 872.5 |
+| 2 | 125 | 同上 | 874.7 |
+| 3 | 124 | 同上 | 868.5 |
+
+合成カーネル (§2.4) の 124〜125 本と同じ上限。実 OTT の initial 864 MiB でも Chrome 154 では 124〜125 本で `instantiate` が失敗する。**plugin 数が 124 を超える構成は、Memory を共有するか、Worker を分けるか、低位 base 化 (#91) が必要**。
+
+### 8.3 結論の更新 (実 OTT の範囲)
+- plugin 別 instance の**定常**は実 OTT でも node / Chrome Worker で N に依らず平坦 (§7, §8.1)。
+- **Memory 本数上限 124〜125 は実 OTT でも同一** (§8.2)。
+- 実 OTT での **PIC 税 (SIDE_MODULE)** と **静的同居** は、絶対 VA 固定の lift では組めないため未測 (§7 の未解決を継続)。
