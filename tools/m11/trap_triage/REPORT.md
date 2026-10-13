@@ -220,7 +220,7 @@ python3 trap_triage/survey_diff.py out_off.json out_on.json
 ```
 `SV_SKIP=<unit,...>`: 列挙した unit を実行せず `kind: "hang"` で記録する。`M11_OV_CLASSCREATE` は env で渡し、`work/ov_classcreate.stamp` で `work/obj/ov.o` を無効化する (値判定、`=0` は OFF)。
 
-**現 main (`0865903`) + 本 head での ON (410360 のみ) の再測定と ok 退行の原因は [REPORT_595.md](REPORT_595.md)** (OFF = main 対照と差 0、ON は ok 退行 5→1。上の §8.2 の表は旧 tree の値)。
+**現 main (`8d883c3`) + 本 head での ON・OFF の再測定と ok 退行の原因は [REPORT_595.md](REPORT_595.md)** (既定 OFF は main 対照と差 0。上の §8.2 の表は旧 tree (`0865903`) の値)。
 
 ### 8.3 #307 (liftdiff OOB 222) との関係
 

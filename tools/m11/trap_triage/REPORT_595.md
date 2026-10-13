@@ -1,30 +1,45 @@
-# REPORT_595 — `M11_OV_CLASSCREATE=1` (ON) の ok 退行 5 件の原因と修正 (#595, 親 #419 / PR #446)
+# REPORT_595 — `M11_OV_CLASSCREATE=1` (ON) の ok 退行の原因と修正 (#595, 親 #419 / PR #446)
 
-結論: ON の ok 退行 5 件 (15 42 45 138 415) のうち **4 件は 2 つの C 転記 (`41c130` / `413060`) で解消**。
-残る 1 件 (unit 415) は ON で新たに呼ばれる closure 外関数 `9b4b00` が miss になるためで、ok→miss の分類変化 (§4)。
+既知類型との関係: D4 (DEFECTS.md)・D15 (DEFECTS.md) に該当 (§2.2 が D4 の deref 脱落、§2.3 が D15 の AfterConstruction 呼出し脱落。番号は `docs/DEFECTS.md` の体系)。
+
+結論: 旧ベース (`5ff73ff`) の ON の ok 退行 5 件 (15 42 45 138 415) のうち **4 件は 2 つの C 転記 (`41c130` / `413060`) で解消**。
+本ベース (main `8d883c3` + 本 PR) の ON の ok 退行は **unit 415 の 1 件のみ** (§1)。415 は ON で新たに呼ばれる closure 外関数 `9b4b00` が miss になるためで、ok→miss の分類変化 (§2.3・§4)。
 Issue 記載の unit 85/719 の退行・unit 114 のハングは、**現 main (#474/#503 後) の ON では再現しない** (§3)。
 **受入条件 2 (ON でも退行 0) は未達 (1 件残)**。既定 OFF は維持し ON を既定にしない。
 
-素材: work-m11 スナップショット + `/opt/emsdk` (PE 無し)。手順: `bash m11_build.sh` / `M11_OV_CLASSCREATE=1 bash m11_build.sh` →
+素材: work-m11 スナップショット + [EMSDK] (`docs/REFERENCES.md`)。PE 無し (fl-win64 未取得)。main `8d883c3` の `m11_build.sh` の qstore pass は PE が無いため 3 構成すべて skip (build log の WARNING で確認)。
+手順: `bash m11_build.sh` / `M11_OV_CLASSCREATE=1 bash m11_build.sh` →
 `node trap_triage/survey_units.mjs out.json` → `python3 trap_triage/survey_diff.py a.json b.json`。942 unit。
-ベース = PR #446 head `5ff73ff` (main `0865903` を含む)。逆アセンブルは `disasm_img.py` (capstone は venv に導入)。
+ベース = 本 PR の merge commit `8445b39` (main `8d883c3` を取り込み済み。#446 は `8d883c3` でマージ済み)。コードはこの commit と同一 (以降の変更は docs のみ)。旧ベース (`5ff73ff`・`0865903`) の値は §1 の旧ベース表だけに残す。逆アセンブルは `disasm_img.py` (capstone は venv に導入)。
 
-## 1. 測定 (build と survey は各構成 1 回ずつ。load average 0.4〜0.9。build 6.5 s (増分) / survey 17.3 s)
+## 1. 測定 (本ベース。build と survey は各構成 1 回ずつの単発。load average 0.6〜0.8)
 
-| 構成 | コード | ok | oob | halt0 | miss | ok 退行 |
-|---|---|--:|--:|--:|--:|---|
-| main 対照 (`origin/main` の `m11_ov.c`) | `0865903` | 818 | 21 | 56 | 46 | — |
-| 既定 OFF | `5ff73ff` | 818 | 21 | 56 | 46 | 対照と unit 単位で差 0 (kind / frames / icall 差 0) |
-| ON (旧) | `5ff73ff` | 813 | 23 | 55 | 50 | 5: 15 42 45 138 415 |
-| ON + `41c130` | `fc3f2af` | 816 | 21 | 56 | 48 | 2: 15 415 |
-| ON + `41c130` + `413060` | `bf5d84f` | 817 | 21 | 56 | 47 | 1: 415 |
-| 既定 OFF (修正後) | `bf5d84f` | 818 | 21 | 56 | 46 | main 対照と差 0 (ネガコン) |
+build 5.3〜10.1 s、survey 12.4〜12.8 s (いずれも wall の単発。既定 OFF の build 10.1 s は m11_simd / winstubs / fnstubs / m11_ov の再 cc を含み、ON の build 5.3 s は ov.o の再 cc のみ)。
 
-`bf5d84f` の ON は 2 回測って unit 単位で一致。OFF → ON (最終): ok→miss 1 (415)、他は kind 不変 (oob→oob 21, halt0→halt0 56)。
-trap (oob+halt0) は OFF 77 / ON 77 で不変 (ON は halt0→ok を一つも作らない = 現 main では ON の利得が無い)。
-ネガコン (修正が効いていることの裏取り): 上表の段階的な退行数 5 → 2 → 1 が、各転記を足す前後の同一 survey での実測。
+| 構成 | コード | ok | oob | halt0 | miss | noproc | ok 退行 |
+|---|---|--:|--:|--:|--:|--:|---|
+| main 対照 (既定 OFF) | `8d883c3` | 818 | 21 | 56 | 46 | 1 | — |
+| 既定 OFF | `8445b39` | 818 | 21 | 56 | 46 | 1 | 対照と unit 単位で差 0 (kind / frames / icall 差 0) |
+| ON | `8445b39` | 817 | 21 | 56 | 47 | 1 | 1: 415 |
 
-## 2. 原因 (unit 単位の実測)
+分母は 942 unit = ok + oob + halt0 + miss + noproc (全行で一致)。`noproc` は `_m11_call_unit` が 0 を返した unit で、3 構成とも unit 941 (VA 0x0) の 1 件。
+
+OFF → ON の遷移は ok→miss 1 (415) のみ。他は kind 不変 (oob→oob 21, halt0→halt0 56, noproc→noproc 1)。trap (oob+halt0) は OFF 77 / ON 77 で不変 (ON は halt0→ok を一つも作らない = 本ベースでも ON の利得が無い)。
+
+旧ベースでの段階測定 (参考。`41c130` と `413060` は同じマクロ `M11_OV_CLASSCREATE` の下にあり、本ベースでは段階ごとの切替ができないため再測定していない。旧ベースの noproc は 942 との差から導出)。
+
+| 構成 (旧ベース) | コード | ok | oob | halt0 | miss | noproc | ok 退行 |
+|---|---|--:|--:|--:|--:|--:|---|
+| main 対照 (旧) | `0865903` | 818 | 21 | 56 | 46 | 1 | — |
+| 既定 OFF (旧) | `5ff73ff` | 818 | 21 | 56 | 46 | 1 | 対照と unit 単位で差 0 |
+| ON (旧) | `5ff73ff` | 813 | 23 | 55 | 50 | 1 | 5: 15 42 45 138 415 |
+| ON + `41c130` | `fc3f2af` | 816 | 21 | 56 | 48 | 1 | 2: 15 415 |
+| ON + `41c130` + `413060` | `bf5d84f` | 817 | 21 | 56 | 47 | 1 | 1: 415 |
+
+旧ベースの `bf5d84f` の ON は 2 回測って unit 単位で一致 (本ベースは単発)。
+ネガコン (段階の寄与の裏取り): 旧ベースの退行数 5 → 2 → 1 は、各転記を足す前後の同一 survey での実測。OFF 側の経路に差分が出ないことは既定 OFF の行 (本ベース・旧ベースとも main 対照と unit 単位で差 0) で確認。
+
+## 2. 原因 (unit 単位の実測。段階の切り分けは旧ベースの表で行った)
 
 ### 2.1 unit 42・45・138: `41c130` (TInterfacedObject.AfterConstruction) が closure 外 → miss
 410360 を ON にすると `[vmt-0x50]` 経由の AfterConstruction 呼出しが現れる。既定実体 `410070` (= `ret`) は `m11_vcall` が直接処理するが、
@@ -45,16 +60,19 @@ OFF でも `410320` は既定 ON (#474) で実オブジェクトを返すため�
 `410360` の呼出し先が `0x9b4b00` (AfterConstruction 相当のスロット実体。`410070` → `481790` → `9b5450` → `4133f0`/`412d60` を呼ぶ 144 byte)。
 boot closure 外 (`boot_fns.json` に無い) ため `m11_icall` が miss → unit 415 の kind が ok → miss。**機能退行ではなく、OFF では AfterConstruction 呼出し自体が
 脱落していた (D15) ため miss が見えなかった**と読める (「ok」だった OFF は呼ばずに終わっていた)。`9b4b00` は `9b5450` (`boot_final3_sigs.h` に無い) も呼び、転記範囲が広いため本 PR では未転記。
-unit 745 (`0x125720` を miss するが kind は halt0 のまま) と 304 (oob の frame が変わるが oob のまま) も差分 unit だが kind は不変。
+unit 745 (`0x125720` を miss するが kind は halt0 のまま) と 304 (oob の frame が変わるが oob のまま) も差分 unit だが kind は不変 (本ベースでも同じ)。
 
 ## 3. Issue 記載の unit 85 / 719 / 114 は現 main では再現しない
-Issue (#595) の退行 5 件 (85 719 42 45 415) とハング (114) は #446 の古い tree (#474/#503 前) での値。現 main (`0865903`) + #446 head の ON では:
+Issue (#595) の退行 5 件 (85 719 42 45 415) とハング (114) は #446 の古い tree (#474/#503 前) での値。現 main (`8d883c3`) + 本 PR の OFF/ON では (§1 と同じ survey の unit 単位、単発):
 - unit 85: OFF ok → ON ok。unit 719: OFF halt0 → ON halt0 (退行ではない、`growMemory` 失敗は OFF から同じ)。
-- unit 114: OFF halt0 → ON halt0 (ハングではない。`SV_SKIP` 不要、survey は 17 s で完走)。unit 114 のハング原因は REPORT_474.md が `5c0270` の D4 と特定済み (本 run では再検証していない)。
-- 退行は元の 5 件のうち 42 45 415 + 新たに 15 138 の組 (上 §2)。同じ unit が毎回同じ原因とは限らない点に注意。
+- unit 114: OFF halt0 → ON halt0 (ハングではない。`SV_SKIP` 不要、ON の survey は 12.8 s で完走)。unit 114 のハング原因は REPORT_474.md が `5c0270` の D4 と特定済み (本 run では再検証していない)。
+- 退行は元の 5 件のうち 42 45 415 + 新たに 15 138 の組 (旧ベース、§2)。本ベースの ON の退行は 415 のみ。同じ unit が毎回同じ原因とは限らない点に注意。
 `409470` 経由の 85 / `409410` 内 `407a50` の 719 は、#474 後の main でどちらも ok / halt0 のまま変わらず、現 main の ON では退行として現れない (どの変更で解消したかは未特定)。
 
-## 4. 未解決 (PM に起票を依頼)
-1. unit 415 (ON で ok→miss): `9b4b00` (ユーザクラス AfterConstruction) の closure 外 miss。転記するか、miss を kind=ok 扱いにしない方針の決定。
-2. `413060` の D4 は **OFF の IR にも存在する** (ON/OFF で同じ関数)。OFF での実害 (`Q(inst)` 破壊の有無) は未測定。既定 ON にするかは別 issue で OFF の survey 差を測って決める。同型の `412d60(&old)` 呼びを持つ他関数の洗い出し。
-3. ON の利得は現 main では無い (trap 77 → 77)。ON にしない根拠は「利得 0・残退行 1」。`410360` / `410320` の ON 経路は `8cc190` 系 (§8.2) の再調査後に再評価。
+## 4. 未解決 (起票先付き)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| (1) unit 415 (ON で ok→miss): `9b4b00` (ユーザクラス AfterConstruction) の closure 外 miss。転記するか、miss を kind=ok 扱いにしない方針の決定 | ON で残る ok 退行 (1 件)。ON を既定にできない直接の理由 | #704 |
+| (2) `413060` の D4 は **OFF の IR にも存在する** (ON/OFF で同じ関数)。OFF での実害 (`Q(inst)` 破壊の有無) は未測定。同型の `412d60(&old)` 呼びを持つ他関数の洗い出し | 推定: OFF でも同じ書込みが起きていれば既定 OFF の survey に影響しうる (未測定)。既定 ON にするかの判断材料 | #705 |
+| (3) ON の利得は現 main では無い (trap 77 → 77)。`410360` / `410320` の ON 経路は `8cc190` 系 (`tools/m11/trap_triage/REPORT.md` §8.2) の再調査後に再評価 | ON にしない根拠は「利得 0・残退行 1」。再調査まで判断保留 | #595 (本 issue) |
