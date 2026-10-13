@@ -119,9 +119,28 @@ leaf_diff は IR leaf かつ機械語に間接 call 無しの 23 関数のみを
 ## 10.8 (#871 fix モード 5) committed HEAD `e7a82d82` での再測定 (素材付き)
 
 - 検証 HEAD: `e7a82d82` (`mk_targets.py` は `9d604905` と論理的に同一。reloc 判定を `if to_rva:` で囲んだ書き換えのみ)。測定はこの commit の作業ツリーで実施。
-- 素材: `fl-win64` (`extracted/*_PE.bin` 313 本を run 内に展開)。`/opt/emsdk` (emcc pin 6.0.12) と `/opt/retdec` (RetDec 5.0) は run 環境に実在。
+- 素材: `fl-win64` (`extracted/*_PE.bin` 313 本を run 内に展開)。`[EMSDK]` (emcc pin 6.0.12) と `[RETDEC]` (RetDec 5.0) は run 環境に実在。
 - `f2_step1.sh` (HEAD `2c2977b9` の作業ツリー、`mk_targets.py` は本 commit と同値): rc 0、9 m 18.3 s、IR leaf 55 / うち機械語でも間接 call 無し 23。
 - `leaf_diff.sh` (HEAD `e7a82d82`): rc 0、2 m 14.6 s、load 0.49。**最終判定 一致 16 / 不一致 7 / 実行不能 0**。集合一致 EQ、IR から call 脱落 0。
 - `nc_leaf.py` (HEAD `e7a82d82`): rc 0、3 m 16.6 s。変異 28 件 (store_drop 5 / load_drop 10 / offset_shift 13) すべて mismatch、未検出 0、unexec 0。
 - 修正前後の遷移 (修正前 `78aa75ad` の `leaf_diff` との突き合わせは、修正前の作業ツリーを再生成していないため本 run では未再計算。§10.4 の前 run 測定を引用): match→match 14、mismatch→mismatch 6、match→mismatch 1 (0x5de250)、mismatch→match 2 (0x6c8fc0, 0x6f1650)。
 - 範囲は leaf 23 関数のみ (§10.5)。残り 7 関数の liftdiff は本 run でも未実施。
+
+## 10.9 (#871 fix モード 6) 最終 head `776e4155` での再測定 (素材付き・範囲限定の判断)
+
+- 検証 HEAD: `776e4155` (コード差分は `e7a82d82` 以降なし。`git diff e7a82d82 HEAD -- tools/plugins/f2` は REPORT_APPENDIX_871.md の docs のみ)。`mk_targets.py` の code 変更は `e7a82d82` 1 件 (`9d604905` と論理的に同一)。
+- 素材: `fl-win64` を `$RUNNER_TEMP` に展開 (`extracted/*_PE.bin`)。`[EMSDK]` (emcc 6.0.12)・`[RETDEC]` (5.0) 実在。
+- `f2_step1.sh` (HEAD `776e4155`): rc 0、606 s、load 6.52 (並列 lift)。`DIFF count = 0`。IR leaf 55 / うち機械語でも間接 call 無し 23。
+- `leaf_diff.sh` (HEAD `776e4155`): rc 0、143 s、load 0.70。**最終判定 一致 16 / 不一致 7 / 実行不能 0**。集合一致 EQ。
+- `nc_leaf.py` (HEAD `776e4155`): rc 0、197 s、load 0.23。store_drop 5/5、load_drop 10/10、offset_shift 13/13 検出 (未検出 0、unexec 0)。
+- 判定 (23 関数、HEAD `776e4155`): 0x6f1650 match・0x6c8fc0 match (改善)、0x5de250 mismatch (回帰、`memory_semantics`)、修正前からの未解決 mismatch 6 (0x6bfec0・0x6c8c90・0x6cc2e0・0x6c9b60・0x6b0ef0・0x6ca5c0)。
+
+### 方式の判断 (指摘 1・2 への対応)
+- 指摘 1 (0x5de250 回帰): **(b) を採用**。回帰は解消していない。wasm 側の読み値 (trace) と native `0x70CF34` (`00008033`) の直接比較、`0x1C0` のずれの出どころは本 run で未実施。回帰を「期待される差分」として許容する判断はしない。merge は回帰を残したままでは行わず、解消は #923 の子として切り出す。受入条件「回帰: 既存 match の維持」は**未達**。
+- 指摘 2 (30 関数 / 317 箇所の影響): **(b) を採用**。検証範囲は leaf 23 関数のみ。残り 7 関数 (非 leaf) の liftdiff は本 run で未実施。「30 関数全体への影響なし」とは言わない。#923 の子。
+- 指摘 3 (未解決 mismatch 6 関数の原因切り分け): 本 run で未着手。受入条件「各関数の未一致原因を 1 行で特定」は**未達**。PR を #871 の完了扱いにしない (部分達成として #871 に残す)。
+- 非ブロッキング (本文の「e2e 再実行」表記): 本 run の数値は 776e4155 で再測定したもの。nc_leaf と修正前後の遷移 (14/6/1/2) の再計算は、修正前の作業ツリー未再生成のため引用 (§10.4)。
+
+### 集計コマンド
+- 最終判定の抽出: `grep -E '^\| [0-9]+ \| [0-9]+ \|' <leaf_diff の stdout> | grep -c 'match'` 等で数える。関数単位の突き合わせは §10.4 の `python3` 集計 (base/head ログを一時領域で VA ごとに突き合わせ)。
+- 残 mismatch 7 = 不一致全体 (回帰 0x5de250 1 + 未解決 6)。残 6 = 回帰を除く。
