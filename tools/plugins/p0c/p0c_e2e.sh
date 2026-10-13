@@ -53,7 +53,7 @@ open(sys.argv[2], 'w').write(ranges + '\n')
 print('ranges written: %d kernels' % len(kt['kernels']))
 PY
   fi
-  bash "$ROOT/lift/lift_ranges.sh" "$PE" "$HERE/work/k80_ranges.txt" "$HERE/work" k80 2400
+  PLUG_CANON_ALLOCA=1 bash "$ROOT/lift/lift_ranges.sh" "$PE" "$HERE/work/k80_ranges.txt" "$HERE/work" k80 2400
 else
   echo "skip (work/k80.lift.ll 存在)"
 fi
