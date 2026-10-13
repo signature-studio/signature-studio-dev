@@ -31,13 +31,13 @@ for name, blk, tier, eng in TARGETS:
     tot['f80'] += int(s['f80_funcs']); tot['unimpl'] += int(s['declares_unimpl']); tot['emcc'] += int(s['emcc_c_rc']); tot['sec'] += int(s['seconds'])
 print('| 計 | | | **%d / %s** | | | | | %d | %d | %d | %d | 各回の計 %s |' % (tot['funcs'], format(tot['bytes'], ','), tot['defines'], tot['f80'], tot['unimpl'], tot['emcc'],
                                                                ' / '.join(str(sum(int(r['seconds']) for r in run)) for run in RUNS)))
-print('\nlift 秒の列は status.csv に残る全回 (n=%d 回、`lift_ranges.sh` のみ。 emcc 除く) の min–max' % len(RUNS))
+print('\n- lift 秒の列は status.csv に残る全回 (n=%d 回、`lift_ranges.sh` のみ。 emcc 除く) の min–max' % len(RUNS))
 bt = {}
 for name, blk, tier, eng in TARGETS:
     b = bt.setdefault(tier, [0, 0, 0, 0])
     b[0] += 1; b[1] += F[name]['closure_funcs']; b[2] += F[name]['closure_bytes']
     b[3] += (int(S[blk]['lift_rc']) == 0 and int(S[blk]['emcc_c_rc']) == 0 and int(S[blk]['f80_funcs']) == 0 and int(S[blk]['declares_unimpl']) == 0)
-print('Tier 別 (本数 / 閉包関数 / B / gate 項目全 0 の本数): ' + '、'.join('%s: %d / %d / %s / %d' % (t, *bt[t][:2], format(bt[t][2], ','), bt[t][3]) for t in sorted(bt)))
+print('- Tier 別 (本数 / 閉包関数 / B / gate 項目全 0 の本数): ' + '、'.join('%s: %d / %d / %s / %d' % (t, *bt[t][:2], format(bt[t][2], ','), bt[t][3]) for t in sorted(bt)))
 
 print('\n### §2 host 呼出面')
 print('| プラグイン | host call site 計 | slot0 (Dispatcher) 即値 ID (site) | 動的 ID | 他 slot (offset: site) |')
@@ -55,10 +55,10 @@ for name, blk, tier, eng in TARGETS:
         nohost.append(name)
     if h['ids_not_in_hs_ids']:
         notin[name] = h['ids_not_in_hs_ids']
-print('\n即値 ID distinct = %d 種 %s、即値 ID site 計 %d、動的 ID site 計 %d、host call site 総計 %d' % (
+print('\n- 即値 ID distinct = %d 種 %s、即値 ID site 計 %d、動的 ID site 計 %d、host call site 総計 %d' % (
     len(ids), sorted(int(k) for k in ids), imm_t, dynt, sites_t))
-print('hs_ids.json に無い即値 ID: %s' % (notin or 'なし'))
-print('host call site 0 の plugin: %s' % (nohost or 'なし'))
+print('- hs_ids.json に無い即値 ID: %s' % (notin or 'なし'))
+print('- host call site 0 の plugin: %s' % (nohost or 'なし'))
 
 print('\n### §3 SIMD kernel 表への依存')
 print('| プラグイン | 閉包内 site | 閉包内で呼ぶ kernel (site) | frontier 内 site | DLL 固有関数走査 site / kernel 種 |')
@@ -73,7 +73,7 @@ for name, blk, tier, eng in TARGETS:
                                                 k['callsites_dll_unique_scan'], k['n_kernels_dll_scan']))
     if k['callsites_in_closure']:
         uses.append(name)
-print('\n閉包内に kernel 呼出がある plugin: %s' % (uses or 'なし'))
+print('\n- 閉包内に kernel 呼出がある plugin: %s' % (uses or 'なし'))
 
 print('\n### §4 engine')
 for name, blk, tier, eng in TARGETS:
