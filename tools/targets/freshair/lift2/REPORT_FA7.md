@@ -25,14 +25,14 @@ Filter process の DSP が読む param (ID 1/2/3/4/416) ではない。model 層
 ## 2. 方法と実測 (再現: `bash tools/targets/freshair/lift2/run_fa7.sh`)
 
 1. **descriptor 表** (`native/probe_ids.c`): Filter model 実 ctor `0x180b4c040(M,dummy)` を実機機械語で実行。M+8 の descriptor ポインタ vector = **417 件**
-   (descriptor 実体は `M+0x19b8+0x148*k` 刻み)。ctor 逆アセンブルで、ID ごとに `vector[id]=&desc` / `desc.id=id` / `desc.cell(+0x28)=M+0x9db8` / `setter 0x1803debc0(M,id,desc.def)` の並びを確認。
+   (ID 311..410 の descriptor 実体は `M+0x1a90+0x148*(ID-311)` 刻み、100/100 で確認)。ctor 逆アセンブルで、ID ごとに `vector[id]=&desc` / `desc.id=id` / `desc.cell(+0x28)=M+0x9db8` / `setter 0x1803debc0(M,id,desc.def)` の並びを確認。
 2. **値域** (`FA_OBJ=1`): descriptor +0x38 の range object (vtable 0x1810ca8a0) 先頭 8 B = {min,max} f32。
    ID 311..410 (100 件) は全て {0.0, 100.0}・既定 f32 0x3f800000 (=1.0)。0x157=343 / 0x158=344 / 0x15a=346 はここに属する。
-   ID 155.. 側に {-1,1} の別バンク 100 件。ID 1/2/3 は個別 vtable (0x1810fa958 / 0x1810cead8)。
+   ID 11..308 (3 刻み、ID≡2 mod 3, 155 を含む) に {-1,1} の別バンク 100 件。ID 1 は vtable 0x1810fa958、ID 2/3 は 0x1810cead8 (個別)。
 3. **setter 実測** (`native/probe_setid.c`): 測定単位は「ctor を毎回新規実行した独立モデル T」。setter 前の T のスナップショットとの差分で変化バイトを取り、
    同じ T で Filter process (0x180b6f050) を 3 回 (64 sample) 実行して L/R の FNV-1a を、ctor 既定の基準出力と比較する。
    基準出力は同一入力 2 回で一致 (`base_out_hash=86e4b27f6a91a7bf`, `deterministic=1`)。
-   - **0x156..0x15b (18 件)**: 変化バイトは全て自 descriptor `[desc_off, desc_off+0x48)` 内 (例 0x157: desc_off=0x4390、変化は 0x4394..0x43a2、1〜6 B/件)。
+   - **0x156..0x15b (18 件)**: 変化バイトは全て自 descriptor `[desc_off, desc_off+0x48)` 内 (例 0x157: desc_off=0x4390、変化は 0x4394..0x43a3、2〜6 B/件)。
      DSP が読む `+0x9dc4/0x9e0c/0x9e54/0x9e9c/0x9ee4` には書かない。出力は **18/18 不変**。
    - **陽性対照 (setter 経路, `PC` 行)**: ID 2 (周波数 `+0x9e0c`) を 200/1000/8000、ID 3 (Q `+0x9e54`) を 0.25/0.5/0.9 で setter すると **6/6 で出力が変わる** (outChanged=1、変化 8〜14 B、
      変化位置は +0x9e0c..0x9e1b / +0x9e54..0x9e62)。ID 2 は 0.5/0.25/0.9 を与えると 20 Hz に下限クランプされるため、PC 行は Hz 単位の値を使う。
@@ -53,11 +53,11 @@ Filter process の DSP が読む param (ID 1/2/3/4/416) ではない。model 層
 
 | 項目 | 結果 |
 |---|---|
-| `run_fa7.sh` | **ALL PASS** (判定 6 + ネガコン 4)。初回 (mlift/emcc ビルド込み) 43.3 s (load average 0.76)、ビルド済みの再実行 3.008 s (load average 0.05、並列 1) |
-| `run_chainmap.sh` (既存・無変更) | **OK 8/8** (EPF 8 本、2.634 s)。EPF を展開していない環境では `0/0 epf` の空振りになり `native_ctrl_trace` が終了時に Abort する (`free(): invalid size`)。素材の有無による差で、本 PR の変更は chainmap の入力 (`native_ctrl.c`・`build_ctrl.sh`・`fa4_chain_map.py`) に触れていない |
-| ネガティブコントロール | NC1 期待集合に 343 (0x157) を混ぜる → FAIL / NC2 setter 0x156..0x15b の outChanged を 1 に改竄 → FAIL (18 件中 0 件一致) / NC3 観測行を除去 → 空 PASS せず FAIL / NC4 (新規) setter 陽性対照 PC 行の outChanged を 0 に改竄 → FAIL。4/4 が期待どおり FAIL |
+| `run_fa7.sh` | **ALL PASS** (判定 6 + NC 5)。初回 (mlift/emcc ビルド込み) 44.712 s (load average 1 分値 0.26 → 0.71)、ビルド済みの再実行 2.888 s (load average 0.60 → 0.60) |
+| `run_chainmap.sh` (既存・無変更) | **OK 8/8** (EPF 8 本、2.495 s)。EPF を展開していない環境では `0/0 epf` の空振りになり `native_ctrl_trace` が終了時に Abort する (`free(): invalid size`)。素材の有無による差で、本 PR の変更は chainmap の入力 (`native_ctrl.c`・`build_ctrl.sh`・`fa4_chain_map.py`) に触れていない |
+| ネガティブコントロール | NC1 期待集合に 343 (0x157) を混ぜる → FAIL / NC2 setter 0x156..0x15b の outChanged を 1 に改竄 → FAIL (18 件中 0 件一致) / NC3 観測行を除去 → 空 PASS せず FAIL / NC4 setter 陽性対照 PC 行の outChanged を 0 に改竄 → FAIL / NC5 (新規) 0x156..0x15b の setErr を 1 に改竄 → 判定 2 が FAIL。5/5 が期待どおり FAIL |
 
-fail-closed: 判定は観測件数に下限を置き (空 PASS 拒否)、不合格は `exit 1`。`lift2_e2e.sh` は本 PR で未変更・未再実行。
+fail-closed: 判定は観測件数に下限を置き (空 PASS 拒否)、不合格は `exit 1`。判定 2 は観測 18 件それぞれで setErr・perr・outChanged の 3 値を個別に要求する (setErr 改竄は NC5 で FAIL)。`lift2_e2e.sh` は本 PR で未変更・未再実行。
 
 ## 4. 範囲外 / 未解決
 
