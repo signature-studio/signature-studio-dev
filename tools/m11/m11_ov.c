@@ -499,9 +499,12 @@ unsigned long long function_410320(unsigned long long self, unsigned int alloc) 
  *   [rax+rdi*8] = [rsi]; [rbx+8] += 1; [rbx+0x20] ≠ 0 なら call [rbx+0x20](rcx=[rbx+0x18], rdx=rsi, r8b=1).
  * RetDec は `mov rax,[rbx]` と `mov rcx,[rsi]` の disp=0 deref を 2 点とも落とし, 項目番地を rbx+8*Count (= FItems 欄そのもの)
  * にして値として rsi (番地) を書いた (DEFECTS D4, #682). 4f9f10 (25 call site の Add 呼出し) から FItems に stack 番地が入る.
- * notify (`call [rbx+0x20]`, D15) は省略 (呼出し先 0x535cf0/0x536570 が closure 外 → miss 化するため。REPORT_682 §7). */
+ * notify (`call [rbx+0x20]`, D15) は既定で省略 (M11_NOTIFY_682=1 で有効化。呼出し先 0x535cf0/0x536570 等が closure 外 → miss 化するため。REPORT_682 §7). */
 #ifndef M11_FIX_682
 #define M11_FIX_682 1
+#endif
+#ifndef M11_NOTIFY_682
+#define M11_NOTIFY_682 0
 #endif
 #if M11_FIX_682
 u64 function_47b260(u64 self, void* src, u64 unused) {
@@ -513,6 +516,9 @@ u64 function_47b260(u64 self, void* src, u64 unused) {
     items = Q(self);
     Q(items + cnt * 8) = Q(s);
     Q(self + 8) = cnt + 1;
+#if M11_NOTIFY_682
+    if (Q(self + 0x20)) ICALL_AT(0x47b2ae, Q(self + 0x20), Q(self + 0x18), s, 1, 0, 0, 0, 0, 0);
+#endif
     return cnt;
 }
 #endif

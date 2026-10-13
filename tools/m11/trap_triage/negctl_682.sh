@@ -9,6 +9,7 @@ CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM1
 tag=$1
 restore() { rm -f work/obj/ov.o; bash m11_build.sh > /dev/null 2>&1; }
 trap restore EXIT
+mkdir -p work/probe682
 emcc -c m11_ov.c -o work/obj/ov.o $CF -DM11_FIX_682=0 || exit 1
 bash m11_build.sh > work/probe682/build_nc_$tag.log 2>&1 || { tail -5 work/probe682/build_nc_$tag.log; exit 1; }
-bash trap_triage/chain_682.sh "$tag"
+bash trap_triage/chain_682.sh "$tag" || exit 1

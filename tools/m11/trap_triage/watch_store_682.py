@@ -19,6 +19,12 @@ os.makedirs(out, exist_ok=True)
 STORE = re.compile(r'^(\s*)store (.*), ptr (nonnull )?(%[-a-zA-Z$._0-9]+|@[-a-zA-Z$._0-9"]+|inttoptr \(i64 (-?\d+) to ptr\)|null)(, align \d+)?\s*$')
 DEF = re.compile(r'^define [^\n@]*@([-a-zA-Z$._0-9"]+)\(')
 
+WIDTH = {'i1': 1, 'i8': 1, 'i16': 2, 'i32': 4, 'i64': 8, 'ptr': 4, 'float': 4, 'double': 8}
+def store_width(vs):
+    """store の値型から書込み幅 (byte) を出す. 未知の型 (ベクタ等) は 16 (広めに取り取りこぼしを避ける)."""
+    ty = vs.partition(' ')[0]
+    return WIDTH.get(ty, 16)
+
 def value_i32(vs, sid, ind, out_lines):
     """store の値 (`<ty> <op>`) を i32 の SSA 値 / 定数にする (整数・ptr 以外は 0)."""
     ty, _, op = vs.partition(' ')
@@ -72,9 +78,9 @@ for ln, line in enumerate(lines, 1):
     else:
         a = str(int(sm.group(5)) & 0xffffffff)
     v = value_i32(sm.group(2), sid, ind, out_lines)
-    out_lines.append('%scall void @m11_sw(i32 %s, i32 %s, i32 %d)' % (ind, a, v, sid))
+    out_lines.append('%scall void @m11_sw(i32 %s, i32 %s, i32 %d, i32 %d)' % (ind, a, v, sid, store_width(sm.group(2))))
     inst += 1
-out_lines.append('declare void @m11_sw(i32, i32, i32)')
+out_lines.append('declare void @m11_sw(i32, i32, i32, i32)')
 open(os.path.join(out, 'boot_sw.ll'), 'w').write('\n'.join(out_lines))
 json.dump({str(k): v for k, v in sites.items()}, open(os.path.join(out, 'sites.json'), 'w'), indent=0)
 print('instrumented stores: %d (skipped non-matching store lines: %d)' % (inst, skipped), file=sys.stderr)
