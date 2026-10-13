@@ -7,8 +7,9 @@
 #   最後に 3. の状態を work/ に残す。常に exit 0。
 set -u
 cd "$(dirname "$0")/.."
+source ../shared/env.sh   # FL_WIN64_DIR (既定は従来どおり /home/ubuntu/work/analysis/win64)
 export PATH="$HOME/.local/share/pnpm/bin:$PATH"
-PE="${PE:-${FL_WIN64_DIR:-/home/ubuntu/work/analysis/win64}/extracted/block00031_PE.bin}"
+PE="${PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}"
 mkdir -p work qstore/results
 say() { echo "[qstore_e2e] $*"; }
 survey() { # survey <label>
